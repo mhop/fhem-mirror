@@ -86,7 +86,9 @@ sub YAMAHA_NP_Initialize
                       ." autoUpdatePlayerReadings:1,0"
                       ." autoUpdateTunerReadings:1,0"
                       ." autoUpdatePlayerlistReadings:1,0"
-					  ." searchAttempts"
+                      ." searchAttempts"
+                      ." directPlaySleepNetradio:3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30"
+                      ." directPlaySleepServer:2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30"
                       ." smoothVolumeChange:1,0"
 
                       ." .favoriteList" # Hidden attribute for favorites storage
@@ -229,9 +231,9 @@ sub YAMAHA_NP_Attr
   }
   elsif($attrName eq "searchAttempts")
   {
-    if ($cmd eq "set" && (($attrVal < 1) || ($attrVal > 100)))
+    if ($cmd eq "set" && (($attrVal < 15) || ($attrVal > 100)))
     {
-      return "$attrName must be between 1 and 100";
+      return "$attrName must be between 15 and 100";
     }
   }
   elsif(($attrName eq ".favoriteList") && defined($attrVal))
@@ -240,7 +242,6 @@ sub YAMAHA_NP_Attr
     {
       $attr{$name}{$attrName} = $attrVal; #need to set first!
     }
-
     YAMAHA_NP_favoriteList($name);
   }
   elsif(($attrName eq ".DABList") && defined($attrVal))
@@ -257,7 +258,21 @@ sub YAMAHA_NP_Attr
       }
     }
   }
-  elsif($attrName eq "maxPlayerListItems" && defined($attrVal))
+  elsif(($attrName eq "directPlaySleepNetradio") && defined($attrVal))
+  {
+    if ($cmd eq "set" && (($attrVal < 3) || ($attrVal > 30)))
+    {
+      return "$attrName must be between 3 and 30";
+    }
+  }
+  elsif(($attrName eq "directPlaySleepServer") && defined($attrVal))
+  {
+    if ($cmd eq "set" && (($attrVal < 2) || ($attrVal > 30)))
+    {
+      return "$attrName must be between 2 and 30";
+    }
+  }
+  elsif(($attrName eq "maxPlayerListItems") && defined($attrVal))
   {
     if ($cmd eq "set" && (($attrVal < 8) || ($attrVal > 999)))
     {
@@ -422,7 +437,13 @@ sub YAMAHA_NP_directSet
   my $hash = $defs{$name};
 
   #Log 1,"directSet, directPlay ". $hash->{helper}{directPlayQueue}{input}.":".$hash->{helper}{directPlayQueue}{stream};
-  YAMAHA_NP_Set($hash,"","directPlay",$hash->{helper}{directPlayQueue}{input}.":".$hash->{helper}{directPlayQueue}{stream});
+  $hash->{helper}{directPlayQueue}{stream} = "noStream" if(not($hash->{helper}{directPlayQueue}{stream}));
+  
+  # Due to asyncronous timers possible race condition. Supress if already playing.
+  if(ReadingsVal($name,"playerPlaybackInfo", "stop") ne "play")
+  {
+    YAMAHA_NP_Set($hash,"","directPlay",$hash->{helper}{directPlayQueue}{input}.":".$hash->{helper}{directPlayQueue}{stream});
+  }  
 }
 
 sub YAMAHA_NP_Get
@@ -574,7 +595,7 @@ sub YAMAHA_NP_Set
 
           # Sort playerList first numeric items XXX_NAME -> lvlX_XXX -> ...
           # Replace not allowed characters
-          @playerList = sort map{s/[ :;,']/_/g;$_;} grep/._..*$/,@playerList;
+          @playerList = sort map{s/[ :;,'.]/_/g;$_;} grep/._..*$/,@playerList;
 
           # Sort CD tracks as 'Track_XX'
           if($input eq "cd")
@@ -588,7 +609,7 @@ sub YAMAHA_NP_Set
           # Add tuneUp/tuneDown in case of tuner input
           if($input =~ m/^(DAB|FM)/)
           {
-            push @playerList,("tuneUp","tuneDown");
+            push @playerList, ("tuneUp","tuneDown");
           }
           
           # Add selectStream as set command. In addition '---' as dummy for web interface.
@@ -722,29 +743,36 @@ sub YAMAHA_NP_Set
 
       delete $hash->{helper}{directPlayQueue};
       
-      return "Please enter stream" if(!$a[2]);
+      return "Please enter stream -> INPUT:STREAM_LVL1,STREAM_LVL2,..." if(!$a[2]);
 
       if (!defined $hash->{helper}{directPlayQueueTry})
       {
-        $hash->{helper}{directPlayQueueTry} = 1 ;# we start with 1st try
+        $hash->{helper}{directPlayQueueTry} = 1 ; # 1st try
         readingsSingleUpdate($hash, "directPlay", "started", 1);
       }
       else
       {
-        # Increment and limit the # to searchAttempts
+        # Increment and limit number to searchAttempts
         $hash->{helper}{directPlayQueueTry}++;
         
         if ($hash->{helper}{directPlayQueueTry} > AttrVal($name,"searchAttempts", 15))
         {
           # Timeout
-          YAMAHA_NP_directPlayFinish($hash,"abort-timeout");
+          YAMAHA_NP_directPlayFinish($hash, "abort-timeout");
           return;
         }
       }
       
+      # INPUT:STREAM_LVL1,STREAM_LVL2,...
       my ($inputTarget, $stream) = split(":",$a[2],2); 
       
-      if (ReadingsVal($name,"state",0) ne "on")
+      $inputTarget = lc($inputTarget);
+      
+      # Set default stream name in case none provided
+      $stream = "noStream" if(not $stream);
+      
+      # Check if device unpowered
+      if (ReadingsVal($name, "state", 0) ne "on")
       {
         $what = "on";
         $hash->{helper}{directPlayQueue}{sleep}  = 2;
@@ -755,8 +783,17 @@ sub YAMAHA_NP_Set
       }
       else
       {
+        
+        my $input = ReadingsVal($name, "input", "");
+        
+        #Log 1, "InputTarget: $inputTarget";
+        #Log 1, "Input: $input";
+        
         if ($inputTarget eq $input)
         {
+          # Force Playerlist status update.
+          YAMAHA_NP_SendCmd($hash, "GET:Player,List_Info:GetParam", "statusRequest", "playerListGetList", 0);
+          
           if($inputTarget =~ m/(aux|digital|spotify|airplay)/)
           {
             # These inputs don't have streams. Finish.
@@ -784,7 +821,7 @@ sub YAMAHA_NP_Set
                   ||($stream > $totalTracks )   # too big
                   )
               {
-                YAMAHA_NP_directPlayFinish($hash,"abort-not found");
+                YAMAHA_NP_directPlayFinish($hash, "abort-not found");
                 return ;
               }
               elsif ($currentTrack == $stream)
@@ -829,7 +866,6 @@ sub YAMAHA_NP_Set
                 } 
                 if($found == 0)
                 { 
-                  # && $hash->{helper}{directPlayQueueTry} > 8){#no match, time out
                   YAMAHA_NP_directPlayFinish($hash,"abort-not found");
                   return ;
                 }
@@ -839,13 +875,28 @@ sub YAMAHA_NP_Set
             $what = "selectStream" if ($what eq "directPlay");
             $hash->{helper}{directPlayQueue}{sleep} = 1;
           }
+          # Server, Netradio
           elsif(ReadingsVal($name, "playerListMenuStatus", "-") ne "Ready")
           {
-            YAMAHA_NP_directRestartTimer($name, 3, $a[2], $inputTarget, $stream);# take another chance: data was not complete
+            # Depending on input and server/network speed the duration is unknown
+            # Customization of polling intervall for Server (LAN) and Netradio (vTuner)
+            
+            my $sleep = 3; # default
+            
+            if (lc($inputTarget) eq "server")
+            {
+              $sleep = AttrVal($name,"directPlaySleepServer", 2);
+            }
+            elsif(lc($inputTarget) eq "netradio")
+            {
+              $sleep = AttrVal($name,"directPlaySleepNetradio", 3);
+            }
+            # take another chance: data was not complete
+            YAMAHA_NP_directRestartTimer($name, $sleep, $a[2], $inputTarget, $stream);
             return;
           }
 		  
-		  # Streams with multilevel selection e.g. server, netradio
+          # Streams with multilevel selection e.g. server, netradio
 		  	  
           else	
           { 
@@ -878,8 +929,22 @@ desiredListNloop:
                     YAMAHA_NP_directPlayFinish($hash);# we are done!!
                     return ; 
                   }
-
-                  $hash->{helper}{directPlayQueue}{sleep} = 2;
+                  
+                  # Depending on input and server/network speed the duration is unknown
+                  # Customization of polling intervall for Server (LAN) and Netradio (vTuner)
+                  
+                  my $sleep = 2; # default        
+                  
+                  if (lc($inputTarget) eq "server")
+                  {
+                    $sleep = AttrVal($name,"directPlaySleepServer", 2);
+                  }
+                  elsif(lc($inputTarget) eq "netradio")
+                  {
+                    $sleep = AttrVal($name,"directPlaySleepNetradio", 3);
+                  }
+                  
+                  $hash->{helper}{directPlayQueue}{sleep} = $sleep;                  
                 }
                 
                 my $found = 0;
@@ -902,13 +967,27 @@ desiredListNloop:
                   
                   if (!defined $desiredSong)
                   {# no list item - problem. abort
-                    YAMAHA_NP_directPlayFinish($hash,"abort-not found");    
+                    YAMAHA_NP_directPlayFinish($hash, "abort-not found");    
                     return;                    
                   }
                   elsif (!defined $playerSong)
                   {
+                    # Depending on input and server/network speed the duration is unknown
+                    # Customization of polling intervall for Server (LAN) and Netradio (vTuner)
+                    
+                    my $sleep = 2; # default        
+                    
+                    if (lc($inputTarget) eq "server")
+                    {
+                      $sleep = AttrVal($name,"directPlaySleepServer", 2);
+                    }
+                    elsif(lc($inputTarget) eq "netradio")
+                    {
+                      $sleep = AttrVal($name,"directPlaySleepNetradio", 3);
+                    }
+                    
                     # not yet playing?
-                    YAMAHA_NP_directRestartTimer($name, 2, $a[2], $inputTarget, $stream);# take another chance: data was not complete
+                    YAMAHA_NP_directRestartTimer($name, $sleep, $a[2], $inputTarget, $stream); # take another chance: data was not complete
                     return;
                   }
                   elsif ($desiredSong =~ m/$playerSong/)
@@ -923,11 +1002,21 @@ desiredListNloop:
                 }
                 elsif ($hash->{helper}{playlist}{state} ne "complete")
                 {
-                  YAMAHA_NP_directRestartTimer($name, 2, $a[2], $inputTarget, $stream);# take another chance: data was not complete
+                  my $sleep = 2; # default        
+                    
+                  if (lc($inputTarget) eq "server")
+                  {
+                    $sleep = AttrVal($name, "directPlaySleepServer", 2);
+                  }
+                  elsif(lc($inputTarget) eq "netradio")
+                  {
+                    $sleep = AttrVal($name, "directPlaySleepNetradio", 3);
+                  }                  
+                  YAMAHA_NP_directRestartTimer($name, $sleep, $a[2], $inputTarget, $stream);# take another chance: data was not complete
                 }
                 else
                 {
-                  YAMAHA_NP_directPlayFinish($hash,"abort-not found");                 
+                  YAMAHA_NP_directPlayFinish($hash, "abort-not found");                 
                 } #no chance
                 return;
               }
@@ -943,13 +1032,26 @@ desiredListNloop:
             if ($level > $desiredListLast)
             {
               #$level is one less then desiredListLast!
-              YAMAHA_NP_directPlayFinish($hash,"abort-not found");
+              YAMAHA_NP_directPlayFinish($hash, "abort-not found");
               return;
             }
             $what = "selectStream";
           }
           $hash->{helper}{directPlayQueue}{state}  = "selectInput";
-          $hash->{helper}{directPlayQueue}{sleep}  = 2;
+          $hash->{helper}{directPlayQueue}{sleep}  = 3; # default
+          
+          # Depending on input and server/network speed the duration is unknown
+          # Customization of polling intervall for Server (LAN) and Netradio (vTuner)
+                  
+          if (lc($inputTarget) eq "server")
+          {
+            $hash->{helper}{directPlayQueue}{sleep} = AttrVal($name, "directPlaySleepServer", 2);
+          }
+          elsif(lc($inputTarget) eq "netradio")
+          {
+            $hash->{helper}{directPlayQueue}{sleep} = AttrVal($name, "directPlaySleepNetradio", 3);
+          }
+          
           $hash->{helper}{directPlayQueue}{a}      = $a[2];
           $hash->{helper}{directPlayQueue}{input}  = $inputTarget;
           $hash->{helper}{directPlayQueue}{stream} = $stream;
@@ -961,13 +1063,27 @@ desiredListNloop:
             # stream set necessary?
             delete $hash->{helper}{directPlayQueue};
             $hash->{helper}{directPlayQueue}{state}  = "selectInput";
-            $hash->{helper}{directPlayQueue}{sleep}  = 3;
+            
+            $hash->{helper}{directPlayQueue}{sleep}  = 3; # default
+            # Depending on input and server/network speed the duration is unknown
+            # Customization of polling intervall for Server (LAN) and Netradio (vTuner)
+                    
+            if (lc($inputTarget) eq "server")
+            {
+              $hash->{helper}{directPlayQueue}{sleep} = AttrVal($name, "directPlaySleepServer", 2);
+            }
+            elsif(lc($inputTarget) eq "netradio")
+            {
+              $hash->{helper}{directPlayQueue}{sleep} = AttrVal($name, "directPlaySleepNetradio", 3);
+            }
+            
             $hash->{helper}{directPlayQueue}{a}      = $a[2];
             $hash->{helper}{directPlayQueue}{input}  = $inputTarget;
             $hash->{helper}{directPlayQueue}{stream} = $stream;
           }
           $what = "input";
           $a[2] = $inputTarget;
+          YAMAHA_NP_directRestartTimer($name, 2, $a[2], $inputTarget, $stream);
         }
       }
     }
@@ -979,7 +1095,7 @@ desiredListNloop:
       RemoveInternalTimer("statTimeOut:".$hash->{NAME});
     }
 
-#    Log 1,"General process $what ++++$a[2] --------->$hash->{helper}{directPlayQueue}{a}";
+     #Log 1,"General process $what ++++$a[2] --------->$hash->{helper}{directPlayQueue}{a}";
       
     if($what eq "selectStream")
     {
@@ -1638,8 +1754,8 @@ sub YAMAHA_NP_ParseResponse
             
             $hash->{MODEL}                      = $1;
             $hash->{helper}{dInfo}{MODEL}       = $1;
-			$hash->{FIRMWARE}                   = $3;
-			$hash->{helper}{dInfo}{FIRMWARE}    = $3;
+            $hash->{FIRMWARE}                   = $3;
+            $hash->{helper}{dInfo}{FIRMWARE}    = $3;
             $hash->{helper}{dInfo}{SYSTEM_ID}   = $2;
             readingsBulkUpdate($hash, ".volumeStraightMin" , int($4));
             readingsBulkUpdate($hash, ".volumeStraightMax" , int($5));
@@ -1775,9 +1891,24 @@ sub YAMAHA_NP_ParseResponse
 
           $song = ReadingsVal($name,"listItem_$1","-") if ($song =~ /^Track(.*)/);
           readingsBulkUpdate($hash, "playerPlaySong"    , $song);
-
           readingsBulkUpdate($hash, "playerPlaybackInfo", ($data !~ /<Playback_Info>(.+)<\/Playback_Info>/)? ""    : lc($1));          
-          readingsBulkUpdate($hash, "playerPlayTime"    , ($data !~ /<Play_Time>(.+)<\/Play_Time>/)        ? ""    : strftime("\%H:\%M:\%S", gmtime($1)));                  
+          
+          if ($data =~ /<Play_Time>(.+)<\/Play_Time>/)
+          {
+            if(int($1) < 3600) # 00:00
+            {
+              readingsBulkUpdate($hash, "playerPlayTime", strftime("\%M:\%S", gmtime($1)));
+            }
+            else               # 00:00:00
+            {
+              readingsBulkUpdate($hash, "playerPlayTime", strftime("\%H:\%M:\%S", gmtime($1)));
+            }
+          }
+          else
+          {
+            readingsBulkUpdate($hash, "playerPlayTime", "");
+          }
+          
           readingsBulkUpdate($hash, "playerPlayArtist"  , ($data !~ /<Artist>(.+)<\/Artist>/)              ? ""    : YAMAHA_NP_html2txt($1));
           readingsBulkUpdate($hash, "playerPlayAlbum"   , ($data !~ /<Album>(.+)<\/Album>/)                ? ""    : YAMAHA_NP_html2txt($1));
           readingsBulkUpdate($hash, "playerDeviceType"  , ($data !~ /<Device_Type>(.+)<\/Device_Type>/)    ? ""    : lc($1));
@@ -2112,99 +2243,99 @@ sub YAMAHA_NP_ParseResponse
         }
         elsif($arg eq "playerListGetList") 	
         {
-		  if($data =~ /<Menu_Status>(.*)<\/Menu_Status>/)
-		  {
-			$hash->{helper}{playlist}{ready} = $1;
-			readingsBulkUpdate($hash, "playerListMenuStatus", $hash->{helper}{playlist}{ready});
-		  }
-		  
-		  my $lay = ($data =~ /<Menu_Layer>(.*)<\/Menu_Layer>/) ? $1 : "-";
-		  my $nam = ($data =~ /<Menu_Name>(.*)<\/Menu_Name>/)   ? $1 : "-";
-		  my ($lnMax,$lnCur,$lnPg) = (1,1,1);# maxline, currentline, currentpage
-		  
-		  if($data =~ /<Cursor_Position><Current_Line>(.*)<\/Current_Line><Max_Line>(.*)<\/Max_Line><\/Cursor_Position>/)
-		  {
-			($lnMax,$lnCur,$lnPg) = ($2,$1,int(($1-1)/8));
-		  }
+        if($data =~ /<Menu_Status>(.*)<\/Menu_Status>/)
+        {
+        $hash->{helper}{playlist}{ready} = $1;
+        readingsBulkUpdate($hash, "playerListMenuStatus", $hash->{helper}{playlist}{ready});
+        }
+        
+        my $lay = ($data =~ /<Menu_Layer>(.*)<\/Menu_Layer>/) ? $1 : "-";
+        my $nam = ($data =~ /<Menu_Name>(.*)<\/Menu_Name>/)   ? $1 : "-";
+        my ($lnMax,$lnCur,$lnPg) = (1,1,1);# maxline, currentline, currentpage
+        
+        if($data =~ /<Cursor_Position><Current_Line>(.*)<\/Current_Line><Max_Line>(.*)<\/Max_Line><\/Cursor_Position>/)
+        {
+        ($lnMax,$lnCur,$lnPg) = ($2,$1,int(($1-1)/8));
+        }
 
-		  $lnMax = AttrVal($name, "maxPlayerListItems", 999) if ($lnMax >= AttrVal($name, "maxPlayerListItems", 999)); # Limit to given attribute value
-		  
-		  if (!$hash->{helper}{playlist}{mnCur} || $hash->{helper}{playlist}{mnCur} ne "$lay:$nam")
-		  {
-			# did we change our context? Clean up
-			$hash->{helper}{playlist}{mnCur} = "$lay:$nam"; 
-			foreach (grep /playerListLvl.*$/,keys %{$hash->{READINGS}})
-			{
-			  #delete level information
-			  delete $hash->{READINGS}{$_} if (substr($_,13)>$lay);
-			}
-			readingsBulkUpdate($hash, "playerListLvl$lay", "$nam");
-			
-			delete $hash->{READINGS}{$_} foreach (grep /listItem_...$/,keys %{$hash->{READINGS}});#delete playlist
+        $lnMax = AttrVal($name, "maxPlayerListItems", 999) if ($lnMax >= AttrVal($name, "maxPlayerListItems", 999)); # Limit to given attribute value
+        
+        if (!$hash->{helper}{playlist}{mnCur} || $hash->{helper}{playlist}{mnCur} ne "$lay:$nam")
+        {
+        # did we change our context? Clean up
+        $hash->{helper}{playlist}{mnCur} = "$lay:$nam"; 
+        foreach (grep /playerListLvl.*$/,keys %{$hash->{READINGS}})
+        {
+          #delete level information
+          delete $hash->{READINGS}{$_} if (substr($_,13)>$lay);
+        }
+        readingsBulkUpdate($hash, "playerListLvl$lay", "$nam");
+        
+        delete $hash->{READINGS}{$_} foreach (grep /listItem_...$/,keys %{$hash->{READINGS}});#delete playlist
 
-			for (my $pln = 1;$pln <= $lnMax;$pln++)
-			{
-			  #prefill entries as unknown
-			  $pln = sprintf("%03d",$pln);
-			  next if ($pln > 999);
-			  $hash->{READINGS}{"listItem_$pln"}{VAL} = "unknown";
-			  $hash->{READINGS}{"listItem_$pln"}{TIME}= "-";
-			}
-			my $lnNext = (($lnPg + 1) % (int(($lnMax-1)/8)+1))*8 + 1;
-			$hash->{helper}{playlist}{state} = ($lnNext == 1) ? "complete" : "incomplete"; 
-			YAMAHA_NP_SendCmd($hash, "PUT:Player,List_Control,Jump_Line:1","statusRequest", "playerListJumpLine", 0);
-		  }
-		  else
-		  {
-			if ($hash->{helper}{playlist}{state} eq "incomplete")
-			{
-			  my $lnNext = (($lnPg + 1) % (int(($lnMax-1)/8)+1))*8 + 1;
-			  $hash->{helper}{playlist}{state} = "complete" if($lnNext == 1); 
-			  YAMAHA_NP_SendCmd($hash, "PUT:Player,List_Control,Jump_Line:$lnNext","statusRequest", "playerListJumpLine", 0);
-			}
-		  }
-		  if($data =~ /<Current_List>(.*)<\/Current_List>/)
-		  {
-			# write list entries
-			# <Line_X><Txt>****</Txt><Attribute>Container|Item|Unselectable</Attribute></Line_X>
-			my ($i,$ip) = (1,1);
-			my %pla =( Container => "c_",Item => "i_");   #PlayListAttr - convert to prefix
-			while($data =~ /<Line_$i><Txt>(.*?)<\/Txt><Attribute>(.*?)<\/Attribute><\/Line_$i>/gc)
-			{
-			  last if($ip >= AttrVal($name, "maxPlayerListItems", 999)); # Limit to giver attribute value
-			  $ip = sprintf("%03d",($lnPg * 8) + $i);
-			  if($1){readingsBulkUpdate($hash, "listItem_$ip", $pla{$2}.YAMAHA_NP_html2txt($1));}
-			  $i++;
-			}    
-		  } 
-		  $hash->{helper}{playlist}{lnCur} = $lnCur; 
-		  if (ReadingsVal($name,"playerListMenuStatus","") eq "Ready")
-		  {
-			# see whether more action is required
-			if ($hash->{helper}{playlist}{selection})
-			{
-			  YAMAHA_NP_SendCmd($hash, "PUT:Player,List_Control,Direct_Sel:Line_$hash->{helper}{playlist}{selection}", "selectStream", $hash->{helper}{playlist}{selection}, 0);
-			  delete $hash->{helper}{playlist}{selection};
-			}
-			elsif ($hash->{helper}{playlist}{desiredDirectoryLevel})
-			{
-			  # want to change directory level
-			  my ($currentLevel) = split(":",$hash->{helper}{playlist}{mnCur});# currentLevel, 
-			  if ($hash->{helper}{playlist}{desiredDirectoryLevel} < $currentLevel)
-			  {
-				YAMAHA_NP_SendCmd($hash, "PUT:Player,List_Control,Cursor:Return", "playerListCursorReturn", $hash->{helper}{playlist}{desiredDirectoryLevel},0);
-			  }
-			  else
-			  {
-				delete $hash->{helper}{playlist}{desiredDirectoryLevel};
-			  }
-			}		  
-		  }			
-		}
-		elsif($arg eq "playerListJumpLine")
-		{
-		  YAMAHA_NP_SendCmd($hash, "GET:Player,List_Info:GetParam"      ,"statusRequest", "playerListGetList" , 0);
-		}
+        for (my $pln = 1;$pln <= $lnMax;$pln++)
+        {
+          #prefill entries as unknown
+          $pln = sprintf("%03d",$pln);
+          next if ($pln > 999);
+          $hash->{READINGS}{"listItem_$pln"}{VAL} = "unknown";
+          $hash->{READINGS}{"listItem_$pln"}{TIME}= "-";
+        }
+        my $lnNext = (($lnPg + 1) % (int(($lnMax-1)/8)+1))*8 + 1;
+        $hash->{helper}{playlist}{state} = ($lnNext == 1) ? "complete" : "incomplete"; 
+        YAMAHA_NP_SendCmd($hash, "PUT:Player,List_Control,Jump_Line:1","statusRequest", "playerListJumpLine", 0);
+        }
+        else
+        {
+        if ($hash->{helper}{playlist}{state} eq "incomplete")
+        {
+          my $lnNext = (($lnPg + 1) % (int(($lnMax-1)/8)+1))*8 + 1;
+          $hash->{helper}{playlist}{state} = "complete" if($lnNext == 1); 
+          YAMAHA_NP_SendCmd($hash, "PUT:Player,List_Control,Jump_Line:$lnNext","statusRequest", "playerListJumpLine", 0);
+        }
+        }
+        if($data =~ /<Current_List>(.*)<\/Current_List>/)
+        {
+        # write list entries
+        # <Line_X><Txt>****</Txt><Attribute>Container|Item|Unselectable</Attribute></Line_X>
+        my ($i,$ip) = (1,1);
+        my %pla =( Container => "c_",Item => "i_");   #PlayListAttr - convert to prefix
+        while($data =~ /<Line_$i><Txt>(.*?)<\/Txt><Attribute>(.*?)<\/Attribute><\/Line_$i>/gc)
+        {
+          last if($ip >= AttrVal($name, "maxPlayerListItems", 999)); # Limit to giver attribute value
+          $ip = sprintf("%03d",($lnPg * 8) + $i);
+          if($1){readingsBulkUpdate($hash, "listItem_$ip", $pla{$2}.YAMAHA_NP_html2txt($1));}
+          $i++;
+        }    
+        } 
+        $hash->{helper}{playlist}{lnCur} = $lnCur; 
+        if (ReadingsVal($name,"playerListMenuStatus","") eq "Ready")
+        {
+          # see whether more action is required
+          if ($hash->{helper}{playlist}{selection})
+          {
+            YAMAHA_NP_SendCmd($hash, "PUT:Player,List_Control,Direct_Sel:Line_$hash->{helper}{playlist}{selection}", "selectStream", $hash->{helper}{playlist}{selection}, 0);
+            delete $hash->{helper}{playlist}{selection};
+          }
+          elsif ($hash->{helper}{playlist}{desiredDirectoryLevel})
+          {
+            # want to change directory level
+            my ($currentLevel) = split(":",$hash->{helper}{playlist}{mnCur});# currentLevel, 
+            if ($hash->{helper}{playlist}{desiredDirectoryLevel} < $currentLevel)
+            {
+            YAMAHA_NP_SendCmd($hash, "PUT:Player,List_Control,Cursor:Return", "playerListCursorReturn", $hash->{helper}{playlist}{desiredDirectoryLevel},0);
+            }
+            else
+            {
+              delete $hash->{helper}{playlist}{desiredDirectoryLevel};
+            }
+          }		  
+        }			
+      }
+      elsif($arg eq "playerListJumpLine")
+      {
+        YAMAHA_NP_SendCmd($hash, "GET:Player,List_Info:GetParam"      ,"statusRequest", "playerListGetList" , 0);
+      }
       }
       elsif($cmd eq "on")
       {
@@ -2218,7 +2349,9 @@ sub YAMAHA_NP_ParseResponse
           readingsEndUpdate($hash, 1);
           
           YAMAHA_NP_ResetTimer($hash);
-          $cmd =  $hash->{helper}{directPlayQueue}{state} if($hash->{helper}{directPlayQueue});
+          
+          # Used for direct play if device unpowered
+          $cmd = $hash->{helper}{directPlayQueue}{state} if($hash->{helper}{directPlayQueue});
           return if(!defined $hash->{helper}{directPlayQueue});
         }
       }
@@ -2263,7 +2396,7 @@ sub YAMAHA_NP_ParseResponse
             if($hash->{helper}{volumeChangeDir} eq "EQUAL")
             {
               $hash->{helper}{volumeChangeProcessing} = "0";
-			  readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
+              readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
               readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $hash->{helper}{targetVolume}));
             }			
             elsif($hash->{helper}{volumeChangeDir} =~ m/(UP|DOWN)/)
@@ -2276,9 +2409,9 @@ sub YAMAHA_NP_ParseResponse
 			  elsif($hash->{helper}{volumeChangeDir} eq "DOWN")
 			  {
 			    $volumeStraight -= 1;			
-              }
-			  readingsBulkUpdate($hash, "volumeStraight", $volumeStraight);
-              readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $volumeStraight));
+        }
+        readingsBulkUpdate($hash, "volumeStraight", $volumeStraight);
+        readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $volumeStraight));
 			  YAMAHA_NP_SendCmd($hash, "PUT:System,Volume,Lvl:$volumeStraight", "volume", $volumeStraight, 0);
 			}
           }
@@ -2309,25 +2442,32 @@ sub YAMAHA_NP_ParseResponse
 
         }
       }
-
-#      Log 1,"General <<    : $cmd # $arg ".ReadingsVal($name,"playerListMenuStatus","-");
+     
+      # Reset internal timer for direct play.
+      
+      #Log 1,"General <<    : $cmd # $arg ".ReadingsVal($name,"playerListMenuStatus","-");
+      
       if ($cmd ne "statusRequest")
       {
         if ($hash->{helper}{directPlayQueue})
         {
           RemoveInternalTimer("directPlay:".$name);
-          my $slp = $hash->{helper}{directPlayQueue}{sleep} ? $hash->{helper}{directPlayQueue}{sleep} : 0.5;
+          my $slp = $hash->{helper}{directPlayQueue}{sleep} ? $hash->{helper}{directPlayQueue}{sleep} : 0.5;          
           InternalTimer(gettimeofday() + $slp, "YAMAHA_NP_directSet", "directPlay:".$name, 0);
         }
         YAMAHA_NP_GetStatus($hash, 1) ;# got to update if parameter changed
       }
-      elsif(  ($hash->{helper}{playlist}{ready} && $hash->{helper}{playlist}{ready} ne "Ready")
-            && ($arg ne "playerListJumpLine"))                                              {# fast poll
+      elsif
+      (
+           ($hash->{helper}{playlist}{ready} && $hash->{helper}{playlist}{ready} ne "Ready")
+        && ($arg ne "playerListJumpLine")
+      )                                              
+      {
+        # fast poll
         my $slp = $hash->{helper}{directPlayQueue}{sleep} ? $hash->{helper}{directPlayQueue}{sleep} : 0.5;
         RemoveInternalTimer($hash);
         InternalTimer(gettimeofday() + $slp, "YAMAHA_NP_GetStatus", $hash, 0);
       }
-
       readingsEndUpdate($hash, 1);      
     }
 }
@@ -2348,9 +2488,9 @@ sub blankLineItem
   delete $hash->{READINGS}{$_} foreach(grep /^listItem_/,keys %{$hash->{READINGS}});
 }
 
-sub YAMAHA_NP_directPlayFinish($;@)
+sub YAMAHA_NP_directPlayFinish
 {
-  my ($hash,$status) = @_;
+  my ($hash, $status) = @_;
   delete $hash->{helper}{directPlayQueueTry};
   delete $hash->{helper}{directPlayQueue};
   RemoveInternalTimer("statTimeOut:".$hash->{NAME});
@@ -2607,11 +2747,14 @@ sub YAMAHA_NP_html2txt
       <li><b>autoUpdatePlayerReadings</b> &ndash; optional attribute for auto refresh of player related readings (default is 1).</li>
       <li><b>autoUpdatePlayerlistReadings</b> &ndash; optional attribute for auto scanning of the playerlist content (default is 1). (Due to the playerlist information transfer concept this function might slow down the reaction time of the Yamaha App when used at the same time.)</li>
 	  <li><b>autoUpdateTunerReadings</b> &ndash; optional attribute for auto refresh of tuner related readings (default is 1).</li>
+	  <li><b>directPlaySleepNetradio</b> &ndash; optional attribute to define a sleep time between two netradio requests to the vTuner server while using the directPlay command. Increase in case of slow internet connection (default is 5 seconds).</li>
+	  <li><b>directPlaySleepServer</b> &ndash; optional attribute to define a sleep time between two multimedia server requests while using the directPlay command. Increase in case of slow server connection (default is 2 seconds).</li>
       <li><b>disable</b> &ndash; optional attribute to disable the internal cyclic status update of the NP. Manual status updates via statusRequest command is still possible. Possible values: 0 &rarr; perform cyclic status update, 1 &rarr; don't perform cyclic status updates (default is 1).</li>
 	  <li><b>do_not_notify</b></li>
       <li><b>maxPlayerListItems</b> &ndash; optional attribute to limit the max number of player list items (default is 999).</li>
 	  <li><b>readingFnAttributes</b></li><br>
       <li><b>requestTimeout</b> &ndash; optional attribute change the response timeout in seconds for all queries to the receiver. Possible values: 1...5 seconds (default value is 4).</li>
+	  <li><b>searchAttempts</b> &ndash; optional attribute used by the directPlay command defining the max. number of finding the provided directory content tries before giving up. Possible values: 15...100 (default is 15).</li>
 	  <li><b>smoothVolumeChange</b> &ndash; optional attribute for smooth volume change (significantly more Ethernet traffic is generated during volume change if set to 1) (default is 1).</li>
       <li><b>timerHour</b> [0...23] &ndash; sets hour of device's internal wake&ndash;up timer</li>
       <li><b>timerMinute</b> [0...59] &ndash; sets minutes of device's internal wake&ndash;up timer</li>
@@ -2806,11 +2949,14 @@ sub YAMAHA_NP_html2txt
       <li><b>autoUpdatePlayerReadings</b> &ndash; optionales Attribut zum automtischen aktualisieren der Player&ndash;Readings (Default 1)</li>
       <li><b>autoUpdatePlayerlistReadings</b> &ndash; optionales Attribut zum automatischen Scannen der Playerlist (Men&uuml;) (Default 1). (Aufgrund des Kommunikationskonzeptes bei der &Uuml;bertragung der Playerlistinformation kann diese Funktion zu l&auml;ngeren Reaktionszeiten bei der Yamaha App f&uuml;hren, wenn gleichzeitig auf den Netzwerkplayer zugegriffen wird.)</li>
 	  <li><b>autoUpdateTunerReadings</b> &ndash; optionales Attribut zum automtischen aktualisieren der Tuner&ndash;Readings (Default 1)</li>
-      <li><b>disable</b> &ndash; optionales Attribut zum Deaktivieren des internen zyklischen Timers zum Aktualisieren des NP&ndash;Status. Manuelles Update ist nach wie vor m&ouml;glich. M&ouml;gliche Werte: 0 &rarr; Zyklisches Update aktiv., 1 &rarr; Zyklisches Update inaktiv (Default 1).</li>
+      <li><b>directPlaySleepNetradio</b> &ndash; optionales Attribut zum Definieren der Sleep-Zeit zwischen zwei netradio Anfragen zum vTuner Server, wenn der Befehl directPlay benutzt wird. Kann bei langsamen Interneverbindungen n&uuml;tzlich sein. (Default 5 Sek.).</li>
+	  <li><b>directPlaySleepServer</b> &ndash; optionales Attribut zum Definieren der Sleep-Zeit zwischen zwei Multimediaserver-Anfragen, wenn der Befehl directPlay benutzt wird. Kann bei langsamen Verbindungen n&uuml;tzlich sein. (Default 2 Sek.).</li>
+	  <li><b>disable</b> &ndash; optionales Attribut zum Deaktivieren des internen zyklischen Timers zum Aktualisieren des NP&ndash;Status. Manuelles Update ist nach wie vor m&ouml;glich. M&ouml;gliche Werte: 0 &rarr; Zyklisches Update aktiv., 1 &rarr; Zyklisches Update inaktiv (Default 1).</li>
 	  <li><b>do_not_notify</b></li>
 	  <li><b>maxPlayerListItems</b> &ndash; optionales Attribut zum Limitieren der maximalen Anzahl von Men&uuml;eintr&auml;gen (Default 999).</li>
 	  <li><b>readingFnAttributes</b></li>
 	  <li><b>requestTimeout</b> &ndash; optionales Attribut zum setzen des HTTP response Timeouts (Default 4)</li>
+	  <li><b>searchAttempts</b> &ndash; optionales Attribut zur Definition von max. Anzahl der Suchversuche des angegebenen Direktoryinhalts bei der Benutzng des directPlay Befehls. M&ouml;gliche Werte: 15...100 (Default 15 Sek.).</li>
 	  <li><b>smoothVolumeChange</b> &ndash; optionales Attribut zur sanften Lautst&auml;rke&auml;nderung (Erzeugt deutlich mehr Ethernetkommunikation w&auml;hrend der Lautst&auml;rke&auml;nderung). (Default 1)</li>
       <li><b>timerHour</b> [0...23] &ndash; Setzt die Stunde des internen Wake&ndash;up Timers</li>
       <li><b>timerMinute</b> [0...59] &ndash; Setzt die Minute des internen Wake&ndash;up Timers</li>
