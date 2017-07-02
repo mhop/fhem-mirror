@@ -79,7 +79,7 @@ sub archetype_Initialize($) {
     . "disable:0,1 "
     . "initialize:textField-long "
     . "metaDEF:textField-long "
-    . "metaNAME "
+    . "metaNAME:textField-long "
     . "readingList "
     . "relations "
     . "setList:textField-long "
