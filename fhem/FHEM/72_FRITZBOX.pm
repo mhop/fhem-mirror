@@ -2541,9 +2541,9 @@ sub FRITZBOX_GuestWlan_Run_Web($)
    }
    elsif ( $hash->{SECPORT} ) { #TR-064
       if ($state == 1) { # WLAN on when Guest WLAN on
-         push @tr064CmdArray, ["WLANConfiguration:1", "wlanconfig1", "SetEnable", "NewEnable", "1"];
          push @tr064CmdArray, ["WLANConfiguration:2", "wlanconfig2", "SetEnable", "NewEnable", "1"]
                   if $hash->{fhem}->{is_double_wlan} == 1;
+         push @tr064CmdArray, ["WLANConfiguration:1", "wlanconfig1", "SetEnable", "NewEnable", "1"];
       }
       my $gWlanNo = 2;
       $gWlanNo = 3 
@@ -2652,10 +2652,10 @@ sub FRITZBOX_Wlan_Run_Web($)
       # FRITZBOX_Web_CmdPost ($hash, \@webCmdArray, '/wlan/wlan_settings.lua');
    }
    elsif ($hash->{SECPORT}) { #TR-064
-      push @tr064CmdArray, ["WLANConfiguration:1", "wlanconfig1", "SetEnable", "NewEnable", $state]
-               if $cmd =~ /^(wlan|wlan2\.4)$/;
       push @tr064CmdArray, ["WLANConfiguration:2", "wlanconfig2", "SetEnable", "NewEnable", $state]
                if $hash->{fhem}->{is_double_wlan} == 1 && $cmd ne "wlan2.4";
+      push @tr064CmdArray, ["WLANConfiguration:1", "wlanconfig1", "SetEnable", "NewEnable", $state]
+               if $cmd =~ /^(wlan|wlan2\.4)$/;
       $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
    }
    else { #no API
@@ -4581,7 +4581,7 @@ sub FRITZBOX_Web_Query($$@)
    FRITZBOX_Log $hash, 5, "Response: ".$response->status_line."\n".$response->content;
 
    unless ($response->is_success) {
-      my %retHash = ("Error" => $response->status_line);
+      my %retHash = ("Error" => $response->status_line, "ResetSID" => "1");
       FRITZBOX_Log $hash, 3, "Error: ".$response->status_line;
       return \%retHash;
    }
