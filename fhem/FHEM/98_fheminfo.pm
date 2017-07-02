@@ -227,7 +227,7 @@ sub _fi2_Div($$) {
 sub _fi2_findRev {
    my $cf = 'controls_fhem.txt';
    my $filename = (-e "./$cf") ? "./$cf" : AttrVal("global","modpath",".")."/FHEM/$cf";
-   my ($err, @content) = FileRead({FileName => $cf, ForceType => "file"});
+   my ($err, @content) = FileRead({FileName => $filename, ForceType => "file"});
    return if $err;
    my (undef,$rev) = split (/ /,$content[0]);
    return $rev;
