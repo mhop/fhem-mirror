@@ -22,14 +22,12 @@ GNU General Public License for more details.
 package main;
 use strict;
 use warnings;
-use Config;
 use HttpUtils;
 
 my $c_system  = 'system';
 my $c_noModel = 'noModel';
 
-my %fhemInfo =();
-
+my %fhemInfo   = ();
 my @ignoreList = qw(Global);
 
 sub fheminfo_Initialize($$) {
@@ -51,15 +49,15 @@ sub CommandFheminfo($$) {
     if($args[0] ne "send" && $args[0] ne "");
 
   return "Won't send, as sendStatistics is set to 'never'."
-    if($doSend &&  lc(AttrVal("global","sendStatistics","")) eq "never");
+    if($doSend && lc(AttrVal("global","sendStatistics","")) eq "never");
 
   _fi2_Count();
 
   return toJSON(\%fhemInfo) if (defined($args[1]) && $args[1] eq 'debug');
 
-  _fi2_Send() if $args[0] eq 'send';
+  _fi2_Send() if $doSend;
 
-# do not return statistics data if called from update
+  # do not return statistics data if called from update
   return "Statistics data sent to server. See Logfile (level 4) for details." unless defined($cl);
 
   return _fi2_TelnetTable($doSend) if ($cl && $cl->{TYPE} eq 'telnet');
@@ -74,7 +72,6 @@ sub _fi2_Count() {
    my $release  = "5.8";
    my $feature  = $featurelevel ? $featurelevel : $release;
    my $os       = $^O;
-   my $arch     = $Config{"archname"};
    my $perl     = sprintf("%vd", $^V);
 
    %fhemInfo = ();
@@ -83,7 +80,6 @@ sub _fi2_Count() {
    $fhemInfo{$c_system}{'release'}    = $release;
    $fhemInfo{$c_system}{'feature'}    = $feature;
    $fhemInfo{$c_system}{'os'}         = $os;
-   $fhemInfo{$c_system}{'arch'}       = $arch;
    $fhemInfo{$c_system}{'perl'}       = $perl;
    $fhemInfo{$c_system}{'revision'}   = _fi2_findRev();
    $fhemInfo{$c_system}{'configType'} = configDBUsed() ? 'configDB' : 'configFile';
@@ -92,6 +88,7 @@ sub _fi2_Count() {
    {
 # 1. skip if device is TEMPORARY or VOLATILE
       next if (defined($defs{$key}{'TEMPORARY'}) || defined($defs{$key}{'VOLATILE'})); 
+
       my $name  = $defs{$key}{NAME};
       my $type  = $defs{$key}{TYPE};
       my $model = $c_noModel;
@@ -99,7 +96,8 @@ sub _fi2_Count() {
 # 2. look for model information in internals
       $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
       $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
-      # special for DbLog
+
+      # special internal for DbLog
       $model = defined($defs{$key}{DBMODEL}) ? $defs{$key}{DBMODEL} : $model
                if (lc($type) eq 'dblog');
 
@@ -108,10 +106,11 @@ sub _fi2_Count() {
 
 # 4. look for model information in readings
       $model = ReadingsVal($name,'model',$model);
-      # special for BOSEST
+
+      # special reading for BOSEST
       $model = ReadingsVal($name,'type',$model)
                if (lc($type) eq 'bosest');
-      # special for ZWave
+      # special reading for ZWave
       $model = ReadingsVal($name,'modelId',$model) 
                if (lc($type) eq 'zwave');
       
@@ -130,12 +129,12 @@ sub _fi2_Count() {
       $fhemInfo{$type}{$model}++ ;
    }
 
-# now do some special handlings
+# now do some more special handlings
 
-# add model info for configDB if used
+   # add model info for configDB if used
    eval { $fhemInfo{'configDB'}{_cfgDB_type()}++ if configDBUsed(); };
 
-# delete all modules listed in ignoreList
+   # delete all modules listed in ignoreList
    foreach my $i (@ignoreList) { delete $fhemInfo{$i}; }
 
    return;
@@ -170,9 +169,10 @@ sub _fi2_TelnetTable($) {
   $str .= "System Info\n";
   $str .= sprintf("  Release%*s: %s\n",6," ",$fhemInfo{$c_system}{'release'});
   $str .= sprintf("  FeatureLevel%*s: %s\n",0," ",$fhemInfo{$c_system}{'feature'});
-  $str .= sprintf("  SVN revision%*s: %s\n",0," ",$fhemInfo{$c_system}{'revision'});
+  $str .= sprintf("  ConfigType%*s: %s\n",3," ",$fhemInfo{$c_system}{'configType'});
+  $str .= sprintf("  SVN revision%*s: %s\n",0," ",$fhemInfo{$c_system}{'revision'})
+                  if (defined($fhemInfo{$c_system}{'revision'}));
   $str .= sprintf("  OS%*s: %s\n",11," ",$fhemInfo{$c_system}{'os'});
-  $str .= sprintf("  Arch%*s: %s\n",9," ",$fhemInfo{$c_system}{'arch'});
   $str .= sprintf("  Perl%*s: %s\n",9," ",$fhemInfo{$c_system}{'perl'});
   $str .= sprintf("  uniqueID%*s: %s\n",5," ",$fhemInfo{$c_system}{'uniqueID'});
   $str .= sprintf("  upTime%*s: %s\n",7,"  ",$upTime); 
@@ -203,7 +203,6 @@ sub _fi2_HtmlTable($) {
       $result .= "<tr><td> </td><td>SVN rev:</td><td>$fhemInfo{$c_system}{'revision'}</td></tr>" 
                   if (defined($fhemInfo{$c_system}{'revision'}));
       $result .= "<tr><td> </td><td>OS:</td><td>$fhemInfo{$c_system}{'os'}</td></tr>";
-      $result .= "<tr><td> </td><td>Arch:</td><td>$fhemInfo{$c_system}{'arch'}</td></tr>";
       $result .= "<tr><td> </td><td>Perl:</td><td>$fhemInfo{$c_system}{'perl'}</td></tr>";
       $result .= "<tr><td> </td><td>uniqueId:</td><td>$fhemInfo{$c_system}{'uniqueID'}</td></tr>";
       $result .= "<tr><td> </td><td>upTime:</td><td>$upTime</td></tr>";
