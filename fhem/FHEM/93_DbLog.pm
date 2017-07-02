@@ -16,6 +16,9 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.18.2     29.06.2017       check of index for DbRep added
+# 2.18.1     25.06.2017       DbLog_configCheck/ DbLog_sqlget some changes, commandref revised
+# 2.18.0     24.06.2017       configCheck added (MySQL, PostgreSQL)
 # 2.17.1     17.06.2017       fix log-entries "utf8 enabled" if SVG's called, commandref revised, enable UTF8 for DbLog_get
 # 2.17.0     15.06.2017       enable UTF8 for MySQL (entry in configuration file necessary)
 # 2.16.11    03.06.2017       execmemcache changed for SQLite avoid logging if deleteOldDaysNbl or reduceLogNbL is running 
@@ -132,7 +135,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.17.1";
+my $DbLogVersion = "2.18.2";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -378,7 +381,8 @@ sub DbLog_Set($@) {
 	             deleteOldDays deleteOldDaysNbl userCommand clearReadings:noArg 
 				 eraseReadings:noArg addLog ";
 	$usage .= "listCache:noArg purgeCache:noArg commitCache:noArg exportCache:nopurge,purgecache " if (AttrVal($name, "asyncMode", undef));
-    my (@logs,$dir);
+    $usage .= "configCheck:noArg " if($hash->{DBMODEL} =~ /MYSQL|POSTGRESQL/);
+	my (@logs,$dir);
 	
 	if (!AttrVal($name,"expimpdir",undef)) {
 	    $dir = $attr{global}{modpath}."/log/";
@@ -511,6 +515,10 @@ sub DbLog_Set($@) {
             $cache .= $key." => ".$hash->{cache}{memcache}{$key}."\n"; 			
 		}
 	    return $cache;
+	}
+	elsif ($a[1] eq 'configCheck') {
+		my $check = DbLog_configcheck($hash);
+	    return $check;
 	}
 	elsif ($a[1] eq 'exportCache') {
 	    my $cln;
@@ -2718,6 +2726,371 @@ sub DbLog_Get($@) {
   }
 }
 
+##########################################################################
+#
+# Ermittlung von DB-Parametern für configCheck
+#
+##########################################################################
+sub DbLog_configcheck($) {
+  my ($hash)= @_;
+  my $name = $hash->{NAME};
+  my $dbmodel = $hash->{DBMODEL};
+  my $dbconn  = $hash->{dbconn};
+  my $dbname  = (split(/;|=/, $dbconn))[1];
+  my ($check, $rec);
+  
+  # Connection und Encoding check
+  my (@ce,@se);
+  my ($chutf8mod,$chutf8dat);
+  if($dbmodel =~ /MYSQL/) {
+      @ce = DbLog_sqlget($hash,"SHOW VARIABLES LIKE 'character_set_connection'");
+	  $chutf8mod = @ce?uc($ce[1]):"no result";
+	  @se = DbLog_sqlget($hash,"SHOW VARIABLES LIKE 'character_set_database'");
+      $chutf8dat = @se?uc($se[1]):"no result";
+	  if($chutf8mod eq $chutf8dat) {
+          $rec = "settings o.k.";
+      } else {
+          $rec = "Both encodings should be identical. You can adjust the usage of UTF8 connection by setting the UTF8 parameter in file '$hash->{CONFIGURATION}' to the right value. ";
+      }
+  }
+  if($dbmodel =~ /POSTGRESQL/) {
+      @ce = DbLog_sqlget($hash,"SHOW CLIENT_ENCODING");
+	  $chutf8mod = @ce?uc($ce[0]):"no result";
+	  @se = DbLog_sqlget($hash,"select character_set_name from information_schema.character_sets");
+      $chutf8dat = @se?uc($se[0]):"no result";
+	  if($chutf8mod eq $chutf8dat) {
+          $rec = "settings o.k.";
+      } else {
+          $rec = "This is only an information. PostgreSQL supports automatic character set conversion between server and client for certain character set combinations. The conversion information is stored in the pg_conversion system catalog. PostgreSQL comes with some predefined conversions.";
+      }
+  }  
+  
+  $check  = "<html>";
+  $check .= "<u><b>Result of connection check</u></b><br><br>";
+  
+  if(@ce && @se) {
+      $check .= "Connection to database $dbname successfully done. <br>";
+      $check .= "<b>Recommendation:</b> settings o.k. <br><br>";
+  }
+  
+  if(!@ce || !@se) {
+      $check .= "Connection to database was not successful. <br>";
+      $check .= "<b>Recommendation:</b> Plese see logfile for further information. <br><br>";
+	  $check .= "</html>";
+      return $check;
+  }
+  
+  $check .= "<u><b>Result of encoding check</u></b><br><br>";
+  $check .= "Encoding used by Client (connection): $chutf8mod <br>";
+  $check .= "Encoding used by $dbname: $chutf8dat <br>";
+  $check .= "<b>Recommendation:</b> $rec <br><br>";
+        
+  # Check Betriebsmodus
+  my $mode = $hash->{MODE};
+  my $sfx = AttrVal("global", "language", "EN");
+  $sfx = ($sfx eq "EN" ? "" : "_$sfx");
+  
+  $check .= "<u><b>Result of logmode check</u></b><br><br>";
+  $check .= "Logmode of DbLog-device $name is: $mode <br>";
+  if($mode =~ /asynchronous/) {
+      $rec = "settings o.k.";
+  } else {
+      $rec  = "Switch $name to the asynchronous logmode by setting the 'asyncMode' attribute. The advantage of this mode is to log events non-blocking. <br>";
+	  $rec .= "There are attributes 'syncInterval' and 'cacheLimit' relevant for this working mode. <br>";
+	  $rec .= "Please refer to Commandref <a href='$FW_ME/docs/commandref${sfx}.html#DbLogattr' target='_blank'>attributes</a> for further informations. ";
+  }
+  $check .= "<b>Recommendation:</b> $rec <br><br>"; 
+		
+  # Check Spaltenbreite	history
+  my (@sr_dev,@sr_typ,@sr_evt,@sr_rdg,@sr_val,@sr_unt);
+  my ($cdat_dev,$cdat_typ,$cdat_evt,$cdat_rdg,$cdat_val,$cdat_unt);
+  my ($cmod_dev,$cmod_typ,$cmod_evt,$cmod_rdg,$cmod_val,$cmod_unt);
+  
+  if($dbmodel =~ /MYSQL/) {
+      @sr_dev = DbLog_sqlget($hash,"SHOW FIELDS FROM history where FIELD='DEVICE'");
+	  @sr_typ = DbLog_sqlget($hash,"SHOW FIELDS FROM history where FIELD='TYPE'");
+	  @sr_evt = DbLog_sqlget($hash,"SHOW FIELDS FROM history where FIELD='EVENT'");
+	  @sr_rdg = DbLog_sqlget($hash,"SHOW FIELDS FROM history where FIELD='READING'");
+	  @sr_val = DbLog_sqlget($hash,"SHOW FIELDS FROM history where FIELD='VALUE'");
+	  @sr_unt = DbLog_sqlget($hash,"SHOW FIELDS FROM history where FIELD='UNIT'");
+  }
+  if($dbmodel =~ /POSTGRESQL/) {
+      @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='device'");
+      @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='type'");
+	  @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='event'");
+	  @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='reading'");
+	  @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='value'");
+	  @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='unit'");
+  }
+  
+  $cdat_dev = @sr_dev?($sr_dev[1]):"no result";
+  $cdat_dev =~ tr/varchar\(|\)//d;  
+  $cdat_typ = @sr_typ?($sr_typ[1]):"no result";
+  $cdat_typ =~ tr/varchar\(|\)//d;
+  $cdat_evt = @sr_evt?($sr_evt[1]):"no result";
+  $cdat_evt =~ tr/varchar\(|\)//d;
+  $cdat_rdg = @sr_rdg?($sr_rdg[1]):"no result";
+  $cdat_rdg =~ tr/varchar\(|\)//d;
+  $cdat_val = @sr_val?($sr_val[1]):"no result";
+  $cdat_val =~ tr/varchar\(|\)//d;
+  $cdat_unt = @sr_unt?($sr_unt[1]):"no result";
+  $cdat_unt =~ tr/varchar\(|\)//d;
+
+  $cmod_dev = $hash->{HELPER}{DEVICECOL};
+  $cmod_typ = $hash->{HELPER}{TYPECOL};
+  $cmod_evt = $hash->{HELPER}{EVENTCOL};
+  $cmod_rdg = $hash->{HELPER}{READINGCOL};
+  $cmod_val = $hash->{HELPER}{VALUECOL};
+  $cmod_unt = $hash->{HELPER}{UNITCOL};
+  
+  if($cdat_dev >= $cmod_dev && $cdat_typ >= $cmod_typ && $cdat_evt >= $cmod_evt && $cdat_rdg >= $cmod_rdg && $cdat_val >= $cmod_val && $cdat_unt >= $cmod_unt) {
+      $rec = "settings o.k.";
+  } else {
+      $rec  = "The relation between column width in table history and the field width used in device $name don't meet the requirements. ";
+	  $rec .= "Please make sure that the width of database field definition is equal or larger than the field width used by the module. Compare the given results.<br>";
+	  $rec .= "Currently the default values for field width are: <br><br>";
+	  $rec .= "DEVICE: $columns{DEVICE} <br>";
+	  $rec .= "TYPE: $columns{TYPE} <br>";
+	  $rec .= "EVENT: $columns{EVENT} <br>";
+	  $rec .= "READING: $columns{READING} <br>";
+	  $rec .= "UNIT: $columns{UNIT} <br>";
+	  $rec .= "DEVICE: $columns{DEVICE} <br><br>";
+      $rec .= "You can change the column width in database by a statement like <b>'alter table history modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
+      $rec .= "You can do it for example by executing 'sqlCMD' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
+	  $rec .= "The field width used by the module can be done by setting <a href='$FW_ME/docs/commandref${sfx}.html#DbLogattr' target='_blank'>attributes</a> 'colEvent', 'colReading', 'colValue',";
+  }
+  
+  $check .= "<u><b>Result of table 'history' check</u></b><br><br>";
+  $check .= "Column width set in $dbname: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
+  $check .= "Column width used by $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
+  $check .= "<b>Recommendation:</b> $rec <br><br>";
+
+  # Check Spaltenbreite	current
+  if($dbmodel =~ /MYSQL/) {
+      @sr_dev = DbLog_sqlget($hash,"SHOW FIELDS FROM current where FIELD='DEVICE'");
+	  @sr_typ = DbLog_sqlget($hash,"SHOW FIELDS FROM current where FIELD='TYPE'");
+	  @sr_evt = DbLog_sqlget($hash,"SHOW FIELDS FROM current where FIELD='EVENT'");
+	  @sr_rdg = DbLog_sqlget($hash,"SHOW FIELDS FROM current where FIELD='READING'");
+	  @sr_val = DbLog_sqlget($hash,"SHOW FIELDS FROM current where FIELD='VALUE'");
+	  @sr_unt = DbLog_sqlget($hash,"SHOW FIELDS FROM current where FIELD='UNIT'");
+  }
+  
+  if($dbmodel =~ /POSTGRESQL/) {
+      @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='device'");
+      @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='type'");
+	  @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='event'");
+	  @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='reading'");
+	  @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='value'");
+	  @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='unit'");
+  }
+
+  $cdat_dev = @sr_dev?($sr_dev[1]):"no result";
+  $cdat_dev =~ tr/varchar\(|\)//d;  
+  $cdat_typ = @sr_typ?($sr_typ[1]):"no result";
+  $cdat_typ =~ tr/varchar\(|\)//d;
+  $cdat_evt = @sr_evt?($sr_evt[1]):"no result";
+  $cdat_evt =~ tr/varchar\(|\)//d;
+  $cdat_rdg = @sr_rdg?($sr_rdg[1]):"no result";
+  $cdat_rdg =~ tr/varchar\(|\)//d;
+  $cdat_val = @sr_val?($sr_val[1]):"no result";
+  $cdat_val =~ tr/varchar\(|\)//d;
+  $cdat_unt = @sr_unt?($sr_unt[1]):"no result";
+  $cdat_unt =~ tr/varchar\(|\)//d;
+
+  $cmod_dev = $hash->{HELPER}{DEVICECOL};
+  $cmod_typ = $hash->{HELPER}{TYPECOL};
+  $cmod_evt = $hash->{HELPER}{EVENTCOL};
+  $cmod_rdg = $hash->{HELPER}{READINGCOL};
+  $cmod_val = $hash->{HELPER}{VALUECOL};
+  $cmod_unt = $hash->{HELPER}{UNITCOL};
+  
+  if($cdat_dev >= $cmod_dev && $cdat_typ >= $cmod_typ && $cdat_evt >= $cmod_evt && $cdat_rdg >= $cmod_rdg && $cdat_val >= $cmod_val && $cdat_unt >= $cmod_unt) {
+      $rec = "settings o.k.";
+  } else {
+      $rec  = "The relation between column width in table current and the field width used in device $name don't meet the requirements. ";
+	  $rec .= "Please make sure that the width of database field definition is equal or larger than the field width used by the module. Compare the given results.<br>";
+	  $rec .= "Currently the default values for field width are: <br><br>";
+	  $rec .= "DEVICE: $columns{DEVICE} <br>";
+	  $rec .= "TYPE: $columns{TYPE} <br>";
+	  $rec .= "EVENT: $columns{EVENT} <br>";
+	  $rec .= "READING: $columns{READING} <br>";
+	  $rec .= "UNIT: $columns{UNIT} <br>";
+	  $rec .= "DEVICE: $columns{DEVICE} <br><br>";
+      $rec .= "You can change the column width in database by a statement like <b>'alter table current modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
+      $rec .= "You can do it for example by executing 'sqlCMD' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
+	  $rec .= "The field width used by the module can be done by setting <a href='$FW_ME/docs/commandref${sfx}.html#DbLogattr' target='_blank'>attributes</a> 'colEvent', 'colReading', 'colValue',";
+  }
+  
+  $check .= "<u><b>Result of table 'current' check</u></b><br><br>";
+  $check .= "Column width set in $dbname: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
+  $check .= "Column width used by $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
+  $check .= "<b>Recommendation:</b> $rec <br><br>";
+  
+  # Check Vorhandensein Search_Idx mit den empfohlenen Spalten
+  my (@six,@six_dev,@six_rdg,@six_tsp);
+  my ($idef,$idef_dev,$idef_rdg,$idef_tsp);
+  $check .= "<u><b>Result of check 'Search_Idx' availability</u></b><br><br>";
+	
+  if($dbmodel =~ /MYSQL/) {
+      @six = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Search_Idx'");
+	  if (!@six) {
+	      $check .= "The index 'Search_Idx' is missing. <br>";
+	      $rec    = "You can create the index by executing statement 'CREATE INDEX Search_Idx ON `history` (DEVICE, READING, TIMESTAMP);' <br>";
+		  $rec   .= "Depending on your database size this command may running a long time. <br>"
+	  } else {
+          @six_dev = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Search_Idx' and Column_name='DEVICE'");
+          @six_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Search_Idx' and Column_name='READING'");
+          @six_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Search_Idx' and Column_name='TIMESTAMP'");
+          if (@six_dev && @six_rdg && @six_tsp) {
+              $check .= "Index 'Search_Idx' exists and contains the recommended fields 'DEVICE', 'READING', 'TIMESTAMP'. <br>";
+              $rec    = "settings o.k.";
+          } else {  
+	          $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'DEVICE'. <br>" if (!@six_dev);
+		      $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!@six_rdg);
+		      $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@six_tsp);
+		      $rec    = "The index should contain the fields 'DEVICE', 'READING', 'TIMESTAMP'. ";
+			  $rec   .= "You can change the index by executing e.g. <br>";
+			  $rec   .= "'ALTER TABLE `history` DROP INDEX `Search_Idx`, ADD INDEX `Search_Idx` (`DEVICE`, `READING`, `TIMESTAMP`) USING BTREE' <br>";
+			  $rec   .= "Depending on your database size this command may running a long time. <br>"
+	      }
+	  }
+  }
+  if($dbmodel =~ /POSTGRESQL/) {
+      @six = DbLog_sqlget($hash,"SELECT * FROM pg_indexes WHERE tablename='history' and indexname ='Search_Idx'");
+	  if (!@six) {
+	      $check .= "The index 'Search_Idx' is missing. <br>";
+	      $rec    = "You can create the index by executing statement 'CREATE INDEX \"Search_Idx\" ON history USING btree (device, reading, \"timestamp\")' <br>";
+		  $rec   .= "Depending on your database size this command may running a long time. <br>"
+	  } else {
+          $idef     = $six[4];
+		  $idef_dev = 1 if($idef =~ /device/);
+		  $idef_rdg = 1 if($idef =~ /reading/);
+		  $idef_tsp = 1 if($idef =~ /timestamp/);
+          if ($idef_dev && $idef_rdg && $idef_tsp) {
+              $check .= "Index 'Search_Idx' exists and contains the recommended fields 'DEVICE', 'READING', 'TIMESTAMP'. <br>";
+              $rec    = "settings o.k.";
+          } else {  
+	          $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'DEVICE'. <br>" if (!$idef_dev);
+		      $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$idef_rdg);
+		      $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$idef_tsp);
+		      $rec    = "The index should contain the fields 'DEVICE', 'READING', 'TIMESTAMP'. ";
+			  $rec   .= "You can change the index by executing e.g. <br>";
+			  $rec   .= "'DROP INDEX \"Search_Idx\"; CREATE INDEX \"Search_Idx\" ON history USING btree (device, reading, \"timestamp\")' <br>";
+			  $rec   .= "Depending on your database size this command may running a long time. <br>"
+	      }
+	  }
+  }
+  
+  $check .= "<b>Recommendation:</b> $rec <br><br>";
+  
+  # Check Index Reading_Time_Idx für DbRep-Device falls DbRep verwendet wird
+  my ($dbrp,$irep,);
+  my (@dix,@dix_rdg,@dix_tsp,$irep_rdg,$irep_tsp);
+  my $isused = 0;
+  my @repdvs = devspec2array("TYPE=DbRep");
+  $check .= "<u><b>Result of check 'Reading_Time_Idx' availability for DbRep-devices</u></b><br><br>";
+  
+  foreach (@repdvs) {
+      $dbrp = $_;
+      if(!$defs{$dbrp}) {
+          Log3 ($name, 2, "DbLog $name -> Device '$dbrp' found by configCheck doesn't exist !");
+	      next;
+      }
+	  if ($defs{$dbrp}->{DEF} eq $name) {
+	      # DbRep Device verwendet aktuelles DbLog-Device
+          Log3 ($name, 5, "DbLog $name -> DbRep-Device '$dbrp' uses $name.");
+          $isused = 1;		  
+      }
+  }
+  if ($isused) {
+	  if($dbmodel =~ /MYSQL/) {
+          @dix = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Reading_Time_Idx'");
+	      if (!@dix) {
+	          $check .= "You use at least one DbRep-device assigned to $name, but the recommended index 'Reading_Time_Idx' is missing. <br>";
+	          $rec    = "You can create the index by executing statement 'CREATE INDEX Reading_Time_Idx ON `history` (READING, TIMESTAMP) USING BTREE;' <br>";
+		      $rec   .= "Depending on your database size this command may running a long time. <br>"
+	      } else {
+              @dix_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Reading_Time_Idx' and Column_name='READING'");
+              @dix_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Reading_Time_Idx' and Column_name='TIMESTAMP'");
+              if (@dix_rdg && @dix_tsp) {
+			      $check .= "You use at least one DbRep-device assigned to $name. ";
+                  $check .= "Index 'Reading_Time_Idx' exists and contains the recommended fields 'READING', 'TIMESTAMP'. <br>";
+                  $rec    = "settings o.k.";
+              } else {  
+			      $check .= "You use at least one DbRep-device assigned to $name. ";
+		          $check .= "Index 'Reading_Time_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!@dix_rdg);
+		          $check .= "Index 'Reading_Time_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@dix_tsp);
+		          $rec    = "The index should contain the fields 'READING', 'TIMESTAMP'. ";
+		          $rec   .= "You can change the index by executing e.g. <br>";
+		          $rec   .= "'ALTER TABLE `history` DROP INDEX `Reading_Time_Idx`, ADD INDEX `Reading_Time_Idx` (`READING`, `TIMESTAMP`) USING BTREE' <br>";
+		          $rec   .= "Depending on your database size this command may running a long time. <br>"
+	          }
+	      }
+      }
+	  if($dbmodel =~ /POSTGRESQL/) {
+          @dix = DbLog_sqlget($hash,"SELECT * FROM pg_indexes WHERE tablename='history' and indexname ='Reading_Time_Idx'");
+	      if (!@dix) {
+	          $check .= "You use at least one DbRep-device assigned to $name, but the recommended index 'Reading_Time_Idx' is missing. <br>";
+	          $rec    = "You can create the index by executing statement 'CREATE INDEX \"Reading_Time_Idx\" ON history USING btree (reading, \"timestamp\")' <br>";
+		      $rec   .= "Depending on your database size this command may running a long time. <br>"
+	      } else {
+              $irep     = $dix[4];
+		      $irep_rdg = 1 if($irep =~ /reading/);
+		      $irep_tsp = 1 if($irep =~ /timestamp/);
+              if ($irep_rdg && $irep_tsp) {
+                  $check .= "Index 'Reading_Time_Idx' exists and contains the recommended fields 'READING', 'TIMESTAMP'. <br>";
+                  $rec    = "settings o.k.";
+              } else {  
+		          $check .= "Index 'Reading_Time_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$irep_rdg);
+		          $check .= "Index 'Reading_Time_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$irep_tsp);
+		          $rec    = "The index should contain the fields 'READING', 'TIMESTAMP'. ";
+			      $rec   .= "You can change the index by executing e.g. <br>";
+			      $rec   .= "'DROP INDEX \"Reading_Time_Idx\"; CREATE INDEX \"Reading_Time_Idx\" ON history USING btree (reading, \"timestamp\")' <br>";
+			      $rec   .= "Depending on your database size this command may running a long time. <br>"
+	          }
+	      }
+      }
+  } else {
+      $check .= "You don't use any DbRep-device assigned to $name. Hence an index for DbRep isn't needed. <br>";
+      $rec    = "settings o.k.";
+  }
+  $check .= "<b>Recommendation:</b> $rec <br><br>";
+  
+  $check .= "</html>";
+
+return $check;
+}
+
+sub DbLog_sqlget($$) {
+  my ($hash,$sql)= @_;
+  my $name = $hash->{NAME};
+  my ($dbh,$sth,@sr);
+  
+  Log3 ($name, 4, "DbLog $name - Executing SQL: $sql");
+  
+  $dbh = DbLog_ConnectNewDBH($hash);
+  return if(!$dbh);
+  
+  eval { $sth = $dbh->prepare("$sql");                     
+         $sth->execute;
+	   };
+  if($@) {
+      $dbh->disconnect if($dbh);
+      Log3 ($name, 2, "DbLog $name - $@");
+      return @sr;
+  }
+  
+  @sr = $sth->fetchrow; 
+  
+  $sth->finish;
+  $dbh->disconnect;
+  no warnings 'uninitialized';
+  Log3 ($name, 4, "DbLog $name - SQL result: @sr");
+  use warnings;
+  
+return @sr;
+}
+
 #########################################################################################
 #
 # Addlog - einfügen des Readingwertes eines gegebenen Devices
@@ -4131,22 +4504,33 @@ sub checkUsePK ($$){
     </ol>
 	<br>
 	
-    The content of VALUE is optimized for automated post-processing, e.g.
-    <code>yes</code> is translated to <code>1</code>
+    The content of VALUE is optimized for automated post-processing, e.g. <code>yes</code> is translated to <code>1</code>
     <br><br>
+	
     The current values can be retrieved by the following code like FileLog:<br>
     <ul>
       <code>get myDbLog - - 2012-11-10 2012-11-10 KS300:temperature::</code>
     </ul>
-    <br><br>
-    <b>Examples:</b>
+    <br>
+	
+    <b>Example:</b>
     <ul>
-        <code># log everything to database</code><br>
-
-        <code>define myDbLog DbLog /etc/fhem/db.conf .*:.*</code>
+        <code>define myDbLog DbLog /etc/fhem/db.conf .*:.*</code> <br>
+        <code># log everything to database</code>
     </ul>
+	<br>
+	
+	After you have defined your DbLog-device it is recommended to run the command <br><br>
+    <ul>
+        <code>set &lt;name&gt; configCheck</code> <br>
+    </ul>
+	<br>
+	
+	This check reports some important settings and gives recommendations back to you if proposals are indentified.
+	(Available for MySQL, PostgreSQL) <br>
+	
   </ul>
-  <br/><br/>
+  <br><br>
 
   <a name="DbLogset"></a>
   <b>Set</b> 
@@ -4176,6 +4560,10 @@ sub checkUsePK ($$){
       The command can be usefull in case of you want to write the cached data manually or e.g. by an AT-device on a defined 
 	  point of time into the database. </ul><br>
 
+    <code>set &lt;name&gt; configCheck </code><br><br>
+      <ul>This command checks some important settings and gives recommendations back to you if proposals are indentified. 
+	  (available for MySQL, PostgreSQL) </ul><br>
+	  
     <code>set &lt;name&gt; count </code><br/><br/>
       <ul>Count records in tables current and history and write results into readings countCurrent and countHistory.</ul><br/>
 
@@ -4910,17 +5298,31 @@ sub checkUsePK ($$){
     Der Wert des Readings ist optimiert für eine automatisierte Nachverarbeitung
     z.B. <code>yes</code> ist transformiert nach <code>1</code>
     <br><br>
-    Die gespeicherten Werte können mittels GET Funktion angezeigt werden:
+    
+	Die gespeicherten Werte können mittels GET Funktion angezeigt werden:
     <ul>
       <code>get myDbLog - - 2012-11-10 2012-11-10 KS300:temperature</code>
     </ul>
-    <br><br>
+    <br>
+	
     <b>Beispiel:</b>
     <ul>
-        <code>Speichert alles in der Datenbank</code><br>
-        <code>define myDbLog DbLog /etc/fhem/db.conf .*:.*</code>
+        <code>define myDbLog DbLog /etc/fhem/db.conf .*:.*</code><br>
+        <code>Speichert alles in der Datenbank</code>
     </ul>
+	<br>
+	
+	Nachdem das DbLog-Device definiert wurde, ist empfohlen einen Konfigurationscheck auszuführen: <br><br>
+    <ul>
+        <code>set &lt;name&gt; configCheck</code> <br>
+    </ul>
+	<br>
+	Dieser Check prüft einige wichtige Einstellungen des DbLog-Devices und gibt Empfehlungen für potentielle Verbesserungen. 
+	(verfügbar für MySQL, PostgreSQL) <br>
+	
   </ul>
+  <br>
+  <br>
 
 
   <a name="DbLogset"></a>
@@ -4952,7 +5354,11 @@ sub checkUsePK ($$){
 	  und danach der Cache geleert. Der interne Timer des asynchronen Modus wird dabei neu gesetzt.
       Der Befehl kann nützlich sein um manuell oder z.B. über ein AT den Cacheinhalt zu einem definierten Zeitpunkt in die 
 	  Datenbank zu schreiben. </ul><br>
-	  
+
+    <code>set &lt;name&gt; configCheck </code><br><br>
+      <ul>Es werden einige wichtige Einstellungen geprüft und Empfehlungen zurück gegeben wenn potentielle Verbesserungen
+	  identifiziert wurden. (Verfügbar für MySQL, PostgreSQL) </ul><br/>
+
     <code>set &lt;name&gt; count </code><br><br>
       <ul>Zählt die Datensätze in den Tabellen current und history und schreibt die Ergebnisse in die Readings 
 	  countCurrent und countHistory.</ul><br>
