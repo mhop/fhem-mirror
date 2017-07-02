@@ -405,6 +405,7 @@ FHEM/98_WeekdayTimer.pm      dietmar63            http://forum.fhem.de Unterstue
 FHEM/98_WOL.pm               dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/96_allowed.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/96_archetype.pm         igami                http://forum.fhem.de Automatisierung
 FHEM/98_autocreate.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_average.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_backup.pm            rudolfkoenig         http://forum.fhem.de Sonstiges

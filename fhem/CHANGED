@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     98_archetype: introducing new  module to inheritance attributes
+                and defines devices
   - bugfix:  50_TelegramBot: rewrite readfile function $_ warning - #msg651947
   - bugfix:  49_SSCAM: V2.2.3, fix if SVSversion small is "0"
   - new:     00_SmartMeterP1: V1.7 New module for reading elec.+gas smartmeters.
