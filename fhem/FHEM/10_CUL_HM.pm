@@ -2843,7 +2843,7 @@ sub CUL_HM_Parse($$) {#########################################################
             $stAck = '01'.$dChNo.(($stT eq "ON")?"C8":"00")."00"
           }
           
-          if ($mh{mFlgH} & 0x20){
+          if ((($mh{mFlgH} & 0x24) == 0x20)){
             $longPress .= "_Release";
             $dChHash->{helper}{trgLgRpt}=0;
             push @ack,$mh{shash},$mh{mNo}."8002".$mh{dst}.$mh{src}.$stAck;
@@ -3430,10 +3430,13 @@ sub CUL_HM_parseCommon(@){#####################################################
         $mhp->{cHash}{helper}{BNO}    = $cnt;
         $mhp->{cHash}{helper}{BNOCNT} = 0; # message counter reset
       }
-      $mhp->{cHash}{helper}{BNOCNT} += 1;
-      #$state .= ($mhp->{mFlgH} & 0x20 ? "Release" : "")." $mhp->{cHash}{helper}{BNOCNT}_$cnt" # not sufficient
-      $state .= ((($mhp->{mFlgH} & 0x24) == 0x20) ? "Release" : "")." $mhp->{cHash}{helper}{BNOCNT}_$cnt"
-            if($long eq "long");
+      if (($mhp->{mFlgH} & 0x24) == 0x20 && ($long eq "long")){  # release long press
+        $state .=  "Release";
+      }
+      else{                                                     # continue long press
+        $mhp->{cHash}{helper}{BNOCNT} += 1;
+      }
+      $state .= " $mhp->{cHash}{helper}{BNOCNT}_$cnt";
 
       push @evtEt,[$mhp->{cHash},1,"trigger:".(ucfirst($long))."_$cnt"];
       push @evtEt,[$mhp->{cHash},1,"state:".$state." (to $mhp->{dstN})"] if ($mhp->{devH} ne $mhp->{cHash});
