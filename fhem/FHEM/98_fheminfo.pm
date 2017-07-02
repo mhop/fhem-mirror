@@ -90,23 +90,43 @@ sub _fi2_Count() {
 
    foreach my $key ( keys %defs )
    {
+# 1. skip if device is TEMPORARY or VOLATILE
       next if (defined($defs{$key}{'TEMPORARY'}) || defined($defs{$key}{'VOLATILE'})); 
       my $name  = $defs{$key}{NAME};
       my $type  = $defs{$key}{TYPE};
       my $model = $c_noModel;
-         $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
-         $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
-         # special for DbLog
-         $model = defined($defs{$key}{DBMODEL}) ? $defs{$key}{DBMODEL} : $model
-                  if ($type eq 'DbLog');
-         $model = AttrVal($name,'model',$model);
-         $model = ReadingsVal($name,'model',$model);
-         # special for ZWave
-         $model = ReadingsVal($name,'modelId',$model) 
-                  if ($type eq 'ZWave');
-         $model = $c_noModel if (ref $model);
-      next if ( ($model =~ /^unkno.*/i) || ($model =~ /virtual.*/i) || ($model eq '?') || ($model eq '1') || 
-                (defined($defs{$key}{'chanNo'})) || ($name =~ m/^unknown_/) );
+
+# 2. look for model information in internals
+      $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
+      $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
+      # special for DbLog
+      $model = defined($defs{$key}{DBMODEL}) ? $defs{$key}{DBMODEL} : $model
+               if (lc($type) eq 'dblog');
+
+# 3. look for model information in attributes
+      $model = AttrVal($name,'model',$model);
+
+# 4. look for model information in readings
+      $model = ReadingsVal($name,'model',$model);
+      # special for BOSEST
+      $model = ReadingsVal($name,'type',$model)
+               if (lc($type) eq 'bosest');
+      # special for ZWave
+      $model = ReadingsVal($name,'modelId',$model) 
+               if (lc($type) eq 'zwave');
+      
+# 5. check if model is a scalar
+      $model = $c_noModel if (ref $model);
+
+# 6. skip for some special cases found in database
+      next if ( ($model =~ /^unkno.*/i) || 
+                ($model =~ /virtual.*/i) || 
+                ($model eq '?') || 
+                ($model eq '1') || 
+                (defined($defs{$key}{'chanNo'})) ||
+                ($name =~ m/^unknown_/) );
+
+# 7. finally count it :)
       $fhemInfo{$type}{$model}++ ;
    }
 
@@ -180,7 +200,7 @@ sub _fi2_HtmlTable($) {
       $result .= "<tr><td> </td><td>Release:</td><td>$fhemInfo{$c_system}{'release'}</td></tr>";
       $result .= "<tr><td> </td><td>FeatureLevel:</td><td>$fhemInfo{$c_system}{'feature'}</td></tr>";
       $result .= "<tr><td> </td><td>ConfigType:</td><td>$fhemInfo{$c_system}{'configType'}</td></tr>";
-            $result .= "<tr><td> </td><td>SVN rev:</td><td>$fhemInfo{$c_system}{'revision'}</td></tr>" 
+      $result .= "<tr><td> </td><td>SVN rev:</td><td>$fhemInfo{$c_system}{'revision'}</td></tr>" 
                   if (defined($fhemInfo{$c_system}{'revision'}));
       $result .= "<tr><td> </td><td>OS:</td><td>$fhemInfo{$c_system}{'os'}</td></tr>";
       $result .= "<tr><td> </td><td>Arch:</td><td>$fhemInfo{$c_system}{'arch'}</td></tr>";
