@@ -55,7 +55,7 @@ function drawGooglePieChart(data, el) {
    
     var options = {   is3D: true,
                       chartArea : { height:'80%',width:'95%' },
-                      tooltip: { trigger: 'selection' },
+                      tooltip: { trigger: 'focus' },
                       width: 450,
                       legend: {position: 'right'},
                       pieSliceText: 'none',
@@ -287,10 +287,10 @@ function generateModelsOverview(moduleName, modelData)
         return a[0].toLowerCase().localeCompare(b[0].toLowerCase());
     });
 
-    str += '<table class="block"><tr><th>Model</th><th># of installations</th><th># of definitions</th></tr>'
+    str += '<table class="block modelOverview"><tr><th>Model</th><th># of installations</th><th># of definitions</th></tr>'
     var cl = "odd";
     $.each(models, function(index, arr) {
-        str += '<tr class="'+cl+'"><td>'+convertHtmlEntities(arr[0])+"</td><td>"+arr[1].installations+"</td><td>"+arr[1].definitions+"</td></tr>";       
+        str += '<tr class="'+cl+'"><td class="modelName">'+convertHtmlEntities(arr[0])+'</td><td class="modelValue">'+arr[1].installations+'</td><td class="modelValue">'+arr[1].definitions+"</td></tr>";       
         cl = (cl == "odd" ? "even" : "odd");
     });
     

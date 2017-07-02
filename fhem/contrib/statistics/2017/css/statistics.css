@@ -23,3 +23,7 @@ div#loading {
      background-repeat: no-repeat;
      background-attachment: fixed;
 }
+
+td.modelValue {
+    text-align:center;
+}
