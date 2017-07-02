@@ -312,7 +312,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00FA" => {name=>"HM-OU-CFM-TW"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",}
  ,"00FB" => {name=>"HM-Dis-EP-WM55"          ,st=>'display'           ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,4:1p.2p'    ,chn=>"Btn:1:2,Dis:3:3,Key:4:8",}
  ,"00FC" => {name=>"OLIGO-smart-iq-HM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}
- ,"00FD" => {name=>"HM-Sen-LI-O"             ,st=>'senBright'         ,cyc=>'02:50' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>""}
+ ,"00FD" => {name=>"HM-Sen-LI-O"             ,st=>'senBright'         ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>""}
 
  ,"0101" => {name=>"HM-LC-Sw2PBU-FM"         ,alias=>"HM-LC-Sw2-FM-2"}
  ,"0102" => {name=>"HM-WDS30-OT2-SM-2"       ,alias=>"HM-WDS30-OT2-SM" }
