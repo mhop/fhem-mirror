@@ -1121,15 +1121,18 @@
 		<Product type="2001" id="0106" name="VS-ZD2102 Door/Window Sensor" config="zipato/vszd2102.xml" />
 		<Product type="2002" id="0205" name="ZP3102-EU Multisensor Duo" config="zipato/zp3102.xml"/>
 	</Manufacturer>
-    <Manufacturer id="027a" name="Zooz">
-        <Product type="0003" id="0082" name="ZSE08 Contact Sensor" config="zooz/zse08.xml" />
-        <Product type="0003" id="0083" name="ZSE09 Mini Sensor" config="zooz/zse09.xml" />        
-        <Product type="0003" id="0087" name="ZEN07 Mini Plug" config="zooz/zen07.xml" />
-        <Product type="2021" id="2101" name="ZSE40 4-in-1 sensor" config="zooz/zse40.xml" />
-    </Manufacturer>
-    <Manufacturer id="015d" name="Zooz">
-        <Product type="0651" id="f51c" name="ZEN20 Power Strip" />
-    </Manufacturer>
+        <Manufacturer id="027a" name="Zooz">
+                <Product type="0003" id="0082" name="ZSE08 Contact Sensor" config="zooz/zse08.xml" />
+                <Product type="0003" id="0083" name="ZSE09 Mini Sensor" config="zooz/zse09.xml" />        
+                <Product type="0003" id="0087" name="ZEN07 Mini Plug" config="zooz/zen07.xml" />
+                <Product type="2021" id="2101" name="ZSE40 4-in-1 sensor" config="zooz/zse40.xml" />
+        </Manufacturer>
+        <Manufacturer id="015d" name="Zooz">
+                <Product type="0651" id="f51c" name="ZEN20 Power Strip" />
+        </Manufacturer>
 	<Manufacturer id="0021" name="Zykronix">
-	</Manufacturer>
+        </Manufacturer>
+        <Manufacturer id="0131" name="ZyXEL">
+		<Product type="0101" id="0001" name="SP103 PIR Motion Sensor" config="everspring/sp103.xml"/>
+        </Manufacturer>
 </ManufacturerSpecificData>
