@@ -117,6 +117,7 @@ BlockingStart(;$)
       if(!kill(0, $h->{pid})) {
         $h->{pid} = "DEAD:$h->{pid}";
         delete($BC_hash{$bpid});
+        RemoveInternalTimer($h) if($h->{timeout});
       } else {
         $chld_alive++;
       }
@@ -125,6 +126,7 @@ BlockingStart(;$)
 
     if(!$h->{fn}) {     # Deleted by the module in finishFn?
       delete($BC_hash{$bpid});
+      RemoveInternalTimer($h) if($h->{timeout});
       next;
     }
 
