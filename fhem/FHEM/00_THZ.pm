@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 05/2017
-my $thzversion = "0.160";
+my $thzversion = "0.161";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -507,7 +507,11 @@ my %sets439only =(
 my %sets539only =(
   "p75passiveCooling"			=> {cmd2=>"0A0575", argMin =>   "0", argMax =>    "4",	type =>"1clean",  unit =>""},    
   "p99PumpRateHC"				=> {cmd2=>"0A02CB", argMin =>   "0", argMax =>  "100",	type =>"5temp",  unit =>" %"},  
-  "p99PumpRateDHW"				=> {cmd2=>"0A02CC", argMin =>   "0", argMax =>  "100",	type =>"5temp",  unit =>" %"}  
+  "p99PumpRateDHW"				=> {cmd2=>"0A02CC", argMin =>   "0", argMax =>  "100",	type =>"5temp",  unit =>" %"} ,
+  "p99CoolingHC1Switch"			=> {cmd2=>"0B0287", argMin =>   "0", argMax =>    "1",	type =>"1clean",  unit =>""},
+  "p99CoolingHC1SetTemp"		=> {cmd2=>"0B0582", argMin =>  "15", argMax =>  "27",	type =>"5temp",  unit =>" °C"},    #suggested by TheTrumpeter
+  "p99CoolingHC1HystersisFlowTemp"		=> {cmd2=>"0B0583", argMin =>  "0", argMax =>  "5",	type =>"5temp",  unit =>" K"}, #suggested by TheTrumpeter
+  "p99CoolingHC1HystersisRoomTemp"		=> {cmd2=>"0B0584", argMin =>  "0", argMax =>  "5",	type =>"5temp",  unit =>" K"}  #suggested by TheTrumpeter
 );
   
 
@@ -577,7 +581,9 @@ my %getsonly539 = (  #info from belu and godmorgon
   "sOutputIncrease"     	=> {cmd2=>"0A06A5",   type =>"1clean", unit =>" %"},
   "sHumProtection"		=> {cmd2=>"0A09D1",   type =>"1clean", unit =>""},
   "sSetHumidityMin"     	=> {cmd2=>"0A09D2",   type =>"1clean", unit =>" %"},
-  "sSetHumidityMax"     	=> {cmd2=>"0A09D3",   type =>"1clean", unit =>" %"}
+  "sSetHumidityMax"     	=> {cmd2=>"0A09D3",   type =>"1clean", unit =>" %"},
+  "sCoolHCTotal"   => {cmd2=>"0A0648", cmd3=>"0A0649",     type =>"1clean", unit =>" kWh"},
+  "sDewPointHC1"   => {cmd2=>"0B0264",     type =>"5temp",  unit =>" °C"}
  );
 %getsonly539=(%getsonly539, %getsonly439);
 
@@ -657,7 +663,7 @@ sub THZ_Initialize($)
   $hash->{SetFn}   = "THZ_Set";
   $hash->{AttrFn}  = "THZ_Attr";
   $hash->{FW_detailFn}  ="THZ_detailFn";
-  $hash->{AttrList}= "IODev do_not_notify:1,0  ignore:0,1 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 "
+  $hash->{AttrList}= "IODev do_not_notify:1,0  ignore:0,1 dummy:1,0 showtime:1,0 "
 		    ."interval_sGlobal:0,60,120,180,300,600,3600,7200,43200,86400 "
 		    ."interval_sSol:0,60,120,180,300,600,3600,7200,43200,86400 "
 		    ."interval_sDHW:0,60,120,180,300,600,3600,7200,43200,86400 "
@@ -707,13 +713,12 @@ sub THZ_Define($$)
   my $dev  = $a[2];
 
   if($dev eq "none") {
-    Log 1, "$name device is none, commands will be echoed only";
+     Log3 $name, 2, "$name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
   
   $hash->{DeviceName} = $dev;
-  
  
   
   my $ret = DevIo_OpenDev($hash, 0, "THZ_Refresh_all_gets");
@@ -736,7 +741,7 @@ sub THZ_Refresh_all_gets($) {
   my $timedelay= 5; 						#start after 5 seconds
   foreach  my $cmdhash  (keys %gets) {
     my %par = (  hash => $hash, command => $cmdhash );
-    RemoveInternalTimer(\%par);
+    #RemoveInternalTimer(\%par); #commented out in  v.0161 because appearently redundant; THZ_RemoveInternalTimer is more efficient and both are not needed
     InternalTimer(gettimeofday() + ($timedelay) , "THZ_GetRefresh", \%par, 0);		#increment 0.6 $timedelay++
     $timedelay += 0.6;
   }  #refresh all registers; the register with interval_command ne 0 will keep on refreshing
@@ -761,7 +766,8 @@ sub THZ_GetRefresh($) {
 			  InternalTimer(gettimeofday()+ $interval, "THZ_GetRefresh", $par, 1) ;
 	}
 	$replyc = THZ_Get($hash, $hash->{NAME}, $command) if ($hash->{STATE} ne "disconnected");
-	return ($replyc);
+	#BlockingCall("THZ_GetNB", $hash->{NAME} . "|". $command) if ($hash->{STATE} ne "disconnected");
+    return ($replyc);
 }
 
 
@@ -778,7 +784,7 @@ sub THZ_Write($$) {
   my $bstring;
     $bstring = $msg;
 
-  Log $ll5, "$hash->{NAME} sending $bstring";
+  Log3 $hash->{NAME}, 5, "$hash->{NAME} sending $bstring";
 
   DevIo_SimpleWrite($hash, $bstring, 1);
 }
@@ -797,14 +803,10 @@ sub THZ_Read($)
   return "" if(!defined($buf));
 
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
-  my $ll2 = GetLogLevel($name,2);
-
+  
   my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
   
-Log $ll5, "$name/RAW: $data";
-Log $ll2, "$name/RAW: $data";
-  
+Log3 $name, 3, "$name/RAW: $data";
 }
 
 
@@ -1009,6 +1011,24 @@ sub THZ_Set($@){
 
 #####################################
 #
+# THZ_GetNB - provides a method for polling the heatpump
+#
+# Parameters: name | command to be sent to the interface
+#
+########################################################################################
+sub THZ_GetNB($){
+    my ($string) = @_;
+    my ($name, $cmd) = split("\\|", $string);
+    my $hash = $defs{$name};
+    my ($err, $msg2)=THZ_Get($hash, $name, $cmd);
+    open (MYFILE, '>>data.txt');
+    print MYFILE ($name . "-" . $cmd . "-" . $msg2 . "-" . $err  ."\n");
+    close (MYFILE); 
+    return ($name . "|" . $msg2); 
+}
+
+#####################################
+#
 # THZ_Get - provides a method for polling the heatpump
 #
 # Parameters: hash and command to be sent to the interface
@@ -1018,8 +1038,6 @@ sub THZ_Get($@){
   my ($hash, @a) = @_;
   my $dev = $hash->{DeviceName};
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
-  my $ll2 = GetLogLevel($name,2);
 
   return "\"get $name\" needs one parameter" if(@a != 2);
   my $cmd = $a[1];
@@ -1098,6 +1116,7 @@ sub THZ_Get($@){
 
 
 
+
 #####################################
 #
 # THZ_Get_Comunication- provides a method for comunication called from THZ_Get or THZ_Set
@@ -1141,6 +1160,12 @@ sub THZ_Get_Comunication($$) {
   else  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
   return($err, $msg) ;
 }
+
+
+
+
+
+
 
 
 
@@ -1397,7 +1422,7 @@ local $SIG{__WARN__} = sub
   my $message = shift;
   
   if (!defined($internalHash)) {
-    Log 3, "EXCEPTION in THZ: '$message'";
+    Log3 "Mythz", 3, "EXCEPTION in THZ: '$message'";
   }
   else
   {
@@ -1498,7 +1523,7 @@ sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
-  my @numbers=('0A000C', '0A000D', '0A000E', '0A000F', '0A0014', '0A0016', '0A0125', '0A0126','0A0265', '0A0597', '0A0598', '0A0599', '0A059C','0A05AD', '0A05B0', '0A05DD', '0A05DE', '0A0BA3');
+  my @numbers=('0A0648', '0A0649', '0B0264', '0B0287', '0B0582', '0B0583', '0B0584', '0A0126','0A0265', '0A0597', '0A0598', '0A0599', '0A059C','0A05AD', '0A05B0', '0A05DD', '0A05DE', '0A0BA3');
   #my @numbers=(1, 3, 4, 5, 8, 12, 13, 14, 15, 17, 18, 19, 20, 22, 26, 39, 40, 82, 83, 86, 87, 96, 117, 128, 239, 265, 268, 269, 270, 271, 274, 275, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 297, 299, 317, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 603, 607, 612, 613, 634, 647, 650, 961, 1385, 1386, 1387, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 830, 1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 1555, 272, 1489, 1490, 1491, 1492, 1631, 933, 934, 1634, 928, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, 2029, 2030, 2031, 2032, 2033);
   #my @numbers=(1, 3, 12, 13, 14, 15, 19, 20, 22, 26, 39,  82, 83, 86, 87, 96, 239, 265, 268, 274, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 613, 634, 961, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409,  1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 2970, 2971, 2975, 2976, 2977, 2978, 2979, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 272, 1489, 1491, 1492, 1631, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, );
  # my @numbers=(239, 410, 603, 607, 634, 830, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1467, 1468, 1469, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1501, 1502, 374, 1631, 718, 2372, 328);
@@ -1624,6 +1649,8 @@ sub THZ_Undef($$) {
         delete $defs{$d}{IODev};
       }
   }
+  
+  BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
   DevIo_CloseDev($hash); 
   return undef;
 }
@@ -1866,7 +1893,7 @@ sub THZ_backup_readings($){
   $backupfile=~ s/fhem.save/$replacestr/g;  #saving to statefile path
   if(!open(BAFH, ">$backupfile")) {
     my $msg = "WriteStateFile: Cannot open $backupfile: $!";
-    Log 1, $msg;
+    Log3 $hash->{NAME},3, $msg;
     return $msg;
   }
   print BAFH "#$t\n";
