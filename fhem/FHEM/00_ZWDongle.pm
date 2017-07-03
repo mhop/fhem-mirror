@@ -494,7 +494,7 @@ ZWDongle_Get($@)
                 substr($ret,4,8), substr($ret,12,2));
     $hash->{homeId} = substr($ret,4,8);
     $hash->{nodeIdHex} = substr($ret,12,2);
-    $attr{NAME}{homeId} = substr($ret,4,8);
+    $attr{$name}{homeId} = substr($ret,4,8);
 
   } elsif($cmd eq "version") {                 ############################
     $msg = join("",  map { chr($_) } @r[2..13]);
