@@ -2246,8 +2246,7 @@ PrintHash($$)
           $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, $h->{$c}{NAME});
 
         } else {
-          $sstr .= sprintf("%*s %s:\n",
-                          $lev, " ", uc(substr($c,0,1)).lc(substr($c,1)));
+          $sstr .= sprintf("%*s %s:\n", $lev, " ", $c);
           $sstr .= PrintHash($h->{$c}, $lev+2);
         }
       } elsif(ref($h->{$c}) eq "ARRAY") {
