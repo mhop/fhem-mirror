@@ -1,4 +1,4 @@
-REV 14631
+REV 14636
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,10 +21,10 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-07-03_07:45:02 203139 ./CHANGED
+UPD 2017-07-03_20:33:54 203214 ./CHANGED
 UPD 2017-07-02_07:45:02 36564 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
-UPD 2017-05-23_07:45:05 134695 ./fhem.pl
+UPD 2017-07-03_20:33:56 134636 ./fhem.pl
 UPD 2015-11-07_07:45:11 21944 FHEM/00_CM11.pm
 UPD 2017-04-28_07:45:02 56985 FHEM/00_CUL.pm
 UPD 2017-05-10_07:45:02 76972 FHEM/00_DFPlayerMini.pm
@@ -47,7 +47,7 @@ UPD 2017-01-24_07:45:02 119126 FHEM/00_SIGNALduino.pm
 UPD 2017-06-22_07:45:02 495665 FHEM/00_SONOS.pm
 UPD 2017-06-30_07:45:02 20215 FHEM/00_SmartMeterP1.pm
 UPD 2016-10-27_07:45:10 54624 FHEM/00_TCM.pm
-UPD 2017-06-19_07:45:02 109226 FHEM/00_THZ.pm
+UPD 2017-07-03_20:33:54 110700 FHEM/00_THZ.pm
 UPD 2017-04-29_07:45:02 33275 FHEM/00_TUL.pm
 UPD 2017-04-05_07:45:02 21475 FHEM/00_ZWCUL.pm
 UPD 2017-05-03_07:45:02 42211 FHEM/00_ZWDongle.pm
@@ -464,7 +464,7 @@ UPD 2017-03-02_07:45:02 5804 FHEM/98_weblink.pm
 UPD 2017-04-24_07:45:02 48586 FHEM/98_weekprofile.pm
 UPD 2016-11-02_07:45:12 14487 FHEM/99_SUNRISE_EL.pm
 UPD 2017-01-29_07:45:02 9279 FHEM/99_Utils.pm
-UPD 2017-05-23_07:45:02 6623 FHEM/Blocking.pm
+UPD 2017-07-03_20:33:54 6723 FHEM/Blocking.pm
 UPD 2016-03-31_07:45:12 11202 FHEM/Color.pm
 UPD 2017-04-02_07:45:02 14521 FHEM/DevIo.pm
 UPD 2015-07-28_14:05:29 562 FHEM/FhemUtils/release.pm
@@ -573,7 +573,7 @@ UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
 UPD 2017-04-08_07:45:02 8063 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2017-06-03_07:45:02 195563 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2017-06-03_07:45:02 81343 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2017-07-03_20:33:54 81572 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2017-01-10_07:45:02 10377 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2017-04-18_07:45:02 15127 FHEM/msgSchema.pm
