@@ -114,10 +114,13 @@ sub _fi2_Count() {
       $model = ReadingsVal($name,'modelId',$model) 
                if (lc($type) eq 'zwave');
       
-# 5. check if model is a scalar
+# 5. ignore model for KNX
+      $model = $c_noModel if (lc($type) eq 'knx');
+
+# 6. check if model is a scalar
       $model = $c_noModel if (ref $model);
 
-# 6. skip for some special cases found in database
+# 7. skip for some special cases found in database
       next if ( ($model =~ /^unkno.*/i) || 
                 ($model =~ /virtual.*/i) || 
                 ($model eq '?') || 
@@ -125,7 +128,7 @@ sub _fi2_Count() {
                 (defined($defs{$key}{'chanNo'})) ||
                 ($name =~ m/^unknown_/) );
 
-# 7. finally count it :)
+# 8. finally count it :)
       $fhemInfo{$type}{$model}++ ;
    }
 
