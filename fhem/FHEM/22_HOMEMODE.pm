@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules};
 
-my $HOMEMODE_version = "1.1.3";
+my $HOMEMODE_version = "1.1.4";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -880,6 +880,7 @@ sub HOMEMODE_set_modeAlarm($$$)
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"prevModeAlarm",$amode);
   readingsBulkUpdate($hash,"modeAlarm",$option);
+  readingsBulkUpdateIfChanged($hash,"alarmState",$option);
   readingsEndUpdate($hash,1);
   HOMEMODE_TriggerState($hash) if ($hash->{SENSORSCONTACT} || $hash->{SENSORSMOTION});
   HOMEMODE_execCMDs($hash,HOMEMODE_serializeCMD($hash,@commands),$resident) if (@commands);
@@ -908,12 +909,14 @@ sub HOMEMODE_alarmTriggered($@)
     push @commands,$attr{$name}{"HomeCMDalarmTriggered-on"} if ($attr{$name}{"HomeCMDalarmTriggered-on"});
     readingsBulkUpdateIfChanged($hash,"alarmTriggered",join ",",@triggers);
     readingsBulkUpdateIfChanged($hash,"alarmTriggered_hr",$text);
+    readingsBulkUpdateIfChanged($hash,"alarmState","alarm");
   }
   else
   {
     push @commands,$attr{$name}{"HomeCMDalarmTriggered-off"} if ($attr{$name}{"HomeCMDalarmTriggered-off"} && ReadingsVal($name,"alarmTriggered",""));
     readingsBulkUpdateIfChanged($hash,"alarmTriggered","");
     readingsBulkUpdateIfChanged($hash,"alarmTriggered_hr","");
+    readingsBulkUpdateIfChanged($hash,"alarmState",ReadingsVal($name,"modeAlarm","disarm"));
   }
   readingsEndUpdate($hash,1);
   HOMEMODE_execCMDs($hash,HOMEMODE_serializeCMD($hash,@commands)) if (@commands && ReadingsAge($name,"modeAlarm","") > 5);
@@ -2723,8 +2726,8 @@ sub HOMEMODE_HomebridgeMapping($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $mapping;
-  $mapping .= "SecuritySystemCurrentState=modeAlarm,values=armhome:0;armaway:1;armnight:2;disarm:3";
-  $mapping .= "\nSecuritySystemTargetState=SecuritySystemCurrentState,cmds=0:modeAlarm+armhome;1:modeAlarm+armaway;2:modeAlarm+armnight;3:modeAlarm+disarm,delay=1";
+  $mapping .= "SecuritySystemCurrentState=alarmState,values=armhome:0;armaway:1;armnight:2;disarm:3;alarm:4";
+  $mapping .= "\nSecuritySystemTargetState=modeAlarm,values=armhome:0;armaway:1;armnight:2;disarm:3,cmds=0:modeAlarm+armhome;1:modeAlarm+armaway;2:modeAlarm+armnight;3:modeAlarm+disarm,delay=1";
   $mapping .= "\nSecuritySystemAlarmType=alarmTriggered_ct,values=0:0;/.*/:1";
   $mapping .= "\nOccupancyDetected=presence,values=present:1;absent:0";
   $mapping .= "\nMute=dnd,valueOn=on,cmds=1:dnd+on;0:dnd+off";
@@ -3722,6 +3725,10 @@ sub HOMEMODE_Details($$$)
   <p><b>Readings</b></p>
   <ul>
     <li>
+      <b><i>alarmState</i></b><br>
+      current state of alarm system (includes current alarms - for homebridgeMapping)
+    </li>
+    <li>
       <b><i>alarmTriggered</i></b><br>
       list of triggered alarm sensors (contact/motion sensors)
     </li>
@@ -3942,7 +3949,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>modeAlarm</i></b><br>
-      current alarm mode
+      current mode of alarm system
     </li>
     <li>
       <b><i>motionsInside</i></b><br>
