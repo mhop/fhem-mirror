@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.18.3     04.07.2017       bugfix (links with $FW_ME deleted), MODEL as Internal (for statistic)
 # 2.18.2     29.06.2017       check of index for DbRep added
 # 2.18.1     25.06.2017       DbLog_configCheck/ DbLog_sqlget some changes, commandref revised
 # 2.18.0     24.06.2017       configCheck added (MySQL, PostgreSQL)
@@ -135,7 +136,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.18.2";
+my $DbLogVersion = "2.18.3";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -2094,6 +2095,8 @@ sub DbLog_readCfg($){
     Log3 $hash->{NAME}, 3, "Only Mysql, Postgresql, Oracle, SQLite are fully supported.";
     Log3 $hash->{NAME}, 3, "It may cause SQL-Erros during generating plots.";
   }
+  
+  $hash->{MODEL} = $hash->{DBMODEL}; # used in FHEM statistics
     
   if($hash->{DBMODEL} eq "MYSQL") {
 	$hash->{UTF8} = defined($dbconfig{utf8})?$dbconfig{utf8}:0;
@@ -2797,7 +2800,7 @@ sub DbLog_configcheck($) {
   } else {
       $rec  = "Switch $name to the asynchronous logmode by setting the 'asyncMode' attribute. The advantage of this mode is to log events non-blocking. <br>";
 	  $rec .= "There are attributes 'syncInterval' and 'cacheLimit' relevant for this working mode. <br>";
-	  $rec .= "Please refer to Commandref <a href='$FW_ME/docs/commandref${sfx}.html#DbLogattr' target='_blank'>attributes</a> for further informations. ";
+	  $rec .= "Please refer to Commandref attributes for further informations.";
   }
   $check .= "<b>Recommendation:</b> $rec <br><br>"; 
 		
@@ -2853,15 +2856,15 @@ sub DbLog_configcheck($) {
 	  $rec .= "TYPE: $columns{TYPE} <br>";
 	  $rec .= "EVENT: $columns{EVENT} <br>";
 	  $rec .= "READING: $columns{READING} <br>";
-	  $rec .= "UNIT: $columns{UNIT} <br>";
-	  $rec .= "DEVICE: $columns{DEVICE} <br><br>";
+	  $rec .= "VALUE: $columns{VALUE} <br>";
+	  $rec .= "UNIT: $columns{UNIT} <br><br>";
       $rec .= "You can change the column width in database by a statement like <b>'alter table history modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
       $rec .= "You can do it for example by executing 'sqlCMD' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
-	  $rec .= "The field width used by the module can be done by setting <a href='$FW_ME/docs/commandref${sfx}.html#DbLogattr' target='_blank'>attributes</a> 'colEvent', 'colReading', 'colValue',";
+	  $rec .= "The field width used by the module can be done by setting attributes 'colEvent', 'colReading', 'colValue',";
   }
   
   $check .= "<u><b>Result of table 'history' check</u></b><br><br>";
-  $check .= "Column width set in $dbname: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
+  $check .= "Column width set in DB $dbname: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
   $check .= "Column width used by $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
   $check .= "<b>Recommendation:</b> $rec <br><br>";
 
@@ -2914,15 +2917,15 @@ sub DbLog_configcheck($) {
 	  $rec .= "TYPE: $columns{TYPE} <br>";
 	  $rec .= "EVENT: $columns{EVENT} <br>";
 	  $rec .= "READING: $columns{READING} <br>";
-	  $rec .= "UNIT: $columns{UNIT} <br>";
-	  $rec .= "DEVICE: $columns{DEVICE} <br><br>";
+	  $rec .= "VALUE: $columns{VALUE} <br>";
+	  $rec .= "UNIT: $columns{UNIT} <br><br>";
       $rec .= "You can change the column width in database by a statement like <b>'alter table current modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
       $rec .= "You can do it for example by executing 'sqlCMD' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
-	  $rec .= "The field width used by the module can be done by setting <a href='$FW_ME/docs/commandref${sfx}.html#DbLogattr' target='_blank'>attributes</a> 'colEvent', 'colReading', 'colValue',";
+	  $rec .= "The field width used by the module can be done by setting attributes 'colEvent', 'colReading', 'colValue',";
   }
   
   $check .= "<u><b>Result of table 'current' check</u></b><br><br>";
-  $check .= "Column width set in $dbname: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
+  $check .= "Column width set in DB $dbname: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
   $check .= "Column width used by $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
   $check .= "<b>Recommendation:</b> $rec <br><br>";
   
