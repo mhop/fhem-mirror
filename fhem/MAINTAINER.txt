@@ -495,10 +495,11 @@ contrib/98_exportdevice.pm   loredo               http://forum.fhem.de Sonstiges
 contrib/98_geodata.pm        betateilchen         http://forum.fhem.de Sonstiges
 contrib/98_openweathermap.pm betateilchen         http://forum.fhem.de Wettermodule
 contrib/98_PID.pm            betateilchen         http://forum.fhem.de Automatisierung
-contrib/by_ext.holiday       loredo               http://forum.fhem.de Sonstiges
-contrib/de_social.holiday    loredo               http://forum.fhem.de Sonstiges
 contrib/GDS/55_GDS.pm        betateilchen         http://forum.fhem.de Wettermodule
 contrib/GDS/GDSweblink.pm    jensb                http://forum.fhem.de Wettermodule
+contrib/holiday              betateilchen         http://forum.fhem.de Sonstiges
+        by_ext.holiday       loredo               http://forum.fhem.de Sonstiges
+        de_social.holiday    loredo               http://forum.fhem.de Sonstiges
 contrib/Infratec/*           wzut                 http://forum.fhem.de Bastelecke
 contrib/PRESENCE             markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 contrib/PRESENCE/lepresenced PatrickR             http://forum.fhem.de Unterstuetzende Dienste
