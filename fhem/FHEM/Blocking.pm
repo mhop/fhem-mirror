@@ -26,8 +26,8 @@ sub BlockingKill($);
 sub BlockingInformParent($;$$);
 sub BlockingStart(;$);
 
-our $BC_telnetDevice;
-our %BC_hash;
+use vars qw($BC_telnetDevice);
+use vars qw(%BC_hash);
 my $telnetClient;
 my $bc_pid = 0;
 
