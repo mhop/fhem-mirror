@@ -26,8 +26,8 @@ sub BlockingKill($);
 sub BlockingInformParent($;$$);
 sub BlockingStart(;$);
 
-use vars qw($BC_telnetDevice);
-use vars qw(%BC_hash);
+our $BC_telnetDevice;
+our %BC_hash;
 my $telnetClient;
 my $bc_pid = 0;
 
@@ -74,8 +74,29 @@ BC_searchTelnet($)
 }
 
 sub
+BlockingInfo($$@)
+{
+  my @ret;
+  foreach my $h (values %BC_hash) {
+    next if($h->{terminated} || !$h->{pid});
+    my $fn  = (ref($h->{fn})  ? ref($h->{fn})  : $h->{fn});
+    my $arg = (ref($h->{arg}) ? ref($h->{arg}) : $h->{arg});
+    my $to  = ($h->{timeout}  ? $h->{timeout}  : "N/A");
+    push @ret, "Pid:$h->{pid} Fn:$fn Arg:$arg Timeout:$to";
+  }
+  push @ret, "No BlockingCall processes running currently" if(!@ret);
+  return join("\n", @ret);
+}
+
+sub
 BlockingCall($$@)
 {
+  my %hash = (
+    Fn  => "BlockingInfo",
+    Hlp => ",show info about processes started by BlockingCall"
+  );
+  $cmds{blockinginfo} = \%hash;
+
   my ($blockingFn, $arg, $finishFn, $timeout, $abortFn, $abortArg) = @_;
 
   my %h = ( pid=>'WAITING:', fn=>$blockingFn, arg=>$arg, finishFn=>$finishFn,
