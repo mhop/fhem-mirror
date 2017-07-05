@@ -52,6 +52,8 @@
 #
 # SVN-History:
 # 05.07.2017
+#	Neue Variante für das Ermitteln der laufenden Favoriten, Radios oder Playlists.
+# 05.07.2017
 #	Veralteten Mechanismus für das Unterbrechen der Sendeschleife aufgeräumt.
 #	SONOS_ConvertNumToWord kann nun mit undef-Übergaben umgehen.
 #	Andere Methodik zum Ermitteln von FavouriteName, RadioName und PlaylistName eingebaut.
@@ -80,10 +82,6 @@
 #	Es gibt vier neue Attribute am Sonosdevice: "getFavouritesListAtNewVersion", "getPlaylistsListAtNewVersion", "getRadiosListAtNewVersion" und "getQueueListAtNewVersion". In Zusammenarbeit mit "getListsDirectlyToReadings" wird dann bei Änderung der entsprechenden Liste automatisch das entsprechende Reading aller Sonosplayer-Devices aktualisiert. Hierbei entfallen dann etwaige eigene Notifies, die eine Aktualisierung der Readings veranlassen. Diese sollten dann natürlich auch entfernt werden.
 #	Die Überprüfung, ob der SubProzess noch lebt, wird nun über die bereits bestehende Verbindung abgewickelt. Dadurch entfallen die ständigen Verbindungsversuche zum SubProzess. Dazu wird ein Reading 'LastProcessAnswer' am zentralen Sonos-Device geführt.
 #	Bei Verlust der Verbindung zum SubProzess wird nun keine 100% Systemlast mehr verursacht.
-# 15.05.2017
-#	Bei der Ermittlung der Masterplayer werden "unsichtbare" Player (wie Bridge o.ä.) nun unterdrückt.
-#	An einer Stelle wurde ein fehlerhafter Default-Wert für 'currentTrackPositionSec' eingesetzt, was zu Folgefehlern führte.
-#	Die Wiederverwendung von Ports für die UPnP-Erkennung muss nun mittels dem Attribut 'reusePorts' aktiviert werden.
 #
 ########################################################################################
 #
@@ -1330,12 +1328,13 @@ sub SONOS_Read($) {
 				$current{FavouriteName} = '';
 				eval {
 					my $readingsValue = ReadingsVal($hash->{NAME}, 'Favourites', '');
-					$readingsValue = '()' if (trim($readingsValue) eq '');
-					my %favourites = %{eval($readingsValue)};
-					while (my ($key, $value) = each (%favourites)) {
-						if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
-							if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
-								$current{FavouriteName} = $value->{Title};
+					if ($readingsValue ne '') {
+						my %favourites = %{eval($readingsValue)};
+						while (my ($key, $value) = each (%favourites)) {
+							if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
+								if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
+									$current{FavouriteName} = $value->{Title};
+								}
 							}
 						}
 					}
@@ -1348,12 +1347,13 @@ sub SONOS_Read($) {
 				$current{PlaylistName} = '';
 				eval {
 					my $readingsValue = ReadingsVal($hash->{NAME}, 'Playlists', '');
-					$readingsValue = '()' if (trim($readingsValue) eq '');
-					my %playlists = %{eval($readingsValue)};
-					while (my ($key, $value) = each (%playlists)) {
-						if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
-							if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
-								$current{PlaylistName} = $value->{Title};
+					if ($readingsValue ne '') {
+						my %playlists = %{eval($readingsValue)};
+						while (my ($key, $value) = each (%playlists)) {
+							if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
+								if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
+									$current{PlaylistName} = $value->{Title};
+								}
 							}
 						}
 					}
@@ -1366,12 +1366,13 @@ sub SONOS_Read($) {
 				$current{RadioName} = '';
 				eval {
 					my $readingsValue = ReadingsVal($hash->{NAME}, 'Radios', '');
-					$readingsValue = '()' if (trim($readingsValue) eq '');
-					my %radios = %{eval($readingsValue)};
-					while (my ($key, $value) = each (%radios)) {
-						if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
-							if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
-								$current{RadioName} = $value->{Title};
+					if ($readingsValue ne '') {
+						my %radios = %{eval($readingsValue)};
+						while (my ($key, $value) = each (%radios)) {
+							if (defined($current{EnqueuedTransportURI}) && defined($value->{Ressource})) {
+								if ($value->{Ressource} eq $current{EnqueuedTransportURI}) {
+									$current{RadioName} = $value->{Title};
+								}
 							}
 						}
 					}
@@ -10692,7 +10693,7 @@ The order in the sublists are important, because the first entry defines the so-
 <li><a name="SONOS_attribut_reusePort"><b><code>reusePort &lt;int&gt;</code></b>
 </a><br /> One of (0,1). If defined the socket-Attribute 'reuseport' will be used for SSDP Discovery-Port. Can solve restart-problems. If you don't have such problems don't use this attribute.</li>
 <li><a name="SONOS_attribut_SubProcessLogfileName"><b><code>SubProcessLogfileName &lt;Path&gt;</code></b>
-</a><br /> If given, the subprocess logs into its own logfile. Under Windows this is a recommended way for logging, because the two Loggings (Fehm and the SubProcess) overwrite each other. If "-" is given, the logging goes to STDOUT (and therefor in the Fhem-log) as usual.</li>
+</a><br /> If given, the subprocess logs into its own logfile. Under Windows this is a recommended way for logging, because the two Loggings (Fehm and the SubProcess) overwrite each other. If "-" is given, the logging goes to STDOUT (and therefor in the Fhem-log) as usual. The main purpose of this attribute is the short-use of separated logging. No variables are substituted. The value is used as configured.</li>
 <li><a name="SONOS_attribut_usedonlyIPs"><b><code>usedonlyIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
 </a><br />With this attribute you can define IP-addresses, which has to be exclusively used by the UPnP-System of this module. e.g. "192.168.0.11,192.168.0.37"</li>
 </ul></li>
@@ -10890,7 +10891,7 @@ Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintra
 <li><a name="SONOS_attribut_reusePort"><b><code>reusePort &lt;int&gt;</code></b>
 </a><br /> Eines von (0,1). Gibt an, ob die Portwiederwendung für SSDP aktiviert werden soll, oder nicht. Kann Restart-Probleme lösen. Wenn man diese Probleme nicht hat, sollte man das Attribut nicht setzen.</li>
 <li><a name="SONOS_attribut_SubProcessLogfileName"><b><code>SubProcessLogfileName &lt;Pfad&gt;</code></b>
-</a><br /> Hiermit kann für den SubProzess eine eigene Logdatei angegeben werden. Unter Windows z.B. überschreiben sich die beiden Logausgaben (von Fhem und SubProzess) sonst gegenseitig. Wenn "-" angegeben wird, wird wie bisher auf STDOUT (und damit im Fhem-Log) geloggt.</li>
+</a><br /> Hiermit kann für den SubProzess eine eigene Logdatei angegeben werden. Unter Windows z.B. überschreiben sich die beiden Logausgaben (von Fhem und SubProzess) sonst gegenseitig. Wenn "-" angegeben wird, wird wie bisher auf STDOUT (und damit im Fhem-Log) geloggt. Der Hauptanwendungsfall ist die mehr oder weniger kurzfristige Fehlersuche. Es werden keinerlei Variablenwerte ersetzt, und der Wert direkt als Dateiname verwendet.</li>
 <li><a name="SONOS_attribut_usedonlyIPs"><b><code>usedonlyIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
 </a><br />Mit diesem Attribut können IP-Adressen angegeben werden, die ausschließlich vom UPnP-System berücksichtigt werden sollen. Z.B.: "192.168.0.11,192.168.0.37"</li>
 </ul></li>
