@@ -347,7 +347,7 @@ HttpUtils_Connect2($)
         if($hash->{NAME});
       my %par = %{$hash->{sslargs}};
       $par{Timeout}      = $hash->{timeout};
-      $par{SSL_version}  = $sslVersion;
+      $par{SSL_version}  = $sslVersion if(!$par{SSL_version});
       $par{SSL_hostname} = $hash->{host} 
         if(IO::Socket::SSL->can('can_client_sni') &&
            IO::Socket::SSL->can_client_sni() &&
