@@ -31,8 +31,19 @@
 
 #################################
 ######### Wichtige Hinweise und Links #################
-
-
+#
+## Das JSON Modul immer in einem eval aufrufen
+# $data = eval{decode_json($data)};
+#
+# if($@){
+#   Log3($SELF, 2, "$TYPE ($SELF) - error while request: $@");
+#  
+#   readingsSingleUpdate($hash, "state", "error", 1);
+#
+#   return;
+# }
+##
+##
 ##
 #
 
@@ -49,14 +60,14 @@ use MIME::Base64;
 use IO::Socket::INET;
 use Digest::SHA qw(sha1_hex);
 use JSON qw(decode_json encode_json);
-use Encode qw(encode_utf8);
+use Encode qw(encode_utf8 decode_utf8);
 use Blocking;
 
 
 
 
 
-my $version = "0.6.0";
+my $version = "0.8.0";
 
 
 
@@ -412,7 +423,7 @@ sub LGTV_WebOS_Set($@) {
         return "usage: screenMsg <message>" if( @args < 1 );
 
         my $msg = join(" ", @args);
-        $payload{$lgCommands{$cmd}->[1]}    = $msg;
+        $payload{$lgCommands{$cmd}->[1]}    = decode_utf8($msg);
         $uri                                = $lgCommands{$cmd}->[0];
         
     } elsif($cmd eq 'on' or $cmd eq 'off') {
