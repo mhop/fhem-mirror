@@ -97,10 +97,6 @@ sub _fi2_Count() {
       $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
       $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
 
-      # special internal for DbLog
-      $model = defined($defs{$key}{DBMODEL}) ? $defs{$key}{DBMODEL} : $model
-               if (lc($type) eq 'dblog');
-
 # 3. look for model information in attributes
       $model = AttrVal($name,'model',$model);
 
