@@ -723,26 +723,27 @@ sub subscribe {
 		my $ua = LWP::UserAgent->new(timeout => 20);
 		my $response = $ua->request($request);
 
-		if ($response->is_success &&
-			$response->code == 200) {
-			my $sid = $response->header('SID');
-			$timeout = $response->header('Timeout');
-			if ($timeout =~ /^Second-(\d+)$/) {
-				$timeout = $1;
+		if ($response->is_success) {
+			if ($response->code == 200) {
+				my $sid = $response->header('SID');
+				$timeout = $response->header('Timeout');
+				if ($timeout =~ /^Second-(\d+)$/) {
+					$timeout = $1;
+				}
+	
+				my $subscription = UPnP::ControlPoint::Subscription->new(
+											   Service => $self,
+											   Callback => $callback,
+											   SID => $sid,
+											   Timeout => $timeout,
+											   EventSubURL => "$url");
+				$cp->addSubscription($subscription);
+				return $subscription;
+			} else {
+				carp("Subscription request successful but answered with error: " . $response->code . " " . $response->message);
 			}
-
-			my $subscription = UPnP::ControlPoint::Subscription->new(
-										   Service => $self,
-										   Callback => $callback,
-										   SID => $sid,
-										   Timeout => $timeout,
-										   EventSubURL => "$url");
-			$cp->addSubscription($subscription);
-			return $subscription;
-		} 
-		else {
-			carp("Subscription request failed with error: " . 
-				 $response->code . " " . $response->message);
+		} else {
+			carp("Subscription request failed with error: " . $response->code . " " . $response->message);
 		}
 	}
 

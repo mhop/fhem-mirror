@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, Juni 2017
+# SONOSPLAYER.pm (c) by Reiner Leins, July 2017
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -409,7 +409,7 @@ sub SONOSPLAYER_SimulateCurrentTrackPosition() {
 	
 	readingsBeginUpdate($hash);
 	
-	my $trackDurationSec = SONOS_GetTimeSeconds(ReadingsVal($hash->{NAME}, 'currentTrackDuration', 0)) - 1;
+	my $trackDurationSec = SONOS_GetTimeSeconds(ReadingsVal($hash->{NAME}, 'currentTrackDuration', 0));
 	
 	my $trackPositionSec = 0;
 	if (ReadingsVal($hash->{NAME}, 'transportState', 'STOPPED') eq 'PLAYING') {
@@ -500,7 +500,7 @@ sub SONOSPLAYER_Get($@) {
 	} elsif (lc($reading) eq 'ethernetportstatus') {
 		my $portNum = $a[2];
 		
-		readingsSingleUpdate($hash, 'LastActionResult', 'Portstatus properly returned', 1);
+		SONOS_readingsSingleUpdate($hash, 'LastActionResult', 'Portstatus properly returned', 1);
 	
 		my $url = ReadingsVal($name, 'location', '');
 		$url =~ s/(^http:\/\/.*?)\/.*/$1\/status\/enetports/;
@@ -516,7 +516,7 @@ sub SONOSPLAYER_Get($@) {
 	} elsif (lc($reading) eq 'alarm') {
 		my $id = $a[2];
 		
-		readingsSingleUpdate($hash, 'LastActionResult', 'Alarm-Hash properly returned', 1);
+		SONOS_readingsSingleUpdate($hash, 'LastActionResult', 'Alarm-Hash properly returned', 1);
 		
 		my @idList = split(',', ReadingsVal($name, 'AlarmListIDs', ''));
 		if (!SONOS_isInList($id, @idList)) {
@@ -1011,7 +1011,7 @@ sub SONOSPLAYER_Set($@) {
 			foreach my $dev (SONOS_getAllSonosplayerDevices()) {
 				push(@sonosDevs, $dev->{NAME}) if ($dev->{NAME} ne $hash->{NAME});
 			}
-			readingsSingleUpdate($hash, 'LastActionResult', 'AddMember: Wrong Sonos-Devicename "'.$value.'". Use one of "'.join('", "', @sonosDevs).'"', 1);
+			SONOS_readingsSingleUpdate($hash, 'LastActionResult', 'AddMember: Wrong Sonos-Devicename "'.$value.'". Use one of "'.join('", "', @sonosDevs).'"', 1);
 			
 			return undef;
 		}
@@ -1027,7 +1027,7 @@ sub SONOSPLAYER_Set($@) {
 			foreach my $dev (SONOS_getAllSonosplayerDevices()) {
 				push(@sonosDevs, $dev->{NAME}) if ($dev->{NAME} ne $hash->{NAME});
 			}
-			readingsSingleUpdate($hash, 'LastActionResult', 'RemoveMember: Wrong Sonos-Devicename "'.$value.'". Use one of "'.join('", "', @sonosDevs).'"', 1);
+			SONOS_readingsSingleUpdate($hash, 'LastActionResult', 'RemoveMember: Wrong Sonos-Devicename "'.$value.'". Use one of "'.join('", "', @sonosDevs).'"', 1);
 			
 			return undef;
 		}
@@ -1063,7 +1063,7 @@ sub SONOSPLAYER_Set($@) {
 		# Anweisung an den alten linken Lautsprecher absetzen
 		SONOS_DoWork($udn, 'separateStereoPair', uri_escape($leftPlayerShort.':LF,LF;'.$rightPlayerShort.':RF,RF'));
 	} elsif (lc($key) eq 'reboot') {
-		readingsSingleUpdate($hash, 'LastActionResult', 'Reboot properly initiated', 1);
+		SONOS_readingsSingleUpdate($hash, 'LastActionResult', 'Reboot properly initiated', 1);
 	
 		my $url = ReadingsVal($name, 'location', '');
 		$url =~ s/(^http:\/\/.*?)\/.*/$1\/reboot/;
@@ -1072,12 +1072,12 @@ sub SONOSPLAYER_Set($@) {
 	} elsif (lc($key) eq 'wifi') {
 		$value = lc($value);
 		if ($value ne 'on' && $value ne 'off' && $value ne 'persist-off') {
-			readingsSingleUpdate($hash, 'LastActionResult', 'Wrong parameter "'.$value.'". Use one of "off", "persist-off" or "on".', 1);
+			SONOS_readingsSingleUpdate($hash, 'LastActionResult', 'Wrong parameter "'.$value.'". Use one of "off", "persist-off" or "on".', 1);
 			
 			return undef;
 		}
 		
-		readingsSingleUpdate($hash, 'LastActionResult', 'WiFi properly set to '.$value, 1);
+		SONOS_readingsSingleUpdate($hash, 'LastActionResult', 'WiFi properly set to '.$value, 1);
 		
 		my $url = ReadingsVal($name, 'location', '');
 		$url =~ s/(^http:\/\/.*?)\/.*/$1\/wifictrl?wifi=$value/;
@@ -1239,6 +1239,7 @@ sub SONOSPLAYER_Delete($$) {
 	SONOSPLAYER_DeleteIfExists($hash->{NAME}.'RG_Favourites');
 	SONOSPLAYER_DeleteIfExists($hash->{NAME}.'RG_Playlists');
 	SONOSPLAYER_DeleteIfExists($hash->{NAME}.'RG_Radios');
+	SONOSPLAYER_DeleteIfExists($hash->{NAME}.'RG_Queue');
 	
 	# Das Entfernen des Sonos-Devices selbst übernimmt Fhem
 	return undef;
