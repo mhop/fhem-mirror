@@ -640,7 +640,7 @@ sub DOIFtools_Notify($$) {
       CommandSave(undef,undef);
     }
     # Event monitor in DOIF FW_detailFn
-    if ($modules{DOIF}{LOADED} and $modules{DOIF}->{FW_detailFn} and $modules{DOIF}->{FW_detailFn} ne "DOIFtools_eM" and $sn eq "global" and $event =~ "^INITIALIZED\$" ) {
+    if ($modules{DOIF}{LOADED} and (!$modules{DOIF}->{FW_detailFn} or $modules{DOIF}->{FW_detailFn} and $modules{DOIF}->{FW_detailFn} ne "DOIFtools_eM") and $sn eq "global" and $event =~ "^INITIALIZED\$" ) {
         readingsBeginUpdate($hash);
           readingsBulkUpdate($hash,".DOIF_detailFn",$modules{DOIF}->{FW_detailFn});
           $modules{DOIF}->{FW_detailFn} = "DOIFtools_eM";
