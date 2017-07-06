@@ -1953,27 +1953,21 @@ SVG_render($$$$$$$$$$)
       SVG_pO "<polyline $attributes $lStyle points=\"$ret\"/>";
 
     } elsif( $lType eq "bars" ) {
-       if(@{$dxp} == 1) {
-          my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
-          $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
-                $x,$y+$h, $x,$y1, $x+$w,$y1, $x+$w,$y+$h);
-       } else {
-          my $bw = $barwidth*$tmul;
-          # bars are all of equal width (see far above !), 
-          # position rounded to integer multiples of bar width
-          foreach my $i (0..int(@{$dxp})-1) {
-            my ($x1, $y1) = ( $x + $dxp->[$i] - $bw,
-                               $y +$h-($dyp->[$i]-$min)*$hmul);
-            my $curBw = $bw;
-            if($x1 < $x) {
-                $curBw -= $x - $x1;
-                $x1 = $x;
-            }
-            my ($x2, $y2) = ($curBw, ($dyp->[$i]-$min)*$hmul);    
-            SVG_pO "<rect $attributes $lStyle x=\"$x1\" y=\"$y1\" ".
-                        "width=\"$x2\" height=\"$y2\"/>";
-         }
-       }
+      my $bw = $barwidth*$tmul;
+      # bars are all of equal width (see far above !), 
+      # position rounded to integer multiples of bar width
+      foreach my $i (0..int(@{$dxp})-1) {
+        my ($x1, $y1) = ( $x + $dxp->[$i] - $bw,
+                           $y +$h-($dyp->[$i]-$min)*$hmul);
+        my $curBw = $bw;
+        if($x1 < $x) {
+            $curBw -= $x - $x1;
+            $x1 = $x;
+        }
+        my ($x2, $y2) = ($curBw, ($dyp->[$i]-$min)*$hmul);    
+        SVG_pO "<rect $attributes $lStyle x=\"$x1\" y=\"$y1\" ".
+                    "width=\"$x2\" height=\"$y2\"/>";
+      }
     } elsif( $lType eq "ibars" ) { # Forum #35268
       if(@{$dxp} == 1) {
         my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
