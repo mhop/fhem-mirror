@@ -354,7 +354,16 @@ HttpUtils_Connect2($)
            (!$hash->{sslargs} || !defined($hash->{sslargs}{SSL_hostname})));
       $par{SSL_verify_mode} = 0
         if(!$hash->{sslargs} || !defined($hash->{sslargs}{SSL_verify_mode}));
-      IO::Socket::SSL->start_SSL($hash->{conn}, \%par) || undef $hash->{conn};
+
+      eval {
+        IO::Socket::SSL->start_SSL($hash->{conn}, \%par) || undef $hash->{conn};
+      };
+      if($@) {
+        Log3 $hash, $hash->{loglevel}, $@;
+        HttpUtils_Close($hash);
+        return $@;
+      }
+      
       $hash->{hu_sslAdded} = 1 if($hash->{keepalive});
     }
   }
