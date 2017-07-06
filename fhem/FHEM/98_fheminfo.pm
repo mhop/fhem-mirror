@@ -107,8 +107,7 @@ sub _fi2_Count() {
       $model = ReadingsVal($name,'type',$model)
                if (lc($type) eq 'bosest');
       # special reading for ZWave
-      $model = ReadingsVal($name,'modelId',$model) 
-               if (lc($type) eq 'zwave');
+      $model = _fi2_zwave(ReadingsVal($name,'modelId','')) if (lc($type) eq 'zwave');
       
 # 5. ignore model for KNX
       $model = $c_noModel if (lc($type) eq 'knx');
@@ -250,6 +249,36 @@ sub _fi2_findRev {
    my (undef,$rev) = split (/ /,$content[0]);
    return $rev;
 }
+
+sub _fi2_zwave($) {
+  my ($zwave) = @_;
+  my $xml = $attr{global}{modpath}.
+            "/FHEM/lib/openzwave_manufacturer_specific.xml";
+
+  my ($mf, $prod, $id) = split(/-/,$zwave);
+  ($mf, $prod, $id) = (lc($mf), lc($prod), lc($id)); # Just to make it sure
+
+  my ($err,@data) = FileRead({FileName => $xml, ForceType=>'file'});
+  return $err if($err);
+
+  my ($lastMf, $mName, $ret) = ("","");
+  foreach my $l (@data) {
+    if($l =~ m/<Manufacturer.*id="([^"]*)".*name="([^"]*)"/) {
+      $lastMf = lc($1);
+      $mName = $2;
+      next;
+    }
+    if($l =~ m/<Product type\s*=\s*"([^"]*)".*id\s*=\s*"([^"]*)".*name\s*=\s*"([^"]*)"/) {
+      if($mf eq $lastMf && $prod eq lc($1) && $id eq lc($2)) {
+        $ret = "$mName $3";
+        last;
+      }
+    }
+  }
+  return $ret if($ret);
+  return $zwave;
+}
+
 
 1;
 
