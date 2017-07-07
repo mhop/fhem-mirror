@@ -42,12 +42,11 @@ my $DEG = pi/180.0;
 my $RAD = 180./pi;
 
 my $deltaT   = 65;  # Correction time in s
-my $timezone = 1;   # Difference between CET and UT  
 
 my %Astro;
 my %Date;
 
-my $astroversion = 1.0;
+my $astroversion = 1.1;
 
 #-- These we may get on request
 my %gets = (
@@ -1039,12 +1038,11 @@ sub Astro_Get($@) {
     return $astroversion;
     
   }elsif( $a[1] eq "json") {
-  
     Astro_Compute($hash);
     if( $wantsreading==1 ){
       return toJSON($Astro{$a[2]});
     }else{
-      return toJSON(%Astro);
+      return toJSON(\%Astro);
     }
     
   }elsif( $a[1] eq "text") {
