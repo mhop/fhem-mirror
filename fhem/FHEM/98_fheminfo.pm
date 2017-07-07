@@ -27,8 +27,9 @@ use HttpUtils;
 my $c_system  = 'system';
 my $c_noModel = 'noModel';
 
-my %fhemInfo   = ();
-my @ignoreList = qw(Global);
+my %fhemInfo    = ();
+my @ignoreList  = qw(Global);
+my @noModelList = qw(knx dummy at archetype weather pushover twilight hminfo readingsgroup);
 
 sub fheminfo_Initialize($$) {
   my %hash = (
@@ -113,9 +114,11 @@ sub _fi2_Count() {
          $model = _fi2_zwave($model);
       }
       
-# 5. ignore model for KNX
-      $model = $c_noModel if (lc($type) eq 'knx');
-
+# 5. ignore model for some modules
+      foreach my $i (@noModelList) {
+         $model = $c_noModel if (lc($type) eq $i);
+      }
+      
 # 6. check if model is a scalar
       $model = $c_noModel if (ref $model);
 
