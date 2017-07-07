@@ -107,7 +107,11 @@ sub _fi2_Count() {
       $model = ReadingsVal($name,'type',$model)
                if (lc($type) eq 'bosest');
       # special reading for ZWave
-      $model = _fi2_zwave(ReadingsVal($name,'modelId','')) if (lc($type) eq 'zwave');
+      if (lc($type) eq 'zwave') {
+         $model = ReadingsVal($name,'modelId',undef);
+         next unless (defined($model));
+         $model = _fi2_zwave($model);
+      }
       
 # 5. ignore model for KNX
       $model = $c_noModel if (lc($type) eq 'knx');
@@ -252,12 +256,12 @@ sub _fi2_findRev {
 
 sub _fi2_zwave($) {
   my ($zwave) = @_;
-  my $xml = $attr{global}{modpath}.
-            "/FHEM/lib/openzwave_manufacturer_specific.xml";
 
   my ($mf, $prod, $id) = split(/-/,$zwave);
   ($mf, $prod, $id) = (lc($mf), lc($prod), lc($id)); # Just to make it sure
 
+  my $xml = $attr{global}{modpath}.
+            "/FHEM/lib/openzwave_manufacturer_specific.xml";
   my ($err,@data) = FileRead({FileName => $xml, ForceType=>'file'});
   return $err if($err);
 
