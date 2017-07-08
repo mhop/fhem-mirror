@@ -46,13 +46,12 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.1;
+my $astroversion = 1.2;
 
 #-- These we may get on request
 my %gets = (
    "version" => "V",
    "json"  => "J",
-   "value" => "W",
    "text"  => "T"
 );
  
@@ -61,6 +60,9 @@ my @zodiac=("Widder", "Stier", "Zwillinge", "Krebs", "Löwe", "Jungfrau",
 
 my @phases = ("Neumond", "Zunehmende Sichel", "Erstes Viertel", "Zunehmender Mond", 
    "Vollmond", "Abnehmender Mond", "Letztes Viertel", "Abnehmende Sichel", "Neumond");
+   
+sub Astro_SunRise($$$$$$);
+sub Astro_MoonRise($$$$$$$);
  
 #########################################################################################
 #
@@ -77,9 +79,8 @@ sub Astro_Initialize ($) {
   #$hash->{SetFn}   	   = "Astro_Set";  
   $hash->{GetFn}       = "Astro_Get";
   $hash->{UndefFn}     = "Astro_Undef";   
-  $hash->{AttrFn}     = "Astro_Attr";
-  my $attst            = "interval";
-  $hash->{AttrList}    = $attst;			  
+  $hash->{AttrFn}      = "Astro_Attr";    
+  $hash->{AttrList}    = "interval longitude latitude altitude";			  
 	
   return undef;
 }
@@ -94,7 +95,7 @@ sub Astro_Initialize ($) {
 
 sub Astro_Define ($$) {
  my ($hash, $def) = @_;
- my $now = time();
+ #my $now = time();
  my $name = $hash->{NAME}; 
  $hash->{VERSION} = $astroversion;
  readingsSingleUpdate( $hash, "state", "Initialized", 1 ); 
@@ -104,9 +105,9 @@ sub Astro_Define ($$) {
  RemoveInternalTimer($hash);
  
  #-- Call us in n seconds again.
- InternalTimer(gettimeofday()+ 60, "Astro_Update", $hash,1);
+ InternalTimer(gettimeofday()+ 60, "Astro_Update", $hash,0);
 
- return;
+ return undef;
 }
 
 #########################################################################################
@@ -841,20 +842,26 @@ sub Astro_Compute($){
   return undef if( !$init_done );
 
   #-- geodetic latitude and longitude of observer on WGS84  
-  if( defined($attr{"global"}{"latitude"}) ){
+  if( defined($attr{$name}{"latitude"}) ){
+    $Astro{ObsLat}  = $attr{$name}{"latitude"};
+  }elsif( defined($attr{"global"}{"latitude"}) ){
     $Astro{ObsLat}  = $attr{"global"}{"latitude"};
   }else{
     $Astro{ObsLat}  = 50.0;
     Log3 $name,1,"[Astro] No latitude attribute set in global device, using 50.0°";
   }
-  if( defined($attr{"global"}{"longitude"}) ){
+  if( defined($attr{$name}{"longitude"}) ){
+    $Astro{ObsLon}  = $attr{$name}{"longitude"};
+  }elsif( defined($attr{"global"}{"longitude"}) ){
     $Astro{ObsLon}  = $attr{"global"}{"longitude"};
   }else{
     $Astro{ObsLon}  = 10.0;
     Log3 $name,1,"[Astro] No longitude attribute set in global device, using 10.0°";
   } 
   #-- altitude of observer in meters above WGS84 ellipsoid 
-  if( defined($attr{"global"}{"altitude"}) ){
+  if( defined($attr{$name}{"altitude"}) ){
+    $Astro{ObsAlt}  = $attr{$name}{"altitude"};
+  }elsif( defined($attr{"global"}{"altitude"}) ){
     $Astro{ObsAlt}  = $attr{"global"}{"altitude"};
   }else{
     $Astro{ObsAlt}  = 0.0;
@@ -1088,6 +1095,7 @@ sub Astro_Get($@) {
 =pod
 =item helper
 =item summary collection of various routines for astronomical data
+=item summary_DE Sammlung verschiedener Routinen für astronomische Daten
 =begin html
 
    <a name="Astro"></a>
@@ -1101,11 +1109,15 @@ sub Astro_Get($@) {
         <p>
         Notes: <ul>
         <li>Calculations are only valid between the years 1900 and 2100</li>
-        <li>To use the module properly, some definitions determining the observer position need to appear<br/>
-        in the global device, i.e.<br/>
+        <li>The time zone is determined automatically from the local settings of the <br/>
+        operating system. If geocordinates from a different time zone are used, the results are<br/>
+        not corrected automatically.
+        <li>Some definitions determining the observer position are used<br/>
+        from the global device, i.e.<br/>
         <code>attr global longitude &lt;value&gt;</code><br/>
         <code>attr global latitude &lt;value&gt;</code><br/>
         <code>attr global altitude &lt;value&gt;</code> (in m above sea level)<br/>
+        These definitions are only used when there are no corresponding local attribute settings.
         </li>
         <li>
         It is not necessary to define an Astro device to use the data provided by this module<br/>
@@ -1139,6 +1151,12 @@ sub Astro_Get($@) {
             <li><a name="astro_interval">
                 <code>&lt;interval&gt;</code>
                 <br />Update interval in seconds. The default is 3600 seconds, a value of 0 disables the automatic update. </li>
+                  <li>Some definitions determining the observer position:<br/>
+        <code>attr  &lt;name&gt;  longitude &lt;value&gt;</code><br/>
+        <code>attr  &lt;name&gt;  latitude &lt;value&gt;</code><br/>
+        <code>attr  &lt;name&gt;  altitude &lt;value&gt;</code> (in m above sea level)<br/>
+        These definitions take precedence over global attribute settings.
+        </li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
                     href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
