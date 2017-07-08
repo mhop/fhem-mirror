@@ -1,5 +1,4 @@
 # $Id$
-# $Id$
 ################################################################
 #
 #  Copyright notice
@@ -46,6 +45,9 @@
 # 2017-03-23 V 0213 username and password stored encrypted
 # 2017-05-07 V 0214 encryption can be disabled by new attribut cryptLoginData
 # 2017-05-07 V 0214 correct parameters of setClosureAndLinearSpeed caused syntax error
+# 2017-07-01 V 0215 creation of fid and device names for first autocreate extended
+# 2017-07-08 V 0215 login delay increased automatically up to 160s if login failed
+# 2017-07-08 V 0215 default set commands on devices without commands deleted
 
 package main;
 
@@ -93,13 +95,31 @@ sub tahoma_Initialize($)
 
 #####################################
 
+sub tahoma_fhemIdFromDevice($)
+{
+  my @device = split "/", shift;
+  $device[-1] =~ s/\W/_/g;
+  return $device[-1] if (@device <= 4);
+  $device[-2] =~ s/\W/_/g;
+  return $device[-2].'_'.$device[-1] if (@device <= 5);;
+  $device[-3] =~ s/\W/_/g;
+  return $device[-3].'_'.$device[-2].'_'.$device[-1];
+}
+
+sub tahoma_fhemIdFromOid($)
+{
+  my @oid = split "-", shift;
+  $oid[0] =~ s/\W/_/g;
+  return $oid[0];
+}
+
 sub tahoma_Define($$)
 {
   my ($hash, $def) = @_;
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0214";
+  my $ModuleVersion = "0215";
   
   my $subtype;
   my $name = $a[0];
@@ -107,7 +127,7 @@ sub tahoma_Define($$)
     $subtype = "DEVICE";
 
     my $device = $a[3];
-    my $fid = (split "/", $device)[-1];
+    my $fid = tahoma_fhemIdFromDevice($device);
 
     $hash->{device} = $device;
     $hash->{fid} = $fid;
@@ -123,7 +143,7 @@ sub tahoma_Define($$)
     $subtype = "PLACE";
 
     my $oid = $a[@a-1];
-    my $fid = (split "-", $oid)[0];
+    my $fid = tahoma_fhemIdFromOid($oid);
 
     $hash->{oid} = $oid;
     $hash->{fid} = $fid;
@@ -139,7 +159,7 @@ sub tahoma_Define($$)
     $subtype = "SCENE";
 
     my $oid = $a[@a-1];
-    my $fid = (split "-", $oid)[0];
+    my $fid = tahoma_fhemIdFromOid($oid);
 
     $hash->{oid} = $oid;
     $hash->{fid} = $fid;
@@ -245,7 +265,9 @@ sub tahoma_login($)
   $hash->{userAgent} = $attr{$name}{userAgent} if (defined $attr{$name}{userAgent});
   $hash->{timeout} = 10;
   $hash->{HTTPCookies} = undef;
-
+  $hash->{loginRetryTimer} = 5 if (!defined $hash->{loginRetryTimer});
+  $hash->{loginRetryTimer} *= 2 if ($hash->{loginRetryTimer} < 160);
+  
   Log3 $name, 2, "$name: login start";
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
@@ -382,7 +404,7 @@ sub tahoma_readStatusTimer($)
     }
   }
   elsif( !$hash->{logged_in} ) {
-    tahoma_login($hash);
+    tahoma_login($hash) if (!(defined $hash->{loginRetryTimer}) || !(defined $hash->{request_time}) || (($timestart - $hash->{request_time}) >= $hash->{loginRetryTimer}));
     $timeinfo = "tahoma_login";
   }
   elsif( !$hash->{startup_done} ) {
@@ -844,6 +866,14 @@ sub tahoma_dispatch($$$)
     if( (ref $json ne 'ARRAY') && ($json->{errorResponse}) ) {
       $hash->{lastError} = $json->{errorResponse}{message};
       $hash->{logged_in} = 0;
+      Log3 $name, 3, "$name: tahoma_dispatch error: $hash->{lastError}";
+      return;
+    }
+
+    if( (ref $json ne 'ARRAY') && ($json->{error}) ) {
+      $hash->{lastError} = $json->{error};
+      $hash->{logged_in} = 0;
+      Log3 $name, 3, "$name: tahoma_dispatch error: $hash->{lastError}";
       return;
     }
 
@@ -899,7 +929,7 @@ sub tahoma_autocreate($)
     my ($id, $fid, $devname, $define);
     if ($device->{deviceURL}) {
       $id = $device->{deviceURL};
-      $fid = (split("/",$id))[-1];
+      $fid = tahoma_fhemIdFromDevice($id);
       $devname = "tahoma_". $fid;
       $define = "$devname tahoma DEVICE $id";
       if( defined($modules{$hash->{TYPE}}{defptr}{"$fid"}) ) {
@@ -908,7 +938,7 @@ sub tahoma_autocreate($)
       }
     } elsif ( $device->{oid} ) {
       $id = $device->{oid};
-      $fid = (split("-",$id))[0];
+      my $fid = tahoma_fhemIdFromOid($id);
       $devname = "tahoma_". $fid;
       $define = "$devname tahoma PLACE $id" if (!defined $device->{actions});
       $define = "$devname tahoma SCENE $id" if (defined $device->{actions});
@@ -949,19 +979,20 @@ sub tahoma_defineCommands($)
     my ($id, $fid, $devname, $define);
     if ($device->{deviceURL}) {
       $id = $device->{deviceURL};
-      $fid = (split("/",$id))[-1];
+      $fid = tahoma_fhemIdFromDevice($id);
       $devname = "tahoma_". $fid;
       $define = "$devname tahoma DEVICE $id";
+      my $commandlist = "";
       if( defined $device->{definition}{commands}[0]{commandName} ) {
-        my $commandlist = "dim:slider,0,1,100 cancel:noArg";
+        $commandlist = "dim:slider,0,1,100 cancel:noArg";
         foreach my $command (@{$device->{definition}{commands}}) {
           $commandlist .= " " . $command->{commandName};
           $commandlist .= ":noArg" if ($command->{nparams} == 0);
         }
-        if( defined($modules{$hash->{TYPE}}{defptr}{"$fid"}) ) {
-          $modules{$hash->{TYPE}}{defptr}{"$fid"}{COMMANDS} = $commandlist;
-          Log3 $name, 4, "$name: tahoma_defineCommands fid=$fid commandlist=$commandlist";
-        }
+      }
+      if( defined($modules{$hash->{TYPE}}{defptr}{"$fid"}) ) {
+        $modules{$hash->{TYPE}}{defptr}{"$fid"}{COMMANDS} = $commandlist;
+        Log3 $name, 4, "$name: tahoma_defineCommands fid=$fid commandlist=$commandlist";
       }
     }
   }
@@ -976,8 +1007,9 @@ sub tahoma_parseLogin($$)
     $hash->{logged_in} = 0;
     $hash->{STATE} = $json->{errorResponse}{message};
   } else {
-	$hash->{inVersion} = $json->{version};
+    $hash->{inVersion} = $json->{version};
     $hash->{logged_in} = 1;
+    $hash->{loginRetryTimer} = 5,
   }
   Log3 $name, 2, "$name: login end, logged_in=".$hash->{logged_in};
 }
@@ -1002,7 +1034,7 @@ sub tahoma_parseGetEvents($$)
       if( defined($devices->{deviceURL}) ) {
         #print "\nDevice=$devices->{deviceURL} found\n";
         my $id = $devices->{deviceURL};
-        my $fid = (split("/",$id))[-1];
+        my $fid = tahoma_fhemIdFromDevice($id);
         my $devname = "tahoma_". $fid;
         my $d = $modules{$hash->{TYPE}}{defptr}{"$fid"};
         if( defined($d) )# && $d->{NAME} eq $devname )
@@ -1152,7 +1184,7 @@ sub tahoma_parseGetStates($$)
     foreach my $devices ( @{$states->{devices}} ) {
       if( defined($devices->{deviceURL}) ) {
         my $id = $devices->{deviceURL};
-        my $fid = (split("/",$id))[-1];
+        my $fid = tahoma_fhemIdFromDevice($id);
         my $devname = "tahoma_". $fid;
         my $d = $modules{$hash->{TYPE}}{defptr}{"$fid"};
         if( defined($d) )# && $d->{NAME} eq $devname )
@@ -1277,6 +1309,7 @@ sub tahoma_Get($$@)
     elsif( $cmd eq "reset" ) {
       HttpUtils_Close($hash);
       $hash->{logged_in} = undef;
+      $hash->{loginRetryTimer} = undef;
       return "connection closed";
     }
   }
@@ -1401,6 +1434,9 @@ sub tahoma_UserAgent_NonblockingGet($)
   if (index($hash->{url},'file:') == 0)
   {
     $param->{url} = $hash->{url} . $param->{page} . '.json';
+    my $find = "../";
+    $find = quotemeta $find; # escape regex metachars if present
+    $param->{url} =~ s/$find//g;
   }
   else
   {
