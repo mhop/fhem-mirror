@@ -694,6 +694,8 @@ sub LUXTRONIK2_DoUpdate($)
    $return_str .= "|". ($heatpump_visibility[105]==1 ? $heatpump_parameters[98] : "no");
   # 73 - analogOut4 - Voltage heating system circulation pump
    $return_str .= "|". ($heatpump_visibility[267]==1 ? $heatpump_values[163] : "no");
+  # 74 - solarPump
+   $return_str .= "|". ($heatpump_visibility[63]==1 ? $heatpump_values[52] : "no");
 
    return $return_str;
 }
@@ -1093,6 +1095,7 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate($hash,"heatingSystemCircPump",$heatingSystemCircPump?"on":"off");
      readingsBulkUpdate($hash,"hotWaterCircPumpExtern",$a[28]?"on":"off");
      readingsBulkUpdate($hash,"hotWaterSwitchingValve",$hotWaterBoilerValve?"on":"off");
+     readingsBulkUpdate($hash,"solarPump",$a[74]?"on":"off");
      
    # Deaerate Function
      readingsBulkUpdate( $hash, "hotWaterCircPumpDeaerate",$a[61]?"on":"off")    unless $a[61] eq "no";
