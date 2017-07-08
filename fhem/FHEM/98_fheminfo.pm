@@ -201,7 +201,7 @@ sub _fi2_HtmlTable($) {
    my $upTime = _fi2_Uptime();
    my $result  = "<html><table>";
       $result .= "<tr><td colspan='3'>Following statistics data will be sent to server:</br>(see Logfile level 4 for server response)</td></tr>" if($doSend == 1);
-      $result .= "<tr><td>System Info</td></tr>";
+      $result .= "<tr><td><b>System Info</b></td></tr>";
       $result .= "<tr><td> </td><td>Release:</td><td>$fhemInfo{$c_system}{'release'}</td></tr>";
       $result .= "<tr><td> </td><td>FeatureLevel:</td><td>$fhemInfo{$c_system}{'feature'}</td></tr>";
       $result .= "<tr><td> </td><td>ConfigType:</td><td>$fhemInfo{$c_system}{'configType'}</td></tr>";
@@ -212,7 +212,7 @@ sub _fi2_HtmlTable($) {
       $result .= "<tr><td> </td><td>uniqueId:</td><td>$fhemInfo{$c_system}{'uniqueID'}</td></tr>";
       $result .= "<tr><td> </td><td>upTime:</td><td>$upTime</td></tr>";
       $result .= "<tr><td colspan=3>&nbsp;</td></tr>";
-      $result .= "<tr><td>Modules</td><td>Model</td><td>Count</td></tr>";
+      $result .= "<tr><td><b>Modules</b></td><td><b>Model</b></td><td><b>Count</b></td></tr>";
 
    my @keys = keys %fhemInfo;
    foreach my $type (sort @keys)
