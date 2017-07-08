@@ -77,7 +77,8 @@ consFill()
     FW_closeConn();
 
   var query = "?XHR=1"+
-       "&inform=type=raw;withLog="+withLog+";filter="+consFilter+consFType+
+       "&inform=type=raw;withLog="+withLog+";filter="+
+       encodeURIComponent(consFilter)+consFType+
        "&timestamp="+new Date().getTime();
   query = addcsrf(query);
 
