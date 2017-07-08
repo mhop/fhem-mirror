@@ -210,7 +210,8 @@ sub _fi2_HtmlTable($) {
       $result .= "<tr><td> </td><td>OS:</td><td>$fhemInfo{$c_system}{'os'}</td></tr>";
       $result .= "<tr><td> </td><td>Perl:</td><td>$fhemInfo{$c_system}{'perl'}</td></tr>";
       $result .= "<tr><td> </td><td>uniqueId:</td><td>$fhemInfo{$c_system}{'uniqueID'}</td></tr>";
-      $result .= "<tr><td> </td><td>upTime:</td><td>$upTime</td></tr><br/>";
+      $result .= "<tr><td> </td><td>upTime:</td><td>$upTime</td></tr>";
+      $result .= "<tr><td colspan=3>&nbsp;</td></tr>";
       $result .= "<tr><td>Modules</td><td>Model</td><td>Count</td></tr>";
 
    my @keys = keys %fhemInfo;
