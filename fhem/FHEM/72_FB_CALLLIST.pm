@@ -1102,7 +1102,7 @@ sub FB_CALLLIST_returnOrderedHTMLOutput($$$$)
     
     foreach my $col (@order)
     {
-        push @ret, '<td name="'.$col.'" '.$td_additions.'>'.$line->{$col}.'</td>';
+        push @ret, '<td name="'.$col.'" '.$td_additions.'>'.$line->{$col}.'</td>' if($line->{$col});
     }
     
     return join("",@ret)."</tr>";
@@ -1124,9 +1124,12 @@ sub FB_CALLLIST_returnOrderedJSONOutput($$)
     
     foreach my $col (@order)
     {
-        my $val = $line->{$col};
-        $val =~ s,",\\",g;
-        push @ret, '"'.$col.'":"'.$val.'"';
+        if($line->{$col})
+        {
+            my $val = $line->{$col};
+            $val =~ s,",\\",g;
+            push @ret, '"'.$col.'":"'.$val.'"';
+        }
     }
     
     return "{".join(",",@ret)."}";
@@ -1149,7 +1152,7 @@ sub FB_CALLLIST_updateReadings($$)
     
     foreach my $col (@order)
     {
-            readingsBulkUpdate($hash, $line_tmp{line}."-$col", $line_tmp{$col});
+        readingsBulkUpdate($hash, $line_tmp{line}."-$col", $line_tmp{$col}) if($line->{$col});
     }
 }
 
