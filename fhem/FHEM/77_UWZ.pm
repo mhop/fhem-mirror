@@ -60,7 +60,40 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL           = "UWZ";
-my $version         = "1.4.7";
+my $version         = "1.6.0";
+
+
+
+
+# Declare functions
+sub UWZ_Log($$$);
+sub UWZ_Map2Movie($$);
+sub UWZ_Map2Image($$);
+sub UWZ_Initialize($);
+sub UWZ_Define($$);
+sub UWZ_Undef($$);
+sub UWZ_Set($@);
+sub UWZ_Get($@);
+sub UWZ_GetCurrent($@);
+sub UWZ_GetCurrentHail($);
+sub UWZ_JSONAcquire($$);
+sub UWZ_Start($);
+sub UWZ_Aborted($);
+sub UWZ_Done($);
+sub UWZ_Run($);
+sub UWZAsHtml($;$);
+sub UWZAsHtmlLite($;$);
+sub UWZAsHtmlFP($;$);
+sub UWZAsHtmlMovie($$);
+sub UWZAsHtmlKarteLand($$);
+sub UWZ_GetSeverityColor($$);
+sub UWZ_GetUWZLevel($$);
+sub UWZSearchLatLon($$);
+sub UWZSearchAreaID($$);
+sub UWZ_IntervalAtWarnLevel($);
+
+
+
 
 my $countrycode = "DE";
 my $plz = "77777";
@@ -279,6 +312,7 @@ sub UWZ_Initialize($) {
                         "lang ".
                         "sort_readings_by:severity,start ".
                         "localiconbase ".
+                        "intervalAtWarnLevel ".
                         $readingFnAttributes;
    
     foreach my $d(sort keys %{$modules{UWZ}{defptr}}) {
@@ -314,9 +348,10 @@ sub UWZ_Define($$) {
         $hash->{URL} =  "http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=" . $URL_language . "&areaID=UWZ" . $a[2] . $a[3];
     
         
-        $hash->{fhem}{LOCAL}     = 0;
-        $hash->{INTERVAL}        = $a[4];
-        $hash->{VERSION}         = $version;
+        $hash->{fhem}{LOCAL}    = 0;
+        $hash->{INTERVAL}       = $a[4];
+        $hash->{INTERVALWARN}   = 0;
+        $hash->{VERSION}        = $version;
        
         RemoveInternalTimer($hash);
        
@@ -377,7 +412,6 @@ sub UWZ_Set($@) {
     
     return;
 }
-
 
 sub UWZ_Get($@) {
 
@@ -506,7 +540,6 @@ sub UWZ_JSONAcquire($$) {
     return $response->content;
 }
 
-
 #####################################
 sub UWZ_Start($) {
 
@@ -520,6 +553,7 @@ sub UWZ_Start($) {
         RemoveInternalTimer( $hash );
         InternalTimer(gettimeofday() + $hash->{INTERVAL}, "UWZ_Start", $hash, 1 );  
         return undef if( AttrVal($name, "disable", 0 ) == 1 );
+        readingsSingleUpdate($hash,'currentIntervalMode','normal',0);
     }
 
     ## URL by CountryCode
@@ -572,10 +606,7 @@ sub UWZ_Done($) {
     # delete the marker for RUNNING_PID process
     delete( $hash->{helper}{RUNNING_PID} );  
 
-    UWZ_Log $hash, 4, "Delete old Readings"; 
-    #CommandDeleteReading(undef, "$hash->{NAME} Warn_?_.*");
-
-
+    
     # UnWetterdaten speichern
     readingsBeginUpdate($hash);
 
@@ -592,6 +623,7 @@ sub UWZ_Done($) {
       
         if (keys %values > 0) {
             my $newState;
+            UWZ_Log $hash, 4, "Delete old Readings"; 
             for my $Counter ($values{WarnCount} .. 9) {
                 CommandDeleteReading(undef, "$hash->{NAME} Warn_${Counter}_.*");
             }
@@ -620,8 +652,13 @@ sub UWZ_Done($) {
     }
     
     readingsEndUpdate( $hash, 1 );
+    
+    if( AttrVal($name,'intervalAtWarnLevel','') ne '' and ReadingsVal($name,'WarnUWZLevel',0) > 1 ) {
+    
+        UWZ_IntervalAtWarnLevel($hash);
+        UWZ_Log $hash, 5, "run Sub IntervalAtWarnLevel"; 
+    }
 }
-
 
 #####################################
 sub UWZ_Run($) {
@@ -773,7 +810,6 @@ sub UWZ_Run($) {
                             "12" => "violett" );
 
     my @uwzmaxlevel;
-    #foreach my $single_warning (@{ $uwz_warnings->{'results'} }) {
     foreach my $single_warning (@sorted) {
 
         push @uwzmaxlevel, UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'});
@@ -966,7 +1002,6 @@ sub UWZ_Run($) {
     
     return "$name|$message|WarnCount|$uwz_warncount" ;
 }
-
 
 #####################################
 sub UWZAsHtml($;$) {
@@ -1171,7 +1206,6 @@ sub UWZAsHtmlFP($;$) {
     return $ret;
 }
 
-
 #####################################
 sub UWZAsHtmlMovie($$) {
 
@@ -1205,9 +1239,6 @@ sub UWZAsHtmlMovie($$) {
     return $ret;
 }
 
-
-
-
 #####################################
 sub UWZAsHtmlKarteLand($$) {
 
@@ -1239,7 +1270,6 @@ sub UWZAsHtmlKarteLand($$) {
     return $ret;
 }
 
-
 #####################################
 sub UWZ_GetSeverityColor($$) {
     my ($name,$uwzlevel) = @_;
@@ -1254,7 +1284,6 @@ sub UWZ_GetSeverityColor($$) {
 
     return $UWZSeverity{$uwzlevel};
 }
-
 
 #####################################
 sub UWZ_GetUWZLevel($$) {
@@ -1277,6 +1306,42 @@ sub UWZ_GetUWZLevel($$) {
     }
 }
 
+#####################################
+sub UWZ_IntervalAtWarnLevel($) {
+
+    my $hash        = shift;
+    
+    my $name        = $hash->{NAME};
+    my $warnLevel   = ReadingsVal($name,'WarnUWZLevel',0);
+    my @valuestring = split( ',', AttrVal($name,'intervalAtWarnLevel','') );
+    my %warnLevelInterval;
+    
+    
+    readingsSingleUpdate($hash,'currentIntervalMode','warn',0);
+    
+    foreach( @valuestring ) {
+    
+        my @values = split( '=' , $_ );
+        $warnLevelInterval{$values[0]} = $values[1];
+    }
+    
+    if( defined($warnLevelInterval{$warnLevel}) and $hash->{INTERVALWARN} != $warnLevelInterval{$warnLevel} ) {
+    
+        $hash->{INTERVALWARN} = $warnLevelInterval{$warnLevel};
+    
+        RemoveInternalTimer( $hash );
+        InternalTimer(gettimeofday() + $hash->{INTERVALWARN}, "UWZ_Start", $hash, 1 );
+        
+        UWZ_Log $hash, 4, "restart internal timer with interval $hash->{INTERVALWARN}";
+        
+    } else {
+        
+        RemoveInternalTimer( $hash );
+        InternalTimer(gettimeofday() + $hash->{INTERVALWARN}, "UWZ_Start", $hash, 1 );
+        
+        UWZ_Log $hash, 4, "restart internal timer with interval $hash->{INTERVALWARN}";
+    }
+}
 
 #####################################
 ##
@@ -1348,7 +1413,6 @@ sub UWZSearchLatLon($$) {
 
 }
 
-
 #####################################
 sub UWZSearchAreaID($$) {
     my ($lat,$lon) = @_;
@@ -1409,9 +1473,10 @@ sub UWZSearchAreaID($$) {
 
 
 =pod
+
 =item device
-=item summary    Modul extracts thunderstorm warnings from unwetterzentrale.de
-=item summary_DE Modul extrahiert Unwetterwarnungen von unwetterzentrale.de.
+=item summary       extracts thunderstorm warnings from unwetterzentrale.de
+=item summary_DE    extrahiert Unwetterwarnungen von unwetterzentrale.de
 
 =begin html
 
@@ -1616,6 +1681,11 @@ sub UWZSearchAreaID($$) {
          define baseurl to host your own thunderstorm warn pics (filetype is png). 
          <br>
       </li>
+      <li><code>intervalAtWarnLevel</code>
+         <br>
+         define the interval per warnLevel. Example: 2=1800,3=900,4=300
+         <br>
+      </li>
 
 
 
@@ -1639,6 +1709,7 @@ sub UWZSearchAreaID($$) {
       <li><b>Warn_</b><i>0</i><b>_Creation</b> - warning creation </li>
       <li><b>Warn_</b><i>0</i><b>_Creation_Date</b> - warning creation datum </li>
       <li><b>Warn_</b><i>0</i><b>_Creation_Time</b> - warning creation time </li>
+      <li><b>currentIntervalMode</b> - default/warn, Interval is read from INTERVAL or INTERVALWARN Internal</li>
       <li><b>Warn_</b><i>0</i><b>_Start</b> - begin of warnperiod</li>
       <li><b>Warn_</b><i>0</i><b>_Start_Date</b> - start date of warnperiod</li>
       <li><b>Warn_</b><i>0</i><b>_Start_Time</b> - start time of warnperiod</li>
@@ -2003,6 +2074,11 @@ sub UWZSearchAreaID($$) {
          BaseURL angeben um Warn Icons lokal zu hosten. (Dateityp ist png). 
          <br>
       </li>
+      <li><code>intervalAtWarnLevel</code>
+         <br>
+         konfiguriert den Interval je nach WarnLevel. Beispiel: 2=1800,3=900,4=300
+         <br>
+      </li>
 
       <br>
    </ul>  
@@ -2024,6 +2100,7 @@ sub UWZSearchAreaID($$) {
       <li><b>Warn_</b><i>0</i><b>_Creation</b> - Warnungs Erzeugung </li>
       <li><b>Warn_</b><i>0</i><b>_Creation_Date</b> - Warnungs Erzeugungs Datum </li>
       <li><b>Warn_</b><i>0</i><b>_Creation_Time</b> - Warnungs Erzeugungs Zeit </li>
+      <li><b>currentIntervalMode</b> - default/warn, aktuell Verwendeter Interval. Internal INTERVAL oder INTERVALWARN</li>
       <li><b>Warn_</b><i>0</i><b>_Start</b> - Begin der Warnung</li>
       <li><b>Warn_</b><i>0</i><b>_Start_Date</b> - Startdatum der Warnung</li>
       <li><b>Warn_</b><i>0</i><b>_Start_Time</b> - Startzeit der Warnung</li>
