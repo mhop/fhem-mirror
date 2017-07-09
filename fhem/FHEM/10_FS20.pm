@@ -128,7 +128,7 @@ FS20_Initialize($)
   $hash->{ParseFn}   = "FS20_Parse";
   $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 follow-on-timer ".
                        "do_not_notify:1,0 ignore:1,0 dummy:1,0 showtime:1,0 ".
-                       "$readingFnAttributes " .
+                       "useSetExtensions:0,1 $readingFnAttributes " .
                        "model:".join(",", sort keys %models);
 }
 
@@ -209,7 +209,9 @@ FS20_Set($@)
     }
     $list = (join(" ", sort keys %fs20_c2b) . " dim:slider,0,6.25,100")
         if(!defined($list));
-    return SetExtensions($hash, $list, @a);
+    return SetExtensions($hash, $list, @a)
+        if(AttrVal($name, "useSetExtensions", 1));
+    return "Unknown argument $a[1], choose one of $list";
   }
   SetExtensionsCancel($hash);
 
@@ -665,6 +667,11 @@ four2hex($$)
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 
+    <li>useSetExtensions<br>
+        Setting it to 0 you can disable using the Setextensions. Deffault is 1.
+        </li><br>
+
+
   </ul>
   <br>
 
@@ -907,6 +914,11 @@ four2hex($$)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+
+    <li>useSetExtensions<br>
+      Falls es auf 0 gesetzt wird, werden die SetExtensions Befehle nicht
+      angeboten. Die Voreinstellung ist 1.
+      </li><br>
 
   </ul>
   <br>
