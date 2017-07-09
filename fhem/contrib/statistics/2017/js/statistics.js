@@ -30,39 +30,7 @@ function rand(length) {
     return text;
 }
 
-
-function drawUpdatePieChart (data, el) {
-    
-    var id = rand(5);
-   
-    el.append("");
-    el.append("<div id='"+id+"' class='googlepiechart'></div>");
-
-    var array = new google.visualization.DataTable();
-   
-    array.addColumn("string","Topping");
-    array.addColumn("number","Slices");
-
-    array.addRow(["< 1 day", data["0"]]); 
-    array.addRow(["1 day - 1 week", data["7"] ]); 
-    array.addRow(["1 week - 1 month", data["30"]]); 
-    array.addRow(["1 month - 6 months", data["180"]]); 
-    array.addRow(["> 1 year", data["365"]]); 
-    
-    var options = {   is3D: true,
-                      chartArea : { height:'80%',width:'95%' },
-                      tooltip: { trigger: 'focus' },
-                      width: 450,
-                      legend: {position: 'right'},
-                      pieSliceText: 'none',
-                      height: 350,
-                  };
-   
-    var chart = new google.visualization.PieChart(document.getElementById(id));
-    chart.draw(array,options);
-}
-
-function drawGooglePieChart(data, el) {
+function drawGooglePieChart(data, el, subst, sort="byKey") {
    
     var id = rand(5);
    
@@ -72,11 +40,17 @@ function drawGooglePieChart(data, el) {
     var result = [];
 
     for(var i in data) {
-        result.push([i, parseInt(data[i])]);
+        result.push([((subst && i in subst) ? subst[i] : i)+" ("+data[i]+")", parseInt(data[i])]);
     }
    
-    result.sort();
-    result.reverse();
+    if(sort === "byKey") {
+        result.sort();
+        result.reverse();
+    }
+    else if(sort === "byValue")
+    {
+        result.sort(function(a,b) {return b[1] - a[1]});
+    }
  
     var array = new google.visualization.DataTable();
    
@@ -87,14 +61,17 @@ function drawGooglePieChart(data, el) {
    
     var options = {   is3D: true,
                       chartArea : { height:'80%',width:'95%' },
-                      tooltip: { trigger: 'focus' },
+                      tooltip: { trigger: 'selection' },
                       width: 450,
-                      legend: {position: 'right'},
+                      legend: {position: 'right',labeledValueText: 'both'},
                       pieSliceText: 'none',
                       height: 350,
+                      sliceVisibilityThreshold: 0.005
                   };
-   
+                  
+    var container = document.getElementById(id);
     var chart = new google.visualization.PieChart(document.getElementById(id));
+    
     chart.draw(array,options);
 }
 
@@ -353,9 +330,11 @@ function onSuccess(data, textStatus, jqXHR) {
         
         // draw google pie charts
         drawGooglePieChart(data.data.system.release, $("div#versiontab-FHEM"));
-        drawGooglePieChart(data.data.system.os, $("div#versiontab-os"));
+        drawGooglePieChart(data.data.system.os, $("div#versiontab-os"), {"linux":"Linux","MSWin32":"Windows","darwin":"MacOS"}, "byValue");
         drawGooglePieChart(data.data.system.perl, $("div#versiontab-perl"));
-        drawUpdatePieChart(data.data.system.age, $("div#versiontab-update"));
+        
+        delete data.data.system.age.unknown; // don't display unknown update age systems
+        drawGooglePieChart(data.data.system.age, $("div#versiontab-update"), {"0":"≤ 1 day", "7": "1 day - 1 week", "30": "1 week - 1 month", "180": "1 month - 6 months", "365": "> 6 months"}, false);
 
         // create module table
         createModulTable(data.data.modules,data.data.models, $("table#module-table"));
