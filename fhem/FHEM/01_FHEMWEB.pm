@@ -2651,7 +2651,7 @@ FW_dev2image($;$)
   $state = $d->{STATE} if(!defined($state));
   return "" if(!$type || !defined($state));
 
-  my $model = $attr{$name}{model} if(defined($attr{$name}{model}));
+  my $model = AttrVal($name, "model", "");
 
   my (undef, $rstate) = ReplaceEventMap($name, [undef, $state], 0);
 

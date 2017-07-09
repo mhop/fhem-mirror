@@ -47,7 +47,7 @@ BC_searchTelnet($)
   foreach my $d (sort keys %defs) { # 
     my $h = $defs{$d};
     next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
-    next if($attr{$d}{SSL} ||
+    next if(AttrVal($d, "SSL", undef) ||
             AttrVal($d, "allowfrom", "127.0.0.1") ne "127.0.0.1");
     next if($h->{DEF} !~ m/^\d+( global)?$/);
     next if($h->{DEF} =~ m/IPV6/);

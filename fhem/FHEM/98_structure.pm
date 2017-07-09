@@ -184,7 +184,7 @@ structure_Notify($$)
   my %clientstate;
 
   my @structPrio = attrSplit($attr{$me}{clientstate_priority})
-        if($attr{$me}{clientstate_priority});
+        if($attr{$me} && $attr{$me}{clientstate_priority});
 
   return "" if($hash->{INSET} && !AttrVal($me, "evaluateSetResult", 0));
   return "" if(@{$hash->{".asyncQueue"}}); # Do not trigger during async set 
