@@ -51,6 +51,8 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 09.07.2017
+#	BulkUpdate: Beginn und Ende sind nun sicher davor einen vom SubProzess gestarteten BulkUpdate vorzeitig zu beenden.
 # 05.07.2017
 #	Neue Variante für das Ermitteln der laufenden Favoriten, Radios oder Playlists.
 # 05.07.2017
@@ -67,21 +69,6 @@
 #	Beim Löschen blieb noch die automatisch angelegte ReadingsGroup für die aktuelle Abspielliste bestehen.
 # 21.06.2017
 #	Bei der ersten Verbindung war das Reading für die letzte SubProzess-Antwort eventuell bereits veraltet. Das wird nun durch ein Datum in der Zukunft verhindert.
-# 20.06.2017
-#	Die Verarbeitung des Notify-Events für die Anzeigeaktualisierung ist in das SONOSPLAYER-Modul umgezogen (wo es auch logisch hingehört).
-#	Die Zeitkonvertierung hatte einen Sekundenfehler.
-#	Durch eine fehlerhafte IF-Verschachtelung in der ControlPoint.pm gab es komische Log-Augaben.
-#	Die lokalen Cover werden nur noch heruntergeladen, wenn das Attribut "getLocalCoverArt" am Sonos-Device gesetzt ist. Normalerweise merkt man davon nichts, da die eingebauten Coveranzeigen diese nicht verwenden. Wenn man diese heruntergeladenen Cover selbst noch verwendet werden, dann muss dieses Attribut gesetzt werden!
-#	Das Problem mit den Wide-Character bei der Hashwert-Berechnung von ProxyCache und SpeakBuffer wird abgefangen, und ein Versuch mit einem dazwischenliegenden Konverter durchgeführt.
-#	Das Subscribing für Rendering-Events wird in einem Eval durchgeführt, sodass eine abgefangene Fehlermeldung bei nicht-Erfolg ausgegeben wird. Das passiert z.B. bei einem Sub- oder Surroundlautsprecher.
-#	Die Simulation der aktuellen TrackPosition lief weiter, wenn der Player vor einem disappeared nicht gestoppt wurde.
-#	Bei der Verarbeitung eines Befehls im SubProzess wurde in einigen Fällen die Befehlsqueue nicht korrekt verringert, was zu Folgefehlern führte.
-#	Wenn der RestoreThread einen ungültigen Datensatz in der RestoreQueue vorfindet, überspringt er ihn...
-#	Bessere Behandlung der TrackProviderermittlung
-#	Bei MakeCoverURL gab es Logausgaben mit dem falschen Level.
-#	Es gibt vier neue Attribute am Sonosdevice: "getFavouritesListAtNewVersion", "getPlaylistsListAtNewVersion", "getRadiosListAtNewVersion" und "getQueueListAtNewVersion". In Zusammenarbeit mit "getListsDirectlyToReadings" wird dann bei Änderung der entsprechenden Liste automatisch das entsprechende Reading aller Sonosplayer-Devices aktualisiert. Hierbei entfallen dann etwaige eigene Notifies, die eine Aktualisierung der Readings veranlassen. Diese sollten dann natürlich auch entfernt werden.
-#	Die Überprüfung, ob der SubProzess noch lebt, wird nun über die bereits bestehende Verbindung abgewickelt. Dadurch entfallen die ständigen Verbindungsversuche zum SubProzess. Dazu wird ein Reading 'LastProcessAnswer' am zentralen Sonos-Device geführt.
-#	Bei Verlust der Verbindung zum SubProzess wird nun keine 100% Systemlast mehr verursacht.
 #
 ########################################################################################
 #
@@ -243,6 +230,9 @@ my $SONOS_Thread_PlayerRestore :shared = -1;
 
 my %SONOS_Thread_IsAlive_Counter;
 my $SONOS_Thread_IsAlive_Counter_MaxMerci = 2;
+
+# Runtime Variables on Module-Level
+my %SONOS_Module_BulkUpdateFromSubProcessInWork;
 
 # Some Constants
 my @SONOS_PINGTYPELIST = qw(none tcp udp icmp syn);
@@ -1056,7 +1046,7 @@ sub SONOS_StopSubProcess($) {
 		
 		# Alle SonosPlayer-Devices disappearen
 		for my $player (SONOS_getAllSonosplayerDevices()) {
-			readingsBeginUpdate($player);
+			SONOS_readingsBeginUpdate($player);
 			SONOS_readingsBulkUpdateIfChanged($player, 'presence', 'disappeared');
 			SONOS_readingsBulkUpdateIfChanged($player, 'state', 'disappeared');
 			SONOS_readingsBulkUpdateIfChanged($player, 'transportState', 'STOPPED');
@@ -1236,7 +1226,7 @@ sub SONOS_Read($) {
 			}
 			
 			if ($hash) {
-				readingsBeginUpdate($hash);
+				SONOS_readingsBeginUpdate($hash, 1);
 			} else {
 				SONOS_Log undef, 0, "Fehlerhafter Aufruf von ReadingsBeginUpdate: $1";
 			}
@@ -1249,7 +1239,7 @@ sub SONOS_Read($) {
 			}
 			
 			if ($hash) {
-				readingsEndUpdate($hash, 1);
+				SONOS_readingsEndUpdate($hash, 1, 1);
 			} else {
 				SONOS_Log undef, 0, "Fehlerhafter Aufruf von ReadingsEndUpdate: $1";
 			}
@@ -1267,7 +1257,7 @@ sub SONOS_Read($) {
 			my $hash = SONOS_getSonosPlayerByUDN($1);
 			
 			# Start the updating...
-			readingsBeginUpdate($hash);
+			SONOS_readingsBeginUpdate($hash);
 			
 			# Updating...
 			SONOS_readingsBulkUpdateIfChanged($hash, "currentTrack", '');
@@ -1318,7 +1308,7 @@ sub SONOS_Read($) {
 			my $hash = SONOS_getSonosPlayerByUDN($1);
 			
 			if ($hash) {
-				readingsBeginUpdate($hash);
+				SONOS_readingsBeginUpdate($hash);
 				my $oldTransportState = ReadingsVal($hash->{NAME}, 'transportState', 0);
 				my $oldTrackHandle = ReadingsVal($hash->{NAME}, 'currentTrackHandle', '');
 				my $oldTrack = ReadingsVal($hash->{NAME}, 'currentTrack', '');
@@ -1517,7 +1507,7 @@ sub SONOS_Read($) {
 							$currentElem{TrackProviderIconRoundURL} = $current{TrackProviderIconRoundURL};
 							
 							# Loslegen
-							readingsBeginUpdate($elem);
+							SONOS_readingsBeginUpdate($elem);
 							
 							# Neue Werte setzen
 							SONOS_readingsBulkUpdateIfChanged($elem, "currentTitle", $currentElem{Title});
@@ -1757,7 +1747,7 @@ sub SONOS_PropagateTitleInformationsToSlave($$) {
 	SONOS_Log $hash->{UDN}, 5, 'PropagateTitleInformationsToSlave('.$hash->{NAME}.' => '.$slaveHash->{NAME}.')';
 	
 	if (AttrVal($slaveHash->{NAME}, 'getTitleInfoFromMaster', 0)) {
-		readingsBeginUpdate($slaveHash);
+		SONOS_readingsBeginUpdate($slaveHash);
 		
 		foreach my $reading (keys %{$defs{$hash->{NAME}}->{READINGS}}) {
 			if ($reading =~ /^(current|next).*/) {
@@ -1946,12 +1936,12 @@ sub SONOS_IsSubprocessAliveChecker() {
 		
 		# Letzten Zeitpunkt und Anzahl der Neustarts merken...
 		my $sHash = SONOS_getSonosPlayerByName();
-		readingsBeginUpdate($sHash);
+		SONOS_readingsBeginUpdate($sHash);
 		readingsBulkUpdate($sHash, 'LastProcessRestart', SONOS_TimeNow(), 1);
 		my $restarts = ReadingsVal($sHash->{NAME}, 'LastProcessRestartCount', 0);
 		$restarts = 0 if (!looks_like_number($restarts));
 		readingsBulkUpdate($sHash, 'LastProcessRestartCount', $restarts + 1, 1);
-		readingsEndUpdate($sHash, 1);
+		SONOS_readingsEndUpdate($sHash, 1);
 		
 		# Stoppen...
 		InternalTimer(gettimeofday() + 1, 'SONOS_StopSubProcess', $hash, 0);
@@ -9595,13 +9585,48 @@ sub SONOS_readingsBulkUpdateIfChanged($$$) {
 
 ########################################################################################
 #
+# SONOS_readingsBeginUpdate - Wrapper for readingsBeginUpdate.
+#
+########################################################################################
+sub SONOS_readingsBeginUpdate($;$) {
+	my ($hash, $fromSubProcess) = @_;
+	
+	readingsBeginUpdate($hash);
+	
+	if (defined($fromSubProcess)) {
+		$SONOS_Module_BulkUpdateFromSubProcessInWork{$hash->{NAME}} = 1;
+		SONOS_Log undef, 4, 'ReadingsBeginUpdate from SubProcess for "'.$hash->{NAME}.'"';
+	} else {
+		SONOS_Log undef, 4, 'ReadingsBeginUpdate from Module for "'.$hash->{NAME}.'"';
+	}
+}
+
+########################################################################################
+#
 # SONOS_readingsEndUpdate - Wrapper for readingsEndUpdate.
 #
 ########################################################################################
-sub SONOS_readingsEndUpdate($$) {
-	my ($hash, $doTrigger) = @_;
+sub SONOS_readingsEndUpdate($$;$) {
+	my ($hash, $doTrigger, $fromSubProcess) = @_;
 	
-	readingsEndUpdate($hash, $doTrigger);
+	if ($SONOS_Module_BulkUpdateFromSubProcessInWork{$hash->{NAME}}) {
+		if (defined($fromSubProcess)) {
+			readingsEndUpdate($hash, $doTrigger);
+			delete($SONOS_Module_BulkUpdateFromSubProcessInWork{$hash->{NAME}});
+			SONOS_Log undef, 4, 'ReadingsEndUpdate from SubProcess for "'.$hash->{NAME}.'"';
+		} else {
+			SONOS_Log undef, 4, 'Supress ReadingsEndUpdate from Module due to running BulkUpdate from SubProcess for "'.$hash->{NAME}.'"';
+		}
+	} else {
+		readingsEndUpdate($hash, $doTrigger);
+		delete($SONOS_Module_BulkUpdateFromSubProcessInWork{$hash->{NAME}});
+		
+		if (defined($fromSubProcess)) {
+			SONOS_Log undef, 4, 'ReadingsEndUpdate from SubProcess for "'.$hash->{NAME}.'"';
+		} else {
+			SONOS_Log undef, 4, 'ReadingsEndUpdate from Module for "'.$hash->{NAME}.'"';
+		}
+	}
 }
 
 ########################################################################################

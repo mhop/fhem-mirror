@@ -407,7 +407,7 @@ sub SONOSPLAYER_SimulateCurrentTrackPosition() {
 	
 	return undef if (AttrVal($hash->{NAME}, 'disable', 0));
 	
-	readingsBeginUpdate($hash);
+	SONOS_readingsBeginUpdate($hash);
 	
 	my $trackDurationSec = SONOS_GetTimeSeconds(ReadingsVal($hash->{NAME}, 'currentTrackDuration', 0));
 	
@@ -426,8 +426,8 @@ sub SONOSPLAYER_SimulateCurrentTrackPosition() {
 		readingsBulkUpdateIfChanged($hash, 'currentTrackPositionSimulatedPercent', sprintf(AttrVal($hash->{NAME}, 'simulateCurrentTrackPositionPercentFormat', '%.1f'), 0.0));
 	}
 	
-	readingsEndUpdate($hash, 1);
-		
+	SONOS_readingsEndUpdate($hash, 1);
+	
 	if ($hash->{helper}->{simulateCurrentTrackPosition}) {
 		InternalTimer(gettimeofday() + $hash->{helper}->{simulateCurrentTrackPosition}, 'SONOSPLAYER_SimulateCurrentTrackPosition', $hash, 0);
 	}
