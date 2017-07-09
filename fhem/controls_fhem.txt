@@ -1,4 +1,4 @@
-REV 14663
+REV 14672
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -141,13 +141,13 @@ UPD 2015-07-28_14:05:31 4865 FHEM/22_ALL3076.pm
 UPD 2017-07-05_07:45:01 176955 FHEM/22_HOMEMODE.pm
 UPD 2015-07-28_14:05:31 6433 FHEM/23_ALL4027.pm
 UPD 2016-02-29_07:45:12 37829 FHEM/23_KOSTALPIKO.pm
-UPD 2017-05-20_07:45:02 99719 FHEM/23_LUXTRONIK2.pm
+UPD 2017-07-09_07:45:02 99884 FHEM/23_LUXTRONIK2.pm
 UPD 2015-07-28_14:05:31 5069 FHEM/23_WEBIO.pm
 UPD 2015-07-28_14:05:31 5626 FHEM/23_WEBIO_12DIGITAL.pm
 UPD 2015-07-28_14:05:31 10651 FHEM/24_NetIO230B.pm
 UPD 2017-05-27_07:45:02 15713 FHEM/24_TPLinkHS110.pm
 UPD 2017-06-06_07:45:02 410216 FHEM/26_KM273.pm
-UPD 2017-05-08_07:45:02 50360 FHEM/26_tahoma.pm
+UPD 2017-07-09_07:45:02 51809 FHEM/26_tahoma.pm
 UPD 2017-06-26_07:45:02 84733 FHEM/30_DUOFERN.pm
 UPD 2015-07-28_14:05:31 4923 FHEM/30_ENECSYSGW.pm
 UPD 2017-03-16_07:45:02 51376 FHEM/30_HUEBridge.pm
@@ -444,7 +444,7 @@ UPD 2015-07-28_14:05:31 31513 FHEM/98_dewpoint.pm
 UPD 2016-12-03_07:45:16 5092 FHEM/98_dummy.pm
 UPD 2017-03-16_07:45:02 10243 FHEM/98_expandJSON.pm
 UPD 2017-06-30_07:45:02 5320 FHEM/98_fhemdebug.pm
-UPD 2017-07-08_07:45:02 11594 FHEM/98_fheminfo.pm
+UPD 2017-07-09_07:45:02 11677 FHEM/98_fheminfo.pm
 UPD 2017-03-14_07:45:02 7818 FHEM/98_help.pm
 UPD 2017-02-13_07:45:02 44023 FHEM/98_logProxy.pm
 UPD 2017-06-21_07:45:02 52462 FHEM/98_monitoring.pm
@@ -1174,6 +1174,9 @@ UPD 2015-08-14_07:45:11 2026 www/images/fhemSVG/fts_shutter_1w_60.svg
 UPD 2015-08-14_07:45:11 2438 www/images/fhemSVG/fts_shutter_1w_70.svg
 UPD 2015-08-14_07:45:11 2644 www/images/fhemSVG/fts_shutter_1w_80.svg
 UPD 2015-08-14_07:45:11 2850 www/images/fhemSVG/fts_shutter_1w_90.svg
+UPD 2017-07-09_07:45:02 11005 www/images/fhemSVG/fts_shutter_all.svg
+UPD 2017-07-09_07:45:02 12015 www/images/fhemSVG/fts_shutter_alldown.svg
+UPD 2017-07-09_07:45:02 16270 www/images/fhemSVG/fts_shutter_allup.svg
 UPD 2017-07-04_07:45:02 7198 www/images/fhemSVG/fts_shutter_shadding_run.svg
 UPD 2017-07-04_07:45:02 6929 www/images/fhemSVG/fts_shutter_shadding_stop.svg
 UPD 2015-07-28_14:05:32 3810 www/images/fhemSVG/fts_shutter_updown.svg
@@ -1867,7 +1870,7 @@ UPD 2015-07-28_14:05:34 29813 www/jscolor/jscolor.js
 UPD 2015-07-28_14:05:34 331 www/pgm2/RSS.js
 UPD 2016-12-04_07:45:11 6371 www/pgm2/alarm.js
 UPD 2017-02-18_07:45:02 6202 www/pgm2/brightstyle.css
-UPD 2017-05-02_07:45:02 9515 www/pgm2/console.js
+UPD 2017-07-09_07:45:02 9543 www/pgm2/console.js
 UPD 2017-02-18_07:45:02 1064 www/pgm2/darkCommon.css
 UPD 2015-07-28_14:05:34 4334 www/pgm2/darkfloorplanstyle.css
 UPD 2017-02-24_07:45:02 4813 www/pgm2/darksmallscreenstyle.css
