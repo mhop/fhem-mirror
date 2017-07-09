@@ -166,6 +166,7 @@ FHEM2FHEM_Read($)
         $defs{$rname}{TEMPORARY} = 1;  # Do not save it
         DoTrigger($rname, $msg);
         delete($defs{$rname});
+        delete($attr{$rname}); # Forum #73490
 
       } else {
         if(AttrVal($name,"eventOnly",0)) {
