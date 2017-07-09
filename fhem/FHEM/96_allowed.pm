@@ -77,13 +77,14 @@ allowed_Authorize($$$$)
   if($type eq "cmd") {
     return 0 if(!$me->{allowedCommands});
     # Return 0: allow stacking with other instances, see Forum#46380
-    return ($me->{allowedCommands} =~ m/\b$arg\b/) ? 0 : 2;
+    return ($me->{allowedCommands} =~ m/\b\Q$arg\E\b/) ? 0 : 2;
   }
 
   if($type eq "devicename") {
     return 0 if(!$me->{allowedDevices});
-    return ($me->{allowedDevices} =~ m/\b$arg\b/) ? 0 : 2;
+    return ($me->{allowedDevices} =~ m/\b\Q$arg\E\b/) ? 0 : 2;
   }
+
 
   return 0;
 }
