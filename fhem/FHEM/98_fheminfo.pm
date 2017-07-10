@@ -54,7 +54,10 @@ sub CommandFheminfo($$) {
 
   _fi2_Count();
 
-  return toJSON(\%fhemInfo) if (defined($args[1]) && $args[1] eq 'debug');
+  if (defined($args[1]) && $args[1] eq 'debug') {
+     $fhemInfo{$c_system}{'uniqueID'} = substr($fhemInfo{$c_system}{'uniqueID'},0,3);
+     return toJSON(\%fhemInfo);
+  }
 
   _fi2_Send() if $doSend;
 
@@ -179,7 +182,7 @@ sub _fi2_TelnetTable($) {
                   if (defined($fhemInfo{$c_system}{'revision'}));
   $str .= sprintf("  OS%*s: %s\n",11," ",$fhemInfo{$c_system}{'os'});
   $str .= sprintf("  Perl%*s: %s\n",9," ",$fhemInfo{$c_system}{'perl'});
-  $str .= sprintf("  uniqueID%*s: %s\n",5," ",$fhemInfo{$c_system}{'uniqueID'});
+  $str .= sprintf("  uniqueID%*s: %s\n",5," ",substr($fhemInfo{$c_system}{'uniqueID'},0,3));
   $str .= sprintf("  upTime%*s: %s\n",7,"  ",$upTime); 
 
    my @keys = keys %fhemInfo;
@@ -209,7 +212,7 @@ sub _fi2_HtmlTable($) {
                   if (defined($fhemInfo{$c_system}{'revision'}));
       $result .= "<tr><td> </td><td>OS:</td><td>$fhemInfo{$c_system}{'os'}</td></tr>";
       $result .= "<tr><td> </td><td>Perl:</td><td>$fhemInfo{$c_system}{'perl'}</td></tr>";
-      $result .= "<tr><td> </td><td>uniqueId:</td><td>$fhemInfo{$c_system}{'uniqueID'}</td></tr>";
+      $result .= "<tr><td> </td><td>uniqueId:</td><td>".substr($fhemInfo{$c_system}{'uniqueID'},0,3)."</td></tr>";
       $result .= "<tr><td> </td><td>upTime:</td><td>$upTime</td></tr>";
       $result .= "<tr><td colspan=3>&nbsp;</td></tr>";
       $result .= "<tr><td><b>Modules</b></td><td><b>Model</b></td><td><b>Count</b></td></tr>";
