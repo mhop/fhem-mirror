@@ -1,8 +1,8 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 05/2017
-my $thzversion = "0.161";
+# by immi 07/2017
+my $thzversion = "0.163"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -256,7 +256,7 @@ my %parsinghash = (
 	      [" boosterHC: ",		10, 1, "bit1", 1],  	[" filterBoth: ",	9, 1, "bit0", 1],
 	      [" ventStage: ",		9, 1, "bit1", 1],  	[" pumpHC: ",		9, 1, "bit2", 1],
 	      [" defrost: ",		9, 1, "bit3", 1],  	[" filterUp: ",		8, 1, "bit0", 1],
-	      [" filterDown: ",	8, 1, "bit1", 1]
+	      [" filterDown: ",	8, 1, "bit1", 1],    [" cooling: ", 11, 1, "bit3", 1]
 	      ],
   "0clean"    => [["", 8, 2, "hex", 1]             
               ],
@@ -361,6 +361,8 @@ my %sets439539common = (
   "p99HC1maxFlowTemp"			=> {cmd2=>"0A0027", argMin =>  "10", argMax =>  "75",	type =>"5temp",  unit =>" °C"},
   "p89DHWeco"				=> {cmd2=>"0A058D", argMin =>  "0",  argMax =>   "1", 	type =>"1clean",  unit =>""},
   "p99startUnschedVent"			=> {cmd2=>"0A05DD", argMin =>  "0",  argMax =>   "3", 	type =>"1clean",  unit =>""},
+  "p99FrostProtectionBoost"  => {cmd2=>"0A05B3", argMin =>  "10", argMax =>  "30",	type =>"5temp",  unit =>" °C"}, #added by TheTrumpeter __EINFRIERSCHUTZ NE
+  "p99FrostProtectionCancel"  => {cmd2=>"0A05B4", argMin =>  "0", argMax =>  "20",	type =>"5temp",  unit =>" °C"}, #added by TheTrumpeter __ABTAUABBR.
   "pClockDay"				=> {cmd2=>"0A0122", argMin =>  "1",  argMax =>  "31", 	type =>"0clean",  unit =>""},
   "pClockMonth"				=> {cmd2=>"0A0123", argMin =>  "1",  argMax =>  "12",	type =>"0clean",  unit =>""},
   "pClockYear"				=> {cmd2=>"0A0124", argMin =>  "12", argMax =>  "20",	type =>"0clean",  unit =>""},
@@ -509,9 +511,9 @@ my %sets539only =(
   "p99PumpRateHC"				=> {cmd2=>"0A02CB", argMin =>   "0", argMax =>  "100",	type =>"5temp",  unit =>" %"},  
   "p99PumpRateDHW"				=> {cmd2=>"0A02CC", argMin =>   "0", argMax =>  "100",	type =>"5temp",  unit =>" %"} ,
   "p99CoolingHC1Switch"			=> {cmd2=>"0B0287", argMin =>   "0", argMax =>    "1",	type =>"1clean",  unit =>""},
-  "p99CoolingHC1SetTemp"		=> {cmd2=>"0B0582", argMin =>  "15", argMax =>  "27",	type =>"5temp",  unit =>" °C"},    #suggested by TheTrumpeter
-  "p99CoolingHC1HystersisFlowTemp"		=> {cmd2=>"0B0583", argMin =>  "0", argMax =>  "5",	type =>"5temp",  unit =>" K"}, #suggested by TheTrumpeter
-  "p99CoolingHC1HystersisRoomTemp"		=> {cmd2=>"0B0584", argMin =>  "0", argMax =>  "5",	type =>"5temp",  unit =>" K"}  #suggested by TheTrumpeter
+  "p99CoolingHC1SetTemp"		=> {cmd2=>"0B0582", argMin =>  "12", argMax =>  "27",	type =>"5temp",  unit =>" °C"},    #suggested by TheTrumpeter
+  "p99CoolingHC1HystersisFlowTemp"		=> {cmd2=>"0B0583", argMin =>  "0.5", argMax =>  "5",	type =>"5temp",  unit =>" K"}, #suggested by TheTrumpeter
+  "p99CoolingHC1HystersisRoomTemp"		=> {cmd2=>"0B0584", argMin =>  "0.5", argMax =>  "3",	type =>"5temp",  unit =>" K"}  #suggested by TheTrumpeter
 );
   
 
@@ -648,7 +650,6 @@ my $internalHash;
 sub THZ_Initialize($)
 {
   my ($hash) = @_;
-
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
@@ -688,7 +689,6 @@ sub THZ_Initialize($)
 		    ."firmware:4.39,2.06,2.14,5.39,4.39technician "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
-
 }
 
 
@@ -711,16 +711,12 @@ sub THZ_Define($$)
   				
   DevIo_CloseDev($hash);
   my $dev  = $a[2];
-
   if($dev eq "none") {
      Log3 $name, 2, "$name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
-  
   $hash->{DeviceName} = $dev;
- 
-  
   my $ret = DevIo_OpenDev($hash, 0, "THZ_Refresh_all_gets");
   return $ret;
 }
@@ -758,7 +754,8 @@ sub THZ_Refresh_all_gets($) {
 sub THZ_GetRefresh($) {
 	my ($par)=@_;
 	my $hash=$par->{hash};
-	my $command=$par->{command};
+	my $command=$par->{command};    
+    my $name =$hash->{NAME};
 	my $interval = AttrVal($hash->{NAME}, ("interval_".$command), 0); 
 	my $replyc = "";
 	if ($interval) {
@@ -767,6 +764,11 @@ sub THZ_GetRefresh($) {
 	}
 	$replyc = THZ_Get($hash, $hash->{NAME}, $command) if ($hash->{STATE} ne "disconnected");
 	#BlockingCall("THZ_GetNB", $hash->{NAME} . "|". $command) if ($hash->{STATE} ne "disconnected");
+    if ($command =~ "sFirmware") {  # model summary for statistics
+        my $sFirmwareId = join('', (split(/ |:/, ReadingsVal($name,"sFirmware-Id"," : : : ")))[0..6]);
+        my $sFirmware= (split(/ /, ReadingsVal($name,"sFirmware","  ")))[1];
+        $hash->{model}= sprintf("%.5s%s%s", AttrVal($name,"firmware","n.a.")."______", $sFirmware, $sFirmwareId);
+    }
     return ($replyc);
 }
 
@@ -778,14 +780,9 @@ sub THZ_GetRefresh($) {
 #
 ########################################################################################
 sub THZ_Write($$) {
-  my ($hash,$msg) = @_;
+  my ($hash,$bstring) = @_;
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
-  my $bstring;
-    $bstring = $msg;
-
-  Log3 $hash->{NAME}, 5, "$hash->{NAME} sending $bstring";
-
+  Log3 $hash->{NAME}, 5, "$hash->{NAME} sending $bstring"; 
   DevIo_SimpleWrite($hash, $bstring, 1);
 }
 
@@ -1523,7 +1520,7 @@ sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
-  my @numbers=('0A0648', '0A0649', '0B0264', '0B0287', '0B0582', '0B0583', '0B0584', '0A0126','0A0265', '0A0597', '0A0598', '0A0599', '0A059C','0A05AD', '0A05B0', '0A05DD', '0A05DE', '0A0BA3');
+  my @numbers=('0A05B3', '0A05B4', '0B0264', '0B0287', '0B0582', '0B0583', '0B0584', '0A0126','0A0265', '0A0597', '0A0598', '0A0599', '0A059C','0A05AD', '0A05B0', '0A05DD', '0A05DE', '0A0BA3');
   #my @numbers=(1, 3, 4, 5, 8, 12, 13, 14, 15, 17, 18, 19, 20, 22, 26, 39, 40, 82, 83, 86, 87, 96, 117, 128, 239, 265, 268, 269, 270, 271, 274, 275, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 297, 299, 317, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 603, 607, 612, 613, 634, 647, 650, 961, 1385, 1386, 1387, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 830, 1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 1555, 272, 1489, 1490, 1491, 1492, 1631, 933, 934, 1634, 928, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, 2029, 2030, 2031, 2032, 2033);
   #my @numbers=(1, 3, 12, 13, 14, 15, 19, 20, 22, 26, 39,  82, 83, 86, 87, 96, 239, 265, 268, 274, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 613, 634, 961, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409,  1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 2970, 2971, 2975, 2976, 2977, 2978, 2979, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 272, 1489, 1491, 1492, 1631, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, );
  # my @numbers=(239, 410, 603, 607, 634, 830, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1467, 1468, 1469, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1501, 1502, 374, 1631, 718, 2372, 328);
