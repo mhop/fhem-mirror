@@ -41,6 +41,9 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.5.0        10.07.2017       replace $hash->{dbloghash}{DBMODEL} by $hash->{dbloghash}{MODEL} (DbLog was changed)
+# 5.4.0        03.07.2017       restoreMySQL - restore of csv-files (from dumpServerSide), 
+#                               RestoreRowsHistory/ DumpRowsHistory, Commandref revised
 # 5.3.1        28.06.2017       vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised
 # 5.3.0        26.06.2017       change of mysql_optimize_tables, new command optimizeTables
 # 5.2.1        25.06.2017       bugfix in sqlCmd_DoParse (PRAGMA, UTF8, SHOW)
@@ -228,7 +231,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.3.1";
+my $DbRepVersion = "5.5.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -338,7 +341,22 @@ sub DbRep_Set($@) {
   my $dbh            = $hash->{DBH};
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
-  my $dbmodel        = $hash->{dbloghash}{DBMODEL};
+  my $dbmodel        = $hash->{dbloghash}{MODEL};
+  my $dbname         = $hash->{DATABASE};
+  
+  my (@bkps,$dir);
+  $dir = AttrVal($name, "dumpDirLocal", "./");  # 'dumpDirRemote' (Backup-Verz. auf dem MySQL-Server) muß gemountet sein und in 'dumpDirLocal' eingetragen sein
+  $dir = $dir."/" unless($dir =~ m/\/$/);
+	
+  opendir(DIR,$dir);
+  my $sd = $dbname."_history_.*.csv";              
+  while (my $file = readdir(DIR)) {
+      next unless (-f "$dir/$file");
+      next unless ($file =~ /^$sd/);
+      push @bkps,$file;
+  }
+  closedir(DIR);
+  my $cj = @bkps?join(",",reverse(sort @bkps)):" ";
   
   my $setlist = "Unknown argument $opt, choose one of ".
                 (($hash->{ROLE} ne "Agent")?"sumValue:noArg ":"").
@@ -357,6 +375,7 @@ sub DbRep_Set($@) {
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"dumpMySQL:clientSide,serverSide ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"optimizeTables:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/ )?"vacuum:noArg ":"").
+				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)?"restoreMySQL:".$cj." ":"").
                 (($hash->{ROLE} ne "Agent")?"countEntries:noArg ":"");
   
   return if(IsDisabled($name));
@@ -387,6 +406,15 @@ sub DbRep_Set($@) {
            }
        }
 	   
+	   DbRep_Main($hash,$opt,$prop);
+       return undef;
+  }
+  
+  if ($opt eq "restoreMySQL" && $hash->{ROLE} ne "Agent") {
+       $hash->{LASTCMD} = "$opt";	   
+       Log3 ($name, 3, "DbRep $name - ################################################################");
+       Log3 ($name, 3, "DbRep $name - ###             New database Restore/Recovery                ###");
+       Log3 ($name, 3, "DbRep $name - ################################################################");
 	   DbRep_Main($hash,$opt,$prop);
        return undef;
   }
@@ -541,7 +569,7 @@ sub DbRep_Get($@) {
   my $dbh     = $hash->{DBH};
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
-  my $dbmodel = $hash->{dbloghash}{DBMODEL};
+  my $dbmodel = $hash->{dbloghash}{MODEL};
   my $to = AttrVal($name, "timeout", "60");
   
   my $getlist = "Unknown argument $opt, choose one of ".
@@ -582,7 +610,7 @@ sub DbRep_Attr($$$$) {
   my ($cmd,$name,$aName,$aVal) = @_;
   my $hash = $defs{$name};
   $hash->{dbloghash} = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-  my $dbmodel = $hash->{dbloghash}{DBMODEL};
+  my $dbmodel = $hash->{dbloghash}{MODEL};
   my $do;
       
     # $cmd can be "del" or "set"
@@ -843,7 +871,7 @@ sub DbRep_Undef($$) {
  
  BlockingKill($hash->{HELPER}{RUNNING_PID}) if (exists($hash->{HELPER}{RUNNING_PID}));
  BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
- BlockingKill($hash->{HELPER}{RUNNING_BACKUP_SERVER}) if (exists($hash->{HELPER}{RUNNING_BACKUP_SERVER})); 
+ BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER})); 
  BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
     
 return undef;
@@ -932,18 +960,18 @@ sub DbRep_Main($$;$) {
  # testexit($hash);
  
  return if( ($hash->{HELPER}{RUNNING_BACKUP_CLIENT} || 
-             $hash->{HELPER}{RUNNING_BACKUP_SERVER}) && $opt ne "dumpMySQL" );
+             $hash->{HELPER}{RUNNING_BCKPREST_SERVER}) && $opt !~ /dumpMySQL|restoreMySQL/ );
  
  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
  delread($hash);
  
- if ($opt eq "dumpMySQL") {	   
+ if ($opt =~ /dumpMySQL/) {	   
      BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
-     BlockingKill($hash->{HELPER}{RUNNING_BACKUP_SERVER}) if (exists($hash->{HELPER}{RUNNING_BACKUP_SERVER}));
+     BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
 	 BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
      
 	 if ($cmd eq "serverSide") {
-	     $hash->{HELPER}{RUNNING_BACKUP_SERVER} = BlockingCall("mysql_DoDumpServerSide", "$name", "DumpDone", $to, "DumpAborted", $hash);
+	     $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_DoDumpServerSide", "$name", "DumpDone", $to, "DumpAborted", $hash);
 		 ReadingsSingleUpdateValue ($hash, "state", "serverSide Dump is running - be patient and see Logfile !", 1);
 	 } else {
 	     $hash->{HELPER}{RUNNING_BACKUP_CLIENT} = BlockingCall("mysql_DoDumpClientSide", "$name", "DumpDone", $to, "DumpAborted", $hash);
@@ -951,6 +979,14 @@ sub DbRep_Main($$;$) {
 	 }
      return;
  }
+ 
+ if ($opt =~ /restoreMySQL/) {	
+     BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
+     $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_RestoreServerSide", "$name|$cmd", "RestoreDone", $to, "DumpAborted", $hash);
+	 ReadingsSingleUpdateValue ($hash, "state", "restore database is running - be patient and see Logfile !", 1);
+     return;
+ }
+ 
  if ($opt =~ /optimizeTables|vacuum/) {	
      BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE})); 
      $hash->{HELPER}{RUNNING_OPTIMIZE} = BlockingCall("DbRep_optimizeTables", "$name", "OptimizeDone", $to, "OptimizeAborted", $hash);
@@ -3340,7 +3376,7 @@ sub impfile_Push($) {
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
- my $dbmodel    = $hash->{dbloghash}{DBMODEL};
+ my $dbmodel    = $hash->{dbloghash}{MODEL};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my $err=0;
@@ -4714,7 +4750,7 @@ sub mysql_DoDumpServerSide($) {
  my $ebd                        = AttrVal($name, "executeBeforeDump", undef);
  my $ead                        = AttrVal($name, "executeAfterDump", undef);
  my $table                      = "history";
- my ($dbh,$sth,$err,$db_MB_start,$db_MB_end);
+ my ($dbh,$sth,$err,$db_MB_start,$db_MB_end,$drh);
  my (%db_tables,@tablenames);
  
  Log3 ($name, 4, "DbRep $name -> Start BlockingCall mysql_DoDumpServerSide");
@@ -4807,7 +4843,7 @@ sub mysql_DoDumpServerSide($) {
  my $sql = "SELECT * FROM history INTO OUTFILE '$dump_path_rem$bfile' FIELDS TERMINATED BY ',' ENCLOSED BY '\"' LINES TERMINATED BY '\n'; ";
 
  eval {$sth = $dbh->prepare($sql);
-       $sth->execute();
+       $drh = $sth->execute();
       }; 
   
   if ($@) {
@@ -4836,11 +4872,12 @@ sub mysql_DoDumpServerSide($) {
 
  $rt = $rt.",".$brt;
  
- Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname, total time used: ".sprintf("%.0f",$brt)." sec.");
+ Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used: ".sprintf("%.0f",$brt)." sec.");
+ Log3 ($name, 3, "DbRep $name - Number of exported datasets: $drh.");
  Log3 ($name, 3, "DbRep $name - Size of backupfile: ".byte_output($filesize));
  Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
  
-return "$name|$rt|''|$dump_path_rem$bfile|n.a.|n.a.|$filesize";
+return "$name|$rt|''|$dump_path_rem$bfile|n.a.|$drh|$filesize";
 }
 
 ####################################################################################################
@@ -4863,7 +4900,7 @@ sub DumpDone($) {
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall DumpDone");
   
   delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
-  delete($hash->{HELPER}{RUNNING_BACKUP_SERVER});
+  delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -4912,6 +4949,137 @@ return;
 }
 
 ####################################################################################################
+#                  Restore MySQL (serverSide)
+####################################################################################################
+sub mysql_RestoreServerSide($) {
+ my ($string) = @_;
+ my ($name, $bfile)      = split("\\|", $string);
+ my $hash                = $defs{$name};
+ my $dbloghash           = $hash->{dbloghash};
+ my $dbconn              = $dbloghash->{dbconn};
+ my $dbuser              = $dbloghash->{dbuser};
+ my $dblogname           = $dbloghash->{NAME};
+ my $dbpassword          = $attr{"sec$dblogname"}{secret};
+ my $dbname              = $hash->{DATABASE};
+ my $dump_path_rem       = AttrVal($name, "dumpDirRemote", "./");
+ $dump_path_rem          = $dump_path_rem."/" unless($dump_path_rem =~ m/\/$/);
+ my $table               = "history";
+ my ($dbh,$sth,$err,$drh);
+ 
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall mysql_RestoreServerSide");
+ 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
+ # Verbindung mit DB
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ if ($@) {
+	 $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_RestoreServerSide finished");
+     return "$name|''|$err|''|''|''|''";
+ }
+ 
+ Log3 ($name, 3, "DbRep $name - Starting restore of database '$dbname', table '$table'.");
+
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+
+ my $sql = "LOAD DATA CONCURRENT INFILE '$dump_path_rem$bfile' IGNORE INTO TABLE $table FIELDS TERMINATED BY ',' ENCLOSED BY '\"' LINES TERMINATED BY '\n'; ";
+
+ eval {$sth = $dbh->prepare($sql);
+       $drh = $sth->execute();
+      }; 
+  
+  if ($@) {
+     # error bei sql-execute
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_RestoreServerSide finished");
+	 $dbh->disconnect;
+     return "$name|''|$err|''|''|''|''";     
+  }
+  
+ $sth->finish;
+ $dbh->disconnect;
+  
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
+ Log3 ($name, 3, "DbRep $name - Restore of $dump_path_rem$bfile into '$dbname', '$table' finished - total time used: ".sprintf("%.0f",$brt)." sec for $drh datasets.");
+ Log3 ($name, 3, "DbRep $name - Number of imported datasets: $drh.");
+ Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_RestoreServerSide finished");
+ 
+return "$name|$rt|''|$dump_path_rem$bfile|$drh";
+}
+
+####################################################################################################
+#                                  Auswertungsroutine Restore
+####################################################################################################
+sub RestoreDone($) {
+  my ($string)   = @_;
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $bt         = $a[1];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[2]?decode_base64($a[2]):undef;
+  my $bfile      = $a[3];
+  my $drh        = $a[4];
+  my $name       = $hash->{NAME};
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall RestoreDone");
+  
+  delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+  delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
+  
+  if ($err) {
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      Log3 ($name, 4, "DbRep $name -> BlockingCall RestoreDone finished");
+      return;
+  } 
+  
+  my $state = "Restore of $bfile finished";
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateValue($hash, "RestoreRowsHistory", $drh);
+  ReadingsBulkUpdateTimeState($hash,$brt,undef,$state);
+  readingsEndUpdate($hash, 1);
+
+  Log3 ($name, 3, "DbRep $name - Database restore finished successfully. ");
+
+  Log3 ($name, 4, "DbRep $name -> BlockingCall RestoreDone finished");
+  
+return;
+}
+
+####################################################################################################
+#                    Abbruchroutine Timeout Restore
+####################################################################################################
+sub RestoreAborted($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $dbh  = $hash->{DBH} if ($hash->{DBH}); 
+  
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} timed out") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} timed out") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
+  
+  my $state = "Database restore timed out";
+  $dbh->disconnect() if(defined($dbh));
+  ReadingsSingleUpdateValue ($hash, "state", $state, 1);
+  
+  Log3 ($name, 3, "DbRep $name - Database restore aborted by timeout !");
+  
+  delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+  delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
+return;
+}
+
+####################################################################################################
 #                    Abbruchroutine Timeout DB-Abfrage
 ####################################################################################################
 sub ParseAborted($) {
@@ -4936,7 +5104,7 @@ sub DumpAborted($) {
   my ($err,$erread);
   
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} timed out") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
-  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_SERVER}{fn} timed out") if($hash->{HELPER}{RUNNING_BACKUP_SERVER});
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} timed out") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
   
   # Befehl nach Dump ausführen
   my $ead = AttrVal($name, "executeAfterDump", undef);
@@ -4954,10 +5122,10 @@ sub DumpAborted($) {
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
   
-  Log3 ($name, 3, "DbRep $name - Database dump aborted with timeout !");
+  Log3 ($name, 3, "DbRep $name - Database dump aborted by timeout !");
   
   delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
-  delete($hash->{HELPER}{RUNNING_BACKUP_SERVER});
+  delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
 return;
 }
 
@@ -5589,7 +5757,8 @@ return;
      <li> automatic rename of device names in datasets and other DbRep-definitions after FHEM "rename" command (see <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Execution of arbitrary user specific SQL-commands </li>
 	 <li> creation of backups non-blocking (MySQL) </li>
-	 <li> optimize the connected database </li>
+	 <li> restore of serverSide-backups non-blocking (MySQL) </li>
+	 <li> optimize the connected database (optimizeTables, vacuum) </li>
      </ul></ul>
      <br>
      
@@ -5608,7 +5777,7 @@ return;
    
   <b>Preparations </b> <br><br>
   
-  The module requires the usage of a DbLog instance and the credentials of the database definition will be used. (currently tested with MySQL and SQLite). <br>
+  The module requires the usage of a DbLog instance and the credentials of the database definition will be used. <br>
   Only the content of table "history" will be included (except command "sqlCmd"). <br><br>
   
   Overview which other Perl-modules DbRep is using: <br><br>
@@ -5797,6 +5966,12 @@ return;
 
 								 The <b>naming convention of dump files</b> is:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.csv <br><br>
 								 
+								 You can start a restore of table history from serverSide-Backup by command: <br><br>
+								   <ul>
+								   set &lt;name&gt; &lt;restoreMySQL&gt; &lt;filename&gt;.csv <br><br>
+								   </ul>
+								
+                                 <br>									 
 								 </li><br>
 								 
     <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format between period given by timestamp. 
@@ -5868,6 +6043,15 @@ return;
                                  <br><br>
                                  </li> <br>
                                  </ul> 
+								 
+    <li><b> restoreMySQL &lt;file&gt;.csv </b>  - imports the content of table history from a serverSide-backup. <br>
+                                 The function provides a drop-down-list of files which can be used for restore.
+                                 Therefore you have to mount the remote directory "dumpDirRemote" of the MySQL-Server on the 
+								 Client and make it usable to the DbRep-device by setting the <a href="#DbRepattr">attribute</a> 
+								 "dumpDirLocal". <br>
+								 All files with extension "csv" and if the filename is beginning with the name of the connected database 
+								 (see Internal DATABASE) will be listed. <br><br>
+								 </li><br>
 
 	<li><b> sqlCmd </b>        - executes an arbitrary user specific command. <br>
                                  If the command contains a operation to delete data, the <a href="#DbRepattr">attribute</a> 
@@ -6466,7 +6650,8 @@ sub bdump {
 	      Befehl (siehe <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Ausführen von beliebigen Benutzer spezifischen SQL-Kommandos </li>
 	 <li> Backups der FHEM-Datenbank erstellen (MySQL) </li>
-	 <li> Optimierung der angeschlossenen Datenbank </li>
+	 <li> Restore von serverSide-Backups (MySQL) </li>
+	 <li> Optimierung der angeschlossenen Datenbank (optimizeTables, vacuum) </li>
      
 	 </ul></ul>
      <br>
@@ -6485,7 +6670,7 @@ sub bdump {
   <b>Voraussetzungen </b> <br><br>
   
   Das Modul setzt den Einsatz einer oder mehrerer DbLog-Instanzen voraus. Es werden die Zugangsdaten dieser 
-  Datenbankdefinition genutzt (bisher getestet mit MySQL und SQLite). <br>
+  Datenbankdefinition genutzt. <br>
   Es werden nur Inhalte der Tabelle "history" (Ausnahme Kommando "sqlCmd") berücksichtigt. <br><br>
   
   Überblick welche anderen Perl-Module DbRep verwendet: <br><br>
@@ -6641,7 +6826,7 @@ sub bdump {
 								 gespeichert. <br>
 								 Es wird die gesamte history-Tabelle (nicht current-Tabelle) <b>im CSV-Format</b> ohne 
 								 Einschränkungen exportiert. <br>
-								 Vor dem Dump kann eine Tabellenoptimierung ("optimizeTablesBeforeDump") 
+								 Vor dem Dump kann eine Tabellenoptimierung ("Attribut optimizeTablesBeforeDump") 
 								 optional zugeschaltet werden . <br><br>
 								 
 								 <b>Achtung ! <br>
@@ -6681,6 +6866,13 @@ sub bdump {
 
 								 Die <b>Namenskonvention der Dumpfiles</b> ist:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.csv <br><br>
 								 
+								 Ein Restore der Datenbank aus diesem Backup kann durch den Befehl: <br><br>
+								   <ul>
+								   set &lt;name&gt; &lt;restoreMySQL&gt; &lt;filename&gt;.csv <br><br>
+								   </ul>
+								
+                                 gestartet werden. <br><br>								
+								   
 								 </li><br>
                                  
     <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. 
@@ -6778,7 +6970,15 @@ sub bdump {
                                  <br><br>
                                  </li> <br>
                                  </ul>  								 
- 
+
+    <li><b> restoreMySQL &lt;File&gt;.csv </b>  - importiert den Inhalt der history-Tabelle aus einem serverSide-Backup. <br>
+                                 Die Funktion stellt über eine Drop-Down Liste eine Dateiauswahl für den Restore zur Verfügung.
+                                 Dazu ist das Verzeichnis "dumpDirRemote" des MySQL-Servers auf dem Client zu mounten 
+								 und im <a href="#DbRepattr">Attribut</a> "dumpDirLocal" dem DbRep-Device bekannt zu machen. <br>
+								 Es werden alle Files mit der Endung "csv" und deren Name mit der 
+								 verbundenen Datenbank beginnt (siehe Internal DATABASE), aufgelistet . <br><br>
+								 </li><br>
+								 
     <li><b> sqlCmd </b>        - führt ein beliebiges Benutzer spezifisches Kommando aus. <br>
                                  Enthält dieses Kommando eine Delete-Operation, muss zur Sicherheit das 
 								 <a href="#DbRepattr">Attribut</a> "allowDeletion" gesetzt sein. <br>
