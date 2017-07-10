@@ -24,6 +24,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ########################################################################################
+#
+# Contributions from: "Reinhart", Marcus Proest
+#
+########################################################################################
+
 package main;
 
 use strict;
@@ -50,7 +55,7 @@ use vars qw($FW_dir);
 sub YAF_Request($@);
 
 my $fhem_url;
-my $yaf_version=0.45;
+my $yaf_version=0.46;
 my $yafw_encoding = "UTF-8";
 my $mp   = AttrVal("global", "modpath", ".");
 my $yaf_www_directory = $mp."/FHEM/YAF/www";
@@ -223,10 +228,11 @@ sub YAF_Request ($@) {
 	my ($htmlarg) = @_;
 	# %20 durch Leerzeichen ersetzen
 	$htmlarg =~ s/%20/ /g;
-	
+	$htmlarg =~ s/www\///g;
 	# Log for debug
-    Log 1,"YAF_Request: htmlarg: $htmlarg";
-    
+	#Log 1,"YAF_Request: htmlarg: $htmlarg";
+	#Log 1,"YAF_Dirs: FHEM_url: $fhem_url FW_cname: $FW_cname FW_RET: $FW_RET FW_dir: $FW_dir";
+
 	# GET Parameter
 	my @params = split(/\?/, $htmlarg);
 
@@ -451,3 +457,31 @@ sub YAF_NotFound{
 }
 
 1;
+
+# Beginn der Commandref
+
+=pod
+=item helper
+=item summary YAF provides an interactive alternative to the floorplan module
+=item summary_DE YAF ist eine interaktive alternaitve zum floorplan Modul.
+
+=begin html
+
+<a name="YAF"></a>
+<b>Define</b>
+<ul>
+	<code>define yaf YAF</code>
+</ul>
+=end html
+
+=begin html_DE
+
+<a name="YAF"></a>
+<b>Define</b>
+<ul>
+	<code>define yaf YAF</code>
+</ul>
+=end html
+
+# Ende der Commandref
+=cut
