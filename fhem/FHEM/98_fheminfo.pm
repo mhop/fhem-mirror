@@ -34,8 +34,8 @@ my @noModelList = qw(knx dummy at archetype weather pushover twilight hminfo rea
 sub fheminfo_Initialize($$) {
   my %hash = (
     Fn  => "CommandFheminfo",
-    uri => "https://fhem.de/stats/statistics2.cgi",
     Hlp => "[send],show or send Fhem statistics",
+    uri => "https://fhem.de/stats/statistics2.cgi",
   );
   $cmds{fheminfo} = \%hash;
 }
@@ -55,7 +55,7 @@ sub CommandFheminfo($$) {
   _fi2_Count();
 
   if (defined($args[1]) && $args[1] eq 'debug') {
-     $fhemInfo{$c_system}{'uniqueID'} = substr($fhemInfo{$c_system}{'uniqueID'},0,3);
+     $fhemInfo{$c_system}{'uniqueID'} = _fi2_shortId();
      return toJSON(\%fhemInfo);
   }
 
@@ -182,7 +182,7 @@ sub _fi2_TelnetTable($) {
                   if (defined($fhemInfo{$c_system}{'revision'}));
   $str .= sprintf("  OS%*s: %s\n",11," ",$fhemInfo{$c_system}{'os'});
   $str .= sprintf("  Perl%*s: %s\n",9," ",$fhemInfo{$c_system}{'perl'});
-  $str .= sprintf("  uniqueID%*s: %s\n",5," ",substr($fhemInfo{$c_system}{'uniqueID'},0,3));
+  $str .= sprintf("  uniqueID%*s: %s\n",5," ",_fi2_shortId());
   $str .= sprintf("  upTime%*s: %s\n",7,"  ",$upTime); 
 
    my @keys = keys %fhemInfo;
@@ -212,7 +212,7 @@ sub _fi2_HtmlTable($) {
                   if (defined($fhemInfo{$c_system}{'revision'}));
       $result .= "<tr><td> </td><td>OS:</td><td>$fhemInfo{$c_system}{'os'}</td></tr>";
       $result .= "<tr><td> </td><td>Perl:</td><td>$fhemInfo{$c_system}{'perl'}</td></tr>";
-      $result .= "<tr><td> </td><td>uniqueId:</td><td>".substr($fhemInfo{$c_system}{'uniqueID'},0,3)."</td></tr>";
+      $result .= "<tr><td> </td><td>uniqueId:</td><td>"._fi2_shortId()."</td></tr>";
       $result .= "<tr><td> </td><td>upTime:</td><td>$upTime</td></tr>";
       $result .= "<tr><td colspan=3>&nbsp;</td></tr>";
       $result .= "<tr><td><b>Modules</b></td><td><b>Model</b></td><td><b>Count</b></td></tr>";
@@ -252,7 +252,7 @@ sub _fi2_Div($$) {
   return (int($p1/$p2), $p1 % $p2);
 }
 
-sub _fi2_findRev {
+sub _fi2_findRev() {
    my $cf = 'controls_fhem.txt';
    my $filename = (-e "./$cf") ? "./$cf" : AttrVal("global","modpath",".")."/FHEM/$cf";
    my ($err, @content) = FileRead({FileName => $filename, ForceType => "file"});
@@ -290,6 +290,9 @@ sub _fi2_zwave($) {
   return $zwave;
 }
 
+sub _fi2_shortId() {
+  return substr($fhemInfo{$c_system}{'uniqueID'},0,3)."...";
+}
 
 1;
 
