@@ -314,18 +314,19 @@ sub _fi2_shortId() {
     The optional parameter <code>send</code> transmitts the collected data
     to a central server in order to support the development of FHEM. The
     transmitted data is processed graphically. The results can be viewed
-    on <a href="http://fhem.de/stats/statistics.html">http://fhem.de/stats/statistics.html</a>.
-    Based on the IP address, the approximate location is determined with
-    an accuracy of about 40-80 km. The IP address is not saved.
+    on <a href="https://fhem.de/stats/statistics.html">http://fhem.de/stats/statistics.html</a>.
+    The IP address will not be stored in database, only used for region determination during send.
   <br>
   <br>
     Features:<br>
     <ul>
+      <li>FHEM release and FeatureLevel (will be removed soon)</li>
+      <li>ConfigType (configDB|configFILE)</li>
+      <li>SVN rev number</li>
       <li>Operating System Information</li>
-      <li>Hardware architecture</li>
       <li>Installed Perl version</li>
-      <li>Installed FHEM release</li>
-      <li>Defined modules (only official FHEM Modules are counted)</li>
+      <li>Uptime (not sent to server)</li>
+      <li>Defined modules</li>
       <li>Defined models per module</li>
     </ul>
   <br>
