@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.0.002
+#  Version 4.1
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -113,7 +113,8 @@ use vars qw(%HMCCU_SCRIPTS);
 	substitute       => "ERROR_REDUCED,ERROR_OVERHEAT!(0|false):no,(1|true):yes;LEVEL!#0-0:off,#1-100:on;DIRECTION!0:none,1:up,2:down,3:undefined",
 	webCmd           => "control:on:off",
 	widgetOverride   => "control:slider,0,10,100"	
-	},	"HM-LC-Dim1T-Pl|HM-LC-Dim1T-CV|HM-LC-Dim1T-FM|HM-LC-Dim1T-CV-2|HM-LC-Dim2T-SM|HM-LC-Dim2T-SM-2|HM-LC-Dim1T-DR|HM-LC-Dim1T-FM-LF|HM-LC-Dim1T-FM-2|HM-LC-Dim1T-Pl-3|HM-LC-Dim1TPBU-FM|HM-LC-Dim1TPBU-FM-2" => {
+	},
+	"HM-LC-Dim1T-Pl|HM-LC-Dim1T-CV|HM-LC-Dim1T-FM|HM-LC-Dim1T-CV-2|HM-LC-Dim2T-SM|HM-LC-Dim2T-SM-2|HM-LC-Dim1T-DR|HM-LC-Dim1T-FM-LF|HM-LC-Dim1T-FM-2|HM-LC-Dim1T-Pl-3|HM-LC-Dim1TPBU-FM|HM-LC-Dim1TPBU-FM-2" => {
 	_description     => "Funk-Abschnitt-Dimmaktor",
 	_channels        => "1",
 	ccureadingfilter => "(^LEVEL\$|DIRECTION)",
@@ -144,6 +145,22 @@ use vars qw(%HMCCU_SCRIPTS);
 	statedatapoint   => "PRESS",
 	statevals        => "press:true",
 	substitute       => "PRESS!(1|true):pressed,(0|false):released"
+	},
+	"HM-PBI-4-FM" => {
+	_description     => "Funk-Tasterschnittstelle",
+	_channels        => "1,2,3,4",
+	ccureadingfilter => "PRESS",
+	statedatapoint   => "PRESS_SHORT",
+	statevals        => "press:true",
+	substitute       => "PRESS_SHORT,PRESS_LONG,PRESS_CONT!(1|true):pressed,(0|false):released;PRESS_LONG_RELEASE!(0|false):no,(1|true):yes"
+	},
+	"HM-RC-Key4-2|HM-RC-Key4-3" => {
+	_description     => "Funk-Handsender Key",
+	_channels        => "1,2,3,4",
+	ccureadingfilter => "PRESS",
+	"event-on-update-reading" => ".*",
+	statedatapoint   => "PRESS_SHORT",
+	substitute       => "PRESS_SHORT,PRESS_LONG!(1|true):pressed"
 	},
 	"HM-LC-Sw1PBU-FM" => {
 	_description     => "Unterputz Schaltaktor für Markenschalter",
@@ -427,7 +444,8 @@ use vars qw(%HMCCU_SCRIPTS);
 	substitute       => "ERROR_REDUCED,ERROR_OVERHEAT!(0|false):no,(1|true):yes;LEVEL!#0-0:off,#1-100:on;DIRECTION!0:none,1:up,2:down,3:undefined",
 	webCmd           => "control:on:off",
 	widgetOverride   => "control:slider,0,10,100"	
-	},	"HM-LC-Dim1T-Pl|HM-LC-Dim1T-CV|HM-LC-Dim1T-FM|HM-LC-Dim1T-CV-2|HM-LC-Dim2T-SM|HM-LC-Dim2T-SM-2|HM-LC-Dim1T-DR|HM-LC-Dim1T-FM-LF|HM-LC-Dim1T-FM-2|HM-LC-Dim1T-Pl-3|HM-LC-Dim1TPBU-FM|HM-LC-Dim1TPBU-FM-2" => {
+	},
+	"HM-LC-Dim1T-Pl|HM-LC-Dim1T-CV|HM-LC-Dim1T-FM|HM-LC-Dim1T-CV-2|HM-LC-Dim2T-SM|HM-LC-Dim2T-SM-2|HM-LC-Dim1T-DR|HM-LC-Dim1T-FM-LF|HM-LC-Dim1T-FM-2|HM-LC-Dim1T-Pl-3|HM-LC-Dim1TPBU-FM|HM-LC-Dim1TPBU-FM-2" => {
 	_description     => "Funk-Abschnitt-Dimmaktor",
 	ccureadingfilter => "(^LEVEL\$|DIRECTION)",
 	ccuscaleval      => "LEVEL:0:1:0:100",
@@ -452,6 +470,17 @@ use vars qw(%HMCCU_SCRIPTS);
 	ccureadingfilter => "PRESS",
 	statevals        => "press:true",
 	substitute       => "PRESS!(1|true):pressed,(0|false):released"
+	},
+	"HM-PBI-4-FM" => {
+	_description     => "Funk-Tasterschnittstelle",
+	ccureadingfilter => "PRESS",
+	substitute       => "PRESS_SHORT,PRESS_LONG,PRESS_CONT!(1|true):pressed,(0|false):released;PRESS_LONG_RELEASE!(0|false):no,(1|true):yes"
+	},
+	"HM-RC-Key4-2|HM-RC-Key4-3" => {
+	_description     => "Funk-Handsender Key",
+	ccureadingfilter => "PRESS",
+	"event-on-update-reading" => ".*",
+	substitute       => "PRESS_SHORT,PRESS_LONG!(1|true):pressed"
 	},
 	"HM-LC-Sw1PBU-FM" => {
 	_description     => "Unterputz Schaltaktor für Markenschalter",
@@ -545,6 +574,16 @@ use vars qw(%HMCCU_SCRIPTS);
 	ccureadingfilter => "(^HUMIDITY|^TEMPERATURE)",
 	statedatapoint   => "1.TEMPERATURE",
 	stripnumber      => 1
+	},
+	"HM-Sen-RD-O" => {
+	_description     => "Regensensor",
+	ccureadingfilter => "(STATE|WORKING)",
+	controldatapoint => "2.STATE",
+	eventMap         => "/datapoint 2.STATE 1:on/datapoint 2.STATE 0:off/",
+	statedatapoint   => "1.STATE",
+	substitute       => "1.STATE!(0|false):dry,(1|true):rain;2.STATE!(0|false):off,(1|true):on",
+	webCmd           => "control",
+	widgetOverride   => "control:uzsuToggle,off,on"
 	},
 	"HM-WDS100-C6-O-2" => {
 	_description     => "Funk-Kombisensor",
@@ -706,11 +745,11 @@ if (oPR) {
 	},
 	"CreateStringVariable" => {
 		description => "Create CCU system variable of type STRING",
-		syntax      => "name, init, desc",
-		parameters  => 3,
+		syntax      => "name, unit, init, desc",
+		parameters  => 4,
 		code        => qq(
 object oSV = dom.GetObject("\$name");
-if (!oSV){   
+if (!oSV){
   object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
   oSV = dom.CreateObject(OT_VARDP);
   oSysVars.Add(oSV.ID());
@@ -718,7 +757,7 @@ if (!oSV){
   oSV.ValueType(ivtString);
   oSV.ValueSubType(istChar8859);
   oSV.DPInfo("\$desc");
-  oSV.ValueUnit("");
+  oSV.ValueUnit("\$unit");
   oSV.State("\$init");
   oSV.Internal(false);
   oSV.Visible(true);
@@ -758,8 +797,8 @@ else {
 	},
 	"CreateBoolVariable" => {
 		description => "Create CCU system variable of type BOOL",
-		syntax      => "name, init, desc, value1, value2",
-		parameters  => 5,
+		syntax      => "name, unit, init, desc, valtrue, valfalse",
+		parameters  => 6,
 		code        => qq(
 object oSV = dom.GetObject("\$name");
 if (!oSV){   
@@ -772,6 +811,7 @@ if (!oSV){
   oSV.ValueName0("\$value1");
   oSV.ValueName1("\$value2");    
   oSV.DPInfo("\$desc");
+  oSV.ValueUnit("\$unit");
   oSV.State("\$init");
   dom.RTUpdate(false);
 }
@@ -785,7 +825,7 @@ else {
 		syntax      => "name, unit, init, desc, list",
 		parameters  => 5,
 		code        => qq(
-object oSV = dom.GetObject("p2");
+object oSV = dom.GetObject("\$name");
 if (!oSV){   
   object oSysVars = dom.GetObject(ID_SYSTEM_VARIABLES);
   oSV = dom.CreateObject(OT_VARDP);
@@ -804,14 +844,16 @@ else {
 }
 		)
 	},
-	"DeleteVariable" => {
-		description => "Delete CCU system variable",
-		syntax      => "name",
-		parameters  => 1,
+	"DeleteObject" => {
+		description => "Delete CCU object",
+		syntax      => "name, type",
+		parameters  => 2,
 		code        => qq(
 object oSV = dom.GetObject("\$name");
 if (oSV) {
-  dom.DeleteObject(oSV.ID());
+  if (oSV.IsTypeOf(\$type)) {
+    dom.DeleteObject(oSV.ID());
+  }
 }
 		)
 	},
@@ -874,7 +916,7 @@ foreach(devid, root.Devices().EnumUsedIDs()) {
    integer cc=0;
    foreach (chnid, odev.Channels()) {
       object ochn=dom.GetObject(chnid);
-      WriteLine("C;" # ochn.Address() # ";" # ochn.Name());
+      WriteLine("C;" # ochn.Address() # ";" # ochn.Name() # ";" # ochn.ChnDirection());
       cc=cc+1;
    }
    WriteLine("D;" # intna # ";" # odev.Address() # ";" # odev.Name() # ";" # odev.HssType() # ";" # cc);
@@ -937,6 +979,58 @@ foreach (sDevName, sDevList.Split(",")) {
   }
 }
 WriteLine (c);
+		)
+	},
+	"GetDatapointList" => {
+		description => "Query datapoint information of device list",
+		syntax      => "list",
+		parameters  => 1,
+		code        => qq(
+string chnid;
+string sDPId;
+string sDevice;
+string sDevList = "\$list";
+foreach (sDevice, sDevList.Split(",")) {
+  object odev = dom.GetObject (sDevice);
+  if (odev) {
+    string sType = odev.HssType();
+    foreach (chnid, odev.Channels()) {
+      object ochn = dom.GetObject(chnid);
+      if (ochn) {
+        string sAddr = ochn.Address();
+        string sChnNo = sAddr.StrValueByIndex(":",1);
+        foreach(sDPId, ochn.DPs()) {
+          object oDP = dom.GetObject(sDPId);
+          if (oDP) {
+            string sDPName = oDP.Name().StrValueByIndex(".",2);
+            WriteLine (sAddr # ";" # sType # ";" # sChnNo # ";" # sDPName # ";" # oDP.ValueType() # ";" # oDP.Operations());
+          }
+        }
+      }
+    }
+  }
+}
+		)
+	},
+	"GetChannel" => {
+		description => "Get datapoints of channel list",
+		syntax      => "list, ccuget",
+		parameters  => 2,
+		code        => qq(
+string sDPId;
+string sChannel;
+string sChnList = "\$list";
+foreach (sChannel, sChnList.Split(",")) {
+  object oChannel = dom.GetObject (sChannel);
+  if (oChannel) {
+    foreach(sDPId, oChannel.DPs()) {
+      object oDP = dom.GetObject(sDPId);
+      if (oDP) {
+        WriteLine (sChannel # "=" # oDP.Name() # "=" # oDP.\$ccuget());
+      }
+    }
+  }
+}
 		)
 	}
 );

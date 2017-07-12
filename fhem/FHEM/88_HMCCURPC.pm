@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 0.95 beta
+#  Version 0.96 beta
 #
 #  Thread based RPC Server module for HMCCU.
 #
@@ -40,7 +40,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPC_VERSION = '0.95 beta';
+my $HMCCURPC_VERSION = '0.96 beta';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPC_MAX_EVENTS = 50;
@@ -65,6 +65,9 @@ my $HMCCURPC_TIMEOUT_WRITE = 0.001;
 
 # Timeout for accepting incoming connections
 my $HMCCURPC_TIMEOUT_ACCEPT = 1;
+
+# Timeout for incoming CCU events
+my $HMCCURPC_TIMEOUT_EVENT = 600;
 
 # Send statistic information after specified amount of events
 my $HMCCURPC_STATISTICS = 500;
@@ -155,7 +158,7 @@ sub HMCCURPC_GetAttribute ($$$$);
 sub HMCCURPC_GetRPCPortList ($);
 sub HMCCURPC_ListDevices ($);
 sub HMCCURPC_RegisterCallback ($);
-sub HMCCURPC_RegisterSingleCallback ($$);
+sub HMCCURPC_RegisterSingleCallback ($$$);
 sub HMCCURPC_DeRegisterCallback ($);
 sub HMCCURPC_InitRPCServer ($$$);
 sub HMCCURPC_StartRPCServer ($);
@@ -234,9 +237,10 @@ sub HMCCURPC_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = "rpcInterfaces:multiple-strict,".join(',',sort keys %HMCCURPC_RPC_PORT).
-		" ccuflags:multiple-strict,expert,keepThreads rpcMaxEvents rpcQueueSize rpcTriggerTime". 
+		" ccuflags:multiple-strict,expert,keepThreads,reconnect".
+		" rpcMaxEvents rpcQueueSize rpcTriggerTime". 
 		" rpcServer:on,off rpcServerAddr rpcServerPort rpcWriteTimeout rpcAcceptTimeout".
-		" rpcConnTimeout rpcWaitTime rpcStatistics ".
+		" rpcConnTimeout rpcWaitTime rpcStatistics rpcEventTimeout ".
 		$readingFnAttributes;
 }
 
@@ -483,7 +487,7 @@ sub HMCCURPC_Get ($@)
 	my $rc;
 
 	if ($opt eq 'rpcevents') {
-		my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL");
+		my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL", "TO");
 		$result = '';
 		foreach my $clkey (keys %{$hash->{hmccu}{rpc}}) {
 			next if ($clkey eq 'DATA');
@@ -598,6 +602,7 @@ sub HMCCURPC_Read ($)
 	
 	# Get attributes
 	my $rpcmaxevents = AttrVal ($name, 'rpcMaxEvents', $HMCCURPC_MAX_EVENTS);
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	
 	# Data read from child socket is only a trigger for reading data from event queue
 	my $buffer = '';
@@ -643,10 +648,17 @@ sub HMCCURPC_Read ($)
 			$devices{$par[0]}{newaddr} = $par[1];			
 			$devcount++;
 		}
+		elsif ($et eq 'TO') {
+			if ($ccuflags =~ /reconnect/) {
+				Log3 $name, 2, "HMCCURPC: Reconnecting to CCU interface ".
+					HMCCURPC_RPC_NUMPORT{$par[0]};
+				HMCCURPC_RegisterSingleCallback ($hash, $par[0], 1);
+			}
+		}
 		
 		$eventcount++;
 		if ($eventcount > $rpcmaxevents) {
-			Log3 $name, 4, "Read stopped after $rpcmaxevents events";
+			Log3 $name, 4, "HMCCURPC: Read stopped after $rpcmaxevents events";
 			last;
 		}
 	}
@@ -807,7 +819,8 @@ sub HMCCURPC_ProcessEvent ($$)
 		"IN", 2,
 		"EX", 2,
 		"SL", 1,
-		"ST", 10
+		"TO", 1,
+		"ST", 11
 	);
 	
 	# Parse event
@@ -856,8 +869,9 @@ sub HMCCURPC_ProcessEvent ($$)
 		my $delay = $rh->{$clkey}{evtime}-$t[0];
 		$rh->{$clkey}{sumdelay} += $delay;
 		$rh->{$clkey}{avgdelay} = $rh->{$clkey}{sumdelay}/$rh->{$clkey}{rec}{$et};
+		Log3 $name, 2, "HMCCURPC: Received CENTRAL event. ".$t[2]."=".$t[3] if ($t[1] eq 'CENTRAL');
 		my ($add, $chn) = split (/:/, $t[1]);
-		return ($et, $clkey, $add, $chn, $t[2], $t[3]);
+		return defined ($chn) ? ($et, $clkey, $add, $chn, $t[2], $t[3]) : undef;
 	}
 	elsif ($et eq 'SL') {
 		#
@@ -998,11 +1012,21 @@ sub HMCCURPC_ProcessEvent ($$)
 		my @res = ($et, $clkey);
 		push (@res, @t);
 		my $total = shift @t;
-		my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL");
-		for (my $i=0; $i<9; $i++) {
+		my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL", "TO");
+		for (my $i=0; $i<scalar(@eventtypes); $i++) {
 			$hash->{hmccu}{rpc}{$clkey}{snd}{$eventtypes[$i]} += $t[$i];
 		}
 		return @res;
+	}
+	elsif ($et eq 'TO') {
+		#
+		# Event timeout
+		# Input:  TO|clkey|Time
+		# Output: TO, clkey, Port, Time
+		#
+		Log3 $name, 2, "HMCCU: Received no events from interface $clkey for ".$t[0]." seconds";
+		DoTrigger ($name, "No events from interface $clkey for ".$t[0]." seconds");
+		return ($et, $clkey, $hash->{hmccu}{rpc}{$clkey}{port}, $t[0]);
 	}
 
 	return undef;
@@ -1084,19 +1108,22 @@ sub HMCCURPC_RegisterCallback ($)
 	my $regcount = 0;
 	
 	foreach my $port (@rpcports) {
-		$regcount++ if (HMCCURPC_RegisterSingleCallback ($hash, $port));
+		$regcount++ if (HMCCURPC_RegisterSingleCallback ($hash, $port, 0));
 	}
 	
 	return $regcount;
 }
 
 ######################################################################
-# Register single callback
+# Register callback for specified CCU interface port.
+# If parameter 'force' is 1 callback will be registered even if state
+# is "running". State will not be modified.
+# Return 0 on error.
 ######################################################################
 
-sub HMCCURPC_RegisterSingleCallback ($$)
+sub HMCCURPC_RegisterSingleCallback ($$$)
 {
-	my ($hash, $port) = @_;
+	my ($hash, $port, $force) = @_;
 	my $name = $hash->{NAME};
 
 	my $serveraddr = $hash->{host};
@@ -1104,8 +1131,8 @@ sub HMCCURPC_RegisterSingleCallback ($$)
 	my $rpcserveraddr = AttrVal ($name, 'rpcServerAddr', $localaddr);
 	my $clkey = 'CB'.$port;
 	
-	return 0 if (!exists ($hash->{hmccu}{rpc}{$clkey}) ||
-		$hash->{hmccu}{rpc}{$clkey}{state} ne 'working');
+	return 0 if (!exists ($hash->{hmccu}{rpc}{$clkey}));
+	return 0 if ($hash->{hmccu}{rpc}{$clkey}{state} ne 'working' && $force == 0);
 
 	my $cburl = '';
 	if (HMCCURPC_IsAscRPCPort ($port)) {
@@ -1114,32 +1141,33 @@ sub HMCCURPC_RegisterSingleCallback ($$)
 	else {
 		$cburl = "xmlrpc_bin://$rpcserveraddr:".$hash->{hmccu}{rpc}{$clkey}{cbport};
 	}
-	
-	# The client URL is only relevant for ASCII RPC
+
 	my $clurl = "http://$serveraddr:$port/";
 	$clurl .= $HMCCURPC_RPC_URL{$port} if (exists ($HMCCURPC_RPC_URL{$port}));
 	
 	$hash->{hmccu}{rpc}{$clkey}{port} = $port;
 	$hash->{hmccu}{rpc}{$clkey}{clurl} = $clurl;
 	$hash->{hmccu}{rpc}{$clkey}{cburl} = $cburl;
-	$hash->{hmccu}{rpc}{$clkey}{state} = 'registered';
+	$hash->{hmccu}{rpc}{$clkey}{state} = 'registered' if ($force == 0);
 
-	Log3 $name, 1, "HMCCURPC: Registering callback $cburl with ID $clkey at $clurl";
-# 	if ($HMCCURPC_RPC_PROT{$port} eq 'A') {
-# 		my $rpcclient = RPC::XML::Client->new ($clurl);
-# 		$rpcclient->send_request ("init", $cburl, $clkey);
-# 	}
-
+	Log3 $name, 2, "HMCCURPC: Registering callback $cburl with ID $clkey at $clurl";
+	my $rc;
 	if (HMCCURPC_IsAscRPCPort ($port)) {
-		HMCCURPC_SendRequest ($hash, $port, "init", $cburl, $clkey);
+		$rc = HMCCURPC_SendRequest ($hash, $port, "init", $cburl, $clkey);
 	}
 	else {
-		HMCCURPC_SendBinRequest ($hash, $port, "init",
+		$rc = HMCCURPC_SendBinRequest ($hash, $port, "init",
 			$BINRPC_STRING, $cburl, $BINRPC_STRING, $clkey);
 	}
-	Log3 $name, 1, "HMCCURPC: RPC callback with URL $cburl registered";
 	
-	return 1;
+	if (defined ($rc)) {
+		Log3 $name, 1, "HMCCURPC: RPC callback with URL $cburl registered";
+		return 1;
+	}
+	else {
+		Log3 $name, 1, "HMCCURPC: Failed to register callback for ID $clkey";
+		return 0;
+	}
 }
 
 ######################################################################
@@ -1210,7 +1238,7 @@ sub HMCCURPC_InitRPCServer ($$$)
 	Log3 $name, 2, "HMCCURPC: Callback server $clkey created. Listening on port $callbackport";
 
 	# Callback for events
-	Log3 $name, 2, "HMCCURPC: Adding callback for events for server $clkey";
+	Log3 $name, 4, "HMCCURPC: Adding callback for events for server $clkey";
 	$server->add_method (
 	   { name=>"event",
 	     signature=> ["string string string string int","string string string string double","string string string string boolean","string string string string i4"],
@@ -1219,7 +1247,7 @@ sub HMCCURPC_InitRPCServer ($$$)
 	);
 
 	# Callback for new devices
-	Log3 $name, 2, "HMCCURPC: Adding callback for new devices for server $clkey";
+	Log3 $name, 4, "HMCCURPC: Adding callback for new devices for server $clkey";
 	$server->add_method (
 	   { name=>"newDevices",
 	     signature=>["string string array"],
@@ -1228,7 +1256,7 @@ sub HMCCURPC_InitRPCServer ($$$)
 	);
 
 	# Callback for deleted devices
-	Log3 $name, 2, "HMCCURPC: Adding callback for deleted devices for server $clkey";
+	Log3 $name, 4, "HMCCURPC: Adding callback for deleted devices for server $clkey";
 	$server->add_method (
 	   { name=>"deleteDevices",
 	     signature=>["string string array"],
@@ -1237,7 +1265,7 @@ sub HMCCURPC_InitRPCServer ($$$)
 	);
 
 	# Callback for modified devices
-	Log3 $name, 2, "HMCCURPC: Adding callback for modified devices for server $clkey";
+	Log3 $name, 4, "HMCCURPC: Adding callback for modified devices for server $clkey";
 	$server->add_method (
 	   { name=>"updateDevice",
 	     signature=>["string string string int"],
@@ -1246,7 +1274,7 @@ sub HMCCURPC_InitRPCServer ($$$)
 	);
 
 	# Callback for replaced devices
-	Log3 $name, 2, "HMCCURPC: Adding callback for replaced devices for server $clkey";
+	Log3 $name, 4, "HMCCURPC: Adding callback for replaced devices for server $clkey";
 	$server->add_method (
 	   { name=>"replaceDevice",
 	     signature=>["string string string string"],
@@ -1255,7 +1283,7 @@ sub HMCCURPC_InitRPCServer ($$$)
 	);
 
 	# Callback for readded devices
-	Log3 $name, 2, "HMCCURPC: Adding callback for readded devices for server $clkey";
+	Log3 $name, 4, "HMCCURPC: Adding callback for readded devices for server $clkey";
 	$server->add_method (
 	   { name=>"replaceDevice",
 	     signature=>["string string array"],
@@ -1264,7 +1292,7 @@ sub HMCCURPC_InitRPCServer ($$$)
 	);
 	
 	# Dummy implementation, always return an empty array
-	Log3 $name, 2, "HMCCURPC: Adding callback for list devices for server $clkey";
+	Log3 $name, 4, "HMCCURPC: Adding callback for list devices for server $clkey";
 	$server->add_method (
 	   { name=>"listDevices",
 	     signature=>["array string"],
@@ -1305,6 +1333,7 @@ sub HMCCURPC_StartRPCServer ($)
 	$thrpar{socktimeout} = AttrVal ($name, 'rpcWriteTimeout',  $HMCCURPC_TIMEOUT_WRITE);
 	$thrpar{conntimeout} = AttrVal ($name, 'rpcConnTimeout',   $HMCCURPC_TIMEOUT_CONNECTION);
 	$thrpar{acctimeout}  = AttrVal ($name, 'rpcAcceptTimeout', $HMCCURPC_TIMEOUT_ACCEPT);
+	$thrpar{evttimeout}  = AttrVal ($name, 'rpcEventTimeout',  $HMCCURPC_TIMEOUT_EVENT);
 	$thrpar{waittime}    = AttrVal ($name, 'rpcWaitTime',      $HMCCURPC_TIME_WAIT);
 	$thrpar{queuesize}   = AttrVal ($name, 'rpcQueueSize',     $HMCCURPC_MAX_QUEUESIZE);
 	$thrpar{triggertime} = AttrVal ($name, 'rpcTriggerTime',   $HMCCURPC_TIME_TRIGGER);
@@ -1313,7 +1342,7 @@ sub HMCCURPC_StartRPCServer ($)
 	
 	my $ccunum = $hash->{CCUNum};
 	my $serveraddr = $hash->{host};
-	my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL");
+	my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL", "TO");
 
 	# Get or detect local IP address
 	if ($localaddr eq '') {
@@ -1831,7 +1860,7 @@ sub HMCCURPC_HandleConnection ($$$$)
 	my $tid = threads->tid ();
 	my $clkey = 'CB'.$port;
 	
-	my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL");
+	my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL", "TO");
 
 	# Initialize RPC server
 	my $iface = $HMCCURPC_RPC_NUMPORT{$port};
@@ -1854,9 +1883,9 @@ sub HMCCURPC_HandleConnection ($$$$)
 	$rpcsrv->{hmccu}{queuesize}  = $thrpar->{queuesize};
 	$rpcsrv->{hmccu}{statistics} = $thrpar->{statistics};
 	$rpcsrv->{hmccu}{running}    = 0;
+	$rpcsrv->{hmccu}{evttime}    = time ();
 	
 	# Initialize statistic counters
-	$rpcsrv->{hmccu}{snd}{total} = 0;
 	foreach my $et (@eventtypes) {
 		$rpcsrv->{hmccu}{rec}{$et} = 0;
 		$rpcsrv->{hmccu}{snd}{$et} = 0;
@@ -1872,6 +1901,9 @@ sub HMCCURPC_HandleConnection ($$$$)
 	$rpcsrv->{__daemon}->timeout ($thrpar->{acctimeout});
 
 	while ($run) {
+		my $difftime = time()-$rpcsrv->{hmccu}{evttime};
+		HMCCURPC_Write ($rpcsrv, "TO", $clkey, $difftime) if ($difftime >= $thrpar->{evttimeout});
+		
 		# Next statement blocks for timeout seconds
 		my $connection = $rpcsrv->{__daemon}->accept ();
 		next if (! $connection);
@@ -2034,6 +2066,8 @@ sub HMCCURPC_Write ($$$$)
 	if (defined ($server->{hmccu}{eventqueue})) {
 		my $queue = $server->{hmccu}{eventqueue};
 
+		$server->{hmccu}{evttime} = time ();
+		
 		if (defined ($server->{hmccu}{queuesize}) &&
 			$queue->pending () >= $server->{hmccu}{queuesize}) {
 			Log3 $name, 1, "CCURPC: $cb maximum queue size reached";
@@ -2060,7 +2094,7 @@ sub HMCCURPC_WriteStats ($$)
 	my ($server, $clkey) = @_;
 	my $name = $server->{hmccu}{name};
 	
-	my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL");
+	my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL", "TO");
 
 	# Send statistic info
 	my $st = $server->{hmccu}{snd}{total};
@@ -2746,6 +2780,7 @@ sub HMCCURPC_DecodeResponse ($)
 			Set flags for controlling device behaviour. Meaning of flags is:<br/>
 				expert - Activate expert mode<br/>
 				keepThreads - Do not delete thread objects after RPC server has been stopped<br/>
+				reconnect - Try to re-register at CCU if no events received for rpcEventTimeout seconds<br/>
 		</li><br/>
 		<li><b>rpcAcceptTimeout &lt;seconds&gt;</b><br/>
 			Specify timeout for accepting incoming connections. Default is 1 second. Increase this 
@@ -2753,6 +2788,10 @@ sub HMCCURPC_DecodeResponse ($)
 		</li><br/>
 	   <li><b>rpcConnTimeout &lt;seconds&gt;</b><br/>
 	   	Specify timeout of CCU connection handling. Default is 10 second.
+	   </li><br/>
+	   <li><b>rpcEventTimeout &lt;seconds&gt;</b><br/>
+	   	Specify timeout for CCU events. Default is 600 seconds. If timeout occurs an event
+	   	is triggered. 
 	   </li><br/>
 	   <li><b>rpcInterfaces { BidCos-Wired, BidCos-RF, HmIP-RF, VirtualDevices, CUxD, Homegear }</b><br/>
 	   	Select RPC interfaces. If attribute is missing the corresponding attribute of I/O device

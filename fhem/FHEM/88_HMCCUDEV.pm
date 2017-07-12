@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.0.002
+#  Version 4.1
 #
 #  (c) 2017 zap (zap01 <at> t-online <dot> de)
 #
@@ -37,7 +37,6 @@
 #  attr <name> ccucalculate <value>:<reading>[:<dp-list>][...]
 #  attr <name> ccuflags { altread, nochn0, trace }
 #  attr <name> ccuget { State | Value }
-#  attr <name> ccupeer [channel.]datapoint oper expr:{ hmccu:object=value | fhem:command }
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingformat { address[lc] | name[lc] | datapoint[lc] }
 #  attr <name> ccureadingfilter <filter-rule>[,...]
@@ -46,6 +45,7 @@
 #  attr <name> ccuverify { 0 | 1 | 2}
 #  attr <name> controldatapoint <channel-number>.<datapoint>
 #  attr <name> disable { 0 | 1 }
+#  attr <name> peer datapoints:condition:{hmccu:object=value|ccu:object=value|fhem:command}
 #  attr <name> hmstatevals <subst-rule>[;...]
 #  attr <name> statechannel <channel>
 #  attr <name> statedatapoint [<channel-number>.]<datapoint>
@@ -90,7 +90,7 @@ sub HMCCUDEV_Initialize ($)
 		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ".
 		"ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 ".
 		"hmstatevals:textField-long statevals substexcl substitute:textField-long statechannel ".
-		"statedatapoint controldatapoint stripnumber ccupeer:textField-long ".$readingFnAttributes;
+		"statedatapoint controldatapoint stripnumber peer:textField-long ".$readingFnAttributes;
 }
 
 #####################################
@@ -310,7 +310,7 @@ sub HMCCUDEV_Set ($@)
 		}
 		
 		return HMCCU_SetError ($hash, "Usage: set $name datapoint [{channel-number}.]{datapoint} {value}")
-			if (!defined ($objname) || !defined ($objvalue) || $objvalue eq '');
+			if (!defined ($objvalue) || $objvalue eq '');
 
 		if ($objname =~ /^([0-9]+)\..+$/) {
 			my $chn = $1;
@@ -500,7 +500,8 @@ sub HMCCUDEV_Set ($@)
 		}
 	}
 	elsif ($opt eq 'config') {
-		return HMCCU_SetError ($hash, "Usage: set $name config [{channel-number}] {parameter}={value} [...]") if ((scalar keys %{$h}) < 1);
+		return HMCCU_SetError ($hash, "Usage: set $name config [{channel-number}] {parameter}={value} [...]")
+			if ((scalar keys %{$h}) < 1);
 		my $objname = $ccuaddr;
 		
 		# Channel number is optional because parameter can be related to device or channel
@@ -947,6 +948,10 @@ sub HMCCUDEV_Get ($@)
          <a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>
 		<li><b>hmstatevals &lt;subst-rule&gt;[;...]</b><br/>
+         <a href="#HMCCUCHNattr">see HMCCUCHN</a>
+		</li><br/>
+		<li><b>peer [&lt;datapoints&gt;:&lt;condition&gt;:
+			{ccu:&lt;object&gt;=&lt;value&gt;|hmccu:&lt;object&gt;=&lt;value&gt;|fhem:&lt;command&gt;}</b><br/>
          <a href="#HMCCUCHNattr">see HMCCUCHN</a>
 		</li><br/>
       <li><b>statechannel &lt;channel-number&gt;</b><br/>

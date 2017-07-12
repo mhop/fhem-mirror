@@ -1,14 +1,14 @@
-################################################################
+######################################################################
 #
 #  88_HMCCUCHN.pm
 #
 #  $Id$
 #
-#  Version 4.0.002
+#  Version 4.1
 #
 #  (c) 2017 zap (zap01 <at> t-online <dot> de)
 #
-################################################################
+######################################################################
 #
 #  define <name> HMCCUCHN <ccudev> [readonly] [defaults]
 #         [iodev=<iodevname>]
@@ -44,15 +44,16 @@
 #  attr <name> ccuverify { 0 | 1 | 2 }
 #  attr <name> controldatapoint <datapoint>
 #  attr <name> disable { 0 | 1 }
+#  attr <name> peer datapoints:condition:{hmccu:object=value|ccu:object=value|fhem:command}
 #  attr <name> hmstatevals <subst-rule>[;...]
 #  attr <name> statedatapoint <datapoint>
 #  attr <name> statevals <text1>:<subtext1>[,...]
 #  attr <name> substexcl <reading-expr>
 #  attr <name> substitute <subst-rule>[;...]
 #
-################################################################
+######################################################################
 #  Requires modules 88_HMCCU.pm, HMCCUConf.pm
-################################################################
+######################################################################
 
 package main;
 
@@ -81,7 +82,12 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "IODev ccuackstate:0,1 ccucalculate ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint disable:0,1 hmstatevals:textField-long statedatapoint statevals substitute:textField-long substexcl stripnumber ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccuackstate:0,1 ccucalculate ".
+		"ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter ".
+		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ".
+		"ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint ".
+		"disable:0,1 hmstatevals:textField-long statedatapoint statevals substitute:textField-long ".
+		"substexcl stripnumber peer:textField-long ". $readingFnAttributes;
 }
 
 ##################################################
@@ -873,6 +879,40 @@ sub HMCCUCHN_Get ($@)
          Optionally the name of the HomeMatic state reading can be specified at the beginning of
          the attribute in format =&lt;reading&gt;;. The default reading name is 'hmstate'.
       </li><br/>
+		<li><b>peer [&lt;datapoints&gt;:&lt;condition&gt;:
+			{ccu:&lt;object&gt;=&lt;value&gt;|hmccu:&lt;object&gt;=&lt;value&gt;|
+			fhem:&lt;command&gt;}</b><br/>
+      	Logically peer a datapoint of a HMCCUCHN or HMCCUDEV device with another device or any
+      	FHEM command.<br/>
+      	Parameter <i>datapoints</i> is a comma separated list of datapoints in format
+      	<i>channelno.datapoint</i> which can trigger the action. If source device is of type HMCCUCHN
+      	the parameter <i>channelno</i> is obsolete.<br/>
+      	Parameter <i>condition</i> is a valid Perl expression which can contain
+      	<i>channelno.datapoint</i> names as variables. Variables must start with a '$' or a '%'.
+      	If a variable is preceded by a '$' the variable is substituted by the converted datapoint
+      	value (i.e. "on" instead of "true"). If variable is preceded by a '%' the raw value
+      	(i.e. "true") is used. If the special character is doubled the previous values will
+      	be used.<br/>
+      	If the result of this operation is true, the action specified after the second colon
+      	is executed. Three types of actions are supported:<br/>
+      	<b>hmccu</b>: Parameter <i>object</i> refers to a FHEM device/datapoint in format
+      	&lt;device&gt;:&lt;channelno&gt;.&lt;datapoint&gt;<br/>
+      	<b>ccu</b>: Parameter <i>object</i> refers to a CCU channel/datapoint in format
+      	&lt;channel&gt;.&lt;datapoint&gt;. <i>channel</i> can be a channel name or address.<br/>
+      	<b>fhem</b>: The specified <i>command</i> will be executed<br/>
+      	If action contains the string $value it is substituted by the current value of the 
+      	datapoint which triggered the action. The attribute supports multiple peering rules
+      	separated by semicolons and optionally by newline characters.<br/><br/>
+      	Examples:<br/>
+      	# Set FHEM device mydummy to value if formatted value of 1.STATE is 'on'<br/>
+      	<code>attr mydev peer 1.STATE:'$1.STATE' eq 'on':fhem:set mydummy $value</code><br/>
+      	# Set 2.LEVEL of device myBlind to 100 if raw value of 1.STATE is 1<br/>
+      	<code>attr mydev peer 1.STATE:'%1.STATE' eq '1':hmccu:myBlind:2.LEVEL=100</code><br/>
+      	# Set 1.STATE of device LEQ1234567 to true if 1.LEVEL < 100<br/>
+      	<code>attr mydev peer 1.LEVEL:$1.LEVEL < 100:ccu:LEQ1234567:1.STATE=true</code><br/>
+      	# Set 1.STATE of device LEQ1234567 to true if current level is different from old level<br/>
+      	<code>attr mydev peer 1.LEVEL:$1.LEVEL != $$1.LEVEL:ccu:LEQ1234567:1.STATE=true</code><br/>
+		</li><br/>
       <li><b>statedatapoint &lt;datapoint&gt;</b><br/>
          Set state datapoint used by some commands like 'set devstate'.
       </li><br/>
