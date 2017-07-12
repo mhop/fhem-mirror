@@ -206,10 +206,9 @@ sub doAggregate() {
          $countAll{'system'}{'age'}{'7'}++   if ($age > 1  && $age <= 7);
          $countAll{'system'}{'age'}{'30'}++  if ($age > 7  && $age <= 30);
          $countAll{'system'}{'age'}{'180'}++ if ($age > 30 && $age <= 180);
-         $countAll{'system'}{'age'}{'365'}++ if ($age > 180);
-      } else {
-         $countAll{'system'}{'age'}{'unknown'}++;
-      }
+         $countAll{'system'}{'age'}{'365'}++ if ($age > 180 && $age <= 366);
+         $countAll{'system'}{'age'}{'999'}++ if ($age > 366); 
+      } 
       
       $res = undef;
       

@@ -66,7 +66,7 @@ function drawGooglePieChart(data, el, subst, sort="byKey") {
                       legend: {position: 'right',labeledValueText: 'both'},
                       pieSliceText: 'none',
                       height: 350,
-                      sliceVisibilityThreshold: 0.005
+                      sliceVisibilityThreshold: 0.004
                   };
                   
     var container = document.getElementById(id);
@@ -329,12 +329,11 @@ function onSuccess(data, textStatus, jqXHR) {
         drawGoogleWorldMap(data.data.geo.countrycode,$("div#maptab-world"));
         
         // draw google pie charts
-        drawGooglePieChart(data.data.system.release, $("div#versiontab-FHEM"));
         drawGooglePieChart(data.data.system.os, $("div#versiontab-os"), {"linux":"Linux","MSWin32":"Windows","darwin":"MacOS"}, "byValue");
         drawGooglePieChart(data.data.system.perl, $("div#versiontab-perl"));
         
         delete data.data.system.age.unknown; // don't display unknown update age systems
-        drawGooglePieChart(data.data.system.age, $("div#versiontab-update"), {"0":"≤ 1 day", "7": "1 day - 1 week", "30": "1 week - 1 month", "180": "1 month - 6 months", "365": "> 6 months"}, false);
+        drawGooglePieChart(data.data.system.age, $("div#versiontab-update"), {"0":"≤ 1 day", "7": "1 day - 1 week", "30": "1 week - 1 month", "180": "1 month - 6 months", "365": "6 months - 1 year", "999": "> 1 year"}, false);
 
         // create module table
         createModulTable(data.data.modules,data.data.models, $("table#module-table"));
