@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.19.0     11.07.2017       replace {DBMODEL} by {MODEL} completely
 # 2.18.3     04.07.2017       bugfix (links with $FW_ME deleted), MODEL as Internal (for statistic)
 # 2.18.2     29.06.2017       check of index for DbRep added
 # 2.18.1     25.06.2017       DbLog_configCheck/ DbLog_sqlget some changes, commandref revised
@@ -136,7 +137,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.18.3";
+my $DbLogVersion = "2.19.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -382,7 +383,7 @@ sub DbLog_Set($@) {
 	             deleteOldDays deleteOldDaysNbl userCommand clearReadings:noArg 
 				 eraseReadings:noArg addLog ";
 	$usage .= "listCache:noArg purgeCache:noArg commitCache:noArg exportCache:nopurge,purgecache " if (AttrVal($name, "asyncMode", undef));
-    $usage .= "configCheck:noArg " if($hash->{DBMODEL} =~ /MYSQL|POSTGRESQL/);
+    $usage .= "configCheck:noArg " if($hash->{MODEL} =~ /MYSQL|POSTGRESQL/);
 	my (@logs,$dir);
 	
 	if (!AttrVal($name,"expimpdir",undef)) {
@@ -641,9 +642,9 @@ sub DbLog_Set($@) {
         } else {
             $cmd = "delete from history where TIMESTAMP < ";
         
-            if ($hash->{DBMODEL} eq 'SQLITE')        { $cmd .= "datetime('now', '-$a[2] days')"; }
-            elsif ($hash->{DBMODEL} eq 'MYSQL')      { $cmd .= "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
-            elsif ($hash->{DBMODEL} eq 'POSTGRESQL') { $cmd .= "NOW() - INTERVAL '$a[2]' DAY"; }
+            if ($hash->{MODEL} eq 'SQLITE')        { $cmd .= "datetime('now', '-$a[2] days')"; }
+            elsif ($hash->{MODEL} eq 'MYSQL')      { $cmd .= "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
+            elsif ($hash->{MODEL} eq 'POSTGRESQL') { $cmd .= "NOW() - INTERVAL '$a[2]' DAY"; }
             else { $cmd = undef; $ret = 'Unknown database type. Maybe you can try userCommand anyway.'; }
 
             if(defined($cmd)) {
@@ -1267,7 +1268,7 @@ sub DbLog_Push(@) {
   my $doins = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabele current erfolgen (updates schlugen fehl) 
   my $dbh;
   
-  my $nh = ($hash->{DBMODEL} ne 'SQLITE')?1:0;
+  my $nh = ($hash->{MODEL} ne 'SQLITE')?1:0;
   # Unterscheidung $dbh um Abbrüche in Plots (SQLite) zu vermeiden und 
   # andererseite kein "MySQL-Server has gone away" Fehler
   if ($nh) {
@@ -1328,11 +1329,11 @@ sub DbLog_Push(@) {
 	
   if (lc($DbLogType) =~ m(history)) {
       # insert history mit/ohne primary key
-	  if ($usepkh && $hash->{DBMODEL} eq 'MYSQL') {
+	  if ($usepkh && $hash->{MODEL} eq 'MYSQL') {
 	      eval { $sth_ih = $dbh->prepare("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-	  } elsif ($usepkh && $hash->{DBMODEL} eq 'SQLITE') {
+	  } elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {
 	      eval { $sth_ih = $dbh->prepare("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-	  } elsif ($usepkh && $hash->{DBMODEL} eq 'POSTGRESQL') {
+	  } elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
 	      eval { $sth_ih = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
 	  } else {
 	      # old behavior
@@ -1352,11 +1353,11 @@ sub DbLog_Push(@) {
   
   if (lc($DbLogType) =~ m(current) ) {
       # insert current mit/ohne primary key, insert-values für current werden generiert
-	  if ($usepkc && $hash->{DBMODEL} eq 'MYSQL') {
+	  if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
           eval { $sth_ic = $dbh->prepare("INSERT IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };	  
-	  } elsif ($usepkc && $hash->{DBMODEL} eq 'SQLITE') {
+	  } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
 	      eval { $sth_ic = $dbh->prepare("INSERT OR IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-	  } elsif ($usepkc && $hash->{DBMODEL} eq 'POSTGRESQL') {
+	  } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
 	      eval { $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
 	  }  else {
 	      # old behavior
@@ -1365,7 +1366,7 @@ sub DbLog_Push(@) {
 	  if ($@) {
 	      return $@;
       }
-	  if ($usepkc && $hash->{DBMODEL} eq 'MYSQL') {
+	  if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
 	      # update current (mit PK), insert-values für current wird generiert
 		  $sth_uc = $dbh->prepare("REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
 	      $sth_uc->bind_param_array(1, [@timestamp]);
@@ -1375,7 +1376,7 @@ sub DbLog_Push(@) {
 		  $sth_uc->bind_param_array(5, [@reading]);
           $sth_uc->bind_param_array(6, [@value]);
           $sth_uc->bind_param_array(7, [@unit]);  
-	  } elsif ($usepkc && $hash->{DBMODEL} eq 'SQLITE') {  
+	  } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {  
 	      # update current (mit PK), insert-values für current wird generiert
 		  $sth_uc = $dbh->prepare("INSERT OR REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
 	      $sth_uc->bind_param_array(1, [@timestamp]);
@@ -1385,7 +1386,7 @@ sub DbLog_Push(@) {
 		  $sth_uc->bind_param_array(5, [@reading]);
           $sth_uc->bind_param_array(6, [@value]);
           $sth_uc->bind_param_array(7, [@unit]);
-	  } elsif ($usepkc && $hash->{DBMODEL} eq 'POSTGRESQL') {  
+	  } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {  
 	      # update current (mit PK), insert-values für current wird generiert
 		  $sth_uc = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
 		                           DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING,
@@ -1574,7 +1575,7 @@ sub DbLog_execmemcache ($) {
   }
   
   # bei SQLite Sperrverwaltung Logging wenn andere schreibende Zugriffe laufen
-  if($hash->{DBMODEL} eq "SQLITE") {
+  if($hash->{MODEL} eq "SQLITE") {
       if($hash->{HELPER}{DELDAYS_PID}) {
 	      $error = "deleteOldDaysNbl is running - resync at NextSync";
 		  $dolog = 0;
@@ -1721,11 +1722,11 @@ sub DbLog_PushAsync(@) {
 	
   if (lc($DbLogType) =~ m(history)) {
       # insert history mit/ohne primary key
-	  if ($usepkh && $hash->{DBMODEL} eq 'MYSQL') {
+	  if ($usepkh && $hash->{MODEL} eq 'MYSQL') {
 	      eval { $sth_ih = $dbh->prepare("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-	  } elsif ($usepkh && $hash->{DBMODEL} eq 'SQLITE') {
+	  } elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {
 	      eval { $sth_ih = $dbh->prepare("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-	  } elsif ($usepkh && $hash->{DBMODEL} eq 'POSTGRESQL') {
+	  } elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
 	      eval { $sth_ih = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
 	  } else {
 	      # old behavior
@@ -1750,11 +1751,11 @@ sub DbLog_PushAsync(@) {
   
   if (lc($DbLogType) =~ m(current) ) {
       # insert current mit/ohne primary key, insert-values für current werden generiert
-	  if ($usepkc && $hash->{DBMODEL} eq 'MYSQL') {
+	  if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
           eval { $sth_ic = $dbh->prepare("INSERT IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };	  
-	  } elsif ($usepkc && $hash->{DBMODEL} eq 'SQLITE') {
+	  } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
 	      eval { $sth_ic = $dbh->prepare("INSERT OR IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-	  } elsif ($usepkc && $hash->{DBMODEL} eq 'POSTGRESQL') {
+	  } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
 	      eval { $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
 	  } else {
 	      # old behavior
@@ -1768,7 +1769,7 @@ sub DbLog_PushAsync(@) {
 		  $dbh->disconnect();
           return "$name|$error|0|$rowlist";
       }
-	  if ($usepkc && $hash->{DBMODEL} eq 'MYSQL') {
+	  if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
 	      # update current (mit PK), insert-values für current wird generiert
 		  $sth_uc = $dbh->prepare("REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
 	      $sth_uc->bind_param_array(1, [@timestamp]);
@@ -1778,7 +1779,7 @@ sub DbLog_PushAsync(@) {
 		  $sth_uc->bind_param_array(5, [@reading]);
           $sth_uc->bind_param_array(6, [@value]);
           $sth_uc->bind_param_array(7, [@unit]);  
-	  } elsif ($usepkc && $hash->{DBMODEL} eq 'SQLITE') {  
+	  } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {  
 	      # update current (mit PK), insert-values für current wird generiert
 		  $sth_uc = $dbh->prepare("INSERT OR REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
 	      $sth_uc->bind_param_array(1, [@timestamp]);
@@ -1788,7 +1789,7 @@ sub DbLog_PushAsync(@) {
 		  $sth_uc->bind_param_array(5, [@reading]);
           $sth_uc->bind_param_array(6, [@value]);
           $sth_uc->bind_param_array(7, [@unit]);
-	  } elsif ($usepkc && $hash->{DBMODEL} eq 'POSTGRESQL') {  
+	  } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {  
 	      # update current (mit PK), insert-values für current wird generiert
 		  $sth_uc = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
 		                           DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
@@ -2082,23 +2083,21 @@ sub DbLog_readCfg($){
 
   #check the database model
   if($hash->{dbconn} =~ m/pg:/i) {
-    $hash->{DBMODEL}="POSTGRESQL";
+    $hash->{MODEL}="POSTGRESQL";
   } elsif ($hash->{dbconn} =~ m/mysql:/i) {
-    $hash->{DBMODEL}="MYSQL";
+    $hash->{MODEL}="MYSQL";
   } elsif ($hash->{dbconn} =~ m/oracle:/i) {
-    $hash->{DBMODEL}="ORACLE";
+    $hash->{MODEL}="ORACLE";
   } elsif ($hash->{dbconn} =~ m/sqlite:/i) {
-    $hash->{DBMODEL}="SQLITE";
+    $hash->{MODEL}="SQLITE";
   } else {
-    $hash->{DBMODEL}="unknown";
+    $hash->{MODEL}="unknown";
     Log3 $hash->{NAME}, 3, "Unknown dbmodel type in configuration file $configfilename.";
     Log3 $hash->{NAME}, 3, "Only Mysql, Postgresql, Oracle, SQLite are fully supported.";
     Log3 $hash->{NAME}, 3, "It may cause SQL-Erros during generating plots.";
   }
-  
-  $hash->{MODEL} = $hash->{DBMODEL}; # used in FHEM statistics
     
-  if($hash->{DBMODEL} eq "MYSQL") {
+  if($hash->{MODEL} eq "MYSQL") {
 	$hash->{UTF8} = defined($dbconfig{utf8})?$dbconfig{utf8}:0;
   }
 	
@@ -2127,12 +2126,12 @@ sub DbLog_ConnectPush($;$$) {
   }
 
   Log3 $hash->{NAME}, 3, "DbLog $name: Push-Handle to db $dbconn created" if(!$get);
-  Log3 $hash->{NAME}, 3, "DbLog $name: UTF8 support enabled" if($utf8 && $hash->{DBMODEL} eq "MYSQL" && !$get);
+  Log3 $hash->{NAME}, 3, "DbLog $name: UTF8 support enabled" if($utf8 && $hash->{MODEL} eq "MYSQL" && !$get);
   readingsSingleUpdate($hash, 'state', 'connected', 1) if(!$get);
 
   $hash->{DBHP}= $dbhp;
   
-  if ($hash->{DBMODEL} eq "SQLITE") {
+  if ($hash->{MODEL} eq "SQLITE") {
     $dbhp->do("PRAGMA temp_store=MEMORY");
     $dbhp->do("PRAGMA synchronous=NORMAL");
     $dbhp->do("PRAGMA journal_mode=WAL");
@@ -2300,7 +2299,7 @@ sub DbLog_Get($@) {
   }
 
   #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
-  if ($hash->{DBMODEL} eq "POSTGRESQL") {
+  if ($hash->{MODEL} eq "POSTGRESQL") {
     $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
@@ -2308,21 +2307,21 @@ sub DbLog_Get($@) {
     $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
     $sqlspec{max_value}      = "MAX(VALUE)";
     $sqlspec{day_before}     = "($sqlspec{from_timestamp} - INTERVAL '1 DAY')";
-  } elsif ($hash->{DBMODEL} eq "ORACLE") {
+  } elsif ($hash->{MODEL} eq "ORACLE") {
     $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
     $sqlspec{max_value}      = "MAX(VALUE)";
     $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
-  } elsif ($hash->{DBMODEL} eq "MYSQL") {
+  } elsif ($hash->{MODEL} eq "MYSQL") {
     $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H:%i:%s')";
     $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
     $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d %H:%i:%s')";
     $sqlspec{order_by_hour}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H')";
     $sqlspec{max_value}      = "MAX(CAST(VALUE AS DECIMAL(20,8)))";
     $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
-  } elsif ($hash->{DBMODEL} eq "SQLITE") {
+  } elsif ($hash->{MODEL} eq "SQLITE") {
     $sqlspec{get_timestamp}  = "TIMESTAMP";
     $sqlspec{from_timestamp} = "'$from'";
     $sqlspec{to_timestamp}   = "'$to'";
@@ -2737,7 +2736,7 @@ sub DbLog_Get($@) {
 sub DbLog_configcheck($) {
   my ($hash)= @_;
   my $name = $hash->{NAME};
-  my $dbmodel = $hash->{DBMODEL};
+  my $dbmodel = $hash->{MODEL};
   my $dbconn  = $hash->{dbconn};
   my $dbname  = (split(/;|=/, $dbconn))[1];
   my ($check, $rec);
@@ -3242,7 +3241,7 @@ sub DbLog_cutCol($$$$$$$) {
   my $colreading = AttrVal($name, 'colReading', undef);
   my $colvalue   = AttrVal($name, 'colValue', undef);
    
-  if ($hash->{DBMODEL} ne 'SQLITE' || defined($colevent) || defined($colreading) || defined($colvalue) ) {
+  if ($hash->{MODEL} ne 'SQLITE' || defined($colevent) || defined($colreading) || defined($colvalue) ) {
       $dn   = substr($dn,0, $hash->{HELPER}{DEVICECOL});
       $dt   = substr($dt,0, $hash->{HELPER}{TYPECOL});
       $evt  = substr($evt,0, $hash->{HELPER}{EVENTCOL});
@@ -3276,9 +3275,9 @@ sub DbLog_reduceLog($@) {
         .(($average || $filter) ? ', ' : '').(($average) ? "$average" : '')
         .(($average && $filter) ? ", " : '').(($filter) ? uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1] : ''));
     
-    if ($hash->{DBMODEL} eq 'SQLITE')        { $cmd = "datetime('now', '-$a[2] days')"; }
-    elsif ($hash->{DBMODEL} eq 'MYSQL')      { $cmd = "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
-    elsif ($hash->{DBMODEL} eq 'POSTGRESQL') { $cmd = "NOW() - INTERVAL '$a[2]' DAY"; }
+    if ($hash->{MODEL} eq 'SQLITE')        { $cmd = "datetime('now', '-$a[2] days')"; }
+    elsif ($hash->{MODEL} eq 'MYSQL')      { $cmd = "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
+    elsif ($hash->{MODEL} eq 'POSTGRESQL') { $cmd = "NOW() - INTERVAL '$a[2]' DAY"; }
     else { $ret = 'Unknown database type.'; }
     
     if ($cmd) {
@@ -3508,9 +3507,9 @@ sub DbLog_reduceLogNbl($) {
         .(($average || $filter) ? ', ' : '').(($average) ? "$average" : '')
         .(($average && $filter) ? ", " : '').(($filter) ? uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1] : ''));
     
-    if ($hash->{DBMODEL} eq 'SQLITE')        { $cmd = "datetime('now', '-$a[2] days')"; }
-    elsif ($hash->{DBMODEL} eq 'MYSQL')      { $cmd = "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
-    elsif ($hash->{DBMODEL} eq 'POSTGRESQL') { $cmd = "NOW() - INTERVAL '$a[2]' DAY"; }
+    if ($hash->{MODEL} eq 'SQLITE')        { $cmd = "datetime('now', '-$a[2] days')"; }
+    elsif ($hash->{MODEL} eq 'MYSQL')      { $cmd = "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
+    elsif ($hash->{MODEL} eq 'POSTGRESQL') { $cmd = "NOW() - INTERVAL '$a[2]' DAY"; }
     else { $ret = 'Unknown database type.'; }
     
     if ($cmd) {
@@ -3851,11 +3850,11 @@ sub DbLog_deldaysNbl($) {
   }
   
   $cmd = "delete from history where TIMESTAMP < ";
-  if ($hash->{DBMODEL} eq 'SQLITE') { 
+  if ($hash->{MODEL} eq 'SQLITE') { 
       $cmd .= "datetime('now', '-$days days')"; 
-  } elsif ($hash->{DBMODEL} eq 'MYSQL') { 
+  } elsif ($hash->{MODEL} eq 'MYSQL') { 
       $cmd .= "DATE_SUB(CURDATE(),INTERVAL $days DAY)"; 
-  } elsif ($hash->{DBMODEL} eq 'POSTGRESQL') { 
+  } elsif ($hash->{MODEL} eq 'POSTGRESQL') { 
       $cmd .= "NOW() - INTERVAL '$days' DAY"; 
   } else {  
 	  $ret = 'Unknown database type. Maybe you can try userCommand anyway.';
@@ -3970,7 +3969,7 @@ sub prepareSql(@) {
     my $jsonChartConfig = $_[12];
     my $pagingstart = $_[13]; 
     my $paginglimit = $_[14]; 
-    my $dbmodel = $hash->{DBMODEL};
+    my $dbmodel = $hash->{MODEL};
     my ($sql, $jsonstring, $countsql, $hourstats, $daystats, $weekstats, $monthstats, $yearstats);
 
     if ($dbmodel eq "POSTGRESQL") {
@@ -4038,7 +4037,7 @@ sub prepareSql(@) {
         $yearstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' ";
         $yearstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
-    } elsif ($hash->{DBMODEL} eq "SQLITE") {
+    } elsif ($dbmodel eq "SQLITE") {
         ### SQLITE Queries for Statistics ###
         ### hour:
         $hourstats = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
