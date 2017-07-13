@@ -233,6 +233,8 @@ PRESENCE_Define($$)
     }
 
     delete($hash->{helper}{cachednr});
+    
+    readingsSingleUpdate($hash,"model",$hash->{MODE},0);
 
     return undef;
 }
