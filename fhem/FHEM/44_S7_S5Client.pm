@@ -56,6 +56,7 @@ sub new {
 	$self->{__davet121003} = [ 0x12, &DLE, &ETX ];
 	
 	$self->{PDULength} = &MaxPduSize;
+	$self->{MaxReadLength} = ($self->{PDULength} - 18);
 		
 
 	#my @__davet1006 = ( &DLE, &ACK );

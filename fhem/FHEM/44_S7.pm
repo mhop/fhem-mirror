@@ -320,7 +320,7 @@ sub S7_Attr(@) {
 
 				Log3( $name, 3, "$name S7_Attr: setting MaxReadLength= $aVal" );
 			}
-		} elsif ($aName eq "MaxMessageLength") {
+		} elsif ($aName eq "Intervall") {
 			if ( $aVal >= 1 ) {
 
 				$hash->{Interval} = $aVal;
