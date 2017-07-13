@@ -84,7 +84,6 @@ dist:
 	find .f -name .#\* -print | xargs rm -f
 	find .f -type f -print | grep -v Makefile | grep -v SWAP |\
 		xargs perl -pi -e 's/=VERS=/$(VERS)/g;s/=DATE=/$(DATE)/g'
-	perl -pi -e 's/my \$$release\s+=.*/my \$$release = "$(VERS)";/' .f/FHEM/98_fheminfo.pm
 	@echo "    deb-nightly   - to create a nightly .deb file from current svn"
 	rm -rf .f/www/SVGcache
 	mv .f $(DESTDIR)
@@ -106,7 +105,6 @@ deb:
 	find .f -name .#\* -print | xargs rm -f
 	find .f -type f -print | grep -v Makefile |\
 		xargs perl -pi -e 's/=VERS=/$(VERSN)/g;s/=DATE=/$(DATEN)/g'
-	perl -pi -e 's/my \$$release\s+=.*/my \$$release = "$(VERS)";/' .f/$(MODDIR)/FHEM/98_fheminfo.pm
 	cp controls_fhem.txt .f/$(MODDIR)/FHEM/controls_fhem.txt
 	find .f -type f | xargs chmod 644
 	find .f -type d | xargs chmod 755
