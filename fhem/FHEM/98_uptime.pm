@@ -64,7 +64,7 @@ sub _upT_Div($$) {
 =begin html
 
 <a name="uptime"></a>
-<h3>uptime/h3>
+<h3>uptime</h3>
 <ul>
   <code>uptime</code>
   <br>
