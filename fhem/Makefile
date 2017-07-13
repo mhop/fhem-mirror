@@ -1,6 +1,7 @@
 VERS=5.8
 DATE=2017-02-19
 
+# $Id$
 # used for nightly build
 DATEN=$(shell date +"%Y-%m-%d")
 VERSN=$(VERS).$(shell svn info | grep 'Revision' | awk '{ print $$2; }')
