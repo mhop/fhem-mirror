@@ -10,34 +10,6 @@
 #
 ########################################################################################
 #
-# define <name> OWVAR [<model>] <ROM_ID> or <FAM_ID>.<ROM_ID> 
-#
-# where <name> may be replaced by any name string 
-#     
-#       <model> is a 1-Wire device type. If omitted AND no FAM_ID given we assume this to be an
-#              DS2890 variable resistor
-#       <FAM_ID> is a 1-Wire family id, currently allowed values are 2C
-#       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
-#                without Family ID, e.g. A2D90D000800 
-#
-# get <name> id          => FAM_ID.ROM_ID.CRC 
-# get <name> present     => 1 if device present, 0 if not
-# get <name> value       => query value
-# get <name> version     => OWX version number
-# set <name> value       => wiper setting
-#
-# Additional attributes are defined in fhem.cfg
-# attr <name> Name   <string>[|<string>] = name for the channel [|name used in state reading]
-# attr <name> Unit   <string>[|<string>] = unit of measurement for this channel [|unit used in state reading] 
-# attr <name> Function <string>|<string> = The first string is an arbitrary functional expression f(V) involving the variable V. 
-#               V is replaced by the raw potentiometer reading (in the range of [0,100]). The second string must be the inverse
-#               function g(U) involving the variable U, such that U can be replaced by the value given in the 
-#                set argument. Care has to taken that g(U) is in the range [0,100].
-#                No check on the validity of these functions is performed, 
-#                singularities my crash FHEM.
-#                                        
-########################################################################################
-#
 #  This programm is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
@@ -75,12 +47,11 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="6.1";
+my $owx_version="7.0";
 my $owg_channel = "";
 
 my %gets = (
   "id"          => "",
-  "present"     => "",
   "value"       => "",
   "version"     => ""
 );
@@ -266,7 +237,7 @@ sub OWVAR_Attr(@) {
   
   if ( $do eq "set") {
   	ARGUMENT_HANDLER: {
-      #-- interval modified at runtime
+      #-- IODev
       $key eq "IODev" and do {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
@@ -407,28 +378,6 @@ sub OWVAR_Get($@) {
   #-- Get other values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   
-  #-- get present
-  if($a[1] eq "present" ) {
-    #-- OWX interface
-    if( $interface =~ /^OWX/ ){
-      #-- asynchronous mode
-      if( $hash->{ASYNC} ){
-        Log3 $name, 1,"OWVAR: Get ASYNC interface not implemented";
-        #eval {
-        #  OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
-        #};
-        #return GP_Catch($@) if $@;
-        return "$name.present => ".ReadingsVal($name,"present","unknown");
-      } else {
-        $value = OWX_Verify($master,$hash->{ROM_ID});
-      }
-      $hash->{PRESENT} = $value;
-      return "$name.present => $value";
-    } else {
-      return "OWVAR: Verification not yet implemented for interface $interface";
-    }
-  } 
-  
   #-- get version
   if( $a[1] eq "version") {
     return "$name.version => $owx_version";
@@ -455,7 +404,8 @@ sub OWVAR_Get($@) {
   }
    #-- process results
   if( $master->{ASYNCHRONOUS} ){
-    return "OWVAR: $name getting value, please wait for completion";
+    #return "OWVAR: $name getting value, please wait for completion";
+    return undef;
   }else{
     #-- when we have a return code, we have an error
     if( defined($ret)  ){
@@ -493,19 +443,10 @@ sub OWVAR_GetValues($@) {
     OWVAR_FormatValues($hash);
   }
   
-  #-- restart timer for updates
-  RemoveInternalTimer($hash);
-  #InternalTimer(time()+$hash->{INTERVAL}, "OWVAR_GetValues", $hash, 0);
-
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
-    #-- max 3 tries
-    for(my $try=0; $try<3; $try++){
-      $ret = OWXVAR_GetValues($hash);
-      last
-        if( !defined($ret) );
-    }
+    $ret = OWXVAR_GetValues($hash);
   }elsif( $interface eq "OWX_ASYNC" ){
     Log3 $name, 1,"OWVAR: Get ASYNC interface not implemented";
   }elsif( $interface eq "OWServer" ){
@@ -518,9 +459,6 @@ sub OWVAR_GetValues($@) {
   #-- process results
   if( defined($ret)  ){
     $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
-    if( $hash->{ERRCOUNT} > 5 ){
-      $hash->{INTERVAL} = 9999;
-    }
     return "OWVAR: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
   }
 
@@ -747,59 +685,93 @@ sub OWFSVAR_SetValues($$$) {
 sub OWXVAR_BinValues($$$$$$$) {
   my ($hash, $context, $reset, $owx_dev, $crcpart, $numread, $res) = @_;
   
-  my ($i,$j,$k,@data);
-  my $change = 0;
- 
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
+  my $error  = 0;
+  
+  my ($i,$j,$k,@data);
+  my $change = 0;
 
   my $msg;
-  OWX_WDBG($name,"OWVAR: $name: BinValues called with ",$res)
-    if( $main::owx_debug>2 );
+  OWX_WDBGL($name,4,"OWXVAR_BinValues called for device $name in context $context with data ",$res);
   
-  #-- process results
-  #die "OWVAR: $name not accessible in 2nd step" unless ( defined $res and $res ne 0 );
-  
-  if( $context eq "getstate" )  {
-    #-- process results
-    @data=split(//,$res);
-    if (@data != 2) {
-      $msg="Error- $name returns invalid data length, ".int(@data)." instead of 2 bytes ";
-    }else{
-      $msg="No error";
-      my $stat = ord($data[0]);
-      my $val  = ord($data[1]);
-      
-      $hash->{owg_val}=sprintf("%5.2f",(1.0-$val/255.0)*100);  
-  
-      #-- and now from raw to formatted values
-      $hash->{PRESENT}  = 1;
-      my $value = OWVAR_FormatValues($hash);
-      #Log3  $hash->{NAME}, 5, $value;
+  #-- process results 
+  if( $context eq "setstate" )  {
+    #-- we have to get rid  of the first 10 bytes
+    if( length($res) == 11 ){
+      $res=substr($res,10);
     }
-    OWX_WDBG($name,"OWXVAR_BinValues: ".$msg,$res)
-      if( $main::owx_debug>2 );
-    return undef;
     
-  #--- obsolete code - we have put all operations into the SetValues part. Leave in for now
-  }elsif( $context eq "setstate" )  {
-    my $val  = ord($res);
-    #$hash->{owg_val}=sprintf("%5.2f",(1-$val/255.0)*100);  
-    #-- process results
-    if (length($res) != 1){
-      $msg="$name returns invalid data length, ".length($res)." instead of 1 bytes, ";
-    }elsif($val ne $crcpart){   
-      $msg="$name returns invalid data $val instead of $crcpart, "
+    if( length($res) != 1 ) {
+      $error = 1;
+      $msg   = "$name: invalid data length, ".length($res)." instead of 1 bytes ";
+    }elsif( $res ne $crcpart ){
+      $error = 1;
+      $msg   = "$name: invalid data ";
     }else{
-      $msg="No error, val = $val";
+      $msg   = "$name: no error, ";
     }
-    OWX_WDBG($name,"OWXVAR_BinValues: ".$msg,$res)
-      if( $main::owx_debug>2 );
-    ####        master   slave  context     proc  owx_dev   data      crcpart numread startread callback delay
-    #                                       2 suppresses the initial bus reset, 16 inserts at top of queue      
-    #OWX_Qomplex($master, $hash, "confirm",  18,   $owx_dev, "\x96",   0,      2,      11,       undef,   0.01); 
-    return undef;
+    OWX_WDBGL($name,5-4*$error,"OWXVAR_BinValues setstate:    ".$msg,$res);
+    
+    #-- increase error count
+    if( $error ){
+      $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
+    }else{
+      ####        master   slave  context     proc owx_dev   data     crcpart numread startread callback            delay
+      OWX_Qomplex($master, $hash, "release",  18,  $owx_dev, "\x96",  0,      11,      0,       \&OWXVAR_BinValues,   0.01); 
+    }
+  #------------------------------------------------------------------
+  }elsif( $context eq "release" )  {
+    #-- we have to get rid  of the first 10 bytes
+    if( length($res) == 11 ){
+      $res=substr($res,10);
+    }
+    
+    if( length($res) != 1 ) {
+      $error = 1;
+      $msg   = "$name: invalid data length, ".length($res)." instead of 1 bytes ";
+    }elsif( $res ne "\x96" ){
+      $error = 1;
+      $msg   = "$name: invalid data ";
+    }else{
+      $msg   = "$name: no error, ";
+    }
+    OWX_WDBGL($name,5-4*$error,"OWXVAR_BinValues release :    ".$msg,$res);
+    #-- increase error count
+    if( $error ){
+      $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
+    }
+  #------------------------------------------------------------------
+  }elsif( $context eq "getstate" )  {
+    #-- we have to get rid  of the first 10 bytes
+    if( length($res) == 12 ){
+      $res=substr($res,10);
+    }
+    @data=split(//,$res);
+    
+    #-- process results
+    if (@data != 2) {
+      $error = 1;
+      $msg   = "$name: invalid data length, ".int(@data)." instead of 2 bytes ";
+    }else{
+      $msg   = "$name: no error, ";
+    }
+    OWX_WDBGL($name,5-4*$error,"OWXVAR_BinValues getstate:    ".$msg,$res);
+   
+    my $stat = ord($data[0]);
+    my $val  = ord($data[1]);
+      
+    $hash->{owg_val}=sprintf("%5.2f",(1.0-$val/255.0)*100);  
+  
+    #-- and now from raw to formatted values
+    $hash->{PRESENT}  = 1;
+    if ( !$error ){
+      my $value = OWVAR_FormatValues($hash)
+    }else{
+      $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
+    }
   }
+  return undef;
 }
 
 ########################################################################################
@@ -832,14 +804,12 @@ sub OWXVAR_GetValues($) {
     return "OWVAR: $name has returned invalid data"
       if( length($res)!=12);
     OWX_Reset($master);  
-    eval {
-      OWXVAR_BinValues($hash,"getstate",0,$owx_dev,0,2,substr($res,10,2));
-    };
-    return $@ ? $@ : undef;
+    return OWXVAR_BinValues($hash,"getstate",0,$owx_dev,0,2,substr($res,10,2));
+
   #-- NEW OWX interface
   }else{
     ####        master   slave  context     proc owx_dev   data     crcpart numread startread callback            delay
-    OWX_Qomplex($master, $hash, "getstate", 0,   $owx_dev, "\xF0",  0,      2,      10,       \&OWXVAR_BinValues, 0.01); 
+    OWX_Qomplex($master, $hash, "getstate", 0,   $owx_dev, "\xF0",  0,      12,     0,       \&OWXVAR_BinValues, undef); 
     return undef;
   }
 }
@@ -889,9 +859,8 @@ sub OWXVAR_SetValues($$$) {
     $hash->{owg_val}=sprintf("%5.2f",(1-$pos/255.0)*100);  
   #-- NEW OWX interface
   }else{
-    ####        master   slave  context     proc  owx_dev   data      crcpart numread startread callback              delay
-    OWX_Qomplex($master, $hash, "setstate", 0,    $owx_dev, $select,  0,      1,      0,        undef,   0);   
-    OWX_Qomplex($master, $hash, "confirm",  3,    $owx_dev, "\x96",   0,      1,      0,        undef,   0); 
+    ####        master   slave  context     proc  owx_dev   data      crcpart numread startread callback          delay
+    OWX_Qomplex($master, $hash, "setstate", 0,    $owx_dev, $select,  substr($select,1),       11,     0,        \&OWXVAR_BinValues,  0.1);   
     $hash->{owg_val}=sprintf("%5.2f",(1-$pos/255.0)*100);  
   }
   return undef;
@@ -951,11 +920,6 @@ sub OWXVAR_SetValues($$$) {
             <li><a name="owvar_id">
                     <code>get &lt;name&gt; id</code></a>
                 <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
-            <li><a name="owvar_present">
-                    <code>get &lt;name&gt; present</code></a>
-                <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
-            <li><a name="owvar_value2">
-                    <code>get &lt;name&gt; value</code></a><br />Obtain the value. </li>
         </ul>
         <br />
         <a name="OWVARattr"></a>

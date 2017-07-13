@@ -11,44 +11,6 @@
 #
 ########################################################################################
 #
-# define <name> OWTHERM [<model>] <ROM_ID> [interval] or <FAM_ID>.<ROM_ID> [interval]
-#
-# where <name> may be replaced by any name string 
-#     
-#       <model> is a 1-Wire device type. If omitted AND no FAM_ID given we assume this to be an
-#              DS1820 temperature sensor. Currently allowed values are DS1820, DS18B20, DS1822
-#       <FAM_ID> is a 1-Wire family id, currently allowed values are 10, 22, 28
-#       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
-#                without Family ID, e.g. A2D90D000800 
-#       [interval] is an optional query interval in seconds
-#
-# get <name> id          => FAM_ID.ROM_ID.CRC 
-# get <name> present     => 1 if device present, 0 if not
-# get <name> interval    => query interval
-# get <name> temperature => temperature measurement
-# get <name> alarm       => alarm temperature settings
-# get <name> version     => OWX version number
-#
-# set <name> interval    => period for measurement
-# set <name> tempLow     => lower alarm temperature setting 
-# set <name> tempHigh    => higher alarm temperature setting
-#
-# Additional attributes are defined in fhem.cfg
-#
-# attr <name> stateAL  "<string>"  = character string for denoting low alarm condition, default is ↓
-# attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is ↑
-# attr <name> tempOffset <float>   = temperature offset in degree Celsius added to the raw temperature reading 
-# attr <name> tempUnit  <string>   = unit of measurement, e.g. Celsius/Kelvin/Fahrenheit, default is Celsius
-# attr <name> tempConv onkick|onread    =  determines, whether a temperature measurement will happen when "kicked" 
-#               through the OWX backend module (all temperature sensors at the same time), or on 
-#               reading the sensor (1 second waiting time). 
-# attr <name> resolution  9|10|11|12 = resolution in bit for measurement
-# attr <name> interval  <floar>    = period for measurement
-# attr <name> tempLow   <float>    = lower alarm temperature setting 
-# attr <name> tempHigh  <float>    = higher alarm temperature setting
-#
-########################################################################################
-#
 #  This programm is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
@@ -86,12 +48,10 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="6.1";
+my $owx_version="7.0";
 
 my %gets = (
   "id"          => "",
-  "present"     => "",
-  "interval"    => "",
   "temperature" => "",
   "alarm"       => "",
   "version"     => ""
@@ -114,7 +74,7 @@ my %convtimes = (
 9  => 100,
 10 => 200,
 11 => 400,
-12 => 800,
+12 => 1000,
 );
 
 ########################################################################################
@@ -273,7 +233,6 @@ sub OWTHERM_Define ($$) {
 #
 ########################################################################################
 
-
 sub OWTHERM_Notify ($$) {
   my ($hash,$dev) = @_;
   if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
@@ -290,7 +249,6 @@ sub OWTHERM_Notify ($$) {
 #            a = argument array
 #
 ########################################################################################
-
 
 sub OWTHERM_Init ($) {
   my ($hash)=@_;
@@ -317,12 +275,12 @@ sub OWTHERM_Attr(@) {
   
   if ( $do eq "set") {
   	ARGUMENT_HANDLER: {
-      #-- interval modified at runtime
+       #-- interval modified at runtime
       $key eq "interval" and do {
         #-- check value
-        return "OWTHERM: Set with short interval, must be > 1" if(int($value) < 1);
+        return "OWTHERM: set $name interval must be >=0" if(int($value) < 0);
         #-- update timer
-        $hash->{INTERVAL} = $value;
+        $hash->{INTERVAL} = int($value);
 
         if ($init_done) {
           RemoveInternalTimer($hash);
@@ -427,6 +385,8 @@ sub OWTHERM_FormatValues($) {
   } else {
     $hash->{ALARM} = 0;
   }
+  main::OWX_Alarms($hash->{IODev})
+    if( $hash->{ALARM} );
   
   #-- put into READINGS
   readingsBeginUpdate($hash);
@@ -470,38 +430,11 @@ sub OWTHERM_Get($@) {
      return "$name.id => $value";
   } 
   
-  #-- hash of the busmaster
+  #-- hash of the busmaster 
   my $master = $hash->{IODev};
   
   #-- Get other values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
-  
-  #-- get present
-  if($a[1] eq "present" ) {
-    #-- OWX interface
-    if( $interface =~ /^OWX/ ){
-      #-- asynchronous mode
-      if( $hash->{ASYNC} ){
-        eval {
-          OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
-        };
-        return GP_Catch($@) if $@;
-        return "$name.present => ".ReadingsVal($name,"present","unknown");
-      } else {
-        $value = OWX_Verify($master,$hash->{ROM_ID});
-      }
-      $hash->{PRESENT} = $value;
-      return "$name.present => $value";
-    } else {
-      return "OWTHERM: Verification not yet implemented for interface $interface";
-    }
-  } 
-  
-  #-- get interval
-  if($a[1] eq "interval") {
-    $value = $hash->{INTERVAL};
-     return "$name.interval => $value";
-  } 
   
   #-- get version
   if( $a[1] eq "version") {
@@ -510,13 +443,15 @@ sub OWTHERM_Get($@) {
   
   #-- OWX interface
   if( $interface eq "OWX" ){
-    #-- not different from getting all values ..
     $ret = OWXTHERM_GetValues($hash);
+
+  #-- OWX_ASYNC interface
   }elsif( $interface eq "OWX_ASYNC" ){
     eval {
       $ret = OWX_ASYNC_RunToCompletion($hash,OWXTHERM_PT_GetValues($hash));
     };
     $ret = GP_Catch($@) if $@;
+
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
@@ -527,7 +462,8 @@ sub OWTHERM_Get($@) {
   
   #-- process results
   if( $master->{ASYNCHRONOUS} ){
-    return "OWTHERM: $name getting values, please wait for completion";
+    #return "OWTHERM: $name getting values, please wait for completion";
+    return undef;
   }else{
     #-- when we have a return code, we have an error
     if( defined($ret)  ){
@@ -567,19 +503,17 @@ sub OWTHERM_GetValues($@) {
     OWTHERM_FormatValues($hash);
   }
   
-  #-- restart timer for updates
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash); 
+  #-- auto-update for device disabled;
+  return undef
+    if( $hash->{INTERVAL} == 0 );
+  #-- restart timer for updates  
   InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 0);
 
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
-    #-- max 3 tries
-    for(my $try=0; $try<3; $try++){
-      $ret = OWXTHERM_GetValues($hash);
-      last
-        if( !defined($ret) );
-    }
+    $ret = OWXTHERM_GetValues($hash);
   }elsif( $interface eq "OWX_ASYNC" ){
     #-- skip, if the conversion is driven by master
     unless ( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
@@ -597,10 +531,6 @@ sub OWTHERM_GetValues($@) {
 
   #-- process results
   if( defined($ret)  ){
-    $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
-    if( $hash->{ERRCOUNT} > 5 ){
-      $hash->{INTERVAL} = 9999;
-    }
     return "OWTHERM: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
   }
 
@@ -735,10 +665,11 @@ sub OWTHERM_Set($@) {
   #-- set new timer interval
   if($key eq "interval") {
     # check value
-    return "OWTHERM: Set with short interval, must be >= 1"
-      if(int($value) < 1);
-    # update timer
-  	return OWTHERM_Attr("set",@a);
+    return "OWTHERM: set $name interval must be >= 0"
+      if(int($value) < 0);
+    $hash->{INTERVAL} = int($value);
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 0);
   }
 
   #-- set tempLow or tempHigh
@@ -800,7 +731,7 @@ sub OWTHERM_Set($@) {
   
   #-- process results
   $hash->{PRESENT} = 1; 
-  OWTHERM_FormatValues($hash); 
+  #OWTHERM_FormatValues($hash); 
   Log3 $name, 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
   return undef;
@@ -944,30 +875,35 @@ sub OWFSTHERM_SetValues($$) {
 sub OWXTHERM_BinValues($$$$$$$) {
   my ($hash, $context, $reset, $owx_dev, $crcpart, $numread, $res) = @_;
   
-  my ($i,$j,$k,@data,$ow_thn,$ow_tln);
-  my $change = 0;
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
+  my ($i,$j,$k,@data,$ow_thn,$ow_tln);
+  my $error  = 0;
+  my $change = 0;
   my $msg;
-  OWX_WDBG($name,"OWTHERM_BinValues called for device $name with ",$res)
-    if( $main::owx_debug>2 );
+  
+  OWX_WDBGL($name,5,"OWXTHERM_BinValues called for device $name in context $context with data ",$res);
+  
+  #-- we have to get rid  of the first 10 bytes
+  if( length($res) == 19 ){
+      $res=substr($res,10);
+  }
+  @data=split(//,$res);
   
   #-- process results
-  @data=split(//,$res);
   if (@data != 9){
-    $msg="Error - $name returns invalid data length, ".int(@data)." instead of 9 bytes, ";
+    $error = 1;
+    $msg   = "$name: invalid data length, ".int(@data)." instead of 9 bytes, ";
   }elsif(ord($data[7])<=0){
-    $msg="Error - $name returns invalid data, ";
+    $error = 1;
+    $msg   = "$name: invalid data, ";
   }elsif(OWX_CRC8(substr($res,0,8),$data[8])==0){
-    $msg="Error - invalid data from device $name, invalid CRC, ";
+    $error = 1;
+    $msg   = "$name: invalid CRC, ";
   }else{
-    $msg="No error, ";
-    for(my $i=0;$i<8;$i++){
-      $hash->{owg_val}->[$i] = (ord($data[0])>>$i) & 1;
-      $hash->{owg_vax}->[$i] = (ord($data[1])>>$i) & 1;
-    };
+    $msg   = "$name: no error, ";
   }
-  OWX_WDBG($name,"OWXTHERM_BinValues: ".$msg,$res)
-    if( $main::owx_debug>2 );
   
   #-- this must be different for the different device types
   #   family = 10 => DS1820, DS18S20
@@ -975,7 +911,7 @@ sub OWXTHERM_BinValues($$$$$$$) {
   
     my $count_remain = ord($data[6]);
     my $count_perc   = ord($data[7]);
-    my $delta        = -0.25 + ($count_perc - $count_remain)/$count_perc;
+    my $delta        = ($count_perc != 0)?(-0.25 + ($count_perc - $count_remain)/$count_perc):0;
    
     my $lsb  = ord($data[0]);
     my $msb  = 0;
@@ -1014,17 +950,22 @@ sub OWXTHERM_BinValues($$$$$$$) {
     $ow_thn = ord($data[2]) > 127 ? 128-ord($data[2]) : ord($data[2]);
     $ow_tln = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
     
-  } else {
-    die "OWTHERM: $name: Unknown device family $hash->{OW_FAMILY}\n";
-  }
+  } 
   
   #-- process alarm settings
   $hash->{owg_tl} = $ow_tln;
   $hash->{owg_th} = $ow_thn;
   
+  OWX_WDBGL($name,5-4*$error,"OWXTHERM_BinValues:  ".$msg." ".$hash->{owg_temp}."  ",$res);
+
   #-- and now from raw to formatted values
-  $hash->{PRESENT}  = 1;
-  my $value = OWTHERM_FormatValues($hash);
+  
+  if( $error ){
+    $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
+  }else{
+    $hash->{PRESENT}  = 1;
+    OWTHERM_FormatValues($hash);
+  }
   return undef;
 }
 
@@ -1069,10 +1010,11 @@ sub OWXTHERM_GetValues($) {
       select(undef,undef,undef,$convtimes{AttrVal($name,"resolution",12)}*0.001);
     #-- NEW OWX interface
     }else{
-      ####        master   slave  context proc  owx_dev   data     crcpart numread startread callback delay
-      OWX_Qomplex($master, $hash, undef,  0,    $owx_dev, "\x44",  0,      0,      undef,    undef, $convtimes{AttrVal($name,"resolution",12)}*0.001); 
+      ####        master   slave  context     proc  owx_dev   data     crcpart numread startread callback delay
+      OWX_Qomplex($master, $hash, "convert",  5,    $owx_dev, "\x44",  0,      1,      undef,    undef, $convtimes{AttrVal($name,"resolution",12)}*0.001 ); 
     }
   }
+
   #-- NOW ask the specific device
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
@@ -1082,16 +1024,14 @@ sub OWXTHERM_GetValues($) {
     my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
     return "OWTHERM: $name not accessible in reading"
       if( $res eq 0 );
-    return "OWTHERM: $name has returned invalid data"
-      if( length($res)!=19);
-    eval {
-      OWXTHERM_BinValues($hash,undef,$owx_dev,undef,undef,9,substr($res,10,9));
-    };
-    return $@ ? $@ : undef;
+    Log 1,"OWTHERM: $name has returned invalid data of length ".length($res)
+       if( length($res)!=19);
+    return OWXTHERM_BinValues($hash,"getsp",$owx_dev,undef,undef,9,substr($res,10,9));
+
   #-- NEW OWX interface
   }else{
-    ####        master   slave  context            proc owx_dev   data    crcpart numread startread callback              delay
-    OWX_Qomplex($master, $hash, undef,             1,   $owx_dev, "\xBE", 0,      9,      10,       \&OWXTHERM_BinValues, 0.01); 
+    ####        master   slave  context    proc owx_dev   data    crcpart numread startread callback              delay 
+    OWX_Qomplex($master, $hash, "readsp",  1,   $owx_dev, "\xBE", 0,      19,     0,       \&OWXTHERM_BinValues, undef); 
     return undef;
   }
 }
@@ -1149,8 +1089,8 @@ sub OWXTHERM_SetValues($$) {
     }
   #-- NEW OWX interface
   }else{
-    ####        master   slave  context proc owx_dev   data     crcpart numread startread callback delay
-    OWX_Qomplex($master, $hash, undef,  0,   $owx_dev, $select, 0,      3,      10,       undef,   0.05); 
+    ####        master   slave  context     proc owx_dev   data     crcpart numread startread callback delay
+    OWX_Qomplex($master, $hash, "writesp",  0,   $owx_dev, $select, 0,      3,      10,       undef,   undef); 
   }
   return undef;
 }
@@ -1331,7 +1271,7 @@ sub OWXTHERM_PT_SetValues($$) {
         <ul>
             <li><a name="owtherm_interval">
                     <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Temperature
-                readout interval in seconds. The default is 300 seconds. <b>Attention:</b>This is the 
+                readout interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update. <b>Attention:</b>This is the 
                 readout interval. Whether an actual temperature measurement is performed, is determined by the
                 tempConv attribute </li>
             <li><a name="owtherm_tempHigh">
@@ -1350,12 +1290,6 @@ sub OWXTHERM_PT_SetValues($$) {
             <li><a name="owtherm_id">
                     <code>get &lt;name&gt; id</code></a>
                 <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
-            <li><a name="owtherm_present">
-                    <code>get &lt;name&gt; present</code></a>
-                <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
-            <li><a name="owtherm_interval2">
-                    <code>get &lt;name&gt; interval</code></a><br />Returns temperature measurement
-                interval in seconds.</li>
             <li><a name="owtherm_temperature">
                     <code>get &lt;name&gt; temperature</code></a><br />Obtain the temperature. </li>
             <li><a name="owtherm_alarm">

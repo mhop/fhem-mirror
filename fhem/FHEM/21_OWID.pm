@@ -11,25 +11,6 @@
 #
 ########################################################################################
 #
-# define <name> OWID <FAM_ID> <ROM_ID> [interval] or OWID <FAM_ID>.<ROM_ID> [interval] 
-#
-# where <name> may be replaced by any name string 
-#   
-#       <FAM_ID> is a 2 character (1 byte) 1-Wire Family ID
-#  
-#       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
-#                without Family ID, e.g. A2D90D000800 
-#       [interval] is an optional query interval in seconds
-#
-# set <name> interval => set query interval for checking presence
-#
-# get <name> id       => FAM_ID.ROM_ID.CRC 
-# get <name> present  => 1 if device present, 0 if not
-# get <name> version  => OWX version number
-#
-#
-########################################################################################
-#
 #  This programm is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
@@ -68,11 +49,10 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log3($$$);
 
-my $owx_version="6.1";
+my $owx_version="7.0";
 #-- declare variables
 my %gets = (
   "present"     => "",
-  "interval"    => "",
   "id"          => "",
   "version"     => ""
 );
@@ -80,7 +60,7 @@ my %sets    = (
   "interval"    => ""
 );
 my %updates = (
- "present"    => ""
+  "present"    => ""
 );
  
 ########################################################################################
@@ -215,10 +195,8 @@ sub OWID_Define ($$) {
 
   $hash->{NOTIFYDEV} = "global";
 
-  if ($init_done) {
-    return OWID_Init($hash);
-  }
-  return undef;
+  return OWID_Init($hash);
+
 }
 
 #########################################################################################
@@ -249,7 +227,7 @@ sub OWID_Init ($) {
   my ($hash)=@_;
   #-- Start timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+10, "OWID_GetValues", $hash, 0);
+  InternalTimer(gettimeofday()+30, "OWID_GetValues", $hash, 0);
   #--
   readingsSingleUpdate($hash,"state","Initialized",1);
   
@@ -280,9 +258,9 @@ sub OWID_Attr(@) {
       #-- interval modified at runtime
       $key eq "interval" and do {
         #-- check value
-        return "OWID: Set with short interval, must be > 1" if(int($value) < 1);
+        return "OWID: set $name interval must be >= 0" if(int($value) < 0);
         #-- update timer
-        $hash->{INTERVAL} = $value;
+        $hash->{INTERVAL} = int($value);
         if ($init_done) {
           RemoveInternalTimer($hash);
           InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
@@ -337,33 +315,39 @@ sub OWID_Get($@) {
      return "$name.id => $value";
   } 
   
-  #-- get interval
-  if($a[1] eq "interval") {
-    $value = $hash->{INTERVAL};
-     return "$name.interval => $value";
-  } 
-  
   #-- get present
   if($a[1] eq "present") {
     #-- hash of the busmaster
-    my $master       = $hash->{IODev};
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
+    my $master    = $hash->{IODev};
+    my $interface = $master->{TYPE};
+  
+    #-- OWX interface
+    if( $interface eq "OWX" ){
+      $value = OWX_Verify($master,$name,$hash->{ROM_ID},0);    
+    #-- OWX_ASYNC interface
+    }elsif( $interface eq "OWX_ASYNC" ){
       eval {
         OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
       };
       return GP_Catch($@) if $@;
-      return "$name.present => ".ReadingsVal($name,"present","unknown");
+        
+    #-- Unknown interface 
     } else {
-      $value = OWX_Verify($master,$hash->{ROM_ID});
+      return "OWID: Verification not yet implemented for interface $interface";
     }
-    if( $value == 0 ){
-      readingsSingleUpdate($hash,"present",0,$hash->{PRESENT}); 
-    } else {
-      readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
+    #-- process results
+    if( $master->{ASYNCHRONOUS} ){
+      return undef;
+    }else{
+      #-- generate an event only if presence has changed
+      if( $value == 0 ){
+        readingsSingleUpdate($hash,"present",0,$hash->{PRESENT}); 
+      } else {
+        readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
+      }
+      $hash->{PRESENT} = $value;
+      return "$name.present => $value";
     }
-    $hash->{PRESENT} = $value;
-    return "$name.present => $value";
   } 
   
   #-- get version
@@ -389,30 +373,42 @@ sub OWID_GetValues($) {
   my $offset;
   my $factor;
   
-  #-- restart timer for updates
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash); 
+  #-- auto-update for device disabled;
+  return undef
+    if( $hash->{INTERVAL} == 0 );
+  #-- restart timer for updates  
   InternalTimer(time()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
   
   #-- hash of the busmaster
-  my $master       = $hash->{IODev};
+  my $master    = $hash->{IODev};
+  my $interface = $master->{TYPE};
   
-  if( $hash->{ASYNC} ){
+  #-- OWX interface
+  if( $interface eq "OWX" ){
+    $value = OWX_Verify($master,$name,$hash->{ROM_ID},0);
+      
+  #-- OWX_ASYNC interface
+  }elsif( $interface eq "OWX_ASYNC" ){
     eval {
-      OWX_ASYNC_Schedule($hash,OWX_ASYNC_PT_Verify($hash));
+      OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
     };
     return GP_Catch($@) if $@;
-    return undef;
-  } else {
-    $value = OWX_Verify($master,$hash->{ROM_ID});
   }
 
-  #-- generate an event only if presence has changed
-  if( $value == 0 ){
-    readingsSingleUpdate($hash,"present",0,$hash->{PRESENT}); 
-  } else {
-    readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
+  #-- process results
+  if( $master->{ASYNCHRONOUS} ){
+    return undef;
+  }else{
+    #-- generate an event only if presence has changed
+    if( $value == 0 ){
+      readingsSingleUpdate($hash,"present",0,$hash->{PRESENT}); 
+    } else {
+      readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
+    }
+    $hash->{PRESENT} = $value;
+    return "$name.present => $value";
   }
-  $hash->{PRESENT} = $value;
 }
 
 #######################################################################################
@@ -449,10 +445,10 @@ sub OWID_Set($@) {
   #-- set new timer interval
   if($key eq "interval") {
     # check value
-    return "OWID: Set with short interval, must be > 1"
-      if(int($value) < 1);
+    return "OWID: Set $name interval must be >= 0"
+      if(int($value) < 0);
     # update timer
-    $hash->{INTERVAL} = $value;
+    $hash->{INTERVAL} = int($value);
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
     return undef;
@@ -533,7 +529,9 @@ sub OWID_Undef ($) {
                 <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
         </ul>
                 <h4>Attributes</h4>
-        <ul>
+        <ul><li><a name="owtherm_interval2">
+                    <code>attr &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+                interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update.</li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
         
