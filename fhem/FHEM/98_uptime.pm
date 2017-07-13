@@ -34,10 +34,12 @@ sub uptime_Initialize($$) {
 sub CommandUptime($$) {
   my ($cl,$param) = @_;
   my @args = split("[ \t]+", $param);
+  $args[0] = defined($args[0]) ? lc($args[0]) : "";
 
   my $diff = time - $fhem_started;
+  return $diff if(lc($args[0]) eq 'raw');
+
   my ($d,$h,$m,$ret);
-  
   ($d,$diff) = _upT_Div($diff,86400);
   ($h,$diff) = _upT_Div($diff,3600);
   ($m,$diff) = _upT_Div($diff,60);
@@ -66,10 +68,11 @@ sub _upT_Div($$) {
 <a name="uptime"></a>
 <h3>uptime</h3>
 <ul>
-  <code>uptime</code>
+  <code>uptime [raw]</code>
   <br>
-  <br>
-    uptime shows FHEM uptime since last FHEM (re-)start.
+    uptime shows FHEM uptime since last FHEM (re-)start.<br/>
+    if called with optional parameter "raw" only seconds will be shown,<br/>
+    without any fomatting.
   <br>
 </ul>
 
