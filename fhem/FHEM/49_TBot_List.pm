@@ -68,16 +68,17 @@
 #   Menu für gesamte Liste
 #   Sortierung A-Z und Z-A für Liste
 #   allow double entries and correct handling
-# 0.3 2017-05-13 Menu / Sort und fixes 
+# 0.4 2017-05-13 Menu / Sort und fixes 
 
 #   changed query data to prefix TBL_
 #   fhem-call get peerId is quiet
+# 0.5 2017-05-13 Menu / Sort und fixes 
 #   
+#   confirm delete configurable as attribute confirmDelete 
 #   
 #   
 ##############################################################################
 # TASKS 
-#   
 #   
 #   
 #   Make texts and addtl buttons configurable
@@ -143,6 +144,7 @@ sub TBot_List_Initialize($) {
           "telegramBots:textField ".
           "optionDouble:0,1 ".
           "handleUnsolicited:0,1 ".
+          "confirmDelete:0,1 ".
           "allowedPeers:textField ".
           $readingFnAttributes;           
 }
@@ -403,6 +405,9 @@ sub TBot_List_Attr(@) {
   if ($cmd eq "set") {
 
     if ( ($aName eq 'optionDouble') ) {
+      $aVal = ($aVal eq "1")? "1": "0";
+
+    } elsif ( ($aName eq "confirmDelete" ) ) {
       $aVal = ($aVal eq "1")? "1": "0";
 
     } elsif ($aName eq 'allowedPeers') {
@@ -850,9 +855,11 @@ sub TBot_List_handler($$$$;$)
       if ( defined($msgId ) ) {
         # show ask for removal
         my $textmsg = "Liste ".$lname."\nEintrag ".($no+1)." (".$list[$no].") ?";
-        # show ask msg 
-        my $inline = "(".TBot_List_inlinekey( $hash, "Entfernen", "list_rem-$no" )."|".TBot_List_inlinekey( $hash, "Aendern", "list_askchg-$no" )."|".
-            TBot_List_inlinekey( $hash, "Nach Oben", "list_totop-$no" )."|".TBot_List_inlinekey( $hash, "Zurueck", "list_edit" ).")";
+        # show ask msgs (depending on attr)
+        my $indata = ( AttrVal($name,'confirmDelete',1) ? "list_rem-$no" : "list_remyes-$no" );
+        my $inline = "(".TBot_List_inlinekey( $hash, "Entfernen", $indata )."|".
+                   TBot_List_inlinekey( $hash, "Aendern", "list_askchg-$no" )."|".
+                   TBot_List_inlinekey( $hash, "Nach Oben", "list_totop-$no" )."|".TBot_List_inlinekey( $hash, "Zurueck", "list_edit" ).")";
         fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
       } else {
         $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
@@ -1348,6 +1355,9 @@ sub TBot_List_Setup($) {
     </li> 
 
     <li><code>handleUnsolicited &lt;1 or 0&gt;</code><br>If set to 1 and new messages are sent in a chat where a dialog of this list is active the bot will ask if an entry should be added. This helps for accidential messages without out first pressing the "add" button.
+    </li> 
+    
+    <li><code>confirmDelete &lt;1 or 0&gt;</code><br>If set to 1 the bot will ask for a confirmation if an entry should be deleted. This is the default. With a value of 0 the additional confirmation will not be requested.
     </li> 
     
   </ul>
