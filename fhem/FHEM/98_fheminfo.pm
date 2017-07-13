@@ -73,16 +73,12 @@ sub CommandFheminfo($$) {
 #
 sub _fi2_Count() {
    my $uniqueID = getUniqueId();
-   my $release  = "5.8";
-   my $feature  = $featurelevel ? $featurelevel : $release;
    my $os       = $^O;
    my $perl     = sprintf("%vd", $^V);
 
    %fhemInfo = ();
 
    $fhemInfo{$c_system}{'uniqueID'}   = $uniqueID;
-   $fhemInfo{$c_system}{'release'}    = $release;
-   $fhemInfo{$c_system}{'feature'}    = $feature;
    $fhemInfo{$c_system}{'os'}         = $os;
    $fhemInfo{$c_system}{'perl'}       = $perl;
    $fhemInfo{$c_system}{'revision'}   = _fi2_findRev();
@@ -171,19 +167,15 @@ sub _fi2_Send() {
 
 sub _fi2_TelnetTable($) {
   my ($doSend) = shift;
-  my $upTime = _fi2_Uptime();
   my $str;
   $str .= "Following statistics data will be sent to server:\n(see Logfile level 4 for server response)\n\n" if($doSend == 1);
   $str .= "System Info\n";
-  $str .= sprintf("  Release%*s: %s\n",6," ",$fhemInfo{$c_system}{'release'});
-  $str .= sprintf("  FeatureLevel%*s: %s\n",0," ",$fhemInfo{$c_system}{'feature'});
   $str .= sprintf("  ConfigType%*s: %s\n",3," ",$fhemInfo{$c_system}{'configType'});
   $str .= sprintf("  SVN revision%*s: %s\n",0," ",$fhemInfo{$c_system}{'revision'})
                   if (defined($fhemInfo{$c_system}{'revision'}));
   $str .= sprintf("  OS%*s: %s\n",11," ",$fhemInfo{$c_system}{'os'});
   $str .= sprintf("  Perl%*s: %s\n",9," ",$fhemInfo{$c_system}{'perl'});
   $str .= sprintf("  uniqueID%*s: %s\n",5," ",_fi2_shortId());
-  $str .= sprintf("  upTime%*s: %s\n",7,"  ",$upTime); 
 
    my @keys = keys %fhemInfo;
    foreach my $type (sort @keys)
@@ -201,19 +193,15 @@ sub _fi2_TelnetTable($) {
 
 sub _fi2_HtmlTable($) {
    my ($doSend) = shift;
-   my $upTime = _fi2_Uptime();
    my $result  = "<html><table>";
       $result .= "<tr><td colspan='3'>Following statistics data will be sent to server:</br>(see Logfile level 4 for server response)</td></tr>" if($doSend == 1);
       $result .= "<tr><td><b>System Info</b></td></tr>";
-      $result .= "<tr><td> </td><td>Release:</td><td>$fhemInfo{$c_system}{'release'}</td></tr>";
-      $result .= "<tr><td> </td><td>FeatureLevel:</td><td>$fhemInfo{$c_system}{'feature'}</td></tr>";
       $result .= "<tr><td> </td><td>ConfigType:</td><td>$fhemInfo{$c_system}{'configType'}</td></tr>";
       $result .= "<tr><td> </td><td>SVN rev:</td><td>$fhemInfo{$c_system}{'revision'}</td></tr>" 
                   if (defined($fhemInfo{$c_system}{'revision'}));
       $result .= "<tr><td> </td><td>OS:</td><td>$fhemInfo{$c_system}{'os'}</td></tr>";
       $result .= "<tr><td> </td><td>Perl:</td><td>$fhemInfo{$c_system}{'perl'}</td></tr>";
       $result .= "<tr><td> </td><td>uniqueId:</td><td>"._fi2_shortId()."</td></tr>";
-      $result .= "<tr><td> </td><td>upTime:</td><td>$upTime</td></tr>";
       $result .= "<tr><td colspan=3>&nbsp;</td></tr>";
       $result .= "<tr><td><b>Modules</b></td><td><b>Model</b></td><td><b>Count</b></td></tr>";
 
@@ -229,27 +217,6 @@ sub _fi2_HtmlTable($) {
 
    $result .= "</table></html>";
    return $result;
-}
-
-sub _fi2_Uptime() {
-  my $diff = time - $fhem_started;
-  my ($d,$h,$m,$ret);
-  
-  ($d,$diff) = _fi2_Div($diff,86400);
-  ($h,$diff) = _fi2_Div($diff,3600);
-  ($m,$diff) = _fi2_Div($diff,60);
-
-  $ret  = "";
-  $ret .= "$d days, " if($d >  1);
-  $ret .= "1 day, "   if($d == 1);
-  $ret .= sprintf("%02s:%02s:%02s", $h, $m, $diff);
-
-  return $ret;
-}
-
-sub _fi2_Div($$) {
-  my ($p1,$p2) = @_;
-  return (int($p1/$p2), $p1 % $p2);
 }
 
 sub _fi2_findRev() {
@@ -312,20 +279,18 @@ sub _fi2_shortId() {
   <br>
   <br>
     The optional parameter <code>send</code> transmitts the collected data
-    to a central server in order to support the development of FHEM. The
-    transmitted data is processed graphically. The results can be viewed
-    on <a href="https://fhem.de/stats/statistics.html">http://fhem.de/stats/statistics.html</a>.
+    to a central server in order to support the development of FHEM. <br/>
+    The submitted data is processed graphically. The results can be viewed
+    on <a href="https://fhem.de/stats/statistics.html">http://fhem.de/stats/statistics.html</a>.<br/>
     The IP address will not be stored in database, only used for region determination during send.
   <br>
   <br>
     Features:<br>
     <ul>
-      <li>FHEM release and FeatureLevel (will be removed soon)</li>
       <li>ConfigType (configDB|configFILE)</li>
       <li>SVN rev number</li>
       <li>Operating System Information</li>
       <li>Installed Perl version</li>
-      <li>Uptime (not sent to server)</li>
       <li>Defined modules</li>
       <li>Defined models per module</li>
     </ul>

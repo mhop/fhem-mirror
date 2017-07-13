@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 98_fheminfo.pm: remove release, featurelevel, uptime infos
+  - added:   98_uptime.pm: new command module to show FHEM uptime
   - change:  93_DbLog: V2.19.0, replace internal DBMODEL by MODEL completely
   - update:  88_HMCCU: Version 4.1
   - feature: 93_DbRep: V5.5.0, new command restoreMySQL, use new Internal
