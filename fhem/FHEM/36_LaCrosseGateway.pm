@@ -45,7 +45,7 @@ sub LaCrosseGateway_Initialize($) {
                            ." mode:USB,WiFi,Cable"
                            ." usbFlashCommand"
                            ." filter"
-                           ." $readingFnAttributes";
+    ." $readingFnAttributes";
 
 }
 
@@ -54,8 +54,7 @@ sub LaCrosseGateway_Fingerprint($$) {
 }
 
 #=======================================================================================
-sub LaCrosseGateway_Define($$) {
-  my ($hash, $def) = @_;
+sub LaCrosseGateway_Define($$) {my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
   if(@a != 3) {
@@ -598,7 +597,20 @@ sub LaCrosseGateway_Parse($$$$) {
   }
   
   if($msg =~ m/^\[LaCrosseITPlusReader.Gateway|\[LaCrosseGateway32 V/) {
-    $hash->{model} = $msg;
+    my $model = "";
+    my $version = "";
+    my $settings = "";
+    if($msg =~ m/^\[LaCrosseGateway32 V/) {
+      ($model, $version, $settings) = split(/ /, $msg, 3);
+      $model .= " $version";
+    }
+    else {
+      ($model, $settings) = split(/ /, $msg, 2);
+    }
+    $model = substr($model, 1);
+    
+    $hash->{model} = $model;
+    $hash->{settings} = $settings;
 
     my $attrVal = AttrVal($name, "timeout", undef);
     if(defined($attrVal)) {
