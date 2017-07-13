@@ -68,12 +68,11 @@ sub _upT_Div($$) {
 <a name="uptime"></a>
 <h3>uptime</h3>
 <ul>
-  <code>uptime [raw]</code>
-  <br>
+  <code>uptime [raw]</code><br/>
+  <br/>
     uptime shows FHEM uptime since last FHEM (re-)start.<br/>
     if called with optional parameter "raw" only seconds will be shown,<br/>
-    without any fomatting.
-  <br>
+    without any fomatting.<br/>
 </ul>
 
 =end html
