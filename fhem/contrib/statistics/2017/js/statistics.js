@@ -329,7 +329,7 @@ function onSuccess(data, textStatus, jqXHR) {
         drawGoogleWorldMap(data.data.geo.countrycode,$("div#maptab-world"));
         
         // draw google pie charts
-        drawGooglePieChart(data.data.system.os, $("div#versiontab-os"), {"linux":"Linux","MSWin32":"Windows","darwin":"MacOS"}, "byValue");
+        drawGooglePieChart(data.data.system.os, $("div#versiontab-os"), {"linux":"Linux","MSWin32":"Windows","darwin":"macOS"}, "byValue");
         drawGooglePieChart(data.data.system.perl, $("div#versiontab-perl"));
         
         delete data.data.system.age.unknown; // don't display unknown update age systems
