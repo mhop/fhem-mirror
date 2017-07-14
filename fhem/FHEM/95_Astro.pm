@@ -46,7 +46,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.2;
+my $astroversion = 1.3;
 
 #-- These we may get on request
 my %gets = (
@@ -54,12 +54,190 @@ my %gets = (
    "json"  => "J",
    "text"  => "T"
 );
- 
-my @zodiac=("Widder", "Stier", "Zwillinge", "Krebs", "Löwe", "Jungfrau", 
-    "Waage", "Skorpion", "Schütze", "Steinbock", "Wassermann", "Fische");
 
-my @phases = ("Neumond", "Zunehmende Sichel", "Erstes Viertel", "Zunehmender Mond", 
-   "Vollmond", "Abnehmender Mond", "Letztes Viertel", "Abnehmende Sichel", "Neumond");
+my $astro_tt;
+
+my %astro_transtable_EN = ( 
+    "overview"          =>  "Summary",
+    "name"              =>  "Name", 
+    "time"              =>  "Time",
+    "action"            =>  "Action",
+    "type"              =>  "Type",
+    "description"       =>  "Description",
+    "profile"           =>  "Profile",
+    #--
+    "coord"             =>  "Coordinates",
+    "position"          =>  "Position",
+    "longitude"         =>  "Longitude",
+    "latitude"          =>  "Latitude",
+    "altitude"          =>  "Height above sea",
+    "lonecl"            =>  "Ecliptical longitude",
+    "latecl"            =>  "Ecliptical latitude",
+    "ra"                =>  "Right ascension",        
+    "dec"               =>  "Declination",
+    "az"                =>  "Azimuth",
+    "alt"               =>  "Horizontal altitude",
+    "age"               =>  "Age",
+    "rise"              =>  "Rise",
+    "set"               =>  "Set",
+    "transit"           =>  "Transit",
+    "distance"          =>  "Distance",
+    "diameter"          =>  "Diameter",
+    "toobs"             =>  "to observer",
+    "toce"              =>  "to Earth center",
+    "twilightcivil"     =>  "Civil twilight",
+    "twilightnautic"    =>  "Nautical twilight",
+    "twilightastro"     =>  "Astronomical twilight",
+    "sign"              =>  "Zodiac sign",
+    #--
+    "today"             =>  "Today",
+    "tomorrow"          =>  "Tomorrow",
+    "weekday"           =>  "Day of Week",
+    "date"              =>  "Date",
+    "jdate"             =>  "Julian date",
+    "dayofyear"         =>  "day of year",
+    "days"              =>  "days",
+    "timezone"          =>  "Time Zone",
+    "lmst"              =>  "Local Sidereal Time",  
+    #--
+    "monday"    =>  ["Monday","Mon"],
+    "tuesday"   =>  ["Tuesday","Tue"],
+    "wednesday" =>  ["Wednesday","Wed"],
+    "thursday"  =>  ["Thursday","Thu"],
+    "friday"    =>  ["Friday","Fri"],
+    "saturday"  =>  ["Saturday","Sat"],
+    "sunday"    =>  ["Sunday","Sun"],
+    #--
+    "season"    => "Season",
+    "spring"    => "Spring",
+    "summer"    => "Summer",
+    "fall"      => "Fall",
+    "winter"    => "Winter",
+        #--
+    "aries"     => "Ram",
+    "taurus"    => "Bull",
+    "gemini"    => "Twins",
+    "cancer"    => "Crab",
+    "leo"       => "Lion",
+    "virgo"     => "Maiden",
+    "libra"     => "Scales",
+    "scorpio"   => "Scorpion",
+    "Sagittarius" => "Archer",
+    "capricorn" => "Goat",
+    "aquarius"  => "Water Bearer",
+    "pisces"    => "Fish",
+    #--
+    "sun"         => "Sun",
+    #--
+    "moon"           => "Moon",
+    "phase"          => "Phase",
+    "newmoon"        => "New Moon",
+    "waxingcrescent" => "Waxing Crescent",
+    "firstquarter   "=> "First Quarter",
+    "waxingmoon"     => "Waxing Moon",
+    "fullmoon"       => "Full Moon",
+    "waningmoon"     => "Waning Moon",
+    "lastquarter"    => "Last Quarter",
+    "waningcrescent" => "Waning Crescent"
+    );
+    
+ my %astro_transtable_DE = ( 
+    "overview"          =>  "Zusammenfassung",
+    "name"              =>  "Name", 
+    "time"              =>  "Zeit",
+    "action"            =>  "Aktion",
+    "type"              =>  "Typ",
+    "description"       =>  "Beschreibung",
+    "profile"           =>  "Profil",
+    #--
+    "coord"             =>  "Koordinaten",
+    "position"          =>  "Position",
+    "longitude"         =>  "Länge",
+    "latitude"          =>  "Breite",
+    "altitude"          =>  "Höhe ü.M.",
+    "lonecl"            =>  "Eklipt. Länge",
+    "latecl"            =>  "Eklipt. Breite",
+    "ra"                =>  "Rektaszension",        
+    "dec"               =>  "Deklination",
+    "az"                =>  "Azimut",
+    "alt"               =>  "Horizontwinkel",
+    "age"               =>  "Alter",
+    "phase"             =>  "Phase",
+    "rise"              =>  "Aufgang",
+    "set"               =>  "Untergang",
+    "transit"           =>  "Kulmination",
+    "distance"          =>  "Entfernung",
+    "diameter"          =>  "Durchmesser",
+    "toobs"             =>  "z. Beobachter",
+    "toce"              =>  "z. Erdmittelpunkt",
+    "twilightcivil"     =>  "Bürgerliche Dämmerung",
+    "twilightnautic"    =>  "Nautische Dämmerung",
+    "twilightastro"     =>  "Astronomische Dämmerung",
+    "sign"              =>  "Tierkreiszeichen",
+    #--
+    "today"             =>  "Heute",
+    "tomorrow"          =>  "Morgen",
+    "weekday"           =>  "Wochentag",
+    "date"              =>  "Datum",
+    "jdate"             =>  "Julianisches Datum",
+    "dayofyear"         =>  "Tag d. Jahres",
+    "days"              =>  "Tage",
+    "timezone"          =>  "Zeitzone",
+    "lmst"              =>  "Lokale Sternzeit",  
+    #--
+    "monday"    =>  ["Montag","Mo"],
+    "tuesday"   =>  ["Dienstag","Di"],
+    "wednesday" =>  ["Mittwoch","Mi"],
+    "thursday"  =>  ["Donnerstag","Do"],
+    "friday"    =>  ["Freitag","Fr"],
+    "saturday"  =>  ["Samstag","Sa"],
+    "sunday"    =>  ["Sonntag","So"],
+    #--
+    "season"    => "Jahreszeit",
+    "spring"    => "Frühling",
+    "summer"    => "Sommer",
+    "fall"      => "Herbst",
+    "winter"    => "Winter",
+    #--
+    "aries"     => "Widder",
+    "taurus"    => "Stier",
+    "gemini"    => "Zwillinge",
+    "cancer"    => "Krebs",
+    "leo"       => "Löwe",
+    "virgo"     => "Jungfrau",
+    "libra"     => "Waage",
+    "scorpio"   => "Skorpion",
+    "Sagittarius" => "Schütze",
+    "capricorn" => "Steinbock",
+    "aquarius"  => "Wassermann",
+    "pisces"    => "Fische",
+    #--
+    "sun"         => "Sonne",
+    #--
+    "moon"           => "Mond",
+    "phase"          => "Phase",
+    "newmoon"        => "Neumond",
+    "waxingcrescent" => "Zunehmende Sichel",
+    "firstquarter   "=> "Erstes Viertel",
+    "waxingmoon"     => "Zunehmender Mond",
+    "fullmoon"       => "Vollmond",
+    "waningmoon"     => "Abnehmender Mond",
+    "lastquarter"    => "Letztes Viertel",
+    "waningcrescent" => "Abnehmende Sichel"
+    );
+ 
+my @zodiac=("aries","taurus","gemini","cancer","leo","virgo",
+    "libra","scorpio","sagittarius","capricorn","aquarius","pisces");
+
+my @phases = ("newmoon","waxingcrescent", "firstquarter", "waxingmoon", 
+    "fullmoon", "waningmoon", "lastquarter", "waningcrescent");
+
+my %seasons = (
+    "spring" => [80,172],       #21./22.3. - 20.6.
+    "summer" => [173,265],      #21.06. bis 21./22.09.
+    "fall"   => [266,353],      #22./23.09. bis 20./21.12.
+    "winter" => [354,79]        
+    );
    
 sub Astro_SunRise($$$$$$);
 sub Astro_MoonRise($$$$$$$);
@@ -159,7 +337,7 @@ sub Astro_Attr(@) {
   return $ret;
 }
 
-sub Astro_mod($$) { my ($a,$b)=@_;return($a-floor($a/$b)*$b); }
+sub Astro_mod($$) { my ($a,$b)=@_;if( $a =~ /\d*\.\d*/){return($a-floor($a/$b)*$b)}else{return undef}; }
 sub Astro_mod2Pi($) { my ($x)=@_;$x = Astro_mod($x, 2.*pi);return($x); }
 sub Astro_round($$) { my ($x,$n)=@_; return int(10**$n*$x+0.5)/10**$n};
 
@@ -172,10 +350,10 @@ sub Astro_round($$) { my ($x,$n)=@_; return int(10**$n*$x+0.5)/10**$n};
 sub Astro_HHMM($){
   my ($hh) = @_;
   return("")
-    if ($hh==0) ;
+    if (!defined($hh) || $hh !~ /\d*\.\d*/) ;
   
-  my $m = ($hh-floor($hh))*60.;
   my $h = floor($hh);
+  my $m = ($hh-$h)*60.;
   return sprintf("%02d:%02d",$h,$m);
 }
 
@@ -500,7 +678,9 @@ sub Astro_MoonPosition($$$$$$$){
   }else{
     $p = 2*floor($moonCoor{age} / (90.*$DEG))+1;
   }
-  $moonCoor{phases} = $phases[$p];  
+  $p = $p % 8;
+  $moonCoor{phases} = $phases[$p]; 
+  $moonCoor{phasei} = $p;
   $moonCoor{sig}    = $zodiac[floor($moonCoor{lon}*$RAD/30)];
 
   return ( \%moonCoor );
@@ -729,7 +909,6 @@ sub Astro_SunRise($$$$$$){
   }
 }
 
-
 #########################################################################################
 #
 # Astro_MoonRise - Find local time of moonrise and moonset
@@ -839,6 +1018,14 @@ sub Astro_Compute($){
 
   my $name = $hash->{NAME};
   
+  #-- readjust language
+  my $lang = AttrVal("global","language","EN");
+  if( $lang eq "DE"){
+    $astro_tt = \%astro_transtable_DE;
+  }else{
+    $astro_tt = \%astro_transtable_EN;
+  }
+  
   return undef if( !$init_done );
 
   #-- geodetic latitude and longitude of observer on WGS84  
@@ -900,7 +1087,7 @@ sub Astro_Compute($){
   $Astro{SunDec}  = Astro_round($sunCoor->{dec}*$RAD,1);
   $Astro{SunAz}   = Astro_round($sunCoor->{az} *$RAD,1);
   $Astro{SunAlt}  = Astro_round($sunCoor->{alt}*$RAD + Astro_Refraction($sunCoor->{alt}),1);  # including refraction WARNUNG => *RAD ???
-  $Astro{SunSign} = $sunCoor->{sig};
+  $Astro{SunSign} = $astro_tt->{$sunCoor->{sig}};
   $Astro{SunDiameter}=Astro_round($sunCoor->{diameter}*$RAD*60,1); #angular diameter in arc seconds
   $Astro{SunDistance}=Astro_round($sunCoor->{distance},0);
   
@@ -928,12 +1115,13 @@ sub Astro_Compute($){
   $Astro{MoonDec} = Astro_round($moonCoor->{dec}*$RAD,1);
   $Astro{MoonAz}  = Astro_round($moonCoor->{az} *$RAD,1);
   $Astro{MoonAlt} = Astro_round($moonCoor->{alt}*$RAD + Astro_Refraction($moonCoor->{alt}),1);  # including refraction WARNUNG => *RAD ???
-  $Astro{MoonSign}     = $moonCoor->{sig};
+  $Astro{MoonSign}     = $astro_tt->{$moonCoor->{sig}};
   $Astro{MoonDistance} = Astro_round($moonCoor->{distance},0);
   $Astro{MoonDiameter} = Astro_round($moonCoor->{diameter}*$RAD*60.,1); # angular diameter in arc seconds
   $Astro{MoonAge}      = Astro_round($moonCoor->{age}*$RAD,1);
   $Astro{MoonPhaseN}   = Astro_round($moonCoor->{phasen},2);
-  $Astro{MoonPhaseS}   = $moonCoor->{phases};
+  $Astro{MoonPhaseI}   = $astro_tt->{$moonCoor->{phasei}};
+  $Astro{MoonPhaseS}   = $astro_tt->{$moonCoor->{phases}};
   
   #-- calculate distance from the observer (on the surface of earth) to the center of the moon
   my ($xm,$ym,$zm) = Astro_EquPolar2Cart($moonCoor->{ra}, $moonCoor->{dec}, $moonCoor->{distance});
@@ -950,6 +1138,16 @@ sub Astro_Compute($){
   $Astro{ObsDate}= sprintf("%02d.%02d.%04d",$Date{day},$Date{month},$Date{year});
   $Astro{ObsTime}= sprintf("%02d:%02d:%02d",$Date{hour},$Date{min},$Date{sec});
   $Astro{ObsTimezone}= $Date{zonedelta};
+  #-- check season
+  my $doj = $Date{dayofyear};
+  $Astro{ObsDayofyear} = $doj;
+  foreach my $key (keys %seasons) {
+    if(   (($seasons{$key}[0] < $seasons{$key}[1]) && ($seasons{$key}[0] <= $doj) && ($seasons{$key}[1] >= $doj))
+       || (($seasons{$key}[0] > $seasons{$key}[1]) && (($seasons{$key}[0] <= $doj) || ($seasons{$key}[1] >= $doj))) ){
+       $Astro{ObsSeason} = $astro_tt->{$key}; 
+       last;
+    }  
+  }
  
   return( undef );
 };
@@ -983,6 +1181,7 @@ sub Astro_Update($@) {
   $Date{min}  = $min;
   $Date{sec}  = $sec; 
   $Date{zonedelta} = (strftime "%z", localtime)/100;
+  $Date{dayofyear} = strftime("%-j", localtime);
   
   Astro_Compute($hash);
   
@@ -1024,6 +1223,7 @@ sub Astro_Get($@) {
       $Date{sec}  = (defined($8)) ? $8 : 0; 
       my $fTot = timelocal($Date{sec},$Date{min},$Date{hour},$Date{day},$Date{month}-1,$Date{year});
       $Date{zonedelta} = (strftime "%z", localtime($fTot))/100;
+      $Date{dayofyear} = strftime("%-j", localtime($fTot));
     }else{
       return "[Astro_Get] $name has improper time specification, use YYYY-MM-DD HH:MM:SS";
     }
@@ -1039,6 +1239,7 @@ sub Astro_Get($@) {
     $Date{min}  = $min;
     $Date{sec}  = $sec; 
     $Date{zonedelta} = (strftime "%z", localtime)/100;
+    $Date{dayofyear} = strftime("%-j", localtime);
   }
 
   if( $a[1] eq "version") {
@@ -1058,27 +1259,30 @@ sub Astro_Get($@) {
     if( $wantsreading==1 ){
       return $Astro{$a[2]};
     }else{
-      my $ret=sprintf("Datum %s %s \n",$Astro{ObsDate},$Astro{ObsTime});
-      $ret .= sprintf("Julianisches Datum %.2f Tage, Zeitzone %2d\n",$Astro{ObsJD},$Astro{ObsTimezone});
-      $ret .= sprintf("Geokoordinaten     %.5f° Länge, %.5f° Breite, %.0fm Höhe ü.M.\n",$Astro{ObsLon},$Astro{ObsLat},$Astro{ObsAlt});
-      $ret .= sprintf("Lokale Sternzeit   %s \n\n",$Astro{ObsLMST});
-  
-      $ret .= sprintf("Sonnenaufgang            %s   Sonnenuntergang %s   Sonnenkulmination %s\n",$Astro{SunRise},$Astro{SunSet},$Astro{SunTransit});
-      $ret .= sprintf("Bürgerliche Dämmerung    %s  -  %s\n",$Astro{CivilTwilightMorning},$Astro{CivilTwilightEvening});
-      $ret .= sprintf("Nautische Dämmerung      %s  -  %s\n",$Astro{NauticTwilightMorning},$Astro{NauticTwilightEvening});
-      $ret .= sprintf("Astronomische Dämmerung  %s  -  %s\n",$Astro{AstroTwilightMorning},$Astro{AstroTwilightEvening});
-      $ret .= sprintf("Sonnenentfernung: %.0f km z. Erdmittelpunkt (%.0f km z. Betrachter)\n",$Astro{SunDistance},$Astro{SunDistanceObserver});
-      $ret .= sprintf("Sonnenposition:   Eklipt. Länge %2.1f° Rektaszension %2.2fh, Deklination %2.1f°; Azimut %2.1f°, Höhe über Horizont %2.1f°\n",
-        $Astro{SunLon},$Astro{SunRa},$Astro{SunDec},$Astro{SunAz},$Astro{SunAlt});
-      $ret .= sprintf("Sonnendurchmesser: %2.1f', Tierkreiszeichen %s\n\n",
-        $Astro{SunDiameter},$Astro{SunSign});
-  
-      $ret .= sprintf("Mondaufgang %s   Monduntergang %s   Mondkulmination %s\n",$Astro{MoonRise},$Astro{MoonSet},$Astro{MoonTransit});
-      $ret .= sprintf("Mondentfernung: %.0f km z. Erdmittelpunkt (%.0f km z. Betrachter)\n",$Astro{MoonDistance},$Astro{MoonDistanceObserver});
-      $ret .= sprintf("Mondposition:   Eklipt. Länge %2.1f°, Eklipt. Breite %2.1f°; Rektaszension %2.2fh, Deklination %2.1f°; Azimut %2.1f°, Höhe über Horizont %2.1f°\n",
-        $Astro{MoonLon},$Astro{MoonLat},$Astro{MoonRa},$Astro{MoonDec},$Astro{MoonAz},$Astro{MoonAlt});
-      $ret .= sprintf("Monddurchmesser: %2.1f',  Mondalter %2.1f°, Mondphase %1.2f = %s, Mondzeichen %s\n",
-        $Astro{MoonDiameter},$Astro{MoonAge},$Astro{MoonPhaseN},$Astro{MoonPhaseS},$Astro{MoonSign});
+      my $ret=sprintf("%s %s %s \n",$astro_tt->{"date"},$Astro{ObsDate},$Astro{ObsTime});
+      $ret .= sprintf("%s %.2f %s, %d %s\n",$astro_tt->{"jdate"},$Astro{ObsJD},$astro_tt->{"days"},$Astro{ObsDayofyear},$astro_tt->{"dayofyear"});
+      $ret .= sprintf("%s %s, %s %2d\n",$astro_tt->{"season"},$Astro{ObsSeason},$astro_tt->{"timezone"},$Astro{ObsTimezone});
+      $ret .= sprintf("%s %.5f° %s, %.5f° %s, %.0fm %s\n",$astro_tt->{"coord"},$Astro{ObsLon},$astro_tt->{"longitude"},
+        $Astro{ObsLat},$astro_tt->{"latitude"},$Astro{ObsAlt},$astro_tt->{"altitude"});
+      $ret .= sprintf("%s %s \n\n",$astro_tt->{"lmst"},$Astro{ObsLMST});
+      $ret .= "\n".$astro_tt->{"sun"}."\n";
+      $ret .= sprintf("%s %s   %s %s   %s %s\n",$astro_tt->{"rise"},$Astro{SunRise},$astro_tt->{"set"},$Astro{SunSet},$astro_tt->{"transit"},$Astro{SunTransit});
+      $ret .= sprintf("%s %s  -  %s\n",$astro_tt->{"twilightcivil"},$Astro{CivilTwilightMorning},$Astro{CivilTwilightEvening});
+      $ret .= sprintf("%s %s  -  %s\n",$astro_tt->{"twilightnautic"},$Astro{NauticTwilightMorning},$Astro{NauticTwilightEvening});
+      $ret .= sprintf("%s %s  -  %s\n",$astro_tt->{"twilightastro"},$Astro{AstroTwilightMorning},$Astro{AstroTwilightEvening});
+      $ret .= sprintf("%s: %.0fkm %s (%.0fkm %s)\n",$astro_tt->{"distance"},$Astro{SunDistance},$astro_tt->{"toce"},$Astro{SunDistanceObserver},$astro_tt->{"toobs"});
+      $ret .= sprintf("%s:  %s %2.1f°, %s %2.2fh, %s %2.1f°; %s %2.1f°, %s %2.1f°\n",
+        $astro_tt->{"position"},$astro_tt->{"lonecl"},$Astro{SunLon},$astro_tt->{"ra"},
+        $Astro{SunRa},$astro_tt->{"dec"},$Astro{SunDec},$astro_tt->{"az"},$Astro{SunAz},$astro_tt->{"alt"},$Astro{SunAlt});
+      $ret .= sprintf("%s %2.1f', %s %s\n\n",$astro_tt->{"diameter"},$Astro{SunDiameter},$astro_tt->{"sign"},$Astro{SunSign});
+      $ret .= "\n".$astro_tt->{"moon"}."\n";
+      $ret .= sprintf("%s %s   %s %s   %s %s\n",$astro_tt->{"rise"},$Astro{MoonRise},$astro_tt->{"set"},$Astro{MoonSet},$astro_tt->{"transit"},$Astro{MoonTransit});
+      $ret .= sprintf("%s: %.0fkm %s (%.0fkm %s)\n",$astro_tt->{"distance"},$Astro{MoonDistance},$astro_tt->{"toce"},$Astro{MoonDistanceObserver},$astro_tt->{"toobs"});
+      $ret .= sprintf("%s:  %s %2.1f°, %s %2.1f°; %s %2.2fh, %s %2.1f°; %s %2.1f°, %s %2.1f°\n",
+        $astro_tt->{"position"},$astro_tt->{"lonecl"},$Astro{MoonLon},$astro_tt->{"latecl"},$Astro{MoonLat},$astro_tt->{"ra"},
+        $Astro{MoonRa},$astro_tt->{"dec"},$Astro{MoonDec},$astro_tt->{"az"},$Astro{MoonAz},$astro_tt->{"alt"},$Astro{MoonAlt});
+      $ret .= sprintf("%s %2.1f',  %s %2.1f°, %s %1.2f = %s, %s %s\n",$astro_tt->{"diameter"},
+        $Astro{MoonDiameter},$astro_tt->{"age"},$Astro{MoonAge},$astro_tt->{"phase"},$Astro{MoonPhaseN},$Astro{MoonPhaseS},$astro_tt->{"sign"},$Astro{MoonSign});
     
     #$ret .="\ndistance=".$moonCoor->{distance}."   test=".sqrt( ($xm)**2 + ($ym)**2 + ($zm)**2 )." $xm  $ym  $zm";
     #$ret .="\ndistance=".$radius."   test=".sqrt( ($x)**2 + ($y)**2 + ($z)**2 )." $x  $y  $z";
@@ -1109,6 +1313,8 @@ sub Astro_Get($@) {
         <p>
         Notes: <ul>
         <li>Calculations are only valid between the years 1900 and 2100</li>
+        <li>This module uses the global attribute <code>language</code> to determine its output data<br/>
+         (default: EN=english). For German output set <code>attr global language DE</code>.</li>
         <li>The time zone is determined automatically from the local settings of the <br/>
         operating system. If geocordinates from a different time zone are used, the results are<br/>
         not corrected automatically.
