@@ -36,6 +36,7 @@ use warnings;
 use POSIX;
 
 use Math::Trig;
+use Time::Local;
 #use Data::Dumper;
 
 my $DEG = pi/180.0;
@@ -46,7 +47,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.3;
+my $astroversion = 1.31;
 
 #-- These we may get on request
 my %gets = (
