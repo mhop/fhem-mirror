@@ -51,6 +51,9 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 14.07.2017
+#	Änderung in der ControlPoint.pm: Es wurden zuviele Suchantworten berücksichtigt.
+#	Bei einem Modify wird von Fhem nur die DefFn aufgerufen (und nicht vorher UndefFn). Dadurch blieben Reste, die aber vor einer Definition aufgeräumt werden müssen. Resultat war eine 100%-CPU-Last.
 # 09.07.2017
 #	BulkUpdate: Beginn und Ende sind nun sicher davor einen vom SubProzess gestarteten BulkUpdate vorzeitig zu beenden.
 # 05.07.2017
@@ -877,7 +880,18 @@ sub SONOS_FhemWebCallback($) {
 sub SONOS_Define($$) {
 	my ($hash, $def) = @_;
 	my @a = split("[ \t]+", $def);
-  
+	
+	# Check if we just want a modify...
+	if ($hash->{NAME}) {
+		SONOS_Log undef, 1, 'Modify Device: '.$hash->{NAME};
+		
+		# Alle Timer entfernen...
+		RemoveInternalTimer($hash);
+		
+		# SubProzess beenden, und Verbindung kappen...
+		SONOS_StopSubProcess($hash);
+	}
+	
 	# check syntax
 	return 'Usage: define <name> SONOS [[[[upnplistener] interval] waittime] delaytime]' if($#a < 1 || $#a > 5);
 	my $name = $a[0];
@@ -9765,7 +9779,7 @@ sub SONOS_getSonosPlayerByRoomName($) {
 #  Parameter hash = hash of the master, name
 #
 ########################################################################################
-sub SONOS_Undef ($$) {
+sub SONOS_Undef($$) {
 	my ($hash, $name) = @_;
 	
 	# Alle Timer entfernen...

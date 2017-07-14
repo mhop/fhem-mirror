@@ -207,6 +207,14 @@ sub SONOSPLAYER_Initialize ($) {
 ########################################################################################
 sub SONOSPLAYER_Define ($$) {
 	my ($hash, $def) = @_;
+	
+	# Check if we just want a modify...
+	if ($hash->{NAME}) {
+		SONOS_Log undef, 1, 'Modify SonosPlayer-Device: '.$hash->{NAME};
+		
+		# Alle Timer entfernen...
+		RemoveInternalTimer($hash);
+	}
 	  
 	# define <name> SONOSPLAYER <udn>
 	# e.g.: define Sonos_Wohnzimmer SONOSPLAYER RINCON_000EFEFEFEF401400

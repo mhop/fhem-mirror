@@ -418,7 +418,7 @@ sub _receiveSearchResponse {
                 last;
             }
 
-            if ($search->{_friendlyName} && $search->{_friendlyName}) {
+            if ($search->{_friendlyName} && $buf =~ $search->{_friendlyName}) {
                 $found = 1;
                 last;
             }
