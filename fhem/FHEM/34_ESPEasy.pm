@@ -104,7 +104,9 @@ my %ESPEasy_setCmds = (
   "serialsend"     => "1",  #_P020_Ser2Net.ino
   "buzzer"         => "0",
   "inputswitchstate" => "0", # _0P001_Switch.ini
-  "event"          => "1"
+  "event"          => "1",
+  "neopixelfx"     => "1"
+
 );
 
 # ------------------------------------------------------------------------------
@@ -145,23 +147,24 @@ my %ESPEasy_setCmdsUsage = (
                     . "<Forward|Backward|Release> <Speed|Steps> "
                     . "<SINGLE|DOUBLE|INTERLEAVE|MICROSTEP>",
   "candle"         => "CANDLE:<FlameType>:<Color>:<Brightness>",
-  "neopixel"       => "NeoPixel <led nr> <red 0-255> <green 0-255> <blue 0-255>",
+  "neopixel"       => "NeoPixel <led_nr> <red 0-255> <green 0-255> <blue 0-255>",
   "neopixelall"    => "NeoPixelAll <red 0-255> <green 0-255> <blue 0-255>",
-  "neopixelline"   => "NeoPixelLine <start led nr> <stop led nr> <red 0-255> ".
+  "neopixelline"   => "NeoPixelLine <start_led_nr> <end_led_nr> <red 0-255> ".
                       "<green 0-255> <blue 0-255>",
   "oledframedcmd"  => "oledframedcmd <on|off>",
   "serialsend"     => "serialsend <string>",
   "buzzer"         => "buzzer",
   "inputswitchstate" => "inputswitchstate",
   "event"          => "event <string>", #Forum #73291
+  "neopixelfx"     => "neopixelfx <off|on|dim|line|one|all|rgb|fade|colorfade|rainbow|kitt|comet|theatre|scan|dualscan|twinkle|twinklefade|sparkle|fire|stop> <parameter>",   #Forum #73949
 
   #Lights
-  "rgb"            => "rgb <rrggbb> [fading time]",
-  "pct"            => "pct <pct> [fading time]",
-  "ct"             => "ct <ct> [fading time] [pct bri]",
-  "on"             => "on [fading time]",
-  "off"            => "off [fading time]",
-  "toggle"         => "toggle [fading time]"
+  "rgb"            => "rgb <rrggbb> [fadetime]",
+  "pct"            => "pct <pct> [fadetime]",
+  "ct"             => "ct <ct> [fadetime] [pct bri]",
+  "on"             => "on [fadetime]",
+  "off"            => "off [fadetime]",
+  "toggle"         => "toggle [fadetime]"
 
 );
 
