@@ -10,44 +10,6 @@
 # $Id$
 #
 ########################################################################################
-#   
-# define <name> OWAD [<model>] <ROM_ID> [interval] or or OWAD <FAM_ID>.<ROM_ID> [interval]
-#
-# where <name> may be replaced by any name string 
-#     
-#       <model> is a 1-Wire device type. If omitted, we assume this to be an
-#              DS2450 A/D converter 
-#       <FAM_ID> is a 1-Wire family id, currently allowed value is 20
-#       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
-#                without Family ID, e.g. A2D90D000800 
-#       [interval] is an optional query interval in seconds
-#
-# get <name> id       => FAM_ID.ROM_ID.CRC 
-# get <name> present  => 1 if device present, 0 if not
-# get <name> interval => query interval
-# get <name> reading  => measurement for all channels
-# get <name> alarm    => alarm measurement settings for all channels
-# get <name> status   => alarm and i/o status for all channels
-# get <name> version  => OWX version number
-#
-# set <name> interval => set period for measurement
-#
-# Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B,C,D
-#
-# attr <name> stateAL0  "<string>"     = character string for denoting low normal condition, default is empty
-# attr <name> stateAH0  "<string>"     = character string for denoting high normal condition, default is empty
-# attr <name> stateAL1  "<string>"     = character string for denoting low alarm condition, default is ↓
-# attr <name> stateAH1  "<string>"     = character string for denoting high alarm condition, default is ↑
-# attr <name> <channel>Name   <string>[|<string>] = name for the channel [|name used in state reading]
-# attr <name> <channel>Unit   <string> = unit of measurement for this channel used in state reading (default V, none for empty)
-# attr <name> <channel>Function <string>  = arbitrary functional expression involving the values V<channel>=VA,VB,VC,VD
-#                                         VA is replaced by the measured voltage in channel A, etc.
-#
-# attr <name> <channel>Alarm  <string> = alarm setting in this channel, either both, low, high or none (default) 
-# attr <name> <channel>Low    <float>  = measurement value (on the scale determined by function) for low alarm 
-# attr <name> <channel>High   <float>  = measurement value (on the scale determined by function) for high alarm 
-#
-########################################################################################
 #
 #  This programm is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -86,7 +48,7 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log3($$$);
 
-my $owx_version="6.1";
+my $owx_version="7.0";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -99,8 +61,6 @@ my @owg_range;
 
 my %gets = (
   "id"          => "",
-  "present"     => "",
-  "interval"    => "",
   "reading"     => "",
   "alarm"       => "",
   "status"      => "",
@@ -332,9 +292,9 @@ sub OWAD_Attr(@) {
       #-- interval modified at runtime
       $key eq "interval" and do {
         #-- check value
-        return "OWAD: Set with short interval, must be > 1" if(int($value) < 1);
+        return "OWAD: set $name interval, must be >= 0" if(int($value) < 0);
        #-- update timer
-        $hash->{INTERVAL} = $value;
+        $hash->{INTERVAL} = int($value);
         if ($init_done) {
           RemoveInternalTimer($hash);
           InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 0);
@@ -436,7 +396,6 @@ sub OWAD_FormatValues($) {
   my $galarm     = 0;
   my $achange    = 0;
   my $schange    = 0;
-  $hash->{ALARM} = 0; 
   
   #-- alarm signatures
   my $stateal1 = defined($attr{$name}{stateAL1}) ? $attr{$name}{stateAL1} : "↓";
@@ -541,8 +500,10 @@ sub OWAD_FormatValues($) {
   #-- STATE
   readingsBulkUpdate($hash,"state",$svalue);
   readingsEndUpdate($hash,1); 
-  $hash->{ALARM} = 1
-    if( $galarm == 1); 
+  if( $galarm != $hash->{ALARM} ){
+    $hash->{ALARM} = $galarm;
+    main::OWX_Alarms($hash->{IODev});
+  } 
   return $svalue;
 }
 
@@ -582,35 +543,11 @@ sub OWAD_Get($@) {
      return "$name.id => $value";
   } 
   
-  #-- get present
-  if($a[1] eq "present") {
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
-      my ($task,$task_state);
-      eval {
-        OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
-      };
-      return GP_Catch($@) if $@;
-      return "$name.present => ".ReadingsVal($name,"present","unknown");
-    } else {
-      $value = OWX_Verify($master,$hash->{ROM_ID});
-    }
-    $hash->{PRESENT} = $value;
-    return "$name.present => $value";
-  } 
-
-  #-- get interval
-  if($a[1] eq "interval") {
-    $value = $hash->{INTERVAL};
-     return "$name.interval => $value";
-  } 
-  
   #-- get version
   if( $a[1] eq "version") {
     return "$name.version => $owx_version";
   }
   
-
   #-- get reading according to interface type
   if($a[1] eq "reading") {
     #-- OWX interface
@@ -631,18 +568,16 @@ sub OWAD_Get($@) {
   
     #-- process result
     if( $master->{ASYNCHRONOUS} ){
-      return "OWAD: $name getting reading, please wait for completion";
+      return undef;
     }else{
       if( defined($ret) ){
         $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
-        if( $hash->{ERRCOUNT} > 5 ){
-          $hash->{INTERVAL} = 9999;
-        }
-        return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
+        return "OWAD: Could not get reading from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
       }
       return "OWAD: $name.reading => ".$hash->{READINGS}{"state"}{VAL};
     }
   }
+  
   #-- get alarm values according to interface type
   if($a[1] eq "alarm") {
     #-- OWX interface
@@ -663,14 +598,11 @@ sub OWAD_Get($@) {
   
     #-- process result
     if( $master->{ASYNCHRONOUS} ){
-      return "OWAD: $name getting alarm values, please wait for completion";
+      return undef;
     }else{
       if( defined($ret) ){
         $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
-        if( $hash->{ERRCOUNT} > 5 ){
-          $hash->{INTERVAL} = 9999;
-        }
-        return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
+        return "OWAD: Could not get alarm values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
       }
     
       #-- assemble ouput string
@@ -704,13 +636,11 @@ sub OWAD_Get($@) {
   
     #-- process result
     if( $master->{ASYNCHRONOUS} ){
-      return "OWAD: $name getting status, please wait for completion";
+      #return "OWAD: $name getting status, please wait for completion";
+      return undef;
     }else{
       if( defined($ret) ){
         $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
-        if( $hash->{ERRCOUNT} > 5 ){
-          $hash->{INTERVAL} = 9999;
-        }
         return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
       } 
     
@@ -772,18 +702,18 @@ sub OWAD_GetValues($) {
   my $warn        = "none";
   $hash->{ALARM}  = "0";
 
-  #-- restart timer for updates
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash); 
+  #-- auto-update for device disabled;
+  return undef
+    if( $hash->{INTERVAL} == 0 );
+  #-- restart timer for updates  
   InternalTimer(time()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 0);
    
-  #-- Get readings, alarms and stati according to interface type
+  #-- Get readings, alarms and status according to interface type
   if( $interface eq "OWX" ){
-    #-- max 3 tries
-    #for(my $try=0; $try<3; $try++){
-      $ret1 = OWXAD_GetPage($hash,"reading",0);
-      $ret2 = OWXAD_GetPage($hash,"alarm",0);
-      $ret3 = OWXAD_GetPage($hash,"status",1);
-    #}
+    $ret1 = OWXAD_GetPage($hash,"reading",0);
+    $ret2 = OWXAD_GetPage($hash,"alarm",0);
+    $ret3 = OWXAD_GetPage($hash,"status",1);
   }elsif( $interface eq "OWX_ASYNC" ){
     eval {
       OWX_ASYNC_Schedule( $hash, OWXAD_PT_GetPage($hash,"reading",0));
@@ -807,7 +737,7 @@ sub OWAD_GetValues($) {
   $ret .= $ret3
     if( defined($ret3) );
   if( $ret ne "" ){
-    return "OWAD: Could not get values from device $name, reason $ret";
+    return "OWAD: Could not get reading, alarm and status values from device $name, reason $ret";
   }
   
   return undef;
@@ -944,17 +874,17 @@ sub OWAD_Set($@) {
  
  #-- re-intialize
  if($key eq "initialize") {
-    OWAD_Initialize($hash);
+    OWAD_InitializeDevice($hash);
     return undef;
   }
   
   #-- set new timer interval
   if($key eq "interval") {
     # check value
-    return "OWAD: Set with short interval, must be > 1"
-      if(int($value) < 1);
+    return "OWAD: set $name interval must be >= 0"
+      if(int($value) < 0);
     # update timer
-    $hash->{INTERVAL} = $value;
+    $hash->{INTERVAL} = int($value);
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 0);
     return undef;
@@ -1239,7 +1169,7 @@ sub OWFSAD_GetPage($$$) {
   }
   #-- and now from raw to formatted values
   $hash->{PRESENT}  = 1;
-  if( $final==1){
+  if( $final==1 ){
     my $value = OWAD_FormatValues($hash);
     Log 5, $value;
   }
@@ -1335,26 +1265,36 @@ sub OWXAD_BinValues($$$$$$$) {
   #-- hash of the busmaster
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
-  my @data=[]; 
+  my $error  = 0;
+  my @data   = []; 
   my $value;
   my $msg;
-  OWX_WDBG($name,"OWXAD_BinValues called for device $name in context $context with ",$res)
-    if( $main::owx_debug>2 );
+  
+  OWX_WDBGL($name,4,"OWXAD_BinValues: called for device $name in context $context with data ",$res);
 
   my $final = ($context =~ /\.final$/ );  
   my ($ow_thn,$ow_tln);
   
-  #-- process results
-  @data=split(//,$res);
-  if (@data != 10){
-     $msg="$name returns invalid data length, ".int(@data)." instead of 10 bytes ";
-  }elsif (OWX_CRC16($crcpart.substr($res,0,8),$data[8],$data[9])==0){
-     $msg="$name returns invalid CRC "
-  }else{
-     $msg="No error ";
+  #-- we have to get rid  of the first 12 bytes
+  if( length($res) == 22 ){
+    $res=substr($res,12);
   }
-  OWX_WDBG($name,"OWXAD_BinValues: ".$msg,$crcpart)
-    if( $main::owx_debug>2 );
+  @data=split(//,$res);
+  $crcpart = $crcpart.substr($res,0,8);
+
+  #-- process results
+  if (int(@data) != 10){
+     $msg   = "$name: invalid data length, ".int(@data)." instead of 10 bytes ";
+     $error = 1;
+  }elsif (OWX_CRC16($crcpart,$data[8],$data[9])==0){
+     $msg   ="$name: invalid CRC ";
+     $error = 1;
+  }else{
+     $msg   = "$name: no error ";
+  }
+  OWX_WDBGL($name,5-4*$error,"OWXAD_BinValues: context $context    ".$msg,$res);
+  $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1
+    if( $error ); 
         
   #=============== get the voltage reading ===============================
   if( $context =~ /^ds2450.getreading/ ){
@@ -1424,7 +1364,7 @@ sub OWXAD_BinValues($$$$$$$) {
   } 
   #-- and now from raw to formatted values
   $hash->{PRESENT}  = 1;
-  if( $final ){
+  if( ($final) && (!$error) ){
     my $value = OWAD_FormatValues($hash);
   }
   return undef
@@ -1458,14 +1398,21 @@ sub OWXAD_GetPage($$$@) {
   #=============== get the voltage reading ===============================
   if( $page eq "reading") {
     #-- issue the match ROM command \x55 and the start conversion command
-    OWX_Reset($master);
-    $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
-    if( $res eq 0 ){
-      return "not accessible for conversion";
-    } 
-    #-- conversion needs some 5 ms per channel
-    select(undef,undef,undef,0.02);
-
+    #-- OLD OWX interface
+    if( !$master->{ASYNCHRONOUS} ){
+      OWX_Reset($master);
+      $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
+      if( $res eq 0 ){
+        return "not accessible for conversion";
+      } 
+      #-- conversion needs some 5 ms per channel
+      select(undef,undef,undef,0.02);
+    #-- NEW OWX interface
+    }else{
+      ####        master   slave  context   proc  owx_dev   data                     crcpart  numread  startread callback   delay
+      #                                     1 additional reset after last action
+      OWX_Qomplex($master, $hash, "convert", 4,    $owx_dev, "\x3C\x0F\x00\xFF\xFF", 0,       0,       undef,    undef,     0.02); 
+    }   
     #-- issue the match ROM command \x55 and the read conversion page command
     #   \xAA\x00\x00 
     $select="\xAA\x00\x00";
@@ -1484,6 +1431,7 @@ sub OWXAD_GetPage($$$@) {
     return "wrong memory page requested from $owx_dev";
   }
   my $context = "ds2450.get".$page.($final ? ".final" : "");
+  my $proc = ($final ? 1 : 0);
   #-- OLD OWX interface
   if( !$master->{ASYNCHRONOUS} ){
     #-- reset the bus
@@ -1495,12 +1443,13 @@ sub OWXAD_GetPage($$$@) {
     return "$owx_dev has returned invalid data"
       if( length($res)!=22);
     #-- for processing we also need the 3 command bytes
-    return OWXAD_BinValues($hash,$context,1,undef,$owx_dev,$select,substr($res,12,10));
+    return OWXAD_BinValues($hash,$context,$proc,$owx_dev,$select,10,substr($res,12,10));
+    
   #-- NEW OWX interface
   }else{
     ####        master   slave  context   proc  owx_dev   data     crcpart  numread  startread callback               delay
     #                                     1 additional reset after last action
-    OWX_Qomplex($master, $hash, $context, 1,    $owx_dev, $select, $select, 10,      12,       \&OWXAD_BinValues,     0); 
+    OWX_Qomplex($master, $hash, $context, 0,    $owx_dev, $select, $select, 22,      0,        \&OWXAD_BinValues,     0.01); 
     return undef;
   }   
 }
@@ -1536,8 +1485,6 @@ sub OWXAD_SetPage($$) {
       $select .= sprintf "%c\xFF\xFF\xFF",int($hash->{owg_vhigh}->[$i]*256000/$owg_range[$i]);
     }
      
-#++Use of uninitialized value within @owg_vlow in multiplication  at 
-#++/usr/share/fhem/FHEM/21_OWAD.pm line 1362.
   #=============== set the status ===============================
   } elsif ( $page eq "status" ) {
     my ($sb1,$sb2)=(0,0);
@@ -1579,8 +1526,8 @@ sub OWXAD_SetPage($$) {
     }
   #-- NEW OWX interface
   }else{
-    ####        master   slave  context proc  owx_dev   data     crcpart numread  startread callback delay
-    OWX_Qomplex($master, $hash, undef,  0,    $owx_dev, $select, 0,      0,       0,         undef,  0); 
+    ####        master   slave  context        proc  owx_dev   data     crcpart numread  startread callback delay
+    OWX_Qomplex($master, $hash, "ds2450.set",  0,    $owx_dev, $select, 0,      0,       0,        undef,   undef); 
   }   
   return undef;
 }
@@ -1786,7 +1733,7 @@ sub OWXAD_PT_SetPage($$) {
                 code </li>
             <li>
                 <code>&lt;interval&gt;</code>
-                <br />Measurement interval in seconds. The default is 300 seconds. </li>
+                <br />Measurement interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update. </li>
         </ul>
         <br />
         <a name="OWADset"></a>
@@ -1794,7 +1741,7 @@ sub OWXAD_PT_SetPage($$) {
         <ul>
             <li><a name="owad_interval">
                     <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
-                interval in seconds. The default is 300 seconds. </li>
+                interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update.</li>
         </ul>
         <br />
         <a name="OWADget"></a>
@@ -1803,13 +1750,6 @@ sub OWXAD_PT_SetPage($$) {
             <li><a name="owad_id">
                     <code>get &lt;name&gt; id</code></a>
                 <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
-            <li><a name="owad_present">
-                    <code>get &lt;name&gt; present</code>
-                </a>
-                <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
-            <li><a name="owad_interval2">
-                    <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval in
-                seconds. </li>
             <li><a name="owad_reading">
                     <code>get &lt;name&gt; reading</code></a><br />Obtain the measuement values. </li>
             <li><a name="owad_alarm">
@@ -1830,6 +1770,9 @@ sub OWXAD_PT_SetPage($$) {
                 <br />character string for denoting low alarm condition, default is ↓</li>
             <li><a name="owad_stateAH1"><code>attr &lt;name&gt; stateAH1 &lt;string&gt;</code></a>
                 <br />character string for denoting high alarm condition, default is ↑</li>
+            <li><a name="owad_interval2">
+                    <code>attr &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+                interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update.</li>
         </ul> For each of the following attributes, the channel identification A,B,C,D may be used. <ul>
             <li><a name="owad_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
                         &lt;string&gt;[|&lt;string&gt;]</code></a>
