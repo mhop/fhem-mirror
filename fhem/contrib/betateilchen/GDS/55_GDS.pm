@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 55_GDS.pm 13494 2017-02-23 18:25:48Z betateilchen $
 
 # copyright and license informations
 =pod

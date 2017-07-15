@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id$
+# $Id: mkfhemnightly 13678 2017-03-12 10:18:04Z betateilchen $
 #
 # create nightly build and transfer it to static webspace
 # (C) 2013-2017 betateilchen

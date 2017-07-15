@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 98_svn.pm 11079 2016-03-18 12:50:58Z betateilchen $
 #
 package main;
 use strict;
