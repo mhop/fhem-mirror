@@ -41,6 +41,8 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.5.2        16.07.2017       dbmeta_DoParse -> show variables (no global)
+# 5.5.1        16.07.2017       wrong text output in state when restoreMySQL was aborted by timeout
 # 5.5.0        10.07.2017       replace $hash->{dbloghash}{DBMODEL} by $hash->{dbloghash}{MODEL} (DbLog was changed)
 # 5.4.0        03.07.2017       restoreMySQL - restore of csv-files (from dumpServerSide), 
 #                               RestoreRowsHistory/ DumpRowsHistory, Commandref revised
@@ -231,7 +233,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.5.0";
+my $DbRepVersion = "5.5.2";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -982,7 +984,7 @@ sub DbRep_Main($$;$) {
  
  if ($opt =~ /restoreMySQL/) {	
      BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
-     $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_RestoreServerSide", "$name|$cmd", "RestoreDone", $to, "DumpAborted", $hash);
+     $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_RestoreServerSide", "$name|$cmd", "RestoreDone", $to, "RestoreAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "restore database is running - be patient and see Logfile !", 1);
      return;
  }
@@ -3850,7 +3852,7 @@ sub dbmeta_DoParse($) {
  if ($opt ne "svrinfo") {
     foreach my $ple (@parlist) {
          if ($opt eq "dbvars") {
-             $sql = "show global variables like '$ple';";
+             $sql = "show variables like '$ple';";
          } elsif ($opt eq "dbstatus") {
              $sql = "show global status like '$ple';";
          } elsif ($opt eq "tableinfo") {
