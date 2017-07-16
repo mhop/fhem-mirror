@@ -152,7 +152,7 @@ sub _fi2_Send() {
    my %hu_hash = ();
    $hu_hash{url}      = $cmds{fheminfo}{uri};
    $hu_hash{data}     = "uniqueID=".$fhemInfo{$c_system}{'uniqueID'}."&json=$json";
-   $hu_hash{header}   = "User-Agent: FHEM/".$fhemInfo{$c_system}{'release'};
+   $hu_hash{header}   = "User-Agent: FHEM";
    $hu_hash{callback} = sub($$$) {
         my ($hash, $err, $data) = @_;
         if($err) {
