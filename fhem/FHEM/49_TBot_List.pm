@@ -75,7 +75,8 @@
 # 0.5 2017-05-13 Menu / Sort und fixes 
 #   
 #   confirm delete configurable as attribute confirmDelete 
-#   
+#   confirm add unsolicited configurable as attribute confirmUnsolicited 
+# 0.6 2017-07-16   confirmDelete & confirmUnsolicited
 #   
 ##############################################################################
 # TASKS 
@@ -145,6 +146,7 @@ sub TBot_List_Initialize($) {
           "optionDouble:0,1 ".
           "handleUnsolicited:0,1 ".
           "confirmDelete:0,1 ".
+          "confirmUnsolicited:0,1 ".
           "allowedPeers:textField ".
           $readingFnAttributes;           
 }
@@ -407,7 +409,7 @@ sub TBot_List_Attr(@) {
     if ( ($aName eq 'optionDouble') ) {
       $aVal = ($aVal eq "1")? "1": "0";
 
-    } elsif ( ($aName eq "confirmDelete" ) ) {
+    } elsif ( ($aName eq "confirmDelete" ) ||  ($aName eq "confirmUnsolicited" ) ) {
       $aVal = ($aVal eq "1")? "1": "0";
 
     } elsif ($aName eq 'allowedPeers') {
@@ -1103,13 +1105,18 @@ sub TBot_List_handler($$$$;$)
     
     $arg = TBot_List_changeMultiLine( $arg );
     
-    my $textmsg = "Liste ".$lname."\nSoll der Eintrag ".$arg." hinzugefügt werden?";
+    my $textmsg = "Liste ".$lname."\nSoll der Eintrag ".$arg." hinzugefuegt werden?";
     if ( defined($msgId ) ) {
       # store text for adding 
       TBot_List_setMsgId( $hash, $tbot, $chatId, $arg, "expadd" );
-
-      my $inline = "(".TBot_List_inlinekey( $hash, "Ja", "list_expaddyes" )."|".TBot_List_inlinekey( $hash, "Nein", "list_edit" ).")";
-      fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
+      
+      if ( AttrVal($name,'confirmUnsolicited',1) ) {
+        my $inline = "(".TBot_List_inlinekey( $hash, "Ja", "list_expaddyes" )."|".TBot_List_inlinekey( $hash, "Nein", "list_edit" ).")";
+        fhem( "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
+      } else {
+        # directly add entry  --> call recursively
+        TBot_List_handler( $hash,  "list_expaddyes", $tbot, $peer );  
+      }
     } else {
       $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
     }
