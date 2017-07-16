@@ -130,7 +130,7 @@ use warnings;
 use Text::Diff;
 use DBI;
 use Sys::Hostname;
-#use Data::Dumper;
+eval { use MIME::Base64 };
 
 ##################################################
 # Forward declarations for functions in fhem.pl
@@ -184,8 +184,6 @@ if(!open(CONFIG, 'configDB.conf')) {
 	Log3('configDB', 1, 'Cannot open database configuration file configDB.conf');
 	return 0;
 }
-#my @config=<CONFIG>;
-#close(CONFIG);
 
 my @config;
 while (<CONFIG>){
@@ -239,6 +237,7 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype = "unknown";
 }
 
+$configDB{base64}            = eval { encode_base64('bla')} ? 1 : 0;
 $configDB{attr}{nostate}     = 1 if($ENV{'cfgDB_nostate'});
 $configDB{attr}{rescue}      = 1 if($ENV{'cfgDB_rescue'});
 $configDB{attr}{loadversion} = $ENV{'cfgDB_version'} ? $ENV{'cfgDB_version'} : 0;
@@ -254,7 +253,6 @@ sub cfgDB_Init() {
 #	Create non-existing database tables 
 #	Create default config entries if necessary
 #
-
 	my $fhem_dbh = _cfgDB_Connect;
 
 #	create TABLE fhemversions ifnonexistent
@@ -335,6 +333,7 @@ sub cfgDB_FileRead($) {
       Log3(undef, 4, "configDB serving from cache: $filename");
       return (undef,split(/\n/,$configDB{cache}{$filename}));
     }
+
 	Log3(undef, 4, "configDB reading file: $filename");
 	my ($err, @ret, $counter);
 	my $fhem_dbh = _cfgDB_Connect;
@@ -399,6 +398,7 @@ sub cfgDB_ReadAll($) {
 		push (@dbconfig, 'define WEB FHEMWEB 8083 global');
 		push (@dbconfig, 'define Logfile FileLog ./log/fhem-%Y-%m-%d.log fakelog');
 	} else {
+        Log3(undef, 1, ">>> configDB: please install perl module MIME::Base64 soon!") unless $configDB{base64};
 		# add Config Rows to commandfile
 		@dbconfig = _cfgDB_ReadCfg(@dbconfig);
 		# add State Rows to commandfile
