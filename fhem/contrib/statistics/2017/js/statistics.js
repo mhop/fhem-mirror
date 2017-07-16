@@ -317,7 +317,7 @@ function onSuccess(data, textStatus, jqXHR) {
     div.append("created in: " + data.generated.toFixed(3) + " seconds<br>");
     div.append("number of submissions (last 12 months): " + data.nodes12 + "<br>");
     div.append("total number of submissions (since : " + data.started + "): "+data.nodesTotal+"<br><br>");
-    div.append("Infos on contributing data, see <a href='https://fhem.de/commandref.html#fheminfo' target='_new'>fheminfo</a> command.");
+    div.append("You can help us to increase the quality of FHEM statistics data. Please check <a href='https://fhem.de/commandref.html#fheminfo' target='_new'>fheminfo</a> command for details.");
 
     $("div.tabs").tabs();
 
