@@ -1682,6 +1682,10 @@ FW_makeDeviceLine($$$$$)
   }
 
   my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, $extPage);
+  if($cmdlist) {
+    my $cl2 = $cmdlist; $cl2 =~ s/ [^:]*//g; $cl2 =~ s/:/ /g;  # Forum #74053
+    $allSets = "$allSets $cl2";
+  }
   $allSets = FW_widgetOverride($d, $allSets);
 
   my $colSpan = ($usuallyAtEnd->{$d} ? ' colspan="2"' : '');
