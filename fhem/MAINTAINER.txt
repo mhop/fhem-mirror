@@ -500,7 +500,7 @@ contrib/PRESENCE/lepresenced PatrickR             http://forum.fhem.de Unterstue
 contrib/SIP/*        	     wzut                 http://forum.fhem.de Sonstiges
 contrib/WebViewControl/*     Dirk                 http://forum.fhem.de Mobile Devices
 contrib/Widgets/DateTimePicker* Matscher          http://forum.fhem.de Frontends
-contrib/YAF/*                danielweisensee      http://forum.fhem.de Frontends
+contrib/YAF/*                MarcP                http://forum.fhem.de Frontends
 
 www/codemirror/*             rapster              http://forum.fhem.de Frontends
 www/frontend/*               johannnes            http://forum.fhem.de Frontends
