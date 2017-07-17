@@ -265,7 +265,7 @@ BlockingKill($)
 
       }
       InternalTimer(gettimeofday()+1, "BlockingStart", \%BC_hash, 0)
-        if(kill(0, $h->{pid})); # Forum #58867
+        if(looks_like_number($h->{pid}) && kill(0, $h->{pid})); # Forum #58867
     }
   }
   BlockingStart();
