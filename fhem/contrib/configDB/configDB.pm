@@ -122,6 +122,8 @@
 #
 # 2017-03-24 - added     use index on fhemconfig (only sqlite)
 #
+# 2017-07-17 - changed   store files base64 encoded
+#
 ##############################################################################
 =cut
 
