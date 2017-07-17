@@ -41,6 +41,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.6.0        17.07.2017       default timeout changed to 86400, new get-command "procinfo" (MySQL)
 # 5.5.2        16.07.2017       dbmeta_DoParse -> show variables (no global)
 # 5.5.1        16.07.2017       wrong text output in state when restoreMySQL was aborted by timeout
 # 5.5.0        10.07.2017       replace $hash->{dbloghash}{DBMODEL} by $hash->{dbloghash}{MODEL} (DbLog was changed)
@@ -233,7 +234,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.5.2";
+my $DbRepVersion = "5.6.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -572,18 +573,19 @@ sub DbRep_Get($@) {
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbmodel = $hash->{dbloghash}{MODEL};
-  my $to = AttrVal($name, "timeout", "60");
+  my $to = AttrVal($name, "timeout", "86400");
   
   my $getlist = "Unknown argument $opt, choose one of ".
                 "svrinfo:noArg ".
                 (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
                 (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
+				(($dbmodel eq "MYSQL")?"procinfo:noArg ":"").
                 (($dbmodel eq "MYSQL")?"dbvars:noArg ":"") 
                 ;
   
   return if(IsDisabled($name));
   
-  if ($opt eq "dbvars" || $opt eq "dbstatus" || $opt eq "tableinfo") {
+  if ($opt =~ /dbvars|dbstatus|tableinfo|procinfo/) {
       return "The operation \"$opt\" isn't available with database type $dbmodel" if ($dbmodel ne 'MYSQL');
 	  return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
 	  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
@@ -952,7 +954,7 @@ sub DbRep_Connect($) {
 sub DbRep_Main($$;$) {
  my ($hash,$opt,$cmd) = @_;
  my $name        = $hash->{NAME}; 
- my $to          = AttrVal($name, "timeout", "60");
+ my $to          = AttrVal($name, "timeout", "86400");
  my $reading     = AttrVal($name, "reading", "%");
  my $aggregation = AttrVal($name, "aggregation", "no");   # wichtig !! aggregation niemals "undef"
  my $device      = AttrVal($name, "device", "%");
@@ -1351,11 +1353,11 @@ sub averval_DoParse($) {
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");
 
  #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
- if ($dbloghash->{DBMODEL} eq "POSTGRESQL") {
+ if ($dbloghash->{MODEL} eq "POSTGRESQL") {
      $selspec = "AVG(VALUE::numeric)";
- } elsif ($dbloghash->{DBMODEL} eq "MYSQL") {
+ } elsif ($dbloghash->{MODEL} eq "MYSQL") {
      $selspec = "AVG(VALUE)";
- } elsif ($dbloghash->{DBMODEL} eq "SQLITE") {
+ } elsif ($dbloghash->{MODEL} eq "SQLITE") {
      $selspec = "AVG(VALUE)";
  } else {
      $selspec = "AVG(VALUE)";
@@ -2127,7 +2129,7 @@ sub diffval_DoParse($) {
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
- my $dbmodel    = $dbloghash->{DBMODEL};
+ my $dbmodel    = $dbloghash->{MODEL};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my ($dbh,$sql,$sth,$err);
 
@@ -2516,11 +2518,11 @@ sub sumval_DoParse($) {
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
  
  #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
- if ($dbloghash->{DBMODEL} eq "POSTGRESQL") {
+ if ($dbloghash->{MODEL} eq "POSTGRESQL") {
      $selspec = "SUM(VALUE::numeric)";
- } elsif ($dbloghash->{DBMODEL} eq "MYSQL") {
+ } elsif ($dbloghash->{MODEL} eq "MYSQL") {
      $selspec = "SUM(VALUE)";
- } elsif ($dbloghash->{DBMODEL} eq "SQLITE") {
+ } elsif ($dbloghash->{MODEL} eq "SQLITE") {
      $selspec = "SUM(VALUE)";
  } else {
      $selspec = "SUM(VALUE)";
@@ -2840,11 +2842,11 @@ sub insert_Push($) {
  my $st = [gettimeofday];
 
  # insert history mit/ohne primary key
- if ($usepkh && $dbloghash->{DBMODEL} eq 'MYSQL') {
+ if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
      eval { $sth = $dbh->prepare("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
- } elsif ($usepkh && $dbloghash->{DBMODEL} eq 'SQLITE') {
+ } elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
      eval { $sth = $dbh->prepare("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
- } elsif ($usepkh && $dbloghash->{DBMODEL} eq 'POSTGRESQL') {
+ } elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
      eval { $sth = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
  } else {
      eval { $sth = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
@@ -3359,7 +3361,7 @@ sub expfile_ParseDone($) {
   readingsEndUpdate($hash, 1);
   
   my $rows = $ds.$rds.$nrows;
-  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file ".AttrVal($name, "expimpfile", undef).": $rows");
+  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file ".AttrVal($name, "expimpfile", undef).": $rows.");
 
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -3423,11 +3425,11 @@ sub impfile_Push($) {
  # "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""
  
  # insert history mit/ohne primary key
- if ($usepkh && $dbloghash->{DBMODEL} eq 'MYSQL') {
+ if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
      eval { $sth = $dbh->prepare_cached("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
- } elsif ($usepkh && $dbloghash->{DBMODEL} eq 'SQLITE') {
+ } elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
      eval { $sth = $dbh->prepare_cached("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
- } elsif ($usepkh && $dbloghash->{DBMODEL} eq 'POSTGRESQL') {
+ } elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
      eval { $sth = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
  } else {
      eval { $sth = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
@@ -3803,7 +3805,7 @@ sub dbmeta_DoParse($) {
  my $dbuser      = $dbloghash->{dbuser};
  my $dblogname   = $dbloghash->{NAME};
  my $dbpassword  = $attr{"sec$dblogname"}{secret};
- my $dbmodel     = $dbloghash->{DBMODEL};
+ my $dbmodel     = $dbloghash->{MODEL};
  my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my ($dbh,$sth,$sql);
  my $err;
@@ -3829,7 +3831,7 @@ sub dbmeta_DoParse($) {
  my $param = AttrVal($name, "showVariables", "%") if($opt eq "dbvars");
  $param = AttrVal($name, "showSvrInfo", "[A-Z_]") if($opt eq "svrinfo");
  $param = AttrVal($name, "showStatus", "%") if($opt eq "dbstatus");
- $param = "1" if($opt eq "tableinfo");        # Dummy-Eintrag für einen Schleifendurchlauf
+ $param = "1" if($opt =~ /tableinfo|procinfo/);    # Dummy-Eintrag für einen Schleifendurchlauf
  my @parlist = split(",",$param); 
  
  # SQL-Startzeit
@@ -3857,6 +3859,8 @@ sub dbmeta_DoParse($) {
              $sql = "show global status like '$ple';";
          } elsif ($opt eq "tableinfo") {
              $sql = "show Table Status from $db;";
+         } elsif ($opt eq "procinfo") {
+             $sql = "show processlist;";
          }
 
          Log3($name, 4, "DbRep $name - SQL execute: $sql"); 
@@ -3903,7 +3907,27 @@ sub dbmeta_DoParse($) {
 					     push(@row_array, $line->{Name}.".comment ".$line->{Comment}) if($line->{Comment});
                      }
 				 }
-             } else {
+             } elsif ($opt eq "procinfo") {
+			       my $res = "<html><table border=2 bordercolor='darkgreen' cellspacing=0>";
+				   $res .= "<tr><td style='padding-right:5px;padding-left:5px;font-weight:bold'>ID</td>";
+				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>USER</td>";
+				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>HOST</td>";
+				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>DB</td>";
+				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>CMD</td>";
+				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>TIME_Sec</td>";
+				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>STATE</td>";
+				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>INFO</td>";
+				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>PROGRESS</td></tr>";
+			       while (my @line = $sth->fetchrow_array()) {
+                       Log3 ($name, 4, "DbRep $name - SQL result: @line");
+					   my $row = join("|", @line);
+		               $row =~ s/\|/<\/td><td style='padding-right:5px;padding-left:5px'>/g;
+                       $res .= "<tr><td style='padding-right:5px;padding-left:5px'>".$row."</td></tr>";
+                   }
+                   my $tab .= $res."</table></html>";
+                   push(@row_array, "Test ".$tab);
+
+			 } else {
 			     while (my @line = $sth->fetchrow_array()) {
                      Log3 ($name, 4, "DbRep $name - SQL result: @line");
                      my $row = join("§", @line);
@@ -3913,7 +3937,7 @@ sub dbmeta_DoParse($) {
 			     }
 			 }
 		 } 
-     $sth->finish;
+         $sth->finish;
      }
  } else {
      $param =~ s/,/\|/g;
@@ -4011,13 +4035,13 @@ sub dbmeta_ParseDone($) {
   my @row_array = split("§", $rowlist);
   Log3 ($name, 5, "DbRep $name - SQL result decoded: \n@row_array") if(@row_array);
   
-  my $pre = "VAR_" if($opt eq "dbvars");
+  my $pre = "";
+  $pre    = "VAR_" if($opt eq "dbvars");
   $pre    = "STAT_" if($opt eq "dbstatus");
   $pre    = "INFO_" if($opt eq "tableinfo");
-  $pre    = "" if($opt eq "svrinfo");
   
   foreach my $row (@row_array) {
-      my @a = split(" ", $row);
+      my @a = split(" ", $row, 2);
       my $k = $a[0];
       my $v = $a[1];
 	  ReadingsBulkUpdateValue ($hash, $pre.$k, $v);
@@ -4044,7 +4068,7 @@ sub DbRep_optimizeTables($) {
  my $dbconn        = $dbloghash->{dbconn};
  my $dbuser        = $dbloghash->{dbuser};
  my $dblogname     = $dbloghash->{NAME};
- my $dbmodel       = $dbloghash->{DBMODEL};
+ my $dbmodel       = $dbloghash->{MODEL};
  my $dbpassword    = $attr{"sec$dblogname"}{secret};
  my $dbname        = $hash->{DATABASE};
  my $value         = 0;
@@ -4827,7 +4851,7 @@ sub mysql_DoDumpServerSide($) {
 	 }
  }
  
- Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname', table '$table'.");
+ Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname', table '$table'");
 
  # Startzeit ermitteln 
  my ($Sekunden, $Minuten, $Stunden, $Monatstag, $Monat, $Jahr, $Wochentag, $Jahrestag, $Sommerzeit) = localtime(time);
@@ -4874,8 +4898,8 @@ sub mysql_DoDumpServerSide($) {
 
  $rt = $rt.",".$brt;
  
- Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used: ".sprintf("%.0f",$brt)." sec.");
- Log3 ($name, 3, "DbRep $name - Number of exported datasets: $drh.");
+ Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used: ".sprintf("%.0f",$brt)." seconds");
+ Log3 ($name, 3, "DbRep $name - Number of exported datasets: $drh");
  Log3 ($name, 3, "DbRep $name - Size of backupfile: ".byte_output($filesize));
  Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
  
@@ -6479,7 +6503,7 @@ sub bdump {
 								86400, all datasets older than one day will be considered). The Timestamp calculation 
 								will be done dynamically at execution time. </li> <br> 
 
-  <li><b>timeout </b>         - set the timeout-value for Blocking-Call Routines in background (default 60 seconds)  </li> <br>
+  <li><b>timeout </b>         - set the timeout-value for Blocking-Call Routines in background (default 86400 seconds)  </li> <br>
 
   <li><b>userExitFn   </b>   - provides an interface to execute user specific program code. <br>
                                To activate the interfaace at first you should implement the subroutine which will be 
@@ -6596,7 +6620,7 @@ sub bdump {
   </ul></ul>
   
   All activities like database changes and changes of other DbRep-definitions will be logged in FHEM Logfile with verbose=3. In order that the renameDevice 
-  function don't running to timeout set the timeout attribute to an appropriate value, especially if there are databases with huge datasets to evaluate. 
+  function don't running into timeout set the timeout attribute to an appropriate value, especially if there are databases with huge datasets to evaluate. 
   As well as all the other database operations of this module, the autorename operation will be executed nonblocking. <br><br>
   
         <ul>
@@ -6609,7 +6633,7 @@ sub bdump {
         attr Rep.Agent room DbLog         <br>
         attr Rep.Agent showproctime 1     <br>
         attr Rep.Agent stateFormat { ReadingsVal("$name","state", undef) eq "running" ? "renaming" : ReadingsVal("$name","state", undef). " &raquo;; ProcTime: ".ReadingsVal("$name","sql_processing_time", undef)." sec"}  <br>
-        attr Rep.Agent timeout 3600       <br>
+        attr Rep.Agent timeout 86400      <br>
         </code>
         <br>
         </ul>
@@ -7398,7 +7422,7 @@ sub bdump {
 								Datensätze die älter als ein Tag sind berücksichtigt). Die Timestampermittlung erfolgt 
 								dynamisch zum Ausführungszeitpunkt. </li> <br> 
 								
-  <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen (Standard 60) in 
+  <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen (Standard 86400 Sekunden) in 
                                 Sekunden  </li> <br>
   <li><b>userExitFn   </b>    - stellt eine Schnittstelle zur Ausführung eigenen Usercodes zur Verfügung. <br>
                                 Um die Schnittstelle zu aktivieren, wird zunächst die aufzurufende Subroutine in 
@@ -7530,7 +7554,7 @@ sub bdump {
         attr Rep.Agent room DbLog         <br>
         attr Rep.Agent showproctime 1     <br>
         attr Rep.Agent stateFormat { ReadingsVal("$name","state", undef) eq "running" ? "renaming" : ReadingsVal("$name","state", undef). " &raquo;; ProcTime: ".ReadingsVal("$name","sql_processing_time", undef)." sec"}  <br>
-        attr Rep.Agent timeout 3600       <br>
+        attr Rep.Agent timeout 86400      <br>
         </code>
         <br>
         </ul>
