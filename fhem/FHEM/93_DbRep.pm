@@ -3925,7 +3925,7 @@ sub dbmeta_DoParse($) {
                        $res .= "<tr><td style='padding-right:5px;padding-left:5px'>".$row."</td></tr>";
                    }
                    my $tab .= $res."</table></html>";
-                   push(@row_array, "Test ".$tab);
+                   push(@row_array, "ProcessList ".$tab);
 
 			 } else {
 			     while (my @line = $sth->fetchrow_array()) {
