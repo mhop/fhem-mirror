@@ -98,19 +98,20 @@ sub version_sortModules($$)
 sub version_getRevFromControls(;$)
 {
   my ($name) = @_;
-  $name = "fhem" unless(defined($name));
-  my $control_file = AttrVal("global","modpath",".")."/FHEM/controls_$name.txt";
+  $name //= "fhem";
+  my $cf = "controls_$name.txt";
+  my $filename = (-e "./$cf") ? "./$cf" : AttrVal("global","modpath",".")."/FHEM/$cf";
+  my ($err, @content) = FileRead({FileName => $filename, ForceType => "file"});
+  if ($err) {
+    Log 3, "version: unable to open $filename: $err";
+    return undef;
+  }
   my $revision;
-
-  if(open(FH, $control_file)) {
-    while(<FH>) {
-      chomp;
-      if(/^REV\s+(\S+.*)$/) {
-        $revision = $1;
-        last;
-      } 
+  foreach my $l (@content) {
+    if($l =~ /^REV\s+(\S+.*)$/) {
+      $revision = $1;
+      last;
     }
-    close(FH);
   }
   return $revision;
 }
