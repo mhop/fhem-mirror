@@ -110,6 +110,7 @@ sub _fi2_Count() {
       if (lc($type) eq 'zwave') {
          $model = ReadingsVal($name,'modelId',undef);
          next unless (defined($model));
+         next if ($model =~ /^0x.... /);
          $model = _fi2_zwave($model);
       }
       
