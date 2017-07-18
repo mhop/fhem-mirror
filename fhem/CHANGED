@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbRep: V5.6.1, commandref revised, minor fixes
   - feature: 93_DbRep: V2.6.0, new get-command "procinfo" (MySQL), default 
                        timeout changed to 86400
   - bugfix:  93_DbRep: minor bugfixes (thanks to Omega)

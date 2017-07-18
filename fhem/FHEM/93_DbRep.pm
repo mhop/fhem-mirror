@@ -30,17 +30,14 @@
 #
 ###########################################################################################################################
 #
-# create additional indexes due to performance purposes:
-#
-# ALTER TABLE 'fhem'.'history' ADD INDEX `Reading_Time_Idx` (`READING`, `TIMESTAMP`) USING BTREE;
-#
 # Definition: define <name> DbRep <DbLog-Device>
 #
-# This module uses credentials of DbLog-devices
+# This module uses credentials of the DbLog-Device
 #
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.6.1        18.07.2017       commandref revised, minor fixes
 # 5.6.0        17.07.2017       default timeout changed to 86400, new get-command "procinfo" (MySQL)
 # 5.5.2        16.07.2017       dbmeta_DoParse -> show variables (no global)
 # 5.5.1        16.07.2017       wrong text output in state when restoreMySQL was aborted by timeout
@@ -234,7 +231,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.6.0";
+my $DbRepVersion = "5.6.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -3118,7 +3115,7 @@ sub fetchrows_DoParse($) {
  }
 
  # SQL zusammenstellen für DB-Abfrage
- $sql = createSelectSql("DEVICE,READING,TIMESTAMP,VALUE,UNIT",$device,$reading,"?","?","ORDER BY TIMESTAMP LIMIT ".($limit+1));
+ $sql = createSelectSql("DEVICE,READING,TIMESTAMP,VALUE,UNIT",$device,$reading,"?","?","ORDER BY TIMESTAMP DESC LIMIT ".($limit+1));
  
  $sth = $dbh->prepare($sql);
  
@@ -3226,7 +3223,7 @@ sub fetchrows_ParseDone($) {
   
   ReadingsBulkUpdateValue($hash, "number_fetched_rows", ($nrows>$limit)?$nrows-1:$nrows);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,($nrows-$limit>0)?
-      "<html>done - Warning: present rows exceed specified limit, adjust <a href='$FW_ME/docs/commandref${sfx}.html#DbRepattrlimit' target='_blank'>attribute</a></html>":"done");
+      "<html>done - Warning: present rows exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRepattrlimit' target='_blank'>limit</a></html>":"done");
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -3860,7 +3857,7 @@ sub dbmeta_DoParse($) {
          } elsif ($opt eq "tableinfo") {
              $sql = "show Table Status from $db;";
          } elsif ($opt eq "procinfo") {
-             $sql = "show processlist;";
+             $sql = "show full processlist;";
          }
 
          Log3($name, 4, "DbRep $name - SQL execute: $sql"); 
@@ -5785,6 +5782,7 @@ return;
 	 <li> creation of backups non-blocking (MySQL) </li>
 	 <li> restore of serverSide-backups non-blocking (MySQL) </li>
 	 <li> optimize the connected database (optimizeTables, vacuum) </li>
+	 <li> report of existing database processes (MySQL) </li>
      </ul></ul>
      <br>
      
@@ -5817,7 +5815,7 @@ return;
   
   Due to performance reason the following index should be created in addition: <br>
   <code>
-  ALTER TABLE 'fhem'.'history' ADD INDEX `Reading_Time_Idx` (`READING`, `TIMESTAMP`) USING BTREE;
+  CREATE INDEX Report_Idx ON `history` (TIMESTAMP, READING) USING BTREE;
   </code>
 </ul>
 <br>
@@ -6171,7 +6169,7 @@ return;
                              explained <a href=http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html>there</a>.  <br>
                              
                                  <br><ul>
-                                 Example:  <br>
+                                 <b>Example</b>  <br>
                                  get &lt;name&gt; dbstatus  <br>
                                  attr &lt;name&gt; showStatus %uptime%,%qcache%    <br>               
                                  # Only readings containing "uptime" and "qcache" in name will be created
@@ -6186,13 +6184,25 @@ return;
                            <a href=http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html>there</a>. <br>
                            
                                  <br><ul>
-                                 Example:  <br>
+                                 <b>Example</b>  <br>
                                  get &lt;name&gt; dbvars  <br>
                                  attr &lt;name&gt; showVariables %version%,%query_cache%    <br>               
                                  # Only readings containing "version" and "query_cache" in name will be created
                                  </li> 
                                  <br><br>
-                                 </ul>                               
+                                 </ul>    
+
+    <li><b> procinfo </b> - reports the existing database processes in a summary table (only MySQL). <br>
+	                        Typically only the own processes of the connection user (set in DbLog configuration file) will be
+							reported. If all precesses have to be reported, the global "PROCESS" right has to be granted to the 
+							user. <br>
+							As of MariaDB 5.3 for particular SQL-Statements a progress reporting will be provided 
+							(table row "PROGRESS"). So you can track, for instance, the degree of processing during an index
+							creation. <br>
+							Further informations can be found
+                            <a href=https://mariadb.com/kb/en/mariadb/show-processlist/>there</a>. <br>
+                            </li>     
+                            <br><br>								 
 
     <li><b> svrinfo </b> -  common database server informations, e.g. DBMS-version, server address and port and so on. The quantity of elements to get depends
                             on the database type. Using the <a href="#DbRepattr">attribute</a> "showSvrInfo" the quantity of results can be limited to show only 
@@ -6200,7 +6210,7 @@ return;
                             <a href=https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx>there</a>. <br>
                                  
                                  <br><ul>
-                                 Example:  <br>
+                                 <b>Example</b>  <br>
                                  get &lt;name&gt; svrinfo  <br>
                                  attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%   <br>               
                                  # Only readings containing "SQL_CATALOG_TERM" and "NAME" in name will be created
@@ -6214,7 +6224,7 @@ return;
 							  Further detailed informations of items meaning are explained <a href=http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html>there</a>.  <br>
                                  
                                  <br><ul>
-                                 Example:  <br>
+                                 <b>Example</b>  <br>
                                  get &lt;name&gt; tableinfo  <br>
                                  attr &lt;name&gt; showTableInfo current,history   <br>               
                                  # Only informations related to tables "current" and "history" are going to be created
@@ -6350,10 +6360,10 @@ sub bdump {
   <li><b>expimpfile </b>      - Path/filename for data export/import </li> <br>
   
   <a name="DbRepattrlimit"></a>
-  <li><b>limit </b>           - limits the number of selected datasets by the the "fetchrows" command. 
-                                (default 1000). This limitation should prevent the browser session from overload and 
+  <li><b>limit </b>           - limits the number of selected datasets by the "fetchrows" command (default 1000). 
+                                This limitation should prevent the browser session from overload and 
 								avoids FHEMWEB from blocking. Please change the attribut according your requirements or change the 
-								selection criteria (evaluation period). </li> <br>
+								selection criteria (decrease evaluation period). </li> <br>
   
   <li><b>optimizeTablesBeforeDump </b>  - if set to "1", the database tables will be optimized before executing the dump
                                           (default: 0).  
@@ -6678,6 +6688,7 @@ sub bdump {
 	 <li> Backups der FHEM-Datenbank erstellen (MySQL) </li>
 	 <li> Restore von serverSide-Backups (MySQL) </li>
 	 <li> Optimierung der angeschlossenen Datenbank (optimizeTables, vacuum) </li>
+	 <li> Ausgabe der existierenden Datenbankprozesse (MySQL) </li>
      
 	 </ul></ul>
      <br>
@@ -6710,7 +6721,7 @@ sub bdump {
   
   Aus Performancegründen sollten zusätzlich folgender Index erstellt werden: <br>
   <code>
-  ALTER TABLE 'fhem'.'history' ADD INDEX `Reading_Time_Idx` (`READING`, `TIMESTAMP`) USING BTREE;
+  CREATE INDEX Report_Idx ON `history` (TIMESTAMP, READING) USING BTREE;
   </code>
 </ul>
 <br>
@@ -7097,7 +7108,7 @@ sub bdump {
                              sind <a href=http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html>hier</a> verfügbar.  <br>
                              
                                  <br><ul>
-                                 Bespiel:  <br>
+                                 <b>Bespiel</b>  <br>
                                  get &lt;name&gt; dbstatus  <br>
                                  attr &lt;name&gt; showStatus %uptime%,%qcache%    <br>               
                                  # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthalten 
@@ -7112,7 +7123,7 @@ sub bdump {
                            <a href=http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html>hier</a> verfügbar. <br>
                            
                                  <br><ul>
-                                 Bespiel:  <br>
+                                 <b>Bespiel</b>  <br>
                                  get &lt;name&gt; dbvars  <br>
                                  attr &lt;name&gt; showVariables %version%,%query_cache%    <br>               
                                  # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten
@@ -7120,13 +7131,25 @@ sub bdump {
                                  <br><br>
                                  </ul>                               
 
+    <li><b> procinfo </b> - listet die existierenden Datenbank-Prozesse in einer Tabelle auf (nur MySQL). <br>
+	                        Typischerweise werden nur die Prozesse des Verbindungsusers (angegeben in DbLog-Konfiguration)
+							ausgegeben. Sollen alle Prozesse angezeigt werden, ist dem User das globale Recht "PROCESS" 
+							einzuräumen. <br>
+							Für bestimmte SQL-Statements wird seit MariaDB 5.3 ein Fortschrittsreporting (Spalte "PROGRESS")
+							ausgegeben. Zum Beispiel kann der Abarbeitungsgrad bei der Indexerstellung verfolgt werden. <br>
+							Weitere Informationen sind 
+                            <a href=https://mariadb.com/kb/en/mariadb/show-processlist/>hier</a> verfügbar. <br>
+                            </li>     
+                            <br><br>
+                         
+								 
     <li><b> svrinfo </b> -  allgemeine Datenbankserver-Informationen wie z.B. die DBMS-Version, Serveradresse und Port usw. Die Menge der Listenelemente 
                             ist vom Datenbanktyp abhängig. Mit dem <a href="#DbRepattr">Attribut</a> "showSvrInfo" kann die Ergebnismenge eingeschränkt werden.
                             Weitere Erläuterungen zu den gelieferten Informationen sind 
                             <a href=https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx>hier</a> zu finden. <br>
                                  
                                  <br><ul>
-                                 Bespiel:  <br>
+                                 <b>Bespiel</b>  <br>
                                  get &lt;name&gt; svrinfo  <br>
                                  attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%   <br>               
                                  # Es werden nur Readings erzeugt die im Namen "SQL_CATALOG_TERM" und "NAME" enthalten
@@ -7140,7 +7163,7 @@ sub bdump {
                               Readings sind  <a href=http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html>hier</a> zu finden.  <br>
                                  
                                  <br><ul>
-                                 Bespiel:  <br>
+                                 <b>Bespiel</b>  <br>
                                  get &lt;name&gt; tableinfo  <br>
                                  attr &lt;name&gt; showTableInfo current,history   <br>               
                                  # Es werden nur Information der Tabellen "current" und "history" angezeigt
@@ -7328,7 +7351,7 @@ sub bdump {
                                 # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
                                 </ul><br>  
                               
-  <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses von "set ... sqlResult" fest. 
+  <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses des Kommandos "set ... sqlCmd" fest. 
                                 Mögliche Optionen sind: <br><br>
   
 								<ul>
