@@ -167,12 +167,7 @@ sub doAggregate() {
    my $nodesTotal = $dbInfo->{'submissionsTotal'};
    my $nodes12    = 0;
 
-   $countAll{'system'}{'age'}{'0'}   = 0;
-   $countAll{'system'}{'age'}{'7'}   = $countAll{'system'}{'age'}{'0'};
-   $countAll{'system'}{'age'}{'30'}  = $countAll{'system'}{'age'}{'0'};
-   $countAll{'system'}{'age'}{'180'} = $countAll{'system'}{'age'}{'0'};
-   $countAll{'system'}{'age'}{'365'} = $countAll{'system'}{'age'}{'0'};
-   $countAll{'system'}{'age'}{'999'} = $countAll{'system'}{'age'}{'0'};
+   map { $countAll{system}{age}{$_} = 0; } (0,7,30,180,365,999);
 
    $sql  = "SELECT geo,json FROM jsonNodes WHERE uniqueID <> 'databaseInfo' ";
    $sql .= "AND geo <> '' AND json <> '' and lastseen > $limit";
@@ -229,10 +224,10 @@ sub doAggregate() {
          $countAll{'modules'}{$type}{'installations'} += 1;
          while ( my ($model, $count) = each( %{$decoded->{$type}}) ) { 
             next if($model eq "noModel");
-            $countAll{'modules'}{$type}{'definitions'}         += $count; 
+            $countAll{'modules'}{$type}{'definitions'} += $count; 
             next if($model eq "migratedData");
             $countAll{'models'}{$type}{$model}{'definitions'} += $count;
-            $countAll{'models'}{$type}{$model}{'installations'}+= 1;
+            $countAll{'models'}{$type}{$model}{'installations'} += 1;
          }
       }
    }
