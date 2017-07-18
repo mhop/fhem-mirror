@@ -337,7 +337,7 @@ sub CUL_HM_updateConfig($){
       if ($hash->{helper}{role}{chn}){
         my $chn = (length($id) == 8)?substr($id,6,2):"01";
         my $devId = substr($id,0,6);
-        if ($culHmModel->{$mId} && $culHmModel->{$mId}{chn} =~ m/Sw._V/){#virtual?
+        if ($culHmModel->{$mId} && $culHmModel->{$mId}{chn} =~ m/Dim_V/){#virtual?
           my @chnPh = (grep{$_ =~ m/Sw:/ } split ',',$culHmModel->{$mId}{chn});
           @chnPh = split ':',$chnPh[0] if (@chnPh);
           my $chnPhyMax = $chnPh[2]?$chnPh[2]:1;         # max Phys channels
