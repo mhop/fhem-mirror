@@ -92,7 +92,7 @@ sub insertDB() {
   my $decoded  = decode_json($json);
   if (defined($decoded->{'system'}{'revision'})) {
      # replace revision number with revision date
-     my $rev      = $decoded->{'system'}{'revision'};
+     my $rev      = $decoded->{'system'}{'revision'} + 1;
      if($rev =~ /^\d+$/) {
        my $d = (split(/ /,qx(sudo -u rko /usr/bin/svn info -r $rev $fhemPathSvn|grep Date:)))[3];
        my ($year,$mon,$mday) = split(/-/,$d);
@@ -167,6 +167,13 @@ sub doAggregate() {
    my $nodesTotal = $dbInfo->{'submissionsTotal'};
    my $nodes12    = 0;
 
+   $countAll{'system'}{'age'}{'0'}   = 0;
+   $countAll{'system'}{'age'}{'7'}   = $countAll{'system'}{'age'}{'0'};
+   $countAll{'system'}{'age'}{'30'}  = $countAll{'system'}{'age'}{'0'};
+   $countAll{'system'}{'age'}{'180'} = $countAll{'system'}{'age'}{'0'};
+   $countAll{'system'}{'age'}{'365'} = $countAll{'system'}{'age'}{'0'};
+   $countAll{'system'}{'age'}{'999'} = $countAll{'system'}{'age'}{'0'};
+
    $sql  = "SELECT geo,json FROM jsonNodes WHERE uniqueID <> 'databaseInfo' ";
    $sql .= "AND geo <> '' AND json <> '' and lastseen > $limit";
    $sth = $dbh->prepare( $sql );
@@ -201,7 +208,8 @@ sub doAggregate() {
 
       if (defined($decoded->{'system'}{'revdate'})){
          $res = $decoded->{'system'}{'revdate'};
-         my $age = sprintf("%.0f",(time - $res)/86400);
+#         my $age = sprintf("%.1f",(time - $res)/86400);
+         my $age = int((time - $res)/86400);
          $countAll{'system'}{'age'}{'0'}++   if ($age <= 1);
          $countAll{'system'}{'age'}{'7'}++   if ($age > 1  && $age <= 7);
          $countAll{'system'}{'age'}{'30'}++  if ($age > 7  && $age <= 30);
