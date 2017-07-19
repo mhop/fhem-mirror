@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: V2.21.2, some improvements like get reading 'state' of
+                       state-events, timeout increased, change configCheck for 
+                       DbRep Report_Idx 
   - new:     46_SmartPi: Support read data from  Smart Pi expansion module
   - change:  93_DbRep: V5.6.1, commandref revised, minor fixes
   - feature: 93_DbRep: V2.6.0, new get-command "procinfo" (MySQL), default 

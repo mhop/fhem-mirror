@@ -16,6 +16,10 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.21.2     19.07.2017       changed readCfg to report more error-messages
+# 2.21.1     18.07.2017       change configCheck for DbRep Report_Idx
+# 2.21.0     17.07.2017       standard timeout increased to 86400, enhanced explaination in configCheck 
+# 2.20.0     15.07.2017       state-Events complemented with state by using $events = deviceEvents($dev_hash,1)
 # 2.19.0     11.07.2017       replace {DBMODEL} by {MODEL} completely
 # 2.18.3     04.07.2017       bugfix (links with $FW_ME deleted), MODEL as Internal (for statistic)
 # 2.18.2     29.06.2017       check of index for DbRep added
@@ -137,7 +141,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.19.0";
+my $DbLogVersion = "2.21.2";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -239,7 +243,11 @@ sub DbLog_Define($@)
 
   # read configuration data
   my $ret = DbLog_readCfg($hash);
-  return $ret if ($ret); # return on error while reading configuration
+  if ($ret) {
+      # return on error while reading configuration
+	  Log3($hash->{NAME}, 1, "DbLog $hash->{NAME} - Error while reading $hash->{CONFIGURATION}: '$ret' ");
+      return; 
+  }
   
   # set used COLUMNS
   InternalTimer(gettimeofday()+2, "setinternalcols", $hash, 0);
@@ -1027,7 +1035,7 @@ sub DbLog_Log($$) {
   # Notify-Routine Startzeit
   my $nst = [gettimeofday];
   
-  my $events = deviceEvents($dev_hash,0);  
+  my $events = deviceEvents($dev_hash,1);  
   return if(!$events);
   
   my $max   = int(@{$events});
@@ -1091,9 +1099,9 @@ sub DbLog_Log($$) {
   #one Transaction
   eval {  
       for (my $i = 0; $i < $max; $i++) {
-	      my $event = $dev_hash->{CHANGED}[$i];
-          Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show);
-          $event = "" if(!defined($event));  
+          my $event = $events->[$i];
+          $event = "" if(!defined($event));
+          Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show);  
 	  
 	      if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
 			  my $timestamp = $ts_0;
@@ -1543,7 +1551,7 @@ sub DbLog_execmemcache ($) {
   my $clim       = AttrVal($name, "cacheLimit", 500);
   my $async      = AttrVal($name, "asyncMode", undef);
   my $ce         = AttrVal($name, "cacheEvents", 0);
-  my $timeout    = AttrVal($name, "timeout", 1800);
+  my $timeout    = AttrVal($name, "timeout", 86400);
   my $dbconn     = $hash->{dbconn};
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
@@ -2077,9 +2085,12 @@ sub DbLog_readCfg($){
 
   eval join("\n", @config);
 
-  $hash->{dbconn}     = $dbconfig{connection};
-  $hash->{dbuser}     = $dbconfig{user};
-  $attr{"sec$name"}{secret} = $dbconfig{password};
+  $hash->{dbconn} = $dbconfig{connection} or $err = "could not read connection";
+  return $err if($err);
+  $hash->{dbuser} = $dbconfig{user} or $err = "could not read user";
+  return $err if($err);
+  $attr{"sec$name"}{secret} = $dbconfig{password} or $err = "could not read password";
+  return $err if($err);
 
   #check the database model
   if($hash->{dbconn} =~ m/pg:/i) {
@@ -2092,16 +2103,16 @@ sub DbLog_readCfg($){
     $hash->{MODEL}="SQLITE";
   } else {
     $hash->{MODEL}="unknown";
-    Log3 $hash->{NAME}, 3, "Unknown dbmodel type in configuration file $configfilename.";
-    Log3 $hash->{NAME}, 3, "Only Mysql, Postgresql, Oracle, SQLite are fully supported.";
-    Log3 $hash->{NAME}, 3, "It may cause SQL-Erros during generating plots.";
+	$ret = "unknown database type";
+    Log3 $hash->{NAME}, 1, "Unknown database model found in configuration file $configfilename.";
+    Log3 $hash->{NAME}, 1, "Only MySQL/MariaDB, PostgreSQL, Oracle, SQLite are fully supported.";
   }
     
   if($hash->{MODEL} eq "MYSQL") {
 	$hash->{UTF8} = defined($dbconfig{utf8})?$dbconfig{utf8}:0;
   }
 	
-	return;
+return $ret;
 }
 
 sub DbLog_ConnectPush($;$$) {
@@ -2784,7 +2795,7 @@ sub DbLog_configcheck($) {
   
   $check .= "<u><b>Result of encoding check</u></b><br><br>";
   $check .= "Encoding used by Client (connection): $chutf8mod <br>";
-  $check .= "Encoding used by $dbname: $chutf8dat <br>";
+  $check .= "Encoding used by DB $dbname: $chutf8dat <br>";
   $check .= "<b>Recommendation:</b> $rec <br><br>";
         
   # Check Betriebsmodus
@@ -2937,8 +2948,10 @@ sub DbLog_configcheck($) {
       @six = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Search_Idx'");
 	  if (!@six) {
 	      $check .= "The index 'Search_Idx' is missing. <br>";
-	      $rec    = "You can create the index by executing statement 'CREATE INDEX Search_Idx ON `history` (DEVICE, READING, TIMESTAMP);' <br>";
-		  $rec   .= "Depending on your database size this command may running a long time. <br>"
+	      $rec    = "You can create the index by executing statement 'CREATE INDEX Search_Idx ON `history` (DEVICE, READING, TIMESTAMP) USING BTREE;' <br>";
+		  $rec   .= "Depending on your database size this command may running a long time. <br>";
+		  $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
+		  $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
 	  } else {
           @six_dev = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Search_Idx' and Column_name='DEVICE'");
           @six_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Search_Idx' and Column_name='READING'");
@@ -2952,8 +2965,8 @@ sub DbLog_configcheck($) {
 		      $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@six_tsp);
 		      $rec    = "The index should contain the fields 'DEVICE', 'READING', 'TIMESTAMP'. ";
 			  $rec   .= "You can change the index by executing e.g. <br>";
-			  $rec   .= "'ALTER TABLE `history` DROP INDEX `Search_Idx`, ADD INDEX `Search_Idx` (`DEVICE`, `READING`, `TIMESTAMP`) USING BTREE' <br>";
-			  $rec   .= "Depending on your database size this command may running a long time. <br>"
+			  $rec   .= "'ALTER TABLE `history` DROP INDEX `Search_Idx`, ADD INDEX `Search_Idx` (`DEVICE`, `READING`, `TIMESTAMP`) USING BTREE;' <br>";
+			  $rec   .= "Depending on your database size this command may running a long time. <br>";
 	      }
 	  }
   }
@@ -2962,7 +2975,9 @@ sub DbLog_configcheck($) {
 	  if (!@six) {
 	      $check .= "The index 'Search_Idx' is missing. <br>";
 	      $rec    = "You can create the index by executing statement 'CREATE INDEX \"Search_Idx\" ON history USING btree (device, reading, \"timestamp\")' <br>";
-		  $rec   .= "Depending on your database size this command may running a long time. <br>"
+		  $rec   .= "Depending on your database size this command may running a long time. <br>";
+		  $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
+          $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
 	  } else {
           $idef     = $six[4];
 		  $idef_dev = 1 if($idef =~ /device/);
@@ -2978,19 +2993,19 @@ sub DbLog_configcheck($) {
 		      $rec    = "The index should contain the fields 'DEVICE', 'READING', 'TIMESTAMP'. ";
 			  $rec   .= "You can change the index by executing e.g. <br>";
 			  $rec   .= "'DROP INDEX \"Search_Idx\"; CREATE INDEX \"Search_Idx\" ON history USING btree (device, reading, \"timestamp\")' <br>";
-			  $rec   .= "Depending on your database size this command may running a long time. <br>"
+			  $rec   .= "Depending on your database size this command may running a long time. <br>";
 	      }
 	  }
   }
   
   $check .= "<b>Recommendation:</b> $rec <br><br>";
   
-  # Check Index Reading_Time_Idx für DbRep-Device falls DbRep verwendet wird
+  # Check Index Report_Idx für DbRep-Device falls DbRep verwendet wird
   my ($dbrp,$irep,);
   my (@dix,@dix_rdg,@dix_tsp,$irep_rdg,$irep_tsp);
   my $isused = 0;
   my @repdvs = devspec2array("TYPE=DbRep");
-  $check .= "<u><b>Result of check 'Reading_Time_Idx' availability for DbRep-devices</u></b><br><br>";
+  $check .= "<u><b>Result of check 'Report_Idx' availability for DbRep-devices</u></b><br><br>";
   
   foreach (@repdvs) {
       $dbrp = $_;
@@ -3006,49 +3021,53 @@ sub DbLog_configcheck($) {
   }
   if ($isused) {
 	  if($dbmodel =~ /MYSQL/) {
-          @dix = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Reading_Time_Idx'");
+          @dix = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Report_Idx'");
 	      if (!@dix) {
-	          $check .= "You use at least one DbRep-device assigned to $name, but the recommended index 'Reading_Time_Idx' is missing. <br>";
-	          $rec    = "You can create the index by executing statement 'CREATE INDEX Reading_Time_Idx ON `history` (READING, TIMESTAMP) USING BTREE;' <br>";
-		      $rec   .= "Depending on your database size this command may running a long time. <br>"
+	          $check .= "You use at least one DbRep-device assigned to $name, but the recommended index 'Report_Idx' is missing. <br>";
+	          $rec    = "You can create the index by executing statement 'CREATE INDEX Report_Idx ON `history` (TIMESTAMP, READING) USING BTREE;' <br>";
+		      $rec   .= "Depending on your database size this command may running a long time. <br>";
+		      $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
+		      $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well ! <br>";
 	      } else {
-              @dix_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Reading_Time_Idx' and Column_name='READING'");
-              @dix_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Reading_Time_Idx' and Column_name='TIMESTAMP'");
+              @dix_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Report_Idx' and Column_name='READING'");
+              @dix_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Report_Idx' and Column_name='TIMESTAMP'");
               if (@dix_rdg && @dix_tsp) {
 			      $check .= "You use at least one DbRep-device assigned to $name. ";
-                  $check .= "Index 'Reading_Time_Idx' exists and contains the recommended fields 'READING', 'TIMESTAMP'. <br>";
+                  $check .= "Index 'Report_Idx' exists and contains the recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
               } else {  
 			      $check .= "You use at least one DbRep-device assigned to $name. ";
-		          $check .= "Index 'Reading_Time_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!@dix_rdg);
-		          $check .= "Index 'Reading_Time_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@dix_tsp);
-		          $rec    = "The index should contain the fields 'READING', 'TIMESTAMP'. ";
+		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!@dix_rdg);
+		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@dix_tsp);
+		          $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
 		          $rec   .= "You can change the index by executing e.g. <br>";
-		          $rec   .= "'ALTER TABLE `history` DROP INDEX `Reading_Time_Idx`, ADD INDEX `Reading_Time_Idx` (`READING`, `TIMESTAMP`) USING BTREE' <br>";
-		          $rec   .= "Depending on your database size this command may running a long time. <br>"
+		          $rec   .= "'ALTER TABLE `history` DROP INDEX `Report_Idx`, ADD INDEX `Report_Idx` (`TIMESTAMP`, `READING`) USING BTREE' <br>";
+		          $rec   .= "Depending on your database size this command may running a long time. <br>";
 	          }
 	      }
       }
 	  if($dbmodel =~ /POSTGRESQL/) {
-          @dix = DbLog_sqlget($hash,"SELECT * FROM pg_indexes WHERE tablename='history' and indexname ='Reading_Time_Idx'");
+          @dix = DbLog_sqlget($hash,"SELECT * FROM pg_indexes WHERE tablename='history' and indexname ='Report_Idx'");
 	      if (!@dix) {
-	          $check .= "You use at least one DbRep-device assigned to $name, but the recommended index 'Reading_Time_Idx' is missing. <br>";
-	          $rec    = "You can create the index by executing statement 'CREATE INDEX \"Reading_Time_Idx\" ON history USING btree (reading, \"timestamp\")' <br>";
-		      $rec   .= "Depending on your database size this command may running a long time. <br>"
+	          $check .= "You use at least one DbRep-device assigned to $name, but the recommended index 'Report_Idx' is missing. <br>";
+	          $rec    = "You can create the index by executing statement 'CREATE INDEX \"Report_Idx\" ON history USING btree (\"timestamp\", reading)' <br>";
+		      $rec   .= "Depending on your database size this command may running a long time. <br>";
+		      $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
+		      $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well ! <br>";
 	      } else {
               $irep     = $dix[4];
 		      $irep_rdg = 1 if($irep =~ /reading/);
 		      $irep_tsp = 1 if($irep =~ /timestamp/);
               if ($irep_rdg && $irep_tsp) {
-                  $check .= "Index 'Reading_Time_Idx' exists and contains the recommended fields 'READING', 'TIMESTAMP'. <br>";
+                  $check .= "Index 'Report_Idx' exists and contains the recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
               } else {  
-		          $check .= "Index 'Reading_Time_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$irep_rdg);
-		          $check .= "Index 'Reading_Time_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$irep_tsp);
-		          $rec    = "The index should contain the fields 'READING', 'TIMESTAMP'. ";
+		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$irep_rdg);
+		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$irep_tsp);
+		          $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
 			      $rec   .= "You can change the index by executing e.g. <br>";
-			      $rec   .= "'DROP INDEX \"Reading_Time_Idx\"; CREATE INDEX \"Reading_Time_Idx\" ON history USING btree (reading, \"timestamp\")' <br>";
-			      $rec   .= "Depending on your database size this command may running a long time. <br>"
+			      $rec   .= "'DROP INDEX \"Report_Idx\"; CREATE INDEX \"Report_Idx\" ON history USING btree (\"timestamp\", reading)' <br>";
+			      $rec   .= "Depending on your database size this command may running a long time. <br>";
 	          }
 	      }
       }
@@ -4442,7 +4461,7 @@ sub checkUsePK ($$){
     #    user => "fhemuser",                                          
     #    password => "fhempassword",
     #    # optional enable(1) / disable(0) UTF-8 support (at least V 4.042 is necessary) 	
-    #    utf8 => 1,   
+    #    utf8 => 1   
     #);                                                              
     ####################################################################################
     #                                                                
@@ -4851,7 +4870,7 @@ sub checkUsePK ($$){
 	  If the database isn't available, the events will be cached in memeory furthermore, and tried to save into database again after 
 	  the next synchronisation time cycle if the database is available. <br>
 	  In asynchronous mode the data insert into database will be executed non-blocking by a background process. 
-	  You can adjust the timeout value for this background process by attribute "timeout" (default 1800s). <br>
+	  You can adjust the timeout value for this background process by attribute "timeout" (default 86400s). <br>
 	  In synchronous mode (normal mode) the events won't be cached im memory and get saved into database immediately. If the database isn't
 	  available the events are get lost. <br>
     </ul>
@@ -5138,7 +5157,7 @@ sub checkUsePK ($$){
 	  <code>
 	  attr &lt;device&gt; timeout <n>
 	  </code><br>
-      setup timeout of the write cycle into database in asynchronous mode (default 1800s) <br>
+      setup timeout of the write cycle into database in asynchronous mode (default 86400s) <br>
 
     </ul>
   </ul>
@@ -5230,7 +5249,7 @@ sub checkUsePK ($$){
     #    user => "fhemuser",                                          
     #    password => "fhempassword",
     #    # optional enable(1) / disable(0) UTF-8 support (at least V 4.042 is necessary) 	
-    #    utf8 => 1,   
+    #    utf8 => 1   
     #);                                                              
     ####################################################################################
     #                                                                
@@ -5696,7 +5715,7 @@ sub checkUsePK ($$){
 	  Ist die Datenbank nicht verfügbar, werden die Events weiterhin im Speicher gehalten und nach Ablauf des Syncintervalls in die Datenbank
 	  geschrieben falls sie dann verfügbar ist. <br>
 	  Im asynchronen Mode werden die Daten nicht blockierend mit einem separaten Hintergrundprozess in die Datenbank geschrieben.
-	  Det Timeout-Wert für diesen Hintergrundprozess kann mit dem Attribut "timeout" (Default 1800s) eingestellt werden.
+	  Det Timeout-Wert für diesen Hintergrundprozess kann mit dem Attribut "timeout" (Default 86400s) eingestellt werden.
 	  Im synchronen Modus (Normalmodus) werden die Events nicht gecacht und sofort in die Datenbank geschrieben. Ist die Datenbank nicht 
 	  verfügbar gehen sie verloren.<br>
     </ul>
@@ -5988,7 +6007,7 @@ sub checkUsePK ($$){
 	  <code>
 	  attr &lt;device&gt; timeout <n>
 	  </code><br>
-      Setzt den Timeout-Wert für den Schreibzyklus in die Datenbank im asynchronen Modus (default 1800s). <br>
+      Setzt den Timeout-Wert für den Schreibzyklus in die Datenbank im asynchronen Modus (default 86400s). <br>
 
     </ul>
   </ul>
