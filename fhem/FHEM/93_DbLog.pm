@@ -2085,12 +2085,12 @@ sub DbLog_readCfg($){
 
   eval join("\n", @config);
 
-  $hash->{dbconn} = $dbconfig{connection} or $err = "could not read connection";
-  return $err if($err);
-  $hash->{dbuser} = $dbconfig{user} or $err = "could not read user";
-  return $err if($err);
-  $attr{"sec$name"}{secret} = $dbconfig{password} or $err = "could not read password";
-  return $err if($err);
+  return "could not read connection" if (!defined $dbconfig{connection});
+  $hash->{dbconn} = $dbconfig{connection};
+  return "could not read user" if (!defined $dbconfig{user});
+  $hash->{dbuser} = $dbconfig{user};
+  return "could not read password" if (!defined $dbconfig{password});
+  $attr{"sec$name"}{secret} = $dbconfig{password};
 
   #check the database model
   if($hash->{dbconn} =~ m/pg:/i) {
