@@ -221,6 +221,7 @@ FHEM/46_TRX_ELSE.pm          wherzig              http://forum.fhem.de RFXTRX
 FHEM/46_TRX_LIGHT.pm         wherzig              http://forum.fhem.de RFXTRX
 FHEM/46_TRX_SECURITY.pm      wherzig              http://forum.fhem.de RFXTRX
 FHEM/46_TRX_WEATHER.pm       wherzig              http://forum.fhem.de RFXTRX
+FHEM/46_SmartPi.pm	     CoolTux		  http://forum.fhem.de Sonstige Systeme
 FHEM/47_OBIS.pm              icinger              http://forum.fhem.de Sonstige Systeme
 FHEM/49_IPCAM.pm             mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/49_SSCAM.pm             DS_Starter           http://forum.fhem.de Sonstiges
