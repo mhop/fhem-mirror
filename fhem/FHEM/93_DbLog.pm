@@ -2076,8 +2076,7 @@ sub DbLog_readCfg($){
   my $name = $hash->{NAME};
 
   my $configfilename= $hash->{CONFIGURATION};
-  my %dbconfig; 
-  my $ret;
+  my %dbconfig;
 
 # use generic fileRead to get configuration data
   my ($err, @config) = FileRead($configfilename);
@@ -2103,16 +2102,16 @@ sub DbLog_readCfg($){
     $hash->{MODEL}="SQLITE";
   } else {
     $hash->{MODEL}="unknown";
-	$ret = "unknown database type";
     Log3 $hash->{NAME}, 1, "Unknown database model found in configuration file $configfilename.";
     Log3 $hash->{NAME}, 1, "Only MySQL/MariaDB, PostgreSQL, Oracle, SQLite are fully supported.";
+	return "unknown database type";
   }
     
   if($hash->{MODEL} eq "MYSQL") {
 	$hash->{UTF8} = defined($dbconfig{utf8})?$dbconfig{utf8}:0;
   }
 	
-return $ret;
+return;
 }
 
 sub DbLog_ConnectPush($;$$) {
