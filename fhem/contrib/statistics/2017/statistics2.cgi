@@ -198,9 +198,6 @@ sub doAggregate() {
       $res     =~ s/^v//;
       $countAll{'system'}{'perl'}{$res}++;
 
-      $res      = $decoded->{'system'}{'release'};
-      $countAll{'system'}{'release'}{$res}++;
-
       if (defined($decoded->{'system'}{'revdate'})){
          $res = $decoded->{'system'}{'revdate'};
 #         my $age = sprintf("%.1f",(time - $res)/86400);
