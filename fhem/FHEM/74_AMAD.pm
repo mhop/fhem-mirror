@@ -24,6 +24,21 @@
 # $Id$
 #
 ###############################################################################
+##
+##
+## Das JSON Modul immer in einem eval aufrufen
+# $data = eval{decode_json($data)};
+#
+# if($@){
+#   Log3($SELF, 2, "$TYPE ($SELF) - error while request: $@");
+#  
+#   readingsSingleUpdate($hash, "state", "error", 1);
+#
+#   return;
+# }
+##
+##
+
 
 
 package main;
@@ -1532,7 +1547,6 @@ sub AMAD_decrypt($) {
     <br>
     The communication port of the AMADCommBridge device can easily be changed within the attribut "port".</b>
   </ul>
-  <br><a name="AMADCommBridge"></a>
   <b>AMAD Communication Bridge</b>
   <ul>
     Creating your first AMAD device automatically creates the AMADCommBridge device in the room AMAD. With the help  of the AMADCommBridge any Android device communicates initially to FHEM.<b>To make the IP addresse of the FHEM server known to the Android device, the FHEM server IP address needs to be configured in the AMADCommBridge. WITHOUT THIS STEP THE AMADCommBridge WILL NOT WORK PROPERLY.</b><br>
@@ -1707,7 +1721,6 @@ sub AMAD_decrypt($) {
     <br>
     Der Port f&uuml;r die Bridge kann ohne Probleme im Bridge Device mittels dem Attribut "port" ver&auml;ndert werden.</b>
   </ul>
-  <br><a name="AMADCommBridge"></a>
   <b>AMAD Communication Bridge</b>
   <ul>
     Beim ersten anlegen einer AMAD Deviceinstanz wird automatisch ein Ger&auml;t Namens AMADCommBridge im Raum AMAD mit angelegt. Dieses Ger&auml;t diehnt zur Kommunikation vom Androidger&auml;t zu FHEM ohne das zuvor eine Anfrage von FHEM aus ging. <b>Damit das Androidger&auml;t die IP von FHEM kennt, muss diese sofort nach dem anlegen der Bridge &uuml;ber den set Befehl in ein entsprechendes Reading in die Bridge  geschrieben werden. DAS IST SUPER WICHTIG UND F&Uuml;R DIE FUNKTION DER BRIDGE NOTWENDIG.</b><br>
