@@ -86,21 +86,21 @@ sub insertDB() {
   my $json     = $data{json};
   my $geo      = getLocation();
 
-  $dbh = DBI->connect($dsn,"","", { RaiseError => 1, ShowErrorStatement => 1 }) ||
-          die "Cannot connect: $DBI::errstr";
-
   my $decoded  = decode_json($json);
   if (defined($decoded->{'system'}{'revision'})) {
      # replace revision number with revision date
      my $rev      = $decoded->{'system'}{'revision'} + 1;
      if($rev =~ /^\d+$/) {
        my $d = (split(/ /,qx(sudo -u rko /usr/bin/svn info -r $rev $fhemPathSvn|grep Date:)))[3];
+       return undef unless (defined($d));
        my ($year,$mon,$mday) = split(/-/,$d);
        $decoded->{'system'}{'revdate'} = mktime(0,0,7,$mday,($mon-1),($year-1900),0,0,0);
        $json = encode_json $decoded;
      }
   }
   
+  $dbh = DBI->connect($dsn,"","", { RaiseError => 1, ShowErrorStatement => 1 }) ||
+          die "Cannot connect: $DBI::errstr";
   $sth = $dbh->prepare(q{INSERT OR REPLACE INTO jsonNodes(uniqueID,geo,json) VALUES(?,?,?)});
   my $result = $sth->execute($uniqueID,$geo,$json);
   add2total() if $result;
