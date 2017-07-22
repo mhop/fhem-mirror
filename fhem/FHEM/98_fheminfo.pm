@@ -59,7 +59,7 @@ sub CommandFheminfo($$) {
      return toJSON(\%fhemInfo);
   }
 
-  _fi2_Send() if $doSend;
+  _fi2_Send($cl) if $doSend;
 
   # do not return statistics data if called from update
   return "Statistics data sent to server. See Logfile (level 4) for details." unless defined($cl);
@@ -145,7 +145,10 @@ sub _fi2_Count() {
    return;
 }
 
-sub _fi2_Send() {
+sub _fi2_Send($) {
+   my ($cl) = shift;
+   $cl //= undef;
+
    my $json = toJSON(\%fhemInfo);
 
    Log3("fheminfo",4,"fheminfo: $json");
@@ -154,7 +157,8 @@ sub _fi2_Send() {
    $hu_hash{url}      = $cmds{fheminfo}{uri};
    $hu_hash{data}     = "uniqueID=".$fhemInfo{$c_system}{'uniqueID'}."&json=$json";
    $hu_hash{header}   = "User-Agent: FHEM";
-   $hu_hash{callback} = sub($$$) {
+   if (defined($cl)) {
+     $hu_hash{callback} = sub($$$) {
         my ($hash, $err, $data) = @_;
         if($err) {
           Log 1, "fheminfo send: Server ERROR: $err";
@@ -162,7 +166,15 @@ sub _fi2_Send() {
           Log3("fheminfo",4,"fheminfo send: Server RESPONSE: $data");
         }
       };
-   HttpUtils_NonblockingGet(\%hu_hash);
+      HttpUtils_NonblockingGet(\%hu_hash);
+   } else {
+      my ($err, $data) = HttpUtils_BlockingGet(\%hu_hash);
+      if($err) {
+        Log 1, "fheminfo send: Server ERROR: $err";
+      } else {
+        Log3("fheminfo",4,"fheminfo send: Server RESPONSE: $data");
+      }
+   }
    return;
 }
 
