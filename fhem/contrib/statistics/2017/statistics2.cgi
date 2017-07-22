@@ -196,6 +196,8 @@ sub doAggregate() {
 
       $res      = $decoded->{'system'}{'perl'};
       $res     =~ s/^v//;
+      $res     =~ /(^\d*\.\d*)/;
+      $res      = $1;
       $countAll{'system'}{'perl'}{$res}++;
 
       if (defined($decoded->{'system'}{'revdate'})){
