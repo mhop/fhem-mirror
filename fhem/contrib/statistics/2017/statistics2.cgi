@@ -31,7 +31,7 @@ use DBI;
 use CGI qw(:standard Vars);
 #use Data::Dumper;
 use JSON;
-use POSIX qw(mktime);
+use POSIX qw(mktime strftime);
 use Time::HiRes qw(time);
 
 use lib "./lib";
@@ -154,6 +154,10 @@ sub doAggregate() {
    $dbh = DBI->connect($dsn,"","", { RaiseError => 1, ShowErrorStatement => 1 }) ||
           die "Cannot connect: $DBI::errstr";
 
+   my $today      = strftime("%Y-%m-%d", localtime);
+   my $nodesToday = $dbh->selectrow_array("SELECT count(*) FROM jsonNodes where lastSeen like '$today%'");
+   $nodesToday  //= 0;
+
    my ($sql,@dbInfo,%countAll,$decoded,$res);
 
    $sql = q(SELECT * from jsonNodes where uniqueID = 'databaseInfo');
@@ -202,7 +206,6 @@ sub doAggregate() {
 
       if (defined($decoded->{'system'}{'revdate'})){
          $res = $decoded->{'system'}{'revdate'};
-#         my $age = sprintf("%.1f",(time - $res)/86400);
          my $age = int((time - $res)/86400);
          $countAll{'system'}{'age'}{'0'}++   if ($age <= 1);
          $countAll{'system'}{'age'}{'7'}++   if ($age > 1  && $age <= 7);
@@ -233,7 +236,7 @@ sub doAggregate() {
    
    $dbh->disconnect();
 
-   return ($updated,$started,$nodesTotal,$nodes12,%countAll);
+   return ($updated,$started,$nodesTotal,$nodes12,$nodesToday,%countAll);
 }
 
 # ---------- do the presentation ----------
@@ -243,13 +246,14 @@ sub viewStatistics() {
    my $q = new CGI; 
    $q->charset('utf-8'); 
    if($data{type} && $data{type} eq "json") { # return result als JSON object
-     my ($updated,$started,$nodesTotal,$nodes12,%countAll) = doAggregate();
+     my ($updated,$started,$nodesTotal,$nodes12,$nodesToday,%countAll) = doAggregate();
     
      my $json = encode_json({updated    => $updated,
                              generated  => time()-$start,
                              started    => $started,
                              nodesTotal => $nodesTotal,
                              nodes12    => $nodes12,
+                             nodesToday => $nodesToday,
                              data       => \%countAll
                        });
       print $q->header( -type => "application/json",
