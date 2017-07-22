@@ -148,10 +148,11 @@ sub _fi2_Count() {
 sub _fi2_Send($) {
    my ($cl) = shift;
    $cl //= undef;
+   my $sendType = defined($cl) ? 'nonblocking' : 'blocking';
 
    my $json = toJSON(\%fhemInfo);
 
-   Log3("fheminfo",4,"fheminfo: $json");
+   Log3("fheminfo",4,"fheminfo send ($sendType): $json");
 
    my %hu_hash = ();
    $hu_hash{url}      = $cmds{fheminfo}{uri};
