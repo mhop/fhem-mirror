@@ -29,6 +29,8 @@ my $upd_needJoin;
 my $upd_nChanged;
 my $upd_running;
 
+eval "require IO::Socket::SSL";  # Forum #74387
+my $upd_hasSSL = $@ ? 0 : 1;
 
 ########################################
 sub
@@ -239,6 +241,7 @@ doUpdate($$$$)
 {
   my ($curr, $max, $src, $arg) = @_;
   my ($basePath, $ctrlFileName);
+  $src =~ s'^http://fhem\.de'https://fhem.de' if($upd_hasSSL);
   if($src !~ m,^(.*)/([^/]*)$,) {
     uLog 1, "Cannot parse $src, probably not a valid http control file";
     return;
