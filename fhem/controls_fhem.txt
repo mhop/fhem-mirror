@@ -1,4 +1,4 @@
-REV 14761
+REV 14766
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -446,7 +446,7 @@ UPD 2015-07-28_14:05:31 31513 FHEM/98_dewpoint.pm
 UPD 2016-12-03_07:45:16 5092 FHEM/98_dummy.pm
 UPD 2017-03-16_07:45:02 10243 FHEM/98_expandJSON.pm
 UPD 2017-06-30_07:45:02 5320 FHEM/98_fhemdebug.pm
-UPD 2017-07-19_07:45:02 10579 FHEM/98_fheminfo.pm
+UPD 2017-07-23_07:45:02 10965 FHEM/98_fheminfo.pm
 UPD 2017-03-14_07:45:02 7818 FHEM/98_help.pm
 UPD 2017-02-13_07:45:02 44023 FHEM/98_logProxy.pm
 UPD 2017-06-21_07:45:02 52462 FHEM/98_monitoring.pm
