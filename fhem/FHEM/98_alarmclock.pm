@@ -148,6 +148,7 @@ sub alarmclock_Initialize($)
                         . " RepRoutine3Repeats"
                         . " RepRoutine3Mode:Alarm,PreAlarm,off"
                         . " RepRoutine3Stop:Snooze,off"
+                        . " WeekprofileName"
                         . " disable:1,0"
                         . " $readingFnAttributes";
 
@@ -212,6 +213,8 @@ sub alarmclock_Set($$)
     my $name = shift @param;
     my $opt = shift @param;
     my $value = join("", @param);
+
+    my $Weekprofile = AttrVal($hash->{NAME},"WeekprofileName","Weekprofile_1,Weekprofile_2,Weekprofile_3,Weekprofile_4,Weekprofile_5");
     
     if(!defined($alarmclock_sets{$opt})) {
         my $list =   " AlarmTime1_Monday"
@@ -228,13 +231,15 @@ sub alarmclock_Set($$)
                     ." AlarmTime_Weekend"
                     ." stop:Alarm"
                     ." skip:NextAlarm,None"
-                    ." save:Weekprofile_1,Weekprofile_2,Weekprofile_3,Weekprofile_4,Weekprofile_5"
-                    ." load:Weekprofile_1,Weekprofile_2,Weekprofile_3,Weekprofile_4,Weekprofile_5"
+                    ." save:$Weekprofile"
+                    ." load:$Weekprofile"
                     ." disable:1,0";                    
 
 
         return "Unknown argument $opt, choose one of $list";
     }
+    
+        
 
 ### AlarmTime ###   
     
@@ -351,48 +356,37 @@ sub alarmclock_Set($$)
         }
     }
     
+    
 ### save Weekprofile ###    
     
     if ($opt eq "save") 
     {
-        if ($value =~ /^(Weekprofile_1|Weekprofile_2|Weekprofile_3|Weekprofile_4|Weekprofile_5)$/)
-        {
-
-                my $time1 = ReadingsVal($hash->{NAME},"AlarmTime1_Monday","off");
-                my $time2 = ReadingsVal($hash->{NAME},"AlarmTime2_Tuesday","off");
-                my $time3 = ReadingsVal($hash->{NAME},"AlarmTime3_Wednesday","off");
-                my $time4 = ReadingsVal($hash->{NAME},"AlarmTime4_Thursday","off");
-                my $time5 = ReadingsVal($hash->{NAME},"AlarmTime5_Friday","off");
-                my $time6 = ReadingsVal($hash->{NAME},"AlarmTime6_Saturday","off");
-                my $time7 = ReadingsVal($hash->{NAME},"AlarmTime7_Sunday","off");
-      
-    
-                readingsSingleUpdate( $hash, $value,"$time1,$time2,$time3,$time4,$time5,$time6,$time7", 1 );       
-        }
-
+        my $time1 = ReadingsVal($hash->{NAME},"AlarmTime1_Monday","off");
+        my $time2 = ReadingsVal($hash->{NAME},"AlarmTime2_Tuesday","off");
+        my $time3 = ReadingsVal($hash->{NAME},"AlarmTime3_Wednesday","off");
+        my $time4 = ReadingsVal($hash->{NAME},"AlarmTime4_Thursday","off");
+        my $time5 = ReadingsVal($hash->{NAME},"AlarmTime5_Friday","off");
+        my $time6 = ReadingsVal($hash->{NAME},"AlarmTime6_Saturday","off");
+        my $time7 = ReadingsVal($hash->{NAME},"AlarmTime7_Sunday","off");
+        readingsSingleUpdate( $hash, $value,"$time1,$time2,$time3,$time4,$time5,$time6,$time7", 1 );       
     }
     
 ### load Weekprofile ###    
     
     if ($opt eq "load") 
     {
-        if ($value =~ /^(Weekprofile_1|Weekprofile_2|Weekprofile_3|Weekprofile_4|Weekprofile_5)$/)
-        {
-            my @time = split(/,/, ReadingsVal($hash->{NAME}, $value,""));
+        my @time = split(/,/, ReadingsVal($hash->{NAME}, $value,""));
       
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate( $hash, "AlarmTime1_Monday", $time[0]);
-            readingsBulkUpdate( $hash, "AlarmTime2_Tuesday", $time[1]);
-            readingsBulkUpdate( $hash, "AlarmTime3_Wednesday", $time[2]);
-            readingsBulkUpdate( $hash, "AlarmTime4_Thursday", $time[3]);
-            readingsBulkUpdate( $hash, "AlarmTime5_Friday", $time[4]);
-            readingsBulkUpdate( $hash, "AlarmTime6_Saturday", $time[5]);
-            readingsBulkUpdate( $hash, "AlarmTime7_Sunday", $time[6]);
-            readingsEndUpdate($hash,1);
-            alarmclock_createtimer($hash);
-    
-        }
-
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate( $hash, "AlarmTime1_Monday", $time[0]);
+        readingsBulkUpdate( $hash, "AlarmTime2_Tuesday", $time[1]);
+        readingsBulkUpdate( $hash, "AlarmTime3_Wednesday", $time[2]);
+        readingsBulkUpdate( $hash, "AlarmTime4_Thursday", $time[3]);
+        readingsBulkUpdate( $hash, "AlarmTime5_Friday", $time[4]);
+        readingsBulkUpdate( $hash, "AlarmTime6_Saturday", $time[5]);
+        readingsBulkUpdate( $hash, "AlarmTime7_Sunday", $time[6]);
+        readingsEndUpdate($hash,1);
+        alarmclock_createtimer($hash);
     } 
 
 ### skip ###   
@@ -548,7 +542,7 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
     alarmclock_holiday_check($hash);
     
     my $alarmtimetoday = $alarmday{$hash->{helper}{Today}};
-    my $alarmtimetommorow = $alarmday{$hash->{helper}{Tomorrow}};
+    my $alarmtimetomorrow = $alarmday{$hash->{helper}{Tomorrow}};
     
     
     if ((ReadingsVal($hash->{NAME},$alarmtimetoday,"NONE")) =~ /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
@@ -664,7 +658,7 @@ if ((AttrVal($hash->{NAME}, "disable", 0 ) ne "1" ) && (ReadingsVal($hash->{NAME
 ### Alarm Reading ###
 
     my $AlarmToday = ReadingsVal($hash->{NAME},$alarmtimetoday," ");
-    my $AlarmTomorrow = ReadingsVal($hash->{NAME},$alarmtimetommorow," ");
+    my $AlarmTomorrow = ReadingsVal($hash->{NAME},$alarmtimetomorrow," ");
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "AlarmToday", $AlarmToday);
     readingsBulkUpdate( $hash, "AlarmTomorrow", $AlarmTomorrow);
@@ -1581,6 +1575,10 @@ sub alarmclock_Notify($$)
             <li><b>PresenceCheck</b> <br>
                 0 disables monitoring the presence device<br>
                 1 activates monitoring
+            </li>
+            <li><b>WeekprofileName</b> <br>
+                Optional list with name for storing the week profiles<br>
+                Example: attr &lt;name&gt;  WeekprofileName MyWeek1,MyWeek2,MyWeek3 <br>
             </li>
             <li><b>disable</b> <br>
                 1 disables all alarms<br>
