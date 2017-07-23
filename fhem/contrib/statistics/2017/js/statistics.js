@@ -30,7 +30,7 @@ function rand(length) {
     return text;
 }
 
-function drawGooglePieChart(data, el, subst, sort="byKey") {
+function drawGooglePieChart(data, el, subst, sort="byKey", threshold) {
    
     var id = rand(5);
    
@@ -66,7 +66,7 @@ function drawGooglePieChart(data, el, subst, sort="byKey") {
                       legend: {position: 'right',labeledValueText: 'both'},
                       pieSliceText: 'none',
                       height: 350,
-                      sliceVisibilityThreshold: 0.004
+                      sliceVisibilityThreshold: threshold
                   };
                   
     var container = document.getElementById(id);
@@ -315,9 +315,10 @@ function onSuccess(data, textStatus, jqXHR) {
     
     div.append("last submission: " + data.updated + " UTC<br>");
     div.append("created in: " + data.generated.toFixed(3) + " seconds<br>");
-    div.append("number of submissions (last 12 months): " + data.nodes12 + "<br>");
+    div.append("number of submissions today: " + data.nodesToday + "<br>");
+    div.append("number of submissions (last 12 months, used for statistics): " + data.nodes12 + "<br>");
     div.append("total number of submissions (since : " + data.started + "): "+data.nodesTotal+"<br><br>");
-    div.append("You can help us to increase the quality of FHEM statistics data. Please check <a href='https://fhem.de/commandref.html#fheminfo' target='_new'>fheminfo</a> command for details.");
+    div.append("You can help us increase the quality of FHEM statistics data. Please check <a href='https://fhem.de/commandref.html#fheminfo' target='_new'>fheminfo</a> command for details.");
 
     $("div.tabs").tabs();
 
@@ -329,8 +330,8 @@ function onSuccess(data, textStatus, jqXHR) {
         drawGoogleWorldMap(data.data.geo.countrycode,$("div#maptab-world"));
         
         // draw google pie charts
-        drawGooglePieChart(data.data.system.os, $("div#versiontab-os"), {"linux":"Linux","MSWin32":"Windows","darwin":"macOS"}, "byValue");
-        drawGooglePieChart(data.data.system.perl, $("div#versiontab-perl"));
+        drawGooglePieChart(data.data.system.os, $("div#versiontab-os"), {"linux":"Linux","MSWin32":"Windows","darwin":"macOS","cygwin":"Cygwin","freebsd":"FreeBSD"}, "byValue",0 );
+        drawGooglePieChart(data.data.system.perl, $("div#versiontab-perl"),false,undefined,0);
         
         drawGooglePieChart(data.data.system.age, $("div#versiontab-update"), {"0":"≤ 1 day", "7": "1 day - 1 week", "30": "1 week - 1 month", "180": "1 month - 6 months", "365": "6 months - 1 year", "999": "> 1 year"}, false);
 
