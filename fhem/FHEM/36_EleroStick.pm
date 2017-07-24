@@ -1,23 +1,14 @@
 # $Id$
 
-# ToDo-List
-# ---------
-# [ ] Disable the timer when a Drive asks for information to avoid conflicts
-#     After getting a message in EleroStick_Write we must interupt the timer 
-#     for "ChannelTimeout" seconds
-#
-# [ ] Perhaps we need a cache for incoming commands that delays the incoming commands
-#     for "ChannelTimeout" seconds to give the previous command a chance to hear its acknowledge
-#     
-#
 package main;
 
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 
-my $clients   = ":EleroDrive";
-my %matchList = ("1:EleroDrive" => ".*",);
+my $clients   = ":EleroDrive:EleroSwitch";
+my %matchList = ("1:EleroDrive" => ".*",
+                 "2:EleroSwitch" => ".*");
 
 # Answer Types
 my $easy_confirm = "aa044b";
@@ -45,6 +36,7 @@ sub EleroStick_Initialize($) {
                             "Interval " .
                             "Delay " .
                             "DisableTimer:1,0 " .
+                            "SwitchChannels " .
                             "$readingFnAttributes ";
                                                      
 }
@@ -61,8 +53,7 @@ sub EleroStick_Enqueue($$) {
 
   if(!$hash->{QUEUE}) {
     $hash->{QUEUE} = [""];
-    ###debugLog($name, "QUEUE created with: $data");
-
+ 
     EleroStick_SimpleWrite($hash, $data);
     my $timerName = $name . "#QueueTimer";
     my $interval = 0.1;
@@ -71,7 +62,6 @@ sub EleroStick_Enqueue($$) {
   }
   else {
     push(@{$hash->{QUEUE}}, $data);
-    ###debugLog($name, "Pushed to QUEUE: $data");
   }
 
 }
@@ -84,10 +74,7 @@ sub EleroStick_StartQueueTimer($) {
   my $interval = AttrVal($name, "Delay", 0.5);
 
   InternalTimer(gettimeofday() + $interval, "EleroStick_OnQueueTimer", $timerName, 0);
-
-  ####debugLog($name, "Timer started: $timerName");
 }
-
 
 
 #=======================================================================================
@@ -97,13 +84,10 @@ sub EleroStick_OnQueueTimer($) {
   my $hash = $defs{$name};
   my $queue = $hash->{QUEUE};
 
-  ###debugLog($name, "OnQueueTimer");
-
   if (defined($queue) && @{$queue} > 0) {
     my $data = $queue->[0];
     if ($data ne "") {
       EleroStick_SimpleWrite($hash, $data);
-      ###debugLog($name, "Timer msg=$data");
     }
 
     shift(@{$queue});
@@ -203,8 +187,6 @@ sub EleroStick_SendEasyCheck($) {
     my $byteMsg = $head.$msgLength.$msgCmd.$checksum;
 
     EleroStick_Enqueue($hash, $byteMsg);
-    ###EleroStick_SimpleWrite($hash, $byteMsg)
-   
   }
 }
 
@@ -272,7 +254,6 @@ sub EleroStick_OnTimer($$) {
       my $now = index($channels, "x");
       if($now ne -1) {
         substr($channels, $now, 1, "1");
-        ###debugLog($name, "now " . ($now +1));
         EleroStick_SendEasyInfo($hash, $now +1);
 
         for(my $i = $now +1; $i<15; $i++) {
@@ -301,6 +282,22 @@ sub EleroStick_OnTimer($$) {
 
 #=======================================================================================
 sub EleroStick_Set($@) {
+  my ($hash, @a) = @_;
+  my $name = shift @a;
+  my $cmd = shift @a;
+  my $arg = join(" ", @a);
+  
+  my $list = "parse";
+  return $list if( $cmd eq '?' || $cmd eq '');
+  
+  if ($cmd eq "parse") {
+    $hash->{buffer} = $arg;
+    EleroStick_Parse($hash);
+  }
+  else {
+    return "Unknown argument $cmd, choose one of ".$list;
+  }
+  
   return undef;
 }
 
@@ -318,15 +315,58 @@ sub EleroStick_Write($$) {
   
   # Send to the transmitter stick
   if($cmd eq 'send'){
-    ###debugLog($name, "EleroStick send cmd=send msg=$msg");
     EleroStick_Enqueue($hash, $msg);
   }
   
   # Request status for a channel
   elsif ($cmd eq 'refresh') {
-    ###debugLog($name, "EleroStick cmd=refresh msg=$msg");
     EleroStick_SendEasyInfo($hash, $msg);
   }
+  
+}
+
+#=======================================================================================
+sub EleroStick_Parse($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  readingsSingleUpdate($hash,'AnswerMsg', $hash->{buffer},1);
+  
+  if(index($hash->{buffer}, $easy_confirm, 0) == 0) {
+    $hash->{lastAnswerType} = "easy_confirm";
+    
+    my $cc = substr($hash->{buffer},6,4);
+    my $firstChannels  = substr($cc,0,2);
+    my $secondChannels = substr($cc,2,2);
+    my $bytes =  $firstChannels.$secondChannels ;
+    $bytes = hex ($bytes);
+    my $dummy="";
+    my $learndChannelFound = 0;
+    for (my $i=0; $i < 15; $i++) {
+      if($bytes & 1 << $i) {
+        if(!$learndChannelFound) {
+          $dummy = $dummy . "x";
+          $learndChannelFound = 1;
+        }
+        else {
+          $dummy = $dummy . "1";
+        }
+      }
+      else {
+        $dummy = $dummy . "0";
+      }
+    }
+    
+    $hash->{channels} = $dummy;
+  }
+  elsif(index($hash->{buffer}, $easy_ack, 0) == 0) {
+    $hash->{lastAnswerType} = "easy_ack";
+    my $buffer = $hash->{buffer};
+    Dispatch($hash, $buffer, "");
+  }
+  
+  readingsSingleUpdate($hash, 'AnswerType', $hash->{lastAnswerType}, 1);
+  Log3 $name, 4, "Current buffer content: " . $hash->{buffer}." Name ". $hash->{NAME};
   
 }
 
@@ -357,45 +397,7 @@ sub EleroStick_Read($) {
   my $calLen = ($strLen * 2) + 4;
 
   if($calLen == length($hash->{buffer})){
-    # Die Länge der Nachricht entspricht der Vorgabe im Header
-
-    readingsSingleUpdate($hash,'AnswerMsg', $hash->{buffer},1);
-    
-    if(index($hash->{buffer}, $easy_confirm, 0) == 0) {
-      $hash->{lastAnswerType} = "easy_confirm";
-      
-      my $cc = substr($hash->{buffer},6,4);
-      my $firstChannels  = substr($cc,0,2);
-      my $secondChannels = substr($cc,2,2);
-      my $bytes =  $firstChannels.$secondChannels ;
-      $bytes = hex ($bytes);
-      my $dummy="";
-      my $learndChannelFound = 0;
-      for (my $i=0; $i < 15; $i++) {
-        if($bytes & 1 << $i) {
-          if(!$learndChannelFound) {
-            $dummy = $dummy . "x"; 
-            $learndChannelFound = 1; 
-          }
-          else {
-            $dummy = $dummy . "1";
-          }
-        }
-        else {
-          $dummy = $dummy . "0";
-        }
-      }       
-       
-      $hash->{channels} = $dummy;
-    }
-    elsif(index($hash->{buffer}, $easy_ack, 0) == 0) {
-      $hash->{lastAnswerType} = "easy_ack";
-      my $buffer = $hash->{buffer};
-      Dispatch($hash, $buffer, "");
-    }
-    
-    readingsSingleUpdate($hash, 'AnswerType', $hash->{lastAnswerType}, 1);
-    Log3 $name, 4, "Current buffer content: " . $hash->{buffer}." Name ". $hash->{NAME};
+    EleroStick_Parse($hash);
   }
   else {
     # Wait for the rest of the data
@@ -416,7 +418,6 @@ sub EleroStick_Ready($) {
   }
   else {
     EleroStick_SendEasyCheck($hash);
-    ###debugLog($name, "EleroStick_Ready -> SendEasyInfo");
   }
   
   return $openResult if($hash->{STATE} eq "disconnected");
@@ -536,7 +537,12 @@ sub EleroStick_Attr(@) {
     <li>DisableTimer<br>
       Disables the periodically request of the status. Should normally not be set to 1.
     </li>
-
+    
+    <br>
+    <li>SwitchChannels<br>
+      Comma separated list of channels that are a switch device.
+    </li>
+    
     <br>
     <li>Interval<br>
       When all channels are checkt, this number of seconds will be waited, until the channels will be checked again.<br>

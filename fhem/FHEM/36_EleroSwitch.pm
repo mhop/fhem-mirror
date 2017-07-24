@@ -1,10 +1,5 @@
 # $Id$
 
-# ToDo-List
-# ---------
-# [ ] Move to any position, not only top, bottom, intermediate, ... 
-
-
 package main;
 
 use strict;
@@ -12,21 +7,18 @@ use warnings;
 use SetExtensions;
 
 #=======================================================================================
-sub EleroDrive_Initialize($) {
+sub EleroSwitch_Initialize($) {
   my ($hash) = @_;
 
   $hash->{Match}         = ".*";
-  $hash->{DefFn}         = "EleroDrive_Define";
-  $hash->{UndefFn}       = "EleroDrive_Undef";
-  $hash->{FingerprintFn} = "EleroDrive_Fingerprint";
-  $hash->{ParseFn}       = "EleroDrive_Parse";
-  $hash->{SetFn}         = "EleroDrive_Set";
-  $hash->{GetFn}         = "EleroDrive_Get";
-  $hash->{AttrFn}        = "EleroDrive_Attr";
+  $hash->{DefFn}         = "EleroSwitch_Define";
+  $hash->{UndefFn}       = "EleroSwitch_Undef";
+  $hash->{FingerprintFn} = "EleroSwitch_Fingerprint";
+  $hash->{ParseFn}       = "EleroSwitch_Parse";
+  $hash->{SetFn}         = "EleroSwitch_Set";
+  $hash->{GetFn}         = "EleroSwitch_Get";
+  $hash->{AttrFn}        = "EleroSwitch_Attr";
   $hash->{AttrList}      = "IODev " .
-                           "TopToBottomTime " .
-                           "TiltPercent " .
-                           "IntermediatePercent " .
                            "$readingFnAttributes ";
                            
   $hash->{noAutocreatedFilelog} = 1; 
@@ -34,11 +26,11 @@ sub EleroDrive_Initialize($) {
 
 
 #=======================================================================================
-sub EleroDrive_Define($$) {
+sub EleroSwitch_Define($$) {
   my ( $hash, $def ) = @_;
   my @a = split( "[ \t][ \t]*", $def );
   
-  return "Usage: define <name> EleroDrive <Channel>" if(@a < 3);
+  return "Usage: define <name> EleroSwitch <Channel>" if(@a < 3);
 
   my $devName   = $a[0];
   my $type      = $a[1];
@@ -49,7 +41,7 @@ sub EleroDrive_Define($$) {
   $hash->{TYPE}     = $type;
   $hash->{channel}  = $channel;
   
-  $modules{EleroDrive}{defptr}{$channel} = $hash;
+  $modules{EleroSwitch}{defptr}{$channel} = $hash;
   
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
@@ -64,24 +56,24 @@ sub EleroDrive_Define($$) {
 
 
 #=======================================================================================
-sub EleroDrive_Undef($$) {
+sub EleroSwitch_Undef($$) {
   my ($hash, $arg) = @_;  
   my $channel = $hash->{channel};
   
   RemoveInternalTimer($hash); 
-  delete( $modules{EleroDrive}{defptr}{$channel} );
+  delete( $modules{EleroSwitch}{defptr}{$channel} );
   
   return undef;
 }
 
 
 #=======================================================================================
-sub EleroDrive_Get($@) {
+sub EleroSwitch_Get($@) {
   return undef;
 }
 
 #=======================================================================================
-sub EleroDrive_ToFixPosition($$) {
+sub EleroSwitch_Send($$) {
   my ( $hash, $position) = @_;
   
   my $channel = $hash->{channel};
@@ -96,19 +88,20 @@ sub EleroDrive_ToFixPosition($$) {
   my $checksum = '';
   my $payload = '';
   
-  if($position eq 'bottom'){
-    $payload = '40';
-  }
-  elsif($position eq 'top'){
-    $payload = '20';
-  }
-  elsif($position eq 'stop'){
+  if($position eq 'off'){
+    # stop / off
     $payload = '10';
   }
-  elsif($position eq 'intermediate'){
+  elsif($position eq 'on'){
+    # top / on
+    $payload = '20';
+  }
+  elsif($position eq 'dim1'){
+    # intermediate / dim1
     $payload = '44';
   }
-  elsif($position eq 'tilt'){
+  elsif($position eq 'dim2'){
+    # tilt / dim2
     $payload = '24';
   }
   
@@ -135,26 +128,21 @@ sub EleroDrive_ToFixPosition($$) {
     
     my $byteMsg = $head.$msgLength.$msgCmd.$firstChannels.$secondChannels.$payload.$checksum;
     
-    IOWrite($hash, "send", $byteMsg);
+    IOWrite($hash, "send", $byteMsg); 
+    
   }
  
 }
 
 
 #=======================================================================================
-sub EleroDrive_ToAnyPosition($$) {
-  my ( $hash, $position) = @_;
-  my $name = $hash->{NAME};
-}
-
-#=======================================================================================
-sub EleroDrive_Set($@) {
+sub EleroSwitch_Set($@) {
   my ( $hash, $name, $cmd, @params ) = @_;
     
   my $channel = $hash->{channel};
   my $iodev = $hash->{IODev}->{NAME};
   
-  my $commands=("stop:noArg moveDown:noArg moveUp:noArg moveIntermediate:noArg moveTilt:noArg refresh:noArg");
+  my $commands=("on:noArg off:noArg dim1:noArg dim2:noArg refresh:noArg");
   return $commands if( $cmd eq '?' || $cmd eq '');
 
   my $doRefresh = '0';
@@ -162,39 +150,29 @@ sub EleroDrive_Set($@) {
   if($cmd eq 'refresh'){
     IOWrite($hash, "refresh", $channel);
   }
-  elsif($cmd eq 'moveDown'){
-    EleroDrive_ToFixPosition($hash, "bottom");
+  elsif($cmd eq 'on'){
+    EleroSwitch_Send($hash, "on");
     $doRefresh = '1';
   }
-  elsif($cmd eq 'moveUp'){
-    EleroDrive_ToFixPosition($hash, "top");
+  elsif($cmd eq 'off'){
+    EleroSwitch_Send($hash, "off");
     $doRefresh = '1';
   }
-  elsif($cmd eq 'stop'){
-    EleroDrive_ToFixPosition($hash, "stop");
+  elsif($cmd eq 'dim1'){
+    EleroSwitch_Send($hash, "dim1");
   }
-  elsif($cmd eq 'moveIntermediate'){
-    EleroDrive_ToFixPosition($hash, "intermediate");
-    $doRefresh = '1';
-  }
-  elsif($cmd eq 'moveTilt'){
-    EleroDrive_ToFixPosition($hash, "tilt");
-    $doRefresh = '1';
-  }
-  elsif($cmd eq 'moveTo' && scalar @params eq 1){
-    EleroDrive_ToAnyPosition($hash, $params[0]);
-    
+  elsif($cmd eq 'dim2'){
+    EleroSwitch_Send($hash, "dim2");
     $doRefresh = '1';
   }
   else {
     return "Unknown argument $cmd, choose one of $commands";
   }
 
-  # Start a one time timer that refreshes the position for this drive
-  my $refreshDelay = AttrVal($name, "TopToBottomTime", 0);
-  if($doRefresh && $refreshDelay) {
+  # Start a one time timer that refreshes this switch
+  if($doRefresh) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday() + $refreshDelay + 2, "EleroDrive_OnRefreshTimer", $hash, 0);
+    InternalTimer(gettimeofday() + 2, "EleroSwitch_OnRefreshTimer", $hash, 0);
   }
 
   return undef;
@@ -202,14 +180,14 @@ sub EleroDrive_Set($@) {
 
 
 #=======================================================================================
-sub EleroDrive_Fingerprint($$) {
+sub EleroSwitch_Fingerprint($$) {
   my ($name, $msg) = @_;
   return ("", $msg);
 }
 
 
 #=======================================================================================
-sub EleroDrive_Parse($$) {
+sub EleroSwitch_Parse($$) {
   my ($hash, $msg) = @_;
   my $name = $hash->{NAME};
   my $buffer = $msg;
@@ -225,72 +203,52 @@ sub EleroDrive_Parse($$) {
   while ($bytes != 1 and $channel <= 15) {
     $bytes = $bytes >> 1;
     $channel++;
-  }
-  
+  }           
+              
   if($channel <= 15) {
     # Check if it is defined as a switch device
     my $switchChannels = AttrVal($name, "SwitchChannels", undef);
     if(defined $switchChannels) {
       my @channelList = split /,/, $switchChannels;
-      if ($channel ~~ @channelList) {
+      if (!$channel ~~ @channelList) {
         return undef;
       }
     }
+    else {
+      return undef;
+    }
     
-    my $rhash = $modules{EleroDrive}{defptr}{$channel};
-    my $rname = $rhash->{NAME};
     
     # get status
     my $statusByte = substr($buffer,10,2);
              
     my %deviceStati = ('00' => "no_information",
-                       '01' => "top_position",
-                       '02' => "bottom_position",
-                       '03' => "intermediate_position",
-                       '04' => "tilt_position",
-                       '05' => "blocking",
+                       '01' => "off",
+                       '02' => "on",
+                       '03' => "dim1",
+                       '04' => "dim2",
+                       '05' => "unknown",
                        '06' => "overheated",
                        '07' => "timeout",
-                       '08' => "move_up_started",
-                       '09' => "move_down_started",
-                       '0a' => "moving_up",
-                       '0b' => "moving_down",
-                       '0d' => "stopped_in_undefined_position",
-                       '0e' => "top_tilt_stop",
-                       '0f' => "bottom_intermediate_stop",
-                       '10' => "switching_device_switched_off",
-                       '11' => "switching_device_switched_on"                 
+                       '08' => "unknown",
+                       '09' => "unknown",
+                       '0a' => "unknown",
+                       '0b' => "unknown",
+                       '0d' => "unknown",
+                       '0e' => "unknown",
+                       '0f' => "unknown",
+                       '10' => "off",
+                       '11' => "on"                 
                       );
-                      
-    my %percentDefinitions = ('00' => 50,
-                       '01' => 0,
-                       '02' => 100,
-                       '03' => AttrVal($rname, "IntermediatePercent", 50),
-                       '04' => AttrVal($rname, "TiltPercent", 50),
-                       '05' => -1,
-                       '06' => -1,
-                       '07' => -1,
-                       '08' => -1,
-                       '09' => -1,
-                       '0a' => -1,
-                       '0b' => -1,
-                       '0d' => 50,
-                       '0e' => 0,
-                       '0f' => 100,
-                       '10' => -1,
-                       '11' => -1                 
-                      );                      
                          
     my $newstate = $deviceStati{$statusByte};
-    my $percentClosed = $percentDefinitions{$statusByte};
-    
-    if($modules{EleroDrive}{defptr}{$channel}) {
+         
+    my $rhash = $modules{EleroSwitch}{defptr}{$channel};
+    my $rname = $rhash->{NAME};
+      
+    if($modules{EleroSwitch}{defptr}{$channel}) {
       readingsBeginUpdate($rhash);
       readingsBulkUpdate($rhash, "state", $newstate);
-      readingsBulkUpdate($rhash, "position", $newstate);
-      if($percentClosed ne -1) {
-        readingsBulkUpdate($rhash, "percentClosed", $percentClosed);
-      }
       readingsEndUpdate($rhash,1);
            
       my @list;
@@ -298,19 +256,19 @@ sub EleroDrive_Parse($$) {
       return @list;
     }
     else {
-      return "UNDEFINED EleroDrive_$channel EleroDrive $channel";
+      return "UNDEFINED EleroSwitch_$channel EleroSwitch $channel";
     }
   }
 }
 
 
 #=======================================================================================
-sub EleroDrive_Attr(@) {
+sub EleroSwitch_Attr(@) {
 
 }
 
 #=======================================================================================
-sub EleroDrive_OnRefreshTimer($$) {
+sub EleroSwitch_OnRefreshTimer($$) {
   my ($hash, @params) = @_;
   my $name  = $hash->{NAME};
   my $channel = $hash->{channel};
@@ -325,76 +283,60 @@ sub EleroDrive_OnRefreshTimer($$) {
 1;
 
 =pod
-=item summary    Represents on elero drive
-=item summary_DE Repräsentiert ein elero drive
+=item summary    Represents an Elero switch
+=item summary_DE Repräsentiert einen Elero switch
 =begin html
 
-<a name="EleroDrive"></a>
-<h3>EleroDrive</h3>
+<a name="EleroSwitch"></a>
+<h3>EleroSwitch</h3>
 
 <ul>
-  This mudule implements an Elero drive. It uses EleroStick as IO-Device.
+  This mudule implements an Elero switch. It uses EleroStick as IO-Device.
   <br><br>
   
-  <a name="EleroDrive_Define"></a>
+  <a name="EleroSwitch_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; EleroDrive &lt;channel&gt;</code> <br>
+    <code>define &lt;name&gt; EleroSwitch &lt;channel&gt;</code> <br>
     &lt;channel&gt; specifies the channel of the transmitter stick that shall be used.
     <br><br>
   </ul>
   
-  <a name="EleroDrive_Set"></a>
+  <a name="EleroSwitch_Set"></a>
   <b>Set</b>
   <ul>
-    <li>moveDown<br>
+    <li>on<br>
     </li>
-    <li>moveUp<br>
+    <li>off<br>
     </li>
-    <li>stop<br>
+    <li>dim1<br>
     </li>
-    <li>moveIntermediate<br>
-    </li>
-    <li>moveTilt<br>
+    <li>dim2<br>
     </li>
     <li>refresh<br>
     </li>
  </ul>
  <br>
 
-  <a name="EleroDrive_Get"></a>
+  <a name="EleroSwitch_Get"></a>
   <b>Get</b>
   <ul>
     <li>no gets<br>
     </li><br>   
   </ul>
 
-  <a name="EleroDrive_Attr"></a>
+  <a name="EleroSwitch_Attr"></a>
   <b>Attributes</b>
   <ul>
     <li>IODev<br>
     The name of the IO-Device, normally the name of the EleroStick definition</li>
-    
-    <li>TopToBottomTime<br>
-    The time in seconds this drive needs for a complete run from the top to the bottom or vice versa</li>
-    
-    <li>IntermediatePercent<br>
-    Percent open when in intermediate position</li>
-    
-    <li>TiltPercent<br>
-    Percent open when in tilt position</li>
-    
   </ul><br>
   
-  <a name="EleroDrive_Readings"></a>
+  <a name="EleroSwitch_Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>position<br>
-    Current position of the drive (top_position, bottom_position, ...)</li>
-    
-    <li>percentClosed<br>
-    0 ... 100<br>
-    100 is completely closed, 0 is completely open</li>
+    <li>state<br>
+    Current state of the switch (on, off, dim1, dim2)</li>
   </ul><br>
 
 </ul>
