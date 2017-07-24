@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.21.3     24.07.2017       commandref revised
 # 2.21.2     19.07.2017       changed readCfg to report more error-messages
 # 2.21.1     18.07.2017       change configCheck for DbRep Report_Idx
 # 2.21.0     17.07.2017       standard timeout increased to 86400, enhanced explaination in configCheck 
@@ -4451,8 +4452,13 @@ sub checkUsePK ($$){
 
 	<pre>
     ####################################################################################
-    # database configuration file                                    
-    #                                                                
+    # database configuration file     
+    # 	
+    # NOTE:
+    # If you don't use a value for user / password please delete the leading hash mark
+    # and write 'user => ""' respectively 'password => ""' instead !	
+	#
+	#
     ## for MySQL                                                     
     ####################################################################################
     #%dbconfig= (                                                    
@@ -5239,9 +5245,14 @@ sub checkUsePK ($$){
 
 	<pre>
     ####################################################################################
-    # database configuration file                                    
-    #                                                                
-    ## for MySQL                                                     
+    # database configuration file     
+    # 	
+    # NOTE:
+    # If you don't use a value for user / password please delete the leading hash mark
+    # and write 'user => ""' respectively 'password => ""' instead !	
+	#
+	#
+    ## for MySQL                                                      
     ####################################################################################
     #%dbconfig= (                                                    
     #    connection => "mysql:database=fhem;host=db;port=3306",       
