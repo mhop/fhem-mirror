@@ -3477,7 +3477,7 @@ Soll der Assistent gelöscht werden?</text>
   </action>
   <flow type="flow">
     <name>First Run Assistant</name>
-    <group>AMADNG Info/Control Flowset v3.9.76</group>
+    <group>AMADNG Info/Control Flowset v4.0.0</group>
     <enabled>false</enabled>
     <executionPolicy>PARALLEL</executionPolicy>
     <triggercontainer id="t1" x="34.99996" y="-2292.5">
@@ -3649,7 +3649,7 @@ Soll der Assistent gelöscht werden?</actioncontainer>
   </flow>
   <flow type="flow">
     <name>Informations</name>
-    <group>AMADNG Info/Control Flowset v3.9.76</group>
+    <group>AMADNG Info/Control Flowset v4.0.0</group>
     <enabled>false</enabled>
     <executionPolicy>QUEUE</executionPolicy>
     <emergencyStopCount>900</emergencyStopCount>
@@ -4104,7 +4104,7 @@ Soll der Assistent gelöscht werden?</actioncontainer>
   </flow>
   <flow type="flow">
     <name>Send Data to AMADCommBridge</name>
-    <group>AMADNG Info/Control Flowset v3.9.76</group>
+    <group>AMADNG Info/Control Flowset v4.0.0</group>
     <enabled>true</enabled>
     <executionPolicy>PARALLEL</executionPolicy>
     <emergencyStopCount>900</emergencyStopCount>
@@ -4172,7 +4172,7 @@ Soll der Assistent gelöscht werden?</actioncontainer>
   </flow>
   <flow type="flow">
     <name>SetCommands</name>
-    <group>AMADNG Info/Control Flowset v3.9.76</group>
+    <group>AMADNG Info/Control Flowset v4.0.0</group>
     <enabled>false</enabled>
     <executionPolicy>QUEUE</executionPolicy>
     <emergencyStopCount>900</emergencyStopCount>
@@ -4525,7 +4525,7 @@ Soll der Assistent gelöscht werden?</actioncontainer>
   </flow>
   <flow type="flow">
     <name>Update AMAD Flowset</name>
-    <group>AMADNG Info/Control Flowset v3.9.76</group>
+    <group>AMADNG Info/Control Flowset v4.0.0</group>
     <enabled>true</enabled>
     <executionPolicy>QUEUE</executionPolicy>
     <triggercontainer id="t1" x="420.0" y="-682.5">
@@ -4581,7 +4581,7 @@ Soll der Assistent gelöscht werden?</actioncontainer>
   </flow>
   <flow type="flow">
     <name>VoiceControl</name>
-    <group>AMADNG Info/Control Flowset v3.9.76</group>
+    <group>AMADNG Info/Control Flowset v4.0.0</group>
     <enabled>true</enabled>
     <executionPolicy>QUEUE</executionPolicy>
     <triggercontainer id="t1" x="70.0" y="-52.5" />
