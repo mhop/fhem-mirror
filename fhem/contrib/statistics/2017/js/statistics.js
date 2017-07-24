@@ -30,8 +30,9 @@ function rand(length) {
     return text;
 }
 
-function drawGooglePieChart(data, el, subst, sort="byKey", threshold) {
+function drawGooglePieChart(data, el, subst, sort, threshold) {
    
+    sort = (sort == undefined ? "byKey" : sort);
     var id = rand(5);
    
     el.append("");
