@@ -241,6 +241,10 @@ sub NEUTRINO_SendCommand($$;$$) {
 		$serviceurl = "standby";
 	}
 	
+	elsif ($service eq "model") {
+		$serviceurl = "info";
+	}
+	
 	elsif ($service eq "bouquet") {
 		$serviceurl = "getbouquet?actual";
 	}
@@ -880,9 +884,16 @@ sub NEUTRINO_ReceiveCommand($$$) {
 						Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] detect change";
 						readingsBulkUpdate( $hash, "power","on");
 						readingsBulkUpdate( $hash, "state", "on" );
-						NEUTRINO_SendCommand( $hash, "version" );
+						delete($hash->{helper}{FIRSTSTART});
 					}
-
+					
+					#2017.07.25 - Erste Start: NUTRINO Version auslesen
+					if ($hash->{helper}{FIRSTSTART} eq  '') {
+						NEUTRINO_SendCommand( $hash, "version" );
+						NEUTRINO_SendCommand( $hash, "model" );
+						$hash->{helper}{FIRSTSTART} = '1';
+					}
+					
 					#2017.07.12 - time_raw_now/time_now vom FHEM-Server verwenden
 					readingsSingleUpdate( $hash, "time_raw_now", $UnixDate ,0);
 					readingsSingleUpdate( $hash, "time_now", localtime() ,0);
@@ -1041,6 +1052,17 @@ sub NEUTRINO_ReceiveCommand($$$) {
 			}
 			else {
 				Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ERROR: no mute could be extracted";
+			}
+        }
+		
+		# model
+        elsif ( $service eq "model" ) {
+			
+			if (@ans[0]) {
+				readingsBulkUpdate( $hash, "model",@ans[0]);
+			}
+			else {
+				Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ERROR: no model could be extracted";
 			}
         }
 		
@@ -1646,28 +1668,7 @@ sub NEUTRINO_Undefine($$) {
             <b>eventid</b> - Shows the current event id of the current program
           </li>
           <li>
-            <b>image_branch</b> - Shows image information of NEUTRINO
-          </li>
-          <li>
-            <b>image_builddate</b> - Shows image information of NEUTRINO
-          </li>
-          <li>
-            <b>image_commit</b> - Shows image information of NEUTRINO
-          </li>
-          <li>
-            <b>image_creator</b> - Shows image information of NEUTRINO
-          </li>
-          <li>
-            <b>image_describe</b> - Shows image information of NEUTRINO
-          </li>
-          <li>
-            <b>image_homepage</b> - Shows image information of NEUTRINO
-          </li>
-          <li>
-            <b>image_imagename</b> - Shows image information of NEUTRINO
-          </li>
-          <li>
-            <b>image_version</b> - Shows image information of NEUTRINO
+            <b>image_*</b> - Shows image information of NEUTRINO
           </li>
           <li>
             <b>input</b> - Shows currently used input
@@ -1768,7 +1769,7 @@ sub NEUTRINO_Undefine($$) {
           # Alternativer Port<br>
           define SATReceiver NEUTRINO 192.168.0.10 8080<br>
           <br>
-          # Alternativer poll interval von 20 seconds<br>
+          # Alternativer poll intervall von 20 seconds<br>
           define SATReceiver NEUTRINO 192.168.0.10 80 20<br>
           <br>
           # Mit HTTP Benutzer Zugangsdaten<br>
@@ -1920,28 +1921,7 @@ sub NEUTRINO_Undefine($$) {
             <b>eventid</b> - Zeigt die aktuelle Event ID von der aktuellen Sendung an
           </li>
           <li>
-            <b>image_branch</b> - Zeigt Image Informationen von NEUTRINO
-          </li>
-          <li>
-            <b>image_builddate</b> - Zeigt Image Informationen von NEUTRINO
-          </li>
-          <li>
-            <b>image_commit</b> - Zeigt Image Informationen von NEUTRINO
-          </li>
-          <li>
-            <b>image_creator</b> - Zeigt Image Informationen von NEUTRINO
-          </li>
-          <li>
-            <b>image_describe</b> - Zeigt Image Informationen von NEUTRINO
-          </li>
-          <li>
-            <b>image_homepage</b> - Zeigt Image Informationen von NEUTRINO
-          </li>
-          <li>
-            <b>image_imagename</b> - Zeigt Image Informationen von NEUTRINO
-          </li>
-          <li>
-            <b>image_version</b> - Zeigt Image Informationen von NEUTRINO
+            <b>image_*</b> - Zeigt Image Informationen von NEUTRINO
           </li>
           <li>
             <b>input</b> - Zeigt den aktuellen Input an (TV/Radio)
