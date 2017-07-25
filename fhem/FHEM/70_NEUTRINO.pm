@@ -1,6 +1,13 @@
 ﻿# $Id$
 ############################################################################
-# 2017-07-21, v1.0.6
+# 2017-07-25, v1.0.7
+#
+# v1.0.7
+# - FEATURE: Reading Model hinzugefügt
+# - CHANGE   CommandRef ergänzt
+# - BUFIX:   Optimierung Neutrino Version/Model auslesen bei
+#             Änderung Power
+#             Initialisierung Device
 #
 # v1.0.6
 # - FEATURE: CommandRef hinzugefügt (DE/EN)
