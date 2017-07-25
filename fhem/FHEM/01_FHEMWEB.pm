@@ -829,8 +829,9 @@ FW_answerCall($)
     my $supplied = defined($FW_webArgs{fwcsrf}) ? $FW_webArgs{fwcsrf} : "";
     my $want = $defs{$FW_wname}{CSRFTOKEN};
     if($supplied ne $want) {
-      Log3 $FW_wname, 3, "FHEMWEB $FW_wname CSRF error: $supplied ne $want. ".
-                         "For detals see the csrfToken FHEMWEB attribute";
+      Log3 $FW_wname, 3, "FHEMWEB $FW_wname CSRF error: $supplied ne $want ".
+                         "for client $FW_chash->{NAME}. ".
+                         "For details see the csrfToken FHEMWEB attribute.";
       $FW_httpRetCode = "400 Bad Request";
       return 0;
     }
