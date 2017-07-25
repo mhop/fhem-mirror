@@ -120,6 +120,9 @@ CUL_TX_Parse($$)
   my $state="";
   my $t = ReadingsVal($name, "temperature", undef);
   my $h = ReadingsVal($name, "humidity", undef);
+  $t = $val if($msgtype eq "temperature");
+  $h = $val if($msgtype eq "humidity");
+
   if(defined($t) && defined($h)) {
     $state="T: $t H: $h";
 
