@@ -1450,7 +1450,7 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($mh{md} =~ m/^(KS550|KS888|HM-WDS100-C6-O)/) { ########################
     if($mh{mTp} eq "70") {
       my ($t,$h,$r,$w,$wd,$s,$b) = map{hex($_)} unpack 'A4A2A4A4(A2)*',$mh{p};
-      push @evtEt,[$mh{devH},1,"battery:". (($t & 0x8000)?"low"  :"ok"  )] if {$mh{md} eq "HM-WDS100-C6-O-2"}; #has no battery
+      push @evtEt,[$mh{devH},1,"battery:". (($t & 0x8000)?"low"  :"ok"  )] if ($mh{md} eq "HM-WDS100-C6-O-2"); #has no battery
       my $tsgn = ($t & 0x4000);
       $t = ($t & 0x3fff)/10;
       $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
