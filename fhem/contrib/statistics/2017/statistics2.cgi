@@ -222,7 +222,11 @@ sub doAggregate() {
 
       foreach my $type (sort @keys) {
          next if $type eq 'system';
-         $countAll{'modules'}{$type}{'definitions'} += $decoded->{$type}{'noModel'} ? $decoded->{$type}{'noModel'} : 0;
+         if(lc($type) eq 'configdb') {
+            $countAll{'modules'}{$tyoe}{'definitions'} = 0;
+            next;
+         }
+         $countAll{'modules'}{$type}{'definitions'}   += $decoded->{$type}{'noModel'} ? $decoded->{$type}{'noModel'} : 0;
          $countAll{'modules'}{$type}{'installations'} += 1;
          while ( my ($model, $count) = each( %{$decoded->{$type}}) ) { 
             next if($model eq "noModel");
