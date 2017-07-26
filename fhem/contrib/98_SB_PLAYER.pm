@@ -63,6 +63,7 @@ use constant { true => 1, false => 0 };
 
 sub SB_PLAYER_SonginfoHandleQueue($);   # CD 0075
 sub SB_PLAYER_RemoveInternalTimers($);  # CD 0078
+sub SB_PLAYER_ftuiMedialist($);         # CD 0082
 
 # the list of favorites
 # CD 0010 moved to $hash->{helper}{SB_PLAYER_Favs}, fixes problem on module reload
@@ -150,8 +151,8 @@ sub SB_PLAYER_Initialize( $ ) {
     $hash->{AttrList}  .= "serverautoon "; # CD 0077 nicht verwendet, entfernen
     $hash->{AttrList}  .= "fadeinsecs ";
     $hash->{AttrList}  .= "amplifier:on,play ";
-    $hash->{AttrList}  .= "coverartheight:50,100,200 ";
-    $hash->{AttrList}  .= "coverartwidth:50,100,200 ";
+    $hash->{AttrList}  .= "coverartheight:50,100,200,400,800,1600 ";
+    $hash->{AttrList}  .= "coverartwidth:50,100,200,400,800,1600 ";
     # CD 0028
     $hash->{AttrList}  .= "ttsVolume ";
     $hash->{AttrList}  .= "ttsOptions:multiple-strict,debug,debugsaverestore,unsync,nosaverestore,forcegroupon,ignorevolumelimit,eventondone "; # CD 0062 Auswahl vorgeben
@@ -350,6 +351,26 @@ sub SB_PLAYER_Attr( @ ) {
         if ($args[1] eq "0") {
             $dodelete=1;
         } elsif ($args[1] eq "1") {
+            # CD 0082 Readings setzen (kein manueller statusRequest mehr nötig)
+            readingsBeginUpdate( $hash );
+            my $t=$hash->{FAVSTR};
+            $t=~s/,/:/g;
+            readingsBulkUpdate( $hash, "ftuiFavoritesItems", $t );
+            $t=~s/_/ /g;
+            readingsBulkUpdate( $hash, "ftuiFavoritesAlias", $t );
+
+            $t=$hash->{SERVERPLAYLISTS};
+            $t=~s/,/:/g;
+            readingsBulkUpdate( $hash, "ftuiPlaylistsItems", $t );
+            $t=~s/_/ /g;
+            readingsBulkUpdate( $hash, "ftuiPlaylistsAlias", $t );
+            if( AttrVal( $name, "donotnotify", "false" ) eq "true" ) {
+                readingsEndUpdate( $hash, 0 );
+            } else {
+                readingsEndUpdate( $hash, 1 );
+            }
+            # CD 0082 end
+        
             delete($hash->{SONGINFOQUEUE}) if(defined($hash->{SONGINFOQUEUE})); # CD 0072
             if(defined($hash->{helper}{playlistIds})) {
                 $hash->{helper}{playlistInfoRetries}=5; # CD 0076
@@ -1290,10 +1311,10 @@ sub SB_PLAYER_Parse( $$ ) {
 
     } elsif( $cmd eq "title" ) {
         readingsBulkUpdate( $hash, "currentTitle", join( " ", @args ) );
-
+        SB_PLAYER_ftuiMedialist( $hash ) if(AttrVal($name,"ftuiSupport","") eq "1"); # CD 0082
     } elsif( $cmd eq "artist" ) {
         readingsBulkUpdate( $hash, "currentArtist", join( " ", @args ) );
-
+        SB_PLAYER_ftuiMedialist( $hash ) if(AttrVal($name,"ftuiSupport","") eq "1"); # CD 0082
     } elsif( $cmd eq "album" ) {
         readingsBulkUpdate( $hash, "currentAlbum", join( " ", @args ) );
 
@@ -1522,8 +1543,9 @@ sub SB_PLAYER_Parse( $$ ) {
             } elsif( $args[ 1 ] eq "alarmDefaultVolume" ) {
                 readingsBulkUpdate( $hash, "alarmsDefaultVolume", $args[ 2 ] ); # CD 0052 fixed
             } elsif( $args[ 1 ] eq "alarmfadeseconds" ) {
-                if($args[ 2 ] eq "1") {
+                if($args[ 2 ] ne "0") {
                     readingsBulkUpdate( $hash, "alarmsFadeIn", "on" );
+                    readingsBulkUpdate( $hash, "alarmsFadeSeconds", $args[ 2 ] );   # CD 0082
                 } else {
                     readingsBulkUpdate( $hash, "alarmsFadeIn", "off" );
                 }
@@ -1748,8 +1770,13 @@ sub SB_PLAYER_Parse( $$ ) {
                 if(defined($hash->{helper}{playlistInfo}{$2}) && ($trackid>0)) {
                     last;
                 }
-                $hash->{helper}{playlistInfo}{$trackid}{title}='no data';
-                $hash->{helper}{playlistInfo}{$trackid}{artist}='-';
+                if ($trackid<0) {
+                    $hash->{helper}{playlistInfo}{$trackid}{artist}=ReadingsVal($name,'currentArtist','-');
+                    $hash->{helper}{playlistInfo}{$trackid}{title}=ReadingsVal($name,'currentTitle','-');
+                } else {
+                    $hash->{helper}{playlistInfo}{$trackid}{artist}='-';
+                    $hash->{helper}{playlistInfo}{$trackid}{title}='no data';
+                }
                 $hash->{helper}{playlistInfo}{$trackid}{album}='-';
                 $hash->{helper}{playlistInfo}{$trackid}{coverid}=0;
                 $hash->{helper}{playlistInfo}{$trackid}{duration}=0;
@@ -1812,53 +1839,7 @@ sub SB_PLAYER_Parse( $$ ) {
         #   if (rand() > 0.4) {delete $hash->{helper}{playlistInfo}{$trackid}};
         # TEST
     } elsif( $cmd eq "FHEMupdatePlaylistInfoDone" ) {
-            my $wait=1;
-
-            my $coverbase="http://" . $hash->{SBSERVER} . "/music/";
-
-            my @ids=split(',',$hash->{helper}{playlistIds});
-            my $ftuimedialist="[";
-            # [ {"Artist":"abc", "Title":"def", "Album":"yxz", "Time":"123", "File":"spotify:track:123456", "Track":"1", "Cover":"https://...." }, {"Artist":"abc", ... ]
-            $hash->{helper}{playlistInfoRetries}--; # CD 0076
-            foreach(@ids) {
-                if(defined($hash->{helper}{playlistInfo}{$_})) {
-                    $hash->{helper}{playlistInfo}{$_}{artist}=~s/\"//g;
-                    $hash->{helper}{playlistInfo}{$_}{title}=~s/\"//g;
-                    $hash->{helper}{playlistInfo}{$_}{album}=~s/\"//g;
-                    $hash->{helper}{playlistInfo}{$_}{artist} =~ s{\\}{\\\\}g;  # CD 0081
-                    $hash->{helper}{playlistInfo}{$_}{title} =~ s{\\}{\\\\}g;   # CD 0081
-                    $hash->{helper}{playlistInfo}{$_}{album} =~ s{\\}{\\\\}g;   # CD 0081
-                    $ftuimedialist.="{\"Artist\":\"".$hash->{helper}{playlistInfo}{$_}{artist}."\",";
-                    $ftuimedialist.="\"Title\":\"".$hash->{helper}{playlistInfo}{$_}{title}."\",";
-                    $ftuimedialist.="\"Album\":\"".$hash->{helper}{playlistInfo}{$_}{album}."\",";
-                    $ftuimedialist.="\"Time\":\"".(int($hash->{helper}{playlistInfo}{$_}{duration}))."\",";
-                    $ftuimedialist.="\"File\":\"".$hash->{helper}{playlistInfo}{$_}{url}."\",";
-                    $ftuimedialist.="\"Track\":\"".$hash->{helper}{playlistInfo}{$_}{tracknum}."\",";
-                    if(defined($hash->{helper}{playlistInfo}{$_}{artwork_url}) && ($hash->{helper}{playlistInfo}{$_}{artwork_url} ne "-")) {
-                        $ftuimedialist.="\"Cover\":\"".$hash->{helper}{playlistInfo}{$_}{artwork_url}."\"},";
-                    } else {
-                        $ftuimedialist.="\"Cover\":\"".$coverbase.$hash->{helper}{playlistInfo}{$_}{coverid}."/cover_50x50_o\"},";
-                    }
-                } else {
-                    $ftuimedialist.="{\"Artist\":\"-\",";
-                    $ftuimedialist.="\"Album\":\"-\",";
-                    $ftuimedialist.="\"Time\":\"0\",";
-                    $ftuimedialist.="\"File\":\"-\",";
-                    $ftuimedialist.="\"Track\":\"0\",";
-                    $ftuimedialist.="\"Cover\":\"-\"},";
-                    if($hash->{helper}{playlistInfoRetries}>0) {    # CD 0076
-                        SB_PLAYER_SonginfoAddQueue($hash,$_,$wait) unless ($_==0);   # CD 0072 # CD 0076
-                        $wait=0;
-                        $ftuimedialist.="\"Title\":\"loading...\",";
-                    } else {
-                        $ftuimedialist.="\"Title\":\"no data\",";   # CD 0076
-                        Log3( $hash, 3, "SB_PLAYER_Parse: $name: no songinfo for id $_" );  # CD 0072
-                    }
-                }
-            }
-            $ftuimedialist=~s/,$/]/;
-            #Log 0,$ftuimedialist;
-            readingsBulkUpdate( $hash, "ftuiMedialist", $ftuimedialist );
+        SB_PLAYER_ftuiMedialist( $hash );
     # CD 0065 end
     } elsif( $cmd eq "NONE" ) {
         # we shall never end up here, as cmd=NONE is used by the server for
@@ -1882,6 +1863,81 @@ sub SB_PLAYER_Parse( $$ ) {
 
     return( $name );
 }
+
+# CD 0082
+# ----------------------------------------------------------------------------
+#  build ftuiMedialist reading
+# ----------------------------------------------------------------------------
+sub SB_PLAYER_ftuiMedialist($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    my $wait=1;
+    my $trackcounter=1; # CD 0082
+    my $coverbase="http://" . $hash->{SBSERVER} . "/music/";
+
+    return unless defined($hash->{helper}{playlistIds});    # CD 0082
+    
+    my @ids=split(',',$hash->{helper}{playlistIds});
+    my $ftuimedialist="[";
+    # [ {"Artist":"abc", "Title":"def", "Album":"yxz", "Time":"123", "File":"spotify:track:123456", "Track":"1", "Cover":"https://...." }, {"Artist":"abc", ... ]
+    $hash->{helper}{playlistInfoRetries}--; # CD 0076
+    foreach(@ids) {
+        if(defined($hash->{helper}{playlistInfo}{$_})) {
+            # CD 0082 Artist von Remote-Streams ersetzen
+            if(($_<0)&&(ReadingsVal($name,'playlistCurrentTrack',0) eq $trackcounter)) {
+                $hash->{helper}{playlistInfo}{$_}{artist}=ReadingsVal($name,'currentArtist',$hash->{helper}{playlistInfo}{$_}{artist});
+            }
+            if(($_<0)&&(ReadingsVal($name,'playlistCurrentTrack',0) eq $trackcounter)) {
+                $hash->{helper}{playlistInfo}{$_}{title}=ReadingsVal($name,'currentTitle',$hash->{helper}{playlistInfo}{$_}{title});
+            }
+
+            $hash->{helper}{playlistInfo}{$_}{artist}=~s/\"//g;
+            $hash->{helper}{playlistInfo}{$_}{title}=~s/\"//g;
+            $hash->{helper}{playlistInfo}{$_}{album}=~s/\"//g;
+            $hash->{helper}{playlistInfo}{$_}{artist} =~ s{\\}{\\\\}g;  # CD 0081
+            $hash->{helper}{playlistInfo}{$_}{title} =~ s{\\}{\\\\}g;   # CD 0081
+            $hash->{helper}{playlistInfo}{$_}{album} =~ s{\\}{\\\\}g;   # CD 0081
+            $ftuimedialist.="{\"Artist\":\"".$hash->{helper}{playlistInfo}{$_}{artist}."\",";
+            $ftuimedialist.="\"Title\":\"".$hash->{helper}{playlistInfo}{$_}{title}."\",";
+            $ftuimedialist.="\"Album\":\"".$hash->{helper}{playlistInfo}{$_}{album}."\",";
+            $ftuimedialist.="\"Time\":\"".(int($hash->{helper}{playlistInfo}{$_}{duration}))."\",";
+            $ftuimedialist.="\"File\":\"".$hash->{helper}{playlistInfo}{$_}{url}."\",";
+            $ftuimedialist.="\"Track\":\"".$hash->{helper}{playlistInfo}{$_}{tracknum}."\",";
+            if(defined($hash->{helper}{playlistInfo}{$_}{artwork_url}) && ($hash->{helper}{playlistInfo}{$_}{artwork_url} ne "-")) {
+                $ftuimedialist.="\"Cover\":\"".$hash->{helper}{playlistInfo}{$_}{artwork_url}."\"},";
+            } else {
+                # CD 0082 versuchen Cover von Remote-Streams zu ersetzen
+                if(($_<0)&&(ReadingsVal($name,'playlistCurrentTrack',0) eq $trackcounter) && (ReadingsVal($name,'coverarturl','x')!~/radio\.png/)) {
+                    $ftuimedialist.="\"Cover\":\"".ReadingsVal($name,'coverarturl',$coverbase.$hash->{helper}{playlistInfo}{$_}{coverid}."/cover_50x50_o").'"},';
+                } else {
+                # CD 0082 end
+                    $ftuimedialist.="\"Cover\":\"".$coverbase.$hash->{helper}{playlistInfo}{$_}{coverid}."/cover_50x50_o\"},";
+                }
+            }
+        } else {
+            $ftuimedialist.="{\"Artist\":\"-\",";
+            $ftuimedialist.="\"Album\":\"-\",";
+            $ftuimedialist.="\"Time\":\"0\",";
+            $ftuimedialist.="\"File\":\"-\",";
+            $ftuimedialist.="\"Track\":\"0\",";
+            $ftuimedialist.="\"Cover\":\"-\"},";
+            if($hash->{helper}{playlistInfoRetries}>0) {    # CD 0076
+                SB_PLAYER_SonginfoAddQueue($hash,$_,$wait) unless ($_==0);   # CD 0072 # CD 0076
+                $wait=0;
+                $ftuimedialist.="\"Title\":\"loading...\",";
+            } else {
+                $ftuimedialist.="\"Title\":\"no data\",";   # CD 0076
+                Log3( $hash, 3, "SB_PLAYER_Parse: $name: no songinfo for id $_" );  # CD 0072
+            }
+        }
+        $trackcounter+=1;   # CD 0082
+    }
+    $ftuimedialist=~s/,$/]/;
+    #Log 0,$ftuimedialist;
+    readingsBulkUpdate( $hash, "ftuiMedialist", $ftuimedialist );
+}
+# CD 0082 end
 
 # CD 0054
 # ----------------------------------------------------------------------------
@@ -2247,6 +2303,7 @@ sub SB_PLAYER_Set( $@ ) {
             "shuffle:off,song,album next:noArg prev:noArg playlist sleep " . # CD 0017 song und album hinzugefügt # CD 0052 shuffle on entfernt
             "allalarms:enable,disable,statusRequest,delete,add " .              # CD 0015 alarm1 alarm2 entfernt
             "alarmsSnooze:slider,0,1,30 alarmsTimeout:slider,0,5,90  alarmsDefaultVolume:slider,0,1,100 alarmsFadeIn:on,off alarmsEnabled:on,off " . # CD 0016, von MM übernommen, Namen geändert
+            "alarmsFadeSeconds " .      # CD 0082 hinzugefügt
             "cliraw talk sayText " .    # CD 0014 sayText hinzugefügt
             "unsync:noArg " .
             "currentTrackPosition " .   # CD 0047 hinzugefügt
@@ -2798,6 +2855,7 @@ sub SB_PLAYER_Set( $@ ) {
             IOWrite( $hash, "$hash->{PLAYERMAC} playerpref alarmDefaultVolume ?\n" );
             IOWrite( $hash, "$hash->{PLAYERMAC} playerpref alarmTimeoutSeconds ?\n" );
             IOWrite( $hash, "$hash->{PLAYERMAC} playerpref alarmSnoozeSeconds ?\n" );
+            IOWrite( $hash, "$hash->{PLAYERMAC} playerpref alarmfadeseconds ?\n" ); # CD 0082
             # CD 0016 end
         # CD 0015 start
         } elsif( $arg[ 0 ] eq "delete" ) {
@@ -2839,7 +2897,12 @@ sub SB_PLAYER_Set( $@ ) {
                 IOWrite( $hash, "$hash->{PLAYERMAC} playerpref alarmsEnabled 0\n" );
                 readingsSingleUpdate( $hash, "alarmsEnabled", "off", $donotnotify ) if($updateReadingsOnSet);  # CD 0017
             }
+        # CD 0082 start
+        } elsif($cmd eq "alarmsFadeSeconds") {
+            IOWrite( $hash, "$hash->{PLAYERMAC} playerpref alarmfadeseconds ". $arg[0] ."\n" );
+            readingsSingleUpdate( $hash, "alarmsFadeSeconds", $arg[ 0 ], $donotnotify ) if($updateReadingsOnSet);
         }
+        # CD 0082 end
     # CD 0016
     } elsif( index( $cmd, "alarm" ) != -1 ) {
         my $alarmno = int( substr( $cmd, 5 ) ) + 0;
@@ -3705,6 +3768,7 @@ sub SB_PLAYER_GetStatus( $ ) {
         IOWrite( $hash, "$hash->{PLAYERMAC} playerpref alarmDefaultVolume ?\n" );
         IOWrite( $hash, "$hash->{PLAYERMAC} playerpref alarmTimeoutSeconds ?\n" );
         IOWrite( $hash, "$hash->{PLAYERMAC} playerpref alarmSnoozeSeconds ?\n" );
+        IOWrite( $hash, "$hash->{PLAYERMAC} playerpref alarmfadeseconds ?\n" ); # CD 0082
         # MM 0016 end
         # CD 0007
         IOWrite( $hash, "$hash->{PLAYERMAC} playerpref syncVolume ?\n" );
@@ -4136,10 +4200,11 @@ sub SB_PLAYER_ParseAlarms( $@ ) {
         # MM 0016 start
         } elsif( $_ =~ /^(tags:)(\S+)/ ) {
             next;
-        } elsif( $_ =~ /^(fade:)([0|1])/ ) {
+        } elsif( $_ =~ /^(fade:)([0-9]+)/ ) {    # CD 0082 playerpref alarmfadeseconds unterstützen
             # example: fade:1
-            if( $2 eq "1" ) {
+            if( $2 ne "0" ) {
                 readingsBulkUpdate( $hash, "alarmsFadeIn", "on" );      # CD 0016 von MM übernommen, Namen geändert
+                readingsBulkUpdate( $hash, "alarmsFadeSeconds", $2 );   # CD 0082
             } else {
                 readingsBulkUpdate( $hash, "alarmsFadeIn", "off" );     # CD 0016 von MM übernommen, Namen geändert
             }
@@ -4148,7 +4213,7 @@ sub SB_PLAYER_ParseAlarms( $@ ) {
             $hash->{helper}{ALARMSCOUNT} = $2;  # CD 0016 ALARMSCOUNT nach {helper} verschoben
             next;
         } else {
-            Log3( $hash, 1, "SB_PLAYER_Alarms($name): Unknown data ($_)");
+            Log3( $hash, 2, "SB_PLAYER_Alarms($name): Unknown data ($_)");
             next;
         }
         # MM 0016 end
@@ -5236,6 +5301,7 @@ sub SB_PLAYER_RemoveInternalTimers($) {
      <li><b>alarmsTimeout &lt;minutes&gt;</b> -  Set duration of alarms in minutes. Setting this to 0 will disable the automatic timeout.</li>
      <li><b>alarmsDefaultVolume &lt;vol&gt;</b> -  Set default volume level (0-100) of alarms. This can be overridden by individual levels per alarm.</li>
      <li><b>alarmsFadeIn on|off</b> -  Whether alarms should fade in on this player</li>
+     <li><b>alarmsFadeSeconds &lt;seconds&gt;</b> -  Fade-in period in seconds for the alarms.</li>
      <li><b>alarmsEnabled on|off</b> -  Whether any alarm can sound on this player. Set to off to prevent any alarm from sounding; on to allow them to sound</li>
      <li><b>snooze</b> - Switch off a running alarm and start again after a certain time, defined by the reading alarmsSnooze.</li>
      <br>
@@ -5491,7 +5557,8 @@ sub SB_PLAYER_RemoveInternalTimers($) {
      <li><b>alarmsDefaultVolume &lt;vol&gt;</b> -  Legt die generelle Lautst&auml;rke (0-100) f&uuml;r den Wecker fest.
      Dieser Wert kann durch eine individuelle Lautst&auml;rkeangabe je Alarm &uuml;berschrieben werden (siehe auch
      <a href="#SBplayeralarmxvolume">alarm&lt;X&gt; volume &lt;n&gt;</a>)</li>
-     <li><b>alarmsFadeIn on|off</b> -  Schaltet fadeIn f&uuml;r die Wecker ein (on) oder aus (off)</li>
+     <li><b>alarmsFadeIn on|off</b> -  Schaltet fadeIn f&uuml;r die Wecker ein (on) oder aus (off).</li>
+     <li><b>alarmsFadeSeconds &lt;seconds&gt;</b> -  Fade-in Dauer f&uuml;r die Wecker.</li>
      <li><b>alarmsEnabled on|off</b> -  Gibt an, ob die eingetragenen Wecker &uuml;berhaupt abgespielt
      werden sollen (on) oder nicht (off).</li>
      <li><b>snooze</b> - Schaltet einen gerade laufenden Wecker aus und nach einer durch
