@@ -69,7 +69,7 @@ use Time::HiRes qw(gettimeofday time);
 
 use constant { true => 1, false => 0 };
 use constant { TRUE => 1, FALSE => 0 };
-use constant SB_SERVER_VERSION => '0040';
+use constant SB_SERVER_VERSION => '0041';
 
 my $SB_SERVER_hasDataDumper = 1;        # CD 0024
 
@@ -179,11 +179,18 @@ sub SB_SERVER_Define( $$ ) {
     my ($user,$password);
     my @newDef;
 
+    # CD 0041 start
+    my @notifyregexp;
+    push @notifyregexp,"global";
+    push @notifyregexp,$hash->{NAME};
+    # CD 0041 end
+    
     # parse the user spec
     foreach( @a ) {
 	if( $_ =~ /^(RCC:)(.*)/ ) {
 	    $hash->{RCCNAME} = $2;
         push @newDef,$_;
+        push @notifyregexp,$2;              # CD 0041
 	    next;
 	} elsif( $_ =~ /^(WOL:)(.*)/ ) {
 	    $hash->{WOLNAME} = $2;
@@ -192,6 +199,7 @@ sub SB_SERVER_Define( $$ ) {
 	} elsif( $_ =~ /^(PRESENCE:)(.*)/ ) {   # CD 0007
 	    $hash->{PRESENCENAME} = $2;         # CD 0007
         push @newDef,$_;
+        push @notifyregexp,$2;              # CD 0041
 	    next;                               # CD 0007
 	} elsif( $_ =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{3,5})/ ) {
 	    $hash->{IP} = $1;
@@ -254,103 +262,41 @@ sub SB_SERVER_Define( $$ ) {
     }
 
     # Preset our readings if undefined
-    my $tn = TimeNow();
-
-    # server on / off
-    if( !defined( $hash->{READINGS}{power}{VAL} ) ) {
-	$hash->{READINGS}{power}{VAL} = "?";
-	$hash->{READINGS}{power}{TIME} = $tn;
-    }
-
-    # the server version
-    if( !defined( $hash->{READINGS}{serverversion}{VAL} ) ) {
-	$hash->{READINGS}{serverversion}{VAL} = "?";
-	$hash->{READINGS}{serverversion}{TIME} = $tn;
-    }
-
-    # is the CLI port secured with password?
-    if( !defined( $hash->{READINGS}{serversecure}{VAL} ) ) {
-	$hash->{READINGS}{serversecure}{VAL} = "?";
-	$hash->{READINGS}{serversecure}{TIME} = $tn;
-    }
-
-
-    # the maximum number of favorites on the server
-    if( !defined( $hash->{READINGS}{favoritestotal}{VAL} ) ) {
-	$hash->{READINGS}{favoritestotal}{VAL} = 0;
-	$hash->{READINGS}{favoritestotal}{TIME} = $tn;
-    }
-
-    # is a scan in progress
-    if( !defined( $hash->{READINGS}{scanning}{VAL} ) ) {
-	$hash->{READINGS}{scanning}{VAL} = "?";
-	$hash->{READINGS}{scanning}{TIME} = $tn;
-    }
-
-    # the scan in progress
-    if( !defined( $hash->{READINGS}{scandb}{VAL} ) ) {
-	$hash->{READINGS}{scandb}{VAL} = "?";
-	$hash->{READINGS}{scandb}{TIME} = $tn;
-    }
-
-    # the scan already completed
-    if( !defined( $hash->{READINGS}{scanprogressdone}{VAL} ) ) {
-	$hash->{READINGS}{scanprogressdone}{VAL} = "?";
-	$hash->{READINGS}{scanprogressdone}{TIME} = $tn;
-    }
-
-    # the scan already completed
-    if( !defined( $hash->{READINGS}{scanprogresstotal}{VAL} ) ) {
-	$hash->{READINGS}{scanprogresstotal}{VAL} = "?";
-	$hash->{READINGS}{scanprogresstotal}{TIME} = $tn;
-    }
-
-    # did the last scan fail
-    if( !defined( $hash->{READINGS}{scanlastfailed}{VAL} ) ) {
-	$hash->{READINGS}{scanlastfailed}{VAL} = "?";
-	$hash->{READINGS}{scanlastfailed}{TIME} = $tn;
-    }
-
-    # number of players connected to us
-    if( !defined( $hash->{READINGS}{players}{VAL} ) ) {
-	$hash->{READINGS}{players}{VAL} = "?";
-	$hash->{READINGS}{players}{TIME} = $tn;
-    }
-
-    # number of players connected to mysqueezebox
-    if( !defined( $hash->{READINGS}{players_mysb}{VAL} ) ) {
-	$hash->{READINGS}{players_mysb}{VAL} = "?";
-	$hash->{READINGS}{players_mysb}{TIME} = $tn;
-    }
-
-    # number of players connected to other servers in our network
-    if( !defined( $hash->{READINGS}{players_other}{VAL} ) ) {
-	$hash->{READINGS}{players_other}{VAL} = "?";
-	$hash->{READINGS}{players_other}{TIME} = $tn;
-    }
-
-    # number of albums in the database
-    if( !defined( $hash->{READINGS}{db_albums}{VAL} ) ) {
-	$hash->{READINGS}{db_albums}{VAL} = "?";
-	$hash->{READINGS}{db_albums}{TIME} = $tn;
-    }
-
-    # number of artists in the database
-    if( !defined( $hash->{READINGS}{db_artists}{VAL} ) ) {
-	$hash->{READINGS}{db_artists}{VAL} = "?";
-	$hash->{READINGS}{db_artists}{TIME} = $tn;
-    }
-
-    # number of songs in the database
-    if( !defined( $hash->{READINGS}{db_songs}{VAL} ) ) {
-	$hash->{READINGS}{db_songs}{VAL} = "?";
-	$hash->{READINGS}{db_songs}{TIME} = $tn;
-    }
-
-    # number of genres in the database
-    if( !defined( $hash->{READINGS}{db_genres}{VAL} ) ) {
-	$hash->{READINGS}{db_genres}{VAL} = "?";
-	$hash->{READINGS}{db_genres}{TIME} = $tn;
+    if (!defined($hash->{OLDDEF})) {
+        readingsBeginUpdate( $hash );
+        # server on / off
+        readingsBulkUpdate( $hash, "power", "?" );
+        # the server version
+        readingsBulkUpdate( $hash, "serverversion", "?" );
+        # is the CLI port secured with password?
+        readingsBulkUpdate( $hash, "serversecure", "?" );
+        # the maximum number of favorites on the server
+        readingsBulkUpdate( $hash, "favoritestotal", "?" );
+        # is a scan in progress
+        readingsBulkUpdate( $hash, "scanning", "?" );
+        # the scan in progress
+        readingsBulkUpdate( $hash, "scandb", "?" );
+        # the scan already completed
+        readingsBulkUpdate( $hash, "scanprogressdone", "?" );
+        # the scan already completed
+        readingsBulkUpdate( $hash, "scanprogresstotal", "?" );
+        # did the last scan fail
+        readingsBulkUpdate( $hash, "scanlastfailed", "?" );
+        # number of players connected to us
+        readingsBulkUpdate( $hash, "players", "?" );
+        # number of players connected to mysqueezebox
+        readingsBulkUpdate( $hash, "players_mysb", "?" );
+        # number of players connected to other servers in our network
+        readingsBulkUpdate( $hash, "players_other", "?" );
+        # number of albums in the database
+        readingsBulkUpdate( $hash, "db_albums", "?" );
+        # number of artists in the database
+        readingsBulkUpdate( $hash, "db_artists", "?" );
+        # number of songs in the database
+        readingsBulkUpdate( $hash, "db_songs", "?" );
+        # number of genres in the database
+        readingsBulkUpdate( $hash, "db_genres", "?" );
+        readingsEndUpdate( $hash, 0 );
     }
 
     # initialize the command stack
@@ -420,6 +366,7 @@ sub SB_SERVER_Define( $$ ) {
 
     Log3( $hash, 4, "SB_SERVER_Define: leaving" );
 
+    notifyRegexpChanged($hash, "(". (join '|',@notifyregexp) . ")"); # CD 0041
     return $ret;
 }
 
@@ -1686,6 +1633,28 @@ sub SB_SERVER_ParseAppResponse( $$ ) {
 }
 # CD 0032 end
 
+# CD 0041 start
+# ----------------------------------------------------------------------------
+#  used for checking if the string contains a valid MAC adress
+# ----------------------------------------------------------------------------
+sub SB_SERVER_IsValidMAC( $ ) {
+    my $instr = shift( @_ );
+
+    my $d = "[0-9A-Fa-f]";
+    my $dd = "$d$d";
+
+    if( $instr =~ /($dd([:-])$dd(\2$dd){4})/og ) {
+      if( $instr =~ /^(00[:-]){5}(00)$/) {
+        return( 0 );
+      } else {
+        return( 1 );
+      }
+    } else {
+        return( 0 );
+    }
+}
+# CD 0041 end
+
 # ----------------------------------------------------------------------------
 #  Dispatch every single line of commands
 # ----------------------------------------------------------------------------
@@ -1702,8 +1671,8 @@ sub SB_SERVER_DispatchCommandLine( $$ ) {
     # is the first return value a player ID?
     # Player ID is MAC adress, hence : included
     my @id = split( ":", $id1 );
-
-    if( @id > 1 ) {
+    
+    if( SB_SERVER_IsValidMAC($id1) == 1 ) { # CD 0041 SB_SERVER_IsValidMAC verwenden
         # CD 0032 start
         # check for app response
         if(SB_SERVER_ParseAppResponse($hash,$buf)==0) {
@@ -3220,8 +3189,8 @@ sub SB_SERVER_Notify( $$ ) {
         DevIo_OpenDev($hash, 0, "SB_SERVER_DoInit" ) unless defined($hash->{helper}{disableReconnect}); # CD 0038
     }
     # CD end
-    #Log3( $hash, 4, "SB_SERVER_Notify($name): called" .
-    #    "Own:" . $name . " Device:" . $devName );
+    #Log3( $hash, 3, "SB_SERVER_Notify($name): called" .
+    #    "Own:" . $name . " Device:" . $devName . " Events:" . (join " ",@{$dev_hash->{CHANGED}}) );
 
     # CD 0024 start
     if( grep(m/^SAVE$|^SHUTDOWN$/, @{$dev_hash->{CHANGED}}) ) { # CD 0043 auch bei SHUTDOWN speichern
