@@ -1446,7 +1446,7 @@ DOIF_cmd ($$$$)
       DOIF_cmd ($hash,$nr,$subnr,$event);
     }
   } else {
-    if (defined ($sleeptimer[$nr])) {
+    if ($sleeptimer[$nr]) {
       my $last_cond=ReadingsVal($pn,"cmd_nr",0)-1;
       if (DOIF_SetSleepTimer($hash,$last_cond,$nr,0,$event,-1,$sleeptimer[$nr])) {
         DOIF_cmd ($hash,$nr,$subnr,$event);
@@ -2041,9 +2041,9 @@ DOIF_SetSleepTimer($$$$$$$)
       or AttrVal($pn,"do","") eq "always"
       or AttrVal($pn,"do","") eq "resetwait"
       or AttrVal($pn,"repeatsame","")
-      or defined($repeatcmd))) {
+      or $repeatcmd)) {
     my $sleeptime=0;
-    if (defined ($repeatcmd)) {
+    if ($repeatcmd) {
       $sleeptime=$repeatcmd;
     } else {
       my @sleeptimer=SplitDoIf(':',AttrVal($pn,"wait",""));
@@ -2073,7 +2073,7 @@ DOIF_SetSleepTimer($$$$$$$)
       }
       InternalTimer($next_time, "DOIF_SleepTrigger",$hash, 0);
       return 0;
-    } elsif (defined($repeatcmd)){
+    } elsif ($repeatcmd){
       return 0;
     } else {
       return 1;
