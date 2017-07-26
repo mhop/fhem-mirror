@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.0     25.07.2017       attribute "addStateEvent" added
 # 2.21.3     24.07.2017       commandref revised
 # 2.21.2     19.07.2017       changed readCfg to report more error-messages
 # 2.21.1     18.07.2017       change configCheck for DbRep Report_Idx
@@ -142,7 +143,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.21.2";
+my $DbLogVersion = "2.22.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -167,7 +168,8 @@ sub DbLog_Initialize($)
   $hash->{AttrFn}           = "DbLog_Attr";
   $hash->{SVG_regexpFn}     = "DbLog_regexpFn";
   $hash->{ShutdownFn}       = "DbLog_Shutdown";
-  $hash->{AttrList}         = "colEvent ".
+  $hash->{AttrList}         = "addStateEvent:0,1 ".
+                              "colEvent ".
                               "colReading ".
 							  "colValue ".
                               "disable:1,0 ".
@@ -1036,7 +1038,7 @@ sub DbLog_Log($$) {
   # Notify-Routine Startzeit
   my $nst = [gettimeofday];
   
-  my $events = deviceEvents($dev_hash,1);  
+  my $events = deviceEvents($dev_hash, AttrVal($name, "addStateEvent", 1));  
   return if(!$events);
   
   my $max   = int(@{$events});
@@ -4863,7 +4865,23 @@ sub checkUsePK ($$){
   
   <a name="DbLogattr"></a>
   <b>Attributes</b> 
-
+  <br><br>
+   
+  <ul><b>addStateEvent</b>
+    <ul>
+	  <code>attr &lt;device&gt; addStateEvent [0|1]
+	  </code><br>
+      As you probably know the event associated with the state Reading is special, as the "state: "
+      string is stripped, i.e event is not "state: on" but just "on". <br>
+	  Mostly it is desireable to get the complete event without "state: " stripped, so it is the default behavior of DbLog.
+	  That means you will get state-event complete as "state: xxx". <br>
+	  In some circumstances, e.g. older or special modules, it is a good idea to set addStateEvent to "0".
+      Try it if you have trouble with the default adjustment.	  
+      <br>
+    </ul>
+  </ul>
+  <br>
+  
   <ul><b>asyncMode</b>
     <ul>
 	  <code>attr &lt;device&gt; asyncMode [1|0]
@@ -5713,7 +5731,24 @@ sub checkUsePK ($$){
 
   <a name="DbLogattr"></a>
   <b>Attribute</b>
-
+   <br><br>
+ 
+  <ul><b>addStateEvent</b>
+    <ul>
+	  <code>attr &lt;device&gt; addStateEvent [0|1]
+	  </code><br>
+      Bekanntlich wird normalerweise bei einem Event mit dem Reading "state" der state-String entfernt, d.h.
+      der Event ist nicht zum Beispiel "state: on" sondern nur "on". <br>
+	  Meistens ist es aber hilfreich in DbLog den kompletten Event verarbeiten zu können. Deswegen übernimmt DbLog per Default
+      den Event inklusive dem Reading-String "state". <br>
+      In einigen Fällen, z.B. alten oder speziellen Modulen, ist es allerdings wünschenswert den state-String wie gewöhnlich
+	  zu entfernen. In diesen Fällen bitte addStateEvent = "0" setzen.
+      Versuchen sie bitte diese Einstellung, falls es mit dem Standard Probleme geben sollte.	  
+      <br>
+    </ul>
+  </ul>
+  <br>
+  
   <ul><b>asyncMode</b>
     <ul>
 	  <code>attr &lt;device&gt; asyncMode [1|0]
