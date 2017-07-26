@@ -1,0 +1,984 @@
+# $Id$
+############################################################################
+# 2017-07-26, v0.0.16
+#
+# v0.0.16 erste SVN Version
+# - BUFIX:      Refresh CSRFTOKEN nach einem reconnect
+#				Readings zurücksetzen wenn Offline
+#                os_RunTime_days,os_RunTime_hours und os_RunTime_minutes
+#                printer_aktiv und printer_names
+#               div. Optimierungen
+# - FEATURE     Attribut "win_resetreadings:0,1" Standard = 1 / 1 = Readings zurücksetzen wenn Offline 
+#               Attribut "autoupdategitlab:0,1"  Standard = 1 / 0 = Hier kann der automatische Download deaktiviert werden.
+# - CHANGE      Attribut "http-noshutdown" Auf Standwardwert "0" gesetzt
+#
+# v0.0.15
+# - BUFIX:      Start optimiert / Log sortiert
+#
+# v0.0.14
+# - FEATURE:	Winconnect mit Windows starten
+#            	Ausführen (minimiert/normales Fenster)
+#            	checkprocess (prüft ob ein Prozess gestartet ist inkl. Anzahl)
+#            	wincontrol.exe.config wird nicht mehr benötigt
+#            	Windows Version (os_Version & os_ReleaseID ab Win10)
+#            	Benutzer / Hostname (os_Username, os_Computername & os_Domainname)
+#               Performance: CPU, Festplatte, Netzwerk, RAM, …
+#            	Hardware Ausrüstung: Prozessor, BIOS & RAM (memory_*, bios_* und cpu_*)
+#               VolumeDown, VolumeUp (mit attr volumeStep)
+#               Laufzeiten in Tage/Stunden/Minuten (os_RunTime_minutes, os_RunTime_hours und os_RunTime_days)
+# - BUFIX:      checkservice (im FHEM Reading wurde immer nur der erste Service eingetragen)
+#
+# v0.0.13
+# - FEATURE:	Performance Optimierungen
+#            	set powermode add(standby/hibernate)
+#            	drive informations (Space in MB/change only > 10MB)
+# - BUFIX:      div.
+#               Programmabsturtz nach ca. 4-5 Tagen 
+#
+# v0.0.12
+# - FEATURE:	CSRFToken
+# - BUFIX:      Detect Audio Sound
+#
+# v0.0.11
+# - FEATURE:	ttsmsg play sound
+#            	messagebox play sound
+#            	set camera (on/off)
+#            	make picture (camera)
+#            	motion detect (camera)
+#            	Update Winconnect.exe (inkl. autoupdate)
+#				microphone sound detection
+#				Startscreen
+# - BUFIX:      .NET Fehlermeldung
+#				set screen on
+#				set screen off
+# - Readings:	audio_devicename
+#				microphone_devicename
+#
+# v0.0.10
+# - FEATURE:	send notifymsg (set notifymsg Ballon Tip)
+#            	send messagebox (set messagebox)
+#            	Verzeichnis überwachen
+#            	set powermode (shutdown/restart)
+#
+# v0.0.9
+# - FEATURE: 	FHEM SSL
+#
+# v0.0.8
+# - FEATURE: 	FHEM Anmeldung (basicAuth)
+#            	volume mute (on/off)
+# - BUGFIX: 	statusrequest (firststart)
+# - Readings:   speecherrormessage
+#            	speecherrormessagequality
+#            	speechmessagequality
+#            	mute
+#
+# v0.0.7 - 20161107
+# - BUGFIX:     Umlaute beim senden einer ttsmsg
+# - FEATURE: 	set commandhide
+#            	set user_aktividletime
+#            	printer_aktiv
+#            	Spracherkennung
+#
+# v0.0.6 - 20161025
+# - BUFIX:      no audiodevice
+# - FEATURE:	set brightness 0 - 100
+#
+# v0.0.5 - 20161024
+# - BUGFIX
+#
+# v0.0.4 - 20161024
+# - BUGFIX:     (Bereinigung wincontrol / FHEM readings)
+# - FEATURE:	send ttsmsg (TextToSpeech)
+# - Readings:	os_StartTime         = Startzeit Windows
+#            	wincontrol_starttime = Startzeit WinControl
+#            	wincontrol_user      = Benutzer der Wintrol gestartet hat
+#            	battery_ChargeStatus
+#            	battery_LifePercent
+#            	battery_LifeRemainingsMin
+#            	battery_PowerLineStatus
+#
+# v0.0.3 - 20161020
+# - FEATURE:	set command
+#            	set showfile
+#            	set checkservice
+#
+# v0.0.0 - 20161018
+# - FEATURE:	ON/OFF Windows Screen
+#            	set volume
+#            	detect playing audio
+#
+#     Copyright by Michael Winkler
+#     e-mail: michael.winkler at online.de
+#
+#     This file is part of fhem.
+#
+#     Fhem is free software: you can redistribute it andor modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+
+package main;
+
+use strict;
+use warnings;
+use HttpUtils;
+use Time::Piece;
+
+sub WINCONNECT_Set($@);
+sub WINCONNECT_GetStatus($;$);
+sub WINCONNECT_Define($$);
+sub WINCONNECT_Undefine($$);
+
+# Autoupdateinformationen
+my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.16.exe";
+my $DownloadVer = "0.0.16";
+
+###################################
+sub WINCONNECT_Initialize($) {
+    my ($hash) = @_;
+
+    Log3 $hash, 5, "WINCONNECT_Initialize: Entering";
+
+    $hash->{SetFn}   = "WINCONNECT_Set";
+    $hash->{DefFn}   = "WINCONNECT_Define";
+    $hash->{UndefFn} = "WINCONNECT_Undefine";
+
+	$hash->{AttrList} = "volumeStep win_resetreadings:0,1 disable:0,1 autoupdategitlab:0,1 " . $readingFnAttributes;
+
+    return;
+}
+
+#####################################
+# Get Status
+#####################################
+sub WINCONNECT_GetStatus($;$) {
+    my ($hash, $update ) = @_;
+    my $name      = $hash->{NAME};
+    my $interval  = $hash->{INTERVAL};
+	
+    RemoveInternalTimer($hash);
+
+    return if ( AttrVal( $name, "disable", 0 ) == 1 );
+	
+	InternalTimer( gettimeofday() + $interval, "WINCONNECT_GetStatus", $hash, 0 );
+	
+	my $filename  = '././www/winconnect/WinControl.exe';
+	my $filedir   = '././www/winconnect';
+	my $filemtime = (stat $filename)[9];
+
+	Log3 $name, 5, "WINCONNECT $name: called function WINCONNECT_GetStatus()";
+	Log3 $name, 5, "WINCONNECT $name: filename  = " . $filename . " filemtime = " . $filemtime;
+	
+	readingsBeginUpdate($hash);
+	
+		#WinControl Versionsinformationen
+		readingsBulkUpdate( $hash, "wincontrol_gitlap", $DownloadVer );
+		readingsBulkUpdate( $hash, "wincontrol_gitlap_url", $DownloadURL);
+		
+		#WinControl Update Info eintragen
+		readingsBulkUpdate( $hash, "wincontrol_update", $filemtime );
+		readingsBulkUpdate( $hash, "model", ReadingsVal( $name, "os_Name", "unbekannt" ) );
+	
+	readingsEndUpdate( $hash, 1 );
+	
+	#Autoupdatefile von Gitlab herunterladen
+	if ($DownloadURL ne '' && !(-e $filename . "_" .$DownloadVer) && AttrVal( $name, "autoupdategitlab", "1" ) ) {
+	
+		#Verzeichnis anlegen
+		mkdir($filedir, 0777) unless(-d $filedir );
+
+		open (FILE, ">". $filename . "_" .$DownloadVer);
+		print FILE $name;
+		close (FILE);
+		Log3 $name, 0, "WINCONNECT [NEW] Download new version URL = $DownloadURL";
+		HttpUtils_NonblockingGet({url=>$DownloadURL, timeout=>5, hash=>$hash, service=>"autoupdate", callback=>\&WINCONNECT_GetNewVersion});
+	}
+	
+	if ( !$update ) {
+        WINCONNECT_SendCommand( $hash, "powerstate" );
+    }
+    else {
+		WINCONNECT_SendCommand( $hash, "statusrequest" );
+	}
+	
+    return;
+}
+
+sub WINCONNECT_GetNewVersion($$$) {
+	my ($hash, $err, $data) = @_;
+	my $filename  = '././www/winconnect/WinControl.exe';
+	my $name      = $hash->{NAME};
+   	my $CheckFile = $filename . "_" .$DownloadVer;
+	
+	# Alte Datei löschen
+	if (-e $filename) {unlink ($filename) or die $!;}
+    
+	# Download neue Datei
+	open(FH, ">$filename");
+	print FH $data;
+	close(FH);
+	
+	# Prüfen ob die Dateigröße passt!
+	if ((stat $filename)[7] < 600000) {
+		#Download fehlgeschlagen!
+		if (-e $CheckFile) {unlink ($CheckFile) or die $!;}
+
+		Log3 $name, 0, "WINCONNECT [NEW] Download ERROR file to small. Filesize = " . (stat $filename)[7];
+	}else{
+		Log3 $name, 0, "WINCONNECT [NEW] Download new version OK";
+	}
+}
+
+###################################
+sub WINCONNECT_SendCommand($$;$$) {
+    my ( $hash, $service, $cmd ) = @_;
+    my $name            = $hash->{NAME};
+    my $address         = $hash->{helper}{ADDRESS};
+    my $http_noshutdown = AttrVal( $name, "http-noshutdown", "0" );
+	my $serviceurl		= "";
+	my $PWRState 		= ReadingsVal( $name, "state", "" );
+	my $Winconnect      = ReadingsVal( $name, "wincontrol", "statusrequest" );
+	my $WinconnectUPD   = ReadingsVal( $name, "wincontrol_update", "0" );
+	my $URL;
+
+    Log3 $name, 5, "WINCONNECT $name: called function WINCONNECT_SendCommand()";
+
+    # Check Service and change serviceurl
+	if ($service eq "statusrequest") {
+		$serviceurl = "statusrequest";
+	}
+	elsif ($service eq "volume") {
+		$serviceurl = "volume";
+	}
+	elsif ($service eq "file_dir") {
+		$serviceurl = "file_dir";
+	}
+	elsif ($service eq "picture_dir") {
+		$serviceurl = "picture_dir";
+	}
+	elsif ($service eq "camera") {
+		$serviceurl = "camera";
+	}
+	elsif ($service eq "file_order") {
+		$serviceurl = "file_order";
+	}
+	elsif ($service eq "file_filter") {
+		$serviceurl = "file_filter";
+	}
+	elsif ($service eq "mute") {
+		$serviceurl = "volumemute";
+	}
+	elsif ($service eq "speechcommands") {
+		$serviceurl = "speechcommands";
+	}
+	elsif ($service eq "speechquality") {
+		$serviceurl = "speechquality";
+	}
+	elsif ($service eq "brightness") {
+		$serviceurl = "brightness";
+	}
+	elsif ($service eq "user_aktividletime") {
+		$serviceurl = "user_aktividletime";
+	}
+	elsif ($service eq "powerstate") {
+		$serviceurl = "powerstate" . "=" . $PWRState . ";" . $Winconnect . ";" . $WinconnectUPD;
+	}
+	elsif ($service eq "command") {
+		$serviceurl = "command";
+	}
+	elsif ($service eq "commandhide") {
+		$serviceurl = "commandhide";
+	}
+	elsif ($service eq "update") {
+		$serviceurl = "update";
+	}
+	elsif ($service eq "checkservice") {
+		$serviceurl = "checkservice";
+	}
+	elsif ($service eq "checkperformance") {
+		$serviceurl = "checkperformance";
+	}	
+	elsif ($service eq "checkperformance_interval") {
+		$serviceurl = "checkperformance_interval";
+	}
+	elsif ($service eq "checkprocess") {
+		$serviceurl = "checkprocess";
+	}
+	elsif ($service eq "showfile") {
+		$serviceurl = "showfile";
+	}
+	elsif ($service eq "ttsmsg") {
+		$serviceurl = "ttsmsg";
+	}
+	elsif ($service eq "powermode") {
+		$serviceurl = "powermode";
+	}
+	elsif ($service eq "messagebox") {
+		$serviceurl = "messagebox";
+	}
+	elsif ($service eq "notifymsg") {
+		$serviceurl = "notifymsg";
+	}
+	elsif ($service eq "screenon") {
+		$serviceurl = "screen=on";
+	}
+	elsif ($service eq "picture_make") {
+		$serviceurl = "picture_make";
+	}
+	elsif ($service eq "screenoff") {
+		$serviceurl = "screen=off";
+	}
+	else{
+		$serviceurl = $service;
+	}
+
+	# URL zusammenbauen
+	$cmd = ( defined($cmd) ) ? $cmd : "";
+    $URL =  "http://" . $address . ":8183/fhem/" . $serviceurl . $cmd ;
+	$URL =~ tr/\r\n/|/;
+	
+    Log3 $name, 6, "WINCONNECT $name: GET " . urlDecode($URL);
+
+     HttpUtils_NonblockingGet(
+            {
+                url        => $URL,
+                timeout    => 10,
+                noshutdown => $http_noshutdown,
+                #data       => undef, 2017.07.20 - enfernt
+                hash       => $hash,
+                service    => $service,
+                cmd        => $cmd,
+                #type       => $type, 2017.07.20 - enfernt
+				callback   => \&WINCONNECT_ReceiveCommand
+            }
+        );
+
+    return;
+}
+
+###################################
+sub WINCONNECT_Set($@) {
+    my ( $hash, @a ) = @_;
+    my $name       = $hash->{NAME};
+    my $state      = ReadingsVal( $name, "state", "absent" );
+   	my $cmd        = "";
+	my $Value	   = "";
+	my $Count      = 0;
+	
+    Log3 $name, 5, "WINCONNECT $name: called function WINCONNECT_Set()";
+
+	my $usage = "choose one of volume:slider,0,1,100 mute:on,off camera:on,off powermode:shutdown,restart,standby,hibernate volumeUp:noArg volumeDown:noArg brightness:slider,0,1,100 picture_make:noArg update:noArg speechquality:slider,0,1,100 statusRequest:noArg screenOn:noArg screenOff:noArg command commandhide showfile picture_dir checkperformance_interval checkperformance:textField-long checkservice checkprocess notifymsg messagebox file_dir file_filter file_order:ascending,descending ttsmsg user_aktividletime speechcommands";
+
+	return "No Argument given" if ( !defined( $a[1] ) );
+
+    # statusRequest
+    if ( lc( $a[1] ) eq "statusrequest" ) {
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1];
+		WINCONNECT_SendCommand( $hash, "statusrequest" );
+    }
+	
+	# on
+    elsif ( lc( $a[1] ) eq "on" ) {
+        readingsSingleUpdate( $hash, "state", "on",0 );
+    }
+
+	# powerstate
+    elsif ( lc( $a[1] ) eq "powerstate" ) {
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1];
+		WINCONNECT_SendCommand( $hash, "powerstate" );
+    }
+
+	# update
+    elsif ( lc( $a[1] ) eq "update" ) {
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1];
+		WINCONNECT_SendCommand( $hash, "update" );
+    }
+	
+    # off
+    elsif ( lc( $a[1] ) eq "off" ) {
+        readingsSingleUpdate( $hash, "state", "off",0 );
+    }
+	
+	# screenOn
+	elsif ( lc( $a[1] ) eq "screenon" ) {
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1];
+		if ( $state eq "on" ) {WINCONNECT_SendCommand( $hash, "screenon" );}else {return "Device needs to be ON to adjust screenon.";}
+    }
+	
+	#screenOff
+	elsif ( lc( $a[1] ) eq "screenoff" ) {
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1];
+		if ( $state eq "on" ) {WINCONNECT_SendCommand( $hash, "screenoff" );}else {return "Device needs to be ON to adjust screenoff.";}
+    }
+	
+	# volume
+    elsif ( lc( $a[1] ) eq "volume" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+            my $_ = $a[2];
+            if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+                $cmd = $a[2];
+            }
+            else {
+                return "Argument does not seem to be a valid integer between 0 and 100";
+            }
+			WINCONNECT_SendCommand( $hash, "volume" , "=" . $cmd  );
+			readingsSingleUpdate( $hash, "volume", $cmd,0 ); 
+        }
+        else {return "Device needs to be ON to adjust volume.";}
+    }
+		
+	# volumeUp
+	elsif ( lc( $a[1] ) eq "volumeup" ) {
+		my $volumeStep = int(AttrVal($name, "volumeStep", 5));
+		my $volumenow  = ReadingsVal( $name, "volume", 0);
+		my $volumeNew  = $volumenow + $volumeStep;
+				
+		if ($volumeNew > 100) {$volumeNew  = 100;}
+		
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $volumeNew;
+		if ( $state eq "on" ) {WINCONNECT_SendCommand( $hash, "volume" , "=" . $volumeNew  );readingsSingleUpdate( $hash, "volume", $volumeNew,0 );}else {return "Device needs to be ON to adjust volume.";}
+    }
+	
+	# volumeDown
+	elsif ( lc( $a[1] ) eq "volumedown" ) {
+		my $volumeStep = int(AttrVal($name, "volumeStep", 5));
+		my $volumenow  = ReadingsVal( $name, "volume", 0);
+		my $volumeNew  = $volumenow - $volumeStep;
+		
+		if ($volumeNew < 0) {$volumeNew  = 0;}
+		
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $volumeNew;
+		if ( $state eq "on" ) {WINCONNECT_SendCommand( $hash, "volume" , "=" . $volumeNew  );readingsSingleUpdate( $hash, "volume", $volumeNew,0 );}else {return "Device needs to be ON to adjust volume.";}
+    }
+	
+	# mute
+    elsif ( lc( $a[1] ) eq "mute" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+           	WINCONNECT_SendCommand( $hash, "volumemute" , "=" . $a[2]  );
+			readingsSingleUpdate( $hash, "mute", $a[2],0 ); 
+        }
+        else {return "Device needs to be ON to adjust volume mute.";}
+    }
+
+	# powermode
+    elsif ( lc( $a[1] ) eq "powermode" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+           	WINCONNECT_SendCommand( $hash, "powermode" , "=" . $a[2]  );
+        }
+        else {return "Device needs to be ON to adjust powermode.";}
+    }
+	
+	# user_aktividletime
+    elsif ( lc( $a[1] ) eq "user_aktividletime" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+            my $_ = $a[2];
+            if ( m/^\d+$/ && $_ >= 0 && $_ <= 10000 ) {
+                $cmd = $a[2];
+            }
+            else {
+                return "Argument does not seem to be a valid integer between 0 and 10000";
+            }
+			WINCONNECT_SendCommand( $hash, "user_aktividletime" , "=" . $cmd  );
+			readingsSingleUpdate( $hash, "user_aktividletime", $cmd,0 ); 
+        }
+        else {return "Device needs to be ON to adjust user_aktividletime.";}
+    }
+	
+	# brightness
+    elsif ( lc( $a[1] ) eq "brightness" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+            my $_ = $a[2];
+            if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+                $cmd = $a[2];
+            }
+            else {
+                return "Argument does not seem to be a valid integer between 0 and 100";
+            }
+			WINCONNECT_SendCommand( $hash, "brightness" , "=" . $cmd  );
+			readingsSingleUpdate( $hash, "brightness", $cmd,0 ); 
+        }
+        else {return "Device needs to be ON to adjust brightness.";}
+    }
+	
+	# speechquality
+    elsif ( lc( $a[1] ) eq "speechquality" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+            my $_ = $a[2];
+            if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+                $cmd = $a[2];
+            }
+            else {
+                return "Argument does not seem to be a valid integer between 0 and 100";
+            }
+			WINCONNECT_SendCommand( $hash, "speechquality" , "=" . $cmd  );
+			readingsSingleUpdate( $hash, "speechquality", $cmd,0 ); 
+        }
+        else {return "Device needs to be ON to adjust speechquality.";}
+    }
+	
+	# command
+    elsif ( lc( $a[1] ) eq "command" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "command" , "=" . $cmd );
+		}
+		else {return "Device needs to be ON to execute command.";}
+    }
+	
+	# commandhide
+	elsif ( lc( $a[1] ) eq "commandhide" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "commandhide" , "=" . $cmd );
+		}
+		else {return "Device needs to be ON to execute commandhide.";}
+    }
+		
+	# showfile
+    elsif ( lc( $a[1] ) eq "showfile" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "showfile" , "=" . $cmd );
+		}
+		else {return "Device needs to be ON to showfile.";}
+    }
+   
+	# ttsmsg
+    elsif ( lc( $a[1] ) eq "ttsmsg" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+				$Count = $Count + 1;
+				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "ttsmsg" , "=" . $cmd );
+			readingsSingleUpdate( $hash, "ttsmsg", $Value,0 );
+		}
+		else {return "Device needs to be ON to send ttsmsg.";}
+    }   
+
+	# messagebox
+    elsif ( lc( $a[1] ) eq "messagebox" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+				$Count = $Count + 1;
+				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "messagebox" , "=" . $cmd );
+			readingsSingleUpdate( $hash, "messagebox", $Value,0 );
+		}
+		else {return "Device needs to be ON to send messagebox.";}
+    } 
+	
+	# notifymsg
+    elsif ( lc( $a[1] ) eq "notifymsg" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+				$Count = $Count + 1;
+				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "notifymsg" , "=" . $cmd );
+			readingsSingleUpdate( $hash, "notifymsg", $Value,0 );
+		}
+		else {return "Device needs to be ON to send notifymsg.";}
+    } 
+	
+	# checkservice
+    elsif ( lc( $a[1] ) eq "checkservice" ) {
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+				$Count = $Count + 1;
+				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			readingsSingleUpdate( $hash, "checkservice", $Value,0 );
+			WINCONNECT_SendCommand( $hash, "checkservice" , "=" . $cmd );
+		}
+		else {return "Device needs to be ON to checkservice.";}
+    }
+
+	# checkperformance
+    elsif ( lc( $a[1] ) eq "checkperformance" ) {
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+				$Count = $Count + 1;
+				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			readingsSingleUpdate( $hash, "checkperformance", $Value,0 );
+			WINCONNECT_SendCommand( $hash, "checkperformance" , "=" . $cmd );
+		}
+		else {return "Device needs to be ON to checkperformance.";}
+    }
+
+	# checkperformance_interval
+    elsif ( lc( $a[1] ) eq "checkperformance_interval" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+            my $_ = $a[2];
+            if ( m/^\d+$/ && $_ >= 10 && $_ <= 10000 ) {
+                $cmd = $a[2];
+            }
+            else {
+                return "Argument does not seem to be a valid integer between 10 and 10000";
+            }
+			WINCONNECT_SendCommand( $hash, "checkperformance_interval" , "=" . $cmd  );
+			readingsSingleUpdate( $hash, "checkperformance_interval", $cmd,0 ); 
+        }
+        else {return "Device needs to be ON to adjust checkperformance_interval.";}
+    }
+	
+	# checkprocess
+    elsif ( lc( $a[1] ) eq "checkprocess" ) {
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+				$Count = $Count + 1;
+				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			readingsSingleUpdate( $hash, "checkprocess", $Value,0 );
+			WINCONNECT_SendCommand( $hash, "checkprocess" , "=" . $cmd );
+		}
+		else {return "Device needs to be ON to checkprocess.";}
+    }
+	
+	# speechcommands
+    elsif ( lc( $a[1] ) eq "speechcommands" ) {
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+				$Count = $Count + 1;
+				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "speechcommands" , "=" . $cmd );
+			readingsSingleUpdate( $hash, "speechcommands", $Value,0 );
+		}
+		else {return "Device needs to be ON to speechcommands.";}
+    }
+
+	# file_dir
+    elsif ( lc( $a[1] ) eq "file_dir" ) {
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+				$Count = $Count + 1;
+				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "file_dir" , "=" . $cmd );
+			readingsSingleUpdate( $hash, "file_dir", $Value,0 );
+		}
+		else {return "Device needs to be ON to file_dir.";}
+    }
+	
+	# file_filter
+    elsif ( lc( $a[1] ) eq "file_filter" ) {
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+				$Count = $Count + 1;
+				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "file_filter" , "=" . $cmd );
+			readingsSingleUpdate( $hash, "file_filter", $Value,0 );
+		}
+		else {return "Device needs to be ON to file_filter.";}
+    }
+
+	# file_order
+    elsif ( lc( $a[1] ) eq "file_order" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+           	WINCONNECT_SendCommand( $hash, "file_order" , "=" . $a[2]  );
+			readingsSingleUpdate( $hash, "file_order", $a[2],0 ); 
+        }
+        else {return "Device needs to be ON to adjust file_order.";}
+    }
+
+	# picture_dir
+    elsif ( lc( $a[1] ) eq "picture_dir" ) {
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+				$Count = $Count + 1;
+				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "picture_dir" , "=" . $cmd );
+			readingsSingleUpdate( $hash, "picture_dir", $Value,0 );
+		}
+		else {return "Device needs to be ON to picture_dir.";}
+    }
+
+	# picture_make
+	elsif ( lc( $a[1] ) eq "picture_make" ) {
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1];
+		if ( $state eq "on" ) {WINCONNECT_SendCommand( $hash, "picture_make" );}else {return "Device needs to be ON to adjust picture_make.";}
+    }
+
+	# camera
+    elsif ( lc( $a[1] ) eq "camera" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+           	WINCONNECT_SendCommand( $hash, "camera" , "=" . $a[2]  );
+        }
+        else {return "Device needs to be ON to adjust camera.";}
+    }
+	
+    # return usage hint
+    else {return $usage;}
+
+    return;
+}
+
+###################################
+sub WINCONNECT_Define($$) {
+    my ( $hash, $def ) = @_;
+    my @a 		   = split( "[ \t][ \t]*", $def );
+    my $name 	   = $hash->{NAME};
+	
+    Log3 $name, 5, "WINCONNECT $name: called function WINCONNECT_Define()";
+
+    if ( int(@a) < 2 ) {
+        my $msg = "Wrong syntax: define <name> WINCONNECT <ip-or-hostname> [<poll-interval>] ";
+        Log3 $name, 4, $msg;
+        return $msg;
+    }
+
+    $hash->{TYPE} = "WINCONNECT";
+
+    my $address = $a[2];
+    $hash->{helper}{ADDRESS} = $address;
+
+	# use interval of 45sec if not defined
+    my $interval = $a[3] || 45;
+    $hash->{INTERVAL} = $interval;
+	
+    # set default settings on first define
+    if ($init_done) {
+        $attr{$name}{icon} = 'it_server';
+    }
+	
+	# start the status update timer
+    RemoveInternalTimer($hash);
+    InternalTimer( gettimeofday() + 2, "WINCONNECT_GetStatus", $hash, 1);
+	
+    return;
+}
+
+sub WINCONNECT_ReceiveCommand($) {
+
+	my ($param, $err, $data) = @_;
+    my $hash     = $param->{hash};
+    my $name     = $hash->{NAME};
+	my $VerWin   = substr(ReadingsVal( $name, "wincontrol", "0" ),4);
+	my $VerGit   = substr(ReadingsVal( $name, "wincontrol_gitlap", "0" ),4);
+	my $service  = $param->{service};
+	
+	readingsBeginUpdate($hash);
+ 
+	# Versionsnachricht
+	my $Message = $name . "%20NOTIFYMSG%20Neue%20WinConnect%20Version%20verfügbar!%20Downloadlink%20=%20" . $DownloadURL;
+	
+    if($err ne "")    {
+		Log3 $name, 5, "WINCONNECT $name: error while requesting ".$param->{url}." - $err"; 
+        readingsBulkUpdate( $hash, "state", "off" );
+		readingsBulkUpdate( $hash, "audio", "off"); 
+		
+		if (AttrVal($name, "win_resetreadings", 1) eq '1') {
+			readingsBulkUpdate( $hash, "user_aktiv", "false" ); 
+			readingsBulkUpdate( $hash, "os_RunTime_days", "0" ); 
+			readingsBulkUpdate( $hash, "os_RunTime_hours", "0" ); 
+			readingsBulkUpdate( $hash, "os_RunTime_minutes", "0" ); 
+			readingsBulkUpdate( $hash, "printer_aktiv", "false" );
+			readingsBulkUpdate( $hash, "printer_names", "no_prining" );
+		}
+
+    }
+ 
+    elsif($data ne "")
+    {
+		readingsBulkUpdate( $hash, "state", "on" );
+        Log3 $name, 5, "WINCONNECT $name: url ".$param->{url}." returned: $data";
+		
+		# 2017.07.26 - Check update
+		if ($VerWin < $VerGit && $hash->{helper}{SENDVERSION} eq  '' && $service ne 'notifymsg') {
+			# Neue Version vorhanden
+			$hash->{helper}{SENDVERSION} = '1';
+			WINCONNECT_SendCommand( $hash, "notifymsg" , "=" . $Message);
+		} else{
+			delete($hash->{helper}{SENDVERSION})
+		}
+    }
+
+	readingsEndUpdate( $hash, 1 );
+
+}
+
+############################################################################################################
+#
+#   Begin of helper functions
+#
+############################################################################################################
+
+###################################
+sub WINCONNECT_Undefine($$) {
+    my ( $hash, $arg ) = @_;
+    my $name = $hash->{NAME};
+
+    Log3 $name, 5, "WINCONNECT $name: called function WINCONNECT_Undefine()";
+
+    # Stop the internal GetStatus-Loop and exit
+    RemoveInternalTimer($hash);
+
+    return;
+}
+
+1;
+=pod
+=item device
+=item summary control for Windows based systems via network connection
+=item summary_DE Steuerung von Windows basierte Systemen &uuml;ber das Netzwerk
+=begin html
+
+<a name="WINCONNECT"></a>
+<h3>WINCONNECT</h3>
+<ul>
+  This module controls a Windows PC.
+  <br><br>
+  
+    <ul>
+      <a name="WINCONNECTdefine" id="WINCONNECTdefine"></a> <b>Define</b>
+      <ul>
+        <code>define &lt;name&gt; WINCONNECT &lt;ip-address-or-hostname&gt; [&lt;poll-interval&gt;]</code><br>
+        <br>
+        Defining an WINCONNECT device will schedule an internal task (interval can be set with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 45 seconds), which periodically reads the status of the device and triggers notify/filelog commands.<br>
+        <br>
+        Example:<br>
+        <ul>
+          <code>define Buero.PC WINCONNECT 192.168.0.10<br>
+          <br>
+          # With custom interval of 60 seconds<br>
+          define Buero.PC WINCONNECT 192.168.0.10 60<br></code>
+		</ul>
+	  </ul>
+	</ul>
+	
+  <br><br>
+    More information on <a target="_blank" href="https://forum.fhem.de/index.php/topic,59251.0.html">FHEM Forum</a>.<br/>
+  <br>
+</ul>
+
+=end html
+=begin html_DE
+
+<a name="WINCONNECT"></a>
+<h3>WINCONNECT</h3>
+<ul>
+  Diese Module dient zur Steuerung eines Windows PCs 
+  <br><br>
+  
+    <ul>
+      <a name="WINCONNECTdefine" id="WINCONNECTdefine"></a> <b>Define</b>
+      <ul>
+        <code>define &lt;name&gt; WINCONNECT &lt;ip-address-or-hostname&gt; [&lt;poll-interval&gt;]</code><br>
+        <br>
+        F&uuml;r definierte WINCONNECT Ger&auml;te wird ein interner Task angelegt, welcher periodisch die Readings aktualisiert. Der Standartpollintervall ist 45 Sekunden.<br>
+        <br>
+        Example:<br>
+        <ul>
+          <code>define Buero.PC WINCONNECT 192.168.0.10<br>
+          <br>
+          # Alternativer poll intervall von 60 seconds<br>
+          define Buero.PC WINCONNECT 192.168.0.10 60<br></code>
+      </ul>
+    </ul>
+	</ul>
+  <br><br>
+    Mehr Information im <a target="_blank" href="https://forum.fhem.de/index.php/topic,59251.0.html">FHEM Forum</a>.<br/>
+  <br>
+</ul>
+
+=end html_DE
+=cut
