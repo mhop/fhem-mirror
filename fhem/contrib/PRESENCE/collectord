@@ -863,6 +863,7 @@ sub aggregateRooms
 
     my $previous = "absence";
     my %rssi_results = ();
+    my $hroom;
     my @rooms;
     my $key;
 
@@ -922,7 +923,7 @@ sub aggregateRooms
                             $highest_key = $key;
                         }
 
-			$rssi_results{$key} = $h->{$rssi_addon_data_key};
+                        $rssi_results{$key} = $h->{$rssi_addon_data_key};
                     }
                     else
                     {
@@ -939,20 +940,22 @@ sub aggregateRooms
         if($rssi_available and defined($highest_key))
         {
             Log 2, "successful RSSI comparisation (highest $rssi_addon_data_key value $highest_value found in room $highest_key" if(@rooms > 1);
-            @rooms = ($highest_key);
+            $hroom = $highest_key;
         }
     }
 
     if(@rooms > 0)
     {
-        my $rssi_data = join(";", map { "rssi_".$_."='".$rssi_results{$_}."'" } map { s/\s+/_/g } grep {$rssi_results{$_}} keys %rssi_results);
-        return "present;room='".join(",",sort  @rooms).
-                (defined($hash->{$rooms[0]}{data}) ? "';".$hash->{$rooms[0]}{data} : "").
+        my $rssi_data = join(";", map("rssi_".$_."='".$rssi_results{$_}."'", map {s/\s+/_/rg } keys %rssi_results)));
+        my $ret = "present". 
+                (defined($hroom) ? ";room='".$hroom."'" : ""). 
+                "rooms='".join(",",sort  @rooms)."'".
+                (defined($hroom) ? ";".$hash->{$hroom}{data} : (defined($hash->{$rooms[0]}{data}) ? "';".$hash->{$rooms[0]}{data} : "")).
                 (defined($rssi_data) ? ";".$rssi_data : "");
     }
     else
     {
-        return  "absence";
+        return  "absence;room=;rooms=;rssi=;";
     }
 }
 
