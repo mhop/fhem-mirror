@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_AMADDevice: Version 4.0.1 Charset utf8
   - changed: 93_DBLog: V.2.21.3, commandref revised
   - new:     74_AMADDevice: New Version of AMAD (AMADNG) Verion 4.0
   - new:     73_AMADCommBridge: New Version of AMAD (AMADNG) Verion 4.0

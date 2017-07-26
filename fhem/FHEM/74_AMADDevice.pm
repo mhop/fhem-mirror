@@ -54,7 +54,7 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.0";
+my $modulversion = "4.0.1";
 my $flowsetversion = "4.0.0";
 
 
@@ -377,6 +377,7 @@ sub AMADDevice_WriteReadings($$) {
         
         $v =~ s/\bnull\b/off/g if( ($t eq "nextAlarmDay" or $t eq "nextAlarmTime") and $v eq "null" );
         $v =~ s/\bnull\b//g;
+        $v = encode_utf8($v);
         
         readingsBulkUpdateIfChanged($hash, $t, $v, 1) if( defined( $v ) and ($t ne 'deviceState'
                                                             or $t ne 'incomingCallerName'
