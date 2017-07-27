@@ -222,10 +222,6 @@ sub doAggregate() {
 
       foreach my $type (sort @keys) {
          next if $type eq 'system';
-         if(lc($type) eq 'configdb') {
-            $countAll{'modules'}{$type}{'definitions'} = 0;
-            next;
-         }
          $countAll{'modules'}{$type}{'definitions'}   += $decoded->{$type}{'noModel'} ? $decoded->{$type}{'noModel'} : 0;
          $countAll{'modules'}{$type}{'installations'} += 1;
          while ( my ($model, $count) = each( %{$decoded->{$type}}) ) { 
@@ -233,8 +229,12 @@ sub doAggregate() {
             $countAll{'modules'}{$type}{'definitions'} += $count; 
             next if(ref($model) eq "HASH");
             next if($model eq "migratedData");
-            $countAll{'models'}{$type}{$model}{'definitions'} += $count;
             $countAll{'models'}{$type}{$model}{'installations'} += 1;
+            $countAll{'models'}{$type}{$model}{'definitions'} += $count;
+            if (lc($type) eq 'configdb') {
+               $countAll{'modules'}{$type}{'definitions'} = 0;
+               $countAll{'models'}{$type}{$model}{'definitions'} = 0;
+            }
          }
       }
    }
