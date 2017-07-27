@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 07/2017
-my $thzversion = "0.163"; 
+my $thzversion = "0.164"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -31,6 +31,7 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use feature ":5.10";
 use SetExtensions;
+use Blocking;
 
 sub THZ_Read($);
 sub THZ_ReadAnswer($);
@@ -611,7 +612,7 @@ my %getsonly2xx = (
   "sHC2"			=> {cmd2=>"F5", type =>"F5hc2",    unit =>""},
   "sSystem"			=> {cmd2=>"F6", type =>"F6sys206", unit =>""},
   "sHistory"			=> {cmd2=>"09", type =>"09his206", unit =>""},
-  "sLast10errors"		=> {cmd2=>"D1", type =>"D1last206", unit =>""},
+ # "sLast10errors"		=> {cmd2=>"D1", type =>"D1last206", unit =>""},   removed  after andres hint; 33211.msg658108
   "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob206", unit =>""},  #allFB
   "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime206", unit =>""},
  );
@@ -717,6 +718,7 @@ sub THZ_Define($$)
     return undef;
   }
   $hash->{DeviceName} = $dev;
+  $attr{$name}{devStateIcon} = 'opened:10px-kreis-gruen disconnected:10px-kreis-rot';
   my $ret = DevIo_OpenDev($hash, 0, "THZ_Refresh_all_gets");
   return $ret;
 }
@@ -763,7 +765,7 @@ sub THZ_GetRefresh($) {
 			  InternalTimer(gettimeofday()+ $interval, "THZ_GetRefresh", $par, 1) ;
 	}
 	$replyc = THZ_Get($hash, $hash->{NAME}, $command) if ($hash->{STATE} ne "disconnected");
-	#BlockingCall("THZ_GetNB", $hash->{NAME} . "|". $command) if ($hash->{STATE} ne "disconnected");
+	#BlockingCall("THZ_GetNB",   $hash->{NAME} ."|". $command) if ($hash->{STATE} ne "disconnected");
     if ($command =~ "sFirmware") {  # model summary for statistics
         my $sFirmwareId = join('', (split(/ |:/, ReadingsVal($name,"sFirmware-Id"," : : : ")))[0..6]);
         my $sFirmware= (split(/ /, ReadingsVal($name,"sFirmware","  ")))[1];
@@ -1019,7 +1021,8 @@ sub THZ_GetNB($){
     my $hash = $defs{$name};
     my ($err, $msg2)=THZ_Get($hash, $name, $cmd);
     open (MYFILE, '>>data.txt');
-    print MYFILE ($name . "-" . $cmd . "-" . $msg2 . "-" . $err  ."\n");
+    my $FD=$hash->{FD} ;
+    print MYFILE ($name . "-" . $cmd .  "-" . $FD . "-" . $msg2 . "-" . $err  ."\n");
     close (MYFILE); 
     return ($name . "|" . $msg2); 
 }
@@ -1048,6 +1051,8 @@ sub THZ_Get($@){
     $err=THZ_backup_readings($hash);
     return $err;
   }
+  
+  
   my $cmdhash = $gets{$cmd};
   #return "Unknown argument $cmd, choose one of " .   join(" ", sort keys %gets) if(!defined($cmdhash));
   if(!defined($cmdhash)) {
@@ -1130,14 +1135,14 @@ sub THZ_Get_Comunication($$) {
   #slow down for old firmwares
   select(undef, undef, undef, 0.25) if (AttrVal($hash->{NAME}, "firmware" , "4.39")  =~ /^2/ );
   select(undef, undef, undef, 0.001);
-  THZ_Write($hash,  "02"); 			# step1 --> STX start of text 	
+  THZ_Write($hash,  "02"); 			# step0 --> STX start of text 	
   ($err, $msg) = THZ_ReadAnswer($hash);
 
 #Expectedanswer1    is  "10"  DLE data link escape
 
   if ($msg ne "10")    {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15"); select(undef, undef, undef, 0.1); return($err, $msg) ;}
   else  {
-     THZ_Write($hash,  $cmdHex); 		# step2 --> send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
+     THZ_Write($hash,  $cmdHex); 		# step1 --> send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
      ($err, $msg) = THZ_ReadAnswer($hash);
   }
   
@@ -1148,7 +1153,7 @@ sub THZ_Get_Comunication($$) {
   if ($msg eq "10") 	{ ($err, $msg) = THZ_ReadAnswer($hash);}
   elsif ($msg eq "15") 	{ $err .=  " THZ_Get_Com: error found at step1  NAK!! "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
   if ($msg eq "1002" || $msg eq "02") {
-    THZ_Write($hash,  "10"); 		    	# step3 --> DLE data link escape  // ack datatranfer
+    THZ_Write($hash,  "10"); 		    	# step2 --> DLE data link escape  // ack datatranfer
     ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
     THZ_Write($hash,  "10");  
   }
