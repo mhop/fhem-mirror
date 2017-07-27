@@ -946,7 +946,7 @@ sub aggregateRooms
 
     if(@rooms > 0)
     {
-        my $rssi_data = join(";", map("rssi_".$_."='".$rssi_results{$_}."'", map {s/\s+/_/rg } keys %rssi_results)));
+        my $rssi_data = join(";", map("rssi_".$_."='".$rssi_results{$_}."'", map {s/\s+/_/rg } keys %rssi_results));
         my $ret = "present". 
                 (defined($hroom) ? ";room='".$hroom."'" : ""). 
                 "rooms='".join(",",sort  @rooms)."'".
