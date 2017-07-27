@@ -227,7 +227,7 @@ sub doAggregate() {
          while ( my ($model, $count) = each( %{$decoded->{$type}}) ) { 
             next if($model eq "noModel");
             $countAll{'modules'}{$type}{'definitions'} += $count; 
-            next if(ref($model) eq "HASH");
+            next if($model =~ /HASH\(/ || $model =~ /disabling/);
             next if($model eq "migratedData");
             $countAll{'models'}{$type}{$model}{'installations'} += 1;
             $countAll{'models'}{$type}{$model}{'definitions'} += $count;
