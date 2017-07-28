@@ -1,8 +1,14 @@
 ﻿# $Id$
 ############################################################################
-# 2017-07-25, v1.0.7
+# 2017-07-28, v1.0.8
 #
-# v1.0.7
+# v1.0.8
+# - BUFIX:   Code Optimierungen
+#            Zeilenumbruch in EPG Informationen entfernt
+#            NEUTRINO BUG Umschalten wenn EGP und CHANNEL_ID nicht passen!
+#            BUG leeres EPG https://forum.fhem.de/index.php/topic,54481.msg665355.html#msg665355
+#
+# v1.0.7 erste SVN Version
 # - FEATURE: Reading Model hinzugefügt
 # - CHANGE   CommandRef ergänzt
 # - BUFIX:   Optimierung Neutrino Version/Model auslesen bei
@@ -98,9 +104,7 @@ sub NEUTRINO_Initialize($) {
     $hash->{DefFn}   = "NEUTRINO_Define";
     $hash->{UndefFn} = "NEUTRINO_Undefine";
 
-    $hash->{AttrList} =
-"https:0,1 http-method:absolete http-noshutdown:1,0 disable:0,1 timeout "
-      . $readingFnAttributes;
+    $hash->{AttrList} = "https:0,1 http-method:absolete http-noshutdown:1,0 disable:0,1 timeout " . $readingFnAttributes;
   
     return;
 }
@@ -218,10 +222,6 @@ sub NEUTRINO_SendCommand($$;$$) {
 		$serviceurl = 
 					"epg?xml=true&channelname="
 					. $channelname . "&max=6";
-	}
-	
-	elsif ($service eq "getrawtime") {
-		$serviceurl = "gettime?rawtime";
 	}
 	
 	elsif ($service eq "timerlist") {
@@ -773,7 +773,12 @@ sub NEUTRINO_ReceiveCommand($$$) {
 	if ($service eq "timerlist" && $data == 0){
 		$data = "empty";
 	}
-
+	
+	# volume data = 0 then data = off
+	if ($service eq "volume" && $data == 0){
+		$data = "off";
+	}
+	
     # device not reachable
 	if ($err) {
 
@@ -1007,11 +1012,15 @@ sub NEUTRINO_ReceiveCommand($$$) {
         elsif ( $service eq "volume" ) {
             if (index(lc(@ans[0]), "ok")  != -1) {
 				#2017.07.12 - Nur bei einer Aenderung schreiben
-				if (ReadingsVal( $name, "volume", "0" ) ne substr($cmd,1) ) {readingsBulkUpdate( $hash, "volume", substr($cmd,1) );}
+				readingsBulkUpdateIfChanged( $hash, "volume", substr($cmd,1) );
+			}
+			elsif (index(lc(@ans[0]), "off")  != -1) {
+				#2017.07.12 - Nur bei einer Aenderung schreiben
+				readingsBulkUpdateIfChanged( $hash, "volume", "0" );
 			}
 			elsif (@ans[0]) {
 				#2017.07.12 - Nur bei einer Aenderung schreiben
-				if (ReadingsVal( $name, "volume", "0" ) ne @ans[0] ) {readingsBulkUpdate( $hash, "volume", @ans[0] );}
+				readingsBulkUpdateIfChanged( $hash, "volume", @ans[0] );
 			}
 			else {
 				Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ERROR: no volume could be extracted";
@@ -1230,57 +1239,40 @@ sub NEUTRINO_ReceiveCommand($$$) {
                   "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ERROR: no record epg information could be found";
             }	   
         }
-		
-		# time
-        elsif ( $service eq "gettime" ) {
-            if (@ans[0]) {
-
-				readingsBulkUpdate( $hash, "time_now", @ans[0] )
-			}
-			else {
-				Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ERROR: no time could be extracted";
-			}
-		
-        }
-		
-		# rawtime
-        elsif ( $service eq "getrawtime" ) {
-            if (@ans[0]) {
-				readingsBulkUpdate( $hash, "time_raw_now", @ans[0] );
-			}
-			else {
-				Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ERROR: no rawtime could be extracted";
-			}
-
-        }
-		
+			
 		# channel (ID)
         elsif ( $service eq "zapto" ) {
             
 			if (@ans[0]) {
-			
-				# 2017.07.12 - EPG Info aktualisieren wenn der Kanal gewurde!
-				if (ReadingsVal( $name, "channel_id", "0" ) ne @ans[0]  ) {
-					Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] detect change OLD " . ReadingsVal( $name, "channel_id", "0" );
-					Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] detect change NEW @ans[0]";
-					#2017.07.12 - entfernt: channel_id wird mit epginfos gesetzt 'readingsBulkUpdate( $hash, "channel_id", @ans[0] );'
-					NEUTRINO_SendCommand( $hash, "epginfo" );
-					NEUTRINO_SendCommand( $hash, "build_live_url" ); #2017.07.12 - channel_url wird nur beim Senderwechsel aktualisiert!
-					#NEUTRINO_SendCommand( $hash, "bouquet" );        #2017.07.12 - Bouquetliste wird nur beim Senderwechsel aktualisiert!
-					NEUTRINO_SendCommand( $hash, "getmode" );        #2017.07.12 - Mode wird nur beim Senderwechsel aktualisiert!
+				if (@ans[0] eq 'ok') {
+					# Umschalten eines Sender erkannt / Aktuellen Sender abfragen!
+					Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] detect switch channel";
+					NEUTRINO_SendCommand( $hash, "zapto" );
 				}
 				else {
-					# 2017.07.12 - EPGInfo aktualisieren wenn die aktuelle Sendeung zu ende ist
-					if ($UnixDate > ReadingsVal( $name, "egp_current_stop_sec", "0" )  ) {
-						Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] epginfo detect change";
+					# Prüfen ob div. Informationen aktualisiert werden müssen
+					if (ReadingsVal( $name, "channel_id", "0" ) ne @ans[0]  ) {
+						Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] detect change OLD " . ReadingsVal( $name, "channel_id", "0" );
+						Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] detect change NEW @ans[0]";
+						
+						readingsBulkUpdateIfChanged( $hash, "channel_id", @ans[0] );
+						
 						NEUTRINO_SendCommand( $hash, "epginfo" );
+						NEUTRINO_SendCommand( $hash, "build_live_url" ); #2017.07.12 - channel_url wird nur beim Senderwechsel aktualisiert!
+						NEUTRINO_SendCommand( $hash, "getmode" );        #2017.07.12 - Mode wird nur beim Senderwechsel aktualisiert!
+					}
+					else {
+						# 2017.07.12 - EPGInfo aktualisieren wenn die aktuelle Sendeung zu ende ist
+						if ($UnixDate > ReadingsVal( $name, "egp_current_stop_sec", "0" )  ) {
+							Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] epginfo detect change";
+							NEUTRINO_SendCommand( $hash, "epginfo" );
+						}
 					}
 				}
 			}
 			else {
 				Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ERROR: no ID could be extracted";
 			}
-
 		}
 		
 		# stream URL
@@ -1319,14 +1311,14 @@ sub NEUTRINO_ReceiveCommand($$$) {
 			if (@ans[0]) {
 				if (index(lc(@ans[0]), "on")  != -1) {
 					#2017.07.12 - Nur bei einer Aenderung schreiben
-					if (ReadingsVal( $name, "recordmode", "0" ) ne 'on' ) {readingsBulkUpdate( $hash, "recordmode","on");}
+					readingsBulkUpdateIfChanged( $hash, "recordmode","on");
 				}
 				elsif(index(lc(@ans[0]), "off")  != -1) {
 					#2017.07.12 - Nur bei einer Aenderung schreiben
-					if (ReadingsVal( $name, "recordmode", "0" ) ne 'off' ) {readingsBulkUpdate( $hash, "recordmode","off");}
+					readingsBulkUpdateIfChanged( $hash, "recordmode","off");
 				}
 				else{
-					readingsBulkUpdate( $hash, "recordmode", "-" )
+					readingsBulkUpdateIfChanged( $hash, "recordmode", "-" )
 				}
 			}
 			else {
@@ -1354,7 +1346,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
 				$readvalue =~ s/\s/_/g;
 				readingsBulkUpdate( $hash, "channel",$readvalue);
 				
-				if (defined( $return->{prog} ) ) {
+				if (defined( $return->{prog} ) && $return->{prog} ) {
 				
 					#egp stop time serach
 					my $arr_size = @{ $return->{prog} };
@@ -1370,49 +1362,37 @@ sub NEUTRINO_ReceiveCommand($$$) {
 						$i++;
 					}
 					
-					foreach ( "eventid", ) {
-						$reading   = $_;
-
-						if ( defined( $return->{prog}[$readnumber]{$reading} )
-							&& lc( $return->{prog}[$readnumber]{$reading} ) ne "n/a" )
-						{
-							$readvalue = $return->{prog}[$readnumber]{$reading};
-							if ($readvalue) {
-								readingsBulkUpdate( $hash, $reading, $readvalue );
-							}
-							else {
-								readingsBulkUpdate( $hash, $reading, "0" );
-							}
-						}
-						else {
-							readingsBulkUpdate( $hash, $reading, "0" );
-						}
+					# 2017.07.27 - BUG NEUTRINO / Umschalten wenn EGP und CHANNEL_ID nicht passen!
+					if (ReadingsVal( $name, "channel_id", "" ) ne $return->{prog}[$readnumber]{channel_id}) {
+						Log3 $name, 0, "NEUTRINO [BUG NEUTRINO] EPG channel_id = " . $return->{prog}[$readnumber]{channel_id} ;
+						NEUTRINO_SendCommand( $hash, "zapto", $return->{prog}[$readnumber]{channel_id} );
 					}
-					
-					# 2017.07.12 - current channel_ID
-					readingsBulkUpdate( $hash, "channel_id",$return->{prog}[$readnumber]{channel_id});
-					
+
 					# currentTitel
 					$readvalue = $return->{prog}[$readnumber]{description};
 					readingsBulkUpdate( $hash, "currentTitle",$readvalue);
+					Log3 $name, 0, "NEUTRINO [DEBUG]" . ReadingsVal( $name, "egp_current_info2", "" ) ;
 					
-					foreach ( "description","info1","info2","start_t","stop_t","duration_min","date","channel_id","stop_sec","start_sec", ) {
+					foreach ( "eventid","description","info1","info2","start_t","stop_t","duration_min","date","channel_id","stop_sec","start_sec", ) {
 						$reading     = $_;
-						$readingname = "egp_current_" . $_;
-
+						if ($_ eq "eventid") {$readingname = $reading ;} else {$readingname = "egp_current_" . $_;}
+						
 						if ( defined( $return->{prog}[$readnumber]{$reading} )
 							&& lc( $return->{prog}[$readnumber]{$reading} ) ne "n/a" )
 						{
 							$readvalue = $return->{prog}[$readnumber]{$reading};
+							$readvalue =~ s/\n//g;
+							
 							if ($readvalue) {
 								readingsBulkUpdate( $hash, $readingname, $readvalue );
+								Log3 $name, 0, "NEUTRINO [DEBUG]" . $readvalue ;
 							}
 							else {
-								readingsBulkUpdate( $hash, $readingname, "0" );
+								readingsBulkUpdate( $hash, $readingname, "-" );
 							}
 						}
 						else {
-							readingsBulkUpdate( $hash, $readingname, "0" );
+							readingsBulkUpdate( $hash, $readingname, "-" );
 						}
 					}
 				}
@@ -1432,7 +1412,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
 						if (index(lc($line), $_)  != -1) {
 							$signalvalue = substr($line,index($line,":")+1);
 							#2017.07.12 - Nur bei einer Aenderung schreiben
-							if (ReadingsVal( $name, "$_", "0" ) ne $signalvalue ) {readingsBulkUpdate( $hash, "$_",$signalvalue);}
+							readingsBulkUpdateIfChanged( $hash, "$_",$signalvalue);
 						}
 					}
 				}
