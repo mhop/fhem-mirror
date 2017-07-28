@@ -27,6 +27,11 @@
 #########################################################################################################################
 #  Versions History:
 #
+# 2.4.0  28.07.2017    new set command runView lastsnap_fw, commandref revised, minor fixes
+# 2.3.2  28.07.2017    code change of getcaminfo (params of Interaltimer)
+# 2.3.1  28.07.2017    code review creating log entries when pollnologging is set/unset
+# 2.3.0  27.07.2017    new "get snapinfo" command, minor fixes
+# 2.2.4  25.07.2017    avoid error "Operation Getptzlistpreset of Camera ... was not successful" if cam is disabled
 # 2.2.3  30.06.2017    fix if SVSversion small "0", create events for "snap"
 # 2.2.2  11.06.2017    bugfix sscam_login, sscam_login_return, 
 #                      Forum: https://forum.fhem.de/index.php/topic,45671.msg646701.html#msg646701
@@ -162,7 +167,7 @@
 
 package main;
               
-eval "use JSON qw( decode_json );1" or my $SScamMMDBI = "JSON";   # Debian: apt-get install libjson-perl
+eval "use JSON qw( decode_json );1;" or my $SScamMMDBI = "JSON";  # Debian: apt-get install libjson-perl
 use Data::Dumper;                                                 # Perl Core module
 use strict;                           
 use warnings;
@@ -171,7 +176,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "2.2.3";
+my $SSCamVersion = "2.4.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -410,7 +415,7 @@ sub SSCam_Set {
                    "snap ".
                    "enable ".
                    "disable ".
-                   "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open ".
+                   "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open,lastsnap_fw ".
                    "stopView:noArg ".
                    "extevent:1,2,3,4,5,6,7,8,9,10 ".
                    ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
@@ -609,8 +614,13 @@ sub SSCam_Set {
                 $hash->{HELPER}{WLTYPE}     = "image"; 
 				$hash->{HELPER}{ALIAS}      = " ";
 				$hash->{HELPER}{RUNVIEW}    = "live_fw";
+            } elsif ($prop eq "lastsnap_fw") {
+                $hash->{HELPER}{OPENWINDOW}  = 0;
+                $hash->{HELPER}{WLTYPE}      = "base64img"; 
+				$hash->{HELPER}{ALIAS}       = " ";
+				$hash->{HELPER}{RUNVIEW}     = "lastsnap_fw";
             } else {
-                return "$prop isn't a valid option of runview, use one of live_fw, live_link, live_open, lastrec_fw, lastrec_open";
+                return "$prop isn't a valid option of runview, use one of live_fw, live_link, live_open, lastrec_fw, lastrec_open, lastsnap_fw";
             }
             runliveview($hash); 
             
@@ -644,6 +654,7 @@ sub SSCam_Get {
 	
 	my $getlist = "Unknown argument $opt, choose one of ".
                   "caminfoall:noArg ".
+				  "snapinfo:noArg ".
                   "svsinfo:noArg ".
                   "snapfileinfo:noArg ".
                   "eventlist:noArg ".
@@ -663,6 +674,9 @@ sub SSCam_Get {
                 
     } elsif ($opt eq "svsinfo") {
         getsvsinfo($hash);
+                
+    } elsif ($opt eq "snapinfo") {
+        getsnapinfo("$name:0:0");
                 
     } elsif ($opt eq "snapfileinfo") {
         if (!ReadingsVal("$name", "LastSnapId", undef)) {return "Reading LastSnapId is empty - please take a snapshot before !"}
@@ -693,7 +707,7 @@ return;
 # wird von FW aufgerufen. $FW_wname = aufrufende Webinstanz, $d = aufrufendes 
 # Device (z.B. CamCP1)
 sub SSCam_FWview ($$$$) {
-  my ($FW_wname, $d, $room, $pageHash) = @_;            # # pageHash is set for summaryFn in FHEMWEB
+  my ($FW_wname, $d, $room, $pageHash) = @_;   # pageHash is set for summaryFn in FHEMWEB
   my $hash          = $defs{$d};
   my $name          = $hash->{NAME};
   my $link          = $hash->{HELPER}{LINK};
@@ -703,20 +717,24 @@ sub SSCam_FWview ($$$$) {
     
   return if(!$hash->{HELPER}{LINK} || ReadingsVal("$name", "state", "") =~ /^dis.*/ || IsDisabled($name));
   
-  Log3($name, 5, "$name - SSCam_FWview called by FW_wname: $FW_wname, device: $d, room: $room");
-  my $attr = AttrVal($d, "htmlattr", "");
+  my $attr = AttrVal($d, "htmlattr", " ");
+  Log3($name, 4, "$name - SSCam_FWview called - FW_wname: $FW_wname, device: $d, room: $room, attributes: $attr");
   
   if($wltype eq "image") {
-    $ret = "<img src=$link $attr><br>" .weblink_FwDetail($d);
+    $ret = "<img src=$link $attr><br>".weblink_FwDetail($d);
   
   } elsif($wltype eq "iframe") {
-    $ret = "<iframe src=$link $attr>Iframes disabled</iframe>" .weblink_FwDetail($d);
+    $ret = "<iframe src=$link $attr>Iframes disabled</iframe>".weblink_FwDetail($d);
            
   } elsif($wltype eq "link") {
     $alias = $hash->{HELPER}{ALIAS};
-    $ret = "<a href=$link $attr>$alias</a><br>";        # wenn attr target=_blank neuer Browsertab
+    $ret = "<a href=$link $attr>$alias</a><br>";     
 
+  } elsif($wltype eq "base64img") {
+    $alias = $hash->{HELPER}{ALIAS};
+    $ret = "<img $attr alt='$alias' src='data:image/jpeg;base64,$link'><br>";
   }
+  
   # FW_directNotify("FILTER=room=$room", "#FHEMWEB:$FW_wname", "location.reload('true')", "") if($d eq $name);
 return $ret;
 }
@@ -748,6 +766,7 @@ sub initonboot ($) {
          getsvsinfo($hash);
          # Kameraspezifische Infos holen
          getcaminfo($hash);
+		 getsnapinfo("$name:0:0");
          getcapabilities($hash);
          # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
          getptzlistpreset($hash);
@@ -969,9 +988,7 @@ sub camstartrec ($) {
     } 
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Aufnahme starten
-        Log3($name, 4, "$name - Recording of Camera $camname will be started now");
-                           
+        # Aufnahme starten                         
         $hash->{OPMODE} = "Start";
         $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1025,9 +1042,6 @@ sub camstoprec ($) {
     } 
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Aufnahme stoppen
-        Log3($name, 4, "$name - Recording of Camera $camname will be stopped now");
-                        
         $hash->{OPMODE} = "Stop";
         $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1075,10 +1089,7 @@ sub camexpmode ($) {
         return;
     }
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        
-        Log3($name, 4, "$name - Setting of exposure mode of Camera $camname will be started now");
-                           
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                           
         $hash->{OPMODE} = "ExpMode";
         $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1126,9 +1137,7 @@ sub cammotdetsc ($) {
         return;
     }
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        Log3($name, 4, "$name - Setting of motion detection source of Camera $camname will be started now");
-                           
+    if ($hash->{HELPER}{ACTIVE} eq "off") {             
         $hash->{OPMODE} = "MotDetSc";
         $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1178,9 +1187,7 @@ sub camsnap ($) {
     }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # einen Schnappschuß aufnehmen
-        Log3($name, 4, "$name - Take Snapshot of Camera $camname");
-                        
+        # einen Schnappschuß aufnehmen              
         $hash->{OPMODE} = "Snap";
         $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1218,7 +1225,6 @@ sub runliveview ($) {
         
         # Fehlertext zum Errorcode ermitteln
         $error = &experror($hash,$errorcode);
-
         # Setreading 
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"Errorcode",$errorcode);
@@ -1226,18 +1232,18 @@ sub runliveview ($) {
         readingsEndUpdate($hash, 1);
     
         Log3($name, 2, "$name - ERROR - Liveview of Camera $camname can't be started - $error");
-        
         return;
     }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Liveview starten
-        Log3($name, 4, "$name - Start Liveview of Camera $camname");
-                        
+        # Liveview starten             
         $hash->{OPMODE} = "runliveview";
         $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
-		# erzwingen die Camid zu ermitteln und bei bei login-Fehler neu SID zu holen
+	    $hash->{HELPER}{SNAPLIMIT}   = 1;            # nur 1 Snap laden, für lastsnap_fw 
+	    $hash->{HELPER}{SNAPIMGSIZE} = 2;            # full size picture, für lastsnap_fw 
+	    $hash->{HELPER}{KEYWORD}     = $camname;     # nur Snaps von $camname selektieren, für lastsnap_fw 
+		# erzwingen die Camid zu ermitteln und bei login-Fehler neue SID zu holen
 		delete $hash->{CAMID};  
         
         if ($attr{$name}{debugactivetoken}) {
@@ -1266,12 +1272,7 @@ sub stopliveview ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         
-		# kurzer state-switch -> Browser aktualisieren
-        readingsSingleUpdate($hash,"state","stopview",1); 
-        
-        # Liveview stoppen
-        Log3($name, 4, "$name - Stop Liveview of Camera $camname now");
-                        
+        # Liveview stoppen           
         $hash->{OPMODE} = "stopliveview";
         $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1285,7 +1286,9 @@ sub stopliveview ($) {
         
         # Reading LiveStreamUrl löschen
         delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});
-                
+		# kurzer state-switch -> Browser aktualisieren
+        readingsSingleUpdate($hash,"state","stopview",1); 
+		
 		# vorhandenen Aufnahmestatus wieder herstellen		
         if (ReadingsVal("$name", "Record", "") eq "Start") {
             readingsSingleUpdate( $hash,"state", "on", 1); 
@@ -1305,36 +1308,6 @@ sub stopliveview ($) {
 }
 
 ###############################################################################
-#                     Filename zu Schappschuß ermitteln
-###############################################################################
-sub getsnapfilename ($) {
-    my ($hash)   = @_;
-    my $name     = $hash->{NAME};
-    my $snapid   = ReadingsVal("$name", "LastSnapId", " ");
-    
-    return if(IsDisabled($name));
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # den Filenamen zu einem Schnappschuß ermitteln
-        Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
-                        
-        $hash->{OPMODE} = "getsnapfilename";
-        $hash->{HELPER}{ACTIVE} = "on";
-		$hash->{HELPER}{LOGINRETRIES} = 0;
-        
-        if ($attr{$name}{debugactivetoken}) {
-            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
-        }
-        sscam_getapisites($hash);
-    
-	} else {
-        RemoveInternalTimer($hash, "getsnapfilename");
-        InternalTimer(gettimeofday()+0.5, "getsnapfilename", $hash, 0);
-    }    
-}
-
-
-###############################################################################
 #                       external Event 1-10 auslösen
 ###############################################################################
 sub extevent ($) {
@@ -1343,9 +1316,7 @@ sub extevent ($) {
     
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        Log3($name, 4, "$name - trigger external event \"$hash->{HELPER}{EVENTID}\"");
-                        
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "extevent";
         $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1469,7 +1440,7 @@ sub doptzaction ($) {
 }
 
 ###############################################################################
-#                         stoppen continues move
+#                         stoppen continoues move
 ###############################################################################
 sub movestop ($) {
     my ($hash)   = @_;
@@ -1478,9 +1449,7 @@ sub movestop ($) {
     
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        Log3($name, 4, "$name - Stop Camera $camname moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
-                        
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "movestop";
         $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1571,7 +1540,9 @@ sub getcaminfoall {
     
     geteventlist($hash);
     RemoveInternalTimer($hash, "getcaminfo");
-    InternalTimer(gettimeofday()+0.5, "getcaminfo", $hash, 0);
+    InternalTimer(gettimeofday()+0.4, "getcaminfo", $hash, 0);
+    RemoveInternalTimer($hash, "getsnapinfo");
+    InternalTimer(gettimeofday()+0.6, "getsnapinfo", "$name:0:0", 0);
     RemoveInternalTimer($hash, "getmotionenum");
     InternalTimer(gettimeofday()+0.8, "getmotionenum", $hash, 0);
     RemoveInternalTimer($hash, "getcapabilities");
@@ -1611,6 +1582,61 @@ return;
 }
 
 ###########################################################################
+#  Infos zum letzten Snap abfragen (z.B. weil nicht über SSCam ausgelöst)
+###########################################################################
+sub getsnapinfo ($) {
+    my ($str)   = @_;
+	my ($name,$slim,$ssize) = split(":",$str);
+	my $hash = $defs{$name};
+    my $camname  = $hash->{CAMNAME};
+    
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {               
+        $hash->{OPMODE} = "getsnapinfo";
+        $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+		$hash->{HELPER}{SNAPLIMIT}    = $slim;   # alle Snapshots werden abgerufen und ausgewertet
+		$hash->{HELPER}{SNAPIMGSIZE}  = $ssize;  # 0-Do not append image, 1-Icon size, 2-Full size
+		$hash->{HELPER}{KEYWORD}      = $camname;
+		
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        sscam_getapisites($hash);
+		
+    } else {
+        RemoveInternalTimer($hash, "getsnapinfo");
+        InternalTimer(gettimeofday()+0.7, "getsnapinfo", "$name:$slim:$ssize", 0);
+    }
+}
+
+###############################################################################
+#                     Filename zu Schappschuß ermitteln
+###############################################################################
+sub getsnapfilename ($) {
+    my ($hash)   = @_;
+    my $name     = $hash->{NAME};
+    
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {    
+        $hash->{OPMODE} = "getsnapfilename";
+        $hash->{HELPER}{ACTIVE} = "on";
+		$hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        sscam_getapisites($hash);
+    
+	} else {
+        RemoveInternalTimer($hash, "getsnapfilename");
+        InternalTimer(gettimeofday()+0.5, "getsnapfilename", $hash, 0);
+    }    
+}
+
+###########################################################################
 #       allgemeine Infos über Synology Surveillance Station
 ###########################################################################
 sub getsvsinfo ($) {
@@ -1620,11 +1646,8 @@ sub getsvsinfo ($) {
     
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Kamerainfos abrufen
-        Log3($name, 4, "$name - Retrieval of Surveillance Station related informations starts now");
-                        
-        $hash->{OPMODE} = "Getsvsinfo";
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE} = "getsvsinfo";
         $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
@@ -1649,10 +1672,7 @@ sub getcaminfo ($) {
     
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Kamerainfos abrufen
-        Log3($name, 4, "$name - Retrieval Camera-Informations of $camname starts now");
-                        
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "Getcaminfo";
         $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1679,9 +1699,7 @@ sub getStmUrlPath ($) {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Stream-Urls abrufen
-        Log3($name, 4, "$name - Retrieval Stream-URLs of $camname starts now");
-                        
+        # Stream-Urls abrufen              
         $hash->{OPMODE} = "getStmUrlPath";
         $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1707,10 +1725,7 @@ sub geteventlist ($) {
     
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Kamerainfos abrufen
-        Log3($name, 4, "$name - Query event informations of $camname starts now");
-                        
+    if ($hash->{HELPER}{ACTIVE} eq "off") {      
         $hash->{OPMODE} = "geteventlist";
         $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1736,9 +1751,7 @@ sub getmotionenum ($) {
     
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        Log3($name, 4, "$name - Enumerate motion detection parameters of $camname starts now");
-                        
+    if ($hash->{HELPER}{ACTIVE} eq "off") {   
         $hash->{OPMODE} = "getmotionenum";
         $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1765,10 +1778,7 @@ sub getcapabilities ($) {
     
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # PTZ-ListPresets abrufen
-        Log3($name, 4, "$name - Retrieval Capabilities of Camera $camname starts now");
-                        
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                       
         $hash->{OPMODE} = "Getcapabilities";
         $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1792,7 +1802,7 @@ sub getptzlistpreset ($) {
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     
-    return if(IsDisabled($name));
+    return if(IsDisabled($name) || ReadingsVal("$name", "Availability", "enabled") =~ /disabled/);
     
     if (ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
         Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera");
@@ -1803,10 +1813,7 @@ sub getptzlistpreset ($) {
         return;
     }
     
-	if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # PTZ-ListPresets abrufen
-        Log3($name, 4, "$name - Retrieval PTZ-ListPresets of $camname starts now");
-                        
+	if ($hash->{HELPER}{ACTIVE} eq "off") {                       
         $hash->{OPMODE} = "Getptzlistpreset";
         $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1841,10 +1848,7 @@ sub getptzlistpatrol ($) {
         return;
     }
 
-    if ($hash->{HELPER}{ACTIVE} ne "on") {
-        # PTZ-ListPatrols abrufen
-        Log3($name, 4, "$name - Retrieval PTZ-ListPatrols of $camname starts now");
-                        
+    if ($hash->{HELPER}{ACTIVE} ne "on") {                        
         $hash->{OPMODE} = "Getptzlistpatrol";
         $hash->{HELPER}{ACTIVE} = "on";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
@@ -1885,7 +1889,7 @@ sub sscam_getapisites {
   
    # API-Pfade und MaxVersions ermitteln 
    Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - ###            start new cam operation            ##"); 
+   Log3($name, 4, "$name - ###    start cam operation $hash->{OPMODE}          "); 
    Log3($name, 4, "$name - ####################################################"); 
    Log3($name, 4, "$name - --- Begin Function sscam_getapisites nonblocking ---");
    
@@ -2446,12 +2450,20 @@ sub sscam_camop ($) {
       readingsSingleUpdate($hash,"state", "snap", 1); 
       readingsSingleUpdate($hash, "LastSnapId", "", 0);
    
+   } elsif ($OpMode eq "getsnapinfo") {
+      # Informationen über den letzten oder mehrere Schnappschüsse ermitteln
+	  my $limit   = $hash->{HELPER}{SNAPLIMIT};
+	  my $imgsize = $hash->{HELPER}{SNAPIMGSIZE};
+	  my $keyword = $hash->{HELPER}{KEYWORD};
+      $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
+   
    } elsif ($OpMode eq "getsnapfilename") {
       # der Filename der aktuellen Schnappschuß-ID wird ermittelt
       $snapid = ReadingsVal("$name", "LastSnapId", " ");
+      Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&imgSize=\"0\"&idList=\"$snapid\"&_sid=\"$sid\"";
    
-   } elsif ($OpMode eq "gopreset") {
+   }elsif ($OpMode eq "gopreset") {
       # Preset wird angefahren
       $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "moving", 0); 
@@ -2469,6 +2481,7 @@ sub sscam_camop ($) {
       $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&speed=\"3\"&moveType=\"Start\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "movestop") {
+      Log3($name, 4, "$name - Stop Camera $hash->{CAMNAME} moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
       $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&moveType=\"Stop\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "Enable") {
@@ -2477,7 +2490,7 @@ sub sscam_camop ($) {
    } elsif ($OpMode eq "Disable") {
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
    
-   } elsif ($OpMode eq "Getsvsinfo") {
+   } elsif ($OpMode eq "getsvsinfo") {
       $url = "http://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfomaxver\"&method=\"GetInfo\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "Getcaminfo") {
@@ -2583,9 +2596,10 @@ sub sscam_camop ($) {
       $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MotionEnum\"&camId=\"$camid\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "extevent") {
+      Log3($name, 4, "$name - trigger external event \"$hash->{HELPER}{EVENTID}\"");
       $url = "http://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtmaxver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
    
-   } elsif ($OpMode eq "runliveview") {    
+   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ /snap/) {    
       if ($hash->{HELPER}{RUNVIEW} =~ m/live/) {
           # externe URL
           $livestream = !AttrVal($name, "livestreamprefix", undef) ? "http://$serveraddr:$serverport" : AttrVal($name, "livestreamprefix", undef);
@@ -2629,7 +2643,14 @@ sub sscam_camop ($) {
           Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
       }
       return;
-   }  
+	  
+   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/) {
+      # den letzten Schnappschuß life anzeigen
+	  my $limit   = $hash->{HELPER}{SNAPLIMIT};
+	  my $imgsize = $hash->{HELPER}{SNAPIMGSIZE};
+	  my $keyword = $hash->{HELPER}{KEYWORD};
+      $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
+   }
    
    Log3($name, 4, "$name - Call-Out now: $url");
    
@@ -2667,6 +2688,14 @@ sub sscam_camop_parse ($) {
    my ($threshold_camCap,$threshold_value,$threshold_ssCap);
    my ($percentage_camCap,$percentage_value,$percentage_ssCap);
    my ($objectSize_camCap,$objectSize_value,$objectSize_ssCap);
+   
+   # Einstellung für Logausgabe Pollinginfos
+   # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 3 
+   if (AttrVal($name, "pollnologging", 0) == 1) {
+       $verbose = 4;
+   } else {
+       $verbose = 3;
+   }
    
    if ($err ne "") {
         # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -2821,6 +2850,59 @@ sub sscam_camop_parse ($) {
                 # nach Snap Aufnahme Filename des Snaps ermitteln
                 getsnapfilename($hash);
             
+			} elsif ($OpMode eq "getsnapinfo" || $OpMode eq "runliveview") {
+                # Informationen zu einem oder mehreren Schnapschüssen wurde abgerufen bzw. Lifeanzeige Schappschuß              
+				my $i = 0;
+				my $sn = 0;
+                my %allsnaps = ();
+                while ($data->{'data'}{'data'}[$i]) {
+		            if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
+			            $i += 1;
+				        next;
+			        }
+			        $snapid = $data->{'data'}{'data'}[$i]{'id'};
+			        my $createdTm = $data->{'data'}{'data'}[$i]{'createdTm'};
+                    my $fileName  = $data->{'data'}{'data'}[$i]{'fileName'};
+					my $imageData = $data->{'data'}{'data'}[$i]{'imageData'};  # Image data of snapshot in base64 format
+			        
+			        $allsnaps{$sn}{"snapid"}    = $snapid;
+					my @t = split(" ", FmtDateTime($createdTm));
+					my @d = split("-", $t[0]);
+					$createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+                    $allsnaps{$sn}{createdTm}  = $createdTm;
+			        $allsnaps{$sn}{fileName}   = $fileName;
+					$allsnaps{$sn}{imageData}  = $imageData;
+                    $sn += 1;
+					$i += 1;
+                }
+				
+				my @as = sort{$a <=>$b}keys(%allsnaps);
+				foreach my $key (@as) {
+				    Log3($name,5, "$name - Snap '$key': ID => $allsnaps{$key}{snapid}, File => $allsnaps{$key}{fileName}, Created => $allsnaps{$key}{createdTm}");
+				}
+				
+				# Schnapschuss soll als liveView angezeigt werden (mindestens 1 Bild vorhanden)
+			    if ($hash->{HELPER}{RUNVIEW} =~ /snap/ && exists($allsnaps{0}{imageData})) {
+					$hash->{HELPER}{LINK} = $allsnaps{0}{imageData};
+					# Browserrefresh 
+                    DoTrigger($name,"startview");					
+				}	
+				
+				my $lsid   = exists($allsnaps{0}{snapid})?$allsnaps{0}{snapid}:"n.a.";
+				my $lfname = exists($allsnaps{0}{fileName})?$allsnaps{0}{fileName}:"n.a.";
+				my $lstime = exists($allsnaps{0}{createdTm})?$allsnaps{0}{createdTm}:"n.a.";		
+				
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsBulkUpdate($hash,"LastSnapId",$lsid);
+				readingsBulkUpdate($hash,"LastSnapFilename", $lfname);
+				readingsBulkUpdate($hash,"LastSnapTime", $lstime);
+                readingsEndUpdate($hash, 1);
+                                
+                # Logausgabe
+                Log3($name, $verbose, "$name - Snapinfos of Camera $camname have been retrieved successfully");
+            
 			} elsif ($OpMode eq "getsnapfilename") {
                 # den Filenamen eines Schnapschusses ermitteln
                 $snapid = ReadingsVal("$name", "LastSnapId", " ");
@@ -2832,7 +2914,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
-                Log3($name, 4, "$name - Filename of Snap-ID $snapid is \"$data->{'data'}{'data'}[0]{'fileName'}\"");
+                Log3($name, 4, "$name - Filename of Snap-ID $snapid is \"$data->{'data'}{'data'}[0]{'fileName'}\"") if($data->{'data'}{'data'}[0]{'fileName'});
             
 			} elsif ($OpMode eq "gopreset") {
                 # eine Presetposition wurde angefahren
@@ -2944,7 +3026,7 @@ sub sscam_camop_parse ($) {
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been disabled successfully");
             
-			} elsif ($OpMode eq "Getsvsinfo") {
+			} elsif ($OpMode eq "getsvsinfo") {
                 # Parse SVS-Infos
                 $userPriv = $data->{'data'}{'userPriv'};
                 if (defined($userPriv)) {
@@ -3002,8 +3084,7 @@ sub sscam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                      
-                # Logausgabe
-                Log3($name, 3, "$name - Informations related to Surveillance Station retrieved successfully");
+                Log3($name, $verbose, "$name - Informations related to Surveillance Station retrieved successfully");
             
 			} elsif ($OpMode eq "getStmUrlPath") {
                 # Parse SVS-Infos
@@ -3047,7 +3128,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
                      
                 # Logausgabe
-                Log3($name, 4, "$name - Stream-URLs of $camname retrieved successfully");
+                Log3($name, $verbose, "$name - Stream-URLs of $camname retrieved successfully");
             
 			} elsif ($OpMode eq "Getcaminfo") {
                 # Parse Caminfos
@@ -3164,13 +3245,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
                             
                 # Logausgabe
-                # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 3 
-                if (defined($attr{$name}{pollnologging}) and $attr{$name}{pollnologging} eq "1") {
-                    $verbose = 4;
-                } else {
-                    $verbose = 3;
-                }
-                Log3($name, $verbose, "$name - Camera-Informations of $camname retrieved");
+                Log3($name, $verbose, "$name - Informations of camera $camname have been retrieved successfully");
             
 			} elsif ($OpMode eq "geteventlist") {              
                 my $eventnum    = $data->{'data'}{'total'};
@@ -3199,13 +3274,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
        
                 # Logausgabe
-                # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 3 
-                if (defined($attr{$name}{pollnologging}) and $attr{$name}{pollnologging} eq "1") {
-                    $verbose = 4;
-                } else {
-                    $verbose = 3;
-                }
-                Log3($name, $verbose, "$name - Query event list of $camname successfully done");
+                Log3($name, $verbose, "$name - Query eventlist of camera $camname have been retrieved successfully");
             
 			} elsif ($OpMode eq "getmotionenum") {              
                 
@@ -3272,13 +3341,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
        
                 # Logausgabe
-                # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 2 
-                if (defined($attr{$name}{pollnologging}) and $attr{$name}{pollnologging} eq "1") {
-                    $verbose = 4;
-                } else {
-                    $verbose = 3;
-                }
-                Log3($name, $verbose, "$name - Enumerate motion detection parameters of $camname successfully done");
+                Log3($name, $verbose, "$name - Enumerate motion detection parameters of $camname have been retrieved successfully");
             
 			} elsif ($OpMode eq "Getcapabilities") {
                 # Parse Infos
@@ -3355,13 +3418,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
                   
                 # Logausgabe
-                # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 2 
-                if (defined(AttrVal($name, "pollnologging", undef)) and AttrVal($name, "pollnologging", undef) eq "1") {
-                    $verbose = 4;
-                } else {
-                    $verbose = 3;
-                }
-                Log3($name, $verbose, "$name - Capabilities of Camera $camname retrieved");
+                Log3($name, $verbose, "$name - Capabilities of Camera $camname have been retrieved successfully");
             
 			} elsif ($OpMode eq "Getptzlistpreset") {
                 # Parse PTZ-ListPresets
@@ -3394,12 +3451,6 @@ sub sscam_camop_parse ($) {
                   
                             
                 # Logausgabe
-                # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 2 
-                if (defined(AttrVal($name, "pollnologging", undef)) and AttrVal($name, "pollnologging", undef) eq "1") {
-                    $verbose = 4;
-                } else {
-                    $verbose = 3;
-                }
                 Log3($name, $verbose, "$name - PTZ Presets of $camname retrieved");
             
 			} elsif ($OpMode eq "Getptzlistpatrol") {
@@ -3433,12 +3484,6 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
                      
                 # Logausgabe
-                # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 2 
-                if (defined(AttrVal($name, "pollnologging", undef)) and AttrVal($name, "pollnologging", undef) eq "1") {
-                    $verbose = 4;
-                } else {
-                    $verbose = 3;
-                }
                 Log3($name, $verbose, "$name - PTZ Patrols of $camname retrieved");
             }
             
@@ -3835,7 +3880,7 @@ sub experror {
        <li>Positioning of PTZ-cameras to absolute X/Y-coordinates  </li>
        <li>continuous moving of PTZ-camera lense   </li>
        <li>trigger of external events 1-10 (action rules in SVS)   </li>
-       <li>start and stop of camera livestreams  </li>
+       <li>start and stop of camera livestreams, show the last recording and snapshot embedded </li>
        <li>fetch of livestream-Url's with key (login not needed in that case)   </li>
        <li>playback of last recording  </li><br>
     </ul>
@@ -3962,6 +4007,7 @@ sub experror {
       <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - observer    </li></td></tr>
+	  <tr><td><li>get ... snapinfo           </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... stmUrlPath         </td><td> session: ServeillanceStation - observer    </li></td></tr>      
       </table>
     </ul>
@@ -4005,7 +4051,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b>set &lt;name&gt; [on] [off] </b></li> <br>
+  <li><b>set &lt;name&gt; [on|off] </b></li> <br>
    
   The command "set &lt;name&gt; on" starts a recording. The default recording time takes 15 seconds. It can be changed by the <a href="#SSCamattr">attribute</a> "rectime" individualy. 
   With the <a href="#SSCamattr">attribute</a> (respectively the default value) provided recording time can be overwritten once by "set &lt;name&gt; on [rectime]".
@@ -4074,7 +4120,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; [enable] [disable] </b></li> <br>
+  <li><b> set &lt;name&gt; [enable|disable] </b></li> <br>
   
   For <b>deactivating / activating</b> a list of cameras or all cameras by Regex-expression, subsequent two 
   examples using "at":
@@ -4104,7 +4150,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; expmode [day] [night] [auto] </b></li> <br>
+  <li><b> set &lt;name&gt; expmode [day|night|auto] </b></li> <br>
   
   With this command you are able to control the exposure mode and can set it to day, night or automatic mode. 
   Thereby, for example, the behavior of camera LED's will be suitable controlled. 
@@ -4117,7 +4163,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; motdetsc [camera] [SVS] [disable] </b></li> <br>
+  <li><b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b></li> <br>
   
   The command "motdetsc" (stands for "motion detection source") switchover the motion detection to the desired mode.
   If motion detection will be done by camera / SVS without any parameters, the original camera motion detection settings are kept.
@@ -4240,7 +4286,7 @@ sub experror {
   If the motion should be done with the largest possible increment the following command can be used for simplification:
 
   <pre>
-   set &lt;name&gt; goAbsPTZ up [down ] [left] [right]
+   set &lt;name&gt; goAbsPTZ up [down|left|right]
   </pre>
 
   In this case the lense will be moved with largest possible increment into the given absolute position.
@@ -4272,29 +4318,30 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; runView live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;]  </b></li> <br>
+  <li><b> set &lt;name&gt; runView [live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b></li> <br>
   
   With "live_fw, live_link, live_open" a livestream (mjpeg-stream) of a camera will be started, either as embedded image 
   or as a generated link. <br>
   The option "live_open" starts a new browser window. If the optional &lt;room&gt; was set, the window will only be
   started if the specified room is currently opend in a browser session. <br><br> 
   
+  The command <b>"set &lt;name&gt; runView lastsnap_fw"</b> shows the last snapshot of the camera embedded in room- or detailview. <br><br>
+  
   Access to the last recording of a camera can be done using "lastrec_fw" respectively "lastrec_open".
   The recording will be opened in iFrame. So there are some control elements available, e.g. to increase/descrease 
   reproduce speed. <br>
   
-  The art of windows in FHEMWEB can be affected by HTML-tags in <a href="#SSCamattr">attribute</a> "htmlattr". 
+  The kind of windows in FHEMWEB can be affected by HTML-tags in <a href="#SSCamattr">attribute</a> "htmlattr". 
   <br><br>
   
   <b>Examples:</b><br>
   <pre>
-    attr &lt;name&gt; htmlattr target=_blank width="500" height="375"
-    attr &lt;name&gt; htmlattr target=_blank width=500,height=375
-    attr &lt;name&gt; htmlattr width=700,height=525,top=200,left=300
+    attr &lt;name&gt; htmlattr width="500" height="375"
+    attr &lt;name&gt; htmlattr width="700",height="525",top="200",left="300"
   </pre>
   
   With these attribute values a streaming link will be opened (by click on) in a new browser tab or windows. If the stream will be started as an image, the size changes appropriately the
-  values of width and hight. <br> 
+  values of width and hight. <br>
   
   The command <b>"set &lt;name&gt; runView live_open"</b> starts the stream immediately in a new browser window (longpoll=1 
   must be set for WEB). 
@@ -4342,6 +4389,7 @@ sub experror {
       get &lt;name&gt; stmUrlPath
       get &lt;name&gt; svsinfo
       get &lt;name&gt; snapfileinfo
+      get &lt;name&gt; snapinfo
   </pre>
   
   With command <b>"get &lt;name&gt; caminfoall"</b> dependend of the type of Camera (e.g. Fix- or PTZ-Camera) the available properties will be retrieved and provided as Readings.<br>
@@ -4364,6 +4412,14 @@ sub experror {
   This command is similar to get caminfoall, informations relating to SVS and the camera will be retrieved. 
   In difference to caminfoall in either case a new session ID will be generated (do a new login), the camera ID will be
   new identified and all necessary API-parameters will be new investigated.  
+  </ul>
+  <br><br> 
+  
+  <ul>
+  <li><b> get &lt;name&gt; snapinfo </b></li> <br>
+  
+  Informations about snapshots will be retrieved. Heplful if snapshots are not triggerd by SSCam, but by motion detection of the camera or surveillance
+  station instead.
   </ul>
   <br><br> 
   
@@ -4444,77 +4500,10 @@ sub experror {
   <li><b>OPMODE</b> - the last executed operation of the module </li>  
   <li><b>SERVERADDR</b> - IP-Address of SVS Host </li>
   <li><b>SERVERPORT</b> - SVS-Port </li>
-  
   <br><br>
   </ul>
  </ul>
 
-<a name="SSCamreadings"></a>
-<b>Readings</b>
- <ul>
-  <br>
-  Using the polling mechanism or retrieval by "get"-call readings are provieded, The meaning of the readings are listed in subsequent table: <br>
-  The transfered Readings can be deversified dependend on the type of camera.<br><br>
-  <ul>
-  <table>  
-  <colgroup> <col width=5%> <col width=95%> </colgroup>
-    <tr><td><li>Availability</li>       </td><td>- Availability of Camera (disabled, enabled, disconnected, other)  </td></tr>
-    <tr><td><li>CamEventNum</li>        </td><td>- delivers the total number of in SVS registered events of the camera  </td></tr>
-    <tr><td><li>CamExposureControl</li> </td><td>- indicating type of exposure control  </td></tr>
-    <tr><td><li>CamExposureMode</li>    </td><td>- current exposure mode (Day, Night, Auto, Schedule, Unknown)  </td></tr>
-    <tr><td><li>CamForceEnableMulticast</li>  </td><td>- Is the camera forced to enable multicast.  </td></tr>
-    <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
-    <tr><td><li>CamLastRec</li>         </td><td>- Path / name of the last recording   </td></tr>
-    <tr><td><li>CamLastRecTime</li>     </td><td>- date / starttime / endtime of the last recording   </td></tr>
-    <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
-    <tr><td><li>CamModel</li>           </td><td>- Model of camera  </td></tr>
-    <tr><td><li>CamMotDetSc</li>        </td><td>- state of motion detection source (disabled, by camera, by SVS) and their parameter </td></tr>
-    <tr><td><li>CamPort</li>            </td><td>- IP-Port of Camera  </td></tr>
-    <tr><td><li>CamPreRecTime</li>      </td><td>- Duration of Pre-Recording (in seconds) adjusted in SVS  </td></tr>
-    <tr><td><li>CamRecShare</li>        </td><td>- shared folder on disk station for recordings </td></tr>
-    <tr><td><li>CamRecVolume</li>       </td><td>- Volume on disk station for recordings  </td></tr>
-    <tr><td><li>CamVendor</li>          </td><td>- Identifier of camera producer  </td></tr>
-    <tr><td><li>CamVideoFlip</li>       </td><td>- Is the video flip  </td></tr>
-    <tr><td><li>CamVideoMirror</li>     </td><td>- Is the video mirror  </td></tr>
-    <tr><td><li>CapAudioOut</li>        </td><td>- Capability to Audio Out over Surveillance Station (false/true)  </td></tr>
-    <tr><td><li>CapChangeSpeed</li>     </td><td>- Capability to various motion speed  </td></tr>
-    <tr><td><li>CapPTZAbs</li>          </td><td>- Capability to perform absolute PTZ action  </td></tr>
-    <tr><td><li>CapPTZAutoFocus</li>    </td><td>- Capability to perform auto focus action  </td></tr>
-    <tr><td><li>CapPTZDirections</li>   </td><td>- the PTZ directions that camera support  </td></tr>
-    <tr><td><li>CapPTZFocus</li>        </td><td>- mode of support for focus action  </td></tr>
-    <tr><td><li>CapPTZHome</li>         </td><td>- Capability to perform home action  </td></tr>
-    <tr><td><li>CapPTZIris</li>         </td><td>- mode of support for iris action  </td></tr>
-    <tr><td><li>CapPTZPan</li>          </td><td>- Capability to perform pan action  </td></tr>
-    <tr><td><li>CapPTZTilt</li>         </td><td>- mode of support for tilt action  </td></tr>
-    <tr><td><li>CapPTZZoom</li>         </td><td>- Capability to perform zoom action  </td></tr>
-    <tr><td><li>DeviceType</li>         </td><td>- device type (Camera, Video_Server, PTZ, Fisheye)  </td></tr>
-    <tr><td><li>Error</li>              </td><td>- message text of last error  </td></tr>
-    <tr><td><li>Errorcode</li>          </td><td>- error code of last error  </td></tr>
-    <tr><td><li>LastSnapFilename</li>   </td><td>- the filename of the last snapshot   </td></tr>
-    <tr><td><li>LastSnapId</li>         </td><td>- the ID of the last snapshot   </td></tr>    
-    <tr><td><li>LastUpdateTime</li>     </td><td>- date / time the last update of readings by "caminfoall"  </td></tr> 
-    <tr><td><li>LiveStreamUrl </li>     </td><td>- the livestream URL if stream is started (is shown if <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set) </td></tr> 
-    <tr><td><li>Patrols</li>            </td><td>- in Synology Surveillance Station predefined patrols (at PTZ-Cameras)  </td></tr>
-    <tr><td><li>PollState</li>          </td><td>- shows the state of automatic polling  </td></tr>    
-    <tr><td><li>Presets</li>            </td><td>- in Synology Surveillance Station predefined Presets (at PTZ-Cameras)  </td></tr>
-    <tr><td><li>Record</li>             </td><td>- if recording is running = Start, if no recording is running = Stop  </td></tr> 
-    <tr><td><li>StmKey</li>             </td><td>- current streamkey. it can be used to open livestreams without session id    </td></tr> 
-    <tr><td><li>StmKeyUnicst</li>       </td><td>- Uni-cast stream path of the camera. (<a href="#SSCamattr">attribute</a> "showStmInfoFull" has to be set)  </td></tr> 
-    <tr><td><li>StmKeymjpegHttp</li>    </td><td>- Mjpeg stream path(over http) of the camera (<a href="#SSCamattr">attribute</a> "showStmInfoFull" has to be set)  </td></tr> 
-    <tr><td><li>SVScustomPortHttp</li>  </td><td>- Customized port of Surveillance Station (HTTP) (to get with "svsinfo")  </td></tr> 
-    <tr><td><li>SVScustomPortHttps</li> </td><td>- Customized port of Surveillance Station (HTTPS) (to get with "svsinfo")  </td></tr>
-    <tr><td><li>SVSlicenseNumber</li>   </td><td>- The total number of installed licenses (to get with "svsinfo")  </td></tr>
-    <tr><td><li>SVSuserPriv</li>        </td><td>- The effective rights of the user used for log in (to get with "svsinfo")  </td></tr>
-    <tr><td><li>SVSversion</li>         </td><td>- package version of the installed Surveillance Station (to get with "svsinfo")  </td></tr>
-    <tr><td><li>UsedSpaceMB</li>        </td><td>- used disk space of recordings by Camera  </td></tr>
-    <tr><td><li>VideoFolder</li>        </td><td>- Path to the recorded video  </td></tr>
-  </table>
-  </ul>
-  <br><br>    
-  
- </ul>
-
- 
 <a name="SSCamattr"></a>
 <b>Attributes</b>
   <br><br>
@@ -4532,11 +4521,11 @@ sub experror {
 	or not set) </li><br>
   
   <li><b>htmlattr</b><br>
-    additional specifications to livestream-Url to manipulate the behavior of stream, e.g. size of the image </li><br>
+    additional specifications to inline oictures to manipulate the behavior of stream, e.g. size of the image.	</li><br>
 	
 	    <ul>
 		<b>Example:</b><br>
-        attr &lt;name&gt; htmlattr width=500 height=325 top=200 left=300
+        attr &lt;name&gt; htmlattr width="500" height="325" top="200" left="300"
         </ul>
 		<br>
         </li>
@@ -4605,6 +4594,72 @@ sub experror {
   </ul>  
   </ul>
   <br><br>
+ 
+<a name="SSCamreadings"></a>
+<b>Readings</b>
+ <ul>
+  <br>
+  Using the polling mechanism or retrieval by "get"-call readings are provieded, The meaning of the readings are listed in subsequent table: <br>
+  The transfered Readings can be deversified dependend on the type of camera.<br><br>
+  <ul>
+  <table>  
+  <colgroup> <col width=5%> <col width=95%> </colgroup>
+    <tr><td><li>Availability</li>       </td><td>- Availability of Camera (disabled, enabled, disconnected, other)  </td></tr>
+    <tr><td><li>CamEventNum</li>        </td><td>- delivers the total number of in SVS registered events of the camera  </td></tr>
+    <tr><td><li>CamExposureControl</li> </td><td>- indicating type of exposure control  </td></tr>
+    <tr><td><li>CamExposureMode</li>    </td><td>- current exposure mode (Day, Night, Auto, Schedule, Unknown)  </td></tr>
+    <tr><td><li>CamForceEnableMulticast</li>  </td><td>- Is the camera forced to enable multicast.  </td></tr>
+    <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
+    <tr><td><li>CamLastRec</li>         </td><td>- Path / name of the last recording   </td></tr>
+    <tr><td><li>CamLastRecTime</li>     </td><td>- date / starttime / endtime of the last recording   </td></tr>
+    <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
+    <tr><td><li>CamModel</li>           </td><td>- Model of camera  </td></tr>
+    <tr><td><li>CamMotDetSc</li>        </td><td>- state of motion detection source (disabled, by camera, by SVS) and their parameter </td></tr>
+    <tr><td><li>CamPort</li>            </td><td>- IP-Port of Camera  </td></tr>
+    <tr><td><li>CamPreRecTime</li>      </td><td>- Duration of Pre-Recording (in seconds) adjusted in SVS  </td></tr>
+    <tr><td><li>CamRecShare</li>        </td><td>- shared folder on disk station for recordings </td></tr>
+    <tr><td><li>CamRecVolume</li>       </td><td>- Volume on disk station for recordings  </td></tr>
+    <tr><td><li>CamVendor</li>          </td><td>- Identifier of camera producer  </td></tr>
+    <tr><td><li>CamVideoFlip</li>       </td><td>- Is the video flip  </td></tr>
+    <tr><td><li>CamVideoMirror</li>     </td><td>- Is the video mirror  </td></tr>
+    <tr><td><li>CapAudioOut</li>        </td><td>- Capability to Audio Out over Surveillance Station (false/true)  </td></tr>
+    <tr><td><li>CapChangeSpeed</li>     </td><td>- Capability to various motion speed  </td></tr>
+    <tr><td><li>CapPTZAbs</li>          </td><td>- Capability to perform absolute PTZ action  </td></tr>
+    <tr><td><li>CapPTZAutoFocus</li>    </td><td>- Capability to perform auto focus action  </td></tr>
+    <tr><td><li>CapPTZDirections</li>   </td><td>- the PTZ directions that camera support  </td></tr>
+    <tr><td><li>CapPTZFocus</li>        </td><td>- mode of support for focus action  </td></tr>
+    <tr><td><li>CapPTZHome</li>         </td><td>- Capability to perform home action  </td></tr>
+    <tr><td><li>CapPTZIris</li>         </td><td>- mode of support for iris action  </td></tr>
+    <tr><td><li>CapPTZPan</li>          </td><td>- Capability to perform pan action  </td></tr>
+    <tr><td><li>CapPTZTilt</li>         </td><td>- mode of support for tilt action  </td></tr>
+    <tr><td><li>CapPTZZoom</li>         </td><td>- Capability to perform zoom action  </td></tr>
+    <tr><td><li>DeviceType</li>         </td><td>- device type (Camera, Video_Server, PTZ, Fisheye)  </td></tr>
+    <tr><td><li>Error</li>              </td><td>- message text of last error  </td></tr>
+    <tr><td><li>Errorcode</li>          </td><td>- error code of last error  </td></tr>
+    <tr><td><li>LastSnapFilename</li>   </td><td>- the filename of the last snapshot   </td></tr>
+    <tr><td><li>LastSnapId</li>         </td><td>- the ID of the last snapshot   </td></tr>    
+    <tr><td><li>LastSnapTime</li>       </td><td>- timestamp of the last snapshot   </td></tr> 
+    <tr><td><li>LastUpdateTime</li>     </td><td>- date / time the last update of readings by "caminfoall"  </td></tr> 
+    <tr><td><li>LiveStreamUrl </li>     </td><td>- the livestream URL if stream is started (is shown if <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set) </td></tr> 
+    <tr><td><li>Patrols</li>            </td><td>- in Synology Surveillance Station predefined patrols (at PTZ-Cameras)  </td></tr>
+    <tr><td><li>PollState</li>          </td><td>- shows the state of automatic polling  </td></tr>    
+    <tr><td><li>Presets</li>            </td><td>- in Synology Surveillance Station predefined Presets (at PTZ-Cameras)  </td></tr>
+    <tr><td><li>Record</li>             </td><td>- if recording is running = Start, if no recording is running = Stop  </td></tr> 
+    <tr><td><li>StmKey</li>             </td><td>- current streamkey. it can be used to open livestreams without session id    </td></tr> 
+    <tr><td><li>StmKeyUnicst</li>       </td><td>- Uni-cast stream path of the camera. (<a href="#SSCamattr">attribute</a> "showStmInfoFull" has to be set)  </td></tr> 
+    <tr><td><li>StmKeymjpegHttp</li>    </td><td>- Mjpeg stream path(over http) of the camera (<a href="#SSCamattr">attribute</a> "showStmInfoFull" has to be set)  </td></tr> 
+    <tr><td><li>SVScustomPortHttp</li>  </td><td>- Customized port of Surveillance Station (HTTP) (to get with "svsinfo")  </td></tr> 
+    <tr><td><li>SVScustomPortHttps</li> </td><td>- Customized port of Surveillance Station (HTTPS) (to get with "svsinfo")  </td></tr>
+    <tr><td><li>SVSlicenseNumber</li>   </td><td>- The total number of installed licenses (to get with "svsinfo")  </td></tr>
+    <tr><td><li>SVSuserPriv</li>        </td><td>- The effective rights of the user used for log in (to get with "svsinfo")  </td></tr>
+    <tr><td><li>SVSversion</li>         </td><td>- package version of the installed Surveillance Station (to get with "svsinfo")  </td></tr>
+    <tr><td><li>UsedSpaceMB</li>        </td><td>- used disk space of recordings by Camera  </td></tr>
+    <tr><td><li>VideoFolder</li>        </td><td>- Path to the recorded video  </td></tr>
+  </table>
+  </ul>
+  <br><br>    
+ </ul>
+
 </ul>
 
 
@@ -4632,7 +4687,7 @@ sub experror {
       <li>Positionieren von PTZ-Kameras zu absoluten X/Y-Koordinaten  </li>
       <li>kontinuierliche Bewegung von PTZ-Kameras   </li>
       <li>auslösen externer Ereignisse 1-10 (Aktionsregel SVS)   </li>
-      <li>starten und beenden von Kamera-Livestreams  </li>
+      <li>starten und beenden von Kamera-Livestreams, anzeigen der letzten Aufnahme oder des letzten Schnappschusses  </li>
       <li>Abruf und Ausgabe der Kamera Streamkeys sowie Stream-Urls (Nutzung von Kamera-Livestreams ohne Session Id)  </li>
       <li>abspielen der letzten Aufnahme  </li><br>
      </ul> 
@@ -4759,6 +4814,7 @@ sub experror {
       <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+	  <tr><td><li>get ... snapinfo           </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... stmUrlPath         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       </table>
     </ul>
@@ -4871,7 +4927,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; [enable] [disable] </b></li> <br>
+  <li><b> set &lt;name&gt; [enable|disable] </b></li> <br>
   
   Um eine Liste von Kameras oder alle Kameras (mit Regex) zum Beispiel um 21:46 zu <b>deaktivieren</b> / zu <b>aktivieren</b> zwei Beispiele mit at:
   <pre>
@@ -4899,7 +4955,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; expmode [day] [night] [auto] </b></li> <br>
+  <li><b> set &lt;name&gt; expmode [day|night|auto] </b></li> <br>
   
   Mit diesem Befehl kann der Belichtungsmodus der Kameras gesetzt werden. Dadurch wird z.B. das Verhalten der Kamera-LED's entsprechend gesteuert. 
   Die erfolgreiche Umschaltung wird durch das Reading CamExposureMode ("get ... caminfoall") reportet. <br><br>
@@ -4910,7 +4966,7 @@ sub experror {
   Funktion auszugehen. 
   <br><br><br>
   
-  <b> set &lt;name&gt; motdetsc [camera] [SVS] [disable] </b> <br>
+  <b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b> <br>
   
   Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
   Wird die Bewegungserkennung durch die Kamera / SVS ohne weitere Optionen eingestellt, werden die momentan gültigen Bewegungserkennungsparameter der 
@@ -5032,7 +5088,7 @@ sub experror {
   Soll die Bewegung mit der maximalen Schrittweite erfolgen, kann zur Vereinfachung der Befehl:
 
   <pre>
-   set &lt;name&gt; goAbsPTZ up [down ] [left] [right]
+   set &lt;name&gt; goAbsPTZ up [down|left|right]
   </pre>
 
   verwendet werden. Die Optik wird in diesem Fall mit der größt möglichen Schrittweite zur Absolutposition in der angegebenen Richtung bewegt. 
@@ -5064,7 +5120,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; runView live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;]  </b></li> <br>
+  <li><b> set &lt;name&gt; runView [live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b></li> <br>
   
   Mit "live_fw, live_link, live_open" wird ein Livestream (mjpeg-Stream) der Kamera, entweder als eingebettetes Image 
   oder als generierter Link, gestartet. <br>
@@ -5073,18 +5129,18 @@ sub experror {
     
   Der Zugriff auf die letzte Aufnahme einer Kamera kann über die Optionen "lastrec_fw" bzw. "lastrec_open" erfolgen.
   Bei Verwendung von "lastrec_fw" wird die letzte Aufnahme als eingebettetes iFrame-Objekt abgespielt. Es stehen entsprechende
-  Steuerungselemente zur Wiedergabegeschwindigkeit usw. zur Verfügung. <br>
+  Steuerungselemente zur Wiedergabegeschwindigkeit usw. zur Verfügung. <br><br>
+  Der Befehl <b>"set &lt;name&gt; runView lastsnap_fw"</b> zeigt den letzten Schnappschuss der Kamera eingebettet an. <br><br>
   Durch Angabe des optionalen Raumes bei "lastrec_open" erfolgt die gleiche Einschränkung wie bei "live_open". <br><br>
   
   Die Gestaltung der Fenster im FHEMWEB kann durch HTML-Tags im <a href="#SSCamattr">Attribut</a> "htmlattr" beeinflusst werden. <br><br>
   
   <b>Beispiel:</b><br>
   <pre>
-    attr &lt;name&gt; htmlattr target=_blank width="500" height="375"
-    attr &lt;name&gt; htmlattr target=_blank width=500,height=375
-    attr &lt;name&gt; htmlattr width=700,height=525,top=200,left=300
+    attr &lt;name&gt; htmlattr width="500" height="375"
+    attr &lt;name&gt; htmlattr width="500" height="375" top="200" left="300"
   </pre>
-  
+    
   Mit diesen Attributwerten öffnet der Link (mit Klick) als weiteres Fenster/Browsertab. Wird der Stream als live_fw gestartet, 
   ändert sich die Größe entsprechend der Angaben von Width und Hight. <br>
   Das Kommando <b>"set &lt;name&gt; runView live_open"</b> startet den Livestreamlink sofort in einem neuen 
@@ -5128,9 +5184,10 @@ sub experror {
       get &lt;name&gt; caminfoall
       get &lt;name&gt; eventlist
       get &lt;name&gt; scanVirgin
+      get &lt;name&gt; snapfileinfo
+      get &lt;name&gt; snapinfo
       get &lt;name&gt; stmUrlPath
       get &lt;name&gt; svsinfo
-      get &lt;name&gt; snapfileinfo
   </pre>
   
   Mit dem Befehl <b>"get &lt;name&gt; caminfoall"</b> werden abhängig von der Art der Kamera (z.B. Fix- oder PTZ-Kamera) die 
@@ -5164,6 +5221,14 @@ sub experror {
   Wie mit get caminfoall werden alle Informationen der SVS und Kamera abgerufen. Allerdings wird in jedem Fall eine 
   neue Session ID generiert (neues Login), die Kamera-ID neu ermittelt und es werden alle notwendigen API-Parameter neu 
   eingelesen.  
+  </ul>
+  <br><br> 
+  
+  <ul>
+  <li><b> get &lt;name&gt; snapinfo </b></li> <br>
+  
+  Es werden Schnappschussinformationen gelesen. Hilfreich wenn Schnappschüsse nicht durch SSCam, sondern durch die Bewegungserkennung der Kamera 
+  oder Surveillance Station erzeugt werden.
   </ul>
   <br><br> 
   
@@ -5250,72 +5315,6 @@ sub experror {
  </ul>
 
 
-<a name="SSCamreadings"></a>
-<b>Readings</b>
- <ul>
-  <br>
-  Über den Pollingmechanismus bzw. durch Abfrage mit "Get" werden Readings bereitgestellt, deren Bedeutung in der nachfolgenden Tabelle dargestellt sind. <br>
-  Die übermittelten Readings können in Abhängigkeit des Kameratyps variieren.<br><br>
-  <ul>
-  <table>  
-  <colgroup> <col width=5%> <col width=95%> </colgroup>
-    <tr><td><li>Availability</li>       </td><td>- Verfügbarkeit der Kamera (disabled, enabled, disconnected, other)  </td></tr>
-    <tr><td><li>CamEventNum</li>        </td><td>- liefert die Gesamtanzahl der in SVS registrierten Events der Kamera  </td></tr>
-    <tr><td><li>CamExposureControl</li> </td><td>- zeigt den aktuell eingestellten Typ der Belichtungssteuerung  </td></tr>
-    <tr><td><li>CamExposureMode</li>    </td><td>- aktueller Belichtungsmodus (Day, Night, Auto, Schedule, Unknown)  </td></tr>
-    <tr><td><li>CamForceEnableMulticast</li> </td><td>- sagt aus ob die Kamera verpflichet ist Multicast einzuschalten.  </td></tr>
-    <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
-    <tr><td><li>CamLastRec</li>         </td><td>- Pfad / Name der letzten Aufnahme   </td></tr>
-    <tr><td><li>CamLastRecTime</li>     </td><td>- Datum / Startzeit - Stopzeit der letzten Aufnahme   </td></tr>
-    <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
-    <tr><td><li>CamModel</li>           </td><td>- Kameramodell  </td></tr>
-    <tr><td><li>CamMotDetSc</li>        </td><td>- Status der Bewegungserkennung (disabled, durch Kamera, durch SVS) und deren Parameter </td></tr>
-    <tr><td><li>CamPort</li>            </td><td>- IP-Port der Kamera  </td></tr>
-    <tr><td><li>CamPreRecTime</li>      </td><td>- Dauer der der Voraufzeichnung in Sekunden (Einstellung in SVS)  </td></tr>
-    <tr><td><li>CamRecShare</li>        </td><td>- gemeinsamer Ordner auf der DS für Aufnahmen  </td></tr>
-    <tr><td><li>CamRecVolume</li>       </td><td>- Volume auf der DS für Aufnahmen  </td></tr>
-    <tr><td><li>CamVendor</li>          </td><td>- Kamerahersteller Bezeichnung  </td></tr>
-    <tr><td><li>CamVideoFlip</li>       </td><td>- Ist das Video gedreht  </td></tr>
-    <tr><td><li>CamVideoMirror</li>     </td><td>- Ist das Video gespiegelt  </td></tr>
-    <tr><td><li>CapAudioOut</li>        </td><td>- Fähigkeit der Kamera zur Audioausgabe über Surveillance Station (false/true)  </td></tr>
-    <tr><td><li>CapChangeSpeed</li>     </td><td>- Fähigkeit der Kamera verschiedene Bewegungsgeschwindigkeiten auszuführen  </td></tr>
-    <tr><td><li>CapPTZAbs</li>          </td><td>- Fähigkeit der Kamera für absolute PTZ-Aktionen   </td></tr>
-    <tr><td><li>CapPTZAutoFocus</li>    </td><td>- Fähigkeit der Kamera für Autofokus Aktionen  </td></tr>
-    <tr><td><li>CapPTZDirections</li>   </td><td>- die verfügbaren PTZ-Richtungen der Kamera  </td></tr>
-    <tr><td><li>CapPTZFocus</li>        </td><td>- Art der Kameraunterstützung für Fokussierung  </td></tr>
-    <tr><td><li>CapPTZHome</li>         </td><td>- Unterstützung der Kamera für Home-Position  </td></tr>
-    <tr><td><li>CapPTZIris</li>         </td><td>- Unterstützung der Kamera für Iris-Aktion  </td></tr>
-    <tr><td><li>CapPTZPan</li>          </td><td>- Unterstützung der Kamera für Pan-Aktion  </td></tr>
-    <tr><td><li>CapPTZTilt</li>         </td><td>- Unterstützung der Kamera für Tilt-Aktion  </td></tr>
-    <tr><td><li>CapPTZZoom</li>         </td><td>- Unterstützung der Kamera für Zoom-Aktion  </td></tr>
-    <tr><td><li>DeviceType</li>         </td><td>- Kameratyp (Camera, Video_Server, PTZ, Fisheye)  </td></tr>
-    <tr><td><li>Error</li>              </td><td>- Meldungstext des letzten Fehlers  </td></tr>
-    <tr><td><li>Errorcode</li>          </td><td>- Fehlercode des letzten Fehlers   </td></tr>
-    <tr><td><li>LastSnapFilename</li>   </td><td>- der Filename des letzten Schnapschusses   </td></tr>
-    <tr><td><li>LastSnapId</li>         </td><td>- die ID des letzten Schnapschusses   </td></tr>
-    <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung durch "caminfoall" </td></tr> 
-    <tr><td><li>LiveStreamUrl </li>     </td><td>- die LiveStream-Url wenn der Stream gestartet ist. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein) </td></tr> 
-    <tr><td><li>Patrols</li>            </td><td>- in Surveillance Station voreingestellte Überwachungstouren (bei PTZ-Kameras)  </td></tr>
-    <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>    
-    <tr><td><li>Presets</li>            </td><td>- in Surveillance Station voreingestellte Positionen (bei PTZ-Kameras)  </td></tr>
-    <tr><td><li>Record</li>             </td><td>- Aufnahme läuft = Start, keine Aufnahme = Stop  </td></tr> 
-    <tr><td><li>StmKey</li>             </td><td>- aktueller StreamKey. Kann zum öffnen eines Livestreams ohne Session Id genutzt werden.    </td></tr> 
-    <tr><td><li>StmKeyUnicst</li>       </td><td>- Uni-cast Stream Pfad der Kamera. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein)  </td></tr> 
-    <tr><td><li>StmKeymjpegHttp</li>    </td><td>- Mjpeg Stream Pfad (über http) der Kamera. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein)  </td></tr>
-    <tr><td><li>SVScustomPortHttp</li>  </td><td>- benutzerdefinierter Port der Surveillance Station (HTTP) im DSM-Anwendungsportal (get mit "svsinfo")  </td></tr> 
-    <tr><td><li>SVScustomPortHttps</li> </td><td>- benutzerdefinierter Port der Surveillance Station (HTTPS) im DSM-Anwendungsportal (get mit "svsinfo") </td></tr>
-    <tr><td><li>SVSlicenseNumber</li>   </td><td>- die Anzahl der installierten Kameralizenzen (get mit "svsinfo") </td></tr>
-    <tr><td><li>SVSuserPriv</li>        </td><td>- die effektiven Rechte des verwendeten Users nach dem Login (get mit "svsinfo") </td></tr>
-    <tr><td><li>SVSversion</li>         </td><td>- die Paketversion der installierten Surveillance Station (get mit "svsinfo") </td></tr>
-    <tr><td><li>UsedSpaceMB</li>        </td><td>- durch Aufnahmen der Kamera belegter Plattenplatz auf dem Volume  </td></tr>
-    <tr><td><li>VideoFolder</li>        </td><td>- Pfad zu den aufgenommenen Videos  </td></tr>
-  </table>
-  </ul>
-  <br><br>    
-  
- </ul>
-
-
 <a name="SSCamattr"></a>
 <b>Attribute</b>
   <br><br>
@@ -5334,11 +5333,11 @@ sub experror {
     httptimeout = "0" oder nicht gesetzt) </li><br>
   
   <li><b>htmlattr</b><br>
-  ergänzende Angaben zur Livestream-Url um das Verhalten wie Bildgröße zu beeinflussen <br><br> 
+  ergänzende Angaben zur Inline-Bilddarstellung um das Verhalten wie Bildgröße zu beeinflussen. <br><br> 
   
         <ul>
 		<b>Beispiel:</b><br>
-        attr &lt;name&gt; htmlattr width=500 height=325 top=200 left=300
+        attr &lt;name&gt; htmlattr width="500" height="325" top="200" left="300"
         </ul>
 		<br>
         </li>
@@ -5409,12 +5408,77 @@ sub experror {
     </table>
    </ul>     
    <br>
-   
    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-  
-  </ul>  
+   <br><br>
   </ul>
-  <br><br>
+
+<a name="SSCamreadings"></a>
+<b>Readings</b>
+ <ul>
+  <br>
+  Über den Pollingmechanismus bzw. durch Abfrage mit "Get" werden Readings bereitgestellt, deren Bedeutung in der nachfolgenden Tabelle dargestellt sind. <br>
+  Die übermittelten Readings können in Abhängigkeit des Kameratyps variieren.<br><br>
+  <ul>
+  <table>  
+  <colgroup> <col width=5%> <col width=95%> </colgroup>
+    <tr><td><li>Availability</li>       </td><td>- Verfügbarkeit der Kamera (disabled, enabled, disconnected, other)  </td></tr>
+    <tr><td><li>CamEventNum</li>        </td><td>- liefert die Gesamtanzahl der in SVS registrierten Events der Kamera  </td></tr>
+    <tr><td><li>CamExposureControl</li> </td><td>- zeigt den aktuell eingestellten Typ der Belichtungssteuerung  </td></tr>
+    <tr><td><li>CamExposureMode</li>    </td><td>- aktueller Belichtungsmodus (Day, Night, Auto, Schedule, Unknown)  </td></tr>
+    <tr><td><li>CamForceEnableMulticast</li> </td><td>- sagt aus ob die Kamera verpflichet ist Multicast einzuschalten.  </td></tr>
+    <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
+    <tr><td><li>CamLastRec</li>         </td><td>- Pfad / Name der letzten Aufnahme   </td></tr>
+    <tr><td><li>CamLastRecTime</li>     </td><td>- Datum / Startzeit - Stopzeit der letzten Aufnahme   </td></tr>
+    <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
+    <tr><td><li>CamModel</li>           </td><td>- Kameramodell  </td></tr>
+    <tr><td><li>CamMotDetSc</li>        </td><td>- Status der Bewegungserkennung (disabled, durch Kamera, durch SVS) und deren Parameter </td></tr>
+    <tr><td><li>CamPort</li>            </td><td>- IP-Port der Kamera  </td></tr>
+    <tr><td><li>CamPreRecTime</li>      </td><td>- Dauer der der Voraufzeichnung in Sekunden (Einstellung in SVS)  </td></tr>
+    <tr><td><li>CamRecShare</li>        </td><td>- gemeinsamer Ordner auf der DS für Aufnahmen  </td></tr>
+    <tr><td><li>CamRecVolume</li>       </td><td>- Volume auf der DS für Aufnahmen  </td></tr>
+    <tr><td><li>CamVendor</li>          </td><td>- Kamerahersteller Bezeichnung  </td></tr>
+    <tr><td><li>CamVideoFlip</li>       </td><td>- Ist das Video gedreht  </td></tr>
+    <tr><td><li>CamVideoMirror</li>     </td><td>- Ist das Video gespiegelt  </td></tr>
+    <tr><td><li>CapAudioOut</li>        </td><td>- Fähigkeit der Kamera zur Audioausgabe über Surveillance Station (false/true)  </td></tr>
+    <tr><td><li>CapChangeSpeed</li>     </td><td>- Fähigkeit der Kamera verschiedene Bewegungsgeschwindigkeiten auszuführen  </td></tr>
+    <tr><td><li>CapPTZAbs</li>          </td><td>- Fähigkeit der Kamera für absolute PTZ-Aktionen   </td></tr>
+    <tr><td><li>CapPTZAutoFocus</li>    </td><td>- Fähigkeit der Kamera für Autofokus Aktionen  </td></tr>
+    <tr><td><li>CapPTZDirections</li>   </td><td>- die verfügbaren PTZ-Richtungen der Kamera  </td></tr>
+    <tr><td><li>CapPTZFocus</li>        </td><td>- Art der Kameraunterstützung für Fokussierung  </td></tr>
+    <tr><td><li>CapPTZHome</li>         </td><td>- Unterstützung der Kamera für Home-Position  </td></tr>
+    <tr><td><li>CapPTZIris</li>         </td><td>- Unterstützung der Kamera für Iris-Aktion  </td></tr>
+    <tr><td><li>CapPTZPan</li>          </td><td>- Unterstützung der Kamera für Pan-Aktion  </td></tr>
+    <tr><td><li>CapPTZTilt</li>         </td><td>- Unterstützung der Kamera für Tilt-Aktion  </td></tr>
+    <tr><td><li>CapPTZZoom</li>         </td><td>- Unterstützung der Kamera für Zoom-Aktion  </td></tr>
+    <tr><td><li>DeviceType</li>         </td><td>- Kameratyp (Camera, Video_Server, PTZ, Fisheye)  </td></tr>
+    <tr><td><li>Error</li>              </td><td>- Meldungstext des letzten Fehlers  </td></tr>
+    <tr><td><li>Errorcode</li>          </td><td>- Fehlercode des letzten Fehlers   </td></tr>
+    <tr><td><li>LastSnapFilename</li>   </td><td>- der Filename des letzten Schnapschusses   </td></tr>
+    <tr><td><li>LastSnapId</li>         </td><td>- die ID des letzten Schnapschusses   </td></tr>
+	<tr><td><li>LastSnapTime</li>       </td><td>- Zeitstempel des letzten Schnapschusses   </td></tr>
+    <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung durch "caminfoall" </td></tr> 
+    <tr><td><li>LiveStreamUrl </li>     </td><td>- die LiveStream-Url wenn der Stream gestartet ist. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein) </td></tr> 
+    <tr><td><li>Patrols</li>            </td><td>- in Surveillance Station voreingestellte Überwachungstouren (bei PTZ-Kameras)  </td></tr>
+    <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>    
+    <tr><td><li>Presets</li>            </td><td>- in Surveillance Station voreingestellte Positionen (bei PTZ-Kameras)  </td></tr>
+    <tr><td><li>Record</li>             </td><td>- Aufnahme läuft = Start, keine Aufnahme = Stop  </td></tr> 
+    <tr><td><li>StmKey</li>             </td><td>- aktueller StreamKey. Kann zum öffnen eines Livestreams ohne Session Id genutzt werden.    </td></tr> 
+    <tr><td><li>StmKeyUnicst</li>       </td><td>- Uni-cast Stream Pfad der Kamera. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein)  </td></tr> 
+    <tr><td><li>StmKeymjpegHttp</li>    </td><td>- Mjpeg Stream Pfad (über http) der Kamera. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein)  </td></tr>
+    <tr><td><li>SVScustomPortHttp</li>  </td><td>- benutzerdefinierter Port der Surveillance Station (HTTP) im DSM-Anwendungsportal (get mit "svsinfo")  </td></tr> 
+    <tr><td><li>SVScustomPortHttps</li> </td><td>- benutzerdefinierter Port der Surveillance Station (HTTPS) im DSM-Anwendungsportal (get mit "svsinfo") </td></tr>
+    <tr><td><li>SVSlicenseNumber</li>   </td><td>- die Anzahl der installierten Kameralizenzen (get mit "svsinfo") </td></tr>
+    <tr><td><li>SVSuserPriv</li>        </td><td>- die effektiven Rechte des verwendeten Users nach dem Login (get mit "svsinfo") </td></tr>
+    <tr><td><li>SVSversion</li>         </td><td>- die Paketversion der installierten Surveillance Station (get mit "svsinfo") </td></tr>
+    <tr><td><li>UsedSpaceMB</li>        </td><td>- durch Aufnahmen der Kamera belegter Plattenplatz auf dem Volume  </td></tr>
+    <tr><td><li>VideoFolder</li>        </td><td>- Pfad zu den aufgenommenen Videos  </td></tr>
+  </table>
+  </ul>
+  <br><br>    
+ </ul>
+  
+ </ul>
+ <br><br>
 </ul>
 
 =end html_DE

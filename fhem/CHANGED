@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCam: V2.4.0, new commands "snapinfo" and 
+                       "runView lastsnap_fw", minor fixes
   - feature: 93_DbLog: V2.22.0, new attribute "addStateEvent"
   - bugfix:  74_AMADDevice: Version 4.0.1 Charset utf8
   - changed: 93_DBLog: V.2.21.3, commandref revised
