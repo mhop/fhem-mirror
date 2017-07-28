@@ -290,6 +290,7 @@ FHEM/70_VolumeLink.pm        rapster              http://forum.fhem.de Multimedi
 FHEM/70_WS3600.pm            Josch                http://forum.fhem.de Sonstiges
 FHEM/70_XBMC.pm              vbs                  http://forum.fhem.de Multimedia
 FHEM/70_NEUTRION.pm          michael.winkler      http://forum.fhem.de Multimedia
+FHEM/70_WINCONNECT.pm        michael.winkler      http://forum.fhem.de Sonstige Systeme
 FHEM/70_Pushbullet.pm        fhainz               http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_Pushover.pm          loredo               http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_PushNotifier.pm      xusader              http://forum.fhem.de Unterstuetzende Dienste
