@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.21";     # Version of this module
+my $module_version    = "1.22";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -1100,7 +1100,7 @@ sub ESPEasy_dispatch($$$@) #called by bridge -> send to logical devices
   return if (IsDisabled $name);
 
   my $type = $hash->{TYPE};
-  my $ipv = $hash->{PEER} =~ m/:/ ? 6 : 4;
+  my $ipv  = $host =~ m/:/ ? 6 : 4;
   my $bhash = $modules{ESPEasy}{defptr}{BRIDGE}{$ipv};
   my $bname = $bhash->{NAME};
 
