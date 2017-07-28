@@ -2883,6 +2883,7 @@ sub sscam_camop_parse ($) {
 				
 				# Schnapschuss soll als liveView angezeigt werden (mindestens 1 Bild vorhanden)
 			    if ($hash->{HELPER}{RUNVIEW} =~ /snap/ && exists($allsnaps{0}{imageData})) {
+				    delete $hash->{HELPER}{RUNVIEW};
 					$hash->{HELPER}{LINK} = $allsnaps{0}{imageData};
 					# Browserrefresh 
                     DoTrigger($name,"startview");					
