@@ -1371,7 +1371,6 @@ sub NEUTRINO_ReceiveCommand($$$) {
 					# currentTitel
 					$readvalue = $return->{prog}[$readnumber]{description};
 					readingsBulkUpdate( $hash, "currentTitle",$readvalue);
-					Log3 $name, 0, "NEUTRINO [DEBUG]" . ReadingsVal( $name, "egp_current_info2", "" ) ;
 					
 					foreach ( "eventid","description","info1","info2","start_t","stop_t","duration_min","date","channel_id","stop_sec","start_sec", ) {
 						$reading     = $_;
@@ -1385,7 +1384,6 @@ sub NEUTRINO_ReceiveCommand($$$) {
 							
 							if ($readvalue) {
 								readingsBulkUpdate( $hash, $readingname, $readvalue );
-								Log3 $name, 0, "NEUTRINO [DEBUG]" . $readvalue ;
 							}
 							else {
 								readingsBulkUpdate( $hash, $readingname, "-" );
