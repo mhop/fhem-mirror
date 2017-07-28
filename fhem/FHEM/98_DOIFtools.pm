@@ -373,7 +373,7 @@ sub DOIFtools_eM($$$$) {
         }
       }
   }
-  return $ret;
+  return $ret ? $ret : undef;
 }
 ######################
 # Show the content of the log (plain text), or an image and offer a link
