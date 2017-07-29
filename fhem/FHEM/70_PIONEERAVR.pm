@@ -2746,6 +2746,7 @@ sub PIONEERAVR_Read($)
 
             # to update the OSD/screen while playing from iPad/network a command has to be sent regulary
             if ($2 eq "02" ) {
+				RemoveInternalTimer( $hash, "PIONEERAVR_screenUpdate" );
                 # reset screenUpdate timer -> again in 5s
                 my $checkInterval = 5;
                 my $next = gettimeofday() + $checkInterval;
