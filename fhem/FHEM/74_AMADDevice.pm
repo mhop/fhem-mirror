@@ -54,7 +54,7 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.1";
+my $modulversion = "4.0.2";
 my $flowsetversion = "4.0.0";
 
 
@@ -591,7 +591,7 @@ sub AMADDevice_Set($$@) {
         my $browser = AttrVal( $name, "setOpenUrlBrowser", "com.android.chrome|com.google.android.apps.chrome.Main" );
         my @browserapp = split( /\|/, $browser );
 
-        my $uri     = $host . ":" . $port . "/fhem-amad/setCommands/openURL?url=".$openurl."&browserapp=".$browserapp[0]."&browserappclass=".$browserapp[1];
+        $uri     = $host . ":" . $port . "/fhem-amad/setCommands/openURL?url=".$openurl."&browserapp=".$browserapp[0]."&browserappclass=".$browserapp[1];
         $method     = "POST";
     }
     
