@@ -27,6 +27,8 @@
 #########################################################################################################################
 #  Versions History:
 #
+# 2.4.1  29.07.2017    fix behavior of state when starting lastsnap_fw, fix "uninitialized value in pattern match (m//) 
+#                      at ./FHEM/49_SSCam.pm line 2895"
 # 2.4.0  28.07.2017    new set command runView lastsnap_fw, commandref revised, minor fixes
 # 2.3.2  28.07.2017    code change of getcaminfo (params of Interaltimer)
 # 2.3.1  28.07.2017    code review creating log entries when pollnologging is set/unset
@@ -176,7 +178,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "2.4.0";
+my $SSCamVersion = "2.4.1";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -734,7 +736,7 @@ sub SSCam_FWview ($$$$) {
     $alias = $hash->{HELPER}{ALIAS};
     $ret = "<img $attr alt='$alias' src='data:image/jpeg;base64,$link'><br>";
   }
-  
+
   # FW_directNotify("FILTER=room=$room", "#FHEMWEB:$FW_wname", "location.reload('true')", "") if($d eq $name);
 return $ret;
 }
@@ -1286,15 +1288,13 @@ sub stopliveview ($) {
         
         # Reading LiveStreamUrl löschen
         delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});
-		# kurzer state-switch -> Browser aktualisieren
+		# Longpoll refresh
         readingsSingleUpdate($hash,"state","stopview",1); 
 		
-		# vorhandenen Aufnahmestatus wieder herstellen		
-        if (ReadingsVal("$name", "Record", "") eq "Start") {
-            readingsSingleUpdate( $hash,"state", "on", 1); 
-        } else {
-            readingsSingleUpdate($hash,"state", "off", 1); 
-        }        
+        # Aufnahmestatus im state abbilden
+	    my $st;
+	    (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
+	    readingsSingleUpdate($hash,"state", $st, 1);        
         
 		$hash->{HELPER}{ACTIVE} = "off";  
 		if ($attr{$name}{debugactivetoken}) {
@@ -2632,11 +2632,10 @@ sub sscam_camop ($) {
           }
       }
       
-      if (ReadingsVal("$name", "Record", "") eq "Start") {
-          readingsSingleUpdate( $hash,"state", "on", 1); 
-      } else {
-          readingsSingleUpdate($hash,"state", "off", 1); 
-      }
+      # Aufnahmestatus in state abbilden mit Longpoll refresh
+	  my $st;
+	  (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
+	  readingsSingleUpdate($hash,"state", $st, 1); 
       
       $hash->{HELPER}{ACTIVE} = "off";
       if ($attr{$name}{debugactivetoken}) {
@@ -2879,20 +2878,12 @@ sub sscam_camop_parse ($) {
 				my @as = sort{$a <=>$b}keys(%allsnaps);
 				foreach my $key (@as) {
 				    Log3($name,5, "$name - Snap '$key': ID => $allsnaps{$key}{snapid}, File => $allsnaps{$key}{fileName}, Created => $allsnaps{$key}{createdTm}");
-				}
-				
-				# Schnapschuss soll als liveView angezeigt werden (mindestens 1 Bild vorhanden)
-			    if ($hash->{HELPER}{RUNVIEW} =~ /snap/ && exists($allsnaps{0}{imageData})) {
-				    delete $hash->{HELPER}{RUNVIEW};
-					$hash->{HELPER}{LINK} = $allsnaps{0}{imageData};
-					# Browserrefresh 
-                    DoTrigger($name,"startview");					
 				}	
 				
 				my $lsid   = exists($allsnaps{0}{snapid})?$allsnaps{0}{snapid}:"n.a.";
 				my $lfname = exists($allsnaps{0}{fileName})?$allsnaps{0}{fileName}:"n.a.";
 				my $lstime = exists($allsnaps{0}{createdTm})?$allsnaps{0}{createdTm}:"n.a.";		
-				
+				                
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
@@ -2900,9 +2891,23 @@ sub sscam_camop_parse ($) {
 				readingsBulkUpdate($hash,"LastSnapFilename", $lfname);
 				readingsBulkUpdate($hash,"LastSnapTime", $lstime);
                 readingsEndUpdate($hash, 1);
-                                
+					
+				# Schnapschuss soll als liveView angezeigt werden (mindestens 1 Bild vorhanden)
+			    if (exists($hash->{HELPER}{RUNVIEW}) && $hash->{HELPER}{RUNVIEW} =~ /snap/ && exists($allsnaps{0}{imageData})) {
+				    delete $hash->{HELPER}{RUNVIEW};
+					# Aufnahmestatus in state abbilden 
+	                my $st;
+	                (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
+	                readingsSingleUpdate($hash,"state", $st, 1); 
+					
+					$hash->{HELPER}{LINK} = $allsnaps{0}{imageData};
+					# Longpoll refresh 
+                    DoTrigger($name,"startview");					
+				}
+					
                 # Logausgabe
                 Log3($name, $verbose, "$name - Snapinfos of Camera $camname have been retrieved successfully");
+				
             
 			} elsif ($OpMode eq "getsnapfilename") {
                 # den Filenamen eines Schnapschusses ermitteln

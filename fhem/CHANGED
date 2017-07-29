@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCam: "uninitialized value in pattern ..." at fhem start
   - feature: 49_SSCam: V2.4.0, new commands "snapinfo" and 
                        "runView lastsnap_fw", minor fixes
   - feature: 93_DbLog: V2.22.0, new attribute "addStateEvent"
