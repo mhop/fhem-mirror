@@ -1567,7 +1567,7 @@ sub Calendar_Initialize($) {
   $hash->{SetFn}   = "Calendar_Set";
   $hash->{AttrFn}   = "Calendar_Attr";
   $hash->{NotifyFn}= "Calendar_Notify";
-  $hash->{AttrList}=  "update:sync,async,none hideOlderThan hideLaterThan onCreateEvent SSLVerify:0,1 $readingFnAttributes";
+  $hash->{AttrList}=  "update:sync,async,none removevcalendar:0,1 hideOlderThan hideLaterThan onCreateEvent SSLVerify:0,1 $readingFnAttributes";
 }
 
 
@@ -2224,8 +2224,9 @@ sub Calendar_Cleanup($) {
   delete($hash->{".fhem"}{removeall});
   delete($hash->{".fhem"}{serialized});
   delete($hash->{".fhem"}{subprocess});
-
+    
   my $name= $hash->{NAME};
+  delete($hash->{".fhem"}{iCalendar}) if(AttrVal($name,"removevcalendar",0));
   Log3 $hash, 4, "Calendar $name: process ended."; 
 }
 
@@ -2436,7 +2437,11 @@ sub Calendar_UpdateCalendar($$) {
   }
   
   foreach my $v (grep { $_->{type} eq "VEVENT" } @{$root->{entries}}) {
-        #main::Debug "Merging " . $v->asString();
+        
+        # totally skip outdated calendar entries
+	next if ($v->tm($v->value("DTEND")) < time() && $v->valueOrDefault("RRULE", "") eq "");
+		
+	#main::Debug "Merging " . $v->asString();
         my $found= 0;
         my $added= 0; # flag to prevent multiple additions
         $n++;
@@ -2880,7 +2885,12 @@ sub CalendarAsHtml($;$) {
         background and FHEM will not block during updates. If this attribute is set to 
         <code>none</code>, the calendar will not be updated at all.
         </li><p>
-  
+
+    <li><code>removevcalendar 0|1</code><br>
+        If this attribute is set to 1, the vCalendar will be discarded after the processing to reduce the memory consumption of the module.
+        A retrieval via <code>get &lt;name&gt; vcalendar</code> is then no longer possible.
+        </li><p>
+		
     <li><code>hideOlderThan &lt;timespec&gt;</code><br>
         <code>hideLaterThan &lt;timespec&gt;</code><br><p>
         
@@ -3274,7 +3284,13 @@ sub CalendarAsHtml($;$) {
         nicht blockieren. Wenn dieses Attribut auf <code>none</code> gesetzt ist, wird der
         Kalender &uuml;berhaupt nicht aktualisiert.
         </li><p>
-  
+
+    <li><code>removevcalendar 0|1</code><br>
+		Wenn dieses Attribut auf 1 gesetzt ist, wird der vCalendar nach der Verarbeitung verworfen,
+		gleichzeitig reduziert sich der Speicherverbrauch des Moduls.
+		Ein Abruf &uuml;ber <code>get &lt;name&gt; vcalendar</code> ist dann nicht mehr m&ouml;glich.
+        </li><p>
+		
     <li><code>hideOlderThan &lt;timespec&gt;</code><br>
         <code>hideLaterThan &lt;timespec&gt;</code><br><p>
         
@@ -3308,7 +3324,7 @@ sub CalendarAsHtml($;$) {
         
         <li><code>SSLVerify</code><br>
     
-        Dieses Attribut setzt die Art der &Uuml;berpruuml;fung des Zertifikats des Partners
+        Dieses Attribut setzt die Art der &Uuml;berpr&uuml;fung des Zertifikats des Partners
         bei mit SSL gesicherten Verbindungen. Entweder auf 0 setzen f&uuml;r 
         SSL_VERIFY_NONE (keine &Uuml;berpr&uuml;fung des Zertifikats) oder auf 1 f&uuml;r
         SSL_VERIFY_PEER (&Uuml;berpr&uuml;fung des Zertifikats). Die &Uuml;berpr&uuml;fung auszuschalten

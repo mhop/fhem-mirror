@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 57_Calendar: reduce memory footprint (forum #74481)
   - bugfix:  74_AMADDevice: fix openurl bug
   - bugfix:  49_SSCam: "uninitialized value in pattern ..." on fhem start
   - feature: 49_SSCam: V2.4.0, new commands "snapinfo" and 
