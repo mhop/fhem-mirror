@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 07/2017
-my $thzversion = "0.164"; 
+my $thzversion = "0.165"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -688,6 +688,7 @@ sub THZ_Initialize($)
 		    ."interval_sFlowRate:0,3600,7200,28800,43200,86400 "
 		    ."interval_sDisplay:0,60,120,180,300 "
 		    ."firmware:4.39,2.06,2.14,5.39,4.39technician "
+            ."interval_sDewPointHC1:0,60,120,180,300 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
 }
