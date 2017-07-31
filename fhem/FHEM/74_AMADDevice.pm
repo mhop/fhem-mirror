@@ -54,7 +54,7 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.2";
+my $modulversion = "4.0.3";
 my $flowsetversion = "4.0.0";
 
 
@@ -782,7 +782,7 @@ sub AMADDevice_Parse($$) {
     my $name            = $io_hash->{NAME};
 
 
-    my $decode_json     = eval{decode_json(encode_utf8($json))};
+    my $decode_json     = eval{decode_json($json)};
     if($@){
         Log3 $name, 3, "AMADDevice ($name) - JSON error while request: $@";
         return;
