@@ -42,7 +42,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.3.1";
+my $VERSION = "2.3.2";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -1613,6 +1613,13 @@ SYSMON_getUptime($$)
   my $uptime_str = SYSMON_execute($hash, "cat /proc/uptime");
   if(defined($uptime_str)) {
     my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
+    #postfux use idle from /proc/stat instead
+    my $stat_str = SYSMON_execute($hash, "cat /proc/stat|grep 'cpu '");
+    my($tName, $neuCPUuser, $neuCPUnice, $neuCPUsystem, $neuCPUidle, $neuCPUiowait, $neuCPUirq, $neuCPUsoftirq) = split(/\s+/, trim($stat_str));
+    if(defined($neuCPUidle)){
+      $idle=$neuCPUidle/100;
+    }
+    #postfux
     if(defined($uptime) && int($uptime)!=0) {
       # Anzahl Cores beruecksichtigen
       my $core_num = SYSMON_getCPUCoreNum_intern($hash);
