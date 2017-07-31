@@ -11,46 +11,6 @@
 #
 ########################################################################################
 #
-# define <name> OWSWITCH [<model>] <ROM_ID> [interval] or OWSWITCH <fam>.<ROM_ID> [interval]
-#
-# where <name> may be replaced by any name string 
-#     
-#       <model> is a 1-Wire device type. If omitted, we assume this to be an
-#              DS2413. Allowed values are DS2413, DS2406, DS2408
-#       <fam> is a 1-Wire family id, currently allowed values are 12, 29, 3A
-#       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
-#                without Family ID, e.g. A2D90D000800 
-#       [interval] is an optional query interval in seconds
-#
-# get <name> id       => FAM_ID.ROM_ID.CRC 
-# get <name> present  => 1 if device present, 0 if not
-# get <name> interval => query interval
-# get <name> input <channel-name> => state for channel (name A, B or defined channel name)
-#            note: this value reflects the measured value, not necessarily the one set as
-#            output state, because the output transistors are open collector switches. A measured
-#            state of 1 = OFF therefore corresponds to an output state of 1 = OFF, but a measured
-#            state of 0 = ON can also be due to an external shortening of the output.
-# get <name> gpio  => values for channels
-# get <name> version  => OWX version number
-#
-# set <name> interval => set period for measurement
-# set <name> output <channel-name>  on|off|on-for-timer <int>|on-for-timer <int>
-#            => set value for channel (name A, B or defined channel name)
-#            note: 1 = OFF, 0 = ON in normal usage. See also the note above
-#            ON-for-timer/OFF-for-timer will set the desired value only for <int> seconds
-#            and then will return to the opposite value.
-# set <name> gpio  value => set values for channels (3 = both OFF, 1 = B ON 2 = A ON 0 = both ON)
-# set <name> init yes => re-initialize device
-#
-# Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
-# Note: attributes are read only during initialization procedure - later changes are not used.
-#
-# attr <name> stateS <string> = character string denoting external shortening condition, default is X
-# attr <name> <channel>Name <string>|<string> = name for the channel [|short name used in state reading]
-# attr <name> <channel>Unit <string>|<string> = values to display in state variable for on|off condition
-#
-########################################################################################
-#
 #  This programm is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
@@ -87,15 +47,13 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="6.11";
+my $owx_version="7.0";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
 
 my %gets = (
   "id"          => "",
-  "present"     => "",
-  "interval"    => "",
   "input"       => "",
   "gpio"        => "",
   "version"     => ""
@@ -251,6 +209,7 @@ sub OWSWITCH_Define ($$) {
   $hash->{OW_ID}      = $id;
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
+  $hash->{ERRCOUNT}   = 0;
   $hash->{INTERVAL}   = $interval;
   
   #-- Couple to I/O device
@@ -326,9 +285,9 @@ sub OWSWITCH_Attr(@) {
       #-- interval modified at runtime
      $key eq "interval" and do {
         #-- check value
-        return "OWSWITCH: Set with short interval, must be > 1" if(int($value) < 1);
+        return "OWSWITCH: set $name  interval must be >= 0" if(int($value) < 0);
         #-- update timer
-        $hash->{INTERVAL} = $value;
+        $hash->{INTERVAL} = int($value);
         if ($init_done) {
           RemoveInternalTimer($hash);
           InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 0);
@@ -490,28 +449,6 @@ sub OWSWITCH_Get($@) {
 
   #-- hash of the busmaster
   my $master       = $hash->{IODev};  
-
-  #-- get present
-  if($a[1] eq "present") {
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
-      eval {
-        OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
-      };
-      return GP_Catch($@) if $@;
-      return "$name.present => ".ReadingsVal($name,"present","unknown");
-    } else {
-      $value = OWX_Verify($master,$hash->{ROM_ID});
-    }
-    $hash->{PRESENT} = $value;
-    return "$name.present => $value";
-  } 
-
-  #-- get interval
-  if($a[1] eq "interval") {
-    $value = $hash->{INTERVAL};
-     return "$name.interval => $value";
-  } 
   
   #-- get version
   if( $a[1] eq "version") {
@@ -547,15 +484,16 @@ sub OWSWITCH_Get($@) {
       };
       $ret = GP_Catch($@) if $@;
     #-- OWFS interface
-    }elsif( $interface eq "OWFS" ){
+    }elsif( $interface eq "OWServer" ){
       $ret = OWFSSWITCH_GetState($hash);
     #-- Unknown interface
     }else{
       return "OWSWITCH: Get with wrong IODev type $interface";
     }
     #-- process result
-    if( ($master->{ASYNCHRONOUS}) && ($interface ne "OWFS") ){
-      return "OWSWITCH: $name getting input, please wait for completion";
+    if( ($master->{ASYNCHRONOUS}) && ($interface ne "OWServer") ){
+      #return "OWSWITCH: $name getting input, please wait for completion";
+      return undef;
     }else{
       return $name.".".$a[2]." => ".$hash->{READINGS}{$owg_channel[$fnd]}{VAL};
     } 
@@ -579,7 +517,8 @@ sub OWSWITCH_Get($@) {
     }
     #-- process results
     if( $master->{ASYNCHRONOUS} ){
-      return "OWSWITCH: $name getting gpio, please wait for completion";
+      #return "OWSWITCH: $name getting gpio, please wait for completion";
+      return undef;
     }else{
       if( defined($ret)  ){
         return "OWSWITCH: Could not get values from device $name, reason $ret";
@@ -609,8 +548,11 @@ sub OWSWITCH_GetValues($) {
   OWSWITCH_InitializeDevice($hash)
     if( $hash->{READINGS}{"state"}{VAL} eq "defined"); 
 
-  #-- restart timer for updates
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash); 
+  #-- auto-update for device disabled;
+  return undef
+    if( $hash->{INTERVAL} == 0 );
+  #-- restart timer for updates  
   InternalTimer(time()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 0);
   
   #-- Get readings according to interface type
@@ -714,10 +656,10 @@ sub OWSWITCH_Set($@) {
   #-- set new timer interval
   if($key eq "interval") {
     # check value
-    return "OWSWITCH: Set with short interval, must be > 1"
-      if(int($value) < 1);
+    return "OWSWITCH: set $name interval must be >= 0"
+      if(int($value) < 0);
     # update timer
-    $hash->{INTERVAL} = $value;
+    $hash->{INTERVAL} = int($value);
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 0);
     return undef;
@@ -1025,7 +967,8 @@ sub OWXSWITCH_BinValues($$$$$$$) {
   #-- hash of the busmaster
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
-  my @data=[]; 
+  my $error  = 0;
+  my @data   = []; 
   my $value;
   my $msg;
   my $cmd;
@@ -1033,8 +976,7 @@ sub OWXSWITCH_BinValues($$$$$$$) {
   my $outfnd;
   my $outval;
   
-  OWX_WDBG($name,"OWXSWITCH_BinValues called for device $name in context $context with data ",$res)
-    if( $main::owx_debug>2 );
+  OWX_WDBGL($name,4,"OWXSWITCH_BinValues: called for device $name in context $context with data ",$res);
 
   #-- note: value 1 corresponds to OFF, 0 to ON normally
   #         val = input value, vax = output value
@@ -1048,13 +990,21 @@ sub OWXSWITCH_BinValues($$$$$$$) {
     #-- initial get operation
     #-- family = 12 => DS2406 -------------------------------------------------------
     if( $chip eq "ds2406" )  {
+      #-- we have to get rid  of the first 12 bytes
+      if( length($res) == 16 ){
+        $res=substr($res,12);
+      }
       @data=split(//,$res);
+      $crcpart = $crcpart.substr($res,0,2);
+      
       if (@data != 4){
-        $msg="Error - $name returns invalid data length, ".int(@data)." instead of 4 bytes, ";
-      }elsif(OWX_CRC16($crcpart.substr($res,0,2),$data[2],$data[3]) == 0){
-        $msg="Error - state could not be set for device $name, invalid CRC, ";
+        $error = 1;
+        $msg   = "$name: invalid data length in $context, ".int(@data)." instead of 4 bytes, ";
+      }elsif(OWX_CRC16($crcpart,$data[2],$data[3]) == 0){
+        $error = 1;
+        $msg   = "$name: invalid CRC in getstate, ";
       }else{
-        $msg="No error, ";
+        $msg   = "$name: no error, ";
         $value=ord($data[0]);
         $hash->{owg_val}->[0] = ($value>>2) & 1;
         $hash->{owg_vax}->[0] =  $value     & 1;
@@ -1064,15 +1014,24 @@ sub OWXSWITCH_BinValues($$$$$$$) {
       }
     #-- family = 29 => DS2408 -------------------------------------------------------
     }elsif( $chip eq "ds2408" ) {
+      #-- we have to get rid  of the first 12 bytes
+      if( length($res) == 22 ){
+        $res=substr($res,12);
+      }
       @data=split(//,$res);
-      if (@data != 10){
-        $msg="Error - $name returns invalid data length, ".int(@data)." instead of 10 bytes, ";
+      $crcpart = $crcpart.substr($res,0,8);
+
+      if (@data < 10){
+        $error = 1;
+        $msg   = "$name: invalid data length in $context, ".int(@data)." instead of >=10 bytes, ";
       }elsif(ord($data[6])!=255){
-        $msg="Error - $name returns invalid data, ";
-      }elsif(OWX_CRC16($crcpart.substr($res,0,8),$data[8],$data[9]) == 0){
-        $msg="Error - state could not be set for device $name, invalid CRC, ";
+        $error = 1;
+        $msg   = "$name: invalid data in getstate, ";
+      }elsif(OWX_CRC16($crcpart,$data[8],$data[9]) == 0){
+        $error = 1;
+        $msg   = "$name: invalid CRC in getstate, ";
       }else{
-        $msg="No error, ";
+        $msg   = "$name: no error, ";
         for(my $i=0;$i<8;$i++){
           $hash->{owg_val}->[$i] = (ord($data[0])>>$i) & 1;
           $hash->{owg_vax}->[$i] = (ord($data[1])>>$i) & 1;
@@ -1080,27 +1039,33 @@ sub OWXSWITCH_BinValues($$$$$$$) {
       }
     #-- family = 3A => DS2413 -------------------------------------------------------
     }elsif( $chip eq "ds2413" ){
+      #-- we have to get rid  of the first 10 bytes
+      if( length($res) == 12 ){
+        $res=substr($res,10);
+      }
       @data=split(//,$res);
+
       if (@data != 2){
-        $msg="Error - $name returns invalid data length, ".int(@data)." instead of 2 bytes, ";
+        $error = 1;
+        $msg   = "$name: invalid data length in $context, ".int(@data)." instead of 2 bytes, ";
       }elsif((15- (ord($data[0])>>4)) != (ord($data[0]) & 15)){
-        $msg="Error - $name returns invalid data, ";
+        $error = 1;
+        $msg   = "$name: invalid data in getstate, ";
       }else{
-        $msg="No error, ";
+        $msg    ="$name: no error, ";
         $hash->{owg_val}->[0] = ord($data[0])      & 1;
         $hash->{owg_vax}->[0] = (ord($data[0])>>1) & 1;
         $hash->{owg_val}->[1] = (ord($data[0])>>2) & 1;
         $hash->{owg_vax}->[1] = (ord($data[0])>>3) & 1;
       }
-    #--
-    }else{
-      die "OWSWITCH: $name has unknown device family $hash->{OW_FAMILY} in OWXSWITCH_BinValues getstate\n";
     };
-    OWX_WDBG($name,"OWXSWITCH_BinValues: ".$msg,$res)
-      if( $main::owx_debug>2 );
+    main::OWX_WDBGL($name,5-4*$error,"OWXSWITCH_BinValues $context: ".$msg,$res);
+     
+    $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1
+      if( $error ); 
       
     #-- Formatting only after final get
-    if( $outfnd eq "final"){
+    if( defined($outfnd) && ($outfnd eq "final") && !$error ){
       $hash->{PRESENT}  = 1;
       $value = OWSWITCH_FormatValues($hash);
       return undef;
@@ -1128,13 +1093,20 @@ sub OWXSWITCH_BinValues($$$$$$$) {
     $value = $2;
     #-- family = 12 => DS2406 -------------------------------------------------------
     if( $chip eq "ds2406" ) {
+      #-- we have to get rid  of the first 13 bytes
+      if( length($res) == 15 ){
+        $res=substr($res,13);
+      }
       @data=split(//,$res);
+
       if (@data != 2){
-        $msg="Error - $name returns invalid data length, ".int(@data)." instead of 2 bytes, ";
+        $error = 1;
+        $msg   = "$name: invalid data length in setstate, ".int(@data)." instead of 2 bytes, ";
       }elsif(OWX_CRC16($crcpart,$data[0],$data[1]) == 0){
-        $msg="Error - state could not be set for device $name, invalid CRC, ";
+        $error = 1;
+        $msg   = "$name: invalid CRC in setstate, ";
       }else{
-        $msg="No error, ";
+        $msg   = "$name: no error, ";
         $hash->{owg_val}->[0] = ($value>>2) & 1;
         $hash->{owg_vax}->[0] =  $value     & 1;
         $hash->{owg_val}->[1] = ($value>>3) & 1;
@@ -1142,12 +1114,20 @@ sub OWXSWITCH_BinValues($$$$$$$) {
       }
     #-- family = 29 => DS2408 -------------------------------------------------------
     }elsif( $chip eq "ds2408" ) {
-      if (length($res)!=1){
-        $msg="Error - $name returns invalid data length, ".length($res)." instead of 1 bytes, ";
-      }elsif($res ne "\xAA"){
-        $msg="Error - state could not be set for device $name, ";
+      #-- we have to get rid  of the first 12 bytes
+      if( length($res) == 13 ){
+        $res=substr($res,12);
+      }
+      @data=split(//,$res);
+
+      if (@data !=1 ){
+        $error = 1;
+        $msg   = "$name: invalid data length in setstate, ".int(@data)." instead of 1 bytes, ";
+      }elsif($data[0] ne "\xAA"){
+        $error = 1;
+        $msg   = "$name: invalid data in setstate, ";
       }else{
-        $msg="No error, ";
+        $msg   = "$name: no error, ";
         for(my $i=0;$i<8;$i++){
           $outval = ($value >>$i) & 1;
           $hash->{owg_vax}->[$i] = $outval;
@@ -1157,13 +1137,20 @@ sub OWXSWITCH_BinValues($$$$$$$) {
       }
     #-- family = 3A => DS2413 -------------------------------------------------------
     }elsif( $chip eq "ds2413" ){
+      #-- we have to get rid  of the first 12 bytes
+      if( length($res) == 14 ){
+        $res=substr($res,12);
+      }
       @data=split(//,$res);
+
       if (@data != 2){
-        $msg="Error - $name returns invalid data length, ".int(@data)." instead of 2 bytes, ";
+        $error = 1;
+        $msg   = "$name: invalid data length in setstate, ".int(@data)." instead of 2 bytes, ";
       }elsif( $data[0] ne "\xAA"){
-        $msg="Error - state could not be set for device $name, ";
+        $error = 1;
+        $msg   = "$name: invalid data in setstate, ";
       }else{
-        $msg="No error, ";
+        $msg   = "$name: no error, ";
         $outval = (ord($data[1])>>1) & 1;
         $hash->{owg_vax}->[0] = $outval;
         $hash->{owg_val}->[0] = 0 
@@ -1174,15 +1161,12 @@ sub OWXSWITCH_BinValues($$$$$$$) {
           if( $outval ==0);
       }
    #--
-    }else{
-      die "OWSWITCH: $name has unknown device family $hash->{OW_FAMILY} in OWXSWITCH_BinValues setstate\n";
-    };
-    OWX_WDBG($name,"OWXSWITCH_BinValues: ".$msg,$res)
-      if( $main::owx_debug>2 );
+    }
+    OWX_WDBGL($name,5-4*$error,"OWXSWITCH_BinValues $context: ".$msg,$res);
+    $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1
+      if( $error ); 
     #-- and finally after setstate follows another getstate
     OWXSWITCH_GetModState($hash,"final",undef);
-  }else{
-    die "OWSWITCH: unknown context $context in OWXSWITCH_BinValues";
   }
   return undef;
 }
@@ -1219,15 +1203,15 @@ sub OWXSWITCH_GetModState($$$) {
   if( !defined($outfnd) ){
     $context = "getstate";
     #-- take your time
-    $proc = 0;
+    $proc = 1;
   }elsif( $outfnd eq "final"){
     $context = "getstate.final";
     #-- faster !
-    $proc = 16;
+    $proc = 1;
   }else{
     $context = "modstate.$outfnd.$outval";
     #-- faster !
-    $proc = 16;
+    $proc = 1;
   }
    
   #-- family = 12 => DS2406
@@ -1246,14 +1230,13 @@ sub OWXSWITCH_GetModState($$$) {
       return "OWSWITCH: $name has returned invalid data"
         if( length($res)!=16);
       #OWX_Reset($master);
-      eval {
-        OWXSWITCH_BinValues($hash,"ds2406.$context",undef,$owx_dev,$select,4,substr($res,12));
-      };
-      return $@ ? $@ : undef;
+      return OWXSWITCH_BinValues($hash,"ds2406.$context",undef,$owx_dev,$select,4,substr($res,12));
+
     #-- NEW OWX interface
     }else{
       ####        master   slave   context           proc   owx_dev   data     crcpart  numread startread callback               delay
-      OWX_Qomplex($master, $hash, "ds2406.$context", $proc, $owx_dev, $select, $select, 4,      12,       \&OWXSWITCH_BinValues, 0); 
+      #OWX_Qomplex($master, $hash, "ds2406.$context", $proc, $owx_dev, $select, $select, 4,      12,       \&OWXSWITCH_BinValues, 0.05); 
+      OWX_Qomplex($master, $hash, "ds2406.$context", $proc, $owx_dev, $select, $select, 16,      0,       \&OWXSWITCH_BinValues, 0.05); 
       return undef;
     }
   #-- family = 29 => DS2408
@@ -1272,14 +1255,13 @@ sub OWXSWITCH_GetModState($$$) {
       return "OWSWITCH: $name has returned invalid data"
         if( length($res)!=22);
       #OWX_Reset($master);
-      eval {
-        OWXSWITCH_BinValues($hash,"ds2408.$context",0,$owx_dev,$select,4,substr($res,12));
-      };
-      return $@ ? $@ : undef;
+      return OWXSWITCH_BinValues($hash,"ds2408.$context",0,$owx_dev,$select,4,substr($res,12));
+
     #-- NEW OWX interface
     }else{
       ####        master   slave  context            proc   owx_dev   data     crcpart numread startread callback               delay
-      OWX_Qomplex($master, $hash, "ds2408.$context", $proc, $owx_dev, $select, $select,10,     12,       \&OWXSWITCH_BinValues, 0); 
+      #OWX_Qomplex($master, $hash, "ds2408.$context", $proc, $owx_dev, $select, $select,12,     12,       \&OWXSWITCH_BinValues, 0.05); 
+      OWX_Qomplex($master, $hash, "ds2408.$context", $proc, $owx_dev, $select, $select, 22,     0,       \&OWXSWITCH_BinValues, 0.05); 
       return undef;
     }
   #-- family = 3A => DS2413
@@ -1297,14 +1279,13 @@ sub OWXSWITCH_GetModState($$$) {
       return "OWSWITCH: $name has returned invalid data"
         if( length($res)!=12);
       #OWX_Reset($master);
-      eval {
-        OWXSWITCH_BinValues($hash,"ds2413.$context",0,$owx_dev,substr($res,9,1),2,substr($res,10));
-      };
-      return $@ ? $@ : undef;
+      return OWXSWITCH_BinValues($hash,"ds2413.$context",0,$owx_dev,substr($res,9,1),2,substr($res,10));
+
     #-- NEW OWX interface
     }else{
       ####        master   slave   context           proc   owx_dev   data     crcpart numread  startread callback               delay
-      OWX_Qomplex($master, $hash, "ds2413.$context", $proc, $owx_dev, "\xF5", "\xF5",  2,       10,       \&OWXSWITCH_BinValues, 0); 
+      #OWX_Qomplex($master, $hash, "ds2413.$context", $proc, $owx_dev, "\xF5", "\xF5",  2,       10,       \&OWXSWITCH_BinValues, 0.05); 
+      OWX_Qomplex($master, $hash, "ds2413.$context", $proc, $owx_dev, "\xF5", "\xF5",  12,       0,       \&OWXSWITCH_BinValues, 0.05); 
       return undef;
     }
   } else {
@@ -1353,10 +1334,10 @@ sub OWXSWITCH_SetState($$) {
       return OWXSWITCH_BinValues($hash,"ds2406.setstate.$value",0,$owx_dev,$select,2,substr($res,13));
     #-- NEW OWX interface
     }else{
-      ####        master   slave   context                  proc owx_dev   data     crcpart       numread startread callback               delay
+      ####        master   slave   context                  proc owx_dev     data     crcpart       numread startread callback               delay
       #                                                     16 pushes this to the top of the queue
-      #OWX_Qomplex($master, $hash, "ds2406.setstate.$value", 0, $owx_dev,   $select, 0, 2,      13,       \&OWXSWITCH_BinValues, 0.01); 
-      OWX_Qomplex($master, $hash, "ds2406.setstate.$value", 0, $owx_dev,   $select, 0, 2,      2,       \&OWXSWITCH_BinValues, 0.01); 
+      #OWX_Qomplex($master, $hash, "ds2406.setstate.$value", 1,  $owx_dev,   $select, $select,            2,      13,       \&OWXSWITCH_BinValues, undef); 
+      OWX_Qomplex($master, $hash, "ds2406.setstate.$value", 1,  $owx_dev,   $select, $select,            15,      0,       \&OWXSWITCH_BinValues, undef); 
       return undef;
     }
   #--  family = 29 => DS2408
@@ -1378,7 +1359,8 @@ sub OWXSWITCH_SetState($$) {
     }else{
       ####        master   slave  context                   proc  owx_dev   data     crcpart numread startread callback               delay
       #                                                     16 pushes this to the top of the queue
-      OWX_Qomplex($master, $hash, "ds2408.setstate.$value", 16,   $owx_dev, $select, 0,      1,      12,       \&OWXSWITCH_BinValues, 0); 
+      #OWX_Qomplex($master, $hash, "ds2408.setstate.$value", 1,   $owx_dev, $select, 0,      1,      12,       \&OWXSWITCH_BinValues, undef); 
+      OWX_Qomplex($master, $hash, "ds2408.setstate.$value", 1,   $owx_dev, $select, 0,      13,      0,       \&OWXSWITCH_BinValues, undef); 
       return undef;
     }
   #-- family = 3A => DS2413      
@@ -1390,7 +1372,7 @@ sub OWXSWITCH_SetState($$) {
     #-- OLD OWX interface
     if( !$master->{ASYNCHRONOUS} ){ 
       OWX_Reset($master);
-      $res=OWX_Complex($master,$owx_dev,$select,1);
+      $res=OWX_Complex($master,$owx_dev,$select,2);
       if( $res eq 0 ){
         return "device $owx_dev not accessible in writing"; 
       }
@@ -1400,7 +1382,8 @@ sub OWXSWITCH_SetState($$) {
     }else{
       ####        master   slave  context            proc owx_dev   data     cmd    numread startread callback               delay
       #                                                  16 pushes this to the top of the queue
-      OWX_Qomplex($master, $hash, "ds2413.setstate", 16,   $owx_dev, $select, 0,     2,      12,       \&OWXSWITCH_BinValues, 0); 
+      #OWX_Qomplex($master, $hash, "ds2413.setstate", 1,   $owx_dev, $select, 0,     2,      12,       \&OWXSWITCH_BinValues, undef); 
+      OWX_Qomplex($master, $hash, "ds2413.setstate", 1,   $owx_dev, $select, 0,     14,      0,       \&OWXSWITCH_BinValues, undef); 
       return undef;
     }
   } else {
@@ -1693,14 +1676,14 @@ sub OWXSWITCH_PT_SetOutput($$$) {
                 code </li>
             <li>
                 <code>&lt;interval&gt;</code>
-                <br />Measurement interval in seconds. The default is 300 seconds. </li>
+                <br />Measurement interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update. </li>
         </ul>
         <a name="OWSWITCHset"></a>
         <h4>Set</h4>
         <ul>
             <li><a name="owswitch_interval">
                     <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
-                interval in seconds. The default is 300 seconds. </li>
+                interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update. </li>
             <li><a name="owswitch_output">
                     <code>set &lt;name&gt; output &lt;channel-name&gt; on | off | on-for-timer &lt;time&gt; | off-for-timer &lt;time&gt;</code>
                     </a><br />Set
@@ -1721,13 +1704,6 @@ sub OWXSWITCH_PT_SetOutput($$$) {
             <li><a name="owswitch_id">
                     <code>get &lt;name&gt; id</code></a>
                 <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
-            <li><a name="owswitch_present">
-                    <code>get &lt;name&gt; present</code>
-                </a>
-                <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
-            <li><a name="owswitch_interval2">
-                    <code>get &lt;name&gt; interval</code></a><br />Measurement interval in
-                seconds. </li>
             <li><a name="owswitch_input">
                     <code>get &lt;name&gt; input &lt;channel-name&gt;</code></a><br /> state for
                 channel (A,B, ... or defined channel name) This value reflects the measured value,
@@ -1738,8 +1714,12 @@ sub OWXSWITCH_PT_SetOutput($$$) {
             <li><a name="owswitch_gpio">
                     <code>get &lt;name&gt; gpio</code></a><br />Obtain state of all channels</li>
         </ul>
-        <a name="OWSWITCHattr"></a>
-        <h4>Attributes</h4> For each of the following attributes, the channel identification A,B,...
+        <a name="OWSWITCHattr"></a>  
+        <h4>Attributes</h4> 
+        <ul><li><a name="owswitch_interval2">
+                    <code>attr &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+                interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update.</li>
+        </ul>For each of the following attributes, the channel identification A,B,...
         may be used. <ul>
             <li><a name="owswitch_states"><code>&lt;name&gt; stateS &lt;string&gt;</code></a>
                 <br/> character string denoting external shortening condition (default is X, set to "none" for empty).</li>
