@@ -23,6 +23,8 @@
 # 16.11.16 GA add new attribute overallHeatingSwitchRef for threshold based configuration
 # 17.11.16 GA add internals for configuration parameters: p_interval, p_cycletime, p_minOnOffTime, 
 #                 p_maxPulse, p_roomsMinOnOffThreshold and p_overallHeatingSwitch
+# 01.08.17 GA add attribute disable to stop calculations of PWM
+# 01.08.17 GA fix OverallHeatingSwitch (without threshold) now independent from ValveProtection
 
 ##############################################
 # $Id$
@@ -76,7 +78,7 @@ PWM_Initialize($)
   $hash->{UndefFn}   = "PWM_Undef";
   $hash->{AttrFn}    = "PWM_Attr";
 
-  $hash->{AttrList}  = "event-on-change-reading event-min-interval valveProtectIdlePeriod overallHeatingSwitchRef:pulseMax,pulseSum,pulseAvg,pulseAvg2,pulseAvg3,avgPulseRoomsOn";
+  $hash->{AttrList}  = "disable:1,0 event-on-change-reading event-min-interval valveProtectIdlePeriod overallHeatingSwitchRef:pulseMax,pulseSum,pulseAvg,pulseAvg2,pulseAvg3,avgPulseRoomsOn";
   #$hash->{GetList}   = "status timers";
 
 }
@@ -106,6 +108,13 @@ PWM_Calculate($)
     InternalTimer(gettimeofday() + $hash->{INTERVAL}, "PWM_Calculate", $hash, 0);
   }
 
+  if (defined($attr{$name}{disable}) and $attr{$name}{disable} == 1) {
+    Log3 ($hash, 3, "PWM_Calculate $name");
+    $hash->{STATE} = "disabled";
+    readingsSingleUpdate ($hash,  "lastrun", "disabled", 0);
+    return;
+  }
+
   Log3 ($hash, 3, "PWM_Calculate $name");
 
   readingsBeginUpdate ($hash);
@@ -123,8 +132,6 @@ PWM_Calculate($)
   foreach my $d (sort keys %defs) {
     if ( (defined ($defs{$d}{TYPE})) && $defs{$d}{TYPE} eq "PWMR" ) {      # all PWMR objects
        if (!defined ($attr{$d}{disable}) or $attr{$d}{disable} == 0) {     # not disabled
-         #if ($hash->{NAME} eq $defs{$d}{IODev}) {                          # referencing to this fb
-         #if ($hash->{NAME} eq $defs{$d}{IODev}{NAME}) {                          # referencing to this fb
          if ($hash->{NAME} eq $defs{$d}{IODev}->{NAME}) {                          # referencing to this fb
 
           Log3 ($hash, 4, "PWM_Calculate calc $name, room $d");
@@ -406,6 +413,7 @@ PWM_Calculate($)
   #
 
   my $cntRoomsOn = 0;
+  my $cntRoomsOnVP = 0;
   my $cntRoomsOff = 0;
   my $pulseRoomsOn = 0;
   my $pulseRoomsOff = 0;
@@ -456,6 +464,7 @@ PWM_Calculate($)
 
 	  PWMR_SetRoom ($defs{$roomVP}, "on"); 
           $cntRoomsOn++;
+          $cntRoomsOnVP++;
           $pulseRoomsOn += $RoomsPulses{$roomVP};
 
 	} else {
@@ -525,7 +534,7 @@ PWM_Calculate($)
       } else {
 
         # room based
-        $newstateOHS = ($cntRoomsOn > 0) ? "on" : "off";
+        $newstateOHS = (($cntRoomsOn - $cntRoomsOnVP) > 0) ? "on" : "off";
 
       }
 
@@ -1168,6 +1177,9 @@ PWM_Attr(@)
 
   <b>Attributes</b>
   <ul>
+    <li>disable<br>
+        Set to 1 will disable all calculations and STATE will be set to "disabled".<br>
+        </li><br>
     <li>valveProtectIdlePeriod<br>
         Protect Valve by switching on actor for 300 seconds.<br>
         After <i>valveProtectIdlePeriod</i> number of days without switching the valve the actor is set to "on" for 300 seconds.
