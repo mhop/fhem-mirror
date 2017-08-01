@@ -2416,7 +2416,7 @@ ZWave_ccsAllGet ($)
   foreach my $idx (1..int($#zwave_wd)) {
     ZWave_Get($hash, $hash->{NAME}, "ccs", $zwave_wd[$idx]);
   }
-  return ("working in the background","EMPTY");
+  return (ZWave_WibMsg($hash),"EMPTY");
 }
 
 sub
@@ -3087,6 +3087,15 @@ ZWave_configParse($$$$)
 }
 
 sub
+ZWave_WibMsg($)
+{
+  my ($hash) = @_;
+  return ZWave_isWakeUp($hash) ? 
+                "Scheduled get requests for sending after WAKEUP" :
+                "working in the background";
+}
+
+sub
 ZWave_configAllGet($)
 {
   my ($hash) = @_;
@@ -3097,7 +3106,7 @@ ZWave_configAllGet($)
   foreach my $c (sort keys %{$mc->{get}}) {
     ZWave_Get($hash, $hash->{NAME}, $c);
   }
-  return ("working in the background","EMPTY");
+  return (ZWave_WibMsg($hash),"EMPTY");
 }
 
 sub
@@ -3109,7 +3118,7 @@ ZWave_associationAllGet($$)
     $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationAllGet;
     delete($hash->{CL});
     ZWave_Get($hash, $hash->{NAME}, "associationGroups");
-    return("working in the background", "EMPTY");
+    return(ZWave_WibMsg($hash), "EMPTY");
   }
 
   my $nGrp = ($data =~ m/..8506(..)/ ? hex($1) :
@@ -3131,7 +3140,7 @@ ZWave_mcaAllGet($$)
     $zwave_parseHook{"$hash->{nodeIdHex}:..8e"} = \&ZWave_mcaAllGet;
     delete($hash->{CL});
     ZWave_Get($hash, $hash->{NAME}, "mcaGroupings");
-    return("working in the background", "EMPTY");
+    return(ZWave_WibMsg($hash), "EMPTY");
   }
 
   my $nGrp = ($data =~ m/..8e06(..)/ ? hex($1) :
