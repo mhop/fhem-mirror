@@ -399,6 +399,9 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
 
 ###################################################
 # Start the program
+my $fhemdebug;
+$fhemdebug = shift @ARGV if($ARGV[0] eq "-d");
+
 if(int(@ARGV) < 1) {
   print "Usage:\n";
   print "as server: fhem configfile\n";
@@ -2751,6 +2754,10 @@ CommandAttr($$)
       }
     }
 
+    if($fhemdebug && $sdev eq "global") {
+      $a[2] = "-" if($attrName eq "logfile");
+      $a[2] = 5   if($attrName eq "verbose");
+    }
     $ret = CallFn($sdev, "AttrFn", "set", @a);
     if($ret) {
       push @rets, $ret;
@@ -3960,6 +3967,10 @@ setGlobalAttrBeforeFork($)
     my ($n,$v) = ($1,$2);
     $v =~ s/#.*//;
     $v =~ s/ .*$//;
+    if($fhemdebug) {
+      $v = "-" if($n eq "logfile");
+      $v = 5   if($n eq "verbose");
+    }
     $attr{global}{$n} = $v;
     GlobalAttr("set", "global", $n, $v);
   }
