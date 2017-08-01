@@ -111,15 +111,23 @@ FW_jqueryReadyFn()
     var id = $(this).attr("id");
     if(!id || id.indexOf("TYPE") != 0)
       return;
-    var maxTd=0, tdCount=[];
-    $(this).find("tr").each(function(){         // count the td's
-      var cnt=0;
-      $(this).find("td").each(function(){ cnt++; });
-      if(maxTd < cnt) maxTd = cnt;
+    var maxTd=0, tdCount=[], tbl = $(this);
+    $(tbl).find("> tbody > tr").each(function(){         // count the td's
+      var cnt = 0, row=this;
+      $(row).find("> td").each(function(){ 
+        var cs = $(this).attr("colspan");
+        cnt += parseInt(cs ? cs : 1);
+      });
+      if(maxTd < cnt)
+        maxTd = cnt;
       tdCount.push(cnt);
     });
-    $(this).find("tr").each(function(){         // set the colspan
-      $(this).find("td").last().attr("colspan", maxTd-tdCount.shift()+1);
+    $(tbl).find("> tbody> tr").each(function(){         // set the colspan
+      var tdc = tdCount.shift();
+      $(this).find("> td:last").each(function(){
+        var cs = $(this).attr("colspan");
+        $(this).attr("colspan", maxTd-tdc+(cs ? parseInt(cs) : 1));
+      });
     });
   });
 

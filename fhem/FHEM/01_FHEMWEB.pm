@@ -930,9 +930,10 @@ FW_answerCall($)
     $FW_lastHashUpdate = $lastDefChange;
   }
 
-  my $t = AttrVal($FW_wname, "title",
-          AttrVal("global", "title", "Home, Sweet Home"));
+  my $hsh = "Home, Sweet Home";
+  my $t = AttrVal($FW_wname, "title", AttrVal("global", "title", $hsh));
   $t = eval $t if($t =~ m/^{.*}$/s); # Forum #48668
+  $t = $hsh if(!defined($t));
 
 
   FW_pO '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" '.
