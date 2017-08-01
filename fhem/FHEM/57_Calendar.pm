@@ -1567,7 +1567,7 @@ sub Calendar_Initialize($) {
   $hash->{SetFn}   = "Calendar_Set";
   $hash->{AttrFn}   = "Calendar_Attr";
   $hash->{NotifyFn}= "Calendar_Notify";
-  $hash->{AttrList}=  "update:sync,async,none removevcalendar:0,1 hideOlderThan hideLaterThan onCreateEvent SSLVerify:0,1 $readingFnAttributes";
+  $hash->{AttrList}=  "update:sync,async,none removevcalendar:0,1 cutoffOlderThan hideOlderThan hideLaterThan onCreateEvent SSLVerify:0,1 $readingFnAttributes";
 }
 
 
@@ -2436,10 +2436,27 @@ sub Calendar_UpdateCalendar($$) {
         #main::Debug "Adding event $id with key $k to lookup hash.";
   }
   
+    # start of time window for cutoff
+    my $cutoffOlderThan = AttrVal($name, "cutoffOlderThan", undef);
+    my $cutoffT= 0;
+    my $cutoff;
+    if(defined($cutoffOlderThan)) {
+        ($error, $cutoffT)= Calendar_GetSecondsFromTimeSpec($cutoffOlderThan);
+        if($error) {
+            Log3 $hash, 2, "$name: attribute cutoffOlderThan: $error";
+        };
+        $cutoff= $t- $cutoffT;
+    }
+  
   foreach my $v (grep { $_->{type} eq "VEVENT" } @{$root->{entries}}) {
         
         # totally skip outdated calendar entries
-	next if ($v->tm($v->value("DTEND")) < time() && $v->valueOrDefault("RRULE", "") eq "");
+	next if(
+          defined($cutoffOlderThan) && 
+          $v->hasKey("DTEND") && 
+          $v->tm($v->value("DTEND")) < $cutoff && 
+          !$v->hasKey("RRULE")
+        );
 		
 	#main::Debug "Merging " . $v->asString();
         my $found= 0;
@@ -2916,7 +2933,14 @@ sub CalendarAsHtml($;$) {
         <tr><td>DDDd</td><td>days</td><td>100d</td></tr>
         </table></li>
         <p>
-    
+
+    <li><code>cutoffOlderThan &lt;timespec&gt;</code><br>
+        This attribute cuts off all non-recurring calendar events that ended a timespan cutoffOlderThan
+        before the last update of the calendar. The purpose of setting this attribute is to save memory. 
+        Such calendar events cannot be accessed at all from FHEM. Calendar events are not cut off if
+        they are recurring or if they have no end time (DTEND).
+    </li><p>
+        
     <li><code>onCreateEvent &lt;perl-code&gt;</code><br>
     
         This attribute allows to run the Perl code &lt;perl-code&gt; for every
@@ -3316,6 +3340,13 @@ sub CalendarAsHtml($;$) {
         </table></li>
         <p>
     
+    <li><code>cutoffOlderThan &lt;timespec&gt;</code><br>
+        Dieses Attribut schneidet alle nicht wiederkehrenden Termine weg, die eine Zeitspanne cutoffOlderThan
+        vor der letzten Aktualisierung des Kalenders endeten. Der Zweck dieses Attributs ist es Speicher zu
+        sparen. Auf solche Termine kann gar nicht mehr aus FHEM heraus zugegriffen werden. Serientermine und
+        Termine ohne Endezeitpunkt (DTEND) werden nicht weggeschnitten.
+    </li><p>
+
     <li><code>onCreateEvent &lt;perl-code&gt;</code><br>
     
 		Dieses Attribut f&uuml;hrt ein Perlprogramm &lt;perl-code&gt; f&uuml;r jeden erzeugten Termin aus.
