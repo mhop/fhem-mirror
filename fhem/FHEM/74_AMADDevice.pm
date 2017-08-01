@@ -55,7 +55,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 my $modulversion = "4.0.3";
-my $flowsetversion = "4.0.0";
+my $flowsetversion = "4.0.1";
 
 
 
@@ -916,7 +916,7 @@ sub AMADDevice_decrypt($) {
     In this case, an AMADDevice is created by hand. The AMAD_ID, here 123456, must also be entered exactly as a global variable in Automagic.
   </ul>
   <br><br><br>
-  <a name="AMADreadings"></a>
+  <a name="AMADDevicereadings"></a>
   <b>Readings</b>
   <ul>
     <li>airplanemode - on/off, state of the aeroplane mode</li>
@@ -972,7 +972,7 @@ sub AMADDevice_decrypt($) {
     <br><br>
   </ul>
   <br><br>
-  <a name="AMADset"></a>
+  <a name="AMADDeviceset"></a>
   <b>Set</b>
   <ul>
     <li>activateVoiceInput - start voice input on Android device</li>
@@ -1028,7 +1028,7 @@ sub AMADDevice_decrypt($) {
     Example: <i>attr Nexus10Wohnzimmer setBluetoothDevice Logitech_BT_Adapter|AB:12:CD:34:EF:32,Anker_A3565|GH:56:IJ:78:KL:76</i> 
   </ul>
   <br><br>
-  <a name="AMADstate"></a>
+  <a name="AMADDevicestate"></a>
   <b>state</b>
   <ul>
     <li>initialized - shown after initial define.</li>

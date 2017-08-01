@@ -70,8 +70,8 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.0";
-my $flowsetversion = "4.0.0";
+my $modulversion = "4.0.1";
+my $flowsetversion = "4.0.1";
 
 
 
@@ -114,6 +114,7 @@ sub AMADCommBridge_Initialize($) {
     $hash->{AttrFn}     = "AMADCommBridge_Attr";
     $hash->{AttrList}   = "fhemControlMode:trigger,setControl,thirdPartControl ".
                           "debugJSON:0,1 ".
+                          "enableSubCalls:0,1 ".
                           "disable:1 ".
                           "allowFrom ".
                           $readingFnAttributes;
@@ -266,7 +267,6 @@ sub AMADCommBridge_ErrorHandling($$$) {
     my ($param,$err,$data)    = @_;
     
     my $hash                        = $param->{hash};
-    #my $name                        = $hash->{NAME};
     my $dhash                       = $modules{AMADDevice}{defptr}{$param->{'amad_id'}};
     my $dname                       = $dhash->{NAME};
 
@@ -804,10 +804,11 @@ sub AMADCommBridge_ResponseProcessing($$) {
             my $fhemCmd = $decode_json->{payload}{setcmd};
         
             fhem ("set $fhemCmd") if( AttrVal( $bname, 'fhemControlMode', 'trigger' ) eq 'setControl' );
-            readingsSingleUpdate( $bhash, "receiveFhemCommand", "set ".$fhemCmd, 1 ) if( AttrVal( $bname, 'fhemControlMode', 'trigger' ) eq 'trigger' );;
+            my $r = AnalyzeCommandChain($bhash, 'set'.$fhemCmd);
+            readingsSingleUpdate( $bhash, "receiveFhemCommand", "set ".$fhemCmd, 1 ) if( AttrVal( $bname, 'fhemControlMode', 'trigger' ) eq 'trigger' );
             Log3 $bname, 4, "AMADCommBridge ($name) - AMADCommBridge_CommBridge: set reading receive fhem command";
 
-            $response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM execute set command now\r\n";
+            $response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM response $r\r\n";
             $c = $hash->{CD};
             print $c "HTTP/1.1 200 OK\r\n",
                 "Content-Type: text/plain\r\n",
@@ -853,32 +854,32 @@ sub AMADCommBridge_ResponseProcessing($$) {
             return;
         }
 
+        elsif ( $fhemcmd eq 'fhemfunc' ) {
+            my $fhemCmd = $decode_json->{payload}{fhemsub};
+ 
+            Log3 $bname, 4, "AMADCommBridge ($name) - AMADCommBridge_CommBridge: receive fhem-function command";
+ 
+            if( AttrVal( $bname, 'enableSubCalls', 0 ) == 1 ) {
 
-#         elsif ( $fhemcmd =~ /fhemfunc\b/ ) {
-#             my $fhemCmd = $data[1];
-# 
-#             Log3 $bname, 4, "AMADCommBridge ($name) - AMADCommBridge_CommBridge: receive fhem-function command";
-# 
-#             if( $fhemCmd =~ /^{.*}$/ ) {
-#         
-#                 $response = $fhemCmd if( ReadingsVal( $name, "expertMode", 0 ) eq "1" );
-#             
-#             } else {
-# 
-#                 $response = "header lines: \r\n AMADCommBridge receive no typical FHEM function\r\n FHEM to do nothing\r\n";
-#             }
-# 
-#             $c = $hash->{CD};
-#             print $c "HTTP/1.1 200 OK\r\n",
-#                 "Content-Type: text/plain\r\n",
-#                 "Connection: close\r\n",
-#                 "Content-Length: ".length($response)."\r\n\r\n",
-#                 $response;
-# 
-#             return;
-#         }
-    
+                $response = AnalyzeCommand($bhash, '{'.$fhemCmd.'}');
+                    
+            } else {
+            
+                $response = "header lines: \r\n Attribut enableSubCalls is not set or value is 0\r\n FHEM to do nothing\r\n";
+                Log3 $bname, 3, "AMADCommBridge ($name) - Attribut enableSubCalls is not set or value is 0, FHEM to do nothing";
+            }
+ 
+            $c = $hash->{CD};
+            print $c "HTTP/1.1 200 OK\r\n",
+                "Content-Type: text/plain\r\n",
+                "Connection: close\r\n",
+                "Content-Length: ".length($response)."\r\n\r\n",
+                $response;
+ 
+            return;
+         }
     }
+
 
 
     $response = "header lines: \r\n AMADCommBridge receive incomplete or corrupt Data\r\n FHEM to do nothing\r\n";
