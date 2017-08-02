@@ -3318,7 +3318,12 @@ DoTrigger($$@)
   }
 
   my $max = int(@{$hash->{CHANGED}});
-  return "" if(defined($attr{$dev}) && defined($attr{$dev}{do_not_notify}));
+  if(AttrVal($dev, "do_not_notify", 0)) {
+    delete($hash->{CHANGED});
+    delete($hash->{CHANGETIME});
+    delete($hash->{CHANGEDWITHSTATE});
+    return "";
+  }
   my $now = TimeNow();
 
   ################
