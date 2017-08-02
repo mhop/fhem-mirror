@@ -103,43 +103,45 @@ CommandCmdAlias($$$)
 
 =pod
 =item command
-=item summary    create new commands or replace internal ones.
+=item summary    create new FHEM commands or replace internal ones
 =item summary_DE neue FHEM Befehle definieren oder existierende &auml;ndern
 =begin html
 
 <a name="cmdalias"></a>
 <h3>cmdalias</h3>
 <ul>
-  create new commands or replace internal ones.
-  <br>
+  create new FHEM commands or replace internal ones.
+  <br><br>
 
   <a name="cmdaliasdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; cmdalias &lt;cmd&gt; [parameter]
-                AS newcommand..."</code><br>
+    <code>define &lt;name&gt; cmdalias &lt;cmd_to_be_replaced or new_cmd&gt;
+                 [parameter] AS &lt;existing_cmd&gt;</code><br>
     <br>
-    <ul>
-      parameter is optional and is a regexp which must match the command
-      entered.
-      If it matches, then the specified newcommand will be executed, which is 
-      a fhem command (see <a href="#command">Fhem command types</a> for
-      details). Like in the <a href="#notify">notify</a> commands, $EVENT or
-      $EVTPART may be used, in this case representing the command arguments as
-      whole or the unique words entered.<br>
-      Notes:<ul>
-      <li>newcommand may contain cmd, but recursion is not allowed.</li>
-      <li>if there are multiple definitions, they are checked/executed in
-      alphabetically sorted name oder.</li>
-      </ul>
-      Examples:
-      <ul><code>
-        define s1 cmdalias shutdown update AS save;;shutdown<br>
-        define s2 cmdalias set lamp .* AS { Log 1, "$EVENT";; fhem("set $EVENT") }
-      </code></ul>
-    </ul>
+
+    parameter is optional and is a regexp which must match the command
+    entered.
+    If it matches, then the specified &lt;existing_command&gt; will be
+    executed, which is a FHEM command (see <a href="#command">FHEM command
+    types</a> for details). Like in <a href="#notify">notify</a>, $EVENT or
+    $EVTPART may be used, in this case representing the
+    command arguments as whole or the unique words entered.<br>
   </ul>
+
+  Notes:<ul>
+  <li>recursion is not allowed.</li>
+  <li>if there are multiple definitions, they are checked/executed in
+  alphabetically sorted &lt;name&gt; oder.</li>
+  </ul>
+  Examples:
+  <ul><code>
+    define s1 cmdalias shutdown update AS save;;shutdown<br>
+    define s2 cmdalias set lamp .* AS { Log 1, "$EVENT";; fhem("set $EVENT") }
+  </code></ul>
+
 </ul>
 
 =end html
 =cut
+
