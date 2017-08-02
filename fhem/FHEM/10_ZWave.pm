@@ -1820,7 +1820,7 @@ ZWave_versionClassAllGet($@)
       ZWave_Get($hash, $name, "versionClass", $c);
     }
     $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
-    return("working the background, check the vclasses attribute", "EMPTY");
+    return(ZWave_WibMsg($hash).", check the vclasses attribute", "EMPTY");
   }
   $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
 
