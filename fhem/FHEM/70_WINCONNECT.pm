@@ -1,6 +1,11 @@
 # $Id$
 ############################################################################
-# 2017-07-26, v0.0.16
+# 2017-08-02, v0.0.17
+#
+# v0.0.17
+# - BUFIX:      [FEHMModul] - Code Optimierungen
+# - CHANGE      [WinWebGUI] - FHEM Devicename check auf Gültigkeit https://forum.fhem.de/index.php/topic,59251.msg667257.html#msg667257
+# - FEATURE:	[WinWebGUI] - Fenster verstecken https://forum.fhem.de/index.php/topic,59251.msg665863.html#msg665863
 #
 # v0.0.16 erste SVN Version
 # - BUFIX:      Refresh CSRFTOKEN nach einem reconnect
@@ -140,8 +145,8 @@ sub WINCONNECT_Define($$);
 sub WINCONNECT_Undefine($$);
 
 # Autoupdateinformationen
-my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.16.exe";
-my $DownloadVer = "0.0.16";
+my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.17.exe";
+my $DownloadVer = "0.0.17";
 
 ###################################
 sub WINCONNECT_Initialize($) {
@@ -179,15 +184,19 @@ sub WINCONNECT_GetStatus($;$) {
 	Log3 $name, 5, "WINCONNECT $name: called function WINCONNECT_GetStatus()";
 	Log3 $name, 5, "WINCONNECT $name: filename  = " . $filename . " filemtime = " . $filemtime;
 	
+	#Alte Readings bereinigen
+	print (fhem( "deletereading $name wincontrol_gitlap" )) if ( ReadingsVal( $name, "wincontrol_gitlap", "0" ) ne "0" ) ;
+	print (fhem( "deletereading $name wincontrol_gitlap_url" )) if ( ReadingsVal( $name, "wincontrol_gitlap_url", "0" ) ne "0" ) ;
+	
 	readingsBeginUpdate($hash);
 	
-		#WinControl Versionsinformationen
-		readingsBulkUpdate( $hash, "wincontrol_gitlap", $DownloadVer );
-		readingsBulkUpdate( $hash, "wincontrol_gitlap_url", $DownloadURL);
+	#WinControl Versionsinformationen
+	readingsBulkUpdateIfChanged( $hash, "wincontrol_gitlab", $DownloadVer );
+	readingsBulkUpdateIfChanged( $hash, "wincontrol_gitlab_url", $DownloadURL);
 		
-		#WinControl Update Info eintragen
-		readingsBulkUpdate( $hash, "wincontrol_update", $filemtime );
-		readingsBulkUpdate( $hash, "model", ReadingsVal( $name, "os_Name", "unbekannt" ) );
+	#WinControl Update Info eintragen
+	readingsBulkUpdateIfChanged( $hash, "wincontrol_update", $filemtime );
+	readingsBulkUpdateIfChanged( $hash, "model", ReadingsVal( $name, "os_Name", "unbekannt" ) );
 	
 	readingsEndUpdate( $hash, 1 );
 	
@@ -389,7 +398,7 @@ sub WINCONNECT_Set($@) {
 	
 	# on
     elsif ( lc( $a[1] ) eq "on" ) {
-        readingsSingleUpdate( $hash, "state", "on",0 );
+        readingsSingleUpdate( $hash, "state", "on",1 );
     }
 
 	# powerstate
@@ -406,7 +415,7 @@ sub WINCONNECT_Set($@) {
 	
     # off
     elsif ( lc( $a[1] ) eq "off" ) {
-        readingsSingleUpdate( $hash, "state", "off",0 );
+        readingsSingleUpdate( $hash, "state", "off",1 );
     }
 	
 	# screenOn
@@ -436,7 +445,7 @@ sub WINCONNECT_Set($@) {
                 return "Argument does not seem to be a valid integer between 0 and 100";
             }
 			WINCONNECT_SendCommand( $hash, "volume" , "=" . $cmd  );
-			readingsSingleUpdate( $hash, "volume", $cmd,0 ); 
+			readingsSingleUpdate( $hash, "volume", $cmd,1 ); 
         }
         else {return "Device needs to be ON to adjust volume.";}
     }
@@ -450,7 +459,7 @@ sub WINCONNECT_Set($@) {
 		if ($volumeNew > 100) {$volumeNew  = 100;}
 		
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $volumeNew;
-		if ( $state eq "on" ) {WINCONNECT_SendCommand( $hash, "volume" , "=" . $volumeNew  );readingsSingleUpdate( $hash, "volume", $volumeNew,0 );}else {return "Device needs to be ON to adjust volume.";}
+		if ( $state eq "on" ) {WINCONNECT_SendCommand( $hash, "volume" , "=" . $volumeNew  );readingsSingleUpdate( $hash, "volume", $volumeNew,1 );}else {return "Device needs to be ON to adjust volume.";}
     }
 	
 	# volumeDown
@@ -462,7 +471,7 @@ sub WINCONNECT_Set($@) {
 		if ($volumeNew < 0) {$volumeNew  = 0;}
 		
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $volumeNew;
-		if ( $state eq "on" ) {WINCONNECT_SendCommand( $hash, "volume" , "=" . $volumeNew  );readingsSingleUpdate( $hash, "volume", $volumeNew,0 );}else {return "Device needs to be ON to adjust volume.";}
+		if ( $state eq "on" ) {WINCONNECT_SendCommand( $hash, "volume" , "=" . $volumeNew  );readingsSingleUpdate( $hash, "volume", $volumeNew,1 );}else {return "Device needs to be ON to adjust volume.";}
     }
 	
 	# mute
@@ -505,7 +514,7 @@ sub WINCONNECT_Set($@) {
                 return "Argument does not seem to be a valid integer between 0 and 10000";
             }
 			WINCONNECT_SendCommand( $hash, "user_aktividletime" , "=" . $cmd  );
-			readingsSingleUpdate( $hash, "user_aktividletime", $cmd,0 ); 
+			readingsSingleUpdate( $hash, "user_aktividletime", $cmd,1 ); 
         }
         else {return "Device needs to be ON to adjust user_aktividletime.";}
     }
@@ -525,7 +534,7 @@ sub WINCONNECT_Set($@) {
                 return "Argument does not seem to be a valid integer between 0 and 100";
             }
 			WINCONNECT_SendCommand( $hash, "brightness" , "=" . $cmd  );
-			readingsSingleUpdate( $hash, "brightness", $cmd,0 ); 
+			readingsSingleUpdate( $hash, "brightness", $cmd,1 ); 
         }
         else {return "Device needs to be ON to adjust brightness.";}
     }
@@ -545,7 +554,7 @@ sub WINCONNECT_Set($@) {
                 return "Argument does not seem to be a valid integer between 0 and 100";
             }
 			WINCONNECT_SendCommand( $hash, "speechquality" , "=" . $cmd  );
-			readingsSingleUpdate( $hash, "speechquality", $cmd,0 ); 
+			readingsSingleUpdate( $hash, "speechquality", $cmd,1 ); 
         }
         else {return "Device needs to be ON to adjust speechquality.";}
     }
@@ -604,7 +613,7 @@ sub WINCONNECT_Set($@) {
 			}
 			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
 			WINCONNECT_SendCommand( $hash, "ttsmsg" , "=" . $cmd );
-			readingsSingleUpdate( $hash, "ttsmsg", $Value,0 );
+			readingsSingleUpdate( $hash, "ttsmsg", $Value,1 );
 		}
 		else {return "Device needs to be ON to send ttsmsg.";}
     }   
@@ -621,7 +630,7 @@ sub WINCONNECT_Set($@) {
 			}
 			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
 			WINCONNECT_SendCommand( $hash, "messagebox" , "=" . $cmd );
-			readingsSingleUpdate( $hash, "messagebox", $Value,0 );
+			readingsSingleUpdate( $hash, "messagebox", $Value,1 );
 		}
 		else {return "Device needs to be ON to send messagebox.";}
     } 
@@ -638,7 +647,7 @@ sub WINCONNECT_Set($@) {
 			}
 			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
 			WINCONNECT_SendCommand( $hash, "notifymsg" , "=" . $cmd );
-			readingsSingleUpdate( $hash, "notifymsg", $Value,0 );
+			readingsSingleUpdate( $hash, "notifymsg", $Value,1 );
 		}
 		else {return "Device needs to be ON to send notifymsg.";}
     } 
@@ -653,7 +662,7 @@ sub WINCONNECT_Set($@) {
 				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
 			}
 			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
-			readingsSingleUpdate( $hash, "checkservice", $Value,0 );
+			readingsSingleUpdate( $hash, "checkservice", $Value,1 );
 			WINCONNECT_SendCommand( $hash, "checkservice" , "=" . $cmd );
 		}
 		else {return "Device needs to be ON to checkservice.";}
@@ -669,7 +678,7 @@ sub WINCONNECT_Set($@) {
 				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
 			}
 			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
-			readingsSingleUpdate( $hash, "checkperformance", $Value,0 );
+			readingsSingleUpdate( $hash, "checkperformance", $Value,1 );
 			WINCONNECT_SendCommand( $hash, "checkperformance" , "=" . $cmd );
 		}
 		else {return "Device needs to be ON to checkperformance.";}
@@ -705,7 +714,7 @@ sub WINCONNECT_Set($@) {
 				if ($Count >= 3 ) {if ($Value eq "") {$Value = $_ ;} else {$Value = $Value . " " . $_ ;}}
 			}
 			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
-			readingsSingleUpdate( $hash, "checkprocess", $Value,0 );
+			readingsSingleUpdate( $hash, "checkprocess", $Value,1 );
 			WINCONNECT_SendCommand( $hash, "checkprocess" , "=" . $cmd );
 		}
 		else {return "Device needs to be ON to checkprocess.";}
@@ -722,7 +731,7 @@ sub WINCONNECT_Set($@) {
 			}
 			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
 			WINCONNECT_SendCommand( $hash, "speechcommands" , "=" . $cmd );
-			readingsSingleUpdate( $hash, "speechcommands", $Value,0 );
+			readingsSingleUpdate( $hash, "speechcommands", $Value,1 );
 		}
 		else {return "Device needs to be ON to speechcommands.";}
     }
@@ -738,7 +747,7 @@ sub WINCONNECT_Set($@) {
 			}
 			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
 			WINCONNECT_SendCommand( $hash, "file_dir" , "=" . $cmd );
-			readingsSingleUpdate( $hash, "file_dir", $Value,0 );
+			readingsSingleUpdate( $hash, "file_dir", $Value,1 );
 		}
 		else {return "Device needs to be ON to file_dir.";}
     }
@@ -767,7 +776,7 @@ sub WINCONNECT_Set($@) {
 
         if ( $state eq "on" ) {
            	WINCONNECT_SendCommand( $hash, "file_order" , "=" . $a[2]  );
-			readingsSingleUpdate( $hash, "file_order", $a[2],0 ); 
+			readingsSingleUpdate( $hash, "file_order", $a[2],1 ); 
         }
         else {return "Device needs to be ON to adjust file_order.";}
     }
@@ -783,7 +792,7 @@ sub WINCONNECT_Set($@) {
 			}
 			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
 			WINCONNECT_SendCommand( $hash, "picture_dir" , "=" . $cmd );
-			readingsSingleUpdate( $hash, "picture_dir", $Value,0 );
+			readingsSingleUpdate( $hash, "picture_dir", $Value,1 );
 		}
 		else {return "Device needs to be ON to picture_dir.";}
     }
@@ -853,7 +862,7 @@ sub WINCONNECT_ReceiveCommand($) {
     my $hash     = $param->{hash};
     my $name     = $hash->{NAME};
 	my $VerWin   = substr(ReadingsVal( $name, "wincontrol", "0" ),4);
-	my $VerGit   = substr(ReadingsVal( $name, "wincontrol_gitlap", "0" ),4);
+	my $VerGit   = substr(ReadingsVal( $name, "wincontrol_gitlab", "0.0.0.0" ),4);
 	my $service  = $param->{service};
 	
 	readingsBeginUpdate($hash);
@@ -863,23 +872,23 @@ sub WINCONNECT_ReceiveCommand($) {
 	
     if($err ne "")    {
 		Log3 $name, 5, "WINCONNECT $name: error while requesting ".$param->{url}." - $err"; 
-        readingsBulkUpdate( $hash, "state", "off" );
-		readingsBulkUpdate( $hash, "audio", "off"); 
+        readingsBulkUpdateIfChanged( $hash, "state", "off" );
+		readingsBulkUpdateIfChanged( $hash, "audio", "off"); 
 		
 		if (AttrVal($name, "win_resetreadings", 1) eq '1') {
-			readingsBulkUpdate( $hash, "user_aktiv", "false" ); 
-			readingsBulkUpdate( $hash, "os_RunTime_days", "0" ); 
-			readingsBulkUpdate( $hash, "os_RunTime_hours", "0" ); 
-			readingsBulkUpdate( $hash, "os_RunTime_minutes", "0" ); 
-			readingsBulkUpdate( $hash, "printer_aktiv", "false" );
-			readingsBulkUpdate( $hash, "printer_names", "no_prining" );
+			readingsBulkUpdateIfChanged( $hash, "user_aktiv", "false" ); 
+			readingsBulkUpdateIfChanged( $hash, "os_RunTime_days", "0" ); 
+			readingsBulkUpdateIfChanged( $hash, "os_RunTime_hours", "0" ); 
+			readingsBulkUpdateIfChanged( $hash, "os_RunTime_minutes", "0" ); 
+			readingsBulkUpdateIfChanged( $hash, "printer_aktiv", "false" );
+			readingsBulkUpdateIfChanged( $hash, "printer_names", "no_prining" );
 		}
 
     }
  
     elsif($data ne "")
     {
-		readingsBulkUpdate( $hash, "state", "on" );
+		readingsBulkUpdateIfChanged( $hash, "state", "on" );
         Log3 $name, 5, "WINCONNECT $name: url ".$param->{url}." returned: $data";
 		
 		# 2017.07.26 - Check update
