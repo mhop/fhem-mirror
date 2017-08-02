@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbLog, V2.22.1, Forum:#74690, warning unitialized value
   - feature: 70_WINCONNECT: [WinWebGUI] - Fenster verstecken
   - feature: 57_Calendar: added attribute cutoffOlderThan (forum #74481)
   - feature: fhem.pl: add -d option for debugging (Forum #74774)

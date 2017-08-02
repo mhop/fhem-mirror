@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.1     25.07.2017       Forum:#74690, bug unitialized in row 734,4318 -> "if($fld[0] && $fld[1])" 
 # 2.22.0     25.07.2017       attribute "addStateEvent" added
 # 2.21.3     24.07.2017       commandref revised
 # 2.21.2     19.07.2017       changed readCfg to report more error-messages
@@ -143,7 +144,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.0";
+my $DbLogVersion = "2.22.1";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -731,10 +732,10 @@ sub DbLog_regexpFn($$) {
     my @fld = split(":", $a[$i]);
 
     $ret .= '|' if( $ret );
-    $ret .=  $fld[0] .'.'. $fld[1];
+    $ret .=  $fld[0] .'.'. $fld[1] if($fld[0] && $fld[1]);
   }                  
 
-  return $ret;
+return $ret;
 }
 
 ################################################################
@@ -4314,7 +4315,7 @@ DbLog_sampleDataFn($$$$$)
     for(my $r=0; $r < $max; $r++) {
       my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
       my $ret = "";
-      $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20);
+      $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20) if($f[0]&&$f[1]&&$f[2]&&$f[3]);
 #      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
 #      $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
 #      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
