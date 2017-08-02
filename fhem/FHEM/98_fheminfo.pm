@@ -29,7 +29,8 @@ my $c_noModel = 'noModel';
 
 my %fhemInfo    = ();
 my @ignoreList  = qw(Global);
-my @noModelList = qw(knx dummy at archetype weather pushover twilight hminfo readingsgroup);
+my @noModelList = qw(readingsgroup doif lacrosse zwdongle wol weekdaytimer 
+   cul_rfr solarview lw12 tscul knx dummy at archetype weather pushover twilight hminfo readingsgroup);
 
 sub fheminfo_Initialize($$) {
   my %hash = (
@@ -94,8 +95,10 @@ sub _fi2_Count() {
       my $model = $c_noModel;
 
 # 2. look for model information in internals
-      $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
-      $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
+      unless (lc($type) eq 'knx') {
+         $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
+         $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
+      }
 
 # 3. look for model information in attributes
       $model = AttrVal($name,'model',$model);
@@ -120,7 +123,7 @@ sub _fi2_Count() {
       }
       
 # 6. check if model is a scalar
-      $model = $c_noModel if (ref $model);
+      $model = $c_noModel if (ref($model) eq 'HASH');
 
 # 7. skip for some special cases found in database
       next if ( ($model =~ /^unkno.*/i) || 
