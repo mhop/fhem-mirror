@@ -1,6 +1,10 @@
 # $Id$
 ############################################################################
-# 2017-08-02, v0.0.17
+# 2017-08-04, v0.0.18
+#
+# v0.0.18
+# - BUFIX:      [WinWebGUI] - Autoupdate
+#               [WinWebGUI] - Shutdown Messagebox
 #
 # v0.0.17
 # - BUFIX:      [FEHMModul] - Code Optimierungen
@@ -145,8 +149,8 @@ sub WINCONNECT_Define($$);
 sub WINCONNECT_Undefine($$);
 
 # Autoupdateinformationen
-my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.17.exe";
-my $DownloadVer = "0.0.17";
+my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.18.exe";
+my $DownloadVer = "0.0.18";
 
 ###################################
 sub WINCONNECT_Initialize($) {
@@ -171,7 +175,7 @@ sub WINCONNECT_GetStatus($;$) {
     my $name      = $hash->{NAME};
     my $interval  = $hash->{INTERVAL};
 	
-    RemoveInternalTimer($hash);
+    #RemoveInternalTimer($hash);
 
     return if ( AttrVal( $name, "disable", 0 ) == 1 );
 	
@@ -850,7 +854,7 @@ sub WINCONNECT_Define($$) {
     }
 	
 	# start the status update timer
-    RemoveInternalTimer($hash);
+    #RemoveInternalTimer($hash);
     InternalTimer( gettimeofday() + 2, "WINCONNECT_GetStatus", $hash, 1);
 	
     return;
