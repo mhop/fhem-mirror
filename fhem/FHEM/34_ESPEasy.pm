@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.22";     # Version of this module
+my $module_version    = "1.23";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -600,8 +600,6 @@ sub ESPEasy_Read($) {
   my $bhash  = $modules{ESPEasy}{defptr}{BRIDGE}{$ipv}; #hash of original instance
   my $bname  = $bhash->{NAME};
   my $btype  = $bhash->{TYPE};
-  $Data::Dumper::Indent = 0;
-  $Data::Dumper::Terse  = 1;
 
   # Levering new TcpServerUtils security feature.
   #$attr{$name}{allowfrom} = ".*" if !$attr{$name}{allowfrom};
@@ -651,7 +649,8 @@ sub ESPEasy_Read($) {
 
   $logHeader->{Authorization} =~ s/Basic\s.*\s/Basic ***** / if defined $logHeader->{Authorization};
   # Dump logHeader
-  Log3 $bname, 5, "$btype $name: Received header: ".Dumper($logHeader) if defined $logHeader;
+  Log3 $bname, 5, "$btype $name: Received header: ".ESPEasy_dumpSingleLine($logHeader)
+    if (defined $logHeader);
   # Dump content
   Log3 $bname, 5, "$btype $name: Received content: $data[1]" if defined $data[1];
 
@@ -2555,6 +2554,16 @@ sub ESPEasy_isHostname($)
 
 # ------------------------------------------------------------------------------
 sub ESPEasy_whoami()  {return (split('::',(caller(1))[3]))[1] || '';}
+
+# ------------------------------------------------------------------------------
+sub ESPEasy_dumpSingleLine($)
+{
+  my $saveIndent = $Data::Dumper::Indent; my $saveTerse = $Data::Dumper::Terse ;
+  $Data::Dumper::Indent = 0; $Data::Dumper::Terse  = 1;
+  my $ret = Dumper($_[0]);
+  $Data::Dumper::Indent = $saveIndent; $Data::Dumper::Terse = $saveTerse;
+  return $ret;
+}
 
 # ------------------------------------------------------------------------------
 sub ESPEasy_removeGit($)
