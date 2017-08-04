@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 07/2017
-my $thzversion = "0.165"; 
+my $thzversion = "0.166"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -689,6 +689,7 @@ sub THZ_Initialize($)
 		    ."interval_sDisplay:0,60,120,180,300 "
 		    ."firmware:4.39,2.06,2.14,5.39,4.39technician "
             ."interval_sDewPointHC1:0,60,120,180,300 "
+            ."simpleReadTimeout:0.25,0.5,1,2 " #standard has been 0.5 since msg468515
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
 }
@@ -1185,11 +1186,12 @@ sub THZ_ReadAnswer($)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	
-	Log3 $hash->{NAME}, 5, "$hash->{NAME} start Funktion THZ_ReadAnswer";
+	Log3 $hash->{NAME}, 5, "$name start Funktion THZ_ReadAnswer";
 	###------Windows support
 	select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
-	my $buf = DevIo_SimpleReadWithTimeout($hash, 0.25); 
-	$buf = DevIo_SimpleReadWithTimeout($hash, 0.25) if(!defined($buf)) ; #added for Karl Antwort msg468515
+	my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.5")) / 2;
+    my $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout);
+    $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout) if(!defined($buf)) ; #added for karl msg468515
 	if(!defined($buf)) {
 	  #Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe too slow?";
 	  return ("THZ_ReadAnswer: InterfaceNotRespondig. Maybe too slow", "");
@@ -1452,7 +1454,7 @@ sub THZ_Parse1($$) {
   my $parsingelement;
   # search for the type in %gets
      foreach  my $cmdhash  (values %gets) {
-    if ($cmdhash->{cmd2} eq $parsingcmd)
+    if (defined ($cmdhash->{cmd2}) and ($cmdhash->{cmd2} eq $parsingcmd))
 	{$msgtype = $cmdhash->{type} ;
 	 last
 	 }
