@@ -629,7 +629,7 @@ my %getsonly214 = (
  );
 
 
-my %sets=%sets439539common;
+my %sets=(%sets439539common, %sets439only);
 my %gets=(%getsonly439, %sets);
 my %OpMode = ("1" =>"standby", "11" => "automatic", "3" =>"DAYmode", "4" =>"setback", "5" =>"DHWmode", "14" =>"manual", "0" =>"emergency");   
 my %Rev_OpMode = reverse %OpMode;
