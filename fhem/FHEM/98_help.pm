@@ -8,6 +8,7 @@ use warnings;
 my $ret;
 
 sub CommandHelp;
+sub cref_internals;
 sub cref_search;
 sub cref_search_cmd;
 sub cref_fill_list;
@@ -15,7 +16,7 @@ sub cref_fill_list;
 sub help_Initialize($$) {
   my %hash = (  Fn => "CommandHelp",
 		   Hlp => "[<moduleName>],get help (this screen or module dependent docu)",
-		   InternalCmds => "attributes,command,commands,devspec,global,perl" );
+		   InternalCmds => cref_internals() );
   $cmds{help} = \%hash;
   cref_fill_list();
 }
@@ -29,11 +30,9 @@ sub CommandHelp {
   $lang = (lc($lang) eq 'de') ? '_DE' : '';
 
   if($mod) {
-
     $mod = "help" if($mod eq "?");
     $mod = $defs{$mod}->{TYPE} if( defined($defs{$mod}) && $defs{$mod}->{TYPE} );
-  
-    my $internals = "attributes,command,commands,devspec,global,perl";
+
     $mod = lc($mod);
     my $modPath = AttrVal('global','modpath','.');
 	my $output = '';
@@ -42,7 +41,7 @@ sub CommandHelp {
       my %mods;
 	  my @modDir = ("$modPath/FHEM");
 
-      $mod = $cmds{$mod}{ModuleName} if defined($cmds{$mod}{ModuleName});
+      $mod = $cmds{$mod}{ModuleName} if defined($cmds{$mod}) && defined($cmds{$mod}{ModuleName});
 
 	  foreach my $modDir (@modDir) {
 	    eval { opendir(DH, $modDir); }; # || die "Cant open $modDir: $!\n";
@@ -68,7 +67,6 @@ sub CommandHelp {
       $output = "No help found for module: $mod" unless $output;
 
     } else {
-
       $output = '';
 	  my $i;
 	  my $f = "$modPath/docs/commandref_frame$lang.html";
@@ -153,6 +151,19 @@ sub CommandHelp {
     return $str;
 
   }
+}
+
+sub cref_internals {
+   my $mod = "./docs/commandref_frame.html";
+   my $output = "";
+   my ($err,@text) = FileRead({FileName => $mod, ForceType => 'file'});
+   return $err if $err;
+   foreach my $l (@text) {
+     if($l =~ m/(^<!-- )(.*)( end.*>)/) {
+        $output .= "$2,";
+     }
+   }
+   return $output;
 }
 
 sub cref_search {
