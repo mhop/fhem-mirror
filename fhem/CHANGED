@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+..-.chamged: configDB: store files base64 encoded, Forum:#74302
   - bugfix:  93_DbLog, back to V2.22.0, Forum:#75039
   - bugfix:  93_DbLog, V2.22.1, Forum:#74690, warning unitialized value
   - feature: 70_WINCONNECT: [WinWebGUI] - Fenster verstecken
