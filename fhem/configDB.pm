@@ -122,6 +122,8 @@
 #
 # 2017-03-24 - added     use index on fhemconfig (only sqlite)
 #
+# 2017-07-17 - changed   store files base64 encoded
+#
 ##############################################################################
 =cut
 
@@ -130,7 +132,7 @@ use warnings;
 use Text::Diff;
 use DBI;
 use Sys::Hostname;
-eval { use MIME::Base64 };
+use MIME::Base64;
 
 ##################################################
 # Forward declarations for functions in fhem.pl
@@ -237,7 +239,6 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype = "unknown";
 }
 
-$configDB{base64}            = eval { encode_base64('bla')} ? 1 : 0;
 $configDB{attr}{nostate}     = 1 if($ENV{'cfgDB_nostate'});
 $configDB{attr}{rescue}      = 1 if($ENV{'cfgDB_rescue'});
 $configDB{attr}{loadversion} = $ENV{'cfgDB_version'} ? $ENV{'cfgDB_version'} : 0;
@@ -286,14 +287,49 @@ sub cfgDB_Init() {
 #	create TABLE fhemstate if nonexistent
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemstate(stateString TEXT)");
 
-#	create TABLE fhembinfilesave if nonexistent
+#	create TABLE fhemb64filesave if nonexistent
 	if($cfgDB_dbtype eq "MYSQL") {
-		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhembinfilesave(filename TEXT, content MEDIUMBLOB)");
+		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemb64filesave(filename TEXT, content MEDIUMBLOB)");
 	} elsif ($cfgDB_dbtype eq "POSTGRESQL") {
-		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhembinfilesave(filename TEXT, content bytea)");
+		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemb64filesave(filename TEXT, content bytea)");
 	} else {
-		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhembinfilesave(filename TEXT, content BLOB)");
+		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemb64filesave(filename TEXT, content BLOB)");
 	}
+
+### migrate fhembinfilesave to fhemb64filesave
+    # check: fhembinfilesave exists?
+    my $sth_test = $fhem_dbh->table_info("%", "%", "fhembinfilesave", 'TABLE');
+    if ($sth_test->fetch()) {
+       $sth_test->finish();
+       # check: any files for migratione?
+   	   $count = undef;
+	   $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhembinfilesave');
+       if ($count > 0) {
+          printf "need to migrate $count files to base64\n";
+          my @toMigrate;
+          my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhembinfilesave" );
+          $sth->execute();
+          while (my $file = $sth->fetchrow_array()) {
+             printf "migrating $file : ";
+             # 1. read from fhembinfilesave
+             my $sth2 = $fhem_dbh->prepare( "SELECT content from fhembinfilesave where filename = '$file'" );
+             $sth2->execute();
+             my $content = $sth2->fetchrow_array();
+             $sth2->finish();
+             # 2. encode and write to fhemb64filesave
+             $fhem_dbh->do("delete from fhemb64filesave where filename = '$file'");
+	         $sth2 = $fhem_dbh->prepare('INSERT INTO fhemb64filesave values (?, ?)');
+             $sth2->execute($file,encode_base64($content));
+	         $sth2->finish();
+             # 3. delete from fhembinfilesave
+             $fhem_dbh->do("delete from fhembinfilesave where filename = '$file'");
+             printf "done.\n";
+          }
+       }
+       # 4. drop table fhembinfilesave
+       $fhem_dbh->do("drop table fhembinfilesave");
+    }
+### end migration base64
 
 # close database connection
 	$fhem_dbh->commit();
@@ -337,11 +373,12 @@ sub cfgDB_FileRead($) {
 	Log3(undef, 4, "configDB reading file: $filename");
 	my ($err, @ret, $counter);
 	my $fhem_dbh = _cfgDB_Connect;
-	my $sth = $fhem_dbh->prepare( "SELECT content FROM fhembinfilesave WHERE filename LIKE '$filename'" );
+	my $sth = $fhem_dbh->prepare( "SELECT content FROM fhemb64filesave WHERE filename LIKE '$filename'" );
 	$sth->execute();
 	my $blobContent = $sth->fetchrow_array();
 	$sth->finish();
 	$fhem_dbh->disconnect();
+	$blobContent = decode_base64($blobContent) if ($blobContent);
 	$counter = length($blobContent);
 	if($counter) {
 	    if ($configDB{attr}{useCache}) {
@@ -364,9 +401,9 @@ sub cfgDB_FileWrite($@) {
     }
 	Log3(undef, 4, "configDB writing file: $filename");
 	my $fhem_dbh = _cfgDB_Connect;
-	$fhem_dbh->do("delete from fhembinfilesave where filename = '$filename'");
-	my $sth = $fhem_dbh->prepare('INSERT INTO fhembinfilesave values (?, ?)');
-	$sth->execute($filename,join("\n", @content));
+	$fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
+	my $sth = $fhem_dbh->prepare('INSERT INTO fhemb64filesave values (?, ?)');
+	$sth->execute($filename,encode_base64(join("\n", @content)));
 	$sth->finish();
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
@@ -375,7 +412,7 @@ sub cfgDB_FileWrite($@) {
 sub cfgDB_FileUpdate($) {
 	my ($filename) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
-	my $id = $fhem_dbh->selectrow_array("SELECT filename from fhembinfilesave where filename = '$filename'");
+	my $id = $fhem_dbh->selectrow_array("SELECT filename from fhemb64filesave where filename = '$filename'");
 	$fhem_dbh->disconnect();
 	if($id) {
 		my $filesize = -s $filename;
@@ -398,7 +435,6 @@ sub cfgDB_ReadAll($) {
 		push (@dbconfig, 'define WEB FHEMWEB 8083 global');
 		push (@dbconfig, 'define Logfile FileLog ./log/fhem-%Y-%m-%d.log fakelog');
 	} else {
-        Log3(undef, 1, ">>> configDB: please install perl module MIME::Base64 soon!") unless $configDB{base64};
 		# add Config Rows to commandfile
 		@dbconfig = _cfgDB_ReadCfg(@dbconfig);
 		# add State Rows to commandfile
@@ -659,7 +695,7 @@ sub cfgDB_FW_fileList($$@) {
 sub cfgDB_Read99() {
   my $ret = "";
   my $fhem_dbh = _cfgDB_Connect;
-  my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhembinfilesave WHERE filename like '%/99_%.pm' group by filename" );
+  my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemb64filesave WHERE filename like '%/99_%.pm' group by filename" );
   $sth->execute();
   while (my $line = $sth->fetchrow_array()) {
     $line =~ m,^(.*)/([^/]*)$,; # Split into dir and file
@@ -897,7 +933,7 @@ sub _cfgDB_Info() {
 	}
 	push @r, $l;
 
-	$row = $fhem_dbh->selectall_arrayref("SELECT filename from fhembinfilesave group by filename");
+	$row = $fhem_dbh->selectall_arrayref("SELECT filename from fhemb64filesave group by filename");
 	$count = @$row;
 	$count = ($count)?$count:'No';
 	$f = ("$count" ne '1') ? "s" : "";
@@ -1073,7 +1109,7 @@ sub _cfgDB_findDef($;$) {
 }
 
 sub _cfgDB_type() { 
-   return $cfgDB_dbtype; 
+   return "$cfgDB_dbtype (b64)";
 }
 
 ##################################################
@@ -1085,7 +1121,7 @@ sub _cfgDB_type() {
 sub _cfgDB_Filedelete($) {
 	my ($filename) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
-	my $ret = $fhem_dbh->do("delete from fhembinfilesave where filename = '$filename'");
+	my $ret = $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
 	if($ret > 0) {
@@ -1100,9 +1136,10 @@ sub _cfgDB_Filedelete($) {
 sub _cfgDB_Fileexport($;$) {
 	my ($filename,$raw) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
-	my $sth      = $fhem_dbh->prepare( "SELECT content FROM fhembinfilesave WHERE filename = '$filename'" );  
+	my $sth      = $fhem_dbh->prepare( "SELECT content FROM fhemb64filesave WHERE filename = '$filename'" );  
 	$sth->execute();
 	my $blobContent = $sth->fetchrow_array();
+    $blobContent = decode_base64($blobContent);
 	my $counter = length($blobContent);
 	$sth->finish();
 	$fhem_dbh->disconnect();
@@ -1126,9 +1163,10 @@ sub _cfgDB_binFileimport($$;$) {
 		binmode(inFile);
 		my $readBytes = read(inFile, $blobContent, $filesize);
 	close(inFile);
+	$blobContent = encode_base64($blobContent);
 	my $fhem_dbh = _cfgDB_Connect;
-	$fhem_dbh->do("delete from fhembinfilesave where filename = '$filename'");
-	my $sth = $fhem_dbh->prepare('INSERT INTO fhembinfilesave values (?, ?)');
+	$fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
+	my $sth = $fhem_dbh->prepare('INSERT INTO fhemb64filesave values (?, ?)');
 
 # add support for postgresql by Matze
     $sth->bind_param( 1, $filename );
@@ -1154,7 +1192,7 @@ sub _cfgDB_Filelist(;$) {
 				"------------------------------------------------------------\n";
 	$ret = "" if $notitle;
 	my $fhem_dbh = _cfgDB_Connect;
-	my $sql = "SELECT filename FROM fhembinfilesave group by filename order by filename";  
+	my $sql = "SELECT filename FROM fhemb64filesave group by filename order by filename";  
 	my $content = $fhem_dbh->selectall_arrayref($sql);
 	foreach my $row (@$content) {
 		$ret .= "@$row[0]\n" if(defined(@$row[0]));
