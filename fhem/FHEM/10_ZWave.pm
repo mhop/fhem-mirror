@@ -265,7 +265,11 @@ my %zwave_class = (
   RATE_TBL_MONITOR         => { id => '49' },
   TARIFF_CONFIG            => { id => '4a' },
   TARIFF_TBL_MONITOR       => { id => '4b' },
-  DOOR_LOCK_LOGGING        => { id => '4c' },
+  DOOR_LOCK_LOGGING        => { id => '4c',
+    get   =>  { doorLockLoggingRecordsSupported   => '01',
+                doorLockLoggingRecord             => '03%02x' },
+    parse => { "034c02(.*)" => '"doorLockLoggingRecordsSupported:".hex($val)',
+               "..4c04(.*)" => 'ZWave_doorLLRParse($hash, $1)'} },
   NETWORK_MANAGEMANT_BASIC => { id => '4d' },
   SCHEDULE_ENTRY_LOCK      => { id => '4e', # V1, V2, V3
     get   =>  { scheduleEntryLockTypeSupported  => '09',
@@ -2341,6 +2345,99 @@ ZWave_mfsParse($$$$$)
 
   }
   return sprintf("model:0x%s 0x%s 0x%s", $mf, $prod, $id);
+}
+
+sub
+ZWave_doorLLRParse($$)
+{
+  my ($hash, $val) = @_;
+  my $result;
+  my $name = $hash->{NAME};
+  my @eventTypeHash = ( 'none',                                    #not defined
+     'Lock Command: Keypad access code verified lock command',     #evtT  1
+     'Unlock Command: Keypad access code verified unlock command', #evtT  2
+     'Lock Command: Keypad lock button pressed',                   #evtT  3
+     'Unlock command: Keypad unlock button pressed',               #evtT  4
+     'Lock Command: Keypad access code out of schedule',           #evtT  5
+     'Unlock Command: Keypad access code out of schedule',         #evtT  6
+     'Keypad illegal access code entered',                         #evtT  7
+     'Key or latch operation locked (manual)',                     #evtT  8
+     'Key or latch operation unlocked (manual)',                   #evtT  9
+     'Auto lock operation',                                        #evtT 10
+     'Auto unlock operation',                                      #evtT 11
+     'Lock Command: Z-Wave access code verified',                  #evtT 12
+     'Unlock Command: Z-Wave access code verified',                #evtT 13
+     'Lock Command: Z-Wave (no code)',                             #evtT 14
+     'Unlock Command: Z-Wave (no code)',                           #evtT 15
+     'Lock Command: Z-Wave access code out of schedule',           #evtT 16
+     'Unlock Command Z-Wave access code out of schedule',          #evtT 17
+     'Z-Wave illegal access code entered',                         #evtT 18
+     'Key or latch operation locked (manual)',                     #evtT 19
+     'Key or latch operation unlocked (manual)',                   #evtT 20
+     'Lock secured',                                               #evtT 21
+     'Lock unsecured',                                             #evtT 22
+     'User code added',                                            #evtT 23
+     'User code deleted',                                          #evtT 24
+     'All user codes deleted',                                     #evtT 25
+     'Master code changed',                                        #evtT 26
+     'User code changed',                                          #evtT 27
+     'Lock reset',                                                 #evtT 28
+     'Configuration changed',                                      #evtT 29
+     'Low battery',                                                #evtT 30
+     'New Battery installed',                                      #evtT 31
+    );
+  #              |- $recordNumber
+  #              |   |- $timestampYear
+  #              |   |     |- $timestampMonth
+  #              |   |     |   |- $timestampDay
+  #              |   |     |   |   |- $recordStatusTimestampHour
+  #              |   |     |   |   |   |- $timestampMinute
+  #              |   |     |   |   |   |   |- $timestampSecond
+  #              |   |     |   |   |   |   |   |- $eventType
+  #              |   |     |   |   |   |   |   |   |- $userIdentifier
+  #              |   |     |   |   |   |   |   |   |   |- $userCodeLength
+  #              20  07e1  07  1f  34  28  2b  08  00  00
+  if( $val =~ /^(..)(....)(..)(..)(..)(..)(..)(..)(..)(..)/ ) {
+    my $recordNumber   = hex($1);
+    my $timestampYear  = hex($2);
+    my $timestampMonth = hex($3);
+    my $timestampDay   = hex($4);
+    my $recordStatusTimestampHour = sprintf( "%b", hex($5) );
+    my $recordStatus = substr $recordStatusTimestampHour, 0, 1;
+    $recordStatus = oct( "0b$recordStatus" );
+    my $timestampHour = substr $recordStatusTimestampHour, 1, 5;
+    $timestampHour = oct( "0b$timestampHour" );
+    my $timestampMinute = hex($6);
+    my $timestampSecond = hex($7);
+    my $eventTypeNumber = hex($8);
+    my $userIdentifier  = hex($9);
+    my $userCodeLength  = hex($10);
+
+    my $timestamp = sprintf ("%4d-%02d-%02d %02d:%02d:%02d", 
+        $timestampYear,$timestampMonth,$timestampDay,$timestampHour,
+        $timestampMinute,$timestampSecond);
+
+    $result = "doorLockLoggingRecord:".
+        "recordNr: $recordNumber ".
+        "recordStatus: $recordStatus ".
+        "eventType: $eventTypeHash[$eventTypeNumber] ".
+        "userIdentifier: $userIdentifier ".
+        "userCodeLength: $userCodeLength ".
+        "timestamp: $timestamp";
+  }
+
+  #                                                        |- $userCode
+  #              20  07e1  07  1f  34  28  2b  08  00  00  3132333435
+  if( $val =~ /^(..)(....)(..)(..)(..)(..)(..)(..)(..)(..)(.+)/ ) {
+    my $userCode = "recieved but not saved.";
+    $result .= " USER_CODE: $userCode";
+  }
+  
+  if( $result ne '' ) {
+    return $result;
+  } else {
+    return "doorLockLoggingRecord:$val";
+  }
 }
 
 my @zwave_wd = ("none","mon","tue","wed","thu","fri","sat","sun");
@@ -5066,7 +5163,11 @@ s2Hex($)
 <ul>
   This module is used to control ZWave devices via FHEM, see <a
   href="http://www.z-wave.com">www.z-wave.com</a> for details for this device
-  family.  This module is a client of the <a href="#ZWDongle">ZWDongle</a>
+  family. The full specification of ZWave command classes can be found here:
+  <a href="http://zwavepublic.com/specifications" 
+  title="website with the full specification of ZWave command classes">
+  http://zwavepublic.com/specifications</a>.
+  This module is a client of the <a href="#ZWDongle">ZWDongle</a>
   module, which is directly attached to the controller via USB or TCP/IP.  To
   use the SECURITY features, the Crypt-Rijndael perl module is needed.
   <br><br>
@@ -5698,6 +5799,24 @@ s2Hex($)
   <li>battery<br>
     return the charge of the battery in %, as battery:value % or battery:low
     </li>
+    </li>
+
+  <br><br><b>CLASS DOOR_LOCK_LOGGING, V1 (deprecated)</b>
+  <li>doorLockLoggingRecordsSupported<br>
+    Gives back the number of records that can be stored by the device.
+    </li>
+  <li>doorLockLoggingRecord n<br>
+    Requests and reports the logging record number n.<br>
+    You will get a reading with the requested record number, the record status,
+    the event type, user identifier, user's code length and the timestamp of
+    the event in the form of yyyy-mm-dd hh:mm:ss. Although the request does
+    report the user code, the user typed in, it is dropped for security
+    reasons, so it does not get logged in clear text.<br>
+    If the report could not get parsed correctly, it does report the raw
+    message.<br>
+    The event types can be looked up in the "Software Design Specification -
+    Z-Wave Application Command Class Specification" at page 150 from SIGMA
+    DESIGNS in the version of 2017-07-10.</li>
 
   <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
   <li>ccsOverride<br>
