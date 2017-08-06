@@ -199,8 +199,8 @@ FHEMWEB_Initialize($)
 
   ###############
   # Initialize internal structures
-  map { addToAttrList($_) } ( "webCmd", "icon", "cmdIcon", "devStateIcon",
-                              "widgetOverride",  "sortby", "devStateStyle");
+  map { addToAttrList($_) } ( "webCmd", "webCmdLabel:textField-long", "icon",
+      "cmdIcon", "devStateIcon", "widgetOverride",  "sortby", "devStateStyle");
   InternalTimer(time()+60, "FW_closeInactiveClients", 0, 0);
 
   $FW_dir      = "$attr{global}{modpath}/www";
@@ -1701,7 +1701,14 @@ FW_makeDeviceLine($$$$$)
     Log 1, "ERROR: bad cmdIcon definition for $d" if(@a % 2);
     my %cmdIcon = @a;
 
-    foreach my $cmd (split(":", $cmdlist)) {
+    my @cl = split(":", $cmdlist);
+    my @wcl = split(":", AttrVal($d, "webCmdLabel", ""));
+    my $nRows;
+    $nRows = split("\n", AttrVal($d, "webCmdLabel", "")) if(@wcl);
+    @wcl = () if(@wcl != @cl);  # some safety
+
+    for(my $i1=0; $i1<@cl; $i1++) {
+      my $cmd = $cl[$i1];
       my $htmlTxt;
       my @c = split(' ', $cmd);   # @c==0 if $cmd==" ";
       if(int(@c) && $allSets && $allSets =~ m/\b$c[0]:([^ ]*)/) {
@@ -1720,7 +1727,23 @@ FW_makeDeviceLine($$$$$)
       } else {
         my $nCmd = $cmdIcon{$cmd} ? 
                       FW_makeImage($cmdIcon{$cmd},$cmd,"webCmd") : $cmd;
-        FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 1, "col3";
+        if(@wcl > $i1) {
+          if($nRows > 1) {
+            FW_pO "<td><table class='wide'><tr>" if($i1 == 0);
+            FW_pO  "<td>$wcl[$i1]</td><td>";
+            FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 0, "col3";
+            FW_pO "</td>";
+            FW_pO "</tr><tr>"          if($wcl[$i1] =~ m/\n/);
+            FW_pO "</tr></table></td>" if($i1 == @cl-1);
+          } else {
+            FW_pO  "<td><div class='col3'>$wcl[$i1] ";
+            FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 0, "", 0, 1;
+            FW_pO "</div></td>";
+          }
+
+        } else {
+          FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 1, "col3";
+        }
       }
     }
   }
@@ -3857,7 +3880,7 @@ FW_widgetOverride($$)
           attr lamp webCmd on:off:on-for-timer 10<br>
         </ul>
         <br>
-
+       
         The first specified command is looked up in the "set device ?" list
         (see the <a href="#setList">setList</a> attribute for dummy devices).
         If <b>there</b> it contains some known modifiers (colon, followed
@@ -3868,12 +3891,12 @@ FW_widgetOverride($$)
           attr d1 webCmd state<br>
           attr d1 readingList state<br>
           attr d1 setList state:on,off<br><br>
-
+       
           define d2 dummy<br>
           attr d2 webCmd state<br>
           attr d2 readingList state<br>
           attr d2 setList state:slider,0,1,10<br><br>
-
+       
           define d3 dummy<br>
           attr d3 webCmd state<br>
           attr d3 readingList state<br>
@@ -3884,6 +3907,13 @@ FW_widgetOverride($$)
         instance.
         </li>
         <br>
+
+    <a name="webCmdLabel"></a>
+    <li>webCmdLabel<br>
+        Colon separated list of labels, used to prefix each webCmd. The number
+        of labels must exactly match the number of webCmds. To implement
+        multiple rows, insert a return character after the text and before the
+        colon.</li></br>
 
     <a name="webname"></a>
     <li>webname<br>
@@ -4664,6 +4694,14 @@ FW_widgetOverride($$)
         Anmerkung: dies ist ein Attribut f&uuml;r das anzuzeigende Ger&auml;t,
         nicht f&uuml;r die FHEMWEBInstanz.
         </li><br>
+
+    <a name="webCmdLabel"></a>
+    <li>webCmdLabel<br>
+        Durch Doppelpunkte getrennte Auflistung von Texten, die vor dem
+        jeweiligen webCmd angezeigt werden. Der Anzahl der Texte muss exakt den
+        Anzahl der webCmds entsprechen. Um mehrzeilige Anzeige zu realisieren,
+        kann ein Return nach dem Text und vor dem Doppelpunkt eingefuehrt
+        werden.</li><br>
 
     <a name="webname"></a>
     <li>webname<br>
