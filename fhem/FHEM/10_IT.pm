@@ -564,7 +564,7 @@ IT_Set($@)
           $onoffcode = $hash->{userV1setCodes}{$a[0]};
        }
     }
-    if (length($onoffcode) == 4) {   # EV1527
+    if (length($onoffcode) == 4 && $hash->{READINGS}{protocol}{VAL} ne 'SBC_FreeTec') {   # EV1527
       $onoffcode = $bintotristate{substr($onoffcode,0,2)} . $bintotristate{substr($onoffcode,2,2)};
     }
     $message = "is".uc($hash->{XMIT}.$onoffcode);
@@ -640,13 +640,13 @@ IT_Set($@)
 			$protocolId = 'P3#';  # IT V1
 		}
 	}
-	if ($hash->{READINGS}{protocol}{VAL} ne "EV1527" && $hash->{READINGS}{protocol}{VAL} ne "V1") {    # bei ITv1 und EV1527 wird das "is" am Anfang nicht entfernt
+	if ($hash->{READINGS}{protocol}{VAL} ne "EV1527" && $hash->{READINGS}{protocol}{VAL} ne "V1" && $hash->{READINGS}{protocol}{VAL} ne 'SBC_FreeTec') {  # bei ITv1, SBC_FreeTec und EV1527 wird das "is" am Anfang nicht entfernt
 		$message = substr($message,2);
 		if (substr($message,0,1) eq "h") {    # h entfernen falls am am Anfang
 			$message = substr($message,1);
 		}
 	}
-	Log3 $hash, 4, "$io->{NAME} IT_set: sendMsg=" . $protocolId . $message . '#R' . $SignalRepeats . $ITClock;
+	Log3 $hash, 4, "$io->{NAME} IT_set: sendMsg=" . $protocolId . $message . '#R' . $SignalRepeats . $ITClock . $ITfrequency;
 	IOWrite($hash, 'sendMsg', $protocolId . $message . '#R' . $SignalRepeats . $ITClock . $ITfrequency);
   }
   return $ret;
@@ -994,8 +994,9 @@ IT_Parse($$)
   my $isEV1527 = undef;
   if (length($msg) == 7) {
     if ($msgcode) {    # ITv1 or SBC_FreeTec
-      if (substr($msg,6, 1) eq '0' && substr($msgcode,8,2) ne 'FF') {   # SBC_FreeTec
-        $housecode=substr($msgcode,0,8);
+      my $sbcFreeTec = substr($msgcode,0,8);
+      if (defined($modules{IT}{defptr}{lc("$sbcFreeTec")}) || substr($msg,6, 1) eq '0' && substr($msgcode,8,2) ne 'FF') {   # SBC_FreeTec
+        $housecode=$sbcFreeTec;
         $onoffcode=substr($msgcode,length($msgcode)-4,4);
         Log3 $hash,5,"$ioname IT: SBC_FreeTec housecode = $housecode  onoffcode = $onoffcode";
       } else {       # ITv1
@@ -1130,7 +1131,9 @@ IT_Parse($$)
   }
   $def=$modules{IT}{defptr}{lc($housecode)};
 #$lh->{"learn"}  = 'ON';
+  
   foreach my $name (keys %{$def}) {
+    next if (IsIgnored($name));
     if (length($msg) == 17 || length($msg) == 19) {
       if ($def->{$name}->{READINGS}{group}{VAL} != $groupBit || $def->{$name}->{READINGS}{unit}{VAL} != $unitCode) {
         next;
@@ -1285,12 +1288,11 @@ sub IT_Attr(@)
 <ul>
   The InterTechno 433MHZ protocol is used by a wide range of devices, which are either of
   the sender/sensor or the receiver/actuator category.
-  Right now, we are able to SEND and RECEIVE InterTechno commands.
-  Supported are devices like switches, dimmers, etc. through an <a href="#CUL">CUL</a> or <a href="#SIGNALduino">SIGNALduino</a> device, 
-  this must be defined first.<br>
-  This module supports Intertechno protocol version 1 and version 3.
+  Momentarily, we are able to send and receive InterTechno commands.
+  Supported devices are switches, dimmers, etc. through an <a href="#CUL">CUL</a> or <a href="#SIGNALduino">SIGNALduino</a> device (this must be defined first).<br>
+  This module supports the version 1 and version 3 of the Intertechno protocol.
   Newly found devices are added into the category "IT" by autocreate.
-  Hint: IT protocol 1 devices are created on pressing the on-button.
+  Hint: IT protocol 1 devices are only created when pressing the on-button twice within 30 seconds.
 
   <br><br>
 
@@ -1307,39 +1309,68 @@ sub IT_Attr(@)
     <code>define &lt;name&gt; IT HE800 &lt;Transmitter ID&gt; &lt;Receiver ID&gt;</code>
     <br><br>
 
-   The value of housecode is a 10-digit InterTechno Code, consisting of 0/1/F as it is
-   defined as a tri-state protocol. These digits depend on the device you are using.
+   The value of &lt;housecode&gt; is a 10-digit InterTechno Code, consisting of 0/1/F (co called tri-state format). These digits depend on the device you are using.
    <br>
-   Bit 11 and 12 are used for switching/dimming. As different manufacturers are using
-   different bit-codes you can specifiy here the 2-digit code for off/on/dimup/dimdown
-   in the same form: 0/1/F.
+   Bit 11 and 12 are used for switching/dimming. Different manufacturers are using
+   different bit-codes. You specifiy here the 2-digit code for off/on/dimup/dimdown
+   using the tri state format, i.e., 0/1/F.
 	<br>
    The value of ITRotarySwitches consists of the value of the alpha switch A-P and
-   the numeric switch 1-16 as set on the intertechno device. E.g. A1 or G12.
+   the numeric switch 1-16 as set on the intertechno device (for example A1 or G12). Please use the Wiki for more information how
+   to decode your device. 
 <br>
    The value of FLS100RotarySwitches consist of the value of the I,II,II,IV switch
-   and the numeric 1,2,3,4 swicht. E.g. I2 or IV4.
+   and the numeric 1,2,3,4 switch (for example I2 or IV4).
 <br>
    The value of ITRotarySwitches and FLS100RotarySwitches are internaly translated
    into a houscode value.
-
+<br>
+   For the Intertechno protocol 3 the housecode consists of 26 numbers. Additionally 4 numbers are used as unit code as well as 
+   group code.
+<br> 
+   To add a new device in Fhem: define IT myITSwitch IT <Adresse 26 Bit> <Group bit> <Unit Code> 
+<br><br>
+<b>Intertechno protocol 1 (ITv1)</b>
    <ul>
-   <li><code>&lt;housecode&gt;</code> is a 10 digit tri-state number (0/1/F) depending on
-	 your device setting (see list below).</li>
-   <li><code>&lt;on-code&gt;</code> is a 2 digit tri-state number for switching your device on;
-     It is appended to the housecode to build the 12-digits IT-Message.</li>
-   <li><code>&lt;off-code&gt;</code> is a 2 digit tri-state number for switching your device off;
-     It is appended to the housecode to build the 12-digits IT-Message.</li>
-   <li>The optional <code>&lt;dimup-code&gt;</code> is a 2 digit tri-state number for dimming your device up;
-     It is appended to the housecode to build the 12-digits IT-Message.</li>
-   <li>The optional <code>&lt;dimdown-code&gt;</code> is a 2 digit tri-state number for dimming your device down;
-     It is appended to the housecode to build the 12-digits IT-Message.</li>
+   <li><code>&lt;housecode&gt;</code> 10  numbers in tri state format (i.e., either 0/1/F) depending on the device.</li>
+   <li><code>&lt;on-code&gt; &lt;off-code&gt;</code> 2 numbers in quad state format (0/1/F/D), containing the on-format;
+     this number is added to the  &lt;housecode&gt; to get the 12-number IT command that is acutally send.</li>
+   <li>optional <code>&lt;dimup-code&gt; &lt;dimdown-code&gt;</code>  2 numbers in quad state format (0/1/F/D), 
+   contains the command for dimming; 
+     this number is added to the &lt;housecode&gt; to define tha actual 12-number sending command.</li>
+   <li>Notice: orginal ITv1 devices are only defined using the on command.</li>
+   <li>Devices which are nt orignal ITv1 devices cen be defined as follows:</li><br>
+       To autocreate press twice "on" within 30 seconds. The Log gives:<br>
+       <code>2016.11.27 11:47:37.753 4: sduinoD IT: 001F001000 not defined (Switch code: <b>11</b>)</code><br>
+       <code>2016.11.27 11:47:37.755 2: autocreate: define IT_001F001000 IT 001F001000 0F F0</code><br><br>
+       Now press "off" or any other button:<br>
+       <code>2016.11.27 11:48:32.004 3: sduinoD IT: Code <b>1D</b> not supported by IT_001F001000.</code><br><br>
+       Because this is not original Intertechno, the on/off code in the list is not correct and has to be changed. This can be done as follows<br>
+       <code>DEF  001F001000 <b>11 1D</b></code><br><br>
+   <li>  <b>EV1527</b></li>
+         If the housecode does not contain a valid (10) ITv1 tri state code, autocreate will define the deviceas EV1527.<br>
+         <code>&lt;housecode&gt;</code>  1527xabcde , abcde is the collected housecode in hex format<br>
+         <code>&lt;on-code&gt; &lt;off-code&gt;</code>  4 numbers bin number (0/1) containing the on command;
+         this number is added to the  housecode to get the entire 12-number sending command.<br>
+         optional <code>&lt;dimup-code&gt; &lt;dimdown-code&gt;</code>  4 numbers in bin format (0/1), 
+         contains the command for dimming up or down; 
+         this number is added to the housecode to get the entire 12-number sending command.<br><br>
+         If the device was autocreated the on/off- as well as the dimcode has to be adapted.<br>
+   </ul>
+   <br>
+<b>SBC_FreeTec</b><br>
+   <ul>
+   <li><code>&lt;housecode&gt;</code> 8 numbers in tri state format (0/1/F), depending from the used device.</li>
+   <li><code>&lt;on-code&gt;</code> 4 numbers in tri state format, contains the on-command;
+     this number is added to the housecode to form the 12-number sending command.</li>
+   <li><code>&lt;off-code&gt;</code> 4 numbers in tri state format, contains the off-command;
+     this number is added to the housecode to get the 12-number sending command.</li>
    </ul>
    <br>
    <b>HE800</b><br>
    <ul>
-     <li><code>&lt;Transmitter ID&gt;</code> Eindeutige Transmitter-ID (1..65535)</li>
-     <li><code>&lt;Receiver ID&gt;</code> Receiver-ID [0]1..15, 0=Broadcast 1-15 (HE844A button# 1-4 & MASTER=0, HE850 UNIT# 1-15, HE853 = 1)</li>
+     <li><code>&lt;Transmitter ID&gt;</code> unique transmitter ID (1..65535)</li>
+     <li><code>&lt;Receiver ID&gt;</code> receiver ID [0]1..15, 0=Broadcast 1-15 (HE844A button# 1-4 & MASTER=0, HE850 UNIT# 1-15, HE853 = 1)</li>
    </ul>
    
 <br>
@@ -1350,6 +1381,7 @@ Examples:
       <code>define otherlamp IT 000000000F 11 10 00 00</code><br>
       <code>define otherroll1 IT FFFFFFF00F 11 10</code><br>
       <code>define IT_1527xe0fec IT 1527xe0fec 1001 0000</code><br>
+      <code>define SBC_FreeTec_Steck1 IT FFF00FFF 000F 0000</code><br>
       <code>define itswitch1 IT A1</code><br>
       <code>define lamp IT J10</code><br>
       <code>define flsswitch1 IT IV1</code><br>
@@ -1358,7 +1390,7 @@ Examples:
     </ul>
  <br>
    For Intertechno protocol 3 the &lt;housecode&gt; is a 26-digits number.
-   Additionaly there are a 4-digits unit code and a 1-digit group code used.
+   Additionaly there is a 4-digits &lt;unit code&gt; and a 1-digit &lt;group code&gt;.
    <ul>
    <li><code>&lt;address&gt;</code> is a 26 digit number (0/1)</li>
    <li><code>&lt;group&gt;</code> is a 1 digit number (0/1)</li>
@@ -1417,19 +1449,19 @@ Examples:
     <a name="IODev"></a>
     <li>IODev<br>
         Set the IO device which will be used to send signals
-        for this device. An example for the physical device is a CUL.
-		Note: On startup, fhem DOES NOT assign an InterTechno device to an
-		IODevice! The attribute IODev needs to be used ALWAYS!</li><br>
+        for this device. An example for the physical device is a CUL or the SIGNALduino.
+		Note: On startup, fhem WILL NOT automatically assign an
+		IODevice to the Intertechno device! The attribute IODev needs ALLWAYS to be set manually!</li><br>
 
     <a name="eventMap"></a>
     <li>eventMap<br>
         Replace event names and set arguments. The value of this attribute
         consists of a list of space separated values. Each value is a colon
-        separated pair. The first part specifies the "old" value, the second
-        the new/desired value. If the first character is slash(/) or comma(,)
-        the values are not separated by space but by this character to
-        enable spaces in values.
-        Examples:<ul><code>
+        separated pair. The first part specifies the value to be replaced, the second
+        the new/desired value. In order to use spaces in the new/desired values it is necessary to inform Fhem about the new separating character. This is done by using a slash(/) or comma(,)
+        as first character, then the values are not separated by space but by this character.
+        Examples:
+          <ul><code>
         attr store eventMap on:open off:closed<br>
         attr store eventMap /on-for-timer 10:open/off:closed/<br>
         set store open
@@ -1454,7 +1486,7 @@ Examples:
     <a name="model"></a>
     <li>model<br>
         The model attribute denotes the type of the device.
-        This attribute will (currently) not be used by fhem.pl directly.
+        This attribute will (currently) not be used by Fhem directly.
         It can be used by e.g. external programs or web interfaces to
         distinguish classes of devices and send the appropriate commands
         (e.g. "on" or "off" to a switch, "dim..%" to dimmers etc.).
@@ -1476,30 +1508,65 @@ Examples:
 
     <a name="ignore"></a>
     <li>ignore<br>
-        Ignore this device, e.g. if it belongs to your neighbour. The device
-        won't trigger any FileLogs/notifys, issued commands will be silently
+        Ignore this device, e.g., if it belongs to your neighbour. The device
+        will not trigger any FileLogs/notifys, issued commands will be silently
         ignored (no RF signal will be sent out, just like for the <a
-        href="#attrdummy">dummy</a> attribute). The device won't appear in the
+        href="#attrdummy">dummy</a> attribute). The device will not appear in the
         list command (only if it is explicitely asked for it), nor will it
         be affected by commands which use wildcards or attributes as name specifiers
         (see <a href="#devspec">devspec</a>). You still get them with the
         "ignored=1" special devspec.
         </li><br>
+        
+    <a name="ITclock"></a>
+    <li>ITclock<br> 
+      IT clock is the smallest time length of any pulse while sending the Intertechno V1 protocol.<br>
+      Any signal of the IT protocol typically consists of a sequence of HIGHs and LOWs with a particular time length. These lengths usually have a ratio of 1:3 (if, for example, LOW has a pulse length of X then HIGH has a pulse length of 3*X).<br>
+      The default value of original IT devices is 250. Other vendors use sometimes a different value; nevertheless ITclock should only be changed if you encounter problems using this device in Fhem.<br>
+      - In order to discover the correct ITclock using a SIGNALduino: After pressing a button at a remote the received raw signal can be found in the log as well as in the device view of the IT-device, for example<br>
+      MS;P0=357;P2=-1128;P3=1155;P4=-428;P5=-11420;D=05023402020202020202020202020202020202023402340234;CP=0;SP=5;<br>
+      The number after "CP=" shows the pattern number of the clock, so e.g.  follows from CP=0 --> P0, which defines at the beginning of the message, hence the clock was 357 (microseconds).<br>
+      - at the CUL can the ITclock found out from the raw messages (X31).
+    </li><br>
+    
+    <a name="ITfrequency"></a> </li>
+    <li>ITfrequency<br>
+      Sets the frequency of the sender.
+    </li><br>
+    
+    <a name="ITrepetition"></a>
+    <li>ITrepetition<br>
+      Sets the number of repitions (default=6).
+    </li><br>
 
+    <a name="userV1setCodes"></a>
+     <li>userV1setCodes<br>
+       If an ITv1 protocol is used indivual setcodes can be added. Example:
+       <ul><code>
+       attr lamp userV1setCodes red:FD blue:1F<br>
+       attr lamp userV1setCodes up:1001 down:1000 stop:1011
+       </code></ul>
+    </li><br>
+    
+    <a name="SIGNALduinoProtocolId"></a>
+    <li>SIGNALduinoProtocolId<br>
+      Using this attribute the protocol ID can be choosen if one uses a SIGNALduino. 
+    </li><br>
+     
   </ul>
   <br>
 
   <a name="ITevents"></a>
   <b>Generated events:</b>
   <ul>
-     From an IT device you can receive the following events.
+     The IT device generates the following events.
      <li>on</li>
      <li>off</li>
      <li>dimdown</li>
      <li>dimup<br></li>
      <li>dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50%<br>
     dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%<br></li>
-      Which event is sent is device dependent and can sometimes configured on
+      Which event is sent dependents on the device and can sometimes configured on
      the device.
   </ul>
 </ul>
@@ -1514,14 +1581,15 @@ Examples:
   Das InterTechno 433MHZ Protokoll wird von einer Vielzahl von Ger&auml;ten 
 	benutzt. Diese geh&ouml;ren entweder zur Kategorie Sender/Sensoren oder zur 
 	Kategorie Empf&auml;nger/Aktoren. Es ist das Senden sowie das Empfangen von InterTechno 
-	Befehlen m&ouml;glich. Ger&auml;ten können z.B.  
+	Befehlen m&ouml;glich. Ger&auml;ten k&ouml;tnnen z.B.  
 	Schalter, Dimmer usw. sein.
 
-  Von diesem Modul wird sowohl das Protolkoll 1 sowie das Protokoll 3 unterstützt.
-  Neu empfangene Pakete werden per Autocreate in Fhem unter der Kategorie IT angelegt.
-  Hinweis: IT Protokoll 1 devices werden nur beim on Befehl angelegt.
+  Von diesem Modul wird sowohl das Protolkoll 1 sowie das Protokoll 3 unterst&uuml;tzt.
+  Neu empfangene Pakete werden per autocreate in Fhem unter der Kategorie IT angelegt.
+  Hinweis: F&uuml;r ein AutoCreate muss die Taste innerhalb von 30 Sek 2 mal gedr&uuml;ckt werden.
 
-  <br><br>
+  <br>
+  <br>
 
   <a name="ITdefine"></a>
   <b>Define</b>
@@ -1536,8 +1604,8 @@ Examples:
     <code>define &lt;name&gt; IT HE800 &lt;Transmitter ID&gt; &lt;Receiver ID&gt;</code>
     <br><br>
 
-   Der Wert von housecode ist abh&auml;ngig vom verwendeten Ger&auml;t und besteht aus zehn Ziffern InterTechno-Code Protokoll 1. 
-   Da dieser ein tri-State-Protokoll ist, k&ouml;nnen die Ziffern jeweils 0/1/F annehmen.
+   Der Wert von Hauscode ist abh&auml;ngig vom verwendeten Ger&auml;t und besteht aus zehn Ziffern InterTechno-Code Protokoll 1. 
+   Da dieser ein tri-State-Protokoll ist, k&ouml;nnen die Ziffern jeweils die Werte 0/1/F annehmen.
    <br>
    Bit 11/12 werden f&uuml;r Schalten oder Dimmen verwendet. Da die Hersteller verschiedene Codes verwenden, k&ouml;nnen hier die 
    (2-stelligen) Codes f&uuml;r an, aus, heller und dunkler (on/off/dimup/dimdown) als tri-State-Ziffern (0/1/F) festgelegt werden.
@@ -1548,25 +1616,50 @@ Examples:
    Der Wert des FLS100Rotary-Schalters setzt sich aus dem Wert des Schalters I,II,II,IV und dem numerischen Schalter 1-4 
    des InterTechno-Ger&auml;tes zusammen, z.B. I2 oder IV4.
 <br>
-   Die Werte der ITRotary-Schalter und FLS100Rotary-Schalter werden intern in housecode-Werte umgewandelt.
+   Die Werte der ITRotary-Schalter und FLS100Rotary-Schalter werden intern in Hauscode-Werte umgewandelt.
 <br>
-   F&uuml;r Intertechno Protokoll 3 besteht der hauscode aus 26 Ziffern. Zusätzlich werden noch 4 Ziffern als Unit Code sowie eine Ziffer als Group code benötigt.
+   F&uuml;r Intertechno Protokoll 3 besteht der Hauscode aus 26 Ziffern. Zus&auml;tzlich werden noch 4 Ziffern als Unit Code sowie eine Ziffer als Group code ben&ouml;tigt.
 <br> 
    Neues IT Element in FHEM anlegen: define IT myITSwitch IT <Adresse 26 Bit> <Group bit> <Unit Code> 
-<br> 
+<br><br>
+<b>Intertechno Protokoll 1 (ITv1)</b>
    <ul>
    <li><code>&lt;housecode&gt;</code> 10 Ziffern lange tri-State-Zahl (0/1/F) abh&auml;ngig vom benutzten Ger&auml;t.</li>
-   <li><code>&lt;on-code&gt;</code> 2 Ziffern lange tri-State-Zahl, die den Einschaltbefehl enth&auml;lt;
+   <li><code>&lt;on-code&gt; &lt;off-code&gt;</code> jeweils 2 Ziffern lange quad-State-Zahl (0/1/F/D), die den Einschaltbefehl enth&auml;lt;
+     die Zahl wird an den &lt;housecode&gt; angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
+   <li>optional <code>&lt;dimup-code&gt; &lt;dimdown-code&gt;</code> jeweils 2 Ziffern lange quad-State-Zahl (0/1/F/D), 
+   die den Befehl zum Herauf- und Herunterregeln enth&auml;lt; 
+     die Zahl wird an den &lt;housecode&gt; angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
+   <li>Hinweis: orginal ITv1 devices werden nur beim on Befehl angelegt.</li>
+   <li>Die nicht orginal ITv1 devices k&ouml;nnen wie folgt angelegt werden:</li><br>
+       Zum anlegen mit autocreate 2 mal auf "on" dr&uuml;cken:<br>
+       <code>2016.11.27 11:47:37.753 4: sduinoD IT: 001F001000 not defined (Switch code: <b>11</b>)</code><br>
+       <code>2016.11.27 11:47:37.755 2: autocreate: define IT_001F001000 IT 001F001000 0F F0</code><br><br>
+       Nun auf "off" oder eine andere Taste dr&uuml;cken:<br>
+       <code>2016.11.27 11:48:32.004 3: sduinoD IT: Code <b>1D</b> not supported by IT_001F001000.</code><br><br>
+       Da dies keine orginal Intertechno Steckdose ist, passt der on/off code im define nicht und muss angepasst werden<br>
+       <code>DEF  001F001000 <b>11 1D</b></code><br><br>
+   <li>  <b>EV1527</b></li>
+         Wenn im housecode ein nicht g&uuml;ltiger (10) ITv1 Tristatecode enthalten ist, dann wird es per autocreate als EV1527 angelegt.<br>
+         <code>&lt;housecode&gt;</code>  1527xabcde , abcde ist der empfangene housecode im Hex Format<br>
+         <code>&lt;on-code&gt; &lt;off-code&gt;</code> jeweils 4 Ziffern lange Bin Zahl (0/1), die den Einschaltbefehl enth&auml;lt;
+         die Zahl wird an den housecode angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.<br>
+         optional <code>&lt;dimup-code&gt; &lt;dimdown-code&gt;</code> jeweils 4 Ziffern lange Bin Zahl (0/1), 
+         die den Befehl zum Herauf- und Herunterregeln enth&auml;lt; 
+         die Zahl wird an den housecode angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.<br><br>
+         Nach dem anlegen per autocreate muss noch der on/off- und optional der dimcode beim define (DEF) angepasst werden.<br>
+   </ul>
+   <br>
+<b>SBC_FreeTec</b><br>
+   <ul>
+   <li><code>&lt;housecode&gt;</code> 8 Ziffern lange tri-State-Zahl (0/1/F) abh&auml;ngig vom benutzten Ger&auml;t.</li>
+   <li><code>&lt;on-code&gt;</code> 4 Ziffern lange tri-State-Zahl, die den Einschaltbefehl enth&auml;lt;
      die Zahl wird an den housecode angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
-   <li><code>&lt;off-code&gt;</code> 2 Ziffern lange tri-State-Zahl, die den Ausschaltbefehl enth&auml;lt;
-     die Zahl wird an den housecode angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
-   <li>Der optionale <code>&lt;dimup-code&gt;</code> ist eine 2 Ziffern lange tri-State-Zahl, die den Befehl zum Heraufregeln enth&auml;lt;
-     die Zahl wird an den housecode angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
-   <li>Der optionale <code>&lt;dimdown-code&gt;</code> ist eine 2 Ziffern lange tri-State-Zahl, die den Befehl zum Herunterregeln enth&auml;lt;
+   <li><code>&lt;off-code&gt;</code> 4 Ziffern lange tri-State-Zahl, die den Ausschaltbefehl enth&auml;lt;
      die Zahl wird an den housecode angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
    </ul>
    <br>
-   <b>HE800</b><br>
+<b>HE800</b><br>
    <ul>
      <li><code>&lt;Transmitter ID&gt;</code> Eindeutige Transmitter-ID (1..65535)</li>
      <li><code>&lt;Receiver ID&gt;</code> Receiver-ID [0]1..15, 0=Broadcast 1-15 (HE844A button# 1-4 & MASTER=0, HE850 UNIT# 1-15, HE853 = 1)</li>
@@ -1581,6 +1674,7 @@ Beispiele:
       <code>define otherlamp IT 000000000F 11 10 00 00</code><br>
       <code>define otherroll1 IT FFFFFFF00F 11 10</code><br>
       <code>define IT_1527xe0fec IT 1527xe0fec 1001 0000</code><br>
+      <code>define SBC_FreeTec_Steck1 IT FFF00FFF 000F 0000</code><br>
       <code>define itswitch1 IT A1</code><br>
       <code>define lamp IT J10</code><br>
       <code>define flsswitch1 IT IV1</code><br>
@@ -1588,8 +1682,8 @@ Beispiele:
       <code>define HE800_TID1_SW1 IT HE800 1 1</code><br>
     </ul>
    <br>
-   F&uuml;r Intertechno Protokoll 3 ist der &lt;housecode&gt; eine 26-stellige Zahl. Zus&auml;tzlich wird noch ein 1 stelliger Gruppen-Code, sowie 
-   ein 4-stelliger unit code verwendet.
+   F&uuml;r <b>Intertechno Protokoll 3 (ITv3)</b> ist der &lt;housecode&gt; eine 26-stellige Zahl. Zus&auml;tzlich wird noch ein 1 stelliger Gruppen-Code, sowie 
+   ein 4-stelliger &lt;unit code&gt; verwendet.
    <ul>
    <li><code>&lt;address&gt;</code> ist eine 26-stellige Nummer (0/1)</li>
    <li><code>&lt;group&gt;</code> ist eine 1-stellige Nummer (0/1)</li>
@@ -1646,19 +1740,17 @@ Beispiele:
     <a name="IODev"></a>
     <li>IODev<br>
         Spezifiziert das physische Ger&auml;t, das die Ausstrahlung der Befehle f&uuml;r das 
-        "logische" Ger&auml;t ausf&uuml;hrt. Ein Beispiel f&uuml;r ein physisches Ger&auml;t ist ein CUL.<br>
+        "logische" Ger&auml;t ausf&uuml;hrt. Ein Beispiel f&uuml;r ein physisches Ger&auml;t ist ein CUL oder ein SIGNALduino.<br>
         Anmerkung: Beim Start weist fhem einem InterTechno-Ger&auml;t kein IO-Ger&auml;t zu. 
         Das Attribut IODev ist daher IMMER zu setzen.</li><br>
 
     <a name="eventMap"></a>
     <li>eventMap<br>
-      Ersetzt Namen von Ereignissen und set Parametern. Die Liste besteht dabei 
+      Ersetzt Namen von Ereignissen (wie on und off) und set-Parametern. Die Liste besteht dabei 
       aus mit Doppelpunkt verbundenen Wertepaaren, die durch Leerzeichen getrennt 
-      sind. Der erste Teil des Wertepaares ist der "alte" Wert, der zweite der neue/gew&uuml;nschte. 
-      Ist das erste Zeichen der Werteliste ein Komma (,) oder ein Schr&auml;gsstrich (/), wird 
-      das Leerzeichen als Listenzeichen durch dieses ersetzt. Dies erlaubt die Benutzung 
-      von Leerzeichen innerhalb der Werte.
-      Beispiele:<ul><code>
+      sind. Der erste Teil des Wertepaares ist der zu ersetzende Wert, der zweite der neue/gew&uuml;nschte Wert. 
+      Man kann Leerzeichen innerhalb der neuen/gewünschten Werte verwenden, muss dann aber Fhem signalisieren, dass das die Werte nicht mehr durch Leerzeichen getrennt werden. Die geschieht, indem das erste Zeichen der Werteliste ein Komma (,) oder ein Schr&auml;gsstrich (/) wird. Dieses Komma bzw der Schrägstrich werden dann als Listenzeichen verwendet. Beispiele:
+      <ul><code>
       attr store eventMap on:open off:closed<br>
       attr store eventMap /on-for-timer 10:open/off:closed/<br>
       set store open
@@ -1683,8 +1775,8 @@ Beispiele:
     <a name="model"></a>
     <li>model<br>
       Hiermit kann das Modell des IT-Ger&auml;ts n&auml;her beschrieben werden. Diese 
-      Eigenschaft wird (im Moment) nicht von fhem ausgewertet.
-      Mithilfe dieser Information k&ouml;nnen externe Programme oder Web-Interfaces
+      Eigenschaft wird (im Moment) nicht von Fhem ausgewertet.
+      Mit Hilfe dieser Information k&ouml;nnen externe Programme oder Web-Interfaces
       Ger&auml;teklassen unterscheiden, um geeignete Kommandos zu senden (z.B. "on" 
       oder "off" an Schalter, aber "dim..%" an Dimmer usw.). Die Schreibweise 
       der Modellbezeichnung sollten der dem Ger&auml;t mitgelieferten Dokumentation
@@ -1703,7 +1795,7 @@ Beispiele:
 
     <a name="ignore"></a>
     <li>ignore<br>
-      Durch das Setzen dieser Eigenschaft wird das Ger&auml;t nicht durch fhem beachtet,
+      Durch das Setzen dieser Eigenschaft wird das Ger&auml;t nicht durch Fhem beachtet,
       z.B. weil es einem Nachbarn geh&ouml;rt. Aktivit&auml;ten dieses Ger&auml;tes erzeugen weder
       Log-Eintr&auml;ge noch reagieren notifys darauf, erzeugte Kommandos werden ignoriert
       (wie bei Verwendung des Attributes <a href="#attrdummy">dummy</a> werden keine 
@@ -1711,8 +1803,43 @@ Beispiele:
       (au&szlig;er es wird explizit aufgerufen), noch wird es bei Befehlen ber&uuml;cksichtigt, 
       die mit Platzhaltern in Namensangaben arbeiten (siehe <a href="#devspec">devspec</a>).
       Sie werden weiterhin mit der speziellen devspec (Ger&auml;tebeschreibung) "ignored=1" gefunden.
-        </li><br>
+    </li><br>
 
+    <a name="ITclock"></a>
+    <li>ITclock<br>
+      ITclock ist die kleinste Basispulsl&auml;nge beim Senden des Intertechno V1 Protokolls.<br>
+      Ein Signal beim IT-Protokoll besteht immer aus einer Sequenz von HIGH und LOW, die mit einer bestimmten Pulsl&auml;nge gesendet werden. Typischerweise stehen die Pulsl&auml;ngen dabei im Verh&auml;ltnis 1:3 (also z.B. LOW=Basispulsl&auml;nge und HIGH=3*Basispulsl&auml;nge).<br>
+      Voreingestellt ist 250 für Original-IT-Ger&auml;te. Andere Hersteller verwenden manchmal andere Werte, dennoch sollte ITclock nur dann ver&auml;ndert werden, wenn es Probleme beim Schalten mit Fhem gibt. Achten Sie in dem Fall auch darauf, ob nicht vielleicht das Signal zu schwach ist oder gest&ouml;rt wird, um regelm&auml;ssig empfangen zu werden.<br>
+      - Hier ist eine Beschreibung für die Ermittlung des ITclock beim Signalduino: Nach Dr&uuml;cken einer Taste an der Fernbedienung steht die empfangene raw Nachricht im log und in der device-Ansicht des IT-device, also etwa<br>
+      MS;P0=357;P2=-1128;P3=1155;P4=-428;P5=-11420;D=05023402020202020202020202020202020202023402340234;CP=0;SP=5;<br>
+      Die Ziffer hinter "CP=" gibt die Pattern-Nr des clock an, also z.B. folgt aus CP=0 --> P0, das am Anfang der Nachricht definiert ist, hier ist also die clock 357.<br>
+      - Beim CUL kann die ITclock aus den raw Daten (X31) ermittelt werden.
+    </li><br>
+      
+    <a name="ITfrequency"></a> </li>
+    <li>ITfrequency<br>
+      Setzt die Sendefrequenz.
+    </li><br>
+    
+    <a name="ITrepetition"></a>
+    <li>ITrepetition<br>
+      Setzt die Sendewiederholungen (Default=6).
+    </li><br>
+    
+    <a name="userV1setCodes"></a>
+    <li>userV1setCodes<br>
+       Damit k&ouml;nnen beim ITv1 Protokoll eigene setcodes zugef&uuml;gt werden. Beispiele:
+       <ul><code>
+       attr lamp userV1setCodes rot:FD blau:1F<br>
+       attr lamp userV1setCodes hoch:1001 runter:1000 stop:1011
+       </code></ul>
+    </li><br>
+    
+    <a name="SIGNALduinoProtocolId"></a>
+    <li>SIGNALduinoProtocolId<br>
+      Damit kann beim Senden mit dem SIGNALduino eine Protocol-Id gew&auml;hlt werden. 
+    </li><br>
+     
   </ul>
   <br>
 
@@ -1724,7 +1851,7 @@ Beispiele:
      <li>off</li>
      <li>dimdown</li>
      <li>dimup<br></li>
-     Welche Ereignisse erzeugt werden ist ger&auml;teabh&auml;ngig und kann evtl. am Ger&auml;t eingestellt werden.
+     Welche Ereignisse erzeugt werden ist ger&auml;teabh&auml;ngig und kann evtl. eingestellt werden.
   </ul>
 </ul>
 
