@@ -1148,7 +1148,7 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
 
     $('#editdlg').dialog(
       { modal:true, closeOnEscape:true, width:$(window).width()*3/4,
-        maxHeight:$(window).height()*3/4,
+        height:$(window).height()*3/4,
         close:function(){ $('#editdlg').remove(); },
         buttons:[
         { text:"Cancel", click:function(){
