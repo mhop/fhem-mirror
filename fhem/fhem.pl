@@ -1120,35 +1120,45 @@ AnalyzeCommand($$;$)
   my ($fn, $param) = split("[ \t][ \t]*", $cmd, 2);
   return undef if(!$fn);
 
+
   #############
   # Search for abbreviation
-  if(!defined($cmds{$fn})) {
-    foreach my $f (sort keys %cmds) {
-      if(length($f) > length($fn) && lc(substr($f,0,length($fn))) eq lc($fn)) {
-        Log 5, "$fn => $f";
-        $fn = $f;
-        last;
+  sub
+  getAbbr($$)
+  {
+    my ($fn,$h) = @_;
+    my $lcfn = lc($fn);
+    my $fnlen = length($fn);
+    return $fn if(defined($h->{$fn}));
+    foreach my $f (sort keys %{$h}) {
+      if(length($f) >= $fnlen && lc(substr($f,0,$fnlen)) eq $lcfn) {
+        Log 5, "AnalyzeCommand: trying $f for $fn";
+        return $f;
       }
     }
+    return undef;
   }
+
+  my $lfn = getAbbr($fn,\%cmds);
+  $fn = $lfn if($lfn);
   $fn = $cmds{$fn}{ReplacedBy}
                 if(defined($cmds{$fn}) && defined($cmds{$fn}{ReplacedBy}));
 
-  return "Forbidden command $fn." if($cl && !Authorized($cl,"cmd",$fn));
-
   #############
-  # autoload commands.
-  my $lcfn = lc($fn);
-  $fn = $lcfn if(defined($cmds{$lcfn}));
-  if(!defined($cmds{$fn}) || !defined($cmds{$fn}{Fn})) {
+  # autoload command with ModuleName
+  if(!$cmds{$fn} || !defined($cmds{$fn}{Fn})) {
     my $modName;
-    map { $modName = $_ if($lcfn eq lc($_)); } keys %modules;
-    $modName = $cmds{$lcfn}{ModuleName}
-                        if($cmds{$lcfn} && $cmds{$lcfn}{ModuleName});
+    $modName = $cmds{$fn}{ModuleName} if($cmds{$fn} && $cmds{$fn}{ModuleName});
+    $modName = getAbbr($fn,\%modules) if(!$modName);
+
     LoadModule($modName) if($modName);
-    $fn = $lcfn if($cmds{$lcfn});
-    return "Unknown command $fn, try help." if(!$cmds{$fn} || !$cmds{$fn}{Fn});
+    my $lfn = getAbbr($fn,\%cmds);
+    $fn = $lfn if($lfn);
   }
+
+  return "Unknown command $fn, try help." if(!$cmds{$fn} || !$cmds{$fn}{Fn});
+
+  return "Forbidden command $fn." if($cl && !Authorized($cl,"cmd",$fn));
 
   if($cl && $cmds{$fn}{ClientFilter} &&
      $cl->{TYPE} !~ m/$cmds{$fn}{ClientFilter}/) {
