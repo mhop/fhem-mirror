@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     31_Nello: first release
   - feature: 01_FHEMWEB.pm: add webCmdLabel (Forum #72581)
   - changed: fhem.pl: search cmds via lowercase/abbrev in modules (Forum #75007)
   - changed: 14_CUL_TCM97001: Add rain/wind Sensor
