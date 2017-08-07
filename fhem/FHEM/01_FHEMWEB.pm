@@ -1721,29 +1721,27 @@ FW_makeDeviceLine($$$$$)
           last if(defined($htmlTxt));
         }
       }
-      if($htmlTxt) {
-        FW_pO $htmlTxt;
 
+      if($htmlTxt) {
+        $htmlTxt =~ s,^<td[^>]*>(.*)</td>$,$1,;
       } else {
         my $nCmd = $cmdIcon{$cmd} ? 
                       FW_makeImage($cmdIcon{$cmd},$cmd,"webCmd") : $cmd;
-        if(@wcl > $i1) {
-          if($nRows > 1) {
-            FW_pO "<td><table class='wide'><tr>" if($i1 == 0);
-            FW_pO  "<td>$wcl[$i1]</td><td>";
-            FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 0, "col3";
-            FW_pO "</td>";
-            FW_pO "</tr><tr>"          if($wcl[$i1] =~ m/\n/);
-            FW_pO "</tr></table></td>" if($i1 == @cl-1);
-          } else {
-            FW_pO  "<td><div class='col3'>$wcl[$i1] ";
-            FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 0, "", 0, 1;
-            FW_pO "</div></td>";
-          }
+        $htmlTxt = FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 0, "", 1, 1;
+      }
 
+      if(@wcl > $i1) {
+        if($nRows > 1) {
+          FW_pO "<td><table class='wide'><tr>" if($i1 == 0);
+          FW_pO  "<td>$wcl[$i1]</td><td>$htmlTxt</td>";
+          FW_pO "</tr><tr>"          if($wcl[$i1] =~ m/\n/);
+          FW_pO "</tr></table></td>" if($i1 == @cl-1);
         } else {
-          FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 1, "col3";
+          FW_pO  "<td><div class='col3'>$wcl[$i1]$ htmlTxt</div></td>";
         }
+
+      } else {
+        FW_pO  "<td><div class='col3'>$htmlTxt</div></td>";
       }
     }
   }
