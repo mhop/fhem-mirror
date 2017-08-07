@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.23";     # Version of this module
+my $module_version    = "1.30";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -105,9 +105,14 @@ my %ESPEasy_setCmds = (
   "buzzer"         => "0",
   "inputswitchstate" => "0", # _0P001_Switch.ini
   "event"          => "1",
-  "neopixelfx"     => "1"
-
+  "nfx"            => "1"
 );
+
+my @ESPEasy_maplightCmds = 
+  qw( on off toggle pct ct rgb dim line one all fade colorfade rainbow kitt
+      comet theatre scan dualscan twinkle twinklefade sparkle wipe fire stop 
+      fadetime fadedelay count speed bgcolor
+    );
 
 # ------------------------------------------------------------------------------
 # "setCmds" => "syntax", ESPEasy_paramPos() will parse for some <.*> positions
@@ -156,16 +161,40 @@ my %ESPEasy_setCmdsUsage = (
   "buzzer"         => "buzzer",
   "inputswitchstate" => "inputswitchstate",
   "event"          => "event <string>", #Forum #73291
-  "neopixelfx"     => "neopixelfx <off|on|dim|line|one|all|rgb|fade|colorfade|rainbow|kitt|comet|theatre|scan|dualscan|twinkle|twinklefade|sparkle|fire|stop> <parameter>",   #Forum #73949
+  "nfx"            => "nfx <off|on|dim|line|one|all|rgb|fade|colorfade|rainbow|kitt|comet|theatre|scan|dualscan|twinkle|twinklefade|sparkle|wipe|fire|stop> <parameter>",   #Forum #73949
 
   #Lights
-  "rgb"            => "rgb <rrggbb> [fadetime]",
+  "rgb"            => "rgb <rrggbb> [fadetime] [delay +/-ms]",
   "pct"            => "pct <pct> [fadetime]",
   "ct"             => "ct <ct> [fadetime] [pct bri]",
-  "on"             => "on [fadetime]",
-  "off"            => "off [fadetime]",
-  "toggle"         => "toggle [fadetime]"
+  "on"             => "on [fadetime] [delay +/-ms]",
+  "off"            => "off [fadetime] [delay +/-ms]",
+  "toggle"         => "toggle [fadetime]",
 
+  # more light related commands - Forum #73949
+  "dim"            => "dim <value 0-255>",
+  "line"           => "line <startpixel> <endpixel> <rrggbb>",
+  "one"            => "one <pixel> <rrggbb>",
+  "all"            => "all <rrggbb> [fadetime] [delay +/-ms]",
+  "fade"           => "fade <rrggbb> [fadetime ms] [delay +/-ms]",
+  "colorfade"      => "colorfade <rrggbb_start> <rrggbb_end> [startpixel] [endpixel]",
+  "rainbow"        => "rainbow [speed +/- 0-50]",
+  "kitt"           => "kitt <rrggbb> [speed 0-50]",
+  "comet"          => "comet <rrggbb> [speed +/- 0-50]",
+  "theatre"        => "theatre <rrggbb> [rrggbb background] [speed +/- 0-50]",
+  "scan"           => "scan <rrggbb> [rrggbb background] [speed 0-50]",
+  "dualscan"       => "dualscan <rrggbb> [rrggbb background] [speed 0-50]",
+  "twinkle"        => "twinkle <rrggbb> [rrggbb background] [speed 0-50]",
+  "twinklefade"    => "twinklefade <rrggbb> [number of pixels] [speed 0-50]",
+  "sparkle"        => "sparkle <rrggbb> [rrggbb background] [speed 0-50]",
+  "wipe"           => "wipe <rrggbb> [rrggbb dot] [speed +/- 0-50]",
+  "fire"           => "fire [fps] [brightness 0-255] [cooling 20-100] [sparking 50-200]",
+  "stop"           => "stop",
+  "fadetime"       => "fadetime <value in ms>",
+  "fadedelay"      => "fadedelay <value in +/-ms>",
+  "count"          => "count <value>",
+  "speed"          => "speed <value 0-50>",
+  "bgcolor"        => "bgcolor <rrggbb>"
 );
 
 # ------------------------------------------------------------------------------
@@ -490,7 +519,8 @@ sub ESPEasy_Set($$@)
     }
 
     #Lights Plugin
-    if (defined AttrVal($name,"mapLightCmds",undef) && $cmd =~ m/^(ct|pct|rgb|on|off|toggle)$/i) {
+    my $lightCmds = join("|",@ESPEasy_maplightCmds);
+    if (defined AttrVal($name,"mapLightCmds",undef) && $cmd =~ m/^$lightCmds$/i) {
       unshift @params, $cmd;
       $cmd = lc AttrVal($name,"mapLightCmds","");
     }
@@ -513,18 +543,34 @@ sub ESPEasy_Set($$@)
       my $clist = join(" ", @cList);
       my $hlist = join(",", @cList);
       foreach (@cList) {$clist =~ s/ $_/ $_:noArg/ if $ESPEasy_setCmds{$_} == 0}
-      # expand rgb
-      my $cp = AttrVal($name,"colorpicker","HSVp");
-      $clist =~ s/rgb/rgb:colorpicker,$cp/; # add colorPicker if rgb cmd is available
       # expand ct
       my $ct = "ct:colorpicker,CT,"
                .AttrVal($name,"ctWW_reducedRange",AttrVal($name,"colorpickerCTww",$d_colorpickerCTww))
                .",10,"
                .AttrVal($name,"ctCW_reducedRange",AttrVal($name,"colorpickerCTcw",$d_colorpickerCTcw));
       $clist =~ s/ct /$ct /;
-      # expand pct
+      # expand colorpicker
+      my $cp = AttrVal($name,"colorpicker","HSVp");
+      my $cpRepl = "rgb|bgcolor|fade|all|comet|twinkle|twinklefade|sparkle|theatre|scan|dualscan|wipe";
+      $clist =~ s/(($cpRepl)\s)/$2:colorpicker,$cp /g; # add colorPicker if rgb cmd is available
+      # expand pct colorpicker widget (-100)
       my $pct = "pct:colorpicker,BRI,0,1,100";
       $clist =~ s/pct /$pct /;
+      # expand dim colorpicker widget (-255)
+      my $dim = "dim:colorpicker,BRI,0,1,255";
+      $clist =~ s/dim /$dim /;
+      # slider for some values...
+      my $fadetime = "fadetime:slider,0,100,10000";
+      $clist =~ s/fadetime /$fadetime /;
+      my $fadedelay = "fadedelay:slider,-5000,10,5000";
+      $clist =~ s/fadedelay /$fadedelay /;
+      my $speed = "speed:slider,-50,1,50";
+      $clist =~ s/speed /$speed /;
+      my $count = "count:slider,1,1,50";
+      $clist =~ s/count /$count /;
+      my $rainbow = "rainbow:slider,-10,1,10";
+      $clist =~ s/rainbow/$rainbow/;
+
       # expand help
       $clist =~ s/help/help:$hlist/;
       Log3 $name, 2, "$type $name: Unknown set command $cmd" if $cmd ne "?";
@@ -1442,8 +1488,9 @@ sub ESPEasy_httpReqParse($$$)
       # maps plugin type (answer for set state/gpio) to SENSOR_TYPE_SWITCH
       # 10 = SENSOR_TYPE_SWITCH
       my $vType = (defined $res->{plugin} && $res->{plugin} eq "1") ? "10" : "0";
-      if (defined $res->{plugin} && $res->{plugin} eq "123") {
-        # Lights plugin (eq 123)
+
+      # Plugin lights:123 nfx:124
+      if (defined $res->{plugin} && $res->{plugin} =~ m/^(123|124)$/) {
         foreach (keys %{ $res }) {
           push @values, "r||$_||".$res->{$_}."||".$vType
             if $res->{$_} ne "" && $_ ne "plugin";
@@ -2148,6 +2195,30 @@ sub ESPEasy_adjustSetCmds($)
   delete $ESPEasy_setCmds{on};
   delete $ESPEasy_setCmds{off};
   delete $ESPEasy_setCmds{toggle};
+  
+  delete $ESPEasy_setCmds{dim};
+  delete $ESPEasy_setCmds{line};
+  delete $ESPEasy_setCmds{one};
+  delete $ESPEasy_setCmds{all};
+  delete $ESPEasy_setCmds{fade};
+  delete $ESPEasy_setCmds{colorfade};
+  delete $ESPEasy_setCmds{rainbow};
+  delete $ESPEasy_setCmds{kitt};
+  delete $ESPEasy_setCmds{comet};
+  delete $ESPEasy_setCmds{theatre};
+  delete $ESPEasy_setCmds{scan};
+  delete $ESPEasy_setCmds{dualscan};
+  delete $ESPEasy_setCmds{twinkle};
+  delete $ESPEasy_setCmds{twinklefade};
+  delete $ESPEasy_setCmds{sparkle};
+  delete $ESPEasy_setCmds{wipe};
+  delete $ESPEasy_setCmds{fire};
+  delete $ESPEasy_setCmds{stop};
+  delete $ESPEasy_setCmds{fadetime};
+  delete $ESPEasy_setCmds{fadedelay};
+  delete $ESPEasy_setCmds{count};
+  delete $ESPEasy_setCmds{speed};
+  delete $ESPEasy_setCmds{bgcolor};
 
   if (defined AttrVal($name,"mapLightCmds",undef)) {
     $ESPEasy_setCmds{rgb}      = 1;
@@ -2156,6 +2227,31 @@ sub ESPEasy_adjustSetCmds($)
     $ESPEasy_setCmds{on}       = 0;
     $ESPEasy_setCmds{off}      = 0;
     $ESPEasy_setCmds{toggle}   = 0;
+
+    # used by nfx plugin
+    $ESPEasy_setCmds{dim}      = 1;
+    $ESPEasy_setCmds{line}     = 3;
+    $ESPEasy_setCmds{one}      = 2;
+    $ESPEasy_setCmds{all}      = 1;
+    $ESPEasy_setCmds{fade}     = 1;
+    $ESPEasy_setCmds{colorfade}= 2;
+    $ESPEasy_setCmds{rainbow}  = 0;
+    $ESPEasy_setCmds{kitt}     = 1;
+    $ESPEasy_setCmds{comet}    = 1;
+    $ESPEasy_setCmds{theatre}  = 1;
+    $ESPEasy_setCmds{scan}     = 1;
+    $ESPEasy_setCmds{dualscan} = 1;
+    $ESPEasy_setCmds{twinkle}  = 1;
+    $ESPEasy_setCmds{twinklefade} = 1;
+    $ESPEasy_setCmds{sparkle}  = 1;
+    $ESPEasy_setCmds{wipe}     = 1;
+    $ESPEasy_setCmds{fire}     = 0;
+    $ESPEasy_setCmds{stop}     = 0;
+    $ESPEasy_setCmds{fadetime} = 1;
+    $ESPEasy_setCmds{fadedelay}= 1;
+    $ESPEasy_setCmds{speed}    = 1;
+    $ESPEasy_setCmds{count}    = 1;
+    $ESPEasy_setCmds{bgcolor}  = 1;
   }
   if (defined AttrVal($name,"rgbGPIOs",undef)) {
     $ESPEasy_setCmds{rgb}      = 1;
@@ -3197,6 +3293,23 @@ sub ESPEasy_removeGit($)
       </ul>
     </li><br>
 
+    <li><a name="ESPEasy_device_set_nfx">nfx</a> (plugin can be found
+      <a target="_blank" href="https://github.com/djcysmic/NeopixelBusFX">here</a>)<br>
+      Control nfx plugin<br>
+      Note: To use FHEMWEB's colorpicker and slider widgets you have to set
+      Attribut <a href="ESPEasy_device_attr_maplightscmds">mapLightCmds</a>.
+      <ul>
+        <li>arguments: <code>&lt;off|on|dim|line|one|all|rgb|fade|colorfade|rainbow|kitt|comet|theatre|scan|dualscan|twinkle|twinklefade|sparkle|wipe|fire|stop|statusrequest|fadetime|fadedelay|speed|count|bgcolor&gt; [&lt;rgb&gt;] [&lt;fadeing time&gt;] [&lt;delay time&gt;]</code></li>
+        <li>examples:<br>
+          <code>
+          set &lt;esp&gt; nfx all 00ff00 100<br>
+          set &lt;esp&gt; nfx rgb aa00ff 1000 10<br>
+          set &lt;esp&gt; nfx line 0 100 f0f0f0c<br>
+          </code>
+        </li>
+      </ul>
+    </li><br>    
+
     <li><a name="ESPEasy_device_set_candle">candle</a><br>
       Control candle rgb plugin<br>
       <ul>
@@ -3478,9 +3591,12 @@ sub ESPEasy_removeGit($)
 
     <li><a name="ESPEasy_device_attr_maplightscmds">mapLightCmds</a><br>
       Enable the following commands and map them to the specified ESPEasy
-      command: rgb, ct, pct, on, off, toggle<br>
-      Needed if you want to use FHEM's colorpickers to control a rgb/ct ESPEasy
-      plugin.<br>
+      command: rgb, ct, pct, on, off, toggle, dim, line, one, all, fade,
+      colorfade, rainbow, kitt, comet, theatre, scan, dualscan, twinkle,
+      twinklefade, sparkle, wipe, fire, stop, fadetime, fadedelay, count, speed,
+      bgcolor. Ask the ESPEasy maintainer to add more if required.<br>
+      Needed to use FHEM's colorpicker or slider widgets to control a 
+      rgb/ct/effect/... plugin.<br>
       required values: <code>a valid set command</code><br>
       eg. <code>attr &lt;esp&gt; mapLightCmds Lights</code>
     </li><br>
