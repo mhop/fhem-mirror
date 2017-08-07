@@ -1,8 +1,8 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 07/2017
-my $thzversion = "0.166"; 
+# by immi 08/2017
+my $thzversion = "0.168"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -690,6 +690,7 @@ sub THZ_Initialize($)
 		    ."firmware:4.39,2.06,2.14,5.39,4.39technician "
             ."interval_sDewPointHC1:0,60,120,180,300 "
             ."simpleReadTimeout:0.25,0.5,1,2 " #standard has been 0.5 since msg468515
+            ."nonblocking:0,1 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
 }
@@ -737,7 +738,6 @@ sub THZ_Refresh_all_gets($) {
  # unlink("data.txt");
   THZ_RemoveInternalTimer("THZ_GetRefresh");
   Log3 $hash->{NAME}, 5, "thzversion = $thzversion ";
-  #readingsSingleUpdate($hash, "state", "opened", 1); # copied from cul 26.11.2014
   my $timedelay= 5; 						#start after 5 seconds
   foreach  my $cmdhash  (keys %gets) {
     my %par = (  hash => $hash, command => $cmdhash );
@@ -760,20 +760,35 @@ sub THZ_GetRefresh($) {
 	my $hash=$par->{hash};
 	my $command=$par->{command};    
     my $name =$hash->{NAME};
-	my $interval = AttrVal($hash->{NAME}, ("interval_".$command), 0); 
-	my $replyc = "";
-	if ($interval) {
+	my $interval = AttrVal($name, ("interval_".$command), 0); 
+	if (AttrVal($name, "nonblocking" , "0")  =~ /1/ ) {
+        if (!(exists($hash->{helper}{RUNNING_PID}))) {
+            DevIo_CloseDev($hash);          #close device in parent process
+            #$hash->{STATE}="disconnected";
+            my $bctimeout = (AttrVal($name, "simpleReadTimeout", "0.5"))*2 +1;
+            $hash->{helper}{RUNNING_PID} = BlockingCall("THZ_GetNB", $name."|".$command, "THZ_GetNBDone", $bctimeout, "THZ_GetNBAbort", $hash);
+            Log3 $hash, 3, "[$name] THZ_GetRefresh($command) BlockingCall started";
+        }
+        else {
+            Log3 $hash, 3, "[$name] THZ_GetRefresh($command) rescheduled (Blocking Call is still running)";
+            InternalTimer(gettimeofday() + 2, "THZ_GetRefresh", $par, 1);
+            return;
+        }
+    }
+    else {
+      THZ_Get($hash, $hash->{NAME}, $command) if ($hash->{STATE} ne "disconnected");
+    }
+    
+    if ($interval) {
 			  $interval = 60 if ($interval < 60); #do not allow intervall <60 sec 
 			  InternalTimer(gettimeofday()+ $interval, "THZ_GetRefresh", $par, 1) ;
 	}
-	$replyc = THZ_Get($hash, $hash->{NAME}, $command) if ($hash->{STATE} ne "disconnected");
-	#BlockingCall("THZ_GetNB",   $hash->{NAME} ."|". $command) if ($hash->{STATE} ne "disconnected");
     if ($command =~ "sFirmware") {  # model summary for statistics
         my $sFirmwareId = join('', (split(/ |:/, ReadingsVal($name,"sFirmware-Id"," : : : ")))[0..6]);
         my $sFirmware= (split(/ /, ReadingsVal($name,"sFirmware","  ")))[1];
         $hash->{model}= sprintf("%.5s%s%s", AttrVal($name,"firmware","n.a.")."______", $sFirmware, $sFirmwareId);
     }
-    return ($replyc);
+    return;
 }
 
 
@@ -857,6 +872,7 @@ sub THZ_Set($@){
   my $arg1 = "00:00";
   my ($err, $msg) =("", " ");
   my $cmdhash = $sets{$cmd};
+  THZ_AvoidCollisions($hash);
   #return "Unknown argument $cmd, choose one of " . join(" ", sort keys %sets) if(!defined($cmdhash));
   if(!defined($cmdhash)) {
     my $setList;
@@ -1009,25 +1025,100 @@ sub THZ_Set($@){
 
 
 
-
-#####################################
+########################################################################################
 #
-# THZ_GetNB - provides a method for polling the heatpump
+# THZ_GetNB - NonBlocking Get parameter from heatpump
 #
-# Parameters: name | command to be sent to the interface
+# Parameters: "name | command" (single string)
 #
 ########################################################################################
 sub THZ_GetNB($){
-    my ($string) = @_;
-    my ($name, $cmd) = split("\\|", $string);
-    my $hash = $defs{$name};
-    my ($err, $msg2)=THZ_Get($hash, $name, $cmd);
-    open (MYFILE, '>>data.txt');
-    my $FD=$hash->{FD} ;
-    print MYFILE ($name . "-" . $cmd .  "-" . $FD . "-" . $msg2 . "-" . $err  ."\n");
-    close (MYFILE); 
-    return ($name . "|" . $msg2); 
+  my ($string) = @_;
+  my ($name, $cmd) = split("\\|", $string);
+  my $hash = $defs{$name};
+  my $ret = DevIo_OpenDev($hash, 0, undef);         #open device in child process
+  if (defined($ret)) {
+    Log3 $hash, 3, "[$name] THZ_GetNB: open device $hash->{DeviceName} error:$ret";
+    return ("$name|$cmd|$ret");
+  }
+  my $msg = THZ_Get($hash, $name, $cmd);
+  DevIo_CloseDev($hash);                            #close device in child process
+  if ($msg =~ m/\n/m) {                             #error message from get contains \n
+    return ("$name|$cmd|[ERROR]");
+  }
+  else {
+    return ("$name|$cmd|$msg");
+  }
 }
+
+
+########################################################################################
+#
+# THZ_GetNBDone - Finish Function
+#
+# Parameters: "name | command | message" (single string)
+#
+########################################################################################
+sub THZ_GetNBDone($){
+  my ($string) = @_;
+  my ($name, $cmd, $msg) = split("\\|", $string);
+  my $hash = $defs{$name};
+  Log3 $hash, 4, "[$name] THZ_GetNBDone: $cmd - $msg";
+  readingsSingleUpdate($hash, $cmd, $msg, 1) if ($msg ne "[ERROR]");
+  delete($hash->{helper}{RUNNING_PID}) if (defined($hash->{helper}{RUNNING_PID}));
+  DevIo_OpenDev($hash, 1, undef); #  if($hash->{STATE} ne "opened");         #reopen device for parent process
+  return;
+ }
+
+ 
+########################################################################################
+#
+# THZ_GetNBAbort - Abort Function
+#
+# Parameter: hash
+#
+########################################################################################
+sub THZ_GetNBAbort($){
+  my ($hash) = @_;
+  delete($hash->{helper}{RUNNING_PID}) if (defined($hash->{helper}{RUNNING_PID}));
+  DevIo_OpenDev($hash, 1, undef);#   if($hash->{STATE} ne "opened");         #reopen device for parent process
+  Log3 $hash->{NAME}, 3, "BlockingCall for ".$hash->{NAME}." was aborted";
+  return;
+}
+
+
+########################################################################################
+#
+# THZ_AvoidCollisions - prevents collisions between parent and child process is used at the beginning of THZ_Get and THZ_Set
+#
+# Parameter: hash
+#
+########################################################################################
+
+
+sub THZ_AvoidCollisions($){
+    my ($hash) = @_;
+    # if child found, wait 0,25 second, and kill it
+    # maybe after 1 second child would have finished, but its THZ_GetNBDone is blocked
+    if (defined($hash->{helper}{RUNNING_PID})){
+    select(undef, undef, undef, 0.25);     
+    BlockingKill($hash->{helper}{RUNNING_PID});
+    delete($hash->{helper}{RUNNING_PID});
+    DevIo_OpenDev($hash, 1, undef); #if($hash->{STATE} ne "opened");
+    #reset heatpump
+    THZ_Write($hash,  "10"); 		    	
+    select(undef, undef, undef, 0.1);
+    THZ_ReadAnswer($hash);	
+    THZ_Write($hash,  "10");
+    select(undef, undef, undef, 0.1);
+    Log3 $hash->{NAME}, 3, "Possible collision in ".$hash->{NAME}." was aborted";
+    }
+    return;
+}
+
+
+
+
 
 #####################################
 #
@@ -1044,7 +1135,8 @@ sub THZ_Get($@){
   return "\"get $name\" needs one parameter" if(@a != 2);
   my $cmd = $a[1];
   my ($err, $msg2) =("", " ");
-
+  THZ_AvoidCollisions($hash);
+  
   if ($cmd eq "debug_read_raw_register_slow") {
     THZ_debugread($hash);
     return ("all raw registers read and saved");
@@ -1111,10 +1203,6 @@ sub THZ_Get($@){
     
   my $activatetrigger =1;
   readingsSingleUpdate($hash, $cmd, $msg2, $activatetrigger);
-  
-  #open (MYFILE, '>>data.txt');
-  #print MYFILE ($cmd . "-" . $msg2 . "\n");
-  #close (MYFILE); 
   return ($msg2);	       
 }
 
@@ -1134,8 +1222,6 @@ sub THZ_Get_Comunication($$) {
   Log3 $hash->{NAME}, 5, "THZ_Get_Comunication: Check if port is open. State = '($hash->{STATE})'";
   if (!(($hash->{STATE}) eq "opened"))  { return("closed connection", "");}
   
-  #slow down for old firmwares
-  select(undef, undef, undef, 0.25) if (AttrVal($hash->{NAME}, "firmware" , "4.39")  =~ /^2/ );
   select(undef, undef, undef, 0.001);
   THZ_Write($hash,  "02"); 			# step0 --> STX start of text 	
   ($err, $msg) = THZ_ReadAnswer($hash);
@@ -1189,13 +1275,11 @@ sub THZ_ReadAnswer($)
 	Log3 $hash->{NAME}, 5, "$name start Funktion THZ_ReadAnswer";
 	###------Windows support
 	select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
-	my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.5")) / 2;
+	my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.5")) / 2; #added for Andre he would kile to have 8/2 second; I will grant it after implementing nonblocking
     my $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout);
     $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout) if(!defined($buf)) ; #added for karl msg468515
-	if(!defined($buf)) {
-	  #Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe too slow?";
-	  return ("THZ_ReadAnswer: InterfaceNotRespondig. Maybe too slow", "");
-	}
+	
+    return ("THZ_ReadAnswer: InterfaceNotRespondig. Maybe too slow", "") if(!defined($buf)) ;
 	
 	my $data =  uc(unpack('H*', $buf));
 	my $count =1;
@@ -1217,7 +1301,6 @@ sub THZ_ReadAnswer($)
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
 	return (undef, $data);
 }
-
  
 #####################################
 #
