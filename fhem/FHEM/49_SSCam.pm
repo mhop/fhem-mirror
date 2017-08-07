@@ -27,6 +27,15 @@
 #########################################################################################################################
 #  Versions History:
 #
+# 2.6.1  07.08.2017    some changes in composegallery if createSnapGallery used, room Snapshots changed to SnapGalllery
+#                      commandref revised
+# 2.6.0  06.08.2017    new command createSnapGallery
+# 2.5.4  05.08.2017    analyze $hash->{CL} in SetFn bzw. GetFn, set snapGallery only if snapGalleryBoost=1 is set,
+#                      some snapGallery improvements and fixes
+# 2.5.3  02.08.2017    implement snapGallery as set-command
+# 2.5.2  01.08.2017    get snapGallery with or without snapGalleryBoost (some more attributes for snapGallery)
+# 2.5.1  31.07.2017    sub composegallery (no polling necessary)
+# 2.5.0  31.07.2017    logtext revised, new get snapGallery command
 # 2.4.1  29.07.2017    fix behavior of state when starting lastsnap_fw, fix "uninitialized value in pattern match (m//) 
 #                      at ./FHEM/49_SSCam.pm line 2895"
 # 2.4.0  28.07.2017    new set command runView lastsnap_fw, commandref revised, minor fixes
@@ -178,7 +187,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "2.4.1";
+my $SSCamVersion = "2.6.1";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -223,6 +232,10 @@ my %SSCam_errlist = (
   600 => "Presetname and PresetID not found in Hash",
 );
 
+# Standardvariablen
+my $SSCam_slim = 3;                          # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $SSCAM_snum = "1,2,3,4,5,6,7,8,9,10";     # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
+
 sub SSCam_Initialize($) {
  my ($hash) = @_;
  $hash->{DefFn}        = "SSCam_Define";
@@ -244,6 +257,11 @@ sub SSCam_Initialize($) {
 		 "loginRetries:1,2,3,4,5,6,7,8,9,10 ".
          "videofolderMap ".
          "pollcaminfoall ".
+		 "snapGalleryBoost:0,1 ".
+		 "snapGallerySize:Icon,Full ".
+		 "snapGalleryNumber:$SSCAM_snum ".
+		 "snapGalleryColumns ".
+		 "snapGalleryHtmlAttr ".
          "pollnologging:1,0 ".
          "debugactivetoken:1 ".
          "rectime ".
@@ -335,6 +353,10 @@ sub SSCam_Delete {
     
     # gespeicherte Credentials löschen
     setKeyValue($index, undef);
+	
+	# löschen snapGallerie-Device falls vorhanden
+	my $sgdev = "SSCam.$hash->{NAME}.snapgallery";
+    CommandDelete($hash->{CL},"$sgdev");
     
 return undef;
 }
@@ -372,7 +394,72 @@ sub SSCam_Attr {
             delete($defs{$name}{READINGS}{StmKeyUnicst}) if ($defs{$name}{READINGS}{StmKeyUnicst});
             delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});         
         }
-    }    
+    }
+
+    if ($aName eq "snapGallerySize") {
+        if($cmd eq "set") {
+            $do = ($aVal eq "Icon")?1:2;
+        }
+        $do = 0 if($cmd eq "del");
+
+        if ($do == 0) {
+            delete($hash->{HELPER}{SNAPHASH}) if(AttrVal($name,"snapGalleryBoost",0));  # Snaphash nur löschen wenn Snaps gepollt werden   
+            Log3($name, 4, "$name - Snapshot hash deleted");
+		} elsif (AttrVal($name,"snapGalleryBoost",0)) {
+		    # snap-Infos abhängig ermitteln wenn gepollt werden soll
+		    my ($slim,$ssize);
+            $hash->{HELPER}{GETSNAPGALLERY} = 1;
+		    $slim  = AttrVal($name,"snapGalleryNumber",$SSCam_slim);    # Anzahl der abzurufenden Snaps
+			$ssize = $do;
+			RemoveInternalTimer($hash, "getsnapinfo");
+			InternalTimer(gettimeofday()+0.7, "getsnapinfo", "$name:$slim:$ssize", 0);
+		}
+    }     
+	
+    if ($aName eq "snapGalleryBoost") {
+        if($cmd eq "set") {
+            $do = ($aVal == 1)?1:0;
+        }
+        $do = 0 if($cmd eq "del");
+
+        if ($do == 0) {
+            delete($hash->{HELPER}{SNAPHASH});  # Snaphash löschen
+            Log3($name, 4, "$name - Snapshot hash deleted");
+		
+		} else {
+		    # snapgallery regelmäßig neu einlesen wenn Polling ein
+			return "When you want activate \"snapGalleryBoost\", you have to set the attribute \"pollcaminfoall\" first because the functionality depends on retrieving snapshots periodical." 
+		       if(!AttrVal($name,"pollcaminfoall",0));
+			   
+		    my ($slim,$ssize);
+            $hash->{HELPER}{GETSNAPGALLERY} = 1;
+		    $slim  = AttrVal($name,"snapGalleryNumber",$SSCam_slim); # Anzahl der abzurufenden Snaps
+			my $sg = AttrVal($name,"snapGallerySize","Icon");        # Auflösung Image
+			$ssize = ($sg eq "Icon")?1:2;
+			RemoveInternalTimer($hash, "getsnapinfo");
+			InternalTimer(gettimeofday()+0.7, "getsnapinfo", "$name:$slim:$ssize", 0);
+		}
+    } 
+	
+	if ($aName eq "snapGalleryNumber" && AttrVal($name,"snapGalleryBoost",0)) {
+		my ($slim,$ssize);    
+        if($cmd eq "set") {
+            $do = ($aVal != 0)?1:0;
+        }
+        $do = 0 if($cmd eq "del");
+		
+        if ($do == 0) { 
+		    $slim = 3;
+		} else {
+		    $slim = $aVal;
+		}
+        
+		$hash->{HELPER}{GETSNAPGALLERY} = 1;
+		my $sg = AttrVal($name,"snapGallerySize","Icon");  # Auflösung Image
+		$ssize = ($sg eq "Icon")?1:2;
+		RemoveInternalTimer($hash, "getsnapinfo");
+		InternalTimer(gettimeofday()+0.7, "getsnapinfo", "$name:$slim:$ssize", 0);
+	}
     
     if ($aName eq "simu_SVSversion") {
 	    delete $hash->{HELPER}{APIPARSET};
@@ -380,16 +467,20 @@ sub SSCam_Attr {
     }
                          
     if ($cmd eq "set") {
-        if ($aName eq "pollcaminfoall") {
-           unless ($aVal =~ /^\d+$/) { return " The Value for $aName is not valid. Use only figures 0-9 without decimal places !";}
-           }
-        if ($aName eq "rectime") {
-           unless ($aVal =~ /^\d+$/) { return " The Value for $aName is not valid. Use only figures 0-9 without decimal places !";}
-           }
-        if ($aName eq "httptimeout") {
-           unless ($aVal =~ /^[0-9]+$/) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
-           }
+        if ($aName =~ m/httptimeout|snapGalleryColumns|rectime|pollcaminfoall/ ) {
+            unless ($aVal =~ /^\d+$/) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
+        }   
     }
+
+    if ($cmd eq "del") {
+        if ($aName =~ m/pollcaminfoall/ ) {
+		    # Polling nicht ausschalten wenn snapGalleryBoost ein (regelmäßig neu einlesen)
+			return "Please switch off \"snapGalleryBoost\" first if you want to deactivate \"pollcaminfoall\" because the functionality of \"snapGalleryBoost\" depends on retrieving snapshots periodical." 
+		       if(AttrVal($name,"snapGalleryBoost",1));
+        }   
+    }
+	
+	
 return undef;
 }
 
@@ -408,242 +499,258 @@ sub SSCam_Set {
   my $setlist;
   my @prop;
         
-        $setlist = "Unknown argument $opt, choose one of ".
-                   "credentials ".
-                   "expmode:auto,day,night ".
-                   "on ".
-                   "off ".
-                   "motdetsc:disable,camera,SVS ".
-                   "snap ".
-                   "enable ".
-                   "disable ".
-                   "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open,lastsnap_fw ".
-                   "stopView:noArg ".
-                   "extevent:1,2,3,4,5,6,7,8,9,10 ".
-                   ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
-                   ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-                   ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
-                   ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
+  return "module is deactivated" if(IsDisabled($name));
+  
+  $setlist = "Unknown argument $opt, choose one of ".
+             "credentials ".
+             "expmode:auto,day,night ".
+             "on ".
+             "off ".
+             "motdetsc:disable,camera,SVS ".
+             "snap ".
+			 (AttrVal($name, "snapGalleryBoost",0)?(AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ":" ").
+			 "createSnapGallery:noArg ".
+             "enable ".
+             "disable ".
+             "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open,lastsnap_fw ".
+             "stopView:noArg ".
+             "extevent:1,2,3,4,5,6,7,8,9,10 ".
+             ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
+             ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
+             ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
+             ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
            
-        
-        if ($opt eq "on") {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+  if (!$hash->{CREDENTIALS} && $opt ne "credentials") {
+	    # sind die Credentials gesetzt ?
+		return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";
+	
+  } elsif ($opt eq "on") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             
-            if (defined($prop)) {
-                unless ($prop =~ /^\d+$/) { return " The Value for \"$opt\" is not valid. Use only figures 0-9 without decimal places !";}
-                $hash->{HELPER}{RECTIME_TEMP} = $prop;
-                }
-            camstartrec($hash);
+      if (defined($prop)) {
+          unless ($prop =~ /^\d+$/) { return " The Value for \"$opt\" is not valid. Use only figures 0-9 without decimal places !";}
+          $hash->{HELPER}{RECTIME_TEMP} = $prop;
+      }
+      camstartrec($hash);
  
-        }
-        elsif ($opt eq "off") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            camstoprec($hash);
-        }
-        elsif ($opt eq "snap") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            camsnap($hash);
-        }
-        elsif ($opt eq "enable") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            camenable($hash);
-        }
-        elsif ($opt eq "disable") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            camdisable($hash);
-        }
-        elsif ($opt eq "motdetsc") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            if (!$prop || $prop !~ /^(disable|camera|SVS)$/) { return " \"$opt\" needs one of those arguments: disable, camera, SVS !";}
+  } elsif ($opt eq "off") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+          camstoprec($hash);
+        
+  } elsif ($opt eq "snap") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+          camsnap($hash);
+        
+  } elsif ($opt eq "snapGallery") {
+	  if(!AttrVal($name, "snapGalleryBoost",0)) {
+	      # Snaphash ist nicht vorhanden und wird neu abgerufen und ausgegeben
+		  if (defined($hash->{CL})) {
+		      # Clienthash auflösen zur Fehlersuche (aufrufende FHEMWEB Instanz)
+              while (my ($key,$val) = each(%{$hash->{CL}})) {
+                  $val = $val?$val:" ";
+                  Log3($name, 4, "$name - snapGallery Clienthash: $key -> $val");
+              }
+          } else {
+		      Log3($name, 2, "$name - snapGallery Clienthash wasn't delivered !");
+			  return "Clienthash wasn't delivered. Can't use asynchronous output for snapGallery.";
+		  }
+		  
+		  $hash->{HELPER}{CL} = $hash->{CL};
+		  $hash->{HELPER}{GETSNAPGALLERY} = 1;
+        
+		  # snap-Infos für Gallerie abrufen
+		  my ($sg,$slim,$ssize); 
+		  $slim  = $prop?AttrVal($name,"snapGalleryNumber",$prop):AttrVal($name,"snapGalleryNumber",$SSCam_slim);  # Anzahl der abzurufenden Snapshots
+		  $ssize = (AttrVal($name,"snapGallerySize","Icon") eq "Icon")?1:2;                                        # Image Size 1-Icon, 2-Full		
+        
+		  getsnapinfo("$name:$slim:$ssize");
+		
+      } else {
+		  # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet
+		  my $htmlCode = composegallery($name);
+		  return $htmlCode;
+	  }
+	  
+  } elsif ($opt eq "createSnapGallery") {
+      my ($ret,$sgdev);
+      return "When you want use \"$opt\", you have to set the attribute \"snapGalleryBoost\" first because the functionality depends on retrieving snapshots automatically." 
+		       if(!AttrVal($name,"snapGalleryBoost",0));
+	  $sgdev = "SSCam.$name.snapgallery";
+      $ret = CommandDefine($hash->{CL},"$sgdev weblink htmlCode {composegallery('$name','$sgdev')}");
+	  return $ret if($ret);
+	  my $wlname = "SSCam.$name.snapgallery";
+	  my $room   = "SnapGallery";
+	  CommandAttr($hash->{CL},$wlname." room ".$room);
+	  return "<html>Snapgallery device \"$sgdev\" was created successfully. Please have a look to room <a href=\"/fhem?room=$room\">$room</a>.<br> You can now assign it to another room if you want. Don't rename this new device ! </html>";
+      
+  } elsif ($opt eq "enable") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+          camenable($hash);
+        
+  } elsif ($opt eq "disable") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+          camdisable($hash);
+       
+  } elsif ($opt eq "motdetsc") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      if (!$prop || $prop !~ /^(disable|camera|SVS)$/) { return " \"$opt\" needs one of those arguments: disable, camera, SVS !";}
             
-            $hash->{HELPER}{MOTDETSC} = $prop;
+      $hash->{HELPER}{MOTDETSC} = $prop;
             
-            if ($prop1) {
-                # check ob Zahl zwischen 1 und 99
-                return "invalid value for sensitivity (SVS or camera) - use number between 1 - 99" if ($prop1 !~ /^([1-9]|[1-9][0-9])*$/);
-                $hash->{HELPER}{MOTDETSC_PROP1} = $prop1;
-            }
-            if ($prop2) {
-                # check ob Zahl zwischen 1 und 99
-                return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop2 !~ /^([1-9]|[1-9][0-9])*$/);
-                $hash->{HELPER}{MOTDETSC_PROP2} = $prop2;
-            }
-            if ($prop3) {
-                # check ob Zahl zwischen 1 und 99
-                return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop3 !~ /^([1-9]|[1-9][0-9])*$/);
-                $hash->{HELPER}{MOTDETSC_PROP3} = $prop3;
-            }
-            cammotdetsc($hash);
-        }
-        elsif ($opt eq "credentials") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
-            delete $hash->{HELPER}{SID} if($hash->{HELPER}{SID});          
-            ($success) = setcredentials($hash,$prop,$prop1);
-            $hash->{HELPER}{ACTIVE} = "off";  
-			if($success) {
-			    getsvsinfo($hash);
-			    return "Username and Password saved successfully";
-			} else {
-			    return "Error while saving Username / Password - see logfile for details";
-			}
+      if ($prop1) {
+          # check ob Zahl zwischen 1 und 99
+          return "invalid value for sensitivity (SVS or camera) - use number between 1 - 99" if ($prop1 !~ /^([1-9]|[1-9][0-9])*$/);
+          $hash->{HELPER}{MOTDETSC_PROP1} = $prop1;
+      }
+      if ($prop2) {
+          # check ob Zahl zwischen 1 und 99
+          return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop2 !~ /^([1-9]|[1-9][0-9])*$/);
+          $hash->{HELPER}{MOTDETSC_PROP2} = $prop2;
+      }
+      if ($prop3) {
+          # check ob Zahl zwischen 1 und 99
+          return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop3 !~ /^([1-9]|[1-9][0-9])*$/);
+          $hash->{HELPER}{MOTDETSC_PROP3} = $prop3;
+      }
+      cammotdetsc($hash);
+        
+  } elsif ($opt eq "credentials") {
+      return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
+      delete $hash->{HELPER}{SID} if($hash->{HELPER}{SID});          
+      ($success) = setcredentials($hash,$prop,$prop1);
+      $hash->{HELPER}{ACTIVE} = "off";  
+	  
+	  if($success) {
+	      getsvsinfo($hash);
+		  return "Username and Password saved successfully";
+	  } else {
+		   return "Error while saving Username / Password - see logfile for details";
+	  }
 			
-		}
-        elsif ($opt eq "expmode") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            unless ($prop) { return " \"$opt\" needs one of those arguments: auto, day, night !";}
+  } elsif ($opt eq "expmode") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      unless ($prop) { return " \"$opt\" needs one of those arguments: auto, day, night !";}
             
-            $hash->{HELPER}{EXPMODE} = $prop;
-            camexpmode($hash);
-        }
-        elsif ($opt eq "goPreset") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            if (!$prop) {return "Function \"goPreset\" needs a \"Presetname\" as an argument";}
+      $hash->{HELPER}{EXPMODE} = $prop;
+      camexpmode($hash);
+        
+  } elsif ($opt eq "goPreset") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      if (!$prop) {return "Function \"goPreset\" needs a \"Presetname\" as an argument";}
             
-            @prop = split(/;/, $prop);
-            $prop = $prop[0];
-            @prop = split(/,/, $prop);
-            $prop = $prop[0];
-            $hash->{HELPER}{GOPRESETNAME} = $prop;
-            $hash->{HELPER}{PTZACTION}    = "gopreset";
-            doptzaction($hash);
-        }
-        elsif ($opt eq "runPatrol") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            if (!$prop) {return "Function \"runPatrol\" needs a \"Patrolname\" as an argument";}
+      @prop = split(/;/, $prop);
+      $prop = $prop[0];
+      @prop = split(/,/, $prop);
+      $prop = $prop[0];
+      $hash->{HELPER}{GOPRESETNAME} = $prop;
+      $hash->{HELPER}{PTZACTION}    = "gopreset";
+      doptzaction($hash);
+        
+  } elsif ($opt eq "runPatrol") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      if (!$prop) {return "Function \"runPatrol\" needs a \"Patrolname\" as an argument";}
             
-            @prop = split(/;/, $prop);
-            $prop = $prop[0];
-            @prop = split(/,/, $prop);
-            $prop = $prop[0];
-            $hash->{HELPER}{GOPATROLNAME} = $prop;
-            $hash->{HELPER}{PTZACTION}    = "runpatrol";
-            doptzaction($hash);
-        }
-        elsif ($opt eq "goAbsPTZ") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      @prop = split(/;/, $prop);
+      $prop = $prop[0];
+      @prop = split(/,/, $prop);
+      $prop = $prop[0];
+      $hash->{HELPER}{GOPATROLNAME} = $prop;
+      $hash->{HELPER}{PTZACTION}    = "runpatrol";
+      doptzaction($hash);
+        
+  } elsif ($opt eq "goAbsPTZ") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 
-            if ($prop eq "up" || $prop eq "down" || $prop eq "left" || $prop eq "right") {
-                if ($prop eq "up")    {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 480;}
-                if ($prop eq "down")  {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 0;}
-                if ($prop eq "left")  {$hash->{HELPER}{GOPTZPOSX} = 0; $hash->{HELPER}{GOPTZPOSY} = 240;}    
-                if ($prop eq "right") {$hash->{HELPER}{GOPTZPOSX} = 640; $hash->{HELPER}{GOPTZPOSY} = 240;} 
+      if ($prop eq "up" || $prop eq "down" || $prop eq "left" || $prop eq "right") {
+          if ($prop eq "up")    {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 480;}
+          if ($prop eq "down")  {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 0;}
+          if ($prop eq "left")  {$hash->{HELPER}{GOPTZPOSX} = 0; $hash->{HELPER}{GOPTZPOSY} = 240;}    
+          if ($prop eq "right") {$hash->{HELPER}{GOPTZPOSX} = 640; $hash->{HELPER}{GOPTZPOSY} = 240;} 
                 
-                $hash->{HELPER}{PTZACTION} = "goabsptz";
-                doptzaction($hash);
-                return undef;
-            }               
-            else
-            {
-                if ($prop !~ /\d+/ || $prop1 !~ /\d+/ || abs($prop) > 640 || abs($prop1) > 480) {
-                return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
-                }
+          $hash->{HELPER}{PTZACTION} = "goabsptz";
+          doptzaction($hash);
+          return undef;
+            
+	  } else {
+          if ($prop !~ /\d+/ || $prop1 !~ /\d+/ || abs($prop) > 640 || abs($prop1) > 480) {
+              return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
+          }
                 
-                $hash->{HELPER}{GOPTZPOSX} = abs($prop);
-                $hash->{HELPER}{GOPTZPOSY} = abs($prop1);
+          $hash->{HELPER}{GOPTZPOSX} = abs($prop);
+          $hash->{HELPER}{GOPTZPOSY} = abs($prop1);
                 
-                $hash->{HELPER}{PTZACTION}  = "goabsptz";
-                doptzaction($hash);
+          $hash->{HELPER}{PTZACTION}  = "goabsptz";
+          doptzaction($hash);
                 
-                return undef;
+          return undef;
                 
-            } 
-            return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
+      } 
+          return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
 
-        }
-        elsif ($opt eq "move") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+  } elsif ($opt eq "move") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 
-            if (!defined($prop) || ($prop ne "up" && $prop ne "down" && $prop ne "left" && $prop ne "right" && $prop !~ m/dir_\d/)) {return "Function \"move\" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)";}
+      if (!defined($prop) || ($prop ne "up" && $prop ne "down" && $prop ne "left" && $prop ne "right" && $prop !~ m/dir_\d/)) {return "Function \"move\" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)";}
             
-            $hash->{HELPER}{GOMOVEDIR} = $prop;
-            $hash->{HELPER}{GOMOVETIME} = defined($prop1) ? $prop1 : 1;
+      $hash->{HELPER}{GOMOVEDIR} = $prop;
+      $hash->{HELPER}{GOMOVETIME} = defined($prop1) ? $prop1 : 1;
             
-            $hash->{HELPER}{PTZACTION}  = "movestart";
-            doptzaction($hash);
-        }
-        elsif ($opt eq "runView") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      $hash->{HELPER}{PTZACTION}  = "movestart";
+      doptzaction($hash);
+        
+  } elsif ($opt eq "runView") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             
-            if ($prop eq "live_open") {
-                if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
-                $hash->{HELPER}{OPENWINDOW} = 1;
-                $hash->{HELPER}{WLTYPE}     = "link";    
-				$hash->{HELPER}{ALIAS}      = "LiveView";
-				$hash->{HELPER}{RUNVIEW}    = "live_open";				
-            } elsif ($prop eq "live_link") {
-                $hash->{HELPER}{OPENWINDOW} = 0;
-                $hash->{HELPER}{WLTYPE}     = "link"; 
-				$hash->{HELPER}{ALIAS}      = "LiveView";
-				$hash->{HELPER}{RUNVIEW}    = "live_link";
-            } elsif ($prop eq "lastrec_open") {
-                if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
-                $hash->{HELPER}{OPENWINDOW} = 1;
-                $hash->{HELPER}{WLTYPE}     = "link"; 
-				$hash->{HELPER}{ALIAS}      = "LastRecording";
-				$hash->{HELPER}{RUNVIEW}    = "lastrec_open";
-            }  elsif ($prop eq "lastrec_fw") {
-                $hash->{HELPER}{OPENWINDOW} = 0;
-                $hash->{HELPER}{WLTYPE}     = "iframe"; 
-				$hash->{HELPER}{ALIAS}      = " ";
-				$hash->{HELPER}{RUNVIEW}    = "lastrec";
-            } elsif ($prop eq "live_fw") {
-                $hash->{HELPER}{OPENWINDOW} = 0;
-                $hash->{HELPER}{WLTYPE}     = "image"; 
-				$hash->{HELPER}{ALIAS}      = " ";
-				$hash->{HELPER}{RUNVIEW}    = "live_fw";
-            } elsif ($prop eq "lastsnap_fw") {
-                $hash->{HELPER}{OPENWINDOW}  = 0;
-                $hash->{HELPER}{WLTYPE}      = "base64img"; 
-				$hash->{HELPER}{ALIAS}       = " ";
-				$hash->{HELPER}{RUNVIEW}     = "lastsnap_fw";
-            } else {
-                return "$prop isn't a valid option of runview, use one of live_fw, live_link, live_open, lastrec_fw, lastrec_open, lastsnap_fw";
-            }
-            runliveview($hash); 
+      if ($prop eq "live_open") {
+          if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
+          $hash->{HELPER}{OPENWINDOW} = 1;
+          $hash->{HELPER}{WLTYPE}     = "link";    
+		  $hash->{HELPER}{ALIAS}      = "LiveView";
+		  $hash->{HELPER}{RUNVIEW}    = "live_open";				
+      } elsif ($prop eq "live_link") {
+          $hash->{HELPER}{OPENWINDOW} = 0;
+          $hash->{HELPER}{WLTYPE}     = "link"; 
+		  $hash->{HELPER}{ALIAS}      = "LiveView";
+		  $hash->{HELPER}{RUNVIEW}    = "live_link";
+      } elsif ($prop eq "lastrec_open") {
+          if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
+          $hash->{HELPER}{OPENWINDOW} = 1;
+          $hash->{HELPER}{WLTYPE}     = "link"; 
+	      $hash->{HELPER}{ALIAS}      = "LastRecording";
+		  $hash->{HELPER}{RUNVIEW}    = "lastrec_open";
+      }  elsif ($prop eq "lastrec_fw") {
+          $hash->{HELPER}{OPENWINDOW} = 0;
+          $hash->{HELPER}{WLTYPE}     = "iframe"; 
+	      $hash->{HELPER}{ALIAS}      = " ";
+		  $hash->{HELPER}{RUNVIEW}    = "lastrec";
+      } elsif ($prop eq "live_fw") {
+          $hash->{HELPER}{OPENWINDOW} = 0;
+          $hash->{HELPER}{WLTYPE}     = "image"; 
+		  $hash->{HELPER}{ALIAS}      = " ";
+		  $hash->{HELPER}{RUNVIEW}    = "live_fw";
+      } elsif ($prop eq "lastsnap_fw") {
+          $hash->{HELPER}{OPENWINDOW}  = 0;
+          $hash->{HELPER}{WLTYPE}      = "base64img"; 
+		  $hash->{HELPER}{ALIAS}       = " ";
+		  $hash->{HELPER}{RUNVIEW}     = "lastsnap_fw";
+      } else {
+          return "$prop isn't a valid option of runview, use one of live_fw, live_link, live_open, lastrec_fw, lastrec_open, lastsnap_fw";
+      }
+      runliveview($hash); 
             
-        }
-        elsif ($opt eq "extevent") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+  } elsif ($opt eq "extevent") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
                                    
-            $hash->{HELPER}{EVENTID} = $prop;
-            extevent($hash);
-        }
-        elsif ($opt eq "stopView") 
-        {
-            return "module is deactivated" if(IsDisabled($name));
-            stopliveview($hash);            
-        }
-        else  
-        {
-            return "$setlist";
-        }  
+      $hash->{HELPER}{EVENTID} = $prop;
+      extevent($hash);
+        
+  } elsif ($opt eq "stopView") {
+      stopliveview($hash);            
+        
+  } else {
+      return "$setlist";
+  }  
+  
 return;
 }
 
@@ -653,9 +760,13 @@ sub SSCam_Get {
     return "\"get X\" needs at least an argument" if ( @a < 2 );
     my $name = shift @a;
     my $opt = shift @a;
-	
+	my $arg = shift @a;
+	my $ret = "";
+
 	my $getlist = "Unknown argument $opt, choose one of ".
                   "caminfoall:noArg ".
+				  ((AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))
+				      ?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ").
 				  "snapinfo:noArg ".
                   "svsinfo:noArg ".
                   "snapfileinfo:noArg ".
@@ -677,8 +788,42 @@ sub SSCam_Get {
     } elsif ($opt eq "svsinfo") {
         getsvsinfo($hash);
                 
+    } elsif ($opt eq "snapGallery") {
+	    if(!AttrVal($name, "snapGalleryBoost",0)) {
+	        # Snaphash ist nicht vorhanden und wird neu abgerufen und ausgegeben
+		    if (defined($hash->{CL})) {
+		        # Clienthash auflösen zur Fehlersuche (aufrufende FHEMWEB Instanz)
+                while (my ($key,$val) = each(%{$hash->{CL}})) {
+                    $val = $val?$val:" ";
+                    Log3($name, 4, "$name - snapGallery Clienthash: $key -> $val");
+                }
+            } else {
+		        Log3($name, 2, "$name - snapGallery Clienthash wasn't delivered !");
+			    return "Clienthash wasn't delivered. Can't use asynchronous output for snapGallery.";
+		    }
+		    return "Clienthash doesn't contain \"canAsyncOutput\" and therefore can't use asynchronous output for snapGallery. Please set attribute \"snapGalleryBoost=1\" if this error appears constantly."
+		        if(!$hash->{CL}{canAsyncOutput});
+			  
+		    $hash->{HELPER}{CL} = $hash->{CL};
+		    $hash->{HELPER}{GETSNAPGALLERY} = 1;
+        
+		    # snap-Infos für Gallerie abrufen
+		    my ($sg,$slim,$ssize); 
+		    $slim  = $arg?AttrVal($name,"snapGalleryNumber",$arg):AttrVal($name,"snapGalleryNumber",$SSCam_slim);  # Anzahl der abzurufenden Snapshots
+		    $ssize = (AttrVal($name,"snapGallerySize","Icon") eq "Icon")?1:2;                                      # Image Size 1-Icon, 2-Full		
+        
+		    getsnapinfo("$name:$slim:$ssize");
+		
+		} else {
+		    # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet
+			my $htmlCode = composegallery($name);
+		    return $htmlCode;
+		}
+
     } elsif ($opt eq "snapinfo") {
-        getsnapinfo("$name:0:0");
+        # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
+        my ($slim,$ssize) = snaplimsize($hash);		
+        getsnapinfo("$name:$slim:$ssize");
                 
     } elsif ($opt eq "snapfileinfo") {
         if (!ReadingsVal("$name", "LastSnapId", undef)) {return "Reading LastSnapId is empty - please take a snapshot before !"}
@@ -700,7 +845,7 @@ sub SSCam_Get {
 	} else {
         return "$getlist";
 	}
-return;
+return $ret;  # not generate trigger out of command
 }
 
 ######################################################################################
@@ -768,7 +913,11 @@ sub initonboot ($) {
          getsvsinfo($hash);
          # Kameraspezifische Infos holen
          getcaminfo($hash);
-		 getsnapinfo("$name:0:0");
+		 
+         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
+         my ($slim,$ssize) = snaplimsize($hash);		
+         getsnapinfo("$name:$slim:$ssize");
+
          getcapabilities($hash);
          # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
          getptzlistpreset($hash);
@@ -1241,10 +1390,7 @@ sub runliveview ($) {
         # Liveview starten             
         $hash->{OPMODE} = "runliveview";
         $hash->{HELPER}{ACTIVE} = "on";
-		$hash->{HELPER}{LOGINRETRIES} = 0;
-	    $hash->{HELPER}{SNAPLIMIT}   = 1;            # nur 1 Snap laden, für lastsnap_fw 
-	    $hash->{HELPER}{SNAPIMGSIZE} = 2;            # full size picture, für lastsnap_fw 
-	    $hash->{HELPER}{KEYWORD}     = $camname;     # nur Snaps von $camname selektieren, für lastsnap_fw 
+		$hash->{HELPER}{LOGINRETRIES} = 0; 
 		# erzwingen die Camid zu ermitteln und bei login-Fehler neue SID zu holen
 		delete $hash->{CAMID};  
         
@@ -1541,9 +1687,13 @@ sub getcaminfoall {
     geteventlist($hash);
     RemoveInternalTimer($hash, "getcaminfo");
     InternalTimer(gettimeofday()+0.4, "getcaminfo", $hash, 0);
+    	
+    # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
+    my ($slim,$ssize) = snaplimsize($hash);
     RemoveInternalTimer($hash, "getsnapinfo");
-    InternalTimer(gettimeofday()+0.6, "getsnapinfo", "$name:0:0", 0);
-    RemoveInternalTimer($hash, "getmotionenum");
+    InternalTimer(gettimeofday()+0.6, "getsnapinfo", "$name:$slim:$ssize", 0);
+    
+	RemoveInternalTimer($hash, "getmotionenum");
     InternalTimer(gettimeofday()+0.8, "getmotionenum", $hash, 0);
     RemoveInternalTimer($hash, "getcapabilities");
     InternalTimer(gettimeofday()+1.3, "getcapabilities", $hash, 0);
@@ -1582,7 +1732,7 @@ return;
 }
 
 ###########################################################################
-#  Infos zum letzten Snap abfragen (z.B. weil nicht über SSCam ausgelöst)
+#  Infos zu Snaps abfragen (z.B. weil nicht über SSCam ausgelöst)
 ###########################################################################
 sub getsnapinfo ($) {
     my ($str)   = @_;
@@ -1594,9 +1744,10 @@ sub getsnapinfo ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {               
         $hash->{OPMODE} = "getsnapinfo";
+		$hash->{OPMODE} = "getsnapgallery" if(exists($hash->{HELPER}{GETSNAPGALLERY}));
         $hash->{HELPER}{ACTIVE} = "on";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-		$hash->{HELPER}{SNAPLIMIT}    = $slim;   # alle Snapshots werden abgerufen und ausgewertet
+		$hash->{HELPER}{SNAPLIMIT}    = $slim;   # 0-alle Snapshots werden abgerufen und ausgewertet, sonst $slim
 		$hash->{HELPER}{SNAPIMGSIZE}  = $ssize;  # 0-Do not append image, 1-Icon size, 2-Full size
 		$hash->{HELPER}{KEYWORD}      = $camname;
 		
@@ -2450,11 +2601,12 @@ sub sscam_camop ($) {
       readingsSingleUpdate($hash,"state", "snap", 1); 
       readingsSingleUpdate($hash, "LastSnapId", "", 0);
    
-   } elsif ($OpMode eq "getsnapinfo") {
+   } elsif ($OpMode eq "getsnapinfo" || $OpMode eq "getsnapgallery") {
       # Informationen über den letzten oder mehrere Schnappschüsse ermitteln
 	  my $limit   = $hash->{HELPER}{SNAPLIMIT};
 	  my $imgsize = $hash->{HELPER}{SNAPIMGSIZE};
 	  my $keyword = $hash->{HELPER}{KEYWORD};
+	  Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "getsnapfilename") {
@@ -2645,9 +2797,9 @@ sub sscam_camop ($) {
 	  
    } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/) {
       # den letzten Schnappschuß life anzeigen
-	  my $limit   = $hash->{HELPER}{SNAPLIMIT};
-	  my $imgsize = $hash->{HELPER}{SNAPIMGSIZE};
-	  my $keyword = $hash->{HELPER}{KEYWORD};
+	  my $limit   = 1;                # nur 1 Snap laden, für lastsnap_fw 
+	  my $imgsize = 2;                # full size picture, für lastsnap_fw 
+	  my $keyword = $hash->{CAMNAME}; # nur Snaps von $camname selektieren, für lastsnap_fw   
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
    }
    
@@ -2829,61 +2981,45 @@ sub sscam_camop_parse ($) {
 			} elsif ($OpMode eq "Snap") {
                 # ein Schnapschuß wurde aufgenommen
                 # falls Aufnahme noch läuft -> state = on setzen
-                if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
-                    readingsSingleUpdate( $hash,"state", "on", 0); 
-                } else {
-                    readingsSingleUpdate($hash,"state", "off", 0); 
-                }
+	            my $st;
+	            (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
+	            readingsSingleUpdate($hash,"state", $st, 0);
                 
                 $snapid = $data->{data}{'id'};
                 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
-                readingsBulkUpdate($hash,"LastSnapId",$snapid);
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
                 Log3($name, 3, "$name - Snapshot of Camera $camname has been done successfully");
                 
-                # nach Snap Aufnahme Filename des Snaps ermitteln
-                getsnapfilename($hash);
+				# Token freigeben vor nächstem Kommando
+                $hash->{HELPER}{ACTIVE} = "off";
+  
+                # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
+                my ($slim,$ssize) = snaplimsize($hash);		
+                RemoveInternalTimer($hash, "getsnapinfo");
+                InternalTimer(gettimeofday()+0.6, "getsnapinfo", "$name:$slim:$ssize", 0);
             
-			} elsif ($OpMode eq "getsnapinfo" || $OpMode eq "runliveview") {
-                # Informationen zu einem oder mehreren Schnapschüssen wurde abgerufen bzw. Lifeanzeige Schappschuß              
-				my $i = 0;
-				my $sn = 0;
-                my %allsnaps = ();
-                while ($data->{'data'}{'data'}[$i]) {
-		            if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
-			            $i += 1;
-				        next;
-			        }
-			        $snapid = $data->{'data'}{'data'}[$i]{'id'};
-			        my $createdTm = $data->{'data'}{'data'}[$i]{'createdTm'};
-                    my $fileName  = $data->{'data'}{'data'}[$i]{'fileName'};
-					my $imageData = $data->{'data'}{'data'}[$i]{'imageData'};  # Image data of snapshot in base64 format
-			        
-			        $allsnaps{$sn}{"snapid"}    = $snapid;
-					my @t = split(" ", FmtDateTime($createdTm));
+			} elsif ($OpMode eq "getsnapinfo" || $OpMode eq "getsnapgallery" || $OpMode eq "runliveview") {
+                # Informationen zu einem oder mehreren Schnapschüssen wurde abgerufen bzw. Lifeanzeige Schappschuß              			
+				my $lsid   = exists($data->{data}{data}[0]{id})?$data->{data}{data}[0]{id}:"n.a.";
+				my $lfname = exists($data->{data}{data}[0]{fileName})?$data->{data}{data}[0]{fileName}:"n.a.";
+				
+				my $lstime;
+				if(exists($data->{data}{data}[0]{createdTm})) {
+				    $lstime = $data->{data}{data}[0]{createdTm};
+				    my @t = split(" ", FmtDateTime($lstime));
 					my @d = split("-", $t[0]);
-					$createdTm = "$d[2].$d[1].$d[0] / $t[1]";
-                    $allsnaps{$sn}{createdTm}  = $createdTm;
-			        $allsnaps{$sn}{fileName}   = $fileName;
-					$allsnaps{$sn}{imageData}  = $imageData;
-                    $sn += 1;
-					$i += 1;
-                }
+					$lstime = "$d[2].$d[1].$d[0] / $t[1]";
+				} else {
+				    $lstime = "n.a.";	
+				}
 				
-				my @as = sort{$a <=>$b}keys(%allsnaps);
-				foreach my $key (@as) {
-				    Log3($name,5, "$name - Snap '$key': ID => $allsnaps{$key}{snapid}, File => $allsnaps{$key}{fileName}, Created => $allsnaps{$key}{createdTm}");
-				}	
-				
-				my $lsid   = exists($allsnaps{0}{snapid})?$allsnaps{0}{snapid}:"n.a.";
-				my $lfname = exists($allsnaps{0}{fileName})?$allsnaps{0}{fileName}:"n.a.";
-				my $lstime = exists($allsnaps{0}{createdTm})?$allsnaps{0}{createdTm}:"n.a.";		
-				                
+				Log3($name,4, "$name - Snap [0]: ID => $lsid, File => $lfname, Created => $lstime");
+				 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
@@ -2893,20 +3029,67 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
 					
 				# Schnapschuss soll als liveView angezeigt werden (mindestens 1 Bild vorhanden)
-			    if (exists($hash->{HELPER}{RUNVIEW}) && $hash->{HELPER}{RUNVIEW} =~ /snap/ && exists($allsnaps{0}{imageData})) {
+				Log3($name, 3, "$name - There is no snapshot of camera $camname to display ! Take one snapshot before.") 
+				   if(exists($hash->{HELPER}{RUNVIEW}) && $hash->{HELPER}{RUNVIEW} =~ /snap/ && !exists($data->{'data'}{'data'}[0]{imageData}));
+			    
+				if (exists($hash->{HELPER}{RUNVIEW}) && $hash->{HELPER}{RUNVIEW} =~ /snap/ && exists($data->{'data'}{'data'}[0]{imageData})) {
 				    delete $hash->{HELPER}{RUNVIEW};
 					# Aufnahmestatus in state abbilden 
 	                my $st;
 	                (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
 	                readingsSingleUpdate($hash,"state", $st, 1); 
 					
-					$hash->{HELPER}{LINK} = $allsnaps{0}{imageData};
+					$hash->{HELPER}{LINK} = $data->{data}{data}[0]{imageData};
 					# Longpoll refresh 
                     DoTrigger($name,"startview");					
 				}
+
+                if($OpMode eq "getsnapgallery") {
+				    # es soll eine Schnappschußgallerie bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt werden (Attr snapGalleryBoost=0)
+				    my $i = 0;
+				    my $sn = 0;
+                    my %allsnaps = ();  # Schnappschuss Hash wird leer erstellt
+                     
+					$hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
+					
+					while ($data->{'data'}{'data'}[$i]) {
+		                if($data->{'data'}{'data'}[$i]{'camName'} ne $camname) {
+			                $i += 1;
+				            next;
+			            }
+			            $snapid = $data->{data}{data}[$i]{id};
+			            my $createdTm = $data->{data}{data}[$i]{createdTm};
+                        my $fileName  = $data->{data}{data}[$i]{fileName};
+					    my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
+			        
+			            $allsnaps{$sn}{snapid} = $snapid;
+					    my @t = split(" ", FmtDateTime($createdTm));
+					    my @d = split("-", $t[0]);
+					    $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+                        $allsnaps{$sn}{createdTm}  = $createdTm;
+			            $allsnaps{$sn}{fileName}   = $fileName;
+					    $allsnaps{$sn}{imageData}  = $imageData;
+						Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $allsnaps{$sn}{snapid}, File => $allsnaps{$sn}{fileName}, Created => $allsnaps{$sn}{createdTm}");
+                        $sn += 1;
+					    $i += 1;
+                    }
+	                
+					# Hash der Schnapschüsse erstellen
+					$hash->{HELPER}{SNAPHASH} = \%allsnaps;
+                    
+					# Direktausgabe Snaphash wenn nicht gepollt wird
+					if(!AttrVal($name, "snapGalleryBoost",0)) {		    
+						my $htmlCode = composegallery($name);
+                        asyncOutput($hash->{HELPER}{CL}, "$htmlCode");						
+					    delete($hash->{HELPER}{SNAPHASH});               # Snaphash löschen wenn nicht gepollt wird
+						delete($hash->{HELPER}{CL});
+					}
+
+					delete($hash->{HELPER}{GETSNAPGALLERY}); # Steuerbit getsnapgallery statt getsnapinfo
+				}		
 					
                 # Logausgabe
-                Log3($name, $verbose, "$name - Snapinfos of Camera $camname have been retrieved successfully");
+                Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
 				
             
 			} elsif ($OpMode eq "getsnapfilename") {
@@ -3090,7 +3273,7 @@ sub sscam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
                      
-                Log3($name, $verbose, "$name - Informations related to Surveillance Station retrieved successfully");
+                Log3($name, $verbose, "$name - Informations related to Surveillance Station retrieved");
             
 			} elsif ($OpMode eq "getStmUrlPath") {
                 # Parse SVS-Infos
@@ -3134,7 +3317,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
                      
                 # Logausgabe
-                Log3($name, $verbose, "$name - Stream-URLs of $camname retrieved successfully");
+                Log3($name, $verbose, "$name - Stream-URLs of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getcaminfo") {
                 # Parse Caminfos
@@ -3251,7 +3434,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
                             
                 # Logausgabe
-                Log3($name, $verbose, "$name - Informations of camera $camname have been retrieved successfully");
+                Log3($name, $verbose, "$name - Informations of camera $camname retrieved");
             
 			} elsif ($OpMode eq "geteventlist") {              
                 my $eventnum    = $data->{'data'}{'total'};
@@ -3280,7 +3463,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
        
                 # Logausgabe
-                Log3($name, $verbose, "$name - Query eventlist of camera $camname have been retrieved successfully");
+                Log3($name, $verbose, "$name - Query eventlist of camera $camname retrieved");
             
 			} elsif ($OpMode eq "getmotionenum") {              
                 
@@ -3347,7 +3530,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
        
                 # Logausgabe
-                Log3($name, $verbose, "$name - Enumerate motion detection parameters of $camname have been retrieved successfully");
+                Log3($name, $verbose, "$name - Enumerate motion detection parameters of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getcapabilities") {
                 # Parse Infos
@@ -3424,7 +3607,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
                   
                 # Logausgabe
-                Log3($name, $verbose, "$name - Capabilities of Camera $camname have been retrieved successfully");
+                Log3($name, $verbose, "$name - Capabilities of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getptzlistpreset") {
                 # Parse PTZ-ListPresets
@@ -3457,7 +3640,7 @@ sub sscam_camop_parse ($) {
                   
                             
                 # Logausgabe
-                Log3($name, $verbose, "$name - PTZ Presets of $camname retrieved");
+                Log3($name, $verbose, "$name - PTZ Presets of camera $camname retrieved");
             
 			} elsif ($OpMode eq "Getptzlistpatrol") {
                 # Parse PTZ-ListPatrols
@@ -3490,7 +3673,7 @@ sub sscam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
                      
                 # Logausgabe
-                Log3($name, $verbose, "$name - PTZ Patrols of $camname retrieved");
+                Log3($name, $verbose, "$name - PTZ Patrols of camera $camname retrieved");
             }
             
        } else {
@@ -3516,11 +3699,14 @@ sub sscam_camop_parse ($) {
             Log3($name, 2, "$name - ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error");
        }
    }
-   
+  
+  # Token freigeben   
   $hash->{HELPER}{ACTIVE} = "off";
+
   if ($attr{$name}{debugactivetoken}) {
       Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
   }
+
 return;
 }
 
@@ -3803,7 +3989,6 @@ return;
 
 ###############################################################################
 #   Test ob JSON-String empfangen wurde
-  
 sub evaljson { 
   my ($hash,$myjson,$url)= @_;
   my $success = 1;
@@ -3823,9 +4008,118 @@ sub evaljson {
 return($hash,$success);
 }
 
+###############################################################################
+# Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
+sub snaplimsize ($) {      
+  my ($hash)= @_;
+  my $name     = $hash->{NAME};
+  my ($slim,$ssize);
+  
+  if(!AttrVal($name,"snapGalleryBoost",0)) {
+      $slim  = 1;
+      $ssize = 0;			
+  } else {
+      $hash->{HELPER}{GETSNAPGALLERY} = 1;
+	  $slim = AttrVal($name,"snapGalleryNumber",$SSCam_slim);    # Anzahl der abzurufenden Snaps
+	  my $sg = AttrVal($name,"snapGallerySize","Icon");          # Auflösung Image
+	  $ssize = ($sg eq "Icon")?1:2;
+  }	
+return ($slim,$ssize);
+}
+	 
+###############################################################################
+#   Schnappschußgalerie zusammenstellen
+sub composegallery ($;$$) { 
+  my ($name,$wlname) = @_;
+  my $hash     = $defs{$name};
+  my $camname  = $hash->{CAMNAME};
+  my $allsnaps = $hash->{HELPER}{SNAPHASH}; # = \%allsnaps
+  my $sgc      = AttrVal($name,"snapGalleryColumns",3);          # Anzahl der Images in einer Tabellenzeile
+  my $lss      = ReadingsVal($name, "LastSnapTime", " ");        # Zeitpunkt neueste Aufnahme
+  my $lang     = AttrVal("global","language","EN");              # Systemsprache       
+  my $limit    = $hash->{HELPER}{SNAPLIMIT};                     # abgerufene Anzahl Snaps
+  my $totalcnt = $hash->{HELPER}{TOTALCNT};                      # totale Anzahl Snaps
+  $limit       = $totalcnt if ($limit > $totalcnt);              # wenn weniger Snaps vorhanden sind als $limit -> Text in Anzeige korrigieren
+  my $lupt     = ((ReadingsTimestamp($name,"LastSnapTime"," ") gt ReadingsTimestamp($name,"LastUpdateTime"," ")) 
+                 ? ReadingsTimestamp($name, "LastSnapTime", " ") 
+				 : ReadingsTimestamp($name, "LastUpdateTime", " "));  # letzte Aktualisierung
+  $lupt =~ s/ / \/ /;
+  
+  my $ha = AttrVal($name, "snapGalleryHtmlAttr", undef)?AttrVal($name, "snapGalleryHtmlAttr", undef):AttrVal($name, "htmlattr", 'width="500" height="325"');
+
+  # falls "composegallery" durch ein mit mit "createSnapGallery" angelegtes Device aufgerufen wird
+  my ($devWlink,$wlhash,$wlha,$wlalias);
+  if ($wlname) {
+      $wlalias  = $attr{$wlname}{alias}?$attr{$wlname}{alias}:$wlname;   # Linktext als Aliasname oder Devicename setzen
+      $devWlink = "<a href=\"/fhem?detail=$wlname\">$wlalias</a>"; 
+      $wlhash   = $defs{$wlname};
+      $wlha     = $attr{$wlname}{htmlattr}; 
+      $ha       = (defined($wlha))?$wlha:$ha;  # htmlattr vom weblink-Device übernehmen falls von wl-Device aufgerufen und gesetzt   
+  } else {
+      $devWlink = " ";
+  }
+  
+  # wenn Weblink genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
+  my $sgbnote = " ";
+  if($wlname && !AttrVal($name,"snapGalleryBoost",0)) {
+      $sgbnote = "<b>CAUTION</b> - No snapshots can be retrieved. Please set the attribute \"snapGalleryBoost=1\" in device <a href=\"/fhem?detail=$name\">$name</a>" if ($lang eq "EN");
+	  $sgbnote = "<b>ACHTUNG</b> - Es können keine Schnappschüsse abgerufen werden. Bitte setzen sie das Attribut \"snapGalleryBoost=1\" im Device <a href=\"/fhem?detail=$name\">$name</a>" if ($lang eq "DE");
+  }
+  
+  my $header;
+  if ($lang eq "EN") {
+      $header  = "Snapshots ($limit/$totalcnt) of camera <b>$camname</b> - newest Snapshot: $lss<br>";
+	  $header .= " (Possibly another snapshots are available. Last recall: $lupt)<br>" if(AttrVal($name,"snapGalleryBoost",0));
+  } else {
+      $header  = "Schnappschüsse ($limit/$totalcnt) von Kamera <b>$camname</b> - neueste Aufnahme: $lss <br>";
+	  $header .= " (Eventuell sind neuere Aufnahmen verfügbar. Letzter Abruf: $lupt)<br>" if(AttrVal($name,"snapGalleryBoost",0));
+  }
+  $header .= $sgbnote;
+  
+  my $gattr  = (AttrVal($name,"snapGallerySize","Icon") eq "Full")?$ha:" ";    
+  
+  my @as = sort{$a <=>$b}keys%{$allsnaps};
+  
+  # Ausgabetabelle erstellen
+  my ($htmlCode,$ct);
+  $htmlCode  = "<html>";
+  $htmlCode .= sprintf( "$devWlink<br> <div class=\"makeTable wide\"; style=\"text-align:center\"> $header <br>");
+  $htmlCode .= "<table class=\"block wide internals\">";
+  $htmlCode .= "<tbody>";
+  $htmlCode .= "<tr class=\"odd\">";
+  my $cell   = 1;
+  
+  foreach my $key (@as) {
+      $ct = $allsnaps->{$key}{createdTm};
+	  my $html = sprintf( "<td>$ct<br /> <img $gattr src=\"data:image/jpeg;base64,$allsnaps->{$key}{imageData}\" /> </td>" );
+
+      $cell++;
+
+      if ( $cell == $sgc+1 ) {
+        $htmlCode .= $html;
+        $htmlCode .= "</tr>";
+        $htmlCode .= "<tr class=\"odd\">";
+        $cell = 1;
+      } else {
+        $htmlCode .= $html;
+      }
+  }
+
+  if ( $cell == 2 ) {
+    $htmlCode .= "<td> </td>";
+  }
+
+  $htmlCode .= "</tr>";
+  $htmlCode .= "</tbody>";
+  $htmlCode .= "</table>";
+  $htmlCode .= "</div>";
+  $htmlCode .= "</html>";
+  				
+return $htmlCode;
+}
+
 ##############################################################################
 #  Auflösung Errorcodes bei Login / Logout
-
 sub experrorauth {
   # Übernahmewerte sind $hash, $errorcode
   my ($hash,@errorcode) = @_;
@@ -3888,7 +4182,8 @@ sub experror {
        <li>trigger of external events 1-10 (action rules in SVS)   </li>
        <li>start and stop of camera livestreams, show the last recording and snapshot embedded </li>
        <li>fetch of livestream-Url's with key (login not needed in that case)   </li>
-       <li>playback of last recording  </li><br>
+       <li>playback of last recording and playback the last snapshot  </li>
+	   <li>create a gallery of the last 1-10 snapshots (as a Popup or permanent weblink-Device)  </li><br>
     </ul>
    </ul>
    The recordings and snapshots will be stored in Synology Surveillance Station (SVS) and are managed like the other (normal) recordings / snapshots defined by Surveillance Station rules.<br>
@@ -4005,7 +4300,8 @@ sub experror {
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... runView            </td><td> session: ServeillanceStation - observer with privilege liveview of camera </li></td></tr>
-      <tr><td><li>set ... extevent           </td><td> session: DSM - user as member of admin-group   </li></td></tr>
+      <tr><td><li>set ... snapGallery        </td><td> session: ServeillanceStation - observer    </li></td></tr>
+	  <tr><td><li>set ... extevent           </td><td> session: DSM - user as member of admin-group   </li></td></tr>
       <tr><td><li>set ... stopView           </td><td> -                                          </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                          </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
@@ -4043,13 +4339,15 @@ sub experror {
       <tr><td>"snap":                                              </td><td>triggers a snapshot of the relevant camera and store it into Synology Surveillance Station</td></tr>
       <tr><td>"disable":                                           </td><td>deactivates a camera in Synology Surveillance Station</td></tr>
       <tr><td>"enable":                                            </td><td>activates a camera in Synology Surveillance Station</td></tr>
-      <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>save a set of credentils </td></tr>
+      <tr><td>"createSnapGallery":                                 </td><td>creates a snapshot gallery as a permanent (weblink)Device</td></tr>      
+	  <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>save a set of credentils </td></tr>
       <tr><td>"expmode [ day | night | auto ]":                    </td><td>set the exposure mode to day, night or auto </td></tr>
       <tr><td>"extevent [ 1-10 ]":                                 </td><td>triggers the external event 1-10 (see actionrule editor in SVS) </td></tr>
       <tr><td>"motdetsc [ camera | SVS | disable ]":               </td><td>set motion detection to the desired mode </td></tr>
       <tr><td>"goPreset &lt;Presetname&gt;":                       </td><td>moves a PTZ-camera to a predefinied Preset-position  </td></tr>
       <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>starts a predefinied patrol (PTZ-cameras)  </td></tr>
-      <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>moves a PTZ-camera to a absolute X/Y-coordinate or to direction up/down/left/right  </td></tr>
+      <tr><td>"snapGallery [1-10]":                                </td><td>creates an output of the last [n] snapshots  </td></tr>      
+	  <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>moves a PTZ-camera to a absolute X/Y-coordinate or to direction up/down/left/right  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>starts a continuous move of PTZ-camera to direction up/down/left/right or dir_X  </td></tr> 
       <tr><td>"runView [image | lastrec | lastrec_open | link | link_open &lt;room&gt; ]":  </td><td>starts a livestream as embedded image or link  </td></tr> 
       <tr><td>"stopView":                                          </td><td>stops a camera livestream  </td></tr> 
@@ -4057,73 +4355,22 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b>set &lt;name&gt; [on|off] </b></li> <br>
-   
-  The command "set &lt;name&gt; on" starts a recording. The default recording time takes 15 seconds. It can be changed by the <a href="#SSCamattr">attribute</a> "rectime" individualy. 
-  With the <a href="#SSCamattr">attribute</a> (respectively the default value) provided recording time can be overwritten once by "set &lt;name&gt; on [rectime]".
-  The recording will be stopped after processing time "rectime"automatically.<br>
-
-  A special case is the start using "set &lt;name&gt; on 0" respectively the attribute value "rectime = 0". In that case a endless-recording will be started. One have to stop this recording
-  by command "set &lt;name&gt; off" explicitely.<br>
-
-  The recording behavior can be impacted with <a href="#SSCamattr">attribute</a> "recextend" furthermore as explained as follows.<br><br>
-
-  <b>Attribute "recextend = 0" or not set (default):</b><br><br>
-  <ul>
-  <li> if, for example, a recording with rectimeme=22 is started, no other startcommand (for a recording) will be accepted until this started recording is finished.
-  A hint will be logged in case of verboselevel = 3. </li>
-  </ul>
-  <br>
-
-  <b>Attribute "recextend = 1" is set:</b><br><br>
-  <ul>
-  <li> a before started recording will be extend by the recording time "rectime" if a new start command is received. That means, the timer for the automatic stop-command will be
-  renewed to "rectime" given bei the command, attribute or default value. This procedure will be repeated every time a new start command for recording is received. 
-  Therefore a running recording will be extended until no start command will be get. </li>
-
-  <li> a before started endless-recording will be stopped after recordingtime 2rectime" if a new "set <name> on"-command is received (new set of timer). If it is unwanted make sure you 
-  don't set the <a href="#SSCamattr">attribute</a> "recextend" in case of endless-recordings. </li>
-  </ul>
-  <br>
+  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b></li> <br>
   
-  Examples for simple <b>Start/Stop a Recording</b>: <br><br>
-
-  <table>
-  <colgroup> <col width=20%> <col width=80%> </colgroup>
-      <tr><td>set &lt;name&gt; on [rectime]  </td><td>starts a recording of camera &lt;name&gt;, stops automatically after [rectime] (default 15s or defined by <a href="#SSCamattr">attribute</a>) </td></tr>
-      <tr><td>set &lt;name&gt; off           </td><td>stops the recording of camera &lt;name&gt;</td></tr>
-  </table>
-  </ul>
+  set username / password combination for access the Synology Surveillance Station. 
+  See <a href="#SSCam_Credentials">Credentials</a><br> for further informations.
+  
   <br><br>
-
-  <ul>
-  <li><b> set &lt;name&gt; snap </b></li> <br>
-  
-  A snapshot can be triggered with:
-  <pre> 
-     set &lt;name&gt; snap 
-  </pre>
-
-  Subsequent some Examples for <b>taking snapshots</b>: <br><br>
-  
-  If a serial of snapshots should be released, it can be done using the following notify command.
-  For the example a serial of snapshots are to be triggerd if the recording of a camera starts. <br>
-  When the recording of camera "CamHE1" starts (Attribut event-on-change-reading -> "Record" has to be set), then 3 snapshots at intervals of 2 seconds are triggered.
-
-  <pre>
-     define he1_snap_3 notify CamHE1:Record.*on define h3 at +*{3}00:00:02 set CamHE1 snap 
-  </pre>
-
-  Release of 2 Snapshots of camera "CamHE1" at intervals of 6 seconds after the motion sensor "MelderHE1" has sent an event, <br>
-  can be done e.g. with following notify-command:
-
-  <pre>
-     define he1_snap_2 notify MelderHE1:on.* define h2 at +*{2}00:00:06 set CamHE1 snap 
-  </pre>
-
-  The ID and the filename of the last snapshot will be displayed as value of variable "LastSnapId" respectively "LastSnapFilename" in the device-Readings. <br><br>
   </ul>
+  
+  <ul>
+  <li><b> set &lt;name&gt; createSnapGallery </b></li> <br>
+  
+  A snapshot gallery will be created as a permanent (weblink)Device. The device will be provided in room "SnapGallery".
+  With the "snapGallery..."-<a href="#SSCamattr">attributes</a> respectively the weblink-device specific attributes (what was created)
+  you are able to manipulate the properties of the new snapshot gallery device. <br> 
   <br><br>
+  </ul>
   
   <ul>
   <li><b> set &lt;name&gt; [enable|disable] </b></li> <br>
@@ -4167,6 +4414,89 @@ sub experror {
   Is the field for the Day/Night-mode shown greyed in SVS -&gt; IP-camera -&gt; optimization -&gt; exposure mode, this function will be probably unsupported.  
   </ul>
   <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b></li> <br>
+  
+  This command triggers an external event (1-10) in SVS. 
+  The actions which will are used have to be defined in the actionrule editor of SVS at first. There are the events 1-10 possible.
+  In the message application of SVS you may select Email, SMS or Mobil (DS-Cam) messages to release if an external event has been triggerd.
+  Further informations can be found in the online help of the actionrule editor.
+  The used user needs to be a member of the admin-group and DSM-session is needed too.
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ] </b></li> <br>
+  
+  This command can be used to move a PTZ-camera to an arbitrary absolute X/Y-coordinate, or to absolute position using up/down/left/right. 
+  The option is only available for cameras which are having the Reading "CapPTZAbs=true". The property of a camera can be requested with "get &lt;name&gt; caminfoall" .
+  <br><br>
+
+  Example for a control to absolute X/Y-coordinates: <br>
+
+  <pre>
+    set &lt;name&gt; goAbsPTZ 120 450
+  </pre>
+ 
+  In this example the camera lense moves to position X=120 und Y=450. <br>
+  The valuation is:
+
+  <pre>
+    X = 0 - 640      (0 - 319 moves lense left, 321 - 640 moves lense right, 320 don't move lense)
+    Y = 0 - 480      (0 - 239 moves lense down, 241 - 480 moves lense up, 240 don't move lense) 
+  </pre>
+
+  The lense can be moved in smallest steps to very large steps into the desired direction.
+  If necessary the procedure has to be repeated to bring the lense into the desired position. <br><br>
+
+  If the motion should be done with the largest possible increment the following command can be used for simplification:
+
+  <pre>
+   set &lt;name&gt; goAbsPTZ up [down|left|right]
+  </pre>
+
+  In this case the lense will be moved with largest possible increment into the given absolute position.
+  Also in this case the procedure has to be repeated to bring the lense into the desired position if necessary. 
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b></li> <br>
+  
+  Using this command you can move PTZ-cameras to a predefined position. <br>
+  The Preset-positions have to be defined first of all in the Synology Surveillance Station. This usually happens in the PTZ-control of IP-camera setup in SVS.
+  The Presets will be read ito FHEM with command "get &lt;name&gt; caminfoall" (happens automatically when FHEM restarts). The import process can be repeated regular by camera polling.
+  A long polling interval is recommendable in this case because of the Presets are only will be changed if the user change it in the IP-camera setup itself. 
+  <br><br>
+  
+  Here it is an example of a PTZ-control depended on IR-motiondetector event:
+  
+  <pre>
+    define CamFL.Preset.Wandschrank notify MelderTER:on.* set CamFL goPreset Wandschrank, ;; define CamFL.Preset.record at +00:00:10 set CamFL on 5 ;;;; define s3 at +*{3}00:00:05 set CamFL snap ;; define CamFL.Preset.back at +00:00:30 set CamFL goPreset Home
+  </pre>
+  
+  Operating Mode: <br>
+  
+  The IR-motiondetector registers a motion. Hereupon the camera "CamFL" moves to Preset-posion "Wandschrank". A recording with the length of 5 seconds starts 10 seconds later. 
+  Because of the prerecording time of the camera is set to 10 seconds (cf. Reading "CamPreRecTime"), the effectice recording starts when the camera move begins. <br>
+  When the recording starts 3 snapshots with an interval of 5 seconds will be taken as well. <br>
+  After a time of 30 seconds in position "Wandschrank" the camera moves back to postion "Home". <br><br>
+  
+  An extract of the log illustrates the process:
+  
+  <pre>  
+   2016.02.04 15:02:14 2: CamFL - Camera Flur_Vorderhaus has moved to position "Wandschrank"
+   2016.02.04 15:02:24 2: CamFL - Camera Flur_Vorderhaus Recording with Recordtime 5s started
+   2016.02.04 15:02:29 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:30 2: CamFL - Camera Flur_Vorderhaus Recording stopped
+   2016.02.04 15:02:34 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:39 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:44 2: CamFL - Camera Flur_Vorderhaus has moved to position "Home"
+  </pre>
+  </ul>
+  <br><br>
+
   
   <ul>
   <li><b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b></li> <br>
@@ -4216,90 +4546,7 @@ sub experror {
   </pre>
   </ul>
   <br><br>
-  
-  <ul>
-  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b></li> <br>
-  
-  Using this command you can move PTZ-cameras to a predefined position. <br>
-  The Preset-positions have to be defined first of all in the Synology Surveillance Station. This usually happens in the PTZ-control of IP-camera setup in SVS.
-  The Presets will be read ito FHEM with command "get &lt;name&gt; caminfoall" (happens automatically when FHEM restarts). The import process can be repeated regular by camera polling.
-  A long polling interval is recommendable in this case because of the Presets are only will be changed if the user change it in the IP-camera setup itself. 
-  <br><br>
-  
-  Here it is an example of a PTZ-control depended on IR-motiondetector event:
-  
-  <pre>
-    define CamFL.Preset.Wandschrank notify MelderTER:on.* set CamFL goPreset Wandschrank, ;; define CamFL.Preset.record at +00:00:10 set CamFL on 5 ;;;; define s3 at +*{3}00:00:05 set CamFL snap ;; define CamFL.Preset.back at +00:00:30 set CamFL goPreset Home
-  </pre>
-  
-  Operating Mode: <br>
-  
-  The IR-motiondetector registers a motion. Hereupon the camera "CamFL" moves to Preset-posion "Wandschrank". A recording with the length of 5 seconds starts 10 seconds later. 
-  Because of the prerecording time of the camera is set to 10 seconds (cf. Reading "CamPreRecTime"), the effectice recording starts when the camera move begins. <br>
-  When the recording starts 3 snapshots with an interval of 5 seconds will be taken as well. <br>
-  After a time of 30 seconds in position "Wandschrank" the camera moves back to postion "Home". <br><br>
-  
-  An extract of the log illustrates the process:
-  
-  <pre>  
-   2016.02.04 15:02:14 2: CamFL - Camera Flur_Vorderhaus has moved to position "Wandschrank"
-   2016.02.04 15:02:24 2: CamFL - Camera Flur_Vorderhaus Recording with Recordtime 5s started
-   2016.02.04 15:02:29 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
-   2016.02.04 15:02:30 2: CamFL - Camera Flur_Vorderhaus Recording stopped
-   2016.02.04 15:02:34 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
-   2016.02.04 15:02:39 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
-   2016.02.04 15:02:44 2: CamFL - Camera Flur_Vorderhaus has moved to position "Home"
-  </pre>
-  </ul>
-  <br><br>
-  
-  <ul>
-  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b></li> <br>
-  
-  This commans starts a predefined patrol (tour) of a PTZ-camera. <br>
-  At first the patrol has to be predefined in the Synology Surveillance Station. It can be done in the PTZ-control of IP-Kamera Setup -&gt; PTZ-control -&gt; patrol.
-  The patrol tours will be read with command "get &lt;name&gt; caminfoall" which is be executed automatically when FHEM restarts.
-  The import process can be repeated regular by camera polling. A long polling interval is recommendable in this case because of the patrols are only will be changed 
-  if the user change it in the IP-camera setup itself. 
-  Further informations for creating patrols you can get in the online-help of Surveillance Station.
-  </ul>
-  <br><br>
-  
-  <ul>
-  <li><b> set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ] </b></li> <br>
-  
-  This command can be used to move a PTZ-camera to an arbitrary absolute X/Y-coordinate, or to absolute position using up/down/left/right. 
-  The option is only available for cameras which are having the Reading "CapPTZAbs=true". The property of a camera can be requested with "get &lt;name&gt; caminfoall" .
-  <br><br>
-
-  Example for a control to absolute X/Y-coordinates: <br>
-
-  <pre>
-    set &lt;name&gt; goAbsPTZ 120 450
-  </pre>
- 
-  In this example the camera lense moves to position X=120 und Y=450. <br>
-  The valuation is:
-
-  <pre>
-    X = 0 - 640      (0 - 319 moves lense left, 321 - 640 moves lense right, 320 don't move lense)
-    Y = 0 - 480      (0 - 239 moves lense down, 241 - 480 moves lense up, 240 don't move lense) 
-  </pre>
-
-  The lense can be moved in smallest steps to very large steps into the desired direction.
-  If necessary the procedure has to be repeated to bring the lense into the desired position. <br><br>
-
-  If the motion should be done with the largest possible increment the following command can be used for simplification:
-
-  <pre>
-   set &lt;name&gt; goAbsPTZ up [down|left|right]
-  </pre>
-
-  In this case the lense will be moved with largest possible increment into the given absolute position.
-  Also in this case the procedure has to be repeated to bring the lense into the desired position if necessary. 
-  </ul>
-  <br><br>
-  
+    
   <ul>
   <li><b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [seconds] </b></li> <br>
   
@@ -4320,6 +4567,58 @@ sub experror {
     set &lt;name&gt; move dir_1 1.5   : moves PTZ 1,5 Sek. (plus processing time) to top-right 
     set &lt;name&gt; move dir_20 0.7  : moves PTZ 1,5 Sek. (plus processing time) to left-bottom ("CapPTZDirections = 32)"
   </pre>
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b>set &lt;name&gt; [on|off] </b></li> <br>
+   
+  The command "set &lt;name&gt; on" starts a recording. The default recording time takes 15 seconds. It can be changed by the <a href="#SSCamattr">attribute</a> "rectime" individualy. 
+  With the <a href="#SSCamattr">attribute</a> (respectively the default value) provided recording time can be overwritten once by "set &lt;name&gt; on [rectime]".
+  The recording will be stopped after processing time "rectime"automatically.<br>
+
+  A special case is the start using "set &lt;name&gt; on 0" respectively the attribute value "rectime = 0". In that case a endless-recording will be started. One have to stop this recording
+  by command "set &lt;name&gt; off" explicitely.<br>
+
+  The recording behavior can be impacted with <a href="#SSCamattr">attribute</a> "recextend" furthermore as explained as follows.<br><br>
+
+  <b>Attribute "recextend = 0" or not set (default):</b><br><br>
+  <ul>
+  <li> if, for example, a recording with rectimeme=22 is started, no other startcommand (for a recording) will be accepted until this started recording is finished.
+  A hint will be logged in case of verboselevel = 3. </li>
+  </ul>
+  <br>
+
+  <b>Attribute "recextend = 1" is set:</b><br><br>
+  <ul>
+  <li> a before started recording will be extend by the recording time "rectime" if a new start command is received. That means, the timer for the automatic stop-command will be
+  renewed to "rectime" given bei the command, attribute or default value. This procedure will be repeated every time a new start command for recording is received. 
+  Therefore a running recording will be extended until no start command will be get. </li>
+
+  <li> a before started endless-recording will be stopped after recordingtime 2rectime" if a new "set <name> on"-command is received (new set of timer). If it is unwanted make sure you 
+  don't set the <a href="#SSCamattr">attribute</a> "recextend" in case of endless-recordings. </li>
+  </ul>
+  <br>
+  
+  Examples for simple <b>Start/Stop a Recording</b>: <br><br>
+
+  <table>
+  <colgroup> <col width=20%> <col width=80%> </colgroup>
+      <tr><td>set &lt;name&gt; on [rectime]  </td><td>starts a recording of camera &lt;name&gt;, stops automatically after [rectime] (default 15s or defined by <a href="#SSCamattr">attribute</a>) </td></tr>
+      <tr><td>set &lt;name&gt; off           </td><td>stops the recording of camera &lt;name&gt;</td></tr>
+  </table>
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b></li> <br>
+  
+  This commans starts a predefined patrol (tour) of a PTZ-camera. <br>
+  At first the patrol has to be predefined in the Synology Surveillance Station. It can be done in the PTZ-control of IP-Kamera Setup -&gt; PTZ-control -&gt; patrol.
+  The patrol tours will be read with command "get &lt;name&gt; caminfoall" which is be executed automatically when FHEM restarts.
+  The import process can be repeated regular by camera polling. A long polling interval is recommendable in this case because of the patrols are only will be changed 
+  if the user change it in the IP-camera setup itself. 
+  Further informations for creating patrols you can get in the online-help of Surveillance Station.
   </ul>
   <br><br>
   
@@ -4346,9 +4645,6 @@ sub experror {
     attr &lt;name&gt; htmlattr width="700",height="525",top="200",left="300"
   </pre>
   
-  With these attribute values a streaming link will be opened (by click on) in a new browser tab or windows. If the stream will be started as an image, the size changes appropriately the
-  values of width and hight. <br>
-  
   The command <b>"set &lt;name&gt; runView live_open"</b> starts the stream immediately in a new browser window (longpoll=1 
   must be set for WEB). 
   A browser window will be initiated to open for every FHEM session which is active. If you want to change this behavior, 
@@ -4370,13 +4666,42 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b></li> <br>
+  <li><b> set &lt;name&gt; snap </b></li> <br>
   
-  This command triggers an external event (1-10) in SVS. 
-  The actions which will are used have to be defined in the actionrule editor of SVS at first. There are the events 1-10 possible.
-  In the message application of SVS you may select Email, SMS or Mobil (DS-Cam) messages to release if an external event has been triggerd.
-  Further informations can be found in the online help of the actionrule editor.
-  The used user needs to be a member of the admin-group and DSM-session is needed too.
+  A snapshot can be triggered with:
+  <pre> 
+     set &lt;name&gt; snap 
+  </pre>
+
+  Subsequent some Examples for <b>taking snapshots</b>: <br><br>
+  
+  If a serial of snapshots should be released, it can be done using the following notify command.
+  For the example a serial of snapshots are to be triggerd if the recording of a camera starts. <br>
+  When the recording of camera "CamHE1" starts (Attribut event-on-change-reading -> "Record" has to be set), then 3 snapshots at intervals of 2 seconds are triggered.
+
+  <pre>
+     define he1_snap_3 notify CamHE1:Record.*on define h3 at +*{3}00:00:02 set CamHE1 snap 
+  </pre>
+
+  Release of 2 Snapshots of camera "CamHE1" at intervals of 6 seconds after the motion sensor "MelderHE1" has sent an event, <br>
+  can be done e.g. with following notify-command:
+
+  <pre>
+     define he1_snap_2 notify MelderHE1:on.* define h2 at +*{2}00:00:06 set CamHE1 snap 
+  </pre>
+
+  The ID and the filename of the last snapshot will be displayed as value of variable "LastSnapId" respectively "LastSnapFilename" in the device-Readings. <br><br>
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; snapGallery [1-10] </b></li> <br>
+  
+  The command is only available if the attribute "snapGalleryBoost=1" is set. <br>
+  It creates an output of the last [x] snapshots as well as "get ... snapGallery".  But differing from "get" with
+  <a href="#SSCamattr">attribute</a> "snapGalleryBoost=1" no popup will be created. The snapshot gallery will be depicted as
+  an browserpage instead. All further functions and attributes are appropriate the <a href="#SSCamget">"get ... snapGallery"</a>
+  command.
   </ul>
   <br><br>
   
@@ -4392,6 +4717,7 @@ sub experror {
       get &lt;name&gt; caminfoall
       get &lt;name&gt; eventlist
       get &lt;name&gt; scanVirgin
+      get &lt;name&gt; snapGallery
       get &lt;name&gt; stmUrlPath
       get &lt;name&gt; svsinfo
       get &lt;name&gt; snapfileinfo
@@ -4420,6 +4746,33 @@ sub experror {
   new identified and all necessary API-parameters will be new investigated.  
   </ul>
   <br><br> 
+  
+  <ul>
+  <li><b> get &lt;name&gt; snapGallery [1-10] </b></li> <br>
+  
+  A popup with the last [x] snapshots will be created. If the <a href="#SSCamattr">attribute</a> "snapGalleryBoost" is set, 
+  the last snapshots (default 3) are requested by polling and they will be stored in the FHEM-servers main memory. 
+  This method is helpful to speed up the output especially in case of full size images, but it can be possible 
+  that NOT the newest snapshots are be shown if they have not be initialized by the SSCAm-module itself.
+  
+  To control this function behavior there are further <a href="#SSCamattr">attributes</a>: <br><br>
+  
+  <ul>
+     <li>snapGalleryBoost   </li> 
+	 <li>snapGalleryColumns   </li> 
+	 <li>snapGalleryHtmlAttr   </li> 
+	 <li>snapGalleryNumber   </li> 
+	 <li>snapGallerySize   </li> 
+  </ul> <br>
+  available.
+  </ul> <br>
+  
+        <ul>
+		<b>Note:</b><br>
+        Depended from quantity and resolution (quality) of the snapshot images adequate CPU and/or main memory
+		ressources are needed.
+        </ul>
+		<br><br>
   
   <ul>
   <li><b> get &lt;name&gt; snapinfo </b></li> <br>
@@ -4567,6 +4920,37 @@ sub experror {
   
   <li><b>simu_SVSversion</b><br>
     simulates another SVS version. (only a lower version than the installed one is possible !)  </li><br>
+	
+  <li><b>snapGalleryBoost</b><br>
+    If set, the last snapshots (default 3) will be retrieved by Polling, will be stored in the FHEM-servers main memory
+    and can be displayed by the "set/get ... snapGallery" command. <br>
+	This mode is helpful if many or full size images shall be displayed. 
+	If the attribute is set, you can't specify arguments in addition to the "set/get ... snapGallery" command. 
+    (see also attribut "snapGalleryNumber") </li><br>
+  
+  <li><b>snapGalleryColumns</b><br>
+    The number of snapshots which shall appear in one row of the gallery popup (default 3). </li><br>
+	
+  <li><b>snapGalleryHtmlAttr</b><br>
+    the image parameter can be controlled by this attribute. <br>
+	If the attribute isn't set, the value of attribute "htmlattr" will be used. <br>
+	If  "htmlattr" is also not set, default parameters are used instead (width="500" height="325"). <br><br>
+	
+        <ul>
+		<b>Example:</b><br>
+        attr &lt;name&gt; snapGalleryHtmlAttr width="325" height="225"
+        </ul>
+		<br>
+        </li>
+		
+  <li><b>snapGalleryNumber</b><br>
+    The number of snapshots to retrieve (default 3). </li><br>
+	
+  <li><b>snapGallerySize</b><br>
+     By this attribute the quality of the snapshot images can be controlled (default "Icon"). <br>
+	 If mode "Full" is set, the images are retrieved with their original available resolution. That requires more ressources 
+	 and may slow down the display. By setting attribute "snapGalleryBoost=1" the display may accelerated, because in that case
+	 the images will be retrieved by continuous polling and need only bring to display. </li><br>
   
   <li><b>showStmInfoFull</b><br>
     additional stream informations like LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp will be created  </li><br>
@@ -4695,7 +5079,8 @@ sub experror {
       <li>auslösen externer Ereignisse 1-10 (Aktionsregel SVS)   </li>
       <li>starten und beenden von Kamera-Livestreams, anzeigen der letzten Aufnahme oder des letzten Schnappschusses  </li>
       <li>Abruf und Ausgabe der Kamera Streamkeys sowie Stream-Urls (Nutzung von Kamera-Livestreams ohne Session Id)  </li>
-      <li>abspielen der letzten Aufnahme  </li><br>
+      <li>abspielen der letzten Aufnahme bzw. Anzeige des letzten Schnappschusses  </li>
+	  <li>erzeugen einer Gallerie der letzten 1-10 Schnappschüsse (als Popup oder permanentes Device)  </li><br>
      </ul> 
     </ul>
     Die Aufnahmen stehen in der Synology Surveillance Station (SVS) zur Verfügung und unterliegen, wie jede andere Aufnahme, den in der Synology Surveillance Station eingestellten Regeln. <br>
@@ -4809,7 +5194,8 @@ sub experror {
       <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
-      <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
+      <tr><td><li>set ... snapGallery        </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+	  <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... runView            </td><td> session: ServeillanceStation - Betrachter mit Privileg Liveansicht für Kamera        </li></td></tr>
       <tr><td><li>set ... stopView           </td><td> -                                            </li></td></tr>
@@ -4820,6 +5206,7 @@ sub experror {
       <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+	  <tr><td><li>get ... snapGallery        </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
 	  <tr><td><li>get ... snapinfo           </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... stmUrlPath         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       </table>
@@ -4841,7 +5228,7 @@ sub experror {
 <b>Set </b>
 <ul>
     
-    Es gibt zur Zeit folgende Optionen für "set &lt;name&gt; ...": <br><br>
+  Es gibt zur Zeit folgende Optionen für "set &lt;name&gt; ...": <br><br>
 
   <table>
   <colgroup> <col width=30%> <col width=70%> </colgroup>
@@ -4851,13 +5238,15 @@ sub experror {
       <tr><td>"snap":                                              </td><td>löst einen Schnappschuß der entsprechenden Kamera aus und speichert ihn in der Synology Surveillance Station</td></tr>
       <tr><td>"disable":                                           </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
       <tr><td>"enable":                                            </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
-      <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>speichert die Zugangsinformationen</td></tr>
+      <tr><td>"createSnapGallery":                                 </td><td>erzeugt eine Schnappschußgallerie als (weblink)Device</td></tr>
+	  <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>speichert die Zugangsinformationen</td></tr>
       <tr><td>"expmode [ day | night | auto ]":                    </td><td>aktiviert den Belichtungsmodus Tag, Nacht oder Automatisch </td></tr>
       <tr><td>"extevent [ 1-10 ]":                                 </td><td>löst das externe Ereignis 1-10 aus (Aktionsregel in SVS) </td></tr>
       <tr><td>"motdetsc [ camera | SVS | disable ]":               </td><td>schaltet die Bewegungserkennung in den gewünschten Modus (durch Kamera, SVS, oder deaktiviert) </td></tr>
       <tr><td>"goPreset &lt;Presetname&gt;":                       </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
       <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>startet eine vordefinierte Überwachungstour einer PTZ-Kamera  </td></tr>
-      <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
+      <tr><td>"snapGallery [1-10]":                                </td><td>erzeugt eine Ausgabe der letzten [n] Schnappschüsse  </td></tr>
+	  <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>startet kontinuerliche Bewegung einer PTZ-Kamera in Richtung up/down/left/right bzw. dir_X  </td></tr> 
       <tr><td>"runView live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;]":  </td><td>startet einen Livestream als eingbettetes Image, IFrame bzw. Link  </td></tr>
       <tr><td>"stopView":                                          </td><td>stoppt einen Kamera-Livestream  </td></tr>
@@ -4865,72 +5254,22 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; [on] [off] </b></li><br>
-
-  Der Befehl "set &lt;name&gt; on" startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem Attribut "rectime" individuell festgelegt werden. 
-  Die im Attribut (bzw. im Standard) hinterlegte Aufnahmedauer kann einmalig mit "set &lt;name&gt; on [rectime]" überschrieben werden.
-  Die Aufnahme stoppt automatisch nach Ablauf der Zeit "rectime".<br>
-
-  Ein Sonderfall ist der Start einer Daueraufnahme mit "set &lt;name&gt; on 0" bzw. dem Attributwert "rectime = 0". In diesem Fall wird eine Daueraufnahme gestartet die 
-  explizit wieder mit dem Befehl "set &lt;name&gt; off" gestoppt werden muß.<br>
-
-  Das Aufnahmeverhalten kann weiterhin mit dem Attribut "recextend" wie folgt beeinflusst werden.<br><br>
-
-  <b>Attribut "recextend = 0" bzw. nicht gesetzt (Standard):</b><br><br>
-  <ul>
-  <li> wird eine Aufnahme mit z.B. rectime=22 gestartet, wird kein weiterer Startbefehl für eine Aufnahme akzeptiert bis diese gestartete Aufnahme nach 22 Sekunden
-  beendet ist. Ein Hinweis wird bei verbose=3 im Logfile protokolliert. </li>
-  </ul>
-  <br>
-
-  <b>Attribut "recextend = 1" gesetzt:</b><br>
-  <ul>
-  <li> eine zuvor gestartete Aufnahme wird bei einem erneuten "set <name> on" -Befehl um die Aufnahmezeit "rectime" verlängert. Das bedeutet, dass der Timer für 
-  den automatischen Stop auf den Wert "rectime" neu gesetzt wird. Dieser Vorgang wiederholt sich mit jedem Start-Befehl. Dadurch verlängert sich eine laufende 
-  Aufnahme bis kein Start-Inpuls mehr registriert wird. </li>
-
-  <li> eine zuvor gestartete Endlos-Aufnahme wird mit einem erneuten "set <name> on"-Befehl nach der Aufnahmezeit "rectime" gestoppt (Timerneustart). Ist dies 
-  nicht gewünscht, ist darauf zu achten dass bei der Verwendung einer Endlos-Aufnahme das Attribut "recextend" nicht verwendet wird. </li>
-  </ul>
-  <br>
+  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b></li> <br>
   
-  Beispiele für einfachen <b>Start/Stop einer Aufnahme</b>: <br><br>
-
-  <table>
-  <colgroup> <col width=20%> <col width=80%> </colgroup>
-      <tr><td>set &lt;name&gt; on [rectime]  </td><td>startet die Aufnahme der Kamera &lt;name&gt;, automatischer Stop der Aufnahme nach Ablauf der Zeit [rectime] (default 15s oder wie im <a href="#SSCamattr">Attribut</a> "rectime" angegeben)</td></tr>
-      <tr><td>set &lt;name&gt; off   </td><td>stoppt die Aufnahme der Kamera &lt;name&gt;</td></tr>
-  </table>
-  </ul>
+  Setzt Username / Passwort für den Zugriff auf die Synology Surveillance Station. 
+  Siehe <a href="#SSCam_Credentials">Credentials</a><br>
+  
   <br><br>
-
-  <ul>
-  <li><b> set &lt;name&gt; snap </b></li> <br>
-  
-  Ein <b>Schnappschuß</b> kann ausgelöst werden mit:
-  <pre> 
-     set &lt;name&gt; snap 
-  </pre>
-  
-  Nachfolgend einige Beispiele für die <b>Auslösung von Schnappschüssen</b>. <br><br>
-  
-  Soll eine Reihe von Schnappschüssen ausgelöst werden wenn eine Aufnahme startet, kann das z.B. durch folgendes notify geschehen. <br>
-  Sobald der Start der Kamera CamHE1 ausgelöst wird (Attribut event-on-change-reading -> "Record" setzen), werden abhängig davon 3 Snapshots im Abstand von 2 Sekunden getriggert.
-
-  <pre>
-     define he1_snap_3 notify CamHE1:Record.*Start define h3 at +*{3}00:00:02 set CamHE1 snap
-  </pre>
-  
-  Triggern von 2 Schnappschüssen der Kamera "CamHE1" im Abstand von 6 Sekunden nachdem der Bewegungsmelder "MelderHE1" einen Event gesendet hat, <br>
-  kann z.B. mit folgendem notify geschehen:
-
-  <pre>
-     define he1_snap_2 notify MelderHE1:on.* define h2 at +*{2}00:00:06 set CamHE1 snap 
-  </pre>
-
-  Es wird die ID und der Filename des letzten Snapshots als Wert der Variable "LastSnapId" bzw. "LastSnapFilename" in den Readings der Kamera ausgegeben. <br><br>
   </ul>
+  
+  <ul>
+  <li><b> set &lt;name&gt; createSnapGallery </b></li> <br>
+  
+  Es wird eine Schnappschußgallerie als permanentes (weblink)Device erzeugt. Das Device wird im Raum "SnapGallery" erstellt.
+  Mit den "snapGallery..."-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des entstandenen Weblink-Devices 
+  können die Eigenschaften der Schnappschußgallerie beeinflusst werden. <br> 
   <br><br>
+  </ul>
   
   <ul>
   <li><b> set &lt;name&gt; [enable|disable] </b></li> <br>
@@ -4958,7 +5297,7 @@ sub experror {
      attr all_cams_enable room Cams
   </pre>
   </ul>
-  <br><br>
+  <br>
   
   <ul>
   <li><b> set &lt;name&gt; expmode [day|night|auto] </b></li> <br>
@@ -4970,100 +5309,17 @@ sub experror {
   Die erfolgreiche Ausführung dieser Funktion ist davon abhängig ob die SVS diese Funktionalität der Kamera unterstützt. 
   Ist in SVS -&gt; IP-Kamera -&gt; Optimierung -&gt; Belichtungsmodus das Feld für den Tag/Nachtmodus grau hinterlegt, ist nicht von einer lauffähigen Unterstützung dieser 
   Funktion auszugehen. 
-  <br><br><br>
-  
-  <b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b> <br>
-  
-  Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
-  Wird die Bewegungserkennung durch die Kamera / SVS ohne weitere Optionen eingestellt, werden die momentan gültigen Bewegungserkennungsparameter der 
-  Kamera / SVS beibehalten. Die erfolgreiche Ausführung der Operation lässt sich u.a. anhand des Status von SVS -&gt; IP-Kamera -&gt; Ereigniserkennung -&gt; 
-  Bewegung nachvollziehen. <br><br>
-  Für die Bewegungserkennung durch SVS bzw. durch Kamera können weitere Optionen angegeben werden. Die verfügbaren Optionen bezüglich der Bewegungserkennung 
-  durch SVS sind "Empfindlichkeit" und "Schwellwert". <br><br>
-  <ul>
-  <table>
-  <colgroup> <col width=50%> <col width=50%> </colgroup>
-      <tr><td>set <name> motdetsc SVS [Empfindlichkeit] [Schwellwert]  </td><td># Befehlsmuster  </td></tr>
-      <tr><td>set <name> motdetsc SVS 91 30                            </td><td># setzt die Empfindlichkeit auf 91 und den Schwellwert auf 30  </td></tr>
-      <tr><td>set <name> motdetsc SVS 0 40                             </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40  </td></tr>
-      <tr><td>set <name> motdetsc SVS 15                               </td><td># setzt die Empfindlichkeit auf 15, Schwellwert bleibt unverändert   </td></tr>
-  </table>
-  </ul>
   <br><br>
-  
-  Wird die Bewegungserkennung durch die Kamera genutzt, stehen die Optionen "Empfindlichkeit", "Objektgröße" und "Prozentsatz für Auslösung" zur Verfügung. <br><br>
-  <ul>
-  <table>
-  <colgroup> <col width=50%> <col width=50%> </colgroup>
-      <tr><td>set <name> motdetsc camera [Empfindlichkeit] [Schwellwert] [Prozentsatz] </td><td># Befehlsmuster  </td></tr>
-      <tr><td>set <name> motdetsc camera 89 0 20                                       </td><td># setzt die Empfindlichkeit auf 89, Prozentsatz auf 20  </td></tr>
-      <tr><td>set <name> motdetsc camera 0 40 10                                      </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40, Prozentsatz auf 10  </td></tr>
-      <tr><td>set <name> motdetsc camera 30                                            </td><td># setzt die Empfindlichkeit auf 30, andere Werte bleiben unverändert  </td></tr>
-      </table>
   </ul>
-  </ul>
-  <br><br>
 
-  Es ist immer die Reihenfolge der Optionswerte zu beachten. Nicht gewünschte Optionen sind mit "0" zu besetzen sofern danach Optionen folgen 
-  deren Werte verändert werden sollen (siehe Beispiele oben). Der Zahlenwert der Optionen beträgt 1 - 99 (außer Sonderfall "0"). <br><br>
-  
-  Die jeweils verfügbaren Optionen unterliegen der Funktion der Kamera und der Unterstützung durch die SVS. Es können jeweils nur die Optionen genutzt werden die in 
-  SVS -&gt; Kamera bearbeiten -&gt; Ereigniserkennung zur Verfügung stehen. Weitere Infos sind der Online-Hilfe zur SVS zu entnehmen. <br><br>
-  
-  Über den Befehl "get ... caminfoall" wird auch das <a href="#SSCamreadings">Reading</a> "CamMotDetSc" aktualisiert welches die gegenwärtige Einstellung der Bewegungserkennung dokumentiert. 
-  Es werden nur die Parameter und Parameterwerte angezeigt, welche die SVS aktiv unterstützt. Die Kamera selbst kann weiterführende Einstellmöglichkeiten besitzen. <br><br>
-  
-  Beipiel:
-  <pre>
-  CamMotDetSc    SVS, sensitivity: 76, threshold: 55
-  </pre>
-  <br><br>
-  
   <ul>
-  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b></li> <br>
+  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b></li> <br>
   
-  Mit diesem Kommando können PTZ-Kameras in eine vordefininierte Position bewegt werden. <br>
-  Die Preset-Positionen müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. Das geschieht in der PTZ-Steuerung im IP-Kamera Setup.
-  Die Presets werden über das Kommando "get &lt;name&gt; caminfoall" eingelesen (geschieht bei restart von FHEM automatisch). Der Einlesevorgang kann durch ein Kamerapolling
-  regelmäßig wiederholt werden. Ein langes Pollingintervall ist in diesem Fall empfehlenswert, da sich die Presetpositionen nur im Fall der Neuanlage bzw. Änderung verändern werden. 
-  <br><br>
-  
-  Hier ein Beispiel einer PTZ-Steuerung in Abhängigkeit eines IR-Melder Events:
-  
-  <pre>
-    define CamFL.Preset.Wandschrank notify MelderTER:on.* set CamFL goPreset Wandschrank, ;; define CamFL.Preset.record at +00:00:10 set CamFL on 5 ;;;; define s3 at +*{3}00:00:05 set CamFL snap ;; define CamFL.Preset.back at +00:00:30 set CamFL goPreset Home
-  </pre>
-  
-  Funktionsweise: <br>
-  Der IR-Melder "MelderTER" registriert eine Bewegung. Daraufhin wird die Kamera CamFL in die Preset-Position "Wandschrank" gebracht. Eine Aufnahme mit Dauer von 5 Sekunden startet 10 Sekunden
-  später. Da die Voraufnahmezeit der Kamera 10s beträgt (vgl. Reading "CamPreRecTime"), startet die effektive Aufnahme wenn der Kameraschwenk beginnt. <br>
-  Mit dem Start der Aufnahme werden drei Schnappschüsse im Abstand von 5 Sekunden angefertigt. <br>
-  Nach einer Zeit von 30 Sekunden fährt die Kamera wieder zurück in die "Home"-Position. <br><br>
-  
-  Ein Auszug aus dem Log verdeutlicht den Ablauf:
-  
-  <pre>  
-   2016.02.04 15:02:14 2: CamFL - Camera Flur_Vorderhaus has moved to position "Wandschrank"
-   2016.02.04 15:02:24 2: CamFL - Camera Flur_Vorderhaus Recording with Recordtime 5s started
-   2016.02.04 15:02:29 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
-   2016.02.04 15:02:30 2: CamFL - Camera Flur_Vorderhaus Recording stopped
-   2016.02.04 15:02:34 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
-   2016.02.04 15:02:39 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
-   2016.02.04 15:02:44 2: CamFL - Camera Flur_Vorderhaus has moved to position "Home"
-  </pre>
-  </ul>
-  <br><br>
-  
-  <ul>
-  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b></li> <br>
-  
-  Dieses Kommando startet die vordefinierterte Überwachungstour einer PTZ-Kamera. <br>
-  Die Überwachungstouren müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. 
-  Das geschieht in der PTZ-Steuerung im IP-Kamera Setup -&gt; PTZ-Steuerung -&gt; Überwachung.
-  Die Überwachungstouren (Patrols) werden über das Kommando "get &lt;name&gt; caminfoall" eingelesen, welches beim Restart von FHEM automatisch abgearbeitet wird. 
-  Der Einlesevorgang kann durch ein Kamerapolling regelmäßig wiederholt werden. Ein langes Pollingintervall ist in diesem Fall empfehlenswert, da sich die 
-  Überwachungstouren nur im Fall der Neuanlage bzw. Änderung verändern werden.
-  Nähere Informationen zur Anlage von Überwachungstouren sind in der Hilfe zur Surveillance Station enthalten. 
+  Dieses Kommando triggert ein externes Ereignis (1-10) in der SVS. 
+  Die Aktionen, die dieses Ereignis auslöst, sind zuvor in dem Aktionsregeleditor der SVS einzustellen. Es stehen die Ereignisse 1-10 zur Verfügung.
+  In der Banchrichtigungs-App der SVS können auch Email, SMS oder Mobil (DS-Cam) Nachrichten ausgegeben werden wenn ein externes Ereignis ausgelöst wurde.
+  Nähere Informationen dazu sind in der Hilfe zum Aktionsregeleditor zu finden.
+  Der verwendete User benötigt Admin-Rechte in einer DSM-Session.
   </ul>
   <br><br>
   
@@ -5103,6 +5359,89 @@ sub experror {
   <br><br>
   
   <ul>
+  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b></li> <br>
+  
+  Mit diesem Kommando können PTZ-Kameras in eine vordefininierte Position bewegt werden. <br>
+  Die Preset-Positionen müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. Das geschieht in der PTZ-Steuerung im IP-Kamera Setup.
+  Die Presets werden über das Kommando "get &lt;name&gt; caminfoall" eingelesen (geschieht bei restart von FHEM automatisch). Der Einlesevorgang kann durch ein Kamerapolling
+  regelmäßig wiederholt werden. Ein langes Pollingintervall ist in diesem Fall empfehlenswert, da sich die Presetpositionen nur im Fall der Neuanlage bzw. Änderung verändern werden. 
+  <br><br>
+  
+  Hier ein Beispiel einer PTZ-Steuerung in Abhängigkeit eines IR-Melder Events:
+  
+  <pre>
+    define CamFL.Preset.Wandschrank notify MelderTER:on.* set CamFL goPreset Wandschrank, ;; define CamFL.Preset.record at +00:00:10 set CamFL on 5 ;;;; define s3 at +*{3}00:00:05 set CamFL snap ;; define CamFL.Preset.back at +00:00:30 set CamFL goPreset Home
+  </pre>
+  
+  Funktionsweise: <br>
+  Der IR-Melder "MelderTER" registriert eine Bewegung. Daraufhin wird die Kamera CamFL in die Preset-Position "Wandschrank" gebracht. Eine Aufnahme mit Dauer von 5 Sekunden startet 10 Sekunden
+  später. Da die Voraufnahmezeit der Kamera 10s beträgt (vgl. Reading "CamPreRecTime"), startet die effektive Aufnahme wenn der Kameraschwenk beginnt. <br>
+  Mit dem Start der Aufnahme werden drei Schnappschüsse im Abstand von 5 Sekunden angefertigt. <br>
+  Nach einer Zeit von 30 Sekunden fährt die Kamera wieder zurück in die "Home"-Position. <br><br>
+  
+  Ein Auszug aus dem Log verdeutlicht den Ablauf:
+  
+  <pre>  
+   2016.02.04 15:02:14 2: CamFL - Camera Flur_Vorderhaus has moved to position "Wandschrank"
+   2016.02.04 15:02:24 2: CamFL - Camera Flur_Vorderhaus Recording with Recordtime 5s started
+   2016.02.04 15:02:29 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:30 2: CamFL - Camera Flur_Vorderhaus Recording stopped
+   2016.02.04 15:02:34 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:39 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:44 2: CamFL - Camera Flur_Vorderhaus has moved to position "Home"
+  </pre>
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b></li> <br>
+  
+  Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
+  Wird die Bewegungserkennung durch die Kamera / SVS ohne weitere Optionen eingestellt, werden die momentan gültigen Bewegungserkennungsparameter der 
+  Kamera / SVS beibehalten. Die erfolgreiche Ausführung der Operation lässt sich u.a. anhand des Status von SVS -&gt; IP-Kamera -&gt; Ereigniserkennung -&gt; 
+  Bewegung nachvollziehen. <br><br>
+  Für die Bewegungserkennung durch SVS bzw. durch Kamera können weitere Optionen angegeben werden. Die verfügbaren Optionen bezüglich der Bewegungserkennung 
+  durch SVS sind "Empfindlichkeit" und "Schwellwert". <br><br>
+  <ul>
+  <table>
+  <colgroup> <col width=50%> <col width=50%> </colgroup>
+      <tr><td>set <name> motdetsc SVS [Empfindlichkeit] [Schwellwert]  </td><td># Befehlsmuster  </td></tr>
+      <tr><td>set <name> motdetsc SVS 91 30                            </td><td># setzt die Empfindlichkeit auf 91 und den Schwellwert auf 30  </td></tr>
+      <tr><td>set <name> motdetsc SVS 0 40                             </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40  </td></tr>
+      <tr><td>set <name> motdetsc SVS 15                               </td><td># setzt die Empfindlichkeit auf 15, Schwellwert bleibt unverändert   </td></tr>
+  </table>
+  </ul>
+  <br><br>
+  
+  Wird die Bewegungserkennung durch die Kamera genutzt, stehen die Optionen "Empfindlichkeit", "Objektgröße" und "Prozentsatz für Auslösung" zur Verfügung. <br><br>
+  <ul>
+  <table>
+  <colgroup> <col width=50%> <col width=50%> </colgroup>
+      <tr><td>set <name> motdetsc camera [Empfindlichkeit] [Schwellwert] [Prozentsatz] </td><td># Befehlsmuster  </td></tr>
+      <tr><td>set <name> motdetsc camera 89 0 20                                       </td><td># setzt die Empfindlichkeit auf 89, Prozentsatz auf 20  </td></tr>
+      <tr><td>set <name> motdetsc camera 0 40 10                                      </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40, Prozentsatz auf 10  </td></tr>
+      <tr><td>set <name> motdetsc camera 30                                            </td><td># setzt die Empfindlichkeit auf 30, andere Werte bleiben unverändert  </td></tr>
+      </table>
+  </ul>
+  <br><br>
+
+  Es ist immer die Reihenfolge der Optionswerte zu beachten. Nicht gewünschte Optionen sind mit "0" zu besetzen sofern danach Optionen folgen 
+  deren Werte verändert werden sollen (siehe Beispiele oben). Der Zahlenwert der Optionen beträgt 1 - 99 (außer Sonderfall "0"). <br><br>
+  
+  Die jeweils verfügbaren Optionen unterliegen der Funktion der Kamera und der Unterstützung durch die SVS. Es können jeweils nur die Optionen genutzt werden die in 
+  SVS -&gt; Kamera bearbeiten -&gt; Ereigniserkennung zur Verfügung stehen. Weitere Infos sind der Online-Hilfe zur SVS zu entnehmen. <br><br>
+  
+  Über den Befehl "get ... caminfoall" wird auch das <a href="#SSCamreadings">Reading</a> "CamMotDetSc" aktualisiert welches die gegenwärtige Einstellung der Bewegungserkennung dokumentiert. 
+  Es werden nur die Parameter und Parameterwerte angezeigt, welche die SVS aktiv unterstützt. Die Kamera selbst kann weiterführende Einstellmöglichkeiten besitzen. <br><br>
+  
+  Beipiel:
+  <pre>
+  CamMotDetSc    SVS, sensitivity: 76, threshold: 55
+  </pre>
+  <br><br>
+  </ul>
+  
+  <ul>
   <li><b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [Sekunden] </b></li> <br>
   
   Mit diesem Kommando wird eine kontinuierliche Bewegung der PTZ-Kamera gestartet. Neben den vier Grundrichtungen up/down/left/right stehen auch 
@@ -5122,6 +5461,59 @@ sub experror {
     set &lt;name&gt; move dir_1 1.5   : bewegt PTZ 1,5 Sek. (zzgl. Prozesszeit) nach rechts-oben 
     set &lt;name&gt; move dir_20 0.7  : bewegt PTZ 1,5 Sek. (zzgl. Prozesszeit) nach links-unten ("CapPTZDirections = 32)"
   </pre>
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; [on | off] </b></li><br>
+
+  Der Befehl "set &lt;name&gt; on" startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem Attribut "rectime" individuell festgelegt werden. 
+  Die im Attribut (bzw. im Standard) hinterlegte Aufnahmedauer kann einmalig mit "set &lt;name&gt; on [rectime]" überschrieben werden.
+  Die Aufnahme stoppt automatisch nach Ablauf der Zeit "rectime".<br>
+
+  Ein Sonderfall ist der Start einer Daueraufnahme mit "set &lt;name&gt; on 0" bzw. dem Attributwert "rectime = 0". In diesem Fall wird eine Daueraufnahme gestartet die 
+  explizit wieder mit dem Befehl "set &lt;name&gt; off" gestoppt werden muß.<br>
+
+  Das Aufnahmeverhalten kann weiterhin mit dem Attribut "recextend" wie folgt beeinflusst werden.<br><br>
+
+  <b>Attribut "recextend = 0" bzw. nicht gesetzt (Standard):</b><br><br>
+  <ul>
+  <li> wird eine Aufnahme mit z.B. rectime=22 gestartet, wird kein weiterer Startbefehl für eine Aufnahme akzeptiert bis diese gestartete Aufnahme nach 22 Sekunden
+  beendet ist. Ein Hinweis wird bei verbose=3 im Logfile protokolliert. </li>
+  </ul>
+  <br>
+
+  <b>Attribut "recextend = 1" gesetzt:</b><br>
+  <ul>
+  <li> eine zuvor gestartete Aufnahme wird bei einem erneuten "set <name> on" -Befehl um die Aufnahmezeit "rectime" verlängert. Das bedeutet, dass der Timer für 
+  den automatischen Stop auf den Wert "rectime" neu gesetzt wird. Dieser Vorgang wiederholt sich mit jedem Start-Befehl. Dadurch verlängert sich eine laufende 
+  Aufnahme bis kein Start-Inpuls mehr registriert wird. </li>
+
+  <li> eine zuvor gestartete Endlos-Aufnahme wird mit einem erneuten "set <name> on"-Befehl nach der Aufnahmezeit "rectime" gestoppt (Timerneustart). Ist dies 
+  nicht gewünscht, ist darauf zu achten dass bei der Verwendung einer Endlos-Aufnahme das Attribut "recextend" nicht verwendet wird. </li>
+  </ul>
+  <br>
+  
+  Beispiele für einfachen <b>Start/Stop einer Aufnahme</b>: <br><br>
+
+  <table>
+  <colgroup> <col width=20%> <col width=80%> </colgroup>
+      <tr><td>set &lt;name&gt; on [rectime]  </td><td>startet die Aufnahme der Kamera &lt;name&gt;, automatischer Stop der Aufnahme nach Ablauf der Zeit [rectime] (default 15s oder wie im <a href="#SSCamattr">Attribut</a> "rectime" angegeben)</td></tr>
+      <tr><td>set &lt;name&gt; off   </td><td>stoppt die Aufnahme der Kamera &lt;name&gt;</td></tr>
+  </table>
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b></li> <br>
+  
+  Dieses Kommando startet die vordefinierterte Überwachungstour einer PTZ-Kamera. <br>
+  Die Überwachungstouren müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. 
+  Das geschieht in der PTZ-Steuerung im IP-Kamera Setup -&gt; PTZ-Steuerung -&gt; Überwachung.
+  Die Überwachungstouren (Patrols) werden über das Kommando "get &lt;name&gt; caminfoall" eingelesen, welches beim Restart von FHEM automatisch abgearbeitet wird. 
+  Der Einlesevorgang kann durch ein Kamerapolling regelmäßig wiederholt werden. Ein langes Pollingintervall ist in diesem Fall empfehlenswert, da sich die 
+  Überwachungstouren nur im Fall der Neuanlage bzw. Änderung verändern werden.
+  Nähere Informationen zur Anlage von Überwachungstouren sind in der Hilfe zur Surveillance Station enthalten. 
   </ul>
   <br><br>
   
@@ -5147,8 +5539,7 @@ sub experror {
     attr &lt;name&gt; htmlattr width="500" height="375" top="200" left="300"
   </pre>
     
-  Mit diesen Attributwerten öffnet der Link (mit Klick) als weiteres Fenster/Browsertab. Wird der Stream als live_fw gestartet, 
-  ändert sich die Größe entsprechend der Angaben von Width und Hight. <br>
+  Wird der Stream als live_fw gestartet, ändert sich die Größe entsprechend der Angaben von Width und Hight. <br>
   Das Kommando <b>"set &lt;name&gt; runView live_open"</b> startet den Livestreamlink sofort in einem neuen 
   Browserfenster (longpoll=1 muß für WEB gesetzt sein). 
   Dabei wird für jede aktive FHEM-Session eine Fensteröffnung initiiert. Soll dieses Verhalten geändert werden, kann 
@@ -5168,17 +5559,44 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b></li> <br>
+  <li><b> set &lt;name&gt; snap </b></li> <br>
   
-  Dieses Kommando triggert ein externes Ereignis (1-10) in der SVS. 
-  Die Aktionen, die dieses Ereignis auslöst, sind zuvor in dem Aktionsregeleditor der SVS einzustellen. Es stehen die Ereignisse 1-10 zur Verfügung.
-  In der Banchrichtigungs-App der SVS können auch Email, SMS oder Mobil (DS-Cam) Nachrichten ausgegeben werden wenn ein externes Ereignis ausgelöst wurde.
-  Nähere Informationen dazu sind in der Hilfe zum Aktionsregeleditor zu finden.
-  Der verwendete User benötigt Admin-Rechte in einer DSM-Session.
+  Ein <b>Schnappschuß</b> kann ausgelöst werden mit:
+  <pre> 
+     set &lt;name&gt; snap 
+  </pre>
+  
+  Nachfolgend einige Beispiele für die <b>Auslösung von Schnappschüssen</b>. <br><br>
+  
+  Soll eine Reihe von Schnappschüssen ausgelöst werden wenn eine Aufnahme startet, kann das z.B. durch folgendes notify geschehen. <br>
+  Sobald der Start der Kamera CamHE1 ausgelöst wird (Attribut event-on-change-reading -> "Record" setzen), werden abhängig davon 3 Snapshots im Abstand von 2 Sekunden getriggert.
+
+  <pre>
+     define he1_snap_3 notify CamHE1:Record.*Start define h3 at +*{3}00:00:02 set CamHE1 snap
+  </pre>
+  
+  Triggern von 2 Schnappschüssen der Kamera "CamHE1" im Abstand von 6 Sekunden nachdem der Bewegungsmelder "MelderHE1" einen Event gesendet hat, <br>
+  kann z.B. mit folgendem notify geschehen:
+
+  <pre>
+     define he1_snap_2 notify MelderHE1:on.* define h2 at +*{2}00:00:06 set CamHE1 snap 
+  </pre>
+
+  Es wird die ID und der Filename des letzten Snapshots als Wert der Variable "LastSnapId" bzw. "LastSnapFilename" in den Readings der Kamera ausgegeben. <br><br>
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; snapGallery [1-10] </b></li> <br>
+  
+  Der Befehl ist nur vorhanden wenn das Attribut "snapGalleryBoost=1" gesetzt wurde.
+  Er erzeugt eine Ausgabe der letzten [x] Schnappschüsse ebenso wie "get ... snapGallery".  Abweichend von "get" wird mit Attribut
+  <a href="#SSCamattr">Attribut</a> "snapGalleryBoost=1" kein Popup erzeugt, sondern die Schnappschußgalerie als Browserseite
+  dargestellt. Alle weiteren Funktionen und Attribute entsprechen dem <a href="#SSCamget">"get ... snapGallery"</a> Kommando.
   </ul>
   <br><br>
 
-</ul>
+  </ul>
   <br>
 
 <a name="SSCamget"></a>
@@ -5191,6 +5609,7 @@ sub experror {
       get &lt;name&gt; eventlist
       get &lt;name&gt; scanVirgin
       get &lt;name&gt; snapfileinfo
+      get &lt;name&gt; snapGallery
       get &lt;name&gt; snapinfo
       get &lt;name&gt; stmUrlPath
       get &lt;name&gt; svsinfo
@@ -5229,6 +5648,32 @@ sub experror {
   eingelesen.  
   </ul>
   <br><br> 
+  
+  <ul>
+  <li><b> get &lt;name&gt; snapGallery [1-10] </b></li> <br>
+  
+  Es wird ein Popup mit den letzten [x] Schnapschüssen erzeugt. Ist das <a href="#SSCamattr">Attribut</a> "snapGalleryBoost" gesetzt, 
+  werden die letzten Schnappschüsse (default 3) über Polling abgefragt und im Speicher gehalten. Das Verfahren hilft die Ausgabe zu beschleunigen,
+  kann aber möglicherweise nicht den letzten Schnappschuß anzeigen, falls dieser NICHT über das Modul ausgelöst wurde.
+  
+  Zur weiteren Steuerung dieser Funktion stehen die <a href="#SSCamattr">Attribute</a>: <br><br>
+  
+  <ul>
+     <li>snapGalleryBoost   </li> 
+	 <li>snapGalleryColumns   </li> 
+	 <li>snapGalleryHtmlAttr   </li> 
+	 <li>snapGalleryNumber   </li> 
+	 <li>snapGallerySize   </li> 
+  </ul> <br>
+  zur Verfügung.
+  </ul> <br>
+  
+        <ul>
+		<b>Hinweis:</b><br>
+        Abhängig von der Anzahl und Auflösung (Qualität) der Schnappschuß-Images werden entsprechende ausreichende CPU und/oder
+		RAM-Ressourcen benötigt.
+        </ul>
+		<br><br>
   
   <ul>
   <li><b> get &lt;name&gt; snapinfo </b></li> <br>
@@ -5382,9 +5827,39 @@ sub experror {
     (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS </li><br>
   
   <li><b>simu_SVSversion</b><br>
-    simuliert eine andere SVS-Version. (es ist nur eine niedrigere als die installierte SVS 
+    Simuliert eine andere SVS-Version. (es ist nur eine niedrigere als die installierte SVS 
     Version möglich !) </li><br>
+	
+  <li><b>snapGalleryBoost</b><br>
+    Wenn gesetzt, werden die letzten Schnappschüsse (default 3) über Polling im Speicher gehalten und mit "set/get snapGallery" 
+	aufbereitet angezeigt. Dieser Modus bietet sich an wenn viele bzw. Fullsize Images angezeigt werden sollen. 
+	Ist das Attribut eingeschaltet, können bei "set/get snapGallery" keine Argumente mehr mitgegeben werden. 
+    (siehe Attribut "snapGalleryNumber") </li><br>
   
+  <li><b>snapGalleryColumns</b><br>
+    Die Anzahl der Snaps die in einer Reihe im Popup erscheinen sollen (default 3). </li><br>
+	
+  <li><b>snapGalleryHtmlAttr</b><br>
+    hiermit kann die Bilddarstellung beeinflusst werden. <br>
+	Ist das Attribut nicht gesetzt, wird das Attribut "htmlattr" verwendet. <br>
+	Ist auch dieses nicht gesetzt, wird eine Standardvorgabe verwendet (width="500" height="325"). <br><br>
+	
+        <ul>
+		<b>Beispiel:</b><br>
+        attr &lt;name&gt; snapGalleryHtmlAttr width="325" height="225"
+        </ul>
+		<br>
+        </li>
+		
+  <li><b>snapGalleryNumber</b><br>
+    Die Anzahl der abzurufenden Schnappschüsse (default 3). </li><br>
+	
+  <li><b>snapGallerySize</b><br>
+     Mit diesem Attribut kann die Qualität der Images eingestellt werden (default "Icon"). <br>
+	 Im Modus "Full" wird die original vorhandene Auflösung der Images abgerufen. Dies erfordert mehr Ressourcen und kann die 
+	 Anzeige verlangsamen. Mit "snapGalleryBoost=1" kann die Ausgabe beschleunigt werden, da in diesem Fall die Aufnahmen über 
+	 Polling abgerufen und nur noch zur Anzeige gebracht werden. </li><br>
+	
   <li><b>showStmInfoFull</b><br>
     zusaätzliche Streaminformationen wie LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp werden 
     ausgegeben</li><br>
@@ -5489,4 +5964,3 @@ sub experror {
 
 =end html_DE
 =cut
-
