@@ -979,7 +979,7 @@ sub Spotify_isDisabled($) {
 <ul>
   The <i>Spotify</i> module enables you to control your Spotify (Connect) playback.<br>
   To be able to control your music, you need to authorize with the Spotify WEB API. To do that, a <a target="_blank" rel="nofollow" href="https://developer.spotify.com/my-applications/#!/applications/create">Spotify API application</a> is required.<br>
-  While creating the app, enter any <i>redirect_uri</i>. By default the module will use https://oskar.pw/ as <i>redirect_uri</i> since the site outputs your temporary authentification code.<br>
+  While creating the app, enter any <i>redirect_uri</i>. By default the module will use <a href="https://oskar.pw/" target="_blank">https://oskar.pw/</a> as <i>redirect_uri</i> since the site outputs your temporary authentification code.<br>
   It is safe to rely on this site because the code is useless without your client secret and only valid for a few minutes (important: you have to press the <b>add</b> and <b>save</b> button while adding the url).<br>
   If you want to use it, make sure to add it as <i>redirect_uri</i> to your app - however, you are free to use any other url and extract the code after signing in yourself.<br>
   <br>
@@ -994,7 +994,7 @@ sub Spotify_isDisabled($) {
   </ul>
   <br>
   Once defined, open up your browser and call the URL displayed in <i>AUTHORIZATION_URL</i>, sign in with spotify and extract the code after being redirected.<br>
-  If you get a <b>redirect_uri mismatch</b> make sure to either add https://oskar.pw/ as redirect url or that your url <b>matches exactly</b> with the one defined.<br>
+  If you get a <b>redirect_uri mismatch</b> make sure to either add <a href="https://oskar.pw/" target="_blank">https://oskar.pw/</a> as redirect url or that your url <b>matches exactly</b> with the one defined.<br>
   As soon as you obtained the code call <code>set &lt;name&gt; code &lt;code&gt;</code> - your state should change to connected and you are ready to go.<br>
 
   <br>
@@ -1148,7 +1148,7 @@ sub Spotify_isDisabled($) {
 <ul>
   Das <i>Spotify</i> Modul ermöglicht die Steuerung von Spotify (Connect).<br>
   Um die Wiedergabe zu steuern, wird die Spotify WEB API verwendet. Dafür wird eine eigene <a target="_blank" rel="nofollow" href="https://developer.spotify.com/my-applications/#!/applications/create">Spotify API application</a> benötigt.<br>
-  Während der Erstellung muss eine <i>redirect_uri</i> angegeben - standardmäßig wird vom Modul https://oskar.pw/ verwendet, da diese Seite nach der Anmeldung den Code in leserlicher Form ausgibt.<br>
+  Während der Erstellung muss eine <i>redirect_uri</i> angegeben - standardmäßig wird vom Modul <a href="https://oskar.pw/" target="_blank">https://oskar.pw/</a> verwendet, da diese Seite nach der Anmeldung den Code in leserlicher Form ausgibt.<br>
   Die Seite kann bedenkenlos verwendet werden, da der Code ohne <i>client_secret</i> nutzlos und nur wenige Minuten gültig ist.<br>
   Wenn du diese verwenden willst, stelle sicher, diese bei der Erstellung anzugeben (wichtig: das Hinzufügen der URL muss mit <b>add</b> und <b>save</b> bestätigt werden), ansonsten kann jede beliebige andere Seite verwendet werden und der Code aus der URL extrahiert werden.<br>
   <br>
@@ -1163,7 +1163,7 @@ sub Spotify_isDisabled($) {
   </ul>
   <br>
   Sobald das Gerät angelegt wurde, muss die <i>AUTHORIZATION_URL</i> im Browser geöffnet werden und die Anmeldung mit Spotify erfolgen.<br>
-  Sollte der Fehler <b>redirect_uri mismatch</b> auftauchen, stelle sicher, dass https://oskar.pw/ als <i>redirect_uri</i> hinzugefügt wurde oder die verwendete URL <b>exakt übereinstimmt</b>.<br>
+  Sollte der Fehler <b>redirect_uri mismatch</b> auftauchen, stelle sicher, dass <a href="https://oskar.pw/" target="_blank">https://oskar.pw/</a> als <i>redirect_uri</i> hinzugefügt wurde oder die verwendete URL <b>exakt übereinstimmt</b>.<br>
   Sobald der Anmeldecode ermittelt wurde, führe folgenden Befehl aus: <code>set &lt;name&gt; code &lt;code&gt;</code> - der Status sollte nun auf connected wechseln und das Gerät ist einsatzbereit.<br>
 
   <br>
