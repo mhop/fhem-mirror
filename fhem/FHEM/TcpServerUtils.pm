@@ -125,7 +125,7 @@ TcpServer_Accept($$)
       && $err ne "Socket is not connected") {
       $err = "" if(!$err);
       $err .= " ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr());
-      Log3 $name, 1, "$type SSL/HTTPS error: $err"
+      Log3 $name, 1, "$type SSL/HTTPS error: $err (peer: $caddr)"
         if($err !~ m/error:00000000:lib.0.:func.0.:reason.0./); #Forum 56364
       close($clientinfo[0]);
       return undef;
