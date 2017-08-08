@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.1.5";
+my $HOMEMODE_version = "1.1.6";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -2984,7 +2984,7 @@ sub HOMEMODE_Details($$$)
   $html .= "var t=\$(this).find(\".homeinfo\").text();";
   $html .= "var id=\$(this).find(\".homeinfo\").attr(\"informid\");";
   $html .= "var r=id.split(\"-\")[1];";
-  $html .= "\$(\".homeinfopanel\").text(t).attr(\"informid\",id);";
+  $html .= "\$(\".homeinfopanel\").text(t).attr(\"informid\",r);";
   $html .= "if(r){\$.post(window.location.pathname+\"?cmd=setreading%20$name%20lastInfo%20\"+r+\"$FW_CSRF\")};";
   $html .= "});</script>";
   return $html;
