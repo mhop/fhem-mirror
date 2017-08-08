@@ -2933,7 +2933,7 @@ sub HOMEMODE_Details($$$)
   my $info = ReadingsVal($name,$iid,"");
   my $html = "<div>";
   $html .= "<style>.homehover{cursor:pointer}.homeinfo{display:none}.tar{text-align:right}.homeinfopanel{min-height:30px;max-width:480px;padding:3px 10px}</style>";
-  $html .= "<div class=\"homeinfopanel\" informid=\"$iid\">$info</div>";
+  $html .= "<div class=\"homeinfopanel\" informid=\"$name-$iid\">$info</div>";
   $html .= "<table class=\"wide\">";
   if (AttrVal($name,"HomeYahooWeatherDevice",""))
   {
@@ -2984,7 +2984,7 @@ sub HOMEMODE_Details($$$)
   $html .= "var t=\$(this).find(\".homeinfo\").text();";
   $html .= "var id=\$(this).find(\".homeinfo\").attr(\"informid\");";
   $html .= "var r=id.split(\"-\")[1];";
-  $html .= "\$(\".homeinfopanel\").text(t).attr(\"informid\",r);";
+  $html .= "\$(\".homeinfopanel\").text(t).attr(\"informid\",id);";
   $html .= "if(r){\$.post(window.location.pathname+\"?cmd=setreading%20$name%20lastInfo%20\"+r+\"$FW_CSRF\")};";
   $html .= "});</script>";
   return $html;
