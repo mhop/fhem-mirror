@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.1     07.08.2017       attribute "suppressAddLogV3" to suppress verbose3-logentries created by DbLog_AddLog 
 # 2.22.0     25.07.2017       attribute "addStateEvent" added
 # 2.21.3     24.07.2017       commandref revised
 # 2.21.2     19.07.2017       changed readCfg to report more error-messages
@@ -143,7 +144,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.0";
+my $DbLogVersion = "2.22.1";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -182,6 +183,7 @@ sub DbLog_Initialize($)
 							  "syncInterval ".
 							  "noNotifyDev:1,0 ".
 							  "showproctime:1,0 ".
+							  "suppressAddLogV3:1,0 ".
 							  "asyncMode:1,0 ".
 							  "cacheEvents:2,1,0 ".
 							  "cacheLimit ".
@@ -3213,7 +3215,8 @@ sub DbLog_AddLog($$$) {
           ($dev_name,$dev_type,$event,$dev_reading,$read_val,$ut) = DbLog_cutCol($hash,$dev_name,$dev_type,$event,$dev_reading,$read_val,$ut);
   
           my $row = ($ts."|".$dev_name."|".$dev_type."|".$event."|".$dev_reading."|".$read_val."|".$ut);
-          Log3 $hash->{NAME}, 3, "DbLog $name -> addLog created - TS: $ts, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $dev_reading, Value: $read_val, Unit: $ut";
+          Log3 $hash->{NAME}, 3, "DbLog $name -> addLog created - TS: $ts, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $dev_reading, Value: $read_val, Unit: $ut"
+		      if(!AttrVal($name, "suppressAddLogV3",0));
   
           if($async) {
               # asynchoner non-blocking Mode
@@ -5162,6 +5165,16 @@ sub checkUsePK ($$){
   </ul>
   <br>
   
+  <ul><b>suppressAddLogV3</b>
+    <ul>
+	  <code>attr &lt;device&gt; suppressAddLogV3 [1|0]
+	  </code><br>
+	  
+      If set, verbose3-Logfileentries done by the addLog-function will be suppressed.  <br>
+    </ul>
+  </ul>
+  <br>
+  
   <ul><b>suppressUndef</b>
     <ul>
 	  <code>
@@ -6031,6 +6044,16 @@ sub checkUsePK ($$){
       Wenn DbLog im asynchronen Modus betrieben wird (Attribut asyncMode=1), wird mit diesem Attribut das Intervall in Sekunden zur Speicherung
 	  der im Speicher gecachten Events in die Datenbank eingestellt. Der Defaultwert ist 30 Sekunden. <br>
 	  
+    </ul>
+  </ul>
+  <br>
+  
+  <ul><b>suppressAddLogV3</b>
+    <ul>
+	  <code>attr &lt;device&gt; suppressAddLogV3 [1|0]
+	  </code><br>
+	  
+      Wenn gesetzt werden verbose3-Logeinträge durch die addLog-Funktion unterdrückt.  <br>
     </ul>
   </ul>
   <br>
