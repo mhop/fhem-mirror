@@ -11,6 +11,7 @@
 # required packets
 # libcrypt-pbkdf2-perl
 # Net::MQTT
+# libcpan-meta-yaml-perl
 
 package main;
 
@@ -137,14 +138,14 @@ sub Nello_Attr(@) {
 
     if($attrName eq 'deviceID' && $init_done) {
         my $bridge = 'Nello_MQTT';
-        if(!internalExists($bridge, "TYPE")) {
+        if(!defined InternalVal($bridge, "TYPE", undef)) {
             CommandDefine(undef, $bridge . ' MQTT ec2-35-157-44-19.eu-central-1.compute.amazonaws.com:1883');
             CommandAttr(undef, $bridge . ' room hidden');
             CommandSave(undef, undef);
         }
 
         my $eventdevice = 'Nello_Events';
-        if(!internalExists($eventdevice, 'TYPE')) {
+        if(!defined InternalVal($eventdevice, 'TYPE', undef)) {
             CommandDefine(undef, $eventdevice . ' MQTT_DEVICE');
             CommandAttr(undef, $eventdevice . ' room hidden');
             CommandAttr(undef, $eventdevice . ' IODEV '. $bridge);
@@ -512,6 +513,7 @@ sub Nello_detectExecute {
   <p><b>Required Packages</b></p>
   <code>
   sudo apt-get install libcrypt-pbkdf2-perl<br>
+  sudo apt-get install libcpan-meta-yaml-perl<br>
   sudo cpan -i Net::MQTT::Simple
   </code>
   <br>
@@ -587,6 +589,7 @@ sub Nello_detectExecute {
   <p><b>Benötigte Pakete</b></p>
   <code>
   sudo apt-get install libcrypt-pbkdf2-perl<br>
+  sudo apt-get install libcpan-meta-yaml-perl<br>
   sudo cpan -i Net::MQTT::Simple
   </code>
   <br>
