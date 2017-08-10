@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - bugfix: 31_Nello: fixed device ID detection
+  - feature: 74_AMADDevice: 4.0.5 - Support für NFC and scanning NFC TagId
+  - bugfix:  74_AMADautomagicFlowset_4.0.2.xml: fix openApp Trigger
+  - bugfix:  31_Nello: fixed device ID detection
   - feature: 93_DbLog: V2.22.1, new attribute "suppressAddLogV3"
   - feature: 49_SSCam: V2.6.1, new commands snapGallery, createSnapGallery and
                        corresponding attributes

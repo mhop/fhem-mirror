@@ -5,6 +5,10 @@
 #  (c) 2015-2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
+#   Special thanks goes to comitters:
+#       - Jens Wohlgemuth       Thanks for Commandref
+#
+#
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
@@ -54,8 +58,8 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.3";
-my $flowsetversion = "4.0.1";
+my $modulversion = "4.0.5";
+my $flowsetversion = "4.0.2";
 
 
 
@@ -379,15 +383,18 @@ sub AMADDevice_WriteReadings($$) {
         $v =~ s/\bnull\b//g;
         $v = encode_utf8($v);
         
-        readingsBulkUpdateIfChanged($hash, $t, $v, 1) if( defined( $v ) and ($t ne 'deviceState'
+        readingsBulkUpdateIfChanged($hash, $t, $v, 1)   if( defined( $v ) and ($t ne 'deviceState'
                                                             or $t ne 'incomingCallerName'
-                                                            or $t ne 'incomingCallerNumber')
+                                                            or $t ne 'incomingCallerNumber'
+                                                            or $t ne 'nfcLastTagID')
                                                         );
 
         readingsBulkUpdateIfChanged( $hash, $t, ($v / AttrVal($name,'setVolFactor',1)) ) if( $t eq 'volume' and AttrVal($name,'setVolFactor',1) > 1 );
         readingsBulkUpdate( $hash, '.'.$t, $v ) if( $t eq 'deviceState' );
-        readingsBulkUpdate( $hash, $t, $v ) if( $t eq 'incomingCallerName' );
-        readingsBulkUpdate( $hash, $t, $v ) if( $t eq 'incomingCallerNumber' );
+        readingsBulkUpdate( $hash, $t, $v ) if( $t eq 'incomingCallerName'
+                                                    or $t eq 'incomingCallerNumber'
+                                                    or $t eq 'nfcLastTagID'
+                                            );
     }
     
     readingsBulkUpdateIfChanged( $hash, "deviceState", "offline", 1 ) if( $decode_json->{payload}{airplanemode} && $decode_json->{payload}{airplanemode} eq "on" );
@@ -622,7 +629,15 @@ sub AMADDevice_Set($$@) {
     
         my $app = join( " ", @args );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/openApp?app=$app";
+        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/openApp?app=".$app;
+        $method = "POST";
+    }
+    
+    elsif( lc $cmd eq 'nfc' ) {
+    
+        my $mod = join( " ", @args );
+
+        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setnfc?nfc=".$mod;
         $method = "POST";
     }
     
@@ -685,6 +700,12 @@ sub AMADDevice_Set($$@) {
     elsif( lc $cmd eq 'vibrate' ) {
 
         $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setvibrate";
+        $method = "POST";
+    }
+    
+    elsif( lc $cmd eq 'showhomescreen' ) {
+
+        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/showhomescreen";
         $method = "POST";
     }
     
@@ -753,13 +774,14 @@ sub AMADDevice_Set($$@) {
         my $btdev = AttrVal( $name, "setBluetoothDevice", "none" );
         
         
-        my $list = "screenMsg ttsMsg mediaGoogleMusic:play/pause,stop,next,back mediaSamsungMusic:play/pause,stop,next,back mediaAmazonMusic:play/pause,stop,next,back mediaSpotifyMusic:play/pause,stop,next,back mediaTuneinRadio:play/pause,stop,next,back mediaAldiMusic:play/pause,stop,next,back mediaYouTube:play/pause,stop,next,back mediaVlcPlayer:play/pause,stop,next,back mediaAudible:play/pause,stop,next,back screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off";
+        my $list = "screenMsg ttsMsg mediaGoogleMusic:play/pause,stop,next,back mediaSamsungMusic:play/pause,stop,next,back mediaAmazonMusic:play/pause,stop,next,back mediaSpotifyMusic:play/pause,stop,next,back mediaTuneinRadio:play/pause,stop,next,back mediaAldiMusic:play/pause,stop,next,back mediaYouTube:play/pause,stop,next,back mediaVlcPlayer:play/pause,stop,next,back mediaAudible:play/pause,stop,next,back screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg";
 
         $list .= " screenOrientation:auto,landscape,portrait"   if( AttrVal( $name, "setScreenOrientation", "0" ) eq "1" );
         $list .= " screenFullscreen:on,off"                     if( AttrVal( $name, "setFullscreen", "0" ) eq "1" );
         $list .= " openApp:$apps"                               if( AttrVal( $name, "setOpenApp", "none" ) ne "none" );
         $list .= " system:reboot,shutdown,airplanemodeON"       if( AttrVal( $name, "root", "0" ) eq "1" );
         $list .= " changetoBTDevice:$btdev"                     if( AttrVal( $name, "setBluetoothDevice", "none" ) ne "none" );
+        $list .= " nfc:on,off"                                  if( AttrVal( $name, "root", "0" ) eq "1" );
         $list .= " volume:slider,0,1,$volMax";
         $list .= " volumeNotification:slider,0,1,$notifyVolMax";
         $list .= " volumeRingSound:slider,0,1,$ringSoundVolMax";
@@ -955,6 +977,8 @@ sub AMADDevice_decrypt($) {
     <li>nextAlarmDay - currently set day of alarm</li>
     <li>nextAlarmState - alert/done, current state of "Clock" stock-app</li>
     <li>nextAlarmTime - currently set time of alarm</li>
+    <li>nfc - state of nfc service on/off</li>
+    <li>nfcLastTagID - nfc_id of last scan nfc Tag / In order for the ID to be recognized correctly, the trigger NFC TagIDs must be processed in Flow NFC Tag Support and the TagId's Commase-separated must be entered.</li>
     <li>powerLevel - state of battery in %</li>
     <li>powerPlugged - 0=no/1,2=yes, power supply connected</li>
     <li>screen - on locked,unlocked/off locked,unlocked, state of display</li>
@@ -1010,6 +1034,7 @@ sub AMADDevice_decrypt($) {
   <b>Set (depending on attribute values)</b>
   <ul>
     <li>changetoBtDevice - switch to another bluetooth device. <b>Attribute setBluetoothDevice needs to be set. See note below!</b></li>
+    <li>nfc - activate or deactivate the nfc Modul on/off. <b>attribute root</b></li>
     <li>openApp - start an app. <b>attribute setOpenApp</b></li>
     <li>openURL - opens a URLS in the standard browser as long as no other browser is set by the <b>attribute setOpenUrlBrowser</b>.<b>Example:</b><i> attr Tablet setOpenUrlBrowser de.ozerov.fully|de.ozerov.fully.MainActivity, first parameter: package name, second parameter: Class Name</i></li>
     <li>screen - on/off/lock/unlock, switch screen on/off or lock/unlock screen. In Automagic "Preferences" the "Device admin functions" need to be enabled, otherwise "Screen off" does not work. <b>attribute setScreenOnForTimer</b> changes the time the display remains switched on!</li>
@@ -1121,6 +1146,8 @@ sub AMADDevice_decrypt($) {
     <li>nextAlarmDay - aktiver Alarmtag</li>
     <li>nextAlarmState - aktueller Status des <i>"Androidinternen"</i> Weckers</li>
     <li>nextAlarmTime - aktive Alarmzeit</li>
+    <li>nfc - Status des NFC on/off</li>
+    <li>nfcLastTagID - nfc_id des zu letzt gescannten Tag's / Damit die ID korrekt erkannt wird muss im Flow NFC Tag Support der Trigger NFC TagIDs bearbeitet werden und die TagId's Kommasepariert eingetragen werden.</li>
     <li>powerLevel - Status der Batterie in %</li>
     <li>powerPlugged - Netzteil angeschlossen? 0=NEIN, 1|2=JA</li>
     <li>screen - on locked/unlocked, off locked/unlocked gibt an ob der Bildschirm an oder aus ist und gleichzeitig gesperrt oder nicht gesperrt</li>
@@ -1178,6 +1205,7 @@ sub AMADDevice_decrypt($) {
   <ul>
     <li>changetoBtDevice - wechselt zu einem anderen Bluetooth Ger&auml;t. <b>Attribut setBluetoothDevice mu&szlig; gesetzt sein. Siehe Hinweis unten!</b></li>
     <li>notifySndFile - spielt die angegebene Mediadatei auf dem Androidger&auml;t ab. <b>Die aufzurufende Mediadatei sollte sich im Ordner /storage/emulated/0/Notifications/ befinden. Ist dies nicht der Fall kann man &uuml;ber das Attribut setNotifySndFilePath einen Pfad vorgeben.</b></li>
+    <li>nfc -  schaltet nfc an oder aus /on/off<b>Attribut root</b></li>
     <li>openApp - &ouml;ffnet eine ausgew&auml;hlte App. <b>Attribut setOpenApp</b></li>
     <li>openURL - &ouml;ffnet eine URL im Standardbrowser, sofern kein anderer Browser &uuml;ber das <b>Attribut setOpenUrlBrowser</b> ausgew&auml;hlt wurde.<b> Bsp:</b><i> attr Tablet setOpenUrlBrowser de.ozerov.fully|de.ozerov.fully.MainActivity, das erste ist der Package Name und das zweite der Class Name</i></li>
     <li>setAPSSID - setzt die AccessPoint SSID um ein WLAN sleep zu verhindern</li>
