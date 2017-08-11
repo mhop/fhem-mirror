@@ -1,4 +1,3 @@
-
 ##############################################
 # $Id$
 
@@ -56,13 +55,14 @@ TCM_Initialize($)
 
 # Normal devices
   $hash->{DefFn}    = "TCM_Define";
+  $hash->{FingerprintFn} = "TCM_Fingerprint";
   $hash->{UndefFn}  = "TCM_Undef";
   $hash->{GetFn}    = "TCM_Get";
   $hash->{SetFn}    = "TCM_Set";
   $hash->{NotifyFn} = "TCM_Notify";
   $hash->{AttrFn}   = "TCM_Attr";
   $hash->{AttrList} = "baseID blockSenderID:own,no comModeUTE:auto,biDir,uniDir comType:TCM,RS485 do_not_notify:1,0 " .
-                      "dummy:1,0 learningMode:always,demand,nearfield " .
+                      "dummy:1,0 fingerprint:off,on learningMode:always,demand,nearfield " .
                       "sendInterval:0,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
                       "smartAckLearnMode:simple,advance,advanceSelectRep";
 }
@@ -204,6 +204,48 @@ TCM_InitSerialCom($)
   readingsSingleUpdate($hash, "state", "initialized", 1);
   Log3 $name, 2, "TCM $name initialized";
   return undef;
+}
+
+sub
+TCM_Fingerprint($$)
+{
+  my ($IODev, $msg) = @_;
+  return  ($IODev, $msg) if (AttrVal($IODev, "fingerprint", 'off') eq 'off');
+  my @msg = split(":", $msg);
+
+  if ($msg[1] == 1) {
+    #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
+    substr($msg[5], 1, 1, "0");
+    substr($msg[6], 0, 2, "01");
+    substr($msg[6], 10, 4, "0000");
+  } elsif ($msg[1] == 2) {
+    #EnOcean:PacketType:ResposeCode:MessageData:OptionalData
+
+  } elsif ($msg[1] == 3) {
+
+  } elsif ($msg[1] == 4) {
+    #EnOcean:PacketType:eventCode:MessageData
+
+  } elsif ($msg[1] == 5) {
+
+  } elsif ($msg[1] == 6) {
+    #EnOcean:PacketType:smartAckCode:MessageData
+
+  } elsif ($msg[1] == 7) {
+    #EnOcean:PacketType:RORG:MessageData:SourceID:DestinationID:FunctionNumber:ManufacturerID:RSSI:Delay
+    substr($msg[8], 0, 2, "00");
+    substr($msg[9], 0, 2, "00");
+  } elsif ($msg[1] == 9) {
+
+  } elsif ($msg[1] == 10) {
+
+  } else {
+
+  }
+
+  $msg = join(":", @msg);
+  #Log3 $IODev, 2, "TCM $IODev <TCM_Fingerprint> PacketType: $msg[1] Data: $msg";
+  return ($IODev, $msg);
 }
 
 # Write
@@ -1165,6 +1207,14 @@ sub TCM_Attr(@) {
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
+  } elsif ($attrName eq "fingerprint") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^off|on$/) {
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
   } elsif ($attrName eq "learningMode") {
     if (!defined $attrVal){
 
@@ -1446,6 +1496,11 @@ TCM_Undef($$)
     <li><a name="TCM_baseID">baseID</a> &lt;FF800000 ... FFFFFF80&gt;,
       [baseID] = <none> is default.<br>
       Set Transceiver baseID and override automatic allocation. Use this attribute only if the IODev does not allow automatic allocation.
+    </li>
+    <li><a name="TCM_fingerprint">fingerprint</a> &lt;off|on&gt;,
+      [fingerprint] = off is default.<br>
+      Activate the fingerprint function. The fingerprint function eliminates multiple identical data telegrams received via different TCM modules.<br>
+      The function must be activated for each TCM module.
     </li>
     <li><a name="TCM_comModeUTE">comModeUTE</a> &lt;auto|biDir|uniDir&gt;,
       [comModeUTE] = auto is default.<br>
