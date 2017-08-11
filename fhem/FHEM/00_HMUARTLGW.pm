@@ -146,6 +146,7 @@ sub HMUARTLGW_Initialize($)
 	$hash->{SetFn}     = "HMUARTLGW_Set";
 	$hash->{GetFn}     = "HMUARTLGW_Get";
 	$hash->{AttrFn}    = "HMUARTLGW_Attr";
+	$hash->{RenameFn}  = "HMUARTLGW_Rename";
 	$hash->{ShutdownFn}= "HMUARTLGW_Shutdown";
 
 
@@ -171,6 +172,7 @@ sub HMUARTLGW_GetSetParameterReq($);
 sub HMUARTLGW_getAesKeys($);
 sub HMUARTLGW_updateMsgLoad($$);
 sub HMUARTLGW_Read($);
+sub HMUARTLGW_RemoveHMPair($);
 sub HMUARTLGW_send($$$;$);
 sub HMUARTLGW_send_frame($$);
 sub HMUARTLGW_crc16($;$);
@@ -265,9 +267,10 @@ sub HMUARTLGW_Define($$)
 			$dev .= "\@115200";
 		}
 		$hash->{DevType} = "UART";
+		$hash->{model} = "HM-MOD-UART";
 		readingsBeginUpdate($hash);
 		delete($hash->{READINGS}{"D-LANfirmware"});
-		readingsBulkUpdate($hash, "D-type", "HM-MOD-UART");
+		readingsBulkUpdate($hash, "D-type", $hash->{model});
 		readingsEndUpdate($hash, 1);
 	}
 
@@ -288,6 +291,7 @@ sub HMUARTLGW_Undefine($$;$)
 
 	RemoveInternalTimer($hash);
 	RemoveInternalTimer("HMUARTLGW_CheckCredits:$name");
+	RemoveInternalTimer("hmPairForSec:$name");
 	if ($hash->{keepAlive}) {
 		RemoveInternalTimer($hash->{keepAlive});
 		DevIo_CloseDev($hash->{keepAlive});
@@ -339,6 +343,21 @@ sub HMUARTLGW_Ready($)
 	return 0;
 }
 
+sub HMUARTLGW_Rename($$)
+{
+	my ($name, $old_name) = @_;
+	my $hash = $defs{$name};
+
+	if (defined($hash->{Helper}{Initialized})) {
+		RemoveInternalTimer("HMUARTLGW_CheckCredits:${old_name}");
+		InternalTimer(gettimeofday()+1, "HMUARTLGW_CheckCredits", "HMUARTLGW_CheckCredits:${name}", 1);
+	}
+
+	if ($hash->{hmPair}) {
+		HMUARTLGW_RemoveHMPair("hmPairForSec:${old_name}");
+	}
+}
+
 sub HMUARTLGW_Shutdown($)
 {
 	my ($hash) = @_;
@@ -374,6 +393,7 @@ sub HMUARTLGW_LGW_Init($)
 			$hash->{CNT} = hex($1);
 
 			if ($hash->{DevType} eq "LGW") {
+				$hash->{model} = $2;
 				readingsBeginUpdate($hash);
 				readingsBulkUpdate($hash, "D-type", $2);
 				readingsBulkUpdate($hash, "D-serialNr", $4);
