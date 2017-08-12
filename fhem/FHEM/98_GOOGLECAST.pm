@@ -15,6 +15,11 @@
 # - CHANGE:   renamed to 98_GOOGLECAST.pm
 # - CHANGE:   removed favoriteName_X attribute, it was never used
 # - BUGFIX:   updated commandref with further required packages
+# - FEATURE:  state reading now represents status (online, offline,
+#               playing, paused, buffering)
+# - FEATURE:  new readings mediaContentId, mediaCurrentPosition,
+#               mediaDuration, mediaPlayerState, mediaStreamType
+# - BUGFIX:   change volume to represent integer values only
 #
 # v1.0.7 - 20170804
 # - BUGFIX:  fix reconnection in some cases
@@ -505,6 +510,11 @@ sub GOOGLECAST_Read {
     my $newStatus = $hash->{helper}{ccdevice}->{media_controller}->{status};
     if(defined($newStatus)) {
         #GOOGLECAST_updateReading($hash, "mediaStatus", $newStatus);
+        GOOGLECAST_updateReading($hash, "mediaPlayerState", $newStatus->{player_state});
+        GOOGLECAST_updateReading($hash, "mediaContentId", $newStatus->{content_id});
+        GOOGLECAST_updateReading($hash, "mediaDuration", $newStatus->{duration});
+        GOOGLECAST_updateReading($hash, "mediaCurrentPosition", $newStatus->{current_time});
+        GOOGLECAST_updateReading($hash, "mediaStreamType", $newStatus->{stream_type});
         GOOGLECAST_updateReading($hash, "mediaTitle", $newStatus->{title});
         GOOGLECAST_updateReading($hash, "mediaSeriesTitle", $newStatus->{series_title});
         GOOGLECAST_updateReading($hash, "mediaSeason", $newStatus->{season});
@@ -523,7 +533,18 @@ sub GOOGLECAST_Read {
     my $newCastStatus = $hash->{helper}{ccdevice}->{status};
     if(defined($newCastStatus)) {
         #GOOGLECAST_updateReading($hash, "castStatus", $newCastStatus);
-        GOOGLECAST_updateReading($hash, "volume", $newCastStatus->{volume_level}*100);
+        GOOGLECAST_updateReading($hash, "volume", int($newCastStatus->{volume_level}*100));
+    }
+
+    my $curStatus = ReadingsVal($hash->{NAME}, "mediaPlayerState", "UNKNOWN");
+    if($curStatus eq "PLAYING") {
+        GOOGLECAST_updateReading($hash, "state", "playing");
+    } elsif($curStatus eq "BUFFERING") {
+        GOOGLECAST_updateReading($hash, "state", "buffering");
+    } elsif($curStatus eq "PAUSED") {
+        GOOGLECAST_updateReading($hash, "state", "paused");
+    } else {
+        GOOGLECAST_updateReading($hash, "state", ReadingsVal($hash->{NAME}, "presence", "offline"));
     }
 
     return undef;
