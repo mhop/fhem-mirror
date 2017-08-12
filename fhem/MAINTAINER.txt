@@ -428,6 +428,7 @@ FHEM/98_expandJSON.pm        dev0                 http://forum.fhem.de Unterstue
 FHEM/98_fheminfo.pm          betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_fhemdebug.pm         rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_GoogleAuth.pm        betateilchen         http://forum.fhem.de Unterstuetzende Dienste
+FHEM/98_GOOGLECAST.pm        dominikkarall        http://forum.fhem.de Multimedia
 FHEM/98_help.pm              betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_HourCounter.pm       john                 http://forum.fhem.de MAX
 FHEM/98_logProxy.pm          justme1968           http://forum.fhem.de Frontends/SVG Plots logProxy
