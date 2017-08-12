@@ -7,9 +7,12 @@
 # FHEM module to communicate with BOSE SoundTouch system
 # API as defined in BOSE SoundTouchAPI_WebServices_v1.0.1.pdf
 #
-# Version: 2.1.0
+# Version: 2.1.1
 #
 #############################################################
+#
+# v2.1.1 - 20170812
+# - CHANGE:  changed reading name type to model
 #
 # v2.1.0 - 20170129
 # - NEW REQUIREMENT: TTS: sox, libsox-fmt-mp3 (only required for TTS)
@@ -331,7 +334,7 @@ sub BOSEST_Define($$) {
     $hash->{helper}{supportedBassCmds} = "";
     
     if (int(@a) < 3) {
-        Log3 $hash, 3, "BOSEST: BOSE SoundTouch v2.1.0";
+        Log3 $hash, 3, "BOSEST: BOSE SoundTouch v2.1.1";
         #start discovery process 30s delayed
         InternalTimer(gettimeofday()+30, "BOSEST_startDiscoveryProcess", $hash, 0);
         
@@ -1826,7 +1829,7 @@ sub BOSEST_parseAndUpdateInfo($$) {
     $info->{name} = Encode::encode('UTF-8', $info->{name});
 	readingsBeginUpdate($hash);
     BOSEST_XMLUpdate($hash, "deviceName", $info->{name});
-    BOSEST_XMLUpdate($hash, "type", $info->{type});
+    BOSEST_XMLUpdate($hash, "model", $info->{type});
     BOSEST_XMLUpdate($hash, "deviceID", $info->{deviceID});
     BOSEST_XMLUpdate($hash, "softwareVersion", $info->{components}->{component}[0]->{softwareVersion});
 	readingsEndUpdate($hash, 1);
