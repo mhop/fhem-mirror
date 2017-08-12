@@ -87,18 +87,8 @@ sub insertDB() {
   my $geo      = getLocation();
 
   my $decoded  = decode_json($json);
-  if (defined($decoded->{'system'}{'revision'})) {
-     # replace revision number with revision date
-     my $rev      = $decoded->{'system'}{'revision'} + 1;
-     if($rev =~ /^\d+$/) {
-       my $d = (split(/ /,qx(sudo -u rko /usr/bin/svn info -r $rev $fhemPathSvn|grep Date:)))[3];
-       return undef unless (defined($d));
-       my ($year,$mon,$mday) = split(/-/,$d);
-       $decoded->{'system'}{'revdate'} = mktime(0,0,7,$mday,($mon-1),($year-1900),0,0,0);
-       $json = encode_json $decoded;
-     }
-  }
-  
+  $json = revInfo($decoded) if (defined($decoded->{'system'}{'revision'}));
+
   $dbh = DBI->connect($dsn,"","", { RaiseError => 1, ShowErrorStatement => 1 }) ||
           die "Cannot connect: $DBI::errstr";
   $sth = $dbh->prepare(q{INSERT OR REPLACE INTO jsonNodes(uniqueID,geo,json) VALUES(?,?,?)});
@@ -133,13 +123,34 @@ sub getLocation() {
   }
 }
 
+sub revInfo($) {
+   # replace revision number with revision date
+   my ($decoded) = @_;
+   my $rev = $decoded->{'system'}{'revision'} + 1;
+   if($rev =~ /^\d+$/) {
+     my $d = (split(/ /,qx(sudo -u rko /usr/bin/svn info -r $rev $fhemPathSvn|grep Date:)))[3];
+#     my $d = (split(/ /,qx(/usr/bin/svn info -r $rev $fhemPathSvn|grep Date:)))[3];
+     return undef unless (defined($d));
+     my ($year,$mon,$mday) = split(/-/,$d);
+     $decoded->{'system'}{'revdate'} = mktime(0,0,7,$mday,($mon-1),($year-1900),0,0,0);
+     return encode_json $decoded;
+   }
+}
+
 sub add2total() {
+
+   my $today      = strftime("%Y-%m-%d", localtime);
+   my $tnYear     = strftime("%Y", localtime);
+   my $nodesToday = $dbh->selectrow_array("SELECT count(*) FROM jsonNodes where lastSeen like '$today%'");
+   $nodesToday  //= 1;
+
    my $sql = q(SELECT * from jsonNodes where uniqueID = 'databaseInfo');
    my $sth = $dbh->prepare( $sql );
    $sth->execute();
    my @dbInfo = $sth->fetchrow_array();
    my $dbInfo = decode_json $dbInfo[3];
    $dbInfo->{'submissionsTotal'}++;
+   $dbInfo->{'submissionsPerDay'}{$tnYear}{$today} = ($nodesToday-1); # do not count dbInfo
    my $new = encode_json $dbInfo;
    
    $sth = $dbh->prepare(q{INSERT OR REPLACE INTO jsonNodes(uniqueID,json) VALUES(?,?)});
@@ -155,8 +166,7 @@ sub doAggregate() {
           die "Cannot connect: $DBI::errstr";
 
    my $today      = strftime("%Y-%m-%d", localtime);
-   my $nodesToday = $dbh->selectrow_array("SELECT count(*) FROM jsonNodes where lastSeen like '$today%'");
-   $nodesToday  //= 0;
+   my $tnYear     = strftime("%Y", localtime);
 
    my ($sql,@dbInfo,%countAll,$decoded,$res);
 
@@ -165,11 +175,14 @@ sub doAggregate() {
    $sth->execute();
    @dbInfo = $sth->fetchrow_array();
 
-   my $dbInfo     = decode_json $dbInfo[3];
-   my $updated    = $dbInfo[1];
-   my $started    = substr($dbInfo->{'submissionsSince'},0,10);
-   my $nodesTotal = $dbInfo->{'submissionsTotal'};
-   my $nodes12    = 0;
+   my $dbInfo       = decode_json $dbInfo[3];
+   my $updated      = $dbInfo[1];
+   my $started      = substr($dbInfo->{'submissionsSince'},0,10);
+   my $nodesTotal   = $dbInfo->{'submissionsTotal'};
+   my $nodes12      = 0;
+   my $nodesToday   = $dbInfo->{'submissionsPerDay'}{$tnYear}{$today} 
+                      if defined($dbInfo->{$tnYear}{$today});
+      $nodesToday //= 0;
 
    map { $countAll{system}{age}{$_} = 0; } (0,7,30,180,365,999);
 
