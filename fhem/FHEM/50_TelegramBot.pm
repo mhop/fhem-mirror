@@ -123,6 +123,8 @@
 #   rename of bot also works with token encryption - #msg668108
 # 2.4.3 2017-08-13  delayed retry & rename (#msg668108) 
 
+#   remove debug
+  
 #   
 #   
 ##############################################################################
@@ -2228,8 +2230,11 @@ sub TelegramBot_Callback($$$)
     # ret defined / args defined in params 
     if ( ( $ret ne  "SUCCESS" ) && ( $doRetry ) && ( defined( $param->{args} ) ) ) {
       my $wait = $param->{args}[$TelegramBot_arg_retrycnt];
-      
       my $maxRetries =  AttrVal($name,'maxRetries',0);
+      
+      Log3 $name, 4, "TelegramBot_Callback $name: retry count so far $wait (max: $maxRetries) for msg ".
+            $param->{args}[0]." : ".$param->{args}[1];
+      
       if ( $wait <= $maxRetries ) {
         # calculate wait time 10s / 100s / 1000s ~ 17min / 10000s ~ 3h / 100000s ~ 30h
         $wait = 10**$wait;
@@ -3103,7 +3108,7 @@ sub TelegramBot_getBaseURL($)
 
   my $token = TelegramBot_readToken( $hash );
   
-  Debug "Token  ".$hash->{NAME}."  ".$token;
+#  Debug "Token  ".$hash->{NAME}."  ".$token;
   
   return "https://api.telegram.org/bot".$token."/";
 }
