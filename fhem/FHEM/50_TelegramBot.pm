@@ -123,7 +123,7 @@
 #   rename of bot also works with token encryption - #msg668108
 # 2.4.3 2017-08-13  delayed retry & rename (#msg668108) 
 
-#   remove debug
+#   remove debug / addtl testing
   
 #   
 #   
