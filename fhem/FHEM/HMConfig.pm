@@ -321,7 +321,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0105" => {name=>"HM-LC-Dim1T-DR"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Dim_V:2:3",}
  ,"0106" => {name=>"HM-MOD-EM-8Bit"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Tr:3:3",}
  ,"0107" => {name=>"HM-LC-Ja1PBU-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"0108" => {name=>"HM-DW"                   ,st=>'rgb'               ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Bright:1:1,Col:2:2,Bright_V1:3:3,Col_V2:4:4,Bright_V2:5:5,Col_V2:6:6",}
+ ,"0108" => {name=>"HM-HM-LC-DW-WM"          ,st=>'rgb'               ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Bright:1:1,Col:2:2,Bright_V1:3:3,Col_V2:4:4,Bright_V2:5:5,Col_V2:6:6",}
  ,"0109" => {name=>"HM-DW-WM"                ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}
  ,"010A" => {name=>"HM-Sen-MDIR-O-3"         ,alias=>"HM-Sen-MDIR-O-2" }
 
@@ -1330,6 +1330,7 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
                         }
  ,"HM-DW01"           =>{ intKeyVisib     =>1
                          ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1
+                         ,logicCombination=>1
                          ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
                          ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
                          ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
@@ -1345,13 +1346,15 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
                          ,lgMultiExec     =>1,shMultiExec     =>1
                          ,confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
                          ,characteristic  =>1,localResDis     =>1
-                         ,logicCombination=>1,speedMultiply   =>1
+                         ,speedMultiply   =>1
                          ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
                          ,DimElsActionType=>1
                          ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
                          ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
                         }
  ,"HM-DW02"           =>{ characteristic  =>1,charactLvlLimit =>1,charactColAssign=>1,charactBase     =>1
+                         ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1
+                         ,logicCombination=>1
                          ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
                          ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
                          ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
@@ -1365,8 +1368,51 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
                          ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
                          ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
                          ,lgMultiExec     =>1,shMultiExec     =>1
-                         ,confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
-                         ,characteristic  =>1,localResDis     =>1
+                         ,confBtnTime     =>1,localResDis     =>1
+                         ,speedMultiply   =>1
+                         ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
+                         ,DimElsActionType=>1
+                         ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
+                         ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
+                        }
+ ,"HM-DW03"           =>{ transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1
+                         ,logicCombination=>1
+                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
+                         ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
+                         ,OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1
+                         ,RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1
+                         ,DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1
+                         ,DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1
+                         ,DimJtDlyOff     =>1,DimJtRampOn     =>1,DimJtRampOff    =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
+                         ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
+                         ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
+                         ,lgMultiExec     =>1,shMultiExec     =>1
+                         ,confBtnTime     =>1,localResDis     =>1
+                         ,speedMultiply   =>1
+                         ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
+                         ,DimElsActionType=>1
+                         ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
+                         ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
+                        }
+ ,"HM-DW04"           =>{ transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1
+                         ,logicCombination=>1
+                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
+                         ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
+                         ,OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1
+                         ,RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1
+                         ,DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1
+                         ,DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1
+                         ,DimJtDlyOff     =>1,DimJtRampOn     =>1,DimJtRampOff    =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
+                         ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
+                         ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
+                         ,lgMultiExec     =>1,shMultiExec     =>1
+                         ,confBtnTime     =>1,localResDis     =>1
                          ,logicCombination=>1,speedMultiply   =>1
                          ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
                          ,DimElsActionType=>1
@@ -1378,10 +1424,8 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
 
 #clones - - - - - - - - - - - - - - -
 
-$culHmRegChan{"HM-DW03"}                = 
-$culHmRegChan{"HM-DW05"}                = $culHmRegChan{"HM-DW01"};
-$culHmRegChan{"HM-DW04"}                = 
-$culHmRegChan{"HM-DW06"}                = $culHmRegChan{"HM-DW02"};
+$culHmRegChan{"HM-DW05"}                = $culHmRegChan{"HM-DW03"};
+$culHmRegChan{"HM-DW06"}                = $culHmRegChan{"HM-DW04"};
 
 $culHmRegChan{"HM-Dis-EP-WM5502"}       = $culHmRegChan{"HM-Dis-EP-WM5501"};
 $culHmRegChan{"HM-Sec-Sir-WM02"}        = 
