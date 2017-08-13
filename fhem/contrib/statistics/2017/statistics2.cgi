@@ -181,7 +181,7 @@ sub doAggregate() {
    my $nodesTotal   = $dbInfo->{'submissionsTotal'};
    my $nodes12      = 0;
    my $nodesToday   = $dbInfo->{'submissionsPerDay'}{$tnYear}{$today} 
-                      if defined($dbInfo->{$tnYear}{$today});
+                      if defined($dbInfo->{'submissionsPerDay'}{$tnYear}{$today});
       $nodesToday //= 0;
 
    map { $countAll{system}{age}{$_} = 0; } (0,7,30,180,365,999);
