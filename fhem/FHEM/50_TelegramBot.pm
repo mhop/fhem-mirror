@@ -124,6 +124,7 @@
 # 2.4.3 2017-08-13  delayed retry & rename (#msg668108) 
 
 #   remove debug / addtl testing
+#   adapt prototypes for token
   
 #   
 #   
@@ -179,8 +180,8 @@ sub TelegramBot_AttrNum($$$);
 sub TelegramBot_MakeKeyboard($$$@);
 sub TelegramBot_ExecuteCommand($$$$;$$);
 
-sub TelegramBot_readToken($);
-sub TelegramBot_storeToken($$);
+sub TelegramBot_readToken($;$);
+sub TelegramBot_storeToken($$;$);
 
 #########################
 # Globals
