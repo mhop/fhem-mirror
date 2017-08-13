@@ -31,6 +31,8 @@ foreach my $row (split("\n", $fList)) {
   my ($type, $fName) = split(" ", $row);
   next if($type eq "D");
   next if(!$fName);
+  my $pl = `svnlook pl $arg $repos $fName`;
+  die ("Setting svn:externals is prohibited") if($pl =~ m/svn:externals/);
 
   # check for 80 chars per line conformity
   if($fName =~ m/CHANGED/) {
