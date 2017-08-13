@@ -118,11 +118,17 @@
 
 #   FIX: make fileread work for both old and new perl versions
 # 2.4.2 2017-07-01  rewrite read file function due to $_ warning - #msg651947
+
+#   FIX: make delayed retry work again
+#   rename of bot also works with token encryption - #msg668108
+# 2.4.3 2017-08-13  delayed retry & rename (#msg668108) 
+
 #   
 #   
 ##############################################################################
 # TASKS 
 #   
+#
 #   remove keyboard after favorite confirm
 #   
 #   cleanup encodings
@@ -228,7 +234,7 @@ my %gets = (
 my $TelegramBot_header = "agent: TelegramBot/1.0\r\nUser-Agent: TelegramBot/1.0\r\nAccept: application/json\r\nAccept-Charset: utf-8";
 
 
-
+my $TelegramBot_arg_retrycnt = 6;
 
 ##############################################################################
 ##############################################################################
@@ -365,15 +371,18 @@ sub TelegramBot_Undef($$)
 
 #############################################################################################
 # called when the device gets renamed,
-# in this case we then also need to rename the key in the token store
+# in this case we then also need to rename the key in the token store and ensure it is recoded with new name
 sub TelegramBot_Rename($$) {
     my ($new,$old) = @_;
+    
+    my $nhash = $defs{$new};
+    
+    my $token = TelegramBot_readToken( $nhash, $old );
+    TelegramBot_storeToken( $nhash, $token );
 
+    # remove old token with old name
     my $index_old = "TelegramBot_" . $old . "_token";
-    my $index_new = "TelegramBot_" . $new . "_token";
- 
-    setKeyValue($index_new, getKeyValue($index_old));
-    setKeyValue($index_old, undef);
+    setKeyValue($index_old, undef); 
 }
 
 
@@ -1561,7 +1570,7 @@ sub TelegramBot_SendIt($$$$$;$$$)
   $options = "" if ( ! defined($options) );
   
   # increase retrycount for next try
-  $args[6] = $retryCount+1;
+  $args[$TelegramBot_arg_retrycnt] = $retryCount+1;
   
   Log3 $name, 5, "TelegramBot_SendIt $name: called ";
 
@@ -2004,7 +2013,7 @@ sub TelegramBot_RetrySend($)
 
 
   my $ref = $param->{args};
-  Log3 $name, 4, "TelegramBot_Retrysend $name: reply ".(defined( @$ref[4] )?@$ref[4]:"<undef>")." retry @$ref[5] :@$ref[0]: -:@$ref[1]: ";
+  Log3 $name, 4, "TelegramBot_Retrysend $name: reply ".(defined( @$ref[4] )?@$ref[4]:"<undef>")." retry ".@$ref[$TelegramBot_arg_retrycnt]." :@$ref[0]: -:@$ref[1]: ";
   TelegramBot_SendIt( $hash, @$ref[0], @$ref[1], @$ref[2], @$ref[3], @$ref[4], @$ref[5], @$ref[6] );
   
 }
@@ -2218,14 +2227,14 @@ sub TelegramBot_Callback($$$)
     # handle retry
     # ret defined / args defined in params 
     if ( ( $ret ne  "SUCCESS" ) && ( $doRetry ) && ( defined( $param->{args} ) ) ) {
-      my $wait = $param->{args}[5];
+      my $wait = $param->{args}[$TelegramBot_arg_retrycnt];
       
       my $maxRetries =  AttrVal($name,'maxRetries',0);
       if ( $wait <= $maxRetries ) {
         # calculate wait time 10s / 100s / 1000s ~ 17min / 10000s ~ 3h / 100000s ~ 30h
         $wait = 10**$wait;
         
-        Log3 $name, 4, "TelegramBot_Callback $name: do retry ".$param->{args}[5]." timer: $wait (ret: $ret) for msg ".
+        Log3 $name, 4, "TelegramBot_Callback $name: do retry ".$param->{args}[$TelegramBot_arg_retrycnt]." timer: $wait (ret: $ret) for msg ".
               $param->{args}[0]." : ".$param->{args}[1];
 
         # set timer
@@ -3094,6 +3103,8 @@ sub TelegramBot_getBaseURL($)
 
   my $token = TelegramBot_readToken( $hash );
   
+  Debug "Token  ".$hash->{NAME}."  ".$token;
+  
   return "https://api.telegram.org/bot".$token."/";
 }
 
@@ -3102,15 +3113,17 @@ sub TelegramBot_getBaseURL($)
 
 #####################################
 # stores Telegram API Token 
-sub TelegramBot_storeToken($$)
+sub TelegramBot_storeToken($$;$)
 {
-    my ($hash, $token) = @_;
+    my ($hash, $token, $name) = @_;
      
     if ( $token !~ /^([[:alnum:]]|[-:_])+[[:alnum:]]+([[:alnum:]]|[-:_])+$/ ) {
       return "specify valid API token containing only alphanumeric characters and -: characters";
     }
 
-    my $index = "TelegramBot_".$hash->{NAME}."_token";
+    $name = $hash->{NAME} if ( ! defined($name) );
+    
+    my $index = "TelegramBot_".$name."_token";
     my $key = getUniqueId().$index;
     
     my $enc_pwd = "";
@@ -3135,12 +3148,13 @@ sub TelegramBot_storeToken($$)
 
 #####################################
 # reads the Telegram API Token
-sub TelegramBot_readToken($)
+sub TelegramBot_readToken($;$)
 {
-   my ($hash) = @_;
-   my $name = $hash->{NAME};
+   my ($hash, $name) = @_;
+   
+   $name = $hash->{NAME} if ( ! defined($name) );
 
-   my $index = "TelegramBot_" . $hash->{NAME} . "_token";
+   my $index = "TelegramBot_" . $name . "_token";
    my $key = getUniqueId().$index;
 
    my ($token, $err);
