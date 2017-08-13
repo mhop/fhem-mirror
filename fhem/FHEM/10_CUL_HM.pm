@@ -1630,8 +1630,8 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($mh{md} =~ m/HM-CC-RT-DN/) { ##########################################
     my %ctlTbl=( 0=>"auto", 1=>"manual", 2=>"party",3=>"boost");
 
-    if(  ($mh{mTyp} eq "100A") #info-level/
-       ||($mh{mTyp} eq "0201")){#ackInfo
+    if(($mh{mTyp} eq "100A") || #info-level/
+       ($mh{mTyp} eq "0201"))  {#ackInfo
       my %errTbl=( 0=>"ok", 1=>"ValveTight",  2=>"adjustRangeTooLarge"
                   ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"
                   ,5=>"unknown", 6=>"lowBat", 7=>"ValveErrorPosition" );
@@ -1848,8 +1848,8 @@ sub CUL_HM_Parse($$) {#########################################################
     }
   }
   elsif($mh{md} =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ ############################
-    if (($mh{mTp} eq "02" && $mh{p} =~ m/^01/) ||  # handle Ack_Status
-        ($mh{mTp} eq "10" && $mh{p} =~ m/^06/) ||  #or Info_Status message here
+    if (($mh{mTyp} eq "0201") ||  # handle Ack_Status
+        ($mh{mTyp} eq "1006") ||  #or Info_Status message here
         ($mh{mTp} eq "41"))                {
       my $lvl = $mI[2];
       my $err = ($mh{mTp} eq "41") ? hex($mI[0]) : ($mI[3] ? hex($mI[3]) : "");
@@ -1942,8 +1942,8 @@ sub CUL_HM_Parse($$) {#########################################################
     my $hHash = CUL_HM_id2Hash($mh{src}."02");# hash for heating
     my $pon = 0;# power on if mNo == 0 and heating status plus second msg
                 # status or trigger from rain channel
-    if (($mh{mTp} eq "02" && $mh{p} =~ m/^01/) || #Ack_Status
-        ($mh{mTp} eq "10" && $mh{p} =~ m/^06/)) { #Info_Status
+    if (($mh{mTyp} eq "0201") || #Ack_Status
+        ($mh{mTyp} eq "1006")) { #Info_Status
 
       my ($subType,$chn,$val,$err) = ($mI[0],hex($mI[1]),$mI[2],hex($mI[3]));
       $chn = sprintf("%02X",$chn&0x3f);
@@ -2302,7 +2302,7 @@ sub CUL_HM_Parse($$) {#########################################################
 
   elsif($mh{st} =~ m /^(siren)$/) {############################################
     if (($mh{mTyp} eq "0201") ||  # handle Ack_Status
-        ($mh{mTyp} eq "1006")) { #    or Info_Status message here
+        ($mh{mTyp} eq "1006")) {  #   or Info_Status message here
         
 
       my ($chn,$val,$err) = (hex($mI[1]),hex($mI[2])/2,hex($mI[3]));
@@ -2599,7 +2599,8 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   elsif($mh{st} =~ m /^(motionDetector|motionAndBtn)$/) { #####################
     my $state = $mI[2];
-    if(($mh{mTp} eq "10" ||$mh{mTp} eq "02") && $mh{p} =~ m/^06....../) {
+    if(($mh{mTyp} eq "0201") ||
+       ($mh{mTyp} eq "1006")) {
       my ($chn,$err,$bright)=(hex($mI[1]),hex($mI[3]),hex($mI[2]));
       my $chId = $mh{src}.sprintf("%02X",$chn&0x3f);
       $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
@@ -2709,16 +2710,15 @@ sub CUL_HM_Parse($$) {#########################################################
     #Info Level: mTp=0x10 p(..)(..)(..)(..) subty=06, chn, state,err (3bit)
     #AckStatus:  mTp=0x02 p(..)(..)(..)(..) subty=01, chn, state,err (3bit)
     my ($chn,$state,$err,$cnt); #define locals
-    if(($mh{mTp} eq "10" && $mh{p} =~ m/^06/) ||
-       ($mh{mTp} eq "02" && $mh{p} =~ m/^01/)) {
-      $mh{p} =~ m/^..(..)(..)(..)?$/;
-      ($chn,$state,$err) = (hex($1), $2, hex($3));
+    if(($mh{mTyp} eq "0201") ||
+       ($mh{mTyp} eq "1006")) {
+      ($chn,$state,$err) = (hex($mI[1]), $mI[2], hex($mI[3]));
       $chn = sprintf("%02X",$chn&0x3f);
       $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
                              if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
       push @evtEt,[$mh{devH},1,"alive:yes"];
       push @evtEt,[$mh{devH},1,"battery:". (($err&0x80)?"low"  :"ok"  )];
-      if (  $mh{md} =~ m/^(HM-SEC-SC.*|HM-Sec-RHS|Roto_ZEL-STG-RM-F.K)$/){
+      if (  $mh{md} =~ m/^(HM-SEC-SC.*|HM-SEC-RHS|Roto_ZEL-STG-RM-F.K)$/){
                                  push @evtEt,[$mh{devH},1,"sabotageError:".(($err&0x0E)?"on"   :"off")];}
       elsif($mh{md} ne "HM-SEC-WDS"){push @evtEt,[$mh{devH},1,"cover:"        .(($err&0x0E)?"open" :"closed")];}
     }
@@ -2744,8 +2744,8 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   elsif($mh{st} eq "winMatic") {  #############################################
     my($sType,$chn,$lvl,$stat) = @mI;
-    if(($mh{mTp} eq "10" && $sType eq "06") ||
-       ($mh{mTp} eq "02" && $sType eq "01")){
+    if(($mh{mTyp} eq "0201") ||
+       ($mh{mTyp} eq "1006")){
       $stat = hex($stat);
       $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
                              if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
