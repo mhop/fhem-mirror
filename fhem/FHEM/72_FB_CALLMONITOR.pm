@@ -1173,7 +1173,7 @@ sub FB_CALLMONITOR_readRemotePhonebookViaTelnet($;$)
     my $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
     
     delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
-    return "no password available to access FritzBox" unless(defined($fb_pw));
+    return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'" unless(defined($fb_pw));
     
     my $telnet = Net::Telnet->new(Timeout => 10, Errmode => 'return');
     
@@ -1270,7 +1270,8 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaTR064($;$)
     unless(defined($fb_pw))
     {
         $hash->{helper}{PWD_NEEDED} = 1;
-        return "no password available to access FritzBox";
+        return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'";
+    
     }
     
     Log3 $name, 4, "FB_CALLMONITOR ($name) - identifying available phonebooks";
@@ -1544,7 +1545,7 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaWeb($;$)
     $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
     delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
 
-    return "no password available to access FritzBox" unless(defined($fb_pw));
+    return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'" unless(defined($fb_pw));
 
     $fb_sid = FB_doCheckPW($fb_ip, $fb_user, $fb_pw);
     
@@ -1617,7 +1618,7 @@ sub FB_CALLMONITOR_readRemotePhonebookViaWeb($$;$)
     $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
     delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
     
-    return "no password available to access FritzBox" unless(defined($fb_pw));
+    return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'" unless(defined($fb_pw));
    
     $fb_sid = FB_doCheckPW($fb_ip, $fb_user, $fb_pw);
     
