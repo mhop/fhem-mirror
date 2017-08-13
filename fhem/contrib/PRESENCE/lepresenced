@@ -1,31 +1,31 @@
 #!/usr/bin/perl
 
 ##############################################################################
-# $Id$
+#	$Id$
 ##############################################################################
 #
-# lepresenced
+#	lepresenced
 #
-# checks for one or multiple bluetooth *low energy* devices for their
-# presence state and reports it to the 73_PRESENCE.pm module.
+#	checks for one or multiple bluetooth *low energy* devices for their
+#	presence state and reports it to the 73_PRESENCE.pm module.
 #
-# Copyright (C) 2015-2016 P. Reinhardt, pr-fhem (at) reinhardtweb (dot) de
+#	Copyright (C) 2015-2016 P. Reinhardt, pr-fhem (at) reinhardtweb (dot) de
 #
-# This script free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
+#	This script free software; you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation; either version 2 of the License, or
+#	(at your option) any later version.
 #
-# The GNU General Public License can be found at
-# http://www.gnu.org/copyleft/gpl.html.
-# A copy is found in the textfile GPL.txt and important notices to the
-# license from the author is found in LICENSE.txt distributed with these
-# scripts.
+#	The GNU General Public License can be found at
+#	http://www.gnu.org/copyleft/gpl.html.
+#	A copy is found in the textfile GPL.txt and important notices to the
+#	license from the author is found in LICENSE.txt distributed with these
+#	scripts.
 #
-# This script is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+#	This script is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
 #
 ##############################################################################
 
@@ -43,397 +43,261 @@ use Sys::Syslog qw(:standard :macros);
 use Time::HiRes qw(usleep);
 use Net::Server::Daemonize qw(daemonize);
 
-use constant RETRY_SLEEP                => 1;
-use constant INET_RECV_BUFFER           => 1024;
-use constant MAINLOOP_SLEEP_US          => 250 * 1000;
+use constant RETRY_SLEEP						=> 1;
+use constant INET_RECV_BUFFER					=> 1024;
+use constant MAINLOOP_SLEEP_US					=> 100 * 1000;
 
-use constant CLEANUP_INTERVAL           => 15 * 60;
-use constant CLEANUP_MAX_AGE            => 30 * 60;
-use constant STATS_INTERVAL             =>  5 * 60;
+use constant CLEANUP_INTERVAL					=> 15 * 60;
+use constant CLEANUP_MAX_AGE					=> 30 * 60;
+use constant STATS_INTERVAL						=>  5 * 60;
 
-use constant DEFAULT_RSSI_THRESHOLD     => 10;
-use constant RSSI_WINDOW                => 10;
+use constant ME									=> 'lepresenced';
+use constant VERSION							=> '0.6';
 
-use constant ME                         => 'lepresenced';
-use constant VERSION                    => '0.81';
-
-use constant PIDFILE                    => '/var/run/' . ME . '.pid';
-
-use constant {
-  HCIDUMP_STATE_NONE                    => 0,
-  HCIDUMP_STATE_LE_META_EVENT           => 1,
-  HCIDUMP_STATE_LE_ADVERTISING_REPORT   => 2,
-  HCIDUMP_STATE_ADV_INT                 => 3,
-  HCIDUMP_STATE_SCAN_RSP                => 4,
-};
+use constant PIDFILE							=> '/var/run/' . ME . '.pid';
 
 my %devices :shared;
 my @clients = ();
 my $syslog_level;
 
 sub syslogw {
-  return if (scalar(@_) < 2);
-  if (scalar(@_)==2) {
-    my ($priority, $message) = @_;
-    syslog($priority, "[tid:%i] %s: $message", threads->self()->tid(), (caller(1))[3] // 'main') if ($syslog_level >= $priority);
-  } else {
-    my ($priority, $format, @args) = @_;
-    syslog($priority, "[tid:%i] %s: $format", threads->self()->tid(), (caller(1))[3] // 'main', @args) if ($syslog_level >= $priority);
-  }
+	return if (scalar(@_) < 2);
+	if (scalar(@_)==2) {
+		my ($priority, $message) = @_;
+		syslog($priority, "[tid:%i] %s: $message", threads->self()->tid(), (caller(1))[3] // 'main') if ($syslog_level >= $priority);
+	} else {
+		my ($priority, $format, @args) = @_;
+		syslog($priority, "[tid:%i] %s: $format", threads->self()->tid(), (caller(1))[3] // 'main', @args) if ($syslog_level >= $priority);
+	}
 }
 
 sub error_exit {
-  my $exit_code = shift();
-  syslogw(LOG_ERR, @_);
-  foreach my $thread (threads->list()) {
-    $thread->exit(0);
-  }
-  exit ($exit_code);
+	my $exit_code = shift();
+	syslogw(LOG_ERR, @_);
+	foreach my $thread (threads->list()) {
+		$thread->exit(0);
+	}
+	exit ($exit_code);
 }
 
 sub usage_exit() {
-  print("usage:\n");
-  printf("\t%s --bluetoothdevice <bluetooth device> --listenaddress <listen address> --listenport <listen port> --loglevel <log level> --daemon\n", ME);
-  printf("\t%s -b <bluetooth device> -a <listen address> -p <listen port> -l <log level> -d\n", ME);
-  print("valid log levels:\n");
-  print("\tLOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG. Default: LOG_INFO\n");
-  print("optional arguments:\n");
-  print("--legacymode - legacy mode without rssi detection. Use if you do not have hcidump installed.\n");
-  printf("--rssithreshold - rssi deviation to trigger an update. Minimum value: 5, default: %s\n", DEFAULT_RSSI_THRESHOLD);
-  print("examples:\n");
-  printf("\t%s --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon\n", ME);
-  printf("\t%s --loglevel LOG_DEBUG --daemon\n", ME);
-  closelog();
-  exit(1);
+	print("usage:\n");
+	printf("\t%s --bluetoothdevice <bluetooth device> --listenaddress <listen address> --listenport <listen port> --loglevel <log level> --daemon\n", ME);
+	printf("\t%s -b <bluetooth device> -a <listen address> -p <listen port> -l <log level> -d\n", ME);
+	print("valid log levels:\n");
+	print("\tLOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG. Default: LOG_INFO\n");
+	print("examples:\n");
+	printf("\t%s --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon\n", ME);
+	printf("\t%s --loglevel LOG_DEBUG --daemon\n", ME);
+	closelog();
+	exit(1);
 }
 
 sub parse_options() {
-  my $device                      = "hci0";
-  my $daemonize                   = 0;
-  my $listen_address              = "0.0.0.0";
-  my $listen_port                 = "5333";
-  my $syslog_level                = "LOG_INFO";
-  my $legacy_mode                 = 0;
-  my $rssi_threshold              = DEFAULT_RSSI_THRESHOLD;
-  
-  GetOptions(
-    'bluetoothdevice|device|b=s'  => \$device,
-    'daemon|daemonize|d!'         => \$daemonize,
-    'listenaddress|address|a=s'   => \$listen_address,
-    'listenport|port|p=i'         => \$listen_port,
-    'loglevel|l=s'                => \$syslog_level,
-    'legacymode|legacy!'          => \$legacy_mode,
-    'rssithreshold=i'             => \$rssi_threshold,
-  ) or usage_exit();
-  
-  usage_exit() if ($rssi_threshold < 5);
-  
-  $listen_address =~ m/^\d+\.\d+\.\d+\.\d+$/ or usage_exit();
-  $syslog_level =~ m/^LOG_(EMERG|ALERT|CRIT|ERR|WARNING|NOTICE|INFO|DEBUG)$/ or usage_exit();
-  $syslog_level = eval($syslog_level);
-  
-  return ($device, $daemonize, $listen_address, $listen_port, $syslog_level, $legacy_mode, $rssi_threshold);
+	my $device							= "hci0";
+	my $daemonize						= 0;
+	my $listen_address					= "0.0.0.0";
+	my $listen_port						= "5333";
+	my $syslog_level					= "LOG_INFO";
+
+	GetOptions(
+		'bluetoothdevice|device|b=s'	=> \$device,
+		'daemon|daemonize|d!'			=> \$daemonize,
+		'listenaddress|address|a=s'		=> \$listen_address,
+		'listenport|port|p=i'			=> \$listen_port,
+		'loglevel|l=s'					=> \$syslog_level
+	) or usage_exit();
+	$listen_address =~ m/^\d+\.\d+\.\d+\.\d+$/ or usage_exit();
+	$syslog_level =~ m/^LOG_(EMERG|ALERT|CRIT|ERR|WARNING|NOTICE|INFO|DEBUG)$/ or usage_exit();
+	$syslog_level = eval($syslog_level);
+	
+	return ($device, $daemonize, $listen_address, $listen_port, $syslog_level);
 }
 
-sub update_device($$$) {
-  my ($mac, $name, $rssi) = @_;
-  $mac = lc($mac);
-  {
-    lock(%devices);
-    unless (exists $devices{$mac}) {
-      my %device :shared;
-      $devices{$mac} = \%device;
-    }
-    $name = '(unknown)' if ($name eq '');
-    if (!defined($devices{$mac}{'name'}) || $name ne '(unknown)') {
-      $devices{$mac}{'name'} = $name
-    }
-    $devices{$mac}{'rssi'} = $rssi;
-    $devices{$mac}{'reported_rssi'} = $rssi if (!defined($devices{$mac}{'reported_rssi'}));
-    $devices{$mac}{'prevtimestamp'} = $devices{$mac}{'timestamp'};
-    $devices{$mac}{'timestamp'} = time();
-  }
-  #dump_devices();
+sub update_device($$) {
+	my ($mac, $name) = @_;
+	$mac = lc($mac);
+	{
+		lock(%devices);
+		unless (exists $devices{$mac}) {
+			my %device :shared;
+			$devices{$mac} = \%device;
+		}
+		$devices{$mac}{'name'} = $name unless ($name eq '(unknown)' && defined($devices{$mac}{'name'}));
+		$devices{$mac}{'timestamp'} = time();
+	}
 }
 
-sub dump_devices() {
-  foreach my $mac (keys(%devices)) {
-    printf("mac: %s, timestamp: %s, rssi: %s, name: %s\n", $mac, $devices{$mac}{'timestamp'}, $devices{$mac}{'rssi'}, $devices{$mac}{'name'});
-  }
-  print("\n");
-}
-
-sub bluetooth_scan_thread($$) {
-  my ($device, $legacy_mode) = @_;
-  my $hcitool;
-  for(;;) {
-    my $pid = open($hcitool, "-|", "stdbuf -oL hcitool -i " . $device . " lescan --duplicates 2>&1") || die('Unable to start scanning. Please make sure hcitool and stdbuf are installed!');
-    while (<$hcitool>) {
-      chomp($_);
-      if ($_ eq 'LE Scan ...') {
-        syslogw(LOG_INFO, "Received '%s'.", $_);
-      } elsif (my ($fbmac, $fbname) = $_ =~ /^([\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2})\s(.*)$/i) {
-        if ($legacy_mode) {
-          #syslogw(LOG_DEBUG, "Received advertisement from bluetooth mac address '%s' with name '%s'.", $fbmac, $fbname);
-          update_device($fbmac, $fbname, 'unknown');
-        }
-      } elsif (
-          $_ =~ m/^Set scan parameters failed: Input\/output error$/ ||
-          $_ =~ m/^Invalid device: Network is down$/
-        ) {
-        syslogw(LOG_WARNING, "Received '%s', resetting...", $_);
-        system(sprintf('hciconfig %s reset', $device));
-      } else {
-        syslogw(LOG_WARNING, "Received unknown output: '%s'!", $_);
-      }
-    }
-    syslogw(LOG_WARNING, "hcitool exited, retrying...");
-    close($hcitool);
-    sleep(RETRY_SLEEP);
-  }
-}
-
-sub bluetooth_dump_thread($) {
-  my ($device) = @_;
-  my $hcidump;
-  my %rssitable;
-
-  for(;;) {
-    my $pid = open($hcidump, "-|", "hcidump -i " . $device) || die('Unable to start scanning. Please make sure hcidump is installed or use legacy mode (--legacymode)!');
-    my $state = HCIDUMP_STATE_NONE;
-    my $current_mac = '';
-    my $current_rssi = '';
-    my $current_name = '';
-    
-    while (<$hcidump>) {
-      chomp($_);
-      if ($_ =~ m/^>/) {
-        if ($current_mac) {
-          #printf("DEBUG: mac: %s, name: '%s', rssi: %s\n", $current_mac, $current_name, $current_rssi);
-          
-          # update rssi queue
-          unless (exists $rssitable{$current_mac}) {
-            $rssitable{$current_mac} = [];
-          }
-          if ($current_rssi) {
-            shift(@{$rssitable{$current_mac}}) if(scalar(@{$rssitable{$current_mac}}) >= RSSI_WINDOW);
-            push(@{$rssitable{$current_mac}}, $current_rssi);
-          }
-          my $mean_rssi = 0;
-          foreach my $rssi (@{$rssitable{$current_mac}}) {
-            $mean_rssi += $rssi;
-          }
-          $mean_rssi = int($mean_rssi / scalar(@{$rssitable{$current_mac}}));
-          #printf("DEBUG: mac: %s, rssi count: %i, rssis: %s, mean: %s\n", $current_mac, scalar(@{$rssitable{$current_mac}}), join(',', @{$rssitable{$current_mac}}), $mean_rssi);
-
-          update_device($current_mac, $current_name, $mean_rssi);
-        } 
-        $current_mac = '';
-        $current_rssi = '';
-        $current_name = '';
-        if ($_ =~ m/^> HCI Event: LE Meta Event \(0x3e\) plen \d+$/) {
-          $state = HCIDUMP_STATE_LE_META_EVENT;
-        } else {
-          $state = HCIDUMP_STATE_NONE;
-        }
-      } elsif (
-          $state == HCIDUMP_STATE_LE_META_EVENT &&
-          $_ eq '    LE Advertising Report'
-        ) {
-          $state = HCIDUMP_STATE_LE_ADVERTISING_REPORT;
-      } elsif ($state == HCIDUMP_STATE_LE_ADVERTISING_REPORT) {
-        if (
-          $_ eq '      ADV_IND - Connectable undirected advertising (0)' ||
-          $_ eq '      ADV_NONCONN_IND - Non connectable undirected advertising (3)'
-        ) {
-          $state = HCIDUMP_STATE_ADV_INT;
-        } elsif ($_ eq '      SCAN_RSP - Scan Response (4)') {
-          $state = HCIDUMP_STATE_SCAN_RSP;
-        }
-      } elsif ($state == HCIDUMP_STATE_SCAN_RSP || $state == HCIDUMP_STATE_ADV_INT) {
-        if  ($_ =~ m/^      bdaddr ([0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}) \((Public|Random)\)$/) {
-          $current_mac = $1;
-        } elsif ($_ =~ m/^      Complete local name: '(.*)'$/) {
-          $current_name = $1;
-        } elsif ($_ =~ m/^      RSSI: (-\d+)$/) {
-          $current_rssi = $1;
-        }
-      }
-    }
-    syslogw(LOG_WARNING, "hcidump exited, retrying...");
-    close($hcidump);
-    sleep(RETRY_SLEEP);
-  }
+sub bluetooth_thread($) {
+	my ($device) = @_;
+	my $hcitool;
+	for(;;) {
+		my $pid = open($hcitool, "-|", "stdbuf -oL hcitool -i " . $device . " lescan --duplicates 2>&1") || die('Unable to start scanning. Please make sure hcitool and stdbuf are installed!');
+		while (<$hcitool>) {
+			chomp($_);
+			if ($_ eq 'LE Scan ...') {
+				syslogw(LOG_INFO, "Received '%s'.", $_);
+			} elsif (my ($fbmac, $fbname) = $_ =~ /^([\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2})\s(.*)$/i) {
+				#syslogw(LOG_DEBUG, "Received advertisement from bluetooth mac address '%s' with name '%s'.", $fbmac, $fbname);
+				update_device($fbmac, $fbname);
+			} elsif (
+					$_ =~ m/^Set scan parameters failed: Input\/output error$/ ||
+					$_ =~ m/^Invalid device: Network is down$/
+				) {
+				syslogw(LOG_WARNING, "Received '%s', resetting...", $_);
+				system(sprintf('hciconfig %s reset', $device));
+			} else {
+				syslogw(LOG_WARNING, "Received unknown output: '%s'!", $_);
+			}
+		}
+		syslogw(LOG_WARNING, "hcitool exited, retrying...");
+		close($hcitool);
+		sleep(RETRY_SLEEP);
+	}
 }
 
 sub handle_command($$) {
-  my ($buf, $current_client) = @_;
-  if (my ($mac, undef, $interval) = $buf =~ m/^\s*(([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})\s*\|\s*(\d+)\s*$/) {
-    $mac = lc($mac);
-    if (my ($client) = grep { $current_client == $_->{'handle'} } @clients) {
-      syslogw(LOG_INFO, "Received query update for mac address %s, interval: %i by client %s:%i.", $mac, $interval, $current_client->peerhost(), $current_client->peerport());
-      $client->{'mac'} = $mac;
-      $client->{'interval'} = $interval;
-      $client->{'next_check'} = 0; #now
-    } else {
-      syslogw(LOG_INFO, "Received query for mac address %s, interval: %i. Adding client %s:%i to clients list.", $mac, $interval, $current_client->peerhost(), $current_client->peerport());
-      my %new_client;
-      $new_client{'handle'} = $current_client;
-      $new_client{'mac'} = $mac;
-      $new_client{'interval'} = $interval;
-      $new_client{'next_check'} = 0; #now
-      push(@clients, \%new_client);
-    }
-    print $current_client "command accepted\n"
-  } elsif ($buf =~ m/^\s*now\s*$/) {
-    syslogw(LOG_DEBUG, "Received now command from client %s:%i. Scheduling update...", $current_client->peerhost(), $current_client->peerport());
-    foreach my $client (grep { $_->{'handle'} == $current_client } @clients) {
-      $client->{'next_check'} = 0; #now
-    }
-    print $current_client "command accepted\n"
-  } elsif ($buf =~ m/^\s*stop\s*$/) {
-    # Stop does not make sense when scanning permanently
-    syslogw(LOG_DEBUG, "Received stop command from client %s:%i. Pretending to care and ignoring...", $current_client->peerhost(), $current_client->peerport());
-    print $current_client "no command running\n" # ToDo: Does the FHEM module even care?
-  } else {
-    syslogw(LOG_WARNING, "Received unknown command: '%s'.", $buf);
-  }
+	my ($buf, $current_client) = @_;
+	if (my ($mac, undef, $interval) = $buf =~ m/^\s*(([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})\s*\|\s*(\d+)\s*$/) {
+		$mac = lc($mac);
+		if (my ($client) = grep { $current_client == $_->{'handle'} } @clients) {
+			syslogw(LOG_INFO, "Received query update for mac address %s, interval: %i by client %s:%i.", $mac, $interval, $current_client->peerhost(), $current_client->peerport());
+			$client->{'mac'} = $mac;
+			$client->{'interval'} = $interval;
+			$client->{'next_check'} = 0; #now
+		} else {
+			syslogw(LOG_INFO, "Received query for mac address %s, interval: %i. Adding client %s:%i to clients list.", $mac, $interval, $current_client->peerhost(), $current_client->peerport());
+			my %new_client;
+			$new_client{'handle'} = $current_client;
+			$new_client{'mac'} = $mac;
+			$new_client{'interval'} = $interval;
+			$new_client{'next_check'} = 0; #now
+			push(@clients, \%new_client);
+		}
+		print $current_client "command accepted\n"
+	} elsif ($buf =~ m/^\s*now\s*$/) {
+		syslogw(LOG_DEBUG, "Received now command from client %s:%i. Scheduling update...", $current_client->peerhost(), $current_client->peerport());
+		foreach my $client (grep { $_->{'handle'} == $current_client } @clients) {
+			$client->{'next_check'} = 0; #now
+		}
+		print $current_client "command accepted\n"
+	} elsif ($buf =~ m/^\s*stop\s*$/) {
+		# Stop does not make sense when scanning permanently
+		syslogw(LOG_DEBUG, "Received stop command from client %s:%i. Pretending to care and ignoring...", $current_client->peerhost(), $current_client->peerport());
+		print $current_client "no command running\n" # ToDo: Does the FHEM module even care?
+	} else {
+		syslogw(LOG_WARNING, "Received unknown command: '%s'.", $buf);
+	}
 }
 
 sub stats_task() {
-  my ($min_age, $max_age, $devices);
-  {
-    lock(%devices);
-    $devices = scalar(keys(%devices));
-    foreach my $mac (keys(%devices)) {
-      my $age = time() - $devices{$mac}{'timestamp'};
-      $min_age = $age if (!defined($min_age) || $age < $min_age);
-      $max_age = $age if (!defined($max_age) || $age > $max_age);
-    }
-  }
-  syslogw(LOG_INFO, "Active clients: %i, known devices: %i (min/max age: %s/%s)", scalar(@clients), $devices, $min_age // '%', $max_age // '%');
+	my ($min_age, $max_age, $devices);
+	{
+		lock(%devices);
+		$devices = scalar(keys(%devices));
+		foreach my $mac (keys(%devices)) {
+			my $age = time() - $devices{$mac}{'timestamp'};
+			$min_age = $age if (!defined($min_age) || $age < $min_age);
+			$max_age = $age if (!defined($max_age) || $age > $max_age);
+		}
+	}
+	syslogw(LOG_INFO, "Active clients: %i, known devices: %i (min/max age: %s/%s)", scalar(@clients), $devices, $min_age // '%', $max_age // '%');
 }
 
 sub cleanup_task() {
-  my $start_time = time();
-  my $deleted_items = 0;
-  {
-    lock(%devices);
-    foreach my $mac (keys(%devices)) {
-      my $age = time() - $devices{$mac}{'timestamp'};
-      if ($age > CLEANUP_MAX_AGE) {
-        $deleted_items++;
-        syslogw(LOG_DEBUG, "Deleting device %s.", $mac);
-        delete($devices{$mac});
-      }
-    }
-  }
-  syslogw(LOG_INFO, "Cleanup finished, deleted %i devices in %i seconds.", $deleted_items, time() - $start_time);
+	my $start_time = time();
+	my $deleted_items = 0;
+	{
+		lock(%devices);
+		foreach my $mac (keys(%devices)) {
+			my $age = time() - $devices{$mac}{'timestamp'};
+			if ($age > CLEANUP_MAX_AGE) {
+				$deleted_items++;
+				syslogw(LOG_DEBUG, "Deleting device %s.", $mac);
+				delete($devices{$mac});
+			}
+		}
+	}
+	syslogw(LOG_INFO, "Cleanup finished, deleted %i devices in %i seconds.", $deleted_items, time() - $start_time);
 }
 
 openlog(ME, 'pid', LOG_USER);
-(my $device, my $daemonize, my $listen_address, my $listen_port, $syslog_level, my $legacy_mode, my $rssi_threshold) = parse_options();
+(my $device, my $daemonize, my $listen_address, my $listen_port, $syslog_level) = parse_options();
 
-  local $SIG{INT} = local $SIG{TERM} = local $SIG{HUP} = sub {
-    syslogw(LOG_NOTICE, "Caught signal, cleaning up and exiting...");
-    unlink(PIDFILE) if (-e PIDFILE);
-    closelog();
-    exit(1);
-  };
+	local $SIG{INT} = local $SIG{TERM} = local $SIG{HUP} = sub {
+		syslogw(LOG_NOTICE, "Caught signal, cleaning up and exiting...");
+		unlink(PIDFILE) if (-e PIDFILE);
+		closelog();
+		exit(1);
+	};
 
-syslogw(LOG_NOTICE, "Version %s started (device: %s, listen addr: %s, listen port: %s, daemonize: %i, legacy mode: %i, rssi threshold: %i, log level: %i).",
-    VERSION, $device, $listen_address, $listen_port, $daemonize, $legacy_mode, $rssi_threshold, $syslog_level);
+syslogw(LOG_NOTICE, "Version %s started (device: %s, listen addr: %s, listen port: %s, daemonize: %i, log level: %i).",
+		VERSION, $device, $listen_address, $listen_port, $daemonize, $syslog_level);
 
 daemonize('root', 'root', PIDFILE) if $daemonize;
 
-my $bluetooth_scan_thread = threads->new(\&bluetooth_scan_thread, $device, $legacy_mode)->detach();
-my $bluetooth_dump_thread = threads->new(\&bluetooth_dump_thread, $device)->detach() if (!$legacy_mode);
+my $bluetooth_thread = threads->new(\&bluetooth_thread, $device)->detach();
 
 my $current_client;
 $| = 1;
 my $server_socket = new IO::Socket::INET (
-  LocalHost => $listen_address,
-  LocalPort => $listen_port,
-  Proto => 'tcp',
-  Listen => 5,
-  ReuseAddr => 1,
+	LocalHost => $listen_address,
+	LocalPort => $listen_port,
+	Proto => 'tcp',
+	Listen => 5,
+	ReuseAddr => 1,
 );
 $server_socket or error_exit(1, "ERROR: Unable to create TCP server: $!, Exiting.");
 my $select = IO::Select->new($server_socket) or error_exit(1, "ERROR: Unable to select: $!, Exiting.");
 
-my $next_stats_time = time() + STATS_INTERVAL;
-my $next_cleanup_time = time() + CLEANUP_INTERVAL;
-
-$SIG{PIPE} = sub {
-  syslogw(LOG_INFO, "SIGPIPE received!");
-};
+my $next_stats_time = 0;
+my $next_cleanup_time = 0;
 
 for(;;) {
-  # Process INET socket
-  foreach my $current_client ($select->can_read(0)) {
-    if($current_client == $server_socket) {
-      my $client_socket = $server_socket->accept();
-      $select->add($client_socket);
-      syslogw(LOG_INFO, "Connection from %s:%s. Connected clients: %i.", $client_socket->peerhost(), $client_socket->peerport(), $select->count()-1);
-    } else {
-      sysread ($current_client, my $buf, INET_RECV_BUFFER);
-      if ($buf) {
-        chomp($buf);
-        handle_command($buf, $current_client);
-      } else {
-        $select->remove($current_client);
-        @clients = grep {$_->{'handle'} != $current_client} @clients;
-        syslogw(LOG_INFO, "Client %s:%s disconnected. Connected clients: %i.", $current_client->peerhost(), $current_client->peerport(), $select->count()-1);
-        $current_client->close();
-      }
-    }
-  }
+	# Process INET socket
+	foreach my $current_client ($select->can_read(0)) {
+		if($current_client == $server_socket) {
+			my $client_socket = $server_socket->accept();
+			$select->add($client_socket);
+			syslogw(LOG_INFO, "Connection from %s:%s. Connected clients: %i.", $client_socket->peerhost(), $client_socket->peerport(), $select->count()-1);
+		} else {
+			sysread ($current_client, my $buf, INET_RECV_BUFFER);
+			if ($buf) {
+				chomp($buf);
+				handle_command($buf, $current_client);
+			} else {
+				$select->remove($current_client);
+				@clients = grep {$_->{'handle'} != $current_client} @clients;
+				syslogw(LOG_INFO, "Client %s:%s disconnected. Connected clients: %i.", $current_client->peerhost(), $current_client->peerport(), $select->count()-1);
+				$current_client->close();
+			}
+		}
+	}
 
-  # Check for updates due to a changed rssi
-  if (!$legacy_mode) {
-    lock(%devices);
-    my $devices = scalar(keys(%devices));
-    foreach my $mac (keys(%devices)) {
-      if (abs($devices{$mac}{'reported_rssi'} - $devices{$mac}{'rssi'}) > $rssi_threshold) {
-        if (my @due_clients = grep { $_->{'mac'} eq $mac } @clients) {
-          syslogw(LOG_DEBUG, "Mac address %s needs update due to changed rssi. Old/new rssi: %i/%i, difference: %i, affected clients: %i.", $mac, $devices{$mac}{'reported_rssi'}, $devices{$mac}{'rssi'}, abs($devices{$mac}{'reported_rssi'} - $devices{$mac}{'rssi'}), scalar(@due_clients));
-          foreach my $client (@due_clients) {
-            $client->{'next_check'} = 0; #now
-          }
-        }
-      }
-    }
-  }
-    
-  # Check for due client updates, cleanup, stats
-  # For performance reasons, a maximum of one task is performed per loop
-  if (my @due_clients = grep { time() >= $_->{'next_check'} } @clients) {
-    foreach my $client (@due_clients) {
-      if (
-          defined($devices{$client->{'mac'}}) &&
-          time()-$devices{$client->{'mac'}}{timestamp} <= $client->{'interval'} && 
-          defined($devices{$client->{'mac'}}{prevtimestamp}) && time()-$devices{$client->{'mac'}}{prevtimestamp} <= $client->{'interval'}
-        ) {
-        syslogw(LOG_DEBUG, "Sending update for mac address %s, ages: %i/%i, max age: %i, rssi: %i, result: present.", $client->{'mac'}, time()-$devices{$client->{'mac'}}{'timestamp'}, time()-$devices{$client->{'mac'}}{'prevtimestamp'}, $client->{'interval'}, $devices{$client->{'mac'}}{'rssi'});
-        printf {$client->{'handle'}} "present;device_name=%s;rssi=%s;daemon=%s V%s\n", $devices{$client->{'mac'}}{name}, $devices{$client->{'mac'}}{'rssi'}, ME, VERSION;
-      } else {
-        syslogw(LOG_DEBUG, "Sending update for mac address %s, max age: %i, result: absence.", $client->{'mac'}, $client->{'interval'});
-        printf {$client->{'handle'}} "absence;rssi=unreachable;daemon=%s V%s\n", ME, VERSION;
-      }
-      if (defined($devices{$client->{'mac'}})) {
-        lock(%devices);
-        $devices{$client->{'mac'}}{'reported_rssi'} = $devices{$client->{'mac'}}{'rssi'};
-      }
-      $client->{'next_check'} = time() + $client->{'interval'};
-    }
-  } elsif (time() > $next_cleanup_time) {
-    cleanup_task();
-    $next_cleanup_time = time() + CLEANUP_INTERVAL;
-  } elsif (time() > $next_stats_time) {
-    stats_task();
-    $next_stats_time = time() + STATS_INTERVAL;
-  }
+	# Check for due client updates, cleanup, stats
+	# For performance reasons, a maximum of one task is performed per loop
+	if (my @due_clients = grep { time() >= $_->{'next_check'} } @clients) {
+		foreach my $client (@due_clients) {
+			if (
+				defined($devices{$client->{'mac'}}) &&
+				time()-$devices{$client->{'mac'}}{timestamp} <= $client->{'interval'}
+			) {
+				syslogw(LOG_DEBUG, "Sending update for mac address %s, age: %i, max age: %i, result: present.", $client->{'mac'}, time()-$devices{$client->{'mac'}}{timestamp}, $client->{'interval'});
+				printf {$client->{'handle'}} "present;%s\n", $devices{$client->{'mac'}}{name}
+			} else {
+				syslogw(LOG_DEBUG, "Sending update for mac address %s, max age: %i, result: absence.", $client->{'mac'}, $client->{'interval'});
+				print {$client->{'handle'}} "absence\n"
+			}
+			$client->{'next_check'} = time() + $client->{'interval'};
+		}
+	} elsif (time() > $next_cleanup_time) {
+		cleanup_task();
+		$next_cleanup_time = time() + CLEANUP_INTERVAL;
+	} elsif (time() > $next_stats_time) {
+		stats_task();
+		$next_stats_time = time() + STATS_INTERVAL;
+	}
 
-  usleep(MAINLOOP_SLEEP_US);
+	usleep(MAINLOOP_SLEEP_US);
 }
 $server_socket->close();
