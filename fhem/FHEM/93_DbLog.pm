@@ -16,6 +16,8 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.3     11.08.2017       Forum:#74690, bug unitialized in row 4322 -> $ret .= SVG_txt("par_${r}_0", "", "$f0:$f1:$f2:$f3", 20);
+# 2.22.2     08.08.2017       Forum:#74690, bug unitialized in row 737 -> $ret .= ($fld[0]?$fld[0]:" ").'.'.($fld[1]?$fld[1]:" ");
 # 2.22.1     07.08.2017       attribute "suppressAddLogV3" to suppress verbose3-logentries created by DbLog_AddLog 
 # 2.22.0     25.07.2017       attribute "addStateEvent" added
 # 2.21.3     24.07.2017       commandref revised
@@ -144,7 +146,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.1";
+my $DbLogVersion = "2.22.3";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -733,10 +735,12 @@ sub DbLog_regexpFn($$) {
     my @fld = split(":", $a[$i]);
 
     $ret .= '|' if( $ret );
-    $ret .=  $fld[0] .'.'. $fld[1];
+    no warnings 'uninitialized';            # Forum:74690, bug unitialized
+	$ret .=  $fld[0] .'.'. $fld[1]; 
+	use warnings;
   }                  
 
-  return $ret;
+return $ret;
 }
 
 ################################################################
@@ -4317,7 +4321,9 @@ DbLog_sampleDataFn($$$$$)
     for(my $r=0; $r < $max; $r++) {
       my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
       my $ret = "";
-      $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20);
+      no warnings 'uninitialized';            # Forum:74690, bug unitialized
+      $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20);   
+	  use warnings;
 #      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
 #      $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
 #      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
