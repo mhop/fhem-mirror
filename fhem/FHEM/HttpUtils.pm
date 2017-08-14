@@ -545,7 +545,7 @@ HttpUtils_DigestHeader($$)
   my ($hash, $header) = @_;
   my %digdata;
  
-  while($header =~ /(\w+)="?([^"]+?)"?(?:,\s+|$)/gc) {
+  while($header =~ /(\w+)="?([^"]+?)"?(?:\s*,\s*|$)/gc) {
     $digdata{$1} = $2;
   } 
  
