@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.30";     # Version of this module
+my $module_version    = "1.31";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -690,7 +690,8 @@ sub ESPEasy_Read($) {
   # public IPs
   if (!defined $logHeader->{Authorization} && $peer !~ m/$d_localIPs/) {
     Log3 $bname, 2, "$btype $name: No basic auth set while using public IP "
-                  . "address $peer";
+                  . "address. $peer rejected.";
+    return;
   }
 
   $logHeader->{Authorization} =~ s/Basic\s.*\s/Basic ***** / if defined $logHeader->{Authorization};
