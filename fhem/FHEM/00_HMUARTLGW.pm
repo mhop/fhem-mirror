@@ -1459,7 +1459,8 @@ sub HMUARTLGW_Read($)
 
 		my $crc = HMUARTLGW_crc16(chr(0xfd).$unescaped);
 		if ($crc != 0x0000 &&
-		    $hash->{DevState} != HMUARTLGW_STATE_RUNNING) {
+		    $hash->{DevState} != HMUARTLGW_STATE_RUNNING &&
+		    defined($hash->{Helper}{LastSendLen})) {
 			#When writing to the device while it prepares to write a frame to
 			#the host, the device seems to initialize the crc with 0x827f or
 			#0x8281 plus the length of the frame being received (firmware bug).
