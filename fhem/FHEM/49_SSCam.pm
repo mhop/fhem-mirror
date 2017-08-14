@@ -26,7 +26,9 @@
 #
 #########################################################################################################################
 #  Versions History:
-#
+# 
+# 2.6.3  12.08.2017    get snapGallery can also be triggered by at or notify (better use than "set"), commandref revised
+# 2.6.2  11.08.2017    set snapGallery can be triggered by at or notify
 # 2.6.1  07.08.2017    some changes in composegallery if createSnapGallery used, room Snapshots changed to SnapGalllery
 #                      commandref revised
 # 2.6.0  06.08.2017    new command createSnapGallery
@@ -187,7 +189,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "2.6.1";
+my $SSCamVersion = "2.6.3";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -542,20 +544,11 @@ sub SSCam_Set {
           camsnap($hash);
         
   } elsif ($opt eq "snapGallery") {
+      my $ret = getclhash($hash);
+      return $ret if($ret);
+  
 	  if(!AttrVal($name, "snapGalleryBoost",0)) {
 	      # Snaphash ist nicht vorhanden und wird neu abgerufen und ausgegeben
-		  if (defined($hash->{CL})) {
-		      # Clienthash auflösen zur Fehlersuche (aufrufende FHEMWEB Instanz)
-              while (my ($key,$val) = each(%{$hash->{CL}})) {
-                  $val = $val?$val:" ";
-                  Log3($name, 4, "$name - snapGallery Clienthash: $key -> $val");
-              }
-          } else {
-		      Log3($name, 2, "$name - snapGallery Clienthash wasn't delivered !");
-			  return "Clienthash wasn't delivered. Can't use asynchronous output for snapGallery.";
-		  }
-		  
-		  $hash->{HELPER}{CL} = $hash->{CL};
 		  $hash->{HELPER}{GETSNAPGALLERY} = 1;
         
 		  # snap-Infos für Gallerie abrufen
@@ -566,9 +559,18 @@ sub SSCam_Set {
 		  getsnapinfo("$name:$slim:$ssize");
 		
       } else {
-		  # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet
+		  # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet (Polling ist aktiv)
 		  my $htmlCode = composegallery($name);
-		  return $htmlCode;
+		  for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
+		      if ($hash->{HELPER}{CL}{$k}->{COMP}) {
+		          # CL zusammengestellt (Auslösung durch Notify)
+		          asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");						
+		      } else {
+			      # Output wurde über FHEMWEB ausgelöst
+		          return $htmlCode;
+		      }
+		  }
+		  delete($hash->{HELPER}{CL});
 	  }
 	  
   } elsif ($opt eq "createSnapGallery") {
@@ -789,22 +791,11 @@ sub SSCam_Get {
         getsvsinfo($hash);
                 
     } elsif ($opt eq "snapGallery") {
-	    if(!AttrVal($name, "snapGalleryBoost",0)) {
-	        # Snaphash ist nicht vorhanden und wird neu abgerufen und ausgegeben
-		    if (defined($hash->{CL})) {
-		        # Clienthash auflösen zur Fehlersuche (aufrufende FHEMWEB Instanz)
-                while (my ($key,$val) = each(%{$hash->{CL}})) {
-                    $val = $val?$val:" ";
-                    Log3($name, 4, "$name - snapGallery Clienthash: $key -> $val");
-                }
-            } else {
-		        Log3($name, 2, "$name - snapGallery Clienthash wasn't delivered !");
-			    return "Clienthash wasn't delivered. Can't use asynchronous output for snapGallery.";
-		    }
-		    return "Clienthash doesn't contain \"canAsyncOutput\" and therefore can't use asynchronous output for snapGallery. Please set attribute \"snapGalleryBoost=1\" if this error appears constantly."
-		        if(!$hash->{CL}{canAsyncOutput});
-			  
-		    $hash->{HELPER}{CL} = $hash->{CL};
+	    my $ret = getclhash($hash);
+        return $ret if($ret);
+
+		if(!AttrVal($name, "snapGalleryBoost",0)) {	
+            # Snaphash ist nicht vorhanden und wird abgerufen		
 		    $hash->{HELPER}{GETSNAPGALLERY} = 1;
         
 		    # snap-Infos für Gallerie abrufen
@@ -817,7 +808,16 @@ sub SSCam_Get {
 		} else {
 		    # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet
 			my $htmlCode = composegallery($name);
-		    return $htmlCode;
+		    for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
+		        if ($hash->{HELPER}{CL}{$k}->{COMP}) {
+		            # CL zusammengestellt (Auslösung durch Notify)
+		            asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");						
+		        } else {
+			        # Output wurde über FHEMWEB ausgelöst
+		            return $htmlCode;
+		        }
+		    }
+		    delete($hash->{HELPER}{CL});
 		}
 
     } elsif ($opt eq "snapinfo") {
@@ -2796,9 +2796,9 @@ sub sscam_camop ($) {
       return;
 	  
    } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/) {
-      # den letzten Schnappschuß life anzeigen
+      # den letzten Schnappschuß live anzeigen
 	  my $limit   = 1;                # nur 1 Snap laden, für lastsnap_fw 
-	  my $imgsize = 2;                # full size picture, für lastsnap_fw 
+	  my $imgsize = 2;                # full size image, für lastsnap_fw 
 	  my $keyword = $hash->{CAMNAME}; # nur Snaps von $camname selektieren, für lastsnap_fw   
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
    }
@@ -3080,17 +3080,18 @@ sub sscam_camop_parse ($) {
 					# Direktausgabe Snaphash wenn nicht gepollt wird
 					if(!AttrVal($name, "snapGalleryBoost",0)) {		    
 						my $htmlCode = composegallery($name);
-                        asyncOutput($hash->{HELPER}{CL}, "$htmlCode");						
-					    delete($hash->{HELPER}{SNAPHASH});               # Snaphash löschen wenn nicht gepollt wird
+                        
+					    for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
+                            asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");						
+		                }
+						delete($hash->{HELPER}{SNAPHASH});               # Snaphash löschen wenn nicht gepollt wird
 						delete($hash->{HELPER}{CL});
 					}
 
 					delete($hash->{HELPER}{GETSNAPGALLERY}); # Steuerbit getsnapgallery statt getsnapinfo
 				}		
-					
-                # Logausgabe
-                Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
 				
+                Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
             
 			} elsif ($OpMode eq "getsnapfilename") {
                 # den Filenamen eines Schnapschusses ermitteln
@@ -4012,7 +4013,7 @@ return($hash,$success);
 # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
 sub snaplimsize ($) {      
   my ($hash)= @_;
-  my $name     = $hash->{NAME};
+  my $name  = $hash->{NAME};
   my ($slim,$ssize);
   
   if(!AttrVal($name,"snapGalleryBoost",0)) {
@@ -4026,7 +4027,52 @@ sub snaplimsize ($) {
   }	
 return ($slim,$ssize);
 }
-	 
+
+
+###############################################################################
+# Clienthash übernehmen oder zusammenstellen
+# Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
+sub getclhash ($) {      
+  my ($hash)= @_;
+  my $name  = $hash->{NAME};
+  my $ret;
+
+  if (!defined($hash->{CL})) {
+      # Clienthash wurde nicht übergeben und wird erstellt (FHEMWEB Instanzen mit canAsyncOutput=1 analysiert)
+	  my $outdev;
+	  my @webdvs = devspec2array("TYPE=FHEMWEB:FILTER=canAsyncOutput=1:FILTER=STATE=Connected");
+	  my $i = 1;
+      foreach (@webdvs) {
+          $outdev = $_;
+          next if(!$defs{$outdev});
+		  $hash->{HELPER}{CL}{$i}->{NAME} = $defs{$outdev}{NAME};
+          $hash->{HELPER}{CL}{$i}->{NR}   = $defs{$outdev}{NR};
+		  $hash->{HELPER}{CL}{$i}->{COMP} = 1;
+          $i++;				  
+      }
+  } else {
+      # übergebenen CL-Hash in Helper eintragen
+	  $hash->{HELPER}{CL}{1} = $hash->{CL};
+  }
+	  
+  # Clienthash auflösen zur Fehlersuche (aufrufende FHEMWEB Instanz
+  if (defined($hash->{HELPER}{CL}{1})) {
+      for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
+	      Log3($name, 4, "$name - Clienthash number: $k");
+          while (my ($key,$val) = each(%{$hash->{HELPER}{CL}{$k}})) {
+              $val = $val?$val:" ";
+              Log3($name, 4, "$name - snapGallery Clienthash: $key -> $val");
+          }
+	  }
+  } else {
+      Log3($name, 2, "$name - snapGallery Clienthash was neither delivered nor created !");
+	  $ret = "Clienthash was neither delivered nor created. Can't use asynchronous output for snapGallery.";
+  }
+  
+return ($ret);
+}
+
+
 ###############################################################################
 #   Schnappschußgalerie zusammenstellen
 sub composegallery ($;$$) { 
@@ -4700,8 +4746,10 @@ sub experror {
   The command is only available if the attribute "snapGalleryBoost=1" is set. <br>
   It creates an output of the last [x] snapshots as well as "get ... snapGallery".  But differing from "get" with
   <a href="#SSCamattr">attribute</a> "snapGalleryBoost=1" no popup will be created. The snapshot gallery will be depicted as
-  an browserpage instead. All further functions and attributes are appropriate the <a href="#SSCamget">"get ... snapGallery"</a>
-  command.
+  an browserpage instead. All further functions and attributes are appropriate the <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a>
+  command. <br>
+  If you want create a snapgallery output by triggering, e.g. with an "at" or "notify", you should use the 
+  <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a> command instead of "set".
   </ul>
   <br><br>
   
@@ -4753,7 +4801,9 @@ sub experror {
   A popup with the last [x] snapshots will be created. If the <a href="#SSCamattr">attribute</a> "snapGalleryBoost" is set, 
   the last snapshots (default 3) are requested by polling and they will be stored in the FHEM-servers main memory. 
   This method is helpful to speed up the output especially in case of full size images, but it can be possible 
-  that NOT the newest snapshots are be shown if they have not be initialized by the SSCAm-module itself.
+  that NOT the newest snapshots are be shown if they have not be initialized by the SSCAm-module itself. <br>
+  The function can also be triggered, e.g. by an "at" or "notify". In that case the snapshotgallery will be displayed on all 
+  connected FHEMWEB instances as a popup. <br><br>
   
   To control this function behavior there are further <a href="#SSCamattr">attributes</a>: <br><br>
   
@@ -5590,9 +5640,11 @@ sub experror {
   <li><b> set &lt;name&gt; snapGallery [1-10] </b></li> <br>
   
   Der Befehl ist nur vorhanden wenn das Attribut "snapGalleryBoost=1" gesetzt wurde.
-  Er erzeugt eine Ausgabe der letzten [x] Schnappschüsse ebenso wie "get ... snapGallery".  Abweichend von "get" wird mit Attribut
+  Er erzeugt eine Ausgabe der letzten [x] Schnappschüsse ebenso wie <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a>.  Abweichend von "get" wird mit Attribut
   <a href="#SSCamattr">Attribut</a> "snapGalleryBoost=1" kein Popup erzeugt, sondern die Schnappschußgalerie als Browserseite
-  dargestellt. Alle weiteren Funktionen und Attribute entsprechen dem <a href="#SSCamget">"get ... snapGallery"</a> Kommando.
+  dargestellt. Alle weiteren Funktionen und Attribute entsprechen dem "get &lt;name&gt; snapGallery" Kommando. <br>
+  Wenn die Ausgabe einer Schnappschußgalerie, z.B. über ein "at oder "notify", getriggert wird, sollte besser das  
+  <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a> Kommando anstatt "set" verwendet werden.
   </ul>
   <br><br>
 
@@ -5654,7 +5706,9 @@ sub experror {
   
   Es wird ein Popup mit den letzten [x] Schnapschüssen erzeugt. Ist das <a href="#SSCamattr">Attribut</a> "snapGalleryBoost" gesetzt, 
   werden die letzten Schnappschüsse (default 3) über Polling abgefragt und im Speicher gehalten. Das Verfahren hilft die Ausgabe zu beschleunigen,
-  kann aber möglicherweise nicht den letzten Schnappschuß anzeigen, falls dieser NICHT über das Modul ausgelöst wurde.
+  kann aber möglicherweise nicht den letzten Schnappschuß anzeigen, falls dieser NICHT über das Modul ausgelöst wurde. <br>
+  Diese Funktion kann ebenfalls, z.B. mit "at" oder "notify", getriggert werden. Dabei wird die Schnappschußgalerie auf allen 
+  verbundenen FHEMWEB-Instanzen als Popup angezeigt. <br><br>
   
   Zur weiteren Steuerung dieser Funktion stehen die <a href="#SSCamattr">Attribute</a>: <br><br>
   
