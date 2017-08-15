@@ -1295,7 +1295,7 @@ sub
 FW_detailSelect(@)
 {
   my ($d, $cmd, $list, $param) = @_;
-  return if(!$list || $FW_hiddenroom{input});
+  return "" if(!$list || $FW_hiddenroom{input});
   my %al = map { s/:.*//;$_ => 1 } split(" ", $list);
   my @al = sort keys %al; # remove duplicate items in list
 
