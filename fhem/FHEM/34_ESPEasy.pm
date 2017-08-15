@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.31";     # Version of this module
+my $module_version    = "1.32";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -2726,6 +2726,27 @@ sub ESPEasy_removeGit($)
     <li>Further information about this module is available here:
       <a href="https://forum.fhem.de/index.php/topic,55728.0.html">Forum #55728</a>
     </li>
+    <br>
+    <li><b>UPDATE:
+    </li>
+    <li></b>For security reasons: if one or more of your ESPEasy device uses an
+      public IP address then you have to enable this explicitly or the device(s)
+      will be ignored/rejected:
+    </li>
+    <ul>
+      <li>
+        Enable all ESPEasy device IP addresses/subnets/regexs with the help of
+        bridge attributes
+        <a href="#ESPEasy_bridge_attr_allowedips">allowedIPs</a> /
+        <a href="#ESPEasy_bridge_attr_deniedips">deniedIPs</a>.
+      </li>
+      <li>
+        Enable authentication: see attribute
+        <a href="#ESPEasy_bridge_attr_authentication">authentication</a> and
+        bridge set <a href="#ESPEasy_bridge_set_user">user</a>
+                 / <a href="#ESPEasy_bridge_set_pass">pass</a> commands.
+      </li>
+    </ul>
     <br>
   </ul>
 
