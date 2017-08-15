@@ -236,9 +236,12 @@ FW_jqueryReadyFn()
         .html('<a>'+$(this).html()+'</a>')
         .css({cursor:"pointer"})
         .click(function(){
-          var aname = "#sel_attr"+$(this).attr("data-name").replace(/\./g,'_');
-          $(aname).val($(this).text());
-          FW_detailSelect(aname);
+          var attrName = $(this).text();
+          var sel = "#sel_attr"+$(this).attr("data-name").replace(/\./g,'_');
+          if($(sel+" option[value='"+attrName+"']").length == 0)
+            $(sel).append('<option value="'+attrName+'">'+attrName+'</option>');
+          $(sel).val(attrName);
+          FW_detailSelect(sel, true);
         });
     });
 
@@ -991,7 +994,7 @@ FW_longpoll()
 /*************** WIDGETS START **************/
 /*************** "Double" select in detail window ****/
 function
-FW_detailSelect(selEl)
+FW_detailSelect(selEl, mayMissing)
 {
   if(selEl.target)
     selEl = selEl.target;
@@ -1003,18 +1006,21 @@ FW_detailSelect(selEl)
       devName = $(div).attr("dev"),
       cmd = $(div).attr("cmd");
 
-  for(var i1=0; i1<listArr.length; i1++) {
+  var i1;
+  for(i1=0; i1<listArr.length; i1++) {
     arg = listArr[i1];
     if(arg.indexOf(selVal) == 0 &&
        (arg.length == selVal.length || arg[selVal.length] == ':'))
       break;
   }
-  if(i1==listArr.length)
-    return;
 
   var vArr = [];
-  if(arg.length > selVal.length)
-    vArr = arg.substr(selVal.length+1).split(","); 
+  if(i1==listArr.length && !mayMissing)
+    return;
+  if(i1<listArr.length) {
+    if(arg.length > selVal.length)
+      vArr = arg.substr(selVal.length+1).split(","); 
+  }
 
   var newEl = FW_replaceWidget($(selEl).next(), devName, vArr,undefined,selVal);
   if(cmd == "attr")
