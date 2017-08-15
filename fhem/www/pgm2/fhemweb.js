@@ -1009,7 +1009,7 @@ FW_detailSelect(selEl)
        (arg.length == selVal.length || arg[selVal.length] == ':'))
       break;
   }
-  if(!arg)
+  if(i1==listArr.length)
     return;
 
   var vArr = [];
