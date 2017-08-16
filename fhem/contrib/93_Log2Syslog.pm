@@ -396,12 +396,12 @@ return($data);
   <b>Define</b>
   <ul>
     <br>
-    <code>define &lt;name&gt; Log2Syslog &lt;destination host&gt; [event:<regexp>] [fhem:<regexp>]</code><br>
+    <code>define &lt;name&gt; Log2Syslog &lt;destination host&gt; [event:&lt;regexp&gt;] [fhem:&lt;regexp&gt;]</code><br>
     <br>
 	
 	&lt;destination host&gt; = host where the syslog server is running <br>
-	[event:<regexp>] = optional regex to filter events for logging  <br>
-	[fhem:<regexp>] = optional regex to filter fhem system log for logging <br><br>
+	[event:&lt;regexp&gt;] = optional regex to filter events for logging  <br>
+	[fhem:&lt;regexp&gt;] = optional regex to filter fhem system log for logging <br><br>
 	
 	After definition the new device sends all new appearing fhem systemlog entries and events to the destination host, 
 	port=514/UDP format:IETF, immediately without further settings if the regex for fhem or event were set. <br>
@@ -494,12 +494,12 @@ Mar 20 15:47:53 fhem-vm-8 fhem: 2016-03-20_15:47:53 global: INITIALIZED</pre>
   <b>Definition</b>
   <ul>
     <br>
-    <code>define &lt;name&gt; Log2Syslog &lt;destination host&gt; [event:<regexp>] [fhem:<regexp>] </code><br>
+    <code>define &lt;name&gt; Log2Syslog &lt;destination host&gt; [event:&lt;regexp&gt;] [fhem:&lt;regexp&gt;] </code><br>
     <br>
 
 	&lt;Zielhost&gt; = Host (Name oder IP-Adresse) auf dem der Syslog-Server läuft <br>
-	[event:<regexp>] = optionaler regulärer Ausdruck zur Filterung von Events zur Weiterleitung <br>
-	[fhem:<regexp>] = optionaler regulärer Ausdruck zur Filterung von FHEM Logs zur Weiterleitung <br><br>
+	[event:&lt;regexp&gt;] = optionaler regulärer Ausdruck zur Filterung von Events zur Weiterleitung <br>
+	[fhem:&lt;regexp&gt;] = optionaler regulärer Ausdruck zur Filterung von FHEM Logs zur Weiterleitung <br><br>
 	
 	Direkt nach der Definition sendet das neue Device alle neu auftretenden FHEM Systemlog Einträge und Events ohne weitere 
 	Einstellungen an den Zielhost, Port=514/UDP Format:IETF, wenn reguläre Ausdrücke für Events/FHEM angegeben wurden. <br>
