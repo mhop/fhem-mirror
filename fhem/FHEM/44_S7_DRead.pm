@@ -267,12 +267,40 @@ sub S7_DRead_Parse_new($$) {
 			my $myI = $hash->{S7PLCClient}->ByteAt( \@Writebuffer, $s );
 
 			Log3 $name, 6, "$name S7_DRead_Parse update $n ";
-
-			if ( ( int($myI) & ( 1 << ( $h->{POSITION} % 8 ) ) ) > 0 ) {
-				main::readingsSingleUpdate( $h, "state", "on", 1 );
+			
+			my $valueText = "";
+			
+			if ( ( int($myI) & ( 1 << ( $h->{POSITION} % 8 ) ) ) > 0 ) {				
+				$valueText = "on";
 			}
 			else {
-				main::readingsSingleUpdate( $h, "state", "off", 1 );
+				$valueText = "off";
+			}
+
+			
+			if (ReadingsVal($h->{NAME},"state","") ne $valueText) {				
+				main::readingsSingleUpdate( $h, "state", $valueText, 1 );
+			} else {
+				my $reading="state";
+				#value not changed check event-min-interval attribute
+				my $attrminint = AttrVal($name, "event-min-interval", undef);
+				if($attrminint) {
+						my @a = split(/,/,$attrminint);
+				}			
+				my @v = grep { my $l = $_;
+							   $l =~ s/:.*//;
+							   ($reading=~ m/^$l$/) ? $_ : undef} @a;
+				if(@v) {
+				  my (undef, $minInt) = split(":", $v[0]);
+				  
+				  my $now = gettimeofday();
+				  my $le = $hash->{".lastTime$reading"};
+
+				  if($le && $now-$le >= $minInt) {
+						main::readingsSingleUpdate( $h, $reading, $valueText, 1 );
+				  }
+				} 
+			
 			}
 		}
 	}
@@ -329,6 +357,7 @@ sub S7_DRead_Parse($$) {
 		my @Writebuffer = unpack( "C" x $length,
 			pack( "H2" x $length, split( ",", $hexbuffer ) ) );
 
+		my $now = gettimeofday();
 		foreach my $clientName (@clientList) {
 
 			my $h = $defs{$clientName};
@@ -351,15 +380,91 @@ sub S7_DRead_Parse($$) {
 
 				Log3 $name, 6, "$name S7_DRead_Parse update $clientName ";
 
-				if ( ( int($myI) & ( 1 << ( $h->{POSITION} % 8 ) ) ) > 0 ) {
-
-					main::readingsSingleUpdate( $h, "state", "on", 1 );
-
+#				if ( ( int($myI) & ( 1 << ( $h->{POSITION} % 8 ) ) ) > 0 ) {
+#					main::readingsSingleUpdate( $h, "state", "on", 1 );
+#				}
+#				else {
+#					main::readingsSingleUpdate( $h, "state", "off", 1 );
+#				}
+				
+				my $valueText = "";
+				my $reading="state";
+				
+				if ( ( int($myI) & ( 1 << ( $h->{POSITION} % 8 ) ) ) > 0 ) {				
+					$valueText = "on";
 				}
 				else {
-					main::readingsSingleUpdate( $h, "state", "off", 1 );
-
+					$valueText = "off";
 				}
+
+				#check event-onchange-reading
+				#code wurde der datei fhem.pl funktion readingsBulkUpdate entnommen und adaptiert
+				my $attreocr= AttrVal($h->{NAME}, "event-on-change-reading", undef);
+				my @a;
+				if($attreocr) {
+					@a = split(/,/,$attreocr);
+					$hash->{".attreocr"} = \@a;
+				}
+				# determine whether the reading is listed in any of the attributes
+				my @eocrv;
+				my $eocr = $attreocr &&
+					( @eocrv = grep { my $l = $_; $l =~ s/:.*//;
+										($reading=~ m/^$l$/) ? $_ : undef} @a);
+			
+
+			  # check if threshold is given
+				my $eocrExists = $eocr;
+				if( $eocr
+					&& $eocrv[0] =~ m/.*:(.*)/ ) {
+				  my $threshold = $1;
+
+				  if($valueText =~ m/([\d\.\-eE]+)/ && looks_like_number($1)) { #41083, #62190
+					my $mv = $1;
+					my $last_value = $hash->{".attreocr-threshold$reading"};
+					if( !defined($last_value) ) {
+					  $h->{".attreocr-threshold$reading"} = $mv;
+					} elsif( abs($mv - $last_value) < $threshold ) {
+					  $eocr = 0;
+					} else {
+					  $h->{".attreocr-threshold$reading"} = $mv;
+					}
+				  }
+				}
+				
+				my $changed = !($attreocr)
+					  || ($eocr && ($valueText ne ReadingsVal($h->{NAME},$reading,"")));				
+								
+
+				my $attrminint = AttrVal($h->{NAME}, "event-min-interval", undef);
+				my @aa;
+				if($attrminint) {
+						@aa = split(/,/,$attrminint);
+				}								
+					
+				my @v = grep { my $l = $_;
+							   $l =~ s/:.*//;
+							   ($reading=~ m/^$l$/) ? $_ : undef
+							  } @aa;
+				if(@v) {
+				  my (undef, $minInt) = split(":", $v[0]);
+				  my $le = $h->{".lastTime$reading"};
+				  if($le && $now-$le < $minInt) {
+					if(!$eocr || ($eocr && $valueText eq ReadingsVal($h->{NAME},$reading,""))){
+					  $changed = 0;
+					#} else {
+					#  $hash->{".lastTime$reading"} = $now;
+					}
+				  } else {
+					#$hash->{".lastTime$reading"} = $now;
+					$changed = 1 if($eocrExists);
+				  }
+				}				
+
+				if ($changed == 1) {				
+					main::readingsSingleUpdate( $h, $reading, $valueText, 1 );
+				}
+				
+				
 			}
 
 			#			}

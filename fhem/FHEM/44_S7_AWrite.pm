@@ -59,7 +59,7 @@ sub S7_AWrite_Define($$) {
 			}
 			else {
 				my $msg =
-"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_AWrite {AI|AM|AQ|NAI|NAQ}";
 
 				Log3 undef, 2, $msg;
 				return $msg;
@@ -77,7 +77,7 @@ sub S7_AWrite_Define($$) {
 			}
 			else {
 				my $msg =
-"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_AWrite {AI|AM|AQ|NAI|NAQ}";
 
 				Log3 undef, 2, $msg;
 				return $msg;
@@ -95,7 +95,7 @@ sub S7_AWrite_Define($$) {
 			}
 			else {
 				my $msg =
-"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_AWrite {AI|AM|AQ|NAI|NAQ}";
 
 				Log3 undef, 2, $msg;
 				return $msg;
@@ -109,7 +109,7 @@ sub S7_AWrite_Define($$) {
 			}
 			else {
 				my $msg =
-"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_AWrite {AI|AM|AQ|NAI|NAQ}";
 
 				Log3 undef, 2, $msg;
 				return $msg;
@@ -122,7 +122,7 @@ sub S7_AWrite_Define($$) {
 			}
 			else {
 				my $msg =
-"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_AWrite {AI|AM|AQ|NAI|NAQ}";
 
 				Log3 undef, 2, $msg;
 				return $msg;
@@ -130,7 +130,7 @@ sub S7_AWrite_Define($$) {
 		}
 		else {
 			my $msg =
-"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {AI|AM|AQ|NAI|NAQ}";
+"wrong syntax : define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_AWrite {AI|AM|AQ|NAI|NAQ}";
 
 			Log3 undef, 2, $msg;
 			return $msg;
@@ -422,6 +422,7 @@ sub S7_AWrite_Parse($$) {
 			pack( "H2" x $length, split( ",", $hexbuffer ) ) );
 
 		#my $b = pack( "C" x $length, @Writebuffer );
+		my $now = gettimeofday();
 		foreach my $clientName (@clientList) {
 
 			my $h = $defs{$clientName};
@@ -465,7 +466,75 @@ sub S7_AWrite_Parse($$) {
 					  . $h->{DATATYPE} . ")";
 				}
 
-				main::readingsSingleUpdate( $h, "state", $myI, 1 );
+				#main::readingsSingleUpdate( $h, "state", $myI, 1 );
+				my $reading="state";
+				#check event-onchange-reading
+				#code wurde der datei fhem.pl funktion readingsBulkUpdate entnommen und adaptiert
+				my $attreocr= AttrVal($h->{NAME}, "event-on-change-reading", undef);
+				my @a;
+				if($attreocr) {
+					@a = split(/,/,$attreocr);
+					$hash->{".attreocr"} = \@a;
+				}
+				# determine whether the reading is listed in any of the attributes
+				my @eocrv;
+				my $eocr = $attreocr &&
+					( @eocrv = grep { my $l = $_; $l =~ s/:.*//;
+										($reading=~ m/^$l$/) ? $_ : undef} @a);
+			
+
+			  # check if threshold is given
+				my $eocrExists = $eocr;
+				if( $eocr
+					&& $eocrv[0] =~ m/.*:(.*)/ ) {
+				  my $threshold = $1;
+
+				  if($myI =~ m/([\d\.\-eE]+)/ && looks_like_number($1)) { #41083, #62190
+					my $mv = $1;
+					my $last_value = $hash->{".attreocr-threshold$reading"};
+					if( !defined($last_value) ) {
+					  $h->{".attreocr-threshold$reading"} = $mv;
+					} elsif( abs($mv - $last_value) < $threshold ) {
+					  $eocr = 0;
+					} else {
+					  $h->{".attreocr-threshold$reading"} = $mv;
+					}
+				  }
+				}
+				
+				my $changed = !($attreocr)
+					  || ($eocr && ($myI ne ReadingsVal($h->{NAME},$reading,"")));				
+								
+
+				my $attrminint = AttrVal($h->{NAME}, "event-min-interval", undef);
+				my @aa;
+				if($attrminint) {
+						@aa = split(/,/,$attrminint);
+				}								
+					
+				my @v = grep { my $l = $_;
+							   $l =~ s/:.*//;
+							   ($reading=~ m/^$l$/) ? $_ : undef
+							  } @aa;
+				if(@v) {
+				  my (undef, $minInt) = split(":", $v[0]);
+				  my $le = $h->{".lastTime$reading"};
+				  if($le && $now-$le < $minInt) {
+					if(!$eocr || ($eocr && $myI eq ReadingsVal($h->{NAME},$reading,""))){
+					  $changed = 0;
+					#} else {
+					#  $hash->{".lastTime$reading"} = $now;
+					}
+				  } else {
+					#$hash->{".lastTime$reading"} = $now;
+					$changed = 1 if($eocrExists);
+				  }
+				}				
+
+				if ($changed == 1) {				
+					main::readingsSingleUpdate( $h, $reading, $myI, 1 );
+				}
+								
 			}
 		}
 	}
@@ -616,6 +685,9 @@ sub S7_AWrite_Parse($$) {
 Note: the required memory area (start &ndash; start + datatypelength) need to be with in the configured PLC writing of the physical module.</ul>
 </ul>
 </ul>
+<p>Logo 7 / Logo 8</p>
+<p style="padding-left: 60px;">For Logo7 / Logo 8 also a short notation is supportet:</p>
+<p><code>define &lt;name&gt; S7_AWrite {AI|AM|AQ|NAI|NAQ}X</code></p>
 <p><strong>Set</strong><br /><br /><code>set &lt;name&gt; S7_AWrite &lt;value&gt;</code></p>
 <ul>
 <ul>
@@ -661,6 +733,9 @@ Note: the required memory area (start &ndash; start + datatypelength) need to be
 Note: the required memory area (start &ndash; start + datatypelength) need to be with in the configured PLC writing of the physical module.</ul>
 </ul>
 </ul>
+<p>Logo 7 / Logo 8</p>
+<p style="padding-left: 60px;">For Logo7 / Logo 8 also a short notation is supportet:</p>
+<p><code>define &lt;name&gt; S7_AWrite {AI|AM|AQ|NAI|NAQ}X</code></p>
 <p><strong>Set</strong><br /><br /><code>set &lt;name&gt; S7_AWrite &lt;value&gt;</code></p>
 <ul>
 <ul>
