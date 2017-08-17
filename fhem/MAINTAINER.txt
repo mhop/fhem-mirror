@@ -263,6 +263,7 @@ FHEM/59_PROPLANTA.pm         tupol                http://forum.fhem.de Unterstue
 FHEM/59_WWO.pm               baumrasen            http://forum.fhem.de Unterstuetzende Dienste/Wettermodule
 FHEM/59_Weather.pm           neubert              http://forum.fhem.de Unterstuetzende Dienste/Wettermodule
 FHEM/59_Wunderground.pm      loredo               http://forum.fhem.de Unterstuetzende Dienste/Wettermodule
+FHEM/59_WUup.pm              mahowi               http://forum.fhem.de Unterstuetzende Dienste/Wettermodule
 FHEM/60_allergy.pm           markus-m             http://forum.fhem.de Unterstuetzende Dienste
 FHEM/60_EM.pm                rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/61_EMWZ.pm              rudolfkoenig         http://forum.fhem.de SlowRF

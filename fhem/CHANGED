@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     59_WUup: first release (Forum #65587)
   - feature: 49_SSCam: V2.6.3, snapGallery can be triggered by e.g. notify
   - bugfix:  93_DbLog: V2.22.3, Forum:#74690, unitialized message in row ...
   - feature: 34_ESPEasy: reject non local IPs wo/ basic auth
