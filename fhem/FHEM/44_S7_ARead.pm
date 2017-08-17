@@ -50,6 +50,9 @@ sub S7_ARead_Define($$) {
 	my ( $name, $area, $DB, $start, $datatype );
 
 	$name     = $a[0];
+
+	AssignIoPort($hash);
+
 	if ( uc $a[2] =~ m/^[NA](\d*)/ ) {
 		my $Offset;
 		$area = "db";
@@ -209,8 +212,6 @@ sub S7_ARead_Define($$) {
 	else {
 		push( @{ $modules{S7_ARead}{defptr}{$ID} }, $hash );
 	}
-
-	AssignIoPort($hash);    # logisches modul an physikalisches binden !!!
 
 	$hash->{IODev}{dirty} = 1;
 	Log3 $name, 4,

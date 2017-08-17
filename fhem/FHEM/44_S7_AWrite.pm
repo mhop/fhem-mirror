@@ -41,6 +41,8 @@ sub S7_AWrite_Define($$) {
 	my ( $name, $area, $DB, $start, $datatype, $length );
 
 	$name     = $a[0];
+
+        AssignIoPort($hash);
 	
 	if ( uc $a[2] =~ m/^[NA](\d*)/ ) {
 		my $Offset;
@@ -189,7 +191,6 @@ sub S7_AWrite_Define($$) {
 			$length = 1;
 		}
 	}
-	AssignIoPort($hash);    # logisches modul an physikalisches binden !!!
 
 	$hash->{AREA}     = $area;
 	$hash->{DB}       = $DB;
