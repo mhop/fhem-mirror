@@ -27,6 +27,7 @@
 #######################################################################################################
 #  Versions History:
 #
+# 2.1.0      17.08.2017       sub setsock created
 # 2.0.0      16.08.2017       create syslog without SYS::SYSLOG
 # 1.1.1      13.08.2017       registrate fhemlog_log to %loginform in case of sending fhem-log
 #                             attribute timeout, commandref revised
@@ -66,7 +67,7 @@ sub Log2Syslog_Initialize($) {
   $hash->{UndefFn}  = "Log2Syslog_Undef";
   $hash->{DeleteFn} = "Log2Syslog_Delete";
   $hash->{AttrFn}   = "Log2Syslog_Attr";
-  $hash->{NotifyFn} = "Log2Syslog_Main";
+  $hash->{NotifyFn} = "event_Log";
 
   $hash->{AttrList} = "addStateEvent:1,0 ".
                       "disable:1,0 ".
@@ -118,7 +119,7 @@ sub Log2Syslog_Define($@) {
   $hash->{MYHOST}           = hostfqdn ();                  # FQDN eigener Host
   $hash->{HELPER}{PID}      = $$;                           # PROCID in IETF 
   $hash->{VERSION}          = $Log2SyslogVn;
-  $logInform{$hash->{NAME}} = "Log2Syslog_Main";            # Funktion die in hash %loginform für $name eingetragen wird
+  $logInform{$hash->{NAME}} = "fhemlog_Log";                # Funktion die in hash %loginform für $name eingetragen wird
   
   readingsSingleUpdate($hash, "state", "initialized", 1);
   
@@ -127,13 +128,11 @@ return undef;
 
 sub Log2Syslog_Undef($$) {
   my ($hash, $name) = @_;
-  $hash->{HELPER}{SOCK}->close() if($hash->{HELPER}{SOCK});
 return undef;
 }
 
 sub Log2Syslog_Delete($$) {
   my ($hash, $arg) = @_;
-  $hash->{HELPER}{SOCK}->close() if($hash->{HELPER}{SOCK});
   delete $logInform{$hash->{NAME}};
 return undef;
 }
@@ -161,66 +160,8 @@ sub Log2Syslog_Attr {
 	if ($cmd eq "set" && $aName eq "port") {
         if($aVal !~ m/^\d+$/) { return " The Value of \"$aName\" is not valid. Use only figures !";}
 	}
-	
-	if ($aName =~ m/^.*logFilter$/) {
-	    return "Bad regexp: starting with *" if($aVal =~ m/^\*/);
-        eval { "Hallo" =~ m/^$aVal$/ };
-        return "Bad regexp: $@" if($@);
-	}
     
 return undef;
-}
-
-#################################################################################
-#               Main sub
-#################################################################################
-sub Log2Syslog_Main ($$) { 
-  my ($a,$b) = @_;
-  my ($hash,$name,$dev,$raw);
-  my $call = "init";
-  my $ret;
-  
-  if (ref($a) eq "HASH") {
-      # call from notifyFn
-	  # $hash is my entry, $dev is the entry of the changed device
-	  $hash = $a;
-	  $name = $hash->{NAME};
-	  $dev  = $b;
-	  $call = "evt";
-  } else {
-      # call from %loginform
-	  $name = $a;
-      $hash = $defs{$name};
-	  $raw  = $b;
-	  $call = "log";
-  }
-  return if(IsDisabled($name));
-  
-  my $host    = $hash->{PEERHOST};
-  my $port    = AttrVal($name, "port", 514);
-  my $type    = lc(AttrVal($name, "type", "udp"));
-  my $st      = "active";
-  
-  # Create Socket and check if successful
-  $hash->{HELPER}{SOCK} = new IO::Socket::INET (PeerHost => $host, PeerPort => $port, Proto => $type); 
-  
-  if ($hash->{HELPER}{SOCK}) {
-      if($call eq "log" && defined($hash->{HELPER}{FHEMLOG})) {
-	      # FHEM System-Logs
-		  $ret = fhemlog_Log($name,$raw);
-	  }
-	  if ($call eq "evt" && defined($hash->{HELPER}{EVNTLOG})) {
-	      # FHEM Eventlogs
-	      $ret = event_Log($hash,$dev);
-	  }
-  } else {
-      $st = "unable for open socket for $host, $type, $port";
-  }
-  readingsSingleUpdate($hash, "state", $st, 1) if($st ne OldValue($name));
-  $hash->{HELPER}{SOCK}->close() if($hash->{HELPER}{SOCK});
-  delete $hash->{HELPER}{SOCK};
-  
-return $ret;
 }
 
 #################################################################################
@@ -232,9 +173,9 @@ sub event_Log($$) {
   my $name    = $hash->{NAME};
   my $rex     = $hash->{HELPER}{EVNTLOG};
   my $sock    = $hash->{HELPER}{SOCK};
-  my ($prival);
+  my ($prival,$sock);
   
-  return if(!$rex);
+  return if(IsDisabled($name) || !$rex);
   my $events = deviceEvents($dev, AttrVal($name, "addStateEvent", 0));
   return if(!$events);
 
@@ -256,7 +197,12 @@ sub event_Log($$) {
 	      $prival = setprival($s);
 	    
 	      my $data = setpayload($hash,$prival,$date,$time,$otp,"event");	
-	      eval {$sock->send($data);};
+      
+	      $sock = setsock($hash);
+          if ($sock) {	  
+	          eval {$sock->send($data);};
+		      $sock->close();
+	      }
       }
   }
   
@@ -271,9 +217,9 @@ sub fhemlog_Log($$) {
   my $hash    = $defs{$name};
   my $rex     = $hash->{HELPER}{FHEMLOG};
   my $sock    = $hash->{HELPER}{SOCK};
-  my ($prival);
+  my ($prival,$sock);
   
-  return if(!$rex);
+  return if(IsDisabled($name) || !$rex);
 	
   my ($date,$time,$vbose,undef,$text) = split(" ",$raw,5);
   $date =~ s/\./-/g;
@@ -283,11 +229,37 @@ sub fhemlog_Log($$) {
       $otp    = "$tim $otp" if AttrVal($name,'addTimestamp',0);
 	  $prival = setprival($text,$vbose);
 	  
-      my $data = setpayload($hash,$prival,$date,$time,$otp,"fhem");	  
-	  eval {$sock->send($data);};
+      my $data = setpayload($hash,$prival,$date,$time,$otp,"fhem");	
+      
+      $sock = setsock($hash);
+      if ($sock) {	  
+	      eval {$sock->send($data);};
+		  $sock->close();
+	  }
   }
   
-return "";
+return undef;
+}
+
+###############################################################################
+#                        create Socket 
+###############################################################################
+sub setsock ($) { 
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $host   = $hash->{PEERHOST};
+  my $port   = AttrVal($name, "port", 514);
+  my $type   = lc(AttrVal($name, "type", "udp"));
+  my $st     = "active";
+  
+  # Create Socket and check if successful
+  my $sock = new IO::Socket::INET (PeerHost => $host, PeerPort => $port, Proto => $type); 
+
+  $st = "unable for open socket for $host, $type, $port" if (!$sock);
+
+  readingsSingleUpdate($hash, "state", $st, 1) if($st ne OldValue($name));
+  
+return($sock);
 }
 
 ###############################################################################
