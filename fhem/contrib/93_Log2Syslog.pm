@@ -22,11 +22,14 @@
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #       The module based on idea and input from betateilchen 92_rsyslog.pm
-#       Implements the Syslog Protocol of RFC 5424  (https://tools.ietf.org/html/rfc5424)
+#       Implements the Syslog Protocol of RFC 5424  https://tools.ietf.org/html/rfc5424
+#       and RFC 3164 https://tools.ietf.org/html/rfc3164
 #
 #######################################################################################################
 #  Versions History:
 #
+# 2.2.0      17.08.2017       set BSD data length, set only acceptable characters (USASCII) in payload
+#                             commandref revised
 # 2.1.0      17.08.2017       sub setsock created
 # 2.0.0      16.08.2017       create syslog without SYS::SYSLOG
 # 1.1.1      13.08.2017       registrate fhemlog_log to %loginform in case of sending fhem-log
@@ -41,7 +44,7 @@ use warnings;
 eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
 eval "use Net::Domain qw(hostfqdn);1"  or my $MissModulNDom = "Net::Domain";
 
-my $Log2SyslogVn = "2.0.0";
+my $Log2SyslogVn = "2.2.0";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -58,6 +61,11 @@ my %Log2Syslog_BSDMonth = (
   "11" => "Nov",
   "12" => "Dec"
 );
+
+# Längenvorgaben nach RFC3164
+my %RFC3164len = ("TAG"  => 32,           # max. Länge TAG-Feld
+                  "DL"   => 1024          # max. Lange Message insgesamt
+   			     );
 
 #####################################
 sub Log2Syslog_Initialize($) {
@@ -172,7 +180,6 @@ sub event_Log($$) {
   my ($hash,$dev) = @_;
   my $name    = $hash->{NAME};
   my $rex     = $hash->{HELPER}{EVNTLOG};
-  my $sock    = $hash->{HELPER}{SOCK};
   my ($prival,$sock);
   
   return if(IsDisabled($name) || !$rex);
@@ -187,12 +194,13 @@ sub event_Log($$) {
   for (my $i = 0; $i < $max; $i++) {
       my $s = $events->[$i];
       $s = "" if(!defined($s));
-      
+      $s =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd;         # nur erlaubte Zeichen in payload, ASCII %d32-126
+	  
 	  my $tim          = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
       my ($date,$time) = split(" ",$tim);
 	  
 	  if($n =~ m/^$rex$/ || "$n:$s" =~ m/^$rex$/ || "$tim:$n:$s" =~ m/^$rex$/) {	  
-          my $otp = "$n -> $s";
+          my $otp = "$n $s";
           $otp    = "$tim $otp" if AttrVal($name,'addTimestamp',0);
 	      $prival = setprival($s);
 	    
@@ -216,14 +224,15 @@ sub fhemlog_Log($$) {
   my ($name,$raw) = @_;                              
   my $hash    = $defs{$name};
   my $rex     = $hash->{HELPER}{FHEMLOG};
-  my $sock    = $hash->{HELPER}{SOCK};
   my ($prival,$sock);
   
   return if(IsDisabled($name) || !$rex);
 	
   my ($date,$time,$vbose,undef,$text) = split(" ",$raw,5);
+  $text =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd;      # nur erlaubte Zeichen in payload, ASCII %d32-126
   $date =~ s/\./-/g;
   my $tim = $date." ".$time;
+  
   if($text =~ m/^$rex$/ || "$vbose: $text" =~ m/^$rex$/) {  
       my $otp = "$vbose: $text";
       $otp    = "$tim $otp" if AttrVal($name,'addTimestamp',0);
@@ -237,8 +246,7 @@ sub fhemlog_Log($$) {
 		  $sock->close();
 	  }
   }
-  
-return undef;
+return;
 }
 
 ###############################################################################
@@ -319,19 +327,21 @@ sub setpayload ($$$$$$) {
   
   if ($lf eq "BSD") {
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
-      $time  = (split(".",$time))[0];         # msec ist nicht erlaubt
-	  $month = $Log2Syslog_BSDMonth{$month};  # Monatsmapping z.B. 01 -> Jan
-	  $day   =~ s/0/ /;                       # in Tagen < 10 muss 0 durch Space ersetzt werden
+      $time  = (split(".",$time))[0];               # msec ist nicht erlaubt
+	  $month = $Log2Syslog_BSDMonth{$month};        # Monatsmapping z.B. 01 -> Jan
+	  $day   =~ s/0/ /;                             # in Tagen < 10 muss 0 durch Space ersetzt werden
+	  $ident = substr($ident,0, $RFC3164len{TAG});  # Länge TAG Feld begrenzen
 	  no warnings 'uninitialized'; 
-      $data  = "<$prival>$month $day $time $myhost $ident :$otp";
+      $data  = "<$prival>$month $day $time $myhost TAG$ident: $otp";
 	  use warnings;
+	  $data = substr($data,0, $RFC3164len{DL});     # Länge Total begrenzen
   }
   
   if ($lf eq "IETF") {
       # IETF Protokollformat https://tools.ietf.org/html/rfc5424
 	  my $pid = $hash->{HELPER}{PID}; 
 	  my $mid = "FHEM";                          # message ID, identify type of message, e.g. for firewalls
-	  my $tim = $date."T".$time."Z";
+	  my $tim = $date."T".$time;
 	  no warnings 'uninitialized'; 
       $data   = "<$prival>1 $tim $myhost $ident $pid $mid - :$otp";
 	  use warnings;
@@ -378,8 +388,6 @@ return($data);
 	After definition the new device sends all new appearing fhem systemlog entries and events to the destination host, 
 	port=514/UDP format:IETF, immediately without further settings if the regex for fhem or event were set. <br>
 	Without setting regex no fhem system log or event log will be forwarded. <br>
-    The module uses functions of Perls SYS::SYSLOG module. If you want know more, see for detailed descriptions 
-	on <a href="http://perldoc.perl.org/Sys/Syslog.html">perldoc</a>. <br>
     
 	<br>
     Example to log anything: <br>
@@ -422,8 +430,10 @@ Mar 20 15:47:53 fhem-vm-8 fhem: 2016-03-20_15:47:53 global: INITIALIZED</pre>
     <li><code>logFormat [BSD|IETF]</code><br>
         <br>
         Set the syslog protocol format. <br>
-		Default value is "IETF" if not specified.
-    </li><br>
+		Default value is "IETF" if not specified. 
+		The implemented BSD protocol is defined in <a href="https://tools.ietf.org/html/rfc3164"> RFC3164 </a> and the 
+		IETF protocol can be found in <a href="https://tools.ietf.org/html/rfc5424"> RFC5424 </a>
+		</li><br>
 	
     <li><code>type [TCP|UDP]</code><br>
         <br>
@@ -476,8 +486,6 @@ Mar 20 15:47:53 fhem-vm-8 fhem: 2016-03-20_15:47:53 global: INITIALIZED</pre>
 	Direkt nach der Definition sendet das neue Device alle neu auftretenden FHEM Systemlog Einträge und Events ohne weitere 
 	Einstellungen an den Zielhost, Port=514/UDP Format:IETF, wenn reguläre Ausdrücke für Events/FHEM angegeben wurden. <br>
 	Wurde kein Regex gesetzt, erfolgt keine Weiterleitung von Events oder FHEM Systemlogs. <br>
-    Das Modul verwendet Funktionen des Perl-Moduls SYS::SYSLOG. Weitere Informationen dazu sind auf  
-	<a href="http://perldoc.perl.org/Sys/Syslog.html">perldoc</a> zu finden. <br>
     
 	<br>
     Beispiel:<br/>
@@ -522,7 +530,9 @@ Mar 20 15:47:53 fhem-vm-8 fhem: 2016-03-20_15:47:53 global: INITIALIZED</pre>
     <li><code>logFormat [BSD|IETF]</code><br>
         <br>
         Stellt das Protokollformat ein. <br>
-		Der Standardwert ist "IETF".
+		Der Standardwert ist "IETF". <br>
+		Das implementierte BSD Protokoll ist definiert in <a href="https://tools.ietf.org/html/rfc3164"> RFC3164 </a>. Das 
+		weiterentwickelte IETF-Protokoll kann hier <a href="https://tools.ietf.org/html/rfc5424"> RFC5424 </a> nachgelesen werden.
     </li><br>
 	
     <li><code>type [TCP|UDP]</code><br>
