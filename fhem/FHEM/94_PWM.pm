@@ -25,6 +25,7 @@
 #                 p_maxPulse, p_roomsMinOnOffThreshold and p_overallHeatingSwitch
 # 01.08.17 GA add attribute disable to stop calculations of PWM
 # 01.08.17 GA fix OverallHeatingSwitch (without threshold) now independent from ValveProtection
+# 17.08.17 GA add attribute overallHeatingSwitchThresholdTemp define a threshold temperature to prevent switch to "on"
 
 ##############################################
 # $Id$
@@ -78,7 +79,8 @@ PWM_Initialize($)
   $hash->{UndefFn}   = "PWM_Undef";
   $hash->{AttrFn}    = "PWM_Attr";
 
-  $hash->{AttrList}  = "disable:1,0 event-on-change-reading event-min-interval valveProtectIdlePeriod overallHeatingSwitchRef:pulseMax,pulseSum,pulseAvg,pulseAvg2,pulseAvg3,avgPulseRoomsOn";
+  $hash->{AttrList}  = "disable:1,0 event-on-change-reading event-min-interval valveProtectIdlePeriod overallHeatingSwitchRef:pulseMax,pulseSum,pulseAvg,pulseAvg2,pulseAvg3,avgPulseRoomsOn".
+		       " overallHeatingSwitchThresholdTemp";
   #$hash->{GetList}   = "status timers";
 
 }
@@ -538,28 +540,77 @@ PWM_Calculate($)
 
       }
 
- 
+      # OverallHeatingSwitchThresholdTemp may prevent switch ot on and sets OverallHeatingSwitch to e-off
+      my $newstateOHS_eoff = 0;
+      if ($newstateOHS eq "on" and defined ($hash->{OverallHeatingSwitchTT_tsensor})) {
+
+        my $sensor  = $hash->{OverallHeatingSwitchTT_tsensor};
+        my $reading = $hash->{OverallHeatingSwitchTT_reading};
+
+        if (defined ($defs{$sensor}) and defined ($defs{$sensor}->{READINGS}{$reading})) {
+
+          my $t_regexp = $hash->{OverallHeatingSwitchTT_t_regexp};
+          my $maxTemp  = $hash->{OverallHeatingSwitchTT_maxTemp};
+
+          my $temp = $defs{$sensor}->{READINGS}{$reading}{VAL};
+          $temp =~ /$t_regexp/;
+          if (defined ($1))
+          {
+            $temp = $1;
+            if ($temp >= $maxTemp)
+            {
+              $newstateOHS_eoff = 1;
+              $newstateOHS      = "off";
+              Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch forced to off since ThresholdTemp reached maxTemp ($temp >= $maxTemp)");
+              readingsBulkUpdate ($hash,  "OverallHeatingSwitchTT_Off", 1);
+            }
+            else
+            {
+              if ($hash->{READINGS}{OverallHeatingSwitchTT_Off}{VAL} == 1) {
+                readingsBulkUpdate ($hash,  "OverallHeatingSwitchTT_Off", 0);
+              }
+            }
+
+          }
+          else
+          {
+            Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitchThresholdTemp t_regexp does not match temperature");
+          }
+        }
+        else
+        {
+          Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitchThresholdTemp refers to invalid device or reading");
+        }
+      }
+
       my $actor       = $hash->{OverallHeatingSwitch};
       my $actstateOHS = ($defs{$actor}{STATE} =~ $hash->{OverallHeatingSwitch_regexp_on}) ? "on" : "off";
 
       if ($hash->{OverallHeatingSwitch_followUpTime} > 0) {
 
-        if ($actstateOHS eq "on" and $newstateOHS eq "off") {
+        if ($newstateOHS_eoff == 1) 
+        {
+            readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", "");
+        }
+        else
+        {
+          if ($actstateOHS eq "on" and $newstateOHS eq "off") {
 
-          if ($hash->{READINGS}{OverallHeatingSwitchWaitUntilOff}{VAL} eq "") {
-            $newstateOHS = "on";
-            Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off (init timestamp)");
-            readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", FmtDateTime(time() + $hash->{OverallHeatingSwitch_followUpTime}));
+            if ($hash->{READINGS}{OverallHeatingSwitchWaitUntilOff}{VAL} eq "") {
+              $newstateOHS = "on";
+              Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off (init timestamp)");
+              readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", FmtDateTime(time() + $hash->{OverallHeatingSwitch_followUpTime}));
 
-          } elsif ($hash->{READINGS}{OverallHeatingSwitchWaitUntilOff}{VAL} ge TimeNow()) {
-            $newstateOHS = "on";
-            Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off");
+            } elsif ($hash->{READINGS}{OverallHeatingSwitchWaitUntilOff}{VAL} ge TimeNow()) {
+              $newstateOHS = "on";
+              Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off");
+            } else {
+              readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", "");
+            }
+
           } else {
             readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", "");
           }
-
-        } else {
-          readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", "");
         }
       }
       if ($hash->{OverallHeatingSwitch_delayTimeOn} > 0) {
@@ -583,7 +634,6 @@ PWM_Calculate($)
         }
       }
 
-
       if ($newstateOHS ne $actstateOHS or $hash->{READINGS}{OverallHeatingSwitch}{VAL} ne $actstateOHS) {
 
         my $ret = fhem sprintf ("set %s %s", $hash->{OverallHeatingSwitch}, $newstateOHS);
@@ -591,6 +641,7 @@ PWM_Calculate($)
           Log3 ($name, 4, "PWMR_SetRoom: $name: set $actor $newstateOHS");
   
           readingsBulkUpdate ($hash,  "OverallHeatingSwitch", $newstateOHS);
+
  
 #          push @{$room->{CHANGED}}, "actor $newstateOHS";
 #          DoTrigger($name, undef);
@@ -1029,6 +1080,15 @@ PWM_Attr(@)
 
   if ($action eq "del")
   {
+    if ($attrname eq "overallHeatingSwitchThresholdTemp")
+    {
+      delete ($hash->{OverallHeatingSwitchTT_tsensor}       ) if defined ($hash->{OverallHeatingSwitchTT_tsensor});
+      delete ($hash->{OverallHeatingSwitchTT_reading}       ) if defined ($hash->{OverallHeatingSwitchTT_reading});
+      delete ($hash->{OverallHeatingSwitchTT_t_regexp}      ) if defined ($hash->{OverallHeatingSwitchTT_t_regexp});
+      delete ($hash->{OverallHeatingSwitchTT_maxTemp}       ) if defined ($hash->{OverallHeatingSwitchTT_maxTemp});
+      delete ($hash->{READINGS}{OverallHeatingSwitchTT_Off} ) if defined ($hash->{READINGS}{OverallHeatingSwitchTT_Off});
+    }
+
     if (defined $attr{$name}{$attrname}) {
       delete ($attr{$name}{$attrname});
     }
@@ -1039,6 +1099,40 @@ PWM_Attr(@)
   {
     if (defined $attr{$name}{$attrname}) 
     {
+    }
+    if ($attrname eq "overallHeatingSwitchThresholdTemp")
+    {
+      my ($obj, $temp) = split (",", $attrval, 2);
+      $temp = 50 unless (defined($temp));
+
+      unless ($temp =~ /^(\d[\d\.]+)$/)
+      {
+          return "$name: invalid temperature for attribute $attrname ($attrval)";
+      }
+
+      if (defined ($obj)) 
+      {
+        my ($sensor, $reading, $t_regexp) = split (":", $obj, 3);
+        $reading = "temperature" unless defined ($reading);
+        $t_regexp = '(\d[\d\.]+)', unless defined ($t_regexp);
+
+        if (defined($sensor)) # may be not defined yet
+        {
+          $hash->{OverallHeatingSwitchTT_tsensor}  = $sensor;
+          $hash->{OverallHeatingSwitchTT_reading}  = $reading;
+          $hash->{OverallHeatingSwitchTT_t_regexp} = $t_regexp;
+          $hash->{OverallHeatingSwitchTT_maxTemp}  = $temp;
+          
+
+        } else {
+          Log3 ($hash, 2, "invalid temperature reading in attribute overallHeatingSwitchThresholdTemp");
+          return "$name: invalid value for attribute $attrname ($attrval)";
+        }
+      } else {
+        Log3 ($hash, 2, "invalid value for attribute overallHeatingSwitchThresholdTemp");
+        return "$name: invalid value for attribute $attrname ($attrval)";
+      }
+
     }
   }
 
@@ -1196,6 +1290,19 @@ PWM_Attr(@)
         pulseAvg is an average pulse of all rooms which should be switched to "on".<br>
         pulseAvg2 and pulseAvg3 refer to the 2 or 3 romms with highest pulses.
         </li><br>
+    <li>overallHeatingSwitchThresholdTemp<br>
+        Defines a reading for a temperature and a maximum value that prevents the overallHeatingSwitch from switching to "on".<br>
+        Value has the following format: tsensor[:reading[:t_regexp]],maxValue.<br>
+        <i>tsensor</i> defines the temperature sensor for the actual temperature.<br>
+        <i>reading</i> defines the reading of the temperature sensor. Default is "temperature"<br>
+        <i>t_regexp</i> defines a regular expression to be applied to the reading. Default is '(\d[\d\.]+)'.<br>
+        if <i>maxValue</i> is reached as a temperature from tsensor then overallHeatingSwitch will not be switch to "on".<br>
+        Example: tsensor,44 or tsensor:temperature,44 or tsensor:temperature:(\d+).*,44<br>
+        The reading OverallHeatingSwitchTT_Off will be set to 1 if temperature from tsensor prevents <i>overallHeatingSwitch</i> from switching to "on".<br>
+        Please be aware that temperatures raising to high will seriously harm your heating system and this parameter should not be used as the only protection feature.<br>
+        Using this parameter is on your own risk. Please test your settings very carefully.<br>
+    </li>
+
   </ul>
   <br>
 </ul>
