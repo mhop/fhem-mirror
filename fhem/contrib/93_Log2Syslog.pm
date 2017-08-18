@@ -28,6 +28,7 @@
 #######################################################################################################
 #  Versions History:
 #
+# 2.3.0      18.08.2017       new parameter "ident" in DEF, sub setidex, charfilter
 # 2.2.0      17.08.2017       set BSD data length, set only acceptable characters (USASCII) in payload
 #                             commandref revised
 # 2.1.0      17.08.2017       sub setsock created
@@ -44,7 +45,7 @@ use warnings;
 eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
 eval "use Net::Domain qw(hostfqdn);1"  or my $MissModulNDom = "Net::Domain";
 
-my $Log2SyslogVn = "2.2.0";
+my $Log2SyslogVn = "2.3.0";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -101,21 +102,18 @@ sub Log2Syslog_Define($@) {
       return "Log2Syslog device '$ldvs' is already defined. Only one device can be defined ! ";
   }
   
-  # Example:        define  splunklog Log2Syslog  splunk.myds.me  event:.*     fhem:.*
-  return "wrong syntax, use: define <name> Log2Syslog <host> [event:<regexp>] [fhem:<regexp>] "
+  # Example:        define  splunklog Log2Syslog  splunk.myds.me    ident        event:.*        fhem:.*
+  return "wrong syntax, use: define <name> Log2Syslog <host> [ident:<ident>] [event:<regexp>] [fhem:<regexp>] "
         if(int(@a)-3 < 0);
 		
   delete($hash->{HELPER}{EVNTLOG});
   delete($hash->{HELPER}{FHEMLOG});
+  delete($hash->{HELPER}{IDENT});
   
-  if ($a[3]) {
-	  $hash->{HELPER}{EVNTLOG} = (split("event:",$a[3]))[1] if(lc($a[3]) =~ m/^event:.*/);
-	  $hash->{HELPER}{FHEMLOG} = (split("fhem:",$a[3]))[1] if(lc($a[3]) =~ m/^fhem:.*/);
-  } 
-  if ($a[4]) {
-	  $hash->{HELPER}{EVNTLOG} = (split("event:",$a[4]))[1] if(lc($a[4]) =~ m/^event:.*/);
-	  $hash->{HELPER}{FHEMLOG} = (split("fhem:",$a[4]))[1] if(lc($a[4]) =~ m/^fhem:.*/);
-  }
+  setidrex($hash,$a[3]) if($a[3]);
+  setidrex($hash,$a[4]) if($a[4]);
+  setidrex($hash,$a[5]) if($a[5]);
+  
   return "Bad regexp: starting with *" 
      if((defined($hash->{HELPER}{EVNTLOG}) && $hash->{HELPER}{EVNTLOG} =~ m/^\*/) || (defined($hash->{HELPER}{FHEMLOG}) && $hash->{HELPER}{FHEMLOG} =~ m/^\*/));
   eval { "Hallo" =~ m/^$hash->{HELPER}{EVNTLOG}$/ } if($hash->{HELPER}{EVNTLOG});
@@ -178,8 +176,8 @@ return undef;
 sub event_Log($$) {
   # $hash is my entry, $dev is the entry of the changed device
   my ($hash,$dev) = @_;
-  my $name    = $hash->{NAME};
-  my $rex     = $hash->{HELPER}{EVNTLOG};
+  my $name = $hash->{NAME};
+  my $rex  = $hash->{HELPER}{EVNTLOG};
   my ($prival,$sock);
   
   return if(IsDisabled($name) || !$rex);
@@ -192,18 +190,17 @@ sub event_Log($$) {
   my $ct  = $dev->{CHANGETIME};
   
   for (my $i = 0; $i < $max; $i++) {
-      my $s = $events->[$i];
-      $s = "" if(!defined($s));
-      $s =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd;         # nur erlaubte Zeichen in payload, ASCII %d32-126
+      my $txt = $events->[$i];
+      $txt = "" if(!defined($txt));
+      $txt = charfilter($hash,$txt);
 	  
 	  my $tim          = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
       my ($date,$time) = split(" ",$tim);
 	  
-	  if($n =~ m/^$rex$/ || "$n:$s" =~ m/^$rex$/ || "$tim:$n:$s" =~ m/^$rex$/) {	  
-          my $otp = "$n $s";
-          $otp    = "$tim $otp" if AttrVal($name,'addTimestamp',0);
-	      $prival = setprival($s);
-	    
+	  if($n =~ m/^$rex$/ || "$n:$txt" =~ m/^$rex$/ || "$tim:$n:$txt" =~ m/^$rex$/) {	  
+          my $otp  = "$n $txt";
+          $otp     = "$tim $otp" if AttrVal($name,'addTimestamp',0);
+	      $prival  = setprival($txt);
 	      my $data = setpayload($hash,$prival,$date,$time,$otp,"event");	
       
 	      $sock = setsock($hash);
@@ -222,22 +219,21 @@ return "";
 #################################################################################
 sub fhemlog_Log($$) {
   my ($name,$raw) = @_;                              
-  my $hash    = $defs{$name};
-  my $rex     = $hash->{HELPER}{FHEMLOG};
+  my $hash = $defs{$name};
+  my $rex  = $hash->{HELPER}{FHEMLOG};
   my ($prival,$sock);
   
   return if(IsDisabled($name) || !$rex);
 	
-  my ($date,$time,$vbose,undef,$text) = split(" ",$raw,5);
-  $text =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd;      # nur erlaubte Zeichen in payload, ASCII %d32-126
+  my ($date,$time,$vbose,undef,$txt) = split(" ",$raw,5);
+  $txt = charfilter($hash,$txt);
   $date =~ s/\./-/g;
   my $tim = $date." ".$time;
   
-  if($text =~ m/^$rex$/ || "$vbose: $text" =~ m/^$rex$/) {  
-      my $otp = "$vbose: $text";
-      $otp    = "$tim $otp" if AttrVal($name,'addTimestamp',0);
-	  $prival = setprival($text,$vbose);
-	  
+  if($txt =~ m/^$rex$/ || "$vbose: $txt" =~ m/^$rex$/) {  
+      my $otp  = "$vbose: $txt";
+      $otp     = "$tim $otp" if AttrVal($name,'addTimestamp',0);
+	  $prival  = setprival($txt,$vbose);
       my $data = setpayload($hash,$prival,$date,$time,$otp,"fhem");	
       
       $sock = setsock($hash);
@@ -250,7 +246,40 @@ return;
 }
 
 ###############################################################################
-#                        create Socket 
+#              Helper für ident & Regex setzen 
+###############################################################################
+sub setidrex ($$) { 
+  my ($hash,$a) = @_;
+     
+  $hash->{HELPER}{EVNTLOG} = (split("event:",$a))[1] if(lc($a) =~ m/^event:.*/);
+  $hash->{HELPER}{FHEMLOG} = (split("fhem:",$a))[1] if(lc($a) =~ m/^fhem:.*/);
+  $hash->{HELPER}{IDENT}   = (split("ident:",$a))[1] if(lc($a) =~ m/^ident:.*/);
+  
+return;
+}
+
+###############################################################################
+#              Zeichencodierung für Payload filtern 
+###############################################################################
+sub charfilter ($$) { 
+  my ($hash,$txt) = @_;
+  my $name   = $hash->{NAME};
+
+  # nur erwünschte Zeichen in payload, ASCII %d32-126
+  $txt =~ s/ß/ss/g;
+  $txt =~ s/ä/ae/g;
+  $txt =~ s/ö/oe/g;
+  $txt =~ s/ü/ue/g;
+  $txt =~ s/Ä/AE/g;
+  $txt =~ s/Ö/OE/g;
+  $txt =~ s/Ü/UE/g;
+  $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd;      
+  
+return($txt);
+}
+
+###############################################################################
+#                        erstelle Socket 
 ###############################################################################
 sub setsock ($) { 
   my ($hash) = @_;
@@ -274,7 +303,7 @@ return($sock);
 #               set PRIVAL (severity & facility)
 ###############################################################################
 sub setprival ($;$$) { 
-  my ($text,$vbose)= @_;
+  my ($txt,$vbose) = @_;
   my $prival;
   
   # Priority = (facility * 8) + severity 
@@ -304,8 +333,8 @@ sub setprival ($;$$) {
       $sv = 7 if ($vbose == 5);
   }
                                          
-  $sv = 3 if (lc($text) =~ m/error/);              # error condition
-  $sv = 4 if (lc($text) =~ m/warning/);            # warning conditions
+  $sv = 3 if (lc($txt) =~ m/error/);              # error condition
+  $sv = 4 if (lc($txt) =~ m/warning/);            # warning conditions
   
   $prival = ($fac*8)+$sv;
    
@@ -313,12 +342,12 @@ return($prival);
 }
 
 ###############################################################################
-#               create Payload for Syslog
+#               erstellen Payload für Syslog
 ###############################################################################
 sub setpayload ($$$$$$) { 
-  my ($hash,$prival,$date,$time,$otp,$lt)= @_;
+  my ($hash,$prival,$date,$time,$otp,$lt) = @_;
   my $name   = $hash->{NAME};
-  my $ident  = $name."_".$lt;
+  my $ident  = ($hash->{HELPER}{IDENT}?$hash->{HELPER}{IDENT}:$name)."_".$lt;
   my $myhost = $hash->{MYHOST}?$hash->{MYHOST}:"0.0.0.0";
   my $lf     = AttrVal($name, "logFormat", "IETF");
   my $data;
@@ -328,8 +357,8 @@ sub setpayload ($$$$$$) {
   if ($lf eq "BSD") {
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
       $time  = (split(".",$time))[0];               # msec ist nicht erlaubt
-	  $month = $Log2Syslog_BSDMonth{$month};        # Monatsmapping z.B. 01 -> Jan
-	  $day   =~ s/0/ /;                             # in Tagen < 10 muss 0 durch Space ersetzt werden
+	  $month = $Log2Syslog_BSDMonth{$month};        # Monatsmapping, z.B. 01 -> Jan
+	  $day   =~ s/0/ / if($day =~ m/^0.*$/);        # in Tagen < 10 muss 0 durch Space ersetzt werden
 	  $ident = substr($ident,0, $RFC3164len{TAG});  # Länge TAG Feld begrenzen
 	  no warnings 'uninitialized'; 
       $data  = "<$prival>$month $day $time $myhost TAG$ident: $otp";
@@ -340,10 +369,10 @@ sub setpayload ($$$$$$) {
   if ($lf eq "IETF") {
       # IETF Protokollformat https://tools.ietf.org/html/rfc5424
 	  my $pid = $hash->{HELPER}{PID}; 
-	  my $mid = "FHEM";                          # message ID, identify type of message, e.g. for firewalls
+	  my $mid = "FHEM";                             # message ID, identify type of message, e.g. for firewall filter
 	  my $tim = $date."T".$time;
 	  no warnings 'uninitialized'; 
-      $data   = "<$prival>1 $tim $myhost $ident $pid $mid - :$otp";
+      $data   = "<$prival>1 $tim $myhost $ident $pid $mid - : $otp";
 	  use warnings;
   }
   
@@ -354,7 +383,7 @@ return($data);
 
 =pod
 =item helper
-=item summary    send FHEM system logs and/or events to a syslog server.
+=item summary    forwards FHEM system logs and/or events to a syslog server
 =item summary_DE leitet FHEM Systemlogs und/oder Events an einen Syslog-Server weiter
 
 =begin html
@@ -378,10 +407,11 @@ return($data);
   <b>Define</b>
   <ul>
     <br>
-    <code>define &lt;name&gt; Log2Syslog &lt;destination host&gt; [event:&lt;regexp&gt;] [fhem:&lt;regexp&gt;]</code><br>
+    <code>define &lt;name&gt; Log2Syslog &lt;destination host&gt; [ident:&lt;ident&gt;] [event:&lt;regexp&gt;] [fhem:&lt;regexp&gt;]</code><br>
     <br>
 	
 	&lt;destination host&gt; = host where the syslog server is running <br>
+	[ident:&lt;ident&gt;] = optional program identifier. If not set the device name will be used as default <br>
 	[event:&lt;regexp&gt;] = optional regex to filter events for logging  <br>
 	[fhem:&lt;regexp&gt;] = optional regex to filter fhem system log for logging <br><br>
 	
@@ -392,14 +422,15 @@ return($data);
 	<br>
     Example to log anything: <br>
     <br/>
-    <code>define splunklog Log2Syslog fhemtest 192.168.2.49 event:.* fhem:.* </code><br>
+    <code>define splunklog Log2Syslog fhemtest 192.168.2.49 ident:Test event:.* fhem:.* </code><br>
     <br/>
-    will produce output like:<br/>
-    <pre>Mar 20 15:25:22 fhem-vm-8 fhem: global: SAVE
-Mar 20 15:25:44 fhem-vm-8 fhem: global: SHUTDOWN
-Mar 20 15:25:57 fhem-vm-8 fhem: global: INITIALIZED
-Mar 20 15:26:05 fhem-vm-8 fhem: PegelCux: Niedrigwasser-1: 20.03.2016 18:03
-Mar 20 15:26:05 fhem-vm-8 fhem: PegelCux: Hochwasser-1: 20.03.2016 23:45</pre>
+    will produce output like this raw example of a splunk syslog server:<br/>
+    <pre>Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM - : LogDB sql_processing_time: 0.2306
+Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM - : LogDB background_processing_time: 0.2397
+Aug 18 21:06:45 fhemtest.myds.me 1 2017-08-18T21:06:45 fhemtest.myds.me Test_event 13339 FHEM - : LogDB CacheUsage: 21
+Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.760 fhemtest.myds.me Test_fhem 13339 FHEM - : 4: CamTER - Informations of camera Terrasse retrieved
+Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test_fhem 13339 FHEM - : 4: CamTER - CAMID already set - ignore get camid
+    </pre>
   </ul>
   <br/>
 
@@ -415,16 +446,22 @@ Mar 20 15:26:05 fhem-vm-8 fhem: PegelCux: Hochwasser-1: 20.03.2016 23:45</pre>
         Default behavior is to not log these timestamps, because syslog uses own timestamps.<br/>
         Maybe useful if mseclog is activated in fhem.<br/>
         <br/>
-        Example output:<br/>
-        <pre>Mar 20 15:47:42 fhem-vm-8 fhem: 2016-03-20_15:47:42 global: SAVE
-Mar 20 15:47:46 fhem-vm-8 fhem: 2016-03-20_15:47:46 global: SHUTDOWN
-Mar 20 15:47:53 fhem-vm-8 fhem: 2016-03-20_15:47:53 global: INITIALIZED</pre>
+        Example output (raw) of a Splunk syslog server: <br>
+        <pre>Aug 18 21:26:55 fhemtest.myds.me 1 2017-08-18T21:26:55 fhemtest.myds.me Test_event 13339 FHEM - : 2017-08-18 21:26:55 USV state: OL
+Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_event 13339 FHEM - : 2017-08-18 21:26:54 Bezug state: done
+Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_event 13339 FHEM - : 2017-08-18 21:26:54 recalc_Bezug state: Next: 21:31:59
+        </pre>
     </li><br>
 
     <li><code>addStateEvent [0|1]</code><br>
         <br>
         If set to 1, events will be completed with "state" if a state-event appears.<br/>
 		Default behavior is without getting "state".
+    </li><br>
+	
+    <li><code>disable [0|1]</code><br>
+        <br>
+        disables the device.
     </li><br>
 	
     <li><code>logFormat [BSD|IETF]</code><br>
@@ -476,10 +513,11 @@ Mar 20 15:47:53 fhem-vm-8 fhem: 2016-03-20_15:47:53 global: INITIALIZED</pre>
   <b>Definition</b>
   <ul>
     <br>
-    <code>define &lt;name&gt; Log2Syslog &lt;destination host&gt; [event:&lt;regexp&gt;] [fhem:&lt;regexp&gt;] </code><br>
+    <code>define &lt;name&gt; Log2Syslog &lt;Zielhost&gt; [ident:&lt;ident&gt;] [event:&lt;regexp&gt;] [fhem:&lt;regexp&gt;] </code><br>
     <br>
 
 	&lt;Zielhost&gt; = Host (Name oder IP-Adresse) auf dem der Syslog-Server läuft <br>
+	[ident:&lt;ident&gt;] = optinaler Programm Identifier. Wenn nicht gesetzt wird per default der Devicename benutzt. <br>
 	[event:&lt;regexp&gt;] = optionaler regulärer Ausdruck zur Filterung von Events zur Weiterleitung <br>
 	[fhem:&lt;regexp&gt;] = optionaler regulärer Ausdruck zur Filterung von FHEM Logs zur Weiterleitung <br><br>
 	
@@ -490,14 +528,15 @@ Mar 20 15:47:53 fhem-vm-8 fhem: 2016-03-20_15:47:53 global: INITIALIZED</pre>
 	<br>
     Beispiel:<br/>
     <br/>
-    <code>define splunklog Log2Syslog fhemtest 192.168.2.49 </code><br/>
+    <code>define splunklog Log2Syslog fhemtest 192.168.2.49 ident:Test event:.* fhem:.* </code><br/>
     <br/>
-    Es werden alle Events weitergeleitet:<br/>
-    <pre>Mar 20 15:25:22 fhem-vm-8 fhem: global: SAVE
-Mar 20 15:25:44 fhem-vm-8 fhem: global: SHUTDOWN
-Mar 20 15:25:57 fhem-vm-8 fhem: global: INITIALIZED
-Mar 20 15:26:05 fhem-vm-8 fhem: PegelCux: Niedrigwasser-1: 20.03.2016 18:03
-Mar 20 15:26:05 fhem-vm-8 fhem: PegelCux: Hochwasser-1: 20.03.2016 23:45</pre>
+    Es werden alle Events weitergeleitet wie deses Beispiel der raw-Ausgabe eines Splunk Syslog Servers zeigt::<br/>
+    <pre>Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM - : LogDB sql_processing_time: 0.2306
+Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM - : LogDB background_processing_time: 0.2397
+Aug 18 21:06:45 fhemtest.myds.me 1 2017-08-18T21:06:45 fhemtest.myds.me Test_event 13339 FHEM - : LogDB CacheUsage: 21
+Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.760 fhemtest.myds.me Test_fhem 13339 FHEM - : 4: CamTER - Informations of camera Terrasse retrieved
+Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test_fhem 13339 FHEM - : 4: CamTER - CAMID already set - ignore get camid
+    </pre>
   </ul>
   <br/>
 
@@ -515,16 +554,22 @@ Mar 20 15:26:05 fhem-vm-8 fhem: PegelCux: Hochwasser-1: 20.03.2016 23:45</pre>
         Die Einstellung kann hilfeich sein wenn mseclog in FHEM aktiviert ist.<br/>
         <br/>
 		
-        Beispielausgabe:<br/>
-        <pre>Mar 20 15:47:42 fhem-vm-8 fhem: 2016-03-20_15:47:42 global: SAVE
-Mar 20 15:47:46 fhem-vm-8 fhem: 2016-03-20_15:47:46 global: SHUTDOWN
-Mar 20 15:47:53 fhem-vm-8 fhem: 2016-03-20_15:47:53 global: INITIALIZED</pre>
+        Beispielausgabe (raw) eines Splunk Syslog Servers:<br/>
+        <pre>Aug 18 21:26:55 fhemtest.myds.me 1 2017-08-18T21:26:55 fhemtest.myds.me Test_event 13339 FHEM - : 2017-08-18 21:26:55 USV state: OL
+Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_event 13339 FHEM - : 2017-08-18 21:26:54 Bezug state: done
+Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_event 13339 FHEM - : 2017-08-18 21:26:54 recalc_Bezug state: Next: 21:31:59
+        </pre>
     </li><br>
 
     <li><code>addStateEvent [0|1]</code><br>
         <br>
         Wenn gesetzt, werden state-events mit dem Reading "state" ergänzt.<br/>
 		Die Standardeinstellung ist ohne state-Ergänzung.
+    </li><br>
+	
+    <li><code>disable [0|1]</code><br>
+        <br>
+        Das Device wird aktiviert | aktiviert.
     </li><br>
 	
     <li><code>logFormat [BSD|IETF]</code><br>
