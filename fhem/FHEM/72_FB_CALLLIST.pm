@@ -1102,7 +1102,7 @@ sub FB_CALLLIST_returnOrderedHTMLOutput($$$$)
     
     foreach my $col (@order)
     {
-        push @ret, '<td name="'.$col.'" '.$td_additions.'>'.$line->{$col}.'</td>' if($line->{$col});
+        push @ret, '<td name="'.$col.'" '.$td_additions.'>'.$line->{$col}.'</td>' if(defined($line->{$col}));
     }
     
     return join("",@ret)."</tr>";
