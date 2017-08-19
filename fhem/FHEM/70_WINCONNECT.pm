@@ -1,6 +1,12 @@
 # $Id$
 ############################################################################
-# 2017-08-04, v0.0.18
+# 2017-08-19, v0.0.19
+#
+# v0.0.19
+# - BUFIX:      [FEHMModul] - $_ ersetzt durch $uResult
+#               [FEHMModul] - reading "memory_available" und "memory_total" ohne Zusatz MB
+#               [WinWebGUI] - Exit Messagebox entfernt
+# - FEATURE:	[WinWebGUI] - Exit Menübutton
 #
 # v0.0.18
 # - BUFIX:      [WinWebGUI] - Autoupdate
@@ -149,8 +155,8 @@ sub WINCONNECT_Define($$);
 sub WINCONNECT_Undefine($$);
 
 # Autoupdateinformationen
-my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.18.exe";
-my $DownloadVer = "0.0.18";
+my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.19.exe";
+my $DownloadVer = "0.0.19";
 
 ###################################
 sub WINCONNECT_Initialize($) {
@@ -213,6 +219,10 @@ sub WINCONNECT_GetStatus($;$) {
 		open (FILE, ">". $filename . "_" .$DownloadVer);
 		print FILE $name;
 		close (FILE);
+		
+		#Delete old version
+		if ((-e $filename)) {unlink $filename}
+		
 		Log3 $name, 0, "WINCONNECT [NEW] Download new version URL = $DownloadURL";
 		HttpUtils_NonblockingGet({url=>$DownloadURL, timeout=>5, hash=>$hash, service=>"autoupdate", callback=>\&WINCONNECT_GetNewVersion});
 	}
@@ -232,9 +242,6 @@ sub WINCONNECT_GetNewVersion($$$) {
 	my $filename  = '././www/winconnect/WinControl.exe';
 	my $name      = $hash->{NAME};
    	my $CheckFile = $filename . "_" .$DownloadVer;
-	
-	# Alte Datei löschen
-	if (-e $filename) {unlink ($filename) or die $!;}
     
 	# Download neue Datei
 	open(FH, ">$filename");
@@ -441,8 +448,7 @@ sub WINCONNECT_Set($@) {
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            my $_ = $a[2];
-            if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+            if ( m/^\d+$/ && $a[2] >= 0 && $a[2] <= 100 ) {
                 $cmd = $a[2];
             }
             else {
@@ -510,8 +516,7 @@ sub WINCONNECT_Set($@) {
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            my $_ = $a[2];
-            if ( m/^\d+$/ && $_ >= 0 && $_ <= 10000 ) {
+            if ( m/^\d+$/ && $a[2] >= 0 && $a[2] <= 10000 ) {
                 $cmd = $a[2];
             }
             else {
@@ -530,8 +535,7 @@ sub WINCONNECT_Set($@) {
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            my $_ = $a[2];
-            if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+            if ( m/^\d+$/ && $a[2] >= 0 && $a[2] <= 100 ) {
                 $cmd = $a[2];
             }
             else {
@@ -550,8 +554,7 @@ sub WINCONNECT_Set($@) {
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            my $_ = $a[2];
-            if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+            if ( m/^\d+$/ && $a[2] >= 0 && $a[2] <= 100 ) {
                 $cmd = $a[2];
             }
             else {
@@ -695,8 +698,7 @@ sub WINCONNECT_Set($@) {
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            my $_ = $a[2];
-            if ( m/^\d+$/ && $_ >= 10 && $_ <= 10000 ) {
+            if ( m/^\d+$/ && $a[2] >= 10 && $a[2] <= 10000 ) {
                 $cmd = $a[2];
             }
             else {
