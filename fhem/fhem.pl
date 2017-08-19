@@ -1883,7 +1883,7 @@ CommandDefine($$)
                 if(int(@a) < 2);
   return "$name already defined, delete it first" if(defined($defs{$name}));
   return "Invalid characters in name (not A-Za-z0-9._): $name"
-                        if($name !~ m/^[a-z0-9._]*$/i);
+                        if(!goodDeviceName($name));
 
   my $m = $a[1];
   if(!$modules{$m}) {                           # Perhaps just wrong case?
@@ -2857,7 +2857,7 @@ CommandSetstate($$)
 
       Log3 $d, 3, "WARNING: unsupported character in reading $sname ".
              "(not A-Za-z/\\d_\\.-), notify the $d->{TYPE} module maintainer."
-        if($sname !~ m/^[A-Za-z\d_\.\-\/]+$/ && $sname !~ m/^\./);
+        if(!goodReadingName($sname));
 
       if(!defined($d->{READINGS}{$sname}) ||
          !defined($d->{READINGS}{$sname}{TIME}) ||
@@ -5108,6 +5108,39 @@ getPawList($)
     }
   }
   return @dob;
+}
+
+sub
+goodDeviceName($)
+{
+  my ($name) = @_;
+  return ($name && $name =~ m/^[a-z0-9._]*$/i);
+}
+
+sub
+makeDeviceName($) # Convert non-valid characters to _
+{
+  my ($name) = @_;
+  $name = "UNDEFINED" if(!defined($name));
+  $name =~ s/[^a-z0-9._]/_/gi;
+  return $name;
+}
+
+sub
+goodReadingName($)
+{
+  my ($name) = @_;
+  return ($name && ($name =~ m/^[a-z0-9._\-\/]+$/i || $name =~ m/^\./));
+}
+
+sub
+makeReadingName($) # Convert non-valid characters to _
+{
+  my ($name) = @_;
+  $name = "UNDEFINED" if(!defined($name));
+  return $name if($name =~ m/^\./);
+  $name =~ s/[^a-z0-9._\-\/]/_/gi;
+  return $name;
 }
 
 
