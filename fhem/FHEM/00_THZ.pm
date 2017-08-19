@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 08/2017
-my $thzversion = "0.168"; 
+my $thzversion = "0.169"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -648,8 +648,7 @@ my $internalHash;
 # Parameter hash
 #
 ########################################################################################
-sub THZ_Initialize($)
-{
+sub THZ_Initialize($) {
   my ($hash) = @_;
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
@@ -689,7 +688,7 @@ sub THZ_Initialize($)
 		    ."interval_sDisplay:0,60,120,180,300 "
 		    ."firmware:4.39,2.06,2.14,5.39,4.39technician "
             ."interval_sDewPointHC1:0,60,120,180,300 "
-            ."simpleReadTimeout:0.25,0.5,1,2 " #standard has been 0.5 since msg468515
+            ."simpleReadTimeout:0.25,0.5,1,2,3,4,5,6,7,8,9,10 " #standard has been 0.5 since msg468515 If blocking attribut is NOT enabled then set the timeout value to a maximum value of 0.5 sec.
             ."nonblocking:0,1 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
@@ -703,8 +702,7 @@ sub THZ_Initialize($)
 # Parameter hash and configuration
 #
 ########################################################################################
-sub THZ_Define($$)
-{
+sub THZ_Define($$) {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $name = $a[0];
@@ -811,8 +809,7 @@ sub THZ_Write($$) {
 # called from the global loop, when the select for hash reports data
 # used just for testing the interface
 ########################################################################################
-sub THZ_Read($)
-{
+sub THZ_Read($) {
   my ($hash) = @_;
 
   my $buf = DevIo_SimpleRead($hash);
@@ -834,8 +831,7 @@ Log3 $name, 3, "$name/RAW: $data";
 # Parameter hash
 #
 ########################################################################################
-sub THZ_Ready($)
-{
+sub THZ_Ready($) {
   my ($hash) = @_;
   if($hash->{STATE} eq "disconnected")
   { THZ_RemoveInternalTimer("THZ_GetRefresh");
@@ -872,7 +868,6 @@ sub THZ_Set($@){
   my $arg1 = "00:00";
   my ($err, $msg) =("", " ");
   my $cmdhash = $sets{$cmd};
-  THZ_AvoidCollisions($hash);
   #return "Unknown argument $cmd, choose one of " . join(" ", sort keys %sets) if(!defined($cmdhash));
   if(!defined($cmdhash)) {
     my $setList;
@@ -941,6 +936,7 @@ sub THZ_Set($@){
     }
   #--
   my $i=0;  my $parsingrule;
+  THZ_AvoidCollisions($hash);
   my $parent = $cmdhash->{parent};
   #if I have a father read from it: important for older firmwares
   if(defined($parent) ) {
@@ -1094,9 +1090,7 @@ sub THZ_GetNBAbort($){
 # Parameter: hash
 #
 ########################################################################################
-
-
-sub THZ_AvoidCollisions($){
+sub THZ_AvoidCollisions($) {
     my ($hash) = @_;
     # if child found, wait 0,25 second, and kill it
     # maybe after 1 second child would have finished, but its THZ_GetNBDone is blocked
@@ -1127,7 +1121,7 @@ sub THZ_AvoidCollisions($){
 # Parameters: hash and command to be sent to the interface
 #
 ########################################################################################
-sub THZ_Get($@){
+sub THZ_Get($@) {
   my ($hash, @a) = @_;
   my $dev = $hash->{DeviceName};
   my $name = $hash->{NAME};
@@ -1135,7 +1129,6 @@ sub THZ_Get($@){
   return "\"get $name\" needs one parameter" if(@a != 2);
   my $cmd = $a[1];
   my ($err, $msg2) =("", " ");
-  THZ_AvoidCollisions($hash);
   
   if ($cmd eq "debug_read_raw_register_slow") {
     THZ_debugread($hash);
@@ -1157,7 +1150,7 @@ sub THZ_Get($@){
   }
   
   Log3 $hash->{NAME}, 5, "THZ_Get: Try to get '$cmd'";
-  
+  THZ_AvoidCollisions($hash);
   my $parent = $cmdhash->{parent};	#if I have a father read from it
   if(defined($parent) ) {
       my ($seconds, $microseconds) = gettimeofday();
@@ -1267,25 +1260,20 @@ sub THZ_Get_Comunication($$) {
 # Parameter hash and command to be sent to the interface
 #
 ########################################################################################
-sub THZ_ReadAnswer($) 
-{
+sub THZ_ReadAnswer($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	
-	Log3 $hash->{NAME}, 5, "$name start Funktion THZ_ReadAnswer";
-	###------Windows support
+	Log3 $hash->{NAME}, 5, "$name start Function THZ_ReadAnswer";
 	select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
-	my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.5")) / 2; #added for Andre he would kile to have 8/2 second; I will grant it after implementing nonblocking
+	my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.5")) / 2; #added for Andre he would like to have 8/2 second.
+    $rtimeout = 0.5 if (AttrVal($name, "nonblocking", "0") eq 0); # set to 0.5s is nonblocking disabled
     my $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout);
     $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout) if(!defined($buf)) ; #added for karl msg468515
-	
     return ("THZ_ReadAnswer: InterfaceNotRespondig. Maybe too slow", "") if(!defined($buf)) ;
-	
 	my $data =  uc(unpack('H*', $buf));
 	my $count =1;
-	my $countmax = 80;
-	while (( (length($data) == 1) or (($data =~ m/^01/) and ($data !~ m/1003$/m ))) and ($count <= $countmax))
-	{ ###------Windows support
+	my $countmax = 60;
+	while (( (length($data) == 1) or (($data =~ m/^01/) and ($data !~ m/1003$/m ))) and ($count <= $countmax)){ 
 	  select(undef, undef, undef, 0.005) if( $^O =~ /Win/ ); ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
 	  my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
 	  Log3($hash->{NAME}, 5, "double read $count activated $data");
@@ -1413,7 +1401,6 @@ sub THZ_overwritechecksum($) {
 # retunrns encoded string
 #
 ########################################################################################
-
 sub THZ_encodecommand($$) {
   my ($cmd,$getorset) = @_;
   my $header = "0100";
@@ -1450,16 +1437,13 @@ sub THZ_encodecommand($$) {
 #    Footer: 10 03
 #
 ########################################################################################
-
 sub THZ_decode($) {
   my ($message_orig) = @_;
   #  raw data received from device have to be de-escaped before header evaluation and data use:
-  # - each sequece 2B 18 must be replaced with single byte 2B
-  # - each sequece 10 10 must be replaced with single byte 10
-  my $find = "1010";
+  my $find = "1010";    # - each sequece 10 10 must be replaced with single byte 10
   my $replace = "10";
   $message_orig=THZ_replacebytes($message_orig, $find, $replace);
-  $find = "2B18";
+  $find = "2B18";       # - each sequece 2B 18 must be replaced with single byte 2B
   $replace = "2B";
   $message_orig=THZ_replacebytes($message_orig, $find, $replace);
   
@@ -1470,8 +1454,7 @@ sub THZ_decode($) {
   
   #check header and if ok 0100, check checksum and return the decoded msg
   my $header = substr($message_orig,0,4);
-  if ($header eq  "0100")
-  {
+  if ($header eq "0100")  {
     if (THZ_checksum($message_orig) eq substr($message_orig,4,2)) {
       $message_orig =~ /0100(.*)1003/; 
       my $message = $1;
@@ -1479,22 +1462,10 @@ sub THZ_decode($) {
     }
     else {return(THZ_checksum($message_orig) . "decode: crc_error in answer", $message_orig)};
   }
-  if ($header eq "0103")
-  {
-    return ("decode: command not known", $message_orig);
-  }
-  if ($header eq "0102")
-  {
-    return("decode: CRC error in request", $message_orig);
-  }
-  if ($header eq "0104")
-  {
-    return("decode: UNKNOWN REQUEST", $message_orig);
-  }
-   if ($header eq "0180")
-  {
-    return(undef, $message_orig);
-  }
+  if ($header eq "0103")  { return ("decode: command not known", $message_orig);}
+  if ($header eq "0102")  { return("decode: CRC error in request", $message_orig);}
+  if ($header eq "0104")  { return("decode: UNKNOWN REQUEST", $message_orig);}
+  if ($header eq "0180")  { return(undef, $message_orig);}
   
   return("decode: new unknown answer " , $message_orig);
 }
@@ -1505,8 +1476,7 @@ sub THZ_decode($) {
 #
 ###############################
 
-local $SIG{__WARN__} = sub
-{
+local $SIG{__WARN__} = sub {
   my $message = shift;
   
   if (!defined($internalHash)) {
@@ -1524,7 +1494,6 @@ local $SIG{__WARN__} = sub
 #THZ_Parse1($) could be used in order to test an external config file; I do not know if I want it
 #e.g. {THZ_Parse1(undef,"F70B000500E6")}
 #######################################
-
 sub THZ_Parse1($$) {
   my ($hash,$message) = @_;  
   Log3 $hash->{NAME}, 5, "Parse message: $message";	  
@@ -1666,7 +1635,6 @@ sub THZ_debugread($){
 #THZ_Attr($) 
 #in case of change of attribute starting with interval_ refresh all
 ########################################################################################
-
 sub THZ_Attr(@) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
@@ -1720,9 +1688,6 @@ sub THZ_Attr(@) {
 
 
 #####################################
-
-
-
 sub THZ_Undef($$) {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
@@ -1753,7 +1718,6 @@ sub THZ_Undef($$) {
 # for all other values outside the middlevalues they take he nearest
 # modified takes as an argument the function to be called, not the argument
 ########################################################################################
-
 sub nearest_ceil($$) {
     my $targ = abs(shift);
     my $Math1 = 0.5000000000003;
@@ -1960,8 +1924,7 @@ return ($FW_RETTYPE, $ret);
 
 
 
-sub THZ_detailFn(@)
-{
+sub THZ_detailFn(@){
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$d}; #$d is the name of the defined device 
   return '<div class="SVGplot"><embed src="/fhem/THZ_PrintcurveSVG/" type="image/svg+xml"  name="wl_hr22"/></div> <br>';
