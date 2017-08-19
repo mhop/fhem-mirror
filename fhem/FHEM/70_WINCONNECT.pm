@@ -1,8 +1,8 @@
 # $Id$
 ############################################################################
-# 2017-08-19, v0.0.19
+# 2017-08-19, v0.0.20
 #
-# v0.0.19
+# v0.0.20
 # - BUFIX:      [FEHMModul] - $_ ersetzt durch $uResult
 #               [FEHMModul] - reading "memory_available" und "memory_total" ohne Zusatz MB
 #               [WinWebGUI] - Exit Messagebox entfernt
@@ -155,8 +155,8 @@ sub WINCONNECT_Define($$);
 sub WINCONNECT_Undefine($$);
 
 # Autoupdateinformationen
-my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.19.exe";
-my $DownloadVer = "0.0.19";
+my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.20.exe";
+my $DownloadVer = "0.0.20";
 
 ###################################
 sub WINCONNECT_Initialize($) {
@@ -867,7 +867,7 @@ sub WINCONNECT_ReceiveCommand($) {
 	my ($param, $err, $data) = @_;
     my $hash     = $param->{hash};
     my $name     = $hash->{NAME};
-	my $VerWin   = substr(ReadingsVal( $name, "wincontrol", "0" ),4);
+	my $VerWin   = substr(ReadingsVal( $name, "wincontrol", "0.0.0.0" ),4);
 	my $VerGit   = substr(ReadingsVal( $name, "wincontrol_gitlab", "0.0.0.0" ),4);
 	my $service  = $param->{service};
 	
