@@ -1,6 +1,14 @@
 ﻿# $Id$
 ############################################################################
-# 2017-07-28, v1.0.8
+# 2017-08-19, v1.0.10
+#
+# v1.0.10
+# - BUFIX:   Code Optimierungen
+#
+# v1.0.9
+# - BUFIX:   BUG EPG Info https://forum.fhem.de/index.php/topic,54481.msg665959.html#msg665959
+#            Change Volume
+# - CHANGE   Readings für EPG zurücksetzen wenn keine Infos vorhanden sind
 #
 # v1.0.8
 # - BUFIX:   Code Optimierungen
@@ -138,7 +146,7 @@ sub NEUTRINO_GetStatus($;$) {
     Log3 $name, 5, "NEUTRINO $name [NEUTRINO_GetStatus] called function";
 	if ($update ne '') {Log3 $name, 5, "NEUTRINO $name [NEUTRINO_GetStatus] Update = $update";}
 	
-    RemoveInternalTimer($hash);
+    #RemoveInternalTimer($hash);
     InternalTimer( gettimeofday() + $interval, "NEUTRINO_GetStatus", $hash, 0 );
 
     return if ( AttrVal( $name, "disable", 0 ) == 1 );
@@ -729,7 +737,7 @@ sub NEUTRINO_Define($$) {
     }
 
     # start the status update timer
-    RemoveInternalTimer($hash);
+    #RemoveInternalTimer($hash);
     InternalTimer( gettimeofday() + 2, "NEUTRINO_GetStatus", $hash, 1 );
 
     return;
@@ -773,9 +781,9 @@ sub NEUTRINO_ReceiveCommand($$$) {
 	if ($service eq "timerlist" && $data == 0){
 		$data = "empty";
 	}
-	
+
 	# volume data = 0 then data = off
-	if ($service eq "volume" && $data == 0){
+	if ($service eq "volume" && $data eq '0'){
 		$data = "off";
 	}
 	
@@ -795,9 +803,9 @@ sub NEUTRINO_ReceiveCommand($$$) {
             }
 
             $presence = "absent";
-			readingsBulkUpdate( $hash, "power", "off" );
-			readingsBulkUpdate( $hash, "state", "off" );
-            readingsBulkUpdate( $hash, "presence", $presence )
+			readingsBulkUpdateIfChanged( $hash, "power", "off" );
+			readingsBulkUpdateIfChanged( $hash, "state", "off" );
+            readingsBulkUpdateIfChanged( $hash, "presence", $presence )
               if ( ReadingsVal( $name, "presence", "" ) ne $presence );
         }
     }
@@ -806,7 +814,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
     elsif ($data) {
         $presence = "present";
 		$state    = "on";
-        readingsBulkUpdate( $hash, "presence", $presence )
+        readingsBulkUpdateIfChanged( $hash, "presence", $presence )
         if ( ReadingsVal( $name, "presence", "" ) ne $presence );
 
 		#2017.07.21 - Log anzeigen wenn $cmd befüllt ist
@@ -814,7 +822,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
         
 		# split date (non XML services)
 		my @ans = split (/\n/s, $data);
-	
+
 		#######################
         # process return data
         #######################
@@ -884,8 +892,8 @@ sub NEUTRINO_ReceiveCommand($$$) {
 			if (@ans[0]) {
 							
 				if (index(lc(@ans[0]), "on")  != -1) {
-					readingsBulkUpdate( $hash, "power","off");
-					readingsBulkUpdate( $hash, "state", "standby" );
+					readingsBulkUpdateIfChanged( $hash, "power","off");
+					readingsBulkUpdateIfChanged( $hash, "state", "standby" );
 					$state = "off";
 				}
 
@@ -894,8 +902,8 @@ sub NEUTRINO_ReceiveCommand($$$) {
 					# 2017.07.12 - Aenderungen nur durchfuehren wenn power vorher ungleich "on" war
 					if (ReadingsVal( $name, "power", "unbekannt" ) ne 'on'  ) {
 						Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] detect change";
-						readingsBulkUpdate( $hash, "power","on");
-						readingsBulkUpdate( $hash, "state", "on" );
+						readingsBulkUpdateIfChanged( $hash, "power","on");
+						readingsBulkUpdateIfChanged( $hash, "state", "on" );
 						delete($hash->{helper}{FIRSTSTART});
 					}
 					
@@ -940,25 +948,25 @@ sub NEUTRINO_ReceiveCommand($$$) {
 				
 					if (index($type, "off")  != -1) {
 						Log3 $name, 5, "NEUTRINO $name TYP = OFF";
-						readingsBulkUpdate( $hash, "power", "on");
-						readingsBulkUpdate( $hash, "state", "on" );
+						readingsBulkUpdateIfChanged( $hash, "power", "on");
+						readingsBulkUpdateIfChanged( $hash, "state", "on" );
 					}
 					elsif(index($type, "on")  != -1) {
 						Log3 $name, 5, "NEUTRINO $name TYP = ON";
-						readingsBulkUpdate( $hash, "power", "off");
-						readingsBulkUpdate( $hash, "state", "standby" );					
+						readingsBulkUpdateIfChanged( $hash, "power", "off");
+						readingsBulkUpdateIfChanged( $hash, "state", "standby" );					
 					}
 					else {
-						readingsBulkUpdate( $hash, "power", "off");
-						readingsBulkUpdate( $hash, "state", "standby" );
+						readingsBulkUpdateIfChanged( $hash, "power", "off");
+						readingsBulkUpdateIfChanged( $hash, "state", "standby" );
 						$state = "off";
 					}			
 					NEUTRINO_SendCommand( $hash, "recordmode" );
 				}
 				
 				else{
-					readingsBulkUpdate( $hash, "power", "undefined" );
-					readingsBulkUpdate( $hash, "state", "undefined" );
+					readingsBulkUpdateIfChanged( $hash, "power", "undefined" );
+					readingsBulkUpdateIfChanged( $hash, "state", "undefined" );
 				}
 			}
 			else {
@@ -974,12 +982,12 @@ sub NEUTRINO_ReceiveCommand($$$) {
 				#2017.07.17 - Liste nur bei aenderung aktualisieren
 				if (ReadingsVal( $name, "bouquetnr", "99999" ) ne @ans[0]  ) {
 					Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] detect change";
-					readingsBulkUpdate( $hash, "bouquetnr", @ans[0] );
+					readingsBulkUpdateIfChanged( $hash, "bouquetnr", @ans[0] );
 					NEUTRINO_SendCommand( $hash, "bouquet_list" );
 				}
 			}
 			else {
-				readingsBulkUpdate( $hash, "bouquetnr", "0" );
+				readingsBulkUpdateIfChanged( $hash, "bouquetnr", "0" );
 				Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ERROR: no bouquetnr could be extracted";
 			}
         }
@@ -1033,10 +1041,10 @@ sub NEUTRINO_ReceiveCommand($$$) {
 			if (@ans[0]) {
 				if (index(lc(@ans[0]), "1")  != -1) {
 				    #2017.07.12 - Änderung schreiben
-					if (ReadingsVal( $name, "mute", "0" ) ne 'on'  ) {readingsBulkUpdate( $hash, "mute","on");}
+					readingsBulkUpdateIfChanged( $hash, "mute","on");
 				}
 				else{
-					if (ReadingsVal( $name, "mute", "0" ) ne 'off'  ) {readingsBulkUpdate( $hash, "mute","off");}
+					readingsBulkUpdateIfChanged( $hash, "mute","off");
 				}
 			}
 			else {
@@ -1050,7 +1058,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
 			
 			if (@ans[0]) {
 				if (index(lc(@ans[0]), "ok")  != -1) {
-					readingsBulkUpdate( $hash, "mute","on");
+					readingsBulkUpdateIfChanged( $hash, "mute","on");
 				}
 			}
 			else {
@@ -1063,7 +1071,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
 			
 			if (@ans[0]) {
 				if (index(lc(@ans[0]), "ok")  != -1) {
-					readingsBulkUpdate( $hash, "mute","off");
+					readingsBulkUpdateIfChanged( $hash, "mute","off");
 				}
 			}
 			else {
@@ -1075,7 +1083,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
         elsif ( $service eq "model" ) {
 			
 			if (@ans[0]) {
-				readingsBulkUpdate( $hash, "model",@ans[0]);
+				readingsBulkUpdateIfChanged( $hash, "model",@ans[0]);
 			}
 			else {
 				Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ERROR: no model could be extracted";
@@ -1112,8 +1120,8 @@ sub NEUTRINO_ReceiveCommand($$$) {
 
 						#2017.07.12 - Nur Änderungen schreiben
 						if (ReadingsVal( $name, "timer$i", "0" ) ne $line  ) {
-							readingsBulkUpdate( $hash, "timer$i", $line );
-							readingsBulkUpdate( $hash, "timer$i" . "number", $timernumber );
+							readingsBulkUpdateIfChanged( $hash, "timer$i", $line );
+							readingsBulkUpdateIfChanged( $hash, "timer$i" . "number", $timernumber );
 							
 							# timertyp
 							if ($timertyp eq "1") {$timertyp = "shutdown"}
@@ -1126,7 +1134,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
 							elsif ($timertyp eq "8") {$timertyp = "exec_plugin"}
 							else  {$timertyp = "unknown"}
 							
-							readingsBulkUpdate( $hash, "timer$i" . "typ", $timertyp );
+							readingsBulkUpdateIfChanged( $hash, "timer$i" . "typ", $timertyp );
 							
 							# timer repeat
 							if ($timerrepeat eq "0") {$timerrepeat = "once"}
@@ -1138,25 +1146,25 @@ sub NEUTRINO_ReceiveCommand($$$) {
 							elsif ($timerrepeat eq "6") {$timerrepeat = "beeventdescription"}
 							else  {$timerrepeat = "weekdays"}
 							
-							readingsBulkUpdate( $hash, "timer$i" . "repeat", $timerrepeat );
+							readingsBulkUpdateIfChanged( $hash, "timer$i" . "repeat", $timerrepeat );
 							
 							# timer repcount
-							readingsBulkUpdate( $hash, "timer$i" . "repcount", @timerlist[3] );
+							readingsBulkUpdateIfChanged( $hash, "timer$i" . "repcount", @timerlist[3] );
 							
 							# announceTime
-							if ($timerannounceTime eq "0") {readingsBulkUpdate( $hash, "timer$i" . "manualrecord", "" );}
+							if ($timerannounceTime eq "0") {readingsBulkUpdateIfChanged( $hash, "timer$i" . "manualrecord", "" );}
 							else {
 								my $date = localtime($timerannounceTime)->strftime('%F %T');
-								readingsBulkUpdate( $hash, "timer$i" . "announceTime", $date );
+								readingsBulkUpdateIfChanged( $hash, "timer$i" . "announceTime", $date );
 							}	
 							
 							# startTime
 							my $date = localtime($timerstartTime)->strftime('%F %T');
-							readingsBulkUpdate( $hash, "timer$i" . "startTime", $date );
+							readingsBulkUpdateIfChanged( $hash, "timer$i" . "startTime", $date );
 							
 							# stopTime
 							my $date = localtime($timerstopTime)->strftime('%F %T');
-							readingsBulkUpdate( $hash, "timer$i" . "stopTime", $date );
+							readingsBulkUpdateIfChanged( $hash, "timer$i" . "stopTime", $date );
 							
 							# timer name
 							$timername = "";
@@ -1167,12 +1175,12 @@ sub NEUTRINO_ReceiveCommand($$$) {
 								}
 								$c++;
 							}
-							readingsBulkUpdate( $hash, "timer$i" . "name", $timername );
+							readingsBulkUpdateIfChanged( $hash, "timer$i" . "name", $timername );
 						}
 
 						# find running record
 						if ($neutrinotime > $timerstartTime && $neutrinotime < $timerstopTime) {
-							readingsBulkUpdate( $hash, "recordchannel", $timername );
+							readingsBulkUpdateIfChanged( $hash, "recordchannel", $timername );
 							NEUTRINO_SendCommand( $hash, "epginforecord","");
 						}
 						
@@ -1183,19 +1191,19 @@ sub NEUTRINO_ReceiveCommand($$$) {
 
 			# timer count
 			#2017.07.12 - Nur Änderungen schreiben
-			if (ReadingsVal( $name, "timer_count", "0" ) ne $i ) {readingsBulkUpdate( $hash, "timer_count", $i );}
+			readingsBulkUpdateIfChanged( $hash, "timer_count", $i );
 		
 			# timer maxcount
 			if ($timermaxcount <= $i) {
 				#2017.07.12 - Nur Änderungen schreiben
-				if (ReadingsVal( $name, "timer_maxcount", "0" ) ne $i ) {readingsBulkUpdate( $hash, "timer_maxcount", $i );}
+				readingsBulkUpdateIfChanged( $hash, "timer_maxcount", $i );
 			}
 			else {
 				# detele not used timer 
 				while ($d < $timermaxcount) {
 					if ($d > $i -1 ) {
 						foreach ( "","announceTime","name","number","repcount","repeat","startTime","stopTime","typ", ) {
-							if (ReadingsVal( $name, "timer" . $d . $_, "0" ) ne '-' ) {readingsBulkUpdate( $hash, "timer" . $d . $_, "-" );};
+							readingsBulkUpdateIfChanged( $hash, "timer" . $d . $_, "-" );
 						}
 					}
 					$d++;
@@ -1231,7 +1239,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
 					
 					# recordtitle
 					$readvalue = $return->{prog}[$readnumber]{description};
-					readingsBulkUpdate( $hash, "recordtitle",$readvalue);
+					readingsBulkUpdateIfChanged( $hash, "recordtitle",$readvalue);
 				}
             }
             else {
@@ -1278,7 +1286,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
 		# stream URL
         elsif ( $service eq "build_live_url" ) {
 			if (@ans[0]) {
-				readingsBulkUpdate( $hash, "channel_url", @ans[0] );
+				readingsBulkUpdateIfChanged( $hash, "channel_url", @ans[0] );
 			}
 			else {
 				Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ERROR: no build_live_url could be extracted";
@@ -1290,13 +1298,13 @@ sub NEUTRINO_ReceiveCommand($$$) {
             
 			if (@ans[0]) {
 				if (index(lc(@ans[0]), "tv")  != -1) {
-					readingsBulkUpdate( $hash, "input","tv");
+					readingsBulkUpdateIfChanged( $hash, "input","tv");
 				}
 				elsif(index(lc(@ans[0]), "radio")  != -1) {
-					readingsBulkUpdate( $hash, "input","radio");
+					readingsBulkUpdateIfChanged( $hash, "input","radio");
 				}
 				else{
-					readingsBulkUpdate( $hash, "input", "-" )
+					readingsBulkUpdateIfChanged( $hash, "input", "-" )
 				}
 			}
 			else {
@@ -1340,13 +1348,19 @@ sub NEUTRINO_ReceiveCommand($$$) {
                 
 				# channel_Name
 				$readvalue = $return->{channel_name};
-				readingsBulkUpdate( $hash, "channel_name",$readvalue);
+				readingsBulkUpdateIfChanged( $hash, "channel_name",$readvalue);
 					
 				# channel displayname
 				$readvalue =~ s/\s/_/g;
-				readingsBulkUpdate( $hash, "channel",$readvalue);
+				readingsBulkUpdateIfChanged( $hash, "channel",$readvalue);
 				
-				if (defined( $return->{prog} ) && $return->{prog} ) {
+				if(ref($return->{prog}) eq 'ARRAY') {
+					Log3 $name, 1, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ARRAY!!!" . ref($return->{prog});
+				}else {Log3 $name, 1, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ARRAY!!! NOT" . ref($return->{prog});}
+				
+				Log3 $name, 1, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] Data = $data";
+				
+				if (defined( $return->{prog} ) && ref($return->{prog}) eq 'ARRAY' ) {
 				
 					#egp stop time serach
 					my $arr_size = @{ $return->{prog} };
@@ -1356,7 +1370,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
 						$readvalue = $return->{prog}[$i]{stop_sec};
 						if ($readvalue > $neutrinotime){
 							$readnumber = $i;
-							readingsBulkUpdate( $hash, "egp_current_number", $readnumber);
+							readingsBulkUpdateIfChanged( $hash, "egp_current_number", $readnumber);
 							last;
 						}
 						$i++;
@@ -1370,7 +1384,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
 
 					# currentTitel
 					$readvalue = $return->{prog}[$readnumber]{description};
-					readingsBulkUpdate( $hash, "currentTitle",$readvalue);
+					readingsBulkUpdateIfChanged( $hash, "currentTitle",$readvalue);
 					
 					foreach ( "eventid","description","info1","info2","start_t","stop_t","duration_min","date","channel_id","stop_sec","start_sec", ) {
 						$reading     = $_;
@@ -1383,16 +1397,30 @@ sub NEUTRINO_ReceiveCommand($$$) {
 							$readvalue =~ s/\n//g;
 							
 							if ($readvalue) {
-								readingsBulkUpdate( $hash, $readingname, $readvalue );
+								readingsBulkUpdateIfChanged( $hash, $readingname, $readvalue );
 							}
 							else {
-								readingsBulkUpdate( $hash, $readingname, "-" );
+								readingsBulkUpdateIfChanged( $hash, $readingname, "-" );
 							}
 						}
 						else {
-							readingsBulkUpdate( $hash, $readingname, "-" );
+							readingsBulkUpdateIfChanged( $hash, $readingname, "-" );
 						}
 					}
+				}else{
+					readingsBulkUpdateIfChanged( $hash, "eventid", "-" );
+					readingsBulkUpdateIfChanged( $hash, "egp_current_description", "-" );
+					readingsBulkUpdateIfChanged( $hash, "egp_current_info1", "-" );
+					readingsBulkUpdateIfChanged( $hash, "egp_current_info2", "-" );
+					readingsBulkUpdateIfChanged( $hash, "egp_current_start_t", "-" );
+					readingsBulkUpdateIfChanged( $hash, "egp_current_stop_t", "-" );
+					readingsBulkUpdateIfChanged( $hash, "egp_current_duration_min", "-" );
+					readingsBulkUpdateIfChanged( $hash, "egp_current_date", "-" );
+					readingsBulkUpdateIfChanged( $hash, "egp_current_channel_id", "-" );
+					readingsBulkUpdateIfChanged( $hash, "egp_current_stop_sec", "-" );
+					readingsBulkUpdateIfChanged( $hash, "egp_current_start_sec", "-" );
+					readingsBulkUpdateIfChanged( $hash, "egp_current_number", "-" );
+					readingsBulkUpdateIfChanged( $hash, "currentTitle", "-" );
 				}
             }
             else {
@@ -1429,7 +1457,7 @@ sub NEUTRINO_ReceiveCommand($$$) {
 					if (index(lc($line), "=")  != -1) {
 						$versionvalue = substr($line,index($line,"=")+1);
 						$versionname = substr($line,0,index($line,"="));
-						readingsBulkUpdate( $hash, "image_" . "$versionname",$versionvalue);
+						readingsBulkUpdateIfChanged( $hash, "image_" . "$versionname",$versionvalue);
 					}
 				}
 			}
