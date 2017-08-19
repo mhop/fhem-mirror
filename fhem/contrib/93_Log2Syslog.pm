@@ -28,6 +28,7 @@
 #######################################################################################################
 #  Versions History:
 #
+# 2.3.1      19.08.2017       commandref revised
 # 2.3.0      18.08.2017       new parameter "ident" in DEF, sub setidex, charfilter
 # 2.2.0      17.08.2017       set BSD data length, set only acceptable characters (USASCII) in payload
 #                             commandref revised
@@ -45,7 +46,7 @@ use warnings;
 eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
 eval "use Net::Domain qw(hostfqdn);1"  or my $MissModulNDom = "Net::Domain";
 
-my $Log2SyslogVn = "2.3.0";
+my $Log2SyslogVn = "2.3.1";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -307,7 +308,7 @@ sub setprival ($;$$) {
   my $prival;
   
   # Priority = (facility * 8) + severity 
-  # https://tools.ietf.org/html/rfc5424
+  # https://tools.ietf.org/pdf/rfc5424.pdf
   
   # determine facility
   my $fac = 5;                                    # facility by syslogd
@@ -417,7 +418,27 @@ return($data);
 	
 	After definition the new device sends all new appearing fhem systemlog entries and events to the destination host, 
 	port=514/UDP format:IETF, immediately without further settings if the regex for fhem or event were set. <br>
-	Without setting regex no fhem system log or event log will be forwarded. <br>
+	Without setting regex no fhem system log or event log will be forwarded. <br><br>
+	
+	The verbose level of FHEM system logs will convert into equivalent syslog severity level. <br>
+	Thurthermore the message text will be scanned for signal terms "warning" and "error" (with case insensitivity). 
+	Dependent off the severity will be set equivalent as well. If a severity is already set by verbose level, it wil be overwritten
+    by the level according to the signal term found in the message text. <br><br>
+	
+	<b>Lookup table Verbose-Level to Syslog severity level: </b><br><br>
+    <ul>  
+    <table>  
+    <colgroup> <col width=40%> <col width=60%> </colgroup>
+	  <tr><td> <b>verbose-Level</b> </td><td> <b>Schweregrad in Syslog</b> </td></tr>
+      <tr><td> 0    </td><td> Critical </td></tr>
+      <tr><td> 1    </td><td> Error </td></tr>
+      <tr><td> 2    </td><td> Warning </td></tr>
+      <tr><td> 3    </td><td> Notice </td></tr>
+      <tr><td> 4    </td><td> Informational </td></tr>
+      <tr><td> 5    </td><td> Debug </td></tr>
+    </table>
+    </ul>     
+    <br>
     
 	<br>
     Example to log anything: <br>
@@ -522,8 +543,28 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
 	[fhem:&lt;regexp&gt;] = optionaler regulärer Ausdruck zur Filterung von FHEM Logs zur Weiterleitung <br><br>
 	
 	Direkt nach der Definition sendet das neue Device alle neu auftretenden FHEM Systemlog Einträge und Events ohne weitere 
-	Einstellungen an den Zielhost, Port=514/UDP Format:IETF, wenn reguläre Ausdrücke für Events/FHEM angegeben wurden. <br>
-	Wurde kein Regex gesetzt, erfolgt keine Weiterleitung von Events oder FHEM Systemlogs. <br>
+	Einstellungen an den Zielhost, Port=514/UDP Format=IETF, wenn reguläre Ausdrücke für Events/FHEM angegeben wurden. <br>
+	Wurde kein Regex gesetzt, erfolgt keine Weiterleitung von Events oder FHEM Systemlogs. <br><br>
+	
+	Die Verbose-Level der FHEM Systemlogs werden in entsprechende Schweregrade der Syslog-Messages umgewandelt. <br>
+	Weiterhin wird der Meldungstext der FHEM Systemlogs und Events nach den Signalwörtern "warning" und "error" durchsucht 
+	(Groß- /Kleinschreibung wird nicht beachtet). Davon abhängig wird der Schweregrad ebenfalls äquivalent gesetzt und überschreibt 
+    einen eventuell bereits durch Verbose-Level gesetzten Schweregrad.	<br><br>
+	
+	<b>Umsetzungstabelle Verbose-Level in Syslog-Schweregrad Stufe: </b><br><br>
+    <ul>  
+    <table>  
+    <colgroup> <col width=40%> <col width=60%> </colgroup>
+	  <tr><td> <b>Verbose-Level</b> </td><td> <b>Schweregrad in Syslog</b> </td></tr>
+      <tr><td> 0    </td><td> Critical </td></tr>
+      <tr><td> 1    </td><td> Error </td></tr>
+      <tr><td> 2    </td><td> Warning </td></tr>
+      <tr><td> 3    </td><td> Notice </td></tr>
+      <tr><td> 4    </td><td> Informational </td></tr>
+      <tr><td> 5    </td><td> Debug </td></tr>
+    </table>
+    </ul>     
+    <br>	
     
 	<br>
     Beispiel:<br/>
