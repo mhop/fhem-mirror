@@ -2,6 +2,9 @@
 ############################################################################
 # 2017-08-19, v0.0.20
 #
+# v0.0.21
+# - BUFIX:      [WinWebGUI] - FHEM Server Connect / Reconnect
+#
 # v0.0.20
 # - BUFIX:      [FEHMModul] - $_ ersetzt durch $uResult
 #               [FEHMModul] - reading "memory_available" und "memory_total" ohne Zusatz MB
@@ -394,6 +397,7 @@ sub WINCONNECT_Set($@) {
    	my $cmd        = "";
 	my $Value	   = "";
 	my $Count      = 0;
+	my $SetValue   = 0;
 	
     Log3 $name, 5, "WINCONNECT $name: called function WINCONNECT_Set()";
 
@@ -448,11 +452,12 @@ sub WINCONNECT_Set($@) {
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            if ( m/^\d+$/ && $a[2] >= 0 && $a[2] <= 100 ) {
+			$SetValue  = $a[2];
+            if ($SetValue >= 0 && $SetValue <= 100 ) {
                 $cmd = $a[2];
             }
             else {
-                return "Argument does not seem to be a valid integer between 0 and 100";
+                return "Argument $SetValue does not seem to be a valid integer between 0 and 100";
             }
 			WINCONNECT_SendCommand( $hash, "volume" , "=" . $cmd  );
 			readingsSingleUpdate( $hash, "volume", $cmd,1 ); 
@@ -516,7 +521,8 @@ sub WINCONNECT_Set($@) {
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            if ( m/^\d+$/ && $a[2] >= 0 && $a[2] <= 10000 ) {
+			$SetValue  = $a[2];
+            if ($SetValue >= 0 && $SetValue <= 10000 ) {
                 $cmd = $a[2];
             }
             else {
@@ -535,7 +541,8 @@ sub WINCONNECT_Set($@) {
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            if ( m/^\d+$/ && $a[2] >= 0 && $a[2] <= 100 ) {
+			$SetValue  = $a[2];
+            if ($SetValue >= 0 && $SetValue <= 100 ) {
                 $cmd = $a[2];
             }
             else {
@@ -554,7 +561,8 @@ sub WINCONNECT_Set($@) {
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            if ( m/^\d+$/ && $a[2] >= 0 && $a[2] <= 100 ) {
+			$SetValue  = $a[2];
+            if ($SetValue >= 0 && $SetValue <= 100 ) {
                 $cmd = $a[2];
             }
             else {
@@ -698,7 +706,8 @@ sub WINCONNECT_Set($@) {
         Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            if ( m/^\d+$/ && $a[2] >= 10 && $a[2] <= 10000 ) {
+			$SetValue  = $a[2];
+            if ($SetValue >= 10 && $SetValue <= 10000 ) {
                 $cmd = $a[2];
             }
             else {
