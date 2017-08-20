@@ -28,6 +28,7 @@
 #######################################################################################################
 #  Versions History:
 #
+# 2.4.0      20.08.2017       new sub Log3Syslog for entries in local fhemlog only -> verbose support
 # 2.3.1      19.08.2017       commandref revised
 # 2.3.0      18.08.2017       new parameter "ident" in DEF, sub setidex, charfilter
 # 2.2.0      17.08.2017       set BSD data length, set only acceptable characters (USASCII) in payload
@@ -46,7 +47,12 @@ use warnings;
 eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
 eval "use Net::Domain qw(hostfqdn);1"  or my $MissModulNDom = "Net::Domain";
 
-my $Log2SyslogVn = "2.3.1";
+##################################################
+# Forward declarations
+#
+sub Log3Syslog($$$);
+
+my $Log2SyslogVn = "2.4.0";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -237,6 +243,8 @@ sub fhemlog_Log($$) {
 	  $prival  = setprival($txt,$vbose);
       my $data = setpayload($hash,$prival,$date,$time,$otp,"fhem");	
       
+	  Log3Syslog($name, 4, "$name - Payload created: $data");
+	  
       $sock = setsock($hash);
       if ($sock) {	  
 	      eval {$sock->send($data);};
@@ -296,6 +304,10 @@ sub setsock ($) {
   $st = "unable for open socket for $host, $type, $port" if (!$sock);
 
   readingsSingleUpdate($hash, "state", $st, 1) if($st ne OldValue($name));
+  
+  # Logausgabe (nur in das fhem Logfile !)
+  $st = "Socket opened for Host: $host, Protocol: $type, Port: $port, TLS: ".AttrVal($name, 'TLS', 0) if($sock);
+  Log3Syslog($name, 5, "$name - $st");
   
 return($sock);
 }
@@ -378,6 +390,45 @@ sub setpayload ($$$$$$) {
   }
   
 return($data);
+}
+
+###############################################################################
+#               eigene Log3-Ableitung - Schleife vermeiden
+###############################################################################
+sub Log3Syslog($$$) {
+  my ($dev, $loglevel, $text) = @_;
+  our ($logopened,$currlogfile);
+  
+  $dev = $dev->{NAME} if(defined($dev) && ref($dev) eq "HASH");
+     
+  if(defined($dev) &&
+     defined($attr{$dev}) &&
+     defined (my $devlevel = $attr{$dev}{verbose})) {
+    return if($loglevel > $devlevel);
+
+  } else {
+    return if($loglevel > $attr{global}{verbose});
+
+  }
+
+  my ($seconds, $microseconds) = gettimeofday();
+  my @t = localtime($seconds);
+  my $nfile = ResolveDateWildcards($attr{global}{logfile}, @t);
+  OpenLogfile($nfile) if(!$currlogfile || $currlogfile ne $nfile);
+
+  my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d",
+          $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
+  if($attr{global}{mseclog}) {
+    $tim .= sprintf(".%03d", $microseconds/1000);
+  }
+
+  if($logopened) {
+    print LOG "$tim $loglevel: $text\n";
+  } else {
+    print "$tim $loglevel: $text\n";
+  }
+
+return undef;
 }
 
 1;
