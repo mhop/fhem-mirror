@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 2.7.0  20.08.2017    bugfix if credentials not set, set maximum password lenth to 20
 # 2.6.3  12.08.2017    get snapGallery can also be triggered by at or notify (better use than "set"), commandref revised
 # 2.6.2  11.08.2017    set snapGallery can be triggered by at or notify
 # 2.6.1  07.08.2017    some changes in composegallery if createSnapGallery used, room Snapshots changed to SnapGalllery
@@ -189,7 +190,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "2.6.3";
+my $SSCamVersion = "2.7.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -201,6 +202,7 @@ my %SSCam_errauthlist = (
   402 => "Permission denied - DSM-Session: make sure user is member of Admin-group, SVS-Session: make sure SVS package is started, make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
   403 => "One time password not specified",
   404 => "One time password authenticate failed",
+  405 => "method not allowd",
   407 => "Permission denied - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
 );
 
@@ -522,11 +524,8 @@ sub SSCam_Set {
              ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
              ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
            
-  if (!$hash->{CREDENTIALS} && $opt ne "credentials") {
-	    # sind die Credentials gesetzt ?
-		return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";
-	
-  } elsif ($opt eq "on") {
+
+  if ($opt eq "on") {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             
       if (defined($prop)) {
@@ -537,13 +536,14 @@ sub SSCam_Set {
  
   } elsif ($opt eq "off") {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-          camstoprec($hash);
+      camstoprec($hash);
         
   } elsif ($opt eq "snap") {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-          camsnap($hash);
+      camsnap($hash);
         
   } elsif ($opt eq "snapGallery") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       my $ret = getclhash($hash);
       return $ret if($ret);
   
@@ -574,6 +574,7 @@ sub SSCam_Set {
 	  }
 	  
   } elsif ($opt eq "createSnapGallery") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       my ($ret,$sgdev);
       return "When you want use \"$opt\", you have to set the attribute \"snapGalleryBoost\" first because the functionality depends on retrieving snapshots automatically." 
 		       if(!AttrVal($name,"snapGalleryBoost",0));
@@ -587,11 +588,11 @@ sub SSCam_Set {
       
   } elsif ($opt eq "enable") {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-          camenable($hash);
+      camenable($hash);
         
   } elsif ($opt eq "disable") {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-          camdisable($hash);
+      camdisable($hash);
        
   } elsif ($opt eq "motdetsc") {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -618,6 +619,7 @@ sub SSCam_Set {
         
   } elsif ($opt eq "credentials") {
       return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
+	  return "Password is too long. Make sure your password is maximum of 20 characters long." if (length $prop1 > 20);
       delete $hash->{HELPER}{SID} if($hash->{HELPER}{SID});          
       ($success) = setcredentials($hash,$prop,$prop1);
       $hash->{HELPER}{ACTIVE} = "off";  
@@ -779,18 +781,17 @@ sub SSCam_Get {
 				  
     return if(IsDisabled($name));             
         
-    if (!$hash->{CREDENTIALS}) {
-	    # sind die Credentials gesetzt ?
-		return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";
-	
-	} elsif ($opt eq "caminfoall") {
+    if ($opt eq "caminfoall") {
         # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
+		if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         getcaminfoall($hash,1);
                 
     } elsif ($opt eq "svsinfo") {
+	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         getsvsinfo($hash);
                 
     } elsif ($opt eq "snapGallery") {
+	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 	    my $ret = getclhash($hash);
         return $ret if($ret);
 
@@ -822,20 +823,25 @@ sub SSCam_Get {
 
     } elsif ($opt eq "snapinfo") {
         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
+		if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         my ($slim,$ssize) = snaplimsize($hash);		
         getsnapinfo("$name:$slim:$ssize");
                 
     } elsif ($opt eq "snapfileinfo") {
+	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         if (!ReadingsVal("$name", "LastSnapId", undef)) {return "Reading LastSnapId is empty - please take a snapshot before !"}
         getsnapfilename($hash);
                 
     } elsif ($opt eq "eventlist") {
+	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         geteventlist ($hash);
                 
     } elsif ($opt eq "stmUrlPath") {
+	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         getStmUrlPath ($hash);
             
 	} elsif ($opt eq "scanVirgin") {
+	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         delete $hash->{HELPER}{APIPARSET};
 	    delete $hash->{HELPER}{SID};
 		delete $hash->{CAMID};
@@ -4310,7 +4316,8 @@ sub experror {
      set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt;
     </pre>
     
-    The operator can, dependend on what functions are planned to execute, create an user in DSM respectively in Synology Surveillance Station as well. <br>
+    The password lenth has a maximum of 20 characters. <br> 
+	The operator can, dependend on what functions are planned to execute, create an user in DSM respectively in Synology Surveillance Station as well. <br>
     If the user is member of admin-group, he has access to all module functions. Without this membership the user can only execute functions with lower need of rights. <br>
     The required minimum rights to execute functions are listed in a table further down. <br>
     
@@ -5211,6 +5218,7 @@ sub experror {
      set &lt;name&gt; credentials &lt;Username&gt; &lt;Passwort&gt;
     </pre>
     
+	Die Passwortlänge beträgt maximal 20 Zeichen. <br> 
     Der Anwender kann in Abhängigkeit der beabsichtigten einzusetzenden Funktionen einen Nutzer im DSM bzw. in der Surveillance Station einrichten. <br>
     Ist der DSM-Nutzer der Gruppe Administratoren zugeordnet, hat er auf alle Funktionen Zugriff. Ohne diese Gruppenzugehörigkeit können nur Funktionen mit niedrigeren <br>
     Rechtebedarf ausgeführt werden. Die benötigten Mindestrechte der Funktionen sind in der Tabelle weiter unten aufgeführt. <br>

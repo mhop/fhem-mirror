@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix_  49_SSCam: V2.7.0, set maximum password lenth to 20
   - bugfix:  73_AMADCommBridge: fix AnalyzeCommandChain sub call, fix
                                 AMADautomagicFlowset
   - bugfix:  72_FB_CALLLIST: fix shifted table header 
