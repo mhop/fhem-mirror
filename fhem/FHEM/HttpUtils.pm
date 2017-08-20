@@ -4,7 +4,6 @@ package main;
 
 use strict;
 use warnings;
-use IO::Socket::INET;
 use MIME::Base64;
 use Digest::MD5 qw(md5_hex);
 use vars qw($SSL_ERROR);
@@ -309,8 +308,10 @@ HttpUtils_Connect($)
     }
                 
   } else {
-    $hash->{conn} = IO::Socket::INET->new(
-                PeerAddr=>"$host:$port", Timeout=>$hash->{timeout});
+    $hash->{conn} = $haveInet6 ?
+      IO::Socket::INET6->new(PeerAddr=>"$host:$port",Timeout=>$hash->{timeout}):
+      IO::Socket::INET ->new(PeerAddr=>"$host:$port",Timeout=>$hash->{timeout});
+
     return "$hash->{displayurl}: Can't connect(1) to $hash->{addr}: $@"
       if(!$hash->{conn});
   }

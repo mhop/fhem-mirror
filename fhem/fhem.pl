@@ -34,6 +34,7 @@ use strict;
 use warnings;
 use lib '.';
 use IO::Socket;
+use IO::Socket::INET;
 use Time::HiRes qw(gettimeofday);
 use Scalar::Util qw(looks_like_number);
 use POSIX;
@@ -238,6 +239,7 @@ use vars qw(%value);            # Current values, see commandref.html
 use vars qw(@authenticate);     # List of authentication devices
 use vars qw(@authorize);        # List of authorization devices
 use vars qw(@structChangeHist); # Contains the last 10 structural changes
+use vars qw($haveInet6);        # Using INET6
 
 $selectTimestamp = gettimeofday();
 $cvsid = '$Id$';
@@ -318,6 +320,7 @@ my @globalAttrList = qw(
   uniqueID
   updateInBackground:1,0
   updateNoFileCheck:1,0
+  useInet6:1,0
   version
 );
 use warnings 'qw';
@@ -2556,6 +2559,7 @@ GlobalAttr($$$$)
     my %noDel = ( modpath=>1, verbose=>1, logfile=>1 );
     return "The global attribute $name cannot be deleted" if($noDel{$name});
     $featurelevel = 5.8 if($name eq "featurelevel");
+    $haveInet6    = 0   if($name eq "useInet6");
     return undef;
   }
 
@@ -2632,6 +2636,15 @@ GlobalAttr($$$$)
       system("$^X $root/contrib/commandref_join.pl -noWarnings $out")
     } else {
       system("$^X $root/contrib/commandref_modular.pl $out");
+    }
+  }
+  elsif($name eq "useInet6") {
+    if($val || !defined($val)) {
+      eval { require IO::Socket::INET6; };
+      return $@ if($@);
+      $haveInet6 = 1;
+    } else {
+      $haveInet6 = 0;
     }
   }
 

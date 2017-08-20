@@ -354,7 +354,9 @@ DevIo_OpenDev($$$;$)
       return undef;     # no double callback: connect is running in bg now
 
     } else {
-      my $conn = IO::Socket::INET->new(PeerAddr => $dev, Timeout => $timeout);
+      my $conn = $haveInet6 ? 
+          IO::Socket::INET6->new(PeerAddr => $dev, Timeout => $timeout) :
+          IO::Socket::INET ->new(PeerAddr => $dev, Timeout => $timeout);
       return "" if(!&$doTcpTail($conn)); # no callback: no doCb
     }
 
