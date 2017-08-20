@@ -74,8 +74,8 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.2";
-my $flowsetversion = "4.0.3";
+my $modulversion = "4.0.4";
+my $flowsetversion = "4.0.4";
 
 
 
@@ -283,14 +283,14 @@ sub AMADCommBridge_ErrorHandling($$$) {
         if( $dhash->{helper}{infoErrorCounter} > 0 ) {
         
             readingsBeginUpdate( $dhash );
-            readingsBulkUpdateIfChanged( $dhash, "lastStatusRequestState", "statusRequest_error", 1 );
+            readingsBulkUpdate( $dhash, "lastStatusRequestState", "statusRequest_error", 1 );
 
             if( ReadingsVal( $dname, "flow_Informations", "active" ) eq "inactive" && ReadingsVal( $dname, "flow_SetCommands", "active" ) eq "inactive" ) {
         
                 Log3 $dname, 5, "AMADCommBridge ($dname) - statusRequestERROR: CHECK THE LAST ERROR READINGS FOR MORE INFO, DEVICE IS SET OFFLINE";
             
-                readingsBulkUpdateIfChanged( $dhash, "deviceState", "offline", 1 );
-                readingsBulkUpdateIfChanged ( $dhash, "state", "AMAD Flows inactive, device set offline",1);
+                readingsBulkUpdate( $dhash, "deviceState", "offline", 1 );
+                readingsBulkUpdate ( $dhash, "state", "AMAD Flows inactive, device set offline",1);
             }
 
             elsif( $dhash->{helper}{infoErrorCounter} > 7 && $dhash->{helper}{setCmdErrorCounter} > 4 ) {
@@ -298,7 +298,7 @@ sub AMADCommBridge_ErrorHandling($$$) {
                 Log3 $dname, 5, "AMADCommBridge ($dname) - statusRequestERROR: UNKNOWN ERROR, PLEASE CONTACT THE DEVELOPER, DEVICE DISABLED";
         
                 $attr{$dname}{disable} = 1;
-                readingsBulkUpdateIfChanged ( $dhash, "state", "Unknown Error, device disabled", 1);
+                readingsBulkUpdate ( $dhash, "state", "Unknown Error, device disabled", 1);
         
                 $dhash->{helper}{infoErrorCounter} = 0;
                 $dhash->{helper}{setCmdErrorCounter} = 0;
@@ -315,8 +315,8 @@ sub AMADCommBridge_ErrorHandling($$$) {
 
                 Log3 $dname, 5, "AMADCommBridge ($dname) - statusRequestERROR: To many Errors please check your Network or Device Configuration, DEVICE IS SET OFFLINE";
             
-                readingsBulkUpdateIfChanged( $dhash, "deviceState", "offline", 1 );
-                readingsBulkUpdateIfChanged ( $dhash, "state", "To many Errors, device set offline", 1);
+                readingsBulkUpdate( $dhash, "deviceState", "offline", 1 );
+                readingsBulkUpdate ( $dhash, "state", "To many Errors, device set offline", 1);
                 $dhash->{helper}{infoErrorCounter} = 0;
             }
         
@@ -332,10 +332,10 @@ sub AMADCommBridge_ErrorHandling($$$) {
             if( $err ne "" ) {
             
                 readingsBeginUpdate( $dhash );
-                readingsBulkUpdateIfChanged ( $dhash, "state", "$err") if( ReadingsVal( $dname, "state", 1 ) ne "initialized" );
+                readingsBulkUpdate ( $dhash, "state", "$err") if( ReadingsVal( $dname, "state", 1 ) ne "initialized" );
                 $dhash->{helper}{infoErrorCounter} = ( $dhash->{helper}{infoErrorCounter} + 1 );
 
-                readingsBulkUpdateIfChanged( $dhash, "lastStatusRequestState", "statusRequest_error", 1 );
+                readingsBulkUpdate( $dhash, "lastStatusRequestState", "statusRequest_error", 1 );
         
                 if( $err =~ /timed out/ ) {
         
@@ -362,10 +362,10 @@ sub AMADCommBridge_ErrorHandling($$$) {
         if( $data eq "" and exists( $param->{code} ) && $param->{code} ne 200 ) {
         
             readingsBeginUpdate( $dhash );
-            readingsBulkUpdateIfChanged ( $dhash, "state", $param->{code}, 1 ) if( ReadingsVal( $dname, "state", 1 ) ne "initialized" );
+            readingsBulkUpdate ( $dhash, "state", $param->{code}, 1 ) if( ReadingsVal( $dname, "state", 1 ) ne "initialized" );
             $dhash->{helper}{infoErrorCounter} = ( $dhash->{helper}{infoErrorCounter} + 1 );
 
-            readingsBulkUpdateIfChanged( $dhash, "lastStatusRequestState", "statusRequest_error", 1 );
+            readingsBulkUpdate( $dhash, "lastStatusRequestState", "statusRequest_error", 1 );
         
             if( $param->{code} ne 200 ) {
 
@@ -381,10 +381,10 @@ sub AMADCommBridge_ErrorHandling($$$) {
 
         if( ( $data =~ /Error/i ) and exists( $param->{code} ) ) {    
             readingsBeginUpdate( $dhash );
-            readingsBulkUpdateIfChanged( $dhash, "state", $param->{code}, 1 ) if( ReadingsVal( $dname, "state" ,0) ne "initialized" );
+            readingsBulkUpdate( $dhash, "state", $param->{code}, 1 ) if( ReadingsVal( $dname, "state" ,0) ne "initialized" );
             $dhash->{helper}{infoErrorCounter} = ( $dhash->{helper}{infoErrorCounter} + 1 );
 
-            readingsBulkUpdateIfChanged( $dhash, "lastStatusRequestState", "statusRequest_error", 1 );
+            readingsBulkUpdate( $dhash, "lastStatusRequestState", "statusRequest_error", 1 );
 
             if( $param->{code} eq 404 && ReadingsVal( $dname, "flow_Informations", "inactive" ) eq "inactive" ) {
 
@@ -409,6 +409,7 @@ sub AMADCommBridge_ErrorHandling($$$) {
 
         ### End Error Handling
 
+        readingsSingleUpdate( $dhash, "lastStatusRequestState", "statusRequest_done", 1 );
         $dhash->{helper}{infoErrorCounter} = 0;
     }
     
@@ -418,14 +419,14 @@ sub AMADCommBridge_ErrorHandling($$$) {
         if( $dhash->{helper}{setCmdErrorCounter} > 2 ) {
         
         readingsBeginUpdate( $dhash );
-        readingsBulkUpdateIfChanged( $dhash, "lastSetCommandState", "statusRequest_error", 1 );
+        readingsBulkUpdate( $dhash, "lastSetCommandState", "statusRequest_error", 1 );
 
             if( ReadingsVal( $dname, "flow_Informations", "active" ) eq "inactive" && ReadingsVal( $dname, "flow_SetCommands", "active" ) eq "inactive" ) {
         
                 Log3 $dname, 5, "AMADCommBridge ($dname) - setCommandERROR: CHECK THE LAST ERROR READINGS FOR MORE INFO, DEVICE IS SET OFFLINE";
 
-                readingsBulkUpdateIfChanged( $dhash, "deviceState", "offline", 1 );
-                readingsBulkUpdateIfChanged( $dhash, "state", "AMAD Flows inactive, device set offline", 1 );
+                readingsBulkUpdate( $dhash, "deviceState", "offline", 1 );
+                readingsBulkUpdate( $dhash, "state", "AMAD Flows inactive, device set offline", 1 );
             }
 
             elsif( $dhash->{helper}{infoErrorCounter} > 7 && $dhash->{helper}{setCmdErrorCounter} > 4 ) {
@@ -433,7 +434,7 @@ sub AMADCommBridge_ErrorHandling($$$) {
                 Log3 $dname, 5, "AMADCommBridge ($dname) - setCommandERROR: UNKNOWN ERROR, PLEASE CONTACT THE DEVELOPER, DEVICE DISABLED";
         
                 $attr{$dname}{disable} = 1;
-                readingsBulkUpdateIfChanged( $dhash, "state", "Unknown Error, device disabled", 1 );
+                readingsBulkUpdate( $dhash, "state", "Unknown Error, device disabled", 1 );
                 $dhash->{helper}{infoErrorCounter} = 0;
                 $dhash->{helper}{setCmdErrorCounter} = 0;
 
@@ -449,8 +450,8 @@ sub AMADCommBridge_ErrorHandling($$$) {
         
                 Log3 $dname, 5, "AMADCommBridge ($dname) - setCommandERROR: To many Errors please check your Network or Device Configuration, DEVICE IS SET OFFLINE";
         
-                readingsBulkUpdateIfChanged( $dhash, "deviceState", "offline", 1 );
-                readingsBulkUpdateIfChanged( $dhash, "state", "To many Errors, device set offline", 1 );
+                readingsBulkUpdate( $dhash, "deviceState", "offline", 1 );
+                readingsBulkUpdate( $dhash, "state", "To many Errors, device set offline", 1 );
                 $dhash->{helper}{setCmdErrorCounter} = 0;
             }
 
@@ -465,10 +466,10 @@ sub AMADCommBridge_ErrorHandling($$$) {
         if( defined( $err ) ) {
             if( $err ne "" ) {
                 readingsBeginUpdate( $dhash );
-                readingsBulkUpdateIfChanged( $dhash, "state", $err, 1 ) if( ReadingsVal( $dname, "state", 0 ) ne "initialized" );
+                readingsBulkUpdate( $dhash, "state", $err, 1 ) if( ReadingsVal( $dname, "state", 0 ) ne "initialized" );
                 $dhash->{helper}{setCmdErrorCounter} = ($dhash->{helper}{setCmdErrorCounter} + 1);
         
-                readingsBulkUpdateIfChanged( $dhash, "lastSetCommandState", "setCmd_error", 1 );
+                readingsBulkUpdate( $dhash, "lastSetCommandState", "setCmd_error", 1 );
         
                 if( $err =~ /timed out/ ) {
 
@@ -495,11 +496,11 @@ sub AMADCommBridge_ErrorHandling($$$) {
         if( $data eq "" and exists( $param->{code} ) && $param->{code} ne 200 ) {
         
             readingsBeginUpdate( $dhash );
-            readingsBulkUpdateIfChanged( $dhash, "state", $param->{code}, 1 ) if( ReadingsVal( $dhash, "state", 0 ) ne "initialized" );
+            readingsBulkUpdate( $dhash, "state", $param->{code}, 1 ) if( ReadingsVal( $dhash, "state", 0 ) ne "initialized" );
 
             $dhash->{helper}{setCmdErrorCounter} = ( $dhash->{helper}{setCmdErrorCounter} + 1 );
 
-            readingsBulkUpdateIfChanged($dhash, "lastSetCommandState", "setCmd_error", 1 );
+            readingsBulkUpdate($dhash, "lastSetCommandState", "setCmd_error", 1 );
 
             readingsEndUpdate( $dhash, 1 );
         
@@ -511,15 +512,15 @@ sub AMADCommBridge_ErrorHandling($$$) {
         if( ( $data =~ /Error/i ) and exists( $param->{code} ) ) {
         
             readingsBeginUpdate( $dhash );
-            readingsBulkUpdateIfChanged( $dhash, "state", $param->{code}, 1 ) if( ReadingsVal( $dname, "state", 0 ) ne "initialized" );
+            readingsBulkUpdate( $dhash, "state", $param->{code}, 1 ) if( ReadingsVal( $dname, "state", 0 ) ne "initialized" );
 
             $dhash->{helper}{setCmdErrorCounter} = ( $dhash->{helper}{setCmdErrorCounter} + 1 );
 
-            readingsBulkUpdateIfChanged( $dhash, "lastSetCommandState", "setCmd_error", 1 );
+            readingsBulkUpdate( $dhash, "lastSetCommandState", "setCmd_error", 1 );
         
             if( $param->{code} eq 404 ) {
         
-                readingsBulkUpdateIfChanged( $dhash, "lastSetCommandError", "", 1 );
+                readingsBulkUpdate( $dhash, "lastSetCommandError", "", 1 );
                 Log3 $dname, 5, "AMADCommBridge ($dname) - setCommandERROR: setCommands flow is inactive on your device!";
         
             } else {
@@ -808,7 +809,7 @@ sub AMADCommBridge_ResponseProcessing($$) {
             my $fhemCmd = $decode_json->{payload}{setcmd};
         
             fhem ("set $fhemCmd") if( AttrVal( $bname, 'fhemControlMode', 'trigger' ) eq 'setControl' );
-            my $r = AnalyzeCommandChain($bhash, 'set'.$fhemCmd);
+            my $r = AnalyzeCommandChain($bhash, 'set '.$fhemCmd);
             readingsSingleUpdate( $bhash, "receiveFhemCommand", "set ".$fhemCmd, 1 ) if( AttrVal( $bname, 'fhemControlMode', 'trigger' ) eq 'trigger' );
             Log3 $bname, 4, "AMADCommBridge ($name) - AMADCommBridge_CommBridge: set reading receive fhem command";
 
