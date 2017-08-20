@@ -202,7 +202,7 @@ my %SSCam_errauthlist = (
   402 => "Permission denied - DSM-Session: make sure user is member of Admin-group, SVS-Session: make sure SVS package is started, make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
   403 => "One time password not specified",
   404 => "One time password authenticate failed",
-  405 => "method not allowd",
+  405 => "method not allowd - maybe the password is too long",
   407 => "Permission denied - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
 );
 
@@ -619,7 +619,7 @@ sub SSCam_Set {
         
   } elsif ($opt eq "credentials") {
       return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
-	  return "Password is too long. Make sure your password is maximum of 20 characters long." if (length $prop1 > 20);
+	  return "Password is too long. It is limited up to and including 20 characters." if (length $prop1 > 20);
       delete $hash->{HELPER}{SID} if($hash->{HELPER}{SID});          
       ($success) = setcredentials($hash,$prop,$prop1);
       $hash->{HELPER}{ACTIVE} = "off";  
