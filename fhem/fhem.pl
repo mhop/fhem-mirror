@@ -2474,8 +2474,8 @@ CommandRename($$)
 
   return "Please define $old first" if(!defined($defs{$old}));
   return "$new already defined" if(defined($defs{$new}));
-  return "Invalid characters in name (not A-Za-z0-9.:_): $new"
-                        if($new !~ m/^[a-z0-9.:_]*$/i);
+  return "Invalid characters in name (not A-Za-z0-9._): $new"
+                        if(!goodDeviceName($new));
   return "Cannot rename global" if($old eq "global");
 
   %ntfyHash = ();
