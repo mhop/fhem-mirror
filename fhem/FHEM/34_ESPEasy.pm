@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.32";     # Version of this module
+my $module_version    = "1.33";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -768,7 +768,7 @@ sub ESPEasy_Read($) {
     my @values;
     my @intVals = qw(unit sleep build build_git build_notes version node_type_id);
     foreach my $intVal (@intVals) {
-      next if !defined $json->{data}{ESP}{$intVal};
+      next if !defined $json->{data}{ESP}{$intVal} || $json->{data}{ESP}{$intVal} eq "";
       push(@values,"i||".$intVal."||".$json->{data}{ESP}{$intVal}."||0");
     }
 
@@ -2729,7 +2729,7 @@ sub ESPEasy_removeGit($)
     <br>
     <li><b>UPDATE:
     </li>
-    <li></b>For security reasons: if one or more of your ESPEasy device uses an
+    <li></b>For security reasons: if one or more of your ESPEasy device uses a
       public IP address then you have to enable this explicitly or the device(s)
       will be ignored/rejected:
     </li>
@@ -2782,7 +2782,7 @@ sub ESPEasy_removeGit($)
       <a name=""><code>&lt;port&gt;</code></a><br>
       Specifies TCP port for incoming ESPEasy http requests. This port must
       <u>not</u> be used by any other application or daemon on your system and
-      must be in the range 1025..65535 unless you run your FHEM installation
+      must be in the range 1024..65535 unless you run your FHEM installation
       with root permissions (not recommanded).<br>
       If you want to define an IPv4 and an IPv6 bridge on the same TCP port
       (recommanded) then it might be necessary on (some?) Linux
