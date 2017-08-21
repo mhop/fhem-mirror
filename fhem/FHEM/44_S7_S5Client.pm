@@ -9,14 +9,6 @@ use AutoLoader;
 
 require "44_S7_Client.pm";
 
-#if ( OS_Linux() ) {
-use Device::SerialPort;
-
-#}
-#else {
-#	use Win32::SerialPort;
-#}
-
 package S5Client;
 
 #use S7ClientBase;
@@ -485,13 +477,14 @@ sub S5ConnectPLCAS511($$) {
 	my $b1 = "";
 	my $ttyPort;
 
-	#if ( OS_Linux() ) {
-	$self->{serial} = new Device::SerialPort($portName);
+	if ($^O=~/Win/) {
+		eval ("use Win32::SerialPort;");
+		$self->{serial} = new Win32::SerialPort ($portName);
+	}else{
+		eval ("use Device::SerialPort;");
+		$self->{serial} = new Device::SerialPort ($portName);
+	}
 
-	#}
-	#else {
-	#	$ttyPort = new Win32::SerialPort( $portName );
-	#}
 
 	main::Log3( undef, 3, "Can't open serial port $portName" )
 	  unless ( $self->{serial} );
