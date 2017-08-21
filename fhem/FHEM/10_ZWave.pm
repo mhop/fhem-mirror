@@ -5081,6 +5081,7 @@ ZWave_getPic($$)
       Log 3, "ZWave: downloading $url/$img for $model";
       my $data = GetFileFromURL("$url/$img");
       if($data && open(FH,">$fn")) {
+        binmode(FH);
         print FH $data;
         close(FH)
       }
