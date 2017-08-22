@@ -2645,7 +2645,7 @@ GlobalAttr($$$$)
   }
   elsif($name eq "useInet6") {
     if($val || !defined($val)) {
-      eval { require IO::Socket::INET6; };
+      eval { require IO::Socket::INET6; require Socket6; };
       return $@ if($@);
       $haveInet6 = 1;
     } else {

@@ -114,14 +114,24 @@ HttpUtils_File($)
   return (1, undef, $data);
 }
 
-sub ip2str($) { return sprintf("%d.%d.%d.%d", unpack("C*", shift)); }
+sub
+ip2str($)
+{
+  my ($addr) = @_;
+
+  return sprintf("%d.%d.%d.%d", unpack("C*", $addr)) if(length($addr) == 4);
+  my $h = join(":",map { sprintf("%x",$_) } unpack("n*",$addr));
+  $h =~ s/(:0)+/:/g;
+  $h =~ s/^0://g;
+  return "[$h]";
+}
 
 # http://www.ccs.neu.edu/home/amislove/teaching/cs4700/fall09/handouts/project1-primer.pdf
 my %HU_dnsCache;
 sub
-HttpUtils_dnsParse($$)
+HttpUtils_dnsParse($$$)
 {
-  my ($a, $ql) = @_;    # $ql: avoid hardcoding query length
+  my ($a, $ql,$try6) = @_;    # $ql: avoid hardcoding query length
   return "wrong message ID" if(unpack("H*",substr($a,0,2)) ne "7072");
 
   while(length($a) >= $ql+16) {
@@ -135,19 +145,21 @@ HttpUtils_dnsParse($$)
       }
       $ql++;
     }
+    return (undef, substr($a,$ql+10,16),unpack("N",substr($a,$ql+4,4)))
+        if(unpack("N",substr($a,$ql,4)) == 0x1c0001 && $try6);
     return (undef, substr($a,$ql+10,4), unpack("N",substr($a,$ql+4,4)))
-        if(unpack("N",substr($a,$ql,4)) == 0x10001);
+        if(unpack("N",substr($a,$ql,4)) == 0x10001 && !$try6);
     $ql += 10+unpack("n",substr($a,$ql+8)) if(length($a) >= $ql+10);
   }
   return "No A record found";
 }
 
-# { HttpUtils_gethostbyname({timeout=>4}, "google.com", sub(){my($h,$e,$a)=@_;;
-#   fhem("trigger global ".($e ? "ERR:$e": ("IP:".ip2str($a)))) }) }
+# { HttpUtils_gethostbyname({timeout=>4}, "google.com", 1,
+#   sub(){my($h,$e,$a)=@_;; Log 1, $e ? "ERR:$e": ("IP:".ip2str($a)) }) }
 sub
-HttpUtils_gethostbyname($$$)
+HttpUtils_gethostbyname($$$$)
 {
-  my ($hash, $host, $fn) = @_;
+  my ($hash, $host, $try6, $fn) = @_;
 
   if($host =~ m/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/ &&        # IP-Address
      $1<256 && $2<256 && $3<256 && $4<256) {
@@ -156,20 +168,48 @@ HttpUtils_gethostbyname($$$)
   }
 
   my $dnsServer = AttrVal("global", "dnsServer", undef);
-  if(!$dnsServer) {
-    my $iaddr = inet_aton($host);
-    my $err;
-    if(!defined($iaddr)) {
-      $iaddr = gethostbyname($host); # This is still blocking
-      $err = (($iaddr && length($iaddr)==4) ? 
-                        undef : "gethostbyname $host failed");
+
+  if(!$dnsServer) { # use the blocking libc to get the IP
+    if($haveInet6) {
+      $host = $1 if($host =~ m/^\[([a-f0-9:]+)\]+$/);
+      my $iaddr = Socket6::inet_pton(AF_INET6, $host);
+      return $fn->($hash, undef, $iaddr) if($iaddr);
+
+      $iaddr = Socket6::inet_pton(AF_INET , $host);
+      return $fn->($hash, undef, $iaddr) if($iaddr);
+
+      my ($s4, $s6);
+      my @res = Socket6::getaddrinfo($host, 80);
+      for(my $i=0; $i+5<=@res; $i+=5) {
+        $s4 = $res[$i+3] if($res[$i] == AF_INET  && !$s4);
+        $s6 = $res[$i+3] if($res[$i] == AF_INET6 && !$s6);
+      }
+      if($s6) {
+        (undef, $iaddr) = Socket6::unpack_sockaddr_in6($s6);
+        return $fn->($hash, undef, $iaddr);
+      }
+      if($s4) {
+        (undef, $iaddr) = sockaddr_in($s4);
+        return $fn->($hash, undef, $iaddr);
+      }
+      $fn->($hash, "gethostbyname $host failed", undef);
+
+    } else {
+      my $iaddr = inet_aton($host);
+      my $err;
+      if(!defined($iaddr)) {
+        $iaddr = gethostbyname($host); # This is still blocking
+        $err = (($iaddr && length($iaddr)==4) ? 
+                          undef : "gethostbyname $host failed");
+      }
+      $fn->($hash, $err, $iaddr);
     }
-    $fn->($hash, $err, $iaddr);
+
     return;
   }
 
   return $fn->($hash, undef, $HU_dnsCache{$host}{addr}) # check the cache
-        if($HU_dnsCache{$host} && 
+        if($HU_dnsCache{$host} &&
            $HU_dnsCache{$host}{TS}+$HU_dnsCache{$host}{TTL} > gettimeofday());
 
   # Direct DNS Query via UDP
@@ -180,8 +220,10 @@ HttpUtils_gethostbyname($$$)
              addr=>$dnsServer, callback=>$fn );
   my %timerHash = ( hash=>\%dh, msg=>"DNS" );
   my $bhost = join("", map { pack("CA*",length($_),$_) } split(/\./, $host));
-  my $qry = pack("nnnnnn", 0x7072,0x0100,1,0,0,0) . $bhost . pack("Cnn", 0,1,1);
+  my $qry = pack("nnnnnn", 0x7072,0x0100,1,0,0,0) .
+                $bhost . pack("Cnn", 0,$try6 ? 28:1,1);
   my $ql = length($qry);
+  Log 5, "DNS QUERY ".unpack("H*", $qry);
 
   $dh{directReadFn} = sub() {                           # Parse the answer
     RemoveInternalTimer(\%timerHash);
@@ -189,7 +231,8 @@ HttpUtils_gethostbyname($$$)
     my $len = sysread($dh{conn},$buf,65536);
     HttpUtils_Close(\%dh);
     Log 5, "DNS ANSWER ".($len?$len:0).":".($buf ? unpack("H*", $buf):"N/A");
-    my ($err, $addr, $ttl) = HttpUtils_dnsParse($buf,$ql);
+    my ($err, $addr, $ttl) = HttpUtils_dnsParse($buf,$ql,$try6);
+    return HttpUtils_gethostbyname($hash, $host, 0, $fn) if($err && $try6);
     return $fn->($hash, "DNS: $err", undef) if($err);
     Log 4, "DNS result for $host: ".ip2str($addr).", ttl:$ttl";
     $HU_dnsCache{$host}{TS} = gettimeofday();
@@ -255,58 +298,61 @@ HttpUtils_Connect($)
   return HttpUtils_Connect2($hash) if($hash->{conn} && $hash->{keepalive});
 
   if($hash->{callback}) { # Nonblocking staff
-    $hash->{conn} = IO::Socket::INET->new(Proto=>'tcp', Blocking=>0);
-    if($hash->{conn}) {
-      HttpUtils_gethostbyname($hash, $host, sub($$$) {
-        my ($hash, $err, $iaddr) = @_;
-        $hash = $hash->{origHash} if($hash->{origHash});
-        if($err) {
+    HttpUtils_gethostbyname($hash, $host, $haveInet6, sub($$$) {
+      my ($hash, $err, $iaddr) = @_;
+      $hash = $hash->{origHash} if($hash->{origHash});
+      if($err) {
+        HttpUtils_Close($hash);
+        return $hash->{callback}($hash, $err, "") ;
+      }
+      Log 5, "IP: $host -> ".ip2str($iaddr);
+      $hash->{conn} = length($iaddr) == 4 ?
+                      IO::Socket::INET ->new(Proto=>'tcp', Blocking=>0) :
+                      IO::Socket::INET6->new(Proto=>'tcp', Blocking=>0);
+      return $hash->{callback}($hash, "Creating socket: $!", "")
+              if(!$hash->{conn});
+      my $sa = length($iaddr)==4 ?  sockaddr_in($port, $iaddr) : 
+                        Socket6::pack_sockaddr_in6($port, $iaddr);
+      my $ret = connect($hash->{conn}, $sa);
+      if(!$ret) {
+        if($!{EINPROGRESS} || int($!)==10035 ||
+           (int($!)==140 && $^O eq "MSWin32")) { # Nonblocking connect
+
+          $hash->{FD} = $hash->{conn}->fileno();
+          my %timerHash=(hash=>$hash,sts=>$selectTimestamp,msg=>"connect to");
+          $hash->{directWriteFn} = sub() {
+            delete($hash->{FD});
+            delete($hash->{directWriteFn});
+            delete($selectlist{$hash});
+
+            RemoveInternalTimer(\%timerHash);
+            my $packed = getsockopt($hash->{conn}, SOL_SOCKET, SO_ERROR);
+            my $errno = unpack("I",$packed);
+            if($errno) {
+              HttpUtils_Close($hash);
+              return $hash->{callback}($hash, "$host: ".strerror($errno), "");
+            }
+
+            my $err = HttpUtils_Connect2($hash);
+            $hash->{callback}($hash, $err, "") if($err);
+            return $err;
+          };
+          $hash->{NAME}="" if(!defined($hash->{NAME}));#Delete might check it
+          $selectlist{$hash} = $hash;
+          InternalTimer(gettimeofday()+$hash->{timeout},
+                        "HttpUtils_Err", \%timerHash);
+          return undef;
+
+        } else {
           HttpUtils_Close($hash);
-          return $hash->{callback}($hash, $err, "") ;
+          $hash->{callback}($hash, "connect to $hash->{addr}: $!", "");
+          return undef;
+
         }
-        return $hash->{callback}($hash, "Closed conn / parallel call?", "")
-                if(!$hash->{conn});
-        my $ret = connect($hash->{conn}, sockaddr_in($port, $iaddr));
-        if(!$ret) {
-          if($!{EINPROGRESS} || int($!)==10035 ||
-             (int($!)==140 && $^O eq "MSWin32")) { # Nonblocking connect
+      }
+    });
+    return;
 
-            $hash->{FD} = $hash->{conn}->fileno();
-            my %timerHash=(hash=>$hash,sts=>$selectTimestamp,msg=>"connect to");
-            $hash->{directWriteFn} = sub() {
-              delete($hash->{FD});
-              delete($hash->{directWriteFn});
-              delete($selectlist{$hash});
-
-              RemoveInternalTimer(\%timerHash);
-              my $packed = getsockopt($hash->{conn}, SOL_SOCKET, SO_ERROR);
-              my $errno = unpack("I",$packed);
-              if($errno) {
-                HttpUtils_Close($hash);
-                return $hash->{callback}($hash, "$host: ".strerror($errno), "");
-              }
-
-              my $err = HttpUtils_Connect2($hash);
-              $hash->{callback}($hash, $err, "") if($err);
-              return $err;
-            };
-            $hash->{NAME}="" if(!defined($hash->{NAME}));#Delete might check it
-            $selectlist{$hash} = $hash;
-            InternalTimer(gettimeofday()+$hash->{timeout},
-                          "HttpUtils_Err", \%timerHash);
-            return undef;
-
-          } else {
-            HttpUtils_Close($hash);
-            $hash->{callback}($hash, "connect to $hash->{addr}: $!", "");
-            return undef;
-
-          }
-        }
-      });
-      return;
-    }
-                
   } else {
     $hash->{conn} = $haveInet6 ?
       IO::Socket::INET6->new(PeerAddr=>"$host:$port",Timeout=>$hash->{timeout}):
@@ -705,8 +751,8 @@ HttpUtils_ParseAnswer($)
 #    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
 #    method($data ? "POST" : "GET"),keepalive(0),sslargs({})
 # Example:
-#   HttpUtils_NonblockingGet({ url=>"http://www.google.de/", myParam=>7,
-#     callback=>sub($$$){ Log 1,"$_[0]->{myParam} ERR:$_[1] DATA:$_[2]" } })
+#   { HttpUtils_NonblockingGet({ url=>"http://www.google.de/",
+#     callback=>sub($$$){ Log 1,"ERR:$_[1] DATA:".length($_[2]) } }) }
 sub
 HttpUtils_NonblockingGet($)
 {
