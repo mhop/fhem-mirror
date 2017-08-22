@@ -661,7 +661,7 @@ our %zwave_deviceSpecial;
 my $zwave_cryptRijndael = 0;
 my $zwave_lastHashSent;
 my (%zwave_link, %zwave_img);
-my $zwave_activeHelpSites = "alliance"; # "pepper is dead";
+my $zwave_activeHelpSites = "alliance,pepper"; # pepper alive again (aka zobie)
 my $zwave_allHelpSites = "alliance,pepper";
 
 # standard definitions for regular expression
@@ -5108,7 +5108,7 @@ ZWave_fhemwebFn($$$$)
     $pl .= "<div class='detLink ZWPepper'>";
     my $url = ($n eq "alliance" ?
               "http://products.z-wavealliance.org/products/" :
-              "http://www.pepper1.net/zwavedb/device/");
+              "http://devel.pepper1.net/zwavedb/device/");
     $pl .= "<a target='_blank' href='$url/$link'>Details in $n DB</a>";
     $pl .= "</div>";
   }
