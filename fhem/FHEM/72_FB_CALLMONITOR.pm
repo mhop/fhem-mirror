@@ -945,7 +945,7 @@ sub FB_CALLMONITOR_readPhonebook($;$)
     {
 		my $phonebook_file = AttrVal($name, "reverse-search-phonebook-file", "/var/flash/phonebook");
 		
-        ($err, @lines) = FileRead($phonebook_file); 
+        ($err, @lines) = FileRead({FileName => $phonebook_file, ForceType => "file"}); 
         
         if(defined($err) && $err)
         {
