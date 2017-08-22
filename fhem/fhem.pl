@@ -257,7 +257,7 @@ my $logopened = 0;              # logfile opened or using stdout
 my $namedef = "where <name> is a single device name, a list separated by komma (,) or a regexp. See the devspec section in the commandref.html for details.\n";
 my $rcvdquit;                   # Used for quit handling in init files
 my $readingsUpdateDelayTrigger; # needed internally
-my $sig_term = 0;               # if set to 1, terminate (saving the state)
+my $gotSig;                     # non-undef if got a signal
 my $wbName = ".WRITEBUFFER";    # Buffer-name for delayed writing via select
 my %comments;                   # Comments from the include files
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
@@ -618,6 +618,7 @@ sub MAIN {MAIN:};               #Dummy
 
 
 my $errcount= 0;
+$gotSig = undef if($gotSig && $gotSig eq "HUP");
 while (1) {
   my ($rout,$rin, $wout,$win, $eout,$ein) = ('','', '','', '','');
 
@@ -642,7 +643,11 @@ while (1) {
   my $nfound = select($rout=$rin, $wout=$win, $eout=$ein, $timeout);
 
   $winService->{serviceCheck}->() if($winService->{serviceCheck});
-  CommandShutdown(undef, undef) if($sig_term);
+  if($gotSig) {
+    CommandShutdown(undef, undef) if($gotSig eq "TERM");
+    CommandRereadCfg(undef, "")   if($gotSig eq "HUP");
+    $gotSig = undef;
+  }
 
   if($nfound < 0) {
     my $err = int($!);
@@ -3105,10 +3110,10 @@ sub
 SignalHandling()
 {
   if($^O ne "MSWin32") {
-    $SIG{TERM} = sub { $sig_term = 1; };
+    $SIG{TERM} = sub { $gotSig = "TERM"; };
     $SIG{PIPE} = 'IGNORE';
     $SIG{CHLD} = 'IGNORE';
-    $SIG{HUP}  = sub { CommandRereadCfg(undef, "") };
+    $SIG{HUP}  = sub { $gotSig = "HUP"; };
     $SIG{ALRM} = sub { Log 1, "ALARM signal, blocking write?" };
     #$SIG{'XFSZ'} = sub { Log 1, "XFSZ signal" }; # to test with limit filesize 
   }
