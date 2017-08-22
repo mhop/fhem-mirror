@@ -28,6 +28,8 @@
 #######################################################################################################
 #  Versions History:
 #
+# 2.4.1      21.08.2017       changes in sub charfilter, change PROCID to $hash->{HELPER}{SEQ}
+#                             switch to non-blocking in subs event/fhem_log
 # 2.4.0      20.08.2017       new sub Log3Syslog for entries in local fhemlog only -> verbose support
 # 2.3.1      19.08.2017       commandref revised
 # 2.3.0      18.08.2017       new parameter "ident" in DEF, sub setidex, charfilter
@@ -35,9 +37,9 @@
 #                             commandref revised
 # 2.1.0      17.08.2017       sub setsock created
 # 2.0.0      16.08.2017       create syslog without SYS::SYSLOG
-# 1.1.1      13.08.2017       registrate fhemlog_log to %loginform in case of sending fhem-log
+# 1.1.1      13.08.2017       registrate fhem_log to %loginform in case of sending fhem-log
 #                             attribute timeout, commandref revised
-# 1.1.0      26.07.2017       add regex search to sub fhemlog_Log
+# 1.1.0      26.07.2017       add regex search to sub fhem_log
 # 1.0.0      25.07.2017       initial version
 
 package main;
@@ -52,7 +54,7 @@ eval "use Net::Domain qw(hostfqdn);1"  or my $MissModulNDom = "Net::Domain";
 #
 sub Log3Syslog($$$);
 
-my $Log2SyslogVn = "2.4.0";
+my $Log2SyslogVn = "2.4.1";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -74,6 +76,10 @@ my %Log2Syslog_BSDMonth = (
 my %RFC3164len = ("TAG"  => 32,           # max. Länge TAG-Feld
                   "DL"   => 1024          # max. Lange Message insgesamt
    			     );
+				 
+# Längenvorgaben nach RFC5425
+my %RFC5425len = ("DL" => 8192           # max. Lange Message insgesamt mit TLS
+                  );
 
 #####################################
 sub Log2Syslog_Initialize($) {
@@ -83,7 +89,7 @@ sub Log2Syslog_Initialize($) {
   $hash->{UndefFn}  = "Log2Syslog_Undef";
   $hash->{DeleteFn} = "Log2Syslog_Delete";
   $hash->{AttrFn}   = "Log2Syslog_Attr";
-  $hash->{NotifyFn} = "event_Log";
+  $hash->{NotifyFn} = "event_log";
 
   $hash->{AttrList} = "addStateEvent:1,0 ".
                       "disable:1,0 ".
@@ -130,9 +136,9 @@ sub Log2Syslog_Define($@) {
 		
   $hash->{PEERHOST}         = $a[2];                        # Destination Host (Syslog Server)
   $hash->{MYHOST}           = hostfqdn ();                  # FQDN eigener Host
-  $hash->{HELPER}{PID}      = $$;                           # PROCID in IETF 
+  $hash->{HELPER}{SEQ}      = 1;                            # PROCID in IETF, wird kontinuierlich hochgezählt
   $hash->{VERSION}          = $Log2SyslogVn;
-  $logInform{$hash->{NAME}} = "fhemlog_Log";                # Funktion die in hash %loginform für $name eingetragen wird
+  $logInform{$hash->{NAME}} = "fhem_log";                   # Funktion die in hash %loginform für $name eingetragen wird
   
   readingsSingleUpdate($hash, "state", "initialized", 1);
   
@@ -180,7 +186,7 @@ return undef;
 #################################################################################
 #                               Eventlogging
 #################################################################################
-sub event_Log($$) {
+sub event_log($$) {
   # $hash is my entry, $dev is the entry of the changed device
   my ($hash,$dev) = @_;
   my $name = $hash->{NAME};
@@ -196,26 +202,39 @@ sub event_Log($$) {
   my $tn  = $dev->{NTFY_TRIGGERTIME};
   my $ct  = $dev->{CHANGETIME};
   
-  for (my $i = 0; $i < $max; $i++) {
-      my $txt = $events->[$i];
-      $txt = "" if(!defined($txt));
-      $txt = charfilter($hash,$txt);
+  $sock = setsock($hash);
+  
+  if($sock) {
+      $sock->blocking(0);
+  
+      for (my $i = 0; $i < $max; $i++) {
+          my $txt = $events->[$i];
+          $txt = "" if(!defined($txt));
+          $txt = charfilter($hash,$txt);
 	  
-	  my $tim          = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
-      my ($date,$time) = split(" ",$tim);
+	      my $tim          = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
+          my ($date,$time) = split(" ",$tim);
 	  
-	  if($n =~ m/^$rex$/ || "$n:$txt" =~ m/^$rex$/ || "$tim:$n:$txt" =~ m/^$rex$/) {	  
-          my $otp  = "$n $txt";
-          $otp     = "$tim $otp" if AttrVal($name,'addTimestamp',0);
-	      $prival  = setprival($txt);
-	      my $data = setpayload($hash,$prival,$date,$time,$otp,"event");	
-      
-	      $sock = setsock($hash);
-          if ($sock) {	  
-	          eval {$sock->send($data);};
-		      $sock->close();
-	      }
+	      if($n =~ m/^$rex$/ || "$n:$txt" =~ m/^$rex$/ || "$tim:$n:$txt" =~ m/^$rex$/) {	  
+              my $otp  = "$n $txt";
+              $otp     = "$tim $otp" if AttrVal($name,'addTimestamp',0);
+	          $prival  = setprival($txt);
+	          my $data = setpayload($hash,$prival,$date,$time,$otp,"event");  
+	      	  
+	          my $ret = syswrite $sock, $data."\n";
+			  if($ret <= 0) {
+                  my $err = $!;
+		          readingsSingleUpdate($hash, "state", "write error: $err", 1) if($err ne OldValue($name));
+              } else {
+			      Log3Syslog($name, 4, "$name - Payload sequence $hash->{HELPER}{SEQ} sent");			  
+			  }
+			  
+			  $hash->{HELPER}{SEQ}++;
+	      
+          }
       }
+  
+      $sock->close();
   }
   
 return "";
@@ -224,7 +243,7 @@ return "";
 #################################################################################
 #                               FHEM system logging
 #################################################################################
-sub fhemlog_Log($$) {
+sub fhem_log($$) {
   my ($name,$raw) = @_;                              
   my $hash = $defs{$name};
   my $rex  = $hash->{HELPER}{FHEMLOG};
@@ -242,15 +261,23 @@ sub fhemlog_Log($$) {
       $otp     = "$tim $otp" if AttrVal($name,'addTimestamp',0);
 	  $prival  = setprival($txt,$vbose);
       my $data = setpayload($hash,$prival,$date,$time,$otp,"fhem");	
-      
-	  Log3Syslog($name, 4, "$name - Payload created: $data");
 	  
       $sock = setsock($hash);
+	  
       if ($sock) {	  
-	      eval {$sock->send($data);};
+	      $sock->blocking(0);
+		  my $ret = syswrite $sock, $data."\n";
+		  if($ret <= 0) {
+              my $err = $!;
+		      readingsSingleUpdate($hash, "state", "write error: $err", 1);
+          } else {
+			  Log3Syslog($name, 4, "$name - Payload sequence $hash->{HELPER}{SEQ} sent");			  
+		  }
 		  $sock->close();
+		  $hash->{HELPER}{SEQ}++;
 	  }
   }
+
 return;
 }
 
@@ -279,9 +306,10 @@ sub charfilter ($$) {
   $txt =~ s/ä/ae/g;
   $txt =~ s/ö/oe/g;
   $txt =~ s/ü/ue/g;
-  $txt =~ s/Ä/AE/g;
-  $txt =~ s/Ö/OE/g;
-  $txt =~ s/Ü/UE/g;
+  $txt =~ s/Ä/Ae/g;
+  $txt =~ s/Ö/Oe/g;
+  $txt =~ s/Ü/Ue/g;
+  $txt =~ s/€/EUR/g;
   $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd;      
   
 return($txt);
@@ -299,15 +327,16 @@ sub setsock ($) {
   my $st     = "active";
   
   # Create Socket and check if successful
-  my $sock = new IO::Socket::INET (PeerHost => $host, PeerPort => $port, Proto => $type); 
+  my $sock = new IO::Socket::INET (PeerHost => $host, PeerPort => $port, Proto => $type, Timeout => 4 ); 
 
-  $st = "unable for open socket for $host, $type, $port" if (!$sock);
-
-  readingsSingleUpdate($hash, "state", $st, 1) if($st ne OldValue($name));
-  
-  # Logausgabe (nur in das fhem Logfile !)
-  $st = "Socket opened for Host: $host, Protocol: $type, Port: $port, TLS: ".AttrVal($name, 'TLS', 0) if($sock);
-  Log3Syslog($name, 5, "$name - $st");
+  if (!$sock) {
+      $st = "unable for open socket for $host, $type, $port";
+      readingsSingleUpdate($hash, "state", $st, 1) if($st ne OldValue($name));
+  } else {
+      # Logausgabe (nur in das fhem Logfile !)
+      $st = "Socket opened for Host: $host, Protocol: $type, Port: $port, TLS: ".AttrVal($name, 'TLS', 0);
+      Log3Syslog($name, 5, "$name - $st");
+  }
   
 return($sock);
 }
@@ -381,13 +410,17 @@ sub setpayload ($$$$$$) {
   
   if ($lf eq "IETF") {
       # IETF Protokollformat https://tools.ietf.org/html/rfc5424
-	  my $pid = $hash->{HELPER}{PID}; 
+	  my $pid = $hash->{HELPER}{SEQ}; 
 	  my $mid = "FHEM";                             # message ID, identify type of message, e.g. for firewall filter
 	  my $tim = $date."T".$time;
 	  no warnings 'uninitialized'; 
       $data   = "<$prival>1 $tim $myhost $ident $pid $mid - : $otp";
 	  use warnings;
   }
+  
+  my $dl   = length($data);
+  my $ldat = ($dl>130)?(substr($data,0, 130)." ..."):$data;
+  Log3Syslog($name, 4, "$name - Payload sequence $hash->{HELPER}{SEQ} created:\n$ldat");		
   
 return($data);
 }
@@ -555,6 +588,12 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
         The port of the syslog server is listening. Default port is 514 if not specified.
     </li><br>
 	
+    <li><code>verbose</code><br>
+        <br>
+        To avoid loops, the output of verbose level of the Log2Syslog-Devices will only be reported into the local FHEM Logfile and
+		no forwarded.
+    </li><br>
+	
 	</ul>
     <br/>
   
@@ -681,6 +720,12 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <li><code>port</code><br>
         <br>
         Der verwendete Port des Syslog-Servers. Default Port ist 514 wenn nicht gesetzt.
+    </li><br>
+	
+    <li><code>verbose</code><br>
+        <br>
+        Die Ausgaben der Verbose-Level von Log2Syslog-Devices werden ausschließlich im lokalen FHEM Logfile ausgegeben und
+		nicht weitergeleitet um Schleifen zu vermeiden.
     </li><br>
 	
 	</ul>
