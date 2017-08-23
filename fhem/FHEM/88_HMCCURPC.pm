@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 0.96 beta
+#  Version 0.96.001 beta
 #
 #  Thread based RPC Server module for HMCCU.
 #
@@ -1901,8 +1901,10 @@ sub HMCCURPC_HandleConnection ($$$$)
 	$rpcsrv->{__daemon}->timeout ($thrpar->{acctimeout});
 
 	while ($run) {
-		my $difftime = time()-$rpcsrv->{hmccu}{evttime};
-		HMCCURPC_Write ($rpcsrv, "TO", $clkey, $difftime) if ($difftime >= $thrpar->{evttimeout});
+		if ($thrpar->{evttimeout} > 0) {
+			my $difftime = time()-$rpcsrv->{hmccu}{evttime};
+			HMCCURPC_Write ($rpcsrv, "TO", $clkey, $difftime) if ($difftime >= $thrpar->{evttimeout});
+		}
 		
 		# Next statement blocks for timeout seconds
 		my $connection = $rpcsrv->{__daemon}->accept ();
@@ -2757,6 +2759,10 @@ sub HMCCURPC_DecodeResponse ($)
    <a name="HMCCURPCset"></a>
    <b>Set</b><br/><br/>
    <ul>
+		<li><b> set &lt;name&gt; rpcrequest &lt;port&gt; &lt;method&gt; [&lt;parameters&gt;]</b><br/>
+			Send RPC request to CCU. The result is displayed in FHEM browser window. Parameter 
+			&lt;port&gt; is a valid RPC port (i.e. 2001 for BidCos).
+		</li><br/>
 		<li><b>set &lt;name&gt; rpcserver { on | off }</b><br/>
 			Start or stop RPC server(s). This command is only available if expert mode is activated.
 		</li><br/>
@@ -2791,7 +2797,7 @@ sub HMCCURPC_DecodeResponse ($)
 	   </li><br/>
 	   <li><b>rpcEventTimeout &lt;seconds&gt;</b><br/>
 	   	Specify timeout for CCU events. Default is 600 seconds. If timeout occurs an event
-	   	is triggered. 
+	   	is triggered. If set to 0 the timeout is ignored.
 	   </li><br/>
 	   <li><b>rpcInterfaces { BidCos-Wired, BidCos-RF, HmIP-RF, VirtualDevices, CUxD, Homegear }</b><br/>
 	   	Select RPC interfaces. If attribute is missing the corresponding attribute of I/O device

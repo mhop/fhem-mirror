@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.1
+#  Version 4.1.001
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -255,8 +255,22 @@ use vars qw(%HMCCU_SCRIPTS);
 	_description     => "Bewegungsmelder",
 	_channels        => "1",
 	ccureadingfilter => "(ILLUMINATION|MOTION)",
+	eventMap         => "/datapoint MOTION_DETECTION_ACTIVE 1:detection-on/datapoint MOTION_DETECTION_ACTIVE 0:detection-off/",
 	statedatapoint   => "MOTION",
 	substitute       => "MOTION!(0|false):no,(1|true):yes"
+	},
+	"HmIP-SPI" => {
+	_description     => "Anwesenheitssensor",
+	_channels        => "1",
+	ccureadingfilter => "(ILLUMINATION|PRESENCE)",
+	controldatapoint => "PRESENCE_DETECTION_ACTIVE",
+	eventMap         => "/datapoint RESET_PRESENCE 1:reset/datapoint PRESENCE_DETECTION_ACTIVE 1:detection-on/datapoint PRESENCE_DETECTION_ACTIVE 0:detection-off/",
+	hmstatevals      => "SABOTAGE!(1|true):sabotage",
+	statedatapoint   => "PRESENCE_DETECTION_STATE",
+	stripnumber      => 1,
+	substitute       => "PRESENCE_DETECTION_STATE!(0|false):no,(1|true):yes;PRESENCE_DETECTION_ACTIVE!(0|false):off,(1|true):on",
+	webCmd           => "control",
+	widgetOverride   => "control:uzsuToggle,off,on"
 	},
 	"HM-Sen-LI-O" => {
 	_description     => "Lichtsensor",
@@ -619,8 +633,21 @@ use vars qw(%HMCCU_SCRIPTS);
 	"HmIP-SMI" => {
 	_description     => "Bewegungsmelder",
 	ccureadingfilter => "(ILLUMINATION|MOTION)",
+	eventMap         => "/datapoint 1.MOTION_DETECTION_ACTIVE 1:detection-on/datapoint 1.MOTION_DETECTION_ACTIVE 0:detection-off/",
 	statedatapoint   => "1.MOTION",
 	substitute       => "MOTION!(0|false):no,(1|true):yes"
+	},
+	"HmIP-SPI" => {
+	_description     => "Anwesenheitssensor",
+	ccureadingfilter => "(ILLUMINATION|PRESENCE)",
+	controldatapoint => "1.PRESENCE_DETECTION_ACTIVE",
+	eventMap         => "/datapoint 1.RESET_PRESENCE 1:reset/datapoint 1.PRESENCE_DETECTION_ACTIVE 1:detection-on/datapoint 1.PRESENCE_DETECTION_ACTIVE 0:detection-off/",
+	hmstatevals      => "SABOTAGE!(1|true):sabotage",
+	statedatapoint   => "1.PRESENCE_DETECTION_STATE",
+	stripnumber      => 1,
+	substitute       => "PRESENCE_DETECTION_STATE!(0|false):no,(1|true):yes;PRESENCE_DETECTION_ACTIVE!(0|false):off,(1|true):on",
+	webCmd           => "control",
+	widgetOverride   => "control:uzsuToggle,off,on"
 	},
 	"HM-Sen-LI-O" => {
 	_description     => "Lichtsensor",

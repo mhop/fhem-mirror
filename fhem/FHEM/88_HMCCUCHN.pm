@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.1
+#  Version 4.1.001
 #
 #  (c) 2017 zap (zap01 <at> t-online <dot> de)
 #
@@ -133,15 +133,9 @@ sub HMCCUCHN_Define ($@)
 	my $arg = shift @$a;
 	while (defined ($arg)) {
 		return $usage if ($n == 3);
-		if ($arg eq 'readonly') {
-			$hash->{statevals} = $arg;
-		}
-		elsif ($arg eq 'defaults') {
-			HMCCU_SetDefaults ($hash);
-		}
-		else {
-			return $usage;
-		}
+		if    ($arg eq 'readonly') { $hash->{statevals} = $arg; }
+		elsif ($arg eq 'defaults') { HMCCU_SetDefaults ($hash); }
+		else { return $usage; }
 		$n++;
 		$arg = shift @$a;
 	}
@@ -239,8 +233,7 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'control') {
 		return HMCCU_SetError ($hash, -14) if ($cd eq '');
@@ -255,8 +248,7 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt =~ /^($hash->{statevals})$/) {
 		my $cmd = $1;
@@ -275,8 +267,7 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'toggle') {
 		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{statevals}));
@@ -312,8 +303,7 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'pct') {
 		return HMCCU_SetError ($hash, "Can't find LEVEL datapoint for device type $ccutype")
@@ -362,8 +352,7 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'on-for-timer' || $opt eq 'on-till') {
 		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{statevals}));
@@ -401,8 +390,7 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'clear') {
 		my $rnexp = shift @$a;
@@ -423,14 +411,12 @@ sub HMCCUCHN_Set ($@)
 		}
 		my $rc = HMCCU_RPCSetConfig ($hash, $ccuobj, $h);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'defaults') {
 		my $rc = HMCCU_SetDefaults ($hash);
 		return HMCCU_SetError ($hash, "HMCCU: No default attributes found") if ($rc == 0);
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	else {
 		return "HMCCUCHN: Unknown argument $opt, choose one of ".$rocmds
@@ -819,7 +805,7 @@ sub HMCCUCHN_Get ($@)
          attr mydev ccureadingname 0.(LOWBAT|LOW_BAT):battery<br/>
          # Add reading battery as a copy of readings LOWBAT and LOW_BAT.<br/>
          # Rename reading 4.SET_TEMPERATURE as desired-temp<br/>
-         attr mydev ccureadingname 0.(LOWBAT|LOW_BAT):+battery,1.SET_TEMPERATURE:desired-temp<br/>
+         attr mydev ccureadingname 0.(LOWBAT|LOW_BAT):+battery;1.SET_TEMPERATURE:desired-temp<br/>
          # Store values of readings n.PRESS_SHORT in new reading pressed.<br/>
          # Value of pressed is 1/true if any button is pressed<br/>
          attr mydev ccureadingname [1-4].PRESSED_SHORT:+pressed
@@ -879,20 +865,18 @@ sub HMCCUCHN_Get ($@)
          Optionally the name of the HomeMatic state reading can be specified at the beginning of
          the attribute in format =&lt;reading&gt;;. The default reading name is 'hmstate'.
       </li><br/>
-		<li><b>peer [&lt;datapoints&gt;:&lt;condition&gt;:
+		<li><b>peer &lt;datapoints&gt;:&lt;condition&gt;:
 			{ccu:&lt;object&gt;=&lt;value&gt;|hmccu:&lt;object&gt;=&lt;value&gt;|
 			fhem:&lt;command&gt;}</b><br/>
-      	Logically peer a datapoint of a HMCCUCHN or HMCCUDEV device with another device or any
+      	Logically peer datapoints of a HMCCUCHN or HMCCUDEV device with another device or any
       	FHEM command.<br/>
       	Parameter <i>datapoints</i> is a comma separated list of datapoints in format
-      	<i>channelno.datapoint</i> which can trigger the action. If source device is of type HMCCUCHN
-      	the parameter <i>channelno</i> is obsolete.<br/>
+      	<i>channelno.datapoint</i> which can trigger the action.<br/>
       	Parameter <i>condition</i> is a valid Perl expression which can contain
       	<i>channelno.datapoint</i> names as variables. Variables must start with a '$' or a '%'.
       	If a variable is preceded by a '$' the variable is substituted by the converted datapoint
       	value (i.e. "on" instead of "true"). If variable is preceded by a '%' the raw value
-      	(i.e. "true") is used. If the special character is doubled the previous values will
-      	be used.<br/>
+      	(i.e. "true") is used. If '$' or '%' is doubled the previous values will be used.<br/>
       	If the result of this operation is true, the action specified after the second colon
       	is executed. Three types of actions are supported:<br/>
       	<b>hmccu</b>: Parameter <i>object</i> refers to a FHEM device/datapoint in format

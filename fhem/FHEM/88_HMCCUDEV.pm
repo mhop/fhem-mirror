@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.1
+#  Version 4.1.001
 #
 #  (c) 2017 zap (zap01 <at> t-online <dot> de)
 #
@@ -157,18 +157,10 @@ sub HMCCUDEV_Define ($@)
 
 	# Parse optional command line parameters
 	foreach my $arg (@$a) {
-		if ($arg eq 'readonly') {
-			$hash->{statevals} = $arg;
-		}
-		elsif ($arg eq 'defaults') {
-			HMCCU_SetDefaults ($hash);
-		}
-		elsif ($arg =~ /^[0-9]+$/) {
-			$attr{$name}{statechannel} = $arg;
-		}
-		else {
-			return $usage;
-		}
+		if    ($arg eq 'readonly') { $hash->{statevals} = $arg; }
+		elsif ($arg eq 'defaults') { HMCCU_SetDefaults ($hash); }
+		elsif ($arg =~ /^[0-9]+$/) { $attr{$name}{statechannel} = $arg; }
+		else { return $usage; }
 	}
 
 	# Parse group options
@@ -331,8 +323,7 @@ sub HMCCUDEV_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'control') {
 		return HMCCU_SetError ($hash, -12) if ($cc eq '');
@@ -350,8 +341,7 @@ sub HMCCUDEV_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt =~ /^($hash->{statevals})$/) {
 		my $cmd = $1;
@@ -369,8 +359,7 @@ sub HMCCUDEV_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'toggle') {
 		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{statevals}));
@@ -410,8 +399,7 @@ sub HMCCUDEV_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'pct') {
 		return HMCCU_SetError ($hash, -11) if ($sc eq '');
@@ -455,8 +443,7 @@ sub HMCCUDEV_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'on-for-timer' || $opt eq 'on-till') {
 		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{statevals}));
@@ -488,8 +475,7 @@ sub HMCCUDEV_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'clear') {
 		my $rnexp = shift @$a;
@@ -513,14 +499,12 @@ sub HMCCUDEV_Set ($@)
 		my $rc = HMCCU_RPCSetConfig ($hash, $objname, $h);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'defaults') {
 		my $rc = HMCCU_SetDefaults ($hash);
 		return HMCCU_SetError ($hash, "HMCCU: No default attributes found") if ($rc == 0);
-		HMCCU_SetState ($hash, "OK");
-		return undef;
+		return HMCCU_SetState ($hash, "OK");
 	}
 	else {
 		return "HMCCUCHN: Unknown argument $opt, choose one of ".$rocmds
@@ -619,7 +603,6 @@ sub HMCCUDEV_Get ($@)
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
 
 		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
-
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $ccureadings ? undef : $result;
 	}
