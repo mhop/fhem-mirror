@@ -48,7 +48,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";    # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.0";
+my $yaahmversion    = "1.01";
 my $firstcall=1;
     
 my %yaahm_transtable_EN = ( 
@@ -2860,8 +2860,8 @@ sub YAAHM_Longtable($){
 
 =pod
 =item helper
-=item summary to set up a cyclic processing of commands 
-=item summary_DE dient dazu, eine zyklische Abarbeitung von Kommandos zu realisieren
+=item summary admimistration of profiles for daily, weekly and monthly processes 
+=item summary_DE Verwaltung von Profilen für tägliche, wöchentliche und monatliche Abläufe
 =begin html
 
    <a name="YAAHM"></a>
