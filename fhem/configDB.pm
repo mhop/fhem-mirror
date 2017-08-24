@@ -220,6 +220,8 @@ if ($count > 1) {
 my $cfgDB_dbconn	= $dbconfig{connection};
 my $cfgDB_dbuser	= $dbconfig{user};
 my $cfgDB_dbpass	= $dbconfig{password};
+my $cfgDB_b64       = $dbconfig{b64};
+   $cfgDB_b64     //= 0;
 my $cfgDB_dbtype;
 my $cfgDB_filename;
 
@@ -299,7 +301,7 @@ sub cfgDB_Init() {
 ### migrate fhembinfilesave to fhemb64filesave
     # check: fhembinfilesave exists?
     my $sth_test = $fhem_dbh->table_info("%", "%", "fhembinfilesave", 'TABLE');
-    if ($sth_test->fetch()) {
+    if ($sth_test->fetch() && (!$cfgDB_b64)) {
        $sth_test->finish();
        # check: any files for migratione?
    	   $count = undef;
