@@ -48,7 +48,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";    # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.01";
+my $yaahmversion    = "1.02";
 my $firstcall=1;
     
 my %yaahm_transtable_EN = ( 
@@ -58,7 +58,7 @@ my %yaahm_transtable_EN = (
     "status"            =>  "Status",
     "notstarted"        =>  "Not started",
     "next"              =>  "Next",
-    "manual"            =>  "Manual",
+    "manual"            =>  "Manual Time",
     "active"            =>  "Active",
     "inactive"          =>  "Inactive",
     "overview"          =>  "Summary",
@@ -139,7 +139,7 @@ my %yaahm_transtable_EN = (
     "status"            =>  "Status",
     "notstarted"        =>  "Nicht gestartet",
     "next"              =>  "Nächste",
-    "manual"            =>  "Manuell",
+    "manual"            =>  "Manuelle Zeit",
     "active"            =>  "Aktiv",
     "inactive"          =>  "Inaktiv",
     "overview"          =>  "Zusammenfassung",
@@ -1624,7 +1624,7 @@ sub YAAHM_checkMonthly($$$) {
   #  return $text;
     
   #-- Vorschau täglich oder wenn neu gestartet 
-  if( ($event eq "test") || (($event eq 'housetime') && ($param eq 'aftermidnight')) ){
+  if( ($event eq "test") || (($event eq 'event') && ($param eq 'aftermidnight')) ){
     
     my $specialDevs = AttrVal( $name, "specialDevices", "" );
     foreach my $specialDev ( split( /,/, $specialDevs ) ) {
@@ -2479,7 +2479,7 @@ sub YAAHM_toptable($){
     my $cols = max(int(@modes),int(@states),$weeklyno);
     $ret .= "<tr><td colspan=\"3\" style=\"align:left\"><table class=\"readings\">".
             "<tr class=\"odd\"><td width=\"100px\" class=\"dname\" style=\"padding:5px;\">".$yaahm_tt->{"mode"}."</td>".
-            "<td width=\"120px\"><div class=\"dval\" informId=\"$name-tr_housemode\">".ReadingsVal($name,"tr_housemode",undef)."</div></td>";
+            "<td width=\"60px\"><div class=\"dval\" informId=\"$name-tr_housemode\">".ReadingsVal($name,"tr_housemode",undef)."</div></td><td></td>";
             for( my $i=0; $i<$cols; $i++){
               if( $i < int(@modes)){
                 $ret .= "<td width=\"120px\"><input type=\"button\" id=\"b_".$modes[$i]."\" value=\"".$yaahm_tt->{$modes[$i]}.
@@ -2491,7 +2491,7 @@ sub YAAHM_toptable($){
     $ret .= "</tr>";
     $ret .= "<tr class=\"even\"><td class=\"dname\" style=\"padding:5px;\">".$yaahm_tt->{"state"}."</td>".
             "<td><div informId=\"$name-tr_housestate\">".ReadingsVal($name,"tr_housestate",undef).
-            "</div><div informId=\"$name-sym_housestate\">".ReadingsVal($name,"sym_housestate",undef)."</div></td>";
+            "</div></td><td style=\"width:20px\"><div informId=\"$name-sym_housestate\" style=\"align:center\">".ReadingsVal($name,"sym_housestate",undef)."</div></td>";
             for( my $i=0; $i<$cols; $i++){
               if( $i < int(@states)){
                 $ret .= "<td width=\"120px\"><input type=\"button\" id=\"b_".$states[$i]."\" value=\"".$yaahm_tt->{$states[$i]}.
@@ -2500,12 +2500,12 @@ sub YAAHM_toptable($){
                 $ret .= "<td width=\"120px\"></td>";
               }
             }
-    $ret .= "</tr><tr></tr>";
+    $ret .= "</tr><tr><td colspan=\"8\" style=\"border-bottom: 1px solid #000;\"></td></tr>";
     
     #-- repeat manual next for every weekly table  
     my $nval  = "";
     my $wupn;
-    $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"padding:5px;\">".$yaahm_tt->{"manual"}."</td><td></td>";
+    $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"padding:5px;\">".$yaahm_tt->{"manual"}."</td><td></td><td></td>";
     for (my $i=0;$i<$weeklyno;$i++){
       $wupn = $hash->{DATA}{"WT"}[$i]{"name"};
       $nval = ( defined($hash->{DATA}{"WT"}[$i]{"next"}) ) ? $hash->{DATA}{"WT"}[$i]{"next"} : "";
