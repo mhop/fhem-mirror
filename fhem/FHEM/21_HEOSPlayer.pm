@@ -39,7 +39,7 @@ use Encode qw(encode_utf8);
 use URI::Escape;
 #use Data::Dumper;
 
-my $version = "0.2.0";
+my $version = "1.0.0";
 
 
 
@@ -246,7 +246,6 @@ sub HEOSPlayer_Get($$@) {
 
         my $param = shift( @args );
         $param = '' if( !$param );
-        #$param = substr($param,1) if( $param && $param =~ '^|' );
 
         if ( $param eq '' ) {
 
@@ -277,7 +276,6 @@ sub HEOSPlayer_Get($$@) {
 
             $ret .= HEOSPlayer_MakePlayLink($me->{cl}->{TYPE}, $hash->{NAME}, "1029", "heos_service", "Warteschlange", "https://production.ws.skyegloup.com:443/media/images/service/logos/musicsource_logo_playlists.png", 128, 32);
 
-            #$ret .= "\n\n";
 
             if( $me->{cl}->{TYPE} eq 'FHEMWEB' ) {
 
@@ -287,29 +285,12 @@ sub HEOSPlayer_Get($$@) {
                 $ret =~ s/\n/<br>/g;
                 $ret = "<pre>$ret</pre>" if( $ret =~ m/  / );
                 $ret = "<html>$ret</html>";
-
-            } else {
-
-                #$ret =~ s/<h3[^>]*>//g;
-                #$ret =~ s/<\/h3>/\n\n/g;
-                #$ret =~ s/<h5[^>]*>//g;
-                #$ret =~ s/<\/h5>/\n/g;
-                #$ret =~ s/<hr>//g;
-                #$ret =~ s/<a[^>]*>//g;
-                #$ret =~ s/<\/a>//g;
-                #$ret =~ s/<img[^>]*>//g;
-                #$ret =~ s/<div[^>]*>//g;
-                #$ret =~ s/<\/div>//g;
-                #$ret .= "\n";
-                
-            }
             
             return $ret;
 
         } else {
 
             my ($sid,$cid) = split /,/,$param;
-            #$param=~/^(-?\d+),?(.*)$/;  
 
             if ( $sid eq "1025" ) {
             
@@ -404,16 +385,6 @@ sub HEOSPlayer_Get($$@) {
                     $ret =~ s/\n/<br>/g;
                     $ret = "<pre>$ret</pre>" if( $ret =~ m/  / );
                     $ret = "<html>$ret</html>";
-
-                } else {
-
-                    #$ret =~ s/<a[^>]*>//g;
-                    #$ret =~ s/<\/a>//g;
-                    #$ret =~ s/<img[^>]*>\n//g;
-                    #$ret =~ s/<div[^>]*>//g;
-                    #$ret =~ s/<\/div>//g;
-                    #$ret .= "\n";
-                }
                 
                 asyncOutput( $me->{cl}, $ret );                
                                 
@@ -789,7 +760,7 @@ sub HEOSPlayer_Set($$@) {
             $list .= " playPlaylist:".join(",",@playlists) if( scalar @playlists > 0 );
             $list .= " deletePlaylist:".join(",",@playlists) if( scalar @playlists > 0 );
         }
-        #print "List#########################################################\n".Dumper($list);
+
         $list .= " aux:noArg" if ( exists $hash->{helper}{aux} );
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -913,7 +884,6 @@ sub HEOSPlayer_WriteReadings($$) {
     my( @index )= grep { $presets[$_] eq $search } 0..$#presets if ( defined $search );
     
     readingsBulkUpdate( $hash, 'channel', $index[0]+1 ) if ( scalar @index > 0 );
-    #readingsBulkUpdate( $hash, 'state', 'on' );
     readingsEndUpdate( $hash, 1 );
     Log3 $name, 5, "HEOSPlayer ($name) - readings set for $name";
     return undef;

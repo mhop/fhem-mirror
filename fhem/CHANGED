@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  21_HEOS: little Bugfixes, code cleanup
   - changed: 88_HMCCU Version 4.1.001
   - feature: HttpUtils/IPv6 with the useInet6 global attribute (Forum #75557)
   - bugfix:  74_AMADautomagicFlowset_4.0.5.xml: add openTask Check with

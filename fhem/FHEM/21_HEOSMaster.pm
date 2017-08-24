@@ -61,12 +61,11 @@ my $missingModul = "";
 eval "use Net::Telnet;1" or $missingModul .= "Net::Telnet ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use Encode;1" or $missingModul .= "Encode ";
-eval "use IO::Socket::Multicast;1" or $missingModul .= "IO::Socket::Multicast ";
 
 
 
 
-my $version = "0.2.0";
+my $version = "1.0.0";
 
 my %heosCmds = (
     'enableChangeEvents'        => 'system/register_for_change_events?enable=',
@@ -365,7 +364,7 @@ sub HEOSMaster_Open($) {
     my $password    = HEOSMaster_ReadPassword($hash);
 
     
-    Log3 $name, 4, "HEOSMaster ($name) - Baue Socket Verbindung auf";
+    Log3 $name, 4, "HEOSMaster ($name) - Build socket connection";
 
     my $socket = new Net::Telnet ( Host=>$host,
         Port => $port,
@@ -463,7 +462,7 @@ sub HEOSMaster_Read($) {
 
     
     Log3 $name, 4, "HEOSMaster ($name) - ReadFn gestartet";
-    $len = sysread($hash->{CD},$buf,1024);          # die genaue Puffergröße wird noch ermittelt
+    $len = sysread($hash->{CD},$buf,1024);
     
     if( !defined($len) || !$len ) {
     
@@ -474,7 +473,7 @@ sub HEOSMaster_Read($) {
     
     unless( defined $buf) {
     
-        Log3 $name, 3, "HEOSMaster ($name) - Keine Daten empfangen";
+        Log3 $name, 3, "HEOSMaster ($name) - no data received";
         return;
     }
     
@@ -515,7 +514,6 @@ sub HEOSMaster_ProcessRead($$) {
     
         $hash->{LAST_RECV} = time();
         Log3 $name, 5, "HEOSMaster ($name) - Decoding JSON message. Length: " . length($json) . " Content: " . $json;
-        #my $obj = JSON->new->utf8(0)->decode($json);   Änderung unter großem Vorbehalt wegen Sorge was Umlaute an geht!!!
         my $obj = decode_json($json);
         
         if(defined($obj->{heos})) {
@@ -829,18 +827,6 @@ sub HEOSMaster_ResponseProcessing($$) {
                             $ret = "<pre>$ret</pre>" if( $ret =~ m/  / );
                             $ret = "<html>$ret</html>";
 
-                        } else {
-
-                            #$ret =~ s/<a[^>]*>//g;
-                            #$ret =~ s/<\/a>//g;
-                            #$ret =~ s/<img[^>]*>\n//g;
-                            #$ret =~ s/<div[^>]*>//g;
-                            #$ret =~ s/<\/div>//g;
-                            #$ret =~ s/<h2[^>]*>//g;
-                            #$ret =~ s/<\/h2>//g;
-                            #$ret .= "\n";
-                        }
-
                         asyncOutput( $hash->{helper}{blocking}{$idx}{cl}, $ret );
                         delete $hash->{helper}{blocking}{$idx};
                     }
@@ -886,10 +872,6 @@ sub HEOSMaster_ResponseProcessing($$) {
                 my $ret = '';
                 
                 $ret .= sprintf( "%-35s %-10s %s\n", 'Fav', 'type', 'title' );
-                #foreach my $item (@{ $hash->{helper}{searchresult}}) {
-                
-                #    $ret .= HEOSMaster_MakePlayLink($hash->{helper}{blocking}{name}, 'input', $message{sid}, $item, sprintf( "%-35s %-10s %s\n", "x", $item->{type}, $item->{name} ) );
-                #}
                 
                 $ret .= "\n\n";
                 
@@ -1079,7 +1061,6 @@ sub HEOSMaster_ParseMsg($$) {
         foreach my $c (split //, $buffer) {
             if($open == $close && $open > 0) {
                 $tail .= $c;
-                #Log3 $name, 5, "HEOSMaster ($name) - $open == $close && $open > 0";
                 
             } elsif(($open == $close) && ($c ne '{')) {
             
@@ -1106,8 +1087,7 @@ sub HEOSMaster_ParseMsg($$) {
             $msg = '';
         }
     }
-    
-    #Log3 $name, 5, "HEOSMaster ($name) - return msg: $msg and tail: $tail";
+
     return ($msg,$tail);
 }
 
