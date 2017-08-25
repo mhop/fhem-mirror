@@ -65,7 +65,7 @@ eval "use Encode;1" or $missingModul .= "Encode ";
 
 
 
-my $version = "1.0.0";
+my $version = "1.0.1";
 
 my %heosCmds = (
     'enableChangeEvents'        => 'system/register_for_change_events?enable=',
@@ -826,6 +826,7 @@ sub HEOSMaster_ResponseProcessing($$) {
                             $ret =~ s/\n/<br>/g;
                             $ret = "<pre>$ret</pre>" if( $ret =~ m/  / );
                             $ret = "<html>$ret</html>";
+                        }
 
                         asyncOutput( $hash->{helper}{blocking}{$idx}{cl}, $ret );
                         delete $hash->{helper}{blocking}{$idx};

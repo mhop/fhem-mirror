@@ -39,7 +39,7 @@ use Encode qw(encode_utf8);
 use URI::Escape;
 #use Data::Dumper;
 
-my $version = "1.0.0";
+my $version = "1.0.1";
 
 
 
@@ -285,6 +285,7 @@ sub HEOSPlayer_Get($$@) {
                 $ret =~ s/\n/<br>/g;
                 $ret = "<pre>$ret</pre>" if( $ret =~ m/  / );
                 $ret = "<html>$ret</html>";
+            }
             
             return $ret;
 
@@ -385,6 +386,7 @@ sub HEOSPlayer_Get($$@) {
                     $ret =~ s/\n/<br>/g;
                     $ret = "<pre>$ret</pre>" if( $ret =~ m/  / );
                     $ret = "<html>$ret</html>";
+                }
                 
                 asyncOutput( $me->{cl}, $ret );                
                                 
