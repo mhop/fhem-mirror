@@ -41,7 +41,7 @@ use Blocking;
 use SetExtensions;
 
 
-my $version = "1.2.4";
+my $version = "1.2.5";
 
 
 
@@ -133,7 +133,6 @@ sub PLAYBULB_Define($$) {
     $hash->{VERSION}    = $version;
     
     
-    $modules{PLAYBULB}{defptr}{$hash->{BTMAC}} = $hash;
     readingsSingleUpdate ($hash,"state","Unknown", 0);
     $attr{$name}{room}          = "PLAYBULB" if( !defined($attr{$name}{room}) );
     $attr{$name}{devStateIcon}  = "unreachable:light_question" if( !defined($attr{$name}{devStateIcon}) );
@@ -165,12 +164,11 @@ sub PLAYBULB_Undef($$) {
 
     my ( $hash, $arg ) = @_;
     
-    my $mac = $hash->{BTMAC};
     my $name = $hash->{NAME};
     
     
     Log3 $name, 3, "PLAYBULB ($name) - undefined";
-    delete($modules{PLAYBULB}{defptr}{$mac});
+    delete($modules{PLAYBULB}{defptr}{$hash->{BTMAC});
 
     return undef;
 }
