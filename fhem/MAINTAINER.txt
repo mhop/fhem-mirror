@@ -146,6 +146,7 @@ FHEM/30_pilight_temp.pm      risiko               http://forum.fhem.de Sonstige 
 FHEM/30_pilight_raw.pm       risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_smoke.pm     risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_contact.pm   risiko               http://forum.fhem.de Sonstige Systeme
+FHEM/31_Aurora.pm            justme1968           http://forum.fhem.de Beleuchtung
 FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Beleuchtung
 FHEM/31_Nello.pm             neumann              http://forum.fhem.de Sonstige Systeme
 FHEM/31_PLAYBULB.pm	     CoolTux		  http://forum.fhem.de Beleuchtung

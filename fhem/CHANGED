@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     31_Aurora.pm: first release
   - bugfix:  21_HEOS: fix missing curl
   - bugfix:  31_PLAYBULB: code cleaning
   - bugfix:  21_HEOS: little Bugfixes, code cleanup
