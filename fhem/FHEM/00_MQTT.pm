@@ -27,6 +27,7 @@
 my %sets = (
   "connect" => "",
   "disconnect" => "",
+  "publish" => "",
 );
 
 my %gets = (
@@ -50,13 +51,14 @@ sub MQTT_Initialize($) {
   $hash->{ReadFn}  = "MQTT::Read";
 
   # Consumer
-  $hash->{DefFn}    = "MQTT::Define";
-  $hash->{UndefFn}  = "MQTT::Undef";
-  $hash->{DeleteFn} = "MQTT::Delete";
-  $hash->{SetFn}    = "MQTT::Set";
-  $hash->{NotifyFn} = "MQTT::Notify";
+  $hash->{DefFn}      = "MQTT::Define";
+  $hash->{UndefFn}    = "MQTT::Undef";
+  $hash->{ShutdownFn} = "MQTT::Shutdown";
+  $hash->{SetFn}      = "MQTT::Set";
+  $hash->{NotifyFn}   = "MQTT::Notify";
+  $hash->{AttrFn}     = "MQTT::Attr";
 
-  $hash->{AttrList} = "keep-alive ".$main::readingFnAttributes;
+  $hash->{AttrList} = "keep-alive "."last-will "."on-connect on-disconnect on-timeout".$main::readingFnAttributes;
 }
 
 package MQTT;
@@ -86,10 +88,16 @@ BEGIN {GP_Import(qw(
   RemoveInternalTimer
   InternalTimer
   AttrVal
+  ReadingsVal
   Log3
   AssignIoPort
   getKeyValue
   setKeyValue
+  CallFn
+  defs
+  modules
+  looks_like_number
+  fhem
   ))};
 
 sub Define($$) {
@@ -111,6 +119,8 @@ sub Define($$) {
   setKeyValue($name."_pass",$password) unless(defined($pass));
 
   $hash->{DEF} = $host;
+  
+  #readingsSingleUpdate($hash,"connection","disconnected",0);
 
   if ($main::init_done) {
     return Start($hash);
@@ -119,17 +129,65 @@ sub Define($$) {
   }
 }
 
-sub Undef($$) {
-  my ($hash, $name) = @_;
+sub Undef($) {
+  my $hash = shift;
   Stop($hash);
-  return undef;
-}
-
-sub Delete($$) {
-  my ($hash, $name) = @_;
+  my $name = $hash->{NAME};
   setKeyValue($name."_user",undef);
   setKeyValue($name."_pass",undef);
   return undef;
+}
+
+sub Shutdown($) {
+  my $hash = shift;
+  Stop($hash);
+  my $name = $hash->{NAME};
+  Log3($name,1,"Shutdown executed");
+  return undef;
+}
+
+sub onConnect($) {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $cmdstr = AttrVal($name,"on-connect",undef);
+  return process_event($hash,$cmdstr);
+}
+
+sub onDisconnect($) {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $cmdstr = AttrVal($name,"on-disconnect",undef);
+  return process_event($hash,$cmdstr);
+}
+
+sub onTimeout($) {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $cmdstr = AttrVal($name,"on-timeout",undef);
+  if($cmdstr) {
+    return eval($cmdstr);
+  }
+}
+
+sub process_event($$) {
+  my $hash = shift;
+  my $str = shift;
+  my ($qos, $retain,$topic, $message, $cmd) = parsePublishCmdStr($str);
+  
+  my $do=1;
+  if($cmd) {
+    my $name = $hash->{NAME};
+    $do=eval($cmd);
+    $do=1 if (!defined($do));
+    #no strict "refs";
+    #my $ret = &{$hash->{WBCallback}}($hash);
+    #use strict "refs";
+  }
+  
+  if($do && defined($topic)) {
+    $qos = MQTT_QOS_AT_MOST_ONCE unless defined($qos);
+    send_publish($hash, topic => $topic, message => $message, qos => $qos, retain => $retain);
+  }
 }
 
 sub Set($@) {
@@ -149,7 +207,96 @@ sub Set($@) {
       Stop($hash);
       last;
     };
+    $command eq "publish" and do {
+      shift(@a);
+      shift(@a);
+      #if(scalar(@a)<2) {return "not enough parameters. usage: publish [qos [retain]] topic value";}
+      #my $qos=0;
+      #my $retain=0;
+      #if(looks_like_number ($a[0])) {
+      #   $qos = int($a[0]);
+      #   $qos = 0 if $qos>1;
+      #   shift(@a);
+      #   if(looks_like_number ($a[0])) {
+      #     $retain = int($a[0]);
+      #     $retain = 0 if $retain>2;
+      #     shift(@a);
+      #   }
+      #}
+      #if(scalar(@a)<2) {return "missing parameters. usage: publish [qos [retain]] topic value";}
+      #my $topic = shift(@a);
+      #my $value = join (" ", @a);
+      
+      my ($qos, $retain,$topic, $value) = parsePublishCmd(@a);
+      return "missing parameters. usage: publish [qos:?] [retain:?] topic value1 [value2]..." if(!$topic);
+      return "wrong parameter. topic may nob be '#' or '+'" if ($topic eq '#' or $topic eq '+');
+      $qos = MQTT_QOS_AT_MOST_ONCE unless defined($qos);
+      my $msgid = send_publish($hash, topic => $topic, message => $value, qos => $qos, retain => $retain);
+      last;
+    }
   };
+}
+
+sub parsePublishCmdStr($) {
+  my ($str) = @_;
+
+  if(defined($str) && $str=~m/\s*(?:({.*})\s+)?(.*)/) {
+    my $exp = $1;
+    my $rest = $2;
+    if ($rest){
+      my @lwa = split("[ \t]+",$rest);
+      unshift (@lwa,$exp) if($exp);
+      return parsePublishCmd(@lwa);
+    }    
+  }
+  return undef;
+}
+
+sub parsePublishCmd(@) {
+  my @a = @_;
+  # [qos:?] [retain:?] topic value
+  
+  return undef if(!@a);
+  return undef if(scalar(@a)<1);
+  
+  my $qos = 0;
+  my $retain = 0;
+  my $topic = undef;
+  my $value = "\0";
+  my $expression = undef;
+  
+  while (scalar(@a)>0) {
+    my $av = shift(@a);
+    if($av =~ /\{.*\}/) {
+      $expression = $av;
+      next;
+    }
+    my ($pn,$pv) = split(":",$av);
+    if(defined($pv)) {
+      if($pn eq "qos") {
+        if($pv >=0 && $pv <=2) {
+          $qos = $pv;
+        }
+      } elsif($pn eq "retain") {
+        if($pv >=0 && $pv <=1) {
+          $retain = $pv;
+        }
+      } else {
+        # ignore
+        next;
+      }
+    } else {
+      $topic = $av;
+      last;
+    }
+  }
+  
+  if(scalar(@a)>0) {
+    $value = join(" ", @a);
+  }
+  
+  return undef unless $topic || $expression;  
+  return ($qos, $retain,$topic, $value, $expression);
 }
 
 sub Notify($$) {
@@ -177,17 +324,47 @@ sub Attr($$$$) {
       };
       last;
     };
+    $attribute eq "last-will" and do {
+      if($hash->{STATE} ne "disconnected") {
+        Stop($hash);
+        InternalTimer(gettimeofday()+1, "MQTT::Start", $hash, 0);
+      }
+      last;
+    };
   };
 }
 
+#sub Reconnect($){
+#  my $hash = shift;
+#  Stop($hash);
+#  Start($hash);
+#}
+
 sub Start($) {
   my $hash = shift;
+  my $firsttime = $hash->{".cinitmark"};
+  
+  if(defined($firsttime)) {
+    my $cstate=ReadingsVal($hash->{NAME},"connection","");
+    if($cstate ne "disconnected" && $cstate ne "timed-out") {
+      return undef;
+    }
+  } else {
+    $hash->{".cinitmark"} = 1;
+  }
+   
   DevIo_CloseDev($hash);
   return DevIo_OpenDev($hash, 0, "MQTT::Init");
 }
 
 sub Stop($) {
   my $hash = shift;
+  
+  my $cstate=ReadingsVal($hash->{NAME},"connection","");
+  if($cstate eq "disconnected" || $cstate eq "timed-out") {
+    return undef;
+  }
+  
   send_disconnect($hash);
   DevIo_CloseDev($hash);
   RemoveInternalTimer($hash);
@@ -221,7 +398,10 @@ sub Init($) {
 sub Timer($) {
   my $hash = shift;
   RemoveInternalTimer($hash);
-  readingsSingleUpdate($hash,"connection","timed-out",1) unless $hash->{ping_received};
+  unless ($hash->{ping_received}) {
+    onTimeout($hash);
+    readingsSingleUpdate($hash,"connection","timed-out",1) ;#unless $hash->{ping_received};
+  }
   $hash->{ping_received} = 0;
   InternalTimer(gettimeofday()+$hash->{timeout}, "MQTT::Timer", $hash, 0);
   send_ping($hash);
@@ -242,6 +422,7 @@ sub Read {
     MESSAGE_TYPE: {
       $message_type == MQTT_CONNACK and do {
         readingsSingleUpdate($hash,"connection","connected",1);
+        onConnect($hash);
         GP_ForallClients($hash,\&client_start);
         foreach my $message_id (keys %{$hash->{messages}}) {
           my $msg = $hash->{messages}->{$message_id}->{message};
@@ -258,10 +439,15 @@ sub Read {
           Log3($client->{NAME},5,"publish received for $topic, ".$mqtt->message());
           if (grep { $topic =~ $_ } @{$client->{subscribeExpr}}) {
             readingsSingleUpdate($client,"transmission-state","incoming publish received",1);
-            if ($client->{TYPE} eq "MQTT_DEVICE") {
+            my $fn = $modules{$defs{$client->{NAME}}{TYPE}}{OnMessageFn};
+            if($fn) {
+              CallFn($client->{NAME},"OnMessageFn",($client,$topic,$mqtt->message()))
+            } elsif ($client->{TYPE} eq "MQTT_DEVICE") {
               MQTT::DEVICE::onmessage($client,$topic,$mqtt->message());
-            } else {
+            } elsif ($client->{TYPE} eq "MQTT_BRIDGE") {
               MQTT::BRIDGE::onmessage($client,$topic,$mqtt->message());
+            } else {
+              Log3($client->{NAME},1,"unexpected client or no OnMessageFn defined: ".$client->{TYPE});
             }
           };
         },undef);
@@ -371,7 +557,11 @@ sub send_connect($) {
   my $name = $hash->{NAME};
   my $user = getKeyValue($name."_user");
   my $pass = getKeyValue($name."_pass");
-  return send_message($hash, message_type => MQTT_CONNECT, keep_alive_timer => $hash->{timeout}, user_name => $user, password => $pass);
+  
+  my $lw = AttrVal($name,"last-will",undef);
+  my ($willqos, $willretain,$willtopic, $willmessage) = parsePublishCmdStr($lw);
+  
+  return send_message($hash, message_type => MQTT_CONNECT, keep_alive_timer => $hash->{timeout}, user_name => $user, password => $pass, will_topic => $willtopic,  will_message => $willmessage, will_retain => $willretain, will_qos => $willqos);
 };
 
 sub send_publish($@) {
@@ -405,7 +595,9 @@ sub send_ping($) {
 };
 
 sub send_disconnect($) {
-  return send_message(shift, message_type => MQTT_DISCONNECT);
+  my $hash = shift;
+  onDisconnect($hash);
+  return send_message($hash, message_type => MQTT_DISCONNECT);
 };
 
 sub send_message($$$@) {
@@ -419,6 +611,7 @@ sub send_message($$$@) {
       timeout => gettimeofday()+$hash->{timeout},
     };
   }
+  
   DevIo_SimpleWrite($hash,$message->bytes,undef);
 };
 
@@ -432,15 +625,17 @@ sub topic_to_regexp($) {
   return "^$t\$";
 }
 
-sub client_subscribe_topic($$) {
-  my ($client,$topic) = @_;
+sub client_subscribe_topic($$;$$) {
+  my ($client,$topic,$qos,$retain) = @_;
   push @{$client->{subscribe}},$topic unless grep {$_ eq $topic} @{$client->{subscribe}};
   my $expr = topic_to_regexp($topic);
   push @{$client->{subscribeExpr}},$expr unless grep {$_ eq $expr} @{$client->{subscribeExpr}};
   if ($main::init_done) {
     if (my $mqtt = $client->{IODev}) {;
+      $qos = $client->{".qos"}->{"*"} unless defined $qos; # MQTT_QOS_AT_MOST_ONCE
+      $retain = 0 unless defined $retain; # not supported yet
       my $msgid = send_subscribe($mqtt,
-        topics => [[$topic => $client->{qos} || MQTT_QOS_AT_MOST_ONCE]],
+        topics => [[$topic => $qos || MQTT_QOS_AT_MOST_ONCE]],
       );
       $client->{message_ids}->{$msgid}++;
       readingsSingleUpdate($client,"transmission-state","subscribe sent",1)
@@ -468,8 +663,9 @@ sub Client_Define($$) {
   my ( $client, $def ) = @_;
 
   $client->{NOTIFYDEV} = $client->{DEF} if $client->{DEF};
-  $client->{qos} = MQTT_QOS_AT_MOST_ONCE;
-  $client->{retain} = 0;
+  #$client->{qos} = MQTT_QOS_AT_MOST_ONCE; ### ALT
+  $client->{".qos"}->{'*'} = 0; 
+  $client->{".retain"}->{'*'} = "0";
   $client->{subscribe} = [];
   $client->{subscribeExpr} = [];
   AssignIoPort($client);
@@ -485,25 +681,104 @@ sub Client_Undefine($) {
   client_stop(shift);
   return undef;
 };
-
+#use Data::Dumper;
 sub client_attr($$$$$) {
   my ($client,$command,$name,$attribute,$value) = @_;
 
   ATTRIBUTE_HANDLER: {
     $attribute eq "qos" and do {
-      if ($command eq "set") {
-        $client->{qos} = $MQTT::qos{$value};
+      #if ($command eq "set") {
+      #  $client->{qos} = $MQTT::qos{$value}; ### ALT
+      #} else {
+      #  $client->{qos} = MQTT_QOS_AT_MOST_ONCE; ### ALT
+      #}
+      
+      delete($client->{".qos"});
+      
+      if ($command ne "set") {
+        delete($client->{".qos"});
+        $client->{".qos"}->{"*"} = "0";
       } else {
-        $client->{qos} = MQTT_QOS_AT_MOST_ONCE;
+      
+        my @values = ();
+        if(!defined($value) || $value=~/^[ \t]*$/) {
+           return "QOS value may not be empty. Format: [<reading>|*:]0|1|2";
+        }
+        @values = split("[ \t]+",$value);
+    
+        foreach my $set (@values) {
+          my($rname,$rvalue) = split(":",$set);
+          if(!defined($rvalue)) {
+            $rvalue=$rname;
+            $rname="";
+            $rname="*" if (scalar(@values)==1); # backward compatibility: single value without a reading name should be applied to all
+          }
+          #if ($command eq "set") {
+            # Map constants
+            #$rvalue = MQTT_QOS_AT_MOST_ONCE if($rvalue eq qos_string(MQTT_QOS_AT_MOST_ONCE));
+            #$rvalue = MQTT_QOS_AT_LEAST_ONCE if($rvalue eq qos_string(MQTT_QOS_AT_LEAST_ONCE));
+            #$rvalue = MQTT_QOS_EXACTLY_ONCE if($rvalue eq qos_string(MQTT_QOS_EXACTLY_ONCE));
+            $rvalue=$MQTT::qos{$rvalue} if(defined($MQTT::qos{$rvalue}));
+            if($rvalue ne "0" && $rvalue ne "1" && $rvalue ne "2") {
+              return "unexpected QOS value $rvalue. use 0, 1 or 2. Constants may be also used (".MQTT_QOS_AT_MOST_ONCE."=".qos_string(MQTT_QOS_AT_MOST_ONCE).", ".MQTT_QOS_AT_LEAST_ONCE."=".qos_string(MQTT_QOS_AT_LEAST_ONCE).", ".MQTT_QOS_EXACTLY_ONCE."=".qos_string(MQTT_QOS_EXACTLY_ONCE)."). Format: [<reading>|*:]0|1|2";
+            }
+            #$rvalue="1" unless ($rvalue eq "0");
+            $client->{".qos"}->{$rname} = $rvalue;
+          #} else {
+          #  delete($client->{".qos"}->{$rname});
+          #  $client->{".qos"}->{"*"} = "0" if($rname eq "*");
+          #}
+        }
       }
+      
+      my $showqos = "";
+      if(defined($client->{".qos"})) {
+        foreach my $rname (sort keys %{$client->{".qos"}}) {
+          my $rvalue = $client->{".qos"}->{$rname};
+          $rname="[state]" if ($rname eq "");
+          $showqos.=$rname.':'.$rvalue.' ';
+        }
+      }
+      $client->{"qos"} = $showqos;
       last;
     };
     $attribute eq "retain" and do {
-      if ($command eq "set") {
-        $client->{retain} = $value;
+      delete($client->{".retain"});
+      
+      if ($command ne "set") {
+        delete($client->{".retain"});
+        $client->{".retain"}->{"*"} = "0";
       } else {
-        $client->{retain} = 0;
+        my @values = ();
+
+        if(!defined($value) || $value=~/^[ \t]*$/) {
+           return "retain value may not be empty. Format: [<reading>|*:]0|1";
+        }
+        @values = split("[ \t]+",$value);
+        
+        foreach my $set (@values) {
+          my($rname,$rvalue) = split(":",$set);
+          if(!defined($rvalue)) {
+            $rvalue=$rname;
+            $rname="";
+            $rname="*" if (scalar(@values)==1); # backward compatibility: single value without a reading name should be applied to all
+          }
+            if($rvalue ne "0" && $rvalue ne "1") {
+              return "unexpected retain value. use 0 or 1. Format: [<reading>|*:]0|1";
+            }
+            $client->{".retain"}->{$rname} = $rvalue;
+        }
       }
+      
+      my $showretain = "";
+      if(defined($client->{".retain"})) {
+        foreach my $rname (sort keys %{$client->{".retain"}}) {
+          my $rvalue = $client->{".retain"}->{$rname};
+          $rname="[state]" if ($rname eq "");
+          $showretain.=$rname.':'.$rvalue.' ';
+        }
+      }
+      $client->{"retain"} = $showretain;
       last;
     };
     $attribute eq "IODev" and do {
@@ -529,7 +804,7 @@ sub client_start($) {
   }
   if (@{$client->{subscribe}}) {
     my $msgid = send_subscribe($client->{IODev},
-      topics => [map { [$_ => $client->{qos} || MQTT_QOS_AT_MOST_ONCE] } @{$client->{subscribe}}],
+      topics => [map { [$_ => $client->{".qos"}->{$_} || MQTT_QOS_AT_MOST_ONCE] } @{$client->{subscribe}}],
     );
     $client->{message_ids}->{$msgid}++;
     readingsSingleUpdate($client,"transmission-state","subscribe sent",1);
@@ -578,6 +853,10 @@ sub client_stop($) {
       <p><code>set &lt;name&gt; disconnect</code><br/>
          disconnects the MQTT-device from the mqtt-broker</p>
     </li>
+    <li>
+      <p><code>set &lt;name&gt; publish [qos:?] [retain:?] &lt;topic&gt; &lt;message&gt;</code><br/>
+         sends message to the specified topic</p>
+    </li>
   </ul>
   <a name="MQTTattr"></a>
   <p><b>Attributes</b></p>
@@ -585,6 +864,32 @@ sub client_stop($) {
     <li>
       <p>keep-alive<br/>
          sets the keep-alive time (in seconds).</p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; last-will [qos:?] [retain:?] &lt;topic&gt; &lt;message&gt;</code><br/>
+         Support for MQTT feature "last will" 
+         </p>
+      <p>example:<br/>
+      <code>attr mqtt last-will /fhem/status crashed</code>
+      </p>
+    </li>
+    <li>
+      <p>on-connect, on-disconnect<br/>
+      <code>attr &lt;name&gt; on-connect {Perl-expression} &lt;topic&gt; &lt;message&gt;</code><br/>
+         Publish the specified message to a topic at connect / disconnect (counterpart to lastwill) and / or evaluation of Perl expression<br/>
+         If a Perl expression is provided, the message is sent only if expression returns true (for example, 1) or undef.<br/>
+         The following variables are passed to the expression at evaluation: $hash, $name, $qos, $retain, $topic, $message.
+         </p>
+      <p>examples:<br/>
+      <code>attr mqtt on-connect /topic/status connected</code><br/>
+      <code>attr mqtt on-connect {Log3("abc",1,"on-connect")} /fhem/status connected</code>
+      </p>
+    </li>
+    <li>
+      <p>on-timeout<br/>
+      <code>attr &lt;name&gt; on-timeout {Perl-expression}</code>    
+         evaluate the given Perl expression on timeout<br/>
+         </p>
     </li>
   </ul>
 </ul>

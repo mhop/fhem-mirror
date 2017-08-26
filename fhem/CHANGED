@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 00_MQTT: OnMessageFn, last-will, onConnect/onDisconnect
+  - feature: 10_MQTT_DEVICE: improved publishSet, retain, subscribeReadings
+  - feature: 10_MQTT_BRIDGE: improved retain, subscribeSet 
   - new:     31_Aurora.pm: first release
   - bugfix:  21_HEOS: fix missing curl
   - bugfix:  31_PLAYBULB: code cleaning

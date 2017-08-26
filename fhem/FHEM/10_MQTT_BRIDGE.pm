@@ -48,8 +48,9 @@ sub MQTT_BRIDGE_Initialize($) {
   
   $hash->{AttrList} =
     "IODev ".
-    "qos:".join(",",keys %MQTT::qos)." ".
-    "retain:0,1 ".
+    #"qos:".join(",",keys %MQTT::qos)." ".
+    "qos ".
+    "retain ".
     "publish-topic-base ".
     "publishState ".
     "publishReading_.* ".
@@ -77,6 +78,10 @@ BEGIN {
     readingsSingleUpdate
     Log3
     DoSet
+    fhem
+    defs
+    AttrVal
+    ReadingsVal
   ))
 };
 
@@ -99,23 +104,35 @@ sub Get($$@) {
     };
   };
 }
-
+#use Data::Dumper;
 sub Notify() {
   my ($hash,$dev) = @_;
 
   Log3($hash->{NAME},5,"Notify for $dev->{NAME}");
+  #Log3($hash->{NAME},5,">>>>=====".Dumper($dev->{CHANGED}));
   foreach my $event (@{$dev->{CHANGED}}) {
     $event =~ /^([^:]+)(: )?(.*)$/;
+    #Log3($hash->{NAME},5,">>>>>>>>>>>>>>>>>>");
     Log3($hash->{NAME},5,"$event, '".((defined $1) ? $1 : "-undef-")."', '".((defined $3) ? $3 : "-undef-")."'");
     my $msgid;
     if (defined $3 and $3 ne "") {
       if (defined $hash->{publishReadings}->{$1}) {
-        $msgid = send_publish($hash->{IODev}, topic => $hash->{publishReadings}->{$1}, message => $3, qos => $hash->{qos}, retain => $hash->{retain});
+        my $retain = $hash->{".retain"}->{$1};
+        $retain = $hash->{".retain"}->{'*'} unless defined($retain);
+        my $qos = $hash->{".qos"}->{$1};
+        $qos = $hash->{".qos"}->{'*'} unless defined($qos);
+        #Log3($hash->{NAME},1,">>>>>>>>>>>>>>>>>> RETAIN: ".$retain); $retain=0; ### TEST
+        $msgid = send_publish($hash->{IODev}, topic => $hash->{publishReadings}->{$1}, message => $3, qos => $qos, retain => $retain);
         readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
       }
     } else {
       if (defined $hash->{publishState}) {
-        $msgid = send_publish($hash->{IODev}, topic => $hash->{publishState}, message => $1, qos => $hash->{qos}, retain => $hash->{retain});
+        my $retain = $hash->{".retain"}->{""};
+        $retain = $hash->{".retain"}->{'*'} unless defined($retain);
+        my $qos = $hash->{".qos"}->{""};
+        $qos = $hash->{".qos"}->{'*'} unless defined($qos);
+        #Log3($hash->{NAME},1,">>>>>>>>>>>>>>>>>> RETAIN: ".$retain); $retain=0; ### TEST
+        $msgid = send_publish($hash->{IODev}, topic => $hash->{publishState}, message => $1, qos => $qos, retain => $retain);
         readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
       }
     }
@@ -130,15 +147,18 @@ sub Attr($$$$) {
   ATTRIBUTE_HANDLER: {
     $attribute =~ /^subscribeSet(_?)(.*)/ and do {
       if ($command eq "set") {
-        unless (defined $hash->{subscribeSets}->{$value} and $hash->{subscribeSets}->{$value} eq $2) {
-          unless (defined $hash->{subscribeSets}->{$value}) {
-            client_subscribe_topic($hash,$value);
+        my ($mqos, $mretain,$mtopic, $mvalue, $mcmd)=MQTT::parsePublishCmdStr($value);
+        if(!defined($mtopic)) { return "topic may not be empty";}
+        unless (defined $hash->{subscribeSets}->{$mtopic}->{name} and $hash->{subscribeSets}->{$mtopic}->{name} eq $2) {
+          unless (defined $hash->{subscribeSets}->{$mtopic}->{name}) {
+            client_subscribe_topic($hash,$mtopic,$mqos,$mretain);
           }
-          $hash->{subscribeSets}->{$value} = $2;
+          $hash->{subscribeSets}->{$mtopic}->{name} = $2;
+          $hash->{subscribeSets}->{$mtopic}->{cmd} = $mcmd;
         }
       } else {
         foreach my $topic (keys %{$hash->{subscribeSets}}) {
-          if ($hash->{subscribeSets}->{$topic} eq $2) {
+          if ($hash->{subscribeSets}->{$topic}->{name} eq $2) {
             client_unsubscribe_topic($hash,$topic);
             delete $hash->{subscribeSets}->{$topic};
             last;
@@ -163,20 +183,31 @@ sub Attr($$$$) {
       }
       last;
     };
-    client_attr($hash,$command,$name,$attribute,$value);
+    return client_attr($hash,$command,$name,$attribute,$value);
   }
 }
 
 sub onmessage($$$) {
   my ($hash,$topic,$message) = @_;
-  if (defined (my $command = $hash->{subscribeSets}->{$topic})) {
-    my @args = split ("[ \t]+",$message);
-    if ($command eq "") {
-      Log3($hash->{NAME},5,"calling DoSet($hash->{DEF}".(@args ? ",".join(",",@args) : ""));
-      DoSet($hash->{DEF},@args);
-    } else {
-      Log3($hash->{NAME},5,"calling DoSet($hash->{DEF},$command".(@args ? ",".join(",",@args) : ""));
-      DoSet($hash->{DEF},$command,@args);
+  if (defined (my $command = $hash->{subscribeSets}->{$topic}->{name})) {
+    my $do=1;
+    if(defined (my $cmd = $hash->{subscribeSets}->{$topic}->{cmd})) {
+      Log3($hash->{NAME},5,"evaluating cmd: $cmd");
+      my $name = $hash->{NAME};
+      my $device = $hash->{DEF};
+      $do=eval($cmd);
+      Log3($hash->{NAME},1,"ERROR evaluating $cmd: $@") if($@);
+      $do=1 if (!defined($do));
+    }
+    if($do) {    
+      my @args = split ("[ \t]+",$message);
+      if ($command eq "") {
+        Log3($hash->{NAME},5,"calling DoSet($hash->{DEF}".(@args ? ",".join(",",@args) : ""));
+        DoSet($hash->{DEF},@args);
+      } else {
+        Log3($hash->{NAME},5,"calling DoSet($hash->{DEF},$command".(@args ? ",".join(",",@args) : ""));
+        DoSet($hash->{DEF},$command,@args);
+      }
     }
   }
 }
@@ -213,12 +244,22 @@ sub onmessage($$$) {
   <p><b>Attributes</b></p>
   <ul>
     <li>
-      <p><code>attr &lt;name&gt; subscribeSet &lt;topic&gt;</code><br/>
-         configures a topic that will issue a 'set &lt;message&gt; whenever a message is received</p>
+      <p><code>attr &lt;name&gt; subscribeSet [{Perl-expression}] [qos:?] [retain:?] &lt;topic&gt;</code><br/>
+         configures a topic that will issue a 'set &lt;message&gt; whenever a message is received<br/>
+         QOS and ratain can be optionally defined for this topic. <br/>
+         Furthermore, a Perl statement can be provided which is executed when the message is received. The following variables are available for the expression: $hash, $name, $topic, $message, $devname (linked device). Return value decides whether reading is set (true (e.g., 1) or undef) or discarded (false (e.g., 0)).
+      </p>
+      <p>Example:<br/>
+         <code>attr mqttest subscribeSet {fhem("do somethin")} /topic/cmd</code>
+       </p>
     </li>
     <li>
-      <p><code>attr &lt;name&gt; subscribeSet_&lt;reading&gt; &lt;topic&gt;</code><br/>
-         configures a topic that will issue a 'set &lt;reading&gt; &lt;message&gt; whenever a message is received</p>
+      <p><code>attr &lt;name&gt; subscribeSet_&lt;reading&gt; [{Perl-expression}] [qos:?] [retain:?] &lt;topic&gt;</code><br/>
+         configures a topic that will issue a 'set &lt;reading&gt; &lt;message&gt; whenever a message is received. see above
+for Perl-Expression/QOS/retain</p>
+      <p>Example:<br/>
+         <code>attr mqttest subscribeSet_cmd {if ($message eq "config") fhem("set $devname getconfig");; 0} /topic/cmd</code>
+       </p>
     </li>
     <li>
       <p><code>attr &lt;name&gt; publishState &lt;topic&gt;</code><br/>
@@ -231,6 +272,26 @@ sub onmessage($$$) {
     <li>
       <p><code>attr &lt;name&gt; publish-topic-base &lt;topic&gt;</code><br/>
          this is used as base path when issueing 'get &lt;device&gt; readings' to construct topics to publish to based on the devices existing readings</p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; retain &lt;flags&gt; ...</code><br/>
+         Specifies the retain flag for all or specific readings. Possible values are 0, 1</p>
+      <p>Examples:<br/>
+         <code>attr mqttest retain 0</code><br/>
+         defines retain 0 for all readings/topics (due to downward compatibility)<br>
+         <code> retain *:0 1 test:1</code><br/>
+         defines retain 0 for all readings/topics except the reading 'test'. Retain for 'test' is 1<br>
+       </p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; qos &lt;flags&gt; ...</code><br/>
+         Specifies the QOS flag for all or specific readings. Possible values are 0, 1 or 2. Constants may be also used: at-most-once = 0, at-least-once = 1, exactly-once = 2</p>
+      <p>Examples:<br/>
+         <code>attr mqttest qos 0</code><br/>
+         defines QOS 0 for all readings/topics (due to downward compatibility)<br>
+         <code> retain *:0 1 test:1</code><br/>
+         defines QOS 0 for all readings/topics except the reading 'test'. Retain for 'test' is 1<br>
+       </p>
     </li>
   </ul>
 </ul>
