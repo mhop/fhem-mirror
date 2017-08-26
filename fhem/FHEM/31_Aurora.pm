@@ -283,7 +283,7 @@ Aurora_dispatch($$$;$)
       InternalTimer(gettimeofday()+1, "Aurora_GetUpdate", $hash, 0);
     }
   } elsif( $param->{type} eq 'effects' ) {
-    $hash->{helper}{effects} = $json->{list};
+    $hash->{helper}{effects} = $json->{effectsList};
     if( my $effect = $json->{select} ) {
       if( $effect ne $hash->{helper}{effect} ) { readingsSingleUpdate($hash, 'effect', $effect, 1 ) };
       $hash->{helper}{effect} = $effect;
