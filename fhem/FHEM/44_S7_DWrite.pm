@@ -4,8 +4,7 @@ package main;
 
 use strict;
 use warnings;
-
-#use Switch;
+use Time::HiRes qw(gettimeofday usleep);
 
 my %sets = (
 	"on"     => "",
@@ -18,6 +17,15 @@ my %gets = (
 	"STATE"   => ""
 );
 
+
+sub __isfloat {
+	my $val = shift;
+
+	#  return $val =~ m/^\d+.\d+$/;
+	return $val =~ m/^[-+]?\d*\.?\d*$/;
+
+	#[-+]?[0-9]*\.?[0-9]*
+}
 #####################################
 sub S7_DWrite_Initialize($) {
 	my $hash = shift @_;
@@ -249,24 +257,30 @@ sub S7_DWrite_setABit($$) {
 	if ( $newValue eq "on" || $newValue eq "trigger" ) {
 		$b = 1;
 	}
+	
+	my $byte;
+	my $bit;
+	my $readbuffer;
+	my @cbuffer;
+	my $tbuffer;
+	
 	if ( $shash->{S7TYPE} eq "S5" ) {
 
 		#S5
 		#lesen wir das aktuelle byte
-		my $byte = int( $position / 8 );
-		my $bit  = int( $position % 8 );
-		my $readbuffer;
+		$byte = int( $position / 8 );
+		$bit  = int( $position % 8 );
 		( $res, $readbuffer ) =
 		  S7_ReadBlockFromPLC( $shash, $writeAreaIndex, $dbNR, $byte, 1 );
 
 		if ( $res == 0 && length($readbuffer) == 1 ) {    #reading was OK
 			    #setzen/löschen wir das gewünsche bit
 			    
-			my $tbuffer = join( ", ", unpack( "H2 " x length($readbuffer), $readbuffer ) );
+			$tbuffer = join( ", ", unpack( "H2 " x length($readbuffer), $readbuffer ) );
 			Log3( undef, 5, "S5 Read old Value <-- " . $tbuffer ." now changing bitNr: ".$bit );
 			
 			
-			my @cbuffer = unpack( "C" x length($readbuffer), $readbuffer);
+			@cbuffer = unpack( "C" x length($readbuffer), $readbuffer);
 			if ($b == 1) {
 				$cbuffer[0] |= (1 << $bit);				
 			} else {
@@ -292,7 +306,7 @@ sub S7_DWrite_setABit($$) {
 			}
 				
 			
-			} else {
+		} else {
 
 				my $error = $shash->{S7PLCClient}->getErrorStr($res);
 				my $msg =
@@ -301,37 +315,67 @@ sub S7_DWrite_setABit($$) {
 
 				S7_reconnect($shash);    #lets try a reconnect
 				return ( -2, $msg );
-			}
-
 		}
-		else {
+
+	} else {
 
 			#S7
-			$res =
-			  S7_WriteBitToPLC( $shash, $writeAreaIndex, $dbNR, $position, $b );
-		}
-
-		if ( $res == 0 ) {
-			main::readingsSingleUpdate( $hash, "state", $newValue, 1 );
-		}
-		else {
-			main::readingsSingleUpdate( $hash, "state", "", 1 );
-		}
-
-		if ( $newValue eq "trigger" ) {
-
-			my $triggerLength = 1;
-			if ( defined( $main::attr{$name}{trigger_length} ) ) {
-				$triggerLength = $main::attr{$name}{trigger_length};
-			}
-
-			InternalTimer( gettimeofday() + $triggerLength,
-				"S7_DWrite_SwitchOff", $hash, 1 );
-		}
-
-		return undef;
-
+		$res = S7_WriteBitToPLC( $shash, $writeAreaIndex, $dbNR, $position, $b );
 	}
+
+	if ( $newValue eq "trigger" ) {
+
+		my $triggerLength = 1;#1 second
+		if ( defined( $main::attr{$name}{trigger_length} ) ) {
+			$triggerLength = $main::attr{$name}{trigger_length};
+		}
+
+		if ($triggerLength >=1 ) {
+			InternalTimer( gettimeofday() + $triggerLength,	"S7_DWrite_SwitchOff", $hash, 1 );
+		} else {
+			#we use usleep
+			$triggerLength = $triggerLength*1000*1000;
+			$triggerLength = int($triggerLength);
+			
+			usleep ($triggerLength);
+			
+			if ( $shash->{S7TYPE} eq "S5" ) {
+				$cbuffer[0] &= (~(1 << $bit)) & 0xFF;
+			
+				
+				$readbuffer = pack( "C" x 1, @cbuffer);
+							
+				#schreiben wir das byte
+				$tbuffer = join( ", ", unpack( "H2 " x length($readbuffer), $readbuffer ) );
+				Log3( undef, 5, "S5 Write new Value 2 <-- " . $tbuffer );
+				$res = S7_WriteToPLC( $shash, $writeAreaIndex, $dbNR, $byte,  &S7Client::S7WLByte , $readbuffer );
+				
+				if ( $res != 0 ) {
+					my $error = $shash->{S7PLCClient}->getErrorStr($res);				
+					my $msg =
+					  "$name S7_DWrite_setABit -S5- S7_WriteToPLC2 error: $res=$error";
+					Log3( $name, 3, $msg );
+				}
+						
+			} else {
+					#S7
+				$res =
+					  S7_WriteBitToPLC( $shash, $writeAreaIndex, $dbNR, $position, 0 );
+				
+			}
+			$newValue = "off";
+		}
+	}	
+	
+	if ( $res == 0 ) {
+		main::readingsSingleUpdate( $hash, "state", $newValue, 1 );
+	} else {
+		main::readingsSingleUpdate( $hash, "state", "", 1 );
+	}
+
+	return undef;
+
+}
 
 #####################################
 
@@ -394,7 +438,7 @@ sub S7_DWrite_setABit($$) {
 				
 			my $now = gettimeofday();
 			foreach my $clientName (@clientList) {
-
+		
 				my $h = $defs{$clientName};
 
 				if (   $h->{TYPE} eq "S7_DWrite"
@@ -494,6 +538,7 @@ sub S7_DWrite_setABit($$) {
 					if ($changed == 1) {				
 						main::readingsSingleUpdate( $h, $reading, $valueText, 1 );
 					}
+					
 
 				}
 			}
@@ -571,7 +616,7 @@ sub S7_DWrite_setABit($$) {
 		my $hash = $defs{$name};
 		if ( $cmd eq "set" ) {
 			if ( $aName eq "trigger_length" ) {
-				if ( $aVal ne int($aVal) ) {
+				if ( !__isfloat ($aVal) ) {
 					Log3 $name, 3,
 "S7_DWrite: Invalid $aName in attr $name $aName ($aVal is not a number): $@";
 					return "Invalid $aName : $aVal is not a number";
@@ -623,7 +668,7 @@ Note: the required memory area need to be with in the configured PLC reading of 
 </ul>
 <p><strong>Attr</strong><br /> The following parameters are used to scale every reading</p>
 <ul>
-<li>trigger_length ... sets the on-time of a trigger</li>
+<li>trigger_length ... sets the on-time of a trigger in Seconds. Note out can also use trigger_length less than 1</li>
 </ul>
 =end html
 
@@ -658,7 +703,7 @@ Note: the required memory area need to be with in the configured PLC reading of 
 </ul>
 <p><strong>Attr</strong><br /> The following parameters are used to scale every reading</p>
 <ul>
-<li>trigger_length ... sets the on-time of a trigger</li>
+<li>trigger_length ... sets the on-time of a trigger in Seconds. Note out can also use trigger_length less than 1</li>
 </ul>
 =end html_DE
 

@@ -4,9 +4,8 @@ package main;
 
 use strict;
 use warnings;
+use Time::HiRes qw(gettimeofday);
 
-#use Switch;
-#use 44_S7_Client;
 
 my %gets = (
 

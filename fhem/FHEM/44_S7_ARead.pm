@@ -4,6 +4,7 @@ package main;
 
 use strict;
 use warnings;
+use Time::HiRes qw(gettimeofday);
 
 #use Switch;
 require "44_S7_Client.pm";
