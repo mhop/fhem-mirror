@@ -784,7 +784,20 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     </li><br>
 	
 	</ul>
-    <br/>
+    <br>
+	
+  <a name="Log2Syslogreadings"></a>
+  <b>Readings</b>
+  <ul>
+  <br> 
+    <table>  
+    <colgroup> <col width=40%> <col width=60%> </colgroup>
+	  <tr><td><b>SSL_Algorithm</b>                  </td><td> used SSL algorithm if SSL is enabled and active </td></tr>
+      <tr><td><b>SSL_Version</b>                    </td><td> the used TLS-version if encryption is enabled and is active</td></tr>
+	  <tr><td><b>Transfered_logs_per_minute</b>     </td><td> the average number of forwarded logs/events per minute </td></tr>
+    </table>    
+    <br>
+  </ul>
   
 </ul>
 
@@ -967,7 +980,20 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     </li><br>
 	
 	</ul>
-    <br/>
+    <br>
+	
+  <a name="Log2Syslogreadings"></a>
+  <b>Readings</b>
+  <ul>
+  <br> 
+    <table>  
+    <colgroup> <col width=35%> <col width=65%> </colgroup>
+	  <tr><td><b>SSL_Algorithm</b>                  </td><td> der verwendete SSL Algorithmus wenn SSL eingeschaltet und aktiv ist </td></tr>
+      <tr><td><b>SSL_Version</b>                    </td><td> die verwendete TLS-Version wenn die Veschlüsselung aktiv ist</td></tr>
+	  <tr><td><b>Transfered_logs_per_minute</b>     </td><td> die durchschnittliche Anzahl der übertragenen Logs/Events pro Minute </td></tr>
+    </table>    
+    <br>
+  </ul>
   
 </ul>
 =end html_DE
