@@ -33,7 +33,7 @@
 # 3.0.0      27.08.2017       change attr type to protocol, ready to check in
 # 2.6.0      26.08.2017       more than one Log2Syslog device can be created
 # 2.5.2      26.08.2018       fix in splitting timestamp, change Log2Syslog_trate using internaltimer with attr 
-#                             ratecalcrerun, function Log2Syslog_closesock
+#                             rateCalcRerun, function Log2Syslog_closesock
 # 2.5.1      24.08.2017       some fixes
 # 2.5.0      23.08.2017       TLS encryption available, new readings, $readingFnAttributes
 # 2.4.1      21.08.2017       changes in sub Log2Syslog_charfilter, change PROCID to $hash->{SEQNO}
@@ -107,7 +107,7 @@ sub Log2Syslog_Initialize($) {
 					  "timeout ".
 	                  "protocol:UDP,TCP ".
 	                  "port ".
-					  "ratecalcrerun ".
+					  "rateCalcRerun ".
 					  $readingFnAttributes
                       ;
 return undef;   
@@ -207,7 +207,7 @@ sub Log2Syslog_Attr {
 		}
     }
 	
-	if ($cmd eq "set" && $aName =~ /port|timeout|ratecalcrerun/) {
+	if ($cmd eq "set" && $aName =~ /port|timeout|rateCalcRerun/) {
         if($aVal !~ m/^\d+$/) { return " The Value of \"$aName\" is not valid. Use only figures !";}
 	}
     
@@ -582,7 +582,7 @@ return undef;
 sub Log2Syslog_trate($) {
   my ($hash) = @_;
   my $name  = $hash->{NAME};
-  my $rerun = AttrVal($name, "ratecalcrerun", 60);
+  my $rerun = AttrVal($name, "rateCalcRerun", 60);
   
   if ($hash->{HELPER}{LTIME}+60 <= time()) {
       my $div = (time()-$hash->{HELPER}{LTIME})/60;
@@ -766,7 +766,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
         The port of the syslog server is listening. Default port is 514 if not specified.
     </li><br>
 	
-    <li><code>ratecalcrerun</code><br>
+    <li><code>rateCalcRerun</code><br>
         <br>
         Rerun cycle for calculation of log transfer rate (Reading "Transfered_logs_per_minute") in seconds. 
 		Default is 60 seconds.
@@ -962,7 +962,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
         Der verwendete Port des Syslog-Servers. Default Port ist 514 wenn nicht gesetzt.
     </li><br>
 	
-    <li><code>ratecalcrerun</code><br>
+    <li><code>rateCalcRerun</code><br>
         <br>
         Wiederholungszyklus für die Bestimmung der Log-Transferrate (Reading "Transfered_logs_per_minute") in Sekunden. 
 		Default sind 60 Sekunden.
