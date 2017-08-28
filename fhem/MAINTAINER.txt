@@ -362,6 +362,7 @@ FHEM/92_FileLog.pm           rudolfkoenig         http://forum.fhem.de Automatis
 FHEM/92_SingleFileLog.pm     rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/93_DbLog.pm             Tobias               http://forum.fhem.de Automatisierung
 FHEM/93_DbRep.pm             DS_Starter           http://forum.fhem.de Sonstiges
+FHEM/93_Log2Syslog.pm        DS_Starter           http://forum.fhem.de Automatisierung
 FHEM/93_FHEM2FHEM.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/95_FLOORPLAN.pm         ulimaass             http://forum.fhem.de Frontends/FLOORPLAN
 FHEM/95_Alarm.pm             pahenning            http://forum.fhem.de Unterstützende Dienste
@@ -499,7 +500,6 @@ FHEM/GPUtils.pm              ntruchsess           http://forum.fhem.de FHEM Deve
 contrib/23_WEBTHERM.pm       betateilchen/sachag  http://forum.fhem.de Sonstiges
 contrib/70_ONKYO_AVR_PULL.pm loredo               http://forum.fhem.de Multimedia
 contrib/92_rsyslog.pm        DS_Starter           http://forum.fhem.de Automatisierung
-contrib/93_Log2Syslog.pm     DS_Starter           http://forum.fhem.de Automatisierung
 contrib/98_exportdevice.pm   loredo               http://forum.fhem.de Sonstiges
 contrib/betateilchen/*       betateilchen         http://forum.fhem.de Sonstiges
 contrib/holiday              betateilchen         http://forum.fhem.de Sonstiges
