@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.6.2        28.08.2017       commandref revised
 # 5.6.1        18.07.2017       commandref revised, minor fixes
 # 5.6.0        17.07.2017       default timeout changed to 86400, new get-command "procinfo" (MySQL)
 # 5.5.2        16.07.2017       dbmeta_DoParse -> show variables (no global)
@@ -231,7 +232,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.6.1";
+my $DbRepVersion = "5.6.2";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -6472,28 +6473,37 @@ sub bdump {
   (*) The format of timestamp is as used with DbLog "YYYY-MM-DD HH:MM:SS". For the attributes "timestamp_begin", "timestamp_end" 
   you can also use one of the following entries. The timestamp-attribute will be dynamically set to: <br><br>
                               <ul>
-                              <b>current_year_begin</b>     : "&lt;current year&gt;-01-01 00:00:00"         <br>
-                              <b>current_year_end</b>       : "&lt;current year&gt;-12-31 23:59:59"         <br>
-                              <b>previous_year_begin</b>    : "&lt;previous year&gt;-01-01 00:00:00"        <br>
-                              <b>previous_year_end</b>      : "&lt;previous year&gt;-12-31 23:59:59"        <br>
-                              <b>current_month_begin</b>    : "&lt;current month first day&gt; 00:00:00"    <br>
-                              <b>current_month_end</b>      : "&lt;current month last day&gt; 23:59:59"     <br>
-                              <b>previous_month_begin</b>   : "&lt;previous month first day&gt; 00:00:00"   <br>
-                              <b>previous_month_end</b>     : "&lt;previous month last day&gt; 23:59:59"    <br>
-                              <b>current_week_begin</b>     : "&lt;first day of current week&gt; 00:00:00"  <br>
-                              <b>current_week_end</b>       : "&lt;last day of current week&gt; 23:59:59"   <br>
-                              <b>previous_week_begin</b>    : "&lt;first day of previous week&gt; 00:00:00" <br>
-                              <b>previous_week_end</b>      : "&lt;last day of previous week&gt; 23:59:59"  <br>
-                              <b>current_day_begin</b>      : "&lt;current day&gt; 00:00:00"                <br>
-                              <b>current_day_end</b>        : "&lt;current day&gt; 23:59:59"                <br>
-                              <b>previous_day_begin</b>     : "&lt;previous day&gt; 00:00:00"               <br>
-                              <b>previous_day_end</b>       : "&lt;previous day&gt; 23:59:59"               <br>
-                              <b>current_hour_begin</b>     : "&lt;current hour&gt;:00:00"                  <br>
-                              <b>current_hour_end</b>       : "&lt;current hour&gt;:59:59"                  <br>
-                              <b>previous_hour_begin</b>    : "&lt;previous hour&gt;:00:00"                 <br>
-                              <b>previous_hour_end</b>      : "&lt;previous hour&gt;:59:59"                 <br>                              </ul><br>
+                              <b>current_year_begin</b>     : matches "&lt;current year&gt;-01-01 00:00:00"         <br>
+                              <b>current_year_end</b>       : matches "&lt;current year&gt;-12-31 23:59:59"         <br>
+                              <b>previous_year_begin</b>    : matches "&lt;previous year&gt;-01-01 00:00:00"        <br>
+                              <b>previous_year_end</b>      : matches "&lt;previous year&gt;-12-31 23:59:59"        <br>
+                              <b>current_month_begin</b>    : matches "&lt;current month first day&gt; 00:00:00"    <br>
+                              <b>current_month_end</b>      : matches "&lt;current month last day&gt; 23:59:59"     <br>
+                              <b>previous_month_begin</b>   : matches "&lt;previous month first day&gt; 00:00:00"   <br>
+                              <b>previous_month_end</b>     : matches "&lt;previous month last day&gt; 23:59:59"    <br>
+                              <b>current_week_begin</b>     : matches "&lt;first day of current week&gt; 00:00:00"  <br>
+                              <b>current_week_end</b>       : matches "&lt;last day of current week&gt; 23:59:59"   <br>
+                              <b>previous_week_begin</b>    : matches "&lt;first day of previous week&gt; 00:00:00" <br>
+                              <b>previous_week_end</b>      : matches "&lt;last day of previous week&gt; 23:59:59"  <br>
+                              <b>current_day_begin</b>      : matches "&lt;current day&gt; 00:00:00"                <br>
+                              <b>current_day_end</b>        : matches "&lt;current day&gt; 23:59:59"                <br>
+                              <b>previous_day_begin</b>     : matches "&lt;previous day&gt; 00:00:00"               <br>
+                              <b>previous_day_end</b>       : matches "&lt;previous day&gt; 23:59:59"               <br>
+                              <b>current_hour_begin</b>     : matches "&lt;current hour&gt;:00:00"                  <br>
+                              <b>current_hour_end</b>       : matches "&lt;current hour&gt;:59:59"                  <br>
+                              <b>previous_hour_begin</b>    : matches "&lt;previous hour&gt;:00:00"                 <br>
+                              <b>previous_hour_end</b>      : matches "&lt;previous hour&gt;:59:59"                 <br>                              </ul><br>
   
   Make sure that "timestamp_begin" < "timestamp_end" is fulfilled. <br><br>
+  
+                                <ul>
+							    <b>Example:</b> <br><br>
+								attr &lt;DbRep-device&gt; timestamp_begin current_year_begin <br>
+								attr &lt;DbRep-device&gt; timestamp_end  current_year_end <br><br>
+								
+								# Analyzes the database between the time limits of the current year. <br>
+								</ul>
+								<br><br>
   
   <b>Note </b> <br>
   
@@ -6520,7 +6530,7 @@ sub bdump {
                                called by the interface in your 99_myUtls.pm as shown in by the example:     <br>
 
 		<pre>
-        sub UserExitFn {
+        sub UserFunction {
           my ($name,$reading,$value) = @_;
           my $hash = $defs{$name};
           ...
@@ -6548,7 +6558,7 @@ sub bdump {
 							   For further processing following parameters will be forwarded to the function: <br><br>
                                
 							   <ul>
-                               <li>$hash - the hash of the DbRep-Device </li>
+                               <li>$name - the name of the DbRep-Device </li>
                                <li>$reading - the name of the created reading </li>
                                <li>$value - the value of the reading </li>
 							   
@@ -7404,29 +7414,38 @@ sub bdump {
   (*) Das Format von Timestamp ist wie in DbLog "YYYY-MM-DD HH:MM:SS". Für die Attribute "timestamp_begin", "timestamp_end" 
   kann ebenso eine der folgenden Eingaben verwendet werden. Dabei wird das timestamp-Attribut dynamisch belegt: <br><br>
                               <ul>
-                              <b>current_year_begin</b>     : "&lt;aktuelles Jahr&gt;-01-01 00:00:00"          <br>
-                              <b>current_year_end</b>       : "&lt;aktuelles Jahr&gt;-12-31 23:59:59"          <br>
-                              <b>previous_year_begin</b>    : "&lt;vorheriges Jahr&gt;-01-01 00:00:00"         <br>
-                              <b>previous_year_end</b>      : "&lt;vorheriges Jahr&gt;-12-31 23:59:59"         <br>
-                              <b>current_month_begin</b>    : "&lt;aktueller Monat erster Tag&gt; 00:00:00"    <br>
-                              <b>current_month_end</b>      : "&lt;aktueller Monat letzter Tag&gt; 23:59:59"   <br>
-                              <b>previous_month_begin</b>   : "&lt;Vormonat erster Tag&gt; 00:00:00"           <br>
-                              <b>previous_month_end</b>     : "&lt;Vormonat letzter Tag&gt; 23:59:59"          <br>
-                              <b>current_week_begin</b>     : "&lt;erster Tag der akt. Woche&gt; 00:00:00"     <br>
-                              <b>current_week_end</b>       : "&lt;letzter Tag der akt. Woche&gt; 23:59:59"    <br>
-                              <b>previous_week_begin</b>    : "&lt;erster Tag Vorwoche&gt; 00:00:00"           <br>
-                              <b>previous_week_end</b>      : "&lt;letzter Tag Vorwoche&gt; 23:59:59"          <br>
-                              <b>current_day_begin</b>      : "&lt;aktueller Tag&gt; 00:00:00"                 <br>
-                              <b>current_day_end</b>        : "&lt;aktueller Tag&gt; 23:59:59"                 <br>
-                              <b>previous_day_begin</b>     : "&lt;Vortag&gt; 00:00:00"                        <br>
-                              <b>previous_day_end</b>       : "&lt;Vortag&gt; 23:59:59"                        <br>
-                              <b>current_hour_begin</b>     : "&lt;aktuelle Stunde&gt;:00:00"                  <br>
-                              <b>current_hour_end</b>       : "&lt;aktuelle Stunde&gt;:59:59"                  <br>
-                              <b>previous_hour_begin</b>    : "&lt;vorherige Stunde&gt;:00:00"                 <br>
-                              <b>previous_hour_end</b>      : "&lt;vorherige Stunde&gt;:59:59"                 <br>
+                              <b>current_year_begin</b>     : entspricht "&lt;aktuelles Jahr&gt;-01-01 00:00:00"          <br>
+                              <b>current_year_end</b>       : entspricht "&lt;aktuelles Jahr&gt;-12-31 23:59:59"          <br>
+                              <b>previous_year_begin</b>    : entspricht "&lt;vorheriges Jahr&gt;-01-01 00:00:00"         <br>
+                              <b>previous_year_end</b>      : entspricht "&lt;vorheriges Jahr&gt;-12-31 23:59:59"         <br>
+                              <b>current_month_begin</b>    : entspricht "&lt;aktueller Monat erster Tag&gt; 00:00:00"    <br>
+                              <b>current_month_end</b>      : entspricht "&lt;aktueller Monat letzter Tag&gt; 23:59:59"   <br>
+                              <b>previous_month_begin</b>   : entspricht "&lt;Vormonat erster Tag&gt; 00:00:00"           <br>
+                              <b>previous_month_end</b>     : entspricht "&lt;Vormonat letzter Tag&gt; 23:59:59"          <br>
+                              <b>current_week_begin</b>     : entspricht "&lt;erster Tag der akt. Woche&gt; 00:00:00"     <br>
+                              <b>current_week_end</b>       : entspricht "&lt;letzter Tag der akt. Woche&gt; 23:59:59"    <br>
+                              <b>previous_week_begin</b>    : entspricht "&lt;erster Tag Vorwoche&gt; 00:00:00"           <br>
+                              <b>previous_week_end</b>      : entspricht "&lt;letzter Tag Vorwoche&gt; 23:59:59"          <br>
+                              <b>current_day_begin</b>      : entspricht "&lt;aktueller Tag&gt; 00:00:00"                 <br>
+                              <b>current_day_end</b>        : entspricht "&lt;aktueller Tag&gt; 23:59:59"                 <br>
+                              <b>previous_day_begin</b>     : entspricht "&lt;Vortag&gt; 00:00:00"                        <br>
+                              <b>previous_day_end</b>       : entspricht "&lt;Vortag&gt; 23:59:59"                        <br>
+                              <b>current_hour_begin</b>     : entspricht "&lt;aktuelle Stunde&gt;:00:00"                  <br>
+                              <b>current_hour_end</b>       : entspricht "&lt;aktuelle Stunde&gt;:59:59"                  <br>
+                              <b>previous_hour_begin</b>    : entspricht "&lt;vorherige Stunde&gt;:00:00"                 <br>
+                              <b>previous_hour_end</b>      : entspricht "&lt;vorherige Stunde&gt;:59:59"                 <br>
                               </ul><br>
   
   Natürlich sollte man immer darauf achten dass "timestamp_begin" < "timestamp_end" ist.  <br><br>
+
+                                <ul>
+							    <b>Beispiel:</b> <br><br>
+								attr &lt;DbRep-device&gt; timestamp_begin current_year_begin <br>
+								attr &lt;DbRep-device&gt; timestamp_end  current_year_end <br><br>
+								
+								# Wertet die Datenbank in den Zeitgrenzen des aktuellen Jahres aus. <br>
+								</ul>
+								<br><br>
   
   <b>Hinweis </b> <br>
   
@@ -7452,7 +7471,7 @@ sub bdump {
 							    99_myUtls.pm nach folgendem Muster erstellt:     <br>
 
 		<pre>
-        sub UserExitFn {
+        sub UserFunction {
           my ($name,$reading,$value) = @_;
           my $hash = $defs{$name};
           ...
@@ -7481,7 +7500,7 @@ sub bdump {
 							   Zur Weiterverarbeitung werden der aufgerufenenen Funktion folgende Variablen übergeben: <br><br>
                                
 							   <ul>
-                               <li>$hash - der Hash des DbRep-Devices </li>
+                               <li>$name - der Name des DbRep-Devices </li>
                                <li>$reading - der Namen des erstellen Readings </li>
                                <li>$value - der Wert des Readings </li>
 							   
