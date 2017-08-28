@@ -1,4 +1,4 @@
-REV 14965
+REV 14971
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -1140,6 +1140,7 @@ UPD 2015-07-28_14:05:32 1761 www/images/fhemSVG/ampel_aus.svg
 UPD 2015-07-28_14:05:32 2067 www/images/fhemSVG/ampel_gelb.svg
 UPD 2015-07-28_14:05:32 2064 www/images/fhemSVG/ampel_gruen.svg
 UPD 2015-07-28_14:05:32 2076 www/images/fhemSVG/ampel_rot.svg
+UPD 2017-08-28_07:45:02 643 www/images/fhemSVG/aurora.svg
 UPD 2015-08-11_07:45:11 1801 www/images/fhemSVG/awning.off.svg
 UPD 2015-08-11_07:45:11 1794 www/images/fhemSVG/awning.svg
 UPD 2015-07-28_14:05:32 11079 www/images/fhemSVG/bag.svg
