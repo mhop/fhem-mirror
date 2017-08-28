@@ -1,6 +1,9 @@
 ﻿# $Id$
 ############################################################################
-# 2017-08-19, v1.0.10
+# 2017-08-28, v1.0.11
+#
+# v1.0.11
+# - BUFIX:   Code Optimierungen
 #
 # v1.0.10
 # - BUFIX:   Code Optimierungen
@@ -1355,10 +1358,10 @@ sub NEUTRINO_ReceiveCommand($$$) {
 				readingsBulkUpdateIfChanged( $hash, "channel",$readvalue);
 				
 				if(ref($return->{prog}) eq 'ARRAY') {
-					Log3 $name, 1, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ARRAY!!!" . ref($return->{prog});
-				}else {Log3 $name, 1, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ARRAY!!! NOT" . ref($return->{prog});}
+					Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ARRAY!!!" . ref($return->{prog});
+				}else {Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] ARRAY!!! NOT" . ref($return->{prog});}
 				
-				Log3 $name, 1, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] Data = $data";
+				Log3 $name, 5, "NEUTRINO $name [NEUTRINO_ReceiveCommand] [$service] Data = $data";
 				
 				if (defined( $return->{prog} ) && ref($return->{prog}) eq 'ARRAY' ) {
 				
