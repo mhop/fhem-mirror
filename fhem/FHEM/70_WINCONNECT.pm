@@ -1,9 +1,21 @@
 # $Id$
 ############################################################################
-# 2017-08-19, v0.0.20
+# 2017-08-29, v0.0.21
 #
 # v0.0.21
 # - BUFIX:      [WinWebGUI] - FHEM Server Connect / Reconnect
+#               [WinWebGUI] - shutdown / standby / hibernate
+#               [WinWebGUI] - accept trusted SSL certificat
+#               [WinWebGUI] - battery_ChargeStatus 0 ersetzt in Middle
+# - CHANGE      [WinWebGUI] - Autoupdate immer angeschalten
+#               [WinWebGUI] - select SSL protocols ssl3, tls, tlsv11, tlsv12
+# - FEATURE:	[WinWebGUI] - Icon FHEM Connect      = blau
+#                             Icon FHEM Disconnect   = rot
+#                             Icon FHEM Wrong Device = gelb
+#               [WinWebGUI] - FQDN oder Netbios Name as FHEM Server
+#               [WinWebGUI] - Support button / collect support informations
+#               [WinWebGUI] - WMI Abfragen / WMI Wizard
+#               [WinWebGUI] - Support Core Temp
 #
 # v0.0.20
 # - BUFIX:      [FEHMModul] - $_ ersetzt durch $uResult
@@ -158,8 +170,8 @@ sub WINCONNECT_Define($$);
 sub WINCONNECT_Undefine($$);
 
 # Autoupdateinformationen
-my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.20.exe";
-my $DownloadVer = "0.0.20";
+my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.21.exe";
+my $DownloadVer = "0.0.21";
 
 ###################################
 sub WINCONNECT_Initialize($) {
@@ -906,8 +918,10 @@ sub WINCONNECT_ReceiveCommand($) {
 		readingsBulkUpdateIfChanged( $hash, "state", "on" );
         Log3 $name, 5, "WINCONNECT $name: url ".$param->{url}." returned: $data";
 		
+		if(!defined($hash->{helper}{SENDVERSION})) {$hash->{helper}{SENDVERSION}='';}
+		
 		# 2017.07.26 - Check update
-		if ($VerWin < $VerGit && $hash->{helper}{SENDVERSION} eq  '' && $service ne 'notifymsg') {
+		if ($VerWin < $VerGit && $hash->{helper}{SENDVERSION} eq  '2' && $service ne 'notifymsg') {
 			# Neue Version vorhanden
 			$hash->{helper}{SENDVERSION} = '1';
 			WINCONNECT_SendCommand( $hash, "notifymsg" , "=" . $Message);
@@ -970,7 +984,7 @@ sub WINCONNECT_Undefine($$) {
 	</ul>
 	
   <br><br>
-    More information on <a target="_blank" href="https://forum.fhem.de/index.php/topic,59251.0.html">FHEM Forum</a>.<br/>
+    More information on <a target="_blank" href="https://wiki.fhem.de/wiki/WINCONNECT">FHEM Wiki</a>.<br/>
   <br>
 </ul>
 
@@ -980,7 +994,7 @@ sub WINCONNECT_Undefine($$) {
 <a name="WINCONNECT"></a>
 <h3>WINCONNECT</h3>
 <ul>
-  Diese Module dient zur Steuerung eines Windows PCs 
+  Dieses Module dient zur Steuerung eines Windows PCs 
   <br><br>
   
     <ul>
@@ -1000,7 +1014,7 @@ sub WINCONNECT_Undefine($$) {
     </ul>
 	</ul>
   <br><br>
-    Mehr Information im <a target="_blank" href="https://forum.fhem.de/index.php/topic,59251.0.html">FHEM Forum</a>.<br/>
+    Mehr Information im <a target="_blank" href="https://wiki.fhem.de/wiki/WINCONNECT">FHEM Wiki</a>.<br/>
   <br>
 </ul>
 
