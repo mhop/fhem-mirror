@@ -1,6 +1,11 @@
 # $Id$
 ############################################################################
-# 2017-08-29, v0.0.21
+# 2017-08-31, v0.0.22
+#
+# v0.0.22
+# - BUFIX:      [FEHMModul] - Überreste Attribut "http-noshutdown" entfernt
+# - FEATURE:	[FEHMModul] - Attribut "autoupdatewincontrol:0,1" Standard = 1 / 0 = Hier kann das automatische GUI Update deaktiviert werden.
+# - CHANGE      [WinWebGUI] - Autoupdate über Attribut steuerbar
 #
 # v0.0.21
 # - BUFIX:      [WinWebGUI] - FHEM Server Connect / Reconnect
@@ -170,8 +175,8 @@ sub WINCONNECT_Define($$);
 sub WINCONNECT_Undefine($$);
 
 # Autoupdateinformationen
-my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.21.exe";
-my $DownloadVer = "0.0.21";
+my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.22.exe";
+my $DownloadVer = "0.0.22";
 
 ###################################
 sub WINCONNECT_Initialize($) {
@@ -183,7 +188,7 @@ sub WINCONNECT_Initialize($) {
     $hash->{DefFn}   = "WINCONNECT_Define";
     $hash->{UndefFn} = "WINCONNECT_Undefine";
 
-	$hash->{AttrList} = "volumeStep win_resetreadings:0,1 disable:0,1 autoupdategitlab:0,1 " . $readingFnAttributes;
+	$hash->{AttrList} = "volumeStep win_resetreadings:0,1 disable:0,1 autoupdategitlab:0,1 autoupdatewincontrol:0,1 " . $readingFnAttributes;
 
     return;
 }
@@ -279,7 +284,6 @@ sub WINCONNECT_SendCommand($$;$$) {
     my ( $hash, $service, $cmd ) = @_;
     my $name            = $hash->{NAME};
     my $address         = $hash->{helper}{ADDRESS};
-    my $http_noshutdown = AttrVal( $name, "http-noshutdown", "0" );
 	my $serviceurl		= "";
 	my $PWRState 		= ReadingsVal( $name, "state", "" );
 	my $Winconnect      = ReadingsVal( $name, "wincontrol", "statusrequest" );
@@ -326,7 +330,8 @@ sub WINCONNECT_SendCommand($$;$$) {
 		$serviceurl = "user_aktividletime";
 	}
 	elsif ($service eq "powerstate") {
-		$serviceurl = "powerstate" . "=" . $PWRState . ";" . $Winconnect . ";" . $WinconnectUPD;
+		if ( AttrVal( $name, "autoupdatewincontrol", 1 ) == 1 ) {$serviceurl = "powerstate" . "=" . $PWRState . ";" . $Winconnect . ";" . $WinconnectUPD;}
+		else {$serviceurl = "powerstate" . "=" . $PWRState . ";" . $Winconnect . ";0";}
 	}
 	elsif ($service eq "command") {
 		$serviceurl = "command";
@@ -388,7 +393,7 @@ sub WINCONNECT_SendCommand($$;$$) {
             {
                 url        => $URL,
                 timeout    => 10,
-                noshutdown => $http_noshutdown,
+                noshutdown => 0,
                 #data       => undef, 2017.07.20 - enfernt
                 hash       => $hash,
                 service    => $service,
@@ -921,12 +926,14 @@ sub WINCONNECT_ReceiveCommand($) {
 		if(!defined($hash->{helper}{SENDVERSION})) {$hash->{helper}{SENDVERSION}='';}
 		
 		# 2017.07.26 - Check update
-		if ($VerWin < $VerGit && $hash->{helper}{SENDVERSION} eq  '2' && $service ne 'notifymsg') {
-			# Neue Version vorhanden
-			$hash->{helper}{SENDVERSION} = '1';
-			WINCONNECT_SendCommand( $hash, "notifymsg" , "=" . $Message);
-		} else{
-			delete($hash->{helper}{SENDVERSION})
+		if ( AttrVal( $name, "autoupdatewincontrol", 1 ) == 1 ) {
+			if ($VerWin < $VerGit && $hash->{helper}{SENDVERSION} eq  '2' && $service ne 'notifymsg') {
+				# Neue Version vorhanden
+				$hash->{helper}{SENDVERSION} = '1';
+				WINCONNECT_SendCommand( $hash, "notifymsg" , "=" . $Message);
+			} else{
+				delete($hash->{helper}{SENDVERSION})
+			}
 		}
     }
 
