@@ -124,6 +124,8 @@
 #
 # 2017-07-17 - changed   store files base64 encoded
 #
+# 2017-08-31 - changed   improve table_info for migration check
+#
 ##############################################################################
 =cut
 
@@ -220,8 +222,6 @@ if ($count > 1) {
 my $cfgDB_dbconn	= $dbconfig{connection};
 my $cfgDB_dbuser	= $dbconfig{user};
 my $cfgDB_dbpass	= $dbconfig{password};
-my $cfgDB_b64       = $dbconfig{b64};
-   $cfgDB_b64     //= 0;
 my $cfgDB_dbtype;
 my $cfgDB_filename;
 
@@ -300,8 +300,11 @@ sub cfgDB_Init() {
 
 ### migrate fhembinfilesave to fhemb64filesave
     # check: fhembinfilesave exists?
-    my $sth_test = $fhem_dbh->table_info("%", "%", "fhembinfilesave", 'TABLE');
-    if ($sth_test->fetch() && (!$cfgDB_b64)) {
+    my $sth_test = $fhem_dbh->table_info(undef, 'public', "fhembinfilesave", 'TABLE');
+       $sth_test->execute;
+    my @info = $sth_test->fetchrow_array;
+    my $exists = scalar @info;
+    if ($exists) {
        $sth_test->finish();
        # check: any files for migratione?
    	   $count = undef;
