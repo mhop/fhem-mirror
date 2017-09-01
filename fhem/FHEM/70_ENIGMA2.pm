@@ -159,6 +159,11 @@ sub ENIGMA2_Set($@);
 
 sub ENIGMA2_Set($@) {
     my ( $hash, $a, $h ) = @_;
+
+    # a is not an array --> make an array out of $a and $h
+    $a = [ $a, $h ]
+      if ( ref($a) ne 'ARRAY' );
+
     my $name        = shift @$a;
     my $set         = shift @$a;
     my $state       = ReadingsVal( $name, "state", "absent" );
