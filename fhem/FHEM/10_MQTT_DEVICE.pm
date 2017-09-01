@@ -48,6 +48,7 @@ sub MQTT_DEVICE_Initialize($) {
     #"qos:".join(",",keys %MQTT::qos)." ".
     "qos ".
     "retain ".
+	"sendJson:0,1 ".
     "publishSet ".
     "publishSet_.* ".
     "subscribeReading_.* ".
@@ -92,26 +93,37 @@ sub Set($$$@) {
   my $msgid;
   my $mark=0;
   if($command ne '?') {
-    if(defined($hash->{publishSets}->{$command})) {
-      my $value = join " ",@values;
-      my $retain = $hash->{".retain"}->{$command};
-      $retain = $hash->{".retain"}->{'*'} unless defined($retain);
-      my $qos = $hash->{".qos"}->{$command};
-      $qos = $hash->{".qos"}->{'*'} unless defined($qos);
-      #Log3($hash->{NAME},1,">>>>>>>>>>>>>>>>>> RETAIN: ".$retain); $retain=0; ### TEST
-      $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $qos, retain => $retain);
-      readingsSingleUpdate($hash,$command,$value,1);
-      $mark=1;
-    } elsif(defined($hash->{publishSets}->{""})) {
-      my $retain = $hash->{".retain"}->{""};
-      $retain = $hash->{".retain"}->{'*'} unless defined($retain);
-      my $qos = $hash->{".qos"}->{""};
-      $qos = $hash->{".qos"}->{'*'} unless defined($qos);
-      #Log3($hash->{NAME},1,">>>>>>>>>>>>>>>>>> RETAIN: ".$retain); $retain=0; ### TEST
-      $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $command, qos => $qos, retain => $retain);
-      readingsSingleUpdate($hash,"state",$command,1);
-      $mark=1;
-    }
+    if(defined($hash->{'.sendJson'}) and $hash->{'.sendJson'} eq 1) {
+        my $value = join " ",@values;
+		$value =~ s/^\s+|\s+$//g;
+		my $retain = $hash->{".retain"}->{$command};
+		$retain = $hash->{".retain"}->{'*'} unless defined($retain);
+		my $qos = $hash->{".qos"}->{$command};
+		$qos = $hash->{".qos"}->{'*'} unless defined($qos);		
+        $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => "{\"$command\":\"$value\"}", qos => $qos, retain => $retain);
+        $mark=1
+    } else {  
+		if(defined($hash->{publishSets}->{$command})) {
+		  my $value = join " ",@values;
+		  my $retain = $hash->{".retain"}->{$command};
+		  $retain = $hash->{".retain"}->{'*'} unless defined($retain);
+		  my $qos = $hash->{".qos"}->{$command};
+		  $qos = $hash->{".qos"}->{'*'} unless defined($qos);
+		  #Log3($hash->{NAME},1,">>>>>>>>>>>>>>>>>> RETAIN: ".$retain); $retain=0; ### TEST
+		  $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $qos, retain => $retain);
+		  readingsSingleUpdate($hash,$command,$value,1);
+		  $mark=1;
+		} elsif(defined($hash->{publishSets}->{""})) {
+		  my $retain = $hash->{".retain"}->{""};
+		  $retain = $hash->{".retain"}->{'*'} unless defined($retain);
+		  my $qos = $hash->{".qos"}->{""};
+		  $qos = $hash->{".qos"}->{'*'} unless defined($qos);
+		  #Log3($hash->{NAME},1,">>>>>>>>>>>>>>>>>> RETAIN: ".$retain); $retain=0; ### TEST
+		  $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $command, qos => $qos, retain => $retain);
+		  readingsSingleUpdate($hash,"state",$command,1);
+		  $mark=1;
+		}
+	}
   }
   if(!$mark) {
     return "Unknown argument $command, choose one of " . join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}})
@@ -149,6 +161,16 @@ sub Attr($$$$) {
       }
       last;
     };
+    $attribute eq "sendJson" and do {
+      if ($command eq "set") {
+        $hash->{'.sendJson'} = $value;
+      } else {
+        if (defined $hash->{'.sendJson'}) {
+          delete $hash->{'.sendJson'};
+        }
+      }
+      last;
+    }; 	
     $attribute eq "autoSubscribeReadings" and do {
       if ($command eq "set") {
         unless (defined $hash->{'.autoSubscribeTopic'} and $hash->{'.autoSubscribeTopic'} eq $value) {
