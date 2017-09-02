@@ -846,6 +846,7 @@ sub Spotify_dispatch($$$) {
 		readingsBulkUpdateIfChanged($hash, 'shuffle', $json->{shuffle_state} ? 'on' : 'off', 1);
 		readingsBulkUpdateIfChanged($hash, 'repeat', $hash->{helper}{repeat}, 1);
 		readingsBulkUpdateIfChanged($hash, 'progress_ms', $json->{progress_ms}, 1);
+        readingsBulkUpdateIfChanged($hash, "progress", h2hms_fmt($json->{progress_ms} / 1000 / 60 / 60), 1);
 
 		if(defined $json->{item}) {
 			my $item = $json->{item};
@@ -927,6 +928,7 @@ sub Spotify_saveTrack($$$$) { # save a track object to the readings
 	readingsBulkUpdateIfChanged($hash, $prefix."_artist_uri", $track->{artists}[0]{uri}, 1);
 	readingsBulkUpdateIfChanged($hash, $prefix."_album_name", $track->{album}{name}, 1);
 	readingsBulkUpdateIfChanged($hash, $prefix."_album_uri", $track->{album}{uri}, 1);
+    readingsBulkUpdateIfChanged($hash, $prefix."_duration", h2hms_fmt($track->{duration_ms} / 1000 / 60 / 60), 1);
 
 	my @sizes = ("large", "medium", "small");
 	my $index = 0;
