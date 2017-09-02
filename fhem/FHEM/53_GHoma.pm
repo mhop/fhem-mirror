@@ -562,10 +562,6 @@ sub GHoma_udpbroad {
 <ul>
   <ul>
   Verbindet fhem mit einem G-Homa Zwischenstecker<br><br>
-  <b>Achtung!:</b><br>
-  Mit aktueller Firmware und nach einem Firmware Update ist der integrierte Webserver nicht mehr erreichbar.<br>
-  Dadurch lassen sich keine Einstellungen mehr anpassen. 
-  Die einzige M&ouml;glichkeit ist, die DNS anfragen der G-Homa Dose an plug.g-homa.com zum FHEM server umzuleiten.<br>
   <b>Vorbereitung:</b><br>
     <li>WLAN konfigurieren (bis Firmware 1.06):<br>
       Ger&auml;t in den AP modus bringen (Knopf f&uuml;r mehr als 3s dr&uuml;cken, diesen Schritt wiederholen bis die LED permanent leuchtet)<br>
