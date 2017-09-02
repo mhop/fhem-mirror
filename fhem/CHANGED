@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_AMADCommBridge: fix doubble set Command at Bridge
+  - bugfix:  31_PLAYBULB: fix right curl Missing
   - changed: 72_FB_CALLMONITOR: reverse search only numbers for the specific
              country (e.g. german numbers only via klicktel.de,dasoertliche.de,
              austrian numbers via dasschnelle.at, swiss via search.ch)

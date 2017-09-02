@@ -74,7 +74,7 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.4";
+my $modulversion = "4.0.5";
 my $flowsetversion = "4.0.5";
 
 
@@ -807,13 +807,11 @@ sub AMADCommBridge_ResponseProcessing($$) {
 
         elsif ( $fhemcmd eq 'set' ) {
             my $fhemCmd = $decode_json->{payload}{setcmd};
-        
-            fhem ("set $fhemCmd") if( AttrVal( $bname, 'fhemControlMode', 'trigger' ) eq 'setControl' );
-            my $r = AnalyzeCommandChain($bhash, 'set '.$fhemCmd);
+            AnalyzeCommandChain($bhash, 'set '.$fhemCmd) if( AttrVal( $bname, 'fhemControlMode', 'trigger' ) eq 'setControl' );
             readingsSingleUpdate( $bhash, "receiveFhemCommand", "set ".$fhemCmd, 1 ) if( AttrVal( $bname, 'fhemControlMode', 'trigger' ) eq 'trigger' );
             Log3 $bname, 4, "AMADCommBridge ($name) - AMADCommBridge_CommBridge: set reading receive fhem command";
 
-            $response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM response $r\r\n";
+            $response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM response\r\n";
             $c = $hash->{CD};
             print $c "HTTP/1.1 200 OK\r\n",
                 "Content-Type: text/plain\r\n",
@@ -848,7 +846,7 @@ sub AMADCommBridge_ResponseProcessing($$) {
             my $fhemCmd = $decode_json->{payload}{readingsvalcmd};
             my @datavalue = split( ' ', $fhemCmd );
 
-            $response = ReadingsVal( $datavalue[0], $datavalue[1], $datavalue[2] );
+            $response = ReadingsVal($datavalue[0],$datavalue[1],$datavalue[2]);
             $c = $hash->{CD};
             print $c "HTTP/1.1 200 OK\r\n",
                 "Content-Type: text/plain\r\n",

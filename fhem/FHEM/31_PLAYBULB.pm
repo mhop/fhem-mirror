@@ -41,7 +41,7 @@ use Blocking;
 use SetExtensions;
 
 
-my $version = "1.2.5";
+my $version = "1.2.6";
 
 
 
@@ -168,7 +168,7 @@ sub PLAYBULB_Undef($$) {
     
     
     Log3 $name, 3, "PLAYBULB ($name) - undefined";
-    delete($modules{PLAYBULB}{defptr}{$hash->{BTMAC});
+    delete($modules{PLAYBULB}{defptr}{$hash->{BTMAC}});
 
     return undef;
 }
