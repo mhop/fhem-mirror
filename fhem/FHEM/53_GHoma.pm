@@ -1,4 +1,4 @@
-##############################################
+	##############################################
 # $Id$
 #
 # Protokoll:
@@ -133,7 +133,7 @@ sub GHoma_ClientDisconnect($$) {	# im Mom unnuetz
 #####################################
 sub GHoma_Shutdown($) {				#
   my ($hash) = @_;
-  return unless defined $hash->{Id};        #nicht für Server
+  return unless defined $hash->{Id};        #nicht f?r Server
   # state auf letzten Schaltwert setzen oder auf fixen Startwert (wird bereitsbeim Shutdown ausgefuehrt)
   if      (AttrVal($hash->{NAME},"restoreOnStartup","last") eq "on") {
 	readingsSingleUpdate($hash, "state", "on", 1);
@@ -210,7 +210,7 @@ sub GHoma_moveclient($$) {			# Handles von temporaerem Client zu Statischem uebe
   	$chash->{FD} = $thash->{FD};
 	$chash->{CD} = $thash->{CD};
 	$chash->{SNAME} = $thash->{SNAME};
-	my @client = split(":",$thash->{NAME});
+	my @client = split("_",$thash->{NAME});
 	$chash->{IP} = $client[1];
 	$chash->{PORT} = $client[2];
 	$selectlist{$chash->{NAME}} = $chash;
@@ -358,9 +358,9 @@ sub GHoma_Timer($) {					# wird ausgeloest wenn heartbeat nicht mehr kommt
 }
 #####################################
 sub GHoma_Attr(@) {					#
-  my @a = @_;
-  my $hash = $defs{$a[1]};
-
+  my ($command, $name, $attr, $val) = @_;
+  my $hash = $defs{$name};
+  
 	#  if($a[0] eq "set" && $a[2] eq "SSL") {
 	#    TcpServer_SetSSL($hash);
 	#    if($hash->{CD}) {
@@ -374,14 +374,16 @@ sub GHoma_Attr(@) {					#
 #####################################
 sub GHoma_Set($@) {					#
   my ($hash, @a) = @_;
-  return undef unless defined $hash->{Id};					# set fuer den Server ausblenden
   my $name = $a[0];
   my $type = $a[1];
+  return "Unknown argument $type, choose one of ConfigAll" unless (defined $hash->{Id} || $type eq "ConfigAll");	# set fuer den Server
   my @sets = ('on:noArg', 'off:noArg');
   
   my $status = ReadingsVal($hash->{NAME},"state","");
   
-  if($type eq "on") {
+  if($type eq "ConfigAll") {
+	GHoma_udpbroad($hash, defined $a[2] ? $a[2] : undef);
+  } elsif($type eq "on") {
 	$type = pack('C*', (0xff));
 	readingsSingleUpdate($hash, "state", "set_on", 1) if ( $status =~ m/([set_]?o[n|ff])$/i );
 	$hash->{LASTSTATE} = "on";
@@ -415,7 +417,44 @@ sub GHoma_Undef($$) {				#
   return TcpServer_Close($hash) if defined $hash->{FD};
 }
 #####################################
+sub GHoma_udpbroad {
+  eval "use IO::Socket::INET;";
+	return "please install IO::Socket::INET" if($@);
+  my ($hash, $ownIP) = @_;	
+  
+  # flush after every write
+  $| = 1;
 
+  my ($socket,$data);
+  $socket = new IO::Socket::INET (
+	PeerAddr  => '255.255.255.255',
+	PeerPort  =>  '48899',
+	Proto     => 'udp',
+	Broadcast => 1
+  ) or die "ERROR in Socket Creation : $!\n";
+
+#send operation
+  unless (defined $ownIP) {
+  	my $ownIPl = `hostname -I`;
+  	my @ownIPs = grep { /^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/ } split / /, $ownIPl;
+  	$ownIP = $ownIPs[0];
+  } else {
+    return "$ownIP ist not an correct IP or hostname" unless $ownIP =~ /^((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))|(([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*)+(\.([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*))*$)$/
+  }
+  Log3 $hash, 1, "$hash->{NAME}: setting server address for GHoma plugs to $ownIP:$hash->{PORT}";
+  my @sdata = (
+    "HF-A11ASSISTHREAD",
+	"+ok",
+	"AT+NETP=TCP,Client,$hash->{PORT},$ownIP\r",
+	"AT+TCPTO=120\r"
+	);
+  foreach (@sdata) {
+  	$socket->send($_);
+	Log3 $hash, 1, "$hash->{NAME}: sende Multicast: $_";
+  }
+  $socket->close();
+
+}
 
 1;
 
@@ -431,22 +470,26 @@ sub GHoma_Undef($$) {				#
 <ul>
   <ul>
   Connects fhem to an G-Homa adapter plug<br><br>
-  <b>ATTENTION!:</b><br>
-  With an actual firmware and after firmware update, http access will be disabled.<br>
-  Network parameters cannot changed anymore. 
-  The only way to use the plug again with FHEM is to change route DNS requests from G-Homa plug to plug.g-homa.com to your FHEM server.<br>
   <b>preliminary:</b><br>
-    <li>Configure WLAN settings:<br>
+    <li>Configure WLAN settings (Firmware <= 1.06):<br>
       bring device in AP mode (press button for more than 3s, repeat this step until the LED is permanently on)<br>
       Now connect with your computer to G-Home network.<br>
       Browse to 10.10.100.254 (username:password = admin:admin)<br>
       In STA Setting insert your WLAN settings<br>
     </li>
-    <li>Configure Network Parameters setting:<br>
+    <li>Configure WLAN settings:<br>
+      bring device in AP mode (press button for more than 3s, repeat this step until the LED is permanently on)<br>
+      Configure WLAN with G-Homa App.<br>
+    </li>
+    <li>Configure Network Parameters setting (Firmware <= 1.06):<br>
       Other Setting -> Protocol to TCP-Client<br>
       Other Setting -> Port ID (remember value for FHEM settings)<br>
 	  Other Setting -> Server Address (IP of your FHEM Server)<br>
     </li>
+    <li>Configure Network Parameters settings:<br>
+      Use <code>set ... ConfigAll</code> from server device to set parameters automaticly.<br>
+    </li>
+    
     <li>Optional:<br>
       Block all outgoing connections for G-Homa in your router.<br>
     </li>
@@ -478,6 +521,9 @@ sub GHoma_Undef($$) {				#
     </ul>
     The <a href="#setExtensions"> set extensions</a> are also supported.<br>
     <br>
+	For server device:
+	<code>set &lt;name&gt; ConfigAll [IP|hostname|FQDN]</code><br>
+	Setting all GHoma plugs via UDP broadcast to TCP client of FHEM servers address and port of GHoma server device.<br>
   </ul>
 
   <a name="GHomaattr"></a>
@@ -519,18 +565,25 @@ sub GHoma_Undef($$) {				#
   <b>Achtung!:</b><br>
   Mit aktueller Firmware und nach einem Firmware Update ist der integrierte Webserver nicht mehr erreichbar.<br>
   Dadurch lassen sich keine Einstellungen mehr anpassen. 
-  Die einzige Möglichkeit ist, die DNS anfragen der G-Homa Dose an plug.g-homa.com zum FHEM server umzuleiten.<br>
+  Die einzige M&ouml;glichkeit ist, die DNS anfragen der G-Homa Dose an plug.g-homa.com zum FHEM server umzuleiten.<br>
   <b>Vorbereitung:</b><br>
-    <li>WLAN konfigurieren:<br>
+    <li>WLAN konfigurieren (bis Firmware 1.06):<br>
       Ger&auml;t in den AP modus bringen (Knopf f&uuml;r mehr als 3s dr&uuml;cken, diesen Schritt wiederholen bis die LED permanent leuchtet)<br>
       Nun einen Computer mit der SSID G-Home verbinden.<br>
       Im Browser zu 10.10.100.254 (username:passwort = admin:admin)<br>
       In STA Setting WLAN Einstellungen eintragen<br>
     </li>
-    <li>Network Parameters settings:<br>
+    <li>WLAN konfigurieren:<br>
+      Ger&auml;t in den AP modus bringen (Knopf f&uuml;r mehr als 3s dr&uuml;cken, diesen Schritt wiederholen bis die LED permanent leuchtet)<br>
+      Mit der G-Homa App das WLAN des Zwischensteckers einstellen<br>
+    </li>
+    <li>Network Parameters settings (bis Firmware 1.06):<br>
       Other Setting -> Protocol auf TCP-Server<br>
       Other Setting -> Port ID (wird sp&auml;ter f&uuml;r FHEM ben&ouml;tigt)<br>
 	  Other Setting -> Server Address (IP Adresse des FHEM Servers)<br>
+    </li>
+    <li>Network Parameters settings:<br>
+      &Uuml;ber <code>set ... ConfigAll</code> des Server Ger&auml;tes die Parameter automatisch setzen.<br>
     </li>
     <li>Optional:<br>
       Im Router alle ausgehenden Verbindungen f&uuml;r G-Homa blockieren.<br>
@@ -563,6 +616,9 @@ sub GHoma_Undef($$) {				#
     </ul>
     Die <a href="#setExtensions"> set extensions</a> werden auch unterst&uuml;tzt.<br>
     <br>
+  	F&uuml;r Server Device:
+	<code>set &lt;name&gt; ConfigAll [IP|hostname|FQDN]</code><br>
+	Einstellen aller GHoma Zwischenstecker &uuml;ber UDP broadcast auf TCP client mit FHEM Server Adresse und Port des GHoma Server Devices.<br>
   </ul>
 
     
