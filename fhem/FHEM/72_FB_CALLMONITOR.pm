@@ -589,6 +589,7 @@ FB_CALLMONITOR_reverseSearch($$)
     my $result;
     my $status;
     my $invert_match = undef;
+    my $country_code = AttrVal($name, "country-code", "0049");
     my @attr_list = split("(,|\\|)", AttrVal($name, "reverse-search", ""));
     
     foreach my $method (@attr_list)
@@ -625,153 +626,186 @@ FB_CALLMONITOR_reverseSearch($$)
             }    
             
             # Ask klicktel.de
-            if($method eq "klicktel.de")
+            if($method eq "klicktel.de")      
             { 
-                Log3 $name, 4, "FB_CALLMONITOR ($name) - using klicktel.de for reverse search of $number";
-
-                $result = GetFileFromURL("http://openapi.klicktel.de/searchapi/invers?key=0de6139a49055c37b9b2d7bb3933cb7b&number=".$number, 5, undef, 1);
-                if(not defined($result))
+                unless(($number =~ /^0[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
                 {
-                    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-                    {
-                        $status = "timeout";
-                        undef($result);
-                    }
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using klicktel.de for reverse search of $number because of non-german number";
                 }
                 else
-                {
-                    if($result =~ /"displayname":"([^"]*?)"/)
+                {            
+                    $number =~ s/^0049/0/; # remove country code
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - using klicktel.de for reverse search of $number";
+
+                    $result = GetFileFromURL("http://openapi.klicktel.de/searchapi/invers?key=0de6139a49055c37b9b2d7bb3933cb7b&number=".$number, 5, undef, 1);
+                    if(not defined($result))
                     {
-                        $invert_match = $1;
-                        $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                        FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
-                        undef($result);
-                        return $invert_match;
+                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+                        {
+                            $status = "timeout";
+                            undef($result);
+                        }
                     }
-                    
-                    $status = "unknown";
+                    else
+                    {
+                        if($result =~ /"displayname":"([^"]*?)"/)
+                        {
+                            $invert_match = $1;
+                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                            undef($result);
+                            return $invert_match;
+                        }
+                        
+                        $status = "unknown";
+                    }
                 }
             }
 
             # Ask dasoertliche.de
             elsif($method eq "dasoertliche.de")
             {
-                Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasoertliche.de for reverse search of $number";
-
-                $result = GetFileFromURL("http://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5, undef, 1);
-                if(not defined($result))
+                unless(($number =~ /^0[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
                 {
-                    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-                    {
-                        $status = "timeout";
-                        undef($result);
-                    }
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using dasoertliche.de for reverse search of $number because of non-german number";
                 }
                 else
-                {
-                    #Log 2, $result;
-                    if($result =~ m,<a href="http\://.+?\.dasoertliche\.de.+?".+?class="name ".+?><span class="">(.+?)</span>,)
+                {            
+                    $number =~ s/^0049/0/; # remove country code
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasoertliche.de for reverse search of $number";
+
+                    $result = GetFileFromURL("http://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5, undef, 1);
+                    if(not defined($result))
                     {
-                        $invert_match = $1;
-                        $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                        FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
-                        undef($result);
-                        return $invert_match;
+                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+                        {
+                            $status = "timeout";
+                            undef($result);
+                        }
                     }
-                    elsif(not $result =~ /wir konnten keine Treffer finden/)
+                    else
                     {
-                        Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
+                        #Log 2, $result;
+                        if($result =~ m,<a href="http\://.+?\.dasoertliche\.de.+?".+?class="name ".+?><span class="">(.+?)</span>,)
+                        {
+                            $invert_match = $1;
+                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                            undef($result);
+                            return $invert_match;
+                        }
+                        elsif(not $result =~ /wir konnten keine Treffer finden/)
+                        {
+                            Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
+                        }
+                        
+                        $status = "unknown";
                     }
-                    
-                    $status = "unknown";
                 }
             }
             
             # SWITZERLAND ONLY!!! Ask search.ch
             elsif($method eq  "search.ch")
             {
-                Log3 $name, 4, "FB_CALLMONITOR ($name) - using search.ch for reverse search of $number";
-
-                $result = GetFileFromURL("http://tel.search.ch/api/?key=b0b1207cb7c9d0048867de887aa9a4fd&maxnum=1&was=".$number, 5, undef, 1);
-                if(not defined($result))
+                unless(($number =~ /^0[1-9]/ and $country_code eq "0041") or $number =~ /^0041/)
                 {
-                    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-                    {
-                        $status = "timeout";
-                        undef($result);
-                    }
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using search.ch for reverse search of $number because of non-swiss number";
                 }
                 else
-                {
-                    #Log 2, $result;
-                    if($result =~ m,<entry>(.+?)</entry>,s)
+                {            
+                    $number =~ s/^0041/0/; # remove country code
+            
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - using search.ch for reverse search of $number";
+
+                    $result = GetFileFromURL("http://tel.search.ch/api/?key=b0b1207cb7c9d0048867de887aa9a4fd&maxnum=1&was=".$number, 5, undef, 1);
+                    if(not defined($result))
                     {
-                        my $xml = $1;
-                        
-                        $invert_match = "";
-                        
-                        if($xml =~ m,<tel:firstname>(.+?)</tel:firstname>,)
+                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
                         {
-                            $invert_match .= $1;
+                            $status = "timeout";
+                            undef($result);
                         }
-                        
-                        if($xml =~ m,<tel:name>(.+?)</tel:name>,)
-                        {
-                            $invert_match .= " $1";
-                        }
-                        
-                        if($xml =~ m,<tel:occupation>(.+?)</tel:occupation>,)
-                        {
-                            $invert_match .= ", $1";
-                        }
-                        
-                        $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                        FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
-                        undef($result);
-                        return $invert_match;
                     }
-                    
-                    $status = "unknown";
+                    else
+                    {
+                        #Log 2, $result;
+                        if($result =~ m,<entry>(.+?)</entry>,s)
+                        {
+                            my $xml = $1;
+                            
+                            $invert_match = "";
+                            
+                            if($xml =~ m,<tel:firstname>(.+?)</tel:firstname>,)
+                            {
+                                $invert_match .= $1;
+                            }
+                            
+                            if($xml =~ m,<tel:name>(.+?)</tel:name>,)
+                            {
+                                $invert_match .= " $1";
+                            }
+                            
+                            if($xml =~ m,<tel:occupation>(.+?)</tel:occupation>,)
+                            {
+                                $invert_match .= ", $1";
+                            }
+                            
+                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                            undef($result);
+                            return $invert_match;
+                        }
+                        
+                        $status = "unknown";
+                    }
                 }
             }
 
             # Austria ONLY!!! Ask dasschnelle.at
             elsif($method eq "dasschnelle.at")
             {
-                Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasschnelle.at for reverse search of $number";
-
-                $result = GetFileFromURL("http://www.dasschnelle.at/ergebnisse?what=".$number."&where=&rubrik=0&bezirk=0&orderBy=Standard&mapsearch=false", 5, undef, 1);
-                if(not defined($result))
+                unless(($number =~ /^0[1-9]/ and $country_code eq "0043") or $number =~ /^0043/)
                 {
-                    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-                    {
-                        $status = "timeout";
-                        undef($result);
-                    }
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using dasschnelle.at for reverse search of $number because of non-swiss number";
                 }
                 else
-                {
-                    #Log 2, $result;
-                    if($result =~ /"name"\s*:\s*"([^"]+)",/)
-                    {
-                        $invert_match = "";
+                {            
+                    $number =~ s/^0043/0/; # remove country code
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasschnelle.at for reverse search of $number";
 
-                        while($result =~ /"name"\s*:\s*"([^"]+)",/g)
+                    $result = GetFileFromURL("http://www.dasschnelle.at/ergebnisse?what=".$number."&where=&rubrik=0&bezirk=0&orderBy=Standard&mapsearch=false", 5, undef, 1);
+                    if(not defined($result))
+                    {
+                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
                         {
-                            $invert_match = $1 if(length($1) > length($invert_match));
+                            $status = "timeout";
+                            undef($result);
                         }
-
-                        $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                        FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
-                        undef($result);
-                        return $invert_match;
                     }
-                    elsif(not $result =~ /Es wurden keine passenden Eintr.ge gefunden/)
+                    else
                     {
-                        Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
+                        #Log 2, $result;
+                        if($result =~ /"name"\s*:\s*"([^"]+)",/)
+                        {
+                            $invert_match = "";
+
+                            while($result =~ /"name"\s*:\s*"([^"]+)",/g)
+                            {
+                                $invert_match = $1 if(length($1) > length($invert_match));
+                            }
+
+                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                            undef($result);
+                            return $invert_match;
+                        }
+                        elsif(not $result =~ /Ihre Suche nach .* war erfolglos/)
+                        {
+                            Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
+                        }
+                        
+                        $status = "unknown";
                     }
-                    
-                    $status = "unknown";
                 }
             }
         } 
