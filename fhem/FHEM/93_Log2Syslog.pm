@@ -30,7 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
-# 3.1.0      28.08.2017       get-function added, commandref revised
+# 3.1.0      28.08.2017       get-function added, commandref revised, $readingFnAttributes deleted
 # 3.0.0      27.08.2017       change attr type to protocol, ready to check in
 # 2.6.0      26.08.2017       more than one Log2Syslog device can be created
 # 2.5.2      26.08.2018       fix in splitting timestamp, change Log2Syslog_trate using internaltimer with attr 
@@ -109,8 +109,7 @@ sub Log2Syslog_Initialize($) {
 					  "timeout ".
 	                  "protocol:UDP,TCP ".
 	                  "port ".
-					  "rateCalcRerun ".
-					  $readingFnAttributes
+					  "rateCalcRerun "
                       ;
 return undef;   
 }
