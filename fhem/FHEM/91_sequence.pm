@@ -40,14 +40,15 @@ sequence_Define($$)
     my $to = $def[$i+1];
     eval { "Hallo" =~ m/^$re$/ };
     return "Bad regexp 1: $@" if($@);
-    return "Bad timeout spec $to"
-        if(defined($to) && $to !~ m/^\d*.?\d$/);
+    return "Bad timeout spec $to"       # timeout or delay:timeout
+      if (defined($to) && $to !~ m/^(\d+(\.\d+)?:)?\d+(\.\d+)?$/);
   }
 
   $hash->{RE} = $def[0];
   $hash->{IDX} = 0;
   $hash->{MAX} = int(@def);
   $hash->{STATE} = "active";
+  $hash->{TS} = 0;
   return undef;
 }
 
@@ -70,6 +71,12 @@ sequence_Notify($$)
     next if($n !~ m/^$re$/ && "$n:$s" !~ m/^$re$/);
 
     RemoveInternalTimer($ln);
+
+    if($hash->{TS} > gettimeofday()) { # the delay stuff
+      sequence_Trigger($ln, "abort");
+      last;
+    }
+
     my $idx = $hash->{IDX} + 2;
     Log3 $ln, 5, "sequence $ln matched $idx";
     my @d = split("[ \t]+", $hash->{DEF});
@@ -86,33 +93,37 @@ sequence_Notify($$)
       setReadingsVal($hash, "state", "active", TimeNow());
       DoTrigger($ln, $tt);
       $idx  = 0;
+      $hash->{TS} = 0;
 
     } else {
 
-      $hash->{RE} = $d[$idx];
-      my $nt = gettimeofday() + $d[$idx-1];
+      my ($delay, $nt) = split(':', $d[$idx - 1]);
+      $hash->{TS} = gettimeofday() + $delay if (defined($nt) && $delay > 0);
+      $nt += gettimeofday() + $delay;
       InternalTimer($nt, "sequence_Trigger", $ln, 0);
 
     }
 
     $hash->{IDX} = $idx;
-    $hash->{RE} = $d[$idx];
+    $hash->{RE} = substr($d[$idx], 0, 1) eq ':' ? $n . $d[$idx] : $d[$idx];
     last;
   }
   return "";
 }
 
 sub
-sequence_Trigger($)
+sequence_Trigger($$)
 {
-  my ($ln) = @_;
+  my ($ln, $arg) = @_;
   my $hash = $defs{$ln};
   my @d = split("[ \t]+", $hash->{DEF});
   $hash->{RE} = $d[0];
   my $idx = $hash->{IDX}/2;
   $hash->{IDX} = 0;
+  $hash->{TS} = 0;
   my $tt = "partial_$idx";
-  Log3 $ln, 5, "sequence $ln timeout on $idx ($tt)";
+  $arg = "timeout" if(!$arg);
+  Log3 $ln, 5, "sequence $ln $arg on $idx ($tt)";
   $tt .= $hash->{EVENTS} if(AttrVal($ln, "reportEvents", undef));
   delete($hash->{EVENTS});
 
@@ -158,6 +169,28 @@ sequence_Undef($$)
       define lampon  notify lampseq:trigger set lamp on
       </code>
     </ul>
+    <br>
+    Subsequent patterns can be specified without device name as
+    <code>:&lt;re2&gt;</code>. This will reuse the device name which triggered
+    the previous sequence step:
+    <br>
+    <ul>
+      <code>
+      define lampseq sequence Btn.:on 0.5 :off<br>
+      </code>
+    </ul>
+    <br>
+
+    You can specify timeout as <code>&lt;delay&gt;:&lt;timeout&gt;</code>,
+    where "delay" sets time during which the next event shall not be received,
+    otherwise the sequence will be aborted. This can be used to capture press
+    and hold of a button. Example:<br>
+    <ul>
+      <code>
+      define lampseq sequence Btn1:on 2:3 Btn1:off<br>
+      </code>
+    </ul>
+    sequence will be triggerred if Btn1 is pressed for 2 to 5 seconds.
   </ul>
   <br>
 
@@ -226,6 +259,27 @@ sequence_Undef($$)
       define lampon  notify lampseq:trigger set lamp on
       </code>
     </ul>
+    Nachfolgende Regexps k&ouml;nnen den Namen des Ger&auml;tes weglassen, in
+    diesem Fall werden nur die Events des beim ersten Event eingetroffenen
+    Ger&auml;tes beachtet:
+    <br>
+    <ul>
+      <code>
+      define lampseq sequence Btn.:on 0.5 :off<br>
+      </code>
+    </ul>
+    <br>
+    Timeout kann als <code>&lt;delay&gt;:&lt;timeout&gt;</code> spezifiziert
+    werden, dabei setzt delay die Zeit, wo kein passendes Event empfangen
+    werden darf, ansonsten wird sequence abgebrochen. Das kann verwendet
+    werden, um "press and hold" auszuwerten. Folgendes
+    <ul>
+      <code>
+      define lampseq sequence Btn1:on 2:3 :off<br>
+      </code>
+    </ul>
+    ist nur erfolgreich, falls Btn1 zwischen 2 und 5 Sekunden lang gedr&uuml;ckt
+    wurde.
   </ul>
   <br>
 
