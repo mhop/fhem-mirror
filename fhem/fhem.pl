@@ -5161,5 +5161,28 @@ makeReadingName($) # Convert non-valid characters to _
   return $name;
 }
 
+sub
+computeAlignTime($$@)
+{
+  my ($timeSpec, $alignSpec, $triggertime) = @_; # triggertime is now if absent
+
+  my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($alignSpec);
+  return ("alignTime: $alErr", undef) if($alErr);
+
+  my ($tmErr, $hr, $min, $sec, undef) = GetTimeSpec($timeSpec);
+  return ("timeSpec: $tmErr", undef) if($alErr);
+
+  my $now = time();
+  my $alTime = ($alHr*60+$alMin)*60+$alSec-fhemTzOffset($now);
+  my $step = ($hr*60+$min)*60+$sec;
+  my $ttime = ($triggertime ? int($triggertime) : $now);
+  my $off = ($ttime % 86400) - 86400;
+  while($off < $alTime) {
+    $off += $step;
+  }
+  $ttime += ($alTime-$off);
+  $ttime += $step if($ttime < $now);
+  return (undef, $ttime);
+}
 
 1;
