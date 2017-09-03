@@ -1434,7 +1434,7 @@ CUL_TCM97001_Parse($$)
     readingsBeginUpdate($def);
     my ($val, $valH, $state);
     
-    if ($hashumidity == TRUE) {
+    if (defined($temp)) {
     $msgtype = "temperature";
     $val = sprintf("%2.1f", ($temp) );
     $state="T: $val";
