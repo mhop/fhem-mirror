@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_Log2Syslog: V3.1.0, get certinfo added
   - bugfix:  73_AMADCommBridge: fix doubble set Command at Bridge
   - bugfix:  31_PLAYBULB: fix right curl Missing
   - changed: 72_FB_CALLMONITOR: reverse search only numbers for the specific

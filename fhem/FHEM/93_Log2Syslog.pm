@@ -21,7 +21,7 @@
 #       You should have received a copy of the GNU General Public License
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#       The module based on idea and input from betateilchen 92_rsyslog.pm
+#       The module is based on idea and input from betateilchen 92_rsyslog.pm
 #
 #       Implements the Syslog Protocol of RFC 5424  https://tools.ietf.org/html/rfc5424
 #       and RFC 3164 https://tools.ietf.org/html/rfc3164 and
@@ -30,6 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 3.1.0      28.08.2017       get-function added, commandref revised
 # 3.0.0      27.08.2017       change attr type to protocol, ready to check in
 # 2.6.0      26.08.2017       more than one Log2Syslog device can be created
 # 2.5.2      26.08.2018       fix in splitting timestamp, change Log2Syslog_trate using internaltimer with attr 
@@ -55,14 +56,14 @@ package main;
 use strict;
 use warnings;
 eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
-eval "use Net::Domain qw(hostfqdn);1"  or my $MissModulNDom = "Net::Domain";
+eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom = "Net::Domain";
 
 ###############################################################################
 # Forward declarations
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "3.0.0";
+my $Log2SyslogVn = "3.1.0";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -96,6 +97,7 @@ sub Log2Syslog_Initialize($) {
   $hash->{DefFn}    = "Log2Syslog_Define";
   $hash->{UndefFn}  = "Log2Syslog_Undef";
   $hash->{DeleteFn} = "Log2Syslog_Delete";
+   $hash->{GetFn}   = "Log2Syslog_Get";
   $hash->{AttrFn}   = "Log2Syslog_Attr";
   $hash->{NotifyFn} = "Log2Syslog_eventlog";
 
@@ -141,7 +143,7 @@ sub Log2Syslog_Define($@) {
   return "Bad regexp: $@" if($@);
 		
   $hash->{PEERHOST}         = $a[2];                        # Destination Host (Syslog Server)
-  $hash->{MYHOST}           = hostfqdn ();                  # FQDN eigener Host
+  $hash->{MYHOST}           = hostfqdn();                   # FQDN eigener Host
   $hash->{SEQNO}            = 1;                            # PROCID in IETF, wird kontinuierlich hochgezählt
   $hash->{VERSION}          = $Log2SyslogVn;
   $logInform{$hash->{NAME}} = "Log2Syslog_fhemlog";         # Funktion die in hash %loginform für $name eingetragen wird
@@ -171,6 +173,39 @@ return undef;
 sub Log2Syslog_Delete($$) {
   my ($hash, $arg) = @_;
   delete $logInform{$hash->{NAME}};
+return undef;
+}
+
+###################################################################################
+sub Log2Syslog_Get($@) {
+  my ($hash, @a) = @_;
+  return "\"get X\" needs at least an argument" if ( @a < 2 );
+  my $name    = $a[0];
+  my $opt     = $a[1];
+  my $prop    = $a[2];
+  
+  my $getlist = "Unknown argument $opt, choose one of ".
+                "certinfo:noArg " 
+                ;
+  
+  return if(IsDisabled($name));
+  
+  my($sock,$cert,@certs);
+  if ($opt =~ /certinfo/) {
+      if(ReadingsVal($name,"SSL_Version","n.a.") ne "n.a.") {
+	      $sock = Log2Syslog_setsock($hash);
+		  if(defined($sock)) {
+		      $cert = $sock->dump_peer_certificate();
+		      Log2Syslog_closesock($hash,$sock);
+		  }
+	  }
+	  return $cert if($cert);
+	  return "no SSL session has been created";
+	  
+  } else {
+      return "$getlist";
+  } 
+  
 return undef;
 }
 
@@ -358,6 +393,8 @@ sub Log2Syslog_setsock ($) {
   my $st       = "active";
   my $timeout  = AttrVal($name, "timeout", 0.5);
   my ($sock,$lo,$sslver,$sslalgo);
+  
+  return undef if($init_done != 1);
  
   if(AttrVal($name, "TLS", 0)) {
       # TLS gesicherte Verbindung
@@ -452,7 +489,7 @@ sub Log2Syslog_setprival ($;$$) {
   # https://tools.ietf.org/pdf/rfc5424.pdf
   
   # determine facility
-  my $fac = 5;                                    # facility by syslogd
+  my $fac = 5;                                     # facility by syslogd
   
   # calculate severity
   # mapping verbose level to severity
@@ -495,7 +532,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
   my $data;
   
   return undef,undef if(!$otp);
-  my $pid = $hash->{SEQNO};                     # PayloadID zur Nachverfolgung der Eventabfolge 
+  my $pid = $hash->{SEQNO};                                 # PayloadID zur Nachverfolgung der Eventabfolge 
   $hash->{SEQNO}++;
 
   my ($year,$month,$day) = split("-",$date);
@@ -503,18 +540,18 @@ sub Log2Syslog_setpayload ($$$$$$) {
   if ($lf eq "BSD") {
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
       $time  = (split(/\./,$time))[0] if($time =~ m/\./);   # msec ist nicht erlaubt
-	  $month = $Log2Syslog_BSDMonth{$month};               # Monatsmapping, z.B. 01 -> Jan
-	  $day   =~ s/0/ / if($day =~ m/^0.*$/);               # in Tagen < 10 muss 0 durch Space ersetzt werden
-	  $ident = substr($ident,0, $RFC3164len{TAG});         # Länge TAG Feld begrenzen
+	  $month = $Log2Syslog_BSDMonth{$month};                # Monatsmapping, z.B. 01 -> Jan
+	  $day   =~ s/0/ / if($day =~ m/^0.*$/);                # in Tagen < 10 muss 0 durch Space ersetzt werden
+	  $ident = substr($ident,0, $RFC3164len{TAG});          # Länge TAG Feld begrenzen
 	  no warnings 'uninitialized'; 
       $data  = "<$prival>$month $day $time $myhost $ident: : $otp";
 	  use warnings;
-	  $data = substr($data,0, $RFC3164len{DL});     # Länge Total begrenzen
+	  $data = substr($data,0, $RFC3164len{DL});             # Länge Total begrenzen
   }
   
   if ($lf eq "IETF") {
       # IETF Protokollformat https://tools.ietf.org/html/rfc5424 
-	  my $mid = "FHEM";                             # message ID, identify protocol of message, e.g. for firewall filter
+	  my $mid = "FHEM";                                     # message ID, identify protocol of message, e.g. for firewall filter
 	  my $tim = $date."T".$time;
 	  no warnings 'uninitialized'; 
       $data   = "<$prival>1 $tim $myhost $ident $pid $mid - : $otp";
@@ -522,12 +559,12 @@ sub Log2Syslog_setpayload ($$$$$$) {
   }
   
   if($data =~ /\s$/){$data =~ s/\s$//;}
-  my $dl = length($data)+1;                         # Länge muss ! für TLS stimmen, sonst keine Ausgabe !
+  my $dl = length($data)+1;                                 # Länge muss ! für TLS stimmen, sonst keine Ausgabe !
   
   # wenn Transport Layer Security (TLS) -> Transport Mapping for Syslog https://tools.ietf.org/pdf/rfc5425.pdf
   if(AttrVal($name, "TLS", 0)) {
 	  $data = "$dl $data";
-	  $data = substr($data,0, $RFC5425len{DL});     # Länge Total begrenzen 
+	  $data = substr($data,0, $RFC5425len{DL});             # Länge Total begrenzen 
 	  Log2Syslog_Log3slog($name, 4, "$name - SSL-Payload created with length: ".(($dl>$RFC5425len{DL})?$RFC5425len{DL}:$dl) ); 
   } 
   
@@ -719,6 +756,18 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
   </ul>
   <br>
 
+  <a name="Log2SyslogGet"></a>
+  <b>Get</b>
+  <ul>
+    <br> 
+    
+    <li><code>certinfo</code><br>
+        <br>
+        Show informations about the server certificate if a TLS-session was created (Reading "SSL_Version" isn't "n.a.").
+    </li><br>
+  </ul>
+  <br>
+  
   
   <a name="Log2Syslogattr"></a>
   <b>Attributes</b>
@@ -763,7 +812,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
 	
     <li><code>port</code><br>
         <br>
-        The port of the syslog server is listening. Default port is 514 if not specified.
+        The port of the syslog server is listening. (default 514)
     </li><br>
 	
     <li><code>rateCalcRerun</code><br>
@@ -843,7 +892,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
 	
 	Die Verbose-Level der FHEM Systemlogs werden in entsprechende Schweregrade der Syslog-Messages umgewandelt. <br>
 	Weiterhin wird der Meldungstext der FHEM Systemlogs und Events nach den Signalwörtern "warning" und "error" durchsucht 
-	(Groß- /Kleinschreibung wird nicht beachtet). Davon abhängig wird der Schweregrad ebenfalls äquivalent gesetzt und überschreibt 
+	(Groß- /Kleinschreibung wird nicht beachtet). Davon abhängig wird der Schweregrad ebenfalls äquivalent gesetzt und übersteuert 
     einen eventuell bereits durch Verbose-Level gesetzten Schweregrad.	<br><br>
 	
 	<b>Umsetzungstabelle Verbose-Level in Syslog-Schweregrad Stufe: </b><br><br>
@@ -913,6 +962,18 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
   </ul>
   <br><br>
   
+  <a name="Log2SyslogGet"></a>
+  <b>Get</b>
+  <ul>
+    <br> 
+    
+    <li><code>certinfo</code><br>
+        <br>
+        Zeigt Informationen zum Serverzertifikat wenn eine TLS-Session aufgebaut wurde (Reading "SSL_Version" ist nicht "n.a.").
+    </li><br>
+  </ul>
+  <br>
+  
   
   <a name="Log2Syslogattr"></a>
   <b>Attribute</b>
@@ -959,7 +1020,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
 	
     <li><code>port</code><br>
         <br>
-        Der verwendete Port des Syslog-Servers. Default Port ist 514 wenn nicht gesetzt.
+        Der verwendete Port des Syslog-Servers. (default 514)
     </li><br>
 	
     <li><code>rateCalcRerun</code><br>
@@ -989,7 +1050,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <table>  
     <colgroup> <col width=35%> <col width=65%> </colgroup>
 	  <tr><td><b>SSL_Algorithm</b>                  </td><td> der verwendete SSL Algorithmus wenn SSL eingeschaltet und aktiv ist </td></tr>
-      <tr><td><b>SSL_Version</b>                    </td><td> die verwendete TLS-Version wenn die Veschlüsselung aktiv ist</td></tr>
+      <tr><td><b>SSL_Version</b>                    </td><td> die verwendete TLS-Version wenn die Verschlüsselung aktiv ist</td></tr>
 	  <tr><td><b>Transfered_logs_per_minute</b>     </td><td> die durchschnittliche Anzahl der übertragenen Logs/Events pro Minute </td></tr>
     </table>    
     <br>
