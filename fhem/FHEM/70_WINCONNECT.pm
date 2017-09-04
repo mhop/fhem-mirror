@@ -1,6 +1,11 @@
 # $Id$
 ############################################################################
-# 2017-08-31, v0.0.22
+# 2017-09-04, v0.0.23
+#
+# v0.0.23
+# - BUFIX:      [FEHMModul] - Download gitlab GUI
+# - CHANGE      [FEHMModul] - Download Timeout WinControl.exe = 30
+# - FEATURE:	[WinWebGUI] - NotifyIcon - Kontextmenü
 #
 # v0.0.22
 # - BUFIX:      [FEHMModul] - Überreste Attribut "http-noshutdown" entfernt
@@ -175,8 +180,9 @@ sub WINCONNECT_Define($$);
 sub WINCONNECT_Undefine($$);
 
 # Autoupdateinformationen
-my $DownloadURL = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.22.exe";
-my $DownloadVer = "0.0.22";
+my $DownloadURL   = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.23.exe";
+my $DownloadVer   = "0.0.23";
+my $DownloadError = "";
 
 ###################################
 sub WINCONNECT_Initialize($) {
@@ -200,17 +206,19 @@ sub WINCONNECT_GetStatus($;$) {
     my ($hash, $update ) = @_;
     my $name      = $hash->{NAME};
     my $interval  = $hash->{INTERVAL};
+	my $filemtime = "";
 	
-    #RemoveInternalTimer($hash);
-
+	if ($DownloadError eq "") {$DownloadError = ReadingsVal( $name, "wincontrol_error", "Start WinControl....." );}
+	
     return if ( AttrVal( $name, "disable", 0 ) == 1 );
 	
 	InternalTimer( gettimeofday() + $interval, "WINCONNECT_GetStatus", $hash, 0 );
 	
 	my $filename  = '././www/winconnect/WinControl.exe';
 	my $filedir   = '././www/winconnect';
-	my $filemtime = (stat $filename)[9];
-
+	
+	if ((-e $filename)) {$filemtime = (stat $filename)[9];}
+	
 	Log3 $name, 5, "WINCONNECT $name: called function WINCONNECT_GetStatus()";
 	Log3 $name, 5, "WINCONNECT $name: filename  = " . $filename . " filemtime = " . $filemtime;
 	
@@ -228,6 +236,9 @@ sub WINCONNECT_GetStatus($;$) {
 	readingsBulkUpdateIfChanged( $hash, "wincontrol_update", $filemtime );
 	readingsBulkUpdateIfChanged( $hash, "model", ReadingsVal( $name, "os_Name", "unbekannt" ) );
 	
+	#WinControl Last Error
+	readingsBulkUpdateIfChanged( $hash, "wincontrol_error", $DownloadError);
+	
 	readingsEndUpdate( $hash, 1 );
 	
 	#Autoupdatefile von Gitlab herunterladen
@@ -236,15 +247,19 @@ sub WINCONNECT_GetStatus($;$) {
 		#Verzeichnis anlegen
 		mkdir($filedir, 0777) unless(-d $filedir );
 
-		open (FILE, ">". $filename . "_" .$DownloadVer);
-		print FILE $name;
-		close (FILE);
-		
-		#Delete old version
-		if ((-e $filename)) {unlink $filename}
-		
-		Log3 $name, 0, "WINCONNECT [NEW] Download new version URL = $DownloadURL";
-		HttpUtils_NonblockingGet({url=>$DownloadURL, timeout=>5, hash=>$hash, service=>"autoupdate", callback=>\&WINCONNECT_GetNewVersion});
+		if(!open (FILE, ">". $filename . "_" .$DownloadVer)) {
+			$DownloadError = "WINCONNECT [NEW] Download ERROR Can't write = " .$filename . "_" .$DownloadVer . " Error=" .$!;
+			Log3 $name, 5, $DownloadError;
+		}else {
+			
+			print FILE $name;
+			close (FILE);
+			
+			#Delete old version
+			if ((-e $filename)) {unlink $filename}
+				
+			HttpUtils_NonblockingGet({url=>$DownloadURL, timeout=>30, hash=>$hash, service=>"autoupdate", callback=>\&WINCONNECT_GetNewVersion});		
+		}
 	}
 	
 	if ( !$update ) {
@@ -264,18 +279,28 @@ sub WINCONNECT_GetNewVersion($$$) {
    	my $CheckFile = $filename . "_" .$DownloadVer;
     
 	# Download neue Datei
-	open(FH, ">$filename");
-	print FH $data;
-	close(FH);
-	
-	# Prüfen ob die Dateigröße passt!
-	if ((stat $filename)[7] < 600000) {
-		#Download fehlgeschlagen!
-		if (-e $CheckFile) {unlink ($CheckFile) or die $!;}
+	if(!open(FH, ">$filename")) {
+		$DownloadError = "Download ERROR Can't write = " .$filename . " Error=" .$!;
+		Log3 $name, 5, "WINCONNECT [NEW] " .$DownloadError;
 
-		Log3 $name, 0, "WINCONNECT [NEW] Download ERROR file to small. Filesize = " . (stat $filename)[7];
+		#Delete Version Flag
+		if ((-e $CheckFile)) {unlink $CheckFile}
 	}else{
-		Log3 $name, 0, "WINCONNECT [NEW] Download new version OK";
+		print FH $data;
+		close(FH);
+
+		# Prüfen ob die Dateigröße passt!
+		if ((stat $filename)[7] < 600000) {
+			#Download fehlgeschlagen!
+			if ((-e $CheckFile)) {unlink $CheckFile}
+	
+			$DownloadError = "Download ERROR file to small. Filesize = " . (stat $filename)[7];
+			Log3 $name, 5, "WINCONNECT [NEW] " .$DownloadError;
+		}else{
+			Log3 $name, 0, "WINCONNECT [NEW] Download new version URL = $DownloadURL";
+			Log3 $name, 0, "WINCONNECT [NEW] Download new version OK";
+			$DownloadError = "Download new version = $DownloadVer";
+		}
 	}
 }
 
