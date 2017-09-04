@@ -82,6 +82,7 @@ sub MediaList_Initialize($)
     "Playlist_Del"          => { "count" => "1"}, #Arg: TrackNr
     "Playlist_Empty"        => { "count" => "0", "args" => "noArg"}, #Leeren
 #    "Playlist_Drop"         => { "count" => "1"}  #Loeschen, erst relevant wenn abgespeicherte Playlist 
+    "SortBy"                => { "count" => "1", "args" => "File,Title"}
   );
 
 }
@@ -226,6 +227,18 @@ sub MediaList_Set($@)
     return "Argument not known, keep empty for currentdir or \"playlist\" for your managed playlist" if $par !~ m/(currentdir|playlist)/;
 
     MediaList_OnPlayPressed($hash, $par);
+  }
+
+  # sortiere Playlist nach Kriterien, zb. File, Title, Artist, etc
+  if($cmd eq "SortBy") {
+    return "sort criteria required: ". $sets{$cmd}{"args"} if (!$par);
+
+    my $json = ReadingsVal($me, "currentdir_playlist", "[]");
+    return "no currentdir_playlist available, please select one" if($json eq "[]");
+
+    $json = MediaList_playlist_sort($json, $par, "asc"); 
+    readingsSingleUpdate($hash, "currentdir_playlist", $json, 1);
+    return undef;
   }
 }
 
@@ -429,6 +442,8 @@ sub MediaList_done_playlistinfo($) {
   my $playlistduration = 0;
 
   delete($hash->{helper}{RUNNING_PID});
+
+  $playlist = MediaList_playlist_sort($playlist, "File", "asc"); # sortiere Playlist per default nach Dateinamen
 
   my @data = @{JSON::XS->new->decode($playlist)}; 
   for(my $j=0; $j<=$#data; $j++) {
@@ -705,6 +720,39 @@ sub MediaList_readingsSingleUpdateByName($$$) {
   readingsSingleUpdate($defs{$devName}, $readingName, $readingVal, 1);
 }
 
+####################################
+# die PlayList sortieren, Parameter
+# 1. Hash
+# 2. SortiTem: Filename, Title
+# 3. order: asc, desc
+####################################
+sub MediaList_playlist_sort {
+  my ($json, $SortItem, $order) = @_; 
+  my @t;
+  my @sortdata;
+
+  my @data = @{JSON::XS->new->decode($json)};
+#  Log3 undef, 1, "JSON: ".Dumper($json);
+#  Log3 undef, 1, "DATA: ".Dumper(@data);
+
+  for(my $j=0; $j<=$#data; $j++) {
+    push(@t, $data[$j]->{$SortItem});
+  }
+
+  @t = sort(@t);
+  @t = reverse @t if($order eq "desc");
+
+  for(my $i=0; $i<=$#t; $i++) {
+    for(my $j=0; $j<=$#data; $j++) {
+      if($t[$i] eq $data[$j]->{$SortItem}) {
+       push(@sortdata, $data[$j]);
+      }
+    }
+  }
+
+  return JSON::XS->new->encode(\@sortdata);
+}
+
 
 ####################################
 # CrawlerRoutine zur Navigation im 
@@ -795,6 +843,7 @@ sub MediaList_Crawl($$) {
   Note: this module needs the following additional modules:<br>
   <ul>
     <li>libmp3-tag-perl</li> 
+
     <li>libjson-xs-perl</li> 
     <li>libmp3-info-perl</li>
     <li>libmath-round-perl</li>

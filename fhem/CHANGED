@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_MediaList.pm: added sorting setting function,
+                default sort by filename
   - feature: 10_pilight_ctrl: support protocol heitech
   - feature: 91_sequence: add delay and omit name options (Forum #75925)
   - bugfix:  74_AMADDevice: fix a lot of Bugs
