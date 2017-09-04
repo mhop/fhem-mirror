@@ -314,8 +314,10 @@ FHEM/73_km200.pm             Sailor               http://forum.fhem.de/index.php
 FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/73_MPD.pm               Wzut                 http://forum.fhem.de Multimedia
 FHEM/73_AMADCommBridge.pm    CoolTux              http://forum.fhem.de Sonstige Systeme
+FHEM/73_GardenaSmartBridge.pm CoolTux             http://forum.fhem.de Sonstige Systeme
 FHEM/74_NUKIBridge.pm        CoolTux              http://forum.fhem.de Sonstige Systeme
 FHEM/74_AMADDevice.pm        CoolTux              http://forum.fhem.de Sonstige Systeme
+FHEM/74_GardenaSmartDevice.pm CoolTux             http://forum.fhem.de Sonstige Systeme
 FHEM/74_HOMBOT.pm	     CoolTux              http://forum.fhem.de sonstige Systeme
 FHEM/74_NUKIDevice.pm        CoolTux              http://forum.fhem.de Sonstige Systeme
 FHEM/74_Nmap.pm              igami                http://forum.fhem.de Unterstuetzende Dienste
