@@ -68,7 +68,7 @@ eval "use Encode qw(encode encode_utf8 decode_utf8);1" or $missingModul .= "Enco
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.2.0";
+my $version = "0.2.1";
 
 
 
@@ -689,7 +689,7 @@ sub GardenaSmartDevice_Zulu2LocalString($) {
         <li>battery-charging - Ladeindikator (0/1) oder mit neuerer Firmware (false/true)</li>
         <li>battery-level - Ladezustand der Batterie in Prozent</li>
         <li>battery-rechargeable_battery_status - Zustand der Batterie (Ausser Betrieb/Kritischer Batteriestand, wechseln Sie jetzt/Niedrig/oK)</li>
-        <li>device_info-category - Eigenschaft des Ger&Auml;tes (M&auml;her/Bew&auml;sserungscomputer/Bodensensor)</li>
+        <li>device_info-category - Eigenschaft des Ger&auml;tes (M&auml;her/Bew&auml;sserungscomputer/Bodensensor)</li>
         <li>device_info-last_time_online - Zeitpunkt der letzten Funk&uuml;bertragung</li>
         <li>device_info-manufacturer - Hersteller</li>
         <li>device_info-product - Produkttyp</li>
@@ -705,7 +705,7 @@ sub GardenaSmartDevice_Zulu2LocalString($) {
         <li>mower-error - Aktuelle Fehler Meldung
         <ul>
             <li>Kein Fehler</li>
-            <li>Au&szl;igerhalb des Arbeitsbereichs</li>
+            <li>Au&szlig;erhalb des Arbeitsbereichs</li>
             <li>Kein Schleifensignal</li>
             <li>Falsches Schleifensignal</li>
             <li>Problem Schleifensensor, vorne</li>
@@ -718,8 +718,8 @@ sub GardenaSmartDevice_Zulu2LocalString($) {
             <li>Angehoben</li>
             <li>Eingeklemmt in Ladestation</li>
             <li>Ladestation blockiert</li>
-            <li>Problem Sto&szl;igsensor hinten</li>
-            <li>Problem Sto&szl;igsensor vorne</li>
+            <li>Problem Sto&szlig;sensor hinten</li>
+            <li>Problem Sto&szlig;sensor vorne</li>
             <li>Radmotor rechts blockiert</li>
             <li>Radmotor links blockiert</li>
             <li>Problem Antrieb, rechts</li>
@@ -754,7 +754,7 @@ sub GardenaSmartDevice_Zulu2LocalString($) {
         </li>
         <li>mower-manual_operation - Manueller Betrieb (0/1) oder mit neuerer Firmware (false/true)</li>
         <li>mower-override_end_time - Zeitpunkt wann der manuelle Betrieb beendet ist</li>
-        <li>mower-source_for_next_start - Grudn f&uuml;r den n&auml;chsten Start
+        <li>mower-source_for_next_start - Grund f&uuml;r den n&auml;chsten Start
         <ul>
             <li>Kein Grund</li>
             <li>M&auml;her wurde geladen</li>
@@ -764,7 +764,7 @@ sub GardenaSmartDevice_Zulu2LocalString($) {
             <li>Undefiniert</li>
         </ul>
         </li>  
-        <li>mower-status - M&auml;her Status (siehe state</li>
+        <li>mower-status - M&auml;her Status (siehe state)</li>
         <li>mower-timestamp_next_start - Zeitpunkt des n&auml;chsten geplanten Starts</li>
         <li>radio-connection_status - Status der Funkverbindung</li>
         <li>radio-quality - Indikator f&uuml;r die Funkverbindung in Prozent</li>
