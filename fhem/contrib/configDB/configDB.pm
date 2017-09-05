@@ -309,7 +309,7 @@ sub cfgDB_Init() {
 #    printf "exists: $exists\n";
 #    if ($exists) {
 
-    if (_cfgDB_table_exists($fhem_dbh,'fhembinfilesave') {
+    if ( _cfgDB_table_exists($fhem_dbh,"fhembinfilesave") ) {
        $sth_test->finish();
        # check: any files for migratione?
    	   $count = undef;
