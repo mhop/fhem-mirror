@@ -1612,11 +1612,21 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 
     <a name="pidfilename="></a>
     <li>pidfilename<br>
-        Schreibt die PERL Prozess-ID in die angegebene Datei. Der Server l&auml;uft 
-    als Daemon und einige Distributionen wollen anhand der PID testen, ob der 
-    FHEM Prozess l&auml;uft. Die Datei wird bei Ausf&uuml;hrung des &quot;shutdown&quot;-Kommandos 
-    gel&ouml;scht.
+        Schreibt die PERL Prozess-ID in die angegebene Datei. Der Server
+        l&auml;uft als Daemon und einige Distributionen wollen anhand der PID
+        testen, ob der FHEM Prozess l&auml;uft. Die Datei wird bei
+        Ausf&uuml;hrung des &quot;shutdown&quot;-Kommandos gel&ouml;scht.
     </li><br>
+
+    <a name="proxy"></a>
+    <li>proxy<br>
+        IP:PORT des proxy Servers, wird von HttpUtils benutzt.
+    </li><br>
+    <a name="proxyExclude"></a>
+    <li>proxyExclude<br>
+        Regexp, um bestimmte Hosts nicht via proxy zu kontaktieren.
+    </li><br>
+
 
     <li><a href="#fheminfo">sendStatistics</a><br>
 

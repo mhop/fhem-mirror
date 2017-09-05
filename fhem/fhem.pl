@@ -308,7 +308,8 @@ my @globalAttrList = qw(
   nrarchive
   perlSyntaxCheck:0,1
   pidfilename
-  port
+  proxy
+  proxyExclude
   restartDelay
   restoreDirs
   sendStatistics:onUpdate,manually,never
@@ -559,14 +560,6 @@ if($pfn) {
   die "$pfn: $!\n" if(!open(PID, ">$pfn"));
   print PID $$ . "\n";
   close(PID);
-}
-
-my $gp = $attr{global}{port};
-if($gp) {
-  Log 3, "Converting 'attr global port $gp' to 'define telnetPort telnet $gp'";
-  my $ret = CommandDefine(undef, "telnetPort telnet $gp");
-  Log 1, "$ret" if($ret);
-  delete($attr{global}{port});
 }
 
 my $sc_text = "SecurityCheck:";

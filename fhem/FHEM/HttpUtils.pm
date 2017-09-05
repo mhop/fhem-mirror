@@ -78,6 +78,8 @@ HttpUtils_Close($)
   delete($hash->{hu_filecount});
   delete($hash->{hu_blocking});
   delete($hash->{hu_portSfx});
+  delete($hash->{hu_proxy});
+  delete($hash->{hu_port});
   delete($hash->{directReadFn});
   delete($hash->{directWriteFn});
 }
@@ -291,9 +293,21 @@ HttpUtils_Connect($)
     $port = ($hash->{protocol} eq "https" ? 443: 80);
   }
   $hash->{hu_portSfx} = ($port =~ m/^(80|443)$/ ? "" : ":$port");
+  $hash->{hu_port} = $port;
   $hash->{path} = '/' unless defined($hash->{path});
   $hash->{addr} = "$hash->{protocol}://$host:$port";
   $hash->{auth} = urlDecode("$user:$pwd") if($authstring);
+
+  my $proxy = AttrVal("global", "proxy", undef);
+  if($proxy) {
+    my $pe = AttrVal("global", "proxyExclude", undef);
+    if(!$pe || $host !~ m/$pe/) {
+      my @hp = split(":", $proxy);
+      $host = $hp[0];
+      $port = $hp[1] if($hp[1]);
+      $hash->{hu_proxy} = 1;
+    }
+  }
 
   return HttpUtils_Connect2($hash) if($hash->{conn} && $hash->{keepalive});
 
@@ -389,6 +403,20 @@ HttpUtils_Connect2($)
       return $errstr;
     } else {
       $hash->{conn}->blocking(1);
+
+      if($hash->{hu_proxy}) {   # can block!
+        my $hdr = "CONNECT $hash->{host}:$hash->{hu_port} HTTP/1.0\r\n".
+                  "User-Agent: fhem\r\n".
+                  "\r\n";
+        syswrite $hash->{conn}, $hdr;
+        my $buf;
+        my $len = sysread($hash->{conn},$buf,65536);
+        if(!defined($len) || $len <= 0 || $buf !~ m/HTTP.*200/) {
+          HttpUtils_Close($hash);
+          return "Proxy denied CONNECT";
+        }
+      }
+
       my $sslVersion = AttrVal("global", "sslVersion", "SSLv23:!SSLv3:!SSLv2");
       $sslVersion = AttrVal($hash->{NAME}, "sslVersion", $sslVersion)
         if($hash->{NAME});
@@ -453,7 +481,11 @@ HttpUtils_Connect2($)
   $method = ($data ? "POST" : "GET") if( !$method );
 
   my $httpVersion = $hash->{httpversion} ? $hash->{httpversion} : "1.0";
-  my $hdr = "$method $hash->{path} HTTP/$httpVersion\r\n";
+
+  my $path = $hash->{path};
+  $path = "$hash->{protocol}://$hash->{host}$hash->{hu_portSfx}$path"
+        if($hash->{hu_proxy});
+  my $hdr = "$method $path HTTP/$httpVersion\r\n";
   $hdr .= "Host: $hash->{host}$hash->{hu_portSfx}\r\n";
   $hdr .= "User-Agent: fhem\r\n"
         if(!$hash->{header} || $hash->{header} !~ "User-Agent:");

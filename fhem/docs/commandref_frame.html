@@ -1507,12 +1507,21 @@ The following local attributes are used by a wider range of devices:
         Windows.
     </li><br>
 
-    <a name="pidfilename="></a>
+    <a name="pidfilename"></a>
     <li>pidfilename<br>
         Write the process id of the perl process to the specified file. The
         server runs as a daemon, and some distributions would like to check by
         the pid if we are still running. The file will be deleted upon
         shutdown.
+    </li><br>
+
+    <a name="proxy"></a>
+    <li>proxy<br>
+        IP:PORT of the proxy server to be used by HttpUtils.
+    </li><br>
+    <a name="proxyExclude"></a>
+    <li>proxyExclude<br>
+        regexp for hosts to exclude when using a proxy
     </li><br>
 
     <li><a href="#fheminfo">sendStatistics</a><br>
