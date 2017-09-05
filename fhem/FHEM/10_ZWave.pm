@@ -4358,6 +4358,7 @@ ZWave_processSendStack($$;$)
     }
 
     shift @{$ss};
+    $hash->{cmdsPending} = int(@{$ss});
     RemoveInternalTimer($hash) if(!ZWave_isWakeUp($hash));
   }
 
@@ -4413,6 +4414,7 @@ ZWave_packSendStack($)
   push @ns, sprintf("get:13$id%02x8f01%02x%s%s",
                      length($cmd)/2+3, $ncmd, $cmd, $sfx);
   $hash->{SendStack} = \@ns;
+  $hash->{cmdsPending} = int(@ns);
 }
 
 sub
@@ -4425,6 +4427,7 @@ ZWave_addToSendStack($$$)
   }
   my $ss = $hash->{SendStack};
   push @{$ss}, "$type:$cmd";
+  $hash->{cmdsPending} = int(@{$ss});
   #Log 1, "aTSS: $hash->{NAME}, $type, $cmd / L:".int(@{$ss});
 
   if(ZWave_isWakeUp($hash)) {
@@ -4451,6 +4454,7 @@ ZWave_addToSendStack($$$)
       Log3 $hash, 2,
         "ERROR: $hash->{NAME}: cleaning commands without ack after 5s";
       delete $hash->{SendStack};
+      $hash->{cmdsPending} = 0;
       return ZWave_addToSendStack($hash, $type, $cmd);
     }
   }
