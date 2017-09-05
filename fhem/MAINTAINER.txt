@@ -503,6 +503,7 @@ contrib/23_WEBTHERM.pm       betateilchen/sachag  http://forum.fhem.de Sonstiges
 contrib/70_ONKYO_AVR_PULL.pm loredo               http://forum.fhem.de Multimedia
 contrib/92_rsyslog.pm        DS_Starter           http://forum.fhem.de Automatisierung
 contrib/98_exportdevice.pm   loredo               http://forum.fhem.de Sonstiges
+contrib/98_FileLogConvert.pm DeeSPe               http://forum.fhem.de Automatisierung
 contrib/betateilchen/*       betateilchen         http://forum.fhem.de Sonstiges
 contrib/holiday              betateilchen         http://forum.fhem.de Sonstiges
         by_ext.holiday       loredo               http://forum.fhem.de Sonstiges
