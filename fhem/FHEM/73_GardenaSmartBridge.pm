@@ -70,7 +70,7 @@ eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 ###todo Hier fehlt noch Modulabfrage für ssl
 
 
-my $version = "0.2.0";
+my $version = "0.2.1";
 
 
 
@@ -809,7 +809,7 @@ sub GardenaSmartBridge_ParseJSON($$) {
   <ul>
     <li>debugJSON - </li>
     <li>disable - Disables the Bridge</li>
-    <li>interval - Interval in Minutes (Default=5)</li>
+    <li>interval - Interval in seconds (Default=300)</li>
   </ul>
 </ul>
 

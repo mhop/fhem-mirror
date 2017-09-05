@@ -64,11 +64,11 @@ use Time::Local;
 
 use Data::Dumper;   #debugging
 
-eval "use Encode qw(encode encode_utf8 decode_utf8);1" or $missingModul .= "Encode ";
+# eval "use Encode qw(encode encode_utf8 decode_utf8);1" or $missingModul .= "Encode ";     wird nicht benötigt
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.2.1";
+my $version = "0.2.2";
 
 
 
@@ -313,8 +313,9 @@ sub GardenaSmartDevice_Parse($$) {
             
         } else {
             
-            Log3 $name, 3, "GardenaSmartDevice ($name) - autocreate new device " . join('',split("[ \t]+",$decode_json->{name})) . " with deviceId $decode_json->{id}, model $decode_json->{category} and IODev IODev=$name";
-            return "UNDEFINED " . join('',split("[ \t]+",$decode_json->{name})) . " GardenaSmartDevice $decode_json->{id} $decode_json->{category} IODev=$name";
+            Log3 $name, 3, "GardenaSmartDevice ($name) - autocreate new device " . makeDeviceName($decode_json->{name}) . " with deviceId $decode_json->{id}, model $decode_json->{category} and IODev IODev=$name";
+            #return "UNDEFINED " . join('',split("[ \t]+",$decode_json->{name})) . " GardenaSmartDevice $decode_json->{id} $decode_json->{category} IODev=$name";
+            return "UNDEFINED " . makeDeviceName($decode_json->{name}) . " GardenaSmartDevice $decode_json->{id} $decode_json->{category} IODev=$name";
         }
     }
 }
