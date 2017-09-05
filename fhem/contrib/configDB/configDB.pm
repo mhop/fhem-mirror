@@ -179,8 +179,7 @@ sub _cfgDB_Reorg(;$$);
 sub _cfgDB_Rotate($$);
 sub _cfgDB_Search($$;$);
 sub _cfgDB_Uuid();
-sub _cfgDB_table_exists($$) {
-
+sub _cfgDB_table_exists($$);
 
 ##################################################
 # Read configuration file for DB connection
@@ -301,20 +300,16 @@ sub cfgDB_Init() {
 	}
 
 ### migrate fhembinfilesave to fhemb64filesave
-    # check: fhembinfilesave exists?
+#    # check: fhembinfilesave exists?
 #    my $sth_test = $fhem_dbh->table_info(undef, 'public', "fhembinfilesave", 'TABLE');
 #       $sth_test->execute;
 #    my @info = $sth_test->fetchrow_array;
 #    my $exists = scalar @info;
-#    printf "exists: $exists\n";
-#    if ($exists) {
-
-    if ( _cfgDB_table_exists($fhem_dbh,"fhembinfilesave") ) {
+    if (_cfgDB_table_exists($fhem_dbh,'fhembinfilesave')) {
 #       $sth_test->finish();
        # check: any files for migratione?
    	   $count = undef;
 	   $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhembinfilesave');
-	   printf "count: $count\n";
        if ($count > 0) {
           printf "need to migrate $count files to base64\n";
           my @toMigrate;
@@ -345,21 +340,22 @@ sub cfgDB_Init() {
 # close database connection
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
+
 	return;
-}}
+}
 
 sub _cfgDB_table_exists($$) {
    my ($dbh,$table) = @_;
    printf "looking for table fhembinfilesave\n";
    my @tables = $dbh->tables('','','','TABLE');
    if (@tables) {
-      printf "testing 1\n";
+      printf "testing #1\n";
       for (@tables) {
         next unless $_;
         return 1 if $_ eq $table
       }
    } else {
-      printf "testing 2\n";
+      printf "testing #2\n";
       eval {
          local $dbh->{PrintError} = 0;
          local $dbh->{RaiseError} = 1;
@@ -367,7 +363,7 @@ sub _cfgDB_table_exists($$) {
       };
       return 1 unless $@;
    }
-   printf "table not found.\n";
+   printf "table not found\n";
    return 0;
 }
 
