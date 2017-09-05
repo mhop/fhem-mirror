@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  FHEM2FHEM: addStateEvent attribute (Forum #76229)
   - bugfix:  HttpUtils: use urlDecode for password in URL (Forum #76230)
   - bugfix:  74_GardenaSmartDevice.pm: fix little Commandref bug's
   - new:     73_GardenaSmartBridge/74_GardenaSmartDevice control your Gardena

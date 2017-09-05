@@ -33,7 +33,8 @@ telnet_Initialize($)
 
   $cmds{inform} = { Fn=>"CommandTelnetInform",
           ClientFilter => "telnet",
-          Hlp=>"{on|off|log|raw|timer|status},echo all events to this client" };
+          Hlp=>"{on|onWithState|off|log|raw|timer|status},".
+                        "echo all events to this client" };
 }
 
 sub
@@ -376,8 +377,8 @@ CommandTelnetInform($$)
   return if(!$cl);
   my $name = $cl->{NAME};
 
-  return "Usage: inform {on|off|raw|timer|log|status} [regexp]"
-        if($param !~ m/^(on|off|raw|timer|log|status)/);
+  return "Usage: inform {on|onWithState|off|raw|timer|log|status} [regexp]"
+        if($param !~ m/^(on|onWithState|off|raw|timer|log|status)/);
 
   if($param eq "status") {
     my $i = $inform{$name};

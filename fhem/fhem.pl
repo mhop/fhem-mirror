@@ -3378,7 +3378,6 @@ DoTrigger($$@)
     ################
     # Inform
     if($hash->{CHANGED}) {    # It gets deleted sometimes (?)
-      $max = int(@{$hash->{CHANGED}}); # can be enriched in the notifies
       foreach my $c (keys %inform) {
         my $dc = $defs{$c};
         if(!$dc || $dc->{NR} != $inform{$c}{NR}) {
@@ -3392,11 +3391,13 @@ DoTrigger($$@)
           $tn .= sprintf(".%03d", $microseconds/1000);
         }
         my $re = $inform{$c}{regexp};
+        my $events = deviceEvents($hash, $inform{$c}{type} =~ m/WithState/);
+        $max = int(@{$events});
         for(my $i = 0; $i < $max; $i++) {
-          my $state = $hash->{CHANGED}[$i];
-          next if($re && !($dev =~ m/$re/ || "$dev:$state" =~ m/$re/));
+          my $event = $events->[$i];
+          next if($re && !($dev =~ m/$re/ || "$dev:$event" =~ m/$re/));
           addToWritebuffer($dc,($inform{$c}{type} eq "timer" ? "$tn " : "").
-                                "$hash->{TYPE} $dev $state\n");
+                                "$hash->{TYPE} $dev $event\n");
         }
       }
     }

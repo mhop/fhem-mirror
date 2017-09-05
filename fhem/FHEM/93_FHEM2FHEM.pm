@@ -26,13 +26,14 @@ FHEM2FHEM_Initialize($)
   $hash->{WriteFn} = "FHEM2FHEM_Write";
   $hash->{ReadyFn} = "FHEM2FHEM_Ready";
   $hash->{SetFn}   = "FHEM2FHEM_Set";
+  $hash->{AttrFn}  = "FHEM2FHEM_Attr";
   $hash->{noRawInform} = 1;
 
 # Normal devices
   $hash->{DefFn}   = "FHEM2FHEM_Define";
   $hash->{UndefFn} = "FHEM2FHEM_Undef";
-  $hash->{AttrList}= "dummy:1,0 disable:0,1 ".
-                     "disabledForIntervals excludeEvents eventOnly:1,0";
+  $hash->{AttrList}= "addStateEvent:1,0 dummy:1,0 disable:0,1 ".
+                     "disabledForIntervals eventOnly:1,0 excludeEvents";
 }
 
 #####################################
@@ -266,8 +267,9 @@ FHEM2FHEM_OpenDev($$)
     DoTrigger($name, "CONNECTED") if($reopen);
     syswrite($hash->{TCPDev}, $hash->{portpassword} . "\n")
           if($hash->{portpassword});
+    my $type = AttrVal($hash->{NAME},"addStateEvent",0) ? "onWithState" : "on";
     my $msg = $hash->{informType} eq "LOG" ? 
-                  "inform on $hash->{regexp}" : "inform raw";
+                  "inform $type $hash->{regexp}" : "inform raw";
     syswrite($hash->{TCPDev}, $msg . "\n");
   };
 
@@ -326,6 +328,19 @@ FHEM2FHEM_Set($@)
   
   FHEM2FHEM_CloseDev($hash);
   FHEM2FHEM_OpenDev($hash, 0);
+  return undef;
+}
+
+sub
+FHEM2FHEM_Attr(@)
+{
+  my ($type, $devName, $attrName, @param) = @_;
+  my $hash = $defs{$devName};
+
+  return undef if($attrName ne "addStateEvent");
+  $attr{$devName}{$attrName} = 1;
+  FHEM2FHEM_CloseDev($hash);
+  FHEM2FHEM_OpenDev($hash, 1);
   return undef;
 }
 
@@ -427,6 +442,12 @@ FHEM2FHEM_Set($@)
     <li><a name="#eventOnly">eventOnly</a><br>
       if set, generate only events, do not set corresponding readings.
       This is a compatibility feature, available only for LOG-Mode.
+      </li>
+    <li><a name="#addStateEvent">addStateEvent</a><br>
+      if set, state events are transmitted correctly. Notes: this is relevant
+      only with LOG mode, setting it will generate an additional "reappeared"
+      Log entry, and the remote FHEM must support inform onWithState (i.e. must
+      be up to date).
       </li>
     <li><a name="#excludeEvents">excludeEvents &lt;regexp&gt;</a>
       do not publish events matching &lt;regexp&gt;
@@ -530,16 +551,22 @@ FHEM2FHEM_Set($@)
    <b>Attribute</b>
    <ul>
      <li><a href="#dummy">dummy</a></li>
-      <li><a href="#disable">disable</a></li>
-      <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
-      <li><a name="#eventOnly">eventOnly</a><br>
-        falls gesetzt, werden nur die Events generiert, und es wird kein
-        Reading aktualisiert. Ist nur im LOG-Mode aktiv.
-        </li>
-      <li><a name="#excludeEvents">excludeEvents &lt;regexp&gt;</a>
-        die auf das &lt;regexp&gt; zutreffende Events werden nicht
-        bereitgestellt.
-        </li>
+     <li><a href="#disable">disable</a></li>
+     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+     <li><a name="#eventOnly">eventOnly</a><br>
+       falls gesetzt, werden nur die Events generiert, und es wird kein
+       Reading aktualisiert. Ist nur im LOG-Mode aktiv.
+       </li>
+     <li><a name="#addStateEvent">addStateEvent</a><br>
+       falls gesetzt, werden state Events als solche uebertragen. Zu beachten:
+       das Attribut ist nur f&uuml;r LOG-Mode relevant, beim Setzen wird eine
+       zus&auml;tzliche reopened Logzeile generiert, und die andere Seite muss
+       aktuell sein.
+       </li>
+     <li><a name="#excludeEvents">excludeEvents &lt;regexp&gt;</a>
+       die auf das &lt;regexp&gt; zutreffende Events werden nicht
+       bereitgestellt.
+       </li>
    </ul>
 
 </ul>
