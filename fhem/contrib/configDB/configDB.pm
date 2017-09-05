@@ -310,7 +310,7 @@ sub cfgDB_Init() {
 #    if ($exists) {
 
     if ( _cfgDB_table_exists($fhem_dbh,"fhembinfilesave") ) {
-       $sth_test->finish();
+#       $sth_test->finish();
        # check: any files for migratione?
    	   $count = undef;
 	   $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhembinfilesave');
@@ -352,7 +352,7 @@ sub cfgDB_Init() {
 sub _cfgDB_table_exists($$) {
    my ($dbh,$table) = @_;
    printf "looking for table fhembinfilesave\n";
-   my @tables = $db->tables('','','','TABLE');
+   my @tables = $dbh->tables('','','','TABLE');
    if (@tables) {
       printf "testing 1\n";
       for (@tables) {
