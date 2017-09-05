@@ -345,9 +345,8 @@ sub cfgDB_Init() {
 # close database connection
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
-
 	return;
-}
+}}
 
 sub _cfgDB_table_exists($$) {
    my ($dbh,$table) = @_;
