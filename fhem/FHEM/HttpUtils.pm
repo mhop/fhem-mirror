@@ -293,7 +293,7 @@ HttpUtils_Connect($)
   $hash->{hu_portSfx} = ($port =~ m/^(80|443)$/ ? "" : ":$port");
   $hash->{path} = '/' unless defined($hash->{path});
   $hash->{addr} = "$hash->{protocol}://$host:$port";
-  $hash->{auth} = "$user:$pwd" if($authstring);
+  $hash->{auth} = urlDecode("$user:$pwd") if($authstring);
 
   return HttpUtils_Connect2($hash) if($hash->{conn} && $hash->{keepalive});
 
