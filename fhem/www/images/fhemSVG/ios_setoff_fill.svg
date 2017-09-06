@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   id="svg4662"
+   version="1.1"
+   viewBox="0 0 37.570834 23.283332"
+   height="88"
+   width="142">
+  <defs
+     id="defs4656">
+    <linearGradient
+       id="linearGradient5219-5">
+      <stop
+         id="stop5215"
+         offset="0"
+         style="stop-color:#000000;stop-opacity:1;" />
+      <stop
+         id="stop5217"
+         offset="1"
+         style="stop-color:#000000;stop-opacity:0;" />
+    </linearGradient>
+    <linearGradient
+       y2="287.11099"
+       x2="69.490074"
+       y1="286.17557"
+       x1="60.00201"
+       gradientUnits="userSpaceOnUse"
+       id="linearGradient5228"
+       xlink:href="#linearGradient5219-5" />
+    <linearGradient
+       gradientTransform="translate(-3.2532761,0.3272349)"
+       gradientUnits="userSpaceOnUse"
+       y2="286.37604"
+       x2="37.543156"
+       y1="286.28568"
+       x1="-12.569118"
+       id="linearGradient8409"
+       xlink:href="#linearGradient5219-5" />
+    <pattern
+       id="EMFhbasepattern"
+       patternUnits="userSpaceOnUse"
+       width="6"
+       height="6"
+       x="0"
+       y="0" />
+    <filter
+       height="1.4072429"
+       y="-0.20362144"
+       width="1.4087599"
+       x="-0.20437997"
+       id="filter1996"
+       style="color-interpolation-filters:sRGB">
+      <feGaussianBlur
+         id="feGaussianBlur1998"
+         stdDeviation="1.5601714" />
+    </filter>
+  </defs>
+  <metadata
+     id="metadata4659">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     style="display:inline"
+     transform="translate(0,2.1166666)"
+     id="layer2">
+    <g
+       transform="translate(-0.09163618,-1.2416057)"
+       style="display:inline;fill:#ffffff;fill-opacity:1"
+       id="layer6">
+      <rect
+         transform="rotate(0.03181905)"
+         ry="9.4010534"
+         rx="10.272182"
+         y="0.83268982"
+         x="0.47368613"
+         height="19.799999"
+         width="36.749557"
+         id="rect5207-9"
+         style="opacity:1;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:#ffffff;stroke-width:0.2;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:0.98192767" />
+    </g>
+  </g>
+  <g
+     transform="translate(0,2.1166666)"
+     style="display:inline"
+     id="layer4">
+    <ellipse
+       style="opacity:1;fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:#e4e4e4;stroke-width:0.20000003;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path5211"
+       cx="10.204505"
+       cy="9.5331688"
+       rx="9.1604166"
+       ry="9.194541" />
+  </g>
+  <g
+     style="display:inline"
+     id="layer1">
+    <g
+       transform="translate(0,0.54981708)"
+       id="g869">
+      <rect
+         transform="translate(0,2.1166666)"
+         style="display:inline;opacity:1;fill:#ff0000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.20002498;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         id="rect826-9"
+         width="3.1282191"
+         height="2.9666338"
+         x="8.5221672"
+         y="12.529957"
+         rx="0"
+         ry="1.1046554" />
+      <rect
+         style="opacity:1;fill:#ff0000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.20002498;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         id="rect826"
+         width="3.1080139"
+         height="8.9211302"
+         x="8.5423717"
+         y="4.5009632"
+         rx="0"
+         ry="0.97194844" />
+    </g>
+  </g>
+</svg>
