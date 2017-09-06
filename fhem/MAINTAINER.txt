@@ -240,6 +240,7 @@ FHEM/52_I2C_EEPROM.pm        klausw               http://forum.fhem.de Sonstige 
 FHEM/52_I2C_LCD              ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_BME280           klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_K30              yoda_gh              http://forum.fhem.de Sonstige Systeme
+FHEM/52_I2C_LM75A            clumsy               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_MCP23008         klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_MCP23017         klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_MCP342x          klausw               http://forum.fhem.de Sonstige Systeme
