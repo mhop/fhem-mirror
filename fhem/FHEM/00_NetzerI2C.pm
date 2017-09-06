@@ -28,6 +28,7 @@ I2C_BME280
 I2C_BMP180
 I2C_SHT21
 I2C_TSL2561
+I2C_LM.*
 );
 
 sub NetzerI2C_Initialize($) {
