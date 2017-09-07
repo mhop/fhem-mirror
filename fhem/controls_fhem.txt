@@ -1,4 +1,4 @@
-REV 15017
+REV 15022
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-09-06_07:45:02 209386 ./CHANGED
+UPD 2017-09-07_07:45:02 209464 ./CHANGED
 UPD 2017-09-06_07:45:02 39152 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
 UPD 2017-09-06_07:45:04 136684 ./fhem.pl
@@ -39,10 +39,10 @@ UPD 2016-08-19_14:49:02 3718 FHEM/00_LIRC.pm
 UPD 2016-04-26_07:45:11 33379 FHEM/00_MAXLAN.pm
 UPD 2017-08-27_07:45:02 26741 FHEM/00_MQTT.pm
 UPD 2015-10-03_07:45:11 15183 FHEM/00_MYSENSORS.pm
-UPD 2016-08-23_07:45:12 25513 FHEM/00_NetzerI2C.pm
+UPD 2017-09-07_07:45:02 25519 FHEM/00_NetzerI2C.pm
 UPD 2017-04-26_07:45:02 81061 FHEM/00_OWX.pm
 UPD 2015-07-28_14:05:31 48674 FHEM/00_OWX_ASYNC.pm
-UPD 2016-11-14_07:45:13 38252 FHEM/00_RPII2C.pm
+UPD 2017-09-07_07:45:02 38258 FHEM/00_RPII2C.pm
 UPD 2017-01-24_07:45:02 119126 FHEM/00_SIGNALduino.pm
 UPD 2017-07-15_07:45:02 493218 FHEM/00_SONOS.pm
 UPD 2017-06-30_07:45:02 20215 FHEM/00_SmartMeterP1.pm
@@ -66,7 +66,7 @@ UPD 2016-04-26_07:45:11 44589 FHEM/10_EIB.pm
 UPD 2017-03-06_07:45:02 26891 FHEM/10_EQ3BT.pm
 UPD 2017-03-27_07:45:02 880578 FHEM/10_EnOcean.pm
 UPD 2017-01-30_07:45:02 18761 FHEM/10_FBDECT.pm
-UPD 2016-07-02_07:45:12 37046 FHEM/10_FRM.pm
+UPD 2017-09-07_07:45:02 37161 FHEM/10_FRM.pm
 UPD 2017-08-14_07:45:02 32138 FHEM/10_FS20.pm
 UPD 2015-07-28_14:05:31 10155 FHEM/10_HXBDevice.pm
 UPD 2017-08-07_07:45:02 73643 FHEM/10_IT.pm
@@ -255,6 +255,7 @@ UPD 2016-08-23_07:45:12 15736 FHEM/52_I2C_EEPROM.pm
 UPD 2016-06-03_07:45:11 18299 FHEM/52_I2C_HDC1008.pm
 UPD 2016-03-31_07:45:12 11155 FHEM/52_I2C_K30.pm
 UPD 2015-07-28_14:05:31 14280 FHEM/52_I2C_LCD.pm
+UPD 2017-09-07_07:45:02 10586 FHEM/52_I2C_LM75A.pm
 UPD 2017-03-05_07:45:02 28119 FHEM/52_I2C_MCP23008.pm
 UPD 2016-08-23_07:45:12 29054 FHEM/52_I2C_MCP23017.pm
 UPD 2017-02-17_07:45:02 16361 FHEM/52_I2C_MCP342x.pm
@@ -323,7 +324,7 @@ UPD 2017-07-03_07:45:02 123954 FHEM/71_YAMAHA_NP.pm
 UPD 2017-08-19_07:45:02 75913 FHEM/72_FB_CALLLIST.pm
 UPD 2017-09-03_07:45:02 95739 FHEM/72_FB_CALLMONITOR.pm
 UPD 2017-07-03_07:45:02 219049 FHEM/72_FRITZBOX.pm
-UPD 2017-09-04_07:45:02 42707 FHEM/73_AMADCommBridge.pm
+UPD 2017-09-07_07:45:02 42707 FHEM/73_AMADCommBridge.pm
 UPD 2017-05-09_07:45:02 89288 FHEM/73_ElectricityCalculator.pm
 UPD 2017-09-06_07:45:02 31015 FHEM/73_GardenaSmartBridge.pm
 UPD 2017-05-09_07:45:02 81574 FHEM/73_GasCalculator.pm
@@ -331,7 +332,7 @@ UPD 2017-01-27_07:45:02 88049 FHEM/73_MPD.pm
 UPD 2017-05-12_07:45:02 30582 FHEM/73_NUKIBridge.pm
 UPD 2017-07-14_07:45:02 84692 FHEM/73_PRESENCE.pm
 UPD 2017-05-09_07:45:02 118318 FHEM/73_km200.pm
-UPD 2017-09-04_07:45:02 58701 FHEM/74_AMADDevice.pm
+UPD 2017-09-07_07:45:02 59077 FHEM/74_AMADDevice.pm
 UPD 2017-09-06_07:45:02 35637 FHEM/74_GardenaSmartDevice.pm
 UPD 2016-06-10_07:45:12 39790 FHEM/74_HOMBOT.pm
 UPD 2017-05-16_07:45:02 22674 FHEM/74_NUKIDevice.pm
@@ -519,7 +520,7 @@ UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_nano328.hex
 UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_promini328.hex
 UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_uno.hex
 UPD 2017-01-07_07:45:02 99233 FHEM/firmware/esptool.py
-UPD 2017-09-04_07:45:02 292606 FHEM/lib/74_AMADautomagicFlowset_4.0.6.xml
+UPD 2017-09-07_07:45:02 295585 FHEM/lib/74_AMADautomagicFlowset_4.0.7.xml
 UPD 2015-07-28_14:05:30 2034 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2015-07-28_14:05:30 21217 FHEM/lib/Device/Firmata/Constants.pm
@@ -611,8 +612,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-09-06_07:45:03 3067978 docs/commandref.html
-UPD 2017-09-06_07:45:04 1797775 docs/commandref_DE.html
+UPD 2017-09-07_07:45:03 3070111 docs/commandref.html
+UPD 2017-09-07_07:45:04 1799338 docs/commandref_DE.html
 UPD 2017-09-06_07:45:02 72053 docs/commandref_frame.html
 UPD 2017-09-06_07:45:02 80740 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
@@ -1164,6 +1165,7 @@ UPD 2015-07-28_14:05:32 12083 www/images/fhemSVG/cul_868.svg
 UPD 2015-07-28_14:05:32 7562 www/images/fhemSVG/cul_cul.svg
 UPD 2015-07-28_14:05:32 6093 www/images/fhemSVG/cul_usb.svg
 UPD 2017-01-03_07:45:02 6958 www/images/fhemSVG/cul_wlan.svg
+UPD 2017-09-07_07:45:02 5233 www/images/fhemSVG/dash_button.svg
 UPD 2015-07-28_14:05:32 4825 www/images/fhemSVG/day_night.svg
 UPD 2015-07-28_14:05:32 15419 www/images/fhemSVG/dog_silhouette.svg
 UPD 2015-07-28_14:05:32 2935 www/images/fhemSVG/dreambox.svg
@@ -1268,6 +1270,16 @@ UPD 2016-06-19_07:45:12 953 www/images/fhemSVG/hue_room_recreation.svg
 UPD 2016-06-19_07:45:12 668 www/images/fhemSVG/hue_room_terrace.svg
 UPD 2016-06-19_07:45:12 641 www/images/fhemSVG/hue_room_toilet.svg
 UPD 2015-07-28_14:05:32 4224 www/images/fhemSVG/humidity.svg
+UPD 2017-09-07_07:45:02 3979 www/images/fhemSVG/ios_off_fill.svg
+UPD 2017-09-07_07:45:02 4302 www/images/fhemSVG/ios_off_fortimer_fill.svg
+UPD 2017-09-07_07:45:02 8001 www/images/fhemSVG/ios_off_till_fill.svg
+UPD 2017-09-07_07:45:02 3543 www/images/fhemSVG/ios_off_tillovernight_fill.svg
+UPD 2017-09-07_07:45:02 3514 www/images/fhemSVG/ios_on_fill.svg
+UPD 2017-09-07_07:45:02 4439 www/images/fhemSVG/ios_on_fortimer_fill.svg
+UPD 2017-09-07_07:45:02 7999 www/images/fhemSVG/ios_on_till_fill.svg
+UPD 2017-09-07_07:45:02 3293 www/images/fhemSVG/ios_on_tillovernight_fill.svg
+UPD 2017-09-07_07:45:02 3934 www/images/fhemSVG/ios_setoff_fill.svg
+UPD 2017-09-07_07:45:02 3192 www/images/fhemSVG/ios_seton_fill.svg
 UPD 2015-07-28_14:05:32 22116 www/images/fhemSVG/it_hue_bridge.svg
 UPD 2015-07-28_14:05:32 16822 www/images/fhemSVG/it_i-net.svg
 UPD 2017-02-09_07:45:02 3657 www/images/fhemSVG/it_printer.svg
@@ -1360,6 +1372,8 @@ UPD 2015-07-28_14:05:32 2174 www/images/fhemSVG/rc_STOP.svg
 UPD 2015-07-28_14:05:32 5557 www/images/fhemSVG/rc_SUB.svg
 UPD 2015-07-28_14:05:32 2559 www/images/fhemSVG/rc_TEXT.svg
 UPD 2015-07-28_14:05:32 2153 www/images/fhemSVG/rc_TV.svg
+UPD 2017-09-07_07:45:02 3107 www/images/fhemSVG/rc_TV1_off.svg
+UPD 2017-09-07_07:45:02 419312 www/images/fhemSVG/rc_TV1_on.svg
 UPD 2016-01-12_07:45:11 2961 www/images/fhemSVG/rc_TV2.svg
 UPD 2015-07-28_14:05:32 4797 www/images/fhemSVG/rc_TVstop.svg
 UPD 2015-07-28_14:05:32 998 www/images/fhemSVG/rc_UP.svg
