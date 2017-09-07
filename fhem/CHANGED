@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_GardenaSmartBridge: code clean, update german tranlation
   - feature: 74_AMADDevice: add ttsMsgVol, sets automatically a preset volume
   - feature: proxy global attribute for HttpUtils (Forum #60471)
   - bugfix:  93_DbLog: V2.22.5, several fixes Forum:#75894
