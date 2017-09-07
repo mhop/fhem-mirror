@@ -27,6 +27,8 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 2.8.0  07.09.2017    Home Mode, commandref revised
+# 2.7.1  28.08.2017    minor fixes
 # 2.7.0  20.08.2017    bugfix if credentials not set, set maximum password lenth to 20
 # 2.6.3  12.08.2017    get snapGallery can also be triggered by at or notify (better use than "set"), commandref revised
 # 2.6.2  11.08.2017    set snapGallery can be triggered by at or notify
@@ -190,7 +192,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "2.7.0";
+my $SSCamVersion = "2.8.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -320,6 +322,7 @@ sub SSCam_Define {
   $hash->{HELPER}{APICAMEVENT}    = "SYNO.SurveillanceStation.Camera.Event";
   $hash->{HELPER}{APIVIDEOSTM}    = "SYNO.SurveillanceStation.VideoStreaming";
   $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Streaming";
+  $hash->{HELPER}{APIHM}          = "SYNO.SurveillanceStation.HomeMode";
   
   # Startwerte setzen
   $attr{$name}{webCmd}                 = "on:off:snap:enable:disable";                            # initiale Webkommandos setzen
@@ -508,6 +511,7 @@ sub SSCam_Set {
   $setlist = "Unknown argument $opt, choose one of ".
              "credentials ".
              "expmode:auto,day,night ".
+			 ($hash->{HELPER}{APIHMMAXVER}?"homeMode:on,off ": "").
              "on ".
              "off ".
              "motdetsc:disable,camera,SVS ".
@@ -637,6 +641,13 @@ sub SSCam_Set {
             
       $hash->{HELPER}{EXPMODE} = $prop;
       camexpmode($hash);
+        
+  } elsif ($opt eq "homeMode") {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      unless ($prop) { return " \"$opt\" needs one of those arguments: on, off !";}
+            
+      $hash->{HELPER}{HOMEMODE} = $prop;
+      sethomemode($hash);
         
   } elsif ($opt eq "goPreset") {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1820,6 +1831,32 @@ sub getsvsinfo ($) {
 }
 
 ###########################################################################
+#                                HomeMode setzen 
+###########################################################################
+sub sethomemode ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE} = "sethomemode";
+        $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+		
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        sscam_getapisites($hash);
+		
+    } else {
+        RemoveInternalTimer($hash, "sethomemode");
+        InternalTimer(gettimeofday()+0.6, "sethomemode", $hash, 0);
+    }
+}
+
+###########################################################################
 #   Kamera allgemeine Informationen abrufen (Get), sub von getcaminfoall
 ###########################################################################
 sub getcaminfo ($) {
@@ -2040,7 +2077,8 @@ sub sscam_getapisites {
    my $apicamevent = $hash->{HELPER}{APICAMEVENT};
    my $apievent    = $hash->{HELPER}{APIEVENT};
    my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
-   my $apistm      = $hash->{HELPER}{APISTM}; 
+   my $apistm      = $hash->{HELPER}{APISTM};
+   my $apihm       = $hash->{HELPER}{APIHM};    
    my $url;
    my $param;
   
@@ -2060,7 +2098,7 @@ sub sscam_getapisites {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm";
+   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm";
 
    Log3($name, 4, "$name - Call-Out now: $url");
    
@@ -2095,6 +2133,7 @@ sub sscam_getapisites_parse ($) {
    my $apievent    = $hash->{HELPER}{APIEVENT};
    my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
    my $apistm      = $hash->{HELPER}{APISTM};
+   my $apihm       = $hash->{HELPER}{APIHM};
    my ($apicammaxver,$apicampath);
   
     if ($err ne "") {
@@ -2136,7 +2175,6 @@ sub sscam_getapisites_parse ($) {
             my $logstr;
                         
           # Pfad und Maxversion von "SYNO.API.Auth" ermitteln
-       
             my $apiauthpath = $data->{'data'}->{$apiauth}->{'path'};
             $apiauthpath =~ tr/_//d if (defined($apiauthpath));
             my $apiauthmaxver = $data->{'data'}->{$apiauth}->{'maxVersion'}; 
@@ -2147,7 +2185,6 @@ sub sscam_getapisites_parse ($) {
             Log3($name, 4, "$name - $logstr");
        
           # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalRecording" ermitteln
-       
             my $apiextrecpath = $data->{'data'}->{$apiextrec}->{'path'};
             $apiextrecpath =~ tr/_//d if (defined($apiextrecpath));
             my $apiextrecmaxver = $data->{'data'}->{$apiextrec}->{'maxVersion'}; 
@@ -2158,7 +2195,6 @@ sub sscam_getapisites_parse ($) {
             Log3($name, 4, "$name - $logstr");
        
           # Pfad und Maxversion von "SYNO.SurveillanceStation.Camera" ermitteln
-              
             $apicampath = $data->{'data'}->{$apicam}->{'path'};
             $apicampath =~ tr/_//d if (defined($apicampath));
             $apicammaxver = $data->{'data'}->{$apicam}->{'maxVersion'};
@@ -2168,8 +2204,7 @@ sub sscam_getapisites_parse ($) {
             $logstr = defined($apiextrecmaxver) ? "MaxVersion of $apicam: $apicammaxver" : "MaxVersion of $apicam undefined - Surveillance Station may be stopped";
             Log3($name, 4, "$name - $logstr");
        
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.SnapShot" ermitteln
-              
+          # Pfad und Maxversion von "SYNO.SurveillanceStation.SnapShot" ermitteln  
             my $apitakesnappath = $data->{'data'}->{$apitakesnap}->{'path'};
             $apitakesnappath =~ tr/_//d if (defined($apitakesnappath));
             my $apitakesnapmaxver = $data->{'data'}->{$apitakesnap}->{'maxVersion'};
@@ -2179,8 +2214,7 @@ sub sscam_getapisites_parse ($) {
             $logstr = defined($apitakesnapmaxver) ? "MaxVersion of $apitakesnap: $apitakesnapmaxver" : "MaxVersion of $apitakesnap undefined - Surveillance Station may be stopped";
             Log3($name, 4, "$name - $logstr");
 
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.PTZ" ermitteln
-              
+          # Pfad und Maxversion von "SYNO.SurveillanceStation.PTZ" ermitteln 
             my $apiptzpath = $data->{'data'}->{$apiptz}->{'path'};
             $apiptzpath =~ tr/_//d if (defined($apiptzpath));
             my $apiptzmaxver = $data->{'data'}->{$apiptz}->{'maxVersion'};
@@ -2191,7 +2225,6 @@ sub sscam_getapisites_parse ($) {
             Log3($name, 4, "$name - $logstr");				
 
           # Pfad und Maxversion von "SYNO.SurveillanceStation.Info" ermitteln
-              
             my $apisvsinfopath = $data->{'data'}->{$apisvsinfo}->{'path'};
             $apisvsinfopath =~ tr/_//d if (defined($apisvsinfopath));
             my $apisvsinfomaxver = $data->{'data'}->{$apisvsinfo}->{'maxVersion'};
@@ -2201,8 +2234,7 @@ sub sscam_getapisites_parse ($) {
             $logstr = defined($apisvsinfomaxver) ? "MaxVersion of $apisvsinfo: $apisvsinfomaxver" : "MaxVersion of $apisvsinfo undefined - Surveillance Station may be stopped";
             Log3($name, 4, "$name - $logstr");
                         
-          # Pfad und Maxversion von "SYNO.Surveillance.Camera.Event" ermitteln
-              
+          # Pfad und Maxversion von "SYNO.Surveillance.Camera.Event" ermitteln    
             my $apicameventpath = $data->{'data'}->{$apicamevent}->{'path'};
             $apicameventpath =~ tr/_//d if (defined($apicameventpath));
             my $apicameventmaxver = $data->{'data'}->{$apicamevent}->{'maxVersion'};
@@ -2212,8 +2244,7 @@ sub sscam_getapisites_parse ($) {
             $logstr = defined($apicameventmaxver) ? "MaxVersion of $apicamevent: $apicameventmaxver" : "MaxVersion of $apicamevent undefined - Surveillance Station may be stopped";
             Log3($name, 4, "$name - $logstr");
                         
-          # Pfad und Maxversion von "SYNO.Surveillance.Event" ermitteln
-              
+          # Pfad und Maxversion von "SYNO.Surveillance.Event" ermitteln     
             my $apieventpath = $data->{'data'}->{$apievent}->{'path'};
             $apieventpath =~ tr/_//d if (defined($apieventpath));
             my $apieventmaxver = $data->{'data'}->{$apievent}->{'maxVersion'};
@@ -2224,7 +2255,6 @@ sub sscam_getapisites_parse ($) {
             Log3($name, 4, "$name - $logstr");
                         
           # Pfad und Maxversion von "SYNO.Surveillance.VideoStream" ermitteln
-              
             my $apivideostmpath = $data->{'data'}->{$apivideostm}->{'path'};
             $apivideostmpath =~ tr/_//d if (defined($apivideostmpath));
             my $apivideostmmaxver = $data->{'data'}->{$apivideostm}->{'maxVersion'};
@@ -2235,7 +2265,6 @@ sub sscam_getapisites_parse ($) {
             Log3($name, 4, "$name - $logstr");
                         
           # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalEvent" ermitteln
-       
             my $apiextevtpath = $data->{'data'}->{$apiextevt}->{'path'};
             $apiextevtpath =~ tr/_//d if (defined($apiextevtpath));
             my $apiextevtmaxver = $data->{'data'}->{$apiextevt}->{'maxVersion'}; 
@@ -2246,7 +2275,6 @@ sub sscam_getapisites_parse ($) {
             Log3($name, 4, "$name - $logstr");
                         
           # Pfad und Maxversion von "SYNO.SurveillanceStation.Streaming" ermitteln
-       
             my $apistmpath = $data->{'data'}->{$apistm}->{'path'};
             $apistmpath =~ tr/_//d if (defined($apistmpath));
             my $apistmmaxver = $data->{'data'}->{$apistm}->{'maxVersion'}; 
@@ -2256,13 +2284,24 @@ sub sscam_getapisites_parse ($) {
             $logstr = defined($apistmmaxver) ? "MaxVersion of $apistm selected: $apistmmaxver" : "MaxVersion of $apistm undefined - Surveillance Station may be stopped";
             Log3($name, 4, "$name - $logstr");
 
+          # Pfad und Maxversion von "SYNO.SurveillanceStation.HomeMode" ermitteln
+            my $apihmpath = $data->{'data'}->{$apihm}->{'path'};
+            $apihmpath =~ tr/_//d if (defined($apihmpath));
+            my $apihmmaxver = $data->{'data'}->{$apihm}->{'maxVersion'}; 
+       
+            $logstr = defined($apihmpath) ? "Path of $apihm selected: $apihmpath" : "Path of $apihm undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");
+            $logstr = defined($apihmmaxver) ? "MaxVersion of $apihm selected: $apihmmaxver" : "MaxVersion of $apihm undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");
         
+		
             # aktuelle oder simulierte SVS-Version für Fallentscheidung setzen
             no warnings 'uninitialized'; 
             my $major = $hash->{HELPER}{SVSVERSION}{MAJOR};
             my $minor = $hash->{HELPER}{SVSVERSION}{MINOR};
+			my $small = $hash->{HELPER}{SVSVERSION}{SMALL};
             my $build = $hash->{HELPER}{SVSVERSION}{BUILD}; 
-            my $actvs = $major.$minor.$build;
+            my $actvs = $major.$minor.$small.$build;
             Log3($name, 4, "$name - saved SVS version is: $actvs");
             use warnings; 
                         
@@ -2334,6 +2373,8 @@ sub sscam_getapisites_parse ($) {
             $hash->{HELPER}{APIEXTEVTMAXVER}   = $apiextevtmaxver;
             $hash->{HELPER}{APISTMPATH}        = $apistmpath;
             $hash->{HELPER}{APISTMMAXVER}      = $apistmmaxver;
+            $hash->{HELPER}{APIHMPATH}         = $apihmpath;
+            $hash->{HELPER}{APIHMMAXVER}       = $apihmmaxver;
        
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash,"Errorcode","none");
@@ -2578,6 +2619,9 @@ sub sscam_camop ($) {
    my $apistm            = $hash->{HELPER}{APISTM};
    my $apistmpath        = $hash->{HELPER}{APISTMPATH};
    my $apistmmaxver      = $hash->{HELPER}{APISTMMAXVER};
+   my $apihm             = $hash->{HELPER}{APIHM};
+   my $apihmpath         = $hash->{HELPER}{APIHMPATH};
+   my $apihmmaxver       = $hash->{HELPER}{APIHMMAXVER};
    my $sid               = $hash->{HELPER}{SID};
    my $OpMode            = $hash->{OPMODE};
    my $camid             = $hash->{CAMID};
@@ -2647,6 +2691,11 @@ sub sscam_camop ($) {
    
    } elsif ($OpMode eq "Disable") {
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
+   
+   } elsif ($OpMode eq "sethomemode") {
+      my $sw = $hash->{HELPER}{HOMEMODE};     # HomeMode on,off
+	  $sw  = ($sw eq "on")?"true":"false";
+      $url = "http://$serveraddr:$serverport/webapi/$apihmpath?on=$sw&api=$apihm&method=Switch&version=$apihmmaxver&_sid=\"$sid\"";     
    
    } elsif ($OpMode eq "getsvsinfo") {
       $url = "http://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfomaxver\"&method=\"GetInfo\"&_sid=\"$sid\"";   
@@ -2954,6 +3003,16 @@ sub sscam_camop_parse ($) {
        
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname exposure mode was set to \"$hash->{HELPER}{EXPMODE}\"");
+            
+			} elsif ($OpMode eq "sethomemode") {              
+
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+       
+                # Logausgabe
+                Log3($name, 3, "$name - HomeMode was set to \"$hash->{HELPER}{HOMEMODE}\" (all Cameras!)");
             
 			} elsif ($OpMode eq "MotDetSc") {              
 
@@ -4235,6 +4294,7 @@ sub experror {
        <li>start and stop of camera livestreams, show the last recording and snapshot embedded </li>
        <li>fetch of livestream-Url's with key (login not needed in that case)   </li>
        <li>playback of last recording and playback the last snapshot  </li>
+	   <li>switch the Surveillance Station HomeMode on / off  </li>
 	   <li>create a gallery of the last 1-10 snapshots (as a Popup or permanent weblink-Device)  </li><br>
     </ul>
    </ul>
@@ -4550,6 +4610,13 @@ sub experror {
   </ul>
   <br><br>
 
+  <ul>
+  <li><b> set &lt;name&gt; homeMode [on | off] </b></li> <br>
+  
+  Switch the HomeMode of the Surveillance Station on or off. 
+  Further informations about HomeMode you can find in the <a href="https://www.synology.com/en-global/knowledgebase/Surveillance/help/SurveillanceStation/home_mode">Synology Onlinehelp</a>.
+  <br><br>
+  </ul>
   
   <ul>
   <li><b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b></li> <br>
@@ -5137,6 +5204,7 @@ sub experror {
       <li>starten und beenden von Kamera-Livestreams, anzeigen der letzten Aufnahme oder des letzten Schnappschusses  </li>
       <li>Abruf und Ausgabe der Kamera Streamkeys sowie Stream-Urls (Nutzung von Kamera-Livestreams ohne Session Id)  </li>
       <li>abspielen der letzten Aufnahme bzw. Anzeige des letzten Schnappschusses  </li>
+	  <li>Ein- bzw. Ausschalten des Surveillance Station HomeMode  </li>
 	  <li>erzeugen einer Gallerie der letzten 1-10 Schnappschüsse (als Popup oder permanentes Device)  </li><br>
      </ul> 
     </ul>
@@ -5450,6 +5518,15 @@ sub experror {
   </pre>
   </ul>
   <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; homeMode [on | off] </b></li> <br>
+  
+  Schaltet den HomeMode der Surveillance Station ein bzw. aus. 
+  Informationen zum HomeMode sind in der <a href="https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/home_mode">Synology Onlinehilfe</a> 
+  enthalten.
+  <br><br>
+  </ul>
   
   <ul>
   <li><b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b></li> <br>
