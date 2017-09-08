@@ -9,7 +9,6 @@
 ##############################################################################
 
 # required packets
-# libcrypt-pbkdf2-perl
 # Net::MQTT
 # libcpan-meta-yaml-perl
 
@@ -181,22 +180,9 @@ sub Nello_login {
     my $name = $hash->{NAME};
 
     return 'wrong syntax: set <name> login <username> <password>' if(!defined $username || !defined $password);
-    Nello_authenticate($hash, $username, Nello_passwordHash($username, $password));
+    Nello_authenticate($hash, $username, $password);
 
     return undef;
-}
-
-sub Nello_passwordHash {
-    my ($username, $password) = @_;
-    my $salt = sha256($username . $password);
-
-    my $pbkdf2 = Crypt::PBKDF2->new(
-        hash_class => 'HMACSHA1',
-        iterations => 4000,
-        output_len => 32
-    );
-
-    return uc $pbkdf2->PBKDF2_hex($salt, $password);
 }
 
 sub Nello_authenticate {
@@ -433,11 +419,10 @@ sub Nello_open {
 }
 
 sub Nello_recoverPassword {
-    my ($hash, $username, $temppw) = @_;
-    return 'wrong syntax: set <name> recoverPassword <username> [ <temporary_password> ]' if(!defined $username);
+    my ($hash, $username) = @_;
+    return 'wrong syntax: set <name> recoverPassword <username>' if(!defined $username);
 
-    return Nello_apiRequest($hash, 'recover-password', {username => $username}, 'POST', 0) if(!defined $temppw);
-    return Nello_authenticate($hash, $username, $temppw);
+    return Nello_apiRequest($hash, 'recover-password', {username => $username}, 'POST', 0);
 }
 
 sub Nello_poll {
@@ -506,13 +491,11 @@ sub Nello_detectExecute {
   The <i>Nello</i> module enables you to control your intercom using the <a target="_blank" rel="nofollow" href="https://www.nello.io/en/">nello one</a> module.<br>
   To set it up, you need to <b>add a new user</b> via the nello app just for use with fhem. You cannot use your main account since only one session at a time is possible.<br>
   After that, you can define the device and continue with login.<br>
-  <b>ATTENTION:</b> If the new account was created on an iOS device you need to call the recover function and do the login through <code>set &lt;name&gt; recoverPassword &lt;username&gt; &lt;temporary_password&gt;</code>.
-  Android users can use the default login function.<br>
+  <b>ATTENTION:</b> If the login fails, try resetting your password using the recoverPassword function.<br>
   <b>Recommendation:</b> To receive instant events, call the detectDeviceID function after login.<br>
   <br>
   <p><b>Required Packages</b></p>
   <code>
-  sudo apt-get install libcrypt-pbkdf2-perl<br>
   sudo apt-get install libcpan-meta-yaml-perl<br>
   sudo cpan -i Net::MQTT::Simple
   </code>
@@ -538,8 +521,8 @@ sub Nello_detectExecute {
       login to your created account
     </li>
     <li>
-      <i>recoverPassword &lt;username&gt; [ &lt;temporary_password&gt; ]</i><br>
-      recovers the password or executes the login using a temporary password
+      <i>recoverPassword &lt;username&gt;</i><br>
+      recovers the password
     </li>
 
     <li>
@@ -582,13 +565,11 @@ sub Nello_detectExecute {
   Das <i>Nello</i> Modul ermöglicht die Steuerung des <a target="_blank" rel="nofollow" href="https://www.nello.io/de/">nello one</a> Chips.<br>
   Um es aufzusetzen, muss zunächst ein <b>neuer Nutzer</b> in der Nello-App angelegt werden, der nur für FHEM verwendet wird - eine Nutzung per App ist mit diesem Account dann nicht mehr möglich.<br>
   Anschließend kann das Gerät angelegt werden. Sobald das Gerät erstellt wurde, kann der Login durchgeführt werden.<br>
-  <b>ACHTUNG:</b> Wurde der Account auf einem iOS-Gerät erstellt muss wegen eines Bugs das Passwort über die recoverPassword Funktion zurückgesetzt und anschließend der Login mit <code>set &lt;name&gt; recoverPassword &lt;username&gt; &lt;temporary_password&gt;</code> durchgeführt werden.
-  Ansonsten wird der Login fehlschlagen. Android-Nutzer können das normale login verwenden.<br>
+  <b>ACHTUNG:</b> Sollte der Login fehlschlagen, versuche das Passwort über die recoverPassword Funktion zurückzusetzen.<br>
   <b>Dringend empfohlen:</b> Für verzögerungsfreie Events die detectDeviceID Funktion nach dem Login aufrufen.<br>
   <br>
   <p><b>Benötigte Pakete</b></p>
   <code>
-  sudo apt-get install libcrypt-pbkdf2-perl<br>
   sudo apt-get install libcpan-meta-yaml-perl<br>
   sudo cpan -i Net::MQTT::Simple
   </code>
@@ -610,11 +591,11 @@ sub Nello_detectExecute {
   <ul>
     <li>
       <i>login &lt;username&gt; &lt;password&gt;</i><br>
-      Login in einen Android-Account
+      Login
     </li>
     <li>
-      <i>recoverPassword &lt;username&gt; [ &lt;temporary_password&gt; ]</i><br>
-      setzt das Passwort zurück oder führt den Login mit temporären Passwort durch
+      <i>recoverPassword &lt;username&gt;</i><br>
+      setzt das Passwort zurück
     </li>
 
     <li>
