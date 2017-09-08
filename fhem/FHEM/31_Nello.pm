@@ -487,7 +487,7 @@ sub Nello_detectExecute {
 <h3>Nello</h3>
 <ul>
   The <i>Nello</i> module enables you to control your intercom using the <a target="_blank" rel="nofollow" href="https://www.nello.io/en/">nello one</a> module.<br>
-  To set it up, you need to <b>add a new user</b> via the nello app just for use with fhem. You cannot use your main account since only one session at a time is possible.<br>
+  To set it up, you need to <b>add a new user with admin rights</b> via the nello app just for use with fhem. You cannot use your main account since only one session at a time is possible.<br>
   After that, you can define the device and continue with login.<br>
   <b>ATTENTION:</b> If the login fails, try resetting your password using the recoverPassword function.<br>
   <b>Recommendation:</b> To receive instant events, call the detectDeviceID function after login.<br>
@@ -561,7 +561,7 @@ sub Nello_detectExecute {
 <h3>Nello</h3>
 <ul>
   Das <i>Nello</i> Modul ermöglicht die Steuerung des <a target="_blank" rel="nofollow" href="https://www.nello.io/de/">nello one</a> Chips.<br>
-  Um es aufzusetzen, muss zunächst ein <b>neuer Nutzer</b> in der Nello-App angelegt werden, der nur für FHEM verwendet wird - eine Nutzung per App ist mit diesem Account dann nicht mehr möglich.<br>
+  Um es aufzusetzen, muss zunächst ein <b>neuer Nutzer mit Admin-Rechten</b> in der Nello-App angelegt werden, der nur für FHEM verwendet wird - eine Nutzung per App ist mit diesem Account dann nicht mehr möglich.<br>
   Anschließend kann das Gerät angelegt werden. Sobald das Gerät erstellt wurde, kann der Login durchgeführt werden.<br>
   <b>ACHTUNG:</b> Sollte der Login fehlschlagen, versuche das Passwort über die recoverPassword Funktion zurückzusetzen.<br>
   <b>Dringend empfohlen:</b> Für verzögerungsfreie Events die detectDeviceID Funktion nach dem Login aufrufen.<br>
