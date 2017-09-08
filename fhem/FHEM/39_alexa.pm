@@ -34,6 +34,7 @@ alexa_Initialize($)
                       "articles prepositions ".
                       "echoRooms:textField-long ".
                       "alexaConfirmationLevel:2,1,0 alexaStatusLevel:2,1 ".
+                      "skillId:textField ".
                       $readingFnAttributes;
 }
 
@@ -138,7 +139,7 @@ alexa_Set($$@)
 {
   my ($hash, $name, $cmd, @args) = @_;
 
-  my $list = "reload:noArg";
+  my $list = "reload:noArg skillId";
 
   if( $cmd eq 'reload' ) {
     $hash->{".triggerUsed"} = 1;
@@ -180,17 +181,22 @@ alexa_Set($$@)
     }
 
     return undef;
+  } elsif( $cmd eq 'skillId' ) {
+
+    return CommandAttr(undef,"$name skillId $args[0]" );
   }
 
   return "Unknown argument $cmd, choose one of $list";
 }
+
+
 
 sub
 alexa_Get($$@)
 {
   my ($hash, $name, $cmd) = @_;
 
-  my $list = "customSlotTypes:noArg interactionModel:noArg";
+  my $list = "customSlotTypes:noArg interactionModel:noArg skillId:noArg";
 
   if( lc($cmd) eq 'customslottypes' ) {
     if( $hash->{CL} ) {
@@ -363,6 +369,7 @@ Log 1, Dumper $characteristicsOfIntent;
           $intents->{$intent} = 1;
 
           my $slots = [];
+          my $samples2 = [];
           push @{$slots}, { name => 'article', type => 'FHEM_article' };
           push @{$slots}, { name => 'Device', type => 'FHEM_Device' } if( !$mapping->{device} );
           push @{$slots}, { name => 'preposition', type => 'FHEM_preposition' };
@@ -422,12 +429,15 @@ Log 1, Dumper $characteristicsOfIntent;
                   $line .= " $mapping->{valueSuffix}" if( $mapping->{valueSuffix} );
                 }
 
+                push @{$samples2}, $line;
+
                 $samples .= "\n" if( $samples );
                 $samples .= $line;
               }
             }
           }
           push @{$schema->{intents}}, {intent => $intent, slots => $slots};
+          #push @{$schema->{intents}}, {intent => $intent, slots => $slots, samples => $samples2};
         }
 
         ++$i;
@@ -568,6 +578,14 @@ Log 1, Dumper $characteristicsOfIntent;
            "get alexa interactionmodel\n";
 
     return undef;
+  } elsif( $cmd eq 'skillId' ) {
+    my $skillId = AttrVal($name, 'skillId', undef);
+
+    return 'no skillId set' if( !$skillId );
+
+    $skillId = plex_decrypt( $skillId );
+
+    return "skillId: $skillId";
   }
 
   return "Unknown argument $cmd, choose one of $list";
@@ -599,6 +617,41 @@ Log 1, "!!!!!!!!!!";
 }
 
 sub
+alexa_encrypt($)
+{
+  my ($decoded) = @_;
+  my $key = getUniqueId();
+  my $encoded;
+
+  return $decoded if( $decoded =~ /^crypt:(.*)/ );
+
+  for my $char (split //, $decoded) {
+    my $encode = chop($key);
+    $encoded .= sprintf("%.2x",ord($char)^ord($encode));
+    $key = $encode.$key;
+  }
+
+  return 'crypt:'. $encoded;
+}
+sub
+alexa_decrypt($)
+{
+  my ($encoded) = @_;
+  my $key = getUniqueId();
+  my $decoded;
+
+  $encoded = $1 if( $encoded =~ /^crypt:(.*)/ );
+
+  for my $char (map { pack('C', hex($_)) } ($encoded =~ /(..)/g)) {
+    my $decode = chop($key);
+    $decoded .= chr(ord($char)^ord($decode));
+    $key = $decode.$key;
+  }
+
+  return $decoded;
+}
+
+sub
 alexa_Attr($$$)
 {
   my ($cmd, $name, $attrName, $attrVal) = @_;
@@ -607,15 +660,33 @@ alexa_Attr($$$)
 
   my $hash = $defs{$name};
   if( $attrName eq "disable" ) {
+  } elsif( $attrName eq 'skillId' ) {
+    if( $cmd eq "set" && $attrVal ) {
+
+      if( $attrVal =~ /^crypt:/ ) {
+        return;
+
+      } elsif( $attrVal !~ /(^amzn1\.ask\.skill\.[0-9a-f\-]+)|(^amzn1\.echo-sdk-ams\.app\.[0-9a-f\-]+)/ ) {
+        return "$attrVal is not a valid skill id";
+      }
+
+      $attrVal = plex_encrypt($attrVal);
+
+      if( $orig ne $attrVal ) {
+        $attr{$name}{$attrName} = $attrVal;
+        return "stored obfuscated skillId";
+      }
+    }
   }
+
 
   if( $cmd eq 'set' ) {
 
   } else {
     delete $attr{$name}{$attrName};
 
-     RemoveInternalTimer($hash);
-     InternalTimer(gettimeofday(), "alexa_AttrDefaults", $hash, 0);
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday(), "alexa_AttrDefaults", $hash, 0);
   }
 
   return;
@@ -656,6 +727,8 @@ alexa_Attr($$$)
     <li>interactionModel<br>
       Get Intent Schema, non device specific Custom Slot Types and Sample Utterances for the Interaction Model
       configuration.</li>
+    <li>skillId<br>
+      shows the configured skillId.</li>
   </ul>
 
   <a name="alexa_Attr"></a>
@@ -680,6 +753,9 @@ alexa_Attr($$$)
     <li>alexaConfirmationLevel<br>
       </li>
     <li>alexaStatusLevel<br>
+      </li>
+    <li>skillId<br>
+      skillId to use for automatic interaction model upload (not yet finished !!!)
       </li>
     Note: changes to attributes of the alexa device will automatically trigger a reconfiguration of
           alxea-fhem and there is no need to restart the service.
