@@ -19,8 +19,6 @@ use warnings;
 
 use JSON;
 
-use Crypt::PBKDF2;
-use Digest::SHA qw(sha256);
 use Date::Parse;
 
 
