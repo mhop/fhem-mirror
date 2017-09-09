@@ -309,6 +309,7 @@ my @globalAttrList = qw(
   perlSyntaxCheck:0,1
   pidfilename
   proxy
+  proxyAuth
   proxyExclude
   restartDelay
   restoreDirs

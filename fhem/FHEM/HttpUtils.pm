@@ -392,6 +392,7 @@ sub
 HttpUtils_Connect2($)
 {
   my ($hash) = @_;
+  my $usingSSL;
 
   $hash->{host} =~ s/:.*//;
   if($hash->{protocol} eq "https" && $hash->{conn} && !$hash->{hu_sslAdded}) {
@@ -403,11 +404,13 @@ HttpUtils_Connect2($)
       return $errstr;
     } else {
       $hash->{conn}->blocking(1);
+      $usingSSL = 1;
 
       if($hash->{hu_proxy}) {   # can block!
+        my $pw = AttrVal("global", "proxyAuth", "");
+        $pw = "Proxy-Authorization: Basic $pw\r\n" if($pw);
         my $hdr = "CONNECT $hash->{host}:$hash->{hu_port} HTTP/1.0\r\n".
-                  "User-Agent: fhem\r\n".
-                  "\r\n";
+                  "User-Agent: fhem\r\n$pw\r\n";
         syswrite $hash->{conn}, $hdr;
         my $buf;
         my $len = sysread($hash->{conn},$buf,65536);
@@ -503,6 +506,10 @@ HttpUtils_Connect2($)
     $hdr .= "Content-Length: ".length($data)."\r\n";
     $hdr .= "Content-Type: application/x-www-form-urlencoded\r\n"
                 if ($hdr !~ "Content-Type:");
+  }
+  if(!$usingSSL) {
+    my $pw = AttrVal("global", "proxyAuth", "");
+    $hdr .= "Proxy-Authorization: Basic $pw\r\n" if($pw);
   }
   Log3 $hash, $hash->{loglevel}+1, "HttpUtils request header:\n$hdr";
   $hdr .= "\r\n";
