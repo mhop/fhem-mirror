@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 95_holiday: move holiday files from contrib to FHEM
   - feature: 31_Nello: updated to new api specifications
   - feature: 49_SSCam: V2.8.0, switch Surveillance Station HomeMode available
   - bugfix:  73_GardenaSmartBridge: code clean, update german tranlation

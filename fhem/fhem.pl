@@ -2559,7 +2559,7 @@ GlobalAttr($$$$)
     my %noDel = ( modpath=>1, verbose=>1, logfile=>1 );
     return "The global attribute $name cannot be deleted" if($noDel{$name});
     $featurelevel = 5.8 if($name eq "featurelevel");
-    $haveInet6    = 0   if($name eq "useInet6");
+    $haveInet6    = 0   if($name eq "useInet6"); # IPv6
     return undef;
   }
 
