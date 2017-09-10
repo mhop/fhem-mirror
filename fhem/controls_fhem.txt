@@ -1,4 +1,4 @@
-REV 15042
+REV 15044
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -520,6 +520,29 @@ UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_nano328.hex
 UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_promini328.hex
 UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_uno.hex
 UPD 2017-01-07_07:45:02 99233 FHEM/firmware/esptool.py
+UPD 2017-09-10_16:01:38 757 FHEM/holiday/aut.holiday
+UPD 2017-09-10_16:01:38 373 FHEM/holiday/bb.holiday
+UPD 2017-09-10_16:01:38 344 FHEM/holiday/be.holiday
+UPD 2017-09-10_16:01:38 425 FHEM/holiday/bw.holiday
+UPD 2017-09-10_16:01:38 451 FHEM/holiday/by.holiday
+UPD 2017-09-10_16:01:38 1092 FHEM/holiday/by_ext.holiday
+UPD 2017-09-10_16:01:38 4587 FHEM/holiday/de_social.holiday
+UPD 2017-09-10_16:01:38 1031 FHEM/holiday/en.holiday
+UPD 2017-09-10_16:01:38 344 FHEM/holiday/hb.holiday
+UPD 2017-09-10_16:01:38 285 FHEM/holiday/he.holiday
+UPD 2017-09-10_16:01:38 345 FHEM/holiday/hh.holiday
+UPD 2017-09-10_16:01:38 430 FHEM/holiday/islam2017.holiday
+UPD 2017-09-10_16:01:38 430 FHEM/holiday/islam2018.holiday
+UPD 2017-09-10_16:01:38 430 FHEM/holiday/islam2019.holiday
+UPD 2017-09-10_16:01:38 384 FHEM/holiday/mv.holiday
+UPD 2017-09-10_16:01:38 267 FHEM/holiday/ns.holiday
+UPD 2017-09-10_16:01:38 397 FHEM/holiday/nw.holiday
+UPD 2017-09-10_16:01:38 393 FHEM/holiday/rp.holiday
+UPD 2017-09-10_16:01:38 356 FHEM/holiday/sh.holiday
+UPD 2017-09-10_16:01:38 381 FHEM/holiday/sl.holiday
+UPD 2017-09-10_16:01:38 422 FHEM/holiday/sn.holiday
+UPD 2017-09-10_16:01:38 405 FHEM/holiday/st.holiday
+UPD 2017-09-10_16:01:38 392 FHEM/holiday/th.holiday
 UPD 2017-09-07_07:45:02 295585 FHEM/lib/74_AMADautomagicFlowset_4.0.7.xml
 UPD 2015-07-28_14:05:30 2034 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
