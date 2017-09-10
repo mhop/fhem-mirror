@@ -1061,6 +1061,7 @@ AnalyzePerlCommand($$;$)
   }
   $month++;
   $year+=1900;
+  my $today = sprintf('%04d-%02d-%02d', $year,$month,$mday);
 
   if($evalSpecials) {
     $cmd = join("", map { my $n = substr($_,1); # ignore the %
