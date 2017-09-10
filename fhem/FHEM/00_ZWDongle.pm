@@ -35,6 +35,7 @@ my %sets = (
                           param => { on     =>0x02, stop =>0x05,
                                      stopFailed =>0x06 } },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO
+  "createNodeSec"    => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO
   "factoryReset"     => { cmd => ""       },   # ZW_SET_DEFAULT
   "learnMode"        => { cmd => "50%02x@",    # ZW_SET_LEARN_MODE
                           param => { onNw   =>0x02, on   =>0x01,
@@ -336,7 +337,7 @@ ZWDongle_Set($@)
 
   if($type eq "removeFailedNode" ||
      $type eq "replaceFailedNode" ||
-     $type eq "createNode" ||
+     $type =~ m/^createNode/ ||
      $type eq "sendNIF") {
 
     $a[0] =~ s/^UNKNOWN_//;
@@ -352,12 +353,11 @@ ZWDongle_Set($@)
     return "$type is unsupported by this controller";
   }
 
+  delete($hash->{addSecure});
+  $hash->{addSecure} = 1 if($type eq "createNodeSec");
+
   if($type eq "addNode") {
-    if($a[0] && $a[0] =~ m/sec/i) {
-      $hash->{addSecure} = 1;
-    } else {
-      delete($hash->{addSecure});
-    }
+    $hash->{addSecure} = 1 if($a[0] && $a[0] =~ m/sec/i);
 
     if($a[0]) { # Remember the client for the failed message
       if($a[0] eq "off") {
@@ -1070,13 +1070,16 @@ ZWDongle_Ready($)
     </li>
 
   <li>createNode &lt;device&gt;<br>
+      createNodeSec &lt;device&gt;<br>
     Request the class information for the specified node, and create
     a FHEM device upon reception of the answer. Used to create FHEM devices for
     nodes included with another software or if the fhem.cfg got lost. For the
     node id see the get nodeList command below.  Note: the node must be "alive",
     i.e. for battery based devices you have to press the "wakeup" button 1-2
     seconds before entering this command in FHEM.<br>
-    &lt;device&gt; is either device name or decimal nodeId.
+    &lt;device&gt; is either device name or decimal nodeId.<br>
+    createNodeSec assumes a secure inclusion, see the comments for "addNode
+    onSec" for details.
     </li>
 
   <li>factoryReset yes<br>
