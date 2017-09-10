@@ -583,7 +583,7 @@ Log 1, Dumper $characteristicsOfIntent;
 
     return 'no skillId set' if( !$skillId );
 
-    $skillId = plex_decrypt( $skillId );
+    $skillId = alexa_decrypt( $skillId );
 
     return "skillId: $skillId";
   }
@@ -670,7 +670,7 @@ alexa_Attr($$$)
         return "$attrVal is not a valid skill id";
       }
 
-      $attrVal = plex_encrypt($attrVal);
+      $attrVal = alexa_encrypt($attrVal);
 
       if( $orig ne $attrVal ) {
         $attr{$name}{$attrName} = $attrVal;
