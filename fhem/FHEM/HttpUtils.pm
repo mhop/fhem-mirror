@@ -277,14 +277,19 @@ HttpUtils_Connect($)
 
   Log3 $hash, $hash->{loglevel}, "HttpUtils url=$hash->{displayurl}";
 
-  if($hash->{url} !~
-           /^(http|https):\/\/(([^:\/]+):([^:\/]+)@)?([^:\/]+)(:\d+)?(\/.*)$/) {
+  if($hash->{url} !~ /
+      ^(http|https):\/\/                # $1: proto
+       (([^:\/]+):([^:\/]+)@)?          # $2: auth, $3:user, $4:password
+       ([^:\/]+|\[[0-9a-f:]+\])         # $5: host or IPv6 address
+       (:\d+)?                          # $6: port
+       (\/.*)$                          # $7: path
+    /xi) {
     return "$hash->{displayurl}: malformed or unsupported URL";
   }
 
   my ($authstring,$user,$pwd,$port,$host);
   ($hash->{protocol},$authstring,$user,$pwd,$host,$port,$hash->{path})
-        = ($1,$2,$3,$4,$5,$6,$7);
+        = (lc($1),$2,$3,$4,$5,$6,$7);
   $hash->{host} = $host;
   
   if(defined($port)) {
