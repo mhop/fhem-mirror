@@ -2166,7 +2166,7 @@ FW_style($$)
 
     my $efl = AttrVal($FW_wname, 'editFileList',
       "Own modules and helper files:\$MW_dir:^(.*sh|[0-9][0-9].*Util.*pm|".
-                        ".*cfg|.*holiday|myUtilsTemplate.pm|.*layout)\$\n".
+                        ".*cfg|.*\.holiday|myUtilsTemplate.pm|.*layout)\$\n".
       "Gplot files:\$FW_gplotdir:^.*gplot\$\n".
       "Styles:\$FW_cssdir:^.*(css|svg)\$");
     foreach my $l (split(/[\r\n]/, $efl)) {

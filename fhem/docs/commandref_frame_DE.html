@@ -1612,11 +1612,25 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 
     <a name="pidfilename="></a>
     <li>pidfilename<br>
-        Schreibt die PERL Prozess-ID in die angegebene Datei. Der Server l&auml;uft 
-    als Daemon und einige Distributionen wollen anhand der PID testen, ob der 
-    FHEM Prozess l&auml;uft. Die Datei wird bei Ausf&uuml;hrung des &quot;shutdown&quot;-Kommandos 
-    gel&ouml;scht.
+        Schreibt die PERL Prozess-ID in die angegebene Datei. Der Server
+        l&auml;uft als Daemon und einige Distributionen wollen anhand der PID
+        testen, ob der FHEM Prozess l&auml;uft. Die Datei wird bei
+        Ausf&uuml;hrung des &quot;shutdown&quot;-Kommandos gel&ouml;scht.
     </li><br>
+
+    <a name="proxy"></a>
+    <li>proxy<br>
+        IP:PORT des proxy Servers, wird von HttpUtils benutzt.
+    </li><br>
+    <a name="proxyAuth"></a>
+    <li>proxyAuth<br>
+        Base64 kodiertes Benutzername:Passwort
+    </li><br>
+    <a name="proxyExclude"></a>
+    <li>proxyExclude<br>
+        Regexp, um bestimmte Hosts nicht via proxy zu kontaktieren.
+    </li><br>
+
 
     <li><a href="#fheminfo">sendStatistics</a><br>
 
@@ -1782,7 +1796,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     f&uuml;r die Verwendung in PERL-&quot;oneliners&quot; eingef&uuml;hrt (s.
     unter perldoc -f localtime). Ausnahmen: $month hat einen Wertebereich von 1
     to 12 und $year ist korrigiert von 1900.
-    Weiterhin enth&auml;t $hms die Zeit in dem HH:MM:SS Format.
+    Weiterhin enth&auml;t $hms die Zeit in dem HH:MM:SS Format und $today den
+    aktuellen Datum in YYYY-MM-DD Format.
     <br>
 
     Die Variabe $we hat den Wert 1 wenn der abgefragte Tag auf ein Wochenende

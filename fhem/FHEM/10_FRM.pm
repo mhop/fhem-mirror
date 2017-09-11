@@ -57,6 +57,7 @@ my @clients = qw(
   I2C_TSL2561
   FRM_LCD
   I2C_K30
+  I2C_LM.*
 );
 
 #####################################
@@ -1033,6 +1034,11 @@ sub FRM_OWX_Discover ($) {
 1;
 
 =pod
+=item device
+=item summary accesses FRM devices
+=item summary_DE Zugriff auf FRM Ger&auml;te 
+=begin html
+
   CHANGES
 
   18.12.2015 jensb

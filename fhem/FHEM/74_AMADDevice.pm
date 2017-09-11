@@ -58,8 +58,8 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.6";
-my $flowsetversion = "4.0.5";
+my $modulversion = "4.0.8";
+my $flowsetversion = "4.0.7";
 
 
 
@@ -105,8 +105,9 @@ sub AMADDevice_Initialize($) {
                 "setOpenUrlBrowser ".
                 "setNotifySndFilePath ".
                 "setTtsMsgSpeed ".
-                "setUserFlowState ".
                 "setTtsMsgLang:de,en ".
+                "setTtsMsgVol ".
+                "setUserFlowState ".
                 "setVolUpDownStep:1,2,4,5 ".
                 "setVolMax ".
                 "setVolFactor:2,3,4,5 ".
@@ -439,23 +440,18 @@ sub AMADDevice_Set($$@) {
     if( lc $cmd eq 'screenmsg' ) {
         my $msg = join( " ", @args );
 
-        $msg    =~ s/%/%25/g;
-        $msg    =~ s/\s/%20/g;
-
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/screenMsg?message=$msg";
+        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/screenMsg?message=".urlEncode($msg);
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'ttsmsg' ) {
 
-        my $msg     = join( " ", @args );
-        my $speed   = AttrVal( $name, "setTtsMsgSpeed", "1.0" );
-        my $lang    = AttrVal( $name, "setTtsMsgLang","de" );
+        my $msg         = join( " ", @args );
+        my $speed       = AttrVal( $name, "setTtsMsgSpeed", "1.0" );
+        my $lang        = AttrVal( $name, "setTtsMsgLang","de" );
+        my $ttsmsgvol   = AttrVal( $name, "setTtsMsgVol","none");
 
-        $msg        =~ s/%/%25/g;
-        $msg        =~ s/\s/%20/g;    
-
-        $uri        = $host . ":" . $port . "/fhem-amad/setCommands/ttsMsg?message=".$msg."&msgspeed=".$speed."&msglang=".$lang;
+        $uri        = $host . ":" . $port . "/fhem-amad/setCommands/ttsMsg?message=".urlEncode($msg)."&msgspeed=".$speed."&msglang=".$lang."&msgvol=".$ttsmsgvol;
         $method     = "POST";
     }
     
@@ -1023,7 +1019,7 @@ sub AMADDevice_decrypt($) {
     <li>sendSMS - Sends an SMS to a specific phone number. Bsp.: sendSMS Dies ist ein Test|555487263</li>
     <li>startDaydream - start Daydream</li>
     <li>statusRequest - Get a new status report of Android device. Not all readings can be updated using a statusRequest as some readings are only updated if the value of the reading changes.</li>
-    <li>timer - set a countdown timer in the "Clock" stock app. Only seconds are allowed as parameter.</li>
+    <li>timer - set a countdown timer in the "Clock" stock app. Only minutes are allowed as parameter.</li>
     <li>ttsMsg - send a message which will be played as voice message</li>
     <li>userFlowState - set Flow/s active or inactive,<b><i>set Nexus7Wohnzimmer Badezimmer:inactive vorheizen</i> or <i>set Nexus7Wohnzimmer Badezimmer vorheizen,Nachtlicht Steven:inactive</i></b></li>
     <li>vibrate - vibrate Android device</li>
@@ -1046,6 +1042,7 @@ sub AMADDevice_decrypt($) {
     <li>setNotifySndFilePath - set systempath to notifyfile (default /storage/emulated/0/Notifications/</li>
     <li>setTtsMsgSpeed - set speaking speed for TTS (Value between 0.5 - 4.0, 0.5 Step) default is 1.0</li>
     <li>setTtsMsgLang - set speaking language for TTS, de or en (default is de)</li>
+    <li>setTtsMsgVol - is set, change automatically the media audio end set it back</li>
     <br>
     To be able to use "openApp" the corresponding attribute "setOpenApp" needs to contain the app package name.
     <br><br>
@@ -1191,7 +1188,7 @@ sub AMADDevice_decrypt($) {
     <li>sendSMS - sendet eine SMS an eine bestimmte Telefonnummer. Bsp.: sendSMS Dies ist ein Test|555487263</li>
     <li>startDaydream - startet den Daydream</li>
     <li>statusRequest - Fordert einen neuen Statusreport beim Device an. Es k&ouml;nnen nicht von allen Readings per statusRequest die Daten geholt werden. Einige wenige geben nur bei Status&auml;nderung ihren Status wieder.</li>
-    <li>timer - setzt einen Timer innerhalb der als Standard definierten ClockAPP auf dem Device. Es k&ouml;nnen nur Sekunden angegeben werden.</li>
+    <li>timer - setzt einen Timer innerhalb der als Standard definierten ClockAPP auf dem Device. Es k&ouml;nnen nur Minuten angegeben werden.</li>
     <li>ttsMsg - versendet eine Nachricht welche als Sprachnachricht ausgegeben wird</li>
     <li>userFlowState - aktiviert oder deaktiviert einen oder mehrere Flows,<b><i>set Nexus7Wohnzimmer Badezimmer vorheizen:inactive</i> oder <i>set Nexus7Wohnzimmer Badezimmer vorheizen,Nachtlicht Steven:inactive</i></b></li>
     <li>vibrate - l&auml;sst das Androidger&auml;t vibrieren</li>
@@ -1216,7 +1213,8 @@ sub AMADDevice_decrypt($) {
     <li>system - setzt Systembefehle ab (nur bei gerootetet Ger&auml;en). reboot,shutdown,airplanemodeON (kann nur aktiviert werden) <b>Attribut root</b>, in den Automagic Einstellungen muss "Root Funktion" gesetzt werden</li>
     <li>setNotifySndFilePath - setzt den korrekten Systempfad zur Notifydatei (default ist /storage/emulated/0/Notifications/</li>
     <li>setTtsMsgSpeed - setzt die Sprachgeschwindigkeit bei der Sprachausgabe(Werte zwischen 0.5 bis 4.0 in 0.5er Schritten) default ist 1.0</li>
-    <li>setTtsMsgSpeed - setzt die Sprache bei der Sprachausgabe, de oder en (default ist de)</li>
+    <li>setTtsMsgLang - setzt die Sprache bei der Sprachausgabe, de oder en (default ist de)</li>
+    <li>setTtsMsgVol - wenn gesetzt wird der Wert als neues Media Volume f&uuml; die Sprachansage verwendet und danach wieder der alte Wert eingestellt</li>
     <li>setVolUpDownStep - setzt den Step f&uuml;r volumeUp und volumeDown</li>
     <li>setVolMax - setzt die maximale Volume Gr&uoml;e f&uuml;r den Slider</li>
     <li>setNotifyVolMax - setzt den maximalen Lautst&auml;rkewert für Benachrichtigungslautst&auml;rke f&uuml;r den Slider</li>

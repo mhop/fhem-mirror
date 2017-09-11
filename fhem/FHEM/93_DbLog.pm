@@ -16,6 +16,9 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.5     05.09.2017       fix Internal MODE isn't set correctly after DEF is edited, nextsynch is not renewed if reopen is  
+#                             set manually after reopen was set with a delay Forum:#76213, Link to 98_FileLogConvert.pm added
+# 2.22.4     27.08.2017       fhem chrashes if database DBD driver is not installed (Forum:#75894)
 # 2.22.3     11.08.2017       Forum:#74690, bug unitialized in row 4322 -> $ret .= SVG_txt("par_${r}_0", "", "$f0:$f1:$f2:$f3", 20);
 # 2.22.2     08.08.2017       Forum:#74690, bug unitialized in row 737 -> $ret .= ($fld[0]?$fld[0]:" ").'.'.($fld[1]?$fld[1]:" ");
 # 2.22.1     07.08.2017       attribute "suppressAddLogV3" to suppress verbose3-logentries created by DbLog_AddLog 
@@ -146,7 +149,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.3";
+my $DbLogVersion = "2.22.5";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -235,9 +238,9 @@ sub DbLog_Define($@)
   eval { "Hallo" =~ m/^$regexp$/ };
   return "Bad regexp: $@" if($@);
   
-  $hash->{REGEXP}     = $regexp;
-  $hash->{VERSION}    = $DbLogVersion;
-  $hash->{MODE}       = "synchronous";   # Standardmode
+  $hash->{REGEXP}  = $regexp;
+  $hash->{VERSION} = $DbLogVersion;
+  $hash->{MODE}    = AttrVal($hash->{NAME}, "asyncMode", undef)?"asynchronous":"synchronous";   # Mode setzen Forum:#76213
   
   # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
   notifyRegexpChanged($hash, $regexp);
@@ -393,7 +396,8 @@ return undef;
 ################################################################
 sub DbLog_Set($@) {
     my ($hash, @a) = @_;
-	my $name = $hash->{NAME};
+	my $name  = $hash->{NAME};
+	my $async = AttrVal($name, "asyncMode", undef);
 	my $usage = "Unknown argument, choose one of reduceLog reduceLogNbl reopen rereadcfg:noArg count:noArg countNbl:noArg 
 	             deleteOldDays deleteOldDaysNbl userCommand clearReadings:noArg 
 				 eraseReadings:noArg addLog ";
@@ -486,6 +490,8 @@ sub DbLog_Set($@) {
 		if (!$a[2]) {
 		    Log3($name, 3, "DbLog $name: Reopen requested.");
             DbLog_ConnectPush($hash);
+			delete $hash->{HELPER}{REOPEN_RUNS};
+			DbLog_execmemcache($hash) if($async);
             $ret = "Reopen executed.";
 		} else {
 			unless ($a[2] =~ /^[0-9]+$/) { return " The Value of $a[1]-time is not valid. Use only figures 0-9 !";}
@@ -2131,9 +2137,14 @@ sub DbLog_ConnectPush($;$$) {
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  my $dbhp;
   
   Log3 $hash->{NAME}, 3, "DbLog $name: Creating Push-Handle to database $dbconn with user $dbuser" if(!$get);
-  my $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, mysql_enable_utf8 => $utf8 });
+  eval {$dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, mysql_enable_utf8 => $utf8 }); };
+  if($@) {
+      readingsSingleUpdate($hash, 'state', $@, 1);
+	  Log3 $hash->{NAME}, 3, "DbLog $name: Error - $@";
+  }
   
   if(!$dbhp) {
     RemoveInternalTimer($hash, "DbLog_ConnectPush");
@@ -4391,7 +4402,7 @@ return;
 sub reopen ($){
   my ($hash) = @_;
   my $name   = $hash->{NAME};
-  my $async  = AttrVal($name, "asyncMode", undef);
+  my $async = AttrVal($name, "asyncMode", undef);
   
   RemoveInternalTimer($hash, "reopen");
   
@@ -4400,10 +4411,11 @@ sub reopen ($){
       delete $hash->{HELPER}{REOPEN_RUNS};
 	  Log3($name, 3, "DbLog $name: Database connection reopen request finished.");
 	  readingsSingleUpdate($hash, "state", "reopened", 1);
-	  DbLog_execmemcache($hash);
+	  DbLog_execmemcache($hash) if($async);
   } else {
       InternalTimer(gettimeofday()+30, "reopen", $hash, 0);		
   }
+  
 return;
 }
 
@@ -4468,8 +4480,8 @@ sub checkUsePK ($$){
     # NOTE:
     # If you don't use a value for user / password please delete the leading hash mark
     # and write 'user => ""' respectively 'password => ""' instead !	
-	#
-	#
+    #
+    #
     ## for MySQL                                                     
     ####################################################################################
     #%dbconfig= (                                                    
@@ -4557,14 +4569,22 @@ sub checkUsePK ($$){
     </ul>
 	<br>
 	
-	After you have defined your DbLog-device it is recommended to run the command <br><br>
+	After you have defined your DbLog-device it is recommended to run the <b>configuration check</b> <br><br>
     <ul>
         <code>set &lt;name&gt; configCheck</code> <br>
     </ul>
 	<br>
 	
 	This check reports some important settings and gives recommendations back to you if proposals are indentified.
-	(Available for MySQL, PostgreSQL) <br>
+	(Available for MySQL, PostgreSQL) <br><br>
+	
+	<br>
+	<b>transfer FileLog-data to DbLog </b> <br><br>
+    There is the special module 98_FileLogConvert.pm available to transfer filelog-data to the DbLog-database. <br>
+ 	The module can be downloaded <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/98_FileLogConvert.pm"> here</a>
+	or from directory ./contrib instead.
+	Further informations and help you can find in the corresponding <a href="https://forum.fhem.de/index.php/topic,66383.0.html"> 
+	Forumthread </a>. <br><br>
 	
   </ul>
   <br><br>
@@ -5287,8 +5307,8 @@ sub checkUsePK ($$){
     # NOTE:
     # If you don't use a value for user / password please delete the leading hash mark
     # and write 'user => ""' respectively 'password => ""' instead !	
-	#
-	#
+    #
+    #
     ## for MySQL                                                      
     ####################################################################################
     #%dbconfig= (                                                    
@@ -5336,6 +5356,20 @@ sub checkUsePK ($$){
     müssen installiert werden (use <code>cpan -i &lt;module&gt;</code>
     falls die eigene Distribution diese nicht schon mitbringt). 
     <br><br>
+	
+	Auf einem Debian-System können diese Module z.Bsp. installiert werden mit: <br><br>
+	
+	<ul>
+    <table>  
+    <colgroup> <col width=5%> <col width=95%> </colgroup>
+      <tr><td> <b>DBI</b>         </td><td>: <code> sudo apt-get install libdbi-perl </code> </td></tr>
+      <tr><td> <b>MySQL</b>       </td><td>: <code> sudo apt-get install [mysql-server] mysql-client libdbd-mysql libdbd-mysql-perl </code> (mysql-server nur bei lokaler MySQL-Server-Installation) </td></tr>
+      <tr><td> <b>SQLite</b>      </td><td>: <code> sudo apt-get install sqlite3 libdbi-perl libdbd-sqlite3-perl </code> </td></tr>
+      <tr><td> <b>PostgreSQL</b>  </td><td>: <code> sudo apt-get install libdbd-pg-perl </code> </td></tr>
+    </table>
+	</ul>
+	<br>
+	<br>
 
     <code>&lt;regexp&gt;</code> ist identisch wie <a href="../docs/commandref.html#FileLog">FileLog</a>.
     <br><br>
@@ -5380,13 +5414,22 @@ sub checkUsePK ($$){
     </ul>
 	<br>
 	
-	Nachdem das DbLog-Device definiert wurde, ist empfohlen einen Konfigurationscheck auszuführen: <br><br>
+	Nachdem das DbLog-Device definiert wurde, ist empfohlen einen <b>Konfigurationscheck</b> auszuführen: <br><br>
     <ul>
         <code>set &lt;name&gt; configCheck</code> <br>
     </ul>
 	<br>
 	Dieser Check prüft einige wichtige Einstellungen des DbLog-Devices und gibt Empfehlungen für potentielle Verbesserungen. 
-	(verfügbar für MySQL, PostgreSQL) <br>
+	(verfügbar für MySQL, PostgreSQL) <br><br>
+	
+	<br>
+	<b>FileLog-Dateien nach DbLog übertragen</b> <br><br>
+    Zur Übertragung von vorhandenen Filelog-Daten in die DbLog-Datenbank steht das spezielle Modul 98_FileLogConvert.pm
+    zur Verfügung. <br>
+ 	Dieses Modul kann <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/98_FileLogConvert.pm"> hier</a>
+	bzw. aus dem Verzeichnis ./contrib geladen werden.
+	Weitere Informationen und Hilfestellung gibt es im entsprechenden <a href="https://forum.fhem.de/index.php/topic,66383.0.html"> 
+	Forumthread </a>. <br><br>
 	
   </ul>
   <br>

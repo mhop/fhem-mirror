@@ -1,0 +1,25 @@
+# $Id: aut.holiday 14326 2017-05-20 11:37:11Z loredo $
+# Siehe auch
+# http://de.wikipedia.org/wiki/Feiertage_in_Oesterreich
+# http://www.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=10008541 
+# Bundesgesetz vom 3. Feber 1983 ueber die woechentliche Ruhezeit und 
+# die Arbeitsruhe an Feiertagen (Arbeitsruhegesetz - ARG) Abschnitt 2, §7.2
+
+1 01-01 Neujahr
+1 01-06 Heilige Drei Koenige
+1 05-01 Staatsfeiertag
+1 08-15 Mariae Himmelfahrt
+1 10-26 Nationalfeiertag
+1 11-01 Allerheiligen
+1 12-08 Mariae Empfaengnis
+1 12-24 Weihnachten
+1 12-25 Weihnachten
+1 12-26 Stephanstag
+#1 12-31 Silvester (ist kein Feiertag in Oesterreich)
+
+2  1 Ostermontag
+2 39 Christi Himmelfahrt
+2 50 Pfingstmontag
+2 60 Fronleichnam
+
+#4 07-01 08-31 Sommerferien

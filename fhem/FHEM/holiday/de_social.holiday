@@ -1,0 +1,205 @@
+# $Id: de_social.holiday 14332 2017-05-20 14:06:57Z loredo $
+# Festtage und regional-soziale Jahreszeiten in Deutschland
+# (nicht zu verwechseln mit tatsächlichen, gesetzlichen Feiertagen)
+#
+# Definition von "Regional-sozialer Jahreszeit" siehe hier
+# https://forum.fhem.de/index.php/topic,71978.msg637851.html#msg637851
+#
+# Siehe auch
+# https://de.wikipedia.org/wiki/Fastenzeit
+# https://de.wikipedia.org/wiki/F%C3%BCnfte_Jahreszeit
+# https://de.wikipedia.org/wiki/Karneval,_Fastnacht_und_Fasching#Zeitlicher_Verlauf_des_Karnevals
+# https://de.wikipedia.org/wiki/Karwoche
+
+# Festtage
+1 02-14 Valentinstag
+1 04-30 Tanz in den Mai
+1 10-31 Halloween
+1 11-02 Allerseelen
+1 11-11 Martinstag
+5 -1 Wed 11 24 Buß- und Bettag
+1 12-06 Nikolaus
+1 12-24 Heiligabend
+1 12-31 Silvester
+
+# Fasching
+2 -52 Fasching: Weiberfastnacht
+2 -51 Fasching
+2 -50 Fasching: Fastnachtssamstag
+2 -49 Fasching: Fastnachtssonntag
+2 -48 Fasching: Rosenmontag
+2 -47 Fasching: Fastnacht
+2 -46 Aschermittwoch
+
+# Fastenzeit / Starkbierzeit
+2 -46 Beginn der Fastenzeit
+2 -45 Fastenzeit: Woche 1
+2 -44 Fastenzeit: Woche 1
+2 -43 Fastenzeit: Woche 1
+2 -42 Fastenzeit: Woche 1
+2 -41 Fastenzeit: Woche 2
+2 -40 Fastenzeit: Woche 2
+2 -39 Fastenzeit: Woche 2
+2 -38 Fastenzeit: Woche 2
+2 -37 Fastenzeit: Woche 2
+2 -36 Fastenzeit: Woche 2
+2 -35 Fastenzeit: Woche 2
+2 -34 Fastenzeit: Woche 3
+2 -33 Fastenzeit: Woche 3
+2 -32 Fastenzeit: Woche 3
+2 -31 Fastenzeit: Woche 3
+2 -30 Fastenzeit: Woche 3
+2 -29 Fastenzeit: Woche 3
+2 -28 Fastenzeit: Woche 3
+2 -27 Fastenzeit: Woche 4
+2 -26 Fastenzeit: Woche 4
+2 -25 Fastenzeit: Woche 4
+2 -24 Fastenzeit: Woche 4
+2 -23 Fastenzeit: Woche 4
+2 -22 Fastenzeit: Woche 4
+2 -21 Fastenzeit: Woche 4
+2 -20 Fastenzeit: Woche 5
+2 -19 Fastenzeit: Woche 5
+2 -18 Fastenzeit: Woche 5
+2 -17 Fastenzeit: Woche 5
+2 -16 Fastenzeit: Woche 5
+2 -15 Fastenzeit: Woche 5
+2 -14 Fastenzeit: Woche 5
+2 -13 Fastenzeit: Woche 6
+2 -12 Fastenzeit: Woche 6
+2 -11 Fastenzeit: Woche 6
+2 -10 Fastenzeit: Woche 6
+2  -9 Fastenzeit: Woche 6
+2  -8 Fastenzeit: Woche 6
+2  -7 Fastenzeit: Woche 6
+2  -6 Fastenzeit: Große Woche
+2  -5 Fastenzeit: Große Woche
+2  -4 Fastenzeit: Große Woche
+2  -3 Ende der Fastenzeit
+
+# Passionszeit
+2 -14 Passionssonntag
+2 -13 Passionszeit
+2 -12 Passionszeit
+2 -11 Passionszeit
+2 -10 Passionszeit
+2  -9 Passionszeit
+2  -8 Passionszeit
+2  -7 Passionszeit
+2  -6 Passionszeit
+2  -5 Passionszeit
+2  -4 Passionszeit
+
+# Karwoche
+2  -7 Karwoche
+2  -6 Karwoche
+2  -5 Karwoche
+2  -4 Karwoche
+2  -3 Gründonnerstag
+2  -1 Karsamstag
+
+# Osterzeit
+2  2 Osterzeit
+2  3 Osterzeit
+2  4 Osterzeit
+2  5 Osterzeit
+2  6 Ostersamstag
+2  6 Osterzeit
+2  7 Weißer Sonntag
+2  7 Osterzeit
+2  8 Osterzeit
+2  9 Osterzeit
+2 10 Osterzeit
+2 11 Osterzeit
+2 12 Osterzeit
+2 13 Osterzeit
+2 14 Osterzeit
+2 15 Osterzeit
+2 16 Osterzeit
+2 17 Osterzeit
+2 18 Osterzeit
+2 19 Osterzeit
+2 20 Osterzeit
+2 21 Osterzeit
+2 22 Osterzeit
+2 23 Osterzeit
+2 24 Osterzeit
+2 25 Osterzeit
+2 26 Osterzeit
+2 27 Osterzeit
+2 28 Osterzeit
+2 29 Osterzeit
+2 30 Osterzeit
+2 31 Osterzeit
+2 32 Osterzeit
+2 33 Osterzeit
+2 34 Osterzeit
+2 35 Osterzeit
+2 36 Osterzeit
+2 37 Osterzeit
+2 38 Osterzeit
+2 39 Osterzeit
+2 40 Osterzeit
+2 41 Osterzeit
+2 42 Osterzeit
+2 43 Osterzeit
+2 44 Osterzeit
+2 45 Osterzeit
+2 46 Osterzeit
+2 47 Osterzeit
+2 48 Osterzeit
+
+# Oktoberfest
+5 1 Sat 09 15 Beginn Oktoberfest
+5 1 Sun 09 15 Wiesnzeit
+5 1 Mon 09 15 Wiesnzeit
+5 1 Tue 09 15 Wiesnzeit
+5 1 Wed 09 15 Wiesnzeit
+5 1 Thu 09 15 Wiesnzeit
+5 1 Fri 09 15 Wiesnzeit
+5 2 Sat 09 15 Wiesnzeit
+5 2 Sun 09 15 Wiesnzeit
+5 2 Mon 09 15 Wiesnzeit
+5 2 Tue 09 15 Wiesnzeit
+5 2 Wed 09 15 Wiesnzeit
+5 2 Thu 09 15 Wiesnzeit
+5 2 Fri 09 15 Wiesnzeit
+5 3 Sat 09 15 Wiesnzeit
+5 3 Sun 09 15 Wiesnzeit
+#TODO variable Tage: Verlängerung bis 3.10., wenn 1.10. oder 2.10. ein Sonntag ist
+
+# Halloweenzeit
+1 10-24 Halloweenzeit
+1 10-25 Halloweenzeit
+1 10-26 Halloweenzeit
+1 10-27 Halloweenzeit
+1 10-28 Halloweenzeit
+1 10-29 Halloweenzeit
+1 10-30 Halloweenzeit
+
+# Adventszeit
+5 -3 Mon 12 25 Adventszeit
+5 -3 Tue 12 25 Adventszeit
+5 -3 Wed 12 25 Adventszeit
+5 -3 Thu 12 25 Adventszeit
+5 -3 Fri 12 25 Adventszeit
+5 -3 Sat 12 25 Adventszeit
+5 -2 Mon 12 25 Adventszeit
+5 -2 Tue 12 25 Adventszeit
+5 -2 Wed 12 25 Adventszeit
+5 -2 Thu 12 25 Adventszeit
+5 -2 Fri 12 25 Adventszeit
+5 -2 Sat 12 25 Adventszeit
+5 -1 Mon 12 25 Adventszeit
+5 -1 Tue 12 25 Adventszeit
+5 -1 Wed 12 25 Adventszeit
+5 -1 Thu 12 25 Adventszeit
+5 -1 Fri 12 25 Adventszeit
+5 -1 Sat 12 25 Adventszeit
+#TODO Zeit zwischen 4. Advent und Heiligabend (inkl.)
+
+# Jahreswechsel
+1 12-27 Jahreswechsel
+1 12-28 Jahreswechsel
+1 12-29 Jahreswechsel
+1 12-30 Jahreswechsel

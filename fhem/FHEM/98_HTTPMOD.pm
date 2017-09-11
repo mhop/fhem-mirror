@@ -141,6 +141,10 @@
 #   2017-05-07  fixed typo in documentation
 #   2017-05-08  optimized warning signal handling
 #   2017-05-09  fixed character encoding of source file for documentation
+#               fixed a bug where updateRequestHash was not called after restart and for MaxAge
+#               fixed a warning when alwaysNum without NumLen is specified
+#   2017-09-06  new attribute reAuthAlways to do the defined authentication steps 
+#               before each get / set / getupdate regardless of any reAuthRegex setting or similar.
 #
 
 #
@@ -160,11 +164,10 @@
 #               Implement IMap und IExpr for get
 #
 #               replacement scope attribute?
-#               make axtracting the sid after a get / update an attribute / option?
+#               make extracting the sid after a get / update an attribute / option?
 #               multi page log extraction?
 #               Profiling von Modbus übernehmen?
-#               extend httpmod to support simple tcp connections aver devio instead of HttpUtils?
-#               extend devio for non blocking connect like httputils?
+#               extend httpmod to support simple tcp connections over devio instead of HttpUtils?
 #
 #
 #
@@ -207,7 +210,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.3.11 - 8.5.2017';
+my $HTTPMOD_Version = '3.4.0 - 9.9.2017';
 
 #
 # FHEM module intitialisation
@@ -300,6 +303,7 @@ sub HTTPMOD_Initialize($)
       "set[0-9]*ParseResponse:0,1 " .   # parse response to set as if it was a get
       
       "reAuthRegex " .
+      "reAuthAlways:0,1 " .
       "reAuthJSON " .
       "reAuthXPath " .
       "reAuthXPath-Strict " .
@@ -424,6 +428,7 @@ sub HTTPMOD_Define($$)
     $hash->{".setList"}    = "";
     $hash->{".updateHintList"}    = 1;
     $hash->{".updateReadingList"} = 1;
+    $hash->{".updateRequestHash"} = 1;
 
     return undef;
 }
@@ -1461,6 +1466,7 @@ sub HTTPMOD_Set($@)
 
     my ($url, $header, $data) = HTTPMOD_PrepareRequest($hash, "set", $setNum);
     if ($url) {
+        HTTPMOD_Auth $hash if (AttrVal($name, "reAuthAlways", 0));
         HTTPMOD_AddToQueue($hash, $url, $header, $data, "set$setNum", $rawVal); 
     } else {
         Log3 $name, 3, "$name: no URL for set $setNum";
@@ -1511,6 +1517,7 @@ sub HTTPMOD_Get($@)
 
     my ($url, $header, $data) = HTTPMOD_PrepareRequest($hash, "get", $getNum);
     if ($url) {
+        HTTPMOD_Auth $hash if (AttrVal($name, "reAuthAlways", 0));
         HTTPMOD_AddToQueue($hash, $url, $header, $data, "get$getNum", $getVal); 
     } else {
         Log3 $name, 3, "$name: no URL for Get $getNum";
@@ -1546,6 +1553,7 @@ sub HTTPMOD_GetUpdate($)
         # queue main get request 
         ($url, $header, $data) = HTTPMOD_PrepareRequest($hash, "reading");          # context "reading" is used for other attrs relevant for GetUpdate
         if ($url) {
+            HTTPMOD_Auth $hash if (AttrVal($name, "reAuthAlways", 0));
             HTTPMOD_AddToQueue($hash, $url, $header, $data, "update");              # use request type "update"
         } else {
             Log3 $name, 3, "$name: GetUpdate: no Main URL specified";
@@ -1570,6 +1578,7 @@ sub HTTPMOD_GetUpdate($)
             
             ($url, $header, $data) = HTTPMOD_PrepareRequest($hash, "get", $getNum);
             if ($url) {
+                HTTPMOD_Auth $hash if (AttrVal($name, "reAuthAlways", 0));
                 HTTPMOD_AddToQueue($hash, $url, $header, $data, "get$getNum"); 
             } else {
                 Log3 $name, 3, "$name: no URL for Get $getNum";
@@ -1743,7 +1752,7 @@ sub HTTPMOD_ExtractReading($$$$$)
     $xpathst = HTTPMOD_GetFAttr($name, $context, $num, "XPath-Strict");
     $regopt  = HTTPMOD_GetFAttr($name, $context, $num, "RegOpt");
     $recomb  = HTTPMOD_GetFAttr($name, $context, $num, "RecombineExpr");
-    $sublen  = HTTPMOD_GetFAttr($name, $context, $num, "AutoNumLen");
+    $sublen  = HTTPMOD_GetFAttr($name, $context, $num, "AutoNumLen", 0);
     $alwaysn = HTTPMOD_GetFAttr($name, $context, $num, "AlwaysNum");
     
     # support for old syntax
@@ -1854,7 +1863,7 @@ sub HTTPMOD_ExtractReading($$$$$)
             if ($match == 1) {
                 # only one match
                 $eNum       = $num;
-                $subReading = ($alwaysn ? "${reading}-" . sprintf ("%0${sublen}d", 1) : $reading);
+                $subReading = ($alwaysn ? "${reading}-" . ($sublen ? sprintf ("%0${sublen}d", 1) : "1") : $reading);
             } else {
                 # multiple matches -> check for special name of readings
                 $eNum     = $num ."-".$group;
@@ -1970,6 +1979,8 @@ sub HTTPMOD_DoMaxAge($)
     return if (!$readings); 
     $now = gettimeofday();
 
+    HTTPMOD_UpdateRequestHash($hash) if ($hash->{".updateRequestHash"});
+    
     foreach my $reading (sort keys %{$readings}) {
         my $key = $reading;     # in most cases the reading name can be looked up in the readingBase hash
         Log3 $name, 5, "$name: MaxAge: check reading $reading";
@@ -3441,6 +3452,8 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
             regular Expression to match an error page indicating that a session has expired and a new authentication for read access needs to be done. 
             This attribute only makes sense if you need a forms based authentication for reading data and if you specify a multi step login procedure based on the sid.. attributes.<br>
             This attribute is used for all requests. For set operations you can however specify individual reAuthRegexes with the set[0-9]*ReAuthRegex attributes.
+        <li><b>reAuthAlways</b></li>
+            if set to 1 will force authentication requests defined in the sid-attributes to be sent before each getupdate, get or set.
         <br><br>
         <li><b>sid[0-9]*URL</b></li>
             different URLs or one common URL to be used for each step of an optional login procedure. 

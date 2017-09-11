@@ -35,14 +35,15 @@
 #   2016-12-18  documentation added
 #   2016-12-24  documentation added
 #   2017-01-02  allowShortResponses documented
-#	2017-01-25	documentation for ignoreExpr
-#	2017-03-12	fixed documentation for logical attrs that were wrongly defined as physical ones
+#   2017-01-25  documentation for ignoreExpr
+#   2017-03-12  fixed documentation for logical attrs that were wrongly defined as physical ones
+#   2017-07-15  added documentation for new attributes
+#   2017-07-25  documentation for data type attributes
 #
 
 package main;
 use strict;
 use warnings;
-
 
 #####################################
 sub
@@ -146,16 +147,16 @@ ModbusAttr_Initialize($)
         
         Attributes to define data objects start with obj- followed by a code that identifies the type and address
         of the data object. <br>
-		
+        
         Modbus devices offer the following types of data objects: 
-		<ul>
-		<li> holding registers (16 bit objects that can be read and written)</li>
+        <ul>
+        <li> holding registers (16 bit objects that can be read and written)</li>
         <li> input registers (16 bit objects that can only be read)</li>
-		<li> coils (single bit objects that can be read and written)</li>
+        <li> coils (single bit objects that can be read and written)</li>
         <li> discrete inputs (single bit objects that can only be read)</li>
-		</ul>		
+        </ul>       
         <br>
-		
+        
         The module uses the first character of these data object types to define attributes. 
         Thus h770 refers to a holding register with the decimal address 770 and c120 refers to a coil with address 120. 
         The address has to be specified as pure decimal number. The address counting starts at address 0<br><br>
@@ -212,6 +213,11 @@ ModbusAttr_Initialize($)
                 <code>scanId-5-Response-h770 hex=0064, string=.d, s=25600, s>=100, S=25600, S>=100</code>
             <li><code>scanStop</code></li>
                 stops any running scans.
+            <li><code>saveAsModule &lt;name&gt;</code></li>
+                experimental: saves the definitions of obj- and dev- attributes in a new fhem module file as /tmp/98_ModbusGen&lt;name&gt;.pm.<br>
+                if this file is copied into the fhem module subdirectory (e.g. /opt/fhem/FHEM) and fhem is restarted then instead of defining a device
+                as ModbusAttr with all the attributes to define objects, you can just define a device of the new type ModbusGen&lt;name&gt; and all the 
+                objects will be there by default. However all definitions can still be changed / overriden with the attribues defined in ModbusAttr if needed.
         </ul>
     </ul>
     <br>
@@ -234,7 +240,7 @@ ModbusAttr_Initialize($)
         <li><b>enableControlSet</b></li>
             enables the built in set commands like interval, stop, start and reread (see above)        
         <br>
-		
+        
         please also notice the attributes for the physical modbus interface as documented in 98_Modbus.pm
         <br>
         
@@ -261,7 +267,7 @@ ModbusAttr_Initialize($)
         <br>
         <li><b>obj-[cdih][1-9][0-9]*-expr</b></li> 
             defines a perl expression that converts the raw value read from the device.
-		<br>
+        <br>
         <li><b>obj-[cdih][1-9][0-9]*-ignoreExpr</b></li> 
             defines a perl expression that returns 1 if a value should be ignored and the existing reading should not be modified
         <br>
@@ -309,6 +315,21 @@ ModbusAttr_Initialize($)
             defines an encoding to be used in a call to the perl function encode to convert the raw data string read from the device to a reading. 
             This can be used if the device delivers strings in an encoding like cp850 and after decoding it you want to reencode it to e.g. utf8.
         <br>
+        <li><b>obj-[ih][1-9][0-9]*-type</b></li> 
+            defines that this object has a user defined data type. Data types can be defined using the dev-type- attribues.<br>
+            If a device with many objects uses for example floating point values that span two swapped registers with the unpack code f>, then instead of specifying the -unpack, -revRegs, -len, -format and other attributes over and over again, you could define a data type with attributes that start with dev-type-VT_R4- and then 
+            use this definition for each object as e.g. obj-h1234-type VT_R4<br>
+            example:<br>
+            <pre>
+            attr WP dev-type-VT_R4-format %.1f
+            attr WP dev-type-VT_R4-len 2
+            attr WP dev-type-VT_R4-revRegs 1
+            attr WP dev-type-VT_R4-unpack f>
+            
+            attr WP obj-h1234-reading Temp_Ist
+            attr WP obj-h1234-type VT_R4
+            </pre>
+        <br>
         
         <li><b>obj-[cdih][1-9][0-9]*-showGet</b></li> 
             every reading can also be requested by a get command. However these get commands are not automatically offered in fhemweb. 
@@ -347,7 +368,7 @@ ModbusAttr_Initialize($)
         <br>
         <li><b>dev-([cdih]-)*defExpr</b></li> 
             defines a default Perl expression to use for this object type to convert raw values read.
-		<br>
+        <br>
         <li><b>dev-([cdih]-)*defIgnoreExpr</b></li> 
             defines a default Perl expression to decide when values should be ignored.
         <br>
@@ -374,8 +395,21 @@ ModbusAttr_Initialize($)
         <li><b>dev-([cdih]-)*defShowGet</b></li> 
             if set to 1 then all objects of this type will have a visible get by default. 
         <br>
+        
+        <li><b>dev-type-XYZ-unpack, -len, -encode, -decode, -revRegs, -bswapRegs, -format, -expr, -map</b></li> 
+            define the unpack code, length and other details of a user defined data type. XYZ has to be replaced with the name of a user defined data type.
+            use obj-h123-type XYZ to assign this type to an object.
+        <br>
+        
         <li><b>dev-([cdih]-)*allowShortResponses</b></li> 
             if set to 1 the module will accept a response with valid checksum but data lengh < lengh in header
+        <br>
+        <li><b>dev-h-brokenFC3</b></li> 
+            if set to 1 the module will change the parsing of function code 3 and 4 responses for devices that 
+            send the register address instead of the length in the response
+        <br>
+        <li><b>dev-c-brokenFC5</b></li> 
+            if set the module will use the hex value specified here instead of ff00 as value 1 for setting coils
         <br>
         <li><b>dev-timing-timeout</b></li> 
             timeout for the device (defaults to 2 seconds)
@@ -388,7 +422,7 @@ ModbusAttr_Initialize($)
         <br>
         <li><b>queueMax</b></li> 
             max length of the send queue, defaults to 100
-		<br>
+        <br>
         <li><b>nextOpenDelay</b></li> 
             delay for Modbus-TCP connections. This defines how long the module should wait after a failed TCP connection attempt before the next reconnection attempt. This defaults to 60 seconds.
         <li><b>openTimeout</b></li>     
@@ -399,6 +433,11 @@ ModbusAttr_Initialize($)
             if set to 1, then it will set the loglevel for "disconnected" and "reappeared" messages to 4 instead of 3
         <li><b>maxTimeoutsToReconnect</b></li> 
             this attribute is only valid for TCP connected devices. In such cases a disconnected device might stay undetected and lead to timeouts until the TCP connection is reopened. This attribute specifies after how many timeouts an automatic reconnect is tried.
+        <li><b>nonPrioritizedSet</b></li> 
+            if set to 1, then set commands will not be sent on the bus before other queued requests and the response will not be waited for.
+        <li><b>sortUpdate</b></li> 
+            if set to 1, the requests during a getUpdate cycle will be sorted before queued.
+            
         <li><b>disable</b></li>
             stop communication with the device while this attribute is set to 1. For Modbus over TCP this also closes the TCP connection.
         <br>

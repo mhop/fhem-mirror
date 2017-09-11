@@ -208,24 +208,13 @@ at_adjustAlign($$)
 {
   my($hash, $attrVal) = @_;
 
-  my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($attrVal);
-  return "$hash->{NAME} alignTime: $alErr" if($alErr);
   my ($tm, $command) = split("[ \t]+", $hash->{DEF}, 2);
   $tm =~ m/^(\+)?(\*({\d+})?)?(.*)$/;
   my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
   return "startTimes: $hash->{NAME} is not relative" if(!$rel);
-  my (undef, $hr, $min, $sec, undef) = GetTimeSpec($tspec);
 
-  my $now = time();
-  my $alTime = ($alHr*60+$alMin)*60+$alSec-fhemTzOffset($now);
-  my $step = ($hr*60+$min)*60+$sec;
-  my $ttime = int($hash->{TRIGGERTIME});
-  my $off = ($ttime % 86400) - 86400;
-  while($off < $alTime) {
-    $off += $step;
-  }
-  $ttime += ($alTime-$off);
-  $ttime += $step if($ttime < $now);
+  my ($err, $ttime) = computeAlignTime($tspec, $attrVal,$hash->{TRIGGERTIME});
+  return "$hash->{NAME} $err" if($err);
 
   RemoveInternalTimer($hash);
   InternalTimer($ttime, "at_Exec", $hash, 0);

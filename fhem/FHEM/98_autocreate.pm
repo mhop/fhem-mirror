@@ -341,7 +341,7 @@ autocreate_Notify($$)
           my $fh = new IO::File ">>$hash->{currentlogfile}";
           $hash->{FH} = $fh;
         } else {
-          Log 1, "$oldfile or $hash->{currentfile}: $!";
+          Log 1, "$oldfile or $hash->{currentlogfile}: $!";
           close(IN); 
         }
       }

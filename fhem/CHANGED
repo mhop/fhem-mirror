@@ -1,5 +1,25 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 50_TelegramBot: new set cmd msgDelete
+  - feature: 95_holiday: move holiday files from contrib to FHEM
+  - feature: 31_Nello: updated to new api specifications
+  - feature: 49_SSCam: V2.8.0, switch Surveillance Station HomeMode available
+  - bugfix:  73_GardenaSmartBridge: code clean, update german tranlation
+  - feature: 74_AMADDevice: add ttsMsgVol, sets automatically a preset volume
+  - feature: proxy global attribute for HttpUtils (Forum #60471)
+  - bugfix:  93_DbLog: V2.22.5, several fixes Forum:#75894
+  - feature: 74_GardenaSmartDevice: check character for create devicenames
+  - bugfix:  FHEM2FHEM: addStateEvent attribute (Forum #76229)
+  - bugfix:  HttpUtils: use urlDecode for password in URL (Forum #76230)
+  - bugfix:  74_GardenaSmartDevice.pm: fix little Commandref bug's
+  - new:     73_GardenaSmartBridge/74_GardenaSmartDevice control your Gardena
+                Smart Products
+  - feature: 98_MediaList.pm: added sorting setting function,
+                default sort by filename
+  - feature: 10_pilight_ctrl: support protocol heitech
+  - feature: 91_sequence: add delay and omit name options (Forum #75925)
+  - bugfix:  74_AMADDevice: fix a lot of Bugs
+  - feature: 93_Log2Syslog: V3.1.0, get certinfo added
   - bugfix:  73_AMADCommBridge: fix doubble set Command at Bridge
   - bugfix:  31_PLAYBULB: fix right curl Missing
   - changed: 72_FB_CALLMONITOR: reverse search only numbers for the specific

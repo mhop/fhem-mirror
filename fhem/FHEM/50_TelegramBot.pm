@@ -125,13 +125,18 @@
 
 #   remove debug / addtl testing
 #   adapt prototypes for token
-  
-#   
+#   additional logs / removed debugs
+#   special httputils debug lines added
+#   add msgDelete function to delete messages sent before from the bot
+#   added check for msgId not given as first parameter (e.g. msgDelete / msgEdit)
+# 2.5 2017-09-10  new set cmd msgDelete
+
 #   
 ##############################################################################
 # TASKS 
 #   
-#
+#   
+#   
 #   remove keyboard after favorite confirm
 #   
 #   cleanup encodings
@@ -190,6 +195,8 @@ my %sets = (
   "message" => "textField",
   "msg" => "textField",
   "send" => "textField",
+
+  "msgDelete" => "textField",
 
   "msgEdit" => "textField",
   "msgForceReply" => "textField",
@@ -287,8 +294,6 @@ sub TelegramBot_Define($$) {
   my $errmsg = '';
   
   # Check parameter(s)
-  
-  # Debug "Token : ".TelegramBot_readToken($hash);
   
   # If api token is given check for syntax and remove from hash
   if ( ( int(@a) == 3 ) && ( $a[2] !~ /^([[:alnum:]]|[-:_])+[[:alnum:]]+([[:alnum:]]|[-:_])+$/ ) ) {
@@ -459,6 +464,7 @@ sub TelegramBot_Set($@)
     if ( ($cmd eq 'reply') || ($cmd eq 'msgEdit' ) || ($cmd eq 'queryEditInline' ) ) {
       return "TelegramBot_Set: Command $cmd, no peer, msgid and no text/file specified" if ( $numberOfArgs < 3 );
       $msgid = shift @args; 
+      return "TelegramBot_Set: Command $cmd, msgId must be given as first parameter before peer" if ( $msgid =~ /^@/ );
       $numberOfArgs--;
       $inline = 1 if ($cmd eq 'queryEditInline');
     } elsif ($cmd eq 'msgForceReply')  {
@@ -620,6 +626,35 @@ sub TelegramBot_Set($@)
     Log3 $name, 5, "TelegramBot_Set $name: start send for cmd :$cmd: and isMediaStream :$isMediaStream:";
     $ret = TelegramBot_SendIt( $hash, $peers, $msg, undef, $isMediaStream, undef );
     
+  } elsif($cmd eq 'msgDelete') {
+
+    my $peers;
+    my $sendType = 20;
+    
+    return "TelegramBot_Set: Command $cmd, no peer and no msgid specified" if ( $numberOfArgs < 2 );
+    my $msgid = shift @args; 
+    return "TelegramBot_Set: Command $cmd, msgId must be given as first parameter before peer" if ( $msgid =~ /^@/ );
+    $numberOfArgs--;
+      
+    while ( $args[0] =~ /^@(..+)$/ ) {
+      my $ppart = $1;
+      return "TelegramBot_Set: Command $cmd, need exactly one peer" if ( defined( $peers ) );
+      $peers .= " " if ( defined( $peers ) );
+      $peers = "" if ( ! defined( $peers ) );
+      $peers .= $ppart;
+      
+      shift @args;
+      last if ( int(@args) == 0 );
+    }
+
+    if ( ! defined( $peers ) ) {
+      $peers = AttrVal($name,'defaultPeer',undef);
+      return "TelegramBot_Set: Command $cmd, without explicit peer requires defaultPeer being set" if ( ! defined($peers) );
+    }
+    
+    Log3 $name, 5, "TelegramBot_Set $name: start send for cmd :$cmd: and sendType :$sendType:";
+    $ret = TelegramBot_SendIt( $hash, $peers, "", undef, $sendType, $msgid );
+
   } elsif($cmd eq 'zDebug') {
     # for internal testing only
     Log3 $name, 5, "TelegramBot_Set $name: start debug option ";
@@ -1020,7 +1055,6 @@ sub TelegramBot_SendFavorites($$$$$;$) {
   Log3 $name, 4, "TelegramBot_SendFavorites cmd :$cmd:   peer :$mpeernorm:   aliasExec :".$aliasExec;
   
   if ( $cmd =~ /^\s*cancel\s*$/ ) {
-    # Debug "Stored msg id :".$storedMgsId.":";
     if ( $storedMgsId ) {
       # 10 for edit inline
       $ret = TelegramBot_SendIt( $hash, (($mchatnorm)?$mchatnorm:$mpeernorm), "Favoriten beendet", undef, 10, $storedMgsId );
@@ -1083,7 +1117,6 @@ sub TelegramBot_SendFavorites($$$$$;$) {
 
       $ecmd = $parsecmd;
       
-#      Debug "Needsconfirm: ". $needsConfirm;
       if ( ( $hidden ) && ( ! $aliasExec ) && ( ! $isConfirm ) && ( ! $storedMgsId )  ) {
         Log3 $name, 3, "TelegramBot_SendFavorites hidden favorite (id;".($cmdId+1).") execution from ".$mpeernorm;
       } elsif ( ( ! $isConfirm ) && ( $needsConfirm ) ) {
@@ -1502,9 +1535,10 @@ sub Telegram_HandleCommandInMessages($$$$$)
 #   hash
 #   url - url including parameters
 #   > returns string in case of error or the content of the result object if ok
-sub TelegramBot_DoUrlCommand($$)
+#   ignore set means no error is logged
+sub TelegramBot_DoUrlCommand($$;$)
 {
-  my ( $hash, $url ) = @_;
+  my ( $hash, $url, $ignore ) = @_;
   my $name = $hash->{NAME};
 
   my $ret;
@@ -1523,7 +1557,7 @@ sub TelegramBot_DoUrlCommand($$)
   if ( $err ne "" ) {
     # http returned error
     $ret = "FAILED http access returned error :$err:";
-    Log3 $name, 2, "TelegramBot_DoUrlCommand $name: ".$ret;
+    Log3 $name, ($ignore?5:2), "TelegramBot_DoUrlCommand $name: ".$ret;
   } else {
     my $jo;
     
@@ -1533,13 +1567,13 @@ sub TelegramBot_DoUrlCommand($$)
 
     if ( ! defined( $jo ) ) {
       $ret = "FAILED invalid JSON returned";
-      Log3 $name, 2, "TelegramBot_DoUrlCommand $name: ".$ret;
+      Log3 $name, ($ignore?5:2), "TelegramBot_DoUrlCommand $name: ".$ret;
     } elsif ( $jo->{ok} ) {
       $ret = $jo->{result};
       Log3 $name, 4, "TelegramBot_DoUrlCommand OK with result";
     } else {
       my $ret = "FAILED Telegram returned error: ".$jo->{description};
-      Log3 $name, 2, "TelegramBot_DoUrlCommand $name: ".$ret;
+      Log3 $name, ($ignore?5:2), "TelegramBot_DoUrlCommand $name: ".$ret;
     }    
 
   }
@@ -1633,19 +1667,23 @@ sub TelegramBot_SendIt($$$$$;$$$)
   my $timeout =   AttrVal($name,'cmdTimeout',30);
   $hash->{HU_DO_PARAMS}->{timeout} = $timeout;
 
-  
-  # only for test / debug               
-#  $hash->{HU_DO_PARAMS}->{loglevel} = 3;
+  $hash->{HU_DO_PARAMS}->{loglevel} = 4;
+#  Debug option - switch this on for detailed logging of httputils
+#  $hash->{HU_DO_PARAMS}->{loglevel} = 1;
 
-  # handle data creation only if no error so far
+# handle data creation only if no error so far
   if ( ! defined( $ret ) ) {
 
     # add chat / user id (no file) --> this will also do init
     $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "chat_id", undef, $peer2, 0 );
 
-    if ( ( $isMedia == 0 ) || ( $isMedia == 10 ) ) {
+    if ( ( $isMedia == 0 ) || ( $isMedia == 10 ) || ( $isMedia == 20 ) ) {
       if ( $isMedia == 0 ) {
         $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendMessage";
+      } elsif ( $isMedia == 20 ) {
+        $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."deleteMessage";
+        $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "message_id", undef, $replyid, 0 ) if ( ! defined( $ret ) );
+        $replyid = undef;
       } else {
         $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."editMessageText";
         $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "message_id", undef, $replyid, 0 ) if ( ! defined( $ret ) );
@@ -1682,9 +1720,6 @@ sub TelegramBot_SendIt($$$$$;$$$)
       $msg =~ s/(?<![\\])\\n/\x0A/g;
       $msg =~ s/(?<![\\])\\t/\x09/g;
 
-      ## JVI
-#      Debug "send conv msg  :".$msg.":";
-  
       # add msg (no file)
       $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "text", undef, $msg, 0 ) if ( ! defined( $ret ) );
 
@@ -1733,7 +1768,7 @@ sub TelegramBot_SendIt($$$$$;$$$)
       }
       
       # add msg or file or stream
-      Log3 $name, 4, "TelegramBot_SendIt $name: Filename for image file :".
+        Log3 $name, 4, "TelegramBot_SendIt $name: Filename for image file :".
       TelegramBot_MsgForLog($msg, ($isMedia<0) ).":";
       $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "photo", undef, $msg, $isMedia ) if ( ! defined( $ret ) );
       
@@ -1770,9 +1805,6 @@ sub TelegramBot_SendIt($$$$$;$$$)
     $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, undef, undef, undef, 0 ) if ( ! defined( $ret ) );
 
   }
-  
-  ## JVI
-#  Debug "send command  :".$hash->{HU_DO_PARAMS}->{data}.":";
   
   if ( defined( $ret ) ) {
     Log3 $name, 3, "TelegramBot_SendIt $name: Failed with :$ret:";
@@ -1931,8 +1963,6 @@ sub TelegramBot_MakeKeyboard($$$@)
     Log3 $name, 4, "TelegramBot_MakeKeyboard $name: json downgraded :$ret: is utf8? ".(utf8::is_utf8($ret)?"yes":"no");
   }
   
-#  Debug "json_keyboard :$ret:";
-
   return $ret;
 }
   
@@ -1985,6 +2015,8 @@ sub TelegramBot_UpdatePoll($;$)
     }
   }
     
+  Log3 $name, 5, "TelegramBot_UpdatePoll $name: - Initiate non blocking polling - ".(defined($hash->{HU_UPD_PARAMS}->{callback})?"With callback set":"no callback");
+
   # get next offset id
   my $offset = $hash->{offset_id};
   $offset = 0 if ( ! defined($offset) );
@@ -1999,9 +2031,15 @@ sub TelegramBot_UpdatePoll($;$)
 
   $hash->{STATE} = "Polling";
 
+  $hash->{HU_UPD_PARAMS}->{loglevel} = 4;
+#  Debug option - switch this on for detailed logging of httputils
+#  $hash->{HU_UPD_PARAMS}->{loglevel} = 1;
+  
   $hash->{POLLING} = ( ( defined( $hash->{OLD_POLLING} ) )?$hash->{OLD_POLLING}:1 );
   Log3 $name, 4, "TelegramBot_UpdatePoll $name: initiate polling with nonblockingGet with ".$timeout."s";
   HttpUtils_NonblockingGet( $hash->{HU_UPD_PARAMS} ); 
+
+  Log3 $name, 5, "TelegramBot_UpdatePoll $name: - Ende > next polling started";
 }
 
 
@@ -2273,6 +2311,7 @@ sub TelegramBot_Callback($$$)
     }
   }
   
+  Log3 $name, 5, "TelegramBot_Callback $name: - Ende > Control back to FHEM";
 }
 
 #####################################
@@ -2515,7 +2554,6 @@ sub TelegramBot_ParseCallbackQuery($$$)
     }
   }
   
-  
   my $imid = $callback->{inline_message_id};
   my $chat= $callback->{chat_instance};
 #  Debug "Chat :".$chat.":";
@@ -2716,7 +2754,7 @@ sub TelegramBot_Setup($) {
   } else {
     # getMe as connectivity check and set internals accordingly
     my $url = TelegramBot_getBaseURL($hash)."getMe";
-    my $meret = TelegramBot_DoUrlCommand( $hash, $url );
+    my $meret = TelegramBot_DoUrlCommand( $hash, $url, 1 );   # ignore first error
     if ( ( ! defined($meret) ) || ( ref($meret) ne "HASH" ) ) {
       # retry on first failure
       $meret = TelegramBot_DoUrlCommand( $hash, $url );
@@ -3402,6 +3440,9 @@ sub TelegramBot_BinaryFileWrite($$$) {
     </li>
 
     <li><code>msgEdit &lt;msgid&gt; [ @&lt;peer1&gt; ] &lt;text&gt;</code><br>Changes the given message on the recipients clients. The msgid of the message to be changed must match a valid msgId and the peers need to match the original recipient, so only a single peer can be given or if peer is ommitted the defined default peer user is used. Beside the handling of a change of an existing message, the peer and message handling is otherwise identical to the msg command. 
+    </li>
+
+    <li><code>msgDelete &lt;msgid&gt; [ @&lt;peer1&gt; ] </code><br>Deletes the given message on the recipients clients. The msgid of the message to be changed must match a valid msgId and the peers need to match the original recipient, so only a single peer can be given or if peer is ommitted the defined default peer user is used. Restrictions apply for deleting messages in the Bot API as currently specified here (<a href=https://core.telegram.org/bots/api#deletemessage>deleteMessage</a>)
     </li>
 
     <li><code>cmdSend [ @&lt;peer1&gt; ... @&lt;peerN&gt; ] &lt;fhem command&gt;</code><br>Executes the given fhem command and then sends the result to the given peers or the default peer.<br>

@@ -1507,12 +1507,25 @@ The following local attributes are used by a wider range of devices:
         Windows.
     </li><br>
 
-    <a name="pidfilename="></a>
+    <a name="pidfilename"></a>
     <li>pidfilename<br>
         Write the process id of the perl process to the specified file. The
         server runs as a daemon, and some distributions would like to check by
         the pid if we are still running. The file will be deleted upon
         shutdown.
+    </li><br>
+
+    <a name="proxy"></a>
+    <li>proxy<br>
+        IP:PORT of the proxy server to be used by HttpUtils.
+    </li><br>
+    <a name="proxyAuth"></a>
+    <li>proxyAuth<br>
+        Base64 encoded username:password
+    </li><br>
+    <a name="proxyExclude"></a>
+    <li>proxyExclude<br>
+        regexp for hosts to exclude when using a proxy
     </li><br>
 
     <li><a href="#fheminfo">sendStatistics</a><br>
@@ -1654,7 +1667,8 @@ The following local attributes are used by a wider range of devices:
     $mday, $month, $year, $wday, $yday, $isdst are available in the perl
     oneliners (see also perldoc -f localtime). Exceptions: $month is in the
     range of 1 to 12, and $year is corrected by 1900 (as I would expect).
-    Additionally the variable $hms contains the time in the HH:MM:SS format.
+    Additionally the variable $hms contains the time in the HH:MM:SS format and
+    $today the current date in YYYY-MM-DD format.
     <br>
     Additionally the variabe $we is 1 if it is weekend (i.e $wday == 0 or
     $wday == 6), and 0 otherwise. If the <a href="#holiday2we">holida2we</a>

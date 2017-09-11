@@ -240,6 +240,7 @@ FHEM/52_I2C_EEPROM.pm        klausw               http://forum.fhem.de Sonstige 
 FHEM/52_I2C_LCD              ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_BME280           klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_K30              yoda_gh              http://forum.fhem.de Sonstige Systeme
+FHEM/52_I2C_LM75A            clumsy               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_MCP23008         klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_MCP23017         klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_MCP342x          klausw               http://forum.fhem.de Sonstige Systeme
@@ -314,8 +315,10 @@ FHEM/73_km200.pm             Sailor               http://forum.fhem.de/index.php
 FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/73_MPD.pm               Wzut                 http://forum.fhem.de Multimedia
 FHEM/73_AMADCommBridge.pm    CoolTux              http://forum.fhem.de Sonstige Systeme
+FHEM/73_GardenaSmartBridge.pm CoolTux             http://forum.fhem.de Sonstige Systeme
 FHEM/74_NUKIBridge.pm        CoolTux              http://forum.fhem.de Sonstige Systeme
 FHEM/74_AMADDevice.pm        CoolTux              http://forum.fhem.de Sonstige Systeme
+FHEM/74_GardenaSmartDevice.pm CoolTux             http://forum.fhem.de Sonstige Systeme
 FHEM/74_HOMBOT.pm	     CoolTux              http://forum.fhem.de sonstige Systeme
 FHEM/74_NUKIDevice.pm        CoolTux              http://forum.fhem.de Sonstige Systeme
 FHEM/74_Nmap.pm              igami                http://forum.fhem.de Unterstuetzende Dienste
@@ -501,6 +504,7 @@ contrib/23_WEBTHERM.pm       betateilchen/sachag  http://forum.fhem.de Sonstiges
 contrib/70_ONKYO_AVR_PULL.pm loredo               http://forum.fhem.de Multimedia
 contrib/92_rsyslog.pm        DS_Starter           http://forum.fhem.de Automatisierung
 contrib/98_exportdevice.pm   loredo               http://forum.fhem.de Sonstiges
+contrib/98_FileLogConvert.pm DeeSPe               http://forum.fhem.de Automatisierung
 contrib/betateilchen/*       betateilchen         http://forum.fhem.de Sonstiges
 contrib/holiday              betateilchen         http://forum.fhem.de Sonstiges
         by_ext.holiday       loredo               http://forum.fhem.de Sonstiges

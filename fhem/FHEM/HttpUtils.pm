@@ -78,6 +78,8 @@ HttpUtils_Close($)
   delete($hash->{hu_filecount});
   delete($hash->{hu_blocking});
   delete($hash->{hu_portSfx});
+  delete($hash->{hu_proxy});
+  delete($hash->{hu_port});
   delete($hash->{directReadFn});
   delete($hash->{directWriteFn});
 }
@@ -275,14 +277,19 @@ HttpUtils_Connect($)
 
   Log3 $hash, $hash->{loglevel}, "HttpUtils url=$hash->{displayurl}";
 
-  if($hash->{url} !~
-           /^(http|https):\/\/(([^:\/]+):([^:\/]+)@)?([^:\/]+)(:\d+)?(\/.*)$/) {
+  if($hash->{url} !~ /
+      ^(http|https):\/\/                # $1: proto
+       (([^:\/]+):([^:\/]+)@)?          # $2: auth, $3:user, $4:password
+       ([^:\/]+|\[[0-9a-f:]+\])         # $5: host or IPv6 address
+       (:\d+)?                          # $6: port
+       (\/.*)$                          # $7: path
+    /xi) {
     return "$hash->{displayurl}: malformed or unsupported URL";
   }
 
   my ($authstring,$user,$pwd,$port,$host);
   ($hash->{protocol},$authstring,$user,$pwd,$host,$port,$hash->{path})
-        = ($1,$2,$3,$4,$5,$6,$7);
+        = (lc($1),$2,$3,$4,$5,$6,$7);
   $hash->{host} = $host;
   
   if(defined($port)) {
@@ -291,9 +298,21 @@ HttpUtils_Connect($)
     $port = ($hash->{protocol} eq "https" ? 443: 80);
   }
   $hash->{hu_portSfx} = ($port =~ m/^(80|443)$/ ? "" : ":$port");
+  $hash->{hu_port} = $port;
   $hash->{path} = '/' unless defined($hash->{path});
   $hash->{addr} = "$hash->{protocol}://$host:$port";
-  $hash->{auth} = "$user:$pwd" if($authstring);
+  $hash->{auth} = urlDecode("$user:$pwd") if($authstring);
+
+  my $proxy = AttrVal("global", "proxy", undef);
+  if($proxy) {
+    my $pe = AttrVal("global", "proxyExclude", undef);
+    if(!$pe || $host !~ m/$pe/) {
+      my @hp = split(":", $proxy);
+      $host = $hp[0];
+      $port = $hp[1] if($hp[1]);
+      $hash->{hu_proxy} = 1;
+    }
+  }
 
   return HttpUtils_Connect2($hash) if($hash->{conn} && $hash->{keepalive});
 
@@ -378,6 +397,7 @@ sub
 HttpUtils_Connect2($)
 {
   my ($hash) = @_;
+  my $usingSSL;
 
   $hash->{host} =~ s/:.*//;
   if($hash->{protocol} eq "https" && $hash->{conn} && !$hash->{hu_sslAdded}) {
@@ -389,6 +409,22 @@ HttpUtils_Connect2($)
       return $errstr;
     } else {
       $hash->{conn}->blocking(1);
+      $usingSSL = 1;
+
+      if($hash->{hu_proxy}) {   # can block!
+        my $pw = AttrVal("global", "proxyAuth", "");
+        $pw = "Proxy-Authorization: Basic $pw\r\n" if($pw);
+        my $hdr = "CONNECT $hash->{host}:$hash->{hu_port} HTTP/1.0\r\n".
+                  "User-Agent: fhem\r\n$pw\r\n";
+        syswrite $hash->{conn}, $hdr;
+        my $buf;
+        my $len = sysread($hash->{conn},$buf,65536);
+        if(!defined($len) || $len <= 0 || $buf !~ m/HTTP.*200/) {
+          HttpUtils_Close($hash);
+          return "Proxy denied CONNECT";
+        }
+      }
+
       my $sslVersion = AttrVal("global", "sslVersion", "SSLv23:!SSLv3:!SSLv2");
       $sslVersion = AttrVal($hash->{NAME}, "sslVersion", $sslVersion)
         if($hash->{NAME});
@@ -453,7 +489,11 @@ HttpUtils_Connect2($)
   $method = ($data ? "POST" : "GET") if( !$method );
 
   my $httpVersion = $hash->{httpversion} ? $hash->{httpversion} : "1.0";
-  my $hdr = "$method $hash->{path} HTTP/$httpVersion\r\n";
+
+  my $path = $hash->{path};
+  $path = "$hash->{protocol}://$hash->{host}$hash->{hu_portSfx}$path"
+        if($hash->{hu_proxy});
+  my $hdr = "$method $path HTTP/$httpVersion\r\n";
   $hdr .= "Host: $hash->{host}$hash->{hu_portSfx}\r\n";
   $hdr .= "User-Agent: fhem\r\n"
         if(!$hash->{header} || $hash->{header} !~ "User-Agent:");
@@ -471,6 +511,10 @@ HttpUtils_Connect2($)
     $hdr .= "Content-Length: ".length($data)."\r\n";
     $hdr .= "Content-Type: application/x-www-form-urlencoded\r\n"
                 if ($hdr !~ "Content-Type:");
+  }
+  if(!$usingSSL) {
+    my $pw = AttrVal("global", "proxyAuth", "");
+    $hdr .= "Proxy-Authorization: Basic $pw\r\n" if($pw);
   }
   Log3 $hash, $hash->{loglevel}+1, "HttpUtils request header:\n$hdr";
   $hdr .= "\r\n";

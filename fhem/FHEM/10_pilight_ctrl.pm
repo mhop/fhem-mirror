@@ -50,6 +50,7 @@
 # V 1.23 2017-04-08 - NEW: support new temperature protocols bmp085 and bmp180
 # V 1.24 2017-04-22 - FIX: GS-iwds07 support
 # V 1.25 2017-04-23 - FIX: react only of global::INITIALIZED m/^INITIALIZED$/
+# V 1.26 2017-09-03 - FIX: heitech support
 ############################################## 
 package main;
 
@@ -429,6 +430,7 @@ sub pilight_ctrl_Write($@)
           case m/mumbi/         {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
           case m/brennenstuhl/  {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
           case m/pollin/        {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
+          case m/heitech/		{$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
           case m/impuls/        {$code .= "\"systemcode\":$id,\"programcode\":$unit,";}
           case m/rsl366/        {$code .= "\"systemcode\":$id,\"programcode\":$unit,";}
           case m/daycom/        { if (!defined($syscode)) {
@@ -839,6 +841,7 @@ sub pilight_ctrl_Parse($$)
     case m/cleverwatts/ {$protoID = 1;}
     case m/intertechno_old/ {$protoID = 1;}
     case m/quigg_gt/    {$protoID = 1;}
+    case m/heitech/		{$protoID = 1;}
     
     case m/dimmer/      {$protoID = 2;}
     

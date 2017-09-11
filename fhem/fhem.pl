@@ -308,7 +308,9 @@ my @globalAttrList = qw(
   nrarchive
   perlSyntaxCheck:0,1
   pidfilename
-  port
+  proxy
+  proxyAuth
+  proxyExclude
   restartDelay
   restoreDirs
   sendStatistics:onUpdate,manually,never
@@ -559,14 +561,6 @@ if($pfn) {
   die "$pfn: $!\n" if(!open(PID, ">$pfn"));
   print PID $$ . "\n";
   close(PID);
-}
-
-my $gp = $attr{global}{port};
-if($gp) {
-  Log 3, "Converting 'attr global port $gp' to 'define telnetPort telnet $gp'";
-  my $ret = CommandDefine(undef, "telnetPort telnet $gp");
-  Log 1, "$ret" if($ret);
-  delete($attr{global}{port});
 }
 
 my $sc_text = "SecurityCheck:";
@@ -1067,6 +1061,7 @@ AnalyzePerlCommand($$;$)
   }
   $month++;
   $year+=1900;
+  my $today = sprintf('%04d-%02d-%02d', $year,$month,$mday);
 
   if($evalSpecials) {
     $cmd = join("", map { my $n = substr($_,1); # ignore the %
@@ -2564,7 +2559,7 @@ GlobalAttr($$$$)
     my %noDel = ( modpath=>1, verbose=>1, logfile=>1 );
     return "The global attribute $name cannot be deleted" if($noDel{$name});
     $featurelevel = 5.8 if($name eq "featurelevel");
-    $haveInet6    = 0   if($name eq "useInet6");
+    $haveInet6    = 0   if($name eq "useInet6"); # IPv6
     return undef;
   }
 
@@ -3378,7 +3373,6 @@ DoTrigger($$@)
     ################
     # Inform
     if($hash->{CHANGED}) {    # It gets deleted sometimes (?)
-      $max = int(@{$hash->{CHANGED}}); # can be enriched in the notifies
       foreach my $c (keys %inform) {
         my $dc = $defs{$c};
         if(!$dc || $dc->{NR} != $inform{$c}{NR}) {
@@ -3392,11 +3386,13 @@ DoTrigger($$@)
           $tn .= sprintf(".%03d", $microseconds/1000);
         }
         my $re = $inform{$c}{regexp};
+        my $events = deviceEvents($hash, $inform{$c}{type} =~ m/WithState/);
+        $max = int(@{$events});
         for(my $i = 0; $i < $max; $i++) {
-          my $state = $hash->{CHANGED}[$i];
-          next if($re && !($dev =~ m/$re/ || "$dev:$state" =~ m/$re/));
+          my $event = $events->[$i];
+          next if($re && !($dev =~ m/$re/ || "$dev:$event" =~ m/$re/));
           addToWritebuffer($dc,($inform{$c}{type} eq "timer" ? "$tn " : "").
-                                "$hash->{TYPE} $dev $state\n");
+                                "$hash->{TYPE} $dev $event\n");
         }
       }
     }
@@ -5161,5 +5157,28 @@ makeReadingName($) # Convert non-valid characters to _
   return $name;
 }
 
+sub
+computeAlignTime($$@)
+{
+  my ($timeSpec, $alignSpec, $triggertime) = @_; # triggertime is now if absent
+
+  my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($alignSpec);
+  return ("alignTime: $alErr", undef) if($alErr);
+
+  my ($tmErr, $hr, $min, $sec, undef) = GetTimeSpec($timeSpec);
+  return ("timeSpec: $tmErr", undef) if($alErr);
+
+  my $now = time();
+  my $alTime = ($alHr*60+$alMin)*60+$alSec-fhemTzOffset($now);
+  my $step = ($hr*60+$min)*60+$sec;
+  my $ttime = ($triggertime ? int($triggertime) : $now);
+  my $off = ($ttime % 86400) - 86400;
+  while($off < $alTime) {
+    $off += $step;
+  }
+  $ttime += ($alTime-$off);
+  $ttime += $step if($ttime < $now);
+  return (undef, $ttime);
+}
 
 1;
