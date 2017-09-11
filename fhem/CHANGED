@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 74_AMADDevice: add change temporary ttsMsg language, code clean
   - feature: 50_TelegramBot: new set cmd msgDelete
   - feature: 95_holiday: move holiday files from contrib to FHEM
   - feature: 31_Nello: updated to new api specifications
