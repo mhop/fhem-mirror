@@ -1,6 +1,9 @@
 ﻿# $Id$
 ############################################################################
-# 2017-08-28, v1.0.11
+# 2017-09-11, v1.0.12
+#
+# v1.0.12
+# - BUFIX:   $_ ersetzt durch $uResult
 #
 # v1.0.11
 # - BUFIX:   Code Optimierungen
@@ -528,8 +531,8 @@ sub NEUTRINO_Set($@) {
         Log3 $name, 5, "NEUTRINO $name [NEUTRINO_Set] [" . $a[1] . "] " . $a[2];
 
         if ( $state eq "on" ) {
-            my $_ = $a[2];
-            if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+            my $uResult = $a[2];
+            if ( m/^\d+$/ && $uResult >= 0 && $uResult <= 100 ) {
                 $cmd = $a[2];
             }
             else {
@@ -599,7 +602,7 @@ sub NEUTRINO_Set($@) {
 		}
  
         if ( $state eq "on" ) {
-            my $_ = $a[2];
+            my $uResult = $a[2];
 			my $channellistname;
 			
 			#2017.07.19 - Plus Zeichen im Name erkennen
