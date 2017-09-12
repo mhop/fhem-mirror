@@ -1077,8 +1077,15 @@ sub OWX_Undef ($$) {
 #
 ########################################################################################
 
-sub OWX_Verify ($$) {
-  my ($hash,$dev) = @_;
+sub OWX_Verify () {
+  my ($hashorname,$devname,$devid,$type) = @_;
+  my $hash;
+  
+  if( $type == 1){
+    $hash = $defs{$hashorname};
+  }else{
+    $hash = $hashorname;
+  }
   my $i;
   
   #-- get the interface
@@ -1089,12 +1096,12 @@ sub OWX_Verify ($$) {
     if( !defined($owx_interface) );
   #-- Directly connected interface
   if(  ($owx_interface eq "DS2480") || ($owx_interface eq "DS9097") ){
-    return OWX_Verify_SER($hash,$dev)
+    return OWX_Verify_SER($hash,$devid)
   #-- Ask the COC/CUNO
   }elsif( ($owx_interface eq "COC" ) || ($owx_interface eq "CUNO") ){
-    return OWX_Verify_CCC($hash,$dev)
+    return OWX_Verify_CCC($hash,$devid)
   }elsif( $owx_interface eq "firmata" ){
-  	return FRM_OWX_Verify($hash,$dev);
+  	return FRM_OWX_Verify($hash,$devid);
   } else {
     Log 1,"OWX: Verify called with unknown interface";
     return 0;
