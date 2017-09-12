@@ -23,10 +23,13 @@ sub CALVIEW_Initialize($)
 						"disable:0,1 " .
 						"do_not_notify:1,0 " .
 						"filterSummary:textField-long " .
+						"fulldaytext " .
 						"isbirthday:1,0 " .						
 						"maxreadings " .
 						"modes:next ".
 						"oldStyledReadings:1,0 " .
+						"sourcecolor:textField-long " .
+						"timeshort:1,0 " .
 						"yobfield:_location,_description,_summary " .
 						$readingFnAttributes; 
 }
@@ -146,7 +149,8 @@ sub CALVIEW_GetUpdate($){
 			etime => $tempend[1],
 			edatetimeiso => $isoendtime,
 			btimestamp => $bts[0],
-			mode => $item->[6]};	
+			mode => $item->[6],
+			wday => $wday};			
 	}
 	my $todaycounter = 1;
 	my $tomorrowcounter = 1;
@@ -155,6 +159,8 @@ sub CALVIEW_GetUpdate($){
 	my $yobfield = AttrVal($name,"yobfield","_description");
 	my $filterSummary = AttrVal($name,"filterSummary",".*:.*");
 	my @arrFilters = split(',' , $filterSummary );
+	my $sourceColor = AttrVal($name,"sourcecolor","");
+	my @arrSourceColors = split(',' , $sourceColor );
 	
 	# sort the array by btimestamp
 	my @sdata = map  $_->[0], 
@@ -165,13 +171,21 @@ sub CALVIEW_GetUpdate($){
 		my $age = 0;
 		my @termyear;
 		my $validterm = 0;
+	
 		for my $termin (@sdata){
+			my $termcolor="white";
 			#if($termin->{summary} =~ /$filterSummary/ ){
 			foreach my $filter (@arrFilters){ 
 				my @arrFilter= split(':' , $filter); 
 				my $sourceFilter = $arrFilter[0]; 
 				my $summaryFilter = $arrFilter[1]; 
 				if( $termin->{source} =~ /$sourceFilter/i && $termin->{summary} =~ /$summaryFilter/i ){ $validterm =1;}
+			};
+			foreach my $color (@arrSourceColors){ 
+				my @arrSourceColor = split(':' , $color); 
+				my $sourceName = $arrSourceColor[0]; 
+				my $sourceColor = $arrSourceColor[1]; 
+				if( $termin->{source} =~ /$sourceName/i ){ $termcolor = $sourceColor;}
 			};
 			if ($validterm ==1){
 					#alter berechnen wenn attribut gesetzt ist. alter wird aus "jahr des termins" - "geburtsjahr aus location oder description" errechnet
@@ -182,7 +196,18 @@ sub CALVIEW_GetUpdate($){
 						elsif($yobfield eq "_summary" && defined($termin->{summary}) && length($termin->{summary}) > 0 && $termin->{summary} =~ /(\d{4})/ ) { my ($byear) = $termin->{summary} =~ /(\d{4})/ ; $age = $termyear[2] -  $byear;}
 						else {$age = " "}
 					}
-
+					my $timeshort = "";
+					my $nD = $D + 1;
+					if( $eD eq $nD && $termin->{btime} eq $termin->{etime} ){ $timeshort = AttrVal($name,"fulldaytext","ganztägig"); }
+					else { 
+						if(AttrVal($name,"timeshort","0") eq 0) {$timeshort = $termin->{btime}." - ".$termin->{etime}; }
+						elsif(AttrVal($name,"timeshort","0") eq 1) {
+							my $tmps = substr $termin->{btime},0,5 ;
+							my $tmpe = substr $termin->{etime},0,5 ;
+							$timeshort = $tmps." - ".$tmpe ; 
+						}
+					}
+					
 					#standard reading t_[3steliger counter] anlegen
 					if($isbday == 1 ){ readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_age", $age);}
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_bdate", $termin->{bdate});
@@ -192,11 +217,14 @@ sub CALVIEW_GetUpdate($){
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_daysleftLong", $termin->{daysleftLong});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_summary", $termin->{summary});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_source", $termin->{source});
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_sourcecolor", $termcolor);
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_location", $termin->{location});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_description", $termin->{description});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_edate", $termin->{edate});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_etime", $termin->{etime});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_mode", $termin->{mode}); 
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_timeshort", $timeshort );
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_weekday", $termin->{wday} );
 					#wenn termin heute today readings anlegen
 					if ($date eq $termin->{bdate} ){
 						if($isbday == 1 ){ readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_age", $age);}
@@ -207,11 +235,13 @@ sub CALVIEW_GetUpdate($){
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $counter)."_daysleftLong", $termin->{daysleftLong});						
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_summary", $termin->{summary}); 
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_source", $termin->{source}); 
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_sourcecolor", $termcolor); 
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_location", $termin->{location});
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_description", $termin->{description});
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_edate", $termin->{edate}); 
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_etime", $termin->{etime}); 
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_mode", $termin->{mode});
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_timeshort", $timeshort );
 						$todaycounter ++;
 					}
 					#wenn termin morgen tomorrow readings anlegen
@@ -224,11 +254,13 @@ sub CALVIEW_GetUpdate($){
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_daysleftLong", $termin->{daysleftLong});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_summary", $termin->{summary}); 
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_source", $termin->{source});
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_sourcecolor", $termcolor);
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_location", $termin->{location});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_description", $termin->{description});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_edate", $termin->{edate}); 
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_etime", $termin->{etime});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_mode", $termin->{mode});
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_timeshort", $timeshort );
 						$tomorrowcounter++;
 					}			
 					last if ($counter++ == $max);
@@ -358,6 +390,9 @@ sub CALVIEW_Notify($$)
 		e.g.: 	filterSummary Kalender_Abfall:Leichtverpackungen,Kalender_Abfall:Bioabfall
 				filterSummary Kalender_Abfall:Leichtverpackungen,Kalender_Feiertage:.*,Kalender_Christian:.*,Kalender_Geburtstage:.*
 </li><br>
+<li>fulldaytext [text]<br>
+		this text will be displayed in _timeshort reading for fullday terms (default ganztägig)
+</li><br>
 <li>isbirthday<br>
         0 / not set - no age calculation (default)  <br>
 		1 - age calculation active. The module calculates the age with year given in description or location (see att yobfield).
@@ -371,6 +406,13 @@ sub CALVIEW_Notify($$)
 <li>oldStyledReadings<br>
 		0 the default style of readings <br>
 		1 readings look like "2015.06.21-00:00" with value "Start of Summer" 
+</li><br>
+<li>sourcecolor &lt;calendername&gt;:&lt;colorcode&gt;[,&lt;calendername&gt;:&lt;colorcode&gt;]<br>
+		here you can define the termcolor for terms from your calendars for the calview tabletui widget, several calendar:color pairs must be separated by comma
+</li><br>
+<li>timeshort<br>
+		0 time in _timeshort readings formated 00:00:00 <br>
+		1 time in _timeshort readings formated 00:00  
 </li><br>
 <li>yobfield<br>
 		_description  - (default) year of birth will be read from term description <br>
@@ -412,6 +454,9 @@ sub CALVIEW_Notify($$)
 				filterSummary Kalender_Abfall:Leichtverpackungen,Kalender_Feiertage:.*,Kalender_Christian:.*,Kalender_Geburtstage:.*
 																	
 </li><br>
+<li>fulldaytext [text]<br>
+		Dieser Text wird bei ganztägigen Terminen in _timeshort Readings genutzt (default ganztägig)
+</li><br>
 <li>isbirthday<br>
         0 / nicht gesetzt - keine Altersberechnung (Standard) <br>
 		1 - aktiviert die Altersberechnung im Modul. Das Alter wird aus der in der Terminbeschreibung (description) angegebenen Jahreszahl (Geburtsjahr) berechnet. (siehe Attribut yobfield)
@@ -425,6 +470,15 @@ sub CALVIEW_Notify($$)
 <li>oldStyledReadings<br> 
 		0 die Standarddarstellung für Readings <br>
 		1 aktiviert die Termindarstellung im "alten" Format "2015.06.21-00:00" mit Wert "Start of Summer"
+</li><br>
+<li>sourcecolor &lt;calendername&gt;:&lt;colorcode&gt;[,&lt;calendername&gt;:&lt;colorcode&gt;]<br>
+		Hier kann man die Farben für die einzelnen Calendar definieren die dann zb im Tabletui widget genutzt werden kann.
+		Die calendar:color Elemente sind durch Komma zu trennen.
+		So kann man zb die google-Kalender Farben auch in der TUI für eine gewohnte Anzeige nutzen.
+</li><br>
+<li>timeshort<br>
+		0 Zeit in _timeshort Readings im Format 00:00:00 - 00:00:00 <br>
+		1 Zeit in _timeshort Readings im Format 00:00 - 00:00
 </li><br>
 <li>yobfield<br>
 		_description  - (der Standard) Geburtsjahr wird aus der Terminbechreibung gelesen <br>
