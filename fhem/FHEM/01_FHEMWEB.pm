@@ -615,13 +615,17 @@ FW_initInform($$)
   $me->{inform}{since} = time()-5
       if(!defined($me->{inform}{since}) || $me->{inform}{since} !~ m/^\d+$/);
 
+  my $sinceTimestamp = FmtDateTime($me->{inform}{since});
   if($longpoll) {
-    my $sinceTimestamp = FmtDateTime($me->{inform}{since});
     TcpServer_WriteBlocking($me,
        "HTTP/1.1 200 OK\r\n".
        $FW_headerlines.
        "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n".
        FW_roomStatesForInform($me, $sinceTimestamp));
+
+  } else { # websocket
+     FW_addToWritebuffer($me,
+        FW_roomStatesForInform($me, $sinceTimestamp));
   }
 
   if($FW_id && $defs{$FW_wname}{asyncOutput}) {

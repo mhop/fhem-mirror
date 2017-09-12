@@ -1095,7 +1095,9 @@ ZWave_Cmd($$@)
       ZWave_processSendStack($baseHash, "next");
     }
     $cmd .= " ".join(" ", @a) if(@a);
-    readingsSingleUpdate($hash, "state", $cmd, 1);
+    my $iohash = $hash->{IODev};
+    readingsSingleUpdate($hash, "state", 
+        $iohash->{showSetInState} ? "set_$cmd" : $cmd, 1);
 
   }
 
@@ -4693,11 +4695,19 @@ ZWave_Parse($$@)
         "$ioName transmit $lmsg for CB $callbackid, target ".
         ($hash ? $hash->{NAME} : "unknown");
     if($id eq "00") {
+      my $name="";
       if($hash) {
-        readingsSingleUpdate($hash, "transmit", $lmsg, 0);
         ZWave_processSendStack($hash, "ack", $callbackid);
+        readingsSingleUpdate($hash, "transmit", $lmsg, 0);
+        if($iodev->{showSetInState}) {
+          my $state = ReadingsVal($hash->{NAME}, "state", "");
+          if($state =~ m/^set_(.*)$/) {
+            readingsSingleUpdate($hash, "state", $1, 1);
+            $name = $hash->{NAME};
+          }
+        }
       }
-      return "";
+      return $name;
 
     } else { # Wait for the retry timer to remove this cmd from the stack.
       return "" if(!$hash);

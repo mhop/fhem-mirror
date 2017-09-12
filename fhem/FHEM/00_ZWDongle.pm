@@ -92,9 +92,21 @@ ZWDongle_Initialize($)
   $hash->{GetFn}   = "ZWDongle_Get";
   $hash->{AttrFn}  = "ZWDongle_Attr";
   $hash->{UndefFn} = "ZWDongle_Undef";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1 ".
-                     "helpSites:multiple,pepper,alliance homeId networkKey ".
-                     "neighborListPos neighborListFmt";
+  no warnings 'qw';
+  my @attrList = qw(
+    do_not_notify:1,0
+    dummy:1,0
+    model:ZWDongle
+    disable:0,1
+    helpSites:multiple,pepper,alliance
+    homeId
+    networkKey
+    neighborListPos
+    neighborListFmt
+    showSetInState:1,0
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
 
   $hash->{FW_detailFn} = "ZWDongle_fhemwebFn";
 }
@@ -957,6 +969,10 @@ ZWDongle_Attr($$$$)
       return "attr $name networkKey: not a hex string with a length of 32";
     }
     return;
+
+  } elsif($attr eq "showSetInState") {
+    $hash->{showSetInState} = ($cmd eq "set" ? (defined($value) ? $value:1) :0);
+
   }
 
   return undef;
@@ -1236,6 +1252,14 @@ ZWDongle_Ready($)
       <ul><code>
         { txt=>"NAME", img=>"IMAGE", title=>"Time to ack: timeToAck" }
       </code></ul>
+      </li>
+    <li><a name="showSetInState">showSetInState</a><br>
+      If the attribute is set to 1, and a user issues a set command to a ZWave
+      device, then the state of the ZWave device will be changed to
+      set_&lt;cmd&gt; first, and after the ACK from the device is received, to
+      &lt;cmd&gt;. E.g.: Issuing the command on changes the state first to
+      set_on, and after the device ack is received, to on.  This is analoguos
+      to the CUL_HM module.  Default for this attribute is 0.
       </li>
       
   </ul>
