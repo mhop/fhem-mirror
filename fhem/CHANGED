@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     73_WaterCalculator.pm: New module for water consumption and cost
   - bugfix:  73_AMADCommBridge: fix commandref and Flowset
   - feature: 74_AMADautomagicFlowset: add support for wired headset plugged
   - feature: 74_AMADDevice: add change temporary ttsMsg language, code clean
