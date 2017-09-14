@@ -931,8 +931,7 @@ ZWave_Cmd($$@)
   }
 
   my $id = $hash->{nodeIdHex};
-  my $isMc = ($id =~ m/(....)/);
-  if(!$isMc) {
+  if($id !~ m/(....)/) { # not multiChannel
     if($type eq "set") {
       $cmdList{neighborUpdate} = { fmt=>"48$id",     id=>"", ctrlCmd=>1 };
       $cmdList{returnRouteAdd} = { fmt=>"46$id%02x", id=>"", ctrlCmd=>1 };
@@ -1039,6 +1038,7 @@ ZWave_Cmd($$@)
   Log3 $name, 3, "ZWave $type $name $cmd ".join(" ", @a);
 
   my ($baseClasses, $baseHash) = ($classes, $hash);
+  delete($hash->{lastChannelUsed});
   if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
     my ($baseId,$ch) = ($1, $2);
     $id = $baseId;
@@ -1046,6 +1046,7 @@ ZWave_Cmd($$@)
     $cmdId = "60";  # MULTI_CHANNEL
     $baseHash = $modules{ZWave}{defptr}{"$hash->{homeId} $baseId"};
     $baseClasses = AttrVal($baseHash->{NAME}, "classes", "");
+    $baseHash->{lastChannelUsed} = $name;
   }
 
   my $data;
@@ -4700,13 +4701,16 @@ ZWave_Parse($$@)
         ZWave_processSendStack($hash, "ack", $callbackid);
         readingsSingleUpdate($hash, "transmit", $lmsg, 0);
         if($iodev->{showSetInState}) {
-          my $state = ReadingsVal($hash->{NAME}, "state", "");
+          my $lCU = $hash->{lastChannelUsed};
+          my $lname = $lCU ? $lCU : $hash->{NAME};
+          my $state = ReadingsVal($lname, "state", "");
           if($state =~ m/^set_(.*)$/) {
-            readingsSingleUpdate($hash, "state", $1, 1);
-            $name = $hash->{NAME};
+            readingsSingleUpdate($defs{$lname}, "state", $1, 1);
+            $name = $lname;
           }
         }
       }
+      delete($hash->{lastChannelUsed});
       return $name;
 
     } else { # Wait for the retry timer to remove this cmd from the stack.
