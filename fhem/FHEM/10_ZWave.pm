@@ -934,13 +934,13 @@ ZWave_Cmd($$@)
   my $isMc = ($id =~ m/(....)/);
   if(!$isMc) {
     if($type eq "set") {
-      $cmdList{neighborUpdate} = { fmt=>"48$id",     id=>"" };
-      $cmdList{returnRouteAdd} = { fmt=>"46$id%02x", id=>"" };
-      $cmdList{returnRouteDel} = { fmt=>"47$id",     id=>"" };
+      $cmdList{neighborUpdate} = { fmt=>"48$id",     id=>"", ctrlCmd=>1 };
+      $cmdList{returnRouteAdd} = { fmt=>"46$id%02x", id=>"", ctrlCmd=>1 };
+      $cmdList{returnRouteDel} = { fmt=>"47$id",     id=>"", ctrlCmd=>1 };
       my $iohash = $hash->{IODev};
       if($iohash && ReadingsVal($iohash->{NAME}, "sucNodeId","no") ne "no") {
-        $cmdList{sucRouteAdd} = { fmt=>"51$id", id=>"" };
-        $cmdList{sucRouteDel} = { fmt=>"55$id", id=>"" };
+        $cmdList{sucRouteAdd} = { fmt=>"51$id", id=>"", ctrlCmd=>1 };
+        $cmdList{sucRouteDel} = { fmt=>"55$id", id=>"", ctrlCmd=>1 };
       }
     }
     $cmdList{neighborList}{fmt} = "x" if($type eq "get"); # Add meta command
@@ -1096,8 +1096,8 @@ ZWave_Cmd($$@)
     }
     $cmd .= " ".join(" ", @a) if(@a);
     my $iohash = $hash->{IODev};
-    readingsSingleUpdate($hash, "state", 
-        $iohash->{showSetInState} ? "set_$cmd" : $cmd, 1);
+    my $withSet = ($iohash->{showSetInState} && !$cmdList{$cmd}{ctrlCmd});
+    readingsSingleUpdate($hash, "state", $withSet ? "set_$cmd" : $cmd, 1);
 
   }
 
