@@ -1,4 +1,4 @@
-REV 15061
+REV 15066
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-09-13_07:45:02 210000 ./CHANGED
+UPD 2017-09-15_07:45:02 210078 ./CHANGED
 UPD 2017-09-06_07:45:02 39152 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
 UPD 2017-09-10_16:00:57 136764 ./fhem.pl
@@ -81,7 +81,7 @@ UPD 2017-06-16_07:45:03 27253 FHEM/10_OWServer.pm
 UPD 2017-04-30_07:45:02 71321 FHEM/10_RESIDENTS.pm
 UPD 2016-12-31_12:48:30 57088 FHEM/10_SOMFY.pm
 UPD 2016-12-19_07:45:02 18301 FHEM/10_UNIRoll.pm
-UPD 2017-09-13_07:45:02 225457 FHEM/10_ZWave.pm
+UPD 2017-09-15_07:45:02 225771 FHEM/10_ZWave.pm
 UPD 2017-09-04_07:45:02 33218 FHEM/10_pilight_ctrl.pm
 UPD 2017-08-14_07:45:02 46655 FHEM/11_FHT.pm
 UPD 2017-08-14_07:45:02 8037 FHEM/11_FHT8V.pm
@@ -331,6 +331,7 @@ UPD 2017-05-09_07:45:02 81574 FHEM/73_GasCalculator.pm
 UPD 2017-01-27_07:45:02 88049 FHEM/73_MPD.pm
 UPD 2017-05-12_07:45:02 30582 FHEM/73_NUKIBridge.pm
 UPD 2017-07-14_07:45:02 84692 FHEM/73_PRESENCE.pm
+UPD 2017-09-15_07:45:02 84596 FHEM/73_WaterCalculator.pm
 UPD 2017-05-09_07:45:02 118318 FHEM/73_km200.pm
 UPD 2017-09-13_07:45:02 60506 FHEM/74_AMADDevice.pm
 UPD 2017-09-08_07:45:03 35645 FHEM/74_GardenaSmartDevice.pm
@@ -636,8 +637,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-09-13_07:45:04 3076877 docs/commandref.html
-UPD 2017-09-13_07:45:05 1802012 docs/commandref_DE.html
+UPD 2017-09-15_07:45:03 3094251 docs/commandref.html
+UPD 2017-09-15_07:45:04 1819550 docs/commandref_DE.html
 UPD 2017-09-10_16:00:54 72212 docs/commandref_frame.html
 UPD 2017-09-10_16:00:54 80908 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
