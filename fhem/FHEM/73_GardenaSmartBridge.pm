@@ -62,15 +62,13 @@ use strict;
 use warnings;
 
 use HttpUtils;
-use Data::Dumper;   #debugging
 
 eval "use Encode qw(encode encode_utf8 decode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
-###todo Hier fehlt noch Modulabfrage für ssl
 
 
-my $version = "0.2.2";
+my $version = "0.2.5";
 
 
 
@@ -116,6 +114,7 @@ sub GardenaSmartBridge_Initialize($) {
     $hash->{AttrList}   = "debugJSON:0,1 ".
                           "disable:1 ".
                           "interval ".
+                          "disabledForIntervals ".
                           $readingFnAttributes;
     
     foreach my $d(sort keys %{$modules{GardenaSmartBridge}{defptr}}) {
@@ -314,63 +313,18 @@ sub GardenaSmartBridge_Write($@) {
 
 sub GardenaSmartBridge_ErrorHandling($$$) {
 
-    my ($param,$err,$data)    = @_;
+    my ($param,$err,$data)  = @_;
     
-    my $hash                        = $param->{hash};
-    my $name                        = $hash->{NAME};
+    my $hash                = $param->{hash};
+    my $name                = $hash->{NAME};
+    my $dhash               = $hash;
     
-    my $dhash;
-    if( defined( $param->{'device_id'}) ) {
-        $dhash                      = $modules{GardenaSmartDevice}{defptr}{$param->{'device_id'}};
-    } else {
-        $dhash                      = $hash;
-    }
+    $dhash                  = $modules{GardenaSmartDevice}{defptr}{$param->{'device_id'}}
+    unless( not defined( $param->{'device_id'}) );
+    
     my $dname                       = $dhash->{NAME};
 
 
-    ###todo Das gesamte Errorhandling muss hier noch rein
-    
-    #Log3 $name, 1, "GardenaSmartBridge ($name) - Header:\n".Dumper($param->{header});
-    #Log3 $name, 1, "GardenaSmartBridge ($name) - CODE:\n".Dumper($param->{code});
-    #Log3 $name, 1, "GardenaSmartBridge ($name) - Error:\n".Dumper($err);
-    #Log3 $name, 1, "GardenaSmartBridge ($name) - Data:\n".Dumper($data);
-    
-    
-    
-    
-    #### Ein Fehler der Behandelt werden muss
-   # Data:
-   # '<html>
-   #     <head>
-   #         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
-   #         <title>Error 400 Bad Request</title>
-   #     </head>
-   #     <body><h2>HTTP ERROR 400</h2>
-   #         <p>Problem accessing /sg-1/devices/2ad0d816-8bc3-4f0a-8c52-8b0dc8d7b2ec/abilities/watering_computer/command. Reason:
-   #         <pre>    Bad Request</pre></p><hr><i><small>Powered by Jetty://</small></i><hr/>
-   #
-   #     </body>
-   # </html>
-   # ';
-   
-   # '<html>
-   #    <head>
-   #         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
-   #         <title>Error 503 Service Unavailable</title>
-   #     </head>
-   #     <body><h2>HTTP ERROR 503</h2>
-   #         <p>Problem accessing /sg-1/devices/2ad0d816-8bc3-4f0a-8c52-8b0dc8d7b2ec/abilities/outlet/command. Reason:
-   #         <pre>    Service Unavailable</pre></p><hr><i><small>Powered by Jetty://</small></i><hr/>
-   # 
-   #     </body>
-   # </html>
-   # ';
-   
-   
-   # 2017.08.10 11:17:20 1: GardenaSmartBridge (myGardena) - Data:
-   # $VAR1 = '{"errors":[{"attribute":"password","error":"invalid"}]}';
-
-   
    
    
    if( defined( $err ) ) {
@@ -577,7 +531,7 @@ sub GardenaSmartBridge_ResponseProcessing($$) {
         return;
     }
 
-        Log3 $name, 3, "GardenaSmartBridge ($name) - no Match for processing data"
+    Log3 $name, 3, "GardenaSmartBridge ($name) - no Match for processing data"
 }
 
 sub GardenaSmartBridge_WriteReadings($$) {
