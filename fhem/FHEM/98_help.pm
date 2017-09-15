@@ -3,7 +3,7 @@
 package main;
 use strict;
 use warnings;
-#use Data::Dumper;
+use Data::Dumper;
 
 my $ret;
 
@@ -12,6 +12,8 @@ sub cref_internals;
 sub cref_search;
 sub cref_search_cmd;
 sub cref_fill_list;
+sub cref_findInfo;
+
 
 sub help_Initialize($$) {
   my %hash = (  Fn => "CommandHelp",
@@ -36,6 +38,8 @@ sub CommandHelp {
     $mod = lc($mod);
     my $modPath = AttrVal('global','modpath','.');
 	my $output = '';
+    
+    $output .= cref_findInfo($modPath,$mod);
 
 	if($cmds{help}{InternalCmds} !~ m/$mod\,/) {
       my %mods;
@@ -57,10 +61,10 @@ sub CommandHelp {
       return "Module $mod not found" unless defined($mods{$mod});
 
       # read commandref docu from file
-      $output = cref_search($mods{$mod},$lang);
+      $output .= cref_search($mods{$mod},$lang);
 
       unless($output) {
-         $output = cref_search($mods{$mod},"");
+         $output .= cref_search($mods{$mod},"");
          $output = "Keine deutsche Hilfe gefunden!<br/>$output" if $output;
       }
       
@@ -245,6 +249,21 @@ sub cref_fill_list(){
   }
 }
 
+sub cref_findInfo {
+  my ($modPath,$mod) = @_;
+  my ($l,@line);
+  my ($err,@text) = FileRead({FileName => "$modPath/MAINTAINER.txt", ForceType => 'file'});
+  foreach $l (@text) {
+    @line = split("[ \t][ \t]*", $l,4);
+    last if $l =~ m/$mod/i;
+  }
+  $line[0]= (split("/",$line[0]))[1];
+  my $text  = "<br/><b>Module:</b> $line[0] ";
+     $text .= "<b>Maintainer:</b> $line[1] ";
+     $text .= "<b>Forum:</b> $line[3]\n";
+  $text //= '';
+  return $text;
+}
 
 1;
 
