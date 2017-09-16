@@ -341,6 +341,7 @@ FHEM/82_LGTV.pm              markusbloch          Multimedia
 FHEM/82_LGTV_IP12.pm         markusbloch          Multimedia
 FHEM/82_LGTV_WebOS.pm        CoolTux              Multimedia
 FHEM/82_M232Voltage.pm       neubert              Sonstige Systeme
+FHEM/83_IOhomecontrol.pm     neubert              Sonstige Systeme
 FHEM/87_WS2000.pm            tdressler            Sonstiges
 FHEM/86_Robonect.pm          andi291              Sonstige Systeme
 FHEM/88_ALL4000T.pm          sachag               Sonstiges
