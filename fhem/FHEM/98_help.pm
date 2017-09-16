@@ -254,13 +254,13 @@ sub cref_findInfo {
   my ($l,@line);
   my ($err,@text) = FileRead({FileName => "$modPath/MAINTAINER.txt", ForceType => 'file'});
   foreach $l (@text) {
-    @line = split("[ \t][ \t]*", $l,4);
+    @line = split("[ \t][ \t]*", $l,3);
     last if $l =~ m/$mod/i;
   }
   $line[0]= (split("/",$line[0]))[1] if $line[0] =~ /\//;
   my $text  = "<br/><b>Module:</b> $line[0] ";
      $text .= "<b>Maintainer:</b> $line[1] ";
-     $text .= "<b>Forum:</b> $line[3]\n";
+     $text .= "<b>Forum:</b> $line[2]\n";
   $text //= '';
   return $text;
 }
