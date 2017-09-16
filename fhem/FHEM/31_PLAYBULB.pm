@@ -41,7 +41,7 @@ use Blocking;
 use SetExtensions;
 
 
-my $version = "1.2.6";
+my $version = "1.2.7";
 
 
 
@@ -49,6 +49,7 @@ my $version = "1.2.6";
 my %playbulbModels = (
         BTL300_v5       => {'aColor' => '0x16'  ,'aEffect' => '0x14'    ,'aBattery' => '0x1f'   ,'aDevicename' => '0x3'},   # Candle Firmware 5
         BTL300_v6       => {'aColor' => '0x19'  ,'aEffect' => '0x17'    ,'aBattery' => '0x22'   ,'aDevicename' => '0x3'},   # Candle Firmware 6
+        BTL305_v14      => {'aColor' => '0x29'  ,'aEffect' => '0x27'    ,'aBattery' => '0x22'   ,'aDevicename' => '0x3'},   # Candle S Firmware 1.4
         BTL201_v2       => {'aColor' => '0x1b'  ,'aEffect' => '0x19'    ,'aBattery' => 'none'   ,'aDevicename' => 'none'},  # Smart
         BTL201M_V16     => {'aColor' => '0x25'  ,'aEffect' => '0x23'    ,'aBattery' => 'none'   ,'aDevicename' => '0x7'},   # Smart (1/2017)
         BTL505_v1       => {'aColor' => '0x23'  ,'aEffect' => '0x21'    ,'aBattery' => 'none'   ,'aDevicename' => '0x29'},  # Stripe
@@ -106,7 +107,7 @@ sub PLAYBULB_Initialize($) {
     $hash->{DefFn}      = "PLAYBULB_Define";
     $hash->{UndefFn}    = "PLAYBULB_Undef";
     $hash->{AttrFn}     = "PLAYBULB_Attr";
-    $hash->{AttrList}   = "model:BTL300_v5,BTL300_v6,BTL201_v2,BTL201M_V16,BTL505_v1,BTL400M_v18,BTL400M_v37,BTL100C_v10 ".
+    $hash->{AttrList}   = "model:BTL300_v5,BTL300_v6,BTL201_v2,BTL201M_V16,BTL505_v1,BTL400M_v18,BTL400M_v37,BTL100C_v10,BTL305_v14 ".
                             "sshHost ".
                             $readingFnAttributes;
 
@@ -241,7 +242,9 @@ sub PLAYBULB_Set($$@) {
     
     } else {
         my $list = "on:noArg off:noArg rgb:colorpicker,RGB sat:slider,0,5,255 effect:Flash,Pulse,RainbowJump,RainbowFade,Candle,none speed:slider,170,50,20 color:on,off statusRequest:noArg ";
-        $list .= "deviceName " if( defined($attr{$name}{model}) and ($attr{$name}{model} ne "BTL400M_v18" or $attr{$name}{model} ne "BTL100C_v10" or $attr{$name}{model} ne "BTL400M_v37") );
+        $list .= "deviceName " if( defined($attr{$name}{model}) and ($attr{$name}{model} ne "BTL400M_v18"
+                                                                    or $attr{$name}{model} ne "BTL100C_v10"
+                                                                    or $attr{$name}{model} ne "BTL400M_v37") );
         return SetExtensions($hash, $list, $name, $cmd, $arg);
     }
     
