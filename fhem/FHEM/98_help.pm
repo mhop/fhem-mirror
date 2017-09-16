@@ -71,7 +71,7 @@ sub CommandHelp {
       $output = "No help found for module: $mod" unless $output;
 
     } else {
-      $output = '';
+      $output = "<br/><b>Internal command:</b> $mod";
 	  my $i;
 	  my $f = "$modPath/docs/commandref_frame$lang.html";
       my $skip = 1;
@@ -257,7 +257,7 @@ sub cref_findInfo {
     @line = split("[ \t][ \t]*", $l,4);
     last if $l =~ m/$mod/i;
   }
-  $line[0]= (split("/",$line[0]))[1];
+  $line[0]= (split("/",$line[0]))[1] if $line[0] =~ /\//;
   my $text  = "<br/><b>Module:</b> $line[0] ";
      $text .= "<b>Maintainer:</b> $line[1] ";
      $text .= "<b>Forum:</b> $line[3]\n";
