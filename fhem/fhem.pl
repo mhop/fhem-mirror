@@ -59,6 +59,7 @@ sub Dispatch($$$);
 sub DoTrigger($$@);
 sub EvalSpecials($%);
 sub Each($$;$);
+sub FileDelete($);
 sub FileRead($);
 sub FileWrite($@);
 sub FmtDateTime($);
@@ -4826,6 +4827,25 @@ FileWrite($@)
       return "Can't open $fileName: $!";
 
     }
+  }
+}
+
+sub
+FileDelete($)
+{
+  my ($param) = @_;
+  my ($fileName, $forceType);
+  if(ref($param) eq "HASH") {
+    $fileName = $param->{FileName};
+    $forceType = $param->{ForceType};
+  } else {
+    $fileName = $param;
+  }
+  $forceType //= '';
+  if(configDBUsed() && lc($forceType) ne "file") {
+    return _cfgDB_Filedelete($fileName);
+  } else {
+    return unlink($fileName);
   }
 }
 
