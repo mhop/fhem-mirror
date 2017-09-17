@@ -126,9 +126,35 @@ sub HMtemplate_Attr(@) {#######################################################
         $attr{$name}{"Reg_".$rN} = $param[$no];
       }
       
+      #remove old params
+      if ($attr{$name}{tpl_params}){# first setting
+        my @atS;
+        foreach my $atS (split(" ",$modules{HMtemplate}{AttrList})){
+          if ($atS !~ m/:/){# no values
+            push @atS,$atS;
+            next;
+          }
+          my ($aN,$aV) = split (":",$atS);
+          my @aVaNew;
+          foreach my $curAV(split(",",$aV)){
+            next if (!$curAV);
+            foreach my $curParam (split(",",$attr{$name}{tpl_params})){
+              push @aVaNew,$_ if($curAV ne $curParam);
+            }
+          }
+          push @atS,"$aN:".join(",",@aVaNew);
+        }
+        $modules{HMtemplate}{AttrList} = join(" ",sort @atS);
+      }
+      
+      #now add new ones
       my $paramSnew = join(",",@param);
+      my @at = split(" ",$modules{HMtemplate}{AttrList});
+      $_ .= ",".$paramSnew foreach (grep (m/:/,@at));
       my $paramSold = join(",",split(" ",$attr{$name}{tpl_params}));
-      $modules{HMtemplate}{AttrList} =~ s/$paramSold/$paramSnew/g;
+      #$modules{HMtemplate}{AttrList} =~ s/$paramSold/$paramSnew/g;
+      $modules{HMtemplate}{AttrList} = join(" ",@at);
+      Log 1,"General \n   $paramSnew\n   $paramSold".join("\n   ".split(" ","$modules{HMtemplate}{AttrList}"));
       
       $hash->{tpl_Param} = $attrVal;
     }
