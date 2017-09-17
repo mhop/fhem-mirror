@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  00_MQTT: fix Undef
   - feature: 83_IOhomecontrol: new attribute setCmds
   - bugfix:  00_MQTT: added delete 
   - new:     83_IOhomecontrol: control IOhomecontrol devices via REST API

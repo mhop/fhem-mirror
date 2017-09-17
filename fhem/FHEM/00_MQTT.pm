@@ -133,9 +133,6 @@ sub Define($$) {
 sub Undef($) {
   my $hash = shift;
   Stop($hash);
-  my $name = $hash->{NAME};
-  setKeyValue($name."_user",undef);
-  setKeyValue($name."_pass",undef);
   return undef;
 }
 
