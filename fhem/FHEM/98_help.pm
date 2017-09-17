@@ -258,6 +258,7 @@ sub cref_findInfo {
     last if $l =~ m/$mod/i;
   }
   $line[0]= (split("/",$line[0]))[1] if $line[0] =~ /\//;
+  $line[2]= "no info" if $line[2] =~ /forum\.fhem\.de/;
   my $text  = "<br/><b>Module:</b> $line[0] ";
      $text .= "<b>Maintainer:</b> $line[1] ";
      $text .= "<b>Forum:</b> $line[2]\n";
