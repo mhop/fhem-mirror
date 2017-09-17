@@ -1792,7 +1792,7 @@ $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
                      ,"ActionDetector"   =>{ clear          =>"[readings|all]"
                                             ,update         => ""
                                            }
-                     ,"HM-LC-Ja1PBU-FM"  =>{ pctSlat        =>"-value-|old|noChng"
+                     ,"HM-LC-Ja1PBU-FM"  =>{ pctSlat        =>"[0-100]|old|noChng"
                                             ,pctLvlSlat     =>"-value-|old|noChng -slatValue-|old|noChng"
                                            }
 );
