@@ -10,12 +10,11 @@ use warnings;
 # Server-Side script to check out the fhem SVN repository, and upload the
 # changed files to the server
 
-$ENV{CVS_RSH}="/usr/bin/ssh";
-
 print "\n\n";
-print localtime() . "\n";
+print "fhemupdate.pl START: ".localtime()."\n";
 
-my $homedir="/home/rudi/fhemupdate";
+my $homedir="/home/rko/fhemupdate";
+my $destdir="/var/www/html/fhem.de";
 
 chdir("$homedir/culfw");
 system("svn update .");
@@ -34,6 +33,7 @@ system("mkdir -p fhemupdate");
 my @filelist2 = (
   "./fhem.pl.txt",
   "./CHANGED",
+  "./MAINTAINER.txt",
   "./configDB.pm",
   "FHEM/.*.pm",
   "FHEM/.*.layout",
@@ -52,6 +52,7 @@ my @filelist2 = (
   "FHEM/lib/MP3/.*.pm",
   "FHEM/lib/MP3/Tag/.*",
   "FHEM/lib/UPnP/.*",
+  "FHEM/holiday/.*.holiday",
   "contrib/commandref_join.pl.txt",
   "contrib/commandref_modular.pl.txt",
   "www/pgm2/.*",
@@ -141,29 +142,34 @@ foreach my $f (sort keys %filetime2) {
 }
 close $cfh;
 
-$ENV{RSYNC_RSH}="ssh";
 chdir("$homedir/fhem");
+my $diff=`diff -I '^REV' fhemupdate/$fname $fname`;
+if($diff) {
+  system("cp fhemupdate/$fname $fname");
+  system("svn commit -m '$fname: fhemupdate checkin'");
+}
 
 system("cp -p ../culfw/Devices/CUL/*.hex fhemupdate/FHEM");
 system("cp -p ../culfw/Devices/CUL/*.hex fhemupdate/FHEM/firmware");
 system("cp -p FHEM/firmware/*.hex        fhemupdate/FHEM/firmware");
 
 
-my $rsyncopts="-a --delete --compress --verbose";
-system("rsync $rsyncopts fhemupdate/. fhem.de:fhem/fhemupdate/.");
+my $rsyncopts="-a --delete --verbose";
+print "rsync $rsyncopts fhemupdate/. $destdir/fhemupdate/.\n";
+system("rsync $rsyncopts fhemupdate/. $destdir/fhemupdate/.");
 if(-f "commandref_changed") {
-  system("scp docs/commandref.html docs/commandref_DE.html fhem.de:fhem");
+  system("cp docs/commandref.html docs/commandref_DE.html $destdir");
 }
 
-system("scp CHANGED MAINTAINER.txt fhem.de:fhem");
-system("scp fhem.de:fhem/stats/data/fhem_statistics_db.sqlite ..");
+system("cp CHANGED MAINTAINER.txt $destdir");
+system("cp $destdir/stats/data/fhem_statistics_db.sqlite ..");
 
 chdir("$homedir");
 system("grep -v '^REV' fhem/fhemupdate/controls_fhem.txt > controls_fhem_5.5.txt");
-system("scp controls_fhem_5.5.txt fhem.de:fhem/fhemupdate4/svn/controls_fhem.txt");
+system("cp controls_fhem_5.5.txt $destdir/fhemupdate4/svn/controls_fhem.txt");
 
-system("sh stats/dostats.sh");
+#system("sh stats/dostats.sh"); disabled due to new reworked statistics2.cgi
+print "generating SVNLOG\n";
 system("sh mksvnlog.sh > SVNLOG");
-system("scp SVNLOG fhem.de:fhem");
-
-system("sourceforge/dorsync");
+system("cp SVNLOG $destdir");
+print "fhemupdate.pl END: ".localtime()."\n";
