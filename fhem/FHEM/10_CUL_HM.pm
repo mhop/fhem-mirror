@@ -4049,6 +4049,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     @arr1 = ("--") if (!scalar @arr1);
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1);
     $usg =~ s/ pct/ pct:slider,0,1,100/;
+    $usg =~ s/ pctSlat/ pctSlat:slider,0,1,100/;
     $usg =~ s/ virtual/ virtual:slider,1,1,50/;
     $usg =~ s/ color/ color:colorpicker,HUE,0,0.5,100/;
 	if ($usg =~ m/ tempTmplSet/){
@@ -4719,9 +4720,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if    ($slat eq "old")   {$slat = "C9"}
     elsif ($slat eq "noChng"){$slat = "CA"}
     else{                     $slat =~ s/(\d*\.?\d*).*/$1/;
+          return "Value $a[2] not allowed for slat" if ($slat > 100);
                               $slat = sprintf("%02X",$slat*2);
     }
-
+    return "Value $a[2] not allowed for slat" if (hex($slat) > 202);
+    {return hex{"0xCA"}}
+    {return "test:".(hex{"ca"}+2)}
+    {return "CA"}
+    {return hex{"200"}}
     CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."80${chn}CA$slat");
     $state = "";
     CUL_HM_UpdtReadSingle($hash,"levelSlat",$state,1);
@@ -8849,6 +8855,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
                   ,(grep {!defined $hash->{helper}{mRssi}{io}{$_}} @ioccu));
     unshift @ios,@{$hash->{helper}{io}{prefIO}} if ($hash->{helper}{io}{prefIO});# set prefIO to first choice
     foreach my $iom (@ios){
+      last if ($iom eq "none"); # if "none" is detected stop vccu auto assignment and try normal 
       if (  !$defs{$iom}
           || ReadingsVal($iom,"state","") eq "disconnected"
           || InternalVal($iom,"XmitOpen",1) == 0){# HMLAN/HMUSB/TSCUL?
@@ -10530,11 +10537,13 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           check which IO is operational and has the best RSSI performance for this device.<br>
           Optional a prefered IO - perfIO can be given. In case this IO is operational it will be selected regardless
           of rssi values. <br>
+          If none is detected in the prefIO list the mechanism is stopped and the IO as of IOdev is assigned<br>
           Example:<br>
           <ul><code>
             attr myDevice1 IOgrp vccu<br>
             attr myDevice2 IOgrp vccu:prefIO<br>
             attr myDevice2 IOgrp vccu:prefIO1,prefIO2,prefIO3<br>
+            attr myDevice2 IOgrp vccu:prefIO1,prefIO2,none<br>
           </code></ul>
           </li>
       <li><a name="#CUL_HMlevelRange">levelRange</a><br>
@@ -11880,10 +11889,12 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         welches IO operational ist und welches den besten rssi-faktor für das Device hat.<br>
         Optional kann ein bevorzugtes IO definiert werden. In diesem Fall wird es, wenn operational,
         genutzt - unabhängig von den rssi Werten.<br>
+        wenn kein prefIO verfügbar ist und none erkannt wird wird das IO aus IODev gewählt<br>
         Beispiel:<br>
         <ul><code>
           attr myDevice1 IOgrp vccu<br>
           attr myDevice2 IOgrp vccu:prefIO1,prefIO2,prefIO3<br>
+          attr myDevice2 IOgrp vccu:prefIO1,prefIO2,none<br>
         </code></ul>
         </li>
       <li><a name="#CUL_HMlevelRange">levelRange</a><br>
