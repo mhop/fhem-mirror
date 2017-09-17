@@ -30,7 +30,7 @@ use strict;
 use warnings;
 use HttpUtils;
 use JSON;
-#use Data::Dumper;
+use Data::Dumper;
 
 #####################################
 sub IOhomecontrol_Initialize($) {
@@ -42,7 +42,7 @@ sub IOhomecontrol_Initialize($) {
   $hash->{SetFn}        = "IOhomecontrol_Set";
   $hash->{parseParams}  = 1;
   #$hash->{AttrFn}  = "IOhomecontrol_Attr";
-  #$hash->{AttrList}= "";
+  $hash->{AttrList}     = "setCmds " . $readingFnAttributes;
 }
 
 #####################################
@@ -309,7 +309,17 @@ sub IOhomecontrol_Get($@) {
 
 
 #####################################
-sub IOhomecontrol_Set($@) {
+sub IOhomecontrol_getSetCmds($) {
+  my $hash= shift;
+  my $name= $hash->{NAME};
+  
+  my $attr= AttrVal($name, "setCmds", "");
+  my (undef, $setCmds)= parseParams($attr,",");
+  return $setCmds;
+}
+
+
+sub IOhomecontrol_Set($$$) {
   my ($hash, $argsref, undef) = @_;
 
   my @a= @{$argsref};
@@ -318,9 +328,21 @@ sub IOhomecontrol_Set($@) {
   my $name = shift @a;
   my $cmd= shift @a;
 
-  my $usage= "Unknown argument $cmd, choose one of scene";
+  my $setCmds= IOhomecontrol_getSetCmds($hash);
+  my $usage= "Unknown argument $cmd, choose one of scene " . 
+    join(" ", (keys %{$setCmds}));
+  if(exists($setCmds->{$cmd})) {
+    readingsSingleUpdate($hash, "state", $cmd, 1);
+    my $subst= $setCmds->{$cmd};
+    Log3 $hash, 4, "IOhomecontrol $name: substitute set command $cmd by $subst";
+    ($argsref, undef)= parseParams($subst);
+    @a= @{$argsref};
+    $cmd= shift @a;
+  }
+    
   if($cmd eq "scene") {
     if($#a) {
+      Debug Dumper @a;
       return "Command scene needs exactly one argument.";
     } else {
       my $sc= IOhomecontrol_makeScenes($hash);
@@ -405,6 +427,19 @@ sub IOhomecontrol_Set($@) {
     </ul>
   </ul>
   <br><br>
+  
+  
+  <a name="IOhomecontrolattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>setCmds: a comma-separated list of set command definitions.
+    Every definition is of the form <code>&lt;shorthand&gt;=&lt;command&gt;</code>. This defines a new single-word command <code>&lt;shorthand&gt</code> as a substitute for <code>&lt;command&gt;</code>.<br>
+    Example: <code>attr velux setCmds up=scene "3.dz.roll2 100%",down=scene "3.dz.roll2 0%"</code><br>
+    Substituted commands (and only these) are shown in the state reading. This is useful in conjunction with the <code>devStateIcon</code> attribute, e.g. <code>attr velux devStateIcon down:shutter_closed up:shutter_open</code>.</li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br><br>
+
 
 </ul>
 
