@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  00_MQTT: added delete 
   - new:     83_IOhomecontrol: control IOhomecontrol devices via REST API
   - feature: 31_PLAYBULB: add support for Candle S Firmware 1.4
   - feature: 73_GardenaSmartBridge: add attribut disabledForInterval
