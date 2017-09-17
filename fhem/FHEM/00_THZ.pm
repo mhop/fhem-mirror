@@ -297,22 +297,22 @@ my %sets439technician =(
 
 my %sets439539common = (
   "pOpMode"				=> {cmd2=>"0A0112", type   =>  "2opmode"},  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
-  "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC1"			=> {cmd2=>"0B0008", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
-  "p01RoomTempDayHC1SummerMode"		=> {cmd2=>"0B0569", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC1"			=> {cmd2=>"0B0008", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC1SummerMode"		=> {cmd2=>"0B0569", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
   "p13GradientHC1"			=> {cmd2=>"0B010E", argMin => "0.1", argMax =>    "5", 	type =>"6gradient",  unit =>""}, # 0..5 rappresentato/100
   "p14LowEndHC1"			=> {cmd2=>"0B059E", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},   #in °K 0..20°K rappresentato/10
   "p15RoomInfluenceHC1"			=> {cmd2=>"0B010F", argMin =>   "0", argMax =>  "100",	type =>"0clean", unit =>" %"},
   "p19FlowProportionHC1"		=> {cmd2=>"0B059D", argMin =>   "0", argMax =>  "100",	type =>"1clean", unit =>" %"}, #in % 0..100%
-  "p01RoomTempDayHC2"			=> {cmd2=>"0C0005", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC2"			=> {cmd2=>"0C0008", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
-  "p01RoomTempDayHC2SummerMode"		=> {cmd2=>"0C0569", argMin =>  "12", argMax =>   "27",	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC2SummerMode"	=> {cmd2=>"0C056B", argMin =>  "12", argMax =>   "27",	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC2SummerMode"	=> {cmd2=>"0C056A", argMin =>  "12", argMax =>   "27",	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC2"			=> {cmd2=>"0C0005", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC2"			=> {cmd2=>"0C0008", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin =>  "12", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC2SummerMode"		=> {cmd2=>"0C0569", argMin =>  "12", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC2SummerMode"	=> {cmd2=>"0C056B", argMin =>  "12", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC2SummerMode"	=> {cmd2=>"0C056A", argMin =>  "12", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
   "p16GradientHC2"			=> {cmd2=>"0C010E", argMin => "0.1", argMax =>    "5",	type =>"6gradient",  unit =>""}, # /100
   "p17LowEndHC2"			=> {cmd2=>"0C059E", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
   "p18RoomInfluenceHC2"			=> {cmd2=>"0C010F", argMin =>   "0", argMax =>  "100",	type =>"0clean", unit =>" %"}, 
@@ -617,15 +617,15 @@ my %getsonly2xx = (
   "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime206", unit =>""},
  );
 my %getsonly206 = (
-  "sHC1"			=> {cmd2=>"F4", type =>"F4hc1",    unit =>""},
-  "pFan"              		=> {cmd2=>"01", type =>"01pxx206", unit =>""},
-  "sLast10errors"     		=> {cmd2=>"D1", type =>"D1last206", unit =>""},
+  "sHC1"			    => {cmd2=>"F4", type =>"F4hc1",    unit =>""},
+  "pFan"              	=> {cmd2=>"01", type =>"01pxx206", unit =>""},
+  "sLast10errors"     	=> {cmd2=>"D1", type =>"D1last206", unit =>""},
   "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm",   unit =>""},
   "sFirmware-Id" 		=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
  );
 my %getsonly214 = (
   "pFan"          		=> {cmd2=>"01", type =>"01pxx214", unit =>""},
-  "sHC1"			=> {cmd2=>"F4", type =>"F4hc1214",    unit =>""},
+  "sHC1"			    => {cmd2=>"F4", type =>"F4hc1214",    unit =>""},
  );
 
 
@@ -733,6 +733,7 @@ sub THZ_Define($$) {
 ########################################################################################
 sub THZ_Refresh_all_gets($) {
   my ($hash) = @_;
+  THZ_Testloopapproach($hash);
  # unlink("data.txt");
   THZ_RemoveInternalTimer("THZ_GetRefresh");
   Log3 $hash->{NAME}, 5, "thzversion = $thzversion ";
@@ -761,9 +762,16 @@ sub THZ_GetRefresh($) {
 	my $interval = AttrVal($name, ("interval_".$command), 0); 
 	if (AttrVal($name, "nonblocking" , "0")  =~ /1/ ) {
         if (!(exists($hash->{helper}{RUNNING_PID}))) {
-            DevIo_CloseDev($hash);          #close device in parent process
+            #DevIo_CloseDev($hash);          #close device in parent process
             #$hash->{STATE}="disconnected";
             my $bctimeout = (AttrVal($name, "simpleReadTimeout", "0.5"))*2 +1;
+            
+            my $dev = $hash->{DeviceName};
+            #$hash->{connection} =$hash->{STATE} ."||". $hash->{USBDev} ."||". $hash->{TCPDev} ."||". $hash->{conn} ."||". $hash->{FD} ."||". $selectlist{"$name.$dev"} ;
+            $hash->{connection} =$hash->{STATE} ."||". $hash->{TCPDev} ."||". $hash->{FD} ."||". $selectlist{"$name.$dev"} ;
+            Log3 $hash, 3,  $hash->{connection};
+    
+            
             $hash->{helper}{RUNNING_PID} = BlockingCall("THZ_GetNB", $name."|".$command, "THZ_GetNBDone", $bctimeout, "THZ_GetNBAbort", $hash);
             Log3 $hash, 3, "[$name] THZ_GetRefresh($command) BlockingCall started";
         }
@@ -785,7 +793,7 @@ sub THZ_GetRefresh($) {
         my $sFirmwareId = join('', (split(/ |:/, ReadingsVal($name,"sFirmware-Id"," : : : ")))[0..6]);
         my $sFirmware= (split(/ /, ReadingsVal($name,"sFirmware","  ")))[1];
         $hash->{model}= sprintf("%.5s%s%s", AttrVal($name,"firmware","n.a.")."______", $sFirmware, $sFirmwareId);
-    }
+       }
     return;
 }
 
@@ -811,17 +819,62 @@ sub THZ_Write($$) {
 ########################################################################################
 sub THZ_Read($) {
   my ($hash) = @_;
-
   my $buf = DevIo_SimpleRead($hash);
   return "" if(!defined($buf));
-
   my $name = $hash->{NAME};
-  
-  my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
-  
-Log3 $name, 3, "$name/RAW: $data";
+  $hash->{helper}{PARTIAL} .= uc(unpack('H*', $buf));
+  my $msg=$hash->{helper}{PARTIAL};
+  my $err;
+  if ( !defined($hash->{helper}{step}) or (length($msg) == 1)  or (($msg =~ m/^01/) and ($msg !~ m/1003$/m ))) {} 
+  else {
+    if    ($hash->{helper}{step} eq "step0") { #Expectedanswer0    is  "10"  DLE data link escape
+            if ($msg ne "10")   {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15");  THZ_Resethelper($hash);}
+            else                {THZ_Write($hash, $hash->{helper}{cmdHex}); 		$hash->{helper}{step}="step1";      $hash->{helper}{PARTIAL}="";}
+        }    
+    elsif ($hash->{helper}{step} eq "step1") { #Expectedanswer1     is "1002",		DLE data link escape -- STX start of text  
+            if      ($msg eq "10") 	{ }
+            elsif   ($msg eq "15")  { $err .=  " THZ_Get_Com: error found at step1  NAK!! ";    THZ_Resethelper($hash); }
+            elsif   ($msg eq "1002" || $msg eq "02") {THZ_Write($hash,  "10"); 	                $hash->{helper}{step}="step2"; $hash->{helper}{PARTIAL}="";}
+        }
+    elsif ($hash->{helper}{step} eq "step2") { #Expectedanswer2     is  message from the heatpump
+            #$msg .= " decoded: " . THZ_Parse1($hash,THZ_decode($msg));
+            THZ_Write($hash,  "10");
+            #THZ_Resethelper($hash);
+        }    
+    }   
+Log3 $name, 3, "$name/RAW: $msg - $err - $hash->{helper}{step}";
 }
 
+
+
+#####################################
+#
+# THZ_Resethelper() 
+#
+# Parameter hash
+#
+########################################################################################
+
+sub THZ_Resethelper($) {
+    my ($hash) = @_;
+    $hash->{helper}{step}="";
+    $hash->{helper}{cmdHex}="";
+    $hash->{helper}{PARTIAL}="";     
+}
+
+
+
+sub THZ_Testloopapproach($) {
+    my ($hash) = @_;
+    #my $cmd="sGlobal";
+    my $cmd="sHC1";
+    my $cmdhash = $gets{$cmd};
+    THZ_Write($hash,  "02");
+    $hash->{helper}{step}="step0";
+    $hash->{helper}{cmdHex}=THZ_encodecommand($cmdhash->{cmd2},"get");
+    $hash->{helper}{PARTIAL}="";     
+}
+  
 
 
 #####################################
@@ -1032,7 +1085,14 @@ sub THZ_GetNB($){
   my ($string) = @_;
   my ($name, $cmd) = split("\\|", $string);
   my $hash = $defs{$name};
+  my $dev = $hash->{DeviceName};
   my $ret = DevIo_OpenDev($hash, 0, undef);         #open device in child process
+  #($hash->{STATE}, $hash->{USBDev} , $hash->{TCPDev} , $hash->{conn} , $hash->{FD} , $selectlist{"$name.$dev"}) =  split("\\|", $hash->{connection});  
+  #($hash->{STATE},  $hash->{TCPDev} ,  $hash->{FD} , $selectlist{"$name.$dev"}) =  split("\\|", $hash->{connection});
+  #$selectlist{"$name.$dev"} = $hash;
+  #open (MYFILE, '>>data.txt');
+  #print MYFILE ($hash->{connection} . "\n");
+  #close (MYFILE);
   if (defined($ret)) {
     Log3 $hash, 3, "[$name] THZ_GetNB: open device $hash->{DeviceName} error:$ret";
     return ("$name|$cmd|$ret");
@@ -1219,7 +1279,7 @@ sub THZ_Get_Comunication($$) {
   THZ_Write($hash,  "02"); 			# step0 --> STX start of text 	
   ($err, $msg) = THZ_ReadAnswer($hash);
 
-#Expectedanswer1    is  "10"  DLE data link escape
+#Expectedanswer0    is  "10"  DLE data link escape
 
   if ($msg ne "10")    {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15"); select(undef, undef, undef, 0.1); return($err, $msg) ;}
   else  {
@@ -1229,13 +1289,13 @@ sub THZ_Get_Comunication($$) {
   
   if ((defined($err)))  { $err .=  " THZ_Get_Com: error found at step1 "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
 
-# Expectedanswer2     is "1002",		DLE data link escape -- STX start of text    
+# Expectedanswer1     is "1002",		DLE data link escape -- STX start of text    
 
   if ($msg eq "10") 	{ ($err, $msg) = THZ_ReadAnswer($hash);}
   elsif ($msg eq "15") 	{ $err .=  " THZ_Get_Com: error found at step1  NAK!! "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
   if ($msg eq "1002" || $msg eq "02") {
-    THZ_Write($hash,  "10"); 		    	# step2 --> DLE data link escape  // ack datatranfer
-    ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
+    THZ_Write($hash,  "10"); 		    	# step2 send  DLE data link escape  
+    ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer2 // read from the heatpump
     THZ_Write($hash,  "10");  
   }
   
