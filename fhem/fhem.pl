@@ -583,8 +583,8 @@ foreach my $d (keys %defs) {
   }
 }
 
-DoTrigger("global", "INITIALIZED", 1);
 $fhem_started = time;
+DoTrigger("global", "INITIALIZED", 1);
 
 $attr{global}{motd} .= "Running with root privileges."
         if($^O !~ m/Win/ && $<==0 && $attr{global}{motd} =~ m/^$sc_text/);
