@@ -175,6 +175,7 @@ FHEM/35_SWAP_0000002200000008.pm     justme1968   Sonstige Systeme
 FHEM/36_EC3000.pm            justme1968           Sonstige Systeme
 FHEM/36_EleroDrive.pm        HCS                  Sonstige Systeme
 FHEM/36_EleroStick.pm        HCS                  Sonstige Systeme
+FHEM/36_EleroSwitch.pm       HCS                  Sonstige Systeme
 FHEM/36_JeeLink.pm           justme1968           Sonstige Systeme
 FHEM/36_KeyValueProtocol.pm  HCS                  Sonstige Systeme
 FHEM/36_PCA301.pm            justme1968           Sonstige Systeme
