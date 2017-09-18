@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 08/2017
-my $thzversion = "0.169"; 
+my $thzversion = "0.170"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -721,6 +721,7 @@ sub THZ_Define($$) {
   $hash->{DeviceName} = $dev;
   $attr{$name}{devStateIcon} = 'opened:10px-kreis-gruen disconnected:10px-kreis-rot';
   my $ret = DevIo_OpenDev($hash, 0, "THZ_Refresh_all_gets");
+  #THZ_Testloopapproach($hash);
   return $ret;
 }
 
@@ -733,7 +734,6 @@ sub THZ_Define($$) {
 ########################################################################################
 sub THZ_Refresh_all_gets($) {
   my ($hash) = @_;
-  THZ_Testloopapproach($hash);
  # unlink("data.txt");
   THZ_RemoveInternalTimer("THZ_GetRefresh");
   Log3 $hash->{NAME}, 5, "thzversion = $thzversion ";
@@ -762,15 +762,13 @@ sub THZ_GetRefresh($) {
 	my $interval = AttrVal($name, ("interval_".$command), 0); 
 	if (AttrVal($name, "nonblocking" , "0")  =~ /1/ ) {
         if (!(exists($hash->{helper}{RUNNING_PID}))) {
-            #DevIo_CloseDev($hash);          #close device in parent process
+            DevIo_CloseDev($hash);          #close device in parent process
             #$hash->{STATE}="disconnected";
             my $bctimeout = (AttrVal($name, "simpleReadTimeout", "0.5"))*2 +1;
-            
             my $dev = $hash->{DeviceName};
             #$hash->{connection} =$hash->{STATE} ."||". $hash->{USBDev} ."||". $hash->{TCPDev} ."||". $hash->{conn} ."||". $hash->{FD} ."||". $selectlist{"$name.$dev"} ;
             $hash->{connection} =$hash->{STATE} ."||". $hash->{TCPDev} ."||". $hash->{FD} ."||". $selectlist{"$name.$dev"} ;
             Log3 $hash, 3,  $hash->{connection};
-    
             
             $hash->{helper}{RUNNING_PID} = BlockingCall("THZ_GetNB", $name."|".$command, "THZ_GetNBDone", $bctimeout, "THZ_GetNBAbort", $hash);
             Log3 $hash, 3, "[$name] THZ_GetRefresh($command) BlockingCall started";
@@ -794,6 +792,7 @@ sub THZ_GetRefresh($) {
         my $sFirmware= (split(/ /, ReadingsVal($name,"sFirmware","  ")))[1];
         $hash->{model}= sprintf("%.5s%s%s", AttrVal($name,"firmware","n.a.")."______", $sFirmware, $sFirmwareId);
        }
+    
     return;
 }
 
@@ -829,15 +828,16 @@ sub THZ_Read($) {
   else {
     if    ($hash->{helper}{step} eq "step0") { #Expectedanswer0    is  "10"  DLE data link escape
             if ($msg ne "10")   {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15");  THZ_Resethelper($hash);}
-            else                {THZ_Write($hash, $hash->{helper}{cmdHex}); 		$hash->{helper}{step}="step1";      $hash->{helper}{PARTIAL}="";}
+            else                { THZ_Write($hash, $hash->{helper}{cmdHex}); 		$hash->{helper}{step}="step1";       $hash->{helper}{PARTIAL}="";  }
         }    
     elsif ($hash->{helper}{step} eq "step1") { #Expectedanswer1     is "1002",		DLE data link escape -- STX start of text  
             if      ($msg eq "10") 	{ }
             elsif   ($msg eq "15")  { $err .=  " THZ_Get_Com: error found at step1  NAK!! ";    THZ_Resethelper($hash); }
-            elsif   ($msg eq "1002" || $msg eq "02") {THZ_Write($hash,  "10"); 	                $hash->{helper}{step}="step2"; $hash->{helper}{PARTIAL}="";}
+            elsif   ($msg eq "1002" || $msg eq "02") {THZ_Write($hash,  "10"); 	                $hash->{helper}{step}="step2"; $hash->{helper}{PARTIAL}=""; }
         }
     elsif ($hash->{helper}{step} eq "step2") { #Expectedanswer2     is  message from the heatpump
-            #$msg .= " decoded: " . THZ_Parse1($hash,THZ_decode($msg));
+            ($err, $msg) = THZ_decode($msg);
+            $msg.=THZ_Parse1($hash,$msg);
             THZ_Write($hash,  "10");
             #THZ_Resethelper($hash);
         }    
@@ -866,8 +866,8 @@ sub THZ_Resethelper($) {
 
 sub THZ_Testloopapproach($) {
     my ($hash) = @_;
-    #my $cmd="sGlobal";
-    my $cmd="sHC1";
+    my $cmd="sGlobal";
+    #my $cmd="sHC1";
     my $cmdhash = $gets{$cmd};
     THZ_Write($hash,  "02");
     $hash->{helper}{step}="step0";
@@ -1522,9 +1522,10 @@ sub THZ_decode($) {
     }
     else {return(THZ_checksum($message_orig) . "decode: crc_error in answer", $message_orig)};
   }
+  if ($header eq "0101")  { return ("decode: timing issue", $message_orig);}
   if ($header eq "0103")  { return ("decode: command not known", $message_orig);}
   if ($header eq "0102")  { return("decode: CRC error in request", $message_orig);}
-  if ($header eq "0104")  { return("decode: UNKNOWN REQUEST", $message_orig);}
+  if ($header eq "0104")  { return("decode: UNKNOWN Register REQUEST", $message_orig);}
   if ($header eq "0180")  { return(undef, $message_orig);}
   
   return("decode: new unknown answer " , $message_orig);
@@ -1639,8 +1640,8 @@ sub THZ_Parse1($$) {
 sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
- # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
-  my @numbers=('0A05B3', '0A05B4', '0B0264', '0B0287', '0B0582', '0B0583', '0B0584', '0A0126','0A0265', '0A0597', '0A0598', '0A0599', '0A059C','0A05AD', '0A05B0', '0A05DD', '0A05DE', '0A0BA3');
+  my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
+  #my @numbers=('FB', 'FB', 'FB', 'FB', 'FB', 'FB', 'FB', '0A05B3', '0A05B4', '0B0264', '0B0287', '0B0582', '0B0583', '0B0584', '0A0126','0A0265', '0A0597', '0A0598', '0A0599', '0A059C','0A05AD', '0A05B0', '0A05DD', '0A05DE', '0A0BA3');
   #my @numbers=(1, 3, 4, 5, 8, 12, 13, 14, 15, 17, 18, 19, 20, 22, 26, 39, 40, 82, 83, 86, 87, 96, 117, 128, 239, 265, 268, 269, 270, 271, 274, 275, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 297, 299, 317, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 603, 607, 612, 613, 634, 647, 650, 961, 1385, 1386, 1387, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 830, 1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 1555, 272, 1489, 1490, 1491, 1492, 1631, 933, 934, 1634, 928, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, 2029, 2030, 2031, 2032, 2033);
   #my @numbers=(1, 3, 12, 13, 14, 15, 19, 20, 22, 26, 39,  82, 83, 86, 87, 96, 239, 265, 268, 274, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 613, 634, 961, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409,  1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 2970, 2971, 2975, 2976, 2977, 2978, 2979, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 272, 1489, 1491, 1492, 1631, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, );
  # my @numbers=(239, 410, 603, 607, 634, 830, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1467, 1468, 1469, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1501, 1502, 374, 1631, 718, 2372, 328);
@@ -1649,7 +1650,9 @@ sub THZ_debugread($){
  # my @numbers = (1..3179);
   my $indice= "FF";
   unlink("data.txt"); #delete  debuglog
-  foreach $indice(@numbers) {	
+  #my $i=0;
+  foreach $indice(@numbers) {
+   # $i=$i+1;
    #my $cmd = sprintf("%02X", $indice);
   #  my $cmd = sprintf("%04X", $indice);
     #my $cmd = "0A" . sprintf("%04X",  $indice);
@@ -1658,9 +1661,12 @@ sub THZ_debugread($){
     #($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
     #STX start of text
     THZ_Write($hash,  "02");
-    ($err, $msg) = THZ_ReadAnswer($hash);  
+    ($err, $msg) = THZ_ReadAnswer($hash);
+    #select(undef, undef, undef, (0.05*$i));
+    #if you wait here more than 600ms connection dropped
     # send request
     THZ_Write($hash,  $cmdHex2);
+    #select(undef, undef, undef, (0.05*$i));
     ($err, $msg) = THZ_ReadAnswer($hash);
     #expected 1002; if not following if takes care
     if ($msg eq "10") {
@@ -1683,7 +1689,7 @@ sub THZ_debugread($){
 		  my $activatetrigger =1;
 		 # readingsSingleUpdate($hash, $cmd, $msg, $activatetrigger);
 		  open (MYFILE, '>>data.txt');
-		  print MYFILE ($cmd . "-" . $msg . "\n");
+		  print MYFILE ($cmdHex2 ."-". $cmd . "-" . $msg . "\n");
 		  close (MYFILE);
 		  #Log3 $hash->{NAME}, 3, "$cmd  -  $msg";
     }    
