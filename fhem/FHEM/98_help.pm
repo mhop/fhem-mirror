@@ -39,7 +39,7 @@ sub CommandHelp {
     my $modPath = AttrVal('global','modpath','.');
 	my $output = '';
     
-    $output .= cref_findInfo($modPath,$mod);
+    my $outputInfo = cref_findInfo($modPath,$mod);
 
 	if($cmds{help}{InternalCmds} !~ m/$mod\,/) {
       my %mods;
@@ -61,14 +61,15 @@ sub CommandHelp {
       return "Module $mod not found" unless defined($mods{$mod});
 
       # read commandref docu from file
-      $output .= cref_search($mods{$mod},$lang);
+      $output = cref_search($mods{$mod},$lang);
 
       unless($output) {
-         $output .= cref_search($mods{$mod},"");
-         $output = "Keine deutsche Hilfe gefunden!<br/>$output" if $output;
+         $output = cref_search($mods{$mod},"");
+         $output = "<br/><br/>Keine deutsche Hilfe gefunden!<br/>$output" if $output;
       }
       
       $output = "No help found for module: $mod" unless $output;
+      $output = $outputInfo.$output;
 
     } else {
       $output = "<br/><b>Internal command:</b> $mod";
@@ -258,7 +259,7 @@ sub cref_findInfo {
     last if $l =~ m/$mod/i;
   }
   $line[0]= (split("/",$line[0]))[1] if $line[0] =~ /\//;
-  $line[2]= "no info" if $line[2] =~ /forum\.fhem\.de/;
+  $line[2]= "no info" if $line[2] =~ /http/;
   my $text  = "<br/><b>Module:</b> $line[0] ";
      $text .= "<b>Maintainer:</b> $line[1] ";
      $text .= "<b>Forum:</b> $line[2]\n";
