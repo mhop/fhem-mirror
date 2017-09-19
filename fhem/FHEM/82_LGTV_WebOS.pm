@@ -67,7 +67,7 @@ use Blocking;
 
 
 
-my $version = "0.8.0";
+my $version = "1.0.0";
 
 
 
@@ -104,6 +104,7 @@ sub LGTV_WebOS_Presence($);
 sub LGTV_WebOS_PresenceRun($);
 sub LGTV_WebOS_PresenceDone($);
 sub LGTV_WebOS_PresenceAborted($);
+sub LGTV_WebOS_WakeUp_Udp($@);
 
 
 
@@ -165,7 +166,8 @@ my %openApps = (
             'ARDMediathek'              => 'ard.mediathek',
             'Arte'                      => 'com.3827031.168353',
             'WetterMeteo'               => 'meteonews',
-            'Notificationcenter'        => 'com.webos.app.notificationcenter'
+            'Notificationcenter'        => 'com.webos.app.notificationcenter',
+            'Plex'                      => 'cdp-30'
 );
 
 my %openAppsPackageName = (
@@ -187,7 +189,8 @@ my %openAppsPackageName = (
             'ard.mediathek'                     => 'ARDMediathek',
             'com.3827031.168353'                => 'Arte',
             'meteonews'                         => 'WetterMeteo',
-            'com.webos.app.notificationcenter'  => 'Notificationcenter'
+            'com.webos.app.notificationcenter'  => 'Notificationcenter',
+            'cdp-30'                            => 'Plex'
 );
 
 
@@ -211,6 +214,8 @@ sub LGTV_WebOS_Initialize($) {
     $hash->{AttrList}   = "disable:1 ".
                           "channelGuide:1 ".
                           "pingPresence:1 ".
+                          "wakeOnLanMAC ".
+                          "wakeOnLanBroadcast ".
                           $readingFnAttributes;
 
 
@@ -239,6 +244,7 @@ sub LGTV_WebOS_Define($$) {
     $hash->{helper}{device}{channelguide}{counter}  = 0;
     $hash->{helper}{device}{registered}             = 0;
     $hash->{helper}{device}{runsetcmd}              = 0;
+    $hash->{helper}{device}{channelguide}{counter}  = 'none';
 
 
     Log3 $name, 3, "LGTV_WebOS ($name) - defined with host $host";
@@ -432,7 +438,12 @@ sub LGTV_WebOS_Set($@) {
         if($cmd eq 'off') {
             $uri                                = $lgCommands{powerOff};
         } elsif ($cmd eq 'on') {
-            $uri                                = $lgCommands{powerOn};
+            if( AttrVal($name,'wakeOnLanMAC','none') ne 'none' ) {
+                LGTV_WebOS_WakeUp_Udp($hash,AttrVal($name,'wakeOnLanMAC',0),AttrVal($name,'wakeOnLanBroadcast','255.255.255.255'));
+                return;
+            } else {
+                $uri                                = $lgCommands{powerOn};
+            }
         }
         
     } elsif($cmd eq '3D') {
@@ -549,7 +560,7 @@ sub LGTV_WebOS_Set($@) {
 
     } else {
         my  $list = ""; 
-        $list .= "connect:noArg pairing:noArg screenMsg mute:on,off volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg channelDown:noArg channelUp:noArg getServiceList:noArg on:noArg off:noArg launchApp:Maxdome,AmazonVideo,YouTube,Netflix,TV,GooglePlay,Browser,Chilieu,TVCast,Smartshare,Scheduler,Miracast,TVGuide,Timemachine,ARDMediathek,Arte,WetterMeteo,Notificationcenter 3D:on,off stop:noArg play:noArg pause:noArg rewind:noArg fastForward:noArg clearInputList:noArg input:$inputs channel";
+        $list .= "connect:noArg pairing:noArg screenMsg mute:on,off volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg channelDown:noArg channelUp:noArg getServiceList:noArg on:noArg off:noArg launchApp:Maxdome,AmazonVideo,YouTube,Netflix,TV,GooglePlay,Browser,Chilieu,TVCast,Smartshare,Scheduler,Miracast,TVGuide,Timemachine,ARDMediathek,Arte,WetterMeteo,Notificationcenter,Plex 3D:on,off stop:noArg play:noArg pause:noArg rewind:noArg fastForward:noArg clearInputList:noArg input:$inputs channel";
         return "Unknown argument $cmd, choose one of $list";
     }
     
@@ -628,7 +639,7 @@ sub LGTV_WebOS_Read($) {
     my $buf;
     
     
-    Log3 $name, 4, "LGTV_WebOS ($name) - ReadFn gestartet";
+    Log3 $name, 4, "LGTV_WebOS ($name) - ReadFn started";
 
     $len = sysread($hash->{CD},$buf,10240);
     
@@ -640,7 +651,7 @@ sub LGTV_WebOS_Read($) {
     }
     
 	unless( defined $buf) { 
-        Log3 $name, 3, "LGTV_WebOS ($name) - Keine Daten empfangen";
+        Log3 $name, 3, "LGTV_WebOS ($name) - no data received";
         return; 
     }
     
@@ -807,7 +818,10 @@ sub LGTV_WebOS_ResponseProcessing($$) {
         }
         
         my $decode_json     = decode_json(encode_utf8($json));
-
+        if($@){
+            Log3 $name, 3, "LGTV_WebOS ($name) - JSON error while request: $@";
+            return;
+        }
 
         LGTV_WebOS_WriteReadings($hash,$decode_json);
         
@@ -825,6 +839,7 @@ sub LGTV_WebOS_WriteReadings($$) {
     my $name            = $hash->{NAME};
     my $mute;
     my $response;
+    my %channelList;
 
     
     Log3 $name, 4, "LGTV_WebOS ($name) - Beginn Readings writing";
@@ -859,7 +874,7 @@ sub LGTV_WebOS_WriteReadings($$) {
         
         my $count = 0;
         foreach my $programList ( @{$decode_json->{payload}{programList}} ) {
-        
+            
             if($count < 1) {
             
                 readingsBulkUpdate($hash,'channelCurrentTitle',$programList->{programName});
@@ -1403,6 +1418,32 @@ sub LGTV_WebOS_PresenceAborted($) {
     Log3 $name, 4, "Sub LGTV_WebOS_PresenceAborted ($name) - The BlockingCall Process terminated unexpectedly. Timedout!";
 }
 
+sub LGTV_WebOS_WakeUp_Udp($@) {
+
+    my ($hash,$mac_addr,$host,$port) = @_;
+    my $name  = $hash->{NAME};
+
+
+    $port = 9 if (!defined $port || $port !~ /^\d+$/ );
+
+    my $sock = new IO::Socket::INET(Proto=>'udp') or die "socket : $!";
+    if(!$sock) {
+        Log3 $name, 3, "Sub LGTV_WebOS_WakeUp_Udp ($name) - Can't create WOL socket";
+        return 1;
+    }
+  
+    my $ip_addr   = inet_aton($host);
+    my $sock_addr = sockaddr_in($port, $ip_addr);
+    $mac_addr     =~ s/://g;
+    my $packet    = pack('C6H*', 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, $mac_addr x 16);
+
+    setsockopt($sock, SOL_SOCKET, SO_BROADCAST, 1) or die "setsockopt : $!";
+    send($sock, $packet, 0, $sock_addr) or die "send : $!";
+    close ($sock);
+
+    return 1;
+}
+
 ####### Presence Erkennung Ende ############
 
 
@@ -1506,6 +1547,18 @@ sub LGTV_WebOS_PresenceAborted($) {
             current state of ping presence from TV. create a reading presence with values absent or present.
         </ul>
     </ul>
+    <ul>
+        <ul>
+            <li>wakeOnLanMAC</li>
+            Network MAC Address of the LG TV Networkdevice.
+        </ul>
+    </ul>
+    <ul>
+        <ul>
+            <li>wakeOnLanBroadcast</li>
+            Broadcast Address of the Network - wakeOnLanBroadcast &lt;network&gt;.255
+        </ul>
+    </ul>
 </ul>
 
 =end html
@@ -1595,6 +1648,22 @@ sub LGTV_WebOS_PresenceAborted($) {
     <ul>
         <ul>
             <ul>M&ouml;gliche Werte: 0 =&gt; keine zyklischen TV-Guide-Updates, 1 =&gt; zyklische TV-Guide-Updates</ul>
+        </ul>
+    </ul>
+    <ul>
+        <ul>
+            <ul>
+                <li>wakeOnLanMAC</li>
+                MAC Addresse der Netzwerkkarte vom LG TV
+            </ul>
+        </ul>        
+    </ul>    
+    <ul>
+        <ul>
+            <ul>
+                <li>wakeOnLanBroadcast</li>
+                Broadcast Netzwerkadresse - wakeOnLanBroadcast &lt;netzwerk&gt;.255
+            </ul>
         </ul>
     </ul>
     <p><br /><br /><strong>Generierte Readings/Events:</strong></p>
