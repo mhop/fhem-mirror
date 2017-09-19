@@ -11,32 +11,43 @@ use SetExtensions;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
+#=======================================================================================
 sub CustomReadings_Initialize($) {
   my ($hash) = @_;
 
   $hash->{DefFn}         = "CustomReadings_Define";
   $hash->{UndefFn}       = "CustomReadings_Undef";
+  $hash->{SetFn}         = "CustomReadings_Set";
   $hash->{AttrList}      = "readingDefinitions " 
                          . "interval "
                          . "$readingFnAttributes";
 }
 
-sub
-CustomReadings_Define($$) {
+#=======================================================================================
+sub CustomReadings_Define($$) {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
 
-  CustomReadings_read($hash);
+  CustomReadings_OnTimer($hash);
   
   return undef;
 }
 
-sub CustomReadings_read($) {
+#=======================================================================================
+sub CustomReadings_OnTimer($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+ AttrVal( $name, "interval", 5), "CustomReadings_read", $hash, 0);
+  InternalTimer(gettimeofday()+ AttrVal( $name, "interval", 5), "CustomReadings_OnTimer", $hash, 0);
+  
+  CustomReadings_Read($hash);
+}
+
+#=======================================================================================
+sub CustomReadings_Read($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
   
   # Get the readingDefinitions and remove all newlines from the attribute
   my $readingDefinitions = AttrVal( $name, "readingDefinitions", "");
@@ -117,7 +128,7 @@ sub CustomReadings_read($) {
   
 }
 
-
+#=======================================================================================
 sub CustomReadings_Undef($$) {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
@@ -127,6 +138,7 @@ sub CustomReadings_Undef($$) {
   return undef;
 }
 
+#=======================================================================================
 sub CustomReadings_GetHTML ($) {
 	my ($name) = @_;
   my $hash = $main::defs{$name};
@@ -144,7 +156,25 @@ sub CustomReadings_GetHTML ($) {
 	return $result;
 }
 
-
+#=======================================================================================
+sub CustomReadings_Set($@) {
+  my ($hash, @a) = @_;
+  my $name = shift @a;
+  my $cmd = shift @a;
+  my $arg = join(" ", @a);
+  
+  my $list = "update";
+  return $list if( $cmd eq '?' || $cmd eq '');
+  
+  if ($cmd eq "update") {
+    CustomReadings_Read($hash);
+  }
+  else {
+    return "Unknown argument $cmd, choose one of ".$list;
+  }
+  
+  return undef;
+}
 
 
 1;
