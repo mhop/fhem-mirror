@@ -3857,7 +3857,8 @@ ReplaceEventMap($$$)
     # interpreted as the single possible value for a dropdown
     # Why is the .*= deleted?
     $defs{$dev}{".eventMapCmd"} = join(" ", grep { !/ / }
-                  map { $_ =~ s/.*?=//s; $_ =~ s/.*?://s; "$_:noArg" } @emList);
+                  map { $_ =~ s/.*?=//s; $_ =~ s/.*?://s; 
+                        $_ =~ m/:/ ? $_ : "$_:noArg" } @emList);
   }
 
   my ($dname, $nstr);
