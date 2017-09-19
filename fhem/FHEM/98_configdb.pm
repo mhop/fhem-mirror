@@ -129,7 +129,10 @@ sub CommandConfigdb($$) {
 				$filename  = $attr{global}{modpath};
 				$filename .= "/$param1";
 			}
-			$ret = _cfgDB_Filedelete $filename;
+#			$ret = _cfgDB_Filedelete $filename;
+			$ret  = "File $filename ";
+			$ret .= defined(_cfgDB_Filedelete($filename)) ? "deleted from" : "not found in";
+			$ret .= " database.";
 		}
 
 		when ('fileexport') {

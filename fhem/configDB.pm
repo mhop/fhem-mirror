@@ -1154,11 +1154,12 @@ sub _cfgDB_Filedelete($) {
 	my $ret = $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
-	if($ret > 0) {
-		$ret = "File $filename deleted from database.";
-	} else {
-		$ret = "File $filename not found in database.";
-	}
+	$ret = ($ret > 0) ? 1 : undef;
+#	if($ret > 0) {
+#		$ret = "File $filename deleted from database.";
+#	} else {
+#		$ret = "File $filename not found in database.";
+#	}
 	return $ret;
 }
 
