@@ -56,6 +56,8 @@ sub readingsGroup_Initialize($)
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
 
+  $data{FWEXT}{"readingsGroup"}{SCRIPT} = "fhemweb_readingsGroup.js";
+
   $hash->{FW_atPageEnd} = 1;
 }
 

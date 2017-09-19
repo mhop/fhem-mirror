@@ -56,6 +56,8 @@ sub readingsHistory_Initialize($)
   $hash->{FW_detailFn}  = "readingsHistory_detailFn";
   $hash->{FW_summaryFn}  = "readingsHistory_detailFn";
 
+  $data{FWEXT}{"readingsHistory"}{SCRIPT} = "fhemweb_readingsHistory.js";
+
   $hash->{FW_atPageEnd} = 1;
 
   eval "use Data::Dumper";
