@@ -1,4 +1,4 @@
-REV 15089
+REV 15092
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -22,10 +22,10 @@ MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
 UPD 2017-09-18_07:45:03 210406 ./CHANGED
-UPD 2017-09-17_07:45:02 34760 ./MAINTAINER.txt
+UPD 2017-09-19_07:45:02 34827 ./MAINTAINER.txt
 UPD 2017-09-06_07:45:02 39152 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
-UPD 2017-09-18_07:45:06 137157 ./fhem.pl
+UPD 2017-09-19_07:45:05 137157 ./fhem.pl
 UPD 2015-11-07_07:45:11 21944 FHEM/00_CM11.pm
 UPD 2017-09-09_07:45:02 56979 FHEM/00_CUL.pm
 UPD 2017-05-10_07:45:02 76972 FHEM/00_DFPlayerMini.pm
