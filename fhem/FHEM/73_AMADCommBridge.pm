@@ -74,7 +74,7 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.6";
+my $modulversion = "4.0.7";
 my $flowsetversion = "4.0.9";
 
 
@@ -806,7 +806,7 @@ sub AMADCommBridge_ResponseProcessing($$) {
         }
 
         elsif ( $fhemcmd eq 'set' ) {
-            my $fhemCmd = $decode_json->{payload}{setcmd};
+            my $fhemCmd = encode_utf8($decode_json->{payload}{setcmd});
             AnalyzeCommandChain($bhash, 'set '.$fhemCmd) if( AttrVal( $bname, 'fhemControlMode', 'trigger' ) eq 'setControl' );
             readingsSingleUpdate( $bhash, "receiveFhemCommand", "set ".$fhemCmd, 1 ) if( AttrVal( $bname, 'fhemControlMode', 'trigger' ) eq 'trigger' );
             Log3 $bname, 4, "AMADCommBridge ($name) - AMADCommBridge_CommBridge: set reading receive fhem command";
