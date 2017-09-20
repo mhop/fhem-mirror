@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: LightScene: added traversalOrder attribute
   - bugfix:  31_PLAYBULB: fix battery character value
   - bugfix:  00_MYSENSORS: fix delete gateway
   - bugfix:  82_LGTV_WebOS: fix Argument "none" isn't numeric in addition
