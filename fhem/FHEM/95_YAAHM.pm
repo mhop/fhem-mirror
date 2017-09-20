@@ -48,7 +48,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";    # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.02";
+my $yaahmversion    = "1.07";
 my $firstcall=1;
     
 my %yaahm_transtable_EN = ( 
@@ -393,13 +393,14 @@ sub YAAHM_Define ($$) {
  
  #-- clone daily default profile
  $hash->{DATA}{"DT"}  = {%defaultdailytable};
-  #-- clone weekly default profile
+ 
+ #-- clone weekly default profile
  $hash->{DATA}{"WT"} = ();
  push(@{$hash->{DATA}{"WT"}},{%defaultwakeuptable});
  $hash->{DATA}{"WT"}[0]{"name"} = $yaahm_tt->{"wakeup"};
   push(@{$hash->{DATA}{"WT"}},{%defaultsleeptable});
  $hash->{DATA}{"WT"}[1]{"name"} = $yaahm_tt->{"sleep"};
-
+ 
  #-- clone days for today and tomorrow
  $hash->{DATA}{"DD"}  = ();
  push(@{$hash->{DATA}{"DD"}},{%defaultdayproperties});
@@ -413,7 +414,7 @@ sub YAAHM_Define ($$) {
    my @keys = sort keys %{$modules{Astro}{defptr}};
    Log3 $name,1,"[YAAHM] finds ".int(@keys)." Astro devices, module not loaded separately";
  }
- 
+    
  #--
  $modules{YAAHM}{defptr}{$name} = $hash;
  
@@ -625,12 +626,9 @@ sub YAAHM_Set($@) {
    my $if;
    my $msg;
    my $exec = ( defined($attr{$name}{"simulation"})&&$attr{$name}{"simulation"}==1 ) ? 0 : 1;
-
-   if ( $cmd =~ /^init.*$/ ) {
-	 return;
    
    #-----------------------------------------------------------
-   }elsif ( $cmd =~ /^manualnext.*/ ) {
+   if ( $cmd =~ /^manualnext.*/ ) {
      #--timer address
      if( $args[0] =~ /^\d+/ ) {
        #-- check if valid
@@ -654,7 +652,7 @@ sub YAAHM_Set($@) {
        }
        $cmd = "next_".$ifound;
      }
-	 return YAAHM_next($name,$cmd,$args[1],$exec);
+	 return YAAHM_nextWeeklyTime($name,$cmd,$args[1],$exec);
    
    #-----------------------------------------------------------
    }elsif ( $cmd =~ /^time.*/ ) {
@@ -682,10 +680,15 @@ sub YAAHM_Set($@) {
    } elsif ( $cmd =~ /^save/ ) {
 	return YAAHM_save($hash);
 	 
-    #-----------------------------------------------------------
+   #-----------------------------------------------------------
    } elsif ( $cmd =~ /^restore/ ) {
      return YAAHM_restore($hash);
-	 
+   
+   #-----------------------------------------------------------
+   } elsif ( $cmd =~ /^initialize/ ) {
+     $firstcall = 1;
+     YAAHM_updater($hash);
+     YAAHM_InternalTimer("check",gettimeofday()+ 5, "YAAHM_checkstate", $hash, 0);
    #-----------------------------------------------------------
    } elsif ( $cmd eq "createWeekly" ){
      return "[YAAHM] missing name for new weekly profile"
@@ -739,7 +742,7 @@ sub YAAHM_Set($@) {
      my $str =  "";
 	 return "[YAAHM] Unknown argument " . $cmd . ", choose one of".
 	   " manualnext time:".join(',',@times)." mode:".join(',',@modes).
-	   " state:".join(',',@states)." locked:noArg unlocked:noArg save restore createWeekly deleteWeekly";
+	   " state:".join(',',@states)." locked:noArg unlocked:noArg save:noArg restore:noArg initialize:noArg createWeekly deleteWeekly";
    }
 }
 
@@ -1044,13 +1047,13 @@ sub YAAHM_time {
 
 #########################################################################################
 #
-# YAAHM_next - set the next weekly time
+# YAAHM_nextWeeklyTime - set the next weekly time
 #
 # Parameter name = name of device addressed
 #
 #########################################################################################
 
-sub YAAHM_next {
+sub YAAHM_nextWeeklyTime {
  my ($name,$cmd,$time,$exec) = @_;
    
   my $hash = $defs{$name};
@@ -1062,7 +1065,7 @@ sub YAAHM_next {
   
   if( $i >= int( @{$hash->{DATA}{"WT"}}) ){
     $msg = "Error, timer number $i does not exist, number musst be smaller than ".int( @{$hash->{DATA}{"WT"}});
-    Log3 $name,1,"[YAAHM_next] ".$msg;
+    Log3 $name,1,"[YAAHM_nextWeeklyTime] ".$msg;
     return $msg;
   }
   
@@ -1074,13 +1077,13 @@ sub YAAHM_next {
     }elsif( $time =~ /(\d?\d):(\d\d)(:(\d\d))?/ ){
       if( $1 >= 24 || $2 >= 60){
         $msg = "Error, time specification $time for timer ".$cmd." > 23:59 ";
-        Log3 $name,1,"[YAAHM_next] ".$msg;
+        Log3 $name,1,"[YAAHM_nextWeeklyTime] ".$msg;
         return $msg;
       }
       $time = sprintf("%02d:\%02d",$1,$2);
     }else{
       $msg = "Error, time specification $time invalid for timer ".$cmd.", must be hh:mm";;
-      Log3 $name,1,"[YAAHM_next] ".$msg;
+      Log3 $name,1,"[YAAHM_nextWeeklyTime] ".$msg;
       return $msg;
     }
   }
@@ -1173,12 +1176,12 @@ sub YAAHM_state {
  
   #-- local checks 
   #-- double change
-  if( $prevstate eq $targetstate ){
-    $msg = "transition skipped, we are already in $targetstate state";
+  #if( $prevstate eq $targetstate ){
+  #  $msg = "transition skipped, we are already in $targetstate state";
 
   #-- global checks
   #-- changing away from unlocked in party mode is not possible
-  }elsif( $targetstate ne "unlocked" && $currmode eq "party" ){
+  if( $targetstate ne "unlocked" && $currmode eq "party" ){
     $msg = "not possible in party mode";
   }
   
@@ -1208,7 +1211,6 @@ sub YAAHM_state {
     }
   }
 }
-
 
 #########################################################################################
 #
@@ -1255,7 +1257,7 @@ sub YAAHM_checkstate($) {
   my @devf = ();
   my $isf  = 0;
    
-  my @devlist = split(',',$attr{$name}{"stateDevices"});
+  @devlist = split(',',$attr{$name}{"stateDevices"});
   foreach my $devc (@devlist) {
     @devl = split(':',$devc);
     $dev  = $devl[0];
@@ -1341,8 +1343,6 @@ sub YAAHM_startDayTimer($) {
   my $res  = "defmod $name.dtimer.IF DOIF ";
   my $msg;
   
-  YAAHM_Sun($hash);
-  
   #--cleanup after definition fault
   fhem("deletereading $name t_aftermidnight")
     if( ReadingsVal($name,"t_aftermidnight",undef) );
@@ -1415,31 +1415,25 @@ sub YAAHM_startDayTimer($) {
     my $f2 = defined($defaultdailytable{$key}[1]);
     my $f3 = defined($hash->{DATA}{"DT"}{$key}[2]) && $hash->{DATA}{"DT"}{$key}[2] ne "";
 
-    
     my $xval = "{YAAHM_time('".$name."','".$key."')},".$hash->{DATA}{"DT"}{$key}[2];
     
     #-- entries in the default table with no entry are single-timers
     if( !$f1 and !$f2 ){
-      readingsBulkUpdate( $hash, "s_".$key, $hash->{DATA}{"DT"}{$key}[0] );
       $res .= "([[".$name.":s_".$key."]])\n(".$xval.")\nDOELSEIF"
         if( $f3 );
         
     #-- entries in the default table with only first time are single-timers
     }elsif( $f1 and !$f2 ){
-      readingsBulkUpdate( $hash, "s_".$key, $hash->{DATA}{"DT"}{$key}[0] );
       $res .= "([[".$name.":s_".$key."]])\n(".$xval.")\nDOELSEIF"
         if( $f3 );
         
     #-- entries in the default table with only second time are single-timer offsets
     }elsif( !$f1 and $f2 ){
-      readingsBulkUpdate( $hash, "s_".$key, $hash->{DATA}{"DT"}{$key}[0] );
       $res .= "([[".$name.":s_".$key."]])\n(".$xval.")\nDOELSEIF"
         if( $f3 );
         
     #-- entries in the default table with first and second time are two-timer periods
     }elsif( $f1 and $f2 ){
-      readingsBulkUpdate( $hash, "s_".$key, $hash->{DATA}{"DT"}{$key}[0] );
-      readingsBulkUpdate( $hash, "t_".$key, $hash->{DATA}{"DT"}{$key}[1] );
       $res .= "([[".$name.":s_".$key."]-[".$name.":t_".$key."]])\n(".$xval.")\nDOELSEIF"
         if( $f3 );
         
@@ -1793,12 +1787,14 @@ sub YAAHM_updater($) {
     my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
     $next = gettimeofday()+(23-$hour)*3600+(59-$min)*60+(59-$sec)+34;
     $firstcall=0;
+    
   #-- continue timer for updates
   }else{
     #-- timerHash is internal hash
     $hash = $timerHash->{HASH};
     $next = gettimeofday()+86400;
   }
+  
   #-- safeguard if hash is not properly indirected
   if( defined($hash->{HASH}) ){
     #Log 1,"WARNING ! HASH indirection not ok. firstcall=$firstcall";
@@ -2062,39 +2058,42 @@ sub YAAHM_GetDayStatus($) {
     $hash->{DATA}{"DD"}[1]{"daytype"}    = "holiday";
   }
  
-  #-- sunrise and sunset today and tomorrow
-  my ($sttoday,$sttom);
-  my ($strise0,$stset0,$stseas0,$strise1,$stset1,$stseas1);
-  
-  #-- function calls to 95_Astro.pm module !
-  $sttoday = strftime('%4Y-%2m-%2d', localtime(time));
-  $strise0 = Astro_Get($hash,"dummy","text", "SunRise",$sttoday).":00";
-  $stset0  = Astro_Get($hash,"dummy","text", "SunSet",$sttoday).":00";
-  $stseas0 = Astro_Get($hash,"dummy","text", "ObsSeasonN",$sttoday);
-  
-  $sttom   = strftime('%4Y-%2m-%2d', localtime(time+86400));
-  $strise1 = Astro_Get($hash,"dummy","text", "SunRise",$sttom).":00";
-  $stset1  = Astro_Get($hash,"dummy","text", "SunSet",$sttom).":00";
-  $stseas1 = Astro_Get($hash,"dummy","text", "ObsSeasonN",$sttom);
-    
-  my ($hour,$min) = split(":",$stset0);
-  $hash->{DATA}{"DD"}[0]{"sunset"} = sprintf("%02d:%02d",$hour,$min);
-  
-  ($hour,$min) = split(":",$stset1);
-  $hash->{DATA}{"DD"}[1]{"sunset"} = sprintf("%02d:%02d",$hour,$min);
-  
-  ($hour,$min) = split(":",$strise0);
-  $hash->{DATA}{"DD"}[0]{"sunrise"} = sprintf("%02d:%02d",$hour,$min);
-  
-  ($hour,$min) = split(":",$strise1);
-  $hash->{DATA}{"DD"}[1]{"sunrise"} = sprintf("%02d:%02d",$hour,$min);
-  
-  #-- check season
-  $hash->{DATA}{"DD"}[0]{"season"}    = $seasons[$stseas0];   
-  $hash->{DATA}{"DD"}[1]{"season"}    = $seasons[$stseas1]; 
+  #-- sunrise, sunset and the offsets 
+  YAAHM_sun($hash);
+  YAAHM_sunoffsets($hash);
  
-  #--
   readingsBeginUpdate($hash);
+  #-- and do not forget to put them into readings, because these are read by the timer
+  foreach my $key (sort YAAHM_dsort keys %defaultdailytable){
+    #Log 1,"================> setting into reading s_$key value ".$hash->{DATA}{"DT"}{$key}[0];
+
+    my $f1 = defined($defaultdailytable{$key}[0]);
+    my $f2 = defined($defaultdailytable{$key}[1]);
+    #-- entries in the default table with no entry are single-timers
+    if( !$f1 and !$f2 ){
+      readingsBulkUpdate( $hash, "s_".$key, $hash->{DATA}{"DT"}{$key}[0] );
+        
+    #-- entries in the default table with only first time are single-timers
+    }elsif( $f1 and !$f2 ){
+      readingsBulkUpdate( $hash, "s_".$key, $hash->{DATA}{"DT"}{$key}[0] );
+        
+    #-- entries in the default table with only second time are single-timer offsets
+    }elsif( !$f1 and $f2 ){
+      readingsBulkUpdate( $hash, "s_".$key, $hash->{DATA}{"DT"}{$key}[0] );
+        
+    #-- entries in the default table with first and second time are two-timer periods
+    }elsif( $f1 and $f2 ){
+      readingsBulkUpdate( $hash, "s_".$key, $hash->{DATA}{"DT"}{$key}[0] );
+      readingsBulkUpdate( $hash, "t_".$key, $hash->{DATA}{"DT"}{$key}[1] );
+   
+    #-- something wrong
+    }else{
+      my $msg = "Readings update failed, something wrong with entry ".$key;
+      Log 1,"[YAAHM_GetDayStatus] ".$msg;
+      return $msg;
+    }
+  }
+  
   readingsBulkUpdateIfChanged( $hash, "todayType",$todaytype );
   readingsBulkUpdateIfChanged( $hash, "tr_todayType",$yaahm_tt->{$hash->{DATA}{"DD"}[0]{"daytype"}} );
   if( $todaytype eq "workday"){
@@ -2127,13 +2126,61 @@ sub YAAHM_GetDayStatus($) {
 
 #########################################################################################
 #
-# YAAHM_Sun - obtains times for sunrise and sunset
+# YAAHM_sun - obtain time offsets for midnight etc. sunrise and sunset
 # 
 # Parameter hash = hash of device addressed
 #
 #########################################################################################
 
-sub YAAHM_Sun($) {
+sub YAAHM_sun($) {
+  my ($hash) = @_;
+  
+  #-- sunrise and sunset today and tomorrow
+  my ($sttoday,$sttom);
+  my ($strise0,$stset0,$stseas0,$strise1,$stset1,$stseas1);
+  
+  $sttoday = strftime('%4Y-%2m-%2d', localtime(time));
+  
+  #-- for some unknown reason we need this here:
+  select(undef,undef,undef,0.01);
+  
+  $strise0 = Astro_Get($hash,"dummy","text", "SunRise",$sttoday).":00";
+  my ($hour,$min) = split(":",$strise0);
+  $hash->{DATA}{"DD"}[0]{"sunrise"} = sprintf("%02d:%02d",$hour,$min);
+  
+  $stset0  = Astro_Get($hash,"dummy","text", "SunSet",$sttoday).":00";
+  ($hour,$min) = split(":",$stset0);
+  $hash->{DATA}{"DD"}[0]{"sunset"} = sprintf("%02d:%02d",$hour,$min);
+  
+  $stseas0 = Astro_Get($hash,"dummy","text", "ObsSeasonN",$sttoday);
+  $hash->{DATA}{"DD"}[0]{"season"}    = $seasons[$stseas0];   
+  
+  $sttom   = strftime('%4Y-%2m-%2d', localtime(time+86400));
+  
+  #-- for some unknown reason we need this here:
+  select(undef,undef,undef,0.01);
+  
+  $strise1 = Astro_Get($hash,"dummy","text", "SunRise",$sttom).":00";
+  ($hour,$min) = split(":",$strise1);
+  $hash->{DATA}{"DD"}[1]{"sunrise"} = sprintf("%02d:%02d",$hour,$min);
+  
+  $stset1  = Astro_Get($hash,"dummy","text", "SunSet",$sttom).":00";
+  ($hour,$min) = split(":",$stset1);
+  $hash->{DATA}{"DD"}[1]{"sunset"} = sprintf("%02d:%02d",$hour,$min);
+  
+  $stseas1 = Astro_Get($hash,"dummy","text", "ObsSeasonN",$sttom);
+  $hash->{DATA}{"DD"}[1]{"season"}    = $seasons[$stseas1]; 
+}
+
+#########################################################################################
+#
+# YAAHM_sunoffsets - obtain time offsets for midnight etc. sunrise and sunset
+# 
+# Parameter hash = hash of device addressed
+#
+#########################################################################################
+
+sub YAAHM_sunoffsets($) {
   my ($hash) = @_;
   
   #-- sunrise
@@ -2444,7 +2491,6 @@ sub YAAHM_toptable($){
     if( !defined($st) || $st eq "00:00" ){
       YAAHM_GetDayStatus($hash);
     }
-    YAAHM_Sun($hash);
  
     #--
     my $lockstate = ($hash->{READINGS}{lockstate}{VAL}) ? $hash->{READINGS}{lockstate}{VAL} : "unlocked";
@@ -2479,7 +2525,7 @@ sub YAAHM_toptable($){
     my $cols = max(int(@modes),int(@states),$weeklyno);
     $ret .= "<tr><td colspan=\"3\" style=\"align:left\"><table class=\"readings\">".
             "<tr class=\"odd\"><td width=\"100px\" class=\"dname\" style=\"padding:5px;\">".$yaahm_tt->{"mode"}."</td>".
-            "<td width=\"60px\"><div class=\"dval\" informId=\"$name-tr_housemode\">".ReadingsVal($name,"tr_housemode",undef)."</div></td><td></td>";
+            "<td width=\"120px\"><div class=\"dval\" informId=\"$name-tr_housemode\">".ReadingsVal($name,"tr_housemode",undef)."</div></td><td></td>";
             for( my $i=0; $i<$cols; $i++){
               if( $i < int(@modes)){
                 $ret .= "<td width=\"120px\"><input type=\"button\" id=\"b_".$modes[$i]."\" value=\"".$yaahm_tt->{$modes[$i]}.
@@ -2500,19 +2546,21 @@ sub YAAHM_toptable($){
                 $ret .= "<td width=\"120px\"></td>";
               }
             }
-    $ret .= "</tr><tr><td colspan=\"8\" style=\"border-bottom: 1px solid #000;\"></td></tr>";
-    
+            #style=\"height:20px;border-bottom: 10px solid #333333;background-image: linear-gradient(#e5e5e5,#ababab);\"
+    #$ret .= "</tr><tr><td colspan=\"8\" class=\"devType\" style=\"height:5px;border-top: 1px solid #ababab;border-bottom: 1px solid #ababab;\"></td></tr>";
+    $ret .= "</table><br/><table class=\"readings\">";   
     #-- repeat manual next for every weekly table  
     my $nval  = "";
     my $wupn;
-    $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"padding:5px;\">".$yaahm_tt->{"manual"}."</td><td></td><td></td>";
+    $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"padding:5px;\">".$yaahm_tt->{"manual"}."</td>";
     for (my $i=0;$i<$weeklyno;$i++){
       $wupn = $hash->{DATA}{"WT"}[$i]{"name"};
       $nval = ( defined($hash->{DATA}{"WT"}[$i]{"next"}) ) ? $hash->{DATA}{"WT"}[$i]{"next"} : "";
-      $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding-left:5px\">$wupn<br/><input type=\"text\" id=\"wt%d_n\" informId=\"$name-next_$i\" size=\"4\" maxlength=\"120\" value=\"$nval\" onchange=\"javascript:yaahm_setnext('$name',%d)\"/></td>",$i,$i);
+      $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding-left:10px;padding-right:10px\">$wupn<br/>".
+              "<input type=\"text\" id=\"wt%d_n\" informId=\"$name-next_$i\" size=\"4\" maxlength=\"120\" value=\"$nval\" onchange=\"javascript:yaahm_setnext('$name',%d)\"/></td>",$i,$i);
     }
     $ret .= "</tr>\n";
-    $ret .= "</table></td></tr>";
+    $ret .= "</table><br/></td></tr>";
             
     $ret .= "<tr><td colspan=\"3\"><div class=\"devType\" style=\"font-weight:bold\">".$yaahm_tt->{"overview"}."</div></td></tr>\n";   
     ### daily overview ################################################################################################
@@ -2522,7 +2570,7 @@ sub YAAHM_toptable($){
     #-- continue table
     $ret .= "<td colspan=\"3\">"."</td><td>".$yaahm_tt->{"today"}.                                                         
                                      "</td><td>".$yaahm_tt->{"tomorrow"}.
-                                     "</td><td><div class=\"dval\" informId=\"$name-tr_housestate\">".ReadingsVal($name,"tr_housestate",undef)."</div>&#x27f6;".
+                                     "</td><td><div class=\"dval\" informId=\"$name-tr_housestate\">".ReadingsVal($name,"tr_housestate",undef)."</div>&#x2192;".
                                      $yaahm_tt->{"secstate"}."</td></tr>\n";
     $ret .= "<tr><td colspan=\"3\"></td><td style=\"padding:5px\">".$yaahm_tt->{$weeklytable[$hash->{DATA}{"DD"}[0]{"weekday"}]}[0] .         
                                   "</td><td style=\"padding:5px\">".$yaahm_tt->{$weeklytable[$hash->{DATA}{"DD"}[1]{"weekday"}]}[0].
@@ -2932,11 +2980,15 @@ sub YAAHM_Longtable($){
              <li><a name="yaahm_createweekly">
                     <code>set &lt;name&gt; createWeekly &lt;string&gt;</code>
                 </a>
-                <br />Create a new weekly profile &lt;string&gt;</li>
+                <br/>Create a new weekly profile &lt;string&gt;</li>
             <li><a name="yaahm_deleteweekly">
                     <code>set &lt;name&gt; deleteWeekly &lt;string&gt;</code>
                 </a>
-                <br />Delete the weekly profile &lt;string&gt;</li>
+                <br/>Delete the weekly profile &lt;string&gt;</li>
+            <li><a name="yaahm_initialize">
+                    <code>set &lt;name&gt; initialize</code>
+                </a>
+                <br/>Restart the internal timers</li>
             <li><a name="yaahm_lock">
                     <code>set &lt;name&gt; locked|unlocked</code>
                 </a>
