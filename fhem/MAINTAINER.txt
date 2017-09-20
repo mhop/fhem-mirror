@@ -28,7 +28,7 @@ FHEM/00_KM271.pm             physikus             Sonstiges
 FHEM/00_LIRC.pm              rudolfkoenig         Sonstiges
 FHEM/00_MAXLAN.pm            rudolfkoenig/orphan  MAX
 FHEM/00_MQTT.pm              eisler               MQTT
-FHEM/00_MYSENSORS.pm         ntruchsess           Sonstige Systeme
+FHEM/00_MYSENSORS.pm         Hauswart             Sonstige Systeme
 FHEM/00_NetzerI2C.pm         klausw               Sonstige Systeme
 FHEM/00_OWX.pm               pahenning/ntruchsess 1Wire
 FHEM/00_OWX_ASYNC            ntruchsess           1Wire

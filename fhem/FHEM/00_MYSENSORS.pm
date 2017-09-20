@@ -114,6 +114,7 @@ sub Define($$) {
 
 sub Undef($) {
   Stop(shift);
+  return undef;
 }
 
 sub Set($@) {
@@ -467,6 +468,10 @@ sub matchClient($$) {
 1;
 
 =pod
+=item device
+=item summary includes a MYSENSORS gateway
+=item summary_DE integriert ein MYSENSORS Gateway
+
 =begin html
 
 <a name="MYSENSORS"></a>
