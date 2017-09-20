@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  82_LGTV_WebOS: fix Argument "none" isn't numeric in addition
   - bugfix:  73_AMADCommBridge: fix utf8 character in set mode
   - feature: 82_LGTV_WebOS: version 1.0.0 add WakeOnLAN function
   - bugfix:  00_MQTT: fix Undef

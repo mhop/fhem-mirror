@@ -67,7 +67,7 @@ use Blocking;
 
 
 
-my $version = "1.0.0";
+my $version = "1.0.1";
 
 
 
@@ -244,7 +244,6 @@ sub LGTV_WebOS_Define($$) {
     $hash->{helper}{device}{channelguide}{counter}  = 0;
     $hash->{helper}{device}{registered}             = 0;
     $hash->{helper}{device}{runsetcmd}              = 0;
-    $hash->{helper}{device}{channelguide}{counter}  = 'none';
 
 
     Log3 $name, 3, "LGTV_WebOS ($name) - defined with host $host";
