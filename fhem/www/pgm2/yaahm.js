@@ -91,7 +91,7 @@ function yaahm_setnext(name,i) {
         nval = "undef";
     }
     
-    FW_cmd(url + '?XHR=1&cmd.' + name + '={main::YAAHM_next("' + name + '","next_' + i + '","' + nval + '")}');
+    FW_cmd(url + '?XHR=1&cmd.' + name + '={main::YAAHM_nextWeeklyTime("' + name + '","next_' + i + '","' + nval + '")}');
 }
 
 //------------------------------------------------------------------------------------------------------
