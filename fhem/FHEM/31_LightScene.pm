@@ -29,7 +29,7 @@ sub LightScene_Initialize($)
   $hash->{SetFn}    = "LightScene_Set";
   $hash->{GetFn}    = "LightScene_Get";
   $hash->{AttrFn}   = "LightScene_Attr";
-  $hash->{AttrList} = "async_delay followDevices:1,2 lightSceneRestoreOnlyIfChanged:1,0 showDeviceCurrentState:1,0 switchingOrder ". $readingFnAttributes;
+  $hash->{AttrList} = "async_delay followDevices:1,2 lightSceneRestoreOnlyIfChanged:1,0 showDeviceCurrentState:1,0 switchingOrder traversalOrder ". $readingFnAttributes;
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
   $data{FWEXT}{"/LightScene"}{FUNC} = "LightScene_CGI"; #mod
@@ -640,22 +640,31 @@ LightScene_Set($@)
     return undef;
 
   } elsif( $cmd eq 'nextScene' || $cmd eq 'previousScene' ) {
-    return "no scenes defined" if( $#sorted < 0 );
+    my $sorted = \@sorted;
+    if( my $list = AttrVal($name, 'traversalOrder', undef ) ) {
+      my @parts = split( /[ ,\n]/, $list );
+      $sorted = \@parts;
+    }
+    my $max = scalar @{$sorted}-1;
+
+    return "no scenes defined" if( $max < 0 );
     my $current = ReadingsVal( $name, 'state', '' );
-    my( $index )= grep { $sorted[$_] eq $current } 0..$#sorted;
+    my( $index )= grep { $sorted->[$_] eq $current } 0..$max;
     $index = -1 if( !defined($index) );
 
     ++$index if( $cmd eq 'nextScene' );
     --$index if( $cmd eq 'previousScene' );
 
-    return if( $scene && $scene eq 'nowrap' && $index > $#sorted );
+    return if( $scene && $scene eq 'nowrap' && $index > $max );
     return if( $scene && $scene eq 'nowrap' && $index < 0 );
 
-    $index = 0 if( $index > $#sorted );
-    $index = $#sorted if( $index < 0 );
+    $index = 0 if( $index > $max );
+    $index = $max if( $index < 0 );
 
     $cmd = 'scene';
-    $scene = $sorted[$index];
+    $scene = $sorted->[$index];
+
+    return "no such scene: $scene" if( !defined $hash->{SCENES}{$scene} );
   }
 
 
@@ -1086,6 +1095,10 @@ LightScene_editTable($) {
         Example: To switch a master power outlet before every other device at power on and after every device on power off:<br>
         <code>define media LightScene TV,DVD,Amplifier,masterPower<br>
               attr media switchingOrder .*On:masterPower,.* allOff:!.*,masterPower</code>
+        </li>
+      <li>traversalOrder<br>
+        comma separated list of scene names that should be traversed by the prevoiusScene and nextScene commands.<br>
+        default not set -> all scenes will be traversed in alphabetical order
         </li>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     </ul><br>
