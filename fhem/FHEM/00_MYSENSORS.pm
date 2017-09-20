@@ -195,6 +195,11 @@ sub Stop($) {
 sub Ready($) {
   my $hash = shift;
   return DevIo_OpenDev($hash, 1, "MYSENSORS::Init") if($hash->{STATE} eq "disconnected");
+	if(defined($hash->{USBDev})) {
+		my $po = $hash->{USBDev};
+		my ( $BlockingFlags, $InBytes, $OutBytes, $ErrorFlags ) = $po->status;
+		return ( $InBytes > 0 );
+	}
 }
 
 sub Init($) {
