@@ -41,7 +41,7 @@ use Blocking;
 use SetExtensions;
 
 
-my $version = "1.2.7";
+my $version = "1.2.8";
 
 
 
@@ -49,7 +49,7 @@ my $version = "1.2.7";
 my %playbulbModels = (
         BTL300_v5       => {'aColor' => '0x16'  ,'aEffect' => '0x14'    ,'aBattery' => '0x1f'   ,'aDevicename' => '0x3'},   # Candle Firmware 5
         BTL300_v6       => {'aColor' => '0x19'  ,'aEffect' => '0x17'    ,'aBattery' => '0x22'   ,'aDevicename' => '0x3'},   # Candle Firmware 6
-        BTL305_v14      => {'aColor' => '0x29'  ,'aEffect' => '0x27'    ,'aBattery' => '0x22'   ,'aDevicename' => '0x3'},   # Candle S Firmware 1.4
+        BTL305_v14      => {'aColor' => '0x29'  ,'aEffect' => '0x27'    ,'aBattery' => '0x34'   ,'aDevicename' => '0x3'},   # Candle S Firmware 1.4
         BTL201_v2       => {'aColor' => '0x1b'  ,'aEffect' => '0x19'    ,'aBattery' => 'none'   ,'aDevicename' => 'none'},  # Smart
         BTL201M_V16     => {'aColor' => '0x25'  ,'aEffect' => '0x23'    ,'aBattery' => 'none'   ,'aDevicename' => '0x7'},   # Smart (1/2017)
         BTL505_v1       => {'aColor' => '0x23'  ,'aEffect' => '0x21'    ,'aBattery' => 'none'   ,'aDevicename' => '0x29'},  # Stripe
