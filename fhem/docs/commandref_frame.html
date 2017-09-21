@@ -359,6 +359,9 @@ Device specific attributes are documented in the corresponding device section.
         separated pair. The first part specifies the "old" value, the second
         the new/desired value. If the first character is slash(/) or comma(,)
         then split not by space but by this character, enabling to embed spaces.
+        You can specify a widgetOverride after an additional colon (e.g.
+        on-for-timer:OnFor:texField), the default widget is :noArg to avoid
+        extra input fields in cmdList.
         Examples:<ul><code>
         attr store eventMap on:open off:closed<br>
         attr store eventMap /on-for-timer 10:open/off:closed/<br>
