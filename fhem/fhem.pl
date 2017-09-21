@@ -4844,9 +4844,11 @@ FileDelete($)
   }
   $forceType //= '';
   if(configDBUsed() && lc($forceType) ne "file") {
-    return _cfgDB_Filedelete($fileName);
+    my $ret = _cfgDB_Filedelete($fileName);
+    return ($ret ? undef : "$fileName: _cfgDB_Filedelete failed");
   } else {
-    return unlink($fileName);
+    my $ret = unlink($fileName);
+    return ($ret ? undef : "$fileName: $!");
   }
 }
 
