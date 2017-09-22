@@ -34,6 +34,8 @@ use warnings;
 
 use threads;
 use threads::shared;
+use Digest::MD5;
+use Fcntl 'LOCK_EX', 'LOCK_NB';
 
 use IO::Select;
 use IO::Socket::INET;
@@ -56,7 +58,7 @@ use constant DEFAULT_RSSI_THRESHOLD     => 10;
 use constant RSSI_WINDOW                => 10;
 
 use constant ME                         => 'lepresenced';
-use constant VERSION                    => '0.82';
+use constant VERSION                    => '0.83';
 
 use constant PIDFILE                    => '/var/run/' . ME . '.pid';
 
@@ -72,6 +74,7 @@ my %devices :shared;
 my @clients = ();
 my $syslog_level;
 my $debug;
+my ($beacons_hcitool, $beacons_hcidump) : shared;
 
 sub syslogw {
   return if (scalar(@_) < 2);
@@ -147,6 +150,15 @@ sub parse_options() {
 
 sub sanity_check($) {
   my ($legacy_mode) = @_;
+
+  error_exit(3, "ERROR: lepresenced is already running. Exiting.") if (!flock DATA, LOCK_EX | LOCK_NB);
+
+  # log md5 digest of lepresenced
+  open (my $me, "<$0");
+  binmode ($me);
+  syslogw(LOG_INFO, "md5 digest of '%s' is: %s.", $0, Digest::MD5->new->addfile($me)->hexdigest());
+
+  # check if necessary external binaries exist
   my $ok = 1;
   foreach my $binary ($legacy_mode ? qw/hciconfig hcitool/ : qw/hciconfig hcitool hcidump/) {
     my $binpath = `which $binary 2>/dev/null`;
@@ -158,7 +170,7 @@ sub sanity_check($) {
       $ok = 0;
     }
   }
-  error_exit(3, "ERROR: Exiting due to missing binaries.") if (!$ok);
+  error_exit(4, "ERROR: Exiting due to missing binaries.") if (!$ok);
 }
 
 sub update_device($$$) {
@@ -191,6 +203,7 @@ sub bluetooth_scan_thread($$) {
       if ($_ eq 'LE Scan ...') {
         syslogw(LOG_INFO, "Received '%s'.", $_);
       } elsif (my ($fbmac, $fbname) = $_ =~ /^([\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2})\s(.*)$/i) {
+        $beacons_hcitool++;
         if ($legacy_mode) {
           #syslogw(LOG_DEBUG, "Received advertisement from bluetooth mac address '%s' with name '%s'.", $fbmac, $fbname);
           update_device($fbmac, $fbname, 'unknown');
@@ -270,6 +283,7 @@ sub bluetooth_dump_thread($) {
         }
       } elsif ($state == HCIDUMP_STATE_SCAN_RSP || $state == HCIDUMP_STATE_ADV_INT) {
         if  ($_ =~ m/^      bdaddr ([0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}) \((Public|Random)\)$/) {
+          $beacons_hcidump++;
           $current_mac = $1;
         } elsif ($_ =~ m/^      Complete local name: '(.*)'$/) {
           $current_name = $1;
@@ -329,7 +343,8 @@ sub stats_task() {
       $max_age = $age if (!defined($max_age) || $age > $max_age);
     }
   }
-  syslogw(LOG_INFO, "Active clients: %i, known devices: %i (min/max age: %s/%s)", scalar(@clients), $devices, $min_age // '%', $max_age // '%');
+  syslogw(LOG_INFO, "Active clients: %i, known devices: %i (min/max age: %s/%s), received beacons (hcitool/hcidump/difference): %i/%i/%i",
+    scalar(@clients), $devices, $min_age // '%', $max_age // '%', $beacons_hcitool, $beacons_hcidump, abs($beacons_hcitool - $beacons_hcidump));
 }
 
 sub dump_task() {
@@ -343,6 +358,7 @@ sub dump_task() {
       $devices{$mac}{'name'}
     );
   }
+  printf("Received beacons (hcitool/hcidump): %i/%i, difference: %i\n", $beacons_hcitool, $beacons_hcidump, abs($beacons_hcitool - $beacons_hcidump));
 }
 
 sub cleanup_task() {
@@ -473,3 +489,6 @@ for(;;) {
   usleep(MAINLOOP_SLEEP_US);
 }
 $server_socket->close();
+
+__DATA__
+This exists to allow the locking code at the beginning of the file to work and to praise adamk's wisdom.
