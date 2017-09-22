@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.6     22.09.2017       commandref revised
 # 2.22.5     05.09.2017       fix Internal MODE isn't set correctly after DEF is edited, nextsynch is not renewed if reopen is  
 #                             set manually after reopen was set with a delay Forum:#76213, Link to 98_FileLogConvert.pm added
 # 2.22.4     27.08.2017       fhem chrashes if database DBD driver is not installed (Forum:#75894)
@@ -149,7 +150,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.5";
+my $DbLogVersion = "2.22.6";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -4457,22 +4458,79 @@ sub checkUsePK ($$){
 <h3>DbLog</h3>
 <ul>
   <br>
-
-  <a name="DbLogdefine"></a>
-  <b>Define</b>
-  <ul>
-    <code>define &lt;name&gt; DbLog &lt;configfilename&gt; &lt;regexp&gt;</code>
+  With DbLog events can be stored in a database. SQLite, MySQL/MariaDB and PostgreSQL are supported databases. <br><br>
+  
+  <b>Prereqisites</b> <br><br>
+  
+    The Perl-modules <code>DBI</code> and <code>DBD::&lt;dbtype&gt;</code> are needed to be installed (use <code>cpan -i &lt;module&gt;</code>
+    if your distribution does not have it). 
     <br><br>
-
-    Log events to a database. The database connection is defined in
-    <code>&lt;configfilename&gt;</code> 
 	
-	In <code>contrib/dblog</code> an example configuration and scripts to create needed tables in the 
-    different databases are provided. <br><br>
+	On a debian based system you may install these modules for instance by: <br><br>
 	
-	The <b>configuration file</b> should be copied e.g. to /opt/fhem and has the following structure you have to customize 
-    suitable to your conditions (decomment the appropriate raws and adjust it): <br><br>
-
+	<ul>
+    <table>  
+    <colgroup> <col width=5%> <col width=95%> </colgroup>
+      <tr><td> <b>DBI</b>         </td><td>: <code> sudo apt-get install libdbi-perl </code> </td></tr>
+      <tr><td> <b>MySQL</b>       </td><td>: <code> sudo apt-get install [mysql-server] mysql-client libdbd-mysql libdbd-mysql-perl </code> (mysql-server only if you use a local MySQL-server installation) </td></tr>
+      <tr><td> <b>SQLite</b>      </td><td>: <code> sudo apt-get install sqlite3 libdbi-perl libdbd-sqlite3-perl </code> </td></tr>
+      <tr><td> <b>PostgreSQL</b>  </td><td>: <code> sudo apt-get install libdbd-pg-perl </code> </td></tr>
+    </table>
+	</ul>
+	<br>
+	<br>
+	
+  <b>Preparations</b> <br><br>
+  
+  At first you need to setup the database. <br>
+  Sample code and Scripts to prepare a MySQL/PostgreSQL/SQLite database you can find in <code>contrib/dblog/&lt;DBType&gt;_create.sql</code>.
+  The database contains two tables: <code>current</code> and <code>history</code>. <br>
+  The latter contains all events whereas the former only contains the last event for any given reading and device. 
+  (see also <a href="#DbLogattr">attribute</a> DbLogType)
+  <br><br>
+  
+  The columns have the following meaning:: <br><br>
+  
+	<ul>
+    <table>  
+    <colgroup> <col width=5%> <col width=95%> </colgroup>
+      <tr><td> TIMESTAMP: </td><td>: timestamp of event, e.g. <code>2007-12-30 21:45:22</code> </td></tr>
+      <tr><td> DEVICE:    </td><td>: device name, e.g. <code>Wetterstation</code> </td></tr>
+      <tr><td> TYPE:      </td><td>: device type, e.g. <code>KS300</code> </code> </td></tr>
+      <tr><td> EVENT:     </td><td>: event specification as full string, e.g. <code>humidity: 71 (%)</code> </td></tr>
+	  <tr><td> READING:   </td><td>: name of reading extracted from event, e.g. <code>humidity</code> </td></tr>
+	  <tr><td> VALUE:     </td><td>: actual reading extracted from event, e.g. <code>71</code> </td></tr>
+	  <tr><td> UNIT:      </td><td>: unit extracted from event, e.g. <code>%</code> </td></tr>
+    </table>
+	</ul>
+	<br>
+	<br>
+	
+  <b>create index</b> <br>
+  Due to reading performance, e.g. on creation of SVG-plots, it is very important that the <b>index "Search_Idx"</b>
+  or a comparable index (e.g. a primary key) is applied. A sample code for creation of that index is also available at the mentioned scripts in
+  <code>contrib/dblog/&lt;DBType&gt;_create.sql</code>. <br><br>
+  
+  The index "Search_Idx" can be created, e.g. in database 'fhem', by these statements (also subsequently): <br><br>
+  
+	<ul>
+    <table>  
+    <colgroup> <col width=5%> <col width=95%> </colgroup>
+      <tr><td> <b>MySQL</b>       </td><td>: <code> CREATE INDEX Search_Idx ON `fhem`.`history` (DEVICE, READING, TIMESTAMP); </code> </td></tr>
+      <tr><td> <b>SQLite</b>      </td><td>: <code> CREATE INDEX Search_Idx ON `history` (DEVICE, READING, TIMESTAMP); </code> </td></tr>
+      <tr><td> <b>PostgreSQL</b>  </td><td>: <code> CREATE INDEX "Search_Idx" ON history USING btree (device, reading, "timestamp"); </code> </td></tr>
+    </table>
+	</ul>
+	<br>
+	
+  For the connection to the database a <b>configuration file</b> is used. 
+  The configuration is stored in a separate file to avoid storing the password in the main configuration file and to have it
+  visible in the output of the <a href="https://fhem.de/commandref.html#list">list</a> command.
+  <br><br>
+	
+  The <b>configuration file</b> should be copied e.g. to /opt/fhem and has the following structure you have to customize 
+  suitable to your conditions (decomment the appropriate raws and adjust it): <br><br>
+	
 	<pre>
     ####################################################################################
     # database configuration file     
@@ -4482,7 +4540,7 @@ sub checkUsePK ($$){
     # and write 'user => ""' respectively 'password => ""' instead !	
     #
     #
-    ## for MySQL                                                     
+    ## for MySQL                                                      
     ####################################################################################
     #%dbconfig= (                                                    
     #    connection => "mysql:database=fhem;host=db;port=3306",       
@@ -4513,59 +4571,23 @@ sub checkUsePK ($$){
 	</pre>
 	<br>
 	
-	The configuration is stored in a separate file
-    to avoid storing the password in the main configuration file and to have it
-    visible in the output of the <a href="../docs/commandref.html#list">list</a> command.
-    <br><br>
-	
-	DbLog distinguishes between the synchronous (default) and asynchronous logmode. The logmode is adjustable by the  
-	<a href="#DbLogattr">attribute</a> asyncMode. Since version 2.13.5 DbLog is supporting primary key (PK) set in table 
-	current	or history. If you want use PostgreSQL with PK it has to be at lest version 9.5.  
+
+  <a name="DbLogdefine"></a>
+  <b>Define</b>  
+  <ul>
+  <br>
+  
+    <code>define &lt;name&gt; DbLog &lt;configfilename&gt; &lt;regexp&gt;</code>
     <br><br>
 
-    The modules <code>DBI</code> and <code>DBD::&lt;dbtype&gt;</code>
-    need to be installed (use <code>cpan -i &lt;module&gt;</code>
-    if your distribution does not have it).
+    <code>&lt;configfilename&gt;</code> is the prepared <b>configuration file</b>. <br>
+    <code>&lt;regexp&gt;</code> is identical to the specification of regex in the <a href="https://fhem.de/commandref.html#FileLog">FileLog</a> definition.
     <br><br>
-
-    <code>&lt;regexp&gt;</code> is the same as in <a href="../docs/commandref.html#FileLog">FileLog</a>.
-    <br><br>
-    Sample code to create a MySQL/PostgreSQL/SQLite database is in
-    <code>&lt;DBType&gt;_create.sql</code>.
-    The database contains two tables: <code>current</code> and
-    <code>history</code>. The latter contains all events whereas the former only
-    contains the last event for any given reading and device. (see also <a href="#DbLogattr">attribute</a> DbLogType)
-	
-    The columns have the following meaning: <br><br>
-	
-    <ol>
-      <li>TIMESTAMP: timestamp of event, e.g. <code>2007-12-30 21:45:22</code></li>
-      <li>DEVICE: device name, e.g. <code>Wetterstation</code></li>
-      <li>TYPE: device type, e.g. <code>KS300</code></li>
-      <li>EVENT: event specification as full string,
-                                          e.g. <code>humidity: 71 (%)</code></li>
-      <li>READING: name of reading extracted from event,
-                      e.g. <code>humidity</code></li>
-
-      <li>VALUE: actual reading extracted from event,
-                      e.g. <code>71</code></li>
-      <li>UNIT: unit extracted from event, e.g. <code>%</code></li>
-    </ol>
-	<br>
-	
-    The content of VALUE is optimized for automated post-processing, e.g. <code>yes</code> is translated to <code>1</code>
-    <br><br>
-	
-    The current values can be retrieved by the following code like FileLog:<br>
-    <ul>
-      <code>get myDbLog - - 2012-11-10 2012-11-10 KS300:temperature::</code>
-    </ul>
-    <br>
 	
     <b>Example:</b>
     <ul>
-        <code>define myDbLog DbLog /etc/fhem/db.conf .*:.*</code> <br>
-        <code># log everything to database</code>
+        <code>define myDbLog DbLog /etc/fhem/db.conf .*:.*</code><br>
+        all events will stored into the database
     </ul>
 	<br>
 	
@@ -4577,8 +4599,21 @@ sub checkUsePK ($$){
 	
 	This check reports some important settings and gives recommendations back to you if proposals are indentified.
 	(Available for MySQL, PostgreSQL) <br><br>
+		
+	DbLog distinguishes between the synchronous (default) and asynchronous logmode. The logmode is adjustable by the  
+	<a href="#DbLogattr">attribute</a> asyncMode. Since version 2.13.5 DbLog is supporting primary key (PK) set in table 
+	current	or history. If you want use PostgreSQL with PK it has to be at lest version 9.5.  
+    <br><br>
 	
-	<br>
+    The content of VALUE will be optimized for automated post-processing, e.g. <code>yes</code> is translated to <code>1</code>
+    <br><br>
+    
+    The stored values can be retrieved by the following code like FileLog:<br>
+    <ul>
+      <code>get myDbLog - - 2012-11-10 2012-11-10 KS300:temperature::</code>
+    </ul>
+    <br>
+	
 	<b>transfer FileLog-data to DbLog </b> <br><br>
     There is the special module 98_FileLogConvert.pm available to transfer filelog-data to the DbLog-database. <br>
  	The module can be downloaded <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/98_FileLogConvert.pm"> here</a>
@@ -4587,7 +4622,9 @@ sub checkUsePK ($$){
 	Forumthread </a>. <br><br>
 	
   </ul>
-  <br><br>
+  <br>
+  <br>
+
 
   <a name="DbLogset"></a>
   <b>Set</b> 
@@ -5284,22 +5321,83 @@ sub checkUsePK ($$){
 <h3>DbLog</h3>
 <ul>
   <br>
-
-  <a name="DbLogdefine"></a>
-  <b>Define</b>
-  <ul>
-    <code>define &lt;name&gt; DbLog &lt;configfilename&gt; &lt;regexp&gt;</code>
+  Mit DbLog werden Events in einer Datenbank gespeichert. Es wird SQLite, MySQL/MariaDB und PostgreSQL unterstützt. <br><br>
+  
+  <b>Voraussetzungen</b> <br><br>
+  
+    Die Perl-Module <code>DBI</code> und <code>DBD::&lt;dbtype&gt;</code> müssen installiert werden (use <code>cpan -i &lt;module&gt;</code>
+    falls die eigene Distribution diese nicht schon mitbringt). 
     <br><br>
-
-    Speichert Events in eine Datenbank. Die Datenbankverbindungsparameter werden
-    definiert in <code>&lt;configfilename&gt;</code>. <br>
 	
-	In <code>contrib/dblog</code> sind eine Beispielkonfiguation und Scripts zum Anlegen der benötigten Tabellen
-	der verschiedenen Datenbanktypen bereitgestellt. <br><br>
+	Auf einem Debian-System können diese Module z.Bsp. installiert werden mit: <br><br>
 	
-	Die <b>Konfigurationsdatei</b> wird z.B. nach /opt/fhem kopiert und hat folgenden Aufbau, den man an seine Umgebung 
-    anpassen muß (entsprechende Zeilen entkommentieren und anpassen): <br><br>
-
+	<ul>
+    <table>  
+    <colgroup> <col width=5%> <col width=95%> </colgroup>
+      <tr><td> <b>DBI</b>         </td><td>: <code> sudo apt-get install libdbi-perl </code> </td></tr>
+      <tr><td> <b>MySQL</b>       </td><td>: <code> sudo apt-get install [mysql-server] mysql-client libdbd-mysql libdbd-mysql-perl </code> (mysql-server nur bei lokaler MySQL-Server-Installation) </td></tr>
+      <tr><td> <b>SQLite</b>      </td><td>: <code> sudo apt-get install sqlite3 libdbi-perl libdbd-sqlite3-perl </code> </td></tr>
+      <tr><td> <b>PostgreSQL</b>  </td><td>: <code> sudo apt-get install libdbd-pg-perl </code> </td></tr>
+    </table>
+	</ul>
+	<br>
+	<br>
+	
+  <b>Vorbereitungen</b> <br><br>
+  
+  Zunächst muss die Datenbank angelegt werden. <br>
+  Beispielcode bzw. Scripts zum Erstellen einer MySQL/PostgreSQL/SQLite Datenbank ist in <code>contrib/dblog/&lt;DBType&gt;_create.sql</code> 
+  enthalten.
+  Die Datenbank beinhaltet 2 Tabellen: <code>current</code> und <code>history</code>. <br>
+  Die Tabelle <code>current</code> enthält den letzten Stand pro Device und Reading. <br>
+  In der Tabelle <code>history</code> sind alle Events historisch gespeichert. (siehe auch <a href="#DbLogattr">Attribut</a> DbLogType)
+  <br><br>
+  
+  Die Tabellenspalten haben folgende Bedeutung: <br><br>
+  
+	<ul>
+    <table>  
+    <colgroup> <col width=5%> <col width=95%> </colgroup>
+      <tr><td> TIMESTAMP: </td><td>: Zeitpunkt des Events, z.B. <code>2007-12-30 21:45:22</code> </td></tr>
+      <tr><td> DEVICE:    </td><td>: Name des Devices, z.B. <code>Wetterstation</code> </td></tr>
+      <tr><td> TYPE:      </td><td>: Type des Devices, z.B. <code>KS300</code> </code> </td></tr>
+      <tr><td> EVENT:     </td><td>: das auftretende Event als volle Zeichenkette, z.B. <code>humidity: 71 (%)</code> </td></tr>
+	  <tr><td> READING:   </td><td>: Name des Readings, ermittelt aus dem Event, z.B. <code>humidity</code> </td></tr>
+	  <tr><td> VALUE:     </td><td>: aktueller Wert des Readings, ermittelt aus dem Event, z.B. <code>humidity</code> </td></tr>
+	  <tr><td> UNIT:      </td><td>: Einheit, ermittelt aus dem Event, z.B. <code>%</code> </td></tr>
+    </table>
+	</ul>
+	<br>
+	<br>
+	
+  <b>Index anlegen</b> <br>
+  Für die Leseperformance, z.B. bei der Erstellung von SVG-PLots, ist es von besonderer Bedeutung dass der <b>Index "Search_Idx"</b>
+  oder ein vergleichbarer Index (z.B. ein Primary Key) angelegt ist. <br><br>
+  
+  Der Index "Search_Idx" kann mit diesen Statements, z.B. in der Datenbank 'fhem', angelegt werden (auch nachträglich): <br><br>
+  
+	<ul>
+    <table>  
+    <colgroup> <col width=5%> <col width=95%> </colgroup>
+      <tr><td> <b>MySQL</b>       </td><td>: <code> CREATE INDEX Search_Idx ON `fhem`.`history` (DEVICE, READING, TIMESTAMP); </code> </td></tr>
+      <tr><td> <b>SQLite</b>      </td><td>: <code> CREATE INDEX Search_Idx ON `history` (DEVICE, READING, TIMESTAMP); </code> </td></tr>
+      <tr><td> <b>PostgreSQL</b>  </td><td>: <code> CREATE INDEX "Search_Idx" ON history USING btree (device, reading, "timestamp"); </code> </td></tr>
+    </table>
+	</ul>
+	<br>
+  
+  Der Code zur Anlage ist ebenfalls mit in den Scripten in
+  <code>contrib/dblog/&lt;DBType&gt;_create.sql</code> enthalten. <br><br>
+	
+  Für die Verbindung zur Datenbank wird eine <b>Konfigurationsdatei</b> verwendet. 
+  Die Konfiguration ist in einer sparaten Datei abgelegt um das Datenbankpasswort nicht in Klartext in der 
+  FHEM-Haupt-Konfigurationsdatei speichern zu müssen.
+  Ansonsten wäre es mittels des <a href="https://fhem.de/commandref_DE.html#list">list</a> Befehls einfach auslesbar.
+  <br><br>
+	
+  Die <b>Konfigurationsdatei</b> wird z.B. nach /opt/fhem kopiert und hat folgenden Aufbau, den man an seine Umgebung 
+  anpassen muß (entsprechende Zeilen entkommentieren und anpassen): <br><br>
+	
 	<pre>
     ####################################################################################
     # database configuration file     
@@ -5339,78 +5437,24 @@ sub checkUsePK ($$){
     ####################################################################################
 	</pre>
 	<br>
-    
-	Die Konfiguration ist in einer sparaten Datei abgelegt um das Datenbankpasswort
-    nicht in Klartext in der FHEM-Haupt-Konfigurationsdatei speichern zu müssen.
-    Ansonsten wäre es mittels des <a href="../docs/commandref.html#list">list</a>
-    Befehls einfach auslesbar.
-    <br><br>
 	
-	DbLog unterscheidet den synchronen (Default) und asynchronen Logmodus. Der Logmodus ist über das 
-	<a href="#DbLogattr">Attribut</a> asyncMode einstellbar. Ab Version 2.13.5 unterstützt DbLog einen gesetzten
-	Primary Key (PK) in den Tabellen Current und History. Soll PostgreSQL mit PK genutzt werden, muss PostgreSQL mindestens
-	Version 9.5 sein.
-    <br><br>
 
-    Die Perl-Module <code>DBI</code> und <code>DBD::&lt;dbtype&gt;</code>
-    müssen installiert werden (use <code>cpan -i &lt;module&gt;</code>
-    falls die eigene Distribution diese nicht schon mitbringt). 
-    <br><br>
-	
-	Auf einem Debian-System können diese Module z.Bsp. installiert werden mit: <br><br>
-	
-	<ul>
-    <table>  
-    <colgroup> <col width=5%> <col width=95%> </colgroup>
-      <tr><td> <b>DBI</b>         </td><td>: <code> sudo apt-get install libdbi-perl </code> </td></tr>
-      <tr><td> <b>MySQL</b>       </td><td>: <code> sudo apt-get install [mysql-server] mysql-client libdbd-mysql libdbd-mysql-perl </code> (mysql-server nur bei lokaler MySQL-Server-Installation) </td></tr>
-      <tr><td> <b>SQLite</b>      </td><td>: <code> sudo apt-get install sqlite3 libdbi-perl libdbd-sqlite3-perl </code> </td></tr>
-      <tr><td> <b>PostgreSQL</b>  </td><td>: <code> sudo apt-get install libdbd-pg-perl </code> </td></tr>
-    </table>
-	</ul>
-	<br>
-	<br>
-
-    <code>&lt;regexp&gt;</code> ist identisch wie <a href="../docs/commandref.html#FileLog">FileLog</a>.
-    <br><br>
-    Ein Beispielcode zum Erstellen einer MySQL/PostgreSQL/SQLite Datenbank ist in
-    <code>contrib/dblog/&lt;DBType&gt;_create.sql</code> zu finden.
-    Die Datenbank beinhaltet 2 Tabellen: <code>current</code> und
-    <code>history</code>. Die Tabelle <code>current</code> enthält den letzten Stand
-    pro Device und Reading. In der Tabelle <code>history</code> sind alle
-    Events historisch gespeichert. (siehe auch <a href="#DbLogattr">Attribut</a> DbLogType)
-
-    Die Tabellenspalten haben folgende Bedeutung: <br><br>
-	
-    <ol>
-      <li>TIMESTAMP: Zeitpunkt des Events, z.B. <code>2007-12-30 21:45:22</code></li>
-      <li>DEVICE: name des Devices, z.B. <code>Wetterstation</code></li>
-      <li>TYPE: Type des Devices, z.B. <code>KS300</code></li>
-      <li>EVENT: das auftretende Event als volle Zeichenkette
-                                          z.B. <code>humidity: 71 (%)</code></li>
-      <li>READING: Name des Readings, ermittelt aus dem Event,
-                      z.B. <code>humidity</code></li>
-
-      <li>VALUE: aktueller Wert des Readings, ermittelt aus dem Event,
-                      z.B. <code>71</code></li>
-      <li>UNIT: Einheit, ermittelt aus dem Event, z.B. <code>%</code></li>
-    </ol>
-	<br>
-	
-    Der Wert des Readings ist optimiert für eine automatisierte Nachverarbeitung
-    z.B. <code>yes</code> ist transformiert nach <code>1</code>
-    <br><br>
-    
-	Die gespeicherten Werte können mittels GET Funktion angezeigt werden:
-    <ul>
-      <code>get myDbLog - - 2012-11-10 2012-11-10 KS300:temperature</code>
-    </ul>
+  <a name="DbLogdefine"></a>
+  <b>Define</b>
+  <ul>
     <br>
+	
+    <code>define &lt;name&gt; DbLog &lt;configfilename&gt; &lt;regexp&gt;</code>
+    <br><br>
+
+    <code>&lt;configfilename&gt;</code> ist die vorbereitete <b>Konfigurationsdatei</b>. <br>
+    <code>&lt;regexp&gt;</code> ist identisch <a href="https://fhem.de/commandref_DE.html#FileLog">FileLog</a> der Filelog-Definition.
+    <br><br>
 	
     <b>Beispiel:</b>
     <ul>
         <code>define myDbLog DbLog /etc/fhem/db.conf .*:.*</code><br>
-        <code>Speichert alles in der Datenbank</code>
+        speichert alles in der Datenbank
     </ul>
 	<br>
 	
@@ -5421,8 +5465,23 @@ sub checkUsePK ($$){
 	<br>
 	Dieser Check prüft einige wichtige Einstellungen des DbLog-Devices und gibt Empfehlungen für potentielle Verbesserungen. 
 	(verfügbar für MySQL, PostgreSQL) <br><br>
-	
 	<br>
+		
+	DbLog unterscheidet den synchronen (Default) und asynchronen Logmodus. Der Logmodus ist über das 
+	<a href="#DbLogattr">Attribut</a> asyncMode einstellbar. Ab Version 2.13.5 unterstützt DbLog einen gesetzten
+	Primary Key (PK) in den Tabellen Current und History. Soll PostgreSQL mit PK genutzt werden, muss PostgreSQL mindestens
+	Version 9.5 sein.
+    <br><br>
+	
+    Der gespeicherte Wert des Readings wird optimiert für eine automatisierte Nachverarbeitung, z.B. <code>yes</code> wird transformiert 
+	nach <code>1</code>. <br><br>
+    
+	Die gespeicherten Werte können mittels GET Funktion angezeigt werden:
+    <ul>
+      <code>get myDbLog - - 2012-11-10 2012-11-10 KS300:temperature</code>
+    </ul>
+    <br>
+	
 	<b>FileLog-Dateien nach DbLog übertragen</b> <br><br>
     Zur Übertragung von vorhandenen Filelog-Daten in die DbLog-Datenbank steht das spezielle Modul 98_FileLogConvert.pm
     zur Verfügung. <br>
