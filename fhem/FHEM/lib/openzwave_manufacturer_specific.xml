@@ -414,6 +414,7 @@
 		<Product type="0016" id="0001" name="ZWRS Roller Shutter FLiRS module" config="fakro/zwrs.xml"/>
 	</Manufacturer>
 	<Manufacturer id="010f" name="FIBARO System">
+                <Product type="0001" id="1000" name="HC2" forumNr="no-statistics" />
 		<Product type="0501" id="0101" name="FGBS001 Universal Binary Sensor" config="fibaro/fgbs001.xml" />
 		<Product type="0501" id="0102" name="FGBS001 Universal Binary Sensor" config="fibaro/fgbs001.xml" />
 		<Product type="0501" id="0109" name="FGBS001 Universal Binary Sensor" config="fibaro/fgbs001.xml" />
@@ -756,6 +757,7 @@
 		<Product type="4003" id="0002" name="Dimmer Wall Insert"/>
 		<Product type="4002" id="0001" name="Wall Appliance Module"/>
 		<Product type="4004" id="0001" name="Wall Roller Shutter Module" config="merten/50x5xx.xml"/>
+                <Product type="4005" id="0001" name="Merten Radio Argus 220 Connect Movement Detector" forumNr="no-statistics"/>
 		<Product type="8001" id="8001" name="Receiver Flush-Mounted 1-Gang Switch"/>
 		<Product type="8001" id="8002" name="Switch Wall Insert 1 Gang"/>
 		<Product type="0003" id="0004" name="Transmitter Flush-Mounted 4-Gang Switch"/>
@@ -820,6 +822,7 @@
 		<Product type="0001" id="000f" name="PAN03 Switch Module with meter 3 KW X1" config="philio/pan03.xml"/>
 		<Product type="0001" id="0011" name="PAN11 Smart Energy Plug In Switch" config="philio/pan11.xml"/>
 		<Product type="0001" id="0012" name="PAN04-1 Double Relay Switch 2x1.5kW with Power Measurement" config="philio/pan04.xml"/>
+                <Product type="0001" id="0013" name="PAN06-1 In Wall Dual Relay(1 Way) Switch Module" forumNr="no-statistics"/>
 		<Product type="0001" id="0015" name="PAN08-1 In Wall Roller Shutter Controller" config="philio/pan08.xml"/>
 		<Product type="0001" id="0029" name="PAN16 Smart energy plug in switch" config="philio/pan16.xml"/>
 		<Product type="0002" id="0002" name="PSM02-1 Slim Multi-Sensor" config="philio/psm02.xml"/>
@@ -1089,6 +1092,7 @@
 		<Product type="0003" id="0002" name="TZ68 On/Off Switch Socket" config="wenzhou/tz68.xml"/>
 		<Product type="0003" id="0003" name="TZ56 Wall Switch On/Off" config="wenzhou/tz56.xml"/>
 		<Product type="0003" id="0004" name="TZ55 Wall Switch Dimmer" config="wenzhou/tz55.xml"/>
+                <Product type="0003" id="0008" name="TZ67G Wall Plug Dimmer" forumNr="no-statistics"/>
 		<Product type="0004" id="0002" name="TZ69 Smart energy plug in switch" config="wenzhou/tz69.xml"/>
 		<Product type="0116" id="3119" name="TZ69F Smart energy plug in switch" config="wenzhou/tz69.xml"/>
 		<Product type="000b" id="0001" name="ST812 Flood Detector" config="everspring/st812.xml"/>
