@@ -1,3 +1,4 @@
+#2017.07.31 08:04:33 1: PERL WARNING: Use of uninitialized value $Astro{"MoonPhaseS"} in sprintf at /opt/fhem/FHEM/95_Astro.pm line 1302.
 ########################################################################################
 #
 # 95_Astro.pm
@@ -47,7 +48,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.31;
+my $astroversion = 1.33;
 
 #-- These we may get on request
 my %gets = (
@@ -89,6 +90,7 @@ my %astro_transtable_EN = (
     "twilightcivil"     =>  "Civil twilight",
     "twilightnautic"    =>  "Nautical twilight",
     "twilightastro"     =>  "Astronomical twilight",
+    "twilightcustom"    =>  "Custom twilight",
     "sign"              =>  "Zodiac sign",
     #--
     "today"             =>  "Today",
@@ -174,6 +176,7 @@ my %astro_transtable_EN = (
     "twilightcivil"     =>  "Bürgerliche Dämmerung",
     "twilightnautic"    =>  "Nautische Dämmerung",
     "twilightastro"     =>  "Astronomische Dämmerung",
+    "twilightcustom"    =>  "Konfigurierte Dämmerung",
     "sign"              =>  "Tierkreiszeichen",
     #--
     "today"             =>  "Heute",
@@ -233,7 +236,10 @@ my @zodiac=("aries","taurus","gemini","cancer","leo","virgo",
 my @phases = ("newmoon","waxingcrescent", "firstquarter", "waxingmoon", 
     "fullmoon", "waningmoon", "lastquarter", "waningcrescent");
 
-my %seasons = (
+my @seasons = (
+    "winter","spring","summer","fall");
+    
+my %seasonn = (
     "spring" => [80,172],       #21./22.3. - 20.6.
     "summer" => [173,265],      #21.06. bis 21./22.09.
     "fall"   => [266,353],      #22./23.09. bis 20./21.12.
@@ -243,13 +249,13 @@ my %seasons = (
 sub Astro_SunRise($$$$$$);
 sub Astro_MoonRise($$$$$$$);
  
-#########################################################################################
+########################################################################################################
 #
 # Astro_Initialize 
 # 
 # Parameter hash = hash of device addressed 
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_Initialize ($) {
   my ($hash) = @_;
@@ -259,18 +265,18 @@ sub Astro_Initialize ($) {
   $hash->{GetFn}       = "Astro_Get";
   $hash->{UndefFn}     = "Astro_Undef";   
   $hash->{AttrFn}      = "Astro_Attr";    
-  $hash->{AttrList}    = "interval longitude latitude altitude";			  
+  $hash->{AttrList}    = "interval longitude latitude altitude horizon";			  
 	
   return undef;
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_Define - Implements DefFn function
 # 
 # Parameter hash = hash of device addressed, def = definition string
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_Define ($$) {
  my ($hash, $def) = @_;
@@ -289,13 +295,13 @@ sub Astro_Define ($$) {
  return undef;
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_Undef - Implements Undef function
 # 
 # Parameter hash = hash of device addressed, def = definition string
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_Undef ($$) {
   my ($hash,$arg) = @_;
@@ -305,13 +311,13 @@ sub Astro_Undef ($$) {
   return undef;
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_Attr - Implements Attr function
 # 
 # Parameter hash = hash of device addressed, ???
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_Attr(@) {
   my ($do,$name,$key,$value) = @_;
@@ -342,11 +348,11 @@ sub Astro_mod($$) { my ($a,$b)=@_;if( $a =~ /\d*\.\d*/){return($a-floor($a/$b)*$
 sub Astro_mod2Pi($) { my ($x)=@_;$x = Astro_mod($x, 2.*pi);return($x); }
 sub Astro_round($$) { my ($x,$n)=@_; return int(10**$n*$x+0.5)/10**$n};
 
-#########################################################################################
+########################################################################################################
 #
 # time fragments into minutes, seconds
 #
-#########################################################################################  
+########################################################################################################  
   
 sub Astro_HHMM($){
   my ($hh) = @_;
@@ -369,11 +375,11 @@ sub Astro_HHMMSS($){
   return sprintf("%02d:%02d:%02d",$h,$m,$s);
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_CalcJD - Calculate Julian date: valid only from 1.3.1901 to 28.2.2100
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_CalcJD($$$) {
   my ($day,$month,$year) = @_;
@@ -387,11 +393,11 @@ sub Astro_CalcJD($$$) {
   return($jd + $day);
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_GMST - Julian Date to Greenwich Mean Sidereal Time
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_GMST($){
   my ($JD) = @_;
@@ -404,11 +410,11 @@ sub Astro_GMST($){
   return( Astro_mod($T0+$UT*1.002737909,24.));
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_GMST2UT - Convert Greenweek mean sidereal time to UT
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_GMST2UT($$){
   my ($JD, $gmst) = @_;
@@ -419,11 +425,12 @@ sub Astro_GMST2UT($$){
   return($UT);
 }
 
-#########################################################################################
+########################################################################################################
 #
-# Astro_GMST2LMST - Local Mean Sidereal Time, geographical longitude in radians, East is positive
+# Astro_GMST2LMST - Local Mean Sidereal Time, geographical longitude in radians, 
+#                   East is positive
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_GMST2LMST($$){
   my ($gmst, $lon) = @_;
@@ -431,11 +438,11 @@ sub Astro_GMST2LMST($$){
   return( $lmst );
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_Ecl2Equ - Transform ecliptical coordinates (lon/lat) to equatorial coordinates (RA/dec)
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_Ecl2Equ($$$){
   my ($lon, $lat, $TDT) = @_;
@@ -450,12 +457,12 @@ sub Astro_Ecl2Equ($$$){
   return ($ra,$dec);
 }
 
-#########################################################################################
+########################################################################################################
 #
-# Astro_Equ2Altaz - Transform equatorial coordinates (RA/Dec) to horizonal coordinates (azimuth/altitude)
-#             Refraction is ignored
+# Astro_Equ2Altaz - Transform equatorial coordinates (RA/Dec) to horizonal coordinates 
+#                   (azimuth/altitude). Refraction is ignored
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_Equ2Altaz($$$$$){
   my ($ra, $dec, $TDT, $lat, $lmst)=@_;
@@ -475,11 +482,12 @@ sub Astro_Equ2Altaz($$$$$){
   return ($az,$alt);
 }
 
-#########################################################################################
+########################################################################################################
 #
-# Astro_GeoEqu2TopoEqu - Transform geocentric equatorial coordinates (RA/Dec) to topocentric equatorial coordinates
+# Astro_GeoEqu2TopoEqu - Transform geocentric equatorial coordinates (RA/Dec) to 
+#                        topocentric equatorial coordinates
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_GeoEqu2TopoEqu($$$$$$$){
   my ($ra, $dec, $distance, $lon, $lat, $radius, $lmst) = @_;
@@ -503,11 +511,11 @@ sub Astro_GeoEqu2TopoEqu($$$$$$$){
   return ( ($distanceTopocentric,$decTopocentric,$raTopocentric) );
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_EquPolar2Cart - Calculate cartesian from polar coordinates
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_EquPolar2Cart($$$){
   my ($lon,$lat,$distance) = @_;
@@ -518,13 +526,13 @@ sub Astro_EquPolar2Cart($$$){
   return( ($x,$y,$z) );
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_Observer2EquCart - Calculate observers cartesian equatorial coordinates (x,y,z in celestial frame) 
 #                    from geodetic coordinates (longitude, latitude, height above WGS84 ellipsoid)
 #                    Currently only used to calculate distance of a body from the observer
 #
-#########################################################################################
+########################################################################################################
 
 sub Astro_Observer2EquCart($$$$){
   my ($lon, $lat, $height, $gmst ) = @_;
@@ -558,13 +566,13 @@ sub Astro_Observer2EquCart($$$$){
   return( ($x2,$y2,$z,$radius) );
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_SunPosition - Calculate coordinates for Sun
 # Coordinates are accurate to about 10s (right ascension) 
 # and a few minutes of arc (declination)
 # 
-#########################################################################################
+########################################################################################################
 
 sub Astro_SunPosition($$$){
   my ($TDT, $observerlat, $lmst)=@_;
@@ -602,12 +610,12 @@ sub Astro_SunPosition($$$){
   return ( \%sunCoor );
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_MoonPosition - Calculate data and coordinates for the Moon
-# Coordinates are accurate to about 1/5 degree (in ecliptic coordinates)
+#                      Coordinates are accurate to about 1/5 degree (in ecliptic coordinates)
 # 
-#########################################################################################
+########################################################################################################
 
 sub Astro_MoonPosition($$$$$$$){
   my ($sunlon, $sunanomalyMean, $TDT, $observerlon, $observerlat, $observerradius, $lmst) = @_;
@@ -661,7 +669,8 @@ sub Astro_MoonPosition($$$$$$$){
 
   if (defined($observerlat) && defined($observerlon) && defined($lmst) ) {
     #-- transform geocentric coordinates into topocentric (==observer based) coordinates
-	my  ($distanceTopocentric,$decTopocentric,$raTopocentric) = Astro_GeoEqu2TopoEqu($moonCoor{ra}, $moonCoor{dec}, $moonCoor{distance}, $observerlon, $observerlat, $observerradius, $lmst);
+	my  ($distanceTopocentric,$decTopocentric,$raTopocentric) = 
+	  Astro_GeoEqu2TopoEqu($moonCoor{ra}, $moonCoor{dec}, $moonCoor{distance}, $observerlon, $observerlat, $observerradius, $lmst);
 	#-- now ra and dec are topocentric
 	$moonCoor{ra}  = $raTopocentric;
 	$moonCoor{dec} = $decTopocentric;
@@ -687,11 +696,11 @@ sub Astro_MoonPosition($$$$$$$){
   return ( \%moonCoor );
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_Refraction - Input true altitude in radians, Output: increase in altitude in degrees
 # 
-#########################################################################################
+########################################################################################################
 
 sub Astro_Refraction($){
   my ($alt) = @_;
@@ -732,7 +741,7 @@ sub Astro_Refraction($){
   return( $D ); 
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_GMSTRiseSet - returns Greenwich sidereal time (hours) of time of rise 
 # and set of object with coordinates ra/dec
@@ -740,7 +749,7 @@ sub Astro_Refraction($){
 # Correction for refraction and semi-diameter/parallax of body is taken care of in function RiseSet
 # h is used to calculate the twilights. It gives the required elevation of the disk center of the sun
 # 
-#########################################################################################
+########################################################################################################
 
 sub Astro_GMSTRiseSet($$$$$){
   my ($ra, $dec, $lon, $lat, $h) = @_;
@@ -763,24 +772,24 @@ sub Astro_GMSTRiseSet($$$$$){
   return( ($transit, $rise, $set) );
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_InterpolateGMST - Find GMST of rise/set of object from the two calculated 
 # (start)points (day 1 and 2) and at midnight UT(0)
 # 
-#########################################################################################
+########################################################################################################
 
 sub Astro_InterpolateGMST($$$$){
   my ($gmst0, $gmst1, $gmst2, $timefactor) = @_;
   return( ($timefactor*24.07*$gmst1- $gmst0*($gmst2-$gmst1)) / ($timefactor*24.07+$gmst1-$gmst2) );
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_RiseSet
 #    // JD is the Julian Date of 0h UTC time (midnight)
 # 
-#########################################################################################
+########################################################################################################
 
 sub Astro_RiseSet($$$$$$$$$$$){
   my ($jd0UT, $diameter, $parallax, $ra1, $dec1, $ra2, $dec2, $lon, $lat, $timeinterval, $altip) = @_;
@@ -833,15 +842,16 @@ sub Astro_RiseSet($$$$$$$$$$$){
   return( ($transit,$rise,$set) ); 
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_SunRise - Find (local) time of sunrise and sunset, and twilights
-# JD is the Julian Date of 0h local time (midnight)
-# Accurate to about 1-2 minutes
-# recursive: 1 - calculate rise/set in UTC in a second run
-# recursive: 0 - find rise/set on the current local day. This is set when doing the first call to this function
+#                 JD is the Julian Date of 0h local time (midnight)
+#                 Accurate to about 1-2 minutes
+#                 recursive: 1 - calculate rise/set in UTC in a second run
+#                 recursive: 0 - find rise/set on the current local day. 
+#                                This is set when doing the first call to this function
 # 
-#########################################################################################
+########################################################################################################
 
 sub Astro_SunRise($$$$$$){
   my ($JD, $deltaT, $lon, $lat, $zone, $recursive) = @_;
@@ -855,7 +865,8 @@ sub Astro_SunRise($$$$$$){
   my $sunCoor2 = Astro_SunPosition($jd0UT+1.+$deltaT/24./3600.,undef,undef); 
   
   #-- rise/set time in UTC
-  my ($transit,$rise,$set) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1,undef); 
+  my ($transit,$rise,$set) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
+    $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1,undef); 
   
   my ($transittemp,$risetemp,$settemp);
   #-- check and adjust to have rise/set time on local calendar day
@@ -863,7 +874,6 @@ sub Astro_SunRise($$$$$$){
     if ($zone>0) {
       #rise time was yesterday local time -> calculate rise time for next UTC day
       if ($rise >=24-$zone || $transit>=24-$zone || $set>=24-$zone) {
-        #Log 1,"==> Recursion tomorrow gives transittemp=$transittemp, risetemp=$risetemp, settemp=$settemp";
         ($transittemp,$risetemp,$settemp) = Astro_SunRise($JD+1, $deltaT, $lon, $lat, $zone, 1);
         $transit = $transittemp
           if ($transit>=24-$zone);
@@ -891,26 +901,37 @@ sub Astro_SunRise($$$$$$){
 
 	#-- Twilight calculation
 	#-- civil twilight time in UTC. 
-	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -6.*$DEG);
+	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
+	   $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -6.*$DEG);
 	my $CivilTwilightMorning = Astro_mod($risetemp +$zone, 24.);
 	my $CivilTwilightEvening = Astro_mod($settemp  +$zone, 24.);
 
 	#-- nautical twilight time in UTC. 
-	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -12.*$DEG);
+	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
+	  $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -12.*$DEG);
 	my $NauticTwilightMorning = Astro_mod($risetemp +$zone, 24.);
 	my $NauticTwilightEvening = Astro_mod($settemp  +$zone, 24.);
 
 	#-- astronomical twilight time in UTC. 
-	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -18.*$DEG);
+	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
+	  $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -18.*$DEG);
 	my $AstroTwilightMorning = Astro_mod($risetemp +$zone, 24.);
 	my $AstroTwilightEvening = Astro_mod($settemp  +$zone, 24.);
-	return( ($transit,$rise,$set,$CivilTwilightMorning,$CivilTwilightEvening,$NauticTwilightMorning,$NauticTwilightEvening,$AstroTwilightMorning,$AstroTwilightEvening) );  
+	
+	#-- custom twilight time in UTC
+    ($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
+	  $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, $Astro{ObsHor}*$DEG);
+	my $CustomTwilightMorning = Astro_mod($risetemp +$zone, 24.);
+	my $CustomTwilightEvening = Astro_mod($settemp  +$zone, 24.);
+	
+	return( ($transit,$rise,$set,$CivilTwilightMorning,$CivilTwilightEvening,
+	  $NauticTwilightMorning,$NauticTwilightEvening,$AstroTwilightMorning,$AstroTwilightEvening,$CustomTwilightMorning,$CustomTwilightEvening) );  
   }else{
     return( ($transit,$rise,$set) );  
   }
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_MoonRise - Find local time of moonrise and moonset
 # JD is the Julian Date of 0h local time (midnight)
@@ -919,7 +940,7 @@ sub Astro_SunRise($$$$$$){
 # recursive: 0 - find rise/set on the current local day (set could also be first)
 # returns '' for moonrise/set does not occur on selected day
 # 
-#########################################################################################
+########################################################################################################
 
 sub Astro_MoonRise($$$$$$$){
   my ($JD, $deltaT, $lon, $lat, $radius, $zone, $recursive) = @_;
@@ -936,7 +957,8 @@ sub Astro_MoonRise($$$$$$$){
 
   # rise/set time in UTC, time zone corrected later.
   # Taking into account refraction, semi-diameter and parallax
-  my ($transit,$rise,$set) = Astro_RiseSet($jd0UT, $moonCoor1->{diameter}, $moonCoor1->{parallax}, $moonCoor1->{ra}, $moonCoor1->{dec}, $moonCoor2->{ra}, $moonCoor2->{dec}, $lon, $lat, $timeinterval,undef); 
+  my ($transit,$rise,$set) = Astro_RiseSet($jd0UT, $moonCoor1->{diameter}, $moonCoor1->{parallax}, 
+    $moonCoor1->{ra}, $moonCoor1->{dec}, $moonCoor2->{ra}, $moonCoor2->{dec}, $lon, $lat, $timeinterval,undef); 
   my ($transittemp,$risetemp,$settemp);
   my ($transitprev,$riseprev,$setprev);
   
@@ -1008,11 +1030,11 @@ sub Astro_MoonRise($$$$$$$){
   return( ($transit,$rise,$set) );
 }
 
-#########################################################################################
+########################################################################################################
 #
 # Astro_Compute - sequential calculation of properties
 # 
-#########################################################################################
+########################################################################################################
   
 sub Astro_Compute($){
   my ($hash) = @_;
@@ -1055,6 +1077,13 @@ sub Astro_Compute($){
     $Astro{ObsAlt}  = 0.0;
     Log3 $name,1,"[Astro] No altitude attribute set in global device, using 0.0 m above sea level";
   } 
+  #-- custom horizon of observer in degrees
+  if( defined($attr{$name}{"horizon"}) ){
+    $Astro{ObsHor}  = $attr{$name}{"horizon"};
+  }else{
+    $Astro{ObsHor}  = 0.0;
+    Log3 $name,1,"[Astro] No horizon attribute defined, using 0.0°";
+  } 
   
   #-- internal variables converted to Radians and km 
   my $lat      = $Astro{ObsLat}*$DEG;
@@ -1096,7 +1125,8 @@ sub Astro_Compute($){
   my ($xs,$ys,$zs) = Astro_EquPolar2Cart($sunCoor->{ra}, $sunCoor->{dec}, $sunCoor->{distance});
   $Astro{SunDistanceObserver} = Astro_round(sqrt( ($xs-$x)**2 + ($ys-$y)**2 + ($zs-$z)**2 ),0);
   
-  my ($suntransit,$sunrise,$sunset,$CivilTwilightMorning,$CivilTwilightEvening,$NauticTwilightMorning,$NauticTwilightEvening,$AstroTwilightMorning,$AstroTwilightEvening) = 
+  my ($suntransit,$sunrise,$sunset,$CivilTwilightMorning,$CivilTwilightEvening,
+    $NauticTwilightMorning,$NauticTwilightEvening,$AstroTwilightMorning,$AstroTwilightEvening,$CustomTwilightMorning,$CustomTwilightEvening) = 
     Astro_SunRise($JD0, $deltaT, $lon, $lat, $Date{zonedelta}, 0);
   $Astro{SunTransit} = Astro_HHMM($suntransit);
   $Astro{SunRise}    = Astro_HHMM($sunrise);
@@ -1107,6 +1137,8 @@ sub Astro_Compute($){
   $Astro{NauticTwilightEvening}   = Astro_HHMM($NauticTwilightEvening);
   $Astro{AstroTwilightMorning}    = Astro_HHMM($AstroTwilightMorning);
   $Astro{AstroTwilightEvening}    = Astro_HHMM($AstroTwilightEvening);
+  $Astro{CustomTwilightMorning}    = Astro_HHMM($CustomTwilightMorning);
+  $Astro{CustomTwilightEvening}    = Astro_HHMM($CustomTwilightEvening);
   
   #-- calculate data for the moon at given time
   my $moonCoor    = Astro_MoonPosition($sunCoor->{lon}, $sunCoor->{anomalyMean}, $TDT, $lon, $lat, $radius, $lmst*15.*$DEG);
@@ -1139,13 +1171,17 @@ sub Astro_Compute($){
   $Astro{ObsDate}= sprintf("%02d.%02d.%04d",$Date{day},$Date{month},$Date{year});
   $Astro{ObsTime}= sprintf("%02d:%02d:%02d",$Date{hour},$Date{min},$Date{sec});
   $Astro{ObsTimezone}= $Date{zonedelta};
+  
   #-- check season
   my $doj = $Date{dayofyear};
   $Astro{ObsDayofyear} = $doj;
-  foreach my $key (keys %seasons) {
-    if(   (($seasons{$key}[0] < $seasons{$key}[1]) && ($seasons{$key}[0] <= $doj) && ($seasons{$key}[1] >= $doj))
-       || (($seasons{$key}[0] > $seasons{$key}[1]) && (($seasons{$key}[0] <= $doj) || ($seasons{$key}[1] >= $doj))) ){
-       $Astro{ObsSeason} = $astro_tt->{$key}; 
+  
+  for( my $i=0;$i<4;$i++){
+    my $key = $seasons[$i];
+    if(   (($seasonn{$key}[0] < $seasonn{$key}[1]) &&  ($seasonn{$key}[0] <= $doj) && ($seasonn{$key}[1] >= $doj))
+       || (($seasonn{$key}[0] > $seasonn{$key}[1]) && (($seasonn{$key}[0] <= $doj) || ($seasonn{$key}[1] >= $doj))) ){
+       $Astro{ObsSeason}  = $astro_tt->{$key};
+       $Astro{ObsSeasonN} = $i; 
        last;
     }  
   }
@@ -1211,6 +1247,7 @@ sub Astro_Get($@) {
   #-- second parameter may be a reading
   if( (int(@a)>2) && exists($Astro{$a[2]})) {
     $wantsreading = 1;
+    #Log 1,"=================> WANT as ".$a[1]." READING ".$a[2]." GET READING ".$Astro{$a[2]};
   }
     
   if( int(@a) > (2+$wantsreading) ) {
@@ -1312,8 +1349,32 @@ sub Astro_Get($@) {
             <code>define &lt;name&gt; Astro</code>
             <br />Defines the Astro device (only one is needed per FHEM installation). </p>
         <p>
+        Readings with prefix <i>Sun</i> refer to the sun, with prefix <i>Moon</i> refer to the moon.
+        The suffixes for these readings are 
+        <ul>
+        <li><i>Age</i> = angle (in degrees) of body along its track</li>
+        <li><i>Az,Alt</i> = azimuth and altitude angle (in degrees) of body above horizon</li>
+        <li><i>Dec,Ra</i> = declination (in degrees) and right ascension (in HH:MM) of body position</li>
+        <li><i>Lat,Lon</i> = latitude and longituds (in degrees) of body position</li>
+        <li><i>Diameter</i> = virtual diameter (in arc minutes) of body</li>
+        <li><i>Distance,DistanceObserver</i> = distance (in km) of body to center of earth or to observer</li>
+        <li><i>PhaseN,PhaseS</i> = Numerical and string value for phase of body</li>
+	    <li><i>Sign</i> = Circadian sign for body along its track</li>
+	    <li><i>Rise,Transit,Set</i> = times (in HH:MM) for rise and set as well as for highest position of body</li>
+        </ul>
+        <p>
+        Readings with prefix <i>Obs</i> refer to the observer.
+        In addition to some of the suffixes gives above, the following may occur
+        <ul>
+        <li><i>Date,Dayofyear</i> = date</li>
+        <li><i>JD</i> = Julian date</li>
+        <li><i>Season,SeasonN</i> = String and numerical (0..3) value of season</li>
+        <li><i>Time,Timezone</i> obvious meaning</li>
+        <li><i>GMST,ÖMST</i> = Greenwich and Local Mean Sidereal Time (in HH:MM)</li>
+	    </ul>
         Notes: <ul>
         <li>Calculations are only valid between the years 1900 and 2100</li>
+        <li>Attention: Timezone is taken from the local Perl settings, NOT automatically defined for a location</li>
         <li>This module uses the global attribute <code>language</code> to determine its output data<br/>
          (default: EN=english). For German output set <code>attr global language DE</code>.</li>
         <li>The time zone is determined automatically from the local settings of the <br/>
@@ -1362,6 +1423,7 @@ sub Astro_Get($@) {
         <code>attr  &lt;name&gt;  longitude &lt;value&gt;</code><br/>
         <code>attr  &lt;name&gt;  latitude &lt;value&gt;</code><br/>
         <code>attr  &lt;name&gt;  altitude &lt;value&gt;</code> (in m above sea level)<br/>
+        <code>attr  &lt;name&gt;  horizon &lt;value&gt;</code> custom horizon angle in degrees, default 0<br/>
         These definitions take precedence over global attribute settings.
         </li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
@@ -1375,6 +1437,6 @@ sub Astro_Get($@) {
 
 <a name="Astro"></a>
 <h3>Astro</h3>
-
+Keine deutsche Dokumentation vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#Astro">Astro</a> 
 =end html_DE
 =cut
