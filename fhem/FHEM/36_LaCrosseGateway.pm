@@ -475,6 +475,8 @@ sub LaCrosseGateway_HandleKVP($$) {
   my ($hash, $kvp) = @_;
   my $name = $hash->{NAME};
   
+  $kvp .= ",";
+  
   readingsBeginUpdate($hash);
   
   if($kvp =~ m/UpTimeText=(.*?)(\,|\ ,)/) {
@@ -494,6 +496,9 @@ sub LaCrosseGateway_HandleKVP($$) {
   }
   if($kvp =~ m/OLED=(.*?)(\,|\ ,)/) {
     readingsBulkUpdate($hash, "OLED", $1);
+  }
+  if($kvp =~ m/CPU-Temperature=(.*?)(\,|\ ,)/) {
+    readingsBulkUpdate($hash, "CPU-Temperature", $1);
   }
   
   if(AttrVal($name, "loopTimeReadings", "0") == "1") {
