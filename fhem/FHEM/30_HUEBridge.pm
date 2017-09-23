@@ -139,7 +139,7 @@ HUEBridge_Notify($$)
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
   if( IsDisabled($name) > 0 ) {
-    readingsSingleUpdate($hash, 'state', 'disabled', 1 ) if( ReadingsVal($name,'state','' ) ne 'disabled' );
+    readingsSingleUpdate($hash, 'state', 'inactive', 1 ) if( ReadingsVal($name,'inactive','' ) ne 'disabled' );
     return undef;
   }
 
@@ -624,9 +624,19 @@ HUEBridge_Set($@)
 
     return undef;
 
+  } elsif($cmd eq 'active') {
+    return "can't activate disabled bridge." if(AttrVal($name, "disable", undef));
+
+    readingsSingleUpdate($hash, 'state', 'active', 1 );
+    HUEBridge_OpenDev($hash);
+    return undef;
+
+  } elsif($cmd eq 'inactive') {
+    readingsSingleUpdate($hash, 'state', 'inactive', 1 );
+    return undef;
 
   } else {
-    my $list = "delete creategroup deletegroup savescene deletescene modifyscene scene createrule updaterule deleterule createsensor deletesensor configsensor setsensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
+    my $list = "active inactive delete creategroup deletegroup savescene deletescene modifyscene scene createrule updaterule deleterule createsensor deletesensor configsensor setsensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -948,7 +958,7 @@ sub HUEBridge_ProcessResponse($$)
         {
           my $error = $obj->[0]->{error}->{'description'};
 
-          readingsSingleUpdate($hash, 'lastError', $error, 0 );
+          readingsSingleUpdate($hash, 'lastError', $error, 1 );
         }
 
     if( !AttrVal( $name,'queryAfterSet', 1 ) ) {
@@ -1029,7 +1039,7 @@ HUEBridge_Call($$$$;$)
   my $name = $hash->{NAME};
 
   if( IsDisabled($name) ) {
-    readingsSingleUpdate($hash, 'state', 'disabled', 1 ) if( ReadingsVal($name,'state','' ) ne 'disabled' );
+    readingsSingleUpdate($hash, 'state', 'inactive', 1 ) if( ReadingsVal($name,'state','' ) ne 'inactive' );
     return undef;
   }
 
@@ -1234,7 +1244,7 @@ HUEBridge_dispatch($$$;$)
           {
             my $error = $json->[0]->{error}->{'description'};
 
-            readingsSingleUpdate($hash, 'lastError', $error, 0 );
+            readingsSingleUpdate($hash, 'lastError', $error, 1 );
 
             Log3 $name, 3, $error;
           }
@@ -1593,6 +1603,15 @@ HUEBridge_Attr($$$)
       available (indicated by updatestate with a value of 2. The version and release date is shown in the reading swupdate.<br>
       A notify of the form <code>define HUEUpdate notify bridge:swupdate.* {...}</code>
       can be used to be informed about available firmware updates.<br></li>
+    <li>inactive<br>                           
+      inactivates the current device. note the slight difference to the 
+      disable attribute: using set inactive the state is automatically saved
+      to the statefile on shutdown, there is no explicit save necesary.<br>
+      this command is intended to be used by scripts to temporarily
+      deactivate the harmony device.<br> 
+      the concurrent setting of the disable attribute is not recommended.</li>
+    <li>active<br>                             
+      activates the current device (see inactive).</li>
   </ul><br>
 
   <a name="HUEBridge_Attr"></a>
