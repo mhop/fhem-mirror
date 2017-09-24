@@ -275,7 +275,9 @@ structure_Notify($$)
     $newState = $priority[$minprio];
 
   } elsif($behavior eq "last"){
-    $newState = ReadingsVal($dev->{NAME}, "state", undef);
+    my $readingName = AttrVal($dev->{NAME}, $devmap, "state");
+    $newState = ReadingsVal($dev->{NAME}, $readingName, undef);
+    $newState = "undefined" if(!defined($newState));
 
   }
 
