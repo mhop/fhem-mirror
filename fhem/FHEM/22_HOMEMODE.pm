@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.1.7";
+my $HOMEMODE_version = "1.1.8";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -59,7 +59,7 @@ sub HOMEMODE_Define($$)
   if (!$resdev)
   {
     my @resdevs;
-    foreach (devspec2array("TYPE=RESIDENTS"))
+    foreach (devspec2array("TYPE=RESIDENTS:FILTER=disable!=1"))
     {
       push @resdevs,$_;
     }
@@ -335,7 +335,7 @@ sub HOMEMODE_Notify($$)
     if (ReadingsVal($devname,"presence","") !~ /^maybe/)
     {
       my @presentdevicespresent;
-      foreach my $device (devspec2array("TYPE=$prestype:FILTER=presence=(maybe.)?(absent|present|appeared|disappeared)"))
+      foreach my $device (devspec2array("TYPE=$prestype:FILTER=disable!=1:FILTER=presence=^(maybe.)?(absent|present|appeared|disappeared)"))
       {
         next if (lc($device) !~ /$residentregex/);
         push @presentdevicespresent,$device if (ReadingsVal($device,"presence","") =~ /^(present|appeared|maybe.absent)$/);
@@ -432,7 +432,7 @@ sub HOMEMODE_updateInternals($;$)
     push @allMonitoredDevices,$resdev;
     my $autopresence = HOMEMODE_AttrCheck($hash,"HomeAutoPresence",0);
     my $presencetype = HOMEMODE_AttrCheck($hash,"HomePresenceDeviceType","PRESENCE");
-    my @presdevs = devspec2array("TYPE=$presencetype:FILTER=presence=^(maybe.)?(absent|present|appeared|disappeared)");
+    my @presdevs = devspec2array("TYPE=$presencetype:FILTER=disable!=1:FILTER=presence=^(maybe.)?(absent|present|appeared|disappeared)");
     my @residentsshort;
     my @logtexte;
     foreach my $resident (split /,/,$hash->{RESIDENTS})
@@ -485,7 +485,7 @@ sub HOMEMODE_updateInternals($;$)
     if ($contacts)
     {
       my @sensors;
-      foreach my $s (devspec2array($contacts))
+      foreach my $s (devspec2array("$contacts:FILTER=disable!=1"))
       {
         push @sensors,$s;
         push @allMonitoredDevices,$s if (!grep /^$s$/,@allMonitoredDevices);
@@ -496,7 +496,7 @@ sub HOMEMODE_updateInternals($;$)
     if ($motion)
     {
       my @sensors;
-      foreach my $s (devspec2array($motion))
+      foreach my $s (devspec2array("$motion:FILTER=disable!=1"))
       {
         push @sensors,$s;
         push @allMonitoredDevices,$s if (!grep /^$s$/,@allMonitoredDevices);
@@ -508,7 +508,7 @@ sub HOMEMODE_updateInternals($;$)
     {
       my @sensors;
       my ($p,$e) = split " ",AttrVal($name,"HomeSensorsPowerEnergyReadings","power energy");
-      foreach my $s (devspec2array($power))
+      foreach my $s (devspec2array("$power:FILTER=disable!=1"))
       {
         next unless (defined ReadingsVal($s,$p,undef) && defined ReadingsVal($s,$e,undef));
         push @sensors,$s;
@@ -520,7 +520,7 @@ sub HOMEMODE_updateInternals($;$)
     if ($battery)
     {
       my @sensors;
-      foreach my $s (devspec2array($battery))
+      foreach my $s (devspec2array("$battery:FILTER=disable!=1"))
       {
         my $read = AttrVal($name,"HomeSensorsBatteryReading","battery");
         my $val = ReadingsVal($s,$read,undef);
@@ -544,7 +544,7 @@ sub HOMEMODE_updateInternals($;$)
     my $holiday = HOMEMODE_AttrCheck($hash,"HomeEventsHolidayDevices");
     if ($holiday)
     {
-      foreach (devspec2array($holiday))
+      foreach (devspec2array("$holiday:FILTER=disable!=1"))
       {
         push @allMonitoredDevices,$_ if (!grep /^$_$/,@allMonitoredDevices);
       }
@@ -556,7 +556,7 @@ sub HOMEMODE_updateInternals($;$)
     {
       my $read = AttrVal($name,"HomeSensorsLuminanceReading","luminance");
       my @sensors;
-      foreach my $s (devspec2array($luminance))
+      foreach my $s (devspec2array("$luminance:FILTER=disable!=1"))
       {
         if (defined ReadingsVal($s,AttrVal($name,"HomeSensorsLuminanceReading","luminance"),undef))
         {
@@ -2321,7 +2321,7 @@ sub HOMEMODE_TriggerState($;$$$)
   my @alarmSensors;
   my @lightSensors;
   my $amode = ReadingsVal($name,"modeAlarm","");
-  foreach my $sensor (devspec2array($contacts))
+  foreach my $sensor (devspec2array("$contacts:FILTER=disable!=1"))
   {
     my ($oread,$tread) = split " ",AttrVal($sensor,"HomeReadings",AttrVal($name,"HomeSensorsContactReadings","state sabotageError")),2;
     my $otcmd = AttrVal($sensor,"HomeValues",AttrVal($name,"HomeSensorsContactValues","open|tilted|on"));
@@ -2370,7 +2370,7 @@ sub HOMEMODE_TriggerState($;$$$)
       push @sensorsTampered,$sensor;
     }
   }
-  foreach my $sensor (devspec2array($motions))
+  foreach my $sensor (devspec2array("$motions:FILTER=disable!=1"))
   {
     my ($oread,$tread) = split " ",AttrVal($sensor,"HomeReadings",AttrVal($name,"HomeSensorsMotionReadings","state sabotageError")),2;
     my $otcmd = AttrVal($sensor,"HomeValues",AttrVal($name,"HomeSensorsMotionValues","open|on"));
@@ -2732,7 +2732,7 @@ sub HOMEMODE_HomebridgeMapping($)
   $mapping .= "\nSecuritySystemAlarmType=alarmTriggered_ct,values=0:0;/.*/:1";
   $mapping .= "\nOccupancyDetected=presence,values=present:1;absent:0";
   $mapping .= "\nMute=dnd,valueOn=on,cmds=1:dnd+on;0:dnd+off";
-  $mapping .= "\nOn=anyoneElseAtHome,valueOn=on,cmds=1:anyoneElseAtHome+on;0:anyoneElseAtHome+off";
+  $mapping .= "\nOn=anyoneElseAtHome,valueOn=on,cmdOn=anyoneElseAtHome+on,cmdOff=anyoneElseAtHome+off";
   $mapping .= "\nContactSensorState=contactsOutsideOpen_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"contactsOutsideOpen_ct",undef));
   $mapping .= "\nStatusTampered=sensorsTampered_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"sensorsTampered_ct",undef));
   $mapping .= "\nMotionDetected=motionsInside_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"motionsInside_ct",undef));
