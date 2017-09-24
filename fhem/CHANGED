@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  00_MQTT: fix event-on-change Reading 
   - changed: 30_HUEBridge: added set inactive/active commands
                            create event for lastError reading
   - change:  93_DbLog: V2.22.6 commandref revised
