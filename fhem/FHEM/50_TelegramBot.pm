@@ -131,6 +131,13 @@
 #   added check for msgId not given as first parameter (e.g. msgDelete / msgEdit)
 # 2.5 2017-09-10  new set cmd msgDelete
 
+#   add - in description will not show favorite command in menu #msg686352
+#   Issue: when direct favorite confirm is cancelled - do not jump to favorite menu
+#   json_decode mit nonref   #msg687580
+# 2.6 2017-09-24  hide command in favorites/change direct favorites confirm
+
+#   
+#   
 #   
 ##############################################################################
 # TASKS 
@@ -820,7 +827,7 @@ sub TelegramBot_Attr(@) {
 
       foreach my $cs (  @clist ) {
         $cs =~ s/SeMiCoLoN/;;/g; # reestablish double ; for inside commands
-        my ( $alias, $desc, $parsecmd, $needsConfirm, $needsResult, $hidden ) = TelegramBot_SplitFavoriteDef( $hash, $cs );
+        my ( $alias, $desc, $minusdesc, $parsecmd, $needsConfirm, $needsResult, $hidden ) = TelegramBot_SplitFavoriteDef( $hash, $cs );
         
         # Debug "parsecmd :".$parsecmd.":  ".length($parsecmd);
         next if ( length($parsecmd) == 0 ); # skip emtpy commands
@@ -975,17 +982,24 @@ sub TelegramBot_SplitFavoriteDef($$) {
   #   /-rolladen[Liste Rolladen]=list TYPE=SOMFY
   #   /rolladen[Liste Rolladen]=list TYPE=SOMFY
   
-  my ( $alias, $desc, $parsecmd, $confirm, $result, $hidden  );
+  #   /[-Liste Rolladen]=list TYPE=SOMFY
+  #   /[-Liste Rolladen]=?list TYPE=SOMFY
+  #   /rolladen[-Liste Rolladen]=list TYPE=SOMFY
+  #   /-rolladen[-Liste Rolladen]=list TYPE=SOMFY
+  #   /rolladen[-Liste Rolladen]=list TYPE=SOMFY
+  
+  my ( $alias, $desc, $parsecmd, $confirm, $result, $hidden, $minusdesc  );
   $confirm = "";
   $result = "";
   $hidden = 0;
   
-  if ( $cmd =~ /^\s*((\/([^\[=]*)?)(\[([^\]]+)\])?\s*=)?(\??)(\!?)(.*?)$/ ) {
+  if ( $cmd =~ /^\s*((\/([^\[=]*)?)(\[(-)?([^\]]+)\])?\s*=)?(\??)(\!?)(.*?)$/ ) {
     $alias = $2;
-    $desc = $5;
-    $confirm = $6 if ( $6 );
-    $result = $7  if ( $7 );
-    $parsecmd = $8;
+    $minusdesc = $5 if ( $5 );
+    $desc = $6;
+    $confirm = $7 if ( $7 );
+    $result = $8  if ( $8 );
+    $parsecmd = $9;
     
     $alias = undef if ( $alias && ( $alias =~ /^\/-?$/ ) );
     if ( $alias && ( $alias =~ /\/-/ ) ) {
@@ -1005,7 +1019,7 @@ sub TelegramBot_SplitFavoriteDef($$) {
                   ":  parsecmd :".($parsecmd?$parsecmd:"<undef>").
                   ":   confirm: ".(($confirm eq "?")?1:0).":   result: ".(($result eq "!")?1:0).":   hidden: ".$hidden;
   
-  return ( $alias, $desc, $parsecmd, (($confirm eq "?")?1:0), (($result eq "!")?1:0), $hidden );
+  return ( $alias, $desc, (($minusdesc eq "-")?1:0), $parsecmd, (($confirm eq "?")?1:0), (($result eq "!")?1:0), $hidden );
 }
     
 #####################################
@@ -1027,8 +1041,8 @@ sub TelegramBot_SplitFavoriteDef($$) {
 #   -[0-9]+- = <description or cmd> =; <addition> --> confirmed automatically with addition
 #   
 #
-sub TelegramBot_SendFavorites($$$$$;$) {
-  my ($hash, $mpeernorm, $mchatnorm, $cmd, $mid, $aliasExec ) = @_;
+sub TelegramBot_SendFavorites($$$$$;$$) {
+  my ($hash, $mpeernorm, $mchatnorm, $cmd, $mid, $aliasExec, $iscallback ) = @_;
   my $name = $hash->{NAME};
   
   $aliasExec = 0 if ( ! $aliasExec );
@@ -1112,7 +1126,7 @@ sub TelegramBot_SendFavorites($$$$$;$) {
       my $ecmd = $clist[$cmdId];
       $ecmd =~ s/SeMiCoLoN/;;/g; # reestablish double ; for inside commands 
             
-      my ( $alias, $desc, $parsecmd, $needsConfirm, $needsResult, $hidden ) = TelegramBot_SplitFavoriteDef( $hash, $ecmd );
+      my ( $alias, $desc, $minusdesc, $parsecmd, $needsConfirm, $needsResult, $hidden ) = TelegramBot_SplitFavoriteDef( $hash, $ecmd );
       return "Alias could not be parsed :$ecmd:" if ( ! $parsecmd );
 
       $ecmd = $parsecmd;
@@ -1128,14 +1142,20 @@ sub TelegramBot_SendFavorites($$$$$;$) {
         my $tmptxt;
         
         if ( $isInline ) {
-          $tmptxt = (($desc)?$desc:$parsecmd)." (".($alias?$alias:$fcmd.$cmdFavId)."):TBOT_FAVORITE_-$cmdFavId";
+          $tmptxt = (($desc)?$desc:$parsecmd);
+          $tmptxt .= " (".($alias?$alias:$fcmd.$cmdFavId).")" if ( ! $minusdesc );
+          $tmptxt .= ":TBOT_FAVORITE_-$cmdFavId";
         } else {
           $tmptxt = $fcmd."-".$cmdFavId."- = ".(($desc)?$desc:$parsecmd).($cmdAddition?" =; ".$cmdAddition:"");
         }
         my @tmparr1 = ( $tmptxt );
         push( @keys, \@tmparr1 );
         if ( $isInline ) {
-          $tmptxt =  "Zurueck:TBOT_FAVORITE_MENU";
+          if ( $iscallback ) {
+            $tmptxt =  "Zurueck:TBOT_FAVORITE_MENU";
+          } else {
+            $tmptxt =  "Abbruch:TBOT_FAVORITE_CANCEL";
+          }
         } else {
           $tmptxt = "Abbruch";
         }
@@ -1181,11 +1201,13 @@ sub TelegramBot_SendFavorites($$$$$;$) {
         $cs =~ s/SeMiCoLoN/;;/g; # reestablish double ; for inside commands 
 
         $cnt += 1;
-        my ( $alias, $desc, $parsecmd, $needsConfirm, $needsResult, $hidden ) = TelegramBot_SplitFavoriteDef( $hash, $cs );
+        my ( $alias, $desc, $minusdesc, $parsecmd, $needsConfirm, $needsResult, $hidden ) = TelegramBot_SplitFavoriteDef( $hash, $cs );
         if ( ( defined($parsecmd) ) && ( ( ! $hidden ) || $showalsohidden ) ) { 
           my $key;
           if ( $isInline ) {
-            $key = (($desc)?$desc:$parsecmd)." (".($alias?$alias:$fcmd.$cnt)."):TBOT_FAVORITE_$cnt";
+            $key = (($desc)?$desc:$parsecmd);
+            $key .= " (".($alias?$alias:$fcmd.$cnt).")" if ( ! $minusdesc );
+            $key .= ":TBOT_FAVORITE_$cnt";
           } else {
             $key = ( $fcmd.$cnt." = ".($alias?$alias." = ":"").(($desc)?$desc:$parsecmd) );
           }
@@ -1456,9 +1478,9 @@ sub TelegramBot_AddStoredCommands($$) {
 # INTERNAL: Function to check for commands in messages 
 # Always executes and returns on first match also in case of error 
 # mid contains the message that might be needed to editinline for favorites
-sub Telegram_HandleCommandInMessages($$$$$)
+sub Telegram_HandleCommandInMessages($$$$$$)
 {
-  my ( $hash, $mpeernorm, $mchatnorm, $mtext, $mid ) = @_;
+  my ( $hash, $mpeernorm, $mchatnorm, $mtext, $mid, $iscallback ) = @_;
   my $name = $hash->{NAME};
 
   my $cmdRet;
@@ -1493,7 +1515,7 @@ sub Telegram_HandleCommandInMessages($$$$$)
   # Check for favorites Keyword in msg
   ( $cmd, $doRet ) = TelegramBot_checkCmdKeyword( $hash, $mpeernorm, $mchatnorm, $mtext, AttrVal($name,'cmdFavorites',undef), 0 );
   if ( defined( $cmd ) ) {
-    $cmdRet = TelegramBot_SendFavorites( $hash, $mpeernorm, $mchatnorm, $cmd, $mid );
+    $cmdRet = TelegramBot_SendFavorites( $hash, $mpeernorm, $mchatnorm, $cmd, $mid, 0, $iscallback );
     Log3 $name, 4, "TelegramBot_ParseMsg $name: SendFavorites returned :$cmdRet:" if ( defined($cmdRet) );
     return;
   } elsif ( $doRet ) {
@@ -1506,7 +1528,7 @@ sub Telegram_HandleCommandInMessages($$$$$)
       ( $cmd, $doRet ) = TelegramBot_checkCmdKeyword( $hash, $mpeernorm, $mchatnorm, $mtext, $aliasKey, 1 );
       if ( defined( $cmd ) ) {
         $cmd = $hash->{AliasCmds}{$aliasKey}." ".$cmd;
-        $cmdRet = TelegramBot_SendFavorites( $hash, $mpeernorm, $mchatnorm, $cmd, $mid, 1 ); # call with aliasesxec set
+        $cmdRet = TelegramBot_SendFavorites( $hash, $mpeernorm, $mchatnorm, $cmd, $mid, 1, $iscallback ); # call with aliasesxec set
         Log3 $name, 4, "TelegramBot_ParseMsg $name: SendFavorites (alias) returned :$cmdRet:" if ( defined($cmdRet) );
         return;
       } elsif ( $doRet ) {
@@ -1562,7 +1584,9 @@ sub TelegramBot_DoUrlCommand($$;$)
     my $jo;
     
     eval {
-      $jo = decode_json( $data );
+#      $jo = decode_json( $data );
+     my $json = JSON->new->allow_nonref;
+     $jo = $json->decode(Encode::encode_utf8($data));
     };
 
     if ( ! defined( $jo ) ) {
@@ -2139,7 +2163,9 @@ sub TelegramBot_Callback($$$)
        $data = encode_utf8( $data );
 #       $data = decode_utf8( $data );
 # Debug "-----AFTER------\n".$data."\n-------UC=".${^UNICODE} ."-----\n";
-       $jo = decode_json( $data );
+#       $jo = decode_json( $data );
+       my $json = JSON->new->allow_nonref;
+       $jo = $json->decode(Encode::encode_utf8($data));
        $jo = TelegramBot_Deepencode( $name, $jo );
     };
  
@@ -2509,7 +2535,7 @@ sub TelegramBot_ParseMsg($$$)
     readingsEndUpdate($hash, 1);
     
     # COMMAND Handling (only if no fileid found
-    Telegram_HandleCommandInMessages( $hash, $mpeernorm, $mchatnorm, $mtext, undef ) if ( ! defined( $mfileid ) );
+    Telegram_HandleCommandInMessages( $hash, $mpeernorm, $mchatnorm, $mtext, undef, 0 ) if ( ! defined( $mfileid ) );
    
   } elsif ( scalar(@contacts) > 0 )  {
     # will also update reading
@@ -2632,7 +2658,7 @@ sub TelegramBot_ParseCallbackQuery($$$)
           }
           # where to get chat id from ?
           Log3 $name, 4, "TelegramBot_ParseCallback $name: REPLYMID: $replyId";
-          Telegram_HandleCommandInMessages( $hash, $mpeernorm, $chatId, $fcmd, $replyId );
+          Telegram_HandleCommandInMessages( $hash, $mpeernorm, $chatId, $fcmd, $replyId, 1 );
         }
       }    
     }
@@ -3548,7 +3574,7 @@ sub TelegramBot_BinaryFileWrite($$$) {
     </li> 
     <li><code>favorites &lt;list of commands&gt;</code><br>Specify a list of favorite commands for Fhem (without cmdKeyword). Multiple favorites  are separated by a single semicolon (;). A double semicolon can be used to specify multiple commands for a single favorite <br>
     <br>
-    Favorite commands are fhem commands with an optional alias for the command given. The alias can be sent as message (instead of the favoriteCmd) to execute the command. Before the favorite command also an alias (other shortcut for the favorite) or/and a descriptive text (enclosed in []) can be specifed. If alias or description is specified this needs to be prefixed with a '/' and the alias if given needs to be specified first.
+    Favorite commands are fhem commands with an optional alias for the command given. The alias can be sent as message (instead of the favoriteCmd) to execute the command. Before the favorite command also an alias (other shortcut for the favorite) or/and a descriptive text (description enclosed in []) can be specifed. If alias or description is specified this needs to be prefixed with a '/' and the alias if given needs to be specified first.
     <br>
     Favorites can also only be callable with the alias command and not via the corresponding favorite number and it will not be listed in the keyboard. For this the alias needs to be prefixed with a hyphen (-) after the leading slash
     <br>
@@ -3574,11 +3600,14 @@ sub TelegramBot_BinaryFileWrite($$$) {
     The question mark needs to be before the exclamation mark if both are given.
     <br>
     <br>
+    The description for an alias can also be prefixed with a '-'. In this case the favorite command/alias will not be shown in the favorite menu. This case only works for inline keyboard favorite menus.
+    <br>
+    <br>
     Favorite commands can also include multiple fhem commands being execute using ;; as a separator 
     <br>
         Example: <code>get lights status; /blink=set lights on;; sleep 3;; set lights off; set heater;</code> <br>
     <br>
-    Meaning the full format for a single favorite is <code>/alias[description]=commands</code> where the alias can be empty if the description is given or <code>/alias=command</code> or <code>/-alias=command</code> for a hidden favorite or just the <code>commands</code>. In any case the commands can be also prefixed with a '?' or a '!' (or both). Spaces are only allowed in the description and the commands, usage of spaces in other areas might lead to wrong interpretation of the definition. Spaces and also many other characters are not supported in the alias commands by telegram, so if you want to have your favorite/alias directly recognized in the telegram app, restriction to letters, digits and underscore is required. Double semicolon will be used for specifying mutliple fhem commands in a single favorites, while single semicolon is used to separate between different favorite definitions
+    Meaning the full format for a single favorite is <code>/alias[description]=commands</code> where the alias can be empty if the description is given or <code>/alias=command</code> or <code>/-alias=command</code> for a hidden favorite or just the <code>commands</code>. In any case the commands can be also prefixed with a '?' or a '!' (or both). The description also can be given as <code>[-description]</code> to remvoe the command or alias from the favorite menus in inline keyboard menus. Spaces are only allowed in the description and the commands, usage of spaces in other areas might lead to wrong interpretation of the definition. Spaces and also many other characters are not supported in the alias commands by telegram, so if you want to have your favorite/alias directly recognized in the telegram app, restriction to letters, digits and underscore is required. Double semicolon will be used for specifying mutliple fhem commands in a single favorites, while single semicolon is used to separate between different favorite definitions
     </li> 
     <li><code>favorites2Col &lt;1 or 0&gt;</code><br>Show favorites in 2 columns keyboard (instead of 1 column  - default)
     </li> 
