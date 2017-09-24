@@ -4714,47 +4714,41 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $state = "set_".$lvl;
     CUL_HM_UpdtReadSingle($hash,"level",$state,1);
   }
-  
-  elsif($cmd eq "pctSlat") { ##################################################
-    my $slat = $a[2];
-    if    ($slat eq "old")   {$slat = "C9"}
-    elsif ($slat eq "noChng"){$slat = "CA"}
+  elsif($cmd =~ m/(pctSlat|pctLvlSlat)/) { ####################################
+    my ($lvl,$slat,$plvl,$pslat);
+
+    #--- calc slat----
+    $slat = $cmd eq "pctSlat" ? $a[2]
+                              : (defined $a[3] ? $a[3] 
+                                               : "noChng");
+    if    ($slat eq "old")   {$pslat = "C9"}
+    elsif ($slat eq "noChng"){$pslat = "CA"}
     else{                     $slat =~ s/(\d*\.?\d*).*/$1/;
           return "Value $a[2] not allowed for slat" if ($slat > 100);
-                              $slat = sprintf("%02X",$slat*2);
+                              $pslat = sprintf("%02X",$slat*2);
     }
-    return "Value $a[2] not allowed for slat" if (hex($slat) > 202);
-    {return hex{"0xCA"}}
-    {return "test:".(hex{"ca"}+2)}
-    {return "CA"}
-    {return hex{"200"}}
-    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."80${chn}CA$slat");
-    $state = "";
-    CUL_HM_UpdtReadSingle($hash,"levelSlat",$state,1);
-  }
-  elsif($cmd eq "pctLvlSlat") { ###############################################
-    my ($lvl,$slat) = ($a[2],$a[3]);
-    my $lvlInv = (AttrVal($name, "param", "") =~ m /levelInverse/)?1:0;
+    
+    #--- calc level----
+    $lvl  = $cmd eq "pctLvlSlat" ? $a[2] :"noChng";
+    my $lvlInv          = (AttrVal($name, "param", "") =~ m /levelInverse/) ? 1 : 0;
     my($lvlMin,$lvlMax) = split",",AttrVal($name, "levelRange", "0,100");
-
-    if    ($slat eq "old")   {$slat = "C9"}
-    elsif ($slat eq "noChng"){$slat = "CA"}
-    else{                     $slat =~ s/(\d*\.?\d*).*/$1/;
-                              $slat = sprintf("%02X",$slat*2);
-    }
-    my $plvl;
     $lvl = $lvlMin + $lvl*($lvlMax-$lvlMin)/100; # relativ to range
-    $lvl = ($lvl > $lvlMax)?$lvlMax:(($lvl <= $lvlMin)?0:$lvl);
+    $lvl = ($lvl > $lvlMax) ? $lvlMax
+                            : (($lvl <= $lvlMin)?0:$lvl);
     if    ($lvl eq "old")   {$plvl = "C9"}
     elsif ($lvl eq "noChng"){$plvl = "CA"}
     else{                    $lvl =~ s/(\d*\.?\d*).*/$1/;
-                             $plvl = sprintf("%02X",sprintf("%02X",(($lvlInv)?100-$lvl :$lvl)*2));
+                             $plvl = sprintf("%02X",(($lvlInv) ? 100-$lvl : $lvl)*2);
     }
-
-    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."80${chn}CA$slat");
-    $state = "set_".$lvl;
-    CUL_HM_UpdtReadSingle($hash,"levelSlat","set_".$slat,1);
-    CUL_HM_UpdtReadSingle($hash,"level",$state,1);
+    
+    #--- execute----
+    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."80${chn}$plvl$pslat");
+    
+    CUL_HM_UpdtReadSingle($hash,"levelSlat","set_".$slat,1) if ($slat ne "noChng");
+    if ($lvl  ne "noChng"){
+      CUL_HM_UpdtReadSingle($hash,"level","set_".$lvl,1);
+      $state = "set_".$lvl;
+    }
   }
   
   elsif($cmd eq "stop") { #####################################################
