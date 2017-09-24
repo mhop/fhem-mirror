@@ -252,7 +252,8 @@ BlockingKill($)
 
   if($^O !~ m/Win/) {
     if($h->{pid} && $h->{pid} !~ m/:/ && kill(9, $h->{pid})) {
-      Log 1, "Timeout for $h->{fn} reached, terminated process $h->{pid}";
+      my $ll = (defined($h->{loglevel}) ? $h->{loglevel} : 1); # Forum #77057
+      Log $ll, "Timeout for $h->{fn} reached, terminated process $h->{pid}";
       if($h->{abortFn}) {
         no strict "refs";
         my $ret = &{$h->{abortFn}}($h->{abortArg});
