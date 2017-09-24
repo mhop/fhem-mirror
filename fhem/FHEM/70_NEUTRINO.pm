@@ -532,7 +532,7 @@ sub NEUTRINO_Set($@) {
 
         if ( $state eq "on" ) {
             my $uResult = $a[2];
-            if ( m/^\d+$/ && $uResult >= 0 && $uResult <= 100 ) {
+            if ( $uResult =~ m/^\d+$/ && $uResult >= 0 && $uResult <= 100 ) {
                 $cmd = $a[2];
             }
             else {
