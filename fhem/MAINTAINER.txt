@@ -65,7 +65,7 @@ FHEM/10_KOPP_FC.pm           raspii               Sonstige Systeme
 FHEM/10_MAX.pm               rudolfkoenig/orphan  MAX
 FHEM/10_MQTT_BRIDGE          eisler               MQTT
 FHEM/10_MQTT_DEVICE          eisler               MQTT
-FHEM/10_MYSENSORS_DEVICE     ntruchsess           Sonstige Systeme
+FHEM/10_MYSENSORS_DEVICE     Hauswart             Sonstige Systeme
 FHEM/10_OWServer.pm          neubert/mfr69bs      1Wire
 FHEM/10_SOMFY.pm             viegener             Sonstige Systeme
 FHEM/10_UNIRoll.pm           C_Herrmann           SlowRF
@@ -489,7 +489,7 @@ FHEM/UConv.pm                loredo               FHEM Development
 FHEM/Unit.pm                 loredo               FHEM Development
 FHEM/YahooWeatherAPI.pm      neubert              Unterstuetzende Dienste/Wettermodule
 FHEM/lib/Device/Firmata/*    ntruchsess           Sonstige Systeme
-FHEM/lib/Device/MySensors/*  ntruchsess           Sonstige Systeme
+FHEM/lib/Device/MySensors/*  Hauswart             Sonstige Systeme
 FHEM/lib/MP3/*               Reinerlein           Multimedia
 FHEM/lib/Net/MQTT.pod        eisler               MQTT
 FHEM/lib/Net/MQTT/*          eisler               MQTT
