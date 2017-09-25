@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.7     24.09.2017       minor fixes in configcheck
 # 2.22.6     22.09.2017       commandref revised
 # 2.22.5     05.09.2017       fix Internal MODE isn't set correctly after DEF is edited, nextsynch is not renewed if reopen is  
 #                             set manually after reopen was set with a delay Forum:#76213, Link to 98_FileLogConvert.pm added
@@ -150,7 +151,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.6";
+my $DbLogVersion = "2.22.7";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -2848,26 +2849,26 @@ sub DbLog_configcheck($) {
 	  @sr_unt = DbLog_sqlget($hash,"SHOW FIELDS FROM history where FIELD='UNIT'");
   }
   if($dbmodel =~ /POSTGRESQL/) {
-      @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='device'");
-      @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='type'");
-	  @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='event'");
-	  @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='reading'");
-	  @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='value'");
-	  @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='history' and column_name='unit'");
+      @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='history' and column_name='device'");
+      @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='history' and column_name='type'");
+	  @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='history' and column_name='event'");
+	  @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='history' and column_name='reading'");
+	  @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='history' and column_name='value'");
+	  @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='history' and column_name='unit'");
   }
   
   $cdat_dev = @sr_dev?($sr_dev[1]):"no result";
-  $cdat_dev =~ tr/varchar\(|\)//d;  
+  $cdat_dev =~ tr/varchar\(|\)//d if($cdat_dev ne "no result");  
   $cdat_typ = @sr_typ?($sr_typ[1]):"no result";
-  $cdat_typ =~ tr/varchar\(|\)//d;
+  $cdat_typ =~ tr/varchar\(|\)//d if($cdat_typ ne "no result");
   $cdat_evt = @sr_evt?($sr_evt[1]):"no result";
-  $cdat_evt =~ tr/varchar\(|\)//d;
+  $cdat_evt =~ tr/varchar\(|\)//d if($cdat_evt ne "no result");
   $cdat_rdg = @sr_rdg?($sr_rdg[1]):"no result";
-  $cdat_rdg =~ tr/varchar\(|\)//d;
+  $cdat_rdg =~ tr/varchar\(|\)//d if($cdat_rdg ne "no result");
   $cdat_val = @sr_val?($sr_val[1]):"no result";
-  $cdat_val =~ tr/varchar\(|\)//d;
+  $cdat_val =~ tr/varchar\(|\)//d if($cdat_val ne "no result");
   $cdat_unt = @sr_unt?($sr_unt[1]):"no result";
-  $cdat_unt =~ tr/varchar\(|\)//d;
+  $cdat_unt =~ tr/varchar\(|\)//d if($cdat_unt ne "no result");
 
   $cmod_dev = $hash->{HELPER}{DEVICECOL};
   $cmod_typ = $hash->{HELPER}{TYPECOL};
@@ -2894,7 +2895,7 @@ sub DbLog_configcheck($) {
   }
   
   $check .= "<u><b>Result of table 'history' check</u></b><br><br>";
-  $check .= "Column width set in DB $dbname: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
+  $check .= "Column width set in DB $dbname.history: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
   $check .= "Column width used by $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
   $check .= "<b>Recommendation:</b> $rec <br><br>";
 
@@ -2909,26 +2910,26 @@ sub DbLog_configcheck($) {
   }
   
   if($dbmodel =~ /POSTGRESQL/) {
-      @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='device'");
-      @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='type'");
-	  @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='event'");
-	  @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='reading'");
-	  @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='value'");
-	  @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_schema='$dbname' and table_name='current' and column_name='unit'");
+      @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='current' and column_name='device'");
+      @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='current' and column_name='type'");
+	  @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='current' and column_name='event'");
+	  @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='current' and column_name='reading'");
+	  @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='current' and column_name='value'");
+	  @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='current' and column_name='unit'");
   }
 
   $cdat_dev = @sr_dev?($sr_dev[1]):"no result";
-  $cdat_dev =~ tr/varchar\(|\)//d;  
+  $cdat_dev =~ tr/varchar\(|\)//d if($cdat_dev ne "no result"); 
   $cdat_typ = @sr_typ?($sr_typ[1]):"no result";
-  $cdat_typ =~ tr/varchar\(|\)//d;
+  $cdat_typ =~ tr/varchar\(|\)//d if($cdat_typ ne "no result"); 
   $cdat_evt = @sr_evt?($sr_evt[1]):"no result";
-  $cdat_evt =~ tr/varchar\(|\)//d;
+  $cdat_evt =~ tr/varchar\(|\)//d if($cdat_evt ne "no result"); 
   $cdat_rdg = @sr_rdg?($sr_rdg[1]):"no result";
-  $cdat_rdg =~ tr/varchar\(|\)//d;
+  $cdat_rdg =~ tr/varchar\(|\)//d if($cdat_rdg ne "no result"); 
   $cdat_val = @sr_val?($sr_val[1]):"no result";
-  $cdat_val =~ tr/varchar\(|\)//d;
+  $cdat_val =~ tr/varchar\(|\)//d if($cdat_val ne "no result"); 
   $cdat_unt = @sr_unt?($sr_unt[1]):"no result";
-  $cdat_unt =~ tr/varchar\(|\)//d;
+  $cdat_unt =~ tr/varchar\(|\)//d if($cdat_unt ne "no result"); 
 
   $cmod_dev = $hash->{HELPER}{DEVICECOL};
   $cmod_typ = $hash->{HELPER}{TYPECOL};
@@ -2955,7 +2956,7 @@ sub DbLog_configcheck($) {
   }
   
   $check .= "<u><b>Result of table 'current' check</u></b><br><br>";
-  $check .= "Column width set in DB $dbname: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
+  $check .= "Column width set in DB $dbname.current: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
   $check .= "Column width used by $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
   $check .= "<b>Recommendation:</b> $rec <br><br>";
   
@@ -4486,7 +4487,8 @@ sub checkUsePK ($$){
   Sample code and Scripts to prepare a MySQL/PostgreSQL/SQLite database you can find in <code>contrib/dblog/&lt;DBType&gt;_create.sql</code>.
   The database contains two tables: <code>current</code> and <code>history</code>. <br>
   The latter contains all events whereas the former only contains the last event for any given reading and device. 
-  (see also <a href="#DbLogattr">attribute</a> DbLogType)
+  Please consider the <a href="#DbLogattr">attribute</a> DbLogType implicitly to determine the usage of tables  
+  <code>current</code> and <code>history</code>.
   <br><br>
   
   The columns have the following meaning:: <br><br>
@@ -5350,7 +5352,9 @@ sub checkUsePK ($$){
   enthalten.
   Die Datenbank beinhaltet 2 Tabellen: <code>current</code> und <code>history</code>. <br>
   Die Tabelle <code>current</code> enthält den letzten Stand pro Device und Reading. <br>
-  In der Tabelle <code>history</code> sind alle Events historisch gespeichert. (siehe auch <a href="#DbLogattr">Attribut</a> DbLogType)
+  In der Tabelle <code>history</code> sind alle Events historisch gespeichert. <br>
+  Beachten sie bitte unbedingt das <a href="#DbLogattr">Attribut</a> DbLogType um die Benutzung der Tabellen 
+  <code>current</code> und <code>history</code> festzulegen.
   <br><br>
   
   Die Tabellenspalten haben folgende Bedeutung: <br><br>
