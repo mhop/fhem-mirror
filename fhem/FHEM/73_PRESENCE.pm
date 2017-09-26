@@ -39,7 +39,7 @@ PRESENCE_Initialize($)
     my ($hash) = @_;
 
     # Provider
-    $hash->{ReadFn}   = "PRESENCE_Read";  
+    $hash->{ReadFn}   = "PRESENCE_Read";
     $hash->{ReadyFn}  = "PRESENCE_Ready";
     $hash->{SetFn}    = "PRESENCE_Set";
     $hash->{DefFn}    = "PRESENCE_Define";
@@ -71,7 +71,7 @@ PRESENCE_Define($$)
     my $name = $hash->{NAME};
 
     $hash->{NOTIFYDEV} = "global";
-        
+
     if(defined($a[2]) and defined($a[3]))
     {
         if($a[2] eq "local-bluetooth")
@@ -82,16 +82,16 @@ PRESENCE_Define($$)
                 Log 2, "PRESENCE ($name) - ".$msg;
                 return $msg
             }
-            
+
             $hash->{MODE} = "local-bluetooth";
             $hash->{ADDRESS} = $a[3];
             $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});  
+            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});
         }
         elsif($a[2] eq "fritzbox")
         {
             unless(-X "/usr/bin/ctlmgr_ctl")
-            {    
+            {
                 my $msg = "this is not a fritzbox or you running FHEM with the AVM Beta Image. Please use the FHEM FritzBox Image from fhem.de";
                 Log 2, "PRESENCE ($name) - ".$msg;
                 return $msg;
@@ -103,9 +103,9 @@ PRESENCE_Define($$)
                 Log 2, "PRESENCE ($name) - ".$msg;
                 return $msg;
             }
-            
+
             $hash->{MODE} = "fritzbox";
-            $hash->{ADDRESS} = $a[3];    
+            $hash->{ADDRESS} = $a[3];
             $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
             $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});
         }
@@ -133,7 +133,7 @@ PRESENCE_Define($$)
                 $hash->{TIMEOUT_PRESENT} = ($5 ne "" ? $5 : $hash->{TIMEOUT_NORMAL});
 
                 delete($hash->{helper}{ADDRESS});
-                
+
                 if($hash->{helper}{call} =~ /\|/)
                 {
                     my $msg = "The command contains a pipe ( | ) symbol, which is not allowed.";
@@ -173,18 +173,18 @@ PRESENCE_Define($$)
         elsif($a[2] eq "event")
         {
             return "missing arguments for mode event. You need to provide two event regexp" unless(defined($a[4]));
-            
+
             eval { qr/^$a[3]$/ };
             return "invalid absent regexp: $@" if($@);
 
             eval { qr/^$a[4]$/ };
             return "invalid present regexp: $@" if($@);
-            
+
             $hash->{MODE} = "event";
             $hash->{EVENT_ABSENT} = $a[3];
             $hash->{EVENT_PRESENT} = $a[4];
             $hash->{STATE} = "Initialized";
-            
+
             InternalTimer(gettimeofday(), "PRESENCE_setNotfiyDev", $hash);
         }
         else
@@ -233,7 +233,7 @@ PRESENCE_Define($$)
     }
 
     delete($hash->{helper}{cachednr});
-    
+
     readingsSingleUpdate($hash,"model",$hash->{MODE},0);
 
     return undef;
@@ -252,7 +252,7 @@ PRESENCE_Undef($$)
         BlockingKill($hash->{helper}{RUNNING_PID});
     }
 
-    DevIo_CloseDev($hash); 
+    DevIo_CloseDev($hash);
     return undef;
 }
 
@@ -261,16 +261,16 @@ sub
 PRESENCE_Notify($$)
 {
     my ($hash,$dev) = @_;
-    
+
     return undef if(!defined($hash) or !defined($dev));
 
     my $name = $hash->{NAME};
     my $dev_name = $dev->{NAME};
-    
+
     return undef if(!defined($dev_name) or !defined($name));
-    
+
     my $events = deviceEvents($dev,0);
-    
+
     if($dev_name eq "global" and grep(m/^(?:DEFINED $name|MODIFIED $name|INITIALIZED|REREADCFG)$/, @{$events}))
     {
         if(grep(m/^(?:INITIALIZED|REREADCFG)$/, @{$events}))
@@ -278,7 +278,7 @@ PRESENCE_Notify($$)
             $hash->{helper}{ABSENT_COUNT} = int(ReadingsVal($name, ".absenceThresholdCounter", 0));
             $hash->{helper}{PRESENT_COUNT} = int(ReadingsVal($name, ".presenceThresholdCounter", 0));
         }
-    
+
         if($hash->{MODE} =~ /(lan-ping|local-bluetooth|fritzbox|shellscript|function)/)
         {
             delete $hash->{helper}{RUNNING_PID} if(defined($hash->{helper}{RUNNING_PID}));
@@ -295,21 +295,21 @@ PRESENCE_Notify($$)
     elsif($hash->{MODE} eq "event")
     {
         return undef if($hash->{helper}{DISABLED});
-        
+
         my $re_present = $hash->{EVENT_PRESENT};
         my $re_absent = $hash->{EVENT_ABSENT};
-        
+
         Log3 $name, 5, "PRESENCE ($name) - processing events from $dev_name";
         foreach my $event (@{$events})
         {
-            if($dev_name =~ m/^$re_present$/ or "$dev_name:$event" =~ m/^$re_present$/) 
+            if($dev_name =~ m/^$re_present$/ or "$dev_name:$event" =~ m/^$re_present$/)
             {
                 Log3 $name, 5, "PRESENCE ($name) - $dev_name:$event matched present regexp";
                 readingsBeginUpdate($hash);
                 PRESENCE_ProcessState($hash, "present");
                 readingsEndUpdate($hash, 1);
             }
-            elsif($dev_name =~ m/^$re_absent$/ or "$dev_name:$event" =~ m/^$re_absent$/) 
+            elsif($dev_name =~ m/^$re_absent$/ or "$dev_name:$event" =~ m/^$re_absent$/)
             {
                 Log3 $name, 5, "PRESENCE ($name) - $dev_name:$event matched absent regexp";
                 readingsBeginUpdate($hash);
@@ -326,20 +326,20 @@ PRESENCE_Set($@)
 {
     my ($hash, @a) = @_;
     my $name = $hash->{NAME};
-    
+
     return "No Argument given" if(!defined($a[1]));
 
     my $usage = "Unknown argument ".$a[1].", choose one of statusRequest";
 
     my $powerCmd = AttrVal($name, "powerCmd", undef);
     $usage .= " power" if(defined($powerCmd));
-    
+
     if($a[1] eq "statusRequest")
     {
         if($hash->{MODE} ne "lan-bluetooth")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting local scan";
-            
+
             return PRESENCE_StartLocalScan($hash, 1);
         }
         else
@@ -350,20 +350,20 @@ PRESENCE_Set($@)
             }
             else
             {
-                return "PRESENCE Definition \"$name\" is not connected to ".$hash->{DeviceName}; 
+                return "PRESENCE Definition \"$name\" is not connected to ".$hash->{DeviceName};
             }
-        } 
+        }
     }
-    elsif(defined($powerCmd) && $a[1] eq "power") 
+    elsif(defined($powerCmd) && $a[1] eq "power")
     {
         my %specials= (
         '%NAME' => $name,
         '%ADDRESS' => (defined($hash->{ADDRESS}) ? $hash->{ADDRESS} : ""),
         '%ARGUMENT' => (defined($a[2]) ? $a[2] : "")
         );
-        
+
         $powerCmd = EvalSpecials($powerCmd, %specials);
-        
+
         Log3 $name, 5, "PRESENCE ($name) - executing powerCmd: $powerCmd";
         my $return = AnalyzeCommandChain(undef, $powerCmd);
 
@@ -412,7 +412,7 @@ PRESENCE_Attr(@)
                     $hash->{helper}{DISABLED} = 0;
                     DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
                 }
-            }   
+            }
             else
             {
                 $hash->{helper}{DISABLED} = 0;
@@ -424,7 +424,7 @@ PRESENCE_Attr(@)
         elsif($a[3] eq "1")
         {
             if(defined($hash->{FD}))
-            {   
+            {
                 DevIo_SimpleWrite($hash, "stop\n", 2);
             }
 
@@ -441,7 +441,7 @@ PRESENCE_Attr(@)
         if(defined($hash->{DeviceName}))
         {
             $hash->{helper}{DISABLED} = 0;
-            
+
             if(defined($hash->{FD}))
             {
                 PRESENCE_DoInit($hash) if(exists($hash->{helper}{DISABLED}));
@@ -460,10 +460,10 @@ PRESENCE_Attr(@)
     elsif($a[0] eq "set" and $a[2] eq "powerOnFn")
     {
         my $powerOnFn = $a[3];
-        
+
         $powerOnFn =~ s/^\s+//;
         $powerOnFn =~ s/\s+$//;
-        
+
         if($powerOnFn eq "")
         {
             return "powerOnFn contains no value";
@@ -482,7 +482,7 @@ PRESENCE_Attr(@)
     elsif($a[0] eq "set" and $a[2] eq "absenceTimeout")
     {
         return $a[2]." is only applicable for mode 'event'" if($hash->{MODE} ne "event");
-    
+
         if($a[3] !~ /^\d?\d(?::\d\d){0,2}$/)
         {
             return "not a valid time frame value. See commandref for the correct syntax.";
@@ -491,13 +491,13 @@ PRESENCE_Attr(@)
     elsif($a[0] eq "set" and $a[2] eq "presenceTimeout")
     {
         return $a[2]." is only applicable for mode 'event'" if($hash->{MODE} ne "event");
-    
+
         if($a[3] !~ /^\d?\d(?::\d\d){0,2}$/)
         {
             return "not a valid time frame value. See commandref for the correct syntax.";
         }
     }
-    
+
     return undef;
 }
 
@@ -516,10 +516,10 @@ PRESENCE_Read($)
 
     readingsBeginUpdate($hash);
 
-    for my $line (split /^/, $buf) 
+    for my $line (split /^/, $buf)
     {
         Log3 $name, 5, "PRESENCE ($name) - received data: $line";
-        
+
         if($line =~ /^absence|absent/)
         {
             if(!$hash->{helper}{DISABLED} and $hash->{helper}{CURRENT_TIMEOUT} eq "present" and $hash->{TIMEOUT_NORMAL} != $hash->{TIMEOUT_PRESENT})
@@ -528,11 +528,11 @@ PRESENCE_Read($)
                 Log3 $name, 4 , "PRESENCE ($name) - changing to normal timeout every ".$hash->{TIMEOUT_NORMAL}." seconds";
                 DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 2);
             }
-        
+
             unless($hash->{helper}{DISABLED})
             {
                 PRESENCE_ProcessState($hash, "absent");
-                
+
                 if($line=~ /^[^;]+;(.+)$/)
                 {
                     PRESENCE_ProcessAddonData($hash, $1);
@@ -547,12 +547,12 @@ PRESENCE_Read($)
                 Log3 $name, 4 , "PRESENCE ($name) - changing to present timeout every ".$hash->{TIMEOUT_PRESENT}." seconds";
                 DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_PRESENT}."\n", 2);
             }
-            
+
             unless($hash->{helper}{DISABLED})
             {
                 PRESENCE_ProcessState($hash, "present");
                 my $data = $1;
-                
+
                 if($data =~ /\S=\S/)
                 {
                     PRESENCE_ProcessAddonData($hash, $data);
@@ -596,7 +596,7 @@ PRESENCE_Read($)
             Log3 $name, 3, "PRESENCE ($name) - presenced cannot execute hcitool to check device ";
         }
     }
-    
+
     readingsEndUpdate($hash, 1);
 }
 
@@ -605,7 +605,7 @@ sub
 PRESENCE_Ready($)
 {
     my ($hash) = @_;
-   
+
     return DevIo_OpenDev($hash, 1, "PRESENCE_DoInit") if($hash->{MODE} eq "lan-bluetooth");
 }
 
@@ -622,9 +622,9 @@ sub PRESENCE_StartLocalScan($;$)
     my ($hash, $local) = @_;
     my $name = $hash->{NAME};
     my $mode = $hash->{MODE};
-    
+
     $local = 0 unless(defined($local));
-     
+
     if(not (exists($hash->{ADDRESS}) or exists($hash->{helper}{call})))
     {
         return undef;
@@ -665,7 +665,7 @@ sub PRESENCE_StartLocalScan($;$)
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode function";
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
         }
-        
+
         if(!$hash->{helper}{RUNNING_PID} and $mode =~ /^local-bluetooth|lan-ping|fritzbox|shellscript|function$/)
         {
             delete($hash->{helper}{RUNNING_PID});
@@ -677,23 +677,23 @@ sub PRESENCE_StartLocalScan($;$)
             RemoveInternalTimer($hash);
             InternalTimer(gettimeofday()+$seconds, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
         }
-        
+
         return undef;
     }
     else
     {
         Log3 $hash->{NAME}, 4, "PRESENCE ($name) - another check is currently running. skipping check";
-        
+
         if($local == 0)
         {
             my $seconds = (ReadingsVal($name, "state", "absent") eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL});
-        
+
             Log3 $hash->{NAME}, 4, "PRESENCE ($name) - rescheduling next check in $seconds seconds";
-        
+
             RemoveInternalTimer($hash);
             InternalTimer(gettimeofday()+$seconds, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
         }
-        
+
         return "another check is currently running";
     }
 }
@@ -710,7 +710,7 @@ sub PRESENCE_DoLocalPingScan($)
     my $retcode;
     my $return;
     my $temp;
-    
+
     $SIG{CHLD} = 'IGNORE';
 
     if($^O =~ m/(Win|cygwin)/)
@@ -724,7 +724,7 @@ sub PRESENCE_DoLocalPingScan($)
             $return = "$name|$local|".($temp =~ /TTL=\d+/ ? "present" : "absent");
         }
         else
-        { 
+        {
             $return = "$name|$local|error|Could not execute ping command: \"ping -n $count -4 $device\"";
         }
     }
@@ -739,7 +739,7 @@ sub PRESENCE_DoLocalPingScan($)
             $return = "$name|$local|".($temp =~ /is alive/ ? "present" : "absent");
         }
         else
-        { 
+        {
             $return = "$name|$local|error|Could not execute ping command: \"ping -n $count -4 $device\"";
         }
 
@@ -755,7 +755,7 @@ sub PRESENCE_DoLocalPingScan($)
             $return = "$name|$local|".(($temp =~ /\d+ [Bb]ytes (from|von)/ and not $temp =~ /[Uu]nreachable/) ? "present" : "absent");
         }
         else
-        { 
+        {
             $return = "$name|$local|error|Could not execute ping command: \"ping -c $count $device\"";
         }
     }
@@ -772,7 +772,7 @@ sub PRESENCE_ExecuteFritzBoxCMD($$)
     my $wait;
 
     while(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp" and (stat("/var/tmp/fhem-PRESENCE-cmd-lock.tmp"))[9] > (gettimeofday() - 2))
-    {  
+    {
         $wait = int(rand(4))+2;
         Log3 $name, 5, "PRESENCE ($name) - ctlmgr_ctl is locked. waiting $wait seconds...";
         $wait = 1000000*$wait;
@@ -798,35 +798,35 @@ sub PRESENCE_DoLocalFritzBoxScan($)
     my ($name, $device, $local, $speedcheck) = split("\\|", $string);
 
     Log3 $name, 5, "PRESENCE ($name) - starting fritzbox scan: $string";
-    
+
     my $number = 0;
     my $status = 0;
     my $speed;
-    
+
     $SIG{CHLD} = 'IGNORE';
-    
+
     my $check_command = ($device =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/ ? "mac" : "name");
-    
+
     $device = uc $device if($device =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/);
-    
-    if(defined($defs{$name}{helper}{cachednr})) 
+
+    if(defined($defs{$name}{helper}{cachednr}))
     {
         $number = $defs{$name}{helper}{cachednr};
-   
+
         Log3 $name, 5, "PRESENCE ($name) - try checking $name as device $device with cached number $number";
         my $cached_name = "";
-        
-        $cached_name = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command");    
+
+        $cached_name = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command");
 
         chomp $cached_name;
-   
+
         # only use the cached $number if it has still the correct device name
         if($cached_name eq $device)
         {
             Log3 $name, 5, "PRESENCE ($name) - checking state with cached number ($number)";
             $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/active");
             chomp $status;
-            
+
             if($status ne "0" and $speedcheck eq "1")
             {
                 $speed = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed");
@@ -834,9 +834,9 @@ sub PRESENCE_DoLocalFritzBoxScan($)
                 Log3 $name, 5, "PRESENCE ($name) - speed check returned: $speed";
                 $speed = undef if($speed eq "0");
             }
-            
+
             Log3 $name, 5, "PRESENCE ($name) - ctlmgr_ctl (cached: $number) returned: $status";
-     
+
             if(not $status =~ /^\s*\d+\s*$/)
             {
                 return "$name|$local|error|could not execute ctlmgr_ctl (cached)";
@@ -870,14 +870,14 @@ sub PRESENCE_DoLocalFritzBoxScan($)
         $net_device = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command");
 
         chomp $net_device;
-    
+
         Log3 $name, 5, "PRESENCE ($name) - checking device number $number ($net_device)";
 
         if($net_device eq $device)
         {
             $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/active");
             chomp $status;
-            
+
             if($status ne "0" and $speedcheck eq "1")
             {
                 $speed = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed");
@@ -885,9 +885,9 @@ sub PRESENCE_DoLocalFritzBoxScan($)
                 Log3 $name, 5, "PRESENCE ($name) - speed check returned: $speed";
                 $speed = undef if($speed eq "0");
             }
-   
+
             Log3 $name, 5, "PRESENCE ($name) - state for device number $net_device is $status";
-            
+
             last;
         }
 
@@ -908,11 +908,11 @@ sub PRESENCE_DoLocalBluetoothScan($)
     my $wait = 1;
     my $ps;
     my $psargs = "ax";
-   
+
     Log3 $name, 5, "PRESENCE ($name) - starting bluetooth scan: $string";
- 
+
     $SIG{CHLD} = 'IGNORE';
-    
+
     if(qx(ps --help 2>&1) =~ /BusyBox/g)
     {
         Log3 $name, 5, "PRESENCE ($name) - found busybox variant of ps command, using \"w\" as parameter";
@@ -923,7 +923,7 @@ sub PRESENCE_DoLocalBluetoothScan($)
         Log3 $name, 5, "PRESENCE ($name) - found standard variant of ps command, using \"ax\" as parameter";
         $psargs = "ax";
     }
-    
+
     Log3 $name, 4, "PRESENCE ($name) - executing: which hcitool";
     my $hcitool = qx(which hcitool);
     Log3 $name, 4, "PRESENCE ($name) - 'which hcitool' returns: $hcitool";
@@ -947,7 +947,7 @@ sub PRESENCE_DoLocalBluetoothScan($)
                 $wait = 0;
             }
         }
-        
+
         Log3 $name, 5, "PRESENCE ($name) - executing: hcitool name $device";
         $devname = qx(hcitool $options name $device);
 
@@ -982,20 +982,20 @@ sub PRESENCE_DoLocalShellScriptScan($)
     my $return;
 
     Log3 $name, 5, "PRESENCE ($name) - starting local shell script scan: $string";
-    
+
     $SIG{CHLD} = 'IGNORE';
-    
+
     $ret = qx($call 2>&1);
-    
+
     if(defined($ret))
     {
-        chomp $ret; 
+        chomp $ret;
         Log3 $name, 5, "PRESENCE ($name) - script output: $ret";
     }
-    
+
     if(not defined($ret))
     {
-        $return = "$name|$local|error|scriptcall doesn't return any output"; 
+        $return = "$name|$local|error|scriptcall doesn't return any output";
     }
     elsif($ret eq "1")
     {
@@ -1009,7 +1009,7 @@ sub PRESENCE_DoLocalShellScriptScan($)
     {
         $ret =~ s/\n/<<line-break>>/g;
 
-        $return = "$name|$local|error|unexpected script output (expected 0 or 1): $ret"; 
+        $return = "$name|$local|error|unexpected script output (expected 0 or 1): $ret";
     }
 
     return $return;
@@ -1026,18 +1026,18 @@ sub PRESENCE_DoLocalFunctionScan($)
     my $return;
 
     Log3 $name, 5, "PRESENCE ($name) - execute perl function: $string";
-    
+
     $SIG{CHLD} = 'IGNORE';
-    
+
     $ret = AnalyzeCommandChain(undef, $call);
 
     chomp $ret;
-    
+
     Log3 $name, 5, "PRESENCE ($name) - function returned with: $ret";
-    
+
     if(not defined($ret))
     {
-        $return = "$name|$local|error|function call doesn't return any output"; 
+        $return = "$name|$local|error|function call doesn't return any output";
     }
     elsif($ret eq "1")
     {
@@ -1051,9 +1051,9 @@ sub PRESENCE_DoLocalFunctionScan($)
     {
         $ret =~ s/\n/<<line-break>>/g;
 
-        $return = "$name|$local|error|unexpected function output (expected 0 or 1): $ret"; 
+        $return = "$name|$local|error|unexpected function output (expected 0 or 1): $ret";
     }
-    
+
     return $return;
 }
 
@@ -1065,21 +1065,21 @@ sub PRESENCE_ProcessLocalScan($)
     return unless(defined($string));
 
     my @a = split("\\|",$string);
-    my $hash = $defs{$a[0]}; 
-  
+    my $hash = $defs{$a[0]};
+
     my $local = $a[1];
     my $name = $hash->{NAME};
-    
+
     Log3 $hash->{NAME}, 5, "PRESENCE ($name) - blocking scan result: $string";
 
     delete($hash->{helper}{RUNNING_PID});
-    
+
     if($hash->{helper}{DISABLED})
     {
         Log3 $hash->{NAME}, 5, "PRESENCE ($name) - don't process the scan result, as $name is disabled";
         return;
     }
-    
+
     if(defined($hash->{helper}{RETRY_COUNT}))
     {
         Log3 $hash->{NAME}, 2, "PRESENCE ($name) - check returned a valid result after ".$hash->{helper}{RETRY_COUNT}." unsuccesful ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry");
@@ -1088,7 +1088,7 @@ sub PRESENCE_ProcessLocalScan($)
 
     if($hash->{MODE} eq "fritzbox" and defined($a[3]) and $a[3] ne "")
     {
-        $hash->{helper}{cachednr} = $a[3] if(($a[2] eq "present") || ($a[2] eq "absent")); 
+        $hash->{helper}{cachednr} = $a[3] if(($a[2] eq "present") || ($a[2] eq "absent"));
     }
     elsif($hash->{MODE} eq "fritzbox" and defined($hash->{helper}{cachednr}))
     {
@@ -1096,13 +1096,13 @@ sub PRESENCE_ProcessLocalScan($)
     }
 
     readingsBeginUpdate($hash);
-    
+
     PRESENCE_ProcessState($hash, $a[2]) unless($hash->{helper}{DISABLED});
-    
+
     if($a[2] eq "present")
     {
         readingsBulkUpdate($hash, "device_name", $a[3]) if(defined($a[3]) and $hash->{MODE} =~ /^(lan-bluetooth|local-bluetooth)$/ );
-        
+
         if($hash->{MODE} eq "fritzbox" and defined($a[4]))
         {
             readingsBulkUpdate($hash, "speed", $a[4]);
@@ -1128,9 +1128,9 @@ sub PRESENCE_ProcessLocalScan($)
     if($local eq "0")
     {
         my $seconds = ($a[2] eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL});
-        
+
         Log3 $hash->{NAME}, 4, "PRESENCE ($name) - rescheduling next check in $seconds seconds";
-        
+
         RemoveInternalTimer($hash);
         InternalTimer(gettimeofday()+$seconds, "PRESENCE_StartLocalScan", $hash) unless($hash->{helper}{DISABLED});
     }
@@ -1166,7 +1166,7 @@ sub PRESENCE_ProcessAbortedScan($)
         InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
         Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked (retrying in 10 seconds)"
     }
-    
+
     readingsSingleUpdate($hash, "state", "timeout",1);
 }
 
@@ -1200,17 +1200,17 @@ sub PRESENCE_DoInit($)
 sub PRESENCE_calculateThreshold($)
 {
     my ($value) = @_;
- 
+
     if(defined($value) and $value ne "")
     {
         if($value =~ /^(\d?\d):(\d\d)$/)
         {
             $value = $1 * 60 + $2;
-        }        
+        }
         elsif($value =~ /^(\d?\d):(\d\d):(\d\d)$/)
         {
             $value = $1 * 3600 + $2 * 60 + $3;
-        }       
+        }
         elsif($value !~ /^\d?\d+$/)
         {
             $value = 0;
@@ -1228,22 +1228,22 @@ sub PRESENCE_calculateThreshold($)
 sub PRESENCE_ThresholdTrigger($)
 {
     my ($hash) = @_;
-    
+
     if($hash->{helper}{DISABLED})
     {
         delete($hash->{helper}{NEW_STATE});
         return undef;
     }
-    
+
     if($hash->{helper}{NEW_STATE})
     {
         readingsBeginUpdate($hash);
         readingsBulkUpdateIfChanged($hash, "state", $hash->{helper}{NEW_STATE});
         readingsBulkUpdateIfChanged($hash, "presence", $hash->{helper}{NEW_STATE});
         readingsEndUpdate($hash, 1);
-        
+
         $hash->{helper}{CURRENT_STATE} =  $hash->{helper}{NEW_STATE};
-         
+
         delete($hash->{helper}{NEW_STATE});
     }
 }
@@ -1253,22 +1253,22 @@ sub PRESENCE_ProcessState($$)
 {
     my ($hash, $state) = @_;
     my $name = $hash->{NAME};
-    
+
     my $current_state = $hash->{helper}{CURRENT_STATE} ? $hash->{helper}{CURRENT_STATE} : "";
     my $new_state = $hash->{helper}{NEW_STATE} ? $hash->{helper}{NEW_STATE} : "";
-    
+
     my $absenceThreshold = AttrVal($name, "absenceThreshold", 1);
     my $presenceThreshold = AttrVal($name, "presenceThreshold", 1);
-    
+
     my $absenceTimeout = PRESENCE_calculateThreshold(AttrVal($name, "absenceTimeout", ""));
     my $presenceTimeout = PRESENCE_calculateThreshold(AttrVal($name, "presenceTimeout", ""));
-    
+
     if($state eq "absent")
     {
         RemoveInternalTimer($hash, "PRESENCE_ThresholdTrigger");
-    
+
         my $count = ($hash->{helper}{ABSENT_COUNT} ? $hash->{helper}{ABSENT_COUNT} : 0);
-    
+
         if($hash->{MODE} eq "event")
         {
             if($absenceTimeout > 0 and $current_state ne "absent" and $new_state ne "absent")
@@ -1282,7 +1282,7 @@ sub PRESENCE_ProcessState($$)
             {
                 readingsBulkUpdate($hash, "state", "absent");
                 readingsBulkUpdate($hash, "presence", "absent");
-                
+
                 $hash->{helper}{CURRENT_STATE} = "absent";
                 delete($hash->{helper}{NEW_STATE});
             }
@@ -1299,7 +1299,7 @@ sub PRESENCE_ProcessState($$)
             else
             {
                 $hash->{helper}{ABSENT_COUNT} = $count;
-                
+
                 readingsBulkUpdate($hash, ".presenceThresholdCounter", 0);
                 readingsBulkUpdate($hash, ".absenceThresholdCounter", $count);
                 readingsBulkUpdate($hash, "state", "maybe absent");
@@ -1308,14 +1308,14 @@ sub PRESENCE_ProcessState($$)
                 Log3 $name, 4, "PRESENCE ($name) - device is absent after $count check".($count == 1 ? "" : "s").". ".($absenceThreshold-$count)." check".(($absenceThreshold-$count) == 1 ? "" : "s")." left before going absent";
             }
         }
-        
+
         delete($hash->{helper}{PRESENT_COUNT});
     }
     elsif($state eq "present")
     {
         RemoveInternalTimer($hash, "PRESENCE_ThresholdTrigger");
         my $count = ($hash->{helper}{PRESENT_COUNT} ? $hash->{helper}{PRESENT_COUNT} : 0);
-    
+
         if($hash->{MODE} eq "event")
         {
             if($presenceTimeout > 0 and  $current_state ne "present" and $new_state ne "present")
@@ -1329,7 +1329,7 @@ sub PRESENCE_ProcessState($$)
             {
                 readingsBulkUpdate($hash, "state", "present");
                 readingsBulkUpdate($hash, "presence", "present");
-                
+
                 $hash->{helper}{CURRENT_STATE} = "present";
                 delete($hash->{helper}{NEW_STATE});
             }
@@ -1342,13 +1342,13 @@ sub PRESENCE_ProcessState($$)
                 readingsBulkUpdate($hash, ".presenceThresholdCounter", ($count-1));
                 readingsBulkUpdate($hash, "state", "present");
                 readingsBulkUpdate($hash, "presence", "present");
-                
+
                 $hash->{helper}{CURRENT_STATE} = "present";
             }
             else
             {
                 $hash->{helper}{PRESENT_COUNT} = $count;
-                
+
                 readingsBulkUpdate($hash, ".absenceThresholdCounter", 0);
                 readingsBulkUpdate($hash, ".presenceThresholdCounter", $count);
                 readingsBulkUpdate($hash, "state", "maybe present");
@@ -1357,7 +1357,7 @@ sub PRESENCE_ProcessState($$)
                 Log3 $name, 4, "PRESENCE ($name) - device is present after $count check".($count == 1 ? "" : "s").". ".($presenceThreshold-$count)." check".(($presenceThreshold-$count) == 1 ? "" : "s")." left before going present";
             }
         }
-        
+
         delete($hash->{helper}{ABSENT_COUNT});
     }
     else
@@ -1370,14 +1370,14 @@ sub PRESENCE_ProcessState($$)
 sub PRESENCE_ProcessAddonData($$)
 {
     my ($hash, $data) = @_;
-    
+
     my ($a, $h) = parseParams($data, ";");
-    
+
     foreach my $key (sort keys %{$h})
     {
          readingsBulkUpdate($hash, $key, $h->{$key}) if(defined($h->{$key}));
     }
-    
+
     return undef;
 }
 
@@ -1385,7 +1385,7 @@ sub PRESENCE_ProcessAddonData($$)
 sub PRESENCE_setNotfiyDev($)
 {
     my ($hash) = @_;
-    
+
     notifyRegexpChanged($hash,"(global|".$hash->{EVENT_PRESENT}."|".$hash->{EVENT_ABSENT}.")");
 }
 
@@ -1475,7 +1475,7 @@ sub PRESENCE_setNotfiyDev($)
     <u>Example</u><br><br>
     <code>define iPhone PRESENCE lan-bluetooth 0a:4f:36:d8:f9:89 127.0.0.1:5222</code><br><br>
     <u>presenced</u><br><br>
-    <ul>The presence is a perl network daemon, which provides presence checks of multiple bluetooth devices over network. 
+    <ul>The presence is a perl network daemon, which provides presence checks of multiple bluetooth devices over network.
     It listens on TCP port 5111 for incoming connections from a FHEM PRESENCE instance or a running collectord.<br>
 <PRE>
 Usage:
@@ -1495,13 +1495,13 @@ Options:
   -h, --help
      Print detailed help screen
 </PRE>
-    
-    It uses the hcitool command (provided by a <a href="http://www.bluez.org" target="_new">bluez</a> installation) 
+
+    It uses the hcitool command (provided by a <a href="http://www.bluez.org" target="_new">bluez</a> installation)
     to make a paging request to the given bluetooth address (like 01:B4:5E:AD:F6:D3). The devices must not be visible, but
     still activated to receive bluetooth requests.<br><br>
-    
+
     If a device is present, this is send to FHEM, as well as the device name as reading.<br><br>
-    
+
     The presenced is available as:<br><br>
     <ul>
     <li>direct perl script file: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
@@ -1520,22 +1520,22 @@ Options:
 Usage:
     lepresenced --bluetoothdevice &lt;bluetooth device&gt; --listenaddress &lt;listen address&gt; --listenport &lt;listen port&gt; --loglevel &lt;log level&gt; --daemon
     lepresenced -b &lt;bluetooth device&gt; -a &lt;listen address&gt; -p &lt;listen port> -l &lt;log level&gt; -d
-    
+
 valid log levels:
     LOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG. Default: LOG_INFO
-    
+
 Examples:
 	lepresenced --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon
 	lepresenced --loglevel LOG_DEBUG --daemon
 </PRE>
-    
+
     To detect the presence of a device, it uses the command <i>hcitool lescan</i> (package:
     <a href="http://www.bluez.org" target="_new">bluez</a>) to continuously listen to
     beacons of Bluetooth LE devices.
     <br><br>
-    
+
     If a device is present, this is send to FHEM, as well as the device name as reading.<br><br>
-    
+
     The presenced is available as:<br><br>
     <ul>
     <li>Perl script: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/lepresenced" target="_new">lepresenced</a></li>
@@ -1545,7 +1545,7 @@ Examples:
     <u>collectord</u><br><br>
     <ul>
     The collectord is a perl network daemon, which handles connections to several presenced installations to search for multiple bluetooth devices over network.<br><br>
-    
+
     It listens on TCP port 5222 for incoming connections from a FHEM presence instance.
 <PRE>
 Usage:
@@ -1568,7 +1568,7 @@ Options:
      log to the given logfile
   -h, --help
      Print detailed help screen
-</PRE>  
+</PRE>
     Before the collectord can be used, it needs a config file, where all different rooms, which have a presenced detector, will be listed. This config file looks like:
     <br><br>
 <PRE>
@@ -1583,15 +1583,15 @@ Options:
 
     [living room]
     address=192.168.0.11
-    port=5111    
+    port=5111
     presence_timeout=180
-    absence_timeout=20    
+    absence_timeout=20
 </PRE>
 
     If a device is present in any of the configured rooms, this is send to FHEM, as well as the device name as reading and the room which has detected the device.<br><br>
-    
+
     The collectord is available as:<br><br>
-    
+
     <ul>
     <li>direct perl script file: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
     <li>.deb package for Debian (noarch): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/collectord-1.7.deb" target="_new">collectord-1.7.deb</a></li>
@@ -1662,7 +1662,7 @@ Options:
     <br><br>
     <li><a name="PRESENCE_powerCmd">powerCmd</a></li><br>
     Define a FHEM command, which powers on or off the device.<br><br>
-    
+
     When executing the powerCmd (set command: power) following placeholders will be replaced by there corresponding values:<br><br>
     <ul>
     <li><code>$NAME</code> - name of the PRESENCE definition</li>
@@ -1679,7 +1679,7 @@ Options:
     </ul>
   </ul>
   <br>
- 
+
   <a name="PRESENCEevents"></a>
   <b>Generated Events:</b><br><br>
   <ul>
@@ -1739,7 +1739,7 @@ Options:
     <b>Modus: fritzbox</b><br><br>
     <code>define &lt;name&gt; PRESENCE fritzbox &lt;Ger&auml;tename/MAC-Adresse&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
-    Pr&uuml;ft ob ein Ger&auml;t welches per WLAN mit der FritzBox verbunden ist, erreichbar durch Abfrage des Status mit dem Befehl ctlmgr_ctl. 
+    Pr&uuml;ft ob ein Ger&auml;t welches per WLAN mit der FritzBox verbunden ist, erreichbar durch Abfrage des Status mit dem Befehl ctlmgr_ctl.
     Der Ger&auml;tename (Parameter: &lt;Ger&auml;tename&gt;) muss dem Namen entsprechen, welcher im Men&uuml;punkt "Heimnetz" auf der FritzBox-Oberfl&auml;che angezeigt wird oder kann durch die MAC-Adresse im Format XX:XX:XX:XX:XX:XX ersetzt werden.<br><br>
     <i>Dieser Modus ist nur verwendbar, wenn FHEM auf einer FritzBox l&auml;uft! Die Erkennung einer Abwesenheit kann ca. 10-15 Minuten dauern!</i><br><br>
     <u>Beispiel</u><br><br>
@@ -1769,7 +1769,7 @@ Options:
     <b>Mode: event</b><br><br>
     <code>define &lt;name&gt; PRESENCE event &lt;Abwesend-Regexp&gt; &lt;Anwesend-Regexp&gt;</code><br>
     <br>
-    Lauscht auf Events von anderen Definitionen innerhalb von FHEM um die Anwesenheit darzustellen. 
+    Lauscht auf Events von anderen Definitionen innerhalb von FHEM um die Anwesenheit darzustellen.
     Die regul&auml;ren Ausdr&uuml;cke f&uuml;r An- und Abwesenheit entsprechen dabei der Syntax von <a href="#notify">notify</a>.<br><br>
     Sobald innerhalb von FHEM ein Event gefeuert wird, welches auf die Abwesend-Regexp bzw. Anwesend-Regexp passt, wird der Status entsprechend in PRESENCE gesetzt.<br><br>
     <u>Beispiel</u><br><br>
@@ -1785,7 +1785,7 @@ Options:
     <u>Beispiel</u><br><br>
     <code>define iPhone PRESENCE lan-bluetooth 0a:4f:36:d8:f9:89 127.0.0.1:5222</code><br><br>
     <u>presenced</u><br><br>
-    <ul>Der presenced ist ein Perl Netzwerkdienst, welcher eine Bluetooth-Anwesenheitserkennung von ein oder mehreren Ger&auml;ten &uuml;ber Netzwerk bereitstellt. 
+    <ul>Der presenced ist ein Perl Netzwerkdienst, welcher eine Bluetooth-Anwesenheitserkennung von ein oder mehreren Ger&auml;ten &uuml;ber Netzwerk bereitstellt.
     Dieser lauscht standardm&auml;&szlig;ig auf TCP Port 5111 nach eingehenden Verbindungen von dem PRESENCE Modul oder einem collectord.<br>
 <PRE>
 Usage:
@@ -1805,14 +1805,14 @@ Options:
   -h, --help
      Print detailed help screen
 </PRE>
-    
-    Zur Bluetooth-Abfrage wird der Shell-Befehl "hcitool" verwendet (Paket: <a href="http://www.bluez.org" target="_new">bluez</a>) 
+
+    Zur Bluetooth-Abfrage wird der Shell-Befehl "hcitool" verwendet (Paket: <a href="http://www.bluez.org" target="_new">bluez</a>)
     um sogenannte "Paging-Request" an die gew&uuml;nschte Bluetooth Adresse (z.B. 01:B4:5E:AD:F6:D3) durchzuf&uuml;hren. Das Ger&auml;t muss dabei nicht sichtbar sein, allerdings st&auml;ndig aktiviert sein
     um Bluetooth-Anfragen zu beantworten.
     <br><br>
-    
+
     Wenn ein Ger&auml;t anwesend ist, wird dies an FHEM &uuml;bermittelt zusammen mit dem Ger&auml;tenamen als Reading.<br><br>
-    
+
     Der presenced ist zum Download verf&uuml;gbar als:<br><br>
     <ul>
     <li>Perl Skript: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
@@ -1832,22 +1832,22 @@ Options:
 Usage:
     lepresenced --bluetoothdevice &lt;bluetooth device&gt; --listenaddress &lt;listen address&gt; --listenport &lt;listen port&gt; --loglevel &lt;log level&gt; --daemon
     lepresenced -b &lt;bluetooth device&gt; -a &lt;listen address&gt; -p &lt;listen port> -l &lt;log level> -d
-    
+
 valid log levels:
     LOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG. Default: LOG_INFO
-    
+
 Examples:
 	lepresenced --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon
 	lepresenced --loglevel LOG_DEBUG --daemon
 </PRE>
-    
+
     Zur Bluetooth-Abfrage wird der Befehl <i>hcitool lescan</i> (Paket:
     <a href="http://www.bluez.org" target="_new">bluez</a>) verwendet, der
     fortw&auml;hrend auf die Beacons der Bluetooth-LE-Ger&auml;te lauscht.
     <br><br>
-    
+
     Wenn ein Ger&auml;t anwesend ist, wird dies an FHEM &uuml;bermittelt zusammen mit dem Ger&auml;tenamen als Reading.<br><br>
-    
+
     Der le presenced ist zum Download verf&uuml;gbar als:<br><br>
     <ul>
     <li>Perl Skript: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/lepresenced" target="_new">lepresenced</a></li>
@@ -1857,7 +1857,7 @@ Examples:
     <u>collectord</u><br><br>
     <ul>
     Der collectord ist ein Perl Netzwerk Dienst, welcher Verbindungen zu mehreren presenced-Instanzen verwaltet um eine koordinierte Suche nach ein oder mehreren Bluetooth-Ger&auml;ten &uuml;ber Netzwerk durchzuf&uuml;hren.<br><br>
-    
+
     Er lauscht auf TCP port 5222 nach eingehenden Verbindungen von einem PRESENCE Modul.
 <PRE>
 Usage:
@@ -1880,7 +1880,7 @@ Options:
      log to the given logfile
   -h, --help
      Print detailed help screen
-</PRE>  
+</PRE>
     Bevor der collectord verwendet werden kann, ben&ouml;tigt er eine Konfigurationsdatei in welcher alle R&auml;ume mit einem presenced-Agenten eingetragen sind. Diese Datei sieht wie folgt aus:
     <br><br>
 <PRE>
@@ -1895,15 +1895,15 @@ Options:
 
     [Wohnzimmer]
     address=192.168.0.11
-    port=5111    
+    port=5111
     presence_timeout=180
-    absence_timeout=20    
+    absence_timeout=20
 </PRE>
 <br>
     Wenn ein Ger&auml;t in irgend einem Raum anwesend ist, wird dies an FHEM &uuml;bermittelt, zusammen mit dem Ger&auml;tenamen und dem Raum, in welchem das Ger&auml;t erkannt wurde.<br><br>
-    
+
     Der collectord ist zum Download verf&uuml;gbar als:<br><br>
-    
+
     <ul>
     <li>Perl Skript:  <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
     <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/collectord-1.7.deb" target="_new">collectord-1.7.deb</a></li>
@@ -1915,8 +1915,8 @@ Options:
   <a name="PRESENCEset"></a>
   <b>Set</b>
   <ul>
-  
-  <li><b>statusRequest</b> - Startet einen sofortigen Check.</li> 
+
+  <li><b>statusRequest</b> - Startet einen sofortigen Check.</li>
   <li><b>power</b> - Startet den powerCmd-Befehl welche durch den Parameter powerCmd angegeben ist (Nur wenn das Attribut "powerCmd" definiert ist)</li>
   </ul>
   <br>
@@ -1962,7 +1962,7 @@ Options:
     Sobald das parametrisierte Zeitfenster um ist, wird der Status final auf "present" gesetzt.<br><br>
     Standardwert ist 0 Sekunden (keine Statusverz&ouml;gerung)<br><br>
     <li><a name="PRESENCE_ping_count">ping_count</a></li> (Nur im Modus "ping" anwendbar)<br>
-    Ver&auml;ndert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen. 
+    Ver&auml;ndert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen.
     Je nach Netzwerkstabilit&auml;t k&ouml;nnen erste Pakete verloren gehen oder blockiert werden.<br><br>
     Standardwert ist 4 (Versuche)<br><br>
     <li><a name="PRESENCE_bluetooth_hci_device">bluetooth_hci_device</a></li> (Nur im Modus "local-bluetooth" anwendbar)<br>
@@ -1977,7 +1977,7 @@ Options:
     <br><br>
     <li><a name="PRESENCE_powerCmd">powerCmd</a></li><br>
     Ein FHEM-Befehl, welcher das Ger&auml;t schalten kann.<br><br>
-    
+
     Wenn der power-Befehl ausgef&uuml;hrt wird (set-Befehl: power) werden folgende Platzhalter durch ihre entsprechenden Werte ersetzt:<br><br>
     <ul>
     <li><code>$NAME</code> - Name der PRESENCE-Definition</li>
@@ -1994,7 +1994,7 @@ Options:
     </ul>
     </ul>
   <br>
- 
+
   <a name="PRESENCEevents"></a>
   <b>Generierte Events:</b><br><br>
   <ul>

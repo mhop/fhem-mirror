@@ -5,8 +5,8 @@
 #     Sents messages to your Pushsafer accout which will be delivered to
 #     any configured device (e.g. iOS, Andriod, Windows).
 #
-#     This module is based on the Pushsafer API description 
-#     which is available at https://www.pushsafer.com/en/pushapi:     
+#     This module is based on the Pushsafer API description
+#     which is available at https://www.pushsafer.com/en/pushapi:
 #
 #     Copyright by Markus Bloch
 #     e-mail: Notausstieg0309@googlemail.com
@@ -71,23 +71,23 @@ sub Pushsafer_Define($$)
     my ($hash, $def) = @_;
 
     my @args = split("[ \t]+", $def);
- 
+
     if(!@args == 3)
     {
         return "wrong define syntax: define <name> Pushsafer <privatekey>";
     }
-    
+
     my $privatekey = @args[2];
 
     return "invalid private key: ".$privatekey if ($privatekey !~ /^[a-z\d]{20}$/i);
-    
+
     $hash->{PrivateKey} = $privatekey;
     $hash->{helper}{URL} = "https://www.pushsafer.com/api";
 
     Log3 $hash, 4, "Pushsafer ($name) - defined with private key: ".$privatekey;
 
     $hash->{STATE} = "Initialized";
-    
+
     return undef;
 }
 
@@ -129,11 +129,11 @@ sub Pushsafer_Set($$$@)
         my ($err, $data) = Pushsafer_createBody($hash, $h);
 
         return $err if(defined($err));
-        
+
         my $data_scrambled = $data;
-        
+
         $data_scrambled =~ s/k=[^&]+/k=HIDDEN/g; # remove private key from log output
-        
+
         Log3 $name, 5, "Pushsafer ($name) - sending data: $data_scrambled";
 
         Pushsafer_Send($hash, $data);
@@ -158,7 +158,7 @@ sub Pushsafer_createBody($$)
 {
     my ($hash, $args) = @_;
     my $name = $hash->{NAME};
-    
+
     my @urlParts;
     my @errs;
 
@@ -168,7 +168,7 @@ sub Pushsafer_createBody($$)
     {
         my $key;
         my $val;
-        
+
         if(exists($Pushsaver_Params{$item}))
         {
             if(exists($Pushsaver_Params{$item}{check}) and $args->{$item} !~ $Pushsaver_Params{$item}{check})
@@ -200,23 +200,23 @@ sub Pushsafer_createBody($$)
             push @errs, "unsupported parameter: $item";
             next;
         }
-        
+
         if($key =~/^p\d?$/)
         {
             if($val =~ /^IPCAM:(\S+)$/)
             {
                 my $ipcam = $1;
-                
+
                 if(!exists($defs{$ipcam}) or !exists($defs{$ipcam}{TYPE}) or $defs{$ipcam}{TYPE} ne "IPCAM")
                 {
                     Log3 $name, 3, "Pushsafer ($name) - no such IPCAM device: $ipcam. sending message without a picture...";
                     next;
                 }
-                
+
                 my $path = AttrVal($ipcam, "storage",AttrVal("global", "modpath", ".")."/www/snapshots");
                 $path .= "/" unless($path =~ m,/$,);
                 $path .= ReadingsVal($ipcam, "last", "");
-                
+
                 $val = Pushsafer_createDataUrl($hash, $path);
                 next unless(defined($val));
             }
@@ -231,7 +231,7 @@ sub Pushsafer_createBody($$)
                 next;
             }
         }
-        
+
         push @urlParts, $key."=".urlEncode($val);
     }
 
@@ -242,7 +242,7 @@ sub Pushsafer_createBody($$)
 
 #####################################
 # determine the image file format (reused from IPCAM module by Martin Fischer)
-sub Pushsafer_guessFileFormat($) 
+sub Pushsafer_guessFileFormat($)
 {
     my ($src) = shift;
     my $header;
@@ -255,7 +255,7 @@ sub Pushsafer_guessFileFormat($)
     return undef if(!$reading);
 
     local($_) = $srcHeader;
-    
+
     return "image/jpeg" if /^\xFF\xD8/;
     return "image/png"  if /^\x89PNG\x0d\x0a\x1a\x0a/;
     return "image/gif"  if /^GIF8[79]a/;
@@ -267,7 +267,7 @@ sub Pushsafer_createDataUrl($$)
 {
     my ($hash, $file) = @_;
     my $name = $hash->{NAME};
-    
+
     Log3 $name, 4, "Pushsafer ($name) - open image file: $file";
 
     my ($err, @content) = FileRead({FileName => $file, ForceType => "file"});
@@ -281,21 +281,21 @@ sub Pushsafer_createDataUrl($$)
     {
         my $image = join($/, @content);
         my $mime_type = Pushsafer_guessFileFormat(\$image);
-        
+
         if(defined($mime_type))
         {
             Log3 $name, 5, "Pushsafer ($name) - found image of type: $mime_type";
-            
+
             my $base_64 = encode_base64($image);
-            
+
             return "data:$mime_type;base64,".$base_64;
         }
         else
         {
             Log3 $name, 3, "Pushsafer ($name) - unsupported image type for $file - see commandref for supported image formats";
-        }   
+        }
     }
-    
+
     return undef;
 }
 
@@ -304,7 +304,7 @@ sub Pushsafer_createDataUrl($$)
 sub Pushsafer_Send($$)
 {
   my ($hash, $body) = @_;
-  
+
   my $params = {
     url         => $hash->{helper}{URL},
     timeout     => 10,
@@ -363,7 +363,7 @@ sub Pushsafer_Callback($$$)
         {
             readingsBulkUpdate($hash, "lastSuccess", $1);
         }
-        
+
         if($data =~ /available"?\s*:\s*{(.+)\s*}\s*}\s*$/gcs)
         {
             my %devices =  grep { defined($_) } map { /^"?(\d+)"?:({.+})$/ ? ($1 => $2) : undef } split(",", $1);
@@ -373,28 +373,28 @@ sub Pushsafer_Callback($$$)
                 if(defined($devices{$dev}) and $devices{$dev} =~ /^{\s*"?([^":]+)"?\s*:\s*"?([^":]+)"?\s*}$/)
                 {
                     my ($devname, $available) = ($1, $2);
-                    
+
                     $devname =~ s/\s+//g;
-                    
+
                     readingsBulkUpdate($hash, "availableMessages-$dev-$devname", $available);
                 }
             }
         }
-        
+
         readingsEndUpdate($hash, 1);
     }
 
     return undef;
 }
 
-  
+
 1;
 
 
 =pod
 =item device
-=item summary sents text message notifications via pushsafer.com 
-=item summary_DE verschickt Texnachrichten zur Benachrichtigung via Pushsafer 
+=item summary sents text message notifications via pushsafer.com
+=item summary_DE verschickt Texnachrichten zur Benachrichtigung via Pushsafer
 =begin html
 
 <a name="Pushsafer"></a>
@@ -540,12 +540,12 @@ sub Pushsafer_Callback($$$)
     <code><b>vibration</b></code> - Kurzform: <code>v&nbsp;</code> - Typ: Ganzzahl - Die Anzahl, wie oft das Zielger&auml;t vibrieren soll beim Empfang der Nachricht (maximal 3 mal; nur f&uuml;r iOS-/Android-Ger&auml;te nutzbar). Falls nicht benutzt, wird die ger&auml;teinterne Einstellung verwendet.<br>
     <code><b>url</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>u&nbsp;</code> - Typ: Text - Eine URL, welche der Nachricht angehangen werden soll. Dies kann eine normale http:// bzw. https:// URL sein, es sind jedoch auch weitere spezielle Schemas m&ouml;glich. Eine Liste aller m&ouml;glichen URL-Schemas gibt es unter <a href="https://www.pushsafer.com/de/url_schemes" target="_new">pushsafer.com</a> .<br>
     <code><b>urlText</b>&nbsp;&nbsp;</code> - Kurzform: <code>ut</code> - Typ: Text - Der Text, welcher zum Anzeigen der URL benutzt werden soll anstatt der Zieladresse.<br>
-    <code><b>key</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>k&nbsp;</code> - Typ: Text - &Uuml;bersteuert den zu nutzenden Schl&uuml;ssel zur Identifikation aus dem define-Kommando. Es kann hierbei auch ein Email-Alias-Schl&uuml;ssel benutzt werden.<br>   
-    <code><b>ttl</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>l&nbsp;</code> - Typ: Ganzzahl - Die Lebensdauer der Nachricht in Minuten. Sobald die Lebensdauer erreicht ist, wird die Nachricht selbstst&auml;ndig auf allen Ger&auml;ten gel&ouml;scht. Der m&ouml;gliche Wertebereich liegt zwischen 1 - 43200 Minuten (entspricht 30 Tagen).<br> 
+    <code><b>key</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>k&nbsp;</code> - Typ: Text - &Uuml;bersteuert den zu nutzenden Schl&uuml;ssel zur Identifikation aus dem define-Kommando. Es kann hierbei auch ein Email-Alias-Schl&uuml;ssel benutzt werden.<br>
+    <code><b>ttl</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Kurzform: <code>l&nbsp;</code> - Typ: Ganzzahl - Die Lebensdauer der Nachricht in Minuten. Sobald die Lebensdauer erreicht ist, wird die Nachricht selbstst&auml;ndig auf allen Ger&auml;ten gel&ouml;scht. Der m&ouml;gliche Wertebereich liegt zwischen 1 - 43200 Minuten (entspricht 30 Tagen).<br>
     <code><b>picture</b>&nbsp;&nbsp;</code> - Kurzform: <code>p&nbsp;</code> - Typ: Text - Anh&auml;ngen eines Bildes zur Nachricht. Dies kann ein Dateipfad zu einer Bilddatei sein (z.B. <code>picture=/home/user/Bild.jpg</code>) oder der Name einer IPCAM-Instanz (im Format: <code>picture=IPCAM:<i>&lt;Name&gt;</i></code>) um die letzte Aufnahme zu senden (Bsp. <code>picture=IPCAM:IpKamera_Einganstuer</code>). Es werden die Dateiformate JPG, PNG und GIF unterst&uuml;zt.<br>
     <code><b>picture2</b>&nbsp;</code> - Kurzform: <code>p2</code> - Typ: Text - Gleiche Syntax wie die Option <code>"picture"</code>.<br>
     <code><b>picture3</b>&nbsp;</code> - Kurzform: <code>p3</code> - Typ: Text - Gleiche Syntax wie die Option <code>"picture"</code>.<br>
-    
+
     <br>
     Beispiele:<br>
     <br>

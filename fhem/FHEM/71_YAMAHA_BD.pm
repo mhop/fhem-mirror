@@ -33,7 +33,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
- 
+
 sub YAMAHA_BD_Get($@);
 sub YAMAHA_BD_Define($$);
 sub YAMAHA_BD_GetStatus($;$);
@@ -54,7 +54,7 @@ YAMAHA_BD_Initialize($)
   $hash->{UndefFn}   = "YAMAHA_BD_Undefine";
   $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 model ".
                       $readingFnAttributes;
-                      
+
   $data{RC_layout}{YAMAHA_BluRay} = "YAMAHA_BD_RClayout";
   $data{RC_makenotify}{YAMAHA_BD} = "YAMAHA_BD_RCmakenotify";
 }
@@ -66,7 +66,7 @@ YAMAHA_BD_Define($$)
     my ($hash, $def) = @_;
     my @a = split("[ \t][ \t]*", $def);
     my $name = $hash->{NAME};
-    
+
     if(! @a >= 3)
     {
     my $msg = "wrong syntax: define <name> YAMAHA_BD <ip-or-hostname> [<statusinterval>] [<presenceinterval>]";
@@ -75,9 +75,9 @@ YAMAHA_BD_Define($$)
     }
 
     my $address = $a[2];
-  
+
     $hash->{helper}{ADDRESS} = $address;
-    
+
     # if an update interval was given which is greater than zero, use it.
     if(defined($a[3]) and $a[3] > 0)
     {
@@ -87,7 +87,7 @@ YAMAHA_BD_Define($$)
     {
         $hash->{helper}{OFF_INTERVAL}=30;
     }
-    
+
     # if a second update interval is given, use this as ON_INTERVAL, otherwise use OFF_INTERVAL instead.
     if(defined($a[4]) and $a[4] > 0)
     {
@@ -96,15 +96,15 @@ YAMAHA_BD_Define($$)
     else
     {
         $hash->{helper}{ON_INTERVAL}=$hash->{helper}{OFF_INTERVAL};
-    } 
+    }
 
     $hash->{helper}{CMD_QUEUE} = ();
     delete($hash->{helper}{HTTP_CONNECTION}) if(exists($hash->{helper}{HTTP_CONNECTION}));
-    
+
     # start the status update timer
     $hash->{helper}{DISABLED} = 0 unless(exists($hash->{helper}{DISABLED}));
     YAMAHA_BD_ResetTimer($hash, 2);
-  
+
     return undef;
 }
 
@@ -115,11 +115,11 @@ YAMAHA_BD_Get($@)
     my ($hash, @a) = @_;
     my $what;
     my $return;
-    
+
     return "argument is missing" if(int(@a) != 2);
-    
+
     $what = $a[1];
-    
+
     if(exists($hash->{READINGS}{$what}))
     {
         YAMAHA_BD_GetStatus($hash, 1);
@@ -136,12 +136,12 @@ YAMAHA_BD_Get($@)
     else
     {
         $return = "unknown argument $what, choose one of";
-        
+
         foreach my $reading (keys %{$hash->{READINGS}})
         {
             $return .= " $reading:noArg";
         }
-        
+
         return $return;
     }
 }
@@ -154,9 +154,9 @@ YAMAHA_BD_Set($@)
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
     my $result = "";
-    
-    return "No Argument given" if(!defined($a[1]));  
-   
+
+    return "No Argument given" if(!defined($a[1]));
+
     my $what = $a[1];
     my $usage = "Unknown argument $what, choose one of on:noArg ".
                                                       "off:noArg ".
@@ -171,7 +171,7 @@ YAMAHA_BD_Set($@)
                                                       "trickPlay:normal,repeatChapter,repeatTitle,repeatFolder,repeat-AB,randomChapter,randomTitle,randomAll,shuffleChapter,shuffleTitle,shuffleAll,setApoint";
 
     if($what eq "on")
-    {        
+    {
         YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Power_Control><Power>On</Power></Power_Control></Main_Zone></YAMAHA_AV>","on",undef);
     }
     elsif($what eq "off")
@@ -279,11 +279,11 @@ YAMAHA_BD_Set($@)
         elsif($a[2] eq "setup")
         {
             YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Function>SETUP</Function></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","setup");
-        } 
+        }
         elsif($a[2] eq "home")
         {
             YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Function>HOME</Function></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","home");
-        } 
+        }
         elsif($a[2] eq "clear")
         {
             YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Function>CLEAR</Function></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","clear");
@@ -409,7 +409,7 @@ YAMAHA_BD_Set($@)
         elsif($a[2] eq "close")
         {
             YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Tray_Control><Tray>Close</Tray></Tray_Control></Main_Zone></YAMAHA_AV>","tray","close");
-        }    
+        }
     }
     elsif($what eq "skip")
     {
@@ -420,7 +420,7 @@ YAMAHA_BD_Set($@)
         elsif($a[2] eq "reverse")
         {
             YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Skip>Rev</Skip></Play_Control></Main_Zone></YAMAHA_AV>","skip","reverse");
-        }    
+        }
     }
     elsif($what eq "fast")
     {
@@ -431,7 +431,7 @@ YAMAHA_BD_Set($@)
         elsif($a[2] eq "reverse")
         {
             YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Fast>Rev</Fast></Play_Control></Main_Zone></YAMAHA_AV>","fast","reverse");
-        }    
+        }
     }
     elsif($what eq "slow")
     {
@@ -442,7 +442,7 @@ YAMAHA_BD_Set($@)
         elsif($a[2] eq "reverse")
         {
             YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Slow>Rev</Slow></Play_Control></Main_Zone></YAMAHA_AV>","slow","reverse");
-        }    
+        }
     }
     elsif($what eq "play")
     {
@@ -464,7 +464,7 @@ YAMAHA_BD_Set($@)
     {
         return $usage;
     }
-    
+
     return undef;
 }
 
@@ -495,7 +495,7 @@ YAMAHA_BD_Attr(@)
 
     # Start/Stop Timer according to new disabled-Value
     YAMAHA_BD_ResetTimer($hash);
-    
+
     return undef;
 }
 
@@ -504,7 +504,7 @@ sub
 YAMAHA_BD_Undefine($$)
 {
     my($hash, $name) = @_;
-  
+
     # Stop the internal GetStatus-Loop and exit
     RemoveInternalTimer($hash);
     return undef;
@@ -527,7 +527,7 @@ YAMAHA_BD_GetStatus($;$)
     my $name = $hash->{NAME};
     my $power;
     my $return;
-    
+
     $local = 0 unless(defined($local));
 
     return "" if(!defined($hash->{helper}{ADDRESS}) or !defined($hash->{helper}{ON_INTERVAL}) or !defined($hash->{helper}{OFF_INTERVAL}));
@@ -540,16 +540,16 @@ YAMAHA_BD_GetStatus($;$)
 
     Log3 $name, 4, "YAMAHA_BD ($name) - Requesting system status";
     YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Service_Info>GetParam</Service_Info></System></YAMAHA_AV>", "statusRequest","systemStatus");
-    
+
     Log3 $name, 4, "YAMAHA_BD ($name) - Requesting input info";
     YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Input_Info>GetParam</Input_Info></Main_Zone></YAMAHA_AV>", "statusRequest","inputInfo");
 
     Log3 $name, 4, "YAMAHA_BD ($name) - Requesting power state";
     YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Power_Control><Power>GetParam</Power></Power_Control></Main_Zone></YAMAHA_AV>", "statusRequest","powerStatus");
-    
+
     Log3 $name, 4, "YAMAHA_BD ($name) - Requesting playing info";
     YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Play_Info>GetParam</Play_Info></Main_Zone></YAMAHA_AV>", "statusRequest","playInfo");
-    
+
     Log3 $name, 4, "YAMAHA_BD ($name) - Requesting trickPlay info";
     YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Play_Control>GetParam</Play_Control></Main_Zone></YAMAHA_AV>", "statusRequest","trickPlayInfo");
 
@@ -564,21 +564,21 @@ YAMAHA_BD_SendCommand($$$$)
 {
     my ($hash, $data,$cmd,$arg) = @_;
     my $name = $hash->{NAME};
-    
+
     my $response;
-     
+
     Log3 $name, 4, "YAMAHA_BD ($name) - append to queue \"$cmd".(defined($arg) ? " ".$arg : "")."\": $data";
-    
+
     # In case any URL changes must be made, this part is separated in this function".
-    
+
     my $param = {
                     data       => "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$data,
                     cmd        => $cmd,
                     arg        => $arg,
                 };
-    
-    push @{$hash->{helper}{CMD_QUEUE}}, $param;  
-    
+
+    push @{$hash->{helper}{CMD_QUEUE}}, $param;
+
     YAMAHA_BD_HandleCmdQueue($hash);
 }
 
@@ -590,7 +590,7 @@ YAMAHA_BD_HandleCmdQueue($)
     my ($hash) = @_;
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
-    
+
     if(not($hash->{helper}{RUNNING_REQUEST}) and @{$hash->{helper}{CMD_QUEUE}})
     {
         my $params =  {
@@ -603,12 +603,12 @@ YAMAHA_BD_HandleCmdQueue($)
                        hash       => $hash,
                        callback   => \&YAMAHA_BD_ParseResponse
                       };
-   
+
         my $request = pop @{$hash->{helper}{CMD_QUEUE}};
 
         map {$hash->{helper}{HTTP_CONNECTION}{$_} = $params->{$_}} keys %{$params};
         map {$hash->{helper}{HTTP_CONNECTION}{$_} = $request->{$_}} keys %{$request};
-        
+
         $hash->{helper}{RUNNING_REQUEST} = 1;
         Log3 $name, 4, "YAMAHA_BD ($name) - send command \"$request->{cmd}".(defined($request->{arg}) ? " ".$request->{arg} : "")."\": $request->{data}";
         HttpUtils_NonblockingGet($hash->{helper}{HTTP_CONNECTION});
@@ -621,25 +621,25 @@ sub
 YAMAHA_BD_ParseResponse($$$)
 {
 
-    my ( $param, $err, $data ) = @_;    
-    
+    my ( $param, $err, $data ) = @_;
+
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
-    
+
     my $cmd = $param->{cmd};
     my $arg = $param->{arg};
-    
+
     $data = "" unless(defined($data));
     $err = "" unless(defined($err));
-    
+
     $hash->{helper}{RUNNING_REQUEST} = 0;
-    
+
     delete($hash->{helper}{HTTP_CONNECTION}) unless($param->{keepalive});
-    
+
     if($err ne "")
     {
         Log3 $name, 4, "YAMAHA_BD ($name) - error while executing \"$cmd".(defined($arg) ? " ".$arg : "")."\": $err";
-        
+
         if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1))
         {
             Log3 $name, 3, "YAMAHA_BD ($name) - could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress: $err";
@@ -650,21 +650,21 @@ YAMAHA_BD_ParseResponse($$$)
     elsif($data ne "")
     {
         Log3 $name, 5, "YAMAHA_BD ($name) - got HTTP response for \"$cmd".(defined($arg) ? " ".$arg : "")."\": $data";
-        
+
         if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} == 0)
         {
             Log3 $name, 3, "YAMAHA_BD: device $name reappeared";
-            readingsSingleUpdate($hash, "presence", "present", 1);            
+            readingsSingleUpdate($hash, "presence", "present", 1);
         }
-        
+
         readingsBeginUpdate($hash);
-        
+
          if(not $data =~ /RC="0"/)
         {
             # if the returncode isn't 0, than the command was not successful
             Log3 $name, 3, "YAMAHA_BD ($name) - Could not execute \"$cmd".(defined($arg) ? " ".$arg : "")."\"";
         }
-        
+
         if($cmd eq "statusRequest" and $arg eq "systemStatus")
         {
             if($data =~ /<Error_Info>(.+?)<\/Error_Info>/)
@@ -678,34 +678,34 @@ YAMAHA_BD_ParseResponse($$$)
             {
                 $hash->{MODEL} = $1;
                 $hash->{FIRMWARE} = $2;
-                
+
                 $hash->{MODEL} =~ s/\s*YAMAHA\s*//g;
 
                 $attr{$name}{"model"} = $hash->{MODEL};
             }
-        }   
+        }
         elsif($cmd eq "statusRequest" and $arg eq "powerStatus")
         {
             if($data =~ /<Power>(.+?)<\/Power>/)
-            {   
+            {
                 my $power = $1;
-           
+
                 if($power eq "Standby" or $power eq "Network Standby")
-                {    
+                {
                     $power = "off";
                 }
-                
+
                readingsBulkUpdate($hash, "power", lc($power));
                readingsBulkUpdate($hash, "state", lc($power));
             }
         }
         elsif($cmd eq "on")
         {
-            if($data =~ /RC="0"/ and $data =~ /<Power><\/Power>/)    
+            if($data =~ /RC="0"/ and $data =~ /<Power><\/Power>/)
             {
                 # As the player startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
                 readingsBulkUpdate($hash, "power", "on");
-                readingsBulkUpdate($hash, "state","on");      
+                readingsBulkUpdate($hash, "state","on");
             }
             else
             {
@@ -716,14 +716,14 @@ YAMAHA_BD_ParseResponse($$$)
         {
             if($data =~ /<Trick_Play>(.+?)<\/Trick_Play>/)
             {
-                readingsBulkUpdate($hash, "trickPlay", $1);    
-            }       
+                readingsBulkUpdate($hash, "trickPlay", $1);
+            }
         }
         elsif($cmd eq "statusRequest" and $arg eq "inputInfo")
         {
             if($data =~ /<Input_Info><Status>(.+?)<\/Status><\/Input_Info/)
             {
-                readingsBulkUpdate($hash, "input", $1);    
+                readingsBulkUpdate($hash, "input", $1);
             }
             elsif($data =~ /<Input_Info>(.+?)<\/Input_Info/)
             {
@@ -736,67 +736,67 @@ YAMAHA_BD_ParseResponse($$$)
             {
                 readingsBulkUpdate($hash, "playStatus", lc($1));
             }
-            
+
             if($data =~ /<Contents>.*?<Chapter>(.+?)<\/Chapter>.*?<\/Contents>/)
             {
                 readingsBulkUpdate($hash, "currentChapter", $1);
             }
-            
+
             if($data =~ /<Contents>.*?<Track>(.+?)<\/Track>.*?<\/Contents>/)
             {
                 readingsBulkUpdate($hash, "currentTrack", $1);
             }
-            
+
             if($data =~ /<Contents>.*?<Title>(.+?)<\/Title>.*?<\/Contents>/)
             {
                 readingsBulkUpdate($hash, "currentTitle", $1);
             }
-            
+
             if($data =~ /<Disc_Info>.*?<Track_Num>(.+?)<\/Track_Num>.*?<\/Disc_Info>/)
             {
                 readingsBulkUpdate($hash, "totalTracks", $1);
             }
-            
+
             if($data =~ /<Contents>.*?<Type>(.+?)<\/Type>.*?<\/Contents>/)
             {
                 readingsBulkUpdate($hash, "contentType", lc($1));
             }
-            
+
             if($data =~ /<File_Name>(.+?)<\/File_Name>/)
             {
                 readingsBulkUpdate($hash, "currentMedia", $1);
             }
-            
+
             if($data =~ /<Disc_Type>(.+?)<\/Disc_Type>/)
             {
                 readingsBulkUpdate($hash, "discType", $1);
             }
-            
+
             if($data =~ /<Tray>(.+?)<\/Tray>/)
             {
                 readingsBulkUpdate($hash, "trayStatus", lc($1));
             }
-            
+
             if($data =~ /<Current_PlayTime>(.+?)<\/Current_PlayTime>/)
             {
                 readingsBulkUpdate($hash, "playTimeCurrent", YAMAHA_BD_formatTimestamp($1));
-            }    
-             
+            }
+
             if($data =~ /<Total_Time>(.+?)<\/Total_Time>/)
             {
                 readingsBulkUpdate($hash, "playTimeTotal", YAMAHA_BD_formatTimestamp($1));
             }
         }
-             
+
         readingsEndUpdate($hash, 1);
-        
+
         YAMAHA_BD_GetStatus($hash, 1) if($cmd ne "statusRequest" and $cmd ne "on");
         YAMAHA_BD_ResetTimer($hash, 10) if($cmd eq "on");
     }
-    
+
     $hash->{helper}{AVAILABLE} = ($err ne "" ? 0 : 1);
 
-    YAMAHA_BD_HandleCmdQueue($hash);    
+    YAMAHA_BD_HandleCmdQueue($hash);
 }
 
 #############################
@@ -805,9 +805,9 @@ sub
 YAMAHA_BD_ResetTimer($;$)
 {
     my ($hash, $interval) = @_;
-    
+
     RemoveInternalTimer($hash);
-    
+
     if($hash->{helper}{DISABLED} == 0)
     {
         if(defined($interval))
@@ -827,7 +827,7 @@ YAMAHA_BD_ResetTimer($;$)
 
 #############################
 # define the layout for module 95_remotecontrol.pm
-sub YAMAHA_BD_RClayout() 
+sub YAMAHA_BD_RClayout()
 {
   my @row;
 
@@ -857,11 +857,11 @@ sub YAMAHA_BD_RClayout()
 
 #####################################
 # Callback from 95_remotecontrol for command makenotify.
-sub YAMAHA_BD_RCmakenotify($$) 
+sub YAMAHA_BD_RCmakenotify($$)
 {
   my ($name, $dev) = @_;
   my $new_name="notify_$name";
-  
+
   fhem("define $new_name notify $name set $dev ".'$EVENT',1);
   Log3 undef, 2, "[remotecontrol:YAMAHA_BD] Notify created: $new_name";
   return "Notify created by YAMAHA_BD: $new_name";
@@ -869,14 +869,14 @@ sub YAMAHA_BD_RCmakenotify($$)
 
 #############################
 # formats a 3 byte Hex Value into human readable time duration
-sub YAMAHA_BD_formatTimestamp($) 
+sub YAMAHA_BD_formatTimestamp($)
 {
     my ($hex) = @_;
-    
+
     my ($hour) = sprintf("%02d", unpack("s", pack "s", hex(substr($hex, 0, 2))));
     my ($min) =  sprintf("%02d", unpack("s", pack "s", hex(substr($hex, 2, 2))));
     my ($sec) =  sprintf("%02d", unpack("s", pack "s", hex(substr($hex, 4, 2))));
-    
+
     return "$hour:$min:$sec";
 }
 
@@ -911,22 +911,22 @@ sub YAMAHA_BD_formatTimestamp($)
     seconds), which periodically reads the status of the player (power state, current disc, tray status,...)
     and triggers notify/filelog commands.
     <br><br>
-    Different status update intervals depending on the power state can be given also. 
-    If two intervals are given to the define statement, the first interval statement represents the status update 
-    interval in seconds in case the device is off, absent or any other non-normal state. The second 
+    Different status update intervals depending on the power state can be given also.
+    If two intervals are given to the define statement, the first interval statement represents the status update
+    interval in seconds in case the device is off, absent or any other non-normal state. The second
     interval statement is used when the device is on.
-   
+
     Example:<br><br>
     <ul><code>
        define BD_Player YAMAHA_BD 192.168.0.10
        <br><br>
        # With custom status interval of 60 seconds<br>
-       define BD_Player YAMAHA_BD 192.168.0.10 60 
+       define BD_Player YAMAHA_BD 192.168.0.10 60
        <br><br>
        # With custom "off"-interval of 60 seconds and "on"-interval of 10 seconds<br>
        define BD_Player YAMAHA_BD 192.168.0.10 60 10
     </code></ul>
-   
+
   </ul>
   <br><br>
   <a name="YAMAHA_BDset"></a>
@@ -968,7 +968,7 @@ sub YAMAHA_BD_formatTimestamp($)
     ...<br>
     remoteControl 9<br>
     </code></ul><br><br>
-    
+
     <u>Cursor Selection:</u><br><br>
     <ul><code>
     remoteControl up<br>
@@ -989,7 +989,7 @@ sub YAMAHA_BD_formatTimestamp($)
     remoteControl home<br>
     remoteControl clear<br>
     </code></ul><br><br>
-    
+
     <u>Color Buttons:</u><br><br>
     <ul><code>
     remoteControl red<br>
@@ -997,7 +997,7 @@ sub YAMAHA_BD_formatTimestamp($)
     remoteControl yellow<br>
     remoteControl blue<br>
     </code></ul><br><br>
-    
+
     <u>Play Control Buttons:</u><br><br>
     <ul><code>
     remoteControl program<br>
@@ -1012,7 +1012,7 @@ sub YAMAHA_BD_formatTimestamp($)
     remoteControl secondVideo<br>
     </code></ul><br><br>
     The button names are the same as on your remote control.<br><br>
-  
+
   </ul>
 
   <a name="YAMAHA_BDget"></a>
@@ -1061,7 +1061,7 @@ sub YAMAHA_BD_formatTimestamp($)
 <br>
   <b>Implementator's note</b><br>
   <ul>
-  <li>Some older models (e.g. BD-S671) cannot be controlled over networked by delivery. A <u><b>firmware update is neccessary</b></u> to control these models via FHEM. In general it is always recommended to use the latest firmware.</li> 
+  <li>Some older models (e.g. BD-S671) cannot be controlled over networked by delivery. A <u><b>firmware update is neccessary</b></u> to control these models via FHEM. In general it is always recommended to use the latest firmware.</li>
    <li>The module is only usable if you activate "Network Control" on your player. Otherwise it is not possible to communicate with the player.</li>
   </ul>
   <br>
@@ -1088,13 +1088,13 @@ sub YAMAHA_BD_formatTimestamp($)
     Es bietet die M&ouml;glichkeit den Player an-/auszuschalten, die Schublade zu &ouml;ffnen und schlie&szlig;en,
     die Wiedergabe beeinflussen, s&auml;mtliche Fernbedieungs-Befehle zu senden, sowie den aktuellen Status abzufragen.
     <br><br>
-    Bei der Definition eines YAMAHA_BD-Moduls wird eine interne Routine in Gang gesetzt, welche regelm&auml;&szlig;ig 
+    Bei der Definition eines YAMAHA_BD-Moduls wird eine interne Routine in Gang gesetzt, welche regelm&auml;&szlig;ig
     (einstellbar durch den optionalen Parameter <code>&lt;Status_Interval&gt;</code>; falls nicht gesetzt ist der Standardwert 30 Sekunden)
     den Status des Players abfragt und entsprechende Notify-/FileLog-Definitionen triggert.
     <br><br>
     Sofern 2 Interval-Argumente &uuml;bergeben werden, wird der erste Parameter <code>&lt;Off_Interval&gt;</code> genutzt
-    sofern der Player ausgeschaltet oder nicht erreichbar ist. Der zweiter Parameter <code>&lt;On_Interval&gt;</code> 
-    wird verwendet, sofern der Player eingeschaltet ist. 
+    sofern der Player ausgeschaltet oder nicht erreichbar ist. Der zweiter Parameter <code>&lt;On_Interval&gt;</code>
+    wird verwendet, sofern der Player eingeschaltet ist.
     <br><br>
     Beispiel:<br><br>
     <ul><code>
@@ -1147,7 +1147,7 @@ sub YAMAHA_BD_formatTimestamp($)
     ...<br>
     remoteControl 9<br>
     </code></ul><br><br>
-    
+
     <u>Cursor Steuerung:</u><br><br>
     <ul><code>
     remoteControl up<br>
@@ -1168,7 +1168,7 @@ sub YAMAHA_BD_formatTimestamp($)
     remoteControl home<br>
     remoteControl clear<br>
     </code></ul><br><br>
-    
+
     <u>Farbtasten:</u><br><br>
     <ul><code>
     remoteControl red<br>
@@ -1176,7 +1176,7 @@ sub YAMAHA_BD_formatTimestamp($)
     remoteControl yellow<br>
     remoteControl blue<br>
     </code></ul><br><br>
-  
+
     <u>Wiedergabetasten:</u><br><br>
     <ul><code>
     remoteControl program<br>
@@ -1190,7 +1190,7 @@ sub YAMAHA_BD_formatTimestamp($)
     remoteControl secondAudio<br>
     remoteControl secondVideo<br>
     </code></ul><br><br>
-    
+
     Die Befehlsnamen entsprechen den Tasten auf der Fernbedienung.<br><br>
   </ul>
 
@@ -1205,7 +1205,7 @@ sub YAMAHA_BD_formatTimestamp($)
   <a name="YAMAHA_BDattr"></a>
   <b>Attribute</b>
   <ul>
-  
+
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="disable">disable</a></li>
@@ -1241,7 +1241,7 @@ sub YAMAHA_BD_formatTimestamp($)
 <br>
   <b>Hinweise des Autors</b>
   <ul>
-   <li>Einige &auml;ltere Player-Modelle (z.B. BD-S671) k&ouml;nnen im Auslieferungszustand nicht via Netzwerk gesteuert werden. Um eine Steuerung via FHEM zu erm&ouml;glichen ist ein <u><b>Firmware-Update notwending</b></u>!</li> 
+   <li>Einige &auml;ltere Player-Modelle (z.B. BD-S671) k&ouml;nnen im Auslieferungszustand nicht via Netzwerk gesteuert werden. Um eine Steuerung via FHEM zu erm&ouml;glichen ist ein <u><b>Firmware-Update notwending</b></u>!</li>
     <li>Dieses Modul ist nur nutzbar, wenn die Option "Netzwerksteuerung" am Player aktiviert ist. Ansonsten ist die Steuerung nicht m&ouml;glich.</li>
   </ul>
   <br>
