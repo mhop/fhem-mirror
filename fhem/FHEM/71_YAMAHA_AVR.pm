@@ -58,6 +58,7 @@ YAMAHA_AVR_Initialize($)
                        "disable:0,1 ".
                        "disabledForIntervals ".
                        "request-timeout:1,2,3,4,5 ".
+                       "radioTitleDelimiter ".
                        "model ".
                        "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
                        "volumeMax ".
@@ -1816,6 +1817,10 @@ YAMAHA_AVR_ParseResponse($$$)
                 {
                     readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
                 }
+                elsif($data =~ /<Meta_Info>.*?<DAB>.*?<Service_Label>(.+?)<\/Service_Label>.*?<\/DAB>.*?<\/Meta_Info>/)
+                {
+                    readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
+                }
                 else
                 {
                     readingsBulkUpdateIfChanged($hash, "currentStation", "");
@@ -1852,8 +1857,8 @@ YAMAHA_AVR_ParseResponse($$$)
                     my $tmp = $1;
                     
                     if($data =~ /<Meta_Info>.*?<Radio_Text_A>(.+?)<\/Radio_Text_A>.*?<Radio_Text_B>(.+?)<\/Radio_Text_B>.*?<\/Meta_Info>/)    
-                    {                                            
-                        readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1." ".$2));        
+                    {                                                                   
+                        readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt(trim($1)." ".trim($2)));        
                     }    
                     else
                     {
@@ -1864,6 +1869,10 @@ YAMAHA_AVR_ParseResponse($$$)
                 {         
                     readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));        
                 }    
+                elsif($data =~ /<DAB>.*?<DLS>(.+?)<\/DLS>.*?<\/DAB>/)
+                {         
+                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));        
+                } 
                 else
                 {
                     readingsBulkUpdateIfChanged($hash, "currentTitle", "");
@@ -1880,7 +1889,7 @@ YAMAHA_AVR_ParseResponse($$$)
                     readingsBulkUpdate($hash, "playStatus", "playing");
                 }
                 
-                if($data =~ /<Tuning>.*?<Freq><Current><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Current>.*?<\/Tuning>/ or (YAMAHA_AVR_isModel_DSP($hash) and $data =~ /<Tuning>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*?<\/Tuning>/))
+                if($data =~ /<Tuning>.*?<Freq>(?:<Current>)?<Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit>(?:<\/Current>)?.*<\/Tuning>/ or (YAMAHA_AVR_isModel_DSP($hash) and $data =~ /<Tuning>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*?<\/Tuning>/))
                 {
                     readingsBulkUpdate($hash, "currentStationFrequency", sprintf("%.$2f", ($1 / (10 ** $2)))." $3");
                     readingsBulkUpdate($hash, "tunerFrequency", sprintf("%.$2f", ($1 / (10 ** $2))));

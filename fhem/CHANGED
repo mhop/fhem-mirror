@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  71_YAMAHA_AVR: generate readings for tuner in DAB mode
   - bugfix:  93_DbLog: V2.22.7, bugfix in configCheck for PostgreSQL
   - feature: 10_MYSENSORS_DEVICE: updated to latest MYSENSORS version
   - feature: 50_TelegramBot: hide cmd in favorites/changed favorites confirm
