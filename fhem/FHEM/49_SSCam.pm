@@ -27,6 +27,8 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 3.0.0  23.09.2017    Internal MODEL SVS or CAM -> distinguish/support Cams and SVS in different devices
+#                      new comand get storedCredentials, commandref revised
 # 2.9.0  20.09.2017    new function get homeModeState, minor fixes at simu_SVSversion, commandref revised
 # 2.8.2  19.09.2017    some preparations for version 9 of API "SYNO.SurveillanceStation.Camera", sscam_logout added to function
 #                      get scanVirginirgin
@@ -182,7 +184,8 @@
 #
 # Definition: define <name> SSCam <camname> <ServerAddr> [ServerPort] 
 # 
-# Example: define CamCP1 SSCAM Carport 192.168.2.20 [5000]
+# Example of defining a Cam-device: define CamCP1 SSCAM Carport 192.168.2.20 [5000]
+# Example of defining a SVS-device: define SDS1 SSCAM SVS 192.168.2.20 [5000]
 #
 
 package main;
@@ -196,7 +199,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "2.9.0";
+my $SSCamVersion = "3.0.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -308,10 +311,11 @@ sub SSCam_Define {
   my $serveraddr = $a[3];
   my $serverport = $a[4] ? $a[4] : 5000;
   
-  $hash->{SERVERADDR}       = $serveraddr;
-  $hash->{SERVERPORT}       = $serverport;
-  $hash->{CAMNAME}          = $camname;
-  $hash->{VERSION}          = $SSCamVersion;
+  $hash->{SERVERADDR} = $serveraddr;
+  $hash->{SERVERPORT} = $serverport;
+  $hash->{CAMNAME}    = $camname;
+  $hash->{VERSION}    = $SSCamVersion;
+  $hash->{MODEL}      = ($camname =~ m/^SVS$/i)?"SVS":"CAM";
  
   # benötigte API's in $hash einfügen
   $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
@@ -329,18 +333,27 @@ sub SSCam_Define {
   $hash->{HELPER}{APIHM}          = "SYNO.SurveillanceStation.HomeMode";
   
   # Startwerte setzen
-  $attr{$name}{webCmd}                 = "on:off:snap:enable:disable";                            # initiale Webkommandos setzen
-  $hash->{HELPER}{ACTIVE}              = "off";                                                   # Funktionstoken "off", Funktionen können sofort starten
-  $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";                                                     # Loggingfunktion für Polling ist an
-  $hash->{HELPER}{RECTIME_DEF}         = "15";                                                    # Standard für rectime setzen, überschreibbar durch Attribut "rectime" bzw. beim "set .. on-for-time"
+  if(IsModelCam($hash)) {
+      $attr{$name}{webCmd}             = "on:off:snap:enable:disable";           # initiale Webkommandos setzen
+  } else {
+      $attr{$name}{webCmd}             = "homeMode";
+	  $attr{$name}{webCmdLabel}        = "HomeMode";
+  }
+  $hash->{HELPER}{ACTIVE}              = "off";                                  # Funktionstoken "off", Funktionen können sofort starten
+  $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";                                    # Loggingfunktion für Polling ist an
+  $hash->{HELPER}{RECTIME_DEF}         = "15";                                   # Standard für rectime setzen, überschreibbar durch Attribut "rectime" bzw. beim "set .. on-for-time"
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"Availability", "???");                                                # Verfügbarkeit ist unbekannt
-  readingsBulkUpdate($hash,"PollState","Inactive");                                               # es ist keine Gerätepolling aktiv
-  readingsBulkUpdate($hash,"state", "off");                                                       # Init für "state" , Problemlösung für setstate, Forum #308
+  readingsBulkUpdate($hash,"PollState","Inactive");                              # es ist keine Gerätepolling aktiv
+  if(IsModelCam($hash)) {
+      readingsBulkUpdate($hash,"Availability", "???");                           # Verfügbarkeit ist unbekannt
+      readingsBulkUpdate($hash,"state", "off");                                  # Init für "state" , Problemlösung für setstate, Forum #308
+  } else {
+      readingsBulkUpdate($hash,"state", "Initialized");                          # Init für "state" wenn SVS  
+  }
   readingsEndUpdate($hash,1);                                          
   
-  getcredentials($hash,1);                                                                        # Credentials lesen und in RAM laden ($boot=1)      
+  getcredentials($hash,1);                                                       # Credentials lesen und in RAM laden ($boot=1)      
   
   # initiale Routinen nach Restart ausführen   , verzögerter zufälliger Start
   RemoveInternalTimer($hash, "initonboot");
@@ -376,7 +389,7 @@ return undef;
 sub SSCam_Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
-    my $do;
+    my ($do,$val);
       
     # $cmd can be "del" or "set"
     # $name is device name
@@ -387,11 +400,15 @@ sub SSCam_Attr {
             $do = ($aVal) ? 1 : 0;
         }
         $do = 0 if($cmd eq "del");
-        my $val   = ($do == 1 ?  "inactive" : "off");
+		if(IsModelCam($hash)) {
+            $val = ($do == 1 ? "inactive" : "off");
+		} else {
+		    $val = ($do == 1 ? "disabled" : "initialized");
+		}
     
         readingsSingleUpdate($hash, "state", $val, 1);
         readingsSingleUpdate($hash, "PollState", "Inactive", 1) if($do == 1);
-        readingsSingleUpdate($hash, "Availability", "???", 1) if($do == 1);
+        readingsSingleUpdate($hash, "Availability", "???", 1) if($do == 1 && IsModelCam($hash));
     }
     
     if ($aName eq "showStmInfoFull") {
@@ -484,7 +501,7 @@ sub SSCam_Attr {
     if ($cmd eq "set") {
         if ($aName =~ m/httptimeout|snapGalleryColumns|rectime|pollcaminfoall/ ) {
             unless ($aVal =~ /^\d+$/) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
-        }   
+        }  		
     }
 
     if ($cmd eq "del") {
@@ -516,28 +533,34 @@ sub SSCam_Set {
         
   return "module is deactivated" if(IsDisabled($name));
   
-  $setlist = "Unknown argument $opt, choose one of ".
-             "credentials ".
-             "expmode:auto,day,night ".
-			 ($hash->{HELPER}{APIHMMAXVER}?"homeMode:on,off ": "").
-             "on ".
-             "off ".
-             "motdetsc:disable,camera,SVS ".
-             "snap ".
-			 (AttrVal($name, "snapGalleryBoost",0)?(AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ":" ").
-			 "createSnapGallery:noArg ".
-             "enable ".
-             "disable ".
-             "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open,lastsnap_fw ".
-             "stopView:noArg ".
-             "extevent:1,2,3,4,5,6,7,8,9,10 ".
-             ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
-             ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-             ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
-             ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
-           
+  if(IsModelCam($hash)) {
+      # selist für Cams
+      $setlist = "Unknown argument $opt, choose one of ".
+                 "credentials ".
+                 "expmode:auto,day,night ".
+                 "on ".
+                 "off ".
+                 "motdetsc:disable,camera,SVS ".
+                 "snap ".
+	     		 (AttrVal($name, "snapGalleryBoost",0)?(AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ":" ").
+	     		 "createSnapGallery:noArg ".
+                 "enable ".
+                 "disable ".
+                 "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open,lastsnap_fw ".
+                 "stopView:noArg ".
+                 "extevent:1,2,3,4,5,6,7,8,9,10 ".
+                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
+                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
+                 ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
+                 ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
+  } else {
+      # setlist für SVS Devices
+      $setlist = "Unknown argument $opt, choose one of ".
+	             "credentials ".
+		     	 ($hash->{HELPER}{APIHMMAXVER}?"homeMode:on,off ": "");
+  }         
 
-  if ($opt eq "on") {
+  if ($opt eq "on" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             
       if (defined($prop)) {
@@ -546,15 +569,15 @@ sub SSCam_Set {
       }
       camstartrec($hash);
  
-  } elsif ($opt eq "off") {
+  } elsif ($opt eq "off" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       camstoprec($hash);
         
-  } elsif ($opt eq "snap") {
+  } elsif ($opt eq "snap" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       camsnap($hash);
         
-  } elsif ($opt eq "snapGallery") {
+  } elsif ($opt eq "snapGallery" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       my $ret = getclhash($hash);
       return $ret if($ret);
@@ -585,7 +608,7 @@ sub SSCam_Set {
 		  delete($hash->{HELPER}{CL});
 	  }
 	  
-  } elsif ($opt eq "createSnapGallery") {
+  } elsif ($opt eq "createSnapGallery" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       my ($ret,$sgdev);
       return "When you want use \"$opt\", you have to set the attribute \"snapGalleryBoost\" first because the functionality depends on retrieving snapshots automatically." 
@@ -598,15 +621,15 @@ sub SSCam_Set {
 	  CommandAttr($hash->{CL},$wlname." room ".$room);
 	  return "<html>Snapgallery device \"$sgdev\" was created successfully. Please have a look to room <a href=\"/fhem?room=$room\">$room</a>.<br> You can now assign it to another room if you want. Don't rename this new device ! </html>";
       
-  } elsif ($opt eq "enable") {
+  } elsif ($opt eq "enable" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       camenable($hash);
         
-  } elsif ($opt eq "disable") {
+  } elsif ($opt eq "disable" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       camdisable($hash);
        
-  } elsif ($opt eq "motdetsc") {
+  } elsif ($opt eq "motdetsc" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       if (!$prop || $prop !~ /^(disable|camera|SVS)$/) { return " \"$opt\" needs one of those arguments: disable, camera, SVS !";}
             
@@ -643,21 +666,21 @@ sub SSCam_Set {
 		   return "Error while saving Username / Password - see logfile for details";
 	  }
 			
-  } elsif ($opt eq "expmode") {
+  } elsif ($opt eq "expmode" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       unless ($prop) { return " \"$opt\" needs one of those arguments: auto, day, night !";}
             
       $hash->{HELPER}{EXPMODE} = $prop;
       camexpmode($hash);
         
-  } elsif ($opt eq "homeMode") {
+  } elsif ($opt eq "homeMode" && !IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       unless ($prop) { return " \"$opt\" needs one of those arguments: on, off !";}
             
       $hash->{HELPER}{HOMEMODE} = $prop;
       sethomemode($hash);
         
-  } elsif ($opt eq "goPreset") {
+  } elsif ($opt eq "goPreset" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       if (!$prop) {return "Function \"goPreset\" needs a \"Presetname\" as an argument";}
             
@@ -669,7 +692,7 @@ sub SSCam_Set {
       $hash->{HELPER}{PTZACTION}    = "gopreset";
       doptzaction($hash);
         
-  } elsif ($opt eq "runPatrol") {
+  } elsif ($opt eq "runPatrol" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       if (!$prop) {return "Function \"runPatrol\" needs a \"Patrolname\" as an argument";}
             
@@ -681,7 +704,7 @@ sub SSCam_Set {
       $hash->{HELPER}{PTZACTION}    = "runpatrol";
       doptzaction($hash);
         
-  } elsif ($opt eq "goAbsPTZ") {
+  } elsif ($opt eq "goAbsPTZ" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 
       if ($prop eq "up" || $prop eq "down" || $prop eq "left" || $prop eq "right") {
@@ -710,7 +733,7 @@ sub SSCam_Set {
       } 
           return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
 
-  } elsif ($opt eq "move") {
+  } elsif ($opt eq "move" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 
       if (!defined($prop) || ($prop ne "up" && $prop ne "down" && $prop ne "left" && $prop ne "right" && $prop !~ m/dir_\d/)) {return "Function \"move\" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)";}
@@ -721,7 +744,7 @@ sub SSCam_Set {
       $hash->{HELPER}{PTZACTION}  = "movestart";
       doptzaction($hash);
         
-  } elsif ($opt eq "runView") {
+  } elsif ($opt eq "runView" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             
       if ($prop eq "live_open") {
@@ -761,13 +784,13 @@ sub SSCam_Set {
       }
       runliveview($hash); 
             
-  } elsif ($opt eq "extevent") {
+  } elsif ($opt eq "extevent" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
                                    
       $hash->{HELPER}{EVENTID} = $prop;
       extevent($hash);
         
-  } elsif ($opt eq "stopView") {
+  } elsif ($opt eq "stopView" && IsModelCam($hash)) {
       stopliveview($hash);            
         
   } else {
@@ -785,19 +808,32 @@ sub SSCam_Get {
     my $opt = shift @a;
 	my $arg = shift @a;
 	my $ret = "";
+	my $getlist;
 
-	my $getlist = "Unknown argument $opt, choose one of ".
-                  "caminfoall:noArg ".
-				  ((AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))
-				      ?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ").
-				  ($hash->{HELPER}{APIHMMAXVER}?"homeModeState:noArg ": "").
-				  "snapinfo:noArg ".
-                  "svsinfo:noArg ".
-                  "snapfileinfo:noArg ".
-                  "eventlist:noArg ".
-	        	  "stmUrlPath:noArg ".
-				  "scanVirgin:noArg "
-                  ;
+	if(IsModelCam($hash)) {
+	    # selist für Cams
+	    $getlist = "Unknown argument $opt, choose one of ".
+                   "caminfoall:noArg ".
+		 		   ((AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))
+				       ?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ").
+				   "snapinfo:noArg ".
+                   "svsinfo:noArg ".
+                   "snapfileinfo:noArg ".
+                   "eventlist:noArg ".
+	        	   "stmUrlPath:noArg ".
+				   "storedCredentials:noArg ".
+				   "scanVirgin:noArg "
+                   ;
+	} else {
+        # setlist für SVS Devices
+	    $getlist = "Unknown argument $opt, choose one of ".
+		           "caminfoall:noArg ".
+				   ($hash->{HELPER}{APIHMMAXVER}?"homeModeState:noArg ": "").
+                   "svsinfo:noArg ".
+				   "storedCredentials:noArg ".
+				   "scanVirgin:noArg "
+                   ;
+	}
 				  
     return if(IsDisabled($name));             
         
@@ -806,7 +842,7 @@ sub SSCam_Get {
 		if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         getcaminfoall($hash,1);
                 
-    } elsif ($opt eq "homeModeState") {
+    } elsif ($opt eq "homeModeState" && !IsModelCam($hash)) {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         gethomemodestate($hash);
                 
@@ -814,7 +850,14 @@ sub SSCam_Get {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         getsvsinfo($hash);
                 
-    } elsif ($opt eq "snapGallery") {
+    } elsif ($opt eq "storedCredentials") {
+	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+        # Credentials abrufen
+        my ($success, $username, $password) = getcredentials($hash,0);
+        unless ($success) {return "Credentials couldn't be retrieved successfully - see logfile"};
+        return "Stored Credentials for - Username: $username, Password: $password";
+                
+    } elsif ($opt eq "snapGallery" && IsModelCam($hash)) {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 	    my $ret = getclhash($hash);
         return $ret if($ret);
@@ -845,22 +888,22 @@ sub SSCam_Get {
 		    delete($hash->{HELPER}{CL});
 		}
 
-    } elsif ($opt eq "snapinfo") {
+    } elsif ($opt eq "snapinfo" && IsModelCam($hash)) {
         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
 		if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         my ($slim,$ssize) = snaplimsize($hash);		
         getsnapinfo("$name:$slim:$ssize");
                 
-    } elsif ($opt eq "snapfileinfo") {
+    } elsif ($opt eq "snapfileinfo" && IsModelCam($hash)) {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         if (!ReadingsVal("$name", "LastSnapId", undef)) {return "Reading LastSnapId is empty - please take a snapshot before !"}
         getsnapfilename($hash);
                 
-    } elsif ($opt eq "eventlist") {
+    } elsif ($opt eq "eventlist" && IsModelCam($hash)) {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         geteventlist ($hash);
                 
-    } elsif ($opt eq "stmUrlPath") {
+    } elsif ($opt eq "stmUrlPath" && IsModelCam($hash)) {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         getStmUrlPath ($hash);
             
@@ -941,17 +984,21 @@ sub initonboot ($) {
      } else {
          # allg. SVS-Eigenschaften abrufen
          getsvsinfo($hash);
-         # Kameraspezifische Infos holen
-         getcaminfo($hash);
+         
+		 if(IsModelCam($hash)) {
+		     # Kameraspezifische Infos holen
+             getcaminfo($hash);
 		 
-         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
-         my ($slim,$ssize) = snaplimsize($hash);		
-         getsnapinfo("$name:$slim:$ssize");
+             # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
+             my ($slim,$ssize) = snaplimsize($hash);		
+             getsnapinfo("$name:$slim:$ssize");
 
-         getcapabilities($hash);
-         # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
-         getptzlistpreset($hash);
-         getptzlistpatrol($hash);
+             getcapabilities($hash);
+             
+			 # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
+             getptzlistpreset($hash);
+             getptzlistpatrol($hash);
+		 }
      }
          
      # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-30s 
@@ -1069,52 +1116,34 @@ sub watchdogpollcaminfo ($) {
     my $watchdogtimer = 90;
     
     if (defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10 and ReadingsVal("$name", "PollState", "Active") eq "Inactive" and !IsDisabled($name)) {
-        
-        # Polling ist jetzt aktiv
-        readingsSingleUpdate($hash,"PollState","Active",0);
-            
-        Log3($name, 3, "$name - Polling Camera $camname is activated - Pollinginterval: ".$attr{$name}{pollcaminfoall}."s");
-        
-        # in $hash eintragen für späteren Vergleich (Changes von pollcaminfoall)
-        $hash->{HELPER}{OLDVALPOLL} = $attr{$name}{pollcaminfoall};
-        
+        readingsSingleUpdate($hash,"PollState","Active",1);                       # Polling ist jetzt aktiv
+        readingsSingleUpdate($hash,"state","polling",1) if(!IsModelCam($hash));   # Polling-state bei einem SVS-Device setzten
+		Log3($name, 3, "$name - Polling of $camname is activated - Pollinginterval: ".$attr{$name}{pollcaminfoall}."s");
+        $hash->{HELPER}{OLDVALPOLL} = $attr{$name}{pollcaminfoall};               # in $hash eintragen für späteren Vergleich (Changes von pollcaminfoall)
         &getcaminfoall($hash);           
     }
     
     if (defined($hash->{HELPER}{OLDVALPOLL}) and defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10) {
         if ($hash->{HELPER}{OLDVALPOLL} != $attr{$name}{pollcaminfoall}) {
-        
-            Log3($name, 3, "$name - Polling Camera $camname was changed to new Pollinginterval: ".$attr{$name}{pollcaminfoall}."s");
-            
+            Log3($name, 3, "$name - Polling of $camname was changed to new Pollinginterval: ".$attr{$name}{pollcaminfoall}."s");
             $hash->{HELPER}{OLDVALPOLL} = $attr{$name}{pollcaminfoall};
-            }
+        }
     }
     
     if (defined($attr{$name}{pollnologging})) {
         if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} ne $attr{$name}{pollnologging}) {
-        
             if ($attr{$name}{pollnologging} == "1") {
-            
-                Log3($name, 3, "$name - Log of Polling Camera $camname is deactivated");
-                
-                # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
-                $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $attr{$name}{pollnologging};
-                
+                Log3($name, 3, "$name - Polling-Log of $camname is deactivated");
+                $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $attr{$name}{pollnologging};    # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
             } else {
-            
-                Log3($name, 3, "$name - Log of Polling Camera $camname is activated");
-                
-                # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
-                $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $attr{$name}{pollnologging};
+                Log3($name, 3, "$name - Polling-Log of $camname is activated");
+                $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $attr{$name}{pollnologging};    # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
             }
         }
     } else {
-    
         # alter Wert von "pollnologging" war 1 -> Logging war deaktiviert
         if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} == "1") {
-
-            Log3($name, 3, "$name - Log of Polling Camera $camname is activated");
-            
+            Log3($name, 3, "$name - Polling-Log of $camname is activated");
             $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";            
         }
     }
@@ -1714,49 +1743,58 @@ sub getcaminfoall {
     
     return if(IsDisabled($name));
     
-    geteventlist($hash);
-    RemoveInternalTimer($hash, "getcaminfo");
-    InternalTimer(gettimeofday()+0.4, "getcaminfo", $hash, 0);
-    	
-    # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
-    my ($slim,$ssize) = snaplimsize($hash);
-    RemoveInternalTimer($hash, "getsnapinfo");
-    InternalTimer(gettimeofday()+0.6, "getsnapinfo", "$name:$slim:$ssize", 0);
+    RemoveInternalTimer($hash, "getsvsinfo");
+    InternalTimer(gettimeofday()+1, "getsvsinfo", $hash, 0);
+	
+	if(IsModelCam($hash)) {
+	    # Model ist CAM
+        geteventlist($hash);
+        RemoveInternalTimer($hash, "getcaminfo");
+        InternalTimer(gettimeofday()+0.4, "getcaminfo", $hash, 0);
     
-	RemoveInternalTimer($hash, "getmotionenum");
-    InternalTimer(gettimeofday()+0.8, "getmotionenum", $hash, 0);
-    RemoveInternalTimer($hash, "getcapabilities");
-    InternalTimer(gettimeofday()+1.3, "getcapabilities", $hash, 0);
-    RemoveInternalTimer($hash, "getptzlistpreset");
-    InternalTimer(gettimeofday()+1.6, "getptzlistpreset", $hash, 0);
-    RemoveInternalTimer($hash, "getptzlistpatrol");
-    InternalTimer(gettimeofday()+1.9, "getptzlistpatrol", $hash, 0);
-    RemoveInternalTimer($hash, "getStmUrlPath");
-    InternalTimer(gettimeofday()+2.1, "getStmUrlPath", $hash, 0);
-    
-    # wenn gesetzt = manuelle Abfrage,
-    if ($mode) {
-        getsvsinfo($hash);
-        return;
+        # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
+        my ($slim,$ssize) = snaplimsize($hash);
+        RemoveInternalTimer($hash, "getsnapinfo");
+        InternalTimer(gettimeofday()+0.6, "getsnapinfo", "$name:$slim:$ssize", 0);
+	
+	    RemoveInternalTimer($hash, "getmotionenum");
+        InternalTimer(gettimeofday()+0.8, "getmotionenum", $hash, 0);
+        RemoveInternalTimer($hash, "getcapabilities");
+        InternalTimer(gettimeofday()+1.3, "getcapabilities", $hash, 0);
+        RemoveInternalTimer($hash, "getptzlistpreset");
+        InternalTimer(gettimeofday()+1.6, "getptzlistpreset", $hash, 0);
+        RemoveInternalTimer($hash, "getptzlistpatrol");
+        InternalTimer(gettimeofday()+1.9, "getptzlistpatrol", $hash, 0);
+        RemoveInternalTimer($hash, "getStmUrlPath");
+        InternalTimer(gettimeofday()+2.1, "getStmUrlPath", $hash, 0);
+	} else {
+	    # Model ist SVS
+        RemoveInternalTimer($hash, "gethomemodestate");
+        InternalTimer(gettimeofday()+0.7, "gethomemodestate", $hash, 0);
     }
+    
+	# wenn gesetzt = manuelle Abfrage
+    return if ($mode);
     
     if (defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10) {
         # Pollen wenn pollcaminfo > 10, sonst kein Polling
         
         $new = gettimeofday()+$attr{$name}{pollcaminfoall}; 
         InternalTimer($new, "getcaminfoall", $hash, 0);
+		
+		$now = FmtTime(gettimeofday());
+        $new = FmtTime(gettimeofday()+$attr{$name}{pollcaminfoall});
+		readingsSingleUpdate($hash,"state","polling - next time: $new",1) if(!IsModelCam($hash));  # state für SVS-Device setzen
         
         if (!$attr{$name}{pollnologging}) {
-            $now = FmtTime(gettimeofday());
-            $new = FmtTime(gettimeofday()+$attr{$name}{pollcaminfoall});
-
             Log3($name, 3, "$name - Polling now: $now , next Polling: $new");
         }
     
 	} else {
         # Beenden Polling aller Caminfos
-        readingsSingleUpdate($hash,"PollState","Inactive",0);
-        Log3($name, 3, "$name - Polling of Camera $camname is deactivated");
+        readingsSingleUpdate($hash,"PollState","Inactive",1);
+		readingsSingleUpdate($hash,"state","initialized",1) if(!IsModelCam($hash));  # state für SVS-Device setzen
+        Log3($name, 3, "$name - Polling of $camname is deactivated");
     }
 return;
 }
@@ -2488,15 +2526,32 @@ return sscam_checksid($hash);
 sub sscam_checksid ($) {  
    my ($hash) = @_;
    my $name   = $hash->{NAME};
-    
+   my $subref;
+   
+   if(IsModelCam($hash)) {
+       # Folgefunktion wenn Cam-Device
+       $subref = "sscam_getcamid";
+   } else {
+       # Folgefunktion wenn SVS-Device
+       $subref = "sscam_camop";
+   }
+   
    # SID holen bzw. login
    my $sid = $hash->{HELPER}{SID};
    if(!$sid) {
        Log3($name, 3, "$name - no session ID found - get new one");
-	   sscam_login($hash,'sscam_getcamid');
+	   sscam_login($hash,$subref);
 	   return;
    }
-return sscam_getcamid($hash);
+   
+   if(IsModelCam($hash)) {
+       # Normalverarbeitung für Cams
+       return sscam_getcamid($hash);
+   } else {
+       # Sprung zu sscam_camop wenn SVS Device
+       return sscam_camop($hash);
+   }
+
 }
 
 #############################################################################################
@@ -3107,7 +3162,7 @@ sub sscam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
        
-                Log3($name, 3, "$name - HomeMode was set to \"$hash->{HELPER}{HOMEMODE}\" (all Cameras!)");
+                Log3($name, 3, "$name - HomeMode was set to \"$hash->{HELPER}{HOMEMODE}\" ");
 				
 				# Token freigeben vor nächstem Kommando
                 $hash->{HELPER}{ACTIVE} = "off";
@@ -4205,6 +4260,16 @@ return($hash,$success);
 }
 
 ###############################################################################
+#      Test ob MODEL=CAM (sonst ist es SVS)
+sub IsModelCam ($){ 
+  my ($hash)= @_;
+  
+  my $m = ($hash->{MODEL} eq "CAM")?1:0;
+  
+return($m);
+}
+
+###############################################################################
 # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
 sub snaplimsize ($) {      
   my ($hash)= @_;
@@ -4403,7 +4468,9 @@ sub experror {
 <a name="SSCam"></a>
 <h3>SSCam</h3>
 <ul>
-  Using this Module you are able to operate cameras which are defined in Synology Surveillance Station (SVS). <br>
+  Using this Module you are able to operate cameras which are defined in Synology Surveillance Station (SVS) and execute 
+  functions of the SVS. <br>
+  
   At present the following functions are available: <br><br>
    <ul>
     <ul>
@@ -4425,6 +4492,7 @@ sub experror {
        <li>fetch of livestream-Url's with key (login not needed in that case)   </li>
        <li>playback of last recording and playback the last snapshot  </li>
 	   <li>switch the Surveillance Station HomeMode on/off and retrieve the HomeModeState </li>
+	   <li>show the stored credentials of a device </li>
 	   <li>create a gallery of the last 1-10 snapshots (as a Popup or permanent weblink-Device)  </li><br>
     </ul>
    </ul>
@@ -4457,14 +4525,27 @@ sub experror {
   <b>Define</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCAM &lt;Cameraname in SVS&gt; &lt;ServerAddr&gt; [Port]  </code><br>
-    <br>
-    Defines a new camera device for SSCam. At first the devices have to be set up and operable in Synology Surveillance Station 7.0 and above. <br><br>
+    There is a distinction between the definition of a camera-device and the definition of a Surveillance Station (SVS) 
+	device. Dependend on the kind of the defined device the internal MODEL will be set to CAM or SVS and a proper 
+    subset of the described set/get-commands are assigned to the device. <br>
+	The scope of application of set/get-commands is denoted to every particular command (valid for CAM, SVS, CAM/SVS).
+	<br><br>
+	
+    A camera-device will be defined by: <br><br>
+	
+    <code>define &lt;name&gt; SSCAM &lt;camera name in SVS&gt; &lt;ServerAddr&gt; [Port] </code> <br><br>
+    
+    At first the devices have to be set up and has to be operable in Synology Surveillance Station 7.0 and above. <br><br>
+	
+	A SVS-device to control functions of the Surveillance Station (SVS) will be defined by: <br><br>
+	
+	<code>define &lt;name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] </code> <br><br>
+	
+    In that case the term &lt;camera name in SVS&gt; become replaced by <b>SVS</b> only. <br><br>
     
     The Modul SSCam ist based on functions of Synology Surveillance Station API. <br>
-    Please refer the <a href="http://global.download.synology.com/download/Document/DeveloperGuide/Surveillance_Station_Web_API_v2.0.pdf">Web API Guide</a>. <br><br>
     
-    Currently only HTTP-protocol is supported to call Synology DS. <br><br>  
+    Currently the HTTP-protocol is supported to call Synology Disk Station. <br><br>  
 
     The parameters are in detail:
    <br>
@@ -4473,7 +4554,7 @@ sub experror {
    <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
     <tr><td>name:         </td><td>the name of the new device to use in FHEM</td></tr>
-    <tr><td>Cameraname:   </td><td>Cameraname as defined in Synology Surveillance Station, Spaces are not allowed in Cameraname !</td></tr>
+    <tr><td>Cameraname:   </td><td>camera name as defined in Synology Surveillance Station if camera-device, "SVS" if SVS-Device. Spaces are not allowed in camera name. </td></tr>
     <tr><td>ServerAddr:   </td><td>IP-address of Synology Surveillance Station Host. <b>Note:</b> avoid using hostnames because of DNS-Calls are not unblocking in FHEM </td></tr>
     <tr><td>Port:         </td><td>optional - the port of synology surveillance station, if not set the default of 5000 (HTTP only) is used</td></tr>
    </table>
@@ -4482,9 +4563,12 @@ sub experror {
 
     <b>Example:</b>
      <pre>
-      define CamCP SSCAM Carport 192.168.2.20 [5000]  
+      <code>define CamCP SSCAM Carport 192.168.2.20 [5000]</code>
+      creates a new camera device CamCP
+
+      <code>define DS1 SSCAM SVS 192.168.2.20 [5000]</code>
+      creares a new SVS device DS1	  
     </pre>
-    
     
     When a new Camera is defined, as a start the recordingtime of 15 seconds will be assigned to the device.<br>
     Using the <a href="#SSCamattr">attribute</a> "rectime" you can adapt the recordingtime for every camera individually.<br>
@@ -4510,7 +4594,7 @@ sub experror {
      set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt;
     </pre>
     
-    The password lenth has a maximum of 20 characters. <br> 
+    The password length has a maximum of 20 characters. <br> 
 	The operator can, dependend on what functions are planned to execute, create an user in DSM respectively in Synology Surveillance Station as well. <br>
     If the user is member of admin-group, he has access to all module functions. Without this membership the user can only execute functions with lower need of rights. <br>
     The required minimum rights to execute functions are listed in a table further down. <br>
@@ -4575,8 +4659,12 @@ sub experror {
 <a name="SSCamset"></a>
 <b>Set </b>
   <ul>  
+  <br>
+  The specified set-commands are available for CAM/SVS-devices or only valid for CAM-devices or rather for SVS-Devices. 
+  They can be selected in the drop-down-menu of the particular device. <br><br>
+  
   <ul>
-  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b></li> <br>
+  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
   
   set username / password combination for access the Synology Surveillance Station. 
   See <a href="#SSCam_Credentials">Credentials</a><br> for further informations.
@@ -4585,7 +4673,7 @@ sub experror {
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; createSnapGallery </b></li> <br>
+  <li><b> set &lt;name&gt; createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   A snapshot gallery will be created as a permanent (weblink)Device. The device will be provided in room "SnapGallery".
   With the "snapGallery..."-<a href="#SSCamattr">attributes</a> respectively the weblink-device specific attributes (which was created)
@@ -4594,7 +4682,7 @@ sub experror {
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; [enable|disable] </b></li> <br>
+  <li><b> set &lt;name&gt; [enable|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   For <b>deactivating / activating</b> a list of cameras or all cameras by Regex-expression, subsequent two 
   examples using "at":
@@ -4624,7 +4712,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; expmode [day|night|auto] </b></li> <br>
+  <li><b> set &lt;name&gt; expmode [day|night|auto] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   With this command you are able to control the exposure mode and can set it to day, night or automatic mode. 
   Thereby, for example, the behavior of camera LED's will be suitable controlled. 
@@ -4637,7 +4725,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b></li> <br>
+  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
   
   This command triggers an external event (1-10) in SVS. 
   The actions which will are used have to be defined in the actionrule editor of SVS at first. There are the events 1-10 possible.
@@ -4648,7 +4736,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ] </b></li> <br>
+  <li><b> set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   This command can be used to move a PTZ-camera to an arbitrary absolute X/Y-coordinate, or to absolute position using up/down/left/right. 
   The option is only available for cameras which are having the Reading "CapPTZAbs=true". The property of a camera can be requested with "get &lt;name&gt; caminfoall" .
@@ -4683,7 +4771,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b></li> <br>
+  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   Using this command you can move PTZ-cameras to a predefined position. <br>
   The Preset-positions have to be defined first of all in the Synology Surveillance Station. This usually happens in the PTZ-control of IP-camera setup in SVS.
@@ -4719,7 +4807,7 @@ sub experror {
   <br><br>
 
   <ul>
-  <li><b> set &lt;name&gt; homeMode [on | off] </b></li> <br>
+  <li><b> set &lt;name&gt; homeMode [on | off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
   
   Switch the HomeMode of the Surveillance Station on or off. 
   Further informations about HomeMode you can find in the <a href="https://www.synology.com/en-global/knowledgebase/Surveillance/help/SurveillanceStation/home_mode">Synology Onlinehelp</a>.
@@ -4727,7 +4815,7 @@ sub experror {
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b></li> <br>
+  <li><b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   The command "motdetsc" (stands for "motion detection source") switchover the motion detection to the desired mode.
   If motion detection will be done by camera / SVS without any parameters, the original camera motion detection settings are kept.
@@ -4776,7 +4864,7 @@ sub experror {
   <br><br>
     
   <ul>
-  <li><b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [seconds] </b></li> <br>
+  <li><b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [seconds] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   With this command a continuous move of a PTZ-camera will be started. In addition to the four basic directions up/down/left/right is it possible to use angular dimensions 
   "dir_X". The grain size of graduation depends on properties of the camera and can be identified by the Reading "CapPTZDirections". <br><br>
@@ -4799,7 +4887,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b>set &lt;name&gt; [on|off] </b></li> <br>
+  <li><b>set &lt;name&gt; [on|off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
    
   The command "set &lt;name&gt; on" starts a recording. The default recording time takes 15 seconds. It can be changed by the <a href="#SSCamattr">attribute</a> "rectime" individualy. 
   With the <a href="#SSCamattr">attribute</a> (respectively the default value) provided recording time can be overwritten once by "set &lt;name&gt; on [rectime]".
@@ -4839,7 +4927,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b></li> <br>
+  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   This commans starts a predefined patrol (tour) of a PTZ-camera. <br>
   At first the patrol has to be predefined in the Synology Surveillance Station. It can be done in the PTZ-control of IP-Kamera Setup -&gt; PTZ-control -&gt; patrol.
@@ -4851,7 +4939,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; runView [live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b></li> <br>
+  <li><b> set &lt;name&gt; runView [live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   With "live_fw, live_link, live_open" a livestream (mjpeg-stream) of a camera will be started, either as embedded image 
   or as a generated link. <br>
@@ -4894,7 +4982,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap </b></li> <br>
+  <li><b> set &lt;name&gt; snap </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   A snapshot can be triggered with:
   <pre> 
@@ -4923,7 +5011,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snapGallery [1-10] </b></li> <br>
+  <li><b> set &lt;name&gt; snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   The command is only available if the attribute "snapGalleryBoost=1" is set. <br>
   It creates an output of the last [x] snapshots as well as "get ... snapGallery".  But differing from "get" with
@@ -4942,42 +5030,40 @@ sub experror {
 <a name="SSCamget"></a>
 <b>Get</b>
  <ul>
-  With SSCam the properties of SVS and defined Cameras could be retrieved. Actually it could be done by following commands:
-  <pre>
-      get &lt;name&gt; caminfoall
-      get &lt;name&gt; eventlist
-      get &lt;name&gt; homeModeState
-      get &lt;name&gt; scanVirgin
-      get &lt;name&gt; snapGallery
-      get &lt;name&gt; stmUrlPath
-      get &lt;name&gt; svsinfo
-      get &lt;name&gt; snapfileinfo
-      get &lt;name&gt; snapinfo
-  </pre>
+  <br>
+  With SSCam the properties of SVS and defined Cameras could be retrieved. <br>
+  The specified get-commands are available for CAM/SVS-devices or only valid for CAM-devices or rather for SVS-Devices. 
+  They can be selected in the drop-down-menu of the particular device. <br><br>
+
+  <ul>
+  <li><b> get &lt;name&gt; caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
   
-  With command <b>"get &lt;name&gt; caminfoall"</b> dependend of the type of Camera (e.g. Fix- or PTZ-Camera) the available properties will be retrieved and provided as Readings.<br>
-  For example the Reading "Availability" will be set to "disconnected" if the Camera would be disconnected from Synology Surveillance Station and can be used for further 
-  processing like creating events. <br>
-  By command <b>"get &lt;name&gt; eventlist"</b> the <a href="#SSCamreadings">Reading</a> "CamEventNum" and "CamLastRecord" will be refreshed which containes the total number of in SVS 
-  registered camera events and the path / name of the last recording. 
-  This command will be implicit executed when "get ... caminfoall" is running. <br>
-  The <a href="#SSCamattr">attribute</a> "videofolderMap" replaces the content of reading "VideoFolder". You can use it for example if you have mounted the videofolder of SVS 
-  under another name or path and want to access by your local pc.
-  Using <b>"get &lt;name&gt; snapfileinfo"</b> the filename of the last snapshot will be retrieved. This command will be executed with <b>"get &lt;name&gt; snap"</b> automatically. <br>
-  The command <b>"get &lt;name&gt; svsinfo"</b> is not really dependend on a camera, but rather a command to determine common informations about the installed SVS-version and other properties. <br>
-  The functions "caminfoall" and "svsinfo" will be executed automatically once-only after FHEM restarts to collect some relevant informations for camera control. <br>
-  Please consider to save the <a href="#SSCam_Credentials">credentials</a> what will be used for login to DSM or SVS !
+  Dependend of the type of camera (e.g. Fix- or PTZ-Camera) the available properties are retrieved and provided as Readings.<br>
+  For example the Reading "Availability" will be set to "disconnected" if the camera would be disconnected from Synology 
+  Surveillance Station and can't be used for further processing like creating events.
+  </ul>
+  <br><br>  
+  
+  <ul>
+  <li><b> get &lt;name&gt; eventlist </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  
+  The <a href="#SSCamreadings">Reading</a> "CamEventNum" and "CamLastRecord" will be refreshed which containes the total number 
+  of in SVS registered camera events and the path/name of the last recording. 
+  This command will be implicit executed when "get &lt;name&gt; caminfoall" is running. <br>
+  The <a href="#SSCamattr">attribute</a> "videofolderMap" replaces the content of reading "VideoFolder". You can use it for 
+  example if you have mounted the videofolder of SVS under another name or path and want to access by your local pc. 
+  </ul>
   <br><br>
 
   <ul>
-  <li><b> get &lt;name&gt; homeModeState </b></li> <br>
+  <li><b> get &lt;name&gt; homeModeState </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
   
   HomeMode-state of the Surveillance Station will be retrieved.  
   </ul>
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; scanVirgin </b></li> <br>
+  <li><b> get &lt;name&gt; scanVirgin </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
   
   This command is similar to get caminfoall, informations relating to SVS and the camera will be retrieved. 
   In difference to caminfoall in either case a new session ID will be generated (do a new login), the camera ID will be
@@ -4986,7 +5072,7 @@ sub experror {
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; snapGallery [1-10] </b></li> <br>
+  <li><b> get &lt;name&gt; snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   A popup with the last [x] snapshots will be created. If the <a href="#SSCamattr">attribute</a> "snapGalleryBoost" is set, 
   the last snapshots (default 3) are requested by polling and they will be stored in the FHEM-servers main memory. 
@@ -5015,7 +5101,15 @@ sub experror {
 		<br><br>
   
   <ul>
-  <li><b> get &lt;name&gt; snapinfo </b></li> <br>
+  <li><b> get &lt;name&gt; snapfileinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  
+  The filename of the last snapshot will be retrieved. This command will be executed with <b>"get &lt;name&gt; snap"</b> 
+  automatically.
+  </ul>
+  <br><br>  
+  
+  <ul>
+  <li><b> get &lt;name&gt; snapinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   Informations about snapshots will be retrieved. Heplful if snapshots are not triggerd by SSCam, but by motion detection of the camera or surveillance
   station instead.
@@ -5023,7 +5117,7 @@ sub experror {
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; stmUrlPath </b></li> <br>
+  <li><b> get &lt;name&gt; stmUrlPath </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   This command is to fetch the streamkey information and streamurl using that streamkey. The reading "StmKey" will be filled when this command will be executed and can be used 
   to send it and run by your own application like a browser (see example).
@@ -5035,19 +5129,34 @@ sub experror {
   Example to create an http-call to a livestream using StmKey: <br>
   
   <pre>
-     http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceStation.VideoStreaming&version=1&method=Stream&format=mjpeg&cameraId=5&StmKey="31fd87279976d89bb98409728cced890"
+http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceStation.VideoStreaming&version=1&method=Stream&format=mjpeg&cameraId=5&StmKey="31fd87279976d89bb98409728cced890"
   </pre>
   
-  cameraId (INTERNAL), StmKey has to be replaced by valid values. <br><br>
+  cameraId (Internal CAMID) and StmKey has to be replaced by valid values. <br><br>
   
   <b>Note:</b> <br>
   
-  If you use the stream-call from external and replace hostname / port with valid values and open your router ip ports, please make shure that no
-  unauthorized person could get this sensible data !  <br><br> 
+  If you use the stream-call from external and replace hostname / port with valid values and open your router ip ports, please 
+  make shure that no unauthorized person could get this sensible data !  
   </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> get &lt;name&gt; storedCredentials </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  
+  Shows the stored login credentials in a popup as plain text.
+  </ul>
+  <br><br>  
+  
+  <ul>
+  <li><b> get &lt;name&gt; svsinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  
+  Determines common informations about the installed SVS-version and other properties. <br>
+  </ul>
+  <br><br>  
   
   
-  <b>Polling of Camera-Properties:</b><br><br>
+  <b>Polling of Camera/SVS-Properties</b><br><br>
   <ul>
   Retrieval of Camera-Properties can be done automatically if the attribute "pollcaminfoall" will be set to a value &gt; 10. <br>
   As default that attribute "pollcaminfoall" isn't be set and the automatic polling isn't be active. <br>
@@ -5096,6 +5205,7 @@ sub experror {
   <li><b>CAMNAME</b> - the name of the camera in SVS </li>
   <li><b>CREDENTIALS</b> - the value is "Set" if Credentials are set </li> 
   <li><b>NAME</b> - the cameraname in FHEM </li>
+  <li><b>MODEL</b> - distinction between camera device (CAM) and Surveillance Station device (SVS) </li>
   <li><b>OPMODE</b> - the last executed operation of the module </li>  
   <li><b>SERVERADDR</b> - IP-Address of SVS Host </li>
   <li><b>SERVERPORT</b> - SVS-Port </li>
@@ -5300,7 +5410,8 @@ sub experror {
 <a name="SSCam"></a>
 <h3>SSCam</h3>
 <ul>
-    Mit diesem Modul können Operationen von in der Synology Surveillance Station (SVS) definierten Kameras ausgeführt werden. <br>
+    Mit diesem Modul können Operationen von in der Synology Surveillance Station (SVS) definierten Kameras und Funktionen 
+	der SVS ausgeführt werden. <br>
     Zur Zeit werden folgende Funktionen unterstützt: <br><br>
     <ul>
      <ul>
@@ -5321,6 +5432,7 @@ sub experror {
       <li>starten und beenden von Kamera-Livestreams, anzeigen der letzten Aufnahme oder des letzten Schnappschusses  </li>
       <li>Abruf und Ausgabe der Kamera Streamkeys sowie Stream-Urls (Nutzung von Kamera-Livestreams ohne Session Id)  </li>
       <li>abspielen der letzten Aufnahme bzw. Anzeige des letzten Schnappschusses  </li>
+	  <li>anzeigen der gespeicherten Anmeldeinformationen (Credentials)  </li>
 	  <li>Ein- bzw. Ausschalten des Surveillance Station HomeMode und abfragen des HomeMode-Status </li>
 	  <li>erzeugen einer Gallerie der letzten 1-10 Schnappschüsse (als Popup oder permanentes Device)  </li><br>
      </ul> 
@@ -5357,23 +5469,36 @@ sub experror {
 <b>Definition</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCAM &lt;Kameraname in SVS&gt; &lt;ServerAddr&gt; [Port] </code><br>
-    <br>
+    Bei der Definition wird zwischen einer Kamera-Definition und der Definition einer Surveillance Station (SVS) 
+	unterschieden. Abhängig von der Art des definierten Devices wird das Internal MODEL auf CAM oder SVS gesetzt und eine 
+	passende Teilmenge der beschriebenen set/get-Befehle dem Device zugewiesen. <br>
+	Der Gültigkeitsbereich von set/get-Befehlen ist nach dem jeweiligen Befehl angegeben (gilt für CAM, SVS, CAM/SVS).
+	<br><br>
+	
+    Eine Kamera wird definiert durch: <br><br>
+	
+    <code>define &lt;name&gt; SSCAM &lt;Kameraname in SVS&gt; &lt;ServerAddr&gt; [Port] </code> <br><br>
     
-    Definiert eine neue Kamera für SSCam. Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend funktionieren.<br><br>
-    Das Modul SSCam basiert auf Funktionen der Synology Surveillance Station API. <br>
-    Weitere Informationen unter: <a href="http://global.download.synology.com/download/Document/DeveloperGuide/Surveillance_Station_Web_API_v2.0.pdf">Web API Guide</a>. <br><br>
-    
+    Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend 
+	funktionieren. <br><br>
+	
+	Ein SVS-Device zur Steuerung von Funktionen der Surveillance Station wird definiert mit: <br><br>
+	
+	<code>define &lt;name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] </code> <br><br>
+	
+    In diesem Fall wird statt &lt;Kameraname in SVS&gt; nur <b>SVS</b> angegeben. <br><br>
+	
+	Das Modul SSCam basiert auf Funktionen der Synology Surveillance Station API. <br>
     Momentan wird nur das HTTP-Protokoll unterstützt um die Web-Services der Synology DS aufzurufen. <br><br>  
     
     Die Parameter beschreiben im Einzelnen:
-   <br>
-   <br>    
+    <br>
+    <br>    
     
     <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
     <tr><td>name:           </td><td>der Name des neuen Gerätes in FHEM</td></tr>
-    <tr><td>Kameraname:     </td><td>Kameraname wie er in der Synology Surveillance Station angegeben ist. Leerzeichen im Namen sind nicht erlaubt !</td></tr>
+    <tr><td>Kameraname:     </td><td>Kameraname wie er in der Synology Surveillance Station angegeben ist für Kamera-Device, "SVS" für SVS-Device. Leerzeichen im Namen sind nicht erlaubt. </td></tr>
     <tr><td>ServerAddr:     </td><td>die IP-Addresse des Synology Surveillance Station Host. Hinweis: Es sollte kein Servername verwendet werden weil DNS-Aufrufe in FHEM blockierend sind.</td></tr>
     <tr><td>Port:           </td><td>optional - der Port der Synology Surveillance Station. Wenn nicht angegeben wird der Default-Port 5000 (nur HTTP) gesetzt </td></tr>
     </table>
@@ -5382,10 +5507,13 @@ sub experror {
 
     <b>Beispiel:</b>
      <pre>
-      define CamCP SSCAM Carport 192.168.2.20 [5000]      
+      <code>define CamCP SSCAM Carport 192.168.2.20 [5000] </code>
+      erstellt ein neues Kamera-Device CamCP
+
+      <code>define DS1 SSCAM SVS 192.168.2.20 [5000] </code>
+      erstellt ein neues SVS-Device DS1
      </pre>
      
-    
     Wird eine neue Kamera definiert, wird diesem Device zunächst eine Standardaufnahmedauer von 15 zugewiesen. <br>
     Über das <a href="#SSCamattr">Attribut</a> "rectime" kann die Aufnahmedauer für jede Kamera individuell angepasst werden. Der Wert "0" für "rectime" führt zu einer Endlosaufnahme, die durch "set &lt;name&gt; off" wieder gestoppt werden muß. <br>
     Ein Logeintrag mit einem entsprechenden Hinweis auf diesen Umstand wird geschrieben. <br><br>
@@ -5473,9 +5601,13 @@ sub experror {
   
 <a name="SSCamset"></a>
 <b>Set </b>
-<ul>  
+<ul>
+  <br>
+  Die aufgeführten set-Befehle sind für CAM/SVS-Devices oder nur für CAM-Devices bzw. nur für SVS-Devices gültig. Sie stehen im 
+  Drop-Down-Menü des jeweiligen Devices zur Auswahl zur Verfügung. <br><br>
+  
   <ul>
-  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b></li> <br>
+  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
   
   Setzt Username / Passwort für den Zugriff auf die Synology Surveillance Station. 
   Siehe <a href="#SSCam_Credentials">Credentials</a><br>
@@ -5484,7 +5616,7 @@ sub experror {
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; createSnapGallery </b></li> <br>
+  <li><b> set &lt;name&gt; createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Es wird eine Schnappschußgallerie als permanentes (weblink)Device erzeugt. Das Device wird im Raum "SnapGallery" erstellt.
   Mit den "snapGallery..."-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des entstandenen Weblink-Devices 
@@ -5493,8 +5625,9 @@ sub experror {
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; [enable|disable] </b></li> <br>
+  <li><b> set &lt;name&gt; [enable|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
+  Aktviviert / deaktiviert eine Kamera. <br>
   Um eine Liste von Kameras oder alle Kameras (mit Regex) zum Beispiel um 21:46 zu <b>deaktivieren</b> / zu <b>aktivieren</b> zwei Beispiele mit at:
   <pre>
      define a13 at 21:46 set CamCP1,CamFL,CamHE1,CamTER disable (enable)
@@ -5521,7 +5654,7 @@ sub experror {
   <br>
   
   <ul>
-  <li><b> set &lt;name&gt; expmode [day|night|auto] </b></li> <br>
+  <li><b> set &lt;name&gt; expmode [day|night|auto] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Mit diesem Befehl kann der Belichtungsmodus der Kameras gesetzt werden. Dadurch wird z.B. das Verhalten der Kamera-LED's entsprechend gesteuert. 
   Die erfolgreiche Umschaltung wird durch das Reading CamExposureMode ("get ... caminfoall") reportet. <br><br>
@@ -5534,18 +5667,20 @@ sub experror {
   </ul>
 
   <ul>
-  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b></li> <br>
+  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
   Dieses Kommando triggert ein externes Ereignis (1-10) in der SVS. 
-  Die Aktionen, die dieses Ereignis auslöst, sind zuvor in dem Aktionsregeleditor der SVS einzustellen. Es stehen die Ereignisse 1-10 zur Verfügung.
-  In der Banchrichtigungs-App der SVS können auch Email, SMS oder Mobil (DS-Cam) Nachrichten ausgegeben werden wenn ein externes Ereignis ausgelöst wurde.
+  Die Aktionen, die dieses Ereignis auslöst, sind zuvor in dem Aktionsregeleditor der SVS einzustellen. Es stehen die Ereignisse 
+  1-10 zur Verfügung.
+  In der Benachrichtigungs-App der SVS können auch Email, SMS oder Mobil (DS-Cam) Nachrichten ausgegeben werden wenn ein externes 
+  Ereignis ausgelöst wurde.
   Nähere Informationen dazu sind in der Hilfe zum Aktionsregeleditor zu finden.
   Der verwendete User benötigt Admin-Rechte in einer DSM-Session.
   </ul>
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ] </b></li> <br>
+  <li><b> set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Mit diesem Kommando wird eine PTZ-Kamera in Richtung einer wählbaren absoluten X/Y-Koordinate bewegt, oder zur maximalen Absolutposition in Richtung up/down/left/right. 
   Die Option ist nur für Kameras verfügbar die das Reading "CapPTZAbs=true" (die Fähigkeit für PTZAbs-Aktionen) besitzen. Die Eigenschaften der Kamera kann mit "get &lt;name&gt; caminfoall" abgefragt werden.
@@ -5580,7 +5715,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b></li> <br>
+  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Mit diesem Kommando können PTZ-Kameras in eine vordefininierte Position bewegt werden. <br>
   Die Preset-Positionen müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. Das geschieht in der PTZ-Steuerung im IP-Kamera Setup.
@@ -5615,7 +5750,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; homeMode [on | off] </b></li> <br>
+  <li><b> set &lt;name&gt; homeMode [on | off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
   Schaltet den HomeMode der Surveillance Station ein bzw. aus. 
   Informationen zum HomeMode sind in der <a href="https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/home_mode">Synology Onlinehilfe</a> 
@@ -5624,7 +5759,7 @@ sub experror {
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b></li> <br>
+  <li><b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
   Wird die Bewegungserkennung durch die Kamera / SVS ohne weitere Optionen eingestellt, werden die momentan gültigen Bewegungserkennungsparameter der 
@@ -5672,7 +5807,7 @@ sub experror {
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [Sekunden] </b></li> <br>
+  <li><b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Mit diesem Kommando wird eine kontinuierliche Bewegung der PTZ-Kamera gestartet. Neben den vier Grundrichtungen up/down/left/right stehen auch 
   Zwischenwinkelmaße "dir_X" zur Verfügung. Die Feinheit dieser Graduierung ist von der Kamera abhängig und kann dem Reading "CapPTZDirections" entnommen werden. <br><br>
@@ -5695,7 +5830,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; [on | off] </b></li><br>
+  <li><b> set &lt;name&gt; [on | off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
 
   Der Befehl "set &lt;name&gt; on" startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem Attribut "rectime" individuell festgelegt werden. 
   Die im Attribut (bzw. im Standard) hinterlegte Aufnahmedauer kann einmalig mit "set &lt;name&gt; on [rectime]" überschrieben werden.
@@ -5735,7 +5870,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b></li> <br>
+  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Dieses Kommando startet die vordefinierterte Überwachungstour einer PTZ-Kamera. <br>
   Die Überwachungstouren müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. 
@@ -5748,7 +5883,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; runView [live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b></li> <br>
+  <li><b> set &lt;name&gt; runView [live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Mit "live_fw, live_link, live_open" wird ein Livestream (mjpeg-Stream) der Kamera, entweder als eingebettetes Image 
   oder als generierter Link, gestartet. <br>
@@ -5789,7 +5924,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap </b></li> <br>
+  <li><b> set &lt;name&gt; snap </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Ein <b>Schnappschuß</b> kann ausgelöst werden mit:
   <pre> 
@@ -5817,7 +5952,7 @@ sub experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snapGallery [1-10] </b></li> <br>
+  <li><b> set &lt;name&gt; snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Der Befehl ist nur vorhanden wenn das Attribut "snapGalleryBoost=1" gesetzt wurde.
   Er erzeugt eine Ausgabe der letzten [x] Schnappschüsse ebenso wie <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a>.  Abweichend von "get" wird mit Attribut
@@ -5834,54 +5969,48 @@ sub experror {
 <a name="SSCamget"></a>
 <b>Get</b>
  <ul>
-  Mit SSCam können die Eigenschaften der Surveillance Station und der Kameras abgefragt werden. Zur Zeit stehen dazu 
-  folgende Befehle zur Verfügung:
-  <pre>
-      get &lt;name&gt; caminfoall
-      get &lt;name&gt; eventlist
-      get &lt;name&gt; homeModeState
-      get &lt;name&gt; scanVirgin
-      get &lt;name&gt; snapfileinfo
-      get &lt;name&gt; snapGallery
-      get &lt;name&gt; snapinfo
-      get &lt;name&gt; stmUrlPath
-      get &lt;name&gt; svsinfo
-  </pre>
+  <br>
+  Mit SSCam können die Eigenschaften der Surveillance Station und der Kameras abgefragt werden. <br>
+  Die aufgeführten get-Befehle sind für CAM/SVS-Devices oder nur für CAM-Devices bzw. nur für SVS-Devices gültig. Sie stehen im 
+  Drop-Down-Menü des jeweiligen Devices zur Auswahl zur Verfügung. <br><br>
   
-  Mit dem Befehl <b>"get &lt;name&gt; caminfoall"</b> werden abhängig von der Art der Kamera (z.B. Fix- oder PTZ-Kamera) die 
-  verfügbaren Eigenschaften ermittelt und als Readings zur Verfügung gestellt. <br>
+  <ul>
+  <li><b> get &lt;name&gt; caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  
+  Es werden SVS-Parameter und abhängig von der Art der Kamera (z.B. Fix- oder PTZ-Kamera) die verfügbaren Kamera-Eigenschaften 
+  ermittelt und als Readings zur Verfügung gestellt. <br>
   So wird zum Beispiel das Reading "Availability" auf "disconnected" gesetzt falls die Kamera von der Surveillance Station 
-  getrennt wird und kann für weitere Verarbeitungen genutzt werden. <br>
-  Durch <b>"get &lt;name&gt; eventlist"</b> wird das <a href="#SSCamreadings">Reading</a> "CamEventNum" und "CamLastRec" 
+  getrennt ist.
+  </ul>
+  <br><br> 
+  
+  <ul>
+  <li><b> get &lt;name&gt; eventlist </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  
+  Es wird das <a href="#SSCamreadings">Reading</a> "CamEventNum" und "CamLastRec" 
   aktualisiert, welches die Gesamtanzahl der registrierten Kameraevents und den Pfad / Namen der letzten Aufnahme enthält.
-  Dieser Befehl wird implizit mit "get ... caminfoall" ausgeführt. <br>
-  
+  Dieser Befehl wird implizit mit "get &lt;name&gt; caminfoall" ausgeführt. <br>
   Mit dem <a href="#SSCamattr">Attribut</a> "videofolderMap" kann der Inhalt des Readings "VideoFolder" überschrieben werden. 
-  Dies kann von Vortel sein wenn das Surveillance-Verzeichnis der SVS an dem lokalen PC unter anderem Pfadnamen gemountet ist und darüber der Zugriff auf die Aufnahmen
-  erfolgen soll (z.B. Verwendung Email-Versand). <br><br>
+  Dies kann von Vortel sein wenn das Surveillance-Verzeichnis der SVS an dem lokalen PC unter anderem Pfadnamen gemountet ist 
+  und darüber der Zugriff auf die Aufnahmen erfolgen soll (z.B. Verwendung bei Email-Versand). <br><br>
   
-  Ein DOIF-Beispiel für den Email-Versand von Snapshot und Aufnahmelink per Non-blocking sendmail:
+  Ein DOIF-Beispiel für den Email-Versand von Snapshot und Aufnahmelink per non-blocking sendmail:
   <pre>
      define CamHE1.snap.email DOIF ([CamHE1:"LastSnapFilename"]) 
      ({DebianMailnbl ('Recipient@Domain','Bewegungsalarm CamHE1','Eine Bewegung wurde an der Haustür registriert. Aufnahmelink: \  
      \[CamHE1:VideoFolder]\[CamHE1:CamLastRec]','/media/sf_surveillance/@Snapshot/[CamHE1:LastSnapFilename]')})
   </pre>
-  
-  Mit <b>"get &lt;name&gt; snapfileinfo"</b> wird der Filename des letzten Schnapschusses ermittelt. Der Befehl wird implizit mit <b>"get &lt;name&gt; snap"</b> ausgeführt. <br>
-  Der Befehl <b>"get &lt;name&gt; svsinfo"</b> ist eigentlich nicht von der Kamera abhängig, sondern ermittelt vielmehr allgemeine Informationen zur installierten SVS-Version und andere Eigenschaften. <br>
-  Die Funktionen "caminfoall" und "svsinfo" werden einmalig automatisch beim Start von FHEM ausgeführt um steuerungsrelevante Informationen zu sammeln.<br>
-  Es ist darauf zu achten dass die <a href="#SSCam_Credentials">Credentials</a> gespeichert wurden !
-  <br><br>
+  </ul>
   
   <ul>
-  <li><b> get &lt;name&gt; homeModeState </b></li> <br>
+  <li><b> get &lt;name&gt; homeModeState </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
   HomeMode-Status der Surveillance Station wird abgerufen.  
   </ul>
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; scanVirgin </b></li> <br>
+  <li><b> get &lt;name&gt; scanVirgin </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
   
   Wie mit get caminfoall werden alle Informationen der SVS und Kamera abgerufen. Allerdings wird in jedem Fall eine 
   neue Session ID generiert (neues Login), die Kamera-ID neu ermittelt und es werden alle notwendigen API-Parameter neu 
@@ -5890,7 +6019,7 @@ sub experror {
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; snapGallery [1-10] </b></li> <br>
+  <li><b> get &lt;name&gt; snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Es wird ein Popup mit den letzten [x] Schnapschüssen erzeugt. Ist das <a href="#SSCamattr">Attribut</a> "snapGalleryBoost" gesetzt, 
   werden die letzten Schnappschüsse (default 3) über Polling abgefragt und im Speicher gehalten. Das Verfahren hilft die Ausgabe zu beschleunigen,
@@ -5918,7 +6047,15 @@ sub experror {
 		<br><br>
   
   <ul>
-  <li><b> get &lt;name&gt; snapinfo </b></li> <br>
+  <li><b> get &lt;name&gt; snapfileinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  
+  Es wird der Filename des letzten Schnapschusses ermittelt. Der Befehl wird implizit mit <b>"get &lt;name&gt; snap"</b> 
+  ausgeführt.
+  </ul>
+  <br><br> 
+  
+  <ul>
+  <li><b> get &lt;name&gt; snapinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Es werden Schnappschussinformationen gelesen. Hilfreich wenn Schnappschüsse nicht durch SSCam, sondern durch die Bewegungserkennung der Kamera 
   oder Surveillance Station erzeugt werden.
@@ -5926,7 +6063,7 @@ sub experror {
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; stmUrlPath </b></li> <br>
+  <li><b> get &lt;name&gt; stmUrlPath </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Mit diesem Kommando wird der aktuelle Streamkey der Kamera abgerufen und das Reading mit dem Key-Wert gefüllt. 
   Dieser Streamkey kann verwendet werden um eigene Aufrufe eines Livestreams aufzubauen (siehe Beispiel).
@@ -5939,19 +6076,38 @@ sub experror {
   Beispiel für den Aufbau eines Http-Calls zu einem Livestream mit StmKey: 
   
   <pre>
-    http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceStation.VideoStreaming&version=1&method=Stream&format=mjpeg&cameraId=5&StmKey="31fd87279976d89bb98409728cced890"
+http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceStation.VideoStreaming&version=1&method=Stream&format=mjpeg&cameraId=5&StmKey="31fd87279976d89bb98409728cced890"
   </pre>
   
-  cameraId (INTERNAL), StmKey müssen durch gültige Werte ersetzt werden. <br><br>
+  cameraId (Internal CAMID), StmKey müssen durch gültige Werte ersetzt werden. <br><br>
   
   <b>Hinweis:</b> <br>
   
-  Falls der Stream-Aufruf versendet und von extern genutzt wird sowie hostname / port durch gültige Werte ersetzt und die Routerports entsprechend geöffnet
-  werden, ist darauf zu achten dass diese sensiblen Daten nicht durch unauthorisierte Personen für den Zugriff genutzt werden können !  <br><br><br>
+  Falls der Stream-Aufruf versendet und von extern genutzt wird sowie hostname / port durch gültige Werte ersetzt und die 
+  Routerports entsprechend geöffnet werden, ist darauf zu achten, dass diese sensiblen Daten nicht durch unauthorisierte Personen 
+  für den Zugriff genutzt werden können !
+
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> get &lt;name&gt; storedCredentials </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  
+  Die gespeicherten Anmeldeinformationen (Credentials) werden in einem Popup als Klartext angezeigt.
+  </ul>
+  <br><br> 
+  
+  <ul>
+  <li><b> get &lt;name&gt; svsinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  
+  Ermittelt allgemeine Informationen zur installierten SVS-Version und andere Eigenschaften. <br>
+  </ul>
+  <br><br> 
+  
   </ul>
   <br><br>
 
-  <b>Polling der Kameraeigenschaften:</b><br><br>
+  <b>Polling der Kamera/SVS-Eigenschaften:</b><br><br>
 
   Die Abfrage der Kameraeigenschaften erfolgt automatisch, wenn das Attribut "pollcaminfoall" (siehe Attribute) mit einem Wert &gt; 10 gesetzt wird. <br>
   Per Default ist das Attribut "pollcaminfoall" nicht gesetzt und das automatische Polling nicht aktiv. <br>
@@ -5987,7 +6143,6 @@ sub experror {
   Sind mehrere Kameras in SSCam definiert, sollte "pollcaminfoall" nicht bei allen Kameras auf exakt den gleichen Wert gesetzt werden um Verarbeitungsengpässe <br>
   und dadurch versursachte potentielle Fehlerquellen bei der Abfrage der Synology Surveillance Station zu vermeiden. <br>
   Ein geringfügiger Unterschied zwischen den Pollingintervallen der definierten Kameras von z.B. 1s kann bereits als ausreichend angesehen werden. <br><br> 
-</ul>
 
 
 <a name="SSCaminternals"></a>
@@ -5998,6 +6153,7 @@ sub experror {
   <li><b>CAMID</b> - die ID der Kamera in der SVS, der Wert wird automatisch anhand des SVS-Kameranamens ermittelt. </li>
   <li><b>CAMNAME</b> - der Name der Kamera in der SVS </li>
   <li><b>CREDENTIALS</b> - der Wert ist "Set" wenn die Credentials gesetzt wurden </li>
+  <li><b>MODEL</b> - Unterscheidung von Kamera-Device (CAM) und Surveillance Station Device (SVS) </li>
   <li><b>NAME</b> - der Kameraname in FHEM </li>
   <li><b>OPMODE</b> - die zuletzt ausgeführte Operation des Moduls </li> 
   <li><b>SERVERADDR</b> - IP-Adresse des SVS Hostes </li>
