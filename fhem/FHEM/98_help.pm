@@ -252,17 +252,20 @@ sub cref_fill_list(){
 
 sub cref_findInfo {
   my ($modPath,$mod) = @_;
-  my ($l,@line);
+  my ($l,@line,$found,$text);
   my ($err,@text) = FileRead({FileName => "$modPath/MAINTAINER.txt", ForceType => 'file'});
   foreach $l (@text) {
     @line = split("[ \t][ \t]*", $l,3);
-    last if $l =~ m/$mod/i;
+    $found = ($l =~ m/_$mod/i);
+    last if ($found);
   }
+  if($found) {
   $line[0]= (split("/",$line[0]))[1] if $line[0] =~ /\//;
-  $line[2]= "no info" if $line[2] =~ /http/;
-  my $text  = "<br/><b>Module:</b> $line[0] ";
-     $text .= "<b>Maintainer:</b> $line[1] ";
-     $text .= "<b>Forum:</b> $line[2]\n";
+  $line[2]= "no info" if ($line[2] =~ /http/ || !defined($line[2]));
+  $text  = "<br/><b>Module:</b> $line[0] ";
+  $text .= "<b>Maintainer:</b> $line[1] ";
+  $text .= "<b>Forum:</b> $line[2]\n";
+  }
   $text //= '';
   return $text;
 }
