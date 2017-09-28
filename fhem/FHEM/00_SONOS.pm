@@ -51,6 +51,10 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 28.09.2017
+#	Provider-Icons werden wieder korrekt ermittelt
+#	Das Verarbeiten der Arbeitsschlange im SubProcess wurde optimiert
+#	Die Fehlermeldung mit den redundanten Argumenten bei sprintf wurde umgestellt.
 # 14.07.2017
 #	Änderung in der ControlPoint.pm: Es wurden zuviele Suchantworten berücksichtigt.
 #	Bei einem Modify wird von Fhem nur die DefFn aufgerufen (und nicht vorher UndefFn). Dadurch blieben Reste, die aber vor einer Definition aufgeräumt werden müssen. Resultat war eine 100%-CPU-Last.
@@ -58,20 +62,6 @@
 #	BulkUpdate: Beginn und Ende sind nun sicher davor einen vom SubProzess gestarteten BulkUpdate vorzeitig zu beenden.
 # 05.07.2017
 #	Neue Variante für das Ermitteln der laufenden Favoriten, Radios oder Playlists.
-# 05.07.2017
-#	Veralteten Mechanismus für das Unterbrechen der Sendeschleife aufgeräumt.
-#	SONOS_ConvertNumToWord kann nun mit undef-Übergaben umgehen.
-#	Andere Methodik zum Ermitteln von FavouriteName, RadioName und PlaylistName eingebaut.
-#	Es gibt ein neues Attribut "SubProcessLogfileName". Damit kann die Logausgabe des SubProzesses in eine eigene Datei umgeleitet werden. Unter Windows z.B. gibt es sonst keine saubere Darstellungsmöglichkeit für die Logausgabe, da die beiden Prozesse sich gegenseitig die Ausgaben im Fhem-Log überschreiben. Bei Angabe von '-' wird wie bisher auf STDOUT (und damit im Fhem-Log) geloggt.
-#	Kleinere Fehler bei einzelnen Reading-Aktualisierungen behoben.
-#	Beim Zerlegen der MusicServicesList gab es einen Fehler, der z.B. dafür gesorgt hatte, dass Apple Music nicht erkannt wurde.
-#	Umbau der Verarbeitungslogik in Richtung SubProzess. Das sollte nun schneller und sicher sequentiell verarbeitet werden.
-#	Die Aktualisierung des Readings "LastProcessAnswer" wird jetzt während eines laufenden Bulkupdates auch als solches durchgeführt, und zerstört damit nicht mehr dieses laufende Update.
-#	Alle noch vorhandenen ReadingsSingleUpdate-Aufrufe wurden BulkUpdate-Sicher gemacht.
-#	Die prozentuale Fortschrittsanzeige hat bei Streams negative, hohe Werte angezeigt. Steht jetzt wieder auf 0.
-#	Beim Löschen blieb noch die automatisch angelegte ReadingsGroup für die aktuelle Abspielliste bestehen.
-# 21.06.2017
-#	Bei der ersten Verbindung war das Reading für die letzte SubProzess-Antwort eventuell bereits veraltet. Das wird nun durch ein Datum in der Zukunft verhindert.
 #
 ########################################################################################
 #
@@ -571,7 +561,7 @@ sub SONOS_getTitleRG($;$) {
 	$currentNormalAudio = 0 if (SONOS_Trim($currentNormalAudio) eq '');
 	if ($currentNormalAudio == 1) {
 		my $showNext = ReadingsVal($device, 'nextTitle', '') || ReadingsVal($device, 'nextArtist', '') || ReadingsVal($device, 'nextAlbum', '');
-		$infoString = sprintf('<div style="display: inline-block; margin-left: 0px; vertical-align: top;">%s Titel %s von %s'.(($source) ? ' ~ <b>'.$source.'</b>' : '').'<br />Titel: <b>%s</b><br />Interpret: <b>%s</b><br />Album: <b>%s</b>'.($showNext ? '<div style="display: block; height: %s; display: table-cell; vertical-align: bottom;">Nächste Wiedergabe:</div><table cellpadding="0px" cellspacing="0px" style="padding: 0px; margin: 0px;"><tr><td valign="top" style="padding: 0px; margin: 0px;"><div style="display: inline-block; margin-left: 0px; margin-right: 5px; border: 1px solid lightgray; height: 3.5em; width: 3.5em; background-image: url(%s); background-repeat: no-repeat; background-size: contain; background-position: center center;"><div style="position: relative; top: -5px; left: 2px; display: inline-block; height: 10px; width: 10px; background-image: url(%s); background-repeat: no-repeat; background-size: contain; background-position: center center;"></div></div></td><td valign="top" style="padding: 0px; margin: 0px;"><div style="">Titel: %s<br />Interpret: %s<br />Album: %s</div></td></tr></table>' : '').'</div>',
+		$infoString = sprintf('<div style="display: inline-block; margin-left: 0px; vertical-align: top;">%1$s Titel %2$s von %3$s'.(($source) ? ' ~ <b>'.$source.'</b>' : '').'<br />Titel: <b>%4$s</b><br />Interpret: <b>%5$s</b><br />Album: <b>%6$s</b>'.($showNext ? '<div style="display: block; height: %7$s; display: table-cell; vertical-align: bottom;">Nächste Wiedergabe:</div><table cellpadding="0px" cellspacing="0px" style="padding: 0px; margin: 0px;"><tr><td valign="top" style="padding: 0px; margin: 0px;"><div style="display: inline-block; margin-left: 0px; margin-right: 5px; border: 1px solid lightgray; height: 3.5em; width: 3.5em; background-image: url(%8$s); background-repeat: no-repeat; background-size: contain; background-position: center center;"><div style="position: relative; top: -5px; left: 2px; display: inline-block; height: 10px; width: 10px; background-image: url(%9$s); background-repeat: no-repeat; background-size: contain; background-position: center center;"></div></div></td><td valign="top" style="padding: 0px; margin: 0px;"><div style="">Titel: %10$s<br />Interpret: %11$s<br />Album: %12$s</div></td></tr></table>' : '').'</div>',
 				$transportState, 
 				ReadingsVal($device, 'currentTrack', ''), 
 				ReadingsVal($device, 'numberOfTracks', ''),
@@ -2432,16 +2422,6 @@ sub SONOS_Discover() {
 		return 1;
 	};
 	
-	# Thread Signal Handler for doing some work in this thread 'environment'
-	#$SIG{'HUP'} = sub {
-	#	while ($SONOS_ComObjectTransportQueue->pending()) {
-	#		SONOS_Discover_DoQueue($SONOS_ComObjectTransportQueue->peek());
-	#		$SONOS_ComObjectTransportQueue->dequeue();
-	#	}
-	#	
-	#	return 1;
-	#};
-	
 	SONOS_LoadBookmarkValues();
 	
 	my $error;
@@ -2465,8 +2445,7 @@ sub SONOS_Discover() {
 				
 				# Befehlsqueue abfragen...
 				while ($SONOS_ComObjectTransportQueue->pending()) {
-					SONOS_Discover_DoQueue($SONOS_ComObjectTransportQueue->peek());
-					$SONOS_ComObjectTransportQueue->dequeue();
+					SONOS_Discover_DoQueue($SONOS_ComObjectTransportQueue->dequeue());
 				}
 			}
 		};
@@ -2501,6 +2480,8 @@ sub SONOS_Discover_DoQueue($) {
 	my ($data) = @_;
 	
 	my $workType = $data->{WorkType};
+	return if (!defined($workType));
+	
 	my $udn = $data->{UDN};
 	my @params = ();
 	@params = @{$data->{Params}} if (defined($data->{Params}));
@@ -3104,7 +3085,6 @@ sub SONOS_Discover_DoQueue($) {
 				};
 				if ($@) {
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Error during filewriting: '.$@);
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 				
@@ -3123,7 +3103,6 @@ sub SONOS_Discover_DoQueue($) {
 				eval { "" =~ m/$searchlistName/ };
 				if($@) {
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad Category RegExp "'.$searchlistName.'": '.$@);
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 			}
@@ -3139,7 +3118,6 @@ sub SONOS_Discover_DoQueue($) {
 				eval { "" =~ m/$searchlistElement/ };
 				if($@) {
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad CategoryElement RegExp "'.$searchlistElement.'": '.$@);
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 			}
@@ -3160,7 +3138,6 @@ sub SONOS_Discover_DoQueue($) {
 			eval { "" =~ m/$filterTitle/ };
 			if($@) {
 				SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad FilterTitle RegExp "'.$filterTitle.'": '.$@);
-				$SONOS_ComObjectTransportQueue->dequeue();
 				return;
 			}
 			
@@ -3168,7 +3145,6 @@ sub SONOS_Discover_DoQueue($) {
 			eval { "" =~ m/$filterAlbum/ };
 			if($@) {
 				SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad FilterAlbum RegExp "'.$filterAlbum.'": '.$@);
-				$SONOS_ComObjectTransportQueue->dequeue();
 				return;
 			}
 			
@@ -3176,7 +3152,6 @@ sub SONOS_Discover_DoQueue($) {
 			eval { "" =~ m/$filterArtist/ };
 			if($@) {
 				SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad FilterArtist RegExp "'.$filterArtist.'": '.$@);
-				$SONOS_ComObjectTransportQueue->dequeue();
 				return;
 			}
 			
@@ -3211,7 +3186,6 @@ sub SONOS_Discover_DoQueue($) {
 				# Wenn RegSearch gesetzt war, und nichts gefunden wurde...
 				if (!$resultHash{$searchlistName} || $regSearch) {
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Category "'.$searchlistName.'" not found. Choose one of: "'.join('","', sort keys %resultHash).'"');
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 				my $searchlistTitle = $searchlistName;
@@ -3261,7 +3235,6 @@ sub SONOS_Discover_DoQueue($) {
 					# Wenn RegSearch gesetzt war, und nichts gefunden wurde...
 					if (!$resultHash{$searchlistElement} || $regSearchElement) {
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Element "'.$searchlistElement.'" not found. Choose one of: "'.join('","', sort keys %resultHash).'"');
-						$SONOS_ComObjectTransportQueue->dequeue();
 						return;
 					}
 					$searchlistElementTitle = $searchlistElement;
@@ -3572,7 +3545,6 @@ sub SONOS_Discover_DoQueue($) {
 				eval { "" =~ m/$radioName/ };
 				if($@) {
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad RegExp "'.$radioName.'": '.$@);
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 			}
@@ -3602,7 +3574,6 @@ sub SONOS_Discover_DoQueue($) {
 				# Wenn RegSearch gesetzt war, und nichts gefunden wurde...
 				if (!$resultHash{$radioName} || $regSearch) {
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Radio "'.$radioName.'" not found. Choose one of: "'.join('","', sort keys %resultHash).'"');
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 			
@@ -3624,7 +3595,6 @@ sub SONOS_Discover_DoQueue($) {
 				eval { "" =~ m/$favouriteName/ };
 				if($@) {
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad RegExp "'.$favouriteName.'": '.$@);
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 			}
@@ -3659,7 +3629,6 @@ sub SONOS_Discover_DoQueue($) {
 				# Wenn RegSearch gesetzt war, und nichts gefunden wurde...
 				if (!$resultHash{$favouriteName} || $regSearch) {
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Favourite "'.$favouriteName.'" not found. Choose one of: "'.join('","', sort keys %resultHash).'"');
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 				
@@ -3704,7 +3673,6 @@ sub SONOS_Discover_DoQueue($) {
 				eval { "" =~ m/$playlistName/ };
 				if($@) {
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad RegExp "'.$playlistName.'": '.$@);
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 			}
@@ -3727,7 +3695,6 @@ sub SONOS_Discover_DoQueue($) {
 					# Versuche die Datei zu öffnen
 					if (!open(FILE, '<'.$1)) {
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Error during opening file "'.$1.'": '.$!); 
-						$SONOS_ComObjectTransportQueue->dequeue();
 						return;
 					};
 					
@@ -3793,7 +3760,6 @@ sub SONOS_Discover_DoQueue($) {
 					# Wenn RegSearch gesetzt war, und nichts gefunden wurde...
 					if (!$resultHash{$playlistName} || $regSearch) {
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Playlist "'.$playlistName.'" not found. Choose one of: "'.join('","', sort keys %resultHash).'"');
-						$SONOS_ComObjectTransportQueue->dequeue();
 						return;
 					}
 				
@@ -4014,7 +3980,6 @@ sub SONOS_Discover_DoQueue($) {
 			# Simple Check...
 			if ($params[0] !~ m/^[\.\,\d]*$/) {
 				SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Parameter Error: '.$params[0]);
-				$SONOS_ComObjectTransportQueue->dequeue();
 				return;
 			}
 			my @elemList = sort { $a <=> $b } SONOS_DeleteDoublettes(eval('('.$params[0].')'));
@@ -4044,7 +4009,6 @@ sub SONOS_Discover_DoQueue($) {
 				eval { "" =~ m/$playlistName/ };
 				if($@) {
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad RegExp "'.$playlistName.'": '.$@);
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 			}
@@ -4069,7 +4033,6 @@ sub SONOS_Discover_DoQueue($) {
 			# Wenn RegSearch gesetzt war, und nichts gefunden wurde...
 			if (!$resultHash{$playlistName} || $regSearch) {
 				SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Playlist "'.$playlistName.'" not found. Choose one of: "'.join('","', sort keys %resultHash).'"');
-				$SONOS_ComObjectTransportQueue->dequeue();
 				return;
 			}
 			
@@ -4397,7 +4360,6 @@ sub SONOS_Discover_DoQueue($) {
 				}
 				if ($@) {
 					SONOS_Log $udn, 2, 'Beim Ermitteln des Hash-Wertes ist ein Fehler aufgetreten: '.$@;
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 			}
@@ -4416,7 +4378,6 @@ sub SONOS_Discover_DoQueue($) {
 				SONOS_Log $udn, 3, 'Hole die Durchsage aus dem Cache...';
 			} else {
 				if (!SONOS_GetSpeakFile($udn, $workType, $language, $text, $dest)) {
-					$SONOS_ComObjectTransportQueue->dequeue();
 					return;
 				}
 				
@@ -5485,7 +5446,7 @@ sub SONOS_GetTrackProvider($;$) {
 		return ('Bibliothek', '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/bibliothek_round.png', '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/bibliothek_quadratic.jpg');
 	}
 	
-	eval {
+	my ($a, $b, $c) = eval {
 		my %musicServices = %{eval(SONOS_Client_Data_Retreive('undef', 'reading', 'MusicServicesList', '()'))};
 		if ($songURI =~ m/sid=(\d+)/i) {
 			my $sid = $1;
@@ -5501,15 +5462,18 @@ sub SONOS_GetTrackProvider($;$) {
 				my $quadraticIcon = $musicServices{$sid}{IconQuadraticURL};
 				$quadraticIcon = '' if (!defined($quadraticIcon));
 				
+				SONOS_Log undef, 4, 'Trackprovider-Icons for "'.$result.'": Round: '.$roundIcon.' ~ Quadratic: '.$quadraticIcon;
+				
 				return ($result, $roundIcon, $quadraticIcon);
 			}
 		}
 	};
 	if ($@) {
-		SONOS_Log undef, 2, 'Unable to identify TrackProvider for "'.$songURI.'". Revert to empty default!';
+		SONOS_Log undef, 2, 'Unable to identify TrackProvider for "'.$songURI.'". Revert to empty default! Errormessage: '.$@;
+		return ('', '', '');
+	} else {
+		return ($a, $b, $c);
 	}
-	
-	return ('', '', '');
 }
 
 ########################################################################################
@@ -6682,11 +6646,6 @@ sub SONOS_IsAlive($) {
 		$data{Params} = \@params;
 		
 		$SONOS_ComObjectTransportQueue->enqueue(\%data);
-		
-		# Signalhandler aufrufen, wenn er nicht sowieso noch läuft...
-		#if (defined(threads->object($SONOS_Thread))) {
-		#	threads->object($SONOS_Thread)->kill('HUP') if ($SONOS_ComObjectTransportQueue->pending() == 1);
-		#}
 	}
 	
 	return $result;
@@ -7128,6 +7087,7 @@ sub SONOS_TransportCallback($$) {
 				SONOS_Client_Notifier('SetCurrent:Sender:'.$1);
 				
 				my ($trackProvider, $trackProviderRoundURL, $trackProviderQuadraticURL) = SONOS_GetTrackProvider($currentTrackURI, $1);
+				SONOS_Log undef, 4, 'Trackprovider for Sender "'.$trackProvider.'" ~ RoundIcon: '.$trackProviderRoundURL.' ~ QuadraticIcon: '.$trackProviderQuadraticURL;
 				SONOS_Client_Notifier('SetCurrent:TrackProvider:'.$trackProvider);
 				SONOS_Client_Notifier('SetCurrent:TrackProviderIconRoundURL:'.$trackProviderRoundURL);
 				SONOS_Client_Notifier('SetCurrent:TrackProviderIconQuadraticURL:'.$trackProviderQuadraticURL);
@@ -7222,6 +7182,7 @@ sub SONOS_TransportCallback($$) {
 			}
 			
 			my ($trackProvider, $trackProviderRoundURL, $trackProviderQuadraticURL) = SONOS_GetTrackProvider($currentTrackURI, $currentTitle);
+			SONOS_Log undef, 4, 'Trackprovider "'.$trackProvider.'" ~ RoundIcon: '.$trackProviderRoundURL.' ~ QuadraticIcon: '.$trackProviderQuadraticURL;
 			SONOS_Client_Notifier('SetCurrent:TrackProvider:'.$trackProvider);
 			SONOS_Client_Notifier('SetCurrent:TrackProviderIconRoundURL:'.$trackProviderRoundURL);
 			SONOS_Client_Notifier('SetCurrent:TrackProviderIconQuadraticURL:'.$trackProviderQuadraticURL);
@@ -7250,6 +7211,7 @@ sub SONOS_TransportCallback($$) {
 			SONOS_Client_Notifier('SetCurrent:nextTrackHandle:'.$tmp.'|'.$nextTrackMetaData);
 			
 			my ($trackProvider, $trackProviderRoundURL, $trackProviderQuadraticURL) = SONOS_GetTrackProvider($tmp);
+			SONOS_Log undef, 4, 'NextTrackprovider "'.$trackProvider.'" ~ RoundIcon: '.$trackProviderRoundURL.' ~ QuadraticIcon: '.$trackProviderQuadraticURL;
 			SONOS_Client_Notifier('SetCurrent:nextTrackProvider:'.$trackProvider);
 			SONOS_Client_Notifier('SetCurrent:nextTrackProviderIconRoundURL:'.$trackProviderRoundURL);
 			SONOS_Client_Notifier('SetCurrent:nextTrackProviderIconQuadraticURL:'.$trackProviderQuadraticURL);
@@ -9013,59 +8975,69 @@ sub SONOS_MusicServicesCallback($$) {
 			
 			# ServiceTypes
 			my @serviceTypes = split(',', $response->getValue('AvailableServiceTypeList'));
+			SONOS_Log undef, 5, 'MusicService-Types: '.join(@serviceTypes, ', ');
 			my $servicepos = 0;
 			
 			my %musicServices = ();
 			my $result = $response->getValue('AvailableServiceDescriptorList');
 			SONOS_Log undef, 5, 'MusicService-Call: '.$result;
-			while ($result =~ m/<Service.*?Id="(\d+)".*?Name="(.+?)".*?SecureUri="(.+?)".*?Capabilities="(\d+)".*?>.*?(<Strings.*?Uri="(.+?)".*?\/>|).*?<PresentationMap.*?Uri="(.+?)".*?\/>.*?<\/Service>/sgi) {
+			while ($result =~ m/<Service.*?Id="(\d+)".*?Name="(.+?)"(.*?)<\/Service>/sgi) {
 				my $id = $1;
 				my $name = $2;
-				my $smapi = $3;
-				my $capabilities = $4;
-				my $stringsURL = $6;
+				my $content = $3;
 				
-				my $presentationMap = $7;
+				# If TuneIn, then jump over
+				next if ($name eq 'TuneIn');
 				
-				my $promoString = '';
-				if (defined($stringsURL) && ($stringsURL ne '')) {
-					my $strings = encode('UTF-8', get($stringsURL));
-					if (defined($strings) && ($strings ne '')) {
-						$promoString = $1 if ($strings =~ m/<stringtable.*?xml:lang="de-DE">.*?<string.*?stringId="ServicePromo">(.*?)<\/string>.*?<\/stringtable>/si);
-						$promoString = $1 if (($promoString eq '') && ($strings =~ m/<stringtable.*?xml:lang="en-US">.*?<string.*?stringId="ServicePromo">(.*?)<\/string>.*?<\/stringtable>/si));
+				my $serviceType = $serviceTypes[$servicepos++];
+				
+				if ($content =~ m/.*?SecureUri="(.+?)".*?Capabilities="(\d+)".*?>.*?(<Strings.*?Uri="(.+?)".*?\/>|).*?<PresentationMap.*?Uri="(.+?)".*?\/>.*?/si) {
+					my $smapi = $1;
+					my $capabilities = $2;
+					my $stringsURL = $4;
+					
+					my $presentationMap = $5;
+					
+					my $promoString = '';
+					if (defined($stringsURL) && ($stringsURL ne '')) {
+						my $strings = encode('UTF-8', get($stringsURL));
+						if (defined($strings) && ($strings ne '')) {
+							$promoString = $1 if ($strings =~ m/<stringtable.*?xml:lang="de-DE">.*?<string.*?stringId="ServicePromo">(.*?)<\/string>.*?<\/stringtable>/si);
+							$promoString = $1 if (($promoString eq '') && ($strings =~ m/<stringtable.*?xml:lang="en-US">.*?<string.*?stringId="ServicePromo">(.*?)<\/string>.*?<\/stringtable>/si));
+						}
 					}
+					
+					my $presentationMapData = encode('UTF-8', get($presentationMap));
+					if (defined($presentationMapData)) {
+						SONOS_Log undef, 5, 'PresentationMap('.$id.' ~ '.$name.' ~ ServiceType: "'.$serviceType.'"): '.$presentationMapData;
+					} else {
+						SONOS_Log undef, 5, 'PresentationMap('.$id.' ~ '.$name.' ~ ServiceType: "'.$serviceType.'"): undef';
+					}
+					
+					my ($resolution, $resolutionSubst) = SONOS_ExtractMaxResolution($presentationMapData, 'ArtWorkSizeMap');
+					if (!defined($resolution)) {
+						($resolution, $resolutionSubst) = SONOS_ExtractMaxResolution($presentationMapData, 'BrowseIconSizeMap');
+					}
+					
+					#SONOS_GetMediaMetadata($udn, $id, 
+					
+					$musicServices{$id}{Name} = $name;
+					$musicServices{$id}{ServiceType} = $serviceType;
+					
+					$musicServices{$id}{IconQuadraticURL} = 'http://sonos-logo.ws.sonos.com/'.$musicServices{$id}{ServiceType}.'/'.$musicServices{$id}{ServiceType}.'-400x400.png';
+					$musicServices{$id}{IconQuadraticURL} = '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/proxy/aa?url='.SONOS_URI_Escape($musicServices{$id}{IconQuadraticURL}) if (SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
+					
+					$musicServices{$id}{IconRoundURL} = 'http://sonos-logo.ws.sonos.com/'.$musicServices{$id}{ServiceType}.'/'.$musicServices{$id}{ServiceType}.'-72x72.png';
+					$musicServices{$id}{IconRoundURL} = '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/proxy/aa?url='.SONOS_URI_Escape($musicServices{$id}{IconRoundURL}) if (SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
+					
+					$musicServices{$id}{SMAPI} = $smapi;
+					$musicServices{$id}{Resolution} = $resolution;
+					$musicServices{$id}{ResolutionSubstitution} = $resolutionSubst;
+					$musicServices{$id}{Capabilities} = $capabilities;
+					
+					$promoString =~ s/[\r\n]/ /g;
+					$musicServices{$id}{PromoText} = $promoString;
 				}
-				
-				my $presentationMapData = encode('UTF-8', get($presentationMap));
-				if (defined($presentationMapData)) {
-					SONOS_Log undef, 5, 'PresentationMap('.$id.' ~ '.$name.'): '.$presentationMapData;
-				} else {
-					SONOS_Log undef, 5, 'PresentationMap('.$id.' ~ '.$name.'): undef';
-				}
-				
-				my ($resolution, $resolutionSubst) = SONOS_ExtractMaxResolution($presentationMapData, 'ArtWorkSizeMap');
-				if (!defined($resolution)) {
-					($resolution, $resolutionSubst) = SONOS_ExtractMaxResolution($presentationMapData, 'BrowseIconSizeMap');
-				}
-				
-				#SONOS_GetMediaMetadata($udn, $id, 
-				
-				$musicServices{$id}{Name} = $name;
-				$musicServices{$id}{ServiceType} = $serviceTypes[$servicepos++];
-				
-				$musicServices{$id}{IconQuadraticURL} = 'http://sonos-logo.ws.sonos.com/'.$musicServices{$id}{ServiceType}.'/'.$musicServices{$id}{ServiceType}.'-400x400.png';
-				$musicServices{$id}{IconQuadraticURL} = '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/proxy/aa?url='.SONOS_URI_Escape($musicServices{$id}{IconQuadraticURL}) if (SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
-				
-				$musicServices{$id}{IconRoundURL} = 'http://sonos-logo.ws.sonos.com/'.$musicServices{$id}{ServiceType}.'/'.$musicServices{$id}{ServiceType}.'-72x72.png';
-				$musicServices{$id}{IconRoundURL} = '/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/proxy/aa?url='.SONOS_URI_Escape($musicServices{$id}{IconRoundURL}) if (SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
-				
-				$musicServices{$id}{SMAPI} = $smapi;
-				$musicServices{$id}{Resolution} = $resolution;
-				$musicServices{$id}{ResolutionSubstitution} = $resolutionSubst;
-				$musicServices{$id}{Capabilities} = $capabilities;
-				
-				$promoString =~ s/[\r\n]/ /g;
-				$musicServices{$id}{PromoText} = $promoString;
 			}
 			
 			SONOS_Log undef, 5, 'MusicService-List: '.SONOS_Dumper(\%musicServices);
@@ -10084,9 +10056,6 @@ if (defined($SONOS_ListenPort)) {
 				$data{Params} = \@params;
 				
 				$SONOS_ComObjectTransportQueue->enqueue(\%data);
-				
-				# Signalhandler aufrufen, wenn er nicht sowieso noch läuft...
-				#threads->object($SONOS_Thread)->kill('HUP') if ($SONOS_ComObjectTransportQueue->pending() == 1);
 			}
 		}
 	 	
@@ -10124,6 +10093,7 @@ if (defined($SONOS_ListenPort)) {
 	 			
 	 			# Send Welcome-Message
 	 			send($client, "This is UPnP-Server listening for commands\r\n", 0);
+	 			select(undef, undef, undef, 0.5);
 	 			
 	 			# Antwort lesen, und nur wenn es eine dauerhaft gedachte Verbindung ist, dann auch merken...
 	 			my $answer = '';
@@ -10567,9 +10537,6 @@ sub SONOS_Client_IsAlive() {
 						$data{Params} = \@params;
 						
 						$SONOS_ComObjectTransportQueue->enqueue(\%data);
-						
-						# Signalhandler aufrufen, wenn er nicht sowieso noch läuft...
-						#threads->object($SONOS_Thread)->kill('HUP') if ($SONOS_ComObjectTransportQueue->pending() == 1);
 						
 						# Da ich das nur an den ersten verfügbaren Player senden muss, kann hier die Schleife direkt beendet werden
 						last;
