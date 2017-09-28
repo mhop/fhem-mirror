@@ -44,7 +44,8 @@
 #   2017-02-06  Doku korrigiert
 #   2017-02-18  fixed a bug that caused a missing open when the device is defined while fhem is already initialized
 #   2017-05-09  fixed character encoding for documentation text
-
+#   2017-09-24  interpolation of lost impulses during fhem restart / arduino reset
+#
 # ideas / todo:
 # 
 
@@ -66,7 +67,7 @@ my %ArduCounter_gets = (
     "info"  =>  ""
 );
 
-my $ArduCounter_Version = '4.71 - 9.5.2017';
+my $ArduCounter_Version = '4.8 - 24.9.2017';
 
 #
 # FHEM module intitialisation
@@ -92,6 +93,7 @@ sub ArduCounter_Initialize($)
         "factor " .
         "readingNameCount[0-9]+ " .
         "readingNamePower[0-9]+ " .
+        "readingNameLongCount[0-9]+ " .
         "readingFactor[0-9]+ " .
         "readingStartTime[0-9]+ " .
         "verboseReadings[0-9]+ " .
@@ -569,10 +571,13 @@ sub ArduCounter_Parse($)
     my $retStr = "";
     
     my @lines = split /\n/, $hash->{buffer};
+    my $now   = gettimeofday();
+    
     foreach my $line (@lines) {
         # Log3 $name, 5, "$name: Parse line: $line";
         if ($line =~ 'R([\d]+) C([\d]+) D([\d]+) T([\d]+)( N[\d]+)?( X[\d]+)?( F[\d]+)?(L [\d]+)?( A[\d]+)?')
         {
+            # new count is beeing reported
             my $pin    = $1;
             my $count  = $2;
             my $diff   = $3;
@@ -584,12 +589,12 @@ sub ArduCounter_Parse($)
             my $avgLen = ($9 ? substr($9, 2) : "");
             
             my $factor = AttrVal($name, "readingFactor$pin", AttrVal($name, "factor", 1000));
-            my $rcname = AttrVal($name, "readingNameCount$pin", "pin$pin");
-            my $rpname = AttrVal($name, "readingNamePower$pin", "power$pin");
-            my $lName  = AttrVal($name, "readingNamePower$pin", AttrVal($name, "readingNameCount$pin", "pin$pin"));
+            my $rcname = AttrVal($name, "readingNameCount$pin", "pin$pin");         # internal count reading name
+            my $rlname = AttrVal($name, "readingNameLongCount$pin", "long$pin");    # long count - continues after reset, interpolates 
+            my $rpname = AttrVal($name, "readingNamePower$pin", "power$pin");       # power reading name
+            my $lName  = AttrVal($name, "readingNamePower$pin", AttrVal($name, "readingNameCount$pin", "pin$pin")); # for logging
             
             my $chIdx  = 0;         
-            my $now    = gettimeofday();
             my $sTime  = $now - $time/1000;   # start of observation interval (~first pulse)
             my $fSTime = FmtDateTime($sTime); # formatted
             my $fSdTim = FmtTime($sTime);     # only time formatted 
@@ -597,10 +602,44 @@ sub ArduCounter_Parse($)
             my $eTime  = $now;                # now / end of observation interval
             my $fETime = FmtDateTime($eTime); # formatted
             my $fEdTim = FmtTime($eTime);     # only time formatted 
+            
+            if (!$time || !$factor) {
+                Log3 $name, 3, "$name: Pin $pin ($lName) skip line because time or factor is 0: $line";
+                next;
+            }
             my $power  = sprintf ("%.3f", ($time ? $diff/$time/1000*3600*$factor : 0));
+            my $longCount;
 
             
-            Log3 $name, 4, "$name: Pin $pin ($lName) count $count (diff $diff) in " .
+            
+            if (AttrVal($name, "verboseReadings$pin", 0)) {
+                $longCount = ReadingsVal($name, $rlname, 0);        # alter long count Wert im Reading
+                if (!$hash->{CounterInterpolated}{$pin} && $hash->{CounterResetTime}) {
+                    my $lastCountTime = ReadingsTimestamp ($name, $rlname, 0);  # last time this reading was set
+                    my $lastCountTNum = time_str2num($lastCountTime);
+                    my $offlineTime   = sprintf ("%.2f", $hash->{CounterResetTime} - $lastCountTNum);
+                    
+                    my $lastInterval = ReadingsVal ($name, "timeDiff$pin", 0);
+                    my $lastCDiff    = ReadingsVal ($name, "countDiff$pin", 0);
+                    
+                    my $lastRatio = $lastCDiff / $lastInterval;
+                    my $curRatio  = $diff / $time;
+                    my $intRatio  = 1000 * ($lastRatio + $curRatio) / 2;
+                    my $interpolationCount = int($offlineTime * $intRatio) + 1;     # add one that gets lost as start of new interval
+                    
+                    if ($lastCountTime && $lastInterval && $lastCDiff) {
+                        Log3 $name, 4, "$name: interpolation after counter reset for pin $pin ($lName): offline $offlineTime secs, $interpolationCount estimated pulses (before $lastCDiff in $lastInterval ms, now $diff in $time ms, avg ratio $intRatio p/s)";
+                        Log3 $name, 4, "$name: adding interpolated $interpolationCount and $diff to long count $longCount";
+                        $longCount += $interpolationCount;
+                    } else {
+                        Log3 $name, 4, "$name: interpolation for pin $pin ($lName) not possible - no historic data";
+                    }
+                    $hash->{CounterInterpolated}{$pin} = 1;
+                }
+                $longCount += $diff;
+            }
+            
+            Log3 $name, 4, "$name: Pin $pin ($lName) count $count longCount $longCount (diff $diff) in " .
                 sprintf("%.3f", $time/1000) . "s" .
                 ((defined($reject) && $reject ne "") ? ", reject $reject" : "") .
                 ($avgLen ? ", Avg Len ${avgLen}ms" : "") .
@@ -612,19 +651,22 @@ sub ArduCounter_Parse($)
             
             readingsBeginUpdate($hash);            
             if (AttrVal($name, "readingStartTime$pin", 0)) {
-                $hash->{".updateTime"}      = $sTime;
-                $hash->{".updateTimestamp"} = $fSTime;
                 Log3 $name, 5, "$name: readingStartTime$pin specified: setting reading timestamp to $fSdTim";
                 Log3 $name, 5, "$name: set readings $rpname to $power, timeDiff$pin to $time and countDiff$pin to $diff";
+
+                $hash->{".updateTime"}      = $sTime;
+                $hash->{".updateTimestamp"} = $fSTime;
                 readingsBulkUpdate($hash, $rpname, $power) if ($time);
                 $hash->{CHANGETIME}[$chIdx++] = $fSTime;                        # Intervall start
+
                 $hash->{".updateTime"}      = $eTime;
                 $hash->{".updateTimestamp"} = $fETime;
-
                 readingsBulkUpdate($hash, $rcname, $count);
                 $hash->{CHANGETIME}[$chIdx++] = $fETime;          
-                
+
                 if (AttrVal($name, "verboseReadings$pin", 0)) {
+                    readingsBulkUpdate($hash, $rlname, $longCount);
+                    $hash->{CHANGETIME}[$chIdx++] = $fETime;                          
                     readingsBulkUpdate($hash, "timeDiff$pin", $time);
                     $hash->{CHANGETIME}[$chIdx++] = $fETime;
                     readingsBulkUpdate($hash, "countDiff$pin", $diff);
@@ -639,9 +681,10 @@ sub ArduCounter_Parse($)
             } else {
                 Log3 $name, 5, "$name: set readings $rpname to $power, timeDiff$pin to $time and countDiff$pin to $diff";
                 readingsBulkUpdate($hash, $rpname, $power) if ($time);
-                $eTime = time_str2num(ReadingsTimestamp ($name, $rpname, 0));
+                #$eTime = time_str2num(ReadingsTimestamp ($name, $rpname, 0));
                 readingsBulkUpdate($hash, $rcname, $count);
                 if (AttrVal($name, "verboseReadings$pin", 0)) {
+                    readingsBulkUpdate($hash, $rlname, $longCount);
                     readingsBulkUpdate($hash, "timeDiff$pin", $time);
                     readingsBulkUpdate($hash, "countDiff$pin", $diff);
                     readingsBulkUpdate($hash, "lastMsg$pin", $line);        
@@ -710,10 +753,12 @@ sub ArduCounter_Parse($)
             if ($hash->{Initialized}) {     
                 ArduCounter_ConfigureDevice($hash)              # send pin configuration
             }
-            
             delete $hash->{WaitForHello};
             RemoveInternalTimer ("hwait:$name");        # dont wait for hello reply if already sent
             RemoveInternalTimer ("sendHello:$name");    # Hello not needed anymore if not sent yet
+
+            $hash->{CounterResetTime} = $now;
+            delete $hash->{CounterInterpolated};
          
         } elsif ($line =~ /V([\d\.]+).?Setup done/) {      # old setup message 
             Log3 $name, 3, "$name: device is flashed with an old and incompatible firmware : $1";
@@ -1005,6 +1050,8 @@ sub ArduCounter_Ready($)
             
         <li><b>readingNameCount[0-9]+</b></li> 
             Change the name of the counter reading pinX to something more meaningful.
+        <li><b>readingNameLongCount[0-9]+</b></li> 
+            Change the name of the long counter reading longX (only created when verboseReadingsX is set to 1) to something more meaningful.
         <li><b>readingNamePower[0-9]+</b></li> 
             Change the name of the power reading powerX to something more meaningful.
         <li><b>readingFactor[0-9]+</b></li> 
@@ -1022,7 +1069,8 @@ sub ArduCounter_Ready($)
             the current count at this pin
         <li><b>power.*</b></li> 
             the current calculated power at this pin
-        Most reading names can be customized with attribues and many more readings can be generated by setting the attribute verboseReadings[0-9]+ to 1.
+        Most reading names can be customized with attribues and many more readings can be generated by setting the attribute verboseReadings[0-9]+ to 1.<br>
+        This includes the "long count" reading which keeps on counting up after fhem restarts whereas the pin.* count is only a temporary internal count that starts at 0 when the arduino board  starts.
     </ul>
     <br>
 </ul>
