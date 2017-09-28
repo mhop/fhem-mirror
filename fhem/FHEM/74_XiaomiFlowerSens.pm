@@ -36,7 +36,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.0.1";
+my $version = "1.0.3";
 
 
 
@@ -164,6 +164,8 @@ sub XiaomiFlowerSens_Attr(@) {
     
     if( $attrName eq "disabledForIntervals" ) {
         if( $cmd eq "set" ) {
+            return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
+            unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
             Log3 $name, 3, "XiaomiFlowerSens ($name) - disabledForIntervals";
             readingsSingleUpdate ( $hash, "state", "Unknown", 1 );
         }
@@ -651,26 +653,89 @@ sub XiaomiFlowerSens_BlockingAborted($) {
   <a name="XiaomiFlowerSensattribut"></a>
   <b>Attributes</b>
   <ul>
-    <li>disable - disables the Nuki device</li>
+    <li>disable - disables the device</li>
     <li>interval - interval in seconds for statusRequest</li>
-    <li>minFertility - min fertility value befor low warn event</li>
-    <li>maxFertility - max fertility value befor High warn event</li>
-    <li>minMoisture - min moisture value befor low warn event</li>
-    <li>maxMoisture - max moisture value befor High warn event</li>
-    <li>minTemp - min temperature value befor low warn event</li>
-    <li>maxTemp - max temperature value befor high warn event</li>
-    <li>minlux - min lux value befor low warn event</li>
-    <li>maxlux - max lux value befor high warn event
+    <li>minFertility - min fertility value for low warn event</li>
+    <li>maxFertility - max fertility value for High warn event</li>
+    <li>minMoisture - min moisture value for low warn event</li>
+    <li>maxMoisture - max moisture value for High warn event</li>
+    <li>minTemp - min temperature value for low warn event</li>
+    <li>maxTemp - max temperature value for high warn event</li>
+    <li>minlux - min lux value for low warn event</li>
+    <li>maxlux - max lux value for high warn event
     <br>
     Event Example for min/max Value's: 2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br>
     Event Example for min/max Value's: 2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high</li>
-    <li>sshHost - FQD-Name or IP of ssh remote system / you must configure your ssh system for certificate authentication. For better handling you can config ssh Client wirh .ssh/config file</li>
+    <li>sshHost - FQD-Name or IP of ssh remote system / you must configure your ssh system for certificate authentication. For better handling you can config ssh Client with .ssh/config file</li>
   </ul>
 </ul>
 
 =end html
 
 =begin html_DE
+
+<a name="XiaomiFlowerSens"></a>
+<h3>Xiaomi Flower Monitor</h3>
+<ul>
+  <u><b>XiaomiFlowerSens - liest Daten von einem Xiaomi Flower Monitor</b></u>
+  <br />
+  Dieser Modul liest Daten von einem Sensor und legt sie in den Readings ab.<br />
+  Auf dem (Linux) FHEM-Server werden gatttool und hcitool vorausgesetzt. (sudo apt install bluez)
+  <br /><br />
+  <a name="XiaomiFlowerSensdefine"></a>
+  <b>Define</b>
+  <ul><br />
+    <code>define &lt;name&gt; XiaomiFlowerSens &lt;BT-MAC&gt;</code>
+    <br /><br />
+    Beispiel:
+    <ul><br />
+      <code>define Weihnachtskaktus XiaomiFlowerSens C4:7C:8D:62:42:6F</code><br />
+    </ul>
+    <br />
+	Der Befehl legt ein Device vom Typ XiaomiFlowerSens an mit dem Namen Weihnachtskaktus und der Bluetooth MAC C4:7C:8D:62:42:6F.<br />
+	Nach dem Anlegen des Device werden umgehend und automatisch die aktuellen Daten vom betroffenen Xiaomi Flower Monitor gelesen.
+  </ul>
+  <br /><br />
+  <a name="XiaomiFlowerSensreadings"></a>
+  <b>Readings</b>
+  <ul>
+    <li>state - Status des Flower Monitor oder eine Fehlermeldung falls Fehler beim letzten Kontakt auftraten.</li>
+    <li>battery - aktueller Batterie-Status in Abhängigkeit vom Wert batteryLevel.</li>
+    <li>batteryLevel - aktueller Ladestand der Batterie in Prozent.</li>
+    <li>fertility - Wert des Fruchtbarkeitssensors (Bodenleitf&auml;higkeit)</li>
+    <li>firmware - aktuelle Firmware-Version des Flower Monitor</li>
+    <li>lux - aktuelle Lichtintensit&auml;t</li>
+    <li>moisture - aktueller Feuchtigkeitswert</li>
+    <li>temperature - aktuelle Temperatur</li>
+  </ul>
+  <br /><br />
+  <a name="XiaomiFlowerSensset"></a>
+  <b>Set</b>
+  <ul>
+    <li>statusRequest - aktive Abfrage des aktuellen Status des Xiaomi Flower Monitor und seiner Werte</li>
+    <li>clearFirmwareReading - l&ouml;scht das Reading firmware f&uuml;r/nach Upgrade</li>
+    <br />
+  </ul>
+  <br /><br />
+  <a name="XiaomiFlowerSensattribut"></a>
+  <b>Attribute</b>
+  <ul>
+    <li>disable - deaktiviert das Device</li>
+    <li>interval - Interval in Sekunden zwischen zwei Abfragen</li>
+    <li>minFertility - min Fruchtbarkeits-Grenzwert f&uuml;r ein Ereignis minFertility low </li>
+    <li>maxFertility - max Fruchtbarkeits-Grenzwert f&uuml;r ein Ereignis maxFertility high </li>
+    <li>minMoisture - min Feuchtigkeits-Grenzwert f&uuml;r ein Ereignis minMoisture low </li> 
+    <li>maxMoisture - max Feuchtigkeits-Grenzwert f&uuml;r ein Ereignis maxMoisture high </li>
+    <li>minTemp - min Temperatur-Grenzwert f&uuml;r ein Ereignis minTemp low </li>
+    <li>maxTemp - max Temperatur-Grenzwert f&uuml;r ein Ereignis maxTemp high </li>
+    <li>minlux - min Helligkeits-Grenzwert f&uuml;r ein Ereignis minlux low </li>
+    <li>maxlux - max Helligkeits-Grenzwert f&uuml;r ein Ereignis maxlux high
+    <br /><br />Beispiele f&uuml;r min/max-Ereignisse:<br />
+    2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br />
+    2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high<br /><br /></li>
+    <li>sshHost - FQDN oder IP-Adresse eines entfernten SSH-Systems. Das SSH-System ist auf eine Zertifikat basierte Authentifizierung zu konfigurieren. Am elegantesten geschieht das mit einer  .ssh/config Datei auf dem SSH-Client.</li>
+  </ul>
+</ul>
 
 =end html_DE
 

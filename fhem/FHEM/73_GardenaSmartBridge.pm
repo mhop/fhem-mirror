@@ -68,7 +68,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 
 
-my $version = "0.2.5";
+my $version = "0.2.6";
 
 
 
@@ -209,8 +209,9 @@ sub GardenaSmartBridge_Attr(@) {
     
     elsif( $attrName eq "disabledForIntervals" ) {
         if( $cmd eq "set" ) {
+            return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
+            unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
             Log3 $name, 3, "GardenaSmartBridge ($name) - disabledForIntervals";
-            readingsSingleUpdate ( $hash, "state", "inactive", 1 );
         }
 
         elsif( $cmd eq "del" ) {
@@ -221,6 +222,8 @@ sub GardenaSmartBridge_Attr(@) {
     
     elsif( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
+            return "Interval must be greater than 0"
+            unless($attrVal > 0);
             $hash->{INTERVAL}   = $attrVal;
             RemoveInternalTimer($hash);
             Log3 $name, 3, "GardenaSmartBridge ($name) - set interval: $attrVal";

@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 73_GardenaSmartBridge: add syntax check for disabledForIntervals
+                                    check set Interval Valur greater than 0
+  - feature: 74_XiaomiFlowerMonitor: add syntax check for disabledForIntervals
   - feature: LightScene: added set all command
   - feature: 49_SSCam: V3.0.0, new concept - differ between CAM-/SVS-device,
                        version is downwardly compatible, but homeMode-commands
