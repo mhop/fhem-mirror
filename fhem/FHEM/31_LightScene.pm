@@ -590,8 +590,9 @@ LightScene_Set($@)
 
   my @sorted = sort keys %{$hash->{SCENES}};
 
-     if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", @sorted) ." rename save set setcmd scene:".join(",", @sorted) ." nextScene:noArg previousScene:noArg"};
+  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", @sorted) ." rename save set setcmd scene:".join(",", @sorted) ." all nextScene:noArg previousScene:noArg"};
 
+  if( $cmd eq "all" && !defined( $scene ) ) { return "Usage: set $name all <command>" };
   if( $cmd eq "save" && !defined( $scene ) ) { return "Usage: set $name save <scene_name>" };
   if( $cmd eq "scene" && !defined( $scene ) ) { return "Usage: set $name scene <scene_name>" };
   if( $cmd eq "remove" && !defined( $scene ) ) { return "Usage: set $name remove <scene_name>" };
@@ -671,7 +672,8 @@ LightScene_Set($@)
   $hash->{INSET} = 1;
 
   my @devices;
-  if( $cmd eq "scene" && defined($hash->{switchingOrder}) && defined($hash->{switchingOrder}{$scene}) ) {
+  if( ( $cmd eq "scene" || $cmd eq "all" )
+      && defined($hash->{switchingOrder}) && defined($hash->{switchingOrder}{$scene}) ) {
     @devices = @{$hash->{switchingOrder}{$scene}};
   } else {
     @devices = @{$hash->{devices}};
@@ -725,6 +727,13 @@ LightScene_Set($@)
         $count += $switched;
         $ret .= $rr // "";
       }
+
+    } elsif ( $cmd eq "all" ) {
+      $ret .= " " if( $ret );
+      my($rr,$switched) = LightScene_RestoreDevice($hash,$d,"$scene ".join(" ", @a));
+      $count += $switched;
+      $ret .= $rr // "";
+
     } else {
       $ret = "Unknown argument $cmd, choose one of save scene";
     }
@@ -733,6 +742,8 @@ LightScene_Set($@)
 
   if( $cmd eq "scene" ) {
     readingsSingleUpdate($hash, "state", $scene, 1 ) if( !$hash->{followDevices} || $count == 0 );
+  } elsif( $cmd eq "all" ) {
+    readingsSingleUpdate($hash, "state", "all $scene ".join(" ", @a), 1 ) if( !$hash->{followDevices} || $count == 0 );
   }
 
   delete($hash->{INSET});
@@ -1019,27 +1030,29 @@ LightScene_editTable($) {
   <a name="LightScene_Set"></a>
     <b>Set</b>
     <ul>
+      <li>all &lt;command&gt;<br>
+        execute set &lt;command&gt; for alle devices in this LightScene</li>
       <li>save &lt;scene_name&gt;<br>
-      save current state for alle devices in this LightScene to &lt;scene_name&gt;</li>
+        save current state for alle devices in this LightScene to &lt;scene_name&gt;</li>
       <li>scene &lt;scene_name&gt;<br>
-      shows scene &lt;scene_name&gt; - all devices are switched to the previously saved state</li>
+        shows scene &lt;scene_name&gt; - all devices are switched to the previously saved state</li>
       <li>nextScene [nowrap]<br>
-      activates the next scene in alphabetical order after the current scene or the first if no current scene is set.</li>
+        activates the next scene in alphabetical order after the current scene or the first if no current scene is set.</li>
       <li>previousScene [nowrap]<br>
-      activates the previous scene in alphabetical order before the current scene or the last if no current scene is set.</li>
+        activates the previous scene in alphabetical order before the current scene or the last if no current scene is set.</li>
       <li>set &lt;scene_name&gt; &lt;device&gt; [&lt;cmd&gt;]<br>
-      set the saved state of &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;</li>
+        set the saved state of &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;</li>
       <li>setcmd &lt;scene_name&gt; &lt;device&gt; [&lt;cmd&gt;]<br>
-      set command to be executed for &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;.
+        set command to be executed for &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;.
       &lt;cmd&gt; can be any commandline that fhem understands including multiple commands separated by ;;
       <ul>
         <li>set kino_group setcmd allOff LampeDecke sleep 30 ;; set LampeDecke off</li>
         <li>set light_group setcmd test Lampe1 sleep 10 ;; set Lampe1 on ;; sleep 5 ;; set Lampe1 off</li>
       </ul></li>
       <li>remove &lt;scene_name&gt;<br>
-      remove &lt;scene_name&gt; from list of saved scenes</li>
+        remove &lt;scene_name&gt; from list of saved scenes</li>
       <li>rename &lt;scene_old_name&gt; &lt;scene_new_name&gt;<br>
-      rename &lt;scene_old_name&gt; to &lt;scene_new_name&gt;</li>
+        rename &lt;scene_old_name&gt; to &lt;scene_new_name&gt;</li>
     </ul><br>
 
   <a name="LightScene_Get"></a>
