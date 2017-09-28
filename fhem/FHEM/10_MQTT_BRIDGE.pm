@@ -247,7 +247,7 @@ sub onmessage($$$) {
       <p><code>attr &lt;name&gt; subscribeSet [{Perl-expression}] [qos:?] [retain:?] &lt;topic&gt;</code><br/>
          configures a topic that will issue a 'set &lt;message&gt; whenever a message is received<br/>
          QOS and ratain can be optionally defined for this topic. <br/>
-         Furthermore, a Perl statement can be provided which is executed when the message is received. The following variables are available for the expression: $hash, $name, $topic, $message, $devname (linked device). Return value decides whether reading is set (true (e.g., 1) or undef) or discarded (false (e.g., 0)).
+         Furthermore, a Perl statement can be provided which is executed when the message is received. The following variables are available for the expression: $hash, $name, $topic, $message, $device (linked device). Return value decides whether reading is set (true (e.g., 1) or undef) or discarded (false (e.g., 0)).
       </p>
       <p>Example:<br/>
          <code>attr mqttest subscribeSet {fhem("do somethin")} /topic/cmd</code>
@@ -258,7 +258,7 @@ sub onmessage($$$) {
          configures a topic that will issue a 'set &lt;reading&gt; &lt;message&gt; whenever a message is received. see above
 for Perl-Expression/QOS/retain</p>
       <p>Example:<br/>
-         <code>attr mqttest subscribeSet_cmd {if ($message eq "config") fhem("set $devname getconfig");; 0} /topic/cmd</code>
+         <code>attr mqttest subscribeSet_cmd {if ($message eq "config") fhem("set $device getconfig");; 0} /topic/cmd</code>
        </p>
     </li>
     <li>
