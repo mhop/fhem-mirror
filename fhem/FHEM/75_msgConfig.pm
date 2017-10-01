@@ -611,8 +611,9 @@ sub msgConfig_Notify($$) {
         next unless ( $msg && $msg ne "" );
 
         unless ( $sender && $sender ne "" ) {
-            Log3 $name, 4, "msg: "
-              . "ERROR: Routing ERROR - Unable to retrieve sender reference from $devName";
+            Log3 $name, 5,
+              "msg: ERROR RCV $devName: "
+              . "Unable to retrieve sender reference";
             next;
         }
 
@@ -645,8 +646,12 @@ sub msgConfig_Notify($$) {
         }
 
         unless ($delivered) {
-            Log3 $name, 4, "msg: "
-              . "ERROR: Missing reference in msgContact attribute to $sender for received $t message from $devName";
+            Log3 $name, 4,
+              "msg: ERROR RCV $devName $sender: "
+              . "Missing reference in msgContact attribute of any device";
+            DoTrigger( $name,
+                    "ERROR RCV $devName $sender: "
+                  . "Missing reference in msgContact attribute of any device" );
         }
 
     }
