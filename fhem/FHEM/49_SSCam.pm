@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 3.1.0  26.09.2017    move extevent from CAM to SVS model, Reading PollState enhanced for CAM-Model, minor fixes
 # 3.0.0  23.09.2017    Internal MODEL SVS or CAM -> distinguish/support Cams and SVS in different devices
 #                      new comand get storedCredentials, commandref revised
 # 2.9.0  20.09.2017    new function get homeModeState, minor fixes at simu_SVSversion, commandref revised
@@ -199,7 +200,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.0.0";
+my $SSCamVersion = "3.1.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -548,7 +549,6 @@ sub SSCam_Set {
                  "disable ".
                  "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open,lastsnap_fw ".
                  "stopView:noArg ".
-                 "extevent:1,2,3,4,5,6,7,8,9,10 ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
@@ -557,6 +557,7 @@ sub SSCam_Set {
       # setlist für SVS Devices
       $setlist = "Unknown argument $opt, choose one of ".
 	             "credentials ".
+				 "extevent:1,2,3,4,5,6,7,8,9,10 ".
 		     	 ($hash->{HELPER}{APIHMMAXVER}?"homeMode:on,off ": "");
   }         
 
@@ -784,7 +785,7 @@ sub SSCam_Set {
       }
       runliveview($hash); 
             
-  } elsif ($opt eq "extevent" && IsModelCam($hash)) {
+  } elsif ($opt eq "extevent" && !IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
                                    
       $hash->{HELPER}{EVENTID} = $prop;
@@ -855,7 +856,7 @@ sub SSCam_Get {
         # Credentials abrufen
         my ($success, $username, $password) = getcredentials($hash,0);
         unless ($success) {return "Credentials couldn't be retrieved successfully - see logfile"};
-        return "Stored Credentials for - Username: $username, Password: $password";
+        return "Stored Credentials for $name - Username: $username, Password: $password";
                 
     } elsif ($opt eq "snapGallery" && IsModelCam($hash)) {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1784,7 +1785,8 @@ sub getcaminfoall {
 		
 		$now = FmtTime(gettimeofday());
         $new = FmtTime(gettimeofday()+$attr{$name}{pollcaminfoall});
-		readingsSingleUpdate($hash,"state","polling - next time: $new",1) if(!IsModelCam($hash));  # state für SVS-Device setzen
+		readingsSingleUpdate($hash,"state","polling",1) if(!IsModelCam($hash));  # state für SVS-Device setzen
+		readingsSingleUpdate($hash,"PollState","Active - next time: $new",1);  
         
         if (!$attr{$name}{pollnologging}) {
             Log3($name, 3, "$name - Polling now: $now , next Polling: $new");
@@ -4469,7 +4471,7 @@ sub experror {
 <h3>SSCam</h3>
 <ul>
   Using this Module you are able to operate cameras which are defined in Synology Surveillance Station (SVS) and execute 
-  functions of the SVS. <br>
+  functions of the SVS. It is based on the SVS API and supports the SVS version 7 and above.<br>
   
   At present the following functions are available: <br><br>
    <ul>
@@ -4625,14 +4627,15 @@ sub experror {
       <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - manager       </li></td></tr>
-      <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - manager       </li></td></tr>
+      <tr><td><li>set ... extevent           </td><td> session: DSM - user as member of admin-group   </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
-      <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
+      <tr><td><li>set ... homeMode           </td><td> session: DSM - user as member of admin-group   </li></td></tr>
+	  <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - manager       </li></td></tr>
+	  <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... runView            </td><td> session: ServeillanceStation - observer with privilege liveview of camera </li></td></tr>
       <tr><td><li>set ... snapGallery        </td><td> session: ServeillanceStation - observer    </li></td></tr>
-	  <tr><td><li>set ... extevent           </td><td> session: DSM - user as member of admin-group   </li></td></tr>
       <tr><td><li>set ... stopView           </td><td> -                                          </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                          </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
@@ -5411,7 +5414,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 <h3>SSCam</h3>
 <ul>
     Mit diesem Modul können Operationen von in der Synology Surveillance Station (SVS) definierten Kameras und Funktionen 
-	der SVS ausgeführt werden. <br>
+	der SVS ausgeführt werden. Es basiert auf der SVS API und unterstützt die SVS ab Version 7. <br>
     Zur Zeit werden folgende Funktionen unterstützt: <br><br>
     <ul>
      <ul>
@@ -5560,22 +5563,23 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <ul>
       <table>
       <colgroup> <col width=20%> <col width=80%> </colgroup>
-      <tr><td><li>set ... on                 </td><td> session: ServeillanceStation - Betrachter mit erweiterten Privileg "manuelle Aufnahme" </li></td></tr>
-      <tr><td><li>set ... off                </td><td> session: ServeillanceStation - Betrachter mit erweiterten Privileg "manuelle Aufnahme" </li></td></tr>
-      <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
-      <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - Manager       </li></td></tr>
-      <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
-      <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
-      <tr><td><li>set ... snapGallery        </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>set ... extevent           </td><td> session: DSM - Nutzer Mitglied von Admin-Gruppe     </li></td></tr>
+	  <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
+      <tr><td><li>set ... homeMode           </td><td> session: DSM - Nutzer Mitglied von Admin-Gruppe     </li></td></tr>
 	  <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
-      <tr><td><li>set ... runView            </td><td> session: ServeillanceStation - Betrachter mit Privileg Liveansicht für Kamera        </li></td></tr>
-      <tr><td><li>set ... stopView           </td><td> -                                            </li></td></tr>
-      <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
-      <tr><td><li>set ... extevent           </td><td> session: DSM - Nutzer Mitglied von Admin-Gruppe     </li></td></tr>
+      <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - Manager       </li></td></tr>
+	  <tr><td><li>set ... on                 </td><td> session: ServeillanceStation - Betrachter mit erweiterten Privileg "manuelle Aufnahme" </li></td></tr>
+      <tr><td><li>set ... off                </td><td> session: ServeillanceStation - Betrachter mit erweiterten Privileg "manuelle Aufnahme" </li></td></tr>
+	  <tr><td><li>set ... runView            </td><td> session: ServeillanceStation - Betrachter mit Privileg Liveansicht für Kamera        </li></td></tr>
+      <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
+	  <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+	  <tr><td><li>set ... snapGallery        </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+	  <tr><td><li>set ... stopView           </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
