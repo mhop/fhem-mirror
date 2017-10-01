@@ -8,13 +8,15 @@ use Data::Dumper;
 # initialize ##################################################################
 sub msgConfig_Initialize($) {
     my ($hash) = @_;
+    my $TYPE = "msgConfig";
 
     require "$attr{global}{modpath}/FHEM/msgSchema.pm";
 
-    $hash->{DefFn}   = "msgConfig_Define";
-    $hash->{SetFn}   = "msgConfig_Set";
-    $hash->{GetFn}   = "msgConfig_Get";
-    $hash->{UndefFn} = "msgConfig_Undefine";
+    $hash->{DefFn}    = $TYPE . "_Define";
+    $hash->{SetFn}    = $TYPE . "_Set";
+    $hash->{GetFn}    = $TYPE . "_Get";
+    $hash->{UndefFn}  = $TYPE . "_Undefine";
+    $hash->{NotifyFn} = $TYPE . "_Notify";
 
     # add attributes for configuration
     no warnings 'qw';
@@ -69,6 +71,7 @@ sub msgConfig_Initialize($) {
       msgPriorityPush:-2,-1,0,1,2
       msgPriorityScreen:-2,-1,0,1,2
       msgPriorityText:-2,-1,0,1,2
+      msgRcv:1,0
       msgResidentsDev
       msgSwitcherDev
       msgThPrioHigh:-2,-1,0,1,2
@@ -145,21 +148,21 @@ sub msgConfig_Initialize($) {
 
 # regular Fn ##################################################################
 sub msgConfig_Define($$) {
-
     my ( $hash, $def ) = @_;
+    my $TYPE = $hash->{TYPE};
 
     my @a = split( "[ \t]+", $def, 5 );
 
-    return "Usage: define <name> msgConfig"
+    return "Usage: define <name> $TYPE"
       if ( int(@a) < 2 );
     my $name = $a[0];
 
     return "Global configuration device already defined: "
-      . $modules{msgConfig}{defptr}{NAME}
-      if ( defined( $modules{msgConfig}{defptr} ) );
+      . $modules{$TYPE}{defptr}{NAME}
+      if ( defined( $modules{$TYPE}{defptr} ) );
 
     # create global unique device definition
-    $modules{msgConfig}{defptr} = $hash;
+    $modules{$TYPE}{defptr} = $hash;
 
     # set default settings on first define
     if ( $init_done && !defined( $hash->{OLDDEF} ) ) {
@@ -179,15 +182,17 @@ sub msgConfig_Define($$) {
         readingsEndUpdate( $hash, 1 );
     }
 
+    $hash->{NOTIFYDEV} = "TYPE=(Jabber|TelegramBot|yowsup)";
+
     return undef;
 }
 
 sub msgConfig_Undefine($$) {
-
     my ( $hash, $name ) = @_;
+    my $TYPE = $hash->{TYPE};
 
     # release global unique device definition
-    delete $modules{msgConfig}{defptr};
+    delete $modules{$TYPE}{defptr};
 
     return undef;
 }
@@ -195,10 +200,11 @@ sub msgConfig_Undefine($$) {
 sub msgConfig_Set($@) {
     my ( $hash, @a ) = @_;
     my $name = $hash->{NAME};
+    my $TYPE = $hash->{TYPE};
     shift @a;
     my $what = shift @a;
 
-    Log3 $name, 5, "msgConfig $name: called function msgConfig_Set()";
+    Log3 $name, 5, "$TYPE $name: called function $TYPE" . "_Set()";
 
     my @msgTypes = ( "audio", "light", "mail", "push", "screen", "queue" );
 
@@ -212,7 +218,7 @@ sub msgConfig_Set($@) {
     # addLocation
     elsif ( lc($what) eq "addlocation" ) {
         my $location = join( " ", @a );
-        my $group = AttrVal( $name, "group", "msgConfig" );
+        my $group = AttrVal( $name, "group", $TYPE );
         my $room  = AttrVal( $name, "room",  "" );
         my $return = "";
 
@@ -374,10 +380,11 @@ m/^msgLocationName$|^msgLocationName\s|\smsgLocationName\s|\smsgLocationName$/
 sub msgConfig_Get($@) {
     my ( $hash, @a ) = @_;
     my $name = $hash->{NAME};
+    my $TYPE = $hash->{TYPE};
     shift @a;
     my $what = shift @a;
 
-    Log3 $name, 5, "msgConfig $name: called function msgConfig_Get()";
+    Log3 $name, 5, "$TYPE $name: called function $TYPE" . "_Get()";
 
     my @msgTypes = ( "audio", "light", "mail", "push", "screen" );
 
@@ -549,6 +556,90 @@ sub msgConfig_Get($@) {
     }
 
     return undef;
+}
+
+sub msgConfig_Notify($$) {
+    my ( $hash, $dev ) = @_;
+    my $name    = $hash->{NAME};
+    my $TYPE    = GetType($name);
+    my $devName = $dev->{NAME};
+    my $devType = GetType($devName);
+
+    return ""
+      if ( IsDisabled($name)
+        or IsDisabled($devName)
+        or !AttrVal( $devName, "msgRcv", AttrVal( $name, "msgRcv", "1" ) ) );
+
+    Log3 $name, 5, "$TYPE $name: called function $TYPE" . "_Notify()";
+
+    my @events = @{ deviceEvents( $dev, 1 ) };
+
+    return "" unless (@events);
+
+    foreach my $event (@events) {
+        next
+          unless (
+            $event =~ m/^(msgText|queryData|((?:OTR)?Last)Message|message)/ );
+        my ( $sender, $msg );
+
+        # TelegramBot
+        if ( $devType eq "TelegramBot" ) {
+            if ( $1 eq "msgText" ) {
+                $sender = ReadingsVal( $devName, "msgPeerId", undef );
+                $msg    = ReadingsVal( $devName, "msgText",   undef );
+            }
+            elsif ( $1 eq "queryData" ) {
+                $sender = ReadingsVal( $devName, "queryPeerId", undef );
+                $msg    = ReadingsVal( $devName, "queryData",   undef );
+            }
+        }
+
+        # Jabber
+        elsif ( $devType eq "Jabber" ) {
+            ($sender) =
+              ( ReadingsVal( $devName, $2 . "SenderJID", undef ) =~ m/[^\/]/g );
+            $msg = ReadingsVal( $devName, $2 . "Message", undef );
+        }
+
+        # yowsup
+        elsif ( $devType eq "yowsup" ) {
+            $sender  = $devName;
+            $devName = $modules{yowsup}{defptr}{yowsup}->{NAME};
+            $msg     = ReadingsVal( $devName, "message", undef );
+        }
+
+        next unless ( $sender && $sender ne "" && $msg && $msg ne "" );
+
+        foreach my $t ( "push", "screen" ) {
+            my @contacts = devspec2array(
+                "msgContact" . ucfirst($t) . "=.*$devName:[@#]*$sender.*" );
+
+            if (@contacts) {
+                foreach (@contacts) {
+                    unless ( IsDevice($_) ) {
+                        Log3 $name, 4, "msg $name: "
+                          . "ERROR: Received $t message from $devName for non-existing recipient device $_";
+                        next;
+                    }
+
+                    Log3 $_, 4,
+                      "msg $_: " . "Received $t message from $devName: $msg";
+
+                    my $recipient = $defs{$_};
+
+                    readingsBeginUpdate($recipient);
+                    readingsBulkUpdate( $recipient,
+                        "fhemMsgRcv" . ucfirst($t), $msg );
+                    readingsBulkUpdate( $recipient,
+                        "fhemMsgRcv" . ucfirst($t) . "Gw", $devName );
+                    readingsEndUpdate( $recipient, 1 );
+                }
+            }
+        }
+
+    }
+
+    return "";
 }
 
 # module Fn ####################################################################
@@ -735,7 +826,6 @@ This next step is basically to set attribute msgResidentsDevice to refer to this
           <li>
             <b>createSwitcherDev</b> &nbsp;&nbsp;<de|en>&nbsp;&nbsp;<br>
             Creates a pre-configured Dummy device named HouseAnn and updates globalMsg attribute msgSwitcherDev to refer to it.
-            
           </li>
         </ul>
       </ul>
