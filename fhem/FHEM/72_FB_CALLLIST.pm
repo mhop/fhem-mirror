@@ -1479,7 +1479,7 @@ sub FB_CALLLIST_returnTableHeader($)
     <br>
     If not set, no link will be shown in the list.<br><br>
 
-    <li><a name="FB_CALLLIST_number-of-calls">number-of-calls</a> 1..20</li>
+    <li><a name="FB_CALLLIST_number-of-calls">number-of-calls</a> 1..40</li>
     Defines the maximum number of displayed call entries in the list.<br><br>
     Default Value is 5 calls<br><br>
 
@@ -1739,7 +1739,7 @@ sub FB_CALLLIST_returnTableHeader($)
     <br>
     Sofern nicht gesetzt, wird kein Link angezeigt.<br><br>
 
-    <li><a name="FB_CALLLIST_number-of-calls">number-of-calls</a> 1..20</li>
+    <li><a name="FB_CALLLIST_number-of-calls">number-of-calls</a> 1..40</li>
     Setzt die maximale Anzahl an Eintr&auml;gen in der Anrufliste. Sollte die Anrufliste voll sein, wird das &auml;lteste Gespr&auml;ch gel&ouml;scht.<br><br>
     Standardwert sind 5 Eintr&auml;ge<br><br>
 
