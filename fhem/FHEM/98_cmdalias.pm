@@ -15,7 +15,7 @@ cmdalias_Initialize($)
   my ($hash) = @_;
   $hash->{DefFn}    = "cmdalias_Define";
   $hash->{UndefFn}  = "cmdalias_Undefine";
-  $hash->{AttrList} = "disable:0,1";
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals";
 }
 
 
@@ -85,7 +85,7 @@ CommandCmdAlias($$$)
       Log3 $n, 3, "cmdalias $n called recursively, skipping execution";
       next;
     }
-    if($doesMatch) {
+    if($doesMatch && !IsDisabled($h->{NAME})) {
       my %specials= ("%EVENT" => $param);
       my $exec = EvalSpecials($h->{NEWCMD}, %specials);
       $h->{InExec} = 1;
@@ -141,6 +141,12 @@ CommandCmdAlias($$$)
     define s2 cmdalias set lamp .* AS { Log 1, "$EVENT";; fhem("set $EVENT") }
   </code></ul>
 
+  <a name="cmdaliasattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+  </ul>
 </ul>
 
 =end html
