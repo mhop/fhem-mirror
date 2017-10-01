@@ -1,10 +1,5 @@
 # $Id$
 
-# ToDo-List
-# ---------
-# [ ] Move to any position, not only top, bottom, intermediate, ... 
-
-
 package main;
 
 use strict;
@@ -29,7 +24,7 @@ sub EleroDrive_Initialize($) {
                            "IntermediatePercent " .
                            "$readingFnAttributes ";
                            
-  $hash->{noAutocreatedFilelog} = 1; 
+  $hash->{noAutocreatedFilelog} = 1;
 }
 
 
@@ -43,7 +38,7 @@ sub EleroDrive_Define($$) {
   my $devName   = $a[0];
   my $type      = $a[1];
   my $channel   = $a[2];
-
+  
   $hash->{STATE}    = 'Initialized';
   $hash->{NAME}     = $devName;
   $hash->{TYPE}     = $type;
@@ -51,7 +46,19 @@ sub EleroDrive_Define($$) {
   
   $modules{EleroDrive}{defptr}{$channel} = $hash;
   
-  AssignIoPort($hash);
+  my $ioDev = undef;
+  my @parts = split("_", $devName);
+  if(@parts == 3) {
+    $ioDev = $parts[1];
+  }
+  if($ioDev) {
+    AssignIoPort($hash, $ioDev);
+  }
+  else {
+    AssignIoPort($hash);
+  }
+  
+  
   if(defined($hash->{IODev}->{NAME})) {
     Log3 $devName, 4, "$devName: I/O device is " . $hash->{IODev}->{NAME};
   } 
@@ -214,6 +221,24 @@ sub EleroDrive_Parse($$) {
   my $name = $hash->{NAME};
   my $buffer = $msg;
   
+  # aa054d00010102 : channel 1 top
+  # aa054d00010202 : channel 1 bottom
+  # aa054d00020102 : channel 2 top
+  # aa054d00020202 : channel 2 bottom
+  # aa 05 4d 00 01 01 02
+  # ----- -- -- -- -- -- 
+  # |     |  |  |  |  |
+  # |     |  |  |  |  Checksum
+  # |     |  |  |  State (top, bottom, ...)
+  # |     |  |  Lower channel bits (1 - 8)
+  # |     |  Upper channel bits (9 - 15)
+  # |     4d = Easy_Ack (answer on Easy_Send or Easy_Info)
+  # Fix aa 05
+  # State: 0x01 = top
+  #        0x02 = bottom
+  #        0x03 = intermediate
+  #        0x04 = tilt
+  
   # get the channel
   my $firstChannels  = substr($buffer,6,2);
   my $secondChannels = substr($buffer,8,2);
@@ -236,55 +261,71 @@ sub EleroDrive_Parse($$) {
         return undef;
       }
     }
+  
+    my $rhash = undef;
+  
+    foreach my $d (keys %defs) {
+      my $h = $defs{$d};
+      my $type = $h->{TYPE};
+      if($type eq "EleroDrive") {
+        if (defined($h->{IODev}->{NAME})) {
+          my $ioDev = $h->{IODev}->{NAME};
+          my $def = $h->{DEF};
+          if ($ioDev eq $name && $def eq $channel) {
+            $rhash = $h;
+            last;
+          }
+        }
+      }
+    }
     
-    my $rhash = $modules{EleroDrive}{defptr}{$channel};
-    my $rname = $rhash->{NAME};
+    if($rhash) {
+      my $rname = $rhash->{NAME};
     
-    # get status
-    my $statusByte = substr($buffer,10,2);
-             
-    my %deviceStati = ('00' => "no_information",
-                       '01' => "top_position",
-                       '02' => "bottom_position",
-                       '03' => "intermediate_position",
-                       '04' => "tilt_position",
-                       '05' => "blocking",
-                       '06' => "overheated",
-                       '07' => "timeout",
-                       '08' => "move_up_started",
-                       '09' => "move_down_started",
-                       '0a' => "moving_up",
-                       '0b' => "moving_down",
-                       '0d' => "stopped_in_undefined_position",
-                       '0e' => "top_tilt_stop",
-                       '0f' => "bottom_intermediate_stop",
-                       '10' => "switching_device_switched_off",
-                       '11' => "switching_device_switched_on"                 
-                      );
-                      
-    my %percentDefinitions = ('00' => 50,
-                       '01' => 0,
-                       '02' => 100,
-                       '03' => AttrVal($rname, "IntermediatePercent", 50),
-                       '04' => AttrVal($rname, "TiltPercent", 50),
-                       '05' => -1,
-                       '06' => -1,
-                       '07' => -1,
-                       '08' => -1,
-                       '09' => -1,
-                       '0a' => -1,
-                       '0b' => -1,
-                       '0d' => 50,
-                       '0e' => 0,
-                       '0f' => 100,
-                       '10' => -1,
-                       '11' => -1                 
-                      );                      
-                         
-    my $newstate = $deviceStati{$statusByte};
-    my $percentClosed = $percentDefinitions{$statusByte};
+      # get status
+      my $statusByte = substr($buffer,10,2);
+               
+      my %deviceStati = ('00' => "no_information",
+                         '01' => "top_position",
+                         '02' => "bottom_position",
+                         '03' => "intermediate_position",
+                         '04' => "tilt_position",
+                         '05' => "blocking",
+                         '06' => "overheated",
+                         '07' => "timeout",
+                         '08' => "move_up_started",
+                         '09' => "move_down_started",
+                         '0a' => "moving_up",
+                         '0b' => "moving_down",
+                         '0d' => "stopped_in_undefined_position",
+                         '0e' => "top_tilt_stop",
+                         '0f' => "bottom_intermediate_stop",
+                         '10' => "switching_device_switched_off",
+                         '11' => "switching_device_switched_on"                 
+                        );
+                        
+      my %percentDefinitions = ('00' => 50,
+                         '01' => 0,
+                         '02' => 100,
+                         '03' => AttrVal($rname, "IntermediatePercent", 50),
+                         '04' => AttrVal($rname, "TiltPercent", 50),
+                         '05' => -1,
+                         '06' => -1,
+                         '07' => -1,
+                         '08' => -1,
+                         '09' => -1,
+                         '0a' => -1,
+                         '0b' => -1,
+                         '0d' => 50,
+                         '0e' => 0,
+                         '0f' => 100,
+                         '10' => -1,
+                         '11' => -1                 
+                        );                      
+                           
+      my $newstate = $deviceStati{$statusByte};
+      my $percentClosed = $percentDefinitions{$statusByte};
     
-    if($modules{EleroDrive}{defptr}{$channel}) {
       readingsBeginUpdate($rhash);
       readingsBulkUpdate($rhash, "state", $newstate);
       readingsBulkUpdate($rhash, "position", $newstate);
@@ -298,7 +339,7 @@ sub EleroDrive_Parse($$) {
       return @list;
     }
     else {
-      return "UNDEFINED EleroDrive_$channel EleroDrive $channel";
+      return "UNDEFINED EleroDrive_" . $name . "_" . $channel . " EleroDrive " . $channel;
     }
   }
 }
