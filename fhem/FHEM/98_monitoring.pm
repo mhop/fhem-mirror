@@ -301,8 +301,8 @@ sub monitoring_Notify($$) {
   foreach my $event (@{$events}){
     next unless($event);
 
-    my $addMatch = "$name:$event" =~ $addRegex;
-    my $removeMatch = $removeRegex ? "$name:$event" =~ $removeRegex : 0;
+    my $addMatch = "$name:$event" =~ m/^$addRegex$/;
+    my $removeMatch = $removeRegex ? "$name:$event" =~ m/^$removeRegex$/ : 0;
 
     next unless(defined($event) && ($addMatch || $removeMatch));
 
