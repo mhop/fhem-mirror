@@ -10,7 +10,7 @@
 #
 # Prof. Dr. Peter A. Henning
 #
-# Contributions from: Martin Fischer, Rudolf König, Boris Neubert, Joachim Herold
+# Final version 6.314 before switching to asynchronous IO
 #
 # $Id$
 #
@@ -820,6 +820,10 @@ sub OWX_Discover ($) {
     }elsif( $owx_f eq "29" ){
       $chip     = "DS2408";
       $acstring = "OWSWITCH DS2408";  
+    #-- Family 2C = Potentiometer DS2890
+    }elsif( $owx_f eq "2C" ){
+      $chip     = "DS2890";
+      $acstring = "OWVAR DS2890";  
     #-- Family 3A = Switch DS2413
     }elsif( $owx_f eq "3A" ){
       $chip     = "DS2413";
@@ -1077,7 +1081,7 @@ sub OWX_Undef ($$) {
 #
 ########################################################################################
 
-sub OWX_Verify () {
+sub OWX_Verify {
   my ($hashorname,$devname,$devid,$type) = @_;
   my $hash;
   
