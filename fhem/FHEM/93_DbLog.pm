@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.8     29.09.2017       avoid multiple entries in Dopdown-list when creating SVG by group Device:Reading in DbLog_sampleDataFn
 # 2.22.7     24.09.2017       minor fixes in configcheck
 # 2.22.6     22.09.2017       commandref revised
 # 2.22.5     05.09.2017       fix Internal MODE isn't set correctly after DEF is edited, nextsynch is not renewed if reopen is  
@@ -151,7 +152,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.7";
+my $DbLogVersion = "2.22.8";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -4304,7 +4305,7 @@ DbLog_sampleDataFn($$$$$)
   
   if($currentPresent =~ m/Current/ && $prescurr) {
     # Table Current present, use it for sample data
-    my $query = "select device,reading,value from current where device <> '' order by device,reading";
+    my $query = "select device,reading from current where device <> '' group by device,reading";
     my $sth = $dbhf->prepare( $query );  
     $sth->execute();
     while (my @line = $sth->fetchrow_array()) {

@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DBLog: V2.22.8, avoid multiple entries of 
+                       Device:Reading-combinations in Dopdown-list when
+                       creating SVG
   - bugfix:  10_MQTT_BRIDGE: fix comandref $device 
   - feature: 74_AMADDevice: add media support for YouTubeKids
   - bugfix:  74_AMADautomagicFlowset_4.0.9.xml: fix restore volume bug
