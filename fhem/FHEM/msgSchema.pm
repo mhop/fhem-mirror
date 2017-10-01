@@ -11,35 +11,40 @@ use warnings;
 my $db = {
     'audio' => {
 
-        'AMAD' => {
-            'Normal'        => 'set %DEVICE% ttsMsg %MSG%',
-            'ShortPrio'     => 'set %DEVICE% ttsMsg %MSGSHRT%',
-            'Short'         => 'set %DEVICE% ttsMsg %MSGSHRT%',
+        'AMADDevice' => {
+            'Normal'        => 'set %DEVICE% ttsMsg &%LANG%; %MSGSHRT%',
+            'ShortPrio'     => 'set %DEVICE% ttsMsg &%LANG%; %SHOUTOUT%',
+            'Short'         => 'set %DEVICE% ttsMsg &%LANG%; %SHOUTOUT%',
             'defaultValues' => {
+                'Normal' => {
+                    'LANG' => 'de',
+                },
                 'ShortPrio' => {
-                    'MSGSH' => 'Achtung!',
+                    'LANG'     => 'de',
+                    'SHOUTOUT' => 'Achtung!',
                 },
                 'Short' => {
-                    'MSGSH' => 'Hinweis!',
+                    'LANG'     => 'de',
+                    'SHOUTOUT' => 'Hinweis!',
                 },
             },
         },
 
         'SB_PLAYER' => {
-            'Normal'        => 'set %DEVICE% talk |%TITLE%| %MSG%',
-            'ShortPrio'     => 'set %DEVICE% talk |%TITLE%| %MSGSHRT%',
-            'Short'         => 'set %DEVICE% talk |%TITLE%| %MSGSHRT%',
+            'Normal'        => 'set %DEVICE% talk |%TITLE%| %MSGSHRT%',
+            'ShortPrio'     => 'set %DEVICE% talk |%TITLE%| %SHOUTOUT%',
+            'Short'         => 'set %DEVICE% talk |%TITLE%| %SHOUTOUT%',
             'defaultValues' => {
                 'Normal' => {
                     'TITLE' => 'Announcement',
                 },
                 'ShortPrio' => {
-                    'MSGSH' => 'Achtung!',
-                    'TITLE' => 'Announcement',
+                    'SHOUTOUT' => 'Achtung!',
+                    'TITLE'    => 'Announcement',
                 },
                 'Short' => {
-                    'MSGSH' => '',
-                    'TITLE' => 'Announcement',
+                    'SHOUTOUT' => '',
+                    'TITLE'    => 'Announcement',
                 },
             },
         },
@@ -73,15 +78,15 @@ my $db = {
         },
 
         'Text2Speech' => {
-            'Normal'        => 'set %DEVICE% tts %MSG%',
-            'ShortPrio'     => 'set %DEVICE% tts %MSGSHRT%',
-            'Short'         => 'set %DEVICE% tts %MSGSHRT%',
+            'Normal'        => 'set %DEVICE% tts %MSGSHRT%',
+            'ShortPrio'     => 'set %DEVICE% tts %SHOUTOUT%',
+            'Short'         => 'set %DEVICE% tts %SHOUTOUT%',
             'defaultValues' => {
                 'ShortPrio' => {
-                    'MSGSH' => 'Achtung!',
+                    'SHOUTOUT' => 'Achtung!',
                 },
                 'Short' => {
-                    'MSGSH' => 'Hinweis!',
+                    'SHOUTOUT' => 'Hinweis!',
                 },
             },
         },
@@ -275,7 +280,7 @@ my $db = {
 
     'screen' => {
 
-        'AMAD' => {
+        'AMADDevice' => {
             'Normal' => 'set %DEVICE% screenMsg %MSG%',
             'High'   => 'set %DEVICE% screenMsg %MSG%',
             'Low'    => 'set %DEVICE% screenMsg %MSG%',
