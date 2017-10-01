@@ -608,7 +608,15 @@ sub msgConfig_Notify($$) {
             $msg     = ReadingsVal( $devName, "message", undef );
         }
 
-        next unless ( $sender && $sender ne "" && $msg && $msg ne "" );
+        next unless ( $msg && $msg ne "" );
+
+        unless ( $sender && $sender ne "" ) {
+            Log3 $name, 4, "msg: "
+              . "ERROR: Routing ERROR - Unable to retrieve sender reference from $devName";
+            next;
+        }
+
+        my $delivered = 0;
 
         foreach my $t ( "push", "screen" ) {
             my @contacts = devspec2array(
@@ -616,15 +624,12 @@ sub msgConfig_Notify($$) {
 
             if (@contacts) {
                 foreach (@contacts) {
-                    unless ( IsDevice($_) ) {
-                        Log3 $name, 4, "msg $name: "
-                          . "ERROR: Received $t message from $devName for non-existing recipient device $_";
-                        next;
-                    }
+                    next unless ( IsDevice($_) );
 
                     Log3 $_, 4,
                       "msg $_: " . "Received $t message from $devName: $msg";
 
+                    $delivered = 1;
                     my $recipient = $defs{$_};
 
                     readingsBeginUpdate($recipient);
@@ -635,6 +640,13 @@ sub msgConfig_Notify($$) {
                     readingsEndUpdate( $recipient, 1 );
                 }
             }
+
+            last if ($delivered);
+        }
+
+        unless ($delivered) {
+            Log3 $name, 4, "msg: "
+              . "ERROR: Missing reference in msgContact attribute to $sender for received $t message from $devName";
         }
 
     }
