@@ -537,8 +537,12 @@ sub Pushover_ReceiveCommand($$$) {
                     require JSON;
                     import JSON qw( decode_json );
                 };
-                $return = decode_json( Encode::encode_utf8($data) )
-                  if ( !$@ );
+                unless ($@) {
+                    my $json = JSON->new->allow_nonref;
+                    my $obj =
+                      eval { $json->decode( Encode::encode_utf8($data) ) };
+                    $return = $obj unless ($@);
+                }
             }
             else {
                 if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
