@@ -329,30 +329,29 @@ FW_uzsuTimerEntryCreate(elName, devName, vArr, currVal, set, params, cmd)
   $(newEl).append(time); //time.activateFn();
 
   var widget;
-  if( vArr[1] )
-    {
-      var vArr = vArr;
-      var params = vArr.slice(1).join(',').split(',');
-      var wn = params[0];
-      if( FW_widgets[wn]
-          && FW_widgets[wn].createFn ) {
-        widget = FW_widgets[wn].createFn(elName+'-'+wn, devName+'-'+wn, params,
-                                         currVals[3], undefined, undefined, wchanged);
-        if( widget ) {
-          if( widget.activateFn )
-            widget.activateFn();
+  if( vArr[1] ) {
+    var vArr = vArr;
+    var params = vArr.slice(1).join(',').split(',');
+    var wn = params[0];
+    FW_callCreateFn(elName+'-'+wn, devName+'-'+wn, params,
+                    currVals[3], undefined, undefined, wchanged,
+                    function(wn, ne) {
+      widget = ne;
 
-          wval = currVals[3];
-          if( typeof wval == 'undefined' )
-            wval = params[1];
+      if( widget ) {
+        if( widget.activateFn )
+          widget.activateFn();
 
-          if( widget.setValueFn
-              &&( typeof wval !== 'undefined' )  )
-            widget.setValueFn(wval);
+        wval = currVals[3];
+        if( typeof wval == 'undefined' )
+          wval = params[1];
 
-          $(widget).css('margin','0 8px 0 4px');
-          $(newEl).append(widget)
-        }
+        if( widget.setValueFn
+            &&( typeof wval !== 'undefined' )  )
+          widget.setValueFn(wval);
+
+        $(widget).css('margin','0 8px 0 4px');
+        $(newEl).append(widget)
       } else {
         var button = $('<button>aktion</button>');
         button.button();
@@ -362,7 +361,8 @@ FW_uzsuTimerEntryCreate(elName, devName, vArr, currVal, set, params, cmd)
         button.button("disable");
         $(newEl).append(button);
       }
-    }
+    });
+  }
 
   var enabled = FW_uzsuToggleCreate(undefined, devName+"Enabled", ["uzsuToggle","disabled","enabled"],
                                     currVals[2], undefined, params, changed);
