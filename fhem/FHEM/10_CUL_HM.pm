@@ -2199,7 +2199,7 @@ sub CUL_HM_Parse($$) {#########################################################
 
         if ($mh{md} eq "HM-LC-Ja1PBU-FM" && defined $mI[6]){
           my %dirName = ( 0=>"stop" ,1=>"up" ,2=>"down" ,3=>"err" );
-          push @evtEt,[$mh{cHash},1,"slat:".hex($mI[5])/2];
+          push @evtEt,[$mh{cHash},1,"pctSlat:".hex($mI[5])/2];
           push @evtEt,[$mh{cHash},1,"slatDir:".$dirName{hex($mI[6]) & 0x3}];          
         }
       }
