@@ -137,6 +137,11 @@ BlockingStart(;$)
       }
       if(!kill(0, $h->{pid})) {
         $h->{pid} = "DEAD:$h->{pid}";
+        if(!$h->{terminated} && $h->{abortFn}) {
+          no strict "refs";
+          my $ret = &{$h->{abortFn}}($h->{abortArg},"Process died prematurely");
+          use strict "refs";
+        }
         delete($BC_hash{$bpid});
         RemoveInternalTimer($h) if($h->{timeout});
       } else {
@@ -254,9 +259,11 @@ BlockingKill($)
     if($h->{pid} && $h->{pid} !~ m/:/ && kill(9, $h->{pid})) {
       my $ll = (defined($h->{loglevel}) ? $h->{loglevel} : 1); # Forum #77057
       Log $ll, "Timeout for $h->{fn} reached, terminated process $h->{pid}";
+      $h->{terminated} = 1;
       if($h->{abortFn}) {
         no strict "refs";
-        my $ret = &{$h->{abortFn}}($h->{abortArg});
+        my $ret = &{$h->{abortFn}}($h->{abortArg},
+                        "Timeout: process terminated");
         use strict "refs";
 
       } elsif($h->{finishFn}) {
