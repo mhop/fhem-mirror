@@ -10,6 +10,7 @@ var FW_isiOS = navigator.userAgent.match(/(iPad|iPhone|iPod)/);
 var FW_scripts = {}, FW_links = {};
 var FW_docReady = false, FW_longpollType, FW_csrfToken, FW_csrfOk=true;
 var FW_root = "/fhem";  // root
+var FW_availableJs=[];
 var embedLoadRetry = 100;
 
 // createFn returns an HTML Element, which may contain 
@@ -50,7 +51,8 @@ FW_replaceWidgets(parent)
     var rd=$(this).attr("reading");
     var params = cmd.split(" ");
     var type=$(this).attr("type");
-    if( type == undefined ) type = "set";
+    if(type == undefined)
+      type = "set";
     FW_replaceWidget(this, dev, $(this).attr("arg").split(","),
       $(this).attr("current"), rd, params[0], params.slice(1),
       function(arg) {
@@ -68,6 +70,13 @@ FW_jqueryReadyFn()
   FW_docReady = true;
   FW_serverGenerated = $("body").attr("generated");
   FW_longpollType = $("body").attr("longpoll");
+  var ajs = $("body").attr("data-availableJs");
+  if(ajs) {
+    ajs = ajs.split(",");
+    for(var i1=0; i1<ajs.length; i1++)
+      FW_availableJs[ajs[i1]] = 1;
+  }
+
   if(FW_longpollType != "0")
     setTimeout("FW_longpoll()", 100);
   FW_csrfToken = $("body").attr('fwcsrf');
@@ -1022,18 +1031,46 @@ FW_detailSelect(selEl, mayMissing)
       vArr = arg.substr(selVal.length+1).split(","); 
   }
 
-  var newEl = FW_replaceWidget($(selEl).next(), devName, vArr,undefined,selVal);
-  if(cmd == "attr")
-    FW_queryValue('{AttrVal("'+devName+'","'+selVal+'","")}', newEl);
-
-  if(cmd == "set")
-    FW_queryValue('{ReadingsVal("'+devName+'","'+selVal+'","")}', newEl);
+  FW_replaceWidget($(selEl).next(), devName, vArr,undefined,selVal,
+    undefined, undefined, undefined,
+    function(newEl) {
+      if(cmd == "attr")
+        FW_queryValue('{AttrVal("'+devName+'","'+selVal+'","")}', newEl);
+      if(cmd == "set")
+        FW_queryValue('{ReadingsVal("'+devName+'","'+selVal+'","")}', newEl);
+    });
 }
 
 function
-FW_replaceWidget(oldEl, devName, vArr, currVal, reading, set, params, cmd)
+FW_callCreateFn(elName, devName, vArr, currVal, set, params, cmd, finishFn)
 {
-  var newEl, wn;
+  for(var wn in FW_widgets) {
+    if(FW_widgets[wn].createFn) {
+      var newEl = FW_widgets[wn].createFn(elName, devName, vArr,
+                                          currVal, set, params, cmd);
+      if(newEl)
+        return finishFn(wn, newEl);
+    }
+  }
+
+  var v0 = vArr[0].split("-")[0];
+  if(v0.indexOf("uzsu") == 0)
+    v0 = "uzsu";
+  if(FW_availableJs[v0]) {
+    loadScript("pgm2/fhemweb_"+v0+".js", function() {
+      if(FW_widgets[vArr[0]].createFn)
+        var newEl = FW_widgets[vArr[0]].createFn(elName, devName, vArr,
+                                                 currVal, set, params, cmd);
+      finishFn(vArr[0], newEl);
+    });
+  } else {
+    finishFn();
+  }
+}
+
+function
+FW_replaceWidget(oldEl,devName,vArr,currVal,reading,set,params,cmd,readyFn)
+{
   var elName = $(oldEl).attr("name");
   if(!elName)
     elName = $(oldEl).find("[name]").attr("name");
@@ -1041,48 +1078,50 @@ FW_replaceWidget(oldEl, devName, vArr, currVal, reading, set, params, cmd)
   if(vArr.length == 0) { //  No parameters, input field
     newEl = FW_createTextField(elName, devName, ["textField"], currVal,
                                set, params, cmd);
-    wn = "textField";
+    finishFn("textField", newEl);
 
   } else {
-    for(wn in FW_widgets) {
-      if(FW_widgets[wn].createFn) {
-        newEl = FW_widgets[wn].createFn(elName, devName, vArr, currVal,
-                                        set, params, cmd);
-        if(newEl)
-          break;
-      }
-    }
+    
+    return FW_callCreateFn(elName, devName, vArr, currVal, set,
+                           params, cmd, finishFn);
 
-    if(!newEl) { // Select as fallback
+  }
+
+  function
+  finishFn(wn, newEl)
+  {
+    if(!newEl) {
       vArr.unshift("select");
-      newEl = FW_createSelect(elName, devName, vArr, currVal, set, params, cmd);
+      newEl = FW_createSelect(elName,devName,vArr,currVal,set,params,cmd);
       wn = "select";
     }
-  }
 
-  if(!newEl) { // Simple link
-    newEl = $('<div class="col3"><a style="cursor: pointer;">'+
-                set+' '+params.join(' ')+ '</a></div>');
-    $(newEl).click(function(arg) { cmd(params[0]) });
+    if(!newEl) { // Simple link
+      newEl = $('<div class="col3"><a style="cursor: pointer;">'+
+                  set+' '+params.join(' ')+ '</a></div>');
+      $(newEl).click(function(arg) { cmd(params[0]) });
+      $(oldEl).replaceWith(newEl);
+      if(readyFn)
+        return readyFn(newEl);
+      return;
+    }
+
+    $(newEl).addClass(wn+"_widget");
+
+    if( $(newEl).find("[informId]").length==0 && !$(newEl).attr("informId") ) {
+      if(reading)
+        $(newEl).attr("informId", devName+"-"+reading);
+      var addTitle = $("body").attr("data-addHtmlTitle");
+      if(reading != "state" && addTitle==1)
+        $(newEl).attr("title", reading);
+    }
     $(oldEl).replaceWith(newEl);
-    return newEl;
+
+    if(newEl.activateFn) // CSS is not applied if newEl is not in the document
+      newEl.activateFn();
+    if(readyFn)
+      readyFn(newEl);
   }
-
-  $(newEl).addClass(wn+"_widget");
-
-  if( $(newEl).find("[informId]").length == 0 && !$(newEl).attr("informId") ) {
-    if(reading)
-      $(newEl).attr("informId", devName+"-"+reading);
-    var addTitle = $("body").attr("data-addHtmlTitle");
-    if(reading != "state" && addTitle==1)
-      $(newEl).attr("title", reading);
-  }
-
-  $(oldEl).replaceWith(newEl);
-
-  if(newEl.activateFn) // CSS is not applied if newEl is not in the document
-    newEl.activateFn();
-  return newEl;
 }
 
 function

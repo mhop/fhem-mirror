@@ -77,6 +77,7 @@ use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by SVG
 use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by SVG
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 use vars qw(@FW_fhemwebjs);# List of fhemweb*js scripts to load
+use vars qw($FW_fhemwebjs);# List of fhemweb*js scripts to load
 use vars qw($FW_detail);  # currently selected device for detail view
 use vars qw($FW_cmdret);  # Returned data by the fhem call
 use vars qw($FW_room);    # currently selected room
@@ -208,11 +209,13 @@ FHEMWEB_Initialize($)
   $FW_cssdir   = "$FW_dir/pgm2";
   $FW_gplotdir = "$FW_dir/gplot";
 
-  # Blacklist is needed due to an update bug, where MOV was not implemented
-  my %bl = (_multiple=>1,_noArg=>1,_slider=>1,_svg=>1,_textField=>1,_time=>1);
   if(opendir(DH, "$FW_dir/pgm2")) {
-    @FW_fhemwebjs = sort grep { $_ =~ m/^fhemweb(.*).js$/ && !$bl{$1}; }
-                        readdir(DH);
+    $FW_fhemwebjs = join(",", map { $_ = ~m/^fhemweb_(.*).js$/; $1 }
+                              grep { /fhemweb_(.*).js$/ }
+                              readdir(DH));
+    $data{FWEXT}{"readingsGroup"  }{SCRIPT} = "fhemweb_readingsGroup.js";
+    $data{FWEXT}{"readingsHistory"}{SCRIPT} = "fhemweb_readingsHistory.js";
+    @FW_fhemwebjs = ("fhemweb.js");
     closedir(DH);
   }
 
@@ -890,10 +893,7 @@ FW_answerCall($)
       no strict "refs";
       ($FW_RETTYPE, $FW_RET) = &{$h->{FUNC}}($arg);
       if(defined($FW_RETTYPE) && $FW_RETTYPE =~ m,text/html,) {
-        my $dataAttr =
-          "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete",1) ."' ".
-          "data-confirmJSError='".AttrVal($FW_wname,"confirmJSError",1)."' ".
-          "data-webName='$FW_wname '";
+        my $dataAttr = FW_dataAttr();
         $FW_RET =~ s/<body/<body $dataAttr/;
       }
       use strict "refs";
@@ -987,7 +987,7 @@ FW_answerCall($)
   FW_pO sprintf($jsTemplate, "", "$FW_ME/pgm2/jquery.min.js");
   FW_pO sprintf($jsTemplate, "", "$FW_ME/pgm2/jquery-ui.min.js");
 
-  my (%jsNeg, @jsList);
+  my (%jsNeg, @jsList); # jsNeg was used to exclude automatically loaded files
   map { $_ =~ m/^-(.*)$/ ? $jsNeg{$1} = 1 : push(@jsList, $_); }
       split(" ", AttrVal($FW_wname, "JavaScripts", ""));
   map { FW_pO sprintf($jsTemplate, "", "$FW_ME/pgm2/$_") if(!$jsNeg{$_}); }
@@ -1017,11 +1017,7 @@ FW_answerCall($)
   my $lp = 'longpoll="'.AttrVal($FW_wname,"longpoll",1).'"';
   $FW_id = $FW_chash->{NR} if( !$FW_id );
 
-  my $dataAttr =
-    "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete", 1)."' ".
-    "data-confirmJSError='".AttrVal($FW_wname,"confirmJSError",1)."' ".
-    "data-addHtmlTitle='"  .AttrVal($FW_wname,"addHtmlTitle",  1)."' ".
-    "data-webName='$FW_wname '";
+  my $dataAttr = FW_dataAttr();
   FW_pO "</head>\n<body name='$t' fw_id='$FW_id' $gen $lp $csrf $dataAttr>";
 
   if($FW_activateInform) {
@@ -1082,6 +1078,17 @@ FW_answerCall($)
   }
   FW_pO "</body></html>";
   return 0;
+}
+
+sub
+FW_dataAttr()
+{
+  return
+    "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete", 1)."' ".
+    "data-confirmJSError='".AttrVal($FW_wname,"confirmJSError",1)."' ".
+    "data-addHtmlTitle='"  .AttrVal($FW_wname,"addHtmlTitle",  1)."' ".
+    "data-availableJs='$FW_fhemwebjs' ".
+    "data-webName='$FW_wname '";
 }
 
 sub
@@ -1337,7 +1344,7 @@ FW_doDetail($)
   $t = "MISSING" if(!defined($t));
   FW_addContent();
 
-  if($FW_ss) { # FS20MS2 special: on and off, is not the same as toggle
+  if($FW_ss) {
     my $webCmd = AttrVal($d, "webCmd", undef);
     if($webCmd) {
       FW_pO "<table class=\"webcmd\">";
@@ -3618,8 +3625,6 @@ FW_widgetOverride($$)
          attr WEB JavaScripts codemirror/fhem_codemirror.js<br>
          attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
        </code></ul>
-       Note: if the filename starts with - then it will be excluded for the
-       automatically loaded list (e.g. -fhemweb_fbcalllist.js)
        </li><br>
 
     <a name="longpoll"></a>
@@ -4412,9 +4417,6 @@ FW_widgetOverride($$)
          attr WEB JavaScripts codemirror/fhem_codemirror.js<br>
          attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
        </code></ul>
-       Falls der Dateiname mit - anf&auml;ngt, dann wird diese sonst
-       aus www/pgm2 automatisch geladene Datei nicht geladen. (z.Bsp.:
-       -fhemweb_fbcalllist.js)
        </li><br>
 
     <a name="longpoll"></a>
