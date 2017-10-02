@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbRep: V5.6.3, crash due to wrong timestamp calc (Forum:#77328)
   - change:  01_FHEMWEB.js: on demand loading of fhemweb_*.js (Forum #76868)
   - bugfix:  73_GardenaSmartBridge: fix part of code
   - feature: 49_SSCam: V3.1.0, move extevent from CAM- to SVS-model, Reading

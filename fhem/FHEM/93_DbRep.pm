@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.6.3        01.10.2017       fix crash of fhem due to wrong rmday-calculation if month is changed, Forum:#77328
 # 5.6.2        28.08.2017       commandref revised
 # 5.6.1        18.07.2017       commandref revised, minor fixes
 # 5.6.0        17.07.2017       default timeout changed to 86400, new get-command "procinfo" (MySQL)
@@ -232,7 +233,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.6.2";
+my $DbRepVersion = "5.6.3";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -724,9 +725,7 @@ sub DbRep_Attr($$$$) {
             }
            
             unless ($aVal =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9])|1[1-9]|2[0-3]:([0-5][0-9]):([0-5][0-9])/) 
-                {return " The Value for $aName is not valid. Use format YYYY-MM-DD HH:MM:SS or one of 
-				          \"current_[year|month|day|hour]_begin\",\"current_[year|month|day|hour]_end\", 
-						  \"previous_[year|month|day|hour]_begin\", \"previous_[year|month|day|hour]_end\" !";}
+                {return " The Value of $aName is not valid. Use format YYYY-MM-DD HH:MM:SS or one of \"current_[year|month|day|hour]_begin\",\"current_[year|month|day|hour]_end\", \"previous_[year|month|day|hour]_begin\", \"previous_[year|month|day|hour]_end\" !";}
            
             my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($aVal =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
            
@@ -1018,136 +1017,187 @@ sub DbRep_Main($$;$) {
  ###############################################################################################
  # Auswertungszeit Beginn (String)
  # dynamische Berechnung von Startdatum/zeit aus current_xxx_begin / previous_xxx_begin 
+ # dynamische Berechnung von Endedatum/zeit aus current_xxx_end / previous_xxx_end 
  ###############################################################################################
- my $tsbegin;
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_year_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1));
- } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_month_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_month_begin") {
-     my $ryear = ($mon-1<0)?$year-1:$year;
-	 my $rmon  = ($mon-1<0)?12:$mon-1;
-     $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear));
- } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_week_begin") {
-	 my $tsub = 0 if($wday == 1);         # wenn Start am "Mo" keine Korrektur
+ my ($tsbegin,$tsend,$dim,$tsub,$tadd);
+ my ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear);
+ $tsbegin = AttrVal($hash->{NAME}, "timestamp_begin", "1970-01-01 01:00:00");  
+ $tsend = AttrVal($hash->{NAME}, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
+
+ if (AttrVal($hash->{NAME},"timestamp_begin","") eq "current_year_begin" ||
+     AttrVal($hash->{NAME},"timestamp_end","") eq "current_year_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($hash->{NAME},"timestamp_begin","") eq "current_year_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($hash->{NAME},"timestamp_end","") eq "current_year_begin");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_year_end" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_year_end") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($hash->{NAME},"timestamp_begin","") eq "current_year_end");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($hash->{NAME},"timestamp_end","") eq "current_year_end");
+ }
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_begin" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_begin");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_end" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_end") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_end");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_end");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_month_begin" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_month_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_month_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_month_begin");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_month_end" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_month_end") {
+     $dim = $mon-1?30+(($mon+1)*3%7<4):28+!($year%4||$year%400*!($year%100));
+	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_month_end");
+     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_month_end");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_month_begin" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_month_begin") {
+     $ryear = ($mon-1<0)?$year-1:$year;
+	 $rmon  = ($mon-1<0)?12:$mon-1;
+     $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_month_begin");
+	 $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_month_begin");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_month_end" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_month_end") {
+     $ryear = ($mon-1<0)?$year-1:$year;
+	 $rmon  = ($mon-1<0)?12:$mon-1;
+	 $dim   = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
+	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_month_end");
+     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_month_end");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_week_begin" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_week_begin") {
+	 $tsub = 0 if($wday == 1);            # wenn Start am "Mo" keine Korrektur
 	 $tsub = 86400 if($wday == 2);        # wenn Start am "Di" dann Korrektur -1 Tage
 	 $tsub = 172800 if($wday == 3);       # wenn Start am "Mi" dann Korrektur -2 Tage
 	 $tsub = 259200 if($wday == 4);       # wenn Start am "Do" dann Korrektur -3 Tage
 	 $tsub = 345600 if($wday == 5);       # wenn Start am "Fr" dann Korrektur -4 Tage
 	 $tsub = 432000 if($wday == 6);       # wenn Start am "Sa" dann Korrektur -5 Tage
 	 $tsub = 518400 if($wday == 0);       # wenn Start am "So" dann Korrektur -6 Tage
-	 ($sec,$min,$hour,$mday,$mon,$year) = localtime(time-$tsub);
-	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_week_begin") {
-	 my $tsub = 604800 if($wday == 1);    # wenn Start am "Mo" dann Korrektur -7 Tage
+	 ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
+	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_week_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_week_begin");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_week_end" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_week_end") {
+	 $tadd = 518400 if($wday == 1);       # wenn Start am "Mo" dann Korrektur +6 Tage
+	 $tadd = 432000 if($wday == 2);       # wenn Start am "Di" dann Korrektur +5 Tage
+	 $tadd = 345600 if($wday == 3);       # wenn Start am "Mi" dann Korrektur +4 Tage
+	 $tadd = 259200 if($wday == 4);       # wenn Start am "Do" dann Korrektur +3 Tage
+	 $tadd = 172800 if($wday == 5);       # wenn Start am "Fr" dann Korrektur +2 Tage
+	 $tadd = 86400 if($wday == 6);        # wenn Start am "Sa" dann Korrektur +1 Tage
+	 $tadd = 0 if($wday == 0);            # wenn Start am "So" keine Korrektur
+	 ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time+$tadd);
+	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_week_end");
+	 $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_week_end");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_week_begin" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_week_begin") {
+	 $tsub = 604800 if($wday == 1);       # wenn Start am "Mo" dann Korrektur -7 Tage
 	 $tsub = 691200 if($wday == 2);       # wenn Start am "Di" dann Korrektur -8 Tage
 	 $tsub = 777600 if($wday == 3);       # wenn Start am "Mi" dann Korrektur -9 Tage
 	 $tsub = 864000 if($wday == 4);       # wenn Start am "Do" dann Korrektur -10 Tage
 	 $tsub = 950400 if($wday == 5);       # wenn Start am "Fr" dann Korrektur -11 Tage
 	 $tsub = 1036800 if($wday == 6);      # wenn Start am "Sa" dann Korrektur -12 Tage
 	 $tsub = 1123200 if($wday == 0);      # wenn Start am "So" dann Korrektur -13 Tage
-	 ($sec,$min,$hour,$mday,$mon,$year) = localtime(time-$tsub);
-	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_day_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_day_begin") {
-	 my $rmday = $mday-1;
-	 my $rmon  = $mon;
-	 my $ryear = $year;
-	 if($rmday<1) {
-	     $rmon--;
-		 if ($rmon<0) {
-		     $rmon=12;
-		     $ryear--;
-		 }
-         $rmday = $rmon-2?30+($rmon*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
-	 }
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear));
- } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_hour_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_hour_begin") {
-     my $rhour = $hour-1;
-	 my $rmday = $mday;
-	 my $rmon  = $mon;
-	 my $ryear = $year;
-	 if($rhour<0) {
-	     $rhour = 23;
-		 $rmday = $mday-1;
-		 if($rmday<1) {
-	         $rmon--;
-		     if ($rmon<0) {
-		         $rmon=12;
-		         $ryear--;
-		     }
-			 $rmday = $rmon-2?30+($rmon*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
-		 }
-	 }
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear));
- } else {
-     $tsbegin = AttrVal($hash->{NAME}, "timestamp_begin", "1970-01-01 01:00:00");  
+	 ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
+	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_week_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_week_begin");
  }
  
- #################################################################################################
- # Auswertungszeit Ende (String)
- # dynamische Berechnung von Endedatum/zeit aus current_xxx_end / previous_xxx_end 
- #################################################################################################
- my $tsend;
- if (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_year_end") {
-     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_end") {
-     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1));
- } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_month_end") {
-     my $dim = $mon-1?30+(($mon+1)*3%7<4):28+!($year%4||$year%400*!($year%100));
-     $tsend  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_month_end") {
-     my $ryear = ($mon-1<0)?$year-1:$year;
-	 my $rmon  = ($mon-1<0)?12:$mon-1;
-	 my $dim   = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
-     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear));
- } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_week_end") {
-	 my $tadd = 518400 if($wday == 1);         # wenn Start am "Mo" dann Korrektur +6 Tage
-	 $tadd = 432000 if($wday == 2);            # wenn Start am "Di" dann Korrektur +5 Tage
-	 $tadd = 345600 if($wday == 3);            # wenn Start am "Mi" dann Korrektur +4 Tage
-	 $tadd = 259200 if($wday == 4);            # wenn Start am "Do" dann Korrektur +3 Tage
-	 $tadd = 172800 if($wday == 5);            # wenn Start am "Fr" dann Korrektur +2 Tage
-	 $tadd = 86400 if($wday == 6);             # wenn Start am "Sa" dann Korrektur +1 Tage
-	 $tadd = 0 if($wday == 0);                 # wenn Start am "So" keine Korrektur
-	 ($sec,$min,$hour,$mday,$mon,$year) = localtime(time+$tadd);
-	 $tsend  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_week_end") {
-	 my $tsub = 86400 if($wday == 1);     # wenn Start am "Mo" dann Korrektur -1 Tage
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_week_end" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_week_end") {
+	 $tsub = 86400 if($wday == 1);        # wenn Start am "Mo" dann Korrektur -1 Tage
 	 $tsub = 172800 if($wday == 2);       # wenn Start am "Di" dann Korrektur -2 Tage
 	 $tsub = 259200 if($wday == 3);       # wenn Start am "Mi" dann Korrektur -3 Tage
 	 $tsub = 345600 if($wday == 4);       # wenn Start am "Do" dann Korrektur -4 Tage
 	 $tsub = 432000 if($wday == 5);       # wenn Start am "Fr" dann Korrektur -5 Tage
-	 $tsub = 518400 if($wday == 6);      # wenn Start am "Sa" dann Korrektur -6 Tage
-	 $tsub = 604800 if($wday == 0);      # wenn Start am "So" dann Korrektur -7 Tage
-	 ($sec,$min,$hour,$mday,$mon,$year) = localtime(time-$tsub);
-	 $tsend  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_day_end") {
-     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_day_end") {
-	 my $rmday = $mday-1;
-	 my $rmon  = $mon;
-	 my $ryear = $year;
+	 $tsub = 518400 if($wday == 6);       # wenn Start am "Sa" dann Korrektur -6 Tage
+	 $tsub = 604800 if($wday == 0);       # wenn Start am "So" dann Korrektur -7 Tage
+	 ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
+	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_week_end");
+	 $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_week_end");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_day_begin" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_day_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_day_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_day_begin");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_day_end" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_day_end") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_day_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_day_end");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_day_begin" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_day_begin") {
+	 $rmday = $mday-1;
+	 $rmon  = $mon;
+	 $ryear = $year;
 	 if($rmday<1) {
 	     $rmon--;
 		 if ($rmon<0) {
 		     $rmon=12;
 		     $ryear--;
 		 }
-         $rmday = $rmon-2?30+($rmon*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
+         $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
 	 }
-     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear));
- } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_hour_end") {
-     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year));
- } elsif (AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_hour_end") {
-     my $rhour = $hour-1;
-	 my $rmday = $mday;
-	 my $rmon  = $mon;
-	 my $ryear = $year;
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_day_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_day_begin");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_day_end" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_day_end") {
+	 $rmday = $mday-1;
+	 $rmon  = $mon;
+	 $ryear = $year;
+	 if($rmday<1) {
+	     $rmon--;
+		 if ($rmon<0) {
+		     $rmon=12;
+		     $ryear--;
+		 }
+         $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
+	 }
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_day_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_day_end");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_hour_begin" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_hour_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_hour_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_hour_begin");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_hour_end" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_hour_end") {
+	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_hour_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_hour_end");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_hour_begin" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_hour_begin") {
+     $rhour = $hour-1;
+	 $rmday = $mday;
+	 $rmon  = $mon;
+	 $ryear = $year;
 	 if($rhour<0) {
 	     $rhour = 23;
 		 $rmday = $mday-1;
@@ -1157,14 +1207,35 @@ sub DbRep_Main($$;$) {
 		         $rmon=12;
 		         $ryear--;
 		     }
-			 $rmday = $rmon-2?30+($rmon*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
+			 $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
 		 }
 	 }
-     $tsend = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)); 
- } else {
-     $tsend = AttrVal($hash->{NAME}, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time)); 
- }
-        
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_hour_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_hour_begin");
+ } 
+ 
+ if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_hour_end" ||
+          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_hour_end") {
+     $rhour = $hour-1;
+	 $rmday = $mday;
+	 $rmon  = $mon;
+	 $ryear = $year;
+	 if($rhour<0) {
+	     $rhour = 23;
+		 $rmday = $mday-1;
+		 if($rmday<1) {
+	         $rmon--;
+		     if ($rmon<0) {
+		         $rmon=12;
+		         $ryear--;
+		     }
+			 $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
+		 }
+	 }
+	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_hour_end"); 
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_hour_end"); 
+ }  
+ 
  # extrahieren der Einzelwerte von Datum/Zeit Beginn
  my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($tsbegin =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
  # extrahieren der Einzelwerte von Datum/Zeit Ende 
