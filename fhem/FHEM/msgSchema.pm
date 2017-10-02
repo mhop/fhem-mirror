@@ -12,9 +12,9 @@ my $db = {
     'audio' => {
 
         'AMADDevice' => {
-            'Normal'        => 'set %DEVICE% ttsMsg &%LANG%; %MSGSHRT%',
-            'ShortPrio'     => 'set %DEVICE% ttsMsg &%LANG%; %SHOUTOUT%',
-            'Short'         => 'set %DEVICE% ttsMsg &%LANG%; %SHOUTOUT%',
+            'Normal'        => 'set %DEVICE% ttsMsg &%LANG%;; %MSGSHRT%',
+            'ShortPrio'     => 'set %DEVICE% ttsMsg &%LANG%;; %SHOUTOUT%',
+            'Short'         => 'set %DEVICE% ttsMsg &%LANG%;; %SHOUTOUT%',
             'defaultValues' => {
                 'Normal' => {
                     'LANG' => 'de',
@@ -254,18 +254,21 @@ my $db = {
         },
 
         'TelegramBot' => {
-            'Normal'        => 'set %DEVICE% message %RECIPIENT% %MSG%',
-            'High'          => 'set %DEVICE% message %RECIPIENT% %MSG%',
-            'Low'           => 'set %DEVICE% message %RECIPIENT% %MSG%',
+            'Normal' => 'set %DEVICE% %TelegramBot_MTYPE% %RECIPIENT% %MSG%',
+            'High'   => 'set %DEVICE% %TelegramBot_MTYPE% %RECIPIENT% %MSG%',
+            'Low'    => 'set %DEVICE% %TelegramBot_MTYPE% %RECIPIENT% %MSG%',
             'defaultValues' => {
                 'Normal' => {
-                    'RECIPIENT' => '',
+                    'RECIPIENT'         => '',
+                    'TelegramBot_MTYPE' => 'message',
                 },
                 'High' => {
-                    'RECIPIENT' => '',
+                    'RECIPIENT'         => '',
+                    'TelegramBot_MTYPE' => 'message',
                 },
                 'Low' => {
-                    'RECIPIENT' => '',
+                    'RECIPIENT'         => '',
+                    'TelegramBot_MTYPE' => 'message',
                 },
             },
         },
