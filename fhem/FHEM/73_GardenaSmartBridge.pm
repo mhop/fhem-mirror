@@ -68,7 +68,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 
 
-my $version = "0.2.6";
+my $version = "0.2.7";
 
 
 
@@ -194,14 +194,13 @@ sub GardenaSmartBridge_Attr(@) {
     
     if( $attrName eq "disable" ) {
         if( $cmd eq "set" and $attrVal eq "1" ) {
-            RemoveInternalTimer($hash);
+            RemoveInternalTimer($hash) if($init_done);
             readingsSingleUpdate ( $hash, "state", "inactive", 1 );
             Log3 $name, 3, "GardenaSmartBridge ($name) - disabled";
         }
 
         elsif( $cmd eq "del" ) {
-            RemoveInternalTimer($hash);
-            GardenaSmartBridge_InternalTimerGetDeviceData($hash);
+            GardenaSmartBridge_InternalTimerGetDeviceData($hash) if($init_done);
             readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "GardenaSmartBridge ($name) - enabled";
         }
@@ -225,16 +224,14 @@ sub GardenaSmartBridge_Attr(@) {
             return "Interval must be greater than 0"
             unless($attrVal > 0);
             $hash->{INTERVAL}   = $attrVal;
-            RemoveInternalTimer($hash);
             Log3 $name, 3, "GardenaSmartBridge ($name) - set interval: $attrVal";
-            GardenaSmartBridge_InternalTimerGetDeviceData($hash);
+            GardenaSmartBridge_InternalTimerGetDeviceData($hash) if($init_done);
         }
 
         elsif( $cmd eq "del" ) {
             $hash->{INTERVAL}   = 300;
-            RemoveInternalTimer($hash);
             Log3 $name, 3, "GardenaSmartBridge ($name) - delete User interval and set default: 300";
-            GardenaSmartBridge_InternalTimerGetDeviceData($hash);
+            GardenaSmartBridge_InternalTimerGetDeviceData($hash) if($init_done);
         }
     }
 
@@ -270,6 +267,8 @@ sub GardenaSmartBridge_InternalTimerGetDeviceData($) {
     my $hash    = shift;
     my $name    = $hash->{NAME};
     
+    
+    RemoveInternalTimer($hash);
     
     if( not IsDisabled($name) ) {
     
