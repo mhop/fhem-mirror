@@ -585,6 +585,7 @@ sub Wunderground_Hash2Readings($$;$) {
             {
                 my $period = $r;
                 $period =~ s/[^\d]//g;
+                $period++;
                 $reading = "hfc" . $period . "_";
 
                 readingsBulkUpdate( $hash, $reading . "condition",
@@ -613,12 +614,18 @@ sub Wunderground_Hash2Readings($$;$) {
                     $hash,
                     $reading . "heatindex_c",
                     $h->{heatindex}{metric}
-                );
+                ) if ( $h->{heatindex}{metric} ne "-9999" );
+                readingsBulkUpdateIfChanged( $hash, $reading . "heatindex_c",
+                    "-" )
+                  if ( $h->{heatindex}{metric} eq "-9999" );
                 readingsBulkUpdate(
                     $hash,
                     $reading . "heatindex_f",
                     $h->{heatindex}{english}
-                );
+                ) if ( $h->{heatindex}{english} ne "-9999" );
+                readingsBulkUpdateIfChanged( $hash, $reading . "heatindex_f",
+                    "-" )
+                  if ( $h->{heatindex}{english} eq "-9999" );
                 readingsBulkUpdate( $hash, $reading . "humidity",
                     $h->{humidity} );
                 readingsBulkUpdate( $hash, $reading . "icon", $h->{icon} );
@@ -674,12 +681,18 @@ sub Wunderground_Hash2Readings($$;$) {
                     $hash,
                     $reading . "wind_chill",
                     $h->{windchill}{metric}
-                );
+                ) if ( $h->{windchill}{metric} ne "-9999" );
+                readingsBulkUpdateIfChanged( $hash, $reading . "wind_chill",
+                    "-" )
+                  if ( $h->{windchill}{metric} eq "-9999" );
                 readingsBulkUpdate(
                     $hash,
                     $reading . "wind_chill_f",
                     $h->{windchill}{english}
-                );
+                ) if ( $h->{windchill}{english} ne "-9999" );
+                readingsBulkUpdateIfChanged( $hash, $reading . "wind_chill_f",
+                    "-" )
+                  if ( $h->{windchill}{english} eq "-9999" );
                 readingsBulkUpdate(
                     $hash,
                     $reading . "wind_speed",
@@ -750,6 +763,16 @@ sub Wunderground_Hash2Readings($$;$) {
                 );
                 readingsBulkUpdate(
                     $hash,
+                    $reading . "rain_daytime",
+                    $h->{qpf_day}{mm}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "rain_daytime_in",
+                    $h->{qpf_day}{in}
+                );
+                readingsBulkUpdate(
+                    $hash,
                     $reading . "rain_night",
                     $h->{qpf_night}{mm}
                 );
@@ -767,6 +790,16 @@ sub Wunderground_Hash2Readings($$;$) {
                     $hash,
                     $reading . "snow_day_in",
                     $h->{snow_allday}{in}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "snow_daytime",
+                    $h->{snow_day}{cm}
+                );
+                readingsBulkUpdate(
+                    $hash,
+                    $reading . "snow_daytime_in",
+                    $h->{snow_day}{in}
                 );
                 readingsBulkUpdate(
                     $hash,
@@ -808,7 +841,7 @@ sub Wunderground_Hash2Readings($$;$) {
                     $reading . "wind_speed_max_mph",
                     $h->{maxwind}{mph}
                 );
-                
+
                 last;
             }
 
@@ -843,16 +876,18 @@ sub Wunderground_Hash2Readings($$;$) {
                 my $symbol_f =
                   Encode::encode_utf8( chr(0x202F) . chr(0x00B0) . 'F' );
                 my $symbol_pct = Encode::encode_utf8( chr(0x202F) . '%' );
-#                my $symbol_kmh = Encode::encode_utf8(chr(0x00A0) . 'km/h');
-#                my $symbol_mph = Encode::encode_utf8(chr(0x00A0) . 'mph');
+
+    #                my $symbol_kmh = Encode::encode_utf8(chr(0x00A0) . 'km/h');
+    #                my $symbol_mph = Encode::encode_utf8(chr(0x00A0) . 'mph');
                 $h->{fcttext_metric} =~ s/(\d+)C/$1$symbol_c/g;
                 $h->{fcttext} =~ s/(\d+)F/$1$symbol_f/g;
                 $h->{fcttext_metric} =~ s/(\d+)\s*%/$1$symbol_pct/g;
                 $h->{fcttext} =~ s/(\d+)\s*%/$1$symbol_pct/g;
-#                $h->{fcttext_metric} =~ s/(\d)\s*km\/h/$1$symbol_kmh/g;
-#                $h->{fcttext} =~ s/(\d+)\s*km\/h/$1$symbol_kmh/g;
-#                $h->{fcttext_metric} =~ s/(\d)\s*mph/$1$symbol_mph/g;
-#                $h->{fcttext} =~ s/(\d+)\s*mph/$1$symbol_mph/g;
+
+        #                $h->{fcttext_metric} =~ s/(\d)\s*km\/h/$1$symbol_kmh/g;
+        #                $h->{fcttext} =~ s/(\d+)\s*km\/h/$1$symbol_kmh/g;
+        #                $h->{fcttext_metric} =~ s/(\d)\s*mph/$1$symbol_mph/g;
+        #                $h->{fcttext} =~ s/(\d+)\s*mph/$1$symbol_mph/g;
 
                 readingsBulkUpdate( $hash, $reading . "icon$night",
                     $h->{icon} );
@@ -869,7 +904,7 @@ sub Wunderground_Hash2Readings($$;$) {
                 $hash->{readingDesc}{"title$night"}{lang}  = $lang if ($lang);
                 $hash->{readingDesc}{"text$night"}{lang}   = $lang if ($lang);
                 $hash->{readingDesc}{"text_f$night"}{lang} = $lang if ($lang);
-                
+
                 last;
             }
 
