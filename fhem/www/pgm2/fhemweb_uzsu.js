@@ -647,21 +647,21 @@ FW_uzsuCreate(elName, devName, vArr, currVal, set, params, cmd)
 
 =begin html_DE
 
-  <li>:uzsuToggle,zust1,zust2 - damit ist es m&ouml;glich mit einem
+  <li>uzsuToggle,zust1,zust2 - damit ist es m&ouml;glich mit einem
       Toggle-Button zwischen zwei Zust&auml;nden zu w&auml;hlen. Der Erste ist
       der aktive Zustand.</li>
 
-  <li>:uzsuSelect,val1,val2,... - damit ist es m&ouml;gliche in einer
+  <li>uzsuSelect,val1,val2,... - damit ist es m&ouml;gliche in einer
       Buttonleiste meherere Werte auszuw&auml;hlen.  Das Ergebnis ist
       Komma-separiert.</li>
 
-  <li>:uzsuSelectRadio,val1,val2,... - damit ist es m&ouml;gliche in einer
+  <li>uzsuSelectRadio,val1,val2,... - damit ist es m&ouml;gliche in einer
       Buttonleiste einen aus meherere Werten auszuw&auml;hlen.</li>
 
-  <li>:uzsuDropDown,val1,val2,... - damit ist es m&ouml;gliche mit einem
+  <li>uzsuDropDown,val1,val2,... - damit ist es m&ouml;gliche mit einem
       DropDown Men&uuml; einen der Werte auszuw&auml;hlen.</li>
 
-  <li>:uzsuTimerEntry[,modifier2] - damit werden je ein uzsuSelect,
+  <li>uzsuTimerEntry[,modifier2] - damit werden je ein uzsuSelect,
       uzsuDropDown und uzsuToggle Widget kombiniert um einen Schaltzeitpunkt
       auszuw&auml;hlen. &Uuml;ber den optionalen modifier2 kann ein Widget zur
       Auswahl des Schaltwertes angegeben werden. Siehe Beispiele unten.  Das
@@ -669,7 +669,7 @@ FW_uzsuCreate(elName, devName, vArr, currVal, set, params, cmd)
       Zeitpunkt, eine Aktiv-Indikator und dem Schaltwert, jeweils durch |
       abetrennt.  Zum Beispiel: Mo,Di,Sa,So|00:00|enabled|19.5</li>
 
-  <li>:uzsu[,modifier2] - damit werden mehrere uzsuTimerEntry Widets kombiniert
+  <li>uzsu[,modifier2] - damit werden mehrere uzsuTimerEntry Widets kombiniert
       um eine beliebige Anzahl an Schaltzeiten einzugeben. &Uuml;ber den
       optionalen modifier2 kann ein Widget zur Auswahl des Schaltwertes
       angegeben werden. Siehe Beispiele unten.  Das Ergebiss ist eine durch

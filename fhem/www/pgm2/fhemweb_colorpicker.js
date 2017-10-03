@@ -490,7 +490,7 @@ colorpicker_hsv2rgb(h,s,v) {
   <li>colorpicker,BRI,&lt;min&gt;,&lt;step&gt;,&lt;max&gt; - create a brightness colorpicker</li>
 
   <li>colorpicker,HUE,&lt;min&gt;,&lt;step&gt;,&lt;max&gt; - create a hue colorpicker</li>
-  please see the fhem wiki <a hef='https://wiki.fhem.de/wiki/Color#Colorpicker'>Color</a> section for example screenshots.<br><br>
+  please see the fhem wiki <a href='https://wiki.fhem.de/wiki/Color#Colorpicker'>Color</a> section for example screenshots.<br><br>
 
 =end html
 
