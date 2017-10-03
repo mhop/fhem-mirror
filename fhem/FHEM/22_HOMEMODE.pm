@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.1.8";
+my $HOMEMODE_version = "1.1.9";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -1115,7 +1115,6 @@ sub HOMEMODE_Attributes($)
   push @attribs,"HomeCMDdaytime:textField-long";
   push @attribs,"HomeCMDdnd-off:textField-long";
   push @attribs,"HomeCMDdnd-on:textField-long";
-  push @attribs,"HomeCMDevent:textField-long";
   push @attribs,"HomeCMDfhemINITIALIZED:textField-long";
   push @attribs,"HomeCMDicewarning-on:textField-long";
   push @attribs,"HomeCMDicewarning-off:textField-long";
@@ -1231,7 +1230,8 @@ sub HOMEMODE_userattr($)
   {
     push @userattrAll,"HomeCMDlocation-$_";
   }
-  foreach my $cal (split /,/,$specialevents)
+  push @userattrAll,"HomeCMDevent:textField-long" if ($specialevents);
+  foreach my $cal (devspec2array($specialevents))
   {
     my $events = HOMEMODE_HolidayEvents($cal);
     push @userattrAll,"HomeCMDevent-$cal-each";
@@ -2321,96 +2321,102 @@ sub HOMEMODE_TriggerState($;$$$)
   my @alarmSensors;
   my @lightSensors;
   my $amode = ReadingsVal($name,"modeAlarm","");
-  foreach my $sensor (devspec2array("$contacts:FILTER=disable!=1"))
+  if ($contacts)
   {
-    my ($oread,$tread) = split " ",AttrVal($sensor,"HomeReadings",AttrVal($name,"HomeSensorsContactReadings","state sabotageError")),2;
-    my $otcmd = AttrVal($sensor,"HomeValues",AttrVal($name,"HomeSensorsContactValues","open|tilted|on"));
-    my $amodea = AttrVal($sensor,"HomeModeAlarmActive","-");
-    my $ostate = ReadingsVal($sensor,$oread,"");
-    my $tstate = ReadingsVal($sensor,$tread,"") if ($tread);
-    my $kind = AttrVal($sensor,"HomeContactType","window");
-    next if (!$ostate && !$tstate);
-    if ($ostate =~ /^($otcmd)$/)
+    foreach my $sensor (devspec2array("$contacts:FILTER=disable!=1"))
     {
-      push @contactsOpen,$sensor;
-      push @insideOpen,$sensor if ($kind eq "doorinside");
-      push @doorsOOpen,$sensor if ($kind && $kind eq "dooroutside");
-      push @doorsMOpen,$sensor if ($kind && $kind eq "doormain");
-      push @outsideOpen,$sensor if ($kind =~ /^(dooroutside|doormain|window)$/);
-      push @windowsOpen,$sensor if ($kind eq "window");
-      if (grep /^($amodea)$/,$amode)
+      my ($oread,$tread) = split " ",AttrVal($sensor,"HomeReadings",AttrVal($name,"HomeSensorsContactReadings","state sabotageError")),2;
+      my $otcmd = AttrVal($sensor,"HomeValues",AttrVal($name,"HomeSensorsContactValues","open|tilted|on"));
+      my $amodea = AttrVal($sensor,"HomeModeAlarmActive","-");
+      my $ostate = ReadingsVal($sensor,$oread,"");
+      my $tstate = ReadingsVal($sensor,$tread,"") if ($tread);
+      my $kind = AttrVal($sensor,"HomeContactType","window");
+      next if (!$ostate && !$tstate);
+      if ($ostate =~ /^($otcmd)$/)
       {
-        push @alarmSensors,$sensor;
+        push @contactsOpen,$sensor;
+        push @insideOpen,$sensor if ($kind eq "doorinside");
+        push @doorsOOpen,$sensor if ($kind && $kind eq "dooroutside");
+        push @doorsMOpen,$sensor if ($kind && $kind eq "doormain");
+        push @outsideOpen,$sensor if ($kind =~ /^(dooroutside|doormain|window)$/);
+        push @windowsOpen,$sensor if ($kind eq "window");
+        if (grep /^($amodea)$/,$amode)
+        {
+          push @alarmSensors,$sensor;
+        }
+        if (defined $exit && $trigger eq $sensor && grep /^$oread:/,@{$events})
+        {
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,"prevContact",ReadingsVal($name,"lastContact",""));
+          readingsBulkUpdate($hash,"lastContact",$sensor);
+          readingsEndUpdate($hash,1);
+          HOMEMODE_ContactCommands($hash,$sensor,"open",$kind);
+          HOMEMODE_ContactOpenCheck($name,$sensor,"open");
+        }
       }
-      if (defined $exit && $trigger eq $sensor && grep /^$oread:/,@{$events})
+      else
       {
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"prevContact",ReadingsVal($name,"lastContact",""));
-        readingsBulkUpdate($hash,"lastContact",$sensor);
-        readingsEndUpdate($hash,1);
-        HOMEMODE_ContactCommands($hash,$sensor,"open",$kind);
-        HOMEMODE_ContactOpenCheck($name,$sensor,"open");
+        if (defined $exit && $trigger eq $sensor && grep /^$oread:/,@{$events})
+        {
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,"prevContactClosed",ReadingsVal($name,"lastContactClosed",""));
+          readingsBulkUpdate($hash,"lastContactClosed",$sensor);
+          readingsEndUpdate($hash,1);
+          HOMEMODE_ContactCommands($hash,$sensor,"closed",$kind);
+          my $timer = "atTmp_HomeOpenTimer_".$sensor."_$name";
+          CommandDelete(undef,$timer) if (IsDevice($timer));
+        }
       }
-    }
-    else
-    {
-      if (defined $exit && $trigger eq $sensor && grep /^$oread:/,@{$events})
+      if ($tread && $tstate =~ /^($otcmd)$/)
       {
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"prevContactClosed",ReadingsVal($name,"lastContactClosed",""));
-        readingsBulkUpdate($hash,"lastContactClosed",$sensor);
-        readingsEndUpdate($hash,1);
-        HOMEMODE_ContactCommands($hash,$sensor,"closed",$kind);
-        my $timer = "atTmp_HomeOpenTimer_".$sensor."_$name";
-        CommandDelete(undef,$timer) if (IsDevice($timer));
+        push @sensorsTampered,$sensor;
       }
-    }
-    if ($tread && $tstate =~ /^($otcmd)$/)
-    {
-      push @sensorsTampered,$sensor;
     }
   }
-  foreach my $sensor (devspec2array("$motions:FILTER=disable!=1"))
+  if ($motions)
   {
-    my ($oread,$tread) = split " ",AttrVal($sensor,"HomeReadings",AttrVal($name,"HomeSensorsMotionReadings","state sabotageError")),2;
-    my $otcmd = AttrVal($sensor,"HomeValues",AttrVal($name,"HomeSensorsMotionValues","open|on"));
-    my $amodea = AttrVal($sensor,"HomeModeAlarmActive","-");
-    my $ostate = ReadingsVal($sensor,$oread,"");
-    my $tstate = ReadingsVal($sensor,$tread,"") if ($tread);
-    my $kind = AttrVal($sensor,"HomeSensorLocation","inside");
-    next if (!$ostate && !$tstate);
-    if ($ostate =~ /^($otcmd)$/)
+    foreach my $sensor (devspec2array("$motions:FILTER=disable!=1"))
     {
-      push @motionsOpen,$sensor;
-      push @motionsInsideOpen,$sensor if ($kind eq "inside");
-      push @motionsOutsideOpen,$sensor if ($kind eq "outside");
-      if (grep /^($amodea)$/,$amode)
+      my ($oread,$tread) = split " ",AttrVal($sensor,"HomeReadings",AttrVal($name,"HomeSensorsMotionReadings","state sabotageError")),2;
+      my $otcmd = AttrVal($sensor,"HomeValues",AttrVal($name,"HomeSensorsMotionValues","open|on"));
+      my $amodea = AttrVal($sensor,"HomeModeAlarmActive","-");
+      my $ostate = ReadingsVal($sensor,$oread,"");
+      my $tstate = ReadingsVal($sensor,$tread,"") if ($tread);
+      my $kind = AttrVal($sensor,"HomeSensorLocation","inside");
+      next if (!$ostate && !$tstate);
+      if ($ostate =~ /^($otcmd)$/)
       {
-        push @alarmSensors,$sensor;
+        push @motionsOpen,$sensor;
+        push @motionsInsideOpen,$sensor if ($kind eq "inside");
+        push @motionsOutsideOpen,$sensor if ($kind eq "outside");
+        if (grep /^($amodea)$/,$amode)
+        {
+          push @alarmSensors,$sensor;
+        }
+        if (defined $exit && $trigger eq $sensor && grep /^$oread:/,@{$events})
+        {
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,"prevMotion",ReadingsVal($name,"lastMotion",""));
+          readingsBulkUpdate($hash,"lastMotion",$sensor);
+          readingsEndUpdate($hash,1);
+          HOMEMODE_MotionCommands($hash,$sensor,"open");
+        }
       }
-      if (defined $exit && $trigger eq $sensor && grep /^$oread:/,@{$events})
+      else
       {
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"prevMotion",ReadingsVal($name,"lastMotion",""));
-        readingsBulkUpdate($hash,"lastMotion",$sensor);
-        readingsEndUpdate($hash,1);
-        HOMEMODE_MotionCommands($hash,$sensor,"open");
+        if (defined $exit && $trigger eq $sensor && grep /^$oread:/,@{$events})
+        {
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,"prevMotionClosed",ReadingsVal($name,"lastMotionClosed",""));
+          readingsBulkUpdate($hash,"lastMotionClosed",$sensor);
+          readingsEndUpdate($hash,1);
+          HOMEMODE_MotionCommands($hash,$sensor,"closed");
+        }
       }
-    }
-    else
-    {
-      if (defined $exit && $trigger eq $sensor && grep /^$oread:/,@{$events})
+      if ($tread && $tstate =~ /^($otcmd)$/)
       {
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"prevMotionClosed",ReadingsVal($name,"lastMotionClosed",""));
-        readingsBulkUpdate($hash,"lastMotionClosed",$sensor);
-        readingsEndUpdate($hash,1);
-        HOMEMODE_MotionCommands($hash,$sensor,"closed");
+        push @sensorsTampered,$sensor;
       }
-    }
-    if ($tread && $tstate =~ /^($otcmd)$/)
-    {
-      push @sensorsTampered,$sensor;
     }
   }
   HOMEMODE_alarmTriggered($hash,@alarmSensors);
@@ -2865,7 +2871,7 @@ sub HOMEMODE_CheckHolidayDevices($)
 {
   my ($specs) = @_;
   my @wrongdevices;
-  foreach (split /,/,$specs)
+  foreach (devspec2array($specs))
   {
     push @wrongdevices,$_ if (!IsDevice($_,"holiday"));
   }
