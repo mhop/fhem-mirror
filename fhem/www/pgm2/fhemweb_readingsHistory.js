@@ -36,7 +36,15 @@ FW_readingsHistoryUpdateLine(d){
 
 }
 
+function FW_readingsHistoryCreate(elName, devName, vArr, currVal, set, params, cmd)
+{
+}
 
 FW_widgets['readingsHistory'] = {
+  createFn:FW_readingsHistoryCreate,
   updateLine:FW_readingsHistoryUpdateLine
 };
+
+
+=pod
+=cut

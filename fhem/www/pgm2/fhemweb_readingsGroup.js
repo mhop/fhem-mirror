@@ -143,7 +143,16 @@ FW_readingsGroupUpdateLine(d){
   //console.log("xxx: "+d[1]);
 }
 
+function FW_readingsGroupCreate(elName, devName, vArr, currVal, set, params, cmd)
+{
+}
+
+
 FW_widgets['readingsGroup'] = {
+  createFn:FW_readingsGroupCreate,
   updateLine:FW_readingsGroupUpdateLine
 };
 
+
+=pod
+=cut
