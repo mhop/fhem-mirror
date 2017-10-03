@@ -46,5 +46,7 @@ FW_widgets['readingsHistory'] = {
 };
 
 
+/*
 =pod
 =cut
+*/

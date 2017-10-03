@@ -154,5 +154,7 @@ FW_widgets['readingsGroup'] = {
 };
 
 
+/*
 =pod
 =cut
+*/
