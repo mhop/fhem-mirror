@@ -468,3 +468,31 @@ colorpicker_hsv2rgb(h,s,v) {
 
   return colorpicker_rgb2hex( Math.round(r*255),Math.round(g*255),Math.round(b*255) );
 }
+
+/*
+=pod
+
+=begin html
+
+  <li>:colorpicker,RGB - create an RGB colorpicker</li>
+
+  <li>:colorpicker,HSV - create an HSV colorpicker to set an rgb value</li>
+
+  <li>:colorpicker,HSVp - create an HSV popup colorpicker to set an rgb value</li>
+
+  <li>:colorpicker,HSV,&lt;hue&gt;,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;sat&gt,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;bri&gt,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;
+      - create an HSV colorpicker that uses &lt;hue&gt;, &lt;sat&gt; and &lt;bri&gt; as commands
+      to set the color. can also be used with HSVp to create a popup colorpicker<br>
+      if the device has no combined hsv reading it can be create with the following user reading:<code>attr <device> userReadings hsv {ReadingsVal($name,'hue','0').','.ReadingsVal($name,'sat','100').','.ReadingsVal($name,'bri','100')}</code></li>
+
+  <li>:colorpicker,CT,&lt;min&gt;,&lt;step&gt;,&lt;max&gt; - create a color temperature colorpicker</li>
+
+  <li>:colorpicker,BRI,&lt;min&gt;,&lt;step&gt;,&lt;max&gt; - create a brightness colorpicker</li>
+
+  <li>:colorpicker,HUE,&lt;min&gt;,&lt;step&gt;,&lt;max&gt; - create a hue colorpicker</li>
+  please see the fhem wiki <a hef='https://wiki.fhem.de/wiki/Color#Colorpicker'>Color</a> section for example screenshots.<br><br>
+
+=end html
+
+=cut
+*/
