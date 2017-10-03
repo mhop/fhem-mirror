@@ -1,4 +1,4 @@
-REV 15177
+REV 15179
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -1942,7 +1942,7 @@ UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2017-05-11_07:45:03 5418 www/pgm2/defaultCommon.css
 UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
-UPD 2017-10-03_07:45:02 48156 www/pgm2/fhemweb.js
+UPD 2017-10-03_10:09:37 49811 www/pgm2/fhemweb.js
 UPD 2017-03-03_07:45:02 12493 www/pgm2/fhemweb_colorpicker.js
 UPD 2017-03-07_07:45:02 3139 www/pgm2/fhemweb_fbcalllist.js
 UPD 2015-07-28_14:05:34 1168 www/pgm2/fhemweb_knob.js
