@@ -153,7 +153,7 @@ ZWDongle_Define($$)
   $hash->{nrNAck} = 0;
   my @empty;
   $hash->{SendStack} = \@empty;
-  ZWDongle_shiftSendStack($hash, 0, 5, undef);
+  ZWDongle_shiftSendStack($hash, 0, 5, undef); # Init variables
 
   my $ret = DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
   return $ret;
@@ -657,6 +657,10 @@ ZWDongle_Write($$$)
   ZWDongle_ProcessSendStack($hash);
 }
 
+# Flags:
+# - WaitForAck:  0:Written, 1:SerialACK received, 2:RF-Sent
+# - SendRetries < MaxSendRetries(3, up to 7 when receiving CAN)
+
 sub
 ZWDongle_shiftSendStack($$$$;$)
 {
@@ -666,7 +670,7 @@ ZWDongle_shiftSendStack($$$$;$)
 
   if($cmd && $reason==0 && $cmd =~ m/^01..0013/) { # ACK for SEND_DATA
     Log3 $hash, $loglevel, "$txt, WaitForAck=>2 for $cmd"
-        if($txt && $cmd);
+        if($txt);
     $hash->{WaitForAck}=2;
 
   } else {
@@ -752,7 +756,7 @@ ZWDongle_Read($@)
   #Log3 $name, 5, "ZWDongle RAW buffer: $data";
 
   my $msg;
-  while(length($data) > 0) {
+  while(length($data) >= 2) {
 
     my $fb = substr($data, 0, 2);
 
