@@ -600,26 +600,26 @@ FW_uzsuCreate(elName, devName, vArr, currVal, set, params, cmd)
 
 =begin html
 
-  <li>:uzsuToggle,state1,state2 - dispay a toggle button with two possible
+  <li>uzsuToggle,state1,state2 - dispay a toggle button with two possible
       states. the first is the active state.</li>
 
-  <li>:uzsuSelect,val1,val2,... - display a button bar with a button per value
+  <li>uzsuSelect,val1,val2,... - display a button bar with a button per value
       from which multiple values can be selected. the result is comma
       separated.</li>
 
-  <li>:uzsuSelectRadio,val1,val2,... - display a button bar with a button per
+  <li>uzsuSelectRadio,val1,val2,... - display a button bar with a button per
       value from which only one value can be selected.</li>
 
-  <li>:uzsuDropDown,val1,val2,... - display a dropdown with all values.</li>
+  <li>uzsuDropDown,val1,val2,... - display a dropdown with all values.</li>
 
-  <li>:uzsuTimerEntry[,modifier2] - combine uzsuSelect, uzsuDropDown and
+  <li>uzsuTimerEntry[,modifier2] - combine uzsuSelect, uzsuDropDown and
       uzsuToggle into a single line display to select a timer entry. an
       optional modifier can be given to select the switching value. see
       examples below.  the result is a comma separated list of days followed by
       a time, an enabled indicator and the switching value all separated by a|.
       eg: Mo,Di,Sa,So|00:00|enabled|19.5</li>
 
-  <li>:uzsu[,modifier2] - combine multiple uzsuTimerEntry widets to allow the
+  <li>uzsu[,modifier2] - combine multiple uzsuTimerEntry widets to allow the
       setting of multiple switching times an optional modifier can be given to
       select the switching value. see examples below.  the result is a space
       separeted list of uzsuTimerEntry results. Examples:
