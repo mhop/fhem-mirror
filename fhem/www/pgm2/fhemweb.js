@@ -1076,7 +1076,7 @@ FW_replaceWidget(oldEl,devName,vArr,currVal,reading,set,params,cmd,readyFn)
     elName = $(oldEl).find("[name]").attr("name");
 
   if(vArr.length == 0) { //  No parameters, input field
-    newEl = FW_createTextField(elName, devName, ["textField"], currVal,
+    var newEl = FW_createTextField(elName, devName, ["textField"], currVal,
                                set, params, cmd);
     finishFn("textField", newEl);
 
@@ -1716,3 +1716,42 @@ FW_getSVG(emb)
   }
   return undefined;
 }
+
+/*
+=pod
+
+=begin html
+  <li>:noArg - show no input field.</li>
+  <li>:time - show a JavaScript driven timepicker.</li>
+  <li>:textField - show an input field.</li>
+  <li>:textFieldNL - show the input field and hide the label.</li>
+  <li>:textField-long - show an input-field, but upon
+      clicking on the input field open a textArea (60x25).</li>
+  <li>:textFieldNL-long - the behaviour is the same
+      as :textField-long, but no label is displayed.</li>
+  <li>:slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - show
+      a JavaScript driven slider. The optional ,1 at the end
+      avoids the rounding of floating-point numbers.</li>
+  <li>:multiple,val1,val2,..." - present a multiple-value-selector with an
+      additional textfield. The result is comman separated.</li>
+  <li>:multiple-strict,val1,val2,... - like :multiple, but without the
+      textfield.</li>
+=end html
+
+=begin html_DE
+  <li>:noArg - es wird kein weiteres Eingabefeld angezeigt.</li>
+  <li>:time - zeigt ein Zeitauswahlmen&uuml;.</li>
+  <li>:textField - zeigt ein Eingabefeld.</li>
+  <li>:textField-long - ist wie textField, aber beim Click im Eingabefeld wird
+      ein Dialog mit einer HTML textarea (60x25) wird ge&ouml;ffnet.</li>
+  <li>:slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - zeigt einen
+      Schieberegler. Das optionale 1 (isFloat) vermeidet eine Rundung der
+      Fliesskommazahlen.</li>
+  <li>:multiple,val1,val2,... - zeigt eine Mehrfachauswahl mit einem
+      zus&auml;tzlichen Eingabefeld. Das Ergebnis ist Komma separiert.</li>
+  <li>:multiple-strict,val1,val2,... - ist wie :multiple, blo&szlig; ohne
+    Eingabefeld.</li>
+=end html_DE
+
+=cut
+*/
