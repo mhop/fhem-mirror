@@ -46,17 +46,20 @@ FW_uzsuDropDownCreate(elName, devName, vArr, currVal, set, params, cmd)
   if(!vArr.length || vArr[0] != "uzsuDropDown")
     return undefined;
 
-  vArr[0] = 'time';
+  //vArr[0] = 'time';
   //return FW_createTime(elName, devName, vArr, currVal, set, params, cmd);
 
   var newEl = $("<div style='display:inline-block;margin:2px 4px 2px 0px;'>").get(0);
 
-  $(newEl).append( FW_createSelect(elName, devName,
-    ["select",
-      "00:00","01:00","02:00","03:00","04:00","05:00","06:00","07:00","08:00","09:00",
-      "10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00",
-      "20:00","21:00","22:00","23:00"]
-    ,currVal, set, params, cmd) );
+  if( vArr[1] === undefined )
+    vArr = ["select",
+            "00:00","01:00","02:00","03:00","04:00","05:00","06:00","07:00","08:00","09:00",
+            "10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00",
+            "20:00","21:00","22:00","23:00"];
+  else
+    vArr[0] = 'select';
+    
+  $(newEl).append( FW_createSelect(elName, devName, vArr, currVal, set, params, cmd) );
   var select = $(newEl).find("select");
   select.selectmenu();
   select.selectmenu( "option", "width", "auto" );
