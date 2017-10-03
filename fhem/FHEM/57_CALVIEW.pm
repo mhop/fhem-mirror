@@ -200,6 +200,7 @@ sub CALVIEW_GetUpdate($){
 					my($startday,$startmonth,$startyear)=split(/\./,$termin->{bdate});
 					my($endday,$endmonth,$endyear)=split(/\./,$termin->{edate});
 					my $nextday = $startday + 1;
+					$nextday = sprintf ('%02d', $nextday);
 					Log3 $name , 5,  "CALVIEW $name - nextday = $nextday , endday = $endday , startday = $startday , btime ".$termin->{btime}." , etime ".$termin->{etime}."";
 					if( $endday eq $nextday && $termin->{btime} eq $termin->{etime} ){ $timeshort = AttrVal($name,"fulldaytext","ganztägig"); }
 					else { 
@@ -265,7 +266,9 @@ sub CALVIEW_GetUpdate($){
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_mode", $termin->{mode});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_timeshort", $timeshort );
 						$tomorrowcounter++;
-					}			
+					}
+					$endday = '';
+					$nextday ='';		
 					last if ($counter++ == $max);
 				
 			}
