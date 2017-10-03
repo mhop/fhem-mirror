@@ -3931,7 +3931,7 @@ FW_widgetOverride($$)
     <li>widgetOverride<br>
         Space separated list of name:modifier pairs, to override the widget
         for a set/get/attribute specified by the module author.
-        Following is the list of known modifier:
+        Following is the list of known modifiers:
         <ul>
         <!-- INSERT_DOC_FROM: www/pgm2/fhemweb.*.js -->
         </ul>

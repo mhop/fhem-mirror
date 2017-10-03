@@ -42,7 +42,7 @@ FW_knobCreate(elName, devName, vArr, currVal, set, params, cmd)
 
 =begin html
 
-  <li>:knob,min:1,max:100,... - shows the jQuery knob widget. The parameters
+  <li>knob,min:1,max:100,... - shows the jQuery knob widget. The parameters
       are a comma separated list of key:value pairs, where key does not have to
       contain the "data-" prefix. For details see the jQuery-knob
       definition.<br> Example:
@@ -53,7 +53,7 @@ FW_knobCreate(elName, devName, vArr, currVal, set, params, cmd)
 
 =begin html_DE
 
-  <li>:knob,min:1,max:100,... - zeigt das jQuery knob Widget.Die Parameter
+  <li>knob,min:1,max:100,... - zeigt das jQuery knob Widget.Die Parameter
       werden als eine Komma separierte Liste von Key:Value Paaren spezifiziert,
       wobei das data- Pr&auml;fix entf&auml;llt.F&uuml;r Details siehe die
       jQuery knob Dokumentation.<br> Beispiel:

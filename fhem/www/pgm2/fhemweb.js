@@ -1726,60 +1726,62 @@ FW_getSVG(emb)
 
 =begin html
 
-  <li>:noArg - show no input field.</li>
-  <li>:time - show a JavaScript driven timepicker.<br>
+  <li>noArg - show no input field.</li>
+  <li>time - show a JavaScript driven timepicker.<br>
       Example: attr FS20dev widgetOverride on-till:time</li>
-  <li>:textField - show an input field.<br>
+  <li>textField - show an input field.<br>
       Example: attr WEB widgetOverride room:textField</li>
-  <li>:textFieldNL - show the input field and hide the label.</li>
-  <li>:textField-long - show an input-field, but upon
+  <li>textFieldNL - show the input field and hide the label.</li>
+  <li>textField-long - show an input-field, but upon
       clicking on the input field open a textArea (60x25).</li>
-  <li>:textFieldNL-long - the behaviour is the same
+  <li>textFieldNL-long - the behaviour is the same
       as :textField-long, but no label is displayed.</li>
-  <li>:slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - show
+  <li>slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - show
       a JavaScript driven slider. The optional ,1 at the end
       avoids the rounding of floating-point numbers.</li>
-  <li>:multiple,val1,val2,..." - present a multiple-value-selector with an
-      additional textfield. The result is comman separated.</li>
-  <li>:multiple-strict,val1,val2,... - like :multiple, but without the
-      textfield.</li>
-  <li>:selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
+  <li>multiple,&lt;val1&gt;,&lt;val2&gt;,..." - present a
+      multiple-value-selector with an additional textfield. The result is
+      comman separated.</li>
+  <li>multiple-strict,&lt;val1&gt;,&lt;val2&gt;,... - like :multiple, but
+      without the textfield.</li>
+  <li>selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
       digits after decimal point&gt;,lin|log10" - display a select widget
       generated with values from min to max with step.<br>
       lin generates a constantly increasing series.  log10 generates an
       exponentially increasing series to base 10, step is related to the
       exponent, e.g. 0.0625.</li>
-  <li>:select,val1,val2,... - show a dropdown with all values.
+  <li>select,&lt;val1&gt;,&lt;val2&gt;,... - show a dropdown with all values.
       <b>NOTE</b>: this is also the fallback, if no modifier is found.</li>
 
 =end html
 
 =begin html_DE
 
-  <li>:noArg - es wird kein weiteres Eingabefeld angezeigt.</li>
-  <li>:time - zeigt ein Zeitauswahlmen&uuml;.
+  <li>noArg - es wird kein weiteres Eingabefeld angezeigt.</li>
+  <li>time - zeigt ein Zeitauswahlmen&uuml;.
       Beispiel: attr FS20dev widgetOverride on-till:time</li>
-  <li>:textField - zeigt ein Eingabefeld.<br>
+  <li>textField - zeigt ein Eingabefeld.<br>
       Beispiel: attr WEB widgetOverride room:textField</li>
-  <li>:textField-long - ist wie textField, aber beim Click im Eingabefeld wird
+  <li>textField-long - ist wie textField, aber beim Click im Eingabefeld wird
       ein Dialog mit einer HTML textarea (60x25) wird ge&ouml;ffnet.</li>
-  <li>:slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - zeigt einen
+  <li>slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - zeigt einen
       Schieberegler. Das optionale 1 (isFloat) vermeidet eine Rundung der
       Fliesskommazahlen.</li>
-  <li>:multiple,val1,val2,... - zeigt eine Mehrfachauswahl mit einem
-      zus&auml;tzlichen Eingabefeld. Das Ergebnis ist Komma separiert.</li>
-  <li>:multiple-strict,val1,val2,... - ist wie :multiple, blo&szlig; ohne
-      Eingabefeld.</li>
-  <li>:selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
+  <li>multiple,&lt;val1&gt;,&lt;val2&gt;,... - zeigt eine Mehrfachauswahl mit
+      einem zus&auml;tzlichen Eingabefeld. Das Ergebnis ist Komma
+      separiert.</li>
+  <li>multiple-strict,&lt;val1&gt;,&lt;val2&gt;,... - ist wie :multiple,
+      blo&szlig; ohne Eingabefeld.</li>
+  <li>selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
       digits after decimal point&gt;,lin|log10" zeigt ein HTML-select mit einer
       Zahlenreihe vom Wert min bis Wert max mit Schritten von step
       angezeigt.<br>
       Die Angabe lin erzeugt eine konstant ansteigende Reihe.  Die Angabe
       log10 erzeugt eine exponentiell ansteigende Reihe zur Basis 10,
       step bezieht sich auf den Exponenten, z.B. 0.0625.</li>
-  <li>:select,val1,val2,... - zeigt ein HTML select mit allen Werten.
-      <b>Achtung:</b> so ein Widget wird auch dann angezeigt, falls kein
-      passender Modifier gefunden wurde.</li>
+  <li>select,&lt;val1&gt;,&lt;val2&gt;,... - zeigt ein HTML select mit allen
+      Werten. <b>Achtung</b>: so ein Widget wird auch dann angezeigt, falls
+      kein passender Modifier gefunden wurde.</li>
 
 =end html_DE
 
