@@ -23,9 +23,11 @@ var FW_widgets = {
   time:              { createFn:FW_createTime      },
   noArg:             { createFn:FW_createNoArg     },
   multiple:          { createFn:FW_createMultiple  },
-  "multiple-strict": { createFn:FW_createMultiple  },
-  textfield:         { createFn:FW_createTextField },
-  "textfield-long":  { createFn:FW_createTextField }
+  "multiple-strict": { createFn:FW_createMultiple, second:true  },
+  textField:         { createFn:FW_createTextField },
+  textFieldNL:       { createFn:FW_createTextField, second:true },
+  "textField-long":  { createFn:FW_createTextField, second:true },
+  "textFieldNL-long":{ createFn:FW_createTextField, second:true }
 };
 
 window.onbeforeunload = function(e)
@@ -882,15 +884,17 @@ FW_doUpdate(evt)
       });
     }
 
+    // updateLine is deprecated, use setValueFn
     for(var w in FW_widgets)
-      if(FW_widgets[w].updateLine) // updateLine is deprecated, use setValueFn
+      if(FW_widgets[w].updateLine && !FW_widgets[w].second)
         FW_widgets[w].updateLine(d);
 
     devs.push(d);
   }
 
+  // used for SVG to avoid double-reloads
   for(var w in FW_widgets)
-    if(FW_widgets[w].updateDevs) // used for SVG to avoid double-reloads
+    if(FW_widgets[w].updateDevs && !FW_widgets[w].second)
       FW_widgets[w].updateDevs(devs);
 
   // reset the connection to avoid memory problems
@@ -1045,7 +1049,7 @@ function
 FW_callCreateFn(elName, devName, vArr, currVal, set, params, cmd, finishFn)
 {
   for(var wn in FW_widgets) {
-    if(FW_widgets[wn].createFn) {
+    if(FW_widgets[wn].createFn && !FW_widgets[wn].second) {
       var newEl = FW_widgets[wn].createFn(elName, devName, vArr,
                                           currVal, set, params, cmd);
       if(newEl)
@@ -1721,9 +1725,12 @@ FW_getSVG(emb)
 =pod
 
 =begin html
+
   <li>:noArg - show no input field.</li>
-  <li>:time - show a JavaScript driven timepicker.</li>
-  <li>:textField - show an input field.</li>
+  <li>:time - show a JavaScript driven timepicker.<br>
+      Example: attr FS20dev widgetOverride on-till:time</li>
+  <li>:textField - show an input field.<br>
+      Example: attr WEB widgetOverride room:textField</li>
   <li>:textFieldNL - show the input field and hide the label.</li>
   <li>:textField-long - show an input-field, but upon
       clicking on the input field open a textArea (60x25).</li>
@@ -1736,12 +1743,24 @@ FW_getSVG(emb)
       additional textfield. The result is comman separated.</li>
   <li>:multiple-strict,val1,val2,... - like :multiple, but without the
       textfield.</li>
+  <li>:selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
+      digits after decimal point&gt;,lin|log10" - display a select widget
+      generated with values from min to max with step.<br>
+      lin generates a constantly increasing series.  log10 generates an
+      exponentially increasing series to base 10, step is related to the
+      exponent, e.g. 0.0625.</li>
+  <li>:select,val1,val2,... - show a dropdown with all values.
+      <b>NOTE</b>: this is also the fallback, if no modifier is found.</li>
+
 =end html
 
 =begin html_DE
+
   <li>:noArg - es wird kein weiteres Eingabefeld angezeigt.</li>
-  <li>:time - zeigt ein Zeitauswahlmen&uuml;.</li>
-  <li>:textField - zeigt ein Eingabefeld.</li>
+  <li>:time - zeigt ein Zeitauswahlmen&uuml;.
+      Beispiel: attr FS20dev widgetOverride on-till:time</li>
+  <li>:textField - zeigt ein Eingabefeld.<br>
+      Beispiel: attr WEB widgetOverride room:textField</li>
   <li>:textField-long - ist wie textField, aber beim Click im Eingabefeld wird
       ein Dialog mit einer HTML textarea (60x25) wird ge&ouml;ffnet.</li>
   <li>:slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - zeigt einen
@@ -1750,7 +1769,18 @@ FW_getSVG(emb)
   <li>:multiple,val1,val2,... - zeigt eine Mehrfachauswahl mit einem
       zus&auml;tzlichen Eingabefeld. Das Ergebnis ist Komma separiert.</li>
   <li>:multiple-strict,val1,val2,... - ist wie :multiple, blo&szlig; ohne
-    Eingabefeld.</li>
+      Eingabefeld.</li>
+  <li>:selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
+      digits after decimal point&gt;,lin|log10" zeigt ein HTML-select mit einer
+      Zahlenreihe vom Wert min bis Wert max mit Schritten von step
+      angezeigt.<br>
+      Die Angabe lin erzeugt eine konstant ansteigende Reihe.  Die Angabe
+      log10 erzeugt eine exponentiell ansteigende Reihe zur Basis 10,
+      step bezieht sich auf den Exponenten, z.B. 0.0625.</li>
+  <li>:select,val1,val2,... - zeigt ein HTML select mit allen Werten.
+      <b>Achtung:</b> so ein Widget wird auch dann angezeigt, falls kein
+      passender Modifier gefunden wurde.</li>
+
 =end html_DE
 
 =cut

@@ -4958,6 +4958,8 @@ fhemFork()
   return 0;
 }
 
+# Return the next element from the string (list) for each consecutive call.
+# The index for the next call is stored in the device hash
 sub
 Each($$;$)      # can be used e.g. in at, Forum #40022
 {

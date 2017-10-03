@@ -213,8 +213,6 @@ FHEMWEB_Initialize($)
     $FW_fhemwebjs = join(",", map { $_ = ~m/^fhemweb_(.*).js$/; $1 }
                               grep { /fhemweb_(.*).js$/ }
                               readdir(DH));
-    $data{FWEXT}{"readingsGroup"  }{SCRIPT} = "fhemweb_readingsGroup.js";
-    $data{FWEXT}{"readingsHistory"}{SCRIPT} = "fhemweb_readingsHistory.js";
     @FW_fhemwebjs = ("fhemweb.js");
     closedir(DH);
   }
@@ -3929,119 +3927,13 @@ FW_widgetOverride($$)
         i.e the default http address is http://localhost:8083/fhem
         </li><br>
 
-
-
     <a name="widgetOverride"></a>
     <li>widgetOverride<br>
-        Space spearate list of name:modifier pairs, to override the widget
+        Space separated list of name:modifier pairs, to override the widget
         for a set/get/attribute specified by the module author.
+        Following is the list of known modifier:
         <ul>
-          <li>if the modifier is ":noArg", then no further input field is
-            displayed </li>
-          <li>if the modifier is ":time", then a javascript driven timepicker is
-            displayed.</li>
-          <li>if the modifier is ":textField", an input field is displayed.</li>
-          <li>if the modifier is ":textFieldNL", an input field without label
-            is displayed.</li>
-          <li>if the modifier is ":textField-long", is like textField, but upon
-            clicking on the input field a textArea (60x25) will be opened.</li>
-          <li>if the modifier is ":textFieldNL-long", the behaviour is the same
-            as :textField-long, but no label is displayed.</li>
-
-          <li>if the modifier is of the form
-            ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1]", then a
-            javascript driven slider is displayed. The optional ,1 at the end
-            avoids the rounding of floating-point numbers.</li>
-          <li>if the modifier is of the form ":multiple,val1,val2,...", then
-            multiple values can be selected and own values can be written, the
-            result is comma separated.</li>
-          <li>if the modifier is of the form ":multiple-strict,val1,val2,...",
-            then multiple values can be selected and no new values can be
-            added, the result is comma separated.</li>
-          <li>if the modifier is of the form ":knob,min:1,max:100,...", then
-            the jQuery knob widget will be displayed. The parameters are
-            specified as a comma separated list of key:value pairs, where key
-            does not have to contain the "data-" prefix.</li>
-
-          <li>if the modifier is of the form ":sortable,val1,val2,...", then
-            the user can create a new list from the elements of the given
-            list, can add new elements by entering a text, or delete some from
-            the list. This new list can be sorted via drag &amp; drop. The
-            result is a comma separated list. </li>
-
-          <li>if the modifier is of the form ":sortable-strict,val1,val2,...",
-            then it behaves like :sortable, without the possibility to enter
-            text.</li>
-
-          <li>if the modifier is of the form ":sortable-given,val1,val2,...",
-            then the specified list can be sorted via drag &amp; drop, no
-            elements can be added or deleted.  </li>
-
-          <li>if the modifier is of the form ":uzsuToggle,state1,state2",
-            a toggle button with two possible states is displayed. the first
-            is the active state.</li>
-
-          <li>if the modifier is of the form ":uzsuSelect,val1,val2,...",
-            a button bar with a button per value is displayed from which
-            multiple values can be selected. the result is comma separated.</li>
-
-          <li>if the modifier is of the form ":uzsuSelectRadio,val1,val2,...",
-            a button bar with a button per value is displayed from which only
-            one value can be selected.</li>
-
-          <li>if the modifier is of the form ":uzsuDropDown,val1,val2,...",
-            a dropdown with all values is displayed.</li>
-
-          <li>if the modifier is of the form ":uzsuTimerEntry[,modifier2]",
-            uzsuSelect, uzsuDropDown and uzsuToggle are combined into a single
-            line display to select a timer entry. an optional modifier can be
-            given to select the switching value. see examples below.
-            the result is a comma separated list of days followed by a time,
-            an enabled indicator and the switching value all separated by a|.
-            eg: Mo,Di,Sa,So|00:00|enabled|19.5</li>
-
-          <li>if the modifier is of the form ":uzsu[,modifier2]",
-            multiple uzsuTimerEntry widets are combined to allow the setting
-            of multiple switching times an optional modifier can be
-            given to select the switching value. see examples below.
-            the result is a space separeted list of uzsuTimerEntry results.</li>
-
-          <li>if the modifier is of the form
-            ":selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
-            digits after decimal point&gt;,lin|log10",a select widget is
-            generated with values from min to max with step.<br>
-            lin generates a constantly increasing series.  log10 generates an
-            exponentially increasing series to base 10, step is related to the
-            exponent, e.g. 0.0625.
-          </li>
-
-          <li>else a dropdown with all the modifier values is displayed</li>
-        </ul>
-        If this attribute is specified for a FHEMWEB instance, then it is
-        applied to all devices shown. Examples:
-        <ul>
-          attr FS20dev widgetOverride on-till:time<br>
-          attr WEB widgetOverride room:textField<br>
-          attr dimmer widgetOverride
-          dim:knob,min:1,max:100,step:1,linecap:round<br>
-          <br>
-          attr myToggle widgetOverride state:uzsuToggle,123,xyz<br>
-          attr mySelect widgetOverride state:uzsuSelect,abc,123,456,xyz<br>
-          attr myTemp widgetOverride state:uzsuDropDown,18,18.5,19,19.5,20,20.5,21,21.5,22,22.5,23<br>
-          attr myTimerEntry widgetOverride state:uzsuTimerEntry<br>
-          attr myTimer widgetOverride state:uzsu<br>
-          <br>
-          the following gives some examples of for the modifier2 parameter of uzsuTimerEntry and uzsu to
-          combine the setting of a timer with another widget to select the switching value :
-          <pre>
-... widgetOverride state:uzsu,slider,0,5,100                                         -> a slider
-... widgetOverride state:uzsu,uzsuToggle,off,on                                      -> a on/off button
-... widgetOverride state:uzsu,uzsuDropDown,18,19,20,21,22,23                         -> a dropDownMenue
-... widgetOverride state:uzsu,knob,min:18,max:24,step:0.5,linecap:round,fgColor:red  -> a knob widget
-... widgetOverride state:uzsu,colorpicker                                            -> a colorpicker
-... widgetOverride state:uzsu,colorpicker,CT,2700,50,5000                            -> a colortemperature selector
-          </pre>
-
+        <!-- INSERT_DOC_FROM: www/pgm2/fhemweb.*.js -->
         </ul>
         </li>
         <br>
@@ -4718,145 +4610,11 @@ FW_widgetOverride($$)
     <li>widgetOverride<br>
         Leerzeichen separierte Liste von Name/Modifier Paaren, mit dem man den
         vom Modulautor f&uuml;r einen bestimmten Parameter (Set/Get/Attribut)
-        vorgesehene Widgets &auml;ndern kann.
+        vorgesehene Widgets &auml;ndern kann.  Folgendes ist die Liste der
+        bekannten Modifier:
         <ul>
-          <li>Ist der Modifier ":noArg", wird kein weiteres Eingabefeld
-            angezeigt.</li>
-
-          <li>Ist der Modifier ":time", wird ein in Javaskript geschreibenes
-            Zeitauswahlmen&uuml; angezeigt.</li>
-
-          <li>Ist der Modifier ":textField", wird ein Eingabefeld
-            angezeigt.</li>
-
-          <li>Ist der Modified ":textField-long" ist wie textField, aber beim
-            Click im Eingabefeld ein Dialog mit einer HTML textarea
-            (60x25) wird ge&ouml;ffnet.</li>
-
-          <li>Ist der Modifier in der Form
-            ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1]", so wird ein in
-            JavaScript programmierter Slider angezeigt. Das optionale 1
-            (isFloat) vermeidet eine Rundung der Fliesskommazahlen </li>
-
-          <li>Ist der Modifier ":multiple,val1,val2,...", dann ist eine
-            Mehrfachauswahl m&ouml;glich und es k&ouml;nnen neue Werte gesetzt
-            werden. Das Ergebnis ist Komma-separiert.</li>
-
-          <li>Ist der Modifier ":multiple-strict,val1,val2,...", dann ist eine
-            Mehrfachauswahl m&ouml;glich, es k&ouml;nnen jedoch keine neuen
-            Werte definiert werden. Das Ergebnis ist Komma-separiert.</li>
-
-          <li>Ist der Modifier ":knob,min:1,max:100,...", dass ein
-            jQuery knob Widget wird angezeigt. Die Parameter werden als eine
-            Komma separierte Liste von Key:Value Paaren spezifiziert, wobei das
-            data- Pr&auml;fix entf&auml;llt. </li>
-            
-          <li>Ist der Modifier ":sortable,val1,val2,...", dann ist es
-            m&ouml;glich aus den gegebenen Werten eine Liste der
-            gew&uuml;nschten Werte durch Drag &amp; Drop zusammenzustellen. Die
-            Reihenfolge der Werte kann dabei entsprechend ge&auml;ndert werden.
-            Es m&uuml;ssen keine Werte explizit vorgegeben werden, das Widget
-            kann auch ohne vorgegebenen Werte benutzt werden.  Es k&ouml;nnen
-            eigene Werte zur Liste hinzugef&uuml;gt und einsortiert werden.
-            Das Ergebnis ist Komma-separiert entsprechend aufsteigend
-            sortiert.</li>
-            
-           <li>Ist der Modifier ":sortable-strict,val1,val2,...", dann ist es
-            m&ouml;glich aus den gegebenen Werten eine Liste der
-            gew&uuml;nschten Werte durch Drag &amp; Drop zusammenzustellen. Die
-            Reihenfolge der Werte kann dabei entsprechend ge&auml;ndert werden.
-            Es k&ouml;nnen jedoch keine eigenen Werte zur Liste
-            hinzugef&uuml;gt werden.  Das Ergebnis ist Komma-separiert
-            entsprechend aufsteigend sortiert.</li>
-            
-           <li>Ist der Modifier ":sortable-given,val1,val2,...", dann ist es
-            m&ouml;glich aus den gegebenen Werten eine sortierte Liste der
-            gew&uuml;nschten Werte durch Drag & Drop zusammenzustellen. Es
-            k&ouml;nnen keine Elemente gel&ouml;scht und hinzugef&uuml;gt
-            werden. Es m&uuml;ssen alle gegeben Werte benutzt und entsprechend
-            sortiert sein.  Das Ergebnis ist Komma-separiert entsprechend
-            aufsteigend sortiert.</li>
-
-          <li>Ist der Modifier ":uzsuToggle,zust1,zust2", dann ist es
-            m&ouml;gliche mit einem Toggle-Button zwischen zwei
-            Zust&auml;nden zu w&auml;hlen. Der Erste ist der aktive Zustand.</li>
-
-          <li>Ist der Modifier ":uzsuSelect,val1,val2,...", dann ist es
-            m&ouml;gliche in einer Buttonleiste meherere Werte auszuw&auml;hlen.
-            Das Ergebnis ist Komma-separiert.</li>
-
-          <li>Ist der Modifier ":uzsuSelectRadio,val1,val2,...", dann ist es
-            m&ouml;gliche in einer Buttonleiste einen aus meherere Werten
-            auszuw&auml;hlen.</li>
-
-          <li>Ist der Modifier ":uzsuDropDown,val1,val2,...", dann ist es
-            m&ouml;gliche mit einem DropDown Men&uuml; einen der Werte
-            auszuw&auml;hlen.</li>
-
-          <li>Ist der Modifier ":uzsuTimerEntry[,modifier2]", werden je ein
-            uzsuSelect, uzsuDropDown und uzsuToggle Widget kombiniert um
-            einen Schaltzeitpunkt auszuw&auml;hlen. &Uuml;ber den optionalen
-            modifier2 kann ein Widget zur Auswahl des Schaltwertes angegeben
-            werden. Siehe Beispiele unten.
-            Das Ergebniss is eine komma-separiert Liste von Wochentagen gefolgt
-            vom Zeitpunkt, eine Aktiv-Indikator und dem Schaltwert, jeweils
-            durch | abetrennt.
-            Zum Beispiel: Mo,Di,Sa,So|00:00|enabled|19.5</li>
-
-          <li>Ist der Modifier ":uzsu[,modifier2]", werden mehere
-            uzsuTimerEntry Widets kombiniert um eine beliebige Anzahl an
-            Schaltzeiten einzugeben. &Uuml;ber den optionalen
-            modifier2 kann ein Widget zur Auswahl des Schaltwertes angegeben           
-            werden. Siehe Beispiele unten.
-            Das Ergebiss ist eine durch leerzeichen getrennte Liste von
-            uzsuTimerEntry Ergebnissen.</li>
-            
-          <li>Ist der Modifier in der Form
-            ":selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
-            digits after decimal point&gt;,lin|log10", so wird ein in
-            Select-Widget mit einer Zahlenreihe vom Wert min bis Wert max mit
-            Schritten von step angezeigt.<br>
-
-            Die Angabe lin erzeugt eine konstant ansteigende Reihe.  Die Angabe
-            log10 erzeugt eine exponentiell ansteigende Reihe zur Basis 10,
-            step bezieht sich auf den Exponenten, z.B. 0.0625.
-          </li>
-
-          <li>In allen anderen F&auml;llen (oder falls der Modifier explizit
-            mit :select anfaegt) erscheint ein HTML select mit allen Modifier
-            Werten.</li>
-
-        </ul>
-        Falls das Attribut f&uuml;r eine WEB Instanz gesetzt wurde, dann wird
-        es bei allen von diesem Web-Instan angezeigten Ger&auml;ten angewendet.
-        Beispiele:
-        <ul>
-          attr FS20dev widgetOverride on-till:time<br>
-          attr WEB widgetOverride room:textField<br>
-          attr dimmer widgetOverride dim:knob,min:1,max:100,step:1,linecap:round
-          <br>
-          <br>
-          attr myToggle widgetOverride state:uzsuToggle,123,xyz<br>
-          attr mySelect widgetOverride state:uzsuSelect,abc,123,456,xyz<br>
-          attr myTemp widgetOverride
-            state:uzsuDropDown,18,18.5,19,19.5,20,20.5,21,21.5,22,22.5,23<br>
-          attr myTimerEntry widgetOverride state:uzsuTimerEntry<br>
-          attr myTimer widgetOverride state:uzsu<br>
-          <br>
-          Im Folgenden wird die Verwendung des modifier2 parameters von
-          uzsuTimerEntry und uzsu gezeigt um die Auswahl des Schaltzeitpunktes
-          mit der Auswahl des Schaltwertes zu kombinieren:
-          <pre>
-... widgetOverride state:uzsu,slider,0,5,100                                         -> ein slider
-... widgetOverride state:uzsu,uzsuToggle,off,on                                      -> ein on/off button
-... widgetOverride state:uzsu,uzsuDropDown,18,19,20,21,22,23                         -> ein dropDownMenue
-... widgetOverride state:uzsu,knob,min:18,max:24,step:0.5,linecap:round,fgColor:red  -> ein knob widget
-... widgetOverride state:uzsu,colorpicker                                            -> ein colorpicker
-... widgetOverride state:uzsu,colorpicker,CT,2700,50,5000                            -> ein colortemperature slider
-          </pre>
-
-        </ul>
-        </li><br>
+        <!-- INSERT_DOC_FROM: www/pgm2/fhemweb.*.js -->
+        </ul></li>
 
     </ul>
   </ul>

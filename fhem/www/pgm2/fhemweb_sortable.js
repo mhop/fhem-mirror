@@ -186,4 +186,50 @@ FW_sortableCreateTable(elements, selected)
 }
 
 
+/*
+=pod
 
+=begin html
+
+  <li>:sortable,val1,val2,... - create a new list from the elements of the
+      given list, can add new elements by entering a text, or delete some from
+      the list. This new list can be sorted via drag &amp; drop. The result is
+      a comma separated list. </li>
+
+  <li>:sortable-strict,val1,val2,... - it behaves like :sortable, without the
+      possibility to enter text.</li>
+
+  <li>:sortable-given,val1,val2,... - the specified list can be sorted via drag
+      &amp; drop, no elements can be added or deleted.  </li>
+
+=end html
+
+=begin html_DE
+
+  <li>:sortable,val1,val2,... - damit ist es m&ouml;glich aus den gegebenen
+      Werten eine Liste der gew&uuml;nschten Werte durch Drag &amp; Drop
+      zusammenzustellen. Die Reihenfolge der Werte kann dabei entsprechend
+      ge&auml;ndert werden.  Es m&uuml;ssen keine Werte explizit vorgegeben
+      werden, das Widget kann auch ohne vorgegebenen Werte benutzt werden.  Es
+      k&ouml;nnen eigene Werte zur Liste hinzugef&uuml;gt und einsortiert
+      werden.  Das Ergebnis ist Komma-separiert entsprechend aufsteigend
+      sortiert.</li>
+
+   <li>:sortable-strict,val1,val2,... - damit ist es m&ouml;glich aus den
+      gegebenen Werten eine Liste der gew&uuml;nschten Werte durch Drag &amp;
+      Drop zusammenzustellen. Die Reihenfolge der Werte kann dabei entsprechend
+      ge&auml;ndert werden.  Es k&ouml;nnen jedoch keine eigenen Werte zur
+      Liste hinzugef&uuml;gt werden.  Das Ergebnis ist Komma-separiert
+      entsprechend aufsteigend sortiert.</li>
+
+   <li>:sortable-given,val1,val2,... - damit ist es m&ouml;glich aus den
+      gegebenen Werten eine sortierte Liste der gew&uuml;nschten Werte durch
+      Drag & Drop zusammenzustellen. Es k&ouml;nnen keine Elemente
+      gel&ouml;scht und hinzugef&uuml;gt werden. Es m&uuml;ssen alle gegeben
+      Werte benutzt und entsprechend sortiert sein.  Das Ergebnis ist
+      Komma-separiert entsprechend aufsteigend sortiert.</li>
+
+=end html_DE
+
+=cut
+*/
