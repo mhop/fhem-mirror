@@ -1140,7 +1140,7 @@ sub PRESENCE_ProcessLocalScan($)
 sub PRESENCE_ProcessAbortedScan($)
 {
 
-    my ($hash) = @_;
+    my ($hash, $msg) = @_;
     my $name = $hash->{NAME};
     delete($hash->{helper}{RUNNING_PID});
     RemoveInternalTimer($hash);
@@ -1149,13 +1149,13 @@ sub PRESENCE_ProcessAbortedScan($)
     {
         if($hash->{helper}{RETRY_COUNT} >= 3)
         {
-            Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry"). " (resuming normal operation)" if($hash->{helper}{RETRY_COUNT} == 3);
+            Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry"). " (resuming normal operation): $msg" if($hash->{helper}{RETRY_COUNT} == 3);
             InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
             $hash->{helper}{RETRY_COUNT}++;
         }
         else
         {
-            Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry")." (retrying in 10 seconds)";
+            Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry")." (retrying in 10 seconds): $msg";
             InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
             $hash->{helper}{RETRY_COUNT}++;
         }
@@ -1164,7 +1164,7 @@ sub PRESENCE_ProcessAbortedScan($)
     {
         $hash->{helper}{RETRY_COUNT} = 1;
         InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
-        Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked (retrying in 10 seconds)"
+        Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked (retrying in 10 seconds): $msg"
     }
 
     readingsSingleUpdate($hash, "state", "timeout",1);
