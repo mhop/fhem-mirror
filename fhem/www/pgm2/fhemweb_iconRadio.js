@@ -125,16 +125,14 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
     - displays Icons as radio button and returns value if pushed.
     &lt;value&gt; return value.<br>
     &lt;select color&gt; the background color of the selected icon.<br>
-    The widget contains a CSS-class "iconRadio_widget".
-    <br>
+    The widget contains a CSS-class "iconRadio_widget".<br>
   </li>
   <li>
     iconButtons,&lt;select color&gt;,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;][,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;]]...
     - displays Icons as button bar and returns comma separated values of pushed buttons.
     &lt;value&gt; return value.<br>
     &lt;select color&gt; the background color of the selected icon.<br>
-    The widget contains a CSS-class "iconButtons_widget".
-    <br>
+    The widget contains a CSS-class "iconButtons_widget".<br>
   </li>
   <li>iconLabel[,&lt;reference value&gt;,[&lt;icon&gt;][@&lt;color&gt;]][,&lt;reference value&gt;,[&lt;icon&gt;][@&lt;color&gt;]]...
     - displays states by colorized values, labels and icons, if the current
@@ -144,7 +142,6 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
     &lt;reference value&gt; is a number or a regular expression.<br>
     If &lt;icon&gt; is no icon name, the text will be displayed, otherwise
     the icon. If nothing is specified, the current value will be displayed.<br>
-    <br>
   </li>
   <li>iconSwitch,&lt;reference value&gt;,[&lt;icon&gt;][@&lt;color&gt;][,&lt;reference value&gt;,[&lt;icon&gt;][@&lt;color&gt;]]...
     - switches cyclic after actuation to the diplayed state and the actual
@@ -155,7 +152,6 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
     &lt;reference value&gt; is a number or a string.<br>
     If &lt;icon&gt; is no icon name, the text will be displayed, otherwise
     the icon. If nothing is specified, the reference value will be displayed.<br>
-    <br>
   </li>
 =end html
 =begin html_DE
