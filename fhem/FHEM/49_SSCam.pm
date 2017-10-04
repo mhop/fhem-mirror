@@ -27,6 +27,10 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 3.2.2  03.10.2017    make functions ready to use "SYNO.SurveillanceStation.PTZ" version 5, minor fixes, commandref 
+#                      revised
+# 3.2.1  02.10.2017    change some "SYNO.SurveillanceStation.Camera" methods to version 9             
+# 3.2.0  27.09.2017    new command get listLog, change to $hash->{HELPER}{".SNAPHASH"} for avoid huge "list"-report
 # 3.1.0  26.09.2017    move extevent from CAM to SVS model, Reading PollState enhanced for CAM-Model, minor fixes
 # 3.0.0  23.09.2017    Internal MODEL SVS or CAM -> distinguish/support Cams and SVS in different devices
 #                      new comand get storedCredentials, commandref revised
@@ -200,7 +204,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.1.0";
+my $SSCamVersion = "3.2.2";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -332,6 +336,7 @@ sub SSCam_Define {
   $hash->{HELPER}{APIVIDEOSTM}    = "SYNO.SurveillanceStation.VideoStreaming";
   $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Streaming";
   $hash->{HELPER}{APIHM}          = "SYNO.SurveillanceStation.HomeMode";
+  $hash->{HELPER}{APILOG}         = "SYNO.SurveillanceStation.Log";
   
   # Startwerte setzen
   if(IsModelCam($hash)) {
@@ -433,7 +438,7 @@ sub SSCam_Attr {
         $do = 0 if($cmd eq "del");
 
         if ($do == 0) {
-            delete($hash->{HELPER}{SNAPHASH}) if(AttrVal($name,"snapGalleryBoost",0));  # Snaphash nur löschen wenn Snaps gepollt werden   
+            delete($hash->{HELPER}{".SNAPHASH"}) if(AttrVal($name,"snapGalleryBoost",0));  # Snaphash nur löschen wenn Snaps gepollt werden   
             Log3($name, 4, "$name - Snapshot hash deleted");
 		} elsif (AttrVal($name,"snapGalleryBoost",0)) {
 		    # snap-Infos abhängig ermitteln wenn gepollt werden soll
@@ -453,7 +458,7 @@ sub SSCam_Attr {
         $do = 0 if($cmd eq "del");
 
         if ($do == 0) {
-            delete($hash->{HELPER}{SNAPHASH});  # Snaphash löschen
+            delete($hash->{HELPER}{".SNAPHASH"});  # Snaphash löschen
             Log3($name, 4, "$name - Snapshot hash deleted");
 		
 		} else {
@@ -551,7 +556,7 @@ sub SSCam_Set {
                  "stopView:noArg ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-                 ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
+                 ((ReadingsVal("$name", "CapPTZAbs", "false") ne "false") ? "goAbsPTZ"." " : ""). 
                  ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
   } else {
       # setlist für SVS Devices
@@ -661,7 +666,7 @@ sub SSCam_Set {
       $hash->{HELPER}{ACTIVE} = "off";  
 	  
 	  if($success) {
-	      getsvsinfo($hash);
+	      getcaminfoall($hash);
 		  return "Username and Password saved successfully";
 	  } else {
 		   return "Error while saving Username / Password - see logfile for details";
@@ -736,10 +741,28 @@ sub SSCam_Set {
 
   } elsif ($opt eq "move" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-
-      if (!defined($prop) || ($prop ne "up" && $prop ne "down" && $prop ne "left" && $prop ne "right" && $prop !~ m/dir_\d/)) {return "Function \"move\" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)";}
-            
-      $hash->{HELPER}{GOMOVEDIR} = $prop;
+      
+	  return "PTZ version of Synology API isn't set. Use \"get $name scanVirgin\" first." if(!$hash->{HELPER}{APIPTZMAXVER});
+      
+	  if($hash->{HELPER}{APIPTZMAXVER} <= 4) {
+	      if (!defined($prop) || ($prop !~ /^up$|^down$|^left$|^right$|^dir_\d$/)) {return "Function \"move\" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)";}
+	      $hash->{HELPER}{GOMOVEDIR} = $prop;
+	  
+	  } elsif ($hash->{HELPER}{APIPTZMAXVER} >= 5) {
+	      if (!defined($prop) || ($prop !~ /^right$|^upright$|^up$|^upleft$|^left$|^downleft$|^down$|^downright$/)) {return "Function \"move\" needs an argument like right, upright, up, upleft, left, downleft, down, downright ";}
+	      my %dirs = (
+		              right     => 0,
+                      upright   => 4,
+                      up        => 8,
+                      upleft    => 12,
+                      left      => 16,
+                      downleft  => 20,
+                      down      => 24,
+                      downright => 28,
+		             );
+		  $hash->{HELPER}{GOMOVEDIR} = $dirs{$prop};
+	  }
+	  
       $hash->{HELPER}{GOMOVETIME} = defined($prop1) ? $prop1 : 1;
             
       $hash->{HELPER}{PTZACTION}  = "movestart";
@@ -808,6 +831,8 @@ sub SSCam_Get {
     my $name = shift @a;
     my $opt = shift @a;
 	my $arg = shift @a;
+	my $arg1 = shift @a;
+	my $arg2 = shift @a;
 	my $ret = "";
 	my $getlist;
 
@@ -831,6 +856,7 @@ sub SSCam_Get {
 		           "caminfoall:noArg ".
 				   ($hash->{HELPER}{APIHMMAXVER}?"homeModeState:noArg ": "").
                    "svsinfo:noArg ".
+				   "listLog ".
 				   "storedCredentials:noArg ".
 				   "scanVirgin:noArg "
                    ;
@@ -847,6 +873,16 @@ sub SSCam_Get {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         gethomemodestate($hash);
                 
+    } elsif ($opt eq "listLog" && !IsModelCam($hash)) {
+	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+        # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
+	    getclhash($hash,1);
+		
+		extlogargs($hash,$arg) if($arg);
+        extlogargs($hash,$arg1) if($arg1);
+        extlogargs($hash,$arg2) if($arg2);
+		getsvslog($hash);
+                
     } elsif ($opt eq "svsinfo") {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         getsvsinfo($hash);
@@ -860,8 +896,8 @@ sub SSCam_Get {
                 
     } elsif ($opt eq "snapGallery" && IsModelCam($hash)) {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-	    my $ret = getclhash($hash);
-        return $ret if($ret);
+	    my $txt = getclhash($hash);
+        return $txt if($txt);
 
 		if(!AttrVal($name, "snapGalleryBoost",0)) {	
             # Snaphash ist nicht vorhanden und wird abgerufen		
@@ -1756,10 +1792,10 @@ sub getcaminfoall {
         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
         my ($slim,$ssize) = snaplimsize($hash);
         RemoveInternalTimer($hash, "getsnapinfo");
-        InternalTimer(gettimeofday()+0.6, "getsnapinfo", "$name:$slim:$ssize", 0);
+        InternalTimer(gettimeofday()+0.5, "getsnapinfo", "$name:$slim:$ssize", 0);
 	
 	    RemoveInternalTimer($hash, "getmotionenum");
-        InternalTimer(gettimeofday()+0.8, "getmotionenum", $hash, 0);
+        InternalTimer(gettimeofday()+0.6, "getmotionenum", $hash, 0);
         RemoveInternalTimer($hash, "getcapabilities");
         InternalTimer(gettimeofday()+1.3, "getcapabilities", $hash, 0);
         RemoveInternalTimer($hash, "getptzlistpreset");
@@ -1772,6 +1808,8 @@ sub getcaminfoall {
 	    # Model ist SVS
         RemoveInternalTimer($hash, "gethomemodestate");
         InternalTimer(gettimeofday()+0.7, "gethomemodestate", $hash, 0);
+        RemoveInternalTimer($hash, "getsvslog");
+        InternalTimer(gettimeofday()+0.8, "getsvslog", $hash, 0);
     }
     
 	# wenn gesetzt = manuelle Abfrage
@@ -1932,6 +1970,32 @@ sub gethomemodestate ($) {
     } else {
         RemoveInternalTimer($hash, "gethomemodestate");
         InternalTimer(gettimeofday()+0.7, "gethomemodestate", $hash, 0);
+    }
+}
+
+###########################################################################
+#                         SVS Log abrufen
+###########################################################################
+sub getsvslog ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE} = "getsvslog";
+        $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+		
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        sscam_getapisites($hash);
+		
+    } else {
+        RemoveInternalTimer($hash, "getsvslog");
+        InternalTimer(gettimeofday()+0.9, "getsvslog", $hash, 0);
     }
 }
 
@@ -2182,7 +2246,8 @@ sub sscam_getapisites {
    my $apievent    = $hash->{HELPER}{APIEVENT};
    my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
    my $apistm      = $hash->{HELPER}{APISTM};
-   my $apihm       = $hash->{HELPER}{APIHM};    
+   my $apihm       = $hash->{HELPER}{APIHM};
+   my $apilog      = $hash->{HELPER}{APILOG};     
    my $url;
    my $param;
   
@@ -2202,7 +2267,7 @@ sub sscam_getapisites {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm";
+   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm,$apilog";
 
    Log3($name, 4, "$name - Call-Out now: $url");
    
@@ -2238,6 +2303,7 @@ sub sscam_getapisites_parse ($) {
    my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
    my $apistm      = $hash->{HELPER}{APISTM};
    my $apihm       = $hash->{HELPER}{APIHM};
+   my $apilog      = $hash->{HELPER}{APILOG};
    my ($apicammaxver,$apicampath);
   
     if ($err ne "") {
@@ -2398,6 +2464,16 @@ sub sscam_getapisites_parse ($) {
             $logstr = defined($apihmmaxver) ? "MaxVersion of $apihm selected: $apihmmaxver" : "MaxVersion of $apihm undefined - Surveillance Station may be stopped";
             Log3($name, 4, "$name - $logstr");
         
+          # Pfad und Maxversion von "SYNO.SurveillanceStation.Log" ermitteln
+            my $apilogpath = $data->{'data'}->{$apilog}->{'path'};
+            $apilogpath =~ tr/_//d if (defined($apilogpath));
+            my $apilogmaxver = $data->{'data'}->{$apilog}->{'maxVersion'}; 
+       
+            $logstr = defined($apilogpath) ? "Path of $apilog selected: $apilogpath" : "Path of $apilog undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");
+            $logstr = defined($apilogmaxver) ? "MaxVersion of $apilog selected: $apilogmaxver" : "MaxVersion of $apilog undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");
+			
 		
             # aktuelle oder simulierte SVS-Version für Fallentscheidung setzen
             no warnings 'uninitialized'; 
@@ -2459,10 +2535,10 @@ sub sscam_getapisites_parse ($) {
             # Downgrades für nicht kompatible API-Versionen
             Log3($name, 4, "$name - ------- Begin of adaption section -------");
             
-			$apiptzmaxver = 4;
-            Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
-            $apicammaxver = 8;
-            Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
+			#$apiptzmaxver = 4;
+            #Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
+            # $apicammaxver = 8;
+            # Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
             
 			Log3($name, 4, "$name - ------- End of adaption section -------");
        
@@ -2491,6 +2567,8 @@ sub sscam_getapisites_parse ($) {
             $hash->{HELPER}{APISTMMAXVER}      = $apistmmaxver;
             $hash->{HELPER}{APIHMPATH}         = $apihmpath;
             $hash->{HELPER}{APIHMMAXVER}       = $apihmmaxver;
+            $hash->{HELPER}{APILOGPATH}        = $apilogpath;
+            $hash->{HELPER}{APILOGMAXVER}      = $apilogmaxver;
        
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash,"Errorcode","none");
@@ -2583,7 +2661,6 @@ sub sscam_getcamid ($) {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
    $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
-   
    if ($apicammaxver >= 9) {
        $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=\"List\"&basic=true&streamInfo=true&camStm=0&_sid=\"$sid\"";
    }
@@ -2720,7 +2797,7 @@ return sscam_camop($hash);
 }
 
 #############################################################################################
-#               Auswertung installierte Cams, Selektion Cam , Ausführung Operation
+#                                     Ausführung Operation
 #############################################################################################
 sub sscam_camop ($) {  
    my ($hash) = @_;
@@ -2760,6 +2837,9 @@ sub sscam_camop ($) {
    my $apihm             = $hash->{HELPER}{APIHM};
    my $apihmpath         = $hash->{HELPER}{APIHMPATH};
    my $apihmmaxver       = $hash->{HELPER}{APIHMMAXVER};
+   my $apilog            = $hash->{HELPER}{APILOG};
+   my $apilogpath        = $hash->{HELPER}{APILOGPATH};
+   my $apilogmaxver      = $hash->{HELPER}{APILOGMAXVER};
    my $sid               = $hash->{HELPER}{SID};
    my $OpMode            = $hash->{OPMODE};
    my $camid             = $hash->{CAMID};
@@ -2805,7 +2885,8 @@ sub sscam_camop ($) {
    
    }elsif ($OpMode eq "gopreset") {
       # Preset wird angefahren
-      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+      $apiptzmaxver = ($apiptzmaxver >= 5)?4:$apiptzmaxver;
+	  $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "moving", 0); 
    
    } elsif ($OpMode eq "runpatrol") {
@@ -2844,10 +2925,29 @@ sub sscam_camop ($) {
    } elsif ($OpMode eq "gethomemodestate") {
       $url = "http://$serveraddr:$serverport/webapi/$apihmpath?api=$apihm&method=GetInfo&version=$apihmmaxver&_sid=\"$sid\"";     
    
+   } elsif ($OpMode eq "getsvslog") {
+      my $sev = $hash->{HELPER}{LISTLOGSEVERITY}?$hash->{HELPER}{LISTLOGSEVERITY}:"";
+	  my $lim = $hash->{HELPER}{LISTLOGLIMIT}?$hash->{HELPER}{LISTLOGLIMIT}:0;
+	  my $mco = $hash->{HELPER}{LISTLOGMATCH}?$hash->{HELPER}{LISTLOGMATCH}:"";
+	  my $mco = IsModelCam($hash)?$hash->{CAMNAME}:$mco;
+	  $lim = 1 if(!$hash->{HELPER}{CL}{1});  # Datenabruf im Hintergrund
+	  $sev = (lc($sev) =~ /error/)?3:(lc($sev) =~ /warning/)?2:(lc($sev) =~ /info/)?1:"";
+	  
+	  no warnings 'uninitialized'; 
+      Log3($name,4, "$name - get logList with params: severity => $hash->{HELPER}{LISTLOGSEVERITY}, limit => $lim, matchcode => $hash->{HELPER}{LISTLOGMATCH}");
+      use warnings;
+	  
+	  $url = "http://$serveraddr:$serverport/webapi/$apilogpath?api=$apilog&version=\"2\"&method=\"List\"&time2String=\"no\"&level=\"$sev\"&limit=\"$lim\"&keyword=\"$mco\"&_sid=\"$sid\"";     
+
+	  delete($hash->{HELPER}{LISTLOGSEVERITY});
+	  delete($hash->{HELPER}{LISTLOGLIMIT});
+	  delete($hash->{HELPER}{LISTLOGMATCH});
+	  
    } elsif ($OpMode eq "getsvsinfo") {
       $url = "http://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfomaxver\"&method=\"GetInfo\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "Getcaminfo") {
+      $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=\"true\"&streamInfo=\"true\"&ptz=\"true\"&basic=\"true\"&camAppInfo=\"true\"&optimize=\"true\"&fisheye=\"true\"&eventDetection=\"true\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "getStmUrlPath") {
@@ -2865,10 +2965,8 @@ sub sscam_camop ($) {
    
    } elsif ($OpMode eq "Getcapabilities") {
       # Capabilities einer Cam werden abgerufen
-      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=\"GetCapabilityByCamId\"&cameraId=$camid&_sid=\"$sid\"";   
-      if ($apicammaxver >= 9) {
-	      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&cameraId=$camid&method=\"GetCapabilityByCamId\"&_sid=\"$sid\"";   
-	  }   
+	  $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
+      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=\"GetCapabilityByCamId\"&cameraId=$camid&_sid=\"$sid\"";    
    
    } elsif ($OpMode eq "Getptzlistpatrol") {
       # PTZ-ListPatrol werden abgerufen
@@ -2884,6 +2982,7 @@ sub sscam_camop ($) {
       elsif ($hash->{HELPER}{EXPMODE} eq "night") {
           $expmode = "2";
       }
+	  $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=\"$expmode\"&camParamChkList=32&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "MotDetSc") {
@@ -3182,6 +3281,40 @@ sub sscam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
             
+			} elsif ($OpMode eq "getsvslog") { 
+                my $lec = $data->{'data'}{'total'};    # abgerufene Anzahl von Log-Einträgen
+
+                my $log  = '<html>';
+				my $log0 = "";
+				my $i = 0;
+                while ($data->{'data'}->{'log'}->[$i]) {
+                    my $id = $data->{'data'}->{'log'}->[$i]{'id'};
+			        my $un = $data->{'data'}->{'log'}->[$i]{'user_name'};
+			        my $desc = $data->{'data'}->{'log'}->[$i]{'desc'};
+					my $level = $data->{'data'}->{'log'}->[$i]{'type'};
+					$level = ($level == 3)?"Error":($level == 2)?"Warning":"Information";
+					my $time = $data->{'data'}->{'log'}->[$i]{'time'};
+					$time = FmtDateTime($time);
+					$log0 = $time." - ".$level." - ".$desc if($i == 0);
+			        $log .= "$time - $level - $desc<br>";
+					$i++;
+                }	
+				$log = "<html><b>Surveillance Station Server \"$hash->{SERVERADDR}\" Log</b> ( $i/$lec entries are displayed )<br><br>$log</html>";
+						        
+				# asyncOutput kann normalerweise etwa 100k uebertragen (siehe fhem.pl/addToWritebuffer() fuer Details)
+	            # bzw. https://forum.fhem.de/index.php/topic,77310.0.html
+				# $log = "Too much log data were selected. Please reduce amount of data by specifying all or one of 'severity', 'limit', 'match'" if (length($log) >= 102400);				
+				
+                readingsBeginUpdate($hash);
+				readingsBulkUpdate($hash,"LastLogEntry",$log0) if(!$hash->{HELPER}{CL}{1});  # Datenabruf im Hintergrund;
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+				
+				# Ausgabe Popup der Log-Daten (nach readingsEndUpdate positionieren sonst "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)	    
+				asyncOutput($hash->{HELPER}{CL}{1},"$log");
+				delete($hash->{HELPER}{CL});
+            
 			} elsif ($OpMode eq "MotDetSc") {              
 
                 readingsBeginUpdate($hash);
@@ -3308,16 +3441,16 @@ sub sscam_camop_parse ($) {
                     }
 	                
 					# Hash der Schnapschüsse erstellen
-					$hash->{HELPER}{SNAPHASH} = \%allsnaps;
+					$hash->{HELPER}{".SNAPHASH"} = \%allsnaps;
                     
 					# Direktausgabe Snaphash wenn nicht gepollt wird
 					if(!AttrVal($name, "snapGalleryBoost",0)) {		    
 						my $htmlCode = composegallery($name);
                         
 					    for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
-                            asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");						
+                            asyncOutput($hash->{HELPER}{CL}{$k},"$htmlCode");						
 		                }
-						delete($hash->{HELPER}{SNAPHASH});               # Snaphash löschen wenn nicht gepollt wird
+						delete($hash->{HELPER}{".SNAPHASH"});               # Snaphash löschen wenn nicht gepollt wird
 						delete($hash->{HELPER}{CL});
 					}
 
@@ -3938,16 +4071,16 @@ sub sscam_camop_parse ($) {
             # Fehlertext zum Errorcode ermitteln
             $error = experror($hash,$errorcode);
 			
-		    if ($errorcode =~ /(105|401)/) {
-			   Log3($name, 2, "$name - ERROR - $errorcode - $error in operation $OpMode -> try new login");
-		       return sscam_login($hash,'sscam_getapisites');
-		    }
-
             # Setreading 
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash,"Errorcode",$errorcode);
             readingsBulkUpdate($hash,"Error",$error);
             readingsEndUpdate($hash, 1);
+			
+		    if ($errorcode =~ /(105|401)/) {
+			   Log3($name, 2, "$name - ERROR - $errorcode - $error in operation $OpMode -> try new login");
+		       return sscam_login($hash,'sscam_getapisites');
+		    }
        
             # Logausgabe
             Log3($name, 2, "$name - ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error");
@@ -4013,7 +4146,7 @@ sub sscam_login ($$) {
       if ($attr{$name}{debugactivetoken}) {
           Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
       }
-	  Log3($name, 2, "$name - ERROR - Login of User $username unsuccessful"); 
+	  Log3($name, 2, "$name - ERROR - Login or privilege of user $username unsuccessful"); 
       return;
   }
 
@@ -4290,14 +4423,33 @@ sub snaplimsize ($) {
 return ($slim,$ssize);
 }
 
+###############################################################################
+#              Helper für listLog-Argumente extrahieren 
+###############################################################################
+sub extlogargs ($$) { 
+  my ($hash,$a) = @_;
+
+  $hash->{HELPER}{LISTLOGSEVERITY} = (split("severity:",$a))[1] if(lc($a) =~ m/^severity:.*/);
+  $hash->{HELPER}{LISTLOGLIMIT}    = (split("limit:",$a))[1] if(lc($a) =~ m/^limit:.*/);
+  $hash->{HELPER}{LISTLOGMATCH}    = (split("match:",$a))[1] if(lc($a) =~ m/^match:.*/);
+  
+return;
+}
 
 ###############################################################################
 # Clienthash übernehmen oder zusammenstellen
 # Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
-sub getclhash ($) {      
-  my ($hash)= @_;
+sub getclhash ($;$$) {      
+  my ($hash,$nobgd)= @_;
   my $name  = $hash->{NAME};
   my $ret;
+  
+  if($nobgd) {
+      # nur übergebenen CL-Hash speichern, 
+	  # keine Hintergrundverarbeitung bzw. synthetische Erstellung CL-Hash
+	  $hash->{HELPER}{CL}{1} = $hash->{CL};
+	  return undef;
+  }
 
   if (!defined($hash->{CL})) {
       # Clienthash wurde nicht übergeben und wird erstellt (FHEMWEB Instanzen mit canAsyncOutput=1 analysiert)
@@ -4323,17 +4475,16 @@ sub getclhash ($) {
 	      Log3($name, 4, "$name - Clienthash number: $k");
           while (my ($key,$val) = each(%{$hash->{HELPER}{CL}{$k}})) {
               $val = $val?$val:" ";
-              Log3($name, 4, "$name - snapGallery Clienthash: $key -> $val");
+              Log3($name, 4, "$name - Clienthash: $key -> $val");
           }
 	  }
   } else {
-      Log3($name, 2, "$name - snapGallery Clienthash was neither delivered nor created !");
-	  $ret = "Clienthash was neither delivered nor created. Can't use asynchronous output for snapGallery.";
+      Log3($name, 2, "$name - Clienthash was neither delivered nor created !");
+	  $ret = "Clienthash was neither delivered nor created. Can't use asynchronous output for function.";
   }
   
 return ($ret);
 }
-
 
 ###############################################################################
 #   Schnappschußgalerie zusammenstellen
@@ -4341,7 +4492,7 @@ sub composegallery ($;$$) {
   my ($name,$wlname) = @_;
   my $hash     = $defs{$name};
   my $camname  = $hash->{CAMNAME};
-  my $allsnaps = $hash->{HELPER}{SNAPHASH}; # = \%allsnaps
+  my $allsnaps = $hash->{HELPER}{".SNAPHASH"}; # = \%allsnaps
   my $sgc      = AttrVal($name,"snapGalleryColumns",3);          # Anzahl der Images in einer Tabellenzeile
   my $lss      = ReadingsVal($name, "LastSnapTime", " ");        # Zeitpunkt neueste Aufnahme
   my $lang     = AttrVal("global","language","EN");              # Systemsprache       
@@ -4349,13 +4500,13 @@ sub composegallery ($;$$) {
   my $totalcnt = $hash->{HELPER}{TOTALCNT};                      # totale Anzahl Snaps
   $limit       = $totalcnt if ($limit > $totalcnt);              # wenn weniger Snaps vorhanden sind als $limit -> Text in Anzeige korrigieren
   my $lupt     = ((ReadingsTimestamp($name,"LastSnapTime"," ") gt ReadingsTimestamp($name,"LastUpdateTime"," ")) 
-                 ? ReadingsTimestamp($name, "LastSnapTime", " ") 
-				 : ReadingsTimestamp($name, "LastUpdateTime", " "));  # letzte Aktualisierung
+                 ? ReadingsTimestamp($name,"LastSnapTime"," ") 
+				 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
   $lupt =~ s/ / \/ /;
   
   my $ha = AttrVal($name, "snapGalleryHtmlAttr", undef)?AttrVal($name, "snapGalleryHtmlAttr", undef):AttrVal($name, "htmlattr", 'width="500" height="325"');
 
-  # falls "composegallery" durch ein mit mit "createSnapGallery" angelegtes Device aufgerufen wird
+  # falls "composegallery" durch ein mit "createSnapGallery" angelegtes Device aufgerufen wird
   my ($devWlink,$wlhash,$wlha,$wlalias);
   if ($wlname) {
       $wlalias  = $attr{$wlname}{alias}?$attr{$wlname}{alias}:$wlname;   # Linktext als Aliasname oder Devicename setzen
@@ -4391,7 +4542,7 @@ sub composegallery ($;$$) {
   # Ausgabetabelle erstellen
   my ($htmlCode,$ct);
   $htmlCode  = "<html>";
-  $htmlCode .= sprintf( "$devWlink<br> <div class=\"makeTable wide\"; style=\"text-align:center\"> $header <br>");
+  $htmlCode .= sprintf("$devWlink<br> <div class=\"makeTable wide\"; style=\"text-align:center\"> $header <br>");
   $htmlCode .= "<table class=\"block wide internals\">";
   $htmlCode .= "<tbody>";
   $htmlCode .= "<tr class=\"odd\">";
@@ -4399,7 +4550,7 @@ sub composegallery ($;$$) {
   
   foreach my $key (@as) {
       $ct = $allsnaps->{$key}{createdTm};
-	  my $html = sprintf( "<td>$ct<br /> <img $gattr src=\"data:image/jpeg;base64,$allsnaps->{$key}{imageData}\" /> </td>" );
+	  my $html = sprintf("<td>$ct<br /> <img $gattr src=\"data:image/jpeg;base64,$allsnaps->{$key}{imageData}\" /> </td>" );
 
       $cell++;
 
@@ -4495,6 +4646,7 @@ sub experror {
        <li>playback of last recording and playback the last snapshot  </li>
 	   <li>switch the Surveillance Station HomeMode on/off and retrieve the HomeModeState </li>
 	   <li>show the stored credentials of a device </li>
+	   <li>fetch the Surveillance Station Logs, exploit the newest entry as reading  </li>
 	   <li>create a gallery of the last 1-10 snapshots (as a Popup or permanent weblink-Device)  </li><br>
     </ul>
    </ul>
@@ -4629,7 +4781,7 @@ sub experror {
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... extevent           </td><td> session: DSM - user as member of admin-group   </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
-      <tr><td><li>set ... homeMode           </td><td> session: DSM - user as member of admin-group   </li></td></tr>
+      <tr><td><li>set ... homeMode           </td><td> ssession: ServeillanceStation - observer with privilege Home Mode switch  </li></td></tr>
 	  <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - manager       </li></td></tr>
 	  <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
@@ -4640,6 +4792,7 @@ sub experror {
       <tr><td><li>set ... credentials        </td><td> -                                          </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - observer    </li></td></tr>
+	  <tr><td><li>get ... listLog            </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - observer    </li></td></tr>
@@ -4867,7 +5020,8 @@ sub experror {
   <br><br>
     
   <ul>
-  <li><b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [seconds] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> set &lt;name&gt; move [ right | up | down | left | dir_X ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM up to SVS version 7.1)</li>
+      <b> set &lt;name&gt; move [ right | upright | up | upleft | left | downleft | down | downright ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM and SVS Version 7.2 and above) <br><br>
   
   With this command a continuous move of a PTZ-camera will be started. In addition to the four basic directions up/down/left/right is it possible to use angular dimensions 
   "dir_X". The grain size of graduation depends on properties of the camera and can be identified by the Reading "CapPTZDirections". <br><br>
@@ -5063,7 +5217,38 @@ sub experror {
   
   HomeMode-state of the Surveillance Station will be retrieved.  
   </ul>
-  <br><br> 
+  <br><br>
+
+  <ul>
+  <li><b> get &lt;name&gt; listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Number of lines&gt;] [match:&lt;Searchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
+  
+  Fetches the Surveillance Station Log from Synology server. Without any further options the whole log will be retrieved. <br>
+  You can specify all or any of the following options: <br><br>
+  
+  <ul>
+  <li> &lt;Loglevel&gt; - Information, Warning or Error. Only datasets having this severity are retrieved (default: all) </li>
+  <li> &lt;Number of lines&gt; - the specified number of lines  (newest) of the log are retrieved (default: all) </li>
+  <li> &lt;Searchstring&gt; - only log entries containing the searchstring are retrieved (Note: no Regex possible, the searchstring will be given into the call to SVS) </li>
+  </ul>
+  <br>
+  
+  <b>Examples</b> <br>
+  <ul>
+  <code>get &lt;name&gt; listLog severity:Error limit:5 </code> <br>
+  Reports the last 5 Log entries with severity "Error" <br>
+  <code>get &lt;name&gt; listLog severity:Information match:Carport </code> <br>
+  Reports all Log entries with severity "Information" and containing the string "Carport" <br>
+  <code>get &lt;name&gt; listLog severity:Warning </code> <br>
+  Reports all Log entries with severity "Warning" <br><br>
+  </ul>
+  
+  
+  If the polling of SVS is activated by setting the <a href="#SSCamattr">attribute</a> "pollcaminfoall", the <a href="#SSCamreadings">reading</a> 
+  "LastLogEntry" will be created. <br>
+  In the protocol-setup of the SVS you can adjust what data you want to log. For further informations please have a look at
+  <a href="https://www.synology.com/en-uk/knowledgebase/Surveillance/help/SurveillanceStation/log_advanced">Synology Online-Help</a>.
+  </ul>
+  <br><br>   
   
   <ul>
   <li><b> get &lt;name&gt; scanVirgin </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
@@ -5380,6 +5565,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>Error</li>              </td><td>- message text of last error  </td></tr>
     <tr><td><li>Errorcode</li>          </td><td>- error code of last error  </td></tr>
 	<tr><td><li>HomeModeState</li>      </td><td>- HomeMode-state (SVS-version 8.1.0 and above)   </td></tr>
+	<tr><td><li>LastLogEntry</li>       </td><td>- the neweset entry of Surveillance Station Log (only if SVS-device and if attribute pollcaminfoall is set)   </td></tr>
     <tr><td><li>LastSnapFilename</li>   </td><td>- the filename of the last snapshot   </td></tr>
     <tr><td><li>LastSnapId</li>         </td><td>- the ID of the last snapshot   </td></tr>    
     <tr><td><li>LastSnapTime</li>       </td><td>- timestamp of the last snapshot   </td></tr> 
@@ -5437,6 +5623,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
       <li>abspielen der letzten Aufnahme bzw. Anzeige des letzten Schnappschusses  </li>
 	  <li>anzeigen der gespeicherten Anmeldeinformationen (Credentials)  </li>
 	  <li>Ein- bzw. Ausschalten des Surveillance Station HomeMode und abfragen des HomeMode-Status </li>
+	  <li>abrufen des Surveillance Station Logs, auswerten des neuesten Eintrags als Reading  </li>
 	  <li>erzeugen einer Gallerie der letzten 1-10 Schnappschüsse (als Popup oder permanentes Device)  </li><br>
      </ul> 
     </ul>
@@ -5569,9 +5756,9 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... extevent           </td><td> session: DSM - Nutzer Mitglied von Admin-Gruppe     </li></td></tr>
 	  <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
-      <tr><td><li>set ... homeMode           </td><td> session: DSM - Nutzer Mitglied von Admin-Gruppe     </li></td></tr>
+      <tr><td><li>set ... homeMode           </td><td> session: ServeillanceStation - Betrachter mit Privileg Home-Modus schalten     </li></td></tr>
 	  <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
-      <tr><td><li>set ... move               </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
+	  <tr><td><li>set ... move               </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - Manager       </li></td></tr>
 	  <tr><td><li>set ... on                 </td><td> session: ServeillanceStation - Betrachter mit erweiterten Privileg "manuelle Aufnahme" </li></td></tr>
       <tr><td><li>set ... off                </td><td> session: ServeillanceStation - Betrachter mit erweiterten Privileg "manuelle Aufnahme" </li></td></tr>
@@ -5582,7 +5769,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 	  <tr><td><li>set ... stopView           </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
-      <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>get ... listLog            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+	  <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
 	  <tr><td><li>get ... snapGallery        </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
@@ -5710,7 +5898,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   Soll die Bewegung mit der maximalen Schrittweite erfolgen, kann zur Vereinfachung der Befehl:
 
   <pre>
-   set &lt;name&gt; goAbsPTZ up [down|left|right]
+   set &lt;name&gt; goAbsPTZ [up|down|left|right]
   </pre>
 
   verwendet werden. Die Optik wird in diesem Fall mit der größt möglichen Schrittweite zur Absolutposition in der angegebenen Richtung bewegt. 
@@ -5811,7 +5999,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> set &lt;name&gt; move [ right | up | down | left | dir_X ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM bis SVS Version 7.1)</li> 
+      <b> set &lt;name&gt; move [ right | upright | up | upleft | left | downleft | down | downright ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM ab SVS Version 7.2) <br><br>
   
   Mit diesem Kommando wird eine kontinuierliche Bewegung der PTZ-Kamera gestartet. Neben den vier Grundrichtungen up/down/left/right stehen auch 
   Zwischenwinkelmaße "dir_X" zur Verfügung. Die Feinheit dieser Graduierung ist von der Kamera abhängig und kann dem Reading "CapPTZDirections" entnommen werden. <br><br>
@@ -6010,6 +6199,37 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <li><b> get &lt;name&gt; homeModeState </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
   HomeMode-Status der Surveillance Station wird abgerufen.  
+  </ul>
+  <br><br> 
+  
+  <ul>
+  <li><b> get &lt;name&gt; listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Zeilenzahl&gt;] [match:&lt;Suchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
+  
+  Ruft das Surveillance Station Log vom Synology Server ab. Ohne Angabe der optionalen Zusätze wird das gesamte Log abgerufen. <br>
+  Es können alle oder eine Auswahl der folgenden Optionen angegeben werden: <br><br>
+  
+  <ul>
+  <li> &lt;Loglevel&gt; - Information, Warning oder Error. Nur Sätze mit dem Schweregrad werden abgerufen (default: alle) </li>
+  <li> &lt;Zeilenzahl&gt; - die angegebene Anzahl der Logzeilen (neueste) wird abgerufen (default: alle) </li>
+  <li> &lt;Suchstring&gt; - nur Logeinträge mit dem angegeben String werden abgerufen (Achtung: kein Regex, der Suchstring wird im Call an die SVS mitgegeben) </li>
+  </ul>
+  <br>
+  
+  <b>Beispiele</b> <br>
+  <ul>
+  <code>get &lt;name&gt; listLog severity:Error limit:5 </code> <br>
+  Zeigt die letzten 5 Logeinträge mit dem Schweregrad "Error" <br>  
+  <code>get &lt;name&gt; listLog severity:Information match:Carport </code> <br>
+  Zeigt alle Logeinträge mit dem Schweregrad "Information" die den String "Carport" enthalten <br>  
+  <code>get &lt;name&gt; listLog severity:Warning </code> <br>
+  Zeigt alle Logeinträge mit dem Schweregrad "Warning" <br><br>
+  </ul>
+  
+  
+  Wurde mit dem <a href="#SSCamattr">Attribut</a> "pollcaminfoall" das Polling der SVS aktiviert, wird das <a href="#SSCamreadings">Reading</a> 
+  "LastLogEntry" erstellt. <br>
+  Im Protokoll-Setup der SVS kann man einstellen was protokolliert werden soll. Für weitere Informationen 
+  siehe <a href="https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/log_advanced">Synology Online-Hlfe</a>.
   </ul>
   <br><br> 
   
@@ -6337,6 +6557,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>Error</li>              </td><td>- Meldungstext des letzten Fehlers  </td></tr>
     <tr><td><li>Errorcode</li>          </td><td>- Fehlercode des letzten Fehlers   </td></tr>
 	<tr><td><li>HomeModeState</li>      </td><td>- HomeMode-Status (ab SVS-Version 8.1.0)   </td></tr>
+	<tr><td><li>LastLogEntry</li>       </td><td>- der neueste Eintrag des Surveillance Station Logs (nur SVS-Device und wenn Attribut pollcaminfoall gesetzt)   </td></tr>
     <tr><td><li>LastSnapFilename</li>   </td><td>- der Filename des letzten Schnapschusses   </td></tr>
     <tr><td><li>LastSnapId</li>         </td><td>- die ID des letzten Schnapschusses   </td></tr>
 	<tr><td><li>LastSnapTime</li>       </td><td>- Zeitstempel des letzten Schnapschusses   </td></tr>
