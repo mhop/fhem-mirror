@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  77_SMAEM: V3.0.0, make SMAEM ready for multimeter usage
   - new      /www/pgm2/fhemweb_icon*.js: new widgets for FHEMWEB iconButtons,
              iconLabel, iconRadio, iconSwitch (Forum:#75696)
   - bugfix:  93_DbRep: V5.6.3, crash due to wrong timestamp calc (Forum:#77328)
