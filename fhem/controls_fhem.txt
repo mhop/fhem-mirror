@@ -1,4 +1,4 @@
-REV 15179
+REV 15192
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -25,7 +25,7 @@ UPD 2017-10-03_07:45:02 212661 ./CHANGED
 UPD 2017-09-26_07:45:02 34827 ./MAINTAINER.txt
 UPD 2017-09-20_07:45:02 39189 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
-UPD 2017-09-22_07:45:05 137318 ./fhem.pl
+UPD 2017-10-04_07:45:04 137453 ./fhem.pl
 UPD 2015-11-07_07:45:11 21944 FHEM/00_CM11.pm
 UPD 2017-09-09_07:45:02 56979 FHEM/00_CUL.pm
 UPD 2017-05-10_07:45:02 76972 FHEM/00_DFPlayerMini.pm
@@ -51,8 +51,8 @@ UPD 2017-08-12_07:45:02 56324 FHEM/00_TCM.pm
 UPD 2017-09-18_07:45:03 118121 FHEM/00_THZ.pm
 UPD 2017-04-29_07:45:02 33275 FHEM/00_TUL.pm
 UPD 2017-08-14_07:45:02 21475 FHEM/00_ZWCUL.pm
-UPD 2017-09-13_07:45:02 43179 FHEM/00_ZWDongle.pm
-UPD 2017-10-03_07:45:02 163063 FHEM/01_FHEMWEB.pm
+UPD 2017-10-04_07:45:02 43323 FHEM/00_ZWDongle.pm
+UPD 2017-10-04_07:45:02 149502 FHEM/01_FHEMWEB.pm
 UPD 2016-09-07_07:45:12 15690 FHEM/02_FRAMEBUFFER.pm
 UPD 2017-04-23_07:45:02 42910 FHEM/02_FTUISRV.pm
 UPD 2017-04-13_07:45:01 7971 FHEM/02_HTTPSRV.pm
@@ -139,7 +139,7 @@ UPD 2017-07-14_07:45:02 29050 FHEM/21_OWVAR.pm
 UPD 2017-07-15_07:45:02 116041 FHEM/21_SONOSPLAYER.pm
 UPD 2017-01-07_07:45:02 92019 FHEM/21_VBUSDEV.pm
 UPD 2015-07-28_14:05:31 4865 FHEM/22_ALL3076.pm
-UPD 2017-09-25_07:45:02 178265 FHEM/22_HOMEMODE.pm
+UPD 2017-10-04_07:45:02 178532 FHEM/22_HOMEMODE.pm
 UPD 2015-07-28_14:05:31 6433 FHEM/23_ALL4027.pm
 UPD 2016-02-29_07:45:12 37829 FHEM/23_KOSTALPIKO.pm
 UPD 2017-07-09_07:45:02 99884 FHEM/23_LUXTRONIK2.pm
@@ -270,7 +270,7 @@ UPD 2017-09-03_07:45:02 25538 FHEM/53_GHoma.pm
 UPD 2017-04-26_07:45:02 65500 FHEM/55_InfoPanel.pm
 UPD 2016-08-24_07:45:10 20855 FHEM/55_PIFACE.pm
 UPD 2015-07-28_14:05:31 17091 FHEM/56_POKEYS.pm
-UPD 2017-09-14_07:45:02 24603 FHEM/57_CALVIEW.pm
+UPD 2017-10-04_07:45:02 24684 FHEM/57_CALVIEW.pm
 UPD 2017-08-02_07:45:03 121945 FHEM/57_Calendar.pm
 UPD 2015-11-01_07:45:11 33956 FHEM/59_HCS.pm
 UPD 2017-07-12_07:45:02 20652 FHEM/59_LuftdatenInfo.pm
@@ -623,7 +623,7 @@ UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2017-10-03_07:45:02 15577 FHEM/msgSchema.pm
 UPD 2015-07-28_14:05:31 401 FHEM/myUtilsTemplate.pm
 UPD 2015-07-28_14:05:31 162 FHEM/template.layout
-UPD 2017-02-21_07:45:05 4914 contrib/commandref_join.pl
+UPD 2017-10-04_07:45:04 5460 contrib/commandref_join.pl
 UPD 2016-08-23_07:45:26 4322 contrib/commandref_modular.pl
 UPD 2015-07-28_14:05:35 1242 demolog/LightScenes.dd.save
 UPD 2015-07-28_14:05:35 390 demolog/LightScenes.save
@@ -640,8 +640,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-10-03_07:45:04 3109109 docs/commandref.html
-UPD 2017-10-03_07:45:05 1831344 docs/commandref_DE.html
+UPD 2017-10-04_07:45:03 3109155 docs/commandref.html
+UPD 2017-10-04_07:45:04 1830159 docs/commandref_DE.html
 UPD 2017-09-22_07:45:02 72400 docs/commandref_frame.html
 UPD 2017-09-22_07:45:02 81128 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
@@ -1163,6 +1163,8 @@ UPD 2017-07-26_07:45:02 42510 www/images/fhemSVG/HutschIcon3.svg
 UPD 2015-07-28_14:05:32 2027 www/images/fhemSVG/IR.svg
 UPD 2015-07-28_14:05:32 3699 www/images/fhemSVG/Icon_Fisch.svg
 UPD 2015-07-28_14:05:32 46577 www/images/fhemSVG/RPi.svg
+UPD 2017-10-04_07:45:02 4361 www/images/fhemSVG/Ventilator_fett.svg
+UPD 2017-10-04_07:45:02 7800 www/images/fhemSVG/Ventilator_wind.svg
 UPD 2015-07-28_14:05:32 1662 www/images/fhemSVG/access_keypad_1.svg
 UPD 2015-07-28_14:05:32 22145 www/images/fhemSVG/access_keypad_2.svg
 UPD 2015-07-28_14:05:32 2134 www/images/fhemSVG/alarm_system_password.svg
@@ -1191,6 +1193,7 @@ UPD 2017-01-17_07:45:03 2525 www/images/fhemSVG/clock.svg
 UPD 2015-07-28_14:05:32 9449 www/images/fhemSVG/cul.svg
 UPD 2015-07-28_14:05:32 12083 www/images/fhemSVG/cul_868.svg
 UPD 2015-07-28_14:05:32 7562 www/images/fhemSVG/cul_cul.svg
+UPD 2017-10-04_07:45:02 13794 www/images/fhemSVG/cul_max.svg
 UPD 2015-07-28_14:05:32 6093 www/images/fhemSVG/cul_usb.svg
 UPD 2017-01-03_07:45:02 6958 www/images/fhemSVG/cul_wlan.svg
 UPD 2017-09-07_07:45:02 5233 www/images/fhemSVG/dash_button.svg
@@ -1475,6 +1478,8 @@ UPD 2015-07-28_14:05:32 2613 www/images/fhemSVG/unknown.svg
 UPD 2015-07-28_14:05:32 2405 www/images/fhemSVG/usb.svg
 UPD 2015-07-28_14:05:32 6689 www/images/fhemSVG/usb_stick.svg
 UPD 2015-07-28_14:05:32 4105 www/images/fhemSVG/user_unknown.svg
+UPD 2017-10-04_07:45:02 7572 www/images/fhemSVG/vacuum_bold.svg
+UPD 2017-10-04_07:45:02 3866 www/images/fhemSVG/vacuum_top.svg
 UPD 2017-03-18_07:45:02 7396 www/images/fhemSVG/wuerfel.svg
 UPD 2015-07-28_14:05:33 1269 www/images/openautomation/audio_audio.svg
 UPD 2015-07-28_14:05:33 1192 www/images/openautomation/audio_eject.svg
@@ -1942,14 +1947,14 @@ UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2017-05-11_07:45:03 5418 www/pgm2/defaultCommon.css
 UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
-UPD 2017-10-03_10:09:37 49811 www/pgm2/fhemweb.js
-UPD 2017-03-03_07:45:02 12493 www/pgm2/fhemweb_colorpicker.js
+UPD 2017-10-04_07:45:02 51539 www/pgm2/fhemweb.js
+UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
 UPD 2017-03-07_07:45:02 3139 www/pgm2/fhemweb_fbcalllist.js
-UPD 2015-07-28_14:05:34 1168 www/pgm2/fhemweb_knob.js
-UPD 2017-03-03_07:45:02 4108 www/pgm2/fhemweb_readingsGroup.js
-UPD 2017-03-03_07:45:02 777 www/pgm2/fhemweb_readingsHistory.js
-UPD 2017-03-07_07:45:02 7000 www/pgm2/fhemweb_sortable.js
-UPD 2017-10-03_07:45:02 20539 www/pgm2/fhemweb_uzsu.js
+UPD 2017-10-04_07:45:02 1953 www/pgm2/fhemweb_knob.js
+UPD 2017-10-04_07:45:02 4248 www/pgm2/fhemweb_readingsGroup.js
+UPD 2017-10-04_07:45:02 920 www/pgm2/fhemweb_readingsHistory.js
+UPD 2017-10-04_07:45:02 9001 www/pgm2/fhemweb_sortable.js
+UPD 2017-10-04_07:45:02 26030 www/pgm2/fhemweb_uzsu.js
 UPD 2017-04-13_07:45:02 28196 www/pgm2/fhemweb_weekprofile.js
 UPD 2015-07-28_14:05:34 223 www/pgm2/floorplan_click.js
 UPD 2015-07-28_14:05:34 3246 www/pgm2/floorplan_drag.js
