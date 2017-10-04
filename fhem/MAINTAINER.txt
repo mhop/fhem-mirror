@@ -526,6 +526,10 @@ www/jscolor/*                justme1968           Frontends
 www/pgm2/*                   rudolfkoenig         Frontends/FHEMWEB
 www/pgm2/dashboard/*         svenson08            Frontends
 www/pgm2/fhemweb_fbcalllist.js       markusbloch  Frontends
+www/pgm2/fhemweb_iconButtons.js      Ellert       Frontends
+www/pgm2/fhemweb_iconLabel.js        Ellert       Frontends
+www/pgm2/fhemweb_iconRadio.js        Ellert       Frontends
+www/pgm2/fhemweb_iconSwitch.js       Ellert       Frontends
 www/pgm2/fhemweb_readingsGroup.js    justme1968   Frontends/readingsGroup readingsHistory
 www/pgm2/fhemweb_readingsHistory.js  justme1968   Frontends/readingsGroup readingsHistory
 www/pgm2/fhemweb_sortable.js         markusbloch  Frontends
