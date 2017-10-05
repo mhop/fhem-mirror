@@ -103,12 +103,13 @@ sub Set($$$@) {
       readingsSingleUpdate($hash,$command,$value,1);
       $mark=1;
     } elsif(defined($hash->{publishSets}->{""})) {
+      my $value = join (" ", ($command, @values));
       my $retain = $hash->{".retain"}->{""};
       $retain = $hash->{".retain"}->{'*'} unless defined($retain);
       my $qos = $hash->{".qos"}->{""};
       $qos = $hash->{".qos"}->{'*'} unless defined($qos);
       #Log3($hash->{NAME},1,">>>>>>>>>>>>>>>>>> RETAIN: ".$retain); $retain=0; ### TEST
-      $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $command, qos => $qos, retain => $retain);
+      $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $value, qos => $qos, retain => $retain);
       readingsSingleUpdate($hash,"state",$command,1);
       $mark=1;
     }

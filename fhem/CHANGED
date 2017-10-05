@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  10_MQTT_DEVICE: fix set arguments
   - feature: 49_SSCam: V3.2.2, new command get listLog (SVS-Devs), minor fixes
   - change:  77_SMAEM: V3.0.0, make SMAEM ready for multimeter usage
   - new      /www/pgm2/fhemweb_icon*.js: new widgets for FHEMWEB iconButtons,
