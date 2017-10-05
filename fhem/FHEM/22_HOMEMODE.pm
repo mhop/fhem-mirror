@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.1.9";
+my $HOMEMODE_version = "1.1.10";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -118,7 +118,7 @@ sub HOMEMODE_Undef($$)
   my ($hash,$arg) = @_;
   RemoveInternalTimer($hash);
   my $name = $hash->{NAME};
-  if (devspec2array("TYPE=HOMEMODE") == 1)
+  if (devspec2array("TYPE=HOMEMODE:FILTER=disable!=1") == 1)
   {
     HOMEMODE_cleanUserattr($hash,AttrVal($name,"HomeSensorsContact","")) if (AttrVal($name,"HomeSensorsContact",undef));
     HOMEMODE_cleanUserattr($hash,AttrVal($name,"HomeSensorsMotion","")) if (AttrVal($name,"HomeSensorsMotion",undef));
@@ -262,7 +262,7 @@ sub HOMEMODE_Notify($$)
       HOMEMODE_PowerEnergy($hash,$devname,$1,(split " ",$2)[0]);
     }
   }
-  if (AttrVal($name,"HomeEventsHolidayDevices",undef) && grep(/^$devname$/,split /,/,AttrVal($name,"HomeEventsHolidayDevices","")) && grep /^state:\s/,@{$events})
+  if (AttrVal($name,"HomeEventsHolidayDevices",undef) && grep(/^$devname$/,devspec2array(AttrVal($name,"HomeEventsHolidayDevices","").":FILTER=disable!=1")) && grep /^state:\s/,@{$events})
   {
     foreach my $evt (@{$events})
     {
@@ -544,9 +544,9 @@ sub HOMEMODE_updateInternals($;$)
     my $holiday = HOMEMODE_AttrCheck($hash,"HomeEventsHolidayDevices");
     if ($holiday)
     {
-      foreach (devspec2array("$holiday:FILTER=disable!=1"))
+      foreach my $c (devspec2array("$holiday:FILTER=disable!=1"))
       {
-        push @allMonitoredDevices,$_ if (!grep /^$_$/,@allMonitoredDevices);
+        push @allMonitoredDevices,$c if (!grep /^$c$/,@allMonitoredDevices);
       }
     }
     my $uwz = HOMEMODE_AttrCheck($hash,"HomeUWZ","");
@@ -1115,6 +1115,7 @@ sub HOMEMODE_Attributes($)
   push @attribs,"HomeCMDdaytime:textField-long";
   push @attribs,"HomeCMDdnd-off:textField-long";
   push @attribs,"HomeCMDdnd-on:textField-long";
+  push @attribs,"HomeCMDevent:textField-long";
   push @attribs,"HomeCMDfhemINITIALIZED:textField-long";
   push @attribs,"HomeCMDicewarning-on:textField-long";
   push @attribs,"HomeCMDicewarning-off:textField-long";
@@ -1230,8 +1231,7 @@ sub HOMEMODE_userattr($)
   {
     push @userattrAll,"HomeCMDlocation-$_";
   }
-  push @userattrAll,"HomeCMDevent:textField-long" if ($specialevents);
-  foreach my $cal (devspec2array($specialevents))
+  foreach my $cal (devspec2array("$specialevents:FILTER=disable!=1"))
   {
     my $events = HOMEMODE_HolidayEvents($cal);
     push @userattrAll,"HomeCMDevent-$cal-each";
@@ -1888,7 +1888,7 @@ sub HOMEMODE_replacePlaceholders($$;$)
   $cmd =~ s/%DND%/$dnd/g;
   if (AttrVal($name,"HomeEventsHolidayDevices",undef))
   {
-    foreach my $cal (split /,/,AttrVal($name,"HomeEventsHolidayDevices",""))
+    foreach my $cal (devspec2array(AttrVal($name,"HomeEventsHolidayDevices","")))
     {
       my $state = ReadingsVal($name,"event-$cal","") ne "none" ? ReadingsVal($name,"event-$cal","") : 0;
       $cmd =~ s/%$cal%/$state/g;
@@ -2697,8 +2697,8 @@ sub HOMEMODE_EventCommands($$$)
       }
       HOMEMODE_execCMDs($hash,HOMEMODE_serializeCMD($hash,@commands));
     }
+    readingsSingleUpdate($hash,"event-$cal",$event,1);
   }
-  readingsSingleUpdate($hash,"event-$cal",$event,1);
 }
 
 sub HOMEMODE_UWZCommands($$)
@@ -2883,14 +2883,8 @@ sub HOMEMODE_HolidayEvents($)
 {
   my ($calendar) = @_;
   my @events;
-  my @errors;
   my $fname = AttrVal("global","modpath",".")."/FHEM/".$calendar.".holiday";
-  my ($err,@holidayfile) = FileRead($fname);
-  if ($err)
-  {
-    push @errors,$err;
-    next;
-  }
+  my (undef,@holidayfile) = FileRead($fname);
   foreach (@holidayfile)
   {
     next if ($_ =~ /^\s*(#|$)/);
@@ -2902,7 +2896,6 @@ sub HOMEMODE_HolidayEvents($)
     }
     push @events,join("-",@parts);
   }
-  return (\@errors,"error") if (@errors);
   return (\@events);
 }
 
