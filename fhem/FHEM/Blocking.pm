@@ -23,7 +23,7 @@ use IO::Socket::INET;
 sub BlockingCall($$@);
 sub BlockingExit();
 sub BlockingKill($);
-sub BlockingInformParent($;$$);
+sub BlockingInformParent($;$$$);
 sub BlockingStart(;$);
 
 our $BC_telnetDevice;
@@ -82,7 +82,8 @@ BlockingInfo($$@)
     my $fn  = (ref($h->{fn})  ? ref($h->{fn})  : $h->{fn});
     my $arg = (ref($h->{arg}) ? ref($h->{arg}) : $h->{arg});
     my $to  = ($h->{timeout}  ? $h->{timeout}  : "N/A");
-    push @ret, "Pid:$h->{pid} Fn:$fn Arg:$arg Timeout:$to";
+    my $conn= ($h->{telnet}   ? $h->{telnet}   : "N/A");
+    push @ret, "Pid:$h->{pid} Fn:$fn Arg:$arg Timeout:$to ConnectedVia:$conn";
   }
   push @ret, "No BlockingCall processes running currently" if(!@ret);
   return join("\n", @ret);
@@ -135,7 +136,8 @@ BlockingStart(;$)
         use POSIX ":sys_wait_h";
         waitpid(-1, WNOHANG); # Forum #58867
       }
-      if(!kill(0, $h->{pid})) {
+      if(!kill(0, $h->{pid}) &&
+         (!$h->{telnet} || !$defs{$h->{telnet}})) {
         $h->{pid} = "DEAD:$h->{pid}";
         if(!$h->{terminated} && $h->{abortFn}) {
           no strict "refs";
@@ -184,6 +186,8 @@ BlockingStart(;$)
     }
 
     # Child here
+    BlockingInformParent("BlockingRegisterTelnet", "\$cl,$h->{bc_pid}", 1, 1)
+      if($h->{abortFn});
     no strict "refs";
     my $ret = &{$h->{fn}}($h->{arg});
     use strict "refs";
@@ -199,9 +203,20 @@ BlockingStart(;$)
 }
 
 sub
-BlockingInformParent($;$$)
+BlockingRegisterTelnet($$)
 {
-  my ($informFn, $param, $waitForRead) = @_;
+  my ($cl,$idx) = @_;
+  return 0 if(ref($cl) ne "HASH" || !$cl->{NAME} || !$defs{$cl->{NAME}} ||
+              !$BC_hash{$idx});
+  $BC_hash{$idx}{telnet} = $cl->{NAME};
+  $defs{$cl->{NAME}}{BlockingCall} = $BC_hash{$idx}{fn};
+  return 1;
+}
+
+sub
+BlockingInformParent($;$$$)
+{
+  my ($informFn, $param, $waitForRead, $noEscape) = @_;
   my $ret = undef;
   $waitForRead = 1 if (!defined($waitForRead));
 	
@@ -216,12 +231,14 @@ BlockingInformParent($;$$)
   }
 
   if(defined($param)) {
-    if(ref($param) eq "ARRAY") {
-      $param = join(",", map { $_ =~ s/'/\\'/g; "'$_'" } @{$param});
+    if(!$noEscape) {
+      if(ref($param) eq "ARRAY") {
+        $param = join(",", map { $_ =~ s/'/\\'/g; "'$_'" } @{$param});
 
-    } else {
-      $param =~ s/'/\\'/g;
-      $param = "'$param'"
+      } else {
+        $param =~ s/'/\\'/g;
+        $param = "'$param'"
+      }
     }
   } else {
     $param = "";
