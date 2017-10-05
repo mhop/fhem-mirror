@@ -3372,7 +3372,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>HomeEventsHolidayDevices</i></b><br>
-      comma separated list (devspec) of holiday calendars
+      devspec of holiday calendars
     </li>
     <li>
       <b><i>HomeIcewarningOnOffTemps</i></b><br>
