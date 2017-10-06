@@ -45,7 +45,8 @@ install:
 	@-$(foreach DIR,$(DEST), if [ ! -e $(DIR) ]; then mkdir -p $(DIR); fi; )
 	@echo "- fixing permissions in fhem.cfg"
 	perl contrib/commandref_join.pl 
-	@find FHEM configDB.pm docs www contrib -type f -print | xargs chmod 644
+	@find FHEM configDB.pm MAINTAINER.txt docs www contrib \
+		-type f -print | xargs chmod 644
 	@cp fhem.cfg fhem.cfg.install
 	@-if [ "$(RELATIVE_PATH)" != YES ]; then\
 		perl -pi -e 's,modpath \.,modpath $(MODDIR),' fhem.cfg.install; \
@@ -75,7 +76,7 @@ install:
 dist:
 	mkdir .f
 	cp -r fhem.pl fhem.cfg CHANGED HISTORY Makefile README.SVN\
-                demolog fhem.cfg.demo README_DEMO.txt\
+        MAINTAINER.txt demolog fhem.cfg.demo README_DEMO.txt\
 		FHEM configDB.pm contrib docs www .f
 	mkdir .f/log
 	touch .f/log/empty_file.txt
@@ -98,7 +99,8 @@ deb:
 	rm -rf .f
 	rm -rf $(DESTDIR)
 	make ROOT=`pwd`/.f install
-	cp -r contrib/DEBIAN .f
+	cp MAINTAINER.txt .f
+	cp -r contrib/DEBIAN .f/opt/fhem
 	rm -rf .f/$(MODDIR)/contrib/FB7*/var
 	rm -rf .f/$(MODDIR)/contrib/FB7*/*.image
 	rm -rf .f/$(MODDIR)/contrib/FB7*/*.zip
