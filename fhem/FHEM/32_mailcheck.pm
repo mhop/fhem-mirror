@@ -321,7 +321,7 @@ mailcheck_Attr($$$)
   } elsif( $attrName eq "logfile" ) {
     my $hash = $defs{$name};
 
-    close( $hash->{FH} );
+    close( $hash->{FH} ) if( defined($hash->{FH}) );
     delete $hash->{FH};
     delete $hash->{currentlogfile};
 
