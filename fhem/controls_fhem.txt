@@ -1,4 +1,4 @@
-REV 15198
+REV 15204
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-10-05_07:45:02 212948 ./CHANGED
+UPD 2017-10-06_07:45:03 213074 ./CHANGED
 UPD 2017-10-05_07:45:02 35067 ./MAINTAINER.txt
 UPD 2017-09-20_07:45:02 39189 ./configDB.pm
 UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
@@ -76,7 +76,7 @@ UPD 2017-06-23_07:45:02 71997 FHEM/10_KNX.pm
 UPD 2016-12-22_07:45:02 36655 FHEM/10_KOPP_FC.pm
 UPD 2016-09-02_07:45:11 61514 FHEM/10_MAX.pm
 UPD 2017-09-29_07:45:02 10919 FHEM/10_MQTT_BRIDGE.pm
-UPD 2017-08-27_07:45:02 11922 FHEM/10_MQTT_DEVICE.pm
+UPD 2017-10-06_07:45:03 11971 FHEM/10_MQTT_DEVICE.pm
 UPD 2017-09-26_07:45:02 27090 FHEM/10_MYSENSORS_DEVICE.pm
 UPD 2017-06-16_07:45:03 27253 FHEM/10_OWServer.pm
 UPD 2017-04-30_07:45:02 71321 FHEM/10_RESIDENTS.pm
@@ -139,7 +139,7 @@ UPD 2017-07-14_07:45:02 29050 FHEM/21_OWVAR.pm
 UPD 2017-07-15_07:45:02 116041 FHEM/21_SONOSPLAYER.pm
 UPD 2017-01-07_07:45:02 92019 FHEM/21_VBUSDEV.pm
 UPD 2015-07-28_14:05:31 4865 FHEM/22_ALL3076.pm
-UPD 2017-10-04_07:45:02 178532 FHEM/22_HOMEMODE.pm
+UPD 2017-10-06_07:45:03 178455 FHEM/22_HOMEMODE.pm
 UPD 2015-07-28_14:05:31 6433 FHEM/23_ALL4027.pm
 UPD 2016-02-29_07:45:12 37829 FHEM/23_KOSTALPIKO.pm
 UPD 2017-07-09_07:45:02 99884 FHEM/23_LUXTRONIK2.pm
@@ -485,7 +485,7 @@ UPD 2017-08-14_07:45:02 5804 FHEM/98_weblink.pm
 UPD 2017-04-24_07:45:02 48586 FHEM/98_weekprofile.pm
 UPD 2017-08-14_07:45:02 14487 FHEM/99_SUNRISE_EL.pm
 UPD 2017-01-29_07:45:02 9279 FHEM/99_Utils.pm
-UPD 2017-10-03_07:45:02 7728 FHEM/Blocking.pm
+UPD 2017-10-06_07:45:03 8285 FHEM/Blocking.pm
 UPD 2016-03-31_07:45:12 11202 FHEM/Color.pm
 UPD 2017-08-21_07:45:02 14620 FHEM/DevIo.pm
 UPD 2015-07-28_14:05:29 562 FHEM/FhemUtils/release.pm
@@ -640,7 +640,7 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-10-05_07:45:04 3114150 docs/commandref.html
+UPD 2017-10-06_07:45:04 3114127 docs/commandref.html
 UPD 2017-10-05_07:45:05 1835528 docs/commandref_DE.html
 UPD 2017-09-22_07:45:02 72400 docs/commandref_frame.html
 UPD 2017-09-22_07:45:02 81128 docs/commandref_frame_DE.html
@@ -1950,10 +1950,10 @@ UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
 UPD 2017-10-04_07:45:02 51539 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
 UPD 2017-03-07_07:45:02 3139 www/pgm2/fhemweb_fbcalllist.js
-UPD 2017-10-05_07:45:02 4071 www/pgm2/fhemweb_iconButtons.js
-UPD 2017-10-05_07:45:02 5276 www/pgm2/fhemweb_iconLabel.js
-UPD 2017-10-05_07:45:02 9619 www/pgm2/fhemweb_iconRadio.js
-UPD 2017-10-05_07:45:02 7287 www/pgm2/fhemweb_iconSwitch.js
+UPD 2017-10-06_07:45:03 4130 www/pgm2/fhemweb_iconButtons.js
+UPD 2017-10-06_07:45:03 5333 www/pgm2/fhemweb_iconLabel.js
+UPD 2017-10-06_07:45:03 9676 www/pgm2/fhemweb_iconRadio.js
+UPD 2017-10-06_07:45:03 7345 www/pgm2/fhemweb_iconSwitch.js
 UPD 2017-10-04_07:45:02 1953 www/pgm2/fhemweb_knob.js
 UPD 2017-10-04_07:45:02 4248 www/pgm2/fhemweb_readingsGroup.js
 UPD 2017-10-04_07:45:02 920 www/pgm2/fhemweb_readingsHistory.js
