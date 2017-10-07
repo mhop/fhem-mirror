@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.6.4        05.10.2017       abortFn's adapted to use abortArg (Forum:77472)
 # 5.6.3        01.10.2017       fix crash of fhem due to wrong rmday-calculation if month is changed, Forum:#77328
 # 5.6.2        28.08.2017       commandref revised
 # 5.6.1        18.07.2017       commandref revised, minor fixes
@@ -233,7 +234,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.6.3";
+my $DbRepVersion = "5.6.4";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -4364,21 +4365,6 @@ return;
 }
 
 ####################################################################################################
-#                    Abbruchroutine Timeout DB-Abfrage
-####################################################################################################
-sub OptimizeAborted($) {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my $dbh  = $hash->{DBH}; 
-  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_OPTIMIZE}}{fn} timed out");
-  $dbh->disconnect() if(defined($dbh));
-  ReadingsSingleUpdateValue ($hash, "state", "timeout", 1);
-  delete($hash->{HELPER}{RUNNING_OPTIMIZE});
-  
-return;
-}
-
-####################################################################################################
 # nicht blockierende Dump-Routine für MySQL (clientSide)
 ####################################################################################################
 sub mysql_DoDumpClientSide($) {
@@ -5155,19 +5141,20 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Timeout Restore
 ####################################################################################################
-sub RestoreAborted($) {
-  my ($hash) = @_;
+sub RestoreAborted(@) {
+  my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh  = $hash->{DBH} if ($hash->{DBH}); 
   
-  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} timed out") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
-  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} timed out") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
+  $cause = $cause?$cause:"Timeout: process terminated";
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} $cause") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} $cause") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
   
-  my $state = "Database restore timed out";
+  my $state = "Database restore $cause";
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
   
-  Log3 ($name, 3, "DbRep $name - Database restore aborted by timeout !");
+  Log3 ($name, 3, "DbRep $name - Database restore aborted by \"$cause\" ");
   
   delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
@@ -5177,13 +5164,15 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Timeout DB-Abfrage
 ####################################################################################################
-sub ParseAborted($) {
-  my ($hash) = @_;
+sub ParseAborted(@) {
+  my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh = $hash->{DBH}; 
-  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} timed out");
+  
+  $cause = $cause?$cause:"Timeout: process terminated";
+  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} $cause");
   $dbh->disconnect() if(defined($dbh));
-  ReadingsSingleUpdateValue ($hash, "state", "timeout", 1);
+  ReadingsSingleUpdateValue ($hash,"state",$cause, 1);
   delete($hash->{HELPER}{RUNNING_PID});
   
 return;
@@ -5192,14 +5181,15 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Timeout DB-Dump
 ####################################################################################################
-sub DumpAborted($) {
-  my ($hash) = @_;
+sub DumpAborted(@) {
+  my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh  = $hash->{DBH} if ($hash->{DBH}); 
   my ($err,$erread);
   
-  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} timed out") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
-  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} timed out") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
+  $cause = $cause?$cause:"Timeout: process terminated";
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} $cause") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} $cause") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
   
   # Befehl nach Dump ausführen
   my $ead = AttrVal($name, "executeAfterDump", undef);
@@ -5209,18 +5199,35 @@ sub DumpAborted($) {
 	  if ($err) {
           Log3 ($name, 2, "DbRep $name - $err");
 			 ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-			 $erread = "Warning - Database backup timed out and command after dump not successful";
+			 $erread = "Warning - Database backup ended with \"$cause\" and command after dump not successful";
       }
   }
   
-  my $state = $erread?$erread:"Database backup timed out";
+  my $state = $erread?$erread:$cause;
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
   
-  Log3 ($name, 3, "DbRep $name - Database dump aborted by timeout !");
+  Log3 ($name, 2, "DbRep $name - Database dump aborted by \"$cause\" ");
   
   delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
+return;
+}
+
+####################################################################################################
+#                    Abbruchroutine Timeout DB-Abfrage
+####################################################################################################
+sub OptimizeAborted(@) {
+  my ($hash,$cause) = @_;
+  my $name = $hash->{NAME};
+  my $dbh  = $hash->{DBH}; 
+  
+  $cause = $cause?$cause:"Timeout: process terminated";
+  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_OPTIMIZE}}{fn} $cause");
+  $dbh->disconnect() if(defined($dbh));
+  ReadingsSingleUpdateValue ($hash, "state", $cause, 1);
+  delete($hash->{HELPER}{RUNNING_OPTIMIZE});
+  
 return;
 }
 
