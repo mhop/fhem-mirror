@@ -374,7 +374,7 @@ FB_CALLMONITOR_Read($)
                 $external_number =~ s/^(107\d\d|108\d\d)//g if($country_code eq "0041");
             }
             
-            if($external_number !~ /^0/ and $area_code ne "")
+            if($external_number !~ /^0/ and $external_number !~ /^11/ and $area_code ne "")
             {
                 if($area_code =~ /^0[1-9]\d+$/ and $external_number =~ /^[1-9].+$/)
                 {
@@ -628,7 +628,7 @@ FB_CALLMONITOR_reverseSearch($$)
             # Ask klicktel.de
             if($method eq "klicktel.de")      
             { 
-                unless(($number =~ /^0[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
+                unless(($number =~ /^0?[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
                 {
                     Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using klicktel.de for reverse search of $number because of non-german number";
                 }
@@ -665,7 +665,7 @@ FB_CALLMONITOR_reverseSearch($$)
             # Ask dasoertliche.de
             elsif($method eq "dasoertliche.de")
             {
-                unless(($number =~ /^0[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
+                unless(($number =~ /^0?[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
                 {
                     Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using dasoertliche.de for reverse search of $number because of non-german number";
                 }
@@ -707,7 +707,7 @@ FB_CALLMONITOR_reverseSearch($$)
             # SWITZERLAND ONLY!!! Ask search.ch
             elsif($method eq  "search.ch")
             {
-                unless(($number =~ /^0[1-9]/ and $country_code eq "0041") or $number =~ /^0041/)
+                unless(($number =~ /^0?[1-9]/ and $country_code eq "0041") or $number =~ /^0041/)
                 {
                     Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using search.ch for reverse search of $number because of non-swiss number";
                 }
@@ -764,7 +764,7 @@ FB_CALLMONITOR_reverseSearch($$)
             # Austria ONLY!!! Ask dasschnelle.at
             elsif($method eq "dasschnelle.at")
             {
-                unless(($number =~ /^0[1-9]/ and $country_code eq "0043") or $number =~ /^0043/)
+                unless(($number =~ /^0?[1-9]/ and $country_code eq "0043") or $number =~ /^0043/)
                 {
                     Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using dasschnelle.at for reverse search of $number because of non-swiss number";
                 }
@@ -888,6 +888,8 @@ sub FB_CALLMONITOR_readPhonebook($;$)
    
     my $name = $hash->{NAME};
     my ($err, $count_contacts, @lines, $phonebook);
+    
+    delete($hash->{helper}{PHONEBOOK});
     
 	if(AttrVal($name, "fritzbox-remote-phonebook", "0") eq "1")
     {
@@ -1791,7 +1793,7 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     $number =~ s/\D//g if(not $number =~ /@/);  # Remove anything else isn't a number if it is no VoIP number
     $number =~ s/^$country_code/0/g;            # Replace own country code with leading 0
 
-    if(not $number =~ /^0/ and not $number =~ /@/ and $area_code =~ /^0[1-9]\d+$/) 
+    if($number !~ /^0/ and $number !~ /^11/ and $number !~ /@/ and $area_code =~ /^0[1-9]\d+$/) 
     {
        $number = $area_code.$number;
     }

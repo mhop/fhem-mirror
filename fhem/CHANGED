@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  72_FB_CALLMONITOR: fix wrong reverse-search of emergency call 
+             (110/112/...), fix missing deletion of phonebook on reread.
   - change:  93_DbRep: V5.6.4, use new Blocking.pm abortArg
   - bugfix:  22_HOMEMODE: v1.1.10 - fix notifydev for HomeEventsHolidayDevices
   - bugfix:  10_MQTT_DEVICE: fix set arguments
