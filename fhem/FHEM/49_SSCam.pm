@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 3.2.3  08.10.2017    set optimizeParams, get caminfo (simple), minor bugfix, commandref revised
 # 3.2.2  03.10.2017    make functions ready to use "SYNO.SurveillanceStation.PTZ" version 5, minor fixes, commandref 
 #                      revised
 # 3.2.1  02.10.2017    change some "SYNO.SurveillanceStation.Camera" methods to version 9             
@@ -204,7 +205,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.2.2";
+my $SSCamVersion = "3.2.3";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -552,6 +553,7 @@ sub SSCam_Set {
 	     		 "createSnapGallery:noArg ".
                  "enable ".
                  "disable ".
+				 "optimizeParams ".
                  "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open,lastsnap_fw ".
                  "stopView:noArg ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
@@ -698,6 +700,15 @@ sub SSCam_Set {
       $hash->{HELPER}{PTZACTION}    = "gopreset";
       doptzaction($hash);
         
+  } elsif ($opt eq "optimizeParams" && IsModelCam($hash)) {
+	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+		
+		my %cpcl = (ntp => 1, mirror => 2, flip => 4, rotate => 8);
+		extoptpar($hash,$prop,\%cpcl) if($prop);
+        extoptpar($hash,$prop1,\%cpcl) if($prop1);
+        extoptpar($hash,$prop2,\%cpcl) if($prop2);
+		setoptpar($hash);
+                
   } elsif ($opt eq "runPatrol" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       if (!$prop) {return "Function \"runPatrol\" needs a \"Patrolname\" as an argument";}
@@ -840,6 +851,7 @@ sub SSCam_Get {
 	    # selist für Cams
 	    $getlist = "Unknown argument $opt, choose one of ".
                    "caminfoall:noArg ".
+				   "caminfo:noArg ".
 		 		   ((AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))
 				       ?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ").
 				   "snapinfo:noArg ".
@@ -864,7 +876,12 @@ sub SSCam_Get {
 				  
     return if(IsDisabled($name));             
         
-    if ($opt eq "caminfoall") {
+    if ($opt eq "caminfo") {
+        # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
+		if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+        getcaminfo($hash);
+                
+    } elsif ($opt eq "caminfoall") {
         # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
 		if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         getcaminfoall($hash,1);
@@ -1948,6 +1965,32 @@ sub sethomemode ($) {
 }
 
 ###########################################################################
+#                         Optimierparameter setzen 
+###########################################################################
+sub setoptpar ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE} = "setoptpar";
+        $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+		
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        sscam_getapisites($hash);
+		
+    } else {
+        RemoveInternalTimer($hash, "setoptpar");
+        InternalTimer(gettimeofday()+0.6, "setoptpar", $hash, 0);
+    }
+}
+
+###########################################################################
 #                         HomeMode Status abfragen
 ###########################################################################
 sub gethomemodestate ($) {
@@ -2492,6 +2535,20 @@ sub sscam_getapisites_parse ($) {
                 $actvs .= ($vl[2] =~ /\d/)?$vl[2]."xxxx":$vl[2];
 				$actvs .= "-simu";
             }
+			
+            # Downgrades für nicht kompatible API-Versionen
+			# hier nur nutzen wenn API zentral downgraded werden soll
+            # In den neueren API-Upgrades werden nur einzelne Funktionen auf eine höhere API-Version gezogen
+            # -> diese Steuerung erfolgt in den einzelnen Funktionsaufrufen in sscam_camop			
+            Log3($name, 4, "$name - ------- Begin of adaption section -------");
+            
+			#$apiptzmaxver = 4;
+            #Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
+            #$apicammaxver = 8;
+            #Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
+            
+			Log3($name, 4, "$name - ------- End of adaption section -------");
+			
                         			
             # Simulation anderer SVS-Versionen
             Log3($name, 4, "$name - ------- Begin of simulation section -------");
@@ -2531,17 +2588,7 @@ sub sscam_getapisites_parse ($) {
                 Log3($name, 4, "$name - no simulations done !");
             } 
             Log3($name, 4, "$name - ------- End of simulation section -------");  
-			
-            # Downgrades für nicht kompatible API-Versionen
-            Log3($name, 4, "$name - ------- Begin of adaption section -------");
-            
-			#$apiptzmaxver = 4;
-            #Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
-            # $apicammaxver = 8;
-            # Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
-            
-			Log3($name, 4, "$name - ------- End of adaption section -------");
-       
+			       
             # ermittelte Werte in $hash einfügen
             $hash->{HELPER}{APIAUTHPATH}       = $apiauthpath;
             $hash->{HELPER}{APIAUTHMAXVER}     = $apiauthmaxver;
@@ -2848,7 +2895,8 @@ sub sscam_camop ($) {
        
    Log3($name, 4, "$name - --- Begin Function $OpMode nonblocking ---");
 
-   $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
+   $httptimeout = AttrVal($name, "httptimeout", 4);
+   $httptimeout = $httptimeout+90 if($OpMode eq "setoptpar");   # setzen der Optimierungsparameter dauert lange !
    
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
    
@@ -2929,7 +2977,7 @@ sub sscam_camop ($) {
       my $sev = $hash->{HELPER}{LISTLOGSEVERITY}?$hash->{HELPER}{LISTLOGSEVERITY}:"";
 	  my $lim = $hash->{HELPER}{LISTLOGLIMIT}?$hash->{HELPER}{LISTLOGLIMIT}:0;
 	  my $mco = $hash->{HELPER}{LISTLOGMATCH}?$hash->{HELPER}{LISTLOGMATCH}:"";
-	  my $mco = IsModelCam($hash)?$hash->{CAMNAME}:$mco;
+	  $mco = IsModelCam($hash)?$hash->{CAMNAME}:$mco;
 	  $lim = 1 if(!$hash->{HELPER}{CL}{1});  # Datenabruf im Hintergrund
 	  $sev = (lc($sev) =~ /error/)?3:(lc($sev) =~ /warning/)?2:(lc($sev) =~ /info/)?1:"";
 	  
@@ -2946,6 +2994,15 @@ sub sscam_camop ($) {
    } elsif ($OpMode eq "getsvsinfo") {
       $url = "http://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfomaxver\"&method=\"GetInfo\"&_sid=\"$sid\"";   
    
+   } elsif ($OpMode eq "setoptpar") {
+      my $mirr = $hash->{HELPER}{MIRROR}?$hash->{HELPER}{MIRROR}:ReadingsVal("$name","CamVideoMirror","");
+	  my $flip = $hash->{HELPER}{FLIP}?$hash->{HELPER}{FLIP}:ReadingsVal("$name","CamVideoFlip","");
+	  my $rot  = $hash->{HELPER}{ROTATE}?$hash->{HELPER}{ROTATE}:ReadingsVal("$name","CamVideoRotate","");
+	  my $ntp  = $hash->{HELPER}{NTPSERV}?$hash->{HELPER}{NTPSERV}:ReadingsVal("$name","CamNTPServer","");
+	  my $clst = $hash->{HELPER}{CHKLIST}?$hash->{HELPER}{CHKLIST}:"";
+	  $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
+      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&vdoMirror=$mirr&vdoRotation=$rot&vdoFlip=$flip&timeServer=\"$ntp\"&camParamChkList=$clst&cameraIds=\"$camid\"&_sid=\"$sid\"";  
+             
    } elsif ($OpMode eq "Getcaminfo") {
       $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=\"true\"&streamInfo=\"true\"&ptz=\"true\"&basic=\"true\"&camAppInfo=\"true\"&optimize=\"true\"&fisheye=\"true\"&eventDetection=\"true\"&_sid=\"$sid\"";   
@@ -3315,6 +3372,26 @@ sub sscam_camop_parse ($) {
 				asyncOutput($hash->{HELPER}{CL}{1},"$log");
 				delete($hash->{HELPER}{CL});
             
+			} elsif ($OpMode eq "setoptpar") { 
+                my $rid  = $data->{'data'}{'id'};    # Cam ID return wenn i.O.
+				my $ropt = $rid == $hash->{CAMID}?"none":"error in operation";
+				
+				delete($hash->{HELPER}{NTPSERV});
+				delete($hash->{HELPER}{MIRROR});
+                delete($hash->{HELPER}{FLIP});
+				delete($hash->{HELPER}{ROTATE});
+				delete($hash->{HELPER}{CHKLIST});
+				
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error",$ropt);
+                readingsEndUpdate($hash, 1);
+
+				# Token freigeben vor Abruf caminfo
+                $hash->{HELPER}{ACTIVE} = "off";
+                RemoveInternalTimer($hash, "getcaminfo");
+                InternalTimer(gettimeofday()+0.5, "getcaminfo", $hash, 0);
+				
 			} elsif ($OpMode eq "MotDetSc") {              
 
                 readingsBeginUpdate($hash);
@@ -3753,6 +3830,9 @@ sub sscam_camop_parse ($) {
                 } else {
                     $recStatus = "Stop";
                 }
+				
+				my $rotate = $data->{'data'}->{'cameras'}->[0]->{'video_rotation'};
+				$rotate = $rotate == 1?"true":"false";
                 
                 $exposuremode = $data->{'data'}->{'cameras'}->[0]->{'exposure_mode'};
                 if ($exposuremode == 0) {
@@ -3803,6 +3883,7 @@ sub sscam_camop_parse ($) {
                 readingsBulkUpdate($hash,"CamRecShare",$data->{'data'}->{'cameras'}->[0]->{'camRecShare'});
                 readingsBulkUpdate($hash,"CamRecVolume",$data->{'data'}->{'cameras'}->[0]->{'camRecVolume'});
                 readingsBulkUpdate($hash,"CamIP",$data->{'data'}->{'cameras'}->[0]->{'host'});
+				readingsBulkUpdate($hash,"CamNTPServer",$data->{'data'}->{'cameras'}->[0]->{'time_server'}) if($data->{'data'}->{'cameras'}->[0]->{'time_server'}); 
                 readingsBulkUpdate($hash,"CamVendor",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camVendor'});
                 readingsBulkUpdate($hash,"CamPreRecTime",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camPreRecTime'});
                 readingsBulkUpdate($hash,"CamPort",$data->{'data'}->{'cameras'}->[0]->{'port'});
@@ -3810,6 +3891,7 @@ sub sscam_camop_parse ($) {
                 readingsBulkUpdate($hash,"CamblPresetSpeed",$data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
                 readingsBulkUpdate($hash,"CamVideoMirror",$data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
                 readingsBulkUpdate($hash,"CamVideoFlip",$data->{'data'}->{'cameras'}->[0]->{'video_flip'});
+				readingsBulkUpdate($hash,"CamVideoRotate",$rotate);
                 readingsBulkUpdate($hash,"Availability",$camStatus);
                 readingsBulkUpdate($hash,"DeviceType",$deviceType);
                 readingsBulkUpdate($hash,"LastUpdateTime",$update_time);
@@ -4437,6 +4519,25 @@ return;
 }
 
 ###############################################################################
+#              Helper für optimizeParams-Argumente extrahieren 
+###############################################################################
+sub extoptpar ($$$) { 
+  my ($hash,$a,$cpcl) = @_;
+
+  $hash->{HELPER}{MIRROR}   = (split("mirror:",$a))[1] if(lc($a) =~ m/^mirror:.*/);
+  $hash->{HELPER}{FLIP}     = (split("flip:",$a))[1] if(lc($a) =~ m/^flip:.*/);
+  $hash->{HELPER}{ROTATE}   = (split("rotate:",$a))[1] if(lc($a) =~ m/^rotate:.*/);
+  $hash->{HELPER}{NTPSERV}  = (split("ntp:",$a))[1] if(lc($a) =~ m/^ntp:.*/);
+  
+  $hash->{HELPER}{CHKLIST}  = ($hash->{HELPER}{NTPSERV}?$cpcl->{ntp}:0)+
+                              ($hash->{HELPER}{MIRROR}?$cpcl->{mirror}:0)+
+                              ($hash->{HELPER}{FLIP}?$cpcl->{flip}:0)+
+							  ($hash->{HELPER}{ROTATE}?$cpcl->{rotate}:0);
+  
+return;
+}
+
+###############################################################################
 # Clienthash übernehmen oder zusammenstellen
 # Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
 sub getclhash ($;$$) {      
@@ -4790,7 +4891,7 @@ sub experror {
       <tr><td><li>set ... snapGallery        </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>set ... stopView           </td><td> -                                          </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                          </li></td></tr>
-      <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
+      <tr><td><li>get ... caminfo[all]       </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - observer    </li></td></tr>
 	  <tr><td><li>get ... listLog            </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - observer    </li></td></tr>
@@ -4963,7 +5064,7 @@ sub experror {
   <br><br>
 
   <ul>
-  <li><b> set &lt;name&gt; homeMode [on | off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
+  <li><b> set &lt;name&gt; homeMode [on|off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
   
   Switch the HomeMode of the Surveillance Station on or off. 
   Further informations about HomeMode you can find in the <a href="https://www.synology.com/en-global/knowledgebase/Surveillance/help/SurveillanceStation/home_mode">Synology Onlinehelp</a>.
@@ -5084,6 +5185,31 @@ sub experror {
   <br><br>
   
   <ul>
+  <li><b> set &lt;name&gt; optimizeParams [mirror:&lt;value&gt;] [flip:&lt;value&gt;] [rotate:&lt;value&gt;] [ntp:&lt;value&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  
+  Set one or several properties of the camera. The video can be mirrored (mirror), turned upside down (flip) or 
+  rotated (rotate). Specified properties must be supported by the camera type. With "ntp" you can set a time server the camera 
+  use for time synchronization. <br><br>
+  
+  &lt;value&gt; can be for: <br>
+    <ul>
+    <li> <b>mirror, flip, rotate: </b> true | false  </li>
+	<li> <b>ntp: </b> the name or the IP-address of time server </li> 
+	</ul>
+	<br><br>
+	
+  <b>Examples:</b> <br>
+  <code> set &lt;name&gt; optimizeParams mirror:true flip:true ntp:time.windows.com </code><br>
+  # The video will be mirrored, turned upside down and the time server is set to "time.windows.com".<br>
+  <code> set &lt;name&gt; optimizeParams ntp:Surveillance%20Station </code><br>
+  # The Surveillance Station is set as time server. (NTP-service has to be activated in DSM) <br>
+  <code> set &lt;name&gt; optimizeParams mirror:true flip:false rotate:true </code><br>
+  # The video will be mirrored and rotated round 90 degrees. <br>
+    
+  <br><br>
+  </ul>
+  
+  <ul>
   <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   This commans starts a predefined patrol (tour) of a PTZ-camera. <br>
@@ -5193,11 +5319,13 @@ sub experror {
   They can be selected in the drop-down-menu of the particular device. <br><br>
 
   <ul>
-  <li><b> get &lt;name&gt; caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
-  
+  <li><b> get &lt;name&gt; caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> 
+      <b> get &lt;name&gt; caminfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM) <br><br>
+	  
   Dependend of the type of camera (e.g. Fix- or PTZ-Camera) the available properties are retrieved and provided as Readings.<br>
   For example the Reading "Availability" will be set to "disconnected" if the camera would be disconnected from Synology 
-  Surveillance Station and can't be used for further processing like creating events.
+  Surveillance Station and can't be used for further processing like creating events. <br>
+  "getcaminfo" retrieves a subset of "getcaminfoall".
   </ul>
   <br><br>  
   
@@ -5543,6 +5671,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Model of camera  </td></tr>
     <tr><td><li>CamMotDetSc</li>        </td><td>- state of motion detection source (disabled, by camera, by SVS) and their parameter </td></tr>
+    <tr><td><li>CamNTPServer</li>       </td><td>- set time server  </td></tr>
     <tr><td><li>CamPort</li>            </td><td>- IP-Port of Camera  </td></tr>
     <tr><td><li>CamPreRecTime</li>      </td><td>- Duration of Pre-Recording (in seconds) adjusted in SVS  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- shared folder on disk station for recordings </td></tr>
@@ -5550,6 +5679,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>CamVendor</li>          </td><td>- Identifier of camera producer  </td></tr>
     <tr><td><li>CamVideoFlip</li>       </td><td>- Is the video flip  </td></tr>
     <tr><td><li>CamVideoMirror</li>     </td><td>- Is the video mirror  </td></tr>
+	<tr><td><li>CamVideoRotate</li>     </td><td>- Is the video rotate  </td></tr>
     <tr><td><li>CapAudioOut</li>        </td><td>- Capability to Audio Out over Surveillance Station (false/true)  </td></tr>
     <tr><td><li>CapChangeSpeed</li>     </td><td>- Capability to various motion speed  </td></tr>
     <tr><td><li>CapPTZAbs</li>          </td><td>- Capability to perform absolute PTZ action  </td></tr>
@@ -5767,7 +5897,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 	  <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
 	  <tr><td><li>set ... snapGallery        </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
 	  <tr><td><li>set ... stopView           </td><td> -                                            </li></td></tr>
-      <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>get ... caminfo[all]       </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... listLog            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
 	  <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
@@ -5942,7 +6072,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; homeMode [on | off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
+  <li><b> set &lt;name&gt; homeMode [on|off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
   Schaltet den HomeMode der Surveillance Station ein bzw. aus. 
   Informationen zum HomeMode sind in der <a href="https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/home_mode">Synology Onlinehilfe</a> 
@@ -6023,7 +6153,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; [on | off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
+  <li><b> set &lt;name&gt; [on|off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
 
   Der Befehl "set &lt;name&gt; on" startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem Attribut "rectime" individuell festgelegt werden. 
   Die im Attribut (bzw. im Standard) hinterlegte Aufnahmedauer kann einmalig mit "set &lt;name&gt; on [rectime]" überschrieben werden.
@@ -6061,6 +6191,31 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   </table>
   </ul>
   <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; optimizeParams [mirror:&lt;value&gt;] [flip:&lt;value&gt;] [rotate:&lt;value&gt;] [ntp:&lt;value&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  
+  Setzt eine oder mehrere Eigenschaften für die Kamera. Das Video kann gespiegelt (mirror), auf den Kopf gestellt (flip) oder 
+  gedreht (rotate) werden. Die jeweiligen Eigenschaften müssen von der Kamera unterstützt werden. Mit "ntp" wird der Zeitserver 
+  eingestellt den die Kamera zur Zeitsynchronisation verwendet. <br><br>
+  
+  &lt;value&gt; kann sein für: <br>
+    <ul>
+    <li> <b>mirror, flip, rotate: </b> true | false  </li>
+	<li> <b>ntp: </b> der Name oder die IP-Adresse des Zeitservers </li> 
+	</ul>
+	<br><br>
+	
+  <b>Beispiele:</b> <br>
+  <code> set &lt;name&gt; optimizeParams mirror:true flip:true ntp:time.windows.com </code><br>
+  # Das Bild wird gespiegelt, auf den Kopf gestellt und der Zeitserver auf "time.windows.com" eingestellt.<br>
+  <code> set &lt;name&gt; optimizeParams ntp:Surveillance%20Station </code><br>
+  # Die Surveillance Station wird als Zeitserver eingestellt. (NTP-Dienst muss im DSM aktiviert sein) <br>
+  <code> set &lt;name&gt; optimizeParams mirror:true flip:false rotate:true </code><br>
+  # Das Bild wird gespiegelt und um 90 Grad gedreht. <br>
+    
+  <br><br>
+  </ul>
   
   <ul>
   <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
@@ -6168,12 +6323,14 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   Drop-Down-Menü des jeweiligen Devices zur Auswahl zur Verfügung. <br><br>
   
   <ul>
-  <li><b> get &lt;name&gt; caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  <li><b> get &lt;name&gt; caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li>
+      <b> get &lt;name&gt; caminfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br><br>
   
   Es werden SVS-Parameter und abhängig von der Art der Kamera (z.B. Fix- oder PTZ-Kamera) die verfügbaren Kamera-Eigenschaften 
   ermittelt und als Readings zur Verfügung gestellt. <br>
   So wird zum Beispiel das Reading "Availability" auf "disconnected" gesetzt falls die Kamera von der Surveillance Station 
-  getrennt ist.
+  getrennt ist. <br>
+  "getcaminfo" ruft eine Teilmenge von "getcaminfoall" ab.
   </ul>
   <br><br> 
   
@@ -6535,6 +6692,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Kameramodell  </td></tr>
     <tr><td><li>CamMotDetSc</li>        </td><td>- Status der Bewegungserkennung (disabled, durch Kamera, durch SVS) und deren Parameter </td></tr>
+    <tr><td><li>CamNTPServer</li>       </td><td>- eingestellter Zeitserver  </td></tr>
     <tr><td><li>CamPort</li>            </td><td>- IP-Port der Kamera  </td></tr>
     <tr><td><li>CamPreRecTime</li>      </td><td>- Dauer der der Voraufzeichnung in Sekunden (Einstellung in SVS)  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- gemeinsamer Ordner auf der DS für Aufnahmen  </td></tr>
@@ -6542,6 +6700,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>CamVendor</li>          </td><td>- Kamerahersteller Bezeichnung  </td></tr>
     <tr><td><li>CamVideoFlip</li>       </td><td>- Ist das Video gedreht  </td></tr>
     <tr><td><li>CamVideoMirror</li>     </td><td>- Ist das Video gespiegelt  </td></tr>
+	<tr><td><li>CamVideoRotate</li>     </td><td>- Ist das Video gedreht  </td></tr>
     <tr><td><li>CapAudioOut</li>        </td><td>- Fähigkeit der Kamera zur Audioausgabe über Surveillance Station (false/true)  </td></tr>
     <tr><td><li>CapChangeSpeed</li>     </td><td>- Fähigkeit der Kamera verschiedene Bewegungsgeschwindigkeiten auszuführen  </td></tr>
     <tr><td><li>CapPTZAbs</li>          </td><td>- Fähigkeit der Kamera für absolute PTZ-Aktionen   </td></tr>
