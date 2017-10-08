@@ -43,7 +43,7 @@ use Time::Local;
 
 #########################
 # Global variables
-my $postmeversion  = "2.03";
+my $postmeversion  = "2.04";
 my $FW_encoding    = "UTF-8";
 
 #########################################################################################
@@ -145,7 +145,7 @@ sub PostMe_Init($) {
    
    #-- current number of PostMes
    my $cnop = ReadingsVal($devname,"postmeCnt",0);
-   my @std  = split(',',AttrVal("$devname","postmeStd",undef));
+   my @std  = split(',',AttrVal("$devname","postmeStd",""));
    
    for( my $i=0;$i<int(@std);$i++ ){
      my $pmn = PostMe_Check($hash,$std[$i]);
@@ -1517,7 +1517,7 @@ sub PostMe_widget($) {
             <br />Defines the PostMe system, &lt;postit&gt; is an arbitrary name for the system. </p>
         <a name="PostMeusage"></a>
         <h4>Usage</h4>
-        See <a href="http://www.fhemwiki.de/wiki/Modul_PostMe">Wiki documentation</a>
+        See <a href="http://www.fhemwiki.de/wiki/Modul_PostMe">German Wiki page</a>
         <br/>
         An arbitrary number of lists may be added to the system with the <i>create</i> command.<br/>
         List items may consist of one or more words, and are added/removed by the <i>add</i> and 
@@ -1658,6 +1658,7 @@ sub PostMe_widget($) {
 
 <a name="PostMe"></a>
 <h3>PostMe</h3>
+<a href="https://wiki.fhem.de/wiki/Modul_PostMe">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/commandref.html#PostMe">PostMe</a> 
 
 =end html_DE
 =cut

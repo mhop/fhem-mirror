@@ -37,11 +37,115 @@ use vars qw($FW_ME);
 
 #########################
 # Global variables
-my $alarmname       = "Alarms";    # link text
+my $alarmlinkname   = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "2.85";
+my $alarmversion    = "3.0";
+
+my %alarm_transtable_EN = ( 
+    "ok"                =>  "OK",
+    "notok"             =>  "Not OK",
+    "start"             =>  "Start",
+    "end"               =>  "End",
+    "status"            =>  "Status",
+    "notstarted"        =>  "Not started",
+    "next"              =>  "Next",
+    "arm   "            =>  "Arm",
+    "disarm"            =>  "Disarm",
+    "armbutton"         =>  "Arming",
+    "disarmbutton"      =>  "Disarming",
+    "cancelbutton"      =>  "Canceling",
+    "raise"             =>  "Raise",
+    "wait"              =>  "Wait",
+    "delay"             =>  "Delay",
+    "cancel"            =>  "Cancel",
+    "button"            =>  "Button",
+    "level"             =>  "Level",
+    "message"           =>  "Message",
+    "messagepart"       =>  "Message Part",
+    "notify"            =>  "Notify", 
+    "notifyto"          =>  "Notify to", 
+    "notifyby"          =>  "Notify by",
+    "setby"             =>  "Set by",
+    "regexp"            =>  "RegExp",
+    "time"              =>  "Time",
+    "description"       =>  "Description",
+    "settings"          =>  "Settings",
+    "sensors"           =>  "Sensors",
+    "actors"            =>  "Actors",
+    "action"            =>  "Action",
+    "setaction"         =>  "Set Action",
+    "unsetaction"       =>  "Unset Action",
+    "testaction"        =>  "Test",
+    "armaction"         =>  "Arm Action",
+    "disarmaction"      =>  "Disarm Action",
+    "waitaction"        =>  "Wait Action",
+    "cancelaction"      =>  "Cancel Action",
+    "alarm"             =>  "Alarm",
+    "alarms"            =>  "Alarm System",
+    #--
+    "state"             =>  "Security",
+    "unlocked"          =>  "Unlocked",
+    "locked"            =>  "Locked",
+    "unsecured"         =>  "Not Secured",
+    "secured"           =>  "Secured",             
+    "protected"         =>  "Geschützt",
+    "guarded"           =>  "Guarded"
+    );
+    
+ my %alarm_transtable_DE = ( 
+    "ok"                =>  "OK",
+    "notok"             =>  "Nicht OK",
+    "start"             =>  "Start",
+    "end"               =>  "Ende",
+    "status"            =>  "Status",
+    "notstarted"        =>  "Nicht gestartet",
+    "next"              =>  "Nächste",
+    "arm"               =>  "Schärfen",
+    "disarm"            =>  "Entschärfen",
+    "armbutton"         =>  "Schärfen",
+    "disarmbutton"      =>  "Entschärfen",
+    "cancelbutton"      =>  "Widerrufen",
+    "raise"             =>  "Auslösen",
+    "wait"              =>  "Warte",
+    "delay"             =>  "Verzögerung",
+    "cancel"            =>  "Widerruf",
+    "button"            =>  "Button",
+    "level"             =>  "Level",
+    "message"           =>  "Nachricht",
+    "messagepart"       =>  "Nachrichtenteil",
+    "notify"            =>  "Auslösung", 
+    "notifyto"          =>  "Wirkt auf", 
+    "notifyby"          =>  "Auslösung durch",
+    "setby"             =>  "Gesetzt durch",
+    "regexp"            =>  "RegExp",
+    "time"              =>  "Zeit",
+    "description"       =>  "Beschreibung",
+    "settings"          =>  "Einstellungen",
+    "sensors"           =>  "Sensoren",
+    "actors"            =>  "Aktoren",
+    "action"            =>  "Wirkung",
+    "setaction"         =>  "Aktion Setzen",
+    "unsetaction"       =>  "Aktion Rücksetzen",
+    "testaction"        =>  "Testen",
+    "armaction"         =>  "Scharf-Aktion",
+    "disarmaction"      =>  "Unscharf-Aktion",
+    "waitaction"        =>  "Warte-Aktion",
+    "cancelaction"      =>  "Widerruf-Aktion",
+    "alarm"             =>  "Alarm",
+    "alarms"            =>  "Alarmanlage",
+    #--
+    "state"             =>  "Sicherheit",
+    "unlocked"          =>  "Unverschlossen",
+    "locked"            =>  "Verschlossen",
+    "unsecured"         =>  "Nicht Gesichert",
+    "secured"           =>  "Gesichert",
+    "protected"         =>  "Geschützt",
+    "guarded"           =>  "Überwacht"
+    );
+    
+my $alarm_tt;
 
 #########################################################################################
 #
@@ -59,14 +163,25 @@ sub Alarm_Initialize ($) {
   $hash->{GetFn}       = "Alarm_Get";
   $hash->{UndefFn}     = "Alarm_Undef";   
   #$hash->{AttrFn}      = "Alarm_Attr";
-  my $attst            = "lockstate:lock,unlock statedisplay:simple,color,table,none armdelay armwait armact disarmact cancelact";
+  my $attst            = "lockstate:locked,unlocked testbutton:0,1 statedisplay:simple,color,table,none armdelay armwait armact disarmact cancelact";
   for( my $level=0;$level<$alarmno;$level++ ){
      $attst .=" level".$level."start level".$level."end level".$level."msg level".$level."xec:0,1 level".$level."onact level".$level."offact ";
   }
   $hash->{AttrList}    = $attst;
   
+  if( !defined($alarm_tt) ){
+    #-- in any attribute redefinition readjust language
+    my $lang = AttrVal("global","language","EN");
+    if( $lang eq "DE"){
+      $alarm_tt = \%alarm_transtable_DE;
+    }else{
+      $alarm_tt = \%alarm_transtable_EN;
+    }
+  }
+  $alarmlinkname = $alarm_tt->{"alarms"};
+  
   $data{FWEXT}{Alarmx}{LINK} = "?room=".$alarmhiddenroom;
-  $data{FWEXT}{Alarmx}{NAME} = $alarmname;				  
+  $data{FWEXT}{Alarmx}{NAME} = $alarmlinkname;				  
 	
   return undef;
 }
@@ -80,19 +195,33 @@ sub Alarm_Initialize ($) {
 #########################################################################################
 
 sub Alarm_Define ($$) {
- my ($hash, $def) = @_;
- my $now = time();
- my $name = $hash->{NAME}; 
- $hash->{VERSION} = $alarmversion;
- readingsSingleUpdate( $hash, "state", "Initialized", 1 ); 
- 
- $alarmhiddenroom = defined($attr{$name}{"hiddenroom"})  ? $attr{$name}{"hiddenroom"} : $alarmhiddenroom;  
- $alarmpublicroom = defined($attr{$name}{"publicroom"})  ? $attr{$name}{"publicroom"} : $alarmpublicroom; 
+  my ($hash, $def) = @_;
+  my $now = time();
+  my $name = $hash->{NAME}; 
+  $hash->{VERSION} = $alarmversion;
   
- RemoveInternalTimer($hash);
- InternalTimer      ($now + 5, 'Alarm_CreateEntry', $hash, 0);
+  #-- readjust language
+  my $lang = AttrVal("global","language","EN");
+  if( $lang eq "DE"){
+    $alarm_tt = \%alarm_transtable_DE;
+  }else{
+    $alarm_tt = \%alarm_transtable_EN;
+  }
+  
+  readingsSingleUpdate( $hash, "state", "Initialized", 1 ); 
+ 
+  $alarmhiddenroom           = defined($attr{$name}{"hiddenroom"})  ? $attr{$name}{"hiddenroom"} : $alarmhiddenroom;  
+  $alarmpublicroom           = defined($attr{$name}{"publicroom"})  ? $attr{$name}{"publicroom"} : $alarmpublicroom; 
+  $data{FWEXT}{Alarmx}{LINK} = "?room=".$alarmhiddenroom;
+  $data{FWEXT}{Alarmx}{NAME} = $alarmlinkname;
+  $attr{$name}{"room"}       = $alarmhiddenroom;
+ 
+  $modules{Alarm}{defptr}{$name} = $hash;
+  
+  RemoveInternalTimer($hash);
+  InternalTimer      ($now + 5, 'Alarm_CreateEntry', $hash, 0);
 
- return;
+  return;
 }
 
 #########################################################################################
@@ -105,8 +234,14 @@ sub Alarm_Define ($$) {
 
 sub Alarm_Undef ($$) {
   my ($hash,$arg) = @_;
+  my $name = $hash->{NAME};
   
   RemoveInternalTimer($hash);
+  delete $data{FWEXT}{Alarmx};
+  if (defined $defs{$name."_weblink"}) {
+      FW_fC("delete ".$name."_weblink");
+      Log3 $hash, 3, "[".$name. " V".$alarmversion."]"." Weblink ".$name."_weblink deleted";
+  }
   
   return undef;
 }
@@ -121,6 +256,16 @@ sub Alarm_Undef ($$) {
 
 sub Alarm_Attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
+  
+  my $hash = $defs{"$name"};
+  
+  #-- in any attribute redefinition readjust language
+  my $lang = AttrVal("global","language","EN");
+  if( $lang eq "DE"){
+    $alarm_tt = \%alarm_transtable_DE;
+  }else{
+    $alarm_tt = \%alarm_transtable_EN;
+  }
   return;  
 }
 
@@ -155,6 +300,7 @@ sub Alarm_CreateEntry($) {
 	     }	
       }
    }
+   
    #-- recover state from stored readings
    for( my $level=0;$level<$alarmno;$level++ ){
       my $val = ReadingsVal($name,"level".$level,"");
@@ -246,22 +392,26 @@ sub Alarm_getstate($) {
   #--------------------------
   if( $type eq "simple" ){
      for( my $level=0;$level<$alarmno;$level++ ){
-       $val = $hash->{READINGS}{"level".$level}{VAL};
-        if( ($val eq "disarmed")||($val eq "armed") ){
-           $res.='O';
+        $val = $hash->{READINGS}{"level".$level}{VAL};
+        if( $val eq "disarmed" ){
+           $res .= '-';
+        }elsif( $val eq "armed" ){
+           $res .= 'O';
         }else{
-           $res.='X';
+           $res .= 'X';
         }
      }
   #--------------------------
   }elsif( $type eq "color" ){
-     $res = '<span style="color:green">';
+     $res = '<span style="color:lightgray">';
      for( my $level=0;$level<$alarmno;$level++ ){
         $val = $hash->{READINGS}{"level".$level}{VAL};
-        if( ($val eq "disarmed")||($val eq "armed") ){
-           $res.=' '.$level;
+        if( $val eq "disarmed" ){
+           $res .= ' '.$level;
+        }elsif( $val eq "armed" ){
+           $res .= ' <span style="width:1ex;font-weight:bold;color:green">'.$level.'</span>';
         }else{
-           $res.=' <span style="width:1ex;color:red">'.$level.'</span>';
+           $res .= ' <span style="width:1ex;font-weight:bold;color:red">'.$level.'</span>';
         }
      }
      $res.='</span>';
@@ -270,16 +420,82 @@ sub Alarm_getstate($) {
      $res = '<table><tr style="height:1ex">';
      for( my $level=0;$level<$alarmno;$level++ ){
         $val = $hash->{READINGS}{"level".$level}{VAL};
-        if( ($val eq "disarmed")||($val eq "armed") ){
-           $res.='<td style="width:1ex;background-color:green"/>';
+        if( $val eq "disarmed" ){
+           $res .= '<td style="width:1ex;background-color:lightgray"/>';
+        }elsif( $val eq "armed" ){
+           $res .= '<td style="width:1ex;background-color:green"/>';
         }else{
-           $res.='<td style="width:1ex;background-color:red"/>';
+           $res .= '<td style="width:1ex;background-color:red"/>';
         }
      }
      $res.='</tr></table>';
   #--------------------------
   }
   return $res;
+}
+
+#########################################################################################
+#
+# Alarm_getsettings - Helper function to assemble the alarm settings for a device
+# 
+# Parameter hash = hash of Alarm device
+#           dev = name of device addressed
+#
+#########################################################################################
+
+sub Alarm_getsettings($$$){
+
+  my ($hash,$dev,$type) = @_;
+  my $chg = 0;
+  my @aval = split('\|',AttrVal($dev, "alarmSettings","|||0:00"));
+  
+  if( $type eq "Actor"){
+    #-- check delay time
+    if( !defined($aval[3]) || $aval[3] eq "" ){
+      $aval[3] = "";
+      $chg     = 1;
+    }elsif( $aval[3] =~ /^\d+$/ ){
+      $aval[3] = sprintf("00:%02d",$aval[3]);
+      $chg     = 1;
+    }elsif( $aval[3] !~ /^(\d\d:)?\d\d:\d\d/ ){
+      Log3 $hash, 1, "[Alarm] Delay time $aval[3] ill defined for alarmActor $dev";
+      $aval[3] = "";
+      $chg     = 1;
+    }
+    #-- 
+    if( int(@aval) != 4){
+      Log3 $hash, 1, "[Alarm] Settings incomplete for alarmActor $dev";
+    }
+  }  
+  
+  if( $chg==1 ){
+    CommandAttr(undef,$dev.'alarmSettings '.join('|',@aval));
+  }
+  return @aval;
+}
+
+#########################################################################################
+#
+# Alarm_Test - Test an actor
+# 
+# Parameter name  = name of the Alarm definition
+#           cmd   =  
+#
+#########################################################################################
+
+sub Alarm_Test($$){
+
+   my ($name,$cmd) = @_;
+   my $hash  = $defs{$name};
+   
+    $cmd =~ s/\$NAME/Gerät/g;
+    $cmd =~ s/\$EVENT/Event/g;
+    $cmd =~ s/\$SHORT/Kurznachricht/g;
+    #for( my $i=1;$i<= int(@evtpart);$i++){
+    #     $cmd =~ s/\$EVTPART$i/$evtpart[$i-1]/g;
+    #}
+    fhem($cmd); 
+   
 }
 
 #########################################################################################
@@ -395,8 +611,16 @@ sub Alarm_Exec($$$$$){
             #Log3 $hash,1,"[Alarm] Killing delayed action $name";
             CommandDelete(undef,"$mga");
          }
+         #-- replace some parts
+         my @evtpart = split(" ",$evt);
          #-- calling actors BEFORE state update
          $cmd = AttrVal($name, "level".$level."offact", 0);
+         $cmd =~ s/\$NAME/$dev/g;
+         $cmd =~ s/\$EVENT/$evt/g;
+         $cmd =~ s/\$SHORT/$mga/g;
+         for( my $i=1;$i<= int(@evtpart);$i++){
+           $cmd =~ s/\$EVTPART$i/$evtpart[$i-1]/g;
+         }
          fhem($cmd);
          $cmd = AttrVal($name, "cancelact", 0);
          fhem($cmd)
@@ -632,29 +856,27 @@ sub Alarm_CreateNotifiers($){
            foreach my $d (sort keys %defs ) {
               next if(IsIgnored($d));
               if( AttrVal($d, "alarmDevice","") eq "Actor" ) {
-                 my @aval = split('\|',AttrVal($d, "alarmSettings",""));
+                 my @aval = Alarm_getsettings($hash,$d,"Actor");
                  if( int(@aval) != 4){
                    Log3 $hash, 5, "[Alarm $level] Settings incomplete for alarmActor $d";
                    next;
                  }
                  if( index($aval[0],"alarm".$level) != -1 ){
                     #-- activate without delay 
-                    if(( $aval[3] eq "0" )||($aval[3] eq "0:00")||($aval[3] eq "00:00")){
+                    if(( $aval[3] eq "" )||($aval[3] eq "00:00")){
                        $cmd  .= $aval[1].';';
                     #-- activate with delay
                     } else {
                        $nonum++;
                        my @tarr = split(':',$aval[3]);
-                       if( int(@tarr) == 1){   
-                          if( $aval[3] > 59 ){
-                             Log3 $hash,3,"[Alarm $level] Invalid delay specification for actor $d: $aval[3] > 59";
-                             $cmd = '';
-                          } else {
-                             $cmd  .= sprintf('define alarm%1ddly%1d at +00:00:%02d %s;',$level,$nonum,$aval[3],$aval[1]);       
-                          }
-                       }elsif( int(@tarr) == 2){
-                          $cmd  .= sprintf('define alarm%1ddly%1d at +00:%02d:%02d %s;',$level,$nonum,$tarr[0],$tarr[1],$aval[1]);
-                       }      
+                       if( int(@tarr) == 2){
+                         $cmd  .= sprintf('define alarm%1ddly%1d at +00:%02d:%02d %s;',$level,$nonum,$tarr[0],$tarr[1],$aval[1]);
+                       }elsif( int(@tarr) == 3){
+                         $cmd  .= sprintf('define alarm%1ddly%1d at +%02d:%02d:%02d %s;',$level,$nonum,$tarr[0],$tarr[1],$tarr[2],$aval[1]); 
+                       }else{
+                         Log3 $name,1,"[Alarm $level] Invalid delay specification for actor $d, skipped";
+                         $cmd  .= $aval[1].';';  
+                       }
                     }
                     $cmd2 .= $aval[2].';'
                       if( $aval[2] ne '' );
@@ -712,6 +934,16 @@ sub Alarm_Html($)
     my $hash = $defs{$name};
     my $id = $defs{$name}{NR};
     
+    if( !defined($alarm_tt) ){
+      #-- readjust language
+      my $lang = AttrVal("global","language","EN");
+      if( $lang eq "DE"){
+        $alarm_tt = \%alarm_transtable_DE;
+      }else{
+        $alarm_tt = \%alarm_transtable_EN;
+      }
+    }
+    
     #-- 
     readingsSingleUpdate( $hash, "state", Alarm_getstate($hash)." ".$hash->{READINGS}{"short"}{VAL}, 1 );
  
@@ -722,16 +954,16 @@ sub Alarm_Html($)
     #--
     $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/alarm.js\"></script><script type=\"text/javascript\">\n";
     $ret .= "var alarmno = ".$alarmno.";\n";
-    for( my $k=0;$k<$alarmno;$k++ ){
-      $ret .= "ah.setItem('l".$k."s','".AttrVal($name, "level".$k."start", 0)."');\n"
-        if( defined AttrVal($name, "level".$k."start", 0));
-      $ret .= "ah.setItem('l".$k."e','".AttrVal($name, "level".$k."end", 0)."');\n"
-        if( defined AttrVal($name, "level".$k."end", 0));
-      $ret .= "ah.setItem('l".$k."m','".AttrVal($name, "level".$k."msg", 0)."');\n"
-        if( defined AttrVal($name, "level".$k."msg", 0));
-      $ret .= "ah.setItem('l".$k."x','".AttrVal($name, "level".$k."xec", 0)."');\n"
-        if( defined AttrVal($name, "level".$k."xec", 0));
-    }
+    #for( my $k=0;$k<$alarmno;$k++ ){
+    #  $ret .= "ah.setItem('l".$k."s','".AttrVal($name, "level".$k."start", 0)."');\n"
+    #    if( defined AttrVal($name, "level".$k."start", 0));
+    #  $ret .= "ah.setItem('l".$k."e','".AttrVal($name, "level".$k."end", 0)."');\n"
+    #    if( defined AttrVal($name, "level".$k."end", 0));
+    #  $ret .= "ah.setItem('l".$k."m','".AttrVal($name, "level".$k."msg", 0)."');\n"
+    #    if( defined AttrVal($name, "level".$k."msg", 0));
+    #  $ret .= "ah.setItem('l".$k."x','".AttrVal($name, "level".$k."xec", 0)."');\n"
+    #    if( defined AttrVal($name, "level".$k."xec", 0));
+    #}
     $ret .= "</script>\n";
     
     $ret .= "<table class=\"roomoverview\">\n";
@@ -739,25 +971,26 @@ sub Alarm_Html($)
     
     #-- settings table
     my $row=1;
-    $ret .= "<tr><td><div class=\"devType\">Settings</div></td></tr>";
+    $ret .= "<tr><td><div class=\"devType\">".$alarm_tt->{"settings"}."</div></td></tr>";
     $ret .= "<tr><td><table class=\"block wide\" id=\"settingstable\">\n"; 
     $ret .= "<tr class=\"odd\"><td class=\"col1\" colspan=\"4\"><table id=\"armtable\" border=\"0\">\n";
-    $ret .= "<tr class==\"odd\"><td class=\"col1\" align=\"right\">Arm Button &#8608</td>";
-    $ret .=                    "<td class=\"col2\" align=\"right\"> Wait Action ";
+    $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"text-align:right\">".$alarm_tt->{"armbutton"}."&nbsp;&#8608</td>";
+    $ret .=                    "<td class=\"col2\" style=\"text-align:right\"> ".$alarm_tt->{"waitaction"}." ";
     $ret .= sprintf("<input type=\"text\" id=\"armwait\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",(AttrVal($name, "armwait","") eq "1")?"":AttrVal($name, "armwait","")); 
-    $ret .=               "</td><td class=\"col3\" rowspan=\"2\"> &#8628 Delay <br> &#8626";
+    $ret .=               "</td><td class=\"col3\" rowspan=\"2\"> &#8628 ".$alarm_tt->{"delay"}."<br> &#8626";
     $ret .= sprintf("<input type=\"text\" id=\"armdelay\" size=\"4\" maxlength=\"5\" value=\"%s\"/>",(AttrVal($name, "armdelay","0:00") eq "1")?"":AttrVal($name, "armdelay","0:00"));
     $ret .=               "</td></tr>\n"; 
-    $ret .= "<tr class==\"even\"><td class=\"col1\"></td><td class=\"col2\" align=\"right\">Arm Action ";
+    $ret .= "<tr class=\"even\"><td class=\"col1\"></td><td class=\"col2\" style=\"text-align:right\">".$alarm_tt->{"armaction"}." ";
     $ret .= sprintf("<input type=\"text\" id=\"armaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",(AttrVal($name, "armact","") eq "1")?"":AttrVal($name, "armact","")); 
     $ret .=               "</td></tr>\n";
-    $ret .="<tr class==\"odd\"><td class=\"col1\">Disarm Button &#8608</td><td class=\"col2\" align=\"right\">Disarm Action ";
+    $ret .="<tr class=\"odd\"><td class=\"col1\" style=\"text-align:right\">".$alarm_tt->{"disarmbutton"}."&#8608</td><td class=\"col2\" style=\"text-align:right\">".$alarm_tt->{"disarmaction"}." ";
     $ret .= sprintf("<input type=\"text\" id=\"disarmaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",(AttrVal($name, "disarmact","") eq "1")?"":AttrVal($name, "disarmact","")); 
-    $ret .= "</td><td></td></tr><tr class==\"odd\"><td class=\"col1\">Cancel Button &#8608</td><td class=\"col2\" align=\"right\"> Cancel Action ";
+    $ret .= "</td><td></td></tr><tr class=\"odd\"><td class=\"col1\" style=\"text-align:right\">".$alarm_tt->{"cancelbutton"}."&nbsp;&#8608</td><td class=\"col2\" style=\"text-align:right\"> ".$alarm_tt->{"cancelaction"}." ";
     $ret .= sprintf("<input type=\"text\" id=\"cancelaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",(AttrVal($name, "cancelact","") eq "1")?"":AttrVal($name, "cancelact","")); 
     $ret .= "</td><td></td></tr></table></td></tr>";
-    $ret .= "<tr class=\"odd\"><td class=\"col1\">Level</td><td class=\"col2\">Time [hh:mm]</td><td class=\"col3\">Message Part II</td>".
-            "<td class=\"col4\">Armed/Cancel</td></tr>\n";
+    $ret .= "<tr class=\"odd\"><td class=\"col1\">".$alarm_tt->{"level"}."</td><td class=\"col2\">".$alarm_tt->{"time"}." [hh:mm]<br/>".
+             $alarm_tt->{"start"}."&nbsp;&nbsp;&nbsp;&nbsp;".$alarm_tt->{"end"}."&nbsp;</td><td class=\"col3\">".$alarm_tt->{"messagepart"}." II</td>".
+            "<td class=\"col4\">".$alarm_tt->{"arm"}."/".$alarm_tt->{"cancel"}."</td></tr>\n";
     for( my $k=0;$k<$alarmno;$k++ ){
       $row++;
       my $sval = AttrVal($name, "level".$k."start", 0);
@@ -771,21 +1004,22 @@ sub Alarm_Html($)
         if( $mval eq "1");
 
       my $xval = AttrVal($name, "level".$k."xec", 0);
-      $ret .= sprintf("<tr class=\"%s\"><td class=\"col1\">Alarm $k</td>\n", ($row&1)?"odd":"even"); 
-      $ret .= "<td class=\"col2\">Start&nbsp;<input type=\"text\" id=\"l".$k."s\" size=\"4\" maxlength=\"120\" value=\"$sval\"/>&nbsp;".
-              "End&nbsp;<input type=\"text\" id=\"l".$k."e\" size=\"4\" maxlength=\"120\" value=\"$eval\"/></td>".
+      $ret .= sprintf("<tr class=\"%s\"><td class=\"col1\">".$alarm_tt->{"alarm"}." $k</td>\n", ($row&1)?"odd":"even"); 
+      $ret .=                          "<td class=\"col2\"><input type=\"text\" id=\"l".$k."s\" size=\"4\" maxlength=\"120\" value=\"$sval\"/>&nbsp;&nbsp;&nbsp;".
+                                                          "<input type=\"text\" id=\"l".$k."e\" size=\"4\" maxlength=\"120\" value=\"$eval\"/></td>".
               "<td class=\"col3\"><input type=\"text\" id=\"l".$k."m\" size=\"25\" maxlength=\"256\" value=\"$mval\"/></td>";
       $ret .= sprintf("<td class=\"col4\"><input type=\"checkbox\" id=\"l".$k."x\" %s onclick=\"javascript:alarm_arm('$name','$k')\"/>",($xval eq "armed")?"checked=\"checked\"":"").
-              "<input type=\"button\" value=\"Cancel\" onclick=\"javascript:alarm_cancel('$name','$k')\"/></td></tr>\n";
+              "<input type=\"button\" value=\"".$alarm_tt->{"cancel"}."\" onclick=\"javascript:alarm_cancel('$name','$k')\"/></td></tr>\n";
     }    
     $ret .= "</table></td></tr></tr>";
    
     #-- sensors table
     $row=1;
-    $ret .= "<tr><td><div class=\"devType\">Sensors</div></td></tr>";
+    $ret .= "<tr><td><div class=\"devType\">".$alarm_tt->{"sensors"}."</div></td></tr>";
     $ret .= "<tr><td><table class=\"block wide\" id=\"sensorstable\">\n"; 
-    $ret .= "<tr class=\"odd\"><td/><td class=\"col2\">Notify to Alarm Level<br/>".join("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",(0..($alarmno-1)))."</td><td class=\"col3\">".
-            "Notify on RegExp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Message Part I</td><td class=\"col4\">Action</td></tr>\n";
+    $ret .= "<tr class=\"odd\" style=\"min-width:100px\"><td/><td class=\"col2\" style=\"min-width:200px\">".$alarm_tt->{"notifyto"}." ".$alarm_tt->{"alarm"}." ".$alarm_tt->{"level"}."<br/>".
+             join("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",(0..($alarmno-1)))."</td><td class=\"col3\">".
+             $alarm_tt->{"notifyby"}." ".$alarm_tt->{"regexp"}."</td><td class=\"col3\">".$alarm_tt->{"messagepart"}." I</td><td class=\"col4\">".$alarm_tt->{"action"}."</td></tr>\n";
     foreach my $d (sort keys %defs ) {
        next if(IsIgnored($d));
        if( AttrVal($d, "alarmDevice","") eq "Sensor" ) {
@@ -795,16 +1029,16 @@ sub Alarm_Html($)
            }
            $row++;
            $ret .= sprintf("<tr class=\"%s\" informId=\"$d\" name=\"sensor\">", ($row&1)?"odd":"even");
-           $ret .= "<td width=\"100\" class=\"col1\"><a href=\"$FW_ME?detail=$d\">$d</a></td>\n";
+           $ret .= "<td width=\"120\" class=\"col1\"><a href=\"$FW_ME?detail=$d\">$d</a></td>\n";
            $ret .= "<td id=\"$d\" class=\"col2\">\n";
            for( my $k=0;$k<$alarmno;$k++ ){
               $ret .= sprintf("<input type=\"checkbox\" name=\"alarm$k\" value=\"$k\" %s/>&nbsp;",(index($aval[0],"alarm".$k) != -1)?"checked=\"checked\"":""); 
            }
-           $ret .= "</td><td class=\"col3\"><input type=\"text\" name=\"alarmnotify\" size=\"13\" maxlength=\"512\" value=\"$aval[1]\"/>";
-           $ret .= "<input type=\"text\" name=\"alarmmsg\" size=\"13\" maxlength=\"512\" value=\"$aval[2]\"/></td>\n"; 
-           $ret .= sprintf("<td class=\"col4\"><select name=\"%sonoff\"><option value=\"on\" %s>Raise</option><option value=\"off\" %s>Cancel</option>",
+           $ret .= "</td><td class=\"col3\"><input type=\"text\" name=\"alarmnotify\" size=\"30\" maxlength=\"512\" value=\"$aval[1]\"/>";
+           $ret .= "</td><td class=\"col3\"><input type=\"text\" name=\"alarmmsg\" size=\"30\" maxlength=\"512\" value=\"$aval[2]\"/></td>\n"; 
+           $ret .= sprintf("<td class=\"col4\"><select name=\"%sonoff\"><option value=\"on\" %s>".$alarm_tt->{"raise"}."</option><option value=\"off\" %s>".$alarm_tt->{"cancel"}."</option>",
                $d,($aval[3] eq "on")?"selected=\"selected\"":"",($aval[3] eq "off")?"selected=\"selected\"":"");
-           $ret .= sprintf("<option value=\"arm\" %s>Arm</option><option value=\"disarm\" %s>Disarm</option><select></td></tr>\n",
+           $ret .= sprintf("<option value=\"arm\" %s>".$alarm_tt->{"arm"}."</option><option value=\"disarm\" %s>".$alarm_tt->{"disarm"}."</option><select></td></tr>\n",
                ($aval[3] eq "arm")?"selected=\"seleced\"":"",($aval[3] eq "disarm")?"selected=\"selected\"":"");
        }
     }  
@@ -812,29 +1046,35 @@ sub Alarm_Html($)
     
     #-- actors table
     $row=1;
-    $ret .= "<tr><td><div class=\"devType\">Actors</div></td></tr>";
+    $ret .= "<tr><td><div class=\"devType\">".$alarm_tt->{"actors"}."</div></td></tr>";
     $ret .= "<tr><td><table class=\"block wide\" id=\"actorstable\">\n"; 
-    $ret .= "<tr class=\"odd\"><td/><td class=\"col2\">Set by Alarm Level<br/>".join("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",(0..($alarmno-1))).
-            "</td><td class=\"col3\">Set Action".
-            "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Unset Action</td><td class=\"col4\">Delay</td></tr>\n";
+    $ret .= "<tr class=\"odd\" style=\"min-width:100px\"><td/><td class=\"col2\" style=\"min-width:200px\">".$alarm_tt->{"setby"}." ".$alarm_tt->{"alarm"}." ".$alarm_tt->{"level"}."<br/>".join("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",(0..($alarmno-1))).
+            "</td><td class=\"col3\">".$alarm_tt->{"setaction"};
+    $ret .= "&nbsp; (".$alarm_tt->{"testaction"}.")"
+             if( AttrVal($name,"testbutton",0) == 1);
+    $ret .= "</td><td class=\"col3\">".$alarm_tt->{"unsetaction"};
+    $ret .= "&nbsp; (".$alarm_tt->{"testaction"}.")"
+             if( AttrVal($name,"testbutton",0) == 1);
+    $ret .= "</td><td class=\"col4\">".$alarm_tt->{"delay"}."<br/>[hh:]mm:ss</td></tr>\n";
     foreach my $d (sort keys %defs ) {
        next if(IsIgnored($d));
        if( AttrVal($d, "alarmDevice","") eq "Actor" ) {
-           my @aval = split('\|',AttrVal($d, "alarmSettings","|||0:00"));
-           if( int(@aval) != 4){
-             Log3 $hash, 1, "[Alarm] Settings incomplete for alarmActor $d";
-             @aval=("","","","");
-           }
+           my @aval = Alarm_getsettings($hash,$d,"Actor");
            $row++;
            $ret .= sprintf("<tr class=\"%s\" informId=\"$d\" name=\"actor\">", ($row&1)?"odd":"even");
-           $ret .= "<td width=\"100\" class=\"col1\"><a href=\"$FW_ME?detail=$d\">$d</a></td>\n";
+           $ret .= "<td width=\"120\" class=\"col1\"><a href=\"$FW_ME?detail=$d\">$d</a></td>\n";
            $ret .= "<td id=\"$d\" class=\"col2\">\n";
            for( my $k=0;$k<$alarmno;$k++ ){
               $ret .= sprintf("<input type=\"checkbox\" name=\"alarm$k\"%s/>&nbsp;",(index($aval[0],"alarm".$k) != -1)?"checked=\"checked\"":""); 
            }
-           $ret .= "</td><td class=\"col3\"><input type=\"text\" name=\"alarmon\" size=\"13\" maxlength=\"512\" value=\"$aval[1]\"/>"; 
-           $ret .= "<input type=\"text\" name=\"alarmaoff\" size=\"13\" maxlength=\"512\" value=\"$aval[2]\"/></td>"; 
-           $ret .= "<td class=\"col4\"><input type=\"text\" name=\"delay\" size=\"4\" maxlength=\"5\" value=\"$aval[3]\"/></td></tr>\n";
+           $ret .= "</td><td class=\"col3\"><input type=\"text\" name=\"alarmon\" size=\"30\" maxlength=\"512\" value=\"$aval[1]\"/>";
+           $ret .= "&nbsp;<input type=\"button\" value=\"T\" onclick=\"javascript:alarm_testaction('$name','$d','set')\"/>"
+             if( AttrVal($name,"testbutton",0) == 1);
+           $ret .= "</td><td class=\"col3\">"; 
+           $ret .= "<input type=\"text\" name=\"alarmoff\" size=\"30\" maxlength=\"512\" value=\"$aval[2]\"/>";
+           $ret .= "&nbsp;<input type=\"button\" value=\"T\" onclick=\"javascript:alarm_testaction('$name','$d','unset')\"/>"
+             if( AttrVal($name,"testbutton",0) == 1);
+           $ret .= "</td><td class=\"col4\"><input type=\"text\" name=\"delay\" size=\"5\" maxlength=\"8\" value=\"$aval[3]\"/></td></tr>\n";
        }
     }  
 	$ret .= "</table></td></tr></tr>\n";
@@ -854,7 +1094,11 @@ sub Alarm_Html($)
    <a name="Alarm"></a>
         <h3>Alarm</h3>
         <p> FHEM module to set up a house alarm system with 8 different alarm levels</p>
+         <a name="Alarmusage"></a>
+        <h4>Usage</h4>
+        See <a href="http://www.fhemwiki.de/wiki/Modul_Alarm">German Wiki page</a>
         <a name="Alarmdefine"></a>
+        <br/>
         <h4>Define</h4>
         <p>
             <code>define &lt;name&gt; Alarm</code>
@@ -893,7 +1137,7 @@ sub Alarm_Html($)
                     &lt;string&gt;</code></a>
                 <br />Room name for hidden alarm room (containing only the Alarm device), default:
                 AlarmRoom</li>
-            <li><a name="alarm_hiddenroom"><code>attr &lt;name&gt; hiddenroom
+            <li><a name="alarm_publicroom"><code>attr &lt;name&gt; publicroom
                     &lt;string&gt;</code></a>
                 <br />Room name for public alarm room (containing sensor/actor devices), default:
                 Alarm</li>
@@ -901,14 +1145,16 @@ sub Alarm_Html($)
                     locked|unlocked</code></a>
                 <br /><i>locked</i> means that alarm setups may not be changed, <i>unlocked</i>
                 means that alarm setups may be changed></li>
+              <li><a name="alarm_testbutton"><code>attr &lt;name&gt; testbutton 0|1</code></a>
+                <br /><i>1</i> means that a test button is displayed for every actor field</li>
             <li><a name="alarm_statedisplay"><code>attr &lt;name&gt; statedisplay
                         simple,color,table,none</code></a>
                 <br />defines how the state of all eight alarm levels is shown. Example for the case
-                when only alarm no. 2 is raised: <ul>
-                    <li> simple = OOXOOOOO</li>
-                    <li> color = <span style="color:green"> 0 1 <span style="width:1ex;color:red"
+                when alarm no. 0 is disarmed and only alarm no. 2 is raised: <ul>
+                    <li> simple = -OXOOOOO</li>
+                    <li> color = <span style="color:lightgray"> 0 </span><span style="font-weight:bold;color:green">1 <span style="font-weight:bold;color:red"
                                 >2</span> 3 4 5 6 7</span></li>
-                    <li> table = HTML mini table with green and red fields for alarms
+                    <li> table = HTML mini table with lightgray, green and red fields for alarms
                     </li>
                     <li> none = no state display</li>
                 </ul>
@@ -939,6 +1185,7 @@ sub Alarm_Html($)
 
 <a name="Alarm"></a>
 <h3>Alarm</h3>
+<a href="https://wiki.fhem.de/wiki/Modul_Alarm">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/commandref.html#Alarm">Alarm</a> 
 
 =end html_DE
 =cut

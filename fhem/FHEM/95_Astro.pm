@@ -48,7 +48,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.33;
+my $astroversion = 1.35;
 
 #-- These we may get on request
 my %gets = (
@@ -1058,7 +1058,7 @@ sub Astro_Compute($){
     $Astro{ObsLat}  = $attr{"global"}{"latitude"};
   }else{
     $Astro{ObsLat}  = 50.0;
-    Log3 $name,1,"[Astro] No latitude attribute set in global device, using 50.0°";
+    Log3 $name,3,"[Astro] No latitude attribute set in global device, using 50.0°";
   }
   if( defined($attr{$name}{"longitude"}) ){
     $Astro{ObsLon}  = $attr{$name}{"longitude"};
@@ -1066,7 +1066,7 @@ sub Astro_Compute($){
     $Astro{ObsLon}  = $attr{"global"}{"longitude"};
   }else{
     $Astro{ObsLon}  = 10.0;
-    Log3 $name,1,"[Astro] No longitude attribute set in global device, using 10.0°";
+    Log3 $name,3,"[Astro] No longitude attribute set in global device, using 10.0°";
   } 
   #-- altitude of observer in meters above WGS84 ellipsoid 
   if( defined($attr{$name}{"altitude"}) ){
@@ -1075,14 +1075,14 @@ sub Astro_Compute($){
     $Astro{ObsAlt}  = $attr{"global"}{"altitude"};
   }else{
     $Astro{ObsAlt}  = 0.0;
-    Log3 $name,1,"[Astro] No altitude attribute set in global device, using 0.0 m above sea level";
+    Log3 $name,3,"[Astro] No altitude attribute set in global device, using 0.0 m above sea level";
   } 
   #-- custom horizon of observer in degrees
   if( defined($attr{$name}{"horizon"}) ){
     $Astro{ObsHor}  = $attr{$name}{"horizon"};
   }else{
     $Astro{ObsHor}  = 0.0;
-    Log3 $name,1,"[Astro] No horizon attribute defined, using 0.0°";
+    Log3 $name,5,"[Astro] No horizon attribute defined, using 0.0°";
   } 
   
   #-- internal variables converted to Radians and km 
@@ -1437,6 +1437,6 @@ sub Astro_Get($@) {
 
 <a name="Astro"></a>
 <h3>Astro</h3>
-Keine deutsche Dokumentation vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#Astro">Astro</a> 
+Absichtlich keine deutsche Dokumentation vorhanden, die englische Version gibt es hier: <a href="/fhem/commandref.html#Astro">Astro</a> 
 =end html_DE
 =cut

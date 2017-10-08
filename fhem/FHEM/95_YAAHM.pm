@@ -48,7 +48,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";    # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.07";
+my $yaahmversion    = "1.09";
 my $firstcall=1;
     
 my %yaahm_transtable_EN = ( 
@@ -799,7 +799,7 @@ sub YAAHM_Get($@) {
     $res .= "  }\n}\n";
     return $res;
   } else {
-    return "Unknown argument $arg choose one of version template";
+    return "Unknown argument $arg choose one of version:noArg template:noArg";
   }
 }
 
@@ -885,18 +885,22 @@ sub YAAHM_setParm($@) {
     $val = $a[3];
     if( ($val eq "undef")||($val eq "") ){
          $val = undef;
-    }elsif( $val !~ /\d?\d:\d\d/ ){
-      $msg = "wrong time specification next=$val for weekly timer ".$a[1].", must be hh:mm";
-      Log 1,"[YAAHM_setParm] ".$msg;
-      $val = "07:00";
-    }else{
+    }elsif( $val =~/^off/ ){
+      #-- ok
+    }elsif( $val =~ /\d?\d:\d\d/ ){
+      #-- ok
       my ($hour,$min) = split(':',$val);
       if( $hour>23 || $min>59 ){
         $msg = "wrong time specification next=$val for weekly timer > 23:59".$a[1];
         Log 1,"[YAAHM_setParm] ".$msg;
-        $val = "07:00";
+        $val = "off";
       }
+    }else{
+      $msg = "wrong time specification next=$val for weekly timer ".$a[1].", must be hh:mm of 'off'";
+      Log 1,"[YAAHM_setParm] ".$msg;
+      $val = "off";
     }
+     
     $hash->{DATA}{"WT"}[$a[1]]{"next"}      = $val;
     $hash->{DATA}{"WT"}[$a[1]]{"acti_m"}    = $a[4];
     $hash->{DATA}{"WT"}[$a[1]]{"acti_d"}    = $a[5];
@@ -905,20 +909,20 @@ sub YAAHM_setParm($@) {
       $val = $a[$i+6];
       if( ($val eq "undef")||($val eq "") ){
         $val = undef;
-      }elsif( ($i<3) && ($val !~ /\d?\d:\d\d/)){
-        $msg = "wrong time specification $val for weekly timer ".$a[1].", must be hh:mm";
-        Log 1,"[YAAHM_setParm] ".$msg;
-        $val = "07:00";
       }elsif( $val =~/^off/ ){
         #-- ok
-      }else{
+      }elsif( $val =~ /\d?\d:\d\d/ ){
         #-- ok
         my ($hour,$min) = split(':',$val);
         if( $hour>23 || $min>59 ){
           $msg = "wrong time specification $val for weekly timer > 23:59 ".$a[1];
           Log 1,"[YAAHM_setParm] ".$msg;
-          $val = "07:00";
+          $val = "off";
         }
+      }else{
+        $msg = "wrong time specification $val for weekly timer ".$a[1].", must be hh:mm or 'off'";
+        Log 1,"[YAAHM_setParm] ".$msg;
+        $val = "off";
       }
       $hash->{DATA}{"WT"}[$a[1]]{$weeklytable[$i]} = $val;
     }
@@ -1011,14 +1015,16 @@ sub YAAHM_time {
   readingsBulkUpdate($hash,"tr_housephase",$yaahm_tt->{$targetphase});
   readingsEndUpdate($hash,1); 
   
-  #-- execute function not required by call from external timer
+  #-- helper function not executed, e.g. by call from external timer
   return
     if( !defined($exec) );
   
-  #-- doit
+  #-- execute the helper function
   my $xval;  
   my $ival;
   my $wupn;
+  
+  #-- todo here: what should we do, if the timer is NOT enabled and we get up or go to bed anyhow ???
   if( $targettime eq "wakeup" ){
     $wupn = $hash->{DATA}{"WT"}[0]{"name"};
     $ival = (ReadingsVal($name.".wtimer_0.IF","mode","") ne "disabled");
@@ -1551,7 +1557,7 @@ sub YAAHM_setWeeklyTime($) {
     #-- now check if next time is already past 
     my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
     my $lga  = sprintf("%02d%02d",$hour,$min);
-    my $nga  = $ng;
+    my $nga  = (defined $ng)?$ng:"";
     $nga  =~ s/://;
     
     #-- arbitrary today, next off
@@ -2335,57 +2341,57 @@ sub YAAHM_timewidget($){
   my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
   my $t_now      = sprintf("%02d:%02d",$hour,$min);
   my $a_now  = (60*$hour + $min)/1440 * 2 * pi;
-  my $x_now  = -int(sin($a_now)*$radius*10)/10;
-  my $y_now  =  int(cos($a_now)*$radius*10)/10;
+  my $x_now  = -int(sin($a_now)*$radius*100)/100;
+  my $y_now  =  int(cos($a_now)*$radius*100)/100;
   
   my $t_sunrise  = defined($hash->{DATA}{"DD"}[0]{"sunrise"}) ? $hash->{DATA}{"DD"}[0]{"sunrise"} : "06:00";
   $t_sunrise     =~ s/^0//;
   ($hour,$min) = split(":",$t_sunrise);
   my $a_sunrise  = (60*$hour + $min)/1440 * 2 * pi;
-  my $x_sunrise  = -int(sin($a_sunrise)*$radius*10)/10;
-  my $y_sunrise  =  int(cos($a_sunrise)*$radius*10)/10;
+  my $x_sunrise  = -int(sin($a_sunrise)*$radius*100)/100;
+  my $y_sunrise  =  int(cos($a_sunrise)*$radius*100)/100;
   
   my $t_morning  = defined($hash->{DATA}{"DT"}{"morning"}[0]) ? $hash->{DATA}{"DT"}{"morning"}[0] : "08:00";
   $t_morning     =~ s/^0//;
   ($hour,$min) = split(":",$t_morning);
   my $a_morning  = (60*$hour + $min)/1440 * 2 * pi;
-  my $x_morning  = -int(sin($a_morning)*$radius*10)/10;
-  my $y_morning  =  int(cos($a_morning)*$radius*10)/10;
+  my $x_morning  = -int(sin($a_morning)*$radius*100)/100;
+  my $y_morning  =  int(cos($a_morning)*$radius*100)/100;
   
   my $t_noon  = defined($hash->{DATA}{"DT"}{"noon"}[0]) ? $hash->{DATA}{"DT"}{"noon"}[0] : "12:00";
   $t_noon     =~ s/^0//;
   ($hour,$min) = split(":",$t_noon);
   my $a_noon  = (60*$hour + $min)/1440 * 2 * pi;
-  my $x_noon  = -int(sin($a_noon)*$radius*10)/10;
-  my $y_noon  =  int(cos($a_noon)*$radius*10)/10;
+  my $x_noon  = -int(sin($a_noon)*$radius*100)/100;
+  my $y_noon  =  int(cos($a_noon)*$radius*100)/100;
   
   my $t_afternoon  = defined($hash->{DATA}{"DT"}{"afternoon"}[0]) ? $hash->{DATA}{"DT"}{"afternoon"}[0] : "14:00";
   $t_afternoon     =~ s/^0//;
   ($hour,$min) = split(":",$t_afternoon);
   my $a_afternoon  = (60*$hour + $min)/1440 * 2 * pi;
-  my $x_afternoon  = -int(sin($a_afternoon)*$radius*10)/10;
-  my $y_afternoon  =  int(cos($a_afternoon)*$radius*10)/10;
+  my $x_afternoon  = -int(sin($a_afternoon)*$radius*100)/100;
+  my $y_afternoon  =  int(cos($a_afternoon)*$radius*100)/100;
   
   my $t_sunset  = defined($hash->{DATA}{"DD"}[0]{"sunset"}) ? $hash->{DATA}{"DD"}[0]{"sunset"} : "18:00";
   $t_sunset     =~ s/^0//;
   ($hour,$min) = split(":",$t_sunset);
   my $a_sunset  = (60*$hour + $min)/1440 * 2 * pi;
-  my $x_sunset  = -int(sin($a_sunset)*$radius*10)/10;
-  my $y_sunset  =  int(cos($a_sunset)*$radius*10)/10;
+  my $x_sunset  = -int(sin($a_sunset)*$radius*100)/100;
+  my $y_sunset  =  int(cos($a_sunset)*$radius*100)/100;
     
   my $t_evening  = defined($hash->{DATA}{"DT"}{"evening"}[0]) ? $hash->{DATA}{"DT"}{"evening"}[0] : "19:00";
   $t_evening     =~ s/^0//;
   ($hour,$min) = split(":",$t_evening);
   my $a_evening  = (60*$hour + $min)/1440 * 2 * pi;
-  my $x_evening  = -int(sin($a_evening)*$radius*10)/10;
-  my $y_evening  =  int(cos($a_evening)*$radius*10)/10;
+  my $x_evening  = -int(sin($a_evening)*$radius*100)/100;
+  my $y_evening  =  int(cos($a_evening)*$radius*100)/100;
   
   my $t_night  = defined($hash->{DATA}{"DT"}{"night"}[0]) ? $hash->{DATA}{"DT"}{"night"}[0] : "22:00";
   $t_night     =~ s/^0//;
   ($hour,$min) = split(":",$t_night);
   my $a_night  = (60*$hour + $min)/1440 * 2 * pi;
-  my $x_night  = -int(sin($a_night)*$radius*10)/10;
-  my $y_night  =  int(cos($a_night)*$radius*10)/10;
+  my $x_night  = -int(sin($a_night)*$radius*100)/100;
+  my $y_night  =  int(cos($a_night)*$radius*100)/100;
   FW_pO  '<defs>'.
          sprintf('<linearGradient id="grad1" x1="0%%" y1="0%%" x2="%d%%" y2="%d%%">',int(-$x_noon/$radius*100),int(-$y_noon/$radius*100)).
          '<stop offset="0%" style="stop-color:rgb(255,255,0);stop-opacity:1" />'.
@@ -2404,19 +2410,19 @@ sub YAAHM_timewidget($){
   FW_pO      '<g id="Ebene_1" transform="translate(400,400)">';
   
   #-- daytime arc
-  FW_pO      ' <path d="M0 0 '.($x_morning*1.1).' '.($y_morning*1.1). 'A'.($radius*1.1).' '.($radius*1.1).' 0 1 1'.($x_night*1.1).' '.($y_night*1.1).'Z" fill="none" stroke="rgb(0,255,200)" stroke-width="15" />';
+  FW_pO      ' <path d="M 0 0 '.($x_morning*1.1).' '.($y_morning*1.1). ' A '.($radius*1.1).' '.($radius*1.1).' 0 1 1 '.($x_night*1.1).' '.($y_night*1.1).' Z" fill="none" stroke="rgb(0,255,200)" stroke-width="15" />';
   
   #-- sunset to sunrise sector
-  FW_pO 	 '<path d="M0 0 '.$x_sunset. ' '.$y_sunset. 'A'.$radius.' '.$radius.' 0 0 1'.$x_sunrise.' '.$y_sunrise.'Z" fill="rgb(70,70,100)"/>'; 
+  FW_pO 	 '<path d="M 0 0 '.$x_sunset. ' '.$y_sunset. ' A '.$radius.' '.$radius.' 0 0 1 '.$x_sunrise.' '.$y_sunrise.' Z" fill="rgb(70,70,100)"/>'; 
     
   #-- sunrise to morning sector
-  FW_pO 	 '<path d="M0 0 '.$x_sunrise.' '.$y_sunrise.'A'.$radius.' '.$radius.' 0 0 1'.$x_morning.' '.$y_morning.'Z" fill="url(#grad2)"/>';
+  FW_pO 	 '<path d="M 0 0 '.$x_sunrise.' '.$y_sunrise.' A '.$radius.' '.$radius.' 0 0 1 '.$x_morning.' '.$y_morning.' Z" fill="url(#grad2)"/>';
   
   #-- morning to evening sector
-  FW_pO 	 '<path d="M0 0 '.$x_morning.' '.$y_morning.'A'.$radius.' '.$radius.' 0 0 1'.$x_evening.' '.$y_evening.'Z" fill="url(#grad1)"/>';
+  FW_pO 	 '<path d="M 0 0 '.$x_morning.' '.$y_morning.' A '.$radius.' '.$radius.' 0 0 1 '.$x_evening.' '.$y_evening.' Z" fill="url(#grad1)"/>';
   
   #-- evening to sunset sector
-  FW_pO 	 '<path d="M0 0 '.$x_evening.' '.$y_evening.'A'.$radius.' '.$radius.' 0 0 1'.$x_sunset.' '.$y_sunset.'Z" fill="url(#grad2)"/>';
+  FW_pO 	 '<path d="M 0 0 '.$x_evening.' '.$y_evening.' A '.$radius.' '.$radius.' 0 0 1 '.$x_sunset.' '.$y_sunset.' Z" fill="url(#grad2)"/>';
   
   #-- midnight line
   FW_pO 	 '<line x1="0" y1="0" x2="0" y2="'.($radius*1.2).'" style="stroke:rgb(75, 75, 75);stroke-width:2" />';
@@ -2914,7 +2920,11 @@ sub YAAHM_Longtable($){
 
    <a name="YAAHM"></a>
         <h3>YAAHM</h3>
-        <p> Yet Another Auto Home Module to set up a cyclic processing of commands (daily, weekly, monthly, yearly profile). See German Wiki page at <a href="/fhem/docs/commandref.html#YAAHM">YAAHM</a></p>
+        <p> Yet Another Auto Home Module to set up a cyclic processing of commands (daily, weekly, monthly, yearly profile)</p>
+          <a name="YAAHMusage"></a>
+        <h4>Usage</h4>
+        See <a href="http://www.fhemwiki.de/wiki/Modul_YAAHM">German Wiki page</a>
+        <br/>
         <a name="YAAHMdefine"></a>
         <h4>Define</h4>
         <p>
@@ -3065,6 +3075,6 @@ sub YAAHM_Longtable($){
 
 <a name="YAAHM"></a>
 <h3>YAAHM</h3>
-<a href="https://wiki.fhem.de/wiki/Modul_YAAHM">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#YAAHM">YAAHM</a> 
+<a href="https://wiki.fhem.de/wiki/Modul_YAAHM">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/commandref.html#YAAHM">YAAHM</a> 
 =end html_DE
 =cut
