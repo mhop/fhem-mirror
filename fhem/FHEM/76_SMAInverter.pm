@@ -28,6 +28,7 @@
 #################################################################################################################
 # Versions History done by DS_Starter
 #
+# 2.9.2    08.10.2017      adapted to use extended abortArg (Forum:77472)
 # 2.9.1    24.04.2017      fix for issue #24 (Wrong INV_TYPE for STP10000TL-20) and fix for issue #25 (unpack out of range for SB1.5-1VL-40)
 # 2.9.0    23.04.2017      fixed issue #22: wrong logon command for SunnyBoy systems
 # 2.8.3    19.04.2017      enhanced inverter Type-Hash
@@ -80,7 +81,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Blocking;
 use Time::Local;
 
-my $SMAInverterVersion = "2.9.1";
+my $SMAInverterVersion = "2.9.2";
 
 # Inverter Data fields and supported commands flags.
 # $inv_SPOT_ETODAY                # Today yield
@@ -460,12 +461,11 @@ sub SMAInverter_GetData($) {
  # decide of operation   
  if(AttrVal($name,"mode","automatic") eq "automatic") {
      # automatic operation mode
-	 $hash->{HELPER}{RUNNING_PID} = BlockingCall("getstatus_DoParse", "$name", "getstatus_ParseDone", $timeout, "SMAI_ParseAborted", $hash);
-     InternalTimer(gettimeofday()+$interval, "SMAInverter_GetData", $hash, 0);	 
- } else {
-     # manual operation mode
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("getstatus_DoParse", "$name", "getstatus_ParseDone", $timeout, "SMAI_ParseAborted", $hash);
- }
+	 InternalTimer(gettimeofday()+$interval, "SMAInverter_GetData", $hash, 0);	 
+ } 
+
+$hash->{HELPER}{RUNNING_PID} = BlockingCall("getstatus_DoParse", "$name", "getstatus_ParseDone", $timeout, "getstatus_ParseAborted", $hash);
+$hash->{HELPER}{RUNNING_PID}{loglevel} = 4;
 
 return;
 }
@@ -964,19 +964,22 @@ return;
 ###############################################################
 #           Abbruchroutine Timeout Inverter Abfrage
 ###############################################################
-sub SMAI_ParseAborted($) {
-  my ($hash)    = @_;
+sub getstatus_ParseAborted(@) {
+  my ($hash,$cause) = @_;
   my $name      = $hash->{NAME};
   my $discycles = $hash->{HELPER}{FAULTEDCYCLES};
+  $cause = $cause?$cause:"Timeout: process terminated";
   
   # count of timeouts since module start
   $discycles++;
   $hash->{HELPER}{FAULTEDCYCLES} = $discycles;
   
-  Log3 ($name, 1, "SMAInverter $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} timed out");
-  readingsSingleUpdate($hash, "state", "timeout", 1);
+  Log3 ($name, 1, "SMAInverter $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} $cause");
+  readingsSingleUpdate($hash,"state",$cause, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});
+
+return;
 }
 
 ##########################################################################
