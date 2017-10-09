@@ -1575,17 +1575,18 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 
     <a name="modpath"></a>
     <li>modpath<br>
-        Mit modpath geben Sie den Pfad zu dem Verzeichnis der <code>FHEM</code> 
-        Module an. Der Pfad enh&auml;lt <b>nicht</b> das Verzeichnis FHEM.
+        Mit modpath geben Sie den Pfad zu dem Verzeichnis der <code>FHEM</code>
+        Module an. Der Pfad enth&auml;lt <b>nicht</b> das Verzeichnis FHEM.
         Durch das setzen der Attribute, wird das Verzeichnis nach Dateinamen in
-        der Form NN_&lt;NAME&gt;.pm, und sie werden f&uuml;r die Definition von
-        Ger&auml;ten unter dem Namen &lt;NAME&gt; verf&uuml;gbar gemacht. Wenn
-        das erste Ger&auml;t&nbsp; des Typs &lt;NAME&gt; definiert wird, werden
-        die entsprechenden Module geladen und in dem Modul die entsprechende
-        Function mit dem Namen &lt;NAME&gt;_Initialize wird aufgerufen. Eine
-        Ausnahme bilden Module die mit der Nummer 99 im Dateinamen beginnen.
-        Diese sind&nbsp; enhalten PERL-Hilfsfunktionen. Die Module werden zur
-        Startzeit geladen (i.e.  modpath attribute definition time).
+        der Form NN_&lt;NAME&gt;.pm durchsucht, und sie werden f&uuml;r die
+        Definition von Ger&auml;ten unter dem Namen &lt;NAME&gt; verf&uuml;gbar
+        gemacht. Wenn das erste Ger&auml;t des Typs &lt;NAME&gt; definiert
+        wird, werden die entsprechenden Module geladen und in dem Modul die
+        entsprechende Funktion mit dem Namen &lt;NAME&gt;_Initialize wird
+        aufgerufen. Eine Ausnahme bilden Module die mit der Nummer 99 im
+        Dateinamen beginnen.  Diese enthalten PERL-Hilfsfunktionen und
+        werden zur Startzeit geladen.
+
     </li><br>
 
     <a name="motd"></a>
@@ -1799,7 +1800,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     f&uuml;r die Verwendung in PERL-&quot;oneliners&quot; eingef&uuml;hrt (s.
     unter perldoc -f localtime). Ausnahmen: $month hat einen Wertebereich von 1
     to 12 und $year ist korrigiert von 1900.
-    Weiterhin enth&auml;t $hms die Zeit in dem HH:MM:SS Format und $today den
+    Weiterhin enth&auml;lt $hms die Zeit in dem HH:MM:SS Format und $today den
     aktuellen Datum in YYYY-MM-DD Format.
     <br>
 
