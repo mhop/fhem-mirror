@@ -2,10 +2,11 @@
 #
 #  77_UWZ.pm
 #
-#  (c) 2015 Tobias D. Oestreicher
+#  (c) 2015-2016 Tobias D. Oestreicher
 #
 #  Special thanks goes to comitters:
-#    - Marko Oldenburg (leongaultier at gmail dot com)
+#       - Marko Oldenburg (leongaultier at gmail dot com)
+#       - Hanjo (Forum) patch for sort by creation
 #  
 #  Storm warnings from unwetterzentrale.de
 #  inspired by 59_PROPLANTA.pm
@@ -60,7 +61,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL           = "UWZ";
-my $version         = "1.6.0";
+my $version         = "1.8.0";
 
 
 
@@ -143,6 +144,10 @@ sub UWZ_Map2Movie($$) {
     ## UK
     $lmap->{'clouds-precipitation-uk'}=$uwz_movie_url.'UWZ_EUROPE_GREATBRITAIN_COMPLETE_niwofi.mp4';
     $lmap->{'currents-uk'}=$uwz_movie_url.'UWZ_EUROPE_GREATBRITAIN_COMPLETE_stfi.mp4';
+    
+    ## IT
+    $lmap->{'niederschlag-wolken-it'}=$uwz_movie_url.'UWZ_EUROPE_ITALY_COMPLETE_niwofi.mp4';
+    $lmap->{'stroemung-it'}=$uwz_movie_url.'UWZ_EUROPE_ITALY_COMPLETE_stfi.mp4';
 
     return $lmap->{$smap};
 }
@@ -165,6 +170,7 @@ sub UWZ_Map2Image($$) {
     my $uwz_pt_url = "http://avisos.centrometeo.pt/images/map/";
     my $uwz_se_url = "http://varningar.vader-alarm.se/images/map/";
     my $uwz_es_url = "http://avisos.alertas-tiempo.es/images/map/";
+    my $uwz_it_url = "http://allarmi.meteo-allerta.it/images/map/";
 
 
     my ( $hash, $smap ) = @_;
@@ -283,6 +289,29 @@ sub UWZ_Map2Image($$) {
 
     ## ES
     $lmap->{'espana'}=$uwz_es_url.'espana_index.png';
+    
+    ## IT
+    $lmap->{'italia'}=$uwz_it_url.'italia_index.png';
+    $lmap->{'valledaosta'}=$uwz_it_url.'valledaosta_index.png';
+    $lmap->{'piemonte'}=$uwz_it_url.'piemonte_index.png';
+    $lmap->{'lombardia'}=$uwz_it_url.'lombardia_index.png';
+    $lmap->{'trentinoaltoadige'}=$uwz_it_url.'trentinoaltoadige_index.png';
+    $lmap->{'friuliveneziagiulia'}=$uwz_it_url.'friuliveneziagiulia_index.png';
+    $lmap->{'veneto'}=$uwz_it_url.'veneto_index.png';
+    $lmap->{'liguria'}=$uwz_it_url.'liguria_index.png';
+    $lmap->{'emiliaromagna'}=$uwz_it_url.'emiliaromagna_index.png';
+    $lmap->{'toscana'}=$uwz_it_url.'toscana_index.png';
+    $lmap->{'marche'}=$uwz_it_url.'marche_index.png';
+    $lmap->{'umbria'}=$uwz_it_url.'umbria_index.png';
+    $lmap->{'lazio'}=$uwz_it_url.'lazio_index.png';
+    $lmap->{'molise'}=$uwz_it_url.'molise_index.png';
+    $lmap->{'abruzzo'}=$uwz_it_url.'abruzzo_index.png';
+    $lmap->{'campania'}=$uwz_it_url.'campania_index.png';
+    $lmap->{'puglia'}=$uwz_it_url.'puglia_index.png';
+    $lmap->{'basilicata'}=$uwz_it_url.'basilicata_index.png';
+    $lmap->{'calabria'}=$uwz_it_url.'calabria_index.png';
+    $lmap->{'sicilia'}=$uwz_it_url.'sicilia_index.png';
+    $lmap->{'sardegna'}=$uwz_it_url.'sardegna_index.png';
 
 
     ## Isobaren
@@ -310,7 +339,7 @@ sub UWZ_Initialize($) {
                         "htmltitleclass ".
                         "htmlsequence:ascending,descending ".
                         "lang ".
-                        "sort_readings_by:severity,start ".
+                        "sort_readings_by:severity,start,creation ".
                         "localiconbase ".
                         "intervalAtWarnLevel ".
                         $readingFnAttributes;
@@ -362,7 +391,10 @@ sub UWZ_Define($$) {
         $hash->{STATE}           = "Search-Mode";
         $hash->{CountryCode}     = uc $a[2];
         $hash->{VERSION}         = $version;
-    } 
+    }
+    
+    $modules{UWZ}{defptr}{$hash->{PLZ}} = $hash;
+    
     return undef;
 }
 
@@ -373,7 +405,9 @@ sub UWZ_Undef($$) {
 
     RemoveInternalTimer( $hash );
     BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
-   
+    
+    delete($modules{UWZ}{defptr}{$hash->{PLZ}});
+    
     return undef;
 }
 
@@ -746,9 +780,15 @@ sub UWZ_Run($) {
     UWZ_Log $hash, 4, "There are ".$uwz_warncount." warnings active";
     my $sortby = AttrVal( $name, 'sort_readings_by',"" );
     my @sorted;
-    if ( $sortby ne "severity" ) {
+    
+    if ( $sortby eq "creation" ) {
+        UWZ_Log $hash, 4, "Sorting by creation";
+        @sorted =  sort { $b->{payload}{creation} <=> $a->{payload}{creation} } @{ $uwz_warnings->{'results'} };
+    
+    } elsif ( $sortby ne "severity" ) {
         UWZ_Log $hash, 4, "Sorting by dtgStart";
         @sorted =  sort { $a->{dtgStart} <=> $b->{dtgStart} } @{ $uwz_warnings->{'results'} };
+        
     } else {
         UWZ_Log $hash, 4, "Sorting by severity";
         @sorted =  sort { $a->{severity} <=> $b->{severity} } @{ $uwz_warnings->{'results'} };
@@ -1658,7 +1698,7 @@ sub UWZSearchAreaID($$) {
       </li>
       <li><code>sort_readings_by</code>
          <br>
-         define how readings will be sortet (start|severity). 
+         define how readings will be sortet (start|severity|creation).  
          <br>
       </li>
       <li><code>htmlsequence</code>
@@ -2051,7 +2091,7 @@ sub UWZSearchAreaID($$) {
       </li>
       <li><code>sort_readings_by</code>
          <br>
-         Sortierreihenfolge der Warnmeldungen. (start|severity). 
+         Sortierreihenfolge der Warnmeldungen. (start|severity|creation).
          <br>
       </li>
       <li><code>htmlsequence</code>

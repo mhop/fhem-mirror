@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 77_UWZ: add new sortby creation and add Italia Maps
   - feature: 49_SSCam: V3.2.3, new optimizeParams command to set cam properties
   - bugfix:  72_FB_CALLMONITOR: fix wrong reverse-search of emergency call 
              (110/112/...), fix missing deletion of phonebook on reread.
