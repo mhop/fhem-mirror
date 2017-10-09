@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: V2.22.10, adapted to use extended abortArg
   - change:  76_SMAInverter: V2.9.2, adapted to use extended abortArg
   - feature: 77_UWZ: add new sortby creation and add Italia Maps
   - feature: 49_SSCam: V3.2.3, new optimizeParams command to set cam properties

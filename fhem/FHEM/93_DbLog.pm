@@ -16,6 +16,8 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.10    04.10.2017       Encode::encode_utf8 of $error, DbLog_PushAsyncAborted adapted to use abortArg (Forum:77472)
+# 2.22.9     04.10.2017       added hint to SVG/DbRep in commandref
 # 2.22.8     29.09.2017       avoid multiple entries in Dopdown-list when creating SVG by group Device:Reading in DbLog_sampleDataFn
 # 2.22.7     24.09.2017       minor fixes in configcheck
 # 2.22.6     22.09.2017       commandref revised
@@ -152,7 +154,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.8";
+my $DbLogVersion = "2.22.10";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -1554,7 +1556,7 @@ sub DbLog_Push(@) {
   $dbh->{PrintError} = 1;
   $dbh->disconnect if ($nh);
 
-return $error;
+return Encode::encode_utf8($error);
 }
 
 #################################################################################################
@@ -2019,7 +2021,7 @@ sub DbLog_PushAsyncDone ($) {
  }
  
   if($error) {
-      readingsSingleUpdate($hash, "state", $error, 1);
+      readingsSingleUpdate($hash, "state", Encode::encode_utf8($error), 1);
   } else {
       readingsSingleUpdate($hash, "state", $state, 0);
   } 
@@ -2041,12 +2043,13 @@ return;
 #############################################################################################
 #           Abbruchroutine Timeout non-blocking asynchron DbLog_PushAsync
 #############################################################################################
-sub DbLog_PushAsyncAborted($) {
-  my ($hash) = @_;
+sub DbLog_PushAsyncAborted(@) {
+  my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
+  $cause = $cause?$cause:"Timeout: process terminated";
   
-  Log3 ($name, 2, "DbLog $name -> $hash->{HELPER}{RUNNING_PID}{fn} timed out");
-  readingsSingleUpdate($hash, "state", "Database access timeout", 1);
+  Log3 ($name, 2, "DbLog $name -> $hash->{HELPER}{RUNNING_PID}{fn} $cause");
+  readingsSingleUpdate($hash,"state",$cause, 1);
   delete $hash->{HELPER}{RUNNING_PID};
 }
 
@@ -4622,7 +4625,13 @@ sub checkUsePK ($$){
  	The module can be downloaded <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/98_FileLogConvert.pm"> here</a>
 	or from directory ./contrib instead.
 	Further informations and help you can find in the corresponding <a href="https://forum.fhem.de/index.php/topic,66383.0.html"> 
-	Forumthread </a>. <br><br>
+	Forumthread </a>. <br><br><br>
+	
+	<b>Reporting and Management of DbLog database content</b> <br><br>
+    By using <a href="https://fhem.de/commandref.html#SVG">SVG</a> database content can be visualized. <br>
+ 	Beyond that the module <a href="https://fhem.de/commandref.html#DbRep">DbRep</a> can be used to prepare tabular 
+	database reports or you can manage the database content with available functions of that module. 
+	<br><br>
 	
   </ul>
   <br>
@@ -5493,7 +5502,13 @@ sub checkUsePK ($$){
  	Dieses Modul kann <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/98_FileLogConvert.pm"> hier</a>
 	bzw. aus dem Verzeichnis ./contrib geladen werden.
 	Weitere Informationen und Hilfestellung gibt es im entsprechenden <a href="https://forum.fhem.de/index.php/topic,66383.0.html"> 
-	Forumthread </a>. <br><br>
+	Forumthread </a>. <br><br><br>
+	
+	<b>Reporting und Management von DbLog-Datenbankinhalten</b> <br><br>
+    Mit Hilfe <a href="https://fhem.de/commandref_DE.html#SVG">SVG</a> können Datenbankinhalte visualisiert werden. <br>
+ 	Darüber hinaus kann das Modul <a href="https://fhem.de/commandref_DE.html#DbRep">DbRep</a> genutzt werden um tabellarische 
+	Datenbankauswertungen anzufertigen oder den Datenbankinhalt mit den zur Verfügung stehenden Funktionen zu verwalten. 
+	<br><br>
 	
   </ul>
   <br>
