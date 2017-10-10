@@ -32,7 +32,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-my $version = "0.9.2";
+my $version = "0.9.3";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -63,7 +63,8 @@ sub WUup_Initialize($) {
       . "wuwinddir wuwindspeedmph wuwindgustmph wuwindgustdir wuwinddir_avg2m  "
       . "wuwinddir_avg2m wuwindgustmph_10m wuwindgustdir_10m wuhumidity "
       . "wusoilmoisture wudewptf wutempf wurainin wudailyrainin wubaromin "
-      . "wusoiltempf wusolarradiation wuUV "
+      . "wusoiltempf wusolarradiation wuUV wuwindspdmph_avg2m wuwinddir_avg2m "
+      . "wuwindgustmph_10m windgustdir_10m "
       . $readingFnAttributes;
     $hash->{VERSION} = $version;
 }
@@ -258,7 +259,7 @@ sub WUup_send($) {
         }
         my $param = {
             url     => $url,
-            timeout => 4,
+            timeout => 6,
             hash    => $hash,
             method  => "GET",
             header =>
@@ -298,6 +299,7 @@ sub WUup_receive($) {
     }
     elsif ( $data ne "" ) {
         Log3 $name, 4, "WUup ($name) - server response: $data";
+        readingsSingleUpdate( $hash, "state", "active", undef );
         readingsSingleUpdate( $hash, "response", $data, undef );
     }
 }
@@ -322,6 +324,9 @@ sub WUup_receive($) {
 #            converted units rounded to 4 decimal places
 # 2017-03-16 implemented non-blocking mode
 # 2017-08-16 integrated RapidFire mode (thanks to Scooty66)
+# 2017-10-10 added windspdmph_avg2m, winddir_avg2m, windgustmph_10m, 
+#            windgustdir_10m (thanks to Aeroschmelz for reminding me)
+#            timeout raised to 6s, fixed state error (thanks to mumpitzstuff)
 #
 ################################################################################
 
