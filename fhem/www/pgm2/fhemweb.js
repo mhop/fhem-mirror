@@ -1367,10 +1367,12 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
   newEl.activateFn = function() {
     if(currVal < min || currVal > max)
       return;
+    if(!slider.offsetWidth)
+      return setTimeout(newEl.activateFn, 1);
     maxX = slider.offsetWidth-sh.offsetWidth;
     offX = (currVal-min)*maxX/(max-min);
     var strVal = (flt ? currVal.toFixed(dp) : ""+parseInt(currVal));
-    sh.innerHTML = strVal
+    sh.innerHTML = strVal;
     sh.setAttribute('style', 'left:'+offX+'px;');
     if(elName)
       slider.nextSibling.setAttribute('value', strVal);
