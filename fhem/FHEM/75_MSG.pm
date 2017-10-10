@@ -1,28 +1,5 @@
+###############################################################################
 # $Id$
-##############################################################################
-#
-#     75_MSG.pm
-#     Dynamic message and notification routing for FHEM
-#
-#     Copyright by Julian Pawlowski
-#     e-mail: julian.pawlowski at gmail.com
-#
-#     This file is part of fhem.
-#
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
-#
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
 #
 #TODO
 # - be able to use type "default" to let read from attr
@@ -40,17 +17,17 @@
 # - delivery options as attributes (like ! or ? to gateways, devices or types)
 # - all messages should be queued and then delivered so a timer may come back
 #   and check the gateway device for successful delivery
+# - fix readings: store texts with \x{0000} notation
+# - end user documentation / commandref !!
 #
-
 package main;
 use strict;
 use warnings;
-use Time::HiRes qw(time);
 use Data::Dumper;
+use Time::HiRes qw(time);
+use utf8;
 
-sub CommandMsg($$;$$);
-
-########################################
+# initialize ##################################################################
 sub MSG_Initialize($$) {
     my %hash = (
         Fn => "CommandMsg",
@@ -62,7 +39,8 @@ sub MSG_Initialize($$) {
     require "$attr{global}{modpath}/FHEM/msgSchema.pm";
 }
 
-########################################
+# regular Fn ##################################################################
+sub CommandMsg($$;$$);
 sub CommandMsg($$;$$) {
     my ( $cl, $msg, $testMode ) = @_;
     my $return = "";
@@ -133,7 +111,7 @@ sub CommandMsg($$;$$) {
     ### extract message details
     ###
 
-    my ( $msgA, $params ) = parseParams($msg);
+    my ( $msgA, $params ) = parseParams($msg, "[^\\S\\n]", " ");
 
     # only use output from parseParams when
     # parameters where found
