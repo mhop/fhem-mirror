@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  42_SYSMON: PERL WARNING: Use of uninitialized value
   - bugfix:  59_WUup.pm: fix state and missing attributes (#695364, #696275)
   - change:  93_DbLog: V2.22.10, adapted to use extended abortArg
   - change:  76_SMAInverter: V2.9.2, adapted to use extended abortArg

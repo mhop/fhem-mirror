@@ -42,7 +42,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.3.2";
+my $VERSION = "2.3.3";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -2851,6 +2851,7 @@ sub SYSMON_getNetworkInfo ($$$) {
         #my @iwData = SYSMON_execute($hash, "/sbin/iwconfig $nName 2>/dev/null");
         my @iwData = SYSMON_execute($hash, "/sbin/iwconfig $nDef 2>/dev/null");
         foreach (@iwData) {
+          next unless ($_);
           if($_=~ m/Bit\sRate+(=|:)*(\S*)/) {
             $speed=$2;
           }
