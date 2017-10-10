@@ -184,6 +184,15 @@ sub cref_search {
         $skip = 1;
      } elsif(!$skip) {
         $output .= "$l\n";
+        if($l =~ m,INSERT_DOC_FROM: ([^ ]+)/([^ /]+) ,) {
+          my ($dir, $re) = ($1, $2);
+          if(opendir(DH, $dir)) {
+            foreach my $file (grep { m/^$2$/ } readdir(DH)) {
+              $output .= cref_search("$dir/$file", $lang);
+            }
+            closedir(DH);
+          }
+        }
      }
    }
    return $output;
