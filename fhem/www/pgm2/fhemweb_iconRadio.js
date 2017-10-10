@@ -153,6 +153,7 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
     If &lt;icon&gt; is no icon name, the text will be displayed, otherwise
     the icon. If nothing is specified, the reference value will be displayed.<br>
   </li>
+<br>
 =end html
 =begin html_DE
 
@@ -198,6 +199,7 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
     angezeigt, sonst das Icon. Wird &lt;icon&gt; nicht angegeben,
     wird der Vergleichwert angezeigt.<br>
   </li>
+<br>
 =end html_DE
 =cut
 */
