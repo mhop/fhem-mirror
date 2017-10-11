@@ -58,8 +58,8 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.11";
-my $flowsetversion = "4.0.10";
+my $modulversion = "4.0.12";
+my $flowsetversion = "4.0.11";
 
 
 
@@ -463,6 +463,13 @@ sub AMADDevice_Set($$@) {
         $method     = "POST";
     }
     
+    elsif( lc $cmd eq 'userflowrun' ) {
+        my $flow            = join( " ", @args );
+
+        $uri                = $host . ":" . $port . "/fhem-amad/setCommands/flowRun?flowname=".urlEncode($flow);
+        $method     = "POST";
+    }
+    
     elsif( lc $cmd eq 'volume' or $cmd eq 'mute' or $cmd =~ 'volume[Down|Up]' ) {
         my $vol     = AMADDevice_CreateVolumeValue($hash,$cmd,@args);
     
@@ -689,7 +696,7 @@ sub AMADDevice_Set($$@) {
         my $btdev = AttrVal( $name, "setBluetoothDevice", "none" );
         
         
-        my $list = "screenMsg ttsMsg mediaGoogleMusic:play/pause,stop,next,back mediaSamsungMusic:play/pause,stop,next,back mediaAmazonMusic:play/pause,stop,next,back mediaSpotifyMusic:play/pause,stop,next,back mediaTuneinRadio:play/pause,stop,next,back mediaAldiMusic:play/pause,stop,next,back mediaYouTube:play/pause,stop,next,back mediaYouTubeKids:play/pause,stop,next,back mediaVlcPlayer:play/pause,stop,next,back mediaAudible:play/pause,stop,next,back screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg";
+        my $list = "screenMsg ttsMsg mediaGoogleMusic:play/pause,stop,next,back mediaSamsungMusic:play/pause,stop,next,back mediaAmazonMusic:play/pause,stop,next,back mediaSpotifyMusic:play/pause,stop,next,back mediaTuneinRadio:play/pause,stop,next,back mediaAldiMusic:play/pause,stop,next,back mediaYouTube:play/pause,stop,next,back mediaYouTubeKids:play/pause,stop,next,back mediaVlcPlayer:play/pause,stop,next,back mediaAudible:play/pause,stop,next,back screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState userFlowRun sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg";
 
         $list .= " screenOrientation:auto,landscape,portrait"   if( AttrVal( $name, "setScreenOrientation", "0" ) eq "1" );
         $list .= " screenFullscreen:on,off"                     if( AttrVal( $name, "setFullscreen", "0" ) eq "1" );
@@ -1049,6 +1056,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>timer - set a countdown timer in the "Clock" stock app. Only minutes are allowed as parameter.</li>
     <li>ttsMsg - send a message which will be played as voice message (to change laguage temporary set first character &en; or &de;)</li>
     <li>userFlowState - set Flow/s active or inactive,<b><i>set Nexus7Wohnzimmer Badezimmer:inactive vorheizen</i> or <i>set Nexus7Wohnzimmer Badezimmer vorheizen,Nachtlicht Steven:inactive</i></b></li>
+    <li>userFlowRun - executes the specified flow</li>
     <li>vibrate - vibrate Android device</li>
     <li>volume - set media volume. Works on internal speaker or, if connected, bluetooth speaker or speaker connected via stereo jack</li>
     <li>volumeNotification - set notifications volume</li>
@@ -1219,6 +1227,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>timer - setzt einen Timer innerhalb der als Standard definierten ClockAPP auf dem Device. Es k&ouml;nnen nur Minuten angegeben werden.</li>
     <li>ttsMsg - versendet eine Nachricht welche als Sprachnachricht ausgegeben wird (um die Sprache für diese eine Durchsage zu ändern setze vor Deinem eigentlichen Text &en; oder &de;)</li>
     <li>userFlowState - aktiviert oder deaktiviert einen oder mehrere Flows,<b><i>set Nexus7Wohnzimmer Badezimmer vorheizen:inactive</i> oder <i>set Nexus7Wohnzimmer Badezimmer vorheizen,Nachtlicht Steven:inactive</i></b></li>
+    <li>userFlowRun - führt den angegebenen Flow aus</li>
     <li>vibrate - l&auml;sst das Androidger&auml;t vibrieren</li>
     <li>volume - setzt die Medialautst&auml;rke. Entweder die internen Lautsprecher oder sofern angeschlossen die Bluetoothlautsprecher und per Klinkenstecker angeschlossene Lautsprecher, + oder - vor dem Wert reduziert die aktuelle Lautst&auml;rke um den Wert. Der maximale Sliderwert kann &uuml;ber das Attribut setVolMax geregelt werden.</li>
     <li>volumeUp - erh&oumlh;t die Lautst&auml;rke um den angegeben Wert im entsprechenden Attribut. Ist kein Attribut angegeben wird per default 2 genommen.</li>
