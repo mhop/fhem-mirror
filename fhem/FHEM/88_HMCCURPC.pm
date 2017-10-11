@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 0.96.001 beta
+#  Version 0.96.002 beta
 #
 #  Thread based RPC Server module for HMCCU.
 #
@@ -40,7 +40,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPC_VERSION = '0.96 beta';
+my $HMCCURPC_VERSION = '0.96.002 beta';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPC_MAX_EVENTS = 50;
@@ -869,6 +869,9 @@ sub HMCCURPC_ProcessEvent ($$)
 		my $delay = $rh->{$clkey}{evtime}-$t[0];
 		$rh->{$clkey}{sumdelay} += $delay;
 		$rh->{$clkey}{avgdelay} = $rh->{$clkey}{sumdelay}/$rh->{$clkey}{rec}{$et};
+		if (defined ($hmccu_hash) && $hmccu_hash->{ccustate} ne 'active') {
+			$hmccu_hash->{ccustate} = 'active';
+		}
 		Log3 $name, 2, "HMCCURPC: Received CENTRAL event. ".$t[2]."=".$t[3] if ($t[1] eq 'CENTRAL');
 		my ($add, $chn) = split (/:/, $t[1]);
 		return defined ($chn) ? ($et, $clkey, $add, $chn, $t[2], $t[3]) : undef;
@@ -1024,6 +1027,9 @@ sub HMCCURPC_ProcessEvent ($$)
 		# Input:  TO|clkey|Time
 		# Output: TO, clkey, Port, Time
 		#
+		if (defined ($hmccu_hash)) {
+			$hmccu_hash->{ccustate} = HMCCU_TCPConnect ($hash->{host}, 8181) ? 'timeout' : 'unreachable';
+		}
 		Log3 $name, 2, "HMCCU: Received no events from interface $clkey for ".$t[0]." seconds";
 		DoTrigger ($name, "No events from interface $clkey for ".$t[0]." seconds");
 		return ($et, $clkey, $hash->{hmccu}{rpc}{$clkey}{port}, $t[0]);

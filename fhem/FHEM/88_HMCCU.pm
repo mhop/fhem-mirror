@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.1.001
+#  Version 4.1.002
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -15,7 +15,7 @@
 #
 ##############################################################################
 #
-#  define <name> HMCCU <hostname_or_ip_of_ccu> [ccunumber]
+#  define <name> HMCCU <hostname_or_ip_of_ccu> [ccunumber] [waitforccu=<seconds>]
 #
 #  set <name> cleardefaults
 #  set <name> defaults
@@ -105,7 +105,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.1.001';
+my $HMCCU_VERSION = '4.1.002';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -304,6 +304,8 @@ sub HMCCU_RefToString ($);
 sub HMCCU_ExprMatch ($$$);
 sub HMCCU_ExprNotMatch ($$$);
 sub HMCCU_GetDutyCycle ($);
+sub HMCCU_TCPPing ($$$);
+sub HMCCU_TCPConnect ($$);
 sub HMCCU_CorrectName ($);
 
 # Subprocess functions
@@ -363,6 +365,16 @@ sub HMCCU_Define ($$)
 	
 	$hash->{host} = $$a[2];
 	$hash->{Clients} = ':HMCCUDEV:HMCCUCHN:HMCCURPC:';
+	
+	# Check if TCL-Rega process is running on CCU
+	my $timeout = exists ($h->{waitforccu}) ? $h->{waitforccu} : 0;
+	if (HMCCU_TCPPing ($hash->{host}, 8181, $timeout)) {
+		$hash->{ccustate} = 'active';
+	}
+	else {
+		$hash->{ccustate} = 'unreachable';
+		Log3 $name, 1, "HMCCU: CCU2 is not reachable";
+	}
 
 	if (scalar (@$a) >= 4) {
 		return "CCU number must be in range 1-9" if ($$a[3] < 1 || $$a[3] > 9);
@@ -4380,8 +4392,12 @@ sub HMCCU_ReadRPCQueue ($)
 	if ($hash->{hmccu}{evtime} > 0 && time()-$hash->{hmccu}{evtime} > $rpctimeout &&
 	   $hash->{hmccu}{evtimeout} == 0) {
 	   $hash->{hmccu}{evtimeout} = 1;
+		$hash->{ccustate} = HMCCU_TCPConnect ($hash->{host}, 8181) ? 'timeout' : 'unreachable';
 		Log3 $name, 2, "HMCCU: Received no events from CCU since $rpctimeout seconds";
 		DoTrigger ($name, "No events from CCU since $rpctimeout seconds");
+	}
+	else {
+		$hash->{ccustate} = 'active' if ($hash->{ccustate} ne 'active');
 	}
 
 	my @hm_pids;
@@ -5682,6 +5698,47 @@ sub HMCCU_GetDutyCycle ($)
 }
 
 ######################################################################
+# Check if TCP port is reachable.
+# Parameter timeout should be a multiple of 20 plus 5.
+######################################################################
+
+sub HMCCU_TCPPing ($$$)
+{
+	my ($addr, $port, $timeout) = @_;
+	
+	if ($timeout > 0) {
+		my $t = time ();
+	
+		while (time () < $t+$timeout) {
+			return 1 if (HMCCU_TCPConnect ($addr, $port));
+			sleep (20);
+		}
+		
+		return 0;
+	}
+	else {
+		return HMCCU_TCPConnect ($addr, $port);
+	}
+}
+
+######################################################################
+# Check if TCP connection to specified host and port is possible.
+######################################################################
+
+sub HMCCU_TCPConnect ($$)
+{
+	my ($addr, $port) = @_;
+	
+	my $socket = IO::Socket::INET->new (PeerAddr => $addr, PeerPort => $port);
+	if ($socket) {
+		close ($socket);
+		return 1;
+	}
+
+	return 0;
+}
+
+######################################################################
 # Substitute invalid characters in reading name.
 # Substitution rules: ':' => '.', any other illegal character => '_'
 ######################################################################
@@ -6016,13 +6073,16 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
    <a name="HMCCUdefine"></a>
    <b>Define</b><br/><br/>
    <ul>
-      <code>define &lt;name&gt; HMCCU &lt;HostOrIP&gt; [&lt;ccu-number&gt;]</code>
+      <code>define &lt;name&gt; HMCCU &lt;HostOrIP&gt; [&lt;ccu-number&gt;] [waitforccu=&lt;timeout&gt;]</code>
       <br/><br/>
       Example:<br/>
       <code>define myccu HMCCU 192.168.1.10</code>
       <br/><br/>
       The parameter <i>HostOrIP</i> is the hostname or IP address of a Homematic CCU2. If you have
-      more than one CCU you can specifiy a unique CCU number with parameter <i>ccu-number</i>.
+      more than one CCU you can specifiy a unique CCU number with parameter <i>ccu-number</i>. With
+      option <i>waitforccu</i> HMCCU will wait for the specified time if CCU is not reachable.
+      Parameter <i>timeout</i> should be a multiple of 20 in seconds. Warning: This option could 
+      block the start of FHEM for <i>timeout</i> seconds.
       <br/>
       For automatic update of Homematic device datapoints and FHEM readings one have to:
       <br/><br/>
