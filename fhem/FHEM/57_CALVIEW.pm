@@ -32,6 +32,7 @@ sub CALVIEW_Initialize($)
 						"sourcecolor:textField-long " .
 						"timeshort:1,0 " .
 						"yobfield:_location,_description,_summary " .
+						"weekdayformat:de-long,de-short,en-long,en-short " .
 						$readingFnAttributes; 
 }
 sub CALVIEW_Define($$){
@@ -109,7 +110,10 @@ sub CALVIEW_GetUpdate($){
 	my $isoendtime;
 	my ($D,$M,$Y);
 	my ($eD,$eM,$eY);
-	my @arrWeekday = ("Sonntag","Montag", "Dienstag","Mittwoch","Donnerstag","Freitag","Samstag");
+	my @arrWeekdayDe = ("Sonntag","Montag", "Dienstag","Mittwoch","Donnerstag","Freitag","Samstag");
+	my @arrWeekdayDeShrt = ("So","Mo", "Di","Mi","Do","Fr","Sa");
+	my @arrWeekdayEn = ("Sunday","Monday", "Tuesday","Wednesday","Thursday","Friday","Saturday");
+	my @arrWeekdayEnShrt = ("Sun","Mon", "Tue","Wed","Thu","Fri","Sat");
 	foreach my $item (@termine ){
 		#start datum und zeit behandeln
 		if( defined($item->[0])&& length($item->[0]) > 0) { 	
@@ -136,6 +140,13 @@ sub CALVIEW_GetUpdate($){
 		my $daysleft_long;
 		#my $weekday = Day_of_Week($Y, $M, $D);
 		my ($tsec,$tmin,$thour,$tmday,$tmon,$year,$weekday,$tyday,$tisdst) = localtime(time + (86400 * $daysleft));
+		#"weekdayname:de-long,de-short,en-long,en-short " .
+		my $weekdayname;
+		if ( AttrVal($name,"weekdayformat","de-long") eq "de-short") {$weekdayname = $arrWeekdayDeShrt[$weekday]}
+		elsif (AttrVal($name,"weekdayformat","de-long") eq "en-long") {$weekdayname = $arrWeekdayEn[$weekday]}
+		elsif (AttrVal($name,"weekdayformat","de-long") eq "en-short") {$weekdayname = $arrWeekdayEnShrt[$weekday]}
+		else {$weekdayname = $arrWeekdayDe[$weekday]}
+		
 		if( $daysleft == 0){$daysleft_long = "heute";}
 		elsif( $daysleft == 1){$daysleft_long = "morgen";}
 		else{$daysleft_long = "in ".$daysleft." Tagen";}
@@ -155,7 +166,7 @@ sub CALVIEW_GetUpdate($){
 			btimestamp => $bts[0],
 			mode => $item->[6],
 			weekday => $weekday,
-			weekdayname => $arrWeekday[$weekday]};
+			weekdayname => $weekdayname};
 	}
 	my $todaycounter = 1;
 	my $tomorrowcounter = 1;
@@ -431,6 +442,13 @@ sub CALVIEW_Notify($$)
 		_location - year of birth will be read from term location <br>
 		_summary - year of birth will be read from summary (uses the first sequence of 4 digits in the string)
 </li><br>
+<li>weekdayformat<br>
+		formats the name of the reading weekdayname <br>
+		- de-long - (default) german, long name like Dienstag <br>
+		- de-short - german, short name like Di <br>
+		- en-long - english, long name like Tuesday <br>
+		- en-short - english, short name like Tue <br>
+</li><br>
 =end html
 
 =begin html_DE
@@ -496,6 +514,13 @@ sub CALVIEW_Notify($$)
 		_description  - (der Standard) Geburtsjahr wird aus der Terminbechreibung gelesen <br>
 		_location - Geburtsjahr wird aus dem Terminort gelesen <br>
 		_summary - Geburtsjahr wird aus dem Termintiele gelesen (verwendet wird die erste folge von 4 Ziffern im String))
+</li><br>
+<li>weekdayformat<br>
+		formatiert den Namen im Reading weekdayname <br>
+		- de-long - (default) Deutsch, lang zb Dienstag <br>
+		- de-short - Deutsch, kurze zb Di <br>
+		- en-long - English, lang zb Tuesday <br>
+		- en-short - English, kurze zb Tue <br>
 </li><br>
 =end html_DE
 =cut
