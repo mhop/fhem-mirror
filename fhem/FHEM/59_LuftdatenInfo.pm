@@ -36,6 +36,7 @@ sub LuftdatenInfo_Initialize($);
 sub LuftdatenInfo_Define($$);
 sub LuftdatenInfo_Undefine($$);
 sub LuftdatenInfo_Set($@);
+sub LuftdatenInfo_Get($@);
 sub LuftdatenInfo_Attr(@);
 
 sub LuftdatenInfo_GetHttpResponse($$);
@@ -51,12 +52,14 @@ sub LuftdatenInfo_Initialize($) {
   $hash->{DefFn}    = $TYPE."_Define";
   $hash->{UndefFn}  = $TYPE."_Undefine";
   $hash->{SetFn}    = $TYPE."_Set";
+  $hash->{GetFn}    = $TYPE."_Get";
   $hash->{AttrFn}   = $TYPE."_Attr";
 
   $hash->{AttrList} = ""
     . "disable:1,0 "
     . "disabledForIntervals "
     . "interval "
+    . "rawReading:0,1 "
     . "timeout "
     . $readingFnAttributes
   ;
@@ -65,7 +68,7 @@ sub LuftdatenInfo_Initialize($) {
 # regular Fn ##################################################################
 sub LuftdatenInfo_Define($$) {
   my ($hash, $def) = @_;
-  my ($SELF, $TYPE, @id) = split(/[\s]+/, $def);
+  my ($SELF, $TYPE, $MODE, $DEF) = split(/[\s]+/, $def, 4);
   my $rc = eval{
     require JSON;
     JSON->import();
@@ -78,42 +81,79 @@ sub LuftdatenInfo_Define($$) {
     . "\"apt-get install libjson-perl\""
   ) unless($rc);
 
-  delete($hash->{READINGS});
-  delete($hash->{SENSORID1});
-  delete($hash->{SENSORID2});
+  delete($hash->{SENSORIDS});
   delete($hash->{ADDRESS});
+  delete($hash->{INTERVAL});
+  delete($hash->{TIMEOUT});
+  delete($hash->{MASTER});
+  delete($hash->{SENSORS});
 
-  if(looks_like_number($id[0])){
-    return("Usage: define <name> $TYPE <SDS011sensorID> [<DHT22sensorID>]")
-      if(@id != 1 && @id != 2);
+  my $hadTemperature = 1 if(ReadingsVal($SELF, "temperature", undef));
 
-    $hash->{SENSORIDS} = (@id == 2) ? "explicit" : "implicit";
+  delete($hash->{READINGS});
 
-    $id[1] = $id[0] + 1 unless($id[1]);
+  if($MODE eq "remote"){
+    return("Usage: define <name> $TYPE $MODE <SENSORID1> [<SENSORID2> ...]")
+      if($DEF !~ m/^[\s\d]+$/);
 
-    $hash->{SENSORID1} = $id[0];
-    $hash->{SENSORID2} = $id[1];
-    $hash->{CONNECTION} = "remote";
+    $hash->{SENSORIDS} = $DEF;
+  }
+  elsif($MODE eq "local"){
+    return("Usage: define <name> $TYPE $MODE <IP>")
+      if($DEF =~ m/\s/);
+
+    $hash->{ADDRESS} = $DEF;
+  }
+  elsif($MODE eq "slave"){
+    return("Usage: define <name> $TYPE $MODE <master-name> <reading regexps>")
+      if($DEF !~ m/\s/);
+
+    ($hash->{MASTER}, $hash->{SENSORS}) = split(/[\s]+/, $DEF, 2);
+
+    delete($defs{$hash->{MASTER}}->{READINGS})
+      if(IsDevice($hash->{MASTER}, $TYPE));
   }
   else{
-    return("Usage: define <name> $TYPE <ip>")
-      if(@id != 1);
+    if(looks_like_number($MODE)){
+      $hash->{SENSORIDS} = $MODE;
+      $hash->{SENSORIDS} .= " ".($MODE + 1) if($hadTemperature);
+      $hash->{SENSORIDS} .= " $DEF" if($DEF && looks_like_number($DEF));
 
-    $hash->{ADDRESS} = $id[0];
-    $hash->{CONNECTION} = "local";
+      $MODE = "remote";
+
+      $hash->{DEF} = "$MODE $hash->{SENSORIDS}";
+    }
+    elsif(!$DEF){
+      $hash->{ADDRESS} = $DEF;
+
+      $MODE = "local";
+
+      $hash->{DEF} = "$MODE $hash->{ADDRESS}";
+    }
+    else{
+      return(
+          "Usage: define <name> $TYPE remote <SENSORID1> [<SENSORID2> ...]"
+        . "       define <name> $TYPE local <IP>"
+        . "       define <name> $TYPE slave <master-name> <sensor1 sensor2 ...>"
+      );
+    }
   }
 
-  my $minInterval = $hash->{CONNECTION} eq "local" ? 30 : 300;
-  my $interval = AttrVal($SELF, "interval", $minInterval);
-  $interval = $minInterval unless(looks_like_number($interval));
-  $interval = $minInterval if($interval < $minInterval);
-  my $minTimeout = 5;
-  my $timeout = AttrVal($SELF, "timeout", $minTimeout);
-  $timeout = $minTimeout unless(looks_like_number($timeout));
-  $timeout = $minTimeout if($timeout < $minTimeout);
+  $hash->{MODE} = $MODE;
 
-  $hash->{INTERVAL} = $interval;
-  $hash->{TIMEOUT} = $timeout;
+  unless($MODE eq "slave"){
+    my $minInterval = $hash->{MODE} eq "local" ? 30 : 300;
+    my $interval = AttrVal($SELF, "interval", $minInterval);
+    $interval = $minInterval unless(looks_like_number($interval));
+    $interval = $minInterval if($interval < $minInterval);
+    my $minTimeout = 5;
+    my $timeout = AttrVal($SELF, "timeout", $minTimeout);
+    $timeout = $minTimeout unless(looks_like_number($timeout));
+    $timeout = $minTimeout if($timeout < $minTimeout);
+
+    $hash->{INTERVAL} = $interval;
+    $hash->{TIMEOUT} = $timeout;
+  }
 
   readingsSingleUpdate($hash, "state", "active", 1);
 
@@ -159,6 +199,34 @@ sub LuftdatenInfo_Set($@) {
   return;
 }
 
+sub LuftdatenInfo_Get($@) {
+  my ($hash, @a) = @_;
+  my $TYPE = $hash->{TYPE};
+
+  return "\"get $TYPE\" needs at least one argument" if(@a < 2);
+
+  my $SELF = shift @a;
+	my $argument = shift @a;
+  my $value = join(" ", @a) if (@a);
+
+  my %LuftdatenInfo_gets = (
+    "sensors" => "sensors:noArg",
+  );
+
+  return(
+      "Unknown argument $argument, choose one of "
+    . join(" ", values %LuftdatenInfo_gets)
+  ) if(!exists($LuftdatenInfo_gets{$argument}));
+
+  if($argument eq "sensors"){
+    return (join("\n", split(" ", ReadingsVal(
+      InternalVal($SELF, "MASTER", $SELF), ".sensors", "No sensors found."
+    ))));
+  }
+
+  return;
+}
+
 sub LuftdatenInfo_Attr(@) {
   my ($cmd, $SELF, $attribute, $value) = @_;
   my $hash = $defs{$SELF};
@@ -198,38 +266,27 @@ sub LuftdatenInfo_Attr(@) {
 
 # HttpUtils Fn ################################################################
 sub LuftdatenInfo_GetHttpResponse($$) {
-  my ($hash, $id) = @_;
+  my ($hash, $arg) = @_;
   my $SELF = $hash->{NAME};
   my $TYPE = $hash->{TYPE};
+  my $MODE = $hash->{MODE};
   my $timeout = $hash->{TIMEOUT};
-  my $connection = $hash->{CONNECTION};
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering LuftdatenInfo_GetHttpResponse");
 
-  if($connection eq "remote"){
-    my $param = {
-      url      => "http://api.luftdaten.info/v1/sensor/$id/",
-      timeout  => $timeout,
-      hash     => $hash,
-      method   => "GET",
-      header   => "Accept: application/json",
-      callback => \&LuftdatenInfo_ParseHttpResponse,
-    };
+  my $param = {
+    timeout  => $timeout,
+    hash     => $hash,
+    method   => "GET",
+    header   => "Accept: application/json",
+    callback => \&LuftdatenInfo_ParseHttpResponse,
+  };
+  $param->{url} = "http://api.luftdaten.info/v1/sensor/$arg/"
+    if($MODE eq "remote");
+  $param->{url} = "http://$arg/data.json"
+    if($MODE eq "local");
 
-    HttpUtils_NonblockingGet($param);
-  }
-  elsif($connection eq "local"){
-    my $param = {
-      url      => "http://".$id."/data.json",
-      timeout  => $timeout,
-      hash     => $hash,
-      method   => "GET",
-      header   => "Accept: application/json",
-      callback => \&LuftdatenInfo_ParseHttpResponse,
-    };
-
-    HttpUtils_NonblockingGet($param);
-  }
+  HttpUtils_NonblockingGet($param);
 }
 
 sub LuftdatenInfo_ParseHttpResponse($) {
@@ -237,7 +294,6 @@ sub LuftdatenInfo_ParseHttpResponse($) {
   my $hash = $param->{hash};
   my $SELF = $hash->{NAME};
   my $TYPE = $hash->{TYPE};
-  my $connection = $hash->{CONNECTION};
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering LuftdatenInfo_ParseHttpResponse");
 
@@ -247,20 +303,9 @@ sub LuftdatenInfo_ParseHttpResponse($) {
     readingsSingleUpdate($hash, "state", "error", 1);
   }
   elsif($data eq "[]"){
-    if(
-      InternalVal($SELF, "SENSORID2", undef)
-      && index($param->{url}, $hash->{SENSORID2}) > -1
-      && InternalVal($SELF, "SENSORIDS", "implicit") eq "implicit"
-    ){
-      delete($hash->{SENSORID2});
+    Log3($SELF, 2, "$TYPE ($SELF) - error while request: no data returned");
 
-      Log3($SELF, 2, "$TYPE ($SELF) - no second sensor found");
-    }
-    else{
-      Log3($SELF, 2, "$TYPE ($SELF) - no data returned");
-
-      readingsSingleUpdate($hash, "state", "no data", 1);
-    }
+    readingsSingleUpdate($hash, "state", "error", 1);
   }
   elsif($data ne ""){
     Log3 $SELF, 4, "$TYPE ($SELF) - returned data: $data";
@@ -276,6 +321,9 @@ sub LuftdatenInfo_ParseHttpResponse($) {
       return;
     }
 
+    my $MODE = $hash->{MODE};
+    my $rawReading = AttrVal($SELF, "rawReading", 0);
+
     if($param->{url} =~ m/openstreetmap/){
       my $address = $data->{address};
 
@@ -286,133 +334,162 @@ sub LuftdatenInfo_ParseHttpResponse($) {
         , 1
       );
     }
-    elsif($connection eq "remote"){
+    elsif($MODE eq "remote"){
       my $sensor = @{$data}[-1];
       my $sensor_type = $sensor->{sensor}{sensor_type}{name};
-      my $timestamp = $sensor->{timestamp};
 
-      return unless($timestamp ge ReadingsVal($SELF, ".timestamp", ""));
+      Log3 $SELF, 5, "$TYPE ($SELF) - parsing $sensor_type data";
 
-      Log3 $SELF, 5, "$TYPE ($SELF) - returned data is newer than readings";
+      my $latitude = $sensor->{location}{latitude};
+      my $longitude = $sensor->{location}{longitude};
 
-      if($sensor_type eq "SDS011"){
-        Log3 $SELF, 5, "$TYPE ($SELF) - parsing $sensor_type data";
+      if(
+           $latitude ne ReadingsVal($SELF, "latitude", $latitude)
+        || $longitude ne ReadingsVal($SELF, "longitude", $longitude)
+      ){
+        Log3(
+            $SELF, 2
+          , "$TYPE ($SELF) - "
+          . "$sensor->{sensor}{sensor_type}{name} position differs from "
+          . "other sensor position"
+        );
 
-        my $latitude = $sensor->{location}{latitude};
-        my $longitude = $sensor->{location}{longitude};
-
-        unless(ReadingsVal($SELF, "location", undef)){
-          my $param = {
-            url      =>
-                "http://nominatim.openstreetmap.org/reverse?"
-              . "format=json&lat=$latitude&lon=$longitude"
-            ,
-            timeout  => $hash->{TIMEOUT},
-            hash     => $hash,
-            method   => "GET",
-            header   => "Accept: application/json",
-            callback => \&LuftdatenInfo_ParseHttpResponse,
-          };
-
-          HttpUtils_NonblockingGet($param);
-        }
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash, ".timestamp", $timestamp);
-
-        foreach (@{$sensor->{sensordatavalues}}){
-          if($_->{value_type} eq "P1"){
-            readingsBulkUpdate($hash, "PM10", $_->{value});
-          }
-          elsif($_->{value_type} eq "P2"){
-            readingsBulkUpdate($hash, "PM2.5", $_->{value});
-          }
-        }
-
-        readingsBulkUpdateIfChanged($hash, "latitude", $latitude);
-        readingsBulkUpdateIfChanged($hash, "longitude", $longitude);
-        readingsBulkUpdate($hash, "state", "active");
-        readingsEndUpdate($hash, 1);
-
-        my $SENSORID2 = InternalVal($SELF, "SENSORID2", undef);
-
-        LuftdatenInfo_GetHttpResponse($hash, $SENSORID2)
-          if(defined($SENSORID2));
+        return;
       }
-      elsif($sensor_type ne "SDS011"){
-        Log3 $SELF, 5, "$TYPE ($SELF) - parsing $sensor_type data";
 
-        if(   $sensor->{location}{latitude} ne
-              ReadingsVal($SELF, "latitude", "")
-           || $sensor->{location}{longitude} ne
-              ReadingsVal($SELF, "longitude", "")
-        ){
-          delete($hash->{SENSORID2});
+      unless(ReadingsVal($SELF, "location", undef)){
+        my $param = {
+          url      => "http://nominatim.openstreetmap.org/reverse?".
+                      "format=json&lat=$latitude&lon=$longitude",
+          timeout  => $hash->{TIMEOUT},
+          hash     => $hash,
+          method   => "GET",
+          header   => "Accept: application/json",
+          callback => \&LuftdatenInfo_ParseHttpResponse,
+        };
 
-          Log3(
-              $SELF, 2
-            , "$TYPE ($SELF) - "
-            . "$sensor_type position differs from SDS011 position"
-          );
+        HttpUtils_NonblockingGet($param);
+      }
 
-          return;
+      readingsBeginUpdate($hash);
+
+      foreach (@{$sensor->{sensordatavalues}}){
+        $_->{value} =~ m/^(\S+)(\s|$)/;
+        $_->{value} = $1;
+        my $knownReading = 1;
+
+        if($_->{value_type} eq "P1"){
+          $_->{value_type} = "PM10";
+        }
+        elsif($_->{value_type} eq "P2"){
+          $_->{value_type} = "PM2.5";
+        }
+        elsif($_->{value_type} =~ /temperature$/){
+          $_->{value_type} = "temperature";
+        }
+        elsif($_->{value_type} =~ /humidity$/){
+          $_->{value_type} = "humidity";
+        }
+        elsif($_->{value_type} =~ /pressure$/){
+          $_->{value} = ($_->{value} > 10000 ? $_->{value} / 100 : $_->{value});
+          $_->{value_type} = "pressure";
         }
         else{
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash, ".timestamp", $timestamp);
-
-          foreach (@{$sensor->{sensordatavalues}}){
-            $_->{value} =~ m/^(\S+)(\s|$)/;
-            $_->{value} = $1;
-
-            if($_->{value_type} =~ /temperature$/){
-              readingsBulkUpdate($hash, "temperature", $_->{value});
-            }
-            elsif($_->{value_type} =~ /humidity$/){
-              readingsBulkUpdate($hash, "humidity", $_->{value});
-            }
-            elsif($_->{value_type} =~ /pressure$/){
-              readingsBulkUpdate($hash, "pressure", $_->{value});
-            }
-          }
-
-          readingsBulkUpdate($hash, "state", "active");
-          readingsEndUpdate($hash, 1);
+          $knownReading = 0;
         }
+
+        readingsBulkUpdate($hash, $_->{value_type}, $_->{value})
+          if($knownReading || $rawReading);
       }
+
+      readingsBulkUpdateIfChanged($hash, "latitude", $latitude);
+      readingsBulkUpdateIfChanged($hash, "longitude", $longitude);
+      readingsBulkUpdate($hash, "state", "active");
+      readingsEndUpdate($hash, 1);
     }
-    elsif($connection eq "local"){
-      readingsBeginUpdate($hash);
+    elsif($MODE eq "local"){
+      my @slaves = devspec2array("TYPE=$TYPE:FILTER=MASTER=$SELF");
+      my @sensors;
+      push(@sensors, $_->{value_type}) foreach (@{$data->{sensordatavalues}});
+
+      readingsBeginUpdate($defs{$_}) foreach($SELF, @slaves);
       readingsBulkUpdateIfChanged(
         $hash, "softwareVersion", $data->{software_version}
       );
+      readingsBulkUpdateIfChanged($hash, ".sensors", join(" ", sort(@sensors)));
 
       foreach (@{$data->{sensordatavalues}}){
+        my $knownReading = 1;
         $_->{value} =~ m/^(\S+)(\s|$)/;
         $_->{value} = $1;
 
-        if($_->{value_type} =~ /temperature$/){
-          readingsBulkUpdate($hash, "temperature", $_->{value});
+        my $device = (devspec2array(
+          "MASTER=$SELF:FILTER=SENSORS=(.+ )?$_->{value_type}( .+)?"
+        ))[0];
+        $device = IsDevice($device, $TYPE) ? $defs{$device} : $hash;
+
+        if($_->{value_type} =~ /P1$/){
+          $_->{value_type} = "PM10";
+        }
+        elsif($_->{value_type} =~ /P2$/){
+          $_->{value_type} = "PM2.5";
+        }
+        elsif($_->{value_type} =~ /_height$/){
+          $_->{value_type} = "altitude";
+        }
+        elsif($_->{value_type} =~ /_date$/){
+          $_->{value_type} = "date";
         }
         elsif($_->{value_type} =~ /humidity$/){
-          readingsBulkUpdate($hash, "humidity", $_->{value});
+          $_->{value_type} = "humidity";
+        }
+        elsif($_->{value_type} =~ /_Full$/){
+          $_->{value_type} = "illuminanceFull";
+        }
+        elsif($_->{value_type} =~ /_UV$/){
+          $_->{value_type} = "illuminanceUV";
+        }
+        elsif($_->{value_type} =~ /_IR$/){
+          $_->{value_type} = "illuminanceIR";
+        }
+        elsif($_->{value_type} =~ /_Visible$/){
+          $_->{value_type} = "illuminanceVisible";
+        }
+        elsif($_->{value_type} =~ /_lat$/){
+          $_->{value_type} = "latitude";
+        }
+        elsif($_->{value_type} =~ /_lon$/){
+          $_->{value_type} = "longitude";
         }
         elsif($_->{value_type} =~ /pressure$/){
-          readingsBulkUpdate($hash, "pressure", $_->{value});
+          $_->{value} = ($_->{value} > 10000 ? $_->{value} / 100 : $_->{value});
+          $_->{value_type} = "pressure";
         }
-        elsif($_->{value_type} eq "SDS_P1"){
-          readingsBulkUpdate($hash, "PM10", $_->{value});
-        }
-        elsif($_->{value_type} eq "SDS_P2"){
-          readingsBulkUpdate($hash, "PM2.5", $_->{value});
+        elsif($_->{value_type} =~ /pressure_nn$/){
+          $_->{value} = ($_->{value} > 10000 ? $_->{value} / 100 : $_->{value});
+          $_->{value_type} = "pressureNN";
         }
         elsif($_->{value_type} eq "signal"){
-          readingsBulkUpdate($hash, "signal", $_->{value});
+          $_->{value_type} = "signal";
         }
+        elsif($_->{value_type} =~ /temperature$/){
+          $_->{value_type} = "temperature";
+        }
+        elsif($_->{value_type} =~ /_time$/){
+          $_->{value_type} = "time";
+        }
+        else{
+          $knownReading = 0;
+        }
+
+        readingsBulkUpdate($device, $_->{value_type}, $_->{value})
+          if($knownReading || $rawReading);
       }
 
-      readingsBulkUpdate($hash, "state", "active");
-      readingsEndUpdate($hash, 1);
+      foreach($SELF, @slaves){
+        readingsBulkUpdate($defs{$_}, "state", "active");
+        readingsEndUpdate($defs{$_}, 1);
+      }
     }
   }
 
@@ -424,27 +501,39 @@ sub LuftdatenInfo_statusRequest($) {
   my ($hash) = @_;
   my $SELF = $hash->{NAME};
   my $TYPE = $hash->{TYPE};
-  my $interval = $hash->{INTERVAL};
-  my $connection = $hash->{CONNECTION};
+  my $MODE = $hash->{MODE};
+  my $interval = InternalVal($SELF, "INTERVAL", undef);
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering LuftdatenInfo_statusRequest");
 
-  RemoveInternalTimer($hash);
+  if($interval){
+    RemoveInternalTimer($hash);
+    InternalTimer(
+      gettimeofday() + $interval, "LuftdatenInfo_statusRequest", $hash
+    );
+  }
 
   return if(IsDisabled($SELF));
 
-  InternalTimer(
-    gettimeofday() + $interval, "LuftdatenInfo_statusRequest", $hash
-  );
-
-  if($connection eq "remote"){
-    LuftdatenInfo_GetHttpResponse($hash, $hash->{SENSORID1});
+  if($MODE eq "remote"){
+    LuftdatenInfo_GetHttpResponse($hash, $_)
+      foreach(split(/[\s]+/, $hash->{SENSORIDS}));
   }
-  elsif($connection eq "local"){
+  elsif($MODE eq "local"){
     LuftdatenInfo_GetHttpResponse($hash, $hash->{ADDRESS});
   }
+  elsif($MODE eq "slave"){
+    if(  IsDevice($hash->{MASTER}, $TYPE)
+      && InternalVal($hash->{MASTER}, "MODE", "") eq "local"
+    ){
+      readingsSingleUpdate($hash, "state", "active", 1);
 
-  return;
+      LuftdatenInfo_statusRequest($defs{$hash->{MASTER}});
+    }
+    else{
+      readingsSingleUpdate($hash, "state", "master not defined", 1);
+    }
+  }
 }
 
 1;
@@ -461,12 +550,15 @@ sub LuftdatenInfo_statusRequest($) {
 (en | <a href="commandref_DE.html#LuftdatenInfo"><u>de</u></a>)
 <div>
   <ul>
-    LuftdatenInfo is the FHEM module to read 	particulate matter, temperature
+    LuftdatenInfo is the FHEM module to read particulate matter, temperature
     and humidity values ​​from the self-assembly particulate matter sensors
     from <a href="http://Luftdaten.info"><u>Luftdaten.info</u></a>.<br>
     The values ​​can be queried directly from the server or locally.<br>
-    A local query should only be made if the sensor is NOT sendig data to the
-    server, otherwise the sensor may block and need to be restarted.<br>
+    There is an
+    <a href="https://forum.fhem.de/index.php/topic,73879">
+      <u>alternative Firmware</u>
+    </a>
+     to support more sensors.<br>
     <br>
     <b>Prerequisites</b>
     <ul>
@@ -479,23 +571,24 @@ sub LuftdatenInfo_statusRequest($) {
     <b>Define</b>
     <ul>
       <code>
-        define &lt;name&gt; LuftdatenInfo
-        (&lt;SDS011sensorID&gt;
-         [&lt;DHT22sensorID&gt;|&lt;BME280sensorID&gt;]
-        |&lt;ip&gt;)
+        define &lt;name&gt; LuftdanteInfo2 remote
+          &lt;SENSORID1&gt; [&lt;SENSORID2&gt; ..]<br>
+        define &lt;name&gt; LuftdanteInfo2 local &lt;IP&gt;<br>
+        define &lt;name&gt; LuftdanteInfo2
+          slave &lt;master-name&gt; &lt;sensor1 sensor2 ...&gt;
       </code><br>
-      To query the data from the server, the SDS011 SensorID must be
-      specified.<br>
-      The SensorID stands right at
+      To query the data from the server, all affected SensorIDs must be
+      specified. The IDs of the SDS01 stands right at
       <a href="http://maps.luftdaten.info/">
         <u>http://maps.luftdaten.info/</u>
       </a>
-      . The DHT22 SensorID is usually the SDS011 SensorID + 1 and does not have
-      to be specified explicitly. While parsing the data the location values
-      from both sensors will be compared and a message will be written into the
-      log if they differ.<br>
+      . The DHT22 SensorID is usually the SDS011 SensorID + 1. While parsing
+      the data the location values from all sensors will be compared and a
+      message will be written into the log if they differ.<br>
       For a local query of the data, the IP address or hostname must be
-      specified.
+      specified.<br>
+      If several similar sensors are used, the duplicate values can be written
+      in another device.
     </ul><br>
     <a name="LuftdatenInfoset"></a>
     <b>Set</b>
@@ -505,50 +598,81 @@ sub LuftdatenInfo_statusRequest($) {
         Starts a status request.
       </li>
     </ul><br>
+    <a name="LuftdatenInfoget"></a>
+    <b>Get</b>
+    <ul>
+      <li>
+        <code>sensors</code><br>
+        Lists all senors.
+      </li>
+    </ul><br>
     <a name="LuftdatenInforeadings"></a>
     <b>Readings</b><br>
     <ul>
-      <li>
-        <code>PM10</code><br>
-        Quantity of particles with a diameter of less than 10 μm in μg / m³
-      </li>
-      <li>
-        <code>PM2.5</code><br>
-        Quantity of particles with a diameter of less than 2.5 μm in μg / m³
-      </li>
-      <li>
-        <code>temperature</code><br>
-        Temperature in °C
-      </li>
-      <li>
-        <code>humidity</code><br>
-        Relative humidity in%
-      </li>
-      <li>
-        <code>pressure</code><br>
-        Pressure in hPa<br>
-        Only available with BME280 sensor.
-      </li>
-      <li>
-        <code>latitude</code><br>
-        latitude<br>
-        Only available with remote query.
-      </li>
-      <li>
-        <code>location</code><br>
-        location as "postcode city"<br>
-        Only available with remote query.
-      </li>
-      <li>
-        <code>longitude</code><br>
-        longitude<br>
-        Only available with remote query.
-      </li>
-      <li>
-        <code>signal</code><br>
-        WLAN signal strength in dBm<br>
-        Only available with local query.
-      </li>
+
+        <li>
+          <code>PM10</code><br>
+          Quantity of particles with a diameter of less than 10 μm in μg / m³
+        </li>
+        <li>
+          <code>PM2.5</code><br>
+          Quantity of particles with a diameter of less than 2.5 μm in μg / m³
+        </li>
+        <li>
+          <code>temperature</code><br>
+          Temperature in °C
+        </li>
+        <li>
+          <code>humidity</code><br>
+          Relative humidity in %
+        </li>
+        <li>
+          <code>pressure</code><br>
+          Pressure in hPa
+        </li>
+        <li>
+          <code>pressureNN</code><br>
+          Pressure at sea level in hPa<br>
+          Is calculated if pressure and temperature sensor are active and the
+          sensor is not at sea level.<br>
+          The height, can be determined by maps or SmartPhone, needs to be
+          specified at the configuration page.
+        </li>
+        <li>
+          <code>illuminanceFull</code><br>
+          illuminace of the full spectrum in lux
+        </li>
+        <li>
+          <code>illuminanceIR</code><br>
+          illuminace of the IR spectrum in lux
+        </li>
+        <li>
+          <code>illuminanceUV</code><br>
+          ???
+        </li>
+        <li>
+          <code>illuminanceVisible</code><br>
+          illuminace of the visible spectrum in lux
+        </li>
+        <li>
+          <code>latitude</code>
+        </li>
+        <li>
+          <code>longitude</code>
+        </li>
+        <li>
+          <code>altitude</code>
+        </li>
+        <li>
+          <code>location</code><br>
+          location as "postcode city"<br>
+          Only available with remote query.
+        </li>
+        <li>
+          <code>signal</code><br>
+          WLAN signal strength in dBm<br>
+          Only available with local query.
+        </li>
     </ul><br>
     <a name="LuftdatenInfoattr"></a>
     <b>Attribute</b>
@@ -590,9 +714,11 @@ sub LuftdatenInfo_statusRequest($) {
     <a href="http://Luftdaten.info"><u>Luftdaten.info</u></a> auszulesen.<br>
     Dabei k&ouml;nnen die Werte direkt vom Server oder auch lokal abgefragt
     werden.<br>
-    Eine lokale Abfrage sollte nur erfolgen, wenn der Sensor NICHT an den
-    Server sendet, sonst kann es passieren, dass der Sensor blockiert und
-    neugestartet werden muss.<br>
+    Bei einer lokalen Abfrage werden durch eine
+    <a href="https://forum.fhem.de/index.php/topic,73879">
+      <u>alternative Firmware</u>
+    </a>
+     noch weitere Sensoren unterstützt.<br>
     <br>
     <b>Vorraussetzungen</b>
     <ul>
@@ -605,22 +731,24 @@ sub LuftdatenInfo_statusRequest($) {
     <b>Define</b>
     <ul>
       <code>
-        define &lt;name&gt; LuftdatenInfo
-        (&lt;SDS011sensorID&gt;
-         [&lt;DHT22sensorID&gt;|&lt;BME280sensorID&gt;]
-        |&lt;ip&gt;)
+        define &lt;name&gt; LuftdanteInfo2 remote
+          &lt;SENSORID1&gt; [&lt;SENSORID2&gt; ..]<br>
+        define &lt;name&gt; LuftdanteInfo2 local &lt;IP&gt;<br>
+        define &lt;name&gt; LuftdanteInfo2
+          slave &lt;master-name&gt; &lt;sensor1 sensor2 ...&gt;
       </code><br>
-      F&uuml;r eine Abfrage der Daten vom Server muss die SensorID von dem
-      SDS011 Sensor angegeben werden. Diese steht rechts auf der Seite
+      F&uuml;r eine Abfrage der Daten vom Server müssem alle betroffenenen
+      SensorIDs angegeben werden. Die IDs vom SDS01 stehen rechts auf der Seite
       <a href="http://maps.luftdaten.info/">
         <u>http://maps.luftdaten.info/</u>
       </a>
-      . Die DHT22 SensorID entspricht normalerweise der SDS011 SensorID + 1 und
-      muss nicht explizit mit angegeben werden. Bei einer Abfrage werden die
-      beiden Positionsangaben verglichen und bei Abweichung eine Meldung ins
-      Log geschrieben.<br>
+      . Die DHT22 SensorID entspricht normalerweise der SDS011 SensorID + 1.
+      Bei einer Abfrage werden die die Positionsangaben verglichen und bei
+      einer Abweichung eine Meldung ins Log geschrieben.<br>
       F&uuml;r eine lokale Abfrage der Daten muss die IP Addresse oder der
-      Hostname angegeben werden.
+      Hostname angegeben werden.<br>
+      Werden mehrere ähnliche Sensoren betrieben lassen sich die doppelten
+      Werte in einem anderen Gerät geschrieben werden.
     </ul><br>
     <a name="LuftdatenInfoset"></a>
     <b>Set</b>
@@ -628,6 +756,14 @@ sub LuftdatenInfo_statusRequest($) {
       <li>
         <code>statusRequest</code><br>
         Startet eine Abfrage der Daten.
+      </li>
+    </ul><br>
+    <a name="LuftdatenInfoget"></a>
+    <b>Get</b>
+    <ul>
+      <li>
+        <code>sensors</code><br>
+        Listet alle Sensoren auf.
       </li>
     </ul><br>
     <a name="LuftdatenInforeadings"></a>
@@ -651,22 +787,47 @@ sub LuftdatenInfo_statusRequest($) {
       </li>
       <li>
         <code>pressure</code><br>
-        Luftdruck in hPa<br>
-        Nur bei einem BME280 Sensor verf&uuml;gbar.
+        Luftdruck in hPa
+      </li>
+      <li>
+        <code>pressureNN</code><br>
+        Luftdruck für Normal Null in hPa<br>
+        Wird bei aktivem Luftdruck- und Temperatursensor berechnet, sofern sich
+        der Sensor nicht auf Normal Null befindet.<br>
+        Hierzu ist die Höhe, kann über Kartendienste oder SmartPhone ermittelt
+        werden, auf der Konfigurationsseite anzugeben.
+      </li>
+      <li>
+        <code>illuminanceFull</code><br>
+        Helligkeit des vollen Bereich in lux
+      </li>
+      <li>
+        <code>illuminanceIR</code><br>
+        Helligkeit des IR Bereich in lux
+      </li>
+      <li>
+        <code>illuminanceUV</code><br>
+        ???
+      </li>
+      <li>
+        <code>illuminanceVisible</code><br>
+        Helligkeit des sichtbaren Bereich in lux
       </li>
       <li>
         <code>latitude</code><br>
-        Breitengrad<br>
-        Nur bei remote Abfrage verf&uuml;gbar.
+        Längengrad
+      </li>
+      <li>
+        <code>longitude</code><br>
+        Breitengrad
+      </li>
+      <li>
+        <code>altitude</code><br>
+        Höhe über NN
       </li>
       <li>
         <code>location</code><br>
         Standort als "Postleitzahl Ort"<br>
-        Nur bei remote Abfrage verf&uuml;gbar.
-      </li>
-      <li>
-        <code>longitude</code><br>
-        L&auml;ngengrad<br>
         Nur bei remote Abfrage verf&uuml;gbar.
       </li>
       <li>
