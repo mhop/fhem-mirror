@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_DOIFtools: add getter linearColorGradient, returns a table of
+             value, colornumber, color bar
   - feature: 74_AMADDevice: add set command userFlowRun
   - change:  57_CALVIEW.pm: -new readings weekdayname and weekday
                             -new attr weekdayformat
