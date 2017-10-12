@@ -27,7 +27,9 @@ attr WEBphone hiddenroom DashboardRoom
 attr WEBphone iconPath openautomation:fhemSVG:default
 attr WEBphone room System
 attr WEBphone sortRooms Light Cinema Residents Sensors System
+attr WEBphone smallscreenCommands 1
 attr WEBphone stylesheetPrefix smallscreen
+
 
 define WEBtablet FHEMWEB 8085 global
 attr WEBtablet hiddenroom DashboardRoom
