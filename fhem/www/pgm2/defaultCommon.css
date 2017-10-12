@@ -1,5 +1,7 @@
 @import url("dashboard_style.css");
 
+textarea, .ui-dialog.ui-widget textarea { font-family:Courier; }
+
 body     { font-family:Arial, sans-serif; background-color: #FFFFE7; }
 input    { font-family:Arial, sans-serif; font-size:16px;}
 select   { font-family:Arial, sans-serif; font-size:16px;}
