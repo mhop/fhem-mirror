@@ -329,7 +329,7 @@ sub DOIFtools_Initialize($)
 
   my $oldAttr = "target_room:noArg target_group:noArg executeDefinition:noArg executeSave:noArg eventMonitorInDOIF:noArg readingsPrefix:noArg";
 
-  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 DOIFtoolsEventOnDeleted:1,0 DOIFtoolsEMbeforeReadings:1,0 DOIFtoolsNoLookUp:1,0 DOIFtoolsNoLookUpInDOIF:1,0 DOIFtoolsLogDir disabledForIntervals ".$oldAttr;
+  $hash->{AttrList} = "DOIFtoolsExecuteDefinition:1,0 DOIFtoolsTargetRoom DOIFtoolsTargetGroup DOIFtoolsExecuteSave:1,0 DOIFtoolsReadingsPrefix DOIFtoolsEventMonitorInDOIF:1,0 DOIFtoolsHideModulShortcuts:1,0 DOIFtoolsHideGetSet:1,0 DOIFtoolsMyShortcuts:textField-long DOIFtoolsMenuEntry:1,0 DOIFtoolsHideStatReadings:1,0 DOIFtoolsEventOnDeleted:1,0 DOIFtoolsEMbeforeReadings:1,0 DOIFtoolsNoLookUp:1,0 DOIFtoolsNoLookUpInDOIF:1,0 DOIFtoolsLogDir disabledForIntervals ".$oldAttr; #DOIFtoolsForceGet:true 
 }
 
 sub DOIFtools_dO ($$$$){
@@ -339,10 +339,12 @@ return "";}
 sub DOIFtools_eM($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my @dtn = devspec2array("TYPE=DOIFtools"); 
+  my $lang = AttrVal("global","language","EN");
   my $ret = "";
   # call DOIF_detailFn
   no strict "refs";
-  $ret .= &{ReadingsVal($dtn[0],".DOIF_detailFn","")}($FW_wname, $d, $room, $pageHash) if (ReadingsVal($dtn[0],".DOIF_detailFn",""));
+  my $retfn = &{ReadingsVal($dtn[0],".DOIF_detailFn","")}($FW_wname, $d, $room, $pageHash) if (ReadingsVal($dtn[0],".DOIF_detailFn",""));
+  $ret .= $retfn if ($retfn);
   use strict "refs";
   if (!$room) {
       # LookUp in probably associated with
@@ -350,10 +352,10 @@ sub DOIFtools_eM($$$$) {
       # Event Monitor
       if (AttrVal($dtn[0],"DOIFtoolsEventMonitorInDOIF","")) {
         my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on";
-        my $lang = AttrVal("global","language","EN");
         $ret .= "<br>" if (ReadingsVal($dtn[0],".DOIF_detailFn",""));
-        $ret .= "<table class=\"block wide\"><tr><td><div class=\"dval\"><span title=\"".($lang eq "DE" ? "toggle schaltet den Event-Monitor ein/aus" : "toggle switches event monitor on/off")."\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0$FW_CSRF\">toggle</a>&nbsp;&nbsp;</span>";
-        $ret .= "</div></td></tr></table>";
+        $ret .= "<table class=\"block\"><tr><td><div class=\"dval\"><span title=\"".($lang eq "DE" ? "toggle schaltet den Event-Monitor ein/aus" : "toggle switches event monitor on/off")."\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0$FW_CSRF\">toggle</a>&nbsp;&nbsp;</span>";
+        $ret .= "</div></td>";
+        $ret .= "</tr></table>";
 
         my $a = "";
         if (ReadingsVal($d,".eM","off") eq "on") {
@@ -428,7 +430,7 @@ sub DOIFtools_fhemwebFn($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $ret = "";
   # $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/myfunction.js\"></script>";
-  $ret .= $DOIFtoolsJSfuncStart if (!AttrVal($d,"DOIFtoolsNoLookUp",""));
+  $ret .= $DOIFtoolsJSfuncStart if ($DOIFtoolsJSfuncStart && !AttrVal($d,"DOIFtoolsNoLookUp",""));
   # Logfile Liste
   if($FW_ss && $pageHash) {
         $ret.= "<div id=\"$d\" align=\"center\" class=\"FileLog col2\">".
@@ -675,6 +677,34 @@ sub DOIFtools_Notify($$) {
   }
   return undef;
 }
+
+# DOIFtoolsLinColorGrad(start_color,end_color,percent|[$min,max,current])
+# start_color, end_color: 6 hexadecimal values as string with or without leading #
+# percent: from 0 to 1
+# min: minmal value
+# max: maximal value
+# current: current value
+# return: 6 hexadecimal value as string, prefix depends on input
+sub DOIFtoolsLinColorGrad {
+  my ($sc,$ec,$pct,$max,$cur) = @_;
+  $pct = ($cur-$pct)/($max-$pct) if (@_ == 5);
+  my $prefix = "";
+  $prefix = "#" if ("$sc $ec"=~"#");
+  $sc =~ s/^#//;
+  $ec =~ s/^#//;
+  $pct = $pct > 1 ? 1 : $pct;
+  $pct = $pct < 0 ? 0 : $pct;
+  $sc =~/([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})/;
+  my @sc = (hex($1),hex($2),hex($3));
+  $ec =~/([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})/;
+  my @ec = (hex($1),hex($2),hex($3));
+  my @rgb;
+  for (0..2) {
+    $rgb[$_] = sprintf("%02X", int(($ec[$_] - $sc[$_])*$pct + $sc[$_] + .5));
+  }
+  return $prefix.join("",@rgb);
+}
+
 sub DOIFtoolsRg
 {
   my ($hash,$arg) = @_;
@@ -1125,6 +1155,7 @@ sub DOIFtools_Set($@)
       return $ret;
   } elsif ($arg eq "targetDOIF") {
       readingsSingleUpdate($hash,"targetDOIF",$value,0);
+      FW_directNotify("#FHEMWEB:$FW_wname", "location.reload('".AttrVal($pn,"DOIFtoolsForceGet","")."')", "");
   } elsif ($arg eq "deleteReadingsInTargetDOIF") {
       if ($value) {
         my @i = split(",",$value);
@@ -1141,6 +1172,7 @@ sub DOIFtools_Set($@)
       }
   } elsif ($arg eq "targetDevice") {
       readingsSingleUpdate($hash,"targetDevice",$value,0);
+      FW_directNotify("#FHEMWEB:$FW_wname", "location.reload('".AttrVal($pn,"DOIFtoolsForceGet","")."')", "");
   } elsif ($arg eq "deleteReadingsInTargetDevice") {
       if ($value) {
         my @i = split(",",$value);
@@ -1459,9 +1491,53 @@ sub DOIFtools_Get($@)
       $ret .= CommandAttr(undef,"$value icon helper_doif");
       $ret .= CommandSave(undef,undef) if (AttrVal($pn,"DOIFtoolsExecuteSave",""));
       return $ret;
+  } elsif ($arg eq "linearColorGradient") {
+      my ($sc,$ec,$min,$max,$step) = split(",",$value);
+      if ($value && $sc =~ /[0-9A-F]{6}/ && $ec =~ /[0-9A-F]{6}/ && $min =~ /(-?\d+(\.\d+)?)/ &&  $max =~ /(-?\d+(\.\d+)?)/ && $step =~ /(-?\d+(\.\d+)?)/) {
+        $ret .= "<table>";
+        $ret .= "<th>Color Table</th>";
+        $ret .= "<tr><td colspan=3><div>";
+        for (my $i=0;$i<=255;$i++) {
+          my $col = DOIFtoolsLinColorGrad($sc,$ec,0,255,$i);
+          $ret .= "<span style='background-color:$col;'>&#8202;</span>";
+        }
+        $ret .= "</div></td></tr>";
+        $ret .= "<tr><td>Value</td><td>Color Number</td><td>Color</td></tr>";
+        for (my $i=$min;$i<=$max;$i+=$step) {
+          my $col = DOIFtoolsLinColorGrad($sc,$ec,$min,$max,$i);
+          $ret .= "<tr><td style='text-align:center;'>".sprintf("%.1f",$i)."</td><td style='text-align:center;'>$col</td><td style='background-color:$col;'>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</td></tr>";
+        }
+        $ret .= "</table>\n";
+        
+       return $ret;
+      } else {
+        $ret = $DE ? "Syntax:
+<code>&lt;Startfarbnummer&gt;,&lt;Endfarbnummer&gt;,&lt;Minimalwert&gt;,&lt;Maximalwert&gt;,&lt;Schrittweite&gt;</code>
+
+&lt;Startfarbnummer&gt;, ist eine HTML-Farbnummer, Beispiel: #0000FF für Blau.
+&lt;Endfarbnummer&gt;, , ist eine HTML-Farbnummer, Beispiel: #FF0000 für Rot.
+&lt;Minimalwert&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.
+&lt;Maximalwert&gt;, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.
+&lt;Schrittweite&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 0.5.
+
+Beispielangabe: #0000FF,#FF0000,7,30,0.5
+":
+"Syntax:
+<code>&lt;start color number&gt;,&lt;end color number&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;</code>
+
+&lt;start color number&gt;, a HTML color number, example: #0000FF for blue.
+&lt;end color number&gt;, , a HTML color number, example: #FF0000 for red.
+&lt;minimal value&gt;, the start color number will be scaled to it, example: 7.
+&lt;maximal value&gt;, the end color number will be scaled to it, example: 30.
+&lt;step width&gt;, for each step a color number will be generated, example: 0.5.
+
+Example specification: #0000FF,#FF0000,7,30,0.5
+";
+        return $ret
+      }
   } else {
       my $hardcoded = "checkDOIF:noArg statisticsReport:noArg runningTimerInDOIF:noArg";
-      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL SetAttrIconForDOIF:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"");
+      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL SetAttrIconForDOIF:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"")." linearColorGradient:textField";
   } 
 
   return $ret;
@@ -1501,6 +1577,7 @@ DOIFtools contains tools to support DOIF.<br>
     <li>create shortcuts</li>
     <li>optionally create a menu entry</li>
     <li>show a list of running wait timer</li>
+    <li>scale values to color numbers for coloration</li>
   </ul>
 <br>
 Just one definition per FHEM-installation is allowed. <a href="https://fhem.de/commandref_DE.html#DOIFtools">More in the german section.</a>
@@ -1530,7 +1607,8 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
     <li>Zugriff aus DOIFtools auf vorhandene DOIFtoolsLog-Logdateien.</li>
     <li>zeigt den Event Monitor in der Detailansicht von DOIFtools.</li>
     <li>ermöglicht den Zugriff auf den Event Monitor in der Detailansicht von DOIF.</li>
-    <li>erzeugt DOIF-Operanden aus einer Event-Zeile des Event-Monitors:</li>
+    <li>erzeugt DOIF-Operanden aus einer Event-Zeile des Event-Monitors.</li>
+    <li>skaliert Werte zu Farbnummern zum Einfärben, z.B. von Icons.</li>
     <ul>
       <li>Ist der <b>Event-Monitor in DOIF</b> geöffnet, dann kann die Definition des <b>DOIF geändert</b> werden.</li>
       <li>Ist der <b>Event-Monitor in DOIFtools</b> geöffnet, dann kann die Definition eines <b>DOIF erzeugt</b> werden.</li>
@@ -1646,6 +1724,17 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <code>get &lt;name&gt; SetAttrIconForDOIF &lt;DOIF names for setting the attribute icon to helper_doif&gt;</code><br>
         <b>SetAttrIconForDOIF</b> setzt für die ausgewählten DOIF das Attribut <i>icon</i> auf <i>helper_doif</i>.<br>
         <br>
+        <code>get &lt;name&gt; linearColorGradient &lt;start color number&gt;,&lt;end color number&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;</code><br>
+        <b>linearColorGradient</b> erzeugt eine Tabelle mit linear abgestuften Farbnummern.<br>
+        &lt;Startfarbnummer&gt;, ist eine HTML-Farbnummer, Beispiel: #0000FF für Blau.<br>
+        &lt;Endfarbnummer&gt;, , ist eine HTML-Farbnummer, Beispiel: #FF0000 für Rot.<br>
+        &lt;Minimalwert&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.<br>
+        &lt;Maximalwert&gt;, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.<br>
+        &lt;Schrittweite&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 0.5.<br>
+        <br>
+        Beispiel: <code>get DOIFtools linearColorGradient #0000FF,#FF0000,7,30,0.5</code><br>
+        <br>
+
     </ul>
 
 <a name="DOIFtoolsAttribute"></a>
