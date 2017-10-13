@@ -48,6 +48,7 @@
 # 2017-07-01 V 0215 creation of fid and device names for first autocreate extended
 # 2017-07-08 V 0215 login delay increased automatically up to 160s if login failed
 # 2017-07-08 V 0215 default set commands on devices without commands deleted
+# 2017-10-08 V 0216 group definition added
 
 package main;
 
@@ -113,13 +114,14 @@ sub tahoma_fhemIdFromOid($)
   return $oid[0];
 }
 
+my $groupId = 123001;
 sub tahoma_Define($$)
 {
   my ($hash, $def) = @_;
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0215";
+  my $ModuleVersion = "0216";
   
   my $subtype;
   my $name = $a[0];
@@ -152,6 +154,23 @@ sub tahoma_Define($$)
 
     my $d = $modules{$hash->{TYPE}}{defptr}{"$fid"};
     return "place oid $oid already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
+
+    $modules{$hash->{TYPE}}{defptr}{"$fid"} = $hash;
+
+  } elsif( $a[2] eq "GROUP" && @a == 4 ) {
+    $subtype = "GROUP";
+
+    my $oid = $a[@a-1];
+    my $fid = 'group' . "$groupId";
+    $groupId++;
+
+    $hash->{oid} = $oid;
+    $hash->{fid} = $fid;
+
+    $hash->{INTERVAL} = 0;
+
+    my $d = $modules{$hash->{TYPE}}{defptr}{"$fid"};
+    return "group oid $oid already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
 
     $modules{$hash->{TYPE}}{defptr}{"$fid"} = $hash;
 
@@ -202,6 +221,7 @@ sub tahoma_Define($$)
     tahoma_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
     tahoma_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
     tahoma_initDevice($hash) if( $hash->{SUBTYPE} eq "PLACE" );
+    tahoma_initDevice($hash) if( $hash->{SUBTYPE} eq "GROUP" );
     tahoma_initDevice($hash) if( $hash->{SUBTYPE} eq "SCENE" );
   }
 
@@ -236,6 +256,7 @@ sub tahoma_Notify($$)
   tahoma_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
   tahoma_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
   tahoma_initDevice($hash) if( $hash->{SUBTYPE} eq "PLACE" );
+  tahoma_initDevice($hash) if( $hash->{SUBTYPE} eq "GROUP" );
   tahoma_initDevice($hash) if( $hash->{SUBTYPE} eq "SCENE" );
 }
 
@@ -243,9 +264,10 @@ sub tahoma_Undefine($$)
 {
   my ($hash, $arg) = @_;
 
-  delete( $modules{$hash->{TYPE}}{defptr}{"$hash->{device}"} ) if( $hash->{SUBTYPE} eq "DEVICE" );
-  delete( $modules{$hash->{TYPE}}{defptr}{"$hash->{oid}"} ) if( $hash->{SUBTYPE} eq "PLACE" );
-  delete( $modules{$hash->{TYPE}}{defptr}{"$hash->{oid}"} ) if( $hash->{SUBTYPE} eq "SCENE" );
+  delete( $modules{$hash->{TYPE}}{defptr}{"$hash->{fid}"} ) if( $hash->{SUBTYPE} eq "DEVICE" );
+  delete( $modules{$hash->{TYPE}}{defptr}{"$hash->{fid}"} ) if( $hash->{SUBTYPE} eq "PLACE" );
+  delete( $modules{$hash->{TYPE}}{defptr}{"$hash->{fid}"} ) if( $hash->{SUBTYPE} eq "GROUP" );
+  delete( $modules{$hash->{TYPE}}{defptr}{"$hash->{fid}"} ) if( $hash->{SUBTYPE} eq "SCENE" );
 
   return undef;
 }
@@ -499,6 +521,13 @@ sub tahoma_initDevice($)
     $hash->{inLabel} = $device->{label};
     $hash->{inOID} = $device->{oid};
   }
+  elsif($subtype eq 'GROUP' ) {
+    $hash->{inType} = '';
+    $hash->{inLabel} = '';
+    $hash->{inLabel} = $attr{$hash->{NAME}}{alias} if (defined $attr{$hash->{NAME}}{alias});
+    $hash->{inOID} = '';
+    $hash->{inClass} = '';
+  }
   else
   {
     my $device=$hash->{device};
@@ -656,6 +685,19 @@ sub tahoma_getDeviceList($$$$)
   }
 }
 
+sub tahoma_getGroupList($$$)
+{
+  my ($hash,$oid,$deviceList) = @_;
+  #print "tahoma_getGroupList oid=$oid devices=".scalar @{$deviceList}."\n";
+
+  my @groupDevices = split(',',$oid);
+  foreach my $module (@groupDevices) {
+    if (defined($defs{$module}) && defined($defs{$module}{device}) && defined($defs{$module}{inClass})) {
+      push ( @{$deviceList}, { device => $defs{$module}{device}, class => $defs{$module}{inClass}, levelInvert => $attr{$module}{levelInvert} } ) ;
+    }
+  }
+}
+
 sub tahoma_checkCommand($$$$)
 {
   my ($hash,$device,$command,$value) = @_;
@@ -685,13 +727,15 @@ sub tahoma_applyRequest($$$)
   Log3 $name, 4, "$name: tahoma_applyRequest";
 
   if ( !defined($hash->{IODev}) || !(defined($hash->{device}) || defined($hash->{oid})) || !defined($hash->{inLabel}) || !defined($hash->{inClass}) ) {
-    Log3 $name, 4, "$name: tahoma_applyRequest failed - define error";
+    Log3 $name, 3, "$name: tahoma_applyRequest failed - define error";
     return;
   }
   
   my @devices = ();
   if ( defined($hash->{device}) ) {
     push ( @devices, { device => $hash->{device}, class => $hash->{inClass}, commands => $hash->{COMMANDS}, levelInvert => $attr{$hash->{NAME}}{levelInvert} } );
+  } elsif ($hash->{SUBTYPE} eq 'GROUP') {
+    tahoma_getGroupList($hash->{IODev},$hash->{oid},\@devices);
   } else {
     tahoma_getDeviceList($hash->{IODev},$hash->{oid},$hash->{inClass},\@devices);
   }
@@ -1288,6 +1332,7 @@ sub tahoma_Get($$@)
     }
 
   } elsif( $hash->{SUBTYPE} eq "SCENE"
+      || $hash->{SUBTYPE} eq "GROUP" 
       || $hash->{SUBTYPE} eq "PLACE" ) {
     $list = "";
 
@@ -1320,9 +1365,11 @@ sub tahoma_Get($$@)
 sub tahoma_Set($$@)
 {
   my ($hash, $name, $cmd, $val) = @_;
+  #Log3 $name, 3, "$name: tahoma_Set $cmd $val $hash->{SUBTYPE} $hash->{COMMANDS}";
 
   my $list = "";
   if( $hash->{SUBTYPE} eq "DEVICE" ||
+      $hash->{SUBTYPE} eq "GROUP" ||
       $hash->{SUBTYPE} eq "PLACE" ) {
     $list = "dim:slider,0,1,100 setClosure open:noArg close:noArg my:noArg stop:noArg cancel:noArg";
     $list = $hash->{COMMANDS} if (defined $hash->{COMMANDS});
@@ -1552,6 +1599,7 @@ sub tahoma_decrypt($)
     <code>define &lt;name&gt; tahoma DEVICE &lt;DeviceURL&gt;</code><br>
     <code>define &lt;name&gt; tahoma PLACE &lt;oid&gt;</code><br>
     <code>define &lt;name&gt; tahoma SCENE &lt;oid&gt;</code><br>
+    <code>define &lt;name&gt; tahoma GROUP &lt;tahoma_device1&gt;,&lt;tahoma_device2&gt;,&lt;tahoma_device3&gt;</code><br>
     <br>
     <br>
     A definition is only necessary for a tahoma device:<br>
@@ -1561,6 +1609,7 @@ sub tahoma_decrypt($)
     All registrated devices are automatically created with name tahoma_12345 (device number 12345 is used from setup)<br>
     All defined rooms will be are automatically created.<br>
     Also all defined scenes will be automatically created.<br>
+    Groups of devices can be manually added to send out one group command for all attached devices<br>
     <br>
     <br>
     <b>global Attributes for ACCOUNT:</b>
@@ -1616,6 +1665,12 @@ sub tahoma_decrypt($)
       <code>attr tahoma_4ef30a23 IODev tahoma1</code><br>
       <code>attr tahoma_4ef30a23 alias scene Rolladen S&uuml;dfenster zu</code><br>
       <code>attr tahoma_4ef30a23 room tahoma</code><br>
+      <br>
+      <br>manual created group e.g.:<br>
+      <code>define tahoma_group1 tahoma GROUP tahoma_23234545,tahoma_23234546,tahoma_23234547</code><br>
+      <code>attr tahoma_group1 IODev tahoma1</code><br>
+      <code>attr tahoma_group1 alias Gruppe Rolladen Westen</code><br>
+      <code>attr tahoma_group1 room tahoma</code><br>
     </ul>
   </ul><br>
 </ul>
