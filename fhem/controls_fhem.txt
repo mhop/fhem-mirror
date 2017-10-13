@@ -1,4 +1,4 @@
-REV 15235
+REV 15242
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,10 +21,10 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-10-12_07:45:02 213948 ./CHANGED
+UPD 2017-10-13_07:45:02 214141 ./CHANGED
 UPD 2017-10-05_07:45:02 35067 ./MAINTAINER.txt
 UPD 2017-09-20_07:45:02 39189 ./configDB.pm
-UPD 2016-05-19_07:45:10 15703 ./fhem.cfg.demo
+UPD 2017-10-13_07:45:02 15740 ./fhem.cfg.demo
 UPD 2017-10-04_07:45:04 137453 ./fhem.pl
 UPD 2015-11-07_07:45:11 21944 FHEM/00_CM11.pm
 UPD 2017-09-09_07:45:02 56979 FHEM/00_CUL.pm
@@ -273,7 +273,7 @@ UPD 2015-07-28_14:05:31 17091 FHEM/56_POKEYS.pm
 UPD 2017-10-12_07:45:02 26400 FHEM/57_CALVIEW.pm
 UPD 2017-08-02_07:45:03 121945 FHEM/57_Calendar.pm
 UPD 2015-11-01_07:45:11 33956 FHEM/59_HCS.pm
-UPD 2017-07-12_07:45:02 20652 FHEM/59_LuftdatenInfo.pm
+UPD 2017-10-13_07:45:02 25280 FHEM/59_LuftdatenInfo.pm
 UPD 2016-04-08_07:45:12 25464 FHEM/59_OPENWEATHER.pm
 UPD 2017-03-20_07:45:03 37261 FHEM/59_PROPLANTA.pm
 UPD 2017-04-20_07:45:02 43323 FHEM/59_Twilight.pm
@@ -410,7 +410,7 @@ UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2017-05-01_07:45:02 59873 FHEM/98_DLNARenderer.pm
 UPD 2017-07-27_07:45:02 177543 FHEM/98_DOIF.pm
-UPD 2017-07-29_07:45:02 94027 FHEM/98_DOIFtools.pm
+UPD 2017-10-13_07:45:02 98578 FHEM/98_DOIFtools.pm
 UPD 2016-10-02_07:45:11 40324 FHEM/98_Dooya.pm
 UPD 2016-10-29_07:45:14 28678 FHEM/98_EDIPLUG.pm
 UPD 2017-04-03_07:45:02 25462 FHEM/98_FReplacer.pm
@@ -618,7 +618,7 @@ UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
 UPD 2017-04-08_07:45:02 8063 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2017-10-12_07:45:02 210038 FHEM/lib/openzwave_deviceconfig.xml.gz
 UPD 2017-10-12_07:45:02 89426 FHEM/lib/openzwave_manufacturer_specific.xml
-UPD 2017-01-10_07:45:02 10377 FHEM/lib/zwave_alliancelinks.csv.gz
+UPD 2017-10-13_07:45:02 21723 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2017-10-03_07:45:02 15577 FHEM/msgSchema.pm
 UPD 2015-07-28_14:05:31 401 FHEM/myUtilsTemplate.pm
@@ -640,8 +640,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-10-12_07:45:04 3117253 docs/commandref.html
-UPD 2017-10-12_07:45:05 1838260 docs/commandref_DE.html
+UPD 2017-10-13_07:45:04 3118391 docs/commandref.html
+UPD 2017-10-13_07:45:05 1840312 docs/commandref_DE.html
 UPD 2017-09-22_07:45:02 72400 docs/commandref_frame.html
 UPD 2017-10-10_07:45:02 81076 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
@@ -1945,7 +1945,7 @@ UPD 2017-03-09_07:45:02 41450 www/pgm2/dashboard.js
 UPD 2015-07-28_14:05:34 14618 www/pgm2/dashboard_darkstyle.css
 UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
-UPD 2017-05-11_07:45:03 5418 www/pgm2/defaultCommon.css
+UPD 2017-10-13_07:45:02 5484 www/pgm2/defaultCommon.css
 UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
 UPD 2017-10-11_07:45:02 51614 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
