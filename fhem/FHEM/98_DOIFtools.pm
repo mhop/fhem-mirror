@@ -1495,38 +1495,39 @@ sub DOIFtools_Get($@)
       my ($sc,$ec,$min,$max,$step) = split(",",$value);
       if ($value && $sc =~ /[0-9A-F]{6}/ && $ec =~ /[0-9A-F]{6}/ && $min =~ /(-?\d+(\.\d+)?)/ &&  $max =~ /(-?\d+(\.\d+)?)/ && $step =~ /(-?\d+(\.\d+)?)/) {
         $ret .= "<table>";
-        $ret .= "<th>Color Table</th>";
-        $ret .= "<tr><td colspan=3><div>";
+        $ret .= "<tr><td colspan=4 style='font-weight:bold;'>Color Table</td></tr>";
+        $ret .= "<tr><td colspan=4><div>";
         for (my $i=0;$i<=255;$i++) {
           my $col = DOIFtoolsLinColorGrad($sc,$ec,0,255,$i);
-          $ret .= "<span style='background-color:$col;'>&#8202;</span>";
+          $ret .= "<span style='background-color:$col;'>&#8202;&#8202;</span>";
         }
         $ret .= "</div></td></tr>";
-        $ret .= "<tr><td>Value</td><td>Color Number</td><td>Color</td></tr>";
+        $ret .= "<tr style='text-align:center;'><td> Value </td><td> Color Number </td><td> RGB values </td><td> Color</td> </tr>";
         for (my $i=$min;$i<=$max;$i+=$step) {
           my $col = DOIFtoolsLinColorGrad($sc,$ec,$min,$max,$i);
-          $ret .= "<tr><td style='text-align:center;'>".sprintf("%.1f",$i)."</td><td style='text-align:center;'>$col</td><td style='background-color:$col;'>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</td></tr>";
+          $col =~ /^#?([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/;
+          $ret .= "<tr><td style='text-align:center;'>".sprintf("%.1f",$i)."</td><td style='text-align:center;'>$col</td><td style='text-align:center;'> ".hex($1).",".hex($2).",".hex($3)." </td><td style='background-color:$col;'>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</td></tr>";
         }
         $ret .= "</table>\n";
         
        return $ret;
       } else {
-        $ret = $DE ? "Syntax:
+        $ret = $DE ? "Falsche Eingabe:$value\nSyntax:
 <code>&lt;Startfarbnummer&gt;,&lt;Endfarbnummer&gt;,&lt;Minimalwert&gt;,&lt;Maximalwert&gt;,&lt;Schrittweite&gt;</code>
 
 &lt;Startfarbnummer&gt;, ist eine HTML-Farbnummer, Beispiel: #0000FF für Blau.
-&lt;Endfarbnummer&gt;, , ist eine HTML-Farbnummer, Beispiel: #FF0000 für Rot.
+&lt;Endfarbnummer&gt;, ist eine HTML-Farbnummer, Beispiel: #FF0000 für Rot.
 &lt;Minimalwert&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.
 &lt;Maximalwert&gt;, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.
 &lt;Schrittweite&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 0.5.
 
 Beispielangabe: #0000FF,#FF0000,7,30,0.5
 ":
-"Syntax:
+"Wrong input:$value\nSyntax:
 <code>&lt;start color number&gt;,&lt;end color number&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;</code>
 
 &lt;start color number&gt;, a HTML color number, example: #0000FF for blue.
-&lt;end color number&gt;, , a HTML color number, example: #FF0000 for red.
+&lt;end color number&gt;, a HTML color number, example: #FF0000 for red.
 &lt;minimal value&gt;, the start color number will be scaled to it, example: 7.
 &lt;maximal value&gt;, the end color number will be scaled to it, example: 30.
 &lt;step width&gt;, for each step a color number will be generated, example: 0.5.
@@ -1577,7 +1578,7 @@ DOIFtools contains tools to support DOIF.<br>
     <li>create shortcuts</li>
     <li>optionally create a menu entry</li>
     <li>show a list of running wait timer</li>
-    <li>scale values to color numbers for coloration</li>
+    <li>scale values to color numbers and RGB values for coloration</li>
   </ul>
 <br>
 Just one definition per FHEM-installation is allowed. <a href="https://fhem.de/commandref_DE.html#DOIFtools">More in the german section.</a>
@@ -1608,7 +1609,6 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
     <li>zeigt den Event Monitor in der Detailansicht von DOIFtools.</li>
     <li>ermöglicht den Zugriff auf den Event Monitor in der Detailansicht von DOIF.</li>
     <li>erzeugt DOIF-Operanden aus einer Event-Zeile des Event-Monitors.</li>
-    <li>skaliert Werte zu Farbnummern zum Einfärben, z.B. von Icons.</li>
     <ul>
       <li>Ist der <b>Event-Monitor in DOIF</b> geöffnet, dann kann die Definition des <b>DOIF geändert</b> werden.</li>
       <li>Ist der <b>Event-Monitor in DOIFtools</b> geöffnet, dann kann die Definition eines <b>DOIF erzeugt</b> werden.</li>
@@ -1617,6 +1617,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
     <li>erstellen von Shortcuts</li>
     <li>optionalen Menüeintrag erstellen</li>
     <li>Liste der laufenden Wait-Timer anzeigen</li>
+    <li>skaliert Werte zu Farbnummern und RGB Werten zum Einfärben, z.B. von Icons.</li>
   </ul>
 <br>
 <b>Inhalt</b><br>
