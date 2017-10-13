@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCURPC: fixed bug in event timeout handling
   - change:  59_LuftdatenInfo: DEF change (should happen automatically)
   - feature: 98_DOIFtools: add getter linearColorGradient, returns a table of
              value, colornumber, color bar

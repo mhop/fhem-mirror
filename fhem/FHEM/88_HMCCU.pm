@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.1.002
+#  Version 4.1.003
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -105,7 +105,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.1.002';
+my $HMCCU_VERSION = '4.1.003';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -5710,7 +5710,10 @@ sub HMCCU_TCPPing ($$$)
 		my $t = time ();
 	
 		while (time () < $t+$timeout) {
-			return 1 if (HMCCU_TCPConnect ($addr, $port));
+			if (HMCCU_TCPConnect ($addr, $port)) {
+				sleep (30);
+				return 1;
+			}
 			sleep (20);
 		}
 		

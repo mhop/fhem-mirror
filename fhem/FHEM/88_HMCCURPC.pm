@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 0.96.002 beta
+#  Version 0.97 beta
 #
 #  Thread based RPC Server module for HMCCU.
 #
@@ -40,7 +40,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPC_VERSION = '0.96.002 beta';
+my $HMCCURPC_VERSION = '0.97 beta';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPC_MAX_EVENTS = 50;
@@ -284,8 +284,9 @@ sub HMCCURPC_Define ($$)
 		# Set I/O device and store reference for RPC device in I/O device
 		AssignIoPort ($hash, $hmccu_hash->{NAME});
 		$hmccu_hash->{RPCDEV} = $name;
-		$hash->{ccutype} = $hmccu_hash->{ccutype};
-		$hash->{CCUNum}  = $hmccu_hash->{CCUNum};
+		$hash->{ccutype}  = $hmccu_hash->{ccutype};
+		$hash->{CCUNum}   = $hmccu_hash->{CCUNum};
+		$hash->{ccustate} = $hmccu_hash->{ccustate};
 	}
 	else {
 		# Count CCU devices
@@ -298,6 +299,7 @@ sub HMCCURPC_Define ($$)
 		}
 		$hash->{CCUNum} = $ccucount+1;
 		$hash->{ccutype} = "CCU2";
+		$hash->{ccustate} = 'initialized';
 	}
 
 	Log3 $name, 1, "HMCCURPC: Device $name. Initialized version $HMCCURPC_VERSION";
@@ -306,7 +308,7 @@ sub HMCCURPC_Define ($$)
 	$attr{$name}{stateFormat} = "rpcstate/state";
 	$attr{$name}{verbose} = 2;
 
-	HMCCURPC_ResetRPCState ($hash, "initialized");	
+	HMCCURPC_ResetRPCState ($hash, "initialized");
 	
 	return undef;
 }
@@ -597,8 +599,7 @@ sub HMCCURPC_Read ($)
 	my $child = $hash->{hmccu}{sockchild};
 	return if (!defined ($hash->{hmccu}{eventqueue}));
 	my $queue = $hash->{hmccu}{eventqueue};
-	my $hmccu_hash;
-	$hmccu_hash = $hash->{IODev} if (exists ($hash->{IODev}) && $hash->{noiodev} == 0);
+	my $hmccu_hash = (exists ($hash->{IODev}) && $hash->{noiodev} == 0) ? $hash->{IODev} : $hash;
 	
 	# Get attributes
 	my $rpcmaxevents = AttrVal ($name, 'rpcMaxEvents', $HMCCURPC_MAX_EVENTS);
@@ -625,6 +626,7 @@ sub HMCCURPC_Read ($)
 		if ($et eq 'EV') {
 			$events{$par[0]}{$par[1]}{$par[2]} = $par[3];
 			$evcount++;
+			$hmccu_hash->{ccustate} = 'active' if ($hmccu_hash->{ccustate} ne 'active');
 		}
 		elsif ($et eq 'ND') {
 			$devices{$par[0]}{flag} = 'N';
@@ -649,10 +651,18 @@ sub HMCCURPC_Read ($)
 			$devcount++;
 		}
 		elsif ($et eq 'TO') {
-			if ($ccuflags =~ /reconnect/) {
-				Log3 $name, 2, "HMCCURPC: Reconnecting to CCU interface ".
-					HMCCURPC_RPC_NUMPORT{$par[0]};
-				HMCCURPC_RegisterSingleCallback ($hash, $par[0], 1);
+			$hmccu_hash->{ccustate} = 'timeout';
+			if ($hash->{RPCState} eq 'running' && $hash->{$ccuflags} =~ /reconnect/) {
+				if (HMCCU_TCPConnect ($hash->{host}, $par[0])) {
+					$hmccu_hash->{ccustate} = 'active';
+					Log3 $name, 2, "HMCCURPC: Reconnecting to CCU interface ".
+						$HMCCURPC_RPC_NUMPORT{$par[0]};
+					HMCCURPC_RegisterSingleCallback ($hash, $par[0], 1);
+				}
+				else {
+					$hmccu_hash->{ccustate} = 'unreachable';
+					Log3 $name, 1, "HMCCURPC: CCU not reachable on port ".$par[0];
+				}
 			}
 		}
 		
@@ -715,7 +725,7 @@ sub HMCCURPC_SetState ($$)
 sub HMCCURPC_SetRPCState ($$$)
 {
 	my ($hash, $state, $msg) = @_;
-
+	
 	# Search HMCCU device and check for running RPC servers
 	my $hmccu_hash;
 	$hmccu_hash = $hash->{IODev} if (exists ($hash->{IODev}));
@@ -1027,10 +1037,7 @@ sub HMCCURPC_ProcessEvent ($$)
 		# Input:  TO|clkey|Time
 		# Output: TO, clkey, Port, Time
 		#
-		if (defined ($hmccu_hash)) {
-			$hmccu_hash->{ccustate} = HMCCU_TCPConnect ($hash->{host}, 8181) ? 'timeout' : 'unreachable';
-		}
-		Log3 $name, 2, "HMCCU: Received no events from interface $clkey for ".$t[0]." seconds";
+		Log3 $name, 2, "HMCCURPC: Received no events from interface $clkey for ".$t[0]." seconds";
 		DoTrigger ($name, "No events from interface $clkey for ".$t[0]." seconds");
 		return ($et, $clkey, $hash->{hmccu}{rpc}{$clkey}{port}, $t[0]);
 	}
@@ -1862,6 +1869,9 @@ sub HMCCURPC_HandleConnection ($$$$)
 	my ($port, $callbackport, $queue, $thrpar) = @_;
 	my $name = $thrpar->{name};
 	
+	my $evttimeout = $thrpar->{evttimeout};
+	my $conntimeout = $thrpar->{conntimeout};
+	
 	my $run = 1;
 	my $tid = threads->tid ();
 	my $clkey = 'CB'.$port;
@@ -1907,16 +1917,16 @@ sub HMCCURPC_HandleConnection ($$$$)
 	$rpcsrv->{__daemon}->timeout ($thrpar->{acctimeout});
 
 	while ($run) {
-		if ($thrpar->{evttimeout} > 0) {
+		if ($evttimeout > 0) {
 			my $difftime = time()-$rpcsrv->{hmccu}{evttime};
-			HMCCURPC_Write ($rpcsrv, "TO", $clkey, $difftime) if ($difftime >= $thrpar->{evttimeout});
+			HMCCURPC_Write ($rpcsrv, "TO", $clkey, $difftime) if ($difftime >= $evttimeout);
 		}
 		
 		# Next statement blocks for timeout seconds
 		my $connection = $rpcsrv->{__daemon}->accept ();
 		next if (! $connection);
 		last if (! $run);
-		$connection->timeout ($thrpar->{conntimeout});
+		$connection->timeout ($conntimeout);
 		if ($prot eq 'A') {
 			Log3 $name, 4, "CCURPC: $clkey processing CCU request";
 			$rpcsrv->process_request ($connection);
@@ -1955,13 +1965,13 @@ sub HMCCURPC_HandleConnection ($$$$)
 
 sub HMCCURPC_TriggerIO ($$$)
 {
-	my ($fh, $num_items, $thrpar) = @_;
+	my ($fh, $num_items, $socktimeout) = @_;
 	
 	my $fd = fileno ($fh);
 	my $err = '';
 	my $win = '';
 	vec ($win, $fd, 1) = 1;
-	my $nf = select (undef, $win, undef, $thrpar->{socktimeout});
+	my $nf = select (undef, $win, undef, $socktimeout);
 	if ($nf < 0) {
 		$err = $!;
 	}
@@ -1997,14 +2007,18 @@ sub HMCCURPC_TriggerIO ($$$)
 sub HMCCURPC_ProcessData ($$$$)
 {
 	my ($equeue, $rqueue, $socket, $thrpar) = @_;
+
 	my $name = $thrpar->{name};
+	my $queuesize = $thrpar->{queuesize};
+	my $waittime = $thrpar->{waittime};
+	my $triggertime = $thrpar->{triggertime};
+	my $socktimeout = $thrpar->{socktimeout};
 	
 	my $threadname = "DATA";
 	my $run = 1;
 	my $warn = 0;
 	my $ec = 0;
 	my $tid = threads->tid ();
-	my $triggertime = $thrpar->{triggertime};
 	
 	$SIG{INT} = sub { $run = 0; };
 
@@ -2020,8 +2034,8 @@ sub HMCCURPC_ProcessData ($$$$)
 			my $num_items = $equeue->pending ();
 			if ($num_items > 0) {
 				# Check max queue size
-				if ($num_items >= $thrpar->{queuesize} && $warn == 0) {
-					Log3 $name, 2, "CCURPC: Size of event queue exceeds ".$thrpar->{queuesize};
+				if ($num_items >= $queuesize && $warn == 0) {
+					Log3 $name, 2, "CCURPC: Size of event queue exceeds $queuesize";
 					$warn = 1;
 				}
 				else {
@@ -2030,7 +2044,7 @@ sub HMCCURPC_ProcessData ($$$$)
 				
 				# Inform reader about new items in queue
 				Log3 $name, 4, "CCURPC: Trigger I/O for $num_items items";
-				my ($ttime, $err) = HMCCURPC_TriggerIO ($socket, $num_items, $thrpar);
+				my ($ttime, $err) = HMCCURPC_TriggerIO ($socket, $num_items, $socktimeout);
 				if ($triggertime > 0) {
 					if ($ttime == 0) {
 						$ec++;
@@ -2046,7 +2060,7 @@ sub HMCCURPC_ProcessData ($$$$)
 		}
 		
 		threads->yield ();
-		usleep ($thrpar->{waittime});
+		usleep ($waittime);
 	}
 
 	$equeue->enqueue ("EX|$threadname|SHUTDOWN|".$tid);
@@ -2054,9 +2068,9 @@ sub HMCCURPC_ProcessData ($$$$)
 	
 	# Inform FHEM about the EX event in queue
 	for (my $i=0; $i<10; $i++) {
-		my ($ttime, $err) = HMCCURPC_TriggerIO ($socket, 1, $thrpar);
+		my ($ttime, $err) = HMCCURPC_TriggerIO ($socket, 1, $socktimeout);
 		last if ($ttime > 0);
-		usleep ($thrpar->{waittime});
+		usleep ($waittime);
 	}
 	
 	return;
