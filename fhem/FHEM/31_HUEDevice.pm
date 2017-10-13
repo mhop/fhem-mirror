@@ -393,7 +393,10 @@ HUEDevice_SetParam($$@)
     $cmd = 'bri';
   }
 
-  $cmd = "off" if($cmd eq "pct" && $value == 0 );
+  if($cmd eq "pct" && $value == 0 ) {
+    $cmd = "off";
+    $value = $value2;
+  }
 
   if($cmd eq 'on') {
     $obj->{'on'}  = JSON::true;
@@ -1129,32 +1132,28 @@ HUEDevice_Parse($$)
         my $s = '';
         my $pct = -1;
         my $on = $state->{on}; $readings{on} = $hash->{helper}{onoff} if( !defined($on) );
-        if( $on )
-          {
-            $s = 'on';
-            $readings{onoff} = 1;
+        if( $on ) {
+          $s = 'on';
+          $readings{onoff} = 1;
 
-            if( !defined($readings{bri}) || AttrVal($name, 'subType', 'dimmer') eq 'switch' ) {
-                $pct = 100;
+          if( !defined($readings{bri}) || AttrVal($name, 'subType', 'dimmer') eq 'switch' ) {
+            $pct = 100;
 
-            } else {
-              $pct = int($readings{bri} * 99 / 254 + 1);
-              if( $pct > 0
-                  && $pct < 100  ) {
-                $s = $dim_values{int($pct/7)};
-              }
-              $s = 'off' if( $pct == 0 );
-
+          } else {
+            $pct = int($readings{bri} * 99 / 254 + 1);
+            if( $pct > 0
+                && $pct < 100  ) {
+              $s = $dim_values{int($pct/7)};
             }
+            $s = 'off' if( $pct == 0 );
           }
-        else
-          {
-            $on = 0;
-            $s = 'off';
-            $pct = 0;
+        } else {
+          $on = 0;
+          $s = 'off';
+          $pct = 0;
 
-            $readings{onoff} = 0;
-          }
+          $readings{onoff} = 0;
+        }
 
         $readings{pct} = $pct;
 
