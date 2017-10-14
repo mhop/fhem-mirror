@@ -22,6 +22,7 @@ package main;
 use strict;
 use warnings;
 use Time::Local;
+use Color;
 
 sub DOIFtools_Initialize($);
 sub DOIFtools_Set($@);
@@ -1519,9 +1520,9 @@ sub DOIFtools_Get($@)
 &lt;Endfarbnummer&gt;, ist eine HTML-Farbnummer, Beispiel: #FF0000 für Rot.
 &lt;Minimalwert&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.
 &lt;Maximalwert&gt;, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.
-&lt;Schrittweite&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 0.5.
+&lt;Schrittweite&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 1.
 
-Beispielangabe: #0000FF,#FF0000,7,30,0.5
+Beispielangabe: <code>#0000FF,#FF0000,7,30,1</code>
 ":
 "Wrong input:$value\nSyntax:
 <code>&lt;start color number&gt;,&lt;end color number&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;</code>
@@ -1530,15 +1531,92 @@ Beispielangabe: #0000FF,#FF0000,7,30,0.5
 &lt;end color number&gt;, a HTML color number, example: #FF0000 for red.
 &lt;minimal value&gt;, the start color number will be scaled to it, example: 7.
 &lt;maximal value&gt;, the end color number will be scaled to it, example: 30.
-&lt;step width&gt;, for each step a color number will be generated, example: 0.5.
+&lt;step width&gt;, for each step a color number will be generated, example: 1.
 
-Example specification: #0000FF,#FF0000,7,30,0.5
+Example specification: <code>#0000FF,#FF0000,7,30,1</code>
 ";
         return $ret
       }
+  } elsif ($arg eq "modelColorGradient") {
+    my $err_ret = $DE ? "Falsche Eingabe:$value\nSyntax:
+<code>&lt;Minimalwert&gt;,&lt;Zwischenwert&gt;,&lt;Maximalwert&gt;,&lt;Schrittweite&gt;&lt;Farbmodel&gt;</code>
+
+&lt;Minimalwert&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.
+&lt;Zwischenwert&gt;, der Fixpunkt zwischen Start- u. Endwert, Beispiel: 20.
+&lt;Maximalwert&gt;, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.
+&lt;Schrittweite&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 1.
+&lt;Farbmodel&gt;, die Angabe eines vordefinierten Modells &lt;0|1|2&gt; oder 
+  fünf RGB-Werte als Array [r1,g1,b1,r2,g2,b2,r3,g3,b3,r4,g4,b4,r5,g5,b5] für ein eigenes Model.
+
+Beispielangabe: <code>0,50,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0,127,255]</code>
+          oder: <code>7,20,30,1,0</code>
+":
+"Wrong input:$value\nSyntax:
+<code>&lt;minimal value&gt;,&lt;middle value&gt;,&lt;maximal value&gt;,&lt;step width&gt;,&lt;color model&gt;</code>
+
+&lt;minimal value&gt;, the start color number will be scaled to it, example: 7.
+&lt;middle value&gt;, a fix point between min and max, example: 20.
+&lt;maximal value&gt;, the end color number will be scaled to it, example: 30.
+&lt;step width&gt;, for each step a color number will be generated, example: 1.
+&lt;color model&gt;, a predefined number &lt;0|1|2&gt; or an array of five RGB values,<code>[r1,g1,b1,r2,g2,b2,r3,g3,b3,r4,g4,b4,r5,g5,b5]</code>
+
+Example specification: <code>0,50,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0,127,255]</code>
+                   or: <code>7,20,30,1,0</code>
+";
+    return $err_ret if (!$value);
+    my ($min,$mid,$max,$step,$colors);
+    my $err = "";
+    $value =~ s/,(\[.*\])//;
+    if ($1) {
+      $colors = eval($1);
+      if ($@) {
+        $err="Error eval 1567: $@\n".$err_ret;
+        Log3 $hash->{NAME},3,"modelColorGradient \n".$err; 
+        return $err;
+      }
+      ($min,$mid,$max,$step) = split(",",$value);
+    } else {
+      ($min,$mid,$max,$step,$colors) = split(",",$value);
+    }
+    return $err_ret if ($min>=$mid or $mid >= $max or $step <= 0 or (ref($colors) ne "ARRAY" && $colors !~ "0|1|2"));
+    my $erg=eval("\"".Color::pahColor($min,$mid,$max,$min+$step,$colors)."\"");
+    if ($@) {
+      $err="Error eval 1577: $@\n".$err_ret;
+      Log3 $hash->{NAME},3,"modelColorGradient \n".$err; 
+    return $err;
+    }
+    $ret .= "<table>";
+    $ret .= "<tr><td colspan=4 style='font-weight:bold;'>Color Table</td></tr>";
+    $ret .= "<tr><td colspan=4><div>";
+    for (my $i=0;$i<=255;$i++) {
+      my $col = eval("\"".Color::pahColor($min,$mid,$max,$min+$i*($max-$min)/255,$colors)."\"");
+      if ($@) {
+        $err="Error eval 1567: $@\n".$err_ret;
+        Log3 $hash->{NAME},3,"modelColorGradient \n".$err; 
+        return $err;
+      }
+      $col = "#".substr($col,0,6);
+      $ret .= "<span style='background-color:$col;'>&#8202;&#8202;</span>";
+    }
+    $ret .= "</div></td></tr>";
+    $ret .= "<tr style='text-align:center;'><td> Value </td><td> Color Number </td><td> RGB values </td><td> Color</td> </tr>";
+    for (my $i=$min;$i<=$max;$i+=$step) {
+      my $col = eval("\"".Color::pahColor($min,$mid,$max,$i,$colors)."\"");
+      if ($@) {
+        $err="Error eval 1567: $@\n".$err_ret;
+        Log3 $hash->{NAME},3,"modelColorGradient \n".$err; 
+        return $err;
+      }
+      $col = "#".substr($col,0,6);
+      $col =~ /^#?([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/;
+      $ret .= "<tr><td style='text-align:center;'>".sprintf("%.1f",$i)."</td><td style='text-align:center;'>$col</td><td style='text-align:center;'> ".hex($1).",".hex($2).",".hex($3)." </td><td style='background-color:$col;'>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</td></tr>";
+    }
+    $ret .= "</table>\n";
+    
+    return $ret;
   } else {
       my $hardcoded = "checkDOIF:noArg statisticsReport:noArg runningTimerInDOIF:noArg";
-      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL SetAttrIconForDOIF:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"")." linearColorGradient:textField";
+      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL SetAttrIconForDOIF:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"")." linearColorGradient:textField modelColorGradient:textField";
   } 
 
   return $ret;
@@ -1726,16 +1804,28 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <b>SetAttrIconForDOIF</b> setzt für die ausgewählten DOIF das Attribut <i>icon</i> auf <i>helper_doif</i>.<br>
         <br>
         <code>get &lt;name&gt; linearColorGradient &lt;start color number&gt;,&lt;end color number&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;</code><br>
-        <b>linearColorGradient</b> erzeugt eine Tabelle mit linear abgestuften Farbnummern.<br>
-        &lt;Startfarbnummer&gt;, ist eine HTML-Farbnummer, Beispiel: #0000FF für Blau.<br>
-        &lt;Endfarbnummer&gt;, , ist eine HTML-Farbnummer, Beispiel: #FF0000 für Rot.<br>
-        &lt;Minimalwert&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.<br>
-        &lt;Maximalwert&gt;, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.<br>
-        &lt;Schrittweite&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 0.5.<br>
+        <b>linearColorGradient</b> erzeugt eine Tabelle mit linear abgestuften Farbnummern und RGB-Werten.<br>
+        &lt;start color number&gt;, ist eine HTML-Farbnummer, Beispiel: #0000FF für Blau.<br>
+        &lt;end color number&gt;, , ist eine HTML-Farbnummer, Beispiel: #FF0000 für Rot.<br>
+        &lt;minimal value&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.<br>
+        &lt;maximal value&gt;, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.<br>
+        &lt;step width&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 0.5.
         <br>
         Beispiel: <code>get DOIFtools linearColorGradient #0000FF,#FF0000,7,30,0.5</code><br>
         <br>
-
+        <code>get &lt;name&gt; modelColorGradient &lt;minimal value&gt;,&lt;middle value&gt;,&lt;maximal value&gt;,&lt;step width&gt;,&lt;color model&gt;</code><br>
+        <b>modelColorGradient</b> erzeugt eine Tabelle mit modellbedingt abgestuften Farbnummern und RGB-Werten, siehe FHEM-Wiki<a href="https://wiki.fhem.de/wiki/Color#Farbskala_mit_Color::pahColor"> Farbskala mit Color::pahColor </a><br>
+        &lt;minimal value&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.<br>
+        &lt;middle value&gt;, der Mittenwert ist ein Fixpunkt zwischen Minimal- u. Maximalwert, Beispiel: 20.<br>
+        &lt;maximal value&gt;, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.<br>
+        &lt;step width&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 1.<br>
+        &lt;color model&gt;, die Angabe eines vordefinierten Modells &lt;0|1|2&gt; oder fünf RGB-Werte als Array [r1,g1,b1,r2,g2,b2,r3,g3,b3,r4,g4,b4,r5,g5,b5] für ein eigenes Model.<br>
+        <br>
+        Beispiele:<br>
+        <code>get DOIFtools modelColorGradient 7,20,30,1,0</code><br>
+        <code>get DOIFtools modelColorGradient 0,50,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0,127,255]</code><br>
+        <br>
+        
     </ul>
 
 <a name="DOIFtoolsAttribute"></a>

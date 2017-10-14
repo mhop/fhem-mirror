@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_DOIFtools: add getter modelColorGradient, returns a table of
+             value, colornumber, RGB values and color bar using Color::pahColor
   - new:     98_Siro.pm: New module for Siro shutters
   - feature: 98_DOIFtools: add RGB color values to color table
   - bugfix:  88_HMCCURPC: fixed bug in event timeout handling
