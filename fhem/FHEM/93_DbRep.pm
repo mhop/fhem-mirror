@@ -37,6 +37,8 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.7.1        13.10.2017       tableCurrentFillup fix for PostgreSQL, commandref revised
+# 5.7.0        09.10.2017       tableCurrentPurge, tableCurrentFillup
 # 5.6.4        05.10.2017       abortFn's adapted to use abortArg (Forum:77472)
 # 5.6.3        01.10.2017       fix crash of fhem due to wrong rmday-calculation if month is changed, Forum:#77328
 # 5.6.2        28.08.2017       commandref revised
@@ -234,7 +236,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.6.4";
+my $DbRepVersion = "5.7.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -375,6 +377,8 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"diffValue:noArg ":"").   
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
 				(($hash->{ROLE} ne "Agent")?"sqlCmd ":"").
+				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
+				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"dumpMySQL:clientSide,serverSide ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"optimizeTables:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/ )?"vacuum:noArg ":"").
@@ -455,10 +459,13 @@ sub DbRep_Set($@) {
       }
       DbRep_Main($hash,$opt);
       
-  } elsif ($opt eq "delEntries" && $hash->{ROLE} ne "Agent") {
+  } elsif ($opt =~ m/delEntries|tableCurrentPurge/ && $hash->{ROLE} ne "Agent") {
       if (!AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }        
+      DbRep_Main($hash,$opt);
+      
+  } elsif ($opt =~ m/tableCurrentFillup/ && $hash->{ROLE} ne "Agent") {      
       DbRep_Main($hash,$opt);
       
   } elsif ($opt eq "deviceRename") {
@@ -1008,7 +1015,7 @@ sub DbRep_Main($$;$) {
  
  # Ausgaben und Zeitmanipulationen
  Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
- Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation"); 
+ Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert/); 
  Log3 ($name, 4, "DbRep $name - Command: $opt"); 
 
  # year   als Jahre seit 1900 
@@ -1253,8 +1260,8 @@ sub DbRep_Main($$;$) {
  }
  
  my $tsbegin_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin);
- Log3 ($name, 5, "DbRep $name - Timestamp begin epocheseconds: $epoch_seconds_begin");   
- Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: $tsbegin_string"); 
+ Log3 ($name, 5, "DbRep $name - Timestamp begin epocheseconds: $epoch_seconds_begin") if($opt !~ /tableCurrentPurge/);   
+ Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: $tsbegin_string") if($opt !~ /tableCurrentPurge/);  
         
  # Umwandeln in Epochesekunden Endezeit
  my $epoch_seconds_end = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
@@ -1262,8 +1269,8 @@ sub DbRep_Main($$;$) {
  Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp end: ".AttrVal($hash->{NAME}, "timeOlderThan", undef)." sec") if(AttrVal($hash->{NAME}, "timeOlderThan", undef)); 
  
  my $tsend_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
- Log3 ($name, 5, "DbRep $name - Timestamp end epocheseconds: $epoch_seconds_end"); 
- Log3 ($name, 4, "DbRep $name - Timestamp end human readable: $tsend_string"); 
+ Log3 ($name, 5, "DbRep $name - Timestamp end epocheseconds: $epoch_seconds_end") if($opt !~ /tableCurrentPurge/); 
+ Log3 ($name, 4, "DbRep $name - Timestamp end human readable: $tsend_string") if($opt !~ /tableCurrentPurge/); 
 
  
  # Erstellung Wertehash für "collaggstr"
@@ -1368,7 +1375,19 @@ $hash->{HELPER}{CV} = \%cv;
      $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
      $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
+ 
+ } elsif ($opt eq "tableCurrentPurge") {
+     undef $runtime_string_first;
+     undef $runtime_string_next;
+         
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|current|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
+ 
+ } elsif ($opt eq "tableCurrentFillup") {
+	 $runtime_string_first = AttrVal($hash->{NAME}, "timestamp_begin", undef)?$runtime_string_first:undef;  
+     $runtime_string_next  = AttrVal($hash->{NAME}, "timestamp_end", undef)?$runtime_string_next:undef;
+         
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "currentfillup_Done", $to, "ParseAborted", $hash);        
  
  } elsif ($opt eq "diffValue") {        
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
@@ -2735,7 +2754,7 @@ return;
 ####################################################################################################
 sub del_DoParse($) {
  my ($string) = @_;
- my ($name, $device, $reading, $runtime_string_first, $runtime_string_next) = split("\\|", $string);
+ my ($name,$table,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -2755,39 +2774,26 @@ sub del_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall del_DoParse finished");
-     return "$name|''|''|$err";
+     return "$name|''|''|$err|''";
  }
  
  # SQL zusammenstellen für DB-Operation
- $sql = "DELETE FROM history where ";
- $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
- $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
- $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
- $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
- $sql .= "TIMESTAMP >= ? AND TIMESTAMP < ? ;"; 
+ $sql = createDeleteSql($hash,$table,$device,$reading,$runtime_string_first,$runtime_string_next,''); 
 
  $sth = $dbh->prepare($sql); 
- 
- # SQL zusammenstellen für Logausgabe
- my $sql1 = "DELETE FROM history where ";
- $sql1 .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
- $sql1 .= "DEVICE = '$device' AND "      if($device !~ m(\%));
- $sql1 .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
- $sql1 .= "READING = '$reading' AND "    if($reading !~ m(\%));
- $sql1 .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next';"; 
-    
- Log3 ($name, 4, "DbRep $name - SQL execute: $sql1");        
+     
+ Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
  
  # SQL-Startzeit
  my $st = [gettimeofday];
  
- eval {$sth->execute($runtime_string_first, $runtime_string_next);};
+ eval {$sth->execute();};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
      Log3 ($name, 4, "DbRep $name -> BlockingCall del_DoParse finished");
-     return "$name|''|''|$err";
+     return "$name|''|''|$err|''";
  } 
      
  $rows = $sth->rows;
@@ -2805,7 +2811,7 @@ sub del_DoParse($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$rows|$rt|0";
+ return "$name|$rows|$rt|0|$table";
 }
 
 ####################################################################################################
@@ -2820,6 +2826,7 @@ sub del_ParseDone($) {
   my $bt         = $a[2];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[3]?decode_base64($a[3]):undef;
+  my $table      = $a[4];
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall del_ParseDone");
   
@@ -2841,19 +2848,19 @@ sub del_ParseDone($) {
   
   my ($reading_runtime_string, $ds, $rds);
   if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
-      $reading_runtime_string = AttrVal($hash->{NAME}, "readingNameMap", "")." -- DELETED ROWS -- ";
+      $reading_runtime_string = AttrVal($hash->{NAME}, "readingNameMap", "")."--DELETED_ROWS--";
   } else {
-      $ds   = $device." -- " if ($device);
-      $rds  = $reading." -- " if ($reading);
-      $reading_runtime_string = $ds.$rds." -- DELETED ROWS -- ";
+      $ds   = $device."--" if ($device && $table ne "current");
+      $rds  = $reading."--" if ($reading && $table ne "current");
+      $reading_runtime_string = $ds.$rds."--DELETED_ROWS_".uc($table)."--";
   }
   
   readingsBeginUpdate($hash);
 
   ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $rows);
          
-  $rows = $ds.$rds.$rows;
-  Log3 ($name, 3, "DbRep $name - Entries of database $hash->{DATABASE} deleted: $rows");  
+  $rows = ($table eq "current")?$rows:$ds.$rds.$rows;
+  Log3 ($name, 3, "DbRep $name - Entries of $hash->{DATABASE}.$table deleted: $rows");  
   
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   
@@ -3006,6 +3013,230 @@ sub insert_Done($) {
 
   delete($hash->{HELPER}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Done finished");
+  
+return;
+}
+
+####################################################################################################
+#   Current-Tabelle mit Device,Reading Kombinationen aus history auffüllen
+####################################################################################################
+sub currentfillup_Push($) {
+ my ($string)     = @_;
+ my ($name,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
+ my $hash       = $defs{$name};
+ my $dbloghash  = $hash->{dbloghash};
+ my $dbconn     = $dbloghash->{dbconn};
+ my $dbuser     = $dbloghash->{dbuser};
+ my $dblogname  = $dbloghash->{NAME};
+ my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+ my ($err,$sth,$sql);
+ 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall currentfillup_Push");
+ 
+ my $dbh;
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
+ 
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Push finished");
+     return "$name|''|''|$err";
+ }
+ 
+ # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
+ my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbh);
+  
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+
+ # insert history mit/ohne primary key
+ # SQL zusammenstellen für DB-Operation
+ if ($usepkc && $dbloghash->{MODEL} eq 'MYSQL') {
+     $sql  = "INSERT IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
+	 $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
+     $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
+     $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
+     $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
+     if ($runtime_string_first && !$runtime_string_next) {
+	     $sql .= "TIMESTAMP >= '$runtime_string_first' ";
+	 } elsif (!$runtime_string_first && $runtime_string_next) {
+         $sql .= "TIMESTAMP < '$runtime_string_next' ";
+     } elsif ($runtime_string_first && $runtime_string_next) {
+         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
+     } else {
+         $sql .= "1 ";
+     }
+	 $sql .= "group by device,reading ;";
+	 
+ } elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {
+     $sql  = "INSERT OR IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
+	 $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
+     $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
+     $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
+     $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
+     if ($runtime_string_first && !$runtime_string_next) {
+	     $sql .= "TIMESTAMP >= '$runtime_string_first' ";
+	 } elsif (!$runtime_string_first && $runtime_string_next) {
+         $sql .= "TIMESTAMP < '$runtime_string_next' ";
+     } elsif ($runtime_string_first && $runtime_string_next) {
+         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
+     } else {
+         $sql .= "1 ";
+     }
+	 $sql .= "group by device,reading ;";
+ 
+ } elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+     $sql  = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT '2017-01-01 00:00:00',device,reading FROM history where ";
+	 $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
+     $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
+     $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
+     $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
+     if ($runtime_string_first && !$runtime_string_next) {
+	     $sql .= "TIMESTAMP >= '$runtime_string_first' ";
+	 } elsif (!$runtime_string_first && $runtime_string_next) {
+         $sql .= "TIMESTAMP < '$runtime_string_next' ";
+     } elsif ($runtime_string_first && $runtime_string_next) {
+         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
+     } else {
+         $sql .= "true ";
+     }
+	 $sql .= "group by device,reading ORDER BY 2 ASC, 3 ASC ON CONFLICT DO NOTHING; ";
+ 
+ } else {
+     if($dbloghash->{MODEL} ne 'POSTGRESQL') {
+	     # MySQL und SQLite
+         $sql  = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
+	     $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
+         $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
+         $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
+         $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
+         if ($runtime_string_first && !$runtime_string_next) {
+	         $sql .= "TIMESTAMP >= '$runtime_string_first' ";
+	     } elsif (!$runtime_string_first && $runtime_string_next) {
+             $sql .= "TIMESTAMP < '$runtime_string_next' ";
+         } elsif ($runtime_string_first && $runtime_string_next) {
+             $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
+         } else {
+             $sql .= "1 ";
+         }
+	     $sql .= "group by device,reading ;";
+	 } else {
+	     # PostgreSQL
+         $sql  = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT '2017-01-01 00:00:00',device,reading FROM history where ";
+	     $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
+         $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
+         $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
+         $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
+         if ($runtime_string_first && !$runtime_string_next) {
+	         $sql .= "TIMESTAMP >= '$runtime_string_first' ";
+	     } elsif (!$runtime_string_first && $runtime_string_next) {
+             $sql .= "TIMESTAMP < '$runtime_string_next' ";
+         } elsif ($runtime_string_first && $runtime_string_next) {
+             $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
+         } else {
+             $sql .= "true ";
+         }
+	     $sql .= "group by device,reading ORDER BY 2 ASC, 3 ASC;";
+	 
+	 }
+ }
+ 
+ # Log SQL Statement
+ Log3 ($name, 4, "DbRep $name - SQL execute: $sql");     
+ 
+ eval { $sth = $dbh->prepare($sql); };
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Push finished");
+	 $dbh->disconnect();
+     return "$name|''|''|$err";
+ }
+ 
+ $dbh->begin_work();
+  
+ eval {$sth->execute();};
+ 
+ my $irow;
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - Insert new dataset into database failed".($usepkh?" (possible PK violation) ":": ")."$@");
+     $dbh->rollback();
+     $dbh->disconnect();
+     Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Push finished");
+     return "$name|''|''|$err";
+ } else {
+     $dbh->commit();
+     $irow = $sth->rows;
+     $dbh->disconnect();
+ } 
+
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+ 
+ Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
+ return "$name|$irow|$rt|0";
+}
+
+####################################################################################################
+#                      Auswertungsroutine Current-Tabelle auffüllen
+####################################################################################################
+sub currentfillup_Done($) {
+  my ($string) = @_;
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $name       = $hash->{NAME};
+  my $irow       = $a[1];
+  my $bt         = $a[2];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[3]?decode_base64($a[3]):undef;
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall currentfillup_Done");
+  
+  my $i_timestamp = delete $hash->{HELPER}{I_TIMESTAMP};
+  my $i_device    = delete $hash->{HELPER}{I_DEVICE};
+  my $i_type      = delete $hash->{HELPER}{I_TYPE};
+  my $i_event     = delete $hash->{HELPER}{I_EVENT};
+  my $i_reading   = delete $hash->{HELPER}{I_READING};
+  my $i_value     = delete $hash->{HELPER}{I_VALUE};
+  my $i_unit      = delete $hash->{HELPER}{I_UNIT}; 
+  
+  if ($err) {
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      delete($hash->{HELPER}{RUNNING_PID});
+      Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Done finished");
+      return;
+  } 
+
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+  
+  my $rowstr;
+  $rowstr = $irow if(!AttrVal($name,"device",undef) && !AttrVal($name,"reading",undef));
+  $rowstr = $irow." - limited by device: ".AttrVal($name,"device",undef) if(AttrVal($name,"device",undef) && !AttrVal($name,"reading",undef));
+  $rowstr = $irow." - limited by reading: ".AttrVal($name,"reading",undef) if(!AttrVal($name,"device",undef) && AttrVal($name,"reading",undef));
+  $rowstr = $irow." - limited by device: ".AttrVal($name,"device",undef)." and reading: ".AttrVal($name,"reading",undef) if(AttrVal($name,"device",undef) && AttrVal($name,"reading",undef)); 
+  
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateValue($hash, "number_lines_inserted", $rowstr);        
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  readingsEndUpdate($hash, 1);
+  
+  Log3 ($name, 3, "DbRep $name - Table '$hash->{DATABASE}'.'current' filled up with rows: $rowstr");
+
+  delete($hash->{HELPER}{RUNNING_PID});
+  Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Done finished");
   
 return;
 }
@@ -5244,7 +5475,38 @@ sub createSelectSql($$$$$$) {
  $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
  $sql .= "TIMESTAMP >= $tf AND TIMESTAMP < $tn $addon;";
 
- return $sql;
+return $sql;
+}
+
+####################################################################################################
+#  SQL-Statement zusammenstellen für Löschvorgänge
+####################################################################################################
+sub createDeleteSql($$$$$$$) {
+ my ($hash,$table,$device,$reading,$tf,$tn,$addon) = @_;
+ my $dbmodel = $hash->{dbloghash}{MODEL};
+ my $sql;
+ 
+ if($table eq "current") {
+     $sql = "delete FROM $table; ";
+	 return $sql;
+ }
+ 
+ $sql = "delete FROM $table where ";
+ $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
+ $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
+ $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
+ $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
+ if ($tf && $tn) {
+     $sql .= "TIMESTAMP >= '$tf' AND TIMESTAMP < '$tn' $addon;";
+ } else {
+     if ($dbmodel eq "POSTGRESQL") {
+	     $sql .= "true;";
+	 } else {
+	      $sql .= "1;";
+	 }
+ }
+
+return $sql;
 }
 
 ####################################################################################################
@@ -5862,6 +6124,8 @@ return;
 	 <li> restore of serverSide-backups non-blocking (MySQL) </li>
 	 <li> optimize the connected database (optimizeTables, vacuum) </li>
 	 <li> report of existing database processes (MySQL) </li>
+	 <li> purge content of current-table </li>
+	 <li> fill up the current-table with a (tunable) extract of the history-table</li>
      </ul></ul>
      <br>
      
@@ -5881,7 +6145,7 @@ return;
   <b>Preparations </b> <br><br>
   
   The module requires the usage of a DbLog instance and the credentials of the database definition will be used. <br>
-  Only the content of table "history" will be included (except command "sqlCmd"). <br><br>
+  Only the content of table "history" will be included if isn't other is explained. <br><br>
   
   Overview which other Perl-modules DbRep is using: <br><br>
    
@@ -6200,13 +6464,21 @@ return;
 								 "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute
 								 "reading". Using this function is mostly reasonable if value-differences of readings 
 								 are written to the database. </li> <br> 
+		
+	<li><b> tableCurrentFillup </b> - the current-table will be filled u with an extract of the history-table.  
+	                                  The <a href="#DbRepattr">attributes</a> for limiting time and device, reading are considered.
+                                      Thereby the content of the extract can be affected. In the associated DbLog-device the attribute "DbLogType" should be set to 
+                                      "SampleFill/History". </li> <br> 		
+								 
+	<li><b> tableCurrentPurge </b> - deletes the content of current-table. There are no limits, e.g. by attributes "timestamp_begin", "timestamp_end", device, reading 
+                                     and so on, considered.	</li> <br> 
 
 	<li><b> vacuum </b>       - optimize tables in the connected database (SQLite, PostgreSQL). <br><br>
 								 
 								<ul>
 								<b>Note:</b> <br>
                                 Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
-                                is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br>           
+                                is operating in asynchronous mode to avoid FHEM from blocking. <br><br>           
 								</li>
                                 </ul><br>							 
                
@@ -6777,6 +7049,8 @@ sub bdump {
 	 <li> Restore von serverSide-Backups (MySQL) </li>
 	 <li> Optimierung der angeschlossenen Datenbank (optimizeTables, vacuum) </li>
 	 <li> Ausgabe der existierenden Datenbankprozesse (MySQL) </li>
+	 <li> leeren der current-Tabelle </li>
+	 <li> Auffüllen der current-Tabelle mit einem (einstellbaren) Extrakt der history-Tabelle</li>
      
 	 </ul></ul>
      <br>
@@ -6796,7 +7070,7 @@ sub bdump {
   
   Das Modul setzt den Einsatz einer oder mehrerer DbLog-Instanzen voraus. Es werden die Zugangsdaten dieser 
   Datenbankdefinition genutzt. <br>
-  Es werden nur Inhalte der Tabelle "history" (Ausnahme Kommando "sqlCmd") berücksichtigt. <br><br>
+  Es werden nur Inhalte der Tabelle "history" berücksichtigt wenn nichts anderes beschrieben ist. <br><br>
   
   Überblick welche anderen Perl-Module DbRep verwendet: <br><br>
     
@@ -7149,12 +7423,20 @@ sub bdump {
 								 angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
 								 Readings in die Datenbank geschrieben werden.  </li> <br>
 								 
+	<li><b> tableCurrentFillup </b> - Die current-Tabelle wird mit einem Extrakt der history-Tabelle aufgefüllt. 
+	                                  Die <a href="#DbRepattr">Attribute</a> zur Zeiteinschränkung bzw. device, reading werden ausgewertet.
+                                      Dadurch kann der Inhalt des Extrakts beeinflusst werden. Im zugehörigen DbLog-Device sollte sollte das Attribut 
+                                      "DbLogType=SampleFill/History" gesetzt sein. </li> <br> 
+									 
+	<li><b> tableCurrentPurge </b> - löscht den Inhalt der current-Tabelle. Es werden keine Limitierungen, z.B. durch die Attribute "timestamp_begin", 
+	                                 "timestamp_end", device, reading, usw. , ausgewertet.	</li> <br> 
+								 
 	<li><b> vacuum </b>      - optimiert die Tabellen in der angeschlossenen Datenbank (SQLite, PostgreSQL). <br><br>
 								 
 								<ul>
 								<b>Hinweis:</b> <br>
                                 Obwohl die Funktion selbst non-blocking ausgelegt ist, muß das zugeordnete DbLog-Device
-                                im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden. <br><br>           
+                                im asynchronen Modus betrieben werden um ein Blockieren von FHEM zu vermeiden. <br><br>           
 								</li>
                                 </ul><br>
 								                              

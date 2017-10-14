@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.11    13.10.2017       DbLogType expanded by SampleFill, DbLog_sampleDataFn adapted to sort case insensitive, commandref revised
 # 2.22.10    04.10.2017       Encode::encode_utf8 of $error, DbLog_PushAsyncAborted adapted to use abortArg (Forum:77472)
 # 2.22.9     04.10.2017       added hint to SVG/DbRep in commandref
 # 2.22.8     29.09.2017       avoid multiple entries in Dopdown-list when creating SVG by group Device:Reading in DbLog_sampleDataFn
@@ -154,7 +155,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.10";
+my $DbLogVersion = "2.22.11";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -184,7 +185,7 @@ sub DbLog_Initialize($)
                               "colReading ".
 							  "colValue ".
                               "disable:1,0 ".
-                              "DbLogType:Current,History,Current/History ".
+                              "DbLogType:Current,History,Current/History,SampleFill/History ".
                               "shutdownWait ".
                               "suppressUndef:0,1 ".
 		                      "verbose4Devs ".
@@ -2895,7 +2896,7 @@ sub DbLog_configcheck($) {
 	  $rec .= "UNIT: $columns{UNIT} <br><br>";
       $rec .= "You can change the column width in database by a statement like <b>'alter table history modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
       $rec .= "You can do it for example by executing 'sqlCMD' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
-	  $rec .= "The field width used by the module can be done by setting attributes 'colEvent', 'colReading', 'colValue',";
+	  $rec .= "The field width used by the module can be adjusted by attributes 'colEvent', 'colReading', 'colValue',";
   }
   
   $check .= "<u><b>Result of table 'history' check</u></b><br><br>";
@@ -2956,7 +2957,7 @@ sub DbLog_configcheck($) {
 	  $rec .= "UNIT: $columns{UNIT} <br><br>";
       $rec .= "You can change the column width in database by a statement like <b>'alter table current modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
       $rec .= "You can do it for example by executing 'sqlCMD' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
-	  $rec .= "The field width used by the module can be done by setting attributes 'colEvent', 'colReading', 'colValue',";
+	  $rec .= "The field width used by the module can be adjusted by attributes 'colEvent', 'colReading', 'colValue',";
   }
   
   $check .= "<u><b>Result of table 'current' check</u></b><br><br>";
@@ -4267,9 +4268,7 @@ return $jsonstring;
 }
 
 #########################
-sub
-DbLog_fhemwebFn($$$$)
-{
+sub DbLog_fhemwebFn($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
    my $ret;
@@ -4282,20 +4281,16 @@ DbLog_fhemwebFn($$$$)
                   "set $name copyGplotFile&detail=$name",
                   "<div class=\"dval\">Create SVG plot from DbLog</div>", 0, "dval", 1);
  
-   return $ret;
-
+return $ret;
 }
 
-sub
-DbLog_sampleDataFn($$$$$)
-{
+sub DbLog_sampleDataFn($$$$$) {
   my ($dlName, $dlog, $max, $conf, $wName) = @_;
   my $desc = "Device:Reading";
   my @htmlArr;
   my @example;
   my @colregs;
   my $counter;
-  # my $currentPresent = AttrVal($dlName,'DbLogType','Current');
   my $currentPresent = AttrVal($dlName,'DbLogType','History');  
   
   my $dbhf = DbLog_ConnectNewDBH($defs{$dlName});
@@ -4306,7 +4301,7 @@ DbLog_sampleDataFn($$$$$)
   my $prescurr = eval {$dbhf->selectrow_array("select count(*) from current");} || 0;
   Log3($dlName, 5, "DbLog $dlName: Table current present : $prescurr (0 = not present or no content)");
   
-  if($currentPresent =~ m/Current/ && $prescurr) {
+  if($currentPresent =~ m/Current|SampleFill/ && $prescurr) {
     # Table Current present, use it for sample data
     my $query = "select device,reading from current where device <> '' group by device,reading";
     my $sth = $dbhf->prepare( $query );  
@@ -4317,7 +4312,7 @@ DbLog_sampleDataFn($$$$$)
       push (@colregs, "$line[0]:$line[1]"); # push all eventTypes to selection list
     }
 	$dbhf->disconnect(); 
-    my $cols = join(",", sort @colregs);
+    my $cols = join(",", sort { "\L$a" cmp "\L$b" } @colregs);
 
     $max = 8 if($max > 8);
     for(my $r=0; $r < $max; $r++) {
@@ -4349,7 +4344,7 @@ DbLog_sampleDataFn($$$$$)
 
   }
 
-  return ($desc, \@htmlArr, join("<br>", @example));
+return ($desc, \@htmlArr, join("<br>", @example));
 }
 
 #
@@ -4500,13 +4495,13 @@ sub checkUsePK ($$){
 	<ul>
     <table>  
     <colgroup> <col width=5%> <col width=95%> </colgroup>
-      <tr><td> TIMESTAMP: </td><td>: timestamp of event, e.g. <code>2007-12-30 21:45:22</code> </td></tr>
-      <tr><td> DEVICE:    </td><td>: device name, e.g. <code>Wetterstation</code> </td></tr>
-      <tr><td> TYPE:      </td><td>: device type, e.g. <code>KS300</code> </code> </td></tr>
-      <tr><td> EVENT:     </td><td>: event specification as full string, e.g. <code>humidity: 71 (%)</code> </td></tr>
-	  <tr><td> READING:   </td><td>: name of reading extracted from event, e.g. <code>humidity</code> </td></tr>
-	  <tr><td> VALUE:     </td><td>: actual reading extracted from event, e.g. <code>71</code> </td></tr>
-	  <tr><td> UNIT:      </td><td>: unit extracted from event, e.g. <code>%</code> </td></tr>
+      <tr><td> TIMESTAMP </td><td>: timestamp of event, e.g. <code>2007-12-30 21:45:22</code> </td></tr>
+      <tr><td> DEVICE    </td><td>: device name, e.g. <code>Wetterstation</code> </td></tr>
+      <tr><td> TYPE      </td><td>: device type, e.g. <code>KS300</code> </code> </td></tr>
+      <tr><td> EVENT     </td><td>: event specification as full string, e.g. <code>humidity: 71 (%)</code> </td></tr>
+	  <tr><td> READING   </td><td>: name of reading extracted from event, e.g. <code>humidity</code> </td></tr>
+	  <tr><td> VALUE     </td><td>: actual reading extracted from event, e.g. <code>71</code> </td></tr>
+	  <tr><td> UNIT      </td><td>: unit extracted from event, e.g. <code>%</code> </td></tr>
     </table>
 	</ul>
 	<br>
@@ -5057,7 +5052,29 @@ sub checkUsePK ($$){
 	   </code><br>
 	 
        This attribute determines which table or which tables in the database are wanted to use. If the attribute isn't set, 
-	   the table <i>history</i> will be used as default. <br>
+	   the adjustment <i>history</i> will be used as default. <br>
+	   
+	   
+	   The meaning of the adjustments in detail are: <br><br>
+	   
+	   <ul>
+       <table>  
+       <colgroup> <col width=10%> <col width=90%> </colgroup>
+       <tr><td> <b>Current</b>            </td><td>Events are only logged into the current-table. 
+	                                               The entries of current-table will evaluated with SVG-creation.  </td></tr>
+       <tr><td> <b>History</b>            </td><td>Events are only logged into the history-table. No dropdown list with proposals will created with the 
+	                                               SVG-creation.   </td></tr>
+       <tr><td> <b>Current/History</b>    </td><td>Events will be logged both the current- and the history-table. 
+	                                               The entries of current-table will evaluated with SVG-creation.  </td></tr>
+	   <tr><td> <b>SampleFill/History</b> </td><td>Events are only logged into the history-table. The entries of current-table will evaluated with SVG-creation
+                                                   and can be filled up with a customizable extract of the history-table by using a 
+												   <a href="http://fhem.de/commandref.html#DbRep">DbRep-device</a> command
+												   "set &lt;DbRep-name&gt; tableCurrentFillup"  (advanced feature).  </td></tr>
+       </table>
+	   </ul>
+	   <br>
+	   <br>
+	   
 	   <b>Note:</b> <br>
 	   The current-table has to be used to get a Device:Reading-DropDown list when a SVG-Plot will be created. <br>
      </ul>
@@ -5372,13 +5389,13 @@ sub checkUsePK ($$){
 	<ul>
     <table>  
     <colgroup> <col width=5%> <col width=95%> </colgroup>
-      <tr><td> TIMESTAMP: </td><td>: Zeitpunkt des Events, z.B. <code>2007-12-30 21:45:22</code> </td></tr>
-      <tr><td> DEVICE:    </td><td>: Name des Devices, z.B. <code>Wetterstation</code> </td></tr>
-      <tr><td> TYPE:      </td><td>: Type des Devices, z.B. <code>KS300</code> </code> </td></tr>
-      <tr><td> EVENT:     </td><td>: das auftretende Event als volle Zeichenkette, z.B. <code>humidity: 71 (%)</code> </td></tr>
-	  <tr><td> READING:   </td><td>: Name des Readings, ermittelt aus dem Event, z.B. <code>humidity</code> </td></tr>
-	  <tr><td> VALUE:     </td><td>: aktueller Wert des Readings, ermittelt aus dem Event, z.B. <code>humidity</code> </td></tr>
-	  <tr><td> UNIT:      </td><td>: Einheit, ermittelt aus dem Event, z.B. <code>%</code> </td></tr>
+      <tr><td> TIMESTAMP </td><td>: Zeitpunkt des Events, z.B. <code>2007-12-30 21:45:22</code> </td></tr>
+      <tr><td> DEVICE    </td><td>: Name des Devices, z.B. <code>Wetterstation</code> </td></tr>
+      <tr><td> TYPE      </td><td>: Type des Devices, z.B. <code>KS300</code> </code> </td></tr>
+      <tr><td> EVENT     </td><td>: das auftretende Event als volle Zeichenkette, z.B. <code>humidity: 71 (%)</code> </td></tr>
+	  <tr><td> READING   </td><td>: Name des Readings, ermittelt aus dem Event, z.B. <code>humidity</code> </td></tr>
+	  <tr><td> VALUE     </td><td>: aktueller Wert des Readings, ermittelt aus dem Event, z.B. <code>humidity</code> </td></tr>
+	  <tr><td> UNIT      </td><td>: Einheit, ermittelt aus dem Event, z.B. <code>%</code> </td></tr>
     </table>
 	</ul>
 	<br>
@@ -5983,11 +6000,32 @@ sub checkUsePK ($$){
   <ul><b>DbLogType</b>
      <ul>
 	   <code>
-	   attr &lt;device&gt; DbLogType [Current|History|Current/History]
+	   attr &lt;device&gt; DbLogType [Current|History|Current/History|SampleFill/History]
 	   </code><br>
 	 
        Dieses Attribut legt fest, welche Tabelle oder Tabellen in der Datenbank genutzt werden sollen. Ist dieses Attribut nicht gesetzt, wird
-       per default die Tabelle <i>history</i> verwendet. <br>
+       per default die Einstellung <i>history</i> verwendet. <br><br>
+	   
+	   Bedeutung der Einstellungen sind: <br><br>
+	   
+	   <ul>
+       <table>  
+       <colgroup> <col width=10%> <col width=90%> </colgroup>
+       <tr><td> <b>Current</b>            </td><td>Events werden nur in die current-Tabelle geloggt. 
+	                                               Die current-Tabelle wird bei der SVG-Erstellung ausgewertet.  </td></tr>
+       <tr><td> <b>History</b>            </td><td>Events werden nur in die history-Tabelle geloggt. Es wird keine DropDown-Liste mit Vorschlägen bei der SVG-Erstellung
+                                                   erzeugt.   </td></tr>
+       <tr><td> <b>Current/History</b>    </td><td>Events werden sowohl in die current- also auch in die hitory Tabelle geloggt. 
+	                                               Die current-Tabelle wird bei der SVG-Erstellung ausgewertet.</td></tr>
+	   <tr><td> <b>SampleFill/History</b> </td><td>Events werden nur in die history-Tabelle geloggt. Die current-Tabelle wird bei der SVG-Erstellung ausgewertet und 
+                                                   kann zur Erzeugung einer DropDown-Liste mittels einem
+												   <a href="http://fhem.de/commandref_DE.html#DbRep">DbRep-Device</a> <br> "set &lt;DbRep-Name&gt; tableCurrentFillup" mit
+											       einem einstellbaren Extract der history-Tabelle gefüllt werden (advanced Feature).  </td></tr>
+       </table>
+	   </ul>
+	   <br>
+	   <br>
+	   
 	   <b>Hinweis:</b> <br>
 	   Die Current-Tabelle muß genutzt werden um eine Device:Reading-DropDownliste zur Erstellung eines 
 	   SVG-Plots zu erhalten.   <br>
@@ -6007,9 +6045,9 @@ sub checkUsePK ($$){
    
       <ul>
         <li>Exclude: DbLog verhaelt sich wie bisher auch, alles was ueber die RegExp im DEF angegeben ist, wird geloggt, bis auf das,
-                     was ueber die RegExp in DbLogExclude ausgeschlossen wird<br>
+                     was ueber die RegExp in DbLogExclude ausgeschlossen wird. <br>
                      Das Attribut DbLogInclude wird in diesem Fall nicht beruecksichtigt</li>
-        <li>Include: Es wird nur das geloggt was ueber die RegExp in DbLogInclude eingeschlossen wird.<br>
+        <li>Include: Es wird nur das geloggt was ueber die RegExp in DbLogInclude eingeschlossen wird. <br>
                      Das Attribut DbLogExclude wird in diesem Fall ebenso wenig beruecksichtigt wie die Regex im DEF. </li>
         <li>Exclude/Include: Funktioniert im Wesentlichen wie "Exclude", nur das sowohl DbLogExclude als auch DbLogInclude
                              geprueft werden. Readings die durch DbLogExclude zwar ausgeschlossen wurden, mit DbLogInclude aber wiederum eingeschlossen werden,
