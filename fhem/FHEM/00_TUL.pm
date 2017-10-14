@@ -15,6 +15,9 @@
 # ABU 20170110 removed mod for extended adressing
 # ABU 20170427 reintegrated mechanism for extenden GAD-Support
 # ABU 20170427 cleaned logs
+# ABU 20171006 deactivated default-log-entry
+# ABU 20171006 EIB requires different handling of extended GAD --> added
+
 
 package main;
 
@@ -50,6 +53,8 @@ my %matchList = (
     "2:KNX"      => "^C.*",
     "3:EIB"      => "^B.*",
 );
+
+my $useEIB = '0';
 
 sub
 TUL_Initialize($)
@@ -106,9 +111,9 @@ TUL_Define($$)
   
 	#Set attributes in order to control backward-compatibility
 	#$attr{$name}{useEIB} = 1;
-	Log3 ($name, 0, "Using EIB is deprecated. Please migrate to KNX soon. Module 10_EIB is not maintained any longer. If you still want to use the module EIB, 
-	please set the attribute useEIB to 1 within the tul-device. Please keep in mind, that 10_KNX has a changed syntax regarding the definition, arguments and readings. Please refer to the commandref. 
-	As well 10_EIB and 10_KNX are compatible to daemon eibd and knxd.") if (AttrVal($name, "useEIB", 0) =~ m/0/);
+	#Log3 ($name, 0, "Using EIB is deprecated. Please migrate to KNX soon. Module 10_EIB is not maintained any longer. If you still want to use the module EIB, 
+	#please set the attribute useEIB to 1 within the tul-device. Please keep in mind, that 10_KNX has a changed syntax regarding the definition, arguments and readings. Please refer to the commandref. 
+	#As well 10_EIB and 10_KNX are compatible to daemon eibd and knxd.") if (AttrVal($name, "useEIB", 0) =~ m/0/);
   
 	$hash->{DeviceName} = $dev;
 	$hash->{DeviceAddress} = $devaddr;
@@ -202,7 +207,7 @@ TUL_Write($$$)
 	return if(!defined($fn));
 	
 	#Discard message, if not set to backward-compatibility
-	if ((AttrVal($name, "useEIB", 0) =~ m/0/) and ($fn =~ m/\^B/))
+	if (($useEIB =~ m/0/) and ($fn =~ m/\^B/))
 	{
 		Log3 ($name, 0, "EIB is no longer supported. Message discarded.");
 		return;
@@ -250,7 +255,7 @@ TUL_Read($)
 	}
 
 	#place KNX-Message
-	TUL_Parse($hash, $hash, $name, "B".$buf, $hash->{initString}) if (AttrVal($name, "useEIB", 0) =~ m/1/);
+	TUL_Parse($hash, $hash, $name, "B".$buf, $hash->{initString}) if ($useEIB =~ m/1/);
 	#place EIB-Message
 	TUL_Parse($hash, $hash, $name, "C".$buf, $hash->{initString});
 }
@@ -305,7 +310,9 @@ TUL_SimpleWrite(@)
 	# Old
 	#if($msg =~ /^[BC](.)(.{4})(.*)$/)
 	# New: its2bit
-	if($msg =~ /^[BC](.)(.{5})(.*)$/)
+	#if($msg =~ /^[BC](.)(.{5})(.*)$/)
+	#extended adressing
+	if ((($useEIB =~ m/1/) and ($msg =~ /^[BC](.)(.{4})(.*)$/)) or (($useEIB =~ m/0/) and ($msg =~ /^[BC](.)(.{5})(.*)$/)))
 	{
 		my $eibmsg;
 		if($1 eq "w")
@@ -616,7 +623,22 @@ TUL_Disconnected($)
 sub
 TUL_Attr(@)
 {
-	my @a = @_;
+	my ($cmd,$name,$aName,$aVal) = @_;
+
+	Log3 ($name, 5, "changing value, ATTR: $aName, VALUE: $aVal");
+	
+	if ($aName =~ m/useEIB/)
+	{
+		if ($aVal =~ m/1/)
+		{
+			$useEIB = '1';
+		}
+		else
+		{
+			$useEIB = '0';
+		}
+	}
+	
 	return undef;
 }
 
@@ -639,7 +661,9 @@ sub tul_hex2addr
     # Old
 	#if ($str =~ /([0-9a-f])([0-9a-f])([0-9a-f]{2})/) 
 	# New its2bit
-	if ($str =~ /([0-9a-f]{2})([0-9a-f])([0-9a-f]{2})/) 
+	#if ($str =~ /([0-9a-f]{2})([0-9a-f])([0-9a-f]{2})/) 
+	#extended adressing
+	if ((($useEIB =~ m/1/) and ($str =~ /([0-9a-f])([0-9a-f])([0-9a-f]{2})/)) or (($useEIB =~ m/0/) and ($str =~ /([0-9a-f]{2})([0-9a-f])([0-9a-f]{2})/)))
 	{
         return (hex($1) << 11) | (hex($2) << 8) | hex($3);
     }
@@ -655,13 +679,24 @@ sub tul_addr2hex
 	my $a = $_[0];
 	my $b = $_[1];  # 1 if local (group) address, else physical address
     my $str ;
+	
     if ($b == 1) 
-	{ 
+	{		
 		#logical address used
 		#old, short-syntax
         #$str = sprintf "%01x%01x%02x", ($a >> 11) & 0xf, ($a >> 8) & 0x7, $a & 0xff;
 		#extended adress-range
-		$str = sprintf "%02x%01x%02x", ($a >> 11) & 0x1f, ($a >> 8) & 0x7, $a & 0xff;
+		#$str = sprintf "%02x%01x%02x", ($a >> 11) & 0x1f, ($a >> 8) & 0x7, $a & 0xff;
+		
+		#extended adressing
+		if ($useEIB =~ m/1/)
+		{
+			$str = sprintf "%01x%01x%02x", ($a >> 11) & 0xf, ($a >> 8) & 0x7, $a & 0xff;
+		}
+		else
+		{
+			$str = sprintf "%02x%01x%02x", ($a >> 11) & 0x1f, ($a >> 8) & 0x7, $a & 0xff;
+		}
     }
     else 
 	{ 
@@ -669,27 +704,47 @@ sub tul_addr2hex
 		# Old
 		# $str = sprintf "%01x%01x%02x", $a >> 12, ($a >> 8) & 0xf, $a & 0xff;
 		# New
-        $str = sprintf "%02x%01x%02x", $a >> 12, ($a >> 8) & 0xf, $a & 0xff;
+        #$str = sprintf "%02x%01x%02x", $a >> 12, ($a >> 8) & 0xf, $a & 0xff;
+		
+		#extended adressing
+		if ($useEIB =~ m/1/)
+		{
+			$str = sprintf "%01x%01x%02x", $a >> 12, ($a >> 8) & 0xf, $a & 0xff;
+		}
+		else
+		{
+			$str = sprintf "%02x%01x%02x", $a >> 12, ($a >> 8) & 0xf, $a & 0xff;
+		}
     }
+	
     return $str;
 }
 
 sub tul_str2hex 
 {
 	my $str = $_[0];
-    if ($str =~ /(\d+)\/(\d+)\/(\d+)/) 
-	{ # logical address
+	my $hex;
+	
+    if (($str =~ /(\d+)\/(\d+)\/(\d+)/) or ($str =~ /(\d+)\.(\d+)\.(\d+)/))
+	{ 
+		# logical address
 		# old
 		# my $hex = sprintf("%01x%01x%02x",$1,$2,$3);
 		# New
-		my $hex = sprintf("%02x%01x%02x",$1,$2,$3);
+		#my $hex = sprintf("%02x%01x%02x",$1,$2,$3);
+		
+		#extended adressing
+		if ($useEIB =~ m/1/)
+		{
+			$hex = sprintf("%01x%01x%02x",$1,$2,$3);
+		}
+		else
+		{
+			$hex = sprintf("%02x%01x%02x",$1,$2,$3);
+		}
+
 		return $hex; 
     } 
-    elsif ($str =~ /(\d+)\.(\d+)\.(\d+)/) 
-	{ # physical address
-    	my $hex = sprintf("%01x%01x%02x",$1,$2,$3);
-    	return $hex;
-    }
 }
 
 # For mapping between APCI symbols and values
