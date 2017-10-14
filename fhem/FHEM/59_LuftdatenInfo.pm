@@ -124,7 +124,7 @@ sub LuftdatenInfo_Define($$) {
       $hash->{DEF} = "$MODE $hash->{SENSORIDS}";
     }
     elsif(!$DEF){
-      $hash->{ADDRESS} = $DEF;
+      $hash->{ADDRESS} = $MODE;
 
       $MODE = "local";
 
@@ -428,7 +428,10 @@ sub LuftdatenInfo_ParseHttpResponse($) {
         ))[0];
         $device = IsDevice($device, $TYPE) ? $defs{$device} : $hash;
 
-        if($_->{value_type} =~ /P1$/){
+        if($_->{value_type} =~ /P0$/){
+          $_->{value_type} = "PM1";
+        }
+        elsif($_->{value_type} =~ /P1$/){
           $_->{value_type} = "PM10";
         }
         elsif($_->{value_type} =~ /P2$/){
@@ -469,11 +472,17 @@ sub LuftdatenInfo_ParseHttpResponse($) {
           $_->{value} = ($_->{value} > 10000 ? $_->{value} / 100 : $_->{value});
           $_->{value_type} = "pressureNN";
         }
+        elsif($_->{value_type} =~ /_risk/){
+          $_->{value_type} = "UVRisk";
+        }
         elsif($_->{value_type} eq "signal"){
           $_->{value_type} = "signal";
         }
         elsif($_->{value_type} =~ /temperature$/){
           $_->{value_type} = "temperature";
+        }
+        elsif($_->{value_type} =~ /_watt/){
+          $_->{value_type} = "UVIntensity";
         }
         elsif($_->{value_type} =~ /_time$/){
           $_->{value_type} = "time";
@@ -609,70 +618,81 @@ sub LuftdatenInfo_statusRequest($) {
     <a name="LuftdatenInforeadings"></a>
     <b>Readings</b><br>
     <ul>
-
-        <li>
-          <code>PM10</code><br>
-          Quantity of particles with a diameter of less than 10 μm in μg / m³
-        </li>
-        <li>
-          <code>PM2.5</code><br>
-          Quantity of particles with a diameter of less than 2.5 μm in μg / m³
-        </li>
-        <li>
-          <code>temperature</code><br>
-          Temperature in °C
-        </li>
-        <li>
-          <code>humidity</code><br>
-          Relative humidity in %
-        </li>
-        <li>
-          <code>pressure</code><br>
-          Pressure in hPa
-        </li>
-        <li>
-          <code>pressureNN</code><br>
-          Pressure at sea level in hPa<br>
-          Is calculated if pressure and temperature sensor are active and the
-          sensor is not at sea level.<br>
-          The height, can be determined by maps or SmartPhone, needs to be
-          specified at the configuration page.
-        </li>
-        <li>
-          <code>illuminanceFull</code><br>
-          illuminace of the full spectrum in lux
-        </li>
-        <li>
-          <code>illuminanceIR</code><br>
-          illuminace of the IR spectrum in lux
-        </li>
-        <li>
-          <code>illuminanceUV</code><br>
-          ???
-        </li>
-        <li>
-          <code>illuminanceVisible</code><br>
-          illuminace of the visible spectrum in lux
-        </li>
-        <li>
-          <code>latitude</code>
-        </li>
-        <li>
-          <code>longitude</code>
-        </li>
-        <li>
-          <code>altitude</code>
-        </li>
-        <li>
-          <code>location</code><br>
-          location as "postcode city"<br>
-          Only available with remote query.
-        </li>
-        <li>
-          <code>signal</code><br>
-          WLAN signal strength in dBm<br>
-          Only available with local query.
-        </li>
+      <li>
+        <code>altitude</code>
+      </li>
+      <li>
+        <code>humidity</code><br>
+        Relative humidity in %
+      </li>
+      <li>
+        <code>illuminanceFull</code><br>
+        Illuminace of the full spectrum in lux
+      </li>
+      <li>
+        <code>illuminanceIR</code><br>
+        Iilluminace of the IR spectrum in lux
+      </li>
+      <li>
+        <code>illuminanceUV</code><br>
+        Iilluminace of the UV spectrum in lux
+      </li>
+      <li>
+        <code>illuminanceVisible</code><br>
+        Iilluminace of the visible spectrum in lux
+      </li>
+      <li>
+        <code>latitude</code>
+      </li>
+      <li>
+        <code>location</code><br>
+        location as "postcode city"<br>
+        Only available with remote query.
+      </li>
+      <li>
+        <code>longitude</code>
+      </li>
+      <li>
+        <code>PM1</code><br>
+        Quantity of particles with a diameter of less than 1 μm in μg/m³
+      </li>
+      <li>
+        <code>PM2.5</code><br>
+        Quantity of particles with a diameter of less than 2.5 μm in μg/m³
+      </li>
+      <li>
+        <code>PM10</code><br>
+        Quantity of particles with a diameter of less than 10 μm in μg/m³
+      </li>
+      <li>
+        <code>pressure</code><br>
+        Pressure in hPa
+      </li>
+      <li>
+        <code>pressureNN</code><br>
+        Pressure at sea level in hPa<br>
+        Is calculated if pressure and temperature sensor are active and the
+        sensor is not at sea level.<br>
+        The height, can be determined by maps or SmartPhone, needs to be
+        specified at the configuration page.
+      </li>
+      <li>
+        <code>signal</code><br>
+        WLAN signal strength in dBm<br>
+        Only available with local query.
+      </li>
+      <li>
+        <code>temperature</code><br>
+        Temperature in °C
+      </li>
+      <li>
+        <code>UVIntensity</code><br>
+        UV intensity in W
+      </li>
+      <li>
+        <code>UVRisk</code><br>
+        UV risk from 1 to 5
+      </li>
     </ul><br>
     <a name="LuftdatenInfoattr"></a>
     <b>Attribute</b>
@@ -770,20 +790,53 @@ sub LuftdatenInfo_statusRequest($) {
     <b>Readings</b><br>
     <ul>
       <li>
-        <code>PM10</code><br>
-        Menge der Partikel mit einem Durchmesser von weniger als 10 µm in µg/m³
+        <code>altitude</code><br>
+        Höhe über NN
+      </li>
+      <li>
+        <code>humidity</code><br>
+        Relative Luftfeuchtgkeit in %
+      </li>
+      <li>
+        <code>illuminanceFull</code><br>
+        Helligkeit des vollen Bereich in lux
+      </li>
+      <li>
+        <code>illuminanceIR</code><br>
+        Helligkeit des IR Bereich in lux
+      </li>
+      <li>
+        <code>illuminanceUV</code><br>
+        Helligkeit des UV Bereich in lux
+      </li>
+      <li>
+        <code>illuminanceVisible</code><br>
+        Helligkeit des sichtbaren Bereich in lux
+      </li>
+      <li>
+        <code>latitude</code><br>
+        Längengrad
+      </li>
+      <li>
+        <code>location</code><br>
+        Standort als "Postleitzahl Ort"<br>
+        Nur bei remote Abfrage verf&uuml;gbar.
+      </li>
+      <li>
+        <code>longitude</code><br>
+        Breitengrad
+      </li>
+      <li>
+        <code>PM1</code><br>
+        Menge der Partikel mit einem Durchmesser von weniger als 1 µm in µg/m³
       </li>
       <li>
         <code>PM2.5</code><br>
         Menge der Partikel mit einem Durchmesser von weniger als 2.5 µm in µg/m³
       </li>
       <li>
-        <code>temperature</code><br>
-        Temperatur in °C
-      </li>
-      <li>
-        <code>humidity</code><br>
-        Relative Luftfeuchtgkeit in %
+        <code>PM10</code><br>
+        Menge der Partikel mit einem Durchmesser von weniger als 10 µm in µg/m³
       </li>
       <li>
         <code>pressure</code><br>
@@ -798,42 +851,21 @@ sub LuftdatenInfo_statusRequest($) {
         werden, auf der Konfigurationsseite anzugeben.
       </li>
       <li>
-        <code>illuminanceFull</code><br>
-        Helligkeit des vollen Bereich in lux
-      </li>
-      <li>
-        <code>illuminanceIR</code><br>
-        Helligkeit des IR Bereich in lux
-      </li>
-      <li>
-        <code>illuminanceUV</code><br>
-        ???
-      </li>
-      <li>
-        <code>illuminanceVisible</code><br>
-        Helligkeit des sichtbaren Bereich in lux
-      </li>
-      <li>
-        <code>latitude</code><br>
-        Längengrad
-      </li>
-      <li>
-        <code>longitude</code><br>
-        Breitengrad
-      </li>
-      <li>
-        <code>altitude</code><br>
-        Höhe über NN
-      </li>
-      <li>
-        <code>location</code><br>
-        Standort als "Postleitzahl Ort"<br>
-        Nur bei remote Abfrage verf&uuml;gbar.
-      </li>
-      <li>
         <code>signal</code><br>
         WLAN Signalst&auml;rke in dBm<br>
         Nur bei local Abfrage verf&uuml;gbar.
+      </li>
+      <li>
+        <code>temperature</code><br>
+        Temperatur in °C
+      </li>
+      <li>
+        <code>UVIntensity</code><br>
+        UV Intensität in W
+      </li>
+      <li>
+        <code>UVRisk</code><br>
+        UV Risiko von 1 bis 5
       </li>
     </ul><br>
     <a name="LuftdatenInfoattr"></a>
