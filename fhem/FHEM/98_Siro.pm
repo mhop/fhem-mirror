@@ -1,4 +1,4 @@
-
+#################################################################
 # $Id$
 #
 # Siro module for FHEM
@@ -1366,7 +1366,7 @@ my $testtimestart = gettimeofday();
 	Log3($name,1,"Siro_Set: nodrive -> $nodrive");
 	
 	
-	if ($ondirekttime eq "0" || $offdirekttime eq "0" || $nodrive eq "true") # Fehler division durch 0 abfanken bei ungesetzten attributen
+	if (($ondirekttime eq "0" || $offdirekttime eq "0" || $nodrive eq "true") && $testchannel ne "0" ) # Fehler division durch 0 abfanken bei ungesetzten attributen
 		{
 			Log3($name,1,"Siro_Set: Positionsanfahrt ohne gesetzte Attribute , aktion nicht möglich -> abbruch");
 			return "Positionsanfahrt ohne gesetzte Attribute time_to_open und time_to_close nicht moeglich";
