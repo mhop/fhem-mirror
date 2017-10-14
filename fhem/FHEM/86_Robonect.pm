@@ -34,8 +34,10 @@
 # ABU 20170501 tuned documentation
 # ABU 20170516 removed useless print
 # ABU 20170525 bugfixed winterschlaf again
-# ABU 20170613 added Maehauftrag
-
+# ABU 20171006 added options for Maehauftrag
+# ABU 20171006 added "umlautfilter" for test
+# ABU 20171006 added "health" for test
+# ABU 20171010 finished health for test, added chck for undef at each reading
 
 package main;
 
@@ -59,7 +61,8 @@ my $PW = "passwort";
 
 #available get cmds
 my %gets = (
-	"status" => "noArg"
+	"status" => "noArg",
+	"health" => "noArg"	
 );
 
 #available set cmds
@@ -68,7 +71,7 @@ my %sets = (
 	$HOME => "noArg",
 	$AUTO => "noArg",
 	$MANUAL => "noArg",
-	$JOB => "noArg",
+	$JOB => "",
 	$START => "noArg",
 	$STOP => "noArg",
 	$HYBERNATE => "on,off",
@@ -77,7 +80,7 @@ my %sets = (
 );
 
 my %commands = (
-	GET_STATUS	=> "cmd=status",
+	#GET_STATUS	=> "cmd=status",
 	SET_MODE	=> {$HOME=>"cmd=mode&mode=home", $MANUAL=>"cmd=mode&mode=man", $JOB=>"cmd=mode&mode=job", $AUTO=>"cmd=mode&mode=auto", $EOD=>"cmd=mode&mode=eod", $STOP=>"cmd=stop", $START=>"cmd=start"}	
 );
 
@@ -99,6 +102,37 @@ my %elements = (
 			"duration" 	=> {ALIAS=>"dauer"},
 			"hours"		=> {ALIAS=>"betriebsstunden"}
 		},
+		
+		"health" =>
+		{
+			ALIAS		=> "erweitert",
+			"alarm" =>
+			{
+				ALIAS				=> "alarm",
+				"voltage3v3extmin"	=> {ALIAS=>"unterspannung_extern_3V3", "false"=> "bereit", "true"=>"alarm"},
+				"voltage3v3extmax"	=> {ALIAS=>"ueberspannung_extern_3V3", "false"=> "bereit", "true"=>"alarm"},
+				"voltage3v3intmin"	=> {ALIAS=>"unterspannung_intern_3V3", "false"=> "bereit", "true"=>"alarm"},
+				"voltage3v3intmax"	=> {ALIAS=>"ueberspannung_intern_3V3", "false"=> "bereit", "true"=>"alarm"},
+				"voltagebattmin"	=> {ALIAS=>"unterspannung_batterie", "false"=> "bereit", "true"=>"alarm"},
+				"voltagebattmax"	=> {ALIAS=>"ueberspannung_batterie", "false"=> "bereit", "true"=>"alarm"},
+				"temperatureMin"	=> {ALIAS=>"zu_kalt", "false"=> "bereit", "true"=>"alarm"},
+				"temperatureMax"	=> {ALIAS=>"zu_warm", "false"=> "bereit", "true"=>"alarm"},
+				"humidityMax"		=> {ALIAS=>"zu_feucht", "false"=> "bereit", "true"=>"alarm"},
+			},
+			"voltages" =>
+			{
+				ALIAS		=> "spannung",
+				"ext3v3"	=> {ALIAS=>"extern"},
+				"int3v3"	=> {ALIAS=>"intern"},
+				"batt"		=> {ALIAS=>"batterie"},
+			},
+			"climate" =>
+			{
+				ALIAS		=> "umwelt",
+				"temperature"	=> {ALIAS=>"temperatur"},
+				"humidity"	=> {ALIAS=>"feuchte"},
+			}			
+		},		
 		
 		"timer" =>
 		{
@@ -130,6 +164,9 @@ my %elements = (
 #	}	
 );
 
+#this table is used to replace special chars
+my %umlaute = ("ä" => "&auml;", "ü" => "&uuml;", "ö" => "&ouml;","Ä" => "&Auml;", "Ü" => "&Uuml;", "Ö" => "&Ouml;", "ß" => "&szlig;");
+
 #Init this device
 #This declares the interface to fhem
 #############################
@@ -149,7 +186,8 @@ sub Robonect_Initialize($) {
 								"credentials " .			#user/password combination for authentication in mower, stored in a credentials file
 								"basicAuth " .				#user/password combination for authentication in mower								
 								"pollInterval " .			#interval to poll in seconds
-								"timeout " .				#interval to poll in seconds
+								"timeout " .				#http-timeout
+								"useHealth " .				#if true, poll for health
 								"$readingFnAttributes ";	#standard attributes
 }
 
@@ -303,7 +341,8 @@ sub Robonect_Get($@)
 	#append userdata, if given
 	$url = $url . "user=" . $userName . "&pass=" . $passWord . "&" if (defined ($userName) and defined ($passWord));
 	#append command
-	$url = $url . $commands{GET_STATUS};
+	#$url = $url . $commands{GET_STATUS};
+	$url = $url . "cmd=" . $cmd;
 		
 	my $httpData;
 	$httpData->{url} = $url;
@@ -312,7 +351,8 @@ sub Robonect_Get($@)
 	$httpData->{hideurl} = 0;		
 	$httpData->{callback} = \&Robonect_callback;
 	$httpData->{hash} = $hash;
-	$httpData->{cmd} = $commands{GET_STATUS};
+	#$httpData->{cmd} = $commands{GET_STATUS};
+	$httpData->{cmd} = "cmd=" . $cmd;
 	$httpData->{timeout} = AttrVal ($name, "timeout", 4);
 		
 	HttpUtils_NonblockingGet($httpData);
@@ -345,7 +385,7 @@ sub Robonect_Set($@)
 	my $cmd = $a[1];
 	#lower cmd
 	$cmd = lc($cmd);
-	
+			
 	#create response, if cmd is wrong or gui asks
 	my $cmdTemp = Robonect_getCmdList ($hash, $cmd, %sets);
 	return $cmdTemp if (defined ($cmdTemp)); 
@@ -377,13 +417,13 @@ sub Robonect_Set($@)
 		}	
 	}
 	#if command is user
-	if ($cmd eq lc($USER))
+	elsif ($cmd eq lc($USER))
 	{
 		setKeyValue("ROBONECT_USER_$name", $a[2]);
 		Log3 ($name, 5, "set - wrote username");
 	}
 	#if command is password
-	if ($cmd eq lc($PW))
+	elsif ($cmd eq lc($PW))
 	{
 		setKeyValue("ROBONECT_PW_$name", $a[2]);
 		Log3 ($name, 5, "set - wrote password");
@@ -398,7 +438,26 @@ sub Robonect_Set($@)
 		$url = $url . "user=" . $userName . "&pass=" . $passWord . "&" if (defined ($userName) and defined ($passWord));
 		#append command
 		$url = $url . $decodedCmd;
+
+		#execute for alle "extra" arguments
+		for (my $i = 2; $i < @a; $i++) 
+		{
+			my $cmdAttr = $a[$i];
+			my ($key, $val) = split (/=/, $cmdAttr);
 			
+			if (defined ($key) and defined ($val) and (length ($key) > 0) and (length ($val) > 0))
+			{
+				$url = $url . "&" . $key . "=" . $val;
+				Log3 ($name, 5, "set - found option. Key:$key Value:$val") 
+			}
+			else
+			{	
+				Log3 ($name, 1, "set - found incomplete option. Key:$key Value:$val") 
+			}
+		}
+		
+		Log3 ($name, 5, "set - complete call-string: $url"); 
+		
 		my $httpData;
 		$httpData->{url} = $url;
 		$httpData->{loglevel} = AttrVal ($name, "verbose", 2);
@@ -411,8 +470,9 @@ sub Robonect_Set($@)
 		HttpUtils_NonblockingGet($httpData);
 			
 		return $httpData->{err};
-			
-		Robonect_GetUpdate($hash);		
+		
+		#BUllshit - never gets called	
+		#Robonect_GetUpdate($hash);		
     }	
 	
 	Log3 ($name, 5, "exit set");	
@@ -531,6 +591,14 @@ sub Robonect_GetUpdate($)
 		$callAttr[0] = $name;
 		$callAttr[1] = "status";
 		Robonect_Get ($hash, @callAttr);
+				
+		#try to poll health, if desired
+		my $useHealth = AttrVal($name,"useHealth",undef);		
+		if (defined ($useHealth) and ($useHealth =~ m/[1]|([oO][nN])/))
+		{
+			$callAttr[1] = "health";
+			Robonect_Get ($hash, @callAttr);
+		}
 	}
 
 	my $interval = AttrVal($name,"pollInterval",90);
@@ -569,6 +637,13 @@ sub Robonect_callback ($)
 		my $answer = undef;
 		eval '$answer = decode_json (encode_utf8($data))';
 		
+		#try to replaye german special chars
+		if (defined ($answer) and (length ($answer) > 0))
+		{
+			my $umlautkeys = join ("|", keys(%umlaute));
+			$answer =~ s/($umlautkeys)/$umlaute{$1}/g;
+		}
+				
 		#backup error from eval
 		my $evalErr = $@;
 		
@@ -605,34 +680,66 @@ sub Robonect_callback ($)
 			#readingsBulkUpdate($hash, $key, $value);			
 
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "status", undef);
-			readingsBulkUpdate($hash, $key, $value);
-			readingsBulkUpdate($hash, "state", $value);
+			if (defined ($value) and !($value =~ m/undef/))
+			{
+				readingsBulkUpdate($hash, $key, $value);
+				readingsBulkUpdate($hash, "state", $value);
+			}
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "mode", undef);
-			readingsBulkUpdate($hash, $key, $value);
+			readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "battery", undef);
-			readingsBulkUpdate($hash, $key, $value);
+			readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 			$value = 0;
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "duration", undef);
 			readingsBulkUpdate($hash, $key, sprintf ("%d", $value/3600)) if (defined($value) and ($value =~ m/(?:\d*\.)?\d+/));			
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "status", "hours", undef);
-			readingsBulkUpdate($hash, $key, $value);
+			readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "timer", "status", undef);
-			readingsBulkUpdate($hash, $key, $value);
+			readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 			
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "timer", "next", "date");
-			readingsBulkUpdate($hash, $key, $value);
+			readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "timer", "next", "time");
-			readingsBulkUpdate($hash, $key, $value);
+			readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 			
 			$value = -95;
 			($key, $value) = Robonect_decodeContent ($hash, $answer, "wlan", "signal", undef);
-			readingsBulkUpdate($hash, $key, $value);			
+			readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 			
 			if (defined($value) and ($value =~ m/(?:\d*\.)?\d+/))
 			{
 				$value = sprintf ("%d", ($value + 95) / 0.6);
 				readingsBulkUpdate($hash, $key . "-prozent", $value);
+			}
+			
+			#try to decode health, if desired
+			my $useHealth = AttrVal($name,"useHealth",undef);		
+			if (defined ($useHealth) and ($useHealth =~ m/[1]|([oO][nN])/))
+			{
+				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "alarm", "voltagebattmin");
+				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
+				
+				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "alarm", "voltagebattmax");
+				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
+
+				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "alarm", "temperatureMin");
+				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
+
+				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "alarm", "temperatureMax");
+				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
+				
+				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "alarm", "humidityMax");
+				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
+				
+				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "voltages", "batt");
+				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
+
+				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "umwelt", "temperature");
+				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
+
+				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "umwelt", "humidity");
+				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 			}
 			
 			readingsEndUpdate($hash, 1);
@@ -849,7 +956,8 @@ sub Robonect_getCmdList ($$$)
 		#append option, if valid
 		$retVal = $retVal . ":" . $myOpt if (defined ($myOpt) and (length ($myOpt) > 0));
 		$myOpt = "" if (!defined($myOpt));
-		Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
+		#Logging makes me crazy...
+		#Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
 	}
 	
 	if (!defined ($retVal))
@@ -913,6 +1021,16 @@ sub Robonect_getCmdList ($$$)
 		<li>stop<br>
 			Stops mowing immediately. The mower does not drive home. It stands there, until battery is empty. Use with care!
 		</li>	
+		<li>maehauftrag<br>
+			This command starts a single mowing-task. It can be applied as much parameters as you want. For example you can influence start-/stop-time and duration.<br>
+			The parameters have to be named according the robonect-API (no doublechecking!).<br>
+			<br>
+			Example:<br>
+			Lauch at 15:00, Duration 120 minutes, do not use a remote-start-point, do not change mode after finishing task
+			<pre>
+			  set myMower maehauftrag start=15:00 duration=120 remotestart=0 after=4
+			</pre>			
+		</li>
 		<li>winterschlaf &lt;on, off&gt;<br>
 			If set to on, no polling is executet. Please use this during winter.
 		</li>	
@@ -927,10 +1045,18 @@ sub Robonect_getCmdList ($$$)
 	</ul>
   </ul>
 
-
   <p><a name="RobonectGet"></a> <b>Get</b></p>
-  <ul>  
-  <p>Gets the actual state of the mower - normally not needed, because the status is polled cyclic.</p>
+  <ul>
+	<b>Get</b>
+	<ul>  
+		<li>status<br>
+			Gets the actual state of the mower - normally not needed, because the status is polled cyclic.
+		</li>
+		<li>health<br>
+			This one gets more detailed information - like voltages and temperatures. It is NOT SUPPORTED BY ALL MOWERS!!!<br>
+			If enabled via attribute, health is polled accordingly status.
+		</li>
+	</ul>
   </ul>
   
   <p><a name="RobonectAttr"></a> <b>Attributes</b></p>
@@ -992,6 +1118,13 @@ sub Robonect_getCmdList ($$$)
   <ul>
 	Timeout for httpData to recive data. Default is 4s.
   </ul>
+  
+  <p><a name="RobonectHealth"></a> <b>useHealth</b></p>
+  <ul>
+	If set to 1, the health-status of the mower will be polled. Be aware NOT ALL MOWERS ARE SUPPORTED!<br>
+	Please refer to logfile or LAST_COMM_STATUS if the function does not seem to be working.
+  </ul>
+
 </ul>
 =end html
 =device
@@ -1002,7 +1135,7 @@ sub Robonect_getCmdList ($$$)
 <a name="Robonect"></a> 
 <h3>Robonect</h3>
 <ul>
-<p>Robonect ist ein Nachr&uml;stmodul für automower, die auf der Husky-G3-Steuerung basieren. Es wurde von Fabian H. entwickelt und kann unter www.robonect.de bezogen werden. Dieses Modul gibt Euch Zugriff auf die n&ouml;tigsten Kommandos. Dieses Modul ben&ouml;tigt libjson-perl. Bitte NICHT VERGESSEN zu installieren!</p>
+<p>Robonect ist ein Nachr&uml;stmodul f&uuml;r automower, die auf der Husky-G3-Steuerung basieren. Es wurde von Fabian H. entwickelt und kann unter www.robonect.de bezogen werden. Dieses Modul gibt Euch Zugriff auf die n&ouml;tigsten Kommandos. Dieses Modul ben&ouml;tigt libjson-perl. Bitte NICHT VERGESSEN zu installieren!</p>
 
 
   <p><a name="RobonectDefine"></a> <b>Define</b></p>
@@ -1011,7 +1144,7 @@ sub Robonect_getCmdList ($$$)
     
 	<p>Mit gesetztem Winterschlaf wird die Kommunikation zum M&auml;her unterbunden.</p>
 	
-	<p>Die Zugangsinformationen können im Klartext bei der Definition angegeben werden. Wahlweise auch per Attribut. Standardm&auml;ßig wird der Status vom RObonect alle 90s aktualisiert.</p>
+	<p>Die Zugangsinformationen k&ouml;nnen im Klartext bei der Definition angegeben werden. Wahlweise auch per Attribut. Standardm&auml;&szlig;ig wird der Status vom RObonect alle 90s aktualisiert.</p>
 
     <p>Beispiel:</p>
       <pre>
@@ -1035,7 +1168,7 @@ sub Robonect_getCmdList ($$$)
 			Dies schickt den M&auml;her direkt nach hause. Weiteres m&auml;hen wird verhindert, bis auf manuell oder auto umgeschalten wird.
 		</li>	
 		<li>feierabend<br>
-			Dies schickt den M&auml;her für den aktuellen Timerslot direkt nach hause. Beim n&auml;chsten aktiven Timerslot wird weitergemäht.
+			Dies schickt den M&auml;her f&uuml;r den aktuellen Timerslot direkt nach hause. Beim n&auml;chsten aktiven Timerslot wird weitergem&auml;ht.
 		</li>	
 		<li>start<br>
 			Startet den M&auml;hvorgang im manuellen Modus oder im Automatikmodus bei aktivem Zeitslot.
@@ -1043,8 +1176,19 @@ sub Robonect_getCmdList ($$$)
 		<li>stop<br>
 			Beendet den M&auml;hvorgang. Der M&auml;her f&auml;hrt nicht nach Hause und beginnt nicht wieder zu m&auml;hen. Er bleibt stehen, bis die Batterie leer ist. Nur mit Bedacht benutzen!
 		</li>	
+		<li>maehauftrag<br>
+			Hiermit wird ein (einmaliger) Auftrag an den M&auml;her abgesetzt. Es können beliebig viele Parameter mitgegeben werden. So kann zum Beispiel der Modus nach dem Auftrag,
+			sowie Start- oder Stoppzeit beeinflusst werden.<br>
+			Die Parameter m&uuml;ssen wie in der API des Robonect beschrieben lauten. Es erfolgt keine syntaktische Prüfung!<br>
+			<br>
+			Beispiel:<br>
+			Startzeit 15 Uhr, Dauer 120 Minuten, keinen Fernstartpunkt verwenden, keine Betriebsartenumschaltung nach Auftragsende
+			<pre>
+			  set myMower maehauftrag start=15:00 duration=120 remotestart=0 after=4
+			</pre>			
+		</li>		
 		<li>winterschlaf &lt;on, off&gt;<br>
-			Wenn aktiviert, wird das Pollen unterbunden. Empfiehlt sich für die Winterpause.
+			Wenn aktiviert, wird das Pollen unterbunden. Empfiehlt sich f&uuml;r die Winterpause.
 		</li>	
 		<li>user &ltuser&gt;<br>
 			Alternativ zur Angabe per Argument kann per Set-Befehl der Benutzername zur Anmeldung am Robonect hier einmalig eingegeben werden. Er wird im Klartext in FhemUtils oder der DB gespeichert.<br>
@@ -1058,8 +1202,20 @@ sub Robonect_getCmdList ($$$)
   </ul>
 
   <p><a name="RobonectGet"></a> <b>Get</b></p>
-  <ul>  
-  <p>Holt den aktuellen Status des M&auml;hers. Wird normalerweise nicht benötigt, da automatisch gepolled wird.</p>
+  <ul>
+	<b>Get</b>
+	<ul>  
+		<li>status<br>
+			Holt den aktuellen Status des M&auml;hers. Wird normalerweise nicht ben&ouml;tigt, da automatisch gepolled wird.
+		</li>
+		<li>health<br>
+			Mit diesem Kommando können detailliertere Informationen vom M&auml;her gelesen werden. Beispielsweise sind einge Spannungen und Umweltbedingungen verf&uuml;gbar.<br>
+			Es werden NICHT ALLE M&Auml;HER UNTERST&Uuml;TZT!!!
+			Wenn das entsprechende Attribut gesetzt ist, wird health analog status gepolled.
+			This one gets more detailed information - like voltages and temperatures. It is NOT SUPPORTED BY ALL MOWERS!!!<br>
+			If enabled via attribute, health is polled accordingly status.
+		</li>
+	</ul>
   </ul>
   
   <p><a name="RobonectAttr"></a> <b>Attributes</b></p>
@@ -1095,12 +1251,12 @@ sub Robonect_getCmdList ($$$)
 
   <p><a name="RobonectCredentials"></a> <b>credentials</b></p>
   <ul> 
-    Hier kann ein Link auf ein credentials-file angegeben werden. Die Zugansinformationen werden dann aus der Datei geholt. Dieser Mechanismus überschreibt basicAuth.
+    Hier kann ein Link auf ein credentials-file angegeben werden. Die Zugansinformationen werden dann aus der Datei geholt. Dieser Mechanismus &uuml;berschreibt basicAuth.
   </ul> 
 
   <p><a name="RobonectBasicAuth"></a> <b>basicAuth</b></p>
   <ul> 
-	Hier werden die Zugangsinformationen entweder im Klartext oder base-64-codiert übergeben. Base64-encoder gibts bei google.
+	Hier werden die Zugangsinformationen entweder im Klartext oder base-64-codiert &uuml;bergeben. Base64-encoder gibts bei google.
       <p>Example:</p>
       <pre>
       define myMower Robonect 192.168.5.1
@@ -1119,7 +1275,14 @@ sub Robonect_getCmdList ($$$)
   
   <p><a name="RobonectTimeout"></a> <b>timeout</b></p>
   <ul>
-	Für das holen der Daten per Wlan kann hier ein Timeout angegeben werden. Default sind 4s.
+	F&uuml;r das holen der Daten per Wlan kann hier ein Timeout angegeben werden. Default sind 4s.
+  </ul>
+
+  <p><a name="RobonectHealth"></a> <b>useHealth</b></p>
+  <ul>
+	Wenn dieses Attribut auf 1 gesetzt wird, wird der health-status analog dem normalen Status gepolled.<br>
+	Bitte beachtet, dass NICHT ALLE M&Auml;HER UNTERST&Uuml;TZT WERDEN!
+	Wenn die Funktion nicht gegeben zu sein scheint, bitte den LAST_COMM_STATUS und das Logfile beachten.
   </ul>  
 </ul>
 =end html_DE
