@@ -35,6 +35,8 @@
 # ABU 20170507 changed regex for all dpt9
 # ABU 20170517 added useSetExtensions
 # ABU 20170622 finetuned doku
+# ABU 20171006 added sub-dpt1
+# ABU 20171006 added dpt19
 
 package main;
 
@@ -94,10 +96,25 @@ my %dpttypes = (
 	"dpt1.001" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([oO][nN])|([oO][fF][fF])|(0?1)|(0?0)/, MIN=>"off", MAX=>"on"},
 	"dpt1.002" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([tT][rR][uU][eE])|([fF][aA][lL][sS][eE])|(0?1)|(0?0)/, MIN=>"false", MAX=>"true"},
 	"dpt1.003" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(([eE][nN]|[dD][iI][sS])[aA][bB][lL][eE])|(0?1)|(0?0)/, MIN=>"disable", MAX=>"enable"},
+	"dpt1.004"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"no ramp", MAX=>"ramp"},
+	"dpt1.005"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"no alarm", MAX=>"alarm"},
+	"dpt1.006"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"low", MAX=>"high"},
+	"dpt1.007"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"decrease", MAX=>"increase"},
 	"dpt1.008" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([uU][pP])|([dD][oO][wW][nN])|(0?1)|(0?0)/, MIN=>"up", MAX=>"down"},
 	"dpt1.009" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([cC][lL][oO][sS][eE][dD])|([oO][pP][eE][nN])|(0?1)|(0?0)/, MIN=>"open", MAX=>"closed"},
 	"dpt1.010" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([sS][tT][aA][rR][tT])|([sS][tT][oO][pP])|(0?1)|(0?0)/, MIN=>"stop", MAX=>"start"},
-	"dpt1.019" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([cC][lL][oO][sS][eE][dD])|([oO][pP][eE][nN])|(0?1)|(0?0)/, MIN=>"closed", MAX=>"open"},
+	"dpt1.011"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"inactive", MAX=>"active"},
+	"dpt1.012"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"not inverted", MAX=>"inverted"},
+	"dpt1.013"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"start/stop", MAX=>"cyclically"},
+	"dpt1.014"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"fixed", MAX=>"calculated"},
+	"dpt1.015"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"no action", MAX=>"reset"},
+	"dpt1.016"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"no action", MAX=>"acknowledge"},
+	"dpt1.017"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"trigger", MAX=>"trigger"},
+	"dpt1.018"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"not occupied", MAX=>"occupied"},
+	"dpt1.019" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([cC][lL][oO][sS][eE][dD])|([oO][pP][eE][nN])|(0?1)|(0?0)/, MIN=>"closed", MAX=>"open"},	
+	"dpt1.021"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"logical or", MAX=>"logical and"},
+	"dpt1.022"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"scene A", MAX=>"scene B"},
+	"dpt1.023"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/, MIN=>"move up/down", MAX=>"move and step mode"},
 
 	#Step value (two-bit)
 	"dpt2" 			=> {CODE=>"dpt2", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/([oO][nN])|([oO][fF][fF])|([fF][oO][rR][cC][eE][oO][nN])|([fF][oO][rR][cC][eE][oO][fF][fF])/, MIN=>undef, MAX=>undef},
@@ -171,7 +188,9 @@ my %dpttypes = (
 	"dpt16"         => {CODE=>"dpt16", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/, MIN=>undef, MAX=>undef},
 	"dpt16.000"     => {CODE=>"dpt16", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/, MIN=>undef, MAX=>undef},
 	"dpt16.001"     => {CODE=>"dpt16", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/, MIN=>undef, MAX=>undef},
-	
+
+	"dpt19"			=> {CODE=>"dpt19", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(((3[01]|[0-2]?[0-9]).(1[0-2]|0?[0-9]).(19[0-9][0-9]|2[01][0-9][0-9]))_((2[0-4]|[0?1][0-9]):(60|[0?1-5]?[0-9]):(60|[0?1-5]?[0-9])))|([nN][oO][wW])/, MIN=>undef, MAX=>undef},
+
 	# Color-Code
 	"dpt232"        => {CODE=>"dpt232", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/[0-9A-Fa-f]{6}/, MIN=>undef, MAX=>undef},
 );
@@ -303,6 +322,10 @@ KNX_Define($$) {
 	AssignIoPort($hash);
 	
 	Log3 ($name, 5, "exit define");
+	
+	CommandDefine(undef, 'findMe');
+	CommandDefine('myClass', 'findMe2');
+	
 	return undef;
 }
 
@@ -1252,6 +1275,38 @@ KNX_encodeByDpt ($$$) {
 		$numval = $value;
 		$hexval = $dat;
 	} 
+	#DateTime
+	elsif ($code eq "dpt19")
+	{
+		if (lc($value) eq "now")
+		{
+			#get actual time
+			my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+			my $hoffset;
+			
+			#add offsets
+			$mon++;	
+			# calculate offset for weekday
+			$wday = 7 if ($wday eq "0");
+			
+			$hexval = 0;
+			$hexval = sprintf ("00%.8x", (($secs<<16) + ($mins<<24) + ($hours<<32) + ($wday<<37) + ($mday<<40) + ($mon<<48) + ($year<<56)));
+			
+		} else
+		{
+			my ($date, $time) = split ('_', $value);
+			my ($dd, $mm, $yyyy) = split (/\./, $date);
+			my ($hh, $mi, $ss) = split (':', $time);
+
+			#add offsets
+			$yyyy -= 1900;  # year is based on 1900
+			my $wday = 0;
+			
+			$hexval = 0;
+			$hexval = sprintf ("00%.8x", (($ss<<16) + ($mi<<24) + ($hh<<32) + ($wday<<37) + ($dd<<40) + ($mm<<48) + ($yyyy<<56)));
+		}
+		$numval = 0;
+	}	
 	#RGB-Code
 	elsif ($code eq "dpt232")
 	{
@@ -1535,6 +1590,22 @@ KNX_decodeByDpt ($$$) {
 		#convert to latin-1
 		$state = encode ("utf8", $state) if ($model =~ m/16.001/);		
 	}
+	#DateTime
+	elsif ($code eq "dpt19")
+	{
+		$numval = $value;
+		my $time = hex (substr ($value, 6, 6));
+		my $date = hex (substr ($value, 0, 6));
+		my $secs  = ($time & 0x3F) >> 0;
+		my $mins  = ($time & 0x3F00) >> 8;
+		my $hours = ($time & 0x1F0000) >> 16;
+		my $day   = ($date & 0x1F) >> 0;
+		my $month = ($date & 0x0F00) >> 8;
+		my $year  = ($date & 0xFFFF0000) >> 16;		
+		
+		$year += 1900;
+		$state = sprintf("%02d.%02d.%04d_%02d:%02d:%02d", $day, $month, $year, $hours, $mins, $secs);	
+	}
 	#RGB-Code
 	elsif ($code eq "dpt232")
 	{
@@ -1687,16 +1758,16 @@ sub KNX_getCmdList ($$$)
 	<p>The current date and time can be sent to the bus by the following settings:</p>
 	<pre>
       define timedev KNX 0/0/7:dpt10
-      attr timedev webCmd now
+      attr timedev webCmd value now
       
       define datedev KNX 0/0/8:dpt11
-      attr datedev webCmd now
+      attr datedev webCmd value now
       
       # send every midnight the new date
-      define dateset at *00:00:00 set datedev now
+      define dateset at *00:00:00 set datedev value now
       
       # send every hour the current time
-      define timeset at +*01:00:00 set timedev now
+      define timeset at +*01:00:00 set timedev value now
 	</pre>	
   </ul>
  
@@ -1807,10 +1878,25 @@ sub KNX_getCmdList ($$$)
 	dpt1.001 on, off<br>
 	dpt1.002 true, false<br>
 	dpt1.003 enable, disable<br>	
+	dpt1.004 no ramp, ramp<br>
+	dpt1.005 no alarm, alarm<br>
+	dpt1.006 low, high<br>
+	dpt1.007 decrease, increase<br>
 	dpt1.008 up, down<br>
 	dpt1.009 open, closed<br>	
 	dpt1.010 start, stop<br>	
+	dpt1.011 inactive, active<br>
+	dpt1.012 not inverted, inverted<br>
+	dpt1.013 start/stop, ciclically<br>
+	dpt1.014 fixed, calculated<br>
+	dpt1.015 no action, reset<br>
+	dpt1.016 no action, acknowledge<br>
+	dpt1.017 trigger, trigger<br>
+	dpt1.018 not occupied, occupied<br>
 	dpt1.019 closed, open<br>
+	dpt1.020 logical or, logical and<br>
+	dpt1.021 scene A, scene B<br>
+	dpt1.022 move up/down, move and step mode<br>
 	dpt2 value on, value off, value forceOn, value forceOff<br>
 	dpt3 -100..+100<br>
 	dpt5 0..255<br>
@@ -1858,7 +1944,7 @@ sub KNX_getCmdList ($$$)
 	dpt16 String;<br>
 	dpt16.000 ASCII-String;<br>
 	dpt16.001 ISO-8859-1-String (Latin1);<br>
-	dpt232 RGB-Value RRGGBB<br>	
+	dpt232 RGB-Value RRGGBB<br>
   </ul>		
 </ul>
 =end html
@@ -1954,16 +2040,16 @@ sub KNX_getCmdList ($$$)
 	<p>Aktuelle Uhrzeit / Datum k&ouml;nnen wie folgt auf den Bus gelegt werden:</p>
 	<pre>
       define timedev KNX 0/0/7:dpt10
-      attr timedev webCmd now
+      attr timedev webCmd value now
       
       define datedev KNX 0/0/8:dpt11
-      attr datedev webCmd now
+      attr datedev webCmd value now
       
       # send every midnight the new date
-      define dateset at *00:00:00 set datedev now
+      define dateset at *00:00:00 set datedev value now
       
       # send every hour the current time
-      define timeset at +*01:00:00 set timedev now
+      define timeset at +*01:00:00 set timedev value now
 	</pre>	
   </ul>
  
@@ -2074,10 +2160,25 @@ sub KNX_getCmdList ($$$)
 	dpt1.001 on, off<br>
 	dpt1.002 true, false<br>
 	dpt1.003 enable, disable<br>	
+	dpt1.004 no ramp, ramp<br>
+	dpt1.005 no alarm, alarm<br>
+	dpt1.006 low, high<br>
+	dpt1.007 decrease, increase<br>
 	dpt1.008 up, down<br>
 	dpt1.009 open, closed<br>	
-	dpt1.010 start, stop<br>		
+	dpt1.010 start, stop<br>	
+	dpt1.011 inactive, active<br>
+	dpt1.012 not inverted, inverted<br>
+	dpt1.013 start/stop, ciclically<br>
+	dpt1.014 fixed, calculated<br>
+	dpt1.015 no action, reset<br>
+	dpt1.016 no action, acknowledge<br>
+	dpt1.017 trigger, trigger<br>
+	dpt1.018 not occupied, occupied<br>
 	dpt1.019 closed, open<br>
+	dpt1.020 logical or, logical and<br>
+	dpt1.021 scene A, scene B<br>
+	dpt1.022 move up/down, move and step mode<br>
 	dpt2 value on, value off, value forceOn, value forceOff<br>
 	dpt3 -100..+100<br>
 	dpt5 0..255<br>
@@ -2087,9 +2188,9 @@ sub KNX_getCmdList ($$$)
 	dpt6 -127..+127<br>
 	dpt6.001 0..100	%<br>
 	dpt7 0..65535<br>
-	dpt7.001 0..65535 <br>
+	dpt7.001 0..65535 s<br>
 	dpt7.005 0..65535 s<br>
-	dpt7.006 0..65535 m<br>
+	dpt7.005 0..65535 m<br>	
 	dpt7.012 0..65535 mA<br>	
 	dpt7.013 0..65535 lux<br>
 	dpt8 -32768..32768<br>
@@ -2100,9 +2201,9 @@ sub KNX_getCmdList ($$$)
 	dpt9.001 -670760.0..+670760.0 &deg;<br>
 	dpt9.004 -670760.0..+670760.0 lux<br>
 	dpt9.005 -670760.0..+670760.0 m/s<br>	
-	dpt9.006 -670760.0..+670760.0 Pa<br>
+	dpt9.006 -670760.0..+670760.0 Pa<br>	
 	dpt9.007 -670760.0..+670760.0 %<br>
-	dpt9.008 -670760.0..+670760.0 ppm<br>
+	dpt9.008 -670760.0..+670760.0 ppm<br>	
 	dpt9.009 -670760.0..+670760.0 m³/h<br>
 	dpt9.010 -670760.0..+670760.0 s<br>
 	dpt9.021 -670760.0..+670760.0 mA<br>	
@@ -2117,15 +2218,15 @@ sub KNX_getCmdList ($$$)
 	dpt13.010 -Inf..+Inf Wh<br>
 	dpt13.013 -Inf..+Inf kWh<br>
 	dpt14 -Inf.0..+Inf.0<br>
-	dpt14.019 -Inf.0..+Inf.0 A<br>	
+	dpt14.019 -Inf.0..+Inf.0 A<br>
 	dpt14.027 -Inf.0..+Inf.0 V<br>
 	dpt14.056 -Inf.0..+Inf.0 W<br>
 	dpt14.068 -Inf.0..+Inf.0 &degC;<br>
 	dpt14.076 -Inf.0..+Inf.0 m&sup3;<br>
 	dpt16 String;<br>
 	dpt16.000 ASCII-String;<br>
-	dpt16.001 ISO-8859-1-String (Latin1);<br>	
-	dpt232 RGB-Wert RRGGBB<br>	
+	dpt16.001 ISO-8859-1-String (Latin1);<br>
+	dpt232 RGB-Value RRGGBB<br>
   </ul>
 </ul>
 =end html_DE
