@@ -522,6 +522,7 @@ sub LaCrosseGateway_DeleteOwnSensorsReadings($) {
   delete $hash->{READINGS}{"temperature"};
   delete $hash->{READINGS}{"humidity"};
   delete $hash->{READINGS}{"pressure"};
+  delete $hash->{READINGS}{"iaq"};
 }
 
 #=======================================================================================
@@ -536,6 +537,7 @@ sub LaCrosseGateway_HandleOwnSensors($$) {
   my $temperature = undef;
   my $humidity = undef;
   my $pressure = undef;
+  my $iaq = undef;
 
   if($bytes[2] != 0xFF) {
     $temperature = ($bytes[2]*256 + $bytes[3] - 1000)/10;
@@ -549,7 +551,13 @@ sub LaCrosseGateway_HandleOwnSensors($$) {
 
   if(@bytes > 15 && $bytes[14] != 0xFF) {
     $pressure = $bytes[14] * 256 + $bytes[15];
+    $pressure /= 10.0 if $pressure > 5000;
     readingsBulkUpdate($hash, "pressure", $pressure);
+  }
+  
+  if(@bytes > 17 && $bytes[16] != 0xFF) {
+    $iaq = $bytes[16] * 256 + $bytes[17];
+    readingsBulkUpdate($hash, "iaq", $iaq);
   }
 
   readingsEndUpdate($hash, 1);

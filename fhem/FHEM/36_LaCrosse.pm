@@ -168,7 +168,7 @@ sub LaCrosse_Parse($$) {
   my ($hash, $msg) = @_;
   my $name = $hash->{NAME};
 
-  my( @bytes, $addr, $typeNumber, $typeName, $battery_new, $battery_low, $error, $type, $channel, $temperature, $humidity, $windDirection, $windSpeed, $windGust, $rain, $pressure );
+  my( @bytes, $addr, $typeNumber, $typeName, $battery_new, $battery_low, $error, $type, $channel, $temperature, $humidity, $windDirection, $windSpeed, $windGust, $rain, $pressure, $iaq );
   $temperature = 0xFFFF;
   $humidity = 0xFF;
   $windDirection = 0xFFFF;
@@ -176,6 +176,7 @@ sub LaCrosse_Parse($$) {
   $windGust = 0xFFFF;
   $rain = 0xFFFF;
   $pressure = 0xFFFF;
+  $iaq = 0xFFFF;
   $error = 0;
 
   if( $msg =~ m/^OK 9/ ) {
@@ -313,6 +314,11 @@ sub LaCrosse_Parse($$) {
 
     if(@bytes > 15 && $bytes[14] != 0xFF) {
       $pressure = $bytes[14] * 256 + $bytes[15];
+      $pressure /= 10.0 if $pressure > 5000;
+    }
+  
+    if(@bytes > 17 && $bytes[16] != 0xFF) {
+      $iaq = $bytes[16] * 256 + $bytes[17];
     }
 
   }
@@ -529,6 +535,10 @@ sub LaCrosse_Parse($$) {
 
     if ($typeNumber > 0 && $pressure != 0xFFFF) {
       readingsBulkUpdate($rhash, "pressure", $pressure );
+    }
+  
+    if ($typeNumber > 0 && $iaq != 0xFFFF) {
+      readingsBulkUpdate($rhash, "iaq", $iaq );
     }
 
     readingsEndUpdate($rhash,1);
