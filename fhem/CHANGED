@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     76_msgDialog: introducing new module to define dialogs for instant
+                           messaging via TelegramBot, Jabber and yowsub
   - feature: 93_DbLog: V2.22.11, Attribute DbLogType expanded by SampleFill
   - feature: 93_DbRep: V5.7.1, commands tableCurrentPurge, tableCurrentFillup
   - feature: 98_DOIFtools: add getter modelColorGradient, returns a table of
