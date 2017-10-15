@@ -181,19 +181,23 @@ my %zwave_class = (
     set   => { tmOff       => "0100",
                tmHeating   => "0101",
                tmCooling   => "0102",
-               tmFan       => "0106",
                tmAuto      => "0103",
+               tmFan       => "0106",
                tmEnergySaveHeating => "010b",
+               tmFullPower => "010f",
                tmManual    => "011f" },
     get   => { thermostatMode => "02" },
     parse => { "03400300"  => "thermostatMode:off",
                "03400301"  => "thermostatMode:heating",
                "03400302"  => "thermostatMode:cooling",
+               "03400303"  => "thermostatMode:auto",
                "03400306"  => "thermostatMode:fanOnly",
                "0340030b"  => "thermostatMode:energySaveHeating",
+               "0340030f"  => "thermostatMode:fullPower",
                "0340031f"  => "thermostatMode:manual",
                "03400100"  => "thermostatMode:setTmOff",
                "03400101"  => "thermostatMode:setTmHeating",
+               "03400103"  => "thermostatMode:auto",
                "0340010b"  => "thermostatMode:setTmEnergySaveHeating",
                "0340011f"  => "thermostatMode:setTmManual",
                } } ,
@@ -586,6 +590,9 @@ my %zwave_classVersion = (
   alarmWithType               => { min => 2 },
   alarmWithTypeEvent          => { min => 3 },
   alarmEventSupported         => { min => 3 },
+  tmEnergySaveHeating         => { min => 2 },
+  tmFullPower                 => { min => 3 },
+  tmManual                    => { min => 3 },
 );
 
 my %zwave_cmdArgs = (
@@ -5641,12 +5648,16 @@ s2Hex($)
 
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>tmOff</li>
-  <li>tmEnergySaveHeating</li>
   <li>tmHeating</li>
+  <li>tmCooling</li>
+  <li>tmAuto</li>
+  <li>tmFan</li>
+  <li>V2:</li>
+  <li>tmEnergySaveHeating</li>
+  <li>V3:</li>
+  <li>tmFullPower</li>
   <li>tmManual<br>
-    set the thermostat mode to off, heating but saving energy, heating or
-    manual.
-    </li>
+    set the thermostat mode.</li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>setpointHeating value<br>
@@ -6598,7 +6609,7 @@ s2Hex($)
                 fanrightLeftCirc | upDownCirc | quietCirc ]</li>
 
   <br><br><b>Class THERMOSTAT_MODE</b>
-  <li>thermostatMode:[ off | cooling | heating | fanOnly | 
+  <li>thermostatMode:[ off | cooling | heating | fanOnly | auto | 
                        energySaveHeating | manual | setTmOff | setTmHeating | 
                        setTmEnergySaveHeating | setTmManual ]</li>
   
