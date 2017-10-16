@@ -32,7 +32,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-my $version = "0.9.3";
+my $version = "0.9.4";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -60,11 +60,10 @@ sub WUup_Initialize($) {
       . "disabledForIntervals "
       . "interval "
       . "unit_windspeed:km/h,m/s "
-      . "wuwinddir wuwindspeedmph wuwindgustmph wuwindgustdir wuwinddir_avg2m  "
-      . "wuwinddir_avg2m wuwindgustmph_10m wuwindgustdir_10m wuhumidity "
-      . "wusoilmoisture wudewptf wutempf wurainin wudailyrainin wubaromin "
-      . "wusoiltempf wusolarradiation wuUV wuwindspdmph_avg2m wuwinddir_avg2m "
-      . "wuwindgustmph_10m windgustdir_10m "
+      . "wubaromin wudailyrainin wudewptf wuhumidity wurainin wusoilmoisture "
+      . "wusoiltempf wusolarradiation wutempf wuUV wuwinddir wuwinddir_avg2m "
+      . "wuwindgustdir wuwindgustdir_10m wuwindgustmph wuwindgustmph_10m "
+      . "wuwindspdmph_avg2m wuwindspeedmph "
       . $readingFnAttributes;
     $hash->{VERSION} = $version;
 }
@@ -299,8 +298,8 @@ sub WUup_receive($) {
     }
     elsif ( $data ne "" ) {
         Log3 $name, 4, "WUup ($name) - server response: $data";
-        readingsSingleUpdate( $hash, "state", "active", undef );
-        readingsSingleUpdate( $hash, "response", $data, undef );
+        readingsSingleUpdate( $hash, "state",    "active", undef );
+        readingsSingleUpdate( $hash, "response", $data,    undef );
     }
 }
 
@@ -324,9 +323,10 @@ sub WUup_receive($) {
 #            converted units rounded to 4 decimal places
 # 2017-03-16 implemented non-blocking mode
 # 2017-08-16 integrated RapidFire mode (thanks to Scooty66)
-# 2017-10-10 added windspdmph_avg2m, winddir_avg2m, windgustmph_10m, 
+# 2017-10-10 added windspdmph_avg2m, winddir_avg2m, windgustmph_10m,
 #            windgustdir_10m (thanks to Aeroschmelz for reminding me)
 #            timeout raised to 6s, fixed state error (thanks to mumpitzstuff)
+# 2017-10-16 fixed attributes
 #
 ################################################################################
 
