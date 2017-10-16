@@ -162,6 +162,7 @@ sub HMUARTLGW_Initialize($)
 	                   "qLen " .
 	                   "logIDs ".
 	                   "dummy:1 ".
+	                   "loadEvents:0,1 ".
 	                   $readingFnAttributes;
 }
 
@@ -350,7 +351,7 @@ sub HMUARTLGW_Rename($$)
 
 	if (defined($hash->{Helper}{Initialized})) {
 		RemoveInternalTimer("HMUARTLGW_CheckCredits:${old_name}");
-		InternalTimer(gettimeofday()+1, "HMUARTLGW_CheckCredits", "HMUARTLGW_CheckCredits:${name}", 1);
+		InternalTimer(gettimeofday()+1, "HMUARTLGW_CheckCredits", "HMUARTLGW_CheckCredits:${name}", 0);
 	}
 
 	if ($hash->{hmPair}) {
@@ -539,7 +540,7 @@ sub HMUARTLGW_CheckCredits($)
 		$next = 1;
 	}
 	RemoveInternalTimer("HMUARTLGW_CheckCredits:$name");
-	InternalTimer(gettimeofday()+$next, "HMUARTLGW_CheckCredits", "HMUARTLGW_CheckCredits:$name", 1);
+	InternalTimer(gettimeofday()+$next, "HMUARTLGW_CheckCredits", "HMUARTLGW_CheckCredits:$name", 0);
 }
 
 sub HMUARTLGW_SendPendingCmd($)
@@ -1029,7 +1030,7 @@ sub HMUARTLGW_GetSetParameters($;$$)
 
 		#start credit checker
 		RemoveInternalTimer("HMUARTLGW_CheckCredits:$name");
-		InternalTimer(gettimeofday()+1, "HMUARTLGW_CheckCredits", "HMUARTLGW_CheckCredits:$name", 1);
+		InternalTimer(gettimeofday()+1, "HMUARTLGW_CheckCredits", "HMUARTLGW_CheckCredits:$name", 0);
 
 		$hash->{Helper}{Initialized} = 1;
 		HMUARTLGW_updateCondition($hash);
@@ -1725,7 +1726,7 @@ sub HMUARTLGW_CheckCmdResp($)
 		$hash->{Helper}{CreditFailed}++;
 		$hash->{DevState} = HMUARTLGW_STATE_RUNNING;
 		RemoveInternalTimer("HMUARTLGW_CheckCredits:$name");
-		InternalTimer(gettimeofday()+1, "HMUARTLGW_CheckCredits", "HMUARTLGW_CheckCredits:$name", 1);
+		InternalTimer(gettimeofday()+1, "HMUARTLGW_CheckCredits", "HMUARTLGW_CheckCredits:$name", 0);
 	} elsif ($hash->{DevState} != HMUARTLGW_STATE_RUNNING) {
 		if ((!defined($hash->{Helper}{AckPending}{$hash->{CNT}}{frame})) ||
 		    (defined($hash->{Helper}{AckPending}{$hash->{CNT}}{resend}) &&
@@ -1787,7 +1788,7 @@ sub HMUARTLGW_Set($@)
 		$arg = 60 if(!$arg || $arg !~ m/^\d+$/);
 		HMUARTLGW_RemoveHMPair("hmPairForSec:$name");
 		$hash->{hmPair} = 1;
-		InternalTimer(gettimeofday()+$arg, "HMUARTLGW_RemoveHMPair", "hmPairForSec:$name", 1);
+		InternalTimer(gettimeofday()+$arg, "HMUARTLGW_RemoveHMPair", "hmPairForSec:$name", 0);
 		Log3($hash, 3, "HMUARTLGW ${name} entered pairing-mode");
 	} elsif ($cmd eq "hmPairSerial") {
 		return "Usage: set $name hmPairSerial <10-character-serialnumber>"
@@ -1801,7 +1802,7 @@ sub HMUARTLGW_Set($@)
 		HMUARTLGW_RemoveHMPair("hmPairForSec:$name");
 		$hash->{hmPair} = 1;
 		$hash->{hmPairSerial} = $arg;
-		InternalTimer(gettimeofday()+20, "HMUARTLGW_RemoveHMPair", "hmPairForSec:".$name, 1);
+		InternalTimer(gettimeofday()+20, "HMUARTLGW_RemoveHMPair", "hmPairForSec:".$name, 0);
 	} elsif ($cmd eq "reopen") {
 		HMUARTLGW_Reopen($hash);
 	} elsif ($cmd eq "close") {
@@ -1881,7 +1882,6 @@ sub HMUARTLGW_Attr(@)
 		}
 		HMUARTLGW_writeAesKey($name) if ($init_done);
 	} elsif ($aName eq "dutyCycle") {
-		my $dutyCycle = 1;
 		if ($cmd eq "set") {
 			return "wrong syntax: dutyCycle must be 1 or 0"
 			    if ($aVal !~ m/^[01]$/);
@@ -1951,6 +1951,14 @@ sub HMUARTLGW_Attr(@)
 				DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", \&HMUARTLGW_Connect);
 			}
 		}
+	} elsif ($aName eq "loadEvents") {
+		if ($cmd eq "set") {
+			return "wrong syntax: loadEvents must be 1 or 0"
+			    if ($aVal !~ m/^[01]$/);
+			$attr{$name}{$aName} = $aVal;
+		} else {
+			delete $attr{$name}{$aName};
+		}
 	}
 
 	return $retVal;
@@ -2000,7 +2008,7 @@ sub HMUARTLGW_updateCondition($)
 	if (defined($hash->{msgLoadCurrent})) {
 		my $load = $hash->{msgLoadCurrent};
 
-		readingsSingleUpdate($hash, "load", $load, 0);
+		readingsSingleUpdate($hash, "load", $load, AttrVal($name, "loadEvents", 0));
 
 		$cond = "ok";
 		#FIXME: Dynamic levels
@@ -2522,6 +2530,12 @@ sub HMUARTLGW_getVerbLvl($$$$) {
         not be possible. In addition, the perl-module Crypt::Rijndael (which
         provides the AES cipher) must be installed.
         </li>
+    <li>loadEvents<br>
+        Enables logging of the wireless load (in percent of the allowed maximum
+        sending-time) of the interface.
+
+        Default: 0 (disabled)
+        </li>
     <li>logIDs<br>
         Enables selective logging of HMUARTLGW messages. A list of comma separated
         HMIds or HM device names/channel names can be entered which shall be logged.<br>
@@ -2664,6 +2678,12 @@ sub HMUARTLGW_getVerbLvl($$$$) {
         auf den richtigen Wert gesetzt werden, da ansonsten keine Kommunikation
         m&ouml;glich ist. Zus&auml;tzlich muss das Perl-Modul Crypt::Rijndael
         (stellt den AES-Algorithmus bereit) installiert sein.
+        </li>
+    <li>loadEvents<br>
+        Aktiviert die Erzeugung von Log-Nachrichten &uuml;ber die Funklast
+        des Interfaces (in Prozent der erlaubten Sendezeit).
+
+        Default: 0 (deaktiviert)
         </li>
     <li>logIDs<br>
         Aktiviert die gezielte Erzeugung von Log-Nachrichten. Der Parameter ist
