@@ -1495,21 +1495,21 @@ sub DOIFtools_Get($@)
   } elsif ($arg eq "linearColorGradient") {
       my ($sc,$ec,$min,$max,$step) = split(",",$value);
       if ($value && $sc =~ /[0-9A-F]{6}/ && $ec =~ /[0-9A-F]{6}/ && $min =~ /(-?\d+(\.\d+)?)/ &&  $max =~ /(-?\d+(\.\d+)?)/ && $step =~ /(-?\d+(\.\d+)?)/) {
-        $ret .= "<table>";
+        $ret .= "<br></pre><table>";
         $ret .= "<tr><td colspan=4 style='font-weight:bold;'>Color Table</td></tr>";
         $ret .= "<tr><td colspan=4><div>";
-        for (my $i=0;$i<=255;$i++) {
-          my $col = DOIFtoolsLinColorGrad($sc,$ec,0,255,$i);
-          $ret .= "<span style='background-color:$col;'>&#8202;&#8202;</span>";
+        for (my $i=0;$i<=127;$i++) {
+          my $col = DOIFtoolsLinColorGrad($sc,$ec,0,127,$i);
+          $ret .= "<span style='background-color:$col;'>&nbsp;</span>";
         }
         $ret .= "</div></td></tr>";
         $ret .= "<tr style='text-align:center;'><td> Value </td><td> Color Number </td><td> RGB values </td><td> Color</td> </tr>";
         for (my $i=$min;$i<=$max;$i+=$step) {
           my $col = DOIFtoolsLinColorGrad($sc,$ec,$min,$max,$i);
           $col =~ /^#?([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/;
-          $ret .= "<tr><td style='text-align:center;'>".sprintf("%.1f",$i)."</td><td style='text-align:center;'>$col</td><td style='text-align:center;'> ".hex($1).",".hex($2).",".hex($3)." </td><td style='background-color:$col;'>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</td></tr>";
+          $ret .= "<tr style='text-align:center;'><td>".sprintf("%.1f",$i)."</td><td>$col</td><td> ".hex($1).",".hex($2).",".hex($3)." </td><td style='background-color:$col;'>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</td></tr>";
         }
-        $ret .= "</table>\n";
+        $ret .= "</table><pre>";
         
        return $ret;
       } else {
@@ -1585,18 +1585,18 @@ Example specification: <code>0,50,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0
       Log3 $hash->{NAME},3,"modelColorGradient \n".$err; 
     return $err;
     }
-    $ret .= "<table>";
+    $ret .= "<br></pre><table>";
     $ret .= "<tr><td colspan=4 style='font-weight:bold;'>Color Table</td></tr>";
     $ret .= "<tr><td colspan=4><div>";
-    for (my $i=0;$i<=255;$i++) {
-      my $col = eval("\"".Color::pahColor($min,$mid,$max,$min+$i*($max-$min)/255,$colors)."\"");
+    for (my $i=0;$i<=127;$i++) {
+      my $col = eval("\"".Color::pahColor($min,$mid,$max,$min+$i*($max-$min)/127,$colors)."\"");
       if ($@) {
         $err="Error eval 1567: $@\n".$err_ret;
         Log3 $hash->{NAME},3,"modelColorGradient \n".$err; 
         return $err;
       }
       $col = "#".substr($col,0,6);
-      $ret .= "<span style='background-color:$col;'>&#8202;&#8202;</span>";
+      $ret .= "<span style='background-color:$col;'>&nbsp;</span>";
     }
     $ret .= "</div></td></tr>";
     $ret .= "<tr style='text-align:center;'><td> Value </td><td> Color Number </td><td> RGB values </td><td> Color</td> </tr>";
@@ -1609,9 +1609,9 @@ Example specification: <code>0,50,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0
       }
       $col = "#".substr($col,0,6);
       $col =~ /^#?([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/;
-      $ret .= "<tr><td style='text-align:center;'>".sprintf("%.1f",$i)."</td><td style='text-align:center;'>$col</td><td style='text-align:center;'> ".hex($1).",".hex($2).",".hex($3)." </td><td style='background-color:$col;'>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</td></tr>";
+      $ret .= "<tr style='text-align:center;'><td>".sprintf("%.1f",$i)."</td><td>$col</td><td> ".hex($1).",".hex($2).",".hex($3)." </td><td style='background-color:$col;'>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</td></tr>";
     }
-    $ret .= "</table>\n";
+    $ret .= "</table><pre>";
     
     return $ret;
   } else {
