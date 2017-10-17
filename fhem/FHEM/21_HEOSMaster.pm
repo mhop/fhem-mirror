@@ -65,7 +65,7 @@ eval "use Encode;1" or $missingModul .= "Encode ";
 
 
 
-my $version = "1.0.1";
+my $version = "1.0.2";
 
 my %heosCmds = (
     'enableChangeEvents'        => 'system/register_for_change_events?enable=',
@@ -214,7 +214,7 @@ sub HEOSMaster_Define($$) {
         InternalTimer( gettimeofday()+15, 'HEOSMaster_FirstRun', $hash, 0 ) if( ($hash->{HOST}) );
     }
     
-    $modules{HEOSPlayer}{defptr}{$host} = $hash;
+    $modules{HEOSMaster}{defptr}{$host} = $hash;
     return undef;
 }
 

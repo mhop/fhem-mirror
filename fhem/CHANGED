@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  21_HEOSMaster: fix typo in define Fn
   - feature: 93_DbRep: V5.8.0, can set table as flexible argument for command
                                countEntries and fetchrows
   - new:     76_msgDialog: introducing new module to define dialogs for instant
