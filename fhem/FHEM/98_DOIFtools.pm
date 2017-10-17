@@ -1513,56 +1513,63 @@ sub DOIFtools_Get($@)
         
        return $ret;
       } else {
-        $ret = $DE ? "Falsche Eingabe:$value\nSyntax:
-<code>&lt;Startfarbnummer&gt;,&lt;Endfarbnummer&gt;,&lt;Minimalwert&gt;,&lt;Maximalwert&gt;,&lt;Schrittweite&gt;</code>
-
-&lt;Startfarbnummer&gt;, ist eine HTML-Farbnummer, Beispiel: #0000FF für Blau.
-&lt;Endfarbnummer&gt;, ist eine HTML-Farbnummer, Beispiel: #FF0000 für Rot.
-&lt;Minimalwert&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.
-&lt;Maximalwert&gt;, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.
-&lt;Schrittweite&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 1.
-
+        $ret = $DE ? "<br></pre>
+Falsche Eingabe: <code>$value</code><br>
+Syntax: <code>&lt;Startfarbnummer&gt;,&lt;Endfarbnummer&gt;,&lt;Minimalwert&gt;,&lt;Maximalwert&gt;,&lt;Schrittweite&gt;</code><br>
+<ul>
+<li><code>&lt;Startfarbnummer&gt;</code>, ist eine HTML-Farbnummer, Beispiel: #0000FF für Blau.</li>
+<li><code>&lt;Endfarbnummer&gt;</code>, ist eine HTML-Farbnummer, Beispiel: #FF0000 für Rot.</li>
+<li><code>&lt;Minimalwert&gt;</code>, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.</li>
+<li><code>&lt;Maximalwert&gt;</code>, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.</li>
+<li><code>&lt;Schrittweite&gt;</code>, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 1.</li>
+</ul>
 Beispielangabe: <code>#0000FF,#FF0000,7,30,1</code>
-":
-"Wrong input:$value\nSyntax:
-<code>&lt;start color number&gt;,&lt;end color number&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;</code>
-
-&lt;start color number&gt;, a HTML color number, example: #0000FF for blue.
-&lt;end color number&gt;, a HTML color number, example: #FF0000 for red.
-&lt;minimal value&gt;, the start color number will be scaled to it, example: 7.
-&lt;maximal value&gt;, the end color number will be scaled to it, example: 30.
-&lt;step width&gt;, for each step a color number will be generated, example: 1.
-
+<pre>":"<br></pre>
+Wrong input: <code>$value</code><br>
+Syntax: <code>&lt;start color number&gt;,&lt;end color number&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;</code><br>
+<ul>
+<li><code>&lt;start color number&gt;</code>, a HTML color number, example: #0000FF for blue.</li>
+<li><code>&lt;end color number&gt;</code>, a HTML color number, example: #FF0000 for red.</li>
+<li><code>&lt;minimal value&gt;</code>, the start color number will be scaled to it, example: 7.</li>
+<li><code>&lt;maximal value&gt;</code>, the end color number will be scaled to it, example: 30.</li>
+<li><code>&lt;step width&gt;</code>, for each step a color number will be generated, example: 1.</li>
+</ul>
 Example specification: <code>#0000FF,#FF0000,7,30,1</code>
-";
+<pre>";
         return $ret
       }
   } elsif ($arg eq "modelColorGradient") {
-    my $err_ret = $DE ? "Falsche Eingabe:$value\nSyntax:
-<code>&lt;Minimalwert&gt;,&lt;Zwischenwert&gt;,&lt;Maximalwert&gt;,&lt;Schrittweite&gt;&lt;Farbmodel&gt;</code>
-
-&lt;Minimalwert&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.
-&lt;Zwischenwert&gt;, der Fixpunkt zwischen Start- u. Endwert, Beispiel: 20.
-&lt;Maximalwert&gt;, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.
-&lt;Schrittweite&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 1.
-&lt;Farbmodel&gt;, die Angabe eines vordefinierten Modells &lt;0|1|2&gt; oder 
-  fünf RGB-Werte als Array [r1,g1,b1,r2,g2,b2,r3,g3,b3,r4,g4,b4,r5,g5,b5] für ein eigenes Model.
-
-Beispielangabe: <code>0,50,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0,127,255]</code>
-          oder: <code>7,20,30,1,0</code>
-":
-"Wrong input:$value\nSyntax:
-<code>&lt;minimal value&gt;,&lt;middle value&gt;,&lt;maximal value&gt;,&lt;step width&gt;,&lt;color model&gt;</code>
-
-&lt;minimal value&gt;, the start color number will be scaled to it, example: 7.
-&lt;middle value&gt;, a fix point between min and max, example: 20.
-&lt;maximal value&gt;, the end color number will be scaled to it, example: 30.
-&lt;step width&gt;, for each step a color number will be generated, example: 1.
-&lt;color model&gt;, a predefined number &lt;0|1|2&gt; or an array of five RGB values,<code>[r1,g1,b1,r2,g2,b2,r3,g3,b3,r4,g4,b4,r5,g5,b5]</code>
-
-Example specification: <code>0,50,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0,127,255]</code>
-                   or: <code>7,20,30,1,0</code>
-";
+    my $err_ret = $DE ? "<br></pre>
+Falsche Eingabe: <code>$value</code><br>
+Syntax: <code>&lt;Minimalwert&gt;,&lt;Zwischenwert&gt;,&lt;Maximalwert&gt;,&lt;Schrittweite&gt;&lt;Farbmodel&gt;</code><br>
+<ul>
+<li><code>&lt;Minimalwert&gt;</code>, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.</li>
+<li><code>&lt;Zwischenwert&gt;</code>, der Fixpunkt zwischen Start- u. Endwert, Beispiel: 20.</li>
+<li><code>&lt;Maximalwert&gt;</code>, der Maximalwert auf den die Endfarbnummer skaliert wird, Beispiel: 30.</li>
+<li><code>&lt;Schrittweite&gt;</code>, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 1.</li>
+<li><code>&lt;Farbmodel&gt;</code>, die Angabe eines vordefinierten Modells <code>&lt;0|1|2&gt;</code> oder fünf RGB-Werte <br>als Array <code>[r1,g1,b1,r2,g2,b2,r3,g3,b3,r4,g4,b4,r5,g5,b5]</code> für ein eigenes Model.</li>
+</ul>
+Beispiele:<br>
+<code>30,60,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0,127,255]</code>, z.B. Luftfeuchte<br>
+<code>7,20,30,1,[0,0,255,63,0,192,127,0,127,192,0,63,255,0,0]</code>, z.B. Temperatur<br>
+<code>0,2.6,5.2,0.0625,[192,0,0,208,63,0,224,127,0,240,192,0,255,255,0]</code>, z.B. Exponent der Helligkeit<br>
+<code>7,20,30,1,0</code>
+<pre>":"<br></pre>
+Wrong input: <code>$value</code><br>
+Syntax: <code>&lt;minimal value&gt;,&lt;middle value&gt;,&lt;maximal value&gt;,&lt;step width&gt;,&lt;color model&gt;</code><br>
+<ul>
+<li><code>&lt;minimal value&gt;</code>, the start color number will be scaled to it, example: 7.</li>
+<li><code>&lt;middle value&gt;</code>, a fix point between min and max, example: 20.</li>
+<li><code>&lt;maximal value&gt;</code>, the end color number will be scaled to it, example: 30.</li>
+<li><code>&lt;step width&gt;</code>, for each step a color number will be generated, example: 1.</li>
+<li><code>&lt;color model&gt;</code>, a predefined number &lt;0|1|2&gt; or an array of five RGB values, <br><code>[r1,g1,b1,r2,g2,b2,r3,g3,b3,r4,g4,b4,r5,g5,b5]</code></li>
+</ul>
+Example specifications:<br>
+<code>0,50,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0,127,255]</code> e.g. humidity<br>
+<code>7,20,30,1,[0,0,255,63,0,192,127,0,127,192,0,63,255,0,0]</code>, e.g. temperature<br>
+<code>0,2.6,5.2,0.0625,[192,0,0,208,63,0,224,127,0,240,192,0,255,255,0]</code>, e.g. brightness exponent<br>
+<code>7,20,30,1,0</code>
+<pre>";
     return $err_ret if (!$value);
     my ($min,$mid,$max,$step,$colors);
     my $err = "";
