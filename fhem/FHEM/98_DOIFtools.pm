@@ -706,6 +706,29 @@ sub DOIFtoolsLinColorGrad {
   return $prefix.join("",@rgb);
 }
 
+sub DOIFtoolsHsvColorGrad {
+  my ($cur,$min,$max,$min_s,$max_s,$s,$v)=@_;
+  
+  my $m=($max_s-$min_s)/($max-$min);
+  my $n=$min_s-$min*$m;
+  if ($cur>$max) {
+   $cur=$max;
+  } elsif ($cur<$min) {
+    $cur=$min;
+  }
+    
+  my $h=$cur*$m+$n;
+  $h /=360;
+  $s /=100;
+  $v /=100;  
+  
+  my($r,$g,$b)=Color::hsv2rgb ($h,$s,$v);
+  $r *= 255;
+  $g *= 255;
+  $b *= 255;
+  return sprintf("#%02X%02X%02X", $r+0.5, $g+0.5, $b+0.5);
+}
+
 sub DOIFtoolsRg
 {
   my ($hash,$arg) = @_;
@@ -1538,6 +1561,56 @@ Example specification: <code>#0000FF,#FF0000,7,30,1</code>
 <pre>";
         return $ret
       }
+  } elsif ($arg eq "hsvColorGradient") {
+      my ($min_s,$max_s,$min,$max,$step,$s,$v)=split(",",$value);
+      if ($value && $s >= 0 && $s <= 100 && $v >= 0 && $v <= 100  && $min_s >= 0 && $min_s <= 360 && $max_s >= 0 && $max_s <= 360) {
+        $ret .= "<br></pre><table>";
+        $ret .= "<tr><td colspan=4 style='font-weight:bold;'>Color Table</td></tr>";
+        $ret .= "<tr><td colspan=4><div>";
+        for (my $i=0;$i<=127;$i++) {
+          my $col = DOIFtoolsHsvColorGrad($i,0,127,$min_s,$max_s,$s,$v);
+          $ret .= "<span style='background-color:$col;'>&nbsp;</span>";
+        }
+        $ret .= "</div></td></tr>";
+        $ret .= "<tr style='text-align:center;'><td> Value </td><td> Color Number </td><td> RGB values </td><td> Color</td> </tr>";
+        for (my $i=$min;$i<=$max;$i+=$step) {
+          my $col = DOIFtoolsHsvColorGrad($i,$min,$max,$min_s,$max_s,$s,$v);
+          $col =~ /^#?([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/;
+          $ret .= "<tr style='text-align:center;'><td>".sprintf("%.1f",$i)."</td><td>$col</td><td> ".hex($1).",".hex($2).",".hex($3)." </td><td style='background-color:$col;'>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</td></tr>";
+        }
+        $ret .= "</table><pre>";
+        
+       return $ret;
+      } else {
+        $ret = $DE ? "<br></pre>
+Falsche Eingabe: <code>$value</code><br>
+Syntax: <code>&lt;HUE-Startwert&gt;,&lt;HUE-Endwert&gt;,&lt;Minimalwert&gt;,&lt;Maximalwert&gt;,&lt;Schrittweite&gt;,&lt;Sättigung&gt;,&lt;Hellwert&gt;</code><br>
+<ul>
+<li><code>&lt;HUE-Startwert&gt;</code>, ist ein HUE-Wert <code>0-360</code>, Beispiel: 240 für Blau.</li>
+<li><code>&lt;HUE-Endwert&gt;</code>, ist ein HUE-Wert <code>0-360</code>, Beispiel: 360 für Rot.</li>
+<li><code>&lt;Minimalwert&gt;</code>, der Minimalwert auf den der HUE-Startwert skaliert wird, Beispiel: 7.</li>
+<li><code>&lt;Maximalwert&gt;</code>, der Maximalwert auf den der HUE-Endwert skaliert wird, Beispiel: 30.</li>
+<li><code>&lt;Schrittweite&gt;</code>, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 1.</li>
+<li><code>&lt;Sättigung&gt;</code>, die verwendete Farbsätigung <code>0-100</code>, Beispiel: 80.</li>
+<li><code>&lt;Hellwert&gt;</code>, Angabe der Helligkeit <code>0-100</code>, Beispiel: 80.</li>
+</ul>
+Beispielangabe: <code>240,360,7,30,1,80,80</code>
+<pre>":"<br></pre>
+Wrong input: <code>$value</code><br>
+Syntax: <code>&lt;HUE start value&gt;,&lt;HUE end value&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;,&lt;saturation&gt;,&lt;lightness&gt;</code><br>
+<ul>
+<li><code>&lt;HUE start value&gt;</code>, a HUE value <code>0-360</code>, example: 240 for blue.</li>
+<li><code>&lt;HUE end value&gt;</code>, a HUE value <code>0-360</code>, example: 360 for red.</li>
+<li><code>&lt;minimal value&gt;</code>, the HUE start value will be scaled to it, example: 7.</li>
+<li><code>&lt;maximal value&gt;</code>, the HUE end value will be scaled to it, example: 30.</li>
+<li><code>&lt;step width&gt;</code>, for each step a color number will be generated, example: 1.</li>
+<li><code>&lt;saturation&gt;</code>, a value of saturation <code>0-100</code>, example: 80.</li>
+<li><code>&lt;lightness&gt;</code>, a value of lightness <code>0-100</code>, example: 80.</li>
+</ul>
+Example specification: <code>240,360,7,30,1,80,80</code>
+<pre>";
+        return $ret
+      }
   } elsif ($arg eq "modelColorGradient") {
     my $err_ret = $DE ? "<br></pre>
 Falsche Eingabe: <code>$value</code><br>
@@ -1623,7 +1696,7 @@ Example specifications:<br>
     return $ret;
   } else {
       my $hardcoded = "checkDOIF:noArg statisticsReport:noArg runningTimerInDOIF:noArg";
-      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL SetAttrIconForDOIF:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"")." linearColorGradient:textField modelColorGradient:textField";
+      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL SetAttrIconForDOIF:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"")." linearColorGradient:textField modelColorGradient:textField hsvColorGradient:textField";
   } 
 
   return $ret;
