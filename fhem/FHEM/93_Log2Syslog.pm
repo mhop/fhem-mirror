@@ -653,7 +653,7 @@ return;
 <ul>
   Send FHEM system log entries and/or FHEM events to an external syslog server. <br>
   The syslog protocol has been implemented according the specifications of <a href="https://tools.ietf.org/html/rfc5424"> RFC5424 (IETF)</a>,
-  <a href="https://tools.ietf.org/html/rfc3164"> RFC3164 (BSD)</a> and the TLS transport protocol according the 
+  <a href="https://tools.ietf.org/html/rfc3164"> RFC3164 (BSD)</a> and the TLS transport protocol according to 
   <a href="https://tools.ietf.org/pdf/rfc5425.pdf"> RFC5425</a>. <br>	
   <br>
   
@@ -692,7 +692,7 @@ return;
     <ul>  
     <table>  
     <colgroup> <col width=40%> <col width=60%> </colgroup>
-	  <tr><td> <b>verbose-Level</b> </td><td> <b>Schweregrad in Syslog</b> </td></tr>
+	  <tr><td> <b>verbose-Level</b> </td><td> <b>Severity in Syslog</b> </td></tr>
       <tr><td> 0    </td><td> Critical </td></tr>
       <tr><td> 1    </td><td> Error </td></tr>
       <tr><td> 2    </td><td> Warning </td></tr>
