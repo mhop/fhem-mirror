@@ -1162,6 +1162,7 @@ $culHmRegModel{"HM-LC-Dim1T-CV"}        =
 $culHmRegModel{"HM-LC-Dim1T-FM"}        = 
 $culHmRegModel{"HM-LC-Dim2T-SM"}        = 
 $culHmRegModel{"HM-LC-Dim1T-Pl-2"}      = 
+$culHmRegModel{"HM-LC-Dim1T-Pl-3"}      = 
 $culHmRegModel{"HM-LC-Dim1T-FM-LF"}     = 
 $culHmRegModel{"Schueco-263-134"}       = $culHmRegModel{"HM-LC-Dim1T-Pl"};
 $culHmRegModel{"ASH550I"}               = 
