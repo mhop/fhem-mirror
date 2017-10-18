@@ -76,7 +76,7 @@ install:
 dist:
 	mkdir .f
 	cp -r fhem.pl fhem.cfg CHANGED HISTORY Makefile README.SVN\
-        MAINTAINER.txt demolog fhem.cfg.demo README_DEMO.txt\
+		MAINTAINER.txt demolog fhem.cfg.demo README_DEMO.txt\
 		FHEM configDB.pm contrib docs www .f
 	mkdir .f/log
 	touch .f/log/empty_file.txt
@@ -99,8 +99,8 @@ deb:
 	rm -rf .f
 	rm -rf $(DESTDIR)
 	make ROOT=`pwd`/.f install
-	cp MAINTAINER.txt .f
-	cp -r contrib/DEBIAN .f/opt/fhem
+	cp MAINTAINER.txt .f/opt/fhem
+	cp -r contrib/DEBIAN .f
 	rm -rf .f/$(MODDIR)/contrib/FB7*/var
 	rm -rf .f/$(MODDIR)/contrib/FB7*/*.image
 	rm -rf .f/$(MODDIR)/contrib/FB7*/*.zip
