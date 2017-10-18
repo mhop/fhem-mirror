@@ -1905,6 +1905,19 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <code>get DOIFtools modelColorGradient 7,20,30,1,0</code><br>
         <code>get DOIFtools modelColorGradient 0,50,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0,127,255]</code><br>
         <br>
+        <code>get &lt;name&gt; hsvColorGradient &lt;HUE start value&gt;,&lt;HUE end value&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;,&lt;saturation&gt;,&lt;lightness&gt;</code><br>
+        <b>hsvColorGradient</b> erzeugt eine Tabelle über HUE-Werte abgestufte Farbnummern und RGB-Werten.<br>
+        &lt;Hue start value&gt;, der HUE-Startwert, Beispiel: 240 für Blau.<br>
+        &lt;HUE end value&gt;, der HUE-Endwert, Beispiel: 360 für Rot.<br>
+        &lt;minimal value&gt;, der Minimalwert auf den der HUE-Startwert skaliert wird, Beispiel: 7.<br 20.<br>
+        &lt;maximal value&gt;, der Maximalwert auf den der HUE-Endwert skaliert wird, Beispiel: 30.<br>
+        &lt;step width&gt;, für jeden Schritt wird ein Farbwert erzeugt, Beispiel: 1.<br>
+        &lt;saturation&gt;, die Angabe eines Wertes für die Farbsättigung &lt;0-100&gt;, Beispiel 80.<br>
+        &lt;lightness&gt;, die Angabe eines Wertes für die Helligkeit &lt;0-100&gt;, Beispiel 80.<br>
+        <br>
+        Beispiele:<br>
+        <code>get DOIFtools hsvColorGradient 240,360,7,30,1,80,80</code><br>
+        <br>
         
     </ul>
 
