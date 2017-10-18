@@ -2083,10 +2083,10 @@ FW_textfieldv($$$$)
 {
   my ($n, $z, $class, $value) = @_;
   my $v;
-  $v=" value=\"$value\"" if(defined($value));
+  $v=" value='$value'" if(defined($value));
   return if($FW_hiddenroom{input});
-  my $s = "<input type=\"text\" name=\"$n\" class=\"$class\" ".
-                "autocapitalize=\"off\" size=\"$z\"$v/>";
+  my $s = "<input type='text' name='$n' class='$class' ".
+                "autocomplete='off' autocapitalize='off' size='$z'$v/>";
 
   return $s;
 }
