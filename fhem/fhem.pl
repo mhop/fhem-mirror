@@ -290,6 +290,7 @@ my @globalAttrList = qw(
   blockingCallMax
   commandref:modular,full
   configfile
+  dnsHostsFile
   dnsServer
   dupTimeout
   exclude_from_update

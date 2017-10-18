@@ -214,6 +214,24 @@ HttpUtils_gethostbyname($$$$)
         if($HU_dnsCache{$host} &&
            $HU_dnsCache{$host}{TS}+$HU_dnsCache{$host}{TTL} > gettimeofday());
 
+  my $dh = AttrVal("global", "dnsHostsFile", "undef");
+  if($dh) {
+    my $fh;
+    if(open($fh, $dh)) {
+      while(my $line = <$fh>) {
+        if($line =~ m/^([^# \t]+).*\b\Q$host\E\b/) {
+          if($1 =~ m/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/ &&        # IP-Address
+             $1<256 && $2<256 && $3<256 && $4<256) {
+            $fn->($hash, undef, pack("CCCC", $1, $2, $3, $4));
+            close($fh);
+            return;
+          }
+        }
+      }
+      close($fh);
+    }
+  }
+
   # Direct DNS Query via UDP
   my $c = IO::Socket::INET->new(Proto=>'udp', PeerAddr=>"$dnsServer:53");
   return $fn->($hash, "Cant create UDP socket:$!", undef) if(!$c);
