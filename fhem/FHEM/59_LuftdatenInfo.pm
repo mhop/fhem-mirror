@@ -580,10 +580,10 @@ sub LuftdatenInfo_statusRequest($) {
     <b>Define</b>
     <ul>
       <code>
-        define &lt;name&gt; LuftdanteInfo2 remote
+        define &lt;name&gt; LuftdatenInfo remote
           &lt;SENSORID1&gt; [&lt;SENSORID2&gt; ..]<br>
-        define &lt;name&gt; LuftdanteInfo2 local &lt;IP&gt;<br>
-        define &lt;name&gt; LuftdanteInfo2
+        define &lt;name&gt; LuftdatenInfo local &lt;IP&gt;<br>
+        define &lt;name&gt; LuftdatenInfo
           slave &lt;master-name&gt; &lt;sensor1 sensor2 ...&gt;
       </code><br>
       To query the data from the server, all affected SensorIDs must be
@@ -751,10 +751,10 @@ sub LuftdatenInfo_statusRequest($) {
     <b>Define</b>
     <ul>
       <code>
-        define &lt;name&gt; LuftdanteInfo2 remote
+        define &lt;name&gt; LuftdatenInfo remote
           &lt;SENSORID1&gt; [&lt;SENSORID2&gt; ..]<br>
-        define &lt;name&gt; LuftdanteInfo2 local &lt;IP&gt;<br>
-        define &lt;name&gt; LuftdanteInfo2
+        define &lt;name&gt; LuftdatenInfo local &lt;IP&gt;<br>
+        define &lt;name&gt; LuftdatenInfo
           slave &lt;master-name&gt; &lt;sensor1 sensor2 ...&gt;
       </code><br>
       F&uuml;r eine Abfrage der Daten vom Server müssem alle betroffenenen
