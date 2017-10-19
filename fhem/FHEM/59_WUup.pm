@@ -32,12 +32,13 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-my $version = "0.9.4";
+my $version = "0.9.5";
 
 # Declare functions
 sub WUup_Initialize($);
 sub WUup_Define($$$);
 sub WUup_Undef($$);
+sub WUup_Set($@);
 sub WUup_Attr(@);
 sub WUup_stateRequestTimer($);
 sub WUup_send($);
@@ -54,6 +55,7 @@ sub WUup_Initialize($) {
 
     $hash->{DefFn}   = "WUup_Define";
     $hash->{UndefFn} = "WUup_Undef";
+    $hash->{SetFn}   = "WUup_Set";
     $hash->{AttrFn}  = "WUup_Attr";
     $hash->{AttrList} =
         "disable:1 "
@@ -112,6 +114,19 @@ sub WUup_Undef($$) {
     my ( $hash, $arg ) = @_;
     RemoveInternalTimer($hash);
     return undef;
+}
+
+sub WUup_Set($@) {
+    my ( $hash, $name, $cmd, @args ) = @_;
+
+    return "\"set $name\" needs at least one argument" unless ( defined($cmd) );
+
+    if ( $cmd eq "update" ) {
+        WUup_stateRequestTimer($hash);
+    }
+    else {
+        return "Unknown argument $cmd, choose one of update:noArg";
+    }
 }
 
 sub WUup_Attr(@) {
@@ -327,6 +342,7 @@ sub WUup_receive($) {
 #            windgustdir_10m (thanks to Aeroschmelz for reminding me)
 #            timeout raised to 6s, fixed state error (thanks to mumpitzstuff)
 # 2017-10-16 fixed attributes
+# 2017-10-19 added set-command "update"
 #
 ################################################################################
 
@@ -357,8 +373,7 @@ sub WUup_receive($) {
     <a name="WUupset"></a>
     <b>Set-Commands</b><br/>
     <ul>
-        <br/>
-        - not implemented -<br/>
+        <li><b>update</b> - send data to Weather Underground</li>
     </ul>
     <br/><br/>
 
@@ -457,8 +472,7 @@ sub WUup_receive($) {
     <a name="WUupset"></a>
     <b>Set-Befehle</b><br/>
     <ul>
-        <br/>
-        - keine -<br/>
+        <li><b>update</b> - sende Daten an Weather Underground</li>
     </ul>
     <br/><br/>
 
