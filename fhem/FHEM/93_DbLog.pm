@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.12    19.10.2017       avoid illegible messages in "state"
 # 2.22.11    13.10.2017       DbLogType expanded by SampleFill, DbLog_sampleDataFn adapted to sort case insensitive, commandref revised
 # 2.22.10    04.10.2017       Encode::encode_utf8 of $error, DbLog_PushAsyncAborted adapted to use abortArg (Forum:77472)
 # 2.22.9     04.10.2017       added hint to SVG/DbRep in commandref
@@ -155,7 +156,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.11";
+my $DbLogVersion = "2.22.12";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -1453,12 +1454,11 @@ sub DbLog_Push(@) {
 		  if($tuples && $rows == $ceti) {
 		      Log3 $hash->{NAME}, 4, "DbLog $name -> $rows of $ceti events inserted into table history".($usepkh?" using PK on columns $pkh":"") if($vb4show);
 		  } else {
-		      $error = "Failed to insert events into history. See logfile";
 		      for my $tuple (0..$#row_array) {
 			      my $status = $tuple_status[$tuple];
 				  $status = 0 if($status eq "0E0");
 				  next if($status);         # $status ist "1" wenn insert ok
-				  Log3 $hash->{NAME}, 3, "DbLog $name -> Insert into history failed".($usepkh?" (possible PK violation) ":" ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Event: $event[$tuple]" if($vb4show);
+				  Log3 $hash->{NAME}, 3, "DbLog $name -> Insert into history rejected".($usepkh?" (possible PK violation) ":" ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Event: $event[$tuple]" if($vb4show);
 			  }
 		  }
       }
@@ -1523,12 +1523,11 @@ sub DbLog_Push(@) {
 			  if($tuples && $rows == $ceti) {
 		          Log3 $hash->{NAME}, 4, "DbLog $name -> $rows of $ceti events inserted into table current".($usepkc?" using PK on columns $pkc":"") if($vb4show);
 		      } else {
-		          $error = "Failed to insert events into history. See logfile";
 				  for my $tuple (0..$#device_cur) {
 			          my $status = $tuple_status[$tuple];
 				      $status = 0 if($status eq "0E0");
 				      next if($status);         # $status ist "1" wenn insert ok
-				      Log3 $hash->{NAME}, 3, "DbLog $name -> Failed to insert into current - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status" if($vb4show);
+				      Log3 $hash->{NAME}, 3, "DbLog $name -> Insert into current rejected - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status" if($vb4show);
 				  }
 		      }
           }
@@ -1859,12 +1858,11 @@ sub DbLog_PushAsync(@) {
 		  if($tuples && $rows == $ceti) {
 		      Log3 $hash->{NAME}, 5, "DbLog $name -> $rows of $ceti events inserted into table history".($usepkh?" using PK on columns $pkh":"");
 		  } else {
-		      $error = "Failed to insert events into history. See logfile";
 		      for my $tuple (0..$#row_array) {
 			      my $status = $tuple_status[$tuple];
 				  $status = 0 if($status eq "0E0");
 				  next if($status);         # $status ist "1" wenn insert ok
-				  Log3 $hash->{NAME}, 3, "DbLog $name -> Insert into history failed".($usepkh?" (possible PK violation) ":" ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Event: $event[$tuple]";
+				  Log3 $hash->{NAME}, 3, "DbLog $name -> Insert into history rejected".($usepkh?" (possible PK violation) ":" ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Event: $event[$tuple]";
 			  }
 		  }
       }
@@ -1930,12 +1928,11 @@ sub DbLog_PushAsync(@) {
 			  if($tuples && $rows == $ceti) {
 		          Log3 $hash->{NAME}, 5, "DbLog $name -> $rows of $ceti events inserted into table current".($usepkc?" using PK on columns $pkc":"");
 		      } else {
-		          $error = "Failed to insert events into history. See logfile";
 			      for my $tuple (0..$#device_cur) {
 			          my $status = $tuple_status[$tuple];
 			          $status = 0 if($status eq "0E0");
 			          next if($status);         # $status ist "1" wenn insert ok
-			          Log3 $hash->{NAME}, 2, "DbLog $name -> Failed to insert into current - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status";
+			          Log3 $hash->{NAME}, 2, "DbLog $name -> Insert into current rejected - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status";
 			      }
 		      }
           }
@@ -2022,7 +2019,7 @@ sub DbLog_PushAsyncDone ($) {
  }
  
   if($error) {
-      readingsSingleUpdate($hash, "state", Encode::encode_utf8($error), 1);
+      readingsSingleUpdate($hash, "state", $error, 1);
   } else {
       readingsSingleUpdate($hash, "state", $state, 0);
   } 
