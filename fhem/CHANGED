@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  46_TeslaPowerwall2AC: fix get data internal timer bug
   - bugfix:  93_Log2Syslog: typo in commandref
   - feature: global dnsHostsFile attribute added (Forum #78025)
   - feature: 98_DOIFtools: add getter hsvColorGradient, returns a table of

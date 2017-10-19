@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.2.0";
+my $version = "0.2.2";
 
 
 
@@ -144,7 +144,7 @@ sub TeslaPowerwall2AC_Define($$) {
 
     $attr{$name}{room}                      = "Tesla" if( !defined( $attr{$name}{room} ) );
     
-    Log3 $name, 3, "TeslaPowerwall2AC ($name) - defined SmartPi Device with Host $host, Port $hash->{PORT} and Interval $hash->{INTERVAL}";
+    Log3 $name, 3, "TeslaPowerwall2AC ($name) - defined TeslaPowerwall2AC Device with Host $host, Port $hash->{PORT} and Interval $hash->{INTERVAL}";
     
     $modules{TeslaPowerwall2AC}{defptr}{HOST} = $hash;
 
@@ -230,7 +230,8 @@ sub TeslaPowerwall2AC_Notify($$) {
 
 
     TeslaPowerwall2AC_Timer_GetData($hash) if( grep /^INITIALIZED$/,@{$events}
-                                                or grep /^DELETEATTR.$name.disable$/,@{$events} );
+                                                or grep /^DELETEATTR.$name.disable$/,@{$events}
+                                                or (grep /^DEFINED.$name$/,@{$events} and $init_done) );
     return;
 }
 
@@ -290,7 +291,7 @@ sub TeslaPowerwall2AC_Timer_GetData($) {
     my $name    = $hash->{NAME};
 
 
-    if( $init_done and defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) == 0 ) {
+    if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) == 0 ) {
         if( not IsDisabled($name) ) {
             while( my $obj = each %paths ) {
                 unshift( @{$hash->{actionQueue}}, $obj );
