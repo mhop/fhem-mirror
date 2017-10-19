@@ -241,6 +241,7 @@ use vars qw(@authenticate);     # List of authentication devices
 use vars qw(@authorize);        # List of authorization devices
 use vars qw(@structChangeHist); # Contains the last 10 structural changes
 use vars qw($haveInet6);        # Using INET6
+use vars qw(%prioQueues);       #
 
 $selectTimestamp = gettimeofday();
 $cvsid = '$Id$';
@@ -3005,6 +3006,28 @@ CommandSleep($$)
 }
 
 #####################################
+# Add a function to be executed after select returns. Only one function is
+# executed after select returns.
+# fn:   a function reference
+# arg:  function argument
+# nice: a number like in unix "nice". Smaller numbers mean higher priority.
+#       limited to [-20,19], default 0
+# returns the number of elements in the corrsponding queue
+sub
+PrioQueue_add($$;$)
+{
+  my ($fn, $arg, $nice) = @_;
+
+  $nice =   0 if(not defined($nice) || !looks_like_number($nice));
+  $nice = -20 if($nice <-20);
+  $nice =  19 if($nice > 19);
+  $nextat = 1;
+  $prioQueues{$nice} = [] if(!defined $prioQueues{$nice});
+  push(@{$prioQueues{$nice}},{fn=>$fn, arg=>$arg});
+};
+
+
+#####################################
 # Return the time to the next event (or undef if there is none)
 # and call each function which was scheduled for this time
 sub
@@ -3041,12 +3064,20 @@ HandleTimeout()
     }
   }
 
+  if(%prioQueues) {
+    my $nice = minNum(keys %prioQueues);
+    my $entry = shift(@{$prioQueues{$nice}});
+    delete $prioQueues{$nice} if(!@{$prioQueues{$nice}});
+    &{$entry->{fn}}($entry->{arg});
+    $nextat = 1 if(%prioQueues);
+  }
+ 
   if(!$nextat) {
     $selectTimestamp = $now;
     return undef;
   }
 
-  $now = gettimeofday(); # if some callbacks took longer 
+  $now = gettimeofday(); # if some callbacks took longer
   $selectTimestamp = $now;
 
   return ($now+ 0.01 < $nextat) ? ($nextat-$now) : 0.01;
