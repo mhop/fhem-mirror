@@ -696,7 +696,9 @@ sub LUXTRONIK2_DoUpdate($)
    $return_str .= "|". ($heatpump_visibility[267]==1 ? $heatpump_values[163] : "no");
   # 74 - solarPump
    $return_str .= "|". ($heatpump_visibility[63]==1 ? $heatpump_values[52] : "no");
-
+  # 75 - 2ndHeatSource1
+    $return_str .= "|". ($heatpump_visibility[59]==1 ? $heatpump_values[48] : "no");
+ 
    return $return_str;
 }
 
@@ -1095,7 +1097,8 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate($hash,"heatingSystemCircPump",$heatingSystemCircPump?"on":"off");
      readingsBulkUpdate($hash,"hotWaterCircPumpExtern",$a[28]?"on":"off");
      readingsBulkUpdate($hash,"hotWaterSwitchingValve",$hotWaterBoilerValve?"on":"off");
-     readingsBulkUpdate($hash,"solarPump",$a[74]?"on":"off");
+     if ($a[74] !~ /no/) { readingsBulkUpdate($hash,"solarPump",$a[74]?"on":"off"); }
+     if ($a[75] !~ /no/) { readingsBulkUpdate($hash,"2ndHeatSource1",$a[75]?"on":"off"); }
      
    # Deaerate Function
      readingsBulkUpdate( $hash, "hotWaterCircPumpDeaerate",$a[61]?"on":"off")    unless $a[61] eq "no";
