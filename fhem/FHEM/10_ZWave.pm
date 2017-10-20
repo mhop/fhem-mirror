@@ -697,6 +697,8 @@ ZWave_Initialize($)
     IODev
     WNMI_delay
     classes
+    disable:0,1
+    disabledForIntervals
     do_not_notify:noArg
     dummy:noArg
     eventForRaw
@@ -989,6 +991,8 @@ ZWave_Cmd($$@)
 
   }
   SetExtensionsCancel($hash) if($type eq "set");
+
+  return "" if(IsDisabled($name));
 
   return ZWave_neighborList($hash) if($cmd eq "neighborList");
 
@@ -6204,6 +6208,9 @@ s2Hex($)
       set/get commands depends on it. It contains a space separated list of
       class names (capital letters).
       </li>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+    <li><a href="#dummy">dummy</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#dummy">dummy</a></li>
     <li><a name="eventForRaw">eventForRaw</a><br>

@@ -44,6 +44,7 @@ FBDECT_Initialize($)
   $hash->{ParseFn}   = "FBDECT_Parse";
   $hash->{AttrList}  = 
     "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 showtime:1,0 ".
+    "disable:0,1 disabledForIntervals ".
     "$readingFnAttributes " .
     "model:".join(",", sort @fbdect_models);
   $hash->{AutoCreate}= 
@@ -102,6 +103,7 @@ FBDECT_SetHttp($@)
 
   my $cmd = $a[1];
   my $name = $hash->{NAME};
+  return "" if(IsDisabled($name));
   Log3 $name, 3, "FBDECT set $name $cmd";
 
   if($cmd =~ m/^(on|off|toggle)$/) {
@@ -142,6 +144,7 @@ FBDECT_Set($@)
   SetExtensionsCancel($hash);
 
   my $name = $hash->{NAME};
+  return "" if(IsDisabled($name));
   Log3 $name, 3, "FBDECT set $name $cmd";
 
   my $relay;
@@ -555,6 +558,8 @@ FBDECT_Undef($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#IODev">IODev</a></li>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#dummy">dummy</a></li>
@@ -648,6 +653,8 @@ FBDECT_Undef($$)
   <b>Attribute</b>
   <ul>
     <li><a href="#IODev">IODev</a></li>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#dummy">dummy</a></li>
