@@ -3018,7 +3018,7 @@ PrioQueue_add($$;$)
 {
   my ($fn, $arg, $nice) = @_;
 
-  $nice =   0 if(not defined($nice) || !looks_like_number($nice));
+  $nice =   0 if(!defined($nice) || !looks_like_number($nice));
   $nice = -20 if($nice <-20);
   $nice =  19 if($nice > 19);
   $nextat = 1;
