@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: V2.22.13, output of reopen command improved
   - bugfix:  93_DbLog: V2.22.12, avoid illegible messages in "state"
   - feature: 59_WUup: add set-command "update"
   - bugfix:  46_TeslaPowerwall2AC: fix get data internal timer bug

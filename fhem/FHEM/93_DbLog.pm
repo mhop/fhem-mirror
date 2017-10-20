@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.13    20.10.2017       output of reopen command improved 
 # 2.22.12    19.10.2017       avoid illegible messages in "state"
 # 2.22.11    13.10.2017       DbLogType expanded by SampleFill, DbLog_sampleDataFn adapted to sort case insensitive, commandref revised
 # 2.22.10    04.10.2017       Encode::encode_utf8 of $error, DbLog_PushAsyncAborted adapted to use abortArg (Forum:77472)
@@ -156,7 +157,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.12";
+my $DbLogVersion = "2.22.13";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -503,7 +504,7 @@ sub DbLog_Set($@) {
 		} else {
 			unless ($a[2] =~ /^[0-9]+$/) { return " The Value of $a[1]-time is not valid. Use only figures 0-9 !";}
 		    # Statusbit "Kein Schreiben in DB erlauben" wenn reopen mit Zeitangabe
-            $hash->{HELPER}{REOPEN_RUNS} = 1;
+            $hash->{HELPER}{REOPEN_RUNS} = $a[2];
 			
 			# falls ein hängender Prozess vorhanden ist -> löschen
 			BlockingKill($hash->{HELPER}{RUNNING_PID}) if($hash->{HELPER}{RUNNING_PID});
@@ -515,8 +516,9 @@ sub DbLog_Set($@) {
 			delete $hash->{HELPER}{DELDAYS_PID};
 			delete $hash->{HELPER}{REDUCELOG_PID};
 			
-			Log3($name, 3, "DbLog $name: Connection closed. Reopen requested in $a[2] seconds.");
-			readingsSingleUpdate($hash, "state", "closed for $a[2] seconds", 1);
+			my $ts = (split(" ",FmtDateTime(gettimeofday()+$a[2])))[1];
+			Log3($name, 2, "DbLog $name: Connection closed until $ts ($a[2] seconds).");
+			readingsSingleUpdate($hash, "state", "closed until $ts ($a[2] seconds)", 1);
             InternalTimer(gettimeofday()+$a[2], "reopen", $hash, 0);			
 		}
     }
@@ -4400,14 +4402,14 @@ return;
 sub reopen ($){
   my ($hash) = @_;
   my $name   = $hash->{NAME};
-  my $async = AttrVal($name, "asyncMode", undef);
+  my $async  = AttrVal($name, "asyncMode", undef);
   
   RemoveInternalTimer($hash, "reopen");
   
   if(DbLog_ConnectPush($hash)) {
       # Statusbit "Kein Schreiben in DB erlauben" löschen
-      delete $hash->{HELPER}{REOPEN_RUNS};
-	  Log3($name, 3, "DbLog $name: Database connection reopen request finished.");
+      my $delay = delete $hash->{HELPER}{REOPEN_RUNS};
+	  Log3($name, 2, "DbLog $name: Database connection reopened (it was $delay seconds closed).");
 	  readingsSingleUpdate($hash, "state", "reopened", 1);
 	  DbLog_execmemcache($hash) if($async);
   } else {
