@@ -2086,7 +2086,7 @@ FW_textfieldv($$$$)
   $v=" value='$value'" if(defined($value));
   return if($FW_hiddenroom{input});
   my $s = "<input type='text' name='$n' class='$class' size='$z'$v ".
-            "autocorrect='off' autocomplete='off' autocapitalize='off'/>";
+            "autocorrect='off' autocapitalize='off'/>";
   return $s;
 }
 
