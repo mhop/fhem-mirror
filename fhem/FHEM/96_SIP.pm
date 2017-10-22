@@ -54,7 +54,7 @@ use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.54 / 07.04.17";
+my $sip_version ="V1.6 / 22.10.17";
 my $ua;	# SIP user agent
 my @fifo;
 
@@ -352,8 +352,9 @@ sub SIP_Register($$$)
           Log3 $name,1,"$logname, can´t find my parent ".$hash->{parent}." in process list !";
           die;
         }
-	Log3 $name,4,"$logname, register new expire : ".localtime(time()+$expire);
-        SIP_telnet($hash,"set $name state $type\nexit\n");
+        my $reg_time = FmtDateTime(time()+$expire);
+	Log3 $name,4,"$logname, register new expire : $reg_time";
+        SIP_telnet($hash,"set $name state $type\nset $name listen_alive yes\nset $name expire $reg_time\nexit\n");
 	# need to refresh registration periodically
 	$ua->add_timer( $expire/2, $sub_register );
   };
@@ -613,7 +614,7 @@ sub SIP_CALLDone($)
    {
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "call","done");
-    readingsBulkUpdate($hash, "call_time",$calltime) if defined($calltime);
+    readingsBulkUpdate($hash, "call_time",int($calltime)) if defined($calltime);
     readingsBulkUpdate($hash, "last_error",$final);
     readingsBulkUpdate($hash, "call_state","fail");
     readingsBulkUpdate($hash, "call_success","0");
@@ -626,7 +627,7 @@ sub SIP_CALLDone($)
     readingsBulkUpdate($hash, "call","done");
     readingsBulkUpdate($hash, "call_state",lc($final));
     readingsBulkUpdate($hash, "call_success",$success);
-    readingsBulkUpdate($hash, "call_time",$calltime) if defined($calltime);
+    readingsBulkUpdate($hash, "call_time",int($calltime)) if defined($calltime);
     readingsBulkUpdate($hash, "state",$hash->{'.oldstate'}) if defined($hash->{'.oldstate'});
     readingsEndUpdate($hash, 1);
    }
@@ -731,10 +732,11 @@ sub SIP_Set($@)
 
      if (exists($hash->{LPID}) && (AttrVal($name,"sip_elbc","no") ne "no"))
      {
-      Log3 $name,4,"$name, listen process $hash->{LPID} must be killed befor we start a new call !";
+      Log3 $name,4,"$name, listen process ".$hash->{LPID}." must be killed befor we start a new call !";
       BlockingKill($hash->{helper}{LISTEN_PID});
       delete $hash->{helper}{LISTEN_PID};
       delete $hash->{LPID};
+      readingsSingleUpdate($hash,"listen_alive","no",1);
       $hash->{'.elbc'} = 1; # haben wir gerade einen listen Prozess abgeschossen ?
      }
 
@@ -869,6 +871,16 @@ sub SIP_Set($@)
   if ($cmd eq "state")
   {
    readingsSingleUpdate($hash, "state",$subcmd,1);
+   return undef;
+  }
+  elsif ($cmd eq "listen_alive")
+  {
+   readingsSingleUpdate($hash, "listen_alive",$subcmd,1);
+   return undef;
+  }
+  elsif ($cmd eq "expire")
+  {
+   readingsSingleUpdate($hash, "expire",$subcmd,1);
    return undef;
   }
   elsif ($cmd eq "caller")
@@ -1135,7 +1147,7 @@ sub SIP_ListenStart($)
  {
   my ($event) = @_;
   Log3 $name, 5,  "$logname, SIP_bye : $event";
-  my $calltime = time()-$hash->{CALL_START};
+  my $calltime = int(time()-$hash->{CALL_START});
   SIP_telnet($hash, "set $name caller none\nset $name caller_state hangup\nset $name caller_time $calltime\nexit\n") ;
   $byebye = 1;
   return 1;
@@ -1225,7 +1237,7 @@ sub SIP_ListenStart($)
          $byebye    = 1;
        } 
         else { $dtmf_loop = ((AttrVal($name,"sip_dtmf_loop","once") eq 'once')) ? 0 : 1;
-               my $calltime = time()-$hash->{CALL_START};
+               my $calltime = int(time()-$hash->{CALL_START});
                SIP_telnet($hash, "set $name caller_state hangup\nset $name caller_time $calltime\nexit\n") if(!$dtmf_loop);
              } # führt ggf. zum Schleifenende
      } # end inner loop
@@ -1295,8 +1307,9 @@ sub SIP_ListenDone($)
   if ($ret ne "end")
   { 
    readingsBeginUpdate($hash);
-   readingsBulkUpdate($hash,"state","error");
-   readingsBulkUpdate($hash,"last_error",$ret);
+    readingsBulkUpdate($hash,"state","error");
+    readingsBulkUpdate($hash,"last_error",$ret);
+    readingsBulkUpdate($hash,"listen_alive","no");
    readingsEndUpdate($hash, 1 );
    Log3 $name, 3 , "$name, listen error -> $ret";
    return if(IsDisabled($name));
@@ -1304,7 +1317,10 @@ sub SIP_ListenDone($)
   }
   else 
   { 
-   readingsSingleUpdate($hash,"state","ListenDone",1);
+   readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash,"state","ListenDone");
+    readingsBulkUpdate($hash,"listen_alive","no");
+   readingsEndUpdate($hash, 1 );
    return if(IsDisabled($name));
    return if(!AttrVal($name, "sip_dtmf", 0));
    SIP_try_listen($hash); 
@@ -1391,23 +1407,36 @@ sub SIP_watch_listen($)
   # Lebt denn der Listen Prozess überhaupt noch ? 
   my ($name) = @_;
   my $hash   = $defs{$name};
-
+  my $listen_dead = 0;
   RemoveInternalTimer($name);
   return if (IsDisabled($name));
   return if (!defined($hash->{LPID}));
 
   my $cmd    = "ps -e | grep '".$hash->{LPID}." '";
   my $result = qx($cmd); 
+  my $age    = int(ReadingsAge($name, "expire", 0));
+  my $alive  = ReadingsVal($name,"listen_alive","no");
 
-  if  (index($result,"perl") == -1)
+  if (($age >180) && ($alive eq "yes")) # nach max 150 Sekunden sollte sich der listen Prozess erneut melden
+  { 
+   Log3 $name, 2 , "$name, expire timestamp is $age seconds old, restarting listen process";
+   readingsSingleUpdate($hash,"listen_alive","no",1);
+   $alive = "no";
+  }
+  elsif  (index($result,"perl") == -1)
   {
-   Log3 $name, 2 , $name.", cant find listen prozess ".$hash->{LPID}." in process list !";
+   Log3 $name, 2 , $name.", cant find listen process ".$hash->{LPID}." in process list !";
+   $alive = "no";;
+  }
+  else { Log3 $name, 5 , $name.", listen process ".$hash->{LPID}." found"; }
+
+  if ($alive eq "no")
+  {
    BlockingKill($hash->{helper}{LISTEN_PID});
    delete $hash->{helper}{LISTEN_PID};
    delete $hash->{LPID};
    InternalTimer(gettimeofday()+2, "SIP_try_listen", $hash, 0);
   }
-  else { Log3 $name, 5 , $name.", listen prozess ".$hash->{LPID}." found"; }
 
   InternalTimer(gettimeofday()+60, "SIP_watch_listen", $name, 0);
   return;
