@@ -183,7 +183,7 @@ PRESENCE_Define($$)
             $hash->{MODE} = "event";
             $hash->{EVENT_ABSENT} = $a[3];
             $hash->{EVENT_PRESENT} = $a[4];
-            $hash->{STATE} = "Initialized";
+            $hash->{STATE} = "Initialized" if($init_done);
 
             InternalTimer(gettimeofday(), "PRESENCE_setNotfiyDev", $hash);
         }
