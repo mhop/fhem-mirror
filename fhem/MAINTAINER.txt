@@ -178,7 +178,7 @@ FHEM/36_EleroStick.pm        HCS                  Sonstige Systeme
 FHEM/36_EleroSwitch.pm       HCS                  Sonstige Systeme
 FHEM/36_JeeLink.pm           justme1968           Sonstige Systeme
 FHEM/36_KeyValueProtocol.pm  HCS                  Sonstige Systeme
-FHEM/36_PCA301.pm            justme1968           Sonstige Systeme
+FHEM/36_PrecipitationSensor.pm HCS                Sonstige Systeme
 FHEM/36_LaCrosse.pm          HCS                  Sonstige Systeme
 FHEM/36_LaCrosseGateway.pm   HCS                  Sonstige Systeme
 FHEM/36_EMT7110.pm           HCS                  Sonstige Systeme
