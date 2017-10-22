@@ -48,7 +48,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";    # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.09";
+my $yaahmversion    = "1.10";
 my $firstcall=1;
     
 my %yaahm_transtable_EN = ( 
@@ -607,7 +607,7 @@ sub YAAHM_CreateEntry($) {
    
    #-- Start updater
    InternalTimer(gettimeofday()+ 3, "YAAHM_updater",$hash,0);
-   YAAHM_InternalTimer("check",gettimeofday()+ 5, "YAAHM_checkstate", $hash, 0);
+   YAAHM_InternalTimer("check",time()+ 5, "YAAHM_checkstate", $hash, 0);
 
 }
 
@@ -688,7 +688,7 @@ sub YAAHM_Set($@) {
    } elsif ( $cmd =~ /^initialize/ ) {
      $firstcall = 1;
      YAAHM_updater($hash);
-     YAAHM_InternalTimer("check",gettimeofday()+ 5, "YAAHM_checkstate", $hash, 0);
+     YAAHM_InternalTimer("check",time()+ 5, "YAAHM_checkstate", $hash, 0);
    #-----------------------------------------------------------
    } elsif ( $cmd eq "createWeekly" ){
      return "[YAAHM] missing name for new weekly profile"
@@ -1204,7 +1204,7 @@ sub YAAHM_state {
   readingsBulkUpdate($hash,"tr_housestate",$yaahm_tt->{$targetstate});
   readingsEndUpdate($hash,1); 
   
-  YAAHM_checkstate($hash);
+  YAAHM_InternalTimer("check",time()+ 30, "YAAHM_checkstate", $hash, 0);
   
   #-- doit, if not simulation
   if (defined($attr{$name}{"stateHelper"})){
@@ -2140,17 +2140,28 @@ sub YAAHM_GetDayStatus($) {
 
 sub YAAHM_sun($) {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
   
   #-- sunrise and sunset today and tomorrow
   my ($sttoday,$sttom);
-  my ($strise0,$stset0,$stseas0,$strise1,$stset1,$stseas1);
+  my $count   = 0;
+  my $strise0 = "";
+  my $strise1 = "";
+  my ($msg,$stset0,$stseas0,$stset1,$stseas1);
   
   $sttoday = strftime('%4Y-%2m-%2d', localtime(time));
   
-  #-- for some unknown reason we need this here:
-  select(undef,undef,undef,0.01);
-  
-  $strise0 = Astro_Get($hash,"dummy","text", "SunRise",$sttoday).":00";
+  #-- since the Astro module sometimes gives us strange results, we need to do this more than once
+  while( $strise0 !~ /^\d\d:\d\d:\d\d/ && $count < 5){
+    $strise0 = Astro_Get($hash,"dummy","text", "SunRise",$sttoday).":00";
+    $count++;
+    select(undef,undef,undef,0.01);
+  }
+  if( $count == 5 ){
+    $msg = "Error, no proper sunrise today return from Astro module in 5 attempts";
+    Log3 $name,1,"[YAAHM_sun] ".$msg;
+    $strise0 = "06:00:00";
+  }
   my ($hour,$min) = split(":",$strise0);
   $hash->{DATA}{"DD"}[0]{"sunrise"} = sprintf("%02d:%02d",$hour,$min);
   
@@ -2161,12 +2172,20 @@ sub YAAHM_sun($) {
   $stseas0 = Astro_Get($hash,"dummy","text", "ObsSeasonN",$sttoday);
   $hash->{DATA}{"DD"}[0]{"season"}    = $seasons[$stseas0];   
   
-  $sttom   = strftime('%4Y-%2m-%2d', localtime(time+86400));
-  
-  #-- for some unknown reason we need this here:
-  select(undef,undef,undef,0.01);
-  
-  $strise1 = Astro_Get($hash,"dummy","text", "SunRise",$sttom).":00";
+  $sttom = strftime('%4Y-%2m-%2d', localtime(time+86400));
+  $count = 0;
+  $msg   = "";
+  #-- since the Astro module sometimes gives us strange results, we need to do this more than once
+  while( $strise1 !~ /^\d\d:\d\d:\d\d/ && $count < 5){
+    $strise1 = Astro_Get($hash,"dummy","text", "SunRise",$sttom).":00";
+    $count++;
+    select(undef,undef,undef,0.01);
+  }
+  if( $count == 5 ){
+    $msg = "Error, no proper sunrise tomorrow return from Astro module in 5 attempts";
+    Log3 $name,1,"[YAAHM_sun] ".$msg;
+    $strise1 = "06:00:00";
+  }
   ($hour,$min) = split(":",$strise1);
   $hash->{DATA}{"DD"}[1]{"sunrise"} = sprintf("%02d:%02d",$hour,$min);
   
@@ -2392,6 +2411,13 @@ sub YAAHM_timewidget($){
   my $a_night  = (60*$hour + $min)/1440 * 2 * pi;
   my $x_night  = -int(sin($a_night)*$radius*100)/100;
   my $y_night  =  int(cos($a_night)*$radius*100)/100;
+  
+  my $t_midnight  = "0:00";
+  $t_midnight     =~ s/^0//;
+  ($hour,$min) = split(":",$t_midnight);
+  my $a_midnight  = 0.0;
+  my $x_midnight  = 0.0;
+  my $y_midnight  = $radius;
   FW_pO  '<defs>'.
          sprintf('<linearGradient id="grad1" x1="0%%" y1="0%%" x2="%d%%" y2="%d%%">',int(-$x_noon/$radius*100),int(-$y_noon/$radius*100)).
          '<stop offset="0%" style="stop-color:rgb(255,255,0);stop-opacity:1" />'.
@@ -2410,10 +2436,11 @@ sub YAAHM_timewidget($){
   FW_pO      '<g id="Ebene_1" transform="translate(400,400)">';
   
   #-- daytime arc
-  FW_pO      ' <path d="M 0 0 '.($x_morning*1.1).' '.($y_morning*1.1). ' A '.($radius*1.1).' '.($radius*1.1).' 0 1 1 '.($x_night*1.1).' '.($y_night*1.1).' Z" fill="none" stroke="rgb(0,255,200)" stroke-width="15" />';
+  FW_pO      '<path d="M 0 0 '.($x_morning*1.1).' '.($y_morning*1.1). ' A '.($radius*1.1).' '.($radius*1.1).' 0 1 1 '.($x_night*1.1).' '.($y_night*1.1).' Z" fill="none" stroke="rgb(0,255,200)" stroke-width="15" />';
   
-  #-- sunset to sunrise sector
-  FW_pO 	 '<path d="M 0 0 '.$x_sunset. ' '.$y_sunset. ' A '.$radius.' '.$radius.' 0 0 1 '.$x_sunrise.' '.$y_sunrise.' Z" fill="rgb(70,70,100)"/>'; 
+  #-- sunset to sunrise sector. We need a workaround here for the broken SVG engine of Firefox, splitting this in two arcs
+  FW_pO 	 '<path d="M 0 0 '.$x_sunset.  ' '.$y_sunset.   ' A '.$radius.' '.$radius.' 0 0 1 '.$x_midnight.' '.$y_midnight.' Z" fill="rgb(70,70,100)"/>'; 
+  FW_pO 	 '<path d="M 0 0 '.$x_midnight.' '.$y_midnight. ' A '.$radius.' '.$radius.' 0 0 1 '.$x_sunrise.' '. $y_sunrise. ' Z" fill="rgb(70,70,100)"/>'; 
     
   #-- sunrise to morning sector
   FW_pO 	 '<path d="M 0 0 '.$x_sunrise.' '.$y_sunrise.' A '.$radius.' '.$radius.' 0 0 1 '.$x_morning.' '.$y_morning.' Z" fill="url(#grad2)"/>';
@@ -3075,6 +3102,6 @@ sub YAAHM_Longtable($){
 
 <a name="YAAHM"></a>
 <h3>YAAHM</h3>
-<a href="https://wiki.fhem.de/wiki/Modul_YAAHM">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/commandref.html#YAAHM">YAAHM</a> 
+<a href="https://wiki.fhem.de/wiki/Modul_YAAHM">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#YAAHM">YAAHM</a> 
 =end html_DE
 =cut
