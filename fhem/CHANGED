@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  46_TeslaPowerwall2AC.pm: new formula to calculate batteryPower
   - new:     46_Aqicn.pm: new modul, fetch information about air quality by
                           city name
   - bugfix:  82_LGTV_WebOS: 1.2.0 bugfix - hack for properly fhem freez after

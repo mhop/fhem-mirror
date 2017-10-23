@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.2.2";
+my $version = "0.2.3";
 
 
 
@@ -452,7 +452,7 @@ sub TeslaPowerwall2AC_WriteReadings($$$) {
     }
     
     readingsBulkUpdate($hash,'batteryLevel',sprintf("%.1f",$readings->{percentage})) if( defined($readings->{percentage}) );
-    readingsBulkUpdate($hash,'batteryPower',sprintf("%.1f",$readings->{percentage}*0.135)) if( defined($readings->{percentage}) );
+    readingsBulkUpdate($hash,'batteryPower',sprintf("%.1f",(ReadingsVal($name,'siteinfo-nominal_system_energy_kWh',0)/100) * ReadingsVal($name,'statussoe-percentage',0) ) );
     readingsBulkUpdateIfChanged($hash,'actionQueue',scalar(@{$hash->{actionQueue}}) . ' entries in the Queue');
     readingsBulkUpdateIfChanged($hash,'state',(defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) == 0 ? 'ready' : 'fetch data - ' . scalar(@{$hash->{actionQueue}}) . ' paths in actionQueue'));
     readingsEndUpdate($hash,1);
