@@ -37,6 +37,11 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.8.5        19.10.2017       filter unwanted characters in "procinfo"-result 
+# 5.8.4        17.10.2017       createSelectSql, createDeleteSql, currentfillup_Push switch to devspec 
+# 5.8.3        16.10.2017       change to use createSelectSql: minValue,diffValue - createDeleteSql: delEntries
+# 5.8.2        15.10.2017       sub createTimeArray
+# 5.8.1        15.10.2017       change to use createSelectSql: sumValue,averageValue,exportToFile,maxValue
 # 5.8.0        15.10.2017       adapt createSelectSql for better performance if time/aggregation not set, 
 #                               can set table as flexible argument for countEntries, fetchrows (default: history),
 #                               minor fixes
@@ -239,7 +244,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.8.0";
+my $DbRepVersion = "5.8.5";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -959,7 +964,7 @@ sub DbRep_Connect($) {
 }
 
 ################################################################################################################
-#  Hauptroutine
+#                                              Hauptroutine
 ################################################################################################################
 sub DbRep_Main($$;$) {
  my ($hash,$opt,$prop) = @_;
@@ -968,7 +973,6 @@ sub DbRep_Main($$;$) {
  my $reading     = AttrVal($name, "reading", "%");
  my $aggregation = AttrVal($name, "aggregation", "no");   # wichtig !! aggregation niemals "undef"
  my $device      = AttrVal($name, "device", "%");
- my $aggsec;
  
  # Entkommentieren für Testroutine im Vordergrund
  # testexit($hash);
@@ -1022,6 +1026,85 @@ sub DbRep_Main($$;$) {
  Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
  Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert/); 
  Log3 ($name, 4, "DbRep $name - Command: $opt"); 
+ 
+ # zentrales Timestamp-Array und Zeitgrenzen bereitstellen
+ my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = createTimeArray($hash,$aggregation,$opt);
+ 
+ #####  Funktionsaufrufe ##### 
+ if ($opt eq "sumValue") {
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
+     
+ } elsif ($opt =~ m/countEntries/) {
+     my $table = $prop;
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$table§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
+
+ } elsif ($opt eq "averageValue") {      
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
+    
+ } elsif ($opt eq "fetchrows") {
+     my $table = $prop;
+     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
+     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+             
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$table|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
+    
+ } elsif ($opt eq "exportToFile") {
+     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
+     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+             
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "expfile_ParseDone", $to, "ParseAborted", $hash);
+    
+ } elsif ($opt eq "importFromFile") {             
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name", "impfile_PushDone", $to, "ParseAborted", $hash);
+    
+ } elsif ($opt eq "maxValue") {        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
+         
+ } elsif ($opt eq "minValue") {        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$ts", "minval_ParseDone", $to, "ParseAborted", $hash);   
+         
+ } elsif ($opt eq "delEntries") {
+     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
+     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+         
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
+ 
+ } elsif ($opt eq "tableCurrentPurge") {
+     undef $runtime_string_first;
+     undef $runtime_string_next;
+         
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|current|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
+ 
+ } elsif ($opt eq "tableCurrentFillup") {
+     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
+     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+         
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "currentfillup_Done", $to, "ParseAborted", $hash);        
+ 
+ } elsif ($opt eq "diffValue") {        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
+         
+ } elsif ($opt eq "insert") { 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
+         
+ } elsif ($opt eq "deviceRename" || $opt eq "readingRename") { 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("devren_Push", "$name", "devren_Done", $to, "ParseAborted", $hash);   
+         
+ } elsif ($opt eq "sqlCmd" ) {
+    # Execute a generic sql command
+         
+    $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "ParseAborted", $hash);     
+ }
+
+return;
+}
+
+################################################################################################################
+#                              Create zentrales Timsstamp-Array
+################################################################################################################
+sub createTimeArray($$$) {
+ my ($hash,$aggregation,$opt) = @_;
+ my $name = $hash->{NAME}; 
 
  # year   als Jahre seit 1900 
  # $mon   als 0..11
@@ -1304,6 +1387,7 @@ sub DbRep_Main($$;$) {
              
  Log3 ($name, 5, "DbRep $name - weekday of start for selection: $wd  ->  wdadd: $wdadd"); 
  
+ my $aggsec;
  if ($aggregation eq "hour") {
      $aggsec = 3600;
  } elsif ($aggregation eq "day") {
@@ -1346,72 +1430,177 @@ $hash->{HELPER}{CV} = \%cv;
         $i++;
     } 
 
- if ($opt eq "sumValue") {
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
+return ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts);
+}
+
+####################################################################################################
+#  Zusammenstellung Aggregationszeiträume
+####################################################################################################
+sub collaggstr($$$$) {
+ my ($hash,$runtime,$i,$runtime_string_next) = @_;
+ my $name = $hash->{NAME};
+ my $runtime_string;                                               # Datum/Zeit im SQL-Format für Readingname Teilstring
+ my $runtime_string_first;                                         # Datum/Zeit Auswertungsbeginn im SQL-Format für SQL-Statement
+ my $ll;                                                           # loopindikator, wenn 1 = loopausstieg
+ my $runtime_orig;                                                 # orig. runtime als Grundlage für Addition mit $aggsec
+ my $tsstr             = $hash->{HELPER}{CV}{tsstr};               # für Berechnung Tagesverschieber / Stundenverschieber      
+ my $testr             = $hash->{HELPER}{CV}{testr};               # für Berechnung Tagesverschieber / Stundenverschieber
+ my $dsstr             = $hash->{HELPER}{CV}{dsstr};               # für Berechnung Tagesverschieber / Stundenverschieber
+ my $destr             = $hash->{HELPER}{CV}{destr};               # für Berechnung Tagesverschieber / Stundenverschieber
+ my $msstr             = $hash->{HELPER}{CV}{msstr};               # Startmonat für Berechnung Monatsverschieber
+ my $mestr             = $hash->{HELPER}{CV}{mestr};               # Endemonat für Berechnung Monatsverschieber
+ my $ysstr             = $hash->{HELPER}{CV}{ysstr};               # Startjahr für Berechnung Monatsverschieber
+ my $yestr             = $hash->{HELPER}{CV}{yestr};               # Endejahr für Berechnung Monatsverschieber
+ my $aggregation       = $hash->{HELPER}{CV}{aggregation};         # Aggregation
+ my $aggsec            = $hash->{HELPER}{CV}{aggsec};              # laufende Aggregationssekunden
+ my $epoch_seconds_end = $hash->{HELPER}{CV}{epoch_seconds_end};
+ my $wdadd             = $hash->{HELPER}{CV}{wdadd};               # Ergänzungstage. Starttag + Ergänzungstage = der folgende Montag (für week-Aggregation)  
+ 
+ # only for this block because of warnings if some values not set
+ no warnings 'uninitialized'; 
+
+         # keine Aggregation (all between timestamps)
+         if ($aggregation eq "no") {
+             $runtime_string       = "all_between_timestamps";                                         # für Readingname
+             $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
+             $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);  
+             $ll = 1;
+         }
+         
+         # Monatsaggregation
+         if ($aggregation eq "month") {
+             $runtime_orig = $runtime;
+             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+             
+             # Hilfsrechnungen
+             my $rm   = strftime "%m", localtime($runtime);                    # Monat des aktuell laufenden Startdatums d. SQL-Select
+             my $ry   = strftime "%Y", localtime($runtime);                    # Jahr des aktuell laufenden Startdatums d. SQL-Select
+             my $dim  = $rm-2?30+($rm*3%7<4):28+!($ry%4||$ry%400*!($ry%100));  # Anzahl Tage des aktuell laufenden Monats f. SQL-Select
+             Log3 ($name, 5, "DbRep $name - act year:  $ry, act month: $rm, days in month: $dim, endyear: $yestr, endmonth: $mestr"); 
+                     
+             $runtime_string       = strftime "%Y-%m", localtime($runtime);                            # für Readingname
+             
+             if ($i==1) {
+                 # nur im ersten Durchlauf
+                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime_orig);
+             }
+             
+             if ($ysstr == $yestr && $msstr == $mestr || $ry ==  $yestr && $rm == $mestr) {
+                 $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>1);
+                 $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+                 $ll=1;
+                
+             } else {
+                 if(($runtime) > $epoch_seconds_end) {
+                     $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>11);                     
+                     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+                     $ll=1;
+                 } else {
+                     $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>1);
+                     $runtime_string_next  = strftime "%Y-%m-01", localtime($runtime+($dim*86400));
+                     
+                 } 
+             }
+         my ($yyyy1, $mm1, $dd1) = ($runtime_string_next =~ /(\d+)-(\d+)-(\d+)/);
+         $runtime = timelocal("00", "00", "00", "01", $mm1-1, $yyyy1-1900);
+         
+         # neue Beginnzeit in Epoche-Sekunden
+         $runtime = $runtime_orig+$aggsec;
+         }
+         
+         # Wochenaggregation
+         if ($aggregation eq "week") {          
+             $runtime = $runtime+3600 if($i!=1 && dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+             $runtime_orig = $runtime; 
+
+             my $w  = strftime "%V", localtime($runtime);            # Wochennummer des aktuellen Startdatum/Zeit
+             $runtime_string = "week_".$w;                           # für Readingname
+             my $ms = strftime "%m", localtime($runtime);            # Startmonat (01-12)
+             my $me = strftime "%m", localtime($epoch_seconds_end);  # Endemonat (01-12)
+             
+             if ($i==1) {
+                 # nur im ersten Schleifendurchlauf
+                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
+                 
+                 # Korrektur $runtime_orig für Berechnung neue Beginnzeit für nächsten Durchlauf 
+                 my ($yyyy1, $mm1, $dd1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+)/);
+                 $runtime = timelocal("00", "00", "00", $dd1, $mm1-1, $yyyy1-1900);
+                 $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);           # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+                 $runtime = $runtime+$wdadd;
+                 $runtime_orig = $runtime-$aggsec;                             
+                 
+                 # die Woche Beginn ist gleich der Woche vom Ende Auswertung
+                 if((strftime "%V", localtime($epoch_seconds_end)) eq ($w) && ($ms+$me != 13)) {                  
+                     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
+                     $ll=1;
+                 } else {
+                      $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime);
+                 }
+             } else {
+                 # weitere Durchläufe
+                 if(($runtime+$aggsec) > $epoch_seconds_end) {
+                     $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime_orig);
+                     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
+                     $ll=1;
+                 } else {
+                     $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime_orig) ;
+                     $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime+$aggsec);  
+                 }
+             }
+         
+         # neue Beginnzeit in Epoche-Sekunden
+         $runtime = $runtime_orig+$aggsec;           
+         }
      
- } elsif ($opt =~ m/countEntries/) {
-     my $table = $prop;
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$table§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
+         # Tagesaggregation
+         if ($aggregation eq "day") {  
+             $runtime_string       = strftime "%Y-%m-%d", localtime($runtime);                      # für Readingname
+             $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
+             $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime) if($i>1);
+             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+                                               
+             if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
+                 $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime);                    
+                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr);
+                 $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+                 $ll=1;
+             } else {
+                 $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime+$aggsec);   
+             }
+         Log3 ($name, 5, "DbRep $name - runtime_string: $runtime_string, runtime_string_first(begin): $runtime_string_first, runtime_string_next(end): $runtime_string_next");
 
- } elsif ($opt eq "averageValue") {      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
-    
- } elsif ($opt eq "fetchrows") {
-     my $table = $prop;
-     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
-     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+         # neue Beginnzeit in Epoche-Sekunden
+         $runtime = $runtime+$aggsec;         
+         }
+     
+         # Stundenaggregation
+         if ($aggregation eq "hour") {
+             $runtime_string       = strftime "%Y-%m-%d_%H", localtime($runtime);                   # für Readingname
+             $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
+             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+             $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime) if($i>1);
              
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$table|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
-    
- } elsif ($opt eq "exportToFile") {
-     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
-     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+             my @a = split (":",$tsstr);
+             my $hs = $a[0];
+             my $msstr = $a[1].":".$a[2];
+             @a = split (":",$testr);
+             my $he = $a[0];
+             my $mestr = $a[1].":".$a[2];
              
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "expfile_ParseDone", $to, "ParseAborted", $hash);
-    
- } elsif ($opt eq "importFromFile") {             
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name", "impfile_PushDone", $to, "ParseAborted", $hash);
-    
- } elsif ($opt eq "maxValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
+             if((($msstr gt $mestr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
+                 $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime);                 
+                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr && $hs eq $he);
+                 $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+                 $ll=1;
+             } else {
+                 $runtime_string_next  = strftime "%Y-%m-%d %H", localtime($runtime+$aggsec);   
+             }
+        
+         # neue Beginnzeit in Epoche-Sekunden
+         $runtime = $runtime+$aggsec;         
+         }
          
- } elsif ($opt eq "minValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$ts", "minval_ParseDone", $to, "ParseAborted", $hash);   
-         
- } elsif ($opt eq "delEntries") {
-     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
-     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-         
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
- 
- } elsif ($opt eq "tableCurrentPurge") {
-     undef $runtime_string_first;
-     undef $runtime_string_next;
-         
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|current|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
- 
- } elsif ($opt eq "tableCurrentFillup") {
-     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
-     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-         
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "currentfillup_Done", $to, "ParseAborted", $hash);        
- 
- } elsif ($opt eq "diffValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
-         
- } elsif ($opt eq "insert") { 
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
-         
- } elsif ($opt eq "deviceRename" || $opt eq "readingRename") { 
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("devren_Push", "$name", "devren_Done", $to, "ParseAborted", $hash);   
-         
- } elsif ($opt eq "sqlCmd" ) {
-    # Execute a generic sql command
-         
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "ParseAborted", $hash);     
- }
-
-return;
+return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll);
 }
 
 ####################################################################################################
@@ -1447,6 +1636,10 @@ sub averval_DoParse($) {
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");
+ 
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
 
  #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
  if ($dbloghash->{MODEL} eq "POSTGRESQL") {
@@ -1460,7 +1653,11 @@ sub averval_DoParse($) {
  }
   
  # SQL zusammenstellen für DB-Abfrage
- $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"?","?",'');
+ if ($IsTimeSet || $IsAggrSet) {
+     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"?","?",'');
+ } else {
+     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'');
+ }
  
  eval{$sth = $dbh->prepare($sql);};
  if ($@) {
@@ -1483,12 +1680,16 @@ sub averval_DoParse($) {
      my $runtime_string_next   = $a[2];
      
      # SQL zusammenstellen für Logging
-	 $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",''); 
-     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
+	 if ($IsTimeSet || $IsAggrSet) {
+	     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",''); 
+     }
+	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
      
-     my @line;
-     
-	 eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+     if ($IsTimeSet || $IsAggrSet) {
+	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+	 } else {
+	     eval{$sth->execute();};	 
+	 }
 	 if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -1498,7 +1699,7 @@ sub averval_DoParse($) {
      }
 	 
      # DB-Abfrage -> Ergebnis in @arr aufnehmen
-     @line = $sth->fetchrow_array();
+     my @line = $sth->fetchrow_array();
      
      Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);
 	 
@@ -1540,9 +1741,9 @@ sub averval_ParseDone($) {
   my $name       = $hash->{NAME};
   my $arrstr     = decode_base64($a[1]);
   my $device     = $a[2];
-     $device     =~ s/%/\//g;
+     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $reading    = $a[3];
-     $reading     =~ s/%/\//g;
+     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
@@ -1660,8 +1861,7 @@ sub count_DoParse($) {
 	     $sql = createSelectSql($hash,$table,"COUNT(*)",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
      }
      Log3($name, 4, "DbRep $name - SQL execute: $sql");        
-     
-     my @line;
+
      if ($IsTimeSet || $IsAggrSet) {
 	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
 	 } else {
@@ -1676,7 +1876,7 @@ sub count_DoParse($) {
      }
 	 
 	 # DB-Abfrage -> Ergebnis in @arr aufnehmen
-     @line = $sth->fetchrow_array();
+     my @line = $sth->fetchrow_array();
      
      Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);   
 	 
@@ -1718,9 +1918,9 @@ sub count_ParseDone($) {
   my $name       = $hash->{NAME};
   my $arrstr     = decode_base64($a[1]);
   my $device     = $a[2];
-     $device     =~ s/%/\//g;
+     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $reading    = $a[3];
-     $reading     =~ s/%/\//g;
+     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
@@ -1805,9 +2005,17 @@ sub maxval_DoParse($) {
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
+ 
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
 
  # SQL zusammenstellen für DB-Operation
- $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"?","?","ORDER BY TIMESTAMP");
+ if ($IsTimeSet || $IsAggrSet) {
+     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"?","?","ORDER BY TIMESTAMP");
+ } else {
+     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");
+ }
  
  eval{$sth = $dbh->prepare($sql);};
  if ($@) {
@@ -1830,12 +2038,18 @@ sub maxval_DoParse($) {
      my $runtime_string_next   = $a[2];    
      
      # SQL zusammenstellen für Logausgabe
-	 $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");
-     Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
+	 if ($IsTimeSet || $IsAggrSet) {
+	     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");
+     }
+	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
      
      $runtime_string = encode_base64($runtime_string,"");   
      
-     eval {$sth->execute($runtime_string_first, $runtime_string_next);};
+     if ($IsTimeSet || $IsAggrSet) {
+	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+	 } else {
+	     eval{$sth->execute();};	 
+	 }
      if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -1943,9 +2157,9 @@ sub maxval_ParseDone($) {
   my $name = $hash->{NAME};
   my $rowlist    = decode_base64($a[1]);
   my $device     = $a[2];
-     $device     =~ s/%/\//g;
+     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $reading    = $a[3];
-     $reading     =~ s/%/\//g;
+     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
@@ -2032,9 +2246,17 @@ sub minval_DoParse($) {
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
-
+ 
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
+ 
  # SQL zusammenstellen für DB-Operation
- $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"?","?","ORDER BY TIMESTAMP");
+ if ($IsTimeSet || $IsAggrSet) {
+     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"?","?","ORDER BY TIMESTAMP");
+ } else {
+     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");
+ }
  
  eval{$sth = $dbh->prepare($sql);};
  if ($@) {
@@ -2057,12 +2279,18 @@ sub minval_DoParse($) {
      my $runtime_string_next   = $a[2];   
      
      # SQL zusammenstellen für Logausgabe
-	 $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");
-     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+	 if ($IsTimeSet || $IsAggrSet) {
+	     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");
+     }
+	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
      $runtime_string = encode_base64($runtime_string,"");
      
-     eval {$sth->execute($runtime_string_first, $runtime_string_next);};
+     if ($IsTimeSet || $IsAggrSet) {
+	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+	 } else {
+	     eval{$sth->execute();};	 
+	 }
      if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -2171,9 +2399,9 @@ sub minval_ParseDone($) {
   my $name = $hash->{NAME};
   my $rowlist    = decode_base64($a[1]);
   my $device     = $a[2];
-     $device     =~ s/%/\//g;
+     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $reading    = $a[3];
-     $reading     =~ s/%/\//g;
+     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
@@ -2240,7 +2468,7 @@ sub diffval_DoParse($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbmodel    = $dbloghash->{MODEL};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
- my ($dbh,$sql,$sth,$err);
+ my ($dbh,$sql,$sth,$err,$selspec);
 
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -2263,28 +2491,25 @@ sub diffval_DoParse($) {
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
  
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+ 
+ #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
+ if($dbmodel eq "MYSQL") {
+     $selspec = "TIMESTAMP,VALUE, if(VALUE-\@V < 0 OR \@RB = 1 , \@diff:= 0, \@diff:= VALUE-\@V ) as DIFF, \@V:= VALUE as VALUEBEFORE, \@RB:= '0' as RBIT ";
+ } else {
+     $selspec = "TIMESTAMP,VALUE";
+ }
+ 
  # SQL-Startzeit
  my $st = [gettimeofday];
  
  # SQL zusammenstellen für DB-Operation
- if($dbmodel eq "MYSQL") {
-     $sql  = "SELECT TIMESTAMP,VALUE,
-             if(VALUE-\@V < 0 OR \@RB = 1 , \@diff:= 0, \@diff:= VALUE-\@V ) as DIFF, 
-             \@V:= VALUE as VALUEBEFORE,
-		     \@RB:= '0' as RBIT 
-             FROM history where ";
-     $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
-	 $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
-     $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
-	 $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
-	 $sql .= "TIMESTAMP BETWEEN ? AND ? ORDER BY TIMESTAMP ;";
+ if ($IsTimeSet || $IsAggrSet) {
+     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"?","?",'');
  } else {
-     $sql  = "SELECT TIMESTAMP,VALUE FROM history where ";
-     $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
-	 $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
-     $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
-	 $sql .= "READING = '$reading' AND "    if($reading !~ m(\%)); 
-	 $sql .= "TIMESTAMP BETWEEN ? AND ? ORDER BY TIMESTAMP ;";
+     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'');
  }
  
  $sth = $dbh->prepare($sql); 
@@ -2301,14 +2526,10 @@ sub diffval_DoParse($) {
      $runtime_string           = encode_base64($runtime_string,""); 
      
      # SQL zusammenstellen für Logausgabe
-     my $sql1 = "SELECT ... where ";
-     $sql1 .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
-	 $sql1 .= "DEVICE = '$device' AND "      if($device !~ m(\%));
-     $sql1 .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
-	 $sql1 .= "READING = '$reading' AND "    if($reading !~ m(\%));
-	 $sql1 .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' ORDER BY TIMESTAMP;"; 
-     
-     Log3 ($name, 4, "DbRep $name - SQL execute: $sql1"); 
+	 if ($IsTimeSet || $IsAggrSet) {
+	     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",''); 
+     } 
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
      
 	 if($dbmodel eq "MYSQL") {
 	     eval {$dbh->do("set \@V:= 0, \@diff:= 0, \@diffTotal:= 0, \@RB:= 1;");};   # @\RB = Resetbit wenn neues Selektionsintervall beginnt
@@ -2322,7 +2543,11 @@ sub diffval_DoParse($) {
          return "$name|''|$device|$reading|''|''|''|$err";
      }
 	 
-     eval {$sth->execute($runtime_string_first, $runtime_string_next);};
+     if ($IsTimeSet || $IsAggrSet) {
+	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+	 } else {
+	     eval{$sth->execute();};	 
+	 }
      if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -2514,9 +2739,9 @@ sub diffval_ParseDone($) {
   my $name = $hash->{NAME};
   my $rowlist    = decode_base64($a[1]);
   my $device     = $a[2];
-     $device     =~ s/%/\//g;
+     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $reading    = $a[3];
-     $reading    =~ s/%/\//g;
+     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $rowsrej    = $a[5]?decode_base64($a[5]):undef;     # String von Datensätzen die nicht berücksichtigt wurden (diff Schwellenwert Überschreitung)
@@ -2624,7 +2849,11 @@ sub sumval_DoParse($) {
   
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
- Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
+
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
  
  #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
  if ($dbloghash->{MODEL} eq "POSTGRESQL") {
@@ -2638,7 +2867,11 @@ sub sumval_DoParse($) {
  }
   
  # SQL zusammenstellen für DB-Abfrage
- $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"?","?",'');
+ if ($IsTimeSet || $IsAggrSet) {
+     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"?","?",'');
+ } else {
+     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'');
+ }
  
  eval{$sth = $dbh->prepare($sql);};
  if ($@) {
@@ -2661,12 +2894,16 @@ sub sumval_DoParse($) {
      my $runtime_string_next   = $a[2];
      
      # SQL zusammenstellen für Logging
-	 $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');    
-     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
+	 if ($IsTimeSet || $IsAggrSet) {
+	     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');    
+     } 
+	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
      
-     my @line;
-	 
-	 eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+     if ($IsTimeSet || $IsAggrSet) {
+	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+	 } else {
+	     eval{$sth->execute();};	 
+	 }
 	 if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -2676,7 +2913,7 @@ sub sumval_DoParse($) {
      }
 	 
      # DB-Abfrage -> Ergebnis in @arr aufnehmen
-     @line = $sth->fetchrow_array();
+     my @line = $sth->fetchrow_array();
      
      Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);     
 	 
@@ -2718,9 +2955,9 @@ sub sumval_ParseDone($) {
   my $name       = $hash->{NAME};
   my $arrstr     = decode_base64($a[1]);
   my $device     = $a[2];
-     $device     =~ s/%/\//g;
+     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $reading    = $a[3];
-     $reading     =~ s/%/\//g;
+     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
@@ -2794,11 +3031,19 @@ sub del_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall del_DoParse finished");
-     return "$name|''|''|$err|''";
+     return "$name|''|''|$err|''|''|''";
  }
  
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+ 
  # SQL zusammenstellen für DB-Operation
- $sql = createDeleteSql($hash,$table,$device,$reading,$runtime_string_first,$runtime_string_next,''); 
+ if ($IsTimeSet || $IsAggrSet) {
+     $sql = createDeleteSql($hash,$table,$device,$reading,$runtime_string_first,$runtime_string_next,''); 
+ } else {
+     $sql = createDeleteSql($hash,$table,$device,$reading,undef,undef,''); 
+ }
 
  $sth = $dbh->prepare($sql); 
      
@@ -2813,7 +3058,7 @@ sub del_DoParse($) {
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
      Log3 ($name, 4, "DbRep $name -> BlockingCall del_DoParse finished");
-     return "$name|''|''|$err|''";
+     return "$name|''|''|$err|''|''|''";
  } 
      
  $rows = $sth->rows;
@@ -2831,7 +3076,7 @@ sub del_DoParse($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$rows|$rt|0|$table";
+ return "$name|$rows|$rt|0|$table|$device|$reading";
 }
 
 ####################################################################################################
@@ -2847,6 +3092,10 @@ sub del_ParseDone($) {
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[3]?decode_base64($a[3]):undef;
   my $table      = $a[4];
+  my $device     = $a[5];
+     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g; 
+  my $reading    = $a[6];
+     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g; 
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall del_ParseDone");
   
@@ -2857,11 +3106,6 @@ sub del_ParseDone($) {
       Log3 ($name, 4, "DbRep $name -> BlockingCall del_ParseDone finished");
       return;
   }
-  
-  my $reading = AttrVal($hash->{NAME}, "reading", undef);
-  $reading     =~ s/%/\//g if ($reading);
-  my $device  = AttrVal($hash->{NAME}, "device", undef);
-  $device     =~ s/%/\//g if ($device);
  
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
@@ -3050,7 +3294,7 @@ sub currentfillup_Push($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
- my ($err,$sth,$sql);
+ my ($err,$sth,$sql,$devs,$danz,$ranz);
  
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -3064,7 +3308,7 @@ sub currentfillup_Push($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Push finished");
-     return "$name|''|''|$err";
+     return "$name|''|''|$err|''|''";
  }
  
  # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
@@ -3072,6 +3316,8 @@ sub currentfillup_Push($) {
  
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "'$runtime_string_*'"|"?" in SQL sonst undef) 
  my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash);
+ 
+ ($devs,$danz,$reading,$ranz) = specsForSql($hash,$device,$reading);
   
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -3080,10 +3326,12 @@ sub currentfillup_Push($) {
  # SQL zusammenstellen für DB-Operation
  if ($usepkc && $dbloghash->{MODEL} eq 'MYSQL') {
      $sql  = "INSERT IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
-	 $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
-     $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
-     $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
-     $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
+     $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
+     $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
+     $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
+     $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
+     $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
+     $sql .= "READING IN ($reading) AND "    if($ranz > 1);
      if ($IsTimeSet) {
 	     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
      } else {
@@ -3093,10 +3341,12 @@ sub currentfillup_Push($) {
 	 
  } elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {
      $sql  = "INSERT OR IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
-	 $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
-     $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
-     $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
-     $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
+     $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
+     $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
+     $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
+     $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
+     $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
+     $sql .= "READING IN ($reading) AND "    if($ranz > 1);
      if ($IsTimeSet) {
 	     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
      } else {
@@ -3106,10 +3356,12 @@ sub currentfillup_Push($) {
  
  } elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
      $sql  = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT '2017-01-01 00:00:00',device,reading FROM history where ";
-	 $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
-     $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
-     $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
-     $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
+     $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
+     $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
+     $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
+     $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
+     $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
+     $sql .= "READING IN ($reading) AND "    if($ranz > 1);
      if ($IsTimeSet) {
 	     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
      } else {
@@ -3121,26 +3373,30 @@ sub currentfillup_Push($) {
      if($dbloghash->{MODEL} ne 'POSTGRESQL') {
 	     # MySQL und SQLite
          $sql  = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
-	     $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
-         $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
-         $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
-         $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
-     if ($IsTimeSet) {
-	     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-     } else {
+         $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
+         $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
+         $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
+         $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
+         $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
+         $sql .= "READING IN ($reading) AND "    if($ranz > 1);
+         if ($IsTimeSet) {
+	         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
+         } else {
              $sql .= "1 ";
          }
 	     $sql .= "group by device,reading ;";
 	 } else {
 	     # PostgreSQL
          $sql  = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT '2017-01-01 00:00:00',device,reading FROM history where ";
-	     $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
-         $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
-         $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
-         $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
-     if ($IsTimeSet) {
-	     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-     } else {
+         $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
+         $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
+         $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
+         $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
+         $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
+         $sql .= "READING IN ($reading) AND "    if($ranz > 1);
+         if ($IsTimeSet) {
+	         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
+         } else {
              $sql .= "true ";
          }
 	     $sql .= "group by device,reading ORDER BY 2 ASC, 3 ASC;";
@@ -3157,7 +3413,7 @@ sub currentfillup_Push($) {
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Push finished");
 	 $dbh->disconnect();
-     return "$name|''|''|$err";
+     return "$name|''|''|$err|''|''";
  }
  
  $dbh->begin_work();
@@ -3171,7 +3427,7 @@ sub currentfillup_Push($) {
      $dbh->rollback();
      $dbh->disconnect();
      Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Push finished");
-     return "$name|''|''|$err";
+     return "$name|''|''|$err|''|''";
  } else {
      $dbh->commit();
      $irow = $sth->rows;
@@ -3188,7 +3444,7 @@ sub currentfillup_Push($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$irow|$rt|0";
+ return "$name|$irow|$rt|0|$device|$reading";
 }
 
 ####################################################################################################
@@ -3203,16 +3459,13 @@ sub currentfillup_Done($) {
   my $bt         = $a[2];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[3]?decode_base64($a[3]):undef;
+  my $device     = $a[4]; 
+  my $reading    = $a[5];
+
+  undef $device if ($device =~ m(^%$));
+  undef $reading if ($reading =~ m(^%$));
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall currentfillup_Done");
-  
-  my $i_timestamp = delete $hash->{HELPER}{I_TIMESTAMP};
-  my $i_device    = delete $hash->{HELPER}{I_DEVICE};
-  my $i_type      = delete $hash->{HELPER}{I_TYPE};
-  my $i_event     = delete $hash->{HELPER}{I_EVENT};
-  my $i_reading   = delete $hash->{HELPER}{I_READING};
-  my $i_value     = delete $hash->{HELPER}{I_VALUE};
-  my $i_unit      = delete $hash->{HELPER}{I_UNIT}; 
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall currentfillup_Done"); 
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -3226,10 +3479,10 @@ sub currentfillup_Done($) {
   no warnings 'uninitialized'; 
   
   my $rowstr;
-  $rowstr = $irow if(!AttrVal($name,"device",undef) && !AttrVal($name,"reading",undef));
-  $rowstr = $irow." - limited by device: ".AttrVal($name,"device",undef) if(AttrVal($name,"device",undef) && !AttrVal($name,"reading",undef));
-  $rowstr = $irow." - limited by reading: ".AttrVal($name,"reading",undef) if(!AttrVal($name,"device",undef) && AttrVal($name,"reading",undef));
-  $rowstr = $irow." - limited by device: ".AttrVal($name,"device",undef)." and reading: ".AttrVal($name,"reading",undef) if(AttrVal($name,"device",undef) && AttrVal($name,"reading",undef)); 
+  $rowstr = $irow if(!$device && !$reading);
+  $rowstr = $irow." - limited by device: ".$device if($device && !$reading);
+  $rowstr = $irow." - limited by reading: ".$reading if(!$device && $reading);
+  $rowstr = $irow." - limited by device: ".$device." and reading: ".$reading if($device && $reading); 
   
   readingsBeginUpdate($hash);
   ReadingsBulkUpdateValue($hash, "number_lines_inserted", $rowstr);        
@@ -3573,7 +3826,7 @@ sub expfile_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
-     return "$name|''|''|$err";
+     return "$name|''|''|$err|''|''";
  }
  
  my $outfile = AttrVal($name, "expimpfile", undef);
@@ -3584,19 +3837,24 @@ sub expfile_DoParse($) {
      return "$name|''|''|$err";
  }
  
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "'$runtime_string_*'"|"?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash);
+ 
  # SQL zusammenstellen für DB-Abfrage
- $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"?","?","ORDER BY TIMESTAMP");  
-         
+ if ($IsTimeSet) {
+     $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");  
+ } else {
+     $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");  
+ }
+ 
  $sth = $dbh->prepare($sql);
-  
- # SQL zusammenstellen für Logfileausgabe
- $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");  
- Log3 ($name, 4, "DbRep $name - SQL execute: $sql");    
+ 
+ Log3 ($name, 4, "DbRep $name - SQL execute: $sql");     
 
  # SQL-Startzeit
  my $st = [gettimeofday];
  
- eval {$sth->execute($runtime_string_first, $runtime_string_next);};
+ eval {$sth->execute();};
  
  my $nrows = 0;
  if ($@) {
@@ -3604,7 +3862,7 @@ sub expfile_DoParse($) {
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
      Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
-     return "$name|''|''|$err";
+     return "$name|''|''|$err|''|''";
  } else {
      # only for this block because of warnings of uninitialized values
      no warnings 'uninitialized'; 
@@ -3630,7 +3888,7 @@ sub expfile_DoParse($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$nrows|$rt|$err";
+ return "$name|$nrows|$rt|$err|$device|$reading";
 }
 
 ####################################################################################################
@@ -3645,6 +3903,10 @@ sub expfile_ParseDone($) {
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[3]?decode_base64($a[3]):undef;
   my $name       = $hash->{NAME};
+  my $device     = $a[4];
+     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g; 
+  my $reading    = $a[5];
+     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g; 
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall expfile_ParseDone");
   
@@ -3655,9 +3917,6 @@ sub expfile_ParseDone($) {
       Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_ParseDone finished");
       return;
   } 
-  
-  my $reading = AttrVal($hash->{NAME}, "reading", undef);
-  my $device  = AttrVal($hash->{NAME}, "device", undef);
  
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
@@ -4232,6 +4491,7 @@ sub dbmeta_DoParse($) {
 			       while (my @line = $sth->fetchrow_array()) {
                        Log3 ($name, 4, "DbRep $name - SQL result: @line");
 					   my $row = join("|", @line);
+					   $row =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd; 
 		               $row =~ s/\|/<\/td><td style='padding-right:5px;padding-left:5px'>/g;
                        $res .= "<tr><td style='padding-right:5px;padding-left:5px'>".$row."</td></tr>";
                    }
@@ -5479,13 +5739,17 @@ sub createSelectSql($$$$$$$$) {
  my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
  my $name    = $hash->{NAME};
  my $dbmodel = $hash->{dbloghash}{MODEL};
- my $sql;
+ my ($sql,$devs,$danz,$ranz);
+ 
+ ($devs,$danz,$reading,$ranz) = specsForSql($hash,$device,$reading);
  
  $sql = "SELECT $selspec FROM $table where ";
- $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
- $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
- $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
- $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
+ $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
+ $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
+ $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
+ $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
+ $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
+ $sql .= "READING IN ($reading) AND "    if($ranz > 1);
  if (($tf && $tn)) {
      $sql .= "TIMESTAMP >= $tf AND TIMESTAMP < $tn ";
  } else {
@@ -5505,19 +5769,24 @@ return $sql;
 ####################################################################################################
 sub createDeleteSql($$$$$$$) {
  my ($hash,$table,$device,$reading,$tf,$tn,$addon) = @_;
+ my $name    = $hash->{NAME};
  my $dbmodel = $hash->{dbloghash}{MODEL};
- my $sql;
+ my ($sql,$devs,$danz,$ranz);
  
  if($table eq "current") {
      $sql = "delete FROM $table; ";
 	 return $sql;
  }
  
+ ($devs,$danz,$reading,$ranz) = specsForSql($hash,$device,$reading);
+ 
  $sql = "delete FROM $table where ";
- $sql .= "DEVICE LIKE '$device' AND "   if($device !~ m(^%$) && $device =~ m(\%));
- $sql .= "DEVICE = '$device' AND "      if($device !~ m(\%));
- $sql .= "READING LIKE '$reading' AND " if($reading !~ m(^%$) && $reading =~ m(\%));
- $sql .= "READING = '$reading' AND "    if($reading !~ m(\%));
+ $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
+ $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
+ $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
+ $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
+ $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
+ $sql .= "READING IN ($reading) AND "    if($ranz > 1);
  if ($tf && $tn) {
      $sql .= "TIMESTAMP >= '$tf' AND TIMESTAMP < '$tn' $addon;";
  } else {
@@ -5529,6 +5798,33 @@ sub createDeleteSql($$$$$$$) {
  }
 
 return $sql;
+}
+
+####################################################################################################
+#               Ableiten von Device, Reading-Spezifikationen 
+####################################################################################################
+sub specsForSql($$$) {
+ my ($hash,$device,$reading) = @_;
+ my $name    = $hash->{NAME};
+ 
+ my @dvspcs = devspec2array($device);
+ my $devs = join(",",@dvspcs);
+ my $danz = $#dvspcs+1;
+ if ($danz > 1) {
+     $devs =~ s/,/','/g;
+	 $devs = "'".$devs."'";
+ }
+ Log3 $name, 5, "DbRep $name - Device specifications use for select: $devs";
+ 
+ my @reads = split(/,|\s/,$reading);
+ my $ranz = $#reads+1;
+ if ($ranz > 1) {
+     $reading =~ s/,/','/g;
+	 $reading = "'".$reading."'";
+ }
+ Log3 $name, 5, "DbRep $name - Reading specification use for select: $reading";
+
+return ($devs,$danz,$reading,$ranz);
 }
 
 ####################################################################################################
@@ -5840,177 +6136,6 @@ sub browser_refresh($) {
   {FW_directNotify("#FHEMWEB:WEB", "location.reload('true')", "")};
   #  map { FW_directNotify("#FHEMWEB:$_", "location.reload(true)", "") } devspec2array("WEB.*");
 return;
-}
-
-
-####################################################################################################
-#  Zusammenstellung Aggregationszeiträume
-####################################################################################################
-sub collaggstr($$$$) {
- my ($hash,$runtime,$i,$runtime_string_next) = @_;
- my $name = $hash->{NAME};
- my $runtime_string;                                               # Datum/Zeit im SQL-Format für Readingname Teilstring
- my $runtime_string_first;                                         # Datum/Zeit Auswertungsbeginn im SQL-Format für SQL-Statement
- my $ll;                                                           # loopindikator, wenn 1 = loopausstieg
- my $runtime_orig;                                                 # orig. runtime als Grundlage für Addition mit $aggsec
- my $tsstr             = $hash->{HELPER}{CV}{tsstr};               # für Berechnung Tagesverschieber / Stundenverschieber      
- my $testr             = $hash->{HELPER}{CV}{testr};               # für Berechnung Tagesverschieber / Stundenverschieber
- my $dsstr             = $hash->{HELPER}{CV}{dsstr};               # für Berechnung Tagesverschieber / Stundenverschieber
- my $destr             = $hash->{HELPER}{CV}{destr};               # für Berechnung Tagesverschieber / Stundenverschieber
- my $msstr             = $hash->{HELPER}{CV}{msstr};               # Startmonat für Berechnung Monatsverschieber
- my $mestr             = $hash->{HELPER}{CV}{mestr};               # Endemonat für Berechnung Monatsverschieber
- my $ysstr             = $hash->{HELPER}{CV}{ysstr};               # Startjahr für Berechnung Monatsverschieber
- my $yestr             = $hash->{HELPER}{CV}{yestr};               # Endejahr für Berechnung Monatsverschieber
- my $aggregation       = $hash->{HELPER}{CV}{aggregation};         # Aggregation
- my $aggsec            = $hash->{HELPER}{CV}{aggsec};              # laufende Aggregationssekunden
- my $epoch_seconds_end = $hash->{HELPER}{CV}{epoch_seconds_end};
- my $wdadd             = $hash->{HELPER}{CV}{wdadd};               # Ergänzungstage. Starttag + Ergänzungstage = der folgende Montag (für week-Aggregation)  
- 
- # only for this block because of warnings if some values not set
- no warnings 'uninitialized'; 
-
-         # keine Aggregation (all between timestamps)
-         if ($aggregation eq "no") {
-             $runtime_string       = "all_between_timestamps";                                         # für Readingname
-             $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
-             $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);  
-             $ll = 1;
-         }
-         
-         # Monatsaggregation
-         if ($aggregation eq "month") {
-             $runtime_orig = $runtime;
-             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-             
-             # Hilfsrechnungen
-             my $rm   = strftime "%m", localtime($runtime);                    # Monat des aktuell laufenden Startdatums d. SQL-Select
-             my $ry   = strftime "%Y", localtime($runtime);                    # Jahr des aktuell laufenden Startdatums d. SQL-Select
-             my $dim  = $rm-2?30+($rm*3%7<4):28+!($ry%4||$ry%400*!($ry%100));  # Anzahl Tage des aktuell laufenden Monats f. SQL-Select
-             Log3 ($name, 5, "DbRep $name - act year:  $ry, act month: $rm, days in month: $dim, endyear: $yestr, endmonth: $mestr"); 
-                     
-             $runtime_string       = strftime "%Y-%m", localtime($runtime);                            # für Readingname
-             
-             if ($i==1) {
-                 # nur im ersten Durchlauf
-                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime_orig);
-             }
-             
-             if ($ysstr == $yestr && $msstr == $mestr || $ry ==  $yestr && $rm == $mestr) {
-                 $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>1);
-                 $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-                 $ll=1;
-                
-             } else {
-                 if(($runtime) > $epoch_seconds_end) {
-                     $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>11);                     
-                     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-                     $ll=1;
-                 } else {
-                     $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>1);
-                     $runtime_string_next  = strftime "%Y-%m-01", localtime($runtime+($dim*86400));
-                     
-                 } 
-             }
-         my ($yyyy1, $mm1, $dd1) = ($runtime_string_next =~ /(\d+)-(\d+)-(\d+)/);
-         $runtime = timelocal("00", "00", "00", "01", $mm1-1, $yyyy1-1900);
-         
-         # neue Beginnzeit in Epoche-Sekunden
-         $runtime = $runtime_orig+$aggsec;
-         }
-         
-         # Wochenaggregation
-         if ($aggregation eq "week") {          
-             $runtime = $runtime+3600 if($i!=1 && dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-             $runtime_orig = $runtime; 
-
-             my $w  = strftime "%V", localtime($runtime);            # Wochennummer des aktuellen Startdatum/Zeit
-             $runtime_string = "week_".$w;                           # für Readingname
-             my $ms = strftime "%m", localtime($runtime);            # Startmonat (01-12)
-             my $me = strftime "%m", localtime($epoch_seconds_end);  # Endemonat (01-12)
-             
-             if ($i==1) {
-                 # nur im ersten Schleifendurchlauf
-                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
-                 
-                 # Korrektur $runtime_orig für Berechnung neue Beginnzeit für nächsten Durchlauf 
-                 my ($yyyy1, $mm1, $dd1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+)/);
-                 $runtime = timelocal("00", "00", "00", $dd1, $mm1-1, $yyyy1-1900);
-                 $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);           # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-                 $runtime = $runtime+$wdadd;
-                 $runtime_orig = $runtime-$aggsec;                             
-                 
-                 # die Woche Beginn ist gleich der Woche vom Ende Auswertung
-                 if((strftime "%V", localtime($epoch_seconds_end)) eq ($w) && ($ms+$me != 13)) {                  
-                     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
-                     $ll=1;
-                 } else {
-                      $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime);
-                 }
-             } else {
-                 # weitere Durchläufe
-                 if(($runtime+$aggsec) > $epoch_seconds_end) {
-                     $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime_orig);
-                     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
-                     $ll=1;
-                 } else {
-                     $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime_orig) ;
-                     $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime+$aggsec);  
-                 }
-             }
-         
-         # neue Beginnzeit in Epoche-Sekunden
-         $runtime = $runtime_orig+$aggsec;           
-         }
-     
-         # Tagesaggregation
-         if ($aggregation eq "day") {  
-             $runtime_string       = strftime "%Y-%m-%d", localtime($runtime);                      # für Readingname
-             $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
-             $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime) if($i>1);
-             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-                                               
-             if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
-                 $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime);                    
-                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr);
-                 $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-                 $ll=1;
-             } else {
-                 $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime+$aggsec);   
-             }
-         Log3 ($name, 5, "DbRep $name - runtime_string: $runtime_string, runtime_string_first(begin): $runtime_string_first, runtime_string_next(end): $runtime_string_next");
-
-         # neue Beginnzeit in Epoche-Sekunden
-         $runtime = $runtime+$aggsec;         
-         }
-     
-         # Stundenaggregation
-         if ($aggregation eq "hour") {
-             $runtime_string       = strftime "%Y-%m-%d_%H", localtime($runtime);                   # für Readingname
-             $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
-             $runtime = $runtime+3600 if(dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-             $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime) if($i>1);
-             
-             my @a = split (":",$tsstr);
-             my $hs = $a[0];
-             my $msstr = $a[1].":".$a[2];
-             @a = split (":",$testr);
-             my $he = $a[0];
-             my $mestr = $a[1].":".$a[2];
-             
-             if((($msstr gt $mestr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
-                 $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime);                 
-                 $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr && $hs eq $he);
-                 $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-                 $ll=1;
-             } else {
-                 $runtime_string_next  = strftime "%Y-%m-%d %H", localtime($runtime+$aggsec);   
-             }
-        
-         # neue Beginnzeit in Epoche-Sekunden
-         $runtime = $runtime+$aggsec;         
-         }
-         
-return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll);
 }
 
 ####################################################################################################
@@ -6659,7 +6784,26 @@ return;
 
   <li><b>allowDeletion </b>   - unlocks the delete-function  </li> <br>
 
-  <li><b>device </b>          - selection of a particular device   </li> <br>
+  <li><b>device </b>          - Selection of a particular device. <br>
+                                You can specify <a href="https://fhem.de/commandref.html#devspec">device specifications (devspec)</a>. <br> 
+								Inside of device specifications a SQL wildcard (%) will be evaluated as a normal ASCII-character. 
+								The device names are derived from device specification and the active devices in FHEM before 
+                                SQL selection will be carried out. </li> <br>
+  
+                                <ul>
+							    <b>Examples:</b> <br>
+								<code>attr &lt;Name&gt; device TYPE=DbRep</code> <br>
+								# select datasets of active present devices with Type "DbRep" <br> 
+								<code>attr &lt;Name&gt; device MySTP_5000</code> <br>
+								# select datasets of device "MySTP_5000" <br> 
+								<code>attr &lt;Name&gt; device SMA.*</code> <br>
+								# select datasets of devices starting with "SMA" <br> 
+								<code>attr &lt;Name&gt; device SMA_Energymeter,MySTP_5000</code> <br>
+								# select datasets of devices "SMA_Energymeter" and "MySTP_5000" <br>
+								<code>attr &lt;Name&gt; device %5000</code> <br>
+								# select datasets of devices ending with "5000" <br>  								
+								</ul>
+								<br><br>
 
   <li><b>diffAccept </b>      - valid for function diffValue. diffAccept determines the threshold,  up to that a calaculated difference between two 
                                 straight sequently datasets should be commenly accepted (default = 20). <br>
@@ -6775,7 +6919,18 @@ sub bdump {
 										  </ul>
                                           </li> <br> 
 
-  <li><b>reading </b>         - selection of a particular reading   </li> <br>
+  <li><b>reading </b>         - Selection of a particular reading.
+                                More than one reading are specified as a comma separated list. <br>
+								If SQL wildcard (%) is set in a list, it will be evaluated as a normal ASCII-character. <br>
+                                </li> <br>  
+								
+                                <ul>
+							    <b>Examples:</b> <br>
+								<code>attr &lt;Name&gt; reading etotal</code> <br> 
+								<code>attr &lt;Name&gt; reading et%</code> <br>
+								<code>attr &lt;Name&gt; reading etotal,etoday</code> <br>
+								</ul>
+								<br><br>
 
   <li><b>readingNameMap </b>  - the name of the analyzed reading can be overwritten for output  </li> <br>
 
@@ -6921,7 +7076,7 @@ sub bdump {
 								86400, all datasets older than one day will be considered). The Timestamp calculation 
 								will be done dynamically at execution time. </li> <br> 
 
-  <li><b>timeout </b>         - set the timeout-value for Blocking-Call Routines in background (default 86400 seconds)  </li> <br>
+  <li><b>timeout </b>         - set the timeout-value for Blocking-Call Routines in background in seconds (default 86400)  </li> <br>
 
   <li><b>userExitFn   </b>   - provides an interface to execute user specific program code. <br>
                                To activate the interfaace at first you should implement the subroutine which will be 
@@ -7603,8 +7758,9 @@ sub bdump {
   Über die modulspezifischen Attribute wird die Abgrenzung der Auswertung und die Aggregation der Werte gesteuert. <br><br>
   
   <b>Hinweis zur SQL-Wildcard Verwendung:</b> <br>
-  Innerhalb der Attribut-Werte für "device" und "reading" kann SQL-Wildcards "%" angegeben werden. Das Zeichen "_" wird nicht als SQL-Wildcard supported.
-  Dabei wird "%" als Platzhalter für beliebig viele Zeichen verwendet.  <br>
+  Innerhalb der Attribut-Werte für "device" und "reading" kann SQL-Wildcards "%" angegeben werden. 
+  Dabei wird "%" als Platzhalter für beliebig viele Zeichen verwendet. 
+  Das Zeichen "_" wird nicht als SQL-Wildcard supported.  <br>
   Dies gilt für alle Funktionen <b>ausser</b> "insert", "importFromFile" und "deviceRename". <br>
   Die Funktion "insert" erlaubt nicht, dass die genannten Attribute das Wildcard "%" enthalten. Character "_" wird als normales Zeichen gewertet.<br>
   In Ergebnis-Readings wird das Wildcardzeichen "%" durch "/" ersetzt um die Regeln für erlaubte Zeichen in Readings einzuhalten.
@@ -7615,7 +7771,22 @@ sub bdump {
 
   <li><b>allowDeletion </b>   - schaltet die Löschfunktion des Moduls frei   </li> <br>
 
-  <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. </li> <br>
+  <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. <br>
+                                Es können <a href="https://fhem.de/commandref_DE.html#devspec">Geräte-Spezifikationen (devspec)</a>
+								angegeben werden. <br> 
+								Innerhalb von Geräte-Spezifikationen wird SQL-Wildcard (%) als normales ASCII-Zeichen gewertet. 
+								Die Devicenamen werden vor der Selektion aus der Geräte-Spezifikationen und den aktuell in FHEM 
+								vorhandenen Devices abgeleitet. </li> <br>
+  
+                                <ul>
+							    <b>Beispiele:</b> <br>
+								<code>attr &lt;Name&gt; device TYPE=DbRep</code> <br>
+								<code>attr &lt;Name&gt; device MySTP_5000</code> <br> 
+								<code>attr &lt;Name&gt; device SMA.*,MySTP.*</code> <br> 
+								<code>attr &lt;Name&gt; device SMA_Energymeter,MySTP_5000</code> <br>
+								<code>attr &lt;Name&gt; device %5000</code> <br>
+								</ul>
+								<br><br>
 
   <li><b>diffAccept </b>      - gilt für Funktion diffValue. diffAccept legt fest bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz 
                                 zwischen zwei unmittelbar aufeinander folgenden Datensätzen akzeptiert werden soll (Standard ist 20). <br>
@@ -7726,7 +7897,18 @@ sub bdump {
 										  </ul>
                                           </li> <br> 
   
-  <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes Reading   </li> <br>  
+  <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Readings.
+                                Mehrere Readings werden als Komma separierte Liste angegeben. <br>
+								SQL Wildcard (%) wird in einer Liste als normales ASCII-Zeichen gewertet. <br>
+                                </li> <br>  
+								
+                                <ul>
+							    <b>Beispiele:</b> <br>
+								<code>attr &lt;Name&gt; reading etotal</code> <br>
+								<code>attr &lt;Name&gt; reading et%</code> <br>
+								<code>attr &lt;Name&gt; reading etotal,etoday</code> <br>
+								</ul>
+								<br><br>
   
   <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben  </li> <br>
   
@@ -7872,8 +8054,9 @@ sub bdump {
 								Datensätze die älter als ein Tag sind berücksichtigt). Die Timestampermittlung erfolgt 
 								dynamisch zum Ausführungszeitpunkt. </li> <br> 
 								
-  <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen (Standard 86400 Sekunden) in 
-                                Sekunden  </li> <br>
+  <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen in Sekunden  
+                                (Default: 86400) </li> <br>
+								
   <li><b>userExitFn   </b>    - stellt eine Schnittstelle zur Ausführung eigenen Usercodes zur Verfügung. <br>
                                 Um die Schnittstelle zu aktivieren, wird zunächst die aufzurufende Subroutine in 
 							    99_myUtls.pm nach folgendem Muster erstellt:     <br>
