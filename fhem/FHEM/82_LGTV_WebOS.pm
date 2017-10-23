@@ -67,7 +67,7 @@ use Blocking;
 
 
 
-my $version = "1.0.1";
+my $version = "1.2.0";
 
 
 
@@ -258,7 +258,7 @@ sub LGTV_WebOS_Define($$) {
     if( $init_done ) {
         LGTV_WebOS_TimerStatusRequest($hash);
     } else {
-        InternalTimer( gettimeofday()+15, "LGTV_WebOS_TimerStatusRequest", $hash, 0 );
+        InternalTimer( gettimeofday()+15, "LGTV_WebOS_TimerStatusRequest", $hash );
     }
     
     return undef;
@@ -332,8 +332,6 @@ sub LGTV_WebOS_TimerStatusRequest($) {
     
         Log3 $name, 4, "LGTV_WebOS ($name) - run get functions";
 
-        
-        readingsBulkUpdate($hash, 'state', 'on');
         LGTV_WebOS_Presence($hash) if( AttrVal($name,'pingPresence', 0) == 1 );
         
         if($hash->{helper}{device}{channelguide}{counter} > 2 and AttrVal($name,'channelGuide', 0) == 1 and ReadingsVal($name,'launchApp', 'TV') eq 'TV' ) {
@@ -344,23 +342,22 @@ sub LGTV_WebOS_TimerStatusRequest($) {
         } else {
         
             LGTV_WebOS_GetAudioStatus($hash);
-            InternalTimer( gettimeofday()+2, 'LGTV_WebOS_GetCurrentChannel', $hash, 0 ) if( ReadingsVal($name,'launchApp', 'TV') eq 'TV' );
-            InternalTimer( gettimeofday()+4, 'LGTV_WebOS_GetForgroundAppInfo', $hash, 0 );
-            InternalTimer( gettimeofday()+6, 'LGTV_WebOS_Get3DStatus', $hash, 0 );
-            InternalTimer( gettimeofday()+8, 'LGTV_WebOS_GetExternalInputList', $hash, 0 );
+            InternalTimer( gettimeofday()+2, 'LGTV_WebOS_GetCurrentChannel', $hash ) if( ReadingsVal($name,'launchApp', 'TV') eq 'TV' );
+            InternalTimer( gettimeofday()+4, 'LGTV_WebOS_GetForgroundAppInfo', $hash );
+            InternalTimer( gettimeofday()+6, 'LGTV_WebOS_Get3DStatus', $hash );
+            InternalTimer( gettimeofday()+8, 'LGTV_WebOS_GetExternalInputList', $hash );
         }
     
     } elsif( IsDisabled($name) ) {
     
         LGTV_WebOS_Close($hash);
+        LGTV_WebOS_Presence($hash) if( AttrVal($name,'pingPresence', 0) == 1 );
         $hash->{helper}{device}{runsetcmd}              = 0;
         readingsBulkUpdate($hash, 'state', 'disabled');
     
     } else {
         
         LGTV_WebOS_Presence($hash) if( AttrVal($name,'pingPresence', 0) == 1 );
-        
-        readingsBulkUpdate($hash, 'state', 'off');
         
         readingsBulkUpdate($hash,'channel','-');
         readingsBulkUpdate($hash,'channelName','-');
@@ -380,7 +377,7 @@ sub LGTV_WebOS_TimerStatusRequest($) {
     LGTV_WebOS_Open($hash) if( !IsDisabled($name) and not $hash->{CD} );
     
     $hash->{helper}{device}{channelguide}{counter}  = $hash->{helper}{device}{channelguide}{counter} +1;
-    InternalTimer( gettimeofday()+10,"LGTV_WebOS_TimerStatusRequest", $hash, 1 );
+    InternalTimer( gettimeofday()+10,"LGTV_WebOS_TimerStatusRequest", $hash );
 }
 
 sub LGTV_WebOS_Set($@) {
@@ -590,7 +587,6 @@ sub LGTV_WebOS_Open($) {
     $hash->{CD}    = $socket;         # sysread / close won't work on fileno
     $selectlist{$name} = $hash;
     
-    
     Log3 $name, 4, "LGTV_WebOS ($name) - Socket Connected";
     
     LGTV_WebOS_Handshake($hash);
@@ -609,6 +605,8 @@ sub LGTV_WebOS_Close($) {
     delete($hash->{FD});
     delete($hash->{CD});
     delete($selectlist{$name});
+    
+    readingsSingleUpdate($hash,'state','off',1);
     
     Log3 $name, 4, "LGTV_WebOS ($name) - Socket Disconnected";
 }
@@ -787,7 +785,7 @@ sub LGTV_WebOS_ResponseProcessing($$) {
             if ($keyAccept eq $expectedResponse) {
         
                 Log3 $name, 3, "LGTV_WebOS ($name) - Sucessfull WS connection to $hash->{HOST}";
-                readingsSingleUpdate($hash, 'state', 'on', 1 );
+                readingsSingleUpdate($hash,'state','on',1);
         
             } else {
                 LGTV_WebOS_Close($hash);
@@ -990,6 +988,8 @@ sub LGTV_WebOS_WriteReadings($$) {
         readingsBulkUpdate($hash,'channelNextStartTime','-');
         readingsBulkUpdate($hash,'channelNextEndTime','-');
     }
+    
+    readingsBulkUpdateIfChanged($hash,'state','on');
 
     readingsEndUpdate($hash, 1);
 }
@@ -1397,12 +1397,14 @@ sub LGTV_WebOS_PresenceDone($) {
     
     delete($hash->{helper}{RUNNING_PID});
     
-    Log3 $name, 4, "Sub LGTV_WebOS_PresenceDone ($name) - Der Helper ist diabled. Daher wird hier abgebrochen" if($hash->{helper}{DISABLED});
+    Log3 $name, 4, "Sub LGTV_WebOS_PresenceDone ($name) - Helper is disabled. Stop processing" if($hash->{helper}{DISABLED});
     return if($hash->{helper}{DISABLED});
     
     readingsSingleUpdate($hash, 'presence', $response, 1);
     
-    Log3 $name, 4, "Sub LGTV_WebOS_PresenceDone ($name) - Abschluss!";
+    LGTV_WebOS_SocketClosePresenceAbsent($hash,$response);
+    
+    Log3 $name, 4, "Sub LGTV_WebOS_PresenceDone ($name) - presence done";
 }
 
 sub LGTV_WebOS_PresenceAborted($) {
@@ -1415,6 +1417,18 @@ sub LGTV_WebOS_PresenceAborted($) {
     readingsSingleUpdate($hash,'presence','pingPresence timedout', 1);
     
     Log3 $name, 4, "Sub LGTV_WebOS_PresenceAborted ($name) - The BlockingCall Process terminated unexpectedly. Timedout!";
+}
+
+sub LGTV_WebOS_SocketClosePresenceAbsent($$) {
+
+    my ($hash,$presence)    = @_;
+    
+    my $name                = $hash->{NAME};
+    
+    
+    LGTV_WebOS_Close($hash)
+    if( $presence eq 'absent' and not IsDisabled($name) and $hash->{CD} );  # https://forum.fhem.de/index.php/topic,66671.msg694578.html#msg694578
+    # Sobald pingPresence absent meldet und der Socket noch steht soll er geschlossen werden, da sonst FHEM nach 4-6 min für 10 min blockiert
 }
 
 sub LGTV_WebOS_WakeUp_Udp($@) {
