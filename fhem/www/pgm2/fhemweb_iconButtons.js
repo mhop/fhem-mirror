@@ -56,8 +56,8 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
   $(newEl).find("label").css({"margin":"0","border":"0","border-radius":"4px","background":"inherit"});
   $(newEl).find("span").css({"padding":"0.0em 0.3em"});
 
-  $(newEl).find("Label").each(function(ind,val){
-    $(val).addClass("iconButtons_widget")
+  $(newEl).find("label").each(function(ind,val){
+    $(val).addClass("iconButtons_widget");
 
     var ico = vArr[ind*ipar+3];
     FW_cmd(FW_root+"?cmd={FW_makeImage('"+ico+"')}&XHR=1",function(data){

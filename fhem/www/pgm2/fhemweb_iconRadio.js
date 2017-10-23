@@ -60,7 +60,7 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
   $(newEl).find("span").css({"padding":"0.0em 0.3em"});
 
   $(newEl).find("label").each(function(ind,val){
-    $(val).addClass("iconRadio_widget")
+    $(val).addClass("iconRadio_widget");
 
     var ico = vArr[ind*ipar+3];
     FW_cmd(FW_root+"?cmd={FW_makeImage('"+ico+"')}&XHR=1",function(data){
