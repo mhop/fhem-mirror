@@ -227,6 +227,7 @@ FHEM/46_TRX_SECURITY.pm      wherzig              RFXTRX
 FHEM/46_TRX_WEATHER.pm       wherzig              RFXTRX
 FHEM/46_SmartPi.pm           CoolTux              Sonstige Systeme
 FHEM/46_TeslaPowerwall2AC.pm CoolTux              Solaranlagen
+FHEM/46_Aqicn.pm             CoolTux              Sonstige Systeme
 FHEM/47_OBIS.pm              icinger              Sonstige Systeme
 FHEM/49_IPCAM.pm             mfr69bs              Sonstiges
 FHEM/49_SSCAM.pm             DS_Starter           Sonstiges
