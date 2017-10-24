@@ -23,6 +23,12 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
     return undefined;
   var ipar = 2;
 
+  var use4icon = false;
+  if(vArr[1].match(/^use4icon@/)) {
+    use4icon = true;
+    vArr[1] = vArr[1].replace(/^use4icon@/,"");
+  }
+
   if( vArr[1].match(/^[A-F0-9]{6}$/))
     vArr[1] = "#"+vArr[1];
 
@@ -50,21 +56,48 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
     $(newEl).append(label);
 
     $(button).change(clicked);
+
+    if( currVal )
+      button.prop("checked", currVal.match(new RegExp('(^|,)'+vArr[i]+'($|,)') ) );
   }
 
   $(newEl).buttonset();
   $(newEl).find("label").css({"margin":"0","border":"0","border-radius":"4px","background":"inherit"});
-  $(newEl).find("span").css({"padding":"0.0em 0.3em"});
-
-  $(newEl).find("label").each(function(ind,val){
-    $(val).addClass("iconButtons_widget");
+  $(newEl).find("span").css({"padding":"0.0em 0.3em"})
+                       .attr( "selectcolor",use4icon ? vArr[1] : "");
+  $(newEl).find("input").each(function(ind,val){
+    $(val).next().find("span").attr("ischecked",$(val).prop("checked"));
+  });
+  $(newEl).find("Label").each(function(ind,val){
+    $(val).addClass("iconButtons_widget")
 
     var ico = vArr[ind*ipar+3];
+    var m = ico.match(/.*@(.*)/);
+    var uscol = m[1];
+    if( uscol.match(/^[A-F0-9]{6}$/))
+      uscol = "#"+uscol;
+    $(val).find("span").attr( "unselectcolor",uscol);
+
     FW_cmd(FW_root+"?cmd={FW_makeImage('"+ico+"')}&XHR=1",function(data){
        data = data.replace(/\n$/,'');
       $(newEl).find("label").each(function(ind,val){
+        var span = $(val).find("span");
+        var sc = $(span).attr("selectcolor");
+        var usc = $(span).attr("unselectcolor");
+        var isc = $(span).attr("ischecked");
         var re = new RegExp("\"\s?"+$(val).attr("name")+"(\s?|\")","i");
         if (!(data.match(re) === null) && ($(val).find("span").html().match(re) === null)) {
+          if(isc == "true") {
+            if(sc.length > 0) {
+              data = data.replace(/fill=\".*?\"/,'fill="'+sc+'"')
+                         .replace(/fill:.*?[;\s]/,'fill:'+sc+';');
+            }
+          } else {
+            if(sc.length > 0) {
+              data = data.replace(/fill=\".*?\"/,'fill="'+usc+'"')
+                         .replace(/fill:.*?[;\s]/,'fill:'+usc+';');
+            }
+          }
           $(val).find("span").addClass("iconButtons_widget").html(data);
           return false;
         }
@@ -79,26 +112,52 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
   newEl.getValueFn = function(arg) { var new_val="";
                                   for( var i = 0; i < buttons.length; ++i ) {
                                     var button = buttons[i];
+                                    var span = button.next().find("span");
+                                    var sc = $(span).attr("selectcolor");
                                     if( $(button).prop("checked") ) {
+                                      if(sc.length > 0) {
+                                        var html = $(span).html().replace(/fill=\".*?\"/,"fill=\""+sc+"\"")
+                                                                 .replace(/fill:.*?[;\s]/,"fill:"+sc+";");
+                                        $(span).html(html);
+                                      } else {
                                         button.next().css({"background-color":vArr[1]});
+                                      }
                                       if( new_val ) new_val += ',';
                                       new_val += $(button).button( "option", "label")
                                     }
                                   }
-                                 if( !new_val )  return ',';
-                                 return new_val;
+                                if( !new_val )  return ',';
+                                return new_val;
                                };
 
-  newEl.setValueFn = function(arg){ if( !arg )  arg = ',';
+  newEl.setValueFn = function(arg){ if( !arg ) arg = ',';
                                     if( hidden )
                                       hidden.attr("value", arg);
                                     for( var i = 0; i < buttons.length; ++i ) {
                                       var button = buttons[i];
+                                      var span = button.next().find("span");
+                                      var sc = $(span).attr("selectcolor");
+                                      var usc = $(span).attr("unselectcolor");
+                                      if( usc.match(/^[A-F0-9]{6}$/))
+                                        usc = "#"+usc;
                                       button.prop("checked", arg.match(new RegExp('(^|,)'+vArr[i*ipar+2]+'($|,)') ) );
                                       if (button.prop("checked")==true){
-                                        button.next().css({"background-color":vArr[1]});
+                                        if(sc.length > 0) {
+                                          var html = $(span).html().replace(/fill=\".*?\"/,"fill=\""+sc+"\"")
+                                                                   .replace(/fill:.*?[;\s]/,"fill:"+sc+";");
+                                          $(span).html(html);
+                                        } else {
+                                          button.next().css({"background-color":vArr[1]});
+                                        }
                                       } else {
-                                        button.next().css({"background-color":"inherit"});
+                                        if(sc.length > 0) {
+                                          var html = $(span).html().replace(/fill=\".*?\"/,'fill="'+usc+'"')
+                                                                   .replace(/fill:.*?[;\s]/,'fill:'+usc+';');
+                                          $(span).html(html);
+                                          
+                                        } else {
+                                          button.next().css({"background-color":"inherit"});
+                                        }
                                       }
                                       button.button("refresh");
                                     }

@@ -23,8 +23,15 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
     return undefined;
   var ipar = 2;
 
+  var use4icon = false;
+  if(vArr[1].match(/^use4icon@/)) {
+    use4icon = true;
+    vArr[1] = vArr[1].replace(/^use4icon@/,"");
+  }
+
   if( vArr[1].match(/^[A-F0-9]{6}$/))
     vArr[1] = "#"+vArr[1];
+
   var newEl = $("<div style='display:inline-block;'>").get(0);
   $(newEl).addClass(vArr[0]);
 
@@ -41,7 +48,6 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
 
   var buttons = [];
   for( var i = 2; i < (vArr.length); i+=ipar ) {
-    vArr[i] = vArr[i].replace(/#/g," ");
     var button = $('<input type="radio" name="radio">').uniqueId();
     var label = $('<label for="'+button.attr("id")+'" name="'+vArr[i+1]+'" title="'+vArr[i]+'" >'+vArr[i]+'</label>');
     buttons.push(button);
@@ -51,23 +57,53 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
 
     $(button).change(clicked);
 
+    // console.log("currVal: "+currVal+", vArr["+i+"]: "+vArr[i]+", is: "+ (currVal == vArr[i]));
     if( currVal )
       button.prop("checked", currVal == vArr[i] );
   }
 
   $(newEl).buttonset();
   $(newEl).find("label").css({"margin":"0","border":"0","border-radius":"4px","background":"inherit"});
-  $(newEl).find("span").css({"padding":"0.0em 0.3em"});
-
+  $(newEl).find("span").css({"padding":"0.0em 0.3em"})
+                       .attr( "selectcolor",use4icon ? vArr[1] : "");
+  $(newEl).find("input").each(function(ind,val){
+    $(val).next().find("span").attr("ischecked",$(val).prop("checked"));
+//    console.log("input checked("+ind+"): "+$(val).prop("checked"));
+  });
   $(newEl).find("label").each(function(ind,val){
-    $(val).addClass("iconRadio_widget");
+    $(val).addClass("iconRadio_widget")
 
     var ico = vArr[ind*ipar+3];
+    var m = ico.match(/.*@(.*)/);
+    var uscol = m[1];
+    if( uscol.match(/^[A-F0-9]{6}$/))
+      uscol = "#"+uscol;
+    $(val).find("span").attr( "unselectcolor",uscol);
+
     FW_cmd(FW_root+"?cmd={FW_makeImage('"+ico+"')}&XHR=1",function(data){
        data = data.replace(/\n$/,'');
       $(newEl).find("label").each(function(ind,val){
+        var span = $(val).find("span");
+        var sc = $(span).attr("selectcolor");
+        var usc = $(span).attr("unselectcolor");
+        var isc = $(span).attr("ischecked");
+        // console.log("span usc_"+ind+": "+usc+", sc_"+ind+": "+sc);
         var re = new RegExp("\"\s?"+$(val).attr("name")+"(\s?|\")","i");
         if (!(data.match(re) === null) && ($(val).find("span").html().match(re) === null)) {
+          // console.log("Fw_cmd checked: "+ind+": "+isc);
+          if(isc == "true") {
+            if(sc.length > 0) {
+              data = data.replace(/fill=\".*?\"/,'fill="'+sc+'"')
+                         .replace(/fill:.*?[;\s]/,'fill:'+sc+';');
+              // console.log("Fw_cmd sc_ind: "+ind+": "+sc+", isc:"+isc+"\n"+data);
+            }
+          } else {
+            if(sc.length > 0) {
+              data = data.replace(/fill=\".*?\"/,'fill="'+usc+'"')
+                         .replace(/fill:.*?[;\s]/,'fill:'+usc+';');
+              // console.log("Fw_cmd usc_ind: "+ind+": "+usc+", isc:"+isc+"\n"+data);
+            }
+          }
           $(val).find("span").addClass("iconRadio_widget").html(data);
           return false;
         }
@@ -82,14 +118,24 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
   newEl.getValueFn = function(arg) { var new_val="";
                                   for( var i = 0; i < buttons.length; ++i ) {
                                     var button = buttons[i];
-                                    if( $(button).prop("checked") ) {
+                                    var span = button.next().find("span");
+                                    var sc = $(span).attr("selectcolor");
+                                    // var usc = $(span).attr("unselectcolor");
+                                    if( $(button).prop("checked") == true) {
+                                      if(sc.length > 0) {
+                                        var html = $(span).html().replace(/fill=\".*?\"/,"fill=\""+sc+"\"")
+                                                                 .replace(/fill:.*?[;\s]/,"fill:"+sc+";");
+                                        // console.log("getFn sc_i:"+i+": "+sc+"\n"+html);
+                                        $(span).html(html);
+                                      } else {
                                         button.next().css({"background-color":vArr[1]});
+                                      }
                                       if( new_val ) new_val += ',';
                                       new_val += $(button).button( "option", "label")
                                     }
                                   }
-                                 if( !new_val )  return ',';
-                                 return new_val;
+                                if( !new_val )  return ',';
+                                return new_val;
                                };
 
   newEl.setValueFn = function(arg){ if( !arg ) arg = ',';
@@ -97,18 +143,36 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
                                       hidden.attr("value", arg);
                                     for( var i = 0; i < buttons.length; ++i ) {
                                       var button = buttons[i];
+                                      var span = button.next().find("span");
+                                      var sc = $(span).attr("selectcolor");
+                                      var usc = $(span).attr("unselectcolor");
+                                      if( usc.match(/^[A-F0-9]{6}$/))
+                                        usc = "#"+usc;
+                                      // console.log("setFn usc_"+i+": "+usc+" sc_"+i+": "+sc);
                                       button.prop("checked", (arg == vArr[i*ipar+2]) );
-                                      if (button.prop("checked")==true){
-                                        button.next().css({"background-color":vArr[1]});
+                                      if (button.prop("checked") == true){
+                                        if(sc.length > 0) {
+                                          var html = $(span).html().replace(/fill=\".*?\"/,"fill=\""+sc+"\"")
+                                                                   .replace(/fill:.*?[;\s]/,"fill:"+sc+";");
+                                          $(span).html(html);
+                                        } else {
+                                          button.next().css({"background-color":vArr[1]});
+                                        }
                                       } else {
-                                        button.next().css({"background-color":"inherit"});
+                                        if(sc.length > 0) {
+                                          var html = $(span).html().replace(/fill=\".*?\"/,'fill="'+usc+'"')
+                                                                   .replace(/fill:.*?[;\s]/,'fill:'+usc+';');
+                                          $(span).html(html);
+                                          
+                                        } else {
+                                          button.next().css({"background-color":"inherit"});
+                                        }
                                       }
                                       button.button("refresh");
                                     }
                                   };
 
   newEl.setValueFn( currVal );
-
   return newEl;
 }
 
@@ -121,17 +185,17 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
   &lt;color&gt; is specified by a color name or a color number without leading <b>#</b> e.g. FFA500 or orange. Depending on the context <b>@</b> has to be escaped <b>\@</b>.<br>
   &lt;icon&gt; is the icon name.<br>
   Examples for import with raw definition, will be found in <a href="https://wiki.fhem.de/wiki/FHEMWEB/Widgets">FHEMWEB-Widgets</a>
-  <li>iconRadio,&lt;select color&gt;,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;][,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;]]...
+  <li>iconRadio,[use4icon@]&lt;select color&gt;,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;][,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;]]...
     - displays Icons as radio button and returns value if pushed.
     &lt;value&gt; return value.<br>
-    &lt;select color&gt; the background color of the selected icon.<br>
+    &lt;select color&gt; the background color of the selected icon or the icon color if the prefix <i>use4icon@</i> is used.<br>
     The widget contains a CSS-class "iconRadio_widget".<br>
   </li>
   <li>
-    iconButtons,&lt;select color&gt;,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;][,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;]]...
+    iconButtons,[use4icon@]&lt;select color&gt;,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;][,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;]]...
     - displays Icons as button bar and returns comma separated values of pushed buttons.
     &lt;value&gt; return value.<br>
-    &lt;select color&gt; the background color of the selected icon.<br>
+    &lt;select color&gt; the background color of the selected icon or the icon color if the prefix <i>use4icon@</i> is used.<br>
     The widget contains a CSS-class "iconButtons_widget".<br>
   </li>
   <li>iconLabel[,&lt;reference value&gt;,[&lt;icon&gt;][@&lt;color&gt;]][,&lt;reference value&gt;,[&lt;icon&gt;][@&lt;color&gt;]]...
