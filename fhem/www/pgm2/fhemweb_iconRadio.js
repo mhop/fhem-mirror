@@ -229,13 +229,13 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
   <li>iconRadio,&lt;select color&gt;,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;][,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;]]...
     - zeigt Icons als Radiobutton an und gibt Value bei Betätigung zurück.<br>
     &lt;value&gt; ist der Rückgabewert.<br>
-    &lt;select color&gt; die Hintergrundfarbe des gewählten Icons.<br>
+    &lt;select color&gt; die Hintergrundfarbe des gewählten Icons oder die Farbe des Icons wenn der Prefix use4icon@ vorangestellt wird.<br>
     Das Widget enthält eine CSS-Klasse "iconRadio_widget".<br>
   </li>
   <li>iconButtons,&lt;select color&gt;,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;][,&lt;value&gt;,&lt;icon&gt;[@&lt;color&gt;]]...
     - zeigt Icons als Tastenleiste an und gibt durch Komma getrennte Werte der betätigten Tasten zurück.<br>
     &lt;value&gt; ist der Rückgabewert.<br>
-    &lt;select color&gt; die Hintergrundfarbe des gewählten Icons.<br>
+    &lt;select color&gt; die Hintergrundfarbe des gewählten Icons oder die Farbe des Icons wenn der Prefix use4icon@ vorangestellt wird.<br>
     Das Widget enthält eine CSS-Klasse "iconButton_widget".<br>
   </li>
   <li>iconLabel[,&lt;reference value&gt;,[&lt;icon&gt;][@&lt;color&gt;]][,&lt;reference value&gt;,[&lt;icon&gt;][@&lt;color&gt;]]...
