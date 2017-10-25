@@ -48,7 +48,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";    # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.10";
+my $yaahmversion    = "1.12";
 my $firstcall=1;
     
 my %yaahm_transtable_EN = ( 
@@ -307,6 +307,9 @@ my @seasons = (
 my @profmode = ("party","absence");
 my @profday  = ("vacation","holiday"); 
 
+#-- temporary fix for update purpose
+sub YAAHM_restore($$){};
+
 #########################################################################################
 #
 # YAAHM_Initialize 
@@ -391,20 +394,29 @@ sub YAAHM_Define ($$) {
  $data{FWEXT}{YAAHMx}{NAME} = $yaahmlinkname;	
  $attr{$name}{"room"}       = $yaahmhiddenroom;
  
- #-- clone daily default profile
- $hash->{DATA}{"DT"}  = {%defaultdailytable};
+ my $date = YAAHM_restore($hash,0);
+ #-- data seems to be ok, restore
+ if( defined($date) ){
+   YAAHM_restore($hash,1);
+   Log3 $name,1,"[YAAHM_Define] data hash restored from save file with date $date";
+ #-- intialization
+ }else{
+   Log3 $name,1,"[YAAHM_Define] data hash is initialized";
+   #-- clone daily default profile
+   $hash->{DATA}{"DT"}  = {%defaultdailytable};
  
- #-- clone weekly default profile
- $hash->{DATA}{"WT"} = ();
- push(@{$hash->{DATA}{"WT"}},{%defaultwakeuptable});
- $hash->{DATA}{"WT"}[0]{"name"} = $yaahm_tt->{"wakeup"};
-  push(@{$hash->{DATA}{"WT"}},{%defaultsleeptable});
- $hash->{DATA}{"WT"}[1]{"name"} = $yaahm_tt->{"sleep"};
+   #-- clone weekly default profile
+   $hash->{DATA}{"WT"} = ();
+   push(@{$hash->{DATA}{"WT"}},{%defaultwakeuptable});
+   $hash->{DATA}{"WT"}[0]{"name"} = $yaahm_tt->{"wakeup"};
+    push(@{$hash->{DATA}{"WT"}},{%defaultsleeptable});
+   $hash->{DATA}{"WT"}[1]{"name"} = $yaahm_tt->{"sleep"};
  
- #-- clone days for today and tomorrow
- $hash->{DATA}{"DD"}  = ();
- push(@{$hash->{DATA}{"DD"}},{%defaultdayproperties});
- push(@{$hash->{DATA}{"DD"}},{%defaultdayproperties});
+   #-- clone days for today and tomorrow
+   $hash->{DATA}{"DD"}  = ();
+   push(@{$hash->{DATA}{"DD"}},{%defaultdayproperties});
+   push(@{$hash->{DATA}{"DD"}},{%defaultdayproperties});
+ }
  
  #-- determine Astro device
  if( !exists($modules{Astro}{defptr}) ){
@@ -682,7 +694,7 @@ sub YAAHM_Set($@) {
 	 
    #-----------------------------------------------------------
    } elsif ( $cmd =~ /^restore/ ) {
-     return YAAHM_restore($hash);
+     return YAAHM_restore($hash,1);
    
    #-----------------------------------------------------------
    } elsif ( $cmd =~ /^initialize/ ) {
@@ -813,9 +825,12 @@ sub YAAHM_Get($@) {
 
 sub YAAHM_save($) {
   my ($hash) = @_;
+  $hash->{DATA}{"savedate"} = localtime(time);
+  readingsSingleUpdate( $hash, "savedate", $hash->{DATA}{"savedate"}, 1 ); 
   my $json   = JSON->new->utf8;
   my $jhash0 = eval{ $json->encode( $hash->{DATA} ) };
   my $error  = FileWrite("YAAHMFILE",$jhash0);
+  #Log 1,"[YAAHM_save] error=$error";
   return;
 }
 	 
@@ -827,13 +842,28 @@ sub YAAHM_save($) {
 #
 #########################################################################################
 
-sub YAAHM_restore($) {
-  my ($hash) = @_;
+sub YAAHM_restore($$) {
+  my ($hash,$doit) = @_;
+  my $name = $hash->{NAME};
   my ($error,$jhash0) = FileRead("YAAHMFILE");
-  my $json  = JSON->new->utf8;
+  if( defined($error) ){
+    Log3 $name,1,"[YAAHM_restore] read error=$error";
+    return undef;
+  }
+  my $json   = JSON->new->utf8;
   my $jhash1 = eval{ $json->decode( $jhash0 ) };
-  $hash->{DATA}  = {%{$jhash1}};
-  return;
+  my $date   = $jhash1->{"savedate"};
+  #-- just for the first time, reading an old savefile
+  $date = localtime(time)
+    if( !defined($date));
+  readingsSingleUpdate( $hash, "savedate", $date, 0 ); 
+  if( $doit==1 ){
+    $hash->{DATA}  = {%{$jhash1}}; 
+    Log3 $name,5,"[YAAHM_restore] Data hash restored from save file with date ".$date;
+    return 1;
+  }else{  
+    return $date;
+  }
 }
 
 #########################################################################################
@@ -873,12 +903,10 @@ sub YAAHM_setParm($@) {
          }
        }
        $hash->{DATA}{"DT"}{$key}[$i-1]=$val;
-       #Log 1, "=============> $key $i ".$a[$i+1];
     }
     return $msg;
   #-- weekly profile
   }elsif ($cmd eq "wt") {
-    #Log 1,"=================> ".Dumper(@a);
     #-- action
     $hash->{DATA}{"WT"}[$a[1]]{"action"}    = $a[2];
     #-- next time
@@ -1271,7 +1299,6 @@ sub YAAHM_checkstate($) {
     if( defined($devs) && ($devs ne "") ){
       $devh = Value($dev);
       if( $devs ne $devh ){
-        #Log 1,"==============> Device $dev SOLL $devs IST $devh";
         $isf = 1;
         push(@devf,"<tr><td style=\"text-align:left;padding:5px\">".$dev."</td><td style=\"text-align:left;padding:5px\"><div style=\"color:red\">".$yaahm_tt->{'notok'}.
           "</div></td><td style=\"text-align:left;padding:5px\">".$devh."</td></tr>");
@@ -2071,7 +2098,6 @@ sub YAAHM_GetDayStatus($) {
   readingsBeginUpdate($hash);
   #-- and do not forget to put them into readings, because these are read by the timer
   foreach my $key (sort YAAHM_dsort keys %defaultdailytable){
-    #Log 1,"================> setting into reading s_$key value ".$hash->{DATA}{"DT"}{$key}[0];
 
     my $f1 = defined($defaultdailytable{$key}[0]);
     my $f2 = defined($defaultdailytable{$key}[1]);
@@ -2521,9 +2547,9 @@ sub YAAHM_toptable($){
     
     #-- something's rotten in the state of denmark
     my $st = $hash->{DATA}{"DD"}[0]{"sunrise"};
-    if( !defined($st) || $st eq "00:00" ){
+    #if( !defined($st) || $st eq "00:00" ){
       YAAHM_GetDayStatus($hash);
-    }
+    #}
  
     #--
     my $lockstate = ($hash->{READINGS}{lockstate}{VAL}) ? $hash->{READINGS}{lockstate}{VAL} : "unlocked";
@@ -2752,6 +2778,7 @@ sub YAAHM_Longtable($){
       $eval = $dailytable{$key}[1];
       $xval = $dailytable{$key}[2];
       $xval = "" if( !defined($xval) );
+      
       #--
       if( $dh ){
         #-- timeHelper not in command list
@@ -3031,6 +3058,10 @@ sub YAAHM_Longtable($){
                 </a>
                 <br />Set the lockstate of the yaahm module to <i>locked</i> (i.e., yaahm setups
                 may not be changed) resp. <i>unlocked</i> (i.e., yaahm setups may be changed>)</li>
+            <li><a name="yaahm_save">
+                    <code>set &lt;name&gt; save|restore</code>
+                </a>
+                <br />Manually save/restore the complete profile data to/from the external file YAAHMFILE (save done automatically at each timer starte, restore at FHEM start)</li>
         </ul>
         <a name="YAAHMget"></a>
         <h4>Get</h4>
