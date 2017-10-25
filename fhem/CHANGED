@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  74_74_XiaomiFlowerMonitor: new version, change internal routine
   - feature: fhemweb_iconRadio.js: optionally colorize selected icons instead
                                     of its background by prefix use4icon@
   - feature: fhemweb_iconButtons.js: optionally colorize selected icons instead
