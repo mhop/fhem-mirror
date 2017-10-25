@@ -24,9 +24,9 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
   var ipar = 2;
 
   var use4icon = false;
-  if(vArr[1].match(/^use4icon@/)) {
+  if(vArr[1].match(/^use4icon@|^@/)) {
     use4icon = true;
-    vArr[1] = vArr[1].replace(/^use4icon@/,"");
+    vArr[1] = vArr[1].replace(/^use4icon@|^@/,"");
   }
 
   if( vArr[1].match(/^[A-F0-9]{6}$/))
