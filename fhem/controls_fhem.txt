@@ -1,4 +1,4 @@
-REV 15316
+REV 15320
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -400,7 +400,7 @@ UPD 2016-10-04_07:45:12 57237 FHEM/95_Dashboard.pm
 UPD 2017-03-20_07:45:03 62531 FHEM/95_FLOORPLAN.pm
 UPD 2015-07-28_14:05:31 11755 FHEM/95_PachLog.pm
 UPD 2017-10-09_07:45:03 63621 FHEM/95_PostMe.pm
-UPD 2017-10-23_07:45:02 123802 FHEM/95_YAAHM.pm
+UPD 2017-10-26_07:45:02 124881 FHEM/95_YAAHM.pm
 UPD 2017-09-10_16:00:54 18117 FHEM/95_holiday.pm
 UPD 2016-02-05_07:45:11 21301 FHEM/95_remotecontrol.pm
 UPD 2017-10-23_07:45:02 64275 FHEM/96_SIP.pm
@@ -644,8 +644,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-10-25_07:45:04 3147064 docs/commandref.html
-UPD 2017-10-25_07:45:05 1864044 docs/commandref_DE.html
+UPD 2017-10-26_07:45:04 3147367 docs/commandref.html
+UPD 2017-10-26_07:45:05 1864184 docs/commandref_DE.html
 UPD 2017-10-20_07:45:02 72732 docs/commandref_frame.html
 UPD 2017-10-20_07:45:02 81480 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
@@ -1954,9 +1954,9 @@ UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
 UPD 2017-10-11_07:45:02 51614 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
 UPD 2017-03-07_07:45:02 3139 www/pgm2/fhemweb_fbcalllist.js
-UPD 2017-10-25_07:45:02 7172 www/pgm2/fhemweb_iconButtons.js
+UPD 2017-10-26_07:45:02 7178 www/pgm2/fhemweb_iconButtons.js
 UPD 2017-10-11_07:45:02 5618 www/pgm2/fhemweb_iconLabel.js
-UPD 2017-10-25_07:45:02 13464 www/pgm2/fhemweb_iconRadio.js
+UPD 2017-10-26_07:45:02 13610 www/pgm2/fhemweb_iconRadio.js
 UPD 2017-10-11_07:45:02 7630 www/pgm2/fhemweb_iconSwitch.js
 UPD 2017-10-04_07:45:02 1953 www/pgm2/fhemweb_knob.js
 UPD 2017-10-04_07:45:02 4248 www/pgm2/fhemweb_readingsGroup.js
