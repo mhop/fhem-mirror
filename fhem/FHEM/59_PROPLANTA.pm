@@ -753,10 +753,11 @@ sub PROPLANTA_Aborted($)
 
 ##### noch nicht fertig ###########
 sub #####################################
-PROPLANTA_Html($)
+PROPLANTA_Html(@)
 {
-  my ($d) = @_;
+  my ($d,$days) = @_;
   $d = "<none>" if(!$d);
+  $days = 2 unless defined $days;
   return "$d is not a PROPLANTA instance<br>"
         if(!$defs{$d} || $defs{$d}{TYPE} ne "PROPLANTA");
 
@@ -774,7 +775,7 @@ PROPLANTA_Html($)
   $ret .= '<tr><th>Tag</th><th>morgens</th><th>tagsueber</th><th>abends</th><th>nachts</th><th>min</th><th>max</th><th>Regen tags</th><th>Frost</th></tr></thead>';
   $ret .= "<tbody align=center>";
 # define MyForecast weblink htmlCode { PROPLANTA_Html("ProPlanta_Wetter") }
-   for(my $i=0; $i<=2; $i++) {
+   for(my $i=0; $i<=$days; $i++) {
       $ret .= sprintf('<tr><td>%s</td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s&deg;C</td><td>%s&deg;C</td><td>%s %%</td><td>%s</td></tr>',
           ReadingsVal($d, "fc".$i."_date", ""), 
           ReadingsVal($d, "fc".$i."_weatherMorning", ""), ReadingsVal($d, "fc".$i."_weatherMorningIcon", ""),
@@ -844,11 +845,11 @@ PROPLANTA_Html($)
          <br>
          Optional. Possible values: de (default), at, ch, fr, it 
       </li><br>
-      The function <code>PROPLANTA_Html</code> creates a HTML code for a 3 day weather forecast.
+      The function <code>PROPLANTA_Html</code> creates a HTML code for a weather forecast for the given days (default is 3).
       <br>
       Example:
       <br>
-      <code>define HTMLForecast weblink htmlCode { PROPLANTA_Html("ProPlanta_Wetter") }</code>
+      <code>define HTMLForecast weblink htmlCode { PROPLANTA_Html("ProPlanta_Wetter"[, days])}</code>
       <br/><br/>
    </ul>
    <br>
@@ -954,11 +955,11 @@ PROPLANTA_Html($)
          <br>
          Optional. M&ouml;gliche Werte: de (Standard), at, ch, fr, it
       </li><br>
-      &Uuml;ber die Funktion <code>PROPLANTA_Html</code> wird ein HTML-Code f&uuml;r eine 3-Tages-Vorhersage erzeugt.
+      &Uuml;ber die Funktion <code>PROPLANTA_Html</code> wird ein HTML-Code f&uuml;r eine Vorhersage für die angegebenen Anzahl Tage (standardmäßig 3) erzeugt.
       <br>
       Beispiel:
       <br>
-      <code>define Vorschau weblink htmlCode {PROPLANTA_Html("Wetter")}</code>
+      <code>define Vorschau weblink htmlCode {PROPLANTA_Html("Wetter"[, Tage])}</code>
       <br/><br/>
    </ul>
    <br>
