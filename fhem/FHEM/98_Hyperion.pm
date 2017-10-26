@@ -98,19 +98,18 @@ sub Hyperion_Define($$)
   RemoveInternalTimer($hash);
   if ($init_done && !defined $hash->{OLDDEF})
   {
+    addToDevAttrList($name,"lightSceneParamsToSave") if (!grep /^lightSceneParamsToSave/,split(" ",$attr{"global"}{userattr}));
+    addToDevAttrList($name,"homebridgeMapping:textField-long") if (!grep /^homebridgeMapping/,split(" ",$attr{"global"}{userattr}));
     $attr{$name}{alias} = "Ambilight";
     $attr{$name}{cmdIcon} = "on:general_an off:general_aus dimDown:dimdown dimUp:dimup";
-    $attr{$name}{devStateIcon} = '{(Hyperion_devStateIcon($name),"toggle")}';
+    $attr{$name}{devStateIcon} = '{(Hyperion_devStateIcon($name))}';
     $attr{$name}{"event-on-change-reading"} = ".*";
-    $attr{$name}{group} = "colordimmer";
     $attr{$name}{homebridgeMapping} = $Hyperion_homebridgeMapping;
     $attr{$name}{icon} = "light_led_stripe_rgb";
     $attr{$name}{lightSceneParamsToSave} = "state";
     $attr{$name}{room} = "Hyperion";
     $attr{$name}{webCmd} = $Hyperion_webCmd;
     $attr{$name}{widgetOverride} = "dimUp:noArg dimDown:noArg";
-    addToDevAttrList($name,"lightSceneParamsToSave") if (!grep /^lightSceneParamsToSave/,split(" ",$attr{"global"}{userattr}));
-    addToDevAttrList($name,"homebridgeMapping:textField-long") if (!grep /^homebridgeMapping/,split(" ",$attr{"global"}{userattr}));
   }
   return Hyperion_OpenDev($hash);
 }
@@ -206,15 +205,15 @@ sub Hyperion_Read($)
   my $name    = $hash->{NAME};
   my $buf     = DevIo_SimpleRead($hash);
   return if (!$buf);
+  $buf =~ s/[\r\n]//gm;
   my $result  = $hash->{PARTIAL} ? $hash->{PARTIAL}.$buf : $buf;
   $hash->{PARTIAL} = $result;
   return if ($buf !~ /(^.+"success":(true|false)\}$)/);
   Log3 $name,5,"$name: url $hash->{DeviceName} returned result: $result";
   delete $hash->{PARTIAL};
-  $result =~ /(\s+)?\/{2,}.*|(?:[\t ]*(?:\r?\n|\r))+/gm;
   if ($result =~ /^\{"success":true\}$/)
   {
-    fhem "sleep 1; get $name statusRequest"
+    AnalyzeCommandChain(undef,"sleep 1; get $name statusRequest")
       if (AttrVal($name,"queryAfterSet",1) == 1 || !$hash->{INTERVAL});
     return;
   }
@@ -342,7 +341,7 @@ sub Hyperion_Read($)
       my ($r,$g,$b) = Color::hex2rgb($rgb);
       my ($h,$s,$v) = Color::rgb2hsv($r / 255,$g / 255,$b / 255);
       my $dim = int($v * 100);
-      readingsBulkUpdate($hash,"rgb",$rgb);
+      readingsBulkUpdate($hash,"rgb",$rgb) if ($rgb ne "000000");
       readingsBulkUpdate($hash,"dim",$dim);
       readingsBulkUpdate($hash,"mode","rgb");
       readingsBulkUpdate($hash,"mode_before_off","rgb");
@@ -411,7 +410,7 @@ sub Hyperion_GetConfigs($)
   }
   else
   {
-    fhem "deletereading $name .configs" if (defined ReadingsVal($name,".configs",undef));
+    AnalyzeCommandChain(undef,"deletereading $name .configs") if (defined ReadingsVal($name,".configs",undef));
     $attr{$name}{webCmd} = $Hyperion_webCmd if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
     return "Found just one config file.\nPlease add at least one more config file to properly use this function."
       if (@files == 1);
@@ -549,7 +548,7 @@ sub Hyperion_Set($@)
   {
     return "Value of $cmd has to be in RGB hex format like ffffff or 3F7D90"
       if ($value !~ /^[\dA-Fa-f]{6}$/);
-    $value = lc($value);
+    $value = lc $value;
     my ($r,$g,$b) = Color::hex2rgb($value);
     $obj{color} = [$r,$g,$b];
     $obj{command} = "color";
@@ -586,7 +585,9 @@ sub Hyperion_Set($@)
     my $dimStep = $value ? $value : AttrVal($name,"hyperionDimStep",10);
     my $dimUp = ($dim + $dimStep < 100) ? $dim + $dimStep : 100;
     my $dimDown = ($dim - $dimStep > 0) ? $dim - $dimStep : 1;
-    $cmd eq "dimUp" ? fhem "set $name dim $dimUp" : fhem "set $name dim $dimDown";
+    my $set;
+    $cmd eq "dimUp" ? $set = $dimUp : $set = $dimDown;
+    CommandSet(undef,"$name dim $set");
     return;
   }
   elsif ($cmd eq "effect")
@@ -641,18 +642,10 @@ sub Hyperion_Set($@)
     my $rrgb      = ReadingsVal($name,"rgb","");
     my $reffect   = ReadingsVal($name,"effect","");
     my ($r,$g,$b) = Color::hex2rgb($rrgb);
-    if ($rmode eq "rgb")
-    {
-      fhem "set ".$name." $rmode $rrgb";
-    }
-    elsif ($rmode eq "effect")
-    {
-      fhem "set ".$name." $rmode $reffect";
-    }
-    elsif ($rmode eq "clearall")
-    {
-      fhem "set ".$name." clearall";
-    }
+    my $set       = "$rmode $rrgb";
+    $set          = "$rmode $reffect" if ($rmode eq "effect");
+    $set          = $rmode if ($rmode eq "clearall");
+    CommandSet(undef,"$name $set");
     return;
   }
   elsif ($cmd eq "toggle")
@@ -660,7 +653,7 @@ sub Hyperion_Set($@)
     return "$cmd need no additional value of $value" if (defined $value);
     my $state = Value($name);
     my $nstate = $state ne "off" ? "off" : "on";
-    fhem "set $name $nstate";
+    CommandSet(undef,"$name $nstate");
     return;
   }
   elsif ($cmd eq "toggleMode")
@@ -674,7 +667,7 @@ sub Hyperion_Set($@)
       $nmode = $i < @modeorder - 1 ? $modeorder[$i+1] : $modeorder[0] if ($modeorder[$i] eq $mode);
     }
     $nmode = $nmode ? $nmode : $modeorder[0];
-    fhem "set $name mode $nmode";
+    CommandSet(undef,"$name mode $nmode");
     return;
   }
   elsif ($cmd eq "mode")
@@ -685,22 +678,11 @@ sub Hyperion_Set($@)
     my $rrgb      = ReadingsVal($name,"rgb","");
     my $reffect   = ReadingsVal($name,"effect","");
     my ($r,$g,$b) = Color::hex2rgb($rrgb);
-    if ($rmode eq "rgb")
-    {
-      fhem "set $name $rmode $rrgb";
-    }
-    elsif ($rmode eq "effect")
-    {
-      fhem "set $name $rmode $reffect";
-    }
-    elsif ($rmode eq "clearall")
-    {
-      fhem "set $name clearall";
-    }
-    elsif ($rmode eq "off")
-    {
-      fhem "set $name $rmode";
-    }
+    my $set       = "$rmode $rrgb";
+    $set          = "$rmode $reffect" if ($rmode eq "effect");
+    $set          = $rmode if ($rmode eq "clearall");
+    $set          = $rmode if ($rmode eq "off");
+    CommandSet(undef,"$name $set");
     return;
   }
   elsif ($cmd =~ /^(luminanceGain|luminanceMinimum|saturationGain|saturationLGain|valueGain)$/)
@@ -753,7 +735,9 @@ sub Hyperion_Set($@)
     my $gainStep = $value ? $value : AttrVal($name,"hyperionGainStep",0.1);
     my $gainUp = ($gain + $gainStep < 5) ? $gain + $gainStep : 5;
     my $gainDown = ($gain - $gainStep > 0) ? $gain - $gainStep : 0.1;
-    $cmd eq "valueGainUp" ? fhem "set $name valueGain $gainUp" : fhem "set $name valueGain $gainDown";
+    my $set;
+    $cmd eq "valueGainUp" ? $set = $gainUp : $set = $gainDown;
+    CommandSet(undef,"$name valueGain $set");
     return;
   }
   elsif ($cmd eq "addEffect")
@@ -927,17 +911,19 @@ sub Hyperion_devStateIcon($;$)
   my $name = $hash->{NAME};
   my $rgb = ReadingsVal($name,"rgb","");
   my $dim = ReadingsVal($name,"dim",10);
+  my $val = ReadingsVal($name,"state","off");
+  my $mode = ReadingsVal($name,"mode","");
   my $ico = int($dim / 10) * 10 < 10 ? 10 : int($dim / 10) * 10;
   return ".*:off:toggle"
-    if (Value($name) eq "off");
+    if ($val eq "off");
   return ".*:light_exclamation"
-    if (Value($name) =~ /^(ERROR|disconnected)$/);
+    if (($val eq "disconnected" && !$hash->{INTERVAL}) || $val eq "ERROR");
   return ".*:light_light_dim_$ico@#".$rgb.":toggle"
-    if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "rgb");
+    if ($val ne "off" && $mode eq "rgb");
   return ".*:light_led_stripe_rgb@#FFFF00:toggle"
-    if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "effect");
+    if ($val ne "off" && $mode eq "effect");
   return ".*:it_television@#0000FF:toggle"
-    if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "clearall");
+    if ($val ne "off" && $mode eq "clearall");
   return ".*:light_question";
 }
 
