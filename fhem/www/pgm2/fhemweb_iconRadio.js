@@ -75,9 +75,11 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
 
     var ico = vArr[ind*ipar+3];
     var m = ico.match(/.*@(.*)/);
-    var uscol = m && m[1] ? m[1] : "";
+    var uscol = m && m[1] ? m[1] : "none";
     if( uscol.match(/^[A-F0-9]{6}$/))
       uscol = "#"+uscol;
+    if(uscol == 'none')
+      ico += "@none";
     $(val).find("span").attr( "unselectcolor",uscol);
 
     FW_cmd(FW_root+"?cmd={FW_makeImage('"+ico+"')}&XHR=1",function(data){
@@ -85,7 +87,7 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
       $(newEl).find("label").each(function(ind,val){
         var span = $(val).find("span");
         var sc = $(span).attr("selectcolor");
-        var usc = $(span).attr("unselectcolor");
+        var usc = $(span).attr("unselectcolor") == "none" ? "" : $(span).attr("unselectcolor");
         var isc = $(span).attr("ischecked");
         // console.log("span usc_"+ind+": "+usc+", sc_"+ind+": "+sc);
         var re = new RegExp("\"\s?"+$(val).attr("name")+"(\s?|\")","i");
@@ -145,7 +147,7 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
                                       var button = buttons[i];
                                       var span = button.next().find("span");
                                       var sc = $(span).attr("selectcolor");
-                                      var usc = $(span).attr("unselectcolor");
+                                      var usc = $(span).attr("unselectcolor") == "none" ? "" : $(span).attr("unselectcolor");
                                       if( usc.match(/^[A-F0-9]{6}$/))
                                         usc = "#"+usc;
                                       // console.log("setFn usc_"+i+": "+usc+" sc_"+i+": "+sc);
