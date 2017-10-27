@@ -102,7 +102,7 @@ sub Hyperion_Define($$)
     addToDevAttrList($name,"homebridgeMapping:textField-long") if (!grep /^homebridgeMapping/,split(" ",$attr{"global"}{userattr}));
     $attr{$name}{alias} = "Ambilight";
     $attr{$name}{cmdIcon} = "on:general_an off:general_aus dimDown:dimdown dimUp:dimup";
-    $attr{$name}{devStateIcon} = '{(Hyperion_devStateIcon($name))}';
+    $attr{$name}{devStateIcon} = '{Hyperion_devStateIcon($name)}';
     $attr{$name}{"event-on-change-reading"} = ".*";
     $attr{$name}{homebridgeMapping} = $Hyperion_homebridgeMapping;
     $attr{$name}{icon} = "light_led_stripe_rgb";
@@ -170,7 +170,7 @@ sub Hyperion_list2array($$)
 sub Hyperion_isLocal($)
 {
   my ($hash) = @_;
-  return ($hash->{IP} =~ /^(localhost|127\.0{1,3}\.0{1,3}\.0{0,2}1)$/) ? 1 : undef;
+  return ($hash->{IP} =~ /^(localhost|127\.0{1,3}\.0{1,3}\.0{0,2}1|::1)$/) ? 1 : undef;
 }
 
 sub Hyperion_Get($@)
@@ -249,9 +249,10 @@ sub Hyperion_Read($)
     my $vers        = $data->{hyperion_build}->[0]->{version} ? $data->{hyperion_build}->[0]->{version} : "";
     my $prio        = (defined $data->{priorities}->[0]->{priority}) ? $data->{priorities}->[0]->{priority} : "";
     my $duration    = (defined $data->{priorities}->[0]->{duration_ms} && $data->{priorities}->[0]->{duration_ms} > 999) ? int($data->{priorities}->[0]->{duration_ms} / 1000) : 0;
-    $duration       = ($duration) >= 1 ? $duration : "infinite";
+    $duration       = $duration >= 1 ? $duration : "infinite";
     my $adj         = $data->{adjustment}->[0] ? $data->{adjustment}->[0] : undef;
     my $col         = $data->{activeLedColor}->[0]->{"HEX Value"}->[0] ? $data->{activeLedColor}->[0]->{"HEX Value"}->[0] : "";
+    $col            = "" if ($col =~ /000000$/);
     my $configs     = ReadingsVal($name,".configs",undef);
     my $corr        = $data->{correction}->[0] ? $data->{correction}->[0] : undef;
     my $effects     = $data->{effects} ? $data->{effects} : undef;
@@ -341,7 +342,7 @@ sub Hyperion_Read($)
       my ($r,$g,$b) = Color::hex2rgb($rgb);
       my ($h,$s,$v) = Color::rgb2hsv($r / 255,$g / 255,$b / 255);
       my $dim = int($v * 100);
-      readingsBulkUpdate($hash,"rgb",$rgb) if ($rgb ne "000000");
+      readingsBulkUpdate($hash,"rgb",$rgb);
       readingsBulkUpdate($hash,"dim",$dim);
       readingsBulkUpdate($hash,"mode","rgb");
       readingsBulkUpdate($hash,"mode_before_off","rgb");
@@ -585,8 +586,7 @@ sub Hyperion_Set($@)
     my $dimStep = $value ? $value : AttrVal($name,"hyperionDimStep",10);
     my $dimUp = ($dim + $dimStep < 100) ? $dim + $dimStep : 100;
     my $dimDown = ($dim - $dimStep > 0) ? $dim - $dimStep : 1;
-    my $set;
-    $cmd eq "dimUp" ? $set = $dimUp : $set = $dimDown;
+    my $set = $cmd eq "dimUp" ? $dimUp : $dimDown;
     CommandSet(undef,"$name dim $set");
     return;
   }
@@ -735,8 +735,7 @@ sub Hyperion_Set($@)
     my $gainStep = $value ? $value : AttrVal($name,"hyperionGainStep",0.1);
     my $gainUp = ($gain + $gainStep < 5) ? $gain + $gainStep : 5;
     my $gainDown = ($gain - $gainStep > 0) ? $gain - $gainStep : 0.1;
-    my $set;
-    $cmd eq "valueGainUp" ? $set = $gainUp : $set = $gainDown;
+    my $set = $cmd eq "valueGainUp" ? $gainUp : $gainDown;
     CommandSet(undef,"$name valueGain $set");
     return;
   }
@@ -914,15 +913,15 @@ sub Hyperion_devStateIcon($;$)
   my $val = ReadingsVal($name,"state","off");
   my $mode = ReadingsVal($name,"mode","");
   my $ico = int($dim / 10) * 10 < 10 ? 10 : int($dim / 10) * 10;
-  return ".*:off:toggle"
-    if ($val eq "off");
+  return ".*:off:on"
+    if ($val =~ /^off|rgb\s000000$/);
   return ".*:light_exclamation"
-    if (($val eq "disconnected" && !$hash->{INTERVAL}) || $val eq "ERROR");
-  return ".*:light_light_dim_$ico@#".$rgb.":toggle"
+    if (($val =~ /^(ERROR|disconnected)$/ && !$hash->{INTERVAL}) || ($val eq "ERROR" && $hash->{INTERVAL}));
+  return ".*:light_light_dim_$ico@#".$rgb.":off"
     if ($val ne "off" && $mode eq "rgb");
-  return ".*:light_led_stripe_rgb@#FFFF00:toggle"
+  return ".*:light_led_stripe_rgb@#FFFF00:off"
     if ($val ne "off" && $mode eq "effect");
-  return ".*:it_television@#0000FF:toggle"
+  return ".*:it_television@#0000FF:off"
     if ($val ne "off" && $mode eq "clearall");
   return ".*:light_question";
 }
