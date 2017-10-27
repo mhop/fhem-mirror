@@ -75,7 +75,7 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
 
     var ico = vArr[ind*ipar+3];
     var m = ico.match(/.*@(.*)/);
-    var uscol = m[1];
+    var uscol = m && m[1] ? m[1] : "";
     if( uscol.match(/^[A-F0-9]{6}$/))
       uscol = "#"+uscol;
     $(val).find("span").attr( "unselectcolor",uscol);
