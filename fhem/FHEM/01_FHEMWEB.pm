@@ -1615,7 +1615,7 @@ FW_roomOverview($)
 
         # image tag if we have an icon, else empty
         my $icoName = "ico$l1";
-        map { my ($n,$v) = split(":",$_); $icoName=$v if($l1 =~ m/$n/); }
+        map { my ($n,$v) = split(":",$_); $icoName=$v if($l1 =~ m/^$n$/); }
                         split(" ", AttrVal($FW_wname, "roomIcons", ""));
         my $icon = FW_iconName($icoName) ?
                         FW_makeImage($icoName,$icoName,"icon")."&nbsp;" : "";
