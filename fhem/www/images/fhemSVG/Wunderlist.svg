@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.0"
+   width="512.000000pt"
+   height="512.000000pt"
+   viewBox="0 0 512.000000 512.000000"
+   preserveAspectRatio="xMidYMid meet"
+   id="svg3035"
+   inkscape:version="0.48.5 r10040"
+   sodipodi:docname="wunderlist.svg">
+  <title
+     id="title3047">Wunderlist</title>
+  <defs
+     id="defs3045" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1280"
+     inkscape:window-height="960"
+     id="namedview3043"
+     showgrid="false"
+     inkscape:zoom="0.375"
+     inkscape:cx="1133.3333"
+     inkscape:cy="320"
+     inkscape:window-x="0"
+     inkscape:window-y="36"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg3035" />
+  <metadata
+     id="metadata3037">
+Created by potrace 1.13, written by Peter Selinger 2001-2015
+<rdf:RDF>
+  <cc:Work
+     rdf:about="">
+    <dc:format>image/svg+xml</dc:format>
+    <dc:type
+       rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+    <dc:title>Wunderlist</dc:title>
+    <dc:creator>
+      <cc:Agent>
+        <dc:title>noshery</dc:title>
+      </cc:Agent>
+    </dc:creator>
+    <dc:rights>
+      <cc:Agent>
+        <dc:title>Freeware</dc:title>
+      </cc:Agent>
+    </dc:rights>
+    <dc:source>http://www.icons101.com/icon_png/size_512/id_73530/wunderlist.png</dc:source>
+    <dc:subject>
+      <rdf:Bag>
+        <rdf:li>Wunderlist</rdf:li>
+      </rdf:Bag>
+    </dc:subject>
+    <cc:license
+       rdf:resource="http://creativecommons.org/licenses/by-nc/3.0/" />
+  </cc:Work>
+  <cc:License
+     rdf:about="http://creativecommons.org/licenses/by-nc/3.0/">
+    <cc:permits
+       rdf:resource="http://creativecommons.org/ns#Reproduction" />
+    <cc:permits
+       rdf:resource="http://creativecommons.org/ns#Distribution" />
+    <cc:requires
+       rdf:resource="http://creativecommons.org/ns#Notice" />
+    <cc:requires
+       rdf:resource="http://creativecommons.org/ns#Attribution" />
+    <cc:prohibits
+       rdf:resource="http://creativecommons.org/ns#CommercialUse" />
+    <cc:permits
+       rdf:resource="http://creativecommons.org/ns#DerivativeWorks" />
+  </cc:License>
+</rdf:RDF>
+</metadata>
+  <g
+     transform="translate(0.000000,512.000000) scale(0.100000,-0.100000)"
+     fill="#000000"
+     stroke="none"
+     id="g3039">
+    <path
+       d="M1395 4348 c-14 -3 -25 -5 -25 -3 0 2 -10 -2 -22 -8 -55 -29 -81 -53 -101 -91 l-21 -41 -1 -1722 c0 -1047 4 -1723 9 -1723 9 0 229 90 322 132 27 12 54 23 59 24 9 2 146 59 255 106 137 60 234 100 248 102 7 1 18 8 24 14 7 7 18 12 26 12 7 0 38 11 68 25 30 14 57 25 59 25 3 0 24 9 48 19 23 11 81 36 129 55 l86 36 130 -54 c72 -30 145 -61 164 -70 18 -8 56 -24 83 -34 70 -27 291 -119 344 -143 24 -11 66 -29 95 -40 28 -11 74 -31 104 -45 29 -13 55 -24 57 -24 6 0 225 -91 292 -121 23 -11 47 -19 52 -19 8 0 11 520 11 1720 0 1672 -1 1722 -19 1758 -24 47 -56 77 -106 98 -37 16 -122 18 -1193 18 -633 1 -1163 -2 -1177 -6z m1194 -548 c12 -41 26 -84 31 -95 4 -11 16 -45 26 -75 9 -30 27 -84 39 -120 57 -165 107 -316 109 -328 6 -31 26 -32 383 -30 237 2 359 0 356 -7 -2 -5 -29 -29 -61 -52 -91 -66 -355 -269 -379 -292 -12 -12 -25 -21 -28 -21 -3 0 -14 -8 -24 -17 -11 -10 -38 -31 -60 -48 -22 -16 -40 -35 -41 -41 0 -6 13 -51 29 -100 39 -121 83 -258 121 -384 17 -58 43 -139 56 -180 13 -41 24 -78 24 -82 0 -5 -54 33 -121 84 -66 51 -166 128 -222 171 -56 43 -115 88 -132 101 -16 14 -48 38 -70 55 -22 17 -46 36 -53 41 -13 12 -6 17 -217 -145 -71 -55 -134 -103 -140 -107 -5 -4 -26 -20 -45 -36 -41 -33 -183 -141 -210 -160 -22 -16 -26 -32 34 158 20 63 38 122 40 130 2 8 18 58 35 111 17 53 31 103 31 113 0 9 5 16 12 16 6 0 9 2 6 5 -3 3 9 53 28 111 30 98 31 106 16 119 -9 8 -83 65 -164 127 -80 62 -207 160 -282 218 -75 57 -136 107 -136 110 0 3 164 4 364 2 l363 -2 11 27 c6 16 23 66 38 113 14 47 31 91 37 98 5 6 7 12 4 12 -3 0 8 39 24 88 17 48 32 94 34 102 2 8 20 62 40 120 20 58 38 110 39 117 1 7 5 16 9 19 4 4 7 16 7 28 0 34 15 5 39 -74z"
+       id="path3041" />
+  </g>
+</svg>

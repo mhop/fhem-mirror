@@ -1,70 +1,27 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-
-<svg
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   version="1.0"
-   width="468pt"
-   height="468pt"
-   viewBox="0 0 468 468"
-   id="svg2"
-   inkscape:version="0.48.4 r9939"
-   sodipodi:docname="9.svg">
-  <sodipodi:namedview
-     pagecolor="#ffffff"
-     bordercolor="#666666"
-     borderopacity="1"
-     objecttolerance="10"
-     gridtolerance="10"
-     guidetolerance="10"
-     inkscape:pageopacity="0"
-     inkscape:pageshadow="2"
-     inkscape:window-width="1858"
-     inkscape:window-height="1057"
-     id="namedview9"
-     showgrid="false"
-     inkscape:zoom="0.4034188"
-     inkscape:cx="292.5"
-     inkscape:cy="292.5"
-     inkscape:window-x="1734"
-     inkscape:window-y="-8"
-     inkscape:window-maximized="1"
-     inkscape:current-layer="svg2" />
-  <defs
-     id="defs12" />
-  <metadata
-     id="metadata4">
-Created by potrace 1.8, written by Peter Selinger 2001-2007
-<rdf:RDF>
-  <cc:Work
-     rdf:about="">
-    <dc:format>image/svg+xml</dc:format>
-    <dc:type
-       rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-    <dc:title></dc:title>
-  </cc:Work>
-</rdf:RDF>
-</metadata>
-  <g
-     transform="matrix(0.189474,0,0,-0.189474,0,468)"
-     id="g6">
-    <path
-       d="M 395,2455 C 244,2422 112,2322 57,2200 5,2083 6,2112 2,1260 0,702 2,446 10,400 43,208 198,52 398,11 c 71,-15 1628,-15 1692,0 174,40 322,190 365,370 22,94 22,1579 0,1683 -21,98 -66,187 -127,252 -61,64 -113,98 -201,128 -61,21 -75,21 -867,23 -640,1 -817,-1 -865,-12 z m 1737,-163 c 74,-36 132,-95 170,-170 l 23,-47 0,-840 0,-840 -28,-57 c -37,-76 -96,-134 -171,-169 l -63,-29 -839,2 -839,3 -50,27 C 273,204 196,285 167,348 l -22,47 0,840 0,840 27,52 c 53,100 128,162 227,189 35,10 236,12 856,11 l 810,-2 67,-33 z"
-       id="path8" />
-  </g>
-  <text
-     x="113.77727"
-     y="383.63165"
-     id="text2993"
-     xml:space="preserve"
-     style="font-size:420.84956054px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial Bold"
-     sodipodi:linespacing="125%"><tspan
-       sodipodi:role="line"
-       id="tspan3026">9</tspan></text>
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 21.1.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1"
+	 id="svg2" inkscape:version="0.48.4 r9939" sodipodi:docname="9.svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:svg="http://www.w3.org/2000/svg"
+	 xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 468 468"
+	 style="enable-background:new 0 0 468 468;" xml:space="preserve">
+<style type="text/css">
+	.st0{enable-background:new    ;}
+</style>
+<sodipodi:namedview  bordercolor="#666666" borderopacity="1" gridtolerance="10" guidetolerance="10" id="namedview9" inkscape:current-layer="svg2" inkscape:cx="292.5" inkscape:cy="292.5" inkscape:pageopacity="0" inkscape:pageshadow="2" inkscape:window-height="1057" inkscape:window-maximized="1" inkscape:window-width="1858" inkscape:window-x="1734" inkscape:window-y="-8" inkscape:zoom="0.4034188" objecttolerance="10" pagecolor="#ffffff" showgrid="false">
+	</sodipodi:namedview>
+<g id="g6" transform="matrix(0.189474,0,0,-0.189474,0,468)">
+	<path id="path8" d="M395,2455c-151-33-283-133-338-255c-52-117-51-88-55-940c-2-558,0-814,8-860C43,208,198,52,398,11
+		c71-15,1628-15,1692,0c174,40,322,190,365,370c22,94,22,1579,0,1683c-21,98-66,187-127,252c-61,64-113,98-201,128
+		c-61,21-75,21-867,23C620,2468,443,2466,395,2455z M2132,2292c74-36,132-95,170-170l23-47v-840V395l-28-57c-37-76-96-134-171-169
+		l-63-29l-839,2l-839,3l-50,27c-62,32-139,113-168,176l-22,47v840v840l27,52c53,100,128,162,227,189c35,10,236,12,856,11l810-2
+		L2132,2292z"/>
+</g>
+<g class="st0">
+	<path d="M132.9,314l55.9-6.2c1.4,11.4,4.9,19.8,10.7,25.3c5.8,5.5,13.4,8.2,22.8,8.2c11.9,0,22.1-5.5,30.4-16.4
+		c8.4-11,13.7-33.7,16-68.2c-14.5,16.9-32.7,25.3-54.5,25.3c-23.7,0-44.1-9.1-61.3-27.4c-17.2-18.3-25.8-42.1-25.8-71.4
+		c0-30.5,9.1-55.2,27.2-73.9c18.2-18.7,41.3-28,69.4-28c30.5,0,55.6,11.8,75.2,35.4c19.6,23.6,29.4,62.5,29.4,116.6
+		c0,55.1-10.2,94.8-30.6,119.2c-20.4,24.4-47,36.6-79.7,36.6c-23.6,0-42.6-6.3-57.1-18.8C146.3,357.6,137,338.9,132.9,314z
+		 M263.6,187.8c0-18.6-4.3-33.1-12.8-43.4c-8.6-10.3-18.5-15.4-29.7-15.4c-10.7,0-19.6,4.2-26.6,12.6c-7.1,8.4-10.6,22.2-10.6,41.4
+		c0,19.5,3.8,33.7,11.5,42.8c7.7,9.1,17.3,13.7,28.8,13.7c11.1,0,20.4-4.4,28-13.2C259.8,217.7,263.6,204.8,263.6,187.8z"/>
+</g>
 </svg>

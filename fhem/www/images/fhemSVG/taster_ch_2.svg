@@ -1,89 +1,31 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-
-<svg
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   version="1.0"
-   width="468pt"
-   height="468pt"
-   viewBox="0 0 468 468"
-   id="svg2"
-   inkscape:version="0.91pre3 r13670"
-   sodipodi:docname="taster_ch_2.svg">
-  <sodipodi:namedview
-     pagecolor="#ffffff"
-     bordercolor="#666666"
-     borderopacity="1"
-     objecttolerance="10"
-     gridtolerance="10"
-     guidetolerance="10"
-     inkscape:pageopacity="0"
-     inkscape:pageshadow="2"
-     inkscape:window-width="1858"
-     inkscape:window-height="1057"
-     id="namedview8"
-     showgrid="false"
-     inkscape:zoom="0.4034188"
-     inkscape:cx="292.5"
-     inkscape:cy="292.5"
-     inkscape:window-x="1974"
-     inkscape:window-y="-8"
-     inkscape:window-maximized="1"
-     inkscape:current-layer="svg2" />
-  <defs
-     id="defs12" />
-  <metadata
-     id="metadata4">
-Created by potrace 1.8, written by Peter Selinger 2001-2007
-<rdf:RDF>
-  <cc:Work
-     rdf:about="">
-    <dc:format>image/svg+xml</dc:format>
-    <dc:type
-       rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-    <dc:title></dc:title>
-  </cc:Work>
-</rdf:RDF>
-</metadata>
-  <g
-     transform="matrix(0.258564,0,0,-0.258564,0,468)"
-     id="g6"
-     stroke="none"
-     fill="#000000">
-    <path
-       d="M 97,1796 C 46,1777 22,1754 10,1711 4,1688 0,1385 0,897 0,55 -2,82 55,30 L 82,5 893,2 c 758,-2 814,-1 847,15 73,37 70,-6 70,888 0,775 -1,801 -20,832 -44,73 16,68 -865,70 -650,2 -797,0 -828,-11 z m 1573,-896 0,-770 -765,0 -765,0 0,770 0,770 765,0 765,0 0,-770 z"
-       id="path8" />
-  </g>
-  <rect
-     width="49.576271"
-     height="49.576271"
-     x="202.78989"
-     y="209.12207"
-     id="rect2989"
-     fill="#000000" />
-  <rect
-     id="rect2987"
-     width="360"
-     height="14.872881"
-     x="55"
-     y="227"
-     fill="#000000" />
-  <text
-     xml:space="preserve"
-     style="font-style:normal;font-weight:normal;font-size:32px;line-height:125%;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-     x="69.406776"
-     y="400.57626"
-     id="text3336"
-     sodipodi:linespacing="125%"><tspan
-       sodipodi:role="line"
-       id="tspan3338"
-       x="69.406776"
-       y="400.57626"
-       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:144px;font-family:Arial;-inkscape-font-specification:'Arial Bold'">CH 2</tspan></text>
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 21.1.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1"
+	 id="svg2" inkscape:version="0.91pre3 r13670" sodipodi:docname="taster_ch_2.svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:svg="http://www.w3.org/2000/svg"
+	 xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 468 468"
+	 style="enable-background:new 0 0 468 468;" xml:space="preserve">
+<style type="text/css">
+	.st0{enable-background:new    ;}
+</style>
+<sodipodi:namedview  bordercolor="#666666" borderopacity="1" gridtolerance="10" guidetolerance="10" id="namedview8" inkscape:current-layer="svg2" inkscape:cx="292.5" inkscape:cy="292.5" inkscape:pageopacity="0" inkscape:pageshadow="2" inkscape:window-height="1057" inkscape:window-maximized="1" inkscape:window-width="1858" inkscape:window-x="1974" inkscape:window-y="-8" inkscape:zoom="0.4034188" objecttolerance="10" pagecolor="#ffffff" showgrid="false">
+	</sodipodi:namedview>
+<g id="g6" transform="matrix(0.258564,0,0,-0.258564,0,468)">
+	<path id="path8" d="M97,1796c-51-19-75-42-87-85c-6-23-10-326-10-814C0,55-2,82,55,30L82,5l811-3c758-2,814-1,847,15
+		c73,37,70-6,70,888c0,775-1,801-20,832c-44,73,16,68-865,70C275,1809,128,1807,97,1796z M1670,900V130H905H140v770v770h765h765V900
+		z"/>
+</g>
+<rect id="rect2989" x="202.8" y="209.1" width="49.6" height="49.6"/>
+<rect id="rect2987" x="55" y="227" width="360" height="14.9"/>
+<g class="st0">
+	<path d="M145.8,362.7l20.2,6.4c-3.1,11.2-8.2,19.6-15.4,25.1c-7.2,5.5-16.3,8.2-27.4,8.2c-13.7,0-24.9-4.7-33.8-14
+		c-8.8-9.4-13.2-22.1-13.2-38.4c0-17.2,4.4-30.5,13.3-40s20.5-14.2,34.9-14.2c12.6,0,22.9,3.7,30.7,11.2c4.7,4.4,8.2,10.7,10.5,19
+		l-20.6,4.9c-1.2-5.3-3.8-9.6-7.6-12.7s-8.6-4.6-14.1-4.6c-7.6,0-13.8,2.7-18.6,8.2c-4.8,5.5-7.1,14.4-7.1,26.6
+		c0,13,2.3,22.3,7,27.8c4.7,5.5,10.8,8.3,18.3,8.3c5.5,0,10.3-1.8,14.3-5.3C141.2,375.8,144.1,370.2,145.8,362.7z"/>
+	<path d="M183.9,400.6V297.5h20.8v40.6h40.8v-40.6h20.8v103.1h-20.8v-45.1h-40.8v45.1H183.9z"/>
+	<path d="M390.2,382.2v18.4H321c0.7-6.9,3-13.5,6.8-19.7c3.7-6.2,11.2-14.4,22.2-24.7c8.9-8.3,14.4-13.9,16.4-16.9
+		c2.7-4.1,4.1-8.1,4.1-12.1c0-4.4-1.2-7.8-3.6-10.2c-2.4-2.4-5.6-3.6-9.8-3.6c-4.1,0-7.4,1.2-9.8,3.7c-2.4,2.5-3.8,6.6-4.2,12.4
+		l-19.7-2c1.2-10.9,4.9-18.7,11-23.4c6.2-4.7,13.9-7.1,23.2-7.1c10.2,0,18.2,2.7,24,8.2c5.8,5.5,8.7,12.3,8.7,20.5
+		c0,4.6-0.8,9.1-2.5,13.3c-1.7,4.2-4.3,8.6-7.9,13.2c-2.4,3-6.7,7.4-12.9,13.1c-6.2,5.7-10.2,9.5-11.8,11.4c-1.7,1.9-3,3.7-4,5.5
+		H390.2z"/>
+</g>
 </svg>

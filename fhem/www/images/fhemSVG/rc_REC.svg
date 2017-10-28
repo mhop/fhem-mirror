@@ -1,42 +1,25 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-
-<svg
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   version="1.0"
-   width="468pt"
-   height="468pt"
-   viewBox="0 0 468 468"
-   id="svg2">
-  <defs
-     id="defs12" />
-  <metadata
-     id="metadata4">
-Created by potrace 1.8, written by Peter Selinger 2001-2007
-<rdf:RDF>
-  <cc:Work
-     rdf:about="">
-    <dc:format>image/svg+xml</dc:format>
-    <dc:type
-       rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-    <dc:title></dc:title>
-  </cc:Work>
-</rdf:RDF>
-</metadata>
-  <g
-     transform="matrix(0.189474,0,0,-0.189474,0,468)"
-     id="g6">
-    <path
-       d="M 395,2455 C 244,2422 112,2322 57,2200 5,2083 6,2112 2,1260 0,702 2,446 10,400 43,208 198,52 398,11 c 71,-15 1628,-15 1692,0 174,40 322,190 365,370 22,94 22,1579 0,1683 -21,98 -66,187 -127,252 -61,64 -113,98 -201,128 -61,21 -75,21 -867,23 -640,1 -817,-1 -865,-12 z m 1737,-163 c 74,-36 132,-95 170,-170 l 23,-47 0,-840 0,-840 -28,-57 c -37,-76 -96,-134 -171,-169 l -63,-29 -839,2 -839,3 -50,27 C 273,204 196,285 167,348 l -22,47 0,840 0,840 27,52 c 53,100 128,162 227,189 35,10 236,12 856,11 l 810,-2 67,-33 z"
-       id="path8" />
-  </g>
-  <path
-     d="m 468.49577,281.34534 a 172.27754,172.27754 0 1 1 -344.55508,0 172.27754,172.27754 0 1 1 344.55508,0 z"
-     transform="matrix(0.8,0,0,0.8,-7.9322071,10.298305)"
-     id="path2984"
-     style="fill:#9b0000;fill-opacity:1;stroke:#000000;stroke-width:20;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 21.1.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1"
+	 id="svg2" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:svg="http://www.w3.org/2000/svg"
+	 xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 468 468"
+	 style="enable-background:new 0 0 468 468;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#9B0000;}
+</style>
+<g id="g6" transform="matrix(0.189474,0,0,-0.189474,0,468)">
+	<g id="path8">
+		<path d="M395,2455c-151-33-283-133-338-255c-52-117-51-88-55-940c-2-558,0-814,8-860C43,208,198,52,398,11c71-15,1628-15,1692,0
+			c174,40,322,190,365,370c22,94,22,1579,0,1683c-21,98-66,187-127,252c-61,64-113,98-201,128c-61,21-75,21-867,23
+			C620,2468,443,2466,395,2455z M2132,2292c74-36,132-95,170-170l23-47v-840V395l-28-57c-37-76-96-134-171-169l-63-29l-839,2l-839,3
+			l-50,27c-62,32-139,113-168,176l-22,47v840v840l27,52c53,100,128,162,227,189c35,10,236,12,856,11l810-2L2132,2292z"/>
+	</g>
+</g>
+<g id="path2984">
+	<path class="st0" d="M366.9,235.4c0,76.1-61.7,137.8-137.8,137.8S91.2,311.5,91.2,235.4l0,0c0-76.1,61.7-137.8,137.8-137.8
+		S366.9,159.3,366.9,235.4z"/>
+	<path d="M229,383.2c-81.5,0-147.8-66.3-147.8-147.8c0-81.5,66.3-147.8,147.8-147.8s147.8,66.3,147.8,147.8
+		C376.9,316.9,310.6,383.2,229,383.2z M229,107.6c-70.5,0-127.8,57.3-127.8,127.8c0,70.5,57.3,127.8,127.8,127.8
+		c70.5,0,127.8-57.3,127.8-127.8C356.9,164.9,299.5,107.6,229,107.6z"/>
+</g>
 </svg>
