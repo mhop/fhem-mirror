@@ -1800,6 +1800,9 @@ sub KODI_HTTP_Request($$@)
       The interval which is used to check if Kodi is still alive (by sending a JSON ping) and also it is used to update current player item.</li>
   <li>disable<br>
       Disables the device. All connections will be closed immediately.</li>
+  <li>jsonResponseReading<br>
+      When enabled then every received JSON message from Kodi will be saved into the reading <i>jsonResponse</i> so the last received message is always available.
+      Also an event is triggered upon each update.</li>
   </ul>
 </ul>
 
