@@ -89,13 +89,13 @@ sub RPI_GPIO_Define($$) {
 
  #Pruefen, ob GPIO bereits verwendet
  foreach my $dev (devspec2array("TYPE=$hash->{TYPE}")) {
-	if ($args[2] eq InternalVal($dev,"RPI_pin","") && $hash->{NAME} ne InternalVal($dev,"NAME","") ) {
+	if ($args[2] eq InternalVal($dev,"GPIO_Nr","") && $hash->{NAME} ne InternalVal($dev,"NAME","") ) {
 		return "GPIO $args[2] already used by $dev";
   }
  }
  
 	my $name = $args[0];
-	$hash->{RPI_pin} = $args[2];
+	$hash->{GPIO_Nr} = $args[2];
  
 	if ( defined $args[3] ) {
 		return "unable to find gpio basedir $args[3]" unless (-e $args[3]);
@@ -115,29 +115,29 @@ sub RPI_GPIO_Define($$) {
  
 	$hash->{dir_not_set} = 1;
  
-	if(-e "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}" && 
-	   -w "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value" && 
-	   -w "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/direction") {			#GPIO bereits exportiert?
-		Log3 $hash, 4, "$name: gpio$hash->{RPI_pin} already exists";
+	if(-e "$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}" && 
+	   -w "$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/value" && 
+	   -w "$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/direction") {			#GPIO bereits exportiert?
+		Log3 $hash, 4, "$name: gpio$hash->{GPIO_Nr} already exists";
 		#nix tun...ist ja schon da
 	} elsif (-w "$hash->{GPIO_Basedir}/export") {																																																					#gpio export Datei mit schreibrechten?
 		Log3 $hash, 4, "$name: write access to file $hash->{GPIO_Basedir}/export, use it to export GPIO";
 		my $exp = IO::File->new("> $hash->{GPIO_Basedir}/export");													#gpio ueber export anlegen 
-		print $exp "$hash->{RPI_pin}";
+		print $exp "$hash->{GPIO_Nr}";
 		$exp->close;
 	} else {
 		if ( defined $hash->{WiringPi_gpio} ) {																		#GPIO Utility Vorhanden?
 			Log3 $hash, 4, "$name: using gpio utility to export pin";
 			RPI_GPIO_exuexpin($hash, "in");
 		} else {																									#Abbbruch da kein gpio utility vorhanden
-			my $msg = "$name: can't export gpio$hash->{RPI_pin}, no write access to $hash->{GPIO_Basedir}/export and WiringPi gpio utility not (correct) installed";
+			my $msg = "$name: can't export gpio$hash->{GPIO_Nr}, no write access to $hash->{GPIO_Basedir}/export and WiringPi gpio utility not (correct) installed";
 			Log3 $hash, 1, $msg;
 			return $msg;
 		}
 	}
  
  # wait for Pin export (max 5s)
- my $checkpath = qq($hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value);
+ my $checkpath = qq($hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/value);
  my $counter = 100;
  while( $counter ){
  	last if( -e $checkpath && -w $checkpath );
@@ -150,26 +150,26 @@ sub RPI_GPIO_Define($$) {
 		Log3 $hash, 4, "$name: using gpio utility to export pin (first export via $hash->{GPIO_Basedir}/export failed)";
 		RPI_GPIO_exuexpin($hash, "in");
 	} else {														# Abbbruch da kein gpio utility vorhanden
-		Log3 $hash, 1, "$name: second attempt to export gpio$hash->{RPI_pin} also failed: WiringPi gpio utility not (correct) installed, possibly reasons for first fail:";
+		Log3 $hash, 1, "$name: second attempt to export gpio$hash->{GPIO_Nr} also failed: WiringPi gpio utility not (correct) installed, possibly reasons for first fail:";
  		if ( -e "$hash->{GPIO_Basedir}/export") {
   			Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/export\" exists and is " . ( ( -w "$hash->{GPIO_Basedir}/export") ? "" : "NOT " ) . "writable";
 		} else {
  			Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/export\" doesnt exist";
 		}
-		if(-e "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}") {
-			Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}\" exported but define aborted:";
-			if ( -e "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value") {
-				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value\" exists and is " . ( ( -w "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value") ? "" : "NOT " ) . "writable";
+		if(-e "$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}") {
+			Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}\" exported but define aborted:";
+			if ( -e "$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/value") {
+				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/value\" exists and is " . ( ( -w "$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/value") ? "" : "NOT " ) . "writable";
 			} else {
-				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value\" doesnt exist";
+				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/value\" doesnt exist";
 			}
-			if ( -e "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/direction") {
-				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/direction\" exists and is " . ( ( -w "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/direction") ? "" : "NOT " ) . "writable";
+			if ( -e "$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/direction") {
+				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/direction\" exists and is " . ( ( -w "$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/direction") ? "" : "NOT " ) . "writable";
 			} else {
-				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/direction\" doesnt exist";
+				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/direction\" doesnt exist";
 			}
 		}
-       	return "$name: failed to export pin gpio$hash->{RPI_pin}, see logfile";						
+       	return "$name: failed to export pin gpio$hash->{GPIO_Nr}, see logfile";						
 	}
  }
 
@@ -376,7 +376,7 @@ sub RPI_GPIO_Attr(@) {
 	}
 	if ($attr eq "pud_resistor" && $val) {	# interner pullup/down Widerstand
 		if($val =~ /^(off|up|down)$/) {
-			if(-w "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/pull") {
+			if(-w "$hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr}/pull") {
 				$val =~ s/off/disable/;
 				RPI_GPIO_fileaccess($hash, "pull", $val);
 			} else { #nur fuer Raspberry (ueber gpio utility)
@@ -424,12 +424,12 @@ sub RPI_GPIO_Shutdown($$) {
 	if( AttrVal($hash->{NAME},"direction","") ne "output" and AttrVal($hash->{NAME},"unexportpin","") ne "no" ) {
 		if (-w "$hash->{GPIO_Basedir}/unexport") {# unexport if write access to unexport
 			my $uexp = IO::File->new("> $hash->{GPIO_Basedir}/unexport");
-			print $uexp "$hash->{RPI_pin}";
+			print $uexp "$hash->{GPIO_Nr}";
 			$uexp->close;
 		} else {# else use gpio utility
 			RPI_GPIO_exuexpin($hash, "unexport");
 		}
-		Log3 $hash, 5, "$hash->{NAME}: gpio$hash->{RPI_pin} removed";
+		Log3 $hash, 5, "$hash->{NAME}: gpio$hash->{GPIO_Nr} removed";
 	}
 
 	return undef;	
@@ -449,7 +449,7 @@ sub RPI_GPIO_Undef($$) {
 	if(AttrVal($hash->{NAME},"unexportpin","") ne "no") {
 		if (-w "$hash->{GPIO_Basedir}/unexport") {#unexport Pin alte Version
 			my $uexp = IO::File->new("> $hash->{GPIO_Basedir}/unexport");
-			print $uexp "$hash->{RPI_pin}";
+			print $uexp "$hash->{GPIO_Nr}";
 			$uexp->close;
 		} else {#alternative unexport Pin:
 			RPI_GPIO_exuexpin($hash, "unexport");
@@ -583,7 +583,7 @@ sub RPI_GPIO_updatevalue($) {						#update value for Input devices
 sub RPI_GPIO_fileaccess($$;$) {						#Fileaccess for GPIO base directory
 	my ($hash, @args) = @_;
 	my $fname = $args[0];
-	my $pinroot = qq($hash->{GPIO_Basedir}/gpio$hash->{RPI_pin});
+	my $pinroot = qq($hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr});
 	my $file =qq($pinroot/$fname);
 	Log3 $hash, 5, "$hash->{NAME}, in fileaccess: $fname " . (defined($args[1])?$args[1]:"");
 
@@ -641,7 +641,7 @@ sub RPI_GPIO_exuexpin($$) {			#export, unexport, direction, pud_resistor via GPI
 			$sw = "export";
 			$dir = "out" if ( $dir eq "high" || $dir eq "low" );		#auf out zurueck, da gpio tool dies nicht unterst?tzt
 		}
-		my $exp = $gpioutility.' '.$sw.' '.$hash->{RPI_pin}. (defined $dir ? " " . $dir : "");
+		my $exp = $gpioutility.' '.$sw.' '.$hash->{GPIO_Nr}. (defined $dir ? " " . $dir : "");
 		$exp = `$exp`;
 	} else {
 		my $ret = "WiringPi gpio utility not (correct) installed";
@@ -655,7 +655,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 	my $msg = '';
 	if ( $arg eq "start") {
 		#FH fuer value-datei
-		my $pinroot = qq($hash->{GPIO_Basedir}/gpio$hash->{RPI_pin});
+		my $pinroot = qq($hash->{GPIO_Basedir}/gpio$hash->{GPIO_Nr});
 		my $valfile = qq($pinroot/value);
 		$hash->{filehandle} = IO::File->new("< $valfile"); 
 		if (!defined $hash->{filehandle}) {
