@@ -993,10 +993,11 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
                         }
  ,"HM-LC-Dim1T-DR"    =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
-                         ,localResDis     =>1,fuseDelay       =>1,logicCombination=>1
+                         ,fuseDelay       =>1,localResDis     =>1,logicCombination=>1
                         }
- ,"HM-LC-Dim1T-Pl"    =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
-                         ,fuseDelay       =>1
+ ,"HM-LC-DIM1T-PL"    =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
+                         ,fuseDelay       =>1,localResDis     =>1
+                         ,logicCombination=>1
                         }
  ,"HM-LC-Dim1TPBU-FM" =>{                     ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
                          ,fuseDelay       =>1,localResDis     =>1
@@ -1160,7 +1161,7 @@ $culHmRegModel{"HM-LC-Dim1L-CV-644"}    =
 $culHmRegModel{"HM-LC-Dim1L-Pl-3"}      = $culHmRegModel{"HM-LC-Dim1L-CV-2"};
 
 $culHmRegModel{"HM-LC-Dim1T-FM-LF"}     = 
-$culHmRegModel{"Schueco-263-134"}       = $culHmRegModel{"HM-LC-Dim1T-Pl"};
+$culHmRegModel{"Schueco-263-134"}       = $culHmRegModel{"HM-LC-DIM1T-PL"};
 
 $culHmRegModel{"ASH550I"}               = 
 $culHmRegModel{"ASH550"}                = 
@@ -2262,7 +2263,7 @@ $culHmChanSets{"HM-Dis-EP-WM5502"}      = $culHmChanSets{"HM-TC-IT-WM-W-EU01"};
 
   foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
     next if (!defined $culHmModel{$al}{alias});
-  
+
     foreach my $mt (keys %culHmModel){
       if (($culHmModel{$al}{alias}) eq $culHmModel{$mt}{name}){
         my $md = $culHmModel{$mt}{name};
