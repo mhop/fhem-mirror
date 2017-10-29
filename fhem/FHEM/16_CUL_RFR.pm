@@ -161,10 +161,22 @@ CUL_RFR_AddPrefix($$)
   The CUL_RFR  module is used to "attach" a second CUL to your base CUL, and
   use it as a repeater / range extender. RFR is shorthand for RF_ROUTER.
   Transmission of the data uses the CC1101 packet capabilities with GFSK
-  modulation at 250kBaud after pinging the base CUL at the usual 1kBaud. When
+  modulation at 250kBaud after pinging the base CUL at the usual 1kBaud.  After
   configured, the RFR device can be used like another CUL connected directly to
-  fhem.
+  FHEM.<br>
 
+  In theory every SlowRF protocol should work, as the hook is implemented in
+  the culfw output routine: instead of sending the data to the USB-Interface it
+  is transmitted via radio to the base CUL. There are still some restrictions:
+  <ul>
+  <li>due to the ping both CULs have to be in SlowRF mode, and use the same
+    parameters (freq, bwidth, etc).</li>
+  <li>the logical module handling the protocol is not allowed to access the
+    routines of the IODev (i.e. CUL) directly.</li>
+  </ul>
+  Tested protocols are FHT, FS20, EM, HMS, S300.<br>
+  Since there is no ack or a resend mechanism, it should be primarily used to
+  forward "unimportant" data, it was developed for forwading KS300 packets.
 
   <br><br>
   Before you can use this feature in fhem, you have to enable/configure RF
