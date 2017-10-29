@@ -838,7 +838,7 @@ sub SearchLow ($) {
 =pod
 =item helper
 =item summary to address an OWX interface device via TCP/IP
-=item summary_DE zur Adressierung eines OWX interface device mit TCP/IP
+=item summary_DE zur Adressierung eines OWX Interface Device mit TCP/IP
 =begin html
 
 <a name="OWX_TCP"></a>
