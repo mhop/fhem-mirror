@@ -78,7 +78,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="7.0";
+my $owx_version="7.01";
 #-- controller may be HD44780 or KS0073 
 #   these values can be changed by attribute for different display 
 #   geometries or memory maps
@@ -89,11 +89,11 @@ my @lcdpage       = (0,32,64,96);
 
 #-- declare variables
 my %gets = (
-  "id"          => "",
-  "memory"      => "",
-  "gpio"        => "",
-  "counter"     => "",
-  "version"     => ""
+  "id"          => ":noArg",
+  "memory"      => ":noArg",
+  "gpio"        => ":noArg",
+  "counter"     => ":noArg",
+  "version"     => ":noArg"
   #"register"    => "",
   #"data"        => ""
 );
@@ -345,7 +345,9 @@ sub OWLCD_Get($@) {
     if(int(@a) < 2);
     
   #-- check argument
-  return "OWLCD: Get with unknown argument $a[1], choose one of ".join(" ", sort keys %gets)
+  my $msg = "OWLCD: Get with unknown argument $a[1], choose one of ";
+  $msg .= "$_$gets{$_} " foreach (keys%gets);
+  return $msg
     if(!defined($gets{$a[1]}));
 
   #-- get id
@@ -504,7 +506,7 @@ sub OWLCD_Set($@) {
     }
   #-- check syntax for setting memory
   } elsif( $key eq "memory" ){
-    return "OWLCD: Set needs two parameters when setting memory page: <#page> <string>"
+    return "OWLCD: Set needs two parameters when setting memory page 0/1: <#page> <string>"
       if( int(@a)<4 );
     $line  = ($a[2] =~ m/\d/) ? int($a[2]) : 0;
     $value = $a[3]; 
@@ -512,9 +514,9 @@ sub OWLCD_Set($@) {
       $value .= " ".$a[$i];
     }
   #-- check syntax for setting icon
-  } elsif ( ($key eq "icon") || ($key eq "gpiobit") ){
+  } elsif ( $key eq "icon" ){
     if( ($a[2] ne "0") && ($a[2] ne "none") ){
-      return "OWLCD: Set needs two parameters when setting icon value: <#icon> on/off/blink (resp. 0..5/off/blink for #16)"
+      return "OWLCD: Set needs two parameters when setting icon 0-16 value: <#icon> on/off/blink (resp. 0..5/off/blink for #16)"
         if( (int(@a)!=4) );
       $icon  = ($a[2] =~ m/\d\d?/) ? $a[2] : 0;
       $value = $a[3]; 
@@ -524,6 +526,14 @@ sub OWLCD_Set($@) {
       $icon  = 0;
       $value = "OFF"; 
     }  
+   
+  #-- check syntax for setting gpiobit
+  } elsif ( $key eq "gpiobit" ){
+    return "OWLCD: Set needs two parameters when setting gpiobit 1-3 value: <#bit> on/off"
+      if( (int(@a)!=4) );
+    return "OWLCD: Set gpiobit 1-3 value: <#bit> on/off only possible for bits 1-3"
+        if( $a[2]>3 || $a[2]<1 );
+    
   #-- check syntax for reset and test and initialize
   } elsif ( ($key eq "reset") || ($key eq "test") || ($key eq "initialize")){
     return "OWLCD: Set needs no parameters when setting $key value"
@@ -553,10 +563,12 @@ sub OWLCD_Set($@) {
       return GP_Catch($@) if $@;
     }
   }
+  
   #-- set single gpio bit from all off = 1 on = 0
+  #   contribution from ext323
   if($key eq "gpiobit") {
     my $bit   = $a[2];
-    $value = lc($a[3]); 
+    $value = lc($a[3]);
     $value =~ s/on/0/;
     $value =~ s/off/1/;
     my $vold = $value;
@@ -569,7 +581,7 @@ sub OWLCD_Set($@) {
     if( $value == 1 ){
       $value = 1<<($bit-1) | ReadingsVal($name,"gpio",0);
     }else{
-      $value = 6<<($bit-1) & ReadingsVal($name,"gpio",0);
+      $value = ~(1<<($bit-1)) & ReadingsVal($name,"gpio",0);
     }
     #-- OWX interface
     if( $interface eq "OWX" ){

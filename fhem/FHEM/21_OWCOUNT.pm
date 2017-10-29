@@ -47,7 +47,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="7.0";
+my $owx_version="7.01";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -58,15 +58,15 @@ my $owgmodel;
 my $owgauto     = 0;
 
 my %gets = (
-  "id"          => "",
+  "id"          => ":noArg",
   "mcache"      => "",
   "memory"      => "",
   "midnight"    => "",
   "raw"         => "",
-  "counters"    => "",
-  "month"       => "",
-  "year"        => "",
-  "version"     => ""
+  "counters"    => ":noArg",
+  "month"       => ":noArg",
+  "year"        => ":noArg",
+  "version"     => ":noArg"
 );
 
 my %sets = (
@@ -372,7 +372,13 @@ sub OWCOUNT_ChannelNames($) {
   my $state   = $hash->{READINGS}{"state"}{VAL};
  
   my ($cname,@cnama,$unit,@unarr,$runit,$period);
-
+  
+  my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
+  $gets{"memory"}  = ($nomemory) ? ":noArg" : ":0,1,2,3,4,5,6,7,8,9,10,11,12,13";
+  $gets{"mcache"}  = $gets{"memory"};
+  
+  $gets{"midnight"}=":";
+    
   for (my $i=0;$i<int(@owg_fixed);$i++){
     #-- name
     $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : "$owg_fixed[$i]";
@@ -391,6 +397,10 @@ sub OWCOUNT_ChannelNames($) {
     #-- put into readings
     $owg_channel[$i]=$cnama[0];
     $hash->{READINGS}{$owg_channel[$i]}{ABBR}     = $cnama[1];  
+    $gets{"midnight"} .=  $cnama[0];
+    $gets{"midnight"} .=  "," 
+      if ($i<(int(@owg_fixed)-1))
+      ;
     $hash->{READINGS}{$owg_channel[$i]}{UNIT}     = $unit;
     
     $period  = defined($attr{$name}{$owg_fixed[$i]."Period"}) ? $attr{$name}{$owg_fixed[$i]."Period"} : "hour";
@@ -426,6 +436,7 @@ sub OWCOUNT_ChannelNames($) {
     $hash->{READINGS}{$owg_rate[$i]}{ABBR}     = $cnama[1];  
     $hash->{READINGS}{$owg_rate[$i]}{UNIT}     = $unit;
   }
+  $gets{"raw"} = $gets{"midnight"};
 }  
 
 ########################################################################################
@@ -676,8 +687,11 @@ sub OWCOUNT_Get($@) {
     if(int(@a) < 2);
     
   #-- check argument
-  return "OWCOUNT: get $name with unknown argument $a[1], choose one of ".join(" ", sort keys %gets)
+  my $msg = "OWCOUNT: Get with unknown argument $a[1], choose one of ";
+  $msg .= "$_$gets{$_} " foreach (keys%gets);
+  return $msg
     if(!defined($gets{$a[1]}));
+
 
   #-- get id
   if($a[1] eq "id") {
@@ -1179,7 +1193,6 @@ sub OWCOUNT_ParseMidnight($$$) {
   } else {
     $strval = 0.0;
   }
-  #Log 1,"============> Parsed $name midnight value $strval";
   $hash->{owg_midnight}->[$page-14] = $strval;
 }
 
@@ -1322,8 +1335,6 @@ sub OWCOUNT_SetPage ($$$) {
   
   #-- check if memory usage has been disabled
   my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
-  
-  #Log 1,"=========> device $name set page $page with nomemory=$nomemory and data of length ".length($data)." has data >$data< ";
   
   $data=sprintf("%-32s",$data);
   
@@ -1607,7 +1618,7 @@ sub OWXCOUNT_BinValues($$$$$$$) {
     }else{
       $msg   = "$name: no error ";
     }
-    OWX_WDBGL($name,5-$error*4,"=====================> OWXCOUNT_BinValues getpage: ".$msg,$res); 
+    OWX_WDBGL($name,5-$error*4,"OWXCOUNT_BinValues getpage: ".$msg,$res); 
       
     #-- 
     my  $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
@@ -1627,7 +1638,7 @@ sub OWXCOUNT_BinValues($$$$$$$) {
       #if ( ($data[4] | $data[5] | $data[6] | $data[7]) ne "\x00" ){
       #  $error = 1;
       #  my $msg = "$name: invalid data in counter page ".ord($data[4])." ".ord($data[5])." ".ord($data[6])." ".ord($data[7]);
-      #  OWX_WDBGL($name,1,"=====================> OWXCOUNT_BinValues getpage counter: ".$msg,"")
+      #  OWX_WDBGL($name,1,"OWXCOUNT_BinValues getpage counter: ".$msg,"")
       #}
       if( !$error ){
         #-- counter value
@@ -1656,7 +1667,7 @@ sub OWXCOUNT_BinValues($$$$$$$) {
     }else{
       $msg   = "$name: no error ";
     }
-    OWX_WDBGL($name,5-$error*4,"=====================> OWXCOUNT_BinValues: setpage ".$msg,$res); 
+    OWX_WDBGL($name,5-$error*4,"OWXCOUNT_BinValues: setpage ".$msg,$res); 
     
     #-- process results
     my $select="\x5A".substr($res,10,3);
@@ -1678,7 +1689,7 @@ sub OWXCOUNT_BinValues($$$$$$$) {
     }else{
       $msg   = "$name: no error ";
     }
-    OWX_WDBGL($name,5-$error*4,"=====================> OWXCOUNT_BinValues: setpage.$page.final ".$msg,$res);
+    OWX_WDBGL($name,5-$error*4,"OWXCOUNT_BinValues: setpage.$page.final ".$msg,$res);
    
   }
   return undef;

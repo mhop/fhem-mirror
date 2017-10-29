@@ -47,16 +47,16 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="7.0";
+my $owx_version="7.01";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
 
 my %gets = (
-  "id"          => "",
+  "id"          => ":noArg",
   "input"       => "",
-  "gpio"        => "",
-  "version"     => ""
+  "gpio"        => ":noArg",
+  "version"     => ":noArg"
 );
 
 my %sets = (
@@ -324,6 +324,8 @@ sub OWSWITCH_ChannelNames($) {
   my $state   = $hash->{READINGS}{"state"}{VAL};
  
   my ($cname,@cnama,$unit,@unarr);
+  
+  $gets{"input"}=":";
 
   for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
     #-- name
@@ -332,9 +334,12 @@ sub OWSWITCH_ChannelNames($) {
     if( int(@cnama)!=2){
       push(@cnama,$cnama[0]);
     }
-    #-- put into readings 
+    #-- put into readings and array for display
     $owg_channel[$i] = $cnama[0]; 
-    $hash->{READINGS}{$owg_channel[$i]}{ABBR}     = $cnama[1];  
+    $hash->{READINGS}{$owg_channel[$i]}{ABBR}     = $cnama[1]; 
+    $gets{"input"} .=  $cnama[0];
+    $gets{"input"} .=  "," 
+      if ($i<$cnumber{$attr{$name}{"model"}}-1);
  
     #-- unit
     my $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "ON|OFF";
@@ -348,6 +353,8 @@ sub OWSWITCH_ChannelNames($) {
     #-- put into readings
     $hash->{READINGS}{$owg_channel[$i]}{UNIT}     = $unit;
   }
+  $sets{"output"}=$gets{"input"};
+  
 }
 
 ########################################################################################
@@ -438,7 +445,9 @@ sub OWSWITCH_Get($@) {
     if(int(@a) < 2);
     
   #-- check argument
-  return "OWSWITCH: Get with unknown argument $a[1], choose one of ".join(" ", sort keys %gets)
+  my $msg = "OWSWITCH: Get with unknown argument $a[1], choose one of ";
+  $msg .= "$_$gets{$_} " foreach (keys%gets);
+  return $msg
     if(!defined($gets{$a[1]}));
 
   #-- get id

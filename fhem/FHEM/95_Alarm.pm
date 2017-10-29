@@ -51,7 +51,7 @@ my %alarm_transtable_EN = (
     "status"            =>  "Status",
     "notstarted"        =>  "Not started",
     "next"              =>  "Next",
-    "arm   "            =>  "Arm",
+    "arm"               =>  "Arm",
     "disarm"            =>  "Disarm",
     "armbutton"         =>  "Arming",
     "disarmbutton"      =>  "Disarming",
@@ -1185,7 +1185,7 @@ sub Alarm_Html($)
 
 <a name="Alarm"></a>
 <h3>Alarm</h3>
-<a href="https://wiki.fhem.de/wiki/Modul_Alarm">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/commandref.html#Alarm">Alarm</a> 
+<a href="https://wiki.fhem.de/wiki/Modul_Alarm">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#Alarm">Alarm</a> 
 
 =end html_DE
 =cut

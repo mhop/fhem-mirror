@@ -51,9 +51,9 @@ my $owx_version="7.0";
 my $owg_channel = "";
 
 my %gets = (
-  "id"          => "",
-  "value"       => "",
-  "version"     => ""
+  "id"          => ":noArg",
+  "value"       => ":noArg",
+  "version"     => ":noArg"
 );
 
 my %sets = (
@@ -364,7 +364,9 @@ sub OWVAR_Get($@) {
     if(int(@a) < 2);
     
   #-- check argument
-  return "OWVAR: Get with unknown argument $a[1], choose one of ".join(" ", sort keys %gets)
+  my $msg = "OWVAR: Get with unknown argument $a[1], choose one of ";
+  $msg .= "$_$gets{$_} " foreach (keys%gets);
+  return $msg
     if(!defined($gets{$a[1]}));
   
   #-- get id

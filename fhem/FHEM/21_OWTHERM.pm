@@ -5,7 +5,6 @@
 # FHEM module to commmunicate with 1-Wire temperature sensors DS1820, DS18S20, DS18B20, DS1822
 #
 # Prof. Dr. Peter A. Henning
-# Norbert Truchsess
 #
 # $Id$
 #
@@ -48,13 +47,13 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="7.0";
+my $owx_version="7.01";
 
 my %gets = (
-  "id"          => "",
-  "temperature" => "",
-  "alarm"       => "",
-  "version"     => ""
+  "id"          => ":noArg",
+  "temperature" => ":noArg",
+  "alarm"       => ":noArg",
+  "version"     => ":noArg"
 );
 
 my %sets = (
@@ -421,7 +420,9 @@ sub OWTHERM_Get($@) {
     if(int(@a) != 2);
     
   #-- check argument
-  return "OWTHERM: Get with unknown argument $a[1], choose one of ".join(" ", sort keys %gets)
+  my $msg = "OWTHERM: Get with unknown argument $a[1], choose one of ";
+  $msg .= "$_$gets{$_} " foreach (keys%gets);
+  return $msg
     if(!defined($gets{$a[1]}));
   
   #-- get id

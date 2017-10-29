@@ -48,7 +48,7 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log3($$$);
 
-my $owx_version="7.0";
+my $owx_version="7.01";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -60,11 +60,11 @@ my @owg_resoln;
 my @owg_range;
 
 my %gets = (
-  "id"          => "",
-  "reading"     => "",
-  "alarm"       => "",
-  "status"      => "",
-  "version"     => ""
+  "id"          => ":noArg",
+  "reading"     => ":noArg",
+  "alarm"       => ":noArg",
+  "status"      => ":noArg",
+  "version"     => ":noArg"
 );
 
 my %sets = (
@@ -218,6 +218,7 @@ sub OWAD_Define ($$) {
   $hash->{PRESENT}    = 0;
   $hash->{INTERVAL}   = $interval;
   $hash->{ERRCOUNT}   = 0;
+  $hash->{ERRSTATE}   = 0;
   
   #-- Couple to I/O device
   AssignIoPort($hash);
@@ -534,7 +535,9 @@ sub OWAD_Get($@) {
     if(int(@a) != 2);
     
   #-- check argument
-  return "OWAD: Get with unknown argument $a[1], choose one of ".join(" ", sort keys %gets)
+  my $msg = "OWAD: Get with unknown argument $a[1], choose one of ";
+  $msg .= "$_$gets{$_} " foreach (keys%gets);
+  return $msg
     if(!defined($gets{$a[1]}));
 
   #-- get id
@@ -547,6 +550,9 @@ sub OWAD_Get($@) {
   if( $a[1] eq "version") {
     return "$name.version => $owx_version";
   }
+  
+  #-- reset current ERRSTATE
+  $hash->{ERRSTATE} = 0;
   
   #-- get reading according to interface type
   if($a[1] eq "reading") {
@@ -708,6 +714,9 @@ sub OWAD_GetValues($) {
     if( $hash->{INTERVAL} == 0 );
   #-- restart timer for updates  
   InternalTimer(time()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 0);
+
+  #-- reset current ERRSTATE
+  $hash->{ERRSTATE} = 0;
    
   #-- Get readings, alarms and status according to interface type
   if( $interface eq "OWX" ){
@@ -1265,7 +1274,8 @@ sub OWXAD_BinValues($$$$$$$) {
   #-- hash of the busmaster
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
-  my $error  = 0;
+  #-- inherit previous error
+  my $error  = $hash->{ERRSTATE};
   my @data   = []; 
   my $value;
   my $msg;
@@ -1290,11 +1300,14 @@ sub OWXAD_BinValues($$$$$$$) {
      $msg   ="$name: invalid CRC ";
      $error = 1;
   }else{
-     $msg   = "$name: no error ";
+     $msg   = "$name: no local error, inheritance = $error ";
   }
   OWX_WDBGL($name,5-4*$error,"OWXAD_BinValues: context $context    ".$msg,$res);
-  $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1
-    if( $error ); 
+  if( $error ){
+    $hash->{ERRCOUNT}++;
+    $hash->{ERRSTATE} = 1;
+  };
+  
         
   #=============== get the voltage reading ===============================
   if( $context =~ /^ds2450.getreading/ ){

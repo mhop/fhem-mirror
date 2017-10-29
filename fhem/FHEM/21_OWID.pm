@@ -49,12 +49,12 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log3($$$);
 
-my $owx_version="7.0";
+my $owx_version="7.01";
 #-- declare variables
 my %gets = (
-  "present"     => "",
-  "id"          => "",
-  "version"     => ""
+  "present"     => ":noArg",
+  "id"          => ":noArg",
+  "version"     => ":noArg"
 );
 my %sets    = (
   "interval"    => ""
@@ -301,12 +301,14 @@ sub OWID_Get($@) {
   my $offset;
   my $factor;
 
-   #-- check syntax
+  #-- check syntax
   return "OWID: Get argument is missing @a"
     if(int(@a) != 2);
     
   #-- check argument
-  return "OWID: Get with unknown argument $a[1], choose one of ".join(" ", sort keys %gets)
+  my $msg = "OWID: Get with unknown argument $a[1], choose one of ";
+  $msg .= "$_$gets{$_} " foreach (keys%gets);
+  return $msg
     if(!defined($gets{$a[1]}));
 
   #-- get id

@@ -46,17 +46,17 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="7.0";
+my $owx_version="7.01";
 #-- flexible channel name
 my ($owg_channel,$owg_schannel);
 
 my %gets = (
-  "id"          => "",
-  "reading"     => "",
-  "temperature" => "",
-  "VDD"         => "",
-  "raw"         => "",
-  "version"     => ""
+  "id"          => ":noArg",
+  "reading"     => ":noArg",
+  "temperature" => ":noArg",
+  "VDD"         => ":noArg",
+  "raw"         => ":noArg",
+  "version"     => ":noArg"
 );
 
 my %sets = (
@@ -473,7 +473,9 @@ sub OWMULTI_Get($@) {
     if(int(@a) != 2);
     
   #-- check argument
-  return "OWMULTI: Get with unknown argument $a[1], choose one of ".join(" ", sort keys %gets)
+  my $msg = "OWMULTI: Get with unknown argument $a[1], choose one of ";
+  $msg .= "$_$gets{$_} " foreach (keys%gets);
+  return $msg
     if(!defined($gets{$a[1]}));
   
   #-- get id
@@ -491,6 +493,9 @@ sub OWMULTI_Get($@) {
   if( $a[1] eq "version") {
     return "$name.version => $owx_version";
   }
+  
+  #-- reset current ERRSTATE
+  $hash->{ERRSTATE} = 0;
   
   #-- for the other readings we need a new reading
   #-- OWX interface
@@ -566,6 +571,9 @@ sub OWMULTI_GetValues($) {
   #-- restart timer for updates  
   InternalTimer(time()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 0);
 
+  #-- reset current ERRSTATE
+  $hash->{ERRSTATE} = 0;
+  
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
@@ -803,7 +811,8 @@ sub OWXMULTI_BinValues($$$$$$$) {
   #-- hash of the busmaster
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
-  my $error  = 0;
+  #-- inherit previous error
+  my $error  = $hash->{ERRSTATE};
   my @data   = []; 
   my ($value,$lsb,$msb,$sign);
   my $msg;
@@ -886,8 +895,8 @@ sub OWXMULTI_BinValues($$$$$$$) {
     
     #-- and now from raw to formatted values
     if( $error ){
-      $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
-      
+      $hash->{ERRCOUNT}++;
+      $hash->{ERRSTATE} = 1;
     }else{
       $hash->{PRESENT} = 1;
       OWMULTI_FormatValues($hash);
