@@ -113,7 +113,7 @@ sub KODI_Initialize($$)
   $hash->{ReadyFn}  = "KODI_Ready";
   $hash->{UndefFn}  = "KODI_Undefine";
   $hash->{AttrFn}   = "KODI_Attr";
-  $hash->{AttrList} = "fork:enable,disable compatibilityMode:kodi,plex offMode:quit,hibernate,shutdown,suspend updateInterval disable:1,0 " . $readingFnAttributes;
+  $hash->{AttrList} = "fork:enable,disable compatibilityMode:kodi,plex offMode:quit,hibernate,shutdown,suspend updateInterval disable:0,1 jsonResponseReading:0,1 " . $readingFnAttributes;
 
   $data{RC_makenotify}{XBMC} = "KODI_RCmakenotify";
   $data{RC_layout}{KODI_RClayout}  = "KODI_RClayout";
@@ -482,7 +482,9 @@ sub KODI_ProcessRead($$)
   #processes all complete messages
   while($msg) {
     $hash->{LAST_RECV} = time();
-    Log3($name, 4, "KODI_Read: Decoding JSON message. Length: " . length($msg) . " Content: " . $msg); 
+    Log3($name, 4, "KODI_Read: Decoding JSON message. Length: " . length($msg) . " Content: " . $msg);
+    KODI_SetJsonResponseReading($hash, $msg);
+    
     my $obj = JSON->new->utf8(0)->decode($msg);
     #it is a notification if a method name is present
     if(defined($obj->{method})) {
@@ -503,6 +505,14 @@ sub KODI_ProcessRead($$)
   Log3($name, 5, "KODI_Read: Tail: " . $tail);
   Log3($name, 5, "KODI_Read: PARTIAL: " . $hash->{PARTIAL});
   return;
+}
+
+sub KODI_SetJsonResponseReading($$) 
+{
+  my ($hash, $json) = @_;
+  
+  return if AttrVal($hash->{NAME}, 'jsonResponseReading', 0) == 0;
+  readingsSingleUpdate($hash, "jsonResponse", $json, 1);
 }
 
 sub KODI_ResetMediaReadings($)
@@ -1486,7 +1496,11 @@ sub KODI_HTTP_Call($$$)
   if($ret =~ /^error:(\d{3})$/) {
     return "HTTP Error Code " . $1;
   }
-  return KODI_ProcessResponse($hash,JSON->new->utf8(0)->decode($ret)) if($id);
+  
+  if($id) {
+    KODI_SetJsonResponseReading($hash, $ret);
+    return KODI_ProcessResponse($hash, JSON->new->utf8(0)->decode($ret)) ;
+  }
   return undef; 
 }
 
