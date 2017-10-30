@@ -757,7 +757,7 @@ PROPLANTA_Html(@)
 {
   my ($d,$days) = @_;
   $d = "<none>" if(!$d);
-  $days = 2 unless defined $days;
+  $days = 3 unless defined $days;
   return "$d is not a PROPLANTA instance<br>"
         if(!$defs{$d} || $defs{$d}{TYPE} ne "PROPLANTA");
 
@@ -775,7 +775,7 @@ PROPLANTA_Html(@)
   $ret .= '<tr><th>Tag</th><th>morgens</th><th>tagsueber</th><th>abends</th><th>nachts</th><th>min</th><th>max</th><th>Regen tags</th><th>Frost</th></tr></thead>';
   $ret .= "<tbody align=center>";
 # define MyForecast weblink htmlCode { PROPLANTA_Html("ProPlanta_Wetter") }
-   for(my $i=0; $i<=$days; $i++) {
+   for(my $i=0; $i<$days; $i++) {
       $ret .= sprintf('<tr><td>%s</td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s&deg;C</td><td>%s&deg;C</td><td>%s %%</td><td>%s</td></tr>',
           ReadingsVal($d, "fc".$i."_date", ""), 
           ReadingsVal($d, "fc".$i."_weatherMorning", ""), ReadingsVal($d, "fc".$i."_weatherMorningIcon", ""),
