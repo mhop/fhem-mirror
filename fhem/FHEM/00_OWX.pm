@@ -95,7 +95,7 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version="7.01";
+$owx_version="7.02";
 
 #-- debugging now verbosity, this is just for backward compatibility
 $owx_debug=0;
@@ -1768,7 +1768,7 @@ sub OWX_WDBGL($$$$) {
 =begin html_DE
 
 <a name="OWX"></a>
-<h3>YAAHM</h3>
-<a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#YAAHM">YAAHM</a> 
+<h3>OWX</h3>
+<a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#OWX">OWX</a> 
 =end html_DE
 =cut
