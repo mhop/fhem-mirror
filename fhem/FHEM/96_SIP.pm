@@ -54,7 +54,7 @@ use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.6 / 22.10.17";
+my $sip_version ="V1.61 / 30.10.17";
 my $ua;	# SIP user agent
 my @fifo;
 
@@ -251,6 +251,7 @@ sub SIP_updateConfig($)
 	    BlockingKill($hash->{helper}{LISTEN_PID});
 	    delete $hash->{helper}{LISTEN_PID};
 	    delete $hash->{LPID};
+            readingsSingleUpdate($hash,"listen_alive","no",1);
 	    Log3 $name,4,"$name, Reset Listen done";
 	}
 	if(defined($hash->{CPID}))
@@ -280,23 +281,28 @@ sub SIP_updateConfig($)
        $hash->{AC} = ($res) ? $res : undef;
     }
 
-
-        if (AttrVal($name,"sip_listen", "none") ne "none")
-        {
-      
-         $error = SIP_try_listen($hash);
-         if ($error)
-         { 
-          Log3 $name, 1, $name.", listen -> $error";
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash,"state","error");
-          readingsBulkUpdate($hash,"last_error",$error);
-          readingsEndUpdate($hash, 1 );
-          return undef;
-         }
-        }
-       else { readingsSingleUpdate($hash, "state","initialized",1);}
-       return undef;
+    if (AttrVal($name,"sip_listen", "none") ne "none")
+    {
+     $error = SIP_try_listen($hash);
+     if ($error)
+     { 
+      Log3 $name, 1, $name.", listen -> $error";
+      readingsBeginUpdate($hash);
+       readingsBulkUpdate($hash,"state","error");
+       readingsBulkUpdate($hash,"last_error",$error);
+       readingsBulkUpdate($hash,"listen_alive","no");
+      readingsEndUpdate($hash, 1 );
+      return undef;
+     }
+    }
+    else 
+    { 
+      readingsBeginUpdate($hash);
+       readingsBulkUpdate($hash,"state","initialized");
+       readingsBulkUpdate($hash,"listen_alive","no");
+      readingsEndUpdate($hash, 1 );
+    }
+  return undef;
 }
     
 
@@ -304,7 +310,8 @@ sub SIP_Register($$$)
 {
   my ($hash,$port,$type) = @_;
   my $name    = $hash->{NAME};
-  my $logname = $name."[".$$."]";
+  $hash->{LPID} = $$;
+  my $logname = $name."[".$hash->{LPID}."]";
   my $ip      = AttrVal($name,"sip_ip","");
   return "missing attribute sip_ip" if (!$ip);
   return "this is the IP address of your registrar , not your FHEM !" if ($ip eq AttrVal($name,"sip_registrar","")); 
@@ -352,9 +359,13 @@ sub SIP_Register($$$)
           Log3 $name,1,"$logname, can´t find my parent ".$hash->{parent}." in process list !";
           die;
         }
-        my $reg_time = FmtDateTime(time()+$expire);
-	Log3 $name,4,"$logname, register new expire : $reg_time";
-        SIP_telnet($hash,"set $name state $type\nset $name listen_alive yes\nset $name expire $reg_time\nexit\n");
+    	
+        Log3 $name,4,"$logname, register new expire : ".FmtDateTime(time()+$expire);
+    
+        if (AttrVal($name,"sip_listen","none") ne "none")
+        { SIP_telnet($hash,"set $name state $type\nset $name listen_alive PID_".$hash->{LPID}."\nset $name expire $expire\nexit\n"); }
+        else
+        { SIP_telnet($hash,"set $name state $type\nexit\n"); }
 	# need to refresh registration periodically
 	$ua->add_timer( $expire/2, $sub_register );
   };
@@ -834,6 +845,7 @@ sub SIP_Set($@)
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,"state","error");
     readingsBulkUpdate($hash,"last_error",$ret);
+    readingsBulkUpdate($hash,"listen_alive","no");
     readingsEndUpdate($hash, 1 );
     return $ret;
    }
@@ -1414,10 +1426,13 @@ sub SIP_watch_listen($)
 
   my $cmd    = "ps -e | grep '".$hash->{LPID}." '";
   my $result = qx($cmd); 
+  
   my $age    = int(ReadingsAge($name, "expire", 0));
+  my $maxage = int(ReadingsNum($name,"expire",300)*0.7);
   my $alive  = ReadingsVal($name,"listen_alive","no");
+  my $waits  = AttrVal($name, "sip_watch_listen", 60);
 
-  if (($age >180) && ($alive eq "yes")) # nach max 150 Sekunden sollte sich der listen Prozess erneut melden
+  if (($age > $maxage) && ($alive ne "no")) # nach  expire/2  Sekunden sollte sich der listen Prozess erneut melden
   { 
    Log3 $name, 2 , "$name, expire timestamp is $age seconds old, restarting listen process";
    readingsSingleUpdate($hash,"listen_alive","no",1);
@@ -1438,7 +1453,7 @@ sub SIP_watch_listen($)
    InternalTimer(gettimeofday()+2, "SIP_try_listen", $hash, 0);
   }
 
-  InternalTimer(gettimeofday()+60, "SIP_watch_listen", $name, 0);
+  InternalTimer(gettimeofday()+$waits, "SIP_watch_listen", $name, 0);
   return;
 }
 
