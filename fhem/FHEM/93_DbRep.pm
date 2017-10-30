@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 5.8.6        30.10.2017       don't limit length of attr reading/device if attr contains a list
 # 5.8.5        19.10.2017       filter unwanted characters in "procinfo"-result 
 # 5.8.4        17.10.2017       createSelectSql, createDeleteSql, currentfillup_Push switch to devspec 
 # 5.8.3        16.10.2017       change to use createSelectSql: minValue,diffValue - createDeleteSql: delEntries
@@ -244,7 +245,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.8.5";
+my $DbRepVersion = "5.8.6";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -793,10 +794,11 @@ sub DbRep_Attr($$$$) {
         
 		if ($aName eq "reading" || $aName eq "device") {
             if ($dbmodel && $dbmodel ne 'SQLITE') {
-                if ($dbmodel eq 'POSTGRESQL') {
-                    return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $dbrep_col{READING}" if(length($aVal) > $dbrep_col{READING});
-                } elsif ($dbmodel eq 'MYSQL') {
-                    return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $dbrep_col{READING}" if(length($aVal) > $dbrep_col{READING});
+			    my $attrname = uc($aName);
+                if ($dbmodel eq 'POSTGRESQL' && $aVal !~ m/,/) {
+                    return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $dbrep_col{$attrname}" if(length($aVal) > $dbrep_col{$attrname});
+                } elsif ($dbmodel eq 'MYSQL' && $aVal !~ m/,/) {
+                    return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $dbrep_col{$attrname}" if(length($aVal) > $dbrep_col{$attrname});
                 }
             }
 		}
