@@ -87,10 +87,11 @@ sub Define($) {
     #$hash->{DeviceName}   = $dev;
     $hash->{INTERFACE}    = "firmata";
     $hash->{HWDEVICE}     = $a[2];
+    $hash->{PIN}          = $a[2];
     $hash->{ASYNCHRONOUS} = 0;  
   
     #-- module version
-	$hash->{version}      = "7.02";
+	$hash->{version}      = "7.03";
     main::Log3 $hash->{NAME},1,"OWX_FRM::Define warning: version ".$hash->{version}." not identical to OWX version ".$main::owx_version
       if( $hash->{version} ne $main::owx_version);
    
@@ -178,14 +179,12 @@ sub Init() {
   my $hash   = $self->{hash};
   my $dev    = $hash->{DeviceName};
   my $name   = $hash->{NAME};
-  my $pin    = $hash->{pin}
+  my $pin    = $hash->{PIN};
   my $msg;
   
   main::Log 1,"==================> STARTING INIT of 11_OWX_FRM";
   
-  my @args = ($pin);
-  $hash->{PIN} = $pin;
-  
+  my @args = ($pin);  
   my $ret = main::FRM_Init_Pin_Client($hash,\@args,PIN_ONEWIRE);
   if (defined $ret){
     $msg = "Error ".$ret;
