@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  14_CUL_TCM97001: Bug: "other state" bei W174, 
+             Plausibility check for W174, Append documentation
   - bugfix:  71_YAMAHA_AVR: fix max volume when using float values in 
              set command "volume"
   - bugfix:  93_DbRep: V5.8.6, don't limit length of attr reading/device if 
