@@ -457,9 +457,9 @@ YAMAHA_AVR_Set($@)
     {
         my $target_volume;
         
-        if($what eq "volume" and defined($a[2]) and $a[2] =~ /^\d{1,3}$/ and $a[2] >= 0 &&  $a[2] <= 100)
+        if($what eq "volume" and defined($a[2]) and $a[2] =~ /^\d{1,3}(?:\.\d)?$/ and $a[2] >= 0 &&  $a[2] <= 100)
         {
-            $target_volume = YAMAHA_AVR_volume_rel2abs($a[2]);
+            $target_volume = YAMAHA_AVR_volume_rel2abs(int($a[2]));
         }
         elsif($what eq "volumeDown" and defined(ReadingsVal($name, "volume", undef)))
         {

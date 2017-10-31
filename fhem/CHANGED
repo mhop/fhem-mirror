@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  71_YAMAHA_AVR: fix max volume when using float values in 
+             set command "volume"
   - bugfix:  93_DbRep: V5.8.6, don't limit length of attr reading/device if 
                        attr contains a list
   - feature: 70_KODI: added reading jsonResponse which contains the last
