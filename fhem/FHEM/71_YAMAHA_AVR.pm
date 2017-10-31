@@ -463,13 +463,13 @@ YAMAHA_AVR_Set($@)
         }
         elsif($what eq "volumeDown" and defined(ReadingsVal($name, "volume", undef)))
         {
-            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, "volume", -45) - ((defined($a[2]) and $a[2] =~ /^\d+$/) ? $a[2] : AttrVal($hash->{NAME}, "volumeSteps",5)));
+            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, "volume", -45) - ((defined($a[2]) and $a[2] =~ /^\d+(?:\.\d)?$/) ? int($a[2]) : AttrVal($hash->{NAME}, "volumeSteps",5)));
         }
         elsif($what eq "volumeUp" and defined(ReadingsVal($name, "volume", undef)))
         {
-            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, "volume", -45) + ((defined($a[2]) and $a[2] =~ /^\d+$/) ? $a[2] : AttrVal($hash->{NAME}, "volumeSteps",5)));
+            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, "volume", -45) + ((defined($a[2]) and $a[2] =~ /^\d+(?:\.\d)?$/) ? int($a[2]) : AttrVal($hash->{NAME}, "volumeSteps",5)));
         }
-        elsif(defined($a[2]) and $a[2] =~ /^-?\d+(?:\.\d)?$/)
+        elsif($what eq "volumeStraight" and defined($a[2]) and $a[2] =~ /^-?\d+(?:\.\d)?$/)
         {
             $target_volume = $a[2];
         }
