@@ -71,10 +71,11 @@ sub Define($) {
   	}
   	
   	my @a = split( "[ \t][ \t]*", $def );
-    my $u = "wrong syntax: define <name> FRM_XXX pin";
+    my $u = "wrong syntax: define <name> OWX <firmata-device>:<firmata-pin>";
     return $u unless int(@a) > 0;
     
-    $self->{pin} = $a[2];
+    my($fdev,$pin) = split(':',$a[2]);
+    $self->{pin} = $pin;
     $self->{id}  = 0;
     $self->{name} = $hash->{NAME};
     $self->{hash} = $hash;
@@ -86,8 +87,8 @@ sub Define($) {
 	#-- store with OWX device
     #$hash->{DeviceName}   = $dev;
     $hash->{INTERFACE}    = "firmata";
-    $hash->{HWDEVICE}     = $a[2];
-    $hash->{PIN}          = $a[2];
+    $hash->{HWDEVICE}     = $fdev;
+    $hash->{PIN}          = $pin;
     $hash->{ASYNCHRONOUS} = 0;  
   
     #-- module version
@@ -185,6 +186,7 @@ sub Init() {
   main::Log 1,"==================> STARTING INIT of 11_OWX_FRM";
   
   my @args = ($pin);  
+  $hash->{IODev} = $main::defs{$hash->{HWDEVICE}};
   my $ret = main::FRM_Init_Pin_Client($hash,\@args,PIN_ONEWIRE);
   if (defined $ret){
     $msg = "Error ".$ret;
