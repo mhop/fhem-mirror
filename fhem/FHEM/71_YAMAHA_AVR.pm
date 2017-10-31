@@ -457,19 +457,19 @@ YAMAHA_AVR_Set($@)
     {
         my $target_volume;
         
-        if($what eq "volume" and defined($a[2]) and $a[2] =~ /^\d{1,3}(?:\.\d)?$/ and $a[2] >= 0 &&  $a[2] <= 100)
+        if($what eq "volume" and defined($a[2]) and $a[2] =~ /^\d{1,3}(?:\.\d+)?$/ and $a[2] >= 0 &&  $a[2] <= 100)
         {
             $target_volume = YAMAHA_AVR_volume_rel2abs(int($a[2]));
         }
         elsif($what eq "volumeDown" and defined(ReadingsVal($name, "volume", undef)))
         {
-            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, "volume", -45) - ((defined($a[2]) and $a[2] =~ /^\d+(?:\.\d)?$/) ? int($a[2]) : AttrVal($hash->{NAME}, "volumeSteps",5)));
+            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, "volume", -45) - ((defined($a[2]) and $a[2] =~ /^\d+(?:\.\d+)?$/) ? int($a[2]) : AttrVal($hash->{NAME}, "volumeSteps",5)));
         }
         elsif($what eq "volumeUp" and defined(ReadingsVal($name, "volume", undef)))
         {
-            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, "volume", -45) + ((defined($a[2]) and $a[2] =~ /^\d+(?:\.\d)?$/) ? int($a[2]) : AttrVal($hash->{NAME}, "volumeSteps",5)));
+            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, "volume", -45) + ((defined($a[2]) and $a[2] =~ /^\d+(?:\.\d+)?$/) ? int($a[2]) : AttrVal($hash->{NAME}, "volumeSteps",5)));
         }
-        elsif($what eq "volumeStraight" and defined($a[2]) and $a[2] =~ /^-?\d+(?:\.\d)?$/)
+        elsif($what eq "volumeStraight" and defined($a[2]) and $a[2] =~ /^-?\d+(?:\.\d+)?$/)
         {
             $target_volume = $a[2];
         }
@@ -486,6 +486,9 @@ YAMAHA_AVR_Set($@)
         # if lower than minimum (-80.5) or higher than max (16.5) set target volume to the corresponding boundary
         $target_volume = -80.5 if(defined($target_volume) and $target_volume < -80.5);
         $target_volume = 16.5 if(defined($target_volume) and $target_volume > 16.5);
+        
+        # ensure $target_volume mod 0.5 == 0
+        $target_volume = int($target_volume / 0.5) * 0.5;
         
         Log3 $name, 4, "YAMAHA_AVR ($name) - new target volume: $target_volume";
         
