@@ -95,7 +95,7 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version="7.02";
+$owx_version="7.03";
 
 #-- debugging now verbosity, this is just for backward compatibility
 $owx_debug=0;
@@ -149,10 +149,10 @@ sub OWX_Define ($$) {
   
   #-- check syntax
   if(int(@a) < 3){
-    return "OWX: Syntax error - must be define <name> OWX <serial-device>|<ip-address>[:<port>]|<i2c-bus>:<i2c-addr>|<cuno/coc-device>|<arduino-pin>"
+    return "OWX: Syntax error - must be define <name> OWX <serial-device>|<ip-address>[:<port>]|<i2c-bus>:<i2c-addr>|<cuno/coc-device>|<firmata-device>:<firmata-pin>"
   }
 
-  Log3 $hash->{NAME},2,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<ip-address>[:<port>]|<i2c-bus>:<i2c-addr>|<cuno/coc-device>|<arduino-pin>"
+  Log3 $hash->{NAME},2,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<ip-address>[:<port>]|<i2c-bus>:<i2c-addr>|<cuno/coc-device>|<firmata-device>:<firmata-pin>"
     if( int(@a)>3 );
   my $dev = $a[2];
   
@@ -193,7 +193,7 @@ sub OWX_Define ($$) {
     $hwdevice = OWX_CCC->new($hash);
     
   #-- check if we are connecting to Arduino (via FRM):
-  } elsif ($dev =~ /^\d{1,2}$/) {
+  } elsif ($dev =~ /.*\:\d{1,2}$/) {
   	require "$attr{global}{modpath}/FHEM/11_OWX_FRM.pm";
     $hwdevice = OWX_FRM->new($hash);
     
@@ -1692,7 +1692,7 @@ sub OWX_WDBGL($$$$) {
             <br />
             <code>define OWio2 OWX COC</code>
             <br />
-            <code>define OWio3 OWX 10</code>
+            <code>define OWio3 OWX FIRMATA:10</code>
             <br />
         </p>
         <br />
@@ -1703,7 +1703,7 @@ sub OWX_WDBGL($$$$) {
             <code>define &lt;name&gt; OWX &lt;tcpip&gt;[:&lt;port&gt;]</code> or <br />
             # define <name> OWX <TCP/IP-device> for TCP/IP-UART interfaces or
             <code>define &lt;name&gt; OWX &lt;cuno/coc-device&gt;</code> or <br />
-            <code>define &lt;name&gt; OWX &lt;arduino-pin&gt;</code>
+            <code>define &lt;name&gt; OWX &lt;firmata-device&gt;:&lt;firmata-pin&gt;</code>
             <br /><br /> Define a 1-Wire interface to communicate with a 1-Wire bus.<br />
             <br />
         </p>
