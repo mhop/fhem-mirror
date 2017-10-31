@@ -39,8 +39,8 @@
 # 2014-12-22 john  V2.06 : checked HTML
 # 2015-01-25 john  V2.07 : adjusted argument agent for http-request of proplanta (thanks to framller)
 # 2016-02-25 john  V2.08 : support of Piko 7 with only 2 strings instead of 3 (thanks to erwin)
-
-
+# 2016-02-25 john  V2.09 : substitution of term given/when with if/then
+# 2017-19-26 john  V2.10 : support of https
 ####################################################################################################
 
 # --------------------------------------------
@@ -292,7 +292,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL          = "KOSTALPIKO";
-my $KOSTAL_VERSION = "2.08";
+my $KOSTAL_VERSION = "2.10";
 
 ########################################
 sub KOSTALPIKO_Log($$$)
@@ -373,44 +373,36 @@ sub KOSTALPIKO_Set($@)
   return $usage if ( @a < 2 );
 
   my $cmd = lc( $a[1] );
-  given ($cmd)
+
+  if ( $cmd eq "?" )
   {
-    when ("?")
-    {
-      return $usage;
-    }
-    when ("capturekostaldata")
-    {
-      KOSTALPIKO_Log $hash, 3, "set command: " . $a[1] . " para:" . $hash->{helper}{TimerStatus};
-      KOSTALPIKO_StatusStart($hash);
-    }
-    when ("captureglobalradiation")
-    {
-      KOSTALPIKO_Log $hash, 3, "set command: " . $a[1];
-      KOSTALPIKO_GrStart($hash);
-    }
-    when ("test")
-    {
-      KOSTALPIKO_Log $hash, 3, "set command: " . $a[1];
-      KOSTALPIKO_GrStart($hash);
-    }
+    return $usage;
+  } elsif ( $cmd eq "capturekostaldata" )
+  {
+    KOSTALPIKO_Log $hash, 3, "set command: " . $a[1] . " para:" . $hash->{helper}{TimerStatus};
+    KOSTALPIKO_StatusStart($hash);
+  } elsif ( $cmd eq "captureglobalradiation" )
+  {
+    KOSTALPIKO_Log $hash, 3, "set command: " . $a[1];
+    KOSTALPIKO_GrStart($hash);
+  } elsif ( $cmd eq "test" )
+  {
+    KOSTALPIKO_Log $hash, 3, "set command: " . $a[1];
+    KOSTALPIKO_GrStart($hash);
+  } elsif ( $cmd eq "sleeper" )
+  {
+    return "Set sleeper needs a <value> parameter"
+      if ( @a != 3 );
+    my $value = $a[2];
+    $value = ( $value =~ m/$reUINT/ ) ? $1 : undef;
+    return "value " . $a[2] . " is not a number"
+      if ( !defined($value) );
 
-    when ("sleeper")
-    {
-      return "Set sleeper needs a <value> parameter"
-        if ( @a != 3 );
-      my $value = $a[2];
-      $value = ( $value =~ m/$reUINT/ ) ? $1 : undef;
-      return "value " . $a[2] . " is not a number"
-        if ( !defined($value) );
-
-      KOSTALPIKO_Log $hash, 3, "set command: " . $a[1] . " value:" . $a[2];
-      $hash->{helper}{Sleeper} = $a[2];
-    }
-    default
-    {
-      return $usage;
-    }
+    KOSTALPIKO_Log $hash, 3, "set command: " . $a[1] . " value:" . $a[2];
+    $hash->{helper}{Sleeper} = $a[2];
+  } else
+  {
+    return $usage;
   }
   return;
 }
@@ -508,7 +500,7 @@ sub KOSTALPIKO_StatusHtmlAcquire($)
   return unless ( defined( $hash->{NAME} ) );
 
   my $err_log = '';
-  
+
   my $URL =
     "http://" . $hash->{helper}{User} . ":" . $hash->{helper}{Pass} . "\@" . $hash->{helper}{Host} . "/index.fhtml";
 
@@ -661,7 +653,7 @@ sub KOSTALPIKO_StatusDone($)
   my ( $name, @values ) = split( "\\|", $string );
   my $hash = $defs{$name};
   return unless ( defined( $hash->{NAME} ) );
-  
+
   KOSTALPIKO_Log $hash, 3, '--- started --- with numStrings:' . $strangCount;
 
   # show the values
@@ -675,7 +667,7 @@ sub KOSTALPIKO_StatusDone($)
   {
     my $tag    = "";    # der Name des parameters in der web site
     my $index  = 0;     # laufindex von 1..4 f. String x und Lx
-    my $strang = 1;     # gruppe  String<n>/ L<n> 
+    my $strang = 1;     # gruppe  String<n>/ L<n>
     my $rdName = "";    # name for reading
     my $rdValue;        # value for reading
     my %hashValues = ();                             # hash for name,value
@@ -703,7 +695,7 @@ sub KOSTALPIKO_StatusDone($)
       {
         $tag = $text;    # remember the identifier
       } elsif ( $text eq "Spannung" || $text eq "Strom" || $text eq "Leistung" )
-      { 
+      {
         $index++;
 
         # there are max 4 values per group
@@ -890,7 +882,7 @@ sub KOSTALPIKO_GrHtmlAcquire($)
   my $agent = LWP::UserAgent->new(
     env_proxy         => 1,
     keep_alive        => 1,
-    protocols_allowed => ['http'],
+    protocols_allowed => ['http','https'],
     timeout           => 10,
     agent             => "Mozilla/5.0 (Windows NT 5.1) [de-DE,de;q=0.8,en-US;q=0.6,en;q=0.4]"
   );
@@ -1077,6 +1069,7 @@ sub KOSTALPIKO_GrTimer($)
 1;
 
 =pod
+=item summary   Module for Kostal Piko Inverter 
 =begin html
 
 
