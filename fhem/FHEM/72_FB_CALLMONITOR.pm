@@ -602,6 +602,18 @@ FB_CALLMONITOR_reverseSearch($$)
                 Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
                 return $hash->{helper}{PHONEBOOK}{$number};
             }
+            
+            if(exists($hash->{helper}{PHONEBOOKS}))
+            {
+                foreach my $pb_id (keys %{$hash->{helper}{PHONEBOOKS}})
+                {
+                    if(defined($hash->{helper}{PHONEBOOKS}{$pb_id}{$number}))
+                    {                    
+                        Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
+                        return $hash->{helper}{PHONEBOOKS}{$pb_id}{$number};
+                    }
+                }
+            }
         }
 
         # Using user defined textfile 
@@ -887,9 +899,10 @@ sub FB_CALLMONITOR_readPhonebook($;$)
     my ($hash, $testPassword) = @_;
    
     my $name = $hash->{NAME};
-    my ($err, $count_contacts, @lines, $phonebook);
+    my ($err, $count_contacts, @lines, $phonebook, $pb_hash);
     
     delete($hash->{helper}{PHONEBOOK});
+    delete($hash->{helper}{PHONEBOOKS});
     
 	if(AttrVal($name, "fritzbox-remote-phonebook", "0") eq "1")
     {
@@ -905,8 +918,9 @@ sub FB_CALLMONITOR_readPhonebook($;$)
             
             Log3 $name, 2, "FB_CALLMONITOR ($name) - found remote FritzBox phonebook via telnet";
             
-            ($err, $count_contacts) = FB_CALLMONITOR_parsePhonebook($hash, $phonebook);
+            ($err, $count_contacts, $pb_hash) = FB_CALLMONITOR_parsePhonebook($hash, $phonebook);
             
+            $hash->{helper}{PHONEBOOK} = $pb_hash;
             if(defined($err))
             {
                 Log3 $name, 2, "FB_CALLMONITOR ($name) - could not parse remote phonebook - $err";
@@ -956,8 +970,10 @@ sub FB_CALLMONITOR_readPhonebook($;$)
                 }
                 else
                 {
-                    ($err, $count_contacts) = FB_CALLMONITOR_parsePhonebook($hash, $phonebook);
- 
+                    ($err, $count_contacts, $pb_hash) = FB_CALLMONITOR_parsePhonebook($hash, $phonebook);
+                    
+                    $hash->{helper}{PHONEBOOKS}{$phonebookId} = $pb_hash;
+
                     if(defined($err))
                     {
                         Log3 $name, 2, "FB_CALLMONITOR ($name) - could not parse remote phonebook ".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}." - $err";
@@ -1023,6 +1039,8 @@ sub FB_CALLMONITOR_parsePhonebook($$)
     my $number;
     my $count_contacts = 0;
     
+    my $out;
+    
     if($phonebook =~ /<phonebook/ and $phonebook =~ m,</phonebook>,) 
     {
         if($phonebook =~ /<contact/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/)
@@ -1043,7 +1061,7 @@ sub FB_CALLMONITOR_parsePhonebook($$)
                            
                             $count_contacts++;
                             Log3 $name, 4, "FB_CALLMONITOR ($name) - found $contact_name with number $number";
-                            $hash->{helper}{PHONEBOOK}{$number} = FB_CALLMONITOR_html2txt($contact_name) if(not defined($hash->{helper}{PHONEBOOK}{$number}));
+                            $out->{$number} = FB_CALLMONITOR_html2txt($contact_name);
                             undef $number;
                         }
                     }
@@ -1052,7 +1070,7 @@ sub FB_CALLMONITOR_parsePhonebook($$)
             }
         }
  
-        return (undef, $count_contacts);
+        return (undef, $count_contacts, $out);
     }
     else
     {
@@ -1287,158 +1305,122 @@ sub FB_CALLMONITOR_readRemotePhonebookViaTelnet($;$)
 }
 
 #####################################
+# execute TR-064 methods via HTTP/SOAP request
+sub FB_CALLMONITOR_requestTR064($$$$;$$)
+{
+    my ($hash, $path, $command, $type, $command_arg, $testPassword) = @_;
+    my $name = $hash->{NAME};
+
+    my ($fb_ip,undef) = split(/:/, ($hash->{DeviceName}), 2);
+
+    my $param;
+    my ($err, $data);
+    
+    my $fb_user = AttrVal($name, "fritzbox-user", "admin");
+    
+    $hash->{helper}{READ_PWD} = 1;
+    my $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
+    delete($hash->{helper}{READ_PWD});
+
+    unless(defined($fb_pw))
+    {
+        $hash->{helper}{PWD_NEEDED} = 1;
+        return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'";
+    }
+    
+    my $tr064_base_url = "http://$fb_user:$fb_pw\@$fb_ip:49000";
+    
+    $param->{noshutdown} = 1;
+    $param->{timeout}    = AttrVal($name, "fritzbox-remote-timeout", 5);
+    $param->{loglevel}   = 4;
+    $param->{digest}     = 1;
+    $param->{hideurl}    = 1;
+
+    unless($hash->{helper}{TR064}{SECURITY_PORT})
+    {
+        my $get_security_port = '<?xml version="1.0" encoding="utf-8"?>'.
+                                '<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">'.
+                                  '<s:Body>'.
+                                   '<u:GetSecurityPort xmlns:u="urn:dslforum-org:service:DeviceInfo:1" />'.
+                                  '</s:Body>'.
+                                '</s:Envelope>';
+
+        $param->{url}        = "$tr064_base_url/upnp/control/deviceinfo";
+        $param->{header}     = "SOAPACTION: urn:dslforum-org:service:DeviceInfo:1#GetSecurityPort\r\nContent-Type: text/xml; charset=utf-8";
+        $param->{data}       = $get_security_port;        
+
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - request SSL port for TR-064 access via method GetSecurityPort:\n$get_security_port";
+        my ($err, $data)    = HttpUtils_BlockingGet($param);        
+        
+        if($err ne "")
+        {
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting security port: $err";
+            return "error while requesting phonebooks: $err";
+        }
+
+        if($data eq "" and exists($param->{code}))
+        {
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting security port via TR-064";
+            return  "received no data after requesting security port via TR-064";
+        }
+        
+        Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 method GetSecurityPort response:\n$data";
+        
+        if($data =~ /<NewSecurityPort>(\d+)<\/NewSecurityPort>/)
+        {
+            $tr064_base_url = "https://$fb_user:$fb_pw\@$fb_ip:$1";
+            $hash->{helper}{TR064}{SECURITY_PORT} = $1;
+        }
+    }
+    else
+    {
+        $tr064_base_url = "https://$fb_user:$fb_pw\@$fb_ip:".$hash->{helper}{TR064}{SECURITY_PORT};
+    }
+        
+    # generate challenge XML    
+    my $soap_request = '<?xml version="1.0" encoding="utf-8"?>'.
+                       '<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" >'.
+                         '<s:Body>'.
+                           "<u:$command xmlns:u=\"$type\">".($command_arg ? $command_arg : "")."</u:$command>".
+                         '</s:Body>'.
+                       '</s:Envelope>';
+    
+    $param->{url}    = "$tr064_base_url$path";
+    $param->{header} = "SOAPACTION: $type#$command\r\nContent-Type: text/xml; charset=utf-8";
+    $param->{data}   = $soap_request;
+
+    Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting TR-064 method $command:\n$soap_request";
+    
+    ($err, $data) = HttpUtils_BlockingGet($param);
+
+    if($err ne "")
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting TR-064 method $command: $err";
+        return "error while requesting TR-064 TR-064 method $command: $err";
+    }
+
+    if($data eq "" and exists($param->{code}))
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting TR-064 method $command";
+        return  "received no data after requesting TR-064 method $command";
+    }
+
+    Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 method $command response:\n$data";
+
+    return (undef, $data);
+}
+
+#####################################
 # identifys the phonebooks defined on the FritzBox via TR064 interface (SOAP) and generate download url
 sub FB_CALLMONITOR_identifyPhoneBooksViaTR064($;$)
 {
     my ($hash, $testPassword) = @_;
     my $name = $hash->{NAME};
 
-    my ($fb_ip,undef) = split(/:/, ($hash->{DeviceName}), 2);
-    my $fb_user = AttrVal($name, "fritzbox-user", "admin");
-    my $fb_pw;
-    my $fb_sid;
-    my $FB_port = '49000';
-
-    $hash->{helper}{READ_PWD} = 1;
-    $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
-    delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
-
-    unless(defined($fb_pw))
-    {
-        $hash->{helper}{PWD_NEEDED} = 1;
-        return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'";
+    my ($err, $data) = FB_CALLMONITOR_requestTR064($hash, "/upnp/control/x_contact", "GetPhonebookList", "urn:dslforum-org:service:X_AVM-DE_OnTel:1", undef, $testPassword);
     
-    }
+    return "unable to identify phonebooks via TR-064: $err" if($err);
     
-    Log3 $name, 4, "FB_CALLMONITOR ($name) - identifying available phonebooks";
-
-    my $TR064_control_url      = "/upnp/control/x_contact";
-    my $TR064_service_type     = "urn:dslforum-org:service:X_AVM-DE_OnTel:1";
-    my $TR064_service_command  = "GetPhonebookList"; # TR-064 Support X_AVM-DE_OnTel: GetPhonebookList
-
-    # generate challenge XML
-    my $xml_Challenge;
-    my $init_request = <<EOD;
-<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" >
-  <s:Header>
-    <h:InitChallenge xmlns:h="http://soap-authentication.org/digest/2001/10/" s:mustUnderstand="1">
-      <UserID>$fb_user</UserID>
-    </h:InitChallenge >
-  </s:Header>
-  <s:Body>
-   <u:$TR064_service_command xmlns:u="$TR064_service_type">
-   </u:$TR064_service_command>
-  </s:Body>
-</s:Envelope>
-EOD
-   
-    # request SOAP auth challenge
-    my $param;
-    $param->{url}        = "http://$fb_ip:$FB_port$TR064_control_url";
-    $param->{noshutdown} = 1;
-    $param->{timeout}    = AttrVal($name, "fritzbox-remote-timeout", 5);
-    $param->{loglevel}   = 4;
-    $param->{header}     = "SOAPACTION: $TR064_service_type#$TR064_service_command\r\nContent-Type: text/xml; charset=utf-8";
-    $param->{data}       = $init_request;
-    
-    Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting TR-064 authentication challenge:\n$init_request";
-    
-    my ($err, $data)    = HttpUtils_BlockingGet($param);
-
-    if($err ne "")
-    {
-        Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting phonebooks: $err";
-        return "error while requesting phonebooks: $err";
-    }
-
-    if($data eq "" and exists($param->{code}))
-    {
-        Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting available phonebooks via TR-064";
-        return  "received no data after requesting available phonebooks via TR-064";
-    }
-    
-    Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 challenge response:\n$data";
-      
-    unless($data =~ /<Nonce>/i and $data =~ /<Realm>/i)
-    {
-        Log3 $name, 3, "FB_CALLMONITOR ($name) - received no valid TR-064 challenge response. aborting";
-        return  "received no valid TR-064 challenge response. aborting";
-    }
-    
-    my ($nonce, $realm);
-    
-    if($data =~ m,<Nonce>(.+?)</Nonce>,i)
-    {
-        $nonce = $1;
-    }
-    
-    if($data =~ m,<Realm>(.+?)</Realm>,i)
-    {
-        $realm = $1;
-    }
-
-    # generate auth string
-    my $Auth = md5_hex(md5_hex($fb_user . ':' . $realm . ':' . $fb_pw) . ':' . $nonce);
-
-    Log3 $name, 4, "FB_CALLMONITOR ($name) - generated auth string for phonebook request: $Auth";
-    
-    # create "GetPhonebookList" XML request
-    my $do_request = <<EOD;
-<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-  <s:Header>
-    <h:ClientAuth xmlns:h="http://soap-authentication.org/digest/2001/10/" s:mustUnderstand="1">
-      <Nonce>$nonce</Nonce>
-      <Auth>$Auth</Auth>
-      <UserID>$fb_user</UserID>
-      <Realm>$realm</Realm>
-    </h:ClientAuth>
-  </s:Header>
-  <s:Body>
-        <u:$TR064_service_command xmlns:u="$TR064_service_type">
-        </u:$TR064_service_command>
-  </s:Body>
-</s:Envelope>
-EOD
-
-    $param->{url}        = "http://$fb_ip:$FB_port$TR064_control_url";
-    $param->{noshutdown} = 1;
-    $param->{timeout}    = AttrVal($name, "fritzbox-remote-timeout", 30);
-    $param->{loglevel}   = 4;
-    $param->{method}     = "POST";
-    $param->{header}     = "SOAPACTION: $TR064_service_type#$TR064_service_command\r\nContent-Type: text/xml; charset=utf-8";
-    $param->{data}       = $do_request;
-
-    Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting available phonebook id's:\n$do_request"; 
-    
-    ($err, $data) = HttpUtils_BlockingGet($param);
-
-    $err = "" unless(defined($err));
-    $data = "" unless(defined($data));
-    
-    if ($err ne "")
-    {
-        Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting phonebook id's: $err";
-        return "error while requesting phonebooks: $err";
-    }
-
-    if($data eq "" and exists($param->{code}))
-    {
-        Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting available phonebook id's";
-        return  "received no data after requesting available phonebook id's";
-    }
-    
-    Log3 $name, 5, "FB_CALLMONITOR ($name) - received response:\n$data";
-
-    # if status is still "unauthenticated" => user/password combination is wrong
-    if($data =~ m,<Status>Unauthenticated</Status>,i)
-    {
-        $hash->{helper}{PWD_NEEDED} = 1;
-        Log3 $name, 3, "FB_CALLMONITOR ($name) - unable to login via TR-064, wrong user/password";
-        return "unable to login via TR-064, wrong user/password" 
-    }
-
     my @phonebooks;
 
     # read list response (TR-064 id's: "0,1,2,...")
@@ -1453,51 +1435,22 @@ EOD
         return  "no phonebooks could be found";
     }
 
-    delete($hash->{helper}{PHONEBOOK_NAMES}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
-    delete($hash->{helper}{PHONEBOOK_URL}) if(exists($hash->{helper}{PHONEBOOK_URL}));
-
-    my $phb_id;
-
-    $TR064_service_command = "GetPhonebook"; # TR-064 Support - X_AVM-DE_OnTel: GetPhonebook Urls
-    $param->{header} = "SOAPACTION: $TR064_service_type#$TR064_service_command\r\nContent-Type: text/xml; charset=utf-8";
+    delete($hash->{helper}{PHONEBOOK_NAMES});
+    delete($hash->{helper}{PHONEBOOK_URL});
 
     # request name and FritzBox phone id for each list item
     foreach (@phonebooks) 
     {
-        # request phonebook details for each TR-064 list item
-        my $do_request = <<EOD;
-<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-  <s:Header>
-    <h:ClientAuth xmlns:h="http://soap-authentication.org/digest/2001/10/" s:mustUnderstand="1">
-      <Nonce>$nonce</Nonce>
-      <Auth>$Auth</Auth>
-      <UserID>$fb_user</UserID>
-      <Realm>$realm</Realm>
-    </h:ClientAuth>
-  </s:Header>
-  <s:Body>
-    <u:$TR064_service_command xmlns:u="$TR064_service_type">
-      <NewPhonebookID>$_</NewPhonebookID>
-    </u:$TR064_service_command>
-  </s:Body>
-</s:Envelope>
-EOD
-
-        $param->{data} = $do_request;
-        Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting phonebook description for id $_:\n$do_request";
-        ($err, $data)  = HttpUtils_BlockingGet($param);
-
-        if ($err ne "")
+        my $phb_id;
+        
+        Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting phonebook description for id $_";
+        
+        ($err, $data) = FB_CALLMONITOR_requestTR064($hash, "/upnp/control/x_contact", "GetPhonebook", "urn:dslforum-org:service:X_AVM-DE_OnTel:1", "<NewPhonebookID>$_</NewPhonebookID>", $testPassword);
+    
+        if ($err)
         {
             Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting phonebook description for id $_: $err";
             return "error while requesting phonebook description for id $_: $err";
-        }
-
-        if($data eq "" and exists($param->{code}))
-        {
-            Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting phonebook description for id $_";
-            return  "received no data after requesting phonebook description for id $_";
         }
 
         Log3 $name, 5, "FB_CALLMONITOR ($name) - received response with phonebook description for id $_:\n$data";
@@ -1516,10 +1469,42 @@ EOD
             Log3 $name, 4, "FB_CALLMONITOR ($name) - found phonebook url for id $phb_id: ".$hash->{helper}{PHONEBOOK_URL}{$phb_id};
         }
     }
+   
+    Log3 $name, 4, "FB_CALLMONITOR ($name) - phonebooks found: ".join(", ", map { $hash->{helper}{PHONEBOOK_NAMES}{$_}." (id: $_)" } sort keys %{$hash->{helper}{PHONEBOOK_NAMES}}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));  
+   
+	# get deflections
+	
+    delete($hash->{helper}{DEFLECTIONS});
+    
+    Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting deflection list";
+    ($err, $data) = FB_CALLMONITOR_requestTR064($hash, "/upnp/control/x_contact", "GetDeflections", "urn:dslforum-org:service:X_AVM-DE_OnTel:1",undef, $testPassword);
+    
+    if ($err)
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting deflection list: $err";
+        return "error while requesting deflection list: $err";
+    }
 
-    Log3 $name, 4, "FB_CALLMONITOR ($name) - phonebooks found: ".join(", ", map { $hash->{helper}{PHONEBOOK_NAMES}{$_}." (id: $_)" } sort keys %{$hash->{helper}{PHONEBOOK_NAMES}}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
-
-    delete($hash->{helper}{PWD_NEEDED}) if(exists($hash->{helper}{PWD_NEEDED}));
+    $data =~ s/&lt;/</g;
+    $data =~ s/&gt;/>/g;
+        
+    # extract deflection list
+    while($data =~ /<Item>(.*?)<\/Item>/gcs)
+    {
+        my $deflection_item = $1;
+        my %values;
+        
+        while($deflection_item =~ m,<(?:\w+:)?(\w+)>([^<]+)</(?:\w+:)?(\w+)>,gcs)
+        {
+            $values{$1} = $2;
+        }
+        
+        $hash->{helper}{DEFLECTIONS}{$values{DeflectionId}} = \%values;
+    }
+	
+	Log3 $name, 3, "FB_CALLMONITOR ($name) - found ".(scalar keys %{$hash->{helper}{DEFLECTIONS}})." blocking rules (deflections)" if(exists($hash->{helper}{DEFLECTIONS}));
+    
+    delete($hash->{helper}{PWD_NEEDED});
 
     return undef;
 }
