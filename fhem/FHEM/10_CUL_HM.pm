@@ -8903,7 +8903,8 @@ sub CUL_HM_assignIO($){ #check and assign IO
   if ($oldIODev ne $newIODev) {# have a change - Assign the device at IO and remove from old one
     my $ID = CUL_HM_hash2Id($hash);
     
-    if (   $oldIODev ne $newIODev
+    if (   $oldIODev
+        && $oldIODev ne $newIODev
         && ReadingsVal($oldIODev->{NAME},"state","") ne "disconnected"
 #        && InternalVal($oldIODev->{NAME},"XmitOpen",1) != 0
         &&(  $oldIODev->{helper}{VTS_AES} #if this unselected IO is TSCUL 0.14+ we have to remove the device from IO
