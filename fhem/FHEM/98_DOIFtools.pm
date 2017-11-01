@@ -640,7 +640,7 @@ sub DOIFtools_Notify($$) {
       CommandDeleteAttr(undef,"$pn readingsPrefix") if (AttrVal($pn,"readingsPrefix",""));
       CommandAttr(undef,"$pn DOIFtoolsEventMonitorInDOIF ".AttrVal($pn,"eventMonitorInDOIF","")) if (AttrVal($pn,"eventMonitorInDOIF",""));
       CommandDeleteAttr(undef,"$pn eventMonitorInDOIF") if (AttrVal($pn,"eventMonitorInDOIF",""));
-      CommandSave(undef,undef);
+      # CommandSave(undef,undef);
     }
     # Event monitor in DOIF FW_detailFn
     if ($modules{DOIF}{LOADED} and (!$modules{DOIF}->{FW_detailFn} or $modules{DOIF}->{FW_detailFn} and $modules{DOIF}->{FW_detailFn} ne "DOIFtools_eM") and $sn eq "global" and $event =~ "^INITIALIZED\$" ) {
@@ -1071,7 +1071,7 @@ sub DOIFtools_Define($$$)
   my @Liste = devspec2array("TYPE=DOIFtools");
   if (@Liste > 1) {
     CommandDelete(undef,$pn);
-    CommandSave(undef,undef);
+    # CommandSave(undef,undef);
     return "Only one instance of DOIFtools is allowed per FHEM installation. Delete the old one first.";
   }
   $hash->{STATE} = "initialized";
@@ -1089,27 +1089,18 @@ sub DOIFtools_Attr(@)
   my $value = (defined $a[3]) ? $a[3] : "";
   my $hash = $defs{$pn};
   my $ret="";
-  if ($init_done and $attr eq "DOIFtoolsEventMonitorInDOIF") {
-    # if (!defined $modules{DOIF}->{FW_detailFn} and $cmd eq "set" and $value) {
-        # $modules{DOIF}->{FW_detailFn} = "DOIFtools_eM";
-        # readingsSingleUpdate($hash,".DOIFdO",$modules{DOIF}->{FW_deviceOverview},0);
-        # $modules{DOIF}->{FW_deviceOverview} = 1;
-    # } elsif ($modules{DOIF}->{FW_detailFn} eq "DOIFtools_eM" and ($cmd eq "del" or !$value)) {
-        # delete $modules{DOIF}->{FW_detailFn};
-        # $modules{DOIF}->{FW_deviceOverview} = ReadingsVal($pn,".DOIFdO","");
-    # }
-  } elsif ($init_done and $attr eq "DOIFtoolsMenuEntry") {
+  if ($init_done and $attr eq "DOIFtoolsMenuEntry") {
     if ($cmd eq "set" and $value) {
       if (!(AttrVal($FW_wname, "menuEntries","") =~ m/(DOIFtools\,$FW_ME\?detail\=DOIFtools\,)/)) {
         CommandAttr(undef, "$FW_wname menuEntries DOIFtools,$FW_ME?detail=DOIFtools,".AttrVal($FW_wname, "menuEntries",""));
-        CommandSave(undef, undef);
+        # CommandSave(undef, undef);
       }
     } elsif ($init_done and $cmd eq "del" or !$value) {
       if (AttrVal($FW_wname, "menuEntries","") =~ m/(DOIFtools\,$FW_ME\?detail\=DOIFtools\,)/) {
         my $me = AttrVal($FW_wname, "menuEntries","");
         $me =~ s/DOIFtools\,$FW_ME\?detail\=DOIFtools\,//;
         CommandAttr(undef, "$FW_wname menuEntries $me");
-        CommandSave(undef, undef);
+        # CommandSave(undef, undef);
       }
     
     }
