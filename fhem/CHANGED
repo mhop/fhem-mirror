@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 74_XiaomiFlowerMonitor: add attribut for Blocking.pm logoutput
   - bugfix:  14_CUL_TCM97001: Bug: "other state" bei W174, 
              Plausibility check for W174, Append documentation
   - bugfix:  71_YAMAHA_AVR: fix max volume when using float values in 
@@ -9,7 +10,7 @@
   - feature: 70_KODI: added reading jsonResponse which contains the last
                         received message from Kodi
   - feature: 46_Aqicn: FHEMWEB text color formated, thanks to maddhin
-  - update:  74_74_XiaomiFlowerMonitor: new version, change internal routine
+  - update:  74_XiaomiFlowerMonitor: new version, change internal routine
   - feature: fhemweb_iconRadio.js: optionally colorize selected icons instead
                                     of its background by prefix use4icon@
   - feature: fhemweb_iconButtons.js: optionally colorize selected icons instead

@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.2.0";
+my $version = "1.2.2";
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
@@ -114,6 +114,7 @@ sub XiaomiFlowerSens_Initialize($) {
                             "minLux ".
                             "maxLux ".
                             "sshHost ".
+                            "blockingCallLoglevel:2,3,4,5 ".
                             $readingFnAttributes;
 
 
@@ -139,7 +140,9 @@ sub XiaomiFlowerSens_Define($$) {
     $hash->{VERSION}                        = $version;
     $hash->{INTERVAL}                       = 300;
     $hash->{helper}{CallSensDataCounter}    = 0;
+    $hash->{helper}{CallBatteryFirmware}    = 0;
     $hash->{NOTIFYDEV}                      = "global";
+    $hash->{loglevel}                       = 4;
         
     
     readingsSingleUpdate($hash,"state","initialized", 0);
@@ -185,7 +188,7 @@ sub XiaomiFlowerSens_Attr(@) {
         }
     }
     
-    if( $attrName eq "disabledForIntervals" ) {
+    elsif( $attrName eq "disabledForIntervals" ) {
         if( $cmd eq "set" ) {
             return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
             unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
@@ -199,7 +202,7 @@ sub XiaomiFlowerSens_Attr(@) {
         }
     }
     
-    if( $attrName eq "interval" ) {
+    elsif( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
             if( $attrVal < 300 ) {
                 Log3 $name, 3, "XiaomiFlowerSens ($name) - interval too small, please use something >= 300 (sec), default is 3600 (sec)";
@@ -213,6 +216,18 @@ sub XiaomiFlowerSens_Attr(@) {
         elsif( $cmd eq "del" ) {
             $hash->{INTERVAL} = 300;
             Log3 $name, 3, "XiaomiFlowerSens ($name) - set interval to default";
+        }
+    }
+    
+    elsif( $attrName eq "blockingCallLoglevel" ) {
+        if( $cmd eq "set" ) {
+            $hash->{loglevel} = $attrVal;
+            Log3 $name, 3, "XiaomiFlowerSens ($name) - set blockingCallLoglevel to $attrVal";
+        }
+
+        elsif( $cmd eq "del" ) {
+            $hash->{loglevel} = 4;
+            Log3 $name, 3, "XiaomiFlowerSens ($name) - set blockingCallLoglevel to default";
         }
     }
     
@@ -765,6 +780,8 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
     Event Example for min/max Value's: 2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br>
     Event Example for min/max Value's: 2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high</li>
     <li>sshHost - FQD-Name or IP of ssh remote system / you must configure your ssh system for certificate authentication. For better handling you can config ssh Client with .ssh/config file</li>
+    <li>batteryFirmwareAge - how old can the reading befor fetch new data</li>
+    <li>blockingCallLoglevel - Blocking.pm Loglevel for BlockingCall Logoutput</li>
   </ul>
 </ul>
 
@@ -838,7 +855,8 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
     2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br />
     2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high<br /><br /></li>
     <li>sshHost - FQDN oder IP-Adresse eines entfernten SSH-Systems. Das SSH-System ist auf eine Zertifikat basierte Authentifizierung zu konfigurieren. Am elegantesten geschieht das mit einer  .ssh/config Datei auf dem SSH-Client.</li>
-    <li>batteryFirmwareAge - how old can the reading befor fetch new data</li>
+    <li>batteryFirmwareAge - wie alt soll der Timestamp des Readings sein bevor eine Aktuallisierung statt findet</li>
+    <li>blockingCallLoglevel - Blocking.pm Loglevel für BlockingCall Logausgaben</li>
   </ul>
 </ul>
 
