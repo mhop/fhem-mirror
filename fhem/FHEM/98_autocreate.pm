@@ -379,8 +379,7 @@ autocreate_Notify($$)
   }
 
   CommandSave(undef, undef) if(!$ret && $nrcreated && 
-                                AttrVal($me,"autosave",
-                                AttrVal("global","autosave",1)));
+                                AttrVal($me,"autosave", 1));
   return $ret;
 }
 

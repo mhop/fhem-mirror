@@ -1082,6 +1082,9 @@ The following local attributes are used by a wider range of devices:
     structures, but it won't work correctly if some of these files are not
     writeable.</li>
 
+    <li>before overwriting the files, the old version will be saved, see the <a
+    href="#restoreDirs">restoreDirs</a> global attribute for details.
+
   </ul>
 </ul>
 <!-- save end -->
@@ -1538,6 +1541,20 @@ The following local attributes are used by a wider range of devices:
     <li>proxyExclude<br>
         regexp for hosts to exclude when using a proxy
     </li><br>
+
+    <a name="restoreDirs"></a>
+    <li>restoreDirs<br>
+        update saves each file before overwriting it with the new version from
+        the Web. For this purpose update creates a directory restoreDir in the
+        global modpath directory, then a subdirectory with the current date,
+        where the old version of the currently replaced file is stored.
+        The default value of this attribute is 3, meaning that 3 old versions
+        (i.e. date-directories) are kept, and the older ones are deleted.<br>
+        fhem.cfg and fhem.state will be also copied with this method before
+        executing save. To restore the files, you can use the restore FHEM
+        command.<br>
+        <br>If the attribute is set to 0, the feature is deactivated.
+        </li><br>
 
     <li><a href="#fheminfo">sendStatistics</a><br>
 

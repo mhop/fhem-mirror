@@ -1148,6 +1148,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
       nicht korrekt wenn FHEM f&uuml;r diese Dateien keine Schreibrechte
       besitzt.</li>
 
+    <li>Vor dem &Uuml;berschreiben der Dateien wird die alte Version gesichert,
+      siehe <a href="#restoreDirs">restoreDirs</a> f&uuml;r Einzelheiten.</li>
   </ul>
 </ul>
 <!-- save end -->
@@ -1644,6 +1646,21 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         Regexp, um bestimmte Hosts nicht via proxy zu kontaktieren.
     </li><br>
 
+    <a name="restoreDirs"></a>
+    <li><a name="restoreDirs">restoreDirs</a><br>
+        update sichert jede Datei vor dem &Uuml;berschreiben mit der neuen
+        Version aus dem Web. F&uuml;r diesen Zweck wird zuerst ein restoreDir
+        Verzeichnis in der global modpath Verzeichnis angelegt, und danach
+        ein Unterverzeichnis mit dem aktuellen Datum. In diesem Verzeichnis
+        werden vor dem &Uuml;berschreiben die alten Versionen der Dateien
+        gerettet. Die Voreinstellung ist 3, d.h. die letzten 3
+        Datums-Verzeichnisse werden aufgehoben, und die &auml;lteren entfernt.
+        <br>
+        Auch fhem.cfg und fhem.state wird auf diese Weise vor dem ausf&uuml;ren
+        von save gesichert. Zum restaurieren der alten Dateien kann man das
+        restore Befehl verwenden.<br>
+        Falls man den Wert auf 0 setzt, dann ist dieses Feature deaktiviert.
+        </li><br>
 
     <li><a href="#fheminfo">sendStatistics</a><br>
 

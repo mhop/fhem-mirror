@@ -38,6 +38,7 @@ use IO::Socket::INET;
 use Time::HiRes qw(gettimeofday);
 use Scalar::Util qw(looks_like_number);
 use POSIX;
+use File::Copy qw(copy);
 
 ##################################################
 # Forward declarations
@@ -134,6 +135,10 @@ sub readingsEndUpdate($$);
 sub readingsSingleUpdate($$$$);
 sub redirectStdinStdErr();
 sub rejectDuplicate($$$);
+sub restoreDir_init();
+sub restoreDir_rmTree($);
+sub restoreDir_saveFile($$);
+sub restoreDir_mkDir($$$);
 sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
 sub toJSON($);
@@ -551,7 +556,8 @@ if(configDBUsed()) {
 }
 
 if($cfgRet) {
-  $attr{global}{motd} = "$cfgErrMsg\n$cfgRet";
+  $attr{global}{autosave} = 0;
+  $attr{global}{motd} = "$cfgErrMsg\n$cfgRet\nAutosave deactivated";
   Log 1, $cfgRet;
 
 } elsif($attr{global}{motd} && $attr{global}{motd} =~ m/^$cfgErrMsg/) {
@@ -1566,10 +1572,19 @@ CommandSave($$)
     return "Last 10 structural changes:\n  ".join("\n  ", @structChangeHist);
   }
 
+  if(!$cl && !AttrVal("global", "autosave", 1)) { # Forum #78769
+    Log 4, "Skipping save, as autosave is disabled";
+    return;
+  }
+  my $restoreDir;
+  $restoreDir = restoreDir_init() if(!configDBUsed());
+
   @structChangeHist = ();
   DoTrigger("global", "SAVE", 1);
 
+  restoreDir_saveFile($restoreDir, $attr{global}{statefile});
   my $ret = WriteStatefile();
+
   return $ret if($ret);
   $ret = "";    # cfgDB_SaveState may return undef
 
@@ -1580,6 +1595,7 @@ CommandSave($$)
 
   $param = $attr{global}{configfile} if(!$param);
   return "No configfile attribute set and no argument specified" if(!$param);
+  restoreDir_saveFile($restoreDir, $param);
   if(!open(SFH, ">$param")) {
     return "Cannot open $param: $!";
   }
@@ -1606,6 +1622,7 @@ CommandSave($$)
     my $cfgfile = $h->{CFGFN} ? $h->{CFGFN} : "configfile";
     my $fh = $fh{$cfgfile};
     if(!$fh) {
+      restoreDir_saveFile($restoreDir, $cfgfile);
       if(!open($fh, ">$cfgfile")) {
         $ret .= "Cannot open $cfgfile: $!, ignoring its content\n";
         $fh{$cfgfile} = 1;
@@ -5236,6 +5253,106 @@ computeAlignTime($$@)
   $ttime += ($alTime-$off);
   $ttime += $step if($ttime < $now);
   return (undef, $ttime);
+}
+
+############################
+my %restoreDir_dirs;
+sub
+restoreDir_mkDir($$$)
+{
+  my ($root, $dir, $isFile) = @_;
+  if($isFile) { # Delete the file Component
+    $dir =~ m,^(.*)/([^/]*)$,;
+    $dir = $1;
+  }
+  return if($restoreDir_dirs{$dir});
+  $restoreDir_dirs{$dir} = 1;
+  my @p = split("/", $dir);
+  for(my $i = 0; $i < int(@p); $i++) {
+    my $path = "$root/".join("/", @p[0..$i]);
+    if(!-d $path) {
+      mkdir $path;
+      Log 4, "MKDIR $root/".join("/", @p[0..$i]);
+    }
+  }
+}
+
+sub
+restoreDir_rmTree($)
+{
+  my ($dir) = @_;
+
+  my $dh;
+  if(!opendir($dh, $dir)) {
+    Log 1, "opendir $dir: $!";
+    return;
+  }
+  my @files = grep { $_ ne "." && $_ ne ".." } readdir($dh);
+  closedir($dh);
+
+  foreach my $f (@files) {
+    if(-d "$dir/$f") {
+      restoreDir_rmTree("$dir/$f");
+    } else {
+      Log 4, "rm $dir/$f";
+      if(!unlink("$dir/$f")) {
+        Log 1, "rm $dir/$f failed: $!";
+      }
+    }
+  }
+  Log 4, "rmdir $dir";
+  if(!rmdir($dir)) {
+    Log 1, "rmdir $dir failed: $!";
+  }
+}
+
+sub
+restoreDir_init()
+{
+  my $root = $attr{global}{modpath};
+
+  my $nDirs = AttrVal("global","restoreDirs", 3);
+  if($nDirs !~ m/^\d+$/ || $nDirs < 0) {
+    Log 1, "invalid restoreDirs value $nDirs, setting it to 3";
+    $nDirs = 3;
+  }
+  return "" if($nDirs == 0);
+
+  my $rdName = "restoreDir";
+  my @t = localtime;
+  my $restoreDir = sprintf("$rdName/%04d-%02d-%02d",
+                        $t[5]+1900, $t[4]+1, $t[3]);
+  Log 1, "MKDIR $restoreDir" if(!  -d "$root/restoreDir");
+  restoreDir_mkDir($root, $restoreDir, 0);
+
+  if(!opendir(DH, "$root/$rdName")) {
+    Log 1, "opendir $root/$rdName: $!";
+    return "";
+  }
+  my @oldDirs = sort grep { $_ !~ m/^\./ && $_ ne $restoreDir } readdir(DH);
+  closedir(DH);
+  while(int(@oldDirs) > $nDirs) {
+    my $dir = "$root/$rdName/". shift(@oldDirs);
+    next if($dir =~ m/$restoreDir/);    # Just in case
+    Log 1, "RMDIR: $dir";
+    restoreDir_rmTree($dir);
+  }
+    
+  return $restoreDir;
+}
+
+sub
+restoreDir_saveFile($$)
+{
+  my($restoreDir, $fName) = @_;
+
+  return if(!$restoreDir || !$fName);
+
+  my $root = $attr{global}{modpath};
+  restoreDir_mkDir($root, "$restoreDir/$fName", 1);
+  if(!copy($fName, "$root/$restoreDir/$fName")) {
+    log 1, "copy $fName $root/$restoreDir/$fName failed:$!";
+  }
 }
 
 1;
