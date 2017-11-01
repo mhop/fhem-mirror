@@ -2677,6 +2677,8 @@ sub SYSMON_getNetworkInfo ($$$) {
   my ($hash, $map, $device) = @_;
   
   if($hash->{helper}->{excludes}{'network'}) {return $map;}
+
+  return $map unless (-e "/sbin/ifconfig");
   
   SYSMON_Log($hash, 5, "get $device");
   my($nName, $nDef) = split(/:/, $device);
