@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: WMBus: preliminary support for SML payload
   - feature: 98_DOIFtools: unattended save removed, Forum(78769)
                DOIFtools will perform save if allowed by
                attribute DOIFtoolsExecuteSave when creating automatically a

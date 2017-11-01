@@ -44,6 +44,8 @@ use constant {
   CI_ERROR => 0x70,   # Error from device, only specified for wired M-Bus but used by Easymeter WMBUS module
   CI_TL_4 => 0x8a,    # Transport layer from device, 4 Bytes
   CI_TL_12 => 0x8b,   # Transport layer from device, 12 Bytes
+  CI_RESP_SML_4 => 0x7e, # Response from device, 4 Bytes, application layer SML encoded
+  CI_RESP_SML_12 => 0x7f, # Response from device, 12 Bytes, application layer SML encoded  
   
   # DIF types (Data Information Field), see page 32
   DIF_NONE => 0x00,
@@ -85,6 +87,7 @@ use constant {
   ERR_UNKNOWN_ENCRYPTION => 10,
   ERR_TOO_MANY_VIFE => 11,
   ERR_MSG_TOO_SHORT => 12,
+  ERR_SML_PAYLOAD => 13,
   
   
 };
@@ -1009,16 +1012,18 @@ sub getCRCsize {
 sub decodeConfigword($) {
   my $self = shift;
   
-  #if ($self->{cw_parts}{mode} == 5) {
-  $self->{cw_parts}{bidirectional}    = $self->{cw} & 0b1000000000000000 >> 15;
-  $self->{cw_parts}{accessability}    = $self->{cw} & 0b0100000000000000 >> 14;
-  $self->{cw_parts}{synchronous}      = $self->{cw} & 0b0010000000000000 >> 13;
-  $self->{cw_parts}{mode}             = $self->{cw} & 0b0000111100000000 >> 8;
-  $self->{cw_parts}{encrypted_blocks} = $self->{cw} & 0b0000000011110000 >> 4;
-  $self->{cw_parts}{content}          = $self->{cw} & 0b0000000000001100 >> 2;
-  $self->{cw_parts}{repeated_access}  = $self->{cw} & 0b0000000000000010 >> 1;
-  $self->{cw_parts}{hops}             = $self->{cw} & 0b0000000000000001;
-  #} elsif ($self->{cw_parts}{mode} == 7) {
+  #printf("cw: %02x\n", $self->{cw});
+  $self->{cw_parts}{mode}             = ($self->{cw} & 0b0001111100000000) >> 8;
+  #printf("mode: %02x\n", $self->{cw_parts}{mode});
+  if ($self->{cw_parts}{mode} == 5 || $self->{cw_parts}{mode} == 0) {
+    $self->{cw_parts}{bidirectional}    = ($self->{cw} & 0b1000000000000000) >> 15;
+    $self->{cw_parts}{accessability}    = ($self->{cw} & 0b0100000000000000) >> 14;
+    $self->{cw_parts}{synchronous}      = ($self->{cw} & 0b0010000000000000) >> 13;
+    $self->{cw_parts}{encrypted_blocks} = ($self->{cw} & 0b0000000011110000) >> 4;
+    $self->{cw_parts}{content}          = ($self->{cw} & 0b0000000000001100) >> 2;
+    $self->{cw_parts}{repeated_access}  = ($self->{cw} & 0b0000000000000010) >> 1;
+    $self->{cw_parts}{hops}             = ($self->{cw} & 0b0000000000000001);
+  } #elsif ($self->{cw_parts}{mode} == 7) {
     # ToDo: wo kommt das dritte Byte her?
   #  $self->{cw_parts}{mode}             = $self->{cw} & 0b0000111100000000 >> 8;
   #}
@@ -1442,19 +1447,19 @@ sub decodeApplicationLayer($) {
 
   my $offset = 1;
 
-  if ($self->{cifield} == CI_RESP_4) {
+  if ($self->{cifield} == CI_RESP_4 || $self->{cifield} == CI_RESP_SML_4) {
     # Short header
     #print "short header\n";
     ($self->{access_no}, $self->{status}, $self->{cw}) = unpack('CCn', substr($applicationlayer,$offset));
     $offset += 4;
-  } elsif ($self->{cifield} == CI_RESP_12) {
+  } elsif ($self->{cifield} == CI_RESP_12 || $self->{cifield} == CI_RESP_SML_12) {
     # Long header
     #print "Long header\n";
     ($self->{meter_id}, $self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw}) 
-      = unpack('VvCCCCn', substr($applicationlayer,$offset)); 
+      = unpack('VvCCCCv', substr($applicationlayer,$offset)); 
     $self->{meter_id} = sprintf("%08d", $self->{meter_id});  
     $self->{meter_devtypestring} =  $validDeviceTypes{$self->{meter_dev}} || 'unknown'; 
-     $self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
+    $self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
     $offset += 12;
   } elsif ($self->{cifield} == CI_RESP_0) {
     # no header
@@ -1506,11 +1511,19 @@ sub decodeApplicationLayer($) {
     # error, encryption mode not implemented
     $self->{errormsg} = sprintf('Encryption mode %x not implemented', $self->{cw_parts}{mode});
     $self->{errorcode} = ERR_UNKNOWN_ENCRYPTION;
+    $self->{isEncrypted} = 1;
     $self->{decrypted} = 0;
     return 0;
   }
   
-  return $self->decodePayload($payload);  
+  if ($self->{cifield} == CI_RESP_SML_4 || $self->{cifield} == CI_RESP_SML_12) {
+    # payload is SML encoded, that's not implemented
+    $self->{errormsg} = "payload is SML encoded, can't be decoded, SML payload is " . unpack("H*", substr($applicationlayer,$offset));
+    $self->{errorcode} = ERR_SML_PAYLOAD;
+    return 0;
+  } else {
+    return $self->decodePayload($payload);  
+  }
   
 }
 
