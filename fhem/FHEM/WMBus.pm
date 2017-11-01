@@ -1012,17 +1012,17 @@ sub getCRCsize {
 sub decodeConfigword($) {
   my $self = shift;
   
-  #printf("cw: %02x\n", $self->{cw});
-  $self->{cw_parts}{mode}             = ($self->{cw} & 0b0001111100000000) >> 8;
+  #printf("cw: %01x %01x\n", $self->{cw_1}, $self->{cw_2});
+  $self->{cw_parts}{mode}             = ($self->{cw_2} & 0b00011111);
   #printf("mode: %02x\n", $self->{cw_parts}{mode});
   if ($self->{cw_parts}{mode} == 5 || $self->{cw_parts}{mode} == 0) {
-    $self->{cw_parts}{bidirectional}    = ($self->{cw} & 0b1000000000000000) >> 15;
-    $self->{cw_parts}{accessability}    = ($self->{cw} & 0b0100000000000000) >> 14;
-    $self->{cw_parts}{synchronous}      = ($self->{cw} & 0b0010000000000000) >> 13;
-    $self->{cw_parts}{encrypted_blocks} = ($self->{cw} & 0b0000000011110000) >> 4;
-    $self->{cw_parts}{content}          = ($self->{cw} & 0b0000000000001100) >> 2;
-    $self->{cw_parts}{repeated_access}  = ($self->{cw} & 0b0000000000000010) >> 1;
-    $self->{cw_parts}{hops}             = ($self->{cw} & 0b0000000000000001);
+    $self->{cw_parts}{bidirectional}    = ($self->{cw_2} & 0b10000000) >> 7;
+    $self->{cw_parts}{accessability}    = ($self->{cw_2} & 0b01000000) >> 6;
+    $self->{cw_parts}{synchronous}      = ($self->{cw_2} & 0b00100000) >> 5;
+    $self->{cw_parts}{encrypted_blocks} = ($self->{cw_1} & 0b11110000) >> 4;
+    $self->{cw_parts}{content}          = ($self->{cw_1} & 0b00001100) >> 2;
+    $self->{cw_parts}{repeated_access}  = ($self->{cw_1} & 0b00000010) >> 1;
+    $self->{cw_parts}{hops}             = ($self->{cw_1} & 0b00000001);
   } #elsif ($self->{cw_parts}{mode} == 7) {
     # ToDo: wo kommt das dritte Byte her?
   #  $self->{cw_parts}{mode}             = $self->{cw} & 0b0000111100000000 >> 8;
@@ -1450,13 +1450,13 @@ sub decodeApplicationLayer($) {
   if ($self->{cifield} == CI_RESP_4 || $self->{cifield} == CI_RESP_SML_4) {
     # Short header
     #print "short header\n";
-    ($self->{access_no}, $self->{status}, $self->{cw}) = unpack('CCn', substr($applicationlayer,$offset));
+    ($self->{access_no}, $self->{status}, $self->{cw_1}, $self->{cw_2}) = unpack('CCCC', substr($applicationlayer,$offset));
     $offset += 4;
   } elsif ($self->{cifield} == CI_RESP_12 || $self->{cifield} == CI_RESP_SML_12) {
     # Long header
     #print "Long header\n";
-    ($self->{meter_id}, $self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw}) 
-      = unpack('VvCCCCv', substr($applicationlayer,$offset)); 
+    ($self->{meter_id}, $self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw_1}, $self->{cw_2}) 
+      = unpack('VvCCCCCC', substr($applicationlayer,$offset)); 
     $self->{meter_id} = sprintf("%08d", $self->{meter_id});  
     $self->{meter_devtypestring} =  $validDeviceTypes{$self->{meter_dev}} || 'unknown'; 
     $self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
