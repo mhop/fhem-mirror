@@ -62,13 +62,6 @@ sub msgDialog_Initialize($) {
     "msgCommand ".
     $readingFnAttributes
   ;
-
-  if($modules{msgConfig}{defptr}){
-    my $msgConfig = $modules{msgConfig}{defptr}{NAME};
-
-    addToDevAttrList($msgConfig, "$TYPE\_evalSpecials:textField-long ");
-    addToDevAttrList($msgConfig, "$TYPE\_msgCommand:textField ");
-  }
 }
 
 # regular Fn ##################################################################
@@ -90,6 +83,11 @@ sub msgDialog_Define($$) {
     "No global configuration device defined: ".
     "Please define a msgConfig device first"
   ) unless($modules{msgConfig}{defptr});
+
+  my $msgConfig = $modules{msgConfig}{defptr}{NAME};
+
+  addToDevAttrList($msgConfig, "$TYPE\_evalSpecials:textField-long ");
+  addToDevAttrList($msgConfig, "$TYPE\_msgCommand:textField ");
 
   $DEF = msgDialog_evalSpecials($hash, $DEF);
   $DEF = eval{JSON->new->decode($DEF)};
