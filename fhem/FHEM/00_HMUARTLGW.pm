@@ -1044,7 +1044,8 @@ sub HMUARTLGW_GetSetParameters($;$$)
 				Log3($hash, 1, "HMUARTLGW ${name} Adding peer $hash->{Helper}{UpdatePeer}{id} failed! " .
 				               "You have probably forced an unknown aesKey for this device.");
 			} else {
-				Log3($hash, 1, "HMUARTLGW ${name} Removing peer $hash->{Helper}{UpdatePeer}{id} failed!");
+				Log3($hash, HMUARTLGW_getVerbLvl($hash, $hash->{Helper}{UpdatePeer}{id}, $hash->{Helper}{UpdatePeer}{id}, 4),
+				     "HMUARTLGW ${name} Removing peer $hash->{Helper}{UpdatePeer}{id} failed!");
 			}
 			$hash->{Helper}{UpdatePeer}{operation} = "";
 		}
