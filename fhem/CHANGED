@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: fhemweb_iconRadio.js: add a user defined class to svg icons by
+             prefix class<classname>@, improved matching for a numeric sequence
+             of compare values, color numbers are now case insensitive
+  - feature: fhemweb_iconButtons.js, fhemweb_iconLabel.js,
+             fhemweb_iconSwitch.js: add a user defined class to svg icons by
+             prefix class<classname>@, color numbers are now case insensitive
   - bugfix: 31_Nello: updated MQTT IP
   - feature: save writes a copy into restoreDirs (Forum #78769)
   - feature: WMBus: preliminary support for SML payload

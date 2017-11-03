@@ -23,13 +23,20 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
     return undefined;
   var ipar = 2;
 
+  var iconclass = "";
+  if(vArr[1].match(/class.*?@/)) {
+    var m = vArr[1].match(/class(.*?)@/);
+    iconclass = m && m[1] ? m[1] : "";
+    vArr[1] = vArr[1].replace(/class.*?@/,"");
+  }
+
   var use4icon = false;
   if(vArr[1].match(/^use4icon@|^@/)) {
     use4icon = true;
     vArr[1] = vArr[1].replace(/^use4icon@|^@/,"");
   }
 
-  if( vArr[1].match(/^[A-F0-9]{6}$/))
+  if( vArr[1].match(/^[A-F0-9]{6}$/,"i"))
     vArr[1] = "#"+vArr[1];
 
   var newEl = $("<div style='display:inline-block;'>").get(0);
@@ -49,7 +56,7 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
   var buttons = [];
   for( var i = 2; i < (vArr.length); i+=ipar ) {
     var button = $('<input type="checkbox">').uniqueId();
-    var label = $('<label for="'+button.attr("id")+'" name="'+vArr[i+1]+'" title="'+vArr[i]+'" >'+vArr[i]+'</label>');
+    var label = $('<label for="'+button.attr("id")+'" iconr=":'+((i-2)/ipar)+':" name="'+vArr[i+1]+'" title="'+vArr[i]+'" >'+vArr[i]+'</label>');
     buttons.push(button);
 
     $(newEl).append(button);
@@ -74,35 +81,33 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
     var ico = vArr[ind*ipar+3];
     var m = ico.match(/.*@(.*)/);
     var uscol = m && m[1] ? m[1] : "none";
-    if( uscol.match(/^[A-F0-9]{6}$/))
+    if( uscol.match(/^[A-F0-9]{6}$/,"i"))
       uscol = "#"+uscol;
     if(uscol == 'none')
       ico += "@none";
     $(val).find("span").attr( "unselectcolor",uscol);
 
-    FW_cmd(FW_root+"?cmd={FW_makeImage('"+ico+"')}&XHR=1",function(data){
-       data = data.replace(/\n$/,'');
-      $(newEl).find("label").each(function(ind,val){
+    FW_cmd(FW_root+"?cmd={FW_makeImage('"+ico+"','"+ico+"',':"+ind+": "+(iconclass.length > 0 ? iconclass :'')+"')}&XHR=1",function(data){
+      data = data.replace(/\n$/,'');
+      var m = $(data).attr("class").match(/(:\d+?:)/);
+      var iconr = m && m[1] ? m[1] : "error";
+      $(newEl).find("label[iconr='"+iconr+"']").each(function(ind,val){
         var span = $(val).find("span");
         var sc = $(span).attr("selectcolor");
         var usc = $(span).attr("unselectcolor") == "none" ? "" : $(span).attr("unselectcolor");
         var isc = $(span).attr("ischecked");
-        var re = new RegExp("\"\s?"+$(val).attr("name")+"(\s?|\")","i");
-        if (!(data.match(re) === null) && ($(val).find("span").html().match(re) === null)) {
-          if(isc == "true") {
-            if(sc.length > 0) {
-              data = data.replace(/fill=\".*?\"/,'fill="'+sc+'"')
-                         .replace(/fill:.*?[;\s]/,'fill:'+sc+';');
-            }
-          } else {
-            if(sc.length > 0) {
-              data = data.replace(/fill=\".*?\"/,'fill="'+usc+'"')
-                         .replace(/fill:.*?[;\s]/,'fill:'+usc+';');
-            }
+        if(isc == "true") {
+          if(sc.length > 0) {
+            data = data.replace(/fill=\".*?\"/,'fill="'+sc+'"')
+                       .replace(/fill:.*?[;\s]/,'fill:'+sc+';');
           }
-          $(val).find("span").addClass("iconButtons_widget").html(data);
-          return false;
+        } else {
+          if(sc.length > 0) {
+            data = data.replace(/fill=\".*?\"/,'fill="'+usc+'"')
+                       .replace(/fill:.*?[;\s]/,'fill:'+usc+';');
+          }
         }
+        $(span).addClass("iconButtons_widget").html(data);
       });
 
     });
@@ -140,7 +145,7 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
                                       var span = button.next().find("span");
                                       var sc = $(span).attr("selectcolor");
                                       var usc = $(span).attr("unselectcolor") == "none" ? "" : $(span).attr("unselectcolor");
-                                      if( usc.match(/^[A-F0-9]{6}$/))
+                                      if( usc.match(/^[A-F0-9]{6}$/,"i"))
                                         usc = "#"+usc;
                                       button.prop("checked", arg.match(new RegExp('(^|,)'+vArr[i*ipar+2]+'($|,)') ) );
                                       if (button.prop("checked")==true){
