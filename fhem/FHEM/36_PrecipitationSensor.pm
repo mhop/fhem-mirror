@@ -200,7 +200,7 @@ sub PrecipitationSensor_Set($@) {
   my $cmd = shift @a;
   my $arg = join(" ", @a);
   
-  my $list = "raw connect flash parse reboot treshold calibrate savesettings";
+  my $list = "raw connect flash parse reboot treshold calibrate resetPreciAmount savesettings";
   return $list if( $cmd eq '?' || $cmd eq '');
   
   if ($cmd eq "raw") {
@@ -231,6 +231,9 @@ sub PrecipitationSensor_Set($@) {
   }
   elsif ($cmd eq "calibrate") {
     PrecipitationSensor_SimpleWrite($hash, "calibrate");
+  }
+  elsif ($cmd eq "resetPreciAmount") {
+    PrecipitationSensor_SimpleWrite($hash, "resetPreciAmount");
   }
   elsif ($cmd eq "savesettings") {
     PrecipitationSensor_SimpleWrite($hash, "savesettings");
@@ -535,6 +538,10 @@ sub PrecipitationSensor_Attr(@) {
   3.) Wait for at least 120 seconds before calling the "calibrate" command</br>
   4.) The calibrated threshold levels "GroupMagThresh" will be updated after the next Publish interval cycle
   </li><br>
+  
+    <li>restPreciAmount<br>
+    Resets the amount of precipitation. Works only if we are connected (state is opened or initialized)
+    </li><br>
 	
 	<li>savesettings<br>
     Saves the changes to flash. Works only if we are connected (state is opened or initialized)
