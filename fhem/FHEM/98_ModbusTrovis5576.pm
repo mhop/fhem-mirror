@@ -26,6 +26,8 @@
 #
 ##############################################################################
 # Changelog
+# 03.11.2017
+#	Ein neues Register hinzugefügt: "Fehlerstatusregister_CL1".
 # 28.06.2017
 #	Zwei neue Register hinzugefügt: "Wasser_Zirkulationspumpe" und das entsprechende Ebenen-Bit "Wasser_Zirkulationspumpe_EBN" dazu.
 # 14.03.2016 
@@ -49,6 +51,11 @@ my %Trovis5576ParseInfo = (
 				expr => '$val/10',
 				format => '%.1f',
 				unpack => 's>',
+				poll => 1
+			},
+	'h149' => {	reading => 'Fehlerstatusregister_CL1',
+				name => 'FehlerstatusReg',
+				map => '0:Aus, 1:An',
 				poll => 1
 			},
 	
@@ -388,6 +395,7 @@ sub ModbusTrovis5576_Initialize($) {
     	<li>Common Data:<ul>
 	    	<li><b>Modellnummer</b>: Shows the modelnumber. Should be "5576".</li>
 	    	<li><b>Aussen_Temp</b>: Shows the currently measured outside temperature in °C.</li>
+	    	<li><b>Fehlerstatusregister_CL1</b>: Shows the current status register (CL1).</li>
 	    </ul></li>
     	
     	<li>Regelkreis 1 (Usually Wallmounted-Heatings):<ul>
@@ -510,6 +518,7 @@ sub ModbusTrovis5576_Initialize($) {
     	<li>Grundsätzliches:<ul>
 	    	<li><b>Modellnummer</b>: Gibt die gemeldete Modellnummer an. Sollte "5576" sein.</li>
 	    	<li><b>Aussen_Temp</b>: Gibt die gemessene Aussentemperatur in °C an.</li>
+	    	<li><b>Fehlerstatusregister_CL1</b>: Gibt den Zustand des aktuellen Status Register zurück.</li>
 	    </ul></li>
     	
     	<li>Regelkreis 1 (Normalerweise Wandheizkörper):<ul>
