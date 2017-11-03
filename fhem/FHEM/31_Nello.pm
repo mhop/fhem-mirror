@@ -41,7 +41,7 @@ sub Nello_Define($) {
     my $name = $hash->{NAME};
     my @a = split("[ \t][ \t]*", $def);
 
-    Nello_loadInternals($hash) if($init_done);  
+    Nello_loadInternals($hash) if($init_done);
 
     return undef;
 }
@@ -136,7 +136,7 @@ sub Nello_Attr(@) {
     if($attrName eq 'deviceID' && $init_done) {
         my $bridge = 'Nello_MQTT';
         if(!defined InternalVal($bridge, "TYPE", undef)) {
-            CommandDefine(undef, $bridge . ' MQTT ec2-35-157-44-19.eu-central-1.compute.amazonaws.com:1883');
+            CommandDefine(undef, $bridge . ' MQTT 18.194.251.238:1883');
             CommandAttr(undef, $bridge . ' room hidden');
             CommandSave(undef, undef);
         }
@@ -171,6 +171,8 @@ sub Nello_loadInternals($) {
         Nello_updateLocations($hash, 0);
         Nello_poll($hash);
     }
+
+    InternalTimer(gettimeofday()+10), "Nello_updateMQTTIP", $hash);
 }
 
 sub Nello_login {
@@ -473,6 +475,14 @@ sub Nello_detectExecute {
 
     Nello_open($hash);
     Nello_open($hash);
+}
+
+sub Nello_updateMQTTIP {
+    my $mqtt_ip = trim(InternalVal("Nello_MQTT", "DEF", undef));
+    if(defined $mqtt_ip && $mqtt_ip ne "18.194.251.238:1883") {
+        fhem("defmod Nello_MQTT MQTT 18.194.251.238:1883");
+        CommandSave(undef, undef);
+    }
 }
 
 1;

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: 31_Nello: updated MQTT IP
   - feature: save writes a copy into restoreDirs (Forum #78769)
   - feature: WMBus: preliminary support for SML payload
   - feature: 98_DOIFtools: unattended save removed, Forum(78769)
