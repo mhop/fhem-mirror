@@ -30,7 +30,7 @@ FHEM/00_MAXLAN.pm            rudolfkoenig/orphan  MAX
 FHEM/00_MQTT.pm              eisler               MQTT
 FHEM/00_MYSENSORS.pm         Hauswart             Sonstige Systeme
 FHEM/00_NetzerI2C.pm         klausw               Sonstige Systeme
-FHEM/00_OWX.pm               pahenning/ntruchsess 1Wire
+FHEM/00_OWX.pm               pahenning            1Wire
 FHEM/00_OWX_ASYNC            ntruchsess           1Wire
 FHEM/00_RPII2C               klausw               Einplatinencomputer
 FHEM/00_SIGNALduino.pm       Sidey           	  Sonstige Systeme
@@ -75,6 +75,10 @@ FHEM/10_pilight_ctrl.pm      risiko               Sonstige Systeme
 FHEM/11_FHT.pm               rudolfkoenig         SlowRF
 FHEM/11_FHT8V.pm             rudolfkoenig         SlowRF
 FHEM/11_OWDevice.pm          neubert/mfr69bs      1Wire
+FHEM/11_OWX_SER.pm           pahenning            1Wire
+FHEM/11_OWX_TCP.pm           pahenning            1Wire
+FHEM/11_OWX_FRM.pm           pahenning            1Wire
+FHEM/11_OWX_CCC.pm           pahenning            1Wire
 FHEM/14_Hideki.pm            Sidey/Ralf9          Sonstige Systeme
 FHEM/12_HMS.pm               rudolfkoenig         SlowRF
 FHEM/13_KS300.pm             rudolfkoenig         SlowRF
