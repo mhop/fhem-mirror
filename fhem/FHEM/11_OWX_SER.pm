@@ -30,6 +30,12 @@
 # SearchLow
 #
 ########################################################################################
+#
+# $hash->{DeviceName}   = USB-Device
+# $hash->{INTERFACE}    = "DS2480"; 
+# $hash->{TYPE}         = "OWX";      
+#
+########################################################################################
 
 package OWX_SER;
 
@@ -83,11 +89,10 @@ sub Define ($) {
     
     #-- store with OWX device
     $hash->{DeviceName}   = $dev;
-    $hash->{INTERFACE}    = "serial";
     $hash->{ASYNCHRONOUS} = 0;  
   
     #-- module version
-	$hash->{version}      = "7.01";
+	$hash->{version}      = "7.04";
     main::Log3 $hash->{NAME},1,"OWX_SER::Define warning: version ".$hash->{version}." not identical to OWX version ".$main::owx_version
       if( $hash->{version} ne $main::owx_version);
       

@@ -26,13 +26,19 @@
 # firmata_to_device
 #
 ########################################################################################
+#
+# $hash->{DeviceName}   =  <firmata-device>:<firmata-pin>
+# $hash->{INTERFACE}    = "firmata";    
+# $hash->{HWDEVICE}     = <firmata-device> 
+# $hash->{PIN}          = <firmata-pin> 
+# $hash->{TYPE}         = "OWX";   
+#  
+########################################################################################
 
 package OWX_FRM;
 
 use strict;
 use warnings;
-
-use Data::Dumper;
 
 use Device::Firmata::Constants qw/ :all /;
 
@@ -85,21 +91,20 @@ sub Define($) {
 	#main::AssignIoPort($hash);
 	  
 	#-- store with OWX device
-    #$hash->{DeviceName}   = $dev;
+    $hash->{DeviceName}   = $a[2];
     $hash->{INTERFACE}    = "firmata";
     $hash->{HWDEVICE}     = $fdev;
     $hash->{PIN}          = $pin;
     $hash->{ASYNCHRONOUS} = 0;  
   
     #-- module version
-	$hash->{version}      = "7.03";
+	$hash->{version}      = "7.04";
     main::Log3 $hash->{NAME},1,"OWX_FRM::Define warning: version ".$hash->{version}." not identical to OWX version ".$main::owx_version
       if( $hash->{version} ne $main::owx_version);
    
     #-- call low level init function for the device
     main::InternalTimer(time()+55, "OWX_FRM::Init", $self,0);
     return undef;
-
 }
 
 ########################################################################################
@@ -183,7 +188,8 @@ sub Init() {
   my $pin    = $hash->{PIN};
   my $msg;
   
-  main::Log 1,"==================> STARTING INIT of 11_OWX_FRM";
+  #main::Log 1,"==================> STARTING INIT of 11_OWX_FRM";
+  select(undef,undef,undef,0.01);
   
   my @args = ($pin);  
   $hash->{IODev} = $main::defs{$hash->{HWDEVICE}};

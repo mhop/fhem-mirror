@@ -5,7 +5,7 @@
 # * via an active DS2480 bus master interface attached to a TCP/IP-UART device
 # * via a network-attached CUNO
 # * via a COC attached to a Raspberry Pi
-# * via an Arduino running OneWireFirmata attached to USB
+# * via an Arduino running OneWireFirmata
 #
 # Prof. Dr. Peter A. Henning
 #
@@ -54,7 +54,7 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 # 1-Wire devices 
 # http://owfs.sourceforge.net/family.html
 %owg_family = (
-  "01"  => ["DS2401/DS1990A","OWID DS2401"],
+  "01"  => ["DS2401/DS2411/DS1990A","OWID DS2401"],
   "05"  => ["DS2405","OWID DS2405"],
   "09"  => ["DS2502","OWID DS2502"],
   "10"  => ["DS18S20/DS1920","OWTHERM DS1820"],
@@ -81,21 +81,16 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 %gets = (
    "alarms"  => "A",
    "devices" => "D",
-   "qstatus" => "Q",
    "version" => "V"
 );
 
 #-- These occur in a pulldown menu as settable values for the bus master
 %sets = (
-   "close" => "c", "open" => "o", "closeopen" => "co" ,"reopen"       => "R",
-   "discover"     => "C",
-   "detect"       => "T",
-   "disconnected" => "D",
-   "process"      => "P"
+   "reopen"  => "R"
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version="7.03";
+$owx_version="7.04";
 
 #-- debugging now verbosity, this is just for backward compatibility
 $owx_debug=0;
@@ -115,13 +110,11 @@ $owx_debug=0;
 sub OWX_Initialize ($) {
   my ($hash) = @_;
 
-  #-- Provider
   $hash->{Clients} = ":OWAD:OWCOUNT:OWID:OWLCD:OWMULTI:OWSWITCH:OWTHERM:OWVAR:";
   $hash->{WriteFn} = "OWX_Write";
   $hash->{ReadFn}  = "OWX_Read";
   $hash->{ReadyFn} = "OWX_Ready";
 
-  #-- Consumer
   $hash->{DefFn}   = "OWX_Define";
   $hash->{UndefFn} = "OWX_Undef";
   $hash->{GetFn}   = "OWX_Get";
@@ -183,7 +176,7 @@ sub OWX_Define ($$) {
     $hwdevice = OWX_TCP->new($hash);
     
   #-- check if we have an i2c interface attached  
-  }elsif( $dev =~ m|\d\:\d\d| ){
+  }elsif( $dev =~ m|^\d\:\d\d| ){
     require "$attr{global}{modpath}/FHEM/11_OWX_I2C.pm";
     $hwdevice = OWX_I2C->new($hash);
     
@@ -693,24 +686,6 @@ sub OWX_Get($@) {
     my $res = OWX_Discover($hash);
     #-- process result
     return $res
-        
-  } elsif( $a[1] eq "qstatus") {
-    my $qlen  = ($hash->{QUEUE} ? scalar(@{$hash->{QUEUE}}) : 0);
-    my $state =  $hash->{STATE};
-    my $dev   =  $hash->{DeviceName};
-    my $busy  = ($hash->{BUSY})? "BUSY" : "NOT BUSY";
-    my $block = ($hash->{BLOCK})? "BLOCKED" : "NOT BLOCKED";
-    $hash->{BUSY} = 1;
-    
-    
-    my $rout='';
-    my $hash2 = $selectlist{'OWX_WIFI.192.168.0.97:23'};
-    my $vc = vec($rout, $hash2->{FD}, 1);
-    my $res = "OWX: Queue $name: => dev=$dev vc=$vc length=$qlen, state=$state, $busy, $block\n";
-    foreach my $diapoint (@{$hash->{QUEUE}}) {  
-      $res .= "    => ".$diapoint->{owx_dev}." context ".$diapoint->{context}." expecting ".$diapoint->{numread}." bytes, ".$diapoint->{status}."\n";
-    }
-    return $res;
     
   } elsif( $a[1] eq "version") {
     return $owx_version;
@@ -1008,17 +983,10 @@ sub OWX_Ready($) {
 	}
 	return undef;	
   }
-    
-  #-- If we are here, we are disconnected
-  #return DevIo_OpenDev($hash, 1, undef ) if ( $hash->{STATE} eq "disconnected" );
-  #return DevIo_OpenDev($hash,1,"main::OWX_Init") if ( $hash->{STATE} eq "disconnected" );
 		
   #-- get the interface
   my $owx  = $hash->{OWX};
   my $name = $hash->{NAME};
-  
-  #Log3 $name,1,"OWX_Ready called for $name";
-  
   my $time     = time();
   
   #-- skip this if delay time is not yet over
@@ -1056,60 +1024,15 @@ sub OWX_Set($@) {
   #-- for the selector: which values are possible
   return join(" ", sort keys %sets)
     if(!defined($sets{$a[0]}));
-  #return "OWX_Set: With unknown argument $a[0], choose one of " . join(" ", sort keys %sets)
-  #  if(!defined($sets{$a[0]}));
-  
-  #-- Set closedev
-  if( $a[0] eq "close" ){
-    OWX_WDBGL($name,1,"====> CLOSING DEVICE",main::DevIo_CloseDev($hash));
-    $res = 0;
-  }
-  
-  #-- Set opendev
-  if( $a[0] eq "open" ){
-    OWX_WDBGL($name,1,"====> OPENING DEVICE",main::DevIo_OpenDev($hash,0,undef));
-    $res = 0;
-  }
-  
-  #-- Set closeopendev
-  if( $a[0] eq "closeopen" ){
-    OWX_WDBGL($name,1,"====> CLOSING DEVICE",main::DevIo_CloseDev($hash));
-    OWX_WDBGL($name,1,"      OPENING DEVICE",main::DevIo_OpenDev($hash, 0, undef));  
-  }
+  return "OWX_Set: With unknown argument $a[0], choose one of " . join(" ", sort keys %sets)
+    if(!defined($sets{$a[0]}));
   
   #-- Set reopen
   if( $a[0] eq "reopen" ){
-    OWX_WDBGL($name,1,"====> REOPENING DEVICE",main::DevIo_OpenDev($hash, 1, undef));
+    DevIo_OpenDev($hash, 1, undef);
     $res = 0;
   }
-  
-  #-- Set discover
-  if( $a[0] eq "discover" ){
-    OWX_Discover($hash);
-    $res = 0;
-  }
-  
-  #-- Set detect
-  if( $a[0] eq "detect" ){
-    my $owx = $hash->{OWX};
-    $owx->Detect();
-    $res = 0;
-  }
-  
-  if( $a[0] eq "process") {
-    my $res = OWX_PrQueue("queue:$name");
-    #-- process result
-    return $res
-  }
-  
-  #-- Set reopen
-  if( $a[0] eq "disconnected" ){
-    main::DevIo_Disconnected($hash);
-    $res = 0;
-  }
-  
   Log3 $name, 3, "OWX_Set $name ".join(" ",@a)." => $res";  
- # DoTrigger($name, undef) if($init_done);
 }
 
 ########################################################################################
@@ -1669,7 +1592,7 @@ sub OWX_WDBGL($$$$) {
 =pod
 =item helper
 =item summary to commmunicate with 1-Wire bus devices
-=item summary_DE zur Kommunikationm mit 1-Wire Geräten
+=item summary_DE zur Kommunikation mit 1-Wire Geräten
 =begin html
 
 <a name="OWX"></a>
@@ -1680,44 +1603,24 @@ sub OWX_WDBGL($$$$) {
                 port or </li>
             <li>via an active DS2480 bus master interface attached to  a TCP/IP-UART interface </li>
             <li>via a network-attached CUNO or through a COC on the RaspBerry Pi</li>
-            <li>via an Arduino running OneWireFirmata attached to USB</li>
+            <li>via an Arduino running OneWireFirmata</li>
         </ul> Internally these interfaces are vastly different, read the corresponding <a
             href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire"> Wiki pages </a>. 
             The passive DS9097 interface is no longer suppoorted.
         <br />
         <br />
-        <h4>Example</h4><br />
-        <p>
-            <code>define OWio1 OWX /dev/ttyUSB1</code>
-            <br />
-            <code>define OWio2 OWX COC</code>
-            <br />
-            <code>define OWio3 OWX FIRMATA:10</code>
-            <br />
-        </p>
-        <br />
         <a name="OWXdefine"></a>
         <h4>Define</h4>
-        <p>
-            <code>define &lt;name&gt; OWX &lt;serial-device&gt;</code> or <br />
-            <code>define &lt;name&gt; OWX &lt;tcpip&gt;[:&lt;port&gt;]</code> or <br />
-            # define <name> OWX <TCP/IP-device> for TCP/IP-UART interfaces or
-            <code>define &lt;name&gt; OWX &lt;cuno/coc-device&gt;</code> or <br />
-            <code>define &lt;name&gt; OWX &lt;firmata-device&gt;:&lt;firmata-pin&gt;</code>
-            <br /><br /> Define a 1-Wire interface to communicate with a 1-Wire bus.<br />
-            <br />
-        </p>
+        <p>To define a 1-Wire interface to communicate with a 1-Wire bus, several possibilities exist:
         <ul>
-            <li>
-                <code>&lt;serial-device&gt;</code> The serial device (e.g. USB port) to which the
-                1-Wire bus is attached.</li>
-            <li>
-                <code>&lt;cuno-device&gt;</code> The previously defined CUNO to which the 1-Wire bus
-                is attached. </li>
-            <li>
-                <code>&lt;arduino-pin&gt;</code> The pin of the previous defined <a href="#FRM">FRM</a>
-                to which the 1-Wire bus is attached. If there is more than one FRM device defined
-                use <a href="#IODev">IODev</a> attribute to select which FRM device to use.</li>
+            <li><code>define &lt;name&gt; OWX &lt;serial-device&gt;</code>, i.e. specify the serial device (e.g. USB port) to which the
+                1-Wire bus is attached, for example <code>define OWio1 OWX /dev/ttyUSB1</code>.</li>
+            <li><code>define &lt;name&gt; OWX &lt;tcpip&gt;[:&lt;port&gt;]</code>, i.e. specify the IP address and port to which the 1-Wire bus is attached, 
+                for example <code>define OWio1 OWX 192.168.0.1:23</code>. Attention: no socat program needed. </li>
+            <li><code>define &lt;name&gt; OWX &lt;cuno/coc-device&gt;</code>, i.e. specify the previously defined COC/CUNO to which the 1-Wire bus
+                is attached, forexample <code>define OWio2 OWX COC</code></li>
+            <li><code>define &lt;name&gt; OWX &lt;firmata-device&gt;:&lt;firmata-pin&gt;</code>, i.e. specify the name and 1-Wire pin of the previously defined <a href="#FRM">FRM</a>
+                device to which the 1-Wire bus is attached, for example <code>define OWio3 OWX FIRMATA:10</code>.</li>
         </ul>
         <br />
         <a name="OWXset"></a>
@@ -1726,7 +1629,7 @@ sub OWX_WDBGL($$$$) {
             <li><a name="owx_reopen">
                     <code>set &lt;name&gt; reopen</code>
                 </a>
-                <br />re-initializes the 1-Wire bus.
+                <br />re-opens the interface ans re-initializes the 1-Wire bus.
             </li>
         </ul>
         <br />
@@ -1735,14 +1638,17 @@ sub OWX_WDBGL($$$$) {
         <ul>
             <li><a name="owx_alarms"></a>
                 <code>get &lt;name&gt; alarms</code>
-                <br /><br /> performs an "alarm search" for devices on the 1-Wire bus and, if found,
+                <br />performs an "alarm search" for devices on the 1-Wire bus and, if found,
                 generates an event in the log (not with CUNO). </li>
             <li><a name="owx_devices"></a>
                 <code>get &lt;name&gt; devices</code>
-                <br /><br /> redicovers all devices on the 1-Wire bus. If a device found has a
+                <br />redicovers all devices on the 1-Wire bus. If a device found has a
                 previous definition, this is automatically used. If a device is found but has no
                 definition, it is autocreated. If a defined device is not on the 1-Wire bus, it is
                 autodeleted. </li>
+            <li><a name="owx_version"></a>
+                <code>get &lt;name&gt; version</code>
+                <br />internal version number</li>
         </ul>
         <br />
         <a name="OWXattr"></a>
@@ -1759,9 +1665,6 @@ sub OWX_WDBGL($$$$) {
                 and to make an alarm check; if 0 (default) then not</li>         
             <li><a name="OWXinterval"><code>attr &lt;name&gt; interval &lt;number&gt;</code></a>
                 <br />time interval in seconds for kicking temperature sensors and checking for alarms, default 300 s</li>
-            <li><a name="OWXIODev"><code>attr &lt;name&gt; IODev <FRM-device></code></a>
-                <br />assignes a specific FRM-device to OWX when working through an Arduino. 
-                Required only if there is more than one FRM defined.</li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
 =end html

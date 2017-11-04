@@ -31,6 +31,12 @@
 # SearchLow
 #
 ########################################################################################
+#
+# $hash->{DeviceName}   =  <ip-addresse>:port
+# $hash->{INTERFACE}    = "DS2480";    
+# $hash->{TYPE}         = "OWX";   
+#  
+########################################################################################
 
 package OWX_TCP;
 
@@ -86,7 +92,7 @@ sub Define ($) {
     $hash->{ASYNCHRONOUS} = 0;
     
     #-- module version
-	$hash->{version}      = "7.01";
+	$hash->{version}      = "7.04";
     main::Log3 $hash->{NAME},1,"OWX_TCP::Define warning: version ".$hash->{version}." not identical to OWX version "..$main::owx_version
       if( $hash->{version} ne $main::owx_version );
       
@@ -200,10 +206,6 @@ sub Complex ($$$$) {
   
   my $select;
   my $res;
-  
-  #-- get the interface
-  my $interface = $hash->{INTERFACE};
-  my $hwdevice  = $hash->{HWDEVICE};
   
   #-- has match ROM part
   if( $dev ){
@@ -634,8 +636,6 @@ sub Search ($) {
   my ($self,$mode)=@_;
   my $hash = $self->{hash};
   my $name = $hash->{NAME};
-  my $interface = $hash->{INTERFACE};
-  my $hwdevice  = $hash->{HWDEVICE};
   
   my @owx_fams=();
  

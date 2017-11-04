@@ -26,6 +26,13 @@
 # Write
 #
 ########################################################################################
+#
+# $hash->{DeviceName}   =  
+# $hash->{INTERFACE}    = "COC/CUNO"; 
+# $hash->{HWDEVICE}     =     
+# $hash->{TYPE}         = "OWX";   
+#  
+########################################################################################
 
 package OWX_CCC;
 
@@ -44,7 +51,7 @@ sub new($) {
 	return bless {
 		hash => $hash,
 	    #-- module version
-		version => "7.01"
+		version => "7.04"
 	}, $class;
 }
 
