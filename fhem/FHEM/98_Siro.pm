@@ -61,10 +61,11 @@
 # 0.43 2017-10-19	Byte attr "invers_position[0/1]" eingefügt. Invertiert positionsanzeige und anfahrt 0 -> 100% = rollo geschlossen - 1 -> 0% =rollo geschlossen
 # 0.44 2017-10-19	Byte bugfix -> set favorite. Unterscheidung ob "time_down_to_favorite" gesetzt oder nicht. ( interpretation :favorite programmiert oder nicht ) - entsprechende anpassung des kommandos ( erst löschen -> dann speichern )
 # 0.45 2017-10-28	Byte fehler bei erneutem Kommando während Positionsanfahrten behoben
+# 0.46 2017-05-11	Byte fehler bei fhem-neustart behoben
 ################################################################################################################
 # Todo's:
-# - komplette "logs" überarbeiten (Was/Wann - Priorität)
-# - state action bie down to position und invers 1 falsch
+# - 
+# - 
 ###############################################################################################################
 
 
@@ -73,7 +74,7 @@ package main;
 
 use strict;
 use warnings;
-my $version = "V 0.45";
+my $version = "V 0.46";
 
 my %codes = (
 	"55" => "stop",			# Stop the current movement or move to custom position
