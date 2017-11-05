@@ -92,7 +92,7 @@ sub Define ($) {
     $hash->{ASYNCHRONOUS} = 0;
     
     #-- module version
-	$hash->{version}      = "7.04";
+	$hash->{version}      = "7.05";
     main::Log3 $hash->{NAME},1,"OWX_TCP::Define warning: version ".$hash->{version}." not identical to OWX version "..$main::owx_version
       if( $hash->{version} ne $main::owx_version );
       
@@ -836,7 +836,7 @@ sub SearchLow ($) {
 1;
 
 =pod
-=item helper
+=item device
 =item summary to address an OWX interface device via TCP/IP
 =item summary_DE zur Adressierung eines OWX Interface Device mit TCP/IP
 =begin html
@@ -844,7 +844,7 @@ sub SearchLow ($) {
 <a name="OWX_TCP"></a>
 <h3>OWX_TCP</h3>
 See <a href="/fhem/docs/commandref.html#OWX">OWX</a>
-end html
+=end html
 =begin html_DE
 
 <a name="OWX_TCP"></a>

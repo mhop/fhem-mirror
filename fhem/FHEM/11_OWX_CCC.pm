@@ -51,7 +51,7 @@ sub new($) {
 	return bless {
 		hash => $hash,
 	    #-- module version
-		version => "7.04"
+		version => "7.05"
 	}, $class;
 }
 
@@ -591,7 +591,7 @@ sub Write(@) {
 1;
 
 =pod
-=item helper
+=item device
 =item summary to address an OWX interface device via COC/CUNO
 =item summary_DE zur Adressierung eines OWX Interface Device mit COC/CUNO
 =begin html
@@ -599,7 +599,7 @@ sub Write(@) {
 <a name="OWX_CCC"></a>
 <h3>OWX_CCC</h3>
 See <a href="/fhem/docs/commandref.html#OWX">OWX</a>
-end html
+=end html
 =begin html_DE
 
 <a name="OWX_CCC"></a>

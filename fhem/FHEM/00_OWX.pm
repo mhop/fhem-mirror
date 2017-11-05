@@ -81,16 +81,24 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 %gets = (
    "alarms"  => "A",
    "devices" => "D",
-   "version" => "V"
+   "version" => "V",
+   "qstatus" => "P"
 );
 
 #-- These occur in a pulldown menu as settable values for the bus master
 %sets = (
-   "reopen"  => "R"
+   "close"        => "c", 
+   "open"         => "o", 
+   "closeopen"    => "co" ,
+   "reopen"       => "R",
+   "discover"     => "C",
+   "detect"       => "T",
+   "disconnected" => "D",
+   "process"      => "P"
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version="7.04";
+$owx_version="7.05";
 
 #-- debugging now verbosity, this is just for backward compatibility
 $owx_debug=0;
@@ -121,7 +129,7 @@ sub OWX_Initialize ($) {
   $hash->{SetFn}   = "OWX_Set";
   $hash->{AttrFn}  = "OWX_Attr";
   $hash->{AttrList}= "asynchronous:0,1 dokick:0,1 ".
-                     "interval timeout opendelay ".
+                     "interval timeout opendelay expert:0_def,1_detail ".
                      $readingFnAttributes;    
 }
 
@@ -690,9 +698,25 @@ sub OWX_Get($@) {
   } elsif( $a[1] eq "version") {
     return $owx_version;
     
+  #-- expert mode
+  } elsif( $a[1] eq "qstatus") {
+    my $qlen  = ($hash->{QUEUE} ? scalar(@{$hash->{QUEUE}}) : 0);
+    my $state =  $hash->{STATE};
+    my $dev   =  $hash->{DeviceName};
+    my $busy  = ($hash->{BUSY})? "BUSY" : "NOT BUSY";
+    my $block = ($hash->{BLOCK})? "BLOCKED" : "NOT BLOCKED";
+    $hash->{BUSY} = 1;
+    my $res = "OWX: Queue $name: => dev=$dev length=$qlen, state=$state, $busy, $block\n";
+    
+    foreach my $diapoint (@{$hash->{QUEUE}}) {  
+      $res .= "    => ".$diapoint->{owx_dev}." context ".$diapoint->{context}." expecting ".$diapoint->{numread}." bytes, ".$diapoint->{status}."\n";
+    }
+    return $res;
+
+    
   } else {
-    return "OWX_Get with unknown argument $a[1], choose one of ". 
-    join(" ", sort keys %gets);
+    return "OWX_Get with unknown argument $a[1], choose one of ".
+    ( (AttrVal($name,"expert","") eq "1_detail") ? join(":noArg ", sort keys %gets).":noArg" : "alarms devices version"); 
   }
 }
 
@@ -1022,9 +1046,10 @@ sub OWX_Set($@) {
   my $res  = 0;
 
   #-- for the selector: which values are possible
-  return join(" ", sort keys %sets)
+  return ( (AttrVal($name,"expert","") eq "1_detail") ? join(":noArg ", sort keys %sets).":noArg" : "reopen:noArg")
     if(!defined($sets{$a[0]}));
-  return "OWX_Set: With unknown argument $a[0], choose one of " . join(" ", sort keys %sets)
+  return "OWX_Set: With unknown argument $a[0], choose one of " .
+     ( (AttrVal($name,"expert","") eq "1_detail") ? join(" ", sort keys %sets) : "reopen")
     if(!defined($sets{$a[0]}));
   
   #-- Set reopen
@@ -1032,6 +1057,51 @@ sub OWX_Set($@) {
     DevIo_OpenDev($hash, 1, undef);
     $res = 0;
   }
+  
+  #-- expert mode
+  #-- Set closedev
+  if( $a[0] eq "close" ){
+    OWX_WDBGL($name,1,"====> CLOSING DEVICE",main::DevIo_CloseDev($hash));
+    $res = 0;
+  }
+  
+  #-- Set opendev
+  if( $a[0] eq "open" ){
+    OWX_WDBGL($name,1,"====> OPENING DEVICE",main::DevIo_OpenDev($hash,0,undef));
+    $res = 0;
+  }
+  
+  #-- Set closeopendev
+  if( $a[0] eq "closeopen" ){
+    OWX_WDBGL($name,1,"====> CLOSING DEVICE",main::DevIo_CloseDev($hash));
+    OWX_WDBGL($name,1,"      OPENING DEVICE",main::DevIo_OpenDev($hash, 0, undef));  
+  }
+  
+  #-- Set reopen
+  if( $a[0] eq "reopen" ){
+    OWX_WDBGL($name,1,"====> REOPENING DEVICE",main::DevIo_OpenDev($hash, 1, undef));
+    $res = 0;
+  }
+  
+  #-- Set discover
+  if( $a[0] eq "discover" ){
+    OWX_Discover($hash);
+    $res = 0;
+  }
+  
+  #-- Set detect
+  if( $a[0] eq "detect" ){
+    my $owx = $hash->{OWX};
+    $owx->Detect();
+    $res = 0;
+  }
+
+  if( $a[0] eq "process") {
+    my $res = OWX_PrQueue("queue:$name");
+    #-- process result
+    return $res
+  }
+
   Log3 $name, 3, "OWX_Set $name ".join(" ",@a)." => $res";  
 }
 
@@ -1590,7 +1660,7 @@ sub OWX_WDBGL($$$$) {
 1;
 
 =pod
-=item helper
+=item device
 =item summary to commmunicate with 1-Wire bus devices
 =item summary_DE zur Kommunikation mit 1-Wire Geräten
 =begin html
@@ -1607,22 +1677,19 @@ sub OWX_WDBGL($$$$) {
         </ul> Internally these interfaces are vastly different, read the corresponding <a
             href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire"> Wiki pages </a>. 
             The passive DS9097 interface is no longer suppoorted.
-        <br />
-        <br />
         <a name="OWXdefine"></a>
         <h4>Define</h4>
         <p>To define a 1-Wire interface to communicate with a 1-Wire bus, several possibilities exist:
         <ul>
             <li><code>define &lt;name&gt; OWX &lt;serial-device&gt;</code>, i.e. specify the serial device (e.g. USB port) to which the
-                1-Wire bus is attached, for example <code>define OWio1 OWX /dev/ttyUSB1</code>.</li>
-            <li><code>define &lt;name&gt; OWX &lt;tcpip&gt;[:&lt;port&gt;]</code>, i.e. specify the IP address and port to which the 1-Wire bus is attached, 
-                for example <code>define OWio1 OWX 192.168.0.1:23</code>. Attention: no socat program needed. </li>
+                1-Wire bus is attached, for example<br/><code>define OWio1 OWX /dev/ttyUSB1</code></li>
+            <li><code>define &lt;name&gt; OWX &lt;tcpip&gt;[:&lt;port&gt;]</code>, i.e. specify the IP address and port to which the 1-Wire bus is attached. Attention: no socat program needed. 
+                Example:<br/><code>define OWio1 OWX 192.168.0.1:23</code></li>
             <li><code>define &lt;name&gt; OWX &lt;cuno/coc-device&gt;</code>, i.e. specify the previously defined COC/CUNO to which the 1-Wire bus
-                is attached, forexample <code>define OWio2 OWX COC</code></li>
+                is attached, for example<br/><code>define OWio2 OWX COC</code></li>
             <li><code>define &lt;name&gt; OWX &lt;firmata-device&gt;:&lt;firmata-pin&gt;</code>, i.e. specify the name and 1-Wire pin of the previously defined <a href="#FRM">FRM</a>
-                device to which the 1-Wire bus is attached, for example <code>define OWio3 OWX FIRMATA:10</code>.</li>
+                device to which the 1-Wire bus is attached, for example<br/><code>define OWio3 OWX FIRMATA:10</code></li>
         </ul>
-        <br />
         <a name="OWXset"></a>
         <h4>Set</h4>
         <ul>
@@ -1639,7 +1706,7 @@ sub OWX_WDBGL($$$$) {
             <li><a name="owx_alarms"></a>
                 <code>get &lt;name&gt; alarms</code>
                 <br />performs an "alarm search" for devices on the 1-Wire bus and, if found,
-                generates an event in the log (not with CUNO). </li>
+                generates an event in the log (not with all interface types). </li>
             <li><a name="owx_devices"></a>
                 <code>get &lt;name&gt; devices</code>
                 <br />redicovers all devices on the 1-Wire bus. If a device found has a
