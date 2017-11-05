@@ -46,7 +46,7 @@ package main;
 use strict;
 use warnings;
 
-use Net::SSH::Perl;
+use Net::OpenSSH;
 use Data::Dumper qw(Dumper);
 use Math::Expression::Evaluator;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
@@ -589,7 +589,7 @@ sub UpsPico_CheckConnection($@)
 			#### Try out with factory default address
 			$cmd  = "sudo i2cget -y 1 0x69 0x00 b";
 			($stdout, $stderr, $exit) = $ssh->cmd($cmd);
-			if(defined($stderr)) { Log3 $name, 5, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x69 - stderr        : " . $stderr;}
+			if(defined($stderr)) { Log3 $name, 2, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x69 - stderr        : " . $stderr;}
 			if(defined($exit))   { Log3 $name, 5, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x69 - exit          : " . $exit;  }
 			if(defined($stdout)) { Log3 $name, 5, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x69 - stdout        : " . $stdout;}
 			Log3 $name, 5, $name. " : UpsPico - CheckConnection ----------------------------------------------------------";
@@ -601,7 +601,7 @@ sub UpsPico_CheckConnection($@)
 				#### Try out whether RTC register are available
 				$cmd  = "sudo i2cget -y 1 0x6A 0x00 b";
 				($stdout, $stderr, $exit) = $ssh->cmd($cmd);
-				if(defined($stderr)) { Log3 $name, 5, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x6A - stderr        : " . $stderr;}
+				if(defined($stderr)) { Log3 $name, 2, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x6A - stderr        : " . $stderr;}
 				if(defined($exit))   { Log3 $name, 5, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x6A - exit          : " . $exit;  }
 				if(defined($stdout)) { Log3 $name, 5, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x6A - stdout        : " . $stdout;}
 				Log3 $name, 5, $name. " : UpsPico - CheckConnection ----------------------------------------------------------";
@@ -634,7 +634,7 @@ sub UpsPico_CheckConnection($@)
 				#### Try out with alternate address
 				$cmd  = "sudo i2cget -y 1 0x59 0x00 b";
 				($stdout, $stderr, $exit) = $ssh->cmd($cmd);
-				if(defined($stderr)) { Log3 $name, 5, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x5A - stderr        : " . $stderr;}
+				if(defined($stderr)) { Log3 $name, 2, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x5A - stderr        : " . $stderr;}
 				if(defined($exit))   { Log3 $name, 5, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x5A - exit          : " . $exit;  }
 				if(defined($stdout)) { Log3 $name, 5, $name. " : UpsPico - CheckConnection - Obtain I2C range with 0x5A - stdout        : " . $stdout;}
 				Log3 $name, 5, $name. " : UpsPico - CheckConnection ----------------------------------------------------------";
@@ -657,7 +657,7 @@ sub UpsPico_CheckConnection($@)
 				### Otherwise there is no UpsPIco connection available
 				else
 				{
-					Log3 $name, 1, $name. " : UpsPico - CheckConnection - Connection to UPS-PIco could not be established. Terminating Initialisation!";
+					Log3 $name, 2, $name. " : UpsPico - CheckConnection - Connection to UPS-PIco could not be established. Terminating Initialisation!";
 					###Set fullResponse error message
 					readingsSingleUpdate( $hash, "fullResponse", "Error I2C-connection failed.  Check connection and re-define device.", 1);
 					
@@ -855,7 +855,7 @@ sub UpsPico_GetAllData($@)
 			($stdout, $stderr, $exit) = $ssh->cmd($SshCmd);
 
 			### For debugging purposes only
-			if(defined($stderr)) { Log3 $name, 5, $name. " : UpsPico_GetAllData    - stderr " . $RegisterI2CBlock . "       : "   . $stderr; }
+			if(defined($stderr)) { Log3 $name, 2, $name. " : UpsPico_GetAllData    - stderr " . $RegisterI2CBlock . "       : "   . $stderr; }
 			if(defined($exit))   { Log3 $name, 5, $name. " : UpsPico_GetAllData    - exit   " . $RegisterI2CBlock . "       : "   . $exit;   }
 			if(defined($stdout)) { Log3 $name, 5, $name. " : UpsPico_GetAllData    - stdout " . $RegisterI2CBlock . "       : \n" . $stdout; }
 			Log3 $name, 5, $name. " : UpsPico_GetAllData ------------------------------------------------------------------------------------";
@@ -1023,7 +1023,7 @@ sub UpsPico_GetAllData($@)
 						($stdout, $stderr, $exit) = $ssh->cmd($SshCmdStatus);
 											   Log3 $name, 4, $name. " : UpsPico_GetAllData    - Resetting Register to 0x00 for                   : "   . $RegisterName;
 						                       Log3 $name, 5, $name. " : UpsPico_GetAllData    - SshCmdStatus                                     : "   . $SshCmdStatus;
-						if(defined($stderr)) { Log3 $name, 5, $name. " : UpsPico_GetAllData    - stderr Reset                                     : "   . $stderr;      }
+						if(defined($stderr)) { Log3 $name, 2, $name. " : UpsPico_GetAllData    - stderr Reset                                     : "   . $stderr;      }
 						if(defined($exit))   { Log3 $name, 5, $name. " : UpsPico_GetAllData    - exit   Reset                                     : "   . $exit;        }
 						if(defined($stdout)) { Log3 $name, 5, $name. " : UpsPico_GetAllData    - stdout Reset                                     : \n" . $stdout;      }
 						                       Log3 $name, 5, $name. " : UpsPico_GetAllData ------------------------------------------------------------------------------------";
