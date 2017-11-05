@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 98_Dooya: updated module
   - new:     98_Siro: New module for Siro blinds
   - bugfix:  73_UpsPico: Swap to Net::OpenSSH module and error message handling
   - changed: 37_harmony: added set inactive/active commands

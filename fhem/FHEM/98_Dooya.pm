@@ -15,11 +15,11 @@
 # 1.00	2016-03-12	darkmission	autocreate, parse communication from SIGNALduino for correct position when using remote from doooya 
 # 1.10  2016-03-13	Ralf9		changed SendCommand with sendMsg
 # 1.11  2016-03-17	Ralf9   	ID + Channel = DeviceCode
-# 1.12  2016-04-26  Jarnsen     im Dooya parse cmd geändert
-#
+# 1.12  2016-04-26      Jarnsen     im Dooya parse cmd geändert
+# 1.13	2017-08-26	darkmission	Update state when called by remote, little code cleaning (setlist and go-my deleted), some more debug messages
+
 #TODOS:
 # - Groups, diff by channels
-#
 # 
 ######################################################
 
@@ -46,8 +46,8 @@ my %sets = (
 	"prog" => "noArg",
 #	"on-for-timer" => "textField",
 #	"off-for-timer" => "textField",
-	"pos" => "0,10,20,30,40,50,60,70,80,90,100"    # Todo: Warum nicht als Slider?
-#	"pos" => "slider,0,10,100"
+#	"pos" => "0,10,20,30,40,50,60,70,80,90,100"    # Todo: Warum nicht als Slider?
+	"pos" => "slider,0,10,100"
 );
 
 my %sendCommands = (
@@ -139,7 +139,7 @@ sub Dooya_Initialize($) {
 	  . " drive-up-time-to-open"
 	  . " additionalPosReading"
 	  . " $readingFnAttributes"
-	  . " setList"
+#	  . " setList"
 	  . " ignore:0,1"
 	  . " dummy:1,0"
 #	  . " model:dooyablinds,dooyashutter"
@@ -334,9 +334,9 @@ sub Dooya_Parse($$) {
 					### NEEDS to be deactivated due to the state being maintained by the timer
 					# readingsSingleUpdate($lh, "state", $newstate, 1);
 					readingsSingleUpdate($lh, "parsestate", $newstate, 1);
-
-			Log3 $name, 4, "Dooya_Parse $name $newstate";
-
+					
+					Log3 $name, 4, "Dooya_Parse n:$name ns:$newstate lhn:$lh->{NAME} lht:$lh->{TYPE}";				
+					Dooya_Set( $lh, $name, 'virtual', $newstate );
 			push(@list, $name);
 		}
 		# return list of affected devices
@@ -412,10 +412,14 @@ sub Dooya_Attr(@) {
 # call with hash, name, [virtual/send], set-args   (send is default if ommitted)
 sub Dooya_Set($@) {
 	my ( $hash, $name, @args ) = @_;
-
+	Log3 $name, 4, "Dooya_Set: Called";
+	
 	if ( lc($args[0]) =~m/(virtual|send)/ ) {
+		Log3 $name, 4, "Dooya_InternalSet call $args[0] ";
 		Dooya_InternalSet( $hash, $name, @args );
+
 	} else {
+		Log3 $name, 4, "Dooya_InternalSet call send $hash->{NAME} $hash->{TYPE} $name";
 		Dooya_InternalSet( $hash, $name, 'send', @args );
 	}
 }
@@ -446,14 +450,9 @@ sub Dooya_InternalSet($@) {
 	if(!exists($sets{$cmd})) {
 		my @cList;
 
-    # overwrite %sets with setList
-    my $atts = AttrVal($name,'setList',"");
-    my %setlist = split("[: ][ ]*", $atts);
-
 		foreach my $k (sort keys %sets) {
 			my $opts = undef;
 			$opts = $sets{$k};
-      $opts = $setlist{$k} if(exists($setlist{$k}));
 
       if (defined($opts)) {
 				push(@cList,$k . ':' . $opts);
@@ -487,7 +486,7 @@ sub Dooya_InternalSet($@) {
 
 		### initialize locals
 	my $drivetime = 0; # timings until halt command to be sent for on/off-for-timer and pos <value> -> move by time
-	my $updatetime = 0; # timing until update of pos to be done for any unlimited move move to endpos or go-my / stop
+	my $updatetime = 0; # timing until update of pos to be done for any unlimited move move to endpos stop
 	my $move = $cmd;
 	my $newState;
 	my $updateState;
@@ -566,7 +565,7 @@ sub Dooya_InternalSet($@) {
 				$updateState = 'moving';
 			}
 
-		} elsif($cmd =~m/stop|go-my/) {
+		} elsif($cmd =~m/stop/) {
 			$move = 'stop';
 			$newState = $state
 
@@ -655,7 +654,7 @@ sub Dooya_InternalSet($@) {
 			###				return "Dooya_set: Pos not currently known please open or close first";
 			}
 
-		} elsif($cmd =~m/stop|go-my/) {
+		} elsif($cmd =~m/stop/) {
 			#		update pos according to current detail pos
 			$move = 'stop';
 			
@@ -1145,13 +1144,6 @@ sub Dooya_CalcCurrentPos($$$$) {
         Set the repeats for sending signal. You can use 5, 10, 15 and 20.
     </li><br>
         
-    <a name="setList"></a>
-    <li>setList<br>
-        Space separated list of commands, which will be returned upon "set name ?", 
-        so the FHEMWEB frontend can construct the correct control and command dropdown. Specific controls can be added after a colon for each command
-        <br>
-    </li><br>
-
     <a name="additionalPosReading"></a>
     <li>additionalPosReading<br>
         Position of the shutter will be stored in the reading <code>pos</code> as numeric value. 
