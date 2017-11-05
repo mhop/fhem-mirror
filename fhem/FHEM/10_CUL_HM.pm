@@ -4734,40 +4734,45 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_UpdtReadSingle($hash,"level",$state,1);
   }
   elsif($cmd =~ m/^(pctSlat|pctLvlSlat)$/) { ##################################
+    # pctSlat        =>"[0-100]|old|noChng"
+    # pctLvlSlat     =>"-value-|old|noChng -slatValue-|old|noChng"
     my ($lvl,$slat,$plvl,$pslat);
-
+    return "param missing " if (!defined $a[2]);
+    if ($cmd eq "pctSlat"){
+      $slat = $a[2];
+      $lvl  = "noChng";
+    }
+    else{#"pctLvlSlat"
+      $slat = defined $a[3] ? $a[3] : "noChng";
+      $lvl  = $a[2];
+    }
+    
     #--- calc slat----
-    $slat = $cmd eq "pctSlat" ? $a[2]
-                              : (defined $a[3] ? $a[3] 
-                                               : "noChng");
     if    ($slat eq "old")   {$pslat = "C9"}
     elsif ($slat eq "noChng"){$pslat = "CA"}
     else{                     $slat =~ s/(\d*\.?\d*).*/$1/;
           return "Value $a[2] not allowed for slat" if ($slat > 100);
                               $pslat = sprintf("%02X",$slat*2);
+      CUL_HM_UpdtReadSingle($hash,"levelSlat","set_".$slat,1);
     }
     
     #--- calc level----
-    $lvl  = $cmd eq "pctLvlSlat" ? $a[2] :"noChng";
-    my $lvlInv          = (AttrVal($name, "param", "") =~ m/levelInverse/) ? 1 : 0;
-    my($lvlMin,$lvlMax) = split",",AttrVal($name, "levelRange", "0,100");
-    $lvl = $lvlMin + $lvl*($lvlMax-$lvlMin)/100; # relativ to range
-    $lvl = ($lvl > $lvlMax) ? $lvlMax
-                            : (($lvl <= $lvlMin)?0:$lvl);
     if    ($lvl eq "old")   {$plvl = "C9"}
     elsif ($lvl eq "noChng"){$plvl = "CA"}
-    else{                    $lvl =~ s/(\d*\.?\d*).*/$1/;
-                             $plvl = sprintf("%02X",(($lvlInv) ? 100-$lvl : $lvl)*2);
-    }
-    
-    #--- execute----
-    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."80${chn}$plvl$pslat");
-    
-    CUL_HM_UpdtReadSingle($hash,"levelSlat","set_".$slat,1) if ($slat ne "noChng");
-    if ($lvl  ne "noChng"){
+    else{
+      my $lvlInv          = (AttrVal($name, "param", "") =~ m/levelInverse/) ? 1 : 0;
+      my($lvlMin,$lvlMax) = split",",AttrVal($name, "levelRange", "0,100");
+      $lvl = $lvlMin + $lvl*($lvlMax-$lvlMin)/100; # relativ to range
+      $lvl = ($lvl > $lvlMax) ? $lvlMax
+                              : (($lvl <= $lvlMin)?0:$lvl);
+      $lvl =~ s/(\d*\.?\d*).*/$1/;
+      $plvl = sprintf("%02X",(($lvlInv) ? 100-$lvl : $lvl)*2);
       CUL_HM_UpdtReadSingle($hash,"level","set_".$lvl,1);
       $state = "set_".$lvl;
     }
+
+    #--- execute----
+    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."80${chn}$plvl$pslat");
   }
   
   elsif($cmd eq "stop") { #####################################################
@@ -7817,10 +7822,10 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
   }
   CUL_HM_setTmplDisp($tHash);
 }
-sub CUL_HM_setTmplDisp($){ # remove register i outdated
+sub CUL_HM_setTmplDisp($){ # remove register if outdated
   my $tHash = shift;
   delete $tHash->{READINGS}{$_} foreach (grep /^tmpl_/ ,keys %{$tHash->{READINGS}});
-  if ($tHash->{helper}{expert}{tpl}){
+  if ($tHash->{helper}{expert}{tpl} && defined $HMConfig::culHmTpl){
     foreach (keys %{$tHash->{helper}{tmpl}}){
       my ($p,$t) = split(">",$_);
       
