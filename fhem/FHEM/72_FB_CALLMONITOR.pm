@@ -1348,7 +1348,7 @@ sub FB_CALLMONITOR_requestTR064($$$$;$$)
         return "no password available to access FritzBox. Please set your FRITZ!Box password via 'set ".$hash->{NAME}." password <your password>'";
     }
     
-    my $tr064_base_url = "http://$fb_user:$fb_pw\@$fb_ip:49000";
+    my $tr064_base_url = "http://".urlEncode($fb_user).":".urlEncode($fb_pw)."\@$fb_ip:49000";
     
     $param->{noshutdown} = 1;
     $param->{timeout}    = AttrVal($name, "fritzbox-remote-timeout", 5);
@@ -1365,9 +1365,9 @@ sub FB_CALLMONITOR_requestTR064($$$$;$$)
                                   '</s:Body>'.
                                 '</s:Envelope>';
 
-        $param->{url}        = "$tr064_base_url/upnp/control/deviceinfo";
-        $param->{header}     = "SOAPACTION: urn:dslforum-org:service:DeviceInfo:1#GetSecurityPort\r\nContent-Type: text/xml; charset=utf-8";
-        $param->{data}       = $get_security_port;        
+        $param->{url}    = "$tr064_base_url/upnp/control/deviceinfo";
+        $param->{header} = "SOAPACTION: urn:dslforum-org:service:DeviceInfo:1#GetSecurityPort\r\nContent-Type: text/xml; charset=utf-8";
+        $param->{data}   = $get_security_port;        
 
         Log3 $name, 4, "FB_CALLMONITOR ($name) - request SSL port for TR-064 access via method GetSecurityPort:\n$get_security_port";
         my ($err, $data)    = HttpUtils_BlockingGet($param);        
@@ -1388,16 +1388,16 @@ sub FB_CALLMONITOR_requestTR064($$$$;$$)
         
         if($data =~ /<NewSecurityPort>(\d+)<\/NewSecurityPort>/)
         {
-            $tr064_base_url = "https://$fb_user:$fb_pw\@$fb_ip:$1";
+            $tr064_base_url = "https://".urlEncode($fb_user).":".urlEncode($fb_pw)."\@$fb_ip:$1";
             $hash->{helper}{TR064}{SECURITY_PORT} = $1;
         }
     }
     else
     {
-        $tr064_base_url = "https://$fb_user:$fb_pw\@$fb_ip:".$hash->{helper}{TR064}{SECURITY_PORT};
+        $tr064_base_url = "https://".urlEncode($fb_user).":".urlEncode($fb_pw)."\@$fb_ip:".$hash->{helper}{TR064}{SECURITY_PORT};
     }
         
-    # generate challenge XML    
+    # éxecute the TR-064 request 
     my $soap_request = '<?xml version="1.0" encoding="utf-8"?>'.
                        '<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" >'.
                          '<s:Body>'.
@@ -1415,8 +1415,17 @@ sub FB_CALLMONITOR_requestTR064($$$$;$$)
 
     if($err ne "")
     {
-        Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting TR-064 method $command: $err";
-        return "error while requesting TR-064 TR-064 method $command: $err";
+        if(exists($param->{code}) and $param->{code} eq "401")
+        {
+            $hash->{helper}{PWD_NEEDED} = 1;
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - unable to login via TR-064, wrong user/password";
+            return "unable to login via TR-064, wrong user/password";
+        }
+        else
+        {
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting TR-064 method $command: $err";
+            return "error while requesting TR-064 TR-064 method $command: $err";
+        }
     }
 
     if($data eq "" and exists($param->{code}))
