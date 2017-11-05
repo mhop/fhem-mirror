@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 37_harmony: added set inactive/active commands
   - bugfix: 31_Nello: syntax error
   - feature: fhemweb_iconRadio.js: add a user defined class to svg icons by
              prefix class<classname>@, improved matching for a numeric sequence
