@@ -100,7 +100,7 @@ FW_iconSwitchCreate(elName, devName, vArr, currVal, set, params, cmd)
                                       }
                                       if (vArr[i+1] && vArr[i+1].indexOf("@") == 0) { //text only with color
                                           col = vArr[i+1].replace(/@/,'');
-                                          if( col.match(/^[A-F0-9]{6}$/,"i"))
+                                          if( col.match(/^[A-F0-9]{6}$/i))
                                             col = "#"+col;
                                           $(newEl).find("span").html(vArr[i]+"")
                                                                .attr("style","color: "+col+" !important; padding:0.0em 0.3em ")
@@ -117,7 +117,7 @@ FW_iconSwitchCreate(elName, devName, vArr, currVal, set, params, cmd)
                                           });
                                       } else if (vArr[i+1] && vArr[i+1].indexOf("@") > 0) { //text or image with color
                                           ico = vArr[i+1].split("@");
-                                          if( ico[1] && ico[1].match(/^[A-F0-9]{6}$/,"i"))
+                                          if( ico[1] && ico[1].match(/^[A-F0-9]{6}$/i))
                                             ico[1] = "#"+ico[1];
                                           FW_cmd(FW_root+"?cmd={FW_makeImage('"+vArr[i+1]+"','"+arg+"',"+(iconclass.length > 0 ? "'"+iconclass+"'" :'')+")}&XHR=1",function(data){
                                             data = data.replace(/\n$/,'');

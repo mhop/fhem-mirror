@@ -36,7 +36,7 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
     vArr[1] = vArr[1].replace(/^use4icon@|^@/,"");
   }
 
-  if( vArr[1].match(/^[A-F0-9]{6}$/,"i"))
+  if( vArr[1].match(/^[A-F0-9]{6}$/i))
     vArr[1] = "#"+vArr[1];
 
   var newEl = $("<div style='display:inline-block;'>").get(0);
@@ -115,7 +115,7 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
     var ico = vArr[ind*ipar+3];
     var m = ico.match(/.*@(.*)/);
     var uscol = m && m[1] ? m[1] : "none";
-    if( uscol.match(/^[A-F0-9]{6}$/,"i"))
+    if( uscol.match(/^[A-F0-9]{6}$/i))
       uscol = "#"+uscol;
     if(uscol == 'none')
       ico += "@none";
@@ -205,7 +205,7 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
                                       var span = button.next().find("span");
                                       var sc = $(span).attr("selectcolor");
                                       var usc = $(span).attr("unselectcolor") == "none" ? "" : $(span).attr("unselectcolor");
-                                      if( usc.match(/^[A-F0-9]{6}$/,"i"))
+                                      if( usc.match(/^[A-F0-9]{6}$/i))
                                         usc = "#"+usc;
                                       // console.log("setFn usc_"+i+": "+usc+": sc_"+i+": "+sc+", arg: "+arg);
                                       // console.log("setFn, i:",i,"ascd:",ascd,"istart:",istart,"iend:",iend);
