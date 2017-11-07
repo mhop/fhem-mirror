@@ -100,7 +100,11 @@ WMBUS_Define($$)
 			}
 			WMBUS_SetRSSI($hash, $mb, $rssi);
 		} else {
-			return "failed to parse msg: $mb->{errormsg}";
+      my $error = "failed to parse msg: $mb->{errormsg}";
+			if ($mb->{errorcode} == WMBus::ERR_MSG_TOO_SHORT && $hash->{MessageEncoding} eq 'CUL') {
+        $error .= ". Please make sure that TTY_BUFSIZE in culfw is at least two times the message length + 1";
+      }
+      return $error;
 		}
 
 	} else {
