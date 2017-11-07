@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     89_FULLY: Control Fully Browser
   - bugfix:  72_FB_CALLMONITOR: replace all unicode placeholders correctly
              in reverse search results
   - feature: 72_FB_CALLMONITOR: block calls, that matches configured 
