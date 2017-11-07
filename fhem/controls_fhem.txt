@@ -1,4 +1,4 @@
-REV 15402
+REV 15404
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -1962,10 +1962,10 @@ UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
 UPD 2017-10-11_07:45:02 51614 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
 UPD 2017-03-07_07:45:02 3139 www/pgm2/fhemweb_fbcalllist.js
-UPD 2017-11-04_07:45:02 7516 www/pgm2/fhemweb_iconButtons.js
-UPD 2017-11-04_07:45:02 5919 www/pgm2/fhemweb_iconLabel.js
-UPD 2017-11-04_07:45:02 19884 www/pgm2/fhemweb_iconRadio.js
-UPD 2017-11-04_07:45:02 7931 www/pgm2/fhemweb_iconSwitch.js
+UPD 2017-11-07_07:45:02 7507 www/pgm2/fhemweb_iconButtons.js
+UPD 2017-11-07_07:45:02 5913 www/pgm2/fhemweb_iconLabel.js
+UPD 2017-11-07_07:45:02 19875 www/pgm2/fhemweb_iconRadio.js
+UPD 2017-11-07_07:45:02 7925 www/pgm2/fhemweb_iconSwitch.js
 UPD 2017-10-04_07:45:02 1953 www/pgm2/fhemweb_knob.js
 UPD 2017-10-04_07:45:02 4248 www/pgm2/fhemweb_readingsGroup.js
 UPD 2017-10-04_07:45:02 920 www/pgm2/fhemweb_readingsHistory.js
