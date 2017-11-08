@@ -266,6 +266,9 @@ WMBUS_Parse($$)
 		} else {
 			# error
 			Log3 $name, 2, "WMBUS Error during LinkLayer parse:" . $mb->{errormsg};
+			if ($mb->{errorcode} == WMBus::ERR_MSG_TOO_SHORT && $hash->{MessageEncoding} eq 'CUL') {
+        Log3 $name, 2, "Please make sure that TTY_BUFSIZE in culfw is at least two times the message length + 1";
+      }
 			return undef;
 		}
   } else {
