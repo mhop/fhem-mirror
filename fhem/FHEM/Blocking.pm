@@ -131,7 +131,7 @@ BlockingStart(;$)
       if($^O =~ m/Win/) {
         # MaxNr of concurrent forked processes @Win is 64, and must use wait as
         # $SIG{CHLD} = 'IGNORE' does not work.
-        wait;
+        wait if(!$h->{telnet} || !$defs{$h->{telnet}});
       } else {
         use POSIX ":sys_wait_h";
         waitpid(-1, WNOHANG); # Forum #58867
