@@ -187,7 +187,7 @@ BlockingStart(;$)
 
     # Child here
     BlockingInformParent("BlockingRegisterTelnet", "\$cl,$h->{bc_pid}", 1, 1)
-      if($h->{abortFn});
+      if($h->{abortFn} && $^O !~ m/Win/);
     no strict "refs";
     my $ret = &{$h->{fn}}($h->{arg});
     use strict "refs";
@@ -272,7 +272,7 @@ BlockingKill($)
 
   return if($h->{terminated});
 
-  if($^O !~ m/Win/) {
+#  if($^O !~ m/Win/) {
     if($h->{pid} && $h->{pid} !~ m/:/ && kill(9, $h->{pid})) {
       my $ll = (defined($h->{loglevel}) ? $h->{loglevel} : 1); # Forum #77057
       Log $ll, "Timeout for $h->{fn} reached, terminated process $h->{pid}";
@@ -289,10 +289,11 @@ BlockingKill($)
         use strict "refs";
 
       }
+      delete($BC_hash{$h->{bc_pid}});
       InternalTimer(gettimeofday()+1, "BlockingStart", \%BC_hash, 0)
         if(looks_like_number($h->{pid}) && kill(0, $h->{pid})); # Forum #58867
     }
-  }
+#  }
   BlockingStart();
 }
 
