@@ -103,7 +103,6 @@ sub Hyperion_Define($$)
     $attr{$name}{alias} = "Ambilight";
     $attr{$name}{cmdIcon} = "on:general_an off:general_aus dimDown:dimdown dimUp:dimup";
     $attr{$name}{devStateIcon} = '{Hyperion_devStateIcon($name)}';
-    $attr{$name}{"event-on-change-reading"} = ".*";
     $attr{$name}{homebridgeMapping} = $Hyperion_homebridgeMapping;
     $attr{$name}{icon} = "light_led_stripe_rgb";
     $attr{$name}{lightSceneParamsToSave} = "state";
@@ -118,8 +117,8 @@ sub Hyperion_Notify($$)
 {
   my ($hash,$dev) = @_;
   my $name  = $hash->{NAME};
-  return if (!grep /^REREADCFG|MODIFIED\s$name$/,@{$dev->{CHANGED}});
   return if (IsDisabled($name));
+  return if (!grep /^REREADCFG|MODIFIED\s$name$/,@{$dev->{CHANGED}});
   return Hyperion_OpenDev($hash);
 }
 
@@ -176,6 +175,7 @@ sub Hyperion_isLocal($)
 sub Hyperion_Get($@)
 {
   my ($hash,$name,$cmd) = @_;
+  return if (IsDisabled($name) && $cmd ne "?");
   my $params =  "devStateIcon:noArg ".
                 "statusRequest:noArg ".
                 "configFiles:noArg ";
@@ -464,8 +464,8 @@ sub Hyperion_Set($@)
 {
   my ($hash,$name,@aa) = @_;
   my ($cmd,@args) = @aa;
-  my $value = (defined($args[0])) ? $args[0] : undef;
   return if (IsDisabled($name) && $cmd ne "?");
+  my $value = (defined($args[0])) ? $args[0] : undef;
   return "\"set $name\" needs at least one argument and maximum five arguments" if (@aa < 1 || @aa > 5);
   my $duration = (defined $args[1]) ? int $args[1] : int AttrVal($name,"hyperionDefaultDuration",0);
   my $priority = (defined $args[2]) ? int $args[2] : int AttrVal($name,"hyperionDefaultPriority",0);
