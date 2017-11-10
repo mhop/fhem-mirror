@@ -57,7 +57,7 @@ YAMAHA_AVR_Initialize($)
   $hash->{AttrList}  = "do_not_notify:0,1 ".
                        "disable:0,1 ".
                        "disabledForIntervals ".
-                       "request-timeout:1,2,3,4,5 ".
+                       "request-timeout:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
                        "radioTitleDelimiter ".
                        "model ".
                        "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
@@ -1253,7 +1253,7 @@ YAMAHA_AVR_HandleCmdQueue($)
         Log3 $name, 5, "YAMAHA_AVR ($name) - no commands currently running, but queue has pending commands. preparing new request";
         my $params =  {
                         url        => "http://".$address."/YamahaRemoteControl/ctrl",
-                        timeout    => AttrVal($name, "request-timeout", 4),
+                        timeout    => AttrVal($name, "request-timeout", 10),
                         noshutdown => 1, 
                         keepalive => 0,
                         httpversion => "1.1",
@@ -2034,7 +2034,7 @@ YAMAHA_AVR_ParseResponse($$$)
                     # menu browsing finished
                     if(exists($options->{last_layer}) and $options->{last_layer} == $menu_layer and $last and $options->{item_selected})
                     {
-                        Log3 $name, 5 ,"YAMAHA_AVR ($name) - menu browsing to $arg is finished. requesting basic status";
+                        Log3 $name, 4 ,"YAMAHA_AVR ($name) - menu browsing to $arg is finished. requesting basic status";
                         readingsEndUpdate($hash, 1);
                         YAMAHA_AVR_GetStatus($hash, 1);
                         return undef;
@@ -2043,14 +2043,28 @@ YAMAHA_AVR_ParseResponse($$$)
                     # initialization sequence
                     if($options->{init} and $menu_layer > 1)
                     {
-                        Log3 $name, 5 ,"YAMAHA_AVR ($name) - return to start of menu to begin menu browsing";
+                        Log3 $name, 4 ,"YAMAHA_AVR ($name) - return to start of menu to begin menu browsing";
+                        
+                        my $back_cmd = "Return to Home";
+                        my $tries = ++$options->{init};
+                        my $max_tries = 10;
                         
                         # RX-Vx71's series models and older use a different command to return back to menu root                       
-                        my $back_cmd = ((exists($hash->{MODEL}) and $hash->{MODEL} =~ /^(?:RX-A\d{1,2}10|RX-A\d{1,2}00|RX-V\d{1,2}(?:71|67|65))$/) ? "Back to Home" : "Return to Home");
+                        $back_cmd = "Back to Home" if(exists($hash->{MODEL}) and $hash->{MODEL} =~ /^(?:RX-A\d{1,2}10|RX-A\d{1,2}00|RX-V\d{1,2}(?:71|67|65))$/);
                         
-                        YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><List_Control><Cursor>$back_cmd</Cursor></List_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg);
-                        YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg,  {options => {init => 1}});
-
+                        # RX-V2065/RX-V1067 don't support "Back to Home", just "Back" for one level up.
+                        $back_cmd = "Back" if(exists($hash->{MODEL}) and $hash->{MODEL} =~ /^RX-V\d{1,2}(?:65|67)$/);
+                        
+                        if($tries <= $max_tries) 
+                        {
+                            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><List_Control><Cursor>$back_cmd</Cursor></List_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg);
+                            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg,  {options => {init => $tries}});
+                        }
+                        else
+                        {
+                            Log3 $name, 3 ,"YAMAHA_AVR ($name) - unable to return to top menu after $max_tries tries to navigate to $arg";
+                        }
+                        
                         readingsEndUpdate($hash, 1);
                         YAMAHA_AVR_HandleCmdQueue($queue_hash);
                         return;
@@ -2070,7 +2084,7 @@ YAMAHA_AVR_ParseResponse($$$)
                             my $last = ($3 eq "Item");                       
                             my $absolute_line_number = $1 + int($current_line / 8) * 8;
                             
-                            Log3 $name, 5 ,"YAMAHA_AVR ($name) - selecting menu item \"$2\" (line item: $1, absolute number: $absolute_line_number)";
+                            Log3 $name, 4 ,"YAMAHA_AVR ($name) - selecting menu item \"$2\" (line item: $1, absolute number: $absolute_line_number)";
                             
                             YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><List_Control><Jump_Line>$absolute_line_number</Jump_Line></List_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg);
                             YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><List_Control><Direct_Sel>Line_$1</Direct_Sel></List_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg);
@@ -2081,7 +2095,7 @@ YAMAHA_AVR_ParseResponse($$$)
                             if(($current_line + 8) < $max_line)
                             {
                                 #request next page
-                                Log3 $name, 5 ,"YAMAHA_AVR ($name) - request next page of menu (current line: $current_line, max lines: $max_line)";
+                                Log3 $name, 4 ,"YAMAHA_AVR ($name) - request next page of menu (current line: $current_line, max lines: $max_line)";
                                 YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><List_Control><Page>Down</Page></List_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg);
                                 YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg, {options => {not_before => gettimeofday()+1}});
                             }
@@ -2095,7 +2109,7 @@ YAMAHA_AVR_ParseResponse($$$)
                 else
                 {
                     # list must be checked again in 1 second.
-                    Log3 $name, 5 ,"YAMAHA_AVR ($name) - menu is busy. retrying in 1 second";
+                    Log3 $name, 4 ,"YAMAHA_AVR ($name) - menu is busy. retrying in 1 second";
                     YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg, {options => {not_before => (gettimeofday()+1), last_layer => $menu_layer, at_first => 1}});
                 }
             }
