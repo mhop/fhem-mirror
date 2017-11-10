@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 0.3
+#  89_FULLY.pm 0.4
 #
 #  $Id$
 #
@@ -32,7 +32,7 @@ sub FULLY_GotDeviceInfo ($);
 sub FULLY_Abort ($);
 sub FULLY_UpdateReadings ($$);
 
-my $FULLY_VERSION = "0.3";
+my $FULLY_VERSION = "0.4";
 my $FULLY_TIMEOUT = 4;
 my $FULLY_POLL_INTERVAL = 3600;
 
@@ -173,7 +173,8 @@ sub FULLY_Set ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
-	my $options = "clearCache:noArg exit:noArg lock:noArg off:noArg on:noArg restart:noArg unlock:noArg speak url";
+	my $options = "clearCache:noArg exit:noArg lock:noArg motionDetection:on,off off:noArg ".
+		"on:noArg restart:noArg unlock:noArg speak url";
 	my $response;
 	
 	# Fully commands without argument
@@ -186,6 +187,13 @@ sub FULLY_Set ($@)
 	
 	if (exists ($cmds{$opt})) {
 		$response = FULLY_Execute ($hash, $cmds{$opt}, undef);
+	}
+	elsif ($opt eq 'motionDetection') {
+		my $state = shift @$a;
+		return "Usage: set $name motionDetection {on|off}" if (!defined ($state));
+		my $value = $state eq 'on' ? 'true' : 'false';
+		$response = FULLY_Execute ($hash, "setBooleanSetting",
+			{ "key" => "motionDetection", "value" => "$value" });
 	}
 	elsif ($opt eq 'speak') {
 		my $text = shift @$a;
@@ -479,6 +487,9 @@ sub FULLY_UpdateReadings ($$)
 		</li><br/>
 		<li><b>set &lt;name&gt; exit</b><br/>
 			Terminate Fully.
+		</li><br/>
+		<li><b>set &lt;name&gt; motionDetection { on | off }</b><br/>
+			Turn motion detection by camera on or off.
 		</li><br/>
 		<li><b>set &lt;name&gt; { lock | unlock }</b><br/>
 			Lock or unlock display.
