@@ -1766,7 +1766,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <h3>Perl specials</h3>
   Wenn Sie einige Aufgaben automatisieren wollen, dann sollten Sie die Befehle
   <a href="#at">at</a> oder <a href="#notify">notify</a> nutzen. F&uuml;r
-  komplexere Aufgaben sollten Sie lieber ein SHELLl-Skiipt oder einen PERL
+  komplexere Aufgaben sollten Sie lieber ein SHELL-Skript oder einen PERL
   "oneliner" als das at/notify argument anwenden. Dieser Abschnitt gibt Ihnen
   einige Tipps zur Anwendung der PERL-oneliner.<br><br>
 
@@ -1795,7 +1795,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     </li><br>
 
   <li>Um FHEM-Kommandos in den PERL-Ausdr&uuml;cken zu verwenden, benutzen
-    Sie bitte die Funktion fhem(), mit einem Textargument. Dieser Text wird als
+    Sie bitte die Funktion <var>fhem()</var>, mit einem Textargument. Dieser Text wird als
     FHEM-Kommando interpretiert.<br>
     <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Beispiel<ul>
 
@@ -1822,18 +1822,19 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   </li>
 
   <li>Um die Verwendung von Datum und Zeitangaben zu vereinfachen, wurden die
-    Variablen $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst
+    Variablen <var>$sec</var>, <var>$min</var>, <var>$hour</var>, <var>$mday</var>,
+    <var>$month</var>, <var>$year</var>, <var>$wday</var>, <var>$yday</var>, <var>$isdst</var> und <var>$hms</var>
     f&uuml;r die Verwendung in PERL-&quot;oneliners&quot; eingef&uuml;hrt (s.
-    unter perldoc -f localtime). Ausnahmen: $month hat einen Wertebereich von 1
-    to 12 und $year ist korrigiert von 1900.
-    Weiterhin enth&auml;lt $hms die Zeit in dem HH:MM:SS Format und $today den
+    unter <var>perldoc -f localtime</var>). Ausnahmen: <var>$month</var> hat einen Wertebereich von 1
+    bis 12 und <var>$year</var> ist korrigiert von 1900.
+    Weiterhin enth&auml;lt <var>$hms</var> die Zeit in dem HH:MM:SS Format und <var>$today</var> das
     aktuellen Datum in YYYY-MM-DD Format.
     <br>
 
-    Die Variabe $we hat den Wert 1 wenn der abgefragte Tag auf ein Wochenende
-    f&auml;llt (Z.B. $wday == 0 [Sonntag] oder $wday == 6 [Samstag]), und 0
+    Die Variabe <var>$we</var> hat den Wert 1 wenn der abgefragte Tag auf ein Wochenende
+    f&auml;llt (Z.B. <var>$wday</var> == 0 [Sonntag] oder <var>$wday</var> == 6 [Samstag]), und 0
     f&uuml;r die anderen Wochentage. Wenn man das global <a
-    href="#holiday2we">holida2we</a> Attribut setzt, dann ist $we ebenfalls 1
+    href="#holiday2we">holida2we</a> Attribut setzt, dann ist <var>$we</var> ebenfalls 1
     bei Urlaubstagen.<br>
 
     <ul>
@@ -1846,8 +1847,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     <br>
 
   </li><li>
-    Die follgendenHilsfunktionen sind in der Datei 99_Util.pm definiert (wird 
-    wie jede mit 99 beginnende Datei automatisch geladen):
+    Die folgenden Hilfsfunktionen sind in der Datei 99_Util.pm definiert (wird 
+    wie jede mit 99_ beginnende Datei automatisch geladen):
     <ul>
       <li>min(a,b), max(a,b)</li>
       <li>time_str2num("YYYY-MM-DD HH:MM:SS") gibt einen numerischen Wert
@@ -1858,7 +1859,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     </li>
 
   <li>
-    Um auf die Ger&auml;testati/Attribute zuzugreifen benutzen Sie bitte die 
+    Um auf die Ger&auml;testatus/Attribute zuzugreifen benutzen Sie bitte die 
     folgenden Funktionen:
     <br>
     <ul>
