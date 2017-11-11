@@ -136,11 +136,16 @@
 #   json_decode mit nonref   #msg687580
 # 2.6 2017-09-24  hide command in favorites/change direct favorites confirm
 
-#   
-#   
+#   Fix minusdesc undefined issue
+#   Cleanup old code
+
 #   
 ##############################################################################
 # TASKS 
+#   
+#   \n in inline keyboards
+#   
+#   queryDialogStart / queryDialogEnd - keep msg id 
 #   
 #   
 #   
@@ -992,6 +997,7 @@ sub TelegramBot_SplitFavoriteDef($$) {
   $confirm = "";
   $result = "";
   $hidden = 0;
+  $minusdesc = "";
   
   if ( $cmd =~ /^\s*((\/([^\[=]*)?)(\[(-)?([^\]]+)\])?\s*=)?(\??)(\!?)(.*?)$/ ) {
     $alias = $2;
@@ -1277,16 +1283,9 @@ sub TelegramBot_SentLastCommand($$$$) {
   $resppeer .= "(".$mchatnorm.")" if ( $mchatnorm );
   
   $ret =~ s/\$peer/$resppeer/g;
-  #  $ret = "TelegramBot FHEM : $mpeernorm \n Last Commands \n";
   
   # overwrite ret with result from SendIt --> send response
   $ret = TelegramBot_SendIt( $hash, (($mchatnorm)?$mchatnorm:$mpeernorm), $ret, $jsonkb, 0 );
-
-############ OLD SentLastCommands sent as message   
-#  $ret = "TelegramBot fhem  : $mpeernorm \nLast Commands \n\n".$slc;
-  
-#  # overwrite ret with result from Analyzecommand --> send response
-#  $ret = AnalyzeCommand( undef, "set $name message \@$mpeernorm $ret", "" );
 
   return $ret;
 }
@@ -1393,20 +1392,6 @@ sub TelegramBot_ExecuteCommand($$$$;$$) {
   $ret =~ s/^(\s|(\\[rfnt]))+|(\s|(\\[rfnt]))+$//g if ( defined($ret) );
 #  Debug "Length after :".length($ret);
   
-  
-  
-#  my $retstart = "TelegramBot FHEM";
-#  $retstart .= " from $pname ($mpeernorm)" if ( defined( $defpeer ) );
-  
-#  my $retempty = AttrVal($name,'cmdReturnEmptyResult',1);
-
-  # undef is considered ok
-#  if ( ( ! defined( $ret ) ) || ( length( $ret) == 0 ) ) {
-#    # : External message
-#    $ret = "$retstart cmd :$cmd: result OK" if ( $retempty );
-#  } elsif ( ! $isMediaStream ) {
-#    $ret = "$retstart cmd :$cmd: result :$ret:";
-# }
   Log3 $name, 5, "TelegramBot_ExecuteCommand $name: ".TelegramBot_MsgForLog($ret, $isMediaStream ).": ";
   
   if ( ( defined( $ret ) ) && ( length( $ret) != 0 ) ) {
@@ -1534,16 +1519,6 @@ sub Telegram_HandleCommandInMessages($$$$$$)
       } elsif ( $doRet ) {
         return;
       }
-      
-#        # Build the final command from the the alias and the remainder of the message
-#       Log3 $name, 5, "TelegramBot_ParseMsg $name: Alias Match :$aliasKey:";
-#        $cmd = $hash->{AliasCmds}{$aliasKey}." ".$cmd;
-#        $cmdRet = TelegramBot_ExecuteCommand( $hash, $mpeernorm, $mchatnorm, $cmd );
-#        Log3 $name, 4, "TelegramBot_ParseMsg $name: ExecuteFavoriteCmd returned :$cmdRet:" if ( defined($cmdRet) );
-#        return;
-#      } elsif ( $doRet ) {
-#        return;
-#      }
     }
   }
 
@@ -1975,9 +1950,6 @@ sub TelegramBot_MakeKeyboard($$$@)
   
   my $refkb = \%par;
   
-#  $refkb = TelegramBot_Deepencode( $name, $refkb );
-
-#  $ret = encode_json( $refkb );
   my $json        = JSON->new->utf8;
   $ret = $json->utf8(0)->encode( $refkb );
   Log3 $name, 4, "TelegramBot_MakeKeyboard $name: json :$ret: is utf8? ".(utf8::is_utf8($ret)?"yes":"no");
@@ -2375,11 +2347,6 @@ sub TelegramBot_ParseMsg($$$)
     push( @contacts, $chat );
     $chatId = $chat->{id};
   }
-
-#  my $user = $message->{contact};
-#  if ( defined( $user ) ) {
-#    push( @contacts, $user );
-#  }
 
   my $user = $message->{new_chat_participant};
   if ( defined( $user ) ) {
