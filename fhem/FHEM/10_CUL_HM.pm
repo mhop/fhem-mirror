@@ -2746,7 +2746,10 @@ sub CUL_HM_Parse($$) {#########################################################
       $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
                              if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
       push @evtEt,[$mh{devH},1,"battery:". ($err?"low"  :"ok"  )];
-      push @ack,$mh{shash},$mh{mNo}."8002".$mh{dst}.$mh{src}."00"; # additional CUL ACK 
+      push @ack,$mh{shash},$mh{mNo}."8002".$mh{dst}.$mh{src}."00"
+        if (   $ioId eq $mh{dst}
+            && !$mh{devH}{IODev}->{helper}{VTS_ACK}
+            && $mh{devH}{IODev}->{TYPE} !~ m/^(HMLAN|HMUARTLGW)$/); #noansi: additional CUL ACK 
     }
     if (defined($state)){# if state was detected post events
       my $txt;
