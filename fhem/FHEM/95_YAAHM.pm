@@ -48,7 +48,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.15";
+my $yaahmversion    = "1.16";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -59,8 +59,6 @@ my %yaahm_transtable_EN = (
     "notstarted"        =>  "Not started",
     "next"              =>  "Next",
     "manual"            =>  "Manual Time",
-    "waketime"          =>  "Wakeup Time",
-    "sleeptime"         =>  "Sleep Time",
     "exceptly"          =>  "exceptionally",
     "undecid"           =>  "not decidable",
     "swoff"             =>  "switched off",
@@ -148,8 +146,6 @@ my %yaahm_transtable_EN = (
     "notstarted"        =>  "Nicht gestartet",
     "next"              =>  "Nächste",
     "manual"            =>  "Manuelle Zeit",
-    "waketime"          =>  "Weckzeit",
-    "sleeptime"         =>  "Schlafenszeit",
     "clock"             =>  "Uhr",
     "exceptly"          =>  "ausnahmsweise",
     "undecid"           =>  "nicht bestimmbar",
@@ -668,18 +664,18 @@ sub YAAHM_Set($@) {
        }
        $cmd = "next_".$args[0];
      }else{
-       my $ifound = undef;
+       my $if = undef;
        for( my $i=0;$i<int(@{$hash->{DATA}{"WT"}});$i++){
-         $ifound = $i
+         $if = $i
            if ($hash->{DATA}{"WT"}[$i]{"name"} eq $args[0] );
        };
        #-- check if valid
-       if( !defined($ifound) ){
+       if( !defined($if) ){
          $msg = "Error: timer name ".$args[0]." not found";
          Log3 $name,1,"[YAAHM_Set] ".$msg;
          return $msg;
        }
-       $cmd = "next_".$ifound;
+       $cmd = "next_".$if;
      }
 	 return YAAHM_nextWeeklyTime($name,$cmd,$args[1],$exec);
    
@@ -777,7 +773,7 @@ sub YAAHM_Set($@) {
 
 #########################################################################################
 #
-# YAAHM_Set - Implements the Get function
+# YAAHM_Get - Implements the Get function
 # 
 # Parameter hash = hash of device addressed
 #
@@ -831,12 +827,13 @@ sub YAAHM_Get($@) {
            "  my \$time    = ReadingsVal(\"".$name."\",\"housetime\",\"\");\n".
            "  my \$phase   = ReadingsVal(\"".$name."\",\"housephase\",\"\");\n".
            "  my \$state   = ReadingsVal(\"".$name."\",\"housestate\",\"\");\n".
-           "  my \$party   = (ReadingsVal(\"".$name."\",\"housemode\",\"\")) eq \"party\") ? 1 : 0;\n".
-           "  my \$absence = (ReadingsVal(\"".$name."\",\"housemode\",\"\")) eq \"absence\") ? 1 : 0;\n".
+           "  my \$party   = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"party\") ? 1 : 0;\n".
+           "  my \$absence = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"absence\") ? 1 : 0;\n".
+           "  my \$dndist  = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"donotdisturb\") ? 1 : 0;\n".
            "  my \$todaytype = ReadingsVal(\"".$name."\",\"tr_todayType\",\"\");\n".
-           "  my \$todaydesc = ReadingsVal(\"".$name."\",\"todayDesc\",\"\")\n".
+           "  my \$todaydesc = ReadingsVal(\"".$name."\",\"todayDesc\",\"\");\n".
            "  my \$tomorrowtype = ReadingsVal(\"".$name."\",\"tr_tomorrowType\",\"\");\n".
-           "  my \$tomorrowdesc = ReadingsVal(\"".$name."\",\"tomorrowDesc\",\"\")\n";
+           "  my \$tomorrowdesc = ReadingsVal(\"".$name."\",\"tomorrowDesc\",\"\");\n";
     #-- iterate through table        
     foreach my $key (sort YAAHM_dsort keys %dailytable){
            $res .= "  #---------------------------------------------------------------------\n";
@@ -850,8 +847,9 @@ sub YAAHM_Get($@) {
            "  my \$time    = ReadingsVal(\"".$name."\",\"housetime\",\"\");\n".
            "  my \$phase   = ReadingsVal(\"".$name."\",\"housephase\",\"\");\n".
            "  my \$state   = ReadingsVal(\"".$name."\",\"housestate\",\"\");\n".
-           "  my \$party   = (ReadingsVal(\"".$name."\",\"housemode\",\"\")) eq \"party\") ? 1 : 0;\n".
-           "  my \$absence = (ReadingsVal(\"".$name."\",\"housemode\",\"\")) eq \"absence\") ? 1 : 0;\n";
+           "  my \$party   = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"party\") ? 1 : 0;\n".
+           "  my \$absence = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"absence\") ? 1 : 0;\n".
+           "  my \$dndist  = (ReadingsVal(\"".$name."\",\"housemode\",\"\") eq \"donotdisturb\") ? 1 : 0;\n";
     #-- iterate through table        
     for( my $i=0;$i<int(@states);$i++) {
            $res .= "  #---------------------------------------------------------------------\n";
@@ -1236,11 +1234,6 @@ sub YAAHM_mode {
   }
     
   $hash->{DATA}{"HSM"}{"mode"} = $targetmode;
-  readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"prev_housemode",$prevmode);
-  readingsBulkUpdate($hash,"housemode",$targetmode);
-  readingsBulkUpdate($hash,"tr_housemode",$yaahm_tt->{$targetmode});
-  readingsEndUpdate($hash,1); 
   
   #-- doit, if not simulation
   if (defined($attr{$name}{"modeHelper"})){
@@ -1252,6 +1245,13 @@ sub YAAHM_mode {
       return $msg;
     }
   }
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"prev_housemode",$prevmode);
+  readingsBulkUpdate($hash,"housemode",$targetmode);
+  readingsBulkUpdate($hash,"tr_housemode",$yaahm_tt->{$targetmode});
+  readingsEndUpdate($hash,1); 
+  
 }
 
 #########################################################################################
@@ -1286,15 +1286,6 @@ sub YAAHM_state {
     Log3 $name,1,"[YAAHM_state] ".$msg;
     return $msg;
   }
- 
-  $hash->{DATA}{"HSM"}{"state"} = $targetstate;
-  readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"prev_housestate",$prevstate);
-  readingsBulkUpdate($hash,"housestate",$targetstate);
-  readingsBulkUpdate($hash,"tr_housestate",$yaahm_tt->{$targetstate});
-  readingsEndUpdate($hash,1); 
-  
-  YAAHM_InternalTimer("check",time()+ 30, "YAAHM_checkstate", $hash, 0);
   
   #-- doit, if not simulation
   if (defined($attr{$name}{"stateHelper"})){
@@ -1306,6 +1297,16 @@ sub YAAHM_state {
       return $msg;
     }
   }
+ 
+  $hash->{DATA}{"HSM"}{"state"} = $targetstate;
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"prev_housestate",$prevstate);
+  readingsBulkUpdate($hash,"housestate",$targetstate);
+  readingsBulkUpdate($hash,"tr_housestate",$yaahm_tt->{$targetstate});
+  readingsEndUpdate($hash,1); 
+  
+  YAAHM_InternalTimer("check",time()+ 30, "YAAHM_checkstate", $hash, 0);
+  
 }
 
 #########################################################################################
@@ -1743,8 +1744,6 @@ sub YAAHM_setWeeklyTime($) {
     readingsEndUpdate($hash,1);
     YAAHM_sayWeeklyTime($hash,$i,0);                                         
   }
-   
-  
 }
 
 #########################################################################################
@@ -1772,18 +1771,11 @@ sub YAAHM_sayWeeklyTime($$$) {
   $tod = $hash->{DATA}{"WT"}[$timer]{"ring_0"};
   $tom = $hash->{DATA}{"WT"}[$timer]{"ring_1"};
   $ton = $hash->{DATA}{"WT"}[$timer]{"next"};
+  $msg = $hash->{DATA}{"WT"}[$timer]{"name"};
   
  ($hl,$ml) = split(':',strftime('%H:%M', localtime(time)));
   $tl = 60*$hl+$ml;
-  
-  if( $timer == 0){
-      $msg = $yaahm_tt->{"waketime"}
-  }elsif( $timer == 1){
-      $msg = $yaahm_tt->{"sleeptime"}
-  }else{
-      $msg = $yaahm_tt->{"timer"}." $timer";
-  }
-  
+
   #-- today off AND tomorrow any time, off or special time
   if( $tod eq "off" ){
     #-- special time
