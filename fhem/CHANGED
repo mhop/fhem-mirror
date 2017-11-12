@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  98_Siro.pm: add Disable attribute
   - bugfix:  50_TelegramBot: fix minusdesc warning / cleanup
   - fix:     71_YAMAHA_AVR: fix navigateListMenu on RX-Vx65/RX-Vx67 series
   - feature: 89_FULLY: Turn motion detection on or off
