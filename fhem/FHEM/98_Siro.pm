@@ -62,6 +62,7 @@
 # 0.44 2017-10-19	Byte bugfix -> set favorite. Unterscheidung ob "time_down_to_favorite" gesetzt oder nicht. ( interpretation :favorite programmiert oder nicht ) - entsprechende anpassung des kommandos ( erst löschen -> dann speichern )
 # 0.45 2017-10-28	Byte fehler bei erneutem Kommando während Positionsanfahrten behoben
 # 0.46 2017-05-11	Byte fehler bei fhem-neustart behoben
+# 0.47 2017-11-11	Byte attr Disable zugefügt.
 ################################################################################################################
 # Todo's:
 # - 
@@ -74,7 +75,7 @@ package main;
 
 use strict;
 use warnings;
-my $version = "V 0.46";
+my $version = "V 0.47";
 
 my %codes = (
 	"55" => "stop",			# Stop the current movement or move to custom position
@@ -137,6 +138,7 @@ sub Siro_Initialize($) {
 	$hash->{AttrFn}  	= "Siro_Attr";
 	$hash->{Match}     	= "^P72#[A-Fa-f0-9]+";
 	$hash->{AttrList} = " IODev"
+	  . " disable:0,1"
 	  . " SignalRepeats:1,2,3,4,5,6,7,8,9"
 	  . " SignalLongStopRepeats:10,15,20"
 	  . " channel_send_mode_1:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
@@ -451,8 +453,11 @@ sub Siro_Parse($$)
 	my $favcheck =$doubelmsgtime+1; # zeit in der ein zweiter stop kommen muss/darf für fav
 	my $testid = substr($msg, 4, 8);
 	my $testcmd = substr($msg, 12, 2);
-	my $timediff;
-
+	my $timediff;  
+	
+	
+	my $name = $hash->{NAME};
+	return "" if(IsDisabled($name));
 	if(my $lh = $modules{Siro}{defptr}{$testid})
 		{
 			my $name = $lh->{NAME};
@@ -799,6 +804,7 @@ sub Siro_Set($@)
 my $testtimestart = gettimeofday();
 	my $debug;
 	my ( $hash, $name, @args ) = @_;
+	return "" if(IsDisabled($name));
 	# Set without argument  #parseonly
 	my $numberOfArgs  = int(@args);
 	my $nodrive = "false";
