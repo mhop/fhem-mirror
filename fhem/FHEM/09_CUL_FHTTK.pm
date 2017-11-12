@@ -270,7 +270,7 @@ CUL_FHTTK_Parse($$)
       if($defs{$name}{PREV}{TIMESTAMP} > time()-5) {
          if(defined($defs{$name}{PREV}{STATE})) {
              if($defs{$name}{PREV}{STATE} eq $state) {
-                 Log3 $name, 4, sprintf("FHTTK skipping state $state as last similar telegram was received less than 5 (%s) secs ago", $defs{$name}{PREV}{STATE}, time()-$defs{$name}{PREV}{TIMESTAMP});
+                 Log3 $name, 4, sprintf("FHTTK skipping state $state as last similar telegram was received less than 5 (%s) secs ago", time()-$defs{$name}{PREV}{TIMESTAMP});
                  return "";
              }
          }
