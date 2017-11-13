@@ -9,7 +9,7 @@
 </style>
 <sodipodi:namedview  bordercolor="#666666" borderopacity="1" gridtolerance="10" guidetolerance="10" id="namedview18" inkscape:current-layer="svg2" inkscape:cx="13.386911" inkscape:cy="223.98473" inkscape:guide-bbox="true" inkscape:pageopacity="0" inkscape:pageshadow="2" inkscape:window-height="1250" inkscape:window-maximized="0" inkscape:window-width="1744" inkscape:window-x="1536" inkscape:window-y="99" inkscape:zoom="1.05" objecttolerance="10" pagecolor="#ffffff" showgrid="false" showguides="true">
 	</sodipodi:namedview>
-<g id="g6" transform="matrix(0.189474,0,0,-0.189474,0,468)">
+<g id="g6" transform="matrix(0.189474,0,0,-0.189474,0,468)" fill="#000000">
 	<g id="path8">
 		<path d="M395,2455c-151-33-283-133-338-255c-52-117-51-88-55-940c-2-558,0-814,8-860C43,208,198,52,398,11c71-15,1628-15,1692,0
 			c174,40,322,190,365,370c22,94,22,1579,0,1683c-21,98-66,187-127,252c-61,64-113,98-201,128c-61,21-75,21-867,23
@@ -17,7 +17,7 @@
 			l-50,27c-62,32-139,113-168,176l-22,47v840v840l27,52c53,100,128,162,227,189c35,10,236,12,856,11l810-2L2132,2292z"/>
 	</g>
 </g>
-<g id="g4575" transform="matrix(0.8,0,0,0.8,46.5,89.011878)">
+<g id="g4575" transform="matrix(0.8,0,0,0.8,46.5,89.011878)" fill="#9b0000">
 	<g id="rect3052">
 		<path inkscape:connector-curvature="0" d="M75.2,196.3c-3.2,0-5.8,2.6-5.8,5.8l0,0v200.7c0,3.2,2.6,5.8,5.8,5.8l0,0h314.7
 			c3.2,0,5.8-2.6,5.8-5.8V202.1c0-3.2-2.6-5.8-5.8-5.8H75.2z M80.9,207.8h303.2V397H80.9V207.8z"/>
@@ -70,7 +70,7 @@
 			c0-3.1-2-5.5-4.4-5.5H235.3L235.3,288.9z"/>
 	</g>
 </g>
-<g>
+<g fill="#9b0000">
 	<circle class="st0" cx="234.3" cy="99.1" r="43.1"/>
 	<path d="M234.3,146.2c-26,0-47.1-21.1-47.1-47.1c0-26,21.1-47.1,47.1-47.1c26,0,47.1,21.1,47.1,47.1
 		C281.4,125.1,260.3,146.2,234.3,146.2z M234.3,60c-21.6,0-39.1,17.5-39.1,39.1c0,21.6,17.5,39.1,39.1,39.1

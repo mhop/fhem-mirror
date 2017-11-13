@@ -51,25 +51,25 @@ Created by potrace 1.8, written by Peter Selinger 2001-2007
   </cc:Work>
 </rdf:RDF>
 </metadata>
-  <g
+  <g fill="#000000"
      transform="matrix(0.189474,0,0,-0.189474,0,468)"
      id="g6">
     <path
        d="M 395,2455 C 244,2422 112,2322 57,2200 5,2083 6,2112 2,1260 0,702 2,446 10,400 43,208 198,52 398,11 c 71,-15 1628,-15 1692,0 174,40 322,190 365,370 22,94 22,1579 0,1683 -21,98 -66,187 -127,252 -61,64 -113,98 -201,128 -61,21 -75,21 -867,23 -640,1 -817,-1 -865,-12 z m 1737,-163 c 74,-36 132,-95 170,-170 l 23,-47 0,-840 0,-840 -28,-57 c -37,-76 -96,-134 -171,-169 l -63,-29 -839,2 -839,3 -50,27 C 273,204 196,285 167,348 l -22,47 0,840 0,840 27,52 c 53,100 128,162 227,189 35,10 236,12 856,11 l 810,-2 67,-33 z"
        id="path8" />
   </g>
-  <path
+  <path fill="#000000"
      d="m 268.26753,117.23647 c -35.37882,19.94929 -51.27593,29.61223 -52.52277,32.26174 -1.55853,2.96124 -2.02609,24.15736 -2.02609,89.30428 0,73.40716 0.31171,86.34305 2.3378,90.55109 2.02611,4.20806 9.97466,9.19538 52.99032,33.35272 27.742,15.5854 52.0552,28.36542 54.08131,28.36542 2.02609,0 5.76659,-1.40269 8.57194,-3.11708 10.28638,-6.23416 9.8188,1.87024 9.8188,-148.52874 l 0,-136.21628 -3.58462,-5.299028 c -3.89635,-5.92245 -9.35125,-9.19538 -15.11783,-9.19538 -2.18196,0 -26.18346,12.624158 -54.54886,28.521258 z m 50.80836,248.58692 c -0.46756,0.31171 -19.32587,-9.8188 -42.08055,-22.59882 l -41.30128,-23.06637 -0.15584,-80.26473 0,-80.26475 41.76882,-23.37808 41.613,-23.37809 0.46755,126.08579 c 0.15585,69.35498 0,126.39749 -0.3117,126.86505 z"
      id="path10" />
-  <path
+  <path fill="#000000"
      d="m 111.47853,150.12163 c -2.64952,1.24683 -6.23416,4.05221 -8.1044,6.39002 -3.428789,4.3639 -3.428789,4.67561 -3.428789,83.53767 l 0,79.32962 5.299029,5.92244 5.29903,5.7666 40.67787,0.46756 c 47.37957,0.46756 49.87323,0 55.01642,-11.68905 2.80536,-6.23416 2.96122,-10.75391 2.49365,-82.13499 -0.46755,-73.56302 -0.62341,-75.58911 -3.74049,-79.95302 -6.70172,-9.19538 -10.1305,-9.8188 -51.27592,-9.8188 -27.74199,0.15585 -38.65176,0.62342 -42.2364,2.18195 z m 75.74498,89.77184 0,70.13424 -33.50858,0 -33.50859,0 0,-70.13424 0,-70.13425 33.50859,0 33.50858,0 0,70.13425 z"
      id="path16" />
-  <path
+  <path fill="#000000"
      style="font-size:medium;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-indent:0;text-align:start;text-decoration:none;line-height:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;direction:ltr;block-progression:tb;writing-mode:lr-tb;text-anchor:start;baseline-shift:baseline;color:#000000;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:16;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate;font-family:Sans;-inkscape-font-specification:Sans"
      d="M 399.90625,51.5625 54.96875,404.90625 66.40625,416.09375 411.375,62.75 399.90625,51.5625 z"
      id="path3902"
      inkscape:connector-curvature="0" />
-  <path
+  <path fill="#000000"
      style="font-size:medium;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-indent:0;text-align:start;text-decoration:none;line-height:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;direction:ltr;block-progression:tb;writing-mode:lr-tb;text-anchor:start;baseline-shift:baseline;color:#000000;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:16;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate;font-family:Sans;-inkscape-font-specification:Sans"
      d="M 60.90625,55.6875 49.46875,66.875 394.40625,420.25 405.875,409.0625 60.90625,55.6875 z"
      id="path3902-1"

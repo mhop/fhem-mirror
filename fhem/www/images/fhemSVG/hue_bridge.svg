@@ -9,6 +9,7 @@
 </style>
 <sodipodi:namedview  bordercolor="#666666" borderopacity="1" gridtolerance="10" guidetolerance="10" id="namedview33" inkscape:current-layer="svg2" inkscape:cx="360.28832" inkscape:cy="335.25061" inkscape:pageopacity="0" inkscape:pageshadow="2" inkscape:window-height="1057" inkscape:window-maximized="1" inkscape:window-width="1858" inkscape:window-x="1734" inkscape:window-y="-8" inkscape:zoom="1.6102345" objecttolerance="10" pagecolor="#ffffff" showgrid="false">
 	</sodipodi:namedview>
+<g fill="#000000">
 <g id="path3761">
 	<path inkscape:connector-curvature="0" d="M236.2,6.4c-126.4,0-229,102.6-229,229s102.6,229,229,229s229-102.6,229-229
 		S362.6,6.4,236.2,6.4z M236.2,21.9c118,0,213.5,95.5,213.5,213.5S354.2,449,236.2,449S22.7,353.4,22.7,235.4S118.2,21.9,236.2,21.9
@@ -142,5 +143,6 @@
 		C267.6,289,251.2,295.8,233.8,295.8z M233.8,173.2C233.8,173.2,233.8,173.2,233.8,173.2c-15.3,0-29.7,6-40.5,16.8
 		c-10.8,10.8-16.8,25.2-16.8,40.5c0,31.6,25.7,57.3,57.3,57.3c0,0,0,0,0,0c15.3,0,29.7-6,40.5-16.8c10.8-10.8,16.8-25.2,16.8-40.5v0
 		c0-15.3-6-29.7-16.8-40.5C263.5,179.1,249.1,173.2,233.8,173.2z"/>
+</g>
 </g>
 </svg>

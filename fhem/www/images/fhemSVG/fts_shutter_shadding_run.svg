@@ -10,6 +10,7 @@
 </style>
 <sodipodi:namedview  bordercolor="#666666" borderopacity="1" gridtolerance="10" guidetolerance="10" id="namedview20" inkscape:current-layer="svg2" inkscape:cx="-88.426704" inkscape:cy="132.4121" inkscape:pageopacity="0" inkscape:pageshadow="2" inkscape:window-height="1017" inkscape:window-maximized="1" inkscape:window-width="1920" inkscape:window-x="-8" inkscape:window-y="-8" inkscape:zoom="1.470405" objecttolerance="10" pagecolor="#ffffff" showgrid="false">
 	</sodipodi:namedview>
+<g fill="#000000">
 <g id="path4">
 	<path class="st0" d="M225.3,267.5h-147c-6.4,0-11.6-5.2-11.6-11.6V137.1c0-6.4,5.2-11.6,11.6-11.6h184.8c6.4,0,11.6,5.2,11.6,11.6
 		v91.5l-10,0v-91.5c0-0.9-0.7-1.6-1.6-1.6H78.3c-0.9,0-1.6,0.7-1.6,1.6v118.8c0,0.9,0.7,1.6,1.6,1.6h147V267.5z"/>
@@ -72,5 +73,6 @@
 		c2,0.9,4,1.8,6,2.6c0-30.1,0-60.3,0-90.4c0-2.5,0-5,0-7.5c0-3.9-8-3.9-8,0c0,30.1,0,60.3,0,90.4c0,2.5,0,5,0,7.5
 		c0,2.1,3.5,4.1,6,2.6c28-16.3,55.9-32.6,83.9-49c2.5-1.5,2.5-3.8,0-5.3c-28-16.3-55.9-32.6-83.9-49
 		C230.1,212,226.1,217.3,230.2,219.6L230.2,219.6z"/>
+</g>
 </g>
 </svg>

@@ -9,8 +9,7 @@
 </style>
 <sodipodi:namedview  bordercolor="#666666" borderopacity="1" gridtolerance="10" guidetolerance="10" id="namedview42" inkscape:current-layer="svg2" inkscape:cx="130.90436" inkscape:cy="261.78732" inkscape:pageopacity="0" inkscape:pageshadow="2" inkscape:window-height="708" inkscape:window-maximized="0" inkscape:window-width="1359" inkscape:window-x="2204" inkscape:window-y="18" inkscape:zoom="1.3074792" objecttolerance="10" pagecolor="#ffffff" showgrid="false">
 	</sodipodi:namedview>
-<g id="Ebene_1">
-</g>
+<g id="Ebene_1" fill="#000000">
 <g id="path65">
 	<path class="st0" d="M298,314.8h-51.7c-5.6,0-7.7-3.1-7.7-5.8v-14.3c0-2.7,2-5.8,7.7-5.8H298c5.6,0,7.7,3.1,7.7,5.8v14.3
 		C305.7,311.6,303.7,314.8,298,314.8z M248.7,304.8h47v-6h-47V304.8z"/>
@@ -169,5 +168,6 @@
 <g id="path4223-9-7">
 	<path inkscape:connector-curvature="0" d="M244.5,149c13.4,0,26.9,0,40.3,0h5.5c1.2,0,1.2-5.7,0-5.7c-13.5,0-26.9,0-40.3,0h-5.5
 		C243.3,143.3,243.3,149,244.5,149L244.5,149L244.5,149z"/>
+</g>
 </g>
 </svg>

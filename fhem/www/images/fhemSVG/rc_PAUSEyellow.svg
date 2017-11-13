@@ -9,14 +9,14 @@
 </style>
 <sodipodi:namedview  bordercolor="#666666" borderopacity="1" gridtolerance="10" guidetolerance="10" id="namedview6788" inkscape:current-layer="svg2" inkscape:cx="292.5" inkscape:cy="292.5" inkscape:guide-bbox="true" inkscape:pageopacity="0" inkscape:pageshadow="2" inkscape:window-height="1343" inkscape:window-maximized="1" inkscape:window-width="2560" inkscape:window-x="1080" inkscape:window-y="22" inkscape:zoom="1.05" objecttolerance="10" pagecolor="#ffffff" showgrid="false" showguides="true">
 	</sodipodi:namedview>
-<g id="g6" transform="matrix(0.189474,0,0,-0.189474,0,468)">
+<g fill="#000000" id="g6" transform="matrix(0.189474,0,0,-0.189474,0,468)">
 	<path id="path8" d="M395,2455c-151-33-283-133-338-255c-52-117-51-88-55-940c-2-558,0-814,8-860C43,208,198,52,398,11
 		c71-15,1628-15,1692,0c174,40,322,190,365,370c22,94,22,1579,0,1683c-21,98-66,187-127,252c-61,64-113,98-201,128
 		c-61,21-75,21-867,23C620,2468,443,2466,395,2455z M2132,2292c74-36,132-95,170-170l23-47v-840V395l-28-57c-37-76-96-134-171-169
 		l-63-29l-839,2l-839,3l-50,27c-62,32-139,113-168,176l-22,47v840v840l27,52c53,100,128,162,227,189c35,10,236,12,856,11l810-2
 		L2132,2292z"/>
 </g>
-<g id="g6279" transform="matrix(0.8,0,0,0.8,46.553994,92.964263)">
+<g fill="#ffd42a" id="g6279" transform="matrix(0.8,0,0,0.8,46.553994,92.964263)">
 	<path id="path8-4" inkscape:connector-curvature="0" d="M169.8,80.8c-2.6,1.6-5.7,5-7.2,7.6c-2.4,4.4-2.6,12.9-2.6,152.6
 		c0,147,0,147.9,3,151.8c6,8.2,9.9,9.9,23.5,10.3c16.3,0.7,24.2-2.3,28.5-11c3-5.7,3-7.2,3-151.3c0-157.8,0.3-150.8-7.7-158.3
 		c-3.6-3.3-5.2-3.6-19.9-4C176.4,78.1,173.8,78.4,169.8,80.8z M198,240v143.3h-9.3h-9.3V240V96.7h9.3h9.3V240L198,240z"/>
@@ -24,5 +24,5 @@
 		c14.2,0,22.6-3.7,26.8-11.5c2.4-4.7,2.6-12.5,2.6-151.6c0-159.1,0.4-150.2-7.9-157.9c-3.6-3.3-5-3.6-19.8-4
 		C263.8,78.1,261.2,78.4,257.2,80.8z M286.6,240.4l0.3,142.9h-10h-10V240V96.6l9.7,0.4l9.6,0.4L286.6,240.4L286.6,240.4z"/>
 </g>
-<rect x="105.1" y="57.3" class="st0" width="258.4" height="86.1"/>
+<rect x="105.1" y="57.3" class="st0" width="258.4" height="86.1" fill="#ffd42a" />
 </svg>
