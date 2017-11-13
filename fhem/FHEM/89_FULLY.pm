@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 0.4
+#  89_FULLY.pm 0.5
 #
 #  $Id$
 #
@@ -32,7 +32,7 @@ sub FULLY_GotDeviceInfo ($);
 sub FULLY_Abort ($);
 sub FULLY_UpdateReadings ($$);
 
-my $FULLY_VERSION = "0.4";
+my $FULLY_VERSION = "0.5";
 my $FULLY_TIMEOUT = 4;
 my $FULLY_POLL_INTERVAL = 3600;
 
@@ -173,8 +173,8 @@ sub FULLY_Set ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
-	my $options = "clearCache:noArg exit:noArg lock:noArg motionDetection:on,off off:noArg ".
-		"on:noArg restart:noArg unlock:noArg speak url";
+	my $options = "brightness clearCache:noArg exit:noArg lock:noArg motionDetection:on,off ".
+		"off:noArg on:noArg restart:noArg unlock:noArg speak url";
 	my $response;
 	
 	# Fully commands without argument
@@ -187,6 +187,13 @@ sub FULLY_Set ($@)
 	
 	if (exists ($cmds{$opt})) {
 		$response = FULLY_Execute ($hash, $cmds{$opt}, undef);
+	}
+	elsif ($opt eq 'brightness') {
+		my $value = shift @$a;
+		return "Usage: set $name brightness 0-255" if (!defined ($value));
+		$value = 255 if ($value > 255);
+		$response = FULLY_Execute ($hash, "setStringSetting",
+			{ "key" => "screenBrightness", "value" => "$value" });
 	}
 	elsif ($opt eq 'motionDetection') {
 		my $state = shift @$a;
@@ -348,6 +355,9 @@ sub FULLY_ProcessDeviceInfo ($$)
 				next;
 			}
 		}
+		elsif ($rn eq 'screen_brightness') {
+			$rn = "brightness";
+		}
 		elsif ($rn eq 'screen_status') {
 			$parameters .= "|state=$rv";
 		}
@@ -482,6 +492,9 @@ sub FULLY_UpdateReadings ($$)
    <a name="FULLYset"></a>
    <b>Set</b><br/><br/>
    <ul>
+		<li><b>set &lt;name&gt; brightness 0-255</b><br/>
+			Adjust screen brightness.
+		</li><br/>
 		<li><b>set &lt;name&gt; clearCache</b><br/>
 			Clear browser cache.
 		</li><br/>
