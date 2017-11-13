@@ -1,4 +1,3 @@
-#2017.07.31 08:04:33 1: PERL WARNING: Use of uninitialized value $Astro{"MoonPhaseS"} in sprintf at /opt/fhem/FHEM/95_Astro.pm line 1302.
 ########################################################################################
 #
 # 95_Astro.pm
@@ -48,7 +47,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.35;
+my $astroversion = 1.37;
 
 #-- These we may get on request
 my %gets = (
@@ -265,7 +264,10 @@ sub Astro_Initialize ($) {
   $hash->{GetFn}       = "Astro_Get";
   $hash->{UndefFn}     = "Astro_Undef";   
   $hash->{AttrFn}      = "Astro_Attr";    
-  $hash->{AttrList}    = "interval longitude latitude altitude horizon";			  
+  $hash->{AttrList}    = "interval longitude latitude altitude horizon ".$readingFnAttributes;;	
+  
+  $data{FWEXT}{"/Astro_moonwidget"}{FUNC} = "Astro_moonwidget";
+  $data{FWEXT}{"/Astr_moonwidget"}{FORKABLE} = 0;		
 	
   return undef;
 }
@@ -347,6 +349,13 @@ sub Astro_Attr(@) {
 sub Astro_mod($$) { my ($a,$b)=@_;if( $a =~ /\d*\.\d*/){return($a-floor($a/$b)*$b)}else{return undef}; }
 sub Astro_mod2Pi($) { my ($x)=@_;$x = Astro_mod($x, 2.*pi);return($x); }
 sub Astro_round($$) { my ($x,$n)=@_; return int(10**$n*$x+0.5)/10**$n};
+
+sub Astro_tzoffset($) {
+    my ($t)   = @_;
+    my $utc   = mktime(gmtime($t));
+    my $local = mktime(localtime($t));
+    return (($local - $utc)/36);
+}
 
 ########################################################################################################
 #
@@ -1191,6 +1200,54 @@ sub Astro_Compute($){
 
 ########################################################################################
 #
+# Astro_moonwidget - SVG picture of the moon 
+#
+#  Parameter hash = hash of the bus master a = argument array
+#
+########################################################################################
+
+sub Astro_moonwidget($){
+  my ($arg) = @_;
+  my $name = $FW_webArgs{name};
+  $name    =~ s/'//g;
+  my $hash = $defs{$name};
+  
+  my @size=split('x',($FW_webArgs{size} ? $FW_webArgs{size} : '400x400'));
+  
+  $FW_RETTYPE = "image/svg+xml";
+  $FW_RET="";
+  FW_pO '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="'.$size[0].'px" height="'.$size[1].'px">';
+  my $ma = Astro_Get($hash,("","text","MoonAge"));
+
+  my ($radius,$axis,$dir,$start,$middle);
+  my $radius = 250;
+  my $axis  = sin(($ma+90)*$DEG)*$radius;
+  $axis = -$axis
+    if ($axis < 0);
+    
+  if( (0.0 <= $ma && $ma <= 90) || (270.0 < $ma && $ma <= 360.0) ){
+    $dir = 1;
+  }else{
+    $dir = 0;
+  }
+  if( 0.0 < $ma && $ma <= 180 ){
+    $start  = $radius;
+    $middle = -$radius;
+  }else{
+    $start  = -$radius;
+    $middle = $radius;
+  }
+ 
+  FW_pO '<g transform="translate(400,400) scale(-1,1)">';
+  FW_pO '<circle cx="0" cy="0" r="250" fill="rgb(70,70,100)"/>';
+  FW_pO '<path d="M 0 '.$start.' A '.$axis.' '.$radius.' 0 0 '.$dir.' 0 '.$middle.' A '.$radius.' '.$radius.' 0 0 0 0 '.$start.' Z" fill="rgb(255,220,100)"/>';
+  FW_pO '</g>';
+  FW_pO '</svg>';
+  return ($FW_RETTYPE, $FW_RET); 
+}	         
+
+########################################################################################
+#
 # Astro_Update - Update readings 
 #
 #  Parameter hash = hash of the bus master a = argument array
@@ -1217,8 +1274,11 @@ sub Astro_Update($@) {
   $Date{hour} = $hour;
   $Date{min}  = $min;
   $Date{sec}  = $sec; 
-  $Date{zonedelta} = (strftime "%z", localtime)/100;
-  $Date{dayofyear} = strftime("%-j", localtime);
+  #-- broken on windows
+  #$Date{zonedelta} = (strftime "%z", localtime)/100;
+  $Date{zonedelta} = Astro_tzoffset(time)/100;
+  #-- half broken in windows
+  $Date{dayofyear} = 1*strftime("%j", localtime);
   
   Astro_Compute($hash);
   
@@ -1260,8 +1320,11 @@ sub Astro_Get($@) {
       $Date{min}  = (defined($6)) ? $6 : 0;
       $Date{sec}  = (defined($8)) ? $8 : 0; 
       my $fTot = timelocal($Date{sec},$Date{min},$Date{hour},$Date{day},$Date{month}-1,$Date{year});
-      $Date{zonedelta} = (strftime "%z", localtime($fTot))/100;
-      $Date{dayofyear} = strftime("%-j", localtime($fTot));
+      #-- broken on windows
+      #$Date{zonedelta} = (strftime "%z", localtime($fTot))/100;
+      $Date{zonedelta} = Astro_tzoffset($fTot)/100;
+      #-- half broken in windows
+      $Date{dayofyear} = 1*strftime("%j", localtime($fTot));
     }else{
       return "[Astro_Get] $name has improper time specification, use YYYY-MM-DD HH:MM:SS";
     }
@@ -1276,8 +1339,11 @@ sub Astro_Get($@) {
     $Date{hour} = $hour;
     $Date{min}  = $min;
     $Date{sec}  = $sec; 
-    $Date{zonedelta} = (strftime "%z", localtime)/100;
-    $Date{dayofyear} = strftime("%-j", localtime);
+    #-- broken on windows
+    #$Date{zonedelta} = (strftime "%z", localtime)/100;
+    $Date{zonedelta} = Astro_tzoffset(time)/100;
+    #-- half broken in windows
+    $Date{dayofyear} = 1*strftime("%j", localtime);
   }
 
   if( $a[1] eq "version") {
@@ -1321,9 +1387,7 @@ sub Astro_Get($@) {
         $Astro{MoonRa},$astro_tt->{"dec"},$Astro{MoonDec},$astro_tt->{"az"},$Astro{MoonAz},$astro_tt->{"alt"},$Astro{MoonAlt});
       $ret .= sprintf("%s %2.1f',  %s %2.1f°, %s %1.2f = %s, %s %s\n",$astro_tt->{"diameter"},
         $Astro{MoonDiameter},$astro_tt->{"age"},$Astro{MoonAge},$astro_tt->{"phase"},$Astro{MoonPhaseN},$Astro{MoonPhaseS},$astro_tt->{"sign"},$Astro{MoonSign});
-    
-    #$ret .="\ndistance=".$moonCoor->{distance}."   test=".sqrt( ($xm)**2 + ($ym)**2 + ($zm)**2 )." $xm  $ym  $zm";
-    #$ret .="\ndistance=".$radius."   test=".sqrt( ($x)**2 + ($y)**2 + ($z)**2 )." $x  $y  $z";
+
      return $ret;
     }
   }else {
@@ -1372,6 +1436,10 @@ sub Astro_Get($@) {
         <li><i>Time,Timezone</i> obvious meaning</li>
         <li><i>GMST,ÖMST</i> = Greenwich and Local Mean Sidereal Time (in HH:MM)</li>
 	    </ul>
+	    <p>
+	    An SVG image of the current moon phase may be obtained under the link 
+	    <code>&lt;ip address of fhem&gt;/fhem/Astro_moonwidget?name='&lt;device name&gt;'&amp;size='&lt;width&gt;x&lt;height&gt;'</code>
+	    <p>
         Notes: <ul>
         <li>Calculations are only valid between the years 1900 and 2100</li>
         <li>Attention: Timezone is taken from the local Perl settings, NOT automatically defined for a location</li>
@@ -1423,7 +1491,7 @@ sub Astro_Get($@) {
         <code>attr  &lt;name&gt;  longitude &lt;value&gt;</code><br/>
         <code>attr  &lt;name&gt;  latitude &lt;value&gt;</code><br/>
         <code>attr  &lt;name&gt;  altitude &lt;value&gt;</code> (in m above sea level)<br/>
-        <code>attr  &lt;name&gt;  horizon &lt;value&gt;</code> custom horizon angle in degrees, default 0<br/>
+        <code>attr  &lt;name&gt;  horizon &lt;value&gt;</code> custom horizon angle in degrees, default 0<br/>   
         These definitions take precedence over global attribute settings.
         </li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
@@ -1437,6 +1505,6 @@ sub Astro_Get($@) {
 
 <a name="Astro"></a>
 <h3>Astro</h3>
-Absichtlich keine deutsche Dokumentation vorhanden, die englische Version gibt es hier: <a href="/fhem/commandref.html#Astro">Astro</a> 
+Absichtlich keine deutsche Dokumentation vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#Astro">Astro</a> 
 =end html_DE
 =cut

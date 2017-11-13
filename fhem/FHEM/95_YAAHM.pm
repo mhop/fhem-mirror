@@ -48,7 +48,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.16";
+my $yaahmversion    = "1.17";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -898,7 +898,7 @@ sub YAAHM_restore($$) {
   my ($hash,$doit) = @_;
   my $name = $hash->{NAME};
   my ($error,$jhash0) = FileRead("YAAHMFILE");
-  if( defined($error) ){
+  if( defined($error) && $error ne "" ){
     Log3 $name,1,"[YAAHM_restore] read error=$error";
     return undef;
   }
@@ -1708,14 +1708,28 @@ sub YAAHM_setWeeklyTime($) {
     }else{
       #-- "next" after current time => we mean today
       if( $nga > $lga ){
-        $sg0mod = "$ng (man)";
-        $ring_0 = $ng;
+        #-- only restore standard setting
+        if( $ng eq $sg0 ){
+          $sg0mod = $sg0;
+          $ring_0 = $sg0;
+          $hash->{DATA}{"WT"}[$i]{ "next" } = "";
+        }else{
+          $sg0mod = "$ng (man)";
+          $ring_0 = $ng;
+        }
         $ring_1 = $sg1;
       #-- "next" before current time => we mean tomorrow
       }else{
-        $sg1mod = "$ng (man)";
+        #-- only restore standard setting
+        if( $ng eq $sg1 ){
+          $sg0mod = $sg1;
+          $ring_1 = $sg1;
+          $hash->{DATA}{"WT"}[$i]{ "next" } = "";
+        }else{
+          $sg1mod = "$ng (man)";
+          $ring_1 = "$sg1 ($ng)";
+        }
         $ring_0 = $sg0;
-        $ring_1 = "$sg1 ($ng)";
       }
     }
     #-- notation: 
@@ -1782,7 +1796,7 @@ sub YAAHM_sayWeeklyTime($$$) {
     if( ($ton =~ /(\d?\d):(\d\d)(:(\d\d))?/) && ($tom ne $ton) ){
       $hw = $1*1;
       $mw = $2*1;
-      $pt = sprintf("%d:%02d",$hw,$mw);
+      $pt = sprintf("%d:%02d",$hw,$mw)." ".tolower($yaahm_tt->{"today"});
       
       $msg .= " ".tolower($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"exceptly"}." $hw ".$yaahm_tt->{"clock"};
       $msg .=" $mw"
@@ -2594,10 +2608,6 @@ sub YAAHM_timewidget($){
   $name    =~ s/'//g;
   
   my @size=split('x',($FW_webArgs{size} ? $FW_webArgs{size} : '400x400'));
-  #Log 1,"++++++++++++++++++++++++++++++++++++++++++++";
-  #Log 1,"YAAHM_timewidget type $type (subtype $subtype) called with $arg";
-  #Log 1,"YAAHM_timewidget has size ".$size[0]."x".$size[1];
-  #Log 1,"++++++++++++++++++++++++++++++++++++++++++++";
   
   $FW_RETTYPE = "image/svg+xml";
   $FW_RET="";
