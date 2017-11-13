@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 0.97 beta
+#  Version 0.98 beta
 #
 #  Thread based RPC Server module for HMCCU.
 #
@@ -40,7 +40,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPC_VERSION = '0.97 beta';
+my $HMCCURPC_VERSION = '0.98 beta';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPC_MAX_EVENTS = 50;
@@ -237,7 +237,7 @@ sub HMCCURPC_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = "rpcInterfaces:multiple-strict,".join(',',sort keys %HMCCURPC_RPC_PORT).
-		" ccuflags:multiple-strict,expert,keepThreads,reconnect".
+		" ccuflags:multiple-strict,expert,keepThreads,logEvents,reconnect".
 		" rpcMaxEvents rpcQueueSize rpcTriggerTime". 
 		" rpcServer:on,off rpcServerAddr rpcServerPort rpcWriteTimeout rpcAcceptTimeout".
 		" rpcConnTimeout rpcWaitTime rpcStatistics rpcEventTimeout ".
@@ -652,7 +652,7 @@ sub HMCCURPC_Read ($)
 		}
 		elsif ($et eq 'TO') {
 			$hmccu_hash->{ccustate} = 'timeout';
-			if ($hash->{RPCState} eq 'running' && $hash->{$ccuflags} =~ /reconnect/) {
+			if ($hash->{RPCState} eq 'running' && $ccuflags =~ /reconnect/) {
 				if (HMCCU_TCPConnect ($hash->{host}, $par[0])) {
 					$hmccu_hash->{ccustate} = 'active';
 					Log3 $name, 2, "HMCCURPC: Reconnecting to CCU interface ".
@@ -833,6 +833,8 @@ sub HMCCURPC_ProcessEvent ($$)
 		"ST", 11
 	);
 	
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
+	
 	# Parse event
 	return undef if (!defined ($event) || $event eq '');
 	my @t = split (/\|/, $event);
@@ -865,6 +867,9 @@ sub HMCCURPC_ProcessEvent ($$)
 			$rpceventargs{$et};
 		return undef;
 	}
+	
+	# Log event
+	Log3 $name, 2, "HMCCURPC: CCUEvent = $event" if ($ccuflags =~ /logEvents/);
 
 	# Update statistic counters
 	$rh->{$clkey}{rec}{$et}++;

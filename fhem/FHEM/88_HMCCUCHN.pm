@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.1.001
+#  Version 4.1.003
 #
 #  (c) 2017 zap (zap01 <at> t-online <dot> de)
 #
@@ -38,7 +38,7 @@
 #  attr <name> ccuflags { altread, nochn0, trace }
 #  attr <name> ccuget { State | Value }
 #  attr <name> ccureadings { 0 | 1 }
-#  attr <name> ccureadingfilter <datapoint-expr>
+#  attr <name> ccureadingfilter <filter-rule>[;...]
 #  attr <name> ccureadingformat { name[lc] | address[lc] | datapoint[lc] }
 #  attr <name> ccureadingname <oldname>:<newname>[;...]
 #  attr <name> ccuverify { 0 | 1 | 2 }
@@ -84,7 +84,8 @@ sub HMCCUCHN_Initialize ($)
 
 	$hash->{AttrList} = "IODev ccuackstate:0,1 ccucalculate ".
 		"ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter ".
-		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ".
+		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ".
+		"ccureadingname:textField-long ".
 		"ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint ".
 		"disable:0,1 hmstatevals:textField-long statedatapoint statevals substitute:textField-long ".
 		"substexcl stripnumber peer:textField-long ". $readingFnAttributes;
@@ -778,15 +779,19 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
       <li><b>ccureadingfilter &lt;filter-rule[;...]&gt;</b><br/>
          Only datapoints matching specified expression are stored as readings.<br/>
-         Syntax for <i>filter-rule</i> is: [N:][&lt;channel-name&gt;!]&lt;RegExp&gt;<br/>
-         If <i>channel-name</i> is specified the following rule applies only to this channel.
+         Syntax for <i>filter-rule</i> is either:<br/>
+         [N:]{&lt;channel-name&gt;|&lt;channel-number&gt;}!&lt;RegExp&gt; or:<br/>
+         [N:][&lt;channel-number&gt;.]&lt;RegExp&gt;<br/>
+         If <i>channel-name</i> or <i>channel-number</i> is specified the following rule 
+         applies only to this channel.
          By default all datapoints will be stored as readings. Attribute ccudef-readingfilter
          of I/O device will be checked before this attribute.<br/>
          If a rule starts with 'N:' the filter is negated which means that a reading is 
          stored if rule doesn't match.
       </li><br/>
       <li><b>ccureadingformat {address[lc] | name[lc] | datapoint[lc]}</b><br/>
-         Set format of reading names. Default is 'name'. If set to 'address' format of reading names
+         Set format of reading names. Default for virtual device groups is 'name'. The default for all
+         other device types is 'datapoint'. If set to 'address' format of reading names
          is channel-address.datapoint. If set to 'name' format of reading names is
          channel-name.datapoint. If set to 'datapoint' format is channel-number.datapoint. With
          suffix 'lc' reading names are converted to lowercase.
@@ -910,14 +915,16 @@ sub HMCCUCHN_Get ($@)
          set my_switch on
          </code>
       </li><br/>
-      <li><b>stripnumber {<u>0</u> | 1 | 2 | -n}</b><br/>
+      <li><b>stripnumber [&lt;datapoint-expr&gt;!]{<u>0</u>|1|2|-n}[;...]</b><br/>
       	Remove trailing digits or zeroes from floating point numbers and/or round floating
       	point numbers. If attribute is negative (-0 is valid) floating point values are rounded
       	to the specified number of digits before they are stored in readings. The meaning of
       	values 0-2 is:<br/>
       	0 = Floating point numbers are stored as read from CCU (i.e. with trailing zeros)<br/>
       	1 = Trailing zeros are stripped from floating point numbers except one digit.<br/>
-   		2 = All trailing zeros are stripped from floating point numbers.
+   		2 = All trailing zeros are stripped from floating point numbers.<br/>
+   		If <i>datapoint-expr</i> is specified the formatting applies only to datapoints 
+   		matching the regular expression.
       </li><br/>
       <li><b>substexcl &lt;reading-expr&gt;</b><br/>
       	Exclude values of readings matching <i>reading-expr</i> from substitution. This is helpful
@@ -926,7 +933,7 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
       <li><b>substitute &lt;subst-rule&gt;[;...]</b><br/>
          Define substitutions for datapoint/reading values. Syntax of <i>subst-rule</i> is<br/><br/>
-         [[&lt;channelno.&gt;]&lt;datapoint&gt;[,...]!]&lt;{#n1-m1|regexp}&gt;:&lt;text&gt;[,...]
+         [[&lt;channelno&gt;.]&lt;datapoint&gt;[,...]!]&lt;{#n1-m1|regexp}&gt;:&lt;text&gt;[,...]
          <br/><br/>
          Parameter <i>text</i> can contain variables in format ${<i>varname</i>}. The variable 
          ${value} is
@@ -937,11 +944,11 @@ sub HMCCUCHN_Get ($@)
          'T=<i>val</i> deg' and append current value of datapoint 1.HUMIDITY<br/>
          <code>
          attr my_weather substitute TEMPERATURE!.+:T=${value} deg H=${1.HUMIDITY}%
-         </code>
+         </code><br/><br/>
          If rule expression starts with a hash sign a numeric datapoint value is substituted if
          it fits in the number range n &lt;= value &lt;= m.
          <br/><br/>
-         Example: Interpret LEVEL values of dimmer as "on" and "off"<br/>
+         Example: Interpret LEVEL values 100 and 0 of dimmer as "on" and "off"<br/>
          <code>
          attr my_dim substitute LEVEL!#0-0:off,#1-100:on
          </code>

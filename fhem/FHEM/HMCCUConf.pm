@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.1.001
+#  Version 4.1.002
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -154,8 +154,8 @@ use vars qw(%HMCCU_SCRIPTS);
 	statevals        => "press:true",
 	substitute       => "PRESS_SHORT,PRESS_LONG,PRESS_CONT!(1|true):pressed,(0|false):released;PRESS_LONG_RELEASE!(0|false):no,(1|true):yes"
 	},
-	"HM-RC-Key4-2|HM-RC-Key4-3" => {
-	_description     => "Funk-Handsender Key",
+	"HM-RC-Key4-2|HM-RC-Key4-3|HM-RC-Sec4-2|HM-RC-Sec4-3" => {
+	_description     => "Funk-Handsender",
 	_channels        => "1,2,3,4",
 	ccureadingfilter => "PRESS",
 	"event-on-update-reading" => ".*",
@@ -490,8 +490,8 @@ use vars qw(%HMCCU_SCRIPTS);
 	ccureadingfilter => "PRESS",
 	substitute       => "PRESS_SHORT,PRESS_LONG,PRESS_CONT!(1|true):pressed,(0|false):released;PRESS_LONG_RELEASE!(0|false):no,(1|true):yes"
 	},
-	"HM-RC-Key4-2|HM-RC-Key4-3" => {
-	_description     => "Funk-Handsender Key",
+	"HM-RC-Key4-2|HM-RC-Key4-3|HM-RC-Sec4-2|HM-RC-Sec4-3" => {
+	_description     => "Funk-Handsender",
 	ccureadingfilter => "PRESS",
 	"event-on-update-reading" => ".*",
 	substitute       => "PRESS_SHORT,PRESS_LONG!(1|true):pressed"
@@ -538,6 +538,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	cmdIcon          => "Auto:sani_heating_automatic Manu:sani_heating_manual Boost:sani_heating_boost on:general_an off:general_aus",
 	controldatapoint => "2.SET_TEMPERATURE",
 	eventMap         => "/datapoint 2.MANU_MODE 20.0:Manu/datapoint 2.AUTO_MODE 1:Auto/datapoint 2.BOOST_MODE 1:Boost/datapoint 2.MANU_MODE 4.5:off/datapoint 2.MANU_MODE 30.5:on/",
+	genericDeviceType => "thermostat",
 	statedatapoint   => "2.SET_TEMPERATURE",
 	stripnumber      => 1,
 	substexcl        => "control",
@@ -551,6 +552,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	cmdIcon          => "Auto:sani_heating_automatic Manu:sani_heating_manual Boost:sani_heating_boost on:general_an off:general_aus",
 	controldatapoint => "4.SET_TEMPERATURE",
 	eventMap         => "/datapoint 4.MANU_MODE 20.0:Manu/datapoint 4.AUTO_MODE 1:Auto/datapoint 4.BOOST_MODE 1:Boost/datapoint 4.MANU_MODE 4.5:off/datapoint 4.MANU_MODE 30.5:on/",
+	genericDeviceType => "thermostat",
 	hmstatevals      => "FAULT_REPORTING!1:valve_tight,2:range_too_large,3:range_too_small,4:communication_error,5:other_error,6:battery_low,7:valve_error_pos",
 	statedatapoint   => "4.SET_TEMPERATURE",
 	stripnumber      => 1,
@@ -559,12 +561,14 @@ use vars qw(%HMCCU_SCRIPTS);
 	webCmd           => "control:Auto:Manu:Boost:on:off",
 	widgetOverride   => "control:slider,4.5,0.5,30.5,1"
 	},
-	"HMIP-eTRV" => {
+	"HmIP-eTRV|HmIP-eTRV-2" => {
 	_description     => "Heizkoerperthermostat HM-IP",
+	ccureadingfilter => "^ACTUAL_TEMPERATURE|^BOOST_MODE|^SET_POINT_MODE|^SET_POINT_TEMPERATURE|^LEVEL|^WINDOW_STATE",
 	ccureadingname   => "1.LEVEL:valve_position",
 	ccuscaleval      => "LEVEL:0:1:0:100",
 	controldatapoint => "1.SET_POINT_TEMPERATURE",
 	eventMap         => "/datapoint 1.BOOST_MODE true:Boost/datapoint 1.CONTROL_MODE 0:Auto/datapoint 1.CONTROL_MODE 1:Manual/datapoint 1.CONTROL_MODE 2:Holiday/datapoint 1.SET_POINT_TEMPERATURE 4.5:off/datapoint 1.SET_POINT_TEMPERATURE 30.5:on/",
+	genericDeviceType => "thermostat",
 	statedatapoint   => "1.SET_POINT_TEMPERATURE",
 	stripnumber      => 1,
 	substexcl        => "control",
@@ -576,6 +580,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	_description     => "Wandthermostat HM-IP",
 	controldatapoint => "1.SET_POINT_TEMPERATURE",
 	eventMap         => "/datapoint 1.BOOST_MODE true:Boost/datapoint 1.CONTROL_MODE 0:Auto/datapoint 1.CONTROL_MODE 1:Manual/datapoint 1.CONTROL_MODE 2:Holiday/datapoint 1.SET_POINT_TEMPERATURE 4.5:off/datapoint 1.SET_POINT_TEMPERATURE 30.5:on/",
+	genericDeviceType => "thermostat",
 	statedatapoint   => "1.SET_POINT_TEMPERATURE",
 	stripnumber      => 1,
 	substexcl        => "control",

@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.1.003
+#  Version 4.1.004
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -65,10 +65,10 @@
 #  attr <name> rpcserverport <base_port>
 #  attr <name> rpctimeout <read>[,<write>]
 #  attr <name> stripchar <character>
-#  attr <name> stripnumber { -<digits> | 0 | 1 | 2 }
+#  attr <name> stripnumber [<datapoint-expr!]{-<digits>|0|1|2}[;...]
 #  attr <name> substitute <subst_rule>
 #
-#  filter_rule := [channel-regexp!]datapoint-regexp[,...]
+#  filter_rule := channel-regexp!datapoint-regexp[;...]
 #  subst_rule := [[channel.]datapoint[,...]!]<regexp>:<subtext>[,...][;...]
 ##############################################################################
 #  Verbose levels:
@@ -105,7 +105,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.1.003';
+my $HMCCU_VERSION = '4.1.004';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -216,7 +216,7 @@ sub HMCCU_AggregateReadings ($$);
 sub HMCCU_ParseObject ($$$);
 sub HMCCU_FilterReading ($$$);
 sub HMCCU_GetReadingName ($$$$$$$);
-sub HMCCU_FormatReadingValue ($$);
+sub HMCCU_FormatReadingValue ($$$);
 sub HMCCU_Trace ($$$$);
 sub HMCCU_Log ($$$$);
 sub HMCCU_SetError ($@);
@@ -512,7 +512,7 @@ sub HMCCU_Attr ($@)
 # Parse aggregation rules for readings.
 # Syntax of aggregation rule is:
 # FilterSpec[;...]
-# FilterSpec := {Name|Filt|Read|Cond|Else|Pref|Coll}[,...]
+# FilterSpec := {Name|Filt|Read|Cond|Else|Pref|Coll|Html}[,...]
 # Name := name:Name
 # Filt := filter:{name|type|group|room|alias}=Regexp[!Regexp]
 # Read := read:Regexp
@@ -520,6 +520,7 @@ sub HMCCU_Attr ($@)
 # Else := else:Value
 # Pref := prefix:{RULE|Prefix}
 # Coll := coll:{NAME|Attribute}
+# Html := html:Template
 ######################################################################
 
 sub HMCCU_AggregationRules ($$)
@@ -547,12 +548,12 @@ sub HMCCU_AggregationRules ($$)
 		# Parse aggregation rule
 		my @specs = split (',', $r);		
 		foreach my $spec (@specs) {
-			if ($spec =~ /^(name|filter|read|if|else|prefix|coll):(.+)$/) {
+			if ($spec =~ /^(name|filter|read|if|else|prefix|coll|html):(.+)$/) {
 				$opt{$1} = $2;
 			}
 		}
 		
-		# Check if rule syntax is correct
+		# Check if mandatory parameters are specified
 		foreach my $p (@pars) {
 			return HMCCU_Log ($hash, 1, "Parameter $p is missing in aggregation rule $cnt.", 0)
 				if (!exists ($opt{$p}));
@@ -566,6 +567,46 @@ sub HMCCU_AggregationRules ($$)
 		return 0 if (!defined ($fval));
 		my ($fcoll, $fdflt) = split ('!', $opt{coll});
 		$fdflt = 'no match' if (!defined ($fdflt));
+		my $fhtml = exists ($opt{'html'}) ? $opt{'html'} : '';
+		
+		# Read HTML template (optional)
+		if ($fhtml ne '') {
+			my %tdef;
+			my @html;
+			
+			# Read template file
+			if (open (TEMPLATE, "<$fhtml")) {
+				@html = <TEMPLATE>;
+				close (TEMPLATE);
+			}
+			else {
+				return HMCCU_Log ($hash, 1, "Can't open file $fhtml.", 0);
+			}
+
+			# Parse template
+			foreach my $line (@html) {
+				chomp $line;
+				my ($key, $h) = split /:/, $line, 2;
+				next if (!defined ($h) || $key =~ /^#/);
+				$tdef{$key} = $h;
+			}
+
+			# Some syntax checks
+			return HMCCU_Log ($hash, 1, "Missing definition row-odd in template file.", 0)
+				if (!exists ($tdef{'row-odd'}));
+
+			# Set default values
+			$tdef{'begin-html'} = '' if (!exists ($tdef{'begin-html'}));
+			$tdef{'end-html'} = '' if (!exists ($tdef{'end-html'}));
+			$tdef{'begin-table'} = "<table>" if (!exists ($tdef{'begin-table'}));
+			$tdef{'end-table'} = "</table>" if (!exists ($tdef{'end-table'}));
+			$tdef{'default'} = 'no data' if (!exists ($tdef{'default'}));;
+			$tdef{'row-even'} = $tdef{'row-odd'} if (!exists ($tdef{'row-even'}));
+			
+			foreach my $t (keys %tdef) {
+				$hash->{hmccu}{agg}{$fname}{fhtml}{$t} = $tdef{$t};
+			}
+		}
 
 		$hash->{hmccu}{agg}{$fname}{ftype} = $ftype;
 		$hash->{hmccu}{agg}{$fname}{fexpr} = $fexpr;
@@ -861,7 +902,7 @@ sub HMCCU_Notify ($$)
 }
 
 ######################################################################
-# Calculate reading aggregation.
+# Calculate reading aggregations.
 # Called by Notify or via command get aggregation.
 ######################################################################
 
@@ -873,17 +914,18 @@ sub HMCCU_AggregateReadings ($$)
 	my $mc = 0;
 	my $result = '';
 	my $rl = '';
+	my $table = '';
 
 	# Get rule parameters
 	my $ftype = $hash->{hmccu}{agg}{$rule}{ftype};
 	my $fexpr = $hash->{hmccu}{agg}{$rule}{fexpr};
 	my $fexcl = $hash->{hmccu}{agg}{$rule}{fexcl};
 	my $fread = $hash->{hmccu}{agg}{$rule}{fread};
-#	my $fcoll = $hash->{hmccu}{agg}{$rule}{fcoll};
 	my $fcond = $hash->{hmccu}{agg}{$rule}{fcond};
 	my $ftrue = $hash->{hmccu}{agg}{$rule}{ftrue};
 	my $felse = $hash->{hmccu}{agg}{$rule}{felse};
 	my $fpref = $hash->{hmccu}{agg}{$rule}{fpref};
+	my $fhtml = exists ($hash->{hmccu}{agg}{$rule}{fhtml}) ? 1 : 0;
 
 	my $resval;
 	$resval = $ftrue if ($fcond =~ /^(max|min|sum|avg)$/);
@@ -906,38 +948,38 @@ sub HMCCU_AggregateReadings ($$)
 			$cn : AttrVal ($cn, $hash->{hmccu}{agg}{$rule}{fcoll}, $cn);
 		
 		# Compare readings
-		my $f = 0;
 		foreach my $r (keys %{$ch->{READINGS}}) {
 			next if ($r !~ /$fread/);
 			my $rv = $ch->{READINGS}{$r}{VAL};
+			my $f = 0;
+			
 			if (($fcond eq 'any' || $fcond eq 'all') && $rv =~ /$ftrue/) {
 				$mc++;
-				$rl .= ($mc > 1 ? ",$fcoll" : $fcoll);
-				last;
+				$f = 1;
 			}
 			if ($fcond eq 'max' && $rv > $resval) {
 				$resval = $rv;
 				$mc = 1;
-				$rl = $fcoll;
-				last;
+				$f = 1;
 			}
 			if ($fcond eq 'min' && $rv < $resval) {
 				$resval = $rv;
 				$mc = 1;
-				$rl = $fcoll;
-				last;
+				$f = 1;
 			}
 			if ($fcond eq 'sum' || $fcond eq 'avg') {
 				$resval += $rv;
 				$mc++;
 				$f = 1;
-				last;
 			}
 			if (($fcond eq 'gt' && $rv > $ftrue) ||
 			    ($fcond eq 'lt' && $rv < $ftrue) ||
 			    ($fcond eq 'ge' && $rv >= $ftrue) ||
 			    ($fcond eq 'le' && $rv <= $ftrue)) {
 				$mc++;
+				$f = 1;
+			}
+			if ($f) {
 				$rl .= ($mc > 1 ? ",$fcoll" : $fcoll);
 				last;
 			}
@@ -946,6 +988,34 @@ sub HMCCU_AggregateReadings ($$)
 	}
 	
 	$rl =  $hash->{hmccu}{agg}{$rule}{fdflt} if ($rl eq '');
+
+	# HTML code generation
+	if ($fhtml) {
+		if ($rl ne '') {
+			$table = $hash->{hmccu}{agg}{$rule}{fhtml}{'begin-html'}.
+				$hash->{hmccu}{agg}{$rule}{fhtml}{'begin-table'};
+			$table .= $hash->{hmccu}{agg}{$rule}{fhtml}{'header'}
+				if (exists ($hash->{hmccu}{agg}{$rule}{fhtml}{'header'}));
+
+			my $row = 1;
+			foreach my $v (split (",", $rl)) {
+				my $t_row = ($row % 2) ? $hash->{hmccu}{agg}{$rule}{fhtml}{'row-odd'} :
+					$hash->{hmccu}{agg}{$rule}{fhtml}{'row-even'};
+				$t_row =~ s/\<reading\/\>/$v/;
+				$table .= $t_row;
+				$row++;
+			}
+
+			$table .= $hash->{hmccu}{agg}{$rule}{fhtml}{'end-table'}.
+				$hash->{hmccu}{agg}{$rule}{fhtml}{'end-html'};
+		}
+		else {
+			$table = $hash->{hmccu}{agg}{$rule}{fhtml}{'begin-html'}.
+				$hash->{hmccu}{agg}{$rule}{fhtml}{'default'}.
+				$hash->{hmccu}{agg}{$rule}{fhtml}{'end-html'};
+		}
+	}
+
 	if ($fcond eq 'any') {
 		$result = $mc > 0 ? $ftrue : $felse;
 	}
@@ -968,6 +1038,7 @@ sub HMCCU_AggregateReadings ($$)
 	readingsBulkUpdate ($hash, $fpref.'match', $mc);
 	readingsBulkUpdate ($hash, $fpref.'count', $dc);
 	readingsBulkUpdate ($hash, $fpref.'list', $rl);
+	readingsBulkUpdate ($hash, $fpref.'table', $table) if ($fhtml);
 	readingsEndUpdate ($hash, 1);
 	
 	return $result;
@@ -1584,7 +1655,7 @@ sub HMCCU_Get ($@)
 	else {
 		if (exists ($hash->{hmccu}{agg})) {
 			my @rules = keys %{$hash->{hmccu}{agg}};
-			$options .= " aggregation:all,".join (',', @rules) if (scalar (@rules) > 0);
+			$usage .= " aggregation:all,".join (',', @rules) if (scalar (@rules) > 0);
 		}
 		return $usage;
 	}
@@ -1714,9 +1785,15 @@ sub HMCCU_ParseObject ($$$)
 ######################################################################
 # Filter reading by datapoint and optionally by channel name or
 # channel address.
-# Parameters: hash, channel, datapoint
+# Parameter channel can be a channel name or a channel address without
+# interface specification.
+# Filter rule syntax is either:
+#   [N:]{Channel-Number|Channel-Name-Expr}!Datapoint-Expr
+# or
+#   [N:][Channel-Number.]Datapoint-Expr
+# Multiple filter rules must be separated by ;
 ######################################################################
-
+ 
 sub HMCCU_FilterReading ($$$)
 {
 	my ($hash, $chn, $dpt) = @_;
@@ -1725,42 +1802,79 @@ sub HMCCU_FilterReading ($$$)
 
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return 1 if (!defined ($hmccu_hash));
-	
+
 	my $grf = AttrVal ($hmccu_hash->{NAME}, 'ccudef-readingfilter', '');
 	$grf = '.*' if ($grf eq '');
 	my $rf = AttrVal ($name, 'ccureadingfilter', $grf);
 	$rf = $grf.";".$rf if ($rf ne $grf && $grf ne '.*' && $grf ne '');
 
-	my $chnnam = HMCCU_IsChnAddr ($chn, 0) ? HMCCU_GetChannelName ($hmccu_hash, $chn, '') : $chn;
+	my $chnnam = '';
+	my $chnnum = '';
+	my $devadd = '';
 
-	HMCCU_Trace ($hash, 2, $fnc, "chn=$chn, dpt=$dpt, rules=$rf");
-	
-	my $rm = 1;
-	my @rules = split (';', $rf);
-	foreach my $r (@rules) {
-		$rm = 1;
+	# Get channel name and channel number
+	if (HMCCU_IsChnAddr ($chn, 0)) {
+		$chnnam = HMCCU_GetChannelName ($hmccu_hash, $chn, '');
+		($devadd, $chnnum) = HMCCU_SplitChnAddr ($chn);
+	}
+	else {
+		($devadd, $chnnum) = HMCCU_GetAddress ($hash, $chn, '', '');
+		$chnnam = $chn;
+	}
+ 
+ 	HMCCU_Trace ($hash, 2, $fnc, "chn=$chn, chnnam=$chnnam chnnum=$chnnum dpt=$dpt, rules=$rf");
+       
+	foreach my $r (split (';', $rf)) {
+		my $rm = 1;
+		my $cn = '';
+		
+		# Negative filter
 		if ($r =~ /^N:/) {
 			$rm = 0;
 			$r =~ s/^N://;
 		}
+		
+		# Get filter criteria
 		my ($c, $f) = split ("!", $r);
-		HMCCU_Trace ($hash, 2, undef, "    rm=$rm, r=$r, dpt=$dpt chnflt=$c chnnam=$chnnam");
-		if (defined ($f) && $chnnam ne '') {
-			if ($chnnam =~ /$c/) {
-				HMCCU_Trace ($hash, 2, undef, "    $chnnam = $c");
-				return $rm if (($rm && $dpt =~ /$f/) || (!$rm && $dpt =~ /$f/));
-				return $rm ? 0 : 1;
-			}
+		if (defined ($f)) {
+			next if ($c eq '' || $chnnam eq '' || $chnnum eq '');
+			$cn = $c if ($c =~ /^([0-9]{1,2})$/);
 		}
 		else {
-			HMCCU_Trace ($hash, 2, undef, "    check $rm=1 AND $dpt=$r OR $rm=0 AND $dpt=$r");
-			return $rm if (($rm && $dpt =~ /$r/) || (!$rm && $dpt =~ /$r/));
-			HMCCU_Trace ($hash, 2, undef, "    check negative");
+			$c = '';
+			if ($r =~ /^([0-9]{1,2})\.(.+)$/) {
+				$cn = $1;
+				$f = $2;
+			}
+			else {
+				$cn = '';
+				$f = $r;
+			}
 		}
+
+		HMCCU_Trace ($hash, 2, undef, "    check rm=$rm f=$f cn=$cn c=$c");
+		# Positive filter
+		return 1 if (
+			$rm && (
+				(
+					($cn ne '' && "$chnnum" eq "$cn") ||
+					($c ne '' && $chnnam =~ /$c/) ||
+					($cn eq '' && $c eq '')
+				) && $dpt =~ /$f/
+			)
+		);
+		# Negative filter
+		return 1 if (
+			!$rm && (
+				($cn ne '' && "$chnnum" ne "$cn") ||
+				($c ne '' && $chnnam !~ /$c/) ||
+				$dpt !~ /$f/
+			)
+		);
+		HMCCU_Trace ($hash, 2, undef, "    check result false");
 	}
 
-	HMCCU_Trace ($hash, 2, $fnc, "return rm = $rm ? 0 : 1");
-	return $rm ? 0 : 1;
+	return 0;
 }
 
 ######################################################################
@@ -1869,28 +1983,41 @@ sub HMCCU_GetReadingName ($$$$$$$)
 ######################################################################
 # Format reading value depending on attribute stripnumber. Integer
 # values are ignored.
-# 0 = Preserve all digits
-# 1 = Preserve 1 digit
-# 2 = Remove trailing zeroes
-# -n = Round value to specified number of digits (-0 is valid)
+# Syntax of attribute stripnumber:
+#   [datapoint-expr!]format[;...]
+# Valid formats:
+#   0 = Preserve all digits (default)
+#   1 = Preserve 1 digit
+#   2 = Remove trailing zeroes
+#   -n = Round value to specified number of digits (-0 is allowed)
 ######################################################################
 
-sub HMCCU_FormatReadingValue ($$)
+sub HMCCU_FormatReadingValue ($$$)
 {
-	my ($hash, $value) = @_;
+	my ($hash, $value, $dpt) = @_;
 
 	my $stripnumber = AttrVal ($hash->{NAME}, 'stripnumber', '0');
 	return $value if ($stripnumber eq '0' || $value !~ /\.[0-9]+$/);
-
-	if ($stripnumber eq '1') {
-		return sprintf ("%.1f", $value);
-	}
-	elsif ($stripnumber eq '2') {
-		return sprintf ("%g", $value);
-	}
-	elsif ($stripnumber =~ /^-([0-9])$/) {
-		my $fmt = '%.'.$1.'f';
-		return sprintf ($fmt, $value);
+	
+	foreach my $sr (split (';', $stripnumber)) {
+		my ($d, $s) = split ('!', $sr);
+		if (defined ($s)) {
+			next if ($d eq '' || $dpt !~ /$d/);
+		}
+		else {
+			$s = $sr;
+		}
+		
+		if ($s eq '1') {
+			return sprintf ("%.1f", $value);
+		}
+		elsif ($s eq '2') {
+			return sprintf ("%g", $value);
+		}
+		elsif ($s =~ /^-([0-9])$/) {
+			my $fmt = '%.'.$1.'f';
+			return sprintf ($fmt, $value);
+		}
 	}
 
 	return $value;
@@ -2479,10 +2606,10 @@ sub HMCCU_UpdateSingleDevice ($$$)
 					if (HMCCU_FilterReading ($ch, $chnadd, $dpt)) {
 						my @readings = HMCCU_GetReadingName ($ch, '', $da, $chnnum, $dpt, '', $crf);
 						my $svalue = HMCCU_ScaleValue ($ch, $dpt, $value, 0);	
-						my $fvalue = HMCCU_FormatReadingValue ($ch, $svalue);
+						my $fvalue = HMCCU_FormatReadingValue ($ch, $svalue, $dpt);
 						my $cvalue = HMCCU_Substitute ($fvalue, $substitute, 0, $chnnum, $dpt);
 						my %calcs = HMCCU_CalculateReading ($ch, $chnnum, $dpt);
-					
+
 						# Store the resulting value after scaling, formatting and substitution
 						if (exists ($clthash->{hmccu}{dp}{"$chnnum.$dpt"}{OSVAL})) {
 							$clthash->{hmccu}{dp}{"$chnnum.$dpt"}{OSVAL} = $clthash->{hmccu}{dp}{"$chnnum.$dpt"}{SVAL};
@@ -2492,7 +2619,7 @@ sub HMCCU_UpdateSingleDevice ($$$)
 						}
 						$clthash->{hmccu}{dp}{"$chnnum.$dpt"}{SVAL} = $cvalue;					
 						$results{$da}{$chnnum}{$dpt} = $cvalue;
-					
+
 						HMCCU_Trace ($ch, 2, $fnc,
 							"device=$cltname, readings=".join(',', @readings).
 							", orgvalue=$value value=$cvalue peer=$peer");
@@ -4772,7 +4899,7 @@ sub HMCCU_GetVariables ($$)
 		next if (@vardata != 3);
 		next if ($vardata[0] !~ /$pattern/);
 		my $rn = HMCCU_CorrectName ($vardata[0]);
-		my $value = HMCCU_FormatReadingValue ($hash, $vardata[2]);
+		my $value = HMCCU_FormatReadingValue ($hash, $vardata[2], $vardata[0]);
 		readingsBulkUpdate ($hash, $rn, $value) if ($ccureadings); 
 		$result .= $vardata[0].'='.$vardata[2]."\n";
 		$count++;
@@ -5076,7 +5203,7 @@ sub HMCCU_RPCGetConfig ($$$$)
 			$result .= "$key=$value\n";
 			next if (!$ccureadings);
 			
-			$value = HMCCU_FormatReadingValue ($hash, $value);
+			$value = HMCCU_FormatReadingValue ($hash, $value, $key);
 			$value = HMCCU_Substitute ($value, $substitute, 0, $chn, $key);
 			my @readings = HMCCU_GetReadingName ($hash, $int, $add, $chn, $key, $nam, $readingformat);
 			foreach my $rn (@readings) {
@@ -5345,7 +5472,7 @@ sub HMCCU_GetHMState ($$$)
 		}
 		next if ($dp eq '');
 		my ($chn, $dpt) = split (/\./, $dp);
-		my $value = HMCCU_FormatReadingValue ($clhash, $clhash->{hmccu}{dp}{$dp}{VAL});
+		my $value = HMCCU_FormatReadingValue ($clhash, $clhash->{hmccu}{dp}{$dp}{VAL}, $hmstate[0]);
 		my ($rc, $newvalue) = HMCCU_SubstRule ($value, $subst, 0);
 		return ($hmstate[0], $chn, $dpt, $newvalue) if ($rc);
 	}
@@ -6165,7 +6292,7 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
    <b>Get</b><br/><br/>
    <ul>
       <li><b>get &lt;name&gt; aggregation {&lt;rule&gt;|all}</b><br/>
-      	Process aggregation rule defined with attribute ccuaggregation.
+      	Process aggregation rule defined with attribute ccuaggregate.
       </li><br/>
       <li><b>get &lt;name&gt; configdesc {&lt;device&gt;|&lt;channel&gt;}</b><br/>
          Get configuration parameter description of CCU device or channel (similar
@@ -6284,13 +6411,26 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       	<li><b>coll:{&lt;attribute&gt;|NAME}[!&lt;default-text&gt;]</b><br/>
       	Attribute of matching devices stored in aggregation results. Default text in case
       	of no matching devices found is optional.</li>
+      	<li><b>html:&lt;template-file&gt;</b><br/>
+      	Create HTML code with matching devices.</li>
       	</ul><br/>
-      	Aggregation results will be stored in readings <i>prefix</i>count, <i>prefix</i>
-      	list, <i>prefix</i>match and <i>prefix</i>state<br/><br/>
+      	Aggregation results will be stored in readings <i>prefix</i>count, <i>prefix</i>list,
+      	<i>prefix</i>match, <i>prefix</i>state and <i>prefix</i>table.<br/><br/>
+      	Format of a line in <i>template-file</i> is &lt;keyword&gt;:&lt;html-code&gt;. See
+      	FHEM Wiki for an example. Valid keywords are:<br/><br/>
+      	<ul>
+      	<li><b>begin-html</b>: Start of html code.</li>
+      	<li><b>begin-table</b>: Start of table (i.e. the table header)</li>
+      	<li><b>row-odd</b>: HTML code for odd lines. A tag &lt;reading/&gt is replaced by a matching device.</li>
+      	<li><b>row-even</b>: HTML code for event lines.</li>
+      	<li><b>end-table</b>: End of table.</li>
+      	<li><b>default</b>: HTML code for no matches.</li>
+      	<li><b>end-html</b>: End of html code.</li>
+      	</ul><br/>
       	Example: Find open windows<br/>
       	name=lock,filter:type=^HM-Sec-SC.*,read:STATE,if:any=open,else:closed,prefix:lock_,coll:NAME!All windows closed<br/><br/>
-      	Example: Find devices with low batteries<br/>
-      	name=battery,filter:name=.*,read:(LOWBAT|LOW_BAT),if:any=yes,else:no,prefix:batt_,coll:NAME<br/>
+      	Example: Find devices with low batteries. Generate reading in HTML format.<br/>
+      	name=battery,filter:name=.*,read:(LOWBAT|LOW_BAT),if:any=yes,else:no,prefix:batt_,coll:NAME!All batteries OK,html:/home/battery.cfg<br/>
       </li><br/>
       <li><b>ccudef-hmstatevals &lt;subst-rule[;...]&gt;</b><br/>
       	Set global rules for calculation of reading hmstate.

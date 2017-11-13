@@ -87,7 +87,8 @@ sub HMCCUDEV_Initialize ($)
 
 	$hash->{AttrList} = "IODev ccuackstate:0,1 ccucalculate:textField-long ". 
 		"ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter:textField-long ".
-		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ccureadingname ".
+		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ".
+		"ccureadingname:textField-long ".
 		"ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 ".
 		"hmstatevals:textField-long statevals substexcl substitute:textField-long statechannel ".
 		"statedatapoint controldatapoint stripnumber peer:textField-long ".$readingFnAttributes;
