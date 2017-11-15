@@ -95,16 +95,22 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
         var span = $(val).find("span");
         var sc = $(span).attr("selectcolor");
         var usc = $(span).attr("unselectcolor") == "none" ? "" : $(span).attr("unselectcolor");
+        if( usc.match(/^[A-F0-9]{6}$/i))
+          usc = "#"+usc;
         var isc = $(span).attr("ischecked");
         if(isc == "true") {
           if(sc.length > 0) {
-            data = data.replace(/fill=\".*?\"/,'fill="'+sc+'"')
-                       .replace(/fill:.*?[;\s]/,'fill:'+sc+';');
+            var re1 = new RegExp('fill="'+usc+'"','gi');
+            var re2 = new RegExp('fill:\\s?"'+usc+'[;\\s]','gi');
+            data = data.replace(re1,'fill="'+sc+'"')
+                       .replace(re2,'fill:'+sc+';');
           }
         } else {
           if(sc.length > 0) {
-            data = data.replace(/fill=\".*?\"/,'fill="'+usc+'"')
-                       .replace(/fill:.*?[;\s]/,'fill:'+usc+';');
+            var re1 = new RegExp('fill="'+sc+'"','gi');
+            var re2 = new RegExp('fill:\\s?"'+sc+'[;\\s]','gi');
+            data = data.replace(re1,'fill="'+usc+'"')
+                       .replace(re2,'fill:'+usc+';');
           }
         }
         $(span).addClass("iconButtons_widget").html(data);
@@ -121,10 +127,15 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
                                     var button = buttons[i];
                                     var span = button.next().find("span");
                                     var sc = $(span).attr("selectcolor");
+                                    var usc = $(span).attr("unselectcolor");
+                                    if( usc.match(/^[A-F0-9]{6}$/i))
+                                      usc = "#"+usc;
                                     if( $(button).prop("checked") ) {
                                       if(sc.length > 0) {
-                                        var html = $(span).html().replace(/fill=\".*?\"/,"fill=\""+sc+"\"")
-                                                                 .replace(/fill:.*?[;\s]/,"fill:"+sc+";");
+                                        var re1 = new RegExp('fill="'+usc+'"','gi');
+                                        var re2 = new RegExp('fill:\\s?"'+usc+'[;\\s]','gi');
+                                        var html = $(span).html().replace(re1,'fill="'+sc+'"')
+                                                                 .replace(re2,'fill:'+sc+';');
                                         $(span).html(html);
                                       } else {
                                         button.next().css({"background-color":vArr[1]});
@@ -150,16 +161,20 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
                                       button.prop("checked", arg.match(new RegExp('(^|,)'+vArr[i*ipar+2]+'($|,)') ) );
                                       if (button.prop("checked")==true){
                                         if(sc.length > 0) {
-                                          var html = $(span).html().replace(/fill=\".*?\"/,"fill=\""+sc+"\"")
-                                                                   .replace(/fill:.*?[;\s]/,"fill:"+sc+";");
+                                          var re1 = new RegExp('fill="'+usc+'"','gi');
+                                          var re2 = new RegExp('fill:\\s?"'+usc+'[;\\s]','gi');
+                                          var html = $(span).html().replace(re1,'fill="'+sc+'"')
+                                                                   .replace(re2,"fill:"+sc+";");
                                           $(span).html(html);
                                         } else {
                                           button.next().css({"background-color":vArr[1]});
                                         }
                                       } else {
                                         if(sc.length > 0) {
-                                          var html = $(span).html().replace(/fill=\".*?\"/,'fill="'+usc+'"')
-                                                                   .replace(/fill:.*?[;\s]/,'fill:'+usc+';');
+                                          var re1 = new RegExp('fill="'+sc+'"','gi');
+                                          var re2 = new RegExp('fill:\\s?"'+sc+'[;\\s]','gi');
+                                          var html = $(span).html().replace(re1,'fill="'+usc+'"')
+                                                                   .replace(re2,'fill:'+usc+';');
                                           $(span).html(html);
                                           
                                         } else {
