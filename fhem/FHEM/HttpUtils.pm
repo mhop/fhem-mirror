@@ -293,7 +293,7 @@ HttpUtils_Connect($)
   $hash->{displayurl} = $hash->{hideurl} ? "<hidden>" : $hash->{url};
   $hash->{sslargs}    = {} if(!defined($hash->{sslargs}));
 
-  Log3 $hash, $hash->{loglevel}, "HttpUtils url=$hash->{displayurl}";
+  Log3 $hash, $hash->{loglevel}+1, "HttpUtils url=$hash->{displayurl}";
 
   if($hash->{url} !~ /
       ^(http|https):\/\/                # $1: proto
@@ -798,7 +798,7 @@ HttpUtils_ParseAnswer($)
   }
 
   # Debug
-  Log3 $hash, $hash->{loglevel},
+  Log3 $hash, $hash->{loglevel}+1,
     "HttpUtils $hash->{displayurl}: Got data, length: ". length($ret);
   Log3 $hash, $hash->{loglevel}+1,
     "HttpUtils response header:\n$hash->{httpheader}" if($hash->{httpheader});

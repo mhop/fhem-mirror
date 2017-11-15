@@ -495,6 +495,7 @@ FHEM/SHC_parser.pm           rr2000               Sonstige Systeme
 FHEM/SubProcess.pm           neubert              FHEM Development
 FHEM/TcpServerUtils.pm       rudolfkoenig         Automatisierung
 FHEM/TimeSeries.pm           neubert     /jensb   FHEM Development
+FHEM/TR064Utils.pm           rudolfkoenig         Automatisierung
 FHEM/UConv.pm                loredo               FHEM Development
 FHEM/Unit.pm                 loredo               FHEM Development
 FHEM/YahooWeatherAPI.pm      neubert              Unterstuetzende Dienste/Wettermodule

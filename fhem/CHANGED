@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: TR064Utils.pm added
   - changed: 88_HMCCU: Improved attributes ccureadingfilter, stripnumber
   - feature: 89_FULLY: New commands for motion detection and brightness
   - update:  98_Siro.pm: add Disable attribute
