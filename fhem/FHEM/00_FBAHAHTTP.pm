@@ -19,6 +19,7 @@ FBAHAHTTP_Initialize($)
   $hash->{AttrFn}   = "FBAHAHTTP_Attr";
   $hash->{ReadyFn}  = "FBAHAHTTP_Ready";
   $hash->{RenameFn} = "FBAHAHTTP_RenameFn";
+  $hash->{DeleteFn} = "FBAHAHTTP_Delete";
   $hash->{AttrList} = "dummy:1,0 fritzbox-user polltime async_delay ".
                       "disable:0,1 disabledForIntervals";
 }
@@ -52,6 +53,15 @@ FBAHAHTTP_Define($$)
   InternalTimer(1, "FBAHAHTTP_Poll", $hash);
   $hash->{STATE} = "defined";
   return undef;
+}
+
+#####################################
+sub
+FBAHAHTTP_Delete($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my ($err, $fb_pw) = setKeyValue("FBAHAHTTP_PASSWORD_$name", undef);
 }
 
 sub
@@ -168,7 +178,7 @@ FBAHAHTTP_Attr($@)
     return "Cannot delete fritzbox-user" if($type eq "del");
     if($init_done) {
       delete($hash->{".SID"});
-      FBAHAHTTP_Poll($hash);
+      InternalTimer(1, sub { FBAHAHTTP_Poll($hash); }, 0);
     }
   }
   return undef;

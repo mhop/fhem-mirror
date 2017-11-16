@@ -410,6 +410,9 @@ FBAHA_Ready($)
 <a name="FBAHA"></a>
 <h3>FBAHA</h3>
 <ul>
+  <br>Note: Fritz!OS 6.90 and later does not offer the AHA service needed by
+  this module. Use the successor FBAHAHTTP instead of this module.</b><br>
+
   This module connects to the AHA server (AVM Home Automation) on a FRITZ!Box.
   It serves as the "physical" counterpart to the <a href="#FBDECT">FBDECT</a>
   devices. Note: you have to enable the access to this feature in the FRITZ!Box
@@ -492,10 +495,13 @@ FBAHA_Ready($)
 <a name="FBAHA"></a>
 <h3>FBAHA</h3>
 <ul>
+  <br>Achtung: ab Fritz!OS 6.90 ist der ben&ouml;tigte Dienst deaktiviert,
+  bitte den Nachfolger FBAHAHTTP verwenden.</b><br>
+
   Dieses Modul verbindet sich mit dem AHA (AVM Home Automation) Server auf
   einem FRITZ!Box. Es dient als "physikalisches" Gegenst&uuml;ck zum <a
-  href="#FBDECT">FBDECT</a> Modul. Achtung: als erstes muss der Zugang zu
-  diesen Daten in der FRITZ!Box Web-Oberfl&auml;che aktiviert werden.
+  href="#FBDECT">FBDECT</a> Modul. Als erstes muss der Zugang zu diesen Daten
+  in der FRITZ!Box Web-Oberfl&auml;che aktiviert werden.
   <br><br>
   <a name="FBAHAdefine"></a>
   <b>Define</b>
