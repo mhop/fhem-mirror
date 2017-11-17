@@ -51,6 +51,7 @@ FB_CALLMONITOR_Initialize($)
     $hash->{SetFn}     = "FB_CALLMONITOR_Set";
     $hash->{DefFn}     = "FB_CALLMONITOR_Define";
     $hash->{RenameFn}  = "FB_CALLMONITOR_Rename";    
+    $hash->{DeleteFn}  = "FB_CALLMONITOR_Delete";  
     $hash->{UndefFn}   = "FB_CALLMONITOR_Undef";
     $hash->{AttrFn}    = "FB_CALLMONITOR_Attr";
     $hash->{NotifyFn}  = "FB_CALLMONITOR_Notify";
@@ -113,6 +114,20 @@ FB_CALLMONITOR_Undef($$)
     my ($hash, $arg) = @_;
 
     DevIo_CloseDev($hash); 
+    
+    return undef;
+}
+
+#####################################
+# If Device is deleted, delete the password dataIf Device is renamed, copy the password data
+sub
+FB_CALLMONITOR_Delete($$)
+{
+    my ($hash, $name) = @_;  
+    
+    my $index = "FB_CALLMONITOR_".$name."_passwd";    
+    
+    setKeyValue($index, undef);
     
     return undef;
 }
