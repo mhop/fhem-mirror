@@ -481,6 +481,11 @@ sub description {
   return $self->{description};
 }
 
+sub categories {
+  my ($self)= @_;
+  return $self->{categories};
+}
+
 sub ts($$) {
   my ($self,$tm)= @_;
   return "" unless($tm);
@@ -505,20 +510,21 @@ sub asText {
 
 sub asFull {
   my ($self)= @_;
-  return sprintf("%s %9s %s %s-%s %s %s",
+  return sprintf("%s %9s %s %s-%s %s %s %s",
     $self->uid(),
     $self->getMode(),
     $self->{alarm} ? $self->ts($self->{alarm}) : "                   ",
     $self->ts($self->{start}),
     $self->ts($self->{end}),
     $self->{summary},
+    $self->{categories},
     $self->{location}
   );
 }
 
 sub asDebug {
   my ($self)= @_;
-  return sprintf("%s %s %9s %s %s-%s %s %s %s",
+  return sprintf("%s %s %9s %s %s-%s %s %s %s %s",
     $self->uid(),
     $self->modeChanged() ? "*" : " ",
     $self->getMode(),
@@ -526,6 +532,7 @@ sub asDebug {
     $self->ts($self->{start}),
     $self->ts($self->{end}),
     $self->{summary},
+    $self->{categories},
     $self->{location},
     $self->hasNote() ? $self->getNote() : ""
   );
@@ -1097,6 +1104,7 @@ sub makeEventDetails($$) {
   $event->{summary}= $self->valueOrDefault("SUMMARY", "");
   $event->{location}= $self->valueOrDefault("LOCATION", "");
   $event->{description}= $self->valueOrDefault("DESCRIPTION", "");
+  $event->{categories}= $self->valueOrDefault("CATEGORIES", "");
   
   return $event;
 }
@@ -1750,7 +1758,7 @@ sub Calendar_Get($@) {
 
   }
   
-  my @cmds2= qw/text full summary location description alarm start end uid debug/;
+  my @cmds2= qw/text full summary location description categories alarm start end uid debug/;
   if($cmd ~~ @cmds2) {
 
     return "argument is missing" if($#a < 2);
@@ -1819,6 +1827,7 @@ sub Calendar_Get($@) {
         push @texts, $event->summary() if $cmd eq "summary";
         push @texts, $event->location() if $cmd eq "location";
         push @texts, $event->description() if $cmd eq "description";
+        push @texts, $event->categories() if $cmd eq "categories";
         push @texts, $event->alarmTime() if $cmd eq "alarm";
         push @texts, $event->startTime() if $cmd eq "start";
         push @texts, $event->endTime() if $cmd eq "end";
@@ -1872,7 +1881,7 @@ sub Calendar_Get($@) {
     return join(";", keys %uids);
   
   } else {
-    return "Unknown argument $cmd, choose one of update:noArg reload:noArg find text full summary location description alarm start end vcalendar:noArg vevents:noArg";
+    return "Unknown argument $cmd, choose one of update:noArg reload:noArg find text full summary location description categories alarm start end vcalendar:noArg vevents:noArg";
   }
 
 }
@@ -2835,9 +2844,11 @@ sub CalendarAsHtml($;$) {
     <tr><td>text</td><td>a user-friendly textual representation, best suited for display</td></tr>
     <tr><td>summary</td><td>the content of the summary field (subject, title)</td></tr>
     <tr><td>location</td><td>the content of the location field</td></tr>
+    <tr><td>categories</td><td>the content of the categories field</td></tr>
     <tr><td>alarm</td><td>alarm time in human-readable format</td></tr>
     <tr><td>start</td><td>start time in human-readable format</td></tr>
     <tr><td>end</td><td>end time in human-readable format</td></tr>
+    <tr><td>categories</td><td>the content of the categories field</td></tr>
     <tr><td>full</td><td>the full state</td></tr>
     <tr><td>debug</td><td>like full with additional information for debugging purposes</td></tr>
     </table><br>
@@ -3241,6 +3252,7 @@ sub CalendarAsHtml($;$) {
     <tr><td>text</td><td>Benutzer-/Monitorfreundliche Textausgabe.</td></tr>
     <tr><td>summary</td><td>&Uuml;bersicht (Betreff, Titel)</td></tr>
     <tr><td>location</td><td>Ort</td></tr>
+    <tr><td>categories</td><td>Kategorien</td></tr>
     <tr><td>alarm</td><td>Alarmzeit</td></tr>
     <tr><td>start</td><td>Startzeit</td></tr>
     <tr><td>end</td><td>Endezeit</td></tr>
