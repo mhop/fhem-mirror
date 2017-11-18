@@ -3,16 +3,19 @@
 #
 # The purpose of this module is to support serval
 # weather sensors which use various protocol
-# Sidey79 & Ralf9  2016
-#
-
+# Sidey79 & Ralf9  2016 - 2017
+# Joerg 2017
+# 17.04.2017 WH2 (TFA 30.3157 nur Temp, Hum = 255),es wird das Perlmodul Digest:CRC benoetigt fuer CRC-Pruefung benoetigt
+# 29.05.2017 Test ob Digest::CRC installiert
+# 22.07.2017 WH2 angepasst
+# 21.08.2017 WH2 Abbruch wenn kein "FF" am Anfang
 package main;
 
 
 use strict;
 use warnings;
-
-#use Data::Dumper;
+# use Digest::CRC qw(crc);
+# use Data::Dumper;
 
 
 sub SD_WS_Initialize($)
@@ -25,13 +28,16 @@ sub SD_WS_Initialize($)
 	$hash->{ParseFn}	= "SD_WS_Parse";
 	$hash->{AttrFn}		= "SD_WS_Attr";
 	$hash->{AttrList}	= "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
-				"$readingFnAttributes ";
+						  "$readingFnAttributes ";
 	$hash->{AutoCreate} =
 	{ 
 		"SD_WS37_TH.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,",  autocreateThreshold => "2:180"},
 		"SD_WS50_SM.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,",  autocreateThreshold => "2:180"},
-		"BresserTemeo.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:180"}
-
+		"BresserTemeo.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:180"},
+		"SD_WS51_TH.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:180"},
+		"SD_WS58_TH.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:90"},
+    "SD_WH2.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:90"},
+		"SD_WS71_T.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:180"},
 	};
 
 }
@@ -63,7 +69,7 @@ sub SD_WS_Undef($$)
 {
 	my ($hash, $name) = @_;
 	delete($modules{SD_WS}{defptr}{$hash->{CODE}})
-		if(defined($hash->{CODE}) && defined($modules{SD_WS}{defptr}{$hash->{CODE}}));
+	if(defined($hash->{CODE}) && defined($modules{SD_WS}{defptr}{$hash->{CODE}}));
 	return undef;
 }
 
@@ -77,8 +83,7 @@ sub SD_WS_Parse($$)
 	my ($protocol,$rawData) = split("#",$msg);
 	$protocol=~ s/^[WP](\d+)/$1/; # extract protocol
 	
-	
-	
+
 	my $dummyreturnvalue= "Unknown, please report";
 	my $hlen = length($rawData);
 	my $blen = $hlen * 4;
@@ -113,74 +118,166 @@ sub SD_WS_Parse($$)
 			prematch => sub {my $msg = shift; return 1 if ($msg =~ /^FF5[0-9A-F]{5}FF[0-9A-F]{2}/); }, 		# prematch
 			crcok => sub {my $msg = shift; return 1 if ((hex(substr($msg,2,2))+hex(substr($msg,4,2))+hex(substr($msg,6,2))+hex(substr($msg,8,2))&0xFF) == (hex(substr($msg,10,2))) );  }, 	# crc
 			id => sub {my $msg = shift; return (hex(substr($msg,2,2)) &0x03 ); },   							#id
-			#temp => sub {my $msg = shift; return  (sprintf('%x',((hex(substr($msg,6,2)) <<4)/2/10)));  },		#temp
-			#temphex => sub {my $msg = shift; return  sprintf("%04X",((hex(substr($msg,6,2)))<<4)/2);  },			#temp
 			temp => sub {my $msg = shift; return  ((hex(substr($msg,6,2)))-40)  },								#temp
-			#hum => sub {my $msg = shift; return (printf('%02x',hex(substr($msg,4,2))));  }, 					#hum
 			hum => sub {my $msg = shift; return hex(substr($msg,4,2));  }, 										#hum
 			channel => sub {my (undef,$bitData) = @_; return ( SD_WS_binaryToNumber($bitData,12,15)&0x03 );  }, #channel
+			bat 	=> sub { return "";},
         },	
+     71 =>	
+	# 5C2A909F792F
+	# 589A829FDFF4
+	# PiiTTTK?CCCC
+	# P = Preamble (immer 5 ?)
+	# i = ID
+	# T = Temperatur
+	# K = Kanal (B/A/9)
+	# ? = immer F ?
+	# C = Checksum ?
+		  {
+     		sensortype => 'PV-8644',
+        	model =>	'SD_WS71_T',
+			prematch => sub {my $msg = shift; return 1 if ($msg =~ /^5[A-F0-9]{6}F[A-F0-9]{2}/); }, 			# prematch
+			crcok => 	sub {return 1; }, 										# crc is unknown
+			id => 		sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,4,11); },   		# id
+			temp => 	sub {my (undef,$bitData) = @_; return ((SD_WS_binaryToNumber($bitData,12,23) - 2448) / 10); },	#temp
+			channel => 	sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,26,27); },			#channel
+			hum => 		sub {return undef;},
+			bat => 		sub {return undef;},
+    	 	 },
      33 =>
    	 	 {
      		sensortype => 's014/TFA 30.3200/TCM/Conrad',
         	model =>	'SD_WS_33_TH',
 			prematch => sub {my $msg = shift; return 1 if ($msg =~ /^[0-9A-F]{10,11}/); }, 							# prematch
-			crcok => 	sub {return SD_WS_binaryToNumber($bitData,36,39);  }, 										# crc
+			crcok => 	sub {return SD_WS_binaryToNumber($bitData,36,39)+1;  }, 									# crc currently not calculated
 			id => 		sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,0,9); },   				# id
 	#		sendmode =>	sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,10,11) eq "1" ? "manual" : "auto";  }
 			temp => 	sub {my (undef,$bitData) = @_; return (((SD_WS_binaryToNumber($bitData,22,25)*256 +  SD_WS_binaryToNumber($bitData,18,21)*16 + SD_WS_binaryToNumber($bitData,14,17)) *10 -12200) /18)/10;  },	#temp
 			hum => 		sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,30,33)*16 + SD_WS_binaryToNumber($bitData,26,29));  }, 					#hum
 			channel => 	sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,12,13)+1 );  }, 		#channel
-     		bat => 		sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,34) eq "1" ? "ok" : "critical");},
+     		bat => 		sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,34) eq "1" ? "ok" : "critical";},
     # 		sync => 	sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,35,35) eq "1" ? "true" : "false");},
-   	 	 }        
-        
-        
+   	 	 } ,       
+     51 =>
+   	 	 {
+     		sensortype => 'Lidl Wetterstation 2759001/IAN114324',
+        	model =>	'SD_WS_51_TH', 
+			prematch => sub {my $msg = shift; return 1 if ($msg =~ /^[0-9A-F]{10}/); }, 							# prematch
+			crcok => 	sub {return 1;  }, 																			# crc is unknown
+			id => 		sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,0,12); },   				# random id?
+	#		sendmode =>	sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,10,11) eq "1" ? "manual" : "auto";  }
+			temp => 	sub {my (undef,$bitData) = @_; return round(((SD_WS_binaryToNumber($bitData,16,27)) -1220) *5 /90.0,1); },	#temp
+			hum => 		sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,28,31)*10) + (SD_WS_binaryToNumber($bitData,32,35));  }, 		#hum
+			channel => 	sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,36,39) );  }, 		#channel
+     		bat => 		sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,13) eq "1" ? "crititcal" : "ok";},
+      		trend => 	sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,15,16) eq "01" ? "rising" : SD_WS_binaryToNumber($bitData,14,15) eq "00" ? "neutral" : "rising";},
+     # 		sync => 	sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,35,35) eq "1" ? "true" : "false");},
+   	 	 }   ,  
+       58 => 
+   	 	 {
+     		sensortype => 'TFA 3032080',
+        	model =>	'SD_WS_58_TH', 
+			prematch => sub {my $msg = shift; return 1 if ($msg =~ /^45[0-9A-F]{11}/); }, 							# prematch
+			crcok => 	sub {   my $msg = shift;
+							    my @buff = split(//,substr($msg,index($msg,"45"),10));
+							    my $crc_check = substr($msg,index($msg,"45")+10,2);
+							    my $mask = 0x7C;
+							    my $checksum = 0x64;
+							    my $data;
+							    my $nibbleCount;
+							    for ( $nibbleCount=0; $nibbleCount < scalar @buff; $nibbleCount+=2)
+							    {
+							        my $bitCnt;
+							        if ($nibbleCount+1 <scalar @buff)
+							        {
+							        	$data = hex($buff[$nibbleCount].$buff[$nibbleCount+1]);
+							        } else  {
+							        	$data = hex($buff[$nibbleCount]);	
+							        }
+							        for ( my $bitCnt= 7; $bitCnt >= 0 ; $bitCnt-- )
+							        {
+							            my $bit;
+							            # Rotate mask right
+							            $bit = $mask & 1;
+							            $mask = ($mask >> 1 ) | ($mask << 7) & 0xFF;
+							            if ( $bit )
+							            {
+							                $mask ^= 0x18 & 0xFF;
+							            }
+							            # XOR mask into checksum if data bit is 1
+							            if ( $data & 0x80 )
+							            {
+							                $checksum ^= $mask & 0xFF;
+							            }
+							            $data <<= 1 & 0xFF;
+							        }
+							    }
+							    if ($checksum == hex($crc_check)) {
+								    return 1;
+							    } else {
+							    	return 0;
+							    }
+							}, 																			
+			id => 		sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,8,15); },   							   # random id
+			bat => 		sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,16) eq "1" ? "crititcal" : "ok";},  	   # bat?
+			channel => 	sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,17,19)+1 );  },						   # channel
+			temp => 	sub {my (undef,$bitData) = @_; return round((SD_WS_binaryToNumber($bitData,20,31)-720)*0.0556,1); }, 		   # temp
+			hum => 		sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,32,39));  }, 							   # hum
+   	 	 }   ,     
     );
     
     	
 	Log3 $name, 4, "SD_WS_Parse: Protocol: $protocol, rawData: $rawData";
 	
-	if ($protocol eq "37")		# Bresser 7009994
-	{
-		# 0      7 8 9 10 12        22   25    31
-		# 01011010 0 0 01 01100001110 10 0111101 11001010
-		# ID      B? T Kan Temp       ?? Hum     Pruefsumme?
-		
-		# MU;P0=729;P1=-736;P2=483;P3=-251;P4=238;P5=-491;D=010101012323452323454523454545234523234545234523232345454545232345454545452323232345232340;CP=4;
-		
+	if ($protocol eq "37") {		# Bresser 7009994
+		# Protokollbeschreibung:
+		# https://github.com/merbanan/rtl_433_tests/tree/master/tests/bresser_3ch
+		# The data is grouped in 5 bytes / 10 nibbles
+		# ------------------------------------------------------------------------
+		# 0         | 8    12   | 16        | 24        | 32
+		# 1111 1100 | 0001 0110 | 0001 0000 | 0011 0111 | 0101 1001 0  65.1 F 55 %
+		# iiii iiii | bscc tttt | tttt tttt | hhhh hhhh | xxxx xxxx
+		# i: 8 bit random id (changes on power-loss)
+		# b: battery indicator (0=>OK, 1=>LOW)
+		# s: Test/Sync (0=>Normal, 1=>Test-Button pressed / Sync)
+		# c: Channel (MSB-first, valid channels are 1-3)
+		# t: Temperature (MSB-first, Big-endian)
+		#    12 bit unsigned fahrenheit offset by 90 and scaled by 10
+		# h: Humidity (MSB-first) 8 bit relative humidity percentage
+		# x: checksum (byte1 + byte2 + byte3 + byte4) % 256
+		#    Check with e.g. (byte1 + byte2 + byte3 + byte4 - byte5) % 256) = 0
 		$model = "SD_WS37_TH";
 		$SensorTyp = "Bresser 7009994";
-	
-		$id = 		SD_WS_binaryToNumber($bitData,0,7);
-		#$bat = 	int(substr($bitData,8,1)) eq "1" ? "ok" : "low";
-		$channel = 	SD_WS_binaryToNumber($bitData,10,11);
-		$rawTemp = 	SD_WS_binaryToNumber($bitData,12,22);
-		$hum =		SD_WS_binaryToNumber($bitData,25,31);
-		
-		$id = sprintf('%02X', $id);           # wandeln nach hex
-		$temp = ($rawTemp - 609.93) / 9.014;
-		$temp = sprintf("%.1f", $temp);
-		
-		if ($hum < 10 || $hum > 99 || $temp < -30 || $temp > 70) {
+		my $checksum = (SD_WS_binaryToNumber($bitData,0,7) + SD_WS_binaryToNumber($bitData,8,15) + SD_WS_binaryToNumber($bitData,16,23) + SD_WS_binaryToNumber($bitData,24,31)) & 0xFF;
+		if ($checksum != SD_WS_binaryToNumber($bitData,32,39)) {
+			Log3 $name, 3, "$name: SD_WS37 ERROR - checksum $checksum != ".SD_WS_binaryToNumber($bitData,32,39);
 			return "";
+		} else {
+			Log3 $name, 4, "$name: SD_WS37 checksum ok $checksum = ".SD_WS_binaryToNumber($bitData,32,39);
+			$id = SD_WS_binaryToNumber($bitData,0,7);
+			$id = sprintf('%02X', $id);           # wandeln nach hex
+			$bat = int(substr($bitData,8,1)) eq "0" ? "ok" : "low";		# Batterie-Bit konnte nicht geprueft werden
+			$channel = SD_WS_binaryToNumber($bitData,10,11);
+			$rawTemp = 	SD_WS_binaryToNumber($bitData,12,23);
+			$hum = SD_WS_binaryToNumber($bitData,24,31);
+			my $tempFh = $rawTemp / 10 - 90;							# Grad Fahrenheit
+			$temp = (($tempFh - 32) * 5 / 9);							# Grad Celsius
+ 			$temp = sprintf("%.1f", $temp + 0.05);						# round
+			Log3 $name, 4, "$name: SD_WS37 tempraw = $rawTemp, temp = $tempFh F, temp = $temp C, Hum = $hum";
+			Log3 $name, 4, "$name: SD_WS37 decoded protocol = $protocol ($SensorTyp), sensor id = $id, channel = $channel";
 		}
-	
-		$bitData2 = substr($bitData,0,8) . ' ' . substr($bitData,8,4) . ' ' . substr($bitData,12,11);
-		$bitData2 = $bitData2 . ' ' . substr($bitData,23,2) . ' ' . substr($bitData,25,7) . ' ' . substr($bitData,32,8);
-		Log3 $iohash, 4, "$name converted to bits: " . $bitData2;
-		Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) sensor id=$id, channel=$channel, rawTemp=$rawTemp, temp=$temp, hum=$hum";
 	}
 	elsif  ($protocol eq "44" || $protocol eq "44x")	# BresserTemeo
 	{
 		# 0    4    8    12       20   24   28   32   36   40   44       52   56   60
 		# 0101 0111 1001 00010101 0010 0100 0001 1010 1000 0110 11101010 1101 1011 1110 110110010
-		# hhhh hhhh ?bcc iiiiiiii sttt tttt tttt xxxx xxxx ?BCC IIIIIIII Syyy yyyy yyyy
+		# hhhh hhhh ?bcc viiiiiii sttt tttt tttt xxxx xxxx ?BCC VIIIIIII Syyy yyyy yyyy
 
 		# - h humidity / -x checksum
 		# - t temp     / -y checksum
-		# - c Channel  /  C checksum
-		# - i 8 bit random id (aendert sich beim Batterie- und Kanalwechsel)  / - I checksum
+		# - c Channel  / -C checksum
+		# - V sign     / -V checksum
+		# - i 7 bit random id (aendert sich beim Batterie- und Kanalwechsel)  / - I checksum
 		# - b battery indicator (0=>OK, 1=>LOW)               / - B checksum
 		# - s Test/Sync (0=>Normal, 1=>Test-Button pressed)   / - S checksum
 	
@@ -250,6 +347,22 @@ sub SD_WS_Parse($$)
 			return "";
 		}
 		
+		my $sign = substr($binvalue,12,1);
+		my $checkSign = substr($binvalue,44,1) ^ 0b1;
+		
+		if ($sign != $checkSign) 
+		{
+			Log3 $iohash, 4, "SD_WS_Parse BresserTemeo: checksum error in Sign";
+			$checksumOkay = 0;
+		}
+		else
+		{
+			if ($sign)
+			{
+				$temp = 0 - $temp
+			}
+		}
+		
 		$bat = substr($binvalue,9,1);
 		my $checkBat = substr($binvalue,41,1) ^ 0b1;
 		
@@ -265,8 +378,8 @@ sub SD_WS_Parse($$)
 		
 		$channel = SD_WS_binaryToNumber($binvalue, 10, 11);
 		my $checkChannel = SD_WS_binaryToNumber($binvalue, 42, 43) ^ 0b11;
-		$id = SD_WS_binaryToNumber($binvalue, 12, 19);
-		my $checkId = SD_WS_binaryToNumber($binvalue, 44, 51) ^ 0b11111111;
+		$id = SD_WS_binaryToNumber($binvalue, 13, 19);
+		my $checkId = SD_WS_binaryToNumber($binvalue, 45, 51) ^ 0b1111111;
 		
 		if ($channel != $checkChannel || $id != $checkId)
 		{
@@ -283,15 +396,145 @@ sub SD_WS_Parse($$)
 		$id = sprintf('%02X', $id);           # wandeln nach hex
 		Log3 $iohash, 4, "$name SD_WS_Parse: model=$model, temp=$temp, hum=$hum, channel=$channel, id=$id, bat=$bat";
 		
-	}
+	}   elsif  ($protocol eq "64")	# WH2
+  {
+  #* Fine Offset Electronics WH2 Temperature/Humidity sensor protocol
+ #* aka Agimex Rosenborg 66796 (sold in Denmark)
+ #* aka ClimeMET CM9088 (Sold in UK)
+ #* aka TFA Dostmann/Wertheim 30.3157 (Temperature only!) (sold in Germany)
+ #* aka ...
+ #*
+ #* The sensor sends two identical packages of 48 bits each ~48s. The bits are PWM modulated with On Off Keying
+ # * The data is grouped in 6 bytes / 12 nibbles
+ #* [pre] [pre] [type] [id] [id] [temp] [temp] [temp] [humi] [humi] [crc] [crc]
+ #*
+ #* pre is always 0xFF
+ #* type is always 0x4 (may be different for different sensor type?)
+ #* id is a random id that is generated when the sensor starts
+ #* temp is 12 bit signed magnitude scaled by 10 celcius
+ #* humi is 8 bit relative humidity percentage
+ #* Based on reverse engineering with gnu-radio and the nice article here:
+ #*  http://lucsmall.com/2012/04/29/weather-station-hacking-part-2/
+ # 0x4A/74 0x70/112 0xEF/239 0xFF/255 0x97/151 | Sensor ID: 0x4A7 | 255% | 239 | OK
+ #{ Dispatch($defs{sduino}, "W64#FF48D0C9FFBA", undef) }
+
+        #* Message Format:
+       #* .- [0] -. .- [1] -. .- [2] -. .- [3] -. .- [4] -.
+       #* |       | |       | |       | |       | |       |
+       #* SSSS.DDDD DDN_.TTTT TTTT.TTTT WHHH.HHHH CCCC.CCCC
+       #* |  | |     ||  |  | |  | |  | ||      | |       |
+       #* |  | |     ||  |  | |  | |  | ||      | `--------- CRC
+       #* |  | |     ||  |  | |  | |  | |`-------- Humidity
+       #* |  | |     ||  |  | |  | |  | |
+       #* |  | |     ||  |  | |  | |  | `---- weak battery
+       #* |  | |     ||  |  | |  | |  |
+       #* |  | |     ||  |  | |  | `----- Temperature T * 0.1
+       #* |  | |     ||  |  | |  |
+       #* |  | |     ||  |  | `---------- Temperature T * 1
+       #* |  | |     ||  |  |
+       #* |  | |     ||  `--------------- Temperature T * 10
+       #* |  | |     | `--- new battery
+       #* |  | `---------- ID
+       #* `---- START = 9
+       #*
+       #*/ 
+      $msg =  substr($msg,0,16);
+      my (undef ,$rawData) = split("#",$msg);
+      my $hlen = length($rawData);
+      my $blen = $hlen * 4;
+      my $msg_vor ="W64#";
+      my $bitData20;
+      my $sign = 0;
+      my $rr2;
+      my $vorpre = -1; 
+      my $bitData = unpack("B$blen", pack("H$hlen", $rawData));
+     
+      my $temptyp = substr($bitData,0,8);
+      if( $temptyp == "11111110" ) {
+          $rawData = SD_WS_WH2SHIFT($rawData);
+          $msg = $msg_vor.$rawData;
+          $bitData = unpack("B$blen", pack("H$hlen", $rawData));
+          Log3 $iohash, 4, "$name: SD_WS_WH2_1 msg=$msg length:".length($bitData) ;
+          Log3 $iohash, 4, "$name: SD_WS_WH2_1 bitdata: $bitData" ;
+        } else{
+        if ( $temptyp == "11111101" ) {
+          $rawData = SD_WS_WH2SHIFT($rawData);
+          $rawData = SD_WS_WH2SHIFT($rawData);
+          $msg = $msg_vor.$rawData;
+          $bitData = unpack("B$blen", pack("H$hlen", $rawData));
+          Log3 $iohash, 4, "$name: SD_WS_WH2_2 msg=$msg length:".length($bitData) ;
+          Log3 $iohash, 4, "$name: SD_WS_WH2_2 bitdata: $bitData" ;
+          }
+      }
+
+      if( $temptyp == "11111111" ) {
+            $vorpre = 8;
+          }else{
+            Log3 $iohash, 4, "$name: SD_WS_WH2_4 Error kein WH2: Typ: $temptyp" ;
+            return "";
+          }
+
+     my $rc = eval
+     {
+      require Digest::CRC;
+      Digest::CRC->import();
+      1;
+     };
+
+    if($rc)
+    {
+    # Digest::CRC loaded and imported successfully
+     Log3 $iohash, 4, "$name: SD_WS_WH2_1 msg: $msg raw: $rawData " ;
+    $rr2 = SD_WS_WH2CRCCHECK($rawData);
+     if ($rr2 == 0 ){
+            # 1.CRC OK 
+            Log3 $iohash, 4, "$name: SD_WS_WH2_1 CRC_OK   : CRC=$rr2 msg: $msg check:".$rawData ;
+          }else{
+             Log3 $iohash, 4, "$name: SD_WS_WH2_4 CRC_Error: CRC=$rr2 msg: $msg check:".$rawData ;
+            return "";
+          }
+   }else {
+      Log3 $iohash, 1, "$name: SD_WS_WH2_3 CRC_not_load: Modul Digest::CRC fehlt" ;
+      return "";
+   }  
+   
+    $bitData = unpack("B$blen", pack("H$hlen", $rawData)); 
+   	Log3 $iohash, 4, "$name converted to bits: WH2 " . $bitData;    
+    $model = "SD_WS_WH2";
+	  $SensorTyp = "WH2";
+	  $id = 	SD_WS_bin2dec(substr($bitData,$vorpre + 4,6));
+    $id = sprintf('%03X', $id); 
+	 	$channel = 	0;
+    $bat =  	SD_WS_bin2dec(substr($bitData,$vorpre + 20,1));
+    $sign = 	SD_WS_bin2dec(substr($bitData,$vorpre + 12,1)); 
+    
+    if ($sign == 0) {
+    # Temp positiv
+      	$temp = (SD_WS_bin2dec(substr($bitData,$vorpre + 13,11))) / 10;
+    }else{
+    # Temp negativ
+     	$temp = -(SD_WS_bin2dec(substr($bitData,$vorpre + 13,11))) / 10;
+    }
+    Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) sensor id=$id, Data:".substr($bitData,$vorpre + 12,12)." temp=$temp";
+    $hum =  SD_WS_bin2dec(substr($bitData,$vorpre + 24,8));   # TFA 30.3157 nur Temp, Hum = 255
+    Log3 $iohash, 4, "$name SD_WS_WH2_8: $protocol ($SensorTyp) sensor id=$id, Data:".substr($bitData,$vorpre + 24,8)." hum=$hum";
+    Log3 $iohash, 4, "$name SD_WS_WH2_9: $protocol ($SensorTyp) sensor id=$id, channel=$channel, temp=$temp, hum=$hum";
+	
+ 	 }
+   
 	elsif (defined($decodingSubs{$protocol}))		# durch den hash decodieren
 	{
-	 
 	 	   	$SensorTyp=$decodingSubs{$protocol}{sensortype};
-		    
-		    return "" && Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) prematch error" if (!$decodingSubs{$protocol}{prematch}->( $rawData ));
-		    return "" && Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) crc  error"  if (!$decodingSubs{$protocol}{crcok}->( $rawData ));
-		    
+		    if (!$decodingSubs{$protocol}{prematch}->( $rawData ))
+		    { 
+		   		Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) prematch error" ;
+		    	return "";  
+	    	}
+		    my $retcrc=$decodingSubs{$protocol}{crcok}->( $rawData );
+		    if (!$retcrc)		    { 
+		    	Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) crc error: $retcrc";
+		    	return "";  
+	    	}
 	    	$id=$decodingSubs{$protocol}{id}->( $rawData,$bitData );
 	    	#my $temphex=$decodingSubs{$protocol}{temphex}->( $rawData,$bitData );
 	    	
@@ -299,13 +542,14 @@ sub SD_WS_Parse($$)
 	    	$hum=$decodingSubs{$protocol}{hum}->( $rawData,$bitData );
 	    	$channel=$decodingSubs{$protocol}{channel}->( $rawData,$bitData );
 	    	$model = $decodingSubs{$protocol}{model};
-	    	$bat = $decodingSubs{$protocol}{bat};
+	    	$bat = $decodingSubs{$protocol}{bat}->( $rawData,$bitData );
+	    	$trend = $decodingSubs{$protocol}{trend}->( $rawData,$bitData ) if (defined($decodingSubs{$protocol}{trend}));
 
-	    	Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) sensor id=$id, channel=$channel, temp=$temp, hum=$hum";
+	    	Log3 $iohash, 4, "$name decoded protocolid: $protocol ($SensorTyp) sensor id=$id, channel=$channel, temp=$temp, hum=$hum, bat=$bat";
 		
 	} 
 	else {
-		Log3 $iohash, 4, "SD_WS_Parse: unknown message, please report. converted to bits: $bitData";
+		Log3 $iohash, 2, "SD_WS_WH2: unknown message, please report. converted to bits: $bitData";
 		return undef;
 	}
 
@@ -334,8 +578,7 @@ sub SD_WS_Parse($$)
 		Log3 $iohash, 1, 'SD_WS: UNDEFINED sensor ' . $model . ' detected, code ' . $deviceCode;
 		return "UNDEFINED $deviceCode SD_WS $deviceCode";
 	}
-	#Log3 $iohash, 3, 'SD_WS: ' . $def->{NAME} . ' ' . $id;
-	
+		
 	my $hash = $def;
 	$name = $hash->{NAME};
 	return "" if(IsIgnored($name));
@@ -358,16 +601,16 @@ sub SD_WS_Parse($$)
 	} else {
 		$hash->{bitMSG} = $bitData;
 	}
-
-	my $state = "T: $temp" . ($hum > 0 ? " H: $hum":"");
+  
+	my $state = (($temp > -60 && $temp < 70) ? "T: $temp":"T: xx") . (($hum > 0 && $hum < 100) ? " H: $hum":"");
 
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "state", $state);
-	readingsBulkUpdate($hash, "temperature", $temp)  if (defined($temp));
-	readingsBulkUpdate($hash, "humidity", $hum)  if (defined($hum) && $hum > 0);
-	readingsBulkUpdate($hash, "battery", $bat) if (defined($bat));
-	readingsBulkUpdate($hash, "channel", $channel) if (defined($channel));
-	readingsBulkUpdate($hash, "trend", $trend) if (defined($trend));
+	readingsBulkUpdate($hash, "temperature", $temp)  if (defined($temp)&& ($temp > -60 && $temp < 70 ));
+	readingsBulkUpdate($hash, "humidity", $hum)  if (defined($hum) && ($hum > 0 && $hum < 100 )) ;
+	readingsBulkUpdate($hash, "battery", $bat) if (defined($bat) && length($bat) > 0) ;
+	readingsBulkUpdate($hash, "channel", $channel) if (defined($channel)&& length($channel) > 0);
+	readingsBulkUpdate($hash, "trend", $trend) if (defined($trend) && length($trend) > 0);
 	
 	readingsEndUpdate($hash, 1); # Notify is done by Dispatch
 	
@@ -390,6 +633,13 @@ sub SD_WS_Attr(@)
 	return undef;
 }
 
+sub SD_WS_bin2dec($)
+    {
+      my $h = shift;
+      my $int = unpack("N", pack("B32",substr("0" x 32 . $h, -32))); 
+      return sprintf("%d", $int); 
+    }
+
 
 sub SD_WS_binaryToNumber
 {
@@ -400,6 +650,31 @@ sub SD_WS_binaryToNumber
 	
 	return oct("0b".substr($binstr,$fbit,($lbit-$fbit)+1));
 }
+
+ sub SD_WS_WH2CRCCHECK($) {
+       my $rawData = shift;
+       my $datacheck1 = pack( 'H*', substr($rawData,2,length($rawData)-2) );
+       my $crcmein1 = Digest::CRC->new(width => 8, poly => 0x31);
+       my $rr3 = $crcmein1->add($datacheck1)->hexdigest;
+       $rr3 = sprintf("%d", hex($rr3));
+       Log3 "SD_WS_CRCCHECK", 4, "SD_WS_WH2CRCCHECK :  raw:$rawData CRC=$rr3 " ;
+       return $rr3 ;
+    }
+sub SD_WS_WH2SHIFT($){
+         my $rawData = shift;
+         my $hlen = length($rawData);
+         my $blen = $hlen * 4;
+         my $bitData = unpack("B$blen", pack("H$hlen", $rawData));
+    	   my $bitData2 = '1'.unpack("B$blen", pack("H$hlen", $rawData));
+         my $bitData20 = substr($bitData2,0,length($bitData2)-1);
+          $blen = length($bitData20);
+          $hlen = $blen / 4;
+          $rawData = uc(unpack("H$hlen", pack("B$blen", $bitData20)));
+          $bitData = $bitData20;
+          Log3 "SD_WS_WH2SHIFT", 4, "SD_WS_WH2SHIFT_0  raw: $rawData length:".length($bitData) ;
+          Log3 "SD_WS_WH2SHIFT", 4, "SD_WS_WH2SHIFT_1  bitdata: $bitData" ;
+        return $rawData;  
+    }
 
 1;
 
@@ -417,6 +692,9 @@ sub SD_WS_binaryToNumber
   <ul>
     <li>Bresser 7009994</li>
     <li>Opus XT300</li>
+    <li>BresserTemeo</li>
+    <li>WH2 (TFA Dostmann/Wertheim 30.3157(Temperature only!) (sold in Germany), Agimex Rosenborg 66796 (sold in Denmark),ClimeMET CM9088 (Sold in UK)</li>
+    <li>PV-8644 infactory Poolthermometer</li>
   </ul>
   <br>
   New received device are add in fhem with autocreate.
@@ -470,6 +748,8 @@ sub SD_WS_binaryToNumber
     <li>Bresser 7009994</li>
     <li>Opus XT300</li>
     <li>BresserTemeo</li>
+    <li>WH2 (TFA Dostmann/Wertheim 30.3157(Temperatur!) (Deutschland), Agimex Rosenborg 66796 (Denmark),ClimeMET CM9088 (UK)</li>
+    <li>PV-8644 infactory Poolthermometer</li>
   </ul>
   <br>
   Neu empfangene Sensoren werden in FHEM per autocreate angelegt.
