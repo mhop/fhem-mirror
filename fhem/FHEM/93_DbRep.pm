@@ -37,7 +37,9 @@
 ###########################################################################################################################
 #  Versions History:
 #
-# 5.8.6        30.10.2017       don't limit length of attr reading/device if attr contains a list
+# 6.0.0        18.11.2017       FTP transfer dumpfile after dump, delete old dumpfiles within Blockingcall (avoid freezes)
+#                               commandref revised, minor fixes
+# 5.8.6        30.10.2017       don't limit attr reading, device if the attr contains a list
 # 5.8.5        19.10.2017       filter unwanted characters in "procinfo"-result 
 # 5.8.4        17.10.2017       createSelectSql, createDeleteSql, currentfillup_Push switch to devspec 
 # 5.8.3        16.10.2017       change to use createSelectSql: minValue,diffValue - createDeleteSql: delEntries
@@ -245,7 +247,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "5.8.6";
+my $DbRepVersion = "6.0.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -281,6 +283,16 @@ sub DbRep_Initialize($) {
 					   "executeBeforeDump ".
 					   "executeAfterDump ".
                        "expimpfile ".
+					   "ftpUse:1,0 ".
+					   "ftpUser ".
+					   "ftpUseSSL:1,0 ".
+					   "ftpDebug:1,0 ".
+					   "ftpDir ".
+					   "ftpPassive:1,0 ".
+					   "ftpPwd ".
+					   "ftpPort ".
+					   "ftpServer ".
+					   "ftpTimeout ".
                        "aggregation:hour,day,week,month,no ".
 					   "diffAccept ".
 					   "limit ".
@@ -651,6 +663,16 @@ sub DbRep_Attr($$$$) {
 						 executeBeforeDump
 						 executeAfterDump
                          expimpfile
+						 ftpUse
+						 ftpUser
+						 ftpUseSSL
+						 ftpDebug
+						 ftpDir
+						 ftpPassive
+						 ftpPort
+						 ftpPwd
+						 ftpServer
+						 ftpTimeout
 						 dumpMemlimit
 						 dumpComment
 						 dumpSpeed
@@ -758,7 +780,7 @@ sub DbRep_Attr($$$$) {
             delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
         }
         
-		if ($aName eq "timeout" || $aName eq "diffAccept") {
+		if ($aName =~ /ftpTimeout|timeout|diffAccept/) {
             unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
         } 
         
@@ -790,6 +812,14 @@ sub DbRep_Attr($$$$) {
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
             delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
+        }
+		
+		if ($aName eq "ftpUse") {
+            delete($attr{$name}{ftpUseSSL});
+        }
+		
+		if ($aName eq "ftpUseSSL") {
+            delete($attr{$name}{ftpUse});
         }
         
 		if ($aName eq "reading" || $aName eq "device") {
@@ -4749,7 +4779,7 @@ sub DbRep_optimizeTables($) {
   
  if ($dbmodel =~ /POSTGRESQL/) {
      # Anfangsgröße ermitteln
-     $query = "SELECT pg_size_pretty(pg_database_size('fhemtest'))"; 
+     $query = "SELECT pg_size_pretty(pg_database_size('$dbname'))"; 
      Log3 ($name, 5, "DbRep $name - current query: $query ");
      eval { $sth = $dbh->prepare($query);
             $sth->execute;
@@ -4787,7 +4817,7 @@ sub DbRep_optimizeTables($) {
 	 }
 	 
 	 # Endgröße ermitteln
-     $query = "SELECT pg_size_pretty(pg_database_size('fhemtest'))"; 
+     $query = "SELECT pg_size_pretty(pg_database_size('$dbname'))"; 
      Log3 ($name, 5, "DbRep $name - current query: $query ");
      eval { $sth = $dbh->prepare($query);
             $sth->execute;
@@ -4928,7 +4958,7 @@ sub mysql_DoDumpClientSide($) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
-     return "$name|''|$err|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''";
  }
  
  # SQL-Startzeit
@@ -4943,7 +4973,7 @@ sub mysql_DoDumpClientSide($) {
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''";
  }
   
  my @mysql_version = $sth->fetchrow;
@@ -4997,7 +5027,7 @@ sub mysql_DoDumpClientSide($) {
      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''";
  }
     
  while ( $value = $sth->fetchrow_hashref()) {
@@ -5062,7 +5092,7 @@ sub mysql_DoDumpClientSide($) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''";
  }
 
  if($optimize_tables_beforedump) {
@@ -5071,7 +5101,7 @@ sub mysql_DoDumpClientSide($) {
      ($err,$db_MB_start,$db_MB_end) = mysql_optimize_tables($hash,$dbh,@tablenames);
 	 if ($err) {
 	     $err = encode_base64($err,"");
-		 return "$name|''|$err|''|''|''|''";
+		 return "$name|''|$err|''|''|''|''|''|''";
 	 }
  }
     
@@ -5100,7 +5130,7 @@ sub mysql_DoDumpClientSide($) {
 			 $err = encode_base64($@,"");
              Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 			 $dbh->disconnect;
-             return "$name|''|$err|''|''|''|''";
+             return "$name|''|$err|''|''|''|''|''|''";
          }
 	     $db_tables{$tablename}{Rows} = $sth->fetchrow;
          $sth->finish;  
@@ -5142,7 +5172,7 @@ sub mysql_DoDumpClientSide($) {
      Log3 ($name, 2, "DbRep $name - $err");
 	 $err = encode_base64($err,"");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
-     return "$name|''|$err|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''";
  } else {
      Log3 ($name, 5, "DbRep $name - New dumpfile $sql_file has been created.");
  }
@@ -5178,7 +5208,7 @@ sub mysql_DoDumpClientSide($) {
 			 $err = encode_base64($@,"");
              Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 			 $dbh->disconnect;
-             return "$name|''|$err|''|''|''|''";
+             return "$name|''|$err|''|''|''|''|''|''";
          }
          
 		 @ergebnis = $sth->fetchrow;
@@ -5215,7 +5245,7 @@ sub mysql_DoDumpClientSide($) {
 				 $err = encode_base64($@,"");
                  Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 				 $dbh->disconnect;
-                 return "$name|''|$err|''|''|''|''";
+                 return "$name|''|$err|''|''|''|''|''|''";
              }
              
 			 while (@ar = $sth->fetchrow) {
@@ -5251,7 +5281,7 @@ sub mysql_DoDumpClientSide($) {
 					 $err = encode_base64($@,"");
                      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 					 $dbh->disconnect;
-                     return "$name|''|$err|''|''|''|''";
+                     return "$name|''|$err|''|''|''|''|''|''";
                  }
                     
 				 while ( @ar = $sth->fetchrow) {
@@ -5304,6 +5334,15 @@ sub mysql_DoDumpClientSide($) {
  
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
+ 
+ # Dumpfile per FTP senden
+ my ($ftperr,$ftpmsg) = sendftp($hash,$sql_file); 
+ my $ftp = $ftperr?encode_base64($ftperr,""):$ftpmsg?encode_base64($ftpmsg,""):0;
+ 
+ # alte Dumpfiles löschen
+ my @fd  = deldumpfiles($hash,$sql_file);
+ my $bfd = join(", ", @fd );
+ $bfd    = $bfd?encode_base64($bfd,""):0;
 
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -5313,7 +5352,7 @@ sub mysql_DoDumpClientSide($) {
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname, total time used: ".sprintf("%.0f",$brt)." sec.");
  Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
  
-return "$name|$rt|''|$sql_file|$drc|$drh|$filesize";
+return "$name|$rt|''|$sql_file|$drc|$drh|$filesize|$ftp|$bfd";
 }
 
 ####################################################################################################
@@ -5348,7 +5387,7 @@ sub mysql_DoDumpServerSide($) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
-     return "$name|''|$err|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''";
  }
  
  # Eigenschaften der vorhandenen Tabellen ermitteln (SHOW TABLE STATUS -> Rows sind nicht exakt !!)
@@ -5367,7 +5406,7 @@ sub mysql_DoDumpServerSide($) {
      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''";
  }
     
  while ( $value = $sth->fetchrow_hashref()) {
@@ -5396,7 +5435,7 @@ sub mysql_DoDumpServerSide($) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''";
  }
  
  if($optimize_tables_beforedump) {
@@ -5405,7 +5444,7 @@ sub mysql_DoDumpServerSide($) {
      ($err,$db_MB_start,$db_MB_end) = mysql_optimize_tables($hash,$dbh,@tablenames);
 	 if ($err) {
 	     $err = encode_base64($err,"");
-		 return "$name|''|$err|''|''|''|''";
+		 return "$name|''|$err|''|''|''|''|''|''";
 	 }
  }
  
@@ -5436,7 +5475,7 @@ sub mysql_DoDumpServerSide($) {
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''";     
+     return "$name|''|$err|''|''|''|''|''|''";     
   }
   
  $sth->finish;
@@ -5451,17 +5490,27 @@ sub mysql_DoDumpServerSide($) {
  $dump_path_loc    = $dump_path_loc."/" unless($dump_path_loc =~ m/\/$/);
  my $filesize = (stat($dump_path_loc.$bfile))[7]?(stat($dump_path_loc.$bfile))[7]:"n.a.";
  
+ Log3 ($name, 3, "DbRep $name - Number of exported datasets: $drh");
+ Log3 ($name, 3, "DbRep $name - Size of backupfile: ".byte_output($filesize));
+ 
+ # Dumpfile per FTP senden
+ my ($ftperr,$ftpmsg) = sendftp($hash,$bfile); 
+ my $ftp = $ftperr?encode_base64($ftperr,""):$ftpmsg?encode_base64($ftpmsg,""):0;
+ 
+ # alte Dumpfiles löschen
+ my @fd  = deldumpfiles($hash,$bfile);
+ my $bfd = join(", ", @fd );
+ $bfd    = $bfd?encode_base64($bfd,""):0;
+ 
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
 
  $rt = $rt.",".$brt;
  
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used: ".sprintf("%.0f",$brt)." seconds");
- Log3 ($name, 3, "DbRep $name - Number of exported datasets: $drh");
- Log3 ($name, 3, "DbRep $name - Size of backupfile: ".byte_output($filesize));
  Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
  
-return "$name|$rt|''|$dump_path_rem$bfile|n.a.|$drh|$filesize";
+return "$name|$rt|''|$dump_path_rem$bfile|n.a.|$drh|$filesize|$ftp|$bfd";
 }
 
 ####################################################################################################
@@ -5478,6 +5527,8 @@ sub DumpDone($) {
   my $drc        = $a[4];
   my $drh        = $a[5];
   my $fs         = $a[6];
+  my $ftp        = $a[7]?decode_base64($a[7]):undef;
+  my $bfd        = $a[8]?decode_base64($a[8]):undef;
   my $name       = $hash->{NAME};
   my $erread;
   
@@ -5496,16 +5547,13 @@ sub DumpDone($) {
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
   
-  # alte Dumpfiles löschen
-  my @fd  = deldumpfiles($hash,$bfile);
-  my $bfd = join(", ", @fd );
-  
   readingsBeginUpdate($hash);
   ReadingsBulkUpdateValue($hash, "DumpFileCreated", $bfile);
   ReadingsBulkUpdateValue($hash, "DumpFileCreatedSize", $fs);
   ReadingsBulkUpdateValue($hash, "DumpFilesDeleted", $bfd);
   ReadingsBulkUpdateValue($hash, "DumpRowsCurrrent", $drc);
   ReadingsBulkUpdateValue($hash, "DumpRowsHistory", $drh);
+  ReadingsBulkUpdateValue($hash, "FTP_Message", $ftp) if($ftp);
   readingsEndUpdate($hash, 1);
 
   # Befehl nach Dump ausführen
@@ -6122,11 +6170,118 @@ sub deldumpfiles ($$) {
   
   for(my $i = 0; $i < $max; $i++) {
       push(@fd, $files[$i]);
-      Log 3, "DbRep $name - Deleting old dumpfile '$files[$i]' ";
+      Log3($name, 3, "DbRep $name - Deleting old dumpfile '$files[$i]' ");
       unlink("$dump_path_loc/$files[$i]");
   }
 
 return @fd;
+}
+
+####################################################################################################
+#             erzeugtes Dump-File aus dumpDirLocal zum FTP-Server übertragen 
+####################################################################################################
+sub sendftp ($$) {
+  my ($hash,$bfile) = @_; 
+  my $name          = $hash->{NAME};
+  my $dbloghash     = $hash->{dbloghash};
+  my $dump_path_def = $attr{global}{modpath}."/log/";
+  my $dump_path_loc = AttrVal($name,"dumpDirLocal", $dump_path_def);
+  my $file          = (split /[\/]/, $bfile)[-1];
+  my $ftpto         = AttrVal($name,"ftpTimeout",30);
+  my $ftpUse        = AttrVal($name,"ftpUse",0);   
+  my $ftpuseSSL     = AttrVal($name,"ftpUseSSL",0); 
+  my $ftpDir        = AttrVal($name,"ftpDir","/");
+  my $ftpPort       = AttrVal($name,"ftpPort",21);   
+  my $ftpServer     = AttrVal($name,"ftpServer",undef);
+  my $ftpUser       = AttrVal($name,"ftpUser","anonymous");
+  my $ftpPwd        = AttrVal($name,"ftpPwd",undef);
+  my $ftpPassive    = AttrVal($name,"ftpPassive",0);
+  my $ftpDebug      = AttrVal($name,"ftpDebug",0);
+  my ($ftperr,$ftpmsg,$ftp);
+  
+  # kein FTP verwenden oder möglich
+  return ($ftperr,$ftpmsg) if((!$ftpUse && !$ftpuseSSL) || !$bfile);
+  
+  if(!$ftpServer) {
+      $ftperr = "FTP-Error: FTP-Server isn't set.";
+	  Log3($name, 2, "DbRep $name - $ftperr");
+      return ($ftperr,undef);
+  }
+
+  if(!opendir(DH, $dump_path_loc)) {
+      $ftperr = "FTP-Error: Can't open path '$dump_path_loc'";
+	  Log3($name, 2, "DbRep $name - $ftperr");
+	  return ($ftperr,undef);
+  }
+  
+  my $mod_ftpssl = 0;
+  my $mod_ftp    = 0;
+  my $mod;
+  
+  if ($ftpuseSSL) {
+      # FTP mit SSL soll genutzt werden
+	  $mod = "Net::FTPSSL => e.g. with 'sudo cpan -i Net::FTPSSL' ";
+      eval { require Net::FTPSSL; };
+      if(!$@){
+          $mod_ftpssl = 1;
+          import Net::FTPSSL;
+      }
+  } else {
+      # nur FTP
+      $mod = "Net::FTP";
+      eval { require Net::FTP; };
+      if(!$@){
+          $mod_ftp = 1;
+          import Net::FTP;
+      }
+  }
+
+  if ($ftpuseSSL && $mod_ftpssl) {    
+      # use ftp-ssl
+	  my $enc = "E";
+      eval { $ftp = Net::FTPSSL->new($ftpServer, Port => $ftpPort, Timeout => $ftpto, Debug => $ftpDebug, Encryption => $enc) }
+	             or $ftperr = "FTP-SSL-ERROR: Can't connect - $@";
+  } elsif (!$ftpuseSSL && $mod_ftp) {    
+      # use plain ftp
+      eval { $ftp = Net::FTP->new($ftpServer, Port => $ftpPort, Timeout => $ftpto, Debug => $ftpDebug, Passive => $ftpPassive) }
+	             or $ftperr = "FTP-Error: Can't connect - $@";
+  } else {
+      $ftperr = "FTP-Error: required module couldn't be loaded. You have to install it first: $mod.";
+  }
+  if ($ftperr) {
+      Log3($name, 2, "DbRep $name - $ftperr");
+      return ($ftperr,undef);
+  }
+  
+  my $pwdstr = $ftpPwd?$ftpPwd:" ";          
+  $ftp->login($ftpUser, $ftpPwd) or $ftperr = "FTP-Error: Couldn't login with user '$ftpUser' and password '$pwdstr' ";
+  if ($ftperr) {
+      Log3($name, 2, "DbRep $name - $ftperr");
+      return ($ftperr,undef);
+  }
+  
+  $ftp->binary();
+  
+  # FTP Verzeichnis setzen
+  $ftp->cwd($ftpDir) or $ftperr = "FTP-Error: Couldn't change directory to '$ftpDir' ";
+  if ($ftperr) {
+      Log3($name, 2, "DbRep $name - $ftperr");
+      return ($ftperr,undef);
+  }
+  
+  $dump_path_loc =~ s/(\/$|\\$)//;  
+  Log3($name, 3, "DbRep $name - FTP: transferring ".$dump_path_loc."/".$file);
+  
+  $ftpmsg = $ftp->put($dump_path_loc."/".$file);
+  if (!$ftpmsg) {
+      $ftperr = "FTP-Error: Couldn't transfer ".$file." to ".$ftpServer." into dir ".$ftpDir;
+	  Log3($name, 2, "DbRep $name - $ftperr");
+  } else {
+      $ftpmsg = "FTP: ".$file." transferred successfully to ".$ftpServer." into dir ".$ftpDir; 
+      Log3($name, 3, "DbRep $name - $ftpmsg");	  
+  }
+
+return ($ftperr,$ftpmsg);
 }
 
 ####################################################################################################
@@ -6292,6 +6447,7 @@ return;
      <li> automatic rename of device names in datasets and other DbRep-definitions after FHEM "rename" command (see <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Execution of arbitrary user specific SQL-commands </li>
 	 <li> creation of backups non-blocking (MySQL) </li>
+	 <li> transfer dumpfiles to a FTP server after backup </li>
 	 <li> restore of serverSide-backups non-blocking (MySQL) </li>
 	 <li> optimize the connected database (optimizeTables, vacuum) </li>
 	 <li> report of existing database processes (MySQL) </li>
@@ -6319,7 +6475,9 @@ return;
   Only the content of table "history" will be included if isn't other is explained. <br><br>
   
   Overview which other Perl-modules DbRep is using: <br><br>
-   
+  
+  Net::FTP     (only if FTP-Transfer after database dump is used)     <br>
+  Net::FTPSSL  (only if FTP-Transfer with encoding after database dump is used)   <br>  
   POSIX           <br>
   Time::HiRes     <br>
   Time::Local     <br>
@@ -6426,7 +6584,8 @@ return;
 								 tables inclusive possibly created views.
 								 <br><br>
 								 
-								 <b>Option clientSide</b> <br>
+								 <ul>
+								 <b><u>Option clientSide</u></b> <br>
 	                             The dump will be created by client (FHEM-Server) and will be saved in FHEM log-directory by 
 								 default.
                                  The target directory can be set by <a href="#DbRepattr">attribute</a> "dumpDirLocal" and has to be
@@ -6459,7 +6618,7 @@ return;
 								 
 								 to restore the database from the dump. <br><br><br>
 								 
-								 <b>Option serverSide</b> <br>
+								 <b><u>Option serverSide</u></b> <br>
 								 The dump will be created on the MySQL-Server and will be saved in its Home-directory 
 								 by default. <br>
 								 The whole history-table (not the current-table) will be exported <b>CSV-formatted</b> without
@@ -6485,7 +6644,9 @@ return;
 								 If the internal version management of DbRep should be used and the size of the created dumpfile be 
 								 reported, you have to mount the remote  MySQL-Server directory "dumpDirRemote" on the client 
 								 and publish it to the DbRep-device by fill out the <a href="#DbRepattr">attribute</a> 
-								 "dumpDirLocal". <br><br>
+								 "dumpDirLocal". <br>
+								 Same is necessary if ftp transfer after dump is to be used (attribute "ftpUse" respectively "ftpUseSSL").
+								 <br><br>
 
                                  <ul>                                 
                                  <b>Example: </b> <br>
@@ -6512,7 +6673,32 @@ return;
 								   set &lt;name&gt; &lt;restoreMySQL&gt; &lt;filename&gt;.csv <br><br>
 								   </ul>
 								
-                                 <br>									 
+                                 <br><br>
+
+								 <b><u>FTP-Transfer after Dump</u></b> <br>
+								 If those possibility is be used, the <a href="#DbRepattr">attribute</a> "ftpUse" or 
+								 "ftpUseSSL" has to be set. The latter if encoding for FTP is to be used. <br>
+								 Further <a href="#DbRepattr">attributes</a> are: <br><br>
+								 
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> ftpUse      </td><td>: FTP Transfer after dump will be switched on (without SSL encoding) </td></tr>
+                                      <tr><td> ftpUser     </td><td>: User for FTP-server login, default: anonymous </td></tr>
+                                      <tr><td> ftpUseSSL   </td><td>: FTP Transfer with SSL encoding after dump </td></tr>
+                                      <tr><td> ftpDebug    </td><td>: debugging of FTP communication for diagnostics </td></tr>
+	                                  <tr><td> ftpDir      </td><td>: directory on FTP-server in which the file will be send into (default: "/") </td></tr>
+	                                  <tr><td> ftpPassive  </td><td>: set if passive FTP is to be used </td></tr>
+	                                  <tr><td> ftpPort     </td><td>: FTP-Port, default: 21 </td></tr>
+									  <tr><td> ftpPwd      </td><td>: password of FTP-User, not set by default </td></tr>
+									  <tr><td> ftpServer   </td><td>: name or IP-address of FTP-server. <b>absolutely essential !</b> </td></tr>
+									  <tr><td> ftpTimeout  </td><td>: timeout of FTP-connection in seconds (default: 30). </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>
+                                 </ul>
+								   
 								 </li><br>
 								 
     <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format between period given by timestamp. 
@@ -6904,6 +7090,29 @@ sub bdump {
 
   <li><b>expimpfile </b>      - Path/filename for data export/import </li> <br>
   
+  <li><b>ftpUse </b>          - FTP Transfer after dump will be switched on (without SSL encoding). The created 
+                                database backup file will be transfered non-blocking to the FTP-Server (Attribut "ftpServer"). 
+							    </li> <br>
+								
+  <li><b>ftpUseSSL </b>       - FTP Transfer with SSL encoding after dump. The created database backup file will be transfered 
+                                non-blocking to the FTP-Server (Attribut "ftpServer"). </li> <br>
+								
+  <li><b>ftpUser </b>         - User for FTP-server login, default: "anonymous". </li> <br>
+  
+  <li><b>ftpDebug </b>        - debugging of FTP communication for diagnostics. </li> <br>
+  
+  <li><b>ftpDir </b>          - directory on FTP-server in which the file will be send into (default: "/"). </li> <br>
+  
+  <li><b>ftpPassive </b>      - set if passive FTP is to be used </li> <br>
+  
+  <li><b>ftpPort </b>         - FTP-Port, default: 21 </li> <br>
+  
+  <li><b>ftpPwd </b>          - password of FTP-User, is not set by default </li> <br>
+  
+  <li><b>ftpServer </b>       - name or IP-address of FTP-server. <b>absolutely essential !</b> </li> <br>
+  
+  <li><b>ftpTimeout </b>      - timeout of FTP-connection in seconds (default: 30). </li> <br>
+  
   <a name="DbRepattrlimit"></a>
   <li><b>limit </b>           - limits the number of selected datasets by the "fetchrows" command (default 1000). 
                                 This limitation should prevent the browser session from overload and 
@@ -6993,7 +7202,7 @@ sub bdump {
 								                    Every hash-element consists of the serial number of the dataset (key)
 													and its value. </li> <br><br> 
 													 
-        <ul>      
+   
         To process the result, you may use a userExitFn in 99_myUtils for example: <br>		
 		<pre>
         sub resfromjson {
@@ -7018,8 +7227,8 @@ sub bdump {
         return;
         }
   	    </pre> 
-		</ul>				    </ul>					
-                                </ul><br>  
+        </ul>
+		<br>  
                               
   <li><b>timestamp_begin </b> - begin of data selection (*)  </li> <br>
   
@@ -7120,9 +7329,8 @@ sub bdump {
 							   </ul>
 							   </li>
 							   <br><br> 
-
-</ul></ul>
-</ul>
+							   
+</ul></ul></ul>
 
 <a name="DbRepReadings"></a>
 <b>Readings</b>
@@ -7251,6 +7459,7 @@ sub bdump {
 	      Befehl (siehe <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Ausführen von beliebigen Benutzer spezifischen SQL-Kommandos </li>
 	 <li> Backups der FHEM-Datenbank erstellen (MySQL) </li>
+	 <li> senden des Dumpfiles zu einem FTP-Server nach dem Backup </li>
 	 <li> Restore von serverSide-Backups (MySQL) </li>
 	 <li> Optimierung der angeschlossenen Datenbank (optimizeTables, vacuum) </li>
 	 <li> Ausgabe der existierenden Datenbankprozesse (MySQL) </li>
@@ -7279,6 +7488,8 @@ sub bdump {
   
   Überblick welche anderen Perl-Module DbRep verwendet: <br><br>
     
+  Net::FTP     (nur wenn FTP-Transfer nach Datenbank-Dump genutzt wird)     <br>
+  Net::FTPSSL  (nur wenn FTP-Transfer mit Verschlüsselung nach Datenbank-Dump genutzt wird)   <br>
   POSIX           <br>
   Time::HiRes     <br>
   Time::Local     <br>
@@ -7393,7 +7604,8 @@ sub bdump {
 								 Tabellen inklusive eventuell angelegter Views.
 								 <br><br>
 								 
-								 <b>Option clientSide</b> <br>
+								 <ul>
+								 <b><u>Option clientSide</u></b> <br>
 	                             Der Dump wird durch den Client (FHEM-Rechner) erstellt und per default im log-Verzeichnis des Clients 
 								 gespeichert. 
 								 Das Zielverzeichnis kann mit dem <a href="#DbRepattr">Attribut</a> "dumpDirLocal" verändert werden und muß auf
@@ -7425,7 +7637,7 @@ sub bdump {
 								 auf dem MySQL-Server ausgeführt werden um die Datenbank aus dem Dump wiederherzustellen. <br><br>
 								 <br>
 								 
-								 <b>Option serverSide</b> <br>
+								 <b><u>Option serverSide</u></b> <br>
 								 Der Dump wird durch den MySQL-Server erstellt und per default im Home-Verzeichnis des MySQL-Servers 
 								 gespeichert. <br>
 								 Es wird die gesamte history-Tabelle (nicht current-Tabelle) <b>im CSV-Format</b> ohne 
@@ -7449,7 +7661,9 @@ sub bdump {
 								 <b>Hinweis:</b> <br>
 								 Soll die interne Versionsverwaltung des Moduls genutzt und die Größe des erzeugten Dumpfiles
 								 ausgegeben werden, ist das Verzeichnis "dumpDirRemote" des MySQL-Servers auf dem Client zu mounten 
-								 und im <a href="#DbRepattr">Attribut</a> "dumpDirLocal" dem DbRep-Device bekannt zu machen. <br><br>
+								 und im <a href="#DbRepattr">Attribut</a> "dumpDirLocal" dem DbRep-Device bekannt zu machen. <br>
+								 Gleiches gilt wenn der FTP-Transfer nach dem Dump genutzt werden soll (Attribut "ftpUse" bzw. "ftpUseSSL"). 
+								 <br><br>
 
                                  <ul>                                 
                                  <b>Beispiel: </b> <br>
@@ -7475,8 +7689,33 @@ sub bdump {
 								   set &lt;name&gt; &lt;restoreMySQL&gt; &lt;filename&gt;.csv <br><br>
 								   </ul>
 								
-                                 gestartet werden. <br><br>								
-								   
+                                 gestartet werden. <br><br>	
+
+                                 
+								 <b><u>FTP Transfer nach Dump</u></b> <br>
+								 Wenn diese Möglichkeit genutzt werden soll, ist das <a href="#DbRepattr">Attribut</a> "ftpUse" oder 
+								 "ftpUseSSL" zu setzen. Letzteres gilt wenn Verschlüsselung genutzt werden soll. <br>
+								 Weitere <a href="#DbRepattr">Attribute</a> sind: <br><br>
+								 
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> ftpUse      </td><td>: FTP Transfer nach dem Dump wird eingeschaltet (ohne SSL Verschlüsselung) </td></tr>
+                                      <tr><td> ftpUser     </td><td>: User zur Anmeldung am FTP-Server, default: anonymous </td></tr>
+                                      <tr><td> ftpUseSSL   </td><td>: FTP Transfer mit SSL Verschlüsselung nach dem Dump wird eingeschaltet </td></tr>
+                                      <tr><td> ftpDebug    </td><td>: Debugging des FTP Verkehrs zur Fehlersuche </td></tr>
+	                                  <tr><td> ftpDir      </td><td>: Verzeichnis auf dem FTP-Server in welches das File übertragen werden soll (default: "/") </td></tr>
+	                                  <tr><td> ftpPassive  </td><td>: setzen wenn passives FTP verwendet werden soll </td></tr>
+	                                  <tr><td> ftpPort     </td><td>: FTP-Port, default: 21 </td></tr>
+									  <tr><td> ftpPwd      </td><td>: Passwort des FTP-Users, default nicht gesetzt </td></tr>
+									  <tr><td> ftpServer   </td><td>: Name oder IP-Adresse des FTP-Servers. <b>notwendig !</b> </td></tr>
+									  <tr><td> ftpTimeout  </td><td>: Timeout für die FTP-Verbindung in Sekunden (default: 30). </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>
+								
+								 </ul>   
 								 </li><br>
                                  
     <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. 
@@ -7495,6 +7734,7 @@ sub bdump {
 								 geändert werden falls eine Anpassung der Selektionsbedingungen nicht möglich oder 
 								 gewünscht ist. <br><br>
 								 </li> <br>
+								 								 
        
     <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
                                  Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
@@ -7883,6 +8123,30 @@ sub bdump {
   
   <li><b>expimpfile </b>      - Pfad/Dateiname für Export/Import in/aus einem File.  </li> <br>
   
+  <li><b>ftpUse </b>          - FTP Transfer nach dem Dump wird eingeschaltet (ohne SSL Verschlüsselung). Das erzeugte 
+                                Datenbank Backupfile wird non-blocking zum angegebenen FTP-Server (Attribut "ftpServer") 
+								übertragen. </li> <br>
+								
+  <li><b>ftpUseSSL </b>       - FTP Transfer mit SSL Verschlüsselung nach dem Dump wird eingeschaltet. Das erzeugte 
+                                Datenbank Backupfile wird non-blocking zum angegebenen FTP-Server (Attribut "ftpServer") 
+								übertragen. </li> <br>
+								
+  <li><b>ftpUser </b>         - User zur Anmeldung am FTP-Server, default: "anonymous". </li> <br>
+  
+  <li><b>ftpDebug </b>        - Debugging der FTP Kommunikation zur Fehlersuche. </li> <br>
+  
+  <li><b>ftpDir </b>          - Verzeichnis des FTP-Servers in welches das File übertragen werden soll (default: "/"). </li> <br>
+  
+  <li><b>ftpPassive </b>      - setzen wenn passives FTP verwendet werden soll </li> <br>
+  
+  <li><b>ftpPort </b>         - FTP-Port, default: 21 </li> <br>
+  
+  <li><b>ftpPwd </b>          - Passwort des FTP-Users, default nicht gesetzt </li> <br>
+  
+  <li><b>ftpServer </b>       - Name oder IP-Adresse des FTP-Servers. <b>notwendig !</b> </li> <br>
+  
+  <li><b>ftpTimeout </b>      - Timeout für die FTP-Verbindung in Sekunden (default: 30). </li> <br>
+								 
   <a name="DbRepattrlimit"></a>
   <li><b>limit </b>           - begrenzt die Anzahl der resultierenden Datensätze im select-Statement von "fetchrows" 
                                 (default 1000). Diese Limitierung soll eine Überlastung der Browsersession und ein 
@@ -7969,7 +8233,7 @@ sub bdump {
 								                    JSON-kodierten Hash.
 													Jedes Hash-Element (Ergebnissatz) setzt sich aus der laufenden Nummer
 													des Datensatzes (Key) und dessen Wert zusammen. </li><br><br>
-        <ul>
+        
 		Die Weiterverarbeitung des Ergebnisses kann z.B. mit der folgenden userExitFn in 99_myUtils.pm erfolgen: <br>
 		<pre>
         sub resfromjson {
@@ -7994,7 +8258,7 @@ sub bdump {
         return;
         }
   	    </pre>  	
-								</ul>					
+													
                                 </ul><br>  
   
   <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion (*)   </li> <br>
