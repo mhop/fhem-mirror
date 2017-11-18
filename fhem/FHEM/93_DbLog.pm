@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.14    18.11.2017       create state-events if state has been changed (Forum:#78867)
 # 2.22.13    20.10.2017       output of reopen command improved 
 # 2.22.12    19.10.2017       avoid illegible messages in "state"
 # 2.22.11    13.10.2017       DbLogType expanded by SampleFill, DbLog_sampleDataFn adapted to sort case insensitive, commandref revised
@@ -157,7 +158,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.13";
+my $DbLogVersion = "2.22.14";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -392,6 +393,7 @@ sub DbLog_Attr(@) {
 	  DbLog_execmemcache($hash) if($do == 1);
 	  
       readingsSingleUpdate($hash, "state", $val, 1);
+	  $hash->{HELPER}{OLDSTATE} = $val;
         
       if ($do == 0) {
           InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0);
@@ -1269,11 +1271,12 @@ sub DbLog_Log($$) {
           return if($hash->{HELPER}{REOPEN_RUNS});	  
           my $error = DbLog_Push($hash, $vb4show, @row_array);
           Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error" if($vb4show);
-		  if($error) {
-              readingsSingleUpdate($hash, "state", $error, 1);
-		  } else {
-		      readingsSingleUpdate($hash, "state", "connected", 0);
-		  }
+		  
+          my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
+          my $evt    = ($state && $state eq $hash->{HELPER}{OLDSTATE})?0:1;
+          readingsSingleUpdate($hash, "state", $state, $evt);
+          $hash->{HELPER}{OLDSTATE} = $state;
+		  
 		  # Notify-Routine Laufzeit ermitteln
           $net = tv_interval($nst);
       }
@@ -1666,16 +1669,10 @@ sub DbLog_execmemcache ($) {
       readingsSingleUpdate($hash, "NextSync", $nsdt. " or if CacheUsage ".$clim." reached", 0); 
   }
   
-  if($error) {
-      readingsSingleUpdate($hash, "state", $error, 1);
-	  $hash->{HELPER}{OLDSTATE} = $error;
-  } else {
-      if($hash->{HELPER}{OLDSTATE} && $hash->{HELPER}{OLDSTATE} ne "connected") {
-	      readingsSingleUpdate($hash, "state", "connected", 1);
-		  $hash->{HELPER}{OLDSTATE} = "connected";
-	  }
-      readingsSingleUpdate($hash, "state", "connected", 0);
-  }
+  my $state = $error?$error:$hash->{HELPER}{OLDSTATE};
+  my $evt   = ($state && $state eq $hash->{HELPER}{OLDSTATE})?0:1;
+  readingsSingleUpdate($hash, "state", $state, $evt);
+  $hash->{HELPER}{OLDSTATE} = $state;
   
   InternalTimer($nextsync, "DbLog_execmemcache", $hash, 0);
 
@@ -1987,9 +1984,10 @@ sub DbLog_PushAsyncDone ($) {
  my $bt         = $a[2];
  my $rowlist    = $a[3];
  my $asyncmode  = AttrVal($name, "asyncMode", undef);
- my $state      = "connected";
  my $memcount;
 
+ Log3 ($name, 5, "DbLog $name -> Start DbLog_PushAsyncDone");
+  
  if($rowlist) {
      $rowlist = decode_base64($rowlist);
      my @row_array = split('§', $rowlist);
@@ -2006,35 +2004,33 @@ sub DbLog_PushAsyncDone ($) {
 	 };
   }
 	  
- Log3 ($name, 5, "DbLog $name -> Start DbLog_PushAsyncDone");
- $state = "disabled" if(IsDisabled($name));
+  # $state = "disabled" if(IsDisabled($name));
  
- $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
- readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
+  $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
+  readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
  
- if(AttrVal($name, "showproctime", undef) && $bt) {
-     my ($rt,$brt) = split(",", $bt);
-     readingsBeginUpdate($hash);
-     readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt));     
-     readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt));
-     readingsEndUpdate($hash, 1);
- }
+  if(AttrVal($name, "showproctime", undef) && $bt) {
+      my ($rt,$brt) = split(",", $bt);
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt));     
+      readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt));
+      readingsEndUpdate($hash, 1);
+  }
  
-  if($error) {
-      readingsSingleUpdate($hash, "state", $error, 1);
-  } else {
-      readingsSingleUpdate($hash, "state", $state, 0);
-  } 
+  my $state    = $error?$error:(IsDisabled($name))?"disabled":"connected";
+  my $evt      = ($state && $state eq $hash->{HELPER}{OLDSTATE})?0:1;
+  readingsSingleUpdate($hash, "state", $state, $evt);
+  $hash->{HELPER}{OLDSTATE} = $state;
  
- if(!$asyncmode) {
-     delete($defs{$name}{READINGS}{NextSync});
-	 delete($defs{$name}{READINGS}{background_processing_time});
-	 delete($defs{$name}{READINGS}{sql_processing_time});
-	 delete($defs{$name}{READINGS}{CacheUsage});
- }
+  if(!$asyncmode) {
+      delete($defs{$name}{READINGS}{NextSync});
+	  delete($defs{$name}{READINGS}{background_processing_time});
+	  delete($defs{$name}{READINGS}{sql_processing_time});
+	  delete($defs{$name}{READINGS}{CacheUsage});
+  }
  
- delete $hash->{HELPER}{RUNNING_PID};
- Log3 ($name, 5, "DbLog $name -> DbLog_PushAsyncDone finished");
+  delete $hash->{HELPER}{RUNNING_PID};
+  Log3 ($name, 5, "DbLog $name -> DbLog_PushAsyncDone finished");
  
 return;
  
@@ -3263,12 +3259,13 @@ sub DbLog_AddLog($$$) {
 		  # return wenn "reopen" mit Ablaufzeit gestartet ist
           return if($hash->{HELPER}{REOPEN_RUNS});	  
           my $error = DbLog_Push($hash, 1, @row_array);
+		  
+          my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
+          my $evt    = ($state && $state eq $hash->{HELPER}{OLDSTATE})?0:1;
+          readingsSingleUpdate($hash, "state", $state, $evt);
+          $hash->{HELPER}{OLDSTATE} = $state;
+		  
           Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error";
-		  if($error) {
-              readingsSingleUpdate($hash, "state", $error, 1);
-		  } else {
-		      readingsSingleUpdate($hash, "state", "connected", 0);
-		  }
       }
   }
 return;
@@ -4411,6 +4408,7 @@ sub reopen ($){
       my $delay = delete $hash->{HELPER}{REOPEN_RUNS};
 	  Log3($name, 2, "DbLog $name: Database connection reopened (it was $delay seconds closed).");
 	  readingsSingleUpdate($hash, "state", "reopened", 1);
+	  $hash->{HELPER}{OLDSTATE} = "reopened";
 	  DbLog_execmemcache($hash) if($async);
   } else {
       InternalTimer(gettimeofday()+30, "reopen", $hash, 0);		

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: V2.22.14, create state-events if state has been changed 
+                       (Forum:#78867)
   - feature: 10_EQ3BT: support remote Bluetooth interface via SSH (thx@Cooltux!)
   - feature: 93_DbRep: V6.0.0, FTP transfer dumpfile after dump (MySQL), delete
                        old dumpfiles within Blockingcall, minor fixes
