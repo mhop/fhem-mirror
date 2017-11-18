@@ -1481,12 +1481,12 @@ ZWave_thermostatSetpointParse ($$)
   my $scale = (((hex($2) & 0x18)>>3) == 1) ? "F": "C";
   my $size  = (hex($2) & 0x07);
 
-  if (length($3) < $size*2) {
+  if (length($3) != $size*2) {
     Log3 $name, 1, "$name: THERMOSTAT_SETPOINT_REPORT "
                         ."wrong number of bytes received";
     return;
   }
-  my $sp = hex(substr($3,0,$size*2)); # 79659
+  my $sp = hex($3);
   $sp -= (2 ** ($size*8)) if $sp >= (2 ** ($size*8-1));
   $sp = $sp / (10 ** $prec);
 
@@ -4819,6 +4819,16 @@ ZWave_Parse($$@)
   if($cmd ne "APPLICATION_COMMAND_HANDLER") {
     Log3 $ioName, 4, "$ioName unhandled command $cmd";
     return ""
+  }
+
+  if($arg =~ m/^(..)(.*)/) {
+    my $l1 = hex($1);
+    my $l2 = length($2)/2;
+    if($l1 > $l2) {
+      Log3 $ioName, $2, "Packet with short length ($arg)";
+      return "";
+    }
+    $arg = substr($arg, 0, ($l1+1)*2) if($l1 < $l2); #79659
   }
 
   if($arg =~ m/^(..)(..)(.*)/ && $2 eq "c6") { # Danfoss Living Strangeness
