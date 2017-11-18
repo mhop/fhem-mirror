@@ -250,6 +250,7 @@ sub DbLog_Define($@)
   $hash->{REGEXP}  = $regexp;
   $hash->{VERSION} = $DbLogVersion;
   $hash->{MODE}    = AttrVal($hash->{NAME}, "asyncMode", undef)?"asynchronous":"synchronous";   # Mode setzen Forum:#76213
+  $hash->{HELPER}{OLDSTATE} = "initialized";
   
   # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
   notifyRegexpChanged($hash, $regexp);
@@ -1273,7 +1274,7 @@ sub DbLog_Log($$) {
           Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error" if($vb4show);
 		  
           my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
-          my $evt    = ($state && $state eq $hash->{HELPER}{OLDSTATE})?0:1;
+          my $evt    = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
           readingsSingleUpdate($hash, "state", $state, $evt);
           $hash->{HELPER}{OLDSTATE} = $state;
 		  
@@ -1670,7 +1671,7 @@ sub DbLog_execmemcache ($) {
   }
   
   my $state = $error?$error:$hash->{HELPER}{OLDSTATE};
-  my $evt   = ($state && $state eq $hash->{HELPER}{OLDSTATE})?0:1;
+  my $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
   readingsSingleUpdate($hash, "state", $state, $evt);
   $hash->{HELPER}{OLDSTATE} = $state;
   
@@ -2018,7 +2019,7 @@ sub DbLog_PushAsyncDone ($) {
   }
  
   my $state    = $error?$error:(IsDisabled($name))?"disabled":"connected";
-  my $evt      = ($state && $state eq $hash->{HELPER}{OLDSTATE})?0:1;
+  my $evt      = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
   readingsSingleUpdate($hash, "state", $state, $evt);
   $hash->{HELPER}{OLDSTATE} = $state;
  
@@ -3261,7 +3262,7 @@ sub DbLog_AddLog($$$) {
           my $error = DbLog_Push($hash, 1, @row_array);
 		  
           my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
-          my $evt    = ($state && $state eq $hash->{HELPER}{OLDSTATE})?0:1;
+          my $evt    = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
           readingsSingleUpdate($hash, "state", $state, $evt);
           $hash->{HELPER}{OLDSTATE} = $state;
 		  
