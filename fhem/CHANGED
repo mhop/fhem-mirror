@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     14_SD_RSL - basic support for conrad RSL
+  - update:  14_Hideki: windsensor support added
+             00_SIGNALduino: Updated to v3.3.2
+             14_SD_WS: new tfa sensor supported
+             14_SD_WS07: extraction of rssi value support
+             14_SD_WS09: wind/rain total support
   - change:  93_DbLog: V2.22.14, create state-events if state has been changed 
                        (Forum:#78867)
   - feature: 10_EQ3BT: support remote Bluetooth interface via SSH (thx@Cooltux!)
@@ -7,7 +13,7 @@
                        old dumpfiles within Blockingcall, minor fixes
   - feature: 57_Calendar: new field categories (nils_, Forum #79237)
   - change:  72_FB_CALLMONITOR: delete stored FRITZ!Box password in
-             FHEM/uniqueID file upon deletion of a FB_CALLMONITOR definition
+             FHEM/uniqueID file upon deletion of a FB_CALLMONITOR definition  
   - feature: TR064Utils.pm added
   - changed: 88_HMCCU: Improved attributes ccureadingfilter, stripnumber
   - feature: 89_FULLY: New commands for motion detection and brightness

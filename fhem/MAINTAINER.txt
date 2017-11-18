@@ -95,6 +95,7 @@ FHEM/14_SD_WS.pm             Sidey/Ralf9          Sonstige Systeme
 FHEM/14_SD_WS_Maverick.pm    Sidey79/Cruizer      Sonstige Systeme
 FHEM/14_SD_WS07.pm           Sidey/Ralf9          Sonstige Systeme
 FHEM/14_SD_WS09.pm           Sidey/pejonp         Sonstige Systeme
+FHEM/14_SD_RSL.pm            Sidey/Ralf9          Sonstige Systeme
 FHEM/17_SIS_PMS.pm           painseeker           Sonstiges
 FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         SlowRF
 FHEM/19_Revolt.pm            martinppp/mehf       SlowRF
