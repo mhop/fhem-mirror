@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_Hyperion: - new "set binary restart/stop"
+                          - non-blocking for "get configFiles",
+                            "set configFile" and "set binary"
+                          - ATTENTION: change from command killall to kill,
+                            please adjust your sudoers file (if applicable)
   - new:     14_SD_RSL - basic support for conrad RSL
   - update:  14_Hideki: windsensor support added
              00_SIGNALduino: Updated to v3.3.2

@@ -17,6 +17,7 @@ use Color;
 use DevIo;
 use JSON;
 use SetExtensions;
+use Blocking;
 
 my %Hyperion_sets =
 (
@@ -150,6 +151,7 @@ sub Hyperion_Undef($$)
 {                     
   my ($hash,$name) = @_;
   RemoveInternalTimer($hash);
+  BlockingKill($hash->{helper}{RUNNING_PID}) if ($hash->{helper}{RUNNING_PID});
   DevIo_CloseDev($hash);
   return;                  
 }
@@ -168,8 +170,8 @@ sub Hyperion_list2array($$)
 
 sub Hyperion_isLocal($)
 {
-  my ($hash) = @_;
-  return ($hash->{IP} =~ /^(localhost|127\.0{1,3}\.0{1,3}\.0{0,2}1|::1)$/) ? 1 : undef;
+  my ($ip) = @_;
+  return ($ip =~ /^(localhost|127\.0{1,3}\.0{1,3}\.0{0,2}1|::1)$/) ? 1 : undef;
 }
 
 sub Hyperion_Get($@)
@@ -183,6 +185,7 @@ sub Hyperion_Get($@)
     if (!$cmd);
   if ($cmd eq "configFiles")
   {
+    return "Work already/still in progress... Please wait for the current process to finish." if ($hash->{helper}{RUNNING_PID} && !$hash->{helper}{RUNNING_PID}{terminated});
     Hyperion_GetConfigs($hash);
   }
   elsif ($cmd eq "devStateIcon")
@@ -230,8 +233,10 @@ sub Hyperion_Read($)
       {
         my $ver       = (split /V/,(split " ",$data->{hyperion_build}->[0]->{version})[0])[1];
         $ver          =~ s/\.//g;
+        $ver          = $ver * 1;
         my $rver      = $Hyperion_requiredVersion;
         $rver         =~ s/\.//g;
+        $rver         = $rver * 1;
         $error        = "Your version of hyperion (detected version: ".$data->{hyperion_build}->[0]->{version}.") is not (longer) supported by this module!" if ($ver<$rver);
       }
       if ($error)
@@ -383,65 +388,59 @@ sub Hyperion_Read($)
 sub Hyperion_GetConfigs($)
 {
   my ($hash) = @_;
-  return "Not connected" if (!$hash->{FD});
   my $name = $hash->{NAME};
   my $ip = $hash->{IP};
   my $dir = AttrVal($name,"hyperionConfigDir","/etc/hyperion/");
-  my $com = "ls $dir 2>/dev/null";
-  my @files;
-  if (Hyperion_isLocal($hash))
+  my $com = "ls $dir";
+  if (!Hyperion_isLocal($ip))
   {
-    @files = Hyperion_listFilesInDir($hash,$com);
-  }
-  else
-  {
+    my $ssh = qx(which ssh);
+    chomp $ssh;
+    return "SSH client could NOT be found!" if (!$ssh);
     my $user = AttrVal($name,"hyperionSshUser","pi");
-    my $cmd = qx(which ssh);
-    chomp $cmd;
-    $cmd .= " $user\@$ip $com";
-    @files = Hyperion_listFilesInDir($hash,$cmd);
+    $com = "$ssh $user\@$ip '$com'";
   }
-  return "No files found on server \"$ip\" in directory \"$dir\".\nMaybe the wrong directory?\n\nIf SSH is used, has the user \"".AttrVal($name,"hyperionSshUser","pi")."\" been configured to log in without\nentering a password (http://www.linuxproblem.org/art_9.html)?"
-    if (@files == 0);
-  if (@files > 1)
-  {
-    my $configs = join(",",@files);
-    readingsSingleUpdate($hash,".configs",$configs,1) if (ReadingsVal($name,".configs","") ne $configs);
-    $attr{$name}{webCmd} = $Hyperion_webCmd_config if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
-  }
-  else
-  {
-    AnalyzeCommandChain(undef,"deletereading $name .configs") if (defined ReadingsVal($name,".configs",undef));
-    $attr{$name}{webCmd} = $Hyperion_webCmd if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
-    return "Found just one config file.\nPlease add at least one more config file to properly use this function."
-      if (@files == 1);
-    return "No config files found!";
-  }
-  Hyperion_GetUpdate($hash);
-  return "Found ".@files." config files.\nPlease refresh this page to see the result.";
+  Log3 $name,4,"$name: lsCmd: $com";
+  $com = encode_base64($com);
+  $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$com","Hyperion_GetConfigs_finished");
+  return "Working in background...";
 }
 
-sub Hyperion_listFilesInDir($$)
+sub Hyperion_GetConfigs_finished($)
 {
-  my ($hash,$cmd) = @_;
-  my $name = $hash->{NAME};
-  my $fh;
+  my ($string)    = @_;
+  my @a           = split /\|/,$string;
+  my $name        = $a[0];
+  my @files;
+  @files          = split " ",$a[1] if ($a[1]);
+  my $hash        = $defs{$name};
+  my $ip = $hash->{IP};
+  my $dir = AttrVal($name,"hyperionConfigDir","/etc/hyperion/");
+  delete $hash->{helper}{RUNNING_PID};
   my @filelist;
-  if (open(FH,"$cmd|"))
+  foreach (@files)
   {
-    my @files = <FH>;
-    for (my $i = 0; $i < @files; $i++)
-    {
-      my $file = $files[$i];
-      chomp $file;
-      next if ($file !~ /\w+\.config\.json$/);
-      $file =~ s/\.config\.json$//gm;
-      push @filelist,$file;
-      Log3 $name,4,"$name: Hyperion_listFilesInDir matching file: \"$file\"";
-    }
-    close FH;
+    my $file = $_;
+    next if ($file !~ /^([-\.\w]+)\.config\.json$/);
+    $file = $1;
+    push @filelist,$file;
+    Log3 $name,4,"$name: matching config file: \"$_\"";
   }
-  return @filelist;
+  if (@filelist)
+  {
+    my $configs = join(",",@filelist);
+    readingsSingleUpdate($hash,".configs",$configs,0);
+    CommandAttr(undef,"$name webCmd $Hyperion_webCmd_config") if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd && @filelist > 1);
+    CommandAttr(undef,"$name webCmd $Hyperion_webCmd") if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config && @filelist < 2);
+  }
+  else
+  {
+    CommandDeleteReading(undef,"$name .configs") if (ReadingsVal($name,".configs",""));
+    CommandAttr(undef,"$name webCmd $Hyperion_webCmd") if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
+    Log3 $name,3,"$name: No files found on server \"$ip\" in directory \"$dir\".\nMaybe the wrong directory?\n\nIf SSH is used, has the user \"".AttrVal($name,"hyperionSshUser","pi")."\" been configured to log in without\nentering a password (http://www.linuxproblem.org/art_9.html)?";
+  }
+  Hyperion_GetUpdate($hash);
+  return;
 }
 
 sub Hyperion_GetUpdate(@)
@@ -460,6 +459,97 @@ sub Hyperion_GetUpdate(@)
   return;
 }
 
+sub Hyperion_ExecCmd($)
+{
+  my ($string) = @_;
+  my @a = split /\|/,$string;
+  my $name = $a[0];
+  my $cmd = decode_base64($a[1]);
+  my $hash = $defs{$name};
+  my @qx = qx($cmd);
+  my @ret;
+  my $re = "";
+  foreach (@qx)
+  {
+    chomp $_;
+    $_ =~ s/^[\s\t]{1,}/ /;
+    push @ret,$_;
+  }
+  $re .= join " ",@ret if (@ret);
+  return "$name|$re";
+}
+
+sub Hyperion_Kill_finished($)
+{
+  my ($string)    = @_;
+  my @a           = split /\|/,$string;
+  my $name        = $a[0];
+  my $error       = $a[1];
+  my $hash        = $defs{$name};
+  delete $hash->{helper}{RUNNING_PID};
+  if ($error)
+  {
+    Log3 $name,3,"$name: Not able to stop Hyperion! Error: $error";
+    readingsSingleUpdate($hash,"lastError",$error,1);
+  }
+  else
+  {
+    Log3 $name,3,"$name: Hyperion has been stopped";
+    RemoveInternalTimer($hash);
+    DevIo_Disconnected($hash);
+  }
+  return undef;
+}
+
+sub Hyperion_Restart($)
+{
+  my ($string)    = @_;
+  my @a           = split /\|/,$string;
+  my $name        = $a[0];
+  my $error       = $a[1];
+  my $hash        = $defs{$name};
+  delete $hash->{helper}{RUNNING_PID};
+  if ($error)
+  {
+    Log3 $name,3,"$name: Not able to stop Hyperion! Error: $error";
+    readingsSingleUpdate($hash,"lastError",$error,1);
+  }
+  else
+  {
+    my $cmd = $hash->{helper}{startCmd};
+    $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$cmd","Hyperion_Restart_finished");
+  }
+  return undef;
+}
+
+sub Hyperion_Restart_finished($)
+{
+  my ($string)    = @_;
+  my @a           = split /\|/,$string;
+  my $name        = $a[0];
+  my $error       = $a[1];
+  my $hash        = $defs{$name};
+  delete $hash->{helper}{RUNNING_PID};
+  my $file        = $hash->{helper}{configFile};
+  delete $hash->{helper}{configFile};
+  delete $hash->{helper}{startCmd};
+  if ($error)
+  {
+    Log3 $name,3,"$name: Hyperion could not be restarted! Error: $error";
+    readingsSingleUpdate($hash,"lastError",$error,1);
+  }
+  else
+  {
+    Log3 $name,3,"$name: Hyperion restarted with configFile $file";
+    RemoveInternalTimer($hash);
+    DevIo_Disconnected($hash);
+    $file =~ s/\.config\.json$//;
+    readingsSingleUpdate($hash,"configFile",$file,1);
+    InternalTimer(gettimeofday() + 3,"Hyperion_OpenDev",$hash);
+  }
+  return undef;
+}
+
 sub Hyperion_Set($@)
 {
   my ($hash,$name,@aa) = @_;
@@ -473,7 +563,7 @@ sub Hyperion_Set($@)
   if (ReadingsVal($name,".configs",""))
   {
     $Hyperion_sets_local{configFile} = ReadingsVal($name,".configs","");
-    $attr{$name}{webCmd} = $Hyperion_webCmd_config if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd);
+    $Hyperion_sets_local{binary} = "restart,stop";
   }
   $Hyperion_sets_local{adjustRed} = "textField" if (ReadingsVal($name,"adjustRed",""));
   $Hyperion_sets_local{adjustGreen} = "textField" if (ReadingsVal($name,"adjustGreen",""));
@@ -495,55 +585,70 @@ sub Hyperion_Set($@)
   Log3 $name,4,"$name: Hyperion_Set cmd: $cmd";
   Log3 $name,4,"$name: Hyperion_Set value: $value" if ($value);
   Log3 $name,4,"$name: Hyperion_Set duration: $duration, priority: $priority" if ($cmd =~ /^rgb|dim|dimUp|dimDown|effect$/);
-  if ($cmd eq "configFile")
+  if ($cmd =~ /^configFile|binary$/)
   {
-    $value = $value.".config.json";
-    my $confdir = AttrVal($name,"hyperionConfigDir","/etc/hyperion/");
+    return "Work already/still in progress... Please wait for the current process to finish." if ($hash->{helper}{RUNNING_PID} && !$hash->{helper}{RUNNING_PID}{terminated});
     my $binpath  = AttrVal($name,"hyperionBin","/usr/bin/hyperiond");
     my $bin = (split "/",$binpath)[scalar(split "/",$binpath) - 1];
     $bin =~ s/\.sh$// if ($bin =~ /\.sh$/);
+    my $confdir     = AttrVal($name,"hyperionConfigDir","/etc/hyperion/");
     my $user  = AttrVal($name,"hyperionSshUser","pi");
     my $ip = $hash->{IP};
     my $sudo = ($user eq "root" || int AttrVal($name,"hyperionNoSudo",0) == 1) ? "" : "sudo ";
-    my $command = $sudo."killall $bin; sleep 1; ".$sudo."$binpath $confdir$value > /dev/null 2>&1 &";
-    my $status;
-    my $fh;
-    if (Hyperion_isLocal($hash))
+    my $kill = $sudo."kill `pidof $bin`";
+    my $ssh;
+    if (!Hyperion_isLocal($ip))
     {
-      if (open(FH,"$command|"))
-      {
-        $status = <FH>;
-        close FH;
-      }
+      $ssh = qx(which ssh);
+      chomp $ssh;
+      return "SSH client could NOT be found!" if (!$ssh);
+    }
+    my $com = Hyperion_isLocal($ip)?"":"$ssh $user\@$ip '";
+    if ($cmd eq "binary")
+    {
+      return "Value of $cmd has to be 'stop' or 'restart'" if ($value !~ /^(stop|restart)$/);
     }
     else
     {
-      my $com = qx(which ssh);
-      chomp $com;
-      $com .= " $user\@$ip '$command'";
-      if (open(FH,"$com|"))
+      return "Value of $cmd must be given and must be an available config file!" if (!$value || !grep(/^$value$/,split /,/,ReadingsVal($name,".configs","")));
+    }
+    if ($cmd eq "binary" && $value eq "stop")
+    {
+      $com .= $kill;
+      $com .= Hyperion_isLocal($ip)?"":"'";
+      Log3 $name,4,"$name: stopCmd: $com";
+      $com = encode_base64($com);
+      $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$com","Hyperion_Kill_finished");
+    }
+    elsif (($cmd eq "binary" && $value eq "restart") || $cmd eq "configFile")
+    {
+      my $file;
+      if ($value eq "restart")
       {
-        $status = <FH>;
-        close FH;
+        $file = ReadingsVal($name,"configFile","")?ReadingsVal($name,"configFile",""):ReadingsVal($name,".configs","")?(split /,/,ReadingsVal($name,".configs",""))[0]:"";
+        return "No restart possible because no configFile is available." if (!$file);
       }
+      else
+      {
+        $file = $value;
+      }
+      my $start = $com;
+      $file .= ".config.json";
+      $com .= $kill;
+      $start .= "$sudo$binpath $confdir".$file." > /dev/null 2>&1 &";
+      if (!Hyperion_isLocal($ip))
+      {
+        $com .= "'";
+        $start .= "'";
+      }
+      Log3 $name,4,"$name: stopCmd: $com";
+      Log3 $name,4,"$name: startCmd: $start";
+      $com = encode_base64($com);
+      $hash->{helper}{configFile} = $file;
+      $hash->{helper}{startCmd} = encode_base64($start);
+      $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$com","Hyperion_Restart");
     }
-    if (!$status)
-    {
-      Log3 $name,4,"$name: restarted Hyperion with $binpath $confdir$value";
-      $value =~ s/\.config\.json$//;
-      readingsSingleUpdate($hash,"configFile",$value,1);
-      return;
-    }
-    else
-    {
-      Log3 $name,4,"$name: NOT restarted Hyperion with $binpath $confdir$value, status: $status";
-      readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash,"lastError",$status);
-      readingsBulkUpdate($hash,"serverResponse","ERROR");
-      readingsBulkUpdate($hash,"state","ERROR");
-      readingsEndUpdate($hash,1);
-      return "$name NOT restarted Hyperion with $binpath $confdir$value, status: $status";
-    }
+    return;
   }
   elsif ($cmd eq "rgb")
   {
@@ -752,7 +857,7 @@ sub Hyperion_Set($@)
     my $effs = AttrVal($name,"hyperionCustomEffects","");
     $effs .= "\r\n" if ($effs);
     $effs .= '{"name":"'.$value.'","oname":"'.$eff.'","args":'.ReadingsVal($name,"effectArgs","").'}';
-    $attr{$name}{hyperionCustomEffects} = $effs;
+    CommandAttr(undef,"$name hyperionCustomEffects $effs");
     return;
   }
   elsif ($cmd eq "reopen")
@@ -775,7 +880,7 @@ sub Hyperion_Attr(@)
   my ($cmd,$name,$attr_name,$attr_value) = @_;
   my $hash  = $defs{$name};
   my $err;
-  my $local = Hyperion_isLocal($hash);
+  my $local = Hyperion_isLocal($hash->{IP});
   if ($cmd eq "set")
   {
     if ($attr_name eq "hyperionBin")
@@ -963,6 +1068,12 @@ sub Hyperion_devStateIcon($;$)
   <ul>
     <code>define Ambilight Hyperion 192.168.1.4 19444 10</code><br>
   </ul>
+  <br><br>
+  To change config files on your running Hyperion server or to stop/restart your Hyperion server you have to put the following code into your sudoers file (/etc/sudoers) (visudo):
+  <br><br>
+  <ul>
+    <code>fhem    ALL=(ALL) NOPASSWD:/usr/bin/hyperiond,/bin/kill</code>
+  </ul>
   <br>
   <a name="Hyperion_set"></a>
   <p><b>set &lt;required&gt; [optional]</b></p>
@@ -987,6 +1098,11 @@ sub Hyperion_devStateIcon($;$)
       <i>adjustRed &lt;255,0,0&gt;</i><br>
       adjust each color of red separately (comma separated) (R,G,B)<br>
       values from 0 to 255 in steps of 1
+    </li>
+    <li>
+      <i>binary &lt;restart/stop&gt;</i><br>
+      restart or stop the hyperion binary<br>
+      only available after successful "get &lt;name&gt; configFiles"
     </li>
     <li>
       <i>blacklevel &lt;0.00,0.00,0.00&gt;</i><br>
@@ -1110,7 +1226,9 @@ sub Hyperion_devStateIcon($;$)
     <li>
       <i>configFiles</i><br>
       get the available config files in directory from attribute hyperionConfigDir<br>
-      Will only work properly if at least two config files are found. File names must have no spaces and must end with .config.json .
+      File names must have no spaces and must end with .config.json .<br>
+      For non-local Hyperion servers you have to configure passwordless SSH login for the user running fhem to the Hyperion server host (http://www.linuxproblem.org/art_9.html), with attribute hyperionSshUser you can set the SSH user for login.<br>
+      Please watch the log for possible errors while getting config files.
     </li>
     <li>
       <i>devStateIcon</i><br>
