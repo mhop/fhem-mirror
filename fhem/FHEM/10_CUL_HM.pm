@@ -4730,8 +4730,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{
       $hash->{helper}{dlvl} = $plvl;
     }
-    if ($md eq "HM-LC-Ja1PBU-FM"){ $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."80$chn$plvl"."CA";}
-    else{                          $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn$plvl$rval$tval";}
+    if    ($md eq "HM-LC-Ja1PBU-FM"){ $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."80$chn$plvl"."CA";}
+    else{                             $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn$plvl$rval$tval";}
     CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
     $state = "set_".$lvl;
     CUL_HM_UpdtReadSingle($hash,"level",$state,1);
@@ -5341,11 +5341,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                       ,CUL_HM_name2Id($name)                                                              # myself
                       );
       foreach my $tId (@teamList){
-        my $teamC = CUL_HM_id2Name($tId);
         $tId = substr($tId,0,6);
         my $teamD = CUL_HM_id2Name($tId);
+        my $teamCh = ("HM-CC-RT-DN" eq AttrVal($teamD,"model","")) ? "04" #what is the controls channel of the peer?
+                                                                   : "02";
+        my $teamC = CUL_HM_id2Name($tId.$teamCh);
+        
         next if (!defined $defs{$teamC} );
-        CUL_HM_PushCmdStack($defs{$teamD},'++'.$flag."11$id$tId"."8604$temp");
+        
+        CUL_HM_PushCmdStack($defs{$teamD},'++'.$flag."11$id$tId"."86$teamCh$temp");
         CUL_HM_UpdtReadSingle($defs{$teamC},"state",$state,1);
         if (   $tId ne $dst 
             && CUL_HM_getRxType($defs{$teamD}) & "02"){
@@ -7828,10 +7832,9 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
 sub CUL_HM_setTmplDisp($){ # remove register if outdated
   my $tHash = shift;
   delete $tHash->{READINGS}{$_} foreach (grep /^tmpl_/ ,keys %{$tHash->{READINGS}});
-  if ($tHash->{helper}{expert}{tpl} && defined $HMConfig::culHmTpl){
+  if ($tHash->{helper}{expert}{tpl} && defined %HMConfig::culHmTpl){
     foreach (keys %{$tHash->{helper}{tmpl}}){
       my ($p,$t) = split(">",$_);
-      
       my @param;
       if($tHash->{helper}{tmpl}{$_}){
         @param = split(" ",$HMConfig::culHmTpl{$t}{p});
