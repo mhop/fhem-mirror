@@ -1347,7 +1347,7 @@ sub HMinfo_GetFn($@) {#########################################################
     $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
     $ret = "";
   }
-  elsif($cmd eq "templateUsg"){##template: see if it applies ------------------
+  elsif($cmd =~ m/^templateUs(g|gG)$/){##template: see if it applies ------------------
     return HMinfo_templateUsg($opt,$filter,@a);
   }
   #------------ print tables ---------------
@@ -1494,6 +1494,7 @@ sub HMinfo_GetFn($@) {#########################################################
             ,"templateList:".join(",",("all",sort keys%HMConfig::culHmTpl))
             ,"templateChk"
             ,"templateUsg"
+            ,"templateUsgG:sortTemplate,sortPeer,noTmpl,all"
             );
             
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
@@ -2142,6 +2143,7 @@ sub HMinfo_configCheck ($){ ###################################################
     next if (!defined $defs{$dName}{helper}{tmpl});
     foreach (keys %{$defs{$dName}{helper}{tmpl}}){
       my ($p,$t)=split(">",$_);
+      $p = 0 if ($p eq "none");
       my $tck = HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
       push @tlr,$tck if ($tck);
     }
@@ -2415,24 +2417,40 @@ sub HMinfo_templateExe(@){#####################################################
 }
 sub HMinfo_templateUsg(@){#####################################################
   my ($opt,$filter,$tFilter) = @_;
-  my @ul;
+  $tFilter = "all" if (!$tFilter);
+  my @ul;# usageList
+  my @nul;# NonUsageList
+  my %h;
   foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
-    next if(!defined $defs{$dName}{helper}{tmpl});
+    my @regLists = map {(my $foo = $_)=~s/^\.//;$foo}CUL_HM_reglUsed($dName);
+    foreach my $rl (@regLists){
+      if    ($rl =~ m/^RegL_.*\.$/)    {$h{$dName}{general}     = 1;} # no peer register
+      elsif ($rl =~ m/^RegL_03\.(.*)$/){$h{$dName}{$1.":short"} = 1;
+                                        $h{$dName}{$1.":long"}  = 1;} # peer short and long register
+      elsif ($rl =~ m/^RegL_0.\.(.*)$/){$h{$dName}{$1}          = 1;} # peer register
+    }
+   #.RegL_00.
+   #.RegL_01.
+   #.RegL_03.FB2_1
+   #.RegL_03.FB2_2
+   #.RegL_03.dis_01
+   #.RegL_03.dis_02
+   #.RegL_03.self01
+   #.RegL_03.self02
+
     foreach my $tid(keys %{$defs{$dName}{helper}{tmpl}}){
-      my ($p,$t) = split(">",$tid);
-      if($tFilter && $tFilter =~ m/^sort.*/){
+      my ($p,$t) = split(">",$tid);             #split Peer > Template
+      my ($pn,$ls) = split(":",$p);             #split PeerName : list
+      
+      if   ($tFilter =~ m/^sort.*/){
         if($tFilter eq "sortTemplate"){
           push @ul,sprintf("%-20s|%-15s|%s|%s",$t,$dName,$p,$defs{$dName}{helper}{tmpl}{$tid});
         }
-        if($tFilter eq "sortPeer"){
-          my ($pn,$ls) = split(":",$p);
+        elsif($tFilter eq "sortPeer"){
           push @ul,sprintf("%-20s|%-15s|%5s:%-20s|%s",$pn,$t,$ls,$dName,$defs{$dName}{helper}{tmpl}{$tid});
         }
-#        elsif($tFilter ne $t){
-#          next;
-#        }
       }
-      else{ 
+      elsif($tFilter eq $t || $tFilter eq "all"){
         my @param;
         my $para = "";
         if($defs{$dName}{helper}{tmpl}{$tid}){
@@ -2443,12 +2461,28 @@ sub HMinfo_templateUsg(@){#####################################################
           }
           $para = join(" ",@param);
         }
-        push @ul,sprintf("%-20s|%-15s|%s|%s",$dName,$p,$t,$para) if(!$tFilter || $tFilter eq $t);
+        push @ul,sprintf("%-20s|%-15s|%s|%s",$dName,$p,$t,$para);
+      }
+      elsif($tFilter eq "noTmpl"){
+        if    ($p eq "none")         {$h{$dName}{general}      = 0;}
+        elsif ($ls && $ls eq "short"){$h{$dName}{$pn.":short"} = 0;}
+        elsif ($ls && $ls eq "long") {$h{$dName}{$pn.":long"}  = 0;}
+        elsif ($ls && $ls eq "both") {$h{$dName}{$pn.":short"} = 0;
+                                      $h{$dName}{$pn.":long"}  = 0;}
+        elsif ($pn )                 {$h{$dName}{$pn}          = 0;}
+      }
+    }
+    if ($tFilter eq "noTmpl"){
+      foreach my $item (keys %{$h{$dName}}){
+        push @nul,sprintf("%-20s|%-15s ",$dName,$item) if($h{$dName}{$item});
       }
     }
   }
-  return join("\n",sort(@ul));
+  if ($tFilter eq "noTmpl"){return  "\n no template for:\n"
+                                   .join("\n",sort(@nul)); }
+  else{                     return  join("\n",sort(@ul));  }
 }
+
 sub HMinfo_templateChk(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
   # pset: 0                = template w/o peers
