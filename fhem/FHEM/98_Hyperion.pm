@@ -239,7 +239,7 @@ sub Hyperion_Read($)
         $rver         = $rver * 1;
         $error        = "Your version of hyperion (detected version: ".$data->{hyperion_build}->[0]->{version}.") is not (longer) supported by this module!" if ($ver<$rver);
       }
-      if ($error)
+      else
       {
         $error = "ATTENTION!!! $error Please update your hyperion to V$Hyperion_requiredVersion at least using HyperCon...";
         Log3 $name,1,$error;
@@ -437,7 +437,7 @@ sub Hyperion_GetConfigs_finished($)
   {
     CommandDeleteReading(undef,"$name .configs") if (ReadingsVal($name,".configs",""));
     CommandAttr(undef,"$name webCmd $Hyperion_webCmd") if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
-    Log3 $name,3,"$name: No files found on server \"$ip\" in directory \"$dir\".\nMaybe the wrong directory?\n\nIf SSH is used, has the user \"".AttrVal($name,"hyperionSshUser","pi")."\" been configured to log in without\nentering a password (http://www.linuxproblem.org/art_9.html)?";
+    Log3 $name,3,"$name: No files found on server \"$ip\" in directory \"$dir\". Maybe the wrong directory? If SSH is used, has the user \"".AttrVal($name,"hyperionSshUser","pi")."\" been configured to log in without entering a password (http://www.linuxproblem.org/art_9.html)?";
   }
   Hyperion_GetUpdate($hash);
   return;
@@ -855,7 +855,7 @@ sub Hyperion_Set($@)
       return "The base effect can't be a custom effect! Please set a non-custom effect first!" if ($e->{name} eq $eff);
     }
     my $effs = AttrVal($name,"hyperionCustomEffects","");
-    $effs .= "\r\n" if ($effs);
+    $effs .= " " if ($effs);
     $effs .= '{"name":"'.$value.'","oname":"'.$eff.'","args":'.ReadingsVal($name,"effectArgs","").'}';
     CommandAttr(undef,"$name hyperionCustomEffects $effs");
     return;
