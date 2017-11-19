@@ -174,6 +174,7 @@ sub FRITZBOX_Initialize($)
 
   $hash->{DefFn}    = "FRITZBOX_Define";
   $hash->{UndefFn}  = "FRITZBOX_Undefine";
+  $hash->{DeleteFn}  = "FRITZBOX_Delete";
 
   $hash->{SetFn}    = "FRITZBOX_Set";
   $hash->{GetFn}    = "FRITZBOX_Get";
@@ -272,6 +273,17 @@ sub FRITZBOX_Undefine($$)
 
   return undef;
 } # end FRITZBOX_Undefine
+
+#######################################################################
+sub FRITZBOX_Delete ($$)
+{
+   my ( $hash, $name ) = @_;
+   
+   my $index = $hash->{TYPE}."_".$name."_passwd";
+   setKeyValue($index, undef);
+ 
+   return undef;
+}
 
 #######################################################################
 sub FRITZBOX_Attr($@)
@@ -800,8 +812,9 @@ sub FRITZBOX_API_Check_Run($)
          # Getting IP of FHEM host
             FRITZBOX_Log $hash, 4, "Try to get my IP address.";
             my $socket = IO::Socket::INET->new( Proto => 'tcp', PeerAddr => $host, PeerPort    => 'http(80)' );
-            my $ip = $socket->sockhost; #A side-effect of making a socket connection is that our IP address is available from the 'sockhost' method
-            FRITZBOX_Log $hash, 4, "Could not determine my ip address"  unless $ip;
+            my $ip;
+            $ip = $socket->sockhost if $socket; #A side-effect of making a socket connection is that our IP address is available from the 'sockhost' method
+               FRITZBOX_Log $hash, 4, "Could not determine my ip address"  unless $ip;
          # Get a web port
             my $port;
                FRITZBOX_Log $hash, 4, "Try to get a FHEMWEB port.";
