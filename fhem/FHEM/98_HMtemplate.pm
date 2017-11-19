@@ -191,6 +191,7 @@ sub HMtemplate_Attr(@) {#######################################################
   }
   elsif($attrName eq "tpl_entity"){# used with select option
     if ($cmd eq "set"){
+      return "entity:$attrVal not defined" if(!defined $defs{$attrVal});
       $attr{$name}{tpl_ePeer} = "";
       if($hash->{tpl_type} eq "basic"){# we dont need peer - import now
       }
@@ -200,9 +201,25 @@ sub HMtemplate_Attr(@) {#######################################################
         $modules{HMtemplate}{AttrList}  =~ s/tpl_ePeer.*?( |$)//;
         $modules{HMtemplate}{AttrList}  .=" tpl_ePeer:$peerList";
       }
+      ############ set attr param from device if selected
+      if(ReadingsVal($hash->{NAME},"state","") eq "select"){# do we have to set params?
+        my $dh = $defs{$attrVal};
+        my ($tName,$tType) = (InternalVal($name,"tpl_Name",""),InternalVal($name,"tpl_type","")); 
+        if (   $tType eq "basic"){ #we have enough to prefill parameter
+          my @pN = split(" ",$culHmTpl->{$tName}{p});## get param Names template
+          my @pD ;
+          @pD = split(" ",$dh->{helper}{tmpl}{"0>$tName"}) 
+                   if(   defined $dh->{helper}{tmpl}
+                      && defined $dh->{helper}{tmpl}{"0>$tName"});
+          
+          for (my $cnt = 0;$cnt < scalar(@pN); $cnt++){
+            $attr{$name}{"tpl_param_$pN[$cnt]"} = defined $pD[$cnt] ? $pD[$cnt] : "";
+          }
+        }
+      }
     }
     else{
-      $attr{$name}{"tpl_ePeer"}       = "";
+      $attr{$name}{tpl_ePeer}         = "";
       $modules{HMtemplate}{AttrList}  =~ s/ tpl_ePeer.*?\ / tpl_ePeer/;
     }
   }
@@ -385,8 +402,8 @@ sub HMtemplate_SetFn($@) {#####################################################
     $_ = $attr{$name}{"tpl_param_$_"} foreach (@p);
     return HMinfo_templateSet( $attr{$name}{tpl_entity}
                        ,$hash->{tpl_Name}
-                       ,($hash->{tpl_type} eq "basic"?"none"
-                                                    :$attr{$name}{tpl_ePeer}.":".AttrVal($name,"tpl_eType","both"))# type either long/short/both
+                       ,($hash->{tpl_type} eq "basic" ? "0"
+                                                      : $attr{$name}{tpl_ePeer}.":".AttrVal($name,"tpl_eType","both"))# type either long/short/both
                        ,@p
                         );
   }
