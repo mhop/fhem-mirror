@@ -146,11 +146,23 @@ sub Nello_Attr(@) {
             CommandDefine(undef, $eventdevice . ' MQTT_DEVICE');
             CommandAttr(undef, $eventdevice . ' room hidden');
             CommandAttr(undef, $eventdevice . ' IODEV '. $bridge);
-            CommandAttr(undef, $eventdevice . ' subscribeReading_'. $attrValue .'_door /nello_one/'. $attrValue . '/door/');
-            CommandAttr(undef, $eventdevice . ' subscribeReading_'. $attrValue .'_ring /nello_one/'. $attrValue . '/ring/');
-            CommandAttr(undef, $eventdevice . ' subscribeReading_'. $attrValue .'_tw /nello_one/'. $attrValue . '/tw/');
-            CommandSave(undef, undef);
-        }  
+        }
+
+        my $prefix = 'subscribeReading_'. $attrValue .'_';
+        CommandAttr(undef, $eventdevice . ' '. $prefix . 'door /nello_one/'. $attrValue . '/door/') if(!defined $attr{$eventdevice}{$prefix . 'door'});
+        CommandAttr(undef, $eventdevice . ' '. $prefix . 'ring /nello_one/'. $attrValue . '/ring/') if(!defined $attr{$eventdevice}{$prefix . 'ring'});;
+        CommandAttr(undef, $eventdevice . ' '. $prefix . 'tw /nello_one/'. $attrValue . '/tw/') if(!defined $attr{$eventdevice}{$prefix . 'tw'});
+
+        if(defined $hash->{helper}{deviceID} && $hash->{helper}{deviceID} ne $attrValue) {
+            $prefix = 'subscribeReading_'. $hash->{helper}{deviceID} .'_';
+            CommandDeleteAttr(undef, $eventdevice . ' '. $prefix . 'door');
+            CommandDeleteAttr(undef, $eventdevice . ' '. $prefix . 'ring');
+            CommandDeleteAttr(undef, $eventdevice . ' '. $prefix . 'tw');
+        }
+
+        CommandSave(undef, undef);
+
+        $hash->{helper}{deviceID} = $attrValue;
     }
 
     return undef;
@@ -161,6 +173,7 @@ sub Nello_loadInternals($) {
     my $name = $hash->{NAME};
     $hash->{helper}{expires} = ReadingsVal($name, '.expires', undef);
     $hash->{helper}{session} = ReadingsVal($name, '.session', undef);
+    $hash->{helper}{deviceID} = $attr{$name}{"deviceID"};
 
     if(!defined(ReadingsVal($name, '.session', undef))) {
         $hash->{STATE} = 'authorization pending';
@@ -432,6 +445,7 @@ sub Nello_poll {
   
     my $pollInterval = $attr{$name}{updateInterval};
     InternalTimer(gettimeofday()+(defined $pollInterval ? $pollInterval : (!defined $attr{$name}{deviceID} ? 15 : 15*60)), "Nello_poll", $hash);
+    Nello_updateLocations($hash) if(!defined Nello_defaultLocationID($hash));
     Nello_updateActivities($hash);
 }
 
