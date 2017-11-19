@@ -175,6 +175,7 @@ sub FRITZBOX_Initialize($)
   $hash->{DefFn}    = "FRITZBOX_Define";
   $hash->{UndefFn}  = "FRITZBOX_Undefine";
   $hash->{DeleteFn}  = "FRITZBOX_Delete";
+  $hash->{RenameFn}  = "FRITZBOX_Rename";
 
   $hash->{SetFn}    = "FRITZBOX_Set";
   $hash->{GetFn}    = "FRITZBOX_Get";
@@ -283,6 +284,20 @@ sub FRITZBOX_Delete ($$)
    setKeyValue($index, undef);
  
    return undef;
+}
+
+#######################################################################
+sub FRITZBOX_Rename($$)
+{
+    my ($new, $old) = @_; 
+   
+    my $old_index = "FRITZBOX_".$old."_passwd";
+    my $new_index = "FRITZBOX_".$new."_passwd";
+   
+    my ($err, $old_pwd) = getKeyValue($old_index);
+   
+    setKeyValue($new_index, $old_pwd);
+    setKeyValue($old_index, undef);
 }
 
 #######################################################################
