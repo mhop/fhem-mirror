@@ -26,6 +26,7 @@ sub LaCrosseGateway_Initialize($) {
   $hash->{ReadFn}         = "LaCrosseGateway_Read";
   $hash->{WriteFn}        = "LaCrosseGateway_Write";
   $hash->{ReadyFn}        = "LaCrosseGateway_Ready";
+  $hash->{NotifyFn}       = "LaCrosseGateway_Notify";
   $hash->{DefFn}          = "LaCrosseGateway_Define";
   $hash->{FingerprintFn}  = "LaCrosseGateway_Fingerprint";
   $hash->{UndefFn}        = "LaCrosseGateway_Undef";
@@ -54,9 +55,23 @@ sub LaCrosseGateway_Fingerprint($$) {
 }
 
 #=======================================================================================
+sub LaCrosseGateway_Notify($$) {
+  my ($hash, $source_hash) = @_;
+  my $name = $hash->{NAME};
+  
+  my $sourceName = $source_hash->{NAME};
+  my $events = deviceEvents($source_hash, 1);
+  
+  if($sourceName eq "global" && grep(m/^INITIALIZED|REREADCFG$/, @{$events})) {
+    LaCrosseGateway_Connect($hash)
+  }
+  
+}
+
+#=======================================================================================
 sub LaCrosseGateway_Define($$) {my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
-
+  
   if(@a != 3) {
     my $msg = "wrong syntax: define <name> LaCrosseGateway {none | devicename[\@baudrate] | devicename\@directio | hostname:port}";
     Log3 undef, 2, $msg;
@@ -83,9 +98,9 @@ sub LaCrosseGateway_Define($$) {my ($hash, $def) = @_;
   $dev .= "\@57600" if( $dev !~ m/\@/ && $def !~ m/:/ );
   $hash->{DeviceName} = $dev;
 
-  my $ret = LaCrosseGateway_Connect($hash);
+  LaCrosseGateway_Connect($hash) if($init_done);
   
-  return $ret;
+  return undef;
 }
 
 #=======================================================================================
@@ -94,16 +109,10 @@ sub LaCrosseGateway_Undef($$) {
   my $name = $hash->{NAME};
 
   BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
-
-  foreach my $d (sort keys %defs) {
-    if(defined($defs{$d}) && defined($defs{$d}{IODev}) && $defs{$d}{IODev} == $hash) {
-      my $lev = ($reread_active ? 4 : 2);
-      Log3 $name, $lev, "deleting port for $d";
-      delete $defs{$d}{IODev};
-    }
+  
+  if($hash->{STATE} ne "disconnected") {
+    DevIo_CloseDev($hash);
   }
-
-  DevIo_CloseDev($hash);
   
   return undef;
 }
@@ -523,6 +532,8 @@ sub LaCrosseGateway_DeleteOwnSensorsReadings($) {
   delete $hash->{READINGS}{"humidity"};
   delete $hash->{READINGS}{"pressure"};
   delete $hash->{READINGS}{"gas"};
+  delete $hash->{READINGS}{"debug"};
+  
 }
 
 #=======================================================================================
@@ -538,6 +549,7 @@ sub LaCrosseGateway_HandleOwnSensors($$) {
   my $humidity = undef;
   my $pressure = undef;
   my $gas = undef;
+  my $debug = undef;
 
   if($bytes[2] != 0xFF) {
     $temperature = ($bytes[2]*256 + $bytes[3] - 1000)/10;
@@ -548,16 +560,21 @@ sub LaCrosseGateway_HandleOwnSensors($$) {
     $humidity = $bytes[4];
     readingsBulkUpdate($hash, "humidity", $humidity);
   }
-
-  if(@bytes > 15 && $bytes[14] != 0xFF) {
+  
+  if(@bytes >= 16 && $bytes[14] != 0xFF) {
     $pressure = $bytes[14] * 256 + $bytes[15];
     $pressure /= 10.0 if $pressure > 5000;
     readingsBulkUpdate($hash, "pressure", $pressure);
   }
   
-  if(@bytes > 18 && $bytes[16] != 0xFF) {
+  if(@bytes >= 19 && $bytes[16] != 0xFF) {
     $gas = $bytes[16] * 65536 + $bytes[17] * 256 + $bytes[18];
     readingsBulkUpdate($hash, "gas", $gas);
+  }
+  
+  if(@bytes >= 22 && $bytes[19] != 0xFF) {
+    $debug = $bytes[19] * 65536 + $bytes[20] * 256 + $bytes[21];
+    readingsBulkUpdate($hash, "debug", $debug);
   }
 
   readingsEndUpdate($hash, 1);
@@ -565,7 +582,8 @@ sub LaCrosseGateway_HandleOwnSensors($$) {
   delete $hash->{READINGS}{"temperature"} if !$temperature;
   delete $hash->{READINGS}{"humidity"} if !$humidity;
   delete $hash->{READINGS}{"pressure"} if !$pressure;
-
+  delete $hash->{READINGS}{"gas"} if !$gas;
+  delete $hash->{READINGS}{"debug"} if !$debug;
 }
 
 #=======================================================================================
@@ -589,7 +607,7 @@ sub LaCrosseGateway_HandleAnalogData($$) {
 #=======================================================================================
 sub LaCrosseGateway_Parse($$$$) {
   my ($hash, $iohash, $name, $msg) = @_;
-
+  
   next if (!$msg || length($msg) < 1);
   return if ($msg =~ m/^\*\*\*CLEARLOG/);
   return if ($msg =~ m/[^\x20-\x7E]/);
@@ -708,9 +726,12 @@ sub LaCrosseGateway_Connect($;$) {
   my ($hash, $mode) = @_;
   my $name = $hash->{NAME};
   
+  DevIo_CloseDev($hash);
+  
   $mode = 0 if!($mode);
   my $enabled = AttrVal($name, "disable", "0") != "1" && !defined($hash->{helper}{FLASHING});
   if($enabled) {
+    $hash->{nextOpenDelay} = 2;
     my $ret = DevIo_OpenDev($hash, $mode, "LaCrosseGateway_DoInit");
     return $ret;
   }
