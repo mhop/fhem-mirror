@@ -147,6 +147,8 @@ sub CALVIEW_GetUpdate($){
 		elsif (AttrVal($name,"weekdayformat","de-long") eq "en-short") {$weekdayname = $arrWeekdayEnShrt[$weekday]}
 		else {$weekdayname = $arrWeekdayDe[$weekday]}
 		
+		if( !defined($item->[6])){$item->[6] = " ";}  
+		
 		if( $daysleft == 0){$daysleft_long = "heute";}
 		elsif( $daysleft == 1){$daysleft_long = "morgen";}
 		else{$daysleft_long = "in ".$daysleft." Tagen";}
@@ -160,11 +162,12 @@ sub CALVIEW_GetUpdate($){
 			source => $item->[3],
 			location => $item->[4],
 			description => $item->[5],
+			categories => $item->[6],
 			edate => $tempend[0],
 			etime => $tempend[1],
 			edatetimeiso => $isoendtime,
 			btimestamp => $bts[0],
-			mode => $item->[6],
+			mode => $item->[7],
 			weekday => $weekday,
 			weekdayname => $weekdayname};
 	}
@@ -240,6 +243,7 @@ sub CALVIEW_GetUpdate($){
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_sourcecolor", $termcolor);
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_location", $termin->{location});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_description", $termin->{description});
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_categories", $termin->{categories});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_edate", $termin->{edate});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_etime", $termin->{etime});
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_mode", $termin->{mode}); 
@@ -259,6 +263,7 @@ sub CALVIEW_GetUpdate($){
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_sourcecolor", $termcolor); 
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_location", $termin->{location});
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_description", $termin->{description});
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_categories", $termin->{categories});
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_edate", $termin->{edate}); 
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_etime", $termin->{etime}); 
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_mode", $termin->{mode});
@@ -278,6 +283,7 @@ sub CALVIEW_GetUpdate($){
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_sourcecolor", $termcolor);
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_location", $termin->{location});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_description", $termin->{description});
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_categories", $termin->{categories});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_edate", $termin->{edate}); 
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_etime", $termin->{etime});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_mode", $termin->{mode});
@@ -343,6 +349,8 @@ sub getsummery($)
 				my @locations = split(/\n/,$tmplocations);				
 				my $tmpdescriptions = CallFn($calendername, "GetFn", $defs{$calendername},(" ","description", $uid));
 				my @description = split(/\n/,$tmpdescriptions);
+				my $tmpcategories = CallFn($calendername, "GetFn", $defs{$calendername},(" ","categories", $uid));
+				my @categories = split(/\n/,$tmpcategories);
 				
 				for(my $i = 1; $i <= (scalar(@starts)); $i++) {
 					my $internali = $i-1;
@@ -351,7 +359,8 @@ sub getsummery($)
 					my $terminend = $ends[$internali];
 					my $terminort = $locations[$internali];
 					my $termindescription = $description[$internali];
-					push(@terminliste, [$terminstart, $termintext, $terminend, $calendername, $terminort, $termindescription, "next"]);
+					 my $termincategories = $categories[$internali];
+					push(@terminliste, [$terminstart, $termintext, $terminend, $calendername, $terminort, $termindescription, $termincategories, "next"]);
 				}
 			};
 	};
