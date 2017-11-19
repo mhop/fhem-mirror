@@ -139,7 +139,7 @@ sub statistics_Initialize($)
                    ."periodChangePreset "
                    ."specialDeltaPeriodHours "
                    ."specialDeltaPeriods "
-                   ."singularReadings "
+                   ."singularReadings:textField-long "
                    ."tendencyReadings "
                    .$readingFnAttributes;
 }
@@ -578,6 +578,7 @@ sub statistics_doStatisticMinMaxSingle ($$$$$$)
  
   # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
+   $singularReadings=~s/\n|\r//g;
    if ($singularReadings ne "") {
       # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
       my $statValue = sprintf  "%.".$decPlaces."f", $stat[1];
@@ -653,6 +654,7 @@ sub statistics_doStatisticTendency ($$$)
 
   # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
+   $singularReadings=~s/\n|\r//g;
    if ($singularReadings ne "") {
       # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
       statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","1h",$stat[1],0,0);
@@ -793,6 +795,7 @@ sub statistics_doStatisticDelta ($$$$)
 
  # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
+   $singularReadings=~s/\n|\r//g;
    if ($singularReadings ne "") {
       # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
       my $statValue = sprintf  "%.".$decPlaces."f", $stat[1];
@@ -1025,6 +1028,7 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
  
   # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
+   $singularReadings=~s/\n|\r//g;
    if ($singularReadings ne "") {
       # Do this for each state of the current or last period
       while (my ($statKey, $statValue) = each(%stat) ) {  
