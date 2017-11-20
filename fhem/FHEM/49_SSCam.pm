@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 3.2.4  18.11.2017    fix bug don't retrieve getptzlistpreset if cam is disabled
 # 3.2.3  08.10.2017    set optimizeParams, get caminfo (simple), minor bugfix, commandref revised
 # 3.2.2  03.10.2017    make functions ready to use "SYNO.SurveillanceStation.PTZ" version 5, minor fixes, commandref 
 #                      revised
@@ -205,7 +206,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.2.3";
+my $SSCamVersion = "3.2.4";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -2207,7 +2208,7 @@ sub getptzlistpreset ($) {
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     
-    return if(IsDisabled($name) || ReadingsVal("$name", "Availability", "enabled") =~ /disabled/);
+    return if(IsDisabled($name));
     
     if (ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
         Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera");

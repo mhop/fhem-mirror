@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCam: V3.2.4, don't retrieve presets during restart if cam is 
+                       disabled
   - feature: 98_Hyperion: - new "set binary restart/stop"
                           - non-blocking for "get configFiles",
                             "set configFile" and "set binary"
