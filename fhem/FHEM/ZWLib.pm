@@ -15,6 +15,7 @@ use vars qw(%zw_type6);
   '06'  => 'SERIAL_API_SET_TIMEOUTS',
   '07'  => 'SERIAL_API_GET_CAPABILITIES',
   '08'  => 'SERIAL_API_SOFT_RESET',
+  '0b'  => 'SERIAL_API_SETUP',
   '10'  => 'ZW_SET_R_F_RECEIVE_MODE',
   '11'  => 'ZW_SET_SLEEP_MODE',
   '12'  => 'ZW_SEND_NODE_INFORMATION',
@@ -48,6 +49,10 @@ use vars qw(%zw_type6);
   '34'  => 'RTC_TIMER_READ',
   '35'  => 'RTC_TIMER_DELETE',
   '36'  => 'RTC_TIMER_CALL',
+  '39'  => 'CLEAR_NETWORK_STATS',
+  '3a'  => 'GET_NETWORK_STATS',
+  '3b'  => 'GET_BACKGROUND_RSSI',
+  '3f'  => 'REMOVE_NODEID_FROM_NETWORK',
   '40'  => 'ZW_SET_LEARN_NODE_STATE',
   '41'  => 'ZW_GET_NODE_PROTOCOL_INFO',
   '42'  => 'ZW_SET_DEFAULT',
@@ -116,10 +121,12 @@ use vars qw(%zw_type6);
   'be'  => 'ZW_SEND_TEST_FRAME',
   'bf'  => 'ZW_GET_PROTOCOL_STATUS',
   'd0'  => 'ZW_SET_PROMISCUOUS_MODE',
+  'd1'  => 'PROMISCUOUS_COMMAND_HANDLER',
   'd2'  => 'WATCHDOG_START',
   'd3'  => 'WATCHDOG_STOP',
   'f2'  => 'ZME_FREQ_CHANGE',
   'f4'  => 'ZME_BOOTLOADER_FLASH',
+  'f5'  => 'ZME_CAPABILITIES',
 );
 
 %zw_type6 = (

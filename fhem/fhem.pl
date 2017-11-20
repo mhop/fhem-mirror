@@ -4935,6 +4935,7 @@ getKeyValue($)
   return (undef, undef);
 }
 
+# Use an undefined value to delete the key
 sub
 setKeyValue($$)
 {
