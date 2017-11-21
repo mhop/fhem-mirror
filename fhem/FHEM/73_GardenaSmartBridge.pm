@@ -68,7 +68,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 
 
-my $version = "0.2.7";
+my $version = "0.2.8";
 
 
 
@@ -396,7 +396,7 @@ sub GardenaSmartBridge_ErrorHandling($$$) {
         return;
     }
 
-    if( ( ($data =~ /Error/ ) or defined(eval{decode_json($data)}->{errors}) ) and exists( $param->{code} ) ) {    
+    if( ( ($data =~ /Error/ ) or defined(eval{decode_json($data)}->{errors}) ) and exists( $param->{code} ) ) {
         readingsBeginUpdate( $dhash );
         readingsBulkUpdate( $dhash, "state", $param->{code}, 1 ) if( ReadingsVal( $dname, "state" ,0) ne "initialized" );
 
@@ -450,7 +450,7 @@ sub GardenaSmartBridge_ErrorHandling($$$) {
 
 
 
-    readingsSingleUpdate($hash,'state','connect to cloud',1) if( defined($hash->{helper}{locations_id}) );
+    readingsSingleUpdate($hash,'state','connected to cloud',1) if( defined($hash->{helper}{locations_id}) );
     GardenaSmartBridge_ResponseProcessing($hash,$data);
 }
 
