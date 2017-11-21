@@ -1,7 +1,7 @@
 ##############################################
 # $Id$
 #
-# v3.3.1 (stable release 3.3)
+# v3.3.2 (stable release 3.3)
 # The module is inspired by the FHEMduino project and modified in serval ways for processing the incomming messages
 # see http://www.fhemwiki.de/wiki/SIGNALDuino
 # It was modified also to provide support for raw message handling which can be send from the SIGNALduino
@@ -838,7 +838,7 @@ my %ProtocolListSIGNALduino  = (
 			preamble		=> 'W37#',				# prepend to converted message	
 			clientmodule    => 'SD_WS', 
 			length_min      => '40',
-			length_max      => '40',
+			length_max      => '41',
     	},
     "38" =>
       	 {   
