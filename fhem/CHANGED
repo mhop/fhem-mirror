@@ -1,6 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - fix:     00_SIGNALduino: Fix Bresser Sensor
+  - fix:     00_SIGNALduino: Fix Bresser Sensor and perl sensor
                              max length was to short (Forum #79929)
   - gugfix:  74_GardenaSmartBridge: change state to connected
   - bugfix:  74_XiaomiFlowerSens: fix change InternalTimer now
