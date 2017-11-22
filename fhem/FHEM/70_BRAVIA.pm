@@ -1788,7 +1788,8 @@ sub BRAVIA_GetRemotecontrolCommand($) {
         return $commands;
     }
     else {
-        return "";
+    		# return command itself if not mapped
+        return $command;
     }
 }
 
