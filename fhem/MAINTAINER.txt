@@ -440,7 +440,7 @@ FHEM/98_configdb.pm          betateilchen         Sonstiges
 FHEM/98_copy.pm              justme1968           Sonstiges
 FHEM/98_count.pm             betateilchen         Sonstiges
 FHEM/98_CustomReadings.pm    HCS                  Unterstuetzende Dienste
-FHEM/98_dewpoint.pm          Joachim              Automatisierung
+FHEM/98_dewpoint.pm          hotbso               Automatisierung
 FHEM/98_Dooya.pm             Jarnsen/ralf9/darkmission        Sonstige Systeme
 FHEM/98_dummy.pm             rudolfkoenig         Automatisierung
 FHEM/98_expandJSON.pm        dev0                 Unterstuetzende Dienste
