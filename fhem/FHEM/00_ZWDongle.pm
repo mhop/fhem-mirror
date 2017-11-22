@@ -547,7 +547,10 @@ ZWDongle_Get($@)
   } elsif($cmd eq "routeFor") {                ############################
     my $homeId = $hash->{homeId};
     my @list;
-    for(my $off=6; $off<16; $off+=2) {
+    my $e = hex(substr($msg, 6, 2));
+    push @list, ($e==1 ? "last": ($e==2 ? "next":"application"))
+        if($e !=0);
+    for(my $off=8; $off<16; $off+=2) {
         my $dec = hex(substr($msg, $off, 2));
         my $hex = sprintf("%02x", $dec);
         my $h = ($hex eq $hash->{nodeIdHex} ?
