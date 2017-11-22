@@ -27,6 +27,8 @@ package main;
 use strict;
 use warnings;
 
+sub Log($$);
+
 # Debug this module? YES = 1, NO = 0
 my $dewpoint_debug = 0;
 # default maximum time_diff for dewpoint
@@ -409,56 +411,89 @@ dewpoint_Notify($$)
 }
 # -----------------------------
 # Dewpoint calculation.
-# see http://www.faqs.org/faqs/meteorology/temp-dewpoint/ "5. EXAMPLE"
+
+# 'Magnus formula'
+#
+# Parameters from https://de.wikipedia.org/wiki/Taupunkt#S.C3.A4ttigungsdampfdruck
+# Good summary of formulas in http://www.wettermail.de/wetter/feuchte.html
+
+my $E0 = 0.6112; # saturation pressure at T=0 °C
+my @ab_gt0 = (17.62, 243.12);    # T>0
+my @ab_le0 = (22.46, 272.6);     # T<=0 over ice
+
+### ** Public interface ** keep stable
+# vapour pressure in kPa
+sub dewpoint_vp($$)
+{
+  my ($T, $Hr) = @_;
+  my ($a, $b);
+
+  if ($T > 0) {
+    ($a, $b) = @ab_gt0;
+  } else {
+    ($a, $b) = @ab_le0;
+  }
+
+  return 0.01 * $Hr * $E0 * exp($a * $T / ($T + $b));
+}
+
+### ** Public interface ** keep stable
+# dewpoint in °C
 sub
 dewpoint_dewpoint($$)
 {
-  my ($temperature, $humidity) = @_;
-  my $dp;
-  my $A = 17.2694;
-  my $B = ($temperature > 0) ? 237.3 : 265.5;
-  my $es = 610.78 * exp( $A * $temperature / ($temperature + $B) );
-  my $e = $humidity/ 100 * $es;
-  if ($e == 0) {
-    Log 1, "Error: dewpoint() e==0: temp=$temperature, hum=$humidity";
-    return 0;
+  my ($T, $Hr) = @_;
+  if ($Hr == 0) {
+    Log 1, "Error: dewpoint() Hr==0 !: temp=$T, hum=$Hr";
+    return undef;
   }
-  my $e1 = $e / 610.78;
-  my $f = log( $e1 ) / $A;
-  my $f1 = 1 - $f;
-  if ($f1 == 0) {
-  Log 1, "Error: dewpoint() (1-f)==0: temp=$temperature, hum=$humidity";
-  return 0;
+
+  my ($a, $b);
+
+  if ($T > 0) {
+    ($a, $b) = @ab_gt0;
+  } else {
+    ($a, $b) = @ab_le0;
   }
-  $dp = $B * $f / $f1  ;
-  return($dp);
+
+  # solve vp($dp, 100) = vp($T,$Hr) for $dp 
+  my $v = log(dewpoint_vp($T, $Hr) / $E0);
+  my $D = $a - $v;
+
+  # can this ever happen for valid input?
+  if ($D == 0) {
+    Log 1, "Error: dewpoint() D==0 !: temp=$T, hum=$Hr";
+    return undef;
+  }
+
+  return round($b * $v / $D, 1);
 }
 
+
+### ** Public interface ** keep stable
+# absolute Feuchte in g Wasserdampf pro m3 Luft
 sub
 dewpoint_absFeuchte ($$)
 {
-	# Formeln von http://kellerlueftung.blogspot.de/p/blog-page_9.html
-	#             http://www.wettermail.de/wetter/feuchte.html
-  my ($T, $rh) = @_;
-  if (($rh < 0) || ($rh > 110)){
-    Log 1, "Error dewpoint: humidity invalid: $rh";
+  my ($T, $Hr) = @_;
+
+  # 110 ?
+  if (($Hr < 0) || ($Hr > 110)) {
+    Log 1, "Error dewpoint: humidity invalid: $Hr";
     return "";
-	}
-	# a = 7.5, b = 237.3 für T >= 0
-	# a = 7.6, b = 240.7 für T < 0 über Wasser (Taupunkt)
-  my $a = ($T > 0) ? 7.5 : 7.6;
-  my $b = ($T > 0) ? 237.3 : 240.7;
-	my $SDD = 6.1078 * 10**(($a*$T)/($b+$T));
-	my $DD  = $rh/100 * $SDD;
-	my $AF  = (10**5) * (18.016 / 8314.3) * ($DD / (273.15 + $T));
-	my $af  = sprintf( "%.1f",$AF);
-  return($af); # $aF = absolute Feuchte in g Wasserdampf pro m3 Luft
+  }
+  my $DD = dewpoint_vp($T, $Hr);
+  my $AF  = 1.0E6 * (18.016 / 8314.3) * ($DD / (273.15 + $T));
+  return round($AF, 1);
 }
 
 1;
 
 
 =pod
+=item helper
+=item summary compute dewpoint and/or generate events for starting a fan
+=item summary_DE berechne Taupunkt und/oder erzeuge events zum starten eines Lüfters
 =begin html
 
 <a name="dewpoint"></a>
