@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  98_dewpoint: Consolidated and corrected formulas for dewpoint
+                          (Forum #78359) 
   - fix:     00_SIGNALduino: Fix Bresser Sensor and perl sensor
                              max length was to short (Forum #79929)
   - bugfix:  74_GardenaSmartBridge: change state to connected
