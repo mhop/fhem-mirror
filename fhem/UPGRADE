@@ -1,0 +1,23 @@
+This file describes the changes to made for a FHEM installation when upgrading
+_to_ the named version from an older version. It describes no new features,
+only features not working anymore.  It may or may not work to set "attr global
+featurelevel X.Y" (where X.Y is the old FHEM version, e.g. 5.6) in order to
+enable to old feature.
+
+- 2015-11-15 (5.7)
+  - $value{DEVICE} is not set, use Value("DEVICE") instead
+  - the lastinclude global attribute (as in attr global lastinclude filename)
+    is not evaluated anymore, use the following instead:
+      define lastinclude notify global:INITIALIZED include filename
+  - % is replaced with $EVENT, and @ with $NAME.
+    The double %% and @@ is not replaced with a single % and @ anymore.
+
+- 2017-02-19 (5.8)
+  - the FHEMWEB csrfToken attribute is set to a random value on each startup,
+    i.e. which is checked when executing a command started via the FHEMWEB HTTP
+    connection. If using something like:
+      wget 'http://fhemhost:8083/fhem?cmd=set%20device%20on'
+    one of the solutions is to set "attr WEB csrfToken mySecret" and
+    rewrite the above call to:
+      wget 'http://fhemhost:8083/fhem?cmd=set%20device%20on&fwcsrf=mySecret'
+    There are other solutions in the FHEM wiki.
