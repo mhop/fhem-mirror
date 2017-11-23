@@ -58,6 +58,7 @@ my %sets = (
 );
 
 my %gets = (
+  "backgroundRSSI"  => "3b",      # GET_BACKGROUND_RSSI
   "caps"            => "07",      # SERIAL_API_GET_CAPABILITIES
   "ctrlCaps"        => "05",      # ZW_GET_CONTROLLER_CAPS
   "homeId"          => "20",      # MEMORY_GET_ID
@@ -561,6 +562,27 @@ ZWDongle_Get($@)
     push @list, ("at ".($f==1 ? "9.6": ($f==2 ? "40":"100"))."kbps")
         if(@list && $f =~ m/[123]/);
     $msg = (@list ? join(" ", @list) : "N/A");
+  
+  } elsif($cmd eq "backgroundRSSI") {          ############################
+    my @list;
+    my $i=0;
+    my $maxlen = (length($msg) >= 12 ? 10 : length($msg)-2);
+    for(my $off=4; $off<$maxlen; $off+=2) {
+        my $dec = hex(substr($msg, $off, 2));
+        if($dec == 127 || $dec == 0) {
+          push @list, ("ch".($i+1).":N/A");
+        } elsif($dec == 126) {
+          push @list, ("ch".($i+1).":aboveMaxPower");
+        } elsif($dec == 125) {
+          push @list, ("ch".($i+1).":belowReceiverSensitivity");
+        } elsif($dec > 161 && $dec < 225) {
+          push @list, ("ch".($i+1).":".unpack('c', pack('C', $dec))." dBm");
+        } else {
+          push @list, ("ch".($i+1).":reservedValue");
+        }
+        $i++
+    }
+    $msg = join(" ", @list);
   }
 
   $cmd .= "_".join("_", @a) if(@a);
@@ -1180,15 +1202,19 @@ ZWDongle_Ready($)
   <li>homeId<br>
     return the six hex-digit homeId of the controller.
     </li>
-
-  <li>isFailedNode &lt;device&gt;<br>
-    return if a node is stored in the failed node list. &lt;device&gt; is
-    either device name or decimal nodeId.
+  
+  <li>backgroundRSSI<br>
+    query the measured RSSI on the Z-Wave network
     </li>
 
   <li>caps, ctrlCaps, version<br>
     return different controller specific information. Needed by developers
     only.
+    </li>
+
+  <li>isFailedNode &lt;device&gt;<br>
+    return if a node is stored in the failed node list. &lt;device&gt; is
+    either device name or decimal nodeId.
     </li>
 
   <li>neighborList [excludeDead] [onlyRep] &lt;device&gt;<br>
