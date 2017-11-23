@@ -50,364 +50,364 @@ dewpoint_Initialize($)
 sub
 dewpoint_Define($$)
 {
-  my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
+    my ($hash, $def) = @_;
+    my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> dewpoint (dewpoint|fan|alarm) devicename [options]"
+    return "wrong syntax: define <name> dewpoint (dewpoint|fan|alarm) devicename [options]"
     if(@a < 4);
 
 
-  my $name = $a[0];
-  my $cmd_type = $a[2]; # dewpoint, fan, alarm
-  my $devname = $a[3];
+    my $name = $a[0];
+    my $cmd_type = $a[2]; # dewpoint, fan, alarm
+    my $devname = $a[3];
 
-  if ($cmd_type eq "dewpoint") {
-	# define <name> dewpoint dewpoint devicename-regex [temp_name hum_name new_name]
-  	if(@a == 7) {
-  		$hash->{TEMP_NAME} = $a[4];
-  		$hash->{HUM_NAME} = $a[5];
-  		$hash->{NEW_NAME} = $a[6];
-  	} elsif (@a == 4) {
-  		$hash->{TEMP_NAME} = "temperature";
-  		$hash->{HUM_NAME} = "humidity";
-  		$hash->{NEW_NAME} = "dewpoint";
-	} else {
-		return "wrong syntax: define <name> dewpoint dewpoint devicename-regex [temp_name hum_name new_name]"
-	}
-  } elsif ($cmd_type eq "fan") {
-	# define <name> dewpoint fan devicename-regex devicename-outside min_temp
-  	if (@a == 6 || @a == 7) {
-  		$hash->{DEVNAME_OUT} = $a[4];
-  		$hash->{MIN_TEMP} = $a[5];
-		if (@a == 6) { 		
-			$hash->{DIFF_TEMP} = 0;
-		} else {
-			$hash->{DIFF_TEMP} = $a[6];
-		}
-	} else {
-		return "wrong syntax: define <name> dewpoint fan devicename-regex devicename-outside min_temp [diff_temp]"
-	}
-  } elsif ($cmd_type eq "alarm") {
-	# define <name> dewpoint alarm devicename-regex devicename-reference diff_temp
-  	if (@a == 6) {
-  		$hash->{DEVNAME_REF} = $a[4];
-  		$hash->{DIFF_TEMP} = $a[5];
-	} else {
-		return "wrong syntax: define <name> dewpoint alarm devicename-regex devicename-reference diff_temp"
-	}
-  } else {
-  	return "wrong syntax: define <name> dewpoint (dewpoint|fan|alarm) devicename-regex [options]"
-  }
+    if ($cmd_type eq "dewpoint") {
+        # define <name> dewpoint dewpoint devicename-regex [temp_name hum_name new_name]
+        if(@a == 7) {
+            $hash->{TEMP_NAME} = $a[4];
+            $hash->{HUM_NAME} = $a[5];
+            $hash->{NEW_NAME} = $a[6];
+        } elsif (@a == 4) {
+            $hash->{TEMP_NAME} = "temperature";
+            $hash->{HUM_NAME} = "humidity";
+            $hash->{NEW_NAME} = "dewpoint";
+        } else {
+            return "wrong syntax: define <name> dewpoint dewpoint devicename-regex [temp_name hum_name new_name]"
+        }
+    } elsif ($cmd_type eq "fan") {
+        # define <name> dewpoint fan devicename-regex devicename-outside min_temp
+        if (@a == 6 || @a == 7) {
+            $hash->{DEVNAME_OUT} = $a[4];
+            $hash->{MIN_TEMP} = $a[5];
+            if (@a == 6) { 		
+                $hash->{DIFF_TEMP} = 0;
+            } else {
+                $hash->{DIFF_TEMP} = $a[6];
+            }
+        } else {
+            return "wrong syntax: define <name> dewpoint fan devicename-regex devicename-outside min_temp [diff_temp]"
+        }
+    } elsif ($cmd_type eq "alarm") {
+        # define <name> dewpoint alarm devicename-regex devicename-reference diff_temp
+        if (@a == 6) {
+            $hash->{DEVNAME_REF} = $a[4];
+            $hash->{DIFF_TEMP} = $a[5];
+        } else {
+            return "wrong syntax: define <name> dewpoint alarm devicename-regex devicename-reference diff_temp"
+        }
+    } else {
+        return "wrong syntax: define <name> dewpoint (dewpoint|fan|alarm) devicename-regex [options]"
+    }
 
-  $hash->{CMD_TYPE} = $cmd_type;
+    $hash->{CMD_TYPE} = $cmd_type;
 
-  eval { "Hallo" =~ m/^$devname$/ };
-  return "Bad regecaxp: $@" if($@);
-  $hash->{DEV_REGEXP} = $devname;
+    eval { "Hallo" =~ m/^$devname$/ };
+    return "Bad regecaxp: $@" if($@);
+    $hash->{DEV_REGEXP} = $devname;
 
 
-  $hash->{STATE} = "active";
-  return undef;
+    $hash->{STATE} = "active";
+    return undef;
 }
 
 ##########################
 sub
 dewpoint_Notify($$)
 {
-  my ($hash, $dev) = @_;
-  my $hashName = $hash->{NAME};
+    my ($hash, $dev) = @_;
+    my $hashName = $hash->{NAME};
 
-  return "" if(AttrVal($hashName, "disable", undef));
-  return "" if(!defined($hash->{DEV_REGEXP}));
+    return "" if(AttrVal($hashName, "disable", undef));
+    return "" if(!defined($hash->{DEV_REGEXP}));
 
-  my $devName = $dev->{NAME};
+    my $devName = $dev->{NAME};
 
-  my $cmd_type = $hash->{CMD_TYPE};
-  my $re = $hash->{DEV_REGEXP};
+    my $cmd_type = $hash->{CMD_TYPE};
+    my $re = $hash->{DEV_REGEXP};
 
-  # dewpoint
-  my $temp_name = "temperature";
-  my $hum_name = "humidity";
-  my $new_name = "dewpoint";
-  # fan
-  my $devname_out = "";
-  my $min_temp = 0;
-  # alarm
-  my $devname_ref = "";
-  my $diff_temp = 0;
+    # dewpoint
+    my $temp_name = "temperature";
+    my $hum_name = "humidity";
+    my $new_name = "dewpoint";
+    # fan
+    my $devname_out = "";
+    my $min_temp = 0;
+    # alarm
+    my $devname_ref = "";
+    my $diff_temp = 0;
 
 
-  if ($cmd_type eq "dewpoint") {
-  	if (!defined($hash->{TEMP_NAME}) || !defined($hash->{HUM_NAME}) || !defined($hash->{NEW_NAME})) {
-		# should never happen!
-		Log 1, "Error dewpoint: TEMP_NAME || HUM_NAME || NEW_NAME undefined";
-		return "";
-  	}
-  	$temp_name = $hash->{TEMP_NAME};
-  	$hum_name = $hash->{HUM_NAME};
-  	$new_name = $hash->{NEW_NAME};
-  	Log 1, "dewpoint_notify: cmd_type=$cmd_type devname=$devName dewname=$hashName, dev=$devName, dev_regex=$re temp_name=$temp_name hum_name=$hum_name" if ($dewpoint_debug == 1);
-  } elsif ($cmd_type eq "fan") {
-  	if (!defined($hash->{DEVNAME_OUT}) || !defined($hash->{MIN_TEMP})) {
-		# should never happen!
-		Log 1, "Error dewpoint: DEVNAME_OUT || MIN_TEMP undefined";
-		return "";
-  	}
-	$devname_out = $hash->{DEVNAME_OUT};
-	$min_temp = $hash->{MIN_TEMP};
-	$diff_temp = $hash->{DIFF_TEMP};
-  	Log 1, "dewpoint_notify: cmd_type=$cmd_type devname=$devName dewname=$hashName, dev=$devName, dev_regex=$re, devname_out=$devname_out, min_temp=$min_temp, diff_temp=$diff_temp" if ($dewpoint_debug == 1);
+    if ($cmd_type eq "dewpoint") {
+        if (!defined($hash->{TEMP_NAME}) || !defined($hash->{HUM_NAME}) || !defined($hash->{NEW_NAME})) {
+            # should never happen!
+            Log 1, "Error dewpoint: TEMP_NAME || HUM_NAME || NEW_NAME undefined";
+            return "";
+        }
+        $temp_name = $hash->{TEMP_NAME};
+        $hum_name = $hash->{HUM_NAME};
+        $new_name = $hash->{NEW_NAME};
+        Log 1, "dewpoint_notify: cmd_type=$cmd_type devname=$devName dewname=$hashName, dev=$devName, dev_regex=$re temp_name=$temp_name hum_name=$hum_name" if ($dewpoint_debug == 1);
+    } elsif ($cmd_type eq "fan") {
+        if (!defined($hash->{DEVNAME_OUT}) || !defined($hash->{MIN_TEMP})) {
+            # should never happen!
+            Log 1, "Error dewpoint: DEVNAME_OUT || MIN_TEMP undefined";
+            return "";
+        }
+        $devname_out = $hash->{DEVNAME_OUT};
+        $min_temp = $hash->{MIN_TEMP};
+        $diff_temp = $hash->{DIFF_TEMP};
+        Log 1, "dewpoint_notify: cmd_type=$cmd_type devname=$devName dewname=$hashName, dev=$devName, dev_regex=$re, devname_out=$devname_out, min_temp=$min_temp, diff_temp=$diff_temp" if ($dewpoint_debug == 1);
 
-  } elsif ($cmd_type eq "alarm") {
-  	if (!defined($hash->{DEVNAME_REF}) || !defined($hash->{DIFF_TEMP})) {
-		# should never happen!
-		Log 1, "Error dewpoint: DEVNAME_REF || DIFF_TEMP undefined";
-		return "";
-  	}
-	$devname_ref = $hash->{DEVNAME_REF};
-	$diff_temp = $hash->{DIFF_TEMP};
-  	Log 1, "dewpoint_notify: cmd_type=$cmd_type devname=$devName dewname=$hashName, dev=$devName, dev_regex=$re, devname_ref=$devname_ref, diff_temp=$diff_temp" if ($dewpoint_debug == 1);
-  } else {
-	# should never happen:
-	Log 1, "Error notify_dewpoint: <1> unknown cmd_type ".$cmd_type;
-	return "";
-  }
+    } elsif ($cmd_type eq "alarm") {
+        if (!defined($hash->{DEVNAME_REF}) || !defined($hash->{DIFF_TEMP})) {
+            # should never happen!
+            Log 1, "Error dewpoint: DEVNAME_REF || DIFF_TEMP undefined";
+            return "";
+        }
+        $devname_ref = $hash->{DEVNAME_REF};
+        $diff_temp = $hash->{DIFF_TEMP};
+        Log 1, "dewpoint_notify: cmd_type=$cmd_type devname=$devName dewname=$hashName, dev=$devName, dev_regex=$re, devname_ref=$devname_ref, diff_temp=$diff_temp" if ($dewpoint_debug == 1);
+    } else {
+        # should never happen:
+        Log 1, "Error notify_dewpoint: <1> unknown cmd_type ".$cmd_type;
+        return "";
+    }
 
-  my $max = int(@{$dev->{CHANGED}});
-  my $tn;
-  my $n = -1;
-  my $lastval;
+    my $max = int(@{$dev->{CHANGED}});
+    my $tn;
+    my $n = -1;
+    my $lastval;
 
-  return "" if($devName !~ m/^$re$/);
+    return "" if($devName !~ m/^$re$/);
 
-  my $temperature = "";
-  my $humidity = "";
-  my $time_diff;
+    my $temperature = "";
+    my $humidity = "";
+    my $time_diff;
 
-  for (my $i = 0; $i < $max; $i++) {
-    	my $s = $dev->{CHANGED}[$i];
+    for (my $i = 0; $i < $max; $i++) {
+        my $s = $dev->{CHANGED}[$i];
 
-    	Log 1, "dewpoint_notify: s='$s'" if ($dewpoint_debug == 1);
+        Log 1, "dewpoint_notify: s='$s'" if ($dewpoint_debug == 1);
 
-    	################
-    	# Filtering
-    	next if(!defined($s));
-    	my ($evName, $val, $rest) = split(" ", $s, 3); # resets $1
-    	next if(!defined($evName));
-    	next if(!defined($val));
-    	Log 1, "dewpoint_notify: evName='$evName' val=$val'" if ($dewpoint_debug == 1);
-	if (($evName eq "T:") && ($temp_name eq "T")) {
-		$n = $i;
-   		#my ($evName1, $val1, $evName2, $val2, $rest) = split(" ", $s, 5); # resets $1
-		#$lastval = $evName1." ".$val1." ".$evName2." ".$val2;		
-		$lastval = $s;
-		if ($s =~ /T: ([-+]?[0-9]*\.[0-9]+|[-+]?[0-9]+)/) {
-			$temperature = $1;
-		}
-		if ($s =~ /H: [-+]?([0-9]*\.[0-9]+|[0-9]+)/) {	
-			$humidity = $1;
-		}
-    		Log 1, "dewpoint_notify T: H:, temp=$temperature hum=$humidity" if ($dewpoint_debug == 1);
-	} elsif ($evName eq $temp_name.":") {
-		$temperature = $val;
-    		Log 1, "dewpoint_notify temperature! dev=$devName, temp_name=$temp_name, temp=$temperature" if ($dewpoint_debug == 1);
-	} elsif ($evName eq $hum_name.":") {
-		$humidity = $val;
-    		Log 1, "dewpoint_notify humidity! dev=$devName, hum_name=$hum_name, hum=$humidity" if ($dewpoint_debug == 1);
-	}
- 
-  }
+        ################
+        # Filtering
+        next if(!defined($s));
+        my ($evName, $val, $rest) = split(" ", $s, 3); # resets $1
+        next if(!defined($evName));
+        next if(!defined($val));
+        Log 1, "dewpoint_notify: evName='$evName' val=$val'" if ($dewpoint_debug == 1);
+        if (($evName eq "T:") && ($temp_name eq "T")) {
+            $n = $i;
+            #my ($evName1, $val1, $evName2, $val2, $rest) = split(" ", $s, 5); # resets $1
+            #$lastval = $evName1." ".$val1." ".$evName2." ".$val2;		
+            $lastval = $s;
+            if ($s =~ /T: ([-+]?[0-9]*\.[0-9]+|[-+]?[0-9]+)/) {
+                $temperature = $1;
+            }
+            if ($s =~ /H: [-+]?([0-9]*\.[0-9]+|[0-9]+)/) {	
+                $humidity = $1;
+            }
+            Log 1, "dewpoint_notify T: H:, temp=$temperature hum=$humidity" if ($dewpoint_debug == 1);
+        } elsif ($evName eq $temp_name.":") {
+            $temperature = $val;
+            Log 1, "dewpoint_notify temperature! dev=$devName, temp_name=$temp_name, temp=$temperature" if ($dewpoint_debug == 1);
+        } elsif ($evName eq $hum_name.":") {
+            $humidity = $val;
+            Log 1, "dewpoint_notify humidity! dev=$devName, hum_name=$hum_name, hum=$humidity" if ($dewpoint_debug == 1);
+        }
 
-  if ($n == -1) { $n = $max; }
+    }
 
-  #if (($temperature eq "") || ($humidity eq "")) { return undef; } # no way to calculate dewpoint!
+    if ($n == -1) { $n = $max; }
 
-  $time_diff = -1;
-  if (($humidity eq "") && (($temperature eq ""))) {
-	return undef;  # no way to calculate dewpoint!
-  } elsif (($humidity eq "") && (($temperature ne ""))) { 
-	# temperature set, but humidity not. Try to use a valid value from the appropiate reading
-	if (defined($dev->{READINGS}{$hum_name}{VAL}) && defined($dev->{READINGS}{$temp_name}{TIME})) {
-		# calculate time difference
-		$time_diff = time() - time_str2num($dev->{READINGS}{$hum_name}{TIME});
+    #if (($temperature eq "") || ($humidity eq "")) { return undef; } # no way to calculate dewpoint!
 
-		$humidity = $dev->{READINGS}{$hum_name}{VAL};
-		Log 1,">dev=$devName, hum_name=$hum_name, reference humidity=$humidity ($time_diff), temp=$temperature" if ($dewpoint_debug == 1);
-	} else { return undef; }
-	# Check if Attribute timeout is set
-	my $timeout = AttrVal($hash->{NAME},"max_timediff", undef);
-	if (defined($timeout)) {
-		Log 1,"dewpoint timeout=$timeout" if ($dewpoint_debug == 1); 
-	} else { 
-		$timeout = $dewpoint_time_diff_default;
-	}
-	if ($time_diff > 0 && $time_diff > $timeout) { return undef; }  
-  } elsif (($temperature eq "") && ($humidity ne "")) { 
-	# humdidity set, but temperature not. Try to use a valid value from the appropiate reading
-	if (defined($dev->{READINGS}{$temp_name}{VAL}) && defined($dev->{READINGS}{$temp_name}{TIME})) {
-		# calculate time difference
-		$time_diff = time() - time_str2num($dev->{READINGS}{$temp_name}{TIME});
+    $time_diff = -1;
+    if (($humidity eq "") && (($temperature eq ""))) {
+        return undef;  # no way to calculate dewpoint!
+    } elsif (($humidity eq "") && (($temperature ne ""))) { 
+        # temperature set, but humidity not. Try to use a valid value from the appropiate reading
+        if (defined($dev->{READINGS}{$hum_name}{VAL}) && defined($dev->{READINGS}{$temp_name}{TIME})) {
+            # calculate time difference
+            $time_diff = time() - time_str2num($dev->{READINGS}{$hum_name}{TIME});
 
-		$temperature = $dev->{READINGS}{$temp_name}{VAL};
-		Log 1,">dev=$devName, temp_name=$temp_name, reference temperature=$temperature ($time_diff), hum=$humidity" if ($dewpoint_debug == 1);
-	} else { return undef; }
-	# Check if Attribute timeout is set
-	my $timeout = AttrVal($hash->{NAME},"max_timediff", undef);
-	if (defined($timeout)) {
-		Log 1,"dewpoint timeout=$timeout" if ($dewpoint_debug == 1);
-	} else { 
-		$timeout = $dewpoint_time_diff_default;
-	}
-	if ($time_diff > 0 && $time_diff > $timeout) { return undef; }  
-  } 
+            $humidity = $dev->{READINGS}{$hum_name}{VAL};
+            Log 1,">dev=$devName, hum_name=$hum_name, reference humidity=$humidity ($time_diff), temp=$temperature" if ($dewpoint_debug == 1);
+        } else { return undef; }
+        # Check if Attribute timeout is set
+        my $timeout = AttrVal($hash->{NAME},"max_timediff", undef);
+        if (defined($timeout)) {
+            Log 1,"dewpoint timeout=$timeout" if ($dewpoint_debug == 1); 
+        } else { 
+            $timeout = $dewpoint_time_diff_default;
+        }
+        if ($time_diff > 0 && $time_diff > $timeout) { return undef; }  
+    } elsif (($temperature eq "") && ($humidity ne "")) { 
+        # humdidity set, but temperature not. Try to use a valid value from the appropiate reading
+        if (defined($dev->{READINGS}{$temp_name}{VAL}) && defined($dev->{READINGS}{$temp_name}{TIME})) {
+            # calculate time difference
+            $time_diff = time() - time_str2num($dev->{READINGS}{$temp_name}{TIME});
 
-  # We found temperature and humidity. so we can calculate dewpoint first
-  # Prüfen, ob humidity im erlaubten Bereich ist
-  if (($humidity <= 0) || ($humidity >= 110)){
-    Log 1, "Error dewpoint: humidity invalid: $humidity";
+            $temperature = $dev->{READINGS}{$temp_name}{VAL};
+            Log 1,">dev=$devName, temp_name=$temp_name, reference temperature=$temperature ($time_diff), hum=$humidity" if ($dewpoint_debug == 1);
+        } else { return undef; }
+        # Check if Attribute timeout is set
+        my $timeout = AttrVal($hash->{NAME},"max_timediff", undef);
+        if (defined($timeout)) {
+            Log 1,"dewpoint timeout=$timeout" if ($dewpoint_debug == 1);
+        } else { 
+            $timeout = $dewpoint_time_diff_default;
+        }
+        if ($time_diff > 0 && $time_diff > $timeout) { return undef; }  
+    } 
+
+    # We found temperature and humidity. so we can calculate dewpoint first
+    # Prüfen, ob humidity im erlaubten Bereich ist
+    if (($humidity <= 0) || ($humidity >= 110)){
+        Log 1, "Error dewpoint: humidity invalid: $humidity";
+        return undef;
+    }
+    my $dewpoint = sprintf("%.1f", dewpoint_dewpoint($temperature,$humidity));
+    Log 1, "dewpoint_notify: dewpoint=$dewpoint" if ($dewpoint_debug == 1);
+
+    if ($cmd_type eq "dewpoint") {
+        # >define <name> dewpoint dewpoint <devicename> [<temp_name> <hum_name> <new_name>]
+        #
+        # Calculates dewpoint for device <devicename> from temperature and humidity and write it 
+        # to new Reading dewpoint. 
+        # If optional <temp_name>, <hum_name> and <newname> is specified
+        # then read temperature from reading <temp_name>, humidity from reading <hum_name>
+        # and write dewpoint to reading <temp_name>.
+        # if temp_name eq "T" then use temperature from state T: H:, add <newname> to the state
+        # Example:
+        # define dewtest1 dewpoint dewpoint .*
+        # define dewtest2 dewpoint dewpoint .* T H D
+        my $current;
+        my $sensor;
+        my $aFeuchte = AttrVal($hash->{NAME},"absFeuchte", undef);
+        if (defined($aFeuchte)) {
+            $sensor = "absFeuchte";
+            $current = sprintf("%.1f", dewpoint_absFeuchte($temperature,$humidity));
+            $tn = TimeNow();
+            $dev->{READINGS}{$sensor}{TIME} = $tn;
+            $dev->{READINGS}{$sensor}{VAL} = $current;
+            $dev->{CHANGED}[$n++] = $sensor . ": " . $current;		
+            Log 1,"dewpoint absFeuchte= $current" if ($dewpoint_debug == 1);
+            $aFeuchte = "A: " . $current;
+        }	
+
+        $sensor = $new_name;
+        if ($temp_name ne "T") {
+            $current = $dewpoint;
+            $tn = TimeNow();
+            $dev->{READINGS}{$sensor}{TIME} = $tn;
+            $dev->{READINGS}{$sensor}{VAL} = $current;
+            $dev->{CHANGED}[$n++] = $sensor . ": " . $current;
+        } else {
+            #Log 1,">dev=$devName, lastval='$lastval' devSTATE='".$dev->{STATE}."' state=".$dev->{READINGS}{state}{VAL}."'";
+            # state begins with "T:". append dewpoint or insert before BAT
+            if ($lastval =~ /BAT:/) {	
+                $current = $lastval;
+                $current =~ s/BAT:/$sensor: $dewpoint BAT:/g;
+            } elsif ($lastval =~ /<</) {	
+                $current = $lastval;
+                $current =~ s/<</$sensor:$dewpoint   <</g;
+            } else {
+                $current = $lastval." ".$sensor.": ".$dewpoint;
+                if (defined($aFeuchte)) {
+                    $current = $current." ".$aFeuchte;
+                }
+            }
+            $dev->{STATE} = $current; 
+            $dev->{CHANGED}[$n++] = $current;
+        }
+
+        Log 1, "dewpoint_notify: current=$current" if ($dewpoint_debug == 1);
+    } elsif ($cmd_type eq "fan") {
+        # >define <name> dewpoint fan devicename devicename-outside min-temp [diff-temp]
+        #
+        #  This define may be used to turn an fan on or off if the outside air has less
+        #  water 
+        #
+        # - Generate reading/event "fan: on" if (dewpoint of <devicename-outside>) + diff_temp is lower 
+        #   than dewpoint of <devicename> and temperature of <devicename-outside> is >= min-temp
+        #   and reading "fan" was not already "on".
+        # - Generate reading/event "fan: off": else and if reading "fan" was not already "off".
+        Log 1, "dewpoint_notify: fan devname_out=$devname_out, min_temp=$min_temp, diff_temp=$diff_temp" if ($dewpoint_debug == 1);
+        my $sensor;
+        my $current;
+        if (exists $defs{$devname_out}{READINGS}{temperature}{VAL} && exists $defs{$devname_out}{READINGS}{humidity}{VAL}) {
+            my $temperature_out = $defs{$devname_out}{READINGS}{temperature}{VAL};
+            my $humidity_out = $defs{$devname_out}{READINGS}{humidity}{VAL};
+            my $dewpoint_out = sprintf("%.1f", dewpoint_dewpoint($temperature_out,$humidity_out));;
+            Log 1, "dewpoint_notify: fan dewpoint_out=$dewpoint_out" if ($dewpoint_debug == 1);
+            if (($dewpoint_out + $diff_temp) < $dewpoint && $temperature_out >= $min_temp) {
+                $current = "on";
+                Log 1, "dewpoint_notify: fan ON" if ($dewpoint_debug == 1);
+            } else {
+                $current = "off";
+                Log 1, "dewpoint_notify: fan OFF" if ($dewpoint_debug == 1);
+            }
+            $sensor = "fan";
+            if (!exists $defs{$devName}{READINGS}{$sensor}{VAL} || $defs{$devName}{READINGS}{$sensor}{VAL} ne $current) {
+                Log 1, "dewpoint_notify: CHANGE fan $current" if ($dewpoint_debug == 1);
+                $tn = TimeNow();
+                $dev->{READINGS}{$sensor}{TIME} = $tn;
+                $dev->{READINGS}{$sensor}{VAL} = $current;
+                $dev->{CHANGED}[$n++] = $sensor . ": " . $current;
+            }
+
+        } else {
+            Log 1, "dewpoint_notify: fan devname_out=$devname_out no temperature or humidity available for dewpoint calculation" if ($dewpoint_debug == 1);
+        }
+    } elsif ($cmd_type eq "alarm") {
+        # >define <name> dewpoint alarm devicename devicename-reference diff
+        #
+        # - Generate reading/event "alarm: on" if temperature of <devicename-reference>-<diff> is lower 
+        #   than dewpoint of <devicename> and reading "alarm" was not already "on".
+        # - Generate reading/event "alarm: off" if temperature of <devicename-reference>-<diff> is higher 
+        #   than dewpoint of <devicename> and reading "alarm" was not already "off".
+        #
+        #  You have different options to use this define:
+        #  * Use a temperature sensor in or on the wall (<devicename-reference>) and use a temp/hum sensor
+        #    to measure the dewpoint of the air. Alarm if the temperature of the wall is lower than the dewpoint of the air.
+        #    In this case the water of the air will condense on the wall because the wall is cold.
+        # 	Example: define alarmtest dewpoint alarm roomsensor wallsensor 0
+        #  * If you do not have a temperature sensor in/on the wall, you may also compare the rooms dewpoint to the
+        #    temperature of the same or another inside sensor. If you think that your walls are normally 5 degrees colder
+        #    than the inside temperature, set diff to 5. 
+        # 	Example: define alarmtest dewpoint alarm roomsensor roomsensor 5
+        Log 1, "dewpoint_notify: alarm devname_ref=$devname_ref, diff_temp=$diff_temp" if ($dewpoint_debug == 1);
+        my $sensor;
+        my $current;
+        if (exists $defs{$devname_ref}{READINGS}{temperature}{VAL}) {
+            my $temperature_ref = $defs{$devname_ref}{READINGS}{temperature}{VAL};
+            Log 1, "dewpoint_notify: alarm temperature_ref=$temperature_ref" if ($dewpoint_debug == 1);
+            if ($temperature_ref - $diff_temp < $dewpoint) {
+                $current = "on";
+                Log 1, "dewpoint_notify: alarm ON" if ($dewpoint_debug == 1);
+            } else {
+                $current = "off";
+                Log 1, "dewpoint_notify: alarm OFF" if ($dewpoint_debug == 1);
+            }
+            $sensor = "alarm";
+            if (!exists $defs{$devName}{READINGS}{$sensor}{VAL} || $defs{$devName}{READINGS}{$sensor}{VAL} ne $current) {
+                Log 1, "dewpoint_notify: CHANGE alarm $current" if ($dewpoint_debug == 1);
+                $tn = TimeNow();
+                $dev->{READINGS}{$sensor}{TIME} = $tn;
+                $dev->{READINGS}{$sensor}{VAL} = $current;
+                $dev->{CHANGED}[$n++] = $sensor . ": " . $current;
+            }
+        } else {
+            Log 1, "dewpoint_notify: alarm devname_out=$devname_out no temperature or humidity available for dewpoint calculation" if ($dewpoint_debug == 1);
+        }
+
+    } else {
+        # should never happen:
+        Log 1, "Error notify_dewpoint: <2> unknown cmd_type ".$cmd_type;
+        return "";
+    }
     return undef;
-	}
-  my $dewpoint = sprintf("%.1f", dewpoint_dewpoint($temperature,$humidity));
-   Log 1, "dewpoint_notify: dewpoint=$dewpoint" if ($dewpoint_debug == 1);
-
-  if ($cmd_type eq "dewpoint") {
-	# >define <name> dewpoint dewpoint <devicename> [<temp_name> <hum_name> <new_name>]
-	#
-	# Calculates dewpoint for device <devicename> from temperature and humidity and write it 
-	# to new Reading dewpoint. 
-	# If optional <temp_name>, <hum_name> and <newname> is specified
-	# then read temperature from reading <temp_name>, humidity from reading <hum_name>
-	# and write dewpoint to reading <temp_name>.
-	# if temp_name eq "T" then use temperature from state T: H:, add <newname> to the state
-	# Example:
-	# define dewtest1 dewpoint dewpoint .*
-	# define dewtest2 dewpoint dewpoint .* T H D
-	my $current;
-	my $sensor;
-	my $aFeuchte = AttrVal($hash->{NAME},"absFeuchte", undef);
-	if (defined($aFeuchte)) {
-		$sensor = "absFeuchte";
-		$current = sprintf("%.1f", dewpoint_absFeuchte($temperature,$humidity));
-        $tn = TimeNow();
-		$dev->{READINGS}{$sensor}{TIME} = $tn;
-		$dev->{READINGS}{$sensor}{VAL} = $current;
-		$dev->{CHANGED}[$n++] = $sensor . ": " . $current;		
-		Log 1,"dewpoint absFeuchte= $current" if ($dewpoint_debug == 1);
-		$aFeuchte = "A: " . $current;
-	}	
-	
-	$sensor = $new_name;
-	if ($temp_name ne "T") {
-		$current = $dewpoint;
-        $tn = TimeNow();
-		$dev->{READINGS}{$sensor}{TIME} = $tn;
-		$dev->{READINGS}{$sensor}{VAL} = $current;
-		$dev->{CHANGED}[$n++] = $sensor . ": " . $current;
-	} else {
-		#Log 1,">dev=$devName, lastval='$lastval' devSTATE='".$dev->{STATE}."' state=".$dev->{READINGS}{state}{VAL}."'";
-		# state begins with "T:". append dewpoint or insert before BAT
-		if ($lastval =~ /BAT:/) {	
-			$current = $lastval;
-			$current =~ s/BAT:/$sensor: $dewpoint BAT:/g;
-		} elsif ($lastval =~ /<</) {	
-			$current = $lastval;
-			$current =~ s/<</$sensor:$dewpoint   <</g;
-		} else {
-			$current = $lastval." ".$sensor.": ".$dewpoint;
-			if (defined($aFeuchte)) {
-			$current = $current." ".$aFeuchte;
-			}
-		}
-		$dev->{STATE} = $current; 
-		$dev->{CHANGED}[$n++] = $current;
-	}
-
-    	Log 1, "dewpoint_notify: current=$current" if ($dewpoint_debug == 1);
-  } elsif ($cmd_type eq "fan") {
-	# >define <name> dewpoint fan devicename devicename-outside min-temp [diff-temp]
-	#
-	#  This define may be used to turn an fan on or off if the outside air has less
-	#  water 
-	#
-	# - Generate reading/event "fan: on" if (dewpoint of <devicename-outside>) + diff_temp is lower 
-	#   than dewpoint of <devicename> and temperature of <devicename-outside> is >= min-temp
-	#   and reading "fan" was not already "on".
-	# - Generate reading/event "fan: off": else and if reading "fan" was not already "off".
-	Log 1, "dewpoint_notify: fan devname_out=$devname_out, min_temp=$min_temp, diff_temp=$diff_temp" if ($dewpoint_debug == 1);
-	my $sensor;
-	my $current;
-	if (exists $defs{$devname_out}{READINGS}{temperature}{VAL} && exists $defs{$devname_out}{READINGS}{humidity}{VAL}) {
-		my $temperature_out = $defs{$devname_out}{READINGS}{temperature}{VAL};
-		my $humidity_out = $defs{$devname_out}{READINGS}{humidity}{VAL};
-		my $dewpoint_out = sprintf("%.1f", dewpoint_dewpoint($temperature_out,$humidity_out));;
-		Log 1, "dewpoint_notify: fan dewpoint_out=$dewpoint_out" if ($dewpoint_debug == 1);
-		if (($dewpoint_out + $diff_temp) < $dewpoint && $temperature_out >= $min_temp) {
-			$current = "on";
-			Log 1, "dewpoint_notify: fan ON" if ($dewpoint_debug == 1);
-		} else {
-			$current = "off";
-			Log 1, "dewpoint_notify: fan OFF" if ($dewpoint_debug == 1);
-		}
-		$sensor = "fan";
-		if (!exists $defs{$devName}{READINGS}{$sensor}{VAL} || $defs{$devName}{READINGS}{$sensor}{VAL} ne $current) {
-			Log 1, "dewpoint_notify: CHANGE fan $current" if ($dewpoint_debug == 1);
-        		$tn = TimeNow();
-			$dev->{READINGS}{$sensor}{TIME} = $tn;
-			$dev->{READINGS}{$sensor}{VAL} = $current;
-			$dev->{CHANGED}[$n++] = $sensor . ": " . $current;
-		}
-
-	} else {
-		Log 1, "dewpoint_notify: fan devname_out=$devname_out no temperature or humidity available for dewpoint calculation" if ($dewpoint_debug == 1);
-	}
-  } elsif ($cmd_type eq "alarm") {
-	# >define <name> dewpoint alarm devicename devicename-reference diff
-	#
-	# - Generate reading/event "alarm: on" if temperature of <devicename-reference>-<diff> is lower 
-	#   than dewpoint of <devicename> and reading "alarm" was not already "on".
-	# - Generate reading/event "alarm: off" if temperature of <devicename-reference>-<diff> is higher 
-	#   than dewpoint of <devicename> and reading "alarm" was not already "off".
-	#
-	#  You have different options to use this define:
-	#  * Use a temperature sensor in or on the wall (<devicename-reference>) and use a temp/hum sensor
-	#    to measure the dewpoint of the air. Alarm if the temperature of the wall is lower than the dewpoint of the air.
-	#    In this case the water of the air will condense on the wall because the wall is cold.
-	# 	Example: define alarmtest dewpoint alarm roomsensor wallsensor 0
-	#  * If you do not have a temperature sensor in/on the wall, you may also compare the rooms dewpoint to the
-	#    temperature of the same or another inside sensor. If you think that your walls are normally 5 degrees colder
-	#    than the inside temperature, set diff to 5. 
-	# 	Example: define alarmtest dewpoint alarm roomsensor roomsensor 5
-	Log 1, "dewpoint_notify: alarm devname_ref=$devname_ref, diff_temp=$diff_temp" if ($dewpoint_debug == 1);
-	my $sensor;
-	my $current;
-	if (exists $defs{$devname_ref}{READINGS}{temperature}{VAL}) {
-		my $temperature_ref = $defs{$devname_ref}{READINGS}{temperature}{VAL};
-		Log 1, "dewpoint_notify: alarm temperature_ref=$temperature_ref" if ($dewpoint_debug == 1);
-		if ($temperature_ref - $diff_temp < $dewpoint) {
-			$current = "on";
-			Log 1, "dewpoint_notify: alarm ON" if ($dewpoint_debug == 1);
-		} else {
-			$current = "off";
-			Log 1, "dewpoint_notify: alarm OFF" if ($dewpoint_debug == 1);
-		}
-		$sensor = "alarm";
-		if (!exists $defs{$devName}{READINGS}{$sensor}{VAL} || $defs{$devName}{READINGS}{$sensor}{VAL} ne $current) {
-			Log 1, "dewpoint_notify: CHANGE alarm $current" if ($dewpoint_debug == 1);
-        		$tn = TimeNow();
-			$dev->{READINGS}{$sensor}{TIME} = $tn;
-			$dev->{READINGS}{$sensor}{VAL} = $current;
-			$dev->{CHANGED}[$n++] = $sensor . ": " . $current;
-		}
-	} else {
-		Log 1, "dewpoint_notify: alarm devname_out=$devname_out no temperature or humidity available for dewpoint calculation" if ($dewpoint_debug == 1);
-	}
-
-  } else {
-	# should never happen:
-	Log 1, "Error notify_dewpoint: <2> unknown cmd_type ".$cmd_type;
-	return "";
-  }
-  return undef;
 }
 # -----------------------------
 # Dewpoint calculation.
@@ -425,16 +425,16 @@ my @ab_le0 = (22.46, 272.6);     # T<=0 over ice
 # vapour pressure in kPa
 sub dewpoint_vp($$)
 {
-  my ($T, $Hr) = @_;
-  my ($a, $b);
+    my ($T, $Hr) = @_;
+    my ($a, $b);
 
-  if ($T > 0) {
-    ($a, $b) = @ab_gt0;
-  } else {
-    ($a, $b) = @ab_le0;
-  }
+    if ($T > 0) {
+        ($a, $b) = @ab_gt0;
+    } else {
+        ($a, $b) = @ab_le0;
+    }
 
-  return 0.01 * $Hr * $E0 * exp($a * $T / ($T + $b));
+    return 0.01 * $Hr * $E0 * exp($a * $T / ($T + $b));
 }
 
 ### ** Public interface ** keep stable
@@ -442,31 +442,31 @@ sub dewpoint_vp($$)
 sub
 dewpoint_dewpoint($$)
 {
-  my ($T, $Hr) = @_;
-  if ($Hr == 0) {
-    Log 1, "Error: dewpoint() Hr==0 !: temp=$T, hum=$Hr";
-    return undef;
-  }
+    my ($T, $Hr) = @_;
+    if ($Hr == 0) {
+        Log 1, "Error: dewpoint() Hr==0 !: temp=$T, hum=$Hr";
+        return undef;
+    }
 
-  my ($a, $b);
+    my ($a, $b);
 
-  if ($T > 0) {
-    ($a, $b) = @ab_gt0;
-  } else {
-    ($a, $b) = @ab_le0;
-  }
+    if ($T > 0) {
+        ($a, $b) = @ab_gt0;
+    } else {
+        ($a, $b) = @ab_le0;
+    }
 
-  # solve vp($dp, 100) = vp($T,$Hr) for $dp 
-  my $v = log(dewpoint_vp($T, $Hr) / $E0);
-  my $D = $a - $v;
+    # solve vp($dp, 100) = vp($T,$Hr) for $dp 
+    my $v = log(dewpoint_vp($T, $Hr) / $E0);
+    my $D = $a - $v;
 
-  # can this ever happen for valid input?
-  if ($D == 0) {
-    Log 1, "Error: dewpoint() D==0 !: temp=$T, hum=$Hr";
-    return undef;
-  }
+    # can this ever happen for valid input?
+    if ($D == 0) {
+        Log 1, "Error: dewpoint() D==0 !: temp=$T, hum=$Hr";
+        return undef;
+    }
 
-  return round($b * $v / $D, 1);
+    return round($b * $v / $D, 1);
 }
 
 
@@ -475,16 +475,16 @@ dewpoint_dewpoint($$)
 sub
 dewpoint_absFeuchte ($$)
 {
-  my ($T, $Hr) = @_;
+    my ($T, $Hr) = @_;
 
-  # 110 ?
-  if (($Hr < 0) || ($Hr > 110)) {
-    Log 1, "Error dewpoint: humidity invalid: $Hr";
-    return "";
-  }
-  my $DD = dewpoint_vp($T, $Hr);
-  my $AF  = 1.0E6 * (18.016 / 8314.3) * ($DD / (273.15 + $T));
-  return round($AF, 1);
+    # 110 ?
+    if (($Hr < 0) || ($Hr > 110)) {
+        Log 1, "Error dewpoint: humidity invalid: $Hr";
+        return "";
+    }
+    my $DD = dewpoint_vp($T, $Hr);
+    my $AF  = 1.0E6 * (18.016 / 8314.3) * ($DD / (273.15 + $T));
+    return round($AF, 1);
 }
 
 1;
