@@ -30,6 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 3.2.0      22.11.2017       add NOTIFYDEV if possible
 # 3.1.0      28.08.2017       get-function added, commandref revised, $readingFnAttributes deleted
 # 3.0.0      27.08.2017       change attr type to protocol, ready to check in
 # 2.6.0      26.08.2017       more than one Log2Syslog device can be created
@@ -63,7 +64,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "3.1.0";
+my $Log2SyslogVn = "3.2.0";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -140,6 +141,9 @@ sub Log2Syslog_Define($@) {
   return "Bad regexp: $@" if($@);
   eval { "Hallo" =~ m/^$hash->{HELPER}{FHEMLOG}$/ } if($hash->{HELPER}{FHEMLOG});
   return "Bad regexp: $@" if($@);
+  
+  # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
+  notifyRegexpChanged($hash, $hash->{HELPER}{EVNTLOG}) if($hash->{HELPER}{EVNTLOG});
 		
   $hash->{PEERHOST}         = $a[2];                        # Destination Host (Syslog Server)
   $hash->{MYHOST}           = hostfqdn();                   # FQDN eigener Host
