@@ -566,7 +566,7 @@ ZWDongle_Get($@)
   } elsif($cmd eq "backgroundRSSI") {          ############################
     my @list;
     my $i=0;
-    my $maxlen = (length($msg) >= 12 ? 10 : length($msg)-2);
+    my $maxlen = (length($msg) >= 10 ? 10 : length($msg)-2);
     for(my $off=4; $off<$maxlen; $off+=2) {
         my $dec = hex(substr($msg, $off, 2));
         if($dec == 127 || $dec == 0) {
