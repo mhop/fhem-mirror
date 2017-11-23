@@ -1270,6 +1270,7 @@ devspec2array($;$)
 
         if($@) {
           Log 1, "devspec2array $name: $@";
+          stacktrace();
           return $name;
         }
       }
