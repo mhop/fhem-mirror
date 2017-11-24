@@ -421,7 +421,7 @@ sub Hyperion_GetConfigs_finished($)
   foreach (@files)
   {
     my $file = $_;
-    next if ($file !~ /^([-\.\w]+)\.config\.json$/);
+    next if ($file !~ /^([\-\.\w]+)\.config\.json$/);
     $file = $1;
     push @filelist,$file;
     Log3 $name,4,"$name: matching config file: \"$_\"";
@@ -472,8 +472,9 @@ sub Hyperion_ExecCmd($)
   foreach (@qx)
   {
     chomp $_;
-    $_ =~ s/^[\s\t]{1,}/ /;
-    push @ret,$_;
+    $_ =~ s/[\s\t\| ;]{1,}/ /g;
+    $_ =~ s/(^ {1,}| {1,}$)//g;
+    push @ret,$_ if ($_);
   }
   $re .= join " ",@ret if (@ret);
   return "$name|$re";
@@ -489,8 +490,15 @@ sub Hyperion_Kill_finished($)
   delete $hash->{helper}{RUNNING_PID};
   if ($error)
   {
-    Log3 $name,3,"$name: Not able to stop Hyperion! Error: $error";
-    readingsSingleUpdate($hash,"lastError",$error,1);
+    if ($error =~ /^Usage:/)
+    {
+      Log3 $name,3,"$name: Hyperion couldn't be stopped because no running pid was found!";
+    }
+    else
+    {
+      Log3 $name,3,"$name: Not able to stop Hyperion! Error: $error";
+      readingsSingleUpdate($hash,"lastError",$error,1);
+    }
   }
   else
   {
@@ -509,7 +517,7 @@ sub Hyperion_Restart($)
   my $error       = $a[1];
   my $hash        = $defs{$name};
   delete $hash->{helper}{RUNNING_PID};
-  if ($error)
+  if ($error && $error !~ /^Usage:/)
   {
     Log3 $name,3,"$name: Not able to stop Hyperion! Error: $error";
     readingsSingleUpdate($hash,"lastError",$error,1);
@@ -595,7 +603,7 @@ sub Hyperion_Set($@)
     my $user  = AttrVal($name,"hyperionSshUser","pi");
     my $ip = $hash->{IP};
     my $sudo = ($user eq "root" || int AttrVal($name,"hyperionNoSudo",0) == 1) ? "" : "sudo ";
-    my $kill = $sudo."kill `pidof $bin`";
+    my $kill = $sudo."kill `pidof $bin` 2>&1 1>/dev/null";
     my $ssh;
     if (!Hyperion_isLocal($ip))
     {
@@ -606,7 +614,7 @@ sub Hyperion_Set($@)
     my $com = Hyperion_isLocal($ip)?"":"$ssh $user\@$ip '";
     if ($cmd eq "binary")
     {
-      return "Value of $cmd has to be 'stop' or 'restart'" if ($value !~ /^(stop|restart)$/);
+      return "Value of $cmd has to be 'restart' or 'stop'" if ($value !~ /^(stop|restart)$/);
     }
     else
     {
