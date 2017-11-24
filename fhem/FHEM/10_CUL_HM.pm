@@ -7832,7 +7832,7 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
 sub CUL_HM_setTmplDisp($){ # remove register if outdated
   my $tHash = shift;
   delete $tHash->{READINGS}{$_} foreach (grep /^tmpl_/ ,keys %{$tHash->{READINGS}});
-  if ($tHash->{helper}{expert}{tpl} && defined %HMConfig::culHmTpl){
+  if ($tHash->{helper}{expert}{tpl} && (%HMConfig::culHmTpl)){
     foreach (keys %{$tHash->{helper}{tmpl}}){
       my ($p,$t) = split(">",$_);
       my @param;
