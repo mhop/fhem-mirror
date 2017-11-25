@@ -1,1 +1,12 @@
-<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="22 25 60 60"><defs><style>.cls-1{fill:none;}.cls-2{fill:#000000;}</style></defs><title>aurora</title><rect class="cls-1" x="3.5" y="3.5" width="98" height="98" rx="8.2" ry="8.2"/><polygon class="cls-2" points="30.12 68.88 33.05 73.96 71.94 73.97 74.88 68.88 55.45 35.18 49.59 35.18 30.12 68.88"/><path class="cls-2" d="M81.48,73.78,54.31,26.66a.91.91,0,0,0-.87-.5H51.58a1,1,0,0,0-.86.5L23.52,73.75a1,1,0,0,0,0,1l.93,1.61a1,1,0,0,0,.87.5l54.36,0h0a1,1,0,0,0,.87-.5l.93-1.61A1,1,0,0,0,81.48,73.78ZM79.1,74.88l-53.21,0-.35-.61L52.17,28.17h.7L79.46,74.28Z"/></svg>
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="Layer_1" data-name="Layer 1" viewBox="22 25 60 60">
+  <defs>
+    <style>.cls-1{fill:none;}</style>
+  </defs>
+  <title>aurora</title>
+  <rect class="cls-1" x="3.5" y="3.5" width="98" height="98" rx="8.2" ry="8.2"/>
+  <g fill="#000000">
+  <polygon class="cls-2" points="30.12 68.88 33.05 73.96 71.94 73.97 74.88 68.88 55.45 35.18 49.59 35.18 30.12 68.88"/>
+  <path class="cls-2" d="M81.48,73.78,54.31,26.66a.91.91,0,0,0-.87-.5H51.58a1,1,0,0,0-.86.5L23.52,73.75a1,1,0,0,0,0,1l.93,1.61a1,1,0,0,0,.87.5l54.36,0h0a1,1,0,0,0,.87-.5l.93-1.61A1,1,0,0,0,81.48,73.78ZM79.1,74.88l-53.21,0-.35-.61L52.17,28.17h.7L79.46,74.28Z"/>
+  </g>
+</svg>

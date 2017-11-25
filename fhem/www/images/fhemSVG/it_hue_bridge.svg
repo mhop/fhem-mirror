@@ -4,11 +4,9 @@
 	 id="svg2" inkscape:version="0.48.4 r9939" sodipodi:docname="hue_bridge.svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:svg="http://www.w3.org/2000/svg"
 	 xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 469 469"
 	 style="enable-background:new 0 0 469 469;" xml:space="preserve">
-<style type="text/css">
-	.st0{fill:#007CDC;}
-</style>
 <sodipodi:namedview  bordercolor="#666666" borderopacity="1" gridtolerance="10" guidetolerance="10" id="namedview9" inkscape:current-layer="svg2" inkscape:cx="66.730215" inkscape:cy="446.26716" inkscape:pageopacity="0" inkscape:pageshadow="2" inkscape:snap-grids="true" inkscape:snap-to-guides="false" inkscape:window-height="1027" inkscape:window-maximized="1" inkscape:window-width="1618" inkscape:window-x="54" inkscape:window-y="-8" inkscape:zoom="2.56" objecttolerance="10" pagecolor="#ffffff" showgrid="false">
 	</sodipodi:namedview>
+<g fill="#0000000">
 <g id="path3761">
 	<path inkscape:connector-curvature="0" d="M236.2,5c-123.7,0-224,100.3-224,224s100.3,224,224,224s224-100.3,224-224
 		S359.9,5,236.2,5L236.2,5z M236.2,10.5c120.7,0,218.5,97.8,218.5,218.5s-97.8,218.5-218.5,218.5S17.7,349.8,17.7,229
@@ -142,5 +140,6 @@
 <g id="path3980">
 	<path class="st0" d="M233.8,289.3c-36,0-65.2-29.3-65.2-65.2s29.3-65.2,65.2-65.2s65.2,29.3,65.2,65.2S269.8,289.3,233.8,289.3z
 		 M233.8,166.7c-31.6,0-57.4,25.7-57.4,57.4s25.7,57.4,57.4,57.4c31.6,0,57.4-25.7,57.4-57.4S265.4,166.7,233.8,166.7z"/>
+</g>
 </g>
 </svg>
