@@ -47,7 +47,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.37;
+my $astroversion = 1.41;
 
 #-- These we may get on request
 my %gets = (
@@ -124,7 +124,7 @@ my %astro_transtable_EN = (
     "virgo"     => "Maiden",
     "libra"     => "Scales",
     "scorpio"   => "Scorpion",
-    "Sagittarius" => "Archer",
+    "sagittarius" => "Archer",
     "capricorn" => "Goat",
     "aquarius"  => "Water Bearer",
     "pisces"    => "Fish",
@@ -210,7 +210,7 @@ my %astro_transtable_EN = (
     "virgo"     => "Jungfrau",
     "libra"     => "Waage",
     "scorpio"   => "Skorpion",
-    "Sagittarius" => "Schütze",
+    "sagittarius" => "Schütze",
     "capricorn" => "Steinbock",
     "aquarius"  => "Wassermann",
     "pisces"    => "Fische",
@@ -1212,17 +1212,31 @@ sub Astro_moonwidget($){
   $name    =~ s/'//g;
   my $hash = $defs{$name};
   
-  my @size=split('x',($FW_webArgs{size} ? $FW_webArgs{size} : '400x400'));
+  my $mooncolor = 'rgb(255,220,100)';
+  my $moonshadow = 'rgb(70,70,100)';
+;
+  my $colorscheme = ($FW_webArgs{color}  ? $FW_webArgs{color}  : 'none');
+  if( $colorscheme eq 'light' ){
+    $mooncolor = 'rgb(255,220,180)';
+    $moonshadow = 'rgb(210,210,210)';
+  }
+  $mooncolor = $FW_webArgs{mooncolor} 
+    if ($FW_webArgs{mooncolor} );
+  $moonshadow = $FW_webArgs{moonshadow}
+    if ($FW_webArgs{moonshadow} );
+    
+  my @size       = split('x', ($FW_webArgs{size} ? $FW_webArgs{size}  : '400x400'));
   
   $FW_RETTYPE = "image/svg+xml";
   $FW_RET="";
   FW_pO '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="'.$size[0].'px" height="'.$size[1].'px">';
   my $ma = Astro_Get($hash,("","text","MoonAge"));
+  my $mb = Astro_Get($hash,("","text","MoonPhaseS"));
 
   my ($radius,$axis,$dir,$start,$middle);
-  my $radius = 250;
-  my $axis  = sin(($ma+90)*$DEG)*$radius;
-  $axis = -$axis
+  $radius = 250;
+  $axis   = sin(($ma+90)*$DEG)*$radius;
+  $axis   = -$axis
     if ($axis < 0);
     
   if( (0.0 <= $ma && $ma <= 90) || (270.0 < $ma && $ma <= 360.0) ){
@@ -1239,9 +1253,10 @@ sub Astro_moonwidget($){
   }
  
   FW_pO '<g transform="translate(400,400) scale(-1,1)">';
-  FW_pO '<circle cx="0" cy="0" r="250" fill="rgb(70,70,100)"/>';
-  FW_pO '<path d="M 0 '.$start.' A '.$axis.' '.$radius.' 0 0 '.$dir.' 0 '.$middle.' A '.$radius.' '.$radius.' 0 0 0 0 '.$start.' Z" fill="rgb(255,220,100)"/>';
+  FW_pO '<circle cx="0" cy="0" r="250" fill="'.$moonshadow.'"/>';
+  FW_pO '<path d="M 0 '.$start.' A '.$axis.' '.$radius.' 0 0 '.$dir.' 0 '.$middle.' A '.$radius.' '.$radius.' 0 0 0 0 '.$start.' Z" fill="'.$mooncolor.'"/>'; 
   FW_pO '</g>';
+  #FW_pO '<text x="100" y="710" style="font-family:Helvetica;font-size:60px;font-weight:bold" fill="black">'.$mb.'</text>';
   FW_pO '</svg>';
   return ($FW_RETTYPE, $FW_RET); 
 }	         
@@ -1326,7 +1341,7 @@ sub Astro_Get($@) {
       #-- half broken in windows
       $Date{dayofyear} = 1*strftime("%j", localtime($fTot));
     }else{
-      return "[Astro_Get] $name has improper time specification, use YYYY-MM-DD HH:MM:SS";
+      return "[Astro_Get] $name has improper time specification $str, use YYYY-MM-DD HH:MM:SS";
     }
   }else{
     #-- Current time will be used
@@ -1406,6 +1421,7 @@ sub Astro_Get($@) {
 
    <a name="Astro"></a>
         <h3>Astro</h3>
+        <ul>
         <p> FHEM module with a collection of various routines for astronomical data</p>
         <a name="Astrodefine"></a>
         <h4>Define</h4>
@@ -1500,11 +1516,14 @@ sub Astro_Get($@) {
                     >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>
+        </ul>
 =end html
 =begin html_DE
 
 <a name="Astro"></a>
 <h3>Astro</h3>
+<ul>
 Absichtlich keine deutsche Dokumentation vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#Astro">Astro</a> 
+</ul>
 =end html_DE
 =cut
