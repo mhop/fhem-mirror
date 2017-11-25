@@ -1177,12 +1177,14 @@ sub CUL_HM_Parse($$) {#########################################################
     return;
   }
   
-  CUL_HM_assignIO($mh{devH}); #this way the init and remove work even on startup for TSCUL
   if (   !defined $mh{devH}->{IODev}
       || !defined $mh{devH}->{IODev}{NAME}){
     Log3 $mh{devH},1,"CUL_HM $mh{devN} error: no IO deviced!!! correkt it";
     $mh{devH}->{IODev} = $iohash;
   }
+
+  my $oldIo = $mh{devH}{IODev}{NAME};
+  CUL_HM_assignIO($mh{devH}); #this way the init and remove work even on startup for TSCUL
 
   $respRemoved = 0;  #set to 'no response in this message' at start
   $mh{devN}   = $mh{devH}->{NAME};        #sourcehash - will be modified to channel entity
@@ -1195,23 +1197,6 @@ sub CUL_HM_Parse($$) {#########################################################
   }
 
   #----------CUL aesCommReq handling---------
-  if (   AttrVal($mh{devN},"aesCommReq",0) #aesCommReq enabled for device
-      && $mh{devH}{IODev}{NAME} ne $mh{ioName} #message not received on assigned IO
-      && $mh{msgStat} !~ m/AES/) { #IO did not already do AES processing for us
- 
-    my $oldIo = $mh{devH}{IODev}{NAME};
-    CUL_HM_assignIO($mh{devH}); #update IO in case of roaming
-    if (   $mh{devH}{IODev}{NAME} ne $mh{ioName} #current IO not selected as new IO
-        || AttrVal($mh{devH}{IODev}{NAME},"rfmode","") ne "HomeMatic" #new IO is not CUL
-        || AttrVal($oldIo,"rfmode","") ne "HomeMatic") { #old IO is not CUL
-      Log3 $mh{devH},5,"CUL_HM ignoring message for ${oldIo} received on $mh{ioName}";
-      #Do not process message further, the assigned IO has to handle it
-      $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devN}$/,@entities);
-      return (CUL_HM_pushEvnts(),$mh{devN});
-    }
-  }
-  
-  #----------CUL aesCommReq handling---------
   my $aComReq = AttrVal($mh{devN},"aesCommReq",0);
   my $dRfMode = AttrVal($mh{devH}{IODev}{NAME},"rfmode","");
   my $dIoOk   = ($mh{devH}{IODev}{NAME} eq $mh{ioName}) ? 1 : 0;
@@ -1219,7 +1204,6 @@ sub CUL_HM_Parse($$) {#########################################################
       && !$dIoOk                   #message not received on assigned IO
       && $mh{msgStat} !~ m/AES/) { #IO did not already do AES processing for us
  
-    my $oldIo = $mh{devH}{IODev}{NAME};
     CUL_HM_assignIO($mh{devH}); #update IO in case of roaming
     if (   !$dIoOk                                       #current IO not selected as new IO
         || $dRfMode ne "HomeMatic"                       #new IO is not CUL
@@ -8900,12 +8884,13 @@ sub CUL_HM_assignIO($){ #check and assign IO
   }
 
   if (!$newIODev) {# not assigned thru CCU - try normal
+    $newIODev = $oldIODev;
     my $dIo = AttrVal($hash->{NAME},"IODev","");
     if (  $defs{$dIo} 
         &&(!$oldIODev || $dIo ne $oldIODev->{NAME})) {
       $newIODev = $defs{$dIo}; # assign according to Attribut
     }
-    else {
+    elsif (!$defs{$dIo}) {
       AssignIoPort($hash); #let kernal decide
       $newIODev = $hash->{IODev};
     }
