@@ -6,6 +6,8 @@
 #
 # Prof. Dr. Peter A. Henning
 #
+# TODO: Löschen readings, wenn timer gelöscht
+#
 # $Id$
 #
 ########################################################################################
@@ -48,7 +50,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.17";
+my $yaahmversion    = "1.21";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -83,6 +85,9 @@ my %yaahm_transtable_EN = (
     "description"       =>  "Description",
     "profile"           =>  "Profile",
     "profiles"          =>  "Profiles",
+    "transition"        =>  "Transition to",
+    "onlposfrm"         =>  "only possible from",
+    "notposfrm"         =>  "not possible from",
     #--
     "aftermidnight"     =>  "After Midnight",
     "beforesunrise"     =>  "Before Sunrise",
@@ -121,7 +126,7 @@ my %yaahm_transtable_EN = (
     "locked"            =>  "Locked",
     "unsecured"         =>  "Not Secured",
     "secured"           =>  "Secured",
-    "protected"         =>  "Geschützt",
+    "protected"         =>  "Protected",
     "guarded"           =>  "Guarded",
     #--
     "monday"    =>  ["Monday","Mon"],
@@ -170,6 +175,9 @@ my %yaahm_transtable_EN = (
     "description"       =>  "Beschreibung",
     "profile"           =>  "Profil",
     "profiles"          =>  "Profile",
+    "transition"        =>  "Übergang zu",
+    "onlposfrm"         =>  "nur möglich aus",
+    "notposfrm"         =>  "nicht möglich aus",
     #--
     "aftermidnight"     =>  "Nach Mitternacht",
     "beforesunrise"     =>  "Vor Sonnenaufgang",
@@ -316,8 +324,18 @@ my @seasons = (
     "winter","spring","summer","fall");
  
 #-- modes or day types that affect the profile
-my @profmode = ("party","absence");
+my @profmode = ("party","absence","donotdisturb");
 my @profday  = ("vacation","holiday"); 
+
+#-- color schemes
+my $csnum=2;
+my @csmode;
+my @csmode1  = ("#53f3c7","#8bfa56","#ff9458","#fd5777");
+my @csmode2  = ("#35ffc7","#77ff35","#ff7e35","#ff355e");
+
+my @csstate;
+my @csstate1 = ("#53f3c7","#ff9458","#f554e2","#fd5777");
+my @csstate2 = ("#35ffc7","#ff7e35","#ff35e2","#ff355e");
 
 #-- temporary fix for update purpose
 sub YAAHM_restore($$){};
@@ -340,7 +358,7 @@ sub YAAHM_Initialize ($) {
   $hash->{UndefFn}     = "YAAHM_Undef";   
   $hash->{AttrFn}      = "YAAHM_Attr";
   my $attst            = "linkname publicroom hiddenroom lockstate:locked,unlocked simulation:0,1 ".
-                         "timeHelper modeHelper modeAuto:0,1 stateDevices:textField-long stateInterval stateWarning stateHelper stateAuto:0,1 ".
+                         "timeHelper modeHelper modeAuto:0,1 stateDevices:textField-long stateInterval noicons:0,1 colorscheme:1,2 stateWarning stateHelper stateAuto:0,1 ".
                          "holidayDevices:textField-long vacationDevices:textField-long specialDevices:textField-long";
  
   $hash->{AttrList}    = $attst;
@@ -355,12 +373,15 @@ sub YAAHM_Initialize ($) {
     }
   }
   $yaahmlinkname = $yaahm_tt->{"profiles"};
+  #-- default colors
+  @csmode  = @csmode1;
+  @csstate = @csstate1;
   
   $data{FWEXT}{YAAHMx}{LINK} = "?room=".$yaahmhiddenroom;
   $data{FWEXT}{YAAHMx}{NAME} = $yaahmlinkname;		
   
   $data{FWEXT}{"/YAAHM_timewidget"}{FUNC} = "YAAHM_timewidget";
-  $data{FWEXT}{"/YAAHM_timewidget"}{FORKABLE} = 0;		  
+  $data{FWEXT}{"/YAAHM_timewidget"}{FORKABLE} = 0;	  
 	
   return undef;
 }
@@ -389,7 +410,10 @@ sub YAAHM_Define ($$) {
   }else{
     $yaahm_tt = \%yaahm_transtable_EN;
   }
-  #$hash->{DATA}{"TT"}=$yaahm_tt;
+ 
+  #-- default colors
+  @csmode  = @csmode1;
+  @csstate = @csstate1;
 
   # NOTIFYDEV
   my $NOTIFYDEV = "global,$name";
@@ -556,6 +580,17 @@ sub YAAHM_Attr($$$) {
       }
    }
   #---------------------------------------  
+  }elsif ( ($cmd eq "set") && ($attrName eq "colorscheme") ) {
+    Log 1,"==================> colorscheme";
+    if( $attrVal == 2 ){
+      @csmode  = @csmode2;
+      @csstate = @csstate2;
+    }else{
+      @csmode  = @csmode2;
+      @csstate = @csstate2;
+    }
+ 
+  #---------------------------------------  
   }elsif ( ($cmd eq "delete") && ($attrName eq "stateDevices") ) {
     fhem("deletereading $name sdev_housestate");
     fhem("deletereading $name sec_housestate");
@@ -658,7 +693,7 @@ sub YAAHM_Set($@) {
      if( $args[0] =~ /^\d+/ ) {
        #-- check if valid
        if( $args[0] >= int(@{$hash->{DATA}{"WT"}}) ){
-         $msg = "Error, timer number ".$args[0]." does not exist, number musst be smaller than ".int( @{$hash->{DATA}{"WT"}});
+         $msg = "Error, timer number ".$args[0]." does not exist, number must be smaller than ".int( @{$hash->{DATA}{"WT"}});
          Log3 $name,1,"[YAAHM_Set] ".$msg;
          return $msg;
        }
@@ -1210,6 +1245,7 @@ sub YAAHM_mode {
   my $prevmode   = defined($hash->{DATA}{"HSM"}{"mode"})  ? $hash->{DATA}{"HSM"}{"mode"}  : "normal";
   my $currstate  = defined($hash->{DATA}{"HSM"}{"state"}) ? $hash->{DATA}{"HSM"}{"state"} : "unsecured";
   my $msg        = "";
+  my $tr_msg     = "";
   
   #-- local checks
   #-- double change
@@ -1218,22 +1254,31 @@ sub YAAHM_mode {
     
   #-- transition into party and absence is only possible from normal mode
   }elsif( $prevmode ne "normal" && $targetmode ne "normal"){
-    $msg = "transition into $targetmode mode is only possible from normal mode";
-    
+    $msg = "Transition into $targetmode mode is only possible from normal mode";
+    $tr_msg = $yaahm_tt->{transition}.' "'.$yaahm_tt->{$targetmode}.'" '.$yaahm_tt->{"onlposfrm"}.' '.$yaahm_tt->{"mode"}.'="'.$yaahm_tt->{"normal"}.'"';
 
   #-- global checks
   #-- transition into party mode only possible in unlocked state
   }elsif( $targetmode eq "party" && $currstate ne "unsecured" ){
-    $msg = "transition into party mode is only possible in unsecured state"
+    $msg = "Transition into party mode is only possible from unsecured state";
+    $tr_msg = $yaahm_tt->{transition}.' "'.$yaahm_tt->{$targetmode}.'" '.$yaahm_tt->{"onlposfrm"}.' '.$yaahm_tt->{"state"}.'="'.$yaahm_tt->{"unsecured"}.'"';
   }
   
   #-- don't
   if( $msg ne "" ){
     Log3 $name,1,"[YAAHM_mode] ".$msg;
+    readingsSingleUpdate($hash,"tr_errmsg",$tr_msg,1);
     return $msg;
   }
     
   $hash->{DATA}{"HSM"}{"mode"} = $targetmode;
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"tr_errmsg","");
+  readingsBulkUpdate($hash,"prev_housemode",$prevmode);
+  readingsBulkUpdate($hash,"housemode",$targetmode);
+  readingsBulkUpdate($hash,"tr_housemode",$yaahm_tt->{$targetmode});
+  readingsEndUpdate($hash,1); 
   
   #-- doit, if not simulation
   if (defined($attr{$name}{"modeHelper"})){
@@ -1245,12 +1290,6 @@ sub YAAHM_mode {
       return $msg;
     }
   }
-  
-  readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"prev_housemode",$prevmode);
-  readingsBulkUpdate($hash,"housemode",$targetmode);
-  readingsBulkUpdate($hash,"tr_housemode",$yaahm_tt->{$targetmode});
-  readingsEndUpdate($hash,1); 
   
 }
 
@@ -1269,6 +1308,7 @@ sub YAAHM_state {
   my $prevstate = defined($hash->{DATA}{"HSM"}{"state"}) ? $hash->{DATA}{"HSM"}{"state"} : "unsecured";
   my $currmode  = defined($hash->{DATA}{"HSM"}{"mode"})  ? $hash->{DATA}{"HSM"}{"mode"}  : "normal";
   my $msg       = "";
+  my $tr_msg    = "";
  
   #-- local checks 
   #-- double change
@@ -1278,14 +1318,24 @@ sub YAAHM_state {
   #-- global checks
   #-- changing away from unlocked in party mode is not possible
   if( $targetstate ne "unlocked" && $currmode eq "party" ){
-    $msg = "not possible in party mode";
+    $msg = "Not possible in party mode";
+    $tr_msg = $yaahm_tt->{transition}.' "'.$yaahm_tt->{$targetstate}.'" '.$yaahm_tt->{"notposfrm"}.' '.$yaahm_tt->{"mode"}.'="'.$yaahm_tt->{"party"}.'"';
   }
   
   #-- don't
   if( $msg ne "" ){
     Log3 $name,1,"[YAAHM_state] ".$msg;
+    readingsSingleUpdate($hash,"tr_errmsg",$tr_msg,1);
     return $msg;
   }
+  
+  $hash->{DATA}{"HSM"}{"state"} = $targetstate;
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"tr_errmsg","");
+  readingsBulkUpdate($hash,"prev_housestate",$prevstate);
+  readingsBulkUpdate($hash,"housestate",$targetstate);
+  readingsBulkUpdate($hash,"tr_housestate",$yaahm_tt->{$targetstate});
+  readingsEndUpdate($hash,1); 
   
   #-- doit, if not simulation
   if (defined($attr{$name}{"stateHelper"})){
@@ -1298,15 +1348,7 @@ sub YAAHM_state {
     }
   }
  
-  $hash->{DATA}{"HSM"}{"state"} = $targetstate;
-  readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"prev_housestate",$prevstate);
-  readingsBulkUpdate($hash,"housestate",$targetstate);
-  readingsBulkUpdate($hash,"tr_housestate",$yaahm_tt->{$targetstate});
-  readingsEndUpdate($hash,1); 
-  
   YAAHM_InternalTimer("check",time()+ 30, "YAAHM_checkstate", $hash, 0);
-  
 }
 
 #########################################################################################
@@ -1332,7 +1374,7 @@ sub YAAHM_checkstate($) {
   
   my $next;
   
-  $next = gettimeofday()+AttrVal($name,"stateInterval",60)*60;
+  $next = gettimeofday()+AttrVal($name,"stateInterval",1)*60;
   
   YAAHM_RemoveInternalTimer("check",$hash);
   YAAHM_InternalTimer("check",$next, "YAAHM_checkstate", $hash, 0);
@@ -1796,21 +1838,21 @@ sub YAAHM_sayWeeklyTime($$$) {
     if( ($ton =~ /(\d?\d):(\d\d)(:(\d\d))?/) && ($tom ne $ton) ){
       $hw = $1*1;
       $mw = $2*1;
-      $pt = sprintf("%d:%02d",$hw,$mw)." ".tolower($yaahm_tt->{"today"});
+      $pt = sprintf("%d:%02d",$hw,$mw)." ".lc($yaahm_tt->{"today"});
       
-      $msg .= " ".tolower($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"exceptly"}." $hw ".$yaahm_tt->{"clock"};
+      $msg .= " ".lc($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"exceptly"}." $hw ".$yaahm_tt->{"clock"};
       $msg .=" $mw"
        if( $mw != 0 );
     }elsif( $tom =~ /(\d?\d):(\d\d)(:(\d\d))?/ && $tom !~ /.*\(off\)$/ ){
       $hw = $1*1;
       $mw = $2*1;
-      $pt = sprintf("%d:%02d",$hw,$mw)." ".tolower($yaahm_tt->{"tomorrow"});
-      $msg .= " ".tolower($yaahm_tt->{"tomorrow"})." $hw ".$yaahm_tt->{"clock"};
+      $pt = sprintf("%d:%02d",$hw,$mw)." ".lc($yaahm_tt->{"tomorrow"});
+      $msg .= " ".lc($yaahm_tt->{"tomorrow"})." $hw ".$yaahm_tt->{"clock"};
       $msg .=" $mw"
        if( $mw != 0 );
     }elsif( $tom eq "off" || $tom =~ /.*\(off\)$/ ){
-      $pt   = "off ".tolower($yaahm_tt->{"today"})." ".$yaahm_tt->{"and"}." ".tolower($yaahm_tt->{"tomorrow"});
-      $msg .= " ".tolower($yaahm_tt->{"today"})." ".$yaahm_tt->{"and"}." ".tolower($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"swoff"};
+      $pt   = "off ".lc($yaahm_tt->{"today"})." ".$yaahm_tt->{"and"}." ".lc($yaahm_tt->{"tomorrow"});
+      $msg .= " ".lc($yaahm_tt->{"today"})." ".$yaahm_tt->{"and"}." ".lc($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"swoff"};
     }else{
       $pt  = $yaahm_tt->{"undecid"};
       $msg .= " ".$yaahm_tt->{"undecid"};
@@ -1824,14 +1866,14 @@ sub YAAHM_sayWeeklyTime($$$) {
     if( $tt >= $tl ){
       $hw = $1*1;
       $mw = $2*1;
-      $pt = sprintf("%d:%02d",$hw,$mw)." ".tolower($yaahm_tt->{"today"});
-      $msg .= " ".tolower($yaahm_tt->{"today"})." $hw ".$yaahm_tt->{"clock"};
+      $pt = sprintf("%d:%02d",$hw,$mw)." ".lc($yaahm_tt->{"today"});
+      $msg .= " ".lc($yaahm_tt->{"today"})." $hw ".$yaahm_tt->{"clock"};
       $msg .=" $mw"
         if( $mw != 0 );
     #-- todays time already past => tomorrow - but this may be off
     }elsif( ($tom eq "off") || ($tom =~ /.*\(off\)/) ){
-      $pt   = "off ".tolower($yaahm_tt->{"tomorrow"});
-      $msg .= " ".tolower($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"swoff"};
+      $pt   = "off ".lc($yaahm_tt->{"tomorrow"});
+      $msg .= " ".lc($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"swoff"};
     }elsif( $tom =~ /(\d?\d):(\d\d)(:(\d\d))?( \((\d?\d):(\d\d)(:(\d\d))?\))?/ ){
       #Log 1,"===========> |$1|$2|$3|$4|$5|$6";
       if( defined($5) && $5 ne ""){
@@ -1841,8 +1883,8 @@ sub YAAHM_sayWeeklyTime($$$) {
         $hw = $1*1;
         $mw = $2*1;
       }   
-      $pt = sprintf("%d:%02d",$hw,$mw)." ".tolower($yaahm_tt->{"tomorrow"});
-      $msg .= " ".tolower($yaahm_tt->{"tomorrow"})." $hw ".$yaahm_tt->{"clock"};
+      $pt = sprintf("%d:%02d",$hw,$mw)." ".lc($yaahm_tt->{"tomorrow"});
+      $msg .= " ".lc($yaahm_tt->{"tomorrow"})." $hw ".$yaahm_tt->{"clock"};
       $msg .=" $mw"
         if( $mw != 0 );
     }else{
@@ -1877,7 +1919,7 @@ sub YAAHM_checkMonthly($$$) {
   
   my ($ret,$line,$fline,$date);
   my (@lines,@chunks,@tday,@eday,@sday,@tmor,@two);
-  my ($stoday,$stom,$stwom);
+  my ($stoday,$stom,$stwom,$tod);
   my $todaylong = "";
   my $tomlong   = "";
   my $twodaylong= "";
@@ -1899,57 +1941,68 @@ sub YAAHM_checkMonthly($$$) {
       my ($todaydesc,$tomdesc,$twomdesc);
       #-- device of type holiday 
       if( IsDevice( $specialDev, "holiday" )){      
-        $stoday = strftime('%2m-%2d', localtime(time));
-        $stom   = strftime('%2m-%2d', localtime(time+86400));
-        $stwom  = strftime('%2m-%2d', localtime(time+2*86400));
-        my $tod = holiday_refresh( $specialDev, $stoday );
+        $stoday = strftime('%m-%d', localtime(time));
+        $stom   = strftime('%m-%d', localtime(time+86400));
+        $stwom  = strftime('%m-%d', localtime(time+2*86400));
+        $tod = holiday_refresh( $specialDev, $stoday );
         if ( $tod ne "none" ) {
-          $todaydesc = $tod;
-          Log3 $name, 5,"[YAAHM] found today=special date \"$todaydesc\" in holiday $specialDev";
+          $todaydesc .= $tod.",";
+          Log3 $name, 5,"[YAAHM] found today=special date \"$tod\" in holiday $specialDev";
         }
         $tod = holiday_refresh( $specialDev, $stom );
         if ( $tod ne "none" ) {
-          $tomdesc = $tod;
-          Log3 $name, 5,"[YAAHM] found tomorrow=special date \"$tomdesc\" in holiday $specialDev";
+          $tomdesc .= $tod.",";
+          Log3 $name, 5,"[YAAHM] found tomorrow=special date \"$tod\" in holiday $specialDev";
         } 
         $tod = holiday_refresh( $specialDev, $stwom );
         if ( $tod ne "none" ) {
-          $twomdesc = $tod;
-          Log3 $name, 5,"[YAAHM] found twodays=special date \"$twomdesc\" in holiday $specialDev";
+          $twomdesc .= $tod.",";
+          Log3 $name, 5,"[YAAHM] found twodays=special date \"$tod\" in holiday $specialDev";
         } 
       #-- device of type calendar
       }elsif( IsDevice($specialDev, "Calendar" )){
-        $stoday  = strftime('%2d.%2m.%2Y', localtime(time));
-        $stom    = strftime('%2d.%2m.%2Y', localtime(time+86400));
-        $stwom   = strftime('%2d.%2m.%2Y', localtime(time+2*86400));
+        $stoday  = strftime('%d.%m.%Y', localtime(time));
+        $stom    = strftime('%d.%m.%Y', localtime(time+86400));
+        $stwom   = strftime('%d.%m.%Y', localtime(time+2*86400));
         @tday  = split('\.',$stoday);
         @tmor  = split('\.',$stom);
         @two   = split('\.',$stwom);
-        #-- more complicated to check here
-        $fline=Calendar_Get($defs{$specialDev},"get","full","mode=alarm|start|upcoming");
         
+        $fline=Calendar_Get($defs{$specialDev},"get","full","mode=alarm|start|upcoming");
+        #-- more complicated to check here,
+        #   format is '<id> upcoming [<datetoannounce> <timetoannouce>] <datestart> <timestart>-<dateend> <timeend> [<description>]
+        my ($cstart,$cdesc);
+                
         if($fline){
           #chomp($fline);
           @lines = split('\n',$fline);
           foreach $fline (@lines){
             chomp($fline);
             @chunks = split(' ',$fline);
-            @sday   = split('\.',$chunks[4]);
+            if( int(@chunks)>=7 ){
+              $cstart = 4;
+              $cdesc  = 7;
+            }else{
+              $cstart = 2;
+              $cdesc  = 5,
+            }
+            @sday   = split('\.',$chunks[$cstart]);
+            $tod = ($chunks[$cdesc]) ? $chunks[$cdesc] : "???";
             #-- today
             my $rets  = ($sday[2]-$tday[2])*365+($sday[1]-$tday[1])*31+($sday[0]-$tday[0]);
             if( $rets==0 ){
-              $todaydesc = $chunks[7];
-              Log3 $name, 5,"[YAAHM] found today=special date \"$todaydesc\" in calendar $specialDev";
+              $todaydesc .= $tod.",";
+              Log3 $name, 5,"[YAAHM] found today=special date \"$tod\" in calendar $specialDev";
             }    
             $rets  = ($sday[2]-$tmor[2])*365+($sday[1]-$tmor[1])*31+($sday[0]-$tmor[0]);
             if( $rets==0 ){
-              $tomdesc = $chunks[7];
-              Log3 $name, 5,"[YAAHM] found tomorrow=special date \"$tomdesc\" in calendar $specialDev";
+              $tomdesc .= $tod.",";
+              Log3 $name, 5,"[YAAHM] found tomorrow=special date \"$tod\" in calendar $specialDev";
             }
             $rets  = ($sday[2]-$two[2])*365+($sday[1]-$two[1])*31+($sday[0]-$two[0]);
             if( $rets==0 ){
-              $twomdesc = $chunks[7];
-              Log3 $name, 5,"[YAAHM] found twodays=special date \"$twomdesc\" in calendar $specialDev";
+              $twomdesc .= $tod.",";
+              Log3 $name, 5,"[YAAHM] found twodays=special date \"$tod\" in calendar $specialDev";
             }
           }
         }  
@@ -1958,17 +2011,16 @@ sub YAAHM_checkMonthly($$$) {
         
       }
       #-- accumulate descriptions
-      $todaylong .= $todaydesc.','
-        if($todaydesc);
-      $todaylong =~ s/,$//;
-      $tomlong .= $tomdesc.','
-        if($tomdesc);
-      $tomlong =~ s/,$//;
-      $twodaylong .= $twomdesc.','
+      $todaylong .= $todaydesc
+        if($todaydesc);   
+      $tomlong .= $tomdesc
+        if($tomdesc);  
+      $twodaylong .= $twomdesc
         if($twomdesc);
-       $twodaylong =~ s/,$//;
-      
     }
+    $todaylong  =~ s/,$//;
+    $tomlong    =~ s/,$//;
+    $twodaylong =~ s/,$//;
     $hash->{DATA}{"DD"}[0]{"special"} = $todaylong;                        
     $hash->{DATA}{"DD"}[1]{"special"} = $tomlong;                                                 
     #-- put into readings
@@ -2160,8 +2212,8 @@ sub YAAHM_GetDayStatus($) {
   my (@lines,@chunks,@tday,@eday,@sday,@tmor);
   my ($todaydesc,$todaytype,$tomdesc,$tomtype);
   
-  my $stoday  = strftime('%2d.%2m.%2Y', localtime(time));
-  my $stom    = strftime('%2d.%2m.%2Y', localtime(time+86400));
+  my $stoday  = strftime('%d.%m.%Y', localtime(time));
+  my $stom    = strftime('%d.%m.%Y', localtime(time+86400));
   
   #-- workday has lowest priority
   $todaytype = "workday";
@@ -2181,8 +2233,8 @@ sub YAAHM_GetDayStatus($) {
   foreach my $vacdayDev ( split( /,/, $vacdayDevs ) ) {
     #-- device of type holiday 
     if( IsDevice( $vacdayDev, "holiday" )){      
-      $stoday = strftime('%2m-%2d', localtime(time));
-      $stom   = strftime('%2m-%2d', localtime(time+86400));
+      $stoday = strftime('%m-%d', localtime(time));
+      $stom   = strftime('%m-%d', localtime(time+86400));
       my $tod = holiday_refresh( $vacdayDev, $stoday );
       if ( $tod ne "none" ) {
         $todaydesc = $tod;
@@ -2197,8 +2249,8 @@ sub YAAHM_GetDayStatus($) {
       } 
     #-- device of type calendar
     }elsif( IsDevice($vacdayDev, "Calendar" )){
-      $stoday  = strftime('%2d.%2m.%2Y', localtime(time));
-      $stom    = strftime('%2d.%2m.%2Y', localtime(time+86400));
+      $stoday  = strftime('%d.%m.%Y', localtime(time));
+      $stom    = strftime('%d.%m.%Y', localtime(time+86400));
       @tday  = split('\.',$stoday);
       @tmor  = split('\.',$stom);
       #-- more complicated to check here
@@ -2271,8 +2323,8 @@ sub YAAHM_GetDayStatus($) {
   
     #-- device of type holiday 
     if( IsDevice( $holidayDev, "holiday" )){      
-      $stoday = strftime('%2m-%2d', localtime(time));
-      $stom   = strftime('%2m-%2d', localtime(time+86400));
+      $stoday = strftime('%m-%d', localtime(time));
+      $stom   = strftime('%m-%d', localtime(time+86400));
       my $tod = holiday_refresh( $holidayDev, $stoday );
       if ( $tod ne "none" ) {
         $todaydesc = $tod;
@@ -2288,8 +2340,8 @@ sub YAAHM_GetDayStatus($) {
        
     #-- device of type calendar
     }elsif( IsDevice($holidayDev, "Calendar" )){
-      $stoday  = strftime('%2d.%2m.%2Y', localtime(time));
-      $stom    = strftime('%2d.%2m.%2Y', localtime(time+86400));
+      $stoday  = strftime('%d.%m.%Y', localtime(time));
+      $stom    = strftime('%d.%m.%Y', localtime(time+86400));
       $line=Calendar_Get($defs{$holidayDev},"get","text","mode=alarm|start|upcoming");
       if($line){
         chomp($line);
@@ -2416,7 +2468,7 @@ sub YAAHM_sun($) {
   my $strise1 = "";
   my ($msg,$stset0,$stseas0,$stset1,$stseas1);
   
-  $sttoday = strftime('%4Y-%2m-%2d', localtime(time));
+  $sttoday = strftime('%Y-%m-%d', localtime(time));
   
   #-- since the Astro module sometimes gives us strange results, we need to do this more than once
   while( $strise0 !~ /^\d\d:\d\d:\d\d/ && $count < 5){
@@ -2439,7 +2491,7 @@ sub YAAHM_sun($) {
   $stseas0 = Astro_Get($hash,"dummy","text", "ObsSeasonN",$sttoday);
   $hash->{DATA}{"DD"}[0]{"season"}    = $seasons[$stseas0];   
   
-  $sttom = strftime('%4Y-%2m-%2d', localtime(time+86400));
+  $sttom = strftime('%Y-%m-%d', localtime(time+86400));
   $count = 0;
   $msg   = "";
   #-- since the Astro module sometimes gives us strange results, we need to do this more than once
@@ -2596,6 +2648,220 @@ sub YAAHM_sunoffsets($) {
 
 #########################################################################################
 #
+# YAAHM_statewidget - returns SVG code for inclusion into page
+# 
+# Parameter hash = hash of device addressed
+#
+#########################################################################################
+
+sub YAAHM_statewidget($){
+   my ($hash) = @_;
+   
+   my $name = $hash->{NAME};
+   return "" 
+     if( AttrVal($name,"noicons",0) == 1);
+   
+   my $state = $hash->{DATA}{"HSM"}{"state"};
+   my ($color,$locks,$unlocks,$bells,$eyes);
+   if( $state eq "unsecured" ){
+     $color=$csstate[0];
+     $locks="hidden";
+     $unlocks="visible";
+     $bells="hidden";
+     $eyes="hidden";
+  }elsif( $state eq "secured" ){
+     $color=$csstate[1];
+     $locks="visible";
+     $unlocks="hidden";
+     $bells="hidden";
+     $eyes="hidden";
+   }elsif( $state eq "protected" ){
+     $color=$csstate[2];
+     $locks="visible";
+     $unlocks="hidden";
+     $bells="visible";
+     $eyes="hidden";
+   }elsif( $state eq "guarded" ){
+     $color=$csstate[3];
+     $locks="visible";
+     $unlocks="hidden";
+     $bells="visible";
+     $eyes="visible";
+   }else{
+     Log 1,"[YAAHM_statewidget] Error, housestate $state not defined";
+     return;
+   }
+
+   my $ret = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40px" height="40px">';
+   $ret .= '<g transform="translate(5,0)">\n';
+   #-- shield  
+   $ret .='<g transform="scale(0.1,0.1)">\n'.
+          '<path class="hs_is" fill="'.$color.'" d="M179.6,13c0,0-50.1,44.5-146.1,48.5c0,0,13.5,158,50.5,197s95.6,80,95.6,80s78.9-55.5,98.9-81.5 s37.5-75,47-196.5C325.5,60.5,251.8,64,179.6,13z"/>'.
+          '<path style="fill:none;stroke:black;stroke-width:10" d="M179.6,13c0,0-50.1,44.5-146.1,48.5c0,0,13.5,158,50.5,197s95.6,80,95.6,80s78.9-55.5,98.9-81.5 s37.5-75,47-196.5C325.5,60.5,251.8,64,179.6,13z"/></g>'; 
+   #-- small bell
+   $ret .=  '<g class="hs_smb" transform="translate(0,23) scale(0.28,0.28)" visibility="'.$bells.'">\n';
+   $ret .=  '<path d="M 25 6 C 23.354545 6 22 7.3545455 22 9 L 22 10.365234 C 17.172775 11.551105 14.001117 15.612755 14.001953 21.0625 '.
+            'L 14.001953 28.863281 C 14.001953 31.035281 12.718469 33.494563 11.980469 34.726562 L 10.167969 37.445312 C 9.9629687 37.751312 9.9431875 '.
+            '38.147656 10.117188 38.472656 C 10.291188 38.797656 10.631 39 11 39 L 39 39 C 39.369 39 39.708813 38.797656 39.882812 38.472656 C 40.056813 '.
+            '38.147656 40.037031 37.752313 39.832031 37.445312 L 38.044922 34.767578 C 36.668922 32.473578 36 30.587 36 29 L 36 21.199219 C 36 15.68167 '.
+            '32.827303 11.569596 28 10.369141 L 28 9 C 28 7.3545455 26.645455 6 25 6 z M 25 8 C 25.554545 8 26 8.4454545 26 9 L 26 10.044922 C 25.671339 '.
+            '10.019952 25.339787 10 25 10 C 24.660213 10 24.328661 10.020256 24 10.044922 L 24 9 C 24 8.4454545 24.445455 8 25 8 z " fill="black" stroke="black"/>'.
+            '.<path d="M 20.423828 41 C 21.197828 42.763 22.955 44 25 44 C 27.045 44 28.802172 42.763 29.576172 41 L 20.423828 41 z" fill="black"/></g>\n';
+   #-- lock 
+    $ret .= '<g transform="translate(1,-2) scale(0.1,0.1)" visibility="visible" style="fill:black">\n';
+    $ret .= '<path d="M 130.57422 130.58594 C 129.00209 130.6591 127.9626 130.81157 126.67383 131.14062 C 121.6497 132.42339 117.28863 136.02241 114.93164 140.83398 '. 
+            'C 114.02534 142.68411 113.52297 144.27216 113.15234 146.45508 C 113.00288 147.33557 112.9931 149.48213 112.9668 187.17578 C 112.9473 215.14019 '.
+            '112.96786 227.3203 113.03516 228.16016 C 113.33148 231.85916 114.6641 235.33647 116.91797 238.29492 C 117.57258 239.15416 119.29708 240.86998 '.
+            '120.20508 241.56445 C 122.81931 243.56391 125.66412 244.76433 128.79688 245.18945 C 130.22882 245.38381 208.07219 245.39507 209.54102 245.20117 '.
+            'C 217.01971 244.21392 223.13119 238.65732 224.92969 231.21289 C 225.49437 228.87561 225.45703 232.00604 225.45703 187.94336 C 225.45703 161.07427 '.
+            '225.42603 147.57463 225.36523 147.07227 C 225.02812 144.2871 223.98281 141.29331 222.58203 139.10742 C 219.44374 134.21016 214.3933 131.11459 '.
+            '208.72656 130.61328 C 208.60764 130.60277 208.27712 130.59537 208.06445 130.58594 L 191.28711 130.58594 L 191.28711 130.60938 L 169.33203 130.60938 '. 
+            'L 147.37695 130.60938 L 147.37695 130.58594 L 130.57422 130.58594 z M 168.84766 141.69531 C 196.24408 141.67681 207.96833 141.69697 208.37305 141.76367 '. 
+            'C 209.88322 142.01259 211.23437 142.69523 212.37109 143.78125 C 213.56262 144.91963 214.28722 146.23107 214.60742 147.82812 C 214.73627 148.47097 '.
+            '214.74661 152.13826 214.72461 188.36914 L 214.70117 228.20312 L 214.5 228.85352 C 213.61281 231.71117 211.36106 233.77649 208.56055 234.30469 C '.
+            '207.89347 234.43005 204.00466 234.44545 169.125 234.43945 C 131.56507 234.4334 130.40611 234.42765 129.63281 234.26562 C 128.63219 234.05598 127.28912 '. 
+            '233.40183 126.47852 232.73047 C 124.95438 231.46815 123.97606 229.64008 123.74609 227.625 C 123.67879 227.03543 123.65738 215.18032 123.67578 187.48438 '.
+            'L 123.70312 148.18164 L 123.90234 147.47266 C 124.36618 145.82739 125.37129 144.27333 126.59375 143.31055 C 127.28146 142.76892 128.48475 142.14943 '.
+            '129.36719 141.88281 C 129.87599 141.72912 131.53564 141.72051 168.84766 141.69531 z "/>\n'.
+            '<path d="m 168.43291,207.79319 c -2.82175,-0.41393 -5.20902,-2.19673 -6.45085,-4.81746 -0.18456,-0.38949 -0.42714,-1.02683 -0.53907,-1.41632 -0.20211,-0.70332 '.
+            '-0.20369,-0.74985 -0.23134,-6.79219 l -0.0278,-6.08403 -0.4938,-0.46648 c -1.94776,-1.84005 -3.29729,-4.28865 -3.89177,-7.06126 -0.22834,-1.06501 '.
+            '-0.23065,-3.78941 -0.004,-4.90967 0.5504,-2.72228 1.69072,-4.87295 3.59555,-6.78128 1.86685,-1.87027 3.93834,-2.98308 6.53099,-3.50847 1.14974,-0.23298 '.
+            '3.66048,-0.21247 4.804,0.0393 5.18176,1.14065 9.02113,5.15685 9.96535,10.42433 0.21336,1.19023 0.21526,3.4008 0.004,4.5588 -0.4602,2.5216 -1.68503,4.94293 '.
+            '-3.41861,6.75821 -0.69412,0.72682 -0.76553,0.83257 -0.69333,1.02659 0.0464,0.1247 0.0688,2.7301 0.0528,6.15217 -0.027,5.78112 -0.0327,5.95363 -0.22,6.61733 '.
+            '-0.66956,2.3726 -2.29646,4.38412 -4.40661,5.44839 -0.87624,0.44194 -1.4689,0.63145 -2.43431,0.77844 -0.91656,0.13954 -1.37046,0.14668 -2.14096,0.0337 l 0,0 z"/></g>\n'; 
+    $ret .= '<g class="hs_unlocked" transform="translate(1,-2) scale(0.1,0.1)" visibility="'.$unlocks.'" style="fill:black">\n';
+    $ret .= '<path d="M 170.82812 73.273438 C 169.18654 73.276141 168.63971 73.313421 167.69531 73.492188 C 165.61131 73.886674 163.21555 74.79455 161.46875 75.849609 '.
+            'C 159.08962 77.286589 156.84235 79.476504 155.35742 81.806641 C 154.71611 82.812977 143.83472 103.12552 143.69141 103.58398 C 143.32362 104.76045 143.9985 '.
+            '106.3 145.13867 106.88867 C 145.89649 107.27994 146.17527 107.28572 149.68359 106.98633 C 153.46023 106.66405 153.66989 106.60755 154.45508 105.72266 C '.
+            '154.74018 105.40138 156.38998 102.44246 159.67383 96.359375 C 164.73578 86.982504 164.89996 86.708871 166.08984 85.746094 C 168.20634 84.033559 171.35111 '.
+            '83.652548 173.67188 84.828125 C 175.01748 85.50974 200.19425 99.256274 200.56836 99.513672 C 201.52002 100.16843 202.5089 101.37978 203 102.49023 C 203.13162 '.
+            '102.78785 203.32969 103.40656 203.43945 103.86523 C 203.70946 104.99358 203.65191 106.59046 203.30273 107.66992 C 203.08072 108.35626 193.2629 127.83267 '.
+            '192.83203 128.44141 L 192.7168 128.60352 L 204.32227 128.60352 C 204.34489 128.54135 206.0865 125.32409 208.24219 121.36133 C 210.41184 117.37291 212.41514 '. 
+            '113.62986 212.69531 113.04297 C 216.53579 104.99821 213.90717 95.127045 206.625 90.25 C 205.84937 89.730545 181.06362 76.260203 178.6582 75.050781 C 177.5495 '.
+            '74.493339 176.37806 74.054405 175.24219 73.771484 C 173.49309 73.335818 172.90843 73.270038 170.82812 73.273438 z"/></g>\n';
+    $ret .= '<g class="hs_locked" transform="translate(1,-2) scale(0.1,0.1)" visibility="'.$locks.'" style="fill:black">\n';
+    $ret .= '<path d="M 169.33398 90.152344 C 161.36399 90.152344 153.39548 90.185221 152.80078 90.25 C 145.74301 91.018795 139.82758 95.841827 137.60547 102.63867 C '.
+            '137.17355 103.9598 136.90608 105.2186 136.76367 106.60938 C 136.70267 107.20469 136.66992 111.55655 136.66992 119.02344 L 136.66992 130.49805 L 147.37695 '.
+            '130.49805 L 147.40234 118.94727 L 147.42773 107.28516 L 147.62109 106.60352 C 148.34477 104.05797 150.12767 102.25431 152.73633 101.42969 L 153.5332 101.17773 '. 
+            'L 169.24609 101.17773 L 184.95898 101.17773 L 185.70703 101.37695 C 186.11913 101.48679 186.71238 101.69727 187.02539 101.84375 C 189.21729 102.86946 190.84344 '.
+            '105.12709 191.19141 107.62891 C 191.25571 108.09078 191.28711 111.96821 191.28711 119.46289 L 191.28711 130.49805 L 201.99805 130.49805 L 201.99805 119.11719 C '.
+            '201.99805 111.72973 201.9653 107.37447 201.9043 106.74805 C 201.77551 105.42445 201.44824 103.83653 201.06445 102.67773 C 200.64348 101.40669 199.67547 99.408912 '.
+            '198.95703 98.326172 C 195.91418 93.74044 191.20002 90.830687 185.86914 90.25 C 185.27445 90.185221 177.30398 90.152344 169.33398 90.152344 z"/></g>\n';
+    #-- eye
+    $ret .= '<g class="hs_eye" transform="translate(18,24) scale(0.014,0.014)" visibility="'.$eyes.'" style="fill:black">\n';
+    $ret .= '<path d="M493.6,794C196.9,794,10,576.3,10,518.6C10,460.8,196.9,206,493.6,206C790.2,206,990,444,990,518.6C990,593.1,790.2,794,493.6,794z M480.2,368.2c-43.3,0-78.4,'.
+            '36.3-78.4,81c0,44.7,35.1,81,78.4,81c43.3,0,78.4-36.3,78.4-81C558.6,404.4,523.5,368.2,480.2,368.2z M715.6,327.7c28.6,39.3,48,79.2,48,132.1c0,129.9-102.1,235.2-228.1,'.
+            '235.2c-125.9,0-228-105.3-228-235.2c0-80.3,15.4-130.2,74.9-172.7C194.4,316,76,472.2,76,514.9c0,46.8,155.7,217.2,414.2,217.2c258.5,0,427.8-156.8,427.8-217.2C918,475.6,'.
+            '873.8,393.3,715.6,327.7z"/></g>\n';
+   $ret .=  '</g></svg>';
+   
+   return $ret
+}
+
+
+#########################################################################################
+#
+# YAAHM_modewidget - returns SVG code for inclusion into page
+# 
+# Parameter hash = hash of device addressed
+#
+#########################################################################################
+
+sub YAAHM_modewidget($){
+   my ($hash) = @_;
+   
+   my $name = $hash->{NAME};
+   return "" 
+     if( AttrVal($name,"noicons",0) == 1);
+   
+   my $mode = $hash->{DATA}{"HSM"}{"mode"};
+   my ($color,$normals,$absents,$partys,$dnds);
+   if( $mode eq "normal" ){
+     $color=$csmode[0];
+     $normals="visible";
+     $partys="hidden";
+     $absents="hidden";
+     $dnds="hidden";
+  }elsif( $mode eq "party" ){
+     $color=$csmode[1];
+     $normals="hidden";
+     $partys="visible";
+     $absents="hidden";
+     $dnds="hidden";
+   }elsif( $mode eq "absence" ){
+     $color=$csmode[2];
+     $normals="hidden";
+     $partys="hidden";
+     $absents="visible";
+     $dnds="hidden";
+   }elsif( $mode eq "donotdisturb" ){
+     $color=$csmode[3];
+     $normals="hidden";
+     $partys="hidden";
+     $absents="hidden";
+     $dnds="visible";
+   }else{
+     Log 1,"[YAAHM_modewidget] Error, housemode $mode not defined";
+     return;
+   }
+
+   my $ret = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40px" height="40px">';
+   $ret .= ' <g transform="translate(6,5) scale(0.8,0.8)">';
+   $ret .= ' <circle class="hm_is" r="20" cx="20" cy="20" fill="'.$color.'" stroke="none"/>'.
+           ' <circle r="20" cx="20" cy="20" style="fill:none;stroke:black"/>';
+   $ret .= ' <g class="hm_n" transform="translate(0,-6) scale(0.08,0.08)" style="fill:black" visibility="'.$normals.'">'.
+           '<path d="m 313.166,240.194 c 16.213,0 29.35,-13.139 29.35,-29.351 0,-16.213 -13.137,-29.351 -29.35,-29.351 -16.214,0 -29.351,13.138 -29.351,29.351 0,16.212 13.137,29.351 29.351,29.351 z"/>'.
+           '<path d="m 346.165,252.835 c -1.794,-4.361 -6.008,-6.992 -10.449,-6.989 -0.034,-0.002 -0.069,-0.005 -0.103,-0.005 l -44.897,0 c -0.05,0 -0.099,0.005 -0.148,0.007 -4.462,-0.026 -8.704,2.607 '.
+           '  -10.506,6.987 l -34.027,82.713 -34.013,-82.677 c -1.156,-2.809 -4.349,-7.03 -10.858,-7.03 0,0 -33.673,0 -44.897,0 -0.041,0 -0.081,0.005 -0.121,0.006 -4.446,0.057 -8.666,2.623 -10.463,6.989 '.
+           '  l -41.854,101.739 c -2.371,5.764 0.379,12.359 6.143,14.73 1.405,0.578 2.859,0.852 4.289,0.852 4.438,0 8.647,-2.636 10.441,-6.995 l 18.433,-44.807 0,7.792 -21.053,65.773 c -3.541,11.061 '.
+           '  4.711,22.368 16.326,22.368 l 4.727,0 0,52.187 c 0,8.382 6.944,15.141 15.393,14.841 8.047,-0.287 14.308,-7.145 14.308,-15.197 l 0,-51.831 11.758,0 0,52.187 c 0,8.381 6.943,15.141 '.
+           '  15.392,14.841 8.048,-0.286 14.309,-7.145 14.309,-15.197 l 0,-51.83 4.727,0 c 11.614,0 19.866,-11.307 16.326,-22.368 l -21.053,-65.773 0,-8.423 18.707,45.473 c 1.793,4.359 '.
+           '  6.003,6.995 10.441,6.995 0.887,0 1.782,-0.119 2.671,-0.337 0.84,0.194 1.687,0.301 2.525,0.301 4.438,0 8.647,-2.636 10.441,-6.995 l 18.504,-44.979 0,148.292 c 0,8.382 6.944,15.141 '. 
+           '  15.393,14.841 8.047,-0.287 14.308,-7.145 14.308,-15.197 l 0,-80.144 c 0,-3.132 2.363,-5.866 5.488,-6.068 3.424,-0.221 6.27,2.49 6.27,5.866 l 0,80.701 c 0,8.381 6.944,15.141 15.392,14.841 '. 
+           '  8.048,-0.286 14.309,-7.145 14.309,-15.197 l 0,-147.689 18.402,44.732 c 1.793,4.359 6.003,6.995 10.441,6.995 1.43,0 2.885,-0.274 4.29,-0.852 5.764,-2.371 8.514,-8.966 6.143,-14.73 L '.
+           '  346.165,252.835 Z"/>'.
+           '<path d="m 178.716,240.194 c 16.213,0 29.35,-13.139 29.35,-29.351 0,-16.213 -13.137,-29.351 -29.35,-29.351 -16.214,0 -29.351,13.138 -29.351,29.351 0,16.212 13.138,29.351 29.351,29.351 z"/></g>';
+   $ret .= '<g class="hm_a" transform="translate(2.5,0) scale(0.125,0.125)" style="fill:black" visibility="'.$absents.'">'.
+           '<path d="M59.717,110.045L53.353,98.45c-6.704,3.681-13.257,7.81-19.482,12.274l7.711,10.746     C47.376,117.315,53.476,113.47,59.717,110.045z" />'.
+           '<path d="M99.411,94.105l-3.415-12.779c-7.389,1.975-14.738,4.424-21.841,7.277l4.929,12.274     C85.699,98.22,92.535,95.943,99.411,94.105z" />'.
+           '<path d="M230.536,95.09c-6.834-3.415-13.958-6.452-21.186-9.029l-4.44,12.459c6.726,2.396,13.356,5.222,19.714,8.401     L230.536,95.09z" />'.
+           '<path d="M285.464,136.504l-9.739,8.943c4.823,5.251,9.373,10.85,13.528,16.632L300,154.368     C295.538,148.152,290.649,142.14,285.464,136.504z" />'.
+           '<path d="M243.18,117.654c5.932,3.935,11.694,8.28,17.115,12.909l8.588-10.059c-5.826-4.977-12.016-9.646-18.398-13.874     L243.18,117.654z" />'.
+           '<path d="M0,141.823l10.054,8.593c4.629-5.416,9.64-10.605,14.888-15.422l-8.943-9.741C10.358,130.426,4.977,136.003,0,141.823z" />'.
+           '<path d="M106.286,100.191l6.644,0.004l8.061-12.223l25.91,0.181l-11.593,39.963c0,1.166,0.948,2.116,2.114,2.116h10.66     l22.266-41.295l20.437,0.679c5.817,0,10.524-4.455,'.
+           '   10.524-9.951c0.004-5.491-4.711-9.946-10.519-9.946l-20.589,0.688     l-22.117-41.023l-10.665-0.002c-1.166,0.002-2.114,0.952-2.114,2.118l11.513,39.685l-25.97,'.
+           '   0.225l-7.923-11.987l-6.644,0.002     c-0.884,0-1.598,0.712-1.598,1.594v37.582C104.688,99.479,105.404,100.196,106.286,100.191z" />'.
+           '<path d="M171.31,150.616c-8.657-1.973-17.503-2.974-26.307-2.974c-55.361,0-102.631,37.757-114.949,91.814     c-2.361,10.361-3.28,20.82-2.863,31.161h13.237v-0.003c-0.425-9.353,'.
+           ' 0.379-18.823,2.515-28.201     c4.329,1.122,23.682,6.492,23.067,12.719c-0.518,5.222-2.198,11.17-0.8,15.481h12.166c1.671-1.217,3.282-1.797,4.858-0.139     c0.042,0.046,0.097,'.
+           '  0.093,0.141,0.139h96.071c-22.612-14.403-25.811-39.848-25.811-39.848c-1.596-0.694,2.969-18.768-4.14-20.939     c-7.12-2.169-11.608-0.43-21.691-4.929'.
+           '  c-10.096-4.499-6.316-10.786-4.658-25.789c0.708-6.402,2.337-12.133,4.413-16.636     c5.998-1.056,12.159-1.607,18.442-1.607c7.812,0,15.678,0.888,23.373,2.641c27.292,6.216,'.
+           ' 50.529,22.69,65.43,46.38     c11.233,17.864,16.705,38.217,16.059,58.848c-0.864,0.628-1.792,1.254-2.762,1.883h15.907     c1.049-23.743-5.088-47.224-18.01-67.771C228.221,'.
+           ' 176.164,202.05,157.617,171.31,150.616z" /></g>';
+   $ret .= '<g class="hm_p" transform="translate(7,4) scale(0.027,0.027)" style="fill:black" visibility="'.$partys.'">'.
+            '<path d="M64.6,951.8l114.8,36.8c16.1,5.1,33.2-3.7,38.5-19.8l0,0c5.1-16.1-3.7-33.2-19.8-38.5l-26.2-8.4l47.9-147.1c-10.3-1.8-20.5-4.3-30.5-7.5c-10.9-3.5-21.3-7.7-31.3-12.7l-48,'.
+            '  147.4l-26.5-8.5c-16.1-5.1-33.2,3.7-38.5,19.8l0,0C39.7,929.4,48.5,946.6,64.6,951.8z" />'.
+            '<path d="M167.2,725.7c26.3,13.8,61,22.3,90.8,22.3c58.8,0,115.7-27.5,152.3-73.6c33.4-42,43.9-96,52.9-147.6c4.7-27.1,20.8-142.7,21.4-152.9c0.5-8.4,'.
+            '  1.3-19.4-3-26.9c-3.7-6.7-10-11.8-17.3-14.1l-246.9-79c-3.1-1-6.2-1.5-9.3-1.5c-10.9,0-21.2,5.8-26.7,15.7c-31.4,56.6-62.7,113.8-88.9,173C78,473.2,64.9,506.3,63,'.
+            '  541.9c-1.7,29.8,3.7,60,15.4,87.4C96,670.5,127.5,704.9,167.2,725.7z M222.6,319.7l199,63.7c-9.8,82.7-19.7,145.2-28.9,183.5l-95.5-30.5l-62-19.8l-95.5-30.5C154.4,449.3,'.
+            '  182.6,392.8,222.6,319.7z" />'.
+            '<path d="M916.8,893.5l-26.5,8.5l-48-147.4c-10,4.9-20.4,9.2-31.3,12.7c-10,3.2-20.2,5.7-30.5,7.5l47.9,147l-26.2,8.4c-16.1,5.1-24.9,22.3-19.8,38.5l0,0c5.1,16.1,22.3,24.9,38.5,'.
+            '  19.8l114.8-36.8c16.1-5.1,24.9-22.3,19.8-38.5l0,0C950.1,897.2,932.9,888.4,916.8,893.5z" />'.
+            '<path d="M515.2,355.5c-0.7,3.1-0.9,6.4-0.5,9.8c0.1,1.2,15.4,132,28.5,195.1c7,34,15.8,67.9,34.7,97.4c15.9,24.9,37.5,46.1,62.7,61.4c30.4,18.6,65.8,28.6,101.5,28.6c20.2,0,'.
+            '  40.5-3.2,59.7-9.3c10.9-3.5,21.2-7.8,31-13c52.9-27.6,90.7-79.6,101.4-138.2c11.3-62.4-13.8-120.8-40.2-175.8c-23.4-48.8-49.2-96.3-75.4-143.6c-5.5-9.9-15.8-15.7-26.7-15.7c-3.1,'.
+            '  0-6.2,0.5-9.3,1.5l-246.9,79C525.1,336.2,517.5,345,515.2,355.5z M777.4,319.7c40.1,73.1,68.3,129.6,83,166.1l-95.5,30.5l-62,19.8l-95.5,30.5c-9.2-38.3-19.1-100.6-28.9-183.5L777.4,319.7z" /></g>';           
+    $ret .= '<g class="hm_dnd" transform="translate(8,8) scale(0.05,0.05)" style="fill:white" visibility="'.$dnds.'">'.
+            '<path d="M471,330v82h41V289H41V121c0-5.336-2-10.169-6-14.5c-4-4.333-8.833-6.5-14.5-6.5 S10,102.167,6,106.5s-6,9.167-6,14.5v291h41v-82H471z"/>'.
+            '<path d="M105.5,205c10.333,0,19.333-3.667,27-11c7.667-7.334,11.5-16.168,11.5-26.5     c0-10.335-3.833-19.168-11.5-26.5c-7.667-7.333-16.667-11-27-11s-19.167,3.667-26.5,11s-11,'.
+             ' 16.167-11,26.5s3.667,19.167,11,26.5     C86.333,201.333,95.167,205,105.5,205z"/>'.
+            '<path d="M512,258v-50c0-8-2.833-14.5-8.5-19.5c-5.67-5-12.837-8.167-21.5-9.5l-297-29h-2 c-5.333,0-9.833,1.833-13.5,5.5s-5.5,8.167-5.5,13.5v58H88c-12.667,0-19,5.167-19,'.
+            '  15.5S75.333,258,88,258H512z"/></g></g>';
+    $ret .=  '</svg>';
+   
+   return $ret 
+ }          
+            
+#########################################################################################
+#
 # YAAHM_timewidget - returns SVG code for inclusion into any room page
 #
 # Parameter name = name of the YAAHM definition
@@ -2613,11 +2879,7 @@ sub YAAHM_timewidget($){
   $FW_RET="";
   FW_pO '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="'.$size[0].'px" height="'.$size[1].'px">';
  
-  my $hash = $defs{$name};
-	         # Midnight = 0  200
-	         # Noon     = 0 -200
-	         # hh:mm    =>  a = (hh*60 + mm)/1140
-	         
+  my $hash = $defs{$name};	         
   my $radius    = 250;
   
   my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
@@ -2629,6 +2891,7 @@ sub YAAHM_timewidget($){
   my $t_sunrise  = defined($hash->{DATA}{"DD"}[0]{"sunrise"}) ? $hash->{DATA}{"DD"}[0]{"sunrise"} : "06:00";
   $t_sunrise     =~ s/^0//;
   ($hour,$min) = split(":",$t_sunrise);
+  my $sr         = $hour + $min*60;
   my $a_sunrise  = (60*$hour + $min)/1440 * 2 * pi;
   my $x_sunrise  = -int(sin($a_sunrise)*$radius*100)/100;
   my $y_sunrise  =  int(cos($a_sunrise)*$radius*100)/100;
@@ -2636,6 +2899,7 @@ sub YAAHM_timewidget($){
   my $t_morning  = defined($hash->{DATA}{"DT"}{"morning"}[0]) ? $hash->{DATA}{"DT"}{"morning"}[0] : "08:00";
   $t_morning     =~ s/^0//;
   ($hour,$min) = split(":",$t_morning);
+  my $mo         = $hour + $min*60;
   my $a_morning  = (60*$hour + $min)/1440 * 2 * pi;
   my $x_morning  = -int(sin($a_morning)*$radius*100)/100;
   my $y_morning  =  int(cos($a_morning)*$radius*100)/100;
@@ -2657,6 +2921,7 @@ sub YAAHM_timewidget($){
   my $t_sunset  = defined($hash->{DATA}{"DD"}[0]{"sunset"}) ? $hash->{DATA}{"DD"}[0]{"sunset"} : "18:00";
   $t_sunset     =~ s/^0//;
   ($hour,$min) = split(":",$t_sunset);
+  my $ss         = $hour + $min*60;
   my $a_sunset  = (60*$hour + $min)/1440 * 2 * pi;
   my $x_sunset  = -int(sin($a_sunset)*$radius*100)/100;
   my $y_sunset  =  int(cos($a_sunset)*$radius*100)/100;
@@ -2664,6 +2929,7 @@ sub YAAHM_timewidget($){
   my $t_evening  = defined($hash->{DATA}{"DT"}{"evening"}[0]) ? $hash->{DATA}{"DT"}{"evening"}[0] : "19:00";
   $t_evening     =~ s/^0//;
   ($hour,$min) = split(":",$t_evening);
+  my $ev         = $hour + $min*60;
   my $a_evening  = (60*$hour + $min)/1440 * 2 * pi;
   my $x_evening  = -int(sin($a_evening)*$radius*100)/100;
   my $y_evening  =  int(cos($a_evening)*$radius*100)/100;
@@ -2706,13 +2972,15 @@ sub YAAHM_timewidget($){
   FW_pO 	 '<path d="M 0 0 '.$x_midnight.' '.$y_midnight. ' A '.$radius.' '.$radius.' 0 0 1 '.$x_sunrise.' '. $y_sunrise. ' Z" fill="rgb(70,70,100)"/>'; 
     
   #-- sunrise to morning sector
-  FW_pO 	 '<path d="M 0 0 '.$x_sunrise.' '.$y_sunrise.' A '.$radius.' '.$radius.' 0 0 1 '.$x_morning.' '.$y_morning.' Z" fill="url(#grad2)"/>';
+  my $dir = ( $sr < $mo ) ? 0 : 1;
+  FW_pO 	 '<path d="M 0 0 '.$x_sunrise.' '.$y_sunrise.' A '.$radius.' '.$radius.' 0 0 '.$dir.' '.$x_morning.' '.$y_morning.' Z" fill="url(#grad2)"/>';
   
   #-- morning to evening sector
   FW_pO 	 '<path d="M 0 0 '.$x_morning.' '.$y_morning.' A '.$radius.' '.$radius.' 0 0 1 '.$x_evening.' '.$y_evening.' Z" fill="url(#grad1)"/>';
   
   #-- evening to sunset sector
-  FW_pO 	 '<path d="M 0 0 '.$x_evening.' '.$y_evening.' A '.$radius.' '.$radius.' 0 0 1 '.$x_sunset.' '.$y_sunset.' Z" fill="url(#grad2)"/>';
+  $dir = ( $ss < $ev ) ? 1 : 0;
+  FW_pO 	 '<path d="M 0 0 '.$x_evening.' '.$y_evening.' A '.$radius.' '.$radius.' 0 0 '.$dir.' '.$x_sunset.' '.$y_sunset.' Z" fill="url(#grad2)"/>';
   
   #-- midnight line
   FW_pO 	 '<line x1="0" y1="0" x2="0" y2="'.($radius*1.2).'" style="stroke:rgb(75, 75, 75);stroke-width:2" />';
@@ -2798,6 +3066,9 @@ sub YAAHM_toptable($){
     #--
     $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/yaahm.js\"></script><script type=\"text/javascript\">\n";
     
+    $ret .= "var csmode = [\"".$csmode[0]."\",\"".$csmode[1]."\",\"".$csmode[2]."\",\"".$csmode[3]."\"];";
+    $ret .= "var csstate = [\"".$csstate[0]."\",\"".$csstate[1]."\",\"".$csstate[2]."\",\"".$csstate[3]."\"];";
+    
     $ret .= "var dailyno     = ".$dailyno.";\n";
     $ret .= "var dailykeys   = [\"".join("\",\"",(sort YAAHM_dsort keys %dailytable))."\"];\n";
     
@@ -2810,16 +3081,18 @@ sub YAAHM_toptable($){
       $ret .= "\"".$hash->{DATA}{"WT"}[$i]{"name"}."\"";
     }
     $ret .= "];\n";
-
     $ret .= "</script>\n";
-  
+    $ret .= "<div informId=\"$name-housestate\" style=\"display:none\" id=\"hid_hs\">".ReadingsVal($name,"housestate",undef)."</div>".
+            "<div informId=\"$name-housemode\" style=\"display:none\" id=\"hid_hm\">".ReadingsVal($name,"housemode",undef)."</div>";
     $ret .= "<table class=\"roomoverview\">\n";
-    $ret .= "<tr><td colspan=\"3\"><div class=\"devType\" style=\"font-weight:bold\">".$yaahm_tt->{"action"}."</div></td></tr>\n";
+    $ret .= "<tr><td colspan=\"3\"><div class=\"devType\" style=\"font-weight:bold\">".$yaahm_tt->{"action"}.
+      "</div> <div informId=\"$name-tr_errmsg\" class=\"devType\" style=\"font-weight:normal\">".ReadingsVal($name,"tr_errmsg",undef)."</div></td></tr>\n";
     
     ### action ################################################################################################
     #-- determine columns 
-    my $cols = max(int(@modes),int(@states),$weeklyno);
-    $ret .= "<tr><td colspan=\"3\" style=\"align:left\"><table class=\"readings\" style=\"border:1px solid gray;border-radius:10px>".
+    my $cols = max(max(int(@modes),int(@states)),$weeklyno);
+    $ret .= "<tr><td colspan=\"3\" style=\"align:left\"><table class=\"readings\" style=\"border:1px solid gray;border-radius:10px\">".
+            "<tr><td rowspan=\"2\" height=\"40\" valign=\"bottom\" id=\"wid_hm\">".YAAHM_modewidget($hash)."</td><td colspan=\"5\" height=\"20\"></td></tr>".
             "<tr class=\"odd\"><td width=\"100px\" class=\"dname\" style=\"padding:5px;\">".$yaahm_tt->{"mode"}."</td>".
             "<td width=\"120px\"><div class=\"dval\" informId=\"$name-tr_housemode\">".ReadingsVal($name,"tr_housemode",undef)."</div></td><td></td>";
             for( my $i=0; $i<$cols; $i++){
@@ -2831,7 +3104,8 @@ sub YAAHM_toptable($){
               }
             }
     $ret .= "</tr>";
-    $ret .= "<tr class=\"even\"><td class=\"dname\" style=\"padding:5px;\">".$yaahm_tt->{"state"}."</td>".
+    $ret .= "<tr class=\"even\"><td rowspan=\"2\" height=\"40\" id=\"wid_hs\">".YAAHM_statewidget($hash)."</td>".
+            "<td class=\"dname\" style=\"padding:5px;\">".$yaahm_tt->{"state"}."</td>".
             "<td><div informId=\"$name-tr_housestate\">".ReadingsVal($name,"tr_housestate",undef).
             "</div></td><td style=\"width:20px\"><div informId=\"$name-sym_housestate\" style=\"align:center\">".ReadingsVal($name,"sym_housestate",undef)."</div></td>";
             for( my $i=0; $i<$cols; $i++){
@@ -2843,13 +3117,13 @@ sub YAAHM_toptable($){
               }
             }
             #style=\"height:20px;border-bottom: 10px solid #333333;background-image: linear-gradient(#e5e5e5,#ababab);\"
-    #$ret .= "</tr><tr><td colspan=\"8\" class=\"devType\" style=\"height:5px;border-top: 1px solid #ababab;border-bottom: 1px solid #ababab;\"></td></tr>";
+    $ret .= "</tr><td colspan=\"5\" height=\"20\"></td></tr>";
     $ret .= "</table><br/><table class=\"readings\">"; 
       
     #-- repeat manual next for every weekly table  
     my $nval  = "";
     my $wupn;
-    $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"padding:5px;border-left:1px solid gray;border-top:1px solid gray;border-bottom:1px solid gray;border-bottom-left-radius:10px;border-top-left-radius:10px\">".$yaahm_tt->{"manual"}."</td>";
+    $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"padding:5px; border-left: 1px solid gray; border-top:1px solid gray; border-bottom:1px solid gray; border-bottom-left-radius:10px; border-top-left-radius:10px;\">".$yaahm_tt->{"manual"}."</td>";
     for (my $i=0;$i<$weeklyno;$i++){
       if($i<$weeklyno-1){
         $styl= "border-bottom:1px solid gray;border-top:1px solid gray";
@@ -3183,7 +3457,7 @@ sub YAAHM_Longtable($){
       }
       $ass =  ( defined($hash->{DATA}{"WT"}[$i]{"acti_d"}) ) ? $hash->{DATA}{"WT"}[$i]{"acti_d"} : "";
       for( my $j=0;$j<int(@profday);$j++ ){
-        $acc = $profday[$i];
+        $acc = $profday[$j];
         $acc = ( $ass =~ /.*$acc.*/ ) ? " checked=\"checked\"" : "";
         $asg .= sprintf("<input type=\"checkbox\" name=\"acti_%d_d\"  value=\"".$profday[$j]."\" $acc/>&nbsp;",$i);
       }
@@ -3237,7 +3511,7 @@ sub YAAHM_Longtable($){
       }
       $ret .= "</tr>\n";
     }    
-    $ret .= "</table></td></tr></tr>";
+    $ret .= "</table></td></tr>";
     
     #-- complete the code of the page
 	$ret .= "</table>";
@@ -3256,6 +3530,7 @@ sub YAAHM_Longtable($){
 
    <a name="YAAHM"></a>
         <h3>YAAHM</h3>
+        <ul>
         <p> Yet Another Auto Home Module to set up a cyclic processing of commands (daily, weekly, monthly, yearly profile)</p>
           <a name="YAAHMusage"></a>
         <h4>Usage</h4>
@@ -3380,7 +3655,14 @@ sub YAAHM_Longtable($){
                 means that yaahm setups may be changed</li>
             <li><a name="yaahm_simulation"><code>attr &lt;name&gt; simulation
                     0|1</code></a>
-                <br />a value of 1 means that commands will not be executed, but only simulated</li>
+                <br />a value of 1 means that commands issued directly on the device as "set ... " will not be executed, but only simulated. Does <i>not</i> prevent the button 
+                click commands from the interactive web page to be executed.</li>
+            <li><a name="yaahm_noicons"><code>attr &lt;name&gt; noicons
+                    0|1</code></a>
+                <br />when set to 1, animated icons are suppressed</li>
+            <li><a name="yaahm_colorscheme"><code>attr &lt;name&gt; colorscheme
+                    1|2</code></a>
+                <br />color scheme for the icons</li>
             <li><a name="yaahm_timehelper"><code>attr &lt;name&gt; timeHelper &lt;name of perl program&gt;</code></a>
                 <br />name of a perl function that is called at each time step of the daily profile and for the two default weekly profiles</li>
             <li><a name="yaahm_modehelper"><code>attr &lt;name&gt; modeHelper &lt;name of perl program&gt;</code></a>
@@ -3419,11 +3701,14 @@ sub YAAHM_Longtable($){
                 <br />list of devices that provide special date information (like e.g. garbage collection). The devices may be 
                 <a href="#holiday">holiday devices</a> or <a href="#Calendar">Calendar devices</a></li>
         </ul>
+        </ul>
 =end html
 =begin html_DE
 
 <a name="YAAHM"></a>
 <h3>YAAHM</h3>
+<ul>
 <a href="https://wiki.fhem.de/wiki/Modul_YAAHM">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#YAAHM">YAAHM</a> 
+</ul>
 =end html_DE
 =cut
