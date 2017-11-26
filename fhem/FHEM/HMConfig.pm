@@ -967,6 +967,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
                          ,CtOff           =>1,CtDlyOff        =>1
                          ,lgMultiExec     =>1,shMultiExec     =>1
                          }
+ ,rgb                 =>{ intKeyVisib     =>1,localResDis     =>1}
 );
 #clones - - - - - - - - - - - - - - -
 $culHmRegType{pushButton}     = $culHmRegType{remote};
