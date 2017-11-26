@@ -1,4 +1,4 @@
-REV 15496
+REV 15501
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -60,7 +60,7 @@ UPD 2017-05-29_07:45:02 42786 FHEM/02_RSS.pm
 UPD 2015-07-28_14:05:31 4741 FHEM/09_BS.pm
 UPD 2017-11-13_07:45:02 17489 FHEM/09_CUL_FHTTK.pm
 UPD 2015-07-28_14:05:31 6665 FHEM/09_USF1000.pm
-UPD 2017-11-24_13:28:19 561932 FHEM/10_CUL_HM.pm
+UPD 2017-11-26_07:45:02 561038 FHEM/10_CUL_HM.pm
 UPD 2015-07-28_14:05:31 15566 FHEM/10_CUL_IR.pm
 UPD 2017-04-24_07:45:02 16860 FHEM/10_DUOFERNSTICK.pm
 UPD 2016-04-26_07:45:11 44589 FHEM/10_EIB.pm
@@ -406,7 +406,7 @@ UPD 2016-10-04_07:45:12 57237 FHEM/95_Dashboard.pm
 UPD 2017-03-20_07:45:03 62531 FHEM/95_FLOORPLAN.pm
 UPD 2015-07-28_14:05:31 11755 FHEM/95_PachLog.pm
 UPD 2017-10-09_07:45:03 63621 FHEM/95_PostMe.pm
-UPD 2017-11-14_07:45:02 137936 FHEM/95_YAAHM.pm
+UPD 2017-11-26_07:45:02 160604 FHEM/95_YAAHM.pm
 UPD 2017-11-16_07:45:02 18115 FHEM/95_holiday.pm
 UPD 2016-02-05_07:45:11 21301 FHEM/95_remotecontrol.pm
 UPD 2017-10-31_07:45:03 64813 FHEM/96_SIP.pm
@@ -652,8 +652,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-11-25_07:45:04 3174851 docs/commandref.html
-UPD 2017-11-25_07:45:05 1883557 docs/commandref_DE.html
+UPD 2017-11-26_07:45:04 3175384 docs/commandref.html
+UPD 2017-11-26_07:45:05 1883568 docs/commandref_DE.html
 UPD 2017-11-02_07:45:02 73662 docs/commandref_frame.html
 UPD 2017-11-12_07:45:02 82778 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
@@ -1170,7 +1170,7 @@ UPD 2015-07-28_14:05:34 9539 www/images/default/ws_WNW_kl.png
 UPD 2015-07-28_14:05:34 9522 www/images/default/ws_WSW_kl.png
 UPD 2015-07-28_14:05:34 9478 www/images/default/ws_W_kl.png
 UPD 2016-12-31_07:45:02 59588 www/images/fhemSVG/Botvac_VR200.svg
-UPD 2017-11-14_07:45:02 58448 www/images/fhemSVG/DIN_rail_housing.svg
+UPD 2017-11-26_07:45:02 58372 www/images/fhemSVG/DIN_rail_housing.svg
 UPD 2017-11-14_07:45:02 14088 www/images/fhemSVG/HutschIcon3.svg
 UPD 2015-07-28_14:05:32 2027 www/images/fhemSVG/IR.svg
 UPD 2015-07-28_14:05:32 3699 www/images/fhemSVG/Icon_Fisch.svg
@@ -1188,7 +1188,7 @@ UPD 2017-11-14_07:45:02 1811 www/images/fhemSVG/ampel_aus.svg
 UPD 2017-11-14_07:45:02 2095 www/images/fhemSVG/ampel_gelb.svg
 UPD 2017-11-14_07:45:02 2084 www/images/fhemSVG/ampel_gruen.svg
 UPD 2017-11-14_07:45:02 2097 www/images/fhemSVG/ampel_rot.svg
-UPD 2017-08-28_07:45:02 643 www/images/fhemSVG/aurora.svg
+UPD 2017-11-26_07:45:02 696 www/images/fhemSVG/aurora.svg
 UPD 2015-08-11_07:45:11 1801 www/images/fhemSVG/awning.off.svg
 UPD 2015-08-11_07:45:11 1794 www/images/fhemSVG/awning.svg
 UPD 2015-07-28_14:05:32 11079 www/images/fhemSVG/bag.svg
@@ -1256,7 +1256,7 @@ UPD 2015-08-10_07:45:11 34356 www/images/fhemSVG/fts_sunblind_80.svg
 UPD 2015-08-10_07:45:11 33264 www/images/fhemSVG/fts_sunblind_90.svg
 UPD 2015-07-28_14:05:32 1650 www/images/fhemSVG/fts_window_1wbb_open.svg
 UPD 2017-11-14_07:45:02 5430 www/images/fhemSVG/garden_socket.svg
-UPD 2016-05-09_07:45:14 2368 www/images/fhemSVG/gasoline.svg
+UPD 2017-11-26_07:45:02 2381 www/images/fhemSVG/gasoline.svg
 UPD 2015-07-28_14:05:32 2898 www/images/fhemSVG/general_an.svg
 UPD 2015-07-28_14:05:32 8074 www/images/fhemSVG/general_an_fuer_zeit.svg
 UPD 2015-07-28_14:05:32 5226 www/images/fhemSVG/general_aus.svg
@@ -1269,7 +1269,7 @@ UPD 2015-07-28_14:05:32 15925 www/images/fhemSVG/hm-cc-rt-dn.svg
 UPD 2015-07-28_14:05:32 8594 www/images/fhemSVG/hm-dis-wm55.svg
 UPD 2017-01-17_07:45:03 14169 www/images/fhemSVG/hm-sec-win.svg
 UPD 2015-07-28_14:05:32 7258 www/images/fhemSVG/hm-tc-it-wm-w-eu.svg
-UPD 2015-07-28_14:05:32 9126 www/images/fhemSVG/hm_ccu.svg
+UPD 2017-11-26_07:45:02 8629 www/images/fhemSVG/hm_ccu.svg
 UPD 2017-11-14_07:45:02 2937 www/images/fhemSVG/hm_keymatic.svg
 UPD 2015-07-28_14:05:32 9868 www/images/fhemSVG/hm_lan.svg
 UPD 2015-07-28_14:05:32 5946 www/images/fhemSVG/hourglass.svg
@@ -1325,7 +1325,7 @@ UPD 2017-09-07_07:45:02 7999 www/images/fhemSVG/ios_on_till_fill.svg
 UPD 2017-09-07_07:45:02 3293 www/images/fhemSVG/ios_on_tillovernight_fill.svg
 UPD 2017-09-07_07:45:02 3934 www/images/fhemSVG/ios_setoff_fill.svg
 UPD 2017-09-07_07:45:02 3192 www/images/fhemSVG/ios_seton_fill.svg
-UPD 2017-10-29_07:45:02 10297 www/images/fhemSVG/it_hue_bridge.svg
+UPD 2017-11-26_07:45:02 10268 www/images/fhemSVG/it_hue_bridge.svg
 UPD 2015-07-28_14:05:32 16822 www/images/fhemSVG/it_i-net.svg
 UPD 2017-02-09_07:45:02 3657 www/images/fhemSVG/it_printer.svg
 UPD 2017-11-14_07:45:02 6772 www/images/fhemSVG/it_remote_folder.svg
@@ -1352,7 +1352,7 @@ UPD 2015-07-28_14:05:32 5733 www/images/fhemSVG/message_socket_off2.svg
 UPD 2015-07-28_14:05:32 10647 www/images/fhemSVG/message_socket_on2.svg
 UPD 2015-07-28_14:05:32 4579 www/images/fhemSVG/message_socket_unknown.svg
 UPD 2015-07-28_14:05:32 2323 www/images/fhemSVG/motion_detector.svg
-UPD 2017-11-14_07:45:02 3657 www/images/fhemSVG/muelltonne.svg
+UPD 2017-11-26_07:45:02 3630 www/images/fhemSVG/muelltonne.svg
 UPD 2015-07-28_14:05:32 8453 www/images/fhemSVG/outside_socket.svg
 UPD 2015-07-28_14:05:32 2926 www/images/fhemSVG/people_sensor.svg
 UPD 2017-01-03_07:45:02 2504 www/images/fhemSVG/radio_checked.svg
@@ -1366,7 +1366,7 @@ UPD 2017-11-14_07:45:02 3511 www/images/fhemSVG/rc_5.svg
 UPD 2017-11-14_07:45:02 3938 www/images/fhemSVG/rc_6.svg
 UPD 2017-11-14_07:45:02 2976 www/images/fhemSVG/rc_7.svg
 UPD 2017-11-14_07:45:02 4408 www/images/fhemSVG/rc_8.svg
-UPD 2017-11-14_07:45:02 2553 www/images/fhemSVG/rc_9.svg
+UPD 2017-11-26_07:45:02 2529 www/images/fhemSVG/rc_9.svg
 UPD 2017-11-14_07:45:02 6288 www/images/fhemSVG/rc_ASPECT.svg
 UPD 2017-11-14_07:45:02 5772 www/images/fhemSVG/rc_AUDIO.svg
 UPD 2017-11-14_07:45:02 2236 www/images/fhemSVG/rc_AV.svg
@@ -1401,7 +1401,7 @@ UPD 2017-11-14_07:45:02 2405 www/images/fhemSVG/rc_PLAYgreen.svg
 UPD 2015-08-14_07:45:11 2821 www/images/fhemSVG/rc_PLUS.svg
 UPD 2015-07-28_14:05:32 1149 www/images/fhemSVG/rc_POWER.svg
 UPD 2017-11-14_07:45:02 2794 www/images/fhemSVG/rc_PREVIOUS.svg
-UPD 2016-01-12_07:45:11 5018 www/images/fhemSVG/rc_PROG.svg
+UPD 2017-11-26_07:45:02 5033 www/images/fhemSVG/rc_PROG.svg
 UPD 2017-11-14_07:45:02 10267 www/images/fhemSVG/rc_RADIO.svg
 UPD 2017-11-14_07:45:02 4961 www/images/fhemSVG/rc_RADIOred.svg
 UPD 2017-11-14_07:45:02 1657 www/images/fhemSVG/rc_REC.svg
@@ -1698,9 +1698,9 @@ UPD 2015-07-28_14:05:33 2173 www/images/openautomation/light_dinner_table.svg
 UPD 2015-07-28_14:05:33 3596 www/images/openautomation/light_downlight.svg
 UPD 2015-07-28_14:05:33 3177 www/images/openautomation/light_fairy_lights.svg
 UPD 2015-07-28_14:05:33 2079 www/images/openautomation/light_floor_lamp.svg
-UPD 2015-07-28_14:05:33 1980 www/images/openautomation/light_led.svg
-UPD 2015-07-28_14:05:33 43566 www/images/openautomation/light_led_stripe.svg
-UPD 2015-07-28_14:05:33 46454 www/images/openautomation/light_led_stripe_rgb.svg
+UPD 2017-11-26_07:45:02 5832 www/images/openautomation/light_led.svg
+UPD 2017-11-26_07:45:02 51797 www/images/openautomation/light_led_stripe.svg
+UPD 2017-11-26_07:45:02 54654 www/images/openautomation/light_led_stripe_rgb.svg
 UPD 2015-07-28_14:05:33 1708 www/images/openautomation/light_light.svg
 UPD 2015-07-28_14:05:33 2701 www/images/openautomation/light_light_dim_00.svg
 UPD 2015-07-28_14:05:33 2734 www/images/openautomation/light_light_dim_10.svg
@@ -2029,5 +2029,5 @@ UPD 2017-03-03_07:45:02 12158 www/pgm2/svg.js
 UPD 2015-07-28_14:05:34 2502 www/pgm2/svg_defs.svg
 UPD 2015-07-28_14:05:34 2578 www/pgm2/svg_style.css
 UPD 2015-07-28_14:05:34 639 www/pgm2/touchpadstyle.css
-UPD 2017-09-20_07:45:02 7918 www/pgm2/yaahm.js
+UPD 2017-11-26_07:45:02 13092 www/pgm2/yaahm.js
 UPD 2017-03-03_07:45:02 20404 www/pgm2/zwave_neighborlist.js
