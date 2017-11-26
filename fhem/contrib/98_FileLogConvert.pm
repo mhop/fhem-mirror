@@ -216,8 +216,8 @@ sub FileLogConvert_FileRead($)
     $line =~ s/\s{2,}/ /g;
     if ($cmd eq "fileEvents")
     {
-      next unless ($line =~ /^(\d{4}-\d{2}-\d{2})_(\d{2}:\d{2}:\d{2})\s([A-Za-z0-9._]+)\s([A-Za-z0-9_-]+):\s(\S+)(\s.*)?$/
-        || $line =~ /^(\d{4}-\d{2}-\d{2})_(\d{2}:\d{2}:\d{2})\s([A-Za-z0-9._]+)\s([A-Za-z0-9_-]+)$/);
+      next unless ($line =~ /^(\d{4}-\d{2}-\d{2})_(\d{2}:\d{2}:\d{2})\s([A-Za-z0-9\.\-_]+)\s([A-Za-z0-9\.\-_]+):\s(\S+)(\s.*)?$/
+        || $line =~ /^(\d{4}-\d{2}-\d{2})_(\d{2}:\d{2}:\d{2})\s([A-Za-z0-9\.\-_]+)\s([A-Za-z0-9\.\-_]+)$/);
       push @events,$4 if (!grep(/^$4$/,@events));
     }
     else
@@ -230,7 +230,7 @@ sub FileLogConvert_FileRead($)
       my $i_event;
       my $i_value;
       my $i_unit = "";
-      if ($line =~ /^(\d{4}-\d{2}-\d{2})_(\d{2}:\d{2}:\d{2})\s([A-Za-z0-9._]+)\s([A-Za-z0-9_-]+):\s(\S+)(\s.*)?$/)
+      if ($line =~ /^(\d{4}-\d{2}-\d{2})_(\d{2}:\d{2}:\d{2})\s([A-Za-z0-9\.\-_]+)\s([A-Za-z0-9\.\-_]+):\s(\S+)(\s.*)?$/)
       {
         $i_date = $1;
         $i_time = $2;
@@ -245,7 +245,7 @@ sub FileLogConvert_FileRead($)
         $i_event = "$i_reading: $i_value";
         $i_event .= " $rest" if ($rest);
       }
-      elsif ($line =~ /^(\d{4}-\d{2}-\d{2})_(\d{2}:\d{2}:\d{2})\s([A-Za-z0-9._]+)\s([A-Za-z0-9_-]+)$/)
+      elsif ($line =~ /^(\d{4}-\d{2}-\d{2})_(\d{2}:\d{2}:\d{2})\s([A-Za-z0-9\.\-_]+)\s([A-Za-z0-9\.\-_]+)$/)
       {
         $i_date = $1;
         $i_time = $2;
