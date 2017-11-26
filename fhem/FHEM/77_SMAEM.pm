@@ -26,6 +26,7 @@
 #################################################################################################
 # Versions History done by DS_Starter
 #
+# 3.0.1    26.11.2017     use abort cause of BlockingCall
 # 3.0.0    29.09.2017     make SMAEM ready for multimeter usage
 # 2.9.1    29.05.2017     DbLog_splitFn added, some function names adapted
 # 2.9.0    25.05.2017     own SMAEM_setCacheValue, SMAEM_getCacheValue, new internal VERSION
@@ -51,7 +52,7 @@ use bignum;
 use IO::Socket::Multicast;
 use Blocking;
 
-my $SMAEMVersion = "3.0.0";
+my $SMAEMVersion = "3.0.1";
 
 ###############################################################
 #                  SMAEM Initialize
@@ -604,14 +605,15 @@ return;
 #           Abbruchroutine Timeout Inverter Abfrage
 ###############################################################
 sub SMAEM_ParseAborted($) {
-  my ($hash) = @_;
+  my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
+  $cause = $cause?$cause:"Timeout: process terminated";
    
   $discycles++;
   $hash->{HELPER}{FAULTEDCYCLES} = $discycles;
-  Log3 ($name, 1, "SMAEM $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} timed out");
-  readingsSingleUpdate($hash, "state", "timeout", 1);
+  Log3 ($name, 1, "SMAEM $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} $cause");
+  readingsSingleUpdate($hash, "state", $cause, 1);
   delete($hash->{HELPER}{RUNNING_PID});
 }
 
