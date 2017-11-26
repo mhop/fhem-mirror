@@ -324,9 +324,8 @@ sub LaCrosse_Parse($$) {
   
     if(@bytes > 21 && $bytes[19] != 0xFF) {
       $debug = $bytes[19] * 65536 + $bytes[20] * 256 + $bytes[21];
-      readingsBulkUpdate($hash, "debug", $debug);
     }
-
+  
   }
   else {
     DoTrigger($name, "UNKNOWNCODE $msg");
