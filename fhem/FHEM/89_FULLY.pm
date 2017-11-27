@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 0.5
+#  89_FULLY.pm 0.6
 #
 #  $Id$
 #
@@ -25,14 +25,16 @@ sub FULLY_Set ($@);
 sub FULLY_Get ($@);
 sub FULLY_Attr ($@);
 sub FULLY_UpdateDeviceInfo ($);
-sub FULLY_Execute ($$$);
+sub FULLY_Execute ($$$$);
+sub FULLY_ScreenOff ($);
 sub FULLY_GetDeviceInfo ($);
 sub FULLY_ProcessDeviceInfo ($$);
 sub FULLY_GotDeviceInfo ($);
 sub FULLY_Abort ($);
 sub FULLY_UpdateReadings ($$);
+sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "0.5";
+my $FULLY_VERSION = "0.6";
 my $FULLY_TIMEOUT = 4;
 my $FULLY_POLL_INTERVAL = 3600;
 
@@ -52,7 +54,8 @@ sub FULLY_Initialize ($)
 	$hash->{ShutdownFn} = "FULLY_Shutdown";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "pollInterval requestTimeout " . $readingFnAttributes;
+	$hash->{AttrList} = "pingBeforeCmd:0,1,2 pollInterval requestTimeout repeatCommand:0,1,2 " .
+		$readingFnAttributes;
 }
 
 ##################################################
@@ -72,6 +75,7 @@ sub FULLY_Define ($$)
 
 	$hash->{host} = $$a[2];
 	$hash->{version} = $FULLY_VERSION;
+	$hash->{onForTimer} = 'off';
 	$hash->{fully}{password} = $$a[3];
 	$hash->{fully}{schedule} = 0;
 
@@ -174,7 +178,7 @@ sub FULLY_Set ($@)
 	my $name = shift @$a;
 	my $opt = shift @$a;
 	my $options = "brightness clearCache:noArg exit:noArg lock:noArg motionDetection:on,off ".
-		"off:noArg on:noArg restart:noArg unlock:noArg speak url";
+		"off:noArg on:noArg on-for-timer restart:noArg unlock:noArg speak url";
 	my $response;
 	
 	# Fully commands without argument
@@ -186,37 +190,67 @@ sub FULLY_Set ($@)
 	);
 	
 	if (exists ($cmds{$opt})) {
-		$response = FULLY_Execute ($hash, $cmds{$opt}, undef);
+		$response = FULLY_Execute ($hash, $cmds{$opt}, undef, 1);
+	}
+	elsif ($opt eq 'on-for-timer') {
+		my $par = shift @$a;
+		$par = "forever" if (!defined ($par));
+		if ($par eq 'forever') {
+			$response = FULLY_Execute ($hash, "setBooleanSetting",
+				{ "key" => "keepScreenOn", "value" => "true" }, 1);
+			$response = FULLY_Execute ($hash, "screenOn", undef, 0)
+				if (defined ($response) && $response ne '');
+		}
+		elsif ($par eq 'off') {
+			$response = FULLY_Execute ($hash, "setBooleanSetting",
+				{ "key" => "keepScreenOn", "value" => "false" }, 1);
+			$response = FULLY_Execute ($hash, "setStringSetting",
+				{ "key" => "timeToScreenOffV2", "value" => "0" }, 0)
+				if (defined ($response) && $response ne '');	
+		}
+		elsif ($par =~ /^[0-9]+$/) {
+			$response = FULLY_Execute ($hash, "setBooleanSetting",
+				{ "key" => "keepScreenOn", "value" => "true" }, 1);
+			$response = FULLY_Execute ($hash, "screenOn", undef, 0)
+				if (defined ($response) && $response ne '');
+			InternalTimer (gettimeofday()+$par, "FULLY_ScreenOff", $hash, 0);
+		}
+		else {
+			return "Usage: set $name on-for-timer [{ Seconds | forever | off }]";
+		}
+		
+		RemoveInternalTimer ($hash, "FULLY_ScreenOff") if ($par eq 'off' || $par eq 'forever');
+		$hash->{onForTimer} = $par if (defined ($response) && $response ne '');
 	}
 	elsif ($opt eq 'brightness') {
 		my $value = shift @$a;
 		return "Usage: set $name brightness 0-255" if (!defined ($value));
 		$value = 255 if ($value > 255);
 		$response = FULLY_Execute ($hash, "setStringSetting",
-			{ "key" => "screenBrightness", "value" => "$value" });
+			{ "key" => "screenBrightness", "value" => "$value" }, 1);
 	}
 	elsif ($opt eq 'motionDetection') {
 		my $state = shift @$a;
-		return "Usage: set $name motionDetection {on|off}" if (!defined ($state));
+		return "Usage: set $name motionDetection { on | off }" if (!defined ($state));
 		my $value = $state eq 'on' ? 'true' : 'false';
 		$response = FULLY_Execute ($hash, "setBooleanSetting",
-			{ "key" => "motionDetection", "value" => "$value" });
+			{ "key" => "motionDetection", "value" => "$value" }, 1);
 	}
 	elsif ($opt eq 'speak') {
 		my $text = shift @$a;
-		return "Usage: set $name speak {Text}" if (!defined ($text));
+		return 'Usage: set $name speak "{Text}"' if (!defined ($text));
 		while ($text =~ /\[(.+):(.+)\]/) {
 			my ($device, $reading) = ($1, $2);
 			my $value = ReadingsVal ($device, $reading, '');
 			$text =~ s/\[$device:$reading\]/$value/g;
 		}
 		my $enctext = urlEncode ($text);
-		$response = FULLY_Execute ($hash, "textToSpeech", { "text" => "$enctext" });
+		$response = FULLY_Execute ($hash, "textToSpeech", { "text" => "$enctext" }, 1);
 	}
 	elsif ($opt eq 'url') {
 		my $url = shift @$a;
 		my $cmd = defined ($url) ? "loadURL" : "loadStartURL";
-		$response = FULLY_Execute ($hash, $cmd, { "url" => "$url" });
+		$response = FULLY_Execute ($hash, $cmd, { "url" => "$url" }, 1);
 	}
 	else {
 		return "FULLY: Unknown argument $opt, choose one of ".$options;
@@ -242,9 +276,9 @@ sub FULLY_Get ($@)
 	my $opt = shift @$a;
 	my $options = "info:noArg stats:noArg update:noArg";
 	my $response;
-
+	
 	if ($opt eq 'info') {
-		my $result = FULLY_Execute ($hash, 'deviceInfo', undef);
+		my $result = FULLY_Execute ($hash, 'deviceInfo', undef, 1);
 		if (!defined ($result) || $result eq '') {
 			Log3 $name, 2, "FULLY: Command failed";
 			return "FULLY: Command failed";
@@ -282,13 +316,17 @@ sub FULLY_Get ($@)
 # Execute Fully command
 #####################################
 
-sub FULLY_Execute ($$$)
+sub FULLY_Execute ($$$$)
 {
-	my ($hash, $command, $param) = @_;
+	my ($hash, $command, $param, $doping) = @_;
 	my $name = $hash->{NAME};
 
+	# Get attributes
 	my $timeout = AttrVal ($name, 'requestTimeout', $FULLY_TIMEOUT);
+	my $repeatCommand = min (AttrVal ($name, 'repeatCommand', 0), 2);
+	my $ping = min (AttrVal ($name, 'pingBeforeCmd', 0), 2);
 	
+	my $response = '';
 	my $url = "http://".$hash->{host}.":2323/?cmd=$command";
 	
 	if (defined ($param)) {
@@ -299,7 +337,32 @@ sub FULLY_Execute ($$$)
 		}
 	}
 
-	return GetFileFromURL ("$url&password=".$hash->{fully}{password}, $timeout);
+	# Ping tablet device
+	FULLY_Ping ($hash, $ping) if ($doping && $ping > 0);
+	
+	my $i = 0;
+	while ($i <= $repeatCommand && (!defined ($response) || $response eq '')) {
+		$response = GetFileFromURL ("$url&password=".$hash->{fully}{password}, $timeout);
+		Log3 $name, 4, "FULLY: HTTP response empty" if (defined ($response) && $response eq '');
+		$i++;
+	}
+	
+	return $response;
+}
+
+#####################################
+# Timer function: Turn screen off
+#####################################
+
+sub FULLY_ScreenOff ($)
+{
+	my ($hash) = @_;
+	
+	my $response = FULLY_Execute ($hash, "setBooleanSetting",
+		{ "key" => "keepScreenOn", "value" => "false" }, 1);
+	$response = FULLY_Execute ($hash, "screenOff", undef, 1)
+		if (defined ($response) && $response ne '');
+	$hash->{onForTimer} = 'off' if (defined ($response) && $response ne '');
 }
 
 #####################################
@@ -326,7 +389,7 @@ sub FULLY_GetDeviceInfo ($)
 	my ($name) = @_;
 	my $hash = $defs{$name};
 	
-	my $result = FULLY_Execute ($hash, 'deviceInfo', undef);
+	my $result = FULLY_Execute ($hash, 'deviceInfo', undef, 1);
 	
 	return FULLY_ProcessDeviceInfo ($name, $result);
 }
@@ -466,6 +529,39 @@ sub FULLY_UpdateReadings ($$)
 	return $rc;	
 }
 
+#####################################
+# Send ICMP request to tablet device
+# Adapted from presence module.
+# Thx Markus.
+#####################################
+
+sub FULLY_Ping ($$)
+{
+	my ($hash, $count) = @_;
+	my $name = $hash->{NAME};
+	my $host = $hash->{host};
+	my $temp;
+	
+	if ($^O =~ m/(Win|cygwin)/)
+	{
+		$temp = qx(ping -n $count -4 $host);
+	}
+	elsif ($^O =~ m/solaris/)
+	{
+		$temp = qx(ping $host $count 2>&1);
+	}
+	else
+	{
+		$temp = qx(ping -c $count $host 2>&1);
+	}
+	
+	Log3 $name, 4, "FULLY: Ping response = $temp" if (defined ($temp));
+	
+	sleep (1);
+	
+	return $temp;
+}
+
 1;
 
 
@@ -510,6 +606,9 @@ sub FULLY_UpdateReadings ($$)
 		<li><b>set &lt;name&gt; { on | off }</b><br/>
 			Turn tablet display on or off.
 		</li><br/>
+		<li><b>set &lt;name&gt; on-for-timer [{ &lt;Seconds&gt; | <u>forever</u> | off }]</b><br/>
+			Set timer for display. Default is forever.
+		</li><br/>
 		<li><b>set &lt;name&gt; restart</b><br/>
 			Restart Fully.
 		</li><br/>
@@ -542,6 +641,10 @@ sub FULLY_UpdateReadings ($$)
    <b>Attributes</b><br/>
    <br/>
    <ul>
+   	<li><b>pingBeforeCmd &lt;Count&gt;</b><br/>
+   		Send <i>Count</i> ping request to tablet before executing commands. Valid values 
+   		for <i>Count</i> are 0,1,2. Default is 0 (do not send ping request).
+   	</li><br/>
       <li><b>pollInterval &lt;seconds&gt;</b><br/>
          Set polling interval for FULLY device information.
          If <i>seconds</i> is 0 polling is turned off. Valid values are from 10 to
@@ -549,6 +652,10 @@ sub FULLY_UpdateReadings ($$)
       </li><br/>
       <li><b>requestTimeout &lt;seconds&gt;</b><br/>
          Set timeout for http requests. Default is 4 seconds.
+      </li><br/>
+      <li><b>repeatCommand &lt;Count&gt;</b><br/>
+         Repeat fully command on failure. Valid values for <i>Count</i> are 0,1,2. Default
+         is 0 (do not repeat commands).
       </li><br/>
    </ul>
 </ul>
