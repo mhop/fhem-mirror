@@ -47,7 +47,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.41;
+my $astroversion = 1.42;
 
 #-- These we may get on request
 my %gets = (
@@ -135,7 +135,7 @@ my %astro_transtable_EN = (
     "phase"          => "Phase",
     "newmoon"        => "New Moon",
     "waxingcrescent" => "Waxing Crescent",
-    "firstquarter   "=> "First Quarter",
+    "firstquarter"   => "First Quarter",
     "waxingmoon"     => "Waxing Moon",
     "fullmoon"       => "Full Moon",
     "waningmoon"     => "Waning Moon",
@@ -221,7 +221,7 @@ my %astro_transtable_EN = (
     "phase"          => "Phase",
     "newmoon"        => "Neumond",
     "waxingcrescent" => "Zunehmende Sichel",
-    "firstquarter   "=> "Erstes Viertel",
+    "firstquarter"   => "Erstes Viertel",
     "waxingmoon"     => "Zunehmender Mond",
     "fullmoon"       => "Vollmond",
     "waningmoon"     => "Abnehmender Mond",
