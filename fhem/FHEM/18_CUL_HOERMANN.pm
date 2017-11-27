@@ -10,7 +10,7 @@ CUL_HOERMANN_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^R..........";
+  $hash->{Match}     = "^R..........$";
   $hash->{DefFn}     = "CUL_HOERMANN_Define";
   $hash->{ParseFn}   = "CUL_HOERMANN_Parse";
   $hash->{SetFn}     = "CUL_HOERMANN_Set";
