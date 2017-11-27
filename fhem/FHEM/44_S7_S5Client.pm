@@ -477,13 +477,14 @@ sub S5ConnectPLCAS511($$) {
 	my $b1 = "";
 	my $ttyPort;
 
-	if ($^O=~/Win/) {
-		eval ("use Win32::SerialPort;");
+	if($^O =~ m/Win/) {
+		require Win32::SerialPort;
+		#eval ("use Win32::SerialPort;");
 		$self->{serial} = new Win32::SerialPort ($portName);
 	}else{
-		eval ("use Device::SerialPort;");
+		#eval ("use Device::SerialPort;");
+		require Device::SerialPort;
 		$self->{serial} = new Device::SerialPort ($portName);
-	}
 
 
 	main::Log3( undef, 3, "Can't open serial port $portName" )

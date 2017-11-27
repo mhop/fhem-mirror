@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: 44_S7_ARead: event-on-change-reading
+  - bugfix: 44_S7_AWrite: event-on-change-reading
+  - bugfix: 44_S7_DRead: event-on-change-reading
+  - bugfix: 44_S7_DWrite: event-on-change-reading
+  - bugfix: 44_S7_S5Client.pm: loading serial modul
   - change:  89_FULLY: on-timer implemented
   - change:  77_SMAEM: V3.0.1, use abort cause of BlockingCall
   - change:  93_Log2Syslog: V3.2.0, add NOTIFYDEV (if possible)
