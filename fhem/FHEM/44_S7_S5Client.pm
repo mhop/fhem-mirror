@@ -485,7 +485,7 @@ sub S5ConnectPLCAS511($$) {
 		#eval ("use Device::SerialPort;");
 		require Device::SerialPort;
 		$self->{serial} = new Device::SerialPort ($portName);
-
+    }
 
 	main::Log3( undef, 3, "Can't open serial port $portName" )
 	  unless ( $self->{serial} );
