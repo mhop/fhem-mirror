@@ -1,4 +1,4 @@
-// $Id$
+FW_version["fhemweb_weekprofile.js"] = "$Id$";
 
 var language = 'de';
 //for tooltip
@@ -877,3 +877,15 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
 FW_widgets['weekprofile'] = {
   createFn:FW_weekprofileCreate,
 };
+
+/*
+=pod
+=begin html
+
+=end html
+
+=begin html_DE
+
+=end html_DE
+=cut
+*/
