@@ -565,8 +565,8 @@ sub Hyperion_Set($@)
   return if (IsDisabled($name) && $cmd ne "?");
   my $value = (defined($args[0])) ? $args[0] : undef;
   return "\"set $name\" needs at least one argument and maximum five arguments" if (@aa < 1 || @aa > 5);
-  my $duration = (defined $args[1]) ? int $args[1] : int AttrVal($name,"hyperionDefaultDuration",0);
-  my $priority = (defined $args[2]) ? int $args[2] : int AttrVal($name,"hyperionDefaultPriority",0);
+  my $duration = defined $args[1] ? int $args[1] : AttrNum($name,"hyperionDefaultDuration",0);
+  my $priority = defined $args[2] ? int $args[2] : AttrNum($name,"hyperionDefaultPriority",0);
   my %Hyperion_sets_local = %Hyperion_sets;
   if (ReadingsVal($name,".configs",""))
   {
@@ -985,6 +985,7 @@ sub Hyperion_Attr(@)
       return $err if ($err);
       if ($attr_value == 1)
       {
+        BlockingKill($hash->{helper}{RUNNING_PID}) if ($hash->{helper}{RUNNING_PID});
         RemoveInternalTimer($hash);
         DevIo_Disconnected($hash);
       }
@@ -1000,8 +1001,7 @@ sub Hyperion_Attr(@)
     Hyperion_GetUpdate($hash) if (!IsDisabled($name));
     Hyperion_OpenDev($hash) if ($attr_name eq "disable");
   }
-  return $err if ($err);
-  return;
+  return $err ? $err : undef;
 }
 
 sub Hyperion_Call($;$)
