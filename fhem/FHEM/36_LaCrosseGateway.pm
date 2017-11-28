@@ -579,11 +579,11 @@ sub LaCrosseGateway_HandleOwnSensors($$) {
 
   readingsEndUpdate($hash, 1);
 
-  delete $hash->{READINGS}{"temperature"} if $temperature == undef;
-  delete $hash->{READINGS}{"humidity"} if $humidity == undef;
-  delete $hash->{READINGS}{"pressure"} if $pressure == undef;
-  delete $hash->{READINGS}{"gas"} if $gas == undef;
-  delete $hash->{READINGS}{"debug"} if $debug == undef;
+  delete $hash->{READINGS}{"temperature"} if(!defined($temperature));
+  delete $hash->{READINGS}{"humidity"} if(!defined($humidity));
+  delete $hash->{READINGS}{"pressure"} if(!defined($pressure));
+  delete $hash->{READINGS}{"gas"} if(!defined($gas));
+  delete $hash->{READINGS}{"debug"} if(!defined($debug));
 }
 
 #=======================================================================================
