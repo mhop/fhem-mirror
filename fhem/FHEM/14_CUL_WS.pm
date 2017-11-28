@@ -291,22 +291,31 @@ CUL_WS_Parse($$)
   Log3 $name, 4, "CUL_WS $devtype $name: $val";
 
   # Sanity checks
-  if($NotifyTemperature &&
-     $hash->{READINGS}{temperature} &&
-     $hash->{READINGS}{temperature}{VAL}) {
-    my $tval = $hash->{READINGS}{strangetemp} ? 
-               $hash->{READINGS}{strangetemp}{VAL} : 
-               $hash->{READINGS}{temperature}{VAL};
+  if($NotifyTemperature && ReadingsVal($name, "temperature", undef)) {
+    my $tval = ReadingsVal($name, "strangetemp",
+                           ReadingsVal($name, "temperature", undef));
     my $diff = ($NotifyTemperature - $tval)+0;
     if($diff < -15.0 || $diff > 15.0) {
       Log3 $name, 2,
         "$name: Temp difference ($diff) too large: $val, skipping it";
-      $hash->{READINGS}{strangetemp}{VAL} = $NotifyTemperature;
-      $hash->{READINGS}{strangetemp}{TIME} = TimeNow();
+      readingsSingleUpdate($name, "strangetemp", $NotifyTemperature, 0);
       return "";
     }
   }
   delete $hash->{READINGS}{strangetemp} if($hash->{READINGS});
+
+  if($NotifyPressure && ReadingsVal($name, "pressure", undef)) {
+    my $tval = ReadingsVal($name, "strangepress",
+                           ReadingsVal($name, "pressure", undef));
+    my $diff = ($NotifyPressure - $tval)+0;
+    if($diff < -10.0 || $diff > 10.0) {
+      Log3 $name, 2,
+        "$name: Pressure difference ($diff) too large: $val, skipping it";
+      readingsSingleUpdate($name, "strangepress", $NotifyPressure, 0);
+      return "";
+    }
+  }
+  delete $hash->{READINGS}{strangepress} if($hash->{READINGS});
 
   if(defined($hum) && ($hum < 0 || $hum > 100)) {
     Log3 $name, 1, "BOGUS: $name reading: $val, skipping it";
