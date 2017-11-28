@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: 93_DbLog: V2.22.15, some Log verbose level adapted/added
   - bugfix: 44_S7_ARead: event-on-change-reading
   - bugfix: 44_S7_AWrite: event-on-change-reading
   - bugfix: 44_S7_DRead: event-on-change-reading

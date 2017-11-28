@@ -339,7 +339,7 @@ FHEM/75_msgConfig.pm         loredo               Automatisierung
 FHEM/76_msgDialog.pm         igami                Frontends/Sprachsteuerung
 FHEM/76_MSGFile.pm           gandy                Automatisierung
 FHEM/76_MSGMail.pm           gandy                Automatisierung
-FHEM/76_SMAInverter.pm       DS_Starter           Sonstige Systeme
+FHEM/76_SMAInverter.pm       DS_Starter/sct14675  Sonstige Systeme
 FHEM/77_UWZ.pm               CoolTux              Unterstuetzende Dienste/Wettermodule
 FHEM/77_SMAEM.pm             VolkerKettenbach     Sonstige Systeme
 FHEM/77_SMASTP.pm            VolkerKettenbach     Sonstige Systeme
@@ -375,7 +375,7 @@ FHEM/91_sequence.pm          rudolfkoenig         Automatisierung
 FHEM/91_watchdog.pm          rudolfkoenig         Automatisierung
 FHEM/92_FileLog.pm           rudolfkoenig         Automatisierung
 FHEM/92_SingleFileLog.pm     rudolfkoenig         Automatisierung
-FHEM/93_DbLog.pm             Tobias               Automatisierung
+FHEM/93_DbLog.pm             Tobias/DS_Starter    Automatisierung
 FHEM/93_DbRep.pm             DS_Starter           Sonstiges
 FHEM/93_Log2Syslog.pm        DS_Starter           Automatisierung
 FHEM/93_FHEM2FHEM.pm         rudolfkoenig         Automatisierung

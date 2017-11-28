@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 2.22.15    28.11.2017       some Log3 verbose level adapted
 # 2.22.14    18.11.2017       create state-events if state has been changed (Forum:#78867)
 # 2.22.13    20.10.2017       output of reopen command improved 
 # 2.22.12    19.10.2017       avoid illegible messages in "state"
@@ -158,7 +159,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "2.22.14";
+my $DbLogVersion = "2.22.15";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -1083,7 +1084,7 @@ sub DbLog_Log($$) {
 	  Log3 $name, 4, "DbLog $name -> verbose 4 output of device $dev_name skipped due to attribute \"verbose4Devs\" restrictions" if(!$vb4show);
   }
   
-  if($vb4show) {
+  if($vb4show && !$hash->{HELPER}{RUNNING_PID}) {
       Log3 $name, 4, "DbLog $name -> ################################################################";
       Log3 $name, 4, "DbLog $name -> ###              start of new Logcycle                       ###";
       Log3 $name, 4, "DbLog $name -> ################################################################";
@@ -1128,7 +1129,7 @@ sub DbLog_Log($$) {
       for (my $i = 0; $i < $max; $i++) {
           my $event = $events->[$i];
           $event = "" if(!defined($event));
-          Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show);  
+          Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{RUNNING_PID});  
 	  
 	      if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
 			  my $timestamp = $ts_0;
@@ -1218,7 +1219,7 @@ sub DbLog_Log($$) {
 					  if($IGNORE) {
 					      # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $value_fn
 						  Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
-						                          if($vb4show);
+						                          if($vb4show && !$hash->{HELPER}{RUNNING_PID});
 					      next;  
 					  }
 					  
@@ -1235,7 +1236,7 @@ sub DbLog_Log($$) {
   
 			      my $row = ($timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit);
 				  Log3 $hash->{NAME}, 4, "DbLog $name -> added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
-				                          if($vb4show);	
+				                          if($vb4show && !$hash->{HELPER}{RUNNING_PID});	
                   
 				  if($async) {
 				      # asynchoner non-blocking Mode
@@ -1332,7 +1333,7 @@ sub DbLog_Push(@) {
   Log3 $name, 4, "DbLog $name -> ################################################################";
   Log3 $name, 4, "DbLog $name -> ###         New database processing cycle - synchronous      ###";
   Log3 $name, 4, "DbLog $name -> ################################################################";
-  Log3 ($name, 4, "DbLog $name -> DbLogType is: $DbLogType");
+  Log3 $name, 4, "DbLog $name -> DbLogType is: $DbLogType";
   
   # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
   my ($usepkh,$usepkc,$pkh,$pkc);
@@ -1475,12 +1476,16 @@ sub DbLog_Push(@) {
       eval {$dbh->rollback() if(!$dbh->{AutoCommit});}; # issue Turning on AutoCommit failed
 	  if ($@) {
           Log3($name, 2, "DbLog $name -> Error rollback history - $@");
-      }
+      } else {
+	      Log3($name, 4, "DbLog $name -> insert history rolled back");
+	  }
   } else {
       eval {$dbh->commit() if(!$dbh->{AutoCommit});};   # issue Turning on AutoCommit failed
 	  if ($@) {
           Log3($name, 2, "DbLog $name -> Error commit history - $@");
-      }
+      } else {
+	      Log3($name, 4, "DbLog $name -> insert history committed");
+	  }
   }
 
   # update or insert current
@@ -1547,12 +1552,16 @@ sub DbLog_Push(@) {
       eval {$dbh->rollback() if(!$dbh->{AutoCommit});}; # issue Turning on AutoCommit failed
 	  if ($@) {
           Log3($name, 2, "DbLog $name -> Error rollback current - $@");
-      }
+      } else {
+	      Log3($name, 4, "DbLog $name -> insert or update current rolled back");
+	  }
   } else {
       eval {$dbh->commit() if(!$dbh->{AutoCommit});}; # issue Turning on AutoCommit failed
 	  if ($@) {
           Log3($name, 2, "DbLog $name -> Error commit current - $@");
-      }
+      } else {
+	      Log3($name, 4, "DbLog $name -> insert or update current committed");
+	  }
   }
 
   if ($errorh || $errorc) {
@@ -1632,10 +1641,10 @@ sub DbLog_execmemcache ($) {
   }
 	
   if($memcount && $dolog && !$hash->{HELPER}{RUNNING_PID}) {		
-      Log3 $name, 5, "DbLog $name -> ################################################################";
-      Log3 $name, 5, "DbLog $name -> ###      New database processing cycle - asynchronous        ###";
-      Log3 $name, 5, "DbLog $name -> ################################################################";
-	  Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains $memcount entries to process";
+      Log3 $name, 4, "DbLog $name -> ################################################################";
+      Log3 $name, 4, "DbLog $name -> ###      New database processing cycle - asynchronous        ###";
+      Log3 $name, 4, "DbLog $name -> ################################################################";
+	  Log3 $hash->{NAME}, 4, "DbLog $name -> MemCache contains $memcount entries to process";
 		  
 	  foreach my $key (sort(keys%{$hash->{cache}{memcache}})) {
           Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: $hash->{cache}{memcache}{$key}";
@@ -1856,7 +1865,7 @@ sub DbLog_PushAsync(@) {
       if (lc($DbLogType) =~ m(history) ) {
           ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \my @tuple_status } );
 		  if($tuples && $rows == $ceti) {
-		      Log3 $hash->{NAME}, 5, "DbLog $name -> $rows of $ceti events inserted into table history".($usepkh?" using PK on columns $pkh":"");
+		      Log3 $hash->{NAME}, 4, "DbLog $name -> $rows of $ceti events inserted into table history".($usepkh?" using PK on columns $pkh":"");
 		  } else {
 		      for my $tuple (0..$#row_array) {
 			      my $status = $tuple_status[$tuple];
@@ -1874,13 +1883,17 @@ sub DbLog_PushAsync(@) {
       eval {$dbh->rollback() if(!$dbh->{AutoCommit});};  # issue Turning on AutoCommit failed
 	  if ($@) {
           Log3($name, 2, "DbLog $name -> Error rollback history - $@");
-      } 
+      } else {
+	      Log3($name, 4, "DbLog $name -> insert history rolled back");
+	  }
       $rowlback = $rowlist;	
   } else {
       eval {$dbh->commit() if(!$dbh->{AutoCommit});};    # issue Turning on AutoCommit failed
       if ($@) {
           Log3($name, 2, "DbLog $name -> Error commit history - $@");
-      }
+      } else {
+	      Log3($name, 4, "DbLog $name -> insert history committed");
+	  }
   }
   
   # update or insert current
@@ -1892,9 +1905,9 @@ sub DbLog_PushAsync(@) {
 	  if (lc($DbLogType) =~ m(current) ) {
           ($tuples, $rows) = $sth_uc->execute_array( { ArrayTupleStatus => \my @tuple_status } );
 		  if($tuples && $rows == $ceti) {
-		      Log3 $hash->{NAME}, 5, "DbLog $name -> $rows of $ceti events updated in table current".($usepkc?" using PK on columns $pkc":"");
+		      Log3 $hash->{NAME}, 4, "DbLog $name -> $rows of $ceti events updated in table current".($usepkc?" using PK on columns $pkc":"");
 		  } elsif ($tuples && $rows >= $ceti) {
-		      Log3 $hash->{NAME}, 5, "DbLog $name -> $ceti events inserted or replaced in table current".($usepkc?" using PK on columns $pkc":"");
+		      Log3 $hash->{NAME}, 4, "DbLog $name -> $ceti events inserted or replaced in table current".($usepkc?" using PK on columns $pkc":"");
 		  } else {
 		      $doins = 1;
 			  $ceti = 0;
@@ -1903,7 +1916,7 @@ sub DbLog_PushAsync(@) {
 			      $status = 0 if($status eq "0E0");
 			      next if($status);         # $status ist "1" wenn update ok
 			      $ceti++;
-			      Log3 $hash->{NAME}, 5, "DbLog $name -> Failed to update in current, try to insert - TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple], Status = $status";
+			      Log3 $hash->{NAME}, 4, "DbLog $name -> Failed to update in current, try to insert - TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple], Status = $status";
 			      push(@timestamp_cur, "$timestamp[$tuple]"); 
 	              push(@device_cur, "$device[$tuple]");   
 	              push(@type_cur, "$type[$tuple]");  
@@ -1926,13 +1939,13 @@ sub DbLog_PushAsync(@) {
               
 			  ($tuples, $rows) = $sth_ic->execute_array( { ArrayTupleStatus => \my @tuple_status } );
 			  if($tuples && $rows == $ceti) {
-		          Log3 $hash->{NAME}, 5, "DbLog $name -> $rows of $ceti events inserted into table current".($usepkc?" using PK on columns $pkc":"");
+		          Log3 $hash->{NAME}, 4, "DbLog $name -> $rows of $ceti events inserted into table current".($usepkc?" using PK on columns $pkc":"");
 		      } else {
 			      for my $tuple (0..$#device_cur) {
 			          my $status = $tuple_status[$tuple];
 			          $status = 0 if($status eq "0E0");
 			          next if($status);         # $status ist "1" wenn insert ok
-			          Log3 $hash->{NAME}, 2, "DbLog $name -> Insert into current rejected - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status";
+			          Log3 $hash->{NAME}, 3, "DbLog $name -> Insert into current rejected - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status";
 			      }
 		      }
           }
@@ -1945,12 +1958,16 @@ sub DbLog_PushAsync(@) {
       eval {$dbh->rollback() if(!$dbh->{AutoCommit});};  # issue Turning on AutoCommit failed
 	  if ($@) {
           Log3($name, 2, "DbLog $name -> Error rollback current - $@");
-      } 
+      } else {
+	      Log3($name, 4, "DbLog $name -> insert or update current rolled back");
+	  }
   } else {
       eval {$dbh->commit() if(!$dbh->{AutoCommit});};    # issue Turning on AutoCommit failed
       if ($@) {
           Log3($name, 2, "DbLog $name -> Error commit current - $@");
-      }
+      } else {
+	      Log3($name, 4, "DbLog $name -> insert or update current committed");
+	  }
   }
   
   $dbh->disconnect();
@@ -2004,9 +2021,7 @@ sub DbLog_PushAsyncDone ($) {
 	   $memcount = scalar(keys%{$hash->{cache}{memcache}});
 	 };
   }
-	  
-  # $state = "disabled" if(IsDisabled($name));
- 
+
   $memcount = $hash->{cache}{memcache}?scalar(keys%{$hash->{cache}{memcache}}):0;
   readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
  
@@ -2029,12 +2044,9 @@ sub DbLog_PushAsyncDone ($) {
 	  delete($defs{$name}{READINGS}{sql_processing_time});
 	  delete($defs{$name}{READINGS}{CacheUsage});
   }
- 
   delete $hash->{HELPER}{RUNNING_PID};
-  Log3 ($name, 5, "DbLog $name -> DbLog_PushAsyncDone finished");
- 
+  Log3 ($name, 5, "DbLog $name -> DbLog_PushAsyncDone finished"); 
 return;
- 
 }
  
 #############################################################################################
