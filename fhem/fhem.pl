@@ -247,6 +247,7 @@ use vars qw(@authorize);        # List of authorization devices
 use vars qw(@structChangeHist); # Contains the last 10 structural changes
 use vars qw($haveInet6);        # Using INET6
 use vars qw(%prioQueues);       #
+use vars qw($fhemForked);       # 1 in a fhemFork()'ed process, else undef
 
 $selectTimestamp = gettimeofday();
 $cvsid = '$Id$';
@@ -5006,6 +5007,7 @@ fhemFork()
     }
   }
   $SIG{CHLD} = 'DEFAULT';  # Forum #50898
+  $fhemForked = 1;
   return 0;
 }
 

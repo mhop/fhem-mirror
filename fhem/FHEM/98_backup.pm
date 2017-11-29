@@ -197,7 +197,7 @@ createArchiv($$)
 
   }
   Log 2, "Backup with command: $cmd";
-  if($cl && ref($cl) eq "HASH" && $cl->{TYPE} && $cl->{TYPE} eq "FHEMWEB") {
+  if(!$fhemForked) {
     use Blocking;
     our $BC_telnetDevice;
     BC_searchTelnet("backup");
