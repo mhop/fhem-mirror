@@ -1044,7 +1044,7 @@ sub FB_CALLMONITOR_readPhonebook($;$)
         
         Log3 $name, 2, "FB_CALLMONITOR ($name) - found FritzBox phonebook $phonebook_file";
         
-        ($err, $count_contacts) = FB_CALLMONITOR_parsePhonebook($hash, $phonebook);
+        ($err, $count_contacts, $pb_hash) = FB_CALLMONITOR_parsePhonebook($hash, $phonebook);
         
         if(defined($err))
         {
@@ -1053,6 +1053,7 @@ sub FB_CALLMONITOR_readPhonebook($;$)
         }
         else
         {
+            $hash->{helper}{PHONEBOOK} = $pb_hash;
             Log3 $name, 2, "FB_CALLMONITOR ($name) - read $count_contacts contact".($count_contacts == 1 ? "" : "s")." from $phonebook_file";
         }
 	} 
