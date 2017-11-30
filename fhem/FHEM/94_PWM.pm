@@ -26,6 +26,8 @@
 # 01.08.17 GA add attribute disable to stop calculations of PWM
 # 01.08.17 GA fix OverallHeatingSwitch (without threshold) now independent from ValveProtection
 # 17.08.17 GA add attribute overallHeatingSwitchThresholdTemp define a threshold temperature to prevent switch to "on"
+# 30.11.17 GA add helper for last pulses of rooms
+# 30.11.17 GA fix clear roomsToStayOn and roomsToStayOnList if not used
 
 ##############################################
 # $Id$
@@ -119,6 +121,8 @@ PWM_Calculate($)
 
   Log3 ($hash, 3, "PWM_Calculate $name");
 
+  $hash->{helper}{pulses} = ();
+
   readingsBeginUpdate ($hash);
 
   #$hash->{STATE} = "lastrun: ".TimeNow();
@@ -169,6 +173,7 @@ PWM_Calculate($)
 
           $roomsActive++;
           $RoomsPulses{$d} = $newpulse;
+          $hash->{helper}{pulses}{$d} = $newpulse; 
           $newpulseSum += $newpulse;
           $newpulseMax = max($newpulseMax, $newpulse);
 
@@ -509,7 +514,11 @@ PWM_Calculate($)
   if ( $hash->{NoRoomsToStayOn} > 0) {
     readingsBulkUpdate ($hash,  "roomsToStayOn", $minRoomsOn);
     readingsBulkUpdate ($hash,  "roomsToStayOnList", $minRoomsOnList);
+  } else {
+    readingsBulkUpdate ($hash,  "roomsToStayOn", 0);
+    readingsBulkUpdate ($hash,  "roomsToStayOnList", "");
   }
+	
 
   if ( defined ($hash->{OverallHeatingSwitch}) ) {
     if ( $hash->{OverallHeatingSwitch} ne "") {
