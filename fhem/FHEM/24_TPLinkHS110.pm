@@ -125,7 +125,7 @@ sub TPLinkHS110_Get($$)
 		readingsBulkUpdate($hash, "state", "on");
 	}
 	# If the device is a HS110, get realtime data:
-	if ($json->{'system'}->{'get_sysinfo'}->{'model'} eq "HS110(EU)") {
+	if ($json->{'system'}->{'get_sysinfo'}->{'model'} eq "HS110(EU)" or $json->{'system'}->{'get_sysinfo'}->{'model'} eq "HS110(UK)")) {
 		my $realtimejcommand='{"emeter":{"get_realtime":{}}}';
 		my $rc = encrypt($realtimejcommand);
 		my $socket = IO::Socket::INET->new(PeerAddr => $remote_host,
