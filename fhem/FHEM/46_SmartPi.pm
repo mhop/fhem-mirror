@@ -60,7 +60,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "1.0.0";
+my $version = "1.2.0";
 
 
 
@@ -69,6 +69,7 @@ my $version = "1.0.0";
 sub SmartPi_Attr(@);
 sub SmartPi_Define($$);
 sub SmartPi_Initialize($);
+sub SmartPi_Notify($$);
 sub SmartPi_Get($@);
 sub SmartPi_GetData($@);
 sub SmartPi_Undef($$);
@@ -88,10 +89,13 @@ sub SmartPi_Initialize($) {
     $hash->{GetFn}      = "SmartPi_Get";
     $hash->{DefFn}      = "SmartPi_Define";
     $hash->{UndefFn}    = "SmartPi_Undef";
+    $hash->{NotifyFn}   = "SmartPi_Notify";
     
     $hash->{AttrFn}     = "SmartPi_Attr";
     $hash->{AttrList}   = "interval ".
                           "disable:1 ".
+                          "decimalPlace:0,1,2,3,4,5 ".
+                          "disabledForIntervals ".
                           $readingFnAttributes;
     
     foreach my $d(sort keys %{$modules{SmartPi}{defptr}}) {
@@ -115,6 +119,7 @@ sub SmartPi_Define($$) {
     
     my $host                = $a[2];
     $hash->{HOST}           = $host;
+    $hash->{NOTIFYDEV}      = "global";
     $hash->{INTERVAL}       = 300;
     $hash->{PORT}           = 1080;
     $hash->{VERSION}        = $version;
@@ -123,16 +128,6 @@ sub SmartPi_Define($$) {
     $attr{$name}{room} = "SmartPi" if( !defined( $attr{$name}{room} ) );
     
     Log3 $name, 3, "SmartPi ($name) - defined SmartPi Device with Host $host, Port $hash->{PORT} and Interval $hash->{INTERVAL}";
-    
-    
-    if( $init_done ) {
-        
-        SmartPi_Timer_GetData($hash);
-            
-    } else {
-        
-        InternalTimer( gettimeofday()+15, "SmartPi_Timer_GetData", $hash, 0 );
-    }
     
     $modules{SmartPi}{defptr}{HOST} = $hash;
 
@@ -162,33 +157,68 @@ sub SmartPi_Attr(@) {
     if( $attrName eq "disable" ) {
         if( $cmd eq "set" ) {
             if( $attrVal eq "0" ) {
-            
                 readingsSingleUpdate ( $hash, "state", "enabled", 1 );
                 Log3 $name, 3, "SmartPi ($name) - enabled";
             } else {
-
+                RemoveInternalTimer($hash);
                 readingsSingleUpdate ( $hash, "state", "disabled", 1 );
                 Log3 $name, 3, "SmartPi ($name) - disabled";
             }
             
         } else {
-
             readingsSingleUpdate ( $hash, "state", "enabled", 1 );
             Log3 $name, 3, "SmartPi ($name) - enabled";
         }
         
+    elsif( $attrName eq "disabledForIntervals" ) {
+        if( $cmd eq "set" ) {
+            return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
+            unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
+            Log3 $name, 3, "SmartPi ($name) - disabledForIntervals";
+            readingsSingleUpdate ( $hash, "state", "disabled", 1 );
+        }
+
+        elsif( $cmd eq "del" ) {
+            Log3 $name, 3, "SmartPi ($name) - enabled";
+            readingsSingleUpdate ( $hash, "state", "active", 1 );
+        }
+    }
+        
     } elsif( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
-        
             $hash->{INTERVAL} = $attrVal;
             
         } else {
-
             $hash->{INTERVAL} = 300;
         }
     }
     
     return undef;
+}
+
+sub SmartPi_Notify($$) {
+
+    my ($hash,$dev) = @_;
+    my $name = $hash->{NAME};
+    return if (IsDisabled($name));
+    
+    my $devname = $dev->{NAME};
+    my $devtype = $dev->{TYPE};
+    my $events = deviceEvents($dev,1);
+    return if (!$events);
+
+
+    SmartPi_Timer_GetData($hash) if( (grep /^DEFINED.$name$/,@{$events}
+                                    or grep /^INITIALIZED$/,@{$events}
+                                    or grep /^MODIFIED.$name$/,@{$events}
+                                    or grep /^DELETEATTR.$name.interval$/,@{$events}
+                                    or grep /^ATTR.$name.interval.[0-9]+/,@{$events}
+                                    or grep /^DELETEATTR.$name.disable$/,@{$events}
+                                    or grep /^ATTR.$name.disable.0$/,@{$events}
+                                    or grep /^DELETEATTR.$name.decimalPlace$/,@{$events}
+                                    or grep /^ATTR.$name.decimalPlace.[0-9]+/,@{$events}) and $init_done );
+    return;
+
 }
 
 sub SmartPi_Get($@) {
@@ -244,7 +274,11 @@ sub SmartPi_Get($@) {
     }
 
     
-    SmartPi_GetData($hash,$phaseId,$valueId);
+    if( not IsDisabled($name) ) {
+        SmartPi_GetData($hash,$phaseId,$valueId);
+    } else {
+        readingsSingleUpdate($hash,'state','disabled',1);
+    }
     
     return undef;
 }
@@ -255,12 +289,11 @@ sub SmartPi_Timer_GetData($) {
     my $name    = $hash->{NAME};
     
     
+    RemoveInternalTimer($hash);
+    
     if( not IsDisabled($name) ) {
-    
         SmartPi_GetData($hash,'all','all');
-        
     } else {
-    
         readingsSingleUpdate($hash,'state','disabled',1);
     }
     
@@ -367,6 +400,8 @@ sub SmartPi_ResponseProcessing($$) {
 
 
 
+    #$json = '{"serial":"smartpi160812345","name":"House","lat":52.3667,"lng":9.7167,"time":"2017-05-30 19:52:11","softwareversion":"","ipaddress":"169.254.3.10","datasets":[{"time":"2017-05-30 19:52:08","phases":[{"phase":1,"name":"phase 1","values":[{"type":"current","unity":"A","info":"","data":0.24830514},{"type":"voltage","unity":"V","info":"","data":230},{"type":"power","unity":"W","info":"","data":57.110184},{"type":"cosphi","unity":"","info":"","data":0.70275474},{"type":"frequency","unity":"Hz","info":"","data":120.413925}]},{"phase":2,"name":"phase 2","values":[{"type":"current","unity":"A","info":"","data":0.86874366},{"type":"voltage","unity":"V","info":"","data":230},{"type":"power","unity":"W","info":"","data":199.81104},{"type":"cosphi","unity":"","info":"","data":0.99155134},{"type":"frequency","unity":"Hz","info":"","data":386.1237}]},{"phase":3,"name":"phase 3","values":[{"type":"current","unity":"A","info":"","data":1.3195294},{"type":"voltage","unity":"V","info":"","data":230},{"type":"power","unity":"W","info":"","data":303.49176},{"type":"cosphi","unity":"","info":"","data":-0.25960922},{"type":"frequency","unity":"Hz","info":"","data":153.38525}]},{"phase":4,"name":"phase 4","values":[{"type":"current","unity":"A","info":"","data":1.0668689}]}]}]}';
+    
     $decode_json    = eval{decode_json($json)};
     
     if($@){
@@ -389,28 +424,6 @@ sub SmartPi_WriteReadings($$) {
     
     Log3 $name, 4, "SmartPi ($name) - Write Readings";
     
-    
-    
-    #{"serial":"smartpi160812345","name":"House","lat":52.3667,"lng":9.7167,"time":"2017-05-30 19:52:11","softwareversion":"","ipaddress":"169.254.3.10",
-    
-    
-    
-    #"datasets":[{"time":"2017-05-30 19:52:08","phases":[
-    
-    #{"phase":1,"name":"phase 1","values":[
-   # {"type":"current","unity":"A","info":"","data":0.24830514},{"type":"voltage","unity":"V","info":"","data":230},{"type":"power","unity":"W","info":"","data":57.110184},{"type":"cosphi","unity":"","info":"","data":0.70275474},{"type":"frequency","unity":"Hz","info":"","data":120.413925}]},
-    
-    #{"phase":2,"name":"phase 2","values":[
-    #{"type":"current","unity":"A","info":"","data":0.86874366},{"type":"voltage","unity":"V","info":"","data":230},{"type":"power","unity":"W","info":"","data":199.81104},{"type":"cosphi","unity":"","info":"","data":0.99155134},{"type":"frequency","unity":"Hz","info":"","data":386.1237}]},
-    
-    #{"phase":3,"name":"phase 3","values":[
-    #{"type":"current","unity":"A","info":"","data":1.3195294},{"type":"voltage","unity":"V","info":"","data":230},{"type":"power","unity":"W","info":"","data":303.49176},{"type":"cosphi","unity":"","info":"","data":-0.25960922},{"type":"frequency","unity":"Hz","info":"","data":153.38525}]},
-    
-    #{"phase":4,"name":"phase 4","values":[
-    #{"type":"current","unity":"A","info":"","data":1.0668689}]}]}]}
-
-    
-    
     readingsBeginUpdate($hash);
     
     readingsBulkUpdateIfChanged($hash,'serialNumber',$decode_json->{serial},1);
@@ -425,6 +438,7 @@ sub SmartPi_WriteReadings($$) {
         my $dataset;
         my $phase;
         my $value;
+        my $decimal = AttrVal($name,'decimalPlace',2);
     
         foreach $dataset (@{$decode_json->{datasets}}) {
         
@@ -436,11 +450,11 @@ sub SmartPi_WriteReadings($$) {
                     if( ref($phase->{values}) eq "ARRAY" and scalar(@{$phase->{values}}) > 0 ) {
                         foreach $value (@{$phase->{values}}) {
                             
-                            readingsBulkUpdateIfChanged( $hash, "phase$phase->{phase}_Current", $value->{data}, 1 ) if( $value->{type} eq 'current' );
-                            readingsBulkUpdateIfChanged( $hash, "phase$phase->{phase}_Voltage", $value->{data}, 1 ) if( $value->{type} eq 'voltage' );
-                            readingsBulkUpdateIfChanged( $hash, "phase$phase->{phase}_Power", $value->{data}, 1 ) if( $value->{type} eq 'power' );
-                            readingsBulkUpdateIfChanged( $hash, "phase$phase->{phase}_Cosphi", $value->{data}, 1 ) if( $value->{type} eq 'cosphi' );
-                            readingsBulkUpdateIfChanged( $hash, "phase$phase->{phase}_Frequency", $value->{data}, 1 ) if( $value->{type} eq 'frequency' );
+                            readingsBulkUpdateIfChanged( $hash, "phase$phase->{phase}_Current", sprintf("%.${decimal}f",$value->{data}), 1 ) if( $value->{type} eq 'current' );
+                            readingsBulkUpdateIfChanged( $hash, "phase$phase->{phase}_Voltage", sprintf("%.${decimal}f",$value->{data}), 1 ) if( $value->{type} eq 'voltage' );
+                            readingsBulkUpdateIfChanged( $hash, "phase$phase->{phase}_Power", sprintf("%.${decimal}f",$value->{data}), 1 ) if( $value->{type} eq 'power' );
+                            readingsBulkUpdateIfChanged( $hash, "phase$phase->{phase}_Cosphi", sprintf("%.${decimal}f",$value->{data}), 1 ) if( $value->{type} eq 'cosphi' );
+                            readingsBulkUpdateIfChanged( $hash, "phase$phase->{phase}_Frequency", sprintf("%.${decimal}f",$value->{data}), 1 ) if( $value->{type} eq 'frequency' );
                         }
                     }
                 }
@@ -488,6 +502,14 @@ sub SmartPi_WriteReadings($$) {
     <b>get</b>
     <ul>
         <li>phaseX Y             - get new Y (Voltage or Current or so)data about phaseX</li>
+    </ul>
+    <a name="SmartPiattribut"></a>
+    <b>get</b>
+    <ul>
+        <li>disable - disables the device</li>
+        <li>disabledForIntervals - disable device for interval time (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
+        <li>interval - interval in seconds for statusRequest</li>
+        <li></li>
     </ul>
 </ul>
 
