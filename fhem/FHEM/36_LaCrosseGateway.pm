@@ -491,6 +491,9 @@ sub LaCrosseGateway_HandleKVP($$) {
   if($kvp =~ m/UpTimeText=(.*?)(\,|\ ,)/) {
     readingsBulkUpdate($hash, "UpTime", $1);
   }
+  if($kvp =~ m/UpTimeSeconds=(.*?)(\,|\ ,)/) {
+    readingsBulkUpdate($hash, "UpTimeSeconds", $1);
+  }
   if($kvp =~ m/RSSI=(.*?)(\,|\ ,)/) {
     readingsBulkUpdate($hash, "RSSI", $1);
   }
