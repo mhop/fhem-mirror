@@ -497,11 +497,11 @@ sub S7_DWrite_setABit($$) {
 						my $mv = $1;
 						my $last_value = $h->{".attreocr-threshold$reading"};
 						if( !defined($last_value) ) {
-						  $h->{".attreocr-threshold$reading"} = $mv;
+						  # $h->{".attreocr-threshold$reading"} = $mv;
 						} elsif( abs($mv - $last_value) < $threshold ) {
 						  $eocr = 0;
 						} else {
-						  $h->{".attreocr-threshold$reading"} = $mv;
+						  # $h->{".attreocr-threshold$reading"} = $mv;
 						}
 					  }
 					}
