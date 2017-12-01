@@ -569,7 +569,7 @@ ZWDongle_Get($@)
     my $maxlen = (length($msg) >= 10 ? 10 : length($msg));
     for(my $off=4; $off<$maxlen; $off+=2) {
         my $dec = hex(substr($msg, $off, 2));
-        if($dec == 127 || $dec == 0) {
+        if($dec == 127) {
           push @list, ("ch".($i+1).":N/A");
         } elsif($dec == 126) {
           push @list, ("ch".($i+1).":aboveMaxPower");
