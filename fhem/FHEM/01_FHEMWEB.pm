@@ -601,6 +601,7 @@ FW_initInform($$)
     $me->{inform}{filter} = ($FW_room ? $FW_room : ".*");
   }
   my $filter = $me->{inform}{filter};
+  $filter =~ s/([[\]().+?])/\\$1/g if($filter =~ m/room=/); # Forum #80390
   $filter = "NAME=.*" if($filter eq "room=all");
   $filter = "room!=.+" if($filter eq "room=Unsorted");
 
