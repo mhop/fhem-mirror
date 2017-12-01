@@ -402,7 +402,7 @@ sub Hyperion_GetConfigs($)
   }
   Log3 $name,4,"$name: lsCmd: $com";
   $com = encode_base64($com);
-  $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$com","Hyperion_GetConfigs_finished");
+  $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$com","Hyperion_GetConfigs_finished",20,"Hyperion_ExecCmd_aborted",$hash);
   return "Working in background...";
 }
 
@@ -509,6 +509,19 @@ sub Hyperion_Kill_finished($)
   return undef;
 }
 
+sub Hyperion_ExecCmd_aborted($)
+{
+  my ($hash)    = @_;
+  my $name        = $hash->{NAME};
+  delete $hash->{helper}{RUNNING_PID};
+  delete $hash->{helper}{configFile} if ($hash->{helper}{configFile});
+  delete $hash->{helper}{startCmd} if ($hash->{helper}{startCmd});
+  my $er = "Hyperion_ExecCmd aborted due to timeout of 20 sec.";
+  Log3 $name,2,"$name: $er";
+  readingsSingleUpdate($hash,"lastError",$er,1);
+  return undef;
+}
+
 sub Hyperion_Restart($)
 {
   my ($string)    = @_;
@@ -525,7 +538,7 @@ sub Hyperion_Restart($)
   else
   {
     my $cmd = $hash->{helper}{startCmd};
-    $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$cmd","Hyperion_Restart_finished");
+    $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$cmd","Hyperion_Restart_finished",20,"Hyperion_ExecCmd_aborted",$hash);
   }
   return undef;
 }
@@ -626,7 +639,7 @@ sub Hyperion_Set($@)
       $com .= Hyperion_isLocal($ip)?"":"'";
       Log3 $name,4,"$name: stopCmd: $com";
       $com = encode_base64($com);
-      $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$com","Hyperion_Kill_finished");
+      $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$com","Hyperion_Kill_finished",20,"Hyperion_ExecCmd_aborted",$hash);
     }
     elsif (($cmd eq "binary" && $value eq "restart") || $cmd eq "configFile")
     {
@@ -654,7 +667,7 @@ sub Hyperion_Set($@)
       $com = encode_base64($com);
       $hash->{helper}{configFile} = $file;
       $hash->{helper}{startCmd} = encode_base64($start);
-      $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$com","Hyperion_Restart");
+      $hash->{helper}{RUNNING_PID} = BlockingCall("Hyperion_ExecCmd","$name|$com","Hyperion_Restart",20,"Hyperion_ExecCmd_aborted",$hash);
     }
     return;
   }
