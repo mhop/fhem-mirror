@@ -49,6 +49,7 @@ FileLog_Initialize($)
     disable:0,1
     disabledForIntervals
     eventOnThreshold
+    ignoreRegexp
     logtype
     mseclog:1,0
     nrarchive
@@ -181,6 +182,7 @@ FileLog_Log($$)
 
   my $n = $dev->{NAME};
   my $re = $log->{REGEXP};
+  my $iRe = AttrVal($ln, "ignoreRegexp", undef);
   my $max = int(@{$events});
   my $tn = $dev->{NTFY_TRIGGERTIME};
   if($log->{mseclog}) {
@@ -197,6 +199,7 @@ FileLog_Log($$)
     $s = "" if(!defined($s));
     my $t = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
     if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/ || "$t:$n:$s" =~ m/^$re$/) {
+      next if($iRe && ($n =~ m/^$iRe$/ || "$n:$s" =~ m/^$iRe$/));
       $t =~ s/ /_/; # Makes it easier to parse with gnuplot
 
       if(!$switched) {
@@ -236,6 +239,12 @@ FileLog_Attr(@)
   if($a[2] eq "mseclog") {
     $defs{$a[1]}{mseclog} = ($a[0] eq "set" && (!defined($a[3]) || $a[3]) );
     return;
+  }
+
+  if($a[0] eq "set" && $a[2] eq "ignoreRegexp") {
+    return "Missing argument for ignoreRegexp" if(!defined($a[3]));
+    eval { "HALLO" =~ m/$a[3]/ };
+    return $@;
   }
 
   if($a[0] eq "set" && $a[2] eq "disable") {
@@ -1305,6 +1314,8 @@ FileLog_regexpFn($$)
         feature was implemented. A FHEM crash or kill will falsify the counter.
         </li><br>
 
+    <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
+
     <a name="logtype"></a>
     <li>logtype<br>
         Used by the pgm2 webfrontend to offer gnuplot/SVG images made from the
@@ -1625,6 +1636,8 @@ FileLog_regexpFn($$)
         Features angelegt wurden. Ein Absturz/Abschu&szlig; von FHEM
         verf&auml;lscht die Z&auml;hlung.
         </li><br>
+
+    <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
 
     <a name="logtype"></a>
     <li>logtype<br>
