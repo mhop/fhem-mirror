@@ -1371,6 +1371,7 @@ sub FB_CALLMONITOR_requestTR064($$$$;$$)
     $param->{loglevel}   = 4;
     $param->{digest}     = 1;
     $param->{hideurl}    = 1;
+    $param->{sslargs}    = { SSL_verify_mode => 0,  SSL_cipher_list => 'DEFAULT:!DH' }; # workaround for newer OpenSSL-Libraries who do not allow weak DH based ciphers (Forum: #80281)
 
     unless($hash->{helper}{TR064}{SECURITY_PORT})
     {
