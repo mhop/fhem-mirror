@@ -319,7 +319,17 @@ HttpUtils_Connect($)
   $hash->{hu_port} = $port;
   $hash->{path} = '/' unless defined($hash->{path});
   $hash->{addr} = "$hash->{protocol}://$host:$port";
-  $hash->{auth} = urlDecode("$user:$pwd") if($authstring);
+  
+  if($authstring) {
+   $hash->{auth} = 1;
+   $hash->{user} = urlDecode("$user");
+   $hash->{pwd} = urlDecode("$pwd");
+  } elsif(defined($hash->{user}) && defined($hash->{pwd})) {
+   $hash->{auth} = 1;
+  } else  {
+   $hash->{auth} = 0;
+  }
+  
 
   my $proxy = AttrVal("global", "proxy", undef);
   if($proxy) {
@@ -520,8 +530,8 @@ HttpUtils_Connect2($)
   $hdr .= "Connection: Close\r\n"
                               if($httpVersion ne "1.0" && !$hash->{keepalive});
 
-  $hdr .= "Authorization: Basic ".encode_base64($hash->{auth}, "")."\r\n"
-              if(defined($hash->{auth}) && !$hash->{digest} &&
+  $hdr .= "Authorization: Basic ".encode_base64($hash->{user}.":".$hash->{pwd}, "")."\r\n"
+              if($hash->{auth} && !$hash->{digest} &&
                  !($hash->{header} &&
                    $hash->{header} =~ /^Authorization:\s*Digest/mi));
   $hdr .= $hash->{header}."\r\n" if($hash->{header});
@@ -659,7 +669,7 @@ HttpUtils_DigestHeader($$)
   } 
  
   my ($ha1, $ha2, $response);
-  my ($user,$passwd) = split(/:/, $hash->{auth}, 2);
+  my ($user,$passwd) = ($hash->{user}, $hash->{pwd});
 
   if(exists($digdata{qop})) {
     $digdata{nc} = "00000001";
@@ -755,7 +765,7 @@ HttpUtils_ParseAnswer($)
   $hash->{code} = $code;
 
   # if servers requests digest authentication
-  if($code==401 && defined($hash->{auth}) &&
+  if($code==401 && $hash->{auth} &&
     !($hash->{header} && $hash->{header} =~ /^Authorization:\s*Digest/mi) &&
     $hash->{httpheader} =~ /^WWW-Authenticate:\s*Digest\s*(.+?)\s*$/mi) {
    
@@ -771,7 +781,7 @@ HttpUtils_ParseAnswer($)
       return HttpUtils_BlockingGet($hash);
     }
    
-  } elsif($code==401 && defined($hash->{auth})) {
+  } elsif($code==401 && $hash->{auth}) {
     return ("$hash->{displayurl}: wrong authentication", "")
 
   }
@@ -811,7 +821,7 @@ HttpUtils_ParseAnswer($)
 #  optional(default):
 #    digest(0),hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
 #    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
-#    method($data ? "POST" : "GET"),keepalive(0),sslargs({})
+#    method($data?"POST":"GET"),keepalive(0),sslargs({}),user(),pwd()
 # Example:
 #   { HttpUtils_NonblockingGet({ url=>"http://www.google.de/",
 #     callback=>sub($$$){ Log 1,"ERR:$_[1] DATA:".length($_[2]) } }) }
