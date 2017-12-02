@@ -63,6 +63,7 @@
 # 0.45 2017-10-28	Byte fehler bei erneutem Kommando während Positionsanfahrten behoben
 # 0.46 2017-05-11	Byte fehler bei fhem-neustart behoben
 # 0.47 2017-11-11	Byte attr Disable zugefügt.
+# 0.47 2017-02-12	Byte/Dr Smag  Quickfix ERB15LE
 ################################################################################################################
 # Todo's:
 # - 
@@ -75,7 +76,7 @@ package main;
 
 use strict;
 use warnings;
-my $version = "V 0.47";
+my $version = "V 0.48";
 
 my %codes = (
 	"55" => "stop",			# Stop the current movement or move to custom position
@@ -140,7 +141,7 @@ sub Siro_Initialize($) {
 	$hash->{AttrList} = " IODev"
 	  . " disable:0,1"
 	  . " SignalRepeats:1,2,3,4,5,6,7,8,9"
-	  . " SignalLongStopRepeats:10,15,20"
+	  . " SignalLongStopRepeats:10,15,20,40,45,50"
 	  . " channel_send_mode_1:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
 	  . " $readingFnAttributes"
 	  . " setList"
@@ -1066,7 +1067,7 @@ my $testtimestart = gettimeofday();
 						push (@cList,$k);
 						}
 				} # end foreach
-			return "Siro_set: Unknown argument $cmd, choose one of " . join(" ", @cList);
+			return "Unknown argument $cmd, choose one of " . join(" ", @cList);
 		} 
     #########################################
 	
