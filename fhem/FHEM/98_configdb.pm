@@ -63,8 +63,9 @@ sub CommandConfigdb($$) {
 			my ($dbconn,$dbuser,$dbpass,$dbtype)  = _cfgDB_readConfig();
 			my ($dbname,$dbhostname,$dbport,$gzip,$mp,$ret,$size,$source,$target,$ts);
 			$ts     = strftime('%Y-%m-%d_%H-%M-%S',localtime);
-			$mp     = AttrVal('global','modpath','.');
-			$target = "$mp/log/configDB_$ts.dump";
+			$mp     = $configDB{attr}{'dumpPath'};
+			$mp   //= AttrVal('global','modpath','.').'/log';
+			$target = "$mp/configDB_$ts.dump";
 
 			if (lc($param1) eq 'unzipped') {
 				$gzip = '';
