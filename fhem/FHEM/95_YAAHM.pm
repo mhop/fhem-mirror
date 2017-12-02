@@ -50,7 +50,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.21";
+my $yaahmversion    = "1.30";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -1838,8 +1838,7 @@ sub YAAHM_sayWeeklyTime($$$) {
     if( ($ton =~ /(\d?\d):(\d\d)(:(\d\d))?/) && ($tom ne $ton) ){
       $hw = $1*1;
       $mw = $2*1;
-      $pt = sprintf("%d:%02d",$hw,$mw)." ".lc($yaahm_tt->{"today"});
-      
+      $pt = sprintf("%d:%02d",$hw,$mw)." ".lc($yaahm_tt->{"tomorrow"});    
       $msg .= " ".lc($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"exceptly"}." $hw ".$yaahm_tt->{"clock"};
       $msg .=" $mw"
        if( $mw != 0 );
@@ -1854,7 +1853,7 @@ sub YAAHM_sayWeeklyTime($$$) {
       $pt   = "off ".lc($yaahm_tt->{"today"})." ".$yaahm_tt->{"and"}." ".lc($yaahm_tt->{"tomorrow"});
       $msg .= " ".lc($yaahm_tt->{"today"})." ".$yaahm_tt->{"and"}." ".lc($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"swoff"};
     }else{
-      $pt  = $yaahm_tt->{"undecid"};
+      $pt  = $yaahm_tt->{"undecid"}; 
       $msg .= " ".$yaahm_tt->{"undecid"};
     }
   #-- today nontrivial => compare this time with current time
@@ -2873,7 +2872,9 @@ sub YAAHM_timewidget($){
   my $name = $FW_webArgs{name};
   $name    =~ s/'//g;
   
-  my @size=split('x',($FW_webArgs{size} ? $FW_webArgs{size} : '400x400'));
+  my $sz = ($FW_webArgs{size} ? $FW_webArgs{size} : '400x400');
+  $sz    =~ s/'//g;
+  my @size=split('x',$sz);
   
   $FW_RETTYPE = "image/svg+xml";
   $FW_RET="";
