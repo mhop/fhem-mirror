@@ -25,7 +25,12 @@ function doifUpdateCell(doifname,attrname,attrcont,content,style) {
 
 function doifTablePopUp(hash,name,doif,table) {
   FW_cmd(FW_root+"?cmd={DOIF_RegisterEvalAll(\$defs{"+name+"},\""+name+"\",\""+table+"\")}&XHR=1", function(data){
-    FW_okDialog(data,$("[uitabid='DOIF-"+doif+"']"));
+    var uit = $("[uitabid='DOIF-"+doif+"']");
+    if(uit.html() !== undefined){
+      FW_okDialog(data,uit);
+    } else {
+      FW_okDialog(data);
+    }
   });
 }
 
