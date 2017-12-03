@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  FileLog removes newlines from the data (Forum #79684)
   - bugfix:  98_Siro.pm: Support favorit for model ERB15LE
   - feature: notify/FileLog: add ignoreRegexp attribute (Forum #79684)
   - feature: 46_SmartPi: add decimal Attr, fix Notify bug

@@ -207,6 +207,7 @@ FileLog_Log($$)
         $switched = 1;
       }
       $fh = $log->{FH};
+      $s =~ s/\n/ /g;
       print $fh "$t $n $s\n";
       $written++;
     }
@@ -274,6 +275,8 @@ FileLog_Set($@)
     my $r = "Unknown argument $cmd, choose one of ".join(" ",sort keys %sets);
     my $fllist = join(",", grep { $me ne $_ } devspec2array("TYPE=FileLog"));
     $r =~ s/absorb/absorb:$fllist/;
+    $r =~ s/clear/clear:noArg/;
+    $r =~ s/reopen/reopen:noArg/;
     return $r;
   }
   return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 2);
