@@ -1102,7 +1102,7 @@ FW_addLinks($)
 {
   my ($txt) = @_;
   return undef if(!defined($txt));
-  $txt =~ s,\s([a-z0-9._]+)\s,
+  $txt =~ s,\b([a-z0-9._]+)\b,
             $defs{$1} ? "<a href='$FW_ME$FW_subdir?detail=$1'>$1</a>" : $1,gei;
   return $txt;
 }

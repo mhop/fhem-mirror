@@ -366,6 +366,8 @@ SVG_PEdit($$$$)
   return "" if( $pe eq 'never' );
 
   my $gpf = $defs{$d}{GPLOTFILE};
+  my $link = "$FW_ME?cmd=style edit $gpf.gplot".
+               (configDBUsed() ? " configDB" : "").$FW_CSRF;
   my $gp = "$FW_gplotdir/$gpf.gplot";
   my $pm = AttrVal($d,"plotmode",$FW_plotmode);
 
@@ -569,8 +571,7 @@ EOF
   });
   setTimeout(function(){
     \$("table.internals div[informid=$gpf-GPLOTFILE]").each(function(){
-      \$(this).html(
-        "<a href='$FW_ME?cmd=style edit $gpf.gplot&fwcsrf=$FW_CSRF'>$gpf</a>");
+      \$(this).html("<a href='$link'>$gpf</a>");
     }) }, 10);
 </script>
 EOF
