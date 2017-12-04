@@ -1,4 +1,4 @@
-REV 15544
+REV 15548
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-12-03_07:45:03 221660 ./CHANGED
+UPD 2017-12-04_07:45:02 221727 ./CHANGED
 UPD 2017-11-29_07:45:02 35884 ./MAINTAINER.txt
 UPD 2017-09-20_07:45:02 39189 ./configDB.pm
 UPD 2017-10-13_07:45:02 15740 ./fhem.cfg.demo
@@ -391,7 +391,7 @@ UPD 2017-08-14_07:45:02 6980 FHEM/91_eventTypes.pm
 UPD 2017-12-02_07:45:02 27166 FHEM/91_notify.pm
 UPD 2017-09-04_07:45:02 10369 FHEM/91_sequence.pm
 UPD 2017-08-14_07:45:02 14785 FHEM/91_watchdog.pm
-UPD 2017-12-02_07:45:02 55892 FHEM/92_FileLog.pm
+UPD 2017-12-04_07:45:02 55980 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2017-11-29_07:45:02 291201 FHEM/93_DbLog.pm
 UPD 2017-11-19_07:45:03 404590 FHEM/93_DbRep.pm
@@ -1962,9 +1962,9 @@ UPD 2015-07-28_14:05:34 14618 www/pgm2/dashboard_darkstyle.css
 UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2017-10-13_07:45:02 5484 www/pgm2/defaultCommon.css
-UPD 2017-11-29_07:45:02 2187 www/pgm2/doif.js
+UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
-UPD 2017-10-11_07:45:02 51614 www/pgm2/fhemweb.js
+UPD 2017-12-04_07:45:02 51615 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
 UPD 2017-03-07_07:45:02 3139 www/pgm2/fhemweb_fbcalllist.js
 UPD 2017-11-16_07:45:02 8440 www/pgm2/fhemweb_iconButtons.js
