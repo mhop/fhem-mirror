@@ -176,9 +176,12 @@ FBDECT_Get($@)
   my $cmd = ($a[1] ? $a[1] : "");
   my %gets = ("devInfo"=>1);
 
-  my $cmdList = ($hash->{IODev} && $hash->{IODev}{TYPE} eq "FBAHA") ? 
-                  join(" ", sort keys %gets) : "";
-  return "Unknown argument $cmd, choose one of $cmdList" if(!$gets{$cmd});
+  if($hash->{IODev} && $hash->{IODev}{TYPE} eq "FBAHA") {
+    return "Unknown argument $cmd, choose one of ".join(" ",sort keys %gets)
+        if(!$gets{$cmd});
+  } else {
+    return "Unknown argument $cmd, choose one of ";
+  }
 
   if($cmd eq "devInfo") {
     my @answ = FBAHA_getDevList($hash->{IODev}, $hash->{id});
