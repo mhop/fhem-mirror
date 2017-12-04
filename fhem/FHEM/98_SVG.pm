@@ -27,6 +27,7 @@ use vars qw(%FW_webArgs); # all arguments specified in the GET
 use vars qw($FW_formmethod);
 use vars qw($FW_userAgent);
 use vars qw($FW_hiddenroom);
+use vars qw($FW_CSRF);
 
 my $SVG_RET;        # Returned data (SVG)
 sub SVG_calcOffsets($$);
@@ -364,7 +365,8 @@ SVG_PEdit($$$$)
 
   return "" if( $pe eq 'never' );
 
-  my $gp = "$FW_gplotdir/$defs{$d}{GPLOTFILE}.gplot";
+  my $gpf = $defs{$d}{GPLOTFILE};
+  my $gp = "$FW_gplotdir/$gpf.gplot";
   my $pm = AttrVal($d,"plotmode",$FW_plotmode);
 
   my ($err, $cfg, $plot, $srcDesc) = SVG_readgplotfile($d, $gp, $pm);
@@ -561,10 +563,15 @@ SVG_PEdit($$$$)
     e.preventDefault();
 EOF
     $ret .= 
-    "FW_cmd('$sl', function(arg){" .<<'EOF';
+    "FW_cmd('$sl', function(arg){" .<<"EOF";
       FW_okDialog(arg);
     });
   });
+  setTimeout(function(){
+    \$("table.internals div[informid=$gpf-GPLOTFILE]").each(function(){
+      \$(this).html(
+        "<a href='$FW_ME?cmd=style edit $gpf.gplot&fwcsrf=$FW_CSRF'>$gpf</a>");
+    }) }, 10);
 </script>
 EOF
   return $ret;

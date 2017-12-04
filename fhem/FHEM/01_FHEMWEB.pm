@@ -1100,18 +1100,11 @@ FW_addContent(;$)
 sub
 FW_addLinks($)
 {
-  return undef if(!defined($_[0]));
-  my @lines = split( /\n/, $_[0]); # Adding links
-  my $ret = "";
-  foreach my $line (@lines) {
-    $ret .= "\n" if( $ret );
-    foreach my $word ( split( / /, $line ) ) {
-      $word = "<a href=\"$FW_ME$FW_subdir?detail=$word\">$word</a>"
-            if( $defs{$word} );
-      $ret .= "$word ";
-    }
-  }
-  return $ret;
+  my ($txt) = @_;
+  return undef if(!defined($txt));
+  $txt =~ s,\s([a-z0-9._]+)\s,
+            $defs{$1} ? "<a href='$FW_ME$FW_subdir?detail=$1'>$1</a>" : $1,gei;
+  return $txt;
 }
 
 
