@@ -142,20 +142,6 @@ FW_jqueryReadyFn()
     });
   });
 
-  // Replace the FORM-POST in detail-view by XHR
-  /* Inactive, as Internals and Attributes arent auto updated.
-  $("form input[type=submit]").click(function(e) {
-    var cmd = "";
-    $(this).parent().find("[name]").each(function() {
-      cmd += (cmd?"&":"")+$(this).attr("name")+"="+$(this).val();
-    });
-    if(cmd.indexOf("detail=") < 0)
-      return;
-    e.preventDefault();
-    FW_cmd(FW_root+"?"+cmd+"&XHR=1");
-  });
-  */
-
   $("form input.get[type=submit]").click(function(e) { //"get" via XHR to dialog
     e.preventDefault();
     var cmd = "", el=this;
