@@ -1,5 +1,5 @@
 #############################################
-# $Id$# 
+# $Id$
 #
 # This file is part of fhem.
 #
@@ -21,11 +21,13 @@
 package main;
 use strict;
 use warnings;
+use Color;
+use vars qw($FW_wname);   # Web instance name
 
 sub DOIF_cmd ($$$$);
+sub DOIF_Notify ($$);
 
-sub
-DOIF_delTimer($)
+sub DOIF_delTimer($)
 {
   my ($hash) = @_;
   RemoveInternalTimer($hash);
@@ -34,8 +36,7 @@ DOIF_delTimer($)
   }
 }
 
-sub
-DOIF_delAll($)
+sub DOIF_delAll($)
 {
   my ($hash) = @_;
   delete ($hash->{helper});
@@ -55,17 +56,15 @@ DOIF_delAll($)
   delete ($hash->{trigger});
   delete ($hash->{triggertime});
   delete ($hash->{interval});
-  delete ($hash->{regexp});
-  #delete ($hash->{state});
-  #delete ($defs{$hash->{NAME}}{READINGS});
+  foreach my $key (keys %{$hash->{Regex}}) {
+    delete $hash->{Regex}{$key} if ($key !~ "STATE|DOIF_Readings|uiTable");
+  }
   foreach my $key (keys %{$defs{$hash->{NAME}}{READINGS}}) {
     delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key =~ "^(Device|state|error|warning|cmd|e_|timer_|wait_|matched_|last_cmd|mode)");
   }
 }
 
-#########################
-sub
-DOIF_Initialize($)
+sub DOIF_Initialize($)
 {
   my ($hash) = @_;
   $hash->{DefFn}   = "DOIF_Define";
@@ -73,13 +72,487 @@ DOIF_Initialize($)
   $hash->{UndefFn}  = "DOIF_Undef";
   $hash->{AttrFn}   = "DOIF_Attr";
   $hash->{NotifyFn} = "DOIF_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:1,0 addStateEvent:1,0 checkall:event,timer,all weekdays setList:textField-long readingList ".$readingFnAttributes;
+  $hash->{FW_deviceOverview} = 1;
+  $hash->{FW_addDetailToSummary} = 1;
+  $hash->{FW_detailFn} = "DOIF_detailFn";
+  $hash->{FW_summaryFn}  = "DOIF_summaryFn";
+  #$hash->{FW_atPageEnd} = 1;
+
+  $data{FWEXT}{DOIF}{SCRIPT} = "doif.js";
+
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:1,0 addStateEvent:1,0 checkall:event,timer,all weekdays setList:textField-long readingList DOIF_Readings:textField-long uiTable:textField-long ".$readingFnAttributes;
+}
+
+# uiTable
+sub DOIF_reloadFW {
+  map { FW_directNotify("#FHEMWEB:$_", "location.reload()", "") } devspec2array("TYPE=FHEMWEB");
+}
+
+sub DOIF_hsv
+{
+  my ($cur,$min,$max,$min_s,$max_s,$s,$v)=@_;
+  
+  my $m=($max_s-$min_s)/($max-$min);
+  my $n=$min_s-$min*$m;
+  if ($cur>$max) {
+   $cur=$max;
+  } elsif ($cur<$min) {
+    $cur=$min;
+  }
+    
+  my $h=$cur*$m+$n;
+  $h /=360;
+  $s /=100;
+  $v /=100;  
+  
+  my($r,$g,$b)=Color::hsv2rgb ($h,$s,$v);
+  $r *= 255;
+  $g *= 255;
+  $b *= 255;
+  return sprintf("#%02X%02X%02X", $r+0.5, $g+0.5, $b+0.5);
 }
 
 
+sub DOIF_rgb {
+  my ($sc,$ec,$pct,$max,$cur) = @_;
+  $cur = ($cur =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
+  $pct = ($cur-$pct)/($max-$pct) if (@_ == 5);
+  my $prefix = "";
+  $prefix = "#" if ("$sc $ec"=~"#");
+  $sc =~ s/^#//;
+  $ec =~ s/^#//;
+  $pct = $pct > 1 ? 1 : $pct;
+  $pct = $pct < 0 ? 0 : $pct;
+  $sc =~/([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})/;
+  my @sc = (hex($1),hex($2),hex($3));
+  $ec =~/([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})/;
+  my @ec = (hex($1),hex($2),hex($3));
+  my @rgb;
+  for (0..2) {
+    $rgb[$_] = sprintf("%02X", int(($ec[$_] - $sc[$_])*$pct + $sc[$_] + .5));
+  }
+  return $prefix.join("",@rgb);
+} 
 
-sub
-GetBlockDoIf ($$)
+#sub DOIF_Icon {
+#  my ($dev, $reading, $icon, $cmd, $type) = @_;
+#  my $val = ReadingsVal($dev,$reading,"???");
+#  $type= $reading eq 'state' ? 'set' : 'setreading' if (!defined $type);
+#  my $ret = FW_makeImage($icon,$cmd,"icon");
+#  $ret = FW_pH "cmd.$dev=$type $dev $reading $cmd", $ret, 0, "webCmd", 1;
+#  return "$ret";
+#}
+
+sub DOIF_UpdateCell
+{
+  my ($hash,$doifId,$dev,$reading) =@_;
+  my $pn = $hash->{NAME};
+  my $retVal="";
+  my $retStyle="";
+  my $reg="";
+  my $VALUE="";
+  if ($doifId =~ /.*_(.*)_c_(.*)_(.*)_(.*)_(.*)$/) {
+    eval ($hash->{$1}{table}{$2}{$3}{$4}{$5});
+    if ($@) {
+        my $err="$pn: eval: $hash->{$1}{table}{$2}{$3}{$4}{$5} error: $@" ;
+        Log3 $pn,3,$err; 
+    }
+  }
+}
+
+sub DOIF_Widget
+{
+  my ($hash,$reg,$doifId,$value,$style,$widget,$dev,$reading,$command)=@_;
+  if ($reg) {
+    return DOIF_Widget_Register($doifId,$value,$style,$widget,$dev,$reading,$command);
+  } else {
+    DOIF_Widget_Update($hash->{NAME},$doifId,$value,$style,$widget,$dev,$reading,$command);
+  }
+}
+
+sub DOIF_Widget_Update
+{
+  my ($pn,$doifId,$value,$style,$widget,$dev,$reading,$command)=@_;
+  if (defined $widget) {
+    if (1) {
+      map { 
+         FW_directNotify("#FHEMWEB:$_", "doifUpdateCell('$pn','informid','$dev-$reading','$value')","")
+      } devspec2array("TYPE=FHEMWEB");
+    }
+  } else {
+      map { 
+         FW_directNotify("#FHEMWEB:$_", "doifUpdateCell('$pn','doifId','$doifId','$value','display:inline;$style')","")
+      } devspec2array("TYPE=FHEMWEB") if ($value ne "");
+  }
+}
+
+sub DOIF_Widget_Register
+{
+  my ($doifId,$value,$style,$widget,$dev,$reading,$command)=@_;
+  my $type;
+  my $cmd='';
+  if (defined $widget) {
+    if (defined $command) {
+      if ($command =~ /^([^ ]*) *(.*)/) {
+        $type = !defined $1 ? '': $1;
+        $cmd = !defined $2 ? '': $2;
+      } else {
+        $type=$command;
+      } 
+    } else {
+      $type= $reading eq 'state' ? 'set' : 'setreading';
+    }
+    $cmd = $cmd eq '' ? $reading : $cmd;
+    return "<div class='fhemWidget' cmd='$cmd' reading='$reading' dev='$dev' arg='$widget' current='$value' type='$type'></div>";
+  } else {
+    return "<div class='dval' doifId='$doifId' style='display:inline;$style'>$value</div>";
+  }
+}
+ 
+sub DOIF_RegisterCell
+{
+  my ($hash,$table,$func,$r,$c,$cc,$cr) =@_;
+  my $event;
+  my $err;
+  my $dev="";
+  my $reading="";
+  my $value="";
+  my $expr;
+  my $style;
+  my $widget;
+  my $command;
+  my $cell;
+  my $widsty=0;
+  my $trigger=0;
+  
+  if ($func=~ /^\s*(STY[ \t]*\(|WID[ \t]*\()/) {
+    my ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($func,'[\(\)]');
+      if ($err) {
+        return $err;
+      } elsif ($currentBlock ne "") {
+      $cell=$currentBlock;
+    } 
+  } else {
+    $cell=$func;
+  }
+  
+  my $doifId="$hash->{NAME}_".$table."_c_".$r."_".$c."_".$cc."_".$cr;
+  if ($func=~ /^\s*STY[ \t]*\(/) {
+    $widsty=1;
+    ($expr,$style) = SplitDoIf(',',$cell);
+  } elsif ($func=~ /^\s*WID[ \t]*\(/) {
+    $widsty=2;
+    ($expr,$widget,$command) = SplitDoIf(',',$cell);
+  } else {
+    $expr=$cell;
+  }
+  ($expr,$err,$event)=ReplaceAllReadingsDoIf($hash,$expr,($table eq "uiTable" ? -5:-6),0,$doifId);
+  if ($err) {
+    $err="'error $err: in expression: $expr'";
+    return $err;
+  } else {
+    eval $expr;
+    if ($@) {
+      return "'error $@ in expression: $expr'";
+    }
+  }
+  $trigger=$event; 
+  if (defined($widget)) {
+    if ($event) {
+      $dev=$hash->{$table}{dev} if (defined $hash->{$table}{dev});
+      $reading=$hash->{$table}{reading} if (defined $hash->{$table}{reading});
+    } else {
+      return "'no trigger reading in widget: $expr'";
+    }
+    ($widget,$err,$event)=ReplaceAllReadingsDoIf($hash,$widget,($table eq "uiTable" ? -5:-6),0,$doifId);
+    $trigger=$event if ($event);
+    if ($err) {
+      $err="'error $err: in widget: $widget'";
+      return $err;
+    } else {
+      eval $widget;
+      if ($@) {
+        return "'error $@ in widget: $widget'";
+      }
+    }
+  } else {
+    $widget="";
+  }
+  if (defined $style) {
+    ($style,$err,$event)=ReplaceAllReadingsDoIf($hash,$style,($table eq "uiTable" ? -5:-6),0,$doifId);
+    $trigger=$event if ($event);
+    if ($err) {
+      $err="'error $err: in style: $style'";
+      return $err;
+    } else {
+      eval $style;
+      if ($@) {
+        return "'error $@ in style: $style'";
+      }
+    }
+  } else {
+    $style='""';
+  }
+  
+  if ($widsty==2) {
+      $reading="state" if ($reading eq '&STATE');
+      return "DOIF_Widget(".'$hash,$reg,'."'$doifId',$expr,$style,$widget,'$dev','$reading'".(defined $command ? ",$command)":")");
+  } elsif (($widsty==1) or $trigger) {
+      return "DOIF_Widget(".'$hash,$reg,'."'$doifId',$expr,$style)";
+  } else {
+      return $expr;
+  }
+  return ""
+}
+
+sub parse_tpl
+{
+  my ($hash,$wcmd,$table) = @_;
+  my $d=$hash->{NAME};
+  my $err="";
+  while ($wcmd =~ /(?:^|\n)\s*IMPORT\s*(.*)(\n|$)/g) {
+    $err=import_tpl($hash,$1,$table);
+    return ($err,"") if ($err);
+  }
+  
+  #$wcmd =~ s/(^|\n)\s*\#.*(\n|$)/\n/g;
+  #$wcmd =~ s/(#.*\n)|(#.*$)|\n/ /g;
+  $wcmd =~ s/(##.*\n)|(##.*$)/\n/g;
+  $wcmd =~ s/(^|\n)\s*IMPORT.*(\n|$)//g;
+  $wcmd =~ s/\$TPL\{/\$hash->\{$table\}\{template\}\{/g;
+  #$wcmd =~ s/\$TD{/\$hash->{$table}{td}{/g;
+  #$wcmd =~ s/\$TC{/\$hash->{$table}{tc}{/g;
+  $wcmd =~ s/\$ATTRIBUTESFIRST/\$hash->{$table}{attributesfirst}/;
+  
+  $wcmd =~ s/\$TC\{/\$hash->{$table}{tc}\{/g;
+  $wcmd =~ s/\$hash->\{$table\}\{tc\}\{([\d,.]*)?\}.*(\".*\")/for my \$i ($1) \{\$hash->\{$table\}\{tc\}\{\$i\} = $2\}/g;
+  
+  $wcmd =~ s/\$TR\{/\$hash->{$table}{tr}\{/g;
+  $wcmd =~ s/\$hash->\{$table\}\{tr\}\{([\d,.]*)?\}.*(\".*\")/for my \$i ($1) \{\$hash->\{$table\}\{tr\}\{\$i\} = $2\}/g;
+  
+  $wcmd =~ s/\$TD\{(.*)?\}\{(.*)?\}.*(\".*\")/for my \$rowi ($1) \{for my \$coli ($2) \{\$hash->\{$table\}\{td\}\{\$rowi\}\{\$coli\} = $3\}\}/g;
+  $wcmd =~ s/\$TABLE/\$hash->{$table}{tablestyle}/;
+
+  $wcmd =~ s/\$VAR/\$hash->{var}/g;
+  $wcmd =~ s/\$SELF/$d/g;
+  $wcmd =~ s/FUNC_/DOIF_FUNC_$d\_/g;
+  $wcmd =~ s/PUP[ \t]*\(/DOIF_tablePopUp(\"$d\",/g;
+  $wcmd =~ s/\$SHOWNOSTATE/\$hash->{$table}{shownostate}/;
+  $wcmd =~ s/\$SHOWNODEVICELINK/\$hash->{$table}{shownodevicelink}/;
+  $wcmd =~ s/\$SHOWNODEVICELINE/\$hash->{$table}{shownodeviceline}/;
+  
+  if ($wcmd=~ /^\s*\{/) { # perl block
+    my ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($wcmd,'[\{\}]');
+    if ($err) {
+        return ("error in $table: $err","");
+    } elsif ($currentBlock ne "") {
+      $currentBlock ="no warnings 'redefine';".$currentBlock;
+      eval ($currentBlock);
+      if ($@) {
+        $err="$d: error: $@ in $table: $currentBlock";
+        return ($err,"");
+      }
+      $wcmd=$tailBlock;
+    }
+  }
+  
+  $wcmd =~ s/^\s*//;
+  $wcmd =~ s/[ \t]*\n/\n/g;
+  $wcmd =~ s/,[ \t]*[\n]+/,/g;
+  $wcmd =~ s/\.[ \t]*[\n]+/\./g;
+  $wcmd =~ s/\|[ \t]*[\n]+/\|/g;
+  $wcmd =~ s/>[ \t]*[\n]+/>/g;
+  
+  my $tail=$wcmd;
+  my $beginning;
+  my $currentBlock;
+  
+  while($tail =~ /(?:^|\n)\s*DEF\s*(TPL_[^ ^\t^\(]*)[^\(]*\(/g) {
+    ($beginning,$currentBlock,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
+    if ($err) {
+        return ("error in $table: $err","");
+    } elsif ($currentBlock ne "") {
+      $hash->{$table}{tpl}{$1}=$currentBlock;
+    }
+  }
+  return ("",$tail);
+}
+
+sub import_tpl
+{
+  my ($hash,$file,$table) = @_;
+  my $fh;
+  my $err;
+  if(!open($fh, $file)) {
+    return "Can't open $file: $!";
+  }
+  my @tpl=<$fh>;
+  close $fh;
+  my $wcmd=join("",@tpl);
+  ($err,$wcmd)=parse_tpl($hash,$wcmd,$table);
+  return $err if ($err);
+  return "";
+}
+
+sub DOIF_uiTable_def 
+{
+  my ($hash,$wcmd,$table) = @_;
+  return undef if (!$wcmd); 
+  my $err="";
+  delete ($hash->{Regex}{$table});
+  delete ($hash->{$table});
+  ($err,$wcmd)=parse_tpl($hash,$wcmd,$table);
+  return $err if ($err);
+  
+  my @rcmd = split(/\n/,$wcmd);
+  my $ii=0;
+  for (my $i=0; $i<@rcmd; $i++) {
+    next if ($rcmd[$i] =~ /^\s*$/);
+    my @ccmd = SplitDoIf('|',$rcmd[$i]);
+    for (my $k=0;$k<@ccmd;$k++) {
+      if ($ccmd[$k] =~ /^\s*(TPL_[^ ^\t^\(]*)[^\(]*\(/g) {
+        my $template=$1;
+        if (defined $hash->{$table}{tpl}{$template}) {
+          my $templ=$hash->{$table}{tpl}{$template};
+          my ($beginning,$currentBlock,$err,$tail)=GetBlockDoIf($ccmd[$k],'[\(\)]');
+          if ($err) {
+            return "error in $table: $err";
+          } elsif ($currentBlock ne "") {
+            my @param = SplitDoIf(',',$currentBlock);
+            for (my $j=0;$j<@param;$j++) {
+              my $p=$j+1;
+              $templ =~ s/\$$p/$param[$j]/g;
+            }
+            $ccmd[$k]=$templ;
+          }
+        } else {
+          return ("no Template $template defined");
+        }
+      }
+      my @cccmd = SplitDoIf(',',$ccmd[$k]);
+      for (my $l=0;$l<@cccmd;$l++) {
+        my @crcmd = SplitDoIf('.',$cccmd[$l]);
+        for (my $m=0;$m<@crcmd;$m++) {
+          $hash->{$table}{table}{$ii}{$k}{$l}{$m}= DOIF_RegisterCell($hash,$table,$crcmd[$m],$ii,$k,$l,$m);
+          
+        }
+      }
+    }
+    $ii++;
+  }
+  return undef;
+  ##$hash->{$table}{tabledef}=DOIF_RegisterEvalAll($hash);
+}
+
+sub DOIF_RegisterEvalAll
+{
+  my ($hash,$d,$table) = @_;
+  my $ret = "";
+  my $reg=1;
+  return undef if (!defined $hash->{$table}{table});
+  #$ret =~ s/class\=\'block\'/$hash->{$table}{table}/ if($hash->{$table}{table});
+  if ($table eq "uiTable") {
+    $ret .= "\n<table uitabid='DOIF-$d' class=' block ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'".
+      " doifnostate='".($hash->{$table}{shownostate} ? $hash->{$table}{shownostate} : "")."'".
+      " doifnodevline='".($hash->{$table}{shownodeviceline} ? $hash->{$table}{shownodeviceline} : "")."'".
+      " doifattrfirst='".($hash->{$table}{attributesfirst} ? $hash->{$table}{attributesfirst} : "")."'".
+      ">"; 
+    #$ret .= "\n<table uitabid='DOIF-$d' class=' ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'>"; 
+  } else {
+   $ret .= "\n<table uitabid='DOIF-$d' class=' ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'". 
+      " doifattrfirst='".($hash->{$table}{attributesfirst} ? $hash->{$table}{attributesfirst} : "")."'".
+      ">"; 
+  }
+  my $lasttr =scalar keys %{$hash->{$table}{table}};
+  for (my $i=0;$i < $lasttr;$i++){
+    my $class = ($i&1)?"class='odd'":"class='even'";
+    $ret .="<tr ";
+    $ret .=((defined $hash->{$table}{tr}{$i}) ? $hash->{$table}{tr}{$i}:"");
+    $ret .=" ".(($i&1) ? $hash->{$table}{tr}{odd}:"") if (defined $hash->{$table}{tr}{odd});
+    $ret .=" ".((!($i&1)) ? $hash->{$table}{tr}{even}:"") if (defined $hash->{$table}{tr}{even});
+    $ret .=" ".(($i==$lasttr-1) ? $hash->{$table}{tr}{last}:"") if (defined $hash->{$table}{tr}{last});
+    $ret .=" $class >";
+    my $lastc =scalar keys %{$hash->{$table}{table}{$i}};
+    for (my $k=0;$k < $lastc;$k++){
+      $ret .="<td ";
+      $ret .=((defined $hash->{$table}{td}{$i}{$k}) ? $hash->{$table}{td}{$i}{$k}:"");
+      $ret .=" ".((defined $hash->{$table}{tc}{$k} )? $hash->{$table}{tc}{$k}:"");
+      $ret .=" ".(($k&1)?$hash->{$table}{tc}{odd}:"") if (defined $hash->{$table}{tc}{odd});
+      $ret .=" ".((!($k&1))?$hash->{$table}{tc}{even}:"") if (defined $hash->{$table}{tc}{even});
+      $ret .=" ".(($k==$lastc-1)?$hash->{$table}{tc}{last}:"") if (defined $hash->{$table}{tc}{last});
+      $ret .=">";
+      my $lastcc =scalar keys %{$hash->{$table}{table}{$i}{$k}};
+      for (my $l=0;$l < $lastcc;$l++){
+      for (my $m=0;$m < scalar keys %{$hash->{$table}{table}{$i}{$k}{$l}};$m++) {
+          if (defined $hash->{$table}{table}{$i}{$k}{$l}{$m}){
+            my $value= eval ($hash->{$table}{table}{$i}{$k}{$l}{$m});
+            if (defined $hash->{$table}{shownodevicelink} and !$hash->{$table}{shownodevicelink} and defined $defs{$value}) {
+              $ret.="<a href='$FW_ME?detail=$value$FW_CSRF'>$value</a>";
+            } else {
+              $ret.=$value;
+            }
+          }
+        }
+        $ret.="<br>" if ($l+1 != $lastcc);
+      }
+      $ret.="</td>";
+    }
+    $ret .= "</tr>";
+  }
+  $ret .= "</table>\n"; # if ($table eq "uiTable");
+  
+  # my $jsh = "<script type=\"text/javascript\"> \$(window).ready(function(){";
+  # my $jsc = "    \$('.makeTable.wide.internals').before(\$('.makeTable.wide.attributes'));
+      # \$('.makeTable.wide.attributes').before(\$(\"[cmd='attr']\"));
+      # \$(\"a:contains('$table')\").closest('td').attr('valign','top');" if ($hash->{$table}{attributesfirst} && !$FW_room);
+  # $jsc .= "\$('#$d').closest('tr').css('display','none');" if ($FW_room !~ "all" && defined $hash->{uitable}{shownodeviceline} && $FW_room =~ /$hash->{uitable}{shownodeviceline}/);
+  # $jsc .= "\$('#$d').remove();" if ($hash->{uitable}{shownostate});
+  # my $jsf = "  });</script>";
+  # $ret .= $jsh.$jsc.$jsf if ($jsc);
+  #$hash->{$table}{deftable}=$ret;
+  return $ret;
+}
+
+# sub DOIF_summaryFn ($$$$) {
+  # my ($FW_wname, $d, $room, $pageHash) = @_;
+  # my $hash = $defs{$d};
+  # return ($hash->{$table}{shownostate} ? "" : undef);
+# }
+
+sub DOIF_tablePopUp {
+  my ($pn,$d,$icon,$table) = @_;
+  $table = $table ? $table : "uiTable";
+  if ($defs{$d} && AttrVal($d,$table,"")) {
+    my $ret = "<a href=\"#\" onclick=\"doifTablePopUp('$defs{$d}','$d','$pn','$table')\">".FW_makeImage($icon)."</a>";
+  } else {
+    return "no device $d or attribut $table";
+  }
+}
+
+sub DOIF_summaryFn ($$$$) {
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $hash = $defs{$d};
+  my $ret = "";
+  # if ($hash->{uiTable}{shownostate}) {
+   # return "";
+  # }
+  #Log3 $d,1,"vor DOIF_RegisterEvalAll uiState d: $d";
+  $ret=DOIF_RegisterEvalAll($hash,$d,"uiState");
+  #Log3 $d,1,"nach DOIF_RegisterEvalAll";
+  return $ret;
+}
+
+sub DOIF_detailFn ($$$$) {
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $hash = $defs{$d};
+  my $ret = "";
+  #Log3 $d,1,"vor DOIF_RegisterEvalAll uiTable";
+  $ret=DOIF_RegisterEvalAll($hash,$d,"uiTable");
+  #Log3 $d,1,"nach DOIF_RegisterEvalAll";
+  return $ret;
+}
+
+sub GetBlockDoIf ($$)
 {
   my ($cmd,$match) = @_;
   my $count=0;
@@ -114,8 +587,8 @@ GetBlockDoIf ($$)
     return ($cmd,"","","");
   }
 }
-sub
-GetCommandDoIf ($$)
+
+sub GetCommandDoIf ($$)
 {
   my ($separator,$tailBlock) = @_;
   my $char;
@@ -202,8 +675,7 @@ sub EvalCmdStateDoIf($$)
   return($state)
 }
 
-sub
-SplitDoIf($$)
+sub SplitDoIf($$)
 {
   my ($separator,$tailBlock)=@_;
   my @commands;
@@ -219,8 +691,7 @@ SplitDoIf($$)
   return(@commands);
 }
 
-sub
-EventCheckDoif($$$$)
+sub EventCheckDoif($$$$)
 {
   my ($n,$dev,$eventa,$NotifyExp)=@_;
   my $found=0;
@@ -243,8 +714,7 @@ EventCheckDoif($$$$)
   return 0;
 }
 
-sub
-AggrIntDoIf
+sub AggrIntDoIf
 {
   my ($hash,$modeType,$device,$reading,$cond,$default)=@_;
   my $num=0;
@@ -269,7 +739,7 @@ AggrIntDoIf
   my $place;
   my $number;
   
-if ($modeType =~ /.(sum|average|max|min)?[:]?(?:(a|d)?(\d)?)?/) {
+  if ($modeType =~ /.(sum|average|max|min)?[:]?(?:(a|d)?(\d)?)?/) {
     $type = (defined $1)? $1 : "";
     $format= (defined $2)? $2 : "";
     $place= $3;
@@ -387,15 +857,13 @@ if ($modeType =~ /.(sum|average|max|min)?[:]?(?:(a|d)?(\d)?)?/) {
   return 0;
 }
 
-sub
-AggrDoIf
+sub AggrDoIf
 {
   my ($modeType,$device,$reading,$cond,$default)=@_;
   return (AggrIntDoIf(undef,$modeType,$device,$reading,$cond,$default));
 }
 
-sub
-AggregateDoIf
+sub AggregateDoIf
 {
   my ($hash,$modeType,$device,$reading,$cond,$default)=@_;
   my $mode=substr($modeType,0,1);
@@ -412,8 +880,7 @@ AggregateDoIf
   return ("");
 }
 
-sub
-EventDoIf
+sub EventDoIf
 {
   my ($n,$hash,$NotifyExp,$check,$filter,$output,$default)=@_;
 
@@ -481,8 +948,7 @@ EventDoIf
   }
 }
 
-sub
-InternalDoIf
+sub InternalDoIf
 {
   my ($hash,$name,$internal,$default,$regExp,$output)=@_;
 
@@ -515,16 +981,14 @@ InternalDoIf
   return($element);
 }
 
-sub
-ReadingSecDoIf($$)
+sub ReadingSecDoIf($$)
 {
   my ($name,$reading)=@_;
   my ($seconds, $microseconds) = gettimeofday();
   return ($seconds - time_str2num(ReadingsTimestamp($name, $reading, "1970-01-01 01:00:00")));
 }
 
-sub
-ReadingValDoIf
+sub ReadingValDoIf
 {
   my ($hash,$name,$reading,$default,$regExp,$output)=@_;
 
@@ -566,8 +1030,7 @@ ReadingValDoIf
     return($element);
 }
 
-sub
-EvalAllDoIf($$)
+sub EvalAllDoIf($$)
 {
   my ($hash,$tailBlock)= @_;
   my $eval="";
@@ -602,7 +1065,7 @@ EvalAllDoIf($$)
 
 sub ReplaceAggregateDoIf($$$)
 {
-  my ($hash,$block,$condition) = @_;
+  my ($hash,$block,$eval) = @_;
   my $exp;
   my $nameExp;
   my $notifyExp;
@@ -642,14 +1105,13 @@ sub ReplaceAggregateDoIf($$$)
      $block="AggregateDoIf(".'$hash'.",'$aggrType','$nameExp')";
   }
   
-  if (!($condition >= 0)) {
+  if ($eval) {
     my $ret = eval $block;
     return($block." ",$@) if ($@);
     $block=$ret;
   }
   return ($block,undef);
 }
-
 
 sub ReplaceEventDoIf($)
 {
@@ -809,45 +1271,74 @@ sub AddItemDoIf($$)
   return $items;
 }
 
-sub AddRegexpTriggerDoIf($$$)
+sub AddRegexpTriggerDoIf
 {
-  my ($hash,$regexp,$condition)= @_;
-  my $max_regexp=keys %{$hash->{regexp}{$condition}};
-  for (my $i=0; $i<$max_regexp;$i++)
-  {
-    if ($hash->{regexp}{$condition}{$i} eq $regexp) {
-      return;
+  my ($hash,$type,$regexp,$element,$dev,$reading)= @_;
+  
+  $dev="" if (!defined($dev));
+  $reading="" if (!defined($reading));
+  my $regexpid='"'.$regexp.'"';
+
+  if ($dev) {
+    if ($reading){
+      $hash->{Regex}{$type}{$dev}{$element}{$reading}=(($reading =~ "^\&") ? "\^$dev\$":"\^$dev\$:\^$reading: ");
+    } elsif ($regexp) {
+      $hash->{Regex}{$type}{$dev}{$element}{$regexpid}="\^$dev\$:$regexp";
     }
+    return;
   }
-  $hash->{regexp}{$condition}{$max_regexp}=$regexp;
-  $max_regexp=keys %{$hash->{regexp}{all}};
-  for (my $i=0; $i<$max_regexp;$i++)
-  {
-    if ($hash->{regexp}{all}{$i} eq $regexp) {
-      return;
-    }
-  }
-  $hash->{regexp}{all}{$max_regexp}=$regexp;
+  $hash->{Regex}{$type}{$dev}{$element}{$regexpid}=$regexp;
 }
 
-sub AddRegexpStateDoIf($$)
+sub addDOIF_Readings($$)
 {
-  my ($hash,$regexp)= @_;
-  my $max_regexp=keys %{$hash->{state}{STATE}};
-  for (my $i=0; $i<$max_regexp;$i++)
+  my ($hash,$DOIF_Readings) = @_;
+  delete $hash->{DOIF_Readings};
+  delete $hash->{Regex}{DOIF_Readings};
+  my @list=SplitDoIf(',',$DOIF_Readings);
+  my $reading;
+  my $readingdef;
+  
+  for (my $i=0;$i<@list;$i++)
   {
-    if ($hash->{state}{STATE}{$i} eq $regexp) {
-      return;
+    ($reading,$readingdef)=SplitDoIf(":",$list[$i]);
+    if (!$readingdef) {
+      return ($DOIF_Readings,"no reading definiton: $list[$i]");
+    }
+    if ($reading =~ /^\s*([a-z0-9._-]*[a-z._-]+[a-z0-9._-]*)\s*$/i) {
+      my ($def,$err)=ReplaceAllReadingsDoIf($hash,$readingdef,-4,0,$1);
+      return ($def,$err) if ($err);
+      $hash->{DOIF_Readings}{$1}=$def;
+    } else {
+      return ($list [$i],"wrong reading specification for: $reading");
     }
   }
-  $hash->{state}{STATE}{$max_regexp}=$regexp;
+  return ("","");
 }
 
-
-
-sub ReplaceAllReadingsDoIf($$$$)
+sub setDOIF_Reading
 {
-  my ($hash,$tailBlock,$condition,$eval)= @_;
+  my ($hash,$DOIF_Reading,$reading) = @_;
+  $lastWarningMsg="";
+  my $ret = eval $hash->{DOIF_Readings}{$DOIF_Reading};
+  if ($@) {
+    $@ =~ s/^(.*) at \(eval.*\)(.*)$/$1,$2/;
+    $ret="error in DOIF_Readings: ".$@;
+  }
+  if ($lastWarningMsg) {
+    $lastWarningMsg =~ s/^(.*) at \(eval.*$/$1/;
+    Log3 ($hash->{NAME},3 , "$hash->{NAME}: warning in DOIF_Readings: $DOIF_Reading");
+  } 
+  $lastWarningMsg="";
+  if ($ret ne ReadingsVal($hash->{NAME},$DOIF_Reading,"")){
+    push (@{$hash->{helper}{DOIF_Readings_events}},"$DOIF_Reading: $ret");
+    readingsSingleUpdate ($hash,$DOIF_Reading,$ret,0);
+  }
+}
+
+sub ReplaceAllReadingsDoIf
+{
+  my ($hash,$tailBlock,$condition,$eval,$id)= @_;
   my $block="";
   my $beginning;
   my $err;
@@ -876,22 +1367,34 @@ sub ReplaceAllReadingsDoIf($$$$)
         $trigger=1;
       }
       if ($block =~ /^(?:(?:#|@)[^"]*)"([^"]*)"/) {
-        ($block,$err)=ReplaceAggregateDoIf($hash,$block,$condition);
+        ($block,$err)=ReplaceAggregateDoIf($hash,$block,$eval);
         return ($block,$err) if ($err);
         if ($trigger) {
+          $event=1;
           if ($condition >= 0) {
-            AddRegexpTriggerDoIf($hash,$1,$condition);
-            $event=1;
+            AddRegexpTriggerDoIf($hash,"cond",$1,$condition);
           } elsif ($condition == -2) {
-            AddRegexpStateDoIf($hash,$1);
-          }
+            AddRegexpTriggerDoIf($hash,"STATE",$1,"STATE");
+          } elsif ($condition == -4) {
+            AddRegexpTriggerDoIf($hash,"DOIF_Readings",$1,$id);
+          } elsif ($condition == -5) {
+            AddRegexpTriggerDoIf($hash,"uiTable",$1,$id);
+          }  elsif ($condition == -6) {
+            AddRegexpTriggerDoIf($hash,"uiState",$1,$id);
+          } 
         }
       } elsif ($block =~ /^"([^"]*)"/) {
-        if ($condition>=0) {
-          ($block,$err)=ReplaceEventDoIf($block);
-          return ($block,$err) if ($err);
-          AddRegexpTriggerDoIf($hash,$1,$condition);
-          $event=1;
+        ($block,$err)=ReplaceEventDoIf($block);
+        return ($block,$err) if ($err);
+        if ($trigger) {
+          if ($condition>=0) {
+            AddRegexpTriggerDoIf($hash,"cond",$1,$condition);
+            $event=1;
+          } elsif ($condition == -4) {
+            AddRegexpTriggerDoIf($hash,"DOIF_Readings",$1,$id);
+          } else {
+            $block="[".$block."]";
+          }
         } else {
           $block="[".$block."]";
         }
@@ -913,9 +1416,31 @@ sub ReplaceAllReadingsDoIf($$$$)
             $hash->{trigger}{all} = AddItemDoIf($hash->{trigger}{all},"$device") if (!defined ($internal) and !defined($reading));
 
           } elsif ($condition == -2) {
-              $hash->{state}{device} = AddItemDoIf($hash->{state}{device},$device); #if ($device ne $hash->{NAME});
+            if ($trigger) {
+              AddRegexpTriggerDoIf($hash,"STATE","","STATE",$device,((defined $reading) ? $reading : "&STATE"));
+              $event=1;
+            }
           } elsif ($condition == -3) {
               $hash->{itimer}{all} = AddItemDoIf($hash->{itimer}{all},$device);
+          } elsif ($condition == -4) {
+            if ($trigger) {
+              AddRegexpTriggerDoIf($hash,"DOIF_Readings","",$id,$device,((defined $reading) ? $reading :"&STATE"));
+              $event=1;
+            }
+          } elsif ($condition == -5) {
+            if ($trigger) {
+              AddRegexpTriggerDoIf($hash,"uiTable","",$id,$device,((defined $reading) ? $reading : "&STATE"));
+              $hash->{uiTable}{dev}=$device;
+              $hash->{uiTable}{reading}=((defined $reading) ? $reading : "&STATE");
+              $event=1;
+            }
+          } elsif ($condition == -6) {
+            if ($trigger) {
+              AddRegexpTriggerDoIf($hash,"uiState","",$id,$device,((defined $reading) ? $reading : "&STATE"));
+              $hash->{uiState}{dev}=$device;
+              $hash->{uiState}{reading}=((defined $reading) ? $reading : "&STATE");
+              $event=1;
+            }
           }
         } elsif ($condition >= 0) {
           ($timer,$err)=DOIF_CheckTimers($hash,$block,$condition,$trigger);
@@ -932,7 +1457,7 @@ sub ReplaceAllReadingsDoIf($$$$)
     $cmd.=$beginning.$block;
   }
   #return ($definition,"no trigger in condition") if ($condition >=0 and $event == 0);
-  return ($cmd,"");
+  return ($cmd,"",$event);
 }
 
 sub
@@ -1205,7 +1730,6 @@ DOIF_SetState($$$$$)
   my $state=AttrVal($hash->{NAME},"state","");
   $state =~ s/\$SELF/$pn/g;
   my @cmdState=SplitDoIf('|',$attr);
-  return undef if (AttrVal($hash->{NAME},"disable",""));
   $nr=ReadingsVal($pn,"cmd_nr",0)-1 if (!$event);
   if ($nr!=-1) {
     $cmdNr=$nr+1;
@@ -1229,16 +1753,21 @@ DOIF_SetState($$$$$)
   }
   readingsBeginUpdate  ($hash);
   if ($event) {
+    push (@{$hash->{helper}{DOIF_eventas}},"cmd_nr: $cmdNr");
     readingsBulkUpdate($hash,"cmd_nr",$cmdNr);
     if (defined $hash->{do}{$nr}{1}) {
       readingsBulkUpdate($hash,"cmd_seqnr",$subnr+1);
+      push (@{$hash->{helper}{DOIF_eventas}},("cmd_seqnr: ".($subnr+1)));
       readingsBulkUpdate($hash,"cmd",$cmdNr.".".($subnr+1));
     } else {
       delete ($defs{$hash->{NAME}}{READINGS}{cmd_seqnr});
+      push (@{$hash->{helper}{DOIF_eventas}},"cmd: $cmdNr");
       readingsBulkUpdate($hash,"cmd",$cmdNr);
     }
+    push (@{$hash->{helper}{DOIF_eventas}},"cmd_event: $event");
     readingsBulkUpdate($hash,"cmd_event",$event);
     if ($last_error) {
+      push (@{$hash->{helper}{DOIF_eventas}},"error: $last_error");
       readingsBulkUpdate($hash,"error",$last_error);
     } else {
       delete ($defs{$hash->{NAME}}{READINGS}{error});
@@ -1253,9 +1782,13 @@ DOIF_SetState($$$$$)
   } else {
     $state=$cmd;
   }
-
-  readingsBulkUpdate($hash, "state", $state);
-  readingsEndUpdate    ($hash, 1);
+  push (@{$hash->{helper}{DOIF_eventas}},"state: $state");
+  readingsBulkUpdate($hash, "state", $state); 
+  if (defined $hash->{uiState}{table}) {
+    readingsEndUpdate ($hash, 0);
+  } else {
+    readingsEndUpdate ($hash, 1);
+  }
 }
 
 sub
@@ -1420,7 +1953,6 @@ DOIF_cmd ($$$$)
   }
   if ($hash->{do}{$nr}{$subnr}) {
      $cmd=$hash->{do}{$nr}{$subnr};
-
      my $eventa=$hash->{helper}{triggerEvents};
      my $events="";
      if ($eventa) {
@@ -1446,7 +1978,7 @@ DOIF_cmd ($$$$)
       DOIF_cmd ($hash,$nr,$subnr,$event);
     }
   } else {
-    if ($sleeptimer[$nr]) {
+    if (($sleeptimer[$nr])) {
       my $last_cond=ReadingsVal($pn,"cmd_nr",0)-1;
       if (DOIF_SetSleepTimer($hash,$last_cond,$nr,0,$event,-1,$sleeptimer[$nr])) {
         DOIF_cmd ($hash,$nr,$subnr,$event);
@@ -1485,7 +2017,7 @@ sub CheckReadingDoIf($$)
   my $found=0;
   my $device;
   my $reading;
-
+ 
   if (!defined $readings) {
     return 1;
   }
@@ -1505,65 +2037,77 @@ sub CheckReadingDoIf($$)
   return 0;
 }
 
-sub CheckRegexpDoIf($$$$)
+sub CheckRegexpDoIf
 {
-  my ($hash,$name,$eventa,$cond)=@_;
-  my $type;
-  if ($cond eq "STATE") {
-    $type="state";
-  } else {
-    $type="regexp";
-  }
-  my $max_regexp=keys %{$hash->{$type}{$cond}};
-  my $c;
+  my ($hash,$type,$device,$id,$eventa,$readingupdate)=@_;
   my $nameExp;
   my $notifyExp;
-
-  for (my $i=0; $i<$max_regexp;$i++)
-  {
-    if ($hash->{$type}{$cond}{$i} =~ /([^\:]*):(.*)/) {
-      $nameExp=$1;
-      $notifyExp=$2;
-    } else {
-      $nameExp=$hash->{$type}{$cond}{$i};
+  my $event;
+  my @idlist;
+  my @devlist;
+  
+  return undef if (!defined $hash->{Regex}{$type});
+  if ($id eq "") {
+    if (defined $hash->{Regex}{$type}{$device}) {
+      return 1;
     }
-    $nameExp="" if (!$nameExp);
-    $notifyExp="" if (!$notifyExp);
-    if ($nameExp eq "" or $name =~ /$nameExp/) {
-      #my $eventa = $hash->{helper}{triggerEvents};
-      my $events="";
-      if ($eventa) {
-        $events=join(",",@{$eventa});
-      }
-      if ($notifyExp eq "") {
-        if ($cond ne "all" and $cond ne "STATE") {
-          $c=$cond+1;
-          readingsSingleUpdate ($hash, "matched_event_c".$c."_".($i+1),"$events",0);
-        }
-        return 1;
-      }
-      my $max = int(@{$eventa});
-      my $s;
-      my $found;
-      for (my $j = 0; $j < $max; $j++) {
-        $s = $eventa->[$j];
-        $s = "" if(!defined($s));
-        $found = ($s =~ m/$notifyExp/);
-        if ($found) {
-          if ($cond ne "all" and $cond ne "STATE") {
-            $c=$cond+1;
-          readingsSingleUpdate ($hash, "matched_event_c".$c."_".($i+1),$s,0);
+    @devlist=("");
+  } else {
+    @devlist=("$device","");
+  }
+  
+  foreach my $dev (@devlist){
+    if (defined $hash->{Regex}{$type}{$dev}) {
+      @idlist=($id eq "") ? (keys %{$hash->{Regex}{$type}{$dev}}):($id);
+      foreach my $id (@idlist) {
+        foreach my $i (keys %{$hash->{Regex}{$type}{$dev}{$id}}) {
+          #$event=($type eq "cond") ? "c".($id+1) : $id;
+          if ($hash->{Regex}{$type}{$dev}{$id}{$i} =~ /([^\:]*):(.*)/) {
+            $nameExp=$1;
+            $notifyExp=$2;
+          } else {
+            $nameExp=$hash->{Regex}{$type}{$dev}{$id}{$i};
           }
-          return 1
+          $nameExp="" if (!$nameExp);
+          $notifyExp="" if (!$notifyExp);
+          if ($nameExp eq "" or $device =~ /$nameExp/) {
+            my $events="";
+            if ($eventa) {
+              $events=join(",",@{$eventa});
+            }
+            if ($notifyExp eq "") {
+              if ($readingupdate==1) {
+                #readingsSingleUpdate ($hash, "matched_regex_$id",$events,0);
+              } elsif ($readingupdate==2) {
+                #readingsBulkUpdate ($hash, "matched_event_$event"."_".($i+1),$events);
+              }
+              return $i;
+            }
+            my $max = int(@{$eventa});
+            my $s;
+            my $found;
+            for (my $j = 0; $j < $max; $j++) {
+              $s = $eventa->[$j];
+              $s = "" if(!defined($s));
+              $found = ($s =~ m/$notifyExp/);
+              if ($found) {
+                if ($readingupdate==1) {
+                  #readingsSingleUpdate ($hash, "matched_regex_$id",$s,0);
+                } elsif ($readingupdate==2) {
+                  #readingsBulkUpdate ($hash, "matched_event_$event"."_".($i+1),$s);
+                }
+                return $i;
+              }
+            }
+          }
         }
       }
     }
   }
-  return 0;
+  return undef;
 }
 
-sub
-DOIF_Trigger ($$)
+sub DOIF_Trigger ($$)
 {
   my ($hash,$device)= @_;
   my $timerNr=-1;
@@ -1603,7 +2147,7 @@ DOIF_Trigger ($$)
       $hash->{helper}{triggerDev}="";
       $hash->{helper}{event}=$event;
     } else { #event
-      if (!CheckRegexpDoIf($hash, $device, $hash->{helper}{triggerEvents}, $i)) {
+      if (!defined CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEvents},1)) {
         if (AttrVal($pn, "checkall", 0) !~ "1|all|event") {
           next if (!defined ($hash->{devices}{$i}));
           next if ($hash->{devices}{$i} !~ / $device /);
@@ -1664,9 +2208,11 @@ DOIF_Notify($$)
   my $err;
   my $eventa;
   my $eventas;
+
   $eventa = deviceEvents($dev, AttrVal($pn, "addStateEvent", 0));
   $eventas = deviceEvents($dev, 1);
-  if ($dev->{NAME} eq "global" and (EventCheckDoif($dev->{NAME},"global",$eventa,"INITIALIZED") or EventCheckDoif($dev->{NAME},"global",$eventa,"REREADCFG")))
+  
+  if ($dev->{NAME} eq "global" and (EventCheckDoif($dev->{NAME},"global",$eventa,'^INITIALIZED$') or EventCheckDoif($dev->{NAME},"global",$eventa,'^REREADCFG$')))
   {
     $hash->{helper}{globalinit}=1;
     # delete old timer-readings
@@ -1679,18 +2225,30 @@ DOIF_Notify($$)
         DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j);
       }
     }
-	if (AttrVal($pn,"initialize",0) and !AttrVal($pn,"disable",0)) {
-		readingsBeginUpdate($hash);
-		readingsBulkUpdate ($hash,"state",AttrVal($pn,"initialize",0));
-		readingsBulkUpdate ($hash,"cmd_nr","0");
-		readingsBulkUpdate ($hash,"cmd",0);
-		readingsEndUpdate($hash, 0);
+    
+    my $uiTable=AttrVal($pn, "uiTable", 0);
+    if ($uiTable){
+      my $err=DOIF_uiTable_def($hash,$uiTable,"uiTable");
+      Log3 ($pn,3,"$pn: error in uiTable: $err") if ($err);
+    }
+    
+    my $uiState=AttrVal($pn, "uiState", 0);
+    if ($uiState){
+      my $err=DOIF_uiTable_def($hash,$uiState,"uiState");
+      Log3 ($pn,3,"$pn: error in uiState: $err") if ($err);
+    }
+
+    if (AttrVal($pn,"initialize",0) and !AttrVal($pn,"disable",0)) {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate ($hash,"state",AttrVal($pn,"initialize",0));
+      readingsBulkUpdate ($hash,"cmd_nr","0");
+      readingsBulkUpdate ($hash,"cmd",0);
+      readingsEndUpdate($hash, 0);
     }
   }
 
-
   return "" if (!$hash->{helper}{globalinit});
-  return "" if (!$hash->{itimer}{all} and !$hash->{devices}{all} and !$hash->{state}{device} and !keys %{$hash->{state}{STATE}} and !keys %{$hash->{regexp}{all}});
+  #return "" if (!$hash->{itimer}{all} and !$hash->{devices}{all} and !keys %{$hash->{Regex}});
   
   if (($hash->{itimer}{all}) and $hash->{itimer}{all} =~ / $dev->{NAME} /) {
   for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
@@ -1702,12 +2260,18 @@ DOIF_Notify($$)
 
   return "" if (defined $hash->{helper}{cur_cmd_nr});
   return "" if (ReadingsVal($pn,"mode","") eq "disabled");
+  
+  $ret=0;
+  $hash->{helper}{DOIF_eventas} = ();
 
-  if ((($hash->{devices}{all}) and $hash->{devices}{all} =~ / $dev->{NAME} /) or CheckRegexpDoIf($hash,$dev->{NAME},$eventa,"all") or CheckRegexpDoIf($hash,$dev->{NAME},$eventa,"STATE")){
+  if ((($hash->{devices}{all}) and $hash->{devices}{all} =~ / $dev->{NAME} /) or defined CheckRegexpDoIf($hash,"cond",$dev->{NAME},"",$eventa,0)){
     $hash->{helper}{cur_cmd_nr}="Trigger  $dev->{NAME}" if (AttrVal($hash->{NAME},"selftrigger","") ne "all");
+    $hash->{helper}{triggerEvents}=$eventa;
+    $hash->{helper}{triggerEventsState}=$eventas;
+    $hash->{helper}{triggerDev}=$dev->{NAME};
+    $hash->{helper}{event}=join(",",@{$eventa});
+
     readingsSingleUpdate ($hash, "Device",$dev->{NAME},0);
-    #my $events = deviceEvents($dev, AttrVal($dev->{NAME}, "addStateEvent", 0));
-    #readingsSingleUpdate ($hash, "Event","@{$events}",0);
     if ($hash->{readings}{all}) {
       foreach my $item (split(/ /,$hash->{readings}{all})) {
         ($device,$reading)=(split(":",$item));
@@ -1729,21 +2293,65 @@ DOIF_Notify($$)
         readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_events",join(",",@{$eventa}),0);
       }
     }
-    $hash->{helper}{triggerEvents}=$eventa;
-    $hash->{helper}{triggerEventsState}=$eventas;
-    $hash->{helper}{triggerDev}=$dev->{NAME};
-    $hash->{helper}{event}=join(",",@{$eventa});
     $ret=DOIF_Trigger($hash,$dev->{NAME});
   }
-  if ((($hash->{state}{device}) and $hash->{state}{device} =~ / $dev->{NAME} / or CheckRegexpDoIf($hash,$dev->{NAME},$eventa,"STATE")) and !$ret) {
-    $hash->{helper}{cur_cmd_nr}="Trigger  $dev->{NAME}" if (AttrVal($hash->{NAME},"selftrigger","") ne "all");
+  
+  if ((defined CheckRegexpDoIf($hash,"STATE",$dev->{NAME},"STATE",$eventa,1)) and !$ret) {
     $hash->{helper}{triggerEvents}=$eventa;
     $hash->{helper}{triggerEventsState}=$eventas;
     $hash->{helper}{triggerDev}=$dev->{NAME};
     $hash->{helper}{event}=join(",",@{$eventa});
     DOIF_SetState($hash,"",0,"","");
   }
+  
   delete $hash->{helper}{cur_cmd_nr};
+  
+  $hash->{helper}{DOIF_Readings_events}= ();
+  if (defined $hash->{Regex}{"DOIF_Readings"}) {
+    foreach $device ("$dev->{NAME}","") {
+      if (defined $hash->{Regex}{"DOIF_Readings"}{$device}) {
+        #readingsBeginUpdate($hash);
+        foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$device}}) {
+          my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$dev->{NAME},$reading,$eventas,0);
+          setDOIF_Reading($hash,$reading,$readingregex) if (defined($readingregex));
+        }
+        #readingsEndUpdate($hash, 1);
+      }
+    }
+    if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
+      foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$hash->{NAME}}}) {
+        my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventas},0);
+        setDOIF_Reading($hash,$reading,$readingregex) if (defined($readingregex));
+      }
+    }
+  }
+  
+  foreach my $table ("uiTable","uiState") {
+    if (defined $hash->{Regex}{$table}) {
+      foreach $device ("$dev->{NAME}","") {
+        if (defined $hash->{Regex}{$table}{$device}) {
+          foreach my $doifId (keys %{$hash->{Regex}{$table}{$device}}) {
+            my $readingregex=CheckRegexpDoIf($hash,$table,$dev->{NAME},$doifId,$eventas,0);
+            DOIF_UpdateCell($hash,$doifId,$hash->{NAME},$readingregex) if (defined($readingregex));
+          }
+        }
+      }
+      if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
+        foreach my $doifId (keys %{$hash->{Regex}{$table}{$hash->{NAME}}}) {
+          my $readingregex=CheckRegexpDoIf($hash,$table,$hash->{NAME},$doifId,$hash->{helper}{DOIF_eventas},0);
+          DOIF_UpdateCell($hash,$doifId,$hash->{NAME},$readingregex) if (defined($readingregex));
+        }
+      }
+    }
+  }
+ 
+  if (defined $hash->{helper}{DOIF_Readings_events}) {
+    if ($dev->{NAME} ne $hash->{NAME}) {
+      @{$hash->{CHANGED}}=@{$hash->{helper}{DOIF_Readings_events}};
+      @{$hash->{CHANGEDWITHSTATE}}=@{$hash->{helper}{DOIF_Readings_events}};
+      DOIF_Notify($hash,$hash);
+    }
+  }
   return undef;
 }
 
@@ -2031,7 +2639,6 @@ DOIF_SetSleepTimer($$$$$$$)
 
   if ($timerNr >= 0 and !AttrVal($pn,"timerWithWait","")) {#Timer
     if ($last_cond != $nr or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"do","") eq "resetwait" or AttrVal($pn,"repeatsame","")) {
-
       return 1;
     } else {
       return 0;
@@ -2089,8 +2696,6 @@ DOIF_SleepTrigger ($)
   my ($hash)=@_;
   my $sleeptimer=$hash->{helper}{sleeptimer};
   my $sleepsubtimer=$hash->{helper}{sleepsubtimer};
-  $hash->{helper}{sleeptimer}=-1;
-  $hash->{helper}{sleepsubtimer}=-1;
   my $pn = $hash->{NAME};
   $hash->{helper}{cur_cmd_nr}="wait_timer" if (!AttrVal($hash->{NAME},"selftrigger",""));
   $hash->{helper}{triggerEvents}=$hash->{helper}{timerevents};
@@ -2098,7 +2703,8 @@ DOIF_SleepTrigger ($)
   $hash->{helper}{event}=$hash->{helper}{timerevent};
   $hash->{helper}{triggerDev}=$hash->{helper}{timerdev};
   readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
-# if (!AttrVal($hash->{NAME},"disable","")) {
+  $hash->{helper}{sleeptimer}=-1;
+  $hash->{helper}{sleepsubtimer}=-1;
   if (ReadingsVal($pn,"mode","") ne "disabled") {
     DOIF_cmd ($hash,$sleeptimer,$sleepsubtimer,$hash->{helper}{sleepdevice});
   }
@@ -2249,11 +2855,11 @@ DOIF_Attr(@)
     DOIF_delAll ($hash);
     readingsSingleUpdate ($hash,"state","deactivated",1);
   } elsif($a[0] eq "set" && $a[2] eq "state") {
-      delete $hash->{state};
+      delete $hash->{Regex}{"STATE"};
       my ($block,$err)=ReplaceAllReadingsDoIf($hash,$a[3],-2,0);
       return $err if ($err);
   } elsif($a[0] eq "del" && $a[2] eq "state") {
-      delete $hash->{state};
+      delete $hash->{Regex}{"STATE"};
   } elsif($a[0] eq "set" && $a[2] eq "wait") {
       RemoveInternalTimer($hash);
       #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
@@ -2263,6 +2869,25 @@ DOIF_Attr(@)
     delete ($defs{$hash->{NAME}}{READINGS}{cmd_count});
   } elsif($a[0] eq "del" && $a[2] eq "waitsame") {
     delete ($defs{$hash->{NAME}}{READINGS}{waitsame});
+  } elsif($a[0] eq "set" && $a[2] eq "DOIF_Readings") {
+    my ($def,$err)=addDOIF_Readings($hash,$a[3]);
+    if ($err) {
+       return ("error in DOIF_Readings $def, $err");
+    }
+  } elsif($a[0] eq "del" && ($a[2] eq "DOIF_Readings")) {
+    delete ($hash->{DOIF_Readings});
+    delete $hash->{Regex}{"DOIF_Readings"}
+  } elsif($a[0] eq "set" && ($a[2] eq "uiTable" || $a[2] eq "uiState")) {
+    if ($init_done) {
+      my $err=DOIF_uiTable_def($hash,$a[3],$a[2]);
+      return $err if ($err);
+      DOIF_reloadFW;
+      # InternalTimer(gettimeofday()+2,"DOIF_reloadFW",$hash) if($a[3]=~/\$ATTRIBUTESFIRST *= *2/);
+    }
+  } elsif($a[0] eq "del" && ($a[2] eq "uiTable" || $a[2] eq "uiState")) {
+    #my $table=$a[2];
+    delete ($hash->{Regex}{$a[2]});
+    delete ($hash->{$a[2]});
   }
   return undef;
 }
@@ -2423,7 +3048,7 @@ Many examples with english identifiers - see <a href="http://fhem.de/commandref_
 <a name="DOIF"></a>
 <h3>DOIF</h3>
 <ul>
-DOIF (ausgeprochen: du if, übersetzt: tue wenn) ist ein universelles Modul, welches ereignis- und zeitgesteuert in Abhängigkeit definierter Bedingungen Anweisungen ausführt.<br>
+DOIF (ausgeprochen: du if, übersetzt: tue wenn) ist ein universelles Modul mit UI, welches ereignis- und zeitgesteuert in Abhängigkeit definierter Bedingungen Anweisungen ausführt.<br>
 <br>
 In einer Hausautomatisation geht es immer wieder um die Ausführung von Befehlen abhängig von einem Ereignis. Oft reicht aber eine einfache Abfrage der Art: "wenn Ereignis eintritt, dann Befehl ausführen" nicht aus.
 Ebenso häufig möchte man eine Aktion nicht nur von einem einzelnen Ereignis abhängig ausführen, sondern abhängig von mehreren Bedingungen, z. B. "schalte Außenlicht ein, wenn es dunkel wird, aber nicht vor 18:00 Uhr"
@@ -2439,6 +3064,8 @@ Diese werden mit Angaben von Status, Readings, Internals, Events oder Zeiten kom
 Sie werden grundsätzlich in eckigen Klammern angegeben und führen zur Triggerung des Moduls und damit zur Auswertung der dazugehörigen Bedingung.
 Zusätzlich können in einer Bedingung Perl-Funktionen angegeben werden, die in FHEM definiert sind.
 Wenn eine Bedingung wahr wird, so werden die dazugehörigen Befehle ausgeführt.<br>
+<br>
+Das DOIF-Modul verfügt inzwischen über ein eigenes User Interface für Visualierung und Bedienung von FHEM-Devices, siehe <a href="#DOIF_uiTable"><b>[NEU]</b> uiTable, das User Interface</a><br>
 <br>
 Syntax:<br>
 <br>
@@ -2510,8 +3137,10 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_Zeitspanne_eines_Readings_seit_der_letzten_Aenderung">Zeitspanne eines Readings seit der letzten Änderung</a><br>
   <a href="#DOIF_setList__readingList">Darstellungselement mit Eingabemöglichkeit im Frontend und Schaltfunktion</a><br>
   <a href="#DOIF_cmdState">Status des Moduls</a><br>
+  <a href="#DOIF_uiTable"><b>[NEU]</b> uiTable, das User Interface</a><br>
   <a href="#DOIF_Reine_Statusanzeige_ohne_Ausfuehrung_von_Befehlen">Reine Statusanzeige ohne Ausführung von Befehlen</a><br>
   <a href="#DOIF_state">Anpassung des Status mit Hilfe des Attributes <code>state</code></a><br>
+  <a href="#DOIF_Readings"><b>[NEU]</b> Erzeugen berechneter Readings<br>
   <a href="#DOIF_initialize">Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut <code>initialize</code></a><br>
   <a href="#DOIF_disable">Deaktivieren des Moduls</a><br>
   <a href="#DOIF_cmd">Bedingungslose Ausführen von Befehlszweigen</a><br>
@@ -2521,6 +3150,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="https://wiki.fhem.de/wiki/DOIF">DOIF im FHEM-Wiki</a><br>
   <a href="https://forum.fhem.de/index.php/board,73.0.html">DOIF im FHEM-Forum</a><br>
   <a href="#DOIF_Kurzreferenz">Kurzreferenz</a><br>
+  <a href="#DOIF_PerlFunktionen_kurz">Perl-Funktionen</a><br>
 <!-- Vorlage Inhaltsübersicht und Sprungmarke-->
   <a href="#DOIF_"></a><br>
 <a name="DOIF_"></a>
@@ -2535,6 +3165,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_checkReadingEvent">checkReadingEvent</a> &nbsp;
   <a href="#DOIF_cmdpause">cmdpause</a> &nbsp;
   <a href="#DOIF_cmdState">cmdState</a> &nbsp;
+  <a href="#DOIF_Readings">DOIF_Readings</a> &nbsp;
   <a href="#DOIF_disable">disable</a> &nbsp;
   <a href="#DOIF_do_always">do always</a> &nbsp;
   <a href="#DOIF_do_resetwait">do resetwait</a> &nbsp;
@@ -2548,6 +3179,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_state">state</a> &nbsp;
   <a href="#DOIF_timerevent">timerevent</a> &nbsp;
   <a href="#DOIF_timerWithWait">timerWithWait</a> &nbsp;
+  <a href="#DOIF_uiTable">uiTable</a> &nbsp;
   <a href="#DOIF_wait">wait</a> &nbsp;
   <a href="#DOIF_waitdel">waitdel</a> &nbsp;
   <a href="#DOIF_waitsame">waitsame</a> &nbsp;
@@ -3606,6 +4238,257 @@ attr time_switch webCmd mybutton:mybegin:myend
 <br>
 attr di_web setList myInput:first,second</code><br>
 <br>
+<a name="DOIF_uiTable"></a>
+<b>uiTable, das User Interface</a></b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+Mit dem Attribut uiTable kann innerhalb eines DOIF-Moduls ein User Interface in Form einer Tabelle erstellt werden. Die Definition der Tabelle wird mit Hilfe von Perl sowie FHEM-Widgets kombiniert mit DOIF-Syntax vorgenommen.<br> 
+<br>
+Features:<br>
+<br>
+- pro DOIF eine beliebige UI-Tabelle definierbar<br>
+- alle FHEM-Widgets nutzbar<br>
+- alle FHEM-Icons nutzbar<br>
+- DOIF-Syntax verwendbar<br>
+- alle Devices und Readings in FHEM direkt darstellbar und ansprechbar<br>
+- dynamische Styles (z. B. Temperaturfarbe abhängig vom Temperaturwert)<br> 
+- es brauchen keine eigenen CSS- oder js-Dateien definiert werden<br>
+- Nutzung vordefinierter Templates aus Template-Dateien<br>
+<br>
+<b>Aufbau des uiTable-Attributs<br></b>
+<br>
+<code>{<br>
+ &lt;Perlblock für Definition von Template-Attributen, Zellenformatierungen, eigenen Perlfunktionen&gt;<br>
+}<br>
+<br>
+&lt;Template-Methoden&gt;<br>
+<br>
+&lt;Tabellendefinition&gt;<br>
+<br></code>
+<br>
+Der Perlblock ist optional. Er wird in geschweiften Klammern mit wenigen Ausnahmen in Perl definiert. Hier können Template-Attribute für Zeichenketten, das Layout der Tabelle über HMTL-Zellenformatierungen sowie eigene Perlfunktionen definiert werden.
+Im Anschluß an den Perlblock können optional Template-Methoden definiert werden, um komplexere wiederverwendbare Widget-Definitionen zu formulieren. Diese werden in der Tabellendefinition benutzt.
+Die eigentliche Tabellendefinition wird über die Definition von Zellen vorgenommen. Zellen werden mit | voneinander abgegrenzt. Kommentare können an beliebiger Stelle beginnend mit ## bis zum Zeilenende eingefügt werden.<br>
+<br>
+<b>Die Tabellendefinition</b><br>
+<br><code>
+&lt;Zellendefinition erste Zeile erste Spalte&gt;  | &lt;Zellendefinition erste Zeile zweite Spalte  | ... # Definition der ersten Tabellenzeile<br>
+&lt;Zellendefinition zweite Zeile erste Spalte&gt; | &lt;Zellendefinition zweite Zeile zweite Spalte | ... # Definition der zweiten Tabellenzeile<br>
+usw.<br></code>
+<br>
+Endet eine Zeile mit |, so wird deren Definition in der nächsten Zeile fortgesetzt. Dadurch können längere Zeilendefinition einer Tabelle auf mehrerer Zeilen aufgeteilt werden.<br>
+<br>
+Eine Zellendefinition kann sein:<br>
+<br>
+1) <code>&lt;Perlausdruck mit [DOIF-Syntax]&gt;<br></code>
+<br>
+2) <code>STY(&lt;Perlausdruck mit [DOIF-Syntax]&gt;,&lt;css-Style-Definition mit [DOIF-Syntax]&gt;)<br></code>
+<br>
+3) <code>WID([&lt;DEVICE&gt;:&lt;READING&gt;],&lt;FHEM-Widget-Definition mit [DOIF-Syntax]&gt;,"&lt;set-/setreading-Kommando optional&gt;")<br></code>
+<br>
+Die oberen Definitionen können innerhalb einer Zelle mit Punkt bzw. Komma beliebig kombiniert werden. Beim Punkt werden die Ausdrücke aneinandergereiht, bei Komma werden die Ausdrücke mit Zeilenumbruch untereinander innerhalb einer Zelle angeordnet.<br>
+<br>
+Zu 1)<br>
+<br>
+Diese Definition wird verwendet für: Texte, Inhalte von Readings oder Rechenausdrücke. Angaben, die die Zelle aktualisieren sollen, müssen in gewohnte DOIF-Syntax angegeben werden.
+<br>
+Beispiele:<br>
+<br>
+Einfacher Text: <br>
+<br>
+<code>"Status"<br></code>
+<br>
+Reading:<br>
+<br>
+<code>[outdoor:temperature]<br></code>
+<br>
+Berechnung:<br>
+<br>
+<code>([livingroom:temperature]+[kitchen:temperature])/2<br></code>
+<br>
+Perlfunktion:<br>
+<br>
+<code>min([livingroom:temperature],[ktichen:temperature])<br></code>
+<br>
+Mehrere Angaben einer Zelle können mit einem Punkt, wie auch in Perl bei Zeichenketten üblich, konkateniert werden:<br>
+<br>
+<code>"Temperature: ".[outdoor:temperatur]<br></code>
+<br>
+<code>"Die maximale Temperatur der Kinderzimmer beträgt: ".max([child1:temperature],[child2:temperature])<br></code>
+<br>
+Zu 2)<br>
+<br>
+Über die Funktion STY werden Angaben mit Formatierungen über das CSS-Style-Attribut vorgenommen.<br>
+<br>
+Beispiele:<br>
+<br>
+Formatierter Text:<br>
+<br>
+<code>STY("diningroom","font-weight:bold;font-size:16pt;color:#0000FF")<br></code>
+<br>
+Formatiertes Reading:<br>
+<br>
+<code>STY([fridge:temperature],"color:#0000FF")<br></code>
+<br>
+Formatiertes Reading mit dynamischer Farbgebung abhängig von der Temperatur<br>
+<br>
+<code>STY([basement:humidity],"color:".DOIF_hsv([basement:humidity],50,75,40,264,60,90))<br></code>
+<br>
+DOIF_hsv ist eine DOIF-Funktion, bei der man den Farbverlauf definieren kann.<br>
+<br>
+Syntax für die  DOIF_hsv Funktion:<br>
+<br>
+<code>DOIF_hsv(&lt;value&gt;,&lt;min_value&gt;,&lt;max_value&gt;,&lt;min_hsv&gt;,&lt;max_hsv&gt;,&lt;saturation&gt;,&lt;lightness&gt;)<br></code>
+<br>
+Es wird durch eine feste Vorgabe von saturation und lightness, linear ein Farbton (Hue) für value errechnet, dabei entspricht min_value min_hsv und max_value max_hsv.<br>
+<br>
+Die gewünschten Werte für &lt;min_hsv&gt;,&lt;max_hsv&gt;,&lt;saturation&gt;,&lt;lightness&gt; können mit Hilfe eines Color-Pickers bestimmt werden.<br>
+<br>
+Weiterhin lässt sich ebenfalls jede andere Perlfunktion verwenden, die eine beliebige css-Style-Formatierung vornimmt.<br>
+<br>
+Zu 3)<br>
+<br>
+Über die Funktion WID werden FHEM-Widgets definiert. Es können alle in FHEM vorhanden FHEM-Widgets verwendet werden.<br>
+<br>
+Beispiele:<br>
+<br>
+Brennericon<br>
+<br>
+<code>WID([burner:state],"iconLabel,closed,sani_boiler_temp\@DarkOrange,open,sani_boiler_temp")<br></code>
+<br>
+Die Widget-Definition entspricht der FHEM-Widget-Syntax, siehe: <a href="https://wiki.fhem.de/wiki/FHEMWEB/Widgets">FHEMWEB-Widgets</a><br>
+<br>
+Thermostatdefinition mit Hilfe des knob-Widgets:<br>
+<br>
+<code>WID([TH_Bathroom_HM:desired-temp],"knob,min:17,max:25,width:45,height:40,step:0.5,fgColor:DarkOrange,bgcolor:grey,anglearc:270,angleOffset:225,cursor:10,thickness:.3","set")<br></code>
+<br>
+<b>Der Perlblock: Definition von Template-Attributen, Zellenformatierungen und Perl-Funktionen<br></b>
+<br>
+Im ersten Bereich werden sog. Template-Attribute als Variablen definiert, um wiederholende Zeichenketten in Kurzform anzugeben. Template-Attribute werden intern als hash-Variablen abgelegt. Die Syntax entspricht weitgehend der Perl-Syntax.<br>
+<br>
+Die Syntax lautet:<br>
+<br>
+<code>$TPL{&lt;name&gt;}=&lt;Perlsyntax für Zeichenketten&gt;<br></code>
+<br>
+<code>&lt;name&gt;</code> ist beliebig wählbar. <br>
+<br>
+Bsp.<br>
+<code>$TPL{HKnob}="knob,min:17,max:25,width:45,height:40,step:0.5,fgColor:DarkOrange,bgcolor:grey,anglearc:270,angleOffset:225,cursor:10,thickness:.3";<br></code>
+<br>
+Damit würde die obige Beispiel-Definition des Thermostat-Widgets wie folgt aussehen:<br>
+<br>
+<code>WID([TH_Bad_HM:desired-temp],$TPL{HKnob},"set")<br></code>
+<br>
+Weiterhin können die Tabelle, einzelne Zellen-, Zeilen- oder Spaltenformatierungen definiert werden, dazu werden folgende Bezeichner benutzt:<br>
+<br>
+<code>$TABLE="&lt;CSS-Attribute&gt;"<br>
+$TD{&lt;Zellenbereich für Zeilen&gt;}{&lt;Zellenbereich für Spalten&gt;}="&lt;CSS-Attribute der Zellen&gt;"<br>
+$TC{&lt;Zellenbereich für Spalten&gt;}="&lt;CSS-Attribute der Spalten&gt;"<br>
+$TR{Zeilenbereich}="&lt;CSS-Attribute der Zeilen&gt;"<br></code>
+<br>
+mit <br>
+<br>
+<code>&lt;Zellen/Spalten/Zeilen-Bereich&gt;: Zahl|kommagetrennte Aufzählung|Bereich von..bis<br></code>
+<br>
+Beispiele:<br>
+<code>
+$TABLE = "width:300px; height:300px; background-image:url(/fhem/www/pgm2/images/Grundriss.png); background-size: 300px 300px;";<br>
+$TD{0}{0} = "style='border-right-style:solid; border-right-width:10px'";<br>
+$TR{0} = "class='odd' style='font-weight:bold'";<br>
+$TC{1..5} = "align='center'";<br>
+$TC{1,3,5} = "align='center'";<br>
+$TC{last} = "style='font-weight:bold'";<br></code>
+<br>
+Es können ebenfalls beliebige Perl-Funktionen definiert werden, die innerhalb der Tabellendefinition genutzt werden können. Sie sollten mit FUNC_ beginnen. Damit wird sichergestellt, dass die Funktionen systemweit eindeutig sind.<br>
+<br>
+Bsp.<br>
+<br>
+Funktion für temperaturabhängige Farbgebung<br>
+<br>
+<code>
+sub FUNC_temp<br>
+ {<br>
+  my ($temp)=@_<br>
+    return ("font-weight:bold;font-size:12pt;color:".DOIF_hsv ($temp,15,35,210,360,60,90));<br>
+ }<br>
+<br></code>
+<b>Steuerungsattribute<br></b>
+<br>
+Ausblenden des Status in der Devicezeile:<br>
+<br>
+<code>$SHOWNOSTATE=1;</code><br>
+<br>
+Standardmäßig werden Texte innerhalb der Tabelle, die einem vorhandenen FHEM-Device entsprechen als Link zur Details-Ansicht dargestellt. Soll diese Funktionalität unterbunden werden, so kann man dies über folgendes Attribut unterbinden:<br> 
+<br>
+<code>$SHOWNODEVICELINK=1;</code><br>
+<br>
+Die Gerätezeile wird ausgeblendet, wenn der "Reguläre Ausdruck" &lt;regex room&gt; zum Raumnamen passt, gilt nicht für den Raum <i>Everything</i>.<br>
+<br>
+<code>$SHOWNODEVICELINE = "&lt;regex room&gt;";</code><br>
+<br>
+Die Detailansicht wird umorganisiert, hilfreich beim Editieren längerer uiTable-Definitionen.<br>
+<br>
+<code>$ATTRIBUTESFIRST = 1;</code><br>
+<br>
+<b>Template-Methoden<br></b>
+<br>
+Bei Widgetdefinition, die mehrfach verwendet werden sollen, können Template-Methoden definiert werden. Die Definition beginnt mit dem Schlüsselwort <code>DEF</code>. Die Template_Methode muss mit <code>TPL_</code> beginnen.<br>
+<br>
+Syntax<br>
+<br>
+<code>DEF TPL_&lt;name&gt;(&lt;Definition mit Platzhaltern $1,$2 usw.&gt;)<br></code>
+<br>
+<code>&lt;name&gt;</code> ist beliebig wählbar.<br>
+<br>
+In der Tabellendefinition können die zuvor definierten Template-Methoden genutzt werden. Die Übergabeparameter werden an Stelle der Platzhalter $1, $2 usw. eingesetzt.<br>
+<br>
+Beispiel<br>
+<br>
+Template-Methoden-Definition:<br>
+<br>
+<code>DEF TPL_Thermostat(WID($1,$TPL{HKnob},"set"))<br></code>
+<br>
+Nutzung der Template-Methode in der Tabellendefinition:<br>
+<br>
+<code>
+"Bathroom" | TPL_Thermostat([TH_Bathroom_HM:desired-temp])<br>
+"Kitchen" | TPL_Thermostat([TH_Kitchen_HM:desired-temp])<br>
+"Livingroom" | TPL_Thermostat([TH_Livingroom_HM:desired-temp])<br></code>
+<br>
+<b>Import von Templates und Funktionen<br></b>
+<br>
+Mit Hilfe des Befehls IMPORT können Definitionen aus Dateien importiert werden. Damit kann der Perlblock sowie Template-Methoden in eine Datei ausgelagert werden. Der Aufbau der Datei entspricht dem des uiTable-Attributes. Tabellendefinitionen selbst können nicht importiert werden.
+Der IMPORT-Befehl kann vor dem Perlblock oder vor dem Tabellendefintionsbereich angegeben werden. Ebenso können mehrere IMPORT-Befehle angegeben werden. Gleiche Definitionen von Funktionen, Templates usw. aus einer IMPORT-Datei überlagern die zuvor definierten.
+Der IMPORT-Befehl kann ebenfalls innerhalb einer Import-Datei angegeben werden.<br>
+<br>
+Syntax<br>
+<br>
+<code>IMPORT &lt;Pfad mit Dateinamen&gt<br></code>
+<br>
+Bespiel:<br>
+<br>
+in uiTable<br> 
+<br>
+<code>IMPORT /fhem/contrib/DOIF/mytemplates.tpl<br>
+<br>
+## table definition<br>
+<br>
+"outdoor" | TPL_temp([outdoor:temperature])<br>
+<br></code>
+in mytemplates.tpl<br>
+<br>
+<code>## templates and functions<br>
+{<br>
+ $TPL{unit}="°C";<br>
+ sub FUNC_temp<br>
+ {
+     my ($temp)=@_;<br>
+     return ("height:6px;font-weight:bold;font-size:16pt;color:".DOIF_hsv ($temp,-10,30,210,360,60,90));<br>
+ }<br>
+}<br>
+<br>
+## template methode<br>
+DEF TPL_temp(STY($1.$TPL{unit},FUNC_temp($1)))<br></code>
+<br>
 <br>
 <a name="DOIF_cmdState"></a>
 <b>Status des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -3656,6 +4539,38 @@ Der Status wird automatisch aktualisiert, sobald sich eine der Temperaturen änd
 Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwert auf eine Stelle mit der Perlfunktion sprintf formatieren:<br>
 <br>
 <code>attr di_average state Average of the two rooms is {(sprintf("%.1f",([room1:temperature]+[room2:temperature])/2))}</code><br>
+<br>
+<a name="DOIF_Readings"></a>
+<b>Erzeugen berechneter Readings</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+Mit Hilfe des Attributes DOIF_Readings können eigene Readings innerhalb des DOIF definiert werden, auf die man im selben DOIF-Moduls zugreifen kann.
+Die Nutzung ist insbesondere dann sinnvoll, wenn mehrfach die gleichen Berechnungen innerhalb eines DOIF-Modus vorgenommen werden sollen.
+DOIF_Readings-Berechnungen funktionieren ressourcenschonend ohne Erzeugung FHEM-Events nach außen. Änderungen dieser Readings triggern allerdings das eigene DOIF-Modul, wenn sich deren Inhalt ändert.<br>
+<br>
+Syntax<br>
+<br>
+<code>attr &lt;DOIF-Modul&gt; DOIF_Readings &lt;readingname1&gt;:&lt;definiton&gt;, &lt;readingname2&gt;:&lt;definition&gt;,...</code><br>
+<br>
+<code>&lt;definition&gt;</code>: Beliebiger Perlausdruck ergänzt um DOIF-Syntax in eckigen Klammern. Angaben in eckigen Klammern wirken triggernd und aktualisieren das definierte Reading.<br>
+<br>
+Beispiel: Push-Mitteilung über die durchschnittliche Temperatur aller Zimmer<br>
+<br>
+<code>define di_temp DOIF ([$SELF:temperature]&gt;20) (push "Die Durchschnittstemperatur ist höher als 20 Grad, sie beträgt [$SELF:temperature]")<br>
+DOELSE<br>
+<br>
+attr di_temp DOIF_Readings temperature:[#average:d2:":temperature":temperature]<br></code>
+<br>
+Hierbei wird der aufwändig berechnete Durchschnittswert nur einmal berechnet, statt zwei mal, wenn man die Aggregationsfunktion direkt in der Bedingung und im Ausführungsteil angeben würde.<br>
+<br>
+Mit DOIF_Readings ist es ebenfalls möglich eine Wiederholung des Schaltens eines DOIF-Moduls mit do always zu provozieren und gleichzeitig zyklisch sendende Sensoren abzufragen.<br>
+<br>
+Beispiel<br>
+<br>
+<code>define heating DOIF ([switch] eq "on" and [$SELF:frost] eq "on") (set heating on) DOELSE (set heating off)<br>
+attr heating do always<br>
+attr heating DOIF_Readings frost:([outdoor:temperature] < 0 ? "on" : "off")</code><br>
+<br>
+Das Attribut do always ist in diesem Beispiel unkritisch, obwohl Temperatur zyklisch gesendet wird, da das Reading "frost" nur dann die Bedingung triggert, wenn sich dessen Inhalt ändert<br>
 <br>
 <a name="DOIF_initialize"></a>
 <b>Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut <code>initialize</code></b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -4013,8 +4928,11 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt><a href="#DOIF_cmdState">Ger&auml;testatus ersetzen</a> <code><b>attr</b> &lt;name&gt; <b>cmdState </b>&lt;Ersatz cmd_1_1&gt;<b>,</b>...<b>,</b>&lt;Ersatz cmd_1&gt;<b>|</b>&lt;Ersatz cmd_2_1&gt;<b>,</b>...<b>,</b>&lt;Ersatz cmd_2&gt;<b>|...</b></code></dt>
                 <dd>ersetzt die Standartwerte des Ger&auml;testatus als direkte Angabe oder Berechnung, die Ersatzstatus von Befehlssequenzen werden durch Kommata, die von Befehlszweigen durch Pipe Zeichen getrennt.</dd>
 </br>
-        <dt><a href="#DOIF_state">dynamischer Status </a> <code><b>attr</b> &lt;name&gt; <b>state </b>&lt;dynamischer Inhalt&gt;</code></dt>
-                <dd>Zum Erstellen von <code>&lt;dynamischer Inhalt&gt;</code> k&ouml;nnen die f&uuml;r Befehle verf&uuml;gbaren Operanden verwendet werden.</dd>
+        <dt><a href="#DOIF_state">dynamischer Status </a> <code><b>attr</b> &lt;name&gt; <b>state </b>&lt;content&gt;</code></dt>
+                <dd>&lt;content&gt; ist das Ergebnis eines Perl-Ausdrucks, DOIF-Syntax ([&lt;device&gt;:&lt;reading&gt;], usw.) triggert bei Event die Berechnung.</dd>
+</br>
+        <dt><a href="#DOIF_Readings">Erzeugen berechneter Readings </a> <code><b>attr</b> &lt;name&gt; <b>DOIF_Readings </b>&lt;readingname_1&gt;<b>:</b>&lt;content_1&gt;<b>,</b>&lt;readingname_2&gt;<b>:</b>&lt;content_2&gt; ...</code></dt>
+                <dd>&lt;content_n&gt; ist das Ergebnis von Perl-Ausdrücken, DOIF-Syntax ([&lt;device&gt;:&lt;reading&gt;], usw.) triggert bei Event die Berechnung.</dd>
 </br>
         <dt><a href="#DOIF_notexist">Ersatzwert für nicht existierende Readings oder Status</a> <code><b>attr</b> &lt;name&gt; <b>notexist </b>"&lt;Ersatzwert&gt;"</code></dt>
                 <dd></dd>
@@ -4040,11 +4958,73 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 </br>
         <dt><a href="#DOIF_setList__readingList">Readings mit Werteliste und optionaler Widgetangabe</a> <code><b>attr</b> &lt;name&gt; <b>setList </b>&lt;Reading1&gt;<b>:</b>&lang;&lt;Modifier1&gt;<b>,</b>&rang;&lt;Value1&gt;<b>,</b>&lt;Value2&gt;<b>,</b>&lt;...&gt;<b> </b>&lt;Reading2&gt;<b>:</b>&lang;&lt;Modifier2&gt;<b>,</b>&rang;&lt;Value1&gt;<b>,</b>&lt;Value2&gt;<b>,</b>&lt;...&gt; ...</code></dt>
                 <dd>fügt einem Reading einen optionalen Widgetmodifier und eine Werteliste (, getrennt) hinzu, siehe auch <a href="#setList">setList</a>, <a href="#widgetOverride">widgetOverride</a>, und <a href="#webCmd">webCmd</a></dd>
-</br>
+<br>
+  <dt><a href="#DOIF_uiTable">User Interface f&uuml;r DOIF</a> <code><b>attr</b> &lt;name&gt; <b>uiTable</b> &lang;<b>{</b>&lt;perl code (format specification, template specification, function definition, control variable, ...)&gt;<b>}\n</b>&rang;&lt;template file import, method definition, table definition&gt;</code></dt>
+    <dd><u>format specification:</u></dd>
+    <dd><code>$TABLE = "&lt;CSS-Attribute&gt;"</code> ergänzt das table-Elemente um CSS-Attribute.</dd>
+    <dd><code>$TD{&lt;rows&gt;}{&lt;columns&gt;} = "&lt;HTML Attribute&gt;"</code> ergänzt td-Elemente um HTML-Attribute.</dd>
+    <dd><code>$TR{&lt;rows&gt;} = "&lt;HTML Attribute&gt;"</code> ergänzt tr-Elemente um HTML-Attribute.</dd>
+    <dd><code>$TC{&lt;columns&gt;} = "&lt;HTML Attribute&gt;"</code> ergänzt zu columns gehörende td-Elemente um HTML-Attribute.</dd>
+    <dd><u>template specification:</u></dd>
+    <dd><code>$TPL{&lt;name&gt;} = "&lt;Zeichenkette&gt;"</code> speichert ein Template.</dd>
+    <dd><u>function definition:</u></dd>
+    <dd><code>sub FUNC_&lt;name&gt; {&lt;function BLOCK&gt;}</code> definiert eine Funktion.</dd>
+    <dd><u>control variables:</u></dd>
+    <dd><code>$ATTRIBUTESFIRST = 1;</code> organisiert die Detailansicht um.</dd>
+    <dd><code>$SHOWNOSTATE = 1;</code> blendet den Status in der Gerätezeile aus.</dd>
+    <dd><code>$SHOWNODEVICELINE = "&lt;regex room&gt;";</code> blendet die Gerätezeile aus, wenn &lt;regex room&gt; zum Raumnamen passt, gilt nicht für den Raum <i>Everything</i>.</dd>
+    <dd><code>$SHOWNODEVICELINK = 1;</code> schaltet das Ersetzen des Gerätenamen durch einen Link auf die Detailseite aus.</dd>
+    <br>
+    <dd><u>template file import:</u></dd>
+    <dd><code>IMPORT &lt;path with filename&gt;</code> importiert eine Templatedatei.</dd>
+    <dd><u>method definition:</u></dd>
+    <dd><code>DEF TPL_&lt;name&gt;(&lt;definition with place holder $1,$2 usw.&gt;)</code> erzeugt ein Methodentemplate zur wiederholten Nutzung in der Tabellendefinition.</dd>
+    <dd><u>table definition:</u></dd>
+    <dd>Schreiben die nachstehenden Elemente HTML-Code in die Tabellenzelle, so wird er interpretiert.</dd>
+    <dd><code>&crarr;</code> oder <code>&crarr;&crarr;</code> trennt Tabellenzeilen.</dd>
+    <dd><code>|</code> oder <code>|&crarr;</code> trennt Tabellenzellen.</dd>
+    <dd><code>&gt;&crarr;</code> oder <code>,&crarr;</code> sind zur Textstrukturierung zugelassen.</dd>
+    <dd><code>WID([&lt;device&gt;:&lt;reading&gt;],"&lt;widget modifier&gt;"&lang;,"&lt;command&gt;"&rang;)</code> bindet ein Widget an &lt;device&gt;:&lt;reading&gt;, &lt;command&gt; steht für <i>set</i> oder <i>setreading</i>, siehe <a href="#widgetOverride"> widgetOverride </a> und <a href="https://wiki.fhem.de/wiki/FHEMWEB/Widgets"> FHEMWEB-Widgets </a></dd>
+    <dd><code>STY(&lt;content&gt;,&lt;CSS style attributes&gt;)</code> schreibt den Inhalt von &lt;content&gt; in die Zelle und formatiert ihn mit &lt;CSS style attributes&gt;.</dd>
+    <dd><code>&lt;content&gt;</code> schreibt den Inhalt von &lt;content&gt; in die Zelle.</dd>
+    <dd>&lt;content&gt; und &lt;CSS style attributes&gt; sind das Ergebnis von Perl-Ausdrücken. Enthalten sie DOIF-Syntax ([&lt;device&gt;:&lt;reading&gt;], usw.), werden sie dynamisch erzeugt.</dd>
+    <dd><code>PUP(&lt;DOIF-name to show interface table&gt;, &lt;iconname[@color number]&gt;)</code></dd>
+    <dd>gibt ein Link zum Öffnen eines Popup-Fensters zurück.</dd>
+    <dd>&lt;DOIF-name to show interface table&gt; Name des DOIF-Gerätes dessen Benutzerschnittstelle angezeigt werden soll.</dd>
+    <dd>&lt;iconname[@color number]|string&gt; gibt ein Icon an, wenn das Icon nicht verfügbar ist, wird &lt;string&gt; angezeigt.</dd>
+<br>
         <dt><a href="#readingFnAttributes">readingFnAttributes</a></dt>
                 <dd></dd>
-</br>
 </dl>
+<br>
+</ul>
+<a name="DOIF_PerlFunktionen_kurz"></a>
+<u>Perl-Funktionen</u>
+<ul>
+  <dl>
+    <dt><code>DOIF_hsv(&lt;current value&gt;, &lt;lower value&gt;, &lt;upper value&gt;, &lt;lower HUE value&gt;, &lt;upper HUE value&gt;, &lt;saturation&gt;, &lt;lightness&gt;)</code></dt>
+    <dd>gibt eine im HSV-Raum interpolierte HTML Farbnummer zurück, mit Prefix <b>#</b></dd>
+    <dd>&lt;current value&gt; aktueller Wert, für den die Farbnummer erzeugt wird.</dd>
+    <dd>&lt;lower value&gt; unterer Wert, des Bereiches auf den die Farbnummer skaliert wird.</dd>
+    <dd>&lt;upper value&gt; oberer Wert, des Bereiches auf den die Farbnummer skaliert wird.</dd>
+    <dd>&lt;lower HUE value&gt; unterer HUE-Wert, der mit dem unteren Wert korrespondiert (0-360).</dd>
+    <dd>&lt;upper HUE value&gt; oberer HUE-Wert, der mit dem oberen Wert korrespondiert (0-360).</dd>
+    <dd>&lt;saturation&gt; Farbsättigung (0-100).</dd>
+    <dd>&lt;lightness&gt; Hellwert (0-100).</dd>
+<br>
+    <dt><code>DOIF_rgb(&lt;start color number&gt;, &lt;end color number&gt;, &lt;lower value&gt;, &lt;upper value&gt;, &lt;current value&gt;)</code></dt>
+    <dd>gibt eine linear interpolierte RGB Farbnummer zurück, abhängig vom Prefix der Start- o. Endfarbnummer mit oder ohne Prefix <b>#</b>.</dd>
+    <dd>&lt;start color number&gt; Startfarbnummer des Farbbereiches, mit oder ohne Prefix <b>#</b>.</dd>
+    <dd>&lt;end color number&gt; Endfarbnummer des Farbbereiches, mit oder ohne Prefix <b>#</b>.</dd>
+    <dd>&lt;lower value&gt; unterer Wert, des Bereiches auf den die Farbnummer skaliert wird.</dd>
+    <dd>&lt;upper value&gt; oberer Wert, des Bereiches auf den die Farbnummer skaliert wird.</dd>
+    <dd>&lt;current value&gt; aktueller Wert, für den die Farbnummer erzeugt wird.</dd>
+<br>
+    <dt><code>FW_makeImage(&lt;iconname[@color number]&gt;)</code></dt>
+    <dd>gibt HTML-Code zurück, der ein FHEM icon einbindet.</dd>
+    <dd>&lt;color number&gt; optionale Farbnummer in Großschreibung, mit oder ohne Prefix <b>#</b>.</dd>
+    <dd>weitere Infos im Quelltext von 01_FHEMWEB.pm.</dd>
+  </dl>
 </ul>
 <!-- Ende der Kurzreferenz -->
 </ul>
