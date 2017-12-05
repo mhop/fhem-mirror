@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  46_SmartPi: fix syntax error bug in Attribut Sub
   - change:  98_dewpoint: Refactoring using API calls, verbose attribute added
   - change:  FileLog removes newlines from the data (Forum #79684)
   - bugfix:  98_Siro.pm: Support favorit for model ERB15LE

@@ -164,13 +164,13 @@ sub SmartPi_Attr(@) {
                 readingsSingleUpdate ( $hash, "state", "disabled", 1 );
                 Log3 $name, 3, "SmartPi ($name) - disabled";
             }
-            
+
         } else {
             readingsSingleUpdate ( $hash, "state", "enabled", 1 );
             Log3 $name, 3, "SmartPi ($name) - enabled";
         }
-        
-    elsif( $attrName eq "disabledForIntervals" ) {
+
+    } elsif( $attrName eq "disabledForIntervals" ) {
         if( $cmd eq "set" ) {
             return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
             unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
@@ -182,8 +182,7 @@ sub SmartPi_Attr(@) {
             Log3 $name, 3, "SmartPi ($name) - enabled";
             readingsSingleUpdate ( $hash, "state", "active", 1 );
         }
-    }
-        
+
     } elsif( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
             $hash->{INTERVAL} = $attrVal;
@@ -192,7 +191,7 @@ sub SmartPi_Attr(@) {
             $hash->{INTERVAL} = 300;
         }
     }
-    
+
     return undef;
 }
 
