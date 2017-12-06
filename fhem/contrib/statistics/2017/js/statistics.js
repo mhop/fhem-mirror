@@ -63,10 +63,10 @@ function drawGooglePieChart(data, el, subst, sort, threshold) {
     var options = {   is3D: true,
                       chartArea : { height:'80%',width:'95%' },
                       tooltip: { trigger: 'selection' },
-                      width: 450,
+                      width: 600,
                       legend: {position: 'right',labeledValueText: 'both'},
                       pieSliceText: 'none',
-                      height: 350,
+                      height: 450,
                       sliceVisibilityThreshold: threshold
                   };
                   
@@ -284,7 +284,6 @@ function createModulTable(modules,models,table)
 function convertHtmlEntities(str)
 {
     return $("<div />").text(str).html();
-    return str.replace(/[\u00A0-\u9999<>\&]/gim, function(i) { return '&#'+i.charCodeAt(0)+';'; });  
 }
 
 function generateModelsOverview(moduleName, modelData)
