@@ -1,8 +1,8 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 10/2017
-my $thzversion = "0.171"; 
+# by immi 12/2017
+my $thzversion = "0.172"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -64,78 +64,94 @@ sub THZ_Get($@);
 
 my %parsinghash = (
   #msgtype => parsingrule  
-  "01pxx206" => [["p37Fanstage1AirflowInlet: ", 4, 4, "hex", 1],[" p38Fanstage2AirflowInlet: ", 8, 4, "hex", 1],    [" p39Fanstage3AirflowInlet: ", 12, 4, "hex", 1],
-              [" p40Fanstage1AirflowOutlet: ", 16, 4, "hex", 1],[" p41Fanstage2AirflowOutlet: ", 20, 4, "hex", 1],  [" p42Fanstage3AirflowOutlet: ", 24, 4, "hex", 1],
-              [" p43UnschedVent3: ", 	28, 4, "hex", 1],       [" p44UnschedVent2: ", 32, 4, "hex", 1],       		[" p45UnschedVent1: ", 36, 4, "hex", 1],
-              [" p46UnschedVent0: ", 	40, 4, "hex", 1],  	[" p75PassiveCooling: ", 44, 4, "hex", 1]
+  "01pxx206" => [["p37Fanstage1AirflowInlet: ", 4, 4, "hex", 1],    [" p38Fanstage2AirflowInlet: ", 8, 4, "hex", 1],    [" p39Fanstage3AirflowInlet: ", 12, 4, "hex", 1],
+              [" p40Fanstage1AirflowOutlet: ", 16, 4, "hex", 1],    [" p41Fanstage2AirflowOutlet: ", 20, 4, "hex", 1],  [" p42Fanstage3AirflowOutlet: ", 24, 4, "hex", 1],
+              [" p43UnschedVent3: ", 	       28, 4, "hex", 1],    [" p44UnschedVent2: ", 32, 4, "hex", 1],       		[" p45UnschedVent1: ", 36, 4, "hex", 1],
+              [" p46UnschedVent0: ", 	       40, 4, "hex", 1],    [" p75PassiveCooling: ", 44, 4, "hex", 1]
               ],
   "01pxx214" => [["p37Fanstage1AirflowInlet: ", 4, 2, "hex", 1],[" p38Fanstage2AirflowInlet: ", 6, 2, "hex", 1],    [" p39Fanstage3AirflowInlet: ", 8, 2, "hex", 1],
-	      [" p40Fanstage1AirflowOutlet: ", 10, 2, "hex", 1],[" p41Fanstage2AirflowOutlet: ", 12, 2, "hex", 1],	[" p42Fanstage3AirflowOutlet: ", 14, 2, "hex", 1],
-	      [" p43UnschedVent3: ", 	16, 4, "hex", 1],	[" p44UnschedVent2: ", 20, 4, "hex", 1],			[" p45UnschedVent1: ", 24, 4, "hex", 1],
-	      [" p46UnschedVent0: ", 	28, 4, "hex", 1],	[" p75PassiveCooling: ", 32, 2, "hex", 1]
+	      [" p40Fanstage1AirflowOutlet: ", 10, 2, "hex", 1],    [" p41Fanstage2AirflowOutlet: ", 12, 2, "hex", 1],	[" p42Fanstage3AirflowOutlet: ", 14, 2, "hex", 1],
+	      [" p43UnschedVent3: ", 	    16, 4, "hex", 1],	    [" p44UnschedVent2: ", 20, 4, "hex", 1],			[" p45UnschedVent1: ", 24, 4, "hex", 1],
+	      [" p46UnschedVent0: ", 	    28, 4, "hex", 1],	    [" p75PassiveCooling: ", 32, 2, "hex", 1]
 	      ],
   "03pxx206" => [["UpTempLimitDefrostEvaporatorEnd: ", 4, 4, "hex", 10],  [" MaxTimeDefrostEvaporator: ", 8, 4, "hex", 1], 	[" LimitTempCondenserElectBoost: ", 12, 4, "hex", 10],
-	      [" LimitTempCondenserDefrostTerm: ", 16, 4, "hex", 10],   [" CompressorRestartDelay: ", 20, 2, "hex", 1], 	[" MainFanSpeed: ", 22, 2, "hex", 1]
-	      ],
+	      [" LimitTempCondenserDefrostTerm: ", 16, 4, "hex", 10],   [" p47CompressorRestartDelay: ", 20, 2, "hex", 1], 	[" p48MainFanSpeed: ", 22, 2, "hex", 1]
+ 	      ],
   "04pxx206" => [["MaxDefrostDurationAAExchenger: ", 4, 2, "hex", 1],	[" DefrostStartThreshold: ", 6, 4, "hex", 10],		[" VolumeFlowFilterReplacement: ", 10, 4, "hex", 1]
 	      ],
-  "05pxx206" => [["p13GradientHC1: ", 	4, 4, "hex", 10],	[" p14LowEndHC1: ", 8, 4, "hex", 10],		[" p15RoomInfluenceHC1: ", 12, 2, "hex", 10],
-	      [" p16GradientHC2: ", 	14, 4, "hex", 10],	[" p17LowEndHC2: ", 18, 4, "hex", 10],		[" p18RoomInfluenceHC2: ", 22, 2, "hex", 10],
-	      [" p19FlowProportionHC1: ", 24, 4, "hex", 1],	[" p20FlowProportionHC2: ", 28, 4, "hex", 1],	[" MaxSetHeatFlowTempHC1: ", 32, 4, "hex", 10],
-	      [" MinSetHeatFlowTempHC1: ", 36, 4, "hex", 10],	[" MaxSetHeatFlowTempHC2: ", 40, 4, "hex", 10], [" MinSetHeatFlowTempHC2: ", 44, 4, "hex", 10],
+  "05pxx206" => [["p13GradientHC1: ", 	4, 4, "hex", 10],	[" p14LowEndHC1: ", 8, 4, "hex", 10],		        [" p15RoomInfluenceHC1: ", 12, 2, "hex", 10],
+	      [" p16GradientHC2: ", 	14, 4, "hex", 10],	    [" p17LowEndHC2: ", 18, 4, "hex", 10],		        [" p18RoomInfluenceHC2: ", 22, 2, "hex", 10],
+	      [" p19FlowProportionHC1: ", 24, 4, "hex", 1],	    [" p20FlowProportionHC2: ", 28, 4, "hex", 1],	    [" MaxSetHeatFlowTempHC1: ", 32, 4, "hex", 10],
+	      [" MinSetHeatFlowTempHC1: ", 36, 4, "hex", 10],	[" MaxSetHeatFlowTempHC2: ", 40, 4, "hex", 10],     [" MinSetHeatFlowTempHC2: ", 44, 4, "hex", 10],
 	      ],
-  "06pxx206" => [["p21Hyst1: ", 	4, 2, "hex", 10],	[" p22Hyst2: ", 6, 2, "hex", 10],		  		[" p23Hyst3: ", 8, 2, "hex", 10],
-	      [" p24Hyst4: ", 		10, 2, "hex", 10],	[" p25Hyst5: ", 12, 2, "hex", 10],		  		[" p26Hyst6: ", 14, 2, "hex", 10],
-	      [" p27Hyst7: ", 		16, 2, "hex", 10],	[" p28Hyst8: ", 18, 2, "hex", 10],		  		[" p29HystAsymmetry: ", 20, 2, "hex", 1],
-	      [" p30integralComponent: ", 22, 4, "hex", 1],	[" p31MaxBoostStages: ", 26, 2, "hex", 1],	  	[" MaxHeatFlowTemp: ", 28, 4, "hex", 10],
-	      [" p49SummerModeTemp: ", 	32, 4, "hex", 10],	[" p50SummerModeHysteresis: ", 36, 4, "hex", 10], [" p77OutTempAdjust: ", 40, 4, "hex", 1],
-	      [" p78DualModePoint: ", 	44, 4, "hex2int", 10],	[" p79ReHeatingDelay: ", 48, 2, "hex", 1]
+  "06pxx206" => [["p21Hyst1: ", 	  4, 2, "hex", 10],	    [" p22Hyst2: ",             6, 2, "hex", 10],	    [" p23Hyst3: ", 8, 2, "hex", 10],
+	      [" p24Hyst4: ", 		      10, 2, "hex", 10],    [" p25Hyst5: ",             12, 2, "hex", 10],	    [" p26Hyst6: ", 14, 2, "hex", 10],
+	      [" p27Hyst7: ", 		      16, 2, "hex", 10],	[" p28Hyst8: ",             18, 2, "hex", 10],      [" p29HystAsymmetry: ", 20, 2, "hex", 1],
+	      [" p30integralComponent: ", 22, 4, "hex", 1],	    [" p31MaxBoostStages: ",    26, 2, "hex", 1],	    [" MaxHeatFlowTemp: ", 28, 4, "hex", 10],
+	      [" p49SummerModeTemp: ", 	  32, 4, "hex", 10],	[" p50SummerModeHysteresis: ", 36, 4, "hex", 10],   [" p77OutTempFilterTime: ", 40, 4, "hex", 1],
+	      [" p78DualModePoint: ", 	  44, 4, "hex2int", 10],[" p79BoosterTimeoutHC: ",  48, 2, "hex", 1] 	      
+          ],
+  "07pxx206" => [["p32HystDHW: ", 	    4, 2, "hex", 10],   [" p33BoosterTimeoutDHW: ", 6, 2, "hex", 1],        [" p34TempLimitBoostDHW: ", 8, 4, "hex2int", 10],    	[" p35PasteurisationInterval: ", 12, 2, "hex", 1],
+	      [" p36MaxDurationDHWLoad: ", 14, 2, "hex", 1],	[" pasteurisationTemp: ",   16, 4, "hex", 10],      [" maxBoostStagesDHW: ", 20, 2, "hex", 1],
+          [" p84EnableDHWBuffer: ",     22, 2, "hex", 1]
 	      ],
-  "07pxx206" => [["p32HystDHW: ", 	4, 2, "hex", 10],	[" p33BoosterTimeoutDHW: ", 6, 2, "hex", 1],	 [" p34TempLimitBoostDHW: ", 8, 4, "hex2int", 10],    	[" p35PasteurisationInterval: ", 12, 2, "hex", 1],
-	      [" p36MaxDurationDHWLoad: ", 14, 2, "hex", 1],	[" PasteurisationTemp: ", 16, 4, "hex", 10],	 [" MaxBoostStagesDHW: ", 20, 2, "hex", 1],
-	      [" p84EnableDHWBuffer: ", 22, 2, "hex", 1]
-	      ],
-  "08pxx206" => [["p80EnableSolar: ", 	4, 2, "hex", 1],	[" p81DiffTempSolarLoading: ", 6, 4, "hex", 10], [" p82DelayCompStartSolar: ", 10, 2, "hex", 1],
-	      [" p84DHWTempSolarMode: ", 12, 4, "hex", 10],	[" HystDiffTempSolar: ", 16, 4, "hex", 10],	 [" CollectLimitTempSolar: ", 20, 4, "hex", 10]
+  "08pxx206" => [["p80EnableSolar: ", 	4, 2, "hex", 1],	[" p81DiffTempSolarLoading: ", 6, 4, "hex", 10],    [" p82DelayCompStartSolar: ", 10, 2, "hex", 1],
+	      [" p84DHWTempSolarMode: ", 12, 4, "hex", 10],	    [" HystDiffTempSolar: ", 16, 4, "hex", 10],	        [" CollectLimitTempSolar: ", 20, 4, "hex", 10]
 	      ],
   "09his" => [["compressorHeating: ", 	4, 4,  "hex", 1],	[" compressorCooling: ",  8, 4, "hex", 1],
-	      [" compressorDHW: ",	12, 4, "hex", 1],	[" boosterDHW: ",	16, 4, "hex", 1],
-	      [" boosterHeating: ",	20, 4, "hex", 1]
+	      [" compressorDHW: ",	    12, 4, "hex", 1],	    [" boosterDHW: ",	16, 4, "hex", 1],
+	      [" boosterHeating: ",	    20, 4, "hex", 1]
 	      ],
   "09his206" => [["operatingHours1: ", 	4, 4, "hex", 1],	[" operatingHours2: ",  8, 4, "hex", 1],
-	      [" heatingHours: ",	12, 4, "hex", 1],	[" DHWhours: ",	16, 4, "hex", 1],
-	      [" coolingHours: ",	20, 4, "hex", 1]
+	      [" heatingHours: ",	    12, 4, "hex", 1],	    [" DHWhours: ",	16, 4, "hex", 1],
+	      [" coolingHours: ",	    20, 4, "hex", 1]
 	      ],
   "0Apxx206" => [["p54MinPumpCycles: ", 4, 2, "hex", 1],	[" p55MaxPumpCycles: ", 6, 4, "hex", 1],	 [" p56OutTempMaxPumpCycles: ", 10, 4, "hex", 10],
 	      [" p57OutTempMinPumpCycles: ", 14, 4, "hex", 10], [" p58SuppressTempCaptPumpStart: ", 18, 4, "hex", 1]
 	      ],
-  "0Bpxx206" => [["pHTG1StartTime: ", 	4, 4, "hex2time", 1],	[" pHTG1EndTime: ", 8, 4, "hex2time", 1],	[" pHTG1Weekdays: ", 12, 2, "hex2wday", 1],
-	      [" pHTG1Enable: ", 	14, 2, "hex", 1],	[" pHTG2StartTime: ", 16, 4, "hex2time", 1],	[" pHTG2EndTime: ", 20, 4, "hex2time", 1],
-	      [" pHTG2Weekdays: ", 	24, 2, "hex2wday", 1],	[" pHTG2Enable: ", 26, 2, "hex", 1]
-	      ], 
-  "0Cpxx206" => [["pDHWStartTime: ", 	4, 4, "hex2time", 1],	[" pDHWEndTime: ", 8, 4, "hex2time", 1],	[" pDHWWeekdays: ", 12, 2, "hex2wday", 1],
-	      [" pDHWEnable: ", 	14, 2, "hex", 1],
-	      ], 
-  "0Dpxx206" => [["pFAN1StartTime: ", 	4, 4, "hex2time", 1], 	[" pFAN1EndTime: ", 8, 4, "hex2time", 1], 	[" pFAN1Weekdays: ", 12, 2, "hex2wday", 1],
-	      [" pFAN1Enable: ", 	14, 2, "hex", 1], 	[" pFAN2StartTime: ", 16, 4, "hex2time", 1],	[" pFAN2EndTime: ", 20, 4, "hex2time", 1],
-	      [" pFAN2Weekdays: ", 	24, 2, "hex2wday", 1],	[" pFAN2Enable: ", 26, 2, "hex", 1]
-	      ], 
+  "0Bpxx206" => [["progHC1StartTime: ", 	4, 4, "hex2time", 1], 	[" progHC1EndTime: ", 8, 4, "hex2time", 1],
+	      [" progHC1Monday: ", 	    13, 1, "bit0", 1],      [" progHC1Tuesday: ", 	13, 1, "bit1", 1],	
+		  [" progHC1Wednesday: ", 	13, 1, "bit2", 1],      [" progHC1Thursday: ", 13, 1, "bit3", 1],
+		  [" progHC1Friday: ", 	    12, 1, "bit0", 1],      [" progHC1Saturday: ", 12, 1, "bit1", 1],
+		  [" progHC1Sunday: ", 	    12, 1, "bit2", 1],      [" progHC1Enable: ", 	14, 2, "hex", 1],
+	      [" progHC2StartTime: ",   16, 4, "hex2time", 1],	[" progHC2EndTime: ", 20, 4, "hex2time", 1],
+	      [" progHC2Monday: ", 	    25, 1, "bit0", 1],      [" progHC2Tuesday: ", 	25, 1, "bit1", 1],	
+		  [" progHC2Wednesday: ", 	25, 1, "bit2", 1],      [" progHC2Thursday: ", 25, 1, "bit3", 1],
+		  [" progHC2Friday: ", 	    24, 1, "bit0", 1],      [" progHC2Saturday: ", 24, 1, "bit1", 1],
+		  [" progHC2Sunday: ", 	    24, 1, "bit2", 1],      [" progHC2Enable: ", 26, 2, "hex", 1]
+	      ],
+  "0Cpxx206" => [["progDHWStartTime: ", 4, 4, "hex2time", 1],	[" progDHWEndTime: ", 8, 4, "hex2time", 1],
+	      [" progDHWMonday: ", 	    13, 1, "bit0", 1],  [" progDHWTuesday: ", 	13, 1, "bit1", 1],	
+		  [" progDHWWednesday: ", 	13, 1, "bit2", 1],  [" progDHWThursday: ", 13, 1, "bit3", 1],
+		  [" progDHWFriday: ", 	    12, 1, "bit0", 1],  [" progDHWSaturday: ", 12, 1, "bit1", 1],
+		  [" progDHWSunday: ", 	    12, 1, "bit2", 1],  [" progDHWEnable: ", 	14, 2, "hex", 1],
+ 	      ],
+  "0Dpxx206" => [["progFAN1StartTime: ", 4, 4, "hex2time", 1], 	[" progFAN1EndTime: ", 8, 4, "hex2time", 1],
+	      [" progFAN1Monday: ", 	13, 1, "bit0", 1], [" progFAN1Tuesday: ", 	13, 1, "bit1", 1],	
+		  [" progFAN1Wednesday: ", 	13, 1, "bit2", 1], [" progFAN1Thursday: ", 13, 1, "bit3", 1],
+		  [" progFAN1Friday: ", 	12, 1, "bit0", 1], [" progFAN1Saturday: ", 12, 1, "bit1", 1],
+		  [" progFAN1Sunday: ", 	12, 1, "bit2", 1], [" progFAN1Enable: ", 	14, 2, "hex", 1],
+	      [" progFAN2StartTime: ", 16, 4, "hex2time", 1],	[" progFAN2EndTime: ", 20, 4, "hex2time", 1],
+	      [" progFAN2Monday: ", 	25, 1, "bit0", 1], [" progFAN2Tuesday: ", 	25, 1, "bit1", 1],	
+		  [" progFAN2Wednesday: ", 	25, 1, "bit2", 1], [" progFAN2Thursday: ", 25, 1, "bit3", 1],
+		  [" progFAN2Friday: ", 	24, 1, "bit0", 1], [" progFAN2Saturday: ", 24, 1, "bit1", 1],
+		  [" progFAN2Sunday: ", 	24, 1, "bit2", 1], [" progFAN2Enable: ", 26, 2, "hex", 1]
+ 	      ],  
   "0Epxx206" => [["p59RestartBeforeSetbackEnd: ", 4, 4, "hex", 1]
 	      ], 
   "0Fpxx206" => [["pA0DurationUntilAbsenceStart: ", 4, 4, "hex", 10], [" pA0AbsenceDuration: ", 8, 4, "hex", 10], [" pA0EnableAbsenceProg: ", 12, 2, "hex", 1]
 	      ], 	 
   "10pxx206" => [["p70StartDryHeat: ", 	4, 2, "hex", 1],	[" p71BaseTemp: ", 6, 4, "hex", 10],	[" p72PeakTemp: ", 10, 4, "hex", 10],
-	      [" p73TempDuration: ", 	14, 4, "hex", 1],	[" p74TempIncrease: ", 18, 4, "hex", 10]
+	      [" p73TempDuration: ", 	14, 4, "hex", 1],	    [" p74TempIncrease: ", 18, 4, "hex", 10]
 	      ],
-  "16sol" => [["collector_temp: ",	4, 4, "hex2int", 10],	[" dhw_temp: ", 	 8, 4, "hex2int", 10],
-	      [" flow_temp: ",		12, 4, "hex2int", 10],	[" ed_sol_pump_temp: ",	16, 4, "hex2int", 10],
-	      [" x20: ",		20, 4, "hex2int", 1],	[" x24: ",		24, 4, "hex2int", 1], 
-	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
+  "16sol" => [["collectorTemp: ",	4, 4, "hex2int", 10],	[" dhwTemp: ", 	8, 4, "hex2int", 10],
+	      [" flowTemp: ",		    12, 4, "hex2int", 10],	[" edSolPump: ",	16, 2, "hex2int", 1],
+	      [" out: ",		        26, 4, "raw", 1],       [" status: ",		30, 2, "raw", 1]
 	      ],
   "17pxx206" => [["p01RoomTempDay: ", 	4, 4,  "hex",  10],	[" p02RoomTempNight: ",		8,  4, "hex", 10],
 	      [" p03RoomTempStandby: ",	12, 4,  "hex", 10], 	[" p04DHWsetTempDay: ",		16, 4,  "hex", 10], 
 	      [" p05DHWsetTempNight: ",	20, 4,  "hex", 10], 	[" p06DHWsetTempStandby: ",	24, 4,  "hex", 10], 
-	      [" p07FanStageDay: ",	28, 2,  "hex", 1], 	        [" p08FanStageNight: ",		30, 2,  "hex", 1],
+	      [" p07FanStageDay: ",	    28, 2,  "hex", 1], 	    [" p08FanStageNight: ",		30, 2,  "hex", 1],
 	      [" p09FanStageStandby: ",	32, 2,  "hex", 1], 	    [" p10HCTempManual: ",	34, 4,  "hex", 10],
 	      [" p11DHWsetTempManual: ", 38, 4,  "hex", 10],  	[" p12FanStageManual: ",	42, 2,  "hex", 1],
 	      ],
@@ -151,101 +167,100 @@ my %parsinghash = (
 	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 1],
 	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 1]
 	      ],
-  "EEprg206" => [["OpMode: ", 		4, 2, 	"hex", 1], 	[" ProgStateHC: ", 	10, 2, "opmodehc", 1], 	[" ProgStateDHW: ", 	12, 2, "opmodehc", 1],
-	      [" ProgStateFAN: ", 	14, 2, 	"opmodehc", 1], [" BaseTimeAP0: ", 	16, 8, "hex", 1], 	[" StatusAP0: ", 	24, 2, "hex", 1],
-	      [" StartTimeAP0: ", 	26, 8, 	"hex", 1], 	[" EndTimeAP0: ", 	34, 8, "hex", 1]
+  "EEprg206" => [["opMode: ", 	4, 2, 	"opmode2", 1], 	[" ProgStateHC: ", 	10, 2, "opmodehc", 1], 	[" ProgStateDHW: ", 	12, 2, "opmodehc", 1],
+	      [" ProgStateFAN: ", 	14, 2, 	"opmodehc", 1], [" BaseTimeAP0: ", 	16, 8, "hex", 1], 	    [" StatusAP0: ", 	24, 2, "hex", 1],
+	      [" StartTimeAP0: ", 	26, 8, 	"hex", 1], 	    [" EndTimeAP0: ", 	34, 8, "hex", 1]
 	      ],
-  "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
-	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
-	      [" x20: ", 		20, 4, "hex2int", 1],	[" heat_block_time: ", 	24, 4, "hex2int", 1], 
-	      [" BoosterStage: ",	28, 2, "hex", 1],	[" x30: ",		30, 4, "hex", 1],
-	      [" opMode: ",		34, 2, "opmodehc", 1],	[" x36: ",		36, 4, "hex", 1]
- 	      ],
-  "F4hc1"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" x08: ",	 	8, 4, "hex2int", 10],
-	      [" returnTemp: ",		12, 4, "hex2int", 10],  [" integralHeat: ",	16, 4, "hex2int", 1],
-	      [" flowTemp: ",		20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10], 
+  "F3dhw"  => [["dhwTemp: ",	4, 4, "hex2int", 10],	[" outsideTemp: ", 	    8, 4, "hex2int", 10],
+	      [" dhwSetTemp: ",	    12, 4, "hex2int", 10],  [" compBlockTime: ",	16, 4, "hex2int", 1],
+	      [" out: ", 		    20, 4, "raw", 1],	    [" heatBlockTime: ", 	24, 4, "hex2int", 1],
+	      [" dhwBoosterStage: ",	28, 2, "hex", 1],	[" pasteurisationMode: ", 32, 2, "hex", 1],
+	      [" dhwOpMode: ",		34, 2, "opmodehc", 1],	[" x36: ",		        36, 4, "raw", 1]
+  	      ],
+  "F4hc1"  => [["outsideTemp: ", 4, 4, "hex2int", 10],	    [" x08: ",	 	    8, 4, "hex2int", 10],
+	      [" returnTemp: ",		12, 4, "hex2int", 10],      [" integralHeat: ",	16, 4, "hex2int", 1],
+	      [" flowTemp: ",		20, 4, "hex2int", 10],	    [" heatSetTemp: ", 	24, 4, "hex2int", 10], 
 	      [" heatTemp: ",		28, 4, "hex2int", 10],  
-	      [" seasonMode: ",		38, 2, "somwinmode", 1],   				#[" x40: ",		40, 4, "hex2int", 1],
-	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" opMode: ",		48, 2, "opmodehc", 1],
-	      #[" x52: ",		52, 4, "hex2int", 1],
-	      [" roomSetTemp: ",	56, 4, "hex2int", 10],  [" x60: ", 		60, 4, "hex2int", 10],
-	      [" x64: ", 		64, 4, "hex2int", 10],  [" insideTempRC: ",     68, 4, "hex2int", 10],
-	      [" x72: ", 		72, 4, "hex2int", 10],  [" x76: ", 		76, 4, "hex2int", 10],
-	      [" onHysteresisNo: ", 	32, 2, "hex", 1],	[" offHysteresisNo: ", 34, 2, "hex", 1],
-	      [" HCBoosterStage: ",	36, 2, "hex", 1] 
-	     ],
-  "F4hc1214"  => [["outsideTemp: ", 4, 4, "hex2int", 10],	[" x08: ",	 	8, 4, "hex2int", 10],
-	      [" returnTemp: ",		12, 4, "hex2int", 10],  [" integralHeat: ",	16, 4, "hex2int", 1],
-	      [" flowTemp: ",		20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10], 
-	      [" heatTemp: ",		28, 4, "hex2int", 10],  
-	      [" seasonMode: ",		38, 2, "somwinmode", 1],   				#[" x40: ",		40, 4, "hex2int", 1],
-	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" opMode: ",		48, 2, "opmodehc", 1],
-	      #[" x52: ",		52, 4, "hex2int", 1],
-	      [" roomSetTemp: ",	62, 4, "hex2int", 10],  [" x60: ", 		60, 4, "hex2int", 10],
-	      [" x64: ", 		64, 4, "hex2int", 10],      [" insideTempRC: ",     68, 4, "hex2int", 10],
-	      [" x72: ", 		72, 4, "hex2int", 10],      [" x76: ", 		76, 4, "hex2int", 10],
-	      [" onHysteresisNo: ", 	32, 2, "hex", 1],	[" offHysteresisNo: ", 34, 2, "hex", 1],
-	      [" HCBoosterStage: ",	36, 2, "hex", 1] 
-	     ],
-  "F5hc2"  => [["outsideTemp: ", 4, 4, "hex2int", 10],	[" returnTemp: ",	8, 4, "hex2int", 10],
-	      [" vorlaufTemp: ",	12, 4, "hex2int", 10],  [" heatSetTemp: ",	16, 4, "hex2int", 10],
-	      [" heatTemp: ", 		20, 4, "hex2int", 10],	[" stellgroesse: ",	24, 4, "hex2int", 10], 
-	      [" seasonMode: ",		30, 2, "somwinmode",1],	[" opMode: ",		36, 2, "opmodehc", 1]
-	     ],
-  "F6sys206" => [["UserSetFanStage: ", 30, 2, "hex", 1],	[" UserSetFanRemainingTime: ", 36, 4, "hex", 1],
-	      [" LastErrors: ",	4, 8, "hex2error", 1],
- 	     ],
-  "FBglob" => [["outsideTemp: ", 8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
-	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
-	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	[" flowTempHC2: ",	28, 4, "hex2int", 10],
-	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],  [" condenserTemp: ",	40, 4, "hex2int", 10],
-	      [" mixerOpen: ",		45, 1, "bit0", 1],  	[" mixerClosed: ",		45, 1, "bit1", 1],
-	      [" heatPipeValve: ",	45, 1, "bit2", 1],  	[" diverterValve: ",		45, 1, "bit3", 1],
-	      [" dhwPump: ",		44, 1, "bit0", 1],  	[" heatingCircuitPump: ",	44, 1, "bit1", 1],
-	      [" solarPump: ",		44, 1, "bit3", 1],  	[" compressor: ",		47, 1, "bit3", 1],
-	      [" boosterStage3: ",	46, 1, "bit0", 1],  	[" boosterStage2: ",		46, 1, "bit1", 1],
-	      [" boosterStage1: ",	46, 1, "bit2", 1],  	[" highPressureSensor: ",	49, 1, "nbit0", 1],
+	      [" seasonMode: ",		38, 2, "somwinmode", 1],   			#[" x40: ",		40, 4, "hex2int", 1],
+	      [" integralSwitch: ",	44, 4, "hex2int", 1],	    [" hcOpMode: ",		48, 2, "opmodehc", 1],
+          #[" x52: ",		52, 4, "hex2int", 1],
+	      [" roomSetTemp: ",	56, 4, "hex2int", 10],      [" x60: ", 		    60, 4, "hex2int", 10],
+	      [" x64: ", 		    64, 4, "hex2int", 10],      [" insideTempRC: ", 68, 4, "hex2int", 10],
+	      [" x72: ", 		    72, 4, "hex2int", 10],      [" x76: ", 		    76, 4, "hex2int", 10],
+	      [" onHysteresisNo: ", 32, 2, "hex", 1],	        [" offHysteresisNo: ", 34, 2, "hex", 1],
+	      [" hcBoosterStage: ",	36, 2, "hex", 1]
+         ],
+  "F4hc1214" => [["outsideTemp: ",  4, 4, "hex2int", 10],   [" x08: ",		    8, 4, "raw", 1],
+ 	      [" returnTemp: ",		    12, 4, "hex2int", 10],  [" integralHeat: ",	16, 4, "hex2int", 1],
+	      [" flowTemp: ",		    20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10], 
+	      [" heatTemp: ",		    28, 4, "hex2int", 10],  
+	      [" seasonMode: ",		    38, 2, "somwinmode", 1],
+	      [" integralSwitch: ",	    44, 4, "hex2int", 1],	[" hcOpMode: ",		48, 2, "opmodehc", 1], 	      
+          [" roomSetTemp: ",	    62, 4, "hex2int", 10],  [" x60: ", 		    60, 4, "hex2int", 10],
+	      [" x64: ", 		        64, 4, "raw", 1],       [" insideTempRC: ", 68, 4, "hex2int", 10],
+	      [" x72: ", 		        72, 4, "raw", 1],       [" x76: ", 		    76, 4, "raw", 1],
+          [" onHysteresisNo: ", 	32, 2, "hex", 1],	    [" offHysteresisNo: ", 34, 2, "hex", 1],
+          [" hcBoosterStage: ",	    36, 2, "hex", 1]
+         ],
+  "F5hc2"  => [["outsideTemp: ",     4, 4, "hex2int", 10],	[" returnTemp: ",	8, 4, "hex2int", 10],
+	      [" vorlaufTemp: ",	    12, 4, "hex2int", 10],  [" heatSetTemp: ",	16, 4, "hex2int", 10],
+	      [" heatTemp: ", 		    20, 4, "hex2int", 10],	[" stellgroesse: ",	24, 4, "hex2int", 10], 
+	      [" seasonMode: ",		    30, 2, "somwinmode",1],	[" hcOpMode: ",		36, 2, "opmodehc", 1] 
+         ],
+  "F6sys206" => [["userSetFanStage: ", 30, 2, "hex", 1],	[" userSetFanRemainingTime: ", 36, 4, "hex", 1],
+	      [" lastErrors: ",	        4, 8, "hex2error", 1],	     
+         ],
+  "FBglob" => [["outsideTemp: ",    8, 4, "hex2int", 10],	[" flowTemp: ",		        12, 4, "hex2int", 10],
+	      [" returnTemp: ",		    16, 4, "hex2int", 10],	[" hotGasTemp: ", 	        20, 4, "hex2int", 10],
+	      [" dhwTemp: ",	 	    24, 4, "hex2int", 10], 	[" flowTempHC2: ",	        28, 4, "hex2int", 10],
+	      [" evaporatorTemp: ",	    36, 4, "hex2int", 10],  [" condenserTemp: ",	    40, 4, "hex2int", 10],
+	      [" mixerOpen: ",		    45, 1, "bit0", 1],  	[" mixerClosed: ",		    45, 1, "bit1", 1],
+	      [" heatPipeValve: ",	    45, 1, "bit2", 1],  	[" diverterValve: ",	    45, 1, "bit3", 1],
+	      [" dhwPump: ",		    44, 1, "bit0", 1],  	[" heatingCircuitPump: ",	44, 1, "bit1", 1],
+	      [" solarPump: ",		    44, 1, "bit3", 1],  	[" compressor: ",		    47, 1, "bit3", 1],
+	      [" boosterStage3: ",	    46, 1, "bit0", 1],  	[" boosterStage2: ",		46, 1, "bit1", 1],
+	      [" boosterStage1: ",	    46, 1, "bit2", 1],  	[" highPressureSensor: ",	49, 1, "nbit0", 1],
 	      [" lowPressureSensor: ",	49, 1, "nbit1", 1], 	[" evaporatorIceMonitor: ",	49, 1, "bit2", 1],
-	      [" signalAnode: ",	49, 1, "bit3", 1],  	[" evuRelease: ",		48, 1, "bit0", 1],
-	      [" ovenFireplace: ",	48, 1, "bit1", 1],  	[" STB: ",			48, 1, "bit2", 1],
+	      [" signalAnode: ",	    49, 1, "bit3", 1],  	[" evuRelease: ",		    48, 1, "bit0", 1],
+	      [" ovenFireplace: ",	    48, 1, "bit1", 1],  	[" STB: ",			        48, 1, "bit2", 1],
 	      [" outputVentilatorPower: ",50, 4, "hex", 10],  	[" inputVentilatorPower: ",	54, 4, "hex", 10],	[" mainVentilatorPower: ",	58, 4, "hex", 10],
-	      [" outputVentilatorSpeed: ",62, 4, "hex", 1],	[" inputVentilatorSpeed: ",	66, 4, "hex", 1],  	[" mainVentilatorSpeed: ",	70, 4, "hex", 1],
-	      [" outside_tempFiltered: ",74, 4, "hex2int", 10],	[" relHumidity: ",		78, 4, "hex2int", 10],
-	      [" dewPoint: ",		82, 4, "hex2int", 10],
-	      [" P_Nd: ",		86, 4, "hex2int", 100],	[" P_Hd: ",			90, 4, "hex2int", 100],
-	      [" actualPower_Qc: ",	94, 8, "esp_mant", 1],	[" actualPower_Pel: ",		102, 8, "esp_mant", 1],
-	      [" collectorTemp: ",	4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
+	      [" outputVentilatorSpeed: ",62, 4, "hex", 1],	    [" inputVentilatorSpeed: ",	66, 4, "hex", 1],  	[" mainVentilatorSpeed: ",	70, 4, "hex", 1],
+	      [" outside_tempFiltered: ",74, 4, "hex2int", 10],	[" relHumidity: ",		    78, 4, "hex2int", 10],
+	      [" dewPoint: ",		    82, 4, "hex2int", 10],
+	      [" P_Nd: ",		        86, 4, "hex2int", 100],	[" P_Hd: ",			        90, 4, "hex2int", 100],
+	      [" actualPower_Qc: ",	    94, 8, "esp_mant", 1],	[" actualPower_Pel: ",		102, 8, "esp_mant", 1],
+	      [" collectorTemp: ",	    4,  4, "hex2int", 10],	[" insideTemp: ",		    32, 4, "hex2int", 10] 
 	      ],
-  "FBglob206" => [["outsideTemp: ", 8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
-	      [" returnTemp: ",		16, 4, "hex2int", 10],	    [" hotGasTemp: ", 	20, 4, "hex2int", 10],
-	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	    [" flowTempHC2: ",	28, 4, "hex2int", 10],
-	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],      [" condenserTemp: ",	40, 4, "hex2int", 10],
-	      [" mixerOpen: ",		47, 1, "bit1", 1],  	    [" mixerClosed: ",		47, 1, "bit0", 1],
-	      [" heatPipeValve: ",	45, 1, "bit3", 1],  	    [" diverterValve: ",		45, 1, "bit2", 1],
-	      [" dhwPump: ",		45, 1, "bit1", 1],  	    [" heatingCircuitPump: ",	45, 1, "bit0", 1],
-	      [" solarPump: ",		44, 1, "bit2", 1],  	    [" compressor: ",		44, 1, "bit0", 1],
-	      [" boosterStage3: ",	44, 1, "bit3", 1],  	    [" boosterStage2: ",		44, 1, "n.a.", 1],
-	      [" boosterStage1: ",	44, 1, "bit1", 1],  	    [" highPressureSensor: ",	49, 1, "n.a.", 1],
-	      [" lowPressureSensor: ",	49, 1, "n.a.", 1],      [" evaporatorIceMonitor: ",	49, 1, "n.a.", 1],
-	      [" signalAnode: ",	49, 1, "n.a.", 1],  	    [" evuRelease: ",		48, 1, "n.a.", 1],
-	      [" ovenFireplace: ",	48, 1, "n.a.", 1],  	    [" STB: ",			48, 1, "n.a.", 1],
-	      [" outputVentilatorPower: ",48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 1],
-	      [" outputVentilatorSpeed: ",56, 2, "hex", 1],	    [" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
-	      [" outside_tempFiltered: ",64, 4, "hex2int", 10],	[" relHumidity: ",		70, 4, "n.a.", 1],
-	      [" dewPoint: ",		5, 4, "n.a.", 1],
-	      [" P_Nd: ",		5, 4, "n.a.", 1],	            [" P_Hd: ",			5, 4, "n.a.", 1],
-	      [" actualPower_Qc: ",	5, 8, "n.a.", 1],	        [" actualPower_Pel: ",		5, 8, "n.a.", 1],
-	      [" collectorTemp: ",	4,  4, "hex2int", 10],	    [" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
+  "FBglob206" => [["outsideTemp: ", 8, 4, "hex2int", 10],	[" flowTemp: ",		        12, 4, "hex2int", 10],
+	      [" returnTemp: ",		    16, 4, "hex2int", 10],  [" hotGasTemp: ", 	        20, 4, "hex2int", 10],
+	      [" dhwTemp: ",	 	    24, 4, "hex2int", 10],  [" flowTempHC2: ",	        28, 4, "hex2int", 10],
+	      [" evaporatorTemp: ",	    36, 4, "hex2int", 10],  [" condenserTemp: ",	    40, 4, "hex2int", 10],
+	      [" mixerOpen: ",		    47, 1, "bit1", 1],      [" mixerClosed: ",		    47, 1, "bit0", 1],
+	      [" heatPipeValve: ",	    45, 1, "bit3", 1],      [" diverterValve: ",		45, 1, "bit2", 1],
+	      [" dhwPump: ",		    45, 1, "bit1", 1],      [" heatingCircuitPump: ",	45, 1, "bit0", 1],
+	      [" solarPump: ",		    44, 1, "bit2", 1],      [" compressor: ",		    44, 1, "bit0", 1],
+	      [" boosterStage3: ",	    44, 1, "bit3", 1],      [" boosterStage2: ",		44, 1, "n.a.", 1],
+	      [" boosterStage1: ",	    44, 1, "bit1", 1],      [" highPressureSensor: ",	54, 1, "bit3", 1],
+	      [" lowPressureSensor: ",	54, 1, "bit2", 1],      [" evaporatorIceMonitor: ",	55, 1, "bit3", 1],
+	      [" signalAnode: ",	    54, 1, "bit1", 1],      [" evuRelease: ",		    48, 1, "n.a.", 1],
+	      [" ovenFireplace: ",	    54, 1, "bit0", 1],      [" STB: ",			        48, 1, "n.a.", 1],
+	      [" outputVentilatorPower: ",48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 255/100],          
+          [" outputVentilatorSpeed: ",56, 2, "hex", 1],	    [" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
+          [" outsideTempFiltered: ",64, 4, "hex2int", 10],	[" relHumidity: ",		    70, 4, "n.a.", 1],
+          [" dewPoint: ",		    5, 4, "n.a.", 1],
+	      [" P_Nd: ",		        5, 4, "n.a.", 1],	    [" P_Hd: ",			        5, 4, "n.a.", 1],
+	      [" actualPower_Qc: ",	    5, 8, "n.a.", 1],	    [" actualPower_Pel: ",		5, 8, "n.a.", 1],
+	      [" collectorTemp: ",	    4,  4, "hex2int", 10],	[" insideTemp: ",		    32, 4, "hex2int", 10] 
 	      ],
-  "FCtime" => [["Weekday: ", 5, 1,  "weekday", 1],		    [" Hour: ",	6, 2, "hex", 1],
-	      [" Min: ",		8, 2,  "hex", 1], 	            [" Sec: ",	10, 2, "hex", 1],
-	      [" Date: ", 		12, 2, "year", 1],	            ["/", 		14, 2, "hex", 1],
-	      ["/", 			16, 2, "hex", 1]
+  "FCtime" => [["Weekday: ",        5, 1,  "weekday", 1],   [" Hour: ",	                6, 2, "hex", 1],
+	      [" Min: ",		        8, 2,  "hex", 1], 	    [" Sec: ",	                10, 2, "hex", 1],
+	      [" Date: ", 		        12, 2, "year", 1],	    ["/", 		                14, 2, "hex", 1],
+	      ["/", 			        16, 2, "hex", 1]
 	     ],
-  "FCtime206" => [["Weekday: ", 7, 1,  "weekday", 1],  		[" pClockHour: ", 8, 2, "hex", 1],
-	      [" pClockMinutes: ", 10, 2,  "hex", 1],  	 	    [" Sec: ", 12, 2, "hex", 1],
-	      [" pClockYear: ", 14, 2, "hex", 1],       	    [" pClockMonth: ", 18, 2, "hex", 1],
-	      [" pClockDay: ",  20, 2, "hex", 1]
+  "FCtime206" => [["Weekday: ",     7, 1,  "weekday", 1],  	[" pClockHour: ",           8, 2, "hex", 1],
+	      [" pClockMinutes: ",      10, 2,  "hex", 1],  	[" Sec: ",                  12, 2, "hex", 1],
+	      [" pClockYear: ",         14, 2, "hex", 1],       [" pClockMonth: ",          18, 2, "hex", 1],
+	      [" pClockDay: ",          20, 2, "hex", 1]
         ],
   "FDfirm" => [["version: ", 	4, 4, "hexdate", 1]
 	     ],
@@ -253,11 +268,11 @@ my %parsinghash = (
 		 [" Date: ", 	36, 22, "hex2ascii", 1]
 	     ],
   "0A0176Dis" => [[" switchingProg: ",	11, 1, "bit0", 1],  [" compressor: ",	11, 1, "bit1", 1],
-	      [" heatingHC: ",		11, 1, "bit2", 1],  	    [" heatingDHW: ",	10, 1, "bit0", 1],
-	      [" boosterHC: ",		10, 1, "bit1", 1],  	    [" filterBoth: ",	9, 1, "bit0", 1],
-	      [" ventStage: ",		9, 1, "bit1", 1],  	        [" pumpHC: ",		9, 1, "bit2", 1],
-	      [" defrost: ",		9, 1, "bit3", 1],  	        [" filterUp: ",		8, 1, "bit0", 1],
-	      [" filterDown: ",	8, 1, "bit1", 1],               [" cooling: ", 11, 1, "bit3", 1]
+	      [" heatingHC: ",		        11, 1, "bit2", 1],  [" heatingDHW: ",	10, 1, "bit0", 1],
+	      [" boosterHC: ",		        10, 1, "bit1", 1],  [" filterBoth: ",	 9, 1, "bit0", 1],
+	      [" ventStage: ",		         9, 1, "bit1", 1],  [" pumpHC: ",		 9, 1, "bit2", 1],
+	      [" defrost: ",		         9, 1, "bit3", 1],  [" filterUp: ",		 8, 1, "bit0", 1],
+	      [" filterDown: ",	             8, 1, "bit1", 1],  [" cooling: ",      11, 1, "bit3", 1]
 	      ],
   "0clean"    => [["", 8, 2, "hex", 1]             
               ],
@@ -519,24 +534,117 @@ my %sets539only =(
   
 
 my %sets206 = (
-  "p01RoomTempDay"	    => {parent=>"p01-p12",      argMin =>  "10", argMax =>  "30", unit =>" °C"},
-  "p02RoomTempNight"	=> {parent=>"p01-p12",      argMin =>  "10", argMax =>  "30", unit =>" °C"},
-  "p03RoomTempStandby"	=> {parent=>"p01-p12",      argMin =>  "10", argMax =>  "30", unit =>" °C"},
-  "p04DHWsetTempDay"	=> {parent=>"p01-p12",      argMin =>  "10", argMax =>  "55", unit =>" °C"},
-  "p05DHWsetTempNight"	=> {parent=>"p01-p12",      argMin =>  "10", argMax =>  "55", unit =>" °C"},
-  "p06DHWsetTempStandby"=> {parent=>"p01-p12",      argMin =>  "10", argMax =>  "55", unit =>" °C"},
-  "p07FanStageDay"	    => {parent=>"p01-p12",      argMin =>   "0", argMax =>   "3", unit =>""},
-  "p08FanStageNight"	=> {parent=>"p01-p12",      argMin =>   "0", argMax =>   "3", unit =>""},
-  "p09FanStageStandby"	=> {parent=>"p01-p12",      argMin =>   "0", argMax =>   "3", unit =>""},
-  "p10HCTempManual"	    => {parent=>"p01-p12",      argMin =>  "10", argMax =>  "65", unit =>" °C"},
-  "p11DHWsetTempManual"	=> {parent=>"p01-p12",      argMin =>  "10", argMax =>  "65", unit =>" °C"},
-  "p12FanStageManual"   => {parent=>"p01-p12",      argMin =>   "0", argMax =>   "3", unit =>""},
-  "p80EnableSolar"      => {parent=>"pSolar",       argMin =>   "0", argMax =>   "1", unit =>""},
-  "pClockDay"           => {parent=>"sTimedate",    argMin =>   "1", argMax =>  "31", unit =>""},
-  "pClockMonth"         => {parent=>"sTimedate",    argMin =>   "1", argMax =>  "12", unit =>""},
-  "pClockYear"          => {parent=>"sTimedate",    argMin =>  "12", argMax =>  "20", unit =>""},
-  "pClockHour"          => {parent=>"sTimedate",    argMin =>   "0", argMax =>  "23", unit =>""},
-  "pClockMinutes"       => {parent=>"sTimedate",    argMin =>   "0", argMax =>  "59", unit =>""}
+  "p01RoomTempDay"	        	=> {parent=>"p01-p12",      argMin => "10", 	argMax =>  "30", 	unit =>" °C"},
+  "p02RoomTempNight"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "30", 	unit =>" °C"},
+  "p03RoomTempStandby"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "30", 	unit =>" °C"},
+  "p04DHWsetTempDay"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "55", 	unit =>" °C"},
+  "p05DHWsetTempNight"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "55", 	unit =>" °C"},
+  "p06DHWsetTempStandby"        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "55", 	unit =>" °C"},
+  "p07FanStageDay"	        	=> {parent=>"p01-p12",      argMin => "0", 		argMax =>   "3", 	unit =>""},
+  "p08FanStageNight"	        => {parent=>"p01-p12",      argMin => "0", 		argMax =>   "3", 	unit =>""},
+  "p09FanStageStandby"	        => {parent=>"p01-p12",      argMin => "0", 		argMax =>   "3", 	unit =>""},
+  "p10HCTempManual"	        	=> {parent=>"p01-p12",      argMin => "10", 	argMax =>  "65", 	unit =>" °C"},
+  "p11DHWsetTempManual"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "65", 	unit =>" °C"},
+  "p12FanStageManual"           => {parent=>"p01-p12",      argMin => "0", 		argMax =>   "3", 	unit =>""},
+  "p13GradientHC1"			    => {parent=>"pHeat1", 		argMin => "0", 		argMax =>   "5", 	unit =>""},
+  "p14LowEndHC1"			    => {parent=>"pHeat1", 		argMin => "0", 		argMax =>  "20", 	unit =>" K"},
+  "p15RoomInfluenceHC1"			=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>  "10",	unit =>""},
+  "p16GradientHC2"		    	=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>   "5",	unit =>""},
+  "p17LowEndHC2"		    	=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>  "10", 	unit =>" K"},
+  "p18RoomInfluenceHC2"			=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>  "10",	unit =>""},
+  "p19FlowProportionHC1"		=> {parent=>"pHeat1", 		argMin => "0", 		argMax => "100",	unit =>" %"},
+  "p20FlowProportionHC2"		=> {parent=>"pHeat1", 		argMin => "0", 		argMax => "100",	unit =>" %"},
+  "p21Hyst1"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>   "10", 	unit =>" K"},
+  "p22Hyst2"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>   "10", 	unit =>" K"},
+  "p23Hyst3"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>    "5", 	unit =>" K"},
+  "p24Hyst4"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>    "5", 	unit =>" K"},
+  "p25Hyst5"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>    "5", 	unit =>" K"},
+  "p29HystAsymmetry"			=> {parent=>"pHeat2", 		argMin => "1", 		argMax =>    "5",	unit =>""},
+  "p30integralComponent"		=> {parent=>"pHeat2", 		argMin => "10", 	argMax =>  "999",	unit =>" Kmin"},
+  "p32HystDHW"			    	=> {parent=>"pDHW", 		argMin => "2", 		argMax =>   "10", 	unit =>" K"},
+  "p33BoosterTimeoutDHW"		=> {parent=>"pDHW", 		argMin => "0",		argMax =>  "240",	unit =>" min"},
+  "p34TempLimitBoostDHW"    	=> {parent=>"pDHW", 		argMin => "-10", 	argMax =>   "10", 	unit =>" °C"},
+  "p35PasteurisationInterval"  	=> {parent=>"pDHW", 		argMin => "3", 		argMax =>   "30", 	unit =>" Tage"},
+  "p36MaxDurationDHWLoad"    	=> {parent=>"pDHW", 		argMin => "6", 		argMax =>   "12", 	unit =>" h"},
+  "p37Fanstage1AirflowInlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
+  "p38Fanstage2AirflowInlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
+  "p39Fanstage3AirflowInlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
+  "p40Fanstage1AirflowOutlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
+  "p41Fanstage2AirflowOutlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
+  "p42Fanstage3AirflowOutlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
+  "p43UnschedVent3"				=> {parent=>"pFan", 		argMin => "0", 		argMax =>  "1000",	unit =>" min"},
+  "p44UnschedVent2"				=> {parent=>"pFan", 		argMin => "0", 		argMax =>  "1000",	unit =>" min"},
+  "p45UnschedVent1"				=> {parent=>"pFan", 		argMin => "0", 		argMax =>  "1000",	unit =>" min"},
+  "p46UnschedVent0"	        	=> {parent=>"pFan", 		argMin => "0", 		argMax =>  "1000",	unit =>" min"},
+  "p47CompressorRestartDelay"	=> {parent=>"pDefrostEva", 	argMin => "0", 		argMax =>  "20",	unit =>" min"},
+  "p48MainFanSpeed"	        	=> {parent=>"pDefrostEva", 	argMin => "0", 		argMax =>  "100",	unit =>" %"},
+  "p49SummerModeTemp"			=> {parent=>"pHeat2", 		argMin => "10", 	argMax =>   "24",	unit =>" °C"},
+  "p50SummerModeHysteresis"		=> {parent=>"pHeat2", 		argMin => "1", 		argMax =>    "5",	unit =>" K"},
+  "p54MinPumpCycles"			=> {parent=>"pCircPump", 	argMin => "1",  	argMax =>   "24",	unit =>" /Tag"},
+  "p55MaxPumpCycles"			=> {parent=>"pCircPump", 	argMin => "25", 	argMax =>  "288",	unit =>" /Tag"},
+  "p56OutTempMaxPumpCycles"		=> {parent=>"pCircPump", 	argMin => "0",  	argMax =>   "20",	unit =>" °C"},
+  "p57OutTempMinPumpCycles"		=> {parent=>"pCircPump", 	argMin => "0",  	argMax =>   "25",	unit =>" °C"},
+  "p58SuppressTempCaptPumpStart"=> {parent=>"pCircPump", 	argMin => "0",  	argMax =>   "120",	unit =>" s"},
+  "p75PassiveCooling"			=> {parent=>"pFan", 		argMin => "0", 		argMax =>    "1",	unit =>""},
+  "p77OutTempFilterTime"		=> {parent=>"pHeat2", 		argMin => "0",  	argMax =>   "24", 	unit =>" h"},
+  "p78DualModePoint"			=> {parent=>"pHeat2", 		argMin => "-10", 	argMax =>   "20",	unit =>" °C"},
+  "p79BoosterTimeoutHC"			=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>   "60",	unit =>" min"},
+  "p80EnableSolar"              => {parent=>"pSolar",       argMin => "0", 		argMax =>   "1", 	unit =>""},
+  "pClockDay"                   => {parent=>"sTimedate",    argMin => "1", 		argMax =>  "31", 	unit =>""},
+  "pClockMonth"                 => {parent=>"sTimedate",    argMin => "1", 		argMax =>  "12", 	unit =>""},
+  "pClockYear"                  => {parent=>"sTimedate",    argMin => "12", 	argMax =>  "20", 	unit =>""},
+  "pClockHour"                  => {parent=>"sTimedate",    argMin => "0", 		argMax =>  "23", 	unit =>""},
+  "pClockMinutes"               => {parent=>"sTimedate",    argMin => "0", 		argMax =>  "59", 	unit =>""},
+  "progDHWStartTime"            => {parent=>"pDHWProg",     argMin => "00:00",  argMax =>  "23:59", unit =>""},
+  "progDHWEndTime"              => {parent=>"pDHWProg",     argMin => "00:00", 	argMax =>  "23:59", unit =>""},
+  "progDHWEnable"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progDHWMonday"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progDHWTuesday"              => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progDHWWednesday"            => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progDHWThursday"             => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progDHWFriday"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progDHWSaturday"             => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progDHWSunday"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC1StartTime"            => {parent=>"pHeatProg",    argMin => "00:00", 	argMax =>  "23:59", unit =>""}, 
+  "progHC1EndTime"              => {parent=>"pHeatProg",    argMin => "00:00", 	argMax =>  "23:59", unit =>""},
+  "progHC1Enable"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC1Monday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC1Tuesday"              => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC1Wednesday"            => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC1Thursday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC1Friday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC1Saturday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC1Sunday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC2StartTime"            => {parent=>"pHeatProg",    argMin => "00:00", 	argMax =>  "23:59", unit =>""}, 
+  "progHC2EndTime"              => {parent=>"pHeatProg",    argMin => "00:00", 	argMax =>  "23:59", unit =>""},
+  "progHC2Enable"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC2Monday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC2Tuesday"              => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC2Wednesday"            => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC2Thursday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC2Friday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC2Saturday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progHC2Sunday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN1StartTime"           => {parent=>"pFanProg",     argMin => "00:00",	argMax =>  "23:59", unit =>""}, 
+  "progFAN1EndTime"             => {parent=>"pFanProg",     argMin => "00:00",	argMax =>  "23:59", unit =>""},
+  "progFAN1Enable"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN1Monday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN1Tuesday"             => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN1Wednesday"           => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN1Thursday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN1Friday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN1Saturday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN1Sunday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN2StartTime"           => {parent=>"pFanProg",     argMin => "00:00", 	argMax =>  "23:59", unit =>""}, 
+  "progFAN2EndTime"             => {parent=>"pFanProg",     argMin => "00:00", 	argMax =>  "23:59", unit =>""},
+  "progFAN2Enable"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN2Monday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN2Tuesday"             => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN2Wednesday"           => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN2Thursday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN2Friday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN2Saturday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
+  "progFAN2Sunday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""}  
  );
 
 my %setsonly214 = (
@@ -588,13 +696,12 @@ my %getsonly539 = (  #info from belu and godmorgon
   "sHumProtection"		=> {cmd2=>"0A09D1",   type =>"1clean", unit =>""},
   "sSetHumidityMin"     => {cmd2=>"0A09D2",   type =>"1clean", unit =>" %"},
   "sSetHumidityMax"     => {cmd2=>"0A09D3",   type =>"1clean", unit =>" %"},
-  "sCoolHCTotal"        => {cmd2=>"0A0648",   cmd3=>"0A0649",  type =>"1clean", unit =>" kWh"},
+  "sCoolHCTotal"        => {cmd2=>"0A0648",   cmd3 =>"0A0649",  type =>"1clean", unit =>" kWh"},
   "sDewPointHC1"        => {cmd2=>"0B0264",   type =>"5temp",  unit =>" °C"}
  );
 %getsonly539=(%getsonly539, %getsonly439);
 
 my %getsonly2xx = (
-  "pExpert"			    => {cmd2=>"02", type =>"02pxx206", unit =>""},
   "pDefrostEva"			=> {cmd2=>"03", type =>"03pxx206", unit =>""},
   "pDefrostAA"			=> {cmd2=>"04", type =>"04pxx206", unit =>""},
   "pHeat1"			    => {cmd2=>"05", type =>"05pxx206", unit =>""},
@@ -615,9 +722,14 @@ my %getsonly2xx = (
   "sHC2"			    => {cmd2=>"F5", type =>"F5hc2",    unit =>""},
   "sSystem"			    => {cmd2=>"F6", type =>"F6sys206", unit =>""},
   "sHistory"			=> {cmd2=>"09", type =>"09his206", unit =>""},
- # "sLast10errors"		=> {cmd2=>"D1", type =>"D1last206", unit =>""},   removed  after andres hint; 33211.msg658108
-  "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob206", unit =>""},  #allFB
+  "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob206", unit =>""},  
   "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime206", unit =>""},
+  "inputVentilatorSpeed"=> {parent=>"sGlobal",              unit =>" %"},
+  "outputVentilatorSpeed"=>{parent=>"sGlobal",              unit =>" %"},
+  "mainVentilatorSpeed"	=> {parent=>"sGlobal",              unit =>" %"},
+  "inputVentilatorPower"=> {parent=>"sGlobal",              unit =>" %"},
+  "outputVentilatorPower"=>{parent=>"sGlobal",              unit =>" %"},
+  "mainVentilatorPower"	=> {parent=>"sGlobal",              unit =>" %"}, 
  );
 my %getsonly206 = (
   "sHC1"			    => {cmd2=>"F4", type =>"F4hc1",    unit =>""},
@@ -626,23 +738,31 @@ my %getsonly206 = (
   "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm",   unit =>""},
   "sFirmware-Id" 		=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
  );
+
 my %getsonly214 = (
   "pFan"          		=> {cmd2=>"01", type =>"01pxx214", unit =>""},
+  "pExpert"			    => {cmd2=>"02", type =>"02pxx206", unit =>""},
+  "sControl"  			=> {cmd2=>"F2", type =>"F2type", unit =>""},
   "sHC1"			    => {cmd2=>"F4", type =>"F4hc1214",    unit =>""},
- );
+  "sLVR"  				=> {cmd2=>"E8", type =>"E8tyype", unit =>""},
+  "sF0"  				=> {cmd2=>"F0", type =>"F0type", unit =>""},
+  "sF1"  				=> {cmd2=>"F1", type =>"F1type", unit =>""},
+  "sEF"  				=> {cmd2=>"EF", type =>"EFtype", unit =>""},
+ ); 
 
 
-my %sets=(%sets439539common, %sets439only);
-my %gets=(%getsonly439, %sets);
-my %OpMode = ("1" =>"standby", "11" => "automatic", "3" =>"DAYmode", "4" =>"setback", "5" =>"DHWmode", "14" =>"manual", "0" =>"emergency");   
-my %Rev_OpMode = reverse %OpMode;
-my %OpModeHC = ("1" =>"normal", "2" => "setback", "3" =>"standby", "4" =>"restart", "5" =>"restart");
-my %SomWinMode = ( "01" =>"winter", "02" => "summer");
-my %weekday = ( "0" =>"Monday", "1" => "Tuesday", "2" =>"Wednesday", "3" => "Thursday", "4" => "Friday", "5" =>"Saturday", "6" => "Sunday" );
-my %weekdaymap = ( "1" =>"Mon", "2" => "Tue", "3" =>"Wed", "4" => "Thu", "5" => "Fri", "6" =>"Sat", "7" => "Sun" );
-my %faultmap = ( "0" =>"n.a.", "1" => "F01_AnodeFault", "2" => "F02_SafetyTempDelimiterEngaged", "3" => "F03_HighPreasureGuardFault", "4" => "F04_LowPreasureGuardFault", "5" => "F05_OutletFanFault", "6" => "F06_InletFanFault", "7" => "F07_MainOutputFanFault", "11" => "F11_LowPreasureSensorFault", "12"=> "F12_HighPreasureSensorFault", "15" => "F15_DHW_TemperatureFault",  "17" => "F17_DefrostingDurationExceeded", "20" => "F20_SolarSensorFault", "21" => "F21_OutsideTemperatureSensorFault", "22" => "F22_HotGasTemperatureFault", "23" => "F23_CondenserTemperatureSensorFault", "24" => "F24_EvaporatorTemperatureSensorFault", "26" => "F26_ReturnTemperatureSensorFault", "28" => "F28_FlowTemperatureSensorFault", "29" => "F29_DHW_TemperatureSensorFault", "30" => "F30_SoftwareVersionFault", "31" => "F31_RAMfault", "32" => "F32_EEPromFault", "33" => "F33_ExtractAirHumiditySensor", "34" => "F34_FlowSensor", "35" => "F35_minFlowCooling", "36" => "F36_MinFlowRate", "37" => "F37_MinWaterPressure", "40" => "F40_FloatSwitch", "50" => "F50_SensorHeatPumpReturn", "51" => "F51_SensorHeatPumpFlow",  "52" => "F52_SensorCondenserOutlet" );
-my $firstLoadAll = 0;
-my $noanswerreceived = 0;
+my %sets=       (%sets439539common, %sets439only);
+my %gets=       (%getsonly439, %sets);
+my %OpMode=     ("1" =>"standby", "11" => "automatic", "3" =>"DAYmode", "4" =>"setback", "5" =>"DHWmode", "14" =>"manual", "0" =>"emergency");   
+my %Rev_OpMode= reverse %OpMode;
+my %OpModeHC=   ("1" =>"normal", "2" => "setback", "3" =>"standby", "4" =>"restart", "5" =>"restart");
+my %opMode2=    ("0" =>"manual", "1" => "automatic");
+my %SomWinMode= ("01" =>"winter", "02" => "summer");
+my %weekday=    ("0" =>"Monday", "1" => "Tuesday", "2" =>"Wednesday", "3" => "Thursday", "4" => "Friday", "5" =>"Saturday", "6" => "Sunday" );
+#my %weekdaymap= ( "1" =>"Mon", "2" => "Tue", "3" =>"Wed", "4" => "Thu", "5" => "Fri", "6" =>"Sat", "7" => "Sun" );
+my %faultmap=   ( "0" =>"n.a.", "1" => "F01_AnodeFault", "2" => "F02_SafetyTempDelimiterEngaged", "3" => "F03_HighPreasureGuardFault", "4" => "F04_LowPreasureGuardFault", "5" => "F05_OutletFanFault", "6" => "F06_InletFanFault", "7" => "F07_MainOutputFanFault", "11" => "F11_LowPreasureSensorFault", "12"=> "F12_HighPreasureSensorFault", "15" => "F15_DHW_TemperatureFault",  "17" => "F17_DefrostingDurationExceeded", "20" => "F20_SolarSensorFault", "21" => "F21_OutsideTemperatureSensorFault", "22" => "F22_HotGasTemperatureFault", "23" => "F23_CondenserTemperatureSensorFault", "24" => "F24_EvaporatorTemperatureSensorFault", "26" => "F26_ReturnTemperatureSensorFault", "28" => "F28_FlowTemperatureSensorFault", "29" => "F29_DHW_TemperatureSensorFault", "30" => "F30_SoftwareVersionFault", "31" => "F31_RAMfault", "32" => "F32_EEPromFault", "33" => "F33_ExtractAirHumiditySensor", "34" => "F34_FlowSensor", "35" => "F35_minFlowCooling", "36" => "F36_MinFlowRate", "37" => "F37_MinWaterPressure", "40" => "F40_FloatSwitch", "50" => "F50_SensorHeatPumpReturn", "51" => "F51_SensorHeatPumpFlow",  "52" => "F52_SensorCondenserOutlet" );
+my $firstLoadAll= 0;
+my $noanswerreceived= 0;
 my $internalHash;
  
 ########################################################################################
@@ -1027,8 +1147,11 @@ sub THZ_Set($@){
   my $dec = @$parsingrule[$i]->[4];
   Log3 $hash->{NAME}, 5, "write command (parsed element/pos/len/dec/parsingtype): $i / $pos / $len / $dec / $parsingtype";
   
-  $arg *= $dec if ($dec != 1);
-  $arg  = time2quaters($arg) if ($parsingtype eq "quater"); 
+  $arg *= $dec                                                  if ($dec != 1);
+  $arg  = time2quaters($arg)                                    if ($parsingtype eq "quater");
+  $arg= join('', (split(':', $arg)))                            if ($parsingtype eq "hex2time"); # only in firmware 2.x
+  #$arg= eval(join('*100+', (split(':', $arg))))                 if ($parsingtype eq "hex2time"); #just in case the above does not work
+  $arg=(hex(substr($msg, $pos, 1)) & (15-2**$1)) | (2**$1*$arg) if ($parsingtype =~ /bit(\d)/);
   $arg  = substr((sprintf(("%0".$len."X"), $arg)), (-1*$len)); #04X converts to hex and fills up 0s; for negative, it must be trunckated. 
   substr($msg, $pos, $len, $arg);
  
@@ -1643,10 +1766,11 @@ sub THZ_Parse1($$) {
       elsif ($Type eq "swver")		{$value= sprintf("%01u.%02u", hex(substr($value, 0,2)), hex(substr($value, 2,2)));}
       elsif ($Type eq "hex2ascii")	{$value= uc(pack('H*', $value));}
       elsif ($Type eq "opmode")		{$value= $OpMode{hex($value)};}
+      elsif ($Type eq "opmode2")	{$value= $opMode2{hex($value)};}
       elsif ($Type eq "opmodehc")	{$value= $OpModeHC{hex($value)};}
       elsif ($Type eq "esp_mant") 	{$value= sprintf("%.3f", unpack('f', pack( 'L',  reverse(hex($value)))));}
       elsif ($Type eq "somwinmode")	{$value= $SomWinMode{($value)};}
-      elsif ($Type eq "hex2wday")	{$value= bitmap2string(unpack('b7', pack('H*',$value)), \%weekdaymap);}
+      #elsif ($Type eq "hex2wday")	{$value= bitmap2string(unpack('b7', pack('H*',$value)), \%weekdaymap);}
       elsif ($Type eq "hex2error")	{$value= bitmap2string(unpack('b32', pack('H*',$value)), \%faultmap);}
       elsif ($Type eq "weekday")	{$value= $weekday{($value)};}
       elsif ($Type eq "faultmap")	{$value= $faultmap{(hex($value))};}
@@ -1657,6 +1781,7 @@ sub THZ_Parse1($$) {
       elsif ($Type eq "bit3")		{$value= (hex($value) &  0b1000) / 0b1000;}
       elsif ($Type eq "nbit0")		{$value= 1-((hex($value) &  0b0001) / 0b0001);}
       elsif ($Type eq "nbit1")		{$value= 1-((hex($value) &  0b0010) / 0b0010);}
+      elsif ($Type eq "raw")		{;}
       elsif ($Type eq "n.a.")		{$value= "n.a.";}
       $value = $value/$divisor if ($divisor != 1); 
       $ParsedMsg .= $parsingtitle . $value; 
