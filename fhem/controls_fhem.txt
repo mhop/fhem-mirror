@@ -1,4 +1,4 @@
-REV 15556
+REV 15558
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -419,7 +419,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2017-05-01_07:45:02 59873 FHEM/98_DLNARenderer.pm
-UPD 2017-07-27_07:45:02 177543 FHEM/98_DOIF.pm
+UPD 2017-12-06_07:45:02 219844 FHEM/98_DOIF.pm
 UPD 2017-11-02_07:45:02 109308 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2016-10-29_07:45:14 28678 FHEM/98_EDIPLUG.pm
@@ -653,7 +653,7 @@ UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
 UPD 2017-12-02_07:45:04 3176740 docs/commandref.html
-UPD 2017-12-02_07:45:05 1884089 docs/commandref_DE.html
+UPD 2017-12-06_07:45:05 1904232 docs/commandref_DE.html
 UPD 2017-11-02_07:45:02 73662 docs/commandref_frame.html
 UPD 2017-11-12_07:45:02 82778 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
