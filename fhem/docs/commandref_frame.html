@@ -1448,6 +1448,13 @@ The following local attributes are used by a wider range of devices:
         OS implementation (inet_aton and gethostbyname) will be used.
     </li><br>
 
+    <a name="featurelevel"></a>
+    <li>featurelevel<br>
+        Enable/disable old or new features, based on FHEM version.
+        E.g. the $value hash for notify is only set for featurelevel up to 5.6,
+        as it is deprecated, use the Value() function instead.
+    </li><br>
+
     <a name="holiday2we"></a>
     <li>holiday2we<br>
         If this attribute is set, then the <a href="#perl">$we</a> variable
@@ -1459,11 +1466,10 @@ The following local attributes are used by a wider range of devices:
         </ul>
     </li><br>
 
-    <a name="featurelevel"></a>
-    <li>featurelevel<br>
-        Enable/disable old or new features, based on FHEM version.
-        E.g. the $value hash for notify is only set for featurelevel up to 5.6,
-        as it is deprecated, use the Value() function instead.
+    <a name="httpcompress"></a>
+    <li>httpcompress<br>
+        the HttpUtils module is used by a lot of FHEM modules, and enables
+        compression by default. Set httpcompress to 0 to disable this feature.
     </li><br>
 
     <a name="logdir"></a>

@@ -82,6 +82,7 @@ HttpUtils_Close($)
   delete($hash->{hu_port});
   delete($hash->{directReadFn});
   delete($hash->{directWriteFn});
+  delete($hash->{compress});
 }
 
 sub
@@ -342,6 +343,17 @@ HttpUtils_Connect($)
     }
   }
 
+  if((!defined($hash->{compress}) || $hash->{compress}) &&
+      AttrVal("global", "httpcompress", 1)) {
+    if(!defined($HU_use_zlib)) {
+      $HU_use_zlib = 1;
+      eval { require Compress::Zlib; };
+      $HU_use_zlib = 0 if($@);
+    }
+    $hash->{compress} = $HU_use_zlib;
+  }
+
+
   return HttpUtils_Connect2($hash) if($hash->{conn} && $hash->{keepalive});
 
   if($hash->{callback}) { # Nonblocking staff
@@ -407,15 +419,6 @@ HttpUtils_Connect($)
 
     return "$hash->{displayurl}: Can't connect(1) to $hash->{addr}: $@"
       if(!$hash->{conn});
-  }
-
-  if($hash->{compress}) {
-    if(!defined($HU_use_zlib)) {
-      $HU_use_zlib = 1;
-      eval { require Compress::Zlib; };
-      $HU_use_zlib = 0 if($@);
-    }
-    $hash->{compress} = $HU_use_zlib;
   }
 
   return HttpUtils_Connect2($hash);
@@ -530,7 +533,8 @@ HttpUtils_Connect2($)
   $hdr .= "Connection: Close\r\n"
                               if($httpVersion ne "1.0" && !$hash->{keepalive});
 
-  $hdr .= "Authorization: Basic ".encode_base64($hash->{user}.":".$hash->{pwd}, "")."\r\n"
+  $hdr .= "Authorization: Basic ".
+                      encode_base64($hash->{user}.":".$hash->{pwd}, "")."\r\n"
               if($hash->{auth} && !$hash->{digest} &&
                  !($hash->{header} &&
                    $hash->{header} =~ /^Authorization:\s*Digest/mi));
@@ -807,6 +811,11 @@ HttpUtils_ParseAnswer($)
     }
   }
 
+  if($hash->{httpheader} =~ /^Content-Encoding: gzip/mi && $HU_use_zlib) {
+    eval { $ret =  Compress::Zlib::memGunzip($ret) };
+    return ($@, $ret) if($@);
+  }
+
   # Debug
   Log3 $hash, $hash->{loglevel}+1,
     "HttpUtils $hash->{displayurl}: Got data, length: ". length($ret);
@@ -822,8 +831,9 @@ HttpUtils_ParseAnswer($)
 #    digest(0),hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
 #    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
 #    method($data?"POST":"GET"),keepalive(0),sslargs({}),user(),pwd()
+#    compress(1)
 # Example:
-#   { HttpUtils_NonblockingGet({ url=>"http://www.google.de/",
+#   { HttpUtils_NonblockingGet({ url=>"http://fhem.de/MAINTAINER.txt",
 #     callback=>sub($$$){ Log 1,"ERR:$_[1] DATA:".length($_[2]) } }) }
 sub
 HttpUtils_NonblockingGet($)

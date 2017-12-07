@@ -1541,6 +1541,13 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         bzw gethostbyname aufgerufen.
     </li><br>
 
+    <a name="featurelevel"></a>
+    <li>featurelevel<br>
+        Aktiviere bzw. deaktiviere bestimmte alte oder neue Funktionen, basierend
+        auf die FHEM Version. Z.Bsp. das $value hash f&uuml;r notify wird nur bis featurelevel 5.6
+        bef&uuml;llt, da es unerw&uuml;nscht ist. Stattdessen sollte man die
+        Value() Funktion verwenden.
+    </li><br>
 
     <a name="holiday2we"></a>
     <li>holiday2we<br>
@@ -1554,12 +1561,11 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         </ul>
     </li><br>
 
-    <a name="featurelevel"></a>
-    <li>featurelevel<br>
-        Aktiviere bzw. deaktiviere bestimmte alte oder neue Funktionen, basierend
-        auf die FHEM Version. Z.Bsp. das $value hash f&uuml;r notify wird nur bis featurelevel 5.6
-        bef&uuml;llt, da es unerw&uuml;nscht ist. Stattdessen sollte man die
-        Value() Funktion verwenden.
+    <a name="httpcompress"></a>
+    <li>httpcompress<br>
+        das HttpUtils Modul wird von etlichen FHEM modulen verwendet und
+        aktiviert Komprimierung in der Voreinstellung. Falls man
+        httpcompress auf 0 setzt, wird die Komprimierung deaktiviert.
     </li><br>
 
     <a name="logdir"></a>

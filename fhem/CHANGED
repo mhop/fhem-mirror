@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  HttpUtils: compression activated
+             disable it with attr global httpcompress 0
   - bugfix:  46_SmartPi: fix syntax error bug in Attribut Sub
   - change:  98_dewpoint: Refactoring using API calls, verbose attribute added
   - change:  FileLog removes newlines from the data (Forum #79684)
