@@ -454,7 +454,7 @@ isday</pre>
   horizon value which then is used instead of the $defaultaltit in
   SUNRISE_EL.pm.<br> Possible values are: "REAL", "CIVIL", "NAUTIC",
   "ASTRONOMIC" or a positive or negative number preceded by "HORIZON="<br> REAL
-  is 0, CIVIL is -6, NATUIC is -12, ASTRONOMIC is -18 degrees above
+  is 0, CIVIL is -6, NAUTIC is -12, ASTRONOMIC is -18 degrees above
   horizon.<br><br>
 
   Examples:<br>
