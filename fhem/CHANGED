@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbRep: V6.3.2 ,changelist to last version:
+                       - new command delSeqDoublets
+                       - add last command option to internal LASTCMD
+                       - add format d:xx h:xx m:xx s:xx for attributes
+                         timeDiffToNow, timeOlderThan
+                       - new attribute fetchRoute to switch asc,desc datafetch
   - change:  HttpUtils: compression activated
              disable it with attr global httpcompress 0
   - bugfix:  46_SmartPi: fix syntax error bug in Attribut Sub
