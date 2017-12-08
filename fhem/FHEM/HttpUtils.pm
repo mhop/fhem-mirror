@@ -853,6 +853,7 @@ sub
 HttpUtils_BlockingGet($)
 {
   my ($hash) = @_;
+  delete $hash->{callback}; # Forum #80712
   $hash->{hu_blocking} = 1;
   my ($isFile, $fErr, $fContent) = HttpUtils_File($hash);
   return ($fErr, $fContent) if($isFile);
