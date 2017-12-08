@@ -20,7 +20,7 @@ use vars qw($init_done);
 
 my @shortDays = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun");
 
-my @DEVLIST_SEND = ("MAX","CUL_HM","weekprofile","dummy");
+my @DEVLIST_SEND = ("MAX","CUL_HM","HMCCUDEV","weekprofile","dummy");
 
 my $CONFIG_VERSION = "1.1";
 
@@ -43,9 +43,42 @@ $DEV_READINGS{"Fri"}{"CUL_HM"} = "6_tempListFri";
 $DEV_READINGS{"Sat"}{"CUL_HM"} = "0_tempListSat";
 $DEV_READINGS{"Sun"}{"CUL_HM"} = "1_tempListSun";
 
+# HMCCUDEV
+$DEV_READINGS{"Mon"}{"HMCCUDEV"} = "MONDAY";
+$DEV_READINGS{"Tue"}{"HMCCUDEV"} = "TUESDAY";
+$DEV_READINGS{"Wed"}{"HMCCUDEV"} = "WEDNESDAY";
+$DEV_READINGS{"Thu"}{"HMCCUDEV"} = "THURSDAY";
+$DEV_READINGS{"Fri"}{"HMCCUDEV"} = "FRIDAY";
+$DEV_READINGS{"Sat"}{"HMCCUDEV"} = "SATURDAY";
+$DEV_READINGS{"Sun"}{"HMCCUDEV"} = "SUNDAY";
 
 sub weekprofile_findPRF($$$$);
 
+############################################## 
+sub weekprofile_minutesToTime($)
+{
+  my ($minutes) = @_;
+  
+  my $hours = $minutes / 60;
+  $minutes = $minutes - $hours * 60;
+
+  if (length($hours) eq 1){
+    $hours = "0$hours";
+  }
+  if (length($minutes) eq 1){
+    $minutes = "0$minutes";
+  }
+  return "$hours:$minutes";
+}
+############################################## 
+sub weekprofile_timeToMinutes($)
+{
+  my ($time) = @_;
+  
+  my ($hours, $minutes) = split(':',$time, 2);
+
+  return $hours * 60 + $minutes;
+}
 ############################################## 
 sub weekprofile_getDeviceType($$;$)
 {
@@ -95,6 +128,10 @@ sub weekprofile_getDeviceType($$;$)
   elsif ($devHash->{TYPE} =~ /dummy/){
     $type = "MAX"     if ($device =~ m/.*MAX.*FAKE.*/);    #dummy (FAKE WT) with name MAX inside for testing
     $type = "CUL_HM"  if ($device =~ m/.*CUL_HM.*FAKE.*/); #dummy (FAKE WT) with name CUL_HM inside for testing
+  }
+  elsif ( $devHash->{TYPE} =~ /HMCCUDEV/){
+	  my $model = $devHash->{ccutype};
+	  $type = "HMCCUDEV" if ( $model =~ /HmIP-eTRV-2/ );
   }
   
   return $type if ($sndrcv eq "RCV");
@@ -149,8 +186,26 @@ sub weekprofile_readDayProfile($@)
       push(@temps, $timeTemp[$i+1]);
     }
   }
+  elsif ($type eq "HMCCUDEV"){
+    my $lastTime = "";
+
+    for (my $i = 1; $i < 14; $i+=1){
+      my $prfTemp = ReadingsVal($device, "R-1.P1_TEMPERATURE_" . $reading . "_$i", "");
+      my $prfTime = ReadingsVal($device, "R-1.P1_ENDTIME_" . $reading . "_$i", "");
+
+      $prfTime = weekprofile_minutesToTime($prfTime);
+
+      if ($lastTime ne $prfTime){
+        $lastTime = $prfTime;
+
+        push(@temps, $prfTemp);
+        push(@times, $prfTime);
+      }
+    }
+  }
   
   for(my $i = 0; $i < scalar(@temps); $i+=1){
+	Log3 $me, 4, "$me(ReadDayProfile): temp $i $temps[$i]";
     $temps[$i] =~s/[^\d.]//g; #only numbers
     my $tempON = AttrVal($me, "tempON", undef);
     my $tempOFF = AttrVal($me, "tempOFF", undef);
@@ -275,7 +330,7 @@ sub weekprofile_sendDevProfile(@)
         $cmd.=$prf->{DATA}->{$day}->{"temp"}[$i].$endTime;
       }
     }
-  } else { #Homatic
+  } elsif ($type eq "CUL_HM") {
     my $k=0;
     my $dayCnt = scalar(@dayToTransfer);
     foreach my $day (@dayToTransfer){
@@ -290,8 +345,26 @@ sub weekprofile_sendDevProfile(@)
       $cmd .= ($k < $dayCnt-1) ? "; ": "";
       $k++;
     }
+  } elsif ($type eq "HMCCUDEV"){
+    my $k=0;
+    my $dayCnt = scalar(@dayToTransfer);
+    $cmd .= "set $device config 1";
+    foreach my $day (@dayToTransfer){
+      #Usage: set <device> datapoint [{channel-number}.]{datapoint} {value} 
+      my $reading = $DEV_READINGS{$day}{$type};
+      my $dpTime = "P1_ENDTIME_$reading";
+      my $dpTemp = "P1_TEMPERATURE_$reading";
+   
+      my $tmpCnt =  scalar(@{$prf->{DATA}->{$day}->{"temp"}});      
+      for (my $i = 0; $i < $tmpCnt; $i++) {
+        $cmd .= " " . $dpTemp . "_" . ($i + 1) . "=" . $prf->{DATA}->{$day}->{"temp"}[$i];
+        $cmd .= " " . $dpTime . "_" . ($i + 1) . "=" . weekprofile_timeToMinutes($prf->{DATA}->{$day}->{"time"}[$i]);
+      }
+      
+      #$cmd .= ($k < $dayCnt-1) ? "; ": "";
+      $k++;
+    }
   }
-
   my $ret = undef;
   if ($cmd) {
     $cmd =~ s/^\s+|\s+$//g; 
