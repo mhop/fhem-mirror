@@ -1,4 +1,4 @@
-	##############################################
+##############################################
 # $Id$
 #
 # Protokoll:
@@ -6,46 +6,49 @@
 # Antwort von Dose hat immer die letzen 3 Bloecke der MAC vom 11-13 Byte
 #
 # Payload immer in "|"
-# Init1 (vom Server):
+#
+#Init1 (vom Server):
 # 5a a5 00 07|02 05 0d 07 05 07 12|c6 5b b5
 #                ** ** ** ** ** **													** scheinen zufaellig zu sein
 # 5a a5 00 01|02|fd 5b b5
-# Antwort auf Init1 von Dose:
+#Antwort auf Init1 von Dose:
 # 5A A5 00 0B|03 01 0A C0 32 23 62 8A 7E 01 C2|AF 5B B5
 #                               MM MM MM    **										MM: letzte 3 Stellen der MAC, ** scheinbar eine Checksumme basierend auf den 6 zufaelligen Bytes von Init1
-# Init2 (vom Server):
+#                         ?? ??                                                     ??: Unterschiedlich bei verschiedenen Steckermodellen
+#Init2 (vom Server):
 # 5a a5 00 02|05 01|f9 5b b5
-# Antwort auf Init2 von Dose:
+#Antwort auf Init2 von Dose:
 # 5A A5 00 12|07 01 0A C0 32 23 62 8A 7E 00 01 06 AC CF 23 62 8A 7E|5F 5B B5
 #                               MM MM MM											MM: letzte 3 Stellen der MAC
 #                                                 MM MM MM MM MM MM					MM: komplette MAC
+#                         ?? ??                                                     ??: Unterschiedlich bei verschiedenen Steckermodellen
 # 5A A5 00 12|07 01 0A C0 32 23 62 8A 7E 00 02 05 00 01 01 08 11|4C 5B B5    			Anzahl Bytes stimmt nicht! ist aber immer so
 # 5A A5 00 15|90 01 0A E0 32 23 62 8A 7E 00 00 00 81 11 00 00 01 00 00 00 00|32 5B B5		Status der Dose (wird auch immer bei Zustandsaenderung geschickt)
 #                               MM MM MM											MM: letzte 3 Stellen der MAC
 #                                                 qq								qq: Schaltquelle 	81=lokal geschaltet, 11=remote geschaltet
 #                                                                         oo 		oo: Schaltzustand	ff=an, 00=aus
+#                         ?? ??                                                     ??: Unterschiedlich bei verschiedenen Steckermodellen
 # Danach kommt alle x Sekunden ein Heartbeat von der Dose:
 # 5A A5 00 09|04 01 0A C0 32 23 62 8A 7E|71 5B B5
 #                               MM MM MM
+#                         ?? ??                                                     ??: Unterschiedlich bei verschiedenen Steckermodellen
 # Antwort vom Server (wenn die nicht kommt blinkt Dose wieder und muss neu initialisiert werden):
 # 5a a5 00 01|06|f9 5b b5
 #---------------------------------------------------------------------------------------------------------
 # Einschalten der Dose:
 # 5a a5 00 17|10 01 01 0a e0 32 23 62 8a 7e ff fe 00 00 10 11 00 00 01 00 00 00 ff|26 5b b5
 #                                  MM MM MM
+#                            ?? ??                                                     ??: Unterschiedlich bei verschiedenen Steckermodellen
 # Ausschalten der Dose
 # 5a a5 00 17|10 01 01 0a e0 32 23 62 8a 7e ff fe 00 00 10 11 00 00 01 00 00 00 00|25 5b b5
 #                                  MM MM MM
+#                            ?? ??                                                     ??: Unterschiedlich bei verschiedenen Steckermodellen
 # beides wird quittiert (ebenso wird auch bei lokaler betaetigung quittiert) -> siehe 3. Antwort auf Init 2
 package main;
 use strict;
 use warnings;
 use SetExtensions;
 use TcpServerUtils;
-
-use constant  { PREFIX    => pack('C*', (0x5a,0xa5)),
-                POSTFIX   => pack('C*', (0x5b,0xb5)),
-                INIT1A    => pack('C*', (0x02,0x05,0x0d,0x07,0x05,0x07,0x12)), };
 
 my $prefix =  pack('C*', (0x5a,0xa5));
 my $postfix = pack('C*', (0x5b,0xb5));
@@ -54,13 +57,13 @@ my $init1a =  pack('C*', (0x02,0x05,0x0d,0x07,0x05,0x07,0x12));
 my $init1b =  pack('C*', (0x02));
 my $init2 =   pack('C*', (0x05,0x01));
 my $hbeat =   pack('C*', (0x06));
-my $switch1 = pack('C*', (0x10,0x01,0x01,0x0a,0xe0,0x32,0x23));
+my $switch1 = pack('C*', (0x10,0x01,0x01,0x0a,0xe0));
 my $switch2 = pack('C*', (0xff,0xfe,0x00,0x00,0x10,0x11,0x00,0x00,0x01,0x00,0x00,0x00));
 
-my $dosehb =  pack('C*', (0x00,0x09,0x04,0x01,0x0A,0xC0,0x32,0x23));
-my $cinit1 =  pack('C*', (0x03,0x01,0x0a,0xc0,0x32,0x23));
-my $cmac =    pack('C*', (0x07,0x01,0x0a,0xc0,0x32,0x23));
-my $cswitch = pack('C*', (0x90,0x01,0x0a,0xe0,0x32,0x23));
+my $dosehb =  pack('C*', (0x00,0x09,0x04,0x01,0x0a,0xc0));
+my $cinit1 =  pack('C*', (0x03,0x01,0x0a,0xc0));
+my $cmac =    pack('C*', (0x07,0x01,0x0a,0xc0));
+my $cswitch = pack('C*', (0x90,0x01,0x0a,0xe0));
 
 my $timeout = 60;
 
@@ -247,11 +250,11 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
     return;
   }
   
-  if ( substr($buf,0,10) eq ($prefix . $dosehb )) {     									# Heartbeat (Dosen Id wird nicht ueberprueft)
-    #DevIo_SimpleWrite($hash, GHoma_BuildString($hbeat) , undef);
+  if ( substr($buf,0,8) eq ($prefix . $dosehb )) {     									# Heartbeat (Dosen Id wird nicht ueberprueft)
+	#DevIo_SimpleWrite($hash, GHoma_BuildString($hbeat) , undef);
 	RemoveInternalTimer($hash);
 	$buf =~ s/(.|\n)/sprintf("%.2X ",ord($1))/eg;		#empfangene Zeichen in Hexwerte wandeln
-	Log3 $name, 5, "$name empfangen: $buf";
+	Log3 $name, 5, "$name Heartbeatanfrage empfangen: $buf";
     syswrite( $hash->{CD}, GHoma_BuildString($hbeat) );
     Log3 $hash, 5, "$hash->{NAME} Heartbeat gesendet";
     InternalTimer(gettimeofday()+ $timeout, "GHoma_Timer", $hash,0);
@@ -274,8 +277,9 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
 		(my $smsg = $_) =~ s/(.|\n)/sprintf("%.2X ",ord($1))/eg;							# empfangene Zeichen in Hexwerte wandeln
 		Log3 $hash, 5, "$hash->{NAME} RX: 5A A5 $smsg";										# ...und ins Log schreiben
 		
-		if ( substr($_,2,6) eq ($cinit1)) {  												# Antwort auf erstes Init
-			#$hash->{Id} = substr($_,8,3);
+		$hash->{Pattern} = unpack('H*', substr($_,6,2) ) unless defined $hash->{Pattern};
+		
+		if ( substr($_,2,4) eq ($cinit1)) {  												# Antwort auf erstes Init
 			$hash->{Id} = unpack('H*', substr($_,8,3) );
 			unless ($hash->{isClient}) {
 				# fuer Server Loesung bei erster Antwort von Dose nach bestehendem Device mit gleicher Id suchen und Verbindung auf dieses Modul uebertragen
@@ -289,10 +293,6 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
 					}
 				}
 				unless ( defined $clientdefined) {							# ...ein Neues anlegen, falls keins existiert
-					#my $id = unpack('H*', $hash->{Id} );
-					#Log3 $name, 4, "GHoma Unknown device $id, please define it";
-					#DoTrigger("global", "UNDEFINED GHoma_$id GHoma $id");
-					#GHoma_moveclient($hash, $defs{"GHoma_$id"}) if ($defs{"GHoma_$id"});
 					Log3 $name, 4, "GHoma Unknown device $hash->{Id}, please define it";
 					DoTrigger("global", "UNDEFINED GHoma_$hash->{Id} GHoma $hash->{Id}");
 					GHoma_moveclient($hash, $defs{"GHoma_$hash->{Id}"}) if ($defs{"GHoma_$hash->{Id}"});
@@ -303,7 +303,7 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
 				RemoveInternalTimer($hash);
 				InternalTimer(gettimeofday()+ $timeout, "GHoma_Timer", $hash,0);
 			}
-		} elsif ( substr($_,2,6) eq $cmac && substr($_,8,3) eq substr($_,17,3) ) {			# Nachricht mit MAC (kommt unter Anderem als Antwort auf Init2)
+		} elsif ( substr($_,2,4) eq $cmac && substr($_,8,3) eq substr($_,17,3) ) {			# Nachricht mit MAC (kommt unter Anderem als Antwort auf Init2)
 			my $mac;
 			for my $i (0...5) {			# MAC formattieren
 				$mac .= sprintf("%.2X",ord( substr($_,14+$i,1) ));
@@ -311,7 +311,7 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
 				$mac .= ":";
 			}
 			$hash->{MAC} = $mac;
-		} elsif ( substr($_,2,6) eq $cswitch && (( length($_) - 5 ) == 0x15 ) ) {			# An oder Aus
+		} elsif ( substr($_,2,4) eq $cswitch && (( length($_) - 5 ) == 0x15 ) ) {			# An oder Aus
 			my $id = unpack('H*', substr($_,8,3) );
 			my $rstate = hex(unpack('H*', substr($_,22,1))) == 0xFF ? "on" : "off";
             my $src    = hex(unpack('H*', substr($_,14,1))) == 0x81 ? "local" : "remote";
@@ -396,7 +396,8 @@ sub GHoma_Set($@) {					#
 	return SetExtensions($hash, $slist, @a);
   }
   if (defined $hash->{CD}) {
-	syswrite( $hash->{CD}, GHoma_BuildString($switch1 . pack('C*', ( hex(substr($hash->{Id},0,2)), hex(substr($hash->{Id},2,2)), hex(substr($hash->{Id},4,2)) ) ) . $switch2 . $type) );
+  	Log3 $hash, 2, "$hash->{NAME}: Pattern noch nicht empfangen" unless defined $hash->{Pattern};
+	syswrite( $hash->{CD}, GHoma_BuildString($switch1  . pack('C*', ( hex(substr($hash->{Pattern},0,2)), hex(substr($hash->{Pattern},2,2)) ) ) . pack('C*', ( hex(substr($hash->{Id},0,2)), hex(substr($hash->{Id},2,2)), hex(substr($hash->{Id},4,2)) ) ) . $switch2 . $type) );
   }
   return undef;
 }
@@ -648,4 +649,4 @@ sub GHoma_udpbroad {
 
 =end html_DE
 
-=cut 
+=cut
