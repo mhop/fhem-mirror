@@ -533,6 +533,7 @@ isday</pre>
 <div id="SUNRISE_EL">
 
     <h3>SUNRISE_EL</h3>
+<ul>
     <p class="info">
         <strong lang="en">SUNRISE_EL</strong> definiert eine Reihe von Perl-Subroutinen (<abbr>z.B.</abbr> zur Nutzung mit <a href="#at">at</a>):
     </p>
@@ -850,6 +851,7 @@ isday</pre>
         </dd>
     </dl>
 </div>
+</ul>
 
 =end html_DE
 
