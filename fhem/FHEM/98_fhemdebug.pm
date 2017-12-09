@@ -132,10 +132,12 @@ fhemdebug_memusage($)
         if($mname eq "main::" && 
           ($n eq "modules" || $n eq "defs" || $n eq "readyfnlist")) {
           for my $mn (keys %{$main::{$n}}) {
+            Log 5, "$mname$n::$mn";
             $ts{"$mname$n::$mn"} = Devel::Size::total_size($main::{$n}{$mn});
           }
           
         } else {
+          Log 5, "$mname$n";
           $ts{"$mname$n"} = Devel::Size::total_size($h->{$n});
 
         }
