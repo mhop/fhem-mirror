@@ -49,8 +49,8 @@ sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$);
 
 
 #List of firmware versions that are known to be compatible with this modul
-my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#";
-my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#";
+my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#";
+my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#";
 
 sub ##########################################
 LUXTRONIK2_Log($$$)
@@ -301,6 +301,8 @@ LUXTRONIK2_Set($$@)
           ." boostHotWater"
           ." heatingCurveEndPoint"
           ." heatingCurveOffset"
+          ." heatSourceDefrostAirEnd"
+          ." heatSourceDefrostAirThreshold"
           ." hotWaterCircPumpDeaerate:on,off"
           ." hotWaterTemperatureTarget "
           ." resetStatistics:all,statBoilerGradientCoolDownMin,statAmbientTemp...,statElectricity...,statHours...,statHeatQ..."
@@ -2089,7 +2091,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <br>
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
   <br>
-  <i>The modul is reported to work with firmware: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77.</i>
+  <i>The modul is reported to work with firmware: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77, V1.80, V1.81.</i>
   <br>
   More Info on the particular <a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">page of FHEM-Wiki</a> (in German).
   <br>
@@ -2220,7 +2222,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   Siemens Novelan (WPR NET), Roth (ThermoAura®, ThermoTerra), Elco und Wolf Heiztechnik (BWL/BWS) verbaut ist.
   Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
   <br>
-  <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77.</i>
+  <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77, V1.80, V1.81.</i>
   <br>
   Mehr Infos im entsprechenden <u><a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">Artikel der FHEM-Wiki</a></u>.
   <br>&nbsp;
