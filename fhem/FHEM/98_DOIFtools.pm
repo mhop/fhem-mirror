@@ -778,10 +778,14 @@ sub DOIFtoolsNextTimer {
   my ($timer_str,$tn) = @_;
   $timer_str =~ /(\d\d).(\d\d).(\d\d\d\d) (\d\d):(\d\d):(\d\d)\|?(.*)/;
   my $tstr = "$1.$2.$3 $4:$5:$6";
-  return $tstr if (length($7) == 0); 
+  return $tstr if (!$7 && length($7) == 0);
   my $timer = timelocal($6,$5,$4,$1,$2-1,$3);
+  my $weekd = $7;
+  if ($weekd =~ s/\[(.*):(.*)\]//) {
+    $weekd .= ReadingsVal($1,length($2)>0?$2:"state","") if($1);
+  }
   my $tdays = "";
-  $tdays = $tn ? DOIF_weekdays($defs{$tn},$7) : $7;
+  $tdays = $tn ? DOIF_weekdays($defs{$tn},$weekd) : $weekd;
   $tdays =~/([0-8])/;
   return $tstr if (length($1) == 0); 
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($timer);
