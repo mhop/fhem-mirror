@@ -6,8 +6,6 @@
 #
 # Prof. Dr. Peter A. Henning
 #
-# TODO: Löschen readings, wenn timer gelöscht
-#
 # $Id$
 #
 ########################################################################################
@@ -50,7 +48,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.30";
+my $yaahmversion    = "1.31";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -328,14 +326,11 @@ my @profmode = ("party","absence","donotdisturb");
 my @profday  = ("vacation","holiday"); 
 
 #-- color schemes
-my $csnum=2;
 my @csmode;
 my @csmode1  = ("#53f3c7","#8bfa56","#ff9458","#fd5777");
-my @csmode2  = ("#35ffc7","#77ff35","#ff7e35","#ff355e");
 
 my @csstate;
 my @csstate1 = ("#53f3c7","#ff9458","#f554e2","#fd5777");
-my @csstate2 = ("#35ffc7","#ff7e35","#ff35e2","#ff355e");
 
 #-- temporary fix for update purpose
 sub YAAHM_restore($$){};
@@ -358,7 +353,8 @@ sub YAAHM_Initialize ($) {
   $hash->{UndefFn}     = "YAAHM_Undef";   
   $hash->{AttrFn}      = "YAAHM_Attr";
   my $attst            = "linkname publicroom hiddenroom lockstate:locked,unlocked simulation:0,1 ".
-                         "timeHelper modeHelper modeAuto:0,1 stateDevices:textField-long stateInterval noicons:0,1 colorscheme:1,2 stateWarning stateHelper stateAuto:0,1 ".
+                         "modecolor0 modecolor1 modecolor2 modecolor3 statecolor0 statecolor1 statecolor2 statecolor3 ".
+                         "timeHelper modeHelper modeAuto:0,1 stateDevices:textField-long stateInterval noicons:0,1 stateWarning stateHelper stateAuto:0,1 ".
                          "holidayDevices:textField-long vacationDevices:textField-long specialDevices:textField-long";
  
   $hash->{AttrList}    = $attst;
@@ -537,6 +533,32 @@ sub YAAHM_Attr($$$) {
       }
     }
   #---------------------------------------  
+  }elsif ( ($cmd eq "set") && ($attrName =~ /modecolor(\d)/) ) {
+    my $ci = $1;
+    if( $ci >= 0 && $ci <= 3 ){
+      $csmode[$ci] = $attrVal;
+    }   
+    
+  #---------------------------------------  
+  }elsif ( ($cmd eq "del") && ($attrName =~ /modecolor(\d)/) ) {
+    my $ci = $1;
+    if( $ci >= 0 && $ci <= 3 ){
+      $csmode[$ci] = $csmode1[$ci];
+    }   
+   #---------------------------------------  
+  }elsif ( ($cmd eq "set") && ($attrName =~ /statecolor(\d)/) ) {
+    my $ci = $1;
+    if( $ci >= 0 && $ci <= 3 ){
+      $csstate[$ci] = $attrVal;
+    }   
+    
+  #---------------------------------------  
+  }elsif ( ($cmd eq "del") && ($attrName =~ /statecolor(\d)/) ) {
+    my $ci = $1;
+    if( $ci >= 0 && $ci <= 3 ){
+      $csstate[$ci] = $csstate1[$ci];
+    }   
+  #---------------------------------------  
   }elsif ( ($cmd eq "set") && ($attrName eq "linkname") ) {
     
     $yaahmlinkname = $attrVal;
@@ -579,17 +601,7 @@ sub YAAHM_Attr($$$) {
 	     }	
       }
    }
-  #---------------------------------------  
-  }elsif ( ($cmd eq "set") && ($attrName eq "colorscheme") ) {
-    Log 1,"==================> colorscheme";
-    if( $attrVal == 2 ){
-      @csmode  = @csmode2;
-      @csstate = @csstate2;
-    }else{
-      @csmode  = @csmode2;
-      @csstate = @csstate2;
-    }
- 
+
   #---------------------------------------  
   }elsif ( ($cmd eq "delete") && ($attrName eq "stateDevices") ) {
     fhem("deletereading $name sdev_housestate");
@@ -713,6 +725,10 @@ sub YAAHM_Set($@) {
        $cmd = "next_".$if;
      }
 	 return YAAHM_nextWeeklyTime($name,$cmd,$args[1],$exec);
+	 
+   #-----------------------------------------------------------
+   }elsif ( $cmd =~ /^checkstate.*/ ) {
+     YAAHM_InternalTimer("check",time()+ $args[0], "YAAHM_checkstate", $hash, 0);
    
    #-----------------------------------------------------------
    }elsif ( $cmd =~ /^time.*/ ) {
@@ -749,6 +765,7 @@ sub YAAHM_Set($@) {
      $firstcall = 1;
      YAAHM_updater($hash);
      YAAHM_InternalTimer("check",time()+ 5, "YAAHM_checkstate", $hash, 0);
+     
    #-----------------------------------------------------------
    } elsif ( $cmd eq "createWeekly" ){
      return "[YAAHM] missing name for new weekly profile"
@@ -781,7 +798,7 @@ sub YAAHM_Set($@) {
      #-- find index
      $imax = int(@{$hash->{DATA}{"WT"}});
      $if= undef;
-     for( my $j=0;$j<$imax;$j++){
+     for( my $j=2;$j<$imax;$j++){
        if($hash->{DATA}{"WT"}[$j]{"name"} eq $args[0]){
          $if = $j;
          last;
@@ -792,6 +809,25 @@ sub YAAHM_Set($@) {
      splice(@{$hash->{DATA}{"WT"}},$if,1);
      #-- delete timer
      fhem("delete ".$name.".wtimer_".$if.".IF");
+     #-- delete readings
+     for( my $j=$if;$j<$imax-1;$j++){
+       $hash->{READINGS}{"ring_".$j}{VAL} = $hash->{READINGS}{"ring_".($j+1)}{VAL};
+       $hash->{READINGS}{"ring_".$j."_1"}{VAL} = $hash->{READINGS}{"ring_".($j+1)."_1"}{VAL};
+       $hash->{READINGS}{"next_".$j}{VAL} = $hash->{READINGS}{"next_".($j+1)}{VAL};
+       $hash->{READINGS}{"today_".$j}{VAL} = $hash->{READINGS}{"today_".($j+1)}{VAL};
+       $hash->{READINGS}{"today_".$j."_e"}{VAL} = $hash->{READINGS}{"today_".($j+1)."_e"}{VAL};
+       $hash->{READINGS}{"tomorrow_".$j}{VAL} = $hash->{READINGS}{"tomorrow_".($j+1)}{VAL};
+       $hash->{READINGS}{"tomorrow_".$j."_e"}{VAL} = $hash->{READINGS}{"tomorrow_".($j+1)."_e"}{VAL};
+       $hash->{READINGS}{"tr_wake_".$j}{VAL} = $hash->{READINGS}{"tr_wake".($j+1)}{VAL};
+     }
+     fhem("deletereading ".$name." ring_".($imax-1));
+     fhem("deletereading ".$name." ring_".($imax-1)."_1");
+     fhem("deletereading ".$name." next_".($imax-1));
+     fhem("deletereading ".$name." today_".($imax-1));
+     fhem("deletereading ".$name." today_".($imax-1)."_e");
+     fhem("deletereading ".$name." tomorrow_".($imax-1));
+     fhem("deletereading ".$name." tomorrow_".($imax-1)."_e");
+     fhem("deletereading ".$name." tr_wake_".($imax-1));
      #-- save everything
      YAAHM_save($hash);
      fhem("save");
@@ -802,7 +838,7 @@ sub YAAHM_Set($@) {
      my $str =  "";
 	 return "[YAAHM] Unknown argument " . $cmd . ", choose one of".
 	   " manualnext time:".join(',',@times)." mode:".join(',',@modes).
-	   " state:".join(',',@states)." locked:noArg unlocked:noArg save:noArg restore:noArg initialize:noArg createWeekly deleteWeekly";
+	   " state:".join(',',@states)." locked:noArg unlocked:noArg save:noArg checkstate:0,5,10 restore:noArg initialize:noArg createWeekly deleteWeekly";
    }
 }
 
@@ -1426,19 +1462,6 @@ sub YAAHM_checkstate($) {
 
 #########################################################################################
 #
-# YAAHM_SM - State machine
-#
-# Parameter hash = hash of device addressed
-#
-#########################################################################################
-
-sub YAAHM_SM($) {
-  my ($hash) = @_;
-
-}
-
-#########################################################################################
-#
 # YAAHM_informer - Tell FHEMWEB to inform this page
 #
 # Parameter me = hash of FHEMWEB instance
@@ -1721,6 +1744,9 @@ sub YAAHM_setWeeklyTime($) {
     #-- today's waketime
     my $tga = $sg0;
     $tga    =~ s/://;
+    #-- tomorrow's waketime
+    my $tgm = $sg1;
+    $tgm    =~ s/://;
     #-- "next" input
     my $nga = (defined $ng)?$ng:"";
     $nga    =~ s/://;
@@ -1729,6 +1755,20 @@ sub YAAHM_setWeeklyTime($) {
     if( $nga eq "" ){
       $ring_0 = $sg0;
       $ring_1 = $sg1;
+      $ng     = "";
+      $hash->{DATA}{"WT"}[$i]{ "next" }="";
+    #-- "next" is the same as today and today not over
+    }elsif( ($nga eq $tga) && ($tga > $lga)){
+      $ring_0 = $sg0;
+      $ring_1 = $sg1;
+      $ng     = "";
+      $hash->{DATA}{"WT"}[$i]{ "next" }="";
+    #-- "next" is the same as tomorrow and today over
+    }elsif( ($nga eq $tgm) && ($tga < $lga)){
+      $ring_0 = $sg0;
+      $ring_1 = $sg1;
+      $ng     = "";
+      $hash->{DATA}{"WT"}[$i]{ "next" }="";
     #-- "next" is off
     }elsif( $nga eq "off" ){
       #-- today's waketime not over => we mean today
@@ -1750,10 +1790,11 @@ sub YAAHM_setWeeklyTime($) {
     }else{
       #-- "next" after current time => we mean today
       if( $nga > $lga ){
-        #-- only restore standard setting
+        #-- only restore standard setting (do we come here at all ?)
         if( $ng eq $sg0 ){
           $sg0mod = $sg0;
           $ring_0 = $sg0;
+          $ng     = "";
           $hash->{DATA}{"WT"}[$i]{ "next" } = "";
         }else{
           $sg0mod = "$ng (man)";
@@ -1762,10 +1803,11 @@ sub YAAHM_setWeeklyTime($) {
         $ring_1 = $sg1;
       #-- "next" before current time => we mean tomorrow
       }else{
-        #-- only restore standard setting
+        #-- only restore standard setting (do we come here at all ?)
         if( $ng eq $sg1 ){
           $sg0mod = $sg1;
           $ring_1 = $sg1;
+          $ng     = "";
           $hash->{DATA}{"WT"}[$i]{ "next" } = "";
         }else{
           $sg1mod = "$ng (man)";
@@ -2980,7 +3022,7 @@ sub YAAHM_timewidget($){
   FW_pO 	 '<path d="M 0 0 '.$x_morning.' '.$y_morning.' A '.$radius.' '.$radius.' 0 0 1 '.$x_evening.' '.$y_evening.' Z" fill="url(#grad1)"/>';
   
   #-- evening to sunset sector
-  $dir = ( $ss < $ev ) ? 1 : 0;
+  $dir = ( $ss < $ev ) ? 0 : 1;
   FW_pO 	 '<path d="M 0 0 '.$x_evening.' '.$y_evening.' A '.$radius.' '.$radius.' 0 0 '.$dir.' '.$x_sunset.' '.$y_sunset.' Z" fill="url(#grad2)"/>';
   
   #-- midnight line
@@ -3070,6 +3112,9 @@ sub YAAHM_toptable($){
     $ret .= "var csmode = [\"".$csmode[0]."\",\"".$csmode[1]."\",\"".$csmode[2]."\",\"".$csmode[3]."\"];";
     $ret .= "var csstate = [\"".$csstate[0]."\",\"".$csstate[1]."\",\"".$csstate[2]."\",\"".$csstate[3]."\"];";
     
+    $ret .= "var blinking = 0;\n";
+    $ret .= "var hscolor = \"".$csstate[0]."\";\n";
+    
     $ret .= "var dailyno     = ".$dailyno.";\n";
     $ret .= "var dailykeys   = [\"".join("\",\"",(sort YAAHM_dsort keys %dailytable))."\"];\n";
     
@@ -3080,9 +3125,14 @@ sub YAAHM_toptable($){
       $ret .= ","
         if( $i!=0 );
       $ret .= "\"".$hash->{DATA}{"WT"}[$i]{"name"}."\"";
-    }
+    } 
     $ret .= "];\n";
+    #-- watcher for next hidden divisions
+    for( my $i=2;$i<$weeklyno;$i++){ 
+      $ret .= "$(\"body\").on('DOMSubtreeModified', \"#wt".$i."_o\",function () {nval = document.getElementById(\"wt".$i."_o\").innerHTML;document.getElementById(\"wt".$i."_n\").value = nval;})\n";
+    }
     $ret .= "</script>\n";
+  
     $ret .= "<div informId=\"$name-housestate\" style=\"display:none\" id=\"hid_hs\">".ReadingsVal($name,"housestate",undef)."</div>".
             "<div informId=\"$name-housemode\" style=\"display:none\" id=\"hid_hm\">".ReadingsVal($name,"housemode",undef)."</div>";
     $ret .= "<table class=\"roomoverview\">\n";
@@ -3108,7 +3158,7 @@ sub YAAHM_toptable($){
     $ret .= "<tr class=\"even\"><td rowspan=\"2\" height=\"40\" id=\"wid_hs\">".YAAHM_statewidget($hash)."</td>".
             "<td class=\"dname\" style=\"padding:5px;\">".$yaahm_tt->{"state"}."</td>".
             "<td><div informId=\"$name-tr_housestate\">".ReadingsVal($name,"tr_housestate",undef).
-            "</div></td><td style=\"width:20px\"><div informId=\"$name-sym_housestate\" style=\"align:center\">".ReadingsVal($name,"sym_housestate",undef)."</div></td>";
+            "</div></td><td style=\"width:20px\"><div id=\"sym_hs\" informId=\"$name-sym_housestate\" style=\"align:center\">".ReadingsVal($name,"sym_housestate",undef)."</div></td>";
             for( my $i=0; $i<$cols; $i++){
               if( $i < int(@states)){
                 $ret .= "<td width=\"120px\"><input type=\"button\" id=\"b_".$states[$i]."\" value=\"".$yaahm_tt->{$states[$i]}.
@@ -3124,7 +3174,7 @@ sub YAAHM_toptable($){
     #-- repeat manual next for every weekly table  
     my $nval  = "";
     my $wupn;
-    $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"padding:5px; border-left: 1px solid gray; border-top:1px solid gray; border-bottom:1px solid gray; border-bottom-left-radius:10px; border-top-left-radius:10px;\">".$yaahm_tt->{"manual"}."</td>";
+    $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"padding:5px; border-left: 1px solid gray; border-top:1px solid gray; border-bottom:1px solid gray; border-bottom-left-radius:10px; border-top-left-radius:10px;\">".$yaahm_tt->{"manual"}."</td>\n";
     for (my $i=0;$i<$weeklyno;$i++){
       if($i<$weeklyno-1){
         $styl= "border-bottom:1px solid gray;border-top:1px solid gray";
@@ -3134,7 +3184,7 @@ sub YAAHM_toptable($){
       $wupn = $hash->{DATA}{"WT"}[$i]{"name"};
       $nval = ( defined($hash->{DATA}{"WT"}[$i]{"next"}) ) ? $hash->{DATA}{"WT"}[$i]{"next"} : "";
       $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding:5px;padding-left:10px;padding-right:10px;$styl\">$wupn<br/>".
-              "<input type=\"text\" id=\"wt%d_n\" informId=\"$name-next_$i\" size=\"4\" maxlength=\"120\" value=\"$nval\" onchange=\"javascript:yaahm_setnext('$name',%d)\"/></td>",$i,$i);
+              "<div style=\"display:none\" id=\"wt%d_o\" informId=\"$name-next_$i\">$nval</div><input type=\"text\" id=\"wt%d_n\" size=\"4\" maxlength=\"120\" value=\"$nval\" onchange=\"javascript:yaahm_setnext('$name',%d)\"/></td>\n",$i,$i,$i);
     }
     $ret .= "</tr>\n";
     $ret .= "</table><br/></td></tr>";
@@ -3546,6 +3596,7 @@ sub YAAHM_Longtable($){
         Notes: <ul>
         <li>This module uses the global attribute <code>language</code> to determine its output data<br/>
          (default: EN=english). For German output set <code>attr global language DE</code>.</li>
+         <li>This module needs the JSON package</li>
          </ul>
         <h4>Set</h4>
         <ul>
@@ -3619,7 +3670,7 @@ sub YAAHM_Longtable($){
             <li><a name="yaahm_save">
                     <code>set &lt;name&gt; save|restore</code>
                 </a>
-                <br />Manually save/restore the complete profile data to/from the external file YAAHMFILE (save done automatically at each timer starte, restore at FHEM start)</li>
+                <br />Manually save/restore the complete profile data to/from the external file YAAHMFILE (save done automatically at each timer start, restore at FHEM start)</li>
         </ul>
         <a name="YAAHMget"></a>
         <h4>Get</h4>
@@ -3661,9 +3712,14 @@ sub YAAHM_Longtable($){
             <li><a name="yaahm_noicons"><code>attr &lt;name&gt; noicons
                     0|1</code></a>
                 <br />when set to 1, animated icons are suppressed</li>
-            <li><a name="yaahm_colorscheme"><code>attr &lt;name&gt; colorscheme
-                    1|2</code></a>
-                <br />color scheme for the icons</li>
+            <li><a name="yaahm_modecolor"><code>attr &lt;name&gt; modecolor[0|1|2|3] <i>color</i></code></a>
+                <br />four color specifications to signal the modes normal (default <span style="color:#53f3c7">#53f3c7</span>), 
+                 party (default <span style="color:#8bfa56">#8bfa56</span>), absence (default <span style="color:#ff9458">#ff9458</span>), 
+                 donotodisturb (default <span style="color:#fd5777">#fd5777</span>), </li>
+            <li><a name="yaahm_statecolor"><code>attr &lt;name&gt; statecolor[0|1|2|3] <i>color</i></code></a>
+                <br />four color specifications to signal the states unsecured (default <span style="color:#53f3c7">#53f3c7</span>), 
+                secured (default <span style="color:#ff9458">#ff9458</span>), 
+                protected (default <span style="color:#f554e2">#f554e2</span>) and guarded (default <span style="color:#fd5777">#fd5777</span>)</li>
             <li><a name="yaahm_timehelper"><code>attr &lt;name&gt; timeHelper &lt;name of perl program&gt;</code></a>
                 <br />name of a perl function that is called at each time step of the daily profile and for the two default weekly profiles</li>
             <li><a name="yaahm_modehelper"><code>attr &lt;name&gt; modeHelper &lt;name of perl program&gt;</code></a>

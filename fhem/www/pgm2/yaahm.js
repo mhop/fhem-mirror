@@ -99,8 +99,60 @@ function yaahm_setnext(name, i) {
 }
 
 //------------------------------------------------------------------------------------------------------
+// Write field value for next - first two here, the others dynamically
+//------------------------------------------------------------------------------------------------------
+
+$("body").on('DOMSubtreeModified', "#wt0_o",
+  function () {
+        nval = document.getElementById("wt0_o").innerHTML;
+        document.getElementById("wt0_n").value = nval;
+    })
+
+$("body").on('DOMSubtreeModified', "#wt1_o",
+  function () {
+        nval = document.getElementById("wt1_o").innerHTML;
+        document.getElementById("wt1_n").value = nval;
+    })
+
+//------------------------------------------------------------------------------------------------------
 // Animate housestate icon
 //------------------------------------------------------------------------------------------------------
+
+var blinker;
+var hsfill;
+var hscolor;
+
+function blinkhs() {
+    var w = document.getElementById("wid_hs");
+    if (w) {
+        if (hsfill == hscolor) {
+            hsfill = "white";
+            w.getElementsByClassName("hs_is")[0].setAttribute("fill", "white");
+        } else {
+            hsfill = hscolor;
+            w.getElementsByClassName("hs_is")[0].setAttribute("fill", hscolor);
+        }
+    }
+}
+
+$("body").on('DOMSubtreeModified', "#sym_hs",
+function () {
+    var w = document.getElementById("wid_hs");
+    if (w) {
+        var symnew = document.getElementById("sym_hs").innerHTML;
+        if (blinking == 1 && symnew.includes("green")) {
+            clearInterval(blinker);
+            blinking = 0;
+            w.getElementsByClassName("hs_is")[0].setAttribute("fill", hscolor);
+        } else {
+            if (blinking == 0 && ! symnew.includes("green")) {
+                hscolor = w.getElementsByClassName("hs_is")[0].getAttribute("fill");
+                blinker = setInterval('blinkhs()', 1000);
+                blinking = 1;
+            }
+        }
+    }
+})
 
 $("body").on('DOMSubtreeModified', "#hid_hs",
 function () {
@@ -111,6 +163,7 @@ function () {
         if (w) {
             switch (hsnew) {
                 case "unsecured":
+                hscolor = csstate[0];
                 w.getElementsByClassName("hs_is")[0].setAttribute("fill", csstate[0]);
                 w.getElementsByClassName("hs_smb")[0].setAttribute("visibility", "hidden");
                 w.getElementsByClassName("hs_unlocked")[0].setAttribute("visibility", "visible");
@@ -118,6 +171,7 @@ function () {
                 w.getElementsByClassName("hs_eye")[0].setAttribute("visibility", "hidden");
                 break;
                 case "secured":
+                hscolor = csstate[1];
                 w.getElementsByClassName("hs_is")[0].setAttribute("fill", csstate[1]);
                 w.getElementsByClassName("hs_smb")[0].setAttribute("visibility", "hidden");
                 w.getElementsByClassName("hs_unlocked")[0].setAttribute("visibility", "hidden");
@@ -125,6 +179,7 @@ function () {
                 w.getElementsByClassName("hs_eye")[0].setAttribute("visibility", "hidden");
                 break;
                 case "protected":
+                hscolor = csstate[2];
                 w.getElementsByClassName("hs_is")[0].setAttribute("fill", csstate[2]);
                 w.getElementsByClassName("hs_smb")[0].setAttribute("visibility", "visible");
                 w.getElementsByClassName("hs_unlocked")[0].setAttribute("visibility", "hidden");
@@ -132,6 +187,7 @@ function () {
                 w.getElementsByClassName("hs_eye")[0].setAttribute("visibility", "hidden");
                 break;
                 case "guarded":
+                hscolor = csstate[3];
                 w.getElementsByClassName("hs_is")[0].setAttribute("fill", csstate[3]);
                 w.getElementsByClassName("hs_smb")[0].setAttribute("visibility", "visible");
                 w.getElementsByClassName("hs_unlocked")[0].setAttribute("visibility", "hidden");
