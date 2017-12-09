@@ -1344,13 +1344,16 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="shutdown"></a>
 <h3>shutdown</h3>
 <ul>
-  <code>shutdown [restart|exitValue]</code>
-  <br><br>
-  Der Befehl f&auml;hrt den Server herunter (nach dem sichern aller <a
-  href="#statefile">Ger&auml;testati</a>). Er triggert das global:SHUTDOWN
-  Ereignis.  Mit der optionalen Parameter restart startet FHEM danach neu.
-  exitValue ist bei bestimmten Start-programmen von n&ouml;ten.
-  <br><br>
+    <p>
+        <code>shutdown [<var>restart</var>] [<var>exitValue</var>]</code>
+    </p>
+    <p>
+        Der Befehl f&auml;hrt <abbr>FHEM</abbr> herunter (nach dem Sichern aller <a
+        href="#statefile">Ger&auml;testatus</a>). Er triggert den <code>global:SHUTDOWN</code>-<span lang="en">Event</span>.
+        Mit dem optionalen Parameter <var lang="en">restart</var> startet <abbr>FHEM</abbr> danach neu.
+        Der <var lang="en">exitValue</var> ist möglicherweise bei bestimmten Start-Skripten zur korrekten Funktion
+        vonn&ouml;ten <abbr>bzw.</abbr> wichtig.
+    </p>
   Beispiel:
   <ul>
     <code>shutdown</code><br>
