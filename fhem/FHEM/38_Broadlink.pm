@@ -4,7 +4,6 @@
 package main;
 use strict;
 use warnings;
-use integer;
 use Time::Local;
 use IO::Socket::INET;
 use IO::Select;
@@ -66,7 +65,7 @@ sub Broadlink_Define($$) {
 	$hash->{'.id'} = pack('C*', 0, 0, 0, 0);
 	$hash->{counter} = 1;
 	$hash->{isAuthenticated} = 0;
-	if ($hash->{devtype} eq 'sp3') { #steckdose
+	if ($hash->{devtype} eq 'sp3' or $hash->{devtype} eq 'sp3s') { #steckdose
 		Broadlink_auth($hash);
 		if ($hash->{isAuthenticated} != 0) {
 			Broadlink_sp3_getStatus($hash, 1);
@@ -93,7 +92,7 @@ sub Broadlink_Get($@) {
 
 sub Broadlink_Set(@) {
 	my ($hash, $name, $cmd, @args) = @_;
-	if ($hash->{devtype} eq 'sp3') { #steckdose
+	if ($hash->{devtype} eq 'sp3' or $hash->{devtype} eq 'sp3s') { #steckdose
 		if ($cmd eq 'on') {
 			Broadlink_auth($hash);
 			if ($hash->{isAuthenticated} != 0) {
@@ -125,8 +124,18 @@ sub Broadlink_Set(@) {
 				Broadlink_sp3_getStatus($hash);
 			}
 			return undef;
+		} elsif ($cmd eq 'getEnergy' and $hash->{devtype} eq 'sp3s') {
+			Broadlink_auth($hash);
+			if ($hash->{isAuthenticated} != 0) {
+				Broadlink_sp3s_getEnergy($hash);
+			}
+			return undef;
 		} else {
-			return "Unknown argument $cmd, choose one of on off toggle getStatus";
+			if ($hash->{devtype} eq 'sp3s') {
+				return "Unknown argument $cmd, choose one of on off toggle getStatus getEnergy";
+			} else {
+				return "Unknown argument $cmd, choose one of on off toggle getStatus";
+			}
 		}    
 		return "$cmd. Try to get it.";
 	} else { #rmpro rmmini etc.
@@ -186,6 +195,12 @@ sub Broadlink_Set(@) {
 			delete($hash->{commandList}{$cmdname});
 			Broadlink_Save($hash);
 			return undef;
+		} elsif ($cmd eq 'getTemperature' and $hash->{devtype} eq 'rmpro') {
+			Broadlink_auth($hash);
+			if ($hash->{isAuthenticated} != 0) {
+				Broadlink_getTemperature($hash);
+			}
+			return undef;
 		} else {
 			#sort with ignore case
 			my $commandList = join(",", sort {
@@ -193,7 +208,11 @@ sub Broadlink_Set(@) {
 						|| $a cmp $b
 				} keys %{$hash->{commandList}});			
 			#return "Unknown argument $cmd, choose one of learnNewCommand sendCommand sendCommandBase64 sendCommandHex createCommandBase64 createCommandHex";
-			return "Unknown argument $cmd, choose one of recordNewCommand rename remove:" . $commandList . " commandSend:". $commandList;
+			if ($hash->{devtype} eq 'rmpro') {
+				return "Unknown argument $cmd, choose one of recordNewCommand rename getTemperature remove:" . $commandList . " commandSend:". $commandList;
+			} else {
+				return "Unknown argument $cmd, choose one of recordNewCommand rename remove:" . $commandList . " commandSend:". $commandList;
+			}
 		}    
 		return "$cmd. Try to get it.";
 	}
@@ -267,6 +286,41 @@ sub Broadlink_check_data(@) {
 	}	
 }
 
+sub Broadlink_getTemperature(@) {
+	my ($hash) = @_;
+	my @broadlink_payload = ((0) x  16);
+	$broadlink_payload[0] = 1;
+	
+	my $msg = "sp3_energy request";
+	Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
+	my $data = Broadlink_send_packet($hash, 0x6a, @broadlink_payload);
+	#length must be bigger than 0x38, if not, cant get substring with data
+	if (length($data) > 0x38 && $data ne "xxx") {
+		my $err = unpack("C*", substr($data, 0x22, 1)) | (unpack("C*", substr($data, 0x23, 1)) << 8);
+		if ($err == 0) {
+			my $msg = "sp3 receiving temperature - data length: " . length($data);
+			Log3 $hash->{NAME}, 1, $hash->{NAME} . ": " . $msg;
+			my $enc_payload = substr($data, 0x38);
+			my $cipher =  Broadlink_getCipher($hash);         
+			my $decodedData = $cipher->decrypt($enc_payload);
+			my $temperature = 0.0;
+			if (unpack("C*", substr($decodedData, 4, 1)) =~ /^\d+?$/) { #isint
+				$temperature = (unpack("C*", substr($decodedData, 4, 1)) * 10 + unpack("C*", substr($decodedData, 5, 1))) / 10.0;
+			} else {
+				$temperature = (ord(unpack("C*", substr($decodedData, 4, 1))) * 10 + ord(unpack("C*", substr($decodedData, 5, 1)))) / 10.0;
+			}
+			readingsSingleUpdate ( $hash, "currentTemperature", $temperature, 1 );
+		} else {
+			my $msg = "Error receiving temperature";
+			Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
+			readingsSingleUpdate ( $hash, "connectionErrorOn", "geTemperatureWithData", 1 );
+		}
+	} else {
+		my $msg = "no new temperature data found - data length: " . length($data);
+		Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
+		readingsSingleUpdate ( $hash, "connectionErrorOn", "getTemperature", 1 );
+	}
+}
 
 sub Broadlink_sp3_getStatus(@) {
 	my ($hash) = @_;
@@ -296,7 +350,7 @@ sub Broadlink_sp3_getStatus(@) {
 			readingsSingleUpdate ( $hash, "connectionErrorOn", "geStatusWithData", 1 );
 		}
 	} else {
-		my $msg = "no new command data found - data length: " . length($data);
+		my $msg = "no new status data found - data length: " . length($data);
 		Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
 		$hash->{STATE} = "unknown";
 		readingsSingleUpdate ( $hash, "connectionErrorOn", "geStatus", 1 );
@@ -327,6 +381,42 @@ sub Broadlink_sp3_setPower(@) {
 		my $msg = "powerChange - device not connected?";
 		Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
 		$hash->{STATE} = "unkown";
+	}
+}
+
+sub Broadlink_sp3s_getEnergy(@) {
+	my ($hash) = @_;
+	my @broadlink_payload = ((0) x  16);
+	$broadlink_payload[0] = 8;
+	$broadlink_payload[2] = 254;
+	$broadlink_payload[3] = 1;
+	$broadlink_payload[4] = 5;
+	$broadlink_payload[5] = 1;
+	$broadlink_payload[9] = 45;
+	#my @broadlink_payload = pack('C*', 8, 0, 254, 1, 5, 1, 0, 0, 0, 45, 0, 0, 0, 0, 0, 0);
+	
+	my $msg = "sp3_energy request";
+	Log3 $hash->{NAME}, 5, $hash->{NAME} . ": " . $msg;
+	my $data = Broadlink_send_packet($hash, 0x6a, @broadlink_payload);
+	#length must be bigger than 0x38, if not, cant get substring with data
+	if (length($data) > 0x38 && $data ne "xxx") {
+		my $err = unpack("C*", substr($data, 0x22, 1)) | (unpack("C*", substr($data, 0x23, 1)) << 8);
+		if ($err == 0) {
+			my $msg = "sp3 receiving energy - data length: " . length($data);
+			Log3 $hash->{NAME}, 1, $hash->{NAME} . ": " . $msg;
+			my $enc_payload = substr($data, 0x38);
+			my $cipher =  Broadlink_getCipher($hash);         
+			my $decodedData = $cipher->decrypt($enc_payload);
+			readingsSingleUpdate ( $hash, "currentPowerComsuption", sprintf("%.2f", (sprintf("%X", unpack("C*", substr($decodedData, 7, 1)) * 256 + unpack("C*", substr($decodedData, 6, 1))) + sprintf("%.2f", sprintf("%X", unpack("C*", substr($decodedData, 5, 1))) / 100.0))), 1 );
+		} else {
+			my $msg = "Error receiving energy";
+			Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
+			readingsSingleUpdate ( $hash, "connectionErrorOn", "geEnergyWithData", 1 );
+		}
+	} else {
+		my $msg = "no new ernergy data found - data length: " . length($data);
+		Log3 $hash->{NAME}, 4, $hash->{NAME} . ": " . $msg;
+		readingsSingleUpdate ( $hash, "connectionErrorOn", "getEnergy", 1 );
 	}
 }
 
@@ -603,6 +693,7 @@ sub Broadlink_Load(@) {
 <h3>Broadlink</h3>
 <ul>
     <i>Broadlink</i> implements a connection to Broadlink devices - currently tested with Broadlink RM Pro, which is able to send IR and 433MHz commands. It is also able to record this commands.
+	It can also control <i>rmmini</i> devices and sp3 or sp3s plugs.
 	<br>
 	It requires AES encryption please install on Windows:<br>
 	<code>ppm install Crypt-CBC</code><br>
@@ -615,7 +706,7 @@ sub Broadlink_Load(@) {
     <a name="Broadlinkdefine"></a>
     <b>Define</b>
     <ul>
-        <code>define &lt;name&gt; Broadlink &lt;ip/host&gt; &lt;mac&gt; &lt;type=rmpro or sp3&gt;</code>
+        <code>define &lt;name&gt; Broadlink &lt;ip/host&gt; &lt;mac&gt; &lt;type=rmpro or rmmini or sp3 or sp3s&gt;</code>
         <br><br>
         Example: <code>define broadlinkWZ Broadlink 10.23.11.85 34:EA:34:F4:77:7B rmpro</code>
         <br><br>
@@ -626,6 +717,31 @@ sub Broadlink_Load(@) {
     
     <a name="Broadlinkset"></a>
     <b>Set for rmpro</b><br>
+    <ul>
+        <li><code>set &lt;name&gt; &lt;commandSend&gt; &lt;command name&gt;</code>
+        <br><br>
+		Send a previous recorded command.
+        </li>
+		<li><code>set &lt;name&gt; recordNewCommand &lt;command name&gt;</code>
+        <br><br>
+		Records a new command. You have to specify a commandname
+        </li>
+		<li>
+		<code>set &lt;name&gt; remove &lt;command name&gt;</code>
+        <br><br>
+		Removes a recored command.
+        </li>
+		<li>
+		<code>set &lt;name&gt; rename &lt;old command name&gt; &lt;new command name&gt;</code>
+        <br><br>
+		Renames a recored command.
+        </li>
+		<li><code>set &lt;name&gt; getTemperature</code>
+        <br><br>
+		Get the device current enviroment Temperature
+        </li>
+    </ul>
+	<b>Set for rmmini</b><br>
     <ul>
         <li><code>set &lt;name&gt; &lt;commandSend&gt; &lt;command name&gt;</code>
         <br><br>
@@ -666,6 +782,29 @@ sub Broadlink_Load(@) {
 		Get the device on/off status
         </li>
     </ul>
+	    <b>Set for sp3s</b><br>
+    <ul>
+        <li><code>set &lt;name&gt; on</code>
+        <br><br>
+		Set the device on
+        </li>
+		<li><code>set &lt;name&gt; off</code>
+        <br><br>
+		Set the device off
+        </li>
+		<li><code>set &lt;name&gt; toggle</code>
+        <br><br>
+		Toggle the device on and off
+        </li>
+		<li><code>set &lt;name&gt; getStatus</code>
+        <br><br>
+		Get the device on/off status
+        </li>
+		<li><code>set &lt;name&gt; getEnergy</code>
+        <br><br>
+		Get the device current energy consumption
+        </li>
+    </ul>
     <br>
 	<a name="Broadlinkattr"></a>
     <b>Attributes for all Broadlink Devices</b><br>
@@ -685,6 +824,7 @@ sub Broadlink_Load(@) {
 <h3>Broadlink</h3>
 <ul>
     <i>Broadlink</i> implementiert die Verbindung zu Broadlink Geräten - aktuell mit Broadlink RM Pro, welcher sowohl Infrarot als auch 433MHz aufnehmen und anschließend versenden kann.
+	Zusätzlich werden RMMinis und die Wlan Steckdosen SP3 und SP3S unterstützt
 	<br>
 	Das Modul benötigt AES-Verschlüsslung.<br>
 	In Windows installiert man die Untersützung mit:<br>
@@ -698,7 +838,7 @@ sub Broadlink_Load(@) {
     <a name="Broadlinkdefine"></a>
     <b>Define</b>
     <ul>
-        <code>define &lt;name&gt; Broadlink &lt;ip/host&gt; &lt;mac&gt; &lt;type=rmpro or sp3&gt;</code>
+        <code>define &lt;name&gt; Broadlink &lt;ip/host&gt; &lt;mac&gt; &lt;type=rmpro or rmmini or sp3 or sp3s&gt;</code>
         <br><br>
         Beispiel: <code>define broadlinkWZ Broadlink 10.23.11.85 34:EA:34:F4:77:7B rmpro</code>
         <br><br>
@@ -709,6 +849,32 @@ sub Broadlink_Load(@) {
     
     <a name="Broadlinkset"></a>
     <b>Set f&uuml;r rmpro</b><br>
+    <ul>
+        <li><code>set &lt;name&gt; &lt;commandSend&gt; &lt;command name&gt;</code>
+        <br><br>
+		Sendet ein vorher aufgenommenen Befehl
+        </li>
+		<li><code>set &lt;name&gt; recordNewCommand &lt;command name&gt;</code>
+        <br><br>
+		Nimmt ein neuen Befehl auf. Man muss einen Befehlnamen angeben.
+        </li>
+		<li>
+		<code>set &lt;name&gt; remove &lt;command name&gt;</code>
+        <br><br>
+		Löscht einen vorher aufgezeichneten Befehl.
+        </li>
+		<li>
+		<code>set &lt;name&gt; rename &lt;old command name&gt; &lt;new command name&gt;</code>
+        <br><br>
+		Benennt einen vorher aufgezeichneten Befehl um.
+        </li>
+		<li><code>set &lt;name&gt; getTemperature</code>
+        <br><br>
+		Ermittelt die aktuelle Temperatur die am Gerät gemessen wird.
+        </li>
+    </ul>
+	<br>
+	<b>Set f&uuml;r rmmini</b><br>
     <ul>
         <li><code>set &lt;name&gt; &lt;commandSend&gt; &lt;command name&gt;</code>
         <br><br>
@@ -747,6 +913,30 @@ sub Broadlink_Load(@) {
 		<li><code>set &lt;name&gt; getStatus</code>
         <br><br>
 		Ermittelt den aktuellen Status des Gerätes.
+        </li>
+    </ul>
+    <br>
+	    <b>Set f&uuml;r sp3s</b><br>
+    <ul>
+        <li><code>set &lt;name&gt; on</code>
+        <br><br>
+		Schaltet das Gerät an.
+        </li>
+		<li><code>set &lt;name&gt; off</code>
+        <br><br>
+		Schaltet das Gerät aus.
+        </li>
+		<li><code>set &lt;name&gt; toggle</code>
+        <br><br>
+		Schaltet das Gerät entweder ein oder aus.
+        </li>
+		<li><code>set &lt;name&gt; getStatus</code>
+        <br><br>
+		Ermittelt den aktuellen Status des Gerätes.
+        </li>
+		<li><code>set &lt;name&gt; getEnergy</code>
+        <br><br>
+		Ermittelt den aktuellen Stromverbrauch des angeschlossenen Gerätes.
         </li>
     </ul>
     <br>
