@@ -48,7 +48,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.31";
+my $yaahmversion    = "1.32";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -3129,7 +3129,7 @@ sub YAAHM_toptable($){
     $ret .= "];\n";
     #-- watcher for next hidden divisions
     for( my $i=2;$i<$weeklyno;$i++){ 
-      $ret .= "$(\"body\").on('DOMSubtreeModified', \"#wt".$i."_o\",function () {nval = document.getElementById(\"wt".$i."_o\").innerHTML;document.getElementById(\"wt".$i."_n\").value = nval;})\n";
+      $ret .= "\$(\"body\").on('DOMSubtreeModified', \"#wt".$i."_o\",function () {nval = document.getElementById(\"wt".$i."_o\").innerHTML;document.getElementById(\"wt".$i."_n\").value = nval;})\n";
     }
     $ret .= "</script>\n";
   
