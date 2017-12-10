@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use POSIX;
+use HttpUtils;
 #use Devel::Size qw(size total_size);
 
 # This block is only needed when SVG is loaded bevore FHEMWEB
@@ -340,6 +341,7 @@ SVG_txt($$$$)
 {
   my ($v,$t,$c,$sz) = @_;
   $c = "" if(!defined($c));
+  $c =~ s/&/\&amp;/g;
   $c =~ s/"/\&quot;/g;
   return "$t&nbsp;<input type=\"text\" name=\"$v\" size=\"$sz\" ".
                 "value=\"$c\"/>";
