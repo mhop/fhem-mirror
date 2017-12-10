@@ -1,5 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: V3.3.0 ,changelist to last version 2.2.15:
+                       - enhanced log output of reduceLog,reduceLogNbl
+                       - new command addCacheLine,add data to cache immediately
+                       - new attr "useCharfilter"
+                       - new attr "commitMode", see commandref
+                       - avoid print out the content of cache by "list device"
+                       - minor fixes
   - feature: 99_weekprofile: add support for CCU2 (experimental)
   - change:  93_DbRep: V6.3.2 ,changelist to last version:
                        - new command delSeqDoublets
