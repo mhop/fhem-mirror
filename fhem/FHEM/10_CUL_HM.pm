@@ -4673,6 +4673,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     else{
       $lvl =~ s/(\d*\.?\d*).*/$1/;
+      return "level not given" if($lvl == "");
       if ($cmd eq "pct"){
       }
       else{#dim [<changeValue>] ... [ontime] [ramptime]
@@ -6501,7 +6502,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     $change =~ s/00:00//;
     $change =~ s/(\ |:)//g;
     if ($nrRd){
-      $chnhash->{READINGS}{$regPre.$nrn}{VAL} =~ s/00:00// #mark incomplete as wego for a change;
+      $chnhash->{READINGS}{$regPre.$nrn}{VAL} =~ s/00:00//; #mark incomplete as we go for a change;
     }
     my $pN;
     $changed = 1;# yes, we did
@@ -8269,9 +8270,9 @@ sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
           foreach (grep !/_/,grep /tempList$ln/,keys %{$hash->{READINGS}});
     my $tempRegs = ReadingsVal($name,$regPre."RegL_0$lst.","");
     if ($tempRegs !~ m/00:00/){
-      for (my $day = 0;$day<7;$day++){
-        push (@changedRead,"R_$idxN{$lst}${day}_tempList".$days[$day].":incomplete");
-      }
+      # for (my $day = 0;$day<7;$day++){#leave days allone - state is incomplete should be enough
+      #   push (@changedRead,"R_$idxN{$lst}${day}_tempList".$days[$day].":incomplete");
+      # }
       push (@changedRead,"R_$idxN{$lst}tempList_State:incomplete");
       CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
       next;
