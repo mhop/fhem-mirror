@@ -43,7 +43,7 @@ my $alarmlinkname   = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "3.1";
+my $alarmversion    = "3.11";
 
 my %alarm_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -441,32 +441,33 @@ sub Alarm_getsettings($$$){
 
   my ($hash,$dev,$type) = @_;
   my $chg = 0;
-  my @aval = split('\|',AttrVal($dev, "alarmSettings","|||0:00"));
+  my @aval = split('\|',AttrVal($dev, "alarmSettings","|||0:00"),4);
   
   if( $type eq "Actor"){
+  #-- position 0:set by, 1:set func, 2:unset func, 3:delay
+    if( $aval[0] eq "" || $aval[1] eq "" ){
+      Log3 $hash, 1, "[Alarm] Settings incomplete for alarmActor $dev";
+    }
     #-- check delay time
-    if( !defined($aval[3]) || $aval[3] eq "" ){
-      $aval[3] = "";
-      $chg     = 1;
-    }elsif( $aval[3] =~ /^\d+$/ ){
-      $aval[3] = sprintf("00:%02d",$aval[3]);
+    if( $aval[3] =~ /^\d+$/ ){
+      if( $aval[3] > 3559 ){
+        Log3 $hash, 1, "[Alarm] Delay time $aval[3] for alarmActor $dev to large as single number, maximum 3559 seconds";;
+        $aval[3] = "59:59";
+      }else{
+        my $min = int($aval[3]/60);
+        my $sec = $aval[3]%60;
+        $aval[3] = sprintf("%02d:%02d",$min,$sec);
+      }      
       $chg     = 1;
     }elsif( $aval[3] !~ /^(\d\d:)?\d\d:\d\d/ ){
       Log3 $hash, 1, "[Alarm] Delay time $aval[3] ill defined for alarmActor $dev";
-      $aval[3] = "";
+      $aval[3] = "0:00";
       $chg     = 1;
     }
-    #-- unset func may be missing
-    $aval[2] = ""
-      if(!defined($aval[2]));
-    #-- position 0:set by, 1:set func, 2:unset func, 3:delay
-    if( int(@aval) != 4 || !defined($aval[0]) || !defined($aval[1]) ){
-      Log3 $hash, 1, "[Alarm] Settings incomplete for alarmActor $dev";
+    
+    if( $chg==1 ){
+      CommandAttr(undef,$dev.' alarmSettings '.join('|',@aval));
     }
-  }  
-  
-  if( $chg==1 ){
-    CommandAttr(undef,$dev.'alarmSettings '.join('|',@aval));
   }
   return @aval;
 }
