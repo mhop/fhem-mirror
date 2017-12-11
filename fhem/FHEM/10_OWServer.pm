@@ -75,6 +75,7 @@ use vars qw(%gets %sets);
   "/settings/timeout/w1"               => "",
   "/settings/units/pressure_scale"     => "",
   "/settings/units/temperature_scale"  => "",
+  "/uncached/alarm"                    => "",
 );
 
 %sets = (
@@ -135,9 +136,9 @@ OWServer_Define($$)
   my $protocol = $a[2];
 
   $hash->{fhem}{protocol}= $protocol;
-  
+
   $hash->{NOTIFYDEV} = "global";
- 
+
 
   if( $init_done ) {
     OWServer_OpenDev($hash);
@@ -267,7 +268,7 @@ OWServer_Read($@)
       my $r= defined($ret) ? $ret : "<undefined>";
       Log3 $hash, 5, "OWServer child read $path: $r";
       delete $hash->{".path"};
-      print WRITER $ret if(defined($ret)); 
+      print WRITER $ret if(defined($ret));
       close WRITER;
       # see http://forum.fhem.de/index.php?t=tree&goto=94670
       # changed from
@@ -388,7 +389,7 @@ OWServer_Autocreate($)
     return undef if(AttrVal($acdname,"disable",undef));
   }
   return undef unless($acdname ne "");
-  
+
   my $owserver= $hash->{fhem}{owserver};
 
   my @dir= split(",", $owserver->dir("/"));
@@ -398,7 +399,7 @@ OWServer_Autocreate($)
   foreach my $d (keys %defs) {
     next if($defs{$d}{TYPE} !~ /^OW(Device|AD|ID|MULTI|COUNT|LCD|SWITCH|THERM)$/);
     if(defined($defs{$d}{fhem}) && defined($defs{$d}{fhem}{address})) {
-      $defined{$defs{$d}{fhem}{address}} = $d; 
+      $defined{$defs{$d}{fhem}{address}} = $d;
     } elsif(defined($defs{$d}{OW_ID}) and defined($defs{$d}{OW_FAMILY})) {
       $defined{"$defs{$d}{OW_FAMILY}.$defs{$d}{OW_ID}"} = $d;
     }
@@ -486,6 +487,21 @@ OWServer_Get($@)
           $ret .= sprintf("%-*s %d\n",$wide,$str,($stat) ? $stat : 0);
         }
         return $ret;
+  } elsif($cmd eq "/uncached/alarm") {
+        # Oliver Vallant, 2017-04-17
+        my $path= $cmd;
+        my @devices= split(",", $owserver->dir($path));
+        my $ret;
+        for my $device (@devices) {
+          my $name= "";
+          my $address= substr($device, rindex($device, "/")+1);
+          my $type= $owserver->read($device . "/type");
+          foreach my $p (keys %defs) {
+             $name= concatc(", ", $name, $p) if($defs{$p}{TYPE} eq "OWDevice" and $defs{$p}{fhem}{address} eq $address);
+          }
+          $ret .= sprintf("%s %10s %s\n", $address, $type, $name);
+        }
+        return $ret;
   } elsif(defined($gets{$cmd})) {
         my $ret;
         my $value= $owserver->read($cmd);
@@ -555,10 +571,12 @@ OWServer_Set($@)
     You need <a href="http://owfs.cvs.sourceforge.net/viewvc/owfs/owfs/module/ownet/perl5/OWNet/lib/OWNet.pm">OWNet.pm from owfs.org on Sourceforge</a>, which is normally deployed with FHEM. As at 2012-12-23 the OWNet module
     on CPAN has an issue which renders it useless for remote connections.
     <p>
-    The ow* version 2.9 packages provided with Debian Jessie in combination with OWNet.pm as deployed with FHEM have issues. 
-    For Debian Jessie please either unzip 
+    The ow* version 2.9 packages provided with Debian Jessie in combination with OWNet.pm as deployed with FHEM have issues.
+    For Debian Jessie please either unzip
     <a href="http://forum.fhem.de/index.php?action=dlattach;topic=12219.0;attach=2463">owfs_2.8p17-1_all.zip</a> and install
-    owserver, dependencies and what else you require with <code>dpkg -i &lt;package&gt;.deb</code> or use the latest OWNet.pm from Sourceforge. 
+    owserver, dependencies and what else you require with <code>dpkg -i &lt;package&gt;.deb</code> or use the latest OWNet.pm from Sourceforge.
+    <p>
+    The ow* version 3.1 packages provided with Debian Stretch are fine.
     <p>
     A typical working configuration file <code>/etc/owfs.conf</code> looks as follows:<p>
     <code>
@@ -654,6 +672,7 @@ OWServer_Set($@)
         <li><code>/settings/timeout/w1</code></li>
         <li><code>/settings/units/pressure_scale</code></li>
         <li><code>/settings/units/temperature_scale</code></li>
+        <li><code>/uncached/alarm</code></li>
       </ul>
     </li>
     For further informations have look on <a href="http://owfs.org/uploads/owserver.1.html#sect41">owserver manual</a>).
@@ -693,17 +712,19 @@ OWServer_Set($@)
     <br><br>
 
     Definiert eine logische OWServer- Instanz. OWServer ist die Serverkomponente des
-    <a href="http://owfs.org">1-Wire Dateisystems</a>. Sie ermöglicht den Zugriff auf 
+    <a href="http://owfs.org">1-Wire Dateisystems</a>. Sie ermöglicht den Zugriff auf
     alle 1-Wire- Busteilnehmer eines Systems.<br><br>
         &lt;protocol&gt; hat das Format &lt;hostname&gt;:&lt;port&gt;  Nähere Informationen dazu gibt es in der <a href="http://owfs.org/index.php?page=owserver_protocol">owserver Dokumentation</a>.
         <br><br>
-    Voraussetzung innerhalb von FHEM ist das Modul <a href="http://owfs.cvs.sourceforge.net/viewvc/owfs/owfs/module/ownet/perl5/OWNet/lib/OWNet.pm">OWNet.pm von owfs.org</a>, welches bereits mit FHEM ausgeliefert wird. 
+    Voraussetzung innerhalb von FHEM ist das Modul <a href="http://owfs.cvs.sourceforge.net/viewvc/owfs/owfs/module/ownet/perl5/OWNet/lib/OWNet.pm">OWNet.pm von owfs.org</a>, welches bereits mit FHEM ausgeliefert wird.
         Das auf CPAN erhältliche OWNet- Modul beinhaltet seit dem 23.12.2012 einen Fehler, der es für Fernzugriffe unbrauchbar macht.<p>
         Auf dem Computer, an dem der 1-Wire- Bus angeschlossen ist, muss die Software "owserver" installiert sein. Zusätzlich sollte auf diesem Rechner die Konfigurationsdatei "owfs.conf" eingesehen bzw. angepasst werden. <a href="http://www.fhemwiki.de/wiki/OWServer_%26_OWDevice#Tipps_und_Tricks"> Einen WIKI- Artikel dazu gibt es hier.</a>
     <br><br>
     Die ow*-Pakete in der Version 2.9 von Debian Jessie haben Probleme. Bitte entpacke f&uuml;r Debian Jessie entweder
     <a href="http://forum.fhem.de/index.php?action=dlattach;topic=12219.0;attach=2463">owfs_2.8p17-1_all.zip</a> und installiere
     owserver, Abh&auml;ngigkeiten und was Du sonst noch brauchst mit <code>dpkg -i &lt;package&gt;.deb</code>, oder benutze die neueste Version von OWNet.pm von Sourceforge.
+    <p>
+    Die ow*-Pakete in der Version 3.1 von Debian Stretch sind in Ordnung.
     <p>
     Eine typische funktionierende Konfigurationsdatei <code>/etc/owfs.conf</code> sieht so aus:<p>
     <code>
@@ -798,6 +819,7 @@ OWServer_Set($@)
         <li><code>/settings/timeout/w1</code></li>
         <li><code>/settings/units/pressure_scale</code></li>
         <li><code>/settings/units/temperature_scale</code></li>
+        <li><code>/uncached/alarm</code></li>
       </ul>
     </li>
     Nähere Informationen zu diesen Einstellungen gibt es im <a href="http://owfs.org/uploads/owserver.1.html#sect41">owserver- Manual</a>.
@@ -818,7 +840,7 @@ OWServer_Set($@)
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
-  Hinweis: Falls in FHEM trotzdem ungewöhnliche Stillstände auftreten, sollte das Attribut <code>nonblocking</code> wieder deaktiviert werden.<br>  
+  Hinweis: Falls in FHEM trotzdem ungewöhnliche Stillstände auftreten, sollte das Attribut <code>nonblocking</code> wieder deaktiviert werden.<br>
 
 </ul>
 
