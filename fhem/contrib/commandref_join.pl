@@ -150,6 +150,13 @@ generateModuleCommandref($$;$$)
 
       } elsif(!$skip) {
         print $fh $l if($fh);
+        if($l =~ m,<h3>$mod</h3>,i && $fh) {
+          print $fh "<div class='langLinks'>".join(" ", map { 
+            $_ eq $lang ? $_ : 
+            "<a href='commandref".($_ eq "EN" ? "":"_$_").".html#$mod'>$_</a>"
+          } @lang) . "</div>\n";
+        }
+
         $docCount++;
         $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
