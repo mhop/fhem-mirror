@@ -753,7 +753,7 @@ SVG_WriteGplot($)
 # - {src}{X}: hash (X is an order element), consisting of
 #     {arg}: plot arguments for one dev, space separated
 #     {idx}: number of lines requested from the same source
-#     {num}: number or this src in the order array
+#     {num}: number of this src in the order array
 # - {rev}{orderIdx}{localIdx} = N: reverse lookup of the plot argument index,
 #      using {src}{X}{num} as orderIdx and {src}{X}{idx} as localIdx
 sub
@@ -1211,6 +1211,7 @@ SVG_getData($$$$$)
   my @keys = ("min","mindate","max","maxdate","currval","currdate",
               "firstval","firstdate","avg","cnt","lastraw");
 
+  $data{svgOffset} = 0;
   foreach my $src (@{$srcDesc->{order}}) {
     my $s = $srcDesc->{src}{$src};
     my $fname = ($src eq $defs{$d}{LOGDEVICE} ? $defs{$d}{LOGFILE} : "CURRENT");
@@ -1229,9 +1230,10 @@ SVG_getData($$$$$)
         }
         push @vals, \%h;
       }
-
+      $data{svgOffset} += ($s->{idx}+1);
     }
   }
+  delete($data{svgOffset});
 
   # Reorder the $data{maxX} stuff
   my ($min, $max) = (999999, -999999);
