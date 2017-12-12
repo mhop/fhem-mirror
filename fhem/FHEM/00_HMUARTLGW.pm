@@ -213,7 +213,7 @@ sub HMUARTLGW_DoInit($)
 			TEMPORARY => 1,
 			directReadFn => \&HMUARTLGW_Read,
 			DevType => "LGW-KeepAlive",
-			lgwHash => $hash,
+			'.lgwHash' => $hash,
 		};
 
 		$attr{$keepAlive->{NAME}}{room} = "hidden";
@@ -312,7 +312,7 @@ sub HMUARTLGW_Undefine($$;$)
 sub HMUARTLGW_Reopen($;$)
 {
 	my ($hash, $noclose) = @_;
-	$hash = $hash->{lgwHash} if ($hash->{lgwHash});
+	$hash = $hash->{'.lgwHash'} if ($hash->{'.lgwHash'});
 	my $name = $hash->{NAME};
 
 	Log3($hash, 4, "HMUARTLGW ${name} Reopen");
@@ -330,7 +330,7 @@ sub HMUARTLGW_Ready($)
 
 	Log3($hash, 4, "HMUARTLGW ${name} ready: ${state}");
 
-	if ((!$hash->{lgwHash}) && $state eq "disconnected") {
+	if ((!$hash->{'.lgwHash'}) && $state eq "disconnected") {
 		#don't immediately reconnect when we just connected, delay
 		#for 5s because remote closed the connection on us
 		if (defined($hash->{LastOpen}) &&
@@ -410,7 +410,7 @@ sub HMUARTLGW_LGW_Init($)
 			$hash->{CNT} = hex($1);
 
 			my $lgwName = $name;
-			$lgwName = $hash->{lgwHash}->{NAME} if ($hash->{lgwHash});
+			$lgwName = $hash->{'.lgwHash'}->{NAME} if ($hash->{'.lgwHash'});
 
 			my $lgwPw = AttrVal($lgwName, "lgwPw", undef);
 
@@ -1751,6 +1751,8 @@ sub HMUARTLGW_Get($@)
 	my ( $hash, $name, $cmd, @args ) = @_;
 	my $ret = "";
 
+	return "Unknown argument ${cmd}, choose one of " if ($hash->{DevType} eq "LGW-KeepAlive");
+
 	if ($cmd eq "assignIDs") {
 		foreach my $peer (keys(%{$hash->{Peers}})) {
 			next if ($hash->{Peers}{$peer} !~ m/^\+/);
@@ -1783,6 +1785,8 @@ sub HMUARTLGW_Set($@)
 	my $arg = join(" ", @a);
 
 	return "\"set\" needs at least one parameter" if (!$cmd);
+
+	return "Unknown argument ${cmd}, choose one of " if ($hash->{DevType} eq "LGW-KeepAlive");
 
 	if ($cmd eq "hmPairForSec") {
 		$arg = 60 if(!$arg || $arg !~ m/^\d+$/);
@@ -1842,6 +1846,8 @@ sub HMUARTLGW_Attr(@)
 	my $retVal;
 
 	Log3($hash, 5, "HMUARTLGW ${name} Attr ${cmd} ${aName} ".(($aVal)?$aVal:""));
+
+	return "Attribute ${cmd} not supported on keepAlive-subdevice" if ($hash->{DevType} eq "LGW-KeepAlive");
 
 	if ($aName eq "hmId") {
 		if ($cmd eq "set") {
@@ -2392,7 +2398,7 @@ sub HMUARTLGW_updateCoPro($$) {
 sub HMUARTLGW_getVerbLvl($$$$) {
 	my ($hash, $src, $dst, $def) = @_;
 
-	$hash = $hash->{lgwHash} if (defined($hash->{lgwHash}));
+	$hash = $hash->{'.lgwHash'} if (defined($hash->{'.lgwHash'}));
 
 	#Lookup IDs on change
 	if (defined($hash->{Helper}{Log}{Resolve}) && $init_done) {
