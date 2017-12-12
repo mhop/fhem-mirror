@@ -149,11 +149,6 @@ sub HMUARTLGW_Initialize($)
 	$hash->{RenameFn}  = "HMUARTLGW_Rename";
 	$hash->{ShutdownFn}= "HMUARTLGW_Shutdown";
 
-
-	$hash->{Clients} = ":CUL_HM:";
-	my %ml = ( "1:CUL_HM" => "^A......................" );
-	$hash->{MatchList} = \%ml;
-
 	$hash->{AttrList}= "hmId " .
 	                   "lgwPw " .
 	                   "hmKey hmKey2 hmKey3 " .
@@ -276,6 +271,10 @@ sub HMUARTLGW_Define($$)
 	}
 
 	$hash->{DeviceName} = $dev;
+
+	$hash->{Clients} = ":CUL_HM:";
+	my %ml = ( "1:CUL_HM" => "^A......................" );
+	$hash->{MatchList} = \%ml;
 
 	if (defined(AttrVal($name, "dummy", undef))) {
 		readingsSingleUpdate($hash, "state", "dummy", 1);
