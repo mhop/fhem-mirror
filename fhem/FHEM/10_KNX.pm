@@ -38,6 +38,7 @@
 # ABU 20171006 added sub-dpt1
 # ABU 20171006 added dpt19
 # ABU 20171212 added dpt14.057
+# ABU 20171212 finetuned doku
 
 package main;
 
@@ -182,9 +183,9 @@ my %dpttypes = (
 	"dpt14.019"		=> {CODE=>"dpt14", UNIT=>"A", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},
 	"dpt14.027"		=> {CODE=>"dpt14", UNIT=>"V", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},    
 	"dpt14.056"		=> {CODE=>"dpt14", UNIT=>"W", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},
+	"dpt14.057"		=> {CODE=>"dpt14", UNIT=>"cos &Phi;", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},  	
 	"dpt14.068"		=> {CODE=>"dpt14", UNIT=>"&deg;C", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},  
 	"dpt14.076"		=> {CODE=>"dpt14", UNIT=>"m&sup3;", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},  
-	"dpt14.057"		=> {CODE=>"dpt14", UNIT=>"cos &Phi;", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},  
   
 	# 14-Octet String
 	"dpt16"         => {CODE=>"dpt16", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/, MIN=>undef, MAX=>undef},
@@ -1896,9 +1897,9 @@ sub KNX_getCmdList ($$$)
 	dpt1.017 trigger, trigger<br>
 	dpt1.018 not occupied, occupied<br>
 	dpt1.019 closed, open<br>
-	dpt1.020 logical or, logical and<br>
-	dpt1.021 scene A, scene B<br>
-	dpt1.022 move up/down, move and step mode<br>
+	dpt1.021 logical or, logical and<br>
+	dpt1.022 scene A, scene B<br>
+	dpt1.023 move up/down, move and step mode<br>
 	dpt2 value on, value off, value forceOn, value forceOff<br>
 	dpt3 -100..+100<br>
 	dpt5 0..255<br>
@@ -1941,11 +1942,13 @@ sub KNX_getCmdList ($$$)
 	dpt14.019 -Inf.0..+Inf.0 A<br>
 	dpt14.027 -Inf.0..+Inf.0 V<br>
 	dpt14.056 -Inf.0..+Inf.0 W<br>
+	dpt14.057 -Inf.0..+Inf.0 cos&Phi;<br>		
 	dpt14.068 -Inf.0..+Inf.0 &degC;<br>
 	dpt14.076 -Inf.0..+Inf.0 m&sup3;<br>
 	dpt16 String;<br>
 	dpt16.000 ASCII-String;<br>
 	dpt16.001 ISO-8859-1-String (Latin1);<br>
+	dpt19 01.12.2010_01:00:00<br>
 	dpt232 RGB-Value RRGGBB<br>
   </ul>		
 </ul>
@@ -2178,9 +2181,9 @@ sub KNX_getCmdList ($$$)
 	dpt1.017 trigger, trigger<br>
 	dpt1.018 not occupied, occupied<br>
 	dpt1.019 closed, open<br>
-	dpt1.020 logical or, logical and<br>
-	dpt1.021 scene A, scene B<br>
-	dpt1.022 move up/down, move and step mode<br>
+	dpt1.021 logical or, logical and<br>
+	dpt1.022 scene A, scene B<br>
+	dpt1.023 move up/down, move and step mode<br>
 	dpt2 value on, value off, value forceOn, value forceOff<br>
 	dpt3 -100..+100<br>
 	dpt5 0..255<br>
@@ -2223,11 +2226,13 @@ sub KNX_getCmdList ($$$)
 	dpt14.019 -Inf.0..+Inf.0 A<br>
 	dpt14.027 -Inf.0..+Inf.0 V<br>
 	dpt14.056 -Inf.0..+Inf.0 W<br>
+	dpt14.057 -Inf.0..+Inf.0 cos&Phi;<br>		
 	dpt14.068 -Inf.0..+Inf.0 &degC;<br>
 	dpt14.076 -Inf.0..+Inf.0 m&sup3;<br>
 	dpt16 String;<br>
 	dpt16.000 ASCII-String;<br>
 	dpt16.001 ISO-8859-1-String (Latin1);<br>
+	dpt19 01.12.2010_01:00:00<br>
 	dpt232 RGB-Value RRGGBB<br>
   </ul>
 </ul>
