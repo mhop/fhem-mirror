@@ -37,6 +37,7 @@
 # ABU 20170622 finetuned doku
 # ABU 20171006 added sub-dpt1
 # ABU 20171006 added dpt19
+# ABU 20171212 added dpt14.057
 
 package main;
 
@@ -183,6 +184,7 @@ my %dpttypes = (
 	"dpt14.056"		=> {CODE=>"dpt14", UNIT=>"W", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},
 	"dpt14.068"		=> {CODE=>"dpt14", UNIT=>"&deg;C", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},  
 	"dpt14.076"		=> {CODE=>"dpt14", UNIT=>"m&sup3;", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},  
+	"dpt14.057"		=> {CODE=>"dpt14", UNIT=>"cos &Phi;", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},  
   
 	# 14-Octet String
 	"dpt16"         => {CODE=>"dpt16", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/, MIN=>undef, MAX=>undef},
