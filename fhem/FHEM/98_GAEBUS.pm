@@ -43,6 +43,7 @@
 # 26.12.2016 : A.Goebel : fix handling for non "userattr" attributes
 # 27.12.2016 : A.Goebel : fix handling if ebusctl reports "usage:"
 # 27.12.2016 : A.Goebel : fix scan removed from supported classes
+# 13.12.2017 : A.Goebel : add "+f" as additional ebus command to disable "-f" for this request
 
 package main;
 
@@ -913,8 +914,17 @@ GAEBUS_doEbusCmd($$$$$$$)
 
   } elsif ($action eq "r") {
 
+    my $force = " -f "; 
+    $force = "" if ($io eq "h");
+
+    if ($cmdaddon =~ /\+f/) { 
+      $force = "";
+      $cmdaddon =~ s/\+f//;
+    }
+
     $cmd = "$io ";
-    $cmd .= " -f " if ($io ne "h");
+    #$cmd .= " -f " if ($io ne "h");
+    $cmd .= "$force";
     $cmd .= "-c $class " if ($class ne "");
     $cmd .= "$var ";
     $cmd .= "$cmdaddon";
@@ -1401,6 +1411,7 @@ GAEBUS_valueFormat(@)
         the evaluation within the specified interval. (eg. OutsideTemp:3 will evaluate this reading every 3-th cycle)<br>
         All text followed the reading seperated by a blank is given as an additional parameter to ebusd. 
         This can be used to request a single value if more than one is retrieved from ebus.<br>
+	If "+f" is given as an additional parameter this will remove the "-f" option from the ebusd request. This will return the value stored in ebusd instead of requesting it freshly.<br>
         </li><br>
     <li>Attributes of the format<br>
         <code>[w]~&lt;class&gt;~&lt;variable-name&gt;</code><br>
