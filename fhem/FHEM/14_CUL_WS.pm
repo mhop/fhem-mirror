@@ -298,7 +298,7 @@ CUL_WS_Parse($$)
     if($diff < -15.0 || $diff > 15.0) {
       Log3 $name, 2,
         "$name: Temp difference ($diff) too large: $val, skipping it";
-      readingsSingleUpdate($name, "strangetemp", $NotifyTemperature, 0);
+      readingsSingleUpdate($hash, "strangetemp", $NotifyTemperature, 0);
       return "";
     }
   }
@@ -311,7 +311,7 @@ CUL_WS_Parse($$)
     if($diff < -10.0 || $diff > 10.0) {
       Log3 $name, 2,
         "$name: Pressure difference ($diff) too large: $val, skipping it";
-      readingsSingleUpdate($name, "strangepress", $NotifyPressure, 0);
+      readingsSingleUpdate($hash, "strangepress", $NotifyPressure, 0);
       return "";
     }
   }
