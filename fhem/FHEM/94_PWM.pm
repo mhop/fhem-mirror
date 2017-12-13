@@ -28,6 +28,8 @@
 # 17.08.17 GA add attribute overallHeatingSwitchThresholdTemp define a threshold temperature to prevent switch to "on"
 # 30.11.17 GA add helper for last pulses of rooms
 # 30.11.17 GA fix clear roomsToStayOn and roomsToStayOnList if not used
+# 05.12.17 GA add extend helper for last pulses by $roomsWaitOffset{$wkey}
+# 13.12.17 GA fix consider $roomsWaitOffset{$wkey} in oldpulse set for each room
 
 ##############################################
 # $Id$
@@ -149,9 +151,6 @@ PWM_Calculate($)
           # $newstate may be "on_vp" or "off_vp" if valve protection is active
 	  my ($newstate, $newpulse, $cycletime, $oldstate) = PWM_CalcRoom($hash, $defs{$d});
 
-	  $defs{$d}->{READINGS}{oldpulse}{TIME} = TimeNow();
-	  $defs{$d}->{READINGS}{oldpulse}{VAL}  = $newpulse;
-
           my $onoff = $newpulse * $cycletime;
           if ($newstate =~ "off.*") {
             $onoff = (1 - $newpulse) * $cycletime
@@ -165,15 +164,19 @@ PWM_Calculate($)
 	  
           $wkey = $name."_".$d;
           if (defined ($roomsWaitOffset{$wkey})) {
+            $hash->{helper}{pulses}{$d} = $newpulse." / ".$roomsWaitOffset{$wkey}; 
             $newpulse += $roomsWaitOffset{$wkey};
             
           } else {
             $roomsWaitOffset{$wkey} = 0;
+            $hash->{helper}{pulses}{$d} = $newpulse." / ".$roomsWaitOffset{$wkey}; 
           }
+
+	  $defs{$d}->{READINGS}{oldpulse}{TIME} = TimeNow();
+	  $defs{$d}->{READINGS}{oldpulse}{VAL}  = $newpulse;
 
           $roomsActive++;
           $RoomsPulses{$d} = $newpulse;
-          $hash->{helper}{pulses}{$d} = $newpulse; 
           $newpulseSum += $newpulse;
           $newpulseMax = max($newpulseMax, $newpulse);
 
