@@ -905,7 +905,6 @@ sub HOMEMODE_Set($@)
     my $time = HOMEMODE_hourMaker($value);
     CommandDelete(undef,$timer) if (IsDevice($timer));
     CommandDefine(undef,"$timer at +$time set $name:FILTER=modeAlarm!=$amode modeAlarm $amode");
-    CommandAttr(undef,"$timer room ".AttrVal($name,"HomeAtTmpRoom","")) if (AttrVal($name,"HomeAtTmpRoom",""));
     CommandSet(undef,"$name:FILTER=modeAlarm!=$option modeAlarm $option");
   }
   elsif ($cmd eq "dnd-for-minutes")
@@ -922,7 +921,6 @@ sub HOMEMODE_Set($@)
     my $time = HOMEMODE_hourMaker($option);
     CommandDelete(undef,$timer) if (IsDevice($timer));
     CommandDefine(undef,"$timer at +$time set $name:FILTER=dnd!=off dnd off");
-    CommandAttr(undef,"$timer room ".AttrVal($name,"HomeAtTmpRoom","")) if (AttrVal($name,"HomeAtTmpRoom",""));
     CommandSet(undef,"$name:FILTER=dnd!=on dnd on");
   }
   elsif ($cmd eq "dnd")
@@ -2794,7 +2792,6 @@ sub HOMEMODE_ContactOpenCheck($$;$$)
     if ($state =~ /^($opencmds|open)$/)
     {
       CommandDefine(undef,"$timer at +$waittime $at") if ($at && !IsDevice($timer));
-      CommandAttr(undef,"$timer room ".AttrVal($name,"HomeAtTmpRoom","")) if (AttrVal($name,"HomeAtTmpRoom","") && IsDevice($timer));
       if ($retrigger > 1)
       {
         my @commands;
