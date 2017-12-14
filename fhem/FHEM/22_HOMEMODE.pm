@@ -2723,9 +2723,9 @@ sub HOMEMODE_name2alias($;$)
   my ($name,$witharticle) = @_;
   my $alias = AttrVal($name,"alias",$name);
   my $art;
-  $art = "der" if ($alias =~ /[Ss]ensor/);
-  $art = "die" if ($alias =~ /[Tt](ü|ue)r/);
-  $art = "das" if ($alias =~ /[Ff]enster/);
+  $art = "der" if ($alias =~ /sensor|dete[ck]tor|melder/i);
+  $art = "die" if ($alias =~ /t(ü|ue)r/i);
+  $art = "das" if ($alias =~ /fenster/i);
   my $ret = $witharticle && $art ? "$art $alias" : $alias;
   return $ret;
 }
@@ -4787,19 +4787,19 @@ sub HOMEMODE_Details($$$)
       value of minimum weather forecast temperature
     </li>
   </ul>
-  <p>These placeholders can only be used within HomeCMDcontact and HomeCMDmotion attributes</p>
+  <p>These placeholders can only be used within HomeCMDcontact, HomeCMDmotion and HomeCMDalarm attributes</p>
   <ul>
     <li>
       <b><i>%ALIAS%</i></b><br>
-      alias of the last triggered contact/motion sensor
+      alias of the last triggered contact/motion/smoke sensor
     </li>
     <li>
       <b><i>%SENSOR%</i></b><br>
-      name of the last triggered contact/motion sensor
+      name of the last triggered contact/motion/smoke sensor
     </li>
     <li>
       <b><i>%STATE%</i></b><br>
-      state of the last triggered contact/motion sensor
+      state of the last triggered contact/motion/smoke sensor
     </li>
   </ul>
   <p>These placeholders can only be used within calendar event related HomeCMDevent attributes</p>
