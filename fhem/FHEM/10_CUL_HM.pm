@@ -3842,6 +3842,16 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       elsif (defined($reg->{lit})){
         $help .= " special:".join(",",keys%{$reg->{lit}});
       }
+##################
+#  General to be implemented
+#      # ,"0095" => {name=>"HM-CC-RT-DN"  ,st=>'thermostat',cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.4p.5p.6p,3:3p.6p,1,7:3p.4'
+#      my $pRq = ((($reg->{l} == 3)||($reg->{l} == 4)) 
+#                    ?"required"
+#                    :"");
+#                    
+#      my @lCheck = grep /${chn}p/,grep /$reg->{l}:/, split(",",$culHmModel->{$hash->{helper}{mId}}{lst});
+#      $lCheck = @lCheck;
+##################
       push @rI,sprintf("%4d: %-16s | %3s %-14s | %8s | %s\n",
               $reg->{l},$regName,$min,$max.$reg->{u},
               ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),
@@ -4668,12 +4678,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                         ,"","",0);
     my($lvlMin,$lvlMax) = split",",AttrVal($name, "levelRange", "0,100");
     my $lvlInv = (AttrVal($name, "param", "") =~ m/levelInverse/)?1:0;
-
     if ($lvl eq "old"){#keep it - it means "old value"
     }
     else{
       $lvl =~ s/(\d*\.?\d*).*/$1/;
-      return "level not given" if($lvl == "");
+      return "level not given" if(!defined $lvl);
       if ($cmd eq "pct"){
       }
       else{#dim [<changeValue>] ... [ontime] [ramptime]
@@ -4958,7 +4967,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.
                            sprintf("%02X%02X",$bright,$colVal).$ramp.$tval);
   }
-  elsif($cmd eq "color") { ################################################
+  elsif($cmd eq "color") { ####################################################
     my (undef,undef,$colVal) = @a; #date prepared extention to entdate
     return "cmd requires color[0..100] step 0.5" if (!defined $colVal 
                                                 ||$colVal < 0 ||$colVal > 100);
@@ -4982,7 +4991,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'81'.$chn.
                            sprintf("%02X%02X",$bright,$colProg).$min.$max.$ramp.$tval);
   }
-  elsif($cmd eq "colProgram") { ################################################
+  elsif($cmd eq "colProgram") { ###############################################
     my (undef,undef,$colProg) = @a; #date prepared extention to entdate
     return "cmd requires a colorProgram[0..255]" if (!defined $colProg 
                                                      ||$colProg < 0 ||$colProg > 255);
@@ -8539,9 +8548,9 @@ sub CUL_HM_ActCheck($) {# perform supervision
           || $tSince gt $tLast){   #no message received in window
         if ($actHash->{helper}{$devId}{start} lt $tSince){  
           if($autoTry) { #try to send a statusRequest?
-            if (!$actHash->{helper}{$devId}{try} || $actHash->{helper}{$devId}{try}<2){
+            if (!$actHash->{helper}{$devId}{try} || $actHash->{helper}{$devId}{try} < 2){
               $actHash->{helper}{$devId}{try} = $actHash->{helper}{$devId}{try}
-                                                 ? ($actHash->{helper}{$devId}{try} +1)
+                                                 ? ($actHash->{helper}{$devId}{try} + 1)
                                                  : 1;
               my $cmds = CUL_HM_Set($defs{$devName},$devName,"help");
               if ($cmds =~ m/^(statusRequest|getSerial)/){
