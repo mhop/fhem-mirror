@@ -14,7 +14,7 @@ readingsChange_Initialize($)
 
   $hash->{DefFn} = "readingsChangeDefine";
   $hash->{NotifyFn} = "readingsChangeExec";
-  $hash->{AttrList} ="disable:1,0 disabledForIntervals";
+  $hash->{AttrList} ="disable:1,0 disabledForIntervals addStateEvent:1,0";
   $hash->{NotifyOrderPrefix} = "00-"; # be the first
 }
 
@@ -65,7 +65,7 @@ readingsChangeExec($$)
   my $NAME = $dev->{NAME};
   return if($NAME !~ m/$re->[0]/ || !$dev->{READINGS});
 
-  my $events = $dev->{CHANGED};
+  my $events = deviceEvents($dev, AttrVal($SELF, "addStateEvent", 0));
   return if(!$events);
   my $max = int(@{$events});
 
@@ -154,6 +154,7 @@ readingsChangeExec($$)
   <ul>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+    <li><a href="#addStateEvent">addStateEvent</a></li>
   </ul>
   <br>
 

@@ -166,7 +166,7 @@ FHEM/32_TechemSD.pm          herrmannj            Sonstiges
 FHEM/32_WifiLight.pm         herrmannj            Beleuchtung
 FHEM/32_yowsup.pm            justme1968           Unterstuetzende Dienste
 FHEM/32_withings.pm          markus-m             Sonstiges
-FHEM/33_readingschange.pm    rudolfkoenig         Automatisierung
+FHEM/33_readingsChange.pm    rudolfkoenig         Automatisierung
 FHEM/33_readingsGroup.pm     justme1968           Frontends/readingsGroup readingsHistory
 FHEM/33_readingsHistory.pm   justme1968           Frontends/readingsGroup readingsHistory
 FHEM/33_readingsProxy.pm     justme1968           Automatisierung
