@@ -1931,6 +1931,10 @@ $culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
                                                }
                      ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"-bright[0-100]- -colVal[0-100]- -duration- -ramp- ..."
                                                 ,color          =>"-colVal[0-100]-"
+                                                ,on             =>""
+                                                ,off            =>""
+                                                ,up             =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
+                                                ,down           =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
                                                }
                      ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp- ..."
                                                 ,colProgram     =>"[0|1|2|3|4|5|6]"
