@@ -37,6 +37,10 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 6.4.2        15.12.2017       change "delSeqDoublets" to respect attribute "limit" (adviceDelete,adviceRemain), 
+#                               commandref revised
+# 6.4.1        13.12.2017       new Attribute "sqlResultFieldSep" for field separate options of sqlCmd result
+# 6.4.0        10.12.2017       prepare module for usage of datetime picker widget (Forum:#35736) 
 # 6.3.2        05.12.2017       make direction of fetchrows switchable ASC <-> DESC by attribute fetchRoute
 # 6.3.1        04.12.2017       fix DBD::mysql::st execute failed: Expression #1 of SELECT list is not in GROUP BY clause
 #                               and contains nonaggregated column 'DEVELfhem.history.TIMESTAMP' which is not functionally 
@@ -262,7 +266,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "6.3.2";
+my $DbRepVersion = "6.4.2";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -322,6 +326,7 @@ sub DbRep_Initialize($) {
                        "showStatus ".
                        "showTableInfo ".
 					   "sqlResultFormat:separated,mline,sline,table,json ".
+					   "sqlResultFieldSep:|,:,\/ ".
                        "timestamp_begin ".
                        "timestamp_end ".
                        "timeDiffToNow ".
@@ -787,8 +792,8 @@ sub DbRep_Attr($$$$) {
                 delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
                 return undef;
             }
-           
-            unless ($aVal =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9])|1[1-9]|2[0-3]:([0-5][0-9]):([0-5][0-9])/) 
+            $aVal = formatpicker($aVal);		
+            unless ($aVal =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) 
                 {return " The Value of $aName is not valid. Use format YYYY-MM-DD HH:MM:SS or one of \"current_[year|month|day|hour]_begin\",\"current_[year|month|day|hour]_end\", \"previous_[year|month|day|hour]_begin\", \"previous_[year|month|day|hour]_end\" !";}
            
             my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($aVal =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
@@ -1081,7 +1086,7 @@ sub DbRep_Main($$;$) {
  # Ausgaben und Zeitmanipulationen
  Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
  Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert/); 
- Log3 ($name, 4, "DbRep $name - Command: $opt"); 
+ Log3 ($name, 4, "DbRep $name - Command: $opt $prop"); 
  
  # zentrales Timestamp-Array und Zeitgrenzen bereitstellen
  if($opt =~ /delSeqDoublets/) {
@@ -1180,8 +1185,10 @@ sub createTimeArray($$$) {
  #  absolute Auswertungszeiträume statische und dynamische (Beginn / Ende) berechnen 
  ######################################################################################
  
- $tsbegin = AttrVal($hash->{NAME}, "timestamp_begin", "1970-01-01 01:00:00");  
+ $tsbegin = AttrVal($hash->{NAME}, "timestamp_begin", "1970-01-01 01:00:00");
+ $tsbegin = formatpicker($tsbegin);
  $tsend = AttrVal($hash->{NAME}, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
+ $tsend = formatpicker($tsend);
 
  if (AttrVal($hash->{NAME},"timestamp_begin","") eq "current_year_begin" ||
      AttrVal($hash->{NAME},"timestamp_end","") eq "current_year_begin") {
@@ -3890,6 +3897,7 @@ sub delseqdoubl_DoParse($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+ my $limit      = AttrVal($name, "limit", 1000);
  my $table      = "history";
  my ($err,$dbh,$sth,$sql,$rowlist,$nrows,$selspec,$st);
  
@@ -3910,20 +3918,11 @@ sub delseqdoubl_DoParse($) {
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
  
- 
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "'$runtime_string_*'"|"?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash);
- 
  $selspec = "DEVICE,READING,TIMESTAMP,VALUE";
   
  # SQL zusammenstellen für DB-Abfrage
- if ($IsTimeSet || $IsAggrSet) {
-     $sql = createSelectSql($hash,$table,$selspec,$device,$reading,"?","?","ORDER BY TIMESTAMP ASC");
- } else {
-     $sql = createSelectSql($hash,$table,$selspec,$device,$reading,undef,undef,"ORDER BY TIMESTAMP ASC");
- }
- 
- $sth = $dbh->prepare($sql);
+ $sql = createSelectSql($hash,$table,$selspec,$device,$reading,"?","?","ORDER BY TIMESTAMP ASC");
+ $sth = $dbh->prepare_cached($sql);
  
  # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
  my @row_array;
@@ -3945,16 +3944,10 @@ sub delseqdoubl_DoParse($) {
      $st = [gettimeofday];
      
      # SQL zusammenstellen für Logausgabe
-	 if ($IsTimeSet || $IsAggrSet) {
-	     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",''); 
-     } 
-     Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
+	 my $sql1 = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');  
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql1"); 
  
-     if ($IsTimeSet || $IsAggrSet) {
-	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
-	 } else {
-	     eval{$sth->execute();};	 
-	 }
+	 eval{$sth->execute($runtime_string_first, $runtime_string_next);};
      if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -4002,10 +3995,10 @@ sub delseqdoubl_DoParse($) {
 					 $val =~ tr/"\n"//d;
 					 $st = [gettimeofday];
 					 my $dsql = "delete FROM $table where TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE ='$val';";
-					 $sth = $dbh->prepare($dsql); 
+					 my $sthd = $dbh->prepare($dsql); 
                      Log3 ($name, 4, "DbRep $name - SQL execute: $dsql"); 
 					 
-					 eval {$sth->execute();};
+					 eval {$sthd->execute();};
 					 if ($@) {
                          $err = encode_base64($@,"");
                          Log3 ($name, 2, "DbRep $name - $@");
@@ -4013,7 +4006,7 @@ sub delseqdoubl_DoParse($) {
                          Log3 ($name, 4, "DbRep $name -> BlockingCall delseqdoubl_DoParse finished");
                          return "$name|''|''|$err|''|$opt";
                      } 
-					 $ndel = $ndel+$sth->rows;
+					 $ndel = $ndel+$sthd->rows;
                      $dbh->commit() if(!$dbh->{AutoCommit});
 					 
 					 $rt = $rt+tv_interval($st);
@@ -4037,6 +4030,7 @@ sub delseqdoubl_DoParse($) {
  my $retn = ($opt =~ /adviceRemain/)?$nremain:($opt =~ /adviceDelete/)?$ntodel:$ndel; 
 
  my @retarray = ($opt =~ /adviceRemain/)?@remain:($opt =~ /adviceDelete/)?@todel:" "; 
+ splice(@retarray,$limit+10);
  if ($utf8 && @retarray) {
      $rowlist = Encode::encode_utf8(join('|', @retarray));
  } elsif(@retarray) {
@@ -4078,7 +4072,9 @@ sub delseqdoubl_ParseDone($) {
   my $opt        = $a[5];
   my $name       = $hash->{NAME};
   my $reading    = AttrVal($name, "reading", undef);
+  my $limit      = AttrVal($name, "limit", 1000);
   my @row;
+  my $l = 1;
   my $reading_runtime_string;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall delseqdoubl_ParseDone");
@@ -4099,6 +4095,7 @@ sub delseqdoubl_ParseDone($) {
       my @row_array = split("\\|", $rowlist);
       Log3 ($name, 5, "DbRep $name - row_array decoded: @row_array");
       foreach my $row (@row_array) {
+	      last if($l >= $limit);
           $row =~ s/_ESC_/ /g;
           my @a = split("[ \t][ \t]*", $row, 5);
           my $dev = $a[0];
@@ -4113,13 +4110,17 @@ sub delseqdoubl_ParseDone($) {
               $reading_runtime_string = $ts."__".$dev."__".$rea;
           }
 	      ReadingsBulkUpdateValue($hash, $reading_runtime_string, $val);
+		  $l++;
       }
   }
   use warnings;
+  my $sfx = AttrVal("global", "language", "EN");
+  $sfx = ($sfx eq "EN" ? "" : "_$sfx");
 
   my $rnam = ($opt =~ /adviceRemain/)?"number_rows_to_remain":($opt =~ /adviceDelete/)?"number_rows_to_delete":"number_rows_deleted"; 
   ReadingsBulkUpdateValue($hash, "$rnam", "$nrows");
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,($l >= $limit)?
+      "<html>done - Warning: not all items are shown, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRepattrlimit' target='_blank'>limit</a> if you want see more</html>":"done");
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -4484,6 +4485,7 @@ sub sqlCmd_DoParse($) {
   my $dblogname  = $dbloghash->{NAME};
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
   my $err;
 
   # Background-Startzeit
@@ -4536,7 +4538,7 @@ sub sqlCmd_DoParse($) {
   if($sql =~ m/^\s*(select|pragma|show)/is) {
     while (my @line = $sth->fetchrow_array()) {
       Log3 ($name, 4, "DbRep $name - SQL result: @line");
-      my $row = join("|", @line);
+      my $row = join("$srs", @line);
       
 	  # im Ergebnis immer § ersetzen (wegen join Delimiter "§")
 	  $row =~ s/§/|°escaped°|/g;
@@ -4598,6 +4600,7 @@ sub sqlCmd_ParseDone($) {
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[6]?decode_base64($a[6]):undef;
   my $srf        = AttrVal($name, "sqlResultFormat", "separated");
+  my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall sqlCmd_ParseDone");
   
@@ -4631,6 +4634,7 @@ sub sqlCmd_ParseDone($) {
       my $row;
 	  foreach $row ( @rows ) {
 	      $row =~ s/\|°escaped°\|/§/g;
+		  $row =~ s/$srs/\|/g if($srs !~ /\|/);
 		  $row =~ s/\|/<\/td><td style='padding-right:5px;padding-left:5px'>/g;
           $res .= "<tr><td style='padding-right:5px;padding-left:5px'>".$row."</td></tr>";
       }
@@ -6323,6 +6327,24 @@ sub normRelativeTime ($) {
 return ($toth,$tdtn);
 }
 
+##############################################################################################
+#   timestamp_begin, timestamp_end bei Einsatz datetime-Picker entsprechend
+#   den Anforderungen formatieren     
+##############################################################################################
+sub formatpicker ($) {   
+  my ($str) = @_;    
+  if ($str =~ /^(\d{4})-(\d{2})-(\d{2})_(\d{2}):(\d{2})$/) {
+      # Anpassung für datetime-Picker Widget
+	  $str =~ s/_/ /;
+	  $str = $str.":00";
+  }
+  if ($str =~ /^(\d{4})-(\d{2})-(\d{2})_(\d{2}):(\d{2}):(\d{2})$/) {
+      # Anpassung für datetime-Picker Widget
+	  $str =~ s/_/ /;
+  }  
+return $str;		
+}
+
 ####################################################################################################
 #    userexit - Funktion um userspezifische Programmaufrufe nach Aktualisierung eines Readings
 #    zu ermöglichen, arbeitet OHNE Event abhängig vom Attr userExitFn
@@ -6937,9 +6959,12 @@ return;
 	                               <br>
 
                                  Due to security reasons the attribute <a href="#DbRepattr">attribute</a> "allowDeletion" needs to be set for 
-								 execute the "delete" option. <br><br>						   
+								 execute the "delete" option. <br>
+								 The amount of datasets to show by commands "delSeqDoublets adviceDelete", "delSeqDoublets adviceRemain" is 
+								 initially limited (default: 1000) and can be adjusted by <a href="#DbRepattr">attribute</a> "limit".
+								 The adjustment of "limit" has no impact to the "delSeqDoublets delete" function, but affects <b>ONLY</b> the 
+								 display of the data.	 <br><br>			 
 								  
-								 
 								 <ul>
 								 <b>Example</b> - the remaining datasets after executing delete-option are are marked as <b>bold</b>: <br><br>
 								 <ul>
@@ -7250,7 +7275,8 @@ return;
 								 <br>
 								 
 								 The result of the statement will be shown in <a href="#DbRepReadings">Reading</a> "SqlResult".
-								 By <a href="#DbRepattr">attribut</a> "sqlResultFormat" the fomatting can be choosen. <br><br>
+							     The formatting of result can be choosen by <a href="#DbRepattr">attribute</a> "sqlResultFormat", as well as the used
+								 field separator can be determined by <a href="#DbRepattr">attribute</a> "sqlResultFieldSep". <br><br>
 								 
 								 <b>Note:</b> <br>
                                  Even though the module works non-blocking regarding to database operations, a huge 
@@ -7568,7 +7594,8 @@ sub bdump {
   <li><b>ftpTimeout </b>      - timeout of FTP-connection in seconds (default: 30). </li> <br>
   
   <a name="DbRepattrlimit"></a>
-  <li><b>limit </b>           - limits the number of selected datasets by the "fetchrows" command (default 1000). 
+  <li><b>limit </b>           - limits the number of selected datasets by the "fetchrows", or the shown datasets of "delSeqDoublets adviceDelete", 
+                                "delSeqDoublets adviceRemain" commands (default: 1000). 
                                 This limitation should prevent the browser session from overload and 
 								avoids FHEMWEB from blocking. Please change the attribut according your requirements or change the 
 								selection criteria (decrease evaluation period). </li> <br>
@@ -7638,6 +7665,7 @@ sub bdump {
                                 # Only informations about tables "current" and "history" will be shown <br>
                                 </ul><br>  
 								
+  <li><b>sqlResultFieldSep </b> - determines the used field separator (default: "|") in the result of command "set ... sqlCmd".  </li> <br>
 
   <li><b>sqlResultFormat </b> - determines the formatting of the "set ... sqlCmd" command result. possible options are: <br><br>
                                 <ul>
@@ -7645,10 +7673,10 @@ sub bdump {
 								                    reading. (default) <br><br>
                                 <b>mline </b>     - the result will be generated as multiline in 
 								                    <a href="#DbRepReadings">Reading</a> SqlResult. 
-													Field separator is "|". <br><br>	
+													<br><br>	
                                 <b>sline </b>     - the result will be generated as singleline in 
 								                    <a href="#DbRepReadings">Reading</a> SqlResult. 
-													Field separator is "|" and the dataset is separated by "]|[". <br><br>
+													Datasets are separated by "]|[". <br><br>
                                 <b>table </b>     - the result will be generated as an table in 
 								                    <a href="#DbRepReadings">Reading</a> SqlResult. <br><br>
                                 <b>json </b>      - creates <a href="#DbRepReadings">Reading</a> SqlResult as a JSON 
@@ -8044,9 +8072,12 @@ sub bdump {
 	                               <br>
 
                                  Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" für die "delete" Option
-								 gesetzt sein. <br><br>						   
+								 gesetzt sein. <br>
+								 Die Anzahl der anzuzeigenden Datensätze der Kommandos "delSeqDoublets adviceDelete", "delSeqDoublets adviceRemain" ist 
+								 zunächst begrenzt (default 1000) und kann durch das <a href="#DbRepattr">Attribut</a> "limit" angepasst werden.
+								 Die Einstellung von "limit" hat keinen Einfluss auf die "delSeqDoublets delete" Funktion, sondern beeinflusst <b>NUR</b> die 
+								 Anzeige der Daten.	 <br><br>						   
 								  
-								 
 								 <ul>
 								 <b>Beispiel</b> - die nach Verwendung der delete-Option in der DB verbleibenden Datensätze sind <b>fett</b>
 								 gekennzeichnet:<br><br>
@@ -8382,7 +8413,8 @@ sub bdump {
 								 <br>
 								 
 								 Das Ergebnis des Statements wird im <a href="#DbRepReadings">Reading</a> "SqlResult" dargestellt.
-								 Die Formatierung kann durch das <a href="#DbRepattr">Attribut</a> "sqlResultFormat" ausgewählt werden. <br><bR>
+								 Die Ergebnis-Formatierung kann durch das <a href="#DbRepattr">Attribut</a> "sqlResultFormat" ausgewählt, sowie der verwendete
+								 Feldtrenner durch das <a href="#DbRepattr">Attribut</a> "sqlResultFieldSep" festgelegt werden. <br><br>
 								 
 								 <b>Hinweis:</b> <br>
                                  Auch wenn das Modul bezüglich der Datenbankabfrage nichtblockierend arbeitet, kann eine 
@@ -8691,8 +8723,9 @@ sub bdump {
   <li><b>ftpTimeout </b>      - Timeout für die FTP-Verbindung in Sekunden (default: 30). </li> <br>
 								 
   <a name="DbRepattrlimit"></a>
-  <li><b>limit </b>           - begrenzt die Anzahl der resultierenden Datensätze im select-Statement von "fetchrows" 
-                                (default 1000). Diese Limitierung soll eine Überlastung der Browsersession und ein 
+  <li><b>limit </b>           - begrenzt die Anzahl der resultierenden Datensätze im select-Statement von "fetchrows", bzw. der anzuzeigenden Datensätze
+                                der Kommandos "delSeqDoublets adviceDelete", "delSeqDoublets adviceRemain" (default 1000). 
+								Diese Limitierung soll eine Überlastung der Browsersession und ein 
 								blockieren von FHEMWEB verhindern. Bei Bedarf entsprechend ändern bzw. die 
 								Selektionskriterien (Zeitraum der Auswertung) anpassen. </li> <br>
 								
@@ -8759,7 +8792,9 @@ sub bdump {
                                 Bespiel:    attr ... showTableInfo current,history  <br>
                                 # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
                                 </ul><br>  
-                              
+
+  <li><b>sqlResultFieldSep </b> - legt den verwendeten Feldseparator (default: "|") im Ergebnis des Kommandos "set ... sqlCmd" fest.    </li> <br>
+								
   <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses des Kommandos "set ... sqlCmd" fest. 
                                 Mögliche Optionen sind: <br><br>
   
@@ -8767,9 +8802,9 @@ sub bdump {
                                 <b>separated </b> - die Ergebniszeilen werden als einzelne Readings fortlaufend 
                                                     generiert. (default)<br><br> 
                                 <b>mline </b>     - das Ergebnis wird als Mehrzeiler im <a href="#DbRepReadings">Reading</a>
-                                                    SqlResult dargestellt. Feldtrenner ist "|". <br><br>	
+                                                    SqlResult dargestellt. <br><br>	
                                 <b>sline </b>     - das Ergebnis wird als Singleline im <a href="#DbRepReadings">Reading</a>
-                                                    SqlResult dargestellt. Feldtrenner ist "|", Satztrenner ist"]|[". <br><br>
+                                                    SqlResult dargestellt. Satztrenner ist"]|[". <br><br>
                                 <b>table </b>     - das Ergebnis wird als Tabelle im <a href="#DbRepReadings">Reading</a>
                                                     SqlResult dargestellt. <br><br>	
                                 <b>json </b>      - erzeugt das <a href="#DbRepReadings">Reading</a> SqlResult als
