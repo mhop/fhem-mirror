@@ -17,6 +17,7 @@
 # ABU 20170427 cleaned logs
 # ABU 20171006 deactivated default-log-entry
 # ABU 20171006 EIB requires different handling of extended GAD --> added
+# docM 20171106 fixed problem when OBD-IP adapter is offline during FHEM startup  
 
 
 package main;
@@ -138,7 +139,7 @@ TUL_Undef($$)
 		if(defined($defs{$d}) && defined($defs{$d}{IODev}) && $defs{$d}{IODev} == $hash)
 		{
 			my $lev = ($reread_active ? 4 : 2);
-			Log(GetLogLevel($name,$lev), "deleting port for $d");
+			Log (GetLogLevel($name,$lev), "deleting port for $d");
 			delete $defs{$d}{IODev};
 		}
 	}
@@ -183,8 +184,12 @@ TUL_DoInit($)
 	TUL_Clear($hash);
 
 	# send any initializing request if needed
-	# TODO move to device init 
-	return 1 unless openGroupSocket($hash);
+	# TODO move to device init
+
+# docM 2017-11-05
+# moved openGroupSocket() to TUL_OpenDev. 
+#	return 1 unless openGroupSocket($hash);
+# /docM
   
 	# reset buffer
 	purgeReceiverBuf($hash);
@@ -205,6 +210,11 @@ TUL_Write($$$)
 	my $name = $hash->{NAME};
 	
 	return if(!defined($fn));
+	
+# docm 2017-11-05
+# Discard message if TUL is disconnected
+	return if($hash->{STATE} eq "disconnected");
+# /docm
 	
 	#Discard message, if not set to backward-compatibility
 	if (($useEIB =~ m/0/) and ($fn =~ m/\^B/))
@@ -415,7 +425,7 @@ TUL_SimpleRead($)
 	$buf .= $dst;
 	$buf .= $data;
   
-	Log(4,"SimpleRead: $buf\n");
+	Log (4,"SimpleRead: $buf\n");
   
 	return $buf;
 }
@@ -495,6 +505,25 @@ TUL_OpenDev($$)
 		$hash->{DevType} = 'EIBD';
 		$hash->{TCPDev} = $conn;
 		$hash->{FD} = $conn->fileno();
+# docM 2017-11-05
+# Call openGroupSocket() here, as it is part of device initialization.
+		if (openGroupSocket($hash))
+		{
+			Log (3, "OpenDev: OBD response from $dev") if($reopen);
+		}
+		else
+		{
+# failed to connect to OBD. Close socket and start polling		
+			Log (3, "OpenDev: No OBD response from $dev") if(!$reopen);
+			TUL_CloseDev($hash);
+			$readyfnlist{"$name.$dev"} = $hash;
+			$hash->{STATE} = "disconnected";
+			$hash->{NEXT_OPEN} = time()+60;
+			return "";
+		}
+
+# /docM
+
 		delete($readyfnlist{"$name.$dev"});
 		$selectlist{"$name.$dev"} = $hash;
 	}
@@ -590,7 +619,7 @@ TUL_OpenDev($$)
 	if($ret) 
 	{
 		TUL_CloseDev($hash);
-		Log (1, "Cannot init $dev, ignoring it");
+		Log (1, "OpenDev: Cannot init $dev, ignoring it");
 	}
 
 	DoTrigger($name, "CONNECTED") if($reopen);
@@ -669,7 +698,7 @@ sub tul_hex2addr
     }
     else
     {
-		Log(3,"Bad EIB address string: \'$str\'\n");
+		Log (3,"hex2addr: Bad KNX address string: \'$str\'\n");
 		return;
     }
 }
@@ -782,7 +811,7 @@ sub decode_eibd($)
 
     @data = unpack ("C" . length($bytes), $bytes);
     my $datalen = @data;
-    Log (5, "decode_eibd byte len: " . length($bytes) . " array size: $datalen");
+    Log (5, "decode_eibd: byte len: " . length($bytes) . " array size: $datalen");
     
     # in case of data len > 1, the first byte (the one with apci) seems not to be used
     # and only the following byte are of interest.
@@ -806,7 +835,7 @@ sub encode_eibd($)
     $APCI = $apcivalues{$mref->{'type'}};
     if (!(defined $APCI)) 
 	{
-		Log(3,"Bad EIB message type $mref->{'type'}\n");
+		Log (3,"encode_eibd: Bad KNX message type $mref->{'type'}\n");
 		return;
     }
     @data = @{$mref->{'data'}};
@@ -814,7 +843,7 @@ sub encode_eibd($)
     @data = (0x0) if(!@data || !defined($data[0])); #make sure data has at least one element
 	#@data = (0x0) if(!(defined @data) || !(defined $data[0])); #make sure data has at least one element
     my $datalen = @data;
-    Log (5,"encode_eibd dst: $mref->{'dst'} apci: $APCI datalen: $datalen data: @data");
+    Log (5,"encode_eibd: dst: $mref->{'dst'} apci: $APCI datalen: $datalen data: @data");
     @msg = (
 	    tul_hex2addr( $mref->{'dst'}), 	# Destination address
 	    0x0 | ($APCI >> 2), 	# TPDU type, Sequence no, APCI (msb)
@@ -859,11 +888,11 @@ sub decode_tpuart($)
 	#if(($ctrl & 0xB0)!=0xB0)
     if(($ctrl & 0x90)!=0x90)
     {
-		Log (3,"Control Byte " . sprintf("0x%02x",$ctrl) . " does not match expected mask 2x1001nnnn");
+		Log (3,"decode_tpuart: Control Byte " . sprintf("0x%02x",$ctrl) . " does not match expected mask 2x1001nnnn");
     	return undef;
     }
 
-   Log (5,"msg cmd: " . sprintf("0x%02x",$cmd) ." datalen: $len");
+   Log (5,"decode_tpuart: msg cmd: " . sprintf("0x%02x",$cmd) ." datalen: $len");
    
    my $apci = ($cmd >> 6) & 0x0F;
    if($len == 2) 
@@ -871,7 +900,7 @@ sub decode_tpuart($)
    	$bytes = pack("C",$cmd & 0x3F);
    }
 
-   Log (5,"msg cmd: " . sprintf("0x%02x",$cmd) ." datalen: $len apci: $apci");
+   Log (5,"decode_tpuart: msg cmd: " . sprintf("0x%02x",$cmd) ." datalen: $len apci: $apci");
    
     my %msg;
     my @data;
@@ -889,7 +918,7 @@ sub decode_tpuart($)
 
     @data = unpack ("C" . length($bytes), $bytes);
     my $datalen = @data;
-    Log (5, "decode_tpuart byte len: " . length($bytes) . " array size: $datalen");
+    Log (5, "decode_tpuart: decode_tpuart byte len: " . length($bytes) . " array size: $datalen");
     
     $msg{'data'} = \@data;
     return \%msg;
@@ -906,18 +935,18 @@ sub encode_tpuart($)
     $APCI = $apcivalues{$mref->{'type'}};
     if (!(defined $APCI)) 
 	{
-		Log (3,"Bad EIB message type $mref->{'type'}\n");
+		Log (3,"encode_tpuart: Bad KNX message type $mref->{'type'}\n");
 		return;
     }
     @data = @{$mref->{'data'}};
     my $datalen = @data;
     if($datalen > 14)
     {
-  		Log (3,"Bad EIB message length $datalen\n");
+  		Log (3,"encode_tpuart: Bad KNX message length $datalen\n");
 		return;
    	
     }
-    Log (5,"encode_tpuart dst: $mref->{'dst'} apci: $APCI datalen: $datalen data: @data");
+    Log (5,"encode_tpuart: dst: $mref->{'dst'} apci: $APCI datalen: $datalen data: @data");
     @msg = (
     	0xBC, # EIB ctrl byte
 		tul_hex2addr($mref->{'src'}), # src address    	
@@ -970,6 +999,10 @@ sub openGroupSocket($)
 	{
 	    my @msg = (0x0026,0x0000,0x00);			# EIB_OPEN_GROUPCON
 	    sendRequest ($hash, pack "nnC" ,@msg);
+# docM 2017-11-06
+		use IO::Select;
+		goto error unless (IO::Select->new($hash->{TCPDev})->can_read(10)); 
+# /docM		
 	    goto error unless my $answer = getRequest($hash);
 	    my $head = unpack ("n", $answer);
 	    goto error unless $head == 0x0026;
@@ -978,7 +1011,14 @@ sub openGroupSocket($)
 	return 1;
 
   error:
-    print "openGroupSocket failed\n";
+  
+  Log (0,"openGroupSocket: failed\n");
+ 
+# docM 2017-11-05
+# removed print 
+#    print "openGroupSocket failed\n";
+# /docM	
+
     return undef;
 }
 
@@ -1019,12 +1059,12 @@ sub purgeReceiverBuf($)
 	my ($hash) = @_;
 	if($hash->{DevType} eq 'TPUART')
 	{
-	  Log (5,"purging receiver buffer ");
+	  Log (5,"purgeReceiverBuf: purging...");
 	  my $data = undef;
 	  do
 	  {
 	    my(undef,$data) =  $hash->{USBDev}->read(100);
-	    Log (5,"purging packet: ". unpack("H*",$data) . "\n") if(defined($data) and length($data)>0);
+	    Log (5,"purgeReceiverBuf: purging packet: ". unpack("H*",$data) . "\n") if(defined($data) and length($data)>0);
 	  } while(defined($data) and length($data)>0)
 	}
 }
@@ -1035,13 +1075,13 @@ sub getRequestFixLength($$)
 	
 	if($hash->{DevType} eq 'TPUART')
 	{
-		Log (5,"waiting to receive $len bytes ...");
+		Log (5,"getRequestFixLength: waiting to receive $len bytes ...");
 		my $buf = "";
 		while(length($buf)<$len)
 		{
 			#select(undef,undef,undef,0.5);
 			my (undef,$data) =  $hash->{USBDev}->read($len-length($buf));
-	    	Log (5,"Received fixlen packet: ". unpack("H*",$data) . "\n") if(defined($data) and length($data)>0);
+	    	Log (5,"getRequestFixLength: Received fixlen packet: ". unpack("H*",$data) . "\n") if(defined($data) and length($data)>0);
 				
 			$buf .= $data if(defined($data));
 			#Log (5,"buf len: " . length($buf) . " expected: $len");
@@ -1056,10 +1096,10 @@ sub getRequestFixLength($$)
 			$hash->{PARTIAL} .= $remainpart;
 			$buf = substr($buf,0,$len);
 			
-			Log (5,"we got too much.. buf(" .unpack("H*",$buf).") remainingpart(" .unpack("H*",$remainpart).")");
+			Log (5,"getRequestFiLength: we got too much.. buf(" .unpack("H*",$buf).") remainingpart(" .unpack("H*",$remainpart).")");
 		}
 		
-		Log (5,"getRequest len: $len packet: ". unpack("H*",$buf) . "\n");
+		Log (5,"getRequestFixLength: len: $len packet: ". unpack("H*",$buf) . "\n");
 		return $buf;
 	}
 	
@@ -1093,7 +1133,7 @@ sub getGroup($)
 	    	my $data = getRequestFixLength($hash,$reqlen-length($buf)) if($reqlen>length($buf));
 	    	if(length($buf)==0 && (!defined($data)||length($data)==0))
 	    	{
-	    		Log (5,"read fix length delivered no data.");
+	    		Log (5,"getGroup: read fix length delivered no data.");
 	    		return undef;
 	    	}
 	    	$buf .= $data if(defined($data));
@@ -1104,7 +1144,7 @@ sub getGroup($)
 	    	{
 	    		$buf = substr($buf,1);
 	    		$hash->{PARTIAL} = $buf;
-	    		Log (5,"TPUART RSP " . sprintf("0x%02x",$ctrl) ." ignored.");
+	    		Log (5,"getGroup: TPUART RSP " . sprintf("0x%02x",$ctrl) ." ignored.");
 	    		return undef;
 	    	}
 	    	
@@ -1112,7 +1152,7 @@ sub getGroup($)
 	    	{
 	    		my $routingcnt = unpack("xxxxxC", $buf);
 	    		$reqlen = ($routingcnt & 0x0F)+8;
-	    		Log (5,"receiving telegram with len: $reqlen");
+	    		Log (5,"getGroup: receiving telegram with len: $reqlen");
 	    	}
 			
 			
@@ -1124,8 +1164,8 @@ sub getGroup($)
 		}
 		while(!defined($telegram));
 	    
-	    Log (5, "Telegram: (".length($telegram)."): " . unpack("H*",$telegram));
-	    Log (5, "Buf: (".length($buf)."): " . unpack("H*",$buf));
+	    Log (5, "getGroup: Telegram: (".length($telegram)."): " . unpack("H*",$telegram));
+	    Log (5, "getGroup: Buf: (".length($buf)."): " . unpack("H*",$buf));
 	    
 	    $hash->{PARTIAL} = $buf;	
 	    my $msg = decode_tpuart($telegram);
@@ -1144,11 +1184,12 @@ sub getGroup($)
 	    return $msg;
 	}
 	
-	Log (2,"DevType $hash->{DevType} not supported for getGroup\n");
+	Log (2,"GetGroup: DevType $hash->{DevType} not supported for getGroup\n");
 	return undef;
 	
 	error:
-    print "seems like eibd not connected\n";
+	
+	Log (2,"GetGroup: seems like knxd not connected\n");
     return undef;  	    
 }
 
@@ -1164,21 +1205,25 @@ sub getRequest($)
 	    goto error unless sysread($hash->{TCPDev}, $data, 2);
 	    my $size = unpack ("n", $data);
 	    goto error unless sysread($hash->{TCPDev}, $data, $size);
-	    Log (5,"Received packet: ". unpack("H*",$data) . "\n");
+	    Log (5,"getRequest: Received packet: ". unpack("H*",$data) . "\n");
 	    return $data;
 	}
 	elsif($hash->{USBDev}) {
     	my $data = $hash->{USBDev}->input();
-	    Log (5,"Received packet: ". unpack("H*",$data) . "\n") if(defined($data) and length($data)>0);
+	    Log (5,"getRequest: Received packet: ". unpack("H*",$data) . "\n") if(defined($data) and length($data)>0);
     	return $data;
 	}
 	
-	Log (1,"TUL $hash->{NAME}: can not select a source for reading data.");
+	Log (1,"getRequest: TUL $hash->{NAME}: can not select a source for reading data.");
 	return undef;
 	
   error:
-    printf "eibd communication failed\n";
-    return undef;
+# docM 2017-11-05 remove print  
+#    printf "eibd communication failed\n";
+# /docM
+
+  Log (2,"getRequest: communication to knxd failed\n");
+  return undef;
 	
 }
 
@@ -1203,7 +1248,7 @@ sub sendRequest($$)
 	}
 	else
 	{
-		Log (2,"TUL $hash->{NAME}: No known physical protocoll defined.");
+		Log (2,"sendRequest: TUL $hash->{NAME}: No known physical protocoll defined.");
 		return undef;
 	}
 	return 1;
