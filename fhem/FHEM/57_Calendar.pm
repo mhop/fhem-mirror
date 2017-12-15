@@ -42,8 +42,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 # http://forum.fhem.de/index.php?topic=18707
 # http://forum.fhem.de/index.php?topic=15827
 #
-# *** Potential future extensions: 
-# 
+# *** Potential future extensions:
+#
 # sequence of events fired sorted by time
 # http://forum.fhem.de/index.php?topic=29112
 #
@@ -65,58 +65,58 @@ https://tools.ietf.org/html/rfc5545
 Data structures
 ---------------
 
-We call a set of calendar events (short: events) a series, even for sets 
-consisting only of a single event. A series may consist of only one single 
-event, a series of regularly reccuring events and reccuring events with 
-exceptions. A series is identified by a UID. 
+We call a set of calendar events (short: events) a series, even for sets
+consisting only of a single event. A series may consist of only one single
+event, a series of regularly reccuring events and reccuring events with
+exceptions. A series is identified by a UID.
 
 
 *** VEVENT record, class ICal::Entry
 
 In the iCalendar, a series is represented by one or more VEVENT records.
 
-The unique key for a VEVENT record is UID, RECURRENCE-ID (3.8.4.4, p. 112) and 
-SEQUENCE (3.8.7.4, p. 138). 
+The unique key for a VEVENT record is UID, RECURRENCE-ID (3.8.4.4, p. 112) and
+SEQUENCE (3.8.7.4, p. 138).
 
 The internal primary key for a VEVENT is ID.
 
-FHEM keeps a set of VEVENT records (record set). When the calendar is updated, 
-a new record set is retrieved from the iCalendar and updates the old record set 
+FHEM keeps a set of VEVENT records (record set). When the calendar is updated,
+a new record set is retrieved from the iCalendar and updates the old record set
 to form the resultant record set.
 
 A record in the resultant record set can be in exactly one of these states:
-- deleted:  
+- deleted:
             a record from the old record set for which no record with the same
             (UID, RECURRENCE-ID) was in the new record set.
 - new:
-            a record from the new record set for which no record with same 
+            a record from the new record set for which no record with same
             (UID, RECURRENCE-ID) was in the old record set.
 - changed-old:
             a record from the old record set for which a record with the same
-            (UID, RECURRENCE-ID) but different SEQUENCE was in the new record 
-            set. 
+            (UID, RECURRENCE-ID) but different SEQUENCE was in the new record
+            set.
 - changed-new:
             a record from the new record set for which a record with the same
-            (UID, RECURRENCE-ID) but different SEQUENCE was in the old record 
+            (UID, RECURRENCE-ID) but different SEQUENCE was in the old record
             set.
 - known:
-            a record with this (UID, RECURRENCE-ID, SEQUENCE) was both in the 
+            a record with this (UID, RECURRENCE-ID, SEQUENCE) was both in the
             old and in the new record set and both records have the same
             LAST-MODIFIED. The record from the old record set was
             kept and the record from the new record set was discarded.
 - modified-new:
-            a record with this (UID, RECURRENCE-ID, SEQUENCE) was both in the 
-            old and in the new record set and both records differ in 
+            a record with this (UID, RECURRENCE-ID, SEQUENCE) was both in the
+            old and in the new record set and both records differ in
             LAST-MODIFIED. This is the record from the new record set.
 - modified-old:
-            a record with this (UID, RECURRENCE-ID, SEQUENCE) was both in the 
-            old and in the new record set and both records differ in  
+            a record with this (UID, RECURRENCE-ID, SEQUENCE) was both in the
+            old and in the new record set and both records differ in
             LAST-MODIFIED. This is the record from the old record set.
 
 Records in states modified-old and changed-old refer to the corresponding records
 in states modified-new and change-new, and vice versa.
 
-Records in state deleted, modified-old or changed-old are removed upon 
+Records in state deleted, modified-old or changed-old are removed upon
 the next update. They are said to be "obsolete".
 
 A record is said to be "recurring" if it has a RRULE property.
@@ -131,23 +131,23 @@ Each records has a set of events attached.
 
 Events are attached to single records (VEVENTs).
 
-The uid of the event is the UID of the record with all non-alphanumerical 
+The uid of the event is the UID of the record with all non-alphanumerical
 characters removed.
 
 At a given point in time t, an event is in exactly one of these modes:
 - upcoming:
             the start time of the event is in the future
 - alarm:
-            alarm time <= t < start time for any of the alarms for the event 
+            alarm time <= t < start time for any of the alarms for the event
 - start:
             start time <= t <= end time of the event
 - end:
             end time < t
-            
+
 An event is said to be "changed", when its mode has changed during the most
 recent run of calendar event processing.
 
-An event is said to be "hidden", when 
+An event is said to be "hidden", when
 - it was in mode end and end time of the event < t - horizonPast, or
 - it was in mode upcoming and start time of the event > t + horizonFuture
 at the most recent run of calendar event processing. horizonPast defaults to 0,
@@ -155,57 +155,57 @@ horizonFuture defaults to 366 days.
 
 
 
-Processing of iCalender
+Processing of iCalendar
 -----------------------
 
 *** Initial situation:
-We have an old record set of VEVENTs. It is empty on a restart of FHEM or upon 
+We have an old record set of VEVENTs. It is empty on a restart of FHEM or upon
 issueing the "set ... reload" command.
 
 *** Step 1: Retrieval of new record set (Calendar_GetUpdate)
 1) The iCalendar is downloaded from its location into FHEM memory.
 2) It is parsed into a new record set of VEVENTs.
 
-*** Step 2: Update of internal record set (Calendar_UpdateCalendar) 
-1) All records in the old record set that are in state deleted or obsolete are 
+*** Step 2: Update of internal record set (Calendar_UpdateCalendar)
+1) All records in the old record set that are in state deleted or obsolete are
 removed.
 2) All states of all records in the old record set are set to blank.
-3) The old and new record sets are merged to create a resultant record set 
+3) The old and new record sets are merged to create a resultant record set
 according to the following procedure:
 
-If the new record set contains a record with the same (UID, RECURRENCE-ID, 
+If the new record set contains a record with the same (UID, RECURRENCE-ID,
 SEQUENCE) as a record in the old record set:
   - if the two records differ in LAST-MODIFIED, then both records
-    are kept. The state of the record from the old record set is set to 
-    modified-old, the state of the record from the new record set is set to 
+    are kept. The state of the record from the old record set is set to
+    modified-old, the state of the record from the new record set is set to
     modified-new.
   - else the record from the old record set is kept, state set to known, and the
     record from the new record set is discarded.
 
 If the new record set contains a record with the same (UID, RECURRENCE-ID) but
   different SEQUENCE as a record in the old record set, then both records are
-  kept. The state of the record from the new record set is set to changed-new, 
+  kept. The state of the record from the new record set is set to changed-new,
   and the state of record from the old record set is set to changed-old.
 
 If the new record set contains a record that differs from any record in the old
 record set by both UID and RECURRENCE-ID, the record from the new record set
 id added to the resultant record set and its state is set to new.
 
-4) The state of all records in the old record set that have not been touched 
+4) The state of all records in the old record set that have not been touched
 in 3) are set to deleted.
 
 Notes:
-- This procedure favors records from the new record set over records from the 
+- This procedure favors records from the new record set over records from the
   old record set, even if the SEQUENCE is lower or LAST-MODIFIED is earlier.
 - DTSTAMP is the time stamp of the creation of the iCalendar entry. For Google
   Calendar it is the time stamp of the latest retrieval of the calendar.
 
 
 *** Step 3: Update of calendar events (Calendar_UpdateCalendar)
-We walk over all records and treat the corresponding events according to 
+We walk over all records and treat the corresponding events according to
 the state of the record:
 
-- deleted, changed-old, modified-old: 
+- deleted, changed-old, modified-old:
             all events are removed
 - new, changed-new, modified-new:
             all events are removed and events are created anew
@@ -214,23 +214,23 @@ the state of the record:
 
 No events older than 400 days or more than 400 days in the future will be
 created.
-            
+
 Creation of events in a series works as follows:
 
 If we have several events in a series, the main series has the RRULE tag and
-the exceptions have RECURRENCE-IDs. The RECURRENCE-ID match the start 
-dates in the series created from the RRULE that need to be exempted. We 
+the exceptions have RECURRENCE-IDs. The RECURRENCE-ID match the start
+dates in the series created from the RRULE that need to be exempted. We
 therefore collect all events from records with same UID and RECURRENCE-ID set
 as they form the list of records with the exceptions for the UID.
 
 Before the regular creation is done, events for RDATEs are added as long as
-an RDATE is not superseded by an EXDATE. An RDATE takes precedence over a 
+an RDATE is not superseded by an EXDATE. An RDATE takes precedence over a
 regularly created recurring event.
 
 Starting with the start date of the series, one event is created after the
 other. Creation stops when the series ends or when an event more than 400 days
-in the future has been created. If the event is in the list of exceptions 
-(either defined by other events with same UID and a RECURRENCE-ID or by the 
+in the future has been created. If the event is in the list of exceptions
+(either defined by other events with same UID and a RECURRENCE-ID or by the
 EXDATE property), it is not added.
 
 What attributes are recognized and which of these are honored or ignored?
@@ -265,8 +265,8 @@ For all of the above:
 - state
 
 
-Note: the state... readings from the previous version of this module (2015 and 
-earlier) are not available any more. 
+Note: the state... readings from the previous version of this module (2015 and
+earlier) are not available any more.
 
 
 
@@ -274,7 +274,7 @@ Processing of calendar events
 -----------------------------
 Calendar_CheckTimes
 
-In case of a series of calendar events, several calendar events may exist for 
+In case of a series of calendar events, several calendar events may exist for
 the same uid which may be in different modes. Therefore only the most
 interesting mode is chosen over any other mode of any calendar event with
 the same uid. The most interesting mode is the first applicable from the
@@ -301,19 +301,19 @@ Note: there is no colon in these FHEM events.
 Program flow
 ------------
 
-Calendar_Initialize sets the Calendar_Notify to watch for notifications. 
+Calendar_Initialize sets the Calendar_Notify to watch for notifications.
 Calendar_Notify acts on the INITIALIZED and REREADCFG events by starting the
-    timer to call Calendar_Wakeup between 10 and 29 seconds after the 
+    timer to call Calendar_Wakeup between 10 and 29 seconds after the
     notification.
 Calendar_Wakeup starts a processing run.
     It sets the current time t as baseline for process.
-    If the time for the next update has been reached, 
+    If the time for the next update has been reached,
         Calendar_GetUpdate is called
     else
         Calendar_CheckTimes
         Calendar_RearmTimer
     are called.
-Calendar_GetUpdate retrieves the  iCal file. If the source is url, this is 
+Calendar_GetUpdate retrieves the  iCal file. If the source is url, this is
     done asynchronously. Upon successfull retrieval of the iCal file, we
     continue with Calendar_ProcessUpdate.
 Calendar_ProcessUpdate calls
@@ -321,14 +321,14 @@ Calendar_ProcessUpdate calls
         Calendar_CheckTimes
         Calendar_RearmTimer
     in sequence.
-Calendar_UpdateCalendar updates the VEVENT records in the 
+Calendar_UpdateCalendar updates the VEVENT records in the
     $hash->{".fhem"}{vevents} hash and creates the associated calendar events.
-Calendar_CheckTimes checks for a mode change of the calendar events and 
+Calendar_CheckTimes checks for a mode change of the calendar events and
     creates the readings and FHEM events.
-Calendar_RearmTimer sets the timer to call Calendar_Wakeup to time of the 
+Calendar_RearmTimer sets the timer to call Calendar_Wakeup to time of the
     next mode change or update, whatever comes earlier.
-    
-    
+
+
 What's new?
 -----------
 This module version replaces the 2015 version that has been widely. Noteworthy
@@ -336,47 +336,47 @@ changes
 - No more state... readings; "all" reading has been removed as well.
 - The mode... readings (modeAlarm, modeAlarmOrStart, etc.) are deprecated
   and will be removed in a future version. Use the mode=<regex> filter instead.
-- Handles recurring calendar events with out-of-order events and exceptions 
+- Handles recurring calendar events with out-of-order events and exceptions
   (EXDATE).
-- Keeps ALL calendar events within plus/minus 400 days from the date of the 
-  in FHEM: this means that you can have more than one calendar event with the 
+- Keeps ALL calendar events within plus/minus 400 days from the date of the
+  in FHEM: this means that you can have more than one calendar event with the
   same UID.
-- You can restrict visible calendar events with attributes hideLaterThan, 
+- You can restrict visible calendar events with attributes hideLaterThan,
   hideOlderThan.
 - Nonblocking retrieval of calendar from URL.
-- New get commands: 
+- New get commands:
     get <name> vevents
     get <name> vcalendar
     get <name> <format> <mode>
     get <name> <format> mode=<regex>
     get <name> <format> uid=<regex>
-- The get commands 
+- The get commands
     get <name> <format> ...
-  may not work as before since several calendar events may exist for a 
+  may not work as before since several calendar events may exist for a
   single UID, particularly the get command
     get <name> <format> all
   show all calendar events from a series (past, current, and future); you
   probably want to replace "all" by "next":
     get <name> <format> next
-  to get only the first (not past but current or future) calendar event from 
-  each series. 
+  to get only the first (not past but current or future) calendar event from
+  each series.
 - Migration hints:
-  
+
   Replace
     get <name> <format> all
   by
     get <name> <format> next
-    
+
   Replace
     get <name> <format> <uid>
   by
     get <name> <format> uid=<uid> 1
-    
+
   Replace
     get <name> <format> modeAlarmOrStart
   by
     get <name> <format> mode=alarm|start
-  
+
 - The FHEM events created for mode changes of single calendar events have been
   amended:
     changed: UID <mode>
@@ -384,7 +384,7 @@ changes
   <mode> is the current mode of the calendar event after the change. It is
   highly advisable to trigger actions based on these FHEM events instead of
   notifications for changes of the mode... readings.
-  
+
 =cut
 
 #####################################
@@ -461,7 +461,7 @@ sub lastModified {
 
 sub modeChanged {
   my ($self)= @_;
-  return (($self->{_mode} ne $self->{_previousMode}) and  
+  return (($self->{_mode} ne $self->{_previousMode}) and
          ($self->{_previousMode} ne "undefined")) ? 1 : 0;
 }
 
@@ -592,7 +592,7 @@ sub isSeries {
 sub isAfterSeriesEnded {
   my ($self,$t) = @_;
   #main::Debug "    isSeries? " . $self->isSeries();
-  return 0 unless($self->isSeries()); 
+  return 0 unless($self->isSeries());
   #main::Debug "    until= " . $self->{until};
   return 0 unless(exists($self->{until}));
   #main::Debug "    has until!";
@@ -624,7 +624,7 @@ sub nextTime {
 #   main::Debug "Calendar: times[0] " . main::FmtDateTime($times[0]);
 #   main::Debug "Calendar: times[1] " . main::FmtDateTime($times[1]);
 #   main::Debug "Calendar: times[2] " . main::FmtDateTime($times[2]);
-  
+
   if(@times) {
     return $times[0];
   } else {
@@ -634,7 +634,7 @@ sub nextTime {
 
 #####################################
 #
-# Events 
+# Events
 #
 #####################################
 
@@ -723,8 +723,8 @@ sub values($$) {
   return $self->{properties}{$key}{VALUES};
 }
 
-# true, if the property exists at both entries and have the same value 
-# or neither entry has this property 
+# true, if the property exists at both entries and have the same value
+# or neither entry has this property
 sub sameValue($$$) {
   my ($self,$other,$key)= @_;
   my $value1= $self->hasKey($key) ? $self->value($key) : "";
@@ -844,22 +844,22 @@ sub clearReferences($) {
 #   my($self)= @_;
 #   return $self->{tags};
 # }
-# 
+#
 # sub clearTags($) {
 #   my($self)= @_;
 #   $self->{tags}= [];
 # }
-# 
+#
 # sub tagAs($$) {
 #   my ($self, $tag)= @_;
 #   push @{$self->{tags}}, $tag unless($self->isTaggedAs($tag));
 # }
-# 
+#
 # sub isTaggedAs($$) {
 #   my ($self, $tag)= @_;
 #   return grep { $_ eq $tag } @{$self->{tags}} ? 1 : 0;
 # }
-# 
+#
 # sub numTags($) {
 #   my ($self)= @_;
 #   return scalar @{$self->{tags}};
@@ -891,10 +891,10 @@ sub addproperty($$) {
   }
   return unless($key);
   #main::Debug "addproperty for key $key";
-  
+
   # ignore some properties
   # commented out: it is faster to add the property than to do the check
-  # return if(($key eq "ATTENDEE") or ($key eq "TRANSP") or ($key eq "STATUS")); 
+  # return if(($key eq "ATTENDEE") or ($key eq "TRANSP") or ($key eq "STATUS"));
   return if(substr($key,0,2) eq "^X-");
 
   if(($key eq "RDATE") or ($key eq "EXDATE")) {
@@ -920,12 +920,12 @@ sub addproperty($$) {
 
 sub parse($$) {
   my ($self,$ics)= @_;
-  
+
   # This is the proper way to do it, with \R corresponding to (?>\r\n|\n|\x0b|\f|\r|\x85|\x2028|\x2029)
   #      my @ical= split /\R/, $ics;
-  # Tt does not treat some unicode emojis correctly, though. 
+  # Tt does not treat some unicode emojis correctly, though.
   # We thus go for the the DOS/Windows/Unix/Mac classic variants.
-  # Suggested reading: 
+  # Suggested reading:
   # http://stackoverflow.com/questions/3219014/what-is-a-cross-platform-regex-for-removal-of-line-breaks
   my @ical= split /(?>\r\n|[\r\n])/, $ics;
   return $self->parseSub(0, \@ical);
@@ -982,7 +982,7 @@ sub numEvents($) {
 
 sub addEvent($$) {
   my ($self, $event)= @_;
-  $self->{events}->addEvent($event); 
+  $self->{events}->addEvent($event);
 }
 
 sub skippedEvents($) {
@@ -1002,16 +1002,16 @@ sub numSkippedEvents($) {
 
 sub addSkippedEvent($$) {
   my ($self, $event)= @_;
-  $self->{skippedEvents}->addEvent($event); 
+  $self->{skippedEvents}->addEvent($event);
 }
 
 
 
 sub createEvent($) {
   my ($self)= @_;
-  
+
   my $event= Calendar::Event->new();
-  
+
   $event->{uid}= $self->value("UID");
   $event->{uid}=~ s/\W//g; # remove all non-alphanumeric characters, this makes life easier for perl specials
 
@@ -1060,7 +1060,7 @@ sub d($$) {
   my ($self, $d)= @_;
 
   #main::Debug "Duration $d";
-  
+
   my $sign= 1;
   my $t= 0;
 
@@ -1100,18 +1100,18 @@ sub dt($$$$) {
 
 sub makeEventDetails($$) {
   my ($self, $event)= @_;
-  
+
   $event->{summary}= $self->valueOrDefault("SUMMARY", "");
   $event->{location}= $self->valueOrDefault("LOCATION", "");
   $event->{description}= $self->valueOrDefault("DESCRIPTION", "");
   $event->{categories}= $self->valueOrDefault("CATEGORIES", "");
-  
+
   return $event;
 }
 
 sub makeEventAlarms($$) {
   my ($self, $event)= @_;
-  
+
   # alarms
   my @valarms= grep { $_->{type} eq "VALARM" } @{$self->{entries}};
   my @alarmtimes= sort map { $self->dt($event->{start}, $_->value("TRIGGER"), $_->parts("TRIGGER")) } @valarms;
@@ -1120,7 +1120,7 @@ sub makeEventAlarms($$) {
   } else {
     $event->{alarm}= undef;
   }
-  
+
   return $event;
 }
 
@@ -1137,7 +1137,7 @@ sub DSTOffset($$) {
 # This function adds $n times $seconds to $t1 (seconds from the epoch).
 # A correction of 3600 seconds (one hour) is applied if and only if
 # one of $t1 and $t1+$n*$seconds falls into wintertime and the other
-# into summertime. Thus, e.g., adding a multiple of 24*60*60 seconds 
+# into summertime. Thus, e.g., adding a multiple of 24*60*60 seconds
 # to 5 o'clock always gives 5 o'clock and not 4 o'clock or 6 o'clock
 # upon a change of summertime to wintertime or vice versa.
 
@@ -1166,15 +1166,15 @@ sub plusNMonths($$) {
 # 3. parameter: byDay	(string with byDay-value(s), e.g. "FR" or "4SA" or "-1SU" or "4SA,4SU" (not sure if this is possible, i just take the first byDay))
 sub getNextMonthlyDateByDay($$$) {
 	my ( $ipTimeLocal, $ipByDays, $ipInterval )= @_;
-	
+
 	my ($lSecond, $lMinute, $lHour, $lDay, $lMonth, $lYear, $lWday, $lYday, $lIsdst )= localtime( $ipTimeLocal );
- 
+
 	#main::Debug "getNextMonthlyDateByDay($ipTimeLocal, $ipByDays, $ipInterval)";
- 
+
 	my @lByDays = split(",", $ipByDays);
 	my $lByDay = $lByDays[0];	#only get first day element within string
 	my $lByDayLength = length( $lByDay );
-	
+
 	my $lDayStr;		# which day to set the date
 	my $lDayInterval;	# e.g. 2 = 2nd $lDayStr of month or -1 = last $lDayStr of month
 	if ( $lByDayLength > 2 ) {
@@ -1187,7 +1187,7 @@ sub getNextMonthlyDateByDay($$$) {
 
         my @weekdays = qw(SU MO TU WE TH FR SA);
         my ($lDayOfWeek)= grep { $weekdays[$_] eq $lDayStr } 0..$#weekdays;
-	
+
 	# get next day from beginning of the month, e.g. "4FR" = 4th friday of the month
 	my $lNextMonth;
 	my $lNextYear;
@@ -1239,10 +1239,10 @@ sub getNextMonthlyDateByDay($$$) {
 		$lDaysToAddOrSub += ( 7 * ( abs( $lDayInterval ) - 1 ) );
 
 		$lNewTime = plusNSeconds( $lLastOfNextMonth, -24*60*60*$lDaysToAddOrSub, 1);
-	}	
+	}
 	#main::Debug "lByDay = $lByDay, lByDayLength = $lByDayLength, lDay = $lDay, lDayInterval = $lDayInterval, lDayOfWeek = $lDayOfWeek, lFirstOfNextMonth = $lFirstOfNextMonth, lNextYear = $lNextYear, lNextMonth = $lNextMonth";
 	#main::Debug main::FmtDateTime($lNewTime);
- 
+
 	return $lNewTime;
 }
 
@@ -1251,19 +1251,19 @@ use constant eventsLimitPlus  =>  34560000; # +400d
 
 sub addEventLimited($$$) {
     my ($self, $t, $event)= @_;
- 
+
     return -1 if($event->start()< $t+eventsLimitMinus);
     return  1 if($event->start()> $t+eventsLimitPlus);
     #main::Debug "  addEvent: " . $event->asFull();
     $self->addEvent($event);
     return  0;
 
-}  
-  
+}
+
 sub createSingleEvent($$$) {
 
     my ($self, $nextstart, $onCreateEvent)= @_;
-    
+
     my $event= $self->createEvent();
     my $start= $self->tm($self->value("DTSTART"));
     $nextstart= $start unless(defined($nextstart));
@@ -1277,11 +1277,11 @@ sub createSingleEvent($$$) {
     }
     $self->makeEventDetails($event);
     $self->makeEventAlarms($event);
-    
+
     #main::Debug "createSingleEvent DTSTART=" . $self->value("DTSTART") . " DTEND=" . $self->value("DTEND");
     #main::Debug "createSingleEvent Start " . main::FmtDateTime($event->{start});
     #main::Debug "createSingleEvent End   " . main::FmtDateTime($event->{end});
-    
+
     # plug-in
     if(defined($onCreateEvent)) {
         my $e= $event;
@@ -1292,17 +1292,17 @@ sub createSingleEvent($$$) {
         } else {
             $event= $e;
         }
-    }    
-    
+    }
+
     return $event;
 }
 
 sub createEvents($$$%) {
   my ($self, $t, $onCreateEvent, %vevents)= @_;
-  
+
   $self->clearEvents();
   $self->clearSkippedEvents();
-  
+
   if($self->isRecurring()) {
         #
         # recurring event creates a series
@@ -1318,7 +1318,7 @@ sub createEvents($$$%) {
             } else {
                 #main::Debug "keyword $k in RRULE $rrule has value $r{$k}";
             }
-        }    
+        }
 
         # Valid values for freq: SECONDLY, MINUTELY, HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY
         my $freq =  $r{"FREQ"};
@@ -1326,7 +1326,7 @@ sub createEvents($$$%) {
         # According to RFC, interval defaults to 1
         my $interval = exists($r{"INTERVAL"}) ? $r{"INTERVAL"} : 1;
         my $until = exists($r{"UNTIL"}) ? $self->tm($r{"UNTIL"}) : 99999999999999999;
-        my $count = exists($r{"COUNT"}) ? $r{"COUNT"} : 999999;  
+        my $count = exists($r{"COUNT"}) ? $r{"COUNT"} : 999999;
         my $bymonthday = $r{"BYMONTHDAY"} if(exists($r{"BYMONTHDAY"})); # stored but ignored
         my $byday = exists($r{"BYDAY"}) ? $r{"BYDAY"} : "";
         #main::Debug "byday is $byday";
@@ -1334,11 +1334,11 @@ sub createEvents($$$%) {
         my $wkst = $r{"WKST"} if(exists($r{"WKST"})); # stored but ignored
 
         my @weekdays = qw(SU MO TU WE TH FR SA);
-        
-        
+
+
         #main::Debug "createEvents: " . $self->asString();
 
-        # 
+        #
         # we first add all RDATEs
         #
         if($self->hasKey('RDATE')) {
@@ -1357,30 +1357,30 @@ sub createEvents($$$%) {
                 }
                 if(!$skip) {
                     # add event
-                    # and return if we exceed storage limit 
+                    # and return if we exceed storage limit
                     $event->setNote("RDATE: $rdate");
-                    $self->addEventLimited($t, $event); 
+                    $self->addEventLimited($t, $event);
                 }
             }
         }
-        
+
         #
         # now we build the series
         #
-        
+
         # first event in the series
         my $event= $self->createSingleEvent(undef, $onCreateEvent);
         my $n= 0;
-        
-        
+
+
         while(1) {
             my $skip= 0;
-            
+
             # check if superseded by out-of-series event
             if($self->hasReferences()) {
                 foreach my $id (@{$self->references()}) {
                     my $vevent= $vevents{$id};
-                    my $recurrenceid= $vevent->value("RECURRENCE-ID"); 
+                    my $recurrenceid= $vevent->value("RECURRENCE-ID");
                     my $originalstart= $vevent->tm($recurrenceid);
                     if($originalstart == $event->start()) {
                         $event->setNote("RECURRENCE-ID: $recurrenceid");
@@ -1390,7 +1390,7 @@ sub createEvents($$$%) {
                     }
                 }
             }
-           
+
             # RFC 5545 p. 120
             # The final recurrence set is generated by gathering all of the
             # start DATE-TIME values generated by any of the specified "RRULE"
@@ -1401,7 +1401,7 @@ sub createEvents($$$%) {
             # "RRULE").  Where duplicate instances are generated by the "RRULE"
             # and "RDATE" properties, only one recurrence is considered.
             # Duplicate instances are ignored.
-            
+
             # check if excluded by EXDATE
             if($self->hasKey('EXDATE')) {
                 foreach my $exdate (@{$self->values("EXDATE")}) {
@@ -1426,16 +1426,16 @@ sub createEvents($$$%) {
                     }
                 }
             }
-            
+
             return if($event->{start} > $until); # return if we are after end of series
             if(!$skip) {
                 # add event
-                # and return if we exceed storage limit 
-                return if($self->addEventLimited($t, $event) > 0); 
+                # and return if we exceed storage limit
+                return if($self->addEventLimited($t, $event) > 0);
             }
             $n++;
             return if($n>= $count); # return if we exceeded occurances
-            
+
             # advance to next occurence
             my  $nextstart = $event->{start};
             if($freq eq "SECONDLY") {
@@ -1455,7 +1455,7 @@ sub createEvents($$$%) {
                     # we skip interval-1 weeks
                     $nextstart = plusNSeconds($nextstart, 7*24*60*60, $interval-1);
                     my ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat);
-                    my $preventloop = 0;        
+                    my $preventloop = 0;
                     do {
                         $nextstart = plusNSeconds($nextstart, 24*60*60, 1); # forward day by day
                         ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat) =
@@ -1463,7 +1463,7 @@ sub createEvents($$$%) {
                         #main::Debug "Skip to: start " . $event->ts($nextstart) . " = " . $weekdays[$mwday];
                         $preventloop++;
                         if($preventloop > 7) {
-                            main::Log3 undef, 2, 
+                            main::Log3 undef, 2,
                                 "Calendar: something is wrong for RRULE $rrule in " .
                                 $self->asString();
                             last;
@@ -1492,10 +1492,10 @@ sub createEvents($$$%) {
             }
             # the next event
             $event= $self->createSingleEvent($nextstart, $onCreateEvent);
-            
+
         }
-        
-  
+
+
   } else {
         #
         # single event
@@ -1503,7 +1503,7 @@ sub createEvents($$$%) {
         my $event= $self->createSingleEvent(undef, $onCreateEvent);
         $self->addEventLimited($t, $event);
   }
-        
+
 }
 
 
@@ -1515,7 +1515,7 @@ sub asString($$) {
   $level= "" unless(defined($level));
   my $s= $level . $self->{type};
   $s.= " @" . $self->{ln} if(defined($self->{ln}));
-  $s.= " ["; 
+  $s.= " [";
   $s.= "obsolete, " if($self->isObsolete());
   $s.= $self->state();
   $s.= ", refers to " . $self->counterpart() if($self->hasCounterpart());
@@ -1548,12 +1548,12 @@ sub asString($$) {
     foreach my $event (@{$self->{skippedEvents}}) {
         $s.= "$level  " . $event->asDebug() . "\n";
     }
-  }  
+  }
   my @entries=  @{$self->{entries}};
   for(my $i= 0; $i<=$#entries; $i++) {
     $s.= $entries[$i]->asString($level);
   }
-  
+
   return $s;
 }
 
@@ -1599,9 +1599,9 @@ sub Calendar_Define($$) {
   my $type      = $a[3];
   my $url       = $a[4];
   my $interval  = 3600;
-  
+
   $interval= $a[5] if($#a==5);
-   
+
   $hash->{".fhem"}{type}= $type;
   $hash->{".fhem"}{url}= $url;
   $hash->{".fhem"}{interval}= $interval;
@@ -1610,14 +1610,14 @@ sub Calendar_Define($$) {
   $hash->{".fhem"}{nxtUpdtTs}= 0;
 
   #$attr{$name}{"hideOlderThan"}= 0;
-  
+
   #main::Debug "Interval: ${interval}s";
-  # if initialization is not yet done, we do not wake up at this point already to 
+  # if initialization is not yet done, we do not wake up at this point already to
   # avoid the following race condition:
-  # events are loaded from fhem.save and data are updated asynchronousy from 
+  # events are loaded from fhem.save and data are updated asynchronousy from
   # non-blocking Http get
   Calendar_Wakeup($hash, 0) if($init_done);
-  
+
 
   return undef;
 }
@@ -1634,7 +1634,7 @@ sub Calendar_Undef($$) {
     $subprocess->terminate();
     $subprocess->wait();
   }
-  
+
   return undef;
 }
 
@@ -1643,13 +1643,13 @@ sub Calendar_Undef($$) {
 sub Calendar_Attr(@) {
 
   my ($cmd, $name, @a) = @_;
-  
+
   return undef unless($cmd eq "set");
-  
+
   my $hash= $defs{$name};
-  
+
   return "attr $name needs at least one argument." if(!@a);
-    
+
   my $arg= $a[1];
   if($a[0] eq "onCreateEvent") {
     if($arg !~ m/^{.*}$/s) {
@@ -1657,12 +1657,12 @@ sub Calendar_Attr(@) {
     }
   } elsif($a[0] eq "update") {
     my @args= qw/none sync async/;
-    return "Argument for update must be one of " . join(" ", @args) . 
+    return "Argument for update must be one of " . join(" ", @args) .
       " instead of $arg." unless($arg ~~ @args);
   }
-  
+
   return undef;
- 
+
 }
 
 ###################################
@@ -1681,10 +1681,10 @@ sub Calendar_Notify($$)
   # wait 10 to 29 seconds to avoid congestion due to concurrent activities
   Calendar_DisarmTimer($hash);
   my $delay= 10+int(rand(20));
-  
+
   # delay removed until further notice
   $delay= 2;
-  
+
   Log3 $hash, 5, "Calendar $name: FHEM initialization or rereadcfg triggered update, delay $delay seconds.";
   InternalTimer(time()+$delay, "Calendar_Wakeup", $hash, 0) ;
 
@@ -1697,8 +1697,8 @@ sub Calendar_Set($@) {
 
   my $cmd= $a[1];
   $cmd= "?" unless($cmd);
-  
-  
+
+
   my $t= time();
   # usage check
   if((@a == 2) && ($a[1] eq "update")) {
@@ -1708,7 +1708,7 @@ sub Calendar_Set($@) {
   } elsif((@a == 2) && ($a[1] eq "reload")) {
      Calendar_DisarmTimer($hash);
      Calendar_GetUpdate($hash, $t, 1); # remove all events before update
-     return undef;   
+     return undef;
   } else {
     return "Unknown argument $cmd, choose one of update:noArg reload:noArg";
   }
@@ -1720,7 +1720,7 @@ sub Calendar_Get($@) {
   my ($hash, @a) = @_;
 
   my $t= time();
-  
+
   my $eventsObj= $hash->{".fhem"}{events};
   my @events;
 
@@ -1734,20 +1734,20 @@ sub Calendar_Get($@) {
     Calendar_GetUpdate($hash, $t, 0);
     return undef;
   }
-  
+
   if($cmd eq "reload") {
     # this is the same as set reload for convenience
      Calendar_DisarmTimer($hash);
      Calendar_GetUpdate($hash, $t, 1); # remove all events before update
-     return undef;   
+     return undef;
   }
-  
+
   if($cmd eq "events") {
-  
+
     # see https://forum.fhem.de/index.php/topic,46608.msg397309.html#msg397309 for ideas
     # get myCalendar events filter:mode=alarm|start|upcoming format=custom:{ sprintf("...") } select:series=next,max=8,from=-3d,to=10d
     # attr myCalendar defaultFormat <format>
-  
+
     my @texts;
     my @events= Calendar_GetEvents($hash, $t, undef, undef);
     foreach my $event (@events) {
@@ -1757,14 +1757,14 @@ sub Calendar_Get($@) {
     return join("\n", @texts);
 
   }
-  
+
   my @cmds2= qw/text full summary location description categories alarm start end uid debug/;
   if($cmd ~~ @cmds2) {
 
     return "argument is missing" if($#a < 2);
     my $filter= $a[2];
-    
-    
+
+
     # $reading is alarm, all, changed, start, end, upcoming
     my $filterref;
     my $param= undef;
@@ -1799,25 +1799,25 @@ sub Calendar_Get($@) {
         $filterref= \&filter_uid;
         $param= $a[2];
     }
-        
+
     @events= Calendar_GetEvents($hash, $t, $filterref, $param);
-    
+
     # special treatment for next
     if($filter eq "next") {
         my %uids;  # remember the UIDs
-        
+
         # the @events are ordered by start time ascending
         # they do contain all events that have not ended
-        @events= grep {  
+        @events= grep {
             my $seen= defined($uids{$_->uid()});
             $uids{$_->uid()}= 1;
             not $seen;
         } @events;
-    
+
     }
-    
+
     my @texts;
-    
+
     if(@events) {
       foreach my $event (sort { $a->start() <=> $b->start() } @events) {
         push @texts, $event->uid() if $cmd eq "uid";
@@ -1837,13 +1837,13 @@ sub Calendar_Get($@) {
       my $keep= $a[$keeppos];
       return "Argument $keep is not a number." unless($keep =~ /\d+/);
       $keep= $#texts+1 if($keep> $#texts);
-      splice @texts, $keep if($keep>= 0);  
+      splice @texts, $keep if($keep>= 0);
     }
     return "" if($#texts<0);
     return join("\n", @texts);
-    
+
   } elsif($cmd eq "vevents") {
-  
+
         my %vevents= %{$hash->{".fhem"}{vevents}};
         my $s= "";
         foreach my $key (sort {$a<=>$b} keys %vevents) {
@@ -1852,17 +1852,17 @@ sub Calendar_Get($@) {
             $s .= "\n";
         }
         return $s;
- 
+
   } elsif($cmd eq "vcalendar") {
-  
+
         return undef unless(defined($hash->{".fhem"}{iCalendar}));
         return $hash->{".fhem"}{iCalendar}
- 
+
   } elsif($cmd eq "find") {
 
     return "argument is missing" if($#a != 2);
     my $regexp= $a[2];
-    
+
     my %vevents= %{$hash->{".fhem"}{vevents}};
     my %uids;
     foreach my $id (keys %vevents) {
@@ -1871,15 +1871,15 @@ sub Calendar_Get($@) {
         if(@events) {
             eval {
                 if($events[0]->summary() =~ m/$regexp/) {
-                    $uids{$events[0]->uid()}= 1;    # 
+                    $uids{$events[0]->uid()}= 1;    #
                 }
             }
         }
-        Log3($hash, 2, "Calendar " . $hash->{NAME} . 
+        Log3($hash, 2, "Calendar " . $hash->{NAME} .
             ": The regular expression $regexp caused a problem: $@") if($@);
     }
     return join(";", keys %uids);
-  
+
   } else {
     return "Unknown argument $cmd, choose one of update:noArg reload:noArg find text full summary location description categories alarm start end vcalendar:noArg vevents:noArg";
   }
@@ -1898,7 +1898,7 @@ sub Calendar_Wakeup($$) {
   use constant delta => 5; # avoid waking up again in a few seconds
   if($t>= $hash->{".fhem"}{nxtUpdtTs} - delta) {
     # GetUpdate does CheckTimes and RearmTimer asynchronously
-    Calendar_GetUpdate($hash, $t, $removeall); 
+    Calendar_GetUpdate($hash, $t, $removeall);
   } else {
     Calendar_CheckTimes($hash, $t);
     Calendar_RearmTimer($hash, $t);
@@ -1907,7 +1907,7 @@ sub Calendar_Wakeup($$) {
 
 ###################################
 sub Calendar_RearmTimer($$) {
-  
+
   my ($hash, $t) = @_;
 
   #main::Debug "RearmTimer now " . FmtDateTime($t);
@@ -1923,7 +1923,7 @@ sub Calendar_RearmTimer($$) {
         # invocations for calendar events with the event time
         $nt= $et if(defined($et) && ($et< $nt) && ($et > $t));
       }
-  }    
+  }
 
   $hash->{".fhem"}{nextWakeTs}= $nt;
   $hash->{".fhem"}{nextWake}= FmtDateTime($nt);
@@ -1946,34 +1946,34 @@ sub Calendar_DisarmTimer($) {
 sub Calendar_GetSecondsFromTimeSpec($) {
 
   my ($tspec) = @_;
-  
+
   # days
   if($tspec =~ m/^([0-9]+)d$/) {
     return ("", $1*86400);
   }
-  
+
   # seconds
   if($tspec =~ m/^[0-9]+s?$/) {
     return ("", $tspec);
   }
-  
+
   # D:HH:MM:SS
-  if($tspec =~ m/^([0-9]+):([0-1][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/) { 
+  if($tspec =~ m/^([0-9]+):([0-1][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/) {
     return ("", $4+60*($3+60*($2+24*$1)));
   }
 
-  # HH:MM:SS  
+  # HH:MM:SS
   if($tspec =~ m/^([0-9]+):([0-5][0-9]):([0-5][0-9])$/) { # HH:MM:SS
     return ("", $3+60*($2+(60*$1)));
-  } 
-  
-  # HH:MM 
-  if($tspec =~ m/^([0-9]+):([0-5][0-9])$/) {         
+  }
+
+  # HH:MM
+  if($tspec =~ m/^([0-9]+):([0-5][0-9])$/) {
     return ("", 60*($2+60*$1));
   }
-  
+
   return ("Wrong time specification $tspec", undef);
-  
+
 }
 
 ###################################
@@ -2049,12 +2049,12 @@ sub Calendar_GetEvents($$$$) {
     my ($hash, $t, $filterref, $param)= @_;
     my $name= $hash->{NAME};
     my @result= ();
-    
+
     # time window
     my ($error, $t1, $t2)= (undef, undef, undef);
     my $hideOlderThan= AttrVal($name, "hideOlderThan", undef);
     my $hideLaterThan= AttrVal($name, "hideLaterThan", undef);
-    
+
     # start of time window
     if(defined($hideOlderThan)) {
         ($error, $t1)= Calendar_GetSecondsFromTimeSpec($hideOlderThan);
@@ -2074,7 +2074,7 @@ sub Calendar_GetEvents($$$$) {
             $t2= $t+ $t2;
         }
     }
-    
+
     # get and filter events
     my %vevents= %{$hash->{".fhem"}{vevents}};
     foreach my $id (keys %vevents) {
@@ -2090,9 +2090,9 @@ sub Calendar_GetEvents($$$$) {
         }
     }
     return sort { $a->start() <=> $b->start() } @result;
-    
+
 }
-    
+
 ###################################
 sub Calendar_GetUpdate($$$) {
 
@@ -2101,11 +2101,11 @@ sub Calendar_GetUpdate($$$) {
 
   $hash->{".fhem"}{lstUpdtTs}= $t;
   $hash->{".fhem"}{lastUpdate}= FmtDateTime($t);
-  
+
   my $nut= $t+ $hash->{".fhem"}{interval};
   $hash->{".fhem"}{nxtUpdtTs}= $nut;
   $hash->{".fhem"}{nextUpdate}= FmtDateTime($nut);
-  
+
   #main::Debug "Getting update now: " . $hash->{".fhem"}{lastUpdate};
   #main::Debug "Next Update is at : " . $hash->{".fhem"}{nextUpdate};
 
@@ -2114,18 +2114,18 @@ sub Calendar_GetUpdate($$$) {
   if(AttrVal($hash->{NAME},"update","") eq "none") {
     Calendar_CheckTimes($hash, $t);
     Calendar_RearmTimer($hash, $t);
-    return;  
+    return;
   }
 
   Log3 $hash, 4, "Calendar $name: Updating...";
   my $type = $hash->{".fhem"}{type};
   my $url= $hash->{".fhem"}{url};
-  
+
   my $errmsg= "";
   my $ics;
-  
-  if($type eq "url") { 
-  
+
+  if($type eq "url") {
+
     my $SSLVerify= AttrVal($name, "SSLVerify", undef);
     my $SSLArgs= { };
     if(defined($SSLVerify)) {
@@ -2138,13 +2138,13 @@ sub Calendar_GetUpdate($$$) {
         $SSLArgs= { SSL_verify_mode => $SSLVerifyMode };
       }
     }
-  
+
     HttpUtils_NonblockingGet({
       url => $url,
       hideurl => 1,
       noshutdown => 1,
       hash => $hash,
-      timeout => 30, 
+      timeout => 30,
       type => 'caldata',
       removeall => $removeall,
       sslargs => $SSLArgs,
@@ -2154,14 +2154,14 @@ sub Calendar_GetUpdate($$$) {
     Log3 $hash, 4, "Calendar $name: Getting data from URL <hidden>"; # $url
 
   } elsif($type eq "file") {
-  
-    Log3 $hash, 4, "Calendar $name: Getting data from file $url"; 
+
+    Log3 $hash, 4, "Calendar $name: Getting data from file $url";
     if(open(ICSFILE, $url)) {
-      while(<ICSFILE>) { 
-        $ics .= $_; 
+      while(<ICSFILE>) {
+        $ics .= $_;
       }
       close(ICSFILE);
-      
+
       my $paramhash;
       $paramhash->{hash} = $hash;
       $paramhash->{removeall} = $removeall;
@@ -2169,9 +2169,9 @@ sub Calendar_GetUpdate($$$) {
       $paramhash->{type} = 'caldata';
       Calendar_ProcessUpdate($paramhash, '', $ics);
       return undef;
-      
+
     } else {
-      Log3 $hash, 1, "Calendar $name: Could not open file $url"; 
+      Log3 $hash, 1, "Calendar $name: Could not open file $url";
       readingsSingleUpdate($hash, "state", "error (could not open file)", 1);
       return 0;
     }
@@ -2179,7 +2179,7 @@ sub Calendar_GetUpdate($$$) {
     # this case never happens by virtue of _Define, so just
     die "Software Error";
   }
-  
+
 }
 
 
@@ -2191,7 +2191,7 @@ sub Calendar_ProcessUpdate($$$) {
   my $name = $hash->{NAME};
   my $removeall = $param->{removeall};
   my $t= $param->{t};
-  
+
   if(exists($hash->{".fhem"}{subprocess})) {
       Log3 $hash, 2, "Calendar $name: update in progress, process aborted.";
       return 0;
@@ -2200,22 +2200,22 @@ sub Calendar_ProcessUpdate($$$) {
   # not for the developer:
   # we must be sure that code that starts here ends with Calendar_CheckAndRearm()
   # no matter what branch is taken in the following
-  
+
   delete($hash->{".fhem"}{iCalendar});
-    
+
   if($errmsg) {
     Log3 $name, 1, "Calendar $name: retrieval failed with error message $errmsg";
     readingsSingleUpdate($hash, "state", "error ($errmsg)", 1);
   } else {
     readingsSingleUpdate($hash, "state", "retrieved", 1);
   }
-  
+
   if($errmsg or !defined($ics) or ("$ics" eq "") ) {
     Log3 $hash, 1, "Calendar $name: retrieved no or empty data";
     readingsSingleUpdate($hash, "state", "error (no or empty data)", 1);
     Calendar_CheckAndRearm($hash, $t);
   } else {
-    $hash->{".fhem"}{iCalendar}= $ics; # the plain text iCalendar 
+    $hash->{".fhem"}{iCalendar}= $ics; # the plain text iCalendar
     $hash->{".fhem"}{t}= $t;
     $hash->{".fhem"}{removeall}= $removeall;
     if(AttrVal($name, "update", "sync") eq "async") {
@@ -2224,7 +2224,7 @@ sub Calendar_ProcessUpdate($$$) {
       Calendar_SynchronousUpdateCalendar($hash);
     }
   }
-  
+
 }
 
 sub Calendar_Cleanup($) {
@@ -2233,10 +2233,10 @@ sub Calendar_Cleanup($) {
   delete($hash->{".fhem"}{removeall});
   delete($hash->{".fhem"}{serialized});
   delete($hash->{".fhem"}{subprocess});
-    
+
   my $name= $hash->{NAME};
   delete($hash->{".fhem"}{iCalendar}) if(AttrVal($name,"removevcalendar",0));
-  Log3 $hash, 4, "Calendar $name: process ended."; 
+  Log3 $hash, 4, "Calendar $name: process ended.";
 }
 
 
@@ -2246,13 +2246,13 @@ sub Calendar_CheckAndRearm($) {
   my $t= $hash->{".fhem"}{t};
   Calendar_CheckTimes($hash, $t);
   Calendar_RearmTimer($hash, $t);
-}  
+}
 
 sub Calendar_SynchronousUpdateCalendar($) {
-  
+
   my ($hash) = @_;
   my $name= $hash->{NAME};
-  Log3 $hash, 4, "Calendar $name: parsing data synchronously"; 
+  Log3 $hash, 4, "Calendar $name: parsing data synchronously";
   my $ical= Calendar_ParseICS($hash->{".fhem"}{iCalendar});
   Calendar_UpdateCalendar($hash, $ical);
   Calendar_CheckAndRearm($hash);
@@ -2264,10 +2264,10 @@ use constant POLLINTERVAL => 1;
 sub Calendar_AsynchronousUpdateCalendar($) {
 
   require "SubProcess.pm";
-  
+
   my ($hash) = @_;
   my $name= $hash->{NAME};
-  
+
   my $subprocess= SubProcess->new({ onRun => \&Calendar_OnRun });
   $subprocess->{ics}= $hash->{".fhem"}{iCalendar};
   my $pid= $subprocess->run();
@@ -2279,14 +2279,14 @@ sub Calendar_AsynchronousUpdateCalendar($) {
     return undef;
   }
 
-  Log3 $hash, 4, "Calendar $name: parsing data asynchronously (PID= $pid)"; 
+  Log3 $hash, 4, "Calendar $name: parsing data asynchronously (PID= $pid)";
   $hash->{".fhem"}{subprocess}= $subprocess;
   $hash->{".fhem"}{serialized}= "";
   InternalTimer(gettimeofday()+POLLINTERVAL, "Calendar_PollChild", $hash, 0);
-  
+
   # go and do your thing while the timer polls and waits for the child to terminate
-  Log3 $hash, 5, "Calendar $name: control passed back to main loop."; 
-  
+  Log3 $hash, 5, "Calendar $name: control passed back to main loop.";
+
 }
 
 sub Calendar_OnRun() {
@@ -2301,7 +2301,7 @@ sub Calendar_OnRun() {
 
 
 sub Calendar_PollChild($) {
-  
+
   my ($hash)= @_;
   my $name= $hash->{NAME};
   my $subprocess= $hash->{".fhem"}{subprocess};
@@ -2324,14 +2324,14 @@ sub Calendar_PollChild($) {
 
 sub Calendar_ParseICS($) {
 
-  #main::Debug "Calendar $name: parsing data"; 
+  #main::Debug "Calendar $name: parsing data";
   my ($ics)= @_;
   my ($error, $state)= (undef, "");
 
   # we parse the calendar into a recursive ICal::Entry structure
   my $ical= ICal::Entry->new("root");
   $ical->parse($ics);
-  
+
   #main::Debug "*** Result:";
   #main::Debug $ical->asString();
 
@@ -2364,15 +2364,15 @@ sub Calendar_ParseICS($) {
 sub Calendar_UpdateCalendar($$) {
 
   my ($hash, $ical)= @_;
-  
+
   # *******************************
-  # *** Step 1 Digest Parser Result 
+  # *** Step 1 Digest Parser Result
   # *******************************
-  
+
   my $name= $hash->{NAME};
   my $error= $ical->{error};
   my $state= $ical->{state};
-  
+
   if(defined($error)) {
     Log3 $hash, 2, "Calendar $name: error ($error)";
     readingsSingleUpdate($hash, "state", "error ($error)", 1);
@@ -2382,7 +2382,7 @@ sub Calendar_UpdateCalendar($$) {
   }
   my $t= $hash->{".fhem"}{t};
   my $removeall= $hash->{".fhem"}{removeall};
-  
+
   my @entries= @{$ical->{entries}};
   my $root= @{$ical->{entries}}[0];
   my $calname= "?";
@@ -2393,25 +2393,25 @@ sub Calendar_UpdateCalendar($$) {
   } else {
     $calname= $root->value("X-WR-CALNAME");
   }
- 
+
   # *********************
   # *** Step 2 Merging
   # *********************
-  
-  Log3 $hash, 4, "Calendar $name: merging data"; 
-  #main::Debug "Calendar $name: merging data"; 
+
+  Log3 $hash, 4, "Calendar $name: merging data";
+  #main::Debug "Calendar $name: merging data";
 
   # this the hash of VEVENTs that have been created on the previous update
   my %vevents;
   %vevents= %{$hash->{".fhem"}{vevents}} if(!$removeall);
-  
+
   # the keys to the hash are numbers taken from a sequence
   my $lastid= $hash->{".fhem"}{lastid};
 
   #
   # 1, 2, 4
   #
- 
+
   # we first discard all VEVENTs that have been tagged as deleted in the previous run
   # and untag the rest
   foreach my $key (keys %vevents) {
@@ -2424,19 +2424,19 @@ sub Calendar_UpdateCalendar($$) {
         $vevents{$key}->clearReferences();
     }
   }
-  
+
   #
   # 3
   #
- 
+
   # we now run through the list of freshly retrieved VEVENTs and merge them into
   # the hash
   my ($n, $nknown, $nmodified, $nnew, $nchanged)= (0,0,0,0,0,0);
-  
+
   # this code is O(n^2) and stalls FHEM for large numbers of VEVENTs
   # to speed up the code we first build a reverse hash (UID,RECURRENCE-ID) -> id
   sub kf($) { my ($v)= @_; return $v->value("UID").$v->valueOrDefault("RECURRENCE-ID","") }
- 
+
   my %lookup;
   foreach my $id (keys %vevents) {
         my $k= kf($vevents{$id});
@@ -2444,7 +2444,7 @@ sub Calendar_UpdateCalendar($$) {
         $lookup{$k}= $id;
         #main::Debug "Adding event $id with key $k to lookup hash.";
   }
-  
+
     # start of time window for cutoff
     my $cutoffOlderThan = AttrVal($name, "cutoffOlderThan", undef);
     my $cutoffT= 0;
@@ -2456,23 +2456,23 @@ sub Calendar_UpdateCalendar($$) {
         };
         $cutoff= $t- $cutoffT;
     }
-  
+
   foreach my $v (grep { $_->{type} eq "VEVENT" } @{$root->{entries}}) {
-        
+
         # totally skip outdated calendar entries
 	next if(
-          defined($cutoffOlderThan) && 
-          $v->hasKey("DTEND") && 
-          $v->tm($v->value("DTEND")) < $cutoff && 
+          defined($cutoffOlderThan) &&
+          $v->hasKey("DTEND") &&
+          $v->tm($v->value("DTEND")) < $cutoff &&
           !$v->hasKey("RRULE")
         );
-		
+
 	#main::Debug "Merging " . $v->asString();
         my $found= 0;
         my $added= 0; # flag to prevent multiple additions
         $n++;
         # some braindead calendars provide no UID - add one:
-        $v->addproperty(sprintf("UID:synthetic-%06d", $v->{ln})) 
+        $v->addproperty(sprintf("UID:synthetic-%06d", $v->{ln}))
             unless($v->hasKey("UID") or !defined($v->{ln}));
         # look for related records in the old record set
         my $k= kf($v);
@@ -2526,15 +2526,15 @@ sub Calendar_UpdateCalendar($$) {
                 $nchanged++;
             }
         }
-        
+
         if(!$found) {
             $v->setState("new");
             $vevents{++$lastid}= $v;
             $added++;
             $nnew++;
-        }   
+        }
   }
-  
+
   #
   # Cross-referencing series
   #
@@ -2542,18 +2542,18 @@ sub Calendar_UpdateCalendar($$) {
   # to speed up the code we build a hash of a hash UID => {id => VEVENT}
   %lookup= ();
   foreach my $id (keys %vevents) {
-    my $v= $vevents{$id}; 
+    my $v= $vevents{$id};
     $lookup{$v->value("UID")}{$id}= $v unless($v->isObsolete);
   }
   for my $idref (values %lookup)  {
     my %vs= %{$idref};
     foreach my $v (values %vs) {
         foreach my $id (keys %vs) {
-            push @{$v->references()}, $id unless($vs{$id} eq $v);            
+            push @{$v->references()}, $id unless($vs{$id} eq $v);
         }
     }
   }
-  
+
 #   foreach my $id (keys %vevents) {
 #         my $v= $vevents{$id};
 #         next if($v->isObsolete());
@@ -2566,24 +2566,24 @@ sub Calendar_UpdateCalendar($$) {
 #   }
 
 
-  Log3 $hash, 4, "Calendar $name: $n records processed, $nnew new, ". 
-    "$nknown known, $nmodified modified, $nchanged changed."; 
-  
+  Log3 $hash, 4, "Calendar $name: $n records processed, $nnew new, ".
+    "$nknown known, $nmodified modified, $nchanged changed.";
+
   # save the VEVENTs hash and lastid
   $hash->{".fhem"}{vevents}= \%vevents;
   $hash->{".fhem"}{lastid}= $lastid;
-  
+
   # *********************
   # *** Step 3 Events
   # *********************
-  
-  
+
+
   #
   # Recreating the events
   #
-  Log3 $hash, 4, "Calendar $name: creating calendar events"; 
-  #main::Debug "Calendar $name: creating calendar events"; 
-  
+  Log3 $hash, 4, "Calendar $name: creating calendar events";
+  #main::Debug "Calendar $name: creating calendar events";
+
   foreach my $id (keys %vevents) {
         my $v= $vevents{$id};
         if($v->isObsolete()) {
@@ -2595,26 +2595,26 @@ sub Calendar_UpdateCalendar($$) {
         if($v->hasChanged() or !$v->numEvents()) {
             #main::Debug "createEvents";
             $v->createEvents($t, $onCreateEvent, %vevents);
-        }    
-    
+        }
+
   }
-  
+
   #main::Debug "*** Result:";
   #main::Debug $ical->asString();
-  
-  
+
+
   # *********************
   # *** Step 4 Readings
   # *********************
-  
+
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "calname", $calname);
   readingsBulkUpdate($hash, "lastUpdate", $hash->{".fhem"}{lastUpdate});
   readingsBulkUpdate($hash, "nextUpdate", $hash->{".fhem"}{nextUpdate});
   readingsEndUpdate($hash, 1); # DoTrigger, because sub is called by a timer instead of dispatch
-  
-  
-  
+
+
+
 
   return 1;
 }
@@ -2624,9 +2624,9 @@ sub Calendar_UpdateCalendar($$) {
 sub Calendar_CheckTimes($$) {
 
     my ($hash, $t) = @_;
-    
+
     Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Checking times...";
-    
+
     #
     # determine the uids of all events and their most interesting mode
     #
@@ -2646,7 +2646,7 @@ sub Calendar_CheckTimes($$) {
             my $uid= $e->uid();
             my $mode= defined($mim{$uid}) ? $mim{$uid} : "none";
             if($e->isEnded($t)) {
-                $e->setMode("end"); 
+                $e->setMode("end");
             } elsif($e->isUpcoming($t)) {
                 $e->setMode("upcoming");
             } elsif($e->isStarted($t)) {
@@ -2666,7 +2666,7 @@ sub Calendar_CheckTimes($$) {
             }
         }
     }
-    
+
     #
     # determine the uids of events in certain modes
     #
@@ -2679,49 +2679,49 @@ sub Calendar_CheckTimes($$) {
     my @end;
     my @ended;
     foreach my $uid (keys %mim) {
-        push @changed, $uid if($changed{$uid}); 
+        push @changed, $uid if($changed{$uid});
         push @upcoming, $uid if($mim{$uid} eq "upcoming");
-        if($mim{$uid} eq "alarm") { 
+        if($mim{$uid} eq "alarm") {
             push @alarm, $uid;
             push @alarmed, $uid if($changed{$uid});
         }
-        if($mim{$uid} eq "start") { 
+        if($mim{$uid} eq "start") {
             push @start, $uid;
             push @started, $uid if($changed{$uid});
         }
-        if($mim{$uid} eq "end") { 
+        if($mim{$uid} eq "end") {
             push @end, $uid;
             push @ended, $uid if($changed{$uid});
         }
-    }    
-        
-    
+    }
+
+
     #sub uniq { my %uids; return grep {!$uids{$_->uid()}++} @_; }
-    
-    
+
+
     #@allevents= sort { $a->start() <=> $b->start() } uniq(@allevents);
-    
-    
+
+
     #foreach my $event (@allevents) {
     #    main::Debug $event->asFull();
     #}
-    
-   
+
+
     sub es(@) {
         my (@events)= @_;
         return join(";", @events);
     }
-    
+
     sub rbu($$$) {
         my ($hash, $reading, $value)= @_;
-        if(!defined($hash->{READINGS}{$reading}) or 
+        if(!defined($hash->{READINGS}{$reading}) or
            ($hash->{READINGS}{$reading}{VAL} ne $value)) {
             readingsBulkUpdate($hash, $reading, $value);
         }
     }
-   
-    # clears all events in CHANGED, thus must be called first  
-    readingsBeginUpdate($hash); 
+
+    # clears all events in CHANGED, thus must be called first
+    readingsBeginUpdate($hash);
     # we update the readings
     rbu($hash, "modeUpcoming", es(@upcoming));
     rbu($hash, "modeAlarm", es(@alarm));
@@ -2733,10 +2733,10 @@ sub Calendar_CheckTimes($$) {
     rbu($hash, "modeEnd", es(@end));
     rbu($hash, "modeEnded", es(@ended));
     readingsBulkUpdate($hash, "state", "triggered");
-    # DoTrigger, because sub is called by a timer instead of dispatch         
-    readingsEndUpdate($hash, 1); 
-    
-}   
+    # DoTrigger, because sub is called by a timer instead of dispatch
+    readingsEndUpdate($hash, 1);
+
+}
 
 
 #####################################
@@ -2751,9 +2751,9 @@ sub CalendarAsHtml($;$) {
 
   my $l= Calendar_Get($defs{$d}, split("[ \t]+", "- text $o"));
   my @lines= split("\n", $l);
-        
+
   my $ret = '<table class="calendar">';
-  
+
   foreach my $line (@lines) {
     my @fields= split(" ", $line, 3);
     $ret.= sprintf("<tr><td>%s</td><td>%s</td><td>%s</td></tr>", @fields);
@@ -2787,7 +2787,7 @@ sub CalendarAsHtml($;$) {
     <br>
     Defines a calendar device.<br><br>
 
-    A calendar device periodically gathers calendar events from the source calendar at the given URL or from a file. 
+    A calendar device periodically gathers calendar events from the source calendar at the given URL or from a file.
     The file must be in ICal format.<br><br>
 
     If the URL
@@ -2797,7 +2797,7 @@ sub CalendarAsHtml($;$) {
     Note for users of Google Calendar: You can literally use the private ICal URL from your Google Calendar.
     If your Google Calendar
     URL starts with <code>https://</code> and the perl module IO::Socket::SSL is not installed on your system, you can
-    replace it by <code>http://</code> if and only if there is no redirection to the <code>https://</code> URL. 
+    replace it by <code>http://</code> if and only if there is no redirection to the <code>https://</code> URL.
     Check with your browser first if unsure.<br><br>
 
     The optional parameter <code>interval</code> is the time between subsequent updates
@@ -2817,10 +2817,10 @@ sub CalendarAsHtml($;$) {
   <ul>
     <code>set &lt;name&gt; update</code><br>
     Forces the retrieval of the calendar from the URL. The next automatic retrieval is scheduled to occur <code>interval</code> seconds later.<br><br>
-   
+
     <code>set &lt;name&gt; reload</code><br>
     Same as <code>update</code> but all calendar events are removed first.<br><br>
-    
+
   </ul>
   <br>
 
@@ -2830,14 +2830,14 @@ sub CalendarAsHtml($;$) {
   <ul>
     <code>get &lt;name&gt; update</code><br>
     Same as  <code>set &lt;name&gt; update</code><br><br>
-    
+
     <code>get &lt;name&gt; reload</code><br>
     Same as  <code>set &lt;name&gt; update</code><br><br>
-    
+
     <code>get &lt;name&gt; &lt;format&gt; &lt;filter&gt; [&lt;max&gt;]</code><br>
     Returns, line by line, information on the calendar events in the calendar &lt;name&gt;. The content depends on the
     &lt;format&gt specifier:<br><br>
-    
+
     <table>
     <tr><th>&lt;format&gt;</th><th>content</th></tr>
     <tr><td>uid</td><td>the UID of the event</td></tr>
@@ -2854,7 +2854,7 @@ sub CalendarAsHtml($;$) {
     </table><br>
 
     The &lt;filter&gt; specifier determines the selected subset of calendar events:<br><br>
-   
+
     <table>
     <tr><th>&lt;filter&gt;</th><th>selection</th></tr>
     <tr><td>mode=&lt;regex&gt;</td><td>all calendar events with mode matching the regular expression &lt;regex&gt</td></tr>
@@ -2865,17 +2865,17 @@ sub CalendarAsHtml($;$) {
     <tr><td>all</td><td>all calendar events (past, current and future)</td></tr>
     <tr><td>next</td><td>only calendar events that have not yet ended and among these only the first in a series, best suited for display</td></tr>
     </table><br>
-    
+
     The <code>mode=&lt;regex&gt;</code> and <code>uid=&lt;regex&gt;</code> filters should be preferred over the
     <code>&lt;mode&gt;</code> and <code>&lt;uid&gt;</code> filters.<br><br>
-  
+
     The optional parameter <code>&lt;max&gt;</code> limits
     the number of returned lines.<br><br>
-        
-    See attributes <code>hideOlderThan</code> and 
+
+    See attributes <code>hideOlderThan</code> and
     <code>hideLaterThan</code> for how to return events within a certain time window.
     Please remember that the global &pm;400 days limits apply.<br><br>
-    
+
     Examples:<br>
     <code>get MyCalendar text next</code><br>
     <code>get MyCalendar summary uid:435kjhk435googlecom 1</code><br>
@@ -2884,20 +2884,20 @@ sub CalendarAsHtml($;$) {
     <code>get MyCalendar text mode=alarm|start</code><br>
     <code>get MyCalendar text uid=.*6286.*</code><br>
     <br>
-    
+
     <code>get &lt;name&gt; find &lt;regexp&gt;</code><br>
     Returns, line by line, the UIDs of all calendar events whose summary matches the regular expression
     &lt;regexp&gt;.<br><br>
-    
+
     <code>get &lt;name&gt; vcalendar</code><br>
     Returns the calendar in ICal format as retrieved from the source.<br><br>
-    
+
     <code>get &lt;name&gt; vevents</code><br>
-    Returns a list of all VEVENT entries in the calendar with additional information for 
+    Returns a list of all VEVENT entries in the calendar with additional information for
     debugging. Only properties that have been kept during processing of the source
     are shown. The list of calendar events created from each VEVENT entry is shown as well
     as the list of calendar events that have been omitted.
-    
+
   </ul>
 
   <br>
@@ -2910,7 +2910,7 @@ sub CalendarAsHtml($;$) {
         If this attribute is not set or if it is set to <code>sync</code>, the processing of
         the calendar is done in the foreground. Large calendars will block FHEM on slow
         systems. If this attribute is set to <code>async</code>, the processing is done in the
-        background and FHEM will not block during updates. If this attribute is set to 
+        background and FHEM will not block during updates. If this attribute is set to
         <code>none</code>, the calendar will not be updated at all.
         </li><p>
 
@@ -2918,21 +2918,21 @@ sub CalendarAsHtml($;$) {
         If this attribute is set to 1, the vCalendar will be discarded after the processing to reduce the memory consumption of the module.
         A retrieval via <code>get &lt;name&gt; vcalendar</code> is then no longer possible.
         </li><p>
-		
+
     <li><code>hideOlderThan &lt;timespec&gt;</code><br>
         <code>hideLaterThan &lt;timespec&gt;</code><br><p>
-        
-        These attributes limit the list of events shown by 
+
+        These attributes limit the list of events shown by
         <code>get &lt;name&gt; full|debug|text|summary|location|alarm|start|end ...</code>.<p>
-        
+
         The time is specified relative to the current time t. If hideOlderThan is set,
         calendar events that ended before t-hideOlderThan are not shown. If hideLaterThan is
         set, calendar events that will start after t+hideLaterThan are not shown.<p>
-        
-        Please note that an action triggered by a change to mode "end" cannot access the calendar event 
-        if you set hideOlderThan to 0 because the calendar event will already be hidden at that time. Better set 
+
+        Please note that an action triggered by a change to mode "end" cannot access the calendar event
+        if you set hideOlderThan to 0 because the calendar event will already be hidden at that time. Better set
         hideOlderThan to 10.<p>
-        
+
         <code>&lt;timespec&gt;</code> must have one of the following formats:<br>
         <table>
         <tr><th>format</th><th>description</th><th>example</th></tr>
@@ -2947,25 +2947,25 @@ sub CalendarAsHtml($;$) {
 
     <li><code>cutoffOlderThan &lt;timespec&gt;</code><br>
         This attribute cuts off all non-recurring calendar events that ended a timespan cutoffOlderThan
-        before the last update of the calendar. The purpose of setting this attribute is to save memory. 
+        before the last update of the calendar. The purpose of setting this attribute is to save memory.
         Such calendar events cannot be accessed at all from FHEM. Calendar events are not cut off if
         they are recurring or if they have no end time (DTEND).
     </li><p>
-        
+
     <li><code>onCreateEvent &lt;perl-code&gt;</code><br>
-    
+
         This attribute allows to run the Perl code &lt;perl-code&gt; for every
         calendar event that is created. See section <a href="#CalendarPlugIns">Plug-ins</a> below.
     </li><p>
-        
+
     <li><code>SSLVerify</code><br>
-    
+
         This attribute sets the verification mode for the peer certificate for connections secured by
         SSL. Set attribute either to 0 for SSL_VERIFY_NONE (no certificate verification) or
         to 1 for SSL_VERIFY_PEER (certificate verification). Disabling verification is useful
         for local calendar installations (e.g. OwnCloud, NextCloud) without valid SSL certificate.
     </li><p>
-        
+
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
@@ -2974,34 +2974,34 @@ sub CalendarAsHtml($;$) {
   <ul>
   <br>
   A calendar is a set of calendar events. The calendar events are
-  fetched from the source calendar at the given URL on a regular basis.<p> 
-  
+  fetched from the source calendar at the given URL on a regular basis.<p>
+
   A calendar event has a summary (usually the title shown in a visual
   representation of the source calendar), a start time, an end time, and zero, one or more alarm times. In case of multiple alarm times for a calendar event, only the
   earliest alarm time is kept.<p>
-  
-  Recurring calendar events (series) are currently supported to an extent: 
-  FREQ INTERVAL UNTIL COUNT are interpreted, BYMONTHDAY BYMONTH WKST 
+
+  Recurring calendar events (series) are currently supported to an extent:
+  FREQ INTERVAL UNTIL COUNT are interpreted, BYMONTHDAY BYMONTH WKST
   are recognized but not interpreted. BYDAY is correctly interpreted for weekly and monthly events.
   The module will get it most likely wrong
   if you have recurring calendar events with unrecognized or uninterpreted keywords.
   Out-of-order events and events excluded from a series (EXDATE) are handled.
   <p>
-  
+
   Calendar events are created when FHEM is started or when the respective entry in the source
-  calendar has changed and the calendar is updated or when the calendar is reloaded with 
-  <code>get &lt;name&gt; reload</code>. 
-  Only calendar events within &pm;400 days around the event creation time are created. Consider 
+  calendar has changed and the calendar is updated or when the calendar is reloaded with
+  <code>get &lt;name&gt; reload</code>.
+  Only calendar events within &pm;400 days around the event creation time are created. Consider
   reloading the calendar from time to time to avoid running out of upcoming events. You can use something like <code>define reloadCalendar at +*240:00:00 set MyCalendar reload</code> for that purpose.<p>
-  
+
   Some dumb calendars do not use LAST-MODIFIED. This may result in modifications in the source calendar
   go unnoticed. Reload the calendar if you experience this issue.<p>
 
-  A calendar event is identified by its UID. The UID is taken from the source calendar. 
+  A calendar event is identified by its UID. The UID is taken from the source calendar.
   All events in a series including out-of-order events habe the same UID.
   All non-alphanumerical characters
   are stripped off the original UID to make your life easier.<p>
-  
+
   A calendar event can be in one of the following modes:
   <table>
   <tr><td>upcoming</td><td>Neither the alarm time nor the start time of the calendar event is reached.</td></tr>
@@ -3009,7 +3009,7 @@ sub CalendarAsHtml($;$) {
   <tr><td>start</td><td>The start time has passed but the end time of the calendar event is not yet reached.</td></tr>
   <tr><td>end</td><td>The end time of the calendar event has passed.</td></tr>
   </table><br>
-  
+
   A calendar event transitions from one mode to another immediately when the time for the change has come. This is done by waiting
   for the earliest future time among all alarm, start or end times of all calendar events.
   <p>
@@ -3030,46 +3030,46 @@ sub CalendarAsHtml($;$) {
   </table>
   </ul>
   <p>
-  
+
   For recurring events, usually several calendar events exists with the same UID. In such a case,
-  the UID is only shown in the mode reading for the most interesting mode. The most 
+  the UID is only shown in the mode reading for the most interesting mode. The most
   interesting mode is the first applicable of start, alarm, upcoming, end.<p>
-  
+
   In particular, you will never see the UID of a series in modeEnd or modeEnded as long as the series
   has not yet ended - the UID will be in one of the other mode... readings. This means that you better
   do not trigger FHEM events for series based on mode... readings. See below for a recommendation.<p>
-  
+
   <b>Events</b>
   <ul><br>
   When the calendar was reloaded or updated or when an alarm, start or end time was reached, one
   FHEM event is created:<p>
-  
+
   <code>triggered</code><br><br>
-  
-  When you receive this event, you can rely on the calendar's readings being in a consistent and 
+
+  When you receive this event, you can rely on the calendar's readings being in a consistent and
   most recent state.<p>
-  
-  
+
+
   When a calendar event has changed, two FHEM events are created:<p>
-  
+
   <code>changed: UID &lt;mode&gt;</code><br>
   <code>&lt;mode&gt;: UID</code><br><br>
-  
+
   &lt;mode&gt; is the current mode of the calendar event after the change. Note: there is a
   colon followed by a single space in the FHEM event specification.<p>
-  
+
   The recommended way of reacting on mode changes of calendar events is to get notified
   on the aforementioned FHEM events and do not check for the FHEM events triggered
   by a change of a mode reading.
   <p>
   </ul>
-  
+
   <a name="CalendarPlugIns"></a>
   <b>Plug-ins</b>
   <ul>
   <br>
   This is experimental. Use with caution.<p>
-  
+
   A plug-in is a piece of Perl code that modifies a calendar event on the fly. The Perl code operates on the
   hash reference <code>$e</code>. The most important elements are as follows:
 
@@ -3087,8 +3087,8 @@ sub CalendarAsHtml($;$) {
   <code>attr MyCalendar onCreateEvent { $e->{alarm}= $e->{start}-86400 if($e->{summary} =~ /Tonne/);; }</code><br>
   <br>The double semicolon masks the semicolon. <a href="#perl">Perl specials</a> cannot be used.<br>
   </ul>
-  <br><br> 
-  
+  <br><br>
+
   <b>Usage scenarios</b>
   <ul><br><br>
     <i>Show all calendar events with details</i><br><br>
@@ -3133,21 +3133,21 @@ sub CalendarAsHtml($;$) {
     Think about a calendar with calendar events whose summaries (subjects, titles) are the names of devices in your fhem installation.
     You want the respective devices to switch on when the calendar event starts and to switch off when the calendar event ends.<br><br>
     <code>
-    define SwitchActorOn  notify MyCalendar:start:.* { 
-                my $reading="$EVTPART0";; 
-                my $uid= "$EVTPART1";; 
-                my $actor= fhem("get MyCalendar summary $uid");; 
-                if(defined $actor) { 
-                   fhem("set $actor on") 
-                } 
+    define SwitchActorOn  notify MyCalendar:start:.* {
+                my $reading="$EVTPART0";;
+                my $uid= "$EVTPART1";;
+                my $actor= fhem("get MyCalendar summary $uid");;
+                if(defined $actor) {
+                   fhem("set $actor on")
+                }
     }<br><br>
-    define SwitchActorOff  notify MyCalendar:end:.* { 
-                my $reading="$EVTPART0";; 
-                my $uid= "$EVTPART1";; 
-                my $actor= fhem("get MyCalendar summary $uid");; 
-                if(defined $actor) { 
-                   fhem("set $actor off") 
-                } 
+    define SwitchActorOff  notify MyCalendar:end:.* {
+                my $reading="$EVTPART0";;
+                my $uid= "$EVTPART1";;
+                my $actor= fhem("get MyCalendar summary $uid");;
+                if(defined $actor) {
+                   fhem("set $actor off")
+                }
     }
     </code><br><br>
     You can also do some logging:<br><br>
@@ -3159,7 +3159,7 @@ sub CalendarAsHtml($;$) {
 
   </ul>
 
-  
+
   <b>Embedded HTML</b>
   <ul><br>
   The module provides an additional function <code>CalendarAsHtml(&lt;name&gt;,&lt;options&gt;)</code>. It
@@ -3171,7 +3171,7 @@ sub CalendarAsHtml($;$) {
   This is a rudimentary function which might be extended in a future version.
   <p>
   </ul>
-  
+
 
 </ul>
 
@@ -3180,10 +3180,10 @@ sub CalendarAsHtml($;$) {
 =begin html_DE
 
 <a name="Calendar"></a>
-<h3>Calender</h3>
+<h3>Calendar</h3>
 <ul>
   <br>
-    
+
   <a name="Calendardefine"></a>
   <b>Define</b>
   <ul>
@@ -3201,7 +3201,7 @@ sub CalendarAsHtml($;$) {
     Hinweis f&uuml;r Nutzer des Google-Kalenders: Du kann direkt die private iCal-URL des Google Kalender nutzen.
 
     Sollte Deine Google-Kalender-URL mit <code>https://</code> beginnen und das Perl-Modul IO::Socket::SSL ist nicht auf Deinem Systeme installiert,
-	kannst Du in der URL  <code>https://</code> durch <code>http://</code> ersetzen, falls keine automatische Umleitung auf die <code>https://</code> URL erfolgt. 
+	kannst Du in der URL  <code>https://</code> durch <code>http://</code> ersetzen, falls keine automatische Umleitung auf die <code>https://</code> URL erfolgt.
     Solltest Du unsicher sein, ob dies der Fall ist, &uuml;berpr&uuml;fe es bitte zuerst mit Deinem Browser.<br><br>
 
     Der optionale Parameter <code>interval</code> bestimmt die Zeit in Sekunden zwischen den Updates. Default-Wert ist 3600 (1 Stunde).<br><br>
@@ -3222,7 +3222,7 @@ sub CalendarAsHtml($;$) {
 
     Erzwingt das Einlesen des Kalenders von der definierten URL. Das n&auml;chste automatische Einlesen erfolgt in
     <code>interval</code> Sekunden sp&auml;ter.<br><br>
-    
+
     <code>set &lt;name&gt; reload</code><br>
     Dasselbe wie <code>update</code>, jedoch werden zuerst alle Termine entfernt.<br><br>
 
@@ -3245,7 +3245,7 @@ sub CalendarAsHtml($;$) {
 	Folgende Selektoren/Filter stehen zur Verf&uuml;gung:<br><br>
 
 	Der Selektor &lt;format&gt legt den zur&uuml;ckgegeben Inhalt fest:<br><br>
-    
+
     <table>
     <tr><th>&lt;format&gt;</th><th>Inhalt</th></tr>
     <tr><td>uid</td><td>UID des Termins</td></tr>
@@ -3261,7 +3261,7 @@ sub CalendarAsHtml($;$) {
     </table><br>
 
     Der Filter &lt;filter&gt; grenzt die Termine ein:<br><br>
-   
+
     <table>
     <tr><th>&lt;filter&gt;</th><th>Inhalt</th></tr>
     <tr><td>mode=&lt;regex&gt;</td><td>alle Termine, deren Modus durch den regul&auml;ren Ausdruck &lt;regex&gt beschrieben werden.</td></tr>
@@ -3273,16 +3273,16 @@ sub CalendarAsHtml($;$) {
     <tr><td>all</td><td>Alle Termine (vergangene, aktuelle und zuk&uuml;nftige)</td></tr>
     <tr><td>next</td><td>Alle Termine, die noch nicht beendet sind. Bei Serienterminen der erste Termin. Benutzer-/Monitorfreundliche Textausgabe</td></tr>
     </table><br>
-    
+
     Die Filter <code>mode=&lt;regex&gt;</code> und <code>uid=&lt;regex&gt;</code> sollten den Filtern
     <code>&lt;mode&gt;</code> und <code>&lt;uid&gt;</code> vorgezogen werden.<br><br>
-  
+
     Der optionale Parameter <code>&lt;max&gt;</code> schr&auml;nkt die Anzahl der zur&uuml;ckgegebenen Zeilen ein.<br><br>
-        
-    Bitte beachte die Attribute <code>hideOlderThan</code> und 
+
+    Bitte beachte die Attribute <code>hideOlderThan</code> und
     <code>hideLaterThan</code> f&uuml;r die Seletion von Terminen in einem bestimmten Zeitfenster.
     Bitte ber&uuml;cksichtige, dass das globale &pm;400 Tageslimit gilt .<br><br>
-    
+
     Beispiele:<br>
     <code>get MyCalendar text next</code><br>
     <code>get MyCalendar summary uid:435kjhk435googlecom 1</code><br>
@@ -3291,19 +3291,19 @@ sub CalendarAsHtml($;$) {
     <code>get MyCalendar text mode=alarm|start</code><br>
     <code>get MyCalendar text uid=.*6286.*</code><br>
     <br>
-    
+
     <code>get &lt;name&gt; find &lt;regexp&gt;</code><br>
 	Gibt Zeile f&uuml;r Zeile die UIDs aller Termine deren Zusammenfassungen durch den regul&auml;ren Ausdruck &lt;regex&gt beschrieben werden.
     &lt;regexp&gt;.<br><br>
-    
+
     <code>get &lt;name&gt; vcalendar</code><br>
     Gibt den Kalender ICal-Format, so wie er von der Quelle gelesen wurde, zur&uuml;ck.<br><br>
-    
+
     <code>get &lt;name&gt; vevents</code><br>
     Gibt eine Liste aller VEVENT-Eintr&auml;ge des Kalenders &lt;name&gt;, angereichert um Ausgaben f&uuml;r die Fehlersuche, zur&uuml;ck.
     Es werden nur Eigenschaften angezeigt, die w&auml;hrend der Programmausf&uuml;hrung beibehalten wurden. Es wird sowohl die Liste
 	der Termine, die von jedem VEVENT-Eintrag erzeugt wurden, als auch die Liste der ausgelassenen Termine angezeigt.
-    
+
   </ul>
 
   <br>
@@ -3315,7 +3315,7 @@ sub CalendarAsHtml($;$) {
     <li><code>update sync|async|none</code><br>
         Wenn dieses Attribut nicht gesetzt ist oder wenn es auf <code>sync</code> gesetzt ist,
         findet die Verarbeitung des Kalenders im Vordergrund statt. Gro&szlig;e Kalender werden FHEM
-        auf langsamen Systemen blockieren. Wenn das Attribut auf <code>async</code> gesetzt ist, 
+        auf langsamen Systemen blockieren. Wenn das Attribut auf <code>async</code> gesetzt ist,
         findet die Verarbeitung im Hintergrund statt, und FHEM wird w&auml;hrend der Verarbeitung
         nicht blockieren. Wenn dieses Attribut auf <code>none</code> gesetzt ist, wird der
         Kalender &uuml;berhaupt nicht aktualisiert.
@@ -3326,20 +3326,20 @@ sub CalendarAsHtml($;$) {
 		gleichzeitig reduziert sich der Speicherverbrauch des Moduls.
 		Ein Abruf &uuml;ber <code>get &lt;name&gt; vcalendar</code> ist dann nicht mehr m&ouml;glich.
         </li><p>
-		
+
     <li><code>hideOlderThan &lt;timespec&gt;</code><br>
         <code>hideLaterThan &lt;timespec&gt;</code><br><p>
-        
+
 		Dieses Attribut grenzt die Liste der durch <code>get &lt;name&gt; full|debug|text|summary|location|alarm|start|end ...</code> gezeigten Termine ein.
-        
+
         Die Zeit wird relativ zur aktuellen Zeit t angegeben.<br>
 		Wenn &lt;hideOlderThan&gt; gesetzt ist, werden Termine, die vor &lt;t-hideOlderThan&gt; enden, ingnoriert.<br>
         Wenn &lt;hideLaterThan&gt; gesetzt ist, werden Termine, die nach &lt;t+hideLaterThan&gt; anfangen, ignoriert.<p>
 
         Bitte beachten, dass eine Aktion, die durch einen Wechsel in den Modus "end" ausgel&ouml;st wird, nicht auf den Termin
         zugreifen kann, wenn hideOlderThan 0 ist, weil der Termin dann schon versteckt ist. Besser hideOlderThan auf 10 setzen.<p>
-        
-        
+
+
         <code>&lt;timespec&gt;</code> muss einem der folgenden Formate entsprechen:<br>
         <table>
         <tr><th>Format</th><th>Beschreibung</th><th>Beispiel</th></tr>
@@ -3351,7 +3351,7 @@ sub CalendarAsHtml($;$) {
         <tr><td>DDDd</td><td>Tage</td><td>100d</td></tr>
         </table></li>
         <p>
-    
+
     <li><code>cutoffOlderThan &lt;timespec&gt;</code><br>
         Dieses Attribut schneidet alle nicht wiederkehrenden Termine weg, die eine Zeitspanne cutoffOlderThan
         vor der letzten Aktualisierung des Kalenders endeten. Der Zweck dieses Attributs ist es Speicher zu
@@ -3360,21 +3360,21 @@ sub CalendarAsHtml($;$) {
     </li><p>
 
     <li><code>onCreateEvent &lt;perl-code&gt;</code><br>
-    
+
 		Dieses Attribut f&uuml;hrt ein Perlprogramm &lt;perl-code&gt; f&uuml;r jeden erzeugten Termin aus.
         Weitere Informationen unter <a href="#CalendarPlugIns">Plug-ins</a> im Text.
     </li><p>
-        
+
         <li><code>SSLVerify</code><br>
-    
+
         Dieses Attribut setzt die Art der &Uuml;berpr&uuml;fung des Zertifikats des Partners
-        bei mit SSL gesicherten Verbindungen. Entweder auf 0 setzen f&uuml;r 
+        bei mit SSL gesicherten Verbindungen. Entweder auf 0 setzen f&uuml;r
         SSL_VERIFY_NONE (keine &Uuml;berpr&uuml;fung des Zertifikats) oder auf 1 f&uuml;r
         SSL_VERIFY_PEER (&Uuml;berpr&uuml;fung des Zertifikats). Die &Uuml;berpr&uuml;fung auszuschalten
-        ist n&uuml;tzlich f&uuml;r lokale Kalenderinstallationen(e.g. OwnCloud, NextCloud) 
+        ist n&uuml;tzlich f&uuml;r lokale Kalenderinstallationen(e.g. OwnCloud, NextCloud)
         ohne g&uuml;tiges SSL-Zertifikat.
     </li><p>
-        
+
 <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
@@ -3383,16 +3383,16 @@ sub CalendarAsHtml($;$) {
   <ul><br>
 
   Ein Kalender ist eine Menge von Terminen. Ein Termin hat eine Zusammenfassung (normalerweise der Titel, welcher im Quell-Kalender angezeigt wird), eine Startzeit, eine Endzeit und keine, eine oder mehrere Alarmzeiten. Die Termine werden
-  aus dem Quellkalender ermittelt, welcher &uuml;ber die URL angegeben wird. Sollten mehrere Alarmzeiten f&uuml;r einen Termin existieren, wird nur der fr&uuml;heste Alarmzeitpunkt beibehalten. Wiederkehrende Kalendereintr&auml;ge werden in einem gewissen Umfang unterst&uuml;tzt: 
-  FREQ INTERVAL UNTIL COUNT werden ausgewertet, BYMONTHDAY BYMONTH WKST 
+  aus dem Quellkalender ermittelt, welcher &uuml;ber die URL angegeben wird. Sollten mehrere Alarmzeiten f&uuml;r einen Termin existieren, wird nur der fr&uuml;heste Alarmzeitpunkt beibehalten. Wiederkehrende Kalendereintr&auml;ge werden in einem gewissen Umfang unterst&uuml;tzt:
+  FREQ INTERVAL UNTIL COUNT werden ausgewertet, BYMONTHDAY BYMONTH WKST
   werden erkannt aber nicht ausgewertet. BYDAY wird f&uuml;r w&ouml;chentliche und monatliche Termine
   korrekt behandelt. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Termine mit unerkannten oder nicht ausgewerteten Schl&uuml;sselw&ouml;rtern hast.<p>
 
   Termine werden erzeugt, wenn FHEM gestartet wird oder der betreffende Eintrag im Quell-Kalender ver&auml;ndert
-  wurde oder der Kalender mit <code>get &lt;name&gt; reload</code> neu geladen wird. Es werden nur Termine 
+  wurde oder der Kalender mit <code>get &lt;name&gt; reload</code> neu geladen wird. Es werden nur Termine
   innerhalb &pm;400 Tage um die Erzeugungs des Termins herum erzeugt. Ziehe in Betracht, den Kalender von Zeit zu Zeit
   neu zu laden, um zu vermeiden, dass die k&uuml;nftigen Termine ausgehen. Du kann so etwas wie <code>define reloadCalendar at +*240:00:00 set MyCalendar reload</code> daf&uuml;r verwenden.<p>
-  
+
   Manche dummen Kalender benutzen LAST-MODIFIED nicht. Das kann dazu f&uuml;hren, dass Ver&auml;nderungen im
   Quell-Kalender unbemerkt bleiben. Lade den Kalender neu, wenn Du dieses Problem hast.<p>
 
@@ -3422,34 +3422,34 @@ sub CalendarAsHtml($;$) {
   <tr><td>modeUpcoming</td><td>Ereignisse im zuk&uuml;nftigen Modus</td></tr>
   </table>
   <p>
-  
+
   F&uuml;r Serientermine werden mehrere Termine mit der selben UID erzeugt. In diesem Fall
   wird die UID nur im interessantesten gelesenen Modus-Reading angezeigt.
   Der interessanteste Modus ist der erste zutreffende Modus aus der Liste der Modi start, alarm, upcoming, end.<p>
-  
+
   Die UID eines Serientermins wird nicht angezeigt, solange sich der Termin im Modus: modeEnd oder modeEnded befindet
   und die Serie nicht beendet ist. Die UID befindet sich in einem der anderen mode... Readings.
   Hieraus ergibts sich, das FHEM-Events nicht auf einem mode... Reading basieren sollten.
   Weiter unten im Text gibt es hierzu eine Empfehlung.<p>
   </ul>
-  
+
   <b>Events</b>
   <ul><br>
   Wenn der Kalendar neu geladen oder aktualisiert oder eine Alarm-, Start- oder Endezeit
   erreicht wurde, wird ein FHEM-Event erzeugt:<p>
-  
+
   <code>triggered</code><br><br>
-  
+
   Man kann sich darauf verlassen, dass alle Readings des Kalenders in einem konsistenten und aktuellen
   Zustand befinden, wenn dieses Event empfangen wird.<p>
-  
+
   Wenn ein Termin ge&auml;ndert wurde, werden zwei FHEM-Events erzeugt:<p>
-  
+
   <code>changed: UID &lt;mode&gt;</code><br>
   <code>&lt;mode&gt;: UID</code><br><br>
-  
+
   &lt;mode&gt; ist der aktuelle Modus des Termins nach der &auml;nderung. Bitte beachten: Im FHEM-Event befindet sich ein Doppelpunkt gefolgt von einem Leerzeichen.<p>
-  
+
   FHEM-Events sollten nur auf den vorgenannten Events basieren und nicht auf FHEM-Events, die durch &auml;ndern eines mode... Readings ausgel&ouml;st werden.
   <p>
   </ul>
@@ -3459,7 +3459,7 @@ sub CalendarAsHtml($;$) {
   <ul>
   <br>
   Experimentell, bitte mit Vorsicht nutzen.<p>
-  
+
   Ein Plug-In ist ein kleines Perl-Programm, dass Termine nebenher ver&auml;ndern kann.
   Das Perl-Programm arbeitet mit der Hash-Referenz <code>$e</code>.<br>
   Die wichtigsten Elemente sind:
@@ -3478,8 +3478,8 @@ sub CalendarAsHtml($;$) {
   <code>attr MyCalendar onCreateEvent { $e->{alarm}= $e->{start}-86400 if($e->{summary} =~ /Tonne/);; }</code><br>
   <br>Das doppelte Semikolon maskiert das Semikolon. <a href="#perl">Perl specials</a> k&ouml;nnen nicht genutzt werden.<br>
   </ul>
-  <br><br> 
-  
+  <br><br>
+
   <b>Anwendungsbeispiele</b>
   <ul><br>
     <i>Alle Termine inkl. Details anzeigen</i><br><br>
@@ -3528,23 +3528,23 @@ sub CalendarAsHtml($;$) {
     </code>
 	Dann auf DEF klicken und im DEF-Editor folgendes zwischen die beiden geschweiften Klammern {} eingeben:
     <code>
-                my $reading="$EVTPART0"; 
-                my $uid= "$EVTPART1"; 
-                my $actor= fhem("get MyCalendar summary $uid"); 
-                if(defined $actor) { 
-                   fhem("set $actor on") 
-                } 
+                my $reading="$EVTPART0";
+                my $uid= "$EVTPART1";
+                my $actor= fhem("get MyCalendar summary $uid");
+                if(defined $actor) {
+                   fhem("set $actor on")
+                }
     <br><br>
     define SwitchActorOff notify MyCalendar:end:.* {}<br>
     </code>
 	Dann auf DEF klicken und im DEF-Editor folgendes zwischen die beiden geschweiften Klammern {} eingeben:
     <code>
-                my $reading="$EVTPART0"; 
-                my $uid= "$EVTPART1"; 
-                my $actor= fhem("get MyCalendar summary $uid"); 
-                if(defined $actor) { 
-                   fhem("set $actor off") 
-                } 
+                my $reading="$EVTPART0";
+                my $uid= "$EVTPART1";
+                my $actor= fhem("get MyCalendar summary $uid");
+                if(defined $actor) {
+                   fhem("set $actor off")
+                }
     </code><br><br>
     Auch hier kann ein Logging aufgesetzt werden:<br><br>
     <code>
@@ -3573,10 +3573,9 @@ sub CalendarAsHtml($;$) {
   Dies ist eine rudiment&auml;re Funktion, die vielleicht in k&uuml;nftigen Versionen erweitert wird.
   <p>
   </ul>
-  
-  
+
+
 </ul>
 
 =end html_DE
 =cut
-
