@@ -57,15 +57,17 @@ sub _bsh_pegel_cb($){
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
      $hash->{'.content'} = $content;
-  _bsh_decode($hash,$content);   
+  _bsh_decode($hash);   
 }
 
-sub _bsh_decode($$) {
-  my ($hash,$content) = @_;
+sub _bsh_decode($) {
+  my ($hash) = @_;
   my $name = $hash->{NAME};
+  RemoveInternalTimer($hash,'_bsh_decode');
+  InternalTimer(gettimeofday()+60, "_bsh_decode", $hash, 0);
   
   my $tree= HTML::TreeBuilder::XPath->new;
-  $tree->parse($content);
+  $tree->parse($hash->{'.content'});
   my @ort = $tree->findvalues(q{//strong});
   my (undef,undef,$ort) = split(/ /,$ort[1],3);
   $ort = latin1ToUtf8($ort);
