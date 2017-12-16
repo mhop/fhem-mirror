@@ -1547,20 +1547,19 @@ sub FRITZBOX_Readout_Run_Web($)
                       if defined $wlanList{$mac};
                $dName .= ")";
             }
-            #if ( $_->{ethernet} ) {
-            if ( $_->{speed} ) {
+            if ( $_->{ethernet_port} ) {
                $dName .= " (";
                $dName .= "g"         if $_->{guest};
                $dName .= "LAN" . $_->{ethernet_port};
                #$dName .= "LAN" . $result_lan->{$_->{_node}};
                $dName .= ", 1 Gbit/s"    if $_->{speed} eq "1000";
-               $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} != 1000 && $_->{speed} != 0;
+               $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} ne "1000" && $_->{speed} ne "0";
                $dName .= ")";
             }
             my $rName = "mac_".$mac;
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
-            $wlanCount++      if $_->{wlan} == 1;
-            $gWlanCount++      if $_->{wlan} == 1 && $_->{guest} == 1;
+            $wlanCount++      if $_->{wlan} ;
+            $gWlanCount++      if $_->{wlan}  && $_->{guest} ;
             # Remove mac address from oldLanDevice-List
             delete $oldLanDevice{$rName}   if exists $oldLanDevice{$rName};
          }
