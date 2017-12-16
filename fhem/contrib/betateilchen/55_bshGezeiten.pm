@@ -56,7 +56,13 @@ sub _bsh_pegel_cb($){
   my ($param, $err, $content) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
+     $hash->{'.content'} = $content;
+  _bsh_decode($hash,$content);   
+}
 
+sub _bsh_decode($$) {
+  my ($hash,$content) = @_;
+  
   my $tree= HTML::TreeBuilder::XPath->new;
   $tree->parse($content);
   my @ort = $tree->findvalues(q{//strong});
@@ -87,5 +93,6 @@ sub _bsh_pegel_cb($){
   readingsBulkUpdate($hash,'state','active');
   readingsEndUpdate($hash,1);
 }
+
 
 1;
