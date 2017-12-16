@@ -62,6 +62,7 @@ sub _bsh_pegel_cb($){
 
 sub _bsh_decode($$) {
   my ($hash,$content) = @_;
+  my $name = $hash->{NAME};
   
   my $tree= HTML::TreeBuilder::XPath->new;
   $tree->parse($content);
