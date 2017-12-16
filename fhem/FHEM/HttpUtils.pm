@@ -615,7 +615,6 @@ sub
 HttpUtils_DataComplete($)
 {
   my ($hash) = @_;
-  my ($hdr, $data) = ($1, $2);
   my $hl = $hash->{httpdatalen};
   if(!defined($hl)) {
     return 0 if($hash->{buf} !~ m/^(.*?)\r?\n\r?\n(.*)$/s);
@@ -744,8 +743,11 @@ HttpUtils_ParseAnswer($)
     if($hash->{buf} =~ m/^(HTTP.*?)\r?\n\r?\n(.*)$/s) {
       $hash->{httpheader} = $1;
       $hash->{httpdata} = $2;
+      delete($hash->{buf});
     } else {
-      return ("", $hash->{buf});
+      my $ret = $hash->{buf};
+      delete($hash->{buf});
+      return ("", $ret);
     }
   }
   my $ret = $hash->{httpdata};
