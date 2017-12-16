@@ -1,6 +1,6 @@
 ###############################################################################
 #
-# $Id$
+# $Id:17-10-30 13:41:59Z Wzut $
 # 96_SIP.pm 
 # Based on FB_SIP from  werner.meines@web.de
 #
@@ -54,7 +54,7 @@ use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.61 / 30.10.17";
+my $sip_version ="V1.71 / 16.12.17";
 my $ua;	# SIP user agent
 my @fifo;
 
@@ -76,7 +76,7 @@ sub SIP_Initialize($$)
   $hash->{UndefFn}      = "SIP_Undef";
   $hash->{ShutdownFn}   = "SIP_Undef";
   $hash->{SetFn}        = "SIP_Set";
-  $hash->{GetFn}        = "SIP_Get";
+  #$hash->{GetFn}        = "SIP_Get";
   $hash->{NotifyFn}     = "SIP_Notify";
   $hash->{AttrFn}       = "SIP_Attr";
   $hash->{AttrList}     = "sip_watch_listen ".   #
@@ -100,6 +100,7 @@ sub SIP_Initialize($$)
                           "sip_blocking ".                #
                           "sip_elbc:yes,no ".             #
                           "sip_force_interval ".          #
+                          "sip_force_max ".               #
                           "T2S_Device ".                  #
                           "T2S_Timeout ".                 #
                           "audio_converter:sox,ffmpeg ".  #
@@ -306,34 +307,44 @@ sub SIP_updateConfig($)
 }
     
 
-sub SIP_Register($$$)
+sub SIP_Register($$)
 {
-  my ($hash,$port,$type) = @_;
+  my ($hash,$type) = @_;
   my $name    = $hash->{NAME};
   $hash->{LPID} = $$;
   my $logname = $name."[".$hash->{LPID}."]";
   my $ip      = AttrVal($name,"sip_ip","");
+  my $port    = int(AttrVal($name,"sip_port",0));
+  my $leg;
   return "missing attribute sip_ip" if (!$ip);
   return "this is the IP address of your registrar , not your FHEM !" if ($ip eq AttrVal($name,"sip_registrar","")); 
   return "invalid IP address $ip" if (($ip eq "0.0.0.0") || ($ip eq "127.0.0.1")); 
 
-  my $leg = IO::Socket::INET->new(Proto => 'udp', LocalHost => $ip, LocalPort => $port);
-
-  # if  port is already used try another one
-  if (!$leg) 
+  if ($port)
   {
-   Log3 $name,2,"$logname, cannot open port $port at $ip: $!";
-   $port += 10;
-   $leg = IO::Socket::INET->new(
-        Proto => 'udp',
-    LocalHost => $ip,
-    LocalPort => $port) || return "can't open port ".($port-10)." or $port at $ip: $!";
+   $port +=10 if ($type eq "calling");
+   Log3 $name,4,"$logname, trying to use port $port";
+
+   $leg = IO::Socket::INET->new(Proto => 'udp', LocalHost => $ip, LocalPort => $port);
+
+   # if  port is already used try another one
+   if (!$leg) 
+   {
+    Log3 $name,1,"$logname, cannot open port $port at $ip : ".$!;
+    $port += 10;
+    $leg = IO::Socket::INET->new(Proto => 'udp', LocalHost => $ip, LocalPort => $port) || return "can't open port $port at $ip : ".$!;
     Log3 $name,2,"$logname, using secundary port $port with IP $ip";
+   }
+
+   close($leg);
+   $leg = $ip.":".$port;
+  }
+  else 
+  {
+    $leg = $ip;
+    Log3 $name,4,"$logname, using Leg.pm to find a free port";
   }
 
-  close($leg);
-  $leg = $ip.":".$port;
-  
   my $registrar = AttrVal($name,"sip_registrar","fritz.box");
   my $user      = AttrVal($name,"sip_user","620");
   my $from      = AttrVal($name,"sip_from","sip:".$user."@".$registrar);   
@@ -363,9 +374,13 @@ sub SIP_Register($$$)
         Log3 $name,4,"$logname, register new expire : ".FmtDateTime(time()+$expire);
     
         if (AttrVal($name,"sip_listen","none") ne "none")
-        { SIP_telnet($hash,"set $name state $type\nset $name listen_alive PID_".$hash->{LPID}."\nset $name expire $expire\nexit\n"); }
+        { 
+          BlockingInformParent("SIP_rBU", [$name,"state:$type|listen_alive:".$hash->{LPID}."|expire:$expire"],0);
+        }
         else
-        { SIP_telnet($hash,"set $name state $type\nexit\n"); }
+        { 
+          BlockingInformParent("SIP_rSU", [$name, "state:$type"], 0);
+        }
 	# need to refresh registration periodically
 	$ua->add_timer( $expire/2, $sub_register );
   };
@@ -374,6 +389,7 @@ sub SIP_Register($$$)
 
   if($ua->register) # returned  expires time or undef if failed
   {
+   #Log3 $name,4,Dumper($ua);
    return 0;
   }
 
@@ -389,16 +405,14 @@ sub SIP_CALLStart($)
   my ($name,$nr,$ringtime,$msg,$repeat) = split("\\|",$arg);
   my $hash              = $defs{$name};
   my $logname           = $name."[".$$."]";
-     $hash->{telnetPort}= undef;
      $ua                = undef;
   my $rtp_done          = 0;
   my $dtmf              = 'ABCD*#123--4567890';
-  my $port              = AttrVal($name,"sip_port",0);
   my $delay             = AttrVal($name,"sip_call_audio_delay",0); # Verzoegerung in 1/4 Sekunden Schritten 
   my $w                 = ($delay) ? -1 : 0;
   my $fi                = 0;
      #$repeat            = 0 if (!$repeat); 
-  my $packets           = int($delay)*50;
+  my $packets           = int($delay*50);
   my $timeout           = 0;
   my $final;
   my $peer_hangup;
@@ -408,7 +422,7 @@ sub SIP_CALLStart($)
   my $no_answer; 
   my $call; 
   my $codec;
-  my $call_established;
+  my $call_established  = 0;
   my @files;
   my $anz;
   my $stat;
@@ -422,17 +436,7 @@ sub SIP_CALLStart($)
   $hash->{parent} = getppid();
   Log3 $name,4,"$logname, my parent is ".$hash->{parent};
 
-  $hash->{telnetPort} = SIP_telnetPort();
-  return $name."|no telnet port without password found" if (!$hash->{telnetPort}); 
-
-  if (!$port)
-  { 
-   srand $$;
-   $port = int(rand(500)+44000); 
-   Log3 $name,4,"$logname, using random port $port";
-  }
-
-  my $error = SIP_Register($hash,$port,"calling");
+  my $error = SIP_Register($hash,"calling");
   return $name."|0|CallRegister: $error" if ($error);
  
   if ((substr($msg,0,1) ne "-") && $msg)
@@ -460,13 +464,14 @@ sub SIP_CALLStart($)
                          Log3 $name,4,"$logname, cb_final - status : $status - final : $final" if (defined($final));
                          if (($status eq "FAIL") && defined($final))
                           {
-                            if    (int($final) == 481) { SIP_telnet($hash,"set $name call_state ringing\nexit\n"); }
-                            elsif (int($final) == 486) { $fi=1 ; } # Anruf abgelehnt
+                            if    (int($final) == 481) { BlockingInformParent("SIP_rSU", [$name, "call_state:ringing"], 0);} # bis Net::SIP 0.808
+                            elsif (int($final) == 486) { $fi=1; } # canceled
+                            elsif (int($final) == 603) { $fi=1; } # declined - ab Net::SIP 0.812
                           }
                           elsif (($status eq "OK") && !defined($final) && !$call_established) # der Angrufene hat abgenommen
                           {
                             Log3 $name,4, $logname.", call established";
-                            SIP_telnet($hash,"set $name call_state established\nexit\n");
+                            BlockingInformParent("SIP_rSU", [$name, "call_state:established"], 0);
                             $call_established++; # nur 1x , bei mehr als einem File kommen wir ofters hier vorbei
                           }
                        },
@@ -490,13 +495,15 @@ sub SIP_CALLStart($)
                          Log3 $name,4,"$logname, cb_final - status : $status - final : $final" if (defined($final));
                          if (($status eq "FAIL") && defined($final)) 
                          {
-                          if    (int($final) == 481) { SIP_telnet($hash,"set $name call_state ringing\nexit\n"); }
-                          elsif (int($final) == 486) { $fi=1 };
+                          if    (int($final) == 481) { BlockingInformParent("SIP_rSU", [$name, "call_state:ringing"], 0); } # bis Net::SIP 0.808
+                          elsif (int($final) == 486) { $fi=1; } # canceled
+                          elsif (int($final) == 603) { $fi=1; } # declined - ab Net::SIP 0.812
                          }
                          elsif (($status eq "OK") && !defined($final)) # der Angrufene hat abgenommen
                          {
                           Log3 $name,4, $logname.", call established";
-                          SIP_telnet($hash,"set $name call_state established\nexit\n");
+                          BlockingInformParent("SIP_rSU", [$name, "call_state:established"], 0);
+                          $call_established = 1; # setzen für die spätere Entscheidung bye oder cancel
                          }
                        },
     #cb_noanswer => \$no_answer,
@@ -512,8 +519,8 @@ sub SIP_CALLStart($)
   return "$name|0|invite call failed ".$call->error if ($call->error);
 
   Log3 $name,4,"$logname, calling : $nr";
-  SIP_telnet($hash,"set $name call_state calling $nr\nexit\n"); 
-
+  BlockingInformParent("SIP_rSU", [$name, "call_state:calling $nr"], 0);
+ 
   #return "$name|1|no answer" if ($no_answer);
 
   $ua->add_timer($ringtime,\$stopvar);
@@ -522,11 +529,14 @@ sub SIP_CALLStart($)
   $timeout = 1 if defined($stopvar); # hat der bereits zugeschlagen ?
 
   Log3 $name,5,"$logname, 0. Ende des ersten Loops";
-  Log3 $name,5,"$logname, 1. rtp_done : $rtp_done"       if defined($rtp_done);
-  Log3 $name,5,"$logname, 2. fi : $fi"                   if defined($fi);
-  Log3 $name,5,"$logname, 3. timeout : $timeout";
-  Log3 $name,5,"$logname, 4. peer_hangup : $peer_hangup" if defined($peer_hangup);
- 
+  Log3 $name,5,"$logname, 1. rtp_done : $rtp_done"      if defined($rtp_done);
+  Log3 $name,5,"$logname, 2. fi : $fi"                  if defined($fi);
+  Log3 $name,5,"$logname, 3. Final   : $final"          if defined($final);
+  Log3 $name,5,"$logname, 4. timeout : ".$timeout;
+  Log3 $name,5,"$logname, 5. peer_hangup : $peer_hangup" if defined($peer_hangup);
+  Log3 $name,5,"$logname, 6. call_established : ".$call_established;
+  Log3 $name,5,"$logname, 7. no_answer : $no_answer"     if defined($no_answer);
+
   
   # Lebt der Call noch und gibt es ueberhaupt etwas zum wiederholen ?
   while  ( !$peer_hangup && !$peer_hangup2 && !$fi && !$stopvar && $msg && ($anz > 1)) 
@@ -543,7 +553,7 @@ sub SIP_CALLStart($)
 
     $call->reinvite(
      init_media => $ua->rtp('send_recv', $files[0]),
-      #rtp_param => [0, 160, 160/8000, 'PCMU/8000'], unebeding weglassen ! fuehrt zu Verzerrungen bei der Wiedergabe :(
+      #rtp_param => [0, 160, 160/8000, 'PCMU/8000'], unebeding weglassen ! fuehrt zu Verzerrungen bei der Wiedergabe 
     cb_rtp_done => \$rtp_done,
        recv_bye => \$peer_hangup2, # FIXME: do we need to repeat this? Wzut : I think so ...
                    ) || return $name."|0|reinvite failed: ".$ua->error;
@@ -558,7 +568,16 @@ sub SIP_CALLStart($)
   if ( $timeout || $rtp_done) 
   {
     $stopvar = undef;
-    $call->bye( cb_final => \$stopvar );
+    if ($timeout && !$call_established)
+    { 
+      Log3 $name,5,"$logname, call->cancel";
+      $call->cancel( cb_final => \$stopvar ); 
+    }
+    else
+    { 
+      Log3 $name,5,"$logname, call->bye";
+      $call->bye( cb_final => \$stopvar ); 
+    }
     $ua->loop( \$stopvar );
   }
  
@@ -588,7 +607,7 @@ sub SIP_CALLStart($)
    }
   }
 
-  # immer noch kein richtiger Test zur Rueckgabe ?
+  # immer noch kein richtiger Text zur Rueckgabe ?
 
   $final  = "unknown"     if (!defined($final) && !$timeout);
   $final  = "timeout"     if (!defined($final) && $timeout);
@@ -611,24 +630,39 @@ sub SIP_CALLDone($)
    my $final   = (defined($r[2])) ? $r[2] : "???";
    my $name    = $hash->{NAME};
    my $success = (substr($final,0,2) eq "ok") ? 1 : 0;
+   my $calltime = 0;
+   my (undef,$nr,$ringtime,$msg,$repeat,$force) = split("\\|",$hash->{CALL}); # zerlegen wir den Original Call
    my @a;
+   my @fo = (300,0,0);
 
    Log3 $name, 4,"$name, CALLDone -> $string";
    
-   my $calltime = time() - $hash->{helper}{CALL_START};
    delete($hash->{helper}{CALL_PID}) if (defined($hash->{helper}{CALL_PID}));
    delete($hash->{CPID})             if (defined($hash->{CPID}));
    delete $hash->{lastnr}            if (defined($hash->{lastnr}));
-   delete($hash->{helper}{CALL_START}) if (defined($hash->{helper}{CALL_START}));
-   
+   if (defined($hash->{helper}{CALL_START}))
+   {
+    $calltime = time() - $hash->{helper}{CALL_START};
+    delete($hash->{helper}{CALL_START});
+   }
+
+   if ($force)
+   {
+     $force =~ s/^\&//;
+     @fo =  split(",",$force);
+     $fo[2]++ if(!$success); # Anzahl bisheriger Durchläufe
+   }
+
    if ($error ne "1")
    {
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "call","done");
-    readingsBulkUpdate($hash, "call_time",int($calltime)) if defined($calltime);
+    readingsBulkUpdate($hash, "call_time",int($calltime))   if defined($calltime);
     readingsBulkUpdate($hash, "last_error",$final);
     readingsBulkUpdate($hash, "call_state","fail");
     readingsBulkUpdate($hash, "call_success","0");
+    readingsBulkUpdate($hash, "call_attempt",$fo[2])        if ($force);
+    readingsBulkUpdate($hash, "call_attempt","0")           if (!$force);
     readingsBulkUpdate($hash, "state",$hash->{'.oldstate'}) if defined($hash->{'.oldstate'});
     readingsEndUpdate($hash, 1);
    }
@@ -638,31 +672,37 @@ sub SIP_CALLDone($)
     readingsBulkUpdate($hash, "call","done");
     readingsBulkUpdate($hash, "call_state",lc($final));
     readingsBulkUpdate($hash, "call_success",$success);
-    readingsBulkUpdate($hash, "call_time",int($calltime)) if defined($calltime);
+    readingsBulkUpdate($hash, "call_time",int($calltime))   if defined($calltime);
     readingsBulkUpdate($hash, "state",$hash->{'.oldstate'}) if defined($hash->{'.oldstate'});
+    readingsBulkUpdate($hash, "call_attempt",$fo[2])        if ($force);
+    readingsBulkUpdate($hash, "call_attempt","0")           if (!$force);
     readingsEndUpdate($hash, 1);
    }
 
-   my (undef,$nr,$ringtime,$msg,$repeat,$force) = split("\\|",$hash->{CALL}); # zerlegen wir den Original Call
-
    if ($force && !$success)
     {
-     #$repeat = "0" if (!defined($repeat) || ($repeat eq "")) ;
-     $repeat++; $repeat--; 
-     $force =~ s/^\&//;
-     $force++; $force--;
+      $repeat++; $repeat--; 
 
-     my $nr2 = $nr;
-     $nr2 =~ tr/0-9//cd;
+      my $nr2 = $nr;
+      $nr2 =~ tr/0-9//cd;
+      $nr2 .= "_"; 
+      $nr2 .= unpack ("%16C*",$msg);
 
-     my $t = ($force) ? $force : int(AttrVal($name,"sip_force_interval",60));
+     if ($fo[2] < $fo[1]) # bisherige Anzahl kleiner max Wiederholungen ?
+     {
+      $force = "&".join(",", @fo);
 
-     my $time_s = strftime("\%H:\%M:\%S", gmtime($t));
-     $error = CommandDefine(undef, "at_forcecall_".$nr2." at +".$time_s." set $name call $nr $ringtime $msg *".$repeat." &".$t);
-     if (!$error) { $attr{"at_forcecall_".$nr2}{room} = AttrVal($name,"room","Unsorted"); } 
-     else { Log3 $name,2,"$name, $error"; }
-     Log3 $name,4,"$name, at_forcecall_".$nr2." at +".$time_s." set $name call $nr $ringtime $msg *".$repeat." &".$force;
-    }
+      my $time_s = strftime("\%H:\%M:\%S", gmtime($fo[0]));
+      $error = CommandDefine(undef, "at_forcecall_".$nr2." at +".$time_s." set $name call $nr $ringtime $msg *".$repeat." ".$force);
+      if (!$error) { $attr{"at_forcecall_".$nr2}{room} = AttrVal($name,"room","Unsorted"); } 
+      else { Log3 $name,2,"$name, $error"; }
+      Log3 $name,4,"$name, at_forcecall_".$nr2." at +".$time_s." set $name call $nr $ringtime $msg *".$repeat." ".$force;
+     }
+     else 
+     { 
+       Log3 $name,3,"$name, at_forcecall_".$nr2." max count $fo[1] reached giving up !"; 
+     }
+    } ### end force and !$success
  
    my $nextcall = shift @fifo; # sind da noch Calls in der Queue ?
    if ($nextcall)
@@ -728,17 +768,28 @@ sub SIP_Set($@)
 
     my $anz = @a;
     $anz--; # letztes Element
+
     my $force  = (substr($a[$anz],0,1) eq "&") ? $a[$anz] : 0;
-    $anz-- if ($force); # checken wir dann noch auf repeat 
+    if ($force)
+    {
+     Log3 $name,3,"$name, force call $force";
+     $force =~ s/^\&//;
+     my @fo = split(",", $force);
+     $fo[0] = int(AttrVal($name,"sip_force_interval",300)) if (!$fo[0]);
+     $fo[1] = int(AttrVal($name,"sip_force_max",99)) if (!$fo[1]);
+     $fo[2] = 0 if (!$fo[2]);
+     $force = "&".join("," , @fo);
+     $anz--; # checken wir dann noch auf repeat 
+    }
+
     my $repeat = 0;
-    if (substr($a[$anz],0,1) eq "*")
+    if ((substr($a[$anz],0,1) eq "*") && ($anz > 3))
     { 
       $repeat = $a[$anz];
       $repeat =~ s/^\*//;
       $repeat ++; $repeat --;
     } # * weg , Rest als Int
   
-    Log3 $name,3,"$name, force call" if ($force);
     Log3 $name,4,"$name, msg will be repeat $repeat times" if ($repeat);
 
      if (exists($hash->{LPID}) && (AttrVal($name,"sip_elbc","no") ne "no"))
@@ -776,7 +827,7 @@ sub SIP_Set($@)
        my $ret = SIP_create_T2S_File($hash,@a); # na dann lege schon mal los
        return $ret if defined($ret); # Das ging leider schief
 
-       readingsSingleUpdate($hash,"call_state","waiting T2S",0);
+       readingsSingleUpdate($hash,"call_state","waiting T2S",1);
 
        RemoveInternalTimer($hash);
        # geben wir T2S mal ein paar Sekunden
@@ -880,42 +931,7 @@ sub SIP_Set($@)
   # den Rest als ein String
   $subcmd = join(" ",@a);
 
-  if ($cmd eq "state")
-  {
-   readingsSingleUpdate($hash, "state",$subcmd,1);
-   return undef;
-  }
-  elsif ($cmd eq "listen_alive")
-  {
-   readingsSingleUpdate($hash, "listen_alive",$subcmd,1);
-   return undef;
-  }
-  elsif ($cmd eq "expire")
-  {
-   readingsSingleUpdate($hash, "expire",$subcmd,1);
-   return undef;
-  }
-  elsif ($cmd eq "caller")
-  {
-   readingsSingleUpdate($hash, "caller",$subcmd,1);
-   return undef;
-  }
-  elsif ($cmd eq "caller_state")
-  {
-   readingsSingleUpdate($hash, "caller_state",$subcmd,1);
-   return undef;
-  }
-  elsif ($cmd eq "call_state")
-  {
-   readingsSingleUpdate($hash, "call_state",$subcmd,1);
-   return undef;
-  }
-  elsif ($cmd eq "caller_time")
-  {
-   readingsSingleUpdate($hash, "caller_time",$subcmd,1);
-   return undef;
-  }
-  elsif ($cmd eq "password")
+  if ($cmd eq "password")
   {
     return SIP_storePassword($name,$subcmd);
   }
@@ -923,15 +939,15 @@ sub SIP_Set($@)
   return "Unknown argument: $cmd, choose one of ".join(" ", sort keys %sets);
 }	
 
-sub SIP_Get($@) 
-{
-  my ($hash, @a) = @_;
-  my $name = $hash->{NAME}; 
-  my $cmd  = $a[1];
-  return ReadingsVal($name,"caller","???") if ($cmd eq "caller");
+#sub SIP_Get($@) 
+#{
+#  my ($hash, @a) = @_;
+#  my $name = $hash->{NAME}; 
+#  my $cmd  = $a[1];
+#  return ReadingsVal($name,"caller","???") if ($cmd eq "caller");
   #return "Unknown argument: $cmd, choose one of caller:noArg";
-  return undef;
-} 
+#  return undef;
+#} 
 
 
 sub SIP_Undef($$) 
@@ -954,7 +970,6 @@ sub SIP_ListenStart($)
  my $hash             = $defs{$name}; # $hash / $name gueltig in diesem Block 
  $hash->{parent} = getppid();
  Log3 $name,4,"$logname, my parent is ".$hash->{parent};
- $hash->{telnetPort}  = undef;
 
  my $dtmfloop;		# Ende-Flag für die DTMF-Schleife
  my $okloop;		# Ende-Flag für die OK-Ansage
@@ -970,20 +985,8 @@ sub SIP_ListenStart($)
  my $sub_dtmf;
  my $send_something;
 
- $hash->{telnetPort} = SIP_telnetPort();
-
- return $name."|no telnet port without password found" if (!$hash->{telnetPort}); 
-
- my $port = AttrVal($name,"sip_port",0);
- if (!$port)
- {  
-   srand $$;
-   $port = int(rand(500)+44500);
-   Log3 $name,4,"$logname, using random port $port"; 
- }
- else { $port += 10; }
  $ua = undef;
- my $error = SIP_Register($hash,$port,"listen_".AttrVal($name,"sip_listen",""));
+ my $error = SIP_Register($hash,"listen_".AttrVal($name,"sip_listen",""));
  return $name."|ListenRegister: $error" if ($error);
  
  my $msg1 = AttrVal($name, "sip_audiofile_dtmf", "");
@@ -1039,7 +1042,7 @@ sub SIP_ListenStart($)
    
    if ($hash->{dtmf} > int(AttrVal($name,"sip_dtmf_size",2)))
    {
-      SIP_telnet($hash,"set $name dtmf_event ".$hash->{dtmf_event}."\n");
+      BlockingInformParent("SIP_rSU", [$name, "dtmf_event:".$hash->{dtmf_event}], 0);
       $hash->{dtmf}       = 0;
       $hash->{dtmf_event} = "";
       $hash->{old}        = "-";
@@ -1078,35 +1081,39 @@ sub SIP_ListenStart($)
    }
 
    Log3 $name, 4,"$logname, SIP_invite -> ringing $i";
-   SIP_telnet($hash,"set $name caller_state ringing_$i\nexit\n");
-   sleep 1;
-   ######## $$$ read state of my device
-   my $action = SIP_telnet($hash,"get $name caller\n");
-   if ( $action eq "fetch" ) 
-   { 
-    Log3 $name, 4,"$logname, SIP_invite fetch !";
-    SIP_telnet($hash,"set $name caller_state fetching\nexit\n");
-    last; 
-   }
-   elsif ( $action eq "reject" ) 
-   { 
-    Log3 $name, 4,"$logname, SIP_invite block !";
-    SIP_telnet($hash,"set $name caller_state rejected\nexit\n");
-    
-    my $call    = $hash->{call};
-    my $request = $hash->{request};
-    my $leg     = $hash->{leg};
-    my $from    = $hash->{from};
+   select(undef, undef, undef, 1); # 1 Sekunde Pause
 
-    my $response = $request->create_response('603','Declined');
-    $call->{endpoint}->new_response( $call->{ctx},$response,$leg,$from );
+   my $action = BlockingInformParent("SIP_rSU", [$name, "caller_state:ringing $i"], 1);
+
+   if(defined($action))
+   { 
+    Log3 $name, 5,"$logname, action : $action";
+
+    if ( $action eq "fetch" ) 
+    { 
+     Log3 $name, 4,"$logname, SIP_invite fetch !";
+     BlockingInformParent("SIP_rSU", [$name, "caller_state:fetching"], 0);
+     last; 
+    }
+    elsif ( $action eq "reject" ) 
+    { 
+     Log3 $name, 4,"$logname, SIP_invite block !";
+     BlockingInformParent("SIP_rSU", [$name, "caller_state:rejected"], 0);
+
+     my $call    = $hash->{call};
+     my $request = $hash->{request};
+     my $leg     = $hash->{leg};
+     my $from    = $hash->{from};
+
+     my $response = $request->create_response('603','Declined');
+     $call->{endpoint}->new_response( $call->{ctx},$response,$leg,$from );
  
-    last; 
+     last; 
+    }
    }
-
-
   }
-  SIP_telnet($hash, "set $name caller none\nset $name caller_state waiting\nexit\n") if (($i>$waittime) || $block_it);
+
+  BlockingInformParent("SIP_rBU", [$name, "caller:none|caller_state:waiting"], 0) if (($i>$waittime) || $block_it);
 
   return 0;
  };
@@ -1123,7 +1130,8 @@ sub SIP_ListenStart($)
   $caller =~ s/\>//g;
   $caller =~ s/\<//g; # fhem mag keine <> in ReadingsVal :(
   $caller = "???" if (!$caller);
-  SIP_telnet($hash, "set $name caller $caller\nexit\n");
+
+  BlockingInformParent("SIP_rSU", [$name,"caller:".$caller],0);
 
   my ($callnr,undef)  = split("\@", $caller);
  
@@ -1135,7 +1143,7 @@ sub SIP_ListenStart($)
     {
      if ((index($callnr, $_) > -1) || ($_ eq ".*"))
      {
-       SIP_telnet($hash,"set $name caller_state blocking\nexit\n");
+       BlockingInformParent("SIP_rSU", [$name, "caller_state:blocking"], 0);
        Log3 $name, 4, "$logname, blocking $callnr found on $block";
        $block_it = 1;
        #$byebye = 1;
@@ -1148,7 +1156,7 @@ sub SIP_ListenStart($)
   {
     @callers = split (/,/,$filter); 
     foreach (@callers) { return 1 if (index($callnr, $_) > -1); }
-    SIP_telnet($hash,"set $name caller_state ignoring\nexit\n");
+    BlockingInformParent("SIP_rSU", [$name, "caller_state:ignoring"], 0);
     Log3 $name, 4, "$logname, ignoring $callnr number not found in $filter"; 
     return 0;
   }
@@ -1159,8 +1167,9 @@ sub SIP_ListenStart($)
  {
   my ($event) = @_;
   Log3 $name, 5,  "$logname, SIP_bye : $event";
-  my $calltime = int(time()-$hash->{CALL_START});
-  SIP_telnet($hash, "set $name caller none\nset $name caller_state hangup\nset $name caller_time $calltime\nexit\n") ;
+  my $calltime = 0;
+  $calltime = int(time()-$hash->{CALL_START}) if ($hash->{CALL_START});
+  BlockingInformParent("SIP_rBU", [$name, "caller:none|caller_state:hangup|caller_time:$calltime"], 0);
   $byebye = 1;
   return 1;
  };
@@ -1170,10 +1179,10 @@ sub SIP_ListenStart($)
  if (AttrVal($name,"sip_listen", "none") eq "dtmf")
  {
      $hash->{dtmf} = 0;
-     $dtmfloop     = 0;	# Ende-Flag für die DTMF-Schleife
-     $okloop       = 0;	# Ende-Flag für die OK-Ansage
-     $okloopbye    = 0;	# Ende-Flag für recv_bye währne der OK-Ansage
-     $byebye       = 0;	# Anrufer hat aufgelegt
+     $dtmfloop     = 0; # Ende-Flag für die DTMF-Schleife
+     $okloop       = 0; # Ende-Flag für die OK-Ansage
+     $okloopbye    = 0; # Ende-Flag für recv_bye währne der OK-Ansage
+     $byebye       = 0; # Anrufer hat aufgelegt
 
      while(1)
      {
@@ -1182,13 +1191,13 @@ sub SIP_ListenStart($)
      $hash->{dtmf_event} = "";
      $hash->{old}        ="-";
 
-     SIP_telnet($hash, "set $name caller none\nset $name caller_state waitting\nexit\n") ;
-
+     BlockingInformParent("SIP_rBU", [$name, "caller:none|caller_state:waiting"], 0);
+ 
      $ua->listen (cb_create => \&$sub_create,
                   cb_invite =>  sub {
                                      if (!$block_it)
                                      {  
-                                      SIP_telnet($hash,"set $name caller_state ringing\nexit\n");
+                                      BlockingInformParent("SIP_rSU", [$name,"caller_state:ringing"],0);
                                       sleep int(AttrVal($name, "sip_ringtime", 3)); #Anrufer hört das typische Klingeln wenn die Gegenseite nicht abnimmt
                                      }
                                     }, 
@@ -1198,7 +1207,7 @@ sub SIP_ListenStart($)
                                      if (!$block_it)
                                           { 
                                              $hash->{CALL_START} = time();
-                                             SIP_telnet($hash,"set $name caller_state established\nexit\n"); return 1; 
+                                             BlockingInformParent("SIP_rSU", [$name,"caller_state:established"],0);
                                           } 
                                      else { 
                                             sleep 1;
@@ -1250,7 +1259,7 @@ sub SIP_ListenStart($)
        } 
         else { $dtmf_loop = ((AttrVal($name,"sip_dtmf_loop","once") eq 'once')) ? 0 : 1;
                my $calltime = int(time()-$hash->{CALL_START});
-               SIP_telnet($hash, "set $name caller_state hangup\nset $name caller_time $calltime\nexit\n") if(!$dtmf_loop);
+               BlockingInformParent("SIP_rBU", [$name, "caller_state:hangup|caller_time:$calltime"], 0) if(!$dtmf_loop);
              } # führt ggf. zum Schleifenende
      } # end inner loop
 
@@ -1283,7 +1292,7 @@ sub SIP_ListenStart($)
                cb_invite =>  sub {
                                   if (!$block_it)
                                   {  
-                                   SIP_telnet($hash,"set $name caller_state ringing\nexit\n");
+                                   BlockingInformParent("SIP_rSU", [$name,"caller_state:ringing"],0);
                                    sleep int(AttrVal($name, "sip_ringtime", 3)); #Anrufer hört das typische Klingeln wenn die Gegenseite nicht abnimmt
                                   }
                                  }, 
@@ -1551,53 +1560,6 @@ sub SIP_wait_for_t2s($)
   return undef;
 }
 
-sub SIP_telnetPort()
-{
- foreach my $d (sort keys %defs) 
- {  
-    my $h = $defs{$d};
-    next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
-    next if($attr{$d}{SSL} || AttrVal($d, "allowfrom", "127.0.0.1") ne "127.0.0.1");
-    next if($h->{DEF} !~ m/^\d+( global)?$/);
-    next if($h->{DEF} =~ m/IPV6/);
-    my %cDev = ( SNAME=>$d, TYPE=>$h->{TYPE}, NAME=>$d.time() );
-    next if(Authenticate(\%cDev, undef) == 2);    # Needs password
-    #$hash->{telnetPort} = $defs{$d}{"PORT"};
-    #last;
-    return $defs{$d}{"PORT"};
- }
- return 0;
-}
-
-sub SIP_telnet($$)
-{
-  my ($hash,$cmd) = @_;
-  my $name        = $hash->{NAME};
-  my $logname     = $name."[".$$."]";
-  my $txt         = $cmd;
-  $txt            =~ s/\n/ /g;
-  Log3 $name, 5,  "$logname, telnet : $txt";
-
-  my $sock  = IO::Socket::INET->new(
-              PeerHost => "127.0.0.1",
-              PeerPort => $hash->{telnetPort},
-              Proto    => 'tcp',
-              Timeout  => 2);
-  if ($sock)
- {
-      print $sock "$cmd";
-      if (substr($cmd,0,3) eq "get") 
-      {
-         while (<$sock>)  { last if $_ ; } # end of output
-         #$_ =~ s/.* //; # ?? warum ?
-         $_ =~ s/\n//;
-         print $sock "exit\n";
-      }
-      close($sock);
-      return $_;
- } 
- return undef;
-}
 ######################################################
 # storePW & readPW Code geklaut aus 72_FRITZBOX.pm :)
 ######################################################
@@ -1751,6 +1713,37 @@ sub SIP_readPassword($)
    }
  }
 
+#####################################
+# Benutzt um Infos aus dem Blockingprozess in die Readings zu schreiben
+#####################################
+sub SIP_rSU($$) {
+  my ($name, $line) = @_;
+  my $hash = $defs{$name};
+  my ($reading,$val) = split(":",$line);
+  Log3 $hash, 5, "$name, readingS:$reading Val:$val";
+  readingsSingleUpdate($hash, $reading, $val, 1);
+  # Sonderfall bei wfp , Abfrage des caller  auf fetch oder reject 
+  return ReadingsVal($name,"caller","???") if (($reading eq "caller_state") && (substr($val,0,7) eq "ringing"));
+  return undef;
+}
+
+sub SIP_rBU($$) {
+  my ($name, $line) = @_;
+  my $hash = $defs{$name};
+  readingsBeginUpdate($hash);
+  my @pair = split("\\|",$line);
+  foreach (@pair)
+  {
+   my ($reading,$val) = split(":",$_);
+   {
+     Log3 $hash, 5, "$name, readingB:$reading Val:$val";
+     readingsBulkUpdate($hash, $reading, $val);
+   }
+  }
+  readingsEndUpdate($hash, 1 );
+  return undef;
+}
+
 1;
 
 =pod
@@ -1848,6 +1841,12 @@ sub SIP_readPassword($)
     <li><a name="#sip_dtmf_loop">sip_dtmf_loop</a><br>
     once or loop , default once      ...
     </li>
+    <li><a name="#sip_force_interval">sip_force_interval</a><br>
+    default 300
+    </li>
+    <li><a name="#sip_force_max">sip_force_max</a><br>
+    default 99
+    </li>
 
   </ul>
   <br>
@@ -1924,7 +1923,6 @@ sub SIP_readPassword($)
       Optinale Portnummer die vom Modul benutzt wird.<br>
       Wenn dem Attribut kein Wert zugewiesen wurde verwendet das Modul eine zuf&auml;llige Portnummer zwichen 44000 und 45000
       </li>
-  
      <li><b>Audiofiles</b>
       Audiofiles k&ouml;nnen einfach mit dem externen Programm sox erzeugt werden :<br>
       sox &lt;file&gt;.wav -t raw -r 8000 -c 1 -e a-law &lt;file&gt;.al<br>
@@ -1964,6 +1962,13 @@ sub SIP_readPassword($)
      Ist f&uml;r Text2Speech unbedingt erforderlich um die mp3 Dateien in Raw Audio umzuwandeln.<br>
      Installation z.B. mit sudo apt-get install sox und noch die mp3 Unterst&uuml;tzung mit sudo apt-get install libsox-fmt-mp3
     </li>
+    <li><a name="#sip_force_interval">sip_force_interval</a><br>
+    default 300
+    </li>
+    <li><a name="#sip_force_max">sip_force_max</a><br>
+    default 99
+    </li>
+
   </ul>
   <br>
 
