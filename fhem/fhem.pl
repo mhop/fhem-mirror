@@ -2647,7 +2647,7 @@ GlobalAttr($$$$)
 
   }
   elsif($name eq "featurelevel") {
-    return "$val is not in the form N.N" if($val !~ m/^\d\.\d$/);
+    return "$val is not in the form N.N" if($val !~ m/^\d+\.\d+$/);
     $featurelevel = $val;
     
   }

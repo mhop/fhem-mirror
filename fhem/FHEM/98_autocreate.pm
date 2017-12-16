@@ -132,6 +132,8 @@ autocreate_Notify($$)
       next if(AttrVal($me, "disable", undef));
 
       my $it = AttrVal($me, "ignoreTypes", undef);
+      $it = "^$it\$" if($featurelevel > 5.8); # Forum #80775
+
       next if($it && $name =~ m/$it/i);
 
       my $at = AttrVal($me, "autocreateThreshold", undef);
@@ -751,9 +753,12 @@ autocreate_Attr(@)
     <li>ignoreTypes<br>
         This is a regexp, to ignore certain devices, e.g. the neighbours FHT.
         You can specify more than one, with usual regexp syntax, e.g.<br>
-        attr autocreate ignoreTypes CUL_HOERMANN.*|FHT_1234|CUL_WS_7<br>
+        attr autocreate ignoreTypes (CUL_HOERMANN.*|FHT_1234|CUL_WS_7)<br>
         The word "Types" is somehow misleading, as it actually checks the
-        generated device name.
+        generated device name.<br>
+        <b>Note</b>: starting with featurelevel 5.9 the regexp is automatically
+        extended with ^ and $, so that it must match the whole name (same
+        procedure as in notify and FileLog).
         </li><br>
 
     <a name="autocreateThreshold"></a>
@@ -915,9 +920,12 @@ autocreate_Attr(@)
         Funk-Heizungsthermostat (FHT) des Nachbarn. In dem Ausdruck k&ouml;nnen
         mehr als ein Ger&auml;t &uuml;ber die normale Regexp-Syntax angegeben
         werden. Beispiel:<br>
-        attr autocreate ignoreTypes CUL_HOERMANN.*|FHT_1234|CUL_WS_7<br>
+        attr autocreate ignoreTypes (CUL_HOERMANN.*|FHT_1234|CUL_WS_7)<br>
         Das Wort "Types" ist etwas irref&uuml;hrend, da der Ger&auml;tename
-        gepr&uuml;ft wird, und nicht der Typ.
+        gepr&uuml;ft wird, und nicht der Typ.<br>
+        <b>Achtung</b>: ab featurelevel 5.9 wird der Regexp automatisch mit
+        ^ und $ erg&auml;nzt, muss also den kompletten Namen matchen (genau wie
+        bei notify und FileLog).
         </li><br>
 
     <a name="autocreateThreshold"></a>
