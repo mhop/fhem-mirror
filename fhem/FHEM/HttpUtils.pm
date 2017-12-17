@@ -812,10 +812,19 @@ HttpUtils_ParseAnswer($)
       }
     }
   }
-
-  if($hash->{httpheader} =~ /^Content-Encoding: gzip/mi && $HU_use_zlib) {
-    eval { $ret =  Compress::Zlib::memGunzip($ret) };
-    return ($@, $ret) if($@);
+  
+  if($HU_use_zlib) {
+    if($hash->{httpheader} =~ /^Content-Encoding: gzip/mi) {
+      eval { $ret =  Compress::Zlib::memGunzip($ret) };
+      return ($@, $ret) if($@);
+    }
+  
+    if($hash->{httpheader} =~ /^Content-Encoding: deflate/mi) {
+      eval { my $i =  Compress::Zlib::inflateInit();
+             my $out = $i->inflate($ret);
+             $ret = $out if($out) };
+      return ($@, $ret) if($@);
+    }
   }
 
   # Debug
