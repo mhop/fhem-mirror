@@ -74,6 +74,20 @@ printList($)
     last;
   }
 }
+my $var;
+sub
+chkAndGenLangLinks($$$)
+{
+  my ($l, $lang, $fh) = @_;
+  $var = $1 if($l =~ m/<a name="(.*?)"(.*?)><\/a>/);
+  if($l =~ m/(.*?)<\/h3>/ && $var) {
+    print $fh "<div class='langLinks'>[".join(" ", map { 
+        $_ eq $lang ? $_ : 
+        "<a href='commandref".($_ eq "EN" ? "":"_$_").".html#$var'>$_</a>"
+      } @lang) . "]</div>\n";
+    $var = undef;
+  }
+}
 
 foreach my $lang (@lang) {
   my $suffix = ($lang eq "EN" ? "" : "_$lang");
@@ -100,6 +114,8 @@ foreach my $lang (@lang) {
   while(my $l = <IN>) { # Header
     last if($l =~ m/name="perl"/);
     print OUT $l;
+    chkAndGenLangLinks($l, $lang, \*OUT);
+    
     printList($1) if($l =~ m/<!-- header:(.*) -->/);
   }
 
@@ -110,8 +126,11 @@ foreach my $lang (@lang) {
 
   # Copy the tail
   print OUT '<a name="perl"></a>',"\n";
+  $var = "perl"; 
+  
   while(my $l = <IN>) {
     print OUT $l;
+    chkAndGenLangLinks($l, $lang, \*OUT);
   }
   close(OUT);
 }
@@ -147,15 +166,11 @@ generateModuleCommandref($$;$$)
 
       } elsif($l =~ m/^=end html$suffix$/) {
         $skip = 1;
+        print $fh "<p>" if($fh);        
 
       } elsif(!$skip) {
         print $fh $l if($fh);
-        if($l =~ m,<h3>$mod</h3>,i && $fh) {
-          print $fh "<div class='langLinks'>".join(" ", map { 
-            $_ eq $lang ? $_ : 
-            "<a href='commandref".($_ eq "EN" ? "":"_$_").".html#$mod'>$_</a>"
-          } @lang) . "</div>\n";
-        }
+        chkAndGenLangLinks($l, $lang, $fh);
 
         $docCount++;
         $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
