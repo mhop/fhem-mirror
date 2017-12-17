@@ -191,9 +191,10 @@ KS300_Parse($$)
     $haverain = 1 if($rain_raw_adj != $rain_raw_adj_prev);
 
     $v[1] = sprintf("%0.1f", $rain_raw_adj * $def->{RAINUNIT} / 1000);
-    $v[2] = sprintf("%0.1f", ("$a[25]$a[24].$a[23]"+0) * $def->{WINDUNIT});
+    $v[2] = sprintf("%0.1f", ("$a[25]$a[24].$a[23]"+(hex($a[17])&0x4?100:0)) *
+                              $def->{WINDUNIT});
     $v[3] = "$a[22]$a[21]" + 0;
-    $v[4] = "$a[20]$a[19].$a[18]" + 0; $v[4] = "-$v[4]" if($a[17] eq "7");
+    $v[4] = "$a[20]$a[19].$a[18]" + 0;
     $v[4] = sprintf("%0.1f", $v[4]);
     $v[5] = ((hex($a[17]) & 0x2) || $haverain) ? "yes" : "no";
     $v[6] = $a[29];
