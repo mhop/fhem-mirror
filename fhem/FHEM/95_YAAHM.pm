@@ -48,7 +48,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.32";
+my $yaahmversion    = "1.33";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -948,7 +948,7 @@ sub YAAHM_Get($@) {
 
 sub YAAHM_save($) {
   my ($hash) = @_;
-  $hash->{DATA}{"savedate"} = localtime(time);
+  $hash->{DATA}{"savedate"} = sprintf("%s",localtime(time));
   readingsSingleUpdate( $hash, "savedate", $hash->{DATA}{"savedate"}, 1 ); 
   my $json   = JSON->new->utf8;
   my $jhash0 = eval{ $json->encode( $hash->{DATA} ) };
