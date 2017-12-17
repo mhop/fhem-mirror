@@ -238,10 +238,12 @@ FHEM/49_IPCAM.pm             mfr69bs              Sonstiges
 FHEM/49_SSCAM.pm             DS_Starter           Sonstiges
 FHEM/49_TBot_List.pm         viegener             Unterstuetzende Dienste
 FHEM/50_HP1000.pm            loredo               Heizungssteuerung/Raumklima
+FHEM/50_MOBILEALERTSGW.pm    MarkusF              Sonstige Systeme
 FHEM/50_WS300.pm             Dirk                 SlowRF
 FHEM/50_TelegramBot.pm       viegener             Unterstuetzende Dienste
 FHEM/51_I2C_BH1750.pm        arnoaugustin         Einplatinencomputer (bitte auch PM)
 FHEM/51_I2C_BMP180.pm        Dirk                 Einplatinencomputer
+FHEM/51_MOBILEALERTS.pm      MarkusF              Sonstige Systeme
 FHEM/51_Netzer.pm            klausw               Sonstige Systeme
 FHEM/51_RPI_GPIO.pm          klausw               Einplatinencomputer
 FHEM/52_I2C_DS1307           ntruchsess           Sonstige Systeme
