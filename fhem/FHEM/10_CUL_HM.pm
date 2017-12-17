@@ -761,7 +761,7 @@ sub CUL_HM_Attr(@) {#################################
       CUL_HM_UpdtCentral($name);
     }
     else{
-      CUL_HM_hmInitMsg($hash);
+      CUL_HM_hmInitMsg($hash);# will update mId, rxType and others
     }
     $attr{$name}{$attrName} = $attrVal if ($cmd eq "set");
   }
@@ -3828,42 +3828,8 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   }       
   elsif($cmd eq "regList") {  #################################################
     my @regArr = CUL_HM_getRegN($st,$md,$chn);
-    return CUL_HM_getRegInfo(\@regArr,$roleD,$roleC) ;
-    my @rI;
-    foreach my $regName (@regArr){
-      my $reg  = $culHmRegDefine->{$regName};
-      my $help = $reg->{t};
-      my ($min,$max) = ($reg->{min},"to ".$reg->{max});
-      if ($reg->{c} eq "lit"){
-        $help .= " options:".join(",",keys%{$reg->{lit}});
-        $min = "";
-        $max = "literal";
-      }
-      elsif (defined($reg->{lit})){
-        $help .= " special:".join(",",keys%{$reg->{lit}});
-      }
-##################
-#  General to be implemented
-#      # ,"0095" => {name=>"HM-CC-RT-DN"  ,st=>'thermostat',cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.4p.5p.6p,3:3p.6p,1,7:3p.4'
-#      my $pRq = ((($reg->{l} == 3)||($reg->{l} == 4)) 
-#                    ?"required"
-#                    :"");
-#                    
-#      my @lCheck = grep /${chn}p/,grep /$reg->{l}:/, split(",",$culHmModel->{$hash->{helper}{mId}}{lst});
-#      $lCheck = @lCheck;
-##################
-      push @rI,sprintf("%4d: %-16s | %3s %-14s | %8s | %s\n",
-              $reg->{l},$regName,$min,$max.$reg->{u},
-              ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),
-              $help)
-            if (($roleD && $reg->{l} == 0)||
-                ($roleC && $reg->{l} != 0));
-    }
-
-    my $info = sprintf("list: %16s | %-18s | %-8s | %s\n",
-                     "register","range","peer","description");
-    foreach(sort(@rI)){$info .= $_;}
-    return $info;
+    return CUL_HM_getRegInfo($name) ;
+#    return CUL_HM_getRegInfo(\@regArr,$roleD,$roleC) ;
   }
   elsif($cmd eq "cmdList") {  #################################################
     my   @arr;
@@ -7372,18 +7338,21 @@ sub CUL_HM_getMId($) {#in: hash(chn or dev) out:model key (key for %culHmModel)
   my $hash = shift;
   $hash = CUL_HM_getDeviceHash($hash);
   return "" if (!$hash->{NAME});
-  my $mId = $hash->{helper}{mId};
-  if (!$mId){
+  if (!defined $hash->{helper}{mId} || !$hash->{helper}{mId}){
     my $model = AttrVal($hash->{NAME}, "model", "");
+    $hash->{helper}{mId} = "";
     foreach my $mIdKey(keys%{$culHmModel}){
       next if (!$culHmModel->{$mIdKey}{name} ||
                 $culHmModel->{$mIdKey}{name} ne $model);
-      $hash->{helper}{mId} = $mIdKey ;
-      return $mIdKey;
+      $hash->{helper}{mId} = $mIdKey;
+      #--- mId is updated - now update the reglist
+      foreach(CUL_HM_getAssChnNames($hash->{NAME})){
+        $defs{$_}{helper}{regLst} = CUL_HM_getChnList($defs{$_});
+      }
+      last;
     }
-    return "";
   }
-  return $mId;
+  return $hash->{helper}{mId};
 }
 sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
  # Will store result in device helper
@@ -8094,10 +8063,19 @@ sub CUL_HM_time2min($) { # minutes -> time
   return $m;
 }
 
-sub CUL_HM_getRegInfo($$$) { # 
-  my ($regArr,$roleD,$roleC) = @_;
+sub CUL_HM_getRegInfo($) { # 
+  my ($name) = @_;
+  my $hash = $defs{$name};
+  my $devHash = CUL_HM_getDeviceHash($hash);
+  my $st  = AttrVal    ($devHash->{NAME},"subType", "" );
+  my $md  = AttrVal    ($devHash->{NAME},"model"  , "" );
+  my $chn = InternalVal($hash->{NAME}   ,"chanNo" ,"00");
+  my @regArr = CUL_HM_getRegN($st,$md,$chn);
+  my $roleD  = $hash->{helper}{role}{dev};
+  my $roleC  = $hash->{helper}{role}{chn};
+
   my @rI;
-  foreach my $regName (@$regArr){
+  foreach my $regName (@regArr){
     my $reg  = $culHmRegDefine->{$regName};
     my $help = $reg->{t};
     my ($min,$max) = ($reg->{min},"to ".$reg->{max});
@@ -8109,10 +8087,13 @@ sub CUL_HM_getRegInfo($$$) { #
     elsif (defined($reg->{lit})){
       $help .= " special:".join(",",keys%{$reg->{lit}});
     }
+    my $cp = $reg->{l}."p";
     push @rI,sprintf("%4d: %-16s | %3s %-14s | %8s | %s\n",
-            $reg->{l},$regName,$min,$max.$reg->{u},
-            ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),
-            $help)
+                      $reg->{l},$regName
+                     ,$min
+                     ,$max.$reg->{u}
+                     ,($hash->{helper}{regLst} =~ m/$cp/ ? "required" : "")
+                     ,$help)
           if (($roleD && $reg->{l} == 0)||
               ($roleC && $reg->{l} != 0));
   }
@@ -8122,7 +8103,6 @@ sub CUL_HM_getRegInfo($$$) { #
   foreach(sort(@rI)){$info .= $_;}
   return $info;
 }
-
 sub CUL_HM_getRegN($$@){ # get list of register for a model
   my ($st,$md,@chn) = @_;
   my @regArr = keys %{$culHmRegGeneral};
@@ -8133,6 +8113,33 @@ sub CUL_HM_getRegN($$@){ # get list of register for a model
   }
   return @regArr;
 }
+sub CUL_HM_getChnList($){ # get reglist assotioted with a channel
+  my ($hash) = @_;
+  my $devHash = CUL_HM_getDeviceHash($hash);  
+  my $chnN = hex(InternalVal($hash->{NAME},"chanNo","0"));
+  my @mLstA = split(",",$culHmModel->{$devHash->{helper}{mId}}{lst});
+  my $chRl = "";
+
+  if ($hash->{helper}{role}{dev}){
+    $chRl = ",0";
+    if ($hash->{helper}{role}{chn}){# device is added. if we ar channel add this as well. 
+      $chnN = 1;
+    }
+  }
+  foreach my $mLst(@mLstA){
+    my ($Lst,$cLst) = split(":",$mLst);
+    $cLst = $chnN if (!$cLst);
+    next if ($Lst eq "p");# no list, just peers
+    foreach my $aaa (grep /$chnN/,split('\.',$cLst)){
+      $Lst .= "p" if($Lst == 3 || $Lst == 4 || $aaa =~ m/p/);
+      $Lst =~ s/ //g;
+      $chRl .= ",".$Lst;
+    }
+  }
+
+  return $chRl;
+}
+  
 sub CUL_HM_4DisText($) {      # convert text for 4dis
   #text1: start at 54 (0x36) length 12 (0x0c)
   #text2: start at 70 (0x46) length 12 (0x0c)
