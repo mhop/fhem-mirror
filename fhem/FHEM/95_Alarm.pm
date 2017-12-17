@@ -43,7 +43,7 @@ my $alarmlinkname   = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "3.11";
+my $alarmversion    = "3.12";
 
 my %alarm_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -482,7 +482,7 @@ sub Alarm_getsettings($$$){
 
 sub Alarm_save($) {
   my ($hash) = @_;
-  $hash->{DATA}{"savedate"} = localtime(time);
+  $hash->{DATA}{"savedate"} = sprintf("%s",localtime(time));
   readingsSingleUpdate( $hash, "savedate", $hash->{DATA}{"savedate"}, 1 ); 
   my $json   = JSON->new->utf8;
   my $jhash0 = eval{ $json->encode( $hash->{DATA} ) };
