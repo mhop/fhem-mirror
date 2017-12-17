@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.4.0      10.12.2017       avoid print out {RUNNING_PID} by "list device"
 # 3.3.0      07.12.2017       avoid print out the content of cache by "list device"
 # 3.2.0      06.12.2017       change attribute "autocommit" to "commitMode", activate choice of autocommit/transaction in logging
 #                             Addlog/addCacheLine change $TIMESTAMP check,
@@ -169,7 +170,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.3.0";
+my $DbLogVersion = "3.4.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -298,7 +299,7 @@ return undef;
 sub DbLog_Undef($$) {
   my ($hash, $name) = @_;
   my $dbh= $hash->{DBHP};
-  BlockingKill($hash->{HELPER}{RUNNING_PID}) if($hash->{HELPER}{RUNNING_PID});
+  BlockingKill($hash->{HELPER}{".RUNNING_PID"}) if($hash->{HELPER}{".RUNNING_PID"});
   BlockingKill($hash->{HELPER}{REDUCELOG_PID}) if($hash->{HELPER}{REDUCELOG_PID});
   BlockingKill($hash->{HELPER}{COUNT_PID}) if($hash->{HELPER}{COUNT_PID});
   BlockingKill($hash->{HELPER}{DELDAYS_PID}) if($hash->{HELPER}{DELDAYS_PID});
@@ -531,11 +532,11 @@ sub DbLog_Set($@) {
             $hash->{HELPER}{REOPEN_RUNS} = $a[2];
 			
 			# falls ein hängender Prozess vorhanden ist -> löschen
-			BlockingKill($hash->{HELPER}{RUNNING_PID}) if($hash->{HELPER}{RUNNING_PID});
+			BlockingKill($hash->{HELPER}{".RUNNING_PID"}) if($hash->{HELPER}{".RUNNING_PID"});
             BlockingKill($hash->{HELPER}{REDUCELOG_PID}) if($hash->{HELPER}{REDUCELOG_PID});
             BlockingKill($hash->{HELPER}{COUNT_PID}) if($hash->{HELPER}{COUNT_PID});
             BlockingKill($hash->{HELPER}{DELDAYS_PID}) if($hash->{HELPER}{DELDAYS_PID});
-			delete $hash->{HELPER}{RUNNING_PID};     
+			delete $hash->{HELPER}{".RUNNING_PID"};     
 			delete $hash->{HELPER}{COUNT_PID};
 			delete $hash->{HELPER}{DELDAYS_PID};
 			delete $hash->{HELPER}{REDUCELOG_PID};
@@ -1133,7 +1134,7 @@ sub DbLog_Log($$) {
 	  # Log3 $name, 5, "DbLog $name -> verbose 4 output of device $dev_name skipped due to attribute \"verbose4Devs\" restrictions" if(!$vb4show);
   }
   
-  if($vb4show && !$hash->{HELPER}{RUNNING_PID}) {
+  if($vb4show && !$hash->{HELPER}{".RUNNING_PID"}) {
       Log3 $name, 4, "DbLog $name -> ################################################################";
       Log3 $name, 4, "DbLog $name -> ###              start of new Logcycle                       ###";
       Log3 $name, 4, "DbLog $name -> ################################################################";
@@ -1178,7 +1179,7 @@ sub DbLog_Log($$) {
       for (my $i = 0; $i < $max; $i++) {
           my $event = $events->[$i];
           $event = "" if(!defined($event));
-          Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{RUNNING_PID});  
+          Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});  
 	  
 	      if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
 			  my $timestamp = $ts_0;
@@ -1268,7 +1269,7 @@ sub DbLog_Log($$) {
 					  if($IGNORE) {
 					      # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $value_fn
 						  Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
-						                          if($vb4show && !$hash->{HELPER}{RUNNING_PID});
+						                          if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
 					      next;  
 					  }
 					  
@@ -1286,7 +1287,7 @@ sub DbLog_Log($$) {
 			      my $row = ($timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit);
 				  $row    = DbLog_charfilter($row) if(AttrVal($name, "useCharfilter",0));
 				  Log3 $hash->{NAME}, 4, "DbLog $name -> added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
-				                          if($vb4show && !$hash->{HELPER}{RUNNING_PID});	
+				                          if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});	
                   
 				  if($async) {
 				      # asynchoner non-blocking Mode
@@ -1662,8 +1663,8 @@ sub DbLog_execmemcache ($) {
   }
     
   # tote PID's löschen
-  if($hash->{HELPER}{RUNNING_PID} && $hash->{HELPER}{RUNNING_PID}{pid} =~ m/DEAD/) {
-      delete $hash->{HELPER}{RUNNING_PID};
+  if($hash->{HELPER}{".RUNNING_PID"} && $hash->{HELPER}{".RUNNING_PID"}{pid} =~ m/DEAD/) {
+      delete $hash->{HELPER}{".RUNNING_PID"};
   }
   if($hash->{HELPER}{REDUCELOG_PID} && $hash->{HELPER}{REDUCELOG_PID}{pid} =~ m/DEAD/) {
       delete $hash->{HELPER}{REDUCELOG_PID};
@@ -1682,7 +1683,7 @@ sub DbLog_execmemcache ($) {
 	      $error = "reduceLogNbl is running - resync at NextSync";
 		  $dolog = 0;
 	  }
-	  if($hash->{HELPER}{RUNNING_PID}) {
+	  if($hash->{HELPER}{".RUNNING_PID"}) {
 	      $error = "Commit already running - resync at NextSync";
 		  $dolog = 0;
 	  }
@@ -1695,7 +1696,7 @@ sub DbLog_execmemcache ($) {
       readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
   }
 	
-  if($memcount && $dolog && !$hash->{HELPER}{RUNNING_PID}) {		
+  if($memcount && $dolog && !$hash->{HELPER}{".RUNNING_PID"}) {		
       Log3 $name, 4, "DbLog $name -> ################################################################";
       Log3 $name, 4, "DbLog $name -> ###      New database processing cycle - asynchronous        ###";
       Log3 $name, 4, "DbLog $name -> ################################################################";
@@ -1709,7 +1710,7 @@ sub DbLog_execmemcache ($) {
 
 	  my $rowlist = join('§', @row_array);
 	  $rowlist = encode_base64($rowlist,"");
-	  $hash->{HELPER}{RUNNING_PID} = BlockingCall (
+	  $hash->{HELPER}{".RUNNING_PID"} = BlockingCall (
 	                                 "DbLog_PushAsync", 
 	                                 "$name|$rowlist", 
 			                         "DbLog_PushAsyncDone", 
@@ -1719,7 +1720,7 @@ sub DbLog_execmemcache ($) {
 
       Log3 $hash->{NAME}, 5, "DbLog $name -> DbLog_PushAsync called with timeout: $timeout";
   } else {
-      if($dolog && $hash->{HELPER}{RUNNING_PID}) {
+      if($dolog && $hash->{HELPER}{".RUNNING_PID"}) {
 	      $error = "Commit already running - resync at NextSync";
 	  }
   }
@@ -2108,7 +2109,7 @@ sub DbLog_PushAsyncDone ($) {
 	  delete($defs{$name}{READINGS}{sql_processing_time});
 	  delete($defs{$name}{READINGS}{CacheUsage});
   }
-  delete $hash->{HELPER}{RUNNING_PID};
+  delete $hash->{HELPER}{".RUNNING_PID"};
   Log3 ($name, 5, "DbLog $name -> DbLog_PushAsyncDone finished"); 
 return;
 }
@@ -2121,9 +2122,9 @@ sub DbLog_PushAsyncAborted(@) {
   my $name = $hash->{NAME};
   $cause = $cause?$cause:"Timeout: process terminated";
   
-  Log3 ($name, 2, "DbLog $name -> $hash->{HELPER}{RUNNING_PID}{fn} $cause");
+  Log3 ($name, 2, 'DbLog $name -> $hash->{HELPER}{".RUNNING_PID"}{fn} $cause');
   readingsSingleUpdate($hash,"state",$cause, 1);
-  delete $hash->{HELPER}{RUNNING_PID};
+  delete $hash->{HELPER}{".RUNNING_PID"};
 }
 
 
