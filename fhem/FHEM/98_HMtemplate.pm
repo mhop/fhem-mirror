@@ -278,7 +278,7 @@ sub HMtemplate_GetFn($@) {#####################################################
     if (InternalVal($name,"tpl_type","") =~ m/peer-(short|long)/){
       $_ = "lg".$_ foreach (@regArr);
     }
-    return CUL_HM_getRegInfo(\@regArr,1,1); # 
+    return CUL_HM_getRegInfo($name); # 
   }  
   else{
     my @cmdLst = ( "defineCmd"
