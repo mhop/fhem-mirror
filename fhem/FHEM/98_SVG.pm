@@ -1209,9 +1209,8 @@ SVG_getData($$$$$)
   my ($d, $f,$t,$srcDesc,$showData) = @_;
   my (@da, $ret, @vals); 
   my @keys = ("min","mindate","max","maxdate","currval","currdate",
-              "firstval","firstdate","avg","cnt","lastraw");
+              "firstval","firstdate","avg","cnt","lastraw","sum");
 
-  $data{svgOffset} = 0;
   foreach my $src (@{$srcDesc->{order}}) {
     my $s = $srcDesc->{src}{$src};
     my $fname = ($src eq $defs{$d}{LOGDEVICE} ? $defs{$d}{LOGFILE} : "CURRENT");
@@ -1230,10 +1229,8 @@ SVG_getData($$$$$)
         }
         push @vals, \%h;
       }
-      $data{svgOffset} += ($s->{idx}+1);
     }
   }
-  delete($data{svgOffset});
 
   # Reorder the $data{maxX} stuff
   my ($min, $max) = (999999, -999999);

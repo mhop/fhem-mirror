@@ -913,7 +913,6 @@ RESCAN:
     }
 
     my $j = $i+1;
-    $j += $data{svgOffset} if($data{svgOffset});
     $data{"min$j"} = $min[$i];
     $data{"max$j"} = $max[$i];
     $data{"avg$j"} = $cnt[$i] ? sprintf("%0.1f", $sum[$i]/$cnt[$i]) : 0;
