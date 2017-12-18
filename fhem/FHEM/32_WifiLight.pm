@@ -159,7 +159,7 @@ WifiLight_Define($$)
     # if so, we need a shared buffer (llCmdQueue), shared socket and we need to check if the requied slot is free
     foreach $key (keys %defs) 
     {
-      if (($defs{$key}{TYPE} eq 'WifiLight') && ($defs{$key}{IP} eq $hash->{IP}) && ($key ne $name))
+      if (($defs{$key}{TYPE} eq 'WifiLight') && ($defs{$key}{IP} eq $hash->{IP}) && ($defs{$key}{PORT} eq $hash->{PORT}) && ($key ne $name))
       {
         #bridge is in use
         Log3 (undef, 3, "WifiLight: requested bridge $hash->{CONNECTION} at $hash->{IP} already in use by $key, copy llCmdQueue");
