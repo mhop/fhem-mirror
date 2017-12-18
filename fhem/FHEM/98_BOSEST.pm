@@ -7,9 +7,13 @@
 # FHEM module to communicate with BOSE SoundTouch system
 # API as defined in BOSE SoundTouchAPI_WebServices_v1.0.1.pdf
 #
-# Version: 2.1.1
+# Version: 2.2.0
 #
 #############################################################
+#
+# v2.2.0 - 20171211
+# - FEATURE: support new Audio Notification API for TTS (no more minidlna)
+# - BUGFIX:  fix warning about uninitialized value (thx@betateilchen!)
 #
 # v2.1.1 - 20170812
 # - CHANGE:  changed reading name type to model
@@ -334,7 +338,7 @@ sub BOSEST_Define($$) {
     $hash->{helper}{supportedBassCmds} = "";
     
     if (int(@a) < 3) {
-        Log3 $hash, 3, "BOSEST: BOSE SoundTouch v2.1.1";
+        Log3 $hash, 3, "BOSEST: BOSE SoundTouch v2.2.0";
         #start discovery process 30s delayed
         InternalTimer(gettimeofday()+30, "BOSEST_startDiscoveryProcess", $hash, 0);
         
@@ -472,7 +476,7 @@ sub BOSEST_Set($@) {
         BOSEST_on($hash);
     } elsif($workType eq "off") {
         BOSEST_off($hash);
-		    InternalTimer(gettimeofday()+2, "BOSEST_off", $hash, 0);
+        InternalTimer(gettimeofday()+2, "BOSEST_off", $hash, 0);
     } elsif($workType eq "nextTrack") {
         BOSEST_next($hash);
     } elsif($workType eq "prevTrack") {
@@ -484,13 +488,14 @@ sub BOSEST_Set($@) {
     } elsif($workType eq "speak" or $workType eq "speakOff") {
         return "BOSEST: speak requires quoted text as additional parameters" if(int(@params) < 1);
         return "BOSEST: speak requires quoted text" if(substr($blankParams, 0, 1) ne "\"");
-        if(AttrVal($hash->{NAME}, "ttsDirectory", "") eq "") {
-            return "BOSEST: Please set ttsDirectory attribute first.
+        #set text (must be within quotes)
+        my $text = $params[0];
+        if(length($text) > 100 and AttrVal($hash->{NAME}, "ttsDirectory", "") eq "") {
+            return "BOSEST: Text >100 characters => minidlna needed.
+                            Please set ttsDirectory attribute first.
                             FHEM user needs permissions to write to that directory.
                             It is also recommended to set ttsLanguage (default: en).";
         }
-        #set text (must be within quotes)
-        my $text = $params[0];
         my $volume = "";
         if(looks_like_number($params[1])) {
             #set volume (default current volume)
@@ -1002,10 +1007,36 @@ sub BOSEST_speakChannel {
 
 sub BOSEST_speak($$$$$) {
     my ($hash, $text, $volume, $lang, $stopAfterSpeak) = @_;
-    
-    my $ttsDir = AttrVal($hash->{NAME}, "ttsDirectory", "");
+
     $lang = AttrVal($hash->{NAME}, "ttsLanguage", "en") if($lang eq "");
     $volume = AttrVal($hash->{NAME}, "ttsVolume", ReadingsVal($hash->{NAME}, "volume", 20)) if($volume eq "");
+
+    if(length($text) < 100) {
+       my $uri_text = uri_escape($text);
+       my $translateUrl = "http://translate.google.com/translate_tts?ie=UTF-8&tl=$lang&client=tw-ob&q=$uri_text";
+       $translateUrl =~ s/\&/\&amp\;/g;
+
+       if(substr($volume, 0, 1) eq "+" or
+          substr($volume, 0, 1) eq "-") {
+           $volume = ReadingsVal($hash->{NAME}, "volume", 0) + $volume;
+       }
+
+       my $postXml = '<play_info><app_key>Ml7YGAI9JWjFhU7D348e86JPXtisddBa</app_key><url>'.$translateUrl.'</url><service>'.$text.'</service><volume>'.$volume.'</volume></play_info>';
+       if(BOSEST_HTTPPOST($hash, '/speaker', $postXml)) {
+       }
+
+       if(defined($stopAfterSpeak) && $stopAfterSpeak eq "1") {
+           $hash->{helper}{stateCheck}{enabled} = 1;
+           #after play the speaker changes contentItemItemName
+           $hash->{helper}{stateCheck}{actionContentItemItemName} = "";
+           $hash->{helper}{stateCheck}{function} = \&BOSEST_off;
+       }
+
+       return undef;
+    }
+    
+    
+    my $ttsDir = AttrVal($hash->{NAME}, "ttsDirectory", "");
     
     my $sox = qx(which sox);
     chomp $sox;
@@ -1185,6 +1216,7 @@ sub BOSEST_playMessage($$$$) {
 sub BOSEST_deleteOldTTSFiles {
     my ($hash) = @_;
     my ($err, $val) = getKeyValue("BOSEST_tts_files");
+    return undef unless defined($val);
     my @ttsFiles = split(",", $val);
     my $ttsDir = AttrVal($hash->{NAME}, "ttsDirectory", "");
     
