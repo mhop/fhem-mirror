@@ -6,9 +6,14 @@
 #
 # FHEM module to communicate with EQ-3 Bluetooth thermostats
 #
-# Version: 2.0.2
+# Version: 2.0.3
 #
 #############################################################
+#
+# v2.0.3 - 20171218
+# - FEATURE: support maxRetries and timeout attribute
+#            maxRetries...number of tries before error is counted
+#            timeout...timeout for the command
 #
 # v2.0.2 - 20171118
 # - FEATURE: support remote bluetooth interfaces via SSH (thx@Cooltux!)
@@ -150,7 +155,7 @@ sub EQ3BT_Initialize($) {
     $hash->{GetFn}    = 'EQ3BT_Get';
     $hash->{SetFn}    = 'EQ3BT_Set';
     $hash->{AttrFn}   = 'EQ3BT_Attribute';
-    $hash->{AttrList}  = 'sshHost '.
+    $hash->{AttrList}  = 'sshHost maxRetries timeout '.
                             $readingFnAttributes;
     
     return undef;
@@ -165,7 +170,7 @@ sub EQ3BT_Define($$) {
     my $sshHost;
     
     $hash->{STATE} = "initialized";
-    $hash->{VERSION} = "2.0.2";
+    $hash->{VERSION} = "2.0.3";
     Log3 $hash, 3, "EQ3BT: EQ-3 Bluetooth Thermostat ".$hash->{VERSION};
     
     if (int(@a) > 4) {
@@ -528,7 +533,7 @@ sub EQ3BT_execGatttool($) {
         }
         
         if(defined($listen) && $listen eq "listen") {
-            $cmd = "timeout 15 ".$cmd." --listen";
+            $cmd = "timeout ".AttrVal($name, "timeout", 15)." ".$cmd." --listen";
         }
         
         #redirect stderr to stdout
@@ -606,7 +611,7 @@ sub EQ3BT_processGatttoolResult($) {
         $hash->{helper}{"retryCounter$workType"} = 0 if(!defined($hash->{helper}{"retryCounter$workType"}));
         $hash->{helper}{"retryCounter$workType"}++;
         Log3 $hash, 4, "EQ3BT ($name): $workType failed ($handle, $value, $notification)";
-        if ($hash->{helper}{"retryCounter$workType"} > 20) {
+        if ($hash->{helper}{"retryCounter$workType"} > AttrVal($name, "maxRetries", 20)) {
             my $errorCount = ReadingsVal($hash->{NAME}, "errorCount-$workType", 0);
             readingsSingleUpdate($hash, "errorCount-$workType", $errorCount+1, 1);
             Log3 $hash, 3, "EQ3BT ($name): $workType, $handle, $value failed 20 times.";
