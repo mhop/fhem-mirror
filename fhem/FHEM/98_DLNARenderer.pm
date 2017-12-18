@@ -2,6 +2,11 @@
 # Author: dominik.karall@gmail.com
 # $Id$
 #
+# v2.0.6 - 20171209
+# - FEATURE: support acceptedUDNs for UDN whitelisting (thx@MichaelT!)
+# - BUGFIX:  fix renew subscriptions errors on offline devices
+# - BUGFIX:  fix renew warnings, now only on log level 5 (thx@mumpitzstuff!)
+#
 # v2.0.5 - 20170430
 # - BUGFIX:  fix "readings not updated"
 #
@@ -187,13 +192,14 @@ sub DLNARenderer_Define($$) {
   if(@param < 3) {
     #main
     $hash->{UDN} = 0;
-    my $VERSION = "v2.0.5";
+    my $VERSION = "v2.0.6";
     $hash->{VERSION} = $VERSION;
     Log3 $hash, 3, "DLNARenderer: DLNA Renderer $VERSION";
     DLNARenderer_setupControlpoint($hash);
     DLNARenderer_startDlnaRendererSearch($hash);
     readingsSingleUpdate($hash,"state","initialized",1);
     addToDevAttrList($hash->{NAME}, "ignoreUDNs");
+    addToDevAttrList($hash->{NAME}, "acceptedUDNs");
     addToDevAttrList($hash->{NAME}, "defaultRoom");
     return undef;
   }
@@ -219,9 +225,6 @@ sub DLNARenderer_Define($$) {
   addToDevAttrList($hash->{NAME}, "channel_08");
   addToDevAttrList($hash->{NAME}, "channel_09");
   addToDevAttrList($hash->{NAME}, "channel_10");
-  
-  InternalTimer(gettimeofday() + 200, 'DLNARenderer_renewSubscriptions', $hash, 0);
-  InternalTimer(gettimeofday() + 60, 'DLNARenderer_updateStereoMode', $hash, 0);
   
   return undef;
 }
@@ -1257,6 +1260,12 @@ sub DLNARenderer_renewSubscriptionBlocking {
   my ($string) = @_;
   my ($name) = split("\\|", $string);
   my $hash = $main::defs{$name};
+
+  $SIG{__WARN__} = sub {
+    my ($called_from) = caller(0);
+    my $wrn_text = shift;
+    Log3 $hash, 5, "DLNARenderer: ".$called_from.", ".$wrn_text;
+  };
   
   #register callbacks
   #urn:upnp-org:serviceId:AVTransport
@@ -1290,6 +1299,10 @@ sub DLNARenderer_addedDevice {
 
   #ignoreUDNs
   return undef if(AttrVal($hash->{NAME}, "ignoreUDNs", "") =~ /$udn/);
+
+  #acceptedUDNs
+  my $acceptedUDNs = AttrVal($hash->{NAME}, "acceptedUDNs", "");
+  return undef if($acceptedUDNs ne "" && $acceptedUDNs !~ /$udn/);
     
   my $foundDevice = 0;
   my @allDLNARenderers = DLNARenderer_getAllDLNARenderers($hash);
@@ -1371,6 +1384,9 @@ sub DLNARenderer_addedDevice {
         }
       }
       $DLNARendererHash->{helper}{caskeidClients} = substr($DLNARendererHash->{helper}{caskeidClients}, 1) if($DLNARendererHash->{helper}{caskeidClients} ne "");
+
+      InternalTimer(gettimeofday() + 200, 'DLNARenderer_renewSubscriptions', $DLNARendererHash, 0);
+      InternalTimer(gettimeofday() + 60, 'DLNARenderer_updateStereoMode', $DLNARendererHash, 0);
     }
   }
   
@@ -1384,6 +1400,9 @@ sub DLNARenderer_removedDevice($$) {
   
   readingsSingleUpdate($deviceHash, "presence", "offline", 1);
   readingsSingleUpdate($deviceHash, "state", "offline", 1);
+
+  RemoveInternalTimer($deviceHash, 'DLNARenderer_renewSubscriptions');
+  RemoveInternalTimer($deviceHash, 'DLNARenderer_updateStereoMode');
 }
 
 ###############################
