@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     97_PiXtendV2: New module to control a PiXtend V2 -S- board
   - change:  93_DbLog: V3.4.0, avoid output RUNNING_PID + args by "list device"
   - new:     50_MOBILEALERTSGW/51_MOBILEALERTS: New moduls for MobileAlerts
   - change:  93_DbRep: V6.4.2, changelist:
