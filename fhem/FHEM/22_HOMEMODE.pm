@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.2.0";
+my $HOMEMODE_version = "1.2.1";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -1240,12 +1240,12 @@ sub HOMEMODE_Attributes($)
   push @attribs,"HomeCMDalarmSmoke:textField-long";
   push @attribs,"HomeCMDalarmSmoke-on:textField-long";
   push @attribs,"HomeCMDalarmSmoke-off:textField-long";
-  push @attribs,"HomeCMDalarmTriggered:textField-long";
-  push @attribs,"HomeCMDalarmTriggered-off:textField-long";
-  push @attribs,"HomeCMDalarmTriggered-on:textField-long";
   push @attribs,"HomeCMDalarmTampered:textField-long";
   push @attribs,"HomeCMDalarmTampered-off:textField-long";
   push @attribs,"HomeCMDalarmTampered-on:textField-long";
+  push @attribs,"HomeCMDalarmTriggered:textField-long";
+  push @attribs,"HomeCMDalarmTriggered-off:textField-long";
+  push @attribs,"HomeCMDalarmTriggered-on:textField-long";
   push @attribs,"HomeCMDanyoneElseAtHome:textField-long";
   push @attribs,"HomeCMDanyoneElseAtHome-on:textField-long";
   push @attribs,"HomeCMDanyoneElseAtHome-off:textField-long";
@@ -1354,8 +1354,8 @@ sub HOMEMODE_Attributes($)
   push @attribs,"HomeSpecialModes";
   push @attribs,"HomeTextAndAreIs";
   push @attribs,"HomeTextClosedOpen";
-  push @attribs,"HomeTextRisingConstantFalling";
   push @attribs,"HomeTextNosmokeSmoke";
+  push @attribs,"HomeTextRisingConstantFalling";
   push @attribs,"HomeTextTodayTomorrowAfterTomorrow";
   push @attribs,"HomeTextWeatherForecastToday:textField-long";
   push @attribs,"HomeTextWeatherForecastTomorrow:textField-long";
@@ -1953,7 +1953,7 @@ sub HOMEMODE_Attr(@)
     }
     elsif ($attr_name eq "HomeSensorsSmoke")
     {
-      CommandDeleteReading(undef,"$name alarm_smoke");
+      CommandDeleteReading(undef,"$name alarmSmoke");
       HOMEMODE_updateInternals($hash);
     }
     elsif ($attr_name eq "HomeSensorsPowerEnergy")
@@ -2033,6 +2033,9 @@ sub HOMEMODE_replacePlaceholders($$;$)
   my $alarm = ReadingsVal($name,"alarmTriggered",0);
   my $alarmc = ReadingsVal($name,"alarmTriggered_ct",0);
   my $alarmhr = ReadingsVal($name,"alarmTriggered_hr",0);
+  my $smoke = ReadingsVal($name,"alarmSmoke",0);
+  my $smokec = ReadingsVal($name,"alarmSmoke_ct",0);
+  my $smokehr = ReadingsVal($name,"alarmSmoke_hr",0);
   my $daytime = HOMEMODE_DayTime($hash);
   my $mode = ReadingsVal($name,"mode","");
   my $amode = ReadingsVal($name,"modeAlarm","");
@@ -2074,6 +2077,7 @@ sub HOMEMODE_replacePlaceholders($$;$)
   my $sensorscontact = $hash->{SENSORSCONTACT};
   my $sensorsenergy = $hash->{SENSORSENERGY};
   my $sensorsmotion = $hash->{SENSORSMOTION};
+  my $sensorssmoke = $hash->{SENSORSSMOKE};
   my $ure = $hash->{RESIDENTS};
   $ure =~ s/,/\|/g;
   my $arrivers = HOMEMODE_makeHR($hash,0,devspec2array("$ure:FILTER=location=arrival"));
@@ -2148,6 +2152,10 @@ sub HOMEMODE_replacePlaceholders($$;$)
   $cmd =~ s/%SENSORSCONTACT%/$sensorscontact/g;
   $cmd =~ s/%SENSORSENERGY%/$sensorsenergy/g;
   $cmd =~ s/%SENSORSMOTION%/$sensorsmotion/g;
+  $cmd =~ s/%SENSORSSMOKE%/$sensorssmoke/g;
+  $cmd =~ s/%SMOKE%/$smoke/g;
+  $cmd =~ s/%SMOKECT%/$smokec/g;
+  $cmd =~ s/%SMOKEHR%/$smokehr/g;
   $cmd =~ s/%TAMPERED%/$sensorsTampered/g;
   $cmd =~ s/%TEMPERATURE%/$temp/g;
   $cmd =~ s/%TEMPERATURETREND%/$temptrend/g;
@@ -2964,7 +2972,7 @@ sub HOMEMODE_HomebridgeMapping($)
   $mapping .= "\nStatusTampered=sensorsTampered_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"sensorsTampered_ct",undef));
   $mapping .= "\nMotionDetected=motionsInside_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"motionsInside_ct",undef));
   $mapping .= "\nStatusLowBattery=batteryLow_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"batteryLow_ct",undef));
-  $mapping .= "\nSmokeDetected=alarm_smoke_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"alarm_smoke_ct",undef));
+  $mapping .= "\nSmokeDetected=alarmSmoke_ct,values=0:0;/.*/:1" if (defined ReadingsVal($name,"alarmSmoke_ct",undef));
   $mapping .= "\nE863F10F-079E-48FF-8F27-9C2605A29F52=pressure,name=AirPressure,format=UINT16" if (defined ReadingsVal($name,"wind",undef));
   addToDevAttrList($name,"genericDeviceType") if (!grep /^genericDeviceType/,split(" ",AttrVal("global","userattr","")));
   addToDevAttrList($name,"homebridgeMapping:textField-long") if (!grep /^homebridgeMapping/,split(" ",AttrVal("global","userattr","")));
@@ -3048,9 +3056,9 @@ sub HOMEMODE_Smoke($;$$)
     }
   }
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"alarm_smoke",join(",",@sensors));
-  readingsBulkUpdate($hash,"alarm_smoke_ct",scalar @sensors);
-  readingsBulkUpdate($hash,"alarm_smoke_hr",HOMEMODE_makeHR($hash,0,@sensors));
+  readingsBulkUpdate($hash,"alarmSmoke",join(",",@sensors));
+  readingsBulkUpdate($hash,"alarmSmoke_ct",scalar @sensors);
+  readingsBulkUpdate($hash,"alarmSmoke_hr",HOMEMODE_makeHR($hash,0,@sensors));
   readingsEndUpdate($hash,1);
 }
 
@@ -3312,7 +3320,7 @@ sub HOMEMODE_Details($$$)
   </ul>
   <br>
   <a name="HOMEMODE_set"></a>
-  <p><b>set &lt;required&gt;</b></p>
+  <p><b>set &lt;required&gt; [optional]</b></p>
   <ul>
     <li>
       <b><i>anyoneElseAtHome &lt;on/off&gt;</i></b><br>
@@ -4708,6 +4716,25 @@ sub HOMEMODE_Details($$$)
     <li>
       <b><i>%SENSORSMOTION%</i></b><br>
       all motion sensors from internal SENSORSMOTION
+    </li>
+    <li>
+      <b><i>%SENSORSSMOKE%</i></b><br>
+      all smoke sensors from internal SENSORSSMOKE
+    </li>
+    <li>
+      <b><i>%SMOKE%</i></b><br>
+      value of the alarmSmoke reading of the HOMEMODE device<br>
+      will return 0 if no smoke alarm is triggered or a list of triggered sensors if smoke alarm is triggered
+    </li>
+    <li>
+      <b><i>%SMOKECT%</i></b><br>
+      value of the alarmSmoke_ct reading of the HOMEMODE device
+    </li>
+    <li>
+      <b><i>%SMOKEHR%</i></b><br>
+      value of the alarmSmoke_hr reading of the HOMEMODE device<br>
+      will return 0 if no smoke  alarm is triggered or a (human readable) list of triggered sensors if smoke alarm is triggered<br>
+      can be used for sending msg e.g.
     </li>
     <li>
       <b><i>%TAMPERED%</i></b><br>
