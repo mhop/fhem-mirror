@@ -7,9 +7,13 @@
 # FHEM module to communicate with Google Cast devices
 # e.g. Chromecast Video, Chromecast Audio, Google Home
 #
-# Version: 2.0.0
+# Version: 2.0.1
 #
 #############################################################
+#
+# v2.0.1 - 20171209
+# - FEATURE:  support skip/rewind
+# - FEATURE:  support displaying websites on Chromecast
 #
 # v2.0.0 - 20170812
 # - CHANGE:   renamed to 98_GOOGLECAST.pm
@@ -122,7 +126,7 @@ sub GOOGLECAST_Initialize($) {
     $hash->{AttrList} = "favoriteURL_1 favoriteURL_2 favoriteURL_3 favoriteURL_4 ".
                         "favoriteURL_5 ".$readingFnAttributes;
 
-    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.0.0";
+    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.0.1";
 
     return undef;
 }
@@ -219,7 +223,7 @@ sub GOOGLECAST_Attribute($$$$) {
 sub GOOGLECAST_Set($@) {
     my ($hash, $name, @params) = @_;
     my $workType = shift(@params);
-    my $list = "stop:noArg pause:noArg quitApp:noArg play playFavorite:1,2,3,4,5 volume:slider,0,1,100";
+    my $list = "stop:noArg pause:noArg rewind:noArg skip:noArg quitApp:noArg play playFavorite:1,2,3,4,5 volume:slider,0,1,100 displayWebsite";
 
     # check parameters for set function
     if($workType eq "?") {
@@ -238,6 +242,12 @@ sub GOOGLECAST_Set($@) {
         GOOGLECAST_setQuitApp($hash);
     } elsif($workType eq "volume") {
         GOOGLECAST_setVolume($hash, $params[0]);
+    } elsif($workType eq "displayWebsite") {
+        GOOGLECAST_setWebsite($hash, $params[0]);
+    } elsif($workType eq "rewind") {
+        GOOGLECAST_setRewind($hash);
+    } elsif($workType eq "skip") {
+        GOOGLECAST_setSkip($hash);
     } else {
         return SetExtensions($hash, $list, $name, $workType, @params);
     }
@@ -252,6 +262,15 @@ sub GOOGLECAST_setVolume {
 
     eval {
         $hash->{helper}{ccdevice}->set_volume($volume);
+    };
+}
+
+### dashcast ###
+sub GOOGLECAST_setWebsite {
+    my ($hash, $url) = @_;
+
+    eval {
+       GOOGLECAST_loadDashCast($hash->{helper}{ccdevice}, $url);
     };
 }
 
@@ -361,14 +380,20 @@ sub GOOGLECAST_setPlayFavorite {
 sub GOOGLECAST_setPlay {
     my ($hash, $url) = @_;
 
-    if(defined($url)) {
+    if(!defined($url)) {
+        eval {
+            $hash->{helper}{ccdevice}->{media_controller}->play();
+        };
+        return undef;
+    }
+
+
+    if($url =~ /^http/) {
         #support streams are listed here
         #https://github.com/rg3/youtube-dl/blob/master/docs/supportedsites.md
         GOOGLECAST_setPlayYtDl($hash, $url);
     } else {
-        eval {
-            $hash->{helper}{ccdevice}->{media_controller}->play();
-        };
+        GOOGLECAST_playYouTube($hash->{helper}{ccdevice}, $url);
     }
 
     return undef;
@@ -380,6 +405,28 @@ sub GOOGLECAST_setPause {
 
     eval {
         $hash->{helper}{ccdevice}->{media_controller}->pause();
+    };
+
+    return undef;
+}
+
+### rewind ###
+sub GOOGLECAST_setRewind {
+    my ($hash) = @_;
+
+    eval {
+        $hash->{helper}{ccdevice}->{media_controller}->rewind();
+    };
+
+    return undef;
+}
+
+### skip ###
+sub GOOGLECAST_setSkip {
+    my ($hash) = @_;
+
+    eval {
+        $hash->{helper}{ccdevice}->{media_controller}->seek($hash->{helper}{ccdevice}->{media_controller}->{status}->{duration});
     };
 
     return undef;
@@ -557,6 +604,8 @@ import pychromecast
 import time
 import logging
 import youtube_dl
+import pychromecast.controllers.dashcast as dashcast
+import pychromecast.controllers.youtube as youtube
 
 def GOOGLECAST_findChromecastsPython():
     logging.basicConfig(level=logging.CRITICAL)
@@ -564,7 +613,8 @@ def GOOGLECAST_findChromecastsPython():
 
 def GOOGLECAST_createChromecastPython(ip, port, uuid, model_name, friendly_name):
     logging.basicConfig(level=logging.CRITICAL)
-    return pychromecast._get_chromecast_from_host((ip, int(port), uuid, model_name, friendly_name), blocking=False, timeout=0.1, tries=1, retry_wait=0.1)
+    cast = pychromecast._get_chromecast_from_host((ip, int(port), uuid, model_name, friendly_name), blocking=False, timeout=0.1, tries=1, retry_wait=0.1)
+    return cast
 
 def GOOGLECAST_getYTVideoURLPython(yt_url):
     ydl = youtube_dl.YoutubeDL({'quiet': '1', 'no_warnings': '1'})
@@ -584,6 +634,17 @@ def GOOGLECAST_getYTVideoURLPython(yt_url):
 
     video_url = video['url']
     return video_url
+
+def GOOGLECAST_loadDashCast(cast, url):
+    d = dashcast.DashCastController()
+    cast.register_handler(d)
+    d.load_url(url,reload_seconds=60)
+
+def GOOGLECAST_playYouTube(cast, videoId):
+    yt = youtube.YouTubeController()
+    cast.register_handler(yt)
+    yt.play_video(videoId)
+
 
 PYTHON_CODE_END
 
@@ -605,8 +666,8 @@ PYTHON_CODE_END
           <li>sudo apt-get install libwww-perl python-enum34 python-dev libextutils-makemaker-cpanfile-perl python-pip cpanminus</li>
           <li>sudo pip install netifaces</li>
           <li>sudo pip install enum34</li>
-          <li>sudo pip install pychromecast</li>
-          <li>sudo pip install youtube-dl</li>
+          <li>sudo pip install pychromecast --upgrade</li>
+          <li>sudo pip install youtube-dl --upgrade</li>
           <li>sudo cpanm Inline::Python</li>
         </ul>
 
@@ -645,6 +706,9 @@ PYTHON_CODE_END
           <li><code><b>stop</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; stop, stops current playback</li>
           <li><code><b>pause</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; pause</li>
           <li><code><b>quitApp</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; quit current application, like YouTube</li>
+          <li><code><b>skip</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; skip track and play next</li>
+          <li><code><b>rewind</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; rewind track and play it again</li>
+          <li><code><b>displayWebsite</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; displayWebsite on Chromecast Video</li>
           </ul>
     <br>
     </ul>
