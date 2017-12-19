@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.5.0      18.12.2017       importCacheFile, addCacheLine uses useCharfilter option, filter only $event by charfilter 
 # 3.4.0      10.12.2017       avoid print out {RUNNING_PID} by "list device"
 # 3.3.0      07.12.2017       avoid print out the content of cache by "list device"
 # 3.2.0      06.12.2017       change attribute "autocommit" to "commitMode", activate choice of autocommit/transaction in logging
@@ -170,7 +171,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.4.0";
+my $DbLogVersion = "3.5.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -585,6 +586,7 @@ sub DbLog_Set($@) {
 		    $aa .= "$k ";
 		}
 		chop($aa); #letztes Leerzeichen entfernen
+		$aa = DbLog_charfilter($aa) if(AttrVal($name, "useCharfilter",0));
 		
 		my ($i_timestamp, $i_dev, $i_type, $i_evt, $i_reading, $i_val, $i_unit) = split("\\|",$aa);        
 		if($i_timestamp !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/ || !$i_dev || !$i_reading) {
@@ -661,7 +663,9 @@ sub DbLog_Set($@) {
             return "could not open ".$infile.": ".$!;
         }
         while (<FH>) {
-			push(@row_array, $_);
+		    my $row = $_;
+		    $row = DbLog_charfilter($row) if(AttrVal($name, "useCharfilter",0));
+			push(@row_array, $row);
 			$crows++;
 	    }
 		close(FH);
@@ -677,8 +681,8 @@ sub DbLog_Set($@) {
 				    Log3($name, 2, "DbLog $name: cachefile $infile couldn't be renamed after import !");
 				}
 				readingsSingleUpdate($hash, "lastCachefile", $infile." import successful", 1);
-		        readingsSingleUpdate($hash, "state", $crows." cache rows imported from ".$infile, 1);
-			    Log3($name, 3, "DbLog $name: $crows cache rows imported from $infile.");
+		        readingsSingleUpdate($hash, "state", $crows." cache rows processed from ".$infile, 1);
+			    Log3($name, 3, "DbLog $name: $crows cache rows processed from $infile.");
 		    }
         } else {
 		    readingsSingleUpdate($hash, "state", "no rows in ".$infile, 1);
@@ -1179,6 +1183,7 @@ sub DbLog_Log($$) {
       for (my $i = 0; $i < $max; $i++) {
           my $event = $events->[$i];
           $event = "" if(!defined($event));
+		  $event = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
           Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});  
 	  
 	      if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
@@ -1285,7 +1290,6 @@ sub DbLog_Log($$) {
                   ($dev_name,$dev_type,$event,$reading,$value,$unit) = DbLog_cutCol($hash,$dev_name,$dev_type,$event,$reading,$value,$unit);
   
 			      my $row = ($timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit);
-				  $row    = DbLog_charfilter($row) if(AttrVal($name, "useCharfilter",0));
 				  Log3 $hash->{NAME}, 4, "DbLog $name -> added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
 				                          if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});	
                   
@@ -3507,7 +3511,7 @@ sub DbLog_charfilter ($) {
   $txt =~ s/Ö/Oe/g;
   $txt =~ s/Ü/Ue/g;
   $txt =~ s/€/EUR/g;
-  $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd;      
+  $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~//cd;      
   
 return($txt);
 }
@@ -5650,7 +5654,9 @@ sub checkUsePK ($$){
 	  <code>
 	  attr &lt;device&gt; useCharfilter [0|1] <n>
 	  </code><br>
-      if set, only ASCII characters from 32 to 126 are accepted in dataset. mutated vowel and "€" are transcribed.  (default: 0). <br>
+      If set, only ASCII characters from 32 to 126 are accepted in event. 
+	  That are the characters " A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~" .<br>
+	  Mutated vowel and "€" are transcribed (e.g. ä to ae). (default: 0). <br>
     </ul>
   </ul>
   <br>
@@ -6643,7 +6649,9 @@ sub checkUsePK ($$){
 	  <code>
 	  attr &lt;device&gt; useCharfilter [0|1] <n>
 	  </code><br>
-      wenn gesetzt, werden nur ASCII Zeichen von 32 bis 126 im Datensatz akzeptiert. Umlaute und "€" werden umgesetzt.  (default: 0). <br>
+      wenn gesetzt, werden nur ASCII Zeichen von 32 bis 126 im Event akzeptiert. (default: 0) <br>
+	  Das sind die Zeichen " A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~". <br>
+	  Umlaute und "€" werden umgesetzt (z.B. ä nach ae, € nach EUR).  <br>
     </ul>
   </ul>
   <br>
