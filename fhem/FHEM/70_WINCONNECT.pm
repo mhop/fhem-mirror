@@ -1,6 +1,21 @@
 # $Id$
 ############################################################################
-# 2017-09-04, v0.0.23
+# 2017-12-19, v0.0.25
+#
+# v0.0.25
+# - FEATURE:	[WinWebGUI] - Starten als Windows Dienst
+#               [WinWebGUI] - Kamera Vollbild Beenden Button
+#               [WinWebGUI] - TTSMSG - Auswahl Windows integrierte Sprachen
+#               [WinWebGUI] - TTSMSG - Google TTS
+#               [WinWebGUI] - TTSMSG - Amazon Polly TTS (3 Sprachen)
+#               [WinWebGUI] - SetFocusToApp
+#               [WinWebGUI] - sendKey https://msdn.microsoft.com/en-us/library/windows/desktop/dd375731.aspx
+# - CHANGE      [WinWebGUI] - Logdatei wird in %TEMP% angelegt
+#               [WinWebGUI] - Deletereading drive_X_* wenn Laufwerk entfernt wurde z.B. USB-Stick
+# - BUFIX:      [FEHMModul] - Umlaute bei Messagebox und NotifyIcon
+#               [FEHMModul] - Leerzeichen Support bei CheckProcess
+#               [WinWebGUI] - Audio/Mikrofon Device
+#               [WinWebGUI] - Software Kamera
 #
 # v0.0.23
 # - BUFIX:      [FEHMModul] - Download gitlab GUI
@@ -180,8 +195,9 @@ sub WINCONNECT_Define($$);
 sub WINCONNECT_Undefine($$);
 
 # Autoupdateinformationen
-my $DownloadURL   = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.23.exe";
-my $DownloadVer   = "0.0.23";
+my $DownloadGURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.25.exe";
+my $DownloadSURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControlService_0.0.25.exe";
+my $DownloadVer   = "0.0.25";
 my $DownloadError = "";
 
 ###################################
@@ -206,7 +222,7 @@ sub WINCONNECT_GetStatus($;$) {
     my ($hash, $update ) = @_;
     my $name      = $hash->{NAME};
     my $interval  = $hash->{INTERVAL};
-	my $filemtime = "";
+	my $filemtime = "-";
 	
 	if ($DownloadError eq "") {$DownloadError = ReadingsVal( $name, "wincontrol_error", "Start WinControl....." );}
 	
@@ -214,8 +230,9 @@ sub WINCONNECT_GetStatus($;$) {
 	
 	InternalTimer( gettimeofday() + $interval, "WINCONNECT_GetStatus", $hash, 0 );
 	
-	my $filename  = '././www/winconnect/WinControl.exe';
-	my $filedir   = '././www/winconnect';
+	my $filename    = '././www/winconnect/WinControl.exe';
+	my $filenameSR  = '././www/winconnect/WinControlService.exe';
+	my $filedir     = '././www/winconnect';
 	
 	if ((-e $filename)) {$filemtime = (stat $filename)[9];}
 	
@@ -226,15 +243,31 @@ sub WINCONNECT_GetStatus($;$) {
 	print (fhem( "deletereading $name wincontrol_gitlap" )) if ( ReadingsVal( $name, "wincontrol_gitlap", "0" ) ne "0" ) ;
 	print (fhem( "deletereading $name wincontrol_gitlap_url" )) if ( ReadingsVal( $name, "wincontrol_gitlap_url", "0" ) ne "0" ) ;
 	
+	if ( !$update ) {
+        WINCONNECT_SendCommand( $hash, "powerstate" );
+    }
+    else {
+		WINCONNECT_SendCommand( $hash, "statusrequest" );
+	}
+	
+	if (ReadingsVal( $name, "wincontrol_type", ".." ) eq "GUI with own device") {
+		print (fhem( "deletereading $name wincontrol_update" ))     if ( ReadingsVal( $name, "wincontrol_update", "0" ) ne "0" ) ;
+		print (fhem( "deletereading $name wincontrol_gitlab_url" )) if ( ReadingsVal( $name, "wincontrol_gitlab_url", "0" ) ne "0" ) ;
+		print (fhem( "deletereading $name wincontrol_gitlab" ))     if ( ReadingsVal( $name, "wincontrol_gitlab", "0" ) ne "0" ) ;
+		print (fhem( "deletereading $name wincontrol_error" ))      if ( ReadingsVal( $name, "wincontrol_error", "0" ) ne "0" ) ;
+		return;
+	}
+	
 	readingsBeginUpdate($hash);
 	
 	#WinControl Versionsinformationen
 	readingsBulkUpdateIfChanged( $hash, "wincontrol_gitlab", $DownloadVer );
-	readingsBulkUpdateIfChanged( $hash, "wincontrol_gitlab_url", $DownloadURL);
+	readingsBulkUpdateIfChanged( $hash, "wincontrol_gitlab_url", $DownloadGURL);
+	readingsBulkUpdateIfChanged( $hash, "wincontrol_gitlab_serviceurl", $DownloadSURL);
 		
 	#WinControl Update Info eintragen
 	readingsBulkUpdateIfChanged( $hash, "wincontrol_update", $filemtime );
-	readingsBulkUpdateIfChanged( $hash, "model", ReadingsVal( $name, "os_Name", "unbekannt" ) );
+	if (ReadingsVal( $name, "os_Name", "unbekannt" ) ne "unbekannt") {readingsBulkUpdateIfChanged( $hash, "model", ReadingsVal( $name, "os_Name", "unbekannt" ));}
 	
 	#WinControl Last Error
 	readingsBulkUpdateIfChanged( $hash, "wincontrol_error", $DownloadError);
@@ -242,7 +275,7 @@ sub WINCONNECT_GetStatus($;$) {
 	readingsEndUpdate( $hash, 1 );
 	
 	#Autoupdatefile von Gitlab herunterladen
-	if ($DownloadURL ne '' && !(-e $filename . "_" .$DownloadVer) && AttrVal( $name, "autoupdategitlab", "1" ) ) {
+	if ($DownloadGURL ne '' && !(-e $filename . "_" .$DownloadVer) && AttrVal( $name, "autoupdategitlab", "1" ) ) {
 	
 		#Verzeichnis anlegen
 		mkdir($filedir, 0777) unless(-d $filedir );
@@ -256,23 +289,18 @@ sub WINCONNECT_GetStatus($;$) {
 			close (FILE);
 			
 			#Delete old version
-			if ((-e $filename)) {unlink $filename}
+			if ((-e $filename))   {unlink $filename}
+			if ((-e $filenameSR)) {unlink $filenameSR}
 				
-			HttpUtils_NonblockingGet({url=>$DownloadURL, timeout=>30, hash=>$hash, service=>"autoupdate", callback=>\&WINCONNECT_GetNewVersion});		
+			HttpUtils_NonblockingGet({url=>$DownloadGURL, timeout=>30, hash=>$hash, service=>"autoupdate", callback=>\&WINCONNECT_GetNewGUIVersion});		
+			HttpUtils_NonblockingGet({url=>$DownloadSURL, timeout=>30, hash=>$hash, service=>"autoupdate", callback=>\&WINCONNECT_GetNewServiceVersion});
 		}
-	}
-	
-	if ( !$update ) {
-        WINCONNECT_SendCommand( $hash, "powerstate" );
-    }
-    else {
-		WINCONNECT_SendCommand( $hash, "statusrequest" );
 	}
 	
     return;
 }
 
-sub WINCONNECT_GetNewVersion($$$) {
+sub WINCONNECT_GetNewGUIVersion($$$) {
 	my ($hash, $err, $data) = @_;
 	my $filename  = '././www/winconnect/WinControl.exe';
 	my $name      = $hash->{NAME};
@@ -288,16 +316,50 @@ sub WINCONNECT_GetNewVersion($$$) {
 	}else{
 		print FH $data;
 		close(FH);
+		
+		my $filesize = -s $filename;
 
 		# Prüfen ob die Dateigröße passt!
-		if ((stat $filename)[7] < 600000) {
-			#Download fehlgeschlagen!
-			if ((-e $CheckFile)) {unlink $CheckFile}
-	
-			$DownloadError = "Download ERROR file to small. Filesize = " . (stat $filename)[7];
+		if ($filesize < 600000) {
+			$DownloadError = "Download ERROR file to small. Filesize = " . $filesize;
 			Log3 $name, 5, "WINCONNECT [NEW] " .$DownloadError;
+			#Download fehlgeschlagen! / Flag wieder löschen
+			if ((-e $CheckFile)) {unlink $CheckFile}
 		}else{
-			Log3 $name, 0, "WINCONNECT [NEW] Download new version URL = $DownloadURL";
+			Log3 $name, 0, "WINCONNECT [NEW] Download new version URL = $DownloadGURL";
+			Log3 $name, 0, "WINCONNECT [NEW] Download new version OK";
+			$DownloadError = "Download new version = $DownloadVer";
+		}
+	}
+}
+
+sub WINCONNECT_GetNewServiceVersion($$$) {
+	my ($hash, $err, $data) = @_;
+	my $filename  = '././www/winconnect/WinControlService.exe';
+	my $name      = $hash->{NAME};
+   	my $CheckFile = $filename . "_" .$DownloadVer;
+    
+	# Download neue Datei
+	if(!open(FH, ">$filename")) {
+		$DownloadError = "Download ERROR Can't write = " .$filename . " Error=" .$!;
+		Log3 $name, 5, "WINCONNECT [NEW] " .$DownloadError;
+
+		#Delete Version Flag
+		if ((-e $CheckFile)) {unlink $CheckFile}
+	}else{
+		print FH $data;
+		close(FH);
+		
+		my $filesize = -s $filename;
+
+		# Prüfen ob die Dateigröße passt!
+		if ($filesize < 50000) {
+			$DownloadError = "Download ERROR file to small. Filesize = " . $filesize;
+			Log3 $name, 5, "WINCONNECT [NEW] " .$DownloadError;
+			#Download fehlgeschlagen! / Flag wieder löschen
+			if ((-e $CheckFile)) {unlink $CheckFile}
+		}else{
+			Log3 $name, 0, "WINCONNECT [NEW] Download new version URL = $DownloadSURL";
 			Log3 $name, 0, "WINCONNECT [NEW] Download new version OK";
 			$DownloadError = "Download new version = $DownloadVer";
 		}
@@ -313,6 +375,7 @@ sub WINCONNECT_SendCommand($$;$$) {
 	my $PWRState 		= ReadingsVal( $name, "state", "" );
 	my $Winconnect      = ReadingsVal( $name, "wincontrol", "statusrequest" );
 	my $WinconnectUPD   = ReadingsVal( $name, "wincontrol_update", "0" );
+	my $GUIPort         = ReadingsVal( $name, "wincontrol_user_port", "8183" );
 	my $URL;
 
     Log3 $name, 5, "WINCONNECT $name: called function WINCONNECT_SendCommand()";
@@ -379,8 +442,14 @@ sub WINCONNECT_SendCommand($$;$$) {
 	elsif ($service eq "checkprocess") {
 		$serviceurl = "checkprocess";
 	}
+	elsif ($service eq "checkprocess_type") {
+		$serviceurl = "serviceconfigwrite";
+	}
 	elsif ($service eq "showfile") {
 		$serviceurl = "showfile";
+	}
+	elsif ($service eq "setfocustoapp") {
+		$serviceurl = "setfocustoapp";
 	}
 	elsif ($service eq "ttsmsg") {
 		$serviceurl = "ttsmsg";
@@ -403,16 +472,19 @@ sub WINCONNECT_SendCommand($$;$$) {
 	elsif ($service eq "screenoff") {
 		$serviceurl = "screen=off";
 	}
+	elsif ($service eq "sendkey") {
+		$serviceurl = "sendkey";
+	}		
 	else{
 		$serviceurl = $service;
 	}
-
+	
 	# URL zusammenbauen
 	$cmd = ( defined($cmd) ) ? $cmd : "";
-    $URL =  "http://" . $address . ":8183/fhem/" . $serviceurl . $cmd ;
+    $URL =  "http://" . $address . ":" . $GUIPort . "/fhem/" . $serviceurl . $cmd ;
 	$URL =~ tr/\r\n/|/;
 	
-    Log3 $name, 6, "WINCONNECT $name: GET " . urlDecode($URL);
+    Log3 $name, 5, "WINCONNECT $name: GET " . urlDecode($URL);
 
      HttpUtils_NonblockingGet(
             {
@@ -440,11 +512,24 @@ sub WINCONNECT_Set($@) {
 	my $Value	   = "";
 	my $Count      = 0;
 	my $SetValue   = 0;
-	
+	my $GUIType    = ReadingsVal( $name, "wincontrol_type", "GUI without service" );
+	my $usage      = "";
     Log3 $name, 5, "WINCONNECT $name: called function WINCONNECT_Set()";
-
-	my $usage = "choose one of volume:slider,0,1,100 mute:on,off camera:on,off powermode:shutdown,restart,standby,hibernate volumeUp:noArg volumeDown:noArg brightness:slider,0,1,100 picture_make:noArg update:noArg speechquality:slider,0,1,100 statusRequest:noArg screenOn:noArg screenOff:noArg command commandhide showfile picture_dir checkperformance_interval checkperformance:textField-long checkservice checkprocess notifymsg messagebox file_dir file_filter file_order:ascending,descending ttsmsg user_aktividletime speechcommands";
-
+	
+	# Set´s anzeigen je nach WinControl Typ!
+	if ($GUIType eq "GUI with own device") {
+		# GUI mit eigenem Device und einem Windows Service
+		$usage = "choose one of camera:on,off picture_make:noArg speechquality:slider,0,1,100 statusRequest:noArg screenOn:noArg screenOff:noArg command commandhide sendkey showfile picture_dir checkprocess notifymsg messagebox file_dir file_filter file_order:ascending,descending ttsmsg user_aktividletime speechcommands setfocustoapp ";	
+	}
+	elsif($GUIType eq "GUI without service") {
+		# Standard GUI ohne einen Service
+		$usage = "choose one of brightness:slider,0,1,100 camera:on,off checkperformance:textField-long checkperformance_interval checkprocess checkservice command commandhide file_dir file_filter file_order:ascending,descending messagebox mute:on,off notifymsg picture_dir picture_make:noArg powermode:shutdown,restart,standby,hibernate screenOn:noArg screenOff:noArg sendkey setfocustoapp showfile speechcommands speechquality:slider,0,1,100 statusRequest:noArg ttsmsg update:noArg user_aktividletime volume:slider,0,1,100 volumeDown:noArg volumeUp:noArg ";	
+	}
+	else {
+		# Windows Service betrieb / GUI ohne eigenes Device aber mit einem Windows Service
+		$usage = "choose one of brightness:slider,0,1,100 camera:on,off checkperformance:textField-long checkperformance_interval checkprocess checkprocess_type:service,gui checkservice command commandhide command_type:service,gui file_dir file_filter file_order:ascending,descending file_type:service,gui messagebox mute:on,off notifymsg picture_dir picture_make:noArg powermode:shutdown,restart,standby,hibernate screenOn:noArg screenOff:noArg sendkey setfocustoapp showfile speechcommands speechquality:slider,0,1,100 statusRequest:noArg ttsmsg update:noArg user_aktividletime volume:slider,0,1,100 volumeDown:noArg volumeUp:noArg ";
+	}
+	
 	return "No Argument given" if ( !defined( $a[1] ) );
 
     # statusRequest
@@ -643,7 +728,20 @@ sub WINCONNECT_Set($@) {
 		}
 		else {return "Device needs to be ON to execute commandhide.";}
     }
-		
+
+	# command_type
+    elsif ( lc( $a[1] ) eq "command_type" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+			readingsSingleUpdate( $hash, "command_type", $a[2],1 ); 
+           	WINCONNECT_SendCommand( $hash, "SERVICECONFIGWRITE" , "%20type_service_command%20" . $a[2]  );
+        }
+        else {return "Device needs to be ON to adjust command_type.";}
+    }
+	
 	# showfile
     elsif ( lc( $a[1] ) eq "showfile" ) {
         return "No argument given" if ( !defined( $a[2] ) );
@@ -657,7 +755,35 @@ sub WINCONNECT_Set($@) {
 		}
 		else {return "Device needs to be ON to showfile.";}
     }
-   
+
+	# sendkey
+    elsif ( lc( $a[1] ) eq "sendkey" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "sendkey" , "=" . $cmd );
+		}
+		else {return "Device needs to be ON to sendkey.";}
+    }
+	
+	# setfocustoapp
+    elsif ( lc( $a[1] ) eq "setfocustoapp" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+        if ( $state eq "on" ) {
+		
+			foreach (@a) {
+				if ($cmd eq "") {$cmd = $_ ;} else {$cmd = $cmd . "%20" . $_ ;}
+			}
+			Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $cmd;
+			WINCONNECT_SendCommand( $hash, "setfocustoapp" , "=" . $cmd );
+		}
+		else {return "Device needs to be ON to setfocustoapp.";}
+    }
+	
 	# ttsmsg
     elsif ( lc( $a[1] ) eq "ttsmsg" ) {
         return "No argument given" if ( !defined( $a[2] ) );
@@ -776,6 +902,19 @@ sub WINCONNECT_Set($@) {
 		}
 		else {return "Device needs to be ON to checkprocess.";}
     }
+
+	# checkprocess_type
+    elsif ( lc( $a[1] ) eq "checkprocess_type" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+			readingsSingleUpdate( $hash, "checkprocess_type", $a[2],1 ); 
+           	WINCONNECT_SendCommand( $hash, "SERVICECONFIGWRITE" , "%20type_service_checkprocess%20" . $a[2]  );
+        }
+        else {return "Device needs to be ON to adjust checkprocess_type.";}
+    }
 	
 	# speechcommands
     elsif ( lc( $a[1] ) eq "speechcommands" ) {
@@ -838,6 +977,19 @@ sub WINCONNECT_Set($@) {
         else {return "Device needs to be ON to adjust file_order.";}
     }
 
+	# file_type
+    elsif ( lc( $a[1] ) eq "file_type" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 3, "WINCONNECT set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
+			readingsSingleUpdate( $hash, "file_type", $a[2],1 ); 
+           	WINCONNECT_SendCommand( $hash, "SERVICECONFIGWRITE" , "%20type_service_file%20" . $a[2]  );
+        }
+        else {return "Device needs to be ON to adjust file_type.";}
+    }
+	
 	# picture_dir
     elsif ( lc( $a[1] ) eq "picture_dir" ) {
         if ( $state eq "on" ) {
@@ -921,18 +1073,19 @@ sub WINCONNECT_ReceiveCommand($) {
 	my $VerWin   = substr(ReadingsVal( $name, "wincontrol", "0.0.0.0" ),4);
 	my $VerGit   = substr(ReadingsVal( $name, "wincontrol_gitlab", "0.0.0.0" ),4);
 	my $service  = $param->{service};
-	
+
 	readingsBeginUpdate($hash);
  
 	# Versionsnachricht
-	my $Message = $name . "%20NOTIFYMSG%20Neue%20WinConnect%20Version%20verfügbar!%20Downloadlink%20=%20" . $DownloadURL;
+	my $Message = $name . "%20NOTIFYMSG%20Neue%20WinConnect%20Version%20verfügbar!%20Downloadlink%20=%20" . $DownloadGURL;
 	
     if($err ne "")    {
 		Log3 $name, 5, "WINCONNECT $name: error while requesting ".$param->{url}." - $err"; 
         readingsBulkUpdateIfChanged( $hash, "state", "off" );
-		readingsBulkUpdateIfChanged( $hash, "audio", "off"); 
 		
-		if (AttrVal($name, "win_resetreadings", 1) eq '1') {
+		if (ReadingsVal( $name, "wincontrol_user_port", "8183" ) eq "8183" && AttrVal($name, "win_resetreadings", 1) eq '1') {
+			readingsBulkUpdateIfChanged( $hash, "user_aktiv", "false" ); 
+			readingsBulkUpdateIfChanged( $hash, "audio", "off");
 			readingsBulkUpdateIfChanged( $hash, "user_aktiv", "false" ); 
 			readingsBulkUpdateIfChanged( $hash, "os_RunTime_days", "0" ); 
 			readingsBulkUpdateIfChanged( $hash, "os_RunTime_hours", "0" ); 
@@ -940,7 +1093,6 @@ sub WINCONNECT_ReceiveCommand($) {
 			readingsBulkUpdateIfChanged( $hash, "printer_aktiv", "false" );
 			readingsBulkUpdateIfChanged( $hash, "printer_names", "no_prining" );
 		}
-
     }
  
     elsif($data ne "")
