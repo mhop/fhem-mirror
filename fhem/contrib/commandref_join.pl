@@ -80,7 +80,7 @@ chkAndGenLangLinks($$$)
 {
   my ($l, $lang, $fh) = @_;
   $var = $1 if($l =~ m/<a name="(.*?)"(.*?)><\/a>/);
-  if($l =~ m/(.*?)<\/h3>/ && $var) {
+  if($fh && $l =~ m/(.*?)<\/h3>/ && $var) {
     print $fh "<div class='langLinks'>[".join(" ", map { 
         $_ eq $lang ? $_ : 
         "<a href='commandref".($_ eq "EN" ? "":"_$_").".html#$var'>$_</a>"
