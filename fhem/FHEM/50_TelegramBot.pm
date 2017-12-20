@@ -138,16 +138,19 @@
 
 #   Fix minusdesc undefined issue
 #   Cleanup old code
+#   add favoritesMenu to send favorites 
+#   doc favoritesMenu
+#   correct favoritesMenu to allow parameter
+#   FIX: allow_nonref / eval also for makekeyboard #msg732757
+#   new set cmd silentmsg for disable_notification - syntax as in msg
+#   INT: change forceReply to options for sendit
+# 2.7 2017-12-20  
 
 #   
 ##############################################################################
 # TASKS 
 #   
-#   \n in inline keyboards
-#   
 #   queryDialogStart / queryDialogEnd - keep msg id 
-#   
-#   
 #   
 #   remove keyboard after favorite confirm
 #   
@@ -155,7 +158,8 @@
 #   
 #   replyKeyboardRemove - #msg592808
 #   
-#   add an option to send silent messages - msg556631
+#   add an option to send silent messages - msg556631  ??
+#   \n in inline keyboards - not possible currently
 #   
 ##############################################################################
 
@@ -207,6 +211,8 @@ my %sets = (
   "message" => "textField",
   "msg" => "textField",
   "send" => "textField",
+  
+  "silentmsg" => "textField",
 
   "msgDelete" => "textField",
 
@@ -223,9 +229,11 @@ my %sets = (
   "sendDocument" => "textField",
   "sendMedia" => "textField",
   "sendVoice" => "textField",
-
+  
   "sendLocation" => "textField",
 
+  "favoritesMenu" => "textField",
+  
   "cmdSend" => "textField",
 
   "replaceContacts" => "textField",
@@ -464,12 +472,13 @@ sub TelegramBot_Set($@)
 
   my $ret = undef;
   
-  if( ($cmd eq 'message') || ($cmd eq 'queryInline') || ($cmd eq 'queryEditInline') || ($cmd eq 'queryAnswer') || ($cmd eq 'msg') || ($cmd eq '_msg') || ($cmd eq 'reply') || ($cmd eq 'msgEdit') || ($cmd eq 'msgForceReply') || ($cmd =~ /^send.*/ ) ) {
+  if( ($cmd eq 'message') || ($cmd eq 'queryInline') || ($cmd eq 'queryEditInline') || ($cmd eq 'queryAnswer') || ($cmd eq 'msg') || ($cmd eq '_msg') || ($cmd eq 'reply') || ($cmd eq 'msgEdit') || ($cmd eq 'msgForceReply') || ($cmd eq 'silentmsg') || ($cmd =~ /^send.*/ ) ) {
 
     my $msgid;
     my $msg;
     my $addPar;
     my $sendType = 0;
+    my $options = "";
     my $peers;
     my $inline = 0;
     
@@ -480,7 +489,9 @@ sub TelegramBot_Set($@)
       $numberOfArgs--;
       $inline = 1 if ($cmd eq 'queryEditInline');
     } elsif ($cmd eq 'msgForceReply')  {
-      $addPar = "{\"force_reply\":true}";
+      $options .= " -force_reply- ";
+    } elsif ($cmd eq 'silentmsg')  {
+      $options .= " -silent- ";
     } elsif ($cmd eq 'queryInline')  {
       $inline = 1;
     }
@@ -587,9 +598,32 @@ sub TelegramBot_Set($@)
     }
       
     Log3 $name, 5, "TelegramBot_Set $name: start send for cmd :$cmd: and sendType :$sendType:";
-    $ret = TelegramBot_SendIt( $hash, $peers, $msg, $addPar, $sendType, $msgid );
+    $ret = TelegramBot_SendIt( $hash, $peers, $msg, $addPar, $sendType, $msgid, $options );
 
 
+  } elsif($cmd eq 'favoritesMenu') {
+
+    my $peers;
+    if ( int(@args) > 0 ) {
+      while ( $args[0] =~ /^@(..+)$/ ) {
+        my $ppart = $1;
+        return "TelegramBot_Set: Command $cmd, need exactly one peer" if ( ( defined( $peers ) ) );
+        $peers = (defined($peers)?$peers." ":"").$ppart;
+        shift @args;
+        last if ( int(@args) == 0 );
+      }   
+      return "TelegramBot_Set: Command $cmd, addiitonal parameter specified" if ( int(@args) >= 1 );
+    }
+    
+    if ( ! defined( $peers ) ) {
+      $peers = AttrVal($name,'defaultPeer',undef);
+      return "TelegramBot_Set: Command $cmd, without explicit peer requires defaultPeer being set" if ( ! defined($peers) );
+    }
+    
+    return "TelegramBot_Set: Command $cmd, no favorites defined" if ( ! defined( AttrVal($name,'favorites',undef) ) );
+
+    TelegramBot_SendFavorites($hash, $peers, undef, "", undef, undef, 0);
+  
   } elsif($cmd eq 'cmdSend') {
 
     return "TelegramBot_Set: Command $cmd, no peers and no text/file specified" if ( $numberOfArgs < 2 );
@@ -598,7 +632,7 @@ sub TelegramBot_Set($@)
     my $peers;
     while ( $args[0] =~ /^@(..+)$/ ) {
       my $ppart = $1;
-      return "TelegramBot_Set: Command $cmd, need exactly one peer" if ( ($cmd eq 'reply') && ( defined( $peers ) ) );
+      return "TelegramBot_Set: Command $cmd, need exactly one peer" if ( ( defined( $peers ) ) );
       $peers .= " " if ( defined( $peers ) );
       $peers = "" if ( ! defined( $peers ) );
       $peers .= $ppart;
@@ -1052,6 +1086,7 @@ sub TelegramBot_SendFavorites($$$$$;$$) {
   my $name = $hash->{NAME};
   
   $aliasExec = 0 if ( ! $aliasExec );
+  $iscallback = 0 if ( ! $iscallback );
 
   my $ret;
   
@@ -1641,7 +1676,7 @@ sub TelegramBot_SendIt($$$$$;$$$)
   }
   
   Log3 $name, 5, "TelegramBot_SendIt $name: try to send message to :$peer: -:".
-      TelegramBot_MsgForLog($msg, ($isMedia<0) ).": - :".(defined($addPar)?$addPar:"<undef>").":";
+      TelegramBot_MsgForLog($msg, ($isMedia<0) ).": - :".(defined($addPar)?$addPar:"<undef>").":".":    options :".$options.":";
 
     # trim and convert spaces in peer to underline 
   my $peer2 = TelegramBot_GetIdForPeer( $hash, $peer );
@@ -1798,7 +1833,14 @@ sub TelegramBot_SendIt($$$$$;$$$)
 
     if ( defined( $addPar ) ) {
       $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "reply_markup", undef, $addPar, 0 ) if ( ! defined( $ret ) );
+    } elsif ( $options =~ /-force_reply-/ ) {
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "reply_markup", undef, "{\"force_reply\":true}", 0 ) if ( ! defined( $ret ) );
     }
+    
+    if ( $options =~ /-silent-/ ) {
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "disable_notification", undef, "true", 0 ) if ( ! defined( $ret ) );
+    }
+
 
     # finalize multipart 
     $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, undef, undef, undef, 0 ) if ( ! defined( $ret ) );
@@ -1949,14 +1991,21 @@ sub TelegramBot_MakeKeyboard($$$@)
   }
   
   my $refkb = \%par;
-  
-  my $json        = JSON->new->utf8;
-  $ret = $json->utf8(0)->encode( $refkb );
-  Log3 $name, 4, "TelegramBot_MakeKeyboard $name: json :$ret: is utf8? ".(utf8::is_utf8($ret)?"yes":"no");
 
-  if ( utf8::is_utf8($ret) ) {
-    utf8::downgrade($ret); 
-    Log3 $name, 4, "TelegramBot_MakeKeyboard $name: json downgraded :$ret: is utf8? ".(utf8::is_utf8($ret)?"yes":"no");
+  # encode keyboard with JSON
+  my $json        = JSON->new->utf8->allow_nonref;
+  eval {
+    $ret = $json->utf8(0)->encode( $refkb );
+  };
+  Log3 $name, 2, "JSON encode() did fail with: ".(( $@ )?$@:"<unknown error>") if ( ! $ret );
+
+  if ( $ret ) {
+    Log3 $name, 4, "TelegramBot_MakeKeyboard $name: json :$ret: is utf8? ".(utf8::is_utf8($ret)?"yes":"no");
+
+    if ( utf8::is_utf8($ret) ) {
+      utf8::downgrade($ret); 
+      Log3 $name, 4, "TelegramBot_MakeKeyboard $name: json downgraded :$ret: is utf8? ".(utf8::is_utf8($ret)?"yes":"no");
+    }
   }
   
   return $ret;
@@ -3427,6 +3476,9 @@ sub TelegramBot_BinaryFileWrite($$$) {
       <dl>
     </li>
     
+    <li><code>silentmsg ...<br>Sends the given message silently (with disabled_notifications) to the recipients. Syntax and parameters are the same as in the send/message command.
+    </li>
+    
     <li><code>msgForceReply [ @&lt;peer1&gt; ... @&lt;peerN&gt; ] &lt;text&gt;</code><br>Sends the given message to the recipient(s) and requests (forces) a reply. Handling of peers is equal to the message command. Adding reply keyboards is currently not supported by telegram.
     </li>
     <li><code>reply &lt;msgid&gt; [ @&lt;peer1&gt; ] &lt;text&gt;</code><br>Sends the given message as a reply to the msgid (number) given to the given peer or if peer is ommitted to the defined default peer user. Only a single peer can be specified. Beside the handling of the message as a reply to a message received earlier, the peer and message handling is otherwise identical to the msg command. 
@@ -3436,6 +3488,9 @@ sub TelegramBot_BinaryFileWrite($$$) {
     </li>
 
     <li><code>msgDelete &lt;msgid&gt; [ @&lt;peer1&gt; ] </code><br>Deletes the given message on the recipients clients. The msgid of the message to be changed must match a valid msgId and the peers need to match the original recipient, so only a single peer can be given or if peer is ommitted the defined default peer user is used. Restrictions apply for deleting messages in the Bot API as currently specified here (<a href=https://core.telegram.org/bots/api#deletemessage>deleteMessage</a>)
+    </li>
+
+    <li><code>favoritesMenu [ @&lt;peer&gt; ] </code><br>send the favorites menu to the corresponding peer if defined</code>
     </li>
 
     <li><code>cmdSend [ @&lt;peer1&gt; ... @&lt;peerN&gt; ] &lt;fhem command&gt;</code><br>Executes the given fhem command and then sends the result to the given peers or the default peer.<br>

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 50_TelegramBot: new set cmd silentmsg to disable_notification
   - bugfix:  73_GardenaSmart: v0.4.0 bugfixes
   - feature: 31_PLAYBULB: v1.4.0 support for Sphere Model BTL301w
   - change:  77_UWZ: v2.0.0, replace Iconv-Converter with perl encode()
