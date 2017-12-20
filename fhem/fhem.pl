@@ -3061,12 +3061,13 @@ HandleTimeout()
     return ($nextat-$now);
   }
 
-  $now += 0.01;# need to cover min delay at least
   $nextat = 0;
   #############
   # Check the internal list.
   foreach my $i (sort { $intAt{$a}{TRIGGERTIME} <=>
-                        $intAt{$b}{TRIGGERTIME} } keys %intAt) {
+                        $intAt{$b}{TRIGGERTIME} }
+                 grep { $intAt{$_}{TRIGGERTIME} <= $now } # sort is slow
+                        keys %intAt) {
     $i = "" if(!defined($i)); # Forum #40598
     next if(!$intAt{$i}); # deleted in the loop
     my $tim = $intAt{$i}{TRIGGERTIME};
@@ -3074,14 +3075,16 @@ HandleTimeout()
     if(!defined($tim) || !defined($fn)) {
       delete($intAt{$i});
       next;
-    } elsif($tim <= $now) {
-      no strict "refs";
-      &{$fn}($intAt{$i}{ARG});
-      use strict "refs";
-      delete($intAt{$i});
-    } else {
-      $nextat = $tim if(!$nextat || $nextat > $tim);
     }
+    no strict "refs";
+    &{$fn}($intAt{$i}{ARG});
+    use strict "refs";
+    delete($intAt{$i});
+  }
+
+  foreach my $i (keys %intAt) {
+    my $tim = $intAt{$i}{TRIGGERTIME};
+    $nextat = $tim if(defined($tim) && (!$nextat || $nextat > $tim));
   }
 
   if(%prioQueues) {
@@ -3100,7 +3103,7 @@ HandleTimeout()
   $now = gettimeofday(); # if some callbacks took longer
   $selectTimestamp = $now;
 
-  return ($now+ 0.01 < $nextat) ? ($nextat-$now) : 0.01;
+  return ($now < $nextat) ? ($nextat-$now) : 0;
 }
 
 
