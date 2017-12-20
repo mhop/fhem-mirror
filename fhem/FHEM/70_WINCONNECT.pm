@@ -1,6 +1,9 @@
 # $Id$
 ############################################################################
-# 2017-12-19, v0.0.25
+# 2017-12-20, v0.0.26
+#
+# v0.0.26
+# - BUFIX:      [WinWebGUI] - Installation Windows Service
 #
 # v0.0.25
 # - FEATURE:	[WinWebGUI] - Starten als Windows Dienst
@@ -195,9 +198,9 @@ sub WINCONNECT_Define($$);
 sub WINCONNECT_Undefine($$);
 
 # Autoupdateinformationen
-my $DownloadGURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.25.exe";
-my $DownloadSURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControlService_0.0.25.exe";
-my $DownloadVer   = "0.0.25";
+my $DownloadGURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.26.exe";
+my $DownloadSURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControlService_0.0.26.exe";
+my $DownloadVer   = "0.0.26";
 my $DownloadError = "";
 
 ###################################
