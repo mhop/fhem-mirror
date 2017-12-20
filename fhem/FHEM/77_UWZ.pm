@@ -7,6 +7,7 @@
 #  Special thanks goes to comitters:
 #       - Marko Oldenburg (leongaultier at gmail dot com)
 #       - Hanjo (Forum) patch for sort by creation
+#       - cb1 <kontakt@it-buchinger.de> patch Replace Iconv with native perl encode()
 #  
 #  Storm warnings from unwetterzentrale.de
 #  inspired by 59_PROPLANTA.pm
@@ -53,7 +54,6 @@ eval "use HTTP::Request;1" or $missingModul .= "HTTP::Request ";
 eval "use HTML::Parser;1" or $missingModul .= "HTML::Parser ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use Encode::Guess;1" or $missingModul .= "Encode::Guess ";
-eval "use Text::Iconv;1" or $missingModul .= "Text::Iconv ";
 
 require 'Blocking.pm';
 require 'HttpUtils.pm';
@@ -61,7 +61,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL           = "UWZ";
-my $version         = "1.8.0";
+my $version         = "2.0.0";
 
 
 
@@ -772,7 +772,6 @@ sub UWZ_Run($) {
     my $response = UWZ_JSONAcquire($hash,$hash->{URL}); 
 
     UWZ_Log $hash, 5, length($response)." characters captured";
-    my $converter = Text::Iconv->new("windows-1252","UTF-8");
     my $uwz_warnings = JSON->new->ascii->decode($response);
     my $enc = guess_encoding($uwz_warnings);
 
@@ -938,10 +937,12 @@ sub UWZ_Run($) {
         $message .= "Warn_".$i."_levelName|".$single_warning->{'payload'}{'levelName'}."|";
         
         UWZ_Log $hash, 4, "Warn_".$i."_AltitudeMin: ".$enc->decode($single_warning->{'payload'}{'altMin'});
-        $message .= "Warn_".$i."_AltitudeMin|".$converter->convert($single_warning->{'payload'}{'altMin'})."|";
+    
+        $message .= "Warn_".$i."_AltitudeMin|".encode("UTF-8", decode("iso-8859-1", $single_warning->{'payload'}{'altMin'}))."|";
 
         UWZ_Log $hash, 4, "Warn_".$i."_AltitudeMax: ".$enc->decode($single_warning->{'payload'}{'altMax'});
-        $message .= "Warn_".$i."_AltitudeMax|".$converter->convert($single_warning->{'payload'}{'altMax'})."|";
+
+        $message .= "Warn_".$i."_AltitudeMax|".encode("UTF-8", decode("iso-8859-1", $single_warning->{'payload'}{'altMax'}))."|";
 
         my $uclang = "EN";
         if (AttrVal( $name, 'lang',undef) ) {
@@ -955,10 +956,12 @@ sub UWZ_Run($) {
             }
         }
         UWZ_Log $hash, 4, "Warn_".$i."_LongText: ".$enc->decode($single_warning->{'payload'}{'translationsLongText'}{$uclang});
-        $message .= "Warn_".$i."_LongText|".$converter->convert($single_warning->{'payload'}{'translationsLongText'}{$uclang})."|";
+
+        $message .= "Warn_".$i."_LongText|".encode("UTF-8", decode("iso-8859-1", $single_warning->{'payload'}{'translationsLongText'}{$uclang}))."|";
             
         UWZ_Log $hash, 4, "Warn_".$i."_ShortText: ".$enc->decode($single_warning->{'payload'}{'translationsShortText'}{$uclang});
-        $message .= "Warn_".$i."_ShortText|".$converter->convert($single_warning->{'payload'}{'translationsShortText'}{$uclang})."|";
+
+        $message .= "Warn_".$i."_ShortText|".encode("UTF-8", decode("iso-8859-1", $single_warning->{'payload'}{'translationsShortText'}{$uclang}))."|";
 
 ###
         if (AttrVal( $name, 'localiconbase',undef) ) {
@@ -1530,7 +1533,7 @@ sub UWZSearchAreaID($$) {
    A maximum of 10 thunderstorm warnings will be served.
    Additional the module provides a few functions to create HTML-Templates which can be used with weblink.
    <br>
-   <i>The following Perl-Modules are used within this module: HTTP::Request, LWP::UserAgent, JSON, Encode::Guess, Text::Iconv und HTML::Parse</i>.
+   <i>The following Perl-Modules are used within this module: HTTP::Request, LWP::UserAgent, JSON, Encode::Guess und HTML::Parse</i>.
    <br/><br/>
    <b>Define</b>
    <ul>
@@ -1950,7 +1953,7 @@ sub UWZSearchAreaID($$) {
    Es werden maximal 10 Standortbezogene Unwetterwarnungen zur Verfügung gestellt.
    Weiterhin verfügt das Modul über HTML-Templates welche als weblink verwendet werden können.
    <br>
-   <i>Es nutzt die Perl-Module HTTP::Request, LWP::UserAgent, JSON, Encode::Guess, Text::Iconv und HTML::Parse</i>.
+   <i>Es nutzt die Perl-Module HTTP::Request, LWP::UserAgent, JSON, Encode::Guess und HTML::Parse</i>.
    <br/><br/>
    <b>Define</b>
    <ul>

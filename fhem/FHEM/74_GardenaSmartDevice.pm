@@ -62,13 +62,10 @@ use strict;
 use warnings;
 use Time::Local;
 
-use Data::Dumper;   #debugging
-
-# eval "use Encode qw(encode encode_utf8 decode_utf8);1" or $missingModul .= "Encode ";     wird nicht benötigt
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.2.3";
+my $version = "0.4.0";
 
 
 
@@ -102,6 +99,7 @@ sub GardenaSmartDevice_Initialize($) {
     $hash->{AttrFn}     = "GardenaSmartDevice_Attr";
     $hash->{AttrList}   = "readingValueLanguage:de,en ".
                             "model ".
+                            "IODev ".
                             $readingFnAttributes;
     
     foreach my $d(sort keys %{$modules{GardenaSmartDevice}{defptr}}) {
@@ -115,39 +113,29 @@ sub GardenaSmartDevice_Define($$) {
 
     my ( $hash, $def ) = @_;
     my @a = split( "[ \t]+", $def );
-    splice( @a, 1, 1 );
-    my $iodev;
-    my $i = 0;
 
-
-    foreach my $param ( @a ) {
-        if( $param =~ m/IODev=([^\s]*)/ ) {
-        
-            $iodev = $1;
-            splice( @a, $i, 3 );
-            last;
-        }
-        
-        $i++;
-    }
-
-
-    return "too few parameters: define <NAME> GardenaSmartDevice <device_Id> <model>" if( @a != 3 ) ;
+    return "too few parameters: define <NAME> GardenaSmartDevice <device_Id> <model>" if( @a < 3 ) ;
     return "Cannot define Gardena Bridge device. Perl modul $missingModul is missing." if ( $missingModul );
-    
-    my ($name,$deviceId,$category)   = @a;
-    
-    $hash->{DEVICEID}           = $deviceId;
-    $hash->{VERSION}            = $version;
 
+    
+    my $name            = $a[0];
+    my $deviceId        = $a[2];
+    my $category        = $a[3];
+    
+    $hash->{DEVICEID}   = $deviceId;
+    $hash->{VERSION}    = $version;
+
+    
+    
+    CommandAttr(undef,"$name IODev $modules{GardenaSmartBridge}{defptr}{BRIDGE}->{NAME}") if(AttrVal($name,'IODev','none') eq 'none');
+
+    my $iodev           = AttrVal($name,'IODev','none');
+    
     AssignIoPort($hash,$iodev) if( !$hash->{IODev} );
     
     if(defined($hash->{IODev}->{NAME})) {
-    
         Log3 $name, 3, "GardenaSmartDevice ($name) - I/O device is " . $hash->{IODev}->{NAME};
-    
     } else {
-    
         Log3 $name, 1, "GardenaSmartDevice ($name) - no I/O device";
     }
     
@@ -157,6 +145,7 @@ sub GardenaSmartDevice_Define($$) {
     
     return "GardenaSmartDevice device $name on GardenaSmartBridge $iodev already defined."
     if( defined($d) && $d->{IODev} == $hash->{IODev} && $d->{NAME} ne $name );
+    
     
     $attr{$name}{room}          = "GardenaSmart"    if( not defined( $attr{$name}{room} ) );
     $attr{$name}{model}         = $category         if( not defined( $attr{$name}{model} ) );
@@ -313,9 +302,8 @@ sub GardenaSmartDevice_Parse($$) {
             
         } else {
             
-            Log3 $name, 3, "GardenaSmartDevice ($name) - autocreate new device " . makeDeviceName($decode_json->{name}) . " with deviceId $decode_json->{id}, model $decode_json->{category} and IODev IODev=$name";
-            #return "UNDEFINED " . join('',split("[ \t]+",$decode_json->{name})) . " GardenaSmartDevice $decode_json->{id} $decode_json->{category} IODev=$name";
-            return "UNDEFINED " . makeDeviceName($decode_json->{name}) . " GardenaSmartDevice $decode_json->{id} $decode_json->{category} IODev=$name";
+            Log3 $name, 3, "GardenaSmartDevice ($name) - autocreate new device " . makeDeviceName($decode_json->{name}) . " with deviceId $decode_json->{id}, model $decode_json->{category}";
+            return "UNDEFINED " . makeDeviceName($decode_json->{name}) . " GardenaSmartDevice $decode_json->{id} $decode_json->{category}";
         }
     }
 }
