@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.2.1";
+my $HOMEMODE_version = "1.2.2";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -2016,13 +2016,15 @@ sub HOMEMODE_replacePlaceholders($$;$)
   my $dursleep = ReadingsVal($resident,"durTimerSleep_cr",0);
   my $condition = ReadingsVal($sensor,"condition","");
   my $conditionart = ReadingsVal($name,".be","");
-  my $contactsOpen = ReadingsVal($name,"contactsOutsideOpen_hr","");
+  my $contactsOpen = ReadingsVal($name,"contactsOutsideOpen","");
   my $contactsOpenCt = ReadingsVal($name,"contactsOutsideOpen_ct",0);
+  my $contactsOpenHr = ReadingsVal($name,"contactsOutsideOpen_hr",0);
   my $dnd = ReadingsVal($name,"dnd","off") eq "on" ? 1 : 0;
   my $aeah = ReadingsVal($name,"anyoneElseAtHome","off") eq "on" ? 1 : 0;
   my $panic = ReadingsVal($name,"panic","off") eq "on" ? 1 : 0;
-  my $sensorsTampered = ReadingsVal($name,"sensorsTampered_hr","");
-  my $sensorsTamperedCt = ReadingsVal($name,"sensorsTampered_ct","");
+  my $tampered = ReadingsVal($name,"sensorsTampered_hr","");
+  my $tamperedc = ReadingsVal($name,"sensorsTampered_ct","");
+  my $tamperedhr = ReadingsVal($name,"sensorsTampered_hr","");
   my $ice = ReadingsVal($name,"icewarning",0);
   my $ip = ReadingsVal($name,"publicIP","");
   my $light = ReadingsVal($name,"light",0);
@@ -2050,7 +2052,7 @@ sub HOMEMODE_replacePlaceholders($$;$)
   my $ppdevice = ReadingsVal($name,"lastPresentByPresenceDevice","");
   my $paddress = InternalVal($pdevice,"ADDRESS","");
   my $pressure = ReadingsVal($name,"pressure","");
-  my $pressuretrend = ReadingsVal($sensor,"pressure_trend_txt","");
+  my $pressuretrend = ReadingsVal($sensor,"pressureTrend","");
   my $weatherlong = HOMEMODE_WeatherTXT($hash,AttrVal($name,"HomeTextWeatherLong",""));
   my $weathershort = HOMEMODE_WeatherTXT($hash,AttrVal($name,"HomeTextWeatherShort",""));
   my $forecast = HOMEMODE_ForecastTXT($hash);
@@ -2133,8 +2135,10 @@ sub HOMEMODE_replacePlaceholders($$;$)
   $cmd =~ s/%LUMINANCETREND%/$luminancetrend/g;
   $cmd =~ s/%MODE%/$mode/g;
   $cmd =~ s/%MOTION%/$motion/g;
+  $cmd =~ s/%NAME%/$name/g;
   $cmd =~ s/%OPEN%/$contactsOpen/g;
   $cmd =~ s/%OPENCT%/$contactsOpenCt/g;
+  $cmd =~ s/%OPENHR%/$contactsOpenHr/g;
   $cmd =~ s/%RESIDENT%/$resident/g;
   $cmd =~ s/%PANIC%/$panic/g;
   $cmd =~ s/%PRESENT%/$pres/g;
@@ -2156,7 +2160,9 @@ sub HOMEMODE_replacePlaceholders($$;$)
   $cmd =~ s/%SMOKE%/$smoke/g;
   $cmd =~ s/%SMOKECT%/$smokec/g;
   $cmd =~ s/%SMOKEHR%/$smokehr/g;
-  $cmd =~ s/%TAMPERED%/$sensorsTampered/g;
+  $cmd =~ s/%TAMPERED%/$tampered/g;
+  $cmd =~ s/%TAMPEREDCT%/$tamperedc/g;
+  $cmd =~ s/%TAMPEREDHR%/$tamperedhr/g;
   $cmd =~ s/%TEMPERATURE%/$temp/g;
   $cmd =~ s/%TEMPERATURETREND%/$temptrend/g;
   $cmd =~ s/%TOBE%/$conditionart/g;
@@ -2228,7 +2234,7 @@ sub HOMEMODE_WeatherTXT($$)
   my $condition = ReadingsVal($weather,"condition","");
   my $conditionart = ReadingsVal($name,".be","");
   my $pressure = ReadingsVal($name,"pressure","");
-  my $pressuretrend = ReadingsVal($weather,"pressure_trend_txt","");
+  my $pressuretrend = ReadingsVal($weather,"pressureTrend","");
   my $humi = ReadingsVal($name,"humidity",0);
   my $temp = ReadingsVal($name,"temperature",0);
   my $windchill = ReadingsVal($weather,"wind_chill",0);
@@ -3027,7 +3033,7 @@ sub HOMEMODE_Smoke($;$$)
   my @sensors;
   foreach (split /,/,$hash->{SENSORSSMOKE})
   {
-    push @sensors,$_ if (ReadingsVal($_,$r,"") eq $v)
+    push @sensors,$_ if (ReadingsVal($_,$r,"") =~ /^$v$/);
   }
   if ($trigger && $state)
   {
@@ -3311,6 +3317,8 @@ sub HOMEMODE_Details($$$)
       Each set command and each updated reading of the HOMEMODE device will create an event within FHEM, so you're able to create additional notify or DOIF devices if needed.
     </li>
   </ul>
+  <br>
+  <p>A german Wiki page is also available at <a href="https://wiki.fhem.de/wiki/Modul_HOMEMODE" target="_blank">https://wiki.fhem.de/wiki/Modul_HOMEMODE</a>. There you can find lots of example code.</p>
   <br>
   <a name="HOMEMODE_define"></a>
   <p><b>define [optional]</b></p>
@@ -3719,16 +3727,16 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>HomeAtTmpRoom</i></b><br>
-      move temporary ats to this room<br>
+      add this room to temporary at(s) (generated from HOMEMODE)<br>
       default:
     </li>
     <li>
-      <b><i>HomePresenceDeviceAbsentCount-&lt;%RESIDENT%&gt;</i></b><br>
+      <b><i>HomePresenceDeviceAbsentCount-&lt;ROOMMATE/GUEST&gt;</i></b><br>
       number of resident associated presence device to turn resident to absent<br>
       default: maximum number of available presence device for each resident
     </li>
     <li>
-      <b><i>HomePresenceDevicePresentCount-&lt;%RESIDENT%&gt;</i></b><br>
+      <b><i>HomePresenceDevicePresentCount-&lt;ROOMMATE/GUEST&gt;</i></b><br>
       number of resident associated presence device to turn resident to home<br>
       default: 1
     </li>
@@ -3958,12 +3966,12 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>HomeSensorsSmokeReading</i></b><br>
-      readings for smoke sensors on/off state<br>
+      reading for smoke sensors on/off state<br>
       default: state
     </li>
     <li>
       <b><i>HomeSensorsSmokeValue</i></b><br>
-      on value for smoke sensors<br>
+      regex of on values for smoke sensors<br>
       default: on
     </li>
     <li>
@@ -4049,7 +4057,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>HomeTriggerPanic</i></b><br>
-      your panic trigger device (device:reading:valueOn[:valueOff])<br>
+      your panic alarm trigger device (device:reading:valueOn[:valueOff])<br>
       valueOff is optional<br>
       valueOn will toggle panic mode if valueOff is not given<br>
       default:
@@ -4567,12 +4575,12 @@ sub HOMEMODE_Details($$$)
       value of the lastDurSleep_cr reading of the last triggered resident
     </li>
     <li>
-      <b><i>%CALENDARNAME%</i></b><br>
+      <b><i>%&lt;CALENDARNAME&gt;%</i></b><br>
       will return the current event of the given calendar name, will return 0 if event is none<br>
       can be used to trigger actions on any event of the given calendar
     </li>
     <li>
-      <b><i>%CALENDARNAME-EVENTNAME%</i></b><br>
+      <b><i>&lt;%CALENDARNAME-EVENTNAME%&gt;</i></b><br>
       will return 1 if given event of given calendar is current, will return 0 if event is not current<br>
       can be used to trigger actions during specific events only (Christmas?)
     </li>
@@ -4636,14 +4644,23 @@ sub HOMEMODE_Details($$$)
       value of the lastMotion reading (last opened sensor)
     </li>
     <li>
+      <b><i>%NAME%</i></b><br>
+      name of the HOMEMODE device itself (same as %SELF%)
+    </li>
+    <li>
       <b><i>%OPEN%</i></b><br>
-      value of the contactsOutsideOpen_hr reading of the HOMEMODE device<br>
+      value of the contactsOutsideOpen reading of the HOMEMODE device<br>
       can be used to send msg(s) in specific situations, e.g. to warn leaving residents of open contact sensors
     </li>
     <li>
       <b><i>%OPENCT%</i></b><br>
       value of the contactsOutsideOpen_ct reading of the HOMEMODE device<br>
       can be used to send msg(s) in specific situations depending on the number of open contact sensors, maybe in combination with placeholder %OPEN%
+    </li>
+    <li>
+      <b><i>%OPENHR%</i></b><br>
+      value of the contactsOutsideOpen_hr reading of the HOMEMODE device<br>
+      can be used to send msg(s)
     </li>
     <li>
       <b><i>%PANIC%</i></b><br>
@@ -4670,7 +4687,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>%PRESSURETREND%</i></b><br>
-      value of the pressure_trend_txt reading of the Yahoo weather device<br>
+      value of the pressureTrend reading of the Yahoo weather device<br>
       can be used for weather info in HomeTextWeather attributes e.g.
     </li>
     <li>
@@ -4699,7 +4716,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>%SELF%</i></b><br>
-      name of the HOMEMODE device itself
+      name of the HOMEMODE device itself (same as %NAME%)
     </li>
     <li>
       <b><i>%SENSORSBATTERY%</i></b><br>
@@ -4738,11 +4755,16 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>%TAMPERED%</i></b><br>
-      will return all tampered sensors
+      value of the sensorsTampered reading of the HOMEMODE device
     </li>
     <li>
       <b><i>%TAMPEREDCT%</i></b><br>
-      will return the number of tampered sensors
+      value of the sensorsTampered_ct reading of the HOMEMODE device
+    </li>
+    <li>
+      <b><i>%TAMPEREDHR%</i></b><br>
+      value of the sensorsTampered_hr reading of the HOMEMODE device<br>
+      can be used for sending msg e.g.
     </li>
     <li>
       <b><i>%TEMPERATURE%</i></b><br>
@@ -4761,6 +4783,11 @@ sub HOMEMODE_Details($$$)
     <li>
       <b><i>%TWILIGHTEVENT%</i></b><br>
       current twilight event
+    </li>
+    <li>
+      <b><i>%TOBE%</i></b><br>
+      are or is of the weather condition<br>
+      useful for phrasing sentens
     </li>
     <li>
       <b><i>%UWZ%</i></b><br>
