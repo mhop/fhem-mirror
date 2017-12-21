@@ -37,6 +37,10 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.0.0        18.12.2017       don't set $runtime_string_first,$runtime_string_next,$ts if time/aggregation-attributes 
+#                               not set, devren_Push redesigned, new command get blockinginfo, identify if reopen is 
+#                               running on dblog-device and postpone the set-command
+# 6.4.3        17.12.2017       bugfix in delSeqDoublets, fetchrows if datasets contain characters like "' <blank> and s.o.
 # 6.4.2        15.12.2017       change "delSeqDoublets" to respect attribute "limit" (adviceDelete,adviceRemain), 
 #                               commandref revised
 # 6.4.1        13.12.2017       new Attribute "sqlResultFieldSep" for field separate options of sqlCmd result
@@ -266,7 +270,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "6.4.2";
+my $DbRepVersion = "7.0.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -429,6 +433,12 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"countEntries:history,current ":"");
   
   return if(IsDisabled($name));
+  if ($hash->{dbloghash}{HELPER}{REOPEN_RUNS} && $opt !~ /\?/) {
+      my $ro = (split(" ",FmtDateTime(gettimeofday()+$hash->{dbloghash}{HELPER}{REOPEN_RUNS})))[1];
+      Log3 ($name, 3, "DbRep $name - connection $dblogdevice to db $dbname is closed until $ro - $opt postponed");
+	  ReadingsSingleUpdateValue ($hash, "state", "connection $dblogdevice to $dbname is closed until $ro - $opt postponed", 1);
+	  return;
+  }
     
   if ($opt eq "dumpMySQL" && $hash->{ROLE} ne "Agent") {
        $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
@@ -486,40 +496,48 @@ sub DbRep_Set($@) {
   }
   
   if ($opt =~ /countEntries/ && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my $table = $prop?$prop:"history";
       DbRep_Main($hash,$opt,$table);
       
   } elsif ($opt eq "cancelDump" && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
 	  Log3 ($name, 3, "DbRep $name -> running Dump has been canceled");
 	  ReadingsSingleUpdateValue ($hash, "state", "Dump canceled", 1);
       
-  } elsif ($opt =~ m/delSeqDoublets/ && $hash->{ROLE} ne "Agent") {      
+  } elsif ($opt =~ m/delSeqDoublets/ && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
       if ($prop =~ /delete/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       } 
       DbRep_Main($hash,$opt,$prop);
       
   } elsif ($opt eq "fetchrows" && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my $table = $prop?$prop:"history";
       DbRep_Main($hash,$opt,$table);
       
   } elsif ($opt =~ m/(max|min|sum|average|diff)Value/ && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       if (!AttrVal($hash->{NAME}, "reading", "")) {
           return " The attribute reading to analyze is not set !";
       }
       DbRep_Main($hash,$opt);
       
   } elsif ($opt =~ m/delEntries|tableCurrentPurge/ && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       if (!AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }        
       DbRep_Main($hash,$opt);
       
-  } elsif ($opt =~ m/tableCurrentFillup/ && $hash->{ROLE} ne "Agent") {      
+  } elsif ($opt =~ m/tableCurrentFillup/ && $hash->{ROLE} ne "Agent") {   
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
       DbRep_Main($hash,$opt);
       
   } elsif ($opt eq "deviceRename") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my ($olddev, $newdev) = split(",",$prop);
       if (!$olddev || !$newdev) {return "Both entries \"old device name\", \"new device name\" are needed. Use \"set ... deviceRename olddevname,newdevname\" ";}
       $hash->{HELPER}{OLDDEV}  = $olddev;
@@ -528,6 +546,7 @@ sub DbRep_Set($@) {
       DbRep_Main($hash,$opt);
       
   } elsif ($opt eq "readingRename") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my ($oldread, $newread) = split(",",$prop);
       if (!$oldread || !$newread) {return "Both entries \"old reading name\", \"new reading name\" are needed. Use \"set ... readingRename oldreadingname,newreadingname\" ";}
       $hash->{HELPER}{OLDREAD} = $oldread;
@@ -535,7 +554,8 @@ sub DbRep_Set($@) {
 	  $hash->{HELPER}{RENMODE} = "readren";
       DbRep_Main($hash,$opt);
       
-  } elsif ($opt eq "insert" && $hash->{ROLE} ne "Agent") { 
+  } elsif ($opt eq "insert" && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
       if ($prop) {
           if (!AttrVal($hash->{NAME}, "device", "") || !AttrVal($hash->{NAME}, "reading", "") ) {
               return "One or both of attributes \"device\", \"reading\" is not set. It's mandatory to set both to complete dataset for manual insert !";
@@ -586,18 +606,21 @@ sub DbRep_Set($@) {
       DbRep_Main($hash,$opt);
       
   } elsif ($opt eq "exportToFile" && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
           return "The attribute \"expimpfile\" (path and filename) has to be set for export to file !";
       }
       DbRep_Main($hash,$opt);
       
   } elsif ($opt eq "importFromFile" && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
           return "The attribute \"expimpfile\" (path and filename) has to be set for import from file !";
       }
       DbRep_Main($hash,$opt);
       
   } elsif ($opt eq "sqlCmd") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       # Execute a generic sql command
       return "\"set $opt\" needs at least an argument" if ( @a < 3 );
       # remove arg 0, 1 to get SQL command
@@ -607,14 +630,12 @@ sub DbRep_Set($@) {
 	  if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return " Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }  
- 
       DbRep_Main($hash,$opt,$sqlcmd);
 	 
   } else {
       return "$setlist";
   }  
   
-$hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
 return undef;
 }
 
@@ -631,10 +652,12 @@ sub DbRep_Get($@) {
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbmodel = $hash->{dbloghash}{MODEL};
-  my $to = AttrVal($name, "timeout", "86400");
+  my $dbname  = $hash->{DATABASE};
+  my $to      = AttrVal($name, "timeout", "86400");
   
   my $getlist = "Unknown argument $opt, choose one of ".
                 "svrinfo:noArg ".
+				"blockinginfo:noArg ".
                 (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
                 (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
 				(($dbmodel eq "MYSQL")?"procinfo:noArg ":"").
@@ -643,25 +666,40 @@ sub DbRep_Get($@) {
   
   return if(IsDisabled($name));
   
+  if ($hash->{dbloghash}{HELPER}{REOPEN_RUNS} && $opt !~ /\?|procinfo|blockinginfo/) {
+      my $ro = (split(" ",FmtDateTime(gettimeofday()+$hash->{dbloghash}{HELPER}{REOPEN_RUNS})))[1];
+      Log3 ($name, 3, "DbRep $name - connection $dblogdevice to db $dbname is closed until $ro - $opt postponed");
+	  ReadingsSingleUpdateValue ($hash, "state", "connection $dblogdevice to $dbname is closed until $ro - $opt postponed", 1);
+	  return;
+  }
+  
   if ($opt =~ /dbvars|dbstatus|tableinfo|procinfo/) {
+      return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       return "The operation \"$opt\" isn't available with database type $dbmodel" if ($dbmodel ne 'MYSQL');
-	  return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
 	  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
       delread($hash);  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "ParseAborted", $hash);    
   
   } elsif ($opt eq "svrinfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       delread($hash); 
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "ParseAborted", $hash);      
+  
+  } elsif ($opt eq "blockinginfo") {
+      return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+      delread($hash); 
+      ReadingsSingleUpdateValue ($hash, "state", "running", 1);   
+	  DbRep_getblockinginfo($hash);	  
   }
   else 
   {
       return "$getlist";
   } 
   
-$hash->{LASTCMD} = "$opt";
 return undef;
 }
 
@@ -1032,7 +1070,6 @@ sub DbRep_Main($$;$) {
  my $name        = $hash->{NAME}; 
  my $to          = AttrVal($name, "timeout", "86400");
  my $reading     = AttrVal($name, "reading", "%");
- my $aggregation = AttrVal($name, "aggregation", "no");   # wichtig !! aggregation niemals "undef"
  my $device      = AttrVal($name, "device", "%");
  
  # Entkommentieren für Testroutine im Vordergrund
@@ -1085,41 +1122,40 @@ sub DbRep_Main($$;$) {
  
  # Ausgaben und Zeitmanipulationen
  Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
- Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert/); 
  Log3 ($name, 4, "DbRep $name - Command: $opt $prop"); 
  
  # zentrales Timestamp-Array und Zeitgrenzen bereitstellen
- if($opt =~ /delSeqDoublets/) {
-     $aggregation = ($aggregation eq "no")?"day":$aggregation;       # wenn Aggregation "no", für delSeqDoublets immer "day" setzen
- }  
- my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = createTimeArray($hash,$aggregation,$opt);
+ my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next);
+ my $ts = "no_aggregation";                                        # Dummy für eine Select-Schleife wenn != $IsTimeSet || $IsAggrSet
+ my ($IsTimeSet,$IsAggrSet,$aggregation) = checktimeaggr($hash); 
+ if($IsTimeSet || $IsAggrSet) {
+     ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = createTimeArray($hash,$aggregation,$opt);
+ } else {
+     Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: not set") if($opt !~ /tableCurrentPurge/);  
+     Log3 ($name, 4, "DbRep $name - Timestamp end human readable: not set") if($opt !~ /tableCurrentPurge/); 
+ }
+ 
+ Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert/); 
  
  #####  Funktionsaufrufe ##### 
  if ($opt eq "sumValue") {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
-     
+	 
  } elsif ($opt =~ m/countEntries/) {
      my $table = $prop;
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$table§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
-
+	 
  } elsif ($opt eq "averageValue") {      
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
-    
  } elsif ($opt eq "fetchrows") {
-     my $table = $prop;
-     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
-     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-             
+     my $table = $prop;             
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$table|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
     
  } elsif ($opt =~ /delSeqDoublets/) {
      my $cmd = $prop?$prop:"adviceRemain"; 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "ParseAborted", $hash);
     
- } elsif ($opt eq "exportToFile") {
-     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
-     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-             
+ } elsif ($opt eq "exportToFile") {            
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "expfile_ParseDone", $to, "ParseAborted", $hash);
     
  } elsif ($opt eq "importFromFile") {             
@@ -1131,22 +1167,15 @@ sub DbRep_Main($$;$) {
  } elsif ($opt eq "minValue") {        
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$ts", "minval_ParseDone", $to, "ParseAborted", $hash);   
          
- } elsif ($opt eq "delEntries") {
-     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
-     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-         
+ } elsif ($opt eq "delEntries") {         
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
  
  } elsif ($opt eq "tableCurrentPurge") {
      undef $runtime_string_first;
-     undef $runtime_string_next;
-         
+     undef $runtime_string_next;      
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|current|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
  
- } elsif ($opt eq "tableCurrentFillup") {
-     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
-     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-         
+ } elsif ($opt eq "tableCurrentFillup") {         
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "currentfillup_Done", $to, "ParseAborted", $hash);        
  
  } elsif ($opt eq "diffValue") {        
@@ -1155,15 +1184,15 @@ sub DbRep_Main($$;$) {
  } elsif ($opt eq "insert") { 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
          
- } elsif ($opt eq "deviceRename" || $opt eq "readingRename") { 
+ } elsif ($opt =~ /deviceRename|readingRename/) { 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("devren_Push", "$name", "devren_Done", $to, "ParseAborted", $hash);   
          
  } elsif ($opt eq "sqlCmd" ) {
     # Execute a generic sql command
-         
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "ParseAborted", $hash);     
  }
 
+$hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
 return;
 }
 
@@ -1185,67 +1214,67 @@ sub createTimeArray($$$) {
  #  absolute Auswertungszeiträume statische und dynamische (Beginn / Ende) berechnen 
  ######################################################################################
  
- $tsbegin = AttrVal($hash->{NAME}, "timestamp_begin", "1970-01-01 01:00:00");
+ $tsbegin = AttrVal($name, "timestamp_begin", "1970-01-01 01:00:00");
  $tsbegin = formatpicker($tsbegin);
- $tsend = AttrVal($hash->{NAME}, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
+ $tsend = AttrVal($name, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
  $tsend = formatpicker($tsend);
 
- if (AttrVal($hash->{NAME},"timestamp_begin","") eq "current_year_begin" ||
-     AttrVal($hash->{NAME},"timestamp_end","") eq "current_year_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($hash->{NAME},"timestamp_begin","") eq "current_year_begin");
-	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($hash->{NAME},"timestamp_end","") eq "current_year_begin");
+ if (AttrVal($name,"timestamp_begin","") eq "current_year_begin" ||
+     AttrVal($name,"timestamp_end","") eq "current_year_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_begin","") eq "current_year_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_end","") eq "current_year_begin");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_year_end" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_year_end") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($hash->{NAME},"timestamp_begin","") eq "current_year_end");
-	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($hash->{NAME},"timestamp_end","") eq "current_year_end");
+ if (AttrVal($name, "timestamp_begin", "") eq "current_year_end" ||
+          AttrVal($name, "timestamp_end", "") eq "current_year_end") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($name,"timestamp_begin","") eq "current_year_end");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($name,"timestamp_end","") eq "current_year_end");
  }
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_begin" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_begin");
-	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_begin");
+ if (AttrVal($name, "timestamp_begin", "") eq "previous_year_begin" ||
+          AttrVal($name, "timestamp_end", "") eq "previous_year_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($name, "timestamp_begin", "") eq "previous_year_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($name, "timestamp_end", "") eq "previous_year_begin");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_end" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_end") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_year_end");
-	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_year_end");
+ if (AttrVal($name, "timestamp_begin", "") eq "previous_year_end" ||
+          AttrVal($name, "timestamp_end", "") eq "previous_year_end") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($name, "timestamp_begin", "") eq "previous_year_end");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($name, "timestamp_end", "") eq "previous_year_end");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_month_begin" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_month_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_month_begin");
-	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_month_begin");
+ if (AttrVal($name, "timestamp_begin", "") eq "current_month_begin" ||
+          AttrVal($name, "timestamp_end", "") eq "current_month_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_month_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_month_begin");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_month_end" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_month_end") {
+ if (AttrVal($name, "timestamp_begin", "") eq "current_month_end" ||
+          AttrVal($name, "timestamp_end", "") eq "current_month_end") {
      $dim = $mon-1?30+(($mon+1)*3%7<4):28+!($year%4||$year%400*!($year%100));
-	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_month_end");
-     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_month_end");
+	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_month_end");
+     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_month_end");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_month_begin" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_month_begin") {
+ if (AttrVal($name, "timestamp_begin", "") eq "previous_month_begin" ||
+          AttrVal($name, "timestamp_end", "") eq "previous_month_begin") {
      $ryear = ($mon-1<0)?$year-1:$year;
 	 $rmon  = ($mon-1<0)?12:$mon-1;
-     $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_month_begin");
-	 $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_month_begin");
+     $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_begin");
+	 $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_month_begin");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_month_end" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_month_end") {
+ if (AttrVal($name, "timestamp_begin", "") eq "previous_month_end" ||
+          AttrVal($name, "timestamp_end", "") eq "previous_month_end") {
      $ryear = ($mon-1<0)?$year-1:$year;
 	 $rmon  = ($mon-1<0)?12:$mon-1;
 	 $dim   = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
-	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_month_end");
-     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_month_end");
+	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_end");
+     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_month_end");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_week_begin" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_week_begin") {
+ if (AttrVal($name, "timestamp_begin", "") eq "current_week_begin" ||
+          AttrVal($name, "timestamp_end", "") eq "current_week_begin") {
 	 $tsub = 0 if($wday == 1);            # wenn Start am "Mo" keine Korrektur
 	 $tsub = 86400 if($wday == 2);        # wenn Start am "Di" dann Korrektur -1 Tage
 	 $tsub = 172800 if($wday == 3);       # wenn Start am "Mi" dann Korrektur -2 Tage
@@ -1254,12 +1283,12 @@ sub createTimeArray($$$) {
 	 $tsub = 432000 if($wday == 6);       # wenn Start am "Sa" dann Korrektur -5 Tage
 	 $tsub = 518400 if($wday == 0);       # wenn Start am "So" dann Korrektur -6 Tage
 	 ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
-	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_week_begin");
-	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_week_begin");
+	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "current_week_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "current_week_begin");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_week_end" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_week_end") {
+ if (AttrVal($name, "timestamp_begin", "") eq "current_week_end" ||
+          AttrVal($name, "timestamp_end", "") eq "current_week_end") {
 	 $tadd = 518400 if($wday == 1);       # wenn Start am "Mo" dann Korrektur +6 Tage
 	 $tadd = 432000 if($wday == 2);       # wenn Start am "Di" dann Korrektur +5 Tage
 	 $tadd = 345600 if($wday == 3);       # wenn Start am "Mi" dann Korrektur +4 Tage
@@ -1268,12 +1297,12 @@ sub createTimeArray($$$) {
 	 $tadd = 86400 if($wday == 6);        # wenn Start am "Sa" dann Korrektur +1 Tage
 	 $tadd = 0 if($wday == 0);            # wenn Start am "So" keine Korrektur
 	 ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time+$tadd);
-	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_week_end");
-	 $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_week_end");
+	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "current_week_end");
+	 $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "current_week_end");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_week_begin" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_week_begin") {
+ if (AttrVal($name, "timestamp_begin", "") eq "previous_week_begin" ||
+          AttrVal($name, "timestamp_end", "") eq "previous_week_begin") {
 	 $tsub = 604800 if($wday == 1);       # wenn Start am "Mo" dann Korrektur -7 Tage
 	 $tsub = 691200 if($wday == 2);       # wenn Start am "Di" dann Korrektur -8 Tage
 	 $tsub = 777600 if($wday == 3);       # wenn Start am "Mi" dann Korrektur -9 Tage
@@ -1282,12 +1311,12 @@ sub createTimeArray($$$) {
 	 $tsub = 1036800 if($wday == 6);      # wenn Start am "Sa" dann Korrektur -12 Tage
 	 $tsub = 1123200 if($wday == 0);      # wenn Start am "So" dann Korrektur -13 Tage
 	 ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
-	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_week_begin");
-	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_week_begin");
+	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_week_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_week_begin");
  }
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_week_end" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_week_end") {
+ if (AttrVal($name, "timestamp_begin", "") eq "previous_week_end" ||
+          AttrVal($name, "timestamp_end", "") eq "previous_week_end") {
 	 $tsub = 86400 if($wday == 1);        # wenn Start am "Mo" dann Korrektur -1 Tage
 	 $tsub = 172800 if($wday == 2);       # wenn Start am "Di" dann Korrektur -2 Tage
 	 $tsub = 259200 if($wday == 3);       # wenn Start am "Mi" dann Korrektur -3 Tage
@@ -1296,24 +1325,24 @@ sub createTimeArray($$$) {
 	 $tsub = 518400 if($wday == 6);       # wenn Start am "Sa" dann Korrektur -6 Tage
 	 $tsub = 604800 if($wday == 0);       # wenn Start am "So" dann Korrektur -7 Tage
 	 ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
-	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_week_end");
-	 $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_week_end");
+	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_week_end");
+	 $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_week_end");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_day_begin" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_day_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_day_begin");
-	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_day_begin");
+ if (AttrVal($name, "timestamp_begin", "") eq "current_day_begin" ||
+          AttrVal($name, "timestamp_end", "") eq "current_day_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_day_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_day_begin");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_day_end" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_day_end") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_day_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_day_end");
+ if (AttrVal($name, "timestamp_begin", "") eq "current_day_end" ||
+          AttrVal($name, "timestamp_end", "") eq "current_day_end") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_day_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_day_end");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_day_begin" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_day_begin") {
+ if (AttrVal($name, "timestamp_begin", "") eq "previous_day_begin" ||
+          AttrVal($name, "timestamp_end", "") eq "previous_day_begin") {
 	 $rmday = $mday-1;
 	 $rmon  = $mon;
 	 $ryear = $year;
@@ -1325,12 +1354,12 @@ sub createTimeArray($$$) {
 		 }
          $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
 	 }
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_day_begin");
-	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_day_begin");
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_day_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_day_begin");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_day_end" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_day_end") {
+ if (AttrVal($name, "timestamp_begin", "") eq "previous_day_end" ||
+          AttrVal($name, "timestamp_end", "") eq "previous_day_end") {
 	 $rmday = $mday-1;
 	 $rmon  = $mon;
 	 $ryear = $year;
@@ -1342,24 +1371,24 @@ sub createTimeArray($$$) {
 		 }
          $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
 	 }
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_day_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_day_end");
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_day_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_day_end");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_hour_begin" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_hour_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_hour_begin");
-	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_hour_begin");
+ if (AttrVal($name, "timestamp_begin", "") eq "current_hour_begin" ||
+          AttrVal($name, "timestamp_end", "") eq "current_hour_begin") {
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_hour_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_hour_begin");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_hour_end" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_hour_end") {
-	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "current_hour_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "current_hour_end");
+ if (AttrVal($name, "timestamp_begin", "") eq "current_hour_end" ||
+          AttrVal($name, "timestamp_end", "") eq "current_hour_end") {
+	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_hour_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_hour_end");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_hour_begin" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_hour_begin") {
+ if (AttrVal($name, "timestamp_begin", "") eq "previous_hour_begin" ||
+          AttrVal($name, "timestamp_end", "") eq "previous_hour_begin") {
      $rhour = $hour-1;
 	 $rmday = $mday;
 	 $rmon  = $mon;
@@ -1376,12 +1405,12 @@ sub createTimeArray($$$) {
 			 $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
 		 }
 	 }
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_hour_begin");
-	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_hour_begin");
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_hour_begin");
+	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_hour_begin");
  } 
  
- if (AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_hour_end" ||
-          AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_hour_end") {
+ if (AttrVal($name, "timestamp_begin", "") eq "previous_hour_end" ||
+          AttrVal($name, "timestamp_end", "") eq "previous_hour_end") {
      $rhour = $hour-1;
 	 $rmday = $mday;
 	 $rmon  = $mon;
@@ -1398,8 +1427,8 @@ sub createTimeArray($$$) {
 			 $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
 		 }
 	 }
-	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_begin", "") eq "previous_hour_end"); 
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($hash->{NAME}, "timestamp_end", "") eq "previous_hour_end"); 
+	 $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_hour_end"); 
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_hour_end"); 
  }  
  
  # extrahieren der Einzelwerte von Datum/Zeit Beginn
@@ -1433,9 +1462,9 @@ sub createTimeArray($$$) {
  
  $epoch_seconds_end = $timeolderthan ? (time() - $timeolderthan) : $epoch_seconds_end;
 
- #$epoch_seconds_end = AttrVal($hash->{NAME}, "timeOlderThan", undef) ? 
- #                          (time() - AttrVal($hash->{NAME}, "timeOlderThan", undef)) : $epoch_seconds_end;
- Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp end: $timeolderthan sec") if(AttrVal($hash->{NAME}, "timeOlderThan", undef)); 
+ #$epoch_seconds_end = AttrVal($name, "timeOlderThan", undef) ? 
+ #                          (time() - AttrVal($name, "timeOlderThan", undef)) : $epoch_seconds_end;
+ Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp end: $timeolderthan sec") if(AttrVal($name, "timeOlderThan", undef)); 
  
  my $tsend_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
  
@@ -1544,7 +1573,7 @@ sub collaggstr($$$$) {
 
          # keine Aggregation (all between timestamps)
          if ($aggregation eq "no") {
-             $runtime_string       = "all_between_timestamps";                                         # für Readingname
+             $runtime_string       = "no_aggregation";                                         # für Readingname
              $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime);
              $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);  
              $ll = 1;
@@ -1716,13 +1745,13 @@ sub averval_DoParse($) {
  # only for this block because of warnings if details of readings are not set
  no warnings 'uninitialized'; 
   
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+ 
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");
- 
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
- Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
 
  #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
  if ($dbloghash->{MODEL} eq "POSTGRESQL") {
@@ -1904,13 +1933,14 @@ sub count_DoParse($) {
      
  # only for this block because of warnings if details of readings are not set
  no warnings 'uninitialized'; 
+ 
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet,$aggregation) = checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
   
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
-
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash);
 
  # SQL zusammenstellen für DB-Abfrage
  if ($IsTimeSet || $IsAggrSet) {
@@ -1931,7 +1961,7 @@ sub count_DoParse($) {
  # SQL-Startzeit
  my $st = [gettimeofday];
     
- # DB-Abfrage zeilenweise für jeden Array-Eintrag
+ # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
  my $arrstr;
  foreach my $row (@ts) {
      my @a                     = split("#", $row);
@@ -1963,7 +1993,7 @@ sub count_DoParse($) {
      
      Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);   
 	 
-     if(AttrVal($name, "aggregation", "") eq "hour") {
+     if($aggregation eq "hour") {
          my @rsf = split(/[" "\|":"]/,$runtime_string_first);
          $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";  
      } else {
@@ -2084,14 +2114,14 @@ sub maxval_DoParse($) {
      
  # only for this block because of warnings if details of readings are not set
  no warnings 'uninitialized'; 
-  
- # Timestampstring to Array
- my @ts = split("\\|", $ts);
- Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
  
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
  my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
- Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+  
+ # Timestampstring to Array
+ my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");   
 
  # SQL zusammenstellen für DB-Operation
  if ($IsTimeSet || $IsAggrSet) {
@@ -2326,13 +2356,13 @@ sub minval_DoParse($) {
  # only for this block because of warnings if details of readings are not set
  no warnings 'uninitialized'; 
   
- # Timestampstring to Array
- my @ts = split("\\|", $ts);
- Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
- 
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
  my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
- Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+ 
+ # Timestampstring to Array
+ my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");   
  
  # SQL zusammenstellen für DB-Operation
  if ($IsTimeSet || $IsAggrSet) {
@@ -2570,13 +2600,13 @@ sub diffval_DoParse($) {
  # only for this block because of warnings if details of readings are not set
  no warnings 'uninitialized'; 
   
- # Timestampstring to Array
- my @ts = split("\\|", $ts);
- Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
- 
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
  my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+ 
+ # Timestampstring to Array
+ my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
  
  #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
  if($dbmodel eq "MYSQL") {
@@ -2930,13 +2960,13 @@ sub sumval_DoParse($) {
  # only for this block because of warnings if details of readings are not set
  no warnings 'uninitialized'; 
   
- # Timestampstring to Array
- my @ts = split("\\|", $ts);
- Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
-
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
  my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
+ 
+ # Timestampstring to Array
+ my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
  
  #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
  if ($dbloghash->{MODEL} eq "POSTGRESQL") {
@@ -3397,8 +3427,9 @@ sub currentfillup_Push($) {
  # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
  my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbh);
  
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "'$runtime_string_*'"|"?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash);
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
  
  ($devs,$danz,$reading,$ranz) = specsForSql($hash,$device,$reading);
   
@@ -3591,7 +3622,7 @@ sub devren_Push($) {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
- my ($dbh,$err);
+ my ($dbh,$err,$sql);
  
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -3613,7 +3644,10 @@ sub devren_Push($) {
  my $st = [gettimeofday];
  
  my ($sth,$old,$new);
- $dbh->begin_work();
+ eval { $dbh->begin_work() if($dbh->{AutoCommit}); };   # Transaktion wenn gewünscht und autocommit ein
+ if ($@) {
+     Log3($name, 2, "DbRep $name -> Error start transaction - $@");
+ }
  
  if ($renmode eq "devren") {
      $old  = delete $hash->{HELPER}{OLDDEV};
@@ -3623,7 +3657,11 @@ sub devren_Push($) {
      Log3 ($name, 5, "DbRep $name -> Rename old device name \"$old\" to new device name \"$new\" in database $dblogname ");
 	 
 	 # prepare DB operation
-	 $sth = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=TIMESTAMP,DEVICE=? WHERE DEVICE=? ") ;
+	 $old =~ s/'/''/g;       # escape ' with ''
+	 $new =~ s/'/''/g;       # escape ' with ''
+	 $sql = "UPDATE history SET TIMESTAMP=TIMESTAMP,DEVICE='$new' WHERE DEVICE='$old'; ";
+	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
+	 $sth = $dbh->prepare($sql) ;
  
  } elsif ($renmode eq "readren") {
      $old = delete $hash->{HELPER}{OLDREAD};
@@ -3633,22 +3671,29 @@ sub devren_Push($) {
      Log3 ($name, 5, "DbRep $name -> Rename old reading name \"$old\" to new reading name \"$new\" in database $dblogname ");
 	 
 	 # prepare DB operation
-	 $sth = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=TIMESTAMP,READING=? WHERE READING=? ") ;
+	 $old =~ s/'/''/g;       # escape ' with ''
+	 $new =~ s/'/''/g;       # escape ' with ''
+	 $sql = "UPDATE history SET TIMESTAMP=TIMESTAMP,READING='$new' WHERE READING='$old'; ";
+	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
+	 $sth = $dbh->prepare($sql) ;
  }     
  
- eval {$sth->execute($new, $old);};
+ eval { $sth->execute(); };
+ 
+	 $old =~ s/''/'/g;       # escape back 
+	 $new =~ s/''/'/g;       # escape back 
  
  my $urow;
  if ($@) {
      $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - Failed to rename old device name \"$old\" to new device name \"$new\": $@") if($renmode eq "devren");
-	 Log3 ($name, 2, "DbRep $name - Failed to rename old reading name \"$old\" to new reading name \"$new\": $@") if($renmode eq "readren");
-     $dbh->rollback();
+	 my $m = ($renmode eq "devren")?"device":"reading";
+     Log3 ($name, 2, "DbRep $name - Failed to rename old $m name \"$old\" to new $m name \"$new\": $@");
+	 $dbh->rollback() if(!$dbh->{AutoCommit});
      $dbh->disconnect();
      Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Push finished");
      return "$name|''|''|$err";
  } else {
-     $dbh->commit();
+     $dbh->commit() if(!$dbh->{AutoCommit});
      $urow = $sth->rows;
      $dbh->disconnect();
  } 
@@ -3759,8 +3804,9 @@ sub fetchrows_DoParse($) {
      return "$name|''|''|$err|''";
  }
 
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "'$runtime_string_*'"|"?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash);
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
  
  # SQL zusammenstellen für DB-Abfrage
  if ($IsTimeSet) {
@@ -3776,7 +3822,7 @@ sub fetchrows_DoParse($) {
  # SQL-Startzeit
  my $st = [gettimeofday];
  
- eval {$sth->execute();};
+ eval{$sth->execute();};	 
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
@@ -3786,7 +3832,8 @@ sub fetchrows_DoParse($) {
  } 
  
  no warnings 'uninitialized'; 
- my @row_array = map { $_ -> [0]." ".$_ -> [1]." ".$_ -> [2]." ".$_ -> [3]." ".$_ -> [4]."\n" } @{$sth->fetchall_arrayref()};
+ my @row_array = map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."_ESC_".$_->[4]."\n" } @{$sth->fetchall_arrayref()}; 
+ 
  use warnings;
  $nrows = $#row_array+1;                # Anzahl der Ergebniselemente  
  pop @row_array if($nrows>$limit);      # das zuviel selektierte Element wegpoppen wenn Limit überschritten
@@ -3853,7 +3900,7 @@ sub fetchrows_ParseDone($) {
   readingsBeginUpdate($hash);
   
   foreach my $row (@row_array) {
-      my @a = split("[ \t][ \t]*", $row, 5);
+      my @a = split("_ESC_", $row, 6);
       my $dev = $a[0];
       my $rea = $a[1];
       $a[3]   =~ s/:/-/g;          # substituieren unsupported characters ":" -> siehe fhem.pl
@@ -3959,10 +4006,10 @@ sub delseqdoubl_DoParse($) {
      # SQL-Laufzeit ermitteln
      $rt = $rt+tv_interval($st);
  
-     @row_array = map { $_->[0]."_ESC_".$_->[1]."_ESC_".$_->[2]."_ESC_".$_->[3]."\n" } @{$sth->fetchall_arrayref()};
+     @row_array = map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."\n" } @{$sth->fetchall_arrayref()};
      
      $nrows = $#row_array+1;                # Anzahl der Ergebniselemente  
-     s/ /_ESC_/ for @row_array;             # Leerzeichen in TIMESTAMP escapen
+     # s/ /_ESC_/ for @row_array;           # Leerzeichen in TIMESTAMP escapen
  
      # Beginn Löschlogik, Zusammenstellen der löschenden DS (warping)
 	 # Die Arrays @remain, @sel enthalten die VERBLEIBENDEN Datensätze
@@ -3992,9 +4039,12 @@ sub delseqdoubl_DoParse($) {
                  if ($opt =~ /delete/ && $or) {                         # delete Datensätze
 				     my ($dev,$read,$date,$time,$val) = split("_ESC_", $or);
 					 my $dt = $date." ".$time;
-					 $val =~ tr/"\n"//d;
+					 chomp($val);
+					 $dev  =~ s/'/''/g;                                 # escape ' with ''
+					 $read =~ s/'/''/g;                                 # escape ' with ''
+					 $val  =~ s/'/''/g;                                 # escape ' with ''
 					 $st = [gettimeofday];
-					 my $dsql = "delete FROM $table where TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE ='$val';";
+					 my $dsql = "delete FROM $table where TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val';";
 					 my $sthd = $dbh->prepare($dsql); 
                      Log3 ($name, 4, "DbRep $name - SQL execute: $dsql"); 
 					 
@@ -4096,9 +4146,8 @@ sub delseqdoubl_ParseDone($) {
       Log3 ($name, 5, "DbRep $name - row_array decoded: @row_array");
       foreach my $row (@row_array) {
 	      last if($l >= $limit);
-          $row =~ s/_ESC_/ /g;
-          my @a = split("[ \t][ \t]*", $row, 5);
-          my $dev = $a[0];
+          my @a = split("_ESC_", $row, 5); 
+		  my $dev = $a[0];
           my $rea = $a[1];
           $a[3]   =~ s/:/-/g;          # substituieren unsupported characters ":" -> siehe fhem.pl
           my $ts  = $a[2]."_".$a[3];
@@ -4166,8 +4215,9 @@ sub expfile_DoParse($) {
      return "$name|''|''|$err";
  }
  
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "'$runtime_string_*'"|"?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash);
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
  
  # SQL zusammenstellen für DB-Abfrage
  if ($IsTimeSet) {
@@ -6004,8 +6054,8 @@ sub RestoreAborted(@) {
   my $dbh  = $hash->{DBH} if ($hash->{DBH}); 
   
   $cause = $cause?$cause:"Timeout: process terminated";
-  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} $cause") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
-  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} $cause") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
   
   my $state = "Database restore $cause";
   $dbh->disconnect() if(defined($dbh));
@@ -6027,7 +6077,7 @@ sub ParseAborted(@) {
   my $dbh = $hash->{DBH}; 
   
   $cause = $cause?$cause:"Timeout: process terminated";
-  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} $cause");
+  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash,"state",$cause, 1);
   delete($hash->{HELPER}{RUNNING_PID});
@@ -6045,8 +6095,8 @@ sub DumpAborted(@) {
   my ($err,$erread);
   
   $cause = $cause?$cause:"Timeout: process terminated";
-  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} $cause") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
-  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} $cause") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} pid:$hash->{HELPER}{RUNNING_BACKUP_CLIENT}{pid} $cause") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+  Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} pid:$hash->{HELPER}{RUNNING_BCKPREST_SERVER}{pid} $cause") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
   
   # Befehl nach Dump ausführen
   my $ead = AttrVal($name, "executeAfterDump", undef);
@@ -6080,7 +6130,7 @@ sub OptimizeAborted(@) {
   my $dbh  = $hash->{DBH}; 
   
   $cause = $cause?$cause:"Timeout: process terminated";
-  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_OPTIMIZE}}{fn} $cause");
+  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_OPTIMIZE}}{fn} pid:$hash->{HELPER}{RUNNING_OPTIMIZE}{pid} $cause");
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash, "state", $cause, 1);
   delete($hash->{HELPER}{RUNNING_OPTIMIZE});
@@ -6165,6 +6215,7 @@ sub specsForSql($$$) {
  
  my @dvspcs = devspec2array($device);
  my $devs = join(",",@dvspcs);
+ $devs =~ s/'/''/g;               # escape ' with ''
  my $danz = $#dvspcs+1;
  if ($danz > 1) {
      $devs =~ s/,/','/g;
@@ -6172,7 +6223,8 @@ sub specsForSql($$$) {
  }
  Log3 $name, 5, "DbRep $name - Device specifications use for select: $devs";
  
- my @reads = split(/,|\s/,$reading);
+ $reading =~ s/'/''/g;            # escape ' with ''
+ my @reads = split(",",$reading);
  my $ranz = $#reads+1;
  if ($ranz > 1) {
      $reading =~ s/,/','/g;
@@ -6184,25 +6236,37 @@ return ($devs,$danz,$reading,$ranz);
 }
 
 ####################################################################################################
-#                 Check ob Zeitgrenzen bzw. Aggregation gesetzt sind
-#                 Return "1" wenn Bedingung erfüllt, sonst "0"
+#    Check ob Zeitgrenzen bzw. Aggregation gesetzt sind, evtl. übertseuern (je nach Funktion)
+#    Return "1" wenn Bedingung erfüllt, sonst "0"
 ####################################################################################################
 sub checktimeaggr ($) {
- my ($hash) = @_;
- my $name = $hash->{NAME};
- my $IsTimeSet = 0;
- my $IsAggrSet = 0;
+ my ($hash)      = @_;
+ my $name        = $hash->{NAME};
+ my $IsTimeSet   = 0;
+ my $IsAggrSet   = 0;
+ my $aggregation = AttrVal($name,"aggregation","no");
 
  if (AttrVal($name,"timestamp_begin",undef) || AttrVal($name,"timestamp_end",undef) ||
 	 AttrVal($name,"timeDiffToNow",undef) || AttrVal($name,"timeOlderThan",undef) ) {
 	 $IsTimeSet = 1;
  }
  
- if (AttrVal($name,"aggregation","no") ne "no") {
+ if ($aggregation ne "no") {
      $IsAggrSet = 1;
  }
+ if($hash->{LASTCMD} =~ /delSeqDoublets/) {
+     $aggregation = ($aggregation eq "no")?"day":$aggregation;       # wenn Aggregation "no", für delSeqDoublets immer "day" setzen
+	 $IsAggrSet   = 1;
+ }
+ if($hash->{LASTCMD} =~ /exportToFile|delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup/) {
+	 $IsAggrSet   = 0;
+	 $aggregation = "no";
+ }
+ if($hash->{LASTCMD} =~ /deviceRename|readingRename/) {
+	 $IsTimeSet = 0;
+ }  
 
-return ($IsTimeSet,$IsAggrSet);
+return ($IsTimeSet,$IsAggrSet,$aggregation);
 }
 
 ####################################################################################################
@@ -6250,6 +6314,61 @@ sub ReadingsBulkUpdateTimeState ($$$$) {
  readingsBulkUpdate($hash, "state", $sval);
  userexit($name, "state", $sval);
 
+return;
+}
+
+####################################################################################################
+#  Anzeige von laufenden Blocking Prozessen
+####################################################################################################
+sub DbRep_getblockinginfo($@) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  
+  my @rows;
+  our %BC_hash;
+  my $len = 99;
+  foreach my $h (values %BC_hash) {
+      next if($h->{terminated} || !$h->{pid});
+	  my @allk = keys(%$h);
+	  foreach my $k (@allk) {
+	      Log3 ($name, 5, "DbRep $name -> $k : ".%$h{$k});
+	  }
+      my $fn   = (ref($h->{fn})  ? ref($h->{fn})  : $h->{fn});
+      my $arg  = (ref($h->{arg}) ? ref($h->{arg}) : $h->{arg});
+	  my $arg1 = substr($arg,0,$len);
+	  $arg1    = $arg1."..." if(length($arg) > $len+1);
+      my $to   = ($h->{timeout}  ? $h->{timeout}  : "N/A");
+      my $conn = ($h->{telnet}   ? $h->{telnet}   : "N/A");
+      push @rows, "$h->{pid}|ESCAPED|$fn|ESCAPED|$arg1|ESCAPED|$to|ESCAPED|$conn";
+  } 
+   
+  # Readingaufbereitung
+  readingsBeginUpdate($hash);
+  
+  if(!@rows) {
+      ReadingsBulkUpdateTimeState($hash,undef,undef,"done - No BlockingCall processes running");
+      readingsEndUpdate($hash, 1);
+	  return;
+  }
+  
+  my $res = "<html><table border=2 bordercolor='darkgreen' cellspacing=0>";
+  $res .= "<tr><td style='padding-right:5px;padding-left:5px;font-weight:bold'>PID</td>";
+  $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>FUNCTION</td>";
+  $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>ARGUMENTS</td>";
+  $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>TIMEOUT</td>";
+  $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>CONNECTEDVIA</td></tr>";
+  foreach my $row (@rows) {
+      $row =~ s/\|ESCAPED\|/<\/td><td style='padding-right:5px;padding-left:5px'>/g;
+      $res .= "<tr><td style='padding-right:5px;padding-left:5px'>".$row."</td></tr>";
+  }
+  my $tab = $res."</table></html>";
+
+  ReadingsBulkUpdateValue ($hash,"BlockingInfo",$tab);	
+  ReadingsBulkUpdateValue ($hash,"Blocking_Count",$#rows+1);	
+
+  ReadingsBulkUpdateTimeState($hash,undef,undef,"done");
+  readingsEndUpdate($hash, 1);
+  
 return;
 }
 
@@ -7013,6 +7132,10 @@ return;
                                  # If the device name to be renamed was not found in the database, a WARNUNG will appear in reading "device_not_renamed". <br>
                                  # Appropriate entries will be written to Logfile if verbose >= 3 is set.
                                  <br><br>
+								 
+								 <b>Note:</b> <br>
+                                 Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
+                                 is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br> 
                                  </li> <br>
                                  </ul>     
     
@@ -7236,6 +7359,10 @@ return;
                                  # If the reading name to be renamed was not found in the database, a WARNUNG will appear in reading "reading_not_renamed". <br>
                                  # Appropriate entries will be written to Logfile if verbose >= 3 is set.
                                  <br><br>
+								 
+								 <b>Note:</b> <br>
+                                 Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
+                                 is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br> 
                                  </li> <br>
                                  </ul> 
 								 
@@ -7314,9 +7441,10 @@ return;
   <br>
   </ul></ul>
   
-  <b>For all evaluation variants (except sqlCmd) applies: </b> <br>
+  <b>For all evaluation variants (except sqlCmd,deviceRename,readingRename) applies: </b> <br>
   In addition to the needed reading the device can be complemented to restrict the datasets for reporting / function. 
-  If the time limit attributes are not set, the period from '1970-01-01 01:00:00' to the current date/time will be used as selection criterion.
+  If no time limit attribute is set but aggregation is set, the period from '1970-01-01 01:00:00' to the current date/time will be used as 
+  selection criterion. If both time limit attribute and aggregation isn't set, the selection on database is runnung without timestamp criterion.
   <br><br>
   
   <b>Note: </b> <br>
@@ -7343,6 +7471,11 @@ return;
  <br><br>
  
  <ul><ul>
+    <li><b> blockinginfo </b> - list the current system wide running background processes (BlockingCalls) together with their informations. 
+	                            If character string is too long (e.g. arguments) it is reported shortened.
+                                </li>     
+                                <br><br>
+								
     <li><b> dbstatus </b> -  lists global informations about MySQL server status (e.g. informations related to cache, threads, bufferpools, etc. ). 
                              Initially all available informations are reported. Using the <a href="#DbRepattr">attribute</a> "showStatus" the quantity of
                              results can be limited to show only the desired values. Further detailed informations of items meaning are 
@@ -7914,7 +8047,10 @@ sub bdump {
         </code>
         <br>
         </ul>
-  
+		
+  <b>Note:</b> <br>
+     Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
+     is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br> 
   
 </ul>
 
@@ -8130,6 +8266,10 @@ sub bdump {
                                  # Wird der umzubenennende Gerätename in der Datenbank nicht gefunden, wird eine WARNUNG im Reading "device_not_renamed" ausgegeben. <br>
                                  # Entsprechende Einträge erfolgen auch im Logfile mit verbose=3
                                  <br><br>
+								 
+								 <b>Hinweis:</b> <br>
+                                 Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
+                                 im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden (Tabellen-Lock). <br><br> 
                                  </li> <br>
                                  </ul>
           
@@ -8374,6 +8514,10 @@ sub bdump {
 								   WARNUNG im Reading "reading_not_renamed" ausgegeben. <br>
                                  # Entsprechende Einträge erfolgen auch im Logfile mit verbose=3.
                                  <br><br>
+								 
+								 <b>Hinweis:</b> <br>
+                                 Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
+                                 im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden (Tabellen-Lock). <br><br> 
                                  </li> <br>
                                  </ul>  								 
 
@@ -8451,9 +8595,11 @@ sub bdump {
   <br>
   </ul></ul>
   
-  <b>Für alle Auswertungsvarianten (Ausnahme sqlCmd) gilt: </b> <br>
+  <b>Für alle Auswertungsvarianten (Ausnahme sqlCmd,deviceRename,readingRename) gilt: </b> <br>
   Zusätzlich zu dem auszuwertenden Reading kann das Device mit angegeben werden um das Reporting nach diesen Kriterien einzuschränken. 
-  Sind keine Zeitgrenzen-Attribute angegeben, wird '1970-01-01 01:00:00' und das aktuelle Datum/Zeit als Zeitgrenze genutzt. 
+  Sind keine Zeitgrenzen-Attribute angegeben aber Aggregation ist gesetzt, wird '1970-01-01 01:00:00' und das aktuelle Datum/Zeit als 
+  Zeitgrenze genutzt. Sind weder Zeitgrenzen-Attribute noch Aggregation angegeben, wird die Datenselektion ohne Timestamp-Einschränkungen
+  ausgeführt.  
   <br><br>
   
   <b>Hinweis: </b> <br>
@@ -8480,7 +8626,12 @@ sub bdump {
  
  
  <ul><ul>
-    <li><b> dbstatus </b> -  listet globale Informationen zum MySQL Serverstatus (z.B. Informationen zum Cache, Threads, Bufferpools, etc. ). 
+    <li><b> blockinginfo </b> - Listet die aktuell systemweit laufenden Hintergrundprozesse (BlockingCalls) mit ihren Informationen auf. 
+	                            Zu lange Zeichenketten (z.B. Argumente) werden gekürzt ausgeschrieben.
+                                </li>     
+                                <br><br>
+							
+    <li><b> dbstatus </b> -  Listet globale Informationen zum MySQL Serverstatus (z.B. Informationen zum Cache, Threads, Bufferpools, etc. ). 
                              Es werden zunächst alle verfügbaren Informationen berichtet. Mit dem <a href="#DbRepattr">Attribut</a> "showStatus" kann die 
                              Ergebnismenge eingeschränkt werden, um nur gewünschte Ergebnisse abzurufen. Detailinformationen zur Bedeutung der einzelnen Readings 
                              sind <a href=http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html>hier</a> verfügbar.  <br>
@@ -8494,7 +8645,7 @@ sub bdump {
                                  <br><br>
                                  </ul>                               
                                  
-    <li><b> dbvars </b> -  zeigt die globalen Werte der MySQL Systemvariablen. Enthalten sind zum Beispiel Angaben zum InnoDB-Home, dem Datafile-Pfad, 
+    <li><b> dbvars </b> -  Zeigt die globalen Werte der MySQL Systemvariablen. Enthalten sind zum Beispiel Angaben zum InnoDB-Home, dem Datafile-Pfad, 
                            Memory- und Cache-Parameter, usw. Die Ausgabe listet zunächst alle verfügbaren Informationen auf. Mit dem 
                            <a href="#DbRepattr">Attribut</a> "showVariables" kann die Ergebnismenge eingeschränkt werden um nur gewünschte Ergebnisse 
                            abzurufen. Weitere Informationen zur Bedeutung der ausgegebenen Variablen sind 
@@ -8509,7 +8660,7 @@ sub bdump {
                                  <br><br>
                                  </ul>                               
 
-    <li><b> procinfo </b> - listet die existierenden Datenbank-Prozesse in einer Tabelle auf (nur MySQL). <br>
+    <li><b> procinfo </b> - Listet die existierenden Datenbank-Prozesse in einer Tabelle auf (nur MySQL). <br>
 	                        Typischerweise werden nur die Prozesse des Verbindungsusers (angegeben in DbLog-Konfiguration)
 							ausgegeben. Sollen alle Prozesse angezeigt werden, ist dem User das globale Recht "PROCESS" 
 							einzuräumen. <br>
@@ -8964,8 +9115,9 @@ sub bdump {
 
 <br>
 <ul>
-  Abhängig von der ausgeführten DB-Operation werden die Ergebnisse in entsrechenden Readings dargestellt. Zu Beginn einer neuen Operation werden alle alten Readings
-  einer vorangegangenen Operation gelöscht um den Verbleib unpassender bzw. ungültiger Readings zu vermeiden.  <br><br>
+  Abhängig von der ausgeführten DB-Operation werden die Ergebnisse in entsprechenden Readings dargestellt. Zu Beginn einer neuen Operation 
+  werden alle alten Readings einer vorangegangenen Operation gelöscht um den Verbleib unpassender bzw. ungültiger Readings zu vermeiden.  
+  <br><br>
   
   Zusätzlich werden folgende Readings erzeugt (Auswahl): <br><br>
   
@@ -9048,6 +9200,10 @@ sub bdump {
         </code>
         <br>
         </ul>
+		
+  <b>Hinweis:</b> <br>
+  Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
+  im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden (Tabellen-Lock). <br><br> 
   
 </ul>
 

@@ -1,5 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbRep: V7.0.0, changelog:
+                       - faster exec if no time attribut/aggregation is set
+                       - bugfix in fetchrows if data contain chars like "'
+                       - new command get blockinginfo
+                       - identify if reopen is running on assigned dblog-device
+                       - bugfix in delSeqDoublets
+                       - internal code changes/reviews
   - feature: 50_TelegramBot: new set cmd silentmsg to disable_notification
   - bugfix:  73_GardenaSmart: v0.4.0 bugfixes
   - feature: 31_PLAYBULB: v1.4.0 support for Sphere Model BTL301w
