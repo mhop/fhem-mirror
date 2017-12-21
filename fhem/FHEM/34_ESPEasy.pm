@@ -760,9 +760,15 @@ sub ESPEasy_Read($) {
       return;
     }
 
-    my $ident = ESPEasy_isCombineDevices($peer,$espName,AttrVal($bname,"combineDevices",0))
+    my $cd = ESPEasy_isCombineDevices($peer,$espName,AttrVal($bname,"combineDevices",0));
+    my $ident = $cd
       ? $espName ne "" ? $espName : $peer
       : $espName.($espName ne "" && $espDevName ne "" ? "_" : "").$espDevName;
+    Log3 $bname, 4, "$btype $name: "
+                  . "Dispatch to: '$ident', "
+                  . "source: '$json->{data}{ESP}{name}'/"
+                  . "'$json->{data}{SENSOR}{0}{deviceName}' "
+                  . "(combinedDevice: ".($cd ? "true" : "false").")";
 
     # push internals in @values
     my @values;
@@ -1155,7 +1161,7 @@ sub ESPEasy_dispatch($$$@) #called by bridge -> send to logical devices
   my $ac = (AttrVal($bname,"autocreate",AttrVal("global","autoload_undefined_devices",1))) ? 1 : 0;
   my $msg = $ident."::".$host."::".$ac."::".$as."::".$ui."::".join("|||",@values);
 
-  Log3 $bname, 5, "$type $name: Dispatch: $msg";
+#  Log3 $bname, 5, "$type $name: Dispatch: $msg";
   Dispatch($bhash, $msg, undef);
 
   return undef;
