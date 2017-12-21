@@ -2764,7 +2764,7 @@ sub ESPEasy_removeGit($)
     </li>
   </ul>
 
-  <h3>ESPEasy Bridge</h3>
+  <h4>ESPEasy Bridge</h4>
 
   <a name="ESPEasy_bridge_define"></a>
   <b>Define </b>(bridge)<br><br>
@@ -2973,7 +2973,7 @@ sub ESPEasy_removeGit($)
       </li><br>
   </ul>
 
-  <h3>ESPEasy Device</h3>
+  <h4>ESPEasy Device</h4>
 
   <a name="ESPEasy_device_define"></a>
   <b>Define </b>(logical device)<br><br>
