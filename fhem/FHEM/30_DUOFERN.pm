@@ -414,7 +414,7 @@ my %setsThermostat = (
   "temperatureThreshold2:$tempSetList"  => "",
   "temperatureThreshold3:$tempSetList"  => "",
   "temperatureThreshold4:$tempSetList"  => "",
-  "actTempLimit:0,1,2,3"                => "",
+  "actTempLimit:1,2,3,4"                => "",
   "desired-temp:$tempSetList"           => "",
 );
                         
@@ -779,8 +779,14 @@ DUOFERN_Set($@)
     if ($hash->{device}) {
       $hash = $defs{$hash->{device}};
     }
-       
-    return undef;
+    
+    my $ret = "set_".$cmd;
+    $ret = $ret." ".$arg if($arg);
+    $ret = $ret." ".$arg2 if($arg2);
+    
+    DoTrigger($name, $ret);
+    
+    return ("",1);   
   }
   
   return SetExtensions($hash, $list, @b); 
