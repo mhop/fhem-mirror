@@ -285,6 +285,7 @@
 		<Product type="0005" id="0004" name="Z Thermostat 014G0013" config="danfoss/z.xml"/>
 		<Product type="0064" id="0001" name="RA Plus-W Radiator Thermostat"/>
 		<Product type="0115" id="a010" name="Popp Radiator Thermostat" config="danfoss/z.xml"/>
+                <Product type="0248" id="a010" name="COQON DTHERMZ6" config="danfoss/z.xml" forumNr="no-statistics"/>
 		<Product type="8004" id="2000" name="RXZ3 RF relay Switching Unit"/>
 		<Product type="8005" id="0001" name="Living Connect Radiator Thermostat" config="danfoss/living.xml"/>
 	</Manufacturer>
@@ -538,6 +539,7 @@
 		<Product type="0003" id="0002" name="GR-201N In-Wall Switch"/>
 		<Product type="0003" id="0512" name="GR105n Auto Valve" config="gr/gr105n.xml"/>
 		<Product type="0202" id="0511" name="GR105 Auto Valve" config="gr/gr105.xml"/>
+                <Product type="0500" id="0000" name="Topvio Water Leckage Sensor" forumNr="74705"/>
 		<Product type="0500" id="0001" name="GR-309N Door/Window detector"/>
 	</Manufacturer>
 	<Manufacturer id="0020" name="General Electric">
@@ -772,6 +774,7 @@
 	<Manufacturer id="015f" name="Mcohome">
 		<Product type="0001" id="0001" name="Mini Energy Dimmer"/>
 		<Product type="0002" id="0001" name="Mini Energy Switch"/>
+                <Product type="0702" id="5102" name="MH7 Water/Electrical Heating Thermostat" forumNr="no-statistics"/>
 		<Product type="210a" id="1302" name="MH-P210 Mini Energy Dimmer" config="mcohome/mhp210.xml"/>
 		<Product type="3102" id="0201" name="MH-S311 One-load" config="mcohome/mhs311.xml"/>
 		<Product type="3102" id="0202" name="MH-S312 Two-load" config="mcohome/mhs312.xml"/>
@@ -780,7 +783,7 @@
 		<Product type="4102" id="0202" name="MH-S412 Two-load" config="mcohome/mhs412.xml"/>
 		<Product type="0801" id="3102" name="MH8-FC-EU Thermostat" config="mcohome/mh8fceu.xml"/>
 		<Product type="0802" id="3102" name="MH8-FC4-EU Thermostat" config="mcohome/mh8fceu.xml"/>
-		<Product type="0905" id="0201 " name="MH9-CO2-WD CO2 Monitor" config="mcohome/mh9co2.xml"/>
+		<Product type="0905" id="0201" name="MH9-CO2-WD CO2 Monitor" config="mcohome/mh9co2.xml"/>
 		<Product type="5102" id="0103" name="Touch Panel Switch MH-S513" config="mcohome/mhs513.xml"/>
 	</Manufacturer>
 	<Manufacturer id="007a" name="Merten">
