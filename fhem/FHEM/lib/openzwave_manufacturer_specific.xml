@@ -539,7 +539,7 @@
 		<Product type="0003" id="0002" name="GR-201N In-Wall Switch"/>
 		<Product type="0003" id="0512" name="GR105n Auto Valve" config="gr/gr105n.xml"/>
 		<Product type="0202" id="0511" name="GR105 Auto Valve" config="gr/gr105.xml"/>
-                <Product type="0500" id="0000" name="Topvio Water Leckage Sensor" forumNr="74705"/>
+                <Product type="0500" id="0000" name="Topvico Water Leckage Sensor" forumNr="74705"/>
 		<Product type="0500" id="0001" name="GR-309N Door/Window detector"/>
 	</Manufacturer>
 	<Manufacturer id="0020" name="General Electric">
