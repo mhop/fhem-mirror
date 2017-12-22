@@ -2,6 +2,7 @@
 # $Id$
 package main;
 
+# See also https://avm.de/fileadmin/user_upload/Global/Service/Schnittstellen/AHA-HTTP-Interface.pdf
 use strict;
 use warnings;
 use SetExtensions;
@@ -13,7 +14,7 @@ sub FBDECT_Cmd($$@);
 
 sub FBDECT_decodePayload($$$);
 
-my @fbdect_models = qw(Powerline546E Dect200 CometDECT);
+my @fbdect_models = qw(Powerline546E Dect200 CometDECT HAN-FUN);
 
 my %fbdect_payload = (
    7 => { n=>"connected" },
@@ -248,8 +249,12 @@ FBDECT_ParseHttp($$$)
   my $ain = $h{identifier};
   $ain =~ s/[-: ]/_/g;
 
-  my %ll = (6=>"actuator", 7=>"powerMeter", 8=>"tempSensor",
-            9=>"switch", 10=>"repeater");
+  my %ll = (4=>"alarmSensor",
+            6=>"actuator",
+            7=>"powerMeter",
+            8=>"tempSensor",
+            9=>"switch",
+           10=>"repeater");
   my $lsn = int($h{functionbitmask});
   my @fb;
   map { push @fb, $ll{$_} if((1<<$_) & $lsn) } sort keys %ll;
