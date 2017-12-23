@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, July 2017
+# SONOSPLAYER.pm (c) by Reiner Leins, December 2017
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -258,7 +258,7 @@ sub SONOSPLAYER_Detail($$$;$) {
 	return '' if (!ReadingsVal($d, 'IsMaster', 0) || (ReadingsVal($d, 'playerType', '') eq 'ZB100'));
 	
 	# Open incl. Inform-Div
-	my $html .= '<html><div informId="'.$d.'-display_covertitle">';
+	my $html .= '<html><div informid="'.$d.'-display_covertitle">';
 	
 	# Cover-/TitleView
 	$html .= '<div style="border: 1px solid gray; border-radius: 10px; padding: 5px;">';

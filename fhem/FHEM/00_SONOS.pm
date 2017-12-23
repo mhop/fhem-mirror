@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, July 2017
+# SONOS.pm (c) by Reiner Leins, December 2017
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -51,6 +51,14 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 23.12.2017
+#	Subscriptions-Refresh umgebaut.
+#	Devicenamen mit Punkt (.) funktionieren nun.
+#	Fehler mit "undefined value $value" behoben.
+#	GetTrackProvider liefert bei Nichtfinden in der MusicServicesList nun eine leere Angabe, und keine undefined.
+#	Die Angabe in LastProcessAnswer ist nicht Zeitumstellungsfest. Der Wert wurde nun umgestellt auf epoch-Zeit.
+#	Der Verweis auf %intAt wurde entfernt. Die Variable wurde sowieso nie verwendet.
+#	Warnungsunterdrückung von 'mumpitzstuff' eingebaut.
 # 28.09.2017
 #	Provider-Icons werden wieder korrekt ermittelt
 #	Das Verarbeiten der Arbeitsschlange im SubProcess wurde optimiert
@@ -60,8 +68,6 @@
 #	Bei einem Modify wird von Fhem nur die DefFn aufgerufen (und nicht vorher UndefFn). Dadurch blieben Reste, die aber vor einer Definition aufgeräumt werden müssen. Resultat war eine 100%-CPU-Last.
 # 09.07.2017
 #	BulkUpdate: Beginn und Ende sind nun sicher davor einen vom SubProzess gestarteten BulkUpdate vorzeitig zu beenden.
-# 05.07.2017
-#	Neue Variante für das Ermitteln der laufenden Favoriten, Radios oder Playlists.
 #
 ########################################################################################
 #
@@ -135,7 +141,7 @@ my $reusePort = 0;
 ########################################################
 # Standards aus FHEM einbinden
 ########################################################
-use vars qw{%attr %modules %defs %intAt %data};
+use vars qw{%attr %modules %defs %data};
 
 
 ########################################################
@@ -429,6 +435,9 @@ sub SONOS_getCoverTitleRG($;$$) {
 	my ($device, $width, $space) = @_;
 	$width = 500 if (!defined($width));
 	
+	my $saveDevice = $device;
+	$saveDevice =~ s/[^a-zA-Z0-9]//g;
+	
 	my $transportState = ReadingsVal($device, 'transportState', '');
 	my $presence = ReadingsVal($device, 'presence', 'disappeared');
 	$presence = 'disappeared' if ($presence =~ m/~~NotLoadedMarker~~/i);
@@ -454,44 +463,44 @@ sub SONOS_getCoverTitleRG($;$$) {
 	$transportState = FW_makeImage('audio_pause', 'Paused', 'SONOS_Transportstate') if ($transportState eq 'PAUSED_PLAYBACK');
 	$transportState = FW_makeImage('audio_stop', 'Stopped', 'SONOS_Transportstate') if ($transportState eq 'STOPPED');
 	
-	my $fullscreenDiv = '<style type="text/css">.SONOS_Transportstate { height: 0.8em; margin-top: -6px; margin-left: 2px; }</style><div id="cover_current'.$device.'" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 10000; background-color: rgb(20,20,20);" onclick="document.getElementById(\'cover_current'.$device.'\').style.display = \'none\'; document.getElementById(\'global_fulldiv_'.$device.'\').innerHTML = \'\';"><div style="position: absolute; top: 10px; left: 5px; display: inline-block; height: 35px; width: 35px; background-image: url('.ReadingsVal($device, 'currentTrackProviderIconRoundURL', '').'); background-repeat: no-repeat; background-size: contain; background-position: center center;"></div><div style="width: 100%; top 5px; text-align: center; font-weight: bold; color: lightgray; font-size: 200%;">'.ReadingsVal($device, 'roomName', $device).$transportState.'</div><div style="position: relative; top: 8px; height: 86%; max-width: 100%; text-align: center;"><div style="display: inline-block; height: calc(100% - 70px); width: 100%; background-image: url('.((lc($presence) eq 'disappeared') ? '/'.AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'webname', 'fhem').'/sonos/cover/empty.jpg' : ReadingsVal($device, 'currentAlbumArtURL', '')).'); background-repeat: no-repeat; background-size: contain; background-position: center center;"/></div><div style="position: absolute; width: 100%; bottom: 8px; padding: 5px; text-align: center; font-weight: bold; color: lightgray; background-color: rgb(20,20,20); font-size: 120%;">'.((lc($presence) eq 'disappeared') ? 'Player disappeared' : ReadingsVal($device, 'infoSummarize1', '')).'</div><div id="hash_'.$device.'" style="display: none; color: white;">'.md5_hex(ReadingsVal($device, 'roomName', $device).ReadingsVal($device, 'infoSummarize2', '').ReadingsVal($device, 'currentTrackPosition', '').ReadingsVal($device, 'currentAlbumArtURL', '')).'</div>'.(($normalAudio) ? '<div id="prog_runtime_'.$device.'" style="display: none; color: white;">'.$currentRuntime.'</div><div id="prog_starttime_'.$device.'" style="display: none; color: white;">'.$currentStarttime.'</div><div id="prog_playing_'.$device.'" style="display: none; color: white;">'.$playing.'</div><div id="progress'.$device.'" style="position: absolute; bottom: 0px; width: 100%; height: 2px; border: 1px solid #000; overflow: hidden;"><div id="progressbar'.$device.'" style="width: '.(($currentPosition * 100) / $currentRuntime).'%; height: 2px; border-right: 1px solid #000000; background: #d65946;"></div></div>' : '').'</div>';
+	my $fullscreenDiv = '<style type="text/css">.SONOS_Transportstate { height: 0.8em; margin-top: -6px; margin-left: 2px; }</style><div id="cover_current'.$saveDevice.'" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 10000; background-color: rgb(20,20,20);" onclick="document.getElementById(\'cover_current'.$saveDevice.'\').style.display = \'none\'; document.getElementById(\'global_fulldiv_'.$saveDevice.'\').innerHTML = \'\';"><div style="position: absolute; top: 10px; left: 5px; display: inline-block; height: 35px; width: 35px; background-image: url('.ReadingsVal($device, 'currentTrackProviderIconRoundURL', '').'); background-repeat: no-repeat; background-size: contain; background-position: center center;"></div><div style="width: 100%; top 5px; text-align: center; font-weight: bold; color: lightgray; font-size: 200%;">'.ReadingsVal($device, 'roomName', $device).$transportState.'</div><div style="position: relative; top: 8px; height: 86%; max-width: 100%; text-align: center;"><div style="display: inline-block; height: calc(100% - 70px); width: 100%; background-image: url('.((lc($presence) eq 'disappeared') ? '/'.AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'webname', 'fhem').'/sonos/cover/empty.jpg' : ReadingsVal($device, 'currentAlbumArtURL', '')).'); background-repeat: no-repeat; background-size: contain; background-position: center center;"/></div><div style="position: absolute; width: 100%; bottom: 8px; padding: 5px; text-align: center; font-weight: bold; color: lightgray; background-color: rgb(20,20,20); font-size: 120%;">'.((lc($presence) eq 'disappeared') ? 'Player disappeared' : ReadingsVal($device, 'infoSummarize1', '')).'</div><div id="hash_'.$saveDevice.'" style="display: none; color: white;">'.md5_hex(ReadingsVal($device, 'roomName', $device).ReadingsVal($device, 'infoSummarize2', '').ReadingsVal($device, 'currentTrackPosition', '').ReadingsVal($device, 'currentAlbumArtURL', '')).'</div>'.(($normalAudio) ? '<div id="prog_runtime_'.$saveDevice.'" style="display: none; color: white;">'.$currentRuntime.'</div><div id="prog_starttime_'.$saveDevice.'" style="display: none; color: white;">'.$currentStarttime.'</div><div id="prog_playing_'.$saveDevice.'" style="display: none; color: white;">'.$playing.'</div><div id="progress'.$saveDevice.'" style="position: absolute; bottom: 0px; width: 100%; height: 2px; border: 1px solid #000; overflow: hidden;"><div id="progressbar'.$saveDevice.'" style="width: '.(($currentPosition * 100) / $currentRuntime).'%; height: 2px; border-right: 1px solid #000000; background: #d65946;"></div></div>' : '').'</div>';
 	
-	my $javascriptTimer = 'function refreshTime'.$device.'() {
-		var playing = document.getElementById("prog_playing_'.$device.'");
+	my $javascriptTimer = 'function refreshTime'.$saveDevice.'() {
+		var playing = document.getElementById("prog_playing_'.$saveDevice.'");
 		if (!playing || (playing && (playing.innerHTML == "0"))) {
 			return;
 		}
 		
-		var runtime = document.getElementById("prog_runtime_'.$device.'");
-		var starttime = document.getElementById("prog_starttime_'.$device.'");
+		var runtime = document.getElementById("prog_runtime_'.$saveDevice.'");
+		var starttime = document.getElementById("prog_starttime_'.$saveDevice.'");
 		if (runtime && starttime) {
 			var now = new Date().getTime();
 			var percent = (Math.round(now / 10.0) -  Math.round(starttime.innerHTML * 100.0)) / runtime.innerHTML;
-			document.getElementById("progressbar'.$device.'").style.width = percent + "%";
+			document.getElementById("progressbar'.$saveDevice.'").style.width = percent + "%";
 			
-			setTimeout(refreshTime'.$device.', 100);
+			setTimeout(refreshTime'.$saveDevice.', 100);
 		}
 	}';
 	
 	my $javascriptText = '<script type="text/javascript">
-		if (!document.getElementById("global_fulldiv_'.$device.'")) {
+		if (!document.getElementById("global_fulldiv_'.$saveDevice.'")) {
 			var newDiv = document.createElement("div");
-			newDiv.setAttribute("id", "global_fulldiv_'.$device.'");
+			newDiv.setAttribute("id", "global_fulldiv_'.$saveDevice.'");
 			document.body.appendChild(newDiv);
 			
 			var newScript = document.createElement("script");
 			newScript.setAttribute("type", "text/javascript");
-			newScript.appendChild(document.createTextNode(\'function refreshFull'.$device.'() {
-				var fullDiv = document.getElementById("element_fulldiv_'.$device.'");
+			newScript.appendChild(document.createTextNode(\'function refreshFull'.$saveDevice.'() {
+				var fullDiv = document.getElementById("element_fulldiv_'.$saveDevice.'");
 				if (!fullDiv) {
 					return;
 				}
 				var elementHTML = decodeURIComponent(fullDiv.innerHTML);
-				var global = document.getElementById("global_fulldiv_'.$device.'");
+				var global = document.getElementById("global_fulldiv_'.$saveDevice.'");
 				var oldGlobal = global.innerHTML;
 				
-				var hash = document.getElementById("hash_'.$device.'");
-				var hashMatch = /<div id="hash_'.$device.'".*?>(.+?)<.div>/i;
+				var hash = document.getElementById("hash_'.$saveDevice.'");
+				var hashMatch = /<div id="hash_'.$saveDevice.'".*?>(.+?)<.div>/i;
 				hashMatch.exec(elementHTML);
 				
 				if ((oldGlobal != "") && (!hash || (hash.innerHTML != RegExp.$1))) {
@@ -499,10 +508,10 @@ sub SONOS_getCoverTitleRG($;$$) {
 				}
 				
 				if (oldGlobal != "") {
-					setTimeout(refreshFull'.$device.', 1000);
-					var playing = document.getElementById("prog_playing_'.$device.'");
+					setTimeout(refreshFull'.$saveDevice.', 1000);
+					var playing = document.getElementById("prog_playing_'.$saveDevice.'");
 					if (playing && playing.innerHTML == "1") {
-						setTimeout(refreshTime'.$device.', 100);
+						setTimeout(refreshTime'.$saveDevice.', 100);
 					}
 				}
 			} '.$javascriptTimer.'\'));
@@ -512,7 +521,7 @@ sub SONOS_getCoverTitleRG($;$$) {
 	</script>';
 	
 	$javascriptText =~ s/\n/ /g;
-	return $javascriptText.'<table cellpadding="0" cellspacing="0" style="padding: 0px; margin: 0px;"><tr><td valign="top" style="padding: 0px; margin: 0px;"><div style="" onclick="document.getElementById(\'global_fulldiv_'.$device.'\').innerHTML = \'&nbsp;\'; refreshFull'.$device.'(); '.($playing ? 'refreshTime'.$device.'();' : '').'">'.SONOS_getCoverRG($device).'</div><div style="display: none;" id="element_fulldiv_'.$device.'">'.SONOS_URI_Escape($fullscreenDiv).'</div></td><td valign="top" style="padding: 0px; margin: 0px;"><div style="margin-left: 0px; min-width: '.$width.'px;">'.SONOS_getTitleRG($device, $space).'</div></td></tr></table>';
+	return $javascriptText.'<table cellpadding="0" cellspacing="0" style="padding: 0px; margin: 0px;"><tr><td valign="top" style="padding: 0px; margin: 0px;"><div style="" onclick="document.getElementById(\'global_fulldiv_'.$saveDevice.'\').innerHTML = \'&nbsp;\'; refreshFull'.$saveDevice.'(); '.($playing ? 'refreshTime'.$saveDevice.'();' : '').'">'.SONOS_getCoverRG($device).'</div><div style="display: none;" id="element_fulldiv_'.$saveDevice.'">'.SONOS_URI_Escape($fullscreenDiv).'</div></td><td valign="top" style="padding: 0px; margin: 0px;"><div style="margin-left: 0px; min-width: '.$width.'px;">'.SONOS_getTitleRG($device, $space).'</div></td></tr></table>';
 }
 
 ########################################################################################
@@ -527,7 +536,7 @@ sub SONOS_getCoverRG($;$) {
 	my $presence = ReadingsVal($device, 'presence', 'disappeared');
 	$presence = 'disappeared' if ($presence =~ m/~~NotLoadedMarker~~/i);
 	
-	return '<div informid="'.$device.'-display_coverrg"><div style="display: inline-block; margin-right: 5px; border: 1px solid lightgray; height: '.$height.'; width: '.$height.'; background-image: url('.((lc($presence) eq 'disappeared') ? '/'.AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'webname', 'fhem').'/sonos/cover/empty.jpg' : ReadingsVal($device, 'currentAlbumArtURL', '')).'); background-repeat: no-repeat; background-size: contain; background-position: center center;"><div style="position: relative; top: 0px; left: 2px; display: inline-block; height: 15px; width: 15px; background-image: url('.ReadingsVal($device, 'currentTrackProviderIconRoundURL', '').'); background-repeat: no-repeat; background-size: contain; background-position: center center;"></div></div></div>';
+	return '<div informid="'.$device.'-display_covertitle"><div style="display: inline-block; margin-right: 5px; border: 1px solid lightgray; height: '.$height.'; width: '.$height.'; background-image: url('.((lc($presence) eq 'disappeared') ? '/'.AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'webname', 'fhem').'/sonos/cover/empty.jpg' : ReadingsVal($device, 'currentAlbumArtURL', '')).'); background-repeat: no-repeat; background-size: contain; background-position: center center;"><div style="position: relative; top: 0px; left: 2px; display: inline-block; height: 15px; width: 15px; background-image: url('.ReadingsVal($device, 'currentTrackProviderIconRoundURL', '').'); background-repeat: no-repeat; background-size: contain; background-position: center center;"></div></div></div>';
 }
 
 ########################################################################################
@@ -1708,7 +1717,7 @@ sub SONOS_Read($) {
 	}
 	
 	# LastAnswer aktualisieren...
-	SONOS_readingsSingleUpdate(SONOS_getSonosPlayerByName(), 'LastProcessAnswer', SONOS_TimeNow(), 1);
+	SONOS_readingsSingleUpdate(SONOS_getSonosPlayerByName(), 'LastProcessAnswer', time(), 1);
 	
 	# Checker aktivieren...
 	InternalTimer(gettimeofday() + $hash->{INTERVAL}, 'SONOS_IsSubprocessAliveChecker', $hash, 0);
@@ -1912,7 +1921,7 @@ sub SONOS_InitClientProcess($) {
 	DevIo_SimpleWrite($hash, "StartThread\n", 2);
 	
 	# Interner Timer für die Überprüfung der Verbindung zum Client (nicht verwechseln mit dem IsAlive-Timer, der die Existenz eines Sonosplayers überprüft)
-	SONOS_readingsSingleUpdate($hash, 'LastProcessAnswer', '2100-01-01 00:00:00', 0);
+	SONOS_readingsSingleUpdate($hash, 'LastProcessAnswer', '0', 0);
 	InternalTimer(gettimeofday() + ($hash->{INTERVAL} * 2), 'SONOS_IsSubprocessAliveChecker', $hash, 0);
 	
 	return undef;
@@ -1928,15 +1937,15 @@ sub SONOS_IsSubprocessAliveChecker() {
 	
 	return undef if (AttrVal($hash->{NAME}, 'disable', 0));
 	
-	my $lastProcessAnswer = SONOS_GetTimeFromString(ReadingsVal(SONOS_getSonosPlayerByName()->{NAME}, 'LastProcessAnswer', '2100-01-01 00:00:00'));
+	my $lastProcessAnswer = ReadingsVal(SONOS_getSonosPlayerByName()->{NAME}, 'LastProcessAnswer', '0');
 	
 	# Wenn länger nichts passiert ist, dann eine Aktualisierung anfordern...
-	SONOS_DoWork('undef', 'refreshProcessAnswer') if ($lastProcessAnswer < gettimeofday() - $hash->{INTERVAL});
+	SONOS_DoWork('undef', 'refreshProcessAnswer') if ($lastProcessAnswer < time() - $hash->{INTERVAL});
 	
 	# Wenn die letzte Antwort zu lange her ist, dann den SubProzess neustarten...
-	if ($lastProcessAnswer < gettimeofday() - (4 * $hash->{INTERVAL})) {
+	if ($lastProcessAnswer < time() - (4 * $hash->{INTERVAL})) {
 		# Verbindung beenden, damit der SubProzess die Chance hat neu initialisiert zu werden...
-		SONOS_Log $hash->{UDN}, 2, 'LastProcessAnswer way too old (Lastanswer: '.SONOS_GetTimeString($lastProcessAnswer).')... try to restart the process and connection...';
+		SONOS_Log $hash->{UDN}, 2, 'LastProcessAnswer way too old (Lastanswer: '.$lastProcessAnswer.' ~ '.SONOS_GetTimeString($lastProcessAnswer).')... try to restart the process and connection...';
 		
 		# Letzten Zeitpunkt und Anzahl der Neustarts merken...
 		my $sHash = SONOS_getSonosPlayerByName();
@@ -1956,42 +1965,6 @@ sub SONOS_IsSubprocessAliveChecker() {
 		RemoveInternalTimer($hash, 'SONOS_IsSubprocessAliveChecker');
 		InternalTimer(gettimeofday() + $hash->{INTERVAL}, 'SONOS_IsSubprocessAliveChecker', $hash, 0);
 	}
-	
-	#my $answer;
-	## Neue Verbindung parallel zur bestehenden Kommunikationsleitung.
-	## Nur zum Prüfen, ob der SubProzess noch lebt und antworten kann.
-	#my $socket = new IO::Socket::INET(PeerAddr => $hash->{DeviceName}, Proto => 'tcp');
-	#if ($socket) {
-	#	$socket->sockopt(SO_LINGER, pack("ii", 1, 0));
-	#	
-	#	$socket->recv($answer, 500);
-	#	$socket->send("Test\r\n", 0);
-	#	
-	#	$socket->shutdown(2);
-	#	$socket->close();
-	#}
-	## Ab hier keine Parallelverbindung mehr offen...
-	#
-	#if (defined($answer)) {
-	#	$answer =~ s/[\r\n]//g;
-	#}
-	#
-	#if (!defined($answer) || ($answer !~ m/^This is UPnP-Server listening for commands/)) {
-	#	SONOS_Log undef, 0, 'No (or incorrect) answer from Subprocess. Restart Sonos-Subprocess...';
-	#	
-	#	# Verbindung beenden, damit der SubProzess die Chance hat neu initialisiert zu werden...
-	#	RemoveInternalTimer($hash);
-	#	DevIo_SimpleWrite($hash, "disconnect\n", 2);
-	#	DevIo_CloseDev($hash);
-	#	
-	#	# Neu anstarten...
-	#	SONOS_StartClientProcessIfNeccessary($hash->{DeviceName}) if ($SONOS_StartedOwnUPnPServer);
-	#	InternalTimer(gettimeofday() + $hash->{WAITTIME}, 'SONOS_DelayOpenDev', $hash, 0);
-	#} elsif (defined($answer) && ($answer =~ m/^This is UPnP-Server listening for commands/)) {
-	#	SONOS_Log undef, 4, 'Got correct answer from Subprocess...';
-	#	RemoveInternalTimer($hash, 'SONOS_IsSubprocessAliveChecker');
-	#	InternalTimer(gettimeofday() + $hash->{INTERVAL}, 'SONOS_IsSubprocessAliveChecker', $hash, 0);
-	#}
 }
 
 ########################################################################################
@@ -2285,18 +2258,6 @@ sub SONOS_Set($@) {
 				}
 			}
 		}
-		
-		# Jetzt noch die Mengen sicherstellen
-		# Dazu aktuellen Zustand nochmal holen
-		#@current = ();
-		#$current = SONOS_Get($hash, qw($hash->{NAME} Groups));
-		#$current =~ s/ //g;
-		#while ($current =~ m/(\[.*?\])/ig) {
-		#	my @tmp = split(/,/, substr($1, 1, -1));
-		#	push @current, \@tmp;
-		#}
-		#SONOS_Log undef, 5, "Current after List: ".Dumper(\@current);
-		
 	} elsif (lc($key) =~ m/^(Stop|Pause|Mute|MuteOn|MuteOff)(All|)$/i) {
 		my $commandType = lc($1);
 		my $commandValue = $value;
@@ -4043,222 +4004,15 @@ sub SONOS_Discover_DoQueue($) {
 			
 			SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_AnswerMessage(1));
 		} elsif ($workType eq 'renewSubscription') {
-			if (defined($SONOS_TransportSubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_TransportSubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
-				eval {
-					$SONOS_TransportSubscriptions{$udn}->renew();
-					SONOS_Log $udn, 3, 'Transport-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
-				};
-				if ($@) {
-					SONOS_Log $udn, 3, 'Error! Transport-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
-					
-					# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
-					# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
-					if ($@ =~ m/Can.t connect to/) {
-						SONOS_DeleteProxyObjects($udn);
-						
-						# Player-Informationen aktualisieren...
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
-						
-						# Discovery neu anstarten, falls der Player irgendwie doch noch erreichbar sein sollte...
-						$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
-					}
-				}
-			}
-			
-			if (defined($SONOS_RenderingSubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_RenderingSubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
-				eval {
-					$SONOS_RenderingSubscriptions{$udn}->renew();
-					SONOS_Log $udn, 3, 'Rendering-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
-				};
-				if ($@) {
-					SONOS_Log $udn, 3, 'Error! Rendering-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
-					
-					# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
-					# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
-					if ($@ =~ m/Can.t connect to/) {
-						SONOS_DeleteProxyObjects($udn);
-						
-						# Player-Informationen aktualisieren...
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
-						
-						# Discovery neu anstarten, falls der Player irgendwie doch noch erreichbar sein sollte...
-						$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
-					}
-				}
-			}
-			
-			if (defined($SONOS_GroupRenderingSubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_GroupRenderingSubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
-				eval {
-					$SONOS_GroupRenderingSubscriptions{$udn}->renew();
-					SONOS_Log $udn, 3, 'GroupRendering-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
-				};
-				if ($@) {
-					SONOS_Log $udn, 3, 'Error! GroupRendering-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
-					
-					# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
-					# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
-					if ($@ =~ m/Can.t connect to/) {
-						SONOS_DeleteProxyObjects($udn);
-						
-						# Player-Informationen aktualisieren...
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
-						
-						# Discovery neu anstarten, falls der Player irgendwie doch noch erreichbar sein sollte...
-						$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
-					}
-				}
-			}
-			
-			if (defined($SONOS_ContentDirectorySubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_ContentDirectorySubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
-				eval {
-					$SONOS_ContentDirectorySubscriptions{$udn}->renew();
-					SONOS_Log $udn, 3, 'ContentDirectory-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
-				};
-				if ($@) {
-					SONOS_Log $udn, 3, 'Error! ContentDirectory-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
-					
-					# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
-					# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
-					if ($@ =~ m/Can.t connect to/) {
-						SONOS_DeleteProxyObjects($udn);
-						
-						# Player-Informationen aktualisieren...
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
-						
-						# Discovery neu anstarten, falls der Player irgendwie doch noch erreichbar sein sollte...
-						$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
-					}
-				}
-			}
-			
-			if (defined($SONOS_AlarmSubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_AlarmSubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
-				eval {
-					$SONOS_AlarmSubscriptions{$udn}->renew();
-					SONOS_Log $udn, 3, 'Alarm-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
-				};
-				if ($@) {
-					SONOS_Log $udn, 3, 'Error! Alarm-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
-					
-					# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
-					# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
-					if ($@ =~ m/Can.t connect to/) {
-						SONOS_DeleteProxyObjects($udn);
-						
-						# Player-Informationen aktualisieren...
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
-						
-						# Discovery neu anstarten, falls der Player irgendwie doch noch erreichbar sein sollte...
-						$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
-					}
-				}
-			}
-			
-			if (defined($SONOS_ZoneGroupTopologySubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_ZoneGroupTopologySubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
-				eval {
-					$SONOS_ZoneGroupTopologySubscriptions{$udn}->renew();
-					SONOS_Log $udn, 3, 'ZoneGroupTopology-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
-				};
-				if ($@) {
-					SONOS_Log $udn, 3, 'Error! ZoneGroupTopology-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
-					
-					# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
-					# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
-					if ($@ =~ m/Can.t connect to/) {
-						SONOS_DeleteProxyObjects($udn);
-						
-						# Player-Informationen aktualisieren...
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
-						
-						# Discovery neu anstarten, falls der Player irgendwie doch noch erreichbar sein sollte...
-						$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
-					}
-				}
-			}
-			
-			if (defined($SONOS_DevicePropertiesSubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_DevicePropertiesSubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
-				eval {
-					$SONOS_DevicePropertiesSubscriptions{$udn}->renew();
-					SONOS_Log $udn, 3, 'DeviceProperties-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
-				};
-				if ($@) {
-					SONOS_Log $udn, 3, 'Error! DeviceProperties-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
-					
-					# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
-					# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
-					if ($@ =~ m/Can.t connect to/) {
-						SONOS_DeleteProxyObjects($udn);
-						
-						# Player-Informationen aktualisieren...
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
-						
-						# Discovery neu anstarten, falls der Player irgendwie doch noch erreichbar sein sollte...
-						$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
-					}
-				}
-			}
-			
-			if (defined($SONOS_AudioInSubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_AudioInSubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
-				eval {
-					$SONOS_AudioInSubscriptions{$udn}->renew();
-					SONOS_Log $udn, 3, 'AudioIn-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
-				};
-				if ($@) {
-					SONOS_Log $udn, 3, 'Error! AudioIn-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
-					
-					# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
-					# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
-					if ($@ =~ m/Can.t connect to/) {
-						SONOS_DeleteProxyObjects($udn);
-						
-						# Player-Informationen aktualisieren...
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
-						
-						# Discovery neu anstarten, falls der Player irgendwie doch noch erreichbar sein sollte...
-						$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
-					}
-				}
-			}
-			
-			if (defined($SONOS_MusicServicesSubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_MusicServicesSubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
-				eval {
-					$SONOS_MusicServicesSubscriptions{$udn}->renew();
-					SONOS_Log $udn, 3, 'MusicServices-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
-				};
-				if ($@) {
-					SONOS_Log $udn, 3, 'Error! MusicServices-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
-					
-					# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
-					# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
-					if ($@ =~ m/Can.t connect to/) {
-						SONOS_DeleteProxyObjects($udn);
-						
-						# Player-Informationen aktualisieren...
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
-						SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
-						
-						# Discovery neu anstarten, falls der Player irgendwie doch noch erreichbar sein sollte...
-						$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
-					}
-				}
-			}
-
+			SONOS_ProcessRenew($udn, 'Transport', \%SONOS_TransportSubscriptions);
+			SONOS_ProcessRenew($udn, 'Rendering', \%SONOS_RenderingSubscriptions);
+			SONOS_ProcessRenew($udn, 'GroupRendering', \%SONOS_GroupRenderingSubscriptions);
+			SONOS_ProcessRenew($udn, 'ContentDirectory', \%SONOS_ContentDirectorySubscriptions);
+			SONOS_ProcessRenew($udn, 'Alarm', \%SONOS_AlarmSubscriptions);
+			SONOS_ProcessRenew($udn, 'ZoneGroupTopology', \%SONOS_ZoneGroupTopologySubscriptions);
+			SONOS_ProcessRenew($udn, 'DeviceProperties', \%SONOS_DevicePropertiesSubscriptions);
+			SONOS_ProcessRenew($udn, 'AudioIn', \%SONOS_AudioInSubscriptions);
+			SONOS_ProcessRenew($udn, 'MusicServices', \%SONOS_MusicServicesSubscriptions);
 		} elsif ($workType eq 'startHandle') {
 			if ($params[0] =~ m/^(.+)\|(.+)$/) {
 				my $songURI = $1;
@@ -4414,6 +4168,41 @@ sub SONOS_Discover_DoQueue($) {
 	};
 	if ($@) {
 		SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', 'DoWork-Exception ERROR: '.$@);
+	}
+}
+
+########################################################################################
+#
+#  SONOS_ProcessRenew - Process the renewal of sbscriptions
+#
+########################################################################################
+sub SONOS_ProcessRenew($$$) {
+	my ($udn, $subscriptionName, $subscriptionHash) = @_;
+	
+	if (defined($subscriptionHash->{$udn}) && (Time::HiRes::time() - $subscriptionHash->{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
+		eval {
+			$SIG{__WARN__} = sub { $_ = shift; };
+			
+			$subscriptionHash->{$udn}->renew();
+			SONOS_Log $udn, 3, $subscriptionName.'-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
+		};
+		if ($@) {
+			SONOS_Log $udn, 3, 'Error! '.$subscriptionName.'-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
+			
+			# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
+			# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
+			if ($@ =~ m/Can.t connect to/i) {
+				SONOS_DeleteProxyObjects($udn);
+				
+				# Player-Informationen aktualisieren...
+				SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
+				SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
+				SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
+				
+				# Discovery neu anstarten, falls der Player irgendwie doch noch erreichbar sein sollte...
+				$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
+			}
+		}
 	}
 }
 
@@ -5467,6 +5256,8 @@ sub SONOS_GetTrackProvider($;$) {
 				return ($result, $roundIcon, $quadraticIcon);
 			}
 		}
+		
+		return ('', '', '');
 	};
 	if ($@) {
 		SONOS_Log undef, 2, 'Unable to identify TrackProvider for "'.$songURI.'". Revert to empty default! Errormessage: '.$@;
@@ -6623,8 +6414,6 @@ sub SONOS_IsAlive($) {
 				$result = 0;
 				
 				SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
-				# Brauchen wir das wirklich? Dabei werden die lokalen Infos nicht aktualisiert...
-				#SONOS_Client_Notifier('deleteCurrentNextTitleInformationAndDisappear:'.$udn);
 				SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
 				SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
 				$doDeleteProxyObjects = 1;
@@ -10211,11 +10000,11 @@ sub SONOS_Client_Data_Refresh($$$$) {
 	
 	my $udnBuffer = ($udn eq 'undef') ? 'SONOS' : $udn;
 	
-	SONOS_Log undef, 4, "SONOS_Client_Data_Refresh(".(defined($sendCommand) ? $sendCommand : 'undef').", $udn, $name, $value)";
+	SONOS_Log undef, 4, 'SONOS_Client_Data_Refresh('.(defined($sendCommand) ? $sendCommand : 'undef').", $udn, $name, ".(defined($value) ? $value : 'undef').')';
 	
 	$SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name} = $value;
 	if (defined($sendCommand) && ($sendCommand ne '')) {
-		SONOS_Client_Notifier($sendCommand.':'.$udn.':'.$name.':'.$value);
+		SONOS_Client_Notifier($sendCommand.':'.$udn.':'.$name.':'.(defined($value) ? $value : 'undef'));
 	}
 }
 
