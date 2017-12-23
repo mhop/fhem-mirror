@@ -20,7 +20,6 @@ telnet_Initialize($)
   $hash->{AsyncOutputFn}  = "telnet_Output";
   $hash->{UndefFn} = "telnet_Undef";
   $hash->{AttrFn}  = "telnet_Attr";
-  $hash->{NotifyFn}= "telnet_SecurityCheck";
   $hash->{AttrList} = "globalpassword password prompt allowedCommands ".
                         "allowfrom SSL connectTimeout connectInterval ".
                         "encoding:utf8,latin1 sslVersion";
@@ -55,39 +54,6 @@ CommandTelnetEncoding($$)
   }
 
   return $ret;
-}
-
-#####################################
-sub
-telnet_SecurityCheck($$)
-{
-  my ($ntfy, $dev) = @_;
-  return if($dev->{NAME} ne "global" ||
-            !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
-  my $motd = AttrVal("global", "motd", "");
-  if($motd =~ "^SecurityCheck") {
-    my @list1 = devspec2array("TYPE=telnet");
-    my @list2 = devspec2array("TYPE=allowed");
-    my @list3;
-    for my $l (@list1) { # This is a hack, as hardcoded to basicAuth
-      next if(!$defs{$l} || $defs{$l}{TEMPORARY}); # Blocking.pm /Forum #47022
-      my $fnd = 0;
-      for my $a (@list2) {
-        next if(!$defs{$a});
-        my $vf = AttrVal($a, "validFor","");
-        $fnd = 1 if(($vf && $vf =~ m/\b$l\b/) && 
-                    (AttrVal($a, "password","") ||
-                     AttrVal($a, "globalpassword","")));
-      }
-      push @list3, $l if(!$fnd);
-    }
-    $motd .= (join(",", sort @list3).
-            " has no associated allowed device with password/globalpassword.\n")
-        if(@list3);
-    $attr{global}{motd} = $motd;
-  }
-  delete $modules{telnet}{NotifyFn};
-  return;
 }
 
 ##########################

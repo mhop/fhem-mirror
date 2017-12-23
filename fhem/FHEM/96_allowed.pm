@@ -50,6 +50,7 @@ allowed_Define($$)
   }
   $auth_refresh = 1;
   readingsSingleUpdate($hash, "state", "validFor:", 0);
+  SecurityCheck() if($init_done);
   return undef;
 }
 
@@ -104,6 +105,7 @@ allowed_Authenticate($$$$)
     my $basicAuth = AttrVal($aName, "basicAuth", undef);
     delete $cl->{".httpAuthHeader"};
     return 0 if(!$basicAuth);
+    return 2 if(!$param);
 
     my $FW_httpheader = $param;
     my $secret = $FW_httpheader->{Authorization};
@@ -173,6 +175,7 @@ allowed_Authenticate($$$$)
     my $pw = AttrVal($aName, "password", undef);
     if(!$pw) {
       $pw = AttrVal($aName, "globalpassword", undef);
+      return 2 if($pw && !defined($param));
       $pw = undef if($pw && $cl->{NAME} =~ m/_127.0.0.1_/);
     }
     return 0 if(!$pw);
@@ -244,8 +247,10 @@ allowed_Attr(@)
     } else {
       delete($hash->{$attrName});
     }
-    readingsSingleUpdate($hash, "state", "validFor:".join(",",@param), 1)
-      if($attrName eq "validFor");
+    if($attrName eq "validFor") {
+      readingsSingleUpdate($hash, "state", "validFor:".join(",",@param), 1);
+      InternalTimer(1, "SecurityCheck", 0) if($init_done);
+    }
 
   } elsif(($attrName eq "basicAuth" ||
            $attrName eq "password" || $attrName eq "globalpassword") &&
@@ -253,6 +258,7 @@ allowed_Attr(@)
     foreach my $d (devspec2array("TYPE=(FHEMWEB|telnet)")) {
       delete $defs{$d}{Authenticated} if($defs{$d});
     }
+    InternalTimer(1, "SecurityCheck", 0) if($init_done);
   }
 
   return undef;
@@ -266,11 +272,16 @@ allowed_fhemwebFn($$$$)
   my $hash = $defs{$d};
 
   my $vf = $defs{$d}{validFor} ? $defs{$d}{validFor} : "";
-  my @arr = map { "<input type='checkbox' ".($vf =~ m/\b$_\b/ ? "checked ":"").
-                   "name='$_' class='vfAttr'><label>$_</label>" }
+  my (@F_arr, @t_arr);
+  my @arr = map {
+              push(@F_arr, $_) if($defs{$_}{TYPE} eq "FHEMWEB");
+              push(@t_arr, $_) if($defs{$_}{TYPE} eq "telnet");
+              "<input type='checkbox' ".($vf =~ m/\b$_\b/ ? "checked ":"").
+                   "name='$_' class='vfAttr'><label>$_</label>"
+            }
             grep { !$defs{$_}{SNAME} }
             devspec2array("TYPE=(FHEMWEB|telnet)");
-  return "<input id='vfAttr' type='button' value='attr'> $d validFor <ul>".
+  my $r = "<input id='vfAttr' type='button' value='attr'> $d validFor <ul>".
           join("<br>",@arr)."</ul><script>var dev='$d';".<<'EOF';
 $("#vfAttr").click(function(){
   var names=[];
@@ -279,6 +290,15 @@ $("#vfAttr").click(function(){
 });
 </script>
 EOF
+
+  $r .= "For ".join(",",@F_arr).
+        ": \"set $d basicAuth &lt;username&gt; &lt;password&gt;\"<br>"
+    if(@F_arr);
+  $r .= "For ".join(",",@t_arr).
+        ": \"set $d password &lt;password&gt;\" or".
+        "  \"set $d globalpassword &lt;password&gt;\"<br>"
+    if(@t_arr);
+  return $r;
 }
 
 1;

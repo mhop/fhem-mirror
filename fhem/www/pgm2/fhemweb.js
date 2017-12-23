@@ -248,6 +248,26 @@ FW_jqueryReadyFn()
     $(this).data('delayTimer', wait);
   });
 
+  $("pre.motd").each(function(){ // add links for passwort setting
+    var txt = $(this).text();
+    txt = txt.replace(/(configuring|define|attr) .*/g, function(x) {
+      return "<a href='#'>"+x+"</a>";
+    });
+    $(this).html(txt);
+    $(this).find("a").click(function(){
+      var txt = $(this).text();
+      var ma = txt.match(/configuring.*device (.*)/);
+      if(ma)
+        location.href = FW_root+"?detail="+ma[1];
+      FW_cmd(FW_root+"?cmd="+encodeURIComponent(txt)+"&XHR=1",
+        function(data){
+          if(txt.indexOf("attr") == 0) $("pre.motd").html("");
+          if(txt.indexOf("define") == 0)
+            location.href = FW_root+"?detail=allowed";
+        });
+    });
+  });
+
   FW_smallScreenCommands();
   FW_inlineModify();
   FW_rawDef();

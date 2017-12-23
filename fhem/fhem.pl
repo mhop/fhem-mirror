@@ -94,6 +94,7 @@ sub RefreshAuthList();
 sub RemoveInternalTimer($;$);
 sub ReplaceEventMap($$$);
 sub ResolveDateWildcards($@);
+sub SecurityCheck();
 sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
@@ -574,10 +575,6 @@ if($pfn) {
   close(PID);
 }
 
-my $sc_text = "SecurityCheck:";
-$attr{global}{motd} = "$sc_text\n\n"
-        if(!$attr{global}{motd} || $attr{global}{motd} =~ m/^$sc_text/);
-
 $init_done = 1;
 $lastDefChange = 1;
 
@@ -593,24 +590,10 @@ foreach my $d (keys %defs) {
   }
 }
 
+SecurityCheck();
+
 $fhem_started = time;
 DoTrigger("global", "INITIALIZED", 1);
-
-$attr{global}{motd} .= "Running with root privileges."
-        if($^O !~ m/Win/ && $<==0 && $attr{global}{motd} =~ m/^$sc_text/);
-$attr{global}{motd} .=
-        "\nRestart FHEM for a new check if the problem is fixed,\n".
-        "or set the global attribute motd to none to supress this message.\n"
-        if($attr{global}{motd} =~ m/^$sc_text\n\n./);
-my $motd = $attr{global}{motd};
-if($motd eq "$sc_text\n\n") {
-  delete($attr{global}{motd});
-} else {
-  if($motd ne "none") {
-    $motd =~ s/\n/ /g;
-    Log 2, $motd;
-  }
-}
 
 my $osuser = "os:$^O user:".(getlogin || getpwuid($<) || "unknown");
 Log 0, "Featurelevel: $featurelevel";
@@ -5361,6 +5344,42 @@ restoreDir_saveFile($$)
   restoreDir_mkDir($root, "$restoreDir/$fName", 1);
   if(!copy($fName, "$root/$restoreDir/$fName")) {
     log 1, "copy $fName $root/$restoreDir/$fName failed:$!";
+  }
+}
+
+sub
+SecurityCheck()
+{
+  return if(AttrVal("global", "motd", "") eq "none");
+  my @fnd;
+  foreach my $sdev (devspec2array("TYPE=(telnet|FHEMWEB)")) {
+    next if(!$defs{$sdev} || $defs{$sdev}{TEMPORARY});
+    my $hash = { SNAME=>$sdev, TYPE=>$defs{$sdev}{TYPE} };
+    push(@fnd, "  $sdev is not password protected")
+        if(!Authenticate($hash, undef));
+  }
+  if(@fnd) {
+    push @fnd, "";
+    my @l = devspec2array("TYPE=allowed");
+    if(@l) {
+      push @fnd, "Protect this FHEM installation by ".
+                 "configuring the allowed device $l[0]";
+    } else {
+      push @fnd, "Protect this FHEM installation by ".
+                 "defining an allowed device with define allowed allowed";
+    }
+  }
+
+  if($^O !~ m/Win/ && $<==0) {
+    push(@fnd, "Running with root privileges is discouraged.")
+  }
+
+  if(@fnd) {
+    unshift(@fnd, "SecurityCheck:");
+    push(@fnd, "You can disable this message with attr global motd none");
+    $attr{global}{motd} = join("\n", @fnd);
+  } elsif($attr{global}{motd} =~ m/^SecurityCheck/) {
+    delete $attr{global}{motd};
   }
 }
 

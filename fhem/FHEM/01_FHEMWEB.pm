@@ -132,7 +132,7 @@ FHEMWEB_Initialize($)
   $hash->{AttrFn}  = "FW_Attr";
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
-  $hash->{NotifyFn}= ($init_done ? "FW_Notify" : "FW_SecurityCheck");
+  $hash->{NotifyFn}= "FW_Notify";
   $hash->{AsyncOutputFn} = "FW_AsyncOutput";
   $hash->{ActivateInformFn} = "FW_ActivateInform";
   no warnings 'qw';
@@ -224,37 +224,6 @@ FHEMWEB_Initialize($)
       FW_readIcons($pe);
     }
   }
-}
-
-#####################################
-sub
-FW_SecurityCheck($$)
-{
-  my ($ntfy, $dev) = @_;
-  return if($dev->{NAME} ne "global" ||
-            !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
-  my $motd = AttrVal("global", "motd", "");
-  if($motd =~ "^SecurityCheck") {
-    my @list1 = devspec2array("TYPE=FHEMWEB");
-    my @list2 = devspec2array("TYPE=allowed");
-    my @list3;
-    for my $l (@list1) { # This is a hack, as hardcoded to basicAuth
-      next if(!$defs{$l});
-      my $fnd = 0;
-      for my $a (@list2) {
-        next if(!$defs{$a});
-        my $vf = AttrVal($a, "validFor","");
-        $fnd = 1 if($vf && ($vf =~ m/\b$l\b/) && AttrVal($a, "basicAuth",""));
-      }
-      push @list3, $l if(!$fnd);
-    }
-    $motd .= (join(",", sort @list3).
-              " has no associated allowed device with basicAuth.\n")
-        if(@list3);
-    $attr{global}{motd} = $motd;
-  }
-  $modules{FHEMWEB}{NotifyFn}= "FW_Notify";
-  return;
 }
 
 #####################################
@@ -1070,8 +1039,7 @@ FW_answerCall($)
     } else {
       my $motd = AttrVal("global","motd","none");
       if($motd ne "none") {
-        $motd =~ s/\n/<br>/g;
-        FW_addContent(">$motd</div");
+        FW_addContent("><pre class='motd'>$motd</pre></div");
       }
     }
   }
