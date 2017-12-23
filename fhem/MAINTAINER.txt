@@ -366,6 +366,7 @@ FHEM/88_Itach_Relay.pm       sachag               Automatisierung
 FHEM/88_Itach_IRDevice       ulimaass             Sonstige Systeme
 FHEM/88_VantagePro2.pm       sachag               Sonstiges
 FHEM/88_WEBCOUNT.pm          sachag               Sonstiges
+FHEM/88_xs1Bridge.pm         HomeAuto_User        Sonstige Systeme
 FHEM/89_FULLY.pm             zap                  Frontends
 FHEM/89_HEATRONIC.pm         heikoranft           Sonstige Systeme
 FHEM/89_VCONTROL.pm          adamwit              Heizungssteuerung/Raumklima
