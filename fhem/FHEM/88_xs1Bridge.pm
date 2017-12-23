@@ -213,7 +213,7 @@ sub xs1Bridge_GetUpDate() {
 			my $json_utf8 = encode_utf8( $json );						## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
 			$decoded = decode_json($json_utf8);
 
-			Dispatch($hash,$json_utf8,undef);							## Übergabe an anderes Modul, NUR KOMPLETTES JSON !!!
+			#Dispatch($hash,$json_utf8,undef);							## Übergabe an anderes Modul, NUR KOMPLETTES JSON !!!
 			
 			if ($i <= 1 ) {               ### Aktoren / Sensoren
 				my @array = @{ $decoded->{$arrayname[$i]} };
