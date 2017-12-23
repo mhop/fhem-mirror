@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
+    "[http://www.apple.com/DTDs/PropertyList-1.0.dtd http://www.apple.com/DTDs/PropertyList-1.0.dtd]">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>de.fhem</string>
+    <key>WorkingDirectory</key>
+    <string>/opt/fhem</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/perl</string>
+        <string>/opt/fhem/fhem.pl</string>
+        <string>/opt/fhem/fhem.cfg</string>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/opt/fhem/log/start.log</string>
+    <key>StandardErrorPath</key>
+    <string>/opt/fhem/log/start.log</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>UserName</key>
+    <string>fhem</string>
+    <key>AbandonProcessGroup</key>
+    <true/>
+</dict>
+</plist>
