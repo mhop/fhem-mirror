@@ -558,16 +558,6 @@ if(configDBUsed()) {
   }
 }
 
-if($cfgRet) {
-  $attr{global}{autosave} = 0;
-  $attr{global}{motd} = "$cfgErrMsg\n$cfgRet\nAutosave deactivated";
-  Log 1, $cfgRet;
-
-} elsif($attr{global}{motd} && $attr{global}{motd} =~ m/^$cfgErrMsg/) {
-  $attr{global}{motd} = "";
-
-}
-
 my $pfn = $attr{global}{pidfilename};
 if($pfn) {
   die "$pfn: $!\n" if(!open(PID, ">$pfn"));
@@ -590,7 +580,19 @@ foreach my $d (keys %defs) {
   }
 }
 
-SecurityCheck();
+if($cfgRet) {
+  $attr{global}{autosave} = 0;
+  $attr{global}{motd} = "$cfgErrMsg\n$cfgRet\nAutosave deactivated";
+  Log 1, $cfgRet;
+
+} elsif($attr{global}{motd} && $attr{global}{motd} =~ m/^$cfgErrMsg/) {
+  $attr{global}{motd} = "";
+
+} else {
+  SecurityCheck();
+
+}
+
 
 $fhem_started = time;
 DoTrigger("global", "INITIALIZED", 1);
