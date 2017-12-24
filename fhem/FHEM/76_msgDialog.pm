@@ -355,7 +355,7 @@ sub msgDialog_progress($$$;$) {
     ;
 
     foreach (@commands){
-      $_ =~ s/;/;;/g;
+      $_ =~ s/;/;;/g if($_ =~ m/^{.*}$/s);
       my $ret = AnalyzeCommandChain(undef, $_);
 
       Log3($SELF, 4, "$TYPE ($SELF) - return from command \"$_\": $ret")
