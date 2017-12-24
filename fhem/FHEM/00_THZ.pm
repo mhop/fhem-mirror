@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 12/2017
-my $thzversion = "0.172"; 
+my $thzversion = "0.173"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -858,8 +858,8 @@ sub THZ_Define($$) {
 ########################################################################################
 sub THZ_Refresh_all_gets($) {
   my ($hash) = @_;
- # unlink("data.txt");
-  THZ_RemoveInternalTimer("THZ_GetRefresh");
+  RemoveInternalTimer(undef, "THZ_GetRefresh");
+  #THZ_RemoveInternalTimer("THZ_GetRefresh"); not needed since https://svn.fhem.de/trac/changeset/15667/ because now there is a second parameter for the function
   Log3 $hash->{NAME}, 5, "thzversion = $thzversion ";
   my $timedelay= 5; 						#start after 5 seconds
   foreach  my $cmdhash  (keys %gets) {
@@ -1011,7 +1011,8 @@ sub THZ_Testloopapproach($) {
 sub THZ_Ready($) {
   my ($hash) = @_;
   if($hash->{STATE} eq "disconnected")
-  { THZ_RemoveInternalTimer("THZ_GetRefresh");
+  { RemoveInternalTimer(undef, "THZ_GetRefresh");
+    #THZ_RemoveInternalTimer("THZ_GetRefresh");
   select(undef, undef, undef, 0.25); #equivalent to sleep 250ms
   return DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets")
   }	
@@ -1870,31 +1871,26 @@ sub THZ_Attr(@) {
   
   if ( $attrName eq "firmware" )  {  
       if ($attrVal eq "2.06") {
-        THZ_RemoveInternalTimer("THZ_GetRefresh");
          %sets = %sets206;
          %gets = (%getsonly2xx, %getsonly206, %sets);
          THZ_Refresh_all_gets($hash);
       }
       elsif ($attrVal eq "2.14") {
-        THZ_RemoveInternalTimer("THZ_GetRefresh");
         %sets = (%sets206, %setsonly214);
         %gets = (%getsonly2xx, %getsonly214, %sets206);
         THZ_Refresh_all_gets($hash);
       }
       elsif ($attrVal eq "5.39") {
-        THZ_RemoveInternalTimer("THZ_GetRefresh");
         %sets=(%sets439539common, %sets539only);
         %gets=(%getsonly539, %sets);
         THZ_Refresh_all_gets($hash);
       }
       elsif ($attrVal eq "4.39technician") {
-        THZ_RemoveInternalTimer("THZ_GetRefresh");
         %sets=(%sets439539common, %sets439only, %sets439technician);
         %gets=(%getsonly439, %sets);
         THZ_Refresh_all_gets($hash);
       }
       else { #in all other cases I assume $attrVal eq "4.39" cambiato nella v0140
-        THZ_RemoveInternalTimer("THZ_GetRefresh");
         %sets=(%sets439539common, %sets439only);
         %gets=(%getsonly439, %sets);
         THZ_Refresh_all_gets($hash);
@@ -1904,7 +1900,6 @@ sub THZ_Attr(@) {
   
   if( $attrName =~ /^interval_/ ) {
   #DevIo_CloseDev($hash);
-  THZ_RemoveInternalTimer("THZ_GetRefresh");
   #sleep 1;
   #DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets");
   THZ_Refresh_all_gets($hash);
@@ -1918,7 +1913,8 @@ sub THZ_Attr(@) {
 sub THZ_Undef($$) {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
-  THZ_RemoveInternalTimer("THZ_GetRefresh");
+  RemoveInternalTimer(undef, "THZ_GetRefresh");
+  #THZ_RemoveInternalTimer("THZ_GetRefresh");
   foreach my $d (sort keys %defs) {
     if(defined($defs{$d}) &&
        defined($defs{$d}{IODev}) &&
@@ -1971,12 +1967,12 @@ sub nearest_floor($$) {
 # THZ_RemoveInternalTimer($) 
 # modified takes as an argument the function to be called, not the argument
 ########################################################################################
-sub THZ_RemoveInternalTimer($){
-  my ($callingfun) = @_;
-  foreach my $a (keys %intAt) {
-    delete($intAt{$a}) if($intAt{$a}{FN} eq $callingfun);
-  }
-}
+#sub THZ_RemoveInternalTimer($){
+#  my ($callingfun) = @_;
+#  foreach my $a (keys %intAt) {
+#    delete($intAt{$a}) if($intAt{$a}{FN} eq $callingfun);
+#  }
+#}
 
 ################################
 #
