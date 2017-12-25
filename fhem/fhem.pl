@@ -5380,7 +5380,7 @@ SecurityCheck()
     unshift(@fnd, "SecurityCheck:");
     push(@fnd, "You can disable this message with attr global motd none");
     $attr{global}{motd} = join("\n", @fnd);
-  } elsif($attr{global}{motd} =~ m/^SecurityCheck/) {
+  } elsif(AttrVal('global','motd','') =~ m/^SecurityCheck/) {
     delete $attr{global}{motd};
   }
 }
