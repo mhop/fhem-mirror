@@ -525,6 +525,7 @@ contrib/98_FileLogConvert.pm DeeSPe               Automatisierung
 contrib/betateilchen/*       betateilchen         Sonstiges
 holiday/by_ext.holiday       loredo               Sonstiges
 holiday/de_social.holiday    loredo               Sonstiges
+contrib/DEBIAN/*             betateilchen.        Sonstiges
 contrib/Infratec/*           wzut                 Bastelecke
 contrib/PRESENCE             markusbloch          Unterstuetzende Dienste
 contrib/PRESENCE/lepresenced PatrickR             Unterstuetzende Dienste
