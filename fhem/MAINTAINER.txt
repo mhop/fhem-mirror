@@ -268,7 +268,7 @@ FHEM/55_PIFACE.pm            klaus.schauer        Einplatinencomputer
 FHEM/56_POKEYS.pm            axelberner           Sonstiges
 FHEM/57_Calendar.pm          neubert              Unterstuetzende Dienste/Kalendermodule
 FHEM/57_CALVIEW.pm           chris1284            Unterstuetzende Dienste/Kalendermodule
-FHEM/59_HCS.pm               hjr                  Automatisierung
+FHEM/59_HCS.pm               hjr                  Automatisierung (oder auch PM)
 FHEM/59_LuftdatenInfo        igami                Bastelecke
 FHEM/59_OPENWEATHER.pm       tupol                Unterstuetzende Dienste/Wettermodule (Link als PM an tupol)
 FHEM/59_Twilight.pm          dietmar63            Unterstuetzende Dienste/Wettermodule
