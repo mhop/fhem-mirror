@@ -1176,6 +1176,12 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     return;
   }
+
+  $mh{devN}   = $mh{devH}->{NAME};        # source device name
+  if (CUL_HM_getAttrInt($mh{devN},"ignore")){
+    $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devN}$/,@entities);
+    return (CUL_HM_pushEvnts(),$mh{devN},@entities);
+  }
   
   if (   !defined $mh{devH}->{IODev}
       || !defined $mh{devH}->{IODev}{NAME}){
@@ -1187,14 +1193,9 @@ sub CUL_HM_Parse($$) {#########################################################
   CUL_HM_assignIO($mh{devH}); #this way the init and remove work even on startup for TSCUL
 
   $respRemoved = 0;  #set to 'no response in this message' at start
-  $mh{devN}   = $mh{devH}->{NAME};        #sourcehash - will be modified to channel entity
   $mh{shash}  = $mh{devH};                # source hash - will be redirected to channel if applicable
   my $ioId = CUL_HM_h2IoId($mh{devH}->{IODev});
   $ioId = $mh{id} if(!$ioId);
-  if (CUL_HM_getAttrInt($mh{devN},"ignore")){
-    $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devN}$/,@entities);
-    return (CUL_HM_pushEvnts(),$mh{devN},@entities);
-  }
 
   #----------CUL aesCommReq handling---------
   my $aComReq = AttrVal($mh{devN},"aesCommReq",0);
