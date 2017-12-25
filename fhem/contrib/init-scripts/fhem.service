@@ -1,13 +1,20 @@
 # $Id$
+
 [Unit]
 Description=FHEM Home Automation
+Wants=network.target
+After=network.target
 
 [Service]
 Type=forking
-ExecStart=/etc/init.d/fhem start
-ExecStop=//etc/init.d/fhem stop
+User=fhem
+Group=dialout
+WorkingDirectory=/opt/fhem
+#ExecStart=/usr/bin/perl fhem.pl fhem.cfg
+ExecStart=/usr/bin/perl fhem.pl configDB
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
+
