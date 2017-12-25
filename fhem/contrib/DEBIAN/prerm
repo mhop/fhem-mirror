@@ -6,9 +6,7 @@ set -e
 apt-mark unhold fhem
 
 # stop fhem if running
-if test -f /etc/init.d/fhem; then
-    /etc/init.d/fhem stop noaptmark
-fi
+systemctl stop fhem
 
 # remove fhem autostart
-update-rc.d -f fhem remove
+systemctl disble fhem

@@ -12,6 +12,6 @@ if test -f /etc/init/fhem.conf; then
     rm /etc/init/fhem.conf
 fi
 
-if test -f /etc/init.d/fhem; then
-    rm /etc/init.d/fhem
+if test -f /etc/systemd/system/fhem.service; then
+    rm /etc/systemd/system/fhem.service
 fi
