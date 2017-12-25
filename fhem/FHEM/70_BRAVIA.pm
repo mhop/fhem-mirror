@@ -198,6 +198,7 @@ sub BRAVIA_Set($@) {
     $usage .= " mute:" . $mutes;
     $usage .= " input:" . $inputs if ( $inputs ne "" );
     $usage .= " channel:$channels" if ( $channels ne "" );
+    $usage .= " text" if (ReadingsVal($name, "requestFormat", "") eq "json");
 
     my $cmd = '';
     my $result;
@@ -564,6 +565,17 @@ sub BRAVIA_Set($@) {
         readingsSingleUpdate( $hash, "upnp", $a[2], 1 )
            if ( ReadingsVal($name, "upnp", "") ne $a[2] );
     }
+    
+    # text
+    elsif ( $a[1] eq "text" ) {
+        return "No 2nd argument given" if ( !defined( $a[2] ) );
+
+		shift(@a); shift(@a);
+		my $text = join(" ", @a);
+        Log3 $name, 2, "BRAVIA set $name text $text";
+        
+        BRAVIA_SendCommand( $hash, "text", $text );
+    }
 
     # return usage hint
     else {
@@ -775,6 +787,12 @@ sub BRAVIA_SendCommand($$;$$) {
         $data = "{\"method\":\"getScheduleList\",\"params\":[{\"cnt\":100,\"stIdx\":0}],\"id\":1,\"version\":\"1.0\"}";
       } else {
         $URL .= "/cersEx/api/" . $service;
+      }
+    } elsif ($service eq "text") {
+      $URL .= $port->{SERVICE};
+      if ($requestFormat eq "json") {
+        $URL .= "/sony/appControl";
+        $data = "{\"id\":2,\"method\":\"setTextForm\",\"version\":\"1.0\",\"params\":[\"".$cmd."\"]}";
       }
     } else {
       $URL .= $port->{SERVICE};
@@ -1486,6 +1504,11 @@ sub BRAVIA_ProcessCommandData ($$) {
       # nothing to do
     }
 
+    # text
+    elsif ( $service eq "text" ) {
+      # nothing to do
+    }
+
     # register
     elsif ( $service eq "register" ) {
       readingsBeginUpdate($hash);
@@ -1967,6 +1990,8 @@ sub BRAVIA_GetNormalizedName($) {
         Retrieves current status information from TV.</li>
       <li><i>stop</i><br>
         Stops recording, playing of an internal App, etc.</li>
+      <li><i>text</i><br>
+      	Includes the given text into an input field on display.</li>
       <li><i>toggle</i><br>
         Toggles power status of TV.</li>
       <li><i>tvpause</i><br>
@@ -2073,6 +2098,8 @@ sub BRAVIA_GetNormalizedName($) {
         Ruft die aktuellen Statusinformationen vom TV ab.</li>
       <li><i>stop</i><br>
         Stoppt die Wiedergabe einer Aufnahme, einer internen App, etc.</li>
+      <li><i>text</i><br>
+        Überträgt den eingegebenen Text in ein Textfeld der Anzeige.</li>
       <li><i>toggle</i><br>
         Wechselt den Einschaltstatus des TV.</li>
       <li><i>tvpause</i><br>
