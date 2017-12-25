@@ -15,11 +15,15 @@ chown -R fhem:dialout /opt/fhem
 # remove repository entry after first installation
 sed -i /debian.fhem.de/d /etc/apt/sources.list
 
-# set up of autostart (Sysvinit upstart no longer supported)
-ln -s /opt/fhem/contrib/init-scripts/fhem.service /etc/systemd/system/.
-systemctl enable fhem
+# set up of autostart
+# Sysvinit; upstart no longer supported
 
-# and start the fhem service
-systemctl start fhem
+#mkdir -p /etc/init.d
+cp /opt/fhem/contrib/init-scripts/fhem.3 /etc/init.d/fhem
+chmod ugo+x /etc/init.d/fhem
+update-rc.d fhem defaults
 
+if test -f /etc/init.d/fhem; then
+    /etc/init.d/fhem start noaptmark
+fi
 exit 0
