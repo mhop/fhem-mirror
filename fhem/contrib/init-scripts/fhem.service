@@ -10,8 +10,8 @@ Type=forking
 User=fhem
 Group=dialout
 WorkingDirectory=/opt/fhem
-#ExecStart=/usr/bin/perl fhem.pl fhem.cfg
-ExecStart=/usr/bin/perl fhem.pl configDB
+ExecStart=/usr/bin/perl fhem.pl fhem.cfg
+#ExecStart=/usr/bin/perl fhem.pl configDB
 Restart=always
 RestartSec=5
 
