@@ -644,10 +644,7 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
 	
   if( typeof AddCodeMirror == 'function' ) {
     // init codemirror for FW_style edit textarea
-    var s = $('textarea[name="data"]');
-    if( s.length && !s[0].editor ) {
-      s[0].editor = true; AddCodeMirror( s[0] );
-    }
+    AddCodeMirror($('textarea[name="data"]'));
   }
 
   $('#DEFa').click(function(){
@@ -656,9 +653,7 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     $('#disp').css('display', old=='none' ? 'none' : 'block');
     if( typeof AddCodeMirror == 'function' ) {
       var s=document.getElementById("edit").getElementsByTagName("textarea");
-      if(!s[0].editor) { 
-        s[0].editor=true; AddCodeMirror(s[0], function(pcm) {cm = pcm;});
-      }
+      AddCodeMirror(s[0], function(pcm) {cm = pcm;});
     }
     });
     
@@ -722,31 +717,48 @@ FW_rawDef()
         $("#rawDef").remove();
         return;
       }
+      var textAreaStyle = typeof AddCodeMirror == 'function'?'opacity:0':'';
 
       $("#content").append('<div id="rawDef">'+
-          '<textarea id="td_rawDef" rows="25" cols="60" style="width:99%"/>'+
+          '<textarea id="td_rawDef" rows="25" cols="60" style="width:99%; '+textAreaStyle+'"/>'+
           '<button>Execute commands</button>'+
           ' Dump "Probably associated with" too <input type="checkbox">'+
-        '</div></br>');
+        '<br><br></div>');
 
       function
       fillData(opt)
       {
+	var s = $('#rawDef textarea');
+
         FW_cmd(FW_root+"?cmd=list "+opt+" "+dev+"&XHR=1", function(data) {
           var re = new RegExp("^define", "gm");
           data = data.replace(re, "defmod");
-          $("#rawDef textarea").val(data);
+          s.val(data);
+	  
           var off = $("#rawDef").position().top-20;
           $('body, html').animate({scrollTop:off}, 500);
           $("#rawDef button").hide();
 
-          $('#rawDef textarea').bind('input propertychange', function() {
+          var propertychange = function() {
             var nData = $("#rawDef textarea").val();
             if(nData != data)
               $("#rawDef button").show();
             else
               $("#rawDef button").hide();
-          });
+          };
+
+          s.bind('input propertychange', propertychange);
+
+          if( typeof AddCodeMirror == 'function') {
+            $('#rawDef textarea + .CodeMirror').remove();
+            AddCodeMirror(s, function(cm) {
+              cm.on("change", function() {
+                s.val(cm.getValue());
+		propertychange();
+              })
+            });
+          }
+
         });
       }
       fillData("-r");
@@ -1196,9 +1208,8 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
     $("#td_longText").val(txt);
 
     var cm;
-    if(typeof AddCodeMirror == 'function' && !$("#td_longText").get(0).editor) {
-      $("#td_longText").get(0).editor = true;
-      AddCodeMirror($("#td_longText").get(0), function(pcm) {cm = pcm;});
+    if(typeof AddCodeMirror == 'function') {
+      AddCodeMirror($("#td_longText"), function(pcm) {cm = pcm;});
     }
 
     $('#editdlg').dialog(

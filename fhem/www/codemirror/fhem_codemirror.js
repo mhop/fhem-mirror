@@ -57,6 +57,16 @@ var cm_attr = {
 };
 
 function AddCodeMirror(e, cb) {
+    if(e instanceof jQuery) {
+	AddCodeMirror(e.get(0), cb);
+	return;
+    }
+
+    if(e == undefined || e.editor) {
+	return;
+    }
+    e.editor = true;
+
     if(cm_active && cm_loaded == cm_active)
         return cm_wait(e, cb);
         
