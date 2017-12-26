@@ -1,10 +1,14 @@
-#############################################################
+#################################################################
 # $Id$
-#############################################################
-# ToDo´s: (physisches Modul - Verbindung zur Hardware)
+#################################################################
+# physisches Modul - Verbindung zur Hardware
 #
-# ...
-#############################################################
+# note / ToDo´s:
+# 
+# 
+# 
+# 
+#################################################################
 
 package main;
 
@@ -13,26 +17,25 @@ use HttpUtils;					# um Daten via HTTP auszutauschen https://wiki.fhem.de/wiki/H
 use strict;				
 use warnings;					# Warnings
 use POSIX;
+use LWP::Simple;
 use Time::Local;
 
-use JSON qw( decode_json );	# JSON
-use LWP::Simple;					# JSON
-use utf8;							# UTF-8
-use Encode qw(encode_utf8);	# UTF-8
-use Net::Ping;						# Ping Test Verbindung
+my $missingModul = "";
+eval "use Encode qw(encode encode_utf8 decode_utf8);1" or $missingModul .= "Encode ";
+eval "use JSON;1" or $missingModul .= "JSON ";
+
+use Net::Ping;					# Ping Test Verbindung
 
 sub xs1Bridge_Initialize($) {
 	my ($hash) = @_;
 	
 	$hash->{WriteFn}    = "xs1Bridge_Write";
 	$hash->{Clients}    = ":xs1Device:";
-	$hash->{MatchList}  = { "1:xs1Device"   =>   '.*' };			## zum testen lt. Forum - https://regex101.com/
-	
-	#$hash->{MatchList}  = { "1:xs1Device"   =>	'{\n..version.:.+}' };			## zum testen lt. Forum - https://regex101.com/
-	#$hash->{MatchList}  = { "1:xs1Device"   =>	'^{"id":".*' };
+	$hash->{MatchList}  = { "1:xs1Device"   =>	'{\X..version.:.*' };			## https://regex101.com/ Testfunktion
 	
 	$hash->{DefFn}		=	"xs1Bridge_Define";
 	$hash->{AttrFn}  	= 	"xs1Bridge_Attr";  
+	$hash->{UndefFn}	=	"xs1Bridge_Undef";
 	$hash->{AttrList}	=	"debug:0,1 ".
 							"disable:0,1 ".
 							"ignore:0,1 ".
@@ -52,15 +55,16 @@ sub xs1Bridge_Define($$) {
 	my $debug = AttrVal($hash->{NAME},"debug",0);
 	
 	return "Usage: define <name> $name <ip>"  if(@arg != 3);
+	return "Cannot define xs1Bridge device. Perl modul ${missingModul}is missing." if ( $missingModul );
 	
 	# Parameter Define
-	my $xs1_ip = $arg[2];								## Zusatzparameter 1 bei Define - ggf. nur in Sub
+	my $xs1_ip = $arg[2];					## Zusatzparameter 1 bei Define - ggf. nur in Sub
 	$hash->{xs1_ip} = $xs1_ip;
 
-	if (&xs1Bridge_Ping == 1) {						## IP - Check
-	$hash->{STATE} = "Initialized";					## Der Status des Modules nach Initialisierung.
-	$hash->{TIME} = time();								## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.04";							## Version
+	if (&xs1Bridge_Ping == 1) {				## IP - Check
+	$hash->{STATE} = "Initialized";			## Der Status des Modules nach Initialisierung.
+	$hash->{TIME} = time();					## Zeitstempel, derzeit vom anlegen des Moduls
+	$hash->{VERSION} = "1.05";				## Version
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
@@ -72,7 +76,7 @@ sub xs1Bridge_Define($$) {
 	
 	InternalTimer(gettimeofday()+$attr{$name}{interval}, "xs1Bridge_GetUpDate", $hash);		## set Timer
 
-	Log3 $name, 3, "$typ: Module defined with xs1_ip: $xs1_ip";
+	Log3 $name, 3, "$typ: Modul defined with xs1_ip: $xs1_ip";
 	return undef;
    }
    else
@@ -94,28 +98,28 @@ sub xs1Bridge_Attr(@) {
    
 	Debug " $typ: xs1_Attr | Attributes $attrName = $attrValue" if($debug);
 
-	if ($cmd eq "set") {																## Handling bei set .. attribute
-		RemoveInternalTimer($hash);												## Timer löschen
+	if ($cmd eq "set") {											## Handling bei set .. attribute
+		RemoveInternalTimer($hash);									## Timer löschen
 		Debug " $typ: xs1_Attr | Cmd:$cmd | RemoveInternalTimer" if($debug);
 
-		if ($attrName eq "interval") {											## Abfrage Attribute
-			if (($attrValue !~ /^\d*$/) || ($attrValue < 5))				## Bildschirmausgabe - Hinweis Wert zu klein
+		if ($attrName eq "interval") {								## Abfrage Attribute
+			if (($attrValue !~ /^\d*$/) || ($attrValue < 5))		## Bildschirmausgabe - Hinweis Wert zu klein
 			{
 			return "$typ: Interval is too small. Please define new Interval | (at least: 5 seconds)";
 			}
 			my $interval = $attrValue;
 		}
 		elsif ($attrName eq "disable") {
-			if ($attrValue eq "1") {											## Handling bei attribute disable 1
+			if ($attrValue eq "1") {								## Handling bei attribute disable 1
 			readingsSingleUpdate($hash, "state", "deactive", 1);
 			}
-			elsif ($attrValue eq "0") {										## Handling bei attribute disable 0
+			elsif ($attrValue eq "0") {								## Handling bei attribute disable 0
 			readingsSingleUpdate($hash, "state", "active", 1);
 			}
 		}
 	}
 	
-	if ($cmd eq "del") {															## Handling bei del ... attribute
+	if ($cmd eq "del") {											## Handling bei del ... attribute
 		if ($attrName eq "disable" && !defined $attrValue) {
 		readingsSingleUpdate($hash, "state", "active", 1);
 		Debug " $typ: xs1_Attr | Cmd:$cmd | $attrName=$attrValue" if($debug);
@@ -195,27 +199,24 @@ sub xs1Bridge_GetUpDate() {
 		}
 
 		### JSON Abfrage - Schleife
-		my $decoded;
 		for my $i (0..4) {
 			my $adress = "http://".$hash->{xs1_ip}.$cmd.$cmdtyp[$i];
 			Debug " $typ: xs1Bridge_GetUpDate | Adresse: $adress" if($debug);
      
-			my $ua = LWP::UserAgent->new;										## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
+			my $ua = LWP::UserAgent->new;									## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
 			my $resp = $ua->request(HTTP::Request->new(GET => $adress));
 			if ($resp->code != "200") {										## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
-				#print "HTTP GET error code: ", $resp->code, "\n";
-				#print "HTTP GET error message: ", $resp->message, "\n";
 				Log3 $name, 3, "$typ: xs1Bridge_GetUpDate | HTTP GET error code ".$resp->code." -> no JSON-query";
-				if ($i == 0 || $i == 1 || $i == 2 || $i == 3) {last};			## ERROR JSON-query -> Abbruch schleife
+				if ($i == 0 || $i == 1 || $i == 2 || $i == 3) {last};		## ERROR JSON-query -> Abbruch schleife
 			}
 			
-			my ($json) = get($adress) =~ /[^(]*[}]/g;					## cut cname( + ) am Ende von Ausgabe -> ARRAY Struktur
-			my $json_utf8 = encode_utf8( $json );						## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
-			$decoded = decode_json($json_utf8);
+			my ($json) = get( $adress ) =~ /[^(]*[}]/g;					## cut cname( + ) am Ende von Ausgabe -> ARRAY Struktur
+																		## ggf https://stackoverflow.com/questions/9493304/use-of-uninitialized-value-in-pattern-match-m testen
 
-			#Dispatch($hash,$json_utf8,undef);							## Übergabe an anderes Modul, NUR KOMPLETTES JSON !!!
-			
-			if ($i <= 1 ) {               ### Aktoren / Sensoren
+			my $json_utf8 = eval {encode_utf8( $json )};						## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
+			my $decoded = eval {decode_json( $json_utf8 )};
+
+			if ($i <= 1 ) {               ### xs1 Aktoren / Sensoren
 				my @array = @{ $decoded->{$arrayname[$i]} };
 				foreach my $f ( @array ) {
 					if ($f->{"type"} ne "disabled") {
@@ -224,7 +225,24 @@ sub xs1Bridge_GetUpDate() {
 						#Log3 $name, 3, $f->{"id"}." | ".$f->{"type"}." | ".$f->{"name"}." | ". $f->{"value"};
 					}
 				}
-			} elsif ($i == 2) {           ### Info´s
+				
+				my $xs1DeviceDev = "noDispatchDevice";					## defined xs1Device search to Dispatch
+				my $key;
+				foreach my $key (keys(%defs)) {							## https://forum.fhem.de/index.php/topic,19195.msg128890.html#msg128890
+					if($defs{$key}{TYPE} eq "xs1Device") {				## old with Warning: #if(%defs->{$key}{TYPE} eq "xs1Device") {
+						$xs1DeviceDev = $key;
+						last;
+					}
+				}
+			
+				if ($xs1DeviceDev ne "noDispatchDevice")
+				{
+				Debug " $typ: xs1Device ($xs1DeviceDev) find, ready to dispatch" if($debug);
+				Log3 $name, 5, "$typ: xs1Device ($xs1DeviceDev) find, ready to dispatch";
+				Dispatch($hash,$json,undef);						## Dispatch an anderes Modul, NUR KOMPLETTES JSON !!!
+				}
+
+			} elsif ($i == 2) {           ### xs1 Info´s
 				my $features;
 				my $features_i=0;
 				while (defined $decoded->{'info'}{'features'}->[$features_i]) {
@@ -247,7 +265,7 @@ sub xs1Bridge_GetUpDate() {
 				Debug " $typ: xs1_firmware: ".$decoded->{'info'}{'firmware'} if($debug);
 				Debug " $typ: xs1_mac: ".$decoded->{'info'}{'mac'} if($debug);
             
-			} elsif ($i == 3) {           ### Timers noch BUG !!!
+			} elsif ($i == 3) {				### xs1 Timers
 				my @array = @{ $decoded->{$arrayname[$i]} };
 				foreach my $f ( @array ) {
 					if ($f->{"type"} ne "disabled") {
@@ -255,7 +273,7 @@ sub xs1Bridge_GetUpDate() {
 						Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." | ".$f->{"name"}." | ".$f->{"type"}." | ". $f->{"next"} if($debug);
 					}
 				}
-			} elsif ($i == 4) {				### Aktoren / Funktion != disable
+			} elsif ($i == 4) {				### xs1 Aktoren / Funktion != disable
 				my @array2 = @{ $decoded->{$arrayname[0]} };
 				foreach my $f2 ( @array2 ) {
             
@@ -284,13 +302,23 @@ sub xs1Bridge_GetUpDate() {
 	}
 }
 
-sub xs1Bridge_Write($)				## Zustellen von Daten via IOWrite() vom logischen zum physischen Modul um diese an die Hardware weiterzureichen. 
+sub xs1Bridge_Write($)				## Zustellen von Daten via IOWrite() vom logischen zum physischen Modul 
 {
 	my ($hash, $Aktor_ID, $cmd) = @_;
 	my $name = $hash->{NAME};
 	my $typ = $hash->{TYPE};
    
 	Log3 $name, 3, "$typ: xs1Bridge_Write | Aktor_ID=$Aktor_ID, cmd=$cmd";
+}
+
+sub xs1Bridge_Undef($$)    
+{                     
+	my ( $hash, $name) = @_;
+	my $typ = $hash->{TYPE};
+	
+	RemoveInternalTimer($hash);
+	Log3 $name, 3, "$typ: Device with Name: $name delete";
+	return undef;                  
 }
 
 # Eval-Rückgabewert für erfolgreiches
