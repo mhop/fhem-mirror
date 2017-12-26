@@ -1,14 +1,18 @@
-#!/bin/sh
+#!/bin/bash
+# $Id:$
 
-#set -x
 set -e
 
-apt-mark unhold fhem
+# detect init system
+test=$(stat /sbin/init |grep "File")
+re="systemd$"
 
-# stop fhem if running
-if test -f /etc/init.d/fhem; then
-    /etc/init.d/fhem stop noaptmark
+if [[ $test =~ $re ]]; then
+   systemctl stop fhem.service
+   systemctl disable fhem.service
+else
+   if test -f /etc/init.d/fhem; then
+      /etc/init.d/fhem stop noaptmark
+   fi
+   update-rc.d fhem remove
 fi
-
-# remove fhem autostart
-update-rc.d -f fhem remove

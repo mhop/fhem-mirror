@@ -1,10 +1,11 @@
 #!/bin/bash
+# $Id:$
 
-#set -x
-set -e # required by lintian
-set +e # Don't know how to check presence of fhem in passwd with -e
+set -e
 
-if grep -q fhem /etc/passwd; then
+user_exists=$(id -u fhem > /dev/null 2>&1; echo $?)
+if [ "$user_exists" -eq "0" ]; then
+    echo "deleting user fhem"
     userdel fhem
 fi
 
@@ -14,4 +15,8 @@ fi
 
 if test -f /etc/init.d/fhem; then
     rm /etc/init.d/fhem
+fi
+
+if test -f /etc/systemd/system/fhem.service; then
+    rm /etc/systemd/system/fhem.service
 fi
