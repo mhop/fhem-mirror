@@ -260,8 +260,15 @@ sub btIP_readLayout {
 
   my ($err, @layoutfile) = FileRead($filename);
   if($err) {
+#    Log 1, "InfoPanel $name: $err";
+#    $hash->{fhem}{layout} = "text ERROR 50 50 \"Error on reading layout!\"";
     Log 1, "InfoPanel $name: $err";
     $hash->{fhem}{layout} = "text ERROR 50 50 \"Error on reading layout!\"";
+    my ($e,@layout) = FileRead('./FHEM/template.layout');
+    unless ($e){
+       FileWrite($filename,@layout);
+       $hash->{fhem}{layout} = "text ERROR 50 50 \"Please edit layoutfile now.\"";
+    }
   } else {
     $hash->{fhem}{layout} = join("\n", @layoutfile);
     while($hash->{fhem}{layout} =~ m/\@include/ && $level < 1000) {
