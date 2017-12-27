@@ -1,4 +1,4 @@
-REV 15692
+REV 15699
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,8 +21,8 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2017-12-26_07:45:02 224948 ./CHANGED
-UPD 2017-12-26_07:45:02 36160 ./MAINTAINER.txt
+UPD 2017-12-27_07:45:02 225022 ./CHANGED
+UPD 2017-12-27_07:45:02 36160 ./MAINTAINER.txt
 UPD 2017-09-20_07:45:02 39189 ./configDB.pm
 UPD 2017-10-13_07:45:02 15740 ./fhem.cfg.demo
 UPD 2017-12-26_07:45:05 142017 ./fhem.pl
@@ -80,7 +80,7 @@ UPD 2017-10-06_07:45:03 11971 FHEM/10_MQTT_DEVICE.pm
 UPD 2017-10-11_07:45:02 27126 FHEM/10_MYSENSORS_DEVICE.pm
 UPD 2017-12-12_07:45:03 28162 FHEM/10_OWServer.pm
 UPD 2017-04-30_07:45:02 71321 FHEM/10_RESIDENTS.pm
-UPD 2016-12-31_12:48:30 57088 FHEM/10_SOMFY.pm
+UPD 2017-12-27_07:45:02 61015 FHEM/10_SOMFY.pm
 UPD 2016-12-19_07:45:02 18301 FHEM/10_UNIRoll.pm
 UPD 2017-11-19_07:45:03 226644 FHEM/10_ZWave.pm
 UPD 2017-09-04_07:45:02 33218 FHEM/10_pilight_ctrl.pm
@@ -384,7 +384,7 @@ UPD 2015-07-28_14:05:31 3937 FHEM/88_Itach_Relay.pm
 UPD 2015-07-28_14:05:31 3507 FHEM/88_LINDY_HDMI_SWITCH.pm
 UPD 2015-07-28_14:05:31 12845 FHEM/88_VantagePro2.pm
 UPD 2015-07-28_14:05:31 4198 FHEM/88_WEBCOUNT.pm
-UPD 2017-12-24_07:45:02 15239 FHEM/88_xs1Bridge.pm
+UPD 2017-12-27_07:45:02 16023 FHEM/88_xs1Bridge.pm
 UPD 2017-11-28_07:45:03 17804 FHEM/89_FULLY.pm
 UPD 2016-01-05_07:45:12 44169 FHEM/89_HEATRONIC.pm
 UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
@@ -656,7 +656,7 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2017-12-26_07:45:04 3259520 docs/commandref.html
+UPD 2017-12-27_07:45:04 3259020 docs/commandref.html
 UPD 2017-12-26_07:45:05 1975586 docs/commandref_DE.html
 UPD 2017-12-17_13:17:44 73822 docs/commandref_frame.html
 UPD 2017-12-17_13:17:44 83230 docs/commandref_frame_DE.html
@@ -678,7 +678,7 @@ UPD 2017-01-16_07:45:02 2183 www/codemirror/dialog.js
 UPD 2017-01-16_07:45:02 990 www/codemirror/eclipse.css
 UPD 2016-04-21_07:45:12 13942 www/codemirror/fhem.js
 UPD 2016-04-21_07:45:12 62906 www/codemirror/fhem.js.unoptimized
-UPD 2016-06-06_07:45:13 6143 www/codemirror/fhem_codemirror.js
+UPD 2017-12-27_07:45:02 6298 www/codemirror/fhem_codemirror.js
 UPD 2017-01-16_07:45:02 1093 www/codemirror/jump-to-line.js
 UPD 2017-01-16_07:45:02 2641 www/codemirror/match-highlighter.js
 UPD 2017-01-16_07:45:02 2425 www/codemirror/matchbrackets.js
@@ -1968,7 +1968,7 @@ UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2017-12-17_13:17:44 5629 www/pgm2/defaultCommon.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
-UPD 2017-12-24_07:45:02 51880 www/pgm2/fhemweb.js
+UPD 2017-12-27_07:45:02 52098 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
 UPD 2017-03-07_07:45:02 3139 www/pgm2/fhemweb_fbcalllist.js
 UPD 2017-11-16_07:45:02 8440 www/pgm2/fhemweb_iconButtons.js
