@@ -1049,10 +1049,9 @@ AnalyzePerlCommand($$;$)
   my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
   my $we = (($wday==0 || $wday==6) ? 1 : 0);
   if(!$we) {
-    my $h2we = $attr{global}{holiday2we};
-    if($h2we && Value($h2we)) {
+    foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
       my ($a, $b) = ReplaceEventMap($h2we, [$h2we, Value($h2we)], 0);
-      $we = 1 if($b ne "none");
+      $we = 1 if($b && $b ne "none");
     }
   }
   $month++;
@@ -3884,7 +3883,7 @@ sub
 ReplaceEventMap($$$)
 {
   my ($dev, $str, $dir) = @_;
-  my $em = $attr{$dev}{eventMap};
+  my $em = AttrVal($dev, "eventMap", undef);
 
   return $str    if($dir && !$em);
   return @{$str} if(!$dir && (!$em || int(@{$str}) < 2 ||

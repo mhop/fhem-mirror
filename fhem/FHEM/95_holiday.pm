@@ -19,6 +19,7 @@ holiday_Initialize($)
   $hash->{SetFn}    = "holiday_Set";
   $hash->{UndefFn}  = "holiday_Undef";
   $hash->{AttrList} = $readingFnAttributes;
+  $hash->{FW_detailFn} = "holiday_FW_detailFn";
 }
 
 
@@ -228,17 +229,38 @@ sub
 holiday_Set($@)
 {
   my ($hash, @a) = @_;
+  my %sets = (
+    createPrivateCopy => $hash->{READONLY},
+    deletePrivateCopy => !$hash->{READONLY},
+    reload => 1
+  );
+    
+  return "unknown argument $a[1], choose one of ".
+              join(" ", map { "$_:noArg" }
+                        grep { $sets{$_} } keys %sets) if(!$sets{$a[1]});
 
-  return "unknown argument $a[1], choose one of createPrivateCopy:noArg"
-      if($a[1] ne "createPrivateCopy");
-  return "Already a private version" if(!$hash->{READONLY});
-  my $fname = $attr{global}{modpath}."/FHEM/holiday/$hash->{NAME}.holiday";
-  my ($err, @holidayfile) = FileRead($fname);
-  return $err if($err);
-  $fname = $attr{global}{modpath}."/FHEM/$hash->{NAME}.holiday";
-  $err = FileWrite($fname, @holidayfile);
-  holiday_refresh($hash->{NAME});
-  return $err;
+  if($a[1] eq "createPrivateCopy") {
+    return "Already a private version" if(!$hash->{READONLY});
+    my $fname = $attr{global}{modpath}."/FHEM/holiday/$hash->{NAME}.holiday";
+    my ($err, @holidayfile) = FileRead($fname);
+    return $err if($err);
+    $fname = $attr{global}{modpath}."/FHEM/$hash->{NAME}.holiday";
+    $err = FileWrite($fname, @holidayfile);
+    return $err if($err);
+    holiday_refresh($hash->{NAME});
+
+  } elsif($a[1] eq "deletePrivateCopy") {
+
+    return "Not a private version" if($hash->{READONLY});
+    my $err = FileDelete($attr{global}{modpath}."/FHEM/$hash->{NAME}.holiday");
+    return $err if($err);
+    holiday_refresh($hash->{NAME});
+
+  } elsif($a[1] eq "reload") {
+    holiday_refresh($hash->{NAME});
+
+  }
+  return undef;
 }
 
 sub
@@ -311,6 +333,17 @@ western_easter($)
   
   return $month, $day;
 }
+
+sub
+holiday_FW_detailFn($$$$)
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+
+  return "" if($defs{$d}{READONLY});
+  return FW_pH("cmd=style edit $d.holiday",
+               "<div class=\"dval\">Edit $d.holiday</div>", 0, "dval", 1);
+}
+
 1;
 
 =pod
@@ -329,8 +362,9 @@ western_easter($)
     Define a set of holidays. The module will try to open the file
     &lt;name&gt;.holiday in the <a href="#modpath">modpath</a>/FHEM directory
     first, then in the modpath/FHEM/holiday directory, the latter containing a
-    set of predefined files. The set will be shown if an error occures at the
-    time of the definietion.<br>
+    set of predefined files. This list of available holiday files will be shown
+    if an error occurs at the time of the definition, e.g. if you type "define
+    help holiday"<br>
 
     If entries in the holiday file match the current day, then the STATE of
     this holiday instance displayed in the <a href="#list">list</a> command
@@ -409,6 +443,15 @@ western_easter($)
         modified. With createPrivateCopy the file will be copied to the FHEM
         directory, where it can be modified.
       </ul></li>
+    <li>deletePrivateCopy<br>
+      <ul>
+        delete the private copy, see createPrivateCopy above
+      </ul></li>
+    <li>reload<br>
+      <ul>
+        set the state, tomorrow and yesterday readings. Useful after manually
+        editing the file.
+      </ul></li>
   </ul><br>
 
   <a name="holidayget"></a>
@@ -446,7 +489,7 @@ western_easter($)
     Datei &lt;name&gt;.holiday erst in <a href="#modpath">modpath</a>/FHEM zu
     &ouml;ffnen, und dann in modpath/FHEM/holiday, Letzteres enth&auml;lt eine
     Liste von per FHEM-update verteilten Dateien f&uuml;r diverse
-    (Bundes-)L&auml;nder. Diese Liste wird bei einer Feherlmeldung angezeigt.
+    (Bundes-)L&auml;nder. Diese Liste wird bei einer Fehlermeldung angezeigt.
 
     Wenn Eintr&auml;ge im der Datei auf den aktuellen Tag passen wird der STATE
     der Holiday-Instanz die im <a href="#list">list</a> Befehl angezeigt wird
@@ -529,6 +572,15 @@ western_easter($)
         dann ist sie nicht beschreibbar, da dieses Verzeichnis mit FHEM
         update aktualisiert wird. Mit createPrivateCopy kann eine private Kopie
         im FHEM Verzeichnis erstellt werden.
+      </ul></li>
+    <li>deletePrivateCopy<br>
+      <ul>
+        Entfernt die private Kopie, siehe auch createPrivateCopy
+      </ul></li>
+    <li>reload<br>
+      <ul>
+        setzt die state, tomorrow und yesterday Readings. Wird nach einem
+        manuellen Bearbeiten der .holiday Datei ben&ouml;tigt.
       </ul></li>
   </ul><br>
 
