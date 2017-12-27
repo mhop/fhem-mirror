@@ -45,6 +45,7 @@
 # 14.12.16 GA fix supply DBuffer with delta temps for usePID=2 calculation
 # 14.12.16 GA add implement get previousTemps
 # 01.08.17 GA add documentation for attribute disable
+# 27.12.17 GA add handle "off" as c_tempFrostProtect and "on" as c_tempC in getDesiredTempFrom (valid form Homematic)
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -152,9 +153,21 @@ PWMR_getDesiredTempFrom(@)
         $newTemp  = $1;
         Log3 ($hash, 4, "PWMR_getDesiredTempFrom $hash->{NAME}: from $dt->{NAME} reading($d_reading) VAL($d_readingVal) regexp($d_regexpTemp) regexpVal($val)");
 
-      } else {
-        $newTemp = $hash->{c_tempFrostProtect};
-        Log3 ($hash, 4, "PWMR_getDesiredTempFrom $hash->{NAME}: from $dt->{NAME} reading($d_reading) VAL($d_readingVal) regexp($d_regexpTemp) regexpVal($val) set to frostProtect");
+      } else { # regexp does not match
+
+        if ($val =~ /^on$/) {
+          $newTemp = $hash->{c_tempC};
+          Log3 ($hash, 4, "PWMR_getDesiredTempFrom $hash->{NAME}: from $dt->{NAME} reading($d_reading) VAL($d_readingVal) regexp($d_regexpTemp) regexpVal($val) set to 30");
+
+        } elsif ( $val =~ /^off$/ ) {
+
+          $newTemp = $hash->{c_tempFrostProtect};
+          Log3 ($hash, 4, "PWMR_getDesiredTempFrom $hash->{NAME}: from $dt->{NAME} reading($d_reading) VAL($d_readingVal) regexp($d_regexpTemp) regexpVal($val) set to frostProtect");
+        } else {
+
+          $newTemp = $hash->{c_tempFrostProtect};
+          Log3 ($hash, 4, "PWMR_getDesiredTempFrom $hash->{NAME}: from $dt->{NAME} reading($d_reading) VAL($d_readingVal) regexp($d_regexpTemp) regexpVal($val) set to frostProtect");
+        }
 
       }
 
@@ -483,7 +496,7 @@ PWMR_Set($@)
   if ( $cmd eq "frostProtect" ) {
     my $val = $a[2];
     if ( $val eq "on" ) {
-      $hash->{c_frostProtect} = 1;
+     $hash->{c_frostProtect} = 1;
       $attr{$name}{frostProtect} = 1;
       return undef;
     } elsif ( $val eq "off" ) {
@@ -1865,7 +1878,11 @@ PWMR_valueFormat(@)
         If <i>regexp</i> does not match (e.g. reading is 'off') then tempFrostProtect is used.<br> 
         Internals c_desiredTempFrom reflects the actual setting and d_name, d_reading und d_regexpTemp the values used.<br>
         If this attribute is used then state will change from "Calculating" to "From &lt;device&gt;".<br>
-        Calculation of desired-temp is (like when using tempRules) based on the interval specified for this device (default is 300 seconds).
+        Calculation of desired-temp is (like when using tempRules) based on the interval specified for this device (default is 300 seconds).<br>
+        Special values "on" and "off" of Homematic devices are handled as c_tempC (set by attribute tempCosy) and c_tempFrostProtect (set by attribute tempFrostProtect).
+
+
+
         </li><br>
 
     <li>valueFormat<br>
