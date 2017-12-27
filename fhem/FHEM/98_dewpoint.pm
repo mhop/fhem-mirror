@@ -275,14 +275,15 @@ dewpoint_Notify($$)
         # Example:
         # define dewtest1 dewpoint dewpoint .*
         # define dewtest2 dewpoint dewpoint .* T H D
+
+        readingsBeginUpdate($dev);
         my $current;
         my $sensor;
         my $aFeuchte = AttrVal($hash->{NAME},"absFeuchte", undef);
         if (defined($aFeuchte)) {
             $sensor = "absFeuchte";
             $current = dewpoint_absFeuchte($temperature, $humidity);
-            setReadingsVal($dev, $sensor, $current, $tn);
-            addEvent($dev, "$sensor: $current");		
+            readingsBulkUpdate($dev, $sensor, $current);
             Log3($hashName, 5, "dewpoint absFeuchte= $current");
             $aFeuchte = "A: " . $current;
         }	
@@ -290,8 +291,7 @@ dewpoint_Notify($$)
         $sensor = $new_name;
         if ($temp_name ne "T") {
             $current = $dewpoint;
-            setReadingsVal($dev, $sensor, $current, $tn);
-            addEvent($dev, "$sensor: $current");		
+            readingsBulkUpdate($dev, $sensor, $current);
         } else {
             # state begins with "T:". append dewpoint or insert before BAT
             if ($lastval =~ /BAT:/) {	
@@ -311,6 +311,8 @@ dewpoint_Notify($$)
             addEvent($dev, $current);		
         }
 
+        readingsEndUpdate($dev, 1);
+        $dev->{CHANGEDWITHSTATE} = [];
         Log3($hashName, 5, "dewpoint_notify: current=$current");
     } elsif ($cmd_type eq "fan") {
         # >define <name> dewpoint fan devicename devicename-outside min-temp [diff-temp]
