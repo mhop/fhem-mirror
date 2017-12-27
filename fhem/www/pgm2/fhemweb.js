@@ -641,7 +641,7 @@ function
 FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
 {
   var cm;
-	
+
   if( typeof AddCodeMirror == 'function' ) {
     // init codemirror for FW_style edit textarea
     AddCodeMirror($('textarea[name="data"]'));
@@ -720,21 +720,24 @@ FW_rawDef()
       var textAreaStyle = typeof AddCodeMirror == 'function'?'opacity:0':'';
 
       $("#content").append('<div id="rawDef">'+
-          '<textarea id="td_rawDef" rows="25" cols="60" style="width:99%; '+textAreaStyle+'"/>'+
+          '<textarea id="td_rawDef" rows="25" cols="60" style="width:99%; '+
+                textAreaStyle+'"/>'+
           '<button>Execute commands</button>'+
           ' Dump "Probably associated with" too <input type="checkbox">'+
         '<br><br></div>');
 
+      var cmVar;
+
       function
       fillData(opt)
       {
-	var s = $('#rawDef textarea');
+        var s = $('#rawDef textarea');
 
         FW_cmd(FW_root+"?cmd=list "+opt+" "+dev+"&XHR=1", function(data) {
           var re = new RegExp("^define", "gm");
           data = data.replace(re, "defmod");
           s.val(data);
-	  
+
           var off = $("#rawDef").position().top-20;
           $('body, html').animate({scrollTop:off}, 500);
           $("#rawDef button").hide();
@@ -749,12 +752,15 @@ FW_rawDef()
 
           s.bind('input propertychange', propertychange);
 
-          if( typeof AddCodeMirror == 'function') {
-            $('#rawDef textarea + .CodeMirror').remove();
+          if(cmVar) {
+            cmVar.setValue(data);
+
+          } else if(typeof AddCodeMirror == 'function') {
             AddCodeMirror(s, function(cm) {
+              cmVar = cm;
               cm.on("change", function() {
                 s.val(cm.getValue());
-		propertychange();
+                propertychange();
               })
             });
           }

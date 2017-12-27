@@ -235,6 +235,8 @@ FW_Define($$)
   return "Usage: define <name> FHEMWEB [IPV6:]<tcp-portnr> [global]"
         if($port !~ m/^(IPV6:)?\d+$/ || ($global && $global ne "global"));
 
+  FW_Undef($hash) if($hash->{OLDDEF}); # modify
+
   foreach my $pe ("fhemSVG", "openautomation", "default") {
     FW_readIcons($pe);
   }
