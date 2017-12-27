@@ -5356,7 +5356,7 @@ SecurityCheck()
   my @fnd;
   foreach my $sdev (devspec2array("TYPE=(telnet|FHEMWEB)")) {
     next if(!$defs{$sdev} || $defs{$sdev}{TEMPORARY});
-    my $hash = { SNAME=>$sdev, TYPE=>$defs{$sdev}{TYPE} };
+    my $hash = { SNAME=>$sdev, TYPE=>$defs{$sdev}{TYPE}, NAME=>"SecurityCheck"};
     push(@fnd, "  $sdev is not password protected")
         if(!Authenticate($hash, undef));
   }

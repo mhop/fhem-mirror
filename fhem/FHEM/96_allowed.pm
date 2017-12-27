@@ -175,7 +175,6 @@ allowed_Authenticate($$$$)
     my $pw = AttrVal($aName, "password", undef);
     if(!$pw) {
       $pw = AttrVal($aName, "globalpassword", undef);
-      return 2 if($pw && !defined($param));
       $pw = undef if($pw && $cl->{NAME} =~ m/_127.0.0.1_/);
     }
     return 0 if(!$pw);
