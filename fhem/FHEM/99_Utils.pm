@@ -91,6 +91,7 @@ defInfo($;$)
   my @etDev = devspec2array($search);
   foreach my $d (@etDev) {
     next unless $d;
+    next if($d eq $search && !$defs{$d})
     push @ret, $defs{$d}{$internal};
   }
   return @ret;
