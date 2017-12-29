@@ -54,7 +54,7 @@ use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.72 / 29.12.17";
+my $sip_version ="V1.73 / 29.12.17";
 my $ua;	# SIP user agent
 my @fifo;
 
@@ -169,13 +169,13 @@ sub SIP_Attr (@)
 
  my ($cmd, $name, $attrName, $attrVal) = @_;
  my $hash  = $defs{$name};
- #Log3 $name,5,"$name , SIP_Attr : $cmd, $attrName, $attrVal";
 
  if ($cmd eq "set")
  {
    if ($attrName eq "sip_audiofile_call")
    {
     return "unknown audio type, please use only .alaw or .ulaw" if (($attrVal !~ /\.al(.+)$/) && ($attrVal !~ /\.ul(.+)$/));
+    return "file $attrVal not found" if (!-e $attrVal); 
    }
    elsif (substr($attrName ,0,4) eq "sip_") 
    {
@@ -801,7 +801,7 @@ sub SIP_Set($@)
   
     Log3 $name,4,"$name, msg will be repeat $repeat times" if ($repeat);
 
-     if (exists($hash->{LPID}) && (AttrVal($name,"sip_elbc","no") ne "no"))
+     if (exists($hash->{LPID}) && (AttrVal($name,"sip_elbc","no") eq "yes"))
      {
       Log3 $name,4,"$name, listen process ".$hash->{LPID}." must be killed befor we start a new call !";
       BlockingKill($hash->{helper}{LISTEN_PID});
@@ -824,10 +824,15 @@ sub SIP_Set($@)
        $a[0] = "t2s_name"; # ist egal wird eh verworfen
        $a[1] = "tts"; # Kommando des Set Befehls
        $a[2] =~ s/^\!//; # das ! muss weg
+       if (!$a[2]) # ist denn jetzt noch etwas übrig geblieben ?
+       {
+        Log3 $name,4,"name, no valid text found in message : $msg";
+        return "No message text after [!] found";
+       }
        pop @a if ($force); # das & muss ggf. auch noch weg
        pop @a if ($repeat); # das * muss ggf. auch weg
 
-       # die nachsten vier brauchen wir unbedingt fuer T2S
+       # die nächsten vier brauchen wir unbedingt fuer T2S
        $hash->{callnr}    = $nr;
        $hash->{ringtime}  = $ringtime;
        $hash->{forcecall} = $force;
@@ -851,7 +856,7 @@ sub SIP_Set($@)
       else
       { 
         $ret = "audio file $msg not found";
-        readingsBulkUpdate($hash, "last_error",$ret);
+        readingsSingleUpdate($hash, "last_error",$ret,1);
         Log3 $name, 3, "$name, $ret !";
         $hash->{repeat}    = 0;
         $hash->{forcecall} = 0;
@@ -1672,7 +1677,7 @@ sub SIP_readPassword($)
  
    my $t2s_name = AttrVal($name,"T2S_Device",undef);
    return "attr T2S_Device not set !" if !defined($t2s_name);
-   my $t2s_hash = $defs{$t2s_name};
+   my $t2s_hash = (defined($defs{$t2s_name})) ? $defs{$t2s_name} : undef;
    return "T2S_Device $t2s_name not found" if !defined($t2s_hash);
 
    return "attr audio_converter not set" if !AttrVal($name,"audio_converter","");
