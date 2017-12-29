@@ -3694,6 +3694,9 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   return "" if(!$hash->{NAME});
 
   my $name = $hash->{NAME};
+  return ""
+        if (CUL_HM_getAttrInt($name,"ignore"));
+
   my $devName = InternalVal($name,"device",$name);
   my $st = AttrVal($devName, "subType", "");
   my $md = AttrVal($devName, "model", "");
@@ -3951,7 +3954,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         if ($modules{CUL_HM}{helper}{updating});
   my $act = join(" ", @a[1..$#a]);
   my $name    = $hash->{NAME};
-  return "device ignored due to attr 'ignore'"
+  return ""
         if (CUL_HM_getAttrInt($name,"ignore"));
   my $devName = InternalVal($name,"device",$name);
   my $st      = AttrVal($devName, "subType", "");
@@ -8902,6 +8905,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
   }
 
   if (!$newIODev) {# not assigned thru CCU - try normal
+    return if (!$oldIODev);# no IOdev by now - can't help
     $newIODev = $oldIODev;
     my $dIo = AttrVal($hash->{NAME},"IODev","");
     if (  $defs{$dIo} 
