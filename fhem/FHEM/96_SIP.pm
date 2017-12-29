@@ -1,6 +1,6 @@
 ###############################################################################
 #
-# $Id:17-10-30 13:41:59Z Wzut $
+# $Id$
 # 96_SIP.pm 
 # Based on FB_SIP from  werner.meines@web.de
 #
@@ -54,7 +54,7 @@ use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
-my $sip_version ="V1.71 / 16.12.17";
+my $sip_version ="V1.72 / 29.12.17";
 my $ua;	# SIP user agent
 my @fifo;
 
@@ -173,7 +173,11 @@ sub SIP_Attr (@)
 
  if ($cmd eq "set")
  {
-   if (substr($attrName ,0,4) eq "sip_") 
+   if ($attrName eq "sip_audiofile_call")
+   {
+    return "unknown audio type, please use only .alaw or .ulaw" if (($attrVal !~ /\.al(.+)$/) && ($attrVal !~ /\.ul(.+)$/));
+   }
+   elsif (substr($attrName ,0,4) eq "sip_") 
    {
      $_[3] = $attrVal;
      $hash->{".reset"} = 1 if defined($hash->{LPID});
@@ -765,6 +769,11 @@ sub SIP_Set($@)
         Log3 $name ,4,"$name, add call $call to fifo so we can do it later !";
         return undef;
      }
+
+    if (AttrVal($name, "sip_audiofile_call", "") && !defined($a[4]))
+    {
+       return "unknown audio type, please use only .alaw or .ulaw" if (($msg !~ /\.al(.+)$/) && ($msg !~ /\.ul(.+)$/));
+    }
 
     my $anz = @a;
     $anz--; # letztes Element
@@ -1756,7 +1765,10 @@ sub SIP_rBU($$) {
 <h3>SIP</h3>
 <ul>
 
-  Define a SIP-Client device. 
+  Define a SIP-Client device.<br> 
+  Wiki : <a href="https://wiki.fhem.de/wiki/SIP-Client">https://wiki.fhem.de/wiki/SIP-Client</a>
+  <br>
+  Forum : <a href="https://forum.fhem.de/index.php/topic,67443.0.html">https://forum.fhem.de/index.php/topic,67443.0.html</a>
   <br><br>
 
   <a name="SIPdefine"></a>
@@ -1860,9 +1872,11 @@ sub SIP_rBU($$) {
 <h3>SIP</h3>
 <ul>
 
-  Definiert ein SIP-Client Device.
+  Definiert ein SIP-Client Device.<br>
+  Wiki : <a href="https://wiki.fhem.de/wiki/SIP-Client">https://wiki.fhem.de/wiki/SIP-Client</a>
+  <br>
+  Forum : <a href="https://forum.fhem.de/index.php/topic,67443.0.html">https://forum.fhem.de/index.php/topic,67443.0.html</a>
   <br><br>
-
   <a name="SIPdefine"></a>
   <b>Define</b>
   <ul>
