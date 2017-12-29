@@ -15,13 +15,15 @@ use Data::Dumper;
 
 use HttpUtils;
 
+use IO::Socket::INET;
+
 sub HUEBridge_Initialize($)
 {
   my ($hash) = @_;
 
   # Provider
   $hash->{ReadFn}  = "HUEBridge_Read";
-  $hash->{WriteFn} = "HUEBridge_Read";
+  $hash->{WriteFn} = "HUEBridge_Write";
   $hash->{Clients} = ":HUEDevice:";
 
   #Consumer
@@ -35,7 +37,122 @@ sub HUEBridge_Initialize($)
 }
 
 sub
-HUEBridge_Read($@)
+HUEBridge_Read($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $buf;
+  my $len = sysread($hash->{CD}, $buf, 10240);
+  my $peerhost = $hash->{CD}->peerhost;
+  my $peerport = $hash->{CD}->peerport;
+
+  my $close = 0;
+  if( !defined($len) || !$len ) {
+    $close = 1;
+
+  } elsif( $hash->{websocket} ) {
+    $hash->{buf} .= $buf;
+
+    do {
+      my $fin = (ord(substr($hash->{buf},0,1)) & 0x80)?1:0;
+      my $op = (ord(substr($hash->{buf},0,1)) & 0x0F);
+      my $mask = (ord(substr($hash->{buf},1,1)) & 0x80)?1:0;
+      my $len = (ord(substr($hash->{buf},1,1)) & 0x7F);
+      my $i = 2;
+      if( $len == 126 ) {
+        $len = unpack( 'n', substr($hash->{buf},$i,2) );
+        $i += 2;
+      } elsif( $len == 127 ) {
+        $len = unpack( 'q', substr($hash->{buf},$i,8) );
+        $i += 8;
+      }
+      if( $mask ) {
+        $mask = substr($hash->{buf},$i,4);
+        $i += 4;
+      }
+      #FIXME: hande !$fin
+      return if( $len > length($hash->{buf})-$i );
+
+      my $data = substr($hash->{buf}, $i, $len);
+      $hash->{buf} = substr($hash->{buf},$i+$len);
+#Log 1, ">>>$data<<<";
+
+      if( $data eq '?' ) {
+        #ignore keepalive
+
+      } elsif( $op == 0x01 ) {
+        my $obj = eval { decode_json($data) };
+
+        if( $obj ) {
+          Log3 $name, 5, "$name: websocket data: ". Dumper $obj;
+        } else {
+          Log3 $name, 2, "$name: unhandled websocket text $data";
+
+        }
+
+        if( $obj->{t} eq 'event' && $obj->{e} eq 'changed' ) {
+          my $code;
+          my $id = $obj->{id};
+          $code = $name ."-". $id if( $obj->{r} eq 'lights' );
+          $code = $name ."-S". $id if( $obj->{r} eq 'sensors' );
+          $code = $name ."-G". $id if( $obj->{r} eq 'groups' );
+          if( !$code ) {
+            Log3 $name, 5, "$name: ignoring event: $code";
+            return;
+          }
+
+          my $chash = $modules{HUEDevice}{defptr}{$code};
+          if( defined($chash) ) {
+            HUEDevice_Parse($chash,$obj);
+          } else {
+            Log3 $name, 4, "$name: message for unknow device received: $code";
+          }
+
+        } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'scene-called' ) {
+          Log3 $name, 5, "$name: todo: handle websocket scene-called $data";
+          # trigger scene event ?
+
+        } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'added' ) {
+          Log3 $name, 5, "$name: websocket add: $data";
+          HUEBridge_Autocreate($hash);
+
+        } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'deleted' ) {
+          Log3 $name, 5, "$name: todo: handle websocket delete $data";
+          # do what ?
+
+        } else {
+          Log3 $name, 5, "$name: unknown websocket data: $data";
+        }
+
+      } else {
+        Log3 $name, 2, "$name: unhandled websocket data: $data";
+
+      }
+    } while( $hash->{buf} && !$close );
+
+  } elsif( $buf =~ m'^HTTP/1.1 101 Switching Protocols'i )  {
+    $hash->{websocket} = 1;
+    #my $buf = plex_msg2hash($buf, 1);
+Log 1, $buf;
+
+    Log3 $name, 3, "$name: websocket: Switching Protocols ok";
+
+  } else {
+Log 1, $buf;
+    $close = 1;
+    Log3 $name, 2, "$name: websocket: Switching Protocols failed";
+  }
+
+  if( $close ) {
+    HUEBridge_closeWebsocket($hash);
+
+    Log3 $name, 2, "$name: websocket closed";
+  }
+}
+
+sub
+HUEBridge_Write($@)
 {
   my ($hash,$chash,$name,$id,$obj)= @_;
 
@@ -80,7 +197,7 @@ HUEBridge_Detect($)
   }
 
   Log3 $name, 3, "HUEBridge_Detect: ${host}";
-  $hash->{Host} = $host;
+  $hash->{host} = $host;
 
   return $host;
 }
@@ -108,7 +225,7 @@ HUEBridge_Define($$)
 
   readingsSingleUpdate($hash, 'state', 'initialized', 1 );
 
-  $hash->{Host} = $host;
+  $hash->{host} = $host;
   $hash->{INTERVAL} = $interval;
 
   $attr{$name}{"key"} = join "",map { unpack "H*", chr(rand(256)) } 1..16 unless defined( AttrVal($name, "key", undef) );
@@ -156,6 +273,79 @@ sub HUEBridge_Undefine($$)
   return undef;
 }
 
+sub
+HUEBridge_hash2header($)
+{
+  my ($hash) = @_;
+
+  return $hash if( ref($hash) ne 'HASH' );
+
+  my $header;
+  foreach my $key (keys %{$hash}) {
+    #$header .= "\r\n" if( $header );
+    $header .= "$key: $hash->{$key}\r\n";
+  }
+
+  return $header;
+}
+sub HUEBridge_closeWebsocket($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  delete $hash->{buf};
+  delete $hash->{websocket};
+
+  close($hash->{CD}) if( defined($hash->{CD}) );
+  delete($hash->{CD});
+
+  delete($selectlist{$name});
+  delete($hash->{FD});
+
+  delete($hash->{PORT});
+}
+sub HUEBridge_openWebsocket($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  return if( !defined($hash->{websocketport}) );
+
+  HUEBridge_closeWebsocket($hash);
+
+  my ($host,undef) = split(':',$hash->{host},2);
+  if( my $socket = IO::Socket::INET->new(PeerAddr=>"$host:$hash->{websocketport}", Timeout=>2, Blocking=>1, ReuseAddr=>1) ) {
+    $hash->{CD}    = $socket;
+    $hash->{FD}    = $socket->fileno();
+
+    $hash->{PORT}  = $socket->sockport if( $socket->sockport );
+
+    $selectlist{$name} = $hash;
+
+    Log3 $name, 3, "$name: websocket opened to $host:$hash->{websocketport}";
+
+
+    my $ret = "GET ws://$host:$hash->{websocketport} HTTP/1.1\r\n";
+    $ret .= HUEBridge_hash2header( {                  'Host' => "$host:$hash->{websocketport}",
+                                                   'Upgrade' => 'websocket',
+                                                'Connection' => 'Upgrade',
+                                                    'Pragma' => 'no-cache',
+                                             'Cache-Control' => 'no-cache',
+                                         'Sec-WebSocket-Key' => 'RkhFTQ==',
+                                     'Sec-WebSocket-Version' => '13',
+                                   } );
+
+    $ret .= "\r\n";
+#Log 1, $ret;
+
+    syswrite($hash->{CD}, $ret );
+
+  } else {
+    Log3 $name, 2, "$name: failed to open websocket";
+
+  }
+}
+
 sub HUEBridge_fillBridgeInfo($$)
 {
   my ($hash,$config) = @_;
@@ -165,6 +355,11 @@ sub HUEBridge_fillBridgeInfo($$)
   $hash->{modelid} = $config->{modelid};
   $hash->{swversion} = $config->{swversion};
   $hash->{apiversion} = $config->{apiversion};
+
+  if( defined($config->{websocketport}) ) {
+    $hash->{websocketport} = $config->{websocketport};
+    HUEBridge_openWebsocket($hash);
+  }
 
   if( $hash->{apiversion} ) {
     my @l = split( '\.', $config->{apiversion} );
@@ -189,7 +384,7 @@ HUEBridge_OpenDev($)
   HUEBridge_Detect($hash) if( defined($hash->{NUPNP}) );
 
   my ($err,$ret) = HttpUtils_BlockingGet({
-    url => "http://$hash->{Host}/description.xml",
+    url => "http://$hash->{host}/description.xml",
     method => "GET",
     timeout => 3,
   });
@@ -775,6 +970,10 @@ HUEBridge_GetUpdate($)
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEBridge_GetUpdate", $hash, 0);
   }
 
+  if( $hash->{websocketport} && !$hash->{PORT} ) {
+    HUEBridge_openWebsocket($hash);
+  }
+
   my $type;
   my $result;
   my $poll_devices = AttrVal($name, "pollDevices", 1);
@@ -1079,7 +1278,7 @@ HUEBridge_HTTP_Call($$$;$)
 
   #return { state => {reachable => 0 } } if($attr{$name} && $attr{$name}{disable});
 
-  my $uri = "http://" . $hash->{Host} . "/api";
+  my $uri = "http://" . $hash->{host} . "/api";
   if( defined($obj) ) {
     $method = 'PUT' if( !$method );
 
@@ -1133,7 +1332,7 @@ HUEBridge_HTTP_Call2($$$$;$)
 
   #return { state => {reachable => 0 } } if($attr{$name} && $attr{$name}{disable});
 
-  my $url = "http://" . $hash->{Host} . "/api";
+  my $url = "http://" . $hash->{host} . "/api";
   my $blocking = $attr{$name}{httpUtils} < 1;
   $blocking = 1 if( !defined($chash) );
   if( defined($obj) ) {
@@ -1603,14 +1802,14 @@ HUEBridge_Attr($$$)
       available (indicated by updatestate with a value of 2. The version and release date is shown in the reading swupdate.<br>
       A notify of the form <code>define HUEUpdate notify bridge:swupdate.* {...}</code>
       can be used to be informed about available firmware updates.<br></li>
-    <li>inactive<br>                           
-      inactivates the current device. note the slight difference to the 
+    <li>inactive<br>
+      inactivates the current device. note the slight difference to the
       disable attribute: using set inactive the state is automatically saved
       to the statefile on shutdown, there is no explicit save necesary.<br>
       this command is intended to be used by scripts to temporarily
-      deactivate the harmony device.<br> 
+      deactivate the harmony device.<br>
       the concurrent setting of the disable attribute is not recommended.</li>
-    <li>active<br>                             
+    <li>active<br>
       activates the current device (see inactive).</li>
   </ul><br>
 

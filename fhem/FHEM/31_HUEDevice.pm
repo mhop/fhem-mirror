@@ -996,15 +996,15 @@ HUEDevice_ReadFromServer($@)
   if(!$iohash ||
      !$iohash->{TYPE} ||
      !$modules{$iohash->{TYPE}} ||
-     !$modules{$iohash->{TYPE}}{ReadFn}) {
-    Log3 $name, 5, "No I/O device or ReadFn found for $name";
+     !$modules{$iohash->{TYPE}}{WriteFn}) {
+    Log3 $name, 5, "No I/O device or WriteFn found for $name";
     return;
   }
 
   no strict "refs";
   #my $ret;
   unshift(@a,$name);
-  $ret = &{$modules{$iohash->{TYPE}}{ReadFn}}($iohash, @a);
+  $ret = &{$modules{$iohash->{TYPE}}{WriteFn}}($iohash, @a);
   use strict "refs";
   return $ret;
 }
@@ -1249,6 +1249,7 @@ HUEDevice_Parse($$)
       $readings{humidity} = $state->{humidity} * 0.01 if( defined($state->{humidity}) );
       $readings{daylight} = $state->{daylight}?'1':'0' if( defined($state->{daylight}) );
       $readings{temperature} = $state->{temperature} * 0.01 if( defined($state->{temperature}) );
+      $readings{pressure} = $state->{pressure} if( defined($state->{pressure}) );
     }
 
     if( scalar keys %readings ) {
