@@ -188,7 +188,7 @@ Aurora_OpenDev($)
     Log3 $name, 2, "Aurora_OpenDev: got empty config";
     return undef;
   }
-  Log3 $name, 5, "Aurora_OpenDev: got config " . Dumper $result;
+  Log3 $name, 5, "Aurora_OpenDev: got config " . Dumper $result if($Aurora_hasDataDumper);
 
   if( !defined($result->{'linkbutton'}) || !AttrVal($name, 'key', undef) )
     {
