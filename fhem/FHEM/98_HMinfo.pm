@@ -2232,7 +2232,7 @@ sub HMinfo_bpAbort($) {#bp timeout ############################################
   return;
 }
 
-sub HMinfo_templateChk_Get ($){ ###############################################
+sub HMinfo_templateChk_Get($){ ################################################
   my ($param) = shift;
   my ($id,$opt,$filter,@a) = split ",",$param;
   $opt = "" if(!defined $opt);
@@ -2264,6 +2264,7 @@ sub HMinfo_templateDef(@){#####################################################
   return "insufficient parameter, no param" if(!defined $param);
   $tmplDefChange = 1;# signal we have a change!
   if ($param eq "del"){
+    return "template in use, cannot be deleted" if(HMinfo_templateUsg("","",$name));
     delete $HMConfig::culHmTpl{$name};
     return;
   }
