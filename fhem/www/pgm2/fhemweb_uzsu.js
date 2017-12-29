@@ -63,6 +63,7 @@ FW_uzsuDropDownCreate(elName, devName, vArr, currVal, set, params, cmd)
   var select = $(newEl).find("select");
   select.selectmenu();
   select.selectmenu( "option", "width", "auto" );
+  select.selectmenu( "option", "position", {collision: "flipfit"} );
   select.selectmenu( { change: function( event, data ) {
                        if( cmd )
                          cmd(data.item.value);
