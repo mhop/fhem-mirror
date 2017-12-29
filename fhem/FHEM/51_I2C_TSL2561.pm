@@ -1,3 +1,4 @@
+# $Id$
 =head1
   51_I2C_TSL2561.pm
 
@@ -6,8 +7,6 @@
   connected to the Raspberry Pi.
 
   contributed by Kai Stuke 2014
-  
-  $Id$
 
 =head1 DESCRIPTION
   51_I2C_TSL2561.pm reads the illumination of the the ambient light sensor TSL2561
@@ -87,6 +86,8 @@
     changing gain/integrationTime attributes will no longer write to device but will be used at next poll
   26.12.2015 kaihs
     CalculateLux float arithmetics formula fix
+  02.01.2017 jensb
+    inverted check of I2C IO result (not "Ok" instead of "error")
     
     
 =head1 TODO
@@ -709,7 +710,7 @@ sub I2C_TSL2561_I2CRcvTiming ($$) {
   
   $hash->{tsl2561IntegrationTime} = $timing & 0x03;
   $hash->{tsl2561Gain}            = $timing & 0x10;          
-  Log3 $name, 5, "I2C_TSL2561_I2CRcvTiming: time $hash->{tsl2561IntegrationTime}, gain $hash->{tsl2561Gain}";
+  Log3 $name, 4, "I2C_TSL2561_I2CRcvTiming: time $hash->{tsl2561IntegrationTime}, gain $hash->{tsl2561Gain}";
   
   $hash->{acquiState} = TSL2561_ACQUI_STATE_IDLE;
   if (!$hash->{blockingIO}) {
@@ -726,7 +727,7 @@ sub I2C_TSL2561_I2CRcvChan0 ($$) {
   my $name = $hash->{NAME};
     
   $hash->{broadband} = $broadband;
-  Log3 $name, 5, 'I2C_TSL2561_I2CRcvChan0 ' . $broadband; 
+  Log3 $name, 4, 'I2C_TSL2561_I2CRcvChan0 ' . $broadband; 
   
   $hash->{acquiState} = TSL2561_ACQUI_STATE_DATA_CH0_RECEIVED;
   return undef;
@@ -740,7 +741,7 @@ sub I2C_TSL2561_I2CRcvChan1 ($$) {
   my $name = $hash->{NAME};
   
   $hash->{ir} = $ir;
-  Log3 $name, 5, 'I2C_TSL2561_I2CRcvChan1 ' . $ir;   
+  Log3 $name, 4, 'I2C_TSL2561_I2CRcvChan1 ' . $ir;   
 
   $hash->{acquiState} = TSL2561_ACQUI_STATE_DATA_CH1_RECEIVED;
   if (!$hash->{blockingIO}) {
@@ -961,7 +962,7 @@ sub I2C_TSL2561_SetTimingRegister($) {
       my $attrVal = AttrVal($name, 'integrationTime', 13);  
       $hash->{tsl2561IntegrationTime} = $attrVal == 402? TSL2561_INTEGRATIONTIME_402MS : $attrVal == 101? TSL2561_INTEGRATIONTIME_101MS : TSL2561_INTEGRATIONTIME_13MS;
     }
-    Log3 $name, 5, "I2C_TSL2561_SetTimingRegister: time $hash->{tsl2561IntegrationTime}, gain $hash->{tsl2561Gain}";
+    Log3 $name, 4, "I2C_TSL2561_SetTimingRegister: time $hash->{tsl2561IntegrationTime}, gain $hash->{tsl2561Gain}";
     if (I2C_TSL2561_i2cwrite($hash, TSL2561_COMMAND_BIT | TSL2561_REGISTER_TIMING, $hash->{tsl2561IntegrationTime} | $hash->{tsl2561Gain})) {
       if (I2C_TSL2561_i2cread($hash,  TSL2561_COMMAND_BIT | TSL2561_REGISTER_TIMING, 1)) {
         $success = 1;
@@ -989,6 +990,9 @@ sub I2C_TSL2561_SetIntegrationTime($$) {
  
   # store the value even if $hash->{tsl2561Package} is not set (yet). That happens
   # during fhem startup.
+  if (defined($hash->{tsl2561IntegrationTime}) && $hash->{tsl2561IntegrationTime} != $time) {
+    Log3 $name, 4, "I2C_TSL2561_SetIntegrationTime: $hash->{tsl2561IntegrationTime} -> $time";
+  }
   $hash->{tsl2561IntegrationTime} = $time;  
   $hash->{timingModified} = 1;  
   
@@ -1029,6 +1033,9 @@ sub I2C_TSL2561_SetGain($$) {
 
   # store the value even if $hash->{tsl2561Package} is not set (yet). That happens
   # during fhem startup.
+  if (defined($hash->{tsl2561Gain}) && $hash->{tsl2561Gain} != $gain) {
+    Log3 $name, 4, "I2C_TSL2561_SetGain: $hash->{tsl2561Gain} -> $gain";
+  }
   $hash->{tsl2561Gain} = $gain;
   $hash->{timingModified} = 1;  
 
@@ -1441,7 +1448,7 @@ sub I2C_TSL2561_i2cread($$$) {
       });
     };
     my $sendStat = $hash->{$iodev->{NAME}.'_SENDSTAT'};
-    if (defined($sendStat) && $sendStat eq 'error') {
+    if (defined($sendStat) && $sendStat ne 'Ok') {
       readingsSingleUpdate($hash, 'state', TSL2561_STATE_I2C_ERROR, 1);
       Log3 ($hash, 5, $hash->{NAME} . ": i2cread on $iodev->{NAME} failed");
       $success = 0;
@@ -1479,7 +1486,7 @@ sub I2C_TSL2561_i2cwrite($$$) {
       });
     };
     my $sendStat = $hash->{$iodev->{NAME}.'_SENDSTAT'};
-    if (defined($sendStat) && $sendStat eq 'error') {
+    if (defined($sendStat) && $sendStat ne 'Ok') {
       readingsSingleUpdate($hash, 'state', TSL2561_STATE_I2C_ERROR, 1);
       Log3 ($hash, 5, $hash->{NAME} . ": i2cwrite on $iodev->{NAME} failed");
       $success = 0;
@@ -1495,6 +1502,8 @@ sub I2C_TSL2561_i2cwrite($$$) {
 1;
 
 =pod
+=item summary TSL2561 luminosity sensor
+=item summary_DE TSL2561 Helligkeitssensor
 =begin html
 
 <a name="I2C_TSL2561"></a>
