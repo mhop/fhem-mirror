@@ -1,6 +1,10 @@
 # $Id$
 ############################################################################
-# 2017-12-20, v0.0.26
+# 2017-12-29, v0.0.27
+#
+# v0.0.27
+# - BUFIX:      [WinWebGUI] - Crash nach ca. 40-60 Sekunden
+# - CHANGE      [FEHMModul] - get www_files und www_files_reset
 #
 # v0.0.26
 # - BUFIX:      [WinWebGUI] - Installation Windows Service
@@ -193,14 +197,15 @@ use HttpUtils;
 use Time::Piece;
 
 sub WINCONNECT_Set($@);
+sub WINCONNECT_Get($@);
 sub WINCONNECT_GetStatus($;$);
 sub WINCONNECT_Define($$);
 sub WINCONNECT_Undefine($$);
 
 # Autoupdateinformationen
-my $DownloadGURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.26.exe";
-my $DownloadSURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControlService_0.0.26.exe";
-my $DownloadVer   = "0.0.26";
+my $DownloadGURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.27.exe";
+my $DownloadSURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControlService_0.0.27.exe";
+my $DownloadVer   = "0.0.27";
 my $DownloadError = "";
 
 ###################################
@@ -210,6 +215,7 @@ sub WINCONNECT_Initialize($) {
     Log3 $hash, 5, "WINCONNECT_Initialize: Entering";
 
     $hash->{SetFn}   = "WINCONNECT_Set";
+	$hash->{GetFn}   = "WINCONNECT_Get";
     $hash->{DefFn}   = "WINCONNECT_Define";
     $hash->{UndefFn} = "WINCONNECT_Undefine";
 
@@ -269,6 +275,7 @@ sub WINCONNECT_GetStatus($;$) {
 	readingsBulkUpdateIfChanged( $hash, "wincontrol_gitlab_serviceurl", $DownloadSURL);
 		
 	#WinControl Update Info eintragen
+	if ($filemtime eq "-") {$filemtime = 0;}
 	readingsBulkUpdateIfChanged( $hash, "wincontrol_update", $filemtime );
 	if (ReadingsVal( $name, "os_Name", "unbekannt" ) ne "unbekannt") {readingsBulkUpdateIfChanged( $hash, "model", ReadingsVal( $name, "os_Name", "unbekannt" ));}
 	
@@ -1031,6 +1038,61 @@ sub WINCONNECT_Set($@) {
     else {return $usage;}
 
     return;
+}
+
+sub WINCONNECT_Get($@) {
+    my ( $hash, @a ) = @_;
+    my $name = $hash->{NAME};
+    my $what;
+	my $files;
+
+    return "argument is missing" if ( int(@a) < 2 );
+	$what = $a[1];
+
+	#2017.07.21 - Log nur schreiben wenn get nicht initialisiert wird
+	if ($what ne '?') {
+		Log3 $name, 5, "WINCONNECT $name [WINCONNECT_Get] [$what] called function";
+	}
+
+    if ( $what =~ /^(www_files|www_files_reset)$/)
+    {
+		if ( $what eq "www_files" ) {
+		
+			my $directory = '././www/winconnect';
+			opendir (DIR, $directory) or die $!;
+			while (my $file = readdir(DIR)) {
+				if ($file ne "." && $file ne "..") {
+				$files = $files . "$file\n";				
+				}
+			}
+			closedir(DIR);
+            return $files ;
+        }
+
+		elsif ( $what eq "www_files_reset" ) {
+		
+			my $directory = '././www/winconnect';
+			opendir (DIR, $directory) or die $!;
+			while (my $file = readdir(DIR)) {
+				if ($file ne "." && $file ne "..") {
+				Log3 $name, 0, "WINCONNECT [WINCONNECT_Get] [www_files_reset] ././www/winconnect/$file delete!";
+				unlink "././www/winconnect/$file";
+				$files = $files . "DELETE $file\n";				
+				}
+			}
+			closedir(DIR);
+            return $files ;
+        }
+		
+        else {
+            return "no such reading: $what";
+        }
+
+	}
+    
+    else {
+        return "Unknown argument $what, choose one of www_files:noArg www_files_reset:noArg ";
+    }
 }
 
 ###################################
