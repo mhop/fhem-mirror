@@ -16,7 +16,7 @@ use warnings;
 use Time::HiRes qw(time);
 
 my %typeText = (
-  '80' => 'Funkheizkostenverteiler data IIl'
+  '80' => 'Funkheizkostenverteiler data III'
 );
 
 sub 
@@ -27,7 +27,7 @@ TechemHKV_Initialize(@) {
 
   # TECHEM HKV
   # 61, 64 without T1 and T2
-  $hash->{Match}      = "^b..446850[\\d]{8}(61|64|69)80....A0.*";
+  $hash->{Match}      = "^b..446850[\\d]{8}(61|64|69|94)80.*";
 
   $hash->{DefFn}      = "TechemHKV_Define";
   $hash->{UndefFn}    = "TechemHKV_Undef";
@@ -49,18 +49,17 @@ TechemHKV_Define(@) {
 
   return "ID must have 4 or 8 digits" if ($id !~ /^\d{4}(?:\d{4})?$/);
 
-  my $lid = (length($id) == 8)?$id:undef;
-  $id = (length($id) == 8)?substr($id,-4):$id;
-
   $modules{TechemHKV}{defptr}{$id} = $hash;
+
   $hash->{FRIENDLY} = $def if (defined($def));
-  $hash->{LID} = $id if (length($id) == 8);
+  $hash->{LONGID} = $id if (length($id) == 8);
   
   # create crc table if required
   $data{WMBUS}{crc_table_13757} = TechemHKV_createCrcTable() unless (exists($data{WMBUS}{crc_table_13757}));
 
   # subscribe broadcast channels 
   # TechemHKV_subscribe($hash, 'foo');
+  # TechemHKV_Parse($hash, 'b334468500180560094804C3AA20F9F211202B038E80411FD0B81104E6D6265006554261A1B000000000000000001DCBC1706085875BCFADDBEC0F25480');
   TechemHKV_Run($hash) if $init_done;
   return undef;
 }
@@ -69,7 +68,7 @@ sub
 TechemHKV_Undef(@) {
   my ($hash) = @_;
   return undef;
-}
+};
 
 sub
 TechemHKV_Set(@) {
@@ -77,19 +76,19 @@ TechemHKV_Set(@) {
   my $cnt = @args;
 
   return undef;
-}
+};
 
 sub
 TechemHKV_Get(@) {
   my ($hash) = @_;
   
   return undef;
-}
+};
 
 sub 
 TechemHKV_Notify (@) {
   my ($hash, $ntfyDev) = @_;
-  return unless (($ntfyDev->{TYPE} eq 'CUL') || ($ntfyDev->{TYPE} eq 'Global'));
+  return unless (($ntfyDev->{TYPE} =~ /CUL|STACKABLE/) || ($ntfyDev->{TYPE} eq 'Global'));
   foreach my $event (@{$ntfyDev->{CHANGED}}) {
     my @e = split(' ', $event);
     next unless defined($e[0]);
@@ -103,16 +102,16 @@ TechemHKV_Notify (@) {
       readingsBulkUpdate($hash, "temp1", "--.--") if exists($hash->{READINGS}->{'temp1'}); # exlude versions without t1,t2
       readingsBulkUpdate($hash, "temp2", "--.--") if exists($hash->{READINGS}->{'temp2'});
       readingsEndUpdate($hash, 1);
-    }
-  }
+    };
+  };
   return undef;
-}
+};
 
 sub
 TechemHKV_Receive(@) {
   my ($hash, $msg) = @_;
 	
-  $hash->{longID} = $msg->{long} unless defined($hash->{longID});
+  $hash->{LONGID} = $msg->{long} unless defined($hash->{LONGID});
   # TODO log collision if any ...	
 
   my @t = localtime(time);
@@ -122,12 +121,12 @@ TechemHKV_Receive(@) {
   $hash->{METER} = $typeText{$msg->{type}};
   delete $hash->{CHANGETIME}; # clean up, workaround for fhem prior http://forum.fhem.de/index.php/topic,47474.msg391964.html#msg391964
   
-  if (($msg->{version} || '') eq '69') {
+  if (($msg->{version} || '') =~ /69|94/) {
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "temp1", $msg->{temp1});
     readingsBulkUpdate($hash, "temp2", $msg->{temp2});
     readingsEndUpdate($hash, 1);
-  }
+  };
 
   # day period changed
   $ats = ReadingsTimestamp($hash->{NAME},"current_period", "0");
@@ -140,7 +139,7 @@ TechemHKV_Receive(@) {
     readingsBulkUpdate($hash, "current_period", $msg->{actualVal});
     $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts if ($#{ $hash->{CHANGED} } != $i ); # only add ts if there is a event to
     readingsEndUpdate($hash, 1);
-  }
+  };
 
   # billing period changed
   $ats = ReadingsTimestamp($hash->{NAME},"previous_period", "0");
@@ -153,10 +152,9 @@ TechemHKV_Receive(@) {
     readingsBulkUpdate($hash, "previous_period", $msg->{lastVal});
     $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts if ($#{ $hash->{CHANGED} } != $i ); # only add ts if there is a event to
     readingsEndUpdate($hash, 1);
-  }
-
+  };
   return undef;
-}
+};
 
 sub 
 TechemHKV_Run(@) {
@@ -164,7 +162,7 @@ TechemHKV_Run(@) {
   # find a CUL
   foreach my $d (keys %defs) {
     # live patch CUL.pm
-    TechemHKV_IOPatch($hash, $d) if ($defs{$d}{TYPE} eq "CUL");
+    TechemHKV_IOPatch($hash, $d) if ($defs{$d}{TYPE} =~ /CUL|STACKABLE/);
   }
   return undef;
 }
@@ -191,22 +189,64 @@ TechemHKV_Parse(@) {
   $msg = TechemHKV_SanityCheck($msg);
   return ('') unless $msg;
   
-  my @m = ($msg =~ m/../g);
+  $message->{long} = join '', reverse split /(..)/, substr $msg, 6, 8;
+  $message->{short} = substr $message->{long}, 4, 4;
+  $message->{version} = substr $msg, 14, 2;
+  $message->{type} = substr $msg, 16, 2;
+  
+  # last_date
+  #if ($message->{version} eq '94') {
+  #  ($message->{last}->{year}, $message->{last}->{month}, $message->{last}->{day}) 
+  #    = TechemHKV_ParseLastDate(join '', reverse split /(..)/, substr $msg, 24, 4);
+  #} else {
+    ($message->{last}->{year}, $message->{last}->{month}, $message->{last}->{day}) 
+      = TechemHKV_ParseLastDate(join '', reverse split /(..)/, substr $msg, 22, 4);
+  #}  
+  # previous_period
+  #if ($message->{version} eq '94') {
+  #  $message->{lastVal} = hex(join '', reverse split /(..)/, substr $msg, 28, 4);
+  #} else {
+    $message->{lastVal} = hex(join '', reverse split /(..)/, substr $msg, 26, 4);
+  #}
+  
+  # actual_date
+  #if ($message->{version} eq '94') {
+  #  ($message->{actual}->{year}, $message->{actual}->{month}, $message->{actual}->{day}) 
+  #    = TechemHKV_ParseActualDate(join '', reverse split /(..)/, substr $msg, 32, 4);
+  #} else {
+    ($message->{actual}->{year}, $message->{actual}->{month}, $message->{actual}->{day}) 
+      = TechemHKV_ParseActualDate(join '', reverse split /(..)/, substr $msg, 30, 4);
+  #}
+  # actual_period
+  #if ($message->{version} eq '94') {
+  #  $message->{actualVal} = hex(join '', reverse split /(..)/, substr $msg, 36, 4);
+  #} else {
+    $message->{actualVal} = hex(join '', reverse split /(..)/, substr $msg, 34, 4);
+  #}
+  
+  # temp sensor 1
+  if ($message->{version} eq '94') {
+    $message->{temp1} = sprintf "%.2f", (hex(join '', reverse split /(..)/, substr $msg, 40, 4) / 100);
+  } elsif ($message->{version} eq '69') {
+    $message->{temp1} = sprintf "%.2f", (hex(join '', reverse split /(..)/, substr $msg, 38, 4) / 100);
+  }
 
-  # parse
-  ($message->{long}, $message->{short}) = TechemHKV_ParseID(@m);
-  $message->{type} = TechemHKV_ParseSubType(@m);
-  $message->{version} = TechemHKV_ParseSubVersion(@m);
-  $message->{lastVal} = TechemHKV_ParseLastPeriod(@m);
-  $message->{actualVal} = TechemHKV_ParseActualPeriod(@m);
-  $message->{temp1} = TechemHKV_ParseT1(@m);
-  $message->{temp2} = TechemHKV_ParseT2(@m);
-  ($message->{actual}->{year}, $message->{actual}->{month}, $message->{actual}->{day}) = TechemHKV_ParseActualDate(@m);
-  ($message->{last}->{year}, $message->{last}->{month}, $message->{last}->{day}) = TechemHKV_ParseLastDate(@m);
-
+  # temp sensor 2
+  if ($message->{version} eq '94') {
+    $message->{temp2} = sprintf "%.2f", (hex(join '', reverse split /(..)/, substr $msg, 44, 4) / 100);
+  } elsif ($message->{version} eq '69') {
+    $message->{temp2} = sprintf "%.2f", (hex(join '', reverse split /(..)/, substr $msg, 42, 4) / 100);
+  }
+  
   # dispatch
-  if (exists($modules{TechemHKV}{defptr}{$message->{short}})) {
+  if (exists($modules{TechemHKV}{defptr}{$message->{long}})) {
+    my $deviceHash = $modules{TechemHKV}{defptr}{$message->{long}};
+    TechemHKV_Receive($deviceHash, $message);
+    return ($deviceHash->{NAME});
+  } elsif (exists($modules{TechemHKV}{defptr}{$message->{short}})) {
     my $deviceHash = $modules{TechemHKV}{defptr}{$message->{short}};
+    $modules{TechemHKV}{defptr}{$message->{long}} = $deviceHash;
+    delete($modules{TechemHKV}{defptr}{$message->{short}});
     TechemHKV_Receive($deviceHash, $message);
     return ($deviceHash->{NAME});
   }
@@ -267,56 +307,14 @@ TechemHKV_SanityCheck(@) {
       $t .= substr $msg, 25 + ($fb * 36), ($rb * 2);
     }
   }
+  Log3 ("TechemHKV", $dbg, "ok $t");
   return $t;
 }
 
 sub
-TechemHKV_ParseID(@) {
-  my @m = @_;
-  return ("$m[6]$m[5]$m[4]$m[3]", "$m[4]$m[3]");
-}
-
-sub
-TechemHKV_ParseSubType(@) {
-  my @m = @_;
-  return "$m[8]"; 
-}
-
-sub
-TechemHKV_ParseSubVersion(@) {
-  my @m = @_;
-  return "$m[7]"; 
-}
-
-sub
-TechemHKV_ParseLastPeriod(@) {
-  my @m = @_;
-  return hex("$m[14]$m[13]"); 
-}
-
-sub
-TechemHKV_ParseActualPeriod(@) {
-  my @m = @_;
-  return hex("$m[18]$m[17]"); 
-}
-
-sub
-TechemHKV_ParseT1(@) {
-  my @m = @_;
-  return sprintf "%.2f", (hex("$m[20]$m[19]") / 100); 
-}
-
-sub
-TechemHKV_ParseT2(@) {
-  my @m = @_;
-  return sprintf "%.2f", (hex("$m[22]$m[21]") / 100); 
-}
-
-sub
 TechemHKV_ParseActualDate(@) {
-  my @m = @_;
+  my $b = hex($_[0]);
   my @t = localtime(time);
-  my $b = hex("$m[16]$m[15]");
   my $d = ($b >> 4) & 0x1F;
   my $m = ($b >> 9) & 0x0F;
   my $y = $t[5] + 1900;
@@ -325,8 +323,7 @@ TechemHKV_ParseActualDate(@) {
 
 sub
 TechemHKV_ParseLastDate(@) {
-  my @m = @_;
-  my $b = hex("$m[12]$m[11]");
+  my $b = hex($_[0]);
   my $d = ($b >> 0) & 0x1F;
   my $m = ($b >> 5) & 0x0F;
   my $y = ($b >> 9) & 0x3F;
@@ -397,6 +394,8 @@ TechemHKV_crc16_13757(@) {
 1;
 
 =pod
+=item summary    read techem data meter for heating device.
+=item summary_DE Anbindung von Techem Heizkostenverteilern.
 =begin html
 
 <a name="TechemHKV"></a>
