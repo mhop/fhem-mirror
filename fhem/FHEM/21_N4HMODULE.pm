@@ -4,21 +4,7 @@
 #
 # net4home Busconnector Device
 #
-# (c) 2014-2016 Oliver Koerber <koerber@net4home.de>
-#
-#
-# Fhem is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 2 of the License, or
-# (at your option) any later version.
-#
-# Fhem is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+# (c) 2014-2018 Oliver Koerber <koerber@net4home.de>
 #
 # $Id$
 #
@@ -32,10 +18,11 @@ use POSIX;
 use SetExtensions;
 
 sub N4HMODULE_Set($@);
+sub N4HMODULE_Get ($$@);
 sub N4HMODULE_Update($@);
 sub N4HMODULE_DbLog_splitFn($$);
 
-my $n4hmodule_Version = "1.0.1.3 - 27.10.2016";
+my $n4hmodule_Version = "1.0.2.0 - 30.12.2017";
 
 my %OT_devices = (
 	"1" 	=> {"name" => "leer", "OTcanSet" => "false", "OTcanReq" => "false", "fields" => [] },
@@ -77,13 +64,33 @@ my %OT_devices = (
 	
 	"26" 	=> {"name" => "Messwert,Feuchte", "OTcanSet" => "false", "OTcanReq" 	=> "true", "fields" => [] },
 	
+	"34" 	=> {"name" => "TLH-Regler H,Sollwert,Temperatur", "OTcanSet" => "true", "OTcanReq" => "true", "fields" => [
+					{ "cmd" =>  "3B0000", "ID" => "0", "Text" => "AUS", 					"Type" => "Button" , "set" => "off:noArg" },
+					{ "cmd" =>  "3B0100", "ID" => "1", "Text" => "Heizen", 					"Type" => "Button" , "set" => "heat:noArg" },
+					{ "cmd" =>  "3B0200", "ID" => "2", "Text" => "Kühlen", 					"Type" => "Button" , "set" => "cool:noArg" },
+					{ "cmd" =>  "3B0300", "ID" => "3", "Text" => "Auto", 					"Type" => "Button" , "set" => "auto:noArg" },
+					{ "cmd" =>  "3200",   "ID" => "4", "Text" => "Sollwert", 		  		"Type" => "Button" , "set" => "desired-temperature:slider,4,0.5,30,1" },
+					{ "cmd" =>  "3B1400", "ID" => "5", "Text" => "Tagwert aktivieren", 		"Type" => "Button" , "set" => "comfort:noArg" },
+					{ "cmd" =>  "3B1E00", "ID" => "6", "Text" => "Nachtwert aktivieren", 	"Type" => "Button" , "set" => "eco:noArg" },
+					{ "cmd" =>  "3B1500", "ID" => "7", "Text" => "Sollwert -&gt; Tagwert",	"Type" => "Button" , "set" => "setdesired2comfort:noArg" },
+					{ "cmd" =>  "3B1F00", "ID" => "8", "Text" => "Sollwert -&gt; Nachtwert","Type" => "Button" , "set" => "setdesired2eco:noArg" },
+                        ]},
+
 	"95" 	=> {"name" => "Ausgang, Jal, Motor AJ3", "OTcanSet" => "true", "OTcanReq" => "true", "fields" => [
+					{ "cmd" =>  "350000", "ID" => "0", "text" => "Weiterschalten", 			"Type" => "Button" , "set" => "toggle:noArg" },
 					{ "cmd" =>  "320000", "ID" => "1", "text" => "STOP", 					"Type" => "Button" , "set" => "stop:noArg" },
 					{ "cmd" =>  "320300", "ID" => "2", "text" => "AUF",					 	"Type" => "Button" , "set" => "up:noArg" },
 					{ "cmd" =>  "320100", "ID" => "3", "text" => "AB", 						"Type" => "Button" , "set" => "down:noArg" },
 					{ "cmd" =>  "428300", "ID" => "4", "text" => "Sperre OFFEN",			"Type" => "Button" , "set" => "lockup:noArg" },
 					{ "cmd" =>  "428100", "ID" => "5", "text" => "Sperre GESCHLOSSEN", 		"Type" => "Button" , "set" => "lockdown:noArg" },
 					{ "cmd" =>  "420000", "ID" => "6", "text" => "Sperre freigeben", 		"Type" => "Button" , "set" => "unlock:noArg" },
+                        ]},
+
+	"100" 	=> {"name" => "Safety Basis", "OTcanSet" => "true", "OTcanReq" => "true", "fields" => [
+					{ "cmd" =>  "320000", "ID" => "0", "text" => "AUS", 					"Type" => "Button" , "set" => "off:noArg" },
+					{ "cmd" =>  "320100", "ID" => "1", "text" => "Intern scharf 1",			"Type" => "Button" , "set" => "intern1:noArg" },
+					{ "cmd" =>  "320200", "ID" => "2", "text" => "Intern scharf 1",		 	"Type" => "Button" , "set" => "intern2:noArg" },
+					{ "cmd" =>  "320300", "ID" => "3", "text" => "Extern scharf", 			"Type" => "Button" , "set" => "extern:noArg" },
                         ]},
 
 	"210" 	=> {"name" => "UP-RF Absender", "OTcanSet" => "false", "OTcanReq" 	=> "true", "fields" => [] },
@@ -120,6 +127,7 @@ sub N4HMODULE_Initialize($) {
 	$hash->{UndefFn}	   = "N4HMODULE_Undefine";
 	$hash->{ParseFn}	   = "N4HMODULE_Parse";
 	$hash->{SetFn}		   = "N4HMODULE_Set";
+	$hash->{GetFn}		   = "N4HMODULE_Get";
 	$hash->{AttrFn}  	   = "N4HMODULE_Attr";
 	$hash->{AttrList}	   = "IoDev dummy:1,0 Interval sendack:on,off setList ".
 						     "$readingFnAttributes ";
@@ -144,6 +152,8 @@ sub N4HMODULE_Define($$) {
 	}
 
 	$hash->{VERSION}	= $n4hmodule_Version;
+	$hash->{Hardware}  = "undefined";
+	$hash->{Software}   = "undefined";
 	$hash->{STATE} 		= "Initializing";
 	$hash->{NOTIFYDEV}  = "global";
 	$hash->{IODev} 		= $n4hbus;
@@ -152,7 +162,8 @@ sub N4HMODULE_Define($$) {
 	$hash->{DESC}		= $OT_devices{$ot}{name};
 	$hash->{OTcanSet}	= $OT_devices{$ot}{OTcanSet};
 	$hash->{OTcanReq}	= $OT_devices{$ot}{OTcanReq};
-
+	$hash->{Interval}   = 0;
+	
 	$modules{N4HMODULE}{defptr}{$objadr} = $hash;
 	
 	AssignIoPort($hash, $n4hbus);
@@ -162,6 +173,8 @@ sub N4HMODULE_Define($$) {
 	$hash->{helper}{value}		= '';
 	$hash->{helper}{cmd}		= '';
 	$hash->{helper}{ddata}		= '';
+	$hash->{helper}{pct}		= 0;
+	
 
 	if ($hash->{OTcanSet}eq"true") {
 		$hash->{helper}{state}	= 'undefined';
@@ -181,7 +194,7 @@ sub N4HMODULE_Define($$) {
 
         my $state_format;
 		
-        if( $ot == 24 ) { #Temperatur
+        if( $ot == 24 ) { 
           $state_format .= " " if( $state_format );
           $state_format .= "T: temperature";
         } elsif( $ot == 25 ) {
@@ -213,6 +226,12 @@ sub N4HMODULE_Define($$) {
 		# Timer Zeitversetzt starten, damit nicht alles auf den Bus gleichzeit kommt 30 Sekunden + x
 		Log3 $hash, 3, "N4HMODULE_Define (set timer) -> $name ($ot)";
 		InternalTimer( gettimeofday() + 30 + int(rand(15)) , "N4HMODULE_Start", $hash, 0 );
+	} elsif (( $ot ==  34 ) or # TLH
+			(  $ot ==   3 ) or # Aktor, Relais
+			(  $ot ==   5)) {  # Aktor, Dimmer
+		# get initial value from bus after first start
+		Log3 $hash, 3, "N4HMODULE_Define (get) -> $name ($ot)";
+		InternalTimer( gettimeofday() + int(rand(10)) , "N4HMODULE_Start", $hash, 0 );
 	} 
    return undef;
 }
@@ -221,22 +240,46 @@ sub N4HMODULE_Define($$) {
 sub N4HMODULE_Start($)
 ##################################################################################
 {
-	my ($hash) = @_;
-	my $name   = $hash->{NAME};
-	my $interval = $hash->{Interval}; 
-
+	my ($hash) 		= @_;
+	my $name        = $hash->{NAME};
+	my $interval    = $hash->{Interval}; 
+	my $ot			= $hash->{OT};
+	my $webCmd;
+    $webCmd  		= AttrVal($name,"webCmd",undef);
+	
     $interval = $attr{$name}{Interval}  if( defined($attr{$name}{Interval}) );
      
 	Log3 $hash, 5, "N4HMODULE (start): ($name)-> ".$interval." Sekunden";
 
-	if (($interval >= 30) and ($interval <= 86400)) {
     # reset timer if interval is defined
+	if (($interval >= 30) and ($interval <= 86400)) {
 	  Log3 $hash, 5, "N4HMODULE (restart timer): ($name)-> ".$interval." Sekunden";
       RemoveInternalTimer( $hash );
       InternalTimer(gettimeofday() + $interval, "N4HMODULE_Start", $hash, 1 );
 	  N4HMODULE_Update( $hash );
+   } else {
+   
+	# get initial values/state after start
+	if ( $ot == 3 ) {
+		# ot 3 = "Ausgang, Binär, Relais"
+	    if(!defined $webCmd){ $webCmd="toggle:on:off";}
+		Log3 $hash, 5, "N4HMODULE (first timer): ($name)-> status";
+		N4HMODULE_Get($hash, $hash->{NAME}, "status");
+	} elsif ( $ot == 5 ) {
+		# ot 5 = "Ausgang, Dimmer"
+	    if(!defined $webCmd){ $webCmd="pct:toggle:on:off";}
+		Log3 $hash, 5, "N4HMODULE (first timer): ($name)-> status";
+		N4HMODULE_Get($hash, $hash->{NAME}, "status");
+	} elsif ( $ot == 34 ) {
+		# ot 34 = "TLH-Regler H,Sollwert,Temperatur"
+	    if(!defined $webCmd){ $webCmd="off:heat:cool:auto";}
+		Log3 $hash, 5, "N4HMODULE (first timer): ($name)-> desired-temperature";
+		N4HMODULE_Get($hash, $hash->{NAME}, "desired-temperature");
+	}
+	
    }
-}
+   
+} 
 
 ##################################################################################
 sub N4HMODULE_Undefine($$) {
@@ -344,83 +387,314 @@ sub N4HMODULE_ParsePayload($@) {
 
 	my ($hash, $devtype, $ipsrc, $objsrc, $ddata) = @_;
 	my $name = $hash->{NAME};
+	my $ot 	 = $hash->{OT};
 	my $dev_funcion = hex(substr($ddata,0,2)); 
-	my $newState="";
-	my $myval="";
+	my $newState	= "";
+	my $myval		= "";
+	my $objadr 		= $hash->{OBJADR};
 
 	readingsBeginUpdate($hash);
 	
-	if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
-	readingsBulkUpdate($hash,"ddata", $ddata);
 	
+#	+++++++ D0_GET_TYP
+	if ($dev_funcion == hex("03")) {
+
+		if (hex(substr($ddata,2,2)) == "1F") {
+			$hash->{Hardware} = "UP-S4";
+		} elsif (hex(substr($ddata,2,2)) == "29") {
+			$hash->{Hardware} = "HS-AD3";
+		}
+	}
+
 #	+++++++ D0_SET
 	if ($dev_funcion == hex("32")) {
-		readingsBulkUpdate($hash,"cmd", "D0_SET");
 
-		if (hex(substr($ddata,2,2))== hex("00")) {
-			readingsBulkUpdate($hash,"state", "off");
-			$hash->{STATE} = "off";
+		Log3 $hash, 5, "N4HMODULE -> D0_SET ($name) (".$hash->{OT}." OBJ->$objsrc - IP->$ipsrc - ".$hash->{OBJADR}.")";
+	
+		if ( $ot == 34 && $objsrc != $objadr) {
+		# ot 34 = "TLH-Regler H,Sollwert,Temperatur"
+		
+			my ($lastval) = sprintf "%.1f", hex(substr($ddata,4,2))/10;
+			readingsBulkUpdate($hash, "desired-temperature", $lastval);
+			if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+			readingsBulkUpdate($hash,"ddata", $ddata);
+			
+		} elsif ( $ot == 5 ) {
+			# ot 5 = "Ausgang, Dimmer"
+
+			if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+			readingsBulkUpdate($hash,"ddata", $ddata);
+			readingsBulkUpdate($hash,"cmd", "D0_SET");
+			
+			my ($lastval) = sprintf "%.0f", hex(substr($ddata,2,2));
+			
+			if ( $lastval == 0 ) {
+				readingsBulkUpdate($hash, "state", "off");
+				$hash->{helper}{pct} = $hash->{READINGS}{pct}{VAL};	
+				readingsBulkUpdate($hash, "pct", 0);
+			} elsif ( $lastval == 101 ) {
+				readingsBulkUpdate($hash, "state", "on");
+				readingsBulkUpdate($hash, "pct", $hash->{helper}{pct});			
+			} else {
+				readingsBulkUpdate($hash, "state", "on");
+				$hash->{helper}{pct} = $lastval;
+				readingsBulkUpdate($hash, "pct", $lastval);				
+			}
+			
+			
+		} elsif ( $ot == 34 ) {
+			# do nothing - cmd only for ATe
+		} elsif ( $ot == 95 ) {
+
+			if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+			readingsBulkUpdate($hash,"ddata", $ddata);
+			readingsBulkUpdate($hash,"cmd", "D0_SET");
+
+			if (hex(substr($ddata,2,2))== hex("00")) {
+				readingsBulkUpdate($hash,"state", "stop");
+				$hash->{STATE} = "stop";
+				readingsBulkUpdate($hash, "position", 50);
+			} elsif (hex(substr($ddata,2,2))== hex("01")) {
+				readingsBulkUpdate($hash,"state", "down");
+				readingsBulkUpdate($hash, "position", 0);
+				$hash->{STATE} = "down";
+			} elsif (hex(substr($ddata,2,2))== hex("03")) {
+				readingsBulkUpdate($hash,"state", "up");
+				readingsBulkUpdate($hash, "position", 100);
+				$hash->{STATE} = "up";
+			} 
+
 		} else {
-			readingsBulkUpdate($hash,"state", "on");
-			$hash->{STATE} = "on";
-		}
+
+			if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+			readingsBulkUpdate($hash,"ddata", $ddata);
+			readingsBulkUpdate($hash,"cmd", "D0_SET");
+
+			if (hex(substr($ddata,2,2))== hex("00")) {
+				readingsBulkUpdate($hash,"state", "off");
+				$hash->{STATE} = "off";
+			} else {
+				readingsBulkUpdate($hash,"state", "on");
+				$hash->{STATE} = "on";
+			}
+		}	
 	}
 
 #	+++++++ D0_INC
 	if ($dev_funcion == hex("33")) {
-		readingsBulkUpdate($hash,"cmd", "D0_INC");
-	}
-	
-#	+++++++ D0_TOGGLE
-	if ($dev_funcion == hex("35")) {
-		readingsBulkUpdate($hash,"cmd", "D0_TOGGLE");
 
-		if (ReadingsVal($name, "state", "") eq "on") {
-			readingsBulkUpdate($hash,"state", "off");
-			$hash->{STATE} = "off";
-		} elsif (ReadingsVal($name, "state", "") eq "off") {
-			readingsBulkUpdate($hash,"state", "on");
-			$hash->{STATE} = "on";
+		if ( $ot == 5 ) {
+			# ot 5 = "Ausgang, Dimmer"
+			readingsBulkUpdate($hash, "state", "on");
+			$hash->{helper}{pct} = $hash->{helper}{pct}+2;
+			readingsBulkUpdate($hash, "pct", $hash->{helper}{pct});
+			if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+			readingsBulkUpdate($hash,"ddata", $ddata);
+			readingsBulkUpdate($hash,"cmd", "D0_INC");
+		} else {		
+			if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+			readingsBulkUpdate($hash,"ddata", $ddata);
+			readingsBulkUpdate($hash,"cmd", "D0_INC");
 		}
 	}
+#	+++++++ D0_DEC
+	if ($dev_funcion == hex("34")) {
 
-#	+++++++ D0_ACTOR_ACK
-	if ($dev_funcion == hex("37")) {
-		readingsBulkUpdate($hash,"cmd", "D0_ACTOR_ACK");
+		if ( $ot == 5 ) {
+			# ot 5 = "Ausgang, Dimmer"
+			readingsBulkUpdate($hash, "state", "on");
+			$hash->{helper}{pct} = $hash->{helper}{pct}-2;
+			readingsBulkUpdate($hash, "pct", $hash->{helper}{pct});
+			if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+			readingsBulkUpdate($hash,"ddata", $ddata);
+			readingsBulkUpdate($hash,"cmd", "D0_DEC");
+		} else {		
+			if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+			readingsBulkUpdate($hash,"ddata", $ddata);
+			readingsBulkUpdate($hash,"cmd", "D0_DEC");
+		}
+	}
+#	+++++++ D0_TOGGLE
+	if ($dev_funcion == hex("35")) {
+		if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+		readingsBulkUpdate($hash,"ddata", $ddata);
+		readingsBulkUpdate($hash,"cmd", "D0_TOGGLE");
+
+		if ( $ot == 5 ) {
+			# ot 5 = "Ausgang, Dimmer"
+			if (ReadingsVal($name, "state", "") eq "on") {
+				readingsBulkUpdate($hash,"state", "off");
+				$hash->{helper}{pct} = $hash->{READINGS}{pct}{VAL};	
+				readingsBulkUpdate($hash, "pct", 0);
+				$hash->{STATE} = "off";
+			} elsif (ReadingsVal($name, "state", "") eq "off") {
+				readingsBulkUpdate($hash,"state", "on");
+				readingsBulkUpdate($hash, "pct", $hash->{helper}{pct});			
+				$hash->{STATE} = "on";
+			}
+		} else {		
+			if (ReadingsVal($name, "state", "") eq "on") {
+				readingsBulkUpdate($hash,"state", "off");
+				$hash->{STATE} = "off";
+			} elsif (ReadingsVal($name, "state", "") eq "off") {
+				readingsBulkUpdate($hash,"state", "on");
+				$hash->{STATE} = "on";
+			}
+		}	
 	}
 
 #	+++++++ D0_REQ
 	if ($dev_funcion == hex("36")) {
-		readingsBulkUpdate($hash,"cmd", "D0_REQ");
-		Log3 $hash, 5, "N4MODULE -> D0_REQ ($name) (".$hash->{OT}.")";
-		N4HMODULE_Update( $hash );
+
+		if ( $ot == 3 ) {
+		# ot 3 = "Ausgang, Binär, Relais"
+		} elsif ( $ot == 34 ) {
+		# ot 34 = "TLH-Regler H,Sollwert,Temperatur"
+		} else	{
+			if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+			readingsBulkUpdate($hash,"ddata", $ddata);
+			readingsBulkUpdate($hash,"cmd", "D0_REQ");
+			Log3 $hash, 5, "N4HMODULE -> D0_REQ ($name) (".$hash->{OT}.")";
+			N4HMODULE_Update( $hash );
+		}	
 	} 
+
+#	+++++++ D0_ACTOR_ACK
+	if ($dev_funcion == hex("37")) {
+		if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+		readingsBulkUpdate($hash,"ddata", $ddata);
+		readingsBulkUpdate($hash,"cmd", "D0_ACTOR_ACK");
+		Log3 $hash, 5, "N4HMODULE -> D0_ACTOR_ACK ($name) (".$hash->{OT}.")";
+		
+		if ( $ot == 3 ) {
+		# ot 3 = "Ausgang, Binär, Relais"
+			if ( (hex(substr($ddata,4,2))) == 0) {
+				readingsBulkUpdate($hash, "state", "off");
+				$hash->{STATE} = "off";
+			} elsif ( (hex(substr($ddata,4,2))) == 1) {
+				readingsBulkUpdate($hash, "state", "on");
+				$hash->{STATE} = "on";
+			}
+		} elsif ( $ot == 5 ) {
+		# ot 5 = "Ausgang, Dimmer"
+			
+			if ( hex(substr($ddata,4,2)) > 128) {	
+			
+				my ($lastval) = sprintf "%.0f", hex(substr($ddata,4,2));
+				readingsBulkUpdate($hash, "pct", $lastval-128);
+				$hash->{helper}{pct} = $lastval-128;
+				readingsBulkUpdate($hash, "state", "on");
+				$hash->{STATE} = "on";
+			} else {
+				my ($lastval) = sprintf "%.0f", hex(substr($ddata,4,2));
+				$hash->{helper}{pct} = $lastval;
+				readingsBulkUpdate($hash, "state", "off");
+				$hash->{STATE} = "off";
+			}	
+			
+		} elsif ( $ot == 34 ) {
+		# ot 34 = "TLH-Regler H,Sollwert,Temperatur"
+			my ($lastval) = sprintf "%.1f", hex(substr($ddata,4,2))/10;
+			readingsBulkUpdate($hash, "desired-temperature", $lastval);
+
+			if ( (hex(substr($ddata,6,2))) == 0) {
+				readingsBulkUpdate($hash, "CurrentHeatingCoolingState", "0");
+				readingsBulkUpdate($hash, "state", "off");
+				$hash->{STATE} = "off";
+			} elsif ( (hex(substr($ddata,6,2))) == 1) {
+				readingsBulkUpdate($hash, "CurrentHeatingCoolingState", "1");
+				readingsBulkUpdate($hash, "state", "heat");
+				$hash->{STATE} = "heat";
+			} elsif ( (hex(substr($ddata,6,2))) == 2) {
+				readingsBulkUpdate($hash, "CurrentHeatingCoolingState", "2");
+				readingsBulkUpdate($hash, "state", "cool");
+				$hash->{STATE} = "cool";
+			} elsif ( (hex(substr($ddata,6,2))) == 3) {
+				readingsBulkUpdate($hash, "CurrentHeatingCoolingState", "3");
+				readingsBulkUpdate($hash, "state", "auto");
+				$hash->{STATE} = "auto";
+			};
+		};
+		
+	
+	}
 	
 #	+++++++ D0_SENSOR_ACK
 	if ($dev_funcion == hex("41")) {
+		if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+		readingsBulkUpdate($hash,"ddata", $ddata);
 		readingsBulkUpdate($hash,"cmd", "D0_SENSOR_ACK");
-		Log3 $hash, 5, "N4MODULE -> D0_SENSOR_ACK ($name) (".$hash->{OT}.")";
+		Log3 $hash, 5, "N4HMODULE -> D0_SENSOR_ACK ($name) (".$hash->{OT}.")";
 		N4HMODULE_Update( $hash );
+	} 
+
+#	+++++++ D0_LOCK_STATE_ACK
+	if ($dev_funcion == hex("44")) {
+		if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+		readingsBulkUpdate($hash,"ddata", $ddata);
+		readingsBulkUpdate($hash,"cmd", "D0_LOCK_STATE_ACK");
+		Log3 $hash, 5, "N4HMODULE -> D0_LOCK_STATE_ACK ($name) (".$hash->{OT}.")";
 	} 
 	
 #	+++++++ D0_VALUE_ACK (101)
 	if ($dev_funcion == hex("65")) {
+		if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+		readingsBulkUpdate($hash,"ddata", $ddata);
 		readingsBulkUpdate($hash,"cmd", "D0_VALUE_ACK");
-		my ($valtype, $lastval) = N4HMODULE_paramToText($hash, $ddata);
-		if( defined($lastval))	{	readingsBulkUpdate($hash, $valtype, $lastval);	}
-		
+
+			if ( (hex(substr($ddata,4,2))) == 0) {
+				readingsBulkUpdate($hash, "state", "off");
+				$hash->{STATE} = "off";
+			} elsif ( (hex(substr($ddata,4,2))) == 1) {
+				readingsBulkUpdate($hash, "state", "on");
+				$hash->{STATE} = "on";
+			}
+
+			my ($valtype, $lastval) = N4HMODULE_paramToText($hash, $ddata);
+			readingsBulkUpdate($hash, $valtype, $lastval);	
+			readingsBulkUpdate($hash, "state", $lastval);
+
 	}
 
 #	+++++++ D0_VALUE_REQ
 	if ($dev_funcion == hex("66")) {
+		if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+		readingsBulkUpdate($hash,"ddata", $ddata);
 		readingsBulkUpdate($hash,"cmd", "D0_VALUE_REQ");
-		Log3 $hash, 5, "N4MODULE -> D0_VALUE_REQ ($name) (".$hash->{OT}.")";
+		Log3 $hash, 5, "N4HMODULE -> D0_VALUE_REQ ($name) (".$hash->{OT}.")";
 		N4HMODULE_Update( $hash );
 	} 
 
-	#	+++++++ LCD-Text
+	#	+++++++ SetN
 	if ($dev_funcion == hex("3b")) {
-		readingsBulkUpdate($hash,"cmd", "LCD-Text");
+
+		if( defined($objsrc))	{readingsBulkUpdate($hash,"from", $objsrc);}
+		readingsBulkUpdate($hash,"ddata", $ddata);
+		# ot 34 = "TLH-Regler H,Sollwert,Temperatur"
+		if ($ot == 34) {
+			readingsBulkUpdate($hash,"cmd", "SetN");
+			Log3 $hash, 5, "N4HMODULE -> SetN ($name) (".$hash->{OT}.")";
+		
+			if ( (hex(substr($ddata,2,2))) == 0) {
+				readingsBulkUpdate($hash, "CurrentHeatingCoolingState", "0");
+				readingsBulkUpdate($hash, "state", "off");
+				$hash->{STATE} = "off";
+			} elsif ( (hex(substr($ddata,2,2))) == 1) {
+				readingsBulkUpdate($hash, "CurrentHeatingCoolingState", "1");
+				readingsBulkUpdate($hash, "state", "heat");
+				$hash->{STATE} = "heat";
+			} elsif ( (hex(substr($ddata,2,2))) == 2) {
+				readingsBulkUpdate($hash, "CurrentHeatingCoolingState", "2");
+				readingsBulkUpdate($hash, "state", "cool");
+				$hash->{STATE} = "cool";
+			} elsif ( (hex(substr($ddata,2,2))) == 3) {
+				readingsBulkUpdate($hash, "CurrentHeatingCoolingState", "3");
+				readingsBulkUpdate($hash, "state", "auto");
+				$hash->{STATE} = "auto";
+			};
+		} else {
+			readingsBulkUpdate($hash,"cmd", "SetN");
+		}
 	}
 
 	readingsEndUpdate( $hash , 1);
@@ -441,7 +715,7 @@ sub N4HMODULE_paramToText($@) {
 	
 # 	+++++++++++++++++++ Licht analog - IN_HW_NR_IS_LICHT_ANALOG
 	if (hex(substr($ddata,2,2)) == 5 ){
-		$rettype = "brightness";
+		$rettype = "Brightness";
 	}	
 
 # 	+++++++++++++++++++ Uhrzeit - IN_HW_NR_IS_CLOCK
@@ -549,9 +823,9 @@ sub N4HMODULE_Set($@) {
 	return "\"set $a[0]\" needs at least two parameters" if(@a < 2);
 	my $name = shift(@a);
     my $cmd  = shift(@a);
-	my $ext  =  shift(@a);
+	my $ext  = shift(@a);
 	
-	Log3 $hash, 5, "N4MODULE (set): ($name) ($cmd)";
+#	Log3 $hash, 5, "N4HMODULE (set): (Name: $name) (CMD: $cmd) (ext: $ext)";
 
 	my $ot 			= $hash->{OT};
 	my $ipdst		= $hash->{OBJADR};
@@ -564,7 +838,7 @@ sub N4HMODULE_Set($@) {
 	my $devtype = $OT_devices{$ot};
 	  
 
-	if ($ot == 3 || $ot == 4 || $ot == 5 || $ot == 95) {
+	if ($ot == 3 || $ot == 4 || $ot == 5 || $ot == 95 || $ot == 100) {
 
 	for my $field (@{$devtype->{fields}}) {
 	
@@ -586,24 +860,67 @@ sub N4HMODULE_Set($@) {
 		if ($fieldcmd ne "" && $cmd ne "?")  {
 	
 			if (defined($ext)) {
-				
-				
+			
 				if ($cmd eq "pct") {
 					$fieldcmd = "$fieldcmd".sprintf ("%02x", ($ext))."00";
 					$ddata = sprintf ("%02x%s", ((length($fieldcmd))/2), $fieldcmd);
 					readingsSingleUpdate($hash, "pct", "$ext", 1);
-					Log3 $hash, 5, "N4MODULE (set): $name to $cmd ($ext%) ($ddata)";
+					Log3 $hash, 5, "N4HMODULE (set): $name to $cmd ($ext%) ($ddata)";
 				} else {
 					$ddata = sprintf ("%02x%s", (length($fieldcmd)/2), $fieldcmd);
-					Log3 $hash, 5, "N4MODULE (set): $name to $cmd/$ext ($cmd-".join(" ", @sets)."-$devtype-$fieldcmd-$ot)";
+					Log3 $hash, 5, "N4HMODULE (set): $name to $cmd/$ext (".join(" ", @sets).") - $devtype - $fieldcmd - $ot)";
 				}
 				
 			} else {
-				Log3 $hash, 5, "N4MODULE (set): $name to $cmd ($cmd-".join(" ", @sets)."-$devtype-$fieldcmd-$ot)";
-				$ddata = sprintf ("%02x%s", (length($fieldcmd)/2), $fieldcmd);
+			
+				if ($cmd eq "toggle") {
+					$ddata = sprintf ("%02x%s", (length($fieldcmd)/2), $fieldcmd);
+					Log3 $hash, 5, "N4HMODULE (set): $name $cmd ($ddata)";
+				} else {			
+					Log3 $hash, 5, "N4HMODULE (set): $name to $cmd (".join(" ", @sets).") - $devtype - $fieldcmd - $ot)";
+					$ddata = sprintf ("%02x%s", (length($fieldcmd)/2), $fieldcmd);
+					readingsSingleUpdate($hash, "state", "$cmd", 1);
+				}
 			}
 			
-			readingsSingleUpdate($hash, "state", "$cmd", 1);
+			IOWrite($hash, $ipdst, $ddata, 0);
+			return undef;
+		}
+		else {
+			return SetExtensions($hash, join(" ", @sets), $name, $cmd, @a);
+		}
+		
+	} elsif ($ot == 34) {
+	
+		for my $field (@{$devtype->{fields}}) {
+	
+			$setfield  = $field->{set};
+			if (defined($setfield)) {
+		
+				push(@sets,$field->{set});
+			
+				$setfield = ( split /:/, $setfield, 2 )[0];
+
+				if ($setfield eq $cmd) {
+					$fieldname = $field->{text};
+					$fieldcmd  = $field->{cmd};
+					$fieldset  = $field->{set};
+				}
+			}
+		 }	
+		
+		if ($fieldcmd ne "" && $cmd ne "?")  {
+	
+			Log3 $hash, 5, "N4HMODULE (set): $name to $cmd (".join(" ", @sets).") - $devtype - $fieldcmd - $ot)";
+			
+			if ($cmd eq "desired-temperature") {
+				$fieldcmd = "$fieldcmd".sprintf ("%02x", ($ext*10))."00";
+				$ddata = sprintf ("%02x%s", ((length($fieldcmd))/2), $fieldcmd);
+				readingsSingleUpdate($hash, "desired-temperature", "$ext", 1);
+			} else {
+				$ddata = sprintf ("%02x%s", ((length($fieldcmd))/2), $fieldcmd);
+			}
+
 			IOWrite($hash, $ipdst, $ddata, 0);
 			return undef;
 		}
@@ -615,15 +932,16 @@ sub N4HMODULE_Set($@) {
 	elsif ($ot == 24 || $ot == 25 || $ot == 26 || $ot == 240 || $ot == 242 || $ot == 245) {
 
 		if ($cmd ne "?") {
-			Log3 $hash, 5, "N4MODULE (set): $name to $cmd";
+			Log3 $hash, 5, "N4HMODULE (set): $name to $cmd";
 			N4HMODULE_Update($hash, $cmd);
 		}	
 		return undef;
 	}
+	
 	elsif ($ot == 999) {
 
 		if ($cmd ne "?") {
-			Log3 $hash, 5, "N4MODULE (set n56): $name to $cmd";
+			Log3 $hash, 5, "N4HMODULE (set n56): $name to $cmd";
 			N4HMODULE_Update($hash, $cmd);
 		}	
 		return undef;
@@ -633,7 +951,51 @@ sub N4HMODULE_Set($@) {
 	
 }	
 
+##################################################################################
+sub N4HMODULE_Get($$@) {
+##################################################################################
 
+	my ( $hash, $name, $opt, @args ) = @_;
+	
+	my $ot 			= $hash->{OT};
+	my $ipdst		= $hash->{OBJADR};
+	my $ddata 		= "";
+	my $fieldcmd	= "";
+	my $list = "";
+
+	my $list = "desired-temperature:noArg";
+
+	return "\"get $name\" needs at least one argument" unless(defined($opt));
+
+	if (( $ot == 3 ) or
+        ( $ot == 5)) {
+		if ($opt eq "status") {
+			$fieldcmd = "360000";
+			$ddata = sprintf ("%02x%s", ((length($fieldcmd))/2), $fieldcmd);
+			Log3 $hash, 5, "N4HMODULE (get): $opt from $name ($ddata)";
+			IOWrite($hash, $ipdst, $ddata, 0);
+	
+		} else {
+			return "unknown argument $opt, choose one of gettype:noArg status:noArg";
+		}
+	} elsif ( $ot == 34 ) {
+		if ($opt eq "desired-temperature") {
+			$fieldcmd = "360000";
+			$ddata = sprintf ("%02x%s", ((length($fieldcmd))/2), $fieldcmd);
+			Log3 $hash, 5, "N4HMODULE (get): $opt from $name ($ddata)";
+			IOWrite($hash, $ipdst, $ddata, 0);
+	
+		} else {
+			return "unknown argument $opt, choose one of gettype:noArg desired-temperature:noArg";
+		}
+	} else {
+		return "unknown argument, choose one of gettype:noArg";
+	}	
+	return undef;
+		
+ }
+ 
+ 
 ##################################################################################
 sub N4HMODULE_Update($@) {
 ##################################################################################
@@ -642,9 +1004,13 @@ sub N4HMODULE_Update($@) {
 	my $value = shift(@a);
 
 	my $name 		= $hash->{NAME};
-    return unless (defined($hash->{NAME}) and defined $value );
+    return unless (defined($hash->{NAME}) );
 
-	Log3 $hash, 5, "N4MODULE (update): ($name) ($value)";
+	if (defined $value) {
+		Log3 $hash, 5, "N4HMODULE (update): ($name) ($value)";
+	} else {
+		Log3 $hash, 5, "N4HMODULE (update): ($name)";
+	}
 
 	my $ot 			= $hash->{OT};
 	my $ipdst		= $hash->{OBJADR};
@@ -652,7 +1018,19 @@ sub N4HMODULE_Update($@) {
 	my $cs			= "";
 	my $cmd         = "";
 
-	if ($ot == 24) {
+	if ($ot == 3) {
+	
+#	+++++++ 69 D0_STATUS_INFO (105)
+
+			if ( (hex(substr($ddata,6,2))) == 0) {
+				readingsBulkUpdate($hash, "state", "off");
+				$hash->{STATE} = "off";
+			} elsif ( (hex(substr($ddata,6,2))) == 1) {
+				readingsBulkUpdate($hash, "state", "on");
+				$hash->{STATE} = "on";
+			}
+
+	} elsif ($ot == 24) {
 
 #	+++++++ 65 D0_VALUE_ACK (101)
 #	+++++++ 09 Temperatur
@@ -681,7 +1059,7 @@ sub N4HMODULE_Update($@) {
 			$ddata1 = $ddata1.sprintf ("%02X", ( ($cs>>0) & 255 ) );	
 			$ddata = sprintf ("%02x%s", (length($ddata1)/2), $ddata1);
 
-			Log3 $hash, 5, "N4MODULE (set temperature): $name to $cmd - $ddata, $ddata1, $ipdst";
+			Log3 $hash, 5, "N4HMODULE (set temperature): $name to $cmd - $ddata, $ddata1, $ipdst";
 			IOWrite($hash, 32767, $ddata, $ipdst);
 		}
 		return undef;
@@ -696,10 +1074,10 @@ sub N4HMODULE_Update($@) {
 
 		if (defined $value) {
 		 $cmd = $value; 
-		 readingsSingleUpdate($hash, "brightness", "$cmd", 1);
+		 readingsSingleUpdate($hash, "Brightness", "$cmd", 1);
 		}
 		else {
-  		 ($cmd, undef) = split(/ /, ReadingsVal($name , "brightness","")); }
+  		 ($cmd, undef) = split(/ /, ReadingsVal($name , "Brightness","")); }
 
 		if (defined $cmd) {
 			my $cs = $cmd;
@@ -707,7 +1085,7 @@ sub N4HMODULE_Update($@) {
 			$ddata1 = $ddata1.sprintf ("%02X", ( ($cs) ) );	
 			$ddata = sprintf ("%02x%s", (length($ddata1)/2), $ddata1);
 
-			Log3 $hash, 5, "N4MODULE (set brightness): $name to $cmd - $ddata, $ddata1, $ipdst";
+			Log3 $hash, 5, "N4HMODULE (set brightness): $name to $cmd - $ddata, $ddata1, $ipdst";
 			IOWrite($hash, 32767, $ddata, $ipdst);
 		}
 		return undef;
@@ -733,7 +1111,41 @@ sub N4HMODULE_Update($@) {
 			$ddata1 = $ddata1.sprintf ("%02X", ( ($cs) ) );	
 			$ddata = sprintf ("%02x%s", (length($ddata1)/2), $ddata1);
 
-			Log3 $hash, 5, "N4MODULE (set humidity): $name to $cmd - $ddata, $ddata1, $ipdst";
+			Log3 $hash, 5, "N4HMODULE (set humidity): $name to $cmd - $ddata, $ddata1, $ipdst";
+			IOWrite($hash, 32767, $ddata, $ipdst);
+		}
+		return undef;
+	}
+	elsif ($ot == 34) { # TLH-Regler H,Sollwert,Temperatur
+
+#	+++++++ 37 D0_ACTOR_ACK (101)
+
+		Log3 $hash, 5, "N4HMODULE (xxx): $name to $cmd - $ddata, $ipdst";
+		
+		my $ddata1 = "3700";
+		
+		if (defined $value) {
+		 $cmd = $value; 
+		 readingsSingleUpdate($hash, "desired-temp", "$cmd", 1);
+		}
+		else {
+		 ($cmd, undef) = split(/ /, ReadingsVal($name , "desired-temp", "")); } 
+		 
+		if (defined $cmd) {
+
+			if ($cmd >= 0) {
+			$cs = $cmd*16;
+			$ddata1 = $ddata1.sprintf ("%02X", ($cs>>8) );	
+			}
+			elsif ($cmd < 0) { 
+			$cs = 0xff+($cmd*16);
+			$ddata1 = $ddata1.sprintf ("%02X", 0xff );	
+			}
+		
+			$ddata1 = $ddata1.sprintf ("%02X", ( ($cs>>0) & 255 ) );	
+			$ddata = sprintf ("%02x%s", (length($ddata1)/2), $ddata1);
+
+			Log3 $hash, 5, "N4HMODULE (set desired-temp): $name to $cmd - $ddata, $ddata1, $ipdst";
 			IOWrite($hash, 32767, $ddata, $ipdst);
 		}
 		return undef;
@@ -760,7 +1172,7 @@ sub N4HMODULE_Update($@) {
 			$ddata1 = $ddata1.sprintf ("%02X", ( $cs & 0xff ) );	
 			$ddata = sprintf ("%02x%s", (length($ddata1)/2), $ddata1);
 
-			Log3 $hash, 5, "N4MODULE (set wind): $name to $cmd - $ddata, $ddata1, $ipdst";
+			Log3 $hash, 5, "N4HMODULE (set wind): $name to $cmd - $ddata, $ddata1, $ipdst";
 			IOWrite($hash, 32767, $ddata, $ipdst);
 		}
 		return undef;
@@ -787,7 +1199,7 @@ sub N4HMODULE_Update($@) {
 			$ddata1 = $ddata1.sprintf ("%02X", ( $cs & 0xff ) );	
 			$ddata = sprintf ("%02x%s", (length($ddata1)/2), $ddata1);
 
-			Log3 $hash, 5, "N4MODULE (set pressure): $name to $cmd - $ddata, $ddata1, $ipdst";
+			Log3 $hash, 5, "N4HMODULE (set pressure): $name to $cmd - $ddata, $ddata1, $ipdst";
 			IOWrite($hash, 32767, $ddata, $ipdst);
 		}
 		return undef;
@@ -814,7 +1226,7 @@ sub N4HMODULE_Update($@) {
 			$ddata1 = $ddata1.sprintf ("%02X", ( $cs & 0xff ) );	
 			$ddata = sprintf ("%02x%s", (length($ddata1)/2), $ddata1);
 
-			Log3 $hash, 5, "N4MODULE (set rain): $name to $cmd - $ddata, $ddata1, $ipdst";
+			Log3 $hash, 5, "N4HMODULE (set rain): $name to $cmd - $ddata, $ddata1, $ipdst";
 			IOWrite($hash, 32767, $ddata, $ipdst);
 		}
 		return undef;
@@ -838,7 +1250,7 @@ sub N4HMODULE_Update($@) {
 			$ddata = sprintf ("%02x%s", (length($ddata1)/2), $ddata1);
 
 			$ipdst = 1;
-			Log3 $hash, 5, "N4MODULE (set N56): $name to $cmd - $ddata, $ddata1, $ipdst, $n56";
+			Log3 $hash, 5, "N4HMODULE (set N56): $name to $cmd - $ddata, $ddata1, $ipdst, $n56";
 			IOWrite($hash, 1, $ddata, $ipdst);
 		
 		return undef;
@@ -954,6 +1366,9 @@ sub N4HMODULE_ParseN56($) {
 	 <li> 24 - Measurement,Temperature</li>
 	 <li> 25 - Measurement,Brightness</li>
 	 <li> 26 - Measurement,Humidity</li>
+	 <li> 34 - TLH-Regler H,Sollwert,Temperatur</li>
+	 <li> 95 - Ausgang, Jal, Motor AJ3</li>
+	 <li>210 - RF Reader</li>
 	 <li>240 - Measurement,Wind</li>
 	 <li>242 - Measurement,Pressure</li>
 	 <li>245 - Measurement,Rain</li>
@@ -1005,6 +1420,9 @@ sub N4HMODULE_ParseN56($) {
 	 <li> 24 - Messwert,Temperatur</li>
 	 <li> 25 - Messwert,Helligkeit</li>
 	 <li> 26 - Messwert,Feuchte</li>
+	 <li> 34 - TLH-Regler H,Sollwert,Temperatur</li>
+	 <li> 95 - Ausgang, Jal, Motor AJ3</li>
+	 <li>210 - RF Reader</li>
 	 <li>240 - Messwert,Wind</li>
 	 <li>242 - Messwert,Luftdruck</li>
 	 <li>245 - Messwert,Regenmenge</li>
