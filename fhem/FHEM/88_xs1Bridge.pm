@@ -4,9 +4,9 @@
 # physisches Modul - Verbindung zur Hardware
 #
 # note / ToDo´s:
-# 
-# 
-# 
+# .
+# .
+# .
 # 
 #################################################################
 
@@ -31,7 +31,7 @@ sub xs1Bridge_Initialize($) {
 	
 	$hash->{WriteFn}    = "xs1Bridge_Write";
 	$hash->{Clients}    = ":xs1Device:";
-	$hash->{MatchList}  = { "1:xs1Device"   =>	'{\X..version.:.*' };			## https://regex101.com/ Testfunktion
+	$hash->{MatchList}  = { "1:xs1Device"   =>	'[A][k][t][o][r]_[0-6][0-9].*|[S][e][n][s][o][r]_[0-6][0-9].*' };	## https://regex101.com/ Testfunktion
 	
 	$hash->{DefFn}		=	"xs1Bridge_Define";
 	$hash->{AttrFn}  	= 	"xs1Bridge_Attr";  
@@ -39,7 +39,7 @@ sub xs1Bridge_Initialize($) {
 	$hash->{AttrList}	=	"debug:0,1 ".
 							"disable:0,1 ".
 							"ignore:0,1 ".
-							"interval:10,30,60,180,360 ";							
+							"interval:30,60,180,360 ";							
 							##$readingFnAttributes;		## die Standardattribute von FHEM
 							
 	foreach my $d(sort keys %{$modules{xs1Bridge}{defptr}}) {
@@ -64,7 +64,7 @@ sub xs1Bridge_Define($$) {
 	if (&xs1Bridge_Ping == 1) {				## IP - Check
 	$hash->{STATE} = "Initialized";			## Der Status des Modules nach Initialisierung.
 	$hash->{TIME} = time();					## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.05";				## Version
+	$hash->{VERSION} = "1.06";				## Version
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
@@ -103,9 +103,9 @@ sub xs1Bridge_Attr(@) {
 		Debug " $typ: xs1_Attr | Cmd:$cmd | RemoveInternalTimer" if($debug);
 
 		if ($attrName eq "interval") {								## Abfrage Attribute
-			if (($attrValue !~ /^\d*$/) || ($attrValue < 5))		## Bildschirmausgabe - Hinweis Wert zu klein
+			if (($attrValue !~ /^\d*$/) || ($attrValue < 10))		## Bildschirmausgabe - Hinweis Wert zu klein
 			{
-			return "$typ: Interval is too small. Please define new Interval | (at least: 5 seconds)";
+			return "$typ: Interval is too small. Please define new Interval | (at least: 10 seconds)";
 			}
 			my $interval = $attrValue;
 		}
@@ -171,7 +171,7 @@ sub xs1Bridge_GetUpDate() {
 	my $state = $hash->{STATE};
 	my $def;
 	
-	#http://xxx.xxx.xxx.xxx/control?callback=cname&cmd=...
+	#http://x.x.x.x/control?callback=cname&cmd=...
 	#get_list_actuators        - list all actuators
 	#get_list_sensors          - list all sensors
 	#get_list_timers           - list all timers
@@ -198,6 +198,15 @@ sub xs1Bridge_GetUpDate() {
 			readingsSingleUpdate($hash, "state", "active", 1);
 		}
 
+		my $xs1_check = "-";
+
+		if($modules{xs1Device} && $modules{xs1Device}{LOADED}) {						## Check Modul
+			Debug " $typ: xs1Bridge_GetUpDate | Modul xs1Device loaded" if($debug);
+			$xs1_check = "ok";
+		} else {
+			Debug " $typ: xs1Bridge_GetUpDate | Modul xs1Device can´t load! Please check it to be available!" if($debug);
+		}
+
 		### JSON Abfrage - Schleife
 		for my $i (0..4) {
 			my $adress = "http://".$hash->{xs1_ip}.$cmd.$cmdtyp[$i];
@@ -211,35 +220,35 @@ sub xs1Bridge_GetUpDate() {
 			}
 			
 			my ($json) = get( $adress ) =~ /[^(]*[}]/g;					## cut cname( + ) am Ende von Ausgabe -> ARRAY Struktur
-																		## ggf https://stackoverflow.com/questions/9493304/use-of-uninitialized-value-in-pattern-match-m testen
-
 			my $json_utf8 = eval {encode_utf8( $json )};						## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
 			my $decoded = eval {decode_json( $json_utf8 )};
 
-			if ($i <= 1 ) {               ### xs1 Aktoren / Sensoren
+			if ($i <= 1 ) {               	### xs1 Aktoren / Sensoren
 				my @array = @{ $decoded->{$arrayname[$i]} };
 				foreach my $f ( @array ) {
 					if ($f->{"type"} ne "disabled") {
-						readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , $f->{"value"}, 1);
 						Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." | ".$f->{"type"}." | ".$f->{"name"}." | ". $f->{"value"} if($debug);
-						#Log3 $name, 3, $f->{"id"}." | ".$f->{"type"}." | ".$f->{"name"}." | ". $f->{"value"};
+						my $data = "-";
+						if ($i == 0)		### xs1 Aktoren nur update bei differenten Wert
+						{
+							my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}), "unknown");	## Readings Wert
+							my $newState = $f->{"value"};																		## ARRAY Wert xs1 aktuell
+							Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." oldState=$oldState newState=$newState" if($debug);
+							if ($oldState ne $newState) {
+							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , $f->{"value"}, 1);
+							$data = $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$f->{"type"}."_".$f->{"value"};
+							}
+						}
+						else
+						{
+							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , $f->{"value"}, 1);
+							$data = $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$f->{"type"}."_".$f->{"value"};
+						}
+						if ($xs1_check eq "ok") {
+							Debug " $typ: Dispatch -> $data" if($debug);
+							Dispatch($hash,$data,undef);												## Dispatch an xs1Device Modul
+						}
 					}
-				}
-				
-				my $xs1DeviceDev = "noDispatchDevice";					## defined xs1Device search to Dispatch
-				my $key;
-				foreach my $key (keys(%defs)) {							## https://forum.fhem.de/index.php/topic,19195.msg128890.html#msg128890
-					if($defs{$key}{TYPE} eq "xs1Device") {				## old with Warning: #if(%defs->{$key}{TYPE} eq "xs1Device") {
-						$xs1DeviceDev = $key;
-						last;
-					}
-				}
-			
-				if ($xs1DeviceDev ne "noDispatchDevice")
-				{
-				Debug " $typ: xs1Device ($xs1DeviceDev) find, ready to dispatch" if($debug);
-				Log3 $name, 5, "$typ: xs1Device ($xs1DeviceDev) find, ready to dispatch";
-				Dispatch($hash,$json,undef);						## Dispatch an anderes Modul, NUR KOMPLETTES JSON !!!
 				}
 
 			} elsif ($i == 2) {           ### xs1 Info´s
@@ -249,13 +258,21 @@ sub xs1Bridge_GetUpDate() {
 				$features.= $decoded->{'info'}{'features'}->[$features_i]." ";
 				$features_i++;
 				}
+				
+				my @xs1_readings = ("xs1_devicename","xs1_bootloader","xs1_hardware","xs1_features","xs1_firmware","xs1_mac","xs1_uptime");
+				my @xs1_decoded = ($decoded->{'info'}{'devicename'} , $decoded->{'info'}{'bootloader'} , $decoded->{'info'}{'hardware'} , $features , $decoded->{'info'}{'firmware'} , $decoded->{'info'}{'mac'} , FmtDateTime(time()-($decoded->{'info'}{'uptime'})));
+				# xs1_uptime wird teilweise je nach Laufzeit mit aktualisiert (+-1 Sekunde) -> Systemabhängig
+				
+				my $i2 = 0;
 				readingsBeginUpdate($hash);
-				readingsBulkUpdate($hash, "xs1_devicename" , $decoded->{'info'}{'devicename'});
-				readingsBulkUpdate($hash, "xs1_bootloader" , $decoded->{'info'}{'bootloader'});
-				readingsBulkUpdate($hash, "xs1_hardware" , $decoded->{'info'}{'hardware'});
-				readingsBulkUpdate($hash, "xs1_features" , $features);
-				readingsBulkUpdate($hash, "xs1_firmware" , $decoded->{'info'}{'firmware'});
-				readingsBulkUpdate($hash, "xs1_mac" , $decoded->{'info'}{'mac'});
+				for my $i2 (0..6) {
+					my $oldState = ReadingsVal($name, $xs1_readings[$i2], "unknown");		## Readings Wert
+					my $newState = $xs1_decoded[$i2];										## ARRAY Wert xs1 aktuell
+					
+					if ($oldState ne $newState) {											## Update Reading nur bei Wertänderung
+						readingsBulkUpdate($hash, $xs1_readings[$i2] , $xs1_decoded[$i2]);	
+					}
+				}
 				readingsEndUpdate($hash, 1);
             
 				Debug " $typ: xs1_devicename: ".$decoded->{'info'}{'devicename'} if($debug);
@@ -264,13 +281,23 @@ sub xs1Bridge_GetUpDate() {
 				Debug " $typ: xs1_features: ".$features if($debug);
 				Debug " $typ: xs1_firmware: ".$decoded->{'info'}{'firmware'} if($debug);
 				Debug " $typ: xs1_mac: ".$decoded->{'info'}{'mac'} if($debug);
+				Debug " $typ: xs1_uptime: ".$decoded->{'info'}{'uptime'} if($debug);
             
 			} elsif ($i == 3) {				### xs1 Timers
 				my @array = @{ $decoded->{$arrayname[$i]} };
 				foreach my $f ( @array ) {
+					my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}), "unknown");	## Readings Wert
+					my $newState = FmtDateTime($f->{"next"});															## ARRAY Wert xs1 aktuell
+					
 					if ($f->{"type"} ne "disabled") {
-						readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , FmtDateTime($f->{"next"}), 1);
+						if ($oldState ne $newState) {																		## Update Reading nur bei Wertänderung
+							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , FmtDateTime($f->{"next"}), 1);
+						}
 						Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." | ".$f->{"name"}." | ".$f->{"type"}." | ". $f->{"next"} if($debug);
+					}
+					elsif($oldState ne "unknown") {		## deaktive Timer mit Wert werden als Reading entfernt
+						Log3 $name, 3, "$typ: xs1Bridge_GetUpDate | ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." is deactive in xs1";
+						delete $defs{$name}{READINGS}{$readingsname[$i]."_".sprintf("%02d", $f->{"id"})};
 					}
 				}
 			} elsif ($i == 4) {				### xs1 Aktoren / Funktion != disable
@@ -279,13 +306,13 @@ sub xs1Bridge_GetUpDate() {
             
 					if ($f2->{"type"} ne "disabled") {           ## Funktion != actuator -> type disable
 						my @array = @{ $decoded->{'actuator'}->[($f2->{"id"})-1]->{$arrayname[$i]} };
-						my $i2 = 0;                               ## Funktionscounter
+						my $i3 = 0;                               ## Funktionscounter
 
 						foreach my $f3 ( @array ) {
-							$i2 = $i2+1;
+							$i3 = $i3+1;
 							if ($f3->{"type"} ne "disabled") {  ## Funktion != function -> type disable
-								Debug " $typ: ".$readingsname[0]."_".sprintf("%02d", $f2->{"id"})." | ".$f2->{"type"}." | ".$arrayname[$i]."_".$i2." | ".$f3->{"type"} if($debug);
-								#readingsSingleUpdate($hash, $readingsname[0]."_".sprintf("%02d", $f2->{"id"})."_".$arrayname[$i]."_".$i2 , $f3->{"type"} , 1);
+								Debug " $typ: ".$readingsname[0]."_".sprintf("%02d", $f2->{"id"})." | ".$f2->{"type"}." | ".$arrayname[$i]."_".$i3." | ".$f3->{"type"} if($debug);
+								#readingsSingleUpdate($hash, $readingsname[0]."_".sprintf("%02d", $f2->{"id"})."_".$arrayname[$i]."_".$i3 , $f3->{"type"} , 1);
 							}
 						}
 					}
@@ -298,7 +325,7 @@ sub xs1Bridge_GetUpDate() {
 			### Schleifen Ende ###
 		}
       	
-		Debug "\n ------------- ERROR CHECK - ALL END -------------\n\n " if($debug);
+		Debug "\n ------------- ERROR CHECK - ALL END -------------\n " if($debug);
 	}
 }
 
@@ -371,10 +398,26 @@ sub xs1Bridge_Undef($$)
 		This function deactivates the interval. With disable 1 no readings are updated.<br>
 		(Default, disable 0)
 		</li><br>
-		<li>interval (10,30,60,180,360)<br>
+		<li>interval (30,60,180,360)<br>
 		This is the interval in seconds at which readings are read from xs1<br>
+		<i>For actuators, only different states are updated in the set interval.</i><br>
+		<i>Sensors are always updated in intervals, regardless of the status.</i><br>
 		(Default, interval 60)
-		</li><br>
+		</li><br><br>
+	</ul>
+	<b>explanation:</b>
+	<ul>
+		<li>various Readings:</li>
+		<ul>
+		Aktor_(01-64): &nbsp;&nbsp;&nbsp;defined actuator in the device<br>
+		Sensor_(01-64): defined sensor in the device<br>
+		Timer_(01-128): defined timer in the device<br>
+		xs1_bootloader: Firmwareversion Bootloader<br>
+		xs1_features: &nbsp;&nbsp;&nbsp;&nbsp;purchased feature when buying (A = send | B = receive | C = Skripte/Makros | D = Media Access)<br>
+		xs1_firmware: &nbsp;&nbsp;&nbsp;Firmwareversion<br>
+		xs1_uptime: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;device start<br>
+		</ul><br>
+		<li>The message "<code>HTTP GET error code 500 -> no JSON-query </code>" in the log file says that there was no query for a short time.</li>
 	</ul>
 </ul>
 =end html
@@ -419,10 +462,26 @@ sub xs1Bridge_Undef($$)
 		Diese Funktion deaktiviert den Interval. Mit <code>disable 1</code> werden keine Readings aktualisiert.<br>
 		(Default, disable 0)
 		</li><br>
-		<li>interval (10,30,60,180,360)<br>
+		<li>interval (30,60,180,360)<br>
 		Das ist der Intervall in Sekunden, in dem die Readings neu gelesen werden vom xs1.<br>
+		<i>Bei Aktoren werden nur unterschiedliche Zustände aktualisiert im eingestellten Intervall.</i><br>
+		<i>Sensoren werden unabhängig vom Zustand immer im Intervall aktualisiert.</i><br>
 		(Default, interval 60)
-		</li><br>
+		</li><br><br>
+	</ul>
+	<b>Erl&auml;uterung:</b>
+	<ul>
+		<li>Auszug Readings:</li>
+		<ul>
+		Aktor_(01-64): &nbsp;&nbsp;&nbsp;definierter Aktor im Ger&auml;t<br>
+		Sensor_(01-64): definierter Sensor im Ger&auml;t<br>
+		Timer_(01-128): definierter Timer im Ger&auml;t<br>
+		xs1_bootloader: Firmwareversion des Bootloaders<br>
+		xs1_features: &nbsp;&nbsp;&nbsp;&nbsp;erworbene Feature beim Kauf (A = SENDEN | B = EMPFANGEN | C = Skripte/Makros | D = Speicherkartenzugriff)<br>
+		xs1_firmware: &nbsp;&nbsp;&nbsp;Firmwareversion<br>
+		xs1_uptime: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Gerätestart<br>
+		</ul><br>
+		<li>Die Meldung "<code>HTTP GET error code 500 -> no JSON-query </code>" im Logfile besagt, das kurzzeitig keine Abfrage erfolgen konnte.</li>
 	</ul>
 </ul>
 =end html_DE
