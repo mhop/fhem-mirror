@@ -271,6 +271,7 @@ FW_jqueryReadyFn()
   FW_smallScreenCommands();
   FW_inlineModify();
   FW_rawDef();
+  FW_treeMenu();
 }
 
 function
@@ -804,6 +805,92 @@ FW_rawDef()
     });
 
   });
+}
+
+function
+FW_treeMenu()
+{
+  var col = getComputedStyle($("a").get(0),null).getPropertyValue('color'); 
+  var arrowRight='data:image/svg+xml;utf8,<svg viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path fill="gray" d="M1171 960q0 13-10 23l-466 466q-10 10-23 10t-23-10l-50-50q-10-10-10-23t10-23l393-393-393-393q-10-10-10-23t10-23l50-50q10-10 23-10t23 10l466 466q10 10 10 23z"/></svg>'
+        .replace('gray', col);
+  var arrowDown=arrowRight.replace('/>',' transform="rotate(90,896,896)"/>');
+  var fnd;
+
+  $("div#menu table.room").each(function(){     // one loop per Block
+    var t = this, ma = {};
+    $(t).find("td > div > a > span").each(function(e){
+      var span = this, spanTxt = $(span).html();
+      var ta = spanTxt.split("--");
+      if(ta.length <= 1)
+        return;
+      fnd = true;
+      var nxt="", lst="", tr=$(span).closest("tr");
+      for(var i1=0; i1<ta.length-1; i1++) {
+        nxt += "--"+ta[i1];
+        if(!ma[nxt]) {
+          $(tr).before("<tr class='menuTree closed level"+i1+"' "+
+              "data-mTree='"+lst+"' data-nxt='"+nxt+"'>"+
+              "<td><div><a href='#'>"+ta[i1]+"</a><div></div></div></td></tr>");
+        }
+        ma[nxt] = true;
+        lst = nxt;
+      }
+      $(span).html(ta[ta.length-1]);
+      $(tr).attr("data-mTree", nxt)
+           .addClass("menuTree level"+(ta.length-1));
+    });
+  });
+
+  if(fnd) {
+    $("head").append(`
+      <style>
+        tr.menuTree { cursor:pointer; }
+        tr.menuTree.level1 > td > div { margin-left:10px; }
+        tr.menuTree.level2 > td > div { margin-left:20px; }
+        tr.menuTree.level3 > td > div { margin-left:30px; }
+        tr.menuTree.open { font-weight: bold; }
+        tr.menuTree > td > div > div { 
+          display:inline-block; width:1em; height:1em; float:right;
+          background-size: contain;
+        }
+      </style>`);
+    var t = $("div#menu table.room");
+    $(t).find("tr[data-mTree]").not(".level0").hide();
+    $(t).find("tr.menuTree").click(function(){treeClick(this)});
+    $(t).find("tr.menuTree > td > div > div")
+        .css("background-image", "url('"+arrowRight+"')");
+    var selRoom = $("div#content").attr("room");
+    if(selRoom) {
+      var ta = selRoom.split("--"), nxt="";
+      for(var i1=0; i1<ta.length-1; i1++) {
+        nxt += "--"+FW_escapeSelector(ta[i1]);
+        treeClick($(t).find("tr.menuTree[data-nxt="+nxt+"]"));
+      }
+    }
+  }
+
+  function
+  treeClick(el)
+  {
+    var tgt = FW_escapeSelector($(el).attr("data-nxt"));
+    if($(el).hasClass("closed")) {
+      $(el).closest("table").find("tr[data-mTree="+tgt+"]").show();
+      $(el).find("div>div").css("background-image", "url('"+arrowDown+"')");
+    } else {
+      $(el).closest("table").find("tr[data-mTree="+tgt+"]").hide();
+      $(el).find("div>div").css("background-image", "url('"+arrowRight+"')");
+    }
+    $(el).toggleClass("closed");
+    $(el).toggleClass("open");
+  };
+}
+
+function
+FW_escapeSelector(s)
+{
+  if(typeof s != 'string')
+    return s;
+  return s.replace(/[ .#\[\]]/g, function(r) { return '\\'+r });
 }
 
 /*************** LONGPOLL START **************/

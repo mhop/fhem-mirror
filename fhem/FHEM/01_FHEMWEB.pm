@@ -1594,9 +1594,10 @@ FW_roomOverview($)
         $target = 'target="_blank"' if($l2 =~ s/^$FW_ME\/\+/$FW_ME\//);
         $target = 'target="_blank"' if($l2 =~ m/commandref|fhem.de.fhem.html/);
         if($l2 =~ m/.html$/ || $l2 =~ m/^(http|javascript)/ || length($target)){
-           FW_pO "<td><div><a href=\"$l2\" $target >$icon$l1</a></div></td>";
+           FW_pO "<td><div><a href='$l2' $target>$icon<span>$l1</span></a>".
+                 "</div></td>";
         } else {
-          FW_pH $l2, "$icon$l1", 1, $class;
+          FW_pH $l2, "$icon<span>$l1</span>", 1, $class;
         }
 
         FW_pO "</tr>";
