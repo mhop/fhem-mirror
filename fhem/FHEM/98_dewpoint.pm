@@ -383,7 +383,7 @@ dewpoint_Notify($$)
             }
             $sensor = "alarm";
             if (!exists $defs{$devName}{READINGS}{$sensor}{VAL} || $defs{$devName}{READINGS}{$sensor}{VAL} ne $current) {
-                Logr($hashName, 5, "dewpoint_notify: CHANGE alarm $current");
+                Log3($hashName, 5, "dewpoint_notify: CHANGE alarm $current");
                 $dev->{READINGS}{$sensor}{TIME} = $tn;
                 $dev->{READINGS}{$sensor}{VAL} = $current;
                 $dev->{CHANGED}[$n++] = $sensor . ": " . $current;
