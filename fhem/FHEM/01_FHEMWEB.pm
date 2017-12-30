@@ -235,7 +235,7 @@ FW_Define($$)
   return "Usage: define <name> FHEMWEB [IPV6:]<tcp-portnr> [global]"
         if($port !~ m/^(IPV6:)?\d+$/ || ($global && $global ne "global"));
 
-  FW_Undef($hash) if($hash->{OLDDEF}); # modify
+  FW_Undef($hash, undef) if($hash->{OLDDEF}); # modify
 
   foreach my $pe ("fhemSVG", "openautomation", "default") {
     FW_readIcons($pe);
@@ -2152,6 +2152,8 @@ FW_style($$)
         @fList = defInfo('TYPE=SVG','GPLOTFILE');
         @fList = map { "$_.gplot" } @fList;
         @fList = map { "$_.configDB" } @fList if configDBUsed();
+        my %fListUnique = map { $_, 1 } @fList;
+        @fList = sort keys %fListUnique;
       } else {
         @fList = FW_fileList("$v/$re");
       }
@@ -3120,7 +3122,7 @@ FW_closeInactiveClients()
             !$defs{$dev}{LASTACCESS} || $defs{$dev}{inform} ||
             ($now - $defs{$dev}{LASTACCESS}) < 60);
     Log3 $FW_wname, 4, "Closing inactive connection $dev";
-    FW_Undef($defs{$dev}, "");
+    FW_Undef($defs{$dev}, undef);
     delete $defs{$dev};
     delete $attr{$dev};
   }
