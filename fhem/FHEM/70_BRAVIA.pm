@@ -135,6 +135,7 @@ sub BRAVIA_Set($@) {
     my $channelId = ReadingsVal($name, "channelId", "");
     my $channels   = "";
     my $inputs = "";
+    my $apps = "";
     my $mutes = "toggle";
 
     if ( ReadingsVal($name, "input", "") ne "-" ) {
@@ -190,6 +191,15 @@ sub BRAVIA_Set($@) {
     $mutes .= ",on,off";
     #$mutes .= ",off" if ( defined( $hash->{READINGS}{generation}{VAL} ) and $hash->{READINGS}{generation}{VAL} ne "1.0" );
 
+    # App handling
+    my @apps;
+    if ( defined( $hash->{helper}{device}{appPreset} )
+        && ref( $hash->{helper}{device}{appPreset} ) eq "HASH" ) {
+      @apps = keys %{ $hash->{helper}{device}{appPreset} };
+    }
+    @apps = sort(@apps);
+    $apps = join(",", @apps);
+
     my $usage = "Unknown argument " . $a[1] . ", choose one of";
     $usage .= " requestFormat:json,xml register";
     $usage .= ":noArg"
@@ -198,6 +208,7 @@ sub BRAVIA_Set($@) {
     $usage .= " mute:" . $mutes;
     $usage .= " input:" . $inputs if ( $inputs ne "" );
     $usage .= " channel:$channels" if ( $channels ne "" );
+    $usage .= " application:" . $apps if ( $apps ne "" );
     $usage .= " text" if (ReadingsVal($name, "requestFormat", "") eq "json");
 
     my $cmd = '';
@@ -474,6 +485,33 @@ sub BRAVIA_Set($@) {
         }
         else {
             return "Device needs to be reachable to switch input.";
+        }
+    }
+
+    # app
+    elsif ( $a[1] eq "app" ) {
+        if (defined($a[2]) && $presence eq "present" && $power ne "on" ) {
+            Log3 $name, 4, "BRAVIA $name: indirect switching request to ON";
+            BRAVIA_Set( $hash, $name, "on" );
+        }
+
+        return "No 2nd argument given" if ( !defined( $a[2] ) );
+
+        Log3 $name, 2, "BRAVIA set $name " . $a[1] . " " . $a[2];
+
+        # Resolve app uri
+        my $app_uri;
+        if ( defined( $hash->{helper}{device}{appPreset}{ $a[2] } ) ) {
+            $app_uri = $hash->{helper}{device}{appPreset}{ $a[2] }{uri};
+        } else {
+            return "Unknown app '" . $a[2] . "' on that device.";
+        }
+
+        if ( $presence eq "present" ) {
+            BRAVIA_SendCommand( $hash, "setActiveApp", $app_uri );
+        }
+        else {
+            return "Device needs to be reachable to start an app.";
         }
     }
 
@@ -787,6 +825,18 @@ sub BRAVIA_SendCommand($$;$$) {
         $data = "{\"method\":\"getScheduleList\",\"params\":[{\"cnt\":100,\"stIdx\":0}],\"id\":1,\"version\":\"1.0\"}";
       } else {
         $URL .= "/cersEx/api/" . $service;
+      }
+    } elsif ($service eq "getApplicationList") {
+      $URL .= $port->{SERVICE};
+      if ($requestFormat eq "json") {
+        $URL .= "/sony/appControl";
+        $data = "{\"id\":2,\"method\":\"getApplicationList\",\"version\":\"1.0\",\"params\":[]}";
+      }
+    } elsif ($service eq "setActiveApp") {
+      $URL .= $port->{SERVICE};
+      if ($requestFormat eq "json") {
+        $URL .= "/sony/appControl";
+        $data = "{\"id\":2,\"method\":\"setActiveApp\",\"version\":\"1.0\",\"params\":[{\"uri\":\"".$cmd."\"}]}";
       }
     } elsif ($service eq "text") {
       $URL .= $port->{SERVICE};
@@ -1376,6 +1426,13 @@ sub BRAVIA_ProcessCommandData ($$) {
           && ReadingsVal($name, "requestFormat", "") eq "json") {
         BRAVIA_SendCommand( $hash, "getCurrentExternalInputsStatus" );
       }
+
+      # load app list if just switched on
+      if ($newstate eq "on"
+          && (ReadingsVal($name, "state", "") ne "on" || !defined($hash->{helper}{device}{appPreset}))
+          && ReadingsVal($name, "requestFormat", "") eq "json") {
+        BRAVIA_SendCommand( $hash, "getApplicationList" );
+      }
     }
     
     # getScheduleList
@@ -1499,8 +1556,37 @@ sub BRAVIA_ProcessCommandData ($$) {
       }
     }
     
+    # getApplicationList
+    elsif ( $service eq "getApplicationList" ) {
+      my $channelIndex = 0;
+      if ( ref($return) eq "HASH" ) {
+        if (ref($return->{result}) eq "ARRAY") {
+          foreach ( @{ $return->{result} } ) {
+            foreach ( @{ $_ } ) {
+              my $appName;
+              my $appUri;
+              my $key;
+              foreach $key ( keys %{ $_ }) {
+                if ( $key eq "uri" ) {
+                  $appUri = $_->{$key};
+                } elsif ( $key eq "title" ) {
+                  $appName = BRAVIA_GetNormalizedName($_->{$key});
+                }
+              }
+              $hash->{helper}{device}{appPreset}{$appName}{uri}  = $appUri;
+            }
+          }
+        }
+      }
+    }
+
     # setPlayContent
     elsif ( $service eq "setPlayContent" ) {
+      # nothing to do
+    }
+
+    # setActiveApp
+    elsif ( $service eq "setActiveApp" ) {
       # nothing to do
     }
 
@@ -1953,6 +2039,9 @@ sub BRAVIA_GetNormalizedName($) {
     <br><br>
     Options:
     <ul>
+      <li><i>application</i><br>
+        List of applications.
+        Applications are available with modells from 2013 and newer.</li>
       <li><i>channel</i><br>
         List of all known channels. The module collects all visited channels.
         Channels can be loaded automtically with modells from 2013 and newer.
@@ -1961,6 +2050,9 @@ sub BRAVIA_GetNormalizedName($) {
         Switches a channel back.</li>
       <li><i>channelUp</i><br>
         Switches a channel forward.</li>
+      <li><i>input</i><br>
+        List of input channels.
+        Imputs are available with modells from 2013 and newer.</li>
       <li><i>mute</i><br>
         Set mute if <a href=#BRAVIAupnp>Upnp</a> is activated.</li>
       <li><i>off</i><br>
@@ -2061,14 +2153,20 @@ sub BRAVIA_GetNormalizedName($) {
     <br><br>
     Optionen:
     <ul>
+      <li><i>application</i><br>
+        Liste der Anwendungen.
+        Anwenungen sind ab Modelljahr 2013 verfügbar.</li>
       <li><i>channel</i><br>
-        Liste alle bekannten Kanäle. Das Modul merkt sich alle aufgerufenen Kanäle.
+        Liste aller bekannten Kanäle. Das Modul merkt sich alle aufgerufenen Kanäle.
         Ab Modelljahr 2013 werden die Kanäle automatisch geladen
         (Anzahl siehe <a href=#BRAVIAchannelsMax>channelsMax</a>).</li>
       <li><i>channelDown</i><br>
         Einen Kanal zurück schalten.</li>
       <li><i>channelUp</i><br>
         Einen Kanal weiter schalten.</li>
+      <li><i>input</i><br>
+        Liste der Eingänge.
+        Eingänge sind ab Modelljahr 2013 verfügbar.</li>
       <li><i>mute</i><br>
         Direkte Stummschaltung erfolgt nur per aktiviertem <a href=#BRAVIAupnp>Upnp</a>.</li>
       <li><i>off</i><br>
