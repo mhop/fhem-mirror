@@ -21,7 +21,8 @@
 #  GNU General Public License for more details.
 ################################################################
 
-# Version 1.5      26.01.17 add playlist bookmarks, change XML to JSON
+# Version 1.6    - 31.12.17 remove telnet, add BlockingInformParent
+# Version 1.5    - 26.01.17 add playlist bookmarks, change XML to JSON
 # Version 1.43   - 18.01.17 add channelUp and channelDown
 # Version 1.42   - 15.01.17 add Cover and playlist_json
 # Version 1.41   - 12.01.17 add rawTitle 
@@ -96,8 +97,10 @@ my %sets = (
 	"channel"               => "",
 	"channelUp:noArg"       => "",
 	"channelDown:noArg"     => "",
- 	"save_bookmark:noArg"   => "",
-        "load_bookmark"         => "",
+	"save_bookmark:noArg"   => "",
+	"load_bookmark"         => "",
+	"active:noArg" 	        => "",
+	"inactive:noArg"        => "",
          );
 
 use constant clb => "command_list_begin\n";
@@ -181,6 +184,8 @@ sub MPD_updateConfig($)
 		}
 	} 
 
+        return undef if (IsDisabled($name) == 3);
+
 	if (IsDisabled($name))
 	{
 		readingsSingleUpdate($hash,"state","disabled",1);
@@ -221,7 +226,6 @@ sub MPD_updateConfig($)
            #Verzeichnis anlegen gescheitert
            Log3 $name,3,"$name, Could not create directory: www/$cache";
           }
-          #else {Log3 $name,4,"$name, lastfm cache =  www/$cache";}
          }
         
 
@@ -237,7 +241,6 @@ sub MPD_updateConfig($)
 	    }
 	    if ((AttrVal($name, "loadPlaylists", "1") eq "1") && !$error)
 	    {
-		#$error = mpd_cmd($hash, "i|lsinfo|playlists");
                 $error = mpd_cmd($hash, "i|listplaylists|playlists");
 		Log3 $name,3,"$name, error loading playlists -> $error" if ($error);
 		readingsSingleUpdate($hash,"last_error",$error,1) if ($error);
@@ -422,12 +425,23 @@ sub MPD_Set($@)
  my $name= $hash->{NAME};
  my $ret ;
  my $channel_cmd = 0;
+ my $val;
  
  return join(" ", sort keys %sets) if(@a < 2);
- return undef if(IsDisabled($name));
-
  my $cmd = $a[1];
+
+ if ($cmd eq "active") 
+ {
+  readingsSingleUpdate($hash, "state", "active", 1);
+  $hash->{".reset"} = 1; 
+
+  MPD_updateConfig($hash); 
+  return undef;
+ }
+
+ return "active" if(IsDisabled($name));
  return join(" ", sort keys %sets) if ($cmd eq "?");
+
 
  if ($cmd eq "mpdCMD") 
  {
@@ -498,8 +512,7 @@ sub MPD_Set($@)
  if ($cmd eq "next")
  { 
   if (ReadingsNum($name,"nextsong",0) != ReadingsNum($name,"song",0))
-  #if ($hash->{READINGS}{"nextsong"}{VAL} != $hash->{READINGS}{"song"}{VAL})
-   {
+  {
     MPD_ClearReadings($hash);
     return mpd_cmd($hash, clb."next\n".cle);
    } 
@@ -509,20 +522,20 @@ sub MPD_Set($@)
 
  if ($cmd eq "random")  
   { 
-    my $rand = ($hash->{READINGS}{random}{VAL}) ? "0" : "1";
-    $ret = mpd_cmd($hash, clb."random $rand\n".cle);
+    $val = (ReadingsNum($name,"random",0)) ? "0" : "1";
+    $ret = mpd_cmd($hash, clb."random $val\n".cle);
   }
 
  if ($cmd eq "repeat")  
   { 
-    my $rep = ($hash->{READINGS}{repeat}{VAL}) ? "0" : "1";
-    $ret = mpd_cmd($hash, clb."repeat $rep\n".cle);
+    $val = (ReadingsNum($name,"repeat",0)) ? "0" : "1";
+    $ret = mpd_cmd($hash, clb."repeat $val\n".cle);
   }
 
  if ($cmd eq "single")  
   { 
-    my $single = ($hash->{READINGS}{single}{VAL}) ? "0" : "1";
-    $ret = mpd_cmd($hash, clb."single $single\n".cle);  
+    $val = (ReadingsNum($name,"single",0)) ? "0" : "1";
+    $ret = mpd_cmd($hash, clb."single $val\n".cle);  
   }
 
  if ($cmd eq "clear")   
@@ -573,7 +586,7 @@ sub MPD_Set($@)
     $ret = mpd_cmd($hash,clb."play $subcmd\n".cle); 
   }
  
-  if($cmd eq "forward" || $cmd eq "rewind")
+  if (($cmd eq "forward") || ($cmd eq "rewind"))
   {
     my ($elapsed,$total) = split (":",ReadingsVal($name,"time",""));
     $total=int($total);
@@ -593,7 +606,7 @@ sub MPD_Set($@)
    if ((int($hash->{SUBVERSION}) < 20) && (AttrVal($name,"player","mpd") eq "mpd"))
    {
     $ret = "command $cmd needs a MPD version of 0.20.0 or greater ! (is ".$hash->{VERSION}.")";
-    Log3 $name,3,"$name,$ret";
+    Log3 $name,3,"$name, $ret";
     readingsSingleUpdate($hash,"last_error",$ret,1);
    }
    else
@@ -837,40 +850,35 @@ sub MPD_Set($@)
 
  }
 
-
-
-
  if ($cmd eq "updateDb")
  {
    $ret = mpd_cmd($hash, clb."rescan\n".cle);
  }
 
- if ($cmd eq "mpd_event") 
+ if ($cmd eq "inactive") 
  {
-   my (@arr) = split("\\|",$subcmd); 
-   $subcmd = $arr[0];
-   readingsSingleUpdate($hash,"mpd_event",$subcmd,1);
-   Log3 $name,4,"$name mpd event : ".$subcmd;
-   mpd_cmd($hash, clb.cle) if ($subcmd ne "playlist"); 
-
-   shift @arr;
-   MPD_NewPlaylist($hash,join ("\n", @arr));
-      # if ((ReadingsVal($name,"currentTrackProvider","Radio") eq "Radio") || (ReadingsVal($name,"playlist_json","") eq ""));
+  mpd_cmd($hash, clb."stop\nclear\n".cle);
+  MPD_ClearReadings($hash);
+  readingsSingleUpdate($hash, "state", "inactive", 1);
+  $hash->{STATE} = "inactive";
+  $hash->{".reset"} = 1;
+  MPD_updateConfig($hash); 
   return undef;
  }
 
+
   if (substr($cmd,0,13) eq "outputenabled")
   {
-   my $oid = substr($cmd,13,1);
+   my $oid = substr($cmd,13);
    if ($subcmd eq "1")
     {
      $ret = mpd_cmd($hash, "i|enableoutput $oid|x");
-     Log3  $name , 5, "enableoutput $oid | $subcmd";
+     Log3  $name , 5, "$name, enableoutput $oid | $subcmd";
     }
      else
     {
      $ret = mpd_cmd($hash, "i|disableoutput $oid|x");
-     Log3  $name , 5 ,"disableoutput $oid | $subcmd";
+     Log3  $name , 5 ,"$name, disableoutput $oid | $subcmd";
     }
    
    MPD_Outputs_Status($hash);
@@ -967,7 +975,7 @@ sub MPD_Outputs_Status($)
  foreach (@outp)
  {
    my @val = split(": " , $_);
-   Log3  $name, 4 ,"$name: MPD_Outputs_Status -> $val[0] = $val[1]";
+   Log3  $name, 4 ,"$name, MPD_Outputs_Status -> $val[0] = $val[1]";
    $outpid = ($val[0] eq "outputid") ? $val[1] : $outpid;
    readingsBulkUpdate($hash,$val[0].$outpid,$val[1]) if ($val[0] ne "outputid");
    $sets{$val[0].$outpid.":0,1"} = "" if ($val[0] eq "outputenabled");
@@ -980,7 +988,8 @@ sub mpd_cmd($$)
 
  my ($hash,$a)= @_;
  my $output = "";
- my $sp;
+ my $sp1;
+ my $sp2;
  my $artist;
  my $album;
  my $name_ = "";
@@ -1087,14 +1096,22 @@ sub mpd_cmd($$)
          $c =~ s/feat./ \/ /; 
          $c .= " - ".$exot if (defined($exot) && ($exot  ne "")); # Sonderfall Bayern 3
 
-         $sp = index($c, " - ");
+         $sp1 = index($c, " - ");
+         $sp2 = index($c, "-");
      
-         if (AttrVal($name, "titleSplit", 1) && ($sp>0)) # wer nicht mag solls eben abschalten
+         if (AttrVal($name, "titleSplit", 1) && ($sp1>0)) # wer nicht mag solls eben abschalten
           {
-            $artist = substr($c,0,$sp);
+            $artist = substr($c,0,$sp1);
             readingsBulkUpdate($hash,"Artist",$artist);
-            readingsBulkUpdate($hash,"Title",substr($c,$sp+3));
-            $title = substr($c,$sp+3);
+            readingsBulkUpdate($hash,"Title",substr($c,$sp1+3));
+            $title = substr($c,$sp1+3);
+          }
+         elsif (AttrVal($name, "titleSplit", 1) && ($sp2>0)) # wer nicht mag solls eben abschalten
+          {
+            $artist = substr($c,0,$sp2);
+            readingsBulkUpdate($hash,"Artist",$artist);
+            readingsBulkUpdate($hash,"Title",substr($c,$sp2+1));
+            $title = substr($c,$sp2+1);
           }
           else { readingsBulkUpdate($hash,"Title",$c); } # kein Titel Split
         }
@@ -1128,7 +1145,7 @@ sub mpd_cmd($$)
    {
      return  "mpd_Msg ACK ERROR ".$_ if $_ =~ s/^ACK //; # oops - error.
      last if $_ =~ /^OK/;    # end of output.
-      $sp = index($_, ": ");
+      my $sp = index($_, ": ");
       $b = substr($_,0,$sp);
       $c = substr($_,$sp+2);
 
@@ -1177,28 +1194,12 @@ sub MPD_IdleStart($)
  my ($name) = @_;
  return unless(defined($name));
 
+ my $logname      = $name."[".$$."]"; 
  my $hash         = $defs{$name};
  my $old_event    = "";
- my $telnetPort   = undef;
  my $output; 
-
- # Suche das Telnet Device ohne Passwort
- # Code geklaut aus Blocking.pm :)
-
- foreach my $d (sort keys %defs) 
- {  
-    my $h = $defs{$d};
-    next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
-    next if($attr{$d}{SSL} || AttrVal($d, "allowfrom", "127.0.0.1") ne "127.0.0.1");
-    next if($h->{DEF} !~ m/^\d+( global)?$/);
-    next if($h->{DEF} =~ m/IPV6/);
-    my %cDev = ( SNAME=>$d, TYPE=>$h->{TYPE}, NAME=>$d.time() );
-    next if(Authenticate(\%cDev, undef) == 2);    # Needs password
-    $telnetPort = $defs{$d}{"PORT"};
-    last;
- }
-
- return $name."|no telnet port without password found" if (!$telnetPort); 
+ my $crc      = 0;
+ $hash->{CRC} = 0;
 
  my $sock = IO::Socket::INET->new(
             PeerHost => $hash->{HOST},
@@ -1213,23 +1214,6 @@ sub MPD_IdleStart($)
  chomp $_;
 
  return  $name."|not a valid mpd server, welcome string was: ".$_ if $_ !~ /^OK MPD (.+)$/;
-
- if ($hash->{".password"} ne "")
- {
-  # lets try to authenticate with a password
-  print $sock "password ".$hash->{".password"}."\r\n";
-  while (<$sock>)
-  {
-   last if $_ ; # end of output.
-  }
-  chomp;
-  if ($_ !~ /^OK$/)
-   { 
-    print $sock "close\n";
-    close($sock);
-    return $name."|mpd password auth failed : ".$_;
-   }
- }
 
  # Waits until there is a noteworthy change in one or more of MPD's subsystems. 
  # As soon as there is one, it lists all changed systems in a line in the format changed: SUBSYSTEM, 
@@ -1246,17 +1230,8 @@ sub MPD_IdleStart($)
  # - subscription: a client has subscribed or unsubscribed to a channel 
  # - message: a message was received on a channel this client is subscribed to; this event is only emitted when the queue is empty
 
- my $sock2  = IO::Socket::INET->new(
-              PeerHost => "127.0.0.1",
-              PeerPort => $telnetPort,
-              Proto    => 'tcp',
-              Timeout  => 2);
+ BlockingInformParent("MPD_statusRequest", [$name],0);
 
- return $name."|Idle send: ".$! if (!$sock2);
-
- print $sock2 "get $name statusRequest\nexit\n";
- close ($sock2);
- 
  print $sock "idle\n";
 
  my $step = 0;
@@ -1272,9 +1247,8 @@ sub MPD_IdleStart($)
        close($sock);
        return  $name."|ACK ERROR : ".$_;
      }
-   
+
      $_ =~s/changed: //g;
-    
 
      if (($_ ne $old_event) && ($_ ne "OK") && (index($_,": ") == -1))  
      { 
@@ -1288,7 +1262,6 @@ sub MPD_IdleStart($)
      } 
      else #if ($_ eq "OK")  
      {
-       #print $sock "idle\n";
        print $sock "idle\n" if($step) ;  
        print $sock "playlistinfo\n" if(!$step) ;
        $step=2 if ($step==1); 
@@ -1298,32 +1271,55 @@ sub MPD_IdleStart($)
   if ((($old_event eq "player")  || 
        ($old_event eq "playlist")|| 
        ($old_event eq "mixer")   || 
-       #($old_event eq "options")) 
-       ($old_event eq "options"))&& ($step==2)
+       ($old_event eq "options")) && ($step==2)
      ) # muessen wir den Parentprozess informieren ?
      {
-        $sock2 = IO::Socket::INET->new(
-                 PeerHost => "127.0.0.1",
-                 PeerPort => $telnetPort,
-                 Proto    => 'tcp',
-                 Timeout  => 2);
-
-        return $name."|Idle_loop send: ".$! if (!$sock2);
-    
-        Log3 $name,5,"Output : $output";
-        print $sock2 "set $name mpd_event $output\nexit\n";
-        close($sock2);
-        $old_event = "";
-        $output    = "";
-        $step=0;
+        #xxx
+        Log3 $logname,5,"$logname, Idle Output : $output";
+        $crc   = unpack ("%16C*",$output);
+        if (int($hash->{CRC}) != int($crc))
+        {
+         $hash->{CRC} = $crc;
+         Log3 $logname,5,"$logname, $old_event : parent informed crc [".$crc."]";
+         BlockingInformParent("MPD_EVENT", [$name,$output],0);
+        }
+        else
+        {
+         Log3 $logname,5,"$logname, $old_event : parent not informed crc [".$crc."]";
+        }
+        $old_event   = "";
+        $output      = "";
+        $step        = 0;
      } 
    } #while 
  
-  #print $sock "close\n";
   close($sock);
-  #xxx
   return $name."|socket error";  
 } 
+
+sub MPD_EVENT($$)
+{
+  my ($name, $line) = @_;
+  my $hash = $defs{$name};
+  my (@arr) = split("\\|",$line); 
+  Log3 $name,5,"$name, MPD_EVENT : ".$line;
+  my $cmd = $arr[0];
+  readingsSingleUpdate($hash,"mpd_event",$cmd,1);
+  Log3 $name,4,"$name, MPD_EVENT : ".$cmd;
+  mpd_cmd($hash, clb.cle) if ($cmd ne "playlist"); 
+  shift @arr;
+  MPD_NewPlaylist($hash,join ("\n", @arr));
+  return undef;
+}
+
+sub MPD_statusRequest($)
+{
+  my ($name) = @_;
+  my $hash = $defs{$name};
+  mpd_cmd($hash, clb.cle);
+  mpd_cmd($hash, "i|".clb.cle."|x|s");
+  return undef;
+}
 
 sub MPD_IdleDone($)
 {
@@ -1336,7 +1332,7 @@ sub MPD_IdleDone($)
   my $name = $hash->{NAME};
 
   Log3 $name, 5,"$name, IdleDone -> $string";
-  
+
   delete($hash->{helper}{RUNNING_PID});
   delete $hash->{IPID};
 
@@ -1348,7 +1344,7 @@ sub MPD_IdleDone($)
 
   Log3 $name, 4 , "$name, idle error -> $ret";
   return if(IsDisabled($name));
-  
+
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+AttrVal($name, "waits", 60), "MPD_try_idle", $hash, 0);
 
@@ -1361,16 +1357,13 @@ sub MPD_try_idle($)
   my $name   = $hash->{NAME};
   my $waits  = AttrVal($name, "waits", 60);
 
-  $hash->{helper}{RUNNING_PID} = BlockingCall("MPD_IdleStart",$name, "MPD_IdleDone", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
-  if ($hash->{helper}{RUNNING_PID})
+  $hash->{helper}{RUNNING_PID} = BlockingCall("MPD_IdleStart",$name, "MPD_IdleDone") unless(exists($hash->{helper}{RUNNING_PID}));
+  if (defined($hash->{helper}{RUNNING_PID}))
   {
     $hash->{IPID} = $hash->{helper}{RUNNING_PID}{pid};
     Log3 $name, 4 , $name.", Idle new PID : ".$hash->{IPID};
     RemoveInternalTimer($hash);
-    if ($^O !~ /Win/) # was könnte man bei Windows tun ?
-    {
-     InternalTimer(gettimeofday()+$waits, "MPD_watch_idle", $hash, 0); # starte die Überwachung
-    }
+    InternalTimer(gettimeofday()+$waits, "MPD_watch_idle", $hash, 0); # starte die Überwachung
     return 1;
   }
   else 
@@ -1775,6 +1768,7 @@ sub MPD_lfm_album_info(@)
 sub MPD_artist_image($$$)
 {
   my ($hash, $im , $hw) = @_;
+  $im =~s/\%/\%25/g;
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"artist_image_html","<img src='$im' $hw />");
   readingsBulkUpdate($hash,"artist_image","$im");
@@ -1788,6 +1782,7 @@ sub MPD_album_image($$$)
 {
   my ($hash, $im , $hw) = @_;
   readingsBeginUpdate($hash);
+  $im =~s/\%/\%25/g;
   readingsBulkUpdate($hash,"album_image_html","<img src='$im' $hw />");
   readingsBulkUpdate($hash,"album_image","$im");
   readingsEndUpdate($hash, 1);
@@ -1904,7 +1899,7 @@ sub MPD_NewPlaylist($$)
   my $crc   = unpack ("%16C*",$list);
 
   Log3 $name,5,"$name, new Playlist in -> $list";
-  return if ($crc == $hash->{".playlist_crc"});
+  return if (int($crc) == int($hash->{".playlist_crc"}));
   Log3 $name,4,"$name, new CRC : $crc";
   $hash->{".playlist_crc"} = $crc;
 
@@ -1922,23 +1917,39 @@ sub MPD_NewPlaylist($$)
   my $url;
   my $error;
   my $lastcover; 
+  my $i;
+
 
   # Radiostream ohne Artist ?
   if (!@artist && @title && AttrVal($name, "titleSplit", 1))
   {
-     $title[0] =~ s/: / - /;
-     $title[0] =~ s/\+\+\+//;
-     $title[0] =~ s/feat./ \/ /;
-     my  $sp = index($title[0], " - ");
+     for $i (0 .. $#title)
+     {
+     $title[$i] =~ s/: / - /;
+     $title[$i] =~ s/\+\+\+//;
+     $title[$i] =~ s/feat./ \/ /;
+     my  $sp = index($title[$i], " - ");
      if ($sp>0) 
       {
-       $artist[0] = substr($title[0],0,$sp);
-       $title[0]  = substr($title[0],$sp+3);
+       $artist[$i] = substr($title[$i],0,$sp);
+       $title[$i]  = substr($title[$i],$sp+3);
+      } 
+      else 
+      {
+       $sp = index($title[$i], "-");
+       if ($sp>0) 
+       {
+        $artist[$i] = substr($title[$i],0,$sp);
+        $title[$i]  = substr($title[$i],$sp+1);
+       } 
+        else {$artist[$i] = "???";}
+
       }
+     }
   }
 
 
-  for my $i (0 .. $#artist)
+  for $i (0 .. $#artist)
   {
     $lastcover = AttrVal($name,"unknown_artist_image","/fhem/icons/1px-spacer"); # default 
 
@@ -1959,18 +1970,6 @@ sub MPD_NewPlaylist($$)
         }
         else
         {    
-         #eval "use JSON qw( decode_json )";
-         #if($@)
-         #{
-          #$error = "please install JSON to decode cover";  
-          #Log3 $name, 3,"$name, $error"; 
-          #readingsBeginUpdate($hash);
-          #readingsBulkUpdate($hash,"last_error",$error);
-          #readingsBulkUpdate($hash,"playlistinfo","");
-          #readingsEndUpdate($hash,1);
-         #}
-         #else 
-         #{
           my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 1 } );
           my $response = $ua->get("https://embed.spotify.com/oembed/?url=".$albumUri[$i]);
           my $data = '';
@@ -2004,7 +2003,6 @@ sub MPD_NewPlaylist($$)
             { $lastcover = "/fhem/www/".$cache."/".urlEncode($artist[$i])."_".$size.".png"; }
      }
 
-
    $ret .= '{"Artist":"'.$artist[$i].'",';
    $ret .= '"Title":';
    $ret .= (defined($title[$i])) ? '"'.$title[$i].'",' : '"",';
@@ -2025,7 +2023,10 @@ sub MPD_NewPlaylist($$)
   $ret =~ s/\\n//g;
   Log3 $name,5,"$name, new Playlist out -> $ret";
   Log3 $name,5,"$name, list : $list" if ($ret eq "[]");
-  readingsSingleUpdate($hash,"playlistinfo",$ret,1);
+  readingsBeginUpdate($hash);
+   readingsBulkUpdate($hash,"playlistinfo",$ret);
+   readingsBulkUpdate($hash,"playlist_crc",$crc);
+  readingsEndUpdate($hash,1);
   return;  
 }
 
@@ -2153,23 +2154,12 @@ sub MPD_summaryFn($$$$) {
         $link = "cmd.$name=set $name $link" if ($link);
         $txt  = "<a onClick=\"FW_cmd('/fhem?XHR=1&$link&room=$room')\">".$txt."</a>" if ($link);
 
-        my $rname  = "";
-        my $artist = "";
-        my $title  = "";
-        my $album  = "";
         my $hw;
-        my $file   = (defined($hash->{READINGS}{"file"}{VAL})) ? $hash->{READINGS}{"file"}{VAL}."&nbsp;<br />" : "";
-
-        if (defined($hash->{READINGS}{"Title"}{VAL}))  
-        { $title  = ($hash->{READINGS}{"Title"}{VAL} ne "" ) ? $hash->{READINGS}{"Title"}{VAL}."&nbsp;<br />" : "";}
-        if (defined($hash->{READINGS}{"Artist"}{VAL}))
-        { $artist = ($hash->{READINGS}{"Artist"}{VAL} ne "") ? $hash->{READINGS}{"Artist"}{VAL}."&nbsp;<br />": "";}
-
-        if (defined($hash->{READINGS}{"Album"}{VAL}))
-        { $album = ($hash->{READINGS}{"Album"}{VAL} ne "") ? $hash->{READINGS}{"Album"}{VAL}."&nbsp;" : "";}
-
-        if (defined($hash->{READINGS}{"Name"}{VAL}))
-        { $rname  = ($hash->{READINGS}{"Name"}{VAL} ne "")   ? $hash->{READINGS}{"Name"}{VAL}."&nbsp;<br />"  : ""; }
+        my $file   = (ReadingsVal($name,"file",  "")) ? $hash->{READINGS}{"file"}{VAL}."&nbsp;<br />"  : "";
+        my $title  = (ReadingsVal($name,"Title", "")) ? $hash->{READINGS}{"Title"}{VAL}."&nbsp;<br />" : "";
+        my $artist = (ReadingsVal($name,"Artist","")) ? $hash->{READINGS}{"Artist"}{VAL}."&nbsp;<br />": "";
+        my $album  = (ReadingsVal($name,"Album", "")) ? $hash->{READINGS}{"Album"}{VAL}."&nbsp;"       : "";
+        my $rname  = (ReadingsVal($name,"Name",  "")) ? $hash->{READINGS}{"Name"}{VAL}."&nbsp;<br />"  : ""; 
 
 	$html  ="<table><tr><td>$txt</td><td>";
          if (($playlists) && $hash->{".sPlayL"})
@@ -2208,7 +2198,7 @@ sub MPD_summaryFn($$$$) {
          if ((ReadingsVal($name,"artist_image","") ne "") && (($state eq "play") || ($state eq "pause")))
          {
           $hw = (index(ReadingsVal($name,"artist_image",""),"icon") == -1) ? " width='32' height='32'" : "";
-          $html .= "</td><td><img src='".$hash->{READINGS}{"artist_image"}{VAL}."' alt='".$hash->{'.artist'}."' $hw/>";
+          $html .= "</td><td><img src='".ReadingsVal($name,"artist_image","")."' alt='".$hash->{'.artist'}."' $hw/>";
          }
          if ((ReadingsVal($name,"album_image","") ne "") && (($state eq "play") || ($state eq "pause")))
          {
