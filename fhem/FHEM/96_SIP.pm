@@ -52,9 +52,9 @@ use IO::Socket;
 use Socket;
 use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
-#use Data::Dumper;
+use Data::Dumper;
 
-my $sip_version ="V1.73 / 29.12.17";
+my $sip_version ="V1.75 / 31.12.17";
 my $ua;	# SIP user agent
 my @fifo;
 
@@ -172,12 +172,7 @@ sub SIP_Attr (@)
 
  if ($cmd eq "set")
  {
-   if ($attrName eq "sip_audiofile_call")
-   {
-    return "unknown audio type, please use only .alaw or .ulaw" if (($attrVal !~ /\.al(.+)$/) && ($attrVal !~ /\.ul(.+)$/));
-    return "file $attrVal not found" if (!-e $attrVal); 
-   }
-   elsif (substr($attrName ,0,4) eq "sip_") 
+   if (substr($attrName ,0,4) eq "sip_") 
    {
      $_[3] = $attrVal;
      $hash->{".reset"} = 1 if defined($hash->{LPID});
@@ -738,7 +733,7 @@ sub SIP_Set($@)
   my $name = $hash->{NAME}; 
   my $cmd  = (defined($a[1])) ? $a[1] : "?";
   my $subcmd;
-  my $ret;
+  my $error;
 
   return join(" ", sort keys %sets) if ($cmd eq "?");
 
@@ -747,9 +742,9 @@ sub SIP_Set($@)
    my $pwd = SIP_readPassword($name);
    unless (defined $pwd)  
    {
-    my $ret = "Error: no SIP user password set. Please define it with 'set $name password Your_SIP_User_Password'";
-    Log3 $name,2,"$name, $ret";
-    return $ret;
+    $error = "Error: no SIP user password set. Please define it with 'set $name password Your_SIP_User_Password'";
+    Log3 $name,2,"$name, $error";
+    return $error;
    }
   }
 
@@ -769,11 +764,6 @@ sub SIP_Set($@)
         Log3 $name ,4,"$name, add call $call to fifo so we can do it later !";
         return undef;
      }
-
-    if (AttrVal($name, "sip_audiofile_call", "") && !defined($a[4]))
-    {
-       return "unknown audio type, please use only .alaw or .ulaw" if (($msg !~ /\.al(.+)$/) && ($msg !~ /\.ul(.+)$/));
-    }
 
     my $anz = @a;
     $anz--; # letztes Element
@@ -819,18 +809,27 @@ sub SIP_Set($@)
       } 
       elsif (substr($msg,0,1) eq "!") # Text2Speech Text ?
       {
-       shift @a;
-       shift @a;
-       $a[0] = "t2s_name"; # ist egal wird eh verworfen
-       $a[1] = "tts"; # Kommando des Set Befehls
+        if ($msg eq AttrVal($name,"sip_audiofile_call", ""))
+        {
+         @a = split(" ",AttrVal($name,"sip_audiofile_call", ""));
+         unshift (@a, ('t2s_name','tts')); # zwei Platzhalter einfügen , Text beginnt jetzt in $a[2]
+        }
+        else
+        {
+         shift @a;
+         shift @a;
+         pop @a if ($force);  # das & muss ggf. auch noch weg
+         pop @a if ($repeat); # das * muss ggf. auch weg
+         $a[0] = "t2s_name"; # ist egal wird eh verworfen
+         $a[1] = "tts"; # Kommando des Set Befehls
+        }
+
        $a[2] =~ s/^\!//; # das ! muss weg
        if (!$a[2]) # ist denn jetzt noch etwas übrig geblieben ?
        {
         Log3 $name,4,"name, no valid text found in message : $msg";
         return "No message text after [!] found";
        }
-       pop @a if ($force); # das & muss ggf. auch noch weg
-       pop @a if ($repeat); # das * muss ggf. auch weg
 
        # die nächsten vier brauchen wir unbedingt fuer T2S
        $hash->{callnr}    = $nr;
@@ -838,8 +837,8 @@ sub SIP_Set($@)
        $hash->{forcecall} = $force;
        $hash->{repeat}    = $repeat; 
 
-       my $ret = SIP_create_T2S_File($hash,@a); # na dann lege schon mal los
-       return $ret if defined($ret); # Das ging leider schief
+       $error = SIP_create_T2S_File($hash,@a); # na dann lege schon mal los
+       return $error if defined($error); # Das ging leider schief
 
        readingsSingleUpdate($hash,"call_state","waiting T2S",1);
 
@@ -851,16 +850,25 @@ sub SIP_Set($@)
       elsif (-e $msg) 
       { 
         Log3 $name, 4, $name.", audio file $msg found"; 
-        return "unknown audio type, please use only .alaw or .ulaw" if (($msg !~ /\.al(.+)$/) && ($msg !~ /\.ul(.+)$/));
+        $error = SIP_MP3_conv($hash,$msg,$name) if ($msg =~/\.mp3$/);
+        if (!$error)
+        {
+          $msg  =~ s/mp3/alaw/;
+          $error = "unknown audio type, please use only .alaw , .ulaw or .mp3" if (($msg !~ /\.al(.+)$/) && ($msg !~ /\.ul(.+)$/));
+          $error = "audio file $msg not found" if(!-e $msg);
+        }
       } 
       else
       { 
-        $ret = "audio file $msg not found";
-        readingsSingleUpdate($hash, "last_error",$ret,1);
-        Log3 $name, 3, "$name, $ret !";
+        $error = "audio file $msg not found";
+      }
+      if ($error)
+      {
+        readingsSingleUpdate($hash, "last_error",$error,1);
+        Log3 $name, 3, "$name, $error !";
         $hash->{repeat}    = 0;
         $hash->{forcecall} = 0;
-        $msg = ""; 
+        return $error;
       }
     }
     else { Log3 $name, 4, $name.", calling $nr, ringtime: $ringtime , no message"; }
@@ -889,13 +897,13 @@ sub SIP_Set($@)
      else  
     { # das war wohl nix :(
       Log3 $name, 3,  "$name, CALL process start failed, arg : $arg"; 
-      $ret = "can't execute call number $nr as NonBlockingCall";
+      $error = "can't execute call number $nr as NonBlockingCall";
       readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash, "last_error",$ret);
+      readingsBulkUpdate($hash, "last_error",$error);
       readingsBulkUpdate($hash, "call_state","fail");
       readingsEndUpdate($hash, 1);
       delete $hash->{lastnr} if (defined($hash->{lastnr}));
-      return $ret;
+      return $error;
     }
   }
   elsif ($cmd eq "listen")
@@ -903,16 +911,16 @@ sub SIP_Set($@)
    my $type = AttrVal($name,"sip_listen","none");
    return "there is already a listen process running with pid ".$hash->{LPID} if exists($hash->{LPID});
    return "please set attr sip_listen to dtmf or wfp or echo first" if (AttrVal($name,"sip_listen","none") eq "none");
-   $ret = SIP_try_listen($hash);
-   if ($ret)
+   $error = SIP_try_listen($hash);
+   if ($error)
    { 
-    Log3 $name, 1, $name.", listen -> $ret";
+    Log3 $name, 1, $name.", listen -> $error";
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,"state","error");
-    readingsBulkUpdate($hash,"last_error",$ret);
+    readingsBulkUpdate($hash,"last_error",$error);
     readingsBulkUpdate($hash,"listen_alive","no");
     readingsEndUpdate($hash, 1 );
-    return $ret;
+    return $error;
    }
    return undef;
   }
@@ -1491,69 +1499,45 @@ sub SIP_wait_for_t2s($)
   my $msg      = "";
   Log3 $name,4,"$name, wait_for_t2s file : $file";
 
-  if ($file)
+  if (-e $file)
   {
    Log3 $name,4,"$name, new T2S file $file";
- 
    my $out = $file;
    $out  =~ s/mp3/alaw/;
-   if (-e $out)
-   { 
-     Log3 $name,5,"$name, not converted using $out from cache";
-     $msg = $out; 
-   } 
-    else
-   {    
-    my $ret;
-    my $cmd;
-    my $converter = AttrVal($name,"audio_converter","sox");
-    if (($converter eq "sox") && defined($hash->{AC}))
-    {
-     $cmd = $hash->{AC}." ".$file." -t raw -r 8000 -c 1 -e a-law ".$out;
-     Log3 $name,5,"$name, $cmd";
-     $_ = qx($cmd);
-    }
-    elsif (($converter eq "ffmpeg") && defined($hash->{AC}))
-    {
-     $cmd = $hash->{AC}." -v quiet -y -i ".$file." -f alaw -ar 8000 ".$out;
-     Log3 $name,5,"$name, $cmd";
-     $_ = qx($cmd);
-    }
 
-
-    if ($_)
-     {
-      Log3 $name,4,"$name, $converter : $_ , $?";
-      readingsSingleUpdate($hash,"last_error","$converter error $_",1);
-     }
-     else { $msg = $out; }
-   }
+   my $error = SIP_MP3_conv($hash,$file,$name); 
+   $msg = $out if (!$error && (-e $out));
   }        
   else
   {
    Log3 $name,3,"$name, timeout waiting for T2S";
-   readingsSingleUpdate($hash,"call_state","T2S timeout",1);
+   if ($hash->{callnr})
+   {
+    readingsSingleUpdate($hash,"call_state","T2S timeout",1);
+    return undef;
+   }
   }
-   
-  if ($msg && defined($hash->{audio3}))
-  {
+
+  if (!$hash->{callnr})
+  {   
+   if (defined($hash->{audio3}))
+   {
      $hash->{audio3} = $msg;
      SIP_try_listen($hash);
      return undef;
-  }
-
-  if ($msg && defined($hash->{audio2}))
-  {
+   }
+   elsif (defined($hash->{audio2}))
+   {
      $hash->{audio2} = $msg;
      SIP_try_listen($hash);
      return undef;
-  }
-
-  if ($msg && defined($hash->{audio1}))
-  {
+   }
+   elsif (defined($hash->{audio1}))
+   {
      $hash->{audio1} = $msg;
      SIP_try_listen($hash);
      return undef;
+   }
   }
 
   # nun aber calling
@@ -1657,17 +1641,31 @@ sub SIP_readPassword($)
     Log3 $name,3,"$logname, Text : $file found, ignoring it";
     return "";
    }
+ 
+   if ($file =~/\.mp3$/)
+   {
+      my $ret = SIP_MP3_conv($hash,$file,$logname);
+      if ($ret)
+      { 
+       Log3 $name,3,"$logname, $ret";
+       return "";
+      }
+      $file   =~ s/mp3/alaw/;
+   }
+ 
+   if (($file !~ /\.al(.+)$/) && ($file !~ /\.ul(.+)$/))
+   {
+     Log3 $name,3,"$logname, audio file $file not type .alaw or .ulaw, ignoring it";
+     return "";
+   }
+
    if (!-e $file)
    {
     Log3 $name,3,"$logname, audio file $file not found, ignoring it";
     return "";
    }
-   if (($file !~ /\.al(.+)$/) && ($file !~ /\.ul(.+)$/))
-   {
-    Log3 $name,3,"$logname, audio file $file not type .alaw or .ulaw, ignoring it";
-    return "";
-   }
-   return $file;
+
+  return $file;
  }
 
  sub SIP_create_T2S_File($@)
@@ -1757,6 +1755,54 @@ sub SIP_rBU($$) {
   readingsEndUpdate($hash, 1 );
   return undef;
 }
+
+sub SIP_MP3_conv($$$)
+{
+ my ($hash,$file,$logname) = @_;
+ my $name = $hash->{NAME};
+ my $ret;
+ my $status;
+ my $cmd;
+ my $out = $file;
+ $out  =~ s/mp3/alaw/;
+ if (-e $out)
+ { 
+  Log3 $name,5,"$logname, not converted - using $out from cache";
+  return undef; 
+ } 
+ else
+ {    
+  return "external sox or ffmpeg programm not found, please install sox or ffmpeg first and set attr audio_converter" if (!defined($hash->{AC}));
+
+  my $converter = AttrVal($name,"audio_converter","");
+  return "attr audio_converter not set" if(!$converter);
+
+  if ($converter eq "sox")
+  {
+     $cmd = $hash->{AC}." ".$file." -t raw -r 8000 -c 1 -e a-law ".$out." 2>&1";
+     Log3 $name,5,"$logname, $cmd";
+     $ret = qx($cmd);
+     if ($ret)
+     {
+      unlink $out;
+      $ret =~ s/\n//g;
+      Log3 $name,5,"$logname, sox output : $ret";
+     }
+  }
+  elsif ($converter eq "ffmpeg")
+  {
+     $cmd = $hash->{AC}." -v quiet -y -i ".$file." -f alaw -ar 8000 ".$out;
+     Log3 $name,5,"$logname, $cmd";
+     $ret = qx($cmd);
+  }
+  else { return "unknow audio_converter"; }
+
+  return "$converter : $ret"  if ($ret);
+  return "converted file $out not found" if (!-e $out); 
+  return undef;
+ } 
+}
+
 
 1;
 
