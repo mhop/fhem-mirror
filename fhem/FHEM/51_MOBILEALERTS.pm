@@ -142,7 +142,7 @@ sub MOBILEALERTS_Parse ($$) {
     if ( my $hash = $modules{MOBILEALERTS}{defptr}{$deviceID} ) {
         my $verbose = GetVerbose( $hash->{NAME} );
         Log3 $name, 5, "$name MOBILELAERTS: Found Device: " . $hash->{NAME};
-        Log3 $name, 5,
+        Log3 $hash->{NAME}, 5,
           "$hash->{NAME} MOBILELAERTS: Message: " . unpack( "H*", $message )
           if ( $verbose >= 5 );
 
@@ -862,7 +862,6 @@ sub MOBILEALERTS_CheckRainSensor($$) {
 
     #Yesterday
     my $actD = ReadingsTimestamp( $hash->{NAME}, "mmRainActDay", $actTime );
-    Log3 "SOFORT", 1, "A" . substr( $actTime, 0, 10 ) . "A";
     if ( substr( $actTime, 0, 10 ) eq substr( $actD, 0, 10 ) ) {
         MOBILEALERTS_readingsBulkUpdate( $hash, 0, "mmRainActDay",
             $mmRain + ReadingsVal( $hash->{NAME}, "mmRainActDay", "0" ) )
@@ -972,8 +971,8 @@ sub MOBILEALERTS_ActionDetector($) {
   The MOBILEALERTS is a fhem module for the german MobileAlerts devices and TFA WEATHERHUB devices.
   <br><br>
   The fhem module represents a MobileAlerts device. The connection is provided by the <a href="#MOBILEALERTSGW">MOBILELAERTSGW</a> module.
-  Currently supported: MA10100, MA10200, MA10230, MA10300, MA10410.<br>
-  Supported but untested: MA10350, MA10650, MA10660, MA10700, MA10800<br>
+  Currently supported: MA10100, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02<br>
+  Supported but untested: MA10800<br>
   <br>
 
   <a name="MOBILEALERTSdefine"></a>
@@ -1051,8 +1050,8 @@ sub MOBILEALERTS_ActionDetector($) {
   <br><br>
   Dieses FHEM Modul stellt jeweils ein MobileAlerts Ger&auml;t dar. Die Verbindung wird durch das 
   <a href="#MOBILEALERTSGW">MOBILELAERTSGW</a> Modul bereitgestellt.<br>
-  Aktuell werden unterst&uuml;zt: MA10100, MA10200, MA10230, MA10300, MA10410, MA10450, MA10320PRO, TFA 30.3312.02.<br>
-  Unterst&uuml;zt aber ungetestet: MA10350, MA10650, MA10660, MA10700, MA10800<br>
+  Aktuell werden unterst&uuml;zt: MA10100, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02<br>
+  Unterst&uuml;zt aber ungetestet: MA10800<br>
   <br>
 
   <a name="MOBILEALERTSdefine"></a>
@@ -1107,15 +1106,15 @@ sub MOBILEALERTS_ActionDetector($) {
   <ul>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>  
-    <li><a href="#MOBILEALERTSlastMsg">lastMsg</a><br>
+    <li>lastMsg<br>
       Wenn dieser Wert auf 1 gesetzt ist, wird die letzte erhaltene Nachricht als Reading gelogt auch wenn das Ger&auml bekannt ist.
     </li>
-    <li><a href="#MOBILEALERTSactCycle">actCycle &lt;[hhh:mm]|off&gt;</a><br>
+    <li>actCycle &lt;[hhh:mm]|off&gt;<br>
       Dieses Attribut erm&ouml;licht eine 'nicht erreichbarkeit' Erkennung.
       [hhh:mm] ist die maximale Zeit, innerhalb der keine Nachrichten empfrangen wird.
       Das Reading actStatus zeigt den Status 'unknown', 'alive', 'dead' an.
     </li>
-    <li><a href="#MOBILEALERTSexpert">expert</a><br>
+    <li>expert<br>
       Gibt an wie detailiert die Readings angezeigt werden (0=nur aktuelle, 1=mit vorhergehenden, 4=alle).
     </li>    
   </ul>

@@ -752,7 +752,7 @@ sub MOBILEALERTSGW_DecodeUDP($$$) {
   <a name="MOBILEALERTSGWattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#MOBILEALERTSGWforward">forward</a><br>
+    <li>forward<br>
       If value 1 is set, the data will be forwarded to the MobileAlerts Server http://www.data199.com/gateway/put .
     </li>
   </ul>
@@ -823,7 +823,7 @@ sub MOBILEALERTSGW_DecodeUDP($$$) {
   <a name="MOBILEALERTSGWattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#MOBILEALERTSGWforward">forward</a><br>
+    <li>forward<br>
       Wenn dieser Wert auf 1 gesetzt ist, werden die Daten zus&auml;tzlich zum MobileAlerts Server http://www.data199.com/gateway/put gesendet.
     </li>
   </ul>
