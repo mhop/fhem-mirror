@@ -304,6 +304,7 @@ FHEM/70_VIERA.pm             teevau               Sonstiges
 FHEM/70_VolumeLink.pm        rapster              Multimedia
 FHEM/70_WS3600.pm            Josch                Sonstiges
 FHEM/70_XBMC.pm              vbs                  Multimedia
+FHEM/70_KODI.pm              vbs                  Multimedia
 FHEM/70_NEUTRION.pm          michael.winkler      Multimedia
 FHEM/70_WINCONNECT.pm        michael.winkler      Sonstige Systeme
 FHEM/70_Pushbullet.pm        fhainz               Unterstuetzende Dienste
