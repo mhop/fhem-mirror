@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 12/2017
-my $thzversion = "0.173"; 
+my $thzversion = "0.174"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -858,7 +858,7 @@ sub THZ_Define($$) {
 ########################################################################################
 sub THZ_Refresh_all_gets($) {
   my ($hash) = @_;
-  RemoveInternalTimer(undef, "THZ_GetRefresh");
+  RemoveInternalTimer(0, "THZ_GetRefresh");
   #THZ_RemoveInternalTimer("THZ_GetRefresh"); not needed since https://svn.fhem.de/trac/changeset/15667/ because now there is a second parameter for the function
   Log3 $hash->{NAME}, 5, "thzversion = $thzversion ";
   my $timedelay= 5; 						#start after 5 seconds
@@ -1011,7 +1011,7 @@ sub THZ_Testloopapproach($) {
 sub THZ_Ready($) {
   my ($hash) = @_;
   if($hash->{STATE} eq "disconnected")
-  { RemoveInternalTimer(undef, "THZ_GetRefresh");
+  { RemoveInternalTimer(0, "THZ_GetRefresh");
     #THZ_RemoveInternalTimer("THZ_GetRefresh");
   select(undef, undef, undef, 0.25); #equivalent to sleep 250ms
   return DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets")
@@ -1867,7 +1867,7 @@ sub THZ_Attr(@) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
   
-  $attrVal = "4.39" if ($cmd eq "del");
+  $attrVal = "4.39" if (($cmd eq "del") and ($attrName eq "firmware"));
   
   if ( $attrName eq "firmware" )  {  
       if ($attrVal eq "2.06") {
@@ -1913,7 +1913,7 @@ sub THZ_Attr(@) {
 sub THZ_Undef($$) {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
-  RemoveInternalTimer(undef, "THZ_GetRefresh");
+  RemoveInternalTimer(0, "THZ_GetRefresh");
   #THZ_RemoveInternalTimer("THZ_GetRefresh");
   foreach my $d (sort keys %defs) {
     if(defined($defs{$d}) &&
