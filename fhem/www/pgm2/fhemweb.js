@@ -842,18 +842,18 @@ FW_treeMenu()
   });
 
   if(fnd) {
-    $("head").append(`
-      <style>
-        tr.menuTree { cursor:pointer; }
-        tr.menuTree.level1 > td > div { margin-left:10px; }
-        tr.menuTree.level2 > td > div { margin-left:20px; }
-        tr.menuTree.level3 > td > div { margin-left:30px; }
-        tr.menuTree.open { font-weight: bold; }
-        tr.menuTree > td > div > div { 
-          display:inline-block; width:1em; height:1em; float:right;
-          background-size: contain;
-        }
-      </style>`);
+    $("head").append(
+      "<style>"+
+        "tr.menuTree { cursor:pointer; }"+
+        "tr.menuTree.level1 > td > div { margin-left:10px; }"+
+        "tr.menuTree.level2 > td > div { margin-left:20px; }"+
+        "tr.menuTree.level3 > td > div { margin-left:30px; }"+
+        "tr.menuTree.open { font-weight: bold; }"+
+        "tr.menuTree > td > div > div { "+
+          "display:inline-block; width:1em; height:1em; float:right;"+
+          "background-size: contain;"+
+        "}"+
+      "</style>");
     var t = $("div#menu table.room");
     $(t).find("tr[data-mTree]").not(".level0").hide();
     $(t).find("tr.menuTree").click(function(){treeClick(this)});
