@@ -47,7 +47,7 @@ my @YahooCodes_en = (
        'mostly cloudy', # day
        'partly cloudy', # night
        'partly cloudy', # day
-       'clear', 
+       'clear',
        'sunny',
        'fair', #night
        'fair', #day
@@ -80,7 +80,7 @@ my @YahooCodes_nl = (
        'motregen', 'aanvriezende regen' ,'buien',
        'buien', 'sneeuw windstoten', 'lichte sneeuwbuien',
        'stuifsneeuw', 'sneeuw', 'hagel',
-       'ijzel', 'stof', 'mist', 'waas', 'smog', 'heftig',
+       'ijzel', 'stof', 'mist', 'waas', 'smog', 'onstuimig',
        'winderig', 'koud', 'bewolkt',
        'overwegend bewolkt', # night
        'overwegend bewolkt', # day
@@ -129,12 +129,12 @@ my @YahooCodes_pl = (
        'ładny dzień', #day
        'deszcz z gradem',
        'gorąco', 'gdzieniegdzie burze', 'burze', 'burze', 'przelotne opady śniegu', 'duże opady śniegu',
-       'ciężkie opady śniegu', 'dużo śniegu', 'częściowe zachmurzenie', 'burze z deszczem', 'opady śniegu', 'przejściowo burze');       
+       'ciężkie opady śniegu', 'dużo śniegu', 'częściowe zachmurzenie', 'burze z deszczem', 'opady śniegu', 'przejściowo burze');
 
 ###################################
 
 # Cache
-my %YahooWeatherAPI_CachedData= (); 
+my %YahooWeatherAPI_CachedData= ();
 my %YahooWeatherAPI_CachedDataTs= ();
 
 ###################################
@@ -147,7 +147,7 @@ my %YahooWeatherAPI_CachedDataTs= ();
 sub value_to_C($) {
     my ($F)= @_;
     return(int(($F-32)*5/9+0.5));
-}    
+}
 
 sub value_to_hPa($) {
     my ($inHg)= @_;
@@ -170,7 +170,7 @@ sub value_to_km($) {
 #   callbackFnRef  => reference to callback function with arguments ($argsRef, $err, $result)
 # the args hash reference is returned as first argument of the callbackFn
 #
- 
+
 sub YahooWeatherAPI_RetrieveData($) {
     my ($argsRef)= @_;
     YahooWeatherAPI_RetrieveDataWithCache(0, $argsRef);
@@ -182,7 +182,7 @@ sub YahooWeatherAPI_RetrieveDataWithCache($$) {
     my $woeid= $argsRef->{woeid};
 
     Log3 undef, 5, "YahooWeatherAPI: retrieve weather for $woeid.";
-   
+
     # retrieve data from cache
     my $ts= $YahooWeatherAPI_CachedDataTs{$woeid};
     if(defined($ts)) {
@@ -214,7 +214,7 @@ sub YahooWeatherAPI_RetrieveDataWithCache($$) {
         YahooWeatherAPI_RetrieveDataFinished(\%param, undef, $response);
     } else {
         # do not use noshutdown => 0 in parameters
-        HttpUtils_NonblockingGet({   
+        HttpUtils_NonblockingGet({
             url        => $url,
             timeout    => 15,
             argsRef    => $argsRef,
@@ -257,31 +257,31 @@ sub YahooWeatherAPI_JSONReturnChannelData($) {
 
 sub YahooWeatherAPI_ConvertChannelData($) {
     my ($data)= @_; # hash reference
-    
+
     $data->{wind}{chill}= value_to_C($data->{wind}{chill}); # # API delivers wrong value
     $data->{atmosphere}{pressure}= value_to_hPa($data->{atmosphere}{pressure}); # API delivers wrong value
-    
+
 
     my $units= YahooWeatherAPI_units($data); # units hash reference
-    
+
     $data->{wind}{speed}= value_to_km($data->{wind}{speed}); # API delivers km
-    $data->{atmosphere}{visibility}= value_to_km($data->{atmosphere}{visibility}); # API delivers km 
+    $data->{atmosphere}{visibility}= value_to_km($data->{atmosphere}{visibility}); # API delivers km
 
     return 0 if($units->{temperature} eq "C");
 
     my $item= $data->{item};
     $item->{condition}{temp}= value_to_C($item->{condition}{temp});
-    
+
     my $forecast= $item->{forecast};
     foreach my $fc (@{$forecast}) {
         $fc->{low}= value_to_C($fc->{low});
         $fc->{high}= value_to_C($fc->{high});
-    }    
+    }
     return 1;
 
 }
 
-       
+
 sub YahooWeatherAPI_ParseDateTime($) {
 
     my ($value)= @_; ### "Fri, 13 Nov 2015 8:00 am CET"
@@ -289,7 +289,7 @@ sub YahooWeatherAPI_ParseDateTime($) {
     my @months= qw/Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec/;
     my %monthindex;
     @monthindex{@months} = (0..$#months);
-    
+
     if($value =~ '^(\w{3}), (\d{1,2}) (\w{3}) (\d{4}) (\d{1,2}):(\d{2}) (\w{2}) (\w{3,4})$') {
         my ($wd, $d, $mon, $y, $h, $n, $p, $tz)= ($1,$2,$3,$4,$5,$6,$7,$8);
         # 12 AM= 0, 12 PM= 12
@@ -297,7 +297,7 @@ sub YahooWeatherAPI_ParseDateTime($) {
         my $m= $monthindex{$mon};
         return undef unless defined($m);
         #main::Debug "######  $value -> $wd $d $m $y $h:$n $tz";
-        # $mday= 1.. 
+        # $mday= 1..
         # $month= 0..11
         # $year is year-1900
         # we ignore the time zone as it probably never changes for a weather device an assume
@@ -311,7 +311,7 @@ sub YahooWeatherAPI_ParseDateTime($) {
 sub YahooWeatherAPI_pubDate($) {
 
     my ($channel)= @_;
-  
+
     ### pubDate  Fri, 13 Nov 2015 8:00 am CET
     if(!defined($channel->{item}{pubDate})) {
         return("no pubDate received", "", undef);
@@ -322,7 +322,7 @@ sub YahooWeatherAPI_pubDate($) {
         return("okay", $pubDate, $ts);
     } else {
         return("could not parse pubDate $pubDate", $pubDate, undef);
-    } 
+    }
 }
 
 sub YahooWeatherAPI_units($) {
