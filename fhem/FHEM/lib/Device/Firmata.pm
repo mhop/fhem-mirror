@@ -8,18 +8,18 @@ use Device::Firmata::Base
     ISA => 'Device::Firmata::Base',
     FIRMATA_ATTRIBS => {
     };
-    
+
 =head1 NAME
 
 Device::Firmata - Perl interface to Firmata for the arduino platform.
 
 =head1 VERSION
 
-Version 0.59
+Version 0.63
 
 =cut
 
-our $VERSION = '0.59';
+our $VERSION = '0.63';
 our $DEBUG = 0;
 
 
@@ -58,34 +58,32 @@ sub open {
 # --------------------------------------------------
 # Establish a connection to Arduino via the serial port
 #
-    my ( $self, $serial_port, $opts ) = @_;
+  my ( $self, $serial_port, $opts ) = @_;
 
 # We're going to try and create the device connection first...
-    my $package = "Device::Firmata::Platform";
-    eval "require $package";
-    my $serialio = "Device::Firmata::IO::SerialIO"; 
-    eval "require $serialio";
-	
-  	my $io = $serialio->open( $serial_port, $opts );
-  	my $platform = $package->attach( $io, $opts ) or die "Could not connect to Firmata Server";
+  my $package = "Device::Firmata::Platform";
+  eval "require $package";
+  my $serialio = "Device::Firmata::IO::SerialIO";
+  eval "require $serialio";
+
+  my $io = $serialio->open( $serial_port, $opts );
+  my $platform = $package->attach( $io, $opts ) or die "Could not connect to Firmata Server";
 
 	# Figure out what platform we're running on
-    $platform->probe;
-
-    return $platform;
+  $platform->probe;
+  return $platform;
 }
 
 sub listen {
 # --------------------------------------------------
 # Listen on socket and wait for Arduino to establish a connection
 #
-	my ( $pkg, $ip, $port, $opts ) = @_;
+  my ( $pkg, $ip, $port, $opts ) = @_;
 
-    my $netio = "Device::Firmata::IO::NetIO"; 
-    eval "require $netio";
-	
-  	return $netio->listen( $ip, $port, $opts ) or die "Could not bind to socket";
-  	
+  my $netio = "Device::Firmata::IO::NetIO";
+  eval "require $netio";
+
+  return $netio->listen( $ip, $port, $opts ) || die "Could not bind to socket";
 }
 
 1;

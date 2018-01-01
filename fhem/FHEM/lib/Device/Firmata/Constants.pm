@@ -29,6 +29,7 @@ use constant (
     PIN_ONEWIRE => 7,
     PIN_STEPPER => 8,
     PIN_ENCODER => 9,
+    PIN_SERIAL  => 10,
     PIN_LOW  => 0,
     PIN_HIGH => 1,
   }
@@ -260,6 +261,8 @@ use constant (
 
       # extended command set using sysex (0-127/0x00-0x7F)
       RESERVED_COMMAND         => 0x00, # 2nd SysEx data byte is a chip-specific command (AVR, PIC, TI, etc).
+      SERIAL_DATA              => 0x60, # serial port config/write/read/close/flush/listen request and read reply
+      ENCODER_DATA             => 0x61, # receive rotary-encoders current positions
       ANALOG_MAPPING_QUERY     => 0x69, # ask for mapping of analog to pin numbers
       ANALOG_MAPPING_RESPONSE  => 0x6A, # reply with mapping info
       CAPABILITY_QUERY         => 0x6B, # ask for supported modes and resolution of all pins
@@ -291,6 +294,8 @@ use constant (
       I2C                      => 0x06, # pin included in I2C setup
       ONEWIRE                  => 0x07, # pin configured for 1-Wire commuication
       STEPPER                  => 0x08, # pin configured for stepper motor
+      SERIAL                   => 0x0A, # pin configured for serial port
+
       # Deprecated entries
       deprecated => [
         qw( FIRMATA_STRING SYSEX_I2C_REQUEST SYSEX_I2C_REPLY SYSEX_SAMPLING_INTERVAL )
@@ -315,6 +320,7 @@ use constant (
 
       # extended command set using sysex (0-127/0x00-0x7F)
       RESERVED_COMMAND         => 0x00, # 2nd SysEx data byte is a chip-specific command (AVR, PIC, TI, etc).
+      SERIAL_DATA              => 0x60, # serial port config/write/read/close/flush/listen request and read reply
       ENCODER_DATA             => 0x61, # receive rotary-encoders current positions
       ANALOG_MAPPING_QUERY     => 0x69, # ask for mapping of analog to pin numbers
       ANALOG_MAPPING_RESPONSE  => 0x6A, # reply with mapping info
@@ -348,14 +354,14 @@ use constant (
       ONEWIRE                  => 0x07, # pin configured for 1-Wire commuication
       STEPPER                  => 0x08, # pin configured for stepper motor
       ENCODER                  => 0x09, # pin configured for rotary-encoders
-      
+      SERIAL                   => 0x0A, # pin configured for serial port      
 
       # Deprecated entries
       deprecated => [
         qw( FIRMATA_STRING SYSEX_I2C_REQUEST SYSEX_I2C_REPLY SYSEX_SAMPLING_INTERVAL )
       ],
 
-    },    # /Constants for Version 2.6
+    },    # /Constants for Version 2.6    
   }
 );
 

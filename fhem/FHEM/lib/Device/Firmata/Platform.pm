@@ -30,6 +30,7 @@ use Device::Firmata::Base
   servo_resolutions           => {},
   stepper_resolutions         => {},
   encoder_resolutions         => {},
+  serial_resolutions          => {},
   ports                       => [],
   input_ports                 => [],
   pins                        => {},
@@ -44,6 +45,7 @@ use Device::Firmata::Base
   onewire_observer            => [],
   stepper_observer            => [],
   encoder_observer            => [],
+  serial_observer             => [],
   scheduler_observer          => undef,
   string_observer             => undef,
 
@@ -93,6 +95,7 @@ sub detach {
   $self->{onewire_observer}   = [];
   $self->{stepper_observer}   = [];
   $self->{encoder_observer}   = [];
+  $self->{serial_observer}    = [];
   $self->{scheduler_observer} = undef;
   $self->{tasks}              = [];
   $self->{metadata}           = {};
@@ -119,6 +122,7 @@ sub system_reset {
   $self->{onewire_observer}   = [];
   $self->{stepper_observer}   = [];
   $self->{encoder_observer}   = [];
+  $self->{serial_observer}    = [];
   $self->{scheduler_observer} = undef;
   $self->{tasks}              = [];
   $self->{metadata}           = {};
@@ -186,7 +190,7 @@ sub messages_handle {
 
       # Handle metadata information
       $command eq 'REPORT_VERSION' and do {
-        $self->{metadata}{firmware_version} = sprintf "V_%i_%02i",
+        $self->{metadata}{protocol_version} = sprintf "V_%i_%02i",
           @$data;
         last;
       };
@@ -251,6 +255,7 @@ sub sysex_handle {
       my @onewirepins;
       my @stepperpins;
       my @encoderpins;
+      my @serialpins;
       
       foreach my $pin (keys %$capabilities) {
         if (defined $capabilities->{$pin}) {
@@ -289,6 +294,10 @@ sub sysex_handle {
           	push @encoderpins, $pin;
             $self->{metadata}{encoder_resolutions}{$pin} = $capabilities->{$pin}->{PIN_ENCODER+0}->{resolution};
           }
+          if ($capabilities->{$pin}->{PIN_SERIAL+0}) {
+            push @serialpins, $pin;
+            $self->{metadata}{serial_resolutions}{$pin} = $capabilities->{$pin}->{PIN_SERIAL+0}->{resolution};
+          }
         }
       }
       $self->{metadata}{input_pins}   = \@inputpins;
@@ -301,6 +310,7 @@ sub sysex_handle {
       $self->{metadata}{onewire_pins} = \@onewirepins;
       $self->{metadata}{stepper_pins} = \@stepperpins;
       $self->{metadata}{encoder_pins} = \@encoderpins;
+      $self->{metadata}{serial_pins}  = \@serialpins;
       last;
     };
 
@@ -373,6 +383,15 @@ sub sysex_handle {
       };
       last;
     };
+    
+    $sysex_message->{command_str} eq 'SERIAL_DATA' and do {
+      my $serialPort = $data->{port};
+      my $observer = $self->{serial_observer}[$serialPort];
+      if (defined $observer) {
+        $observer->{method}( $data, $observer->{context} );
+      }
+      last;
+    };
   }
 }
 
@@ -392,14 +411,16 @@ sub probe {
   my ($self) = @_;
   $self->{metadata}{firmware}         = '';
   $self->{metadata}{firmware_version} = '';
+  $self->{metadata}{protocol_version} = '';
 
   # Wait for 5 seconds only
   my $end_tics = time + 5;
   $self->firmware_version_query();
+  $self->protocol_version_query();
   while ( $end_tics >= time ) {
-    select( undef, undef, undef, 0.2 );    # wait for response
-    if ( $self->poll && $self->{metadata}{firmware} && $self->{metadata}{firmware_version} ) {
-      $self->{protocol}->{protocol_version} = $self->{metadata}{firmware_version};
+    select( undef, undef, undef, 0.2 );    # wait for responses
+    if ( $self->poll && $self->{metadata}{firmware} && $self->{metadata}{firmware_version} && $self->{metadata}{protocol_version} ) {
+      $self->{protocol}->{protocol_version} = $self->{protocol}->get_max_supported_protocol_version($self->{metadata}{protocol_version});
       if ( $self->{metadata}{capabilities} ) {
         if ( $self->{metadata}{analog_mappings} ) {
           return 1;
@@ -409,8 +430,10 @@ sub probe {
       } else {
         $self->capability_query();
       }
-    } else {
-      $self->firmware_version_query() unless $end_tics - 2 >= time;    # version query on last 2 sec only
+    } elsif ($end_tics - 2 < time) {
+      # version query on last 2 sec only
+      $self->firmware_version_query();
+      $self->protocol_version_query();
     }
   }
   return;
@@ -539,6 +562,12 @@ pmw_write is an alias for analog_write
 =cut
 
 *pwm_write = *analog_write;
+
+sub protocol_version_query {
+  my $self = shift;
+  my $protocol_version_query_packet = $self->{protocol}->packet_query_version;
+  return $self->{io}->data_write($protocol_version_query_packet);
+}
 
 sub firmware_version_query {
   my $self = shift;
@@ -831,6 +860,29 @@ sub encoder_detach {
   return $self->{io}->data_write($self->{protocol}->packet_encoder_detach( $encoderNum ));
 }
 
+sub serial_write {
+  my ( $self, $port, @data ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_serial_write( $port, @data ));
+}
+
+sub serial_read {
+  my ( $self, $port, $numbytes ) = @_;
+  if ($port >= 8) {
+    $self->{io}->data_write($self->{protocol}->packet_serial_listen( $port ));
+  }
+  return $self->{io}->data_write($self->{protocol}->packet_serial_read( $port, 0x00, $numbytes ));
+}
+
+sub serial_stopreading {
+  my ( $self, $port) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_serial_read( $port, 0x01, 0 ));
+}
+
+sub serial_config {
+  my ( $self, $port, $baud, $rxPin, $txPin ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_serial_config( $port, $baud, $rxPin, $txPin ));
+}
+
 =head2 poll
 
 Call this function every once in a while to
@@ -915,6 +967,16 @@ sub observe_encoder {
   my ( $self, $encoderNum, $observer, $context ) = @_;
 #TODO validation?  die "unsupported mode 'ENCODER' for pin '".$pin."'" unless ($self->is_supported_mode($pin,PIN_ENCODER));
   $self->{encoder_observer}[$encoderNum] = {
+      method  => $observer,
+      context => $context,
+    };
+  return 1;
+}
+
+sub observe_serial {
+  my ( $self, $port, $observer, $context ) = @_;
+  return undef if (defined $self->{metadata}->{serialpins} && @$self->{metadata}->{serialpins} == 0 );
+  $self->{serial_observer}[$port] =  {
       method  => $observer,
       context => $context,
     };

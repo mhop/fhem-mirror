@@ -1,0 +1,59 @@
+Revision history for Device-Firmata
+
+0.63    2016.03.19 - Jens Beyer
+        supported protocol version detection modified (Protocol)
+        
+0.62    2016.02.22 - Jens Beyer
+        added software serial support (Platform, Protocol)
+        
+0.61    2016.01.09 - Jens Beyer
+        added serial pin support (Platform, Protocol, Constants)
+        added protocol version query (Platform)
+        fixed messages_handle: REPORT_VERSION returns protocol version (Platform)
+        added method get_max_compatible_protocol_version (Protocol)
+
+0.60    2014.06.28 - Norbert Truchsess
+        Fixed formating of Firmata.pm as Windows line-endings break automatic install from CPAN
+
+0.59    2014.06.26 - Norbert Truchsess
+        Fix a bug in the parser incorrectly skipping single 0x30 bytes
+
+0.58    2014.06.26 - Yanick Champoux
+        cosmetic change to POD for CPAN
+
+0.57    2014.06.12 - Norbert Truchsess
+        Fixed building dist for cpan
+
+0.56    2014.06.04 - Norbert Truchsess
+        add generic method sysex_send to Platform.pl
+
+0.55    2014.04.17 - Norbert Truchsess
+        fix digital-input message interference with output pins on same port
+
+0.54    2014.03.04 - Norbert Truchsess
+        add stepper-motor protocol
+
+0.53    2014.03.03 - Norbert Truchsess
+        add rotary-encoder protocol
+
+0.52    2013.11.22 - Norbert Truchsess
+        add Firmata over Ethernet
+
+0.51    2013.09.10/23:00 - Brett Carroll
+        Changed IO.pm to use Win32::SerialPort instead of Win32::Serialport on Windows platforms
+        Norbert Truchsess: fix handle onewire in capability-response
+
+0.50    2012.12.13-2013.08.11 - Norbert Truchsess
+        adding all missing protocol-features (1-Wire, I2C, Servo ...)
+        adding observers for all suitable protocols
+        
+        Valdas Kondrotas: various bugfixes and enhancements.
+
+        2011.03.23 - Chris Fedde
+        reorganizing as CPAN ready module
+        
+        2011.02.16 Aki Mimoto
+        implementig all protocol basics and releasing Device::Firmata on Github
+
+        2010.08.31 Aki Mimoto
+        start of development

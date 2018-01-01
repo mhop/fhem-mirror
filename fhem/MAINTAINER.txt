@@ -504,7 +504,7 @@ FHEM/TR064Utils.pm           rudolfkoenig         Automatisierung
 FHEM/UConv.pm                loredo               FHEM Development
 FHEM/Unit.pm                 loredo               FHEM Development
 FHEM/YahooWeatherAPI.pm      neubert              Unterstuetzende Dienste/Wettermodule
-FHEM/lib/Device/Firmata/*    ntruchsess           Sonstige Systeme
+FHEM/lib/Device/Firmata/*    jensb                Sonstige Systeme
 FHEM/lib/Device/MySensors/*  Hauswart             Sonstige Systeme
 FHEM/lib/MP3/*               Reinerlein           Multimedia
 FHEM/lib/Net/MQTT.pod        eisler               MQTT

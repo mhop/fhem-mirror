@@ -1,0 +1,1 @@
+perl-firmata is distributed under the same terms as perl itself

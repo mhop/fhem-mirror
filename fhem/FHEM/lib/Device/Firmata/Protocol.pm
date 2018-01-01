@@ -16,6 +16,7 @@ use constant {
   MIDI_PARSE_SYSEX            => 1,
   MIDI_START_SYSEX            => 0xf0,
   MIDI_END_SYSEX              => 0xf7,
+  MAX_PROTOCOL_VERSION        => 'V_2_05',  # highest Firmata protocol version currently implemented
 };
 
 use Device::Firmata::Constants qw/ :all /;
@@ -24,7 +25,7 @@ use Device::Firmata::Base
   FIRMATA_ATTRIBS             => {
   buffer                      => [],
   parse_status                => MIDI_PARSE_NORMAL,
-  protocol_version            => 'V_2_04', # We are starting with the highest protocol
+  protocol_version            => MAX_PROTOCOL_VERSION, # We are starting with the highest protocol
   };
 
 $MIDI_DATA_SIZES = {
@@ -93,6 +94,14 @@ our $ENCODER_COMMANDS = {
   ENCODER_DETACH              => 5,
 };
 
+our $SERIAL_COMMANDS = {
+  SERIAL_CONFIG            => 0x10, # config serial port stetting such as baud rate and pins
+  SERIAL_WRITE             => 0x20, # write to serial port
+  SERIAL_READ              => 0x30, # read request to serial port
+  SERIAL_REPLY             => 0x40, # read reply from serial port
+  SERIAL_LISTEN            => 0x70, # start listening on software serial port
+};
+
 our $MODENAMES = {
   0                           => 'INPUT',
   1                           => 'OUTPUT',
@@ -104,6 +113,7 @@ our $MODENAMES = {
   7                           => 'ONEWIRE',
   8                           => 'STEPPER',
   9                           => 'ENCODER',
+ 10                           => 'SERIAL',
 };
 
 =head1 DESCRIPTION
@@ -322,6 +332,11 @@ sub sysex_parse {
           last;
         };
 
+        $command == $protocol_commands->{SERIAL_DATA} and do {
+          $return_data = $self->handle_serial_reply($sysex_data);
+          last;
+        };
+
         $command == $protocol_commands->{RESERVED_COMMAND} and do {
           $return_data = $sysex_data;
           last;
@@ -421,7 +436,11 @@ sub packet_query_version {
 }
 
 sub handle_query_version_response {
-
+  my ( $self, $data ) = @_;
+  return {
+      major_version => shift @$data,
+      minor_version => shift @$data,
+    };
 }
 
 sub handle_string_data {
@@ -1012,6 +1031,138 @@ sub handle_encoder_response {
   return \@retval;
 }
 
+#/* serial config
+# * -------------------------------
+# * 0  START_SYSEX      (0xF0)
+# * 1  SERIAL_DATA      (0x60)  // command byte
+# * 2  SERIAL_CONFIG    (0x10)  // OR with port (0x11 = SERIAL_CONFIG | HW_SERIAL1)
+# * 3  baud             (bits 0 - 6)
+# * 4  baud             (bits 7 - 13)
+# * 5  baud             (bits 14 - 20) // need to send 3 bytes for baud even if value is < 14 bits
+# * 6  rxPin            (0-127) [optional] // only set if platform requires RX pin number
+# * 7  txPin            (0-127) [optional] // only set if platform requires TX pin number
+# * 6|8 END_SYSEX       (0xF7)
+# */
+
+sub packet_serial_config {
+  my ( $self, $port, $baud, $rxPin, $txPin ) = @_;
+  if (defined($rxPin) && defined($txPin)) {
+    return $self->packet_sysex_command( SERIAL_DATA,
+      $SERIAL_COMMANDS->{SERIAL_CONFIG} | $port,
+      $baud & 0x7f,
+      ($baud >> 7) & 0x7f,
+      ($baud >> 14) & 0x7f,
+      $rxPin & 0x7f,
+      $txPin & 0x7f
+    );
+  } else {  
+    return $self->packet_sysex_command( SERIAL_DATA,
+      $SERIAL_COMMANDS->{SERIAL_CONFIG} | $port,
+      $baud & 0x7f,
+      ($baud >> 7) & 0x7f,
+      ($baud >> 14) & 0x7f
+    );
+  }
+}
+
+#/* serial listen
+# * -------------------------------
+# * 0  START_SYSEX      (0xF0)
+# * 1  SERIAL_DATA      (0x60)  // command byte
+# * 2  SERIAL_LISTEN    (0x70)  // OR with port to switch to (0x79 = switch to SW_SERIAL1)
+# * 3  END_SYSEX        (0xF7)
+# */
+
+sub packet_serial_listen {
+  my ( $self, $port ) = @_;
+  return $self->packet_sysex_command( SERIAL_DATA,
+    $SERIAL_COMMANDS->{SERIAL_LISTEN} | $port
+  );
+}
+
+#/* serial write
+# * -------------------------------
+# * 0  START_SYSEX      (0xF0)
+# * 1  SERIAL_DATA      (0x60)
+# * 2  SERIAL_WRITE     (0x20) // OR with port (0x21 = SERIAL_WRITE | HW_SERIAL1)
+# * 3  data 0           (LSB)
+# * 4  data 0           (MSB)
+# * 5  data 1           (LSB)
+# * 6  data 1           (MSB)
+# * ...                 // up to max buffer - 5
+# * n  END_SYSEX        (0xF7)
+# */
+
+sub packet_serial_write {
+  my ( $self, $port, @serialdata ) = @_;
+  
+  if (scalar @serialdata) {
+    my @data;
+    push_array_as_two_7bit(\@serialdata,\@data);
+    return $self->packet_sysex_command( SERIAL_DATA,
+      $SERIAL_COMMANDS->{SERIAL_WRITE} | $port,
+      @data
+    );
+  } else {
+    return $self->packet_sysex_command( SERIAL_DATA,
+      $SERIAL_COMMANDS->{SERIAL_WRITE} | $port
+    );
+  }
+}
+
+#/* serial read
+# * -------------------------------
+# * 0  START_SYSEX        (0xF0)
+# * 1  SERIAL_DATA        (0x60)
+# * 2  SERIAL_READ        (0x30) // OR with port (0x31 = SERIAL_READ | HW_SERIAL1)
+# * 3  SERIAL_READ_MODE   (0x00) // 0x00 => read continuously, 0x01 => stop reading
+# * 4  maxBytesToRead     (lsb)  // 0x00 for all bytes available [optional]
+# * 5  maxBytesToRead     (msb)  // 0x00 for all bytes available [optional]
+# * 4|6 END_SYSEX         (0xF7)
+# */
+
+sub packet_serial_read {
+  my ( $self, $port, $command, $maxBytes ) = @_;
+  
+  if ($maxBytes > 0) { 
+    return $self->packet_sysex_command( SERIAL_DATA,
+      $SERIAL_COMMANDS->{SERIAL_READ} | $port,
+      $command,
+      $maxBytes & 0x7f,
+      ($maxBytes >> 7) & 0x7f
+    );
+  } else {
+    return $self->packet_sysex_command( SERIAL_DATA,
+      $SERIAL_COMMANDS->{SERIAL_READ} | $port,
+      $command
+    );
+  }
+}
+
+#/* serial reply
+# * -------------------------------
+# * 0  START_SYSEX        (0xF0)
+# * 1  SERIAL_DATA        (0x60)
+# * 2  SERIAL_REPLY       (0x40) // OR with port (0x41 = SERIAL_REPLY | HW_SERIAL1)
+# * 3  data 0             (LSB)
+# * 4  data 0             (MSB)
+# * 3  data 1             (LSB)
+# * 4  data 1             (MSB)
+# * ...                   // up to max buffer - 5
+# * n  END_SYSEX          (0xF7)
+# */
+
+sub handle_serial_reply {
+  my ( $self, $sysex_data ) = @_;
+  
+  my $command = shift @$sysex_data;
+  my $port = $command & 0xF;
+  my @data = double_7bit_to_array($sysex_data);
+  return {
+    port => $port,
+    data => \@data,
+  };
+}
 
 sub shift14bit {
   my $data = shift;
@@ -1131,6 +1282,27 @@ sub unpack_from_7bit {
         ( ( $data[ $pos + 1 ] << ( 7 - $shift ) ) & 0xFF ) );
   }
   return @outdata;
+}
+
+=head2 get_max_compatible_protocol_version
+
+Search list of implemented protocols for identical or next lower version.
+
+=cut
+
+sub get_max_supported_protocol_version {
+  my ( $self, $deviceProtcolVersion ) = @_;
+  return "V_2_01" unless (defined($deviceProtcolVersion));                       # min. supported protocol version if undefined
+  return $deviceProtcolVersion if (defined($COMMANDS->{$deviceProtcolVersion})); # requested version if known
+  
+  my $maxSupportedProtocolVersion = undef;
+  foreach my $protocolVersion (sort keys %{$COMMANDS}) {
+    if ($protocolVersion lt $deviceProtcolVersion) {
+      $maxSupportedProtocolVersion = $protocolVersion;                           # nearest lower version if not known
+    }
+  }
+  
+  return $maxSupportedProtocolVersion;
 }
 
 1;
