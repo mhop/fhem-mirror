@@ -42,6 +42,7 @@
 #              Map https, with APIKey, Traffic & customizable, new attributes  GoogleMapsStyle,GoogleMapsSize,GoogleMapsLocation,GoogleMapsStroke,GoogleMapsDisableUI
 #   2017-04-21 added buttons to save current map settings, renamed attribute GoogleMapsLocation to GoogleMapsCenter
 #   2017-04-22 v1.3.2 stroke supports weight and opacity, minor fixes
+#   2017-12-51 v1.3.3 catch JSON decode issue, addedn Dbog_splitFn, added reading summary, new attr GoogleMapsFixedMap, net attr alternatives, new reading alternatives, alternatives, lighter&thinner on map
 #
 ##############################################################################
 
@@ -69,7 +70,7 @@ sub TRAFFIC_GetUpdate($);
 my %TRcmds = (
     'update' => 'noArg',
 );
-my $TRVersion = '1.3.2';
+my $TRVersion = '1.3.3';
 
 sub TRAFFIC_Initialize($){
 
@@ -81,13 +82,15 @@ sub TRAFFIC_Initialize($){
 
     $hash->{AttrFn}     = "TRAFFIC_Attr";
     $hash->{AttrList}   = 
-      "disable:0,1 start_address end_address raw_data:0,1 language waypoints returnWaypoints stateReading outputReadings travelMode:driving,walking,bicycling,transit includeReturn:0,1 updateSchedule GoogleMapsStyle:default,silver,dark,night GoogleMapsSize GoogleMapsZoom GoogleMapsCenter GoogleMapsStroke GoogleMapsTrafficLayer:0,1 GoogleMapsDisableUI:0,1 " .
+      "disable:0,1 start_address end_address raw_data:0,1 language waypoints returnWaypoints stateReading outputReadings travelMode:driving,walking,bicycling,transit includeReturn:0,1 updateSchedule GoogleMapsStyle:default,silver,dark,night GoogleMapsSize GoogleMapsZoom GoogleMapsCenter GoogleMapsStroke GoogleMapsTrafficLayer:0,1 GoogleMapsDisableUI:0,1 GoogleMapsFixedMap:0,1 alternatives:0,1 " .
       $readingFnAttributes;  
 
     $data{FWEXT}{"/TRAFFIC"}{FUNC} = "TRAFFIC";
     $data{FWEXT}{"/TRAFFIC"}{FORKABLE} = 1; 
 
     $hash->{FW_detailFn} = "TRAFFIC_fhemwebFn";
+    $hash->{DbLog_splitFn} = "X_DbLog_split";
+
 }
 
 sub TRAFFIC_Define($$){
@@ -149,7 +152,6 @@ sub TRAFFIC_Define($$){
 
 
 sub TRAFFIC_Undef($$){      
-
     my ( $hash, $arg ) = @_;       
     RemoveInternalTimer ($hash);
     return undef;                  
@@ -195,9 +197,10 @@ sub TRAFFIC_GetMap($@){
     my $name = $device;
     my $hash = $defs{$name};
     
-    my $debugPoly       = $hash->{helper}{'Poly'};
-    my $returnDebugPoly = $hash->{helper}{'return_Poly'};
-    my $GoogleMapsCenter = AttrVal($name, "GoogleMapsCenter", $hash->{helper}{'GoogleMapsCenter'});
+    my $debugPoly=1;
+    my @alternativesPoly    = split(',',decode_base64($hash->{helper}{'Poly'}));
+    my $returnDebugPoly     = $hash->{helper}{'return_Poly'};
+    my $GoogleMapsCenter    = AttrVal($name, "GoogleMapsCenter", $hash->{helper}{'GoogleMapsCenter'});
 
     if(!$debugPoly || !$GoogleMapsCenter){
         return "<div>please update your device first</div>";
@@ -222,22 +225,35 @@ sub TRAFFIC_GetMap($@){
     $GoogleMapsStroke1Color     = '#4cde44' if !$GoogleMapsStroke1Color;
     $GoogleMapsStroke1Weight    = '6'       if !$GoogleMapsStroke1Weight;
     $GoogleMapsStroke1Opacity   = '100'     if !$GoogleMapsStroke1Opacity;
+    
     $GoogleMapsStroke2Color     = '#FF0000' if !$GoogleMapsStroke2Color;
     $GoogleMapsStroke2Weight    = '1'       if !$GoogleMapsStroke2Weight;
     $GoogleMapsStroke2Opacity   = '100'     if !$GoogleMapsStroke2Opacity;
-    
+
     # make percent value to 50 to 0.5 etc
     $GoogleMapsStroke1Opacity = ($GoogleMapsStroke1Opacity / 100); 
     $GoogleMapsStroke2Opacity = ($GoogleMapsStroke2Opacity / 100);
     
+    # pregenerate the alternatives colors, bit darker and thinner than the primary route
+    my $GoogleMapsStrokeAColor     = '#'.lightHex($GoogleMapsStroke1Color, '0.3');
+    my $GoogleMapsStrokeAWeight    = int($GoogleMapsStroke1Weight - 3);
+    my $GoogleMapsStrokeAOpacity   = $GoogleMapsStroke1Opacity;
+
     my $GoogleMapsDisableUI = '';
     $GoogleMapsDisableUI = "disableDefaultUI: true," if AttrVal($name, "GoogleMapsDisableUI", 0) eq 1;
+    
+    my $GoogleMapsFixedMap = '';
+    $GoogleMapsFixedMap = "draggable: false," if AttrVal($name, "GoogleMapsFixedMap", 0) eq 1;
     
     Log3 $hash, 4, "TRAFFIC: ($name) drawing map in style ".AttrVal($name, "GoogleMapsStyle", 'default' )." in $GoogleMapsWidth x $GoogleMapsHeight px";
 
     my $map;
-    $map .= '<div><script type="text/javascript" src="https://maps.google.com/maps/api/js?key='.$hash->{APIKEY}.'&libraries=geometry&amp"></script>
-        <input size="200" type="hidden" id="path" value="'.decode_base64($debugPoly).'">';
+    $map .= '<div><script type="text/javascript" src="https://maps.google.com/maps/api/js?key='.$hash->{APIKEY}.'&libraries=geometry&amp"></script>';
+    
+    foreach my $polyIndex (0..$#alternativesPoly){
+        $map .=   '<input size="200" type="hidden" id="path'.$polyIndex.'" value="'.$alternativesPoly[$polyIndex].'">';
+    }
+    
     $map .= '<input size="200" type="hidden" id="pathR" value="'.decode_base64($returnDebugPoly).'">' if $returnDebugPoly && decode_base64($returnDebugPoly);
     $map .= '
         <div id="map"></div>
@@ -250,23 +266,29 @@ sub TRAFFIC_GetMap($@){
             var myLatlng = new google.maps.LatLng('.$GoogleMapsCenter.');
             var myOptions = {
                 zoom: '.$GoogleMapsZoom.',
+                '.$GoogleMapsFixedMap.'
                 center: myLatlng,
                 '.$GoogleMapsDisableUI.'
                 mapTypeId: google.maps.MapTypeId.ROADMAP,
                 styles: '.$selectedGoogleMapsStyle.'
             }
             var map = new google.maps.Map(document.getElementById("map"), myOptions);
-            var decodedPath = google.maps.geometry.encoding.decodePath(document.getElementById("path").value); 
+            ';
+     
+    foreach my $polyIndex (1..$#alternativesPoly){
+        $map .='var decodedPath = google.maps.geometry.encoding.decodePath(document.getElementById("path'.$polyIndex.'").value); 
             var decodedLevels = decodeLevels("");
             var setRegion = new google.maps.Polyline({
                 path: decodedPath,
                 levels: decodedLevels,
-                strokeColor: "'.$GoogleMapsStroke1Color.'",
-                strokeOpacity: '.$GoogleMapsStroke1Opacity.',
-                strokeWeight: '.$GoogleMapsStroke1Weight.',
+                strokeColor: "'.$GoogleMapsStrokeAColor.'",
+                strokeOpacity: '.$GoogleMapsStrokeAOpacity.',
+                strokeWeight: '.$GoogleMapsStrokeAWeight.',
                 map: map
-            });';
-
+            });
+            ';
+    }
+            
     $map .= 'var decodedPathR = google.maps.geometry.encoding.decodePath(document.getElementById("pathR").value); 
             var decodedLevelsR = decodeLevels("");
             var setRegionR = new google.maps.Polyline({
@@ -278,6 +300,17 @@ sub TRAFFIC_GetMap($@){
                 map: map
             });' if $returnDebugPoly && decode_base64($returnDebugPoly );
 
+    $map .='var decodedPath = google.maps.geometry.encoding.decodePath(document.getElementById("path0").value); 
+            var decodedLevels = decodeLevels("");
+            var setRegion = new google.maps.Polyline({
+                path: decodedPath,
+                levels: decodedLevels,
+                strokeColor: "'.$GoogleMapsStroke1Color.'",
+                strokeOpacity: '.$GoogleMapsStroke1Opacity.',
+                strokeWeight: '.$GoogleMapsStroke1Weight.',
+                map: map
+            });
+            ';
     $map .= 'var trafficLayer = new google.maps.TrafficLayer();
              trafficLayer.setMap(map);' if AttrVal($name, "GoogleMapsTrafficLayer", 0) eq 1;
 
@@ -461,7 +494,7 @@ sub TRAFFIC_StartUpdate($){
     if(defined(AttrVal($name, "start_address", undef )) && defined(AttrVal($name, "end_address", undef ))){
         
         BlockingCall("TRAFFIC_DoUpdate",$hash->{NAME}.';;;normal',"TRAFFIC_FinishUpdate",60,"TRAFFIC_AbortUpdate",$hash);    
-        
+
         if(defined(AttrVal($name, "includeReturn", undef )) && AttrVal($name, "includeReturn", undef ) eq 1){
             BlockingCall("TRAFFIC_DoUpdate",$hash->{NAME}.';;;return',"TRAFFIC_FinishUpdate",60,"TRAFFIC_AbortUpdate",$hash);    
         }
@@ -525,16 +558,19 @@ sub TRAFFIC_DoUpdate(){
         }
     }
     
-    my $origin = AttrVal($name, "start_address", 0 );
-    my $destination = AttrVal($name, "end_address", 0 );
-    my $travelMode = AttrVal($name, "travelMode", 'driving' );
+    my $origin       = AttrVal($name, "start_address", 0 );
+    my $destination  = AttrVal($name, "end_address", 0 );
+    my $travelMode   = AttrVal($name, "travelMode", 'driving' );
+    my $alternatives = 'false';
+       $alternatives = 'true' if (AttrVal($name, "alternatives", undef ));
     
     if($direction eq "return"){
-        $origin = AttrVal($name, "end_address", 0 );
-        $destination = AttrVal($name, "start_address", 0 );
+        $origin         = AttrVal($name, "end_address", 0 );
+        $destination    = AttrVal($name, "start_address", 0 );
+        $alternatives   = 'false';
     }
     
-    my $url = 'https://maps.googleapis.com/maps/api/directions/json?origin='.$origin.'&destination='.$destination.'&mode='.$travelMode.$TRlanguage.'&departure_time=now'.$TRwaypoints.'&key='.$hash->{APIKEY};
+    my $url = 'https://maps.googleapis.com/maps/api/directions/json?origin='.$origin.'&destination='.$destination.'&mode='.$travelMode.$TRlanguage.'&departure_time=now'.$TRwaypoints.'&key='.$hash->{APIKEY}.'&alternatives='.$alternatives;
     Log3 $hash, 4, "TRAFFIC: ($name) using $url";
     
     my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 0 } );
@@ -543,6 +579,7 @@ sub TRAFFIC_DoUpdate(){
     
     
     # test json decode and catch error nicely
+
     eval {
         my $testJson = decode_json($body->decoded_content); 
         1;
@@ -550,12 +587,12 @@ sub TRAFFIC_DoUpdate(){
     if($@) {
         my $e = $@;
         Log3 $hash, 1, "TRAFFIC: ($name) decode_json on googles return failed, cant continue";
-        my %errorreturn = ('status' => 'API error');
-        return "$name;;;$direction;;;".encode_json(\%errorreturn);
+        Log3 $hash, 5, "TRAFFIC: ($name) received: ".Dumper($body->decoded_content);
+        my %errorReturn = ('status' => 'API error','action' => 'retry');                        
+        #fixme: handle this and schedule a retry        
+        return "$name;;;$direction;;;".encode_json(\%errorReturn);
     };
     my $json = decode_json($body->decoded_content);
-    
-    
     
     
     my $duration_sec            = $json->{'routes'}[0]->{'legs'}[0]->{'duration'}->{'value'} ;
@@ -567,10 +604,14 @@ sub TRAFFIC_DoUpdate(){
     $returnJSON->{'READINGS'}->{'state'}                  = $json->{'status'};
     $returnJSON->{'READINGS'}->{'status'}                 = $json->{'status'};
     $returnJSON->{'READINGS'}->{'eta'}                    = FmtTime( gettimeofday() + $duration_in_traffic_sec ) if defined($duration_in_traffic_sec); 
+    $returnJSON->{'READINGS'}->{'summary'}                = $json->{'routes'}[0]->{'summary'};
     
-    $returnJSON->{'HELPER'}->{'Poly'}                     = encode_base64 ($json->{'routes'}[0]->{overview_polyline}->{points});
-    $returnJSON->{'HELPER'}->{'GoogleMapsCenter'}       = $json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lat}.','.$json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lng};
+    # handling alternatives
+    $returnJSON->{'READINGS'}->{'alternatives'} =  join( ", ", map {  $_->{summary}.' - '.$_->{'legs'}[0]->{'duration_in_traffic'}->{'text'}   } @{$json->{'routes'}} );
     
+    $returnJSON->{'HELPER'}->{'Poly'}                     = encode_base64 (join(',', map{ $_->{overview_polyline}->{points} } @{$json->{'routes'}} ));
+    $returnJSON->{'HELPER'}->{'GoogleMapsCenter'}         = $json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lat}.','.$json->{'routes'}[0]->{'legs'}[0]->{start_location}->{lng};
+
     if($duration_in_traffic_sec && $duration_sec){
         $returnJSON->{'READINGS'}->{'delay'}              = prettySeconds($duration_in_traffic_sec - $duration_sec)  if AttrVal($name, "outputReadings", "" ) =~ m/text/;
         Log3 $hash, 4, "TRAFFIC: ($name) delay in seconds = $duration_in_traffic_sec - $duration_sec";
@@ -628,9 +669,24 @@ sub TRAFFIC_FinishUpdate($){
     my %sensors;
     my $dotrigger = 1;
 
-    Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC_FinishUpdate start";
 
     my $json = decode_json($rawJson);
+    
+    # before we update anything, check if the status contains error, if yes -> retry
+    if(defined($json->{'status'}) && $json->{'status'} =~ m/error/){
+        if ($json->{'action'} eq 'retry'){
+            Log3 $hash, 1, "TRAFFIC: ($name) TRAFFIC_doUpdate returned an error \"".$json->{'status'}. "\" will schedule a retry in 5 seconds";
+            RemoveInternalTimer ($hash);
+            my $nextTrigger = gettimeofday() + 5;
+            $hash->{TRIGGERTIME}     = $nextTrigger;
+            $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
+            InternalTimer($nextTrigger, "TRAFFIC_DoUpdate", $hash, 0);
+        }else{
+            Log3 $hash, 1, "TRAFFIC: ($name) TRAFFIC_doUpdate returned an error: ".$json->{'status'};
+        }
+    }else{
+    
+    Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC_FinishUpdate start";
     readingsBeginUpdate($hash);
     
     my $readings = $json->{'READINGS'};
@@ -671,6 +727,7 @@ sub TRAFFIC_FinishUpdate($){
     readingsEndUpdate($hash, $dotrigger);
     Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC_FinishUpdate done";
     Log3 $hash, 5, "TRAFFIC: ($name) Helper: ".Dumper($hash->{helper}); 
+    }# not an error
 }
 
 sub TRAFFIC_weblink{
@@ -713,9 +770,22 @@ sub prettySeconds {
     }else{
         return $time;
     }
-    
 }
 
+sub minHex{ $_[0]<$_[1] ? $_[0] : $_[1] }
+
+sub degradeHex{
+    my ($rgb, $degr) = (hex(shift), pop);
+    $rgb -= minHex( $rgb&(0xff<<$_), $degr<<$_ ) for (0,8,16);
+    return '%06x', $rgb;
+}
+
+sub lightHex {
+    $_[0] =~ s/#//g;
+  return sprintf '%02x'x3,
+      map{ ($_ *= 1+$_[1]) > 0xff ? 0xff : $_  }
+      map hex, unpack 'A2'x3, $_[0];
+}
 
 1;
 
@@ -785,6 +855,7 @@ sub prettySeconds {
     <li>"start_address" - Street, zipcode City  <b>(mandatory)</b></li>
     <li>"end_address" -  Street, zipcode City <b>(mandatory)</b></li>
     <li>"raw_data" -  0:1</li>
+    <li>"alternatives" -  0:1, include alternative routes into readings and Map</li>
     <li>"language" - de, en etc.</li>
     <li>"waypoints" - Lat, Long coordinates, separated by | </li>
     <li>"returnWaypoints" - Lat, Long coordinates, separated by | </li>
@@ -807,16 +878,18 @@ sub prettySeconds {
   <a name="TRAFFICreadings"></a>
   <b>Readings:</b>
   <ul>
-     <li>delay </li>
-     <li>distance </li>
-     <li>duration </li>
-     <li>duration_in_traffic </li>
-     <li>state </li>
-     <li>eta</li>
-     <li>delay_min</li>
-     <li>duration_min</li>
-     <li>duration_in_traffic_min</li>
-     <li>error_message</li>
+    <li>alternatives</li>
+    <li>delay</li>
+    <li>delay_min</li>
+    <li>distance</li>
+    <li>duration</li>
+    <li>duration_in_traffic</li>
+    <li>duration_in_traffic_min</li>
+    <li>duration_min</li>
+    <li>error_message</li>
+    <li>eta</li>
+    <li>state</li>
+    <li>summary</li>
   </ul>
   <br><br>
   <a name="TRAFFICset"></a>
