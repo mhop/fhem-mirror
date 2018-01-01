@@ -37,6 +37,9 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.2.0        27.12.2017       new attribute "seqDoubletsVariance"
+# 7.1.0        22.12.2017       new attribute timeYearPeriod for reports correspondig to e.g. electricity billing,
+#                               bugfix connection check is running after restart allthough dev is disabled 
 # 7.0.0        18.12.2017       don't set $runtime_string_first,$runtime_string_next,$ts if time/aggregation-attributes 
 #                               not set, devren_Push redesigned, new command get blockinginfo, identify if reopen is 
 #                               running on dblog-device and postpone the set-command
@@ -270,7 +273,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "7.0.0";
+my $DbRepVersion = "7.2.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -324,6 +327,7 @@ sub DbRep_Initialize($) {
                        "readingNameMap ".
                        "readingPreventFromDel ".
                        "role:Client,Agent ".
+                       "seqDoubletsVariance ".
                        "showproctime:1,0 ".
                        "showSvrInfo ".
                        "showVariables ".
@@ -331,6 +335,7 @@ sub DbRep_Initialize($) {
                        "showTableInfo ".
 					   "sqlResultFormat:separated,mline,sline,table,json ".
 					   "sqlResultFieldSep:|,:,\/ ".
+					   "timeYearPeriod ".
                        "timestamp_begin ".
                        "timestamp_end ".
                        "timeDiffToNow ".
@@ -743,6 +748,8 @@ sub DbRep_Attr($$$$) {
 						 dumpComment
 						 dumpSpeed
 						 optimizeTablesBeforeDump
+                         seqDoubletsVariance
+						 timeYearPeriod
                          timestamp_begin
                          timestamp_end
                          timeDiffToNow
@@ -823,6 +830,37 @@ sub DbRep_Attr($$$$) {
     }
                          
     if ($cmd eq "set") {
+		if ($aName =~ /seqDoubletsVariance/) {
+            unless (looks_like_number($aVal)) { return " The Value of $aName is not valid. Only figures are allowed !";}
+        }
+		if ($aName eq "timeYearPeriod") {
+		    # 06-01 02-28
+            unless ($aVal =~ /^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/ )
+			    { return "The Value of \"$aName\" isn't valid. Set the account period as \"MM-DD MM-DD\".";}
+            my ($mm1, $dd1, $mm2, $dd2) = ($aVal =~ /^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/);
+			my (undef,undef,undef,$mday,$mon,$year1,undef,undef,undef) = localtime(time);     # Istzeit Ableitung
+			my $year2 = $year1;
+            # a  b   c  d
+            # 06-01 02-28 , wenn c < a && $mon < a -> Jahr(a)-1, sonst Jahr(c)+1
+		    my $c = ($mon+1).$mday;
+	        my $e = $mm2.$dd2;
+            if ($mm2 <= $mm1 && $c <= $e) {
+			    $year1--;
+			} else {
+			    $year2++;
+			}
+            eval { my $t1 = timelocal(00, 00, 00, $dd1, $mm1-1, $year1-1900); 
+			       my $t2 = timelocal(00, 00, 00, $dd2, $mm2-1, $year2-1900); };
+            if ($@) {
+                my @l = split (/at/, $@);
+                return " The Value of $aName is out of range - $l[0]";
+            }
+            delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
+            delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
+            delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
+            delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
+            return undef;
+        }
         if ($aName eq "timestamp_begin" || $aName eq "timestamp_end") {
             my ($a,$b,$c) = split('_',$aVal);
             if ($a =~ /^current$|^previous$/ && $b =~ /^hour$|^day$|^week$|^month$|^year$/ && $c =~ /^begin$|^end$/) {
@@ -845,31 +883,26 @@ sub DbRep_Attr($$$$) {
             delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
             delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
         }
-        
 		if ($aName =~ /ftpTimeout|timeout|diffAccept/) {
             unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
         } 
-        
 		if ($aName eq "readingNameMap") {
             unless ($aVal =~ m/^[A-Za-z\d_\.-]+$/) { return " Unsupported character in $aName found. Use only A-Z a-z _ . -";}
         }
-        
 		if ($aName eq "timeDiffToNow") {
             unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[dhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ )
-			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"d:10 h:6 m:12 s:20\".  Refer to commandref !";}
+			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"d:10 h:6 m:12 s:20\". Refer to commandref !";}
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
             delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
         } 
-
 		if ($aName eq "timeOlderThan") {
             unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[dhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ )
-			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"d:10 h:6 m:12 s:20\".  Refer to commandref !";}
+			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"d:10 h:6 m:12 s:20\". Refer to commandref !";}
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
             delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
         }
-        
 		if ($aName eq "dumpMemlimit" || $aName eq "dumpSpeed") {
             unless ($aVal =~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 without decimal places.";}
 			my $dml = AttrVal($name, "dumpMemlimit", 100000);
@@ -881,15 +914,12 @@ sub DbRep_Attr($$$$) {
 			    unless($aVal <= ($dml / 10)) {return "The Value of $aName mustn't be greater than 'dumpMemlimit / 10' ! ";}
 			}
         }
-		
 		if ($aName eq "ftpUse") {
             delete($attr{$name}{ftpUseSSL});
         }
-		
 		if ($aName eq "ftpUseSSL") {
             delete($attr{$name}{ftpUse});
         }
-        
 		if ($aName eq "reading" || $aName eq "device") {
             if ($dbmodel && $dbmodel ne 'SQLITE') {
 			    my $attrname = uc($aName);
@@ -1006,7 +1036,7 @@ sub DbRep_firstconnect($) {
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbconn         = $hash->{dbloghash}{dbconn};
 
-if ($init_done == 1) {
+if ($init_done == 1 && !IsDisabled($name)) {
   
   if ( !DbRep_Connect($hash) ) {
       Log3 ($name, 2, "DbRep $name - DB connect failed. Credentials of database $hash->{DATABASE} are valid and database reachable ?");
@@ -1218,6 +1248,27 @@ sub createTimeArray($$$) {
  $tsbegin = formatpicker($tsbegin);
  $tsend = AttrVal($name, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
  $tsend = formatpicker($tsend);
+ 
+ if ( my $tap = AttrVal($name, "timeYearPeriod", undef)) {
+     # a  b   c  d
+     # 06-01 02-28 , wenn c < a && $mon < a -> Jahr(a)-1, sonst Jahr(c)+1
+	 my $ybp = $year+1900;	
+     my $yep = $year+1900;
+	 $tap =~ qr/^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/p;
+	 my $mbp = $1;
+	 my $dbp = $2;
+	 my $mep = $3;
+	 my $dep = $4;
+	 my $c = ($mon+1).$mday;
+	 my $e = $mep.$dep;
+     if ($mep <= $mbp && $c <= $e) {
+	     $ybp--;
+	 } else {
+	     $yep++;
+	 }
+	 $tsbegin = "$ybp-$mbp-$dbp 00:00:00";
+	 $tsend   = "$yep-$mep-$dep 23:59:59";
+ }
 
  if (AttrVal($name,"timestamp_begin","") eq "current_year_begin" ||
      AttrVal($name,"timestamp_end","") eq "current_year_begin") {
@@ -3945,8 +3996,9 @@ sub delseqdoubl_DoParse($) {
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my $limit      = AttrVal($name, "limit", 1000);
+ my $var        = AttrVal($name, "seqDoubletsVariance", undef);
  my $table      = "history";
- my ($err,$dbh,$sth,$sql,$rowlist,$nrows,$selspec,$st);
+ my ($err,$dbh,$sth,$sql,$rowlist,$nrows,$selspec,$st,$var1,$var2);
  
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -4025,13 +4077,20 @@ sub delseqdoubl_DoParse($) {
 			 ($ndev,$nread,undef,undef,$nval) = split("_ESC_", $nr);    # Werte des aktuellen Elements
 	         $or = pop @sel;                                            # das letzte Element der Liste                         
 			 ($odev,$oread,undef,undef,$oval) = split("_ESC_", $or);    # Value des letzten Elements
+             if (looks_like_number($oval) && $var) {                    # Varianz +- falls $val numerischer Wert
+                 $var1 = $oval + $var;
+                 $var2 = $oval - $var;
+             } else {
+                 undef $var1;
+                 undef $var2;
+             }
 	         $oor = pop @sel;                                           # das vorletzte Element der Liste
 		     $ooval = (split '_ESC_', $oor)[-1];                        # Value des vorletzten Elements
 		     if ($ndev.$nread ne $odev.$oread) {
 		         push (@sel,$oor);
 		         push (@sel,$or);
 			     push (@sel,$nr);
-			 } elsif ($ooval eq $oval) {
+			 } elsif ($ooval eq $oval || (($var1 && ($ooval <= $var1)) && ($var2 && ($var2 <= $ooval))) ) {
 		         push (@sel,$oor);
 			     push (@sel,$nr);
                  # Log3 ($name, 5, "DbRep $name -> warping: $or");
@@ -6246,9 +6305,9 @@ sub checktimeaggr ($) {
  my $IsAggrSet   = 0;
  my $aggregation = AttrVal($name,"aggregation","no");
 
- if (AttrVal($name,"timestamp_begin",undef) || AttrVal($name,"timestamp_end",undef) ||
-	 AttrVal($name,"timeDiffToNow",undef) || AttrVal($name,"timeOlderThan",undef) ) {
-	 $IsTimeSet = 1;
+ if ( AttrVal($name,"timestamp_begin",undef) || AttrVal($name,"timestamp_end",undef) ||
+	  AttrVal($name,"timeDiffToNow",undef) || AttrVal($name,"timeOlderThan",undef) || AttrVal($name,"timeYearPeriod",undef) ) {
+	  $IsTimeSet = 1;
  }
  
  if ($aggregation ne "no") {
@@ -7064,7 +7123,9 @@ return;
 								 well as the datasets before or after a value change (database field VALUE). <br>
 								 The <a href="#DbRepattr">attributes</a> to define the scope of aggregation,time period, device and reading are 
 								 considered. If attribute aggregation is not set or set to "no", it will change to the default aggregation 
-								 period "day".
+								 period "day". For datasets containing numerical values it is possible to determine a variance with <a href="#DbRepattr">attribute</a>
+                                 "seqDoubletsVariance". Up to this value consecutive numerical datasets are handled as identical and should be 
+                                 deleted.
 	                             <br><br>
 								 
 	                               <ul>
@@ -7764,6 +7825,18 @@ sub bdump {
 
   <li><b>readingPreventFromDel </b>  - comma separated list of readings which are should prevent from deletion when a 
                                        new operation starts  </li> <br>
+                                       
+  <li><b>seqDoubletsVariance </b> - accepted variance (+/-) for the command "set &lt;Name&gt; delSeqDoublets". <br>
+                                    The value of this attribute describes the variance up to it consecutive numeric values (VALUE) of
+                                    datasets are handled as identical and should be deleted. "seqDoubletsVariance" is an absolut numerical value, 
+                                    which is used as a positive as well as a negative variance. </li> <br>
+
+                                    <ul>
+							        <b>Examples:</b> <br>
+								    <code>attr &lt;Name&gt; seqDoubletsVariance 0.0014 </code> <br>
+								    <code>attr &lt;Name&gt; seqDoubletsVariance 1.45   </code> <br>
+								    </ul>
+								    <br><br> 
 
   <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds) 
                                 for the sql-requests. This is not calculated for a single sql-statement, but the summary 
@@ -7844,6 +7917,24 @@ sub bdump {
   	    </pre> 
         </ul>
 		<br>  
+        
+                                
+  <li><b>timeYearPeriod </b> - Get by this attribute an annual time period will be determined for database data selection. 
+                               The time limits are calculated dynamically during execution time. Every time an annual period is determined. 
+                               Periods of less than a year are not possible to set. <br>
+                               This attribute is particularly intended to make reports synchronous to an account period, e.g. of an energy- or gas provider.
+                               </li> <br> 
+                               
+                               <ul>
+							   <b>Example:</b> <br><br>
+							   attr &lt;DbRep-device&gt; timeYearPeriod 06-25 06-24 <br><br>
+								
+							   # evaluates the database within the time limits 25. june AAAA and 24. june BBBB. <br>
+                               # The year AAAA respectively year BBBB is calculated dynamically depending of the current date. <br>
+                               # If the current date >= 25. june and =< 31. december, than AAAA = current year and BBBB = current year+1 <br>
+                               # If the current date >= 01. january und =< 24. june, than AAAA = current year-1 and BBBB = current year
+							   </ul>
+							   <br><br>
                               
   <li><b>timestamp_begin </b> - begin of data selection (*)  </li> <br>
   
@@ -8194,7 +8285,9 @@ sub bdump {
 								 (Datenbankfeld VALUE). <br>
 								 Die <a href="#DbRepattr">Attribute</a> zur Aggregation,Zeit-,Device- und Reading-Abgrenzung werden dabei 
 								 berücksichtigt. Ist das Attribut "aggregation" nicht oder auf "no" gesetzt, wird als Standard die Aggregation 
-								 "day" verwendet.
+								 "day" verwendet. Für Datensätze mit numerischen Werten kann mit dem <a href="#DbRepattr">Attribut</a>
+                                 "seqDoubletsVariance" eine Abweichung eingestellt werden, bis zu der aufeinander folgende numerische Werte als
+                                 identisch angesehen und gelöscht werden sollen.
 	                             <br><br>
 								 
 	                               <ul>
@@ -8911,6 +9004,18 @@ sub bdump {
   <li><b>role </b>            - die Rolle des DbRep-Device. Standard ist "Client". Die Rolle "Agent" ist im Abschnitt 
                                 <a href="#DbRepAutoRename">DbRep-Agent</a> beschrieben.   </li> <br>
 								
+  <li><b>seqDoubletsVariance </b> - akzeptierte Abweichung (+/-) für das Kommando "set &lt;Name&gt; delSeqDoublets". <br>
+                                    Der Wert des Attributs beschreibt die Abweichung bis zu der aufeinanderfolgende numerische Werte (VALUE) von 
+                                    Datensätze als gleich angesehen und gelöscht werden sollen. "seqDoubletsVariance" ist ein absoluter Zahlenwert, 
+                                    der sowohl als positive als auch negative Abweichung verwendet wird. </li> <br>
+
+                                    <ul>
+							        <b>Beispiele:</b> <br>
+								    <code>attr &lt;Name&gt; seqDoubletsVariance 0.0014 </code> <br>
+								    <code>attr &lt;Name&gt; seqDoubletsVariance 1.45   </code> <br>
+								    </ul>
+								    <br><br>                                     
+                                
   <li><b>showproctime </b>    - wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) 
                                 für die SQL-Ausführung der durchgeführten Funktion. Dabei wird nicht ein einzelnes 
 								SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der jeweiligen 
@@ -8989,6 +9094,24 @@ sub bdump {
   	    </pre>  	
 													
                                 </ul><br>  
+                                
+  <li><b>timeYearPeriod </b> - Mit Hilfe dieses Attributes wird eine jährliche Zeitperiode für die Datenbankselektion bestimmt. 
+                               Die Zeitgrenzen werden zur Ausführungszeit dynamisch berechnet. Es wird immer eine Jahresperiode 
+                               bestimmt. Eine unterjährige Angabe ist nicht möglich. <br>
+                               Dieses Attribut ist vor allem dazu gedacht Auswertungen synchron zu einer Abrechnungsperiode, z.B. der eines 
+                               Energie- oder Gaslieferanten, anzufertigen. 
+                               </li> <br> 
+                               
+                               <ul>
+							   <b>Beispiel:</b> <br><br>
+							   attr &lt;DbRep-device&gt; timeYearPeriod 06-25 06-24 <br><br>
+								
+							   # wertet die Datenbank in den Zeitgrenzen 25. Juni AAAA bis 24. Juni BBBB aus. <br>
+                               # Das Jahr AAAA bzw. BBBB wird in Abhängigkeit des aktuellen Datums errechnet. <br>
+                               # Ist das aktuelle Datum >= 25. Juni und =< 31. Dezember, dann ist AAAA = aktuelles Jahr und BBBB = aktuelles Jahr+1 <br>
+                               # Ist das aktuelle Datum >= 01. Januar und =< 24. Juni, dann ist AAAA = aktuelles Jahr-1 und BBBB = aktuelles Jahr
+							   </ul>
+							   <br><br>
   
   <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion (*)   </li> <br>
   
@@ -9034,8 +9157,9 @@ sub bdump {
   
   <b>Hinweis </b> <br>
   
-  Wird das Attribut "timeDiffToNow" gesetzt, werden die evtentuell gesetzten Attribute "timestamp_begin" bzw. "timestamp_end" gelöscht.
-  Das Setzen von "timestamp_begin" bzw. "timestamp_end" bedingt die Löschung von Attribut "timeDiffToNow" wenn es vorher gesetzt war.
+  Wird das Attribut "timeDiffToNow" gesetzt, werden die eventuell gesetzten anderen Zeit-Attribute 
+  ("timestamp_begin","timestamp_end","timeYearPeriod") gelöscht.
+  Das Setzen von "timestamp_begin" bzw. "timestamp_end" bedingt die Löschung von anderen Zeit-Attribute falls sie vorher gesetzt waren.
   <br><br>
   
   <li><b>timeDiffToNow </b>   - der <b>Selektionsbeginn</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeDiffToNow&gt;"</b> 

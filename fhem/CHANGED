@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_DbRep: V7.2.0, new attributes "seqDoubletsVariance", 
+                       "timeYearPeriod", minor fixes
   - feature: 98_TRAFFIC: v1.3.3, added alternatives, various improvements
   - feature: 70_BRAVIA: new command "application" to start an application on TV
   - feature: FHEMWEB: add structure to roomnames (Forum #63530)
