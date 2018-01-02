@@ -579,7 +579,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   fuseDelay       =>{a=> 51.0,s=>1.0,l=>1,min=>0    ,max=>2.55  ,c=>''         ,f=>100     ,u=>"s"   ,d=>0,t=>"fuse delay"},
   redTempLvl      =>{a=> 52.0,s=>1.0,l=>1,min=>30   ,max=>100   ,c=>''         ,f=>''      ,u=>"C"   ,d=>0,t=>"reduced temperatur recover"},
   redLvl          =>{a=> 53.0,s=>1.0,l=>1,min=>0    ,max=>100   ,c=>''         ,f=>2       ,u=>"%"   ,d=>0,t=>"reduced power level"},
-  powerUpAction   =>{a=> 86.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>"behavior on power up"                 ,lit=>{off=>0,on=>1}},
+  powerUpAction   =>{a=> 86.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>"on: simulate short press of peer self01 (self02 if dual buttons) after power up",lit=>{off=>0,on=>1}},
   statusInfoMinDly=>{a=> 87.0,s=>0.5,l=>1,min=>0    ,max=>15.5  ,c=>''         ,f=>2       ,u=>"s"   ,d=>0,t=>"status message min delay"             ,lit=>{unused=>0}},
   statusInfoRandom=>{a=> 87.5,s=>0.3,l=>1,min=>0    ,max=>7     ,c=>''         ,f=>''      ,u=>"s"   ,d=>0,t=>"status message random delay"},
   characteristic  =>{a=> 88.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>""                                     ,lit=>{linear=>0,square=>1}},
