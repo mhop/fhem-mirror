@@ -59,7 +59,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 my $modulversion = "4.0.12";
-my $flowsetversion = "4.0.11";
+my $flowsetversion = "4.0.12";
 
 
 
@@ -120,6 +120,8 @@ sub AMADDevice_Initialize($) {
                 "setAPSSID ".
                 "root:0,1 ".
                 "disable:1 ".
+                "remoteServer:Automagic,Autoremote,TNES,other ".
+                "IODev ".
                 $readingFnAttributes;
     
     foreach my $d(sort keys %{$modules{AMADDevice}{defptr}}) {
@@ -134,27 +136,17 @@ sub AMADDevice_Define($$) {
 
     my ( $hash, $def ) = @_;
     my @a = split( "[ \t]+", $def );
-    splice( @a, 1, 1 );
-    my $iodev;
-    my $i = 0;
-
     
-    foreach my $param ( @a ) {
-        if( $param =~ m/IODev=([^\s]*)/ ) {
-        
-            $iodev = $1;
-            splice( @a, $i, 3 );
-            last;
-        }
-        
-        $i++;
-    }
-    
-    return "too few parameters: define <name> AMADDevice <HOST-IP> <amad_id>" if( @a != 3 );
+    return "too few parameters: define <name> AMADDevice <HOST-IP> <amad_id> <remoteServer>" if( @a != 5 );
     return "Cannot define a AMAD device. Perl modul $missingModul is missing." if ( $missingModul );
     
+
+    my $name                                    = $a[0];
+    my $host                                    = $a[2];
+    my $amad_id                                 = $a[3];
+    my $remoteServer                            = $a[4];
     
-    my ($name,$host,$amad_id)                        = @a;
+    $hash->{DEF} = "$host $amad_id Automagic" if( $remoteServer ne 'Automagic' );
 
     $hash->{HOST}                               = $host;
     $hash->{AMAD_ID}                            = $amad_id;
@@ -165,21 +157,22 @@ sub AMADDevice_Define($$) {
     $hash->{helper}{setCmdErrorCounter}         = 0;
     $hash->{helper}{deviceStateErrorCounter}    = 0;
 
+
+
     
-
-
+    CommandAttr(undef,"$name IODev $modules{AMADCommBridge}{defptr}{BRIDGE}->{NAME}") if(AttrVal($name,'IODev','none') eq 'none');
+    
+    my $iodev           = AttrVal($name,'IODev','none');
+    
     AssignIoPort($hash,$iodev) if( !$hash->{IODev} );
     
     if(defined($hash->{IODev}->{NAME})) {
-    
         Log3 $name, 3, "AMADDevice ($name) - I/O device is " . $hash->{IODev}->{NAME};
-    
     } else {
-    
         Log3 $name, 1, "AMADDevice ($name) - no I/O device";
     }
-    
-    
+
+
     $iodev = $hash->{IODev}->{NAME};
     
     my $d = $modules{AMADDevice}{defptr}{$amad_id};
@@ -749,7 +742,7 @@ sub AMADDevice_Parse($$) {
             
     } else {
 
-        return "UNDEFINED $fhemDevice AMADDevice $decode_json->{firstrun}{'amaddevice_ip'} $decode_json->{amad}{'amad_id'} IODev=$name";
+        return "UNDEFINED $fhemDevice AMADDevice $decode_json->{firstrun}{'amaddevice_ip'} $decode_json->{amad}{'amad_id'} Automagic";
     }
 }
 

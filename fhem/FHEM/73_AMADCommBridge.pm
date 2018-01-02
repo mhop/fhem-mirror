@@ -74,8 +74,8 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.7";
-my $flowsetversion = "4.0.11";
+my $modulversion = "4.0.8";
+my $flowsetversion = "4.0.12";
 
 
 
@@ -788,7 +788,8 @@ sub AMADCommBridge_ResponseProcessing($$) {
             return Log3 $bname, 3, "AMADCommBridge ($name) - AMADCommBridge: processing receive no reading values from Device: $fhemDevice"
             unless( (defined($decode_json->{payload}) and ($decode_json->{payload})) or (defined($decode_json->{firstrun}) and ($decode_json->{firstrun})) );
             
-            Log3 $bname, 4, "AMADCommBridge ($bname) - AMADCommBridge: processing receive reading values - Device: $fhemDevice Data: $decode_json->{payload}" unless( defined($decode_json->{payload}) and ($decode_json->{payload}) );
+            Log3 $bname, 4, "AMADCommBridge ($bname) - AMADCommBridge: processing receive reading values - Device: $fhemDevice Data: $decode_json->{payload}"
+            if( defined($decode_json->{payload}) and ($decode_json->{payload}) );
 
             Dispatch($bhash,$json,undef);
             Log3 $bname, 4, "AMADCommBridge ($bname) - call Dispatcher";
