@@ -8564,10 +8564,10 @@ sub CUL_HM_ActCheck($) {# perform supervision
                                                  ? ($actHash->{helper}{$devId}{try} + 1)
                                                  : 1;
               my $cmds = CUL_HM_Set($defs{$devName},$devName,"help");
-              if ($cmds =~ m/^(statusRequest|getSerial)/){
+              if ($cmds =~ m/(statusRequest|getSerial)/){
                 # send statusrequest if possible
                 CUL_HM_Set($defs{$devName},$devName,
-                           ($cmds =~ m/^statusRequest/ ? "statusRequest"
+                           ($cmds =~ m/statusRequest/ ? "statusRequest"
                                                        : "getSerial" ));
                 $state = $oldState eq "unset" ? "unknown" 
                                               : $oldState;
