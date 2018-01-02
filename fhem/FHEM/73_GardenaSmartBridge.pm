@@ -68,7 +68,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 
 
-my $version = "0.4.0";
+my $version = "0.4.1";
 
 
 
@@ -88,8 +88,9 @@ sub GardenaSmartBridge_WriteReadings($$);
 sub GardenaSmartBridge_ParseJSON($$);
 sub GardenaSmartBridge_getDevices($);
 sub GardenaSmartBridge_getToken($);
-sub GardenaSmartBridge_InternalTimerGetDeviceData($);
+#sub GardenaSmartBridge_InternalTimerGetDeviceData($);
 sub GardenaSmartBridge_createHttpValueStrings($@);
+sub GardenaSmartBridge_Notify($$);
 
 
 
@@ -109,6 +110,7 @@ sub GardenaSmartBridge_Initialize($) {
     $hash->{SetFn}      = "GardenaSmartBridge_Set";
     $hash->{DefFn}      = "GardenaSmartBridge_Define";
     $hash->{UndefFn}    = "GardenaSmartBridge_Undef";
+    $hash->{NotifyFn}   = "GardenaSmartBridge_Notify";
     
     $hash->{AttrFn}     = "GardenaSmartBridge_Attr";
     $hash->{AttrList}   = "debugJSON:0,1 ".
@@ -141,6 +143,7 @@ sub GardenaSmartBridge_Define($$) {
     $hash->{URL}            = 'https://sg-api.dss.husqvarnagroup.net/sg-1';
     $hash->{VERSION}        = $version;
     $hash->{INTERVAL}       = 300;
+    $hash->{NOTIFYDEV}      = "global,$name";
     
     my $username            = GardenaSmartBridge_encrypt($user);
     my $password            = GardenaSmartBridge_encrypt($pass);
@@ -157,17 +160,6 @@ sub GardenaSmartBridge_Define($$) {
     readingsSingleUpdate($hash,'state','initialized',1);
     readingsSingleUpdate($hash,'token','none',1);
     Log3 $name, 3, "GardenaSmartBridge ($name) - defined GardenaSmartBridge and crypt your credentials";
-
-    
-    if( $init_done ) {
-    
-        GardenaSmartBridge_getToken($hash);
-        readingsSingleUpdate($hash,'state','get token',1);
-        
-    } else {
-    
-        InternalTimer( gettimeofday()+15, "GardenaSmartBridge_getToken", $hash, 0 );
-    }
     
     
     $modules{GardenaSmartBridge}{defptr}{BRIDGE} = $hash;
@@ -194,13 +186,12 @@ sub GardenaSmartBridge_Attr(@) {
     
     if( $attrName eq "disable" ) {
         if( $cmd eq "set" and $attrVal eq "1" ) {
-            RemoveInternalTimer($hash) if($init_done);
+            RemoveInternalTimer($hash);
             readingsSingleUpdate ( $hash, "state", "inactive", 1 );
             Log3 $name, 3, "GardenaSmartBridge ($name) - disabled";
         }
 
         elsif( $cmd eq "del" ) {
-            GardenaSmartBridge_InternalTimerGetDeviceData($hash) if($init_done);
             readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "GardenaSmartBridge ($name) - enabled";
         }
@@ -221,21 +212,65 @@ sub GardenaSmartBridge_Attr(@) {
     
     elsif( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
+            RemoveInternalTimer($hash);
             return "Interval must be greater than 0"
             unless($attrVal > 0);
             $hash->{INTERVAL}   = $attrVal;
             Log3 $name, 3, "GardenaSmartBridge ($name) - set interval: $attrVal";
-            GardenaSmartBridge_InternalTimerGetDeviceData($hash) if($init_done);
         }
 
         elsif( $cmd eq "del" ) {
+            RemoveInternalTimer($hash);
             $hash->{INTERVAL}   = 300;
             Log3 $name, 3, "GardenaSmartBridge ($name) - delete User interval and set default: 300";
-            GardenaSmartBridge_InternalTimerGetDeviceData($hash) if($init_done);
         }
     }
 
     return undef;
+}
+
+sub GardenaSmartBridge_Notify($$) {
+
+    my ($hash,$dev) = @_;
+    my $name = $hash->{NAME};
+    return if (IsDisabled($name));
+    
+    my $devname = $dev->{NAME};
+    my $devtype = $dev->{TYPE};
+    my $events = deviceEvents($dev,1);
+    return if (!$events);
+
+    #Log3 $name, 1, "GardenaSmartBridge ($name) - Im Notify: DEVTYPE: $devtype, DEVNAME: $devname EVENT: @{$events}";
+    
+    
+    GardenaSmartBridge_getToken($hash) if ( 
+                                                ($devtype eq 'Global'
+                                                    and (grep /^INITIALIZED$/,@{$events}
+                                                        or grep /^DEFINED.$name$/,@{$events}
+                                                        or grep /^MODIFIED.$name$/,@{$events}
+                                                    )
+                                                )
+                                                
+                                            or 
+                                                ($devtype eq 'GardenaSmartBridge'
+                                                    and ReadingsVal('$devname','token','') eq 'none')
+                                            );
+
+    GardenaSmartBridge_getDevices($hash) if ( $devtype eq 'Global'
+                                                and (grep /^DELETEATTR.$name.disable$/,@{$events}
+                                                     or grep /^ATTR.$name.disable.0$/,@{$events}
+                                                     or grep /^DELETEATTR.$name.interval$/,@{$events}
+                                                     or grep /^ATTR.$name.interval.[0-9]+/,@{$events}
+                                                    )
+                                                and $init_done );
+
+    if( $devtype eq 'GardenaSmartBridge' and grep /^state:.connected.to.cloud$/,@{$events} ) {
+    
+        InternalTimer( gettimeofday()+$hash->{INTERVAL},"GardenaSmartBridge_getDevices", $hash);
+        Log3 $name, 4, "GardenaSmartBridge ($name) - set internal timer function for recall GardenaSmartBridge_getDevices sub";
+    }
+
+    return;
 }
 
 sub GardenaSmartBridge_Set($@) {
@@ -262,27 +297,27 @@ sub GardenaSmartBridge_Set($@) {
     return undef;
 }
 
-sub GardenaSmartBridge_InternalTimerGetDeviceData($) {
-
-    my $hash    = shift;
-    my $name    = $hash->{NAME};
-    
-    
-    RemoveInternalTimer($hash);
-    
-    if( not IsDisabled($name) ) {
-    
-        GardenaSmartBridge_getDevices($hash);
-        Log3 $name, 4, "GardenaSmartBridge ($name) - set internal timer function for recall InternalTimerGetDeviceData sub";
-        
-    } else {
-    
-        readingsSingleUpdate($hash,'state','disabled',1);
-        Log3 $name, 3, "GardenaSmartBridge ($name) - device is disabled";
-    }
-    
-    InternalTimer( gettimeofday()+$hash->{INTERVAL},"GardenaSmartBridge_InternalTimerGetDeviceData", $hash, 1 );
-}
+# sub GardenaSmartBridge_InternalTimerGetDeviceData($) {
+# 
+#     my $hash    = shift;
+#     my $name    = $hash->{NAME};
+#     
+#     
+#     #RemoveInternalTimer($hash);
+#     
+#     if( not IsDisabled($name) ) {
+#     
+#         GardenaSmartBridge_getDevices($hash);
+#         Log3 $name, 4, "GardenaSmartBridge ($name) - set internal timer function for recall InternalTimerGetDeviceData sub";
+#         
+#     } else {
+#     
+#         readingsSingleUpdate($hash,'state','disabled',1);
+#         Log3 $name, 3, "GardenaSmartBridge ($name) - device is disabled";
+#     }
+#     
+#     InternalTimer( gettimeofday()+$hash->{INTERVAL},"GardenaSmartBridge_InternalTimerGetDeviceData", $hash);
+# }
 
 sub GardenaSmartBridge_Write($@) {
 
@@ -444,8 +479,6 @@ sub GardenaSmartBridge_ErrorHandling($$$) {
 
         return;
     }
-    
-    
 
 
 
@@ -572,8 +605,15 @@ sub GardenaSmartBridge_getDevices($) {
     my $name    = $hash->{NAME};
     
     
-    GardenaSmartBridge_Write($hash,undef,undef,undef);
-    Log3 $name, 4, "GardenaSmartBridge ($name) - fetch device list and device states";
+    if( not IsDisabled($name) ) {
+
+        GardenaSmartBridge_Write($hash,undef,undef,undef);
+        Log3 $name, 4, "GardenaSmartBridge ($name) - fetch device list and device states";
+    } else {
+        
+        readingsSingleUpdate($hash,'state','disabled',1);
+        Log3 $name, 3, "GardenaSmartBridge ($name) - device is disabled";
+    }
 }
 
 sub GardenaSmartBridge_getToken($) {
@@ -581,6 +621,7 @@ sub GardenaSmartBridge_getToken($) {
     my $hash    = shift;
     my $name    = $hash->{NAME};
     
+    readingsSingleUpdate($hash,'state','get token',1);
     
     delete $hash->{helper}{session_id}      if( defined($hash->{helper}{session_id}) and $hash->{helper}{session_id} );
     delete $hash->{helper}{user_id}         if( defined($hash->{helper}{user_id}) and $hash->{helper}{user_id} );
@@ -589,9 +630,6 @@ sub GardenaSmartBridge_getToken($) {
     GardenaSmartBridge_Write($hash,'"sessions": {"email": "'.GardenaSmartBridge_decrypt($hash->{helper}{username}).'","password": "'.GardenaSmartBridge_decrypt($hash->{helper}{password}).'"}',undef,undef);
     
     Log3 $name, 3, "GardenaSmartBridge ($name) - send credentials to fetch Token and locationId";
-    
-    RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday()+$hash->{INTERVAL},"GardenaSmartBridge_InternalTimerGetDeviceData", $hash, 1 );
 }
 
 sub GardenaSmartBridge_encrypt($) {

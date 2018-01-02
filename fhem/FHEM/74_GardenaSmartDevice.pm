@@ -65,7 +65,7 @@ use Time::Local;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.4.0";
+my $version = "0.4.1";
 
 
 

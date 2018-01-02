@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  73_GardenaSmartBridge/74_GardenaSmartDevice: add NotifyFn Support
+             change AttrFn Routine
   - feature: 93_DbRep: V7.2.0, new attributes "seqDoubletsVariance", 
                        "timeYearPeriod", minor fixes
   - feature: 98_TRAFFIC: v1.3.3, added alternatives, various improvements
