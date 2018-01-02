@@ -77,10 +77,11 @@ sub OBIS_Initialize($)
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
 #  $hash->{SetFn} = "OBIS_Set";
+  $hash->{SetFn} = "myOBIS_Set";
     $hash->{GetFn} = "OBIS_Get";
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both createPreValues:on,off ".
   					  $readingFnAttributes;
 }
 
@@ -144,6 +145,7 @@ sub OBIS_Define($$)
     "VSM102"	=> 	["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     "E110"		=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     "E350USB"	=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    "AS1440"	=> 	["/2!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)]
     );
     if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110'};
     $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
@@ -354,6 +356,7 @@ sub OBIS_trySMLdecode($$)
 	#    					$line2=$SML_specialities{"HEX2"}[1]->($data)
 		    			} else {
 		    				$data=~s/([A-F0-9]{2})/chr(hex($1))/eg;
+		    				$data=~s/[^!-~\s]//g;
 		    				$line2="$data";
 	    				}
 	    				
@@ -455,6 +458,7 @@ sub OBIS_Parse($$)
 						$channel=~s/:/\./;
 						$channel=~s/-/\./;
 						$channel=~s/\*/\./;
+#						Log 3,"Channel would be: $channel";
 					}
 					if ($hash->{MeterType} eq "Unknown") {$hash->{MeterType}="Standard"}
 #					if($rmsg=~/^([23456789]+)-.*/) {
@@ -542,6 +546,7 @@ sub OBIS_Parse($$)
 					     		}
 				  			}
 				     		if ($found==0) {
+#				     			Log 3,"Found a Channel-Attr";
 				     			$rmsg=~/^((?:\d{1,3}-\d{1,3}:)?(?:\d{1,3}|[CF]).\d{1,3}(?:.\d{1,3})?(?:\*\d{1,3})?)(?:\((.*?)\))?\((.*?)\)/;
     							my $chan=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
     							my $chan1=$chan;
@@ -631,6 +636,7 @@ sub OBIS_Attr(@)
 				$hash->{helper}{Channels}=undef;
 			}
 		}
+		
 		if ($aName eq "directions") {
 	      $hash->{helper}{directions}=eval $aVal;
 			if ($@) {
@@ -660,7 +666,9 @@ sub OBIS_Attr(@)
 					InternalTimer($t, "GetUpdate", $hash, 0);
 			 	} else {return "OBIS ($name): attr alignTime must be a Value >0"}
 			 } else {
- 				return "OBIS ($name): attr alignTime is useless, if no interval is specified";
+			 	if ($init_done) {
+ 					return "OBIS ($name): attr alignTime is useless, if no interval is specified";
+			 	}
 			 }			
 		}
 		if ($aName eq "pollingMode")
@@ -809,16 +817,18 @@ sub OBIS_decodeTL($){
 
 <a name="OBIS"></a>
 <h3>OBIS</h3>
+<ul>
   This module is for SmartMeters, that report their data in OBIS-Standard. It dosen't matter, wether the data comes as PlainText or SML-encoded.
-  <br>
+  <br><br>
   <b>Define</b>
+  <ul>
     <code>define &lt;name&gt; OBIS device|none [MeterType] </code><br>
     <br>
       &lt;device&gt; specifies the serial port to communicate with the smartmeter.
       Normally on Linux the device will be named /dev/ttyUSBx, where x is a number.
       For example /dev/ttyUSB0. You may specify the baudrate used after the @ char.<br>
-      <br><br>
-      Optional:MeterType can be of
+      <br>
+      Optional: MeterType can be of
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
       <li>E110 -&gt; Landis&&;Gyr E110</li>
       <li>E350USB -&gt; Landis&&;Gyr E350 USB-Version</li>
@@ -829,46 +839,45 @@ sub OBIS_decodeTL($){
     <code>define myPowerMeter OBIS /dev/ttyPlugwise@@9600,7,E,1 VSM102</code>
       <br>
     <br>
- 
+  </ul>
   <b>Attributes</b>
   <ul><li>
     <code>offset_feed <br>offset_energy</code><br>
       If your smartmeter is BEHIND the meter of your powersupplier, then you can hereby adjust
       the total-reading of your SM to that of your official one.
-      <br><br>
-      </li>
-      <li>
+      </li><li>
    <code>channels</code><br>
-      With this, you can rename the reported channels.
+      With this, you can rename the reported channels.<BR>e.g.: 
       <code>attr myOBIS channels {"1.0.96.5.5.255"=>"Status","1.0.0.0.0.255"=>"Info","16.7"=>"Verbrauch"}></code>
-      <br><br></li>
-      <li><code>directions</code><br>
+      </li><li>
+   <code>directions</code><br>
       Some Meters report feeding/comnsuming of power in a statusword.
-      If this is set, you get an extra reading dir_total_consumption which defaults to "in" and "out"
-      Here, you can change this text with:
+      If this is set, you get an extra reading dir_total_consumption which defaults to "in" and "out".<BR>
+      Here, you can change this text with, e.g.: 
       <code>attr myOBIS directions {">" => "pwr consuming", "<"=>"pwr feeding"}</code>
-      </li>
-      <li>
+      </li><li>
    <code>interval</code><br>
       The polling-interval in seconds. (Only useful in Polling-Mode)
-      </li>
-      <li>
+      </li><li>
    <code>alignTime</code><br>
       Aligns the intervals to a given time. Each interval is repeatedly calculated.
-      So if alignTime=00:00 and interval=600 aligns the interval to xx:00:00, xx:10:00, xx:20:00 etc....  
+      So if alignTime=00:00 and interval=600 aligns the interval to xx:00:00, xx:10:00, xx:20:00 etc....
+      </li><li>  
    <code>pollingMode</code><br>
       Changes from direct-read to polling-mode.
       Useful with meters, that send a continous datastream. 
       Reduces CPU-load.  
+      </li><li>
    <code>unitReadings</code><br>
-      Adds the units to the readings like w, wH, A etc.  
+      Adds the units to the readings like w, wH, A etc.
+      </li><li>  
    <code>valueBracket</code><br>
       Sets, weather to use the value from the first or the second bracket, if applicable.
       Standard is "second"
       </li>
       
   <br>
-</ul>
+</ul></ul>
 
 =end html
 
@@ -876,14 +885,16 @@ sub OBIS_decodeTL($){
 
 <a name="OBIS"></a>
 <h3>OBIS</h3>
+<ul>
   Modul für Smartmeter, die ihre Daten im OBIS-Standard senden. Hierbei ist es egal, ob die Daten als reiner Text oder aber SML-kodiert kommen.
-  <br>
+  <br><br>
   <b>Define</b>
+  <ul>
     <code>define &lt;name&gt; OBIS device|none [MeterType] </code><br>
     <br>
       &lt;device&gt; gibt den seriellen Port an.
       <br><br>
-      Optional:MeterType kann sein:
+      Optional: MeterType kann sein:
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
       <li>E110 -&gt; Landis&&;Gyr E110</li>
       <li>E350USB -&gt; Landis&&;Gyr E350 USB-Version</li>
@@ -894,25 +905,21 @@ sub OBIS_decodeTL($){
     <code>define myPowerMeter OBIS /dev/ttyPlugwise@@9600,7,E,1 VSM102</code>
       <br>
     <br>
- 
+  </ul>
   <b>Attribute</b>
   <ul><li>
     <code>offset_feed <br>offset_energy</code><br>
       Wenn das Smartmeter hinter einem Zähler des EVU's sitzt, kann hiermit der Zähler des
       Smartmeters an den des EVU's angepasst werden.
-      <br><br>
-      </li>
-      <li>
+      </li><li>
    <code>channels</code><br>
-      Hiermit können die einzelnen Kanal-Readings mittels RegExes umbenannt werden.
-      Beispiel:
-      <code>attr myOBIS channels {"1.0.96.5.5.255"=>"Status","1.0.0.0.0.255"=>"Info","16.7"=>"Verbrauch"}></code>
-      <br><br>
-      </li>
-      <li><code>directions</code><br>
+      Hiermit können die einzelnen Kanal-Readings mittels RegExes umbenannt werden.<BR>
+      Beispiel: <code>attr myOBIS channels {"1.0.96.5.5.255"=>"Status","1.0.0.0.0.255"=>"Info","16.7"=>"Verbrauch"}></code>
+      </li><li>
+   <code>directions</code><br>
       Manche SmartMeter senden im Statusbyte die Stromrichtung.
-      In diesem Fall gibt es ein extra Reading "dir_total_consumption" welches standardmäßig "in" and "out" beinhaltet
-      Hiermit kann dieser Text geändert werden:
+      In diesem Fall gibt es ein extra Reading "dir_total_consumption" welches standardmäßig "in" and "out" beinhaltet<BR>
+      Hiermit kann dieser Text geändert werden, z.B.:
       <code>attr myOBIS directions {">" => "pwr consuming", "<"=>"pwr feeding"}</code>
       </li><li>
    <code>interval</code><br>
@@ -924,15 +931,17 @@ sub OBIS_decodeTL($){
    <code>pollingMode</code><br>
       Hiermit wird von Direktbenachrichtigung auf Polling umgestellt.
       Bei Smartmetern, welche von selbst im Sekundentakt senden,
-      kann das zu einer spürbaren Senkung der Prozessorleistung führen.  
+      kann das zu einer spürbaren Senkung der Prozessorleistung führen.
+      </li><li>  
    <code>unitReadings</code><br>
-      Hängt bei den Readings auch die Einheiten an, zB w, wH, A usw.  
+      Hängt bei den Readings auch die Einheiten an, zB w, wH, A usw.
+      </li><li>  
    <code>valueBracket</code><br>
       Legt fest, ob der Wert aus dem ersten oder zweiten Klammernpaar genommen wird. 
       Standard ist "second"
       </li>
   <br>
-</ul>
+</ul></ul>
 
 =end html_DE
 
