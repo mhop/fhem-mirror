@@ -82,6 +82,7 @@ CUL_TCM97001_Initialize($)
   $hash->{ParseFn}   = "CUL_TCM97001_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
                         "$readingFnAttributes " .
+                        "max-deviation-temp:1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50 ".
                         "model:".join(",", sort keys %models);
 
   $hash->{AutoCreate}=
@@ -143,7 +144,7 @@ CUL_TCM97001_Undef($$)
 # n8 = ( 0x7 + n0 + n1 + n2 + n3 + n4 + n5 + n6 + n7 ) & 0xf
 sub checksum_W174 {
   my $msg = shift;
-  Log3 "CUL_TCM97001: ", 4 , "CUL_TCM97001: W174 checksum calc for: $msg";
+  Log3 "CUL_TCM97001 ", 4 , "CUL_TCM97001 W174 checksum calc for: $msg";
   my @a = split("", $msg);
   my $bitReverse = undef;
   my $x = undef;
@@ -155,7 +156,7 @@ sub checksum_W174 {
   my @aReverse = split("", $hexReverse);                      # Split reversed a again
   my $CRC = (7 + hex($aReverse[0])+hex($aReverse[1])+hex($aReverse[2])+hex($aReverse[3])+hex($aReverse[4])+hex($aReverse[5])+hex($aReverse[6])+hex($aReverse[7])) & 15;
   if ($CRC == hex($aReverse[8])) {
-      Log3 "CUL_TCM97001: ", 4 , "CUL_TCM97001: W174 checksum ok $CRC == ".hex($aReverse[8]);
+      Log3 "CUL_TCM97001 ", 4 , "CUL_TCM97001 W174 checksum ok $CRC == ".hex($aReverse[8]);
       return TRUE;
   } else {
       return FALSE;
@@ -194,17 +195,17 @@ sub checkCRC4 {
   my $msg = shift;
   my @a = split("", $msg);
   if(scalar(@a)<9){
-    Log3 "checkCRC4", 5, "CUL_TCM97001 failed for msg=($msg) length<9";
+    Log3 "checkCRC4", 5, "CUL_TCM97001 checkCRC4 failed for msg=($msg) length<9";
     return FALSE;
   }
   # xor nibbles 0 to 7 and compare to n8, if more nibble they might have been added to fill gap
   my $CRC = ( (hex($a[0])) ^ (hex($a[1])) ^ (hex($a[2])) ^ (hex($a[3])) ^ 
              (hex($a[4])) ^ (hex($a[5])) ^ (hex($a[6])) ^ (hex($a[7])) );
   if ($CRC ==  (hex($a[8]))) {
-    Log3 "checkCRC4", 5, "CUL_TCM97001 OK for msg=($msg)";
+    Log3 "checkCRC4", 5, "CUL_TCM97001 checkCRC4 OK for msg=($msg)";
     return TRUE;
   }
-  Log3 "checkCRC4", 5, "CUL_TCM97001 FAILED for msg=($msg)";
+  Log3 "checkCRC4", 5, "CUL_TCM97001 checkCRC4 FAILED for msg=($msg)";
   return FALSE;
 }
 #
@@ -216,16 +217,16 @@ sub isRain {
   my $msg = shift;
   my @a = split("", $msg);
   if(scalar(@a)<9){
-    Log3 "isRain", 5, "isRain: CUL_TCM97001 failed for msg=($msg) length<9";
+    Log3 "isRain", 5, "CUL_TCM97001 isRain failed for msg=($msg) length<9";
     return FALSE;
   }
   # if bit 0 of nibble 2 is 1 then this is no rain data
   my $isRainData = ( (hex($a[2]) & 1) );
   if ($isRainData == 1) {
-    Log3 "isRain", 5, "isRain: CUL_TCM97001 for msg=($msg) = FALSE";
+    Log3 "isRain", 5, "CUL_TCM97001 isRain for msg=($msg) = FALSE";
     return FALSE;
   }
-  Log3 "isRain", 5, "isRain: CUL_TCM97001 for msg=($msg) = TRUE";
+  Log3 "isRain", 5, "CUL_TCM97001 isRain for msg=($msg) = TRUE";
   return TRUE;
 }
 
@@ -234,7 +235,7 @@ sub isRain {
 #
 sub checkCRCKW9010 {
   my $msg = shift;
-  Log3 "CUL_TCM97001", 5 , "crc calc for: $msg";
+  Log3 "CUL_TCM97001", 5 , "CUL_TCM97001 checkCRCKW9010 crc calc for: $msg";
   my @a = split("", $msg);
   my $bitReverse = undef;
   my $x = undef;
@@ -249,8 +250,8 @@ sub checkCRCKW9010 {
 
   my $CRC = (hex($aReverse[0])+hex($aReverse[1])+hex($aReverse[2])+hex($aReverse[3])
             +hex($aReverse[4])+hex($aReverse[5])+hex($aReverse[6])+hex($aReverse[7])) & 15;
-  Log3 "CUL_TCM97001", 5 , "calc crc is: $CRC";
-  Log3 "CUL_TCM97001", 5 , "ref crc is :".hex($aReverse[8]);
+  Log3 "CUL_TCM97001", 5 , "CUL_TCM97001 checkCRCKW9010 calc crc is: $CRC";
+  Log3 "CUL_TCM97001", 5 , "CUL_TCM97001 checkCRCKW9010 ref crc is :".hex($aReverse[8]);
   if ($CRC == hex($aReverse[8])) {
       return TRUE;
   }
@@ -282,8 +283,6 @@ sub checkCRC_GTWT02 {
   my @a = split("", $msg);
   my $CRC = (hex($a[0])+hex($a[1])+hex($a[2])+hex($a[3])
             +hex($a[4])+hex($a[5])+hex($a[6])+(hex($a[7]) & 0xE));
-#  my $CRC = (hex($a[0])+hex($a[1])+hex($a[2])+hex($a[3])
-#            +hex($a[4])+hex($a[5])+hex($a[6])+hex($a[7])) -1;
   my $CRCCHECKVAL= (hex($a[7].$a[8].$a[9]) & 0x1F8) >> 3; 
   if ($CRC  % 64 == $CRCCHECKVAL) {
       return TRUE;
@@ -324,11 +323,11 @@ sub checkValues {
 sub
 CUL_TCM97001_Parse($$)
 {
-
   my $enableLongIDs = TRUE; # Disable short ID support, enable longIDs
   my ($hash, $msg) = @_;
   $msg = substr($msg, 1);
   my @a = split("", $msg);
+  my $iodev = $hash->{NAME};
 
   my $id3 = hex($a[0] . $a[1]);
   #my $id4 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
@@ -368,9 +367,9 @@ CUL_TCM97001_Parse($$)
   {
 	$rssi = hex($rssi);
     $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74)) if defined($rssi);
-    Log3 $name, 4, "CUL_TCM97001 $name $id3 ($msg) length: $l RSSI: $rssi";
+    Log3 $name, 4, "$iodev: CUL_TCM97001 $name $id3 ($msg) length: $l RSSI: $rssi";
   } else {
-    Log3 $name, 4, "CUL_TCM97001 $name $id3 ($msg) length: $l"; 
+    Log3 $name, 4, "$iodev: CUL_TCM97001 $name $id3 ($msg) length: $l"; 
   }
 
   my ($msgtype, $msgtypeH);
@@ -405,7 +404,7 @@ CUL_TCM97001_Parse($$)
   
   
 
-  my $longids = AttrVal($hash->{NAME},'longids',1);
+  my $longids = AttrVal($iodev,'longids',1);
 
   if (length($msg) == 8) {
     # Only tmp TCM device
@@ -418,66 +417,6 @@ CUL_TCM97001_Parse($$)
     }
     $readedModel = AttrVal($name, "model", "Unknown");
     
-    if ($readedModel eq "Unknown" || $readedModel eq "TCM97...") {
-
-      $temp    = (hex($a[3].$a[4].$a[5]) >> 2) & 0xFFFF;  
-      my $negative    = (hex($a[2]) >> 0) & 0x3; 
-
-      if ($negative == 0x3) {
-        $temp = (~$temp & 0x03FF) + 1;
-        $temp = -$temp;
-      }
-
-      $temp = $temp / 10;
-
-
-      if (checkValues($temp, 50)) {
-      	$model="TCM97...";
-         # I think bit 3 on byte 3 is battery warning
-      	$batbit    = (hex($a[2]) >> 0) & 0x4; 
-      	$batbit = ~$batbit & 0x1; # Bat bit umdrehen
-      	$mode    = (hex($a[5]) >> 0) & 0x1; 
-      	my $unknown    = (hex($a[4]) >> 0) & 0x2; 
-	    if ($mode) {
-    	  Log3 $name, 5, "CUL_TCM97001 Mode: manual triggert";
-      	} else {
-       	  Log3 $name, 5, "CUL_TCM97001 Mode: auto triggert";
-      	}
-     	if ($unknown) {
-          Log3 $name, 5, "CUL_TCM97001 Unknown Bit: $unknown";
-      	}
-        
-        my $deviceCode;
-        
-        if (!defined($modules{CUL_TCM97001}{defptr}{$tcm97id}))
-        {
-            if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
-          	{
-		         $deviceCode="CUL_TCM97001_".$tcm97id;
-		         Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
-           	} else {
-		         $deviceCode="CUL_TCM97001_" . $model;
-           	}
-        } else {
-        	$deviceCode=$tcm97id;
-        }  
-      	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
-      	if($def) {
-       	  $name = $def->{NAME};
-      	} 
-      	
-      	
-      	
-        if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
-          return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
-        }        
-        $packageOK = TRUE;
-        $hasbatcheck = TRUE;
-        $hasmode = TRUE;
-        $readedModel=$model;
-      }
-    }
     if ($readedModel eq "Unknown" || $readedModel eq "ABS700") {
 
       $temp = (hex($a[2].$a[3]) & 0x7F)+(hex($a[5])/10);
@@ -485,6 +424,32 @@ CUL_TCM97001_Parse($$)
         $temp = -$temp;
       }
       
+		# Sanity check temperature
+		if($def) {
+			my $timeSinceLastUpdate = ReadingsAge($iodev, "state", 0);
+			if ($timeSinceLastUpdate < 0) {
+				$timeSinceLastUpdate *= -1;
+				}
+				if (defined($hash->{READINGS}{temperature}{VAL})) {
+				my $diffTemp = 0;
+				my $oldTemp = $hash->{READINGS}{temperature}{VAL};
+				my $maxdeviation = AttrVal($name, "max-deviation-temp", 1);				# default 1 K
+				if ($temp > $oldTemp) {
+				$diffTemp = ($temp - $oldTemp);
+				} else {
+				$diffTemp = ($oldTemp - $temp);
+				}
+				$diffTemp = sprintf("%.1f", $diffTemp);				
+				Log3 $name, 4, "$iodev: $name old temp $oldTemp, age $timeSinceLastUpdate, new temp $temp, diff temp $diffTemp";
+				my $maxDiffTemp = $timeSinceLastUpdate / 60 + $maxdeviation; 			# maxdeviation + 1.0 Kelvin/Minute
+				$maxDiffTemp = sprintf("%.1f", $maxDiffTemp + 0.05);					# round 0.1
+				Log3 $name, 4, "$iodev:  $name max difference temperature $maxDiffTemp K";
+				if ($diffTemp > $maxDiffTemp) {
+				Log3 $name, 3, "$iodev:  $name ERROR - Temp diff too large (old $oldTemp, new $temp, diff $diffTemp)";
+				return "";
+				}
+			}
+		}
       if (checkValues($temp, 50)) {
         $model="ABS700";
         $batbit = ((hex($a[4]) & 0x8) != 0x8);
@@ -496,9 +461,9 @@ CUL_TCM97001_Parse($$)
             if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
 		         $deviceCode="CUL_TCM97001_".$tcm97id;
-		         Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+		         Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            	} else {
-		         $deviceCode="CUL_TCM97001_" . $model;
+		         $deviceCode="$iodev: CUL_TCM97001_" . $model;
            	}
         } else {
         	$deviceCode=$tcm97id;
@@ -508,7 +473,7 @@ CUL_TCM97001_Parse($$)
        	  $name = $def->{NAME};
       	} 
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
         $hasbatcheck = TRUE;
@@ -517,7 +482,67 @@ CUL_TCM97001_Parse($$)
         
         $readedModel=$model;
       }
-    } 
+    }
+    
+	if ($readedModel eq "Unknown" || $readedModel eq "TCM97...") {
+
+      $temp    = (hex($a[3].$a[4].$a[5]) >> 2) & 0xFFFF;  
+      my $negative    = (hex($a[2]) >> 0) & 0x3; 
+
+      if ($negative == 0x3) {
+        $temp = (~$temp & 0x03FF) + 1;
+        $temp = -$temp;
+      }
+
+      $temp = $temp / 10;
+
+      if (checkValues($temp, 50)) {
+      	$model="TCM97...";
+         # I think bit 3 on byte 3 is battery warning
+      	$batbit    = (hex($a[2]) >> 0) & 0x4; 
+      	$batbit = ~$batbit & 0x1; # Bat bit umdrehen
+      	$mode    = (hex($a[5]) >> 0) & 0x1; 
+      	my $unknown    = (hex($a[4]) >> 0) & 0x2; 
+	    if ($mode) {
+    	  Log3 $name, 5, "$iodev: CUL_TCM97001 Mode: manual triggert";
+      	} else {
+       	  Log3 $name, 5, "$iodev: CUL_TCM97001 Mode: auto triggert";
+      	}
+     	if ($unknown) {
+          Log3 $name, 5, "$iodev: CUL_TCM97001 Unknown Bit: $unknown";
+      	}
+        
+        my $deviceCode;
+        
+        if (!defined($modules{CUL_TCM97001}{defptr}{$tcm97id}))
+        {
+            if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+          	{
+		         $deviceCode="CUL_TCM97001_".$tcm97id;
+		         Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
+           	} else {
+		         $deviceCode="$iodev: CUL_TCM97001_" . $model;
+           	}
+        } else {
+        	$deviceCode=$tcm97id;
+        }  
+      	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+      	if($def) {
+       	  $name = $def->{NAME};
+      	} 
+      	
+      	
+      	
+        if(!$def) {
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+          return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+        }        
+        $packageOK = TRUE;
+        $hasbatcheck = TRUE;
+        $hasmode = TRUE;
+        $readedModel=$model;
+      }
+    }	
   } elsif (length($msg) == 10) {
   	#Log3 $name, 2, "CUL_TCM97001 10er msg: " . $msg;
     my $idType2 = hex($a[1] . $a[2]);
@@ -566,7 +591,7 @@ CUL_TCM97001_Parse($$)
 	          	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
 	          	{
 			         $deviceCode="CUL_TCM97001_".$idType2;
-			         Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+			         Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
 	           	} else {
 			         $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
 	           	}
@@ -579,7 +604,7 @@ CUL_TCM97001_Parse($$)
               $name = $def->{NAME};
             } 
             if(!$def) {
-                Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
                 return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
             $packageOK = TRUE;
@@ -666,7 +691,7 @@ CUL_TCM97001_Parse($$)
 			} 
 					
 			if(!$def) {
-			  Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+			  Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
 			  return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
 			}
 
@@ -707,7 +732,7 @@ CUL_TCM97001_Parse($$)
     #  $name = $def->{NAME};
     }
     $readedModel = AttrVal($name, "model", "Unknown");
-    Log3 $name, 4, "CUL_TCM97001 Parse Name: $name , devicecode: $deviceCode , Model defined: $readedModel";
+    Log3 $name, 4, "$iodev: CUL_TCM97001 Parse Name: $name , devicecode: $deviceCode , Model defined: $readedModel";
     
     if (($readedModel eq "Eurochron" || (hex($a[6]) == 0xF && $readedModel eq "Unknown") && $syncBit[1] < 5000)) {
       # EAS 800 
@@ -736,7 +761,7 @@ CUL_TCM97001_Parse($$)
 		my $dmsg = "P7#" . substr($msg, 0, $l-2, 2);
 		$hash->{RAWMSG} = $msg;
 		my %addvals = (RAWMSG => $msg, DMSG => $dmsg);
-		Log3 $name, 5, "CUL_TCM97001 Dispatch $dmsg to other modul";
+		Log3 $name, 5, "$iodev: CUL_TCM97001 Dispatch $dmsg to other modul";
 		Dispatch($hash, $dmsg, \%addvals);  ## Dispatch to other Modules 
 		return "";
       }
@@ -763,7 +788,7 @@ CUL_TCM97001_Parse($$)
      	{	
      	    if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
-		         Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+		         Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            	} else {
 		         $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
@@ -774,7 +799,7 @@ CUL_TCM97001_Parse($$)
           $name = $def->{NAME};
         }         
         if(!$def) {
-            Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
             return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
         if (defined($humidity)) {
@@ -821,18 +846,18 @@ CUL_TCM97001_Parse($$)
          }
          my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
          my @aReverse = split("", $hexReverse);							# Split reversed a again
-         Log3 $hash,5, "CUL_TCM97001: $name original-msg: $msg , reversed nibbles: $hexReverse";
-         Log3 $hash,5, "CUL_TCM97001: $name nibble 2: $aReverse[2] , nibble 3: $aReverse[3]";
+         Log3 $hash,5, "$iodev: CUL_TCM97001 $name original-msg: $msg , reversed nibbles: $hexReverse";
+         Log3 $hash,5, "$iodev: CUL_TCM97001 $name nibble 2: $aReverse[2] , nibble 3: $aReverse[3]";
          # Nibble 2 must be x110 for rain gauge 
          # Nibble 3 must be 0x03 for rain gauge
          if ((hex($aReverse[2]) >> 1) == 3 && $aReverse[3] == 0x03) {
-            Log3 $hash,4, "CUL_TCM97001: $name detected rain gauge message ok";
+            Log3 $hash,4, "$iodev: CUL_TCM97001 $name detected rain gauge message ok";
             $batbit = $aReverse[2] & 0b0001;									# Bat bit normal=0, low=1
-            Log3 $hash,4, "CUL_TCM97001: $name battery bit: $batbit";
+            Log3 $hash,4, "$iodev: CUL_TCM97001 $name battery bit: $batbit";
             $batbit = ~$batbit & 0x1; 												# Bat bit negation
             $hasbatcheck = TRUE;
             my $rainticks = hex($aReverse[4]) + hex($aReverse[5]) * 16 + hex($aReverse[6]) * 256 + hex($aReverse[7]) * 4096;
-            Log3 $hash,5, "CUL_TCM97001: $name rain gauge swing count: $rainticks";
+            Log3 $hash,5, "$iodev: CUL_TCM97001 $name rain gauge swing count: $rainticks";
             $rain = ($rainticks + ($rainticks & 1)) / 4;			# 1 tick = 0,5 l/qm
             $model="W174";
             $hasrain = TRUE;
@@ -840,7 +865,10 @@ CUL_TCM97001_Parse($$)
             if($def) {
 			   $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
 			   my $hash = $def;
-               my $timeSinceLastUpdate = ReadingsAge($hash->{NAME}, "state", 0);
+               my $timeSinceLastUpdate = ReadingsAge($iodev, "state", 0);
+			   if ($timeSinceLastUpdate < 0) {
+					$timeSinceLastUpdate *= -1;
+					}
                $name = $def->{NAME};
                if (defined($hash->{READINGS}{rain}{VAL})) {
                   my $diffRain = 0;
@@ -851,20 +879,20 @@ CUL_TCM97001_Parse($$)
                      $diffRain = ($oldRain - $rain);
                   }
                   $diffRain = sprintf("%.1f", $diffRain);				
-                  Log3 $hash, 4, "CUL_TCM97001: $name old rain $oldRain, age $timeSinceLastUpdate, new rain $rain, diff rain $diffRain";
+                  Log3 $hash, 4, "$iodev: CUL_TCM97001 $name old rain $oldRain, age $timeSinceLastUpdate, new rain $rain, diff rain $diffRain";
                   my $maxDiffRain = $timeSinceLastUpdate / 60 + 1; 							# 1.0 Liter/Minute + 1.0 
                   $maxDiffRain = sprintf("%.1f", $maxDiffRain + 0.05);						# round 0.1
-                  Log3 $hash, 4, "CUL_TCM97001: $name max difference rain $maxDiffRain l";
+                  Log3 $hash, 4, "$iodev: CUL_TCM97001 $name max difference rain $maxDiffRain l";
                   if ($diffRain > $maxDiffRain) {
-                     Log3 $hash, 3, "CUL_TCM97001: $name ERROR - Rain diff too large (old $oldRain, new $rain, diff $diffRain)";
+                     Log3 $hash, 3, "$iodev: CUL_TCM97001 $name ERROR - Rain diff too large (old $oldRain, new $rain, diff $diffRain)";
                      return "";
                   }
                }
             } else {
-               Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+               Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
                return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
-            Log3 $hash,4, "CUL_TCM97001: $name rain total: $rain l/qm";
+            Log3 $hash,4, "$iodev: CUL_TCM97001 $name rain total: $rain l/qm";
             $readedModel=$model;
 				$packageOK = TRUE;
 			}
@@ -941,19 +969,19 @@ CUL_TCM97001_Parse($$)
 
         #Split reversed a again
         my @aReverse = split("", $hexReverse);
-        Log3 $hash,4, "CUL_TCM97001 hex:$hexReverse  msg:$msg aR:@aReverse ";
+        Log3 $hash,4, "$iodev: CUL_TCM97001 hex:$hexReverse  msg:$msg aR:@aReverse ";
         
         #  Message type (xyyz = temp/humidity if yy <> '11') else wind/rain sensor
         #  Message type (xyyx = NON temp/humidity data if yy = '11')
         $msgtype = substr(sprintf( "%04b", hex( substr( $msg,2,1))),1,2);
-        Log3 $hash,4, "CUL_TCM97001 nib2:$msgtype aRev: $aReverse[2]";
+        Log3 $hash,4, "$iodev: CUL_TCM97001 nib2:$msgtype aRev: $aReverse[2]";
         
         $msgtype = substr(sprintf( "%04b", hex( $aReverse[2])),1,2);
-        Log3 $hash,4, "CUL_TCM97001 nib2R:$msgtype hexR: $hexReverse";
+        Log3 $hash,4, "$iodev: CUL_TCM97001 nib2R:$msgtype hexR: $hexReverse";
 
 
         if ( $msgtype ne "11") {
-        Log3 $hash,4, "CUL_TCM97001 Temp/Hum Msgype: $msgtype nib3:$aReverse[3] ";
+        Log3 $hash,4, "$iodev: CUL_TCM97001 Temp/Hum Msgype: $msgtype nib3:$aReverse[3] ";
 
         if (hex($aReverse[5]) > 3) {
            # negative temp
@@ -970,12 +998,12 @@ CUL_TCM97001_Parse($$)
          
         } else {
         # Wind/Rain/Guest
-        Log3 $hash,4, "CUL_TCM97001 Wind/Rain/Guest Msgype: $msgtype nib3:$aReverse[3] ";
+        Log3 $hash,4, "$iodev: CUL_TCM97001 Wind/Rain/Guest Msgype: $msgtype nib3:$aReverse[3] ";
           #   C = Fixed to 1000 0000 0000  Reverse 0001 0000 0000
           if ((hex($aReverse[3])== 0x1) && (hex($aReverse[4])== 0x0)) { # Windspeed
               $windSpeed = hex($aReverse[6]) + hex($aReverse[7]);
               $haswindspeed = TRUE;
-              Log3 $hash,4, "CUL_TCM97001 windSpeed: $windSpeed ";
+              Log3 $hash,4, "$iodev: CUL_TCM97001 windSpeed: $windSpeed ";
              }
              
           if ((hex($aReverse[3])== 0xF)) { # Windguest    Reverse 
@@ -983,18 +1011,18 @@ CUL_TCM97001_Parse($$)
               $windDirection =  hex($aReverse[4]) + hex($aReverse[5]) ;
               $windDirectionText = $winddir_name[$windDirection];
               $haswind = TRUE;
-              Log3 $hash,4, "CUL_TCM97001 windGuest: $windGuest ";
+              Log3 $hash,4, "$iodev: CUL_TCM97001 windGuest: $windGuest ";
              }
           if ((hex($aReverse[3])== 0x3)) { # Rain
               $rain = (hex($aReverse[4]) + hex($aReverse[5]) + hex($aReverse[6]) + hex($aReverse[7])) * 0.25;
               $hasrain = TRUE;
-              Log3 $hash,4, "CUL_TCM97001 rain: $rain ";
+              Log3 $hash,4, "$iodev: CUL_TCM97001 rain: $rain ";
              }      
         }
 
        
-        #if (checkValues($temp, $humidity)) {
-        if (1) {
+        ### edited by @HomeAutoUser
+		if (checkValues($temp, $humidity) == TRUE) {				# unplausibel Werte sonst teilweise
             $batbit = (hex($a[2]) & 0x8) >> 3;
             #$mode = (hex($a[2]) & 0x4) >> 2;
             $model="TCM21....";
@@ -1002,9 +1030,9 @@ CUL_TCM97001_Parse($$)
          	{	
          	    if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
               	{
-		             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+		             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
                	} else {
-		             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+		             $deviceCode="$iodev: CUL_TCM97001_" . $model . "_" . $channel;
                	}
          	}     
           
@@ -1013,7 +1041,7 @@ CUL_TCM97001_Parse($$)
               $name = $def->{NAME};
             }         
             if(!$def) {
-                Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
                 return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
             $packageOK = TRUE;
@@ -1074,9 +1102,9 @@ CUL_TCM97001_Parse($$)
      	{	
 	      	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
-	             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            	} else {
-	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+	             $deviceCode="$iodev: CUL_TCM97001_" . $model . "_" . $channel;
            	}
      	}     
       
@@ -1085,7 +1113,7 @@ CUL_TCM97001_Parse($$)
           $name = $def->{NAME};
         }         
         if(!$def) {
-            Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
             return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
         $hashumidity = TRUE;
@@ -1142,7 +1170,7 @@ CUL_TCM97001_Parse($$)
          	{	
 		      	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
               	{
-		             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+		             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
                	} else {
 		             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
                	}
@@ -1153,7 +1181,7 @@ CUL_TCM97001_Parse($$)
               $name = $def->{NAME};
             }         
             if(!$def) {
-                Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
                 return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
             if (defined($humidity)) {
@@ -1210,7 +1238,7 @@ CUL_TCM97001_Parse($$)
      	{	
 		  	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
-	             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            	} else {
 	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
@@ -1222,7 +1250,7 @@ CUL_TCM97001_Parse($$)
       	} 
       	      	
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
         $hashumidity = TRUE;
@@ -1264,7 +1292,7 @@ CUL_TCM97001_Parse($$)
      	{	
 		  	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
-	             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            	} else {
 	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
@@ -1276,7 +1304,7 @@ CUL_TCM97001_Parse($$)
       	} 
       	      	
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
 
@@ -1313,13 +1341,13 @@ CUL_TCM97001_Parse($$)
         $temp = -$temp;
       }
       $temp = $temp / 10;
-      Log3 $name, 5, "CUL_TCM97001: PFR_130 Temp=$temp";
+      Log3 $name, 5, "$iodev: CUL_TCM97001 PFR_130 Temp=$temp";
         
       # rain values Pollin PFR_130      
       $rainticks = (hex($a[2].$a[6].$a[7])) & 0x3FF; #mask n2 n6 n7 for rain ticks
-      Log3 $name, 5, "CUL_TCM97001: PFR_130 rainticks=$rainticks";
+      Log3 $name, 5, "$iodev: CUL_TCM97001 PFR_130 rainticks=$rainticks";
       $rainMM = $rainticks / 25 * .5; # rain height in mm/qm, verified against sensor receiver display
-      Log3 $name, 5, "CUL_TCM97001: PFR_130 rain mm=$rainMM";
+      Log3 $name, 5, "$iodev: CUL_TCM97001 PFR_130 rain mm=$rainMM";
       
       if (checkValues($temp, 50)) {
         $batbit = (hex($a[2]) & 0x8) >> 3; # in auriol_protocol_v20.pdf bat bit is n2 & 0x08, same
@@ -1335,7 +1363,7 @@ CUL_TCM97001_Parse($$)
           if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
 	             $deviceCode="CUL_TCM97001_".$idType1;
-	             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            	} else {
 	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
@@ -1349,7 +1377,7 @@ CUL_TCM97001_Parse($$)
       	} 
       	      	
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
 
@@ -1403,7 +1431,7 @@ CUL_TCM97001_Parse($$)
 		  	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
 	             $deviceCode="CUL_TCM97001_".$idType1;
-	             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            	} else {
 	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
@@ -1417,7 +1445,7 @@ CUL_TCM97001_Parse($$)
       	} 
       	      	
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
 
@@ -1461,10 +1489,10 @@ CUL_TCM97001_Parse($$)
         foreach $x (@a) {
 		    $bitReverse = $bitReverse . reverse(sprintf("%04b",hex($x))); 
         }
-        Log3 $hash, 5 , "KW9010 CRC Matched: ($bitReverse)";
+        Log3 $hash, 5 , "$iodev: KW9010 CRC Matched: ($bitReverse)";
         
         my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
-        Log3 $hash, 5 , "KW9010 CRC Hex Matched: $hexReverse";
+        Log3 $hash, 5 , "$iodev: KW9010 CRC Hex Matched: $hexReverse";
 
         #Split reversed a again
         my @aReverse = split("", $hexReverse);
@@ -1480,10 +1508,10 @@ CUL_TCM97001_Parse($$)
         }
         $humidity = hex($aReverse[7].$aReverse[6]) - 156;
         
+		### edited by @HomeAutoUser				
+		if (checkValues($temp, $humidity) == 1) {				# unplausibel Werte sonst teilweise
 
-        #if (checkValues($temp, $humidity)) {
-        if (1) {
-            Log3 $hash, 5 , "KW9010 values are matching";
+            Log3 $hash, 5 , "$iodev: KW9010 values are matching";
             
             $batbit = (hex($a[2]) & 0x8) >> 3;
             #$mode = (hex($a[2]) & 0x4) >> 2; 
@@ -1497,7 +1525,7 @@ CUL_TCM97001_Parse($$)
          	{	
 		      	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
               	{
-		             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+		             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
                	} else {
 		             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
                	}
@@ -1508,7 +1536,7 @@ CUL_TCM97001_Parse($$)
               $name = $def->{NAME};
             }         
             if(!$def) {
-                Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
                 return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
             $hashumidity = TRUE;    
@@ -1519,7 +1547,7 @@ CUL_TCM97001_Parse($$)
             
             $readedModel=$model;
         } else {
-       		Log3 $hash, 5 , "KW9010 t:$temp / h:$humidity mismatch";
+       		Log3 $hash, 5 , "$iodev: KW9010 t:$temp / h:$humidity mismatch";
        		
             $name = "Unknown";
         }
@@ -1527,6 +1555,10 @@ CUL_TCM97001_Parse($$)
      
   }
   
+  	# Ignoriere dieses Gerät. Das Gerät wird keine FileLogs/notifys triggern, empfangene Befehle
+	# werden stillschweigend ignoriert. Das Gerät wird weder in der Device-List angezeigt,
+	# noch wird es in Befehlen mit "Wildcard"-Namenspezifikation (siehe devspec) erscheinen.
+	return "" if(IsIgnored($name));	# wenn Attribut "ignore" gesetzt ist, werden alle Ausgaben ignoriert																								 
   
   if ($packageOK == TRUE) {
     # save lastT, calc rainMM sum for day and hour
@@ -1567,7 +1599,7 @@ CUL_TCM97001_Parse($$)
       $msgtype = "temperature";
       $val = sprintf("%2.1f", ($temp) );
       $state="T: $val";
-      Log3 $name, 5, "CUL_TCM97001 1. $lastDay : $lastHour : $rainSumDay : $rainSumHour";
+      Log3 $name, 5, "$iodev: CUL_TCM97001 1. $lastDay : $lastHour : $rainSumDay : $rainSumHour";
       #rain Pollin PFR-130
       if($mday==$lastDay){
          #same day add rainMM
@@ -1587,9 +1619,9 @@ CUL_TCM97001_Parse($$)
       readingsBulkUpdate($def, "RainD", $rainSumDay );
       readingsBulkUpdate($def, "RainH", $rainSumHour );
       
-      Log3 $name, 5, "CUL_TCM97001 2. $lastDay : $lastHour : $rainSumDay : $rainSumHour";
+      Log3 $name, 5, "$iodev: CUL_TCM97001 2. $lastDay : $lastHour : $rainSumDay : $rainSumHour";
       $state="$state RainH: $rainSumHour RainD: $rainSumDay R: $rainticks Rmm: $rainMM";
-      Log3 $name, 5, "CUL_TCM97001 $msgtype $name $id3 state: $state"; 
+      Log3 $name, 5, "$iodev: CUL_TCM97001 $msgtype $name $id3 state: $state"; 
 
    } else {
 		### edited by elektron-bbs
@@ -1649,10 +1681,10 @@ CUL_TCM97001_Parse($$)
       $msgtypeH = "humidity";
       $valH = $humidity;
       $state="$state H: $valH";
-      Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3 T: $val H: $valH"; 
+      Log3 $name, 4, "$iodev: CUL_TCM97001 $msgtype $name $id3 T: $val H: $valH"; 
     } else {
       $msgtype = "other";
-      Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3";
+      Log3 $name, 4, "$iodev: CUL_TCM97001 $msgtype $name $id3";
       #Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3 ";
     }
 
@@ -1719,11 +1751,11 @@ CUL_TCM97001_Parse($$)
     my $defUnknown = $modules{CUL_TCM97001}{defptr}{"CUL_TCM97001_Unknown"};
     
     if (!$defUnknown) {
-      Log3 "Unknown", 2, "CUL_TCM97001 Unknown device Unknown, please define it";
+      Log3 "Unknown", 2, "$iodev: CUL_TCM97001 Unknown device Unknown, please define it";
       return "UNDEFINED Unknown CUL_TCM97001 CUL_TCM97001_Unknown"; 
     } 
     $name = $defUnknown->{NAME};
-    Log3 $name, 4, "CUL_TCM97001 Device not implemented yet name Unknown msg $msg";
+    Log3 $name, 4, "$iodev: CUL_TCM97001 Device not implemented yet name Unknown msg $msg";
 
       my $rawlen = length($msg);
       my $rawVal = substr($msg, 0, $rawlen-2);
@@ -1773,16 +1805,19 @@ CUL_TCM97001_Parse($$)
   <br>
   <b>Supported models:</b>
   <ul>
-    <li>TCM97...</li>
     <li>ABS700</li>
-    <li>TCM21....</li>
-    <li>Prologue</li>
-    <li>Rubicson</li>
-    <li>NC_WS</li>
-    <li>GT_WT_02</li>
     <li>AURIOL</li>
     <li>Eurochron</li>
+	<li>GT_WT_02</li>
     <li>KW9010</li>
+	<li>NC_WS</li>
+	<li>TCM21....</li>
+    <li>TCM97...</li>
+	<li>PFR-130 (rain)</li>
+	<li>Prologue</li>
+    <li>Rubicson</li>
+    <li>W155 (wind/rain)</li>
+    <li>W174 (rain)</li>
   </ul>
   <br>
   New received device packages are add in fhem category CUL_TCM97001 with autocreate.
@@ -1814,7 +1849,8 @@ CUL_TCM97001_Parse($$)
       </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#model">model</a> (TCM97..., ABS700, TCM21...., Prologue, Rubicson, NC_WS, GT_WT_02, AURIOL, KW9010, Unknown)</li>
+    <li><a href="#model">model</a> (ABS700, AURIOL, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM97…, Unknown, W174)</li>
+    <li>max-deviation-temp: (default:1, allowed values: 1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50)</li>																			
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
@@ -1833,18 +1869,18 @@ CUL_TCM97001_Parse($$)
   <br>
   <b>Unterstütze Modelle:</b>
   <ul>
-    <li>TCM97...</li>
     <li>ABS700</li>
-    <li>TCM21....</li>
-    <li>Prologue</li>
-    <li>Rubicson</li>
-    <li>NC_WS</li>
-    <li>GT_WT_02</li>
     <li>AURIOL</li>
     <li>Eurochron</li>
+	<li>GT_WT_02</li>
     <li>KW9010</li>
+	<li>NC_WS</li>
+	<li>TCM21....</li>
+    <li>TCM97...</li>
+	<li>PFR-130 (rain)</li>
+	<li>Prologue</li>
+    <li>Rubicson</li>
     <li>W155 (wind/rain)</li>
-    <li>PFR-130 (rain)</li>
     <li>W174 (rain)</li>
   </ul>
   <br>
@@ -1878,6 +1914,8 @@ CUL_TCM97001_Parse($$)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#model">model</a> (ABS700, AURIOL, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM97…, Unknown, W174)</li>
+    <li>max-deviation-temp: (Default:1, erlaubte Werte: 1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50)<br>
+		Maximal erlaubte Abweichung der gemessenen Temperatur zum vorhergehenden Wert in Kelvin.<br></li>																										 																										 
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
