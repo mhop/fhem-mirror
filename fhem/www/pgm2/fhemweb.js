@@ -11,6 +11,7 @@ var FW_scripts = {}, FW_links = {};
 var FW_docReady = false, FW_longpollType, FW_csrfToken, FW_csrfOk=true;
 var FW_root = "/fhem";  // root
 var FW_availableJs=[];
+var FW_urlParams={};
 var embedLoadRetry = 100;
 
 // createFn returns an HTML Element, which may contain 
@@ -267,6 +268,12 @@ FW_jqueryReadyFn()
         });
     });
   });
+
+  var sa = location.search.substring(1).split("&");
+  for(var i = 0; i < sa.length; i++) {
+    var kv = sa[i].split("=");
+    FW_urlParams[kv[0]] = kv[1];
+  }
 
   FW_smallScreenCommands();
   FW_inlineModify();
@@ -810,7 +817,10 @@ FW_rawDef()
 function
 FW_treeMenu()
 {
-  var col = getComputedStyle($("a").get(0),null).getPropertyValue('color'); 
+  var col = 'rgb(39, 135, 38)';
+  var a = $("a").get(0);
+  if(window.getComputedStyle && a)
+    col = getComputedStyle(a,null).getPropertyValue('color'); 
   var arrowRight='data:image/svg+xml;utf8,<svg viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path fill="gray" d="M1171 960q0 13-10 23l-466 466q-10 10-23 10t-23-10l-50-50q-10-10-10-23t10-23l393-393-393-393q-10-10-10-23t10-23l50-50q10-10 23-10t23 10l466 466q10 10 10 23z"/></svg>'
         .replace('gray', col);
   var arrowDown=arrowRight.replace('/>',' transform="rotate(90,896,896)"/>');
@@ -1057,13 +1067,8 @@ FW_longpoll()
   }
 
   if(filter == "") {
-    var sa = location.search.substring(1).split("&");
-    for(var i = 0; i < sa.length; i++) {
-      if(sa[i].substring(0,5) == "room=")
-        filter=sa[i];
-      if(sa[i].substring(0,7) == "detail=")
-        filter=sa[i].substring(7);
-    }
+    if(FW_urlParams.room)   filter="room="+FW_urlParams.room;
+    if(FW_urlParams.detail) filter=FW_urlParams.detail;
   }
 
   if($("#floorplan").length>0) //floorplan special

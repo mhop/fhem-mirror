@@ -189,6 +189,7 @@ FHEMWEB_Initialize($)
     smallscreen:unused
     smallscreenCommands:0,1
     stylesheetPrefix
+    styleData:textField-long
     title
     touchpad:unused
     viewport
@@ -213,7 +214,6 @@ FHEMWEB_Initialize($)
     $FW_fhemwebjs = join(",", map { $_ = ~m/^fhemweb_(.*).js$/; $1 }
                               grep { /fhemweb_(.*).js$/ }
                               readdir(DH));
-    @FW_fhemwebjs = ("fhemweb.js");
     closedir(DH);
   }
 
@@ -720,6 +720,9 @@ FW_answerCall($)
   $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
   @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
                                 "$FW_sp:default:fhemSVG:openautomation"));
+  @FW_fhemwebjs = ("fhemweb.js");
+  push(@FW_fhemwebjs, "$FW_sp.js") if(-r "$FW_dir/pgm2/$FW_sp.js");
+
   if($arg =~ m,$FW_ME/floorplan/([a-z0-9.:_]+),i) { # FLOORPLAN: special icondir
     unshift @FW_iconDirs, $1;
     FW_readIcons($1);
@@ -1052,10 +1055,21 @@ FW_answerCall($)
 sub
 FW_dataAttr()
 {
+  sub
+  addParam($$)
+  {
+    my ($p, $default) = @_;
+    my $val = AttrVal($FW_wname,$p, $default);
+    $val =~ s/&/&amp;/g;
+    $val =~ s/'/&quot;/g;
+    return "data-$p='$val' ";
+  }
+
   return
-    "data-confirmDelete='" .AttrVal($FW_wname,"confirmDelete", 1)."' ".
-    "data-confirmJSError='".AttrVal($FW_wname,"confirmJSError",1)."' ".
-    "data-addHtmlTitle='"  .AttrVal($FW_wname,"addHtmlTitle",  1)."' ".
+    addParam("confirmDelete", 1).
+    addParam("confirmJSError", 1).
+    addParam("addHtmlTitle", 1).
+    addParam("styleData", "").
     "data-availableJs='$FW_fhemwebjs' ".
     "data-webName='$FW_wname '";
 }
@@ -1185,7 +1199,7 @@ FW_makeTable($$$@)
   my $class = lc($title);
   $class =~ s/[^A-Za-z]/_/g;
   FW_pO "<div class='makeTable wide ".lc($title)."'>";
-  FW_pO $title;
+  FW_pO "<span class='mkTitle'>$title</span>";
   FW_pO "<table class=\"block wide $class\">";
   my $si = AttrVal("global", "showInternalValues", 0);
 
@@ -1348,7 +1362,7 @@ FW_doDetail($)
         }
 
         FW_pO "<div $style id=\"ddtable\" class='makeTable wide'>";
-        FW_pO "DeviceOverview";
+        FW_pO "<span class='mkTitle'>DeviceOverview</span>";
         FW_pO "<table class=\"block wide\">";
         FW_makeDeviceLine($d,1,\%extPage,$nameDisplay,\%usuallyAtEnd);
         FW_pO "</table></div>";
@@ -1409,7 +1423,7 @@ FW_makeTableFromArray($$@) {
   if (@obj>0) {
     my $row=1;
     FW_pO "<div class='makeTable wide'>";
-    FW_pO "$txt";
+    FW_pO "<span class='mkTitle'>$txt</span>";
     FW_pO "<table class=\"block wide $class\">";
     foreach (sort @obj) {
       FW_pF "<tr class=\"%s\"><td>", (($row++)&1)?"odd":"even";
@@ -1811,7 +1825,7 @@ FW_showRoom()
 
       #################
       # Check if there is a device of this type in the room
-      FW_pO "\n<tr><td><div class=\"devType\">$g</div></td></tr>";
+      FW_pO "<tr class='devTypeTr'><td><div class='devType'>$g</div></td></tr>";
       FW_pO "<tr><td>";
       FW_pO "<table class=\"block wide\" id=\"TYPE_$g\">";
 
@@ -2080,7 +2094,7 @@ FW_displayFileList($@)
   my $hid = lc($heading);
   $hid =~ s/[^A-Za-z]/_/g;
   FW_pO "<div class=\"fileList $hid\">$heading</div>";
-  FW_pO "<table class=\"block fileList\">";
+  FW_pO "<table class=\"block wide fileList\">";
   my $cfgDB = "";
   my $row = 0;
   foreach my $f (@files) {
@@ -2166,7 +2180,8 @@ FW_style($$)
     my @fl = grep { $_ !~ m/(floorplan|dashboard)/ }
                         FW_fileList("$FW_cssdir/.*style.css");
     FW_addContent($start);
-    FW_pO "<table class=\"block fileList\">";
+    FW_pO "<div class='fileList styles'>Styles</div>";
+    FW_pO "<table class='block wide fileList'>";
     my $row = 0;
     foreach my $file (@fl) {
       next if($file =~ m/svg_/);
@@ -3788,6 +3803,11 @@ FW_widgetOverride($$)
        See the global attribute sslVersion.
        </li><br>
 
+    <a name="styleData"></a>
+    <li>styleData<br>
+      data-storage used by dynamic styles like f18
+      </li><br>
+
     <a name="stylesheetPrefix"></a>
     <li>stylesheetPrefix<br>
       prefix for the files style.css, svg_style.css and svg_defs.svg. If the
@@ -4459,15 +4479,20 @@ FW_widgetOverride($$)
           attr WEB sortRooms DG OG EG Keller
         </li><br>
 
-     <a name="smallscreenCommands"></a>
-     <li>smallscreenCommands<br>
-        Falls auf 1 gesetzt werden Kommandos, Slider und Dropdown Men&uuml;s im
-        Smallscreen Landscape Modus angezeigt.
-        </li><br>
+    <a name="smallscreenCommands"></a>
+    <li>smallscreenCommands<br>
+      Falls auf 1 gesetzt werden Kommandos, Slider und Dropdown Men&uuml;s im
+      Smallscreen Landscape Modus angezeigt.
+      </li><br>
 
-     <li>sslVersion<br>
-        Siehe das global Attribut sslVersion.
-        </li><br>
+    <li>sslVersion<br>
+      Siehe das global Attribut sslVersion.
+      </li><br>
+
+    <a name="styleData"></a>
+    <li>styleData<br>
+      wird von dynamischen styles wie f18 werwendet
+      </li><br>
 
     <a name="stylesheetPrefix"></a>
     <li>stylesheetPrefix<br>
