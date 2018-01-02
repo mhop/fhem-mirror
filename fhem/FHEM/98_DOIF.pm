@@ -22,7 +22,6 @@ package main;
 use strict;
 use warnings;
 use Color;
-use vars qw($FW_wname);   # Web instance name
 
 sub DOIF_cmd ($$$$);
 sub DOIF_Notify ($$);
@@ -69,6 +68,7 @@ sub DOIF_Initialize($)
   my ($hash) = @_;
   $hash->{DefFn}   = "DOIF_Define";
   $hash->{SetFn}   = "DOIF_Set";
+  $hash->{GetFn}   = "DOIF_Get";
   $hash->{UndefFn}  = "DOIF_Undef";
   $hash->{AttrFn}   = "DOIF_Attr";
   $hash->{NotifyFn} = "DOIF_Notify";
@@ -80,7 +80,7 @@ sub DOIF_Initialize($)
 
   $data{FWEXT}{DOIF}{SCRIPT} = "doif.js";
 
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:1,0 addStateEvent:1,0 checkall:event,timer,all weekdays setList:textField-long readingList DOIF_Readings:textField-long uiTable:textField-long ".$readingFnAttributes;
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState startup state initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:1,0 addStateEvent:1,0 checkall:event,timer,all weekdays setList:textField-long readingList DOIF_Readings:textField-long uiTable:textField-long ".$readingFnAttributes;
 }
 
 # uiTable
@@ -486,10 +486,12 @@ sub DOIF_RegisterEvalAll
       for (my $m=0;$m < scalar keys %{$hash->{$table}{table}{$i}{$k}{$l}};$m++) {
           if (defined $hash->{$table}{table}{$i}{$k}{$l}{$m}){
             my $value= eval ($hash->{$table}{table}{$i}{$k}{$l}{$m});
-            if (defined $hash->{$table}{shownodevicelink} and !$hash->{$table}{shownodevicelink} and defined $defs{$value}) {
-              $ret.="<a href='$FW_ME?detail=$value$FW_CSRF'>$value</a>";
-            } else {
-              $ret.=$value;
+            if (defined ($value)) {
+              if (defined $defs{$value} and (!defined $hash->{$table}{shownodevicelink} or !$hash->{$table}{shownodevicelink})) {
+                $ret.="<a href='$FW_ME?detail=$value$FW_CSRF'>$value</a>";
+              } else {
+                $ret.=$value;
+              }
             }
           }
         }
@@ -501,23 +503,9 @@ sub DOIF_RegisterEvalAll
   }
   $ret .= "</table>\n"; # if ($table eq "uiTable");
   
-  # my $jsh = "<script type=\"text/javascript\"> \$(window).ready(function(){";
-  # my $jsc = "    \$('.makeTable.wide.internals').before(\$('.makeTable.wide.attributes'));
-      # \$('.makeTable.wide.attributes').before(\$(\"[cmd='attr']\"));
-      # \$(\"a:contains('$table')\").closest('td').attr('valign','top');" if ($hash->{$table}{attributesfirst} && !$FW_room);
-  # $jsc .= "\$('#$d').closest('tr').css('display','none');" if ($FW_room !~ "all" && defined $hash->{uitable}{shownodeviceline} && $FW_room =~ /$hash->{uitable}{shownodeviceline}/);
-  # $jsc .= "\$('#$d').remove();" if ($hash->{uitable}{shownostate});
-  # my $jsf = "  });</script>";
-  # $ret .= $jsh.$jsc.$jsf if ($jsc);
   #$hash->{$table}{deftable}=$ret;
   return $ret;
 }
-
-# sub DOIF_summaryFn ($$$$) {
-  # my ($FW_wname, $d, $room, $pageHash) = @_;
-  # my $hash = $defs{$d};
-  # return ($hash->{$table}{shownostate} ? "" : undef);
-# }
 
 sub DOIF_tablePopUp {
   my ($pn,$d,$icon,$table) = @_;
@@ -684,8 +672,7 @@ sub SplitDoIf($$)
   if (defined $tailBlock) {
     while ($tailBlock ne "") {
       ($cmd,$tailBlock,$err)=GetCommandDoIf($separator,$tailBlock);
-      #return (@commands,$err) if ($err);
-      push(@commands,$cmd);
+      push(@commands,$cmd) if (defined $cmd);
     }
   }
   return(@commands);
@@ -2107,9 +2094,9 @@ sub CheckRegexpDoIf
   return undef;
 }
 
-sub DOIF_Trigger ($$)
+sub DOIF_Trigger 
 {
-  my ($hash,$device)= @_;
+  my ($hash,$device,$checkall)= @_;
   my $timerNr=-1;
   my $ret;
   my $err;
@@ -2148,7 +2135,7 @@ sub DOIF_Trigger ($$)
       $hash->{helper}{event}=$event;
     } else { #event
       if (!defined CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEvents},1)) {
-        if (AttrVal($pn, "checkall", 0) !~ "1|all|event") {
+        if (AttrVal($pn, "checkall", 0) !~ "1|all|event" and !defined $checkall) {
           next if (!defined ($hash->{devices}{$i}));
           next if ($hash->{devices}{$i} !~ / $device /);
           next if (AttrVal($pn, "checkReadingEvent", 0) and !CheckReadingDoIf ($hash->{readings}{$i},$hash->{helper}{triggerEventsState}) and (defined $hash->{internals}{$i} ? $hash->{internals}{$i} !~ / $device:.+ /:1))
@@ -2226,6 +2213,21 @@ DOIF_Notify($$)
       }
     }
     
+    if (AttrVal($pn,"initialize",0) and !AttrVal($pn,"disable",0)) {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate ($hash,"state",AttrVal($pn,"initialize",0));
+      readingsBulkUpdate ($hash,"cmd_nr","0");
+      readingsBulkUpdate ($hash,"cmd",0);
+      readingsEndUpdate($hash, 0);
+    }
+    
+    my $startup=AttrVal($pn, "startup", 0);
+    if ($startup  and !AttrVal($pn,"disable",0)) {
+      $startup =~ s/\$SELF/$pn/g;
+      my ($cmd,$err)=ParseCommandsDoIf($hash,$startup,1);
+      Log3 ($pn,3,"$pn: error in startup: $err") if ($err);
+    }
+    
     my $uiTable=AttrVal($pn, "uiTable", 0);
     if ($uiTable){
       my $err=DOIF_uiTable_def($hash,$uiTable,"uiTable");
@@ -2236,14 +2238,6 @@ DOIF_Notify($$)
     if ($uiState){
       my $err=DOIF_uiTable_def($hash,$uiState,"uiState");
       Log3 ($pn,3,"$pn: error in uiState: $err") if ($err);
-    }
-
-    if (AttrVal($pn,"initialize",0) and !AttrVal($pn,"disable",0)) {
-      readingsBeginUpdate($hash);
-      readingsBulkUpdate ($hash,"state",AttrVal($pn,"initialize",0));
-      readingsBulkUpdate ($hash,"cmd_nr","0");
-      readingsBulkUpdate ($hash,"cmd",0);
-      readingsEndUpdate($hash, 0);
     }
   }
 
@@ -2745,6 +2739,7 @@ CmdDoIf($$)
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,"cmd",0);
     readingsBulkUpdate($hash,"state","initialized");
+    readingsBulkUpdate ($hash,"mode","enabled");
     readingsEndUpdate($hash, 1);
     $hash->{helper}{globalinit}=1;
   }
@@ -2853,7 +2848,10 @@ DOIF_Attr(@)
   } elsif($a[0] eq "set" and $a[2] eq "disable" and $a[3] eq "1") {
     DOIF_delTimer($hash);
     DOIF_delAll ($hash);
-    readingsSingleUpdate ($hash,"state","deactivated",1);
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate ($hash, "state", "deactivated");
+    readingsBulkUpdate ($hash, "mode", "deactivated");
+    readingsEndUpdate  ($hash, 1);
   } elsif($a[0] eq "set" && $a[2] eq "state") {
       delete $hash->{Regex}{"STATE"};
       my ($block,$err)=ReplaceAllReadingsDoIf($hash,$a[3],-2,0);
@@ -2888,6 +2886,11 @@ DOIF_Attr(@)
     #my $table=$a[2];
     delete ($hash->{Regex}{$a[2]});
     delete ($hash->{$a[2]});
+  } elsif($a[0] eq "set" && $a[2] eq "startup") {
+    my ($cmd,$err)=ParseCommandsDoIf($hash,$a[3],0);
+    if ($err) {
+     return ("error in startup $a[3], $err");
+    }
   }
   return undef;
 }
@@ -2922,7 +2925,7 @@ DOIF_Set($@)
       readingsBulkUpdate($hash, "mode", "disabled");
       readingsEndUpdate    ($hash, 1);
   } elsif ($arg eq "initialize" ) {
-      delete ($defs{$hash->{NAME}}{READINGS}{mode});
+      readingsSingleUpdate ($hash,"mode","enabled",1);
       delete ($defs{$hash->{NAME}}{READINGS}{cmd_nr});
 	  delete ($defs{$hash->{NAME}}{READINGS}{cmd});
 	  delete ($defs{$hash->{NAME}}{READINGS}{cmd_seqnr});
@@ -2932,7 +2935,9 @@ DOIF_Set($@)
       #delete ($defs{$hash->{NAME}}{READINGS}{mode});
       readingsSingleUpdate ($hash,"state",ReadingsVal($pn,"last_cmd",""),0) if (ReadingsVal($pn,"last_cmd","") ne "");
       delete ($defs{$hash->{NAME}}{READINGS}{last_cmd});
-      readingsSingleUpdate ($hash,"mode","enable",1)
+      readingsSingleUpdate ($hash,"mode","enabled",1)
+  } elsif ($arg eq "checkall" ) {
+    DOIF_Trigger ($hash,$pn,1);
   } elsif ($arg =~ /^cmd_(.*)/ ) {
     if (ReadingsVal($pn,"mode","") ne "disabled") {
 	  if ($hash->{helper}{sleeptimer} != -1) {
@@ -2955,7 +2960,7 @@ DOIF_Set($@)
 	   $cmdList.="cmd_".($i+1).":noArg ";
 	   #$cmdList.=EvalCmdStateDoIf($hash,$cmdSubState[0]).":noArg " if defined ($cmdState[$i]);
 	  }
-	  return "unknown argument ? for $pn, choose one of disable:noArg initialize:noArg enable:noArg $cmdList $setList";
+	  return "unknown argument ? for $pn, choose one of disable:noArg initialize:noArg enable:noArg checkall:noArg $cmdList $setList";
    } else {
       my @rl = split(" ", AttrVal($pn, "readingList", ""));
       my $doRet;
@@ -2987,6 +2992,20 @@ DOIF_Set($@)
       #return "unknown argument $arg for $pn, choose one of disable:noArg initialize:noArg enable:noArg cmd $setList";
     }
   return $ret;
+}
+
+sub
+DOIF_Get($@)
+{
+  my ($hash, @a) = @_;
+  my $pn = $a[0];
+  return "$pn: get needs at least one parameter" if(@a < 2);
+  my $arg= $a[1];
+  if( $arg eq "html" ) {
+    return DOIF_RegisterEvalAll($hash,$pn,"uiTable");
+  }
+
+  return undef;
 }
 
 
@@ -3143,7 +3162,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_Readings"><b>[NEU]</b> Erzeugen berechneter Readings<br>
   <a href="#DOIF_initialize">Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut <code>initialize</code></a><br>
   <a href="#DOIF_disable">Deaktivieren des Moduls</a><br>
-  <a href="#DOIF_cmd">Bedingungslose Ausführen von Befehlszweigen</a><br>
+  <a href="#DOIF_setcmd">Bedingungslose Ausführen von Befehlszweigen</a><br>
   <a href="#DOIF_Initialisieren_des_Moduls">Initialisieren des Moduls</a><br>
   <a href="#DOIF_Weitere_Anwendungsbeispiele">Weitere Anwendungsbeispiele</a><br>
   <a href="#DOIF_Zu_beachten">Zu beachten</a><br>
@@ -3176,6 +3195,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_selftrigger">selftrigger</a> &nbsp;
   <a href="#DOIF_setList__readingList">readingList</a> &nbsp;
   <a href="#DOIF_setList__readingList">setList</a> &nbsp;
+  <a href="#DOIF_startup">startup</a> &nbsp;
   <a href="#DOIF_state">state</a> &nbsp;
   <a href="#DOIF_timerevent">timerevent</a> &nbsp;
   <a href="#DOIF_timerWithWait">timerWithWait</a> &nbsp;
@@ -3185,6 +3205,20 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_waitsame">waitsame</a> &nbsp;
   <a href="#DOIF_weekdays">weekdays</a> &nbsp;
   <br><a href="#readingFnAttributes">readingFnAttributes</a> &nbsp;
+  </ul>
+<br>
+  <a href="#DOIF_setBefehle"><b>Set Befehle</b></a><br>
+  <ul>
+  <a href="#DOIF_setcheckall">checkall</a> &nbsp;
+  <a href="#DOIF_setdisable">disable</a> &nbsp;
+  <a href="#DOIF_setenable">enable</a> &nbsp;
+  <a href="#DOIF_Initialisieren_des_Moduls">initialize</a> &nbsp;
+  <a href="#DOIF_setcmd">cmd</a> &nbsp;
+  </ul>
+<br>
+  <a href="#DOIF_getBefehle"><b>Get Befehle</b></a><br>
+  <ul>
+  <a href="#HTML-Code von uiTable">html</a> 
   </ul>
 <br>
 <a name="DOIF_Features"></a>
@@ -4581,22 +4615,66 @@ Das Attribut do always ist in diesem Beispiel unkritisch, obwohl Temperatur zykl
 <br>
 Das ist insb. dann sinnvoll, wenn das System ohne Sicherung der Konfiguration (unvorhergesehen) beendet wurde und nach dem Neustart die zuletzt gespeicherten Zustände des Moduls nicht mit den tatsächlichen übereinstimmen.<br>
 <br>
+<a name="DOIF_startup"></a>
+<b>Ausführen von Befehlsketten beim Starten von FHEM</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+Beim Hochfahren von FHEM lässt sich eine bestimme Aktion ausführen. Es kann dazu genutzt werden, um sofort nach dem Hochfahren des Systems einen definierten Zustand des Moduls zu erreichen.
+Dabei wird sichergestellt, dass die angegebenen Befehle erst dann ausgeführt werden, wenn FHEM komplett hochgefahren ist.<br>
+<br>
+Symtax:<br>
+<br>
+<code>attr &lt;DOIF-Modul&gt; startup &lt;FHEM-Befehl oder Perl-Befehl in geschweiften Klammern mit DOIF-Syntax&gt;</code><br>
+<br>
+Die Syntax entspricht der eines DOIF-Ausführungsteils (runde Klammern brauchen nicht angegeben werden).<br>
+<br>
+Beispiele:<br>
+<br>
+<code>attr di_test startup set $SELF cmd_1</code><br>
+<code>attr di_test startup set $SELF checkall</code><br>
+<code>attr di_test startup sleep 60;set lamp1 off;set lamp2 off</code><br>
+<code>attr di_test startup {myfunction()},set lamp1 on,set lamp2 on</code><br>
+<br>
 <a name="DOIF_disable"></a>
 <b>Deaktivieren des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 Ein DOIF-Modul kann mit Hilfe des Attributes disable, deaktiviert werden. Dabei werden alle Timer und Readings des Moduls gelöscht.
 Soll das Modul nur vorübergehend deaktiviert werden, so kann das durch <code>set &lt;DOIF-modul&gt; disable</code> geschehen.
-Hierbei bleiben alle Timer aktiv, sie werden aktualisiert - das Modul bleibt im Takt, allerding werden keine Befehle ausgeführt.
-Das Modul braucht mehr Rechenzeit, als wenn es komplett über das Attribut deaktiviert wird. In beiden Fällen bleibt der Zustand nach dem Neustart erhalten, das Modul bleibt deaktiviert.<br>
+<br>
+<br>
+<a name="DOIF_setBefehle"></a>
+<b>Set-Befehle</b><br>
+<br>
+<a name="DOIF_setcheckall"></a>
+<b>Überprüfung aller DOIF-Bedingungen mit Ausführung eines DOIF-Zweiges</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+mit dem set-Befehl <code>checkall</code> werden wie beim gleichnamigen Attribut alle DOIF-Bedingung überprüft, sobald eine Bedingung als wahr geprüft ist, wird das dazugehörige Kommando ausgeführt.
+Zu beachten ist, dass nur der erste wahre DOIF-Zweig ausgeführt wird und dass nur Zustandsabfragen sowie Zeitintervalle sinnvoll überprüft werden können.
+Ereignisabfragen sowie Zeitpunkt-Definitionen, sind zum Zeitpunkt der checkall-Abfrage normalerweise nicht wahr.<br>
+<br>
+Beispiel:<br>
+<br>
+<code>attr di_test startup set $SELF checkall</code><br>
+<br>
+<a name="DOIF_setdisable"></a>
+<b>Inaktivieren des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+mit dem set-Befehl <code>disable</code> wird ein DOIF-Modul inaktiviert. Hierbei bleiben alle Timer aktiv, sie werden aktualisiert - das Modul bleibt im Takt, allerdings werden keine Befehle ausgeführt.
+Das Modul braucht mehr Rechenzeit, als wenn es komplett über das Attribut <code>disable</code> deaktiviert wird. Ein inaktiver Zustand bleibt nach dem Neustart erhalten.
+Ein inaktives Modul kann über set-Befehle <code>enable</code> bzw. <code>initialize</code> wieder aktiviert werden.<br>
+<br>
+<a name="DOIF_setenable"></a>
+<b>Aktivieren des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+mit dem set-Befehl <code>enable</code> wird ein inaktives DOIF-Modul wieder aktiviert. Im Gegensatz zum set-Befehl <code>initialize</code> wird der letzte Zustand vor der Inaktivierung des Moduls wieder hergestellt.<br>
 <br>
 <a name="DOIF_Initialisieren_des_Moduls"></a>
 <b>Initialisieren des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Mit <code>set &lt;DOIF-modul&gt; initialize</code> wird ein mit <code>set &lt;DOIF-modul&gt; disable</code> deaktiviertes Modul wieder aktiviert.
-Das Kommando <code>set &lt;DOIF-modul&gt; initialize</code> kann auch dazu genutzt werden ein aktives Modul zu initialisiert,
-in diesem Falle wird der letzte Zustand des Moduls gelöscht, damit wird ein Zustandswechsel herbeigeführt, der nächste Trigger führt zur Ausführung.<br>
+mit dem set-Befehl <code>initialize</code> wird ein DOIF-Modul initialisiert. Ein inaktives DOIF-Modul wieder aktiviert.
+Im Gegensatz zum set-Befehl <code>enable</code> wird der letzte Zustand des Moduls gelöscht, damit wird ein Zustandswechsel herbeigeführt, der nächste Trigger führt zur Ausführung eines wahren DOIF-Zweiges.
+Diese Eigenschaft kann auch dazu genutzt werden, ein bereits aktives Modul zu initialisieren.<br>
 <br>
-<a name="DOIF_cmd"></a>
+<a name="DOIF_setcmd"></a>
 <b>Auführen von Befehlszweigen ohne Auswertung der Bedingung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 Mit <code>set &lt;DOIF-modul&gt; cmd_&lt;nr&gt</code> lässt sich ein Befehlszweig (cmd_1, cmd_2, usw.) bedingunglos ausführen.<br>
@@ -4762,7 +4840,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
                 <dd>Wert, der mit dem Regul&auml;ren Ausdruck &uuml;bereinstimmt</dd>
 </br>
         <dt>mode</dt>
-                <dd>der Modus, in dem sich DOIF befindet: &lt;disabled|enable&gt;</dd>
+                <dd>der Modus, in dem sich DOIF befindet: &lt;enabled|disabled|deactivated&gt;</dd>
 </br>
         <dt>state</dt>
                 <dd>Status des DOIF nach Befehlsausf&uuml;hrung, Voreinstellung: cmd_&lt;Nr. des Befehlszweiges&gt;&lang;_&lt;Nr. der Befehlssequenz&gt;&rang;</dd>
@@ -4867,20 +4945,32 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 </dl>
 </br>
 </ul>
-<u>set-Befehl</u>
+<u>set-Befehle</u>
 <ul>
 <dl>
-        <dt><a href="#DOIF_disable">disable</a> <code><b> set </b>&lt;name&gt;<b> disable</b></code></dt>
+        <dt><a href="#DOIF_setcheckall">disable</a> <code><b> set </b>&lt;name&gt;<b> checkall</b></code></dt>
+                <dd>Überprüfung aller DOIF-Bedingungen mit Ausführung eines wahren DOIF-Zweiges</dd>
+</br>
+        <dt><a href="#DOIF_setdisable">disable</a> <code><b> set </b>&lt;name&gt;<b> disable</b></code></dt>
                 <dd>blockiert die Befehlsausf&uuml;hrung</dd>
 </br>
-        <dt><a href="#DOIF_initialize">initialize</a> <code><b> set </b>&lt;name&gt;<b> initialize</b></code></dt>
+        <dt><a href="#DOIF_Initialisieren_des_Moduls">initialize</a> <code><b> set </b>&lt;name&gt;<b> initialize</b></code></dt>
                 <dd>initialisiert das DOIF und aktiviert die Befehlsausf&uuml;hrung</dd>
 </br>
-        <dt><a href="#DOIF_initialize">enable</a> <code><b> set </b>&lt;name&gt;<b> enable</b></code></dt>
+        <dt><a href="#DOIF_setenable">enable</a> <code><b> set </b>&lt;name&gt;<b> enable</b></code></dt>
                 <dd>aktiviert die Befehlsausf&uuml;hrung, im Gegensatz zur obigen Initialisierung bleibt der letzte Zustand des Moduls erhalten</dd>
 </br>
-        <dt><a href="#DOIF_cmd">cmd_&lt;nr&gt</a> <code><b> set </b>&lt;name&gt;<b> cmd_&lt;nr&gt;</b></code></dt>
+        <dt><a href="#DOIF_setcmd">cmd_&lt;nr&gt</a> <code><b> set </b>&lt;name&gt;<b> cmd_&lt;nr&gt;</b></code></dt>
                 <dd>führt ohne Auswertung der Bedingung den Befehlszweig mit der Nummer &lt;nr&gt; aus</dd>
+</dl>
+</br>
+</ul>
+<a name="DOIF_getBefehle"></a>
+<u>get-Befehle</u>
+<ul>
+<dl>
+        <dt><a name="HTML-Code von uiTable">html</a></dt>
+        <dd>liefert HTML-Code einer definierten uiTable zurück.</dd>
 </dl>
 </br>
 </ul>
