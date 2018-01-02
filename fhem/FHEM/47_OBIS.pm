@@ -657,7 +657,7 @@ sub OBIS_Attr(@)
 			}
 		}
 		if ($aName eq "alignTime") {
-			 if ($hash->{helper}{DEVICES}[1]>0) {
+			 if ($hash->{helper}{DEVICES}[1]>0 || !$init_done) {
 			 	if ($aVal=~/\d+/) {
 			  		RemoveInternalTimer($hash);
 				    $hash->{helper}{TRIGGERTIME}=gettimeofday();
