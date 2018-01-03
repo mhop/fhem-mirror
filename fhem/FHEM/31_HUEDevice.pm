@@ -1041,7 +1041,7 @@ HUEDevice_GetUpdate($)
   my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});
   if( !defined($result) ) {
     $hash->{helper}{reachable} = 0;
-    $hash->{STATE} = "unknown";
+    #$hash->{STATE} = "unknown";
     return;
   } elsif( $result->{'error'} ) {
     $hash->{helper}{reachable} = 0;
