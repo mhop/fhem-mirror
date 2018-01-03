@@ -134,12 +134,12 @@ HUEBridge_Read($)
   } elsif( $buf =~ m'^HTTP/1.1 101 Switching Protocols'i )  {
     $hash->{websocket} = 1;
     #my $buf = plex_msg2hash($buf, 1);
-Log 1, $buf;
+#Log 1, $buf;
 
     Log3 $name, 3, "$name: websocket: Switching Protocols ok";
 
   } else {
-Log 1, $buf;
+#Log 1, $buf;
     $close = 1;
     Log3 $name, 2, "$name: websocket: Switching Protocols failed";
   }
