@@ -76,12 +76,10 @@ sub OBIS_Initialize($)
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
-#  $hash->{SetFn} = "OBIS_Set";
-  $hash->{SetFn} = "myOBIS_Set";
     $hash->{GetFn} = "OBIS_Get";
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both createPreValues:on,off ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off ExtChannels:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both createPreValues:on,off ".
   					  $readingFnAttributes;
 }
 
@@ -151,9 +149,6 @@ sub OBIS_Define($$)
     $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
     $hash->{helper}{DEVICES} =$devs{$type};
     $hash->{helper}{TRIGGERTIME}=gettimeofday();
-#    if( !$init_done ) {
-#	    $attr{$name}{"event-on-change-reading"} = ".*";
- #   }
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
 	InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
@@ -507,6 +502,7 @@ sub OBIS_Parse($$)
 											$rmsg =~ $OBIS_codes{$code};
 											my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1.".".$2} // $OBIS_channels{$1.".".$2} // $channel;
 											my $chan=$3+0 > 0 ? "_Ch$3" : "";
+#											if (AttrVal($name,"ExtChannels","off") eq "on") {$chan.=".$4";}
     										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
 												if($1==1) {
     								Log3($hash,4,"Set ".$L.$chan." to ".((looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0)));
