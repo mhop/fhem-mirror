@@ -1,6 +1,37 @@
-##############################################
+########################################################################################
+#
 # $Id$
-##############################################
+#
+# FHEM module for one Firmata analog input pin
+#
+########################################################################################
+#
+#  LICENSE AND COPYRIGHT
+#
+#  Copyright (C) 2013 ntruchess
+#  Copyright (C) 2016 jensb
+#
+#  All rights reserved
+#
+#  This script is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU General Public License for more details.
+#
+#  This copyright notice MUST APPEAR in all copies of the script!
+#
+########################################################################################
+
 package main;
 
 use strict;
@@ -48,8 +79,11 @@ FRM_AD_Init($$)
 	return $ret if (defined $ret);
 	my $firmata = $hash->{IODev}->{FirmataDevice};
 	my $name = $hash->{NAME};
-	$firmata->observe_analog($hash->{PIN},\&FRM_AD_observer,$hash);
-	$main::defs{$name}{resolution}=$firmata->{metadata}{analog_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{analog_resolutions});
+	eval {
+		$firmata->observe_analog($hash->{PIN},\&FRM_AD_observer,$hash);
+		$main::defs{$name}{resolution}=$firmata->{metadata}{analog_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{analog_resolutions});
+	};
+	return FRM_Catch($@) if $@;
 	if (! (defined AttrVal($name,"stateFormat",undef))) {
 		$main::attr{$name}{"stateFormat"} = "reading";
 	}
@@ -139,6 +173,18 @@ FRM_AD_Attr($$$$) {
 1;
 
 =pod
+
+  CHANGES
+
+  2016 jensb
+    o modified sub FRM_AD_Init to catch exceptions and return error message
+
+=cut
+
+=pod
+=item device
+=item summary Firmata: analog input
+=item summary_DE Firmata: analog Eingang
 =begin html
 
 <a name="FRM_AD"></a>
