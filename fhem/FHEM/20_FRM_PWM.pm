@@ -1,6 +1,37 @@
-##############################################
+########################################################################################
+#
 # $Id$
-##############################################
+#
+# FHEM module for one Firmata PWM output pin
+#
+########################################################################################
+#
+#  LICENSE AND COPYRIGHT
+#
+#  Copyright (C) 2013 ntruchess
+#  Copyright (C) 2016 jensb
+#
+#  All rights reserved
+#
+#  This script is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU General Public License for more details.
+#
+#  This copyright notice MUST APPEAR in all copies of the script!
+#
+########################################################################################
+
 package main;
 
 use strict;
@@ -71,7 +102,7 @@ FRM_PWM_Init($$)
 	}
 	my $value = ReadingsVal($name,"value",undef);
 	if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
-		FRM_PWM_Set($hash,$name,$value);
+		FRM_PWM_Set($hash,$name,"value",$value);
 	}
 	main::readingsSingleUpdate($hash,"state","Initialized",1);
 	return undef;
@@ -239,9 +270,21 @@ sub
 FRM_PWM_State($$$$)
 {
   my ($hash, $tim, $sname, $sval) = @_;
+  my $name = $hash->{NAME};
   if ($sname eq "value") {
-    FRM_PWM_Set($hash,$hash->{NAME},$sname,$sval);
+    # depending on the FHEM startup timing and the Arduino connection type, FHEM statefile restore and Arduino connect take place in arbitrary order
+    if (AttrVal($name, "restoreOnStartup", "on") eq "on") {
+      $hash->{READINGS}{$sname}{VAL} = $sval;
+      $hash->{READINGS}{$sname}{TIME} = $tim;
+      if (defined($hash->{IODev}) && defined($hash->{IODev}->{FirmataDevice} && $hash->{IODev}->{FirmataDevice}->{state} eq "Initialized")) {
+        FRM_PWM_Set($hash, $name, "value", $sval);
+      }
+    } else {
+      $hash->{READINGS}{$sname}{VAL} = undef;
+      $hash->{READINGS}{$sname}{TIME} = gettimeofday();
+    }
   }
+  return 0; # default processing by fhem.pl
 }
 
 sub
@@ -272,6 +315,18 @@ FRM_PWM_Attr($$$$)
 1;
 
 =pod
+
+  CHANGES
+
+  2016 jensb
+    o modified subs FRM_PWM_Init and FRM_PWM_State to support attribute "restoreOnStartup"
+
+=cut
+
+=pod
+=item device
+=item summary Firmata: PWM output
+=item summary_DE Firmata: PWM Ausgang
 =begin html
 
 <a name="FRM_PWM"></a>

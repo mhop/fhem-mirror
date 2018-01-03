@@ -106,7 +106,7 @@ FHEM/20_FRM_I2C.pm           ntruchsess           Sonstige Systeme
 FHEM/20_FRM_IN.pm            ntruchsess           Sonstige Systeme
 FHEM/20_FRM_LCD.pm           ntruchsess           Sonstige Systeme (deprecated)
 FHEM/20_FRM_OUT.pm           jensb                Sonstige Systeme
-FHEM/20_FRM_PWM.pm           ntruchsess           Sonstige Systeme
+FHEM/20_FRM_PWM.pm           jensb                Sonstige Systeme
 FHEM/20_FRM_RBG.pm           ntruchsess           Sonstige Systeme
 FHEM/20_FRM_SERVO.pm         ntruchsess           Sonstige Systeme
 FHEM/20_FRM_STEPPER.pm       ntruchsess           Sonstige Systeme
