@@ -56,7 +56,7 @@ FHEM/10_KNX.pm               andi291              KNX/EIB
 FHEM/10_EnOcean.pm           klaus-schauer        EnOcean
 FHEM/10_EQ3BT.pm             dominikkarall        Sonstige Systeme
 FHEM/10_FBDECT.pm            rudolfkoenig         FRITZ!Box
-FHEM/10_FRM.pm               ntruchsess           Sonstige Systeme
+FHEM/10_FRM.pm               jensb                Sonstige Systeme
 FHEM/10_FS20.pm              rudolfkoenig         SlowRF
 FHEM/00_HXBDevice.pm         neubert              Sonstige Systeme
 FHEM/10_IT.pm                dancer0705/bjoernh   InterTechno
