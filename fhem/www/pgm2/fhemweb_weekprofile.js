@@ -199,9 +199,12 @@ function FW_weekprofileRestoreTopic(devName,bnt)
   FW_weekprofileInputDialog(["<p>Restore topic: '"+widget.CURTOPIC+"'&nbsp;?</p>"],["hidden"],null,bnt,function(name,ok){
     if (ok == 1)
         FW_cmd(FW_root+'?cmd=set '+devName+' restore_topic '+widget.CURTOPIC+'&XHR=1',function(data){
-        console.log(devName+" error restore topic '" +data+"'");
-        FW_errmsg(devName+" error restore topic '" +data+"'",5000);
-        return;
+        if (data != "")
+        {
+			console.log(devName+" error restore topic '" +data+"'");
+			FW_errmsg(devName+" error restore topic '" +data+"'",5000);
+			return;
+		}
       });
     });
 }
