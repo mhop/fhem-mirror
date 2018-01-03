@@ -28,8 +28,9 @@ use warnings;
 
 sub HCS_Initialize($$);
 sub HCS_Define($$);
-sub HCS_DoInit($);
 sub HCS_Undef($$);
+sub HCS_Notify($$);
+sub HCS_DoInit($);
 sub HCS_checkState($);
 sub HCS_Get($@);
 sub HCS_Set($@);
@@ -155,6 +156,7 @@ HCS_Notify($$) {
   delete $modules{HCS}{NotifyFn};
   delete $hash->{NTFY_ORDER} if($hash->{NTFY_ORDER});
 
+
   HCS_DoInit($hash);
 
   return undef;
@@ -187,7 +189,7 @@ HCS_DoInit($) {
   $attr{$name}{valveThresholdOn}       = AttrVal($name,"valveThresholdOn",$defaults{valveThresholdOn});
   $attr{$name}{valveThresholdOff}      = AttrVal($name,"valveThresholdOff",$defaults{valveThresholdOff});
 
-  readingsSingleUpdate($hash,"state","Initialized",1);
+  $hash->{STATE} = "Initialized";
 
   if($init_done) {
     my $ret = HCS_getValues($hash,0);
@@ -331,13 +333,14 @@ HCS_Set($@) {
 
   } elsif($arg eq "on") {
     RemoveInternalTimer($hash);
+    readingsSingleUpdate($hash,"state","started",1);
     HCS_checkState($hash);
     Log3 $name, 1, "$type $name monitoring of devices started";
   } elsif($arg eq "off") {
     RemoveInternalTimer($hash);
     $hash->{NEXTCHECK} = "offline";
     readingsSingleUpdate($hash, "state", "off",1);
-    Log3 $name, 1, "$type $name monitoring of devices interrupted";
+    Log3 $name, 1, "$type $name monitoring of devices stopped";
   }
 
 }
@@ -365,6 +368,8 @@ HCS_setState($$) {
   my $state;
   my $stateDevice;
 
+  return if(ReadingsVal($name,"state","") eq "off");
+  
   if($heatDemand == 0) {
     $state = "idle";
     $cmd = $deviceCmdOff;
