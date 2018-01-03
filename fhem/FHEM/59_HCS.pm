@@ -121,9 +121,8 @@ HCS_Define($$) {
     return $ret;
   }
 
-  $hash->{STATE} = "Defined";
-
-  readingsSingleUpdate($hash,"device",$a[2],1);
+  $hash->{DEVICE}   = $a[2];
+  $hash->{STATE}    = "Defined";
 
   HCS_DoInit($hash);
 
@@ -172,6 +171,7 @@ HCS_DoInit($) {
   foreach my $r ( keys %{$hash->{READINGS}} ) {
     delete $hash->{READINGS}{$r} if($r =~ m/.*_state$/ || $r =~ m/.*_demand$/);
   }
+  delete $hash->{READINGS}{"device"};
 
   $attr{$name}{deviceCmdOn}       = AttrVal($name,"deviceCmdOn",$defaults{deviceCmdOn});
   $attr{$name}{deviceCmdOff}      = AttrVal($name,"deviceCmdOff",$defaults{deviceCmdOff});
@@ -341,6 +341,10 @@ HCS_Set($@) {
     RemoveInternalTimer($hash);
     $hash->{NEXTCHECK} = "offline";
     readingsSingleUpdate($hash, "state", "off",1);
+    if ( AttrVal($name,"deviceCmdOn","") eq Value($hash->{DEVICE}) ) {
+      my $cmd = AttrVal($name,"deviceCmdOff","");
+      CommandSet(undef,"$hash->{DEVICE} $cmd");
+    }
     Log3 $name, 1, "$type $name monitoring of devices stopped";
   }
 
@@ -350,37 +354,33 @@ HCS_Set($@) {
 sub
 HCS_setState($$) {
   my ($hash,$heatDemand) = @_;
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
-  my $device         = ReadingsVal($name,"device","");
-  my $deviceState    = Value($device);
+  my $name   = $hash->{NAME};
+  my $type   = $hash->{TYPE};
+  my $device = $hash->{DEVICE};
+  my $deviceValue    = Value($device);
   my $deviceCmdOn    = AttrVal($name,"deviceCmdOn",$defaults{deviceCmdOn});
   my $deviceCmdOff   = AttrVal($name,"deviceCmdOff",$defaults{deviceCmdOff});
   my $eco            = ReadingsVal($name,"eco","off");
   my $idlePeriod     = AttrVal($name,"idleperiod",$defaults{idleperiod});
-  my $lastPeriodTime = ($hash->{helper}{lastSentDeviceCmdOn}) ? $hash->{helper}{lastSentDeviceCmdOn} : 0;
-  my $newPeriodTime  = int(gettimeofday());
-  my $diffPeriodTime = int((int($newPeriodTime)-int($lastPeriodTime))/60);
+  my $lastSwitchTime = ($hash->{helper}{lastSentDeviceCmdOn}) ? $hash->{helper}{lastSentDeviceCmdOn} : 0;
+  my $currentTime    = int(gettimeofday());
+  my $actIdleTime    = int((int($currentTime)-int($lastSwitchTime))/60);
   my $overdrive      = "off";
   my $idle           = 0;
   my $wait           = "00:00:00";
-  my $cmd;
-  my $mode;
-  my $state;
-  my $stateDevice;
+  my $cmd            = $deviceCmdOff;
+  my $state          = "idle";
 
   return if(ReadingsVal($name,"state","off") eq "off");
   
   if($heatDemand == 0) {
     $state = "idle";
-    $cmd = $deviceCmdOff;
   } elsif($heatDemand == 1) {
     $state = "demand";
     $cmd = $deviceCmdOn;
   } elsif($heatDemand == 2) {
     $eco = "on";
     $state = "idle (eco)";
-    $cmd = $deviceCmdOff;
   } elsif($heatDemand == 3) {
     $eco = "on";
     $state = "demand (eco)";
@@ -388,7 +388,6 @@ HCS_setState($$) {
   } elsif($heatDemand == 4) {
     $overdrive = "on";
     $state = "idle (overdrive)";
-    $cmd = $deviceCmdOff;
   } elsif($heatDemand == 5) {
     $overdrive = "on";
     $state = "demand (overdrive)";
@@ -397,13 +396,13 @@ HCS_setState($$) {
 
   my $eventOnChange = AttrVal($name,"event-on-change-reading","");
   my $eventOnUpdate = AttrVal($name,"event-on-update-reading","");
-  $stateDevice = ReadingsVal($name,"devicestate",$defaults{deviceCmdOff});
+  my $deviceState = ReadingsVal($name,"devicestate",$defaults{deviceCmdOff});
 
-  if($idlePeriod && $diffPeriodTime < $idlePeriod) {
-    $wait = FmtTime((($idlePeriod-$diffPeriodTime)*60)-3600);
-    if($heatDemand == 1 || $heatDemand == 3 || $heatDemand == 5 && $cmd eq $deviceCmdOn) {
+  if($idlePeriod && $actIdleTime < $idlePeriod) {
+    $wait = FmtTime((($idlePeriod-$actIdleTime)*60)-3600);
+    if($cmd eq $deviceCmdOn) {
       $idle = 1;
-      $state = "locked" if($stateDevice eq $deviceCmdOff);
+      $state = "locked" if($deviceState eq $deviceCmdOff);
     }
   }
 
@@ -412,21 +411,20 @@ HCS_setState($$) {
     $state = "error";
     Log3 $name, 1, "$type $name device '$device' does not exists.";
   } else {
-    if($idle == 1 && $cmd eq $deviceCmdOn && $stateDevice ne $deviceCmdOn) {
+    if($idle == 1 && $cmd eq $deviceCmdOn && $deviceState ne $deviceCmdOn) {
       Log3 $name, 3, "$type $name device $device locked for $wait min.";
     } else {
 
       if(!$eventOnChange ||
-          ($eventOnUpdate && $eventOnUpdate =~ m/devicestate/ ||
-           $eventOnChange && $eventOnChange =~ m/devicestate/ ) &&
-          ($cmd ne $stateDevice || $deviceState ne $stateDevice)) {
+          ($eventOnUpdate =~ m/devicestate/ || $eventOnChange =~ m/devicestate/ ) &&
+          ($cmd ne $deviceState || $deviceValue ne $deviceState)) {
         my $cmdret = CommandSet(undef,"$device $cmd");
         if($cmdret) {
           Log3 $name, 1, "$type $name An error occurred while switching device '$device': $cmdret";
         } else {
           readingsBulkUpdate($hash, "devicestate", $cmd);
           if($cmd eq $deviceCmdOn) {
-            $hash->{helper}{lastSentDeviceCmdOn} = $newPeriodTime;
+            $hash->{helper}{lastSentDeviceCmdOn} = $currentTime;
             $wait = FmtTime((($idlePeriod)*60)-3600);
           }
         }
