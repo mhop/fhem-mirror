@@ -156,7 +156,6 @@ HCS_Notify($$) {
   delete $modules{HCS}{NotifyFn};
   delete $hash->{NTFY_ORDER} if($hash->{NTFY_ORDER});
 
-
   HCS_DoInit($hash);
 
   return undef;
@@ -196,9 +195,11 @@ HCS_DoInit($) {
     HCS_setState($hash,$ret);
 
     RemoveInternalTimer($hash);
-    my $timer = gettimeofday()+($attr{$name}{interval}*60);
-    InternalTimer($timer, "HCS_checkState", $hash, 0);
-    $hash->{NEXTCHECK} = FmtTime($timer);
+    if(ReadingsVal($name,"state","off") ne "off") {
+      my $timer = gettimeofday()+($attr{$name}{interval}*60);
+      InternalTimer($timer, "HCS_checkState", $hash, 0);
+      $hash->{NEXTCHECK} = FmtTime($timer);
+    }
   }
 
   return undef;
@@ -368,7 +369,7 @@ HCS_setState($$) {
   my $state;
   my $stateDevice;
 
-  return if(ReadingsVal($name,"state","") eq "off");
+  return if(ReadingsVal($name,"state","off") eq "off");
   
   if($heatDemand == 0) {
     $state = "idle";
