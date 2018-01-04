@@ -10,7 +10,9 @@ package main;
 
 use strict;
 use warnings;
-use JSON;     #libjson-perl
+
+use JSON;         #libjson-perl
+use Data::Dumper;
 
 use vars qw(%defs);
 use vars qw($FW_ME);
@@ -278,7 +280,11 @@ sub weekprofile_sendDevProfile(@)
 
   if ($type eq "WEEKPROFILE") {
       my $json = JSON->new;
-      my $json_text = $json->encode($prf->{DATA});
+      my $json_text = undef;
+      
+      eval ( $json_text = $json->encode($prf->{DATA}) );
+      return "Error in profile data" if (!defined($json_text));
+      
       return fhem("set $device profile_data $prf->{TOPIC}:$prf->{NAME} $json_text",1);
   }
 
@@ -487,7 +493,7 @@ sub weekprofile_updateReadings($)
 sub weekprofile_Initialize($)
 {
   my ($hash) = @_;
-
+  
   $hash->{DefFn}    = "weekprofile_Define";
   $hash->{SetFn}    = "weekprofile_Set";
   $hash->{GetFn}    = "weekprofile_Get";
@@ -547,6 +553,21 @@ sub sort_by_name
   return lc("$a->{TOPIC}:$a->{NAME}") cmp lc("$b->{TOPIC}:$b->{NAME}");
 }
 ############################################## 
+sub dumpData($$$) 
+{
+	my ($hash,$prefix,$data) = @_;
+	
+	my $me = $hash->{NAME};	 
+	my $dmp = Dumper($data);
+	
+	$dmp =~ s/^\s+|\s+$//g; #trim whitespace both ends
+	if (AttrVal($me,"verbose",3) < 4) {
+		Log3 $me, 1, "$me$prefix - set verbose to 4 to see the data";
+	} else {
+		Log3 $me, 4, "$me$prefix $dmp";
+	}
+}
+############################################## 
 sub weekprofile_Get($$@)
 {
   my ($hash, $name, $cmd, @params) = @_;
@@ -578,7 +599,11 @@ sub weekprofile_Get($$@)
     return "profile $params[0] has no data" if (!defined($prf->{DATA}));
     
     my $json = JSON->new;
-    my $json_text = $json->encode($prf->{DATA});
+    my $json_text = undef;
+
+    eval { $json_text = $json->encode($prf->{DATA}) };
+    dumpData($hash,"(Get): invalid profile data",$prf->{DATA}) if (!defined($json_text));
+    
     return $json_text;
   } 
   #-----------------------------------------------------------------------------
@@ -638,7 +663,9 @@ sub weekprofile_Get($$@)
   if($cmd eq "sndDevList") {
     my $json = JSON->new;
     my @sortDevList = sort {lc($a->{ALIAS}) cmp lc($b->{ALIAS})} @{$hash->{SNDDEVLIST}};
-    my $json_text = $json->encode(\@sortDevList);
+    my $json_text = undef;
+    eval { $json_text = $json->encode(\@sortDevList) };
+    dumpData($hash,"(Get): invalid device list",\@sortDevList) if (!defined($json_text));
     return $json_text;
   }
   
@@ -718,8 +745,9 @@ sub weekprofile_Set($$@)
 
     my $json = JSON->new;
     my $data = undef;
+
     eval { $data = $json->decode($jsonData); };
-    if ($@) {
+    if (!defined($data)) {
       Log3 $me, 1, "$me(Set): Error parsing profile data.";
       return "Error parsing profile data. No valid json format";
     };
@@ -983,6 +1011,8 @@ sub weekprofile_Attr($$$)
   
   my $hash = $defs{$me};
   
+  return if (!defined($attrVal));
+  
   Log3 $me, 5, "$me(weekprofile_Attr): $cmd, $attrName, $attrVal";
   
   $attr{$me}{$attrName} = $attrVal;
@@ -1066,7 +1096,7 @@ sub weekprofile_readProfilesFromFile(@)
     if (!$version || $version < 1.1) {
       my $prfData=undef;
       eval { $prfData = $json->decode($data[1]); };
-      if ($@) {
+      if (!defined($prfData)) {
         Log3 $me, 1, "$me(readProfilesFromFile): Error parsing profile data $data[1]";
         next;
       };
@@ -1086,7 +1116,7 @@ sub weekprofile_readProfilesFromFile(@)
     elsif ($version = 1.1) {
       my $prfNew=undef;
       eval { $prfNew = $json->decode($data[1]); };
-      if ($@) {
+      if (!defined($prfNew)) {
         Log3 $me, 1, "$me(readProfilesFromFile): Error parsing profile data $data[1]";
         next;
       };
