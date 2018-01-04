@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbRep: fix "month out of range" that causes fhem crash
   - feature: 20_FRM_PWM: new attribute "restoreOnStartup"
   - feature: 20_FRM_OUT: new attributes "activeLow" and "valueMode"
   - feature: 10_FRM: SerialFirmata support

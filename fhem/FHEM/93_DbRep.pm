@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.2.1        04.01.2018       bugfix month out of range that causes fhem crash
 # 7.2.0        27.12.2017       new attribute "seqDoubletsVariance"
 # 7.1.0        22.12.2017       new attribute timeYearPeriod for reports correspondig to e.g. electricity billing,
 #                               bugfix connection check is running after restart allthough dev is disabled 
@@ -273,7 +274,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "7.2.0";
+my $DbRepVersion = "7.2.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -1310,7 +1311,7 @@ sub createTimeArray($$$) {
  if (AttrVal($name, "timestamp_begin", "") eq "previous_month_begin" ||
           AttrVal($name, "timestamp_end", "") eq "previous_month_begin") {
      $ryear = ($mon-1<0)?$year-1:$year;
-	 $rmon  = ($mon-1<0)?12:$mon-1;
+	 $rmon  = ($mon-1<0)?11:$mon-1;
      $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_begin");
 	 $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_month_begin");
  } 
@@ -1318,7 +1319,7 @@ sub createTimeArray($$$) {
  if (AttrVal($name, "timestamp_begin", "") eq "previous_month_end" ||
           AttrVal($name, "timestamp_end", "") eq "previous_month_end") {
      $ryear = ($mon-1<0)?$year-1:$year;
-	 $rmon  = ($mon-1<0)?12:$mon-1;
+	 $rmon  = ($mon-1<0)?11:$mon-1;
 	 $dim   = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
 	 $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_end");
      $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_month_end");
@@ -1400,7 +1401,7 @@ sub createTimeArray($$$) {
 	 if($rmday<1) {
 	     $rmon--;
 		 if ($rmon<0) {
-		     $rmon=12;
+		     $rmon=11;
 		     $ryear--;
 		 }
          $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
@@ -1417,7 +1418,7 @@ sub createTimeArray($$$) {
 	 if($rmday<1) {
 	     $rmon--;
 		 if ($rmon<0) {
-		     $rmon=12;
+		     $rmon=11;
 		     $ryear--;
 		 }
          $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
@@ -1450,7 +1451,7 @@ sub createTimeArray($$$) {
 		 if($rmday<1) {
 	         $rmon--;
 		     if ($rmon<0) {
-		         $rmon=12;
+		         $rmon=11;
 		         $ryear--;
 		     }
 			 $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
@@ -1472,7 +1473,7 @@ sub createTimeArray($$$) {
 		 if($rmday<1) {
 	         $rmon--;
 		     if ($rmon<0) {
-		         $rmon=12;
+		         $rmon=11;
 		         $ryear--;
 		     }
 			 $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
