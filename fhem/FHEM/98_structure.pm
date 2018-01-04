@@ -396,39 +396,38 @@ structure_Set($@)
       next if($hash->{NAME} =~ m/$se/);
     }
 
-    $list[0] = $d;
-    my $sret;
-    if($filter) {
-      my $ret;
-      my $dl0 = $defs{$list[0]};
-      if(defined($dl0) && $dl0->{TYPE} eq "structure") {
-        my ($ostate,$ocnt) = ($dl0->{STATE}, $dl0->{CHANGEDCNT});
-        $ret = AnalyzeCommand(undef, "set $list[0] [$filter] ".
-                                join(" ", @list[1..@list-1]) );
-        if($dl0->{CHANGEDCNT} == $ocnt) { # Forum #70488
-          $dl0->{STATE} = $dl0->{READINGS}{state}{VAL} = $ostate;
-          structure_Notify($hash, $dl0);
-        }
-      } else {
-        $ret = AnalyzeCommand(undef, "set $list[0]:$filter ".
-                                join(" ", @list[1..@list-1]) );
-      }
-      $sret .= $ret if( $ret );
+    my $dl0 = $defs{$d};
+    my $is_structure = defined($dl0) && $dl0->{TYPE} eq "structure";
+    my $async_delay = AttrVal($hash->{NAME}, "async_delay", undef);
+
+    my $cmd;
+    if(!$filter) {
+      $cmd = "set $d ". join(" ", @list[1..@list-1]);
+
+    } elsif( $is_structure ) {
+      $cmd = "set $d [$filter] ". join(" ", @list[1..@list-1]);
 
     } else {
-      my $async_delay = AttrVal($hash->{NAME}, "async_delay", undef);
-      if(defined($async_delay) && $list[1] ne "?") {
-        $startAsyncProcessing = $async_delay if(!@{$hash->{".asyncQueue"}});
-        push @{$hash->{".asyncQueue"}}, join(" ", @list);
+      $cmd = "set $d:$filter ". join(" ", @list[1..@list-1]);
 
-      } else {
-        $sret .= CommandSet(undef, join(" ", @list));
-
-      }
     }
-    if($sret) {
-      $ret .= "\n" if($ret);
-      $ret .= $sret;
+
+    if(defined($async_delay) && $list[1] ne "?") {
+      $startAsyncProcessing = $async_delay if(!@{$hash->{".asyncQueue"}});
+      push @{$hash->{".asyncQueue"}}, $cmd;
+
+    } else {
+      my ($ostate,$ocnt) = ($dl0->{STATE}, $dl0->{CHANGEDCNT});
+      my $sret = AnalyzeCommand(undef, $cmd);
+      if($is_structure && $dl0->{CHANGEDCNT} == $ocnt) { # Forum #70488
+        $dl0->{STATE} = $dl0->{READINGS}{state}{VAL} = $ostate;
+        structure_Notify($hash, $dl0);
+      }
+
+      if($sret) {
+        $ret .= "\n" if($ret);
+        $ret .= $sret;
+      }
       if($list[1] eq "?") {
         $sret =~ s/.*one of //;
         map { $pars{$_} = 1 } split(" ", $sret);
@@ -439,10 +438,9 @@ structure_Set($@)
   Log3 $hash, 5, "SET: $ret" if($ret);
 
   if(defined($startAsyncProcessing)) {
-    InternalTimer(gettimeofday()+$startAsyncProcessing,
-                                "structure_asyncQueue", $hash, 0);
+    InternalTimer(gettimeofday(), "structure_asyncQueue", $hash, 0);
   }
-  return undef if($list[1] ne "?");
+  return $ret if($list[1] ne "?");
   $hash->{".cachedHelp"} = "Unknown argument ?, choose one of " .
                 join(" ", sort keys(%pars));
   return $hash->{".cachedHelp"};
@@ -455,7 +453,7 @@ structure_asyncQueue(@)
 
   my $next_cmd = shift @{$hash->{".asyncQueue"}};
   if(defined $next_cmd) {
-    CommandSet(undef, $next_cmd);
+    AnalyzeCommand(undef, $next_cmd);
     my $async_delay = AttrVal($hash->{NAME}, "async_delay", 0);
     InternalTimer(gettimeofday()+$async_delay,"structure_asyncQueue",$hash,0);
   }
