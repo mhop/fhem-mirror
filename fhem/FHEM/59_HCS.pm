@@ -121,8 +121,9 @@ HCS_Define($$) {
     return $ret;
   }
 
-  $hash->{DEVICE}   = $a[2];
-  $hash->{STATE}    = "Defined";
+  $hash->{DEVICE}     = $a[2];
+  $hash->{STATE}      = "Defined";
+  $hash->{NOTIFYDEV}  = "global";   # NotifyFn nur aufrufen wenn global events (INITIALIZED)
 
   HCS_DoInit($hash);
 
@@ -147,13 +148,8 @@ HCS_Notify($$) {
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
 
-  return if($dev->{NAME} ne "global" ||
-            !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
-
-  return if($attr{$name} && $attr{$name}{disable});
-
-  delete $modules{HCS}{NotifyFn};
-  delete $hash->{NTFY_ORDER} if($hash->{NTFY_ORDER});
+  return if(!grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) && !grep(m/^REREADCFG$/, @{$dev->{CHANGED}}));
+  return if(AttrVal($name,"disable",""));
 
   HCS_DoInit($hash);
 
@@ -190,15 +186,19 @@ HCS_DoInit($) {
 
   $hash->{STATE} = "Initialized";
 
-  if($init_done) {
+  if($init_done || defined($hash->{READINGS}{state})) {
     my $ret = HCS_getValues($hash,0);
     HCS_setState($hash,$ret);
 
     RemoveInternalTimer($hash);
     if(ReadingsVal($name,"state","off") ne "off") {
+      Log3 $name, 4, "$type $name start interval timer.";
       my $timer = gettimeofday()+($attr{$name}{interval}*60);
       InternalTimer($timer, "HCS_checkState", $hash, 0);
       $hash->{NEXTCHECK} = FmtTime($timer);
+    }
+    else {
+      readingsSingleUpdate($hash, "state", "off",0);
     }
   }
 
