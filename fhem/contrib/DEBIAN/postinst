@@ -19,7 +19,7 @@ sed -i /debian.fhem.de/d /etc/apt/sources.list
 # upstart:  not supported
 
 # detect init system
-test=$(stat /sbin/init |grep "File")
+test=$(stat /sbin/init |grep "/sbin/init")
 re="systemd$"
 
 if [[ $test =~ $re ]];

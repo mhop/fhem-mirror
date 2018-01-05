@@ -4,7 +4,7 @@
 set -e
 
 # detect init system
-test=$(stat /sbin/init |grep "File")
+test=$(stat /sbin/init |grep "/sbin/init")
 re="systemd$"
 
 if [[ $test =~ $re ]]; then

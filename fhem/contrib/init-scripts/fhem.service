@@ -13,8 +13,11 @@ WorkingDirectory=/opt/fhem
 ExecStart=/usr/bin/perl fhem.pl fhem.cfg
 #ExecStart=/usr/bin/perl fhem.pl configDB
 # uncomment next two lines if auto-restart desired
-#Restart=always
-#RestartSec=5
+
+# please select restart options according your needs
+# Restart=on-abnormal # uncomment for crash and watchdog event recovery only (keeps shutdown working)
+# Restart=always # alternativly uncomment this line for recover always
+# RestartSec=5 # uncomment always if restart required!
 
 [Install]
 WantedBy=multi-user.target
