@@ -170,7 +170,7 @@ sub _cfgDB_Execute($@);
 sub _cfgDB_Filedelete($);
 sub _cfgDB_Fileexport($;$);
 sub _cfgDB_Filelist(;$);
-sub _cfgDB_Info();
+sub _cfgDB_Info($);
 sub _cfgDB_Migrate();
 sub _cfgDB_ReadCfg(@);
 sub _cfgDB_ReadState(@);
@@ -902,7 +902,7 @@ sub _cfgDB_Migrate() {
 }
 
 # show database statistics
-sub _cfgDB_Info() {
+sub _cfgDB_Info($) {
 	my ($configdb_svnId) = shift;
 	$configdb_svnId //= 'unknown';
 	my ($l, @r, $f);
