@@ -97,7 +97,6 @@ my $FW_lastWebName = "";  # Name of last FHEMWEB instance, for caching
 my $FW_lastHashUpdate = 0;
 my $FW_httpRetCode = "";
 my %FW_csrfTokenCache;
-my %FW_id2inform;
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -271,7 +270,6 @@ FW_Undef($$)
   my ($hash, $arg) = @_;
   my $ret = TcpServer_Close($hash);
   if($hash->{inform}) {
-    delete $FW_id2inform{$hash->{FW_ID}} if($hash->{FW_ID});
     %FW_visibleDeviceHash = FW_visibleDevices();
     delete($logInform{$hash->{NAME}});
   }
@@ -573,8 +571,6 @@ FW_initInform($$)
     $me->{inform}{type}   = ($FW_room ? "status" : "raw");
     $me->{inform}{filter} = ($FW_room ? $FW_room : ".*");
   }
-  $FW_id2inform{$FW_id} = $me if($FW_id);
-
   my $filter = $me->{inform}{filter};
   $filter =~ s/([[\]().+?])/\\$1/g if($filter =~ m/room=/); # Forum #80390
   $filter = "NAME=.*" if($filter eq "room=all");
@@ -2477,11 +2473,10 @@ FW_fC($@)
 {
   my ($cmd, $unique) = @_;
   my $ret;
-  my $cl = $FW_id && $FW_id2inform{$FW_id} ? $FW_id2inform{$FW_id} : $FW_chash;
   if($unique) {
-    $ret = AnalyzeCommand($cl, $cmd);
+    $ret = AnalyzeCommand($FW_chash, $cmd);
   } else {
-    $ret = AnalyzeCommandChain($cl, $cmd);
+    $ret = AnalyzeCommandChain($FW_chash, $cmd);
   }
   return $ret;
 }
