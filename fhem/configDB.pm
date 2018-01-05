@@ -897,13 +897,13 @@ sub _cfgDB_Migrate() {
 	$ret .= cfgDB_MigrationImport;
 	$ret .= "Migration completed\n\n";
 	Log3('configDB',4,'Migration completed.');
-	$ret .= _cfgDB_Info;
+	$ret .= _cfgDB_Info('');
 	return $ret;
 }
 
 # show database statistics
 sub _cfgDB_Info($) {
-	my ($configdb_svnId) = shift;
+	my ($configdb_svnId) = @_;
 	$configdb_svnId //= 'unknown';
 	my ($l, @r, $f);
 	for my $i (1..65){ $l .= '-';}
@@ -1035,7 +1035,7 @@ sub _cfgDB_Reorg(;$$) {
 	$fhem_dbh->disconnect();
 	eval qx(sqlite3 $cfgDB_filename vacuum) if($cfgDB_dbtype eq "SQLITE");
 	return if(defined($quiet));
-	return " Result after database reorg:\n"._cfgDB_Info;
+	return " Result after database reorg:\n"._cfgDB_Info('');
 }
 
 # delete temporary version
