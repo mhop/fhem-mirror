@@ -218,8 +218,8 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('list') {
-			$param1 //= '%';
-			$param2 //= 0;
+			$param1 = $param1 ? $param1 : '%';
+			$param2 = $param2 ? $param2 : 0;
 			$ret = "list not allowed for configDB itself.";
 			break if($param1 =~ m/configdb/i);
 			Log3('configdb', 4, "configdb: list requested for device: $param1 in version $param2.");
