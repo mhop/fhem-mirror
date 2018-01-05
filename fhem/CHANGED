@@ -1,7 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 01_FHEMWEB.pm: -> as room separator (Forum #82151)
   - bugfix:  10_FRM: accept Firmata firmware without AnalogInputFirmata
-  - bugfix: 10_MYSENSORS_DEVICE: corrected S_LIGHT_LEVEL
+  - bugfix:  10_MYSENSORS_DEVICE: corrected S_LIGHT_LEVEL
   - bugfix:  93_DbRep: fix "month out of range" that causes fhem crash
   - feature: 20_FRM_PWM: new attribute "restoreOnStartup"
   - feature: 20_FRM_OUT: new attributes "activeLow" and "valueMode"

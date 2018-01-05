@@ -332,7 +332,7 @@ at_fhemwebFn($$$$)
   my $isPerl = ($ts =~ m/^{(.*)}/);
   $ts = $1 if($isPerl);
 
-  my $h1 = "<br>Change Wizard:".
+  my $h1 .= "<div class='makeTable wide'><span>Change wizard</span>".
 "<table class='block wide' id='atWizard' nm='$hash->{NAME}' ts='$ts' ".
        "rl='$hash->{RELATIVE}' ".
        "pr='$hash->{PERIODIC}' ip='$isPerl' class='block wide'>".<<'EOF';
@@ -385,7 +385,7 @@ EOF
   my @d = split(" ",$hash->{DEF},2);
   LoadModule("notify");
   my ($h2, $j2) = notfy_addFWCmd($d, $d[0], 2);
-  return "$h1$h2</table><br>$j1$j2";
+  return "$h1$h2</table></div><br>$j1$j2";
 }
 
 1;

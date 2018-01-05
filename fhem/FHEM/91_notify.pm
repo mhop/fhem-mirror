@@ -228,7 +228,8 @@ notify_fhemwebFn($$$$)
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$d};
 
-  my $ret .= "Change wizard<br><table class='block wide'>";
+  my $ret .= "<div class='makeTable wide'><span>Change wizard</span>".
+             "<table class='block wide'>";
   my $row = 0;
   my @ra = split(/\|/, $hash->{REGEXP});
   $ret .= "<tr class='".(($row++&1)?"odd":"even").
@@ -274,7 +275,7 @@ notify_fhemwebFn($$$$)
     $ret .= "</td></tr>";
   }
   my ($tr, $js) = notfy_addFWCmd($d, $hash->{REGEXP}, $row);
-  return "$ret$tr</table><br>$js";
+  return "$ret$tr</table></div><br>$js";
 }
 
 sub

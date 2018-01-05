@@ -406,12 +406,13 @@ Device specific attributes are documented in the corresponding device section.
 
     <a name="room"></a>
     <li>room<br>
-        Filter/group devices. Recognized by web-pgm2 and web-pgm3.  A device
-        can appear in more than one room, in this case the rooms have to be
-        specified comma-separated.<br>
+        Filter/group devices in frontends. A device can appear in more than one
+        room, in this case the rooms have to be specified comma-separated.<br>
         Devices in the room hidden will not appear in the web output, or set
-        the <a href="#hiddenroom"> FHEMWEB attribute to selectively disable
-        rooms for certain FHEMWEB instances.
+        the FHEMWEB attribute <a href="#hiddenroom">hiddenroom</a> to
+        selectively disable rooms for certain FHEMWEB instances.
+        The -&gt; string is considered as a structure separator for rooms, e.g.
+        "1st. floor-&gt;Master bedroom".
         </li><br>
 
     <a name="suppressReading"></a>

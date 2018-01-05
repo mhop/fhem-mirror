@@ -829,14 +829,14 @@ FW_treeMenu()
   $("div#menu table.room").each(function(){     // one loop per Block
     var t = this, ma = {};
     $(t).find("td > div > a > span").each(function(e){
-      var span = this, spanTxt = $(span).html();
-      var ta = spanTxt.split("--");
+      var span = this, spanTxt = $(span).text();
+      var ta = spanTxt.split("->");
       if(ta.length <= 1)
         return;
       fnd = true;
       var nxt="", lst="", tr=$(span).closest("tr");
       for(var i1=0; i1<ta.length-1; i1++) {
-        nxt += "--"+ta[i1];
+        nxt += "->"+ta[i1];
         if(!ma[nxt]) {
           $(tr).before("<tr class='menuTree closed level"+i1+"' "+
               "data-mTree='"+lst+"' data-nxt='"+nxt+"'>"+
@@ -861,7 +861,7 @@ FW_treeMenu()
         "tr.menuTree.open { font-weight: bold; }"+
         "tr.menuTree > td > div > div { "+
           "display:inline-block; width:1em; height:1em; float:right;"+
-          "background-size: contain;"+
+          "background-size: contain; background-repeat: no-repeat;"+
         "}"+
       "</style>");
     var t = $("div#menu table.room");
@@ -871,9 +871,9 @@ FW_treeMenu()
         .css("background-image", "url('"+arrowRight+"')");
     var selRoom = $("div#content").attr("room");
     if(selRoom) {
-      var ta = selRoom.split("--"), nxt="";
+      var ta = selRoom.split("->"), nxt="";
       for(var i1=0; i1<ta.length-1; i1++) {
-        nxt += "--"+FW_escapeSelector(ta[i1]);
+        nxt += FW_escapeSelector("->"+ta[i1]);
         treeClick($(t).find("tr.menuTree[data-nxt="+nxt+"]"));
       }
     }
@@ -900,7 +900,7 @@ FW_escapeSelector(s)
 {
   if(typeof s != 'string')
     return s;
-  return s.replace(/[ .#\[\]]/g, function(r) { return '\\'+r });
+  return s.replace(/[ .#\[\]>]/g, function(r) { return '\\'+r });
 }
 
 /*************** LONGPOLL START **************/
@@ -1130,6 +1130,8 @@ FW_detailSelect(selEl, mayMissing)
   var selVal = $(selEl).val();
 
   var div = $(selEl).closest("div.makeSelect");
+  if(!div.attr("list"))      // hiddenRoom=input
+    return;
   var arg,
       listArr = $(div).attr("list").split(" "),
       devName = $(div).attr("dev"),

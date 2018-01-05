@@ -393,11 +393,11 @@ SVG_PEdit($$$$)
 
   $ret .= "<form $pestyle id=\"pedit\" method=\"$FW_formmethod\" autocomplete=\"off\" ".
                 "action=\"$FW_ME/SVG_WriteGplot\">";
-  $ret .= "Plot Editor";
   $ret .= FW_hidden("detail", $d); # go to detail after save
   if(defined($FW_pos{zoom}) && defined($FW_pos{off})) { # for showData
     $ret .= FW_hidden("pos", "zoom=$FW_pos{zoom};off=$FW_pos{off}");
   }
+  $ret .= "<div class='makeTable wide'><span>Plot Editor</span>";
   $ret .= "<table class=\"block wide plotEditor\">";
   $ret .= "<tr class=\"even\">";
   $ret .= "<td>Plot title</td>";
@@ -549,7 +549,7 @@ SVG_PEdit($$$$)
           FW_submit("showFileLogData", "Show preprocessed input").
           "</td></tr>";
 
-  $ret .= "</table></form>";
+  $ret .= "</table></div></form>";
 
   my $sl = "$FW_ME/SVG_WriteGplot?detail=$d&showFileLogData=1";
   if(defined($FW_pos{zoom}) && defined($FW_pos{off})) {

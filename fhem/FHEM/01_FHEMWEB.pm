@@ -646,10 +646,7 @@ FW_AsyncOutput($$)
     $ret = $1;
 
   } else {
-    $ret =~ s/&/&amp;/g;
-    $ret =~ s/'/&apos;/g;
-    $ret =~ s/</&lt;/g;
-    $ret =~ s/>/&gt;/g;
+    $ret = FW_htmlEscape($ret);
     $ret = "<pre>$ret</pre>" if($ret =~ m/\n/ );
     $ret =~ s/\n/<br>/g;
   }
@@ -1522,10 +1519,7 @@ FW_roomOverview($)
     next if($r eq "hidden" || $FW_hiddenroom{$r});
     $FW_room = AttrVal($FW_wname, "defaultRoom", $r)
         if(!$FW_room && $FW_ss);
-    my $lr = $r;
-    $lr =~ s/</&lt;/g;
-    $lr =~ s/>/&gt;/g;
-    push @list1, $lr;
+    push @list1, FW_htmlEscape($r);
     push @list2, "$FW_ME?room=".urlEncode($r);
   }
   my $sfx = AttrVal("global", "language", "EN");
@@ -1576,6 +1570,7 @@ FW_roomOverview($)
   } else {
 
     my $tblnr = 1;
+    my $roomEscaped = FW_htmlEscape($FW_room);
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       my ($l1, $l2) = ($list1[$idx], $list2[$idx]);
       if(!$l1) {
@@ -1586,7 +1581,7 @@ FW_roomOverview($)
         }
 
       } else {
-        FW_pF "<tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
+        FW_pF "<tr%s>", $l1 eq $roomEscaped ? " class=\"sel\"" : "";
 
         my $class = "menu_$l1";
         $class =~ s/[^A-Z0-9]/_/gi;
@@ -3152,6 +3147,7 @@ FW_htmlEscape($)
   $txt =~ s/&/&amp;/g;
   $txt =~ s/</&lt;/g;
   $txt =~ s/>/&gt;/g;
+  $txt =~ s/'/&apos;/g;
 #  $txt =~ s/\n/<br>/g;
   return $txt;
 }
