@@ -214,7 +214,7 @@ sub CommandConfigdb($$) {
 
 		when ('info') {
 			Log3('configdb', 4, "info requested.");
-			$ret = _cfgDB_Info;
+			$ret = _cfgDB_Info('$Id$');
 		}
 
 		when ('list') {

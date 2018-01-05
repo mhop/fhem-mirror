@@ -903,6 +903,8 @@ sub _cfgDB_Migrate() {
 
 # show database statistics
 sub _cfgDB_Info() {
+	my ($configdb_svnId) = shift;
+	$configdb_svnId //= 'unknown';
 	my ($l, @r, $f);
 	for my $i (1..65){ $l .= '-';}
 
