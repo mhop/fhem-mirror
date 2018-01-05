@@ -562,7 +562,7 @@ sub FRM_SetupDevice($) {
   } elsif  ($hash->{SETUP_STAGE} == 2) { # device capabilities
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday() + 1, 'FRM_SetupDevice', $hash, 0);    
-    my $capabilitiesReceived = $device->{metadata}{analog_mappings} && $device->{metadata}{capabilities};
+    my $capabilitiesReceived = $device->{metadata}{capabilities} && ($device->{metadata}{analog_mappings} || ($elapsed >= 5));
     if ($capabilitiesReceived) {
       # device capabilities have been received, convert to readings
       my $inputpins = $device->{metadata}{input_pins};
@@ -634,7 +634,6 @@ sub FRM_SetupDevice($) {
       # ready, init client modules 
       $hash->{SETUP_STAGE} = 3; 
       FRM_SetupDevice($hash); 
-      
     } elsif ($elapsed >= 5) {
       # capabilities receive timeout, abort
       $hash->{SETUP_STAGE} = 5; 
@@ -1464,6 +1463,9 @@ sub FRM_Serial_Close {
     o OWX support
       - modified FRM_Client_AssignIOPort: use already assigned IODev
       
+  04.01.2018 JB
+    o fix capability query for Firmata firmware without AnalogInputFirmata
+      
 =cut
 
 =pod
@@ -1556,8 +1558,8 @@ sub FRM_Serial_Close {
   </li>
   <br>
   <li>
-	  If the device is called none, then no device will be opened, so you
-	  can experiment without hardware attached.<br>
+    If the device is called none, then no device will be opened, so you
+    can experiment without hardware attached.<br>
   </li>
   </ul>
   
@@ -1579,12 +1581,12 @@ sub FRM_Serial_Close {
   <a name="FRMattr"></a>
   <b>Attributes</b><br>
   <ul>
-      <li>resetDeviceOnConnect<br>
+    <li>resetDeviceOnConnect<br>
       Reset the Firmata device immediately after connect to force default Firmata startup state (default: enabled): 
       all pins with analog capability are configured as input, all other (digital) pins are configured as output 
       and the input pin reporting, the i2c configuration and the serial port configuration are cancelled.
-      </li><br>
-      <li>i2c-config &lt;write-read-delay&gt;<br>
+    </li><br>
+    <li>i2c-config &lt;write-read-delay&gt;<br>
       Configure the Arduino for ic2 communication. This will enable i2c on the
       i2c_pins received by the capability-query issued during initialization of FRM.<br>
       As of Firmata 2.3 you can set a delay-time (in microseconds, max. 32767, default: 0) that will be
@@ -1594,41 +1596,38 @@ sub FRM_Serial_Close {
       time required by the connected i2c devices (e.g. 30000 for the BMP180 with triple oversampling,
       see i2c device manufacturer documentation for details).<br>
       See: <a href="http://www.firmata.org/wiki/Protocol#I2C">Firmata Protocol details about I2C</a>
-      </li><br>
-      <li>sampling-interval &lt;interval&gt;<br>
+    </li><br>
+    <li>sampling-interval &lt;interval&gt;<br>
       Configure the interval Firmata reports analog data to FRM (in milliseconds, max. 32767, default: 19 ms).<br>
       See: <a href="http://www.firmata.org/wiki/Protocol#Sampling_Interval">Firmata Protocol details about Sampling Interval</a>
-      </li><br>
-      <li>software-serial-config &lt;port&gt;:&lt;rx pin&gt;:&lt;tx pin&gt;<br>
+    </li><br>
+    <li>software-serial-config &lt;port&gt;:&lt;rx pin&gt;:&lt;tx pin&gt;<br>
       For using a software serial port (port number 8, 9, 10 or 11) two io pins must be specified.
       The RX pin must have interrupt capability and the TX pin must have digital output capability.<br>
       See: <a href="https://www.arduino.cc/en/Reference/SoftwareSerial">Arduino SoftwareSerial Library</a>
-      </li>
+    </li>
   </ul>
   <br><br>
 
   <a name="FRMnotes"></a>
   <b>Notes</b><br>
   <ul>
-      <li>ConfigurableFirmata<br>
-        AnalogInputFirmata must always be enabled, even if not used. Otherwise the device setup will fail with the error <i>Unhandled sysex command</i> when connecting because the pin capability query cannot be completed.
-      </li>
-      <li>Serial Ports<br>
-        Some serial devices can be connected to a serial port of a Firmata device acting as a serial over LAN adapter
-        if their FHEM modules are using basic DevIo (e.g. HEATRONIC in read only mode) by changing their serial device descriptor to
-        <br><br>
-        FHEM:DEVIO:&lt;FRM device name&gt;:&lt;serial port&gt;@&lt;baud rate&gt;<br>
-        The &lt;serial port&gt; of a pin is its &lt;serial resolution&gt; integer divided by two (e.g. resolution=0/1 -> serial port 0).
-        <br><br>
-        To use a serial port both the RX and TX pin of this port must be available via Firmata, even if one of the pins will not be used. 
-        Depending on the Firmata version the first hardware serial port (port 0) cannot be used even with network connected 
-        devices because port 0 is always reserved for the Arduino host communication.
-        On some Arduinos you can use software serial ports (ports 8 to 11). FRM supports a maximum of one software serial port that can
-        be activated using the software-serial-config attribute.
-        <br><br>
-        In current Firmata versions the serial options (data bits, parity, stop bits) cannot be configured but may be compiled into the 
-        Firmata Firmware (see SerialFirmata.cpp ((HardwareSerial*)serialPort)->begin(baud, options)).
-      </li>
+    <li>Serial Ports<br>
+      Some serial devices can be connected to a serial port of a Firmata device acting as a serial over LAN adapter
+      if their FHEM modules are using basic DevIo (e.g. HEATRONIC in read only mode) by changing their serial device descriptor to
+      <br><br>
+      FHEM:DEVIO:&lt;FRM device name&gt;:&lt;serial port&gt;@&lt;baud rate&gt;<br>
+      The &lt;serial port&gt; of a pin is its &lt;serial resolution&gt; integer divided by two (e.g. resolution=0/1 -> serial port 0).
+      <br><br>
+      To use a serial port both the RX and TX pin of this port must be available via Firmata, even if one of the pins will not be used. 
+      Depending on the Firmata version the first hardware serial port (port 0) cannot be used even with network connected 
+      devices because port 0 is always reserved for the Arduino host communication.
+      On some Arduinos you can use software serial ports (ports 8 to 11). FRM supports a maximum of one software serial port that can
+      be activated using the software-serial-config attribute.
+      <br><br>
+      In current Firmata versions the serial options (data bits, parity, stop bits) cannot be configured but may be compiled into the 
+      Firmata Firmware (see SerialFirmata.cpp ((HardwareSerial*)serialPort)->begin(baud, options)).
+    </li>
   </ul>
   </ul>
 <br>
