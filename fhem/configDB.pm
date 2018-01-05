@@ -903,15 +903,18 @@ sub _cfgDB_Migrate() {
 
 # show database statistics
 sub _cfgDB_Info($) {
-	my ($configdb_svnId) = @_;
-	$configdb_svnId //= 'unknown';
+	my ($info2) = @_;
+	$info2 //= 'unknown';
 	my ($l, @r, $f);
 	for my $i (1..65){ $l .= '-';}
 
 	push @r, $l;
 	push @r, " configDB Database Information";
 	push @r, $l;
-	push @r, " ".cfgDB_svnId;
+	my $info1 = cfgDB_svnId;
+	$info1 =~ s/# //;
+	push @r, " db :".$info1;
+	push @r, " cmd:".$info2;
 	push @r, $l;
 	push @r, " dbconn: $cfgDB_dbconn";
 	push @r, " dbuser: $cfgDB_dbuser" if !$configDB{attr}{private};
