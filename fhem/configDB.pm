@@ -126,6 +126,8 @@
 #
 # 2017-08-31 - changed   improve table_info for migration check
 #
+# 2018-01-05 - added     show commandfile's svnid to info output
+#
 ##############################################################################
 =cut
 
@@ -1160,11 +1162,6 @@ sub _cfgDB_Filedelete($) {
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
 	$ret = ($ret > 0) ? 1 : undef;
-#	if($ret > 0) {
-#		$ret = "File $filename deleted from database.";
-#	} else {
-#		$ret = "File $filename not found in database.";
-#	}
 	return $ret;
 }
 
