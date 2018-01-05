@@ -30,7 +30,7 @@ sub HCS_Initialize($$);
 sub HCS_Define($$);
 sub HCS_Undef($$);
 sub HCS_Notify($$);
-sub HCS_DoInit($);
+sub HCS_DoInit($$);
 sub HCS_checkState($);
 sub HCS_Get($@);
 sub HCS_Set($@);
@@ -117,7 +117,7 @@ HCS_Define($$) {
 
   if(!defined($defs{$a[2]})) {
     my $ret = "Device $a[2] not defined. Please add this device first!";
-    Log 1, "$type $name $ret";
+    Log3 $name, 1, "$type $name $ret";
     return $ret;
   }
 
@@ -125,7 +125,7 @@ HCS_Define($$) {
   $hash->{STATE}      = "Defined";
   $hash->{NOTIFYDEV}  = "global";   # NotifyFn nur aufrufen wenn global events (INITIALIZED)
 
-  HCS_DoInit($hash);
+  HCS_DoInit($hash,$init_done);
 
   return undef;
 }
@@ -151,15 +151,15 @@ HCS_Notify($$) {
   return if(!grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) && !grep(m/^REREADCFG$/, @{$dev->{CHANGED}}));
   return if(AttrVal($name,"disable",""));
 
-  HCS_DoInit($hash);
+  HCS_DoInit($hash,1);
 
   return undef;
 }
 
 #####################################
 sub
-HCS_DoInit($) {
-  my ($hash) = @_;
+HCS_DoInit($$) {
+  my ($hash,$complete_init) = @_;
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
@@ -179,14 +179,14 @@ HCS_DoInit($) {
     Log3 $name, 1, "$type $name unknown attribute mode '".$attr{$name}{mode}."'. Please use 'thermostat' or 'valve'.";
     return undef;
   }
-  $attr{$name}{thermostatThresholdOn}   = AttrVal($name,"thermostatThresholdOn",$defaults{thermostatThresholdOn});
+  $attr{$name}{thermostatThresholdOn}  = AttrVal($name,"thermostatThresholdOn",$defaults{thermostatThresholdOn});
   $attr{$name}{thermostatThresholdOff} = AttrVal($name,"thermostatThresholdOff",$defaults{thermostatThresholdOff});
   $attr{$name}{valveThresholdOn}       = AttrVal($name,"valveThresholdOn",$defaults{valveThresholdOn});
   $attr{$name}{valveThresholdOff}      = AttrVal($name,"valveThresholdOff",$defaults{valveThresholdOff});
 
   $hash->{STATE} = "Initialized";
 
-  if($init_done || defined($hash->{READINGS}{state})) {
+  if($complete_init) {
     my $ret = HCS_getValues($hash,0);
     HCS_setState($hash,$ret);
 
