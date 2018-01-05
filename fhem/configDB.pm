@@ -913,8 +913,8 @@ sub _cfgDB_Info($) {
 	push @r, $l;
 	my $info1 = cfgDB_svnId;
 	$info1 =~ s/# //;
-	push @r, " db :".$info1;
-	push @r, " cmd:".$info2;
+	push @r, " d:".$info1;
+	push @r, " c:".$info2;
 	push @r, $l;
 	push @r, " dbconn: $cfgDB_dbconn";
 	push @r, " dbuser: $cfgDB_dbuser" if !$configDB{attr}{private};
