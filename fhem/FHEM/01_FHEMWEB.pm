@@ -97,6 +97,7 @@ my $FW_lastWebName = "";  # Name of last FHEMWEB instance, for caching
 my $FW_lastHashUpdate = 0;
 my $FW_httpRetCode = "";
 my %FW_csrfTokenCache;
+my %FW_id2inform;
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -270,6 +271,7 @@ FW_Undef($$)
   my ($hash, $arg) = @_;
   my $ret = TcpServer_Close($hash);
   if($hash->{inform}) {
+    delete $FW_id2inform{$hash->{FW_ID}} if($hash->{FW_ID});
     %FW_visibleDeviceHash = FW_visibleDevices();
     delete($logInform{$hash->{NAME}});
   }
@@ -571,6 +573,8 @@ FW_initInform($$)
     $me->{inform}{type}   = ($FW_room ? "status" : "raw");
     $me->{inform}{filter} = ($FW_room ? $FW_room : ".*");
   }
+  $FW_id2inform{$FW_id} = $me if($FW_id);
+
   my $filter = $me->{inform}{filter};
   $filter =~ s/([[\]().+?])/\\$1/g if($filter =~ m/room=/); # Forum #80390
   $filter = "NAME=.*" if($filter eq "room=all");
@@ -601,13 +605,6 @@ FW_initInform($$)
         FW_roomStatesForInform($me, $sinceTimestamp));
   }
 
-  if($FW_id && $defs{$FW_wname}{asyncOutput}) {
-    my $data = $defs{$FW_wname}{asyncOutput}{$FW_id};
-    if($data) {
-      FW_addToWritebuffer($me, $data."\n");
-      delete $defs{$FW_wname}{asyncOutput}{$FW_id};
-    }
-  }
   if($me->{inform}{withLog}) {
     $logInform{$me->{NAME}} = "FW_logInform";
   } else {
@@ -629,7 +626,8 @@ FW_addToWritebuffer($$@)
       if ( $len < 65536 ) {
         $txt = chr(0x81) . chr(0x7E) . pack('n', $len) . $txt;
       } else {
-        $txt = chr(0x81) . chr(0x7F) . chr(0x00) . chr(0x00) . chr(0x00) . chr(0x00) . pack('N', $len) . $txt;
+        $txt = chr(0x81) . chr(0x7F) . chr(0x00) . chr(0x00) .
+               chr(0x00) . chr(0x00) . pack('N', $len) . $txt;
       }
     }
   }
@@ -653,21 +651,9 @@ FW_AsyncOutput($$)
 
   # find the longpoll connection with the same fw_id as the page that was the
   # origin of the get command
-  my $found = 0;
   my $data = FW_longpollInfo('JSON',
-                                "#FHEMWEB:$FW_wname","FW_okDialog('$ret')","");
-  foreach my $d (keys %defs ) {
-    my $chash = $defs{$d};
-    next if( $chash->{TYPE} ne 'FHEMWEB' );
-    next if( !$chash->{inform} );
-    next if( !$chash->{FW_ID} || $chash->{FW_ID} ne $hash->{FW_ID} );
-    FW_addToWritebuffer($chash, $data."\n");
-    $found = 1;
-    last;
-  }
-
-  $defs{$FW_wname}{asyncOutput}{$hash->{FW_ID}} = $data if( !$found );
-
+                             "#FHEMWEB:$FW_wname","FW_okDialog('$ret')","");
+  FW_addToWritebuffer($hash, "$data\n");
   return undef;
 }
 
@@ -2473,10 +2459,11 @@ FW_fC($@)
 {
   my ($cmd, $unique) = @_;
   my $ret;
+  my $cl = $FW_id && $FW_id2inform{$FW_id} ? $FW_id2inform{$FW_id} : $FW_chash;
   if($unique) {
-    $ret = AnalyzeCommand($FW_chash, $cmd);
+    $ret = AnalyzeCommand($cl, $cmd);
   } else {
-    $ret = AnalyzeCommandChain($FW_chash, $cmd);
+    $ret = AnalyzeCommandChain($cl, $cmd);
   }
   return $ret;
 }
