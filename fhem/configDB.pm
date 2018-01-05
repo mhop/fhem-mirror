@@ -126,8 +126,6 @@
 #
 # 2017-08-31 - changed   improve table_info for migration check
 #
-# 2018-01-05 - added     show commandfile's svnid to info output
-#
 ##############################################################################
 =cut
 
@@ -899,7 +897,7 @@ sub _cfgDB_Migrate() {
 	$ret .= cfgDB_MigrationImport;
 	$ret .= "Migration completed\n\n";
 	Log3('configDB',4,'Migration completed.');
-	$ret .= _cfgDB_Info('');
+	$ret .= _cfgDB_Info(undef);
 	return $ret;
 }
 
@@ -907,6 +905,7 @@ sub _cfgDB_Migrate() {
 sub _cfgDB_Info($) {
 	my ($info2) = @_;
 	$info2 //= 'unknown';
+Debug ">$info2<";
 	my ($l, @r, $f);
 	for my $i (1..65){ $l .= '-';}
 
@@ -915,8 +914,8 @@ sub _cfgDB_Info($) {
 	push @r, $l;
 	my $info1 = cfgDB_svnId;
 	$info1 =~ s/# //;
-	push @r, " d:".$info1;
-	push @r, " c:".$info2;
+	push @r, " d:$info1";
+	push @r, " c:$info2";
 	push @r, $l;
 	push @r, " dbconn: $cfgDB_dbconn";
 	push @r, " dbuser: $cfgDB_dbuser" if !$configDB{attr}{private};
@@ -1040,7 +1039,7 @@ sub _cfgDB_Reorg(;$$) {
 	$fhem_dbh->disconnect();
 	eval qx(sqlite3 $cfgDB_filename vacuum) if($cfgDB_dbtype eq "SQLITE");
 	return if(defined($quiet));
-	return " Result after database reorg:\n"._cfgDB_Info('');
+	return " Result after database reorg:\n"._cfgDB_Info(undef);
 }
 
 # delete temporary version
@@ -1162,6 +1161,11 @@ sub _cfgDB_Filedelete($) {
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
 	$ret = ($ret > 0) ? 1 : undef;
+#	if($ret > 0) {
+#		$ret = "File $filename deleted from database.";
+#	} else {
+#		$ret = "File $filename not found in database.";
+#	}
 	return $ret;
 }
 
