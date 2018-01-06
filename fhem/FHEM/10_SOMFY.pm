@@ -65,6 +65,9 @@
 # - allow set command position
 # 2.0 Update for official version to allow further rework and Alexa handling
 
+# - change log entries and remove debug in _Parse
+# - added back parsestate temporarily - #msg743423
+#
 #
 ###############################################################################
 #
@@ -540,10 +543,11 @@ sub SOMFY_Parse($$) {
       return "" if(IsIgnored($name));
 
       # update the state and log it
-      Debug "SOMFY Parse: $name msg: $msg  --> $cmd-$newstate";
-			Log3 $name, 4, "SOMFY Parse: $name msg: $msg  --> $cmd-$newstate";
+      # Debug "SOMFY Parse: $name msg: $msg  --> $cmd-$newstate";
+			Log3 $name, 4, "SOMFY Parse: $name msg: $msg  --> $cmd-$newstate   --> io is $ioType";
       readingsSingleUpdate($lh, "received", $cmd, 1);
-      
+      readingsSingleUpdate($lh, "parsestate", $newstate, 1); 
+          
       SOMFY_DispatchRemoteCmd($lh, $cmd ) if ( SOMFY_isRemote( $lh ) );
 
 			push(@list, $name);
