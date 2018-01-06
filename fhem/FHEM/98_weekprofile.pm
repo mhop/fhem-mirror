@@ -445,14 +445,15 @@ sub weekprofile_assignDev($)
   }
   
   if (!defined($prf)) {
-    my $prfDev = weekprofile_createDefaultProfile($hash);  
+	Log3 $me, 5, "create default profile";
+    my $prfDev = weekprofile_createDefaultProfile($hash);
     if(defined($prfDev)) {
       $prf = {};
       $prf->{DATA} = $prfDev;
       $prf->{NAME} = 'default';
       $prf->{TOPIC} = 'default';
-    }
-    $hash->{STATE} = "created";
+      $hash->{STATE} = "created";      
+    }    
   }
   
   if(defined($prf)) {
@@ -1017,6 +1018,22 @@ sub weekprofile_Attr($$$)
   
   $attr{$me}{$attrName} = $attrVal;
   weekprofile_writeProfilesToFile($hash) if ($attrName eq 'configFile');
+  
+  if ($attrName eq 'tempON') {	  
+	  my $tempOFF = AttrVal($me, "tempOFF", $attrVal);
+	  if ($tempOFF > $attrVal) {
+		  Log3 $me, 2, "$me(weekprofile_Attr): warning: tempON must be bigger than tempOFF";
+		 
+	  }
+  }
+  
+  if ($attrName eq 'tempOFF') {
+	  my $tempON = AttrVal($me, "tempON", $attrVal);
+	  if ($tempON < $attrVal) {
+		  Log3 $me, 2, "$me(weekprofile_Attr): warning: tempOFF must be smaller than tempON";
+	  }
+  }
+  
   return undef;
   
 }
@@ -1025,6 +1042,11 @@ sub weekprofile_writeProfilesToFile(@)
 {
   my ($hash) = @_;
   my $me = $hash->{NAME};
+  
+  if (!defined($hash->{PROFILES})) {
+	  Log3 $me, 4, "$me(writeProfileToFile): no pofiles to save";
+	  return;
+  }
   
   my $start = (defined($hash->{MASTERDEV})) ? 1:0;
   my $prfCnt = scalar(@{$hash->{PROFILES}});

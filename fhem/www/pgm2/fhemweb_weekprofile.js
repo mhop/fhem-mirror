@@ -566,12 +566,19 @@ function FW_weekprofileEditDay(widget,day)
     //temp
     var tempOn = widget.TEMP_ON;
     var tempOff = widget.TEMP_OFF;
-    
+
     if (tempOn == null)
       tempOn = 30;
     
     if (tempOff == null)
       tempOff = 5;
+      
+    if (tempOff > tempOn)
+    {
+		var tmp = tempOn;
+		tempOn = tempOff;
+		tempOff = tmp;
+	}
     
     html += "<td><select name=\"TEMP\" size=\"1\" onchange=\"FW_weekprofileTemp_chached(this)\">";
     for (var k=tempOff; k <= tempOn; k+=.5)
