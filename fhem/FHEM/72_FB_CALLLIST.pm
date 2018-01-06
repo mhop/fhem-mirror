@@ -141,7 +141,6 @@ sub FB_CALLLIST_Attr($@)
         }
         elsif($attrib eq "connection-mapping")
         {
-        
             if($value and $value =~ m/^{.*}$/ )
             {
                 my $table = eval $value;
@@ -156,7 +155,6 @@ sub FB_CALLLIST_Attr($@)
         }
         elsif($attrib eq "icon-mapping")
         {
-        
             if($value and $value =~ m/^{.*}$/ )
             {
                 my $table = eval $value;
@@ -313,46 +311,46 @@ sub FB_CALLLIST_Notify($$)
         {
             my $value = AttrVal($name,"external-mapping",undef);
             my $table = eval($value);
-            
+
             if($table and ref($table) eq 'HASH')
             {
                 $hash->{helper}{EXTERNAL_MAP} = $table;
                 Log3 $name, 4, "FB_CALLLIST ($name) - external map stored as hash: $value";
             }
         }
-        
+
         if(grep(m/^(?:ATTR $name connection-mapping .*|INITIALIZED|REREADCFG)$/, @{$events}))
         {
             my $value = AttrVal($name,"connection-mapping",undef);
             my $table = eval($value);
-            
+
             if($table and ref($table) eq 'HASH')
             {
                 $hash->{helper}{CONNECTION_MAP} = $table;
                 Log3 $name, 4, "FB_CALLLIST ($name) - connection map stored as hash: $value";
             }
         }
-        
+
         if(grep(m/^(?:ATTR $name icon-mapping .*|INITIALIZED|REREADCFG)$/, @{$events}))
         {
             my $value = AttrVal($name,"icon-mapping",undef);
-            
+
             $value =~ s/"([^"]+?)"/'$1'/g if(defined($value)); # workaround for array variable interpretation
-            
+
             my $table = eval($value);
-            
+
             if($table and ref($table) eq 'HASH')
             {
                 $hash->{helper}{ICON_MAP} = $table;
                 Log3 $name, 4, "FB_CALLLIST ($name) - icon map stored as hash: $value";
             }
         }
-       
+
         if(grep(m/^(?:ATTR $name .*|DELETEATTR $name.*|INITIALIZED|REREADCFG)$/, @{$events}))
         {
             Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - the selected device $callmonitor does not exist" unless(IsDevice($callmonitor));
             Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device $callmonitor ist not of type FB_CALLMONITOR" if(IsDevice($callmonitor) and !IsDevice($callmonitor,"FB_CALLMONITOR"));
-            
+
             # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
             FB_CALLLIST_cleanupList($hash);
 
@@ -376,7 +374,7 @@ sub FB_CALLLIST_Notify($$)
                 $hash->{FB} = $new;
             }
         }
-        
+
         return undef;
     }
 
