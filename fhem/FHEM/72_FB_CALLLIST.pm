@@ -46,10 +46,10 @@ FB_CALLLIST_Initialize($)
     $hash->{AttrFn}    = "FB_CALLLIST_Attr";
     $hash->{UndefFn}   = "FB_CALLLIST_Undef";
     $hash->{AttrList}  =  "number-of-calls:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 ".
-                          "internal-number-filter ".
-                          "icon-mapping ".
-                          "connection-mapping ".
-                          "external-mapping ".
+                          "internal-number-filter:textField-long ".
+                          "icon-mapping:textField-long ".
+                          "connection-mapping:textField-long ".
+                          "external-mapping:textField-long ".
                           "create-readings:0,1 ".
                           "visible-columns:sortable-strict,row,state,timestamp,name,number,internal,external,connection,duration ".
                           "show-icons:1,0 ".
@@ -129,7 +129,7 @@ sub FB_CALLLIST_Attr($@)
             }
             else
             {
-                delete($hash->{helper}{INTERNAL_FILTER}) if(exists($hash->{helper}{INTERNAL_FILTER}));
+                delete($hash->{helper}{INTERNAL_FILTER});
 
                 foreach my $item (split("[ \t,][ \t,]*",$value))
                 {
@@ -141,19 +141,13 @@ sub FB_CALLLIST_Attr($@)
         }
         elsif($attrib eq "connection-mapping")
         {
+        
             if($value and $value =~ m/^{.*}$/ )
             {
                 my $table = eval $value;
 
-                if($table and ref($table) eq 'HASH')
-                {
-                    $hash->{helper}{CONNECTION_MAP} = $table;
-                    Log3 $name, 4, "FB_CALLLIST ($name) - connection map stored as hash: $value";
-                }
-                else
-                {
-                    return "invalid connection mapping table: $value";
-                }
+                return "invalid connection mapping table: $@" if($@);
+                return "connection mapping table is not a hash structure: $value" if($table and ref($table) ne 'HASH');
             }
             else
             {
@@ -162,21 +156,13 @@ sub FB_CALLLIST_Attr($@)
         }
         elsif($attrib eq "icon-mapping")
         {
+        
             if($value and $value =~ m/^{.*}$/ )
             {
-                $value =~ s/"/'/g; # workaround for array variable interpretation
-
                 my $table = eval $value;
 
-                if($table and ref($table) eq 'HASH')
-                {
-                    $hash->{helper}{ICON_MAP} = $table;
-                    Log3 $name, 4, "FB_CALLLIST ($name) - icon map stored as hash: $value";
-                }
-                else
-                {
-                    return "invalid icon mapping table: $value";
-                }
+                return "invalid icon mapping table: $@" if($@);
+                return "icon mapping table is not a hash structure: $value" if($table and ref($table) ne 'HASH');
             }
             else
             {
@@ -189,15 +175,8 @@ sub FB_CALLLIST_Attr($@)
             {
                 my $table = eval $value;
 
-                if($table and ref($table) eq 'HASH')
-                {
-                    $hash->{helper}{EXTERNAL_MAP} = $table;
-                    Log3 $name, 4, "FB_CALLLIST ($name) - external map stored as hash: $value";
-                }
-                else
-                {
-                    return "invalid external mapping table: $value";
-                }
+                return "invalid external mapping table: $@" if($@);
+                return "external mapping table is not a hash structure: $value" if($table and ref($table) ne 'HASH');
             }
             else
             {
@@ -223,19 +202,19 @@ sub FB_CALLLIST_Attr($@)
     {
         if($attrib eq "internal-number-filter")
         {
-            delete($hash->{helper}{INTERNAL_FILTER}) if(exists($hash->{helper}{INTERNAL_FILTER}));
+            delete($hash->{helper}{INTERNAL_FILTER});
         }
         elsif($attrib eq "connection-mapping")
         {
-            delete($hash->{helper}{CONNECTION_MAP}) if(exists($hash->{helper}{CONNECTION_MAP}));
+            delete($hash->{helper}{CONNECTION_MAP});
         }
         elsif($attrib eq "icon-mapping")
         {
-            delete($hash->{helper}{ICON_MAP}) if(exists($hash->{helper}{ICON_MAP}));
+            delete($hash->{helper}{ICON_MAP});
         }
         elsif($attrib eq "external-mapping")
         {
-            delete($hash->{helper}{EXTERNAL_MAP}) if(exists($hash->{helper}{EXTERNAL_MAP}));
+            delete($hash->{helper}{EXTERNAL_MAP});
         }
     }
 }
@@ -250,7 +229,7 @@ sub FB_CALLLIST_Set($@)
 
     if($cmd eq "clear")
     {
-        delete($hash->{helper}{DATA}) if(exists($hash->{helper}{DATA}));
+        delete($hash->{helper}{DATA});
 
         if(AttrVal($name, "create-readings", "0") eq "1")
         {
@@ -330,11 +309,50 @@ sub FB_CALLLIST_Notify($$)
     {
         my $callmonitor = $hash->{FB};
 
-        if(grep(m/^(?:ATTR $name .*|DELETEATTR $name .*|INITIALIZED|REREADCFG)$/, @{$events}))
+        if(grep(m/^(?:ATTR $name external-mapping .*|INITIALIZED|REREADCFG)$/, @{$events}))
         {
-            Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - the selected device $callmonitor does not exist" unless(defined($defs{$callmonitor}));
-            Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device $callmonitor ist not of type FB_CALLMONITOR" if(defined($defs{$callmonitor}) and $defs{$callmonitor}->{TYPE} ne "FB_CALLMONITOR");
-
+            my $value = AttrVal($name,"external-mapping",undef);
+            my $table = eval($value);
+            
+            if($table and ref($table) eq 'HASH')
+            {
+                $hash->{helper}{EXTERNAL_MAP} = $table;
+                Log3 $name, 4, "FB_CALLLIST ($name) - external map stored as hash: $value";
+            }
+        }
+        
+        if(grep(m/^(?:ATTR $name connection-mapping .*|INITIALIZED|REREADCFG)$/, @{$events}))
+        {
+            my $value = AttrVal($name,"connection-mapping",undef);
+            my $table = eval($value);
+            
+            if($table and ref($table) eq 'HASH')
+            {
+                $hash->{helper}{CONNECTION_MAP} = $table;
+                Log3 $name, 4, "FB_CALLLIST ($name) - connection map stored as hash: $value";
+            }
+        }
+        
+        if(grep(m/^(?:ATTR $name icon-mapping .*|INITIALIZED|REREADCFG)$/, @{$events}))
+        {
+            my $value = AttrVal($name,"icon-mapping",undef);
+            
+            $value =~ s/"([^"]+?)"/'$1'/g if(defined($value)); # workaround for array variable interpretation
+            
+            my $table = eval($value);
+            
+            if($table and ref($table) eq 'HASH')
+            {
+                $hash->{helper}{ICON_MAP} = $table;
+                Log3 $name, 4, "FB_CALLLIST ($name) - icon map stored as hash: $value";
+            }
+        }
+       
+        if(grep(m/^(?:ATTR $name .*|DELETEATTR $name.*|INITIALIZED|REREADCFG)$/, @{$events}))
+        {
+            Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - the selected device $callmonitor does not exist" unless(IsDevice($callmonitor));
+            Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device $callmonitor ist not of type FB_CALLMONITOR" if(IsDevice($callmonitor) and !IsDevice($callmonitor,"FB_CALLMONITOR"));
+            
             # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
             FB_CALLLIST_cleanupList($hash);
 
@@ -358,7 +376,7 @@ sub FB_CALLLIST_Notify($$)
                 $hash->{FB} = $new;
             }
         }
-
+        
         return undef;
     }
 
@@ -463,7 +481,7 @@ sub FB_CALLLIST_Notify($$)
               $data->{missed_call} = 1;
         }
 
-        delete($data->{running_call}) if(defined($data->{running_call}));
+        delete($data->{running_call});
 
         Log3 $name, 5, "FB_CALLLIST ($name) - processed disconnect event for call id $call_id";
     }
@@ -545,7 +563,7 @@ sub FB_CALLLIST_cleanupList($)
         foreach $index (@list)
         {
             Log3 $name, 5, "FB_CALLLIST ($name) - deleting old call $index";
-            delete($hash->{helper}{DATA}{$index}) if(exists($hash->{helper}{DATA}{$index}));
+            delete($hash->{helper}{DATA}{$index});
         }
 
         FB_CALLLIST_deleteExpiredCalls($hash);
@@ -615,7 +633,7 @@ sub FB_CALLLIST_deleteExpiredCalls($;$)
             foreach my $index (@list)
             {
                 Log3 $name, 5, "FB_CALLLIST ($name) - deleting expired call $index";
-                delete($hash->{helper}{DATA}{$index}) if(exists($hash->{helper}{DATA}{$index}));
+                delete($hash->{helper}{DATA}{$index});
             }
         }
 
@@ -1037,7 +1055,7 @@ sub FB_CALLLIST_loadList($)
 
     Log3 $name, 5, "FB_CALLLIST ($name) - loading old call list from file";
 
-    delete($hash->{helper}{DATA}) if(exists($hash->{helper}{DATA}));
+    delete($hash->{helper}{DATA});
 
     my ($err, $dump) = getKeyValue("FB_CALLLIST-$name");
 
