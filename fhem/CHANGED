@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_XiaomiFlowerSens: fix error then use ssh and no connect
   - change:  72_FB_CALLIST: mapping tables (icon-mapping, external-mapping,...)
              will be evaluated after initialization is finished (Forum: #81892)
   - feature: 01_FHEMWEB.pm: -> as room separator (Forum #82151)
