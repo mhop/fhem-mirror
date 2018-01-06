@@ -74,6 +74,7 @@ FBAHAHTTP_connect($)
   my $dr = sub {
     $hash->{STATE} = $_[0];
     Log 2, $hash->{STATE};
+    $hash->{CmdStack} = ();
     return $hash->{STATE};
   };
 
