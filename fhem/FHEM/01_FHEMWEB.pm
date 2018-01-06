@@ -459,6 +459,10 @@ FW_Read($$)
   delete $hash->{CONTENT_LENGTH};
   $hash->{LASTACCESS} = $now;
 
+  $FW_userAgent = $FW_httpheader{"User-Agent"};
+  $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
+  $FW_CSRF = (defined($defs{$FW_wname}{CSRFTOKEN}) ?
+                "&fwcsrf=".$defs{$FW_wname}{CSRFTOKEN} : "");
      
   if($FW_use_sha && $method eq 'GET' &&
      $FW_httpheader{Connection} && $FW_httpheader{Connection} =~ /Upgrade/i) {
@@ -484,10 +488,8 @@ FW_Read($$)
     return -1;
   }
 
-  $FW_userAgent = $FW_httpheader{"User-Agent"};
   $arg = "" if(!defined($arg));
   Log3 $FW_wname, 4, "$name $method $arg; BUFLEN:".length($hash->{BUF});
-  $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
   my $pf = AttrVal($FW_wname, "plotfork", undef);
   if($pf) {   # 0 disables
     # Process SVG rendering as a parallel process
@@ -605,6 +607,14 @@ FW_initInform($$)
         FW_roomStatesForInform($me, $sinceTimestamp));
   }
 
+  if($FW_id && $defs{$FW_wname}{asyncOutput}) {
+    my $data = $defs{$FW_wname}{asyncOutput}{$FW_id};
+    if($data) {
+      FW_addToWritebuffer($me, $data."\n");
+      delete $defs{$FW_wname}{asyncOutput}{$FW_id};
+    }
+  }
+
   if($me->{inform}{withLog}) {
     $logInform{$me->{NAME}} = "FW_logInform";
   } else {
@@ -649,11 +659,19 @@ FW_AsyncOutput($$)
     $ret =~ s/\n/<br>/g;
   }
 
-  # find the longpoll connection with the same fw_id as the page that was the
-  # origin of the get command
   my $data = FW_longpollInfo('JSON',
                              "#FHEMWEB:$FW_wname","FW_okDialog('$ret')","");
-  FW_addToWritebuffer($hash, "$data\n");
+
+  # find the longpoll connection with the same fw_id as the page that was the
+  # origin of the get command
+  my $fwid = $hash->{FW_ID};
+  return if(!$fwid);
+  $hash = $FW_id2inform{$fwid};
+  if($hash) {
+    FW_addToWritebuffer($hash, $data."\n");
+  } else {
+    $defs{$FW_wname}{asyncOutput}{$fwid} = $data;
+  }
   return undef;
 }
 
@@ -694,8 +712,6 @@ FW_answerCall($)
 
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
-  $FW_CSRF = (defined($defs{$FW_wname}{CSRFTOKEN}) ?
-                "&fwcsrf=".$defs{$FW_wname}{CSRFTOKEN} : "");
 
   $MW_dir = "$attr{global}{modpath}/FHEM";
   $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "");
@@ -1360,8 +1376,10 @@ FW_doDetail($)
   }
 
 
-  FW_pO FW_detailSelect($d, "set", FW_widgetOverride($d, getAllSets($d)));
-  FW_pO FW_detailSelect($d, "get", FW_widgetOverride($d, getAllGets($d)));
+  FW_pO FW_detailSelect($d, "set",
+                        FW_widgetOverride($d, getAllSets($d, $FW_chash)));
+  FW_pO FW_detailSelect($d, "get",
+                        FW_widgetOverride($d, getAllGets($d, $FW_chash)));
 
   FW_makeTable("Internals", $d, $h);
   FW_makeTable("Readings", $d, $h->{READINGS});
@@ -2459,11 +2477,10 @@ FW_fC($@)
 {
   my ($cmd, $unique) = @_;
   my $ret;
-  my $cl = $FW_id && $FW_id2inform{$FW_id} ? $FW_id2inform{$FW_id} : $FW_chash;
   if($unique) {
-    $ret = AnalyzeCommand($cl, $cmd);
+    $ret = AnalyzeCommand($FW_chash, $cmd);
   } else {
-    $ret = AnalyzeCommandChain($cl, $cmd);
+    $ret = AnalyzeCommandChain($FW_chash, $cmd);
   }
   return $ret;
 }
@@ -2948,7 +2965,7 @@ FW_devState($$@)
   my ($hasOnOff, $link);
 
   my $cmdList = AttrVal($d, "webCmd", "");
-  my $allSets = FW_widgetOverride($d, getAllSets($d));
+  my $allSets = FW_widgetOverride($d, getAllSets($d, $FW_chash));
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
 

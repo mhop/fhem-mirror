@@ -120,9 +120,9 @@ sub fhem($@);
 sub fhemTimeGm($$$$$$);
 sub fhemTimeLocal($$$$$$);
 sub fhemTzOffset($);
-sub getAllAttr($);
-sub getAllGets($);
-sub getAllSets($);
+sub getAllAttr($;$);
+sub getAllGets($;$);
+sub getAllSets($;$);
 sub getPawList($);
 sub getUniqueId();
 sub latin1ToUtf8($);
@@ -1824,20 +1824,10 @@ CommandGet($$)
 sub
 asyncOutput($$)
 {
-  my ($cl,$ret) = @_;
-
-  return undef if( !$cl );
-
-  if( !$defs{$cl->{NAME}}
-      || $defs{$cl->{NAME}}->{NR} != $cl->{NR}
-      || $defs{$cl->{NAME}}->{NAME} ne $cl->{NAME} ) {
-    Log3 $cl->{NAME},3,"$cl->{NAME} asyncOutput: device gone, output was: $ret";
-    return undef;
-  }
-
-  $ret = CallFn($cl->{NAME}, "AsyncOutputFn", $defs{$cl->{NAME}}, $ret);
-
-  return $ret;
+  my ($cl, $ret) = @_;
+  return undef if(!$cl || !$cl->{NAME});
+  $cl = $defs{$cl->{NAME}} if($defs{$cl->{NAME}}); # compatibility
+  return CallFn($cl->{NAME}, "AsyncOutputFn", $cl, $ret);
 }
 
 #####################################
@@ -2508,9 +2498,9 @@ CommandRename($$)
 
 #####################################
 sub
-getAllAttr($)
+getAllAttr($;$)
 {
-  my $d = shift;
+  my ($d, $cl) = @_;
   return "" if(!$defs{$d});
 
   my $list = $AttrList; # Global values
@@ -2526,11 +2516,11 @@ getAllAttr($)
 
 #####################################
 sub
-getAllGets($)
+getAllGets($;$)
 {
-  my $d = shift;
+  my ($d, $cl) = @_;
   
-  my $a2 = CommandGet(undef, "$d ?");
+  my $a2 = CommandGet($cl, "$d ?");
   return "" if($a2 !~ m/unknown.*choose one of /i);
   $a2 =~ s/.*choose one of //;
   return $a2;
@@ -2538,9 +2528,9 @@ getAllGets($)
 
 #####################################
 sub
-getAllSets($)
+getAllSets($;$)
 {
-  my $d = shift;
+  my ($d, $cl) = @_;
   return "" if(!$defs{$d});      # Just safeguarding
   
   if(AttrVal("global", "apiversion", 1)> 1) {
@@ -2548,7 +2538,7 @@ getAllSets($)
     return join(" ", @setters);
   }
 
-  my $a2 = CommandSet(undef, "$d ?");
+  my $a2 = CommandSet($cl, "$d ?");
   $a2 =~ s/.*choose one of //;
   $a2 = "" if($a2 =~ /^No set implemented for/);
   return "" if($a2 eq "");
@@ -2941,7 +2931,7 @@ WakeUpFn($)
   delete $sleepers{$h->{id}} if( $h->{id} );
 
   $evalSpecials = $h->{evalSpecials};
-  my $ret = AnalyzeCommandChain(undef, $h->{cmd});
+  my $ret = AnalyzeCommandChain($h->{cl}, $h->{cmd});
   Log 2, "After sleep: $ret" if($ret && !$h->{quiet});
 }
 sub
@@ -2992,6 +2982,7 @@ CommandSleep($$)
     my %h = (cmd          => join(";", @cmdList),
              evalSpecials => $evalSpecials,
              quiet        => $quiet,
+             cl           => $cl,
              id           => $id);
     if( $id ) {
       RemoveInternalTimer( $sleepers{$id} ) if( $sleepers{$id} );
