@@ -1,6 +1,13 @@
 ##############################################
 # $Id$
 #
+# 
+# modifikation fuer Energiemessung von martin-s
+#
+# Todo:
+# - unbekannte Strings mit Log1 speichern
+# - unbekannte Steckermodelle mit Log1 speichern
+#
 # Protokoll:
 # Prefix (5a a5), Anzahl Nutzbytes (2 Byte), Payload, Checksumme (FF - LowByte der Summe aller Payloadbytes), Postfix (5b b5)
 # Antwort von Dose hat immer die letzen 3 Bloecke der MAC vom 11-13 Byte
@@ -23,6 +30,7 @@
 #                                                 MM MM MM MM MM MM					MM: komplette MAC
 #                         ?? ??                                                     ??: Unterschiedlich bei verschiedenen Steckermodellen
 # 5A A5 00 12|07 01 0A C0 32 23 62 8A 7E 00 02 05 00 01 01 08 11|4C 5B B5    			Anzahl Bytes stimmt nicht! ist aber immer so
+#                                                       FF FF FF					FF: Firmware Version
 # 5A A5 00 15|90 01 0A E0 32 23 62 8A 7E 00 00 00 81 11 00 00 01 00 00 00 00|32 5B B5		Status der Dose (wird auch immer bei Zustandsaenderung geschickt)
 #                               MM MM MM											MM: letzte 3 Stellen der MAC
 #                                                 qq								qq: Schaltquelle 	81=lokal geschaltet, 11=remote geschaltet
@@ -44,6 +52,13 @@
 #                                  MM MM MM
 #                            ?? ??                                                     ??: Unterschiedlich bei verschiedenen Steckermodellen
 # beides wird quittiert (ebenso wird auch bei lokaler betaetigung quittiert) -> siehe 3. Antwort auf Init 2
+#---------------------------------------------------------------------------------------------------------
+# Bei Dosen mit Verbrauchsdaten:
+# 5A A5 00 16|90 01 0a e0 35 23 d3 48 d4 ff fe 01 81 39 00 00 01 03 20 00 56 9b|70 5b b5	Verbrauchsdaten
+#                         ?? ?? MM MM MM
+#																 id					id: Art der Daten 01 = Leistung, 02 = Energie, 03 = Spannung, 04 = Strom, 05 = Frequenz, 07 = maxpower, 08 = Cosphi
+#																	   VV VV VV     VV: Verbrauchswerte (muss durch 100 geteilt werden)
+
 package main;
 use strict;
 use warnings;
@@ -64,6 +79,18 @@ my $dosehb =  pack('C*', (0x00,0x09,0x04,0x01,0x0a,0xc0));
 my $cinit1 =  pack('C*', (0x03,0x01,0x0a,0xc0));
 my $cmac =    pack('C*', (0x07,0x01,0x0a,0xc0));
 my $cswitch = pack('C*', (0x90,0x01,0x0a,0xe0));
+
+my $measure = pack('C*', (0xff,0xfe,0x01,0x81,0x39,0x00,0x00,0x01));
+
+my %values = (
+	'01' => 'power',
+	'02' => 'energy',
+	'03' => 'voltage',
+	'04' => 'current',
+	'05' => 'frequency',
+	'07' => 'maxpower',
+	'08' => 'cosphi',
+);
 
 my $timeout = 60;
 
@@ -275,7 +302,7 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
 		}
 		
 		(my $smsg = $_) =~ s/(.|\n)/sprintf("%.2X ",ord($1))/eg;							# empfangene Zeichen in Hexwerte wandeln
-		Log3 $hash, 5, "$hash->{NAME} RX: 5A A5 $smsg";										# ...und ins Log schreiben
+		Log3 $hash, 4, "$hash->{NAME} RX: 5A A5 $smsg";										# ...und ins Log schreiben
 		
 		$hash->{Pattern} = unpack('H*', substr($_,6,2) ) unless defined $hash->{Pattern};
 		
@@ -311,6 +338,9 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
 				$mac .= ":";
 			}
 			$hash->{MAC} = $mac;
+		} elsif ( substr($_,2,4) eq $cmac && (( length($_) - 5 ) == 0x11 ) ) {				# Nachricht mit Firmware Version
+			my ($high,$mid,$low)=unpack('CCC',substr($_,16,3));
+			$hash->{FWVERSION} = $high.".".$mid.".".$low;
 		} elsif ( substr($_,2,4) eq $cswitch && (( length($_) - 5 ) == 0x15 ) ) {			# An oder Aus
 			my $id = unpack('H*', substr($_,8,3) );
 			my $rstate = hex(unpack('H*', substr($_,22,1))) == 0xFF ? "on" : "off";
@@ -339,11 +369,27 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
 			
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash, 'state', $rstate);
-			readingsBulkUpdate($hash, 'source', $src);
+  			readingsBulkUpdate($hash, 'source', $src);
+  			readingsEndUpdate($hash, 1);
+		} elsif ( substr($_,2,4) eq $cswitch && substr($_,11,8) eq $measure && ( length($_) - 5 ) == 0x16) {	# Botschaft mit Verbrauchsdaten
+			readingsBeginUpdate($hash);
+			my $value=$values{unpack('H*',substr($_,19,1))};
+			if (defined($value)) {
+				my ($high,$mid,$low)=unpack('CCC',substr($_,21,3));
+				readingsBulkUpdate($hash, $value, ($high*65536+$mid*256+$low)/100);
+			} else {
+				# readingsBulkUpdate($hash, 'message_'.unpack('H*',substr($_,19,1)), unpack('H*',substr($_,20)));
+				Log3 $name, 3, "$name unknown control message Id: " . unpack('H*',substr($_,19,1)) . " value: " . unpack('H*',substr($_,20));
+			}
 			readingsEndUpdate($hash, 1);
-		} 
+		} else {
+			# readingsBeginUpdate($hash);
+			# readingsBulkUpdate($hash, 'message_unkn', unpack('H*',$_));
+			# readingsEndUpdate($hash, 1);
+			Log3 $name, 3, "$name unknown message: " . unpack('H*',$_);
+		}
+      }
     }
-  }
   #Log3 $name, 5, "$name empfangen: $buf";
   return
 }

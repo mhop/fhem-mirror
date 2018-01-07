@@ -442,7 +442,7 @@ sub RPI_GPIO_Undef($$) {
 	}
 	if ( ( AttrVal($hash->{NAME}, "interrupt", "none") ) ne ( "none" ) ) {
 		delete $selectlist{$hash->{NAME}};
-		close($hash->{filehandle});
+		close($hash->{filehandle}) if defined $hash->{filehandle};
 	}
 	# to have a chance to externaly setup the GPIOs -
 	# leave GPIOs untouched if attr unexportpin is set to "no"
@@ -639,10 +639,24 @@ sub RPI_GPIO_exuexpin($$) {			#export, unexport, direction, pud_resistor via GPI
 			$sw = "-g mode";
 		} else {
 			$sw = "export";
-			$dir = "out" if ( $dir eq "high" || $dir eq "low" );		#auf out zurueck, da gpio tool dies nicht unterst?tzt
+			#$dir = "out" if ( $dir eq "high" || $dir eq "low" );		#auf out zurueck, da gpio tool dies nicht unterst?tzt
 		}
-		my $exp = $gpioutility.' '.$sw.' '.$hash->{GPIO_Nr}. (defined $dir ? " " . $dir : "");
-		$exp = `$exp`;
+		#my $exp = $gpioutility.' '.$sw.' '.$hash->{GPIO_Nr}. (defined $dir ? " " . $dir : "");
+		#$exp = `$exp`;
+		my $exp = "$gpioutility $sw $hash->{GPIO_Nr} $dir";
+		my $exp_result = `$exp 2>&1`;
+
+		if ($exp_result =~ /export: Invalid mode/) {
+			#gpio tool in neueren versionen (>= 2.25, feb 2015) unterstützt beim export high/low argumente. 
+			#das verhindert kurzes flickern beim restart von fhem.
+			#fallback auf alte syntax wenn utility "Invalid mode" retourniert
+			
+			Log3 $hash, 2, "$hash->{NAME}: WiringPi alte version erkannt. '$exp' $exp_result";
+
+			$exp = "$gpioutility $sw $hash->{GPIO_Nr} out"; 			#fallback auf out in alter version
+			$exp_result = `$exp 2>&1`
+		}
+		Log3 $hash, 4, "$hash->{NAME}: WiringPi executed: '$exp' $exp_result";
 	} else {
 		my $ret = "WiringPi gpio utility not (correct) installed";
 		Log3 $hash, 1, "$hash->{NAME}: $ret";
