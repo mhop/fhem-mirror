@@ -721,6 +721,7 @@ HUEDevice_Set($@)
   }
 
   if( (my $joined = join(" ", @aa)) =~ /:/ ) {
+    $joined =~ s/on-till\s+[^\s]+//g; #bad workaround for: https://forum.fhem.de/index.php/topic,61636.msg728557.html#msg728557
     my @cmds = split(":", $joined);
     for( my $i = 0; $i <= $#cmds; ++$i ) {
       HUEDevice_SetParam($name, \%obj, split(" ", $cmds[$i]) );
