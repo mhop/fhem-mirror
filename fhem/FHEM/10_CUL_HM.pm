@@ -17,25 +17,29 @@ my $cryptFunc = ($@)?0:1;
 # ========================import constants=====================================
 
 my $culHmModel            =\%HMConfig::culHmModel;
+
 my $culHmRegDefShLg       =\%HMConfig::culHmRegDefShLg;
 my $culHmRegDefine        =\%HMConfig::culHmRegDefine;
 my $culHmRegGeneral       =\%HMConfig::culHmRegGeneral;
 my $culHmRegType          =\%HMConfig::culHmRegType;
 my $culHmRegModel         =\%HMConfig::culHmRegModel;
 my $culHmRegChan          =\%HMConfig::culHmRegChan;
+
 my $culHmGlobalGets       =\%HMConfig::culHmGlobalGets;
 my $culHmVrtGets          =\%HMConfig::culHmVrtGets;
 my $culHmSubTypeGets      =\%HMConfig::culHmSubTypeGets;
 my $culHmModelGets        =\%HMConfig::culHmModelGets;
-my $culHmGlobalSetsDevice =\%HMConfig::culHmGlobalSetsDevice;
+
 my $culHmSubTypeDevSets   =\%HMConfig::culHmSubTypeDevSets;
 my $culHmGlobalSetsChn    =\%HMConfig::culHmGlobalSetsChn;
+my $culHmReglSets         =\%HMConfig::culHmReglSets;
 my $culHmGlobalSets       =\%HMConfig::culHmGlobalSets;
 my $culHmGlobalSetsVrtDev =\%HMConfig::culHmGlobalSetsVrtDev;
 my $culHmSubTypeSets      =\%HMConfig::culHmSubTypeSets;
 my $culHmModelSets        =\%HMConfig::culHmModelSets;
 my $culHmChanSets         =\%HMConfig::culHmChanSets;
 my $culHmFunctSets        =\%HMConfig::culHmFunctSets;
+
 my $culHmBits             =\%HMConfig::culHmBits;
 my $culHmCmdFlags         =\@HMConfig::culHmCmdFlags;
 my $K_actDetID            ="000000";
@@ -3844,9 +3848,16 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     push @arr,"$_ $culHmSubTypeGets->{$st}{$_}" foreach (keys %{$culHmSubTypeGets->{$st}});
     push @arr,"$_ $culHmModelGets->{$md}{$_}"   foreach (keys %{$culHmModelGets->{$md}});
     my   @arr1;
-    if( !$roleV)                             {foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_ ".$culHmGlobalSets->{$_}            }};
+    if ($hash->{helper}{regLst}){
+      foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
+        next if (!defined $culHmReglSets->{$rl});
+                                              foreach(keys %{$culHmReglSets->{$rl}}      ){push @arr1,"$_:".$culHmReglSets->{$rl}{$_}         };
+      }
+    }
+    else{#ignore e.g. for virtuals
+    }
+    if( !$roleV &&($roleD || $roleC)        ){foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
     if(($st eq "virtual"||!$st)    && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_ ".$culHmGlobalSetsVrtDev->{$_}      }};
-    if( !$roleV                    && $roleD){foreach(keys %{$culHmGlobalSetsDevice}     ){push @arr1,"$_ ".$culHmGlobalSetsDevice->{$_}      }};
     if( !$roleV                    && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_ ".${$culHmSubTypeDevSets->{$st}}{$_}}};
     if( !$roleV                    && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_ ".$culHmGlobalSetsChn->{$_}         }};
     if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_ ".${$culHmSubTypeSets->{$st}}{$_}   }};
@@ -3970,14 +3981,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my $fkt   = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
   
   my $oCmd = $cmd;# we extend press to press/L/S if press is defined
-  if ( $cmd =~ m/^press/){
-    $cmd = (InternalVal($name,"peerList",""))?"press":"?";
+  if ( $cmd =~ m/^press/){# substitude pressL/S with press for cmd search
+    $cmd = (InternalVal($name,"peerList","")) ? "press" : "?";
   }
   
   my $h = undef;
   $h = $culHmGlobalSets->{$cmd}         if(                !$roleV                    &&($roleD || $roleC));
   $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&( $roleV || !$st)           && $roleD);
-  $h = $culHmGlobalSetsDevice->{$cmd}   if(!defined($h) && !$roleV                    && $roleD);
   $h = $culHmSubTypeDevSets->{$st}{$cmd}if(!defined($h) && !$roleV                    && $roleD);
   $h = $culHmGlobalSetsChn->{$cmd}      if(!defined($h) && !$roleV                    && $roleC);
   $h = $culHmSubTypeSets->{$st}{$cmd}   if(!defined($h) && $culHmSubTypeSets->{$st}   && $roleC);
@@ -3985,6 +3995,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   $h = $culHmChanSets->{$md."00"}{$cmd} if(!defined($h) && $culHmChanSets->{$md."00"} && $roleD);
   $h = $culHmChanSets->{$md.$chn}{$cmd} if(!defined($h) && $culHmChanSets->{$md.$chn} && $roleC); 
   $h = $culHmFunctSets->{$fkt}{$cmd}    if(!defined($h) && $culHmFunctSets->{$fkt});
+
+  if( !defined($h) && $hash->{helper}{regLst}){
+    foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
+      next if (!defined $culHmReglSets->{$rl});
+      $h = $culHmReglSets->{$rl}{$cmd};
+      last if (defined($h));
+    }
+  }
 
   $cmd = $oCmd;# necessary for press/S/L - check better implementation
 
@@ -3997,9 +4015,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif(!defined($h)) { ### unknown - return the commandlist
     my @arr1 = ();
+    if ($hash->{helper}{regLst}){
+      foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
+        next if (!defined $culHmReglSets->{$rl});
+                                              foreach(keys %{$culHmReglSets->{$rl}}      ){push @arr1,"$_:".$culHmReglSets->{$rl}{$_}         };
+      }
+    }
+    else{#ignore e.g. for virtuals
+    }
     if( !$roleV &&($roleD || $roleC)        ){foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
     if(( $roleV||!$st)             && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_:".$culHmGlobalSetsVrtDev->{$_}      }};
-    if( !$roleV                    && $roleD){foreach(keys %{$culHmGlobalSetsDevice}     ){push @arr1,"$_:".$culHmGlobalSetsDevice->{$_}      }};
     if( !$roleV                    && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_:".${$culHmSubTypeDevSets->{$st}}{$_}}};
     if( !$roleV                    && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_:".$culHmGlobalSetsChn->{$_}         }};
     if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_:".${$culHmSubTypeSets->{$st}}{$_}   }};
@@ -4054,13 +4079,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{
       $usg =~ s/ templateDel//;#not an option
     }
-	if ( $usg =~ m/ press/){
+	if ( $usg =~ m/ (press|event|trgPress|trgEvent)/){
       my $peers = join",",grep/./,split",",InternalVal($name,"peerList","");
       if ($peers){
         $usg =~ s/ press/ press pressS:$peers pressL:$peers/g;
+        $usg =~ s/ (trgPress.:)-peer-/ $1/g;
+        $usg =~ s/ (trgPress.:)/ $1all,$peers/g;
       }
       else{#remove command
-        $usg =~ s/ press[SL]//g;
+        $usg =~ s/ (press|event)[SL]//g;
+        $usg =~ s/ trg(Press|Event)[SL]//g;
       }
 	}
     return $usg;
@@ -4167,7 +4195,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my $state = "set_".join(" ", @a[1..(int(@a)-1)]);
   return "device on readonly. $cmd disabled" 
         if($activeCmds{$cmd} && CUL_HM_getAttrInt($name,"readOnly") );
-  
+
   if   ($cmd eq "raw") {  #####################################################
     return "Usage: set $a[0] $cmd data [data ...]" if(@a < 3);
     $state = "";
@@ -5628,6 +5656,87 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
   }
 
+  elsif($cmd =~ m/^(press|event)(S|L)/) { ######################################
+    #press          =>"-peer-        [-repCount(long only)-] [-repDelay-] ..."
+    #event          =>"-peer- -cond- [-repCount(long only)-] [-repDelay-] ..."
+    return "no peer defined" if (!defined $a[2]);
+    my ($trig,$type,$peer) = ($1,$2,$a[2]);
+    my ($cond,$repCnt,$repDly,$mode,$modeCode) = (0,0,0);
+    return "$peer not peered to $name" if (InternalVal($name,"peerList","") !~ m/$peer/);
+    if ($trig eq "event"){
+      return "condition missing" if (!defined $a[3]);
+      ($cond,$repCnt,$repDly,$modeCode) = ($a[3],$a[4],$a[5],"41");
+      return "condition $cond out of range. Chooose 0...255" if ($cond < 0 || $cond > 255);
+      $cond = sprintf("%02X",$cond);
+    }
+    else{
+      ($repCnt,$repDly,$modeCode,$cond) = ($a[3],$a[4],"40","");
+    }
+    
+    if ($type eq "L"){
+      $mode = 64;
+      $repCnt      = 1    if (!defined $repCnt     );
+      $repDly      = 0.25 if (!defined $repDly     );
+      return "repeatCount $repCnt invalid. use value 1 - 255"     if ($repCnt < 1    || $repCnt>255 );
+      return "repDelay $repDly invalid. use value 0.25 - 1.00"    if ($repDly < 0.25 || $repDly>1 );
+    }
+    else{#short
+      ($repCnt,$repDly,$mode) = (0,0,0);
+    }
+
+    $hash->{helper}{count} = (!$hash->{helper}{count} ? 1 
+                                                      : $hash->{helper}{count}+1)%256;
+    if ($st eq 'virtual'){#serve all peers of virtual button
+      my @peerLchn = split(',',AttrVal($name,"peerIDs",""));
+      my @peerList = map{substr($_,0,6)} @peerLchn;
+      @peerList = grep !/000000/,grep !/^$/,CUL_HM_noDup(@peerList);
+      my $pc =  sprintf("%02X%02X",hex($chn)+$mode,$hash->{helper}{count});# msg end
+      my $snd = 0;
+      foreach my $peer (sort @peerList){
+        my ($pHash,$peerFlag,$rxt);
+        $pHash = CUL_HM_id2Hash($peer);
+        next if (   !$pHash 
+                 || !$pHash->{helper}{role}
+                 || !$pHash->{helper}{role}{prs});
+        $rxt = CUL_HM_getRxType($pHash);
+        $peerFlag = ($rxt & 0x02)?"B4":"A4";#burst
+        CUL_HM_PushCmdStack($pHash,"++${peerFlag}$modeCode$dst$peer$pc");
+        $snd = 1;
+        foreach my $pCh(grep /$peer/,@peerLchn){
+          my $n = CUL_HM_id2Name($pCh);
+          next if (!$n);
+          $n =~ s/_chn-\d\d$//;
+          delete $defs{$n}{helper}{dlvl};#stop desiredLevel supervision
+          CUL_HM_stateUpdatDly($n,10);
+        }
+        if ($rxt & 0x80){#burstConditional
+          CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6));
+        }
+        else{
+          CUL_HM_ProcessCmdStack($pHash);
+        }
+      }
+      if(!$snd){# send 2 broadcast if no relevant peers 
+        CUL_HM_SndCmd($hash,"++8440${dst}000000$pc");
+      }
+    }
+    else{#serve internal channels for actor
+      my ($pDev,$pCh) = unpack 'A6A2',CUL_HM_name2Id($peer,$devHash)."01";
+      return "button cannot be identified" if (!$pCh);
+      delete $hash->{helper}{dlvl};#stop desiredLevel supervision
+      my $msg = sprintf("3E%s%s%s%s%02X%02X",
+                                     $id,$dst,$pDev,$modeCode
+                                    ,hex($pCh)+$mode
+                                    ,$hash->{helper}{count}
+                                    ,$cond);
+      for (my $cnt = 1;$cnt < $repCnt; $cnt++ ){
+        CUL_HM_SndCmd($hash, "++80$msg"); # send direct Wont work for burst!
+        select(undef, undef, undef, $repDly);
+      }
+      CUL_HM_PushCmdStack($hash, "++${flag}$msg"); # send thru commandstack
+      CUL_HM_stateUpdatDly($name,10);#check status after 10 sec
+   }
+  }
   elsif($cmd =~ m/^press(.*)/) { ##############################################
     # [long|short] [<peer>] [<repCount(long only)>] [<repDelay>] [<forceTiming[0|1]>] ...
     my ($repCnt,$repDly,$forceTiming,$mode) = (0,0,0,0);
@@ -5721,6 +5830,29 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         select(undef, undef, undef, $repDly);
       }
       CUL_HM_PushCmdStack($hash, "++${flag}$msg"); # send thru commandstack
+    }
+  }
+  elsif($cmd =~ m/^trg(Press|Event)(.)/) { ####################################
+    $state = "";
+    my ($trig,$type) = ($1,$2);
+    my $peer = $a[2];
+    return "$peer not defined" if(!defined$defs{$peer} && $peer ne "all" );
+    my @peers;
+    if ($peer eq "all"){
+      @peers  = grep/./,split",",InternalVal($name,"peerList","");
+    }
+    else{
+      push @peers,$a[2];
+    }
+
+    if($trig eq "Event"){
+      return "no condition level defined" if (!defined $a[3]);
+      return "condition $a[3] out of range. limit to 0..255" if ($a[3]<0 || $a[3]>255);
+    }
+    foreach my $peerSet(@peers){
+      next if (!defined($peerSet) || !defined($defs{$peerSet}) );
+      if($trig eq "Event"){CUL_HM_Set($defs{$peerSet},$peerSet,"event$type",$name,$a[3]);}
+      else                {CUL_HM_Set($defs{$peerSet},$peerSet,"press$type",$name);}
     }
   }
   elsif($cmd eq "fwUpdate") { #################################################
@@ -8126,14 +8258,13 @@ sub CUL_HM_getChnList($){ # get reglist assotioted with a channel
 
   if ($hash->{helper}{role}{dev}){
     $chRl = ",0";
-    if ($hash->{helper}{role}{chn}){# device is added. if we ar channel add this as well. 
-      $chnN = 1;
-    }
+    $chnN = ($hash->{helper}{role}{chn})? 1    # device is added. if we ar channel add this as well. 
+                                        : "-";
   }
   foreach my $mLst(@mLstA){
-    my ($Lst,$cLst) = split(":",$mLst);
-    $cLst = $chnN if (!$cLst);
-    next if ($Lst eq "p");# no list, just peers
+    my ($Lst,$cLst) = split(":",$mLst.":-");
+    $cLst = $chnN if ($cLst eq "-");
+    next if ($Lst eq "p" || $cLst eq "-");# no list, just peers
     foreach my $aaa (grep /$chnN/,split('\.',$cLst)){
       $Lst .= "p" if($Lst == 3 || $Lst == 4 || $aaa =~ m/p/);
       $Lst =~ s/ //g;
@@ -9855,36 +9986,37 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
               Currently a max of 24h is supported with endtime.<br>
             </li>
-            <li><B>press &lt;[short|long]&gt; &lt;[on|off|&lt;peer&gt;]&gt; &lt;btnNo&gt;</B><a name="CUL_HMpress"></a><br>
+            <li><B>pressL &lt;peer&gt; [&lt;repCount&gt;] [&lt;repDelay&gt;] </B><a name="CUL_HMpressL"></a><br>
                 simulate a press of the local button or direct connected switch of the actor.<br>
-                <B>[short|long]</B> select simulation of short or long press of the button.
-                                    Parameter is optional, short is default<br>
-                <B>[on|off|&lt;peer&gt;]</B> is relevant for devices with direct buttons per channel (blind or dimmer).
-                Those are available for dimmer and blind-actor, usually not for switches<br>
                 <B>&lt;peer&gt;</B> allows to stimulate button-press of any peer of the actor. 
                                     i.e. if the actor is peered to any remote, virtual or io (HMLAN/CUL) 
                                     press can trigger the action defined. <br>              
-                <B>[noBurst]</B> relevant for virtual only <br>
-                It will cause the command being added to the command queue of the peer. <B>No</B> burst is
-                issued subsequent thus the command is pending until the peer wakes up. It therefore 
-                <B>delays the button-press</B>, but will cause less traffic and performance cost. <br>
-                <B>Example:</B>
+                <B>&lt;repCount&gt;</B> number of automatic repetitions.<br>
+                <B>&lt;repDelay&gt;</B> timer between automatic repetitions. <br>
+               <B>Example:</B>
                 <code> 
-                   set actor press # trigger short of internal peer self assotiated to the channel<br>
-                   set actor press long # trigger long of internal peer self assotiated to the channel<br>
-                   set actor press on # trigger short of internal peer self related to 'on'<br>
-                   set actor press long off # trigger long of internal peer self related to 'of'<br>
-                   set actor press long FB_Btn01 # trigger long peer FB button 01<br>
-                   set actor press long FB_chn-8 # trigger long peer FB button 08<br>
-                   set actor press self01 # trigger short of internal peer 01<br>
-                   set actor press fhem02 # trigger short of FHEM channel 2<br>
+                   set actor pressL FB_Btn01 # trigger long peer FB button 01<br>
+                   set actor pressL FB_chn-8 # trigger long peer FB button 08<br>
+                   set actor pressL self01 # trigger short of internal peer 01<br>
+                   set actor pressL fhem02 # trigger short of FHEM channel 2<br>
                 </code>
             </li>
-            <li><B>pressL &lt;peer&gt;</B><a name="CUL_HMpressL"></a><br>
-                simulates a long press for a given peer. See press for details
-            </li>
             <li><B>pressS &lt;peer&gt;</B><a name="CUL_HMpressS"></a><br>
-                simulates a long press for a given peer. See press for details
+                simulates a short press similar to long press
+            </li>
+            <li><B>eventL &lt;peer&gt; &lt;condition&gt; [&lt;repCount&gt;] [&lt;repDelay&gt;] </B><a name="CUL_HMeventL"></a><br>
+                simulate an event of an peer and stimulates the actor.<br>
+                <B>&lt;peer&gt;</B> allows to stimulate button-press of any peer of the actor. 
+                                    i.e. if the actor is peered to any remote, virtual or io (HMLAN/CUL) 
+                                    press can trigger the action defined. <br>              
+                <B>&lt;codition&gt;</B> the level of the condition <br>              
+                <B>Example:</B>
+                <code> 
+                   set actor eventL md 30 # trigger from motion detector with level 30<br>
+                </code>
+            </li>
+            <li><B>eventS &lt;peer&gt; &lt;condition&gt; </B><a name="CUL_HMeventS"></a><br>
+                simulates a short event from a peer of the actor. Typically sensor do not send long events.
             </li>
             <li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggle the Actor. It will switch from any current
                  level to off or from off to 100%</li>
@@ -9936,6 +10068,20 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
              device level with parameter 'protCmdPend'.
         </li>
         <ul>
+          <li><B>trgEventS [all|&lt;peer&gt;] &lt;condition&gt;</B><a name="CUL_HMtrgEventS"></a><br>
+               Issue eventS on the peer entity. If <B>all</B> is selected each of the peers will be triggered. See also <a href="CUL_HMeventS">eventS</a><br>
+               <B>&lt;condition&gt;</B>: is the condition being transmitted with the event. E.g. the brightness in case of a motion detector. 
+          </li>
+          <li><B>trgEventL [all|&lt;peer&gt;] &lt;condition&gt;</B><a name="CUL_HMtrgEventL"></a><br>
+               Issue eventL on the peer entity. If <B>all</B> is selected each of the peers will be triggered. a normal device will not sent event long. See also <a href="CUL_HMeventL">eventL</a><br>
+               <B>&lt;condition&gt;</B>: is the condition being transmitted with the event. E.g. the brightness in case of a motion detector. 
+          </li>
+          <li><B>trgPressS [all|&lt;peer&gt;] </B><a name="CUL_HMtrgPressS"></a><br>
+               Issue pressS on the peer entity. If <B>all</B> is selected each of the peers will be triggered. See also <a href="CUL_HMpressS">pressS</a><br>
+          </li>
+          <li><B>trgPressL [all|&lt;peer&gt;] </B><a name="CUL_HMtrgPressL"></a><br>
+               Issue pressL on the peer entity. If <B>all</B> is selected each of the peers will be triggered. See also <a href="CUL_HMpressL">pressL</a><br>
+          </li>
           <li><B>peerIODev [IO] &lt;btn_no&gt; [<u>set</u>|unset]</B><a name="CUL_HMpeerIODev"></a><br>
                The command is similar to <B><a href="#CUL_HMpeerChan">peerChan</a></B>. 
                While peerChan
@@ -9944,82 +10090,82 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                An IO device according to eQ3 supports up to 50 virtual buttons. Those
                will be peered/unpeerd to the actor. <a href="CUL_HMpress">press</a> can be
                used to stimulate the related actions as defined in the actor register.
-            <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse][<u>set</u>|unset] [<u>both</u>|actor|remote]</B>
-                <a name="CUL_HMpeerChan"></a><br>
-            
-                 peerChan will establish a connection between a sender- <B>channel</B> and
-                 an actuator-<B>channel</B> called link in HM nomenclatur. Peering must not be
-                 confused with pairing.<br>
-                 <B>Pairing</B> refers to assign a <B>device</B> to the central.<br>
-                 <B>Peering</B> refers to virtally connect two <B>channels</B>.<br>
-                 Peering allowes direkt interaction between sender and aktor without
-                 the necessity of a CCU<br>
-                 Peering a sender-channel causes the sender to expect an ack from -each-
-                 of its peers after sending a trigger. It will give positive feedback (e.g. LED green)
-                 only if all peers acknowledged.<br>
-                 Peering an aktor-channel will setup a parameter set which defines the action to be
-                 taken once a trigger from -this- peer arrived. In other words an aktor will <br>
-                 - process trigger from peers only<br>
-                 - define the action to be taken dedicated for each peer's trigger<br>
-                 An actor channel will setup a default action upon peering - which is actor dependant.
-                 It may also depend whether one or 2 buttons are peered <B>in one command</B>.
-                 A swich may setup oen button for 'on' and the other for 'off' if 2 button are
-                 peered. If only one button is peered the funktion will likely be 'toggle'.<br>
-                 The funtion can be modified by programming the register (aktor dependant).<br>
-            
-                 Even though the command is executed on a remote or push-button it will
-                 as well take effect on the actuator directly. Both sides' peering is
-                 virtually independant and has different impact on sender and receiver
-                 side.<br>
-            
-                 Peering of one actuator-channel to multiple sender-channel as
-                 well as one sender-channel to multiple Actuator-channel is
-                 possible.<br>
-            
-                 &lt;actChan&gt; is the actuator-channel to be peered.<br>
-            
-                 &lt;btn_no&gt; is the sender-channel (button) to be peered. If
-                 'single' is choosen buttons are counted from 1. For 'dual' btn_no is
-                 the number of the Button-pair to be used. I.e. '3' in dual is the
-                 3rd button pair correcponding to button 5 and 6 in single mode.<br>
-            
-                 If the command is executed on a channel the btn_no is ignored.
-                 It needs to be set, should be 0<br>
-            
-                 [single|dual]: this mode impacts the default behavior of the
-                 Actuator upon using this button. E.g. a dimmer can be learned to a
-                 single button or to a button pair. <br>
-                 Defaults to dual.<br>
-            
-                 'dual' (default) Button pairs two buttons to one actuator. With a
-                 dimmer this means one button for dim-up and one for dim-down. <br>
-            
-                 'reverse' identical to dual - but button order is reverse.<br>
-            
-                 'single' uses only one button of the sender. It is useful for e.g. for
-                 simple switch actuator to toggle on/off. Nevertheless also dimmer can
-                 be learned to only one button. <br>
-            
-                 [set|unset]: selects either enter a peering or remove it.<br>
-                 Defaults to set.<br>
-                 'set'   will setup peering for the channels<br>
-                 'unset' will remove the peering for the channels<br>
-            
-                 [actor|remote|both] limits the execution to only actor or only remote.
-                 This gives the user the option to redo the peering on the remote
-                 channel while the settings in the actor will not be removed.<br>
-                 Defaults to both.<br>
-            
-                 Example:
-                 <ul><code>
-                   set myRemote peerChan 2 mySwActChn single set       #peer second button to an actuator channel<br>
-                   set myRmtBtn peerChan 0 mySwActChn single set       #myRmtBtn is a button of the remote. '0' is not processed here<br>
-                   set myRemote peerChan 2 mySwActChn dual set         #peer button 3 and 4<br>
-                   set myRemote peerChan 3 mySwActChn dual unset       #remove peering for button 5 and 6<br>
-                   set myRemote peerChan 3 mySwActChn dual unset aktor #remove peering for button 5 and 6 in actor only<br>
-                   set myRemote peerChan 3 mySwActChn dual set remote  #peer button 5 and 6 on remote only. Link settings il mySwActChn will be maintained<br>
-                 </code></ul>
-            </li>
+          </li>
+          <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse][<u>set</u>|unset] [<u>both</u>|actor|remote]</B>
+              <a name="CUL_HMpeerChan"></a><br>
+          
+               peerChan will establish a connection between a sender- <B>channel</B> and
+               an actuator-<B>channel</B> called link in HM nomenclatur. Peering must not be
+               confused with pairing.<br>
+               <B>Pairing</B> refers to assign a <B>device</B> to the central.<br>
+               <B>Peering</B> refers to virtally connect two <B>channels</B>.<br>
+               Peering allowes direkt interaction between sender and aktor without
+               the necessity of a CCU<br>
+               Peering a sender-channel causes the sender to expect an ack from -each-
+               of its peers after sending a trigger. It will give positive feedback (e.g. LED green)
+               only if all peers acknowledged.<br>
+               Peering an aktor-channel will setup a parameter set which defines the action to be
+               taken once a trigger from -this- peer arrived. In other words an aktor will <br>
+               - process trigger from peers only<br>
+               - define the action to be taken dedicated for each peer's trigger<br>
+               An actor channel will setup a default action upon peering - which is actor dependant.
+               It may also depend whether one or 2 buttons are peered <B>in one command</B>.
+               A swich may setup oen button for 'on' and the other for 'off' if 2 button are
+               peered. If only one button is peered the funktion will likely be 'toggle'.<br>
+               The funtion can be modified by programming the register (aktor dependant).<br>
+          
+               Even though the command is executed on a remote or push-button it will
+               as well take effect on the actuator directly. Both sides' peering is
+               virtually independant and has different impact on sender and receiver
+               side.<br>
+          
+               Peering of one actuator-channel to multiple sender-channel as
+               well as one sender-channel to multiple Actuator-channel is
+               possible.<br>
+          
+               &lt;actChan&gt; is the actuator-channel to be peered.<br>
+          
+               &lt;btn_no&gt; is the sender-channel (button) to be peered. If
+               'single' is choosen buttons are counted from 1. For 'dual' btn_no is
+               the number of the Button-pair to be used. I.e. '3' in dual is the
+               3rd button pair correcponding to button 5 and 6 in single mode.<br>
+          
+               If the command is executed on a channel the btn_no is ignored.
+               It needs to be set, should be 0<br>
+          
+               [single|dual]: this mode impacts the default behavior of the
+               Actuator upon using this button. E.g. a dimmer can be learned to a
+               single button or to a button pair. <br>
+               Defaults to dual.<br>
+          
+               'dual' (default) Button pairs two buttons to one actuator. With a
+               dimmer this means one button for dim-up and one for dim-down. <br>
+          
+               'reverse' identical to dual - but button order is reverse.<br>
+          
+               'single' uses only one button of the sender. It is useful for e.g. for
+               simple switch actuator to toggle on/off. Nevertheless also dimmer can
+               be learned to only one button. <br>
+          
+               [set|unset]: selects either enter a peering or remove it.<br>
+               Defaults to set.<br>
+               'set'   will setup peering for the channels<br>
+               'unset' will remove the peering for the channels<br>
+          
+               [actor|remote|both] limits the execution to only actor or only remote.
+               This gives the user the option to redo the peering on the remote
+               channel while the settings in the actor will not be removed.<br>
+               Defaults to both.<br>
+          
+               Example:
+               <ul><code>
+                 set myRemote peerChan 2 mySwActChn single set       #peer second button to an actuator channel<br>
+                 set myRmtBtn peerChan 0 mySwActChn single set       #myRmtBtn is a button of the remote. '0' is not processed here<br>
+                 set myRemote peerChan 2 mySwActChn dual set         #peer button 3 and 4<br>
+                 set myRemote peerChan 3 mySwActChn dual unset       #remove peering for button 5 and 6<br>
+                 set myRemote peerChan 3 mySwActChn dual unset aktor #remove peering for button 5 and 6 in actor only<br>
+                 set myRemote peerChan 3 mySwActChn dual set remote  #peer button 5 and 6 on remote only. Link settings il mySwActChn will be maintained<br>
+               </code></ul>
           </li>
         </ul>
         <li>virtual<a name="CUL_HMvirtual"></a><br>
@@ -11261,28 +11407,37 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
               Das momentane Maximum f&uuml;r eine Endzeit liegt bei 24 Stunden.<br>
             </li>
-            <li><B>press &lt;[short|long]&gt;&lt;[on|off]&gt;</B><a name="CUL_HMpress"></a><br>
-              <B>press &lt;[short|long]&gt;&lt;[noBurst]&gt;</B></a>
-              simuliert den Druck auf einen lokalen Knopf oder direkt verbundenen Knopf des Aktors.<br>
-              <B>[short|long]</B> w&auml;hlt aus ob ein kurzer oder langer Tastendruck simuliert werden soll.<br>
-              <B>[on|off]</B> ist relevant f&uuml;r Ger&auml;te mit direkter Bedienung pro Kanal.
-              Verf&uuml;gbar f&uuml;r Dimmer und Rollo-Aktoren, normalerweise nicht f&uuml;r Schalter.<br>
-              <B>[noBurst]</B> ist relevant f&uuml;r Peers die bedingte Bursts unterst&uuml;tzen.
-              Dies bewirkt das der Befehl der Warteliste des Peers zugef&uuml;gt wird. Ein Burst wird anschließend
-              <B>nicht </B> ausgef&uuml;hrt da der Befehl wartet bis der Peer aufgewacht ist. Dies f&uuml;hrt zu einer
-              <B>Verz&ouml;gerung des Tastendrucks</B>, reduziert aber &Uuml;bertragungs- und Performanceaufwand. <br>
-            </li>
-            <li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggled den Aktor. Schaltet vom aktuellen Level auf
-              0% oder von 0% auf 100%</li>
-          </ul>
-            <li><B>pressL &lt;peer&gt;</B><a name="CUL_HMpressL"></a><br>
-                Simuliert einen langen Tastendruck für einen angegebenen peer. Siehe press.
+            <li><B>pressL &lt;peer&gt; [&lt;repCount&gt;] [&lt;repDelay&gt;] </B><a name="CUL_HMpressL"></a><br>
+                simuliert einen Tastendruck eines lokalen oder anderen peers.<br>
+                <B>&lt;peer&gt;</B> peer auf den der Tastendruck bezogen wird. <br>
+                <B>&lt;repCount&gt;</B> automatische Wiederholungen des long press. <br>
+                <B>&lt;repDelay&gt;</B> timer zwischen den Wiederholungen. <br>
+                <B>Beispiel:</B>
+                <code> 
+                   set actor pressL FB_Btn01 # trigger long peer FB button 01<br>
+                   set actor pressL FB_chn-8 # trigger long peer FB button 08<br>
+                   set actor pressL self01 # trigger short des internen peers 01<br>
+                   set actor pressL fhem02 # trigger short des FHEM channel 2<br>
+                </code>
             </li>
             <li><B>pressS &lt;peer&gt;</B><a name="CUL_HMpressS"></a><br>
-                Simuliert einen kurzen Tastendruck für einen angegebenen peer. Siehe press.
+                simuliert einen kurzen Tastendruck entsprechend peerL
             </li>
 
+            <li><B>eventL &lt;peer&gt; &lt;condition&gt; [&lt;repCount&gt;] [&lt;repDelay&gt;] </B><a name="CUL_HMeventL"></a><br>
+                simuliert einen Event mit zusätzlichem Wert.<br>
+                <B>&lt;peer&gt;</B> peer auf den der Tastendruck bezogen wird.<br>              
+                <B>&lt;codition&gt;</B>wert des Events, 0..255 <br>              
+                <B>Beispiel:</B>
+                <code> 
+                   set actor eventL md 30 # trigger vom Bewegungsmelder mit Wert 30<br>
+                </code>
+            </li>
+            <li><B>eventS &lt;peer&gt; &lt;condition&gt; </B><a name="CUL_HMeventS"></a><br>
+                simuliert einen kurzen Event eines Peers des actors. Typisch senden Sensoren nur short Events.
+            </li>
           <br>
+          </ul>
         </li>
         <li>dimmer, blindActuator<br>
           Dimmer k&ouml;nnen virtuelle Kan&auml;le unterst&uuml;tzen. Diese werden automatisch angelegt falls vorhanden.
@@ -11328,6 +11483,20 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           den Benutzer ist dazu n&ouml;tig. Ob Befehle auf Ausf&uuml;hrung warten kann auf Ger&auml;teebene mit dem Parameter
           'protCmdPend' abgefragt werden.
           <ul>
+          <li><B>trgEventS [all|&lt;peer&gt;] &lt;condition&gt;</B><a name="CUL_HMtrgEventS"></a><br>
+               Initiiert ein eventS fuer die peer entity. Wenn <B>all</B> ausgewählt ist wird das Kommando bei jedem der Peers ausgeführt. Siehe auch <a href="CUL_HMeventS">eventS</a><br>
+               <B>&lt;condition&gt;</B>: Ist der Wert welcher mit dem Event versendet wird. Bei einem Bewegungsmelder ist das bspw. die Helligkeit.  
+          </li>
+          <li><B>trgEventL [all|&lt;peer&gt;] &lt;condition&gt;</B><a name="CUL_HMtrgEventL"></a><br>
+               Initiiert ein eventL fuer die peer entity. Wenn <B>all</B> ausgewählt ist wird das Kommando bei jedem der Peers ausgeführt. Siehe auch <a href="CUL_HMeventL">eventL</a><br>
+               <B>&lt;condition&gt;</B>: is the condition being transmitted with the event. E.g. the brightness in case of a motion detector. 
+          </li>
+          <li><B>trgPressS [all|&lt;peer&gt;] </B><a name="CUL_HMtrgPressS"></a><br>
+               Initiiert ein pressS fuer die peer entity. Wenn <B>all</B> ausgewählt ist wird das Kommando bei jedem der Peers ausgeführt. Siehe auch <a href="CUL_HMpressS">pressS</a><br>
+          </li>
+          <li><B>trgPressL [all|&lt;peer&gt;] </B><a name="CUL_HMtrgPressL"></a><br>
+               Initiiert ein pressL fuer die peer entity. Wenn <B>all</B> ausgewählt ist wird das Kommando bei jedem der Peers ausgeführt. Siehe auch <a href="CUL_HMpressL">pressL</a><br>
+          </li>
             <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse]
               [<u>set</u>|unset] [<u>both</u>|actor|remote]</B><a name="CUL_HMpeerChan"></a><br>
               "peerChan" richtet eine Verbindung zwischen Sender-<B>Kanal</B> und
