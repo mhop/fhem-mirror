@@ -21,9 +21,9 @@ use vars qw(%culHmGlobalGets);
 use vars qw(%culHmVrtGets);
 use vars qw(%culHmSubTypeGets);
 use vars qw(%culHmModelGets);
-use vars qw(%culHmGlobalSetsDevice);
 use vars qw(%culHmSubTypeDevSets);
 use vars qw(%culHmGlobalSetsChn);
+use vars qw(%culHmReglSets);
 use vars qw(%culHmGlobalSets);
 use vars qw(%culHmGlobalSetsVrtDev);
 use vars qw(%culHmSubTypeSets);
@@ -1653,7 +1653,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
 );
 
 ##############################---set---########################################
-%culHmGlobalSets = (# all but virtuals
+%culHmGlobalSets       = (# all but virtuals
                        regBulk       => "-list-:-peer- -addr1:data1- -addr2:data2- ..."
                       ,getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [-PeerChannel-]"
                       ,getConfig     => ""
@@ -1665,42 +1665,55 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
                        virtual       => "-noButtons-"
                       ,clear         => "[readings|rssi|msgEvents|unknownDev]"
 );
-%culHmGlobalSetsDevice = (# all devices but virtuals
-                       raw           => "data ..."
-                      ,reset         => ""
-                      ,unpair        => ""
-                      ,assignHmKey   => ""
-                      ,deviceRename  => "newName"
-                      ,fwUpdate      =>"-filename- -bootTime- ..."
+
+%culHmReglSets         = (# entities with regList
+                      "0"              =>{  #this is a device
+                                            raw           => "data ..."
+                                           ,reset         => ""
+                                           ,unpair        => ""
+                                           ,assignHmKey   => ""
+                                           ,deviceRename  => "newName"
+                                           ,fwUpdate      =>"-filename- -bootTime- ..."
+                                         }
+                     ,"1"              =>{  #this is a channel
+                                            sign          => "[on|off]"
+                                         }
+                     ,"3p"             =>{ press          =>"[long|short] -peer- [-repCount(long only)-] [-repDelay-] ..."
+                                          ,eventL         =>"-peer- -cond-"
+                                          ,eventS         =>"-peer- -cond-"
+                                         }
+                     ,"4p"             =>{ trgPressS      =>"[-peer-]"
+                                          ,trgPressL      =>"[-peer-]"
+                                          ,trgEventS      =>"[-peer-] -condition-"
+                                          ,trgEventL      =>"[-peer-] -condition-"
+                                         }
 );
 
-%culHmSubTypeDevSets = (# device of this subtype
-                      switch           =>{ getSerial     => ""
-                                          ,pair          => ""
-                                          ,getVersion    => ""
-                                          ,getDevInfo    => ""
+%culHmSubTypeDevSets   = (# device of this subtype
+                      switch           =>{ getSerial      => ""
+                                          ,pair           => ""
+                                          ,getVersion     => ""
+                                          ,getDevInfo     => ""
                                          }        
 #                     ,winMatic         =>{ statusRequest => ""} not working at least for FW 1.6
-                     ,keyMatic         =>{ statusRequest => ""}
-                     ,repeater         =>{ statusRequest => ""
-                                          ,getSerial     => ""
+                     ,keyMatic         =>{ statusRequest  => ""}
+                     ,repeater         =>{ statusRequest  => ""
+                                          ,getSerial      => ""
                                          }
 );
 $culHmSubTypeDevSets{dimmer}            = 
 $culHmSubTypeDevSets{blindActuator}     = $culHmSubTypeDevSets{switch};
 
-
-%culHmGlobalSetsChn = (# all channels but virtuals
-                      sign          => "[on|off]"
-                     ,peerBulk      => "-peer1,peer2,...- [set|unset]"
+%culHmGlobalSetsChn    = (# all channels but virtuals
+                      peerBulk      => "-peer1,peer2,...- [set|unset]"
 );
-%culHmSubTypeSets = (# channels of this subtype
+%culHmSubTypeSets      = (# channels of this subtype
                       switch           =>{ "on-for-timer" =>"-ontime-"
                                           ,"on-till"      =>"-time-"
                                           ,on             =>""
                                           ,off            =>""
                                           ,toggle         =>""
-                                          ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
+#                                          ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
                                           ,inhibit        =>"[on|off]"
                                           ,statusRequest  =>""
                                           ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
@@ -1713,7 +1726,7 @@ $culHmSubTypeDevSets{blindActuator}     = $culHmSubTypeDevSets{switch};
                                           ,toggle         =>""
                                           ,pct            =>"[-value-|old] ... [-ontime-] [-ramptime-]"
                                           ,stop           =>""
-                                          ,press          =>"[long|short] [on|off|-peer-] [-repCount(long only)-] [-repDelay-] ..."
+#                                          ,press          =>"[long|short] [on|off|-peer-] [-repCount(long only)-] [-repDelay-] ..."
                                           ,up             =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
                                           ,down           =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
                                           ,inhibit        =>"[on|off]"
@@ -1726,7 +1739,7 @@ $culHmSubTypeDevSets{blindActuator}     = $culHmSubTypeDevSets{switch};
                                           ,toggleDir      =>""
                                           ,pct            =>"[-value-] ... [-ontime-]"
                                           ,stop           =>""
-                                          ,press          =>"[long|short] [on|off|-peer-] [-repCount(long only)-] [-repDelay-] ..."
+#                                          ,press          =>"[long|short] [on|off|-peer-] [-repCount(long only)-] [-repDelay-] ..."
                                           ,up             =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
                                           ,down           =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
                                           ,inhibit        =>"[on|off]"
@@ -1779,7 +1792,7 @@ $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
                                             ,on             =>""
                                             ,off            =>""
                                             ,toggle         =>""
-                                            ,press          =>"[long|short] [-peer-] ..."
+#                                            ,press          =>"[long|short] [-peer-] ..."
                                             ,inhibit        =>"[on|off]"
                                            }
                      ,"HM-CC-TC"         =>{ burstXmit      =>""}
@@ -1850,7 +1863,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
                                                 ,level          =>"-level- -relockDly- -speed-..."
                                                 ,keydef         =>"-btn- -txt1- -txt2-"
                                                 ,inhibit        =>"[on|off]"
-                                                ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-]..."
+#                                                ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-]..."
                                                 ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
                                                }
                      ,"HM-Sen-RD-O02"        =>{ "on-for-timer" =>"-sec-"
@@ -1875,7 +1888,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
                                                 ,"desired-temp" =>"[on|off|5.0..30.0]"
                                                 ,sysTime        =>""
                                                }
-                     ,"HM-CC-RT-DN06"        =>{ press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."}
+#                     ,"HM-CC-RT-DN06"        =>{ press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."}
                      ,"HM-TC-IT-WM-W-EU00"   =>{ sysTime        =>""
                                                 ,getSerial      => ""
                                                }
@@ -1922,7 +1935,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
                                                 ,toggle         =>""
                                                 ,pct            =>"-value- ... [-ontime-] [-ramptime-]"
                                                 ,stop           =>""
-                                                ,press          =>"[long|short] [on|off|-peer-] [-repCount(long only)-] [-repDelay-] ..."
+#                                                ,press          =>"[long|short] [on|off|-peer-] [-repCount(long only)-] [-repDelay-] ..."
                                                 ,up             =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
                                                 ,down           =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
                                                 ,inhibit        =>"[on|off]"
@@ -1944,10 +1957,10 @@ $culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
                                                 ,"on-for-timer" =>"-ontime-"
                                                 ,"on-till"      =>"-time-"
                                                 ,inhibit        =>"[on|off]"
-                                                ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
+#                                                ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
                                                }
                      ,"HM-Sec-Sir-WM04"      =>{ alarmLevel     =>"[disarmed|armExtSens|armAll|armBlocked]"
-                                                ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
+#                                                ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
                                                }
                      ,"HM-Dis-EP-WM5503"     =>{ displayEP      =>"text1,icon1:text2,icon2:text3,icon3 ... -sound- -repetition- -pause- -signal-"}                                       
  );
@@ -2159,8 +2172,8 @@ $culHmChanSets{"HM-Dis-EP-WM5502"}      = $culHmChanSets{"HM-TC-IT-WM-W-EU01"};
 
   "12"          => { txt => "HAVE_DATA"},
   "3E"          => { txt => "SWITCH"      , params => {
-                     DST      => "00,6",
-                     UNKNOWN  => "06,2",
+                     PEER     => "00,6",
+                     fix      => "06,2",
                      CHANNEL  => "08,2",
                      COUNTER  => "10,2", } },
   "3F"          => { txt => "TimeStamp"   , params => {
