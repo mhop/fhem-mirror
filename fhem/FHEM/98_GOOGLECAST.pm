@@ -7,9 +7,17 @@
 # FHEM module to communicate with Google Cast devices
 # e.g. Chromecast Video, Chromecast Audio, Google Home
 #
-# Version: 2.0.1
+# Version: 2.0.2
 #
 #############################################################
+#
+# v2.0.2 - 20180106
+# - FEATURE:  support speak command for TTS
+#               set castdevice speak "Hallo"
+# - BUGFIX:   fix issues with umlauts in device name
+# - BUGFIX:   fix one socket issue
+# - BUGFIX:   fix delay for non youtube-dl links
+# - BUGFIX:   optimize delay for youtube links
 #
 # v2.0.1 - 20171209
 # - FEATURE:  support skip/rewind
@@ -126,7 +134,7 @@ sub GOOGLECAST_Initialize($) {
     $hash->{AttrList} = "favoriteURL_1 favoriteURL_2 favoriteURL_3 favoriteURL_4 ".
                         "favoriteURL_5 ".$readingFnAttributes;
 
-    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.0.1";
+    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.0.2";
 
     return undef;
 }
@@ -158,7 +166,7 @@ sub GOOGLECAST_findChromecasts {
     my @ccResult = GOOGLECAST_findChromecastsPython();
     foreach my $ref_cc (@ccResult) {
         my @cc = @$ref_cc;
-        $result .= "|CCDEVICE|".$cc[0]."|".$cc[1]."|".$cc[2]."|".$cc[3]."|".$cc[4];
+        $result .= "|CCDEVICE|".$cc[0]."|".$cc[1]."|".$cc[2]."|".$cc[3]."|".Encode::encode('UTF-8', $cc[4]);
     }
     Log3 $name, 4, "GOOGLECAST: search result: $result";
 
@@ -223,7 +231,15 @@ sub GOOGLECAST_Attribute($$$$) {
 sub GOOGLECAST_Set($@) {
     my ($hash, $name, @params) = @_;
     my $workType = shift(@params);
-    my $list = "stop:noArg pause:noArg rewind:noArg skip:noArg quitApp:noArg play playFavorite:1,2,3,4,5 volume:slider,0,1,100 displayWebsite";
+    my $list = "stop:noArg pause:noArg rewind:noArg skip:noArg quitApp:noArg play playFavorite:1,2,3,4,5 volume:slider,0,1,100 displayWebsite speak";
+
+    #get quoted text from params
+    my $blankParams = join(" ", @params);
+    my @params2;
+    while($blankParams =~ /"?((?<!")\S+(?<!")|[^"]+)"?\s*/g) {
+        push(@params2, $1);
+    }
+    @params = @params2;
 
     # check parameters for set function
     if($workType eq "?") {
@@ -248,6 +264,8 @@ sub GOOGLECAST_Set($@) {
         GOOGLECAST_setRewind($hash);
     } elsif($workType eq "skip") {
         GOOGLECAST_setSkip($hash);
+    } elsif($workType eq "speak") {
+        GOOGLECAST_setSpeak($hash, $params[0]);
     } else {
         return SetExtensions($hash, $list, $name, $workType, @params);
     }
@@ -274,13 +292,36 @@ sub GOOGLECAST_setWebsite {
     };
 }
 
+### speak ###
+sub GOOGLECAST_setSpeak {
+    my ($hash, $ttsText) = @_;
+
+    my $ttsLang = AttrVal($hash->{NAME}, "ttsLanguage", "de");
+    return "GOOGLECAST: Maximum text length is 100 characters." if(length($ttsText) > 100);
+
+    $ttsText = uri_escape($ttsText);
+    my $ttsUrl = "http://translate.google.com/translate_tts?tl=$ttsLang&client=tw-ob&q=$ttsText";
+
+    eval {
+        $hash->{helper}{ccdevice}->{media_controller}->play_media($ttsUrl, "audio/mpeg");
+    };
+    return undef;
+}
+
 ### playType ###
 sub GOOGLECAST_setPlayType {
     my ($hash, $url, $mime) = @_;
 
-    eval {
-        $hash->{helper}{ccdevice}->{media_controller}->play_media($url, $mime);
-    };
+    Log3 $hash, 4, "GOOGLECAST($hash->{NAME}): setPlayType($url, $mime)";
+
+    if($mime =~ m/text\/html/) {
+        GOOGLECAST_setPlayYtDl($hash, $url);
+    } else {
+        eval {
+            Log3 $hash, 4, "GOOGLECAST($hash->{NAME}): start play_media";
+            $hash->{helper}{ccdevice}->{media_controller}->play_media($url, $mime);
+        };
+    }
 
     return undef;
 }
@@ -308,6 +349,8 @@ sub GOOGLECAST_setPlayMedia_String {
     my ($string) = @_;
     my ($name, $videoUrl, $origUrl) = split("\\|", $string);
     my $hash = $main::defs{$name};
+
+    Log3 $hash, 4, "GOOGLECAST($name): setPlayMedia_String($string)";
 
     if($videoUrl ne "") {
         GOOGLECAST_setPlayMedia($hash, $videoUrl);
@@ -391,7 +434,7 @@ sub GOOGLECAST_setPlay {
     if($url =~ /^http/) {
         #support streams are listed here
         #https://github.com/rg3/youtube-dl/blob/master/docs/supportedsites.md
-        GOOGLECAST_setPlayYtDl($hash, $url);
+        GOOGLECAST_setPlayMedia($hash, $url);
     } else {
         GOOGLECAST_playYouTube($hash->{helper}{ccdevice}, $url);
     }
@@ -514,6 +557,7 @@ sub GOOGLECAST_checkConnection {
 
     if($@ || !defined($selectlist{"GOOGLECAST-".$hash->{NAME}})) {
         Log3 $hash, 4, "GOOGLECAST ($hash->{NAME}): checkConnection, connection failure, reconnect...";
+        delete($selectlist{"GOOGLECAST-".$hash->{NAME}});
         GOOGLECAST_initDevice($hash);
         GOOGLECAST_updateReading($hash, "presence", "offline");
         return undef;
@@ -617,7 +661,7 @@ def GOOGLECAST_createChromecastPython(ip, port, uuid, model_name, friendly_name)
     return cast
 
 def GOOGLECAST_getYTVideoURLPython(yt_url):
-    ydl = youtube_dl.YoutubeDL({'quiet': '1', 'no_warnings': '1'})
+    ydl = youtube_dl.YoutubeDL({'forceurl': True, 'simulate': True, 'quiet': '1', 'no_warnings': '1', 'skip_download': True, 'format': 'best', 'youtube_include_dash_manifest': False})
 
     with ydl:
         result = ydl.extract_info(

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_GOOGLECAST: support speak command for TTS
+                            set castdevice speak "Hallo"
   - feature: 51_MOBILEALERTS: Added Sensor WL2000
   - change:  93_DbRep: V7.3.0, charfilter avoid control characters in datasets
                        to export, function exportToFile importFromFile improved
