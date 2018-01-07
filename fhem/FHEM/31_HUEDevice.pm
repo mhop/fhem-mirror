@@ -1561,13 +1561,13 @@ HUEDevice_Attr($$$;$)
       <li>dimUp [delta]</li>
       <li>dimDown [delta]</li>
       <li>ct &lt;value&gt; [&lt;ramp-time&gt;]<br>
-        set colortemperature to &lt;value&gt; in mireds (range is 154-500) or kelvin (rankge is 2000-6493).</li>
+        set colortemperature to &lt;value&gt; in mireds (range is 154-500) or kelvin (range is 2000-6493).</li>
       <li>ctUp [delta]</li>
       <li>ctDown [delta]</li>
       <li>hue &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set hue to &lt;value&gt;; range is 0-65535.</li>
-      <li>humUp [delta]</li>
-      <li>humDown [delta]</li>
+      <li>hueUp [delta]</li>
+      <li>hueDown [delta]</li>
       <li>sat &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set saturation to &lt;value&gt;; range is 0-254.</li>
       <li>satUp [delta]</li>
