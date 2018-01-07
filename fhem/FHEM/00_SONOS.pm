@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, December 2017
+# SONOS.pm (c) by Reiner Leins, January 2018
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -51,6 +51,10 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 07.01.2018
+#	Der Initialwert von LastProcessAnswer (wird beim Start auf 0 gesetzt) wird nun korrekt berücksichtigt
+#	Bei ignoredIPs und bei usedOnlyIPs kann jetzt für jedes Komma-Getrennte Element auch ein regulärer Ausdruck stehen. Wird mit // umschlossen, und darf keine Doppelpunkte enthalten.
+#	Logausgabe im UPnP-Modul, welche Devices mit welchen Header-Angaben nun akzeptiert wurden (Ausgabe auf Level 5)
 # 23.12.2017
 #	Subscriptions-Refresh umgebaut.
 #	Devicenamen mit Punkt (.) funktionieren nun.
@@ -66,8 +70,6 @@
 # 14.07.2017
 #	Änderung in der ControlPoint.pm: Es wurden zuviele Suchantworten berücksichtigt.
 #	Bei einem Modify wird von Fhem nur die DefFn aufgerufen (und nicht vorher UndefFn). Dadurch blieben Reste, die aber vor einer Definition aufgeräumt werden müssen. Resultat war eine 100%-CPU-Last.
-# 09.07.2017
-#	BulkUpdate: Beginn und Ende sind nun sicher davor einen vom SubProzess gestarteten BulkUpdate vorzeitig zu beenden.
 #
 ########################################################################################
 #
@@ -133,8 +135,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 # IP-Adressen, die vom UPnP-Modul ignoriert werden sollen.
 # Diese können über ein Attribut gesetzt werden.
 ########################################################
-my %ignoredIPs = ();
-my %usedonlyIPs = ();
+my @ignoredIPs = ();
+my @usedonlyIPs = ();
 my $reusePort = 0;
 
 
@@ -1943,7 +1945,7 @@ sub SONOS_IsSubprocessAliveChecker() {
 	SONOS_DoWork('undef', 'refreshProcessAnswer') if ($lastProcessAnswer < time() - $hash->{INTERVAL});
 	
 	# Wenn die letzte Antwort zu lange her ist, dann den SubProzess neustarten...
-	if ($lastProcessAnswer < time() - (4 * $hash->{INTERVAL})) {
+	if (($lastProcessAnswer != 0) && ($lastProcessAnswer < time() - (4 * $hash->{INTERVAL}))) {
 		# Verbindung beenden, damit der SubProzess die Chance hat neu initialisiert zu werden...
 		SONOS_Log $hash->{UDN}, 2, 'LastProcessAnswer way too old (Lastanswer: '.$lastProcessAnswer.' ~ '.SONOS_GetTimeString($lastProcessAnswer).')... try to restart the process and connection...';
 		
@@ -2390,7 +2392,7 @@ sub SONOS_Discover() {
 		$SONOS_RestartControlPoint = 0;
 		
 		eval {
-			$SONOS_Controlpoint = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, SubscriptionURL => '/fhemmodule', MaxWait => 30, UsedOnlyIP => \%usedonlyIPs, IgnoreIP => \%ignoredIPs, ReusePort => $reusePort);
+			$SONOS_Controlpoint = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, SubscriptionURL => '/fhemmodule', MaxWait => 30, LogLevel => $SONOS_Client_LogLevel, UsedOnlyIP => \@usedonlyIPs, IgnoreIP => \@ignoredIPs, ReusePort => $reusePort);
 			$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
 			
 			#$SONOS_Controlpoint->handle;
@@ -5001,7 +5003,7 @@ sub SONOS_RestoreOldPlaystate() {
 	SONOS_Log undef, 1, 'Restore-Thread gestartet. Warte auf Arbeit...';
 	
 	my $runEndlessLoop = 1;
-	my $controlPoint = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, SubscriptionURL => '/fhemmodule', MaxWait => 20, UsedOnlyIP => \%usedonlyIPs, IgnoreIP => \%ignoredIPs, ReusePort => $reusePort);
+	my $controlPoint = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, SubscriptionURL => '/fhemmodule', MaxWait => 20, LogLevel => $SONOS_Client_LogLevel, UsedOnlyIP => \@usedonlyIPs, IgnoreIP => \@ignoredIPs, ReusePort => $reusePort);
 	
 	$SIG{'PIPE'} = 'IGNORE';
 	$SIG{'CHLD'} = 'IGNORE';
@@ -10067,17 +10069,11 @@ sub SONOS_Client_ConsumeMessage($$) {
 		$SONOS_Client_LogfileName = $3;
 		$SONOS_Client_Data{pingType} = $4;
 		
-		my @usedonlyIPs = split(/,/, $5);
+		@usedonlyIPs = split(/,/, $5);
 		$SONOS_Client_Data{usedonlyIPs} = shared_clone(\@usedonlyIPs);
-		for my $elem (@usedonlyIPs) {
-			$usedonlyIPs{SONOS_Trim($elem)} = 1;
-		}
 		
-		my @ignoredIPs = split(/,/, $6);
+		@ignoredIPs = split(/,/, $6);
 		$SONOS_Client_Data{ignoredIPs} = shared_clone(\@ignoredIPs);
-		for my $elem (@ignoredIPs) {
-			$ignoredIPs{SONOS_Trim($elem)} = 1;
-		}
 		
 		$reusePort = $7;
 		
