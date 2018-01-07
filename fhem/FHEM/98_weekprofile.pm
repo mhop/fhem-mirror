@@ -929,6 +929,22 @@ sub weekprofile_Set($$@)
     return undef;
   }
   
+  #----------------------------------------------------------
+  $list.= " reread_master:noArg" if (defined($hash->{MASTERDEV}));
+  if ($cmd eq 'reread_master') {
+	  return "Error no master device assigned" if (!defined($hash->{MASTERDEV}));
+	  my $devName = $hash->{MASTERDEV}->{NAME};
+	  Log3 $me, 4, "$me(Set): reread master profile from $devName";
+      my $prfDev = weekprofile_readDevProfile($hash->{MASTERDEV}->{NAME},$hash->{MASTERDEV}->{TYPE}, $me);
+      if(defined($prfDev)) {
+        $hash->{PROFILES}[0]->{DATA} = $prfDev;
+        weekprofile_updateReadings($hash);
+        return undef;
+      } else {
+		  return "Error reading master profile";
+	  }
+  }
+  
   $list =~ s/ $//;
   return "Unknown argument $cmd, choose one of $list"; 
 }
@@ -1378,6 +1394,9 @@ sub weekprofile_getEditLNK_MasterDev($$)
       All weekprofiles from the topic will be transfered to the correcponding devices.
       Therefore a user attribute 'weekprofile' with the weekprofile name <b>without the topic name</b> have to exist in the device.
     </li>
+    <li>reread_master<br>
+		Refresh (reread) the master profile from the master device.
+    </li>
   </ul>
   
   <a name="weekprofileget"></a>
@@ -1536,6 +1555,9 @@ sub weekprofile_getEditLNK_MasterDev($$)
       <code>set &lt;name&gt; restore_topic &lt;topic&gt;</code><br>
       Alle Wochenpläne in der Topic werden zu den entsprechenden Geräten übertragen.
       Dazu muss im Gerät ein Userattribut 'weekprofile' mit dem Namen des Wochenplans <b>ohne</b> Topic gesetzt sein.
+    </li>
+    <li>reread_master<br>
+		Aktualisiert das master profile indem das 'Master-Geräte' neu ausgelesen wird.
     </li>
   </ul>
   
