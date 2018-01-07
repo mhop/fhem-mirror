@@ -34,8 +34,10 @@ $(document).ready(function(){
     '<meta name="apple-mobile-web-app-capable" content="yes">'+
     '<link rel="apple-touch-icon" href="'+icon+'">');
   if('ontouchstart' in window)                  $("body").addClass('touch');
-  if(f18_small)
+  if(f18_small) {
     $("body").addClass('small');
+    f18_attr["Pinned.menu"] = false;
+  }
 
 
   f18_aCol = getComputedStyle($("a").get(0),null).getPropertyValue('color'); 
