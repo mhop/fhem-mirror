@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbRep: V7.3.0, charfilter avoid control characters in datasets
+                       to export, function exportToFile importFromFile improved
   - feature: FHEMWEB: new style f18
   - feature: 98_weekprofile.pm: new set command 'reread_master'
   - change:  10_SOMFY: minor changes remvoe debug and add parsestate reading

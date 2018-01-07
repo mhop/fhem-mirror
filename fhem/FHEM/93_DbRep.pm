@@ -3,7 +3,7 @@
 ##########################################################################################################
 #       93_DbRep.pm
 #
-#       (c) 2016-2017 by Heiko Maaz
+#       (c) 2016-2018 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to select and report content of databases written by 93_DbLog module
@@ -37,6 +37,10 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.3.0        07.01.2018       DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext
+#                               improved, 
+#                               expfile_DoParse changed to use aggregation for split selects in timeslices (avoid heavy 
+#                               memory consumption)
 # 7.2.1        04.01.2018       bugfix month out of range that causes fhem crash
 # 7.2.0        27.12.2017       new attribute "seqDoubletsVariance"
 # 7.1.0        22.12.2017       new attribute timeYearPeriod for reports correspondig to e.g. electricity billing,
@@ -274,7 +278,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "7.2.1";
+my $DbRepVersion = "7.3.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -1187,7 +1191,7 @@ sub DbRep_Main($$;$) {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "ParseAborted", $hash);
     
  } elsif ($opt eq "exportToFile") {            
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "expfile_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name§$device§$reading§$ts", "expfile_ParseDone", $to, "ParseAborted", $hash);
     
  } elsif ($opt eq "importFromFile") {             
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name", "impfile_PushDone", $to, "ParseAborted", $hash);
@@ -4242,7 +4246,7 @@ return;
 ####################################################################################################
 sub expfile_DoParse($) {
  my ($string) = @_;
- my ($name, $device, $reading, $runtime_string_first, $runtime_string_next) = split("\\|", $string);
+ my ($name, $device, $reading, $ts) = split("\\§", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -4279,41 +4283,67 @@ sub expfile_DoParse($) {
  my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
  
+ # Timestampstring to Array
+ my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
+ 
  # SQL zusammenstellen für DB-Abfrage
- if ($IsTimeSet) {
-     $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");  
+  if ($IsTimeSet || $IsAggrSet) {
+     $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"?","?","ORDER BY TIMESTAMP");  
  } else {
      $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");  
  }
  
- $sth = $dbh->prepare($sql);
- 
- Log3 ($name, 4, "DbRep $name - SQL execute: $sql");     
-
- # SQL-Startzeit
- my $st = [gettimeofday];
- 
- eval {$sth->execute();};
- 
- my $nrows = 0;
+ eval{$sth = $dbh->prepare($sql);};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
-     Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
      return "$name|''|''|$err|''|''";
- } else {
-     # only for this block because of warnings of uninitialized values
-     no warnings 'uninitialized'; 
+ }
+ 
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+ 
+ # DB-Abfrage zeilenweise für jeden Array-Eintrag
+ my $arrstr;
+ my $nrows = 0;
+ no warnings 'uninitialized'; 
+ foreach my $row (@ts) {
+     my @a                     = split("#", $row);
+     my $runtime_string        = $a[0];
+     my $runtime_string_first  = $a[1];
+     my $runtime_string_next   = $a[2];
+     
+     # SQL zusammenstellen für Logging
+	 if ($IsTimeSet || $IsAggrSet) {
+	     $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");    
+     } 
+	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql");    
+ 
+     if ($IsTimeSet || $IsAggrSet) {
+	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+	 } else {
+	     eval{$sth->execute();};	 
+	 }
+	 if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - $@");
+         $dbh->disconnect;
+         Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
+         return "$name|''|''|$err|''|''";
+     } 
+ 
      while (my $row = $sth->fetchrow_arrayref) {
-        print FH join(',', map { s{"}{""}g; "\"$_\""; } @$row), "\n";
+        print FH DbRep_charfilter(join(',', map { s{"}{""}g; "\"$_\"";} @$row)), "\n";
         Log3 ($name, 5, "DbRep $name -> write row:  @$row");
         # Anzahl der Datensätze
         $nrows++;
      }
-     close(FH);
- } 
- 
+ }     
+ close(FH);
+
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
 
@@ -4488,6 +4518,7 @@ sub impfile_Push($) {
      # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog DB create-scripts) beschneiden wenn nicht SQLite
      if ($dbmodel ne 'SQLITE') {
          $i_device   = substr($i_device,0, $dbrep_col{DEVICE});
+         $i_event    = substr($i_event,0, $dbrep_col{EVENT});
          $i_reading  = substr($i_reading,0, $dbrep_col{READING});
          $i_value    = substr($i_value,0, $dbrep_col{VALUE});
          $i_unit     = substr($i_unit,0, $dbrep_col{UNIT}) if($i_unit);
@@ -4512,8 +4543,9 @@ sub impfile_Push($) {
          }
        
      } else {
-         $err = encode_base64("format error in in row $irowcount of $infile.","");
-         Log3 ($name, 2, "DbRep $name -> ERROR - Import of datasets of file $infile was NOT done. Formaterror in row $irowcount !");     
+         my $c = !$i_timestamp?"field \"timestamp\" is empty":!$i_device?"field \"device\" is empty":"field \"reading\" is empty";
+         $err = encode_base64("format error in in row $irowcount of $infile - cause: $c","");
+         Log3 ($name, 2, "DbRep $name -> ERROR - Import of datasets NOT done. Formaterror in row $irowcount of $infile - cause: $c");     
          close(FH);
          $dbh->rollback;
          $dbh->disconnect;
@@ -6318,7 +6350,7 @@ sub checktimeaggr ($) {
      $aggregation = ($aggregation eq "no")?"day":$aggregation;       # wenn Aggregation "no", für delSeqDoublets immer "day" setzen
 	 $IsAggrSet   = 1;
  }
- if($hash->{LASTCMD} =~ /exportToFile|delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup/) {
+ if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup/) {
 	 $IsAggrSet   = 0;
 	 $aggregation = "no";
  }
@@ -6440,7 +6472,6 @@ return;
 sub normRelativeTime ($) {
  my ($hash) = @_;
  my $name = $hash->{NAME};
-  
  my $tdtn = AttrVal($name, "timeDiffToNow", undef);
  my $toth = AttrVal($name, "timeOlderThan", undef);
  
@@ -6504,6 +6535,18 @@ sub normRelativeTime ($) {
      $toth = $d + $h + $m +$s;
  }
 return ($toth,$tdtn);
+}
+
+###############################################################################
+#              Zeichencodierung für Fileexport filtern 
+###############################################################################
+sub DbRep_charfilter ($) { 
+  my ($txt) = @_;
+  
+  # nur erwünschte Zeichen, Filtern von Steuerzeichen
+  $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€//cd;      
+  
+return($txt);
 }
 
 ##############################################################################################
@@ -7352,7 +7395,13 @@ return;
 								 
     <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format between period given by timestamp. 
                                  Limitations of selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading. 
-                                 The filename will be defined by <a href="#DbRepattr">attribute</a> "expimpfile" . </li> <br>
+                                 The filename will be defined by <a href="#DbRepattr">attribute</a> "expimpfile". <br> 
+                                 By setting attribute "aggregation" the export of datasets will be splitted into time slices 
+                                 recording the specified aggregation. 
+                                 Is, for example, "aggregation = month" set, the data are selected in monthly packets and written
+                                 into the exportfile. Thereby the usage of main memory is optimized if very large amount of data
+                                 is exported.                                  
+                                 </li> <br>
                                  
     <li><b> fetchrows [history|current] </b>    -  provides <b>all</b> table-entries (default: history) 
 	                                               between period given by timestamp-<a href="#DbRepattr">attributes</a>. 
@@ -8514,7 +8563,12 @@ sub bdump {
                                  
     <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. 
                                  Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein. 
-                                 Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. </li><br>
+                                 Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br>
+                                 Durch das Attribut "aggregation" wird der Export der Datensätze in Zeitscheiben der angegebenen Aggregation 
+                                 vorgenommen. Ist z.B. "aggregation = month" gesetzt, werden die Daten in monatlichen Paketen selektiert und in
+                                 das Exportfile geschrieben. Dadurch wird die Hauptspeicherverwendung optimiert wenn sehr große Datenmengen
+                                 exportiert werden sollen.                                 
+                                 </li><br>
         
     <li><b> fetchrows [history|current] </b>    -  liefert <b>alle</b> Tabelleneinträge (default: history) 
 	                                               in den gegebenen Zeitgrenzen (siehe <a href="#DbRepattr">Attribute</a>). 
