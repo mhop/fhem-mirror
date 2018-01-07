@@ -309,7 +309,7 @@ sub FB_CALLLIST_Notify($$)
 
         if(grep(m/^(?:ATTR $name external-mapping .*|INITIALIZED|REREADCFG)$/, @{$events}))
         {
-            my $value = AttrVal($name,"external-mapping",undef);
+            my $value = AttrVal($name,"external-mapping","");
             my $table = eval($value);
 
             if($table and ref($table) eq 'HASH')
@@ -321,7 +321,7 @@ sub FB_CALLLIST_Notify($$)
 
         if(grep(m/^(?:ATTR $name connection-mapping .*|INITIALIZED|REREADCFG)$/, @{$events}))
         {
-            my $value = AttrVal($name,"connection-mapping",undef);
+            my $value = AttrVal($name,"connection-mapping","");
             my $table = eval($value);
 
             if($table and ref($table) eq 'HASH')
@@ -333,9 +333,9 @@ sub FB_CALLLIST_Notify($$)
 
         if(grep(m/^(?:ATTR $name icon-mapping .*|INITIALIZED|REREADCFG)$/, @{$events}))
         {
-            my $value = AttrVal($name,"icon-mapping",undef);
-
-            $value =~ s/"([^"]+?)"/'$1'/g if(defined($value)); # workaround for array variable interpretation
+            my $value = AttrVal($name,"icon-mapping","");
+            
+            $value =~ s/"([^"]+?)"/'$1'/g; # workaround for array variable interpretation
 
             my $table = eval($value);
 
