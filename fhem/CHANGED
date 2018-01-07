@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: FHEMWEB: new style f18
   - feature: 98_weekprofile.pm: new set command 'reread_master'
   - change:  10_SOMFY: minor changes remvoe debug and add parsestate reading
   - bugfix:  74_XiaomiFlowerSens: fix error then use ssh and no connect

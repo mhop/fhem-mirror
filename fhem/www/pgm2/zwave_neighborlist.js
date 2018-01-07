@@ -81,14 +81,14 @@ zw_draw(fnRet, width, height)
   svg += '<defs>'+
             '<marker id="endarrow" markerWidth="20" markerHeight="20" '+
                 'refx="50" refy="6" orient="auto" markerUnits="strokeWidth">'+
-              '<path d="M0,0 L0,12 L18,6 z" class="zwArrowHead" />'+
+              '<path d="M0,0 L0,12 L18,6 z" class="zwArrowHead col_link" />'+
              '</marker>'+
             '<marker id="startarrow" markerWidth="20" markerHeight="20" '+
                 'refx="-50" refy="6" orient="auto" markerUnits="strokeWidth">'+
-              '<path d="M18,0 L18,12 L0,6 z" class="zwArrowHead" />'+
+              '<path d="M18,0 L18,12 L0,6 z" class="zwArrowHead col_link" />'+
              '</marker>'+
           '</defs>';
-  svg += '<rect class="zwMargin" x="1" y="1" width="'+
+  svg += '<rect class="zwMargin col_link" x="1" y="1" width="'+
                 (width-1)+'" height="'+(height-1)+'"/>';
   var ld={};
 
@@ -192,7 +192,7 @@ zw_drawline(ld, h, o, n)
   h[n].lines.push(cl);
   var fr = zw_calcPos(h[o], h[n]);
   var to = zw_calcPos(h[n], h[o]);
-  return '<line class="zwLine" data-name="'+cl+
+  return '<line class="zwLine col_link" data-name="'+cl+
                '" x1="'+fr.x+'" y1="'+fr.y+
                '" x2="'+to.x+'" y2="'+to.y+'"'+
                  ' marker-end="url(#endarrow)"'+

@@ -1403,7 +1403,7 @@ SVG_render($$$$$$$$$$)
   # SVG Header
   my $svghdr = 'version="1.1" xmlns="http://www.w3.org/2000/svg" '.
                'xmlns:xlink="http://www.w3.org/1999/xlink" '.
-               "id='SVGPLOT_$name' $filter";
+               "id='SVGPLOT_$name' $filter data-origin='FHEM'";
   if(!$noHeader) {
     SVG_pO '<?xml version="1.0" encoding="UTF-8"?>';
     SVG_pO '<!DOCTYPE svg>';

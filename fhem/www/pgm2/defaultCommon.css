@@ -2,9 +2,9 @@
 
 textarea, .ui-dialog.ui-widget textarea { font-family:Courier; }
 
-body     { font-family:Arial, sans-serif; background-color: #FFFFE7; }
-input    { font-family:Arial, sans-serif; font-size:16px;}
-select   { font-family:Arial, sans-serif; font-size:16px;}
+body     { background-color: #FFFFE7; }
+body,input,select,textarea { font-family:Arial, sans-serif; font-size:16px;}
+input,textarea { border-style:ridge; }
 
 #console { width:100%; top:2em; bottom:0px; position:absolute; overflow-y:auto;}
 #errmsg  { background-color: #000000; color: #FFFFFF;
@@ -138,9 +138,18 @@ select [value^=l6] { color: olive; }
 select [value^=l7] { color: gray; }
 select [value^=l8] { color: yellow; }
 
-svg.zw_nr .zwBox { stroke:#278727; stroke-width:2px; fill:#F0F0D8; }
-svg.zw_nr .zwDongle { stroke:red; stroke-width:2px; fill:#F0F0D8; }
-svg.zw_nr .zwMargin { stroke:#278727; stroke-width:1px; fill:none; }
-svg.zw_nr .zwLine { stroke:#278727; stroke-width:1px; }
-svg.zw_nr .zwArrowHead { fill:#278727; stroke-width:1px; }
+svg.zw_nr .zwBox    { stroke-width:2px; }
+svg.zw_nr .zwDongle { stroke:red;     stroke-width:2px; }
+svg.zw_nr .zwMargin { stroke-width:1px; fill:none; }
+svg.zw_nr .zwLine   { stroke-width:1px; }
+svg.zw_nr .zwArrowHead { stroke-width:1px; }
 svg.zw_nr { height:auto; width:auto; margin:0; }
+
+.col_fg      { color:#000000; }
+.col_link    { color:#278727; stroke:#278727; }
+.col_bg      { background: #FFFFE7; fill:#FFFFE7; }
+.col_evenrow { background: #F8F8E0; fill:#F8F8E0; }
+.col_oddrow  { background: #F0F0D8; fill:#F0F0D8; }
+.col_header  { background: #E0E0C8; fill:#E0E0C8; }
+.col_menu    { background: #D7FFFF; fill:#D7FFFF; }
+.col_sel     { background: #A0FFFF; fill:#A0FFFF; }

@@ -1,0 +1,57 @@
+@import url("defaultCommon.css");
+
+#logo { 
+  position:absolute; top:10px; width:32px; height:32px; z-index:10;
+  background-image:url(../images/default/fhemicon.png);
+  background-size: contain; background-repeat: no-repeat;
+}
+#menuBtn { position:absolute; top:10px; left:10px; width:32px; height:32px; }
+#hdr     { position:absolute; top:10px; left:94px; }
+#content { position:absolute; top:50px; left:10px; bottom:10px; right:10px; }
+#menu {
+  position: absolute;
+  top:50px; left:-120%;
+  z-index:20;
+  display:inline-block;
+  padding:0 0.5em 0.5em 0;
+}
+#menu.visible  { left:10px!important; }
+table.room,table.block.wide,table.fileList { 
+  border:0;
+  border-radius:0;
+  border-top:1px solid gray;
+}
+
+#menuScrollArea { display:none; } /* commandref */
+body[fw_id] #menuScrollArea { display:block; } /* not commandref */
+#right { top:10px; left:10px; }
+
+input[type=submit] { border:none; background:none; }
+select { background:none; }
+#menu img.icon { width:18px; height:18px; }/* Firefox assumes 100px bef.load */
+
+table.roomoverview  { border-spacing:0; }
+div#menu > table { border-spacing:0; }
+tr.devTypeTr td { padding:0px; }
+tr.column > td { padding-right:10px; }
+
+.animated  { transition: all .1s ease-in; }
+a { text-decoration:none; }
+
+div.dist { padding-top:0.3em; }
+button.dist { margin:10px; background:transparent; border:0px; cursor:pointer; }
+
+div.pin { float:right; width:1em; height:1em; }
+div.pinHeader { height:1em; padding:2px; }
+
+body.touch a { font-size: 20px; }
+body.touch #menu { font-size: 20px; } /* for the menuTree icon */
+body.touch div.col1, body.touch #menu table.room div { padding:0.25em 0; }
+
+@media screen and (orientation: portrait) { 
+  body.small table.block tr td:nth-child(n+3) { width: 0px; display: none; }
+  body.small #content > table { width: 100%; }
+  body.small #menuBtn { right:10px; left:auto; }
+  body.small #logo { left:10px; }
+  body.small #hdr { left:52px; }
+}

@@ -209,7 +209,7 @@ ZWDongle_nlData($)
 
     my %line = (
       pos       => '['.AttrVal($e, "neighborListPos", "").']',
-      class     => '"zwBox"',
+      class     => '"zwBox col_link col_oddrow"',
       neighbors => '['.$nl.']'
     );
 
@@ -229,7 +229,7 @@ ZWDongle_nlData($)
   my $pos = AttrVal($d, "neighborListPos", "");
   my $nl = (@dn ? '"'.join('","',@dn).'"' : '');
   push @ret, "\"$d\":{\"txt\":\"$d\", \"pos\":[$pos],".
-                     "\"class\":\"zwDongle\",\"neighbors\":[$nl] }";
+             "\"class\":\"zwDongle col_oddrow col_link\",\"neighbors\":[$nl] }";
   return "{ \"saveFn\":\"attr {1} neighborListPos {2}\",".
            "\"firstObj\":\"$d\",".
            "\"el\":{".join(",",@ret)."} }";
