@@ -887,7 +887,8 @@ FW_treeMenu()
       $(el).closest("table").find("tr[data-mTree="+tgt+"]").show();
       $(el).find("div>div").css("background-image", "url('"+arrowDown+"')");
     } else {
-      $(el).closest("table").find("tr[data-mTree="+tgt+"]").hide();
+      $(el).closest("table").find("tr[data-mTree^="+tgt+"]")
+        .hide().addClass("closed");
       $(el).find("div>div").css("background-image", "url('"+arrowRight+"')");
     }
     $(el).toggleClass("closed");
