@@ -207,11 +207,11 @@ sub MPD_updateConfig($)
         if ($hash->{".volume"} eq "0")
         { # ist Mute aktiv oder soll sie mit Absicht 0 sein ?
           # neuen Restore Wert zu Sicherheit erfinden
-           $hash->{".mute"} = 50;
+           $hash->{"mute"} = 50;
         }
         else
         { # wir haben irgend eine Lautstärke
-          $hash->{".mute"} = -1;
+          $hash->{"mute"} = -1;
           if (ReadingsVal($name,"mute","on") eq "on")
           { # das passt so nicht zusammen !
             readingsSingleUpdate($hash,"mute","off",1);
@@ -559,18 +559,16 @@ sub MPD_Set($@)
 
  if ($cmd eq "mute")
  {
-  my $mute_state = ReadingsVal($name,"mute","off");
+  my $mute_state = ReadingsVal($name,"mute","");
   my $mute = $mute_state;
-  if    (($subcmd eq "on")  && ($mute_state eq "off")){ $vol_new = "0"; $hash->{".mute"} = $vol_now; $mute="on"; }
-  elsif (($subcmd eq "off") && ($mute_state eq "on")) { $vol_new = $hash->{".mute"}; $hash->{".mute"} = -1; $mute="off"; }
+  if    (($subcmd eq "on")  && ($mute_state eq "off")){ $vol_new = "0"; $hash->{"mute"} = $vol_now; $mute="on"; }
+  elsif (($subcmd eq "off") && ($mute_state eq "on")) { $vol_new = $hash->{"mute"}; $hash->{"mute"} = -1; $mute="off"; }
   elsif ($subcmd eq "toggle") 
   {
-  if ($mute_state eq "on")
-   { $vol_new = $hash->{".mute"}; $hash->{".mute"} = -1; $mute="off";}
-  else
-   { $vol_new = "0"; $hash->{".mute"} = $vol_now; $mute="on";}
+   if ($mute_state eq "on")     { $vol_new = $hash->{"mute"}; $hash->{"mute"} = -1; $mute="off";}
+   elsif ($mute_state eq "off") { $vol_new = "0"; $hash->{"mute"} = $vol_now; $mute="on";}
   }
-  readingsSingleUpdate($hash,"mute",$mute,1) if ($mute ne $mute_state);
+  readingsSingleUpdate($hash,"mute",$mute,1);
  }
 
  # muessen wir die Laustärke verändern ?
