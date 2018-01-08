@@ -40,6 +40,7 @@ a { text-decoration:none; }
 
 div.dist { padding-top:0.3em; }
 button.dist { margin:10px; background:transparent; border:0px; cursor:pointer; }
+select,input[type=submit] { cursor:pointer; }
 
 div.pin { float:right; width:1em; height:1em; }
 div.pinHeader { height:1em; padding:2px; }
