@@ -58,8 +58,8 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.12";
-my $flowsetversion = "4.0.12";
+my $modulversion = "4.0.13";
+my $flowsetversion = "4.0.13";
 
 
 
@@ -121,6 +121,7 @@ sub AMADDevice_Initialize($) {
                 "root:0,1 ".
                 "disable:1 ".
                 "remoteServer:Automagic,Autoremote,TNES,other ".
+                "setTakePictureResolution:800x600,1024x768,1280x720,1600x1200,1920x1080 ".
                 "IODev ".
                 $readingFnAttributes;
     
@@ -630,6 +631,14 @@ sub AMADDevice_Set($$@) {
         $method = "POST";
     }
     
+    elsif( lc $cmd eq 'takepicture' ) {
+
+        return "Please set \"setTakePictureResolution\" Attribut first"
+        unless(AttrVal($name,'setTakePictureResolution','none') ne 'none');
+        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/takepicture?pictureresolution=" . AttrVal($name,'setTakePictureResolution','none');
+        $method = "POST";
+    }
+    
     elsif( lc $cmd eq 'sendintent' ) {
         my $intentstring = join( " ", @args );
         my ( $action, $exkey1, $exval1, $exkey2, $exval2 ) = split( "[ \t][ \t]*", $intentstring );
@@ -689,7 +698,7 @@ sub AMADDevice_Set($$@) {
         my $btdev = AttrVal( $name, "setBluetoothDevice", "none" );
         
         
-        my $list = "screenMsg ttsMsg mediaGoogleMusic:play/pause,stop,next,back mediaSamsungMusic:play/pause,stop,next,back mediaAmazonMusic:play/pause,stop,next,back mediaSpotifyMusic:play/pause,stop,next,back mediaTuneinRadio:play/pause,stop,next,back mediaAldiMusic:play/pause,stop,next,back mediaYouTube:play/pause,stop,next,back mediaYouTubeKids:play/pause,stop,next,back mediaVlcPlayer:play/pause,stop,next,back mediaAudible:play/pause,stop,next,back screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState userFlowRun sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg";
+        my $list = "screenMsg ttsMsg mediaGoogleMusic:play/pause,stop,next,back mediaSamsungMusic:play/pause,stop,next,back mediaAmazonMusic:play/pause,stop,next,back mediaSpotifyMusic:play/pause,stop,next,back mediaTuneinRadio:play/pause,stop,next,back mediaAldiMusic:play/pause,stop,next,back mediaYouTube:play/pause,stop,next,back mediaYouTubeKids:play/pause,stop,next,back mediaVlcPlayer:play/pause,stop,next,back mediaAudible:play/pause,stop,next,back screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState userFlowRun sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg takePicture:noArg";
 
         $list .= " screenOrientation:auto,landscape,portrait"   if( AttrVal( $name, "setScreenOrientation", "0" ) eq "1" );
         $list .= " screenFullscreen:on,off"                     if( AttrVal( $name, "setFullscreen", "0" ) eq "1" );
@@ -1066,11 +1075,18 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>screenLock - Locks screen with request for PIN. <b>attribute setScreenlockPIN - enter PIN here. Only use numbers, 4-16 numbers required.</b></li>
     <li>screenOrientation - Auto,Landscape,Portait, set screen orientation (automatic, horizontal, vertical). <b>attribute setScreenOrientation</b></li>
     <li>system - issue system command (only with rooted Android devices). reboot,shutdown,airplanemodeON (can only be switched ON) <b>attribute root</b>, in Automagic "Preferences" "Root functions" need to be enabled.</li>
+    <li>takePicture - take a camera picture <b>Attribut setTakePictureResolution</b></li>
+  </ul>
+  <br><br>
+  <a name="AMADDeviceattribut"></a>
+  <b>Attribut</b>
+  <ul>
     <li>setAPSSID - set WLAN AccesPoint SSID to prevent WLAN sleeps</li>
     <li>setNotifySndFilePath - set systempath to notifyfile (default /storage/emulated/0/Notifications/</li>
     <li>setTtsMsgSpeed - set speaking speed for TTS (Value between 0.5 - 4.0, 0.5 Step) default is 1.0</li>
     <li>setTtsMsgLang - set speaking language for TTS, de or en (default is de)</li>
     <li>setTtsMsgVol - is set, change automatically the media audio end set it back</li>
+    <li>set setTakePictureResolution - set the camera resolution for takePicture action</li>
     <br>
     To be able to use "openApp" the corresponding attribute "setOpenApp" needs to contain the app package name.
     <br><br>
@@ -1235,12 +1251,17 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>nfc -  schaltet nfc an oder aus /on/off<b>Attribut root</b></li>
     <li>openApp - &ouml;ffnet eine ausgew&auml;hlte App. <b>Attribut setOpenApp</b></li>
     <li>openURL - &ouml;ffnet eine URL im Standardbrowser, sofern kein anderer Browser &uuml;ber das <b>Attribut setOpenUrlBrowser</b> ausgew&auml;hlt wurde.<b> Bsp:</b><i> attr Tablet setOpenUrlBrowser de.ozerov.fully|de.ozerov.fully.MainActivity, das erste ist der Package Name und das zweite der Class Name</i></li>
-    <li>setAPSSID - setzt die AccessPoint SSID um ein WLAN sleep zu verhindern</li>
     <li>screen - on/off/lock/unlock schaltet den Bildschirm ein/aus oder sperrt/entsperrt ihn, in den Automagic Einstellungen muss "Admin Funktion" gesetzt werden sonst funktioniert "Screen off" nicht. <b>Attribut setScreenOnForTimer</b> &auml;ndert die Zeit wie lange das Display an bleiben soll!</li>
     <li>screenFullscreen - on/off, (aktiviert/deaktiviert) den Vollbildmodus. <b>Attribut setFullscreen</b></li>
     <li>screenLock - Sperrt den Bildschirm mit Pinabfrage. <b>Attribut setScreenlockPIN - hier die Pin daf&uuml;r eingeben. Erlaubt sind nur Zahlen. Es m&uuml;&szlig;en mindestens 4, bis max 16 Zeichen verwendet werden.</b></li>
     <li>screenOrientation - Auto,Landscape,Portait,  aktiviert die Bildschirmausrichtung (Automatisch,Horizontal,Vertikal). <b>Attribut setScreenOrientation</b></li>
     <li>system - setzt Systembefehle ab (nur bei gerootetet Ger&auml;en). reboot,shutdown,airplanemodeON (kann nur aktiviert werden) <b>Attribut root</b>, in den Automagic Einstellungen muss "Root Funktion" gesetzt werden</li>
+    <li>takePicture - löst die Kamera aus für ein Foto <b>Attribut setTakePictureResolution</b></li>
+  </ul>
+  <br><br>
+  <a name="AMADDeviceattribute"></a>
+  <b>Attribute</b>
+  <ul>
     <li>setNotifySndFilePath - setzt den korrekten Systempfad zur Notifydatei (default ist /storage/emulated/0/Notifications/</li>
     <li>setTtsMsgSpeed - setzt die Sprachgeschwindigkeit bei der Sprachausgabe(Werte zwischen 0.5 bis 4.0 in 0.5er Schritten) default ist 1.0</li>
     <li>setTtsMsgLang - setzt die Sprache bei der Sprachausgabe, de oder en (default ist de)</li>
@@ -1249,6 +1270,8 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>setVolMax - setzt die maximale Volume Gr&uoml;e f&uuml;r den Slider</li>
     <li>setNotifyVolMax - setzt den maximalen Lautst&auml;rkewert für Benachrichtigungslautst&auml;rke f&uuml;r den Slider</li>
     <li>setRingSoundVolMax - setzt den maximalen Lautst&auml;rkewert für Klingellautst&auml;rke f&uuml;r den Slider</li>
+    <li>setAPSSID - setzt die AccessPoint SSID um ein WLAN sleep zu verhindern</li>
+    <li>setTakePictureResolution - welche Kameraauflösung soll verwendet werden?</li>
     <br>
     Um openApp verwenden zu k&ouml;nnen, muss als Attribut der Package Name der App angegeben werden.
     <br><br>
