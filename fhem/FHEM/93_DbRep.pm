@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.3.1        08.01.2018       fix syntax error for perl < 5.20
 # 7.3.0        07.01.2018       DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext
 #                               improved, 
 #                               expfile_DoParse changed to use aggregation for split selects in timeslices (avoid heavy 
@@ -278,7 +279,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "7.3.0";
+my $DbRepVersion = "7.3.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -6421,9 +6422,9 @@ sub DbRep_getblockinginfo($@) {
   my $len = 99;
   foreach my $h (values %BC_hash) {
       next if($h->{terminated} || !$h->{pid});
-	  my @allk = keys(%$h);
+	  my @allk = keys%{$h};
 	  foreach my $k (@allk) {
-	      Log3 ($name, 5, "DbRep $name -> $k : ".%$h{$k});
+	      Log3 ($name, 5, "DbRep $name -> $k : ".$h->{$k});
 	  }
       my $fn   = (ref($h->{fn})  ? ref($h->{fn})  : $h->{fn});
       my $arg  = (ref($h->{arg}) ? ref($h->{arg}) : $h->{arg});
