@@ -120,6 +120,7 @@ use Blocking;
 use Encode;
 use SetExtensions;
 
+use URI::Escape;
 use LWP::UserAgent;
 
 sub GOOGLECAST_Initialize($) {
