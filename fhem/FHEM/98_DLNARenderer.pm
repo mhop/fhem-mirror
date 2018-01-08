@@ -2,6 +2,9 @@
 # Author: dominik.karall@gmail.com
 # $Id$
 #
+# v2.0.7 - 20180108
+# - FEATURE: support ignoredIPs and usedonlyIPs attribute
+#
 # v2.0.6 - 20171209
 # - FEATURE: support acceptedUDNs for UDN whitelisting (thx@MichaelT!)
 # - BUGFIX:  fix renew subscriptions errors on offline devices
@@ -192,7 +195,7 @@ sub DLNARenderer_Define($$) {
   if(@param < 3) {
     #main
     $hash->{UDN} = 0;
-    my $VERSION = "v2.0.6";
+    my $VERSION = "v2.0.7";
     $hash->{VERSION} = $VERSION;
     Log3 $hash, 3, "DLNARenderer: DLNA Renderer $VERSION";
     DLNARenderer_setupControlpoint($hash);
@@ -1172,13 +1175,14 @@ sub DLNARenderer_updateMetaDataItemPart {
 ##############################
 sub DLNARenderer_setupControlpoint {
   my ($hash) = @_;
-  my %empty = ();
   my $error;
   my $cp;
+  my @usedonlyIPs = split(/,/, AttrVal($hash->{NAME}, 'usedonlyIPs', ''));
+  my @ignoredIPs = split(/,/, AttrVal($hash->{NAME}, 'ignoredIPs', ''));
   
   do {
     eval {
-      $cp = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, MaxWait => 30, UsedOnlyIP => \%empty, IgnoreIP => \%empty);
+      $cp = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, MaxWait => 30, UsedOnlyIP => \@usedonlyIPs, IgnoreIP => \@ignoredIPs);
       $hash->{helper}{controlpoint} = $cp;
       
       DLNARenderer_addSocketsToMainloop($hash);
