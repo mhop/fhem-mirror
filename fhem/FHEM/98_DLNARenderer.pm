@@ -168,7 +168,7 @@ sub DLNARenderer_Initialize($) {
   $hash->{ReadFn}    = "DLNARenderer_Read";
   $hash->{UndefFn}   = "DLNARenderer_Undef";
   $hash->{AttrFn}    = "DLNARenderer_Attribute";
-  $hash->{AttrList}  = $readingFnAttributes;
+  $hash->{AttrList}  = "ignoredIPs usedonlyIPs ".$readingFnAttributes;
 }
 
 sub DLNARenderer_Attribute {
