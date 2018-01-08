@@ -52,9 +52,10 @@ use IO::Socket;
 use Socket;
 use Net::Domain qw(hostname hostfqdn);
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
-use Data::Dumper;
+#use Data::Dumper;
 
-my $sip_version ="V1.75 / 31.12.17";
+
+my $sip_version ="V1.76 / 08.01.18";
 my $ua;	# SIP user agent
 my @fifo;
 
@@ -820,7 +821,7 @@ sub SIP_Set($@)
          shift @a;
          pop @a if ($force);  # das & muss ggf. auch noch weg
          pop @a if ($repeat); # das * muss ggf. auch weg
-         $a[0] = "t2s_name"; # ist egal wird eh verworfen
+         $a[0] = "t2s_name"; 
          $a[1] = "tts"; # Kommando des Set Befehls
         }
 
@@ -829,6 +830,18 @@ sub SIP_Set($@)
        {
         Log3 $name,4,"name, no valid text found in message : $msg";
         return "No message text after [!] found";
+       }
+       # gibt es denn Text schon als mp3 ?
+       my $filename = SIP_check_T2S_File($hash,@a);
+
+       if($filename)
+       {
+        $cmd  = "$name call $nr $ringtime $filename";
+        $cmd .= " *".$repeat if ($repeat);
+        $cmd .= " ".$force   if ($force);
+
+        Log3 $name,5,"$name, set call new -> $cmd";
+        return CommandSet(undef,$cmd);
        }
 
        # die nächsten vier brauchen wir unbedingt fuer T2S
@@ -1010,19 +1023,19 @@ sub SIP_ListenStart($)
  $ua = undef;
  my $error = SIP_Register($hash,"listen_".AttrVal($name,"sip_listen",""));
  return $name."|ListenRegister: $error" if ($error);
- 
+
  my $msg1 = AttrVal($name, "sip_audiofile_dtmf", "");
  my $msg2 = AttrVal($name, "sip_audiofile_ok",   "");
  my $msg3 = AttrVal($name, "sip_audiofile_wfp",  "");
 
- $msg1 = $hash->{audio1} if (defined($hash->{audio1}) && $msg1); 
- $msg1 = SIP_check_file($hash,$msg1) if (!defined($hash->{audio1}) && $msg1);;
+ $msg1 = SIP_check_file($hash,$hash->{audio1}) if (defined($hash->{audio1})); 
+ $msg1 = SIP_check_file($hash,$msg1) if (!defined($hash->{audio1}) && $msg1);
 
- $msg2 = $hash->{audio2} if (defined($hash->{audio2}) && $msg2); 
- $msg2 = SIP_check_file($hash,$msg2) if (!defined($hash->{audio2}) && $msg2);;
+ $msg2 = SIP_check_file($hash,$hash->{audio2}) if (defined($hash->{audio2})); 
+ $msg2 = SIP_check_file($hash,$msg2) if (!defined($hash->{audio2}) && $msg2);
 
- $msg3 = $hash->{audio3} if (defined($hash->{audio3}) && $msg3); 
- $msg3 = SIP_check_file($hash,$msg3) if (!defined($hash->{audio3}) && $msg3);;
+ $msg3 = SIP_check_file($hash,$hash->{audio3}) if (defined($hash->{audio3})); 
+ $msg3 = SIP_check_file($hash,$msg3) if (!defined($hash->{audio3}) && $msg3);
 
  Log3 $name,4,"$logname, using $msg1 for audio_dtmf" if ($msg1);
  Log3 $name,4,"$logname, using $msg2 for audio_ok"   if ($msg2);
@@ -1408,18 +1421,30 @@ sub SIP_try_listen($)
 
   if ($a[2] ne "-")
   {
-    my $ret = SIP_create_T2S_File($hash,@a);
-    if ($ret)
+    # prüfen ob es schon eine passende mp3 Datei gibt
+    my $filename = SIP_check_T2S_File($hash,@a);
+    if (!$filename)
     {
+     my $ret = SIP_create_T2S_File($hash,@a);
+     if ($ret)
+     {
       delete $hash->{audio1} if defined($hash->{audio1});
       delete $hash->{audio2} if defined($hash->{audio2});
       delete $hash->{audio3} if defined($hash->{audio3});
       return $ret;
+     }
+     #starte die Überwachung von T2S
+     RemoveInternalTimer($hash);
+     InternalTimer(gettimeofday()+int(AttrVal($name,"T2S_Timeout",5)), "SIP_watchdog_T2S", $hash);
+     return undef;
     }
-    #starte die Überwachung von T2S
-    RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+int(AttrVal($name,"T2S_Timeout",5)), "SIP_watchdog_T2S", $hash);
-    return undef;
+    else
+    {
+      Log3 $name, 4 , "$name, T2S not used $filename exits";
+      $hash->{audio1} = $filename if defined($hash->{audio1});
+      $hash->{audio2} = $filename if defined($hash->{audio2});
+      $hash->{audio3} = $filename if defined($hash->{audio3});
+    }
   }
 
 
@@ -1665,6 +1690,7 @@ sub SIP_readPassword($)
     return "";
    }
 
+  Log3 $name,5,"$logname, audio file $file found";
   return $file;
  }
 
@@ -1683,7 +1709,7 @@ sub SIP_readPassword($)
 
    my $t2s_file = ReadingsVal($t2s_name,"lastFilename",undef);
    Log3 $name,3,"$name, Reading lastFilename not found at device $t2s_name, are you using a old version ?" if !defined($t2s_file);
-
+ 
    readingsSingleUpdate($t2s_hash,"lastFilename","",0);
 
    my $ret = Text2Speech_Set($t2s_hash, @a); # na dann lege schon mal los
@@ -1695,6 +1721,26 @@ sub SIP_readPassword($)
    }
 
   return undef; # alles klar
+ }
+
+ sub SIP_check_T2S_File($@)
+ {
+  my ($hash,@a) = @_;
+  my $name = $hash->{NAME};
+  my $t2s_name  = AttrVal($hash->{NAME},"T2S_Device","");
+  return 0  if (!$t2s_name);
+  shift @a;
+  shift @a;
+  my $txt = join(" ",@a);
+  my $filename = (eval "use Digest::MD5;1") ? md5_hex("de|".$txt).".mp3" : "";
+  if ($filename)
+  {
+    my $file = AttrVal($t2s_name,"TTS_CacheFileDir", "cache"). "/".$filename;
+    Log3 $name,5,"$name, MD5: $txt -> $filename";
+    return $file if (-e $file);
+  }
+  Log3 $name,5,"$name, mp3 File file not found in cache";
+  return 0;
  }
 
  sub SIP_watchdog_T2S($)
