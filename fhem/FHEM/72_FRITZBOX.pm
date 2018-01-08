@@ -133,7 +133,7 @@ while (my ($key, $value) = each %ringTone) {
    $ringToneNumber{lc $value}=$key;
 }
 
-my %alarmDays = qw{1 Mo 2 Tu 4 We 8 Th 16 Fr 32 Sa 64 So};
+my %alarmDays = qw{1 Mo 2 Tu 4 We 8 Th 16 Fr 32 Sa 64 Su};
  
 my %userType = qw{1 IP 2 PC-User 3 Default 4 Guest};
 
