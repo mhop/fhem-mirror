@@ -1182,7 +1182,7 @@ sub DLNARenderer_setupControlpoint {
   
   do {
     eval {
-      $cp = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, MaxWait => 30, UsedOnlyIP => \@usedonlyIPs, IgnoreIP => \@ignoredIPs);
+      $cp = UPnP::ControlPoint->new(SearchPort => 0, SubscriptionPort => 0, MaxWait => 30, UsedOnlyIP => \@usedonlyIPs, IgnoreIP => \@ignoredIPs, LogLevel => AttrVal($hash->{NAME}, 'verbose', 0));
       $hash->{helper}{controlpoint} = $cp;
       
       DLNARenderer_addSocketsToMainloop($hash);
