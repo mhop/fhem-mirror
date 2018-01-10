@@ -101,9 +101,10 @@ dewpoint_Define($$)
 
     eval { "Hallo" =~ m/^$devname$/ };
     return "Bad regexp: $@" if($@);
+
     $hash->{DEV_REGEXP} = $devname;
-
-
+    # set NOTIFYDEV
+    $hash->{NOTIFYDEV} = 'global';
     $hash->{STATE} = "active";
     return undef;
 }
@@ -114,13 +115,38 @@ dewpoint_Notify($$)
 {
     my ($hash, $dev) = @_;
 
-    my $re = $hash->{DEV_REGEXP};
+    my $hashName = $hash->{NAME};
     my $devName = $dev->{NAME};
+    my $re = $hash->{DEV_REGEXP};
+
+    # listen to global in order to update our NOTIFYDEV
+    if ($devName eq 'global') {
+        # look for INITIALIZED or any device change
+        my $rebuild;
+        foreach (@{deviceEvents($dev, 0)}) {
+            if ($_ =~ m/^(INITIALIZED$)|((DEFINED|MODIFIED|RENAMED|DELETED)\s+)/) {
+                $rebuild = 1;
+                last;
+            }
+        }
+
+        if ($rebuild) {
+            # notifyRegexpChanged requires complete device names separated by '|'
+            # while we allow a true regexp
+
+            # build list of devices matching our RE
+            my @matched_devs = ('global', grep { m/^$re$/ } keys(%defs));
+
+            my $notify_re = join('|', @matched_devs);
+            Log3($hashName, 5, "Update NOTIFYDEV to >>$notify_re<<");
+            notifyRegexpChanged($hash, $notify_re);
+        }
+        return undef;
+    }
+
 
     # fast exit
     return "" if (!defined($re) || $devName !~ m/^$re$/);
-
-    my $hashName = $hash->{NAME};
 
     return "" if (AttrVal($hashName, "disable", undef));
 
