@@ -336,7 +336,7 @@ FHEM/74_NUKIDevice.pm        CoolTux              Sonstige Systeme
 FHEM/74_Nmap.pm              igami                Unterstuetzende Dienste
 FHEM/74_XiaomiFlowerSens     CoolTux              Sonstige Systeme
 FHEM/74_THINKINGCLEANER.pm   loredo               Unterstuetzende Dienste
-FHEM/74_Unifi.pm             rapster              Automatisierung
+FHEM/74_Unifi.pm             rapster/Wuehler      Automatisierung
 FHEM/75_MSG.pm               loredo               Automatisierung
 FHEM/75_msgConfig.pm         loredo               Automatisierung
 FHEM/76_msgDialog.pm         igami                Frontends/Sprachsteuerung
