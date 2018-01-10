@@ -1826,8 +1826,18 @@ asyncOutput($$)
 {
   my ($cl, $ret) = @_;
   return undef if(!$cl || !$cl->{NAME});
-  $cl = $defs{$cl->{NAME}} if($defs{$cl->{NAME}}); # compatibility
-  return CallFn($cl->{NAME}, "AsyncOutputFn", $cl, $ret);
+
+  my $temporary;
+  if($defs{$cl->{NAME}}) {
+    $cl = $defs{$cl->{NAME}}; # Compatibility
+  } else {
+    $defs{$cl->{NAME}} = $cl; # timeconsuming answer: get fd ist already closed
+    $temporary = 1;
+  }
+
+  CallFn($cl->{NAME}, "AsyncOutputFn", $cl, $ret);
+  delete $defs{$cl->{NAME}} if($temporary);
+  return undef;
 }
 
 #####################################
