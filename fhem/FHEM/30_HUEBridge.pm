@@ -759,7 +759,7 @@ HUEBridge_Set($@)
 
     return undef;
 
-  } elsif($cmd eq 'configsensor' || $cmd eq 'setsensor') {
+  } elsif($cmd eq 'configsensor' || $cmd eq 'setsensor' || $cmd eq 'updatesensor') {
     return "usage: $cmd <id> <json>" if( @args < 2 );
 
     if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
@@ -777,7 +777,11 @@ HUEBridge_Set($@)
     }
     $json = $decoded;
 
-    my $result = HUEBridge_Call($hash, undef, "sensors/$arg/".($cmd eq 'configsensor'?'config':'state'), $json, 'PUT');
+    my $endpoint = '';
+    $endpoint = 'state' if( $cmd eq 'setsensor' );
+    $endpoint = 'config' if( $cmd eq 'configsensor' );
+
+    my $result = HUEBridge_Call($hash, undef, "sensors/$arg/$endpoint", $json, 'PUT');
     return $result->{error}{description} if( $result->{error} );
 
     my $code = $name ."-S". $arg;
@@ -831,7 +835,7 @@ HUEBridge_Set($@)
     return undef;
 
   } else {
-    my $list = "active inactive delete creategroup deletegroup savescene deletescene modifyscene scene createrule updaterule deleterule createsensor deletesensor configsensor setsensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
+    my $list = "active inactive delete creategroup deletegroup savescene deletescene modifyscene scene createrule updaterule deleterule createsensor deletesensor configsensor setsensor updatesensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -1789,6 +1793,8 @@ HUEBridge_Attr($$$)
       Write sensor config data.</li>
     <li>setsensor &lt;id&gt; &lt;json&gt;<br>
       Write CLIP sensor status data.</li>
+    <li>updatesensor &lt;id&gt; &lt;json&gt;<br>
+      Write sensor toplevel data.</li>
     <li>deletewhitelist &lt;key&gt;<br>
       Deletes the given key from the whitelist in the bridge.</li>
     <li>touchlink<br>
