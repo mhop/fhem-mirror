@@ -1,8 +1,8 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 12/2017
-my $thzversion = "0.174"; 
+# by immi 1/2018
+my $thzversion = "0.175"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -272,7 +272,8 @@ my %parsinghash = (
 	      [" boosterHC: ",		        10, 1, "bit1", 1],  [" filterBoth: ",	 9, 1, "bit0", 1],
 	      [" ventStage: ",		         9, 1, "bit1", 1],  [" pumpHC: ",		 9, 1, "bit2", 1],
 	      [" defrost: ",		         9, 1, "bit3", 1],  [" filterUp: ",		 8, 1, "bit0", 1],
-	      [" filterDown: ",	             8, 1, "bit1", 1],  [" cooling: ",      11, 1, "bit3", 1]
+	      [" filterDown: ",	             8, 1, "bit1", 1],  [" cooling: ",      11, 1, "bit3", 1],
+          [" service: ", 10, 1, "bit2", 1]
 	      ],
   "0clean"    => [["", 8, 2, "hex", 1]             
               ],
@@ -861,12 +862,12 @@ sub THZ_Refresh_all_gets($) {
   RemoveInternalTimer(0, "THZ_GetRefresh");
   #THZ_RemoveInternalTimer("THZ_GetRefresh"); not needed since https://svn.fhem.de/trac/changeset/15667/ because now there is a second parameter for the function
   Log3 $hash->{NAME}, 5, "thzversion = $thzversion ";
-  my $timedelay= 5; 						#start after 5 seconds
+  my $timedelay= 30; 						#start after 5 seconds
   foreach  my $cmdhash  (keys %gets) {
     my %par = (  hash => $hash, command => $cmdhash );
     #RemoveInternalTimer(\%par); #commented out in  v.0161 because appearently redundant; THZ_RemoveInternalTimer is more efficient and both are not needed
     InternalTimer(gettimeofday() + ($timedelay) , "THZ_GetRefresh", \%par, 0);		#increment 0.6 $timedelay++
-    $timedelay += 0.6;
+    $timedelay += 1.6;                      #0.6 seconds are ok
   }  #refresh all registers; the register with interval_command ne 0 will keep on refreshing
 }
 
@@ -999,7 +1000,21 @@ sub THZ_Testloopapproach($) {
     $hash->{helper}{PARTIAL}="";     
 }
   
-
+sub THZ_testtimer($) {
+    my ($hash) = @_;
+ my $counter=1;
+ my $stringa = ("starttest \n");
+ foreach my $a (keys %intAt) 
+ {
+ if ($intAt{$a}{FN} eq "THZ_GetRefresh")	
+ 	{
+		$stringa = $stringa . ("timer ". $counter ." ARG". $intAt{$a}{ARG} ."fn " . $intAt{$a}{FN} ."\n") ;
+		$counter+=1;
+	}
+ }
+ Log3 $hash->{NAME}, 5, $stringa;
+}
+  
 
 #####################################
 #
@@ -1012,6 +1027,7 @@ sub THZ_Ready($) {
   my ($hash) = @_;
   if($hash->{STATE} eq "disconnected")
   { RemoveInternalTimer(0, "THZ_GetRefresh");
+   #THZ_testtimer($hash);
     #THZ_RemoveInternalTimer("THZ_GetRefresh");
   select(undef, undef, undef, 0.25); #equivalent to sleep 250ms
   return DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets")
@@ -1999,7 +2015,7 @@ sub function_heatSetTemp($$) {
   }
   my ($heatSetTemp, $roomSetTemp, $insideTemp) = (split ' ',ReadingsVal($devname,"sHC1",0))[11,21,27];
   my $outside_tempFiltered =(split ' ',ReadingsVal($devname,"sGlobal",0))[65];
-  if (!defined($roomSetTemp)) {
+  if (!$roomSetTemp) {
   $insideTemp=23.8 ; $roomSetTemp = 19.5; $p13GradientHC1 = 0.31; $heatSetTemp = 15; $p15RoomInfluenceHC1 = 80;
   $pOpMode ="DEMO: no data";
   $outside_tempFiltered = 0; $p14LowEndHC1 =0.5; 
