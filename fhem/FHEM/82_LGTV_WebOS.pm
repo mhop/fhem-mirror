@@ -67,7 +67,7 @@ use Blocking;
 
 
 
-my $version = "1.2.0";
+my $version = "2.0.0";
 
 
 
@@ -292,6 +292,7 @@ sub LGTV_WebOS_Attr(@) {
     
     if( $attrName eq "disable" ) {
         if( $cmd eq "set" and $attrVal eq "1" ) {
+            RemoveInternalTimer($hash);
             readingsSingleUpdate ( $hash, "state", "disabled", 1 );
             $hash->{PARTIAL} = '';
             Log3 $name, 3, "LGTV_WebOS ($name) - disabled";
@@ -300,6 +301,7 @@ sub LGTV_WebOS_Attr(@) {
         elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "LGTV_WebOS ($name) - enabled";
+            LGTV_WebOS_TimerStatusRequest($hash);
         }
     }
     
@@ -340,7 +342,7 @@ sub LGTV_WebOS_TimerStatusRequest($) {
             $hash->{helper}{device}{channelguide}{counter}  = 0;
         
         } else {
-        
+
             LGTV_WebOS_GetAudioStatus($hash);
             InternalTimer( gettimeofday()+2, 'LGTV_WebOS_GetCurrentChannel', $hash ) if( ReadingsVal($name,'launchApp', 'TV') eq 'TV' );
             InternalTimer( gettimeofday()+4, 'LGTV_WebOS_GetForgroundAppInfo', $hash );
@@ -892,33 +894,33 @@ sub LGTV_WebOS_WriteReadings($$) {
     
     elsif( defined($decode_json->{payload}{'mute'}) or defined($decode_json->{payload}{'muted'})) {
     
-        if( defined($decode_json->{payload}{'mute'}) and $decode_json->{payload}{'mute'} eq 'true' ) {
+        if( defined($decode_json->{payload}{'mute'}) and ($decode_json->{payload}{'mute'} eq 'true' or $decode_json->{payload}{'mute'} == 1 ) ) {
     
             readingsBulkUpdate($hash,'mute','on');
             
         } elsif( defined($decode_json->{payload}{'mute'}) ) {
-            if( $decode_json->{payload}{'mute'} eq 'false' ) {
+            if( $decode_json->{payload}{'mute'} eq 'false' or $decode_json->{payload}{'mute'} == 0 ) {
         
                 readingsBulkUpdate($hash,'mute','off');
             }
         }
         
-        if( defined($decode_json->{payload}{'muted'}) and $decode_json->{payload}{'muted'} eq 'true' ) {
+        if( defined($decode_json->{payload}{'muted'}) and ($decode_json->{payload}{'muted'} eq 'true' or $decode_json->{payload}{'muted'} == 1) ) {
         
                 readingsBulkUpdate($hash,'mute','on');
             
-        } elsif( defined($decode_json->{payload}{'muted'}) and $decode_json->{payload}{'muted'} eq 'false' ) {
+        } elsif( defined($decode_json->{payload}{'muted'}) and ($decode_json->{payload}{'muted'} eq 'false' or $decode_json->{payload}{'muted'} == 0) ) {
         
             readingsBulkUpdate($hash,'mute','off');
         }
     }
     
     elsif( defined($decode_json->{payload}{status3D}{status}) ) {
-        if( $decode_json->{payload}{status3D}{status} eq 'false' ) {
+        if( $decode_json->{payload}{status3D}{status} eq 'false' or $decode_json->{payload}{status3D}{status} == 0 ) {
         
             readingsBulkUpdate($hash,'3D','off');
         
-        } elsif( $decode_json->{payload}{status3D}{status} eq 'true' ) {
+        } elsif( $decode_json->{payload}{status3D}{status} eq 'true' or $decode_json->{payload}{status3D}{status} == 1 ) {
         
             readingsBulkUpdate($hash,'3D','on');
         }
@@ -946,7 +948,7 @@ sub LGTV_WebOS_WriteReadings($$) {
         
             $hash->{helper}{device}{registered}     = 1;
         
-        } elsif( ($decode_json->{type} eq 'response' and $decode_json->{payload}{returnValue} eq 'true') or ($decode_json->{type} eq 'registered') and defined($decode_json->{payload}{'client-key'}) ) {
+        } elsif( ($decode_json->{type} eq 'response' and ($decode_json->{payload}{returnValue} eq 'true' or $decode_json->{payload}{returnValue} == 1 )) or ($decode_json->{type} eq 'registered') and defined($decode_json->{payload}{'client-key'}) ) {
         
             $response = 'ok';
             readingsBulkUpdate($hash,'pairing','paired');
@@ -1211,8 +1213,7 @@ sub LGTV_WebOS_GetAudioStatus($) {
     my $hash        = shift;
     my $name        = $hash->{NAME};
     
-    
-    RemoveInternalTimer($hash,'LGTV_WebOS_GetAudioStatus');
+
     Log3 $name, 4, "LGTV_WebOS ($name) - LGTV_WebOS_GetAudioStatus: " . $hash->{helper}{device}{runsetcmd};
     LGTV_WebOS_CreateSendCommand($hash,$lgCommands{getAudioStatus},undef) if($hash->{helper}{device}{runsetcmd} == 0);
 }
@@ -1267,7 +1268,6 @@ sub LGTV_WebOS_GetChannelProgramInfo($) {
     my $name        = $hash->{NAME};
     
     
-    RemoveInternalTimer($hash,'LGTV_WebOS_GetChannelProgramInfo');
     Log3 $name, 4, "LGTV_WebOS ($name) - LGTV_WebOS_GetChannelProgramInfo: " . $hash->{helper}{device}{runsetcmd};
     LGTV_WebOS_CreateSendCommand($hash,$lgCommands{getChannelProgramInfo},undef) if($hash->{helper}{device}{runsetcmd} == 0);
 }
