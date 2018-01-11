@@ -1205,6 +1205,7 @@ HUEDevice_Parse($$)
       $hash->{sunriseoffset} = $config->{sunriseoffset} if( defined($config->{sunriseoffset}) );
       $hash->{sunsetoffset} = $config->{sunsetoffset} if( defined($config->{sunsetoffset}) );
 
+      $hash->{tholddark} = $config->{tholddark} if( defined($config->{tholddark}) );
       $hash->{sensitivity} = $config->{sensitivity} if( defined($config->{sensitivity}) );
 
       $readings{battery} = $config->{battery} if( defined($config->{battery}) );
