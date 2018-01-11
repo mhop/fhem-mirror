@@ -10,12 +10,15 @@
 #
 # reduceLog() created by Claudiu Schuster (rapster)
 #
-# redesigned 2016/2017 by DS_Starter with credits by
+# redesigned 2016-2018 by DS_Starter with credits by
 # JoeAllb, DeeSpe
 #
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.6.2      07.01.2018       new attribute "exportCacheAppend", change function exportCache to respect attr exportCacheAppend,
+#                             fix DbLog_execmemcache verbose 5 message
+# 3.6.1      04.01.2018       change SQLite PRAGMA from NORMAL to FULL (Default Value of SQLite)
 # 3.6.0      20.12.2017       check global blockingCallMax in configCheck, configCheck now available for SQLITE
 # 3.5.0      18.12.2017       importCacheFile, addCacheLine uses useCharfilter option, filter only $event by charfilter 
 # 3.4.0      10.12.2017       avoid print out {RUNNING_PID} by "list device"
@@ -172,7 +175,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.6.0";
+my $DbLogVersion = "3.6.2";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -209,6 +212,7 @@ sub DbLog_Initialize($)
 		                      "verbose4Devs ".
 							  "excludeDevs ".
 							  "expimpdir ".
+                              "exportCacheAppend:1,0 ".
 							  "syncInterval ".
 							  "noNotifyDev:1,0 ".
 							  "showproctime:1,0 ".
@@ -610,30 +614,46 @@ sub DbLog_Set($@) {
 	elsif ($a[1] eq 'exportCache') {
 	    my $cln;
 		my $crows = 0;
-		my $outfile;
+		my ($out,$outfile,$error);
 		my $now = strftime('%Y-%m-%d_%H-%M-%S',localtime);
 		
 		# return wenn "reopen" mit Ablaufzeit gestartet ist oder disabled, nicht im asynch-Mode
 	    return if(IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS});
-		return if (!AttrVal($name, "asyncMode", undef));
-		
-        $outfile = $dir."cache_".$name."_".$now;
-		
-        if (open(FH, ">$outfile")) {
+		return if(!AttrVal($name, "asyncMode", undef));
+        
+        if(@logs && AttrVal($name, "exportCacheAppend", 0)) {
+            # exportiertes Cachefile existiert und es soll an das neueste angehängt werden
+            $outfile = $dir.pop(@logs);
+            $out     = ">>$outfile";
+        } else {
+            $outfile = $dir."cache_".$name."_".$now;
+            $out     = ">$outfile";
+        }
+        if(open(FH, $out)) {
             binmode (FH);
         } else {
 		    readingsSingleUpdate($hash, "lastCachefile", $outfile." - Error - ".$!, 1);
-            return "could not open ".$outfile.": ".$!;
+            $error = "could not open ".$outfile.": ".$!;
         }
-	    foreach my $key (sort(keys%{$hash->{cache}{".memcache"}})) {
-            $cln = $hash->{cache}{".memcache"}{$key}."\n";
-            print FH $cln ;
-            $crows++; 			
-		}
-		close(FH);
-		readingsSingleUpdate($hash, "lastCachefile", $outfile." export successful", 1);
-		readingsSingleUpdate($hash, "state", $crows." cache rows exported to ".$outfile, 1);
-		Log3($name, 3, "DbLog $name: $crows cache rows exported to $outfile.");
+        
+        if(!$error) {
+	        foreach my $key (sort(keys%{$hash->{cache}{".memcache"}})) {
+                $cln = $hash->{cache}{".memcache"}{$key}."\n";
+                print FH $cln ;
+                $crows++; 			
+		    }
+		    close(FH);
+            readingsSingleUpdate($hash, "lastCachefile", $outfile." (".$crows." cache rows exported)", 1);
+        }
+		
+		# readingsSingleUpdate($hash, "state", $crows." cache rows exported to ".$outfile, 1);
+        
+        my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
+        my $evt    = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
+        readingsSingleUpdate($hash, "state", $state, $evt);
+        $hash->{HELPER}{OLDSTATE} = $state;
+		
+        Log3($name, 3, "DbLog $name: $crows cache rows exported to $outfile.");
 		
 		if ($a[-1] =~ m/^purgecache/i) {
 	        delete $hash->{cache};
@@ -1709,7 +1729,7 @@ sub DbLog_execmemcache ($) {
 	  Log3 $name, 4, "DbLog $name -> DbLogType is: $DbLogType";
 		  
 	  foreach my $key (sort(keys%{$hash->{cache}{".memcache"}})) {
-          Log3 $hash->{NAME}, 5, 'DbLog $name -> MemCache contains: $hash->{cache}{".memcache"}{$key}';
+          Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: ".$hash->{cache}{".memcache"}{$key};
 		  push(@row_array, delete($hash->{cache}{".memcache"}{$key})); 
 	  }
 
@@ -2258,7 +2278,9 @@ sub DbLog_ConnectPush($;$$) {
   
   if ($hash->{MODEL} eq "SQLITE") {
     $dbhp->do("PRAGMA temp_store=MEMORY");
-    $dbhp->do("PRAGMA synchronous=NORMAL");
+    $dbhp->do("PRAGMA synchronous=FULL");    # For maximum reliability and for robustness against database corruption, 
+                                             # SQLite should always be run with its default synchronous setting of FULL.
+                                             # https://sqlite.org/howtocorrupt.html
     $dbhp->do("PRAGMA journal_mode=WAL");
     $dbhp->do("PRAGMA cache_size=4000");
   }
@@ -3134,7 +3156,7 @@ sub DbLog_configcheck($) {
           @six_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Search_Idx' and Column_name='READING'");
           @six_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Search_Idx' and Column_name='TIMESTAMP'");
           if (@six_dev && @six_rdg && @six_tsp) {
-              $check .= "Index 'Search_Idx' exists and contains the recommended fields 'DEVICE', 'READING', 'TIMESTAMP'. <br>";
+              $check .= "Index 'Search_Idx' exists and contains recommended fields 'DEVICE', 'READING', 'TIMESTAMP'. <br>";
               $rec    = "settings o.k.";
           } else {  
 	          $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'DEVICE'. <br>" if (!@six_dev);
@@ -3161,7 +3183,7 @@ sub DbLog_configcheck($) {
 		  $idef_rdg = 1 if($idef =~ /reading/);
 		  $idef_tsp = 1 if($idef =~ /timestamp/);
           if ($idef_dev && $idef_rdg && $idef_tsp) {
-              $check .= "Index 'Search_Idx' exists and contains the recommended fields 'DEVICE', 'READING', 'TIMESTAMP'. <br>";
+              $check .= "Index 'Search_Idx' exists and contains recommended fields 'DEVICE', 'READING', 'TIMESTAMP'. <br>";
               $rec    = "settings o.k.";
           } else {  
 	          $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'DEVICE'. <br>" if (!$idef_dev);
@@ -3188,7 +3210,7 @@ sub DbLog_configcheck($) {
 		  $idef_rdg = 1 if(lc($idef) =~ /reading/);
 		  $idef_tsp = 1 if(lc($idef) =~ /timestamp/);
           if ($idef_dev && $idef_rdg && $idef_tsp) {
-              $check .= "Index 'Search_Idx' exists and contains the recommended fields 'DEVICE', 'READING', 'TIMESTAMP'. <br>";
+              $check .= "Index 'Search_Idx' exists and contains recommended fields 'DEVICE', 'READING', 'TIMESTAMP'. <br>";
               $rec    = "settings o.k.";
           } else {  
 	          $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'DEVICE'. <br>" if (!$idef_dev);
@@ -3238,7 +3260,7 @@ sub DbLog_configcheck($) {
               @dix_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Report_Idx' and Column_name='TIMESTAMP'");
               if (@dix_rdg && @dix_tsp) {
 			      $check .= "You use at least one DbRep-device assigned to $name. ";
-                  $check .= "Index 'Report_Idx' exists and contains the recommended fields 'TIMESTAMP', 'READING'. <br>";
+                  $check .= "Index 'Report_Idx' exists and contains recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
               } else {  
 			      $check .= "You use at least one DbRep-device assigned to $name. ";
@@ -3264,7 +3286,7 @@ sub DbLog_configcheck($) {
 		      $irep_rdg = 1 if($irep =~ /reading/);
 		      $irep_tsp = 1 if($irep =~ /timestamp/);
               if ($irep_rdg && $irep_tsp) {
-                  $check .= "Index 'Report_Idx' exists and contains the recommended fields 'TIMESTAMP', 'READING'. <br>";
+                  $check .= "Index 'Report_Idx' exists and contains recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
               } else {  
 		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$irep_rdg);
@@ -3289,7 +3311,7 @@ sub DbLog_configcheck($) {
 		      $irep_rdg = 1 if(lc($irep) =~ /reading/);
 		      $irep_tsp = 1 if(lc($irep) =~ /timestamp/);
               if ($irep_rdg && $irep_tsp) {
-                  $check .= "Index 'Report_Idx' exists and contains the recommended fields 'TIMESTAMP', 'READING'. <br>";
+                  $check .= "Index 'Report_Idx' exists and contains recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
               } else {
 		          $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$irep_rdg);
@@ -4716,7 +4738,6 @@ sub DbLog_fhemwebFn($$$$) {
    $ret .= FW_pH("cmd=define $name SVG $d:templateDB:HISTORY;".
                   "set $name copyGplotFile&detail=$name",
                   "<div class=\"dval\">Create SVG plot from DbLog</div>", 0, "dval", 1);
- 
 return $ret;
 }
 
@@ -5134,7 +5155,10 @@ sub checkUsePK ($$){
 	  present timestmp, e.g. "cache_LogDB_2017-03-23_22-13-55". <br>
       There are two options possible, "nopurge" respectively "purgeCache". The option determines whether the cache content 
 	  will be deleted after export or not.
-	  Using option "nopurge" (default) the cache content will be preserved.  </ul><br>
+	  Using option "nopurge" (default) the cache content will be preserved. <br>
+      The <a href="#DbLogattr">attribute</a> "exportCacheAppend" defines, whether every export process creates a new export file 
+      (default) or the cache content is appended to an existing (newest) export file.  
+      </ul><br>
 		  
     <code>set &lt;name&gt; importCachefile &lt;file&gt; </code><br><br>
       <ul>Imports an textfile into the database which has been written by the "exportCache" function. 
@@ -5644,6 +5668,19 @@ sub checkUsePK ($$){
   </ul>
   <br>
   
+  <ul><b>exportCacheAppend</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; exportCacheAppend [1|0]
+	   </code><br>
+	   
+       If set, the export of cache ("set &lt;device&gt; exportCache") appends the content to the newest available
+       export file. If there is no exististing export file, it will be new created. <br>
+       If the attribute not set, every export process creates a new export file . (default)<br/>
+     </ul>
+  </ul>
+  <br>
+  
   <ul><b>noNotifyDev</b>
      <ul>
 	   <code>
@@ -6069,11 +6106,14 @@ sub checkUsePK ($$){
     <code>set &lt;name&gt; exportCache [nopurge | purgeCache] </code><br><br>
       <ul>Wenn DbLog im asynchronen Modus betrieben wird, kann der Cache mit diesem Befehl in ein Textfile geschrieben
 	  werden. Das File wird per Default in dem Verzeichnis (global->modpath)/log/ erstellt. Das Zielverzeichnis kann mit
-	  dem <a href="#DbLogattr">Attribut</a> expimpdir geändert werden. <br>
+	  dem <a href="#DbLogattr">Attribut</a> "expimpdir" geändert werden. <br>
 	  Der Name des Files wird automatisch generiert und enthält den Präfix "cache_", gefolgt von dem DbLog-Devicenamen und
 	  dem aktuellen Zeitstempel, z.B. "cache_LogDB_2017-03-23_22-13-55". <br>
       Mit den Optionen "nopurge" bzw. "purgeCache" wird festgelegt, ob der Cacheinhalt nach dem Export gelöscht werden
-      soll oder nicht. Mit "nopurge" (default) bleibt der Cacheinhalt erhalten.  </ul><br>
+      soll oder nicht. Mit "nopurge" (default) bleibt der Cacheinhalt erhalten. <br>
+      Das <a href="#DbLogattr">Attribut</a> "exportCacheAppend" bestimmt dabei, ob mit jedem Exportvorgang ein neues Exportfile 
+      angelegt wird (default) oder der Cacheinhalt an das bestehende (neueste) Exportfile angehängt wird.      
+      </ul><br>
 	  
     <code>set &lt;name&gt; importCachefile &lt;file&gt; </code><br><br>
       <ul>Importiert ein mit "exportCache" geschriebenes File in die Datenbank. 
@@ -6638,13 +6678,15 @@ sub checkUsePK ($$){
   </ul>
   <br>
   
-  <ul><b>shutdownWait</b>
+  <ul><b>exportCacheAppend</b>
      <ul>
 	   <code>
-	   attr &lt;device&gt; shutdownWait <n>
+	   attr &lt;device&gt; exportCacheAppend [1|0]
 	   </code><br>
 	   
-       FHEM wartet während des shutdowns fuer n Sekunden, um die Datenbank korrekt zu beenden<br/>
+       Wenn gesetzt, wird beim Export des Cache ("set &lt;device&gt; exportCache") der Cacheinhalt an das neueste bereits vorhandene
+       Exportfile angehängt. Ist noch kein Exportfile vorhanden, wird es neu angelegt. <br>
+       Ist das Attribut nicht gesetzt, wird bei jedem Exportvorgang ein neues Exportfile angelegt. (default)<br/>
      </ul>
   </ul>
   <br>
@@ -6667,6 +6709,17 @@ sub checkUsePK ($$){
 	   </code><br>
 	   
        Deaktiviert die programmtechnische Unterstützung eines gesetzten Primary Key durch das Modul.<br>
+     </ul>
+  </ul>
+  <br>
+  
+  <ul><b>shutdownWait</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; shutdownWait <n>
+	   </code><br>
+	   
+       FHEM wartet während des shutdowns fuer n Sekunden, um die Datenbank korrekt zu beenden<br/>
      </ul>
   </ul>
   <br>

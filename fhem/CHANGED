@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: V3.6.2, new attribute "exportCacheAppend", minor fix in 
+                       Log verbose 5
   - bugfix:  82_LGTV_WebOS: fix wrong paired reading and more
   - change:  98_dewpoint: Use NOTIFYDEV
   - bugfix:  93_DbRep: syntax error if perl version < 5.20
