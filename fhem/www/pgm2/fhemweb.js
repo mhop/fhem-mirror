@@ -1232,8 +1232,10 @@ FW_replaceWidget(oldEl,devName,vArr,currVal,reading,set,params,cmd,readyFn)
     $(newEl).addClass(wn+"_widget");
 
     if( $(newEl).find("[informId]").length==0 && !$(newEl).attr("informId") ) {
-      if(reading)
-        $(newEl).attr("informId", devName+"-"+reading);
+      if(reading) {
+        var a = $(oldEl).closest("form").find("input[type=submit][value=attr]");
+        $(newEl).attr("informId", devName+(a.length?"-a-":"-")+reading);
+      }
       var addTitle = $("body").attr("data-addHtmlTitle");
       if(reading != "state" && addTitle==1)
         $(newEl).attr("title", reading);

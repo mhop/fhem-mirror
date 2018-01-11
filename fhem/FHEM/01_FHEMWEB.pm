@@ -1203,6 +1203,7 @@ FW_makeTable($$$@)
   my $si = AttrVal("global", "showInternalValues", 0);
 
   my $row = 1;
+  my $prefix = ($title eq "Attributes" ? "a-" : "");
   foreach my $n (sort keys %{$hash}) {
     next if(!$si && $n =~ m/^\./);      # Skip "hidden" Values
     my $val = $hash->{$n};
@@ -1236,12 +1237,12 @@ FW_makeTable($$$@)
           FW_pO "<td><div class=\"dval\">$v$t</div></td>";
         } else {
           $t = "" if(!$t);
-          FW_pO "<td><div class=\"dval\" informId=\"$name-$n\">$v</div></td>";
-          FW_pO "<td><div informId=\"$name-$n-ts\">$t</div></td>";
+          FW_pO "<td><div class=\"dval\" informId=\"$name-$prefix$n\">$v</div></td>";
+          FW_pO "<td><div informId=\"$name-$prefix$n-ts\">$t</div></td>";
         }
       } else {
         $val = FW_htmlEscape($val);
-        my $tattr = "informId=\"$name-$n\" class=\"dval\"";
+        my $tattr = "informId=\"$name-$prefix$n\" class=\"dval\"";
 
         # if possible provide some links
         if ($n eq "room"){
@@ -2824,7 +2825,7 @@ FW_Notify($$)
       $dn = $1 if($dev->{CHANGED}->[0] =~ m/^MODIFIED (.*)$/);
       if($dev->{CHANGED}->[0] =~ m/^ATTR ([^ ]+) ([^ ]+) (.*)$/s) {
         $dn = $1;
-        my @a = ("$2: $3");
+        my @a = ("a-$2: $3");
         $events = \@a;
       }
     }
