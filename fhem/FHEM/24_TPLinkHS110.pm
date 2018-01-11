@@ -1,6 +1,8 @@
 ################################################################
 # $Id$
 #
+#  Release 2018-11-01 SetExtension
+#
 #  Copyright notice
 #
 #  (c) 2016 Copyright: Volker Kettenbach
@@ -34,6 +36,7 @@ use warnings;
 use IO::Socket::INET;
 use IO::Socket::Timeout;
 use JSON;
+use SetExtensions;
 
 #####################################
 sub TPLinkHS110_Initialize($)
@@ -47,10 +50,10 @@ sub TPLinkHS110_Initialize($)
   $hash->{DeleteFn}   = "TPLinkHS110_Delete";
   $hash->{AttrFn}     = "TPLinkHS110_Attr";
   $hash->{AttrList}   = "interval ".
-			"disable:0,1 " .
-			"nightmode:on,off " .
-  			"timeout " .
-                        "$readingFnAttributes";
+	  "disable:0,1 " .
+	  "nightmode:on,off " .
+	  "timeout " .
+	  "$readingFnAttributes";
 }
 
 #####################################
@@ -199,19 +202,26 @@ sub TPLinkHS110_Get($$)
 #####################################
 sub TPLinkHS110_Set($$)
 {
-	my ( $hash, @a ) = @_;
-  	my $name= $hash->{NAME};
+	my ( $hash, $name, $cmd, @args ) = @_;
+	my $cmdList = "on off";
+	return "\"set $name\" needs at least one argument" unless(defined($cmd));
 	return "Device disabled in config" if ($attr{$name}{"disable"} eq "1");
-   	Log3 $hash, 3, "TPLinkHS110: $name Set <". $a[1] ."> called";
-	return "Unknown argument $a[1], choose one of on off " if($a[1] ne "on" & $a[1] ne "off");
-
-	my $command;
-	if($a[1] eq "on") {
-		$command = '{"system":{"set_relay_state":{"state":1}}}';
-	}
-	if($a[1] eq "off") {
-		$command = '{"system":{"set_relay_state":{"state":0}}}';
-	}
+   	Log3 $hash, 3, "TPLinkHS110: $name Set <". $cmd ."> called";
+		
+	my $command="";
+	if($cmd eq "on")
+		{
+			$command = '{"system":{"set_relay_state":{"state":1}}}';
+		}
+		elsif($cmd eq "off")
+		{
+			$command = '{"system":{"set_relay_state":{"state":0}}}';
+		}
+		else # wenn der übergebene Befehl nicht durch X_Set() verarbeitet werden kann, Weitergabe an SetExtensions
+		{
+			return SetExtensions($hash, $cmdList, $name, $cmd, @args);
+		}	
+	
 	my $remote_host = $hash->{HOST};
 	my $remote_port = 9999;
 	my $c = encrypt($command);
@@ -235,7 +245,7 @@ sub TPLinkHS110_Set($$)
 		return;
 	};
 
-        if ($json->{'system'}->{'set_relay_state'}->{'err_code'} eq "0") {
+	if ($json->{'system'}->{'set_relay_state'}->{'err_code'} eq "0") {
 		TPLinkHS110_Get($hash,"");
 		
 	} else {
