@@ -615,7 +615,7 @@ UnifiVideo_Attr($$$)
   <b>Set</b>
   <ul>
     <li>snapshot cam=&lt;cam&gt; width=&lt;width&gt; fileName=&lt;fileName&gt;<br>
-      takes a snapshot from &lt;cam&gt; with optional &lt;width&gt; and stores ist with the optional &lt;fileName&gt;<br>
+      takes a snapshot from &lt;cam&gt; with optional &lt;width&gt; and stores it with the optional &lt;fileName&gt;<br>
       &lt;cam&gt; can be the number of the cammera, its id or a regex that is matched against the name.
       </li>
     <li>reconnect<br>
