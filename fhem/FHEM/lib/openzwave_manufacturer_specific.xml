@@ -1027,7 +1027,7 @@
 		<Product type="0001" id="0001" name="STZW402+ Electronic Thermostat" config="stelpro/stzw402.xml"/>
 	</Manufacturer>
 	<Manufacturer id="0271" name="Steinel">
-		<Product type="0001" id="1a72" name="IS 140-2" forumNr="no-statistics"/>
+		<Product type="0002" id="1a72" name="IS 140-2" forumNr="steinel/is140-2.xml"/>
 		<Product type="0001" id="1a73" name="XLED Home 2" forumNr="no-statistics"/>
 		<Product type="0001" id="1a74" name="RS LED D2" forumNr="no-statistics"/>
 		<Product type="0001" id="1a75" name="L 810 LED iHF" forumNr="no-statistics"/>
