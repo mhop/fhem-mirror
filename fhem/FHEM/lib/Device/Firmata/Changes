@@ -1,5 +1,8 @@
 Revision history for Device-Firmata
 
+0.64    2018.01.03 - Jens Beyer
+        support Firmata protocol version 2.5 feature PIN_PULLUP (Constants, Platform, Protocol)
+        
 0.63    2016.03.19 - Jens Beyer
         supported protocol version detection modified (Protocol)
         

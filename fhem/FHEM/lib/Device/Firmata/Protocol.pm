@@ -114,6 +114,7 @@ our $MODENAMES = {
   8                           => 'STEPPER',
   9                           => 'ENCODER',
  10                           => 'SERIAL',
+ 11                           => 'PULLUP',
 };
 
 =head1 DESCRIPTION

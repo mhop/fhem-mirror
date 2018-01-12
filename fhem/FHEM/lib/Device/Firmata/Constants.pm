@@ -30,6 +30,7 @@ use constant (
     PIN_STEPPER => 8,
     PIN_ENCODER => 9,
     PIN_SERIAL  => 10,
+    PIN_PULLUP  => 11,
     PIN_LOW  => 0,
     PIN_HIGH => 1,
   }
@@ -295,6 +296,7 @@ use constant (
       ONEWIRE                  => 0x07, # pin configured for 1-Wire commuication
       STEPPER                  => 0x08, # pin configured for stepper motor
       SERIAL                   => 0x0A, # pin configured for serial port
+      PULLUP                   => 0x0B, # digital pin in digitalInput mode with pullup
 
       # Deprecated entries
       deprecated => [
@@ -355,6 +357,7 @@ use constant (
       STEPPER                  => 0x08, # pin configured for stepper motor
       ENCODER                  => 0x09, # pin configured for rotary-encoders
       SERIAL                   => 0x0A, # pin configured for serial port      
+      PULLUP                   => 0x0B, # digital pin in digitalInput mode with pullup
 
       # Deprecated entries
       deprecated => [

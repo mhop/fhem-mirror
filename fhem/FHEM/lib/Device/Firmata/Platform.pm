@@ -256,6 +256,7 @@ sub sysex_handle {
       my @stepperpins;
       my @encoderpins;
       my @serialpins;
+      my @pulluppins;
       
       foreach my $pin (keys %$capabilities) {
         if (defined $capabilities->{$pin}) {
@@ -298,6 +299,9 @@ sub sysex_handle {
             push @serialpins, $pin;
             $self->{metadata}{serial_resolutions}{$pin} = $capabilities->{$pin}->{PIN_SERIAL+0}->{resolution};
           }
+          if ($capabilities->{$pin}->{PIN_PULLUP+0}) {
+            push @pulluppins, $pin;
+          }
         }
       }
       $self->{metadata}{input_pins}   = \@inputpins;
@@ -311,6 +315,7 @@ sub sysex_handle {
       $self->{metadata}{stepper_pins} = \@stepperpins;
       $self->{metadata}{encoder_pins} = \@encoderpins;
       $self->{metadata}{serial_pins}  = \@serialpins;
+      $self->{metadata}{pullup_pins}  = \@pulluppins;
       last;
     };
 
@@ -455,7 +460,7 @@ sub pin_mode {
 
   PIN_MODE_HANDLER: {
 
-    ( $mode == PIN_INPUT ) and do {
+    ( $mode == PIN_INPUT or $mode == PIN_PULLUP ) and do {
       my $port_number = $pin >> 3;
       $self->{io}->data_write($self->{protocol}->message_prepare( SET_PIN_MODE => 0, $pin, $mode ));
       $self->{io}->data_write($self->{protocol}->message_prepare( REPORT_DIGITAL => $port_number, 1 ));
@@ -479,13 +484,17 @@ sub pin_mode {
 Analogous to the digitalWrite function on the
 arduino
 
+Deprecation Warning:
+Writing to pin with mode "INPUT" is only supported for backward compatibility 
+to switch pullup on and off. Use sub pin_mode with $mode=PIN_PULLUP instead.
+
 =cut
 
 sub digital_write {
 
   # --------------------------------------------------
   my ( $self, $pin, $state ) = @_;
-  die "pin '".$pin."' is not configured for mode 'INPUT' or 'OUTPUT'" unless ($self->is_configured_mode($pin,PIN_OUTPUT) or $self->is_configured_mode($pin,PIN_INPUT));
+  die "pin '".$pin."' is not configured for mode 'INPUT', 'PULLUP' or 'OUTPUT'" unless ($self->is_configured_mode($pin,PIN_OUTPUT) or $self->is_configured_mode($pin,PIN_INPUT) or $self->is_configured_mode($pin,PIN_PULLUP));
   my $port_number = $pin >> 3;
 
   my $pin_offset = $pin % 8;
@@ -514,7 +523,7 @@ sub digital_read {
 
   # --------------------------------------------------
   my ( $self, $pin ) = @_;
-  die "pin '".$pin."' is not configured for mode 'INPUT'" unless $self->is_configured_mode($pin,PIN_INPUT);
+  die "pin '".$pin."' is not configured for mode 'INPUT' or 'PULLUP'" unless ($self->is_configured_mode($pin,PIN_INPUT) or $self->is_configured_mode($pin,PIN_PULLUP));
   my $port_number = $pin >> 3;
   my $pin_offset  = $pin % 8;
   my $pin_mask    = 1 << $pin_offset;
