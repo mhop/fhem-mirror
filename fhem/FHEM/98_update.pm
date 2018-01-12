@@ -251,7 +251,7 @@ doUpdate($$$$)
   if(AttrVal("global", "backup_before_update", 0) &&
      $arg ne "check" && $curr==1) {
     my $cmdret = AnalyzeCommand(undef, "backup");
-    if ($cmdret !~ m/backup done.*/) {
+    if($cmdret !~ m/backup done.*|Started.*in the background/) {
       uLog 1, "Something went wrong during backup: $cmdret";
       uLog 1, "update was canceled. Please check manually!";
       return;
