@@ -879,6 +879,18 @@ SVG_substcfg($$$$$$)
   my $gplot_script = join("", @{$cfg});
   $gplot_script .=  $plot if(!$splitret);
 
+  my $plotReplace = AttrVal($wl, "plotReplace", undef);
+  if($plotReplace) {
+    my ($list, $pr) = parseParams($plotReplace, "\\s"," ");
+    for my $k (keys %$pr) {
+      if($pr->{$k} =~ m/^{.*}$/) {
+        $cmdFromAnalyze = $pr->{$k};
+        $pr->{$k} = eval $cmdFromAnalyze;
+      }
+      $gplot_script =~ s/<$k>/$pr->{$k}/g;
+    }
+  }
+
   $gplot_script =~ s/<OUT>/$tmpfile/g;
   $gplot_script =~ s/<IN>/$file/g;
 
@@ -892,18 +904,6 @@ SVG_substcfg($$$$$$)
       $gplot_script =~ s/<L$g_count>/$_/g;
       $plot =~ s/<L$g_count>/$_/g;
       $g_count++;
-    }
-  }
-
-  my $plotReplace = AttrVal($wl, "plotReplace", undef);
-  if($plotReplace) {
-    my ($list, $pr) = parseParams($plotReplace, "\\s"," ");
-    for my $k (keys %$pr) {
-      if($pr->{$k} =~ m/^{.*}$/) {
-        $cmdFromAnalyze = $pr->{$k};
-        $pr->{$k} = eval $cmdFromAnalyze;
-      }
-      $gplot_script =~ s/<$k>/$pr->{$k}/g;
     }
   }
 
