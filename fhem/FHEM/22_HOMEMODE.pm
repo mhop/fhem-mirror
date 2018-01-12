@@ -1168,10 +1168,9 @@ sub HOMEMODE_RESIDENTS($;$)
   {
     foreach (@{$events})
     {
-      my $m = $_;
-      $m =~ s/.*:\s//;
-      next if (!grep /^$m$/,split /,/,$HOMEMODE_UserModesAll);
-      $mode = $m;
+      next unless ($_ =~ /^state:.(.*)$/ && grep /^$1$/,split /,/,$HOMEMODE_UserModesAll);
+      $mode = $1;
+      Log3 $name,5,"$name: HOMEMODE_RESIDENTS mode: $mode";
     }
   }
   if ($mode && $devtype eq "RESIDENTS")
