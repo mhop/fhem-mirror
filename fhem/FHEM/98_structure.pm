@@ -62,7 +62,7 @@ structAdd($$)
   my ($d, $attrList) = @_;
   return if(!$defs{$d});
   $defs{$d}{INstructAdd} = 1;
-  foreach my $c (keys %{$defs{$d}{CONTENT}}) {
+  foreach my $c (@{$defs{$d}{".memberList"}}) {
     if($defs{$c} && $defs{$c}{INstructAdd}) {
       Log 1, "recursive structure definition"
 
@@ -73,6 +73,8 @@ structAdd($$)
   }
   delete $defs{$d}{INstructAdd} if($defs{$d});
 }
+
+sub structure_setDevs($;$);
 
 #############################
 sub
@@ -91,24 +93,44 @@ structure_Define($$)
   $hash->{ATTR} = $stype;
   $hash->{CHANGEDCNT} = 0;
 
-  my %list;
-  my $aList = "$stype ${stype}_map structexclude";
-  foreach my $a (@a) {
-    foreach my $d (devspec2array($a)) {
-      $list{$d} = 1;
-      addToDevAttrList($d, $aList);
-      structAdd($d, $aList) if($defs{$d} && $defs{$d}{TYPE} eq "structure");
-    }
-  }
-  $hash->{CONTENT} = \%list;
-  my @arr = ();
-  $hash->{".asyncQueue"} = \@arr;
-  delete $hash->{".cachedHelp"};
+  structure_setDevs($hash, $def);
+
+  $hash->{".asyncQueue"} = [];
 
   @a = ( "set", $devname, $stype, $devname );
   structure_Attr(@a);
 
   return undef;
+}
+
+sub
+structure_setDevs($;$)
+{
+  my ($hash, $def) = @_;
+  $def = "$hash->{NAME} structure $hash->{DEF}" if(!$def);
+  my $c = $hash->{".memberHash"};
+
+  my @a = split("[ \t][ \t]*", $def);
+  my $devname = shift(@a);
+  my $modname = shift(@a);
+  my $stype   = shift(@a);
+
+  my (%list, @list);
+  my $aList = "$stype ${stype}_map structexclude";
+  foreach my $a (@a) {
+    foreach my $d (devspec2array($a)) {
+      next if(!$defs{$d} || $list{$d});
+      $hash->{DEVSPECDEF} = 1 if($a ne $d);
+      $list{$d} = 1;
+      push(@list, $d);
+      next if($c && $c->{$d});
+      addToDevAttrList($d, $aList);
+      structAdd($d, $aList) if($defs{$d} && $defs{$d}{TYPE} eq "structure");
+    }
+  }
+  $hash->{".memberHash"} = \%list;
+  $hash->{".memberList"} = \@list;
+  delete $hash->{".cachedHelp"};
 }
 
 #############################
@@ -143,43 +165,38 @@ structure_Notify($$)
   my $me = $hash->{NAME};
   my $devmap = $hash->{ATTR}."_map";
 
-  if( $dev->{NAME} eq "global" ) {
+  if($dev->{NAME} eq "global") {
     my $max = int(@{$dev->{CHANGED}});
     for (my $i = 0; $i < $max; $i++) {
       my $s = $dev->{CHANGED}[$i];
       $s = "" if(!defined($s));
+
       if($s =~ m/^RENAMED ([^ ]*) ([^ ]*)$/) {
         my ($old, $new) = ($1, $2);
-        if( exists($hash->{CONTENT}{$old}) ) {
-
-          $hash->{DEF} =~ s/(\s+)$old(\s*)/$1$new$2/;
-
-          delete( $hash->{CONTENT}{$old} );
-          $hash->{CONTENT}{$new} = 1;
+        if($hash->{".memberHash"}{$old}) {
+          $hash->{DEF} =~ s/\b$old\b/$new/;
+          structure_setDevs($hash);
         }
+
       } elsif($s =~ m/^DELETED ([^ ]*)$/) {
-        my ($name) = ($1);
-
-        if( exists($hash->{CONTENT}{$name}) ) {
-
-          $hash->{DEF} =~ s/(\s+)$name(\s*)/ /;
-          $hash->{DEF} =~ s/^ //;
-          $hash->{DEF} =~ s/ $//;
-
-          delete $hash->{CONTENT}{$name};
-          delete $hash->{".cachedHelp"};
+        my $n = $1;
+        if($hash->{".memberHash"}{$n}) {
+          $hash->{DEF} =~ s/\b$n\b//;
+          structure_setDevs($hash)
         }
+
+      } elsif($s =~ m/^DEFINED ([^ ]*)$/) {
+        structure_setDevs($hash) if($hash->{NAME} ne $1 && $hash->{DEVSPECDEF});
+
       }
     }
+    return;
   }
 
   return "" if(IsDisabled($me));
 
-  #pruefen ob Devices welches das notify ausgeloest hat Mitglied dieser
-  # Struktur ist
-  return "" if (! exists $hash->{CONTENT}->{$dev->{NAME}});
+  return "" if (! exists $hash->{".memberHash"}->{$dev->{NAME}});
 
-  # lade das Verhalten, Standard ist absolute 
   my $behavior = AttrVal($me, "clientstate_behavior", "absolute");
   my %clientstate;
 
@@ -208,7 +225,7 @@ structure_Notify($$)
   my $minprio = 99999;
   my $devstate;
 
-  foreach my $d (sort keys %{ $hash->{CONTENT} }) {
+  foreach my $d (sort keys %{ $hash->{".memberHash"} }) {
     next if(!$defs{$d});
 
     if($attr{$d} && $attr{$d}{$devmap}) {
@@ -263,7 +280,7 @@ structure_Notify($$)
       }
     }
 
-    $hash->{CONTENT}{$d} = $devstate;
+    $hash->{".memberHash"}{$d} = $devstate;
   }
 
   my $newState = "undefined";
@@ -313,7 +330,7 @@ CommandAddStruct($)
   }
 
   foreach my $d (devspec2array($a[0])) {
-    $hash->{CONTENT}{$d} = 1;
+    $hash->{".memberHash"}{$d} = 1;
     $hash->{DEF} .= " $d";
   }
 
@@ -341,7 +358,7 @@ CommandDelStruct($)
   }
 
   foreach my $d (devspec2array($a[0])) {
-    delete($hash->{CONTENT}{$d});
+    delete($hash->{".memberHash"}{$d});
     $hash->{DEF} =~ s/\b$d\b//g;
   }
   $hash->{DEF} =~ s/  / /g;
@@ -378,8 +395,7 @@ structure_Set($@)
     }
   }
 
-  my @devList = split("[ \t][ \t]*", $hash->{DEF});
-  shift @devList;
+  my @devList = @{$hash->{".memberList"}};
   if(@list > 1 && $list[$#list] eq "reverse") {
     pop @list;
     @devList = reverse @devList;
@@ -493,8 +509,7 @@ structure_Attr($@)
   $hash->{INATTR} = 1;
 
   my $ret = "";
-  my @devList = split("[ \t][ \t]*", $hash->{DEF});
-  shift @devList;
+  my @devList = @{$hash->{".memberList"}};
   foreach my $d (@devList) {
     next if(!$defs{$d});
     if($attr{$d} && $attr{$d}{structexclude}) {
