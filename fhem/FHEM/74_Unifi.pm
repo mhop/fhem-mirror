@@ -46,6 +46,12 @@ sub Unifi_ArchiveAlerts_Send($);
 sub Unifi_Cmd_Receive($);
 sub Unifi_ClientNames($@);
 sub Unifi_ApNames($@);
+sub Unifi_BlockClient_Send($@);
+sub Unifi_BlockClient_Receive($);
+sub Unifi_UnblockClient_Send($@);
+sub Unifi_UnblockClient_Receive($);
+sub Unifi_WlanconfRest_Send($$@);
+sub Unifi_WlanconfRest_Receive($);
 sub Unifi_NextUpdateFn($$);
 sub Unifi_ReceiveFailure($$);
 sub Unifi_CONNECTED($@);
@@ -155,14 +161,16 @@ sub Unifi_Set($@) {
     
     my $clientNames = Unifi_ClientNames($hash);
     my $apNames = Unifi_ApNames($hash);
+    my $SSIDs = Unifi_SSIDs($hash);
     
-    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|clear|poeMode/) {
+    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|clear|poeMode|blockClient|unblockClient|enableWLAN|disableWLAN/) {
         return "Unknown argument $setName, choose one of update:noArg "
                ."clear:all,readings,clientData "
                .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "archiveAlerts:noArg " : "")
                .(($apNames && Unifi_CONNECTED($hash)) ? "restartAP:all,$apNames setLocateAP:all,$apNames unsetLocateAP:all,$apNames " : "")
                .(($clientNames && Unifi_CONNECTED($hash)) ? "disconnectClient:all,$clientNames " : "")
-               ."poeMode";
+               ."poeMode enableWLAN:$SSIDs disableWLAN:$SSIDs "
+               ."blockClient:$clientNames unblockClient:$clientNames";
     }
     else {
         Log3 $name, 4, "$name: set $setName";
@@ -180,6 +188,56 @@ sub Unifi_Set($@) {
                 }
                 elsif (!$setVal || $setVal eq 'all') {
                     Unifi_DisconnectClient_Send($hash,keys(%{$hash->{clients}}));
+                }
+            }
+            elsif ($setName eq 'blockClient') {
+                if ($setVal && $setVal ne 'all') {
+                    $setVal = Unifi_ClientNames($hash,$setVal,'makeID');
+                    if (defined $hash->{clients}->{$setVal}) {
+                        Unifi_BlockClient_Send($hash,$setVal);
+                    }
+                    else {
+                        return "$hash->{NAME}: Unknown client '$setVal' in command '$setName', choose one of: all,$clientNames";
+                    }
+                }
+                elsif (!$setVal || $setVal eq 'all') {
+                    Unifi_BlockClient_Send($hash,keys(%{$hash->{clients}}));
+                }
+            }
+            elsif ($setName eq 'unblockClient') {
+                if ($setVal && $setVal ne 'all') {
+                    $setVal = Unifi_ClientNames($hash,$setVal,'makeID');
+                    if (defined $hash->{clients}->{$setVal}) {
+                        Unifi_UnblockClient_Send($hash,$setVal);
+                    }
+                    else {
+                        return "$hash->{NAME}: Unknown client '$setVal' in command '$setName', choose one of: all,$clientNames";
+                    }
+                }
+                elsif (!$setVal || $setVal eq 'all') {
+                    Unifi_UnblockClient_Send($hash,keys(%{$hash->{clients}}));
+                }
+            }
+            elsif ($setName eq 'disableWLAN') {
+                my $wlan = Unifi_SSIDs($hash,$setVal,'makeID');
+                if (defined $hash->{wlans}->{$wlan}) {
+                    my $wlanconf = $hash->{wlans}->{$wlan};
+                    $wlanconf->{enabled}='false';
+                    Unifi_WlanconfRest_Send($hash,$wlan,$wlanconf);
+                }
+                else {
+                    return "$hash->{NAME}: Unknown SSID '$setVal' in command '$setName', choose one of: all,$SSIDs";
+                }
+            }
+            elsif ($setName eq 'enableWLAN') {
+                my $wlan = Unifi_SSIDs($hash,$setVal,'makeID');
+                if (defined $hash->{wlans}->{$wlan}) {
+                    my $wlanconf = $hash->{wlans}->{$wlan};
+                    $wlanconf->{enabled}='true';
+                    Unifi_WlanconfRest_Send($hash,$wlan,$wlanconf);
+                }
+                else {
+                    return "$hash->{NAME}: Unknown SSID '$setVal' in command '$setName', choose one of: all,$SSIDs";
                 }
             }
             elsif ($setName eq 'poeMode') {
@@ -648,7 +706,10 @@ sub Unifi_GetWlans_Receive($) {
                 
                 for my $h (@{$data->{data}}) {
                     $hash->{wlans}->{$h->{_id}} = $h;
-                    $hash->{wlans}->{$h->{_id}}->{x_passphrase} = '***'; # Don't show passphrase in list
+                    #TODO: Passphrase ggf. verschlüsseln?!
+                    #Ich musste diese Zeile rausnehmen, sonst ist das Json für enable/disableWLAN bei offenem WLAN (ohne Passphrase) falsch 
+                    #Aussternen geht nicht, sonst wird das PW unter Umständen darauf geändert.
+                    #$hash->{wlans}->{$h->{_id}}->{x_passphrase} = '***'; # Don't show passphrase in list
                 }
             }
             else { Unifi_ReceiveFailure($hash,$data->{meta}); }
@@ -926,6 +987,7 @@ sub Unifi_SetClientReadings($) {
             readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
             readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
             readingsBulkUpdate($hash,$clientName."_snr",$clientRef->{rssi});
+            readingsBulkUpdate($hash,$clientName."_essid",$clientRef->{essid});
             readingsBulkUpdate($hash,$clientName."_accesspoint",$apName);
             readingsBulkUpdate($hash,$clientName,'connected');
         }
@@ -1039,6 +1101,85 @@ sub Unifi_DisconnectClient_Receive($) {
         Unifi_DisconnectClient_Send($hash,@{$param->{clients}});
     }
     
+    return undef;
+}
+###############################################################################
+sub Unifi_UnblockClient_Send($@) {
+  my ($hash,@clients) = @_;
+  my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+  Log3 $name, 5, "$name ($self) - executed with count:'".scalar(@clients)."', ID:'".$clients[0]."'";
+
+  my $id = shift @clients;
+  HttpUtils_NonblockingGet( {
+    %{$hash->{httpParams}},
+    url   => $hash->{unifi}->{url}."cmd/stamgr",
+    callback => \&Unifi_UnblockClient_Receive,
+    clients => [@clients],
+    data => "{'mac': '".$hash->{clients}->{$id}->{mac}."', 'cmd': 'unblock-sta'}",
+  } );
+
+  return undef;
+}
+###############################################################################
+sub Unifi_UnblockClient_Receive($) {
+  my ($param, $err, $data) = @_;
+  my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+  Log3 $name, 5, "$name ($self) - executed.";
+
+  if ($err ne "") {
+    Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+  }
+  elsif ($data ne "") {
+    if ($param->{code} == 200 || $param->{code} == 400 || $param->{code} == 401) {
+      eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+
+      if ($data->{meta}->{rc} eq "ok") {
+        Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
+      }
+      else { Unifi_ReceiveFailure($hash,$data->{meta}); }
+    } else {
+      Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+    }
+  }
+
+  if (scalar @{$param->{clients}}) {
+    Unifi_BlockClient_Send($hash,@{$param->{clients}});
+  }
+
+  return undef;
+}
+###############################################################################
+sub Unifi_WlanconfRest_Send($$@) {
+    my ($hash,$id,$data) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    my $json = encode_json( $data );
+    Log3 $name, 5, "$name ($self) - executed with $json.";
+    HttpUtils_NonblockingGet( {
+                 %{$hash->{httpParams}},
+        method   => "PUT",
+        url      => $hash->{unifi}->{url}."rest/wlanconf/".$id,
+        callback => \&Unifi_WlanconfRest_Receive,
+        aps      => [],
+        data     => $json,
+    } );
+    return undef;
+}
+
+sub Unifi_WlanconfRest_Receive($) {     
+    my ($param, $err, $data) = @_;
+    my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+    Log3 $name, 3, "$name ($self) - executed.";
+    
+    if ($err ne "") {
+        Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+    }
+    elsif ($data ne "") {
+        if ($param->{code} == 200 || $param->{code} == 400  || $param->{code} == 401) {
+            eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+        } else {
+            Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+        }
+    }
     return undef;
 }
 ###############################################################################
@@ -1199,6 +1340,39 @@ sub Unifi_ClientNames($@) {
         $clients =~ s/.$//;
         
         return $clients;
+    }
+}
+###############################################################################
+sub Unifi_SSIDs($@){
+    my ($hash,$ID,$W) = @_;
+    
+    my $wlanRef;
+    
+    if(defined $ID && defined $W && $W eq 'makeName') {   # Return Name from ID
+        $wlanRef = $hash->{wlans}->{$ID};
+        if (defined $wlanRef->{name} && $wlanRef->{name} =~ /^([\w\.\-]+)$/) {
+            $ID = $1;
+        }
+        return $ID;
+    }
+    elsif (defined $ID && defined $W && $W eq 'makeID') {   # Return ID from Name 
+        for (keys %{$hash->{wlans}}) {
+            $wlanRef = $hash->{wlans}->{$_};
+            if (defined $wlanRef->{name} && $wlanRef->{name} eq $ID) {
+                $ID = $_;
+                last;
+            }
+        }
+        return $ID;
+    }
+    else {  # Return all aps in a scalar
+        my $aps = '';
+        for my $apID (keys %{$hash->{wlans}}) {
+            $aps .= Unifi_SSIDs($hash,$apID,'makeName').',';
+        }
+        $aps =~ s/.$//;
+        
+        return $aps;
     }
 }
 ###############################################################################
@@ -1427,6 +1601,14 @@ Or you can use the other readings or set and get features to control your unifi-
     Stop 'locate' on one or all accesspoints. </li>
     <li><code>set &lt;name&gt; poeMode &lt;name|mac|id&gt; &lt;port&gt; &lt;off|auto|passive|passthrough|restart&gt;</code><br>
     Set PoE mode for &lt;port&gt;. </li>
+    <li><code>set &lt;name&gt; blockClient &lt;clientname&gt;</code><br>
+    Block the &lt;clientname&gt;</li>
+    <li><code>set &lt;name&gt; unblockClient &lt;clientname&gt;</code><br>
+    Unblocks the &lt;clientname&gt;</li>
+    <li><code>set &lt;name&gt; disableWLAN &lt;ssid&gt;</code><br>
+    Disables WLAN with &lt;ssid&gt;</li>
+    <li><code>set &lt;name&gt; enableWLAN &lt;ssid&gt;</code><br>
+    Enables WLAN with &lt;ssid&gt;</li>
 </ul>
 
 
@@ -1478,7 +1660,7 @@ Or you can use the other readings or set and get features to control your unifi-
 <h4>Readings</h4>
 <ul>
     Note: All readings generate events. You can control this with <a href="#readingFnAttributes">these global attributes</a>.
-    <li>Each client has 6 readings for connection-state, SNR, uptime, last_seen-time, connected-AP and hostname.</li>
+    <li>Each client has 7 readings for connection-state, SNR, uptime, last_seen-time, connected-AP, essid and hostname.</li>
     <li>Each AP has 3 readings for state (can be 'ok' or 'error'), essid's and count of connected-clients.</li>
     <li>The unifi-controller has 6 readings for event-count in configured 'timePeriod', unarchived-alert count, accesspoint count, overall wlan-state (can be 'ok', 'warning', or other?), connected user count and connected guest count. </li>
     <li>The Unifi-device reading 'state' represents the connection-state to the unifi-controller (can be 'connected', 'disconnected', 'initialized' and 'disabled').</li>
