@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_DbRep: V7.4.0, new commands dumpSQLite/restoreSQLite,
+                       execute commands before/after set optimizeTables, 
+                       vacuum, restoreMySQL, restoreSQLite available,
+                       CAUTION !! attributes executeBeforeDump/executeAfterDump
+                       are renamed to executeBeforeProc/executeAfterProc
   - feature: 74_Unifi: add new set commands to block/unblock clients,
                        enable/disable WLAN, new client-Reading essid
   - feature: structure: implement dynamic members via devspec (Forum #82604)

@@ -37,6 +37,11 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.4.0        09.01.2018       dumpSQLite/restoreSQLite, 
+#                               backup/restore now available when DbLog-device has reopen xxxx running, 
+#                               executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, 
+#                               restoreSQLite, 
+#                               attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc
 # 7.3.1        08.01.2018       fix syntax error for perl < 5.20
 # 7.3.0        07.01.2018       DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext
 #                               improved, 
@@ -63,7 +68,7 @@
 #                               fix currentfillup_Push PostgreSQL -> use $runtime_string_next as Timestring during current
 #                               insert
 # 6.3.0        04.12.2017       support addition format d:xx h:xx m:xx s:xx for attributes timeDiffToNow, timeOlderThan
-# 6.2.3        04.12.2017       fix localtime(time); (current time deduction) in createTimeArray
+# 6.2.3        04.12.2017       fix localtime(time); (current time deduction) in DbRep_createTimeArray
 # 6.2.2        01.12.2017       support all aggregations for delSeqDoublets, better output filesize when mysql dump finished
 # 6.2.1        30.11.2017       support delSeqDoublets without device,reading is set and support device-devspec, reading list,
 #                               minor fixes in delSeqDoublets
@@ -75,7 +80,7 @@
 # 5.8.5        19.10.2017       filter unwanted characters in "procinfo"-result 
 # 5.8.4        17.10.2017       createSelectSql, createDeleteSql, currentfillup_Push switch to devspec 
 # 5.8.3        16.10.2017       change to use createSelectSql: minValue,diffValue - createDeleteSql: delEntries
-# 5.8.2        15.10.2017       sub createTimeArray
+# 5.8.2        15.10.2017       sub DbRep_createTimeArray
 # 5.8.1        15.10.2017       change to use createSelectSql: sumValue,averageValue,exportToFile,maxValue
 # 5.8.0        15.10.2017       adapt createSelectSql for better performance if time/aggregation not set, 
 #                               can set table as flexible argument for countEntries, fetchrows (default: history),
@@ -145,7 +150,7 @@
 # 4.11.0       18.02.2017       added [current|previous]_[month|week|day|hour]_begin and 
 #                               [current|previous]_[month|week|day|hour]_end as options of timestamp
 # 4.10.3       01.02.2017       rename reading "diff-overrun_limit-" to "diff_overrun_limit_", 
-#                               collaggstr day aggregation changed back from 4.7.5 change
+#                               DbRep_collaggstr day aggregation changed back from 4.7.5 change
 # 4.10.2       16.01.2017       bugfix uninitialized value $renmode if RenameAgent
 # 4.10.1       30.11.2016       bugfix importFromFile format problem if UNIT-field wasn't set
 # 4.10         28.12.2016       del_DoParse changed to use Wildcards, del_ParseDone changed to use readingNameMap
@@ -163,7 +168,7 @@
 # 4.8          09.12.2016       diffValue selection chenged to "between"
 # 4.7.7        08.12.2016       code review
 # 4.7.6        07.12.2016       DbRep version as internal, check if perl module DBI is installed
-# 4.7.5        05.12.2016       collaggstr day aggregation changed
+# 4.7.5        05.12.2016       DbRep_collaggstr day aggregation changed
 # 4.7.4        28.11.2016       sub calcount changed due to Forum #msg529312
 # 4.7.3        20.11.2016       new diffValue function made suitable to SQLite
 # 4.7.2        20.11.2016       commandref adapted, state = Warnings adapted
@@ -259,7 +264,7 @@
 # 2.1          25.05.2016       codechange
 # 2.0          24.05.2016       added nonblocking function for fetchrow
 # 1.2          21.05.2016       function and attribute for delEntries added
-# 1.1          20.05.2016       change result-format of "count", move runtime-counter to sub collaggstr
+# 1.1          20.05.2016       change result-format of "count", move runtime-counter to sub DbRep_collaggstr
 # 1.0          19.05.2016       Initial
 #
 
@@ -279,7 +284,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "7.3.1";
+my $DbRepVersion = "7.4.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -312,8 +317,8 @@ sub DbRep_Initialize($) {
 					   "dumpMemlimit ".
 					   "dumpSpeed ".
 					   "dumpFilesKeep:1,2,3,4,5,6,7,8,9,10 ".
-					   "executeBeforeDump ".
-					   "executeAfterDump ".
+					   "executeBeforeProc ".
+					   "executeAfterProc ".
                        "expimpfile ".
 					   "fetchRoute:ascent,descent ".
 					   "ftpUse:1,0 ".
@@ -405,13 +410,22 @@ sub DbRep_Set($@) {
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbmodel        = $hash->{dbloghash}{MODEL};
   my $dbname         = $hash->{DATABASE};
+  my $sd ="";
   
   my (@bkps,$dir);
   $dir = AttrVal($name, "dumpDirLocal", "./");  # 'dumpDirRemote' (Backup-Verz. auf dem MySQL-Server) muß gemountet sein und in 'dumpDirLocal' eingetragen sein
   $dir = $dir."/" unless($dir =~ m/\/$/);
 	
   opendir(DIR,$dir);
-  my $sd = $dbname."_history_.*.csv";              
+  if ($dbmodel =~ /MYSQL/) {
+      $dbname = $hash->{DATABASE};
+      $sd = $dbname."_history_.*.csv"; 
+  } elsif ($dbmodel =~ /SQLITE/) {
+      $dbname = $hash->{DATABASE};
+      $dbname = (split /[\/]/, $dbname)[-1];
+      $dbname = (split /\./, $dbname)[0];
+      $sd = $dbname."_.*.sqlitebkp";
+  }               
   while (my $file = readdir(DIR)) {
       next unless (-f "$dir/$file");
       next unless ($file =~ /^$sd/);
@@ -438,22 +452,17 @@ sub DbRep_Set($@) {
 				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"dumpMySQL:clientSide,serverSide ":"").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/ )?"dumpSQLite:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"optimizeTables:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/ )?"vacuum:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)?"restoreMySQL:".$cj." ":"").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)?"restoreSQLite:".$cj." ":"").
                 (($hash->{ROLE} ne "Agent")?"countEntries:history,current ":"");
   
   return if(IsDisabled($name));
-  if ($hash->{dbloghash}{HELPER}{REOPEN_RUNS} && $opt !~ /\?/) {
-      my $ro = (split(" ",FmtDateTime(gettimeofday()+$hash->{dbloghash}{HELPER}{REOPEN_RUNS})))[1];
-      Log3 ($name, 3, "DbRep $name - connection $dblogdevice to db $dbname is closed until $ro - $opt postponed");
-	  ReadingsSingleUpdateValue ($hash, "state", "connection $dblogdevice to $dbname is closed until $ro - $opt postponed", 1);
-	  return;
-  }
     
   if ($opt eq "dumpMySQL" && $hash->{ROLE} ne "Agent") {
        $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-	
 	   if ($prop eq "serverSide") {
            Log3 ($name, 3, "DbRep $name - ################################################################");
            Log3 ($name, 3, "DbRep $name - ###             New database serverSide dump                 ###");
@@ -463,40 +472,41 @@ sub DbRep_Set($@) {
            Log3 ($name, 3, "DbRep $name - ###             New database clientSide dump                 ###");
            Log3 ($name, 3, "DbRep $name - ################################################################");
 	   }
-	   
-	   # Befehl vor Dump ausführen
-	   my $ebd = AttrVal($name, "executeBeforeDump", undef);
-       if($ebd) {
-           Log3 ($name, 4, "DbRep $name - execute command before dump: '$ebd' ");
-	       my $err = AnalyzeCommandChain(undef, $ebd);     
-	       if ($err) {
-             Log3 ($name, 2, "DbRep $name - $err");
-			 ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-             ReadingsSingleUpdateValue ($hash, "state", "error - command before dump not successful", 1);
-			 return undef;
-           }
-       }
-	   
+	   # Befehl vor Procedure ausführen
+       DbRep_beforeproc($hash, "dump");
 	   DbRep_Main($hash,$opt,$prop);
        return undef;
   }
   
-  if ($opt eq "restoreMySQL" && $hash->{ROLE} ne "Agent") {
+  if ($opt eq "dumpSQLite" && $hash->{ROLE} ne "Agent") {
+       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+       Log3 ($name, 3, "DbRep $name - ################################################################");
+       Log3 ($name, 3, "DbRep $name - ###                    New SQLite dump                       ###");
+       Log3 ($name, 3, "DbRep $name - ################################################################"); 
+	   # Befehl vor Procedure ausführen
+       DbRep_beforeproc($hash, "dump");
+	   DbRep_Main($hash,$opt,$prop);
+       return undef;
+  }
+  
+  if ($opt =~ /restoreMySQL|restoreSQLite/ && $hash->{ROLE} ne "Agent") {
        $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###             New database Restore/Recovery                ###");
        Log3 ($name, 3, "DbRep $name - ################################################################");
+	   # Befehl vor Procedure ausführen
+       DbRep_beforeproc($hash, "restore");
 	   DbRep_Main($hash,$opt,$prop);
        return undef;
   }
   
   if ($opt =~ /optimizeTables|vacuum/ && $hash->{ROLE} ne "Agent") {
        $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-	
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###          New optimize table / vacuum execution           ###");
        Log3 ($name, 3, "DbRep $name - ################################################################");
-	   
+	   # Befehl vor Procedure ausführen
+       DbRep_beforeproc($hash, "optimize");	   
 	   DbRep_Main($hash,$opt);
        return undef;
   }
@@ -506,16 +516,29 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"cancelDump:noArg ":"");
   }
   
-  if ($opt =~ /countEntries/ && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-      my $table = $prop?$prop:"history";
-      DbRep_Main($hash,$opt,$table);
-      
-  } elsif ($opt eq "cancelDump" && $hash->{ROLE} ne "Agent") {
+  if ($opt eq "cancelDump" && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
 	  Log3 ($name, 3, "DbRep $name -> running Dump has been canceled");
 	  ReadingsSingleUpdateValue ($hash, "state", "Dump canceled", 1);
+      return undef;
+  } 
+  
+  #######################################################################################################
+  ##        keine Aktionen außer Backup/Restore solange Reopen xxxx im DbLog-Device läuft
+  #######################################################################################################
+  if ($hash->{dbloghash}{HELPER}{REOPEN_RUNS} && $opt !~ /\?/) {
+      my $ro = (split(" ",FmtDateTime(gettimeofday()+$hash->{dbloghash}{HELPER}{REOPEN_RUNS})))[1];
+      Log3 ($name, 3, "DbRep $name - connection $dblogdevice to db $dbname is closed until $ro - $opt postponed");
+	  ReadingsSingleUpdateValue ($hash, "state", "connection $dblogdevice to $dbname is closed until $ro - $opt postponed", 1);
+	  return;
+  }
+  #######################################################################################################
+  
+  if ($opt =~ /countEntries/ && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+      my $table = $prop?$prop:"history";
+      DbRep_Main($hash,$opt,$table);
       
   } elsif ($opt =~ m/delSeqDoublets/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
@@ -524,7 +547,7 @@ sub DbRep_Set($@) {
       } 
       DbRep_Main($hash,$opt,$prop);
       
-  } elsif ($opt eq "fetchrows" && $hash->{ROLE} ne "Agent") {
+  } elsif ($opt =~ /fetchrows/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my $table = $prop?$prop:"history";
       DbRep_Main($hash,$opt,$table);
@@ -737,8 +760,8 @@ sub DbRep_Attr($$$$) {
                          readingPreventFromDel
                          device
 						 diffAccept
-						 executeBeforeDump
-						 executeAfterDump
+						 executeBeforeProc
+						 executeAfterProc
                          expimpfile
 						 ftpUse
 						 ftpUser
@@ -1107,6 +1130,8 @@ sub DbRep_Main($$;$) {
  my $to          = AttrVal($name, "timeout", "86400");
  my $reading     = AttrVal($name, "reading", "%");
  my $device      = AttrVal($name, "device", "%");
+ my $dbloghash   = $hash->{dbloghash};
+ my $dbmodel     = $dbloghash->{MODEL};
  
  # Entkommentieren für Testroutine im Vordergrund
  # testexit($hash);
@@ -1117,24 +1142,37 @@ sub DbRep_Main($$;$) {
  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
  delread($hash);
  
- if ($opt =~ /dumpMySQL/) {	   
+ if ($opt =~ /dumpMySQL|dumpSQLite/) {	   
      BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
      BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
 	 BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
      
-	 if ($prop eq "serverSide") {
-	     $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_DoDumpServerSide", "$name", "DumpDone", $to, "DumpAborted", $hash);
-		 ReadingsSingleUpdateValue ($hash, "state", "serverSide Dump is running - be patient and see Logfile !", 1);
-	 } else {
-	     $hash->{HELPER}{RUNNING_BACKUP_CLIENT} = BlockingCall("mysql_DoDumpClientSide", "$name", "DumpDone", $to, "DumpAborted", $hash);
-		 ReadingsSingleUpdateValue ($hash, "state", "clientSide Dump is running - be patient and see Logfile !", 1);
-	 }
+     if($dbmodel =~ /MYSQL/) {
+	     if ($prop eq "serverSide") {
+	         $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_DoDumpServerSide", "$name", "DumpDone", $to, "DumpAborted", $hash);
+		     ReadingsSingleUpdateValue ($hash, "state", "serverSide Dump is running - be patient and see Logfile !", 1);
+	     } else {
+	         $hash->{HELPER}{RUNNING_BACKUP_CLIENT} = BlockingCall("mysql_DoDumpClientSide", "$name", "DumpDone", $to, "DumpAborted", $hash);
+		     ReadingsSingleUpdateValue ($hash, "state", "clientSide Dump is running - be patient and see Logfile !", 1);
+	     }
+     }
+     if($dbmodel =~ /SQLITE/) {
+         $hash->{HELPER}{RUNNING_BACKUP_CLIENT} = BlockingCall("sqlite_DoDump", "$name", "DumpDone", $to, "DumpAborted", $hash);
+         ReadingsSingleUpdateValue ($hash, "state", "SQLite Dump is running - be patient and see Logfile !", 1);    
+     }
      return;
  }
  
  if ($opt =~ /restoreMySQL/) {	
      BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
      $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_RestoreServerSide", "$name|$prop", "RestoreDone", $to, "RestoreAborted", $hash);
+	 ReadingsSingleUpdateValue ($hash, "state", "restore database is running - be patient and see Logfile !", 1);
+     return;
+ }
+ 
+ if ($opt =~ /restoreSQLite/) {	
+     BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
+     $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("sqlite_Restore", "$name|$prop", "RestoreDone", $to, "RestoreAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "restore database is running - be patient and see Logfile !", 1);
      return;
  }
@@ -1165,7 +1203,7 @@ sub DbRep_Main($$;$) {
  my $ts = "no_aggregation";                                        # Dummy für eine Select-Schleife wenn != $IsTimeSet || $IsAggrSet
  my ($IsTimeSet,$IsAggrSet,$aggregation) = checktimeaggr($hash); 
  if($IsTimeSet || $IsAggrSet) {
-     ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = createTimeArray($hash,$aggregation,$opt);
+     ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = DbRep_createTimeArray($hash,$aggregation,$opt);
  } else {
      Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: not set") if($opt !~ /tableCurrentPurge/);  
      Log3 ($name, 4, "DbRep $name - Timestamp end human readable: not set") if($opt !~ /tableCurrentPurge/); 
@@ -1235,7 +1273,7 @@ return;
 ################################################################################################################
 #                              Create zentrales Timsstamp-Array
 ################################################################################################################
-sub createTimeArray($$$) {
+sub DbRep_createTimeArray($$$) {
  my ($hash,$aggregation,$opt) = @_;
  my $name = $hash->{NAME}; 
 
@@ -1594,7 +1632,7 @@ $hash->{HELPER}{CV} = \%cv;
     # Aufbau Timestampstring mit Zeitgrenzen entsprechend Aggregation
     while (!$ll) {
         # collect aggregation strings         
-        ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll) = collaggstr($hash,$runtime,$i,$runtime_string_next);
+        ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll) = DbRep_collaggstr($hash,$runtime,$i,$runtime_string_next);
         $ts .= $runtime_string."#".$runtime_string_first."#".$runtime_string_next."|";
         $i++;
     } 
@@ -1605,7 +1643,7 @@ return ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_s
 ####################################################################################################
 #  Zusammenstellung Aggregationszeiträume
 ####################################################################################################
-sub collaggstr($$$$) {
+sub DbRep_collaggstr($$$$) {
  my ($hash,$runtime,$i,$runtime_string_next) = @_;
  my $name = $hash->{NAME};
  my $runtime_string;                                               # Datum/Zeit im SQL-Format für Readingname Teilstring
@@ -5105,7 +5143,7 @@ return;
 }
 
 ####################################################################################################
-#                             optimize Tables MySQL 
+#                             optimize Tables alle Datenbanken 
 ####################################################################################################
 sub DbRep_optimizeTables($) {
  my ($name)        = @_;
@@ -5299,7 +5337,7 @@ return "$name|$rt|''|$db_MB_start|$db_MB_end";
 }
 
 ####################################################################################################
-#             Auswertungsroutine optimze tables
+#             Auswertungsroutine optimize tables
 ####################################################################################################
 sub OptimizeDone($) {
   my ($string)     = @_;
@@ -5311,6 +5349,7 @@ sub OptimizeDone($) {
   my $db_MB_start  = $a[3];
   my $db_MB_end    = $a[4];
   my $name         = $hash->{NAME};
+  my $erread;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall OptimizeDone");
   
@@ -5326,10 +5365,16 @@ sub OptimizeDone($) {
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
     
-  my $state = "optimize tables finished";
   readingsBeginUpdate($hash);
   ReadingsBulkUpdateValue($hash, "SizeDbBegin_MB", $db_MB_start);
   ReadingsBulkUpdateValue($hash, "SizeDbEnd_MB", $db_MB_end);
+  readingsEndUpdate($hash, 1);
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "optimize");
+  
+  my $state = $erread?$erread:"optimize tables finished";
+  readingsBeginUpdate($hash);
   ReadingsBulkUpdateTimeState($hash,$brt,undef,$state);
   readingsEndUpdate($hash, 1);
 
@@ -5359,8 +5404,8 @@ sub mysql_DoDumpClientSide($) {
  my $memory_limit               = AttrVal($name, "dumpMemlimit", 100000);
  my $my_comment                 = AttrVal($name, "dumpComment", "");
  my $dumpspeed                  = AttrVal($name, "dumpSpeed", 10000);
- my $ebd                        = AttrVal($name, "executeBeforeDump", undef);
- my $ead                        = AttrVal($name, "executeAfterDump", undef);
+ my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
+ my $ead                        = AttrVal($name, "executeAfterProc", undef);
  my $mysql_commentstring        = "-- ";
  my $character_set              = "utf8";
  my $repver                     = $hash->{VERSION};
@@ -5816,8 +5861,8 @@ sub mysql_DoDumpServerSide($) {
  my $optimize_tables_beforedump = AttrVal($name, "optimizeTablesBeforeDump", 0);
  my $dump_path_rem              = AttrVal($name, "dumpDirRemote", "./");
  $dump_path_rem                 = $dump_path_rem."/" unless($dump_path_rem =~ m/\/$/);
- my $ebd                        = AttrVal($name, "executeBeforeDump", undef);
- my $ead                        = AttrVal($name, "executeAfterDump", undef);
+ my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
+ my $ead                        = AttrVal($name, "executeAfterProc", undef);
  my $table                      = "history";
  my ($dbh,$sth,$err,$db_MB_start,$db_MB_end,$drh);
  my (%db_tables,@tablenames);
@@ -5850,7 +5895,7 @@ sub mysql_DoDumpServerSide($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
 	 $dbh->disconnect;
      return "$name|''|$err|''|''|''|''|''|''";
  }
@@ -5879,7 +5924,7 @@ sub mysql_DoDumpServerSide($) {
      $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
 	 Log3 ($name, 2, "DbRep $name - $err");
 	 $err = encode_base64($@,"");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
 	 $dbh->disconnect;
      return "$name|''|$err|''|''|''|''|''|''";
  }
@@ -5901,7 +5946,7 @@ sub mysql_DoDumpServerSide($) {
  $Jahr      += 1900;
  $Monat     += 1;
  $Jahrestag += 1;
- my $time_stamp   = $Jahr."_".sprintf("%02d",$Monat)."_".sprintf("%02d",$Monatstag)."_".sprintf("%02d",$Stunden)."_".sprintf("%02d",$Minuten);
+ my $time_stamp = $Jahr."_".sprintf("%02d",$Monat)."_".sprintf("%02d",$Monatstag)."_".sprintf("%02d",$Stunden)."_".sprintf("%02d",$Minuten);
  
  my $bfile = $dbname."_".$table."_".$time_stamp.".csv";
  Log3 ($name, 5, "DbRep $name - Use Outfile: $dump_path_rem$bfile");
@@ -5963,6 +6008,127 @@ return "$name|$rt|''|$dump_path_rem$bfile|n.a.|$drh|$fsize|$ftp|$bfd";
 }
 
 ####################################################################################################
+#                                      Dump-Routine SQLite
+####################################################################################################
+sub sqlite_DoDump($) {
+ my ($name)                     = @_;
+ my $hash                       = $defs{$name};
+ my $dbloghash                  = $hash->{dbloghash};
+ my $dbname                     = $hash->{DATABASE};
+ my $dbconn                     = $dbloghash->{dbconn};
+ my $dbuser                     = $dbloghash->{dbuser};
+ my $dblogname                  = $dbloghash->{NAME};
+ my $dbpassword                 = $attr{"sec$dblogname"}{secret};
+ my $dump_path_def              = $attr{global}{modpath}."/log/";
+ my $dump_path                  = AttrVal($name, "dumpDirLocal", $dump_path_def);
+ $dump_path                     = $dump_path."/" unless($dump_path =~ m/\/$/);
+ my $optimize_tables_beforedump = AttrVal($name, "optimizeTablesBeforeDump", 0);
+ my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
+ my $ead                        = AttrVal($name, "executeAfterProc", undef);
+ my ($dbh,$err,$db_MB,$r,$query,$sth);
+ 
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall sqlite_DoDump");
+ 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
+ # Verbindung mit DB
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ if ($@) {
+	 $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
+     return "$name|''|$err|''|''|''|''|''|''";
+ }
+ 
+ if($optimize_tables_beforedump) {
+     # Vacuum vor Dump
+	 # Anfangsgröße ermitteln
+     $db_MB = (split(' ',qx(du -m $dbname)))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+     Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB");
+     $query  ="VACUUM";
+	 Log3 ($name, 5, "DbRep $name - current query: $query ");
+ 
+     Log3 ($name, 3, "DbRep $name - VACUUM database $dbname....");
+     eval {$sth = $dbh->prepare($query);
+           $r = $sth->execute();
+          }; 
+	 if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! SQLite-Error: ".$@);
+         Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
+		 $sth->finish;
+		 $dbh->disconnect;
+         return "$name|''|$err|''|''|''|''|''|''";     
+	 }
+	 
+	 # Endgröße ermitteln
+	 $db_MB = (split(' ',qx(du -m $dbname)))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+	 Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB");
+ } 
+ 
+ $dbname = (split /[\/]/, $dbname)[-1];
+  
+ Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname'");
+
+ # Startzeit ermitteln 
+ my ($Sekunden, $Minuten, $Stunden, $Monatstag, $Monat, $Jahr, $Wochentag, $Jahrestag, $Sommerzeit) = localtime(time);
+ $Jahr      += 1900;
+ $Monat     += 1;
+ $Jahrestag += 1;
+ my $time_stamp = $Jahr."_".sprintf("%02d",$Monat)."_".sprintf("%02d",$Monatstag)."_".sprintf("%02d",$Stunden)."_".sprintf("%02d",$Minuten);
+ 
+ $dbname = (split /\./, $dbname)[0];
+ my $bfile = $dbname."_".$time_stamp.".sqlitebkp";
+ Log3 ($name, 5, "DbRep $name - Use Outfile: $dump_path$bfile");
+
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+
+ eval { $dbh->sqlite_backup_to_file($dump_path.$bfile); }; 
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
+     $dbh->disconnect;
+     return "$name|''|$err|''|''|''|''|''|''";     
+ }
+  
+ $dbh->disconnect;
+  
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+
+ # Größe Dumpfile ermitteln
+ my @a = split(' ',qx(du $dump_path$bfile)) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+ 
+ my $filesize = ($a[0])?($a[0]*1024):"n.a.";
+ my $fsize    = byte_output($filesize);
+ Log3 ($name, 3, "DbRep $name - Size of backupfile: ".$fsize);
+ 
+ # Dumpfile per FTP senden
+ my ($ftperr,$ftpmsg) = sendftp($hash,$bfile); 
+ my $ftp = $ftperr?encode_base64($ftperr,""):$ftpmsg?encode_base64($ftpmsg,""):0;
+ 
+ # alte Dumpfiles löschen
+ my @fd  = deldumpfiles($hash,$bfile);
+ my $bfd = join(", ", @fd );
+ $bfd    = $bfd?encode_base64($bfd,""):0;
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+ 
+ $fsize = encode_base64($fsize,"");
+
+ $rt = $rt.",".$brt;
+ 
+ Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used: ".sprintf("%.0f",$brt)." seconds");
+ Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
+ 
+return "$name|$rt|''|$dump_path$bfile|n.a.|n.a.|$fsize|$ftp|$bfd";
+}
+
+####################################################################################################
 #             Auswertungsroutine der nicht blockierenden DB-Funktion Dump
 ####################################################################################################
 sub DumpDone($) {
@@ -6005,17 +6171,8 @@ sub DumpDone($) {
   ReadingsBulkUpdateValue($hash, "FTP_Message", $ftp) if($ftp);
   readingsEndUpdate($hash, 1);
 
-  # Befehl nach Dump ausführen
-  my $ead = AttrVal($name, "executeAfterDump", undef);
-  if($ead) {
-      Log3 ($name, 4, "DbRep $name - execute command after dump: '$ead' ");
-	  $err = AnalyzeCommandChain(undef, $ead);     
-	  if ($err) {
-          Log3 ($name, 2, "DbRep $name - $err");
-			 ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-			 $erread = "Warning - Database backup finished but command after dump not successful";
-      }
-  }
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "dump");
   
   my $state = $erread?$erread:"Database backup finished";
   readingsBeginUpdate($hash);
@@ -6027,6 +6184,80 @@ sub DumpDone($) {
   Log3 ($name, 4, "DbRep $name -> BlockingCall DumpDone finished");
   
 return;
+}
+
+####################################################################################################
+#                                     Restore SQLite
+####################################################################################################
+sub sqlite_Restore ($) {
+ my ($string) = @_;
+ my ($name, $bfile)      = split("\\|", $string);
+ my $hash                = $defs{$name};
+ my $dbloghash                  = $hash->{dbloghash};
+ my $dbconn                     = $dbloghash->{dbconn};
+ my $dbuser                     = $dbloghash->{dbuser};
+ my $dblogname                  = $dbloghash->{NAME};
+ my $dbpassword                 = $attr{"sec$dblogname"}{secret};
+ my $dump_path_def              = $attr{global}{modpath}."/log/";
+ my $dump_path                  = AttrVal($name, "dumpDirLocal", $dump_path_def);
+ $dump_path                     = $dump_path."/" unless($dump_path =~ m/\/$/);
+ my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
+ my $ead                        = AttrVal($name, "executeAfterProc", undef);
+ my ($dbh,$err,$dbname);
+ 
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall sqlite_Restore");
+ 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
+ # Verbindung mit DB
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ if ($@) {
+	 $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_Restore finished");
+     return "$name|''|$err|''|''";
+ }
+ 
+ eval { $dbname = $dbh->sqlite_db_filename(); };
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
+     $dbh->disconnect;
+     return "$name|''|$err|''|''";     
+ }
+ 
+ $dbname = (split /[\/]/, $dbname)[-1];
+  
+ Log3 ($name, 3, "DbRep $name - Starting restore of database '$dbname'");
+
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+
+ eval { $dbh->sqlite_backup_from_file($dump_path.$bfile); }; 
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
+     $dbh->disconnect;
+     return "$name|''|$err|''|''";       
+ }
+  
+ $dbh->disconnect;
+  
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
+ Log3 ($name, 3, "DbRep $name - Restore of $dump_path$bfile into '$dbname' finished - total time used: ".sprintf("%.0f",$brt)." seconds.");
+ Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_Restore finished");
+ 
+return "$name|$rt|''|$dump_path$bfile|n.a.";
 }
 
 ####################################################################################################
@@ -6058,7 +6289,7 @@ sub mysql_RestoreServerSide($) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_RestoreServerSide finished");
-     return "$name|''|$err|''|''|''|''";
+     return "$name|''|$err|''|''";   
  }
  
  Log3 ($name, 3, "DbRep $name - Starting restore of database '$dbname', table '$table'.");
@@ -6078,7 +6309,7 @@ sub mysql_RestoreServerSide($) {
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_RestoreServerSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''|''";     
+     return "$name|''|$err|''|''";     
   }
   
  $sth->finish;
@@ -6092,11 +6323,10 @@ sub mysql_RestoreServerSide($) {
 
  $rt = $rt.",".$brt;
  
- Log3 ($name, 3, "DbRep $name - Restore of $dump_path_rem$bfile into '$dbname', '$table' finished - total time used: ".sprintf("%.0f",$brt)." sec for $drh datasets.");
- Log3 ($name, 3, "DbRep $name - Number of imported datasets: $drh.");
+ Log3 ($name, 3, "DbRep $name - Restore of $dump_path_rem$bfile into '$dbname', '$table' finished - total time used: ".sprintf("%.0f",$brt)." seconds.");
  Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_RestoreServerSide finished");
  
-return "$name|$rt|''|$dump_path_rem$bfile|$drh";
+return "$name|$rt|''|$dump_path_rem$bfile|n.a.";
 }
 
 ####################################################################################################
@@ -6112,6 +6342,7 @@ sub RestoreDone($) {
   my $bfile      = $a[3];
   my $drh        = $a[4];
   my $name       = $hash->{NAME};
+  my $erread;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall RestoreDone");
   
@@ -6125,9 +6356,15 @@ sub RestoreDone($) {
       return;
   } 
   
-  my $state = "Restore of $bfile finished";
   readingsBeginUpdate($hash);
   ReadingsBulkUpdateValue($hash, "RestoreRowsHistory", $drh);
+  readingsEndUpdate($hash, 1);
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "restore");
+  
+  my $state = $erread?$erread:"Restore of $bfile finished";
+  readingsBeginUpdate($hash);
   ReadingsBulkUpdateTimeState($hash,$brt,undef,$state);
   readingsEndUpdate($hash, 1);
 
@@ -6144,17 +6381,23 @@ return;
 sub RestoreAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
-  my $dbh  = $hash->{DBH} if ($hash->{DBH}); 
+  my $dbh  = $hash->{DBH}; 
+  my $erread;
   
   $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
+
+  # Befehl nach Procedure ausführen
+  no warnings 'uninitialized'; 
+  $erread = DbRep_afterproc($hash, "restore");
+  $erread = ", ".(split("but", $erread))[1] if($erread);
   
-  my $state = "Database restore $cause";
+  my $state = $cause.$erread;
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
   
-  Log3 ($name, 3, "DbRep $name - Database restore aborted by \"$cause\" ");
+  Log3 ($name, 2, "DbRep $name - Database restore aborted by \"$cause\" ");
   
   delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
@@ -6171,10 +6414,11 @@ sub ParseAborted(@) {
   
   $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
+
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash,"state",$cause, 1);
-  delete($hash->{HELPER}{RUNNING_PID});
   
+  delete($hash->{HELPER}{RUNNING_PID});
 return;
 }
 
@@ -6184,26 +6428,19 @@ return;
 sub DumpAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
-  my $dbh  = $hash->{DBH} if ($hash->{DBH}); 
-  my ($err,$erread);
+  my $dbh  = $hash->{DBH}; 
+  my ($erread);
   
   $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} pid:$hash->{HELPER}{RUNNING_BACKUP_CLIENT}{pid} $cause") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} pid:$hash->{HELPER}{RUNNING_BCKPREST_SERVER}{pid} $cause") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
   
-  # Befehl nach Dump ausführen
-  my $ead = AttrVal($name, "executeAfterDump", undef);
-  if($ead) {
-      Log3 ($name, 4, "DbRep $name - execute command after dump: '$ead' ");
-	  $err = AnalyzeCommandChain(undef, $ead);     
-	  if ($err) {
-          Log3 ($name, 2, "DbRep $name - $err");
-			 ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-			 $erread = "Warning - Database backup ended with \"$cause\" and command after dump not successful";
-      }
-  }
+  # Befehl nach Procedure ausführen
+  no warnings 'uninitialized'; 
+  $erread = DbRep_afterproc($hash, "dump");
+  $erread = ", ".(split("but", $erread))[1] if($erread);
   
-  my $state = $erread?$erread:$cause;
+  my $state = $cause.$erread;
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
   
@@ -6221,13 +6458,23 @@ sub OptimizeAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh  = $hash->{DBH}; 
+  my ($erread);
   
   $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_OPTIMIZE}}{fn} pid:$hash->{HELPER}{RUNNING_OPTIMIZE}{pid} $cause");
-  $dbh->disconnect() if(defined($dbh));
-  ReadingsSingleUpdateValue ($hash, "state", $cause, 1);
-  delete($hash->{HELPER}{RUNNING_OPTIMIZE});
   
+  # Befehl nach Procedure ausführen
+  no warnings 'uninitialized'; 
+  $erread = DbRep_afterproc($hash, "optimize");
+  $erread = ", ".(split("but", $erread))[1] if($erread);
+  
+  my $state = $cause.$erread;
+  $dbh->disconnect() if(defined($dbh));
+  ReadingsSingleUpdateValue ($hash, "state", $state, 1);
+  
+  Log3 ($name, 2, "DbRep $name - Database optimize aborted by \"$cause\" ");
+  
+  delete($hash->{HELPER}{RUNNING_OPTIMIZE}); 
 return;
 }
 
@@ -6550,6 +6797,53 @@ sub DbRep_charfilter ($) {
 return($txt);
 }
 
+###################################################################################
+#                    Befehl vor Procedure ausführen
+###################################################################################
+sub DbRep_beforeproc ($$) {
+  my ($hash, $txt) = @_;
+  my $name         = $hash->{NAME};
+  
+  # Befehl vor Procedure ausführen
+  my $ebd = AttrVal($name, "executeBeforeProc", undef);
+  if($ebd) {
+      Log3 ($name, 3, "DbRep $name - execute command before $txt: '$ebd' ");
+	  my $err = AnalyzeCommandChain(undef, $ebd);     
+	  if ($err) {
+          Log3 ($name, 2, "DbRep $name - command before $txt message: \"$err\" ");
+          my $erread = "Warning - message from command before $txt appeared";
+		  ReadingsSingleUpdateValue ($hash, "before".$txt."_message", $err, 1);
+		  ReadingsSingleUpdateValue ($hash, "state", $erread, 1);
+      }
+  }  
+
+return;  
+}
+
+###################################################################################
+#                    Befehl nach Procedure ausführen
+###################################################################################
+sub DbRep_afterproc ($$) {
+  my ($hash, $txt) = @_;
+  my $name         = $hash->{NAME};
+  my $erread;
+  
+  # Befehl nach Procedure ausführen
+  no warnings 'uninitialized'; 
+  my $ead = AttrVal($name, "executeAfterProc", undef);
+  if($ead) {
+      Log3 ($name, 4, "DbRep $name - execute command after $txt: '$ead' ");
+	  my $err = AnalyzeCommandChain(undef, $ead);     
+	  if ($err) {
+          Log3 ($name, 2, "DbRep $name - command after $txt message: \"$err\" ");
+		  ReadingsSingleUpdateValue ($hash, "after".$txt."_message", $err, 1);
+		  $erread = "Warning - $txt finished, but command after $txt message appeared";
+      }
+  }
+
+return $erread;  
+}
+
 ##############################################################################################
 #   timestamp_begin, timestamp_end bei Einsatz datetime-Picker entsprechend
 #   den Anforderungen formatieren     
@@ -6630,7 +6924,7 @@ return undef;
 ####################################################################################################
 #                          erstellen neues SQL-File für Dumproutine
 ####################################################################################################
-sub NewDumpFilename {
+sub NewDumpFilename ($$$$$){
     my ($sql_text,$dump_path,$dbname,$time_stamp,$character_set) = @_;
 	my $part       = "";
     my $sql_file   = $dump_path.$dbname."_".$time_stamp.$part.".sql";
@@ -6653,7 +6947,7 @@ return ($sql_text,$first_insert,$sql_file,$backupfile,undef);
 ####################################################################################################
 #                          Schreiben DB-Dumps in SQL-File
 ####################################################################################################
-sub WriteToDumpFile {
+sub WriteToDumpFile ($$) {
     my ($inh,$sql_file) = @_;
     my $filesize;
 	my $err = 0;
@@ -6675,7 +6969,7 @@ return ($filesize,undef);
 ####################################################################################################
 #             Filesize (Byte) umwandeln in KB bzw. MB
 ####################################################################################################
-sub byte_output {
+sub byte_output ($) {
     my $bytes  = shift;
 	
 	return if(!defined($bytes));
@@ -6692,7 +6986,7 @@ return $ret;
 ####################################################################################################
 #             Tabellenoptimierung MySQL
 ####################################################################################################
-sub mysql_optimize_tables {
+sub mysql_optimize_tables ($$@) {
   my ($hash,$dbh,@tablenames) = @_;
   my $name   = $hash->{NAME};
   my $dbname = $hash->{DATABASE};
@@ -6771,8 +7065,8 @@ sub deldumpfiles ($$) {
   my $dump_path_def = $attr{global}{modpath}."/log/";
   my $dump_path_loc = AttrVal($name,"dumpDirLocal", $dump_path_def);
   my $dfk           = AttrVal($name,"dumpFilesKeep", 3);
-  my $pfix          = (split '\.', $bfile)[ -1 ];
-  my $dbname        = $hash->{DATABASE};
+  my $pfix          = (split '\.', $bfile)[-1];
+  my $dbname        = (split '_', $bfile)[0];
   my $file          = $dbname."_.*".$pfix;
   my @fd;
 
@@ -7067,9 +7361,9 @@ return;
      <li> rename of device names in datasets </li>
      <li> automatic rename of device names in datasets and other DbRep-definitions after FHEM "rename" command (see <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Execution of arbitrary user specific SQL-commands </li>
-	 <li> creation of backups non-blocking (MySQL) </li>
+	 <li> creation of backups of the database in running state non-blocking (MySQL, SQLite) </li>
 	 <li> transfer dumpfiles to a FTP server after backup </li>
-	 <li> restore of serverSide-backups non-blocking (MySQL) </li>
+	 <li> restore of SQLite-dumps and MySQL serverSide-backups non-blocking </li>
 	 <li> optimize the connected database (optimizeTables, vacuum) </li>
 	 <li> report of existing database processes (MySQL) </li>
 	 <li> purge content of current-table </li>
@@ -7284,22 +7578,23 @@ return;
                                  The target directory can be set by <a href="#DbRepattr">attribute</a> "dumpDirLocal" and has to be
 								 writable by the FHEM process. <br>
 								 Before executing the dump a table optimization can be processed optionally (see attribute 
-								 "optimizeTablesBeforeDump") as well as a FHEM-command (attribute "executeBeforeDump"). <br><br>
+								 "optimizeTablesBeforeDump") as well as a FHEM-command (attribute "executeBeforeProc"). <br><br>
 								 
-								 <b>Attention ! <br>
+								 <b>Note: <br>
 								 To avoid FHEM from blocking, you have to operate DbLog in asynchronous mode if the table
                                  optimization want to be used ! </b> <br><br>
 								 
-								 After the dump a FHEM-command can be executed as well (see attribute "executeAfterDump"). <br>
+								 After the dump a FHEM-command can be executed as well (see attribute "executeAfterProc"). <br>
 								 By the <a href="#DbRepattr">attributes</a> "dumpMemlimit" and "dumpSpeed" the run-time behavior of the function can be 
 								 controlled to optimize the performance and demand of ressources. <br><br>
 								 
                                  The attributes relevant for function "dumpMySQL clientSide" are "dumpComment", "dumpDirLocal", "dumpMemlimit", 
-								 "dumpSpeed ", "dumpFilesKeep", "executeBeforeDump", "executeAfterDump" and 
+								 "dumpSpeed ", "dumpFilesKeep", "executeBeforeProc", "executeAfterProc" and 
 								 "optimizeTablesBeforeDump". <br> 								 
                                  
-								 After a successfull finished dump old dumpfiles will be deleted and only the number of attribute 
-								 "dumpFilesKeep" (default: 3) would remain in target directory "dumpDirLocal". <br><br>
+								 After a successfull finished dump the old dumpfiles are deleted and only the number of files 
+                                 defined by attribute "dumpFilesKeep" (default: 3) remain in the target directory 
+                                 "dumpDirLocal". <br><br>
 
 								 The <b>naming convention of dump files</b> is:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sql <br><br>
 								 
@@ -7318,16 +7613,16 @@ return;
 								 any restrictions. <br>
 								 
 								 Before executing the dump a table optimization can be processed optionally (see attribute 
-								 "optimizeTablesBeforeDump") as well as a FHEM-command (attribute "executeBeforeDump"). <br><br>
+								 "optimizeTablesBeforeDump") as well as a FHEM-command (attribute "executeBeforeProc"). <br><br>
 								 
-								 <b>Attention ! <br>
+								 <b>Note: <br>
 								 To avoid FHEM from blocking, you have to operate DbLog in asynchronous mode if the table
                                  optimization want to be used ! </b> <br><br>
 								 
-								 After the dump a FHEM-command can be executed as well (see attribute "executeAfterDump"). <br>
+								 After the dump a FHEM-command can be executed as well (see attribute "executeAfterProc"). <br>
 								 
                                  The attributes relevant for function "dumpMySQL serverSide" are "dumpDirRemote", "dumpDirLocal", 
-								 "dumpFilesKeep", "optimizeTablesBeforeDump", "executeBeforeDump" and "executeAfterDump". <br><br>
+								 "dumpFilesKeep", "optimizeTablesBeforeDump", "executeBeforeProc" and "executeAfterProc". <br><br>
 								 
                                  The target directory can be set by <a href="#DbRepattr">attribute</a> "dumpDirRemote". 
                                  It must be located on the MySQL-Host and has to be writable by the MySQL-server process. <br>
@@ -7393,6 +7688,36 @@ return;
                                  </ul>
 								   
 								 </li><br>
+                                 
+    <li><b> dumpSQLite </b>   -  creates a dump of the connected SQLite database.  <br>
+	                             This function uses the SQLite Online Backup API and allow to create a consistent backup of the 
+                                 database during the normal operation.
+	                             The dump will be saved in FHEM log-directory by default.
+                                 The target directory can be defined by <a href="#DbRepattr">attribute</a> "dumpDirLocal" and 
+                                 has to be writable by the FHEM process. <br>
+								 Before executing the dump a table optimization can be processed optionally (see attribute 
+								 "optimizeTablesBeforeDump"). 
+                                 <br><br>
+								 
+								 <b>Note: <br>
+								 To avoid FHEM from blocking, you have to operate DbLog in asynchronous mode if the table
+                                 optimization want to be used ! </b> <br><br>
+                                 
+                                 Before and after the dump a FHEM-command can be executed (see attribute "executeBeforeProc", 
+                                 "executeAfterProc"). <br>
+								 
+                                 The attributes relevant for this function are "dumpDirLocal", "dumpFilesKeep", "executeBeforeProc", 
+                                 "executeAfterProc" and "optimizeTablesBeforeDump". <br>
+                                 
+								 After a successfull finished dump the old dumpfiles are deleted and only the number of attribute 
+								 "dumpFilesKeep" (default: 3) remain in the target directory "dumpDirLocal". <br><br>
+
+								 The <b>naming convention of dump files</b> is:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sqlitebkp <br><br>
+					 
+                                 The database can be restored by command "set &lt;DbRep-device&gt; restoreSQLite &lt;filename&gt;" <br>
+                                 The created dump file can be transfered to a FTP-server. Please see explanations about FTP-
+                                 transfer in topic "dumpMySQL". <br><br>
+								 </li><br>
 								 
     <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format between period given by timestamp. 
                                  Limitations of selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading. 
@@ -7401,7 +7726,7 @@ return;
                                  recording the specified aggregation. 
                                  Is, for example, "aggregation = month" set, the data are selected in monthly packets and written
                                  into the exportfile. Thereby the usage of main memory is optimized if very large amount of data
-                                 is exported.                                  
+                                 is exported and avoid the "died prematurely" error.                                  
                                  </li> <br>
                                  
     <li><b> fetchrows [history|current] </b>    -  provides <b>all</b> table-entries (default: history) 
@@ -7452,8 +7777,11 @@ return;
                                  The reading to evaluate must be defined using attribute "reading". 
                                  The evaluation contains the timestamp of the <b>first</b> appearing of the identified minimum value within the given period.  </li> <br>    
 
-	<li><b> optimizeTables </b> - optimize tables in the connected database (MySQL). <br><br>
-								 
+	<li><b> optimizeTables </b> - optimize tables in the connected database (MySQL). <br>
+							      Before and after an optimization it is possible to execute a FHEM command. 
+                                  (please see <a href="#DbRepattr">attributes</a>  "executeBeforeProc", "executeAfterProc") 
+                                  <br><br>
+                                
 								 <ul>
 								 <b>Note:</b> <br>
                                  Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
@@ -7484,7 +7812,14 @@ return;
 								 Client and make it usable to the DbRep-device by setting the <a href="#DbRepattr">attribute</a> 
 								 "dumpDirLocal". <br>
 								 All files with extension "csv" and if the filename is beginning with the name of the connected database 
-								 (see Internal DATABASE) will be listed. <br><br>
+								 (see Internal DATABASE) are listed. <br><br>
+								 </li><br>
+                                 
+    <li><b> restoreSQLite &lt;File&gt;.sqlitebkp </b>  - restores a backup of SQLite database. <br>
+                                 The function provides a drop-down-list of files which can be used for restore.
+                                 The data stored in the current database are deleted respectively overwritten. 
+                                 All files with extension "sqlitebkp" and if the filename is beginning with the name of the connected database 
+								 will are listed. <br><br>
 								 </li><br>
 
 	<li><b> sqlCmd </b>        - executes an arbitrary user specific command. <br>
@@ -7541,8 +7876,11 @@ return;
 	<li><b> tableCurrentPurge </b> - deletes the content of current-table. There are no limits, e.g. by attributes "timestamp_begin", "timestamp_end", device, reading 
                                      and so on, considered.	</li> <br> 
 
-	<li><b> vacuum </b>       - optimize tables in the connected database (SQLite, PostgreSQL). <br><br>
-								 
+	<li><b> vacuum </b>       - optimize tables in the connected database (SQLite, PostgreSQL). <br>
+							    Before and after an optimization it is possible to execute a FHEM command. 
+                                (please see <a href="#DbRepattr">attributes</a>  "executeBeforeProc", "executeAfterProc") 
+                                <br><br>
+                                
 								<ul>
 								<b>Note:</b> <br>
                                 Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
@@ -7755,13 +8093,13 @@ return;
 								was created successfully. 
 								The global attrubute "archivesort" will be considered. </li> <br> 
   
-  <li><b>executeAfterDump </b> - you can specify a FHEM-command which should be executed <b>after dump</b>. <br>
-                                 Funktions have to be enclosed in {} .<br><br>
+  <li><b>executeAfterProc </b> - you can specify a FHEM-command which should be executed <b>after dump</b>. <br>
+                                 Perl functions have to be enclosed in {} .<br><br>
 
                                 <ul>
 							    <b>Example:</b> <br><br>
-								attr &lt;DbRep-device&gt; executeAfterDump set og_gz_westfenster off; <br>
-								attr &lt;DbRep-device&gt; executeAfterDump {adump ("&lt;DbRep-device&gt;")} <br><br>
+								attr &lt;DbRep-device&gt; executeAfterProc set og_gz_westfenster off; <br>
+								attr &lt;DbRep-device&gt; executeAfterProc {adump ("&lt;DbRep-device&gt;")} <br><br>
 								
 								# "adump" is a function defined in 99_myUtils.pm e.g.: <br>
 								
@@ -7778,13 +8116,13 @@ sub adump {
 </ul>
 </li>
   
-  <li><b>executeBeforeDump </b> - you can specify a FHEM-command which should be executed <b>before dump</b>. <br>
-                                  Funktions have to be enclosed in {} .<br><br>
+  <li><b>executeBeforeProc </b> - you can specify a FHEM-command which should be executed <b>before dump</b>. <br>
+                                  Perl functions have to be enclosed in {} .<br><br>
 
                                 <ul>
 							    <b>Example:</b> <br><br>
-								attr &lt;DbRep-device&gt; executeBeforeDump set og_gz_westfenster on; <br>
-								attr &lt;DbRep-device&gt; executeBeforeDump {bdump ("&lt;DbRep-device&gt;")} <br><br>
+								attr &lt;DbRep-device&gt; executeBeforeProc set og_gz_westfenster on; <br>
+								attr &lt;DbRep-device&gt; executeBeforeProc {bdump ("&lt;DbRep-device&gt;")} <br><br>
 								
 								# "bdump" is a function defined in 99_myUtils.pm e.g.: <br>
 								
@@ -8230,9 +8568,9 @@ sub bdump {
      <li> automatisches Umbenennen von Device-Namen in Datenbanksätzen und DbRep-Definitionen nach FHEM "rename" 
 	      Befehl (siehe <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Ausführen von beliebigen Benutzer spezifischen SQL-Kommandos </li>
-	 <li> Backups der FHEM-Datenbank erstellen (MySQL) </li>
+	 <li> Backups der FHEM-Datenbank im laufenden Betrieb erstellen (MySQL, SQLite) </li>
 	 <li> senden des Dumpfiles zu einem FTP-Server nach dem Backup </li>
-	 <li> Restore von serverSide-Backups (MySQL) </li>
+	 <li> Restore von SQLite-Dumps und MySQL serverSide-Backups </li>
 	 <li> Optimierung der angeschlossenen Datenbank (optimizeTables, vacuum) </li>
 	 <li> Ausgabe der existierenden Datenbankprozesse (MySQL) </li>
 	 <li> leeren der current-Tabelle </li>
@@ -8454,21 +8792,21 @@ sub bdump {
 								 gespeichert. 
 								 Das Zielverzeichnis kann mit dem <a href="#DbRepattr">Attribut</a> "dumpDirLocal" verändert werden und muß auf
 								 dem Client durch FHEM beschreibbar sein. <br>
-								 Vor dem Dump kann eine Tabellenoptimierung ("optimizeTablesBeforeDump") oder ein FHEM-Kommando 
-								 ("executeBeforeDump") optional zugeschaltet werden . <br><br>
+								 Vor dem Dump kann eine Tabellenoptimierung (Attribut "optimizeTablesBeforeDump") oder ein FHEM-Kommando 
+								 (Attribut "executeBeforeProc") optional zugeschaltet werden. <br><br>
 								 
 								 <b>Achtung ! <br>
 								 Um ein Blockieren von FHEM zu vermeiden, muß DbLog im asynchronen Modus betrieben werden wenn die
 								 Tabellenoptimierung verwendet wird ! </b> <br><br>
 								 
-								 Nach dem Dump kann ebenfalls ein FHEM-Kommando (siehe "executeAfterDump") ausgeführt werden. <br>
+								 Nach dem Dump kann ebenfalls ein FHEM-Kommando (siehe Attribut "executeAfterProc") ausgeführt werden. <br>
                                  Über die <a href="#DbRepattr">Attribute</a>  "dumpMemlimit" und "dumpSpeed" kann das Laufzeitverhalten der 
 								 Funktion beeinflusst werden um eine Optimierung bezüglich Performance und Ressourcenbedarf zu erreichen. <br>						 
                                  
 								 Die für "dumpMySQL clientSide" relevanten Attribute sind "dumpComment", "dumpDirLocal", "dumpMemlimit", 
-								 "dumpSpeed ", "dumpFilesKeep", "executeBeforeDump", "executeAfterDump" und "optimizeTablesBeforeDump". <br>
-								 Nach einem erfolgreichen Dump werden alte Dumpfiles gelöscht und nur die Anzahl "dumpFilesKeep" (default: 3)
-								 verbleibt im Zielverzeichnis "dumpDirLocal". <br><br>
+								 "dumpSpeed ", "dumpFilesKeep", "executeBeforeProc", "executeAfterProc" und "optimizeTablesBeforeDump". <br>
+								 Nach einem erfolgreichen Dump werden alte Dumpfiles gelöscht und nur die Anzahl Files definiert durch
+                                 das Attribut "dumpFilesKeep" (default: 3) verbleibt im Zielverzeichnis "dumpDirLocal". <br><br>
 								 
 								 Die <b>Namenskonvention der Dumpfiles</b> ist:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sql <br><br>
 								 
@@ -8486,17 +8824,17 @@ sub bdump {
 								 gespeichert. <br>
 								 Es wird die gesamte history-Tabelle (nicht current-Tabelle) <b>im CSV-Format</b> ohne 
 								 Einschränkungen exportiert. <br>
-								 Vor dem Dump kann eine Tabellenoptimierung ("Attribut optimizeTablesBeforeDump") 
+								 Vor dem Dump kann eine Tabellenoptimierung (Attribut "optimizeTablesBeforeDump") 
 								 optional zugeschaltet werden . <br><br>
 								 
 								 <b>Achtung ! <br>
 								 Um ein Blockieren von FHEM zu vermeiden, muß DbLog im asynchronen Modus betrieben werden wenn die
 								 Tabellenoptimierung verwendet wird ! </b> <br><br>
 								 
-								 Vor und nach dem Dump kann ein FHEM-Kommando (siehe "executeBeforeDump", "executeAfterDump") ausgeführt 
+								 Vor und nach dem Dump kann ein FHEM-Kommando (siehe Attribute "executeBeforeProc", "executeAfterProc") ausgeführt 
 								 werden. <br>
 								 Die für "dumpMySQL serverSide" relevanten Attribute sind "dumpDirRemote", "dumpDirLocal", 
-								 "dumpFilesKeep", "optimizeTablesBeforeDump", "executeBeforeDump" und "executeAfterDump". <br><br>
+								 "dumpFilesKeep", "optimizeTablesBeforeDump", "executeBeforeProc" und "executeAfterProc". <br><br>
 								 
 								 Das Zielverzeichnis kann mit dem <a href="#DbRepattr">Attribut</a> "dumpDirRemote" verändert werden. 
 								 Es muß sich auf dem MySQL-Host gefinden und durch den MySQL-Serverprozess beschreibbar sein. <br>
@@ -8538,7 +8876,7 @@ sub bdump {
                                  
 								 <b><u>FTP Transfer nach Dump</u></b> <br>
 								 Wenn diese Möglichkeit genutzt werden soll, ist das <a href="#DbRepattr">Attribut</a> "ftpUse" oder 
-								 "ftpUseSSL" zu setzen. Letzteres gilt wenn Verschlüsselung genutzt werden soll. <br>
+								 "ftpUseSSL" zu setzen. Letzteres gilt wenn eine verschlüsselte Übertragung genutzt werden soll. <br>
 								 Weitere <a href="#DbRepattr">Attribute</a> sind: <br><br>
 								 
 	                               <ul>
@@ -8562,13 +8900,43 @@ sub bdump {
 								 </ul>   
 								 </li><br>
                                  
+    <li><b> dumpSQLite </b>   -  erstellt einen Dump der angeschlossenen SQLite-Datenbank.  <br>
+	                             Diese Funktion nutzt die SQLite Online Backup API und ermöglicht es konsistente Backups der SQLite-DB
+                                 in laufenden Betrieb zu erstellen.
+                                 Der Dump wird per default im log-Verzeichnis des FHEM-Rechners gespeichert. 
+								 Das Zielverzeichnis kann mit dem <a href="#DbRepattr">Attribut</a> "dumpDirLocal" verändert werden und muß
+								 durch FHEM beschreibbar sein.
+					             Vor dem Dump kann optional eine Tabellenoptimierung (Attribut "optimizeTablesBeforeDump") 
+                                 zugeschaltet werden.
+                                 <br><br>
+								 
+								 <b>Achtung ! <br>
+								 Um ein Blockieren von FHEM zu vermeiden, muß DbLog im asynchronen Modus betrieben werden wenn die
+								 Tabellenoptimierung verwendet wird ! </b> <br><br>
+								 
+								 Vor und nach dem Dump kann ein FHEM-Kommando (siehe Attribute "executeBeforeProc", "executeAfterProc") 
+                                 ausgeführt werden. <br>					 
+                                 
+								 Die für diese Funktion relevanten Attribute sind "dumpDirLocal", "dumpFilesKeep", "executeBeforeProc", 
+                                 "executeAfterProc" und "optimizeTablesBeforeDump". <br>
+								 Nach einem erfolgreichen Dump werden alte Dumpfiles gelöscht und nur die Anzahl Files definiert durch das 
+                                 Attribut "dumpFilesKeep" (default: 3) verbleibt im Zielverzeichnis "dumpDirLocal". <br><br>
+								 
+								 Die <b>Namenskonvention der Dumpfiles</b> ist:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sqlitebkp <br><br>
+								 
+								 Die Datenbank kann mit "set &lt;DbRep-device&gt; restoreSQLite &lt;Filename&gt;" wiederhergestellt 
+                                 werden. <br>
+                                 Das erstellte Dumpfile kann auf einen FTP-Server übertragen werden. Siehe dazu die Erläuterungen
+                                 unter "dumpMySQL". <br><br>
+								 </li><br>
+                                 
     <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. 
                                  Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein. 
                                  Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br>
                                  Durch das Attribut "aggregation" wird der Export der Datensätze in Zeitscheiben der angegebenen Aggregation 
                                  vorgenommen. Ist z.B. "aggregation = month" gesetzt, werden die Daten in monatlichen Paketen selektiert und in
                                  das Exportfile geschrieben. Dadurch wird die Hauptspeicherverwendung optimiert wenn sehr große Datenmengen
-                                 exportiert werden sollen.                                 
+                                 exportiert werden sollen und vermeidet den "died prematurely" Abbruchfehler.                                 
                                  </li><br>
         
     <li><b> fetchrows [history|current] </b>    -  liefert <b>alle</b> Tabelleneinträge (default: history) 
@@ -8641,7 +9009,10 @@ sub bdump {
                                  Im Reading wird der Zeitstempel des <b>ersten</b> Auftretens vom Minimalwert ausgegeben 
 								 falls dieser Wert im Intervall mehrfach erreicht wird. </li> <br>
 								 
-	<li><b> optimizeTables </b> - optimiert die Tabellen in der angeschlossenen Datenbank (MySQL). <br><br>
+	<li><b> optimizeTables </b> - optimiert die Tabellen in der angeschlossenen Datenbank (MySQL). <br>
+								  Vor und nach der Optimierung kann ein FHEM-Kommando ausgeführt werden. 
+                                  (siehe <a href="#DbRepattr">Attribute</a>  "executeBeforeProc", "executeAfterProc")
+                                  <br><br>
 								 
 								<ul>
 								<b>Hinweis:</b> <br>
@@ -8676,6 +9047,14 @@ sub bdump {
 								 und im <a href="#DbRepattr">Attribut</a> "dumpDirLocal" dem DbRep-Device bekannt zu machen. <br>
 								 Es werden alle Files mit der Endung "csv" und deren Name mit der 
 								 verbundenen Datenbank beginnt (siehe Internal DATABASE), aufgelistet . <br><br>
+								 </li><br>
+                                 
+    <li><b> restoreSQLite &lt;File&gt;.sqlitebkp </b>  - stellt das Backup einer SQLite-Datenbank wieder her. <br>
+                                 Die Funktion stellt über eine Drop-Down Liste die für den Restore zur Verfügung stehenden Dateien
+                                 zur Verfügung. Die aktuell in der Zieldatenbank enthaltenen Daten werden gelöscht bzw. 
+                                 überschrieben.
+                                 Es werden alle Files mit der Endung "sqlitebkp" und deren Name mit dem Namen der 
+								 verbundenen Datenbank beginnt, aufgelistet . <br><br>
 								 </li><br>
 								 
     <li><b> sqlCmd </b>        - führt ein beliebiges Benutzer spezifisches Kommando aus. <br>
@@ -8732,14 +9111,17 @@ sub bdump {
 	<li><b> tableCurrentPurge </b> - löscht den Inhalt der current-Tabelle. Es werden keine Limitierungen, z.B. durch die Attribute "timestamp_begin", 
 	                                 "timestamp_end", device, reading, usw. , ausgewertet.	</li> <br> 
 								 
-	<li><b> vacuum </b>      - optimiert die Tabellen in der angeschlossenen Datenbank (SQLite, PostgreSQL). <br><br>
+	<li><b> vacuum </b>      - optimiert die Tabellen in der angeschlossenen Datenbank (SQLite, PostgreSQL). <br>
+							   Vor und nach der Optimierung kann ein FHEM-Kommando ausgeführt werden. 
+                               (siehe <a href="#DbRepattr">Attribute</a>  "executeBeforeProc", "executeAfterProc") 
+                               <br><br>
 								 
-								<ul>
-								<b>Hinweis:</b> <br>
-                                Obwohl die Funktion selbst non-blocking ausgelegt ist, muß das zugeordnete DbLog-Device
-                                im asynchronen Modus betrieben werden um ein Blockieren von FHEM zu vermeiden. <br><br>           
-								</li>
-                                </ul><br>
+							   <ul>
+							   <b>Hinweis:</b> <br>
+                               Obwohl die Funktion selbst non-blocking ausgelegt ist, muß das zugeordnete DbLog-Device
+                               im asynchronen Modus betrieben werden um ein Blockieren von FHEM zu vermeiden. <br><br>           
+							   </li>
+                               </ul><br>
 								                              
   <br>
   </ul></ul>
@@ -8938,13 +9320,13 @@ sub bdump {
                                 vorhanden, werden diese gelöscht nachdem ein neuer Dump erfolgreich erstellt wurde. Das globale
 								Attribut "archivesort" wird berücksichtigt. </li> <br> 
   
-  <li><b>executeAfterDump </b> - Es kann ein FHEM-Kommando angegeben werden welches <b>nach dem Dump</b> ausgeführt werden soll. <br>
+  <li><b>executeAfterProc </b> - Es kann ein FHEM-Kommando angegeben werden welches <b>nach dem Dump</b> ausgeführt werden soll. <br>
                                  Funktionen sind in {} einzuschließen.<br><br>
 
                                 <ul>
 							    <b>Beispiel:</b> <br><br>
-								attr &lt;DbRep-device&gt; executeAfterDump set og_gz_westfenster off; <br>
-								attr &lt;DbRep-device&gt; executeAfterDump {adump ("&lt;DbRep-device&gt;")} <br><br>
+								attr &lt;DbRep-device&gt; executeAfterProc set og_gz_westfenster off; <br>
+								attr &lt;DbRep-device&gt; executeAfterProc {adump ("&lt;DbRep-device&gt;")} <br><br>
 								
 								# "adump" ist eine in 99_myUtils definierte Funktion. <br>
 								
@@ -8961,13 +9343,13 @@ sub adump {
 </ul>
 </li>
 								
-  <li><b>executeBeforeDump </b> - Es kann ein FHEM-Kommando angegeben werden welches <b>vor dem Dump</b> ausgeführt werden soll. <br>
+  <li><b>executeBeforeProc </b> - Es kann ein FHEM-Kommando angegeben werden welches <b>vor dem Dump</b> ausgeführt werden soll. <br>
                                  Funktionen sind in {} einzuschließen.<br><br>
 
                                 <ul>
 							    <b>Beispiel:</b> <br><br>
-								attr &lt;DbRep-device&gt; executeBeforeDump set og_gz_westfenster on; <br>
-								attr &lt;DbRep-device&gt; executeBeforeDump {bdump ("&lt;DbRep-device&gt;")} <br><br>
+								attr &lt;DbRep-device&gt; executeBeforeProc set og_gz_westfenster on; <br>
+								attr &lt;DbRep-device&gt; executeBeforeProc {bdump ("&lt;DbRep-device&gt;")} <br><br>
 								
 								# "bdump" ist eine in 99_myUtils definierte Funktion. <br>
 								
