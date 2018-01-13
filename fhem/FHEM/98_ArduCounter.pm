@@ -45,10 +45,23 @@
 #   2017-02-18  fixed a bug that caused a missing open when the device is defined while fhem is already initialized
 #   2017-05-09  fixed character encoding for documentation text
 #   2017-09-24  interpolation of lost impulses during fhem restart / arduino reset
+#   2017-10-03  bug fix
+#   2017-10-06  more optimisations regarding longCount
+#   2017-10-08  more little bug fixes (parsing debug messages)
+#   2017-10-14  modifications for new sketch version 1.9
+#   2017-11-26  minor modifications of log levels
+#   2017-12-02  fixed adding up reject count reading
+#   2017-12-27  modified logging levels
+#   2018-01-01  little fixes
+#   2018-01-02  extend reporting line with history H.*, create new reading pinHistory if received from device and verboseReadings is set to 1
+#               create long count readings always, not only if attr verboseReadings is set to 1
+#	2018-01-03	little docu fix
+#	2018-01-13	little docu addon
 #
 # ideas / todo:
-# 
-
+#   - parse error messages from sketch and show it in a message box? async output?
+#   - timeMissed
+#
 
 
 package main;
@@ -67,7 +80,7 @@ my %ArduCounter_gets = (
     "info"  =>  ""
 );
 
-my $ArduCounter_Version = '4.8 - 24.9.2017';
+my $ArduCounter_Version = '5.7 - 2.1.2018';
 
 #
 # FHEM module intitialisation
@@ -94,6 +107,7 @@ sub ArduCounter_Initialize($)
         "readingNameCount[0-9]+ " .
         "readingNamePower[0-9]+ " .
         "readingNameLongCount[0-9]+ " .
+        "readingNameInterpolatedCount[0-9]+ " .
         "readingFactor[0-9]+ " .
         "readingStartTime[0-9]+ " .
         "verboseReadings[0-9]+ " .
@@ -135,8 +149,8 @@ sub ArduCounter_Define($$)
     delete $hash->{Initialized};
     
     if(!defined($attr{$name}{'flashCommand'})) {
-        #$attr{$name}{'flashCommand'} = 'avrdude -p atmega328P -b 57600 -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]';
-        $attr{$name}{'flashCommand'} = 'avrdude -p atmega328P -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]';
+        #$attr{$name}{'flashCommand'} = 'avrdude -p atmega328P -b 57600 -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]';		# for nano
+        $attr{$name}{'flashCommand'} = 'avrdude -p atmega328P -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]';				# for uno
     }
     
     if ($init_done) {
@@ -233,6 +247,7 @@ sub ArduCounter_Write ($$)
         Log3 $name, 4, "$name: Write called but device is disabled, dropping line to send";
         return 0;
     }   
+    Log3 $name, 4, "$name: Write: $line";
     DevIo_SimpleWrite( $hash, "$line\n", 2);
     return 1;
 }
@@ -550,7 +565,7 @@ sub ArduCounter_HandleVersion($$)
     my $name = $hash->{NAME};
     if ($line =~ / V([\d\.]+)/) {
         my $version = $1;
-        if ($version < "1.7") {
+        if ($version < "1.9") {
             $version .= " - not compatible with this Module version - please flash new sketch";
             Log3 $name, 3, "$name: device reported outdated Arducounter Firmware - please update!";
             delete $hash->{Initialized};
@@ -574,23 +589,26 @@ sub ArduCounter_Parse($)
     my $now   = gettimeofday();
     
     foreach my $line (@lines) {
-        # Log3 $name, 5, "$name: Parse line: $line";
-        if ($line =~ 'R([\d]+) C([\d]+) D([\d]+) T([\d]+)( N[\d]+)?( X[\d]+)?( F[\d]+)?(L [\d]+)?( A[\d]+)?')
+        #Log3 $name, 5, "$name: Parse line: $line";
+        if ($line =~ 'R([\d]+) C([\d]+) D([\d]+) R([\d]+) T([\d]+)( N[\d]+)?( X[\d]+)?( F[\d]+)?( L[\d]+)?( A[\d]+)?( H.*)?')
         {
             # new count is beeing reported
             my $pin    = $1;
             my $count  = $2;
             my $diff   = $3;
-            my $time   = $4;
-            my $deTime = ($5 ? substr($5, 2) / 1000 : "");
-            my $reject = ($6 ? substr($6, 2) : "");
-            my $first  = ($7 ? substr($7, 2) : "");
-            my $last   = ($8 ? substr($8, 2) : "");
-            my $avgLen = ($9 ? substr($9, 2) : "");
+            my $rDiff  = $4;
+            my $time   = $5;
+            my $deTime = ($6  ? substr($6, 2) / 1000 : "");
+            my $reject = ($7  ? substr($7, 2) : "");
+            my $first  = ($8  ? substr($8, 2) : "");
+            my $last   = ($9  ? substr($9, 2) : "");
+            my $avgLen = ($10 ? substr($10, 2) : "");
+            my $hist   = ($11 ? substr($11, 2) : "");
             
             my $factor = AttrVal($name, "readingFactor$pin", AttrVal($name, "factor", 1000));
             my $rcname = AttrVal($name, "readingNameCount$pin", "pin$pin");         # internal count reading name
-            my $rlname = AttrVal($name, "readingNameLongCount$pin", "long$pin");    # long count - continues after reset, interpolates 
+            my $rlname = AttrVal($name, "readingNameLongCount$pin", "long$pin");    # long count - continues after reset
+            my $riname = AttrVal($name, "readingNameInterpolatedCount$pin", "interpolatedLong$pin");    # interpol. count - continues after reset, interpolates 
             my $rpname = AttrVal($name, "readingNamePower$pin", "power$pin");       # power reading name
             my $lName  = AttrVal($name, "readingNamePower$pin", AttrVal($name, "readingNameCount$pin", "pin$pin")); # for logging
             
@@ -608,49 +626,56 @@ sub ArduCounter_Parse($)
                 next;
             }
             my $power  = sprintf ("%.3f", ($time ? $diff/$time/1000*3600*$factor : 0));
-            my $longCount;
 
-            
-            
-            if (AttrVal($name, "verboseReadings$pin", 0)) {
-                $longCount = ReadingsVal($name, $rlname, 0);        # alter long count Wert im Reading
-                if (!$hash->{CounterInterpolated}{$pin} && $hash->{CounterResetTime}) {
-                    my $lastCountTime = ReadingsTimestamp ($name, $rlname, 0);  # last time this reading was set
-                    my $lastCountTNum = time_str2num($lastCountTime);
-                    my $offlineTime   = sprintf ("%.2f", $hash->{CounterResetTime} - $lastCountTNum);
-                    
-                    my $lastInterval = ReadingsVal ($name, "timeDiff$pin", 0);
-                    my $lastCDiff    = ReadingsVal ($name, "countDiff$pin", 0);
-                    
+            my $intrCount = 0;
+            my $offlTime  = 0;            
+            my $longCount = ReadingsVal($name, $rlname, 0);        # alter long count Wert im Reading
+            my $intpCount = ReadingsVal($name, $riname, 0);        # alter interpolated count Wert im Reading
+            if (!$hash->{CounterInterpolated}{$pin} && $hash->{CounterResetTime}) {
+                # arduino reboot -> try to interpolate
+                my $lastCountTime = ReadingsTimestamp ($name, $rlname, 0);  # last time long count reading was set as string
+                my $lastCountTNum = time_str2num($lastCountTime);           # ... as number
+                
+                my $lastInterval  = ReadingsVal ($name, "timeDiff$pin", 0);
+                my $lastCDiff     = ReadingsVal ($name, "countDiff$pin", 0);
+                
+                Log3 $name, 4, "$name: arduino was restarted so some impulses might have got lost for $pin ($lName)";
+                $offlTime = sprintf ("%.2f", $hash->{CounterResetTime} - $lastCountTNum);
+                if ($lastCountTime && $lastInterval && ($offlTime > 0) && ($offlTime < 1000*60*60*12)) {
+                                                        # > 0 and < 12h
                     my $lastRatio = $lastCDiff / $lastInterval;
                     my $curRatio  = $diff / $time;
                     my $intRatio  = 1000 * ($lastRatio + $curRatio) / 2;
-                    my $interpolationCount = int($offlineTime * $intRatio) + 1;     # add one that gets lost as start of new interval
+                    $intrCount    = int(($offlTime * $intRatio)+0.5);
+
+                    Log3 $name, 3, "$name: pin $pin ($lName): interpolation after counter reset, offline $offlTime secs, $intrCount estimated pulses (before $lastCDiff in $lastInterval ms, now $diff in $time ms, avg ratio $intRatio p/s)";
+                    Log3 $name, 5, "$name: pin $pin ($lName): adding interpolated $intrCount to interpolated count $intpCount";
+                    $intpCount += $intrCount;
                     
-                    if ($lastCountTime && $lastInterval && $lastCDiff) {
-                        Log3 $name, 4, "$name: interpolation after counter reset for pin $pin ($lName): offline $offlineTime secs, $interpolationCount estimated pulses (before $lastCDiff in $lastInterval ms, now $diff in $time ms, avg ratio $intRatio p/s)";
-                        Log3 $name, 4, "$name: adding interpolated $interpolationCount and $diff to long count $longCount";
-                        $longCount += $interpolationCount;
-                    } else {
-                        Log3 $name, 4, "$name: interpolation for pin $pin ($lName) not possible - no historic data";
-                    }
-                    $hash->{CounterInterpolated}{$pin} = 1;
+                } else {
+                    Log3 $name, 4, "$name: interpolation of missed pulses for pin $pin ($lName) not possible - no valid historic data.";
                 }
-                $longCount += $diff;
+                $hash->{CounterInterpolated}{$pin} = 1;
             }
+            Log3 $name, 5, "$name: Pin $pin debug: adding $rDiff to long count $longCount and interpolated count $intpCount";
+            $intpCount += $rDiff;
+            $longCount += $rDiff;
             
-            Log3 $name, 4, "$name: Pin $pin ($lName) count $count longCount $longCount (diff $diff) in " .
-                sprintf("%.3f", $time/1000) . "s" .
+            Log3 $name, 4, "$name: Pin $pin ($lName) count $count " . 
+                ($longCount ? "longCount $longCount " : "") .
+                ($intpCount ? "interpCount $intpCount " : "") .
+                "(diff $diff) in " . sprintf("%.3f", $time/1000) . "s" .
                 ((defined($reject) && $reject ne "") ? ", reject $reject" : "") .
-                ($avgLen ? ", Avg Len ${avgLen}ms" : "") .
+                (defined($avgLen) ? ", Avg Len ${avgLen}ms" : "") .
                 ", result $power";
-            Log3 $name, 5, "$name: interval $fSdTim until $fEdTim" .
-                ($first ? ", First at $first" : "") .
-                ($last ? ", Last at $last" : "");
+            Log3 $name, 4, "$name: interval $fSdTim until $fEdTim" .
+                (defined($first) ? ", First at $first" : "") .
+                (defined($last) ? ", Last at $last" : "");
 
             
             readingsBeginUpdate($hash);            
             if (AttrVal($name, "readingStartTime$pin", 0)) {
+                # special way to set readings: use time of interval start as reading time
                 Log3 $name, 5, "$name: readingStartTime$pin specified: setting reading timestamp to $fSdTim";
                 Log3 $name, 5, "$name: set readings $rpname to $power, timeDiff$pin to $time and countDiff$pin to $diff";
 
@@ -664,33 +689,50 @@ sub ArduCounter_Parse($)
                 readingsBulkUpdate($hash, $rcname, $count);
                 $hash->{CHANGETIME}[$chIdx++] = $fETime;          
 
-                if (AttrVal($name, "verboseReadings$pin", 0)) {
-                    readingsBulkUpdate($hash, $rlname, $longCount);
-                    $hash->{CHANGETIME}[$chIdx++] = $fETime;                          
+                readingsBulkUpdate($hash, $rlname, $longCount);
+                $hash->{CHANGETIME}[$chIdx++] = $fETime;                          
+
+                readingsBulkUpdate($hash, $riname, $intpCount);
+                $hash->{CHANGETIME}[$chIdx++] = $fETime;                          
+                
+                if (defined($reject)) {
+                    my $rejCount = ReadingsVal($name, "reject$pin", 0);        # alter reject count Wert im Reading
+                    readingsBulkUpdate($hash, "reject$pin", $reject + $rejCount);
+                    $hash->{CHANGETIME}[$chIdx++] = $fETime;                  
+                }
+                if (AttrVal($name, "verboseReadings$pin", 0)) {                    
+
                     readingsBulkUpdate($hash, "timeDiff$pin", $time);
                     $hash->{CHANGETIME}[$chIdx++] = $fETime;
+                    
                     readingsBulkUpdate($hash, "countDiff$pin", $diff);
                     $hash->{CHANGETIME}[$chIdx++] = $fETime;
+
                     readingsBulkUpdate($hash, "lastMsg$pin", $line);
-                    $hash->{CHANGETIME}[$chIdx++] = $fETime;
-                    if (defined($reject)) {
-                        readingsBulkUpdate($hash, "reject$pin", $reject);
-                        $hash->{CHANGETIME}[$chIdx++] = $fETime;                  
+                    $hash->{CHANGETIME}[$chIdx++] = $fETime;                    
+
+                    if ($hist) {
+                        readingsBulkUpdate($hash, "pinHistory$pin", $hist);
+                        $hash->{CHANGETIME}[$chIdx++] = $fETime;
                     }
                 }
             } else {
+                # normal way to set readings
                 Log3 $name, 5, "$name: set readings $rpname to $power, timeDiff$pin to $time and countDiff$pin to $diff";
                 readingsBulkUpdate($hash, $rpname, $power) if ($time);
                 #$eTime = time_str2num(ReadingsTimestamp ($name, $rpname, 0));
                 readingsBulkUpdate($hash, $rcname, $count);
+                readingsBulkUpdate($hash, $rlname, $longCount);
+                readingsBulkUpdate($hash, $riname, $intpCount);
+                if (defined($reject)) {
+                    my $rejCount = ReadingsVal($name, "reject$pin", 0);        # alter reject count Wert im Reading
+                    readingsBulkUpdate($hash, "reject$pin", $reject + $rejCount);
+                }
                 if (AttrVal($name, "verboseReadings$pin", 0)) {
-                    readingsBulkUpdate($hash, $rlname, $longCount);
                     readingsBulkUpdate($hash, "timeDiff$pin", $time);
-                    readingsBulkUpdate($hash, "countDiff$pin", $diff);
+                    readingsBulkUpdate($hash, "countDiff$pin", $diff);              
                     readingsBulkUpdate($hash, "lastMsg$pin", $line);        
-                    if (defined($reject)) {
-                        readingsBulkUpdate($hash, "reject$pin", $reject);
-                    }
+                    readingsBulkUpdate($hash, "pinHistory$pin", $hist) if ($hist);
                 }
             }
             readingsEndUpdate($hash, 1);
@@ -701,7 +743,7 @@ sub ArduCounter_Parse($)
                         $hash->{'.Drift2'} = ($now - $hash->{'.DeTOff'}) - $deTime;
                     } else {
                         $hash->{'.DeTOff'}  = $now - $deTime;
-                        Log3 $name, 5, "$name: device clock wrapped (now $deTime, before $hash->{'.LastDeT'}). New offset is $hash->{'.DeTOff'}";
+                        Log3 $name, 4, "$name: device clock wrapped or reset (now $deTime, before $hash->{'.LastDeT'}). New offset is $hash->{'.DeTOff'}";
                     }
                 } else {
                     $hash->{'.DeTOff'}  = $now - $deTime;
@@ -765,7 +807,11 @@ sub ArduCounter_Parse($)
             Log3 $name, 3, "$name: please use set $name flash to update";
             ArduCounter_HandleVersion($hash, $line);
             
-        } elsif ($line =~ /^M (.*)/) {
+        } elsif ($line =~ /^D (.*)/) {                  # debug / info Message from device
+            $retStr .= "\n" if ($retStr);
+            $retStr .= $1;
+            Log3 $name, 4, "$name: device: $1";
+        } elsif ($line =~ /^M (.*)/) {                  # other Message from device
             $retStr .= "\n" if ($retStr);
             $retStr .= $1;
             Log3 $name, 3, "$name: device: $1";
@@ -928,9 +974,11 @@ sub ArduCounter_Ready($)
 <h3>ArduCounter</h3>
 
 <ul>
-    This module implements an Interface to an Arduino based counter for pulses on any input pin of an Arduino Uno, Nano or similar device like a Jeenode. The typical use case is an S0-Interface on an energy meter<br>
+    This module implements an Interface to an Arduino based counter for pulses on any input pin of an Arduino Uno, Nano or similar device like a Jeenode.<br>
+	The typical use case is an S0-Interface on an energy meter or water meter<br>
     Counters are configured with attributes that define which Arduino pins should count pulses and in which intervals the Arduino board should report the current counts.<br>
-    The Arduino sketch that works with this module uses pin change interrupts so it can efficiently count pulses on all available input pins.
+    The Arduino sketch that works with this module uses pin change interrupts so it can efficiently count pulses on all available input pins.<br>
+	The module creates readings for pulse counts, consumption and optionally also a pulse history with pulse lengths and gaps of the last 20 pulses.
     <br><br>
     <b>Prerequisites</b>
     <ul>
@@ -966,25 +1014,34 @@ sub ArduCounter_Ready($)
     <ul>
         Specify the pins where impulses should be counted e.g. as <code>attr AC pinX falling pullup 30</code> <br>
         The X in pinX can be an Arduino pin number with or without the letter D e.g. pin4, pinD5, pin6, pinD7 ...<br>
-        After the pin you can define if rising or falling edges of the signals should be counted. The optional keyword pullup activates the pullup resistor for the given Arduino Pin.
-        The last argument is also optional and specifies a minimal pulse length in milliseconds. In this case the first argument (e.g. falling) means that an impulse starts with a falling edge from 1 to 0 and ends when the signal changes back from 0 to 1.
+        After the pin you can use the keywords falling or rising to define if a logical one / 5V (rising) or a logical zero / 0V (falling) should be treated as pulse.<br>
+		The optional keyword pullup activates the pullup resistor for the given Arduino Pin. <br>
+        The last argument is also optional but recommended and specifies a minimal pulse length in milliseconds.<br>
+		An energy meter with S0 interface is typically connected to GND and an input pin like D4. The S0 pulse then pulls the input to 0V.<br>
+		Since the minimal pulse lenght of the s0 interface is specified to be 30ms, the typical configuration for an s0 interface is <br>
+		<code>attr AC pinX falling pullup 30</code><br>
+		Specifying a minimal pulse length is recommended since it filters bouncing of reed contacts or other noise.
         <br><br>
         Example:<br>
         <pre>
         define AC ArduCounter /dev/ttyUSB2
         attr AC factor 1000
         attr AC interval 60 300
-        attr AC pinD4 falling pullup
+        attr AC pinD4 falling pullup 5
         attr AC pinD5 falling pullup 30
+		attr AC verboseReadings5
         attr AC pinD6 rising
         </pre>
-        this defines three counters connected to the pins D4, D5 and D5. <br>
+		
+        This defines three counters connected to the pins D4, D5 and D5. <br>
         D4 and D5 have their pullup resistors activated and the impulse draws the pins to zero.  <br>
-        For D4 every falling edge of the signal (when the input changes from 1 to 0) is counted.<br>
-        For D5 the arduino measures the time in milliseconds between the falling edge and the rising edge. If this time is longer than the specified 30 milliseconds then the impulse is counted. If the time is shorter then this impulse is regarded as noise and added to a separate reject counter.<br>
-        For pin D6 the ardiono counts every time when the signal changes from 0 to 1. <br>
+        For D4 and D5 the arduino measures the time in milliseconds between the falling edge and the rising edge. If this time is longer than the specified 5 or 30 milliseconds 
+		then the impulse is counted. If the time is shorter then this impulse is regarded as noise and added to a separate reject counter.<br>
+		verboseReadings5 causes the module to create additional readings like the pulse history which shows length and gaps between the last pulses.<br>
+        For pin D6 the arduino does not check pulse lengths and counts every time when the signal changes from 0 to 1.<br>
         The ArduCounter sketch which must be loaded on the Arduino implements this using pin change interrupts,
-        so all avilable input pins can be used, not only the ones that support normal interrupts.
+        so all avilable input pins can be used, not only the ones that support normal interrupts. <br>
+		The module has been tested with 14 inputs of an Arduino Uno counting in parallel and pulses as short as 3 milliseconds.
     </ul>
     <br>
 
@@ -999,7 +1056,7 @@ sub ArduCounter_Ready($)
             onto the device. This command needs avrdude to be installed. The attribute flashCommand specidies how avrdude is called. If it is not modifed then the module sets it to avrdude -p atmega328P -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]<br>
             This setting should work for a standard installation and the placeholders are automatically replaced when 
             the command is used. So normally there is no need to modify this attribute.<br>
-            Depending on your specific Arduino board however, you might need to insert <code>-b 57600</code> in the flash Command.<br>
+            Depending on your specific Arduino board however, you might need to insert <code>-b 57600</code> in the flash Command. (e.g. for an Arduino Nano)<br>
             <br>
         <li><b>reset</b></li> 
             reopens the arduino device and sends a command to it which causes a reinitialize and reset of the counters. Then the module resends the attribute configuration / definition of the pins to the device.
@@ -1032,16 +1089,15 @@ sub ArduCounter_Ready($)
             After the normal interval is elapsed the Arduino board reports the count and time for those pins where impulses were encountered.<br>
             This means that even though the normal interval might be 10 seconds, the reported time difference can be 
             something different because it observed impulses as starting and ending point.<br>
-            The Power (e.g. for energy meters) is the calculated based of the counted impulses and the time between the first and the last impulse. <br>
+            The Power (e.g. for energy meters) is then calculated based of the counted impulses and the time between the first and the last impulse. <br>
             For the next interval, the starting time will be the time of the last impulse in the previous 
             reporting period and the time difference will be taken up to the last impulse before the reporting
             interval has elapsed.
             <br><br>
             The second, third and fourth numbers (maximum, minimal interval and minimal count) exist for the special case when the pulse frequency is very low and the reporting time is comparatively short.<br>
-            For example if the normal interval (first number) is 60 seconds and the device counts only one impulse in 90 seconds, the the calculated power reading will jump up and down and will give ugly numbers.
+            For example if the normal interval (first number) is 60 seconds and the device counts only one impulse in 90 seconds, the the calculated power reading will jump up and down and will give ugly numbers.<br>
             By adjusting the other numbers of this attribute this can be avoided.<br>
-            In case in the normal interval the observed impulses are encountered in a time difference that is smaller than the third number (minimal interval) or if the number of impulses counted is smaller than the 
-            fourth number (minimal count) then the reporting is delayed until the maximum interval has elapsed or the above conditions have changed after another normal interval.<br>
+            In case in the normal interval the observed impulses are encountered in a time difference that is smaller than the third number (minimal interval) or if the number of impulses counted is smaller than the fourth number (minimal count) then the reporting is delayed until the maximum interval has elapsed or the above conditions have changed after another normal interval.<br>
             This way the counter will report a higher number of pulses counted and a larger time difference back to fhem.
             <br><br>
             If this is seems too complicated and you prefer a simple and constant reporting interval, then you can set the normal interval and the mximum interval to the same number. This changes the operation mode of the counter to just count during this normal and maximum interval and report the count. In this case the reported time difference is always the reporting interval and not the measured time between the real impulses.
@@ -1051,15 +1107,23 @@ sub ArduCounter_Ready($)
         <li><b>readingNameCount[0-9]+</b></li> 
             Change the name of the counter reading pinX to something more meaningful.
         <li><b>readingNameLongCount[0-9]+</b></li> 
-            Change the name of the long counter reading longX (only created when verboseReadingsX is set to 1) to something more meaningful.
+            Change the name of the long counter reading longX to something more meaningful.
+            
+        <li><b>readingNameInterpolatedCount[0-9]+</b></li> 
+            Change the name of the interpolated long counter reading InterpolatedlongX to something more meaningful.
+            
         <li><b>readingNamePower[0-9]+</b></li> 
             Change the name of the power reading powerX to something more meaningful.
         <li><b>readingFactor[0-9]+</b></li> 
             Override the factor attribute for this individual pin.
         <li><b>readingStartTime[0-9]+</b></li> 
-            Allow the reading time stamp to be set to the beginning of measuring intervals
+            Allow the reading time stamp to be set to the beginning of measuring intervals. 
         <li><b>verboseReadings[0-9]+</b></li> 
-            create readings timeDiff, countDiff and lastMsg for each pin
+            create readings timeDiff, countDiff and lastMsg for each pin <br>
+		<li><b>flashCommand</b></li> 
+			sets the command to call avrdude and flash the onnected arduino with an updated hex file (by default it looks for ArduCounter.hex in the FHEM/firmware subdirectory.<br>
+			This attribute contains <code>avrdude -p atmega328P -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]</code> by default.<br>
+			For an Arduino Nano based counter you should add <code>-b 57600</code> e.g. between the -P and -D options.
     </ul>
     <br>
     <b>Readings / Events</b><br>
@@ -1067,11 +1131,19 @@ sub ArduCounter_Ready($)
         The module creates at least the following readings and events for each defined pin:
         <li><b>pin.*</b></li> 
             the current count at this pin
+		<li><b>long.*</b></li> 	
+			long count which keeps on counting up after fhem restarts whereas the pin.* count is only a temporary internal count that starts at 0 when the arduino board starts.
+		<li><b>interpolatedLong.*</b></li> 	
+			like long.* but when the Arduino restarts the potentially missed pulses are interpolated based on the pulse rate before the restart and after the restart.
+		<li><b>reject.*</b></li> 	
+			counts rejected pulses that are shorter than the specified minimal pulse length. 
         <li><b>power.*</b></li> 
             the current calculated power at this pin
-        Most reading names can be customized with attribues and many more readings can be generated by setting the attribute verboseReadings[0-9]+ to 1.<br>
-        This includes the "long count" reading which keeps on counting up after fhem restarts whereas the pin.* count is only a temporary internal count that starts at 0 when the arduino board  starts.
-    </ul>
+		<li><b>pinHistory.*</b></li> 
+			shows detailed information of the last pulses. This is only available when a minimal pulse length is specified for this pin. Also the total number of impulses recorded here is limited to 20 for all pins together. The output looks like -36/7:0C, -29/7:1G, -22/8:0C, -14/7:1G, -7/7:0C, 0/7:1G<br>
+			The first number is the relative time in milliseconds when the input level changed, followed by the length in milliseconds, the level and the internal action.<br>
+			-36/7:0C for example means that 36 milliseconds before the reporting started, the input changed to 0V, stayed there for 7 milliseconds and this was counted.<br>
+    </ul>			
     <br>
 </ul>
 
