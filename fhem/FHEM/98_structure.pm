@@ -92,13 +92,13 @@ structure_Define($$)
 
   $hash->{ATTR} = $stype;
   $hash->{CHANGEDCNT} = 0;
-
-  structure_setDevs($hash, $def);
-
   $hash->{".asyncQueue"} = [];
 
-  @a = ( "set", $devname, $stype, $devname );
-  structure_Attr(@a);
+  InternalTimer(1, sub {
+    structure_setDevs($hash, $def);
+    @a = ( "set", $devname, $stype, $devname );
+    structure_Attr(@a);
+  }, undef, 0);
 
   return undef;
 }
