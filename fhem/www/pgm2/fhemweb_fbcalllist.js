@@ -14,69 +14,85 @@ $(function () {
 function FW_processCallListUpdate(data)
 {
     var table = $(this).find("table.fbcalllist").first();
-    
-    // clear the list if data starts with "clear"
-    if(/^clear/.test(data))
+    var json_data = jQuery.parseJSON(data)
+
+    // clear the list 
+    if(json_data.action == "clear")
     {
         // if the table isn't already empty
         if(!table.find("tr[name=empty]").length)
         {
-            var tmp = data.split(",");
-            
             table.find("tr[number]").remove();
-            table.append("<tr align=\"center\" name=\"empty\"><td style=\"padding:10px;\" colspan=\""+tmp[1]+"\"><i>"+tmp[2]+"</i></td></tr>");  
+            table.append("<tr align=\"center\" name=\"empty\"><td style=\"padding:10px;\" colspan=\""+table.find("tr.header td").length+"\"><i>"+json_data.content+"</i></td></tr>");
         }
-        return;    
+        return;
     }
-   
-    // clear all lines greater than max-lines (e.g. after activate a filter statement)
-    if(/^max-lines/.test(data))
+
+    // remove deleted item
+    if(json_data.action == "delete")
     {
-        var tmp = data.split(",");
-        table.find("tr[number]").filter(function(index,obj) {return (parseInt($(obj).attr("number")) > parseInt(tmp[1]));}).remove();
-        return;    
+        table.find("tr[index='"+json_data.index+"']").remove();
+        FW_FbCalllistUpdateRowNumbers(table);
+        return;
     }
-   
-    // else it's JSON data with row updates
-    var json_data = jQuery.parseJSON(data)
-   
-    if(table.find("tr[number="+json_data.line+"]").length)
+
+    // update a item with new data
+    if(json_data.action == "update")
     {
-         $.each(json_data, function (key, val) {
-             
-            if(key == "line")
-            { return true; }
-        
-            FW_setCallListValue(table,json_data.line,key,val);
-         });
-    }
-    else // add new tr row with the values)
-    {
-        // delete the empty tr row if it may exist
-        table.find("tr[name=empty]").remove();
-        
-        var new_tr = '<tr align="center" number="'+json_data.line+'" class="'+((json_data.line % 2) == 1 ? "odd" : "even")+'">';
-        var style = "style=\"padding-left:6px;padding-right:6px;\"";
-        
-        
-         // create the corresponding <td> tags with the received data
-        $.each(json_data, function (key, val) {
-            if(key == "line")
-            { return true; }
-            new_tr += '<td name="'+key+'" '+style+'>'+val+'</td>';
-         });
-        
-        new_tr += "</tr>";
-        
-        // insert new tr into table
-        table.append(new_tr);
+        if(table.find("tr[index='"+json_data.index+"']").length)
+        {
+             $.each(json_data.item, function (key, val) {
+
+                if(key == "index" || key == "line")
+                { return true; }
+
+                FW_setCallListValue(table,json_data.index,key,val);
+             });
+        }
+        else // add new tr row with the values)
+        {
+            // delete the empty tr row if it may exist
+            table.find("tr[name=empty]").remove();
+
+            var new_tr = '<tr align="center" number="'+json_data.item.line+'" index="'+json_data.index+'" class="fbcalllist item '+((json_data.line % 2) == 1 ? "odd" : "even")+'">';
+            var style = "style=\"padding-left:6px;padding-right:6px;\"";
+
+             // create the corresponding <td> tags with the received data
+            $.each(json_data.item, function (key, val) {
+                if(key == "index" || key == "line")
+                { return true; }
+                new_tr += '<td name="'+key+'" '+style+'>'+val+'</td>';
+             });
+
+            new_tr += "</tr>";
+
+            // insert new tr into table
+            if(json_data.order == "ascending")
+            {
+                table.append(new_tr);
+            }
+            else
+            {
+                table.find("tr.header").after(new_tr);
+            }
+            FW_FbCalllistUpdateRowNumbers(table);
+        }
     }
 }
 
-function FW_setCallListValue(table,line,key,val)
+function FW_FbCalllistUpdateRowNumbers(table)
 {
-    table.find("tr[number="+line+"] td[name="+key+"]").each(function(index, obj) {
-       $(obj).html(val); 
+    count = 0;
+    table.find("tr.item").each(function(index, obj) {
+        $(obj).attr("number", ++count);
+        $(obj).find("td[name='row']").html(count);
+    });
+}
+
+function FW_setCallListValue(table,index,key,val)
+{
+    table.find("tr[index='"+index+"'] td[name="+key+"]").each(function(index, obj) {
+       $(obj).html(val);
     });
 }
 
