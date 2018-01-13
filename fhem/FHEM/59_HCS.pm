@@ -293,7 +293,7 @@ HCS_Set($@) {
     my $ecoModeOld = ReadingsVal($name,"eco","off");
     if($ecoModeNew ne $ecoModeOld) {
       readingsSingleUpdate($hash, "eco",$ecoModeNew,1);
-      $str = "eco mode changed from $ecoModeOld to $ecoModeNew";
+      $str = "switch eco mode $ecoModeNew";
       Log3 $name, 1, "$type $name $str";
       return $str;
     } else {
@@ -672,12 +672,17 @@ HCS_getValues($$) {
   my $ecoTempOff = AttrVal($name,"ecoTemperatureOff",undef);
   my $ecoState   = ReadingsVal($name,"eco","off");
 
-  if($ecoState eq "on" && (!$ecoTempOn || !$ecoTempOff)) {
-    Log3 $name, 1, "$type $name missing attribute 'ecoTemperatureOn'. Please define this attribute first."
-      if(!$ecoTempOn);
-    Log3 $name, 1, "$type $name missing attribute 'ecoTemperatureOff'. Please define this attribute first."
-      if(!$ecoTempOff);
-  } elsif($ecoState eq "on") {
+  if ( $ecoState eq "on" ) {
+    if ( !$ecoTempOn ) {
+      $attr{$name}{deviceCmdOn} = $defaults{deviceCmdOn};
+      $ecoTempOn = $defaults{deviceCmdOn};
+      Log3 $name, 1, "$type $name set attribute 'ecoTemperatureOn' to default $defaults{deviceCmdOn}."
+    }
+    if ( !$ecoTempOff ) {
+      $attr{$name}{deviceCmdOff} = $defaults{deviceCmdOff};
+      $ecoTempOff = $defaults{deviceCmdOff};
+      Log3 $name, 1, "$type $name set attribute 'ecoTemperatureOff' to default $defaults{deviceCmdOff}."
+    }
     foreach my $d (sort keys %{$hash->{helper}{device}}) {
       my $ignore  = $hash->{helper}{device}{$d}{ignored};
       my $exclude = $hash->{helper}{device}{$d}{excluded};
@@ -800,15 +805,15 @@ HCS_getValues($$) {
     
     Example:
     <ul>
-      Threshold temperature economic mode on: 15&deg; Celsius<br>
-      Threshold temperature economic mode off: 25&deg; Celsius<br>
+      Threshold temperature economic mode on: 16&deg; Celsius<br>
+      Threshold temperature economic mode off: 17&deg; Celsius<br>
       <br>
     
       HCS activates the defined device until the measured temperature of one ore more
-      thermostats is lower or equal than 15&deg; Celsius. If a measured temperature of one 
-      or more thermostats is higher or equal than 25&deg; Celsius, HCS switch of the defined 
+      thermostats is lower or equal than 16&deg; Celsius. If a measured temperature of one 
+      or more thermostats is higher or equal than 17&deg; Celsius, HCS switch of the defined 
       device (if none of the measured temperatures of all thermostats is lower or equal as
-      15&deg; Celsius).
+      16&deg; Celsius).
     </ul>
     <br>
     
