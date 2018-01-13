@@ -591,8 +591,8 @@ FileLog_Get($@)
   
   return "Usage: get $a[0] <infile> <outfile> <from> <to> [<column_spec>...]\n".
          "  where column_spec is <col>:<regexp>:<default>:<fn>\n" .
-         "  see the FileLogGrep entries in he .gplot files\n" .
-         "  <infile> is without direcory, - means the current file\n" .
+         "  see the FileLogGet entries in the .gplot files\n" .
+         "  <infile> is without directory, - means the current file\n" .
          "  <outfile> is a prefix, - means stdout\n"
         if(int(@a) < 4);
   shift @a;
