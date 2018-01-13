@@ -522,11 +522,9 @@ HCS_getValues($$) {
       if($td eq " n/a" || $tm eq " n/a") {
         $delta = " n/a";
       } else {
-        $delta  = sprintf(" %.1f",$td-$tm);
-        $delta  = sprintf("+%.1f",$tm-$td) if($tm > $td);
-        $delta  = sprintf("-%.1f",$td-$tm) if($td > $tm);
+        $delta  = sprintf("%+5.1f",$tm-$td);
       }
-      $str   .= sprintf("%-${ln}s: desired: %s°C measured: %s°C delta: %s valve: %${lv}d%% state: %s\n",
+      $str .= sprintf("%-${ln}s: desired: %s°C measured: %s°C delta: %s valve: %${lv}d%% state: %s\n",
                       $d,$td,$tm,$delta,$act,$info);
     }
 
@@ -601,7 +599,6 @@ HCS_getValues($$) {
     my $act = $devs{$d}{actuator};
     my $tm  = $devs{$d}{tempMeasured};
     my $td  = $devs{$d}{tempDesired};
-    my $delta;
     my $str;
 
     if(!$hash->{helper}{device}{$d}{demand}) {
@@ -613,37 +610,20 @@ HCS_getValues($$) {
       my $tOn   = AttrVal($name,"thermostatThresholdOn",$defaults{thermostatThresholdOn});
       my $tOff  = AttrVal($name,"thermostatThresholdOff",$defaults{thermostatThresholdOff});
 
-      if($tm > $td && $tm-$td >= $tOff) {
+      if( $tm >= $td + $tOff ) {
         $devState = "idle";
         $hash->{helper}{device}{$d}{demand} = 0;
-        $delta = $tm-$td;
-        $str = sprintf("desired: %4.1f measured: %4.1f delta: +%.1f open: %${lv}d%% state: %s",$td,$tm,$delta,$act,$devState);
         $sumIdle++;
-      } elsif($td > $tm && $td-$tm >= $tOn) {
+      } elsif( $tm <= $td - $tOn ) {
         $devState = "demand";
         $hash->{helper}{device}{$d}{demand} = 1;
-        $delta = $td-$tm;
-        $str = sprintf("desired: %4.1f measured: %4.1f delta: -%.1f open: %${lv}d%% state: %s",$td,$tm,$delta,$act,$devState);
         $sumDemand++;
-      } elsif($tm > $td) {
-        $devState = $lastState;
-        $delta = $tm-$td;
-        $str = sprintf("desired: %4.1f measured: %4.1f delta: +%.1f open: %${lv}d%% state: %s",$td,$tm,$delta,$act,$devState);
-        $sumIdle++   if($devState eq "idle");
-        $sumDemand++ if($devState eq "demand");
-      } elsif($td > $tm) {
-        $devState = $lastState;
-        $delta = $td-$tm;
-        $str = sprintf("desired: %4.1f measured: %4.1f delta: -%.1f open: %${lv}d%% state: %s",$td,$tm,$delta,$act,$devState);
-        $sumIdle++   if($devState eq "idle");
-        $sumDemand++ if($devState eq "demand");
       } else {
         $devState = $lastState;
-        $delta = $td-$tm;
-        $str = sprintf("desired: %4.1f measured: %4.1f delta:  %.1f open: %${lv}d%% state: %s",$td,$tm,$delta,$act,$devState);
         $sumIdle++   if($devState eq "idle");
         $sumDemand++ if($devState eq "demand");
       }
+      $str = sprintf("desired: %4.1f measured: %4.1f d: %+5.1f open: %${lv}d%% state: %s",$td,$tm,$tm-$td,$act,$devState);
     } elsif($mode eq "valve") {
       my $vOn   = AttrVal($name,"valveThresholdOn",$defaults{valveThresholdOn});
       my $vOff  = AttrVal($name,"valveThresholdOff",$defaults{valveThresholdOff});
@@ -670,12 +650,8 @@ HCS_getValues($$) {
           $hash->{helper}{device}{$d}{demand} = 0;
           $sumIdle++;
         }
-
       }
-      $delta = sprintf(" %.1f",$td-$tm);
-      $delta = sprintf("+%.1f",$tm-$td) if($tm > $td);
-      $delta = sprintf("-%.1f",$td-$tm) if($td > $tm);
-      $str = sprintf("desired: %4.1f measured: %4.1f delta: %s valve: %${lv}d%% state: %s",$td,$tm,$delta,$valve,$devState);
+      $str = sprintf("desired: %4.1f measured: %4.1f delta: %+5.1f valve: %${lv}d%% state: %s",$td,$tm,$tm-$td,$valve,$devState);
     }
 
     Log3 $name, 4, "$type $name $d: $str";
