@@ -488,8 +488,8 @@ sub BRAVIA_Set($@) {
         }
     }
 
-    # app
-    elsif ( $a[1] eq "app" ) {
+    # application
+    elsif ( $a[1] eq "application" or $a[1] eq "app") {
         if (defined($a[2]) && $presence eq "present" && $power ne "on" ) {
             Log3 $name, 4, "BRAVIA $name: indirect switching request to ON";
             BRAVIA_Set( $hash, $name, "on" );
@@ -1995,7 +1995,7 @@ sub BRAVIA_GetNormalizedName($) {
   my ( $name ) = @_;
   $name =~ s/^\s+//;
   $name =~ s/\s+$//;
-  $name =~ s/\s/_/g;
+  $name =~ s/\s/#/g;
   $name =~ s/,/./g;
   return $name;
 }
