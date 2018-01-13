@@ -111,7 +111,11 @@
 #   2017-07-18  started implementing data types (3.6.0)
 #   2017-07-25  set saveAsModule 
 #   2017-08-17  nicer logging of timeouts 
-#
+#   2017-09-17  extended check for missing len attribute with unpack that expects > 16 bits
+#                   in _send
+#   2017-12-06  little fixes
+#   2017-12-22  remember timeout time in $hash instead of reading it from intAt
+#	2018-01-11	fix bug where defptr pointed to ioHash instead of logical hash when seting IODev Attr
 #
 #   ToDo / Ideas : 
 #                   get reading key (type / adr)
@@ -171,7 +175,7 @@ sub ModbusLD_GetUpdate($);
 sub ModbusLD_GetIOHash($);
 sub ModbusLD_Send($$$;$$$);
 
-my $Modbus_Version = '3.7.0 - 20.8.2017';
+my $Modbus_Version = '3.7.3 - 22.12.2017';
 my $Modbus_PhysAttrs = 
         "queueDelay " .
         "busDelay " .
@@ -296,6 +300,7 @@ sub Modbus_Undef($$)
     DevIo_CloseDev($ioHash); 
     RemoveInternalTimer ("timeout:$name");
     RemoveInternalTimer ("queue:$name");
+    delete $ioHash->{nextTimeout};
     # lösche auch die Verweise aus logischen Modulen auf dieses physische.
     foreach my $d (values %{$ioHash->{defptr}}) {
         Log3 $name, 3, "$name: Undef is removing IO device for $d->{NAME}";
@@ -801,7 +806,6 @@ sub Modbus_ParseFrames($)
     
     use bytes;  
     
-    
     if ($proto eq "RTU") {
         if (AttrVal($name, "skipGarbage", 0)) {
             my $start = index($frame, pack('C', $reqId));
@@ -860,8 +864,7 @@ sub Modbus_ParseFrames($)
             ($tid, $null, $dlen, $devAdr, $pdu) = unpack ('nnnCa*', $frame);
             Log3 $name, 5, "$name: ParseFrames: unpacked rest as tid=$tid, dlen=$dlen, id=$devAdr, pdu=" . unpack ('H*', $pdu);
             if ($ioHash->{REQUEST}{TID} != $tid) {
-                $frame = substr($frame, $dlen + 6);
-                return ("got wrong tid ($tid)", undef);
+                return ("got wrong tid ($tid)");
             }   
         }         
         if (length($pdu) + 1 < $dlen) {
@@ -953,7 +956,7 @@ sub Modbus_ParseFrames($)
         Log3 $name, 4, "$name: ParseFrames got fcode $fCode from $devAdr" .
             ($proto eq "TCP" ? ", tid $tid" : "") .
             ", values " . unpack ('H*', $values) . "HeaderLen $headerLen, ActualLen $actualLen" . 
-            ", request was for $type$parseAdr ($ioHash->{REQUEST}{READING})".
+            ", request was for $type$adr ($ioHash->{REQUEST}{READING})".
             ", len $reqLen for module $logHash->{NAME}";
         if ($fCode < 15) {
             # nothing to parse after reply to 15 / 16
@@ -980,6 +983,7 @@ sub Modbus_EndBUSY($)
     $hash->{helper}{buffer} = "";
     $hash->{BUSY} = 0;
     delete $hash->{REQUEST};
+    delete $hash->{nextTimeout};
     Modbus_Profiler($hash, "Idle"); 
     Modbus_Statistics($hash, "Timeouts", 0);    # damit bei Bedarf das Reading gesetzt wird
     RemoveInternalTimer ("timeout:$name");
@@ -1165,9 +1169,9 @@ sub Modbus_TimeoutSend($)
                 ($ioHash->{helper}{buffer} ? ", Buffer contains " . unpack ("H*", $ioHash->{helper}{buffer}) : "");
 
     Modbus_Statistics($ioHash, "Timeouts", 1);
-    Modbus_EndBUSY ($ioHash);       # set BUSY to 0, delete REQUEST, clear Buffer, do Profilig
+    Modbus_EndBUSY ($ioHash);                   # set BUSY to 0, delete REQUEST, clear Buffer, do Profilig, remove internalTimer
     Modbus_CountTimeouts ($ioHash);
-    Modbus_HandleSendQueue ("direct:$name"); # verwaltet auch idle und busy time statistics variables  
+    Modbus_HandleSendQueue ("direct:$name");    # verwaltet auch idle und busy time statistics variables  
     return;
 };
 
@@ -1365,10 +1369,11 @@ sub Modbus_HandleSendQueue($;$)
 
     Modbus_Statistics($ioHash, "Requests", 1);
     Modbus_Profiler($ioHash, "Wait");   
-    my $timeout   = ModbusLD_DevInfo($logHash, "timing", "timeout", 2);
+    my $timeout = ModbusLD_DevInfo($logHash, "timing", "timeout", 2);
+    my $toTime  = $now+$timeout;
     RemoveInternalTimer ("timeout:$name");
-    InternalTimer($now+$timeout, "Modbus_TimeoutSend", "timeout:$name", 0);
-    
+    InternalTimer($toTime, "Modbus_TimeoutSend", "timeout:$name", 0);
+    $ioHash->{nextTimeout} = $toTime;
         
     shift(@{$queue});           # remove first element from queue
     if(@{$queue} > 0) {         # more items in queue -> schedule next handle 
@@ -1669,7 +1674,7 @@ sub ModbusLD_Attr(@)
         } elsif ($aName eq "IODev") {   # defptr housekeeping
             my $ioHash = $defs{$aVal};
             if ($ioHash && $ioHash->{TYPE} eq "Modbus") {           # gibt es den Geräte-Hash zum IODev Attribut?
-                $ioHash->{defptr}{$hash->{MODBUSID}} = $ioHash;     # register logical device
+                $ioHash->{defptr}{$hash->{MODBUSID}} = $hash;       # register logical device
                 Log3 $name, 5, "$name: Attr IODev - using $aVal";
             } else {
                 Log3 $name, 5, "$name: Attr IODev can't use $aVal - device does not exist (yet?) or is not a physical Modbus Device";
@@ -2363,15 +2368,9 @@ sub ModbusLD_ReadAnswer($;$)
 
     # get timeout. In case ReadAnswer is called after a delay
     # only wait for remaining time
-    my $to   = ModbusLD_DevInfo($hash, "timing", "timeout", 2);
-    my $arg  = "timeout:$ioHash->{NAME}";       # key in internl Timer hash
-    my $rest = $to;
-    # find internal timeout timer time and calculate remaining timeout
-    foreach my $a (keys %intAt) {
-        if($intAt{$a}{ARG} eq $arg) {
-            $rest = $intAt{$a}{TRIGGERTIME} - $now;
-        }
-    }
+    my $to   = ModbusLD_DevInfo($hash, "timing", "timeout", 2); 
+    my $rest = ($ioHash->{nextTimeout} ? $ioHash->{nextTimeout} - $now : 0);
+        
     if ($rest <= 0) {
         Log3 $name, 5, "$name: ReadAnswer called but timeout already over" .
             ($reading ? " requested reading was $reading" : "");
@@ -2705,8 +2704,8 @@ sub ModbusLD_Send($$$;$$$){
     $reqLen = $objLen if (!$reqLen);    # reqLen given as parameter (only for combined read requests from GetUpdate or scans)
         
     my $unpack = ModbusLD_ObjInfo($hash, $objCombi, "unpack", "defUnpack", "n"); 
-    if ($objLen < 2 && $unpack =~ 'f') {
-        Log3 $name, 3, "$name: _Send with unpack containing f but len is too small - please set obj-${objCombi}-Len!";
+    if ($objLen < 2 && $unpack =~ /lLIqQfFNVD/) {
+        Log3 $name, 3, "$name: _Send with unpack $unpack but len seems too small - please set obj-${objCombi}-Len!";
     }       
     
     if ($qlen && AttrVal($ioName, "dropQueueDoubles", 0)) {
