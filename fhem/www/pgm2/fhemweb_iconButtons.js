@@ -94,7 +94,7 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
       $(newEl).find("label[iconr='"+iconr+"']").each(function(ind,val){
         var span = $(val).find("span");
         var sc = $(span).attr("selectcolor");
-        var usc = $(span).attr("unselectcolor") == "none" ? "" : $(span).attr("unselectcolor");
+        var usc = $(span).attr("unselectcolor") == "none" ? "none" : $(span).attr("unselectcolor");
         if( usc.match(/^[A-F0-9]{6}$/i))
           usc = "#"+usc;
         var isc = $(span).attr("ischecked");
@@ -104,13 +104,23 @@ FW_iconButtonsCreate(elName, devName, vArr, currVal, set, params, cmd)
             var re2 = new RegExp('fill:\\s?"'+usc+'[;\\s]','gi');
             data = data.replace(re1,'fill="'+sc+'"')
                        .replace(re2,'fill:'+sc+';');
+          } else {
+            var re1 = new RegExp('fill="none"','gi');
+            var re2 = new RegExp('fill:\\s?none[;\\s]','gi');
+            data = data.replace(re1,'fill=""')
+                       .replace(re2,'fill:; ');
           }
         } else {
           if(sc.length > 0) {
-            var re1 = new RegExp('fill="'+sc+'"','gi');
-            var re2 = new RegExp('fill:\\s?"'+sc+'[;\\s]','gi');
-            data = data.replace(re1,'fill="'+usc+'"')
-                       .replace(re2,'fill:'+usc+';');
+            var re1 = new RegExp('fill="none|'+sc+'"','gi');
+            var re2 = new RegExp('fill:\\s?(none|"'+sc+')[;\\s]','gi');
+            data = data.replace(re1,'fill="'+(usc=="none"?"":usc)+'"')
+                       .replace(re2,'fill:'+(usc=="none"?"":usc)+';');
+          } else {
+            var re1 = new RegExp('fill="none"','gi');
+            var re2 = new RegExp('fill:\\s?none[;\\s]','gi');
+            data = data.replace(re1,'fill=""')
+                       .replace(re2,'fill:; ');
           }
         }
         $(span).addClass("iconButtons_widget").html(data);

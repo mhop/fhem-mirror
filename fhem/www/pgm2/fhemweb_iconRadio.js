@@ -109,19 +109,19 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
     $(val).next().find("span").attr("ischecked",$(val).prop("checked"));
 //    console.log("input checked("+ind+"): "+$(val).prop("checked"));
   });
-  $(newEl).find("label").each(function(ind,val){
+  $(newEl).find("label").each(function(indx,val){
     $(val).addClass("iconRadio_widget")
 
-    var ico = vArr[ind*ipar+3];
+    var ico = vArr[indx*ipar+3];
     var m = ico.match(/.*@(.*)/);
     var uscol = m && m[1] ? m[1] : "none";
     if( uscol.match(/^[A-F0-9]{6}$/i))
       uscol = "#"+uscol;
     if(uscol == 'none')
-      ico += "@none";
+      ico += "@none"; //@none
     $(val).find("span").attr( "unselectcolor",uscol);
 
-    FW_cmd(FW_root+"?cmd={FW_makeImage('"+ico+"','"+ico+"',':"+ind+": "+(iconclass.length > 0 ? iconclass :'')+"')}&XHR=1",function(data){
+    FW_cmd(FW_root+"?cmd={FW_makeImage('"+ico+"','"+ico+"',':"+indx+": "+(iconclass.length > 0 ? iconclass :'')+"')}&XHR=1",function(data){
       data = data.replace(/\n$/,'');
       // console.log($(data).attr("class"));
       var m = $(data).attr("class").match(/(:\d+?:)/);
@@ -129,7 +129,8 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
       $(newEl).find("label[iconr='"+iconr+"']").each(function(ind,val){
         var span = $(val).find("span");
         var sc = $(span).attr("selectcolor");
-        var usc = $(span).attr("unselectcolor") == "none" ? "" : $(span).attr("unselectcolor");
+        var usc = $(span).attr("unselectcolor") == "none" ? "none" : $(span).attr("unselectcolor");
+        // console.log($(span).attr("unselectcolor") == "none");
         if( usc.match(/^[A-F0-9]{6}$/i))
           usc = "#"+usc;
         var isc = $(span).attr("ischecked");
@@ -139,18 +140,30 @@ FW_iconRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
           if(sc.length > 0) {
             var re1 = new RegExp('fill="'+usc+'"','gi');
             var re2 = new RegExp('fill:\\s?"'+usc+'[;\\s]','gi');
-            // console.log("FW_cmd re1u=",re1,", re2u=",re2);
+            // console.log("FW_cmd re1u=",re1+"",", re2u=",re2+"");
             data = data.replace(re1,'fill="'+sc+'"')
                        .replace(re2,'fill:'+sc+';');
+            // console.log("Fw_cmd sc_ind: "+ind+": "+sc+", isc:"+isc+"\n"+data);
+          } else {
+            var re1 = new RegExp('fill="none"','gi');
+            var re2 = new RegExp('fill:\\s?none[;\\s]','gi');
+            data = data.replace(re1,'fill=""')
+                       .replace(re2,'fill:; ');
             // console.log("Fw_cmd sc_ind: "+ind+": "+sc+", isc:"+isc+"\n"+data);
           }
         } else {
           if(sc.length > 0) {
-            var re1 = new RegExp('fill="'+sc+'"','gi');
-            var re2 = new RegExp('fill:\\s?"'+sc+'[;\\s]','gi');
-            // console.log("FW_cmd re1=",re1,", re2=",re2);
-            data = data.replace(re1,'fill="'+usc+'"')
-                       .replace(re2,'fill:'+usc+';');
+            var re1 = new RegExp('fill="none|'+sc+'"','gi');
+            var re2 = new RegExp('fill:\\s?(none|"'+sc+')[;\\s]','gi');
+            // console.log("FW_cmd re1=",re1+"",", re2=",re2+"");
+            data = data.replace(re1,'fill="'+(usc=="none"?"":usc)+'"')
+                       .replace(re2,'fill:'+(usc=="none"?"":usc)+';');
+            // console.log("Fw_cmd usc_ind: "+ind+": "+usc+", isc:"+isc+"\n"+data);
+          } else {
+            var re1 = new RegExp('fill="none"','gi');
+            var re2 = new RegExp('fill:\\s?none[;\\s]','gi');
+            data = data.replace(re1,'fill=""')
+                       .replace(re2,'fill:; ');
             // console.log("Fw_cmd usc_ind: "+ind+": "+usc+", isc:"+isc+"\n"+data);
           }
         }
