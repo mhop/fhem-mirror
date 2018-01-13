@@ -60,8 +60,8 @@ my %defaults = (
   "mode"                   => "thermostat",
   "thermostatThresholdOn"  => 0.5,
   "thermostatThresholdOff" => 0.5,
-  "valveThresholdOn"       => 35,
-  "valveThresholdOff"      => 40,
+  "valveThresholdOn"       => 40,
+  "valveThresholdOff"      => 35,
 );
 
 #####################################
