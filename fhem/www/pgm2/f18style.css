@@ -1,6 +1,6 @@
 @import url("defaultCommon.css");
 
-#logo { 
+#logo {
   position:absolute; top:10px; width:32px; height:32px; z-index:10;
   background-image:url(../images/default/fhemicon.png);
   background-size: contain; background-repeat: no-repeat;
@@ -16,9 +16,10 @@
   padding:0 0.5em 0.5em 0;
 }
 #menu.visible  { left:10px!important; }
-table.room,table.block.wide,table.fileList { 
+table.room,table.block.wide,table.fileList {
   border:0;
   border-radius:0;
+  border-spacing:0;
   border-top:1px solid gray;
 }
 
@@ -49,7 +50,7 @@ body.touch a { font-size: 20px; }
 body.touch #menu { font-size: 20px; } /* for the menuTree icon */
 body.touch div.col1, body.touch #menu table.room div { padding:0.25em 0; }
 
-@media screen and (orientation: portrait) { 
+@media screen and (orientation: portrait) {
   body.small table.block tr td:nth-child(n+3) { width: 0px; display: none; }
   body.small #content > table { width: 100%; }
   body.small #menuBtn { right:10px; left:auto; }
