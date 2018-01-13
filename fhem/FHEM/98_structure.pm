@@ -497,7 +497,7 @@ structure_Attr($@)
     userattr=>1
   );
 
-  return undef if($ignore{$list[1]});
+  return undef if($ignore{$list[1]} || !$init_done);
 
   my $me = $list[0];
   my $hash = $defs{$me};
