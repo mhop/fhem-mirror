@@ -3119,7 +3119,7 @@ RemoveInternalTimer($;$)
   my ($arg, $fn) = @_;
   return if(!$arg && !$fn);
   foreach my $a (keys %intAt) {
-    my ($ia, $if) = ($intAt{$a}{ARG}, $intAt{$a}{ARG});
+    my ($ia, $if) = ($intAt{$a}{ARG}, $intAt{$a}{FN});
     delete($intAt{$a}) if((!$arg || ($ia && $ia eq $arg)) &&
                           (!$fn  || ($if && $if eq $fn)));
   }
