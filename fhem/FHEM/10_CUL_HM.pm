@@ -615,7 +615,7 @@ sub CUL_HM_Rename($$$) {#############################
       my $pPeers = AttrVal($pN, "peerIDs", "");
       if ($pPeers =~ m/$HMidCh/){
         CUL_HM_ID2PeerList ($pN,"x",0);
-        foreach my $pR (grep /-$oldName-/,keys%{$pH->{READINGS}}){#update reading of the peer
+        foreach my $pR (grep /(-|\.)$oldName(-|$)/,keys%{$pH->{READINGS}}){#update reading of the peer
           my $pRn = $pR;
           $pRn =~ s/$oldName/$name/;
           $pH->{READINGS}{$pRn}{VAL}  = $pH->{READINGS}{$pR}{VAL};
@@ -5659,10 +5659,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd =~ m/^(press|event)(S|L)/) { ######################################
     #press          =>"-peer-        [-repCount(long only)-] [-repDelay-] ..."
     #event          =>"-peer- -cond- [-repCount(long only)-] [-repDelay-] ..."
-    return "no peer defined" if (!defined $a[2]);
     my ($trig,$type,$peer) = ($1,$2,$a[2]);
-    my ($cond,$repCnt,$repDly,$mode,$modeCode) = (0,0,0);
-    return "$peer not peered to $name" if (InternalVal($name,"peerList","") !~ m/$peer/);
+    my ($cond,$repCnt,$repDly,$modeCode,$mode) = (0,0,0);
+    if ($st ne 'virtual'){
+      return "no peer defined" if (!defined $a[2]);
+      return "$peer not peered to $name" if (InternalVal($name,"peerList","") !~ m/$peer/);
+    }
+    else{
+      splice @a, 2, 0,"";# shift the array, similate a peer for virtuals
+    }
     if ($trig eq "event"){
       return "condition missing" if (!defined $a[3]);
       ($cond,$repCnt,$repDly,$modeCode) = ($a[3],$a[4],$a[5],"41");
@@ -5670,7 +5675,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $cond = sprintf("%02X",$cond);
     }
     else{
-      ($repCnt,$repDly,$modeCode,$cond) = ($a[3],$a[4],"40","");
+      ($cond,$repCnt,$repDly,$modeCode) = ("",$a[3],$a[4],"40");
     }
     
     if ($type eq "L"){
