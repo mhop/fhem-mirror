@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  70_BRAVIA: fixed hash for space
+                        (application, channel, input names)
   - change:  93_DbLog: change verbose level of addlog from 2 to 4
   - bugfix:  93_DbRep: old dumpfiles not deleted by dumpMySQL clientSide
   - bugfix:  70_BRAVIA: typo fixed, 'set application' works now

@@ -416,14 +416,16 @@ sub BRAVIA_Set($@) {
             BRAVIA_Set( $hash, $name, "on" );
         }
 
-        Log3 $name, 2, "BRAVIA set $name " . $a[1] . " " . $a[2];
+		shift(@a); shift(@a);
+		my $channelStr = join("#", @a);
+        Log3 $name, 2, "BRAVIA set $name " . $a[1] . " " . $channelStr;
 
         return
           "No argument given, choose one of channel presetNumber channelName "
-          if ( !defined( $a[2] ) );
+          if ( !defined( $channelStr ) );
 
         if ( $presence eq "present" ) {
-            my $channelName = $a[2];
+            my $channelName = $channelStr;
             if ( $channelName =~ /^(\d)(\d?)(\d?)(\d?):.*$/ ) {
               BRAVIA_SendCommand( $hash, "ircc", $1, "blocking" );
               BRAVIA_SendCommand( $hash, "ircc", $2, "blocking" ) if (defined($2));
@@ -466,21 +468,23 @@ sub BRAVIA_Set($@) {
 
         return "No 2nd argument given" if ( !defined( $a[2] ) );
 
-        Log3 $name, 2, "BRAVIA set $name " . $a[1] . " " . $a[2];
+		shift(@a); shift(@a);
+		my $inputStr = join("#", @a);
+        Log3 $name, 2, "BRAVIA set $name " . $a[1] . " " . $inputStr;
 
         # Resolve input uri
         my $input_uri;
-        if ( defined( $hash->{helper}{device}{inputPreset}{ $a[2] } ) ) {
-            $input_uri = $hash->{helper}{device}{inputPreset}{ $a[2] }{uri};
+        if ( defined( $hash->{helper}{device}{inputPreset}{ $inputStr } ) ) {
+            $input_uri = $hash->{helper}{device}{inputPreset}{ $inputStr }{uri};
         } else {
-            return "Unknown source input '" . $a[2] . "' on that device.";
+            return "Unknown source input '" . $inputStr . "' on that device.";
         }
 
         if ( $presence eq "present" ) {
             BRAVIA_SendCommand( $hash, "setPlayContent", $input_uri );
 
-            if ( ReadingsVal($name, "input", "") ne $a[2] ) {
-                readingsSingleUpdate( $hash, "input", $a[2], 1 );
+            if ( ReadingsVal($name, "input", "") ne $inputStr ) {
+                readingsSingleUpdate( $hash, "input", $inputStr, 1 );
             }
         }
         else {
@@ -497,14 +501,16 @@ sub BRAVIA_Set($@) {
 
         return "No 2nd argument given" if ( !defined( $a[2] ) );
 
-        Log3 $name, 2, "BRAVIA set $name " . $a[1] . " " . $a[2];
+		shift(@a); shift(@a);
+		my $appStr = join("#", @a);
+        Log3 $name, 2, "BRAVIA set $name " . $a[1] . " " . $appStr;
 
         # Resolve app uri
         my $app_uri;
-        if ( defined( $hash->{helper}{device}{appPreset}{ $a[2] } ) ) {
-            $app_uri = $hash->{helper}{device}{appPreset}{ $a[2] }{uri};
+        if ( defined( $hash->{helper}{device}{appPreset}{ $appStr } ) ) {
+            $app_uri = $hash->{helper}{device}{appPreset}{ $appStr }{uri};
         } else {
-            return "Unknown app '" . $a[2] . "' on that device.";
+            return "Unknown app '" . $appStr . "' on that device.";
         }
 
         if ( $presence eq "present" ) {
