@@ -804,12 +804,12 @@ FW_answerCall($)
   $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
                                                 $FW_tp ? "640,160" : "800,160");
   my ($cmd, $cmddev) = FW_digestCgi($arg);
-  if($cmd && $FW_CSRF) {
+  if($cmd && $FW_CSRF && $cmd !~ m/style (list|select)/) {
     my $supplied = defined($FW_webArgs{fwcsrf}) ? $FW_webArgs{fwcsrf} : "";
     my $want = $defs{$FW_wname}{CSRFTOKEN};
     if($supplied ne $want) {
       Log3 $FW_wname, 3, "FHEMWEB $FW_wname CSRF error: $supplied ne $want ".
-                         "for client $FW_chash->{NAME}. ".
+                         "for client $FW_chash->{NAME} / command $cmd. ".
                          "For details see the csrfToken FHEMWEB attribute.";
       $FW_httpRetCode = "400 Bad Request";
       return 0;
@@ -1566,8 +1566,7 @@ FW_roomOverview($)
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       next if(!$list1[$idx]);
       my $sel = ($list1[$idx] eq $FW_room ? " selected=\"selected\""  : "");
-      my $csrf = ($list2[$idx] =~ m/cmd=/ ? $FW_CSRF : '');
-      FW_pO "<option value='$list2[$idx]$csrf'$sel>$list1[$idx]</option>";
+      FW_pO "<option value='$list2[$idx]'$sel>$list1[$idx]</option>";
     }
     FW_pO "</select></td>";
     FW_pO "</tr>";
@@ -2361,7 +2360,7 @@ FW_pH(@)
   my ($link, $txt, $td, $class, $doRet,$nonl) = @_;
   my $ret;
 
-  $link .= $FW_CSRF if($link =~ m/cmd/);
+  $link .= $FW_CSRF if($link =~ m/cmd/ && $link !~m/cmd=style%20(list|select)/);
   $link = ($link =~ m,^/,) ? $link : "$FW_ME$FW_subdir?$link";
   
   # Using onclick, as href starts safari in a webapp.
