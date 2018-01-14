@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.6.3      14.01.2018       change verbose level of addlog "no Reading of device ..." message from 2 to 4 
 # 3.6.2      07.01.2018       new attribute "exportCacheAppend", change function exportCache to respect attr exportCacheAppend,
 #                             fix DbLog_execmemcache verbose 5 message
 # 3.6.1      04.01.2018       change SQLite PRAGMA from NORMAL to FULL (Default Value of SQLite)
@@ -175,7 +176,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.6.2";
+my $DbLogVersion = "3.6.3";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -3411,7 +3412,7 @@ sub DbLog_AddLog($$$) {
 	  Log3 $name, 4, "DbLog $name -> Readings extracted from Regex: @exrds";
 	  
 	  if(!@exrds) {
-          Log3 $name, 2, "DbLog $name -> no Reading of device '$dev_name' selected from '$rdspec' used by addLog !";
+          Log3 $name, 4, "DbLog $name -> no Reading of device '$dev_name' selected from '$rdspec' used by addLog !";
 	      next;
       }
 	  
