@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbRep: old dumpfiles not deleted by dumpMySQL clientSide
   - bugfix:  70_BRAVIA: typo fixed, 'set application' works now
   - feature: 93_DbRep: V7.4.0, new commands dumpSQLite/restoreSQLite,
                        execute commands before/after set optimizeTables, 

@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.4.1        14.01.2018       fix old dumpfiles not deleted by dumpMySQL clientSide
 # 7.4.0        09.01.2018       dumpSQLite/restoreSQLite, 
 #                               backup/restore now available when DbLog-device has reopen xxxx running, 
 #                               executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, 
@@ -284,7 +285,7 @@ use Encode qw(encode_utf8);
 
 sub DbRep_Main($$;$);
 
-my $DbRepVersion = "7.4.0";
+my $DbRepVersion = "7.4.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -5828,7 +5829,7 @@ sub mysql_DoDumpClientSide($) {
  my $ftp = $ftperr?encode_base64($ftperr,""):$ftpmsg?encode_base64($ftpmsg,""):0;
  
  # alte Dumpfiles löschen
- my @fd  = deldumpfiles($hash,$sql_file);
+ my @fd  = deldumpfiles($hash,$backupfile);
  my $bfd = join(", ", @fd );
  $bfd    = $bfd?encode_base64($bfd,""):0;
 
