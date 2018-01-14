@@ -15,10 +15,12 @@ $(document).ready(function(){
     f18_attr = f18_sd.f18;
   }
   if(!f18_attr) {
-    f18_attr = { "Pinned.menu":"true", "savePinChanges":true };
+    f18_attr = { "Pinned.menu":"true" };
     f18_resetCol();
     f18_sd.f18 = f18_attr;
   }
+  if(typeof f18_attr.savePinChanges == "undefined")
+    f18_attr.savePinChanges = true;
 
  f18_setCss('init');
 
