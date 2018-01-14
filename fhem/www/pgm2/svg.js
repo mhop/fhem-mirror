@@ -1,6 +1,7 @@
 "use strict";
 FW_version["svg.js"] = "$Id$";
 
+var svgCallback={};
 if(!svgNS) {
   var svgNS = "http://www.w3.org/2000/svg";
   var svg_initialized={}, lastHidden;
@@ -343,6 +344,8 @@ svg_init_one(embed, svg)
     return;
   svg_initialized[sid] = true;
   $("text.legend", svg).click(function(e){sv_menu(e, embed)});
+  for(var i in svgCallback)
+    svgCallback[i](svg);
 }
 
 function

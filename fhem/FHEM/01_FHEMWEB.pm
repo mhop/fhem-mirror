@@ -141,6 +141,7 @@ FHEMWEB_Initialize($)
     CORS:0,1
     HTTPS:1,0
     CssFiles
+    Css:textField-long
     JavaScripts
     SVGcache:1,0
     addHtmlTitle:1,0
@@ -951,6 +952,8 @@ FW_answerCall($)
   FW_pO sprintf($cssTemplate, "pgm2/jquery-ui.min.css");
   map { FW_pO sprintf($cssTemplate, $_); }
                         split(" ", AttrVal($FW_wname, "CssFiles", ""));
+  my $css = AttrVal($FW_wname, "Css", "");
+  FW_pO "<style id='fhemweb_css'>$css</style>\n" if($css);
 
   ########################
   # JavaScripts
@@ -3399,6 +3402,11 @@ FW_widgetOverride($$)
        </code></ul>
        </li><br>
 
+    <a name="Css"></a>
+    <li>Css<br>
+       CSS included in the header after the CssFiles section.
+       </li><br>
+
     <a name="cmdIcon"></a>
     <li>cmdIcon<br>
         Space separated list of cmd:iconName pairs. If set, the webCmd text is
@@ -4098,6 +4106,11 @@ FW_widgetOverride($$)
           attr WEB CssFiles pgm2/mystyle.css
         </code></ul>
         </li><br>
+
+    <a name="Css"></a>
+    <li>Css<br>
+       CSS, was nach dem CssFiles Abschnitt im Header eingefuegt wird.
+       </li><br>
 
     <a name="defaultRoom"></a>
     <li>defaultRoom<br>

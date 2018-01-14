@@ -1,14 +1,9 @@
-/*
-  - style FW_okDialog
-  - SVG width on mobile
-  - FLOORPLAN
-  - Dashboard
- */
+"use strict";
+FW_version["f18.js"] = "$Id$";
 
-var f18_attr, f18_aCol, f18_pinOut, f18_sd, f18_isMobile;
+// TODO: rewrite menu, dashboard, floorplan, fix longpollSVG
+var f18_attr, f18_aCol, f18_sd, f18_isMobile, f18_icon={}, f18_move=false;
 var f18_small = (screen.width < 480 || screen.height < 480);
-// font-awesome: map-pin
-var f18_pinIn='data:image/svg+xml;utf8,<svg viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path fill="gray" d="M896 1088q66 0 128-15v655q0 26-19 45t-45 19h-128q-26 0-45-19t-19-45v-655q62 15 128 15zm0-1088q212 0 362 150t150 362-150 362-362 150-362-150-150-362 150-362 362-150zm0 224q14 0 23-9t9-23-9-23-23-9q-146 0-249 103t-103 249q0 14 9 23t23 9 23-9 9-23q0-119 84.5-203.5t203.5-84.5z"/></svg>';
 
 $(window).resize(f18_resize);
 $(document).ready(function(){
@@ -20,12 +15,12 @@ $(document).ready(function(){
     f18_attr = f18_sd.f18;
   }
   if(!f18_attr) {
-    f18_attr = { "Pinned.menu":"true" };
+    f18_attr = { "Pinned.menu":"true", "savePinChanges":true };
     f18_resetCol();
     f18_sd.f18 = f18_attr;
   }
 
- f18_setCss();
+ f18_setCss('init');
 
  var icon = FW_root+"/images/default/fhemicon_ios.png";
   $('head').append(
@@ -41,8 +36,10 @@ $(document).ready(function(){
 
 
   f18_aCol = getComputedStyle($("a").get(0),null).getPropertyValue('color'); 
-  f18_pinIn  = f18_pinIn.replace('gray', f18_aCol);
-  f18_pinOut = f18_pinIn.replace('/>',' transform="rotate(90,896,896)"/>');
+  for(var i in f18_icon)
+    f18_icon[i] = f18_icon[i].replace('gray', f18_aCol);
+  f18_icon.pinOut = f18_icon.pinIn
+                        .replace('/>',' transform="rotate(90,896,896)"/>');
 
   if(f18_attr.hideLogo) {
     $("div#menuScrollArea div#logo").css("display", "none");
@@ -51,16 +48,15 @@ $(document).ready(function(){
   f18_menu();
   f18_tables();
   f18_svgSetCols();
+  if(typeof svgCallback != "undefined")
+    svgCallback.f18 = f18_svgSetCols;
 });
 
 function
 f18_menu()
 {
-  // font-awesome: bars
-  var bars='data:image/svg+xml;utf8,<svg viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path fill="gray" d="M1664 1344v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45z"/></svg>'
-        .replace('gray', f18_aCol);
   $("<div id='menuBtn'></div>").prependTo("div#menuScrollArea")
-    .css( {"background-image":"url('"+bars+"')", "cursor":"pointer" })
+    .css( {"background-image":"url('"+f18_icon.bars+"')", "cursor":"pointer" })
     .click(function(){ $("div#menu").toggleClass("visible") });
 
   $("div#menu").prepend("<div></div>");
@@ -102,6 +98,7 @@ f18_tables()
       var ntr = $(el).closest("tr").next("tr");
       isFixed ? $(ntr).show() : $(ntr).hide();
     });
+    f18_addMove(el, function(){ log("Hello") });
   });
 
   if(FW_urlParams.detail) {
@@ -123,8 +120,8 @@ f18_tables()
     function
     addRow(name, desc, val)
     {
-      $("table.colors")
-        .append("<tr class='"+name+" "+(++row%2 ? "even":"odd")+"'>"+
+      $("table.f18colors")
+        .append("<tr class='ar_"+name+" "+(++row%2 ? "even":"odd")+"'>"+
                   "<td "+(val ? "" : "colspan='2'")+">"+
                         "<div class='col1'>"+desc+"</div></td>"+
                   (val ? "<td><div class='col2'>"+val+"</div></div></td>" : '')+
@@ -132,14 +129,15 @@ f18_tables()
     }
 
     function
-    addHider(name, desc, fn)
+    addHider(name, desc, fn, lVarName)
     {
       addRow(name, desc, "<input type='checkbox'>");
-      $("table.colors tr."+name+" input")
-        .prop("checked", f18_attr[name])
+      $("table.f18colors tr.ar_"+name+" input")
+        .prop("checked", lVarName ? window[lVarName] : f18_attr[name])
         .click(function(){
           var c = $(this).is(":checked");
-          f18_setAttr(name, c);
+          if(!lVarName)
+            f18_setAttr(name, c);
           fn(c);
         });
     }
@@ -148,12 +146,12 @@ f18_tables()
     addColorChooser(name, desc)
     {
       addRow(name, desc, "<div class='cp'></div>");
-      FW_replaceWidget("table.colors tr."+name+" div.col2 div.cp", name,
+      FW_replaceWidget("table.f18colors tr.ar_"+name+" div.col2 div.cp", name,
         ["colorpicker","RGB"], f18_attr.cols[name], name, "rgb", undefined,
         function(value) {
           f18_attr.cols[name] = value;
           f18_setAttr();
-          f18_setCss();
+          f18_setCss(name);
         });
     }
 
@@ -162,14 +160,14 @@ f18_tables()
 
     $("tr.f18").append("<div class='fileList f18colors'>f18 special</div>");
     $("div.f18colors").css("margin-top", "20px");
-    $("tr.f18").append("<table class='block wide colors'></table>");
+    $("tr.f18").append("<table class='block wide f18colors'></table>");
 
     loadScript("pgm2/fhemweb_colorpicker.js", addColors);
 
     function
     addColors()
     {
-      $("table.colors")
+      $("table.f18colors")
         .append("<tr class='reset' "+(++row%2 ? "even":"odd")+"'>"+
                   "<td colspan='2'><div class='col1'>Preset colors: "+
                      "<a href='#'>default</a> "+
@@ -177,11 +175,11 @@ f18_tables()
                      "<a href='#'>dark</a> "+
                   "</div></td>"+
                 "</tr>");
-      $("table.colors tr.reset a").click(function(){
+      $("table.f18colors tr.reset a").click(function(){
         row = 0;
-        $("table.colors").html("");
+        $("table.f18colors").html("");
         f18_resetCol($(this).text());
-        f18_setCss();
+        f18_setCss('preset');
         f18_setAttr();
         addColors();
       });
@@ -192,9 +190,38 @@ f18_tables()
       addColorChooser("oddrow",  "Odd row");
       addColorChooser("header",  "Header row");
       addColorChooser("menu",    "Menu");
-      addColorChooser("sel",     "Menu/Selected");
+      addColorChooser("sel",     "Menu:Selected");
       addColorChooser("inpBack", "Input bg");
-      $("table.colors input").attr("size", 8);
+      $("table.f18colors input").attr("size", 8);
+
+      addRow("editStyle", "<a href='#'>Additional CSS</a>");
+      $("table.f18colors tr.ar_editStyle a").click(function(){
+        $('body').append(
+          '<div id="editdlg" style="display:none">'+
+            '<textarea id="f18_cssEd" rows="25" cols="60" style="width:99%"/>'+
+          '</div>');
+
+        $("#f18_cssEd").val($("head #fhemweb_css").html());
+        $('#editdlg').dialog(
+          { modal:true, closeOnEscape:true, width:$(window).width()*3/4,
+            height:$(window).height()*3/4, title:$(this).text(),
+            close:function(){ $('#editdlg').remove(); },
+            buttons:[
+            { text: "Cancel",click:function(){$(this).dialog('close')}},
+            { text: "OK", click:function(){
+
+              if(!$("head #fhemweb_css"))
+                $("head").append("<style id='fhemweb_css'>\n</style>");
+              var txt = $("#f18_cssEd").val();
+              $("head #fhemweb_css").html(txt);
+              var wn = $("body").attr("data-webName");
+              FW_cmd(FW_root+"?cmd=attr "+wn+" Css "+
+                     encodeURIComponent(txt.replace(/;/g,";;"))+"&XHR=1");
+              $(this).dialog('close');
+            }}]
+          });
+      });
+
       addRow("empty", "&nbsp;");
       addHider("hidePin", "Hide pin", function(c){
         $("div.pinHeader div.pin").css("display", c ? "none":"block");
@@ -203,6 +230,15 @@ f18_tables()
         $("div#menuScrollArea div#logo").css("display", c ? "none":"block");
         f18_resize();
       });
+      addHider("savePinChanges", "Save pin changes", function(){});
+
+      /*
+      addHider("hideMove", "Drag group", function(c){
+        $("div.pinHeader div.move").css("display", c ? "block":"none");
+        f18_move = c;
+      }, "f18_move");
+      */
+
     }
   }
 
@@ -215,6 +251,7 @@ f18_tables()
         var ntr = $(el).next("table");
         isFixed ? $(ntr).show() : $(ntr).hide();
       });
+      f18_addMove(el, function(){ log("Hello") });
     });
   }
 }
@@ -223,7 +260,7 @@ function
 f18_resize()
 {
   var w=$(window).width();
-  log("W:"+w+" S:"+screen.width);
+  log("f18.js W:"+w+" S:"+screen.width);
 
   var diff = 0
   diff += f18_attr.hideLogo ? 0 : 40;
@@ -243,7 +280,8 @@ f18_addPin(el, name, defVal, fn, hidePin)
     init = defVal;
   $("<div class='pin'></div>")
     .appendTo(el)
-    .css("background-image", "url('"+(init ? f18_pinIn : f18_pinOut)+"')");
+    .css("background-image", "url('"+
+                              (init ? f18_icon.pinIn : f18_icon.pinOut)+"')");
   $(el).addClass("col_header pinHeader "+name.replace(/[^A-Z0-9]/ig,'_'));
   el = $(el).find("div.pin");
   $(el)
@@ -253,19 +291,34 @@ f18_addPin(el, name, defVal, fn, hidePin)
     .click(function(){
       var nextVal = !$(el).hasClass("pinIn");
       $(el).toggleClass("pinIn");
-      $(el).css("background-image","url('"+(nextVal ?f18_pinIn:f18_pinOut)+"')")
+      $(el).css("background-image","url('"+
+                             (nextVal ? f18_icon.pinIn : f18_icon.pinOut)+"')")
       f18_setAttr("Pinned."+name, nextVal);
       fn(nextVal);
     });
   fn(init);
 }
 
+function
+f18_addMove(el, fn)
+{
+  $("<div class='move'></div>")
+    .appendTo(el)
+    .css("background-image", "url('"+f18_icon.arrows+"')")
+    .css("display", f18_move ? "block":"none");
+  el = $(el).find("div.move");
+  $(el)
+    .css("cursor", "pointer")
+    .click(fn);
+}
 
 function
 f18_setAttr(name, value)
 {
   if(name)
     f18_attr[name]=value;
+  if(name && name.indexOf("Pinned.") == 0 && !f18_attr.savePinChanges)
+    return;
   var wn = $("body").attr("data-webName");
   FW_cmd(FW_root+"?cmd=attr "+wn+" styleData "+
         encodeURIComponent(JSON.stringify(f18_sd, null, 2))+"&XHR=1");
@@ -288,16 +341,16 @@ f18_resetCol(name)
   f18_attr.cols = name ? cols[name] : cols["default"];
 }
 
+// Put all the colors into a head style tag, send background changes to FHEM
 function
-f18_setCss()
+f18_setCss(why)
 {
   var cols = f18_attr.cols;
   var style = "";
   function bg(c) { return "{ background:#"+c+"; fill:#"+c+"; }\n" }
   function fg(c) { return "{ color:#"+c+"; }\n" }
-  style += ".col_fg, body, input "+fg(cols.fg);
-  style += ".col_bg, body, #menu, input, option "+bg(cols.bg);
-  style += ".col_fg, body, input { color:#"+cols.fg+"; }\n";
+  style += ".col_fg, body, input, textarea "+fg(cols.fg);
+  style += ".col_bg, body, #menu, textarea, input, option "+bg(cols.bg);
   style += ".col_link, a, .handle, .fhemlog, input[type=submit], select "+
                  "{color:#"+cols.link+"; stroke:#"+cols.link+";}\n";
   style += "svg:not([fill]):not(.jssvg) { fill:#"+cols.link+"; }\n";
@@ -316,54 +369,70 @@ f18_setCss()
   style += "div.ui-dialog { border:1px solid #"+cols.link+"; }";
   style += "button.ui-button { background:#"+cols.oddrow+"!important; "+
                               "border:1px solid #"+cols.link+"!important; }\n";
+  $("head style#f18_css").remove();
 
-  $("head style.f18").remove();
-  $("head").append("<style class='f18'>"+style+"</style>");
+  if(why == 'preset' || why == 'bg') { // Add background to css to avoid flicker
+    if(!$("head #fhemweb_css").length)
+      $("head").append("<style id='fhemweb_css'>\n</style>");
+    var otxt = $("head #fhemweb_css").html(), ntxt = otxt;
+    if(!ntxt)
+      ntxt = "";
+    ntxt = ntxt.replace(/^body,#menu { background:[^;]*; }[\r\n]*/m,'');
+    ntxt += "body,#menu { background:#"+cols.bg+"; }\n";
+    if(ntxt != otxt) {
+      $("head #fhemweb_css").html(ntxt);
+      var wn = $("body").attr("data-webName");
+      FW_cmd(FW_root+"?cmd=attr "+wn+" Css "+
+             encodeURIComponent(ntxt.replace(/;/g,";;"))+"&XHR=1");
+    }
+  }
+
+  style = "<style id='f18_css'>"+style+"</style>";
+  if($("head style#fhemweb_css").length)
+    $("head style#fhemweb_css").before(style);
+  else
+    $("head").append(style);
 }
 
-var dbg;
+// SVG color tuning
 function
-f18_svgSetCols()
+f18_svgSetCols(svg)
 {
-  $("body embed").each(function(){
-    this.addEventListener('load', function(){
-      var svg = FW_getSVG(this);
-      if(svg.contentType != "image/svg+xml")
-        return;
-      if(!svg || !svg.firstChild || !svg.firstChild.nextSibling)
-        return;
-      svg = svg.firstChild.nextSibling;
-      if(!svg.getAttribute("data-origin"))
-        return;
+  if(!svg || !svg.getAttribute("data-origin"))
+    return;
 
+  var style = $(svg).find("> style").first();
+  var sTxt = $(style).text();
+  var cols = f18_attr.cols;
+  sTxt = sTxt.replace(/font-family:Times/, "fill:#"+cols.fg);
+  $(style).text(sTxt);
 
-      var style = $(svg).find("> style").first();
-      var sTxt = $(style).text();
-      var cols = f18_attr.cols;
-      sTxt = sTxt.replace(/font-family:Times/, "fill:#"+cols.fg);
-      $(style).text(sTxt);
+  function
+  addCol(c, d)
+  {
+    var r="";
+    for(var i1=0; i1<6; i1+=2) {
+      var n = parseInt(c.substr(i1,2), 16);
+      n += d;
+      if(n>255) n = 255;
+      if(n<  0) n = 0;
+      n = n.toString(16);
+      if(n.length < 2)
+        n = "0"+length;
+      r += n;
+    }
+    return r;
+  }
 
-      function
-      addCol(c, d)
-      {
-        var r="";
-        for(var i1=0; i1<6; i1+=2) {
-          var n = parseInt(c.substr(i1,2), 16);
-          n += d;
-          if(n>255) n = 255;
-          if(n<  0) n = 0;
-          n = n.toString(16);
-          if(n.length < 2)
-            n = "0"+length;
-          r += n;
-        }
-        return r;
-      }
-
-      var stA = $(svg).find("> defs > #gr_bg").children();
-      $(stA[0]).css("stop-color", addCol(cols.bg, 10));
-      $(stA[1]).css("stop-color", addCol(cols.bg, -10));
-
-    }, false);
-  });
+  var stA = $(svg).find("> defs > #gr_bg").children();
+  $(stA[0]).css("stop-color", addCol(cols.bg, 10));
+  $(stA[1]).css("stop-color", addCol(cols.bg, -10));
 }
+
+// font-awesome
+var f18_svgPrefix='data:image/svg+xml;utf8,<svg viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path fill="gray" ';
+f18_icon.pinIn=f18_svgPrefix+'d="M896 1088q66 0 128-15v655q0 26-19 45t-45 19h-128q-26 0-45-19t-19-45v-655q62 15 128 15zm0-1088q212 0 362 150t150 362-150 362-362 150-362-150-150-362 150-362 362-150zm0 224q14 0 23-9t9-23-9-23-23-9q-146 0-249 103t-103 249q0 14 9 23t23 9 23-9 9-23q0-119 84.5-203.5t203.5-84.5z"/></svg>';
+
+f18_icon.bars=f18_svgPrefix+'d="M1664 1344v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45z"/></svg>';
+
+f18_icon.arrows=f18_svgPrefix+'d="M1792 896q0 26-19 45l-256 256q-19 19-45 19t-45-19-19-45v-128h-384v384h128q26 0 45 19t19 45-19 45l-256 256q-19 19-45 19t-45-19l-256-256q-19-19-19-45t19-45 45-19h128v-384h-384v128q0 26-19 45t-45 19-45-19l-256-256q-19-19-19-45t19-45l256-256q19-19 45-19t45 19 19 45v128h384v-384h-128q-26 0-45-19t-19-45 19-45l256-256q19-19 45-19t45 19l256 256q19 19 19 45t-19 45-45 19h-128v384h384v-128q0-26 19-45t45-19 45 19l256 256q19 19 19 45z"/></svg>';
