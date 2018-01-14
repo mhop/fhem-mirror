@@ -168,7 +168,7 @@ sub LaCrosse_Parse($$) {
   my ($hash, $msg) = @_;
   my $name = $hash->{NAME};
 
-  my( @bytes, $addr, $typeNumber, $typeName, $battery_new, $battery_low, $error, $type, $channel, $temperature, $humidity, $windDirection, $windSpeed, $windGust, $rain, $pressure, $gas, $debug );
+  my( @bytes, $addr, $typeNumber, $typeName, $battery_new, $battery_low, $error, $type, $channel, $temperature, $humidity, $windDirection, $windSpeed, $windGust, $rain, $pressure, $gas1, $gas2, $lux, $version, $voltage, $debug );
   $temperature = 0xFFFF;
   $humidity = 0xFF;
   $windDirection = 0xFFFF;
@@ -176,7 +176,11 @@ sub LaCrosse_Parse($$) {
   $windGust = 0xFFFF;
   $rain = 0xFFFF;
   $pressure = 0xFFFF;
-  $gas = 0xFFFFFF;
+  $gas1 = 0xFFFFFF;
+  $gas2 = 0xFFFFFF;
+  $lux = 0xFFFFFF;
+  $version = 0xFF;
+  $voltage = 0xFF;
   $debug = 0xFFFFFF;
   $error = 0;
 
@@ -265,6 +269,9 @@ sub LaCrosse_Parse($$) {
     elsif($typeNumber == 4) {
       $typeName = "LaCrosseGateway";
     }
+    elsif($typeNumber == 5) {
+      $typeName = "UniversalSensor";
+    }
     else {
       $typeName = "unknown";
     }
@@ -319,11 +326,27 @@ sub LaCrosse_Parse($$) {
     }
   
     if(@bytes > 18 && $bytes[16] != 0xFF) {
-      $gas = $bytes[16] * 65536 + $bytes[17] * 256 + $bytes[18];
+      $gas1 = $bytes[16] * 65536 + $bytes[17] * 256 + $bytes[18];
+    }
+   
+    if(@bytes > 21 && $bytes[19] != 0xFF) {
+      $gas2 = $bytes[19] * 65536 + $bytes[20] * 256 + $bytes[21];
     }
   
-    if(@bytes > 21 && $bytes[19] != 0xFF) {
-      $debug = $bytes[19] * 65536 + $bytes[20] * 256 + $bytes[21];
+    if(@bytes > 24 && $bytes[22] != 0xFF) {
+      $lux = $bytes[22] * 65536 + $bytes[23] * 256 + $bytes[24];
+    }
+  
+    if(@bytes > 25 && $bytes[25] != 0xFF) {
+      $version = $bytes[25] / 10;
+    }
+  
+    if(@bytes > 26 && $bytes[26] != 0xFF) {
+      $voltage = $bytes[26] / 10;
+    }
+    
+    if(@bytes > 29 && $bytes[27] != 0xFF) {
+      $debug = $bytes[27] * 65536 + $bytes[28] * 256 + $bytes[29];
     }
   
   }
@@ -542,10 +565,26 @@ sub LaCrosse_Parse($$) {
       readingsBulkUpdate($rhash, "pressure", $pressure );
     }
   
-    if ($typeNumber > 0 && $gas != 0xFFFFFF) {
-      readingsBulkUpdate($rhash, "gas", $gas );
+    if ($typeNumber > 0  && $gas1 != 0xFFFFFF) {
+      readingsBulkUpdate($rhash, "gas1", $gas1 );
     }
   
+    if ($typeNumber > 0 && $gas2 != 0xFFFFFF) {
+      readingsBulkUpdate($rhash, "gas2", $gas2 );
+    }
+  
+    if ($typeNumber == 5 && $lux != 0xFFFFFF) {
+      readingsBulkUpdate($rhash, "lux", $lux );
+    }
+  
+    if ($typeNumber == 5 && $version != 0xFF) {
+      readingsBulkUpdate($rhash, "version", $version );
+    }
+  
+    if ($typeNumber = 5 && $voltage != 0xFF) {
+      readingsBulkUpdate($rhash, "voltage", $voltage );
+    }
+    
     if ($typeNumber > 0 && $debug != 0xFFFFFF) {
       readingsBulkUpdate($rhash, "debug", $debug );
     }
