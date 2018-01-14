@@ -7,7 +7,12 @@
 # 
 # $Id$
 
+# Removed: PERL WARNING: Hexadecimal number > 0xffffffff non-portable at
+# Added:   attr ExtChannels -> set History-Readings
+
+
 package main;
+no warnings 'portable';  # Support for 64-bit ints required
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday usleep);
@@ -46,7 +51,7 @@ my %OBIS_codes = (	"Serial" 		=> qr{^0-0:96.1.255(?:.\d+)?\((.*?)\).*},
 					"Channel_sum" 	=> qr{^(?:1.0.)?(\d+).1.7(?:.0|.255)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
 					"Channels"		=> qr{^(?:\d.0.)?(\d+).7\.\d+(?:.0|.255)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
 					"Channels2"		=> qr{^(?:0.1.)?(\d+).2\.\d+(?:.0|.255)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},
-					"Counter"		=> qr{^(?:1.\d.)?(\d).(8)\.(\d)(?:.\d+)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},
+					"Counter"		=> qr{^(?:1.\d.)?(\d).(8)\.(\d).(\d+)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},    #^(?:1.\d.)?(\d).(8)\.(\d)(?:.\d+)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*
 					"ManufID"		=> qr{^129-129:199\.130\.3(?:.\d+)?\((.*?)\).*},
 					"PublicKey"		=> qr{^129-129:199\.130\.5(?:.\d+)?\((.*?)\).*},
 				);
@@ -149,6 +154,9 @@ sub OBIS_Define($$)
     $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
     $hash->{helper}{DEVICES} =$devs{$type};
     $hash->{helper}{TRIGGERTIME}=gettimeofday();
+#    if( !$init_done ) {
+#	    $attr{$name}{"event-on-change-reading"} = ".*";
+ #   }
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
 	InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
@@ -313,12 +321,9 @@ sub OBIS_trySMLdecode($$)
 			my $OBISid=$msg=~m/7701([0-9A-F]*?)01/g;
 			Log3 $hash,5,"OBIS: Full message-> $msg";
 			(undef,undef,$OBISid,undef)=OBIS_decodeTL($1);
-#			Log3 $hash,5,"OBIS: ObisID-> $1";
 			while ($msg =~ m/(7707)([0-9A-F]*)/g) {
-#	    		my $telegramm = $&;
       			my @list=$&=~/(7707)([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]*)/g;
       			Log3 $hash, 5,"OBIS: Telegram=$msg";
-#      			Log 3,Dumper(@list);
       			if (!@list) {Log3 $hash,3,"OBIS - Empty datagram: .$msg"};
 	    		my $line=hex($list[1])."-".hex($list[2]).":".hex($list[3]).".".hex($list[4]).".".hex($list[5])."*255(";
 	    		if ($line eq '255-255:255.255.255*255(') {
@@ -326,26 +331,16 @@ sub OBIS_trySMLdecode($$)
 	    			$msg=$1;
 	    		} else
 	    		{
-#		    		Log3 $hash,5,"Line: $line";
-#		    		Log3 $hash,5,"Before decoding: $list[7]";
 					my ($status,$statusL,$statusT,$valTime,$valTimeL,$valTimeT,$unit,$unitL,$unitT,$scaler,$scalerL,$scalerT,$data,$dataL,$dataT,$other);		   
 		    		($statusL,$statusT,$status,$other)=OBIS_decodeTL($list[7]);
-#		    		Log3 $hash,5,"After status: $other";
 		    		($valTimeL,$valTimeT,$valTime,$other)=OBIS_decodeTL($other);
-#		    		Log3 $hash,5,"After Time: $other";
 		    		($unitL,$unitT,$unit,$other)=OBIS_decodeTL($other);
-#		    		Log3 $hash,5,"After Unit: $other";
 		    		($scalerL,$scalerT,$scaler,$other)=OBIS_decodeTL($other);
-#		    		Log3 $hash,5,"After Scaler: $other";
 		    		($dataL,$dataT,$data,$msg)=OBIS_decodeTL($other);
-#		    		Log3 $hash,5,"After Data: $msg";
-		    		
-	# Type String
-					my $line2=""; 
+		    		my $line2=""; 
 		    		if ($dataT ==0 ) {				
-	$line2=$data;
+						$line2=$data;
 		    			if($line=~$SML_specialities{"HEX4"}[0]) {
-	#	    				
 	#	    				$line2=$SML_specialities{"HEX4"}[1]->($data)
 		    			} elsif($line=~$SML_specialities{"HEX2"}[0]) {
 	#    					$line2=$SML_specialities{"HEX2"}[1]->($data)
@@ -379,7 +374,6 @@ sub OBIS_trySMLdecode($$)
 						if ($dataT & 0b00100000 || $val>=0) {
 							$val=hex($data);
 						}
-	#					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit")  if($dataT ==80);
 						$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit"); # if($dataT ==96);					
 					} elsif ($dataT & 0b01000000) {		# Type Boolean - no Idea, where this is used
 						$line2=OBIS_hex2int($data);			# 0=false, everything else is true
@@ -394,7 +388,6 @@ sub OBIS_trySMLdecode($$)
 					}
 					$initstr.="$line2\\" if ($line=~$SML_specialities{"INFO"}[0]);
 					$newMsg.=$line.$line2.")\r\n";
-	#				Log 3,"$line$line2)";
 	###### TypeLength-Test ends here
 				}
 			}
@@ -403,7 +396,6 @@ sub OBIS_trySMLdecode($$)
 			$newMsg.="!".chr(13).chr(10);
 			Log3 $hash,4,"MSG IS: \r\n$newMsg";
 		} else {
-#			Log 3,"Illegal CRC";
 			$hash->{CRC_Errors}+=1;
 		}
 	}
@@ -436,7 +428,11 @@ sub OBIS_Parse($$)
 	my $remainingSML;
 	($buffer,$remainingSML) = OBIS_trySMLdecode($hash,$buffer) if ($hash->{MeterType}=~/SML|Ext|Unknown/);
 	my $type= $hash->{MeterType};
-	my $name = $hash->{NAME};  
+	my $name = $hash->{NAME};
+			$buf='/'.$buf;  
+	    	$buf =~ /!((?!\/).*)$/gmsi;
+			$buf=$1;
+	
 	if(index($buffer,chr(13).chr(10)) ne -1){
 		readingsBeginUpdate($hash);
 		
@@ -461,7 +457,7 @@ sub OBIS_Parse($$)
 #					}
 			
 			# End of Message
-					if ($rmsg=~/!.*/) {
+					if ($rmsg=~/^!.*/) {
 						$hash->{helper}{EoM}+=1 if ($hash->{helper}{DEVICES}[1]>0);
 					}
 			#Version
@@ -502,14 +498,14 @@ sub OBIS_Parse($$)
 											$rmsg =~ $OBIS_codes{$code};
 											my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1.".".$2} // $OBIS_channels{$1.".".$2} // $channel;
 											my $chan=$3+0 > 0 ? "_Ch$3" : "";
-#											if (AttrVal($name,"ExtChannels","off") eq "on") {$chan.=".$4";}
+											if (AttrVal($name,"ExtChannels","off") eq "on") {$chan.=".$4" if $4;}
     										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
 												if($1==1) {
-    								Log3($hash,4,"Set ".$L.$chan." to ".((looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0)));
+    												Log3($hash,4,"Set ".$L.$chan." to ".((looks_like_number($3) ? $6+0 : $5) +AttrVal($name,"offset_energy",0)));
 
-													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 
+													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $6+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $7")); 
 												} elsif ($1==2) {
-													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 				
+													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $6+0 : $5) +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $7")); 				
 												}
 							  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$4} // $dir{$4}) if (length $4);
     										}											
