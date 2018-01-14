@@ -346,11 +346,14 @@ sub FB_CALLLIST_Notify($$)
             }
         }
 
+        if(grep(m/^(?:INITIALIZED|REREADCFG)$/, @{$events}))
+        {
+            Log3 $name, 2, "FB_CALLLIST ($name) - WARNING - the selected device $callmonitor does not exist" unless(IsDevice($callmonitor));
+            Log3 $name, 2, "FB_CALLLIST ($name) - WARNING - selected device $callmonitor ist not of type FB_CALLMONITOR" if(IsDevice($callmonitor) and !IsDevice($callmonitor,"FB_CALLMONITOR"));
+        }
+
         if(grep(m/^(?:ATTR $name .*|DELETEATTR $name.*|INITIALIZED|REREADCFG)$/, @{$events}))
         {
-            Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - the selected device $callmonitor does not exist" unless(IsDevice($callmonitor));
-            Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device $callmonitor ist not of type FB_CALLMONITOR" if(IsDevice($callmonitor) and !IsDevice($callmonitor,"FB_CALLMONITOR"));
-
             # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
             FB_CALLLIST_cleanupList($hash);
 
@@ -358,7 +361,7 @@ sub FB_CALLLIST_Notify($$)
             {
                 # Inform all FHEMWEB clients
                 FB_CALLLIST_updateFhemWebClients($hash);
-                
+
                 # Update readings
                 FB_CALLLIST_createReadings($hash);
             }
@@ -738,8 +741,7 @@ sub FB_CALLLIST_returnCallState($$;$)
         if($data->{direction} eq "incoming" and ((not exists($data->{internal_connection}) ) or (exists($data->{internal_connection}) and not $data->{internal_connection} =~ /Answering_Machine/)))
         {
             $state = "=>".($data->{missed_call} ? " X" : "");
-            $state = FB_CALLLIST_returnIcon($hash, "incoming.done", $state) if($icons and not $data->{missed_call});
-            $state = FB_CALLLIST_returnIcon($hash, "incoming.missed", $state) if($icons and $data->{missed_call});
+            $state = FB_CALLLIST_returnIcon($hash, "incoming.".($data->{missed_call} ? "missed" : "done"), $state) if($icons);
         }
         elsif($data->{direction} eq "incoming" and exists($data->{internal_connection}) and $data->{internal_connection} =~ /^Answering_Machine/)
         {
@@ -749,8 +751,7 @@ sub FB_CALLLIST_returnCallState($$;$)
         elsif($data->{direction} eq "outgoing")
         {
             $state = "<=".($data->{missed_call} ? " X" : "");
-            $state = FB_CALLLIST_returnIcon($hash, "outgoing.done", $state) if($icons and not $data->{missed_call});
-            $state = FB_CALLLIST_returnIcon($hash, "outgoing.missed", $state) if($icons and $data->{missed_call});
+            $state = FB_CALLLIST_returnIcon($hash, "outgoing.".($data->{missed_call} ? "missed" : "done"), $state) if($icons);
         }
     }
 
@@ -801,9 +802,9 @@ sub FB_CALLLIST_index2line($$)
     {
         my $data = \%{$hash->{helper}{DATA}{$index}};
         my $count = FB_CALLLIST_getItemLineNumberFromIndex($hash,$index);
-        
+
         return undef unless(defined($count)); # call should not be displayed
-        
+
         my $old_locale = setlocale(LC_ALL);
 
         if(AttrVal($name, "language", "en") eq "de")
@@ -827,9 +828,9 @@ sub FB_CALLLIST_index2line($$)
                         connection => ($data->{internal_connection} ? ((exists($hash->{helper}{CONNECTION_MAP}) and exists($hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}})) ? $hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}} : $data->{internal_connection} ) : "-"),
                         duration => FB_CALLLIST_formatDuration($hash, $index)
                    };
-                   
+
         setlocale(LC_ALL, $old_locale);
-        
+
         return $line;
     }
 
@@ -903,7 +904,7 @@ sub FB_CALLLIST_list2html($)
     my $td_style = 'style="padding-left:6px;padding-right:6px;"';
     my $line;
 
-    
+
 
     my $ret .= "<table>";
 
@@ -956,7 +957,7 @@ sub FB_CALLLIST_list2html($)
 
 
 #####################################
-# creating the call list as json array
+# generate all readings for the call list
 sub FB_CALLLIST_createReadings($)
 {
     my ($hash) = @_;
@@ -967,7 +968,7 @@ sub FB_CALLLIST_createReadings($)
     my $create_readings = AttrVal($hash->{NAME}, "create-readings","0");
 
     return undef unless($create_readings);
-    
+
     my @item_list = FB_CALLLIST_getAllItemLines($hash);
 
     readingsBeginUpdate($hash);
@@ -994,7 +995,7 @@ sub FB_CALLLIST_createReadings($)
     readingsEndUpdate($hash, 1);
 
     map { CommandDeleteReading(undef, "$name $_") } @delete_readings;
-    
+
     return undef;
 }
 
@@ -1244,11 +1245,11 @@ sub FB_CALLLIST_checkForInternalNumberFilter($$)
 sub FB_CALLLIST_deleteItem($;$)
 {
     my ($hash, $index) = @_;
-    
+
     my $name = $hash->{NAME};
-    
+
     delete($hash->{helper}{DATA}{$index}) if($index);
-    
+
     if(FB_CALLLIST_createOrderedIndexList($hash))
     {
         FW_directNotify($name, "{\"action\":\"delete\",\"index\":\"$index\"}", 1) if(defined($FW_ME) and $index);
@@ -1310,9 +1311,9 @@ sub FB_CALLLIST_updateOneItemInFHEMWEB($$)
     my $name = $hash->{NAME};
 
     my $line = FB_CALLLIST_index2line($hash,$index);
-    
+
     return undef unless($line); # abort if call should not be displayed (e.g. attr list-type = "completed")
-    
+
     my $json = FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
 
     FW_directNotify($name, "{\"action\":\"update\",\"index\":\"$index\",\"order\":\"".AttrVal($name, "list-order","descending")."\",\"item\":$json}", 1);
