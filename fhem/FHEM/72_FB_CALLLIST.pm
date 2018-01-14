@@ -354,8 +354,14 @@ sub FB_CALLLIST_Notify($$)
             # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
             FB_CALLLIST_cleanupList($hash);
 
-            # Inform all FHEMWEB clients
-            FB_CALLLIST_updateFhemWebClients($hash) if(grep(m/^(?:ATTR|DELETEATTR)/, @{$events}));
+            if(grep(m/^(?:ATTR|DELETEATTR)/, @{$events}))
+            {
+                # Inform all FHEMWEB clients
+                FB_CALLLIST_updateFhemWebClients($hash);
+                
+                # Update readings
+                FB_CALLLIST_createReadings($hash);
+            }
 
             # save current list state to file/configDB
             FB_CALLLIST_saveList($hash);
@@ -492,6 +498,9 @@ sub FB_CALLLIST_Notify($$)
     # inform about changes of current call index
     FB_CALLLIST_updateOneItemInFHEMWEB($hash,$data->{internal_index});
 
+    # Update readings
+    FB_CALLLIST_createReadings($hash);
+
     # save current list state to file/configDB
     FB_CALLLIST_saveList($hash);
 }
@@ -561,8 +570,7 @@ sub FB_CALLLIST_cleanupList($)
         foreach $index (@list)
         {
             Log3 $name, 5, "FB_CALLLIST ($name) - deleting old call $index";
-            FW_directNotify($name, "{\"action\":\"delete\",\"index\":\"$index\"}", 1) if(defined($FW_ME));
-            delete($hash->{helper}{DATA}{$index});
+            FB_CALLLIST_deleteItem($hash,$index);
         }
 
         FB_CALLLIST_deleteExpiredCalls($hash);
@@ -633,10 +641,7 @@ sub FB_CALLLIST_deleteExpiredCalls($;$)
             {
                 Log3 $name, 5, "FB_CALLLIST ($name) - deleting expired call $index";
 
-                # Inform Web Client
-                FW_directNotify($name, "{\"action\":\"delete\",\"index\":\"$index\"}", 1) if(defined($FW_ME));
-
-                delete($hash->{helper}{DATA}{$index});
+                FB_CALLLIST_deleteItem($hash, $index);
             }
         }
 
@@ -764,8 +769,8 @@ sub FB_CALLLIST_makeTable($$$$)
 }
 
 #####################################
-# get formated list items to display
-sub FB_CALLLIST_getListItems($)
+# get the complete list as formated list items to display
+sub FB_CALLLIST_getAllItemLines($)
 {
     my ($hash) = @_;
 
@@ -777,7 +782,8 @@ sub FB_CALLLIST_getListItems($)
     {
         foreach my $index (@list)
         {
-            push @result, FB_CALLLIST_index2line($hash, $index);
+            my $line = FB_CALLLIST_index2line($hash, $index);
+            push @result, $line if($line);
         }
     }
 
@@ -795,6 +801,19 @@ sub FB_CALLLIST_index2line($$)
     {
         my $data = \%{$hash->{helper}{DATA}{$index}};
         my $count = FB_CALLLIST_getItemLineNumberFromIndex($hash,$index);
+        
+        return undef unless(defined($count)); # call should not be displayed
+        
+        my $old_locale = setlocale(LC_ALL);
+
+        if(AttrVal($name, "language", "en") eq "de")
+        {
+            setlocale(LC_ALL, "de_DE.utf8");
+        }
+        else
+        {
+            setlocale(LC_ALL, "en_US.utf8");
+        }
         my $line = {
                         index => $index,
                         line => $count,      # internal line identifier for JavaScript, must be present
@@ -808,6 +827,9 @@ sub FB_CALLLIST_index2line($$)
                         connection => ($data->{internal_connection} ? ((exists($hash->{helper}{CONNECTION_MAP}) and exists($hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}})) ? $hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}} : $data->{internal_connection} ) : "-"),
                         duration => FB_CALLLIST_formatDuration($hash, $index)
                    };
+                   
+        setlocale(LC_ALL, $old_locale);
+        
         return $line;
     }
 
@@ -864,7 +886,7 @@ sub FB_CALLLIST_getItemLineNumberFromIndex($$)
         }
     }
 
-    return undef;
+    return undef; # call should not be displayed
 }
 
 #####################################
@@ -881,16 +903,7 @@ sub FB_CALLLIST_list2html($)
     my $td_style = 'style="padding-left:6px;padding-right:6px;"';
     my $line;
 
-    my $old_locale = setlocale(LC_ALL);
-
-    if(AttrVal($name, "language", "en") eq "de")
-    {
-        setlocale(LC_ALL, "de_DE.utf8");
-    }
-    else
-    {
-        setlocale(LC_ALL, "en_US.utf8");
-    }
+    
 
     my $ret .= "<table>";
 
@@ -907,7 +920,7 @@ sub FB_CALLLIST_list2html($)
 
     $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), 'class="fbcalllist header"','') if(AttrVal($name, "no-table-header", "0") eq "0");
 
-    my @item_list = FB_CALLLIST_getListItems($hash);
+    my @item_list = FB_CALLLIST_getAllItemLines($hash);
 
     if(@item_list > 0)
     {
@@ -938,15 +951,13 @@ sub FB_CALLLIST_list2html($)
     $ret .= "</table></div>";
     $ret .= "</td></tr></table>";
 
-    setlocale(LC_ALL, $old_locale);
-
     return $ret;
 }
 
 
 #####################################
 # creating the call list as json array
-sub FB_CALLLIST_list2json($)
+sub FB_CALLLIST_createReadings($)
 {
     my ($hash) = @_;
 
@@ -954,54 +965,37 @@ sub FB_CALLLIST_list2json($)
 
     my $name = $hash->{NAME};
     my $create_readings = AttrVal($hash->{NAME}, "create-readings","0");
-    my @json_output = ();
 
-    my $old_locale = setlocale(LC_ALL);
+    return undef unless($create_readings);
+    
+    my @item_list = FB_CALLLIST_getAllItemLines($hash);
 
-    if(AttrVal($name, "language", "en") eq "de")
-    {
-        setlocale(LC_ALL, "de_DE.utf8");
-    }
-    else
-    {
-        setlocale(LC_ALL, "en_US.utf8");
-    }
-
-    my @item_list = FB_CALLLIST_getListItems($hash);
-
-    readingsBeginUpdate($hash) if($create_readings eq "1");
+    readingsBeginUpdate($hash);
 
     if(@item_list > 0)
     {
         foreach my $line (@item_list)
         {
-            FB_CALLLIST_updateReadings($hash, $line) if($create_readings eq "1");
-
-            push @json_output,  FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
+            FB_CALLLIST_createReadingsForItem($hash, $line);
         }
     }
 
-    setlocale(LC_ALL, $old_locale);
+    readingsBulkUpdate($hash, "numberOfCalls", scalar @item_list, 1);
 
     # delete old readings
-    if($create_readings eq "1")
+    my @delete_readings;
+
+    for my $reading (grep { /^(\d+)-/ and ($1 > @item_list) } keys %{$hash->{READINGS}})
     {
-        readingsBulkUpdate($hash, "numberOfCalls", scalar @item_list, 1);
-
-        my @delete_readings;
-
-        for my $reading (grep { /^(\d+)-/ and ($1 > @item_list) } keys %{$hash->{READINGS}})
-        {
-            readingsBulkUpdate($hash, $reading, "");
-            push @delete_readings, $reading;
-        }
-
-        readingsEndUpdate($hash, 1) if($create_readings eq "1");
-
-        map { delete($hash->{READINGS}{$_}) } @delete_readings;
+        readingsBulkUpdate($hash, $reading, "");
+        push @delete_readings, $reading;
     }
 
-    return @json_output;
+    readingsEndUpdate($hash, 1);
+
+    map { CommandDeleteReading(undef, "$name $_") } @delete_readings;
+    
+    return undef;
 }
 
 #####################################
@@ -1201,7 +1195,7 @@ sub FB_CALLLIST_returnOrderedJSONOutput($$)
 
 #####################################
 # generate Readings for all list entries
-sub FB_CALLLIST_updateReadings($$)
+sub FB_CALLLIST_createReadingsForItem($$)
 {
     my ($hash,$line) = @_;
 
@@ -1246,26 +1240,18 @@ sub FB_CALLLIST_checkForInternalNumberFilter($$)
 }
 
 #####################################
-# update the call list of all connected FHEMWEB clients via inform mechanism
-sub FB_CALLLIST_updateFhemWebClients($)
+# delete an item from the list and update FHEMWEB clients
+sub FB_CALLLIST_deleteItem($;$)
 {
-    my ($hash) = @_;
+    my ($hash, $index) = @_;
+    
     my $name = $hash->{NAME};
-
-    return undef unless($init_done);
-
-    if(my @list = FB_CALLLIST_list2json($hash))
+    
+    delete($hash->{helper}{DATA}{$index}) if($index);
+    
+    if(FB_CALLLIST_createOrderedIndexList($hash))
     {
-        Log3 $name, 5, "FB_CALLLIST ($name) - inform all FHEMWEB clients";
-
-        # inform all FHEMWEB clients about changes
-        my $count = 0;
-
-        foreach my $line (@list)
-        {
-            FW_directNotify($name, "{\"action\":\"updateItem\",\"item\":$line}", 1);
-            $count++;
-        }
+        FW_directNotify($name, "{\"action\":\"delete\",\"index\":\"$index\"}", 1) if(defined($FW_ME) and $index);
     }
     else
     {
@@ -1289,6 +1275,33 @@ sub FB_CALLLIST_updateFhemWebClients($)
     }
 }
 
+
+#####################################
+# update the call list of all connected FHEMWEB clients via inform mechanism
+sub FB_CALLLIST_updateFhemWebClients($)
+{
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    return undef unless($init_done);
+
+    if(my @list = FB_CALLLIST_getAllItemLines($hash))
+    {
+        Log3 $name, 5, "FB_CALLLIST ($name) - inform all FHEMWEB clients";
+
+        # inform all FHEMWEB clients about changes
+        foreach my $line (@list)
+        {
+            my $json = FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
+            FW_directNotify($name, "{\"action\":\"update\",\"index\":\"".$line->{index}."\",\"order\":\"".AttrVal($name, "list-order","descending")."\",\"item\":$json}", 1);
+        }
+    }
+    else
+    {
+        FB_CALLLIST_deleteItem($hash);
+    }
+}
+
 #####################################
 # update one particular item of the call list of all connected FHEMWEB clients via inform mechanism
 sub FB_CALLLIST_updateOneItemInFHEMWEB($$)
@@ -1296,12 +1309,16 @@ sub FB_CALLLIST_updateOneItemInFHEMWEB($$)
     my ($hash, $index) = @_;
     my $name = $hash->{NAME};
 
-    my $json = FB_CALLLIST_returnOrderedJSONOutput($hash, FB_CALLLIST_index2line($hash,$index));
+    my $line = FB_CALLLIST_index2line($hash,$index);
+    
+    return undef unless($line); # abort if call should not be displayed (e.g. attr list-type = "completed")
+    
+    my $json = FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
 
     FW_directNotify($name, "{\"action\":\"update\",\"index\":\"$index\",\"order\":\"".AttrVal($name, "list-order","descending")."\",\"item\":$json}", 1);
 
     return undef;
- }
+}
 
 
 #####################################

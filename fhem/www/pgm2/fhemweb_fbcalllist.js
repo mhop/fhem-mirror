@@ -16,7 +16,7 @@ function FW_processCallListUpdate(data)
     var table = $(this).find("table.fbcalllist").first();
     var json_data = jQuery.parseJSON(data)
 
-    // clear the list 
+    // clear the list
     if(json_data.action == "clear")
     {
         // if the table isn't already empty
@@ -43,7 +43,7 @@ function FW_processCallListUpdate(data)
         {
              $.each(json_data.item, function (key, val) {
 
-                if(key == "index" || key == "line")
+                if(key == "line")
                 { return true; }
 
                 FW_setCallListValue(table,json_data.index,key,val);
@@ -54,12 +54,12 @@ function FW_processCallListUpdate(data)
             // delete the empty tr row if it may exist
             table.find("tr[name=empty]").remove();
 
-            var new_tr = '<tr align="center" number="'+json_data.item.line+'" index="'+json_data.index+'" class="fbcalllist item '+((json_data.line % 2) == 1 ? "odd" : "even")+'">';
+            var new_tr = '<tr align="center" number="'+json_data.item.line+'" index="'+json_data.index+'" class="fbcalllist item '+((json_data.item.line % 2) == 1 ? "odd" : "even")+'">';
             var style = "style=\"padding-left:6px;padding-right:6px;\"";
 
              // create the corresponding <td> tags with the received data
             $.each(json_data.item, function (key, val) {
-                if(key == "index" || key == "line")
+                if(key == "line")
                 { return true; }
                 new_tr += '<td name="'+key+'" '+style+'>'+val+'</td>';
              });
@@ -84,7 +84,15 @@ function FW_FbCalllistUpdateRowNumbers(table)
 {
     count = 0;
     table.find("tr.item").each(function(index, obj) {
+
+        var oldClass = ((parseInt($(obj).attr("number")) % 2) == 1 ? "odd" : "even");
+
         $(obj).attr("number", ++count);
+
+        var newClass = ((count % 2) == 1 ? "odd" : "even");
+
+        $(obj).removeClass(oldClass);
+        $(obj).addClass(newClass);
         $(obj).find("td[name='row']").html(count);
     });
 }
