@@ -13,6 +13,8 @@
 
 package main;
 no warnings 'portable';  # Support for 64-bit ints required
+#use bigint qw/hex/;
+no warnings qw(overflow portable);
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday usleep);
@@ -84,7 +86,7 @@ sub OBIS_Initialize($)
     $hash->{GetFn} = "OBIS_Get";
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off ExtChannels:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both createPreValues:on,off ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off extChannels:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both createPreValues:on,off ".
   					  $readingFnAttributes;
 }
 
