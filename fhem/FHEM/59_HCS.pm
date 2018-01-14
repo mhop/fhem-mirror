@@ -596,10 +596,9 @@ HCS_getValues($$) {
     }
 
     my $lastState = ReadingsVal($name,$d,"idle");
-    my $act = $devs{$d}{actuator};
-    my $tm  = $devs{$d}{tempMeasured};
-    my $td  = $devs{$d}{tempDesired};
-    my $str;
+    my $valve = $devs{$d}{actuator};
+    my $tm    = $devs{$d}{tempMeasured};
+    my $td    = $devs{$d}{tempDesired};
 
     if(!$hash->{helper}{device}{$d}{demand}) {
       $hash->{helper}{device}{$d}{demand} = 0;
@@ -623,48 +622,31 @@ HCS_getValues($$) {
         $sumIdle++   if($devState eq "idle");
         $sumDemand++ if($devState eq "demand");
       }
-      $str = sprintf("desired: %4.1f measured: %4.1f d: %+5.1f open: %${lv}d%% state: %s",$td,$tm,$tm-$td,$act,$devState);
     } elsif($mode eq "valve") {
-      my $vOn   = AttrVal($name,"valveThresholdOn",$defaults{valveThresholdOn});
-      my $vOff  = AttrVal($name,"valveThresholdOff",$defaults{valveThresholdOff});
-      my $valve = $devs{$d}{actuator};
+      my $vThreshold = AttrVal($name,"valveThresholdOn",$defaults{valveThresholdOn});
+      if ( $lastState eq "demand" ) {
+        $vThreshold  = AttrVal($name,"valveThresholdOff",$defaults{valveThresholdOff});
+      }
 
-      if($valve >= $vOn) {
+      if ( $valve > $vThreshold ) {
         $devState = "demand";
         $hash->{helper}{device}{$d}{demand} = 1;
         $sumDemand++;
       } else {
-
-        if($lastState eq "demand") {
-          if($valve > $vOff) {
-            $devState = "demand";
-            $hash->{helper}{device}{$d}{demand} = 1;
-            $sumDemand++;
-          } else {
-            $devState = "idle";
-            $hash->{helper}{device}{$d}{demand} = 0;
-            $sumIdle++;
-          }
-        } else {
-          $devState = "idle";
-          $hash->{helper}{device}{$d}{demand} = 0;
-          $sumIdle++;
-        }
+        $devState = "idle";
+        $hash->{helper}{device}{$d}{demand} = 0;
+        $sumIdle++;
       }
-      $str = sprintf("desired: %4.1f measured: %4.1f delta: %+5.1f valve: %${lv}d%% state: %s",$td,$tm,$tm-$td,$valve,$devState);
     }
 
+    my $str = sprintf("desired: %4.1f measured: %4.1f delta: %+5.1f valve: %${lv}d%% state: %s",$td,$tm,$tm-$td,$valve,$devState);
     Log3 $name, 4, "$type $name $d: $str";
     readingsBulkUpdate($hash,$d,$devState);
 
   }
   readingsEndUpdate($hash,1);
 
-  my $heatDemand = 0;
-
-  foreach my $d (sort keys %{$hash->{helper}{device}}) {
-    $heatDemand = 1 if($hash->{helper}{device}{$d}{demand} && $hash->{helper}{device}{$d}{demand} == 1);
-  }
+  my $heatDemand = ($sumDemand > 0)? 1:0;
 
   # eco mode
   my $eco = "no";
