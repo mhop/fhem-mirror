@@ -94,10 +94,10 @@ structure_Define($$)
   $hash->{CHANGEDCNT} = 0;
   $hash->{".asyncQueue"} = [];
 
-  InternalTimer(1, sub {
+  structure_setDevs($hash, $def); # needed by set while init is running
+  InternalTimer(1, sub {          # repeat it for devices defined later
     structure_setDevs($hash, $def);
-    @a = ( "set", $devname, $stype, $devname );
-    structure_Attr(@a);
+    structure_Attr("set", $devname, $stype, $devname);
   }, undef, 0);
 
   return undef;
