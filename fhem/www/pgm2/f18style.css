@@ -1,12 +1,12 @@
 @import url("defaultCommon.css");
 
 #logo {
-  position:absolute; top:10px; width:32px; height:32px; z-index:10;
+  position:absolute; top:10px; left:52px; width:32px; height:32px; z-index:10;
   background-image:url(../images/default/fhemicon.png);
   background-size: contain; background-repeat: no-repeat;
 }
 #menuBtn { position:absolute; top:10px; left:10px; width:32px; height:32px; }
-#hdr     { position:absolute; top:10px; left:94px; }
+#hdr     { position:absolute; top:10px; right:10px; }
 #content { position:absolute; top:50px; left:10px; bottom:10px; right:10px; }
 #menu {
   position: absolute;
@@ -54,7 +54,11 @@ body.touch div.col1, body.touch #menu table.room div { padding:0.25em 0; }
 @media screen and (orientation: portrait) {
   body.small table.block tr td:nth-child(n+3) { width: 0px; display: none; }
   body.small #content > table { width: 100%; }
-  body.small #menuBtn { right:10px; left:auto; }
-  body.small #logo { left:10px; }
-  body.small #hdr { left:52px; }
 }
+
+body.pinnedMenu #menuBtn { display:none; }
+body.pinnedMenu #menu { left:10px; }
+body.pinnedMenu #logo { left:10px; }
+body.small.rightMenu #menuBtn { right:10px; left:auto; }
+body.small.rightMenu #logo { right:52px; left:auto; }
+body.small.rightMenu #hdr { left:10px; right:auto; }

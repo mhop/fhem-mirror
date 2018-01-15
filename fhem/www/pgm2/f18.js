@@ -1,7 +1,7 @@
 "use strict";
 FW_version["f18.js"] = "$Id$";
 
-// TODO: rewrite menu, dashboard, floorplan, fix longpollSVG
+// TODO: rewrite menu, dashboard, floorplan
 var f18_attr, f18_aCol, f18_sd, f18_isMobile, f18_icon={}, f18_move=false;
 var f18_small = (screen.width < 480 || screen.height < 480);
 
@@ -41,7 +41,8 @@ $(document).ready(function(){
     $("body").addClass('small');
     f18_attr["Pinned.menu"] = false;
   }
-
+  if(f18_attr.rightMenu)
+    $("body").addClass("rightMenu");
 
   f18_aCol = getComputedStyle($("a").get(0),null).getPropertyValue('color'); 
   for(var i in f18_icon)
@@ -49,10 +50,6 @@ $(document).ready(function(){
   f18_icon.pinOut = f18_icon.pinIn
                         .replace('/>',' transform="rotate(90,896,896)"/>');
 
-  if(f18_attr.hideLogo) {
-    $("div#menuScrollArea div#logo").css("display", "none");
-    $("#hdr").css("left", f18_small ? "10px":"54px");
-  }
   f18_menu();
   f18_tables();
   f18_svgSetCols();
@@ -63,29 +60,29 @@ $(document).ready(function(){
 function
 f18_menu()
 {
+  if($("#menuScrollArea #menuBtn").length)
+    return fixMenu();
+
   $("<div id='menuBtn'></div>").prependTo("div#menuScrollArea")
     .css( {"background-image":"url('"+f18_icon.bars+"')", "cursor":"pointer" })
-    .click(function(){ $("div#menu").toggleClass("visible") });
+    .click(function(){ $("#menu").toggleClass("visible") });
 
   $("div#menu").prepend("<div></div>");
   f18_addPin("div#menu > div:first", "menu", true, fixMenu, f18_small);
-  setTimeout(function(){ $("div#menu,div#content").addClass("animated"); }, 10);
-
+  setTimeout(function(){ $("#menu,#content,#logo,#hdr").addClass("animated"); },
+             10);
   function
-  fixMenu(isFixed) {
-    if(isFixed) {
-      $("div#content").css("left", (parseInt($("div#menu").width())+20)+"px");
-      $("div#menu").addClass("visible");
-      $("div#hdr").css("left", "10px");
-      $("div#menuBtn").hide();
-      if(!f18_small)
-        $("div#logo").css("left", "10px");
+  fixMenu()
+  {
+    $("#menuScrollArea #logo").css("display", f18_attr.hideLogo?"none":"block");
+    if(f18_attr["Pinned.menu"]) {
+      $("body").addClass("pinnedMenu");
+      $("#menu").removeClass("visible");
+      $("#content").css("left", (parseInt($("div#menu").width())+20)+"px");
+
     } else {
-      $("div#content").css("left", "10px"); 
-      $("div#menu").removeClass("visible");
-      if(!f18_small)
-        $("div#logo").css("left", "52px");
-      $("div#menuBtn").show();
+      $("body").removeClass("pinnedMenu");
+      $("#content").css("left", "");
     }
     f18_resize();
   }
@@ -234,9 +231,9 @@ f18_tables()
       addHider("hidePin", "Hide pin", function(c){
         $("div.pinHeader div.pin").css("display", c ? "none":"block");
       });
-      addHider("hideLogo", "Hide logo", function(c){
-        $("div#menuScrollArea div#logo").css("display", c ? "none":"block");
-        f18_resize();
+      addHider("hideLogo", "Hide logo", f18_menu);
+      addHider("rightMenu", "MenuBtn right on SmallScreen", function(c){
+        $("body").toggleClass("rightMenu");
       });
       addHider("savePinChanges", "Save pin changes", function(){});
 
@@ -270,14 +267,10 @@ f18_resize()
   var w=$(window).width();
   log("f18.js W:"+w+" S:"+screen.width);
 
-  var diff = 0
+  var diff = 0;
   diff += f18_attr.hideLogo ? 0 : 40;
   diff += f18_attr["Pinned.menu"] ? 0 : 44;
   $("input.maininput").css("width", (w-(FW_isiOS ? 40 : 30)-diff)+'px');
-  if(f18_small)
-    diff -= 44
-  $("#hdr").css("left",(10+diff)+"px");
-
 }
 
 function
