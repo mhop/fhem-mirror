@@ -7,13 +7,19 @@ var f18_small = (screen.width < 480 || screen.height < 480);
 
 $(window).resize(f18_resize);
 $(document).ready(function(){
+
   f18_sd = $("body").attr("data-styleData");
   if(f18_sd) {
     eval("f18_sd="+f18_sd);
     if(!f18_sd)
       f18_sd = {};
     f18_attr = f18_sd.f18;
+
+  } else {
+    f18_sd = {};
+
   }
+
   if(!f18_attr) {
     f18_attr = { "Pinned.menu":"true" };
     f18_resetCol();
