@@ -3762,8 +3762,8 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>HomeAutoPresenceSuppressState</i></b><br>
-      suppress mode(s) for HomeAutoPresence (p.e. gotosleep|asleep)<br>
-      if set this/these mode(s) of a resident will not affect the residents to change to absent by its presence device<br>
+      suppress state(s) for HomeAutoPresence (p.e. gotosleep|asleep)<br>
+      if set this/these state(s) of a resident will not affect the residents to change to absent by its presence device<br>
       p.e. for misteriously disappearing presence devices in the middle of the night<br>
       default:
     </li>
