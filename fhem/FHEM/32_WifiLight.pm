@@ -3826,15 +3826,8 @@ sub
 WifiLight_HighLevelCmdQueue_Clear(@)
 {
   my ($ledDevice) = @_;
-  foreach my $a (keys %intAt) 
-  {
-    if (($intAt{$a}{ARG} eq $ledDevice) && ($intAt{$a}{FN} eq 'WifiLight_HighLevelCmdQueue_Exec'))
-    {
-
-      Log3 ($ledDevice, 4, "$ledDevice->{NAME} high level cmd queue clear, remove timer at ".$intAt{$a}{TRIGGERTIME} );
-      delete($intAt{$a}) ;
-    }
-  }
+  Log3 ($ledDevice, 4, "$ledDevice->{NAME} high level cmd queue clear");
+  RemoveInternalTimer($ledDevice, 'WifiLight_HighLevelCmdQueue_Exec');
   $ledDevice->{helper}->{hlCmdQueue} = [];
 }
 
