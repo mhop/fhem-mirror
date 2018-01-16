@@ -39,6 +39,8 @@
 # ABU 20171006 added dpt19
 # ABU 20171212 added dpt14.057
 # ABU 20171212 finetuned doku
+# ABU 20171215 added fix for newline in def
+# docm 20180109 fixed problem with dpt16 reading-set
 
 package main;
 
@@ -235,6 +237,7 @@ KNX_Initialize($) {
 sub
 KNX_Define($$) {
 	my ($hash, $def) = @_;
+	$def =~ s/\n/ /g;
 	my @a = split("[ \t][ \t]*", $def);
 	#device name
 	my $name = $a[0];
@@ -583,12 +586,21 @@ KNX_Set($@) {
 	{
 		return "\"string\" only allowed for dpt16" if (not($code eq "dpt16"));
 		return "no data for cmd $cmd" if ($lastArg < 2);
-		
+
 		#join string
-		for (my $i=2; $i<=$lastArg; $i++)
+		#docm 180109 removed
+		#		for (my $i=2; $i<=$lastArg; $i++)
+		#		{
+		#		  $value.= $a[$i]." ";		  
+		#		}
+
+		#docm 180109 inserted
+		$value = $a[2];
+		for (my $i=3; $i<=$lastArg; $i++)
 		{
-		  $value.= $a[$i]." ";		  
-		}				
+		  $value.= " ".$a[$i];		  
+		}
+		#docm 180109 changes end
 	} 	
 	#set RGB <RRGGBB>
 	elsif ($cmd =~ m/$RGB/)
@@ -1574,6 +1586,11 @@ KNX_decodeByDpt ($$$) {
 	{
 		$numval = 0;
 		$state  = "";
+		
+		#docm 180109 inserted
+		$value =~ /^\s*(00)?(\S+)/;
+		$value = $2;
+		#docm 180109 changes end				
 		
 		for (my $i = 0; $i < 14; $i++) 
 		{
