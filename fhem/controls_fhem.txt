@@ -1,4 +1,4 @@
-REV 15897
+REV 15902
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -491,7 +491,7 @@ UPD 2015-07-28_14:05:31 23311 FHEM/98_rain.pm
 UPD 2016-10-29_07:45:14 3985 FHEM/98_restore.pm
 UPD 2017-01-16_07:45:02 44459 FHEM/98_rssFeed.pm
 UPD 2017-11-20_07:45:02 60176 FHEM/98_statistics.pm
-UPD 2018-01-14_07:45:02 29237 FHEM/98_structure.pm
+UPD 2018-01-16_07:45:02 29339 FHEM/98_structure.pm
 UPD 2017-12-24_07:45:02 19948 FHEM/98_telnet.pm
 UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
 UPD 2018-01-13_07:45:02 22066 FHEM/98_update.pm
@@ -632,7 +632,7 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2018-01-12_07:45:02 10104 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2018-01-16_07:45:02 10105 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2017-12-16_07:45:02 207269 FHEM/lib/openzwave_deviceconfig.xml.gz
 UPD 2018-01-12_07:45:02 90510 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2017-10-13_07:45:02 21723 FHEM/lib/zwave_alliancelinks.csv.gz
@@ -1972,8 +1972,8 @@ UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2018-01-08_07:45:02 5908 www/pgm2/defaultCommon.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
-UPD 2018-01-15_07:45:02 15398 www/pgm2/f18.js
-UPD 2018-01-15_07:45:02 2054 www/pgm2/f18style.css
+UPD 2018-01-16_07:45:02 15245 www/pgm2/f18.js
+UPD 2018-01-16_07:45:02 2232 www/pgm2/f18style.css
 UPD 2017-03-03_07:45:02 5892 www/pgm2/fhemdoc_modular.js
 UPD 2018-01-12_07:45:02 55640 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
