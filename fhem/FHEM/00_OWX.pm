@@ -98,7 +98,7 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version="7.05";
+$owx_version="7.06";
 
 #-- debugging now verbosity, this is just for backward compatibility
 $owx_debug=0;
@@ -189,9 +189,9 @@ sub OWX_Define ($$) {
     $hwdevice = OWX_I2C->new($hash);
     
   #-- check if we have a COC/CUNO interface attached  
-  }elsif( (defined( $defs{$dev}->{VERSION} ) ? $defs{$dev}->{VERSION} : "") =~ m/CSM|CUNO/ ){
-    require "$attr{global}{modpath}/FHEM/11_OWX_CCC.pm";
-    $hwdevice = OWX_CCC->new($hash);
+  }elsif( (defined( $defs{$dev}->{VERSION} ) ? $defs{$dev}->{VERSION} : "") =~ m/CSM|CUNO|MapleCUN...(4|5|6|7|C|D|E|F)/ ){
+     require "$attr{global}{modpath}/FHEM/11_OWX_CCC.pm";
+     $hwdevice = OWX_CCC->new($hash);
     
   #-- check if we are connecting to Arduino (via FRM):
   } elsif ($dev =~ /.*\:\d{1,2}$/) {
@@ -1667,6 +1667,7 @@ sub OWX_WDBGL($$$$) {
 
 <a name="OWX"></a>
         <h3>OWX</h3>
+        <ul>
         <p> Backend module to commmunicate with 1-Wire bus devices</p>
         <ul>
             <li>via an active DS2480/DS9097U bus master interface attached to an USB
@@ -1734,11 +1735,14 @@ sub OWX_WDBGL($$$$) {
                 <br />time interval in seconds for kicking temperature sensors and checking for alarms, default 300 s</li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
+        </ul>
 =end html
 =begin html_DE
 
 <a name="OWX"></a>
 <h3>OWX</h3>
+<ul>
 <a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#OWX">OWX</a> 
+</ul>
 =end html_DE
 =cut
