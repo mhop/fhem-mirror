@@ -92,6 +92,8 @@ UnifiVideo_Undefine($$)
 {
   my ($hash, $arg) = @_;
 
+  RemoveInternalTimer($hash, "UnifiVideo_Connect");
+
   delete $modules{$hash->{TYPE}}{defptr};
 
   return undef;
@@ -147,6 +149,7 @@ UnifiVideo_2html($;$$)
   my $i = 0;
   foreach my $entry (@{$json->{data}}) {
     next if( $entry->{deleted} );
+    next if( $entry->{state} eq 'DISCONNECTED' );
     if( defined($cams) ) {
       foreach my $cam (@cams) {
         if( ( $cam =~ m/[0-9]+/ && int($cam) == $i )
@@ -195,6 +198,7 @@ UnifiVideo_Set($$@)
     my $i = 0;
     foreach my $entry (@{$json->{data}}) {
       next if( $entry->{deleted} );
+      next if( $entry->{state} eq 'DISCONNECTED' );
       if( ( $cam =~ m/[0-9]+/ && int($cam) == $i )
           || $entry->{_id} eq $cam
           || $entry->{name} =~ m/$cam/ ) {
@@ -303,13 +307,17 @@ UnifiVideo_parseHttpAnswer($$$)
     foreach my $entry (@{$json->{data}}) {
       if( !$entry->{deleted} ) {
       #Log 1, Dumper $entry->{_id};
-        readingsBulkUpdate($hash, "cam${i}name", $entry->{name}, 1);
-        readingsBulkUpdate($hash, "cam${i}id", $entry->{_id}, 1);
-        #readingsBulkUpdate($hash, "cam${i}snapshotURL", "http://$hash->{HOST}:7080/api/2.0/snapshot/camera/$entry->{_id}?force=true&apiKey=$apiKey" , 1);
+        readingsBulkUpdateIfChanged($hash, "cam${i}name", $entry->{name}, 1);
+        readingsBulkUpdateIfChanged($hash, "cam${i}id", $entry->{_id}, 1);
+        readingsBulkUpdateIfChanged($hash, "cam${i}state", $entry->{state}, 1);
+        #readingsBulkUpdateIfChanged($hash, "cam${i}snapshotURL", "http://$hash->{HOST}:7080/api/2.0/snapshot/camera/$entry->{_id}?force=true&apiKey=$apiKey" , 1);
       }
       ++$i;
     }
     readingsEndUpdate($hash,1);
+
+    RemoveInternalTimer($hash, "UnifiVideo_Connect");
+    InternalTimer(gettimeofday() + 900, "UnifiVideo_Connect", $hash) 
 
   } elsif( $param->{key} eq 'snapshot' ) {
     my $modpath = $attr{global}{modpath};
@@ -387,9 +395,7 @@ UnifiVideo_Read($)
         my $i = 0;
         foreach my $entry (@{$json->{data}}) {
           next if( $entry->{deleted} );
-          if( $entry->{mac} eq $cam ) {
-            last;
-            }
+          last if( $entry->{mac} eq $cam );
           ++$i;
           }
           if( $i >= $json->{meta}{totalCount} ) {
@@ -582,8 +588,6 @@ UnifiVideo_Attr($$$)
 
   } else {
     delete $attr{$name}{$attrName};
-
-    RemoveInternalTimer($hash);
   }
 
   return;
