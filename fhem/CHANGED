@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  42_SYSMON: Falsche Angabe von Ram free / used bei Debian Stretch
   - bugfix:  70_BRAVIA: fixed hash for space
                         (application, channel, input names)
   - change:  93_DbLog: change verbose level of addlog from 2 to 4
