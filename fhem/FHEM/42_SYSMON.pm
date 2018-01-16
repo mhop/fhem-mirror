@@ -2263,7 +2263,11 @@ sub SYSMON_getRamAndSwap($$) {
   if($hash->{helper}->{excludes}{'ramswap'}) {return $map;}
 
   #my @speicher = qx(free -m);
-  my @speicher = SYSMON_execute($hash, "LANG=en free");
+  #my @speicher = SYSMON_execute($hash, "LANG=en free");
+  my $free_version = SYSMON_execute($hash, 'free -V');
+  $free_version =~ s/\D//g;
+  my @speicher = SYSMON_execute($hash, 'LANG=en ' . ($free_version > 339 ? 'free -w' : 'free'));
+
 
   if(!@speicher) {
     return $map;
@@ -2312,7 +2316,8 @@ sub SYSMON_getRamAndSwap($$) {
     }
     #$used_clean = $used - $buffers - $cached;
     #$ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, $used_clean, ($used_clean / $total * 100), ($free + $buffers + $cached));
-    if ($total > 2048) {
+    #if ($total > 2048) {
+    if ($free_version > 339) {
        $used_clean = $used;
        $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, $used_clean, ($used_clean / $total * 100), ($free));
      } else {
