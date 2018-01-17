@@ -122,8 +122,7 @@ f18_tables()
   if(FW_urlParams.cmd == "style%20select") {
     var row=0;
 
-    function
-    addRow(name, desc, val)
+    var addRow = function(name, desc, val)
     {
       $("table.f18colors")
         .append("<tr class='ar_"+name+" "+(++row%2 ? "even":"odd")+"'>"+
@@ -131,10 +130,9 @@ f18_tables()
                         "<div class='col1'>"+desc+"</div></td>"+
                   (val ? "<td><div class='col2'>"+val+"</div></div></td>" : '')+
                 "</tr>");
-    }
+    };
 
-    function
-    addHider(name, desc, fn, lVarName)
+    var addHider = function(name, desc, fn, lVarName)
     {
       addRow(name, desc, "<input type='checkbox'>");
       $("table.f18colors tr.ar_"+name+" input")
@@ -145,10 +143,9 @@ f18_tables()
             f18_setAttr(name, c);
           fn(c);
         });
-    }
+    };
 
-    function
-    addColorChooser(name, desc)
+    var addColorChooser = function(name, desc)
     {
       addRow(name, desc, "<div class='cp'></div>");
       FW_replaceWidget("table.f18colors tr.ar_"+name+" div.col2 div.cp", name,
@@ -158,7 +155,7 @@ f18_tables()
           f18_setAttr();
           f18_setCss(name);
         });
-    }
+    };
 
 
     $("div#content > table").append("<tr class='f18'></tr>");
@@ -167,10 +164,7 @@ f18_tables()
     $("div.f18colors").css("margin-top", "20px");
     $("tr.f18").append("<table class='block wide f18colors'></table>");
 
-    loadScript("pgm2/fhemweb_colorpicker.js", addColors);
-
-    function
-    addColors()
+    var addColors = function()
     {
       $("table.f18colors")
         .append("<tr class='reset' "+(++row%2 ? "even":"odd")+"'>"+
@@ -244,7 +238,8 @@ f18_tables()
       }, "f18_move");
       */
 
-    }
+    };
+    loadScript("pgm2/fhemweb_colorpicker.js", addColors);
   }
 
   if(FW_urlParams.cmd == "style%20list" ||
