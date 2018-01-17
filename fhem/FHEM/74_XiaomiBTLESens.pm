@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.0";
+my $version = "2.0.1";
 
 
 
@@ -442,9 +442,8 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
     $gatttool                               = qx(which gatttool) if($sshHost eq 'none');
     $gatttool                               = qx(ssh $sshHost 'which gatttool') if($sshHost ne 'none');
     chomp $gatttool;
-    $gatttool                               = "ssh $sshHost \'$gatttool\'" if($sshHost ne 'none');
     
-    if(-x $gatttool) {
+    if(defined($gatttool) and ($gatttool)) {
     
         my $cmd;
         my $loop;

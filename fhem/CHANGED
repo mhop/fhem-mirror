@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_XiaomiBTLESens: fix ssh gatttool which test
+  - new:     74_XiaomiBTLESens: modul replace 74_XiaomiFlowerSens, add Support
+                                for Xiamomi Themometer/Hygrometer mit Display
   - bugfix:  42_SYSMON: Falsche Angabe von Ram free / used bei Debian Stretch
   - bugfix:  70_BRAVIA: fixed hash for space
                         (application, channel, input names)
