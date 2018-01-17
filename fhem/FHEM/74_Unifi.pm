@@ -1,6 +1,15 @@
 ##############################################################################
 # $Id$
 
+# CHANGED
+##############################################################################
+# V2.0
+#  - feature: 74_Unifi: add new set commands to block/unblock clients,
+#                       enable/disable WLAN, new client-Reading essid
+# V2.1
+#  - feature: 74_Unifi: add new set command to en-/disable Site Status-LEDs
+
+
 package main;
 use strict;
 use warnings;
@@ -50,6 +59,8 @@ sub Unifi_BlockClient_Send($@);
 sub Unifi_BlockClient_Receive($);
 sub Unifi_UnblockClient_Send($@);
 sub Unifi_UnblockClient_Receive($);
+sub Unifi_SwitchSiteLEDs_Send($$);
+sub Unifi_SwitchSiteLEDs_Receive($);
 sub Unifi_WlanconfRest_Send($$@);
 sub Unifi_WlanconfRest_Receive($);
 sub Unifi_NextUpdateFn($$);
@@ -163,14 +174,14 @@ sub Unifi_Set($@) {
     my $apNames = Unifi_ApNames($hash);
     my $SSIDs = Unifi_SSIDs($hash);
     
-    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|clear|poeMode|blockClient|unblockClient|enableWLAN|disableWLAN/) {
+    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|clear|poeMode|blockClient|unblockClient|enableWLAN|disableWLAN|switchSiteLEDs/) {
         return "Unknown argument $setName, choose one of update:noArg "
                ."clear:all,readings,clientData "
                .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "archiveAlerts:noArg " : "")
                .(($apNames && Unifi_CONNECTED($hash)) ? "restartAP:all,$apNames setLocateAP:all,$apNames unsetLocateAP:all,$apNames " : "")
                .(($clientNames && Unifi_CONNECTED($hash)) ? "disconnectClient:all,$clientNames " : "")
                ."poeMode enableWLAN:$SSIDs disableWLAN:$SSIDs "
-               ."blockClient:$clientNames unblockClient:$clientNames";
+               ."blockClient:$clientNames unblockClient:$clientNames switchSiteLEDs:on,off";
     }
     else {
         Log3 $name, 4, "$name: set $setName";
@@ -218,11 +229,18 @@ sub Unifi_Set($@) {
                     Unifi_UnblockClient_Send($hash,keys(%{$hash->{clients}}));
                 }
             }
+            elsif ($setName eq 'switchSiteLEDs') {
+                my $state="true";
+                if ($setVal && $setVal eq 'off') {
+                    $state="false";
+                }
+                Unifi_SwitchSiteLEDs_Send($hash,$state);
+            }
             elsif ($setName eq 'disableWLAN') {
                 my $wlan = Unifi_SSIDs($hash,$setVal,'makeID');
                 if (defined $hash->{wlans}->{$wlan}) {
                     my $wlanconf = $hash->{wlans}->{$wlan};
-                    $wlanconf->{enabled}='false';
+                    $wlanconf->{enabled}=JSON::false;
                     Unifi_WlanconfRest_Send($hash,$wlan,$wlanconf);
                 }
                 else {
@@ -233,7 +251,7 @@ sub Unifi_Set($@) {
                 my $wlan = Unifi_SSIDs($hash,$setVal,'makeID');
                 if (defined $hash->{wlans}->{$wlan}) {
                     my $wlanconf = $hash->{wlans}->{$wlan};
-                    $wlanconf->{enabled}='true';
+                    $wlanconf->{enabled}=JSON::true;
                     Unifi_WlanconfRest_Send($hash,$wlan,$wlanconf);
                 }
                 else {
@@ -706,9 +724,9 @@ sub Unifi_GetWlans_Receive($) {
                 
                 for my $h (@{$data->{data}}) {
                     $hash->{wlans}->{$h->{_id}} = $h;
-                    #TODO: Passphrase ggf. verschlÃ¼sseln?!
-                    #Ich musste diese Zeile rausnehmen, sonst ist das Json fÃ¼r enable/disableWLAN bei offenem WLAN (ohne Passphrase) falsch 
-                    #Aussternen geht nicht, sonst wird das PW unter UmstÃ¤nden darauf geÃ¤ndert.
+                    #TODO: Passphrase ggf. verschlüsseln?!
+                    #Ich musste diese Zeile rausnehmen, sonst ist das Json für enable/disableWLAN bei offenem WLAN (ohne Passphrase) falsch 
+                    #Aussternen geht nicht, sonst wird das PW unter Umständen darauf geändert.
                     #$hash->{wlans}->{$h->{_id}}->{x_passphrase} = '***'; # Don't show passphrase in list
                 }
             }
@@ -1144,6 +1162,45 @@ sub Unifi_UnblockClient_Receive($) {
 
   if (scalar @{$param->{clients}}) {
     Unifi_BlockClient_Send($hash,@{$param->{clients}});
+  }
+
+  return undef;
+}
+
+###############################################################################
+sub Unifi_SwitchSiteLEDs_Send($$) {
+  my ($hash,$state) = @_;
+  my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+  Log3 $name, 5, "$name ($self) - executed with command: '".$state."'";
+
+  HttpUtils_NonblockingGet( {
+    %{$hash->{httpParams}},
+    url   => $hash->{unifi}->{url}."set/setting/mgmt",
+    callback => \&Unifi_SwitchSiteLEDs_Receive,
+    data => "{'led_enabled': ".$state."}",
+  } );
+  return undef;
+}
+###############################################################################
+sub Unifi_SwitchSiteLEDs_Receive($) {
+  my ($param, $err, $data) = @_;
+  my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+  Log3 $name, 5, "$name ($self) - executed.";
+
+  if ($err ne "") {
+    Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+  }
+  elsif ($data ne "") {
+    if ($param->{code} == 200 || $param->{code} == 400 || $param->{code} == 401) {
+      eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+
+      if ($data->{meta}->{rc} eq "ok") {
+        Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
+      }
+      else { Unifi_ReceiveFailure($hash,$data->{meta}); }
+    } else {
+      Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+    }
   }
 
   return undef;
@@ -1609,6 +1666,8 @@ Or you can use the other readings or set and get features to control your unifi-
     Disables WLAN with &lt;ssid&gt;</li>
     <li><code>set &lt;name&gt; enableWLAN &lt;ssid&gt;</code><br>
     Enables WLAN with &lt;ssid&gt;</li>
+    <li><code>set &lt;name&gt; switchSiteLEDs &lt;on|off&gt;</code><br>
+    Enables or disables the Status-LED settings of the site.</li>
 </ul>
 
 

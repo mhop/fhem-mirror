@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 74_Unifi: add new set command to en-/disable Site Status-LEDs
   - bugfix:  74_XiaomiBTLESens: fix ssh gatttool which test
   - new:     74_XiaomiBTLESens: modul replace 74_XiaomiFlowerSens, add Support
                                 for Xiamomi Themometer/Hygrometer mit Display
