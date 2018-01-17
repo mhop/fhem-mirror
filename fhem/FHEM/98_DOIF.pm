@@ -725,6 +725,7 @@ sub AggrIntDoIf
   my $format;
   my $place;
   my $number;
+  my $readingRegex;
   
   if ($modeType =~ /.(sum|average|max|min)?[:]?(?:(a|d)?(\d)?)?/) {
     $type = (defined $1)? $1 : "";
@@ -739,73 +740,82 @@ sub AggrIntDoIf
       $default=EvalValueDoIf($hash,"default",$default);
     }
   }
+  
+  if (defined $reading) {
+    if ($reading =~ /^"(.*)"$/) {
+      $readingRegex = $1;
+    }
+  }
+
   foreach my $name (($device eq "") ? keys %defs:grep {/$device/} keys %defs) {
     next if($attr{$name} && $attr{$name}{ignore});
-    $value="";
-    $number="";
-    if ($reading) {
-      if (defined $defs{$name}{READINGS}{$reading}) {
-        $value=$defs{$name}{READINGS}{$reading}{VAL};
-        $number = ($value =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
-      } else {
-        next;
-      }
-    }
-    if ($cond) {
-      if ($cond =~ /^"(.*)"$/) {
-         if (defined $defs{$name}{READINGS}{$reading}) {
-           $ret=($value =~ /$1/); 
-         }
-      } else {
-        $_=$value;
-        $STATE=Value($name);
-        $TYPE=$defs{$name}{TYPE};
-        $group=AttrVal($name,"group","");
-        $room=AttrVal($name,"room","");
-        $lastWarningMsg="";
-        $ret = eval $cond;
-        if ($@) {
-          $@ =~ s/^(.*) at \(eval.*\)(.*)$/$1,$2/;
-          if (defined $hash) {
-             Log3 ($hash->{NAME},3 , "$hash->{NAME}: aggregate function: error in condition: $cond, $@");
-          }
-          return("error in aggregate function: ".$@);
+    foreach my $reading ((defined $readingRegex) ? grep {/$readingRegex/} keys %{$defs{$name}{READINGS}} : $reading) {
+      $value="";
+      $number="";
+      if ($reading) {
+        if (defined $defs{$name}{READINGS}{$reading}) {
+          $value=$defs{$name}{READINGS}{$reading}{VAL};
+          $number = ($value =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
+        } else {
+          next;
         }
-        if ($lastWarningMsg) {
-          $warning=1;
-          $lastWarningMsg =~ s/^(.*) at \(eval.*$/$1/;
-          Log3 ($hash->{NAME},3 , "$hash->{NAME}: aggregate function: warning in condition: $cond, Device: $name");
-          readingsSingleUpdate ($hash, "warning_aggr", "condition: $cond , device: $name, $lastWarningMsg",0);
-        } 
-        $lastWarningMsg="";
       }
-    } else {
-      $ret=1;
-    }
-    if ($format eq "a") {
-      $devname=AttrVal($name,"alias",$name);
-    } else {
-      $devname=$name;
-    }
-    if ($ret) {
-      if ($type eq ""){
-        $num++;
-        push (@devices,$devname);
-      } elsif (defined $value) {
-        if ($type eq "sum" or $type eq "average") {
+      if ($cond) {
+        if ($cond =~ /^"(.*)"$/) {
+           if (defined $defs{$name}{READINGS}{$reading}) {
+             $ret=($value =~ /$1/); 
+           }
+        } else {
+          $_=$value;
+          $STATE=Value($name);
+          $TYPE=$defs{$name}{TYPE};
+          $group=AttrVal($name,"group","");
+          $room=AttrVal($name,"room","");
+          $lastWarningMsg="";
+          $ret = eval $cond;
+          if ($@) {
+            $@ =~ s/^(.*) at \(eval.*\)(.*)$/$1,$2/;
+            if (defined $hash) {
+               Log3 ($hash->{NAME},3 , "$hash->{NAME}: aggregate function: error in condition: $cond, $@");
+            }
+            return("error in aggregate function: ".$@);
+          }
+          if ($lastWarningMsg) {
+            $warning=1;
+            $lastWarningMsg =~ s/^(.*) at \(eval.*$/$1/;
+            Log3 ($hash->{NAME},3 , "$hash->{NAME}: aggregate function: warning in condition: $cond, Device: $name");
+            readingsSingleUpdate ($hash, "warning_aggr", "condition: $cond , device: $name, $lastWarningMsg",0);
+          } 
+          $lastWarningMsg="";
+        }
+      } else {
+        $ret=1;
+      }
+      if ($format eq "a") {
+        $devname=AttrVal($name,"alias",$name);
+      } else {
+        $devname=$name;
+      }
+      if ($ret) {
+        if ($type eq ""){
           $num++;
           push (@devices,$devname);
-          $sum+=$number;
-        } elsif ($type eq "max") {
-            if (!defined $extrem or $number>$extrem) {
-              $extrem=$number;
-              @devices=($devname);
-            }  
-        } elsif ($type eq "min") {
-            if (!defined $extrem or $number<$extrem) {
-              $extrem=$number;
-              @devices=($devname);
-            }
+        } elsif (defined $value) {
+          if ($type eq "sum" or $type eq "average") {
+            $num++;
+            push (@devices,$devname);
+            $sum+=$number;
+          } elsif ($type eq "max") {
+              if (!defined $extrem or $number>$extrem) {
+                $extrem=$number;
+                @devices=($devname);
+              }  
+          } elsif ($type eq "min") {
+              if (!defined $extrem or $number<$extrem) {
+                $extrem=$number;
+                @devices=($devname);
+              }
+          }
         }
       }
     }
@@ -3492,7 +3502,7 @@ Die Angabe des Readings kann weggelassen werden, dann wird lediglich nach entspr
 <br>
 Syntax:<br>
 <br>
-<code>[&lt;function&gt;:&lt;format&gt;:"&lt;regex device&gt;:&lt;regex event&gt;":&lt;reading&gt;:&lt;condition&gt;,&lt;default&gt;]</code><br>
+<code>[&lt;function&gt;:&lt;format&gt;:"&lt;regex device&gt;:&lt;regex event&gt;":&lt;reading&gt;|"&lt;regex reading&gt;":&lt;condition&gt;,&lt;default&gt;]</code><br>
 <br>
 &lt;function&gt;:<br>
 <br>
@@ -3512,6 +3522,8 @@ Die Angabe &lt;regex Event&gt; ist im Ausführungsteil nicht sinnvoll und sollte
 <br>
 &lt;reading&gt; Reading, welches überprüft werden soll<br>
 <br>
+"&lt;regex reading&gt"; Regex für Readings, die überprüft werden sollen<br>
+<br>
 &lt;condition&gt;  Aggregations-Bedingung, $_ ist der Platzhalter für den aktuellen Wert des internen Schleifendurchlaufs, Angaben in Anführungszeichen der Art "&lt;value&gt;" entsprechen $_ =~ "&lt;value&gt;" , hier sind alle Perloperatoren möglich.<br>
 <br>
 &lt;default&gt; Default-Wert, falls kein Device gefunden wird, entspricht der Syntax des Default-Wertes bei Readingangaben<br>
@@ -3523,10 +3535,6 @@ Die Angabe &lt;regex Event&gt; ist im Ausführungsteil nicht sinnvoll und sollte
 Anzahl der Devices, die mit "window" beginnen:<br>
 <br>
 <code>[#"^window"]</code><br>
-<br>
-Liste der Devices, die mit "window" beginnen:<br>
-<br>
-<code>[@"^window"]</code><br>
 <br>
 Liste der Devices, die mit "window" beginnen, es werden Aliasnamen ausgegeben, falls definiert:<br>
 <br>
@@ -3543,6 +3551,14 @@ Liste der Devices, die mit "windows" beginnen und im Status das Wort "open" vork
 entspricht:<br>
 <br>
 <code>[@"^window":state:$_ =~ "open"]</code> siehe Aggregationsbedingung.<br>
+<br>
+Kleinster Wert der Readings des Devices "abfall", in deren Namen "Gruenschnitt" vorkommt und die mit "_days" enden:<br>
+<br>
+<code>[#min:"^abfall$":"Gruenschnitt.*_days$"]</code><br>
+<br>
+Durchschnitt von Readings aller Devices, die mit "T_" beginnen, in deren Reading-Namen "temp" vorkommt:<br>
+<br>
+<code>[#average:"^T_":"temp"]</code><br>
 <br>
 In der Aggregationsbedingung <condition> können alle in FHEM definierten Perlfunktionen genutzt werden. Folgende Variablen sind vorbelegt und können ebenfalls benutzt werden:<br>
 <br>
