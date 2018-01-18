@@ -148,7 +148,7 @@ sub ElectricityCalculator_Attr(@)
 		}
 		elsif ($a[3] eq 1)		
 		{	
-			$hash->{STATE} = "diabled";
+			$hash->{STATE} = "disabled";
 		}
 	}
 	
