@@ -1,15 +1,34 @@
 //########################################################################################
 // alarm.js
-// Version 3.1
+// Version 4.0
 // See 95_Alarm for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
 
+//------------------------------------------------------------------------------------------------------
+// Determine csrfToken
+//------------------------------------------------------------------------------------------------------
+
+var req = new XMLHttpRequest();
+req.open('GET', document.location, false);
+req.send(null);
+var csrfToken = req.getResponseHeader('X-FHEM-csrfToken');
+
+//------------------------------------------------------------------------------------------------------
+// encode Parameters for URL
+//------------------------------------------------------------------------------------------------------
+
 function encodeParm(oldval) {
     var newval;
-    newval = oldval.replace(/\+/g, '%2B');
+    newval = oldval.replace(/"/g, '%27');
     newval = newval.replace(/#/g, '%23');
-    newval = newval.replace(/"/g, '%27');
+    newval = newval.replace(/\+/g, '%2B');
+    newval = newval.replace(/&/g, '%26');
+    newval = newval.replace(/'/g, '%27');
+    newval = newval.replace(/=/g, '%3D');
+    newval = newval.replace(/\?/g, '%3F');
+    newval = newval.replace(/\|/g, '%7C');
+    newval = newval.replace(/\s/g, '%20');
     return newval;
 }
 
@@ -84,20 +103,20 @@ $("body").on('DOMSubtreeModified', "#hid_levels", function () {
     for (i = 0; i < alarmno; i++) {
         var s = w.getElementsByClassName("hid_lx")[i].innerHTML;
         if (ast[i] != s) {
-            switch(s){
+            switch (s) {
                 case "disarmed":
-                    col = disarmcolor;
-                    break;
+                col = disarmcolor;
+                break;
                 case "armwait":
-                    col = armwaitcolor;
-                    break;
+                col = armwaitcolor;
+                break;
                 case "armed":
-                    col = armcolor;
-                    break;
+                col = armcolor;
+                break;
                 default:
-                    col = alarmcolor
+                col = alarmcolor
             }
-            t[i].setAttribute("fill",col);
+            t[i].setAttribute("fill", col);
             ast[i] = s;
             ifnd = i;
             sfnd = s;
@@ -115,7 +134,7 @@ $("body").on('DOMSubtreeModified', "#hid_levels", function () {
                     aln = aln + i + ",";
                     atn = atn + s + ",";
                 } else {
-                    adn = adn && ((s == "disarmed")||(s == "armwait"));
+                    adn = adn && ((s == "disarmed") ||(s == "armwait"));
                     aan = aan && (s == "armed");
                 }
             }
@@ -157,7 +176,7 @@ function alarm_setAttribute(name, attr, val) {
         location = location.substr(0, location.length -1);
     }
     var url = document.location.protocol + "//" + document.location.host + location;
-    FW_cmd(url + '?XHR=1&cmd.' + name + '=attr ' + name + ' ' + encodeParm(attr) + ' ' + encodeParm(val));
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20' + encodeParm(attr) + '%20' + encodeParm(val));
 }
 
 function alarm_cancel(name, level) {
@@ -170,7 +189,7 @@ function alarm_cancel(name, level) {
     }
     var url = document.location.protocol + "//" + document.location.host + location;
     
-    FW_cmd(url + '?XHR=1&cmd.' + name + '={Alarm_Exec("' + name + '",' + level + ',"web","button","off")}');
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '={Alarm_Exec("' + name + '",' + level + ',"web","button","off")}');
 }
 
 function alarm_arm(name, level) {
@@ -188,7 +207,7 @@ function alarm_arm(name, level) {
     }
     var url = document.location.protocol + "//" + document.location.host + location;
     
-    FW_cmd(url + '?XHR=1&cmd.' + name + '={Alarm_Arm("' + name + '",' + level + ',"web","button","' + command + '")}');
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '={Alarm_Arm("' + name + '",' + level + ',"web","button","' + command + '")}');
 }
 
 function alarm_testaction(name, dev, type) {
@@ -211,7 +230,7 @@ function alarm_testaction(name, dev, type) {
     }
     var url = document.location.protocol + "//" + document.location.host + location;
     
-    FW_cmd(url + '?XHR=1&cmd.' + name + '={Alarm_Test("' + name + '","' + cmds + '")}');
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '={Alarm_Test("' + name + '","' + cmds + '")}');
 }
 
 
@@ -226,29 +245,26 @@ function alarm_set(name) {
     var url = document.location.protocol + "//" + document.location.host + location;
     
     // saving arm data
-    FW_cmd(url + '?XHR=1&cmd.' + name + '=attr ' + name + ' armdelay ' + document.getElementById('armdelay').value);
-    FW_cmd(url + '?XHR=1&cmd.' + name + '=attr ' + name + ' armwait ' + encodeParm(document.getElementById('armwait').value));
-    FW_cmd(url + '?XHR=1&cmd.' + name + '=attr ' + name + ' armact ' + encodeParm(document.getElementById('armaction').value));
-    FW_cmd(url + '?XHR=1&cmd.' + name + '=attr ' + name + ' disarmact ' + encodeParm(document.getElementById('disarmaction').value));
-    FW_cmd(url + '?XHR=1&cmd.' + name + '=attr ' + name + ' cancelact ' + encodeParm(document.getElementById('cancelaction').value));
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20armdelay%20' + document.getElementById('armdelay').value);
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20armwait%20' + encodeParm(document.getElementById('armwait').value));
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20 ' + name + '%20armact%20' + encodeParm(document.getElementById('armaction').value));
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20disarmact%20' + encodeParm(document.getElementById('disarmaction').value));
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20cancelact%20' + encodeParm(document.getElementById('cancelaction').value));
     
     // saving start and end times
     for (var i = 0;
     i < alarmno;
     i++) {
-        FW_cmd(url + '?XHR=1&cmd.' + name + '=attr ' + name + ' level' + i + 'start ' + document.getElementById('l' + i + 's').value);
-        FW_cmd(url + '?XHR=1&cmd.' + name + '=attr ' + name + ' level' + i + 'end ' + document.getElementById('l' + i + 'e').value);
-        FW_cmd(url + '?XHR=1&cmd.' + name + '=attr ' + name + ' level' + i + 'msg ' + document.getElementById('l' + i + 'm').value);
+        FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20level' + i + 'start%20' + document.getElementById('l' + i + 's').value);
+        FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20level' + i + 'end%20' + document.getElementById('l' + i + 'e').value);
+        FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20level' + i + 'msg%20' + document.getElementById('l' + i + 'm').value);
         if (document.getElementById('l' + i + 'x').checked == true) {
             val = "armed";
         } else {
             val = "disarmed";
         }
-        FW_cmd(url + '?XHR=1&cmd.' + name + '=attr ' + name + ' level' + i + 'xec ' + val);
+        FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr%20' + name + '%20level' + i + 'xec%20' + val);
     }
-    //for (var k in ah.items) {
-    //   ah.setItem(k,document.getElementById(k).value);
-    //}
     
     // acquiring data for each sensor
     var sarr = document.getElementsByName('sensor');
@@ -264,12 +280,11 @@ function alarm_set(name) {
                 val += "alarm" + i + ",";
             }
         }
-        val += "|" + sarr[k].children[2].children[0].value;
-        val += "|" + sarr[k].children[3].children[0].value;
+        val += "|" + encodeParm(sarr[k].children[2].children[0].value);
+        val += "|" + encodeParm(sarr[k].children[3].children[0].value);
         val += "|" + sarr[k].children[4].children[0].options[sarr[k].children[4].children[0].selectedIndex].value;
-        FW_cmd(url + '?XHR=1&cmd.' + nam + '=attr ' + nam + ' alarmSettings ' + encodeParm(val));
+        FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + nam + '=attr%20' + nam + '%20alarmSettings%20' + val);
     }
-    
     // acquiring data for each actor
     var aarr = document.getElementsByName('actor');
     for (var k = 0;
@@ -285,12 +300,12 @@ function alarm_set(name) {
                 val += "alarm" + i + ",";
             }
         }
-        val += "|" + aarr[k].children[2].children[0].value;
-        val += "|" + aarr[k].children[3].children[0].value;
-        val += "|" + aarr[k].children[4].children[0].value;
-        FW_cmd(url + '?XHR=1&cmd.' + nam + '=attr ' + nam + ' alarmSettings ' + encodeParm(val));
+        val += "|" + encodeParm(aarr[k].children[2].children[0].value);
+        val += "|" + encodeParm(aarr[k].children[3].children[0].value);
+        val += "|" + encodeParm(aarr[k].children[4].children[0].value);
+        FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + nam + '=attr%20' + nam + '%20alarmSettings%20' + val);
     }
     
     // creating notifiers
-    FW_cmd(url + '?XHR=1&cmd.' + name + ' ={main::Alarm_CreateNotifiers("' + name + '")}');
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + ' ={main::Alarm_CreateNotifiers("' + name + '")}');
 }

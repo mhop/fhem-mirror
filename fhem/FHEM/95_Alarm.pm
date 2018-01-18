@@ -43,7 +43,7 @@ my $alarmlinkname   = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "3.12";
+my $alarmversion    = "4.0";
 
 my %alarm_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -441,12 +441,16 @@ sub Alarm_getsettings($$$){
 
   my ($hash,$dev,$type) = @_;
   my $chg = 0;
-  my @aval = split('\|',AttrVal($dev, "alarmSettings","|||0:00"),4);
-  
+  my $avl = AttrVal($dev, "alarmSettings","|||0:00");
+  $avl = Alarm_escape($avl,"beforesplit");
+  my @aval = split('\|',$avl,4);
+  $aval[1] = Alarm_escape($aval[1],"aftersplit");
+  $aval[2] = Alarm_escape($aval[2],"aftersplit");
+    
   if( $type eq "Actor"){
-  #-- position 0:set by, 1:set func, 2:unset func, 3:delay
+  #-- position 0:set by level, 1:set func, 2:unset func, 3:delay
     if( $aval[0] eq "" || $aval[1] eq "" ){
-      Log3 $hash, 1, "[Alarm] Settings incomplete for alarmActor $dev";
+      Log3 $hash, 1, "[Alarm] Settings $avl incomplete for alarmActor $dev";
     }
     #-- check delay time
     if( $aval[3] =~ /^\d+$/ ){
@@ -459,7 +463,7 @@ sub Alarm_getsettings($$$){
         $aval[3] = sprintf("%02d:%02d",$min,$sec);
       }      
       $chg     = 1;
-    }elsif( $aval[3] !~ /^(\d\d:)?\d\d:\d\d/ ){
+    }elsif( $aval[3] !~ /^(\d\d:)?\d?\d:\d\d/ ){
       Log3 $hash, 1, "[Alarm] Delay time $aval[3] ill defined for alarmActor $dev";
       $aval[3] = "0:00";
       $chg     = 1;
@@ -474,6 +478,30 @@ sub Alarm_getsettings($$$){
 
 #########################################################################################
 #
+# Alarm_escape - Helper function to de-escape and to escape action parameters
+# 
+# Parameter hash = hash of Alarm device
+#           dev = name of device addressed
+#
+#########################################################################################
+
+sub Alarm_escape($$){
+  my ($str,$type) = @_;
+
+  if( $type eq "beforesplit"){
+    $str =~ s/\\\|/%7C/g;
+  }elsif( $type eq "aftersplit"){
+    $str =~ s/\\//g;
+    $str =~ s/%7C/\|/g;
+  }elsif( $type eq "beforehtml"){
+    $str =~ s/\\//g;
+    $str =~ s/\|/\\\|/g;
+  }
+  return $str;
+}
+
+#########################################################################################
+#
 # Alarm_save
 #
 # Parameter hash = hash of the Alarm device
@@ -482,7 +510,8 @@ sub Alarm_getsettings($$$){
 
 sub Alarm_save($) {
   my ($hash) = @_;
-  $hash->{DATA}{"savedate"} = sprintf("%s",localtime(time));
+  my $date = localtime(time);
+  $hash->{DATA}{"savedate"} = $date;
   readingsSingleUpdate( $hash, "savedate", $hash->{DATA}{"savedate"}, 1 ); 
   my $json   = JSON->new->utf8;
   my $jhash0 = eval{ $json->encode( $hash->{DATA} ) };
@@ -610,7 +639,13 @@ sub Alarm_Exec($$$$$){
      
          if( (($stp < $etp) && ($ntp <= $etp) && ($ntp >= $stp)) ||  (($stp > $etp) && (($ntp <= $etp) || ($ntp >= $stp))) ){  
             #-- raised by sensor (attribute values have been controlled in CreateNotifiers)
-            @sta = split('\|',  AttrVal($dev, "alarmSettings", ""));
+            my $avl = AttrVal($dev, "alarmSettings","");
+            $avl =~ s/\\\|/%7C/g;
+            @sta = split('\|',$avl);
+            for( my $i=0;$i<4;$i++ ){
+              $sta[$i] =~ s/\\//g;
+              $sta[$i] =~ s/%7C/|/g;
+            }
             if( $sta[2] ){
               $mga = $sta[2]." ".AttrVal($name, "level".$level."msg", 0);
               #-- replace some parts
@@ -651,14 +686,12 @@ sub Alarm_Exec($$$$$){
    }elsif( ($act eq "off")||($act eq "cancel") ){
       #-- only if this level is active
       if( ($xac ne "armed")&&($xac ne "disarmed") ){
+         #-- TODO: ohne intAt auskommen
          #-- deleting all running ats
          $dly = sprintf("alarm%1ddly",$level);
-         foreach my $d (sort keys %intAt ) {
-            next if( $intAt{$d}{FN} ne "at_Exec" );
-            $mga = $intAt{$d}{ARG}{NAME};
-            next if( $mga !~ /$dly\d/);
-            #Log3 $hash,1,"[Alarm] Killing delayed action $name";
-            CommandDelete(undef,"$mga");
+         foreach my $d ( devspec2array("NAME=alarm.dly.*")) {
+            Log3 $hash,1,"[Alarm] Killing delayed action $d";
+            CommandDelete(undef,$d);
          }
          #-- replace some parts
          my @evtpart = split(" ",$evt);
@@ -812,7 +845,7 @@ sub Alarm_CreateNotifiers($){
   }
   
   #-- temporary code: transferm from attributes to hash
-  Alarm_transform($hash);
+  #Alarm_transform($hash);
   
   for( my $level=0;$level<$alarmno;$level++ ){
   
@@ -854,15 +887,25 @@ sub Alarm_CreateNotifiers($){
      my $cmd = '';
      foreach my $d (keys %defs ) {
         next if(IsIgnored($d));
-        if( AttrVal($d, "alarmDevice","") eq "Sensor" ) {
-           my @aval = split('\|',AttrVal($d, "alarmSettings",""));
+        if( AttrVal($d, "alarmDevice","") eq "Sensor" ) {   
+           my $avl = AttrVal($d, "alarmSettings","");
+           $avl =~ s/\\\|/%7C/g;
+           my @aval = split('\|',$avl);
            if( int(@aval) != 4){
-              # Log3 $hash, 1, "[Alarm $level] Settings incomplete for sensor $d";
-              next;
+             Log3 $hash,1, "[Alarm $level] Settings $avl incomplete for alarmSensor $d";
+             next;
            }
-           if( (index($aval[0],"alarm".$level) != -1) && ($aval[3] eq "off") ){
+           for( my $i=0;$i<4;$i++ ){
+             $aval[$i] =~ s/\\//g;
+             $aval[$i] =~ s/%7C/\|/g;
+           }
+           
+           #-- workaround: replace any space by \s
+           $aval[1] =~ s/\s/\\s/g;
+          
+           if( (index($aval[0],"alarm".$level) != -1) && ($aval[1] ne "") && ($aval[3] eq "off")){
               $cmd .= '('.$aval[1].')|';
-              #Log3 $hash,1,"[Alarm $level] Adding sensor $d to cancel notifier";
+              Log3 $hash,5,"[Alarm $level] Adding sensor $d to cancel notifier";
            }
         }   
      }
@@ -875,7 +918,7 @@ sub Alarm_CreateNotifiers($){
         CommandDefine(undef,$cmd);
         CommandAttr (undef,'alarm'.$level.'.off.N room '.$alarmpublicroom); 
         CommandAttr (undef,'alarm'.$level.'.off.N group alarmNotifier'); 
-        Log3 $hash,5,"[Alarm $level] Created cancel notifier";    
+        Log3 $hash,3,"[Alarm $level] Created cancel notifier";    
      
         #-- now set up the command for raising alarm - only if cancel exists
         $cmd        = '';
@@ -884,27 +927,30 @@ sub Alarm_CreateNotifiers($){
         foreach my $d (sort keys %defs ) {
            next if(IsIgnored($d));
            if( AttrVal($d, "alarmDevice","") eq "Sensor" ) {
-              my @aval = split('\|',AttrVal($d, "alarmSettings",""));
-              if( int(@aval) != 4){
-                 Log3 $hash, 5, "[Alarm $level] Settings incomplete for alarmSensor $d";
-                 next;
-              }
-              if( index($aval[0],"alarm".$level) != -1){
-                 if( $aval[3] eq "on" ){
-                    $cmd .= '('.$aval[1].')|';
-                    Log3 $hash,5,"[Alarm $level] Adding alarmSensor $d to raise notifier";
-                 }elsif( $aval[3] eq "arm" ){
-                    $cmdarm .= '('.$aval[1].')|';
-                    Log3 $hash,5,"[Alarm $level] Adding alarmSensor $d to arm notifier";
-                 }elsif( $aval[3] eq "disarm" ){
-                    $cmddisarm .= '('.$aval[1].')|';
-                    Log3 $hash,5,"[Alarm $level] Adding alarmSensor $d to disarm notifier";
-                 }
-              }
-           }   
+             my $avl = AttrVal($d, "alarmSettings","");
+             my @aval = split('\|',$avl);
+             if( int(@aval) != 4){
+               Log3 $hash, 1, "[Alarm $level] Settings $avl incomplete for alarmSensor $d";
+               next;
+             }
+             if( index($aval[0],"alarm".$level) != -1){
+               if( ($aval[1] ne "") && ($aval[3] eq "on") ){
+                 $cmd .= '('.$aval[1].')|';
+                 Log3 $hash,5,"[Alarm $level] Adding alarmSensor $d to raise notifier";
+               }elsif( ($aval[1] ne "") && ($aval[3] eq "arm") ){
+                 $cmdarm .= '('.$aval[1].')|';
+                 Log3 $hash,5,"[Alarm $level] Adding alarmSensor $d to arm notifier";
+               }elsif( ($aval[1] ne "") && ($aval[3] eq "disarm") ){
+                 $cmddisarm .= '('.$aval[1].')|';
+                 Log3 $hash,5,"[Alarm $level] Adding alarmSensor $d to disarm notifier";
+               }
+            }
+          }   
         }
         #-- raise notifier
         if( $cmd eq '' ){
+           CommandAttr(undef,$name.' level'.$level.'onact 1');
+           CommandAttr(undef,$name.' level'.$level.'offact 1');
            Log3 $hash,1,"[Alarm $level] No \"Raise\" device defined";
         } else {   
            $cmd  = substr($cmd,0,length($cmd)-1);
@@ -913,7 +959,7 @@ sub Alarm_CreateNotifiers($){
            CommandDefine(undef,$cmd);
            CommandAttr (undef,'alarm'.$level.'.on.N room '.$alarmpublicroom); 
            CommandAttr (undef,'alarm'.$level.'.on.N group alarmNotifier'); 
-           Log3 $hash,5,"[Alarm $level] Created raise notifier";
+           Log3 $hash,3,"[Alarm $level] Created raise notifier";
            
            #-- now set up the list of actors
            $cmd      = '';
@@ -924,12 +970,12 @@ sub Alarm_CreateNotifiers($){
               if( AttrVal($d, "alarmDevice","") eq "Actor" ) {
                  my @aval = Alarm_getsettings($hash,$d,"Actor");
                  if( int(@aval) != 4){
-                   Log3 $hash, 5, "[Alarm $level] Settings incomplete for alarmActor $d";
+                   Log3 $hash, 3, "[Alarm $level] Settings incomplete for alarmActor $d";
                    next;
                  }
                  if( index($aval[0],"alarm".$level) != -1 ){
                     #-- activate without delay 
-                    if(( $aval[3] eq "" )||($aval[3] eq "00:00")){
+                    if(( $aval[3] eq "" )||($aval[3] =~ /(00:)?0?0:00/)){
                        $cmd  .= $aval[1].';';
                     #-- activate with delay
                     } else {
@@ -955,6 +1001,8 @@ sub Alarm_CreateNotifiers($){
               CommandAttr(undef,$name.' level'.$level.'offact '.$cmd2);
               Log3 $hash,5,"[Alarm $level] Added on/off actors to $name";
            } else {
+              CommandAttr(undef,$name.' level'.$level.'onact 1');
+              CommandAttr(undef,$name.' level'.$level.'offact 1');
               Log3 $hash,5,"[Alarm $level] Adding on/off actors not possible";
            }
            #-- arm notifier - optional, but only in case the alarm may be raised
@@ -1084,7 +1132,7 @@ sub Alarm_widget($){
     }
   }    
   
-  Log 1,"[Alarm_widget] name=$name gstate=$gstate dstate=$dstate sizep=$sizep";
+  Log 5,"[Alarm_widget] name=$name gstate=$gstate dstate=$dstate sizep=$sizep";
   
   $name      =~ s/'//g;
   my @size=split('x',($sizep ? $sizep : '60x80'));
@@ -1308,7 +1356,6 @@ sub Alarm_Html($)
       $mval = ""
         if( $mval eq "1");
 
-      my $xval = AttrVal($name, "level".$k."xec", 0);
       my $xval = $hash->{DATA}{"armstate"}{"level".$k};
       $ret .= sprintf("<tr class=\"%s\"><td class=\"col1\">".$alarm_tt->{"alarm"}." $k</td>\n", ($row&1)?"odd":"even"); 
       $ret .=                          "<td class=\"col2\"><input type=\"text\" id=\"l".$k."s\" size=\"4\" maxlength=\"120\" value=\"$sval\"/>&nbsp;&nbsp;&nbsp;".
@@ -1329,10 +1376,13 @@ sub Alarm_Html($)
     foreach my $d (sort keys %defs ) {
        next if(IsIgnored($d));
        if( AttrVal($d, "alarmDevice","") eq "Sensor" ) {
-           my @aval = split('\|',AttrVal($d, "alarmSettings",""));
+           my $avl = AttrVal($d, "alarmSettings","");
+           #-- no escaping necessary
+           my @aval = split('\|',$avl);
            if( int(@aval) != 4){
              Log3 $hash, 1, "[Alarm] Settings incomplete for alarmSensor $d";
            }
+         
            $row++;
            $ret .= sprintf("<tr class=\"%s\" informId=\"$d\" name=\"sensor\">", ($row&1)?"odd":"even");
            $ret .= "<td width=\"120\" class=\"col1\"><a href=\"$FW_ME?detail=$d\">$d</a></td>\n";
@@ -1366,6 +1416,10 @@ sub Alarm_Html($)
        next if(IsIgnored($d));
        if( AttrVal($d, "alarmDevice","") eq "Actor" ) {
            my @aval = Alarm_getsettings($hash,$d,"Actor");
+           #-- escaping before HTML publish
+           $aval[1] = Alarm_escape($aval[1],"beforehtml");
+           $aval[2] = Alarm_escape($aval[2],"beforehtml");
+           $aval[3] = Alarm_escape($aval[3],"beforehtml");
            $row++;
            $ret .= sprintf("<tr class=\"%s\" informId=\"$d\" name=\"actor\">", ($row&1)?"odd":"even");
            $ret .= "<td width=\"120\" class=\"col1\"><a href=\"$FW_ME?detail=$d\">$d</a></td>\n";
