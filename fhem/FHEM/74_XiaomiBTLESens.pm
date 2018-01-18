@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.1";
+my $version = "2.0.3";
 
 
 
@@ -664,19 +664,14 @@ sub XiaomiBTLESens_FlowerSensHandle0x35($$) {
     my $temp;
         
     if( $dataSensor[1] eq "ff" ) {
-        $temp       = hex("0x".$dataSensor[1].$dataSensor[0]) - hex("0xffff");
+        $readings{'temperature'}    = hex("0x".$dataSensor[1].$dataSensor[0]) - hex("0xffff") / 10;
     } else {
-        $temp       = hex("0x".$dataSensor[1].$dataSensor[0]);
+        $readings{'temperature'}    = hex("0x".$dataSensor[1].$dataSensor[0]) / 10;
     }
-        
-    my $lux         = hex("0x".$dataSensor[4].$dataSensor[3]);
-    my $moisture    = hex("0x".$dataSensor[7]);
-    my $fertility   = hex("0x".$dataSensor[9].$dataSensor[8]);
-
-    $readings{'temperature'}    = $temp/10;
-    $readings{'lux'}            = $lux;
-    $readings{'moisture'}       = $moisture;
-    $readings{'fertility'}      = $fertility;
+    
+    $readings{'lux'}                = hex("0x".$dataSensor[4].$dataSensor[3]);
+    $readings{'moisture'}           = hex("0x".$dataSensor[7]);
+    $readings{'fertility'}          = hex("0x".$dataSensor[9].$dataSensor[8]);
         
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
@@ -691,11 +686,9 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x18($$) {
     
     
     Log3 $name, 5, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x18";
-
-    my $blevel      = hex("0x".$notification);
         
-    $readings{'batteryLevel'}   = $blevel;
-    $readings{'battery'}        = ($blevel > 20?"ok":"low");
+    $readings{'batteryLevel'}   = hex("0x".$notification);
+    $readings{'battery'}        = (hex("0x".$notification) > 20?"ok":"low");
         
     $hash->{helper}{CallBattery} = 1;
     XiaomiBTLESens_CallBattery_Timestamp($hash);
@@ -713,12 +706,9 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x10($$) {
     Log3 $name, 5, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x10";
 
     $notification =~ s/\s+//g;
-                                                                            # 54 3d 31 37 2e 33 20 48 3d 35 32 2e 35 00
-    my $temp        = pack('H*',substr($notification,4,8));                 # 31 37 2e 33
-    my $hum         = pack('H*',substr($notification,18,8));                # 35 32 2e 35
 
-    $readings{'temperature'}    = $temp;
-    $readings{'humidity'}       = $hum;
+    $readings{'temperature'}    = pack('H*',substr($notification,4,8));
+    $readings{'humidity'}       = pack('H*',substr($notification,18,8));
         
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
@@ -736,9 +726,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x24($$) {
 
     $notification =~ s/\s+//g;
 
-    my $fw                      = pack('H*',$notification);
-
-    $readings{'firmware'}       = $fw;
+    $readings{'firmware'}       = pack('H*',$notification);
 
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
@@ -756,9 +744,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x3($$) {
 
     $notification =~ s/\s+//g;
 
-    my $devname                     = pack('H*',$notification);
-
-    $readings{'devicename'}         = $devname;
+    $readings{'devicename'}         = pack('H*',$notification);
 
     $hash->{helper}{CallBattery}    = 0;
     return \%readings;
