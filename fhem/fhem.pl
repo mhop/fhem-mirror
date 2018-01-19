@@ -136,6 +136,7 @@ sub readingsEndUpdate($$);
 sub readingsSingleUpdate($$$$);
 sub redirectStdinStdErr();
 sub rejectDuplicate($$$);
+sub resolveAttrRename($$);
 sub restoreDir_init();
 sub restoreDir_rmTree($);
 sub restoreDir_saveFile($$);
@@ -2685,6 +2686,8 @@ CommandAttr($$)
       push @rets, "$sdev: unknown attribute $attrName, choose one of $list";
       next;
     }
+    
+    $attrName = resolveAttrRename($sdev,$attrName);
 
     if(" $list " !~ m/ ${attrName}[ :;]/) {
        my $found = 0;
@@ -4049,6 +4052,21 @@ setGlobalAttrBeforeFork($)
   }
 }
 
+sub
+resolveAttrRename($$)
+{
+  my ($d,$n) = @_;
+  
+  return $n if(!$d || !$defs{$d});
+  my $m = $modules{$defs{$d}{TYPE}};
+  if($m->{AttrRenameMap} && defined($m->{AttrRenameMap}{$n})) {
+    Log 3, "WARNING: $d attribute $n was renamed to ".$m->{AttrRenameMap}{$n};
+    return $m->{AttrRenameMap}{$n};
+  }
+  
+  return $n;
+}
+  
 
 ###########################################
 # Functions used to make fhem-oneliners more readable,
@@ -4151,6 +4169,7 @@ sub
 AttrVal($$$)
 {
   my ($d,$n,$default) = @_;
+  $n = resolveAttrRename($d, $n);
   return $attr{$d}{$n} if(defined($attr{$d}) && defined($attr{$d}{$n}));
   return $default;
 }
