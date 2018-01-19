@@ -114,21 +114,25 @@ FRM_OUT_Set($$$)
   my ($hash, $name, $cmd, @a) = @_;
   my $value;
   my $invert = AttrVal($hash->{NAME},"activeLow", "no");
-  if ($cmd eq "on") {
-  	$value = $invert eq "yes" ? PIN_LOW : PIN_HIGH;
-  } elsif ($cmd eq "off") {
-  	$value = $invert eq "yes" ? PIN_HIGH : PIN_LOW;
-  } else {
-  	my $list = "on off";
-    return SetExtensions($hash, $list, $name, $cmd, @a);
-  }
-  eval {
-    FRM_Client_FirmataDevice($hash)->digital_write($hash->{PIN},$value);
-    if (AttrVal($hash->{NAME}, "valueMode", "send") ne "receive") {
-      main::readingsSingleUpdate($hash,"value",$cmd, 1);
+  if (defined ($cmd)) {
+    if ($cmd eq "on") {
+      $value = $invert eq "yes" ? PIN_LOW : PIN_HIGH;
+    } elsif ($cmd eq "off") {
+      $value = $invert eq "yes" ? PIN_HIGH : PIN_LOW;
+    } else {
+      my $list = "on off";
+      return SetExtensions($hash, $list, $name, $cmd, @a);
     }
-  };
-  return $@;
+    eval {
+      FRM_Client_FirmataDevice($hash)->digital_write($hash->{PIN},$value);
+      if (AttrVal($hash->{NAME}, "valueMode", "send") ne "receive") {
+        main::readingsSingleUpdate($hash,"value",$cmd, 1);
+      }
+    };
+    return $@;
+  } else {
+    return "no command specified";
+  }
 }
 
 sub FRM_OUT_State($$$$)
@@ -195,6 +199,8 @@ FRM_OUT_Attr($$$$) {
     o create reading "value" in FRM_OUT_Init if missing
   02.01.2018 jensb
     o new attribute "valueMode" to control how "value" reading is updated
+  14.01.2018 jensb
+    o fix "uninitialised" when calling FRM_OUT_Set without command
 
 =cut
 
@@ -207,18 +213,20 @@ FRM_OUT_Attr($$$$) {
 <a name="FRM_OUT"></a>
 <h3>FRM_OUT</h3>
 <ul>
-  represents a pin of an <a href="http://www.arduino.cc">Arduino</a> running <a href="http://www.firmata.org">Firmata</a>
-  configured for digital output.<br>
-  Requires a defined <a href="#FRM">FRM</a>-device to work.<br><br> 
+  This module represents a pin of a <a href="http://www.firmata.org">Firmata device</a> 
+  that should be configured as a digital output.<br><br>
+  
+  Requires a defined <a href="#FRM">FRM</a> device to work. The pin must be listed in
+  the internal reading "<a href="#FRMinternals">output_pins</a>"<br>
+  of the FRM device (after connecting to the Firmata device) to be used as digital output.<br><br> 
   
   <a name="FRM_OUTdefine"></a>
   <b>Define</b>
   <ul>
   <code>define &lt;name&gt; FRM_OUT &lt;pin&gt;</code> <br>
   Defines the FRM_OUT device. &lt;pin&gt> is the arduino-pin to use.
-  </ul>
+  </ul><br>
   
-  <br>
   <a name="FRM_OUTset"></a>
   <b>Set</b><br>
   <ul>
@@ -226,12 +234,14 @@ FRM_OUT_Attr($$$$) {
   </ul>
   <ul>
   <a href="#setExtensions">set extensions</a> are supported<br>
-  </ul>
+  </ul><br>
+  
   <a name="FRM_OUTget"></a>
   <b>Get</b><br>
   <ul>
   N/A
   </ul><br>
+  
   <a name="FRM_OUTattr"></a>
   <b>Attributes</b><br>
   <ul>
@@ -254,17 +264,27 @@ FRM_OUT_Attr($$$$) {
         <li>receive - after receiving</li>
         <li>bidirectional - after sending and receiving</li>
       </ul>
-      If you have custom code in your Firmata device that can change the state of an output
-      you can enable receive or bidirectional mode. For this to work the default Firmata application code must 
-      also be modified in function <em>setPinModeCallback</em>: add <ins>|| mode == OUTPUT</ins> 
-      to the if condition for <em>portConfigInputs[pin / 8] |= (1 << (pin & 7));</em> to enable 
-      reporting the output state as if the pin is an input.
       </li>
       <li><a href="#eventMap">eventMap</a><br></li>
       <li><a href="#readingFnAttributes">readingFnAttributes</a><br></li>
-    </ul>
+  </ul><br>
+  
+  <a name="FRM_OUTnotes"></a>
+  <b>Notes</b><br>
+  <ul>
+      <li>attribute <i>stateFormat</i><br>
+      In most cases it is a good idea to assign "value" to the attribute <i>stateFormat</i>. This will show the state
+      of the pin in the web interface.
+      </li>
+      <li>attribute <i>valueMode</i><br>
+      For modes "receive<" and "bidirectional" to work the default Firmata application code must 
+      be modified in function "<code>setPinModeCallback</code>":<br>
+      add "<ins> || mode == OUTPUT</ins>" to the if condition for "<code>portConfigInputs[pin / 8] |= (1 << (pin & 7));</code>" to enable<br>
+      reporting the output state (as if the pin were an input). This is of interest if you have custom code in your Firmata device that can change<br>
+      the state of an output or you want a feedback from the Firmata device after the output state was changed.
+      </li>
   </ul>
-<br>
+</ul><br>
 
 =end html
 =cut
