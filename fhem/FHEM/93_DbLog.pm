@@ -16,6 +16,8 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.6.5      19.01.2018       fix lot of logentries if disabled and db not available
+# 3.6.4      17.01.2018       improve DbLog_Shutdown, extend configCheck by shutdown preparation check
 # 3.6.3      14.01.2018       change verbose level of addlog "no Reading of device ..." message from 2 to 4 
 # 3.6.2      07.01.2018       new attribute "exportCacheAppend", change function exportCache to respect attr exportCacheAppend,
 #                             fix DbLog_execmemcache verbose 5 message
@@ -176,7 +178,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.6.3";
+my $DbLogVersion = "3.6.5";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -321,15 +323,20 @@ sub DbLog_Shutdown($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   
+  $hash->{HELPER}{SHUTDOWNSEQ} = 1;
   DbLog_execmemcache($hash);
   my $shutdownWait = AttrVal($name,"shutdownWait",undef);
   if(defined($shutdownWait)) {
-    Log3($name, 2, "DbLog $name waiting for shutdown");
+    Log3($name, 2, "DbLog $name - waiting for shutdown $shutdownWait seconds ...");
     sleep($shutdownWait);
+    Log3($name, 2, "DbLog $name - continuing shutdown sequence");
   }
-  return undef; 
+  if($hash->{HELPER}{".RUNNING_PID"}) {
+      BlockingKill($hash->{HELPER}{".RUNNING_PID"});
+  }
+  
+return undef; 
 }
-
 
 ################################################################
 #
@@ -413,6 +420,7 @@ sub DbLog_Attr(@) {
   }
   
   if ($aName eq "disable") {
+      my $async = AttrVal($name, "asyncMode", 0);
       if($cmd eq "set") {
           $do = ($aVal) ? 1 : 0;
       }
@@ -426,7 +434,8 @@ sub DbLog_Attr(@) {
 	  $hash->{HELPER}{OLDSTATE} = $val;
         
       if ($do == 0) {
-          InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0);
+          InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0) if($async);
+          InternalTimer(gettimeofday()+2, "DbLog_ConnectPush", $hash, 0) if(!$async);
       }
   }
 
@@ -1683,7 +1692,7 @@ sub DbLog_execmemcache ($) {
 	  return;
   }
   
-  # return wenn "reopen" mit Zeitangabe läuft, oder kein asynchromer Mode oder wenn disabled
+  # return wenn "reopen" mit Zeitangabe läuft, oder kein asynchroner Mode oder wenn disabled
   if(!$async || IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS}) {
 	  return;
   }
@@ -1743,7 +1752,7 @@ sub DbLog_execmemcache ($) {
 							         $timeout, 
 							         "DbLog_PushAsyncAborted", 
 							         $hash );
-
+      $hash->{HELPER}{".RUNNING_PID"}{loglevel} = 4;
       Log3 $hash->{NAME}, 5, "DbLog $name -> DbLog_PushAsync called with timeout: $timeout";
   } else {
       if($dolog && $hash->{HELPER}{".RUNNING_PID"}) {
@@ -2148,7 +2157,7 @@ sub DbLog_PushAsyncAborted(@) {
   my $name = $hash->{NAME};
   $cause = $cause?$cause:"Timeout: process terminated";
   
-  Log3 ($name, 2, 'DbLog $name -> $hash->{HELPER}{".RUNNING_PID"}{fn} $cause');
+  Log3 ($name, 2, "DbLog $name -> ".$hash->{HELPER}{".RUNNING_PID"}{fn}." ".$cause) if(!$hash->{HELPER}{SHUTDOWNSEQ});
   readingsSingleUpdate($hash,"state",$cause, 1);
   delete $hash->{HELPER}{".RUNNING_PID"};
 }
@@ -2199,10 +2208,10 @@ sub DbLog_readCfg($){
   my $configfilename= $hash->{CONFIGURATION};
   my %dbconfig;
 
-# use generic fileRead to get configuration data
+  # use generic fileRead to get configuration data
   my ($err, @config) = FileRead($configfilename);
   return $err if($err);
-
+  
   eval join("\n", @config);
 
   return "could not read connection" if (!defined $dbconfig{connection});
@@ -2245,7 +2254,9 @@ sub DbLog_ConnectPush($;$$) {
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $dbhp;
   
-  Log3 $hash->{NAME}, 3, "DbLog $name: Creating Push-Handle to database $dbconn with user $dbuser" if(!$get);
+  return 0 if(IsDisabled($name));
+  
+  Log3 $hash->{NAME}, 3, "DbLog $name - Creating Push-Handle to database $dbconn with user $dbuser" if(!$get);
 
   my ($useac,$useta) = DbLog_commitMode($hash);
   if(!$useac) {
@@ -2259,20 +2270,20 @@ sub DbLog_ConnectPush($;$$) {
    
   if($@) {
       readingsSingleUpdate($hash, 'state', $@, 1);
-	  Log3 $hash->{NAME}, 3, "DbLog $name: Error - $@";
+	  Log3 $hash->{NAME}, 3, "DbLog $name - Error: $@";
   }
   
   if(!$dbhp) {
     RemoveInternalTimer($hash, "DbLog_ConnectPush");
-    Log3 $hash->{NAME}, 4, 'DbLog $name: Trying to connect to database';
+    Log3 $hash->{NAME}, 4, "DbLog $name - Trying to connect to database";
     readingsSingleUpdate($hash, 'state', 'disconnected', 1);
     InternalTimer(time+5, 'DbLog_ConnectPush', $hash, 0);
-    Log3 $hash->{NAME}, 4, 'Waiting for database connection';
+    Log3 $hash->{NAME}, 4, "DbLog $name - Waiting for database connection";
     return 0;
   }
 
-  Log3 $hash->{NAME}, 3, "DbLog $name: Push-Handle to db $dbconn created" if(!$get);
-  Log3 $hash->{NAME}, 3, "DbLog $name: UTF8 support enabled" if($utf8 && $hash->{MODEL} eq "MYSQL" && !$get);
+  Log3 $hash->{NAME}, 3, "DbLog $name - Push-Handle to db $dbconn created" if(!$get);
+  Log3 $hash->{NAME}, 3, "DbLog $name - UTF8 support enabled" if($utf8 && $hash->{MODEL} eq "MYSQL" && !$get);
   readingsSingleUpdate($hash, 'state', 'connected', 1) if(!$get);
 
   $hash->{DBHP}= $dbhp;
@@ -2310,7 +2321,7 @@ sub DbLog_ConnectNewDBH($) {
   } 
  
   if($@) {
-    Log3($name, 2, "DbLog $name: - $@");
+    Log3($name, 2, "DbLog $name - $@");
   }
   
   if($dbh) {
@@ -2974,6 +2985,32 @@ sub DbLog_configcheck($) {
 	  $rec .= "Please refer to commandref for further informations about these attributes.";
   }
   $check .= "<b>Recommendation:</b> $rec <br><br>"; 
+  
+  if($mode =~ /asynchronous/) {
+      my $shutdownWait = AttrVal($name,"shutdownWait",undef);
+	  my $bpt          = ReadingsVal($name,"background_processing_time",undef);
+	  my $bptv         = defined($bpt)?int($bpt)+2:2;
+	  # $shutdownWait    = defined($shutdownWait)?$shutdownWait:undef;
+	  my $sdw          = defined($shutdownWait)?$shutdownWait:" ";
+      $check .= "<u><b>Result of shutdown sequence preparation check</u></b><br><br>";
+      $check .= "Attribute \"shutdownWait\" is set to: $sdw<br>";
+	  if(!defined($shutdownWait) || $shutdownWait < $bptv) {
+	      if(!$bpt) {
+			  $rec  = "Due to Reading \"background_processing_time\" is not available (you may set attribute \"showproctime\"), there is only a rough estimate to<br>";
+		      $rec .= "set attribute \"shutdownWait\" to $bptv seconds.<br>";
+		  } else {
+		      $rec = "Please set this attribute at least to $bptv seconds to avoid data loss when system shutdown is initiated.";
+		  }
+	  } else {
+	      if(!$bpt) {
+	          $rec  = "The setting may be ok. But due to the Reading \"background_processing_time\" is not available (you may set attribute \"showproctime\"), the current <br>";
+		      $rec .= "setting is only a rough estimate.<br>";
+		  } else {
+		      $rec = "settings o.k.";
+		  }
+	  }
+	  $check .= "<b>Recommendation:</b> $rec <br><br>";
+  }
 		
   ### Check Spaltenbreite history
   #######################################################################
@@ -2981,7 +3018,6 @@ sub DbLog_configcheck($) {
   my ($cdat_dev,$cdat_typ,$cdat_evt,$cdat_rdg,$cdat_val,$cdat_unt);
   my ($cmod_dev,$cmod_typ,$cmod_evt,$cmod_rdg,$cmod_val,$cmod_unt);
   	  
- #if($dbmodel !~ /SQLITE/) {
   if($dbmodel =~ /MYSQL/) {
       @sr_dev = DbLog_sqlget($hash,"SHOW FIELDS FROM history where FIELD='DEVICE'");
 	  @sr_typ = DbLog_sqlget($hash,"SHOW FIELDS FROM history where FIELD='TYPE'");

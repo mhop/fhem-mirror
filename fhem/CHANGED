@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: V3.6.5, avoid shutdown problem if database is too slow,
+                       extend configCheck with shutdown preparation check,
+                       fix logentries if device disabled and db not available
   - bugfix:  74_Unifi: fixed blockClient
   - bugfix:  98_dewpoint.pm: Fix event processing when updating STATE
   - bugfix:  73_ElectricityCalculator.pm: Spelling error
