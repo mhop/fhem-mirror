@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_dewpoint.pm: Fix event processing when updating STATE
   - bugfix:  73_ElectricityCalculator.pm: Spelling error
   - change:  74_XiaomiBTLESens: Code clean
   - feature: 21_HEOSPlayer: add input URL as set command

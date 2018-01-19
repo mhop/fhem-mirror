@@ -203,15 +203,15 @@ dewpoint_Notify($$)
         return "";
     }
 
-    my $max = int(@{$dev->{CHANGED}});
-    my $n = -1;
-    my $lastval;
+    my $nev = int(@{$dev->{CHANGED}});
 
+    # if we use the "T H" syntax we must track the index of the state event
+    my $i_state_ev;
 
     my $temperature = "";
     my $humidity = "";
 
-    for (my $i = 0; $i < $max; $i++) {
+    for (my $i = 0; $i < $nev; $i++) {
         my $s = $dev->{CHANGED}[$i];
 
         Log3($hashName, 5, "dewpoint_notify: s='$s'");
@@ -224,10 +224,8 @@ dewpoint_Notify($$)
         next if(!defined($val));
         Log3($hashName, 5, "dewpoint_notify: evName='$evName' val=$val'");
         if (($evName eq "T:") && ($temp_name eq "T")) {
-            $n = $i;
+            $i_state_ev = $i;
             #my ($evName1, $val1, $evName2, $val2, $rest) = split(" ", $s, 5); # resets $1
-            #$lastval = $evName1." ".$val1." ".$evName2." ".$val2;		
-            $lastval = $s;
             if ($s =~ /T: ([-+]?[0-9]*\.[0-9]+|[-+]?[0-9]+)/) {
                 $temperature = $1;
             }
@@ -245,13 +243,11 @@ dewpoint_Notify($$)
 
     }
 
-    if ($n == -1) { $n = $max; }
-
     #if (($temperature eq "") || ($humidity eq "")) { return undef; } # no way to calculate dewpoint!
 
     # Check if Attribute timeout is set
     my $timeout = AttrVal($hash->{NAME}, "max_timediff", $dewpoint_time_diff_default);
-    Log3($hashName, 5,"dewpoint timeout=$timeout");
+    Log3($hashName, 5,"dewpoint max_timediff=$timeout");
 
     if (($humidity eq "") && (($temperature eq ""))) {
         return undef;  # no way to calculate dewpoint!
@@ -318,8 +314,16 @@ dewpoint_Notify($$)
         if ($temp_name ne "T") {
             $current = $dewpoint;
             readingsBulkUpdate($dev, $sensor, $current);
+            readingsEndUpdate($dev, 1);
         } else {
-            # state begins with "T:". append dewpoint or insert before BAT
+            # explicit manipulation of STATE here
+            # first call readingsEndUpdate to finish STATE processing in the referenced device...
+
+            readingsEndUpdate($dev, 1);
+
+            # ... then update STATE
+            # STATE begins with "T:". append dewpoint or insert before BAT
+            my $lastval = $dev->{CHANGED}[$i_state_ev];
             if ($lastval =~ /BAT:/) {	
                 $current = $lastval;
                 $current =~ s/BAT:/$sensor: $dewpoint BAT:/g;
@@ -333,13 +337,15 @@ dewpoint_Notify($$)
                 }
             }
 
-            $dev->{STATE} = $current; 
-            addEvent($dev, $current);		
+            $dev->{STATE} = $current;
+            # the state event must be REPLACED
+            $dev->{CHANGED}[$i_state_ev] = $current;		
         }
 
-        readingsEndUpdate($dev, 1);
+        # remove cached "state:..." events if any
         $dev->{CHANGEDWITHSTATE} = [];
         Log3($hashName, 5, "dewpoint_notify: current=$current");
+
     } elsif ($cmd_type eq "fan") {
         # >define <name> dewpoint fan devicename devicename-outside min-temp [diff-temp]
         #
@@ -370,13 +376,14 @@ dewpoint_Notify($$)
                 Log3($hashName, 3, "dewpoint_notify: CHANGE fan $current");
                 $dev->{READINGS}{$sensor}{TIME} = $tn;
                 $dev->{READINGS}{$sensor}{VAL} = $current;
-                $dev->{CHANGED}[$n++] = $sensor . ": " . $current;
+                $dev->{CHANGED}[$nev++] = $sensor . ": " . $current;
             }
 
         } else {
             Log3($hashName, 1, "dewpoint_notify: fan devname_out=$devname_out no temperature or humidity available"
                                . " for dewpoint calculation");
         }
+
     } elsif ($cmd_type eq "alarm") {
         # >define <name> dewpoint alarm devicename devicename-reference diff
         #
@@ -412,7 +419,7 @@ dewpoint_Notify($$)
                 Log3($hashName, 5, "dewpoint_notify: CHANGE alarm $current");
                 $dev->{READINGS}{$sensor}{TIME} = $tn;
                 $dev->{READINGS}{$sensor}{VAL} = $current;
-                $dev->{CHANGED}[$n++] = $sensor . ": " . $current;
+                $dev->{CHANGED}[$nev++] = $sensor . ": " . $current;
             }
         } else {
             Log3($hashName, 1, "dewpoint_notify: alarm devname_out=$devname_out no temperature or humidity available"
@@ -424,6 +431,7 @@ dewpoint_Notify($$)
         Log3($hashName, 1, "Error notify_dewpoint: <2> unknown cmd_type ".$cmd_type);
         return "";
     }
+
     return undef;
 }
 
