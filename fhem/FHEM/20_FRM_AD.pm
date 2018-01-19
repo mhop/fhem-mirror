@@ -79,9 +79,14 @@ FRM_AD_Init($$)
 	return $ret if (defined $ret);
 	my $firmata = $hash->{IODev}->{FirmataDevice};
 	my $name = $hash->{NAME};
+	my $resolution = 10;
+	if (defined $firmata->{metadata}{analog_resolutions}) {
+		$resolution = $firmata->{metadata}{analog_resolutions}{$hash->{PIN}} 
+	}
+	$hash->{resolution} = $resolution;
+	$hash->{".max"} = defined $resolution ? (1<<$resolution)-1 : 1024;
 	eval {
 		$firmata->observe_analog($hash->{PIN},\&FRM_AD_observer,$hash);
-		$main::defs{$name}{resolution}=$firmata->{metadata}{analog_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{analog_resolutions});
 	};
 	return FRM_Catch($@) if $@;
 	if (! (defined AttrVal($name,"stateFormat",undef))) {
@@ -99,28 +104,28 @@ FRM_AD_observer
 {
 	my ($pin,$old,$new,$hash) = @_;
 	my $name = $hash->{NAME};
-	Log3 $name,6,"onAnalogMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--");
+	Log3 $name,5,"onAnalogMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--");
 	main::readingsBeginUpdate($hash);
 	main::readingsBulkUpdate($hash,"reading",$new,1);
 	my $upperthresholdalarm = ReadingsVal($name,"alarm-upper-threshold","off");
-    if ( $new < AttrVal($name,"upper-threshold",1024) ) {
-      if ( $upperthresholdalarm eq "on" ) {
-    	main::readingsBulkUpdate($hash,"alarm-upper-threshold","off",1);
-      }
-      my $lowerthresholdalarm = ReadingsVal($name,"alarm-lower-threshold","off"); 
-      if ( $new > AttrVal($name,"lower-threshold",-1) ) {
-        if ( $lowerthresholdalarm eq "on" ) {
-          main::readingsBulkUpdate($hash,"alarm-lower-threshold","off",1);
-        }
-      } else {
-      	if ( $lowerthresholdalarm eq "off" ) {
-          main::readingsBulkUpdate($hash,"alarm-lower-threshold","on",1);
-      	}
-      }
-    } else {
-      if ( $upperthresholdalarm eq "off" ) {
-    	main::readingsBulkUpdate($hash,"alarm-upper-threshold","on",1);
-      }
+	if ( $new < AttrVal($name,"upper-threshold",$hash->{".max"}) ) {
+		if ( $upperthresholdalarm eq "on" ) {
+			main::readingsBulkUpdate($hash,"alarm-upper-threshold","off",1);
+		}
+		my $lowerthresholdalarm = ReadingsVal($name,"alarm-lower-threshold","off"); 
+		if ( $new > AttrVal($name,"lower-threshold",-1) ) {
+			if ( $lowerthresholdalarm eq "on" ) {
+				main::readingsBulkUpdate($hash,"alarm-lower-threshold","off",1);
+			}
+		} else {
+			if ( $lowerthresholdalarm eq "off" ) {
+				main::readingsBulkUpdate($hash,"alarm-lower-threshold","on",1);
+			}
+		}
+	} else {
+		if ( $upperthresholdalarm eq "off" ) {
+			main::readingsBulkUpdate($hash,"alarm-upper-threshold","on",1);
+		}
 	};
 	main::readingsEndUpdate($hash,1);
 }
@@ -178,6 +183,9 @@ FRM_AD_Attr($$$$) {
 
   2016 jensb
     o modified sub FRM_AD_Init to catch exceptions and return error message
+    
+  19.01.2018 jensb
+    o support analog resolution depending on device capability
 
 =cut
 
@@ -190,29 +198,33 @@ FRM_AD_Attr($$$$) {
 <a name="FRM_AD"></a>
 <h3>FRM_AD</h3>
 <ul>
-  represents a pin of an <a href="http://www.arduino.cc">Arduino</a> running <a href="http://www.firmata.org">Firmata</a>
-  configured for analog input.<br>
-  The value read is stored in reading 'state'. Range is from 0 to 1023 (10 Bit)<br>
-  Requires a defined <a href="#FRM">FRM</a>-device to work.<br><br> 
+  This module represents a pin of a <a href="http://www.firmata.org">Firmata device</a> 
+  that should be configured as an analog input.<br><br>
+  
+  Requires a defined <a href="#FRM">FRM</a> device to work. The pin must be listed in the internal reading "<a href="#FRMinternals">analog_pins</a>"<br>
+  of the FRM device (after connecting to the Firmata device) to be used as analog input.<br><br> 
   
   <a name="FRM_ADdefine"></a>
   <b>Define</b>
   <ul>
-  <code>define &lt;name&gt; FRM_AD &lt;pin&gt;</code> <br>
-  Defines the FRM_AD device. &lt;pin&gt; is the arduino-pin to use.
-  </ul>
+      <code>define &lt;name&gt; FRM_AD &lt;pin&gt;</code><br><br>
   
-  <br>
+      Defines the FRM_AD device. &lt;pin&gt; is the arduino-pin to use.
+  </ul><br>
+  
   <a name="FRM_ADset"></a>
   <b>Set</b><br>
   <ul>
     N/A<br>
   </ul><br>
+  
   <a name="FRM_ADget"></a>
   <b>Get</b><br>
   <ul>
     <li>reading<br>
-    returns the voltage-level read on the arduino-pin. Values range from 0 to 1023.</li>
+    returns the voltage-level equivalent at the arduino-pin. The min value is zero and the max value<br>
+    depends on the Firmata device (see internal reading "<a href="#FRMinternals">analog_resolutions</a>" of the FRM device.<br>
+    For 10 bits resolution the range is 0 to 1023 (also see <a href="http://arduino.cc/en/Reference/AnalogRead">analogRead()</a> for details)<br></li>
     <li>alarm-upper-threshold<br>
     returns the current state of 'alarm-upper-threshold'. Values are 'on' and 'off' (Defaults to 'off')<br>
     'alarm-upper-threshold' turns 'on' whenever the 'reading' is higher than the attribute 'upper-threshold'<br>
@@ -224,13 +236,14 @@ FRM_AD_Attr($$$$) {
     <li>state<br>
     returns the 'state' reading</li>
   </ul><br>
+  
   <a name="FRM_ADattr"></a>
   <b>Attributes</b><br>
   <ul>
       <li>upper-threshold<br>
       sets the 'upper-threshold'. Whenever the 'reading' exceeds this value 'alarm-upper-threshold' is set to 'on'<br>
       As soon 'reading' falls below the 'upper-threshold' 'alarm-upper-threshold' turns 'off' again<br>
-      Defaults to 1024.</li>
+      Defaults to the max pin resolution plus one.</li>
       <li>lower-threshold<br>
       sets the 'lower-threshold'. Whenever the 'reading' falls below this value 'alarm-lower-threshold' is set to 'on'<br>
       As soon 'reading' rises above the 'lower-threshold' 'alarm-lower-threshold' turns 'off' again<br>
@@ -241,9 +254,17 @@ FRM_AD_Attr($$$$) {
       </li>
       <li><a href="#eventMap">eventMap</a><br></li>
       <li><a href="#readingFnAttributes">readingFnAttributes</a><br></li>
-    </ul>
-  </ul>
-<br>
+  </ul><br>
+  
+  <a name="FRM_ADnotes"></a>
+  <b>Notes</b><br>
+  <ul>
+      <li>attribute <i>stateFormat</i><br>
+      In most cases it is a good idea to assign "reading" to the attribute <i>stateFormat</i>. This will show the 
+      current value of the pin in the web interface.
+      </li>
+  </ul>  
+</ul><br>
 
 =end html
 =cut
