@@ -8,6 +8,8 @@
 #                       enable/disable WLAN, new client-Reading essid
 # V2.1
 #  - feature: 74_Unifi: add new set command to en-/disable Site Status-LEDs
+# V2.1.1
+#  - bugfix:  74_Unifi: fixed blockClient
 
 
 package main;
@@ -1122,6 +1124,52 @@ sub Unifi_DisconnectClient_Receive($) {
     return undef;
 }
 ###############################################################################
+sub Unifi_BlockClient_Send($@) {
+  my ($hash,@clients) = @_;
+  my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+  Log3 $name, 5, "$name ($self) - executed with count:'".scalar(@clients)."', ID:'".$clients[0]."'";
+  my $id = shift @clients;
+  HttpUtils_NonblockingGet( {
+    %{$hash->{httpParams}},
+    url   => $hash->{unifi}->{url}."cmd/stamgr",
+    callback => \&Unifi_BlockClient_Receive,
+    clients => [@clients],
+    data => "{'mac': '".$hash->{clients}->{$id}->{mac}."', 'cmd': 'block-sta'}",
+  } );
+
+  return undef;
+}
+
+###############################################################################
+sub Unifi_BlockClient_Receive($) {
+  my ($param, $err, $data) = @_;
+  my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+  Log3 $name, 5, "$name ($self) - executed.";
+
+  if ($err ne "") {
+    Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+  }
+  elsif ($data ne "") {
+    if ($param->{code} == 200 || $param->{code} == 400 || $param->{code} == 401) {
+      eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+
+      if ($data->{meta}->{rc} eq "ok") {
+        Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
+      }
+      else { Unifi_ReceiveFailure($hash,$data->{meta}); }
+    } else {
+      Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+    }
+  }
+
+  if (scalar @{$param->{clients}}) {
+    Unifi_BlockClient_Send($hash,@{$param->{clients}});
+  }
+
+  return undef;
+}
+
+###############################################################################
 sub Unifi_UnblockClient_Send($@) {
   my ($hash,@clients) = @_;
   my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
@@ -1161,7 +1209,7 @@ sub Unifi_UnblockClient_Receive($) {
   }
 
   if (scalar @{$param->{clients}}) {
-    Unifi_BlockClient_Send($hash,@{$param->{clients}});
+    Unifi_UnblockClient_Send($hash,@{$param->{clients}});
   }
 
   return undef;
