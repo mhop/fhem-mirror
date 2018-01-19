@@ -93,7 +93,11 @@ FRM_PWM_Init($$)
 	return $ret if (defined $ret);
 	my $firmata = $hash->{IODev}->{FirmataDevice};
 	my $name = $hash->{NAME};
-	my $resolution = $firmata->{metadata}{pwm_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{pwm_resolutions});
+	my $resolution = 8;
+	if (defined $firmata->{metadata}{pwm_resolutions}) {
+		$resolution = $firmata->{metadata}{pwm_resolutions}{$hash->{PIN}} 
+	}
+	$hash->{resolution} = $resolution;
 	$hash->{".max"} = defined $resolution ? (1<<$resolution)-1 : 255;
 	$hash->{".dim"} = 0;
 	$hash->{".toggle"} = "off"; 
@@ -332,59 +336,65 @@ FRM_PWM_Attr($$$$)
 <a name="FRM_PWM"></a>
 <h3>FRM_PWM</h3>
 <ul>
-  represents a pin of an <a href="http://www.arduino.cc">Arduino</a> running <a href="http://www.firmata.org">Firmata</a>
-  configured for analog output.<br>
-  The value set will be output by the specified pin as a pulse-width-modulated signal.<br> 
-  Requires a defined <a href="#FRM">FRM</a>-device to work.<br><br> 
+  This module represents a pin of a <a href="http://www.firmata.org">Firmata device</a> 
+  that should be configured as a pulse width modulated output (PWM).<br><br>
+  
+  Requires a defined <a href="#FRM">FRM</a> device to work. The pin must be listed in the internal reading "<a href="#FRMinternals">pwm_pins</a>"<br>
+  of the FRM device (after connecting to the Firmata device) to be used as PWM output.<br><br> 
   
   <a name="FRM_PWMdefine"></a>
   <b>Define</b>
   <ul>
-  <code>define &lt;name&gt; FRM_PWM &lt;pin&gt;</code> <br>
-  Defines the FRM_PWM device. &lt;pin&gt> is the arduino-pin to use.
-  </ul>
-  
-  <br>
+      <code>define &lt;name&gt; FRM_PWM &lt;pin&gt;</code><br><br>
+      
+      Defines the FRM_PWM device. &lt;pin&gt> is the arduino-pin to use.
+  </ul><br>
+ 
   <a name="FRM_PWMset"></a>
   <b>Set</b><br>
   <ul>
-  <code>set &lt;name&gt; on</code><br>
-  sets the pulse-width to 100%<br>
-  </ul>
-  <ul>
-  <code>set &lt;name&gt; off</code><br>
-  sets the pulse-width to 0%<br>
-  </ul>
-  <ul>
-  <a href="#setExtensions">set extensions</a> are supported<br>
-  </ul>
-  <ul>
-  <code>set &lt;name&gt; toggle</code><br>
-  toggles the pulse-width in between to the last value set by 'value' or 'dim' and 0 respectivly 100%<br>
-  </ul>
-  <ul>
-  <code>set &lt;name&gt; value &lt;value&gt;</code><br>
-  sets the pulse-width to the value specified<br>
-  Range is from 0 to 255 (for 8-bit resolution) (see <a href="http://arduino.cc/en/Reference/AnalogWrite">analogWrite()</a> for details)<br>
-  </ul>
-  <ul>
-  <code>set &lt;name&gt; dim &lt;value&gt;</code><br>
-  sets the pulse-width to the value specified in percent<br>
-  Range is from 0 to 100<br>
-  </ul>
-  <ul>
-  <code>set &lt;name&gt; dimUp</code><br>
-  increases the pulse-width by 10%<br>
-  </ul>
-  <ul>
-  <code>set &lt;name&gt; dimDown</code><br>
-  decreases the pulse-width by 10%<br>
-  </ul>
+      <li><code>set &lt;name&gt; on</code><br>
+      sets the pulse-width to 100%<br>
+      </li>
+      <li>
+      <code>set &lt;name&gt; off</code><br>
+      sets the pulse-width to 0%<br>
+      </li>
+      <li>
+      <a href="#setExtensions">set extensions</a> are supported<br>
+      </li>
+      <li>
+      <code>set &lt;name&gt; toggle</code><br>
+      toggles the pulse-width in between to the last value set by 'value' or 'dim' and 0 respectivly 100%<br>
+      </li>
+      <li>
+      <code>set &lt;name&gt; value &lt;value&gt;</code><br>
+      sets the pulse-width to the value specified<br>
+      The min value is zero and the max value depends on the Firmata device (see internal reading<br>
+      "<a href="#FRMinternals">pwm_resolutions</a>" of the FRM device). For 8 bits resolution the range
+      is 0 to 255 (also see <a href="http://arduino.cc/en/Reference/AnalogWrite">analogWrite()</a> for details)<br>
+      </li>
+      <li>
+      <code>set &lt;name&gt; dim &lt;value&gt;</code><br>
+      sets the pulse-width to the value specified in percent<br>
+      Range is from 0 to 100<br>
+      </li>
+      <li>
+      <code>set &lt;name&gt; dimUp</code><br>
+      increases the pulse-width by 10%<br>
+      </li>
+      <li>
+      <code>set &lt;name&gt; dimDown</code><br>
+      decreases the pulse-width by 10%<br>
+      </li>
+  </ul><br>
+  
   <a name="FRM_PWMget"></a>
   <b>Get</b><br>
   <ul>
   N/A
   </ul><br>
+  
   <a name="FRM_PWMattr"></a>
   <b>Attributes</b><br>
   <ul>
@@ -396,9 +406,17 @@ FRM_PWM_Attr($$$$)
       </li>
       <li><a href="#eventMap">eventMap</a><br></li>
       <li><a href="#readingFnAttributes">readingFnAttributes</a><br></li>
-    </ul>
-  </ul>
-<br>
+  </ul><br>
+  
+  <a name="FRM_PWMnotes"></a>
+  <b>Notes</b><br>
+  <ul>
+      <li>attribute <i>stateFormat</i><br>
+      In most cases it is a good idea to assign "value" to the attribute <i>stateFormat</i>. This will show the 
+      current value of the pin in the web interface.
+      </li>
+  </ul>  
+</ul><br>
 
 =end html
 =cut
