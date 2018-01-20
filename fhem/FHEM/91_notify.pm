@@ -82,7 +82,7 @@ notify_Exec($$)
   for (my $i = 0; $i < $max; $i++) {
     my $s = $events->[$i];
     $s = "" if(!defined($s));
-    my $found = ($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/);
+    my $found = ($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/s);
     if(!$found && AttrVal($n, "eventMap", undef)) {
       my @res = ReplaceEventMap($n, [$n,$s], 0);
       shift @res;
