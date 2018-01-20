@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.4";
+my $version = "2.0.5";
 
 
 
@@ -676,6 +676,8 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x18($$) {
     
     
     Log3 $name, 5, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x18";
+    
+    chomp($notification));
         
     $readings{'batteryLevel'}   = hex("0x".$notification);
     $readings{'battery'}        = (hex("0x".$notification) > 20?"ok":"low");
