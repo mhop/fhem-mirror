@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 10_FRM: new attribute "disable", new states "disabled", 
+                     "defined" and "connected", new attribute "errorExclude",
+                     new reading "stringMessage", new internal "pullup_pins"
   - bugfix:  74_XiaomiBTLESens: fix Illegal hexadecimal digit ' ' ignored
   - change:  74_XiaomiBTLESens: better timer logic
   - feature: 20_FRM_AD: analog resolution now depending on device capability
