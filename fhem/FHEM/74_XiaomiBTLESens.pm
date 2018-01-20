@@ -2,7 +2,7 @@
 # 
 # Developed with Kate
 #
-#  (c) 2016-2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.3";
+my $version = "2.0.4";
 
 
 
@@ -195,6 +195,7 @@ sub XiaomiBTLESens_Attr(@) {
     if( $attrName eq "disable" ) {
         if( $cmd eq "set" and $attrVal eq "1" ) {
             RemoveInternalTimer($hash);
+            
             readingsSingleUpdate ( $hash, "state", "disabled", 1 );
             Log3 $name, 3, "XiaomiBTLESens ($name) - disabled";
         }
@@ -219,6 +220,8 @@ sub XiaomiBTLESens_Attr(@) {
     }
     
     elsif( $attrName eq "interval" ) {
+        RemoveInternalTimer($hash);
+        
         if( $cmd eq "set" ) {
             if( $attrVal < 300 ) {
                 Log3 $name, 3, "XiaomiBTLESens ($name) - interval too small, please use something >= 300 (sec), default is 3600 (sec)";
@@ -323,17 +326,9 @@ sub XiaomiBTLESens_stateRequestTimer($) {
     
     my $name        = $hash->{NAME};
 
-    
-    RemoveInternalTimer($hash);
-    
-    if( $init_done and not IsDisabled($name) ) {
-        
-        XiaomiBTLESens_stateRequest($hash);
-        
-    } else {
-        readingsSingleUpdate ( $hash, "state", "disabled", 1 );
-    }
-    
+
+    XiaomiBTLESens_stateRequest($hash) if( $init_done );
+
     InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(600)), "XiaomiBTLESens_stateRequestTimer", $hash );
     
     Log3 $name, 4, "XiaomiBTLESens ($name) - stateRequestTimer: Call Request Timer";
@@ -632,12 +627,10 @@ sub XiaomiBTLESens_FlowerSensHandle0x38($$) {
     Log3 $name, 5, "XiaomiBTLESens ($name) - FlowerSens Handle0x38";
 
     my @dataBatFw   = split(" ",$notification);
-    my $blevel      = hex("0x".$dataBatFw[0]);
-    my $fw          = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
-        
-    $readings{'batteryLevel'}   = $blevel;
-    $readings{'battery'}        = ($blevel > 20?"ok":"low");
-    $readings{'firmware'}       = $fw;
+
+    $readings{'batteryLevel'}   = hex("0x".$dataBatFw[0]);
+    $readings{'battery'}        = (hex("0x".$dataBatFw[0]) > 20?"ok":"low");
+    $readings{'firmware'}       = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
         
     $hash->{helper}{CallBattery} = 1;
     XiaomiBTLESens_CallBattery_Timestamp($hash);
@@ -659,9 +652,6 @@ sub XiaomiBTLESens_FlowerSensHandle0x35($$) {
 
     return XiaomiBTLESens_stateRequest($hash)
     unless( $dataSensor[0] ne "aa" and $dataSensor[1] ne "bb" and $dataSensor[2] ne "cc" and $dataSensor[3] ne "dd" and $dataSensor[4] ne "ee" and $dataSensor[5] ne "ff");
-
-
-    my $temp;
         
     if( $dataSensor[1] eq "ff" ) {
         $readings{'temperature'}    = hex("0x".$dataSensor[1].$dataSensor[0]) - hex("0xffff") / 10;
