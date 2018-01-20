@@ -500,6 +500,8 @@ DevIo_CloseDev($@)
   delete($readyfnlist{"$name.$dev"});
   delete($hash->{FD});
   delete($hash->{EXCEPT_FD});
+  delete($hash->{PARTIAL});
+  delete($hash->{NEXt_OPEN});
 }
 
 sub
