@@ -526,9 +526,9 @@ if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
 
 # FritzBox special: Wait until the time is set via NTP,
 # but not more than 2 hours
-if(time() < 2*3600) {
+if(gettimeofday() < 2*3600) {
   Log 1, "date/time not set, waiting up to 2 hours to be set.";
-  while(time() < 2*3600) {
+  while(gettimeofday() < 2*3600) {
     sleep(5);
   }
 }
@@ -550,7 +550,7 @@ if(configDBUsed()) {
 
   my $stateFile = $attr{global}{statefile};
   if($stateFile) {
-    my @t = localtime;
+    my @t = localtime(gettimeofday());
     $stateFile = ResolveDateWildcards($stateFile, @t);
     if(-r $stateFile) {
       $ret = CommandInclude(undef, $stateFile);
@@ -595,7 +595,7 @@ if($cfgRet) {
 }
 
 
-$fhem_started = time;
+$fhem_started = int(gettimeofday());
 DoTrigger("global", "INITIALIZED", 1);
 
 my $osuser = "os:$^O user:".(getlogin || getpwuid($<) || "unknown");
@@ -813,7 +813,8 @@ IsDisabled($)
   my $dfi = $attr{$devname}{disabledForIntervals};
   if(defined($dfi)) {
     $dfi =~ s/{([^\x7d]*)}/$cmdFromAnalyze=$1; eval $1/ge; # Forum #69787
-    my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+    my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) =
+        localtime(gettimeofday());
     my $dhms = sprintf("%s\@%02d:%02d:%02d", $wday, $hour, $min, $sec);
     foreach my $ft (split(" ", $dfi)) {
       my ($from, $to) = split("-", $ft);
@@ -1046,7 +1047,8 @@ AnalyzePerlCommand($$;$)
       $value{$d} = $defs{$d}{STATE}
     }
   }
-  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = 
+        localtime(gettimeofday());
   my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
   my $we = (($wday==0 || $wday==6) ? 1 : 0);
   if(!$we) {
@@ -1283,7 +1285,7 @@ CommandInclude($$)
     return "Can't open $arg: $!";
   }
   Log 1, "Including $arg";
-  my @t = localtime();
+  my @t = localtime(gettimeofday());
   my $gcfg = ResolveDateWildcards(AttrVal("global", "configfile", ""), @t);
   my $stf  = ResolveDateWildcards(AttrVal("global", "statefile",  ""), @t);
   if(!$init_done && $arg ne $stf && $arg ne $gcfg) {
@@ -1489,7 +1491,8 @@ WriteStatefile()
   my $stateFile = AttrVal('global','statefile',undef);
   return "No statefile specified" if(!defined($stateFile));
 
-  my @t = localtime;
+  my $now = gettimeofday();
+  my @t = localtime($now);
   $stateFile = ResolveDateWildcards($stateFile, @t);
 
   if(!open(SFH, ">$stateFile")) {
@@ -1498,7 +1501,7 @@ WriteStatefile()
     return $msg;
   }
 
-  my $t = localtime;
+  my $t = localtime($now);
   print SFH "#$t\n";
 
   foreach my $d (sort keys %defs) {
@@ -1697,7 +1700,7 @@ ReplaceSetMagic($$@)       # Forum #38276
       if($s && ($s eq ":t" || $s eq ":sec")) {
         return $all if (!$r || !$r->{$n});
         $val = $r->{$n}{TIME};
-        $val = time() - time_str2num($val) if($s eq ":sec");
+        $val = int(gettimeofday()) - time_str2num($val) if($s eq ":sec");
         return $val;
       }
       $val = $r->{$n}{VAL} if($r && $r->{$n});
@@ -2574,7 +2577,7 @@ GlobalAttr($$$$)
   return undef if($type ne "set");
   ################
   if($name eq "logfile") {
-    my @t = localtime;
+    my @t = localtime(gettimeofday());
     my $ret = OpenLogfile(ResolveDateWildcards($val, @t));
     if($ret) {
       return $ret if($init_done);
@@ -3184,7 +3187,7 @@ SignalHandling()
 sub
 TimeNow()
 {
-  return FmtDateTime(time());
+  return FmtDateTime(gettimeofday());
 }
 
 #####################################
@@ -3633,7 +3636,7 @@ HandleArchiving($;$)
   }
 
   $file =~ s/%./.+/g;
-  my @t = localtime;
+  my @t = localtime(gettimeofday());
   $dir = ResolveDateWildcards($dir, @t);
   return if(!opendir(DH, $dir));
   my @files = sort grep {/^$file$/} readdir(DH);
@@ -4134,7 +4137,7 @@ ReadingsAge($$$)
 {
   my ($device,$reading,$default) = @_;
   my $ts = ReadingsTimestamp($device,$reading,undef);
-  return time() - time_str2num($ts) if(defined($ts));
+  return int(gettimeofday() - time_str2num($ts)) if(defined($ts));
   return $default;
 }
 
@@ -4928,7 +4931,7 @@ sub
 createUniqueId()
 {
   my $uniqueID;
-  srand(time) if(!$srandUsed);
+  srand(gettimeofday()) if(!$srandUsed);
   $srandUsed = 1;
   $uniqueID = join "",map { unpack "H*", chr(rand(256)) } 1..16;
   return $uniqueID;
@@ -5256,7 +5259,7 @@ computeAlignTime($$@)
   my ($tmErr, $hr, $min, $sec, undef) = GetTimeSpec($timeSpec);
   return ("timeSpec: $tmErr", undef) if($alErr);
 
-  my $now = time();
+  my $now = int(gettimeofday());
   my $alTime = ($alHr*60+$alMin)*60+$alSec-fhemTzOffset($now);
   my $step = ($hr*60+$min)*60+$sec;
   my $ttime = ($triggertime ? int($triggertime) : $now);
@@ -5333,7 +5336,7 @@ restoreDir_init()
   return "" if($nDirs == 0);
 
   my $rdName = "restoreDir";
-  my @t = localtime;
+  my @t = localtime(gettimeofday());
   my $restoreDir = sprintf("$rdName/%04d-%02d-%02d",
                         $t[5]+1900, $t[4]+1, $t[3]);
   Log 1, "MKDIR $restoreDir" if(!  -d "$root/restoreDir");
