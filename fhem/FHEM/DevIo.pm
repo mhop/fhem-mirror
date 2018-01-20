@@ -501,7 +501,7 @@ DevIo_CloseDev($@)
   delete($hash->{FD});
   delete($hash->{EXCEPT_FD});
   delete($hash->{PARTIAL});
-  delete($hash->{NEXt_OPEN});
+  delete($hash->{NEXT_OPEN});
 }
 
 sub
