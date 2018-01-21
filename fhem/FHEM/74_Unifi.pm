@@ -10,6 +10,8 @@
 #  - feature: 74_Unifi: add new set command to en-/disable Site Status-LEDs
 # V2.1.1
 #  - bugfix:  74_Unifi: fixed blockClient
+# V2.1.2
+#  - feature: 74_Unifi: new Readings for WLAN-states, fixed Warning
 
 
 package main;
@@ -49,6 +51,7 @@ sub Unifi_ProcessUpdate($);
 sub Unifi_SetClientReadings($);
 sub Unifi_SetHealthReadings($);
 sub Unifi_SetAccesspointReadings($);
+sub Unifi_SetWlanReadings($);
 sub Unifi_DisconnectClient_Send($@);
 sub Unifi_DisconnectClient_Receive($);
 sub Unifi_ApCmd_Send($$@);
@@ -57,6 +60,7 @@ sub Unifi_ArchiveAlerts_Send($);
 sub Unifi_Cmd_Receive($);
 sub Unifi_ClientNames($@);
 sub Unifi_ApNames($@);
+sub Unifi_SSIDs($@);
 sub Unifi_BlockClient_Send($@);
 sub Unifi_BlockClient_Receive($);
 sub Unifi_UnblockClient_Send($@);
@@ -961,6 +965,7 @@ sub Unifi_ProcessUpdate($) {
     Unifi_SetHealthReadings($hash);
     Unifi_SetClientReadings($hash);
     Unifi_SetAccesspointReadings($hash);
+    Unifi_SetWlanReadings($hash);
     ## WLANGROUPS ???
     #'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''#
     readingsEndUpdate($hash,1);
@@ -1073,6 +1078,22 @@ sub Unifi_SetAccesspointReadings($) {
         # readingsBulkUpdate($hash,'-AP_'.$apName.'_guests',$apRef->{'guest-num_sta'});
         # readingsBulkUpdate($hash,'-AP_'.$apName.'_users',$apRef->{'user-num_sta'});
         # readingsBulkUpdate($hash,'-AP_'.$apName.'_last_seen',$apRef->{'last_seen'});
+    }
+    
+    return undef;
+}
+
+###############################################################################
+sub Unifi_SetWlanReadings($) {
+    my ($hash) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    my ($wlanName,$wlanRef);
+    for my $wlanID (keys %{$hash->{wlans}}) {
+        $wlanRef = $hash->{wlans}->{$wlanID};
+        $wlanName = $wlanRef->{name};        
+        readingsBulkUpdate($hash,'-WLAN_'.$wlanName.'_state',($wlanRef->{enabled} == JSON::true) ? 'enabled' : 'disabled');
     }
     
     return undef;
@@ -1470,14 +1491,14 @@ sub Unifi_SSIDs($@){
         }
         return $ID;
     }
-    else {  # Return all aps in a scalar
-        my $aps = '';
-        for my $apID (keys %{$hash->{wlans}}) {
-            $aps .= Unifi_SSIDs($hash,$apID,'makeName').',';
+    else {  # Return all wlans in a scalar
+        my $wlans = '';
+        for my $wlanID (keys %{$hash->{wlans}}) {
+            $wlans .= Unifi_SSIDs($hash,$wlanID,'makeName').',';
         }
-        $aps =~ s/.$//;
+        $wlans =~ s/.$//;
         
-        return $aps;
+        return $wlans;
     }
 }
 ###############################################################################
