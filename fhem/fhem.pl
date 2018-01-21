@@ -2825,7 +2825,8 @@ CommandAttr($$)
       return $err if($err);
       evalStateFormat($hash);
     }
-    addStructChange("attr", $sdev, $param) if(!defined($oVal) || $oVal ne $val);
+    addStructChange("attr", $sdev, "$attrName $val")
+        if(!defined($oVal) || $oVal ne $val);
     DoTrigger("global", "ATTR $sdev $attrName $val", 1) if($init_done);
 
   }
