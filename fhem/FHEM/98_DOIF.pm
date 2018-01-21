@@ -452,7 +452,7 @@ sub DOIF_RegisterEvalAll
   return undef if (!defined $hash->{$table}{table});
   #$ret =~ s/class\=\'block\'/$hash->{$table}{table}/ if($hash->{$table}{table});
   if ($table eq "uiTable") {
-    $ret .= "\n<table uitabid='DOIF-$d' class=' block ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'".
+    $ret .= "\n<table uitabid='DOIF-$d' class=' block wide ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'".
       " doifnostate='".($hash->{$table}{shownostate} ? $hash->{$table}{shownostate} : "")."'".
       " doifnodevline='".($hash->{$table}{shownodeviceline} ? $hash->{$table}{shownodeviceline} : "")."'".
       " doifattrfirst='".($hash->{$table}{attributesfirst} ? $hash->{$table}{attributesfirst} : "")."'".
