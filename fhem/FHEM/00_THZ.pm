@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 1/2018
-my $thzversion = "0.175"; 
+my $thzversion = "0.176"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -167,10 +167,52 @@ my %parsinghash = (
 	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 1],
 	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 1]
 	      ],
+  "E8fan"	=> [["statusAFC: ",         4, 4, "hex", 1], 	    # 0=init air flow calibration (16:00) 4=normal fan operation
+            [" supplyFanSpeedCAL: ",    8, 4, "hex", 60], 	    # calibration speed
+			[" exhaustFanSpeedCAL: ",   12, 4, "hex", 60], 		
+			[" supplyFanAirflowCAL: ",  16, 4, "hex", 100], 	# calibration air flow volume
+			[" exhaustFanAirflowCAL: ", 20, 4, "hex", 100],
+			[" supplyFanSpeed: ",       24, 4, "hex", 1], 		# actual fan speed in 1/s
+			[" exhaustFanSpeed: ",      28, 4, "hex", 1],
+			[" supplyFanAirflowSet: ",  32, 4, "hex", 1],		# actual air flow volume setting in m3/h
+			[" exhaustFanAirflowSet: ", 36, 4, "hex", 1],
+			[" supplyFanSpeedTarget: ", 40, 4, "hex", 1],		# target fan speed in %
+			[" exhaustFanSpeedTarget: ", 44, 4, "hex", 1],
+			[" supplyFanSpeed0: ",      48, 4, "hex", 10], 			
+			[" exhaustFanSpeed0: ",     52, 4, "hex", 10], 	
+			[" supplyFanSpeed200: ",    56, 4, "hex", 10],
+			[" exhaustFanSpeed200: ",   60, 4, "hex", 10],
+			[" airflowTolerance: ",     64, 2, "hex", 1],
+			[" airflowCalibrationInterval: ", 66, 2, "hex", 1],	# calibration interval
+			[" timeToCalibration: ",    68, 2, "hex", 1]		# days to next calibration
+		  ],
   "EEprg206" => [["opMode: ", 	4, 2, 	"opmode2", 1], 	[" ProgStateHC: ", 	10, 2, "opmodehc", 1], 	[" ProgStateDHW: ", 	12, 2, "opmodehc", 1],
 	      [" ProgStateFAN: ", 	14, 2, 	"opmodehc", 1], [" BaseTimeAP0: ", 	16, 8, "hex", 1], 	    [" StatusAP0: ", 	24, 2, "hex", 1],
 	      [" StartTimeAP0: ", 	26, 8, 	"hex", 1], 	    [" EndTimeAP0: ", 	34, 8, "hex", 1]
 	      ],
+  "F2ctrl"  => [["heatRequest: ", 		4, 2, "hex", 1],	    # 0=DHW 2=heat 5=off 6=defrostEva
+			[" heatRequest2: ", 		6, 2, "hex", 1],		# same as heatRequest
+			[" hcStage: ", 				8, 2, "hex", 1],  		# 0=off 1=solar 2=heatPump 3=boost1 4=boost2 5=boost3
+			[" dhwStage: ",				10, 2, "hex", 1],		# 0=off, 1=solar, 2=heatPump 3=boostMax
+			[" heatStageControlModul: ", 12, 2, "hex", 1], 		# either hcStage or dhwStage depending from heatRequest
+			[" compBlockTime: ", 		14, 4, "hex2int", 1],	# remaining compressor block time
+			[" pasteurisationMode: ", 	18, 2, "hex", 1], 		# 0=off 1=on
+			[" defrostEvaporator: ", 	20, 2, "raw", 1],		# 10=off 30=defrostEva
+			[" boosterStage2: ",		22, 1, 	"bit3", 1],		# booster 2		
+			[" solarPump: ",			22, 1, 	"bit2", 1],		# solar pump
+			[" boosterStage1: ",		22, 1, 	"bit1", 1],		# booster 1
+			[" compressor: ",			22, 1, 	"bit0", 1],	    # compressor
+			[" heatPipeValve: ",		23, 1, 	"bit3", 1],		# heat pipe valve
+			[" diverterValve: ",		23, 1, 	"bit2", 1],		# diverter valve
+			[" dhwPump: ",				23, 1, 	"bit1", 1],	    # dhw pump
+			[" heatingCircuitPump: ",	23, 1, 	"bit0", 1],		# hc pump
+			[" mixerOpen: ",			25, 1, 	"bit1", 1],		# mixer open
+			[" mixerClosed: ",			25, 1, 	"bit0", 1],	    # mixer closed
+			[" sensorBits1: ", 			26, 2, "raw", 1],		# sensor condenser temperature ??
+			[" sensorBits2: ", 			28, 2, "raw", 1],		# sensor low pressure ??
+			[" boostBlockTimeAfterPumpStart: ", 30, 4, "hex2int", 1],	# after each  pump start (dhw or heat circuit)
+			[" boostBlockTimeAfterHD: ", 34, 4, "hex2int", 1]	# ??
+          ],
   "F3dhw"  => [["dhwTemp: ",	4, 4, "hex2int", 10],	[" outsideTemp: ", 	    8, 4, "hex2int", 10],
 	      [" dhwSetTemp: ",	    12, 4, "hex2int", 10],  [" compBlockTime: ",	16, 4, "hex2int", 1],
 	      [" out: ", 		    20, 4, "raw", 1],	    [" heatBlockTime: ", 	24, 4, "hex2int", 1],
@@ -662,11 +704,13 @@ my %setsonly214 = (
 my %getsonly439 = (
 #"debug_read_raw_register_slow"	=> { },
   "sSol"			    => {cmd2=>"16", type =>"16sol", unit =>""},
+  "sHistory"			=> {cmd2=>"09", type =>"09his", unit =>""},
+  "sLast10errors"		=> {cmd2=>"D1", type =>"D1last", unit =>""},
+  "sFan"  				=> {cmd2=>"E8", type =>"E8fan", unit =>""},
   "sDHW"			    => {cmd2=>"F3", type =>"F3dhw", unit =>""},
   "sHC1"			    => {cmd2=>"F4", type =>"F4hc1", unit =>""},
   "sHC2"			    => {cmd2=>"F5", type =>"F5hc2", unit =>""},
-  "sHistory"			=> {cmd2=>"09", type =>"09his", unit =>""},
-  "sLast10errors"		=> {cmd2=>"D1", type =>"D1last", unit =>""},
+  "sControl"  			=> {cmd2=>"F2", type =>"F2ctrl", unit =>""},
   "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob", unit =>""},  #allFB
   "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime", unit =>""},
   "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm", unit =>""},
@@ -709,6 +753,7 @@ my %getsonly2xx = (
   "pHeat2"			    => {cmd2=>"06", type =>"06pxx206", unit =>""},
   "pDHW"			    => {cmd2=>"07", type =>"07pxx206", unit =>""},
   "pSolar"			    => {cmd2=>"08", type =>"08pxx206", unit =>""},
+  "sHistory"			=> {cmd2=>"09", type =>"09his206", unit =>""},
   "pCircPump"			=> {cmd2=>"0A", type =>"0Apxx206", unit =>""},
   "pHeatProg"			=> {cmd2=>"0B", type =>"0Bpxx206", unit =>""},
   "pDHWProg"			=> {cmd2=>"0C", type =>"0Cpxx206", unit =>""},
@@ -719,10 +764,11 @@ my %getsonly2xx = (
   "sSol"			    => {cmd2=>"16", type =>"16sol",    unit =>""},
   "p01-p12"			    => {cmd2=>"17", type =>"17pxx206", unit =>""},
   "sProgram"  			=> {cmd2=>"EE", type =>"EEprg206", unit =>""},
+  "sFan"  				=> {cmd2=>"E8", type =>"E8fan",    unit =>""},
+  "sControl"  			=> {cmd2=>"F2", type =>"F2ctrl", unit =>""},
   "sDHW"			    => {cmd2=>"F3", type =>"F3dhw",    unit =>""},
   "sHC2"			    => {cmd2=>"F5", type =>"F5hc2",    unit =>""},
   "sSystem"			    => {cmd2=>"F6", type =>"F6sys206", unit =>""},
-  "sHistory"			=> {cmd2=>"09", type =>"09his206", unit =>""},
   "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob206", unit =>""},  
   "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime206", unit =>""},
   "inputVentilatorSpeed"=> {parent=>"sGlobal",              unit =>" %"},
@@ -862,12 +908,12 @@ sub THZ_Refresh_all_gets($) {
   RemoveInternalTimer(0, "THZ_GetRefresh");
   #THZ_RemoveInternalTimer("THZ_GetRefresh"); not needed since https://svn.fhem.de/trac/changeset/15667/ because now there is a second parameter for the function
   Log3 $hash->{NAME}, 5, "thzversion = $thzversion ";
-  my $timedelay= 30; 						#start after 5 seconds
+  my $timedelay= 15; 						#5 seconds were ok but considering winter 2017/2018 I prefer to increase
   foreach  my $cmdhash  (keys %gets) {
     my %par = (  hash => $hash, command => $cmdhash );
     #RemoveInternalTimer(\%par); #commented out in  v.0161 because appearently redundant; THZ_RemoveInternalTimer is more efficient and both are not needed
     InternalTimer(gettimeofday() + ($timedelay) , "THZ_GetRefresh", \%par, 0);		#increment 0.6 $timedelay++
-    $timedelay += 1.6;                      #0.6 seconds are ok
+    $timedelay += 1.6;                      #0.6 seconds were ok but considering winter 2017/2018 I prefer to increase
   }  #refresh all registers; the register with interval_command ne 0 will keep on refreshing
 }
 
