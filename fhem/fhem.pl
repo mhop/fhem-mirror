@@ -134,6 +134,7 @@ sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
 sub readingsEndUpdate($$);
 sub readingsSingleUpdate($$$$);
+sub readingsDelete($$);
 sub redirectStdinStdErr();
 sub rejectDuplicate($$$);
 sub resolveAttrRename($$);
@@ -4587,6 +4588,13 @@ readingsSingleUpdate($$$$)
   my $rv = readingsBulkUpdate($hash,$reading,$value);
   readingsEndUpdate($hash,$dotrigger);
   return $rv;
+}
+
+sub
+readingsDelete($$)
+{
+  my ($hash,$reading) = @_;
+  delete $hash->{READINGS}{$reading};
 }
 
 ##############################################################################
