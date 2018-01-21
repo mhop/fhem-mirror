@@ -743,6 +743,7 @@ sub Siro_Attr(@)
 					}
 					
 				my $oldstate =$hash->{helper}{position};
+if(!defined $oldstate){$oldstate=0}; 
 				my $newState =  $oldstate;
 				my $updateState;
 				Log3 $hash, 3, "Siro_Attr: state old -> $oldstate new -> $newState";
