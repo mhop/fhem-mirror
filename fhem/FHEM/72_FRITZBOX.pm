@@ -1359,6 +1359,14 @@ sub FRITZBOX_Readout_Run_Web($)
       $returnStr .= "|" . join('|', @roReadings )     if int @roReadings;
       return $name."|".encode_base64($returnStr,"");
    }
+   
+   if ( defined $result->{AuthorizationRequired} ) {
+      FRITZBOX_Log $hash, 2, "Error: AuthorizationRequired=".$result->{AuthorizationRequired};
+      my $returnStr = "Error|Authorization required";
+      $returnStr .= "|fhem->sidTime|0"    if defined $result->{ResetSID};
+      $returnStr .= "|" . join('|', @roReadings )     if int @roReadings;
+      return $name."|".encode_base64($returnStr,"");
+   }
 
    # !!! copes with fw 6.69 !!!
    if ( ref $result->{wlanList} ne 'ARRAY' ) {
