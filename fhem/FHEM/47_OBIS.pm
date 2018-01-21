@@ -12,14 +12,13 @@
 
 
 package main;
-no warnings 'portable';  # Support for 64-bit ints required
-#use bigint qw/hex/;
-no warnings qw(overflow portable);
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday usleep);
 use Scalar::Util qw(looks_like_number);
 use POSIX qw{strftime};
+no warnings 'portable';  # Support for 64-bit ints required
+#use Math::BigInt ':constant';
 
 my %OBIS_channels = ( "21"	=>"power_L1",
 	                  "41"	=>"power_L2",
