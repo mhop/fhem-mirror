@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_DbRep: V7.5.1, new set-options display/writeToDB for 
+                       (max|min|sum|average|diff)Value,
+                       create background_processing_time before execute
+                       commands in attribute "executeAfterProc" (db-dumps)
   - feature: 10_FRM: new attribute "disable", new states "disabled", 
                      "defined" and "connected", new attribute "errorExclude",
                      new reading "stringMessage", new internal "pullup_pins"

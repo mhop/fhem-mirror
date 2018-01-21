@@ -36,7 +36,9 @@
 #
 ###########################################################################################################################
 #  Versions History:
-#
+# 7.5.1        20.01.2018       DumpDone changed to create background_processing_time before execute "executeAfterProc" 
+#                               Commandref updated
+# 7.5.0        16.01.2018       DbRep_OutputWriteToDB, set options display/writeToDB for (max|min|sum|average|diff)Value
 # 7.4.1        14.01.2018       fix old dumpfiles not deleted by dumpMySQL clientSide
 # 7.4.0        09.01.2018       dumpSQLite/restoreSQLite, 
 #                               backup/restore now available when DbLog-device has reopen xxxx running, 
@@ -113,7 +115,7 @@
 # 5.0.1        05.06.2017       dependencies between dumpMemlimit and dumpSpeed created, enhanced verbose 5 logging
 # 5.0.0        04.06.2017       MySQL Dump nonblocking added
 # 4.16.1       22.05.2017       encode json without JSON module, requires at least fhem.pl 14348 2017-05-22 20:25:06Z
-# 4.16.0       22.05.2017       format json as option of sqlResultFormat, state will never be deleted in "delread" 
+# 4.16.0       22.05.2017       format json as option of sqlResultFormat, state will never be deleted in "DbRep_delread" 
 # 4.15.1       20.05.2017       correction of commandref
 # 4.15.0       17.05.2017       SUM(VALUE),AVG(VALUE) recreated for PostgreSQL, Code reviewed and optimized
 # 4.14.2       16.05.2017       SQL-Statements optimized for Wildcard "%" usage if used, Wildcard "_" isn't supported
@@ -284,8 +286,9 @@ use Encode qw(encode_utf8);
 # no if $] >= 5.017011, warnings => 'experimental';  
 
 sub DbRep_Main($$;$);
+sub DbLog_cutCol($$$$$$$);      # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.4.1";
+my $DbRepVersion = "7.5.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -436,18 +439,18 @@ sub DbRep_Set($@) {
   my $cj = @bkps?join(",",reverse(sort @bkps)):" ";
   
   my $setlist = "Unknown argument $opt, choose one of ".
-                (($hash->{ROLE} ne "Agent")?"sumValue:noArg ":"").
-                (($hash->{ROLE} ne "Agent")?"averageValue:noArg ":"").
+                (($hash->{ROLE} ne "Agent")?"sumValue:display,writeToDB ":"").
+                (($hash->{ROLE} ne "Agent")?"averageValue:display,writeToDB ":"").
                 (($hash->{ROLE} ne "Agent")?"delEntries:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"delSeqDoublets:adviceRemain,adviceDelete,delete ":"").
                 "deviceRename ".
 				(($hash->{ROLE} ne "Agent")?"readingRename ":"").
                 (($hash->{ROLE} ne "Agent")?"exportToFile:noArg ":"").
                 (($hash->{ROLE} ne "Agent")?"importFromFile:noArg ":"").
-                (($hash->{ROLE} ne "Agent")?"maxValue:noArg ":"").
-                (($hash->{ROLE} ne "Agent")?"minValue:noArg ":"").
+                (($hash->{ROLE} ne "Agent")?"maxValue:display,writeToDB ":"").
+                (($hash->{ROLE} ne "Agent")?"minValue:display,writeToDB ":"").
                 (($hash->{ROLE} ne "Agent")?"fetchrows:history,current ":"").  
-                (($hash->{ROLE} ne "Agent")?"diffValue:noArg ":"").   
+                (($hash->{ROLE} ne "Agent")?"diffValue:display,writeToDB ":"").   
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
 				(($hash->{ROLE} ne "Agent")?"sqlCmd ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
@@ -558,7 +561,14 @@ sub DbRep_Set($@) {
       if (!AttrVal($hash->{NAME}, "reading", "")) {
           return " The attribute reading to analyze is not set !";
       }
-      DbRep_Main($hash,$opt);
+      if ($prop && $prop =~ /writeToDB/) {
+          if (!AttrVal($hash->{NAME}, "device", "") || AttrVal($hash->{NAME}, "device", "") =~ /[%.*:=,]/ || AttrVal($hash->{NAME}, "reading", "") =~ /[,\s]/) {
+              return "<html>If you want write results back to database, attributes \"device\" and \"reading\" must be set.<br>
+                      In that case \"device\" mustn't be a <a href='https://fhem.de/commandref.html#devspec\'>devspec</a> and mustn't contain SQL-Wildcard (%).<br>
+                      The \"reading\" to evaluate has to be a single reading and no list.</html>";
+          }
+      }
+      DbRep_Main($hash,$opt,$prop);
       
   } elsif ($opt =~ m/delEntries|tableCurrentPurge/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
@@ -713,20 +723,20 @@ sub DbRep_Get($@) {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       return "The operation \"$opt\" isn't available with database type $dbmodel" if ($dbmodel ne 'MYSQL');
 	  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
-      delread($hash);  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
+      DbRep_delread($hash);  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "ParseAborted", $hash);    
   
   } elsif ($opt eq "svrinfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-      delread($hash); 
+      DbRep_delread($hash); 
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "ParseAborted", $hash);      
   
   } elsif ($opt eq "blockinginfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-      delread($hash); 
+      DbRep_delread($hash); 
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);   
 	  DbRep_getblockinginfo($hash);	  
   }
@@ -1141,7 +1151,7 @@ sub DbRep_Main($$;$) {
              $hash->{HELPER}{RUNNING_BCKPREST_SERVER}) && $opt !~ /dumpMySQL|restoreMySQL/ );
  
  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
- delread($hash);
+ DbRep_delread($hash);
  
  if ($opt =~ /dumpMySQL|dumpSQLite/) {	   
      BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
@@ -1214,14 +1224,14 @@ sub DbRep_Main($$;$) {
  
  #####  Funktionsaufrufe ##### 
  if ($opt eq "sumValue") {
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$prop§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
 	 
  } elsif ($opt =~ m/countEntries/) {
      my $table = $prop;
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$table§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
 	 
  } elsif ($opt eq "averageValue") {      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$prop§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
  } elsif ($opt eq "fetchrows") {
      my $table = $prop;             
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$table|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
@@ -1237,10 +1247,10 @@ sub DbRep_Main($$;$) {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name", "impfile_PushDone", $to, "ParseAborted", $hash);
     
  } elsif ($opt eq "maxValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$prop§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
          
  } elsif ($opt eq "minValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$ts", "minval_ParseDone", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$prop§$ts", "minval_ParseDone", $to, "ParseAborted", $hash);   
          
  } elsif ($opt eq "delEntries") {         
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
@@ -1254,7 +1264,7 @@ sub DbRep_Main($$;$) {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "currentfillup_Done", $to, "ParseAborted", $hash);        
  
  } elsif ($opt eq "diffValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$prop§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
          
  } elsif ($opt eq "insert") { 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
@@ -1816,7 +1826,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 ####################################################################################################
 sub averval_DoParse($) {
  my ($string) = @_;
- my ($name, $device, $reading, $ts) = split("\\§", $string);
+ my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -1835,7 +1845,7 @@ sub averval_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err";
+     return "$name|''|$device|$reading|''|$err|''";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -1903,7 +1913,7 @@ sub averval_DoParse($) {
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
-         return "$name|''|$device|$reading|''|$err";
+         return "$name|''|$device|$reading|''|$err|''";
      }
 	 
      # DB-Abfrage -> Ergebnis in @arr aufnehmen
@@ -1919,12 +1929,25 @@ sub averval_DoParse($) {
          $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|"; 
      }
  }   
- 
+  
  $sth->finish;
  $dbh->disconnect;
  
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
+ 
+ # Ergebnisse in Datenbank schreiben
+ my ($wrt,$irowdone);
+ if($prop =~ /writeToDB/) {
+     ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$arrstr,"avg");
+     if ($err) {
+         Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
+         $err = encode_base64($err,"");
+         Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
+         return "$name|''|$device|$reading|''|$err|''";
+     }
+     $rt = $rt+$wrt;
+ }
   
  # Daten müssen als Einzeiler zurückgegeben werden
  $arrstr = encode_base64($arrstr,"");
@@ -1936,7 +1959,7 @@ sub averval_DoParse($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$arrstr|$device|$reading|$rt|0";
+ return "$name|$arrstr|$device|$reading|$rt|0|$irowdone";
 }
 
 ####################################################################################################
@@ -1955,6 +1978,7 @@ sub averval_ParseDone($) {
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
+  my $irowdone  = $a[6];
   my $reading_runtime_string;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall averval_ParseDone");
@@ -1991,6 +2015,7 @@ sub averval_ParseDone($) {
 	  ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
   }
 
+  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");  
   readingsEndUpdate($hash, 1);
   
@@ -2186,7 +2211,7 @@ return;
 ####################################################################################################
 sub maxval_DoParse($) {
  my ($string) = @_;
- my ($name, $device, $reading, $ts) = split("\\§", $string);
+ my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -2205,7 +2230,7 @@ sub maxval_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err";
+     return "$name|''|$device|$reading|''|$err|''";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -2232,7 +2257,7 @@ sub maxval_DoParse($) {
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
      Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err";
+     return "$name|''|$device|$reading|''|$err|''";
  }
  
  # SQL-Startzeit
@@ -2264,7 +2289,7 @@ sub maxval_DoParse($) {
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
-         return "$name|''|$device|$reading|''|$err";
+         return "$name|''|$device|$reading|''|$err|''";
      } 
          
      my @array= map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };
@@ -2280,7 +2305,7 @@ sub maxval_DoParse($) {
      } 
      push(@row_array, @array);  
  }
- 
+  
  $sth->finish;
  $dbh->disconnect;
  
@@ -2312,7 +2337,7 @@ sub maxval_DoParse($) {
          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in maxValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
          $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
          Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
-         return "$name|''|$device|$reading|''|$err";
+         return "$name|''|$device|$reading|''|$err|''";
      }
       
      Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value");
@@ -2342,8 +2367,22 @@ sub maxval_DoParse($) {
      Log3 ($name, 5, "runtimestring Key: $key, value: ".$rh{$key}); 
  }
      
- # Ergebnishash als Einzeiler zurückgeben
+ # Ergebnishash als Einzeiler zurückgeben bzw. Übergabe Schreibroutine
  my $rows = join('§', %rh); 
+ 
+ # Ergebnisse in Datenbank schreiben
+ my ($wrt,$irowdone);
+ if($prop =~ /writeToDB/) {
+     ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$rows,"max");
+     if ($err) {
+         Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
+         $err = encode_base64($err,"");
+         Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
+         return "$name|''|$device|$reading|''|$err|''";
+     }
+     $rt = $rt+$wrt;
+ }
+ 
  my $rowlist = encode_base64($rows,"");
   
  Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
@@ -2353,7 +2392,7 @@ sub maxval_DoParse($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$rowlist|$device|$reading|$rt|0";
+ return "$name|$rowlist|$device|$reading|$rt|0|$irowdone";
 }
 
 ####################################################################################################
@@ -2362,16 +2401,17 @@ sub maxval_DoParse($) {
 sub maxval_ParseDone($) {
   my ($string) = @_;
   my @a = split("\\|",$string);
-  my $hash = $defs{$a[0]};
-  my $name = $hash->{NAME};
-  my $rowlist    = decode_base64($a[1]);
-  my $device     = $a[2];
-     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
-  my $reading    = $a[3];
-     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
-  my $bt         = $a[4];
-  my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[5]?decode_base64($a[5]):undef;
+  my $hash      = $defs{$a[0]};
+  my $name      = $hash->{NAME};
+  my $rowlist   = decode_base64($a[1]);
+  my $device    = $a[2];
+     $device    =~ s/[^A-Za-z\/\d_\.-]/\//g;
+  my $reading   = $a[3];
+     $reading   =~ s/[^A-Za-z\/\d_\.-]/\//g;
+  my $bt        = $a[4];
+  my ($rt,$brt) = split(",", $bt);
+  my $err       = $a[5]?decode_base64($a[5]):undef;
+  my $irowdone  = $a[6];
   my $reading_runtime_string;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall maxval_ParseDone");
@@ -2413,6 +2453,7 @@ sub maxval_ParseDone($) {
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, defined($rv)?sprintf("%.4f",$rv):"-");
   }
   
+  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
 
@@ -2427,7 +2468,7 @@ return;
 ####################################################################################################
 sub minval_DoParse($) {
  my ($string) = @_;
- my ($name, $device, $reading, $ts) = split("\\§", $string);
+ my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -2446,7 +2487,7 @@ sub minval_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err";
+     return "$name|''|$device|$reading|''|$err|''";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -2473,7 +2514,7 @@ sub minval_DoParse($) {
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
      Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err";
+     return "$name|''|$device|$reading|''|$err|''";
  }
  
  # SQL-Startzeit
@@ -2505,7 +2546,7 @@ sub minval_DoParse($) {
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
-         return "$name|''|$device|$reading|''|$err";
+         return "$name|''|$device|$reading|''|$err|''";
      } 
          
      my @array= map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };
@@ -2555,7 +2596,7 @@ sub minval_DoParse($) {
          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in minValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
          $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
          Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
-         return "$name|''|$device|$reading|''|$err";
+         return "$name|''|$device|$reading|''|$err|''";
      }
       
      Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value");
@@ -2584,8 +2625,22 @@ sub minval_DoParse($) {
      Log3 ($name, 5, "runtimestring Key: $key, value: ".$rh{$key}); 
  }
      
- # Ergebnishash als Einzeiler zurückgeben
+ # Ergebnishash als Einzeiler zurückgeben bzw. an Schreibroutine übergeben
  my $rows = join('§', %rh); 
+ 
+ # Ergebnisse in Datenbank schreiben
+ my ($wrt,$irowdone);
+ if($prop =~ /writeToDB/) {
+     ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$rows,"min");
+     if ($err) {
+         Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
+         $err = encode_base64($err,"");
+         Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
+         return "$name|''|$device|$reading|''|$err|''";
+     }
+     $rt = $rt+$wrt;
+ }
+ 
  my $rowlist = encode_base64($rows,"");
   
  Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
@@ -2595,7 +2650,7 @@ sub minval_DoParse($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$rowlist|$device|$reading|$rt|0";
+ return "$name|$rowlist|$device|$reading|$rt|0|$irowdone";
 }
 
 ####################################################################################################
@@ -2606,14 +2661,15 @@ sub minval_ParseDone($) {
   my @a = split("\\|",$string);
   my $hash = $defs{$a[0]};
   my $name = $hash->{NAME};
-  my $rowlist    = decode_base64($a[1]);
-  my $device     = $a[2];
-     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
-  my $reading    = $a[3];
-     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
-  my $bt         = $a[4];
-  my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[5]?decode_base64($a[5]):undef;
+  my $rowlist   = decode_base64($a[1]);
+  my $device    = $a[2];
+     $device    =~ s/[^A-Za-z\/\d_\.-]/\//g;
+  my $reading   = $a[3];
+     $reading   =~ s/[^A-Za-z\/\d_\.-]/\//g;
+  my $bt        = $a[4];
+  my ($rt,$brt) = split(",", $bt);
+  my $err       = $a[5]?decode_base64($a[5]):undef;
+  my $irowdone  = $a[6];
   my $reading_runtime_string;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall minval_ParseDone");
@@ -2655,6 +2711,7 @@ sub minval_ParseDone($) {
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, defined($rv)?sprintf("%.4f",$rv):"-");
   }
   
+  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
 
@@ -2669,7 +2726,7 @@ return;
 ####################################################################################################
 sub diffval_DoParse($) {
  my ($string) = @_;
- my ($name, $device, $reading, $ts) = split("\\§", $string);
+ my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -2690,7 +2747,7 @@ sub diffval_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
-     return "$name|''|$device|$reading|''|''|''|$err";
+     return "$name|''|$device|$reading|''|''|''|$err|''";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -2749,7 +2806,7 @@ sub diffval_DoParse($) {
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
-         return "$name|''|$device|$reading|''|''|''|$err";
+         return "$name|''|$device|$reading|''|''|''|$err|''";
      }
 	 
      if ($IsTimeSet || $IsAggrSet) {
@@ -2762,7 +2819,7 @@ sub diffval_DoParse($) {
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
-         return "$name|''|$device|$reading|''|''|''|$err";
+         return "$name|''|$device|$reading|''|''|''|$err|''";
      
 	 } else {
 		 if($dbmodel eq "MYSQL") {
@@ -2852,7 +2909,7 @@ sub diffval_DoParse($) {
           Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
           $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
           Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
-          return "$name|''|$device|$reading|''|''|''|$err";
+          return "$name|''|$device|$reading|''|''|''|$err|''";
       }
 
       Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, \nTIMESTAMP: $timestamp, VALUE: $value, DIFF: $diff");
@@ -2923,9 +2980,24 @@ sub diffval_DoParse($) {
   
  # Ergebnishash als Einzeiler zurückgeben
  # ignorierte Zeilen ($diff > $difflimit)
- my $rowsrej      = encode_base64($rejectstr,"") if($rejectstr);
+ my $rowsrej = encode_base64($rejectstr,"") if($rejectstr);
+ 
  # Ergebnishash  
- my $rows = join('§', %rh); 
+ my $rows = join('§', %rh);
+
+ # Ergebnisse in Datenbank schreiben
+ my ($wrt,$irowdone);
+ if($prop =~ /writeToDB/) {
+     ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$rows,"diff");
+     if ($err) {
+         Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
+         $err = encode_base64($err,"");
+         Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
+         return "$name|''|$device|$reading|''|''|''|$err|''";
+     }
+     $rt = $rt+$wrt;
+ }
+ 
  my $rowlist = encode_base64($rows,"");
   
  Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
@@ -2935,7 +3007,7 @@ sub diffval_DoParse($) {
  
  $rt = $rt.",".$brt;
  
- return "$name|$rowlist|$device|$reading|$rt|$rowsrej|$ncpslist|0";
+ return "$name|$rowlist|$device|$reading|$rt|$rowsrej|$ncpslist|0|$irowdone";
 }
 
 ####################################################################################################
@@ -2956,6 +3028,7 @@ sub diffval_ParseDone($) {
   my $rowsrej    = $a[5]?decode_base64($a[5]):undef;     # String von Datensätzen die nicht berücksichtigt wurden (diff Schwellenwert Überschreitung)
   my $ncpslist   = decode_base64($a[6]);                 # Hash von Perioden die nicht kalkuliert werden konnten "no calc in period" 
   my $err        = $a[7]?decode_base64($a[7]):undef;
+  my $irowdone   = $a[8];
   my $reading_runtime_string;
   my $difflimit  = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptoert werden (Ausreißer eliminieren)AttrVal($name, "diffAccept", "20");
   
@@ -3014,6 +3087,7 @@ sub diffval_ParseDone($) {
     
   }
 
+  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateValue ($hash, "diff_overrun_limit_".$difflimit, $rowsrej) if($rowsrej);
   ReadingsBulkUpdateValue ($hash, "less_data_in_period", $ncpstr) if($ncpstr);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,($ncpstr||$rowsrej)?"Warning":"done");
@@ -3031,7 +3105,7 @@ return;
 ####################################################################################################
 sub sumval_DoParse($) {
  my ($string) = @_;
- my ($name, $device, $reading, $ts) = split("\\§", $string);
+ my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -3050,7 +3124,7 @@ sub sumval_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err";
+     return "$name|''|$device|$reading|''|$err|''";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -3088,7 +3162,7 @@ sub sumval_DoParse($) {
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
      Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err";
+     return "$name|''|$device|$reading|''|$err|''";
  }
 	
  # SQL-Startzeit
@@ -3118,7 +3192,7 @@ sub sumval_DoParse($) {
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
-         return "$name|''|$device|$reading|''|$err";
+         return "$name|''|$device|$reading|''|$err|''";
      }
 	 
      # DB-Abfrage -> Ergebnis in @arr aufnehmen
@@ -3133,14 +3207,27 @@ sub sumval_DoParse($) {
          my @rsf = split(" ",$runtime_string_first);
          $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|"; 
      }
- }  
+ }
 
  $sth->finish;
  $dbh->disconnect;
  
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
-
+ 
+ # Ergebnisse in Datenbank schreiben
+ my ($wrt,$irowdone);
+ if($prop =~ /writeToDB/) {
+     ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$arrstr,"sum");
+     if ($err) {
+         Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
+         $err = encode_base64($err,"");
+         Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
+         return "$name|''|$device|$reading|''|$err|''";
+     }
+     $rt = $rt+$wrt;
+ }
+  
  # Daten müssen als Einzeiler zurückgegeben werden
  $arrstr = encode_base64($arrstr,"");
  
@@ -3151,7 +3238,7 @@ sub sumval_DoParse($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$arrstr|$device|$reading|$rt|0";
+ return "$name|$arrstr|$device|$reading|$rt|0|$irowdone";
 }
 
 ####################################################################################################
@@ -3170,6 +3257,7 @@ sub sumval_ParseDone($) {
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
+  my $irowdone   = $a[6];
   my $reading_runtime_string;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall sumval_ParseDone");
@@ -3206,6 +3294,7 @@ sub sumval_ParseDone($) {
 	  ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
   }
   
+  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
   
@@ -6170,6 +6259,7 @@ sub DumpDone($) {
   ReadingsBulkUpdateValue($hash, "DumpRowsCurrrent", $drc);
   ReadingsBulkUpdateValue($hash, "DumpRowsHistory", $drh);
   ReadingsBulkUpdateValue($hash, "FTP_Message", $ftp) if($ftp);
+  ReadingsBulkUpdateValue($hash, "background_processing_time", sprintf("%.4f",$brt));
   readingsEndUpdate($hash, 1);
 
   # Befehl nach Procedure ausführen
@@ -6177,7 +6267,7 @@ sub DumpDone($) {
   
   my $state = $erread?$erread:"Database backup finished";
   readingsBeginUpdate($hash);
-  ReadingsBulkUpdateTimeState($hash,$brt,undef,$state);
+  ReadingsBulkUpdateTimeState($hash,undef,undef,$state);
   readingsEndUpdate($hash, 1);
 
   Log3 ($name, 3, "DbRep $name - Database dump finished successfully. ");
@@ -6894,7 +6984,7 @@ return;
 ####################################################################################################
 #                 delete Readings before new operation
 ####################################################################################################
-sub delread($) {
+sub DbRep_delread($) {
  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
  my ($hash) = @_;
  my $name   = $hash->{NAME};
@@ -7258,6 +7348,237 @@ sub calcount ($$) {
 return \%ncp;
 }
 
+####################################################################################################
+#                         Funktionsergebnisse in Datenbank schreiben
+####################################################################################################
+sub DbRep_OutputWriteToDB($$$$$) {
+  my ($name,$device,$reading,$arrstr,$optxt) = @_;
+  my $hash       = $defs{$name};
+  my $dbloghash  = $hash->{dbloghash};
+  my $dbconn     = $dbloghash->{dbconn};
+  my $dbuser     = $dbloghash->{dbuser};
+  my $dblogname  = $dbloghash->{NAME};
+  my $dbmodel    = $hash->{dbloghash}{MODEL};
+  my $DbLogType  = AttrVal($hash->{dbloghash}{NAME}, "DbLogType", "History");
+  my $supk       = AttrVal($hash->{dbloghash}{NAME}, "noSupportPK", 0);
+  my $dbpassword = $attr{"sec$dblogname"}{secret};
+  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  $device        =~ s/[^A-Za-z\/\d_\.-]/\//g;
+  $reading       =~ s/[^A-Za-z\/\d_\.-]/\//g;
+  my $type       = "calculated";
+  my $event      = "calculated";
+  my $unit       = "";
+  my $wrt        = 0;
+  my $irowdone   = 0;
+  my ($dbh,$sth_ih,$sth_uh,$sth_ic,$sth_uc,$err,$timestamp,$value,$date,$time,$rsf,$aggr,@row_array);
+  
+  if(!$hash->{dbloghash}{HELPER}{COLSET}) {
+      $err = "No result of \"$hash->{LASTCMD}\" to database written. Cause: column width in \"$hash->{DEF}\" isn't set";
+      return ($wrt,$irowdone,$err);
+  }
+  
+  no warnings 'uninitialized';
+  (undef,undef,$aggr) = checktimeaggr($hash);
+  $reading = $optxt."_".$aggr."_".$reading;
+  
+  $type = $defs{$device}{TYPE} if($defs{$device});                # $type vom Device ableiten
+  
+  if($optxt =~ /avg|sum/) {
+      my @arr = split("\\|", $arrstr);
+      foreach my $row (@arr) {
+          my @a              = split("#", $row);
+          my $runtime_string = $a[0];                             # Aggregations-Alias (nicht benötigt)
+          $value             = $a[1]?sprintf("%.4f",$a[1]):undef;
+          $rsf               = $a[2];                             # Datum / Zeit für DB-Speicherung
+          ($date,$time)      = split("_",$rsf);
+          $time              =~ s/-/:/g if($time);
+          
+          if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
+              if($aggr =~ /no|day|week|month/) {
+                  $time = "23:59:58";
+              } elsif ($aggr =~ /hour/) {
+                  $time = "$time:59:58";
+              }
+          }
+          if ($value) {
+              # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
+              ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($hash->{dbloghash},$device,$type,$event,$reading,$value,$unit);
+              push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");             
+          } 
+      }
+  }
+
+  if($optxt =~ /min|max|diff/) { 
+      my %rh = split("§", $arrstr);
+      foreach my $key (sort(keys(%rh))) {
+          my @k         = split("\\|",$rh{$key});
+          $rsf          = $k[2];                               # Datum / Zeit für DB-Speicherung
+          $value        = $k[1]?sprintf("%.4f",$k[1]):undef;
+          ($date,$time) = split("_",$rsf);
+          $time         =~ s/-/:/g if($time);
+      
+          if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
+              if($aggr =~ /no|day|week|month/) {
+                  $time = "23:59:58";
+              } elsif ($aggr =~ /hour/) {
+                  $time = "$time:59:58";
+              }
+          }
+          if ($value) {
+              # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
+              ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($hash->{dbloghash},$device,$type,$event,$reading,$value,$unit);
+              push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");             
+          } 
+      }
+  }  
+  
+  if (@row_array) {
+      # Schreibzyklus aktivieren
+      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, mysql_enable_utf8 => $utf8 });};
+      if ($@) {
+          $err = $@;
+          Log3 ($name, 2, "DbRep $name - $@");
+          return ($wrt,$irowdone,$err);
+      }
+       
+      # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
+      my ($usepkh,$usepkc,$pkh,$pkc);
+      if (!$supk) {
+          ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbh);
+      } else {
+          Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key usage suppressed by attribute noSupportPK in DbLog \"$dblogname\"";
+      }
+      
+      if (lc($DbLogType) =~ m(history)) {
+          # insert history mit/ohne primary key
+          if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
+              eval { $sth_ih = $dbh->prepare_cached("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+          } elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
+              eval { $sth_ih = $dbh->prepare_cached("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+          } elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+              eval { $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
+          } else {
+              eval { $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+          }
+          if ($@) {
+              $err = $@;
+              Log3 ($name, 2, "DbRep $name - $@");
+              return ($wrt,$irowdone,$err);
+          }
+		  # update history mit/ohne primary key
+          if ($usepkh && $hash->{MODEL} eq 'MYSQL') {
+		      $sth_uh = $dbh->prepare("REPLACE INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?)"); 
+	      } elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {  
+		      $sth_uh = $dbh->prepare("INSERT OR REPLACE INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?)");
+	      } elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
+		      $sth_uh = $dbh->prepare("INSERT INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
+		                               DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
+								       VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
+	      } else {
+	          $sth_uh = $dbh->prepare("UPDATE history SET TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (TIMESTAMP=?) AND (DEVICE=?) AND (READING=?)");
+	      }
+      }
+      
+      if (lc($DbLogType) =~ m(current) ) {
+          # insert current mit/ohne primary key
+	      if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
+              eval { $sth_ic = $dbh->prepare("INSERT IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };	  
+	      } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
+	          eval { $sth_ic = $dbh->prepare("INSERT OR IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+	      } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
+	          eval { $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
+	      } else {
+	          # old behavior
+	          eval { $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+	      }
+          if ($@) {
+              $err = $@;
+              Log3 ($name, 2, "DbRep $name - $@");
+              return ($wrt,$irowdone,$err);
+          }
+	      # update current mit/ohne primary key
+          if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
+		      $sth_uc = $dbh->prepare("REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); 
+	      } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {  
+		      $sth_uc = $dbh->prepare("INSERT OR REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+	      } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
+		      $sth_uc = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
+		                               DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
+								       VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
+	      } else {
+	          $sth_uc = $dbh->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
+	      }
+      }
+      
+      eval { $dbh->begin_work() if($dbh->{AutoCommit}); };
+      if ($@) {
+          Log3($name, 2, "DbRep $name -> Error start transaction for history - $@");
+      }
+      
+      Log3 $hash->{NAME}, 5, "DbRep $name - data prepared to db write:"; 
+      
+      # SQL-Startzeit
+      my $wst = [gettimeofday]; 
+      
+	  my $ihs = 0;
+	  my $uhs = 0;
+      foreach my $row (@row_array) {
+          my @a = split("\\|",$row);
+          $timestamp = $a[0];
+          $device    = $a[1];
+          $type      = $a[2];
+          $event     = $a[3];
+          $reading   = $a[4];
+          $value     = $a[5];
+          $unit      = $a[6];
+          Log3 $hash->{NAME}, 5, "DbRep $name - $row";
+          
+          eval {
+              # update oder insert history
+              if (lc($DbLogType) =~ m(history) ) {
+                  my $rv_uh = $sth_uh->execute($type,$event,$value,$unit,$timestamp,$device,$reading); 
+				  if ($rv_uh == 0) {
+				      $sth_ih->execute($timestamp,$device,$type,$event,$reading,$value,$unit);
+					  $ihs++; 
+				  } else {
+				      $uhs++;
+				  }
+              }
+              # update oder insert current
+              if (lc($DbLogType) =~ m(current) ) {
+                  my $rv_uc = $sth_uc->execute($timestamp,$type,$event,$value,$unit,$device,$reading);
+                  if ($rv_uc == 0) {
+                      $sth_ic->execute($timestamp,$device,$type,$event,$reading,$value,$unit);
+                  }
+              }
+          };
+ 
+          if ($@) {
+              $err = $@;
+              Log3 ($name, 2, "DbRep $name - $@");
+              $dbh->rollback;
+              $dbh->disconnect;
+	          $ihs = 0;
+	          $uhs = 0;
+              return ($wrt,0,$err);
+          } else {
+              $irowdone++;
+          }
+      }    
+      
+      eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+      $dbh->disconnect;
+      
+	  Log3 $hash->{NAME}, 3, "DbRep $name - number of lines updated in \"$dblogname\": $uhs"; 
+      Log3 $hash->{NAME}, 3, "DbRep $name - number of lines inserted into \"$dblogname\": $ihs"; 
+      
+      # SQL-Laufzeit ermitteln
+      $wrt = tv_interval($wst);
+  } 
+  
+return ($wrt,$irowdone,$err);
+}
+
 ################################################################
 # check ob primary key genutzt wird
 ################################################################
@@ -7278,8 +7599,8 @@ sub DbRep_checkUsePK ($$){
   $pkc =~ tr/"//d;
   $upkh = 1 if(@pkh && @pkh ne "none");
   $upkc = 1 if(@pkc && @pkc ne "none");
-  Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.history: $pkh";
-  Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.current: $pkc";
+  Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key used in $db.history: $pkh";
+  Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key used in $db.current: $pkc";
 
 return ($upkh,$upkc,$pkh,$pkc);
 }
@@ -7355,7 +7676,8 @@ return;
      <li> Exposure of datasets of a Device/Reading-combination within adjustable time limits. </li>
      <li> Selecion of datasets by usage of dynamically calclated time limits at execution time. </li>
      <li> Calculation of quantity of datasets of a Device/Reading-combination within adjustable time limits and several aggregations. </li>
-     <li> The calculation of summary- , difference- , maximum- , minimum- and averageValues of numeric readings within adjustable time limits and several aggregations. </li>
+     <li> The calculation of summary-, difference-, maximum-, minimum- and averageValues of numeric readings within adjustable time limits and several aggregations. </li>
+     <li> write back results of summary-, difference-, maximum-, minimum- and average calculation into the database </li>
      <li> The deletion of datasets. The containment of deletion can be done by Device and/or Reading as well as fix or dynamically calculated time limits at execution time. </li>
      <li> export of datasets to file (CSV-format). </li>
      <li> import of datasets from file (CSV-Format). </li>
@@ -7434,8 +7756,26 @@ return;
  <br><br>
  
  <ul><ul>
-    <li><b> averageValue </b> -  calculates the average value of readingvalues DB-column "VALUE") between period given by timestamp-<a href="#DbRepattr">attributes</a> which are set. 
-                                 The reading to evaluate must be defined using attribute "reading".  </li> <br>
+    <li><b> averageValue [display | writeToDB]</b> 
+                                 - calculates the average value of database column "VALUE" between period given by 
+                                 timestamp-<a href="#DbRepattr">attributes</a> which are set. 
+                                 The reading to evaluate must be specified using attribute "reading".  <br>
+                                 
+                                 Is no or the option "display" specified, the results are only displayed. Using 
+                                 option "writeToDB" the calculated results are stored in the database with a new reading
+                                 name. <br>
+                                 The new readingname is built of a prefix and the original reading name. 
+                                 The prefix is made up of the creation function and the aggregation. <br>
+                                 The timestamp of the new stored readings is deviated from aggregation period, 
+                                 unless no unique point of time of the result can be determined. 
+                                 The field "EVENT" will be filled with "calculated".<br><br>
+                                 
+                                 <ul>
+                                 <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
+                                 avg_day_totalpac <br>
+                                 # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>                         
+                                 </ul>
+                                 </li><br>
                                  
     <li><b> countEntries [history|current] </b> -  provides the number of table-entries (default: history) between period set 
 	                                               by timestamp-<a href="#DbRepattr">attributes</a> if set. 
@@ -7540,7 +7880,9 @@ return;
                                  </li> <br>
                                  </ul>     
     
-    <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
+    <li><b> diffValue [display | writeToDB]</b>    
+                                 - calculates the difference of database column "VALUE" between period given by 
+                                 <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
                                  The reading to evaluate must be defined using attribute "reading". 
                                  This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. 
                                  The difference will be generated from the first available dataset (VALUE-Field) to the last available dataset between the 
@@ -7560,8 +7902,24 @@ return;
                                  at the beginning and one dataset at the end of each aggregation period to take the difference calculation as much as possible.
                                  <br>
                                  <br>
-                                 </li>
                                  </ul>
+                                 
+                                 Is no or the option "display" specified, the results are only displayed. Using 
+                                 option "writeToDB" the calculation results are stored in the database with a new reading
+                                 name. <br>
+                                 The new readingname is built of a prefix and the original reading name. 
+                                 The prefix is made up of the creation function and the aggregation. <br>
+                                 The timestamp of the new stored readings is deviated from aggregation period, 
+                                 unless no unique point of time of the result can be determined. 
+                                 The field "EVENT" will be filled with "calculated".<br><br>
+                                 
+                                 <ul>
+                                 <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
+                                 diff_day_totalpac <br>
+                                 # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>   
+                                 </ul>								 
+                                 </li><br>
+                                 
 
   <li><b> dumpMySQL [clientSide | serverSide]</b>    
 	                             -  creates a dump of the connected MySQL database.  <br>
@@ -7770,13 +8128,51 @@ return;
                                  </li> <br>
                                  </ul>    
     
-    <li><b> maxValue </b>     -  calculates the maximum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
+    <li><b> maxValue [display | writeToDB]</b>     
+                                 - calculates the maximum value of database column "VALUE" between period given by 
+                                 <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
                                  The reading to evaluate must be defined using attribute "reading". 
-                                 The evaluation contains the timestamp of the <b>last</b> appearing of the identified maximum value within the given period.  </li> <br>
+                                 The evaluation contains the timestamp of the <b>last</b> appearing of the identified maximum value 
+                                 within the given period.  <br>
                                  
-    <li><b> minValue </b>     -  calculates the miniimum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
+                                 Is no or the option "display" specified, the results are only displayed. Using 
+                                 option "writeToDB" the calculated results are stored in the database with a new reading
+                                 name. <br>
+                                 The new readingname is built of a prefix and the original reading name. 
+                                 The prefix is made up of the creation function and the aggregation. <br>
+                                 The timestamp of the new stored readings is deviated from aggregation period, 
+                                 unless no unique point of time of the result can be determined. 
+                                 The field "EVENT" will be filled with "calculated".<br><br>
+                                 
+                                 <ul>
+                                 <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
+                                 max_day_totalpac <br>
+                                 # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>                         
+                                 </ul>
+                                 </li><br>
+                                 
+    <li><b> minValue [display | writeToDB]</b>     
+                                 - calculates the minimum value of database column "VALUE" between period given by 
+                                 <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
                                  The reading to evaluate must be defined using attribute "reading". 
-                                 The evaluation contains the timestamp of the <b>first</b> appearing of the identified minimum value within the given period.  </li> <br>    
+                                 The evaluation contains the timestamp of the <b>first</b> appearing of the identified minimum 
+                                 value within the given period.  <br>
+                                 
+                                 Is no or the option "display" specified, the results are only displayed. Using 
+                                 option "writeToDB" the calculated results are stored in the database with a new reading
+                                 name. <br>
+                                 The new readingname is built of a prefix and the original reading name. 
+                                 The prefix is made up of the creation function and the aggregation. <br>
+                                 The timestamp of the new stored readings is deviated from aggregation period, 
+                                 unless no unique point of time of the result can be determined. 
+                                 The field "EVENT" will be filled with "calculated".<br><br>
+                                 
+                                 <ul>
+                                 <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
+                                 min_day_totalpac <br>
+                                 # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>                         
+                                 </ul>
+                                 </li><br>   
 
 	<li><b> optimizeTables </b> - optimize tables in the connected database (MySQL). <br>
 							      Before and after an optimization it is possible to execute a FHEM command. 
@@ -7863,11 +8259,29 @@ return;
 								 </li><br>
                                  </ul>  								 
 
-	<li><b> sumValue </b>     -  calculates the amount of readingvalues DB-column "VALUE") between period given by 
+	<li><b> sumValue [display | writeToDB]</b>     
+                                 - calculates the summary of database column "VALUE" between period given by 
 	                             <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or 
 								 "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute
 								 "reading". Using this function is mostly reasonable if value-differences of readings 
-								 are written to the database. </li> <br> 
+								 are written to the database. <br>
+
+                                 Is no or the option "display" specified, the results are only displayed. Using 
+                                 option "writeToDB" the calculation results are stored in the database with a new reading
+                                 name. <br>
+                                 The new readingname is built of a prefix and the original reading name. 
+                                 The prefix is made up of the creation function and the aggregation. <br>
+                                 The timestamp of the new stored readings is deviated from aggregation period, 
+                                 unless no unique point of time of the result can be determined. 
+                                 The field "EVENT" will be filled with "calculated".<br><br>
+                                 
+                                 <ul>
+                                 <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
+                                 sum_day_totalpac <br>
+                                 # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>                         
+                                 </li> <br>
+                                 </ul>
+                                 </li> <br>
 		
 	<li><b> tableCurrentFillup </b> - the current-table will be filled u with an extract of the history-table.  
 	                                  The <a href="#DbRepattr">attributes</a> for limiting time and device, reading are considered.
@@ -8559,8 +8973,9 @@ sub bdump {
      <li> Selektion der Datensätze unter Verwendung von dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt. </li>
      <li> Berechnung der Anzahl von Datensätzen einer Device/Reading-Kombination unter Berücksichtigung von Zeitgrenzen 
 	      und verschiedenen Aggregationen. </li>
-     <li> Die Berechnung von Summen- , Differenz- , Maximum- , Minimum- und Durchschnittswerten von numerischen Readings 
+     <li> Die Berechnung von Summen-, Differenz-, Maximum-, Minimum- und Durchschnittswerten numerischer Readings 
 	      in Zeitgrenzen und verschiedenen Aggregationen. </li>
+     <li> Speichern von Summen-, Differenz- , Maximum- , Minimum- und Durchschnittswertberechnungen in der Datenbank </li>
      <li> Löschung von Datensätzen. Die Eingrenzung der Löschung kann durch Device und/oder Reading sowie fixer oder 
 	      dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt erfolgen. </li>
      <li> Export von Datensätzen in ein File im CSV-Format </li>
@@ -8640,18 +9055,35 @@ sub bdump {
  <br><br>
  
  <ul><ul>
-    <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den gegebenen 
+    <li><b> averageValue [display | writeToDB]</b> 
+                                 - berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den gegebenen 
 	                             Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
                                  Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
-								 angegeben sein.  </li> <br>
+								 angegeben sein. <br>
+                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
+                                 in der Datenbank gespeichert. <br>
+                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
+                                 Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
+                                 Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
+                                 abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
+                                 Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
+                                 
+                                 <ul>
+                                 <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
+                                 avg_day_totalpac <br>
+                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
+                                 </li> <br>
+                                 </ul>
 
     <li><b> cancelDump </b>   -  bricht einen laufenden Datenbankdump ab. </li> <br>
 								 
-    <li><b> countEntries [history | current] </b> -  liefert die Anzahl der Tabelleneinträge (default: history) in den gegebenen 
-	                                               Zeitgrenzen (siehe <a href="#DbRepattr">Attribute</a>). 
-                                                   Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. 
-                                                   Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading 
-												   gehen in die Selektion mit ein.  </li> <br>
+    <li><b> countEntries [history | current] </b> 
+                                 -  liefert die Anzahl der Tabelleneinträge (default: history) in den gegebenen 
+	                             Zeitgrenzen (siehe <a href="#DbRepattr">Attribute</a>). 
+                                 Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. 
+                                 Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading 
+								 gehen in die Selektion mit ein.  </li> <br>
 
     <li><b> delEntries </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder 
 	                             reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt 
@@ -8756,7 +9188,8 @@ sub bdump {
                                  </li> <br>
                                  </ul>
           
-    <li><b> diffValue </b>    -  berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow / timeOlderThan". 
+    <li><b> diffValue [display | writeToDB] </b>    
+                                 - berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow / timeOlderThan". 
                                  Es muss das auszuwertende Reading im Attribut "reading" angegeben sein. 
                                  Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. <br>								 
                                  Es wird immer die Differenz aus dem Value-Wert des ersten verfügbaren Datensatzes und dem Value-Wert des letzten verfügbaren Datensatzes innerhalb der angegebenen
@@ -8775,7 +9208,21 @@ sub bdump {
                                  der Differenzwerte vornehmen zu können.
                                  <br>
                                  <br>
-                                 </li>
+                                 </ul>
+                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
+                                 in der Datenbank gespeichert. <br>
+                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
+                                 Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
+                                 Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
+                                 abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
+                                 Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
+                                 
+                                 <ul>
+                                 <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
+                                 diff_day_totalpac <br>
+                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
+                                 </li> <br>
                                  </ul>
 
     <li><b> dumpMySQL [clientSide | serverSide]</b>    
@@ -8940,11 +9387,12 @@ sub bdump {
                                  exportiert werden sollen und vermeidet den "died prematurely" Abbruchfehler.                                 
                                  </li><br>
         
-    <li><b> fetchrows [history|current] </b>    -  liefert <b>alle</b> Tabelleneinträge (default: history) 
-	                                               in den gegebenen Zeitgrenzen (siehe <a href="#DbRepattr">Attribute</a>). 
-                                                   Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt. <br>
-												   Die Leserichtung in der Datenbank kann durch das <a href="#DbRepattr">Attribut</a> 
-												   "fetchRoute" bestimmt werden. <br><br>
+    <li><b> fetchrows [history|current] </b>    
+                                 -  liefert <b>alle</b> Tabelleneinträge (default: history) 
+	                             in den gegebenen Zeitgrenzen (siehe <a href="#DbRepattr">Attribute</a>). 
+                                 Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt. <br>
+								 Die Leserichtung in der Datenbank kann durch das <a href="#DbRepattr">Attribut</a> 
+								 "fetchRoute" bestimmt werden. <br><br>
 
 								 <b>Hinweis:</b> <br>
                                  Auch wenn das Modul bezüglich der Datenbankabfrage nichtblockierend arbeitet, kann eine 
@@ -8992,23 +9440,59 @@ sub bdump {
                                  </li> <br>
                                  </ul>    
     
-    <li><b> maxValue </b>     -  berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
+    <li><b> maxValue [display | writeToDB] </b>     
+                                 - berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
 	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
                                  Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
 								 angegeben sein. 
                                  Die Auswertung enthält den Zeitstempel des ermittelten Maximumwertes innerhalb der 
 								 Aggregation bzw. Zeitgrenzen.  
                                  Im Reading wird der Zeitstempel des <b>letzten</b> Auftretens vom Maximalwert ausgegeben
-								 falls dieser Wert im Intervall mehrfach erreicht wird. </li> <br>
+								 falls dieser Wert im Intervall mehrfach erreicht wird. <br>
                                  
-    <li><b> minValue </b>     -  berechnet den Minimalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
+                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
+                                 in der Datenbank gespeichert. <br>
+                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
+                                 Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
+                                 Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
+                                 abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
+                                 Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
+                                 
+                                 <ul>
+                                 <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
+                                 max_day_totalpac <br>
+                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
+                                 </li> <br>
+                                 </ul>                                
+                                 </li> <br>
+                                 
+    <li><b> minValue [display | writeToDB]</b>     
+                                 - berechnet den Minimalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
 	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
                                  Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
 								 angegeben sein. 
                                  Die Auswertung enthält den Zeitstempel des ermittelten Minimumwertes innerhalb der 
 								 Aggregation bzw. Zeitgrenzen.  
                                  Im Reading wird der Zeitstempel des <b>ersten</b> Auftretens vom Minimalwert ausgegeben 
-								 falls dieser Wert im Intervall mehrfach erreicht wird. </li> <br>
+								 falls dieser Wert im Intervall mehrfach erreicht wird. <br>
+                                 
+                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
+                                 in der Datenbank gespeichert. <br>
+                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
+                                 Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
+                                 Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
+                                 abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
+                                 Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
+                                 
+                                 <ul>
+                                 <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
+                                 min_day_totalpac <br>
+                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
+                                 </li> <br>
+                                 </ul>                                 
+                                 </li> <br>
 								 
 	<li><b> optimizeTables </b> - optimiert die Tabellen in der angeschlossenen Datenbank (MySQL). <br>
 								  Vor und nach der Optimierung kann ein FHEM-Kommando ausgeführt werden. 
@@ -9098,11 +9582,29 @@ sub bdump {
 								 
                                  </ul>
 								 
-    <li><b> sumValue </b>     -  berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
+    <li><b> sumValue [display | writeToDB]</b>     
+                                 - berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
 	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
                                  Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" 
 								 angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
-								 Readings in die Datenbank geschrieben werden.  </li> <br>
+								 Readings in die Datenbank geschrieben werden.  <br>
+                                 
+                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
+                                 in der Datenbank gespeichert. <br>
+                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
+                                 Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
+                                 Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
+                                 abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
+                                 Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
+                                 
+                                 <ul>
+                                 <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
+                                 sum_day_totalpac <br>
+                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
+                                 </li> <br>
+                                 </ul>
+                                 </li> <br>
 								 
 	<li><b> tableCurrentFillup </b> - Die current-Tabelle wird mit einem Extrakt der history-Tabelle aufgefüllt. 
 	                                  Die <a href="#DbRepattr">Attribute</a> zur Zeiteinschränkung bzw. device, reading werden ausgewertet.
