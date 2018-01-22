@@ -5162,7 +5162,7 @@ ZWave_fhemwebFn($$$$)
   return
   "<div id='ZWHelp' class='makeTable help'></div>$pl".
   '<script type="text/javascript">'.
-   "var d='$d', FW_tp='$FW_tp';" . <<'JSEND'
+   "var zwaveDevice='$d', FW_tp='$FW_tp';" . <<'JSEND'
     $(document).ready(function() {
       $("div#ZWHelp").insertBefore("div.makeTable.internals"); // Move
       $("div.detLink.ZWPepper").insertAfter("div.detLink.devSpecHelp");
@@ -5172,7 +5172,7 @@ ZWave_fhemwebFn($$$$)
           $("div#ZWHelp").html(val);
         }
         $(this).change(function(){
-          FW_queryValue('{ZWave_helpFn("'+d+'","'+$(this).val()+'")}',
+          FW_queryValue('{ZWave_helpFn("'+zwaveDevice+'","'+$(this).val()+'")}',
                         $(this).get(0));
         });
       });
