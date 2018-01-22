@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.7.0      21.01.2018       parsed event with Log 5 added, configCheck enhanced by configuration read check
 # 3.6.5      19.01.2018       fix lot of logentries if disabled and db not available
 # 3.6.4      17.01.2018       improve DbLog_Shutdown, extend configCheck by shutdown preparation check
 # 3.6.3      14.01.2018       change verbose level of addlog "no Reading of device ..." message from 2 to 4 
@@ -178,7 +179,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.6.5";
+my $DbLogVersion = "3.7.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -1173,7 +1174,7 @@ sub DbLog_Log($$) {
       Log3 $name, 4, "DbLog $name -> ################################################################";
       Log3 $name, 4, "DbLog $name -> ###              start of new Logcycle                       ###";
       Log3 $name, 4, "DbLog $name -> ################################################################";
-      Log3 $name, 4, "DbLog $name -> amount of events received: $max for device: $dev_name";
+      Log3 $name, 4, "DbLog $name -> number of events received: $max for device: $dev_name";
   }
   
   # Devices ausschließen durch Attribut "excludeDevs" (nur wenn kein $hash->{NOTIFYDEV} oder $hash->{NOTIFYDEV} = .*)
@@ -1228,7 +1229,8 @@ sub DbLog_Log($$) {
               if(!defined $reading) {$reading = "";}
               if(!defined $value) {$value = "";}
               if(!defined $unit || $unit eq "") {$unit = AttrVal("$dev_name", "unit", "");}
-
+              Log3 $name, 5, "DbLog $name -> parsed Event: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});  
+              
               #Je nach DBLogSelectionMode muss das vorgegebene Ergebnis der Include-, bzw. Exclude-Pruefung
               #entsprechend unterschiedlich vorbelegt sein.
               #keine Readings loggen die in DbLogExclude explizit ausgeschlossen sind
@@ -2909,7 +2911,28 @@ sub DbLog_configcheck($) {
   my $dbmodel = $hash->{MODEL};
   my $dbconn  = $hash->{dbconn};
   my $dbname  = (split(/;|=/, $dbconn))[1];
-  my ($check, $rec);
+  my ($check, $rec,%dbconfig);
+  
+  ### Configuration read check
+  #######################################################################
+  $check  = "<html>";
+  $check .= "<u><b>Result of configuration read check</u></b><br><br>";
+  my $st  = configDBUsed()?"configDB (don't forget upload configutaion file if changed)":"file";
+  $check .= "Connection parameter store type: $st <br>";
+  my ($err, @config) = FileRead($hash->{CONFIGURATION});
+  if (!$err) {
+      eval join("\n", @config);
+      $rec  = "parameter: ";
+      $rec .= "Connection -> could not read, " if (!defined $dbconfig{connection});
+      $rec .= "Connection -> ".$dbconfig{connection}.", " if (defined $dbconfig{connection});
+      $rec .= "User -> could not read, " if (!defined $dbconfig{user});
+      $rec .= "User -> ".$dbconfig{user}.", " if (defined $dbconfig{user});
+      $rec .= "Password -> could not read " if (!defined $dbconfig{password});
+      $rec .= "Password -> read o.k. " if (defined $dbconfig{password});
+  } else {
+      $rec = $err;
+  }
+  $check .= "Connection $rec <br><br>";
   
   ### Connection und Encoding check
   #######################################################################
@@ -2944,7 +2967,6 @@ sub DbLog_configcheck($) {
       $rec = "This is only an information about text encoding used by the main database.";
   }  
   
-  $check  = "<html>";
   $check .= "<u><b>Result of connection check</u></b><br><br>";
   
   if(@ce && @se) {
@@ -2955,7 +2977,7 @@ sub DbLog_configcheck($) {
   if(!@ce || !@se) {
       $check .= "Connection to database was not successful. <br>";
       $check .= "<b>Recommendation:</b> Plese check logfile for further information. <br><br>";
-	  $check .= "</html>";
+	  # $check .= "</html>";
       return $check;
   }
   $check .= "<u><b>Result of encoding check</u></b><br><br>";
@@ -5506,7 +5528,7 @@ sub checkUsePK ($$){
 	  <ul>
       <li>cacheEvents=1: creates events of reading CacheUsage at point of time when a new dataset has been added to the cache. </li>
 	  <li>cacheEvents=2: creates events of reading CacheUsage at point of time when in aychronous mode a new write cycle to the 
-	                     database starts. In that moment CacheUsage contains the amount of datasets which will be written to 
+	                     database starts. In that moment CacheUsage contains the number of datasets which will be written to 
 						 the database. </li><br>
 	  </ul>
     </ul>

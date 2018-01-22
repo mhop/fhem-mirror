@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: V3.7.0, log verbose 5 enhanced, configuration read check
+                       added to configCheck
   - feature: 74_Unifi: new Readings for WLAN-states, fixed Warning
   - feature: 93_DbRep: V7.5.1, new set-options display/writeToDB for 
                        (max|min|sum|average|diff)Value,
