@@ -1,7 +1,7 @@
 "use strict";
 FW_version["f18.js"] = "$Id$";
 
-// TODO: rewrite menu, dashboard, floorplan
+// TODO: rewrite menu, dashboard, floorplan, Firefox-svg-coloring
 var f18_attr, f18_aCol, f18_sd, f18_isMobile, f18_icon={}, f18_move=false;
 var f18_small = (screen.width < 480 || screen.height < 480);
 
@@ -365,8 +365,19 @@ f18_setCss(why)
   style += "div.ui-dialog { border:1px solid #"+cols.link+"; }";
   style += "button.ui-button { background:#"+cols.oddrow+"!important; "+
                               "border:1px solid #"+cols.link+"!important; }\n";
-  $("head style#f18_css").remove();
 
+  if(typeof DashboardDraggable  != "undefined") {
+    var db = "#dashboard ";
+    style += db+".dashboard_widgetheader "+bg(cols.header);
+    style += db+".dashboard_tabnav "+bg(cols.menu+"!important");
+    style += db+".ui-widget-header .ui-state-default "+bg(cols.menu);
+    style += db+".ui-widget-header .ui-state-active "+bg(cols.sel);
+    style += db+".ui-widget-header "+fg(cols.fg+"!important;");
+    style += db+".ui-widget-header li { border:none!important; }";
+    style += db+".ui-widget-content a "+fg(cols.link+"!important" );
+  }
+
+  $("head style#f18_css").remove();
   if(why == 'preset' || why == 'bg') { // Add background to css to avoid flicker
     if(!$("head #fhemweb_css").length)
       $("head").append("<style id='fhemweb_css'>\n</style>");
