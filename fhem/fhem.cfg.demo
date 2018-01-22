@@ -343,3 +343,7 @@ attr Display size 800x600
 attr Display bg ./demolog/pictures
 attr Display tmin 15
 attr Display refresh 5
+
+define rg readingsGroup TYPE=FHEMWEB
+attr rg comment Workaround for the dashboard bug.
+attr rg room hidden
