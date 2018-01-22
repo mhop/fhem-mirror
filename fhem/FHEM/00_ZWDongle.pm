@@ -145,7 +145,7 @@ ZWDongle_Define($$)
     return undef;
 
   } elsif($dev !~ m/@/ && $dev !~ m/:/) {
-    $def .= "\@115200";  # default baudrate
+    $dev .= "\@115200";  # default baudrate
 
   }
 
