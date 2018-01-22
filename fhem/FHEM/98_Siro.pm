@@ -289,7 +289,7 @@ sub Siro_Shutdown($)
 	 readingsSingleUpdate($hash, ".parse_aborted",$hash->{helper}{parse_aborted}, 0);
 	 readingsSingleUpdate($hash, ".positionsave",$hash->{helper}{position}, 0);
 	 readingsSingleUpdate($hash, ".positiontimer",$hash->{helper}{positiontimer}, 0);
-	 
+	
 	return;
 }
 
@@ -304,6 +304,7 @@ sub Siro_LoadHelper($)
 	my $save =	ReadingsVal($name, '.aktMsg', 'undef');
 	if ($save eq 'undef')
 		{
+		Log3($name, 5, "Siro: Helper lade new device");
 			 $hash->{helper}{position}="0";
 			 $hash->{helper}{aktMsg} = "stop".' '.'0'.' '.gettimeofday();
 			 $hash->{helper}{lastMsg} = "stop".' '.'0'.' '.gettimeofday();
@@ -315,6 +316,7 @@ sub Siro_LoadHelper($)
 	
 	else
 		{
+		Log3($name, 5, "Siro: Helper lade bestandsdaten");
 			 $hash->{helper}{aktMsg} = ReadingsVal($name, '.aktMsg', '');
 			 $hash->{helper}{lastMsg} = ReadingsVal($name, '.lastMsg', '');
 			 $hash->{helper}{lastparse} = ReadingsVal($name, '.lastparse', '');
@@ -323,8 +325,12 @@ sub Siro_LoadHelper($)
 			 $hash->{helper}{parse_aborted} = ReadingsVal($name, '.parse_aborted', '');
 			 $hash->{helper}{position} = ReadingsVal($name, '.positionsave', '');
 			 $hash->{helper}{positiontimer} = ReadingsVal($name, '.positiontimer', '');
+			readingsSingleUpdate($hash, "position",ReadingsVal($name, '.positionsave', '0'), 0);
+			readingsSingleUpdate($hash, "state",ReadingsVal($name, '.positionsave', '0'), 0);
 		}
-	Log3($name, 5, "Siro: Helper initialisiert");
+	Log3($name, 5, "Siro: Helper initialisiert: positionsave ".ReadingsVal($name, '.positionsave', '0')." ");
+	Log3($name, 5, "Siro: Helper initialisiert: state ".ReadingsVal($name, 'state', '0')." ");
+	Log3($name, 5, "Siro: Helper initialisiert: position ".ReadingsVal($name, 'position', '0')." ");
 	return;
 }
 
@@ -410,7 +416,7 @@ sub Siro_SendCommand($@)
 	}
 		
 	$binChannel = sprintf("%04b",$chan);
-	Log3($name, 5, "Siro set channel: $chan ($binChannel) for $io->{NAME}");
+	#Log3($name, 5, "Siro set channel: $chan ($binChannel) for $io->{NAME}");
 	
 	my $value = $name ." ". join(" ", @args);
 	
@@ -439,7 +445,7 @@ sub Siro_SendCommand($@)
 	my $devicename =$hash->{IODev};
 	
 	Log3($name, 5, "Siro_sendCommand: name -> $name command -> $cmd ");
-	Log3($name, 3, "Siro_sendCommand: execute comand $cmd - sendMsg to $devicename channel $chan -> $message ");
+	#Log3($name, 3, "Siro_sendCommand: execute comand $cmd - sendMsg to $devicename channel $chan -> $message ");
 	
 	return $ret;
 }
@@ -743,7 +749,13 @@ sub Siro_Attr(@)
 					}
 					
 				my $oldstate =$hash->{helper}{position};
+				
+				#Log3 $hash, 0, "Siro_Attr: ";
 if(!defined $oldstate){$oldstate=0}; 
+
+
+
+
 				my $newState =  $oldstate;
 				my $updateState;
 				Log3 $hash, 3, "Siro_Attr: state old -> $oldstate new -> $newState";
