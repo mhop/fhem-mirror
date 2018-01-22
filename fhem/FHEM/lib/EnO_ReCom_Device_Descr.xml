@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Enocean_Devices xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" schemaVersion="1.0"
+   xsi:noNamespaceSchemaLocation="./ReCom_Device_Description_Schema.xsd">
+  <Device Product_ID="0x004900000000">
+		<Version>0.0.0.7</Version>
+    <Name>Micropelt MVA004(U)</Name>
+    <Description>Intelligent Thermostatic Radiator Valve</Description>
+    <Frequency>868</Frequency>
+    <TX>
+      <!-- The Profiles we send based on our chip id -->
+      <ChipIDBased>
+        <EEP>
+          <Rorg>0xA5</Rorg>
+          <Func>0x20</Func>
+          <Type>0x01</Type>
+        </EEP>
+      </ChipIDBased>
+    </TX>
+    <RX>
+      <!-- The Profiles we send based on our chip id -->
+      <ChipIDBased>
+        <EEP>
+          <Rorg>0xA5</Rorg>
+          <Func>0x20</Func>
+          <Type>0x01</Type>
+        </EEP>
+      </ChipIDBased>
+    </RX>
+    <!-- ReMan and ReComm commands -->
+    <ReMan>
+    	<Cmd CmdId="0x0001">
+    		<Description>Unlock - RM_FN_UNLOCK</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0002">
+    		<Description>Lock - RM_FN_LOCK</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0003">
+    		<Description>Set security - RM_FN_SET_CODE</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0004">
+    		<Description>Query ID - RM_FN_QUERY_ID</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0006">
+    		<Description>Ping - RM_FN_PING_COMMAND</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0007">
+    		<Description>Query supported RPC functions - RM_FN_QUERY_FUNCTION_COMMAND</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0008">
+    		<Description>Query last Status - RM_FN_QUERY_STATUS</Description>
+    	</Cmd>
+    </ReMan>
+    <ReComm>
+    	<Cmd CmdId="0x0210">
+    		<Description>Get Link Table Metadata Query</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0211">
+    		<Description>Get Link Table Query</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0212">
+    		<Description>Set Link Table Content</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0227">
+    		<Description>Get Product Id Query</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0230">
+    		<Description>Get Device Configuration Query</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0231">
+    		<Description>Set Device Configuration Query</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0310">
+    		<Description>Get Firmware Version Query</Description>
+    	</Cmd>
+    	<Cmd CmdId="0x0224">
+    		<Description>Reset Device Defaults</Description>
+    	</Cmd>
+    </ReComm>
+    <!-- The Recom Device Parameters -->
+    <Device_Parameters>
+      <!-- Here we list the different paramaters,  -->
+      <Parameters>
+        <!-- XML/XSD can not check if we use a index only once, this is up to the user! -->
+        <Param index="0">
+          <Description>Ambient to target temp offset [K]</Description>
+          <Enum>
+	        <Length_In_Bytes>1</Length_In_Bytes>
+            <Default_Value>0</Default_Value>
+            <!--  The description of the enum -->
+            <EnumList>
+              <Enum_Value index="0">
+                <Description>Auto</Description>
+              </Enum_Value>
+              <Enum_Value index="1">
+                <Description>-3K</Description>
+              </Enum_Value>
+              <Enum_Value index="2">
+                <Description>-2K</Description>
+              </Enum_Value>
+              <Enum_Value index="3">
+                <Description>-1K</Description>
+              </Enum_Value>
+              <Enum_Value index="4">
+                <Description>0K</Description>
+              </Enum_Value>
+              <Enum_Value index="5">
+                <Description>+1K</Description>
+              </Enum_Value>
+              <Enum_Value index="6">
+                <Description>+2K</Description>
+              </Enum_Value>
+              <Enum_Value index="7">
+                <Description>+3K</Description>
+              </Enum_Value>
+              <Enum_Value index="8">
+                <Description>+4K</Description>
+              </Enum_Value>
+              <Enum_Value index="9">
+                <Description>+5K</Description>
+              </Enum_Value>
+              <Enum_Value index="10">
+                <Description>+6K</Description>
+              </Enum_Value>
+              <Enum_Value index="11">
+                <Description>+7K</Description>
+              </Enum_Value>
+              <Enum_Value index="12">
+                <Description>+8K</Description>
+              </Enum_Value>
+              <Enum_Value index="13">
+                <Description>+9K</Description>
+              </Enum_Value>
+              <Enum_Value index="14">
+                <Description>+10K</Description>
+              </Enum_Value>
+              <Enum_Value index="15">
+                <Description>+11K</Description>
+              </Enum_Value>
+            </EnumList>
+          </Enum>
+        </Param>
+        <Param index="1">
+          <Description>Radio communication interval [s/min]</Description>
+          <Enum>
+	        <Length_In_Bytes>1</Length_In_Bytes>
+            <Default_Value>4</Default_Value>
+            <!--  The description of the enum -->
+            <EnumList>
+              <Enum_Value index="0">
+                <Description>Auto</Description>
+              </Enum_Value>
+              <Enum_Value index="2">
+                <Description>2min</Description>
+              </Enum_Value>
+              <Enum_Value index="3">
+                <Description>5min</Description>
+              </Enum_Value>
+              <Enum_Value index="4">
+                <Description>10min</Description>
+              </Enum_Value>
+            </EnumList>
+          </Enum>
+        </Param>
+        <Param index="2">
+          <Description>Safe Mode Setting [%]</Description>
+          <Scaled>
+           <Length_In_Bytes>1</Length_In_Bytes>
+           <Default_Value>50</Default_Value>
+           <Range>
+            <Min>0</Min>
+            <Max>100</Max>
+           </Range>
+           <Scale>
+            <Min>0</Min>
+            <Max>100</Max>
+           </Scale>
+           <Unit></Unit>
+          </Scaled>
+        </Param>
+        <Param index="5">
+          <Description>Safe mode communication period [h]</Description>
+          <Enum>
+	        <Length_In_Bytes>1</Length_In_Bytes>
+            <Default_Value>1</Default_Value>
+            <!--  The description of the enum -->
+            <EnumList>
+              <Enum_Value index="0"> <Description>0.5</Description> </Enum_Value>
+              <Enum_Value index="1"> <Description>1</Description> </Enum_Value>
+              <Enum_Value index="2"> <Description>2</Description> </Enum_Value>
+              <Enum_Value index="3"> <Description>4</Description> </Enum_Value>
+              <Enum_Value index="4"> <Description>8</Description> </Enum_Value>
+              <Enum_Value index="5"> <Description>24</Description> </Enum_Value>
+              <Enum_Value index="6"> <Description>48</Description> </Enum_Value>
+              <Enum_Value index="7"> <Description>96</Description> </Enum_Value>
+           </EnumList>
+          </Enum>
+        </Param>
+        <Param index="9">
+          <Description>EnOcean transmitt ID (Base ID)</Description>
+          <Scaled>
+           <Length_In_Bytes>4</Length_In_Bytes>
+           <!--  Default value is the already scaled value, makes it easier readable/editable -->
+           <Default_Value>0xFFFFFFFF</Default_Value>
+           <Range>
+            <Min>0xFF800000</Min>
+            <Max>0xFFFFFFFF</Max>
+           </Range>
+           <Scale>
+            <Min>0xFF800000</Min>
+            <Max>0xFFFFFFFF</Max>
+           </Scale>
+           <Unit></Unit>
+          </Scaled>
+        </Param>
+        <Param index="11">
+          <Description>Offset parameter</Description>
+          <Scaled>
+           <Length_In_Bytes>1</Length_In_Bytes>
+           <Default_Value>91</Default_Value>
+           <Range>
+            <Min>0</Min>
+            <Max>255</Max>
+           </Range>
+           <Scale>
+            <Min>0</Min>
+            <Max>255</Max>
+           </Scale>
+           <Unit></Unit>
+          </Scaled>
+        </Param>
+        <Param index="12">
+          <Description>p-Parameter int. regulator</Description>
+          <Scaled>
+           <Length_In_Bytes>1</Length_In_Bytes>
+           <Default_Value>30</Default_Value>
+           <Range>
+            <Min>0</Min>
+            <Max>255</Max>
+           </Range>
+           <Scale>
+            <Min>0</Min>
+            <Max>255</Max>
+           </Scale>
+           <Unit></Unit>
+          </Scaled>
+        </Param>
+        <Param index="13">
+          <Description>Battery open-circuit voltage (Read Only)</Description>
+          <Scaled>
+           <Length_In_Bytes>1</Length_In_Bytes>
+           <Default_Value>0</Default_Value>
+           <Range>
+            <Min>0</Min>
+            <Max>255</Max>
+           </Range>
+           <Scale>
+            <Min>0</Min>
+            <Max>255</Max>
+           </Scale>
+           <Unit></Unit>
+          </Scaled>
+        </Param>
+      </Parameters>
+    </Device_Parameters>
+  </Device>
+</Enocean_Devices>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
