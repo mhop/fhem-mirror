@@ -248,7 +248,9 @@ sub BRAVIA_Set($@) {
               $macAddr = ReadingsVal( $name, "macAddr", "");
             }
             if ( $macAddr ne "" && $macAddr ne "-" &&
-                ($presence eq "absent" || ReadingsVal($name, "generation", "") eq "1.0.5") ) {
+                ($presence eq "absent" ||
+                 ReadingsVal($name, "generation", "") eq "1.0.5" ||
+                 ReadingsVal($name, "generation", "") eq "2.5.0") ) {
                 $result = BRAVIA_wake( $name, $macAddr );
                 return "wake-up command sent";
             } else {
@@ -383,6 +385,11 @@ sub BRAVIA_Set($@) {
             elsif ( $cmd eq "CHANDOWN" ) {
                 BRAVIA_Set( $hash, $name, "channelDown" );
             }
+            elsif ( $cmd eq "WOL" ) {
+              $macAddr = AttrVal( $name, "macaddr", "" );
+	            $macAddr = ReadingsVal( $name, "macAddr", "") if ($macAddr eq "");
+	            BRAVIA_wake( $name, $macAddr ) if ( $macAddr ne "" && $macAddr ne "-" );
+	          }
             elsif ( $cmd ne "" ) {
                 BRAVIA_SendCommand( $hash, "ircc", $cmd );
             }
@@ -1916,6 +1923,7 @@ sub BRAVIA_GetModelYear($) {
         '1.0.4'     => "2013",
         '1.0.5'     => "2013", #KDL42-W655A
         '2.4.0'     => "2014",
+        '2.5.0'     => "2014", #KD-49X8505B
         '3.8.0'     => "2016", #KD-55XD8505
     };
 
