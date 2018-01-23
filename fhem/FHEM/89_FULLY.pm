@@ -55,6 +55,7 @@ sub FULLY_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = "pingBeforeCmd:0,1,2 pollInterval requestTimeout repeatCommand:0,1,2 " .
+		"disable:0,1 " .
 		$readingFnAttributes;
 }
 
@@ -189,6 +190,9 @@ sub FULLY_Set ($@)
 		"lock" => "enabledLockedMode", "unlock" => "disableLockedMode"
 	);
 	
+	my $disable = AttrVal ($name, 'disable', 0);
+	return undef if ($disable);
+	
 	if (exists ($cmds{$opt})) {
 		$response = FULLY_Execute ($hash, $cmds{$opt}, undef, 1);
 	}
@@ -276,6 +280,9 @@ sub FULLY_Get ($@)
 	my $opt = shift @$a;
 	my $options = "info:noArg stats:noArg update:noArg";
 	my $response;
+	
+	my $disable = AttrVal ($name, 'disable', 0);
+	return undef if ($disable);
 	
 	if ($opt eq 'info') {
 		my $result = FULLY_Execute ($hash, 'deviceInfo', undef, 1);
@@ -373,8 +380,9 @@ sub FULLY_UpdateDeviceInfo ($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
+	my $disable = AttrVal ($name, 'disable', 0);
 
-	if (!exists ($hash->{fully}{bc})) {
+	if (!exists ($hash->{fully}{bc}) && $disable == 0) {
 		$hash->{fully}{bc} = BlockingCall ("FULLY_GetDeviceInfo", $name, "FULLY_GotDeviceInfo",
 			120, "FULLY_Abort", $hash);
 	}
@@ -641,6 +649,9 @@ sub FULLY_Ping ($$)
    <b>Attributes</b><br/>
    <br/>
    <ul>
+      <li><b>disable &lt;0 | 1&gt;</b><br/>
+      	Disable device and automatic polling.
+      </li><br/>
    	<li><b>pingBeforeCmd &lt;Count&gt;</b><br/>
    		Send <i>Count</i> ping request to tablet before executing commands. Valid values 
    		for <i>Count</i> are 0,1,2. Default is 0 (do not send ping request).
