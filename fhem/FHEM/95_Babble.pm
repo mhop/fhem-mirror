@@ -1417,7 +1417,7 @@ sub Babble_getdevs($$) {
            if( !defined(@devsalias{$sbdev}) ){
              $devsalias{$sbdev}[0]=$ig;
            }else{
-             push(@devsalias{$sbdev},$ig);
+             push(@{$devsalias{$sbdev}},$ig);
            }
            $ig++;
            #-- safeguard against empty device
@@ -1448,7 +1448,7 @@ sub Babble_getdevs($$) {
         if( !defined(@devsalias{$sbdev}) ){
           $devsalias{$sbdev}[0]=$ig;
         }else{
-          push(@devsalias{$sbdev},$ig);
+          push(@{devsalias{$sbdev}},$ig);
         }
         $ig++;
         #-- safeguard against empty device
