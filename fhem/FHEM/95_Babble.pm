@@ -42,7 +42,7 @@ use JSON;      # imports encode_json, decode_json, to_json and from_json.
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.0";
+my $babbleversion    = "1.01";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -1013,10 +1013,10 @@ sub Babble_TestIt{
   my $res = "";
   
   #-- no - but maybe we have an alias device ?
-  if( !defined($cmd) || $cmd eq "" ){
+  if( (!defined($cmd) || $cmd eq "") && defined($device) ){
     my $alidev  = $device;
     $alidev      =~s/_\d+$//g; 
-    my $numalias = int(@{$hash->{DATA}{"devsalias"}{$alidev}});
+    my $numalias = (defined($hash->{DATA}{"devsalias"}{$alidev})) ? int(@{$hash->{DATA}{"devsalias"}{$alidev}}) : 0;
     for (my $i=0;$i<$numalias ;$i++){
       my $ig = $hash->{DATA}{"devsalias"}{$alidev}[$i];
       my $bdev    = $hash->{DATA}{"devs"}[$ig];
@@ -1067,7 +1067,7 @@ sub Babble_TestIt{
   }else{
     my $func  = AttrVal($name,"helpFunc",undef);  
     if( $func && $func ne "" ){
-      my $help = $hash->{DATA}{"help"}{$device};
+      my $help = defined($hash->{DATA}{"help"}{$device}) ? $hash->{DATA}{"help"}{$device} : "";
       #-- substitution
       $func =~ s/\$DEV/$device/g;
       $func =~ s/\$VALUE/$value/g;
@@ -1105,7 +1105,7 @@ sub Babble_DoIt{
   if( !defined($cmd) || $cmd eq "" ){
     my $alidev  = $device;
     $alidev      =~s/_\d+$//g; 
-    my $numalias = int(@{$hash->{DATA}{"devsalias"}{$alidev}});
+    my $numalias = (defined($hash->{DATA}{"devsalias"}{$alidev})) ? int(@{$hash->{DATA}{"devsalias"}{$alidev}}) : 0;
     for (my $i=0;$i<$numalias ;$i++){
       my $ig = $hash->{DATA}{"devsalias"}{$alidev}[$i];
       my $bdev    = $hash->{DATA}{"devs"}[$ig];
@@ -1150,7 +1150,7 @@ sub Babble_DoIt{
   }else{
     my $func  = AttrVal($name,"helpFunc",undef);  
     if( $func && $func ne "" ){
-      my $help = $hash->{DATA}{"help"}{$device};
+      my $help = defined($hash->{DATA}{"help"}{$device}) ? $hash->{DATA}{"help"}{$device} : "";
       #-- substitution
       $func =~ s/\$DEV/$device/g;
       $func =~ s/\$VALUE/$value/g;
@@ -1398,13 +1398,13 @@ sub Babble_getdevs($$) {
     foreach my $fhemdev (sort keys %defs ) {
        $bdev  = AttrVal($fhemdev, "babbleDevice",undef);
        if( defined($bdev) ) { 
-         Log3 $name,1,"[Babble_getdevs] finds local FHEM device $fhemdev with babbleDevice=$bdev";
+         Log3 $name,5,"[Babble_getdevs] finds local FHEM device $fhemdev with babbleDevice=$bdev";
          $lbdev = lc($bdev);
          $sbdev = $lbdev;
          if(exists($devshash{$lbdev})) {
            Log3 $name,1,"[Babble_getdevs] Warning: local FHEM device $fhemdev has duplicate babbleDevice=$bdev, is ignored. You need to specifiy ".$bdev."_<number> instead.";
          }else{  
-           Log3 $name,1,"[Babble_getdevs] local FHEM device $fhemdev with babbleDevice=$bdev entered into hashes with ig=$ig";
+           Log3 $name,5,"[Babble_getdevs] local FHEM device $fhemdev with babbleDevice=$bdev entered into hashes with ig=$ig";
            $devs[$ig]        = $bdev;
            #-- take away trailing _<num>
            $sbdev  =~ s/_\d+$//;
@@ -1439,7 +1439,7 @@ sub Babble_getdevs($$) {
       if(exists($devshash{$lbdev})) {
         Log3 $name,1,"[Babble_getdevs] Warning: remote FHEM device $fhemdev has duplicate babbleDevice=$bdev, is ignored. You need to specifiy ".$bdev."_<unique number> instead.";
       }else{
-        Log3 $name,1,"[Babble_getdevs] remote FHEM device $fhemdev with babbleDevice=$bdev entered into hashes with ig=$ig";
+        Log3 $name,5,"[Babble_getdevs] remote FHEM device $fhemdev with babbleDevice=$bdev entered into hashes with ig=$ig";
         $hash->{DATA}{"devs"}[$ig]              = $bdev;
         $hash->{DATA}{"devcontacts"}{$lbdev}[0] = $bdev;
         $hash->{DATA}{"devcontacts"}{$lbdev}[1] = $fhemdev;
