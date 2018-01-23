@@ -390,7 +390,6 @@ PRESENCE_Set($@)
         }
         else
         {
-            Log3 $name, 3, "PRESENCE ($name) - interval override cleared. regular interval will be used for next check.";
             return "invalid override interval given (must be a positive integer)"
         }
     }
