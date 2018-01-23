@@ -85,8 +85,8 @@ PRESENCE_Define($$)
 
             $hash->{MODE} = "local-bluetooth";
             $hash->{ADDRESS} = $a[3];
-            $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});
+            $hash->{INTERVAL_NORMAL} = (defined($a[4]) ? $a[4] : 30);
+            $hash->{INTERVAL_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{INTERVAL_NORMAL});
         }
         elsif($a[2] eq "fritzbox")
         {
@@ -106,8 +106,8 @@ PRESENCE_Define($$)
 
             $hash->{MODE} = "fritzbox";
             $hash->{ADDRESS} = $a[3];
-            $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});
+            $hash->{INTERVAL_NORMAL} = (defined($a[4]) ? $a[4] : 30);
+            $hash->{INTERVAL_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{INTERVAL_NORMAL});
         }
         elsif($a[2] eq "lan-ping")
         {
@@ -120,8 +120,8 @@ PRESENCE_Define($$)
 
             $hash->{MODE} = "lan-ping";
             $hash->{ADDRESS} = $a[3];
-            $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});
+            $hash->{INTERVAL_NORMAL} = (defined($a[4]) ? $a[4] : 30);
+            $hash->{INTERVAL_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{INTERVAL_NORMAL});
         }
         elsif($a[2] =~ /(shellscript|function)/)
         {
@@ -129,8 +129,8 @@ PRESENCE_Define($$)
             {
                 $hash->{MODE} = $2;
                 $hash->{helper}{call} = $3;
-                $hash->{TIMEOUT_NORMAL} = ($4 ne "" ? $4 : 30);
-                $hash->{TIMEOUT_PRESENT} = ($5 ne "" ? $5 : $hash->{TIMEOUT_NORMAL});
+                $hash->{INTERVAL_NORMAL} = ($4 ne "" ? $4 : 30);
+                $hash->{INTERVAL_PRESENT} = ($5 ne "" ? $5 : $hash->{INTERVAL_NORMAL});
 
                 delete($hash->{helper}{ADDRESS});
 
@@ -162,8 +162,8 @@ PRESENCE_Define($$)
 
             $hash->{MODE} = "lan-bluetooth";
             $hash->{ADDRESS} = $a[3];
-            $hash->{TIMEOUT_NORMAL} = (defined($a[5]) ? $a[5] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[6]) ? $a[6] : $hash->{TIMEOUT_NORMAL});
+            $hash->{INTERVAL_NORMAL} = (defined($a[5]) ? $a[5] : 30);
+            $hash->{INTERVAL_PRESENT} = (defined($a[6]) ? $a[6] : $hash->{INTERVAL_NORMAL});
 
             $dev = $a[4];
             $dev .= ":5222" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
@@ -201,8 +201,8 @@ PRESENCE_Define($$)
         return $msg;
     }
 
-    my $timeout = $hash->{TIMEOUT_NORMAL};
-    my $presence_timeout = $hash->{TIMEOUT_PRESENT};
+    my $timeout = $hash->{INTERVAL_NORMAL};
+    my $presence_timeout = $hash->{INTERVAL_PRESENT};
 
     if(defined($timeout) and not $timeout =~ /^\d+$/)
     {
@@ -334,6 +334,9 @@ PRESENCE_Set($@)
     my $powerCmd = AttrVal($name, "powerCmd", undef);
     $usage .= " power" if(defined($powerCmd));
 
+    $usage .= " overrideInterval" if($hash->{MODE} !~ /^event|lan-bluetooth$/);
+    $usage .= " clearOverride:noArg" if($hash->{INTERVAL_OVERRIDED});
+
     if($a[1] eq "statusRequest")
     {
         if($hash->{MODE} ne "lan-bluetooth")
@@ -377,13 +380,30 @@ PRESENCE_Set($@)
         {
             readingsSingleUpdate($hash, "powerCmd", "executed",1);
         }
-
-        return undef;
+    }
+    elsif($a[1] eq "overrideInterval")
+    {
+        if($a[2] and $a[2] =~ /^\d+$/)
+        {
+            Log3 $name, 3, "PRESENCE ($name) - overriding regular check intervals to ".$a[2]." seconds";
+            $hash->{INTERVAL_OVERRIDED} = $a[2];
+        }
+        else
+        {
+            Log3 $name, 3, "PRESENCE ($name) - interval override cleared. regular interval will be used for next check.";
+            return "invalid override interval given (must be a positive integer)"
+        }
+    }
+    elsif($a[1] eq "clearOverride")
+    {
+        delete($hash->{INTERVAL_OVERRIDED});
     }
     else
     {
         return $usage;
     }
+
+    return undef;
 }
 
 
@@ -522,11 +542,11 @@ PRESENCE_Read($)
 
         if($line =~ /^absence|absent/)
         {
-            if(!$hash->{helper}{DISABLED} and $hash->{helper}{CURRENT_TIMEOUT} eq "present" and $hash->{TIMEOUT_NORMAL} != $hash->{TIMEOUT_PRESENT})
+            if(!$hash->{helper}{DISABLED} and $hash->{helper}{CURRENT_TIMEOUT} eq "present" and $hash->{INTERVAL_NORMAL} != $hash->{INTERVAL_PRESENT})
             {
                 $hash->{helper}{CURRENT_TIMEOUT} = "normal";
-                Log3 $name, 4 , "PRESENCE ($name) - changing to normal timeout every ".$hash->{TIMEOUT_NORMAL}." seconds";
-                DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 2);
+                Log3 $name, 4 , "PRESENCE ($name) - changing to normal timeout every ".$hash->{INTERVAL_NORMAL}." seconds";
+                DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{INTERVAL_NORMAL}."\n", 2);
             }
 
             unless($hash->{helper}{DISABLED})
@@ -541,11 +561,11 @@ PRESENCE_Read($)
         }
         elsif($line =~ /present;(.+?)$/)
         {
-            if(!$hash->{helper}{DISABLED} and $hash->{helper}{CURRENT_TIMEOUT} eq "normal" and $hash->{TIMEOUT_NORMAL} != $hash->{TIMEOUT_PRESENT})
+            if(!$hash->{helper}{DISABLED} and $hash->{helper}{CURRENT_TIMEOUT} eq "normal" and $hash->{INTERVAL_NORMAL} != $hash->{INTERVAL_PRESENT})
             {
                 $hash->{helper}{CURRENT_TIMEOUT} = "present";
-                Log3 $name, 4 , "PRESENCE ($name) - changing to present timeout every ".$hash->{TIMEOUT_PRESENT}." seconds";
-                DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_PRESENT}."\n", 2);
+                Log3 $name, 4 , "PRESENCE ($name) - changing to present timeout every ".$hash->{INTERVAL_PRESENT}." seconds";
+                DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{INTERVAL_PRESENT}."\n", 2);
             }
 
             unless($hash->{helper}{DISABLED})
@@ -670,7 +690,7 @@ sub PRESENCE_StartLocalScan($;$)
         {
             delete($hash->{helper}{RUNNING_PID});
 
-            my $seconds = (ReadingsVal($name, "state", "absent") eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL});
+            my $seconds = (ReadingsVal($name, "state", "absent") eq "present" ? $hash->{INTERVAL_PRESENT} : $hash->{INTERVAL_NORMAL});
 
             Log3 $hash->{NAME}, 4, "PRESENCE ($name) - fork failed, rescheduling next check in $seconds seconds";
 
@@ -686,7 +706,7 @@ sub PRESENCE_StartLocalScan($;$)
 
         if($local == 0)
         {
-            my $seconds = (ReadingsVal($name, "state", "absent") eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL});
+            my $seconds = (ReadingsVal($name, "state", "absent") eq "present" ? $hash->{INTERVAL_PRESENT} : $hash->{INTERVAL_NORMAL});
 
             Log3 $hash->{NAME}, 4, "PRESENCE ($name) - rescheduling next check in $seconds seconds";
 
@@ -1124,10 +1144,12 @@ sub PRESENCE_ProcessLocalScan($)
 
     readingsEndUpdate($hash, 1);
 
-    #Schedule the next check withing $timeout if it is a regular run
+    #Schedule the next check within $timeout if it is a regular run
     if($local eq "0")
     {
-        my $seconds = ($a[2] eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL});
+        my $seconds = ($a[2] eq "present" ? $hash->{INTERVAL_PRESENT} : $hash->{INTERVAL_NORMAL});
+
+        $seconds = $hash->{INTERVAL_OVERRIDED} if($hash->{INTERVAL_OVERRIDED});
 
         Log3 $hash->{NAME}, 4, "PRESENCE ($name) - rescheduling next check in $seconds seconds";
 
@@ -1139,32 +1161,33 @@ sub PRESENCE_ProcessLocalScan($)
 #####################################
 sub PRESENCE_ProcessAbortedScan($)
 {
-
     my ($hash, $msg) = @_;
     my $name = $hash->{NAME};
     delete($hash->{helper}{RUNNING_PID});
     RemoveInternalTimer($hash);
 
+    my $retry_interval = AttrVal($name,"retryInterval",10);
+
     if(defined($hash->{helper}{RETRY_COUNT}))
     {
-        if($hash->{helper}{RETRY_COUNT} >= 3)
+        if($hash->{helper}{RETRY_COUNT} >= AttrVal($name, "retryCount", 3))
         {
             Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry"). " (resuming normal operation): $msg" if($hash->{helper}{RETRY_COUNT} == 3);
-            InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+            InternalTimer(gettimeofday()+$hash->{INTERVAL_NORMAL}, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
             $hash->{helper}{RETRY_COUNT}++;
         }
         else
         {
-            Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry")." (retrying in 10 seconds): $msg";
-            InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+            Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry")." (retrying in $retry_interval seconds): $msg";
+            InternalTimer(gettimeofday()+$retry_interval, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
             $hash->{helper}{RETRY_COUNT}++;
         }
     }
     else
     {
         $hash->{helper}{RETRY_COUNT} = 1;
-        InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
-        Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked (retrying in 10 seconds): $msg"
+        InternalTimer(gettimeofday()+$retry_interval, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+        Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked (retrying in $retry_interval seconds): $msg"
     }
 
     readingsSingleUpdate($hash, "state", "timeout",1);
@@ -1186,7 +1209,7 @@ sub PRESENCE_DoInit($)
     {
         readingsSingleUpdate($hash, "state", "active",0);
         $hash->{helper}{CURRENT_TIMEOUT} = "normal";
-        DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 2);
+        DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{INTERVAL_NORMAL}."\n", 2);
     }
     else
     {
@@ -1525,8 +1548,8 @@ valid log levels:
     LOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG. Default: LOG_INFO
 
 Examples:
-	lepresenced --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon
-	lepresenced --loglevel LOG_DEBUG --daemon
+    lepresenced --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon
+    lepresenced --loglevel LOG_DEBUG --daemon
 </PRE>
 
     To detect the presence of a device, it uses the command <i>hcitool lescan</i> (package:
@@ -1605,6 +1628,8 @@ Options:
   <ul>
   <li><b>statusRequest</b> - Schedules an immediatly check.</li>
   <li><b>power</b> - Executes the given power command which is set as attribute to power (on or off) the device (only when attribute "powerCmd" is set)</li>
+  <li><b>overrideInterval</b> - Override the check interval to the given number of seconds. (not applicable in mode "event" and "lan-bluetooth")</li>
+  <li><b>clearOverride</b> - clear an active check interval override (only if set command overrideInterval was executed before)</li>
   </ul>
   <br>
 
@@ -1624,31 +1649,42 @@ Options:
     If this attribute is activated, an active check will be disabled.<br><br>
     Possible values: 0 => not disabled , 1 => disabled<br>
     Default Value is 0 (not disabled)<br><br>
-    <li><a name="PRESENCE_absenceThreshold">absenceThreshold</a></li><br> <i>(Not in Mode "event" applicable)</i><br>
+    <li><a name="PRESENCE_absenceThreshold">absenceThreshold</a></li><br> <i>(not applicable in mode "event" )</i><br>
     The number of checks that have to result in "absent" before the state of the PRESENCE definition is changed to "absent".
     This can be used to verify the absence of a device with multiple check runs before the state is finally changed to "absent".
     If this attribute is set to a value &gt;1, the reading state and presence will be set to "maybe absent" during the absence verification.<br><br>
     Default Value is 1 (no absence verification)<br><br>
-    <li><a name="PRESENCE_presenceThreshold">presenceThreshold</a></li><br> <i>(Not in Mode "event" applicable)</i><br>
+    <li><a name="PRESENCE_presenceThreshold">presenceThreshold</a></li><br> <i>(not applicable in mode "event" )</i><br>
     The number of checks that have to result in "present" before the state of the PRESENCE definition is changed to "present".
     This can be used to verify the permanent presence of a device with multiple check runs before the state is finally changed to "present".
     If this attribute is set to a value &gt;1, the reading state and presence will be set to "maybe present" during the presence verification.<br><br>
     Default Value is 1 (no presence verification)<br><br>
-    <li><a name="PRESENCE_absenceTimeout">absenceTimeout</a></li><br> <i>(Only in Mode "event" applicable)</i><br>
+    <li><a name="PRESENCE_absenceTimeout">absenceTimeout</a></li><br> <i>(only in mode "event" applicable)</i><br>
     The timeout after receiving an "absent" event, before the state of the PRESENCE definition is switched to "absent".
     This can be used to verify the permanent absence by waiting a specific time frame to not receive an "present" event.
     If this timeout is reached with no "present" event received in the meantime, the presence state will finally be set to "absent".
     The timeout is given in HH:MM:SS format, where hours and minutes are optional.
     If this attribute is set to a valid value, the reading state and presence will be set to "maybe absent" during the absence verification.<br><br>
     Default Value is 0 (no absence verification)<br><br>
-    <li><a name="PRESENCE_presenceTimeout">presenceTimeout</a></li><br> <i>(Only in Mode "event" applicable)</i><br>
+    <li><a name="PRESENCE_presenceTimeout">presenceTimeout</a></li><br> <i>(only in mode "event" applicable)</i><br>
     The timeout after receiving an "present" event, before the state of the PRESENCE definition is switched to "present".
     This can be used to verify the permanent presence by waiting a specific time frame to not receive an "absent" event.
     If this timeout is reached with no "absent" event received in the meantime, the presence state will finally be set to "present".
     The timeout is given in HH:MM:SS format, where hours and minutes are optional.
     If this attribute is set to a valid value, the reading state and presence will be set to "maybe present" during the presence verification.<br><br>
     Default Value is 0 (no presence verification)<br><br>
-    <li><a name="PRESENCE_ping_count">ping_count</a></li> (Only in Mode "ping" applicable)<br>
+    <li><a name="PRESENCE_retryInterval">retryInterval</a></li><br> <i>(Not applicable in mode "event" or "lan-bluetooth")</i><br>
+    The check interval in case a check is prematurely aborted and was unable to check the presence. In this case, PRESENCE reschedules
+    the next check as retry within the given retry interval in seconds (usually lower than the regular check interval).
+    <br><br>
+    Default Value is 10 seconds<br><br>
+    <li><a name="PRESENCE_retryCount">retryCount</a></li><br> <i>(Not applicable in mode "event" or "lan-bluetooth")</i><br>
+    The maximum number of checks to perform within the retryInterval in case a check is prematurely aborted and was unable to check the presence.
+    PRESENCE will try to retry after a failed check to a maximum of the given number of tries. If all retries fails also, it will uses afterwards
+    the regular check interval.
+    <br><br>
+    Default Value is 3 (number of check retries)<br><br>
+    <li><a name="PRESENCE_ping_count">ping_count</a></li> (Only in mode "ping" applicable)<br>
     Changes the count of the used ping packets to recognize a present state. Depending on your network performance sometimes a packet can be lost or blocked.<br><br>
     Default Value is 4 (packets)<br><br>
     <li><a name="PRESENCE_bluetooth_hci_device">bluetooth_hci_device</a></li> (Only in Mode "local-bluetooth" applicable)<br>
@@ -1837,8 +1873,8 @@ valid log levels:
     LOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG. Default: LOG_INFO
 
 Examples:
-	lepresenced --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon
-	lepresenced --loglevel LOG_DEBUG --daemon
+    lepresenced --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon
+    lepresenced --loglevel LOG_DEBUG --daemon
 </PRE>
 
     Zur Bluetooth-Abfrage wird der Befehl <i>hcitool lescan</i> (Paket:
@@ -1909,15 +1945,16 @@ Options:
     <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/collectord-1.7.deb" target="_new">collectord-1.7.deb</a></li>
     </ul>
     </ul>
-
   </ul>
   <br>
+
   <a name="PRESENCEset"></a>
   <b>Set</b>
   <ul>
-
   <li><b>statusRequest</b> - Startet einen sofortigen Check.</li>
   <li><b>power</b> - Startet den powerCmd-Befehl welche durch den Parameter powerCmd angegeben ist (Nur wenn das Attribut "powerCmd" definiert ist)</li>
+  <li><b>overrideInterval</b> - Übersteuert das Prüfinterval auf die übergebene Dauer in Sekunden (Nicht im Modus "event" und "lan-bluetooth" anwendbar)</li>
+  <li><b>clearOverride</b> - Entfernt eine zuvor gesetzte Übersteuerung des Prüfintervals (Nur anwendbar, wenn zuvor eine Übersteuerung mit dem Set-Befehl overrideInterval stattgefunden hat)</li>
   </ul>
   <br>
 
@@ -1961,6 +1998,16 @@ Options:
     Wenn dieses Attribut auf einen g&uuml;ltigen Wert gesetzt ist, werden die Readings "state" und "presence" bei einem "present"-Event zun&auml;chst auf den Wert "maybe present" gesetzt.
     Sobald das parametrisierte Zeitfenster um ist, wird der Status final auf "present" gesetzt.<br><br>
     Standardwert ist 0 Sekunden (keine Statusverz&ouml;gerung)<br><br>
+    <li><a name="PRESENCE_retryInterval">retryInterval</a></li> <i>(Nicht im Modus "event" oder "lan-bluetooth" anwendbar)</i><br>
+    Das Prüfinterval, welches im Falle eines vorzeitig abgebrochenen Checks genutzt wird, um eine Wiederholung auszuführen. Dazu wird im Falle eines abgebrochenen
+    Checks der nächste Check nach der übergebenen Dauer in Sekunden ausgeführt. Diese sollte geringer sein als das reguläre Prüfinterval.
+    <br><br>
+    Standardwert ist 10 Sekunden<br><br>
+    <li><a name="PRESENCE_retryCount">retryCount</a></li> <i>(Nicht im Modus "event" oder "lan-bluetooth" anwendbar)</i><br>
+    Die maximale Anzahl an Wiederholungen, sollte ein Check vorzeitig abgebrochen werden. Sobald ein Check vorzeitigabbricht, werden maximal die übergebene Anzahl an Wiederholung
+    innerhalb des in retryInterval konfigurierten Interval ausgeführt um in kürzerer Zeit ein valides Ergebnis zu erhalten.
+    <br><br>
+    Standardwert ist 3 Wiederholungen<br><br>
     <li><a name="PRESENCE_ping_count">ping_count</a></li> (Nur im Modus "ping" anwendbar)<br>
     Ver&auml;ndert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen.
     Je nach Netzwerkstabilit&auml;t k&ouml;nnen erste Pakete verloren gehen oder blockiert werden.<br><br>

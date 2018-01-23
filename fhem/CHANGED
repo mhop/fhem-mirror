@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 73_PRESENCE: new set commands overrideInterval and clearOverride
+                          to temporary override the check interval.
+                          new attributes retryCount and retryInterval
   - feature: 89_FULLY: Added support for attribute disable
   - change:  93_DbLog: V3.7.0, log verbose 5 enhanced, configuration read check
                        added to configCheck
