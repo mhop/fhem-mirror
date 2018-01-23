@@ -1,4 +1,3 @@
-
 # $Id$
 
 package main;
@@ -31,7 +30,7 @@ UnifiVideo_Initialize($)
   $hash->{SetFn}    = "UnifiVideo_Set";
   $hash->{GetFn}    = "UnifiVideo_Get";
   $hash->{AttrFn}   = "UnifiVideo_Attr";
-  $hash->{AttrList} = "filePath apiKey ".
+  $hash->{AttrList} = "disable filePath apiKey ".
                       "sshUser ".
                       $readingFnAttributes;
 
@@ -69,6 +68,8 @@ UnifiVideo_Define($$)
 
   if( $init_done ) {
     UnifiVideo_Connect($hash);
+  } else {
+    readingsSingleUpdate($hash, 'state', 'initialized', 1 );
   }
 
   return undef;
@@ -92,6 +93,7 @@ UnifiVideo_Undefine($$)
 {
   my ($hash, $arg) = @_;
 
+  UnifiVideo_killLogWatcher($hash);
   RemoveInternalTimer($hash, "UnifiVideo_Connect");
 
   delete $modules{$hash->{TYPE}}{defptr};
@@ -302,7 +304,8 @@ UnifiVideo_parseHttpAnswer($$$)
 
     my $totalCount = $json->{meta}{totalCount};
     readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, 'totalCount', $totalCount, 1);
+    readingsBulkUpdate($hash, 'state', $hash->{PID}?'watching':'running', 1 );
+    readingsBulkUpdateIfChanged($hash, 'totalCount', $totalCount, 1);
     my $i = 0;
     foreach my $entry (@{$json->{data}}) {
       if( !$entry->{deleted} ) {
@@ -317,7 +320,7 @@ UnifiVideo_parseHttpAnswer($$$)
     readingsEndUpdate($hash,1);
 
     RemoveInternalTimer($hash, "UnifiVideo_Connect");
-    InternalTimer(gettimeofday() + 900, "UnifiVideo_Connect", $hash) 
+    InternalTimer(gettimeofday() + 900, "UnifiVideo_Connect", $hash);
 
   } elsif( $param->{key} eq 'snapshot' ) {
     my $modpath = $attr{global}{modpath};
@@ -425,20 +428,30 @@ UnifiVideo_killLogWatcher($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+Log 1, "!!!!!!!";
 
+Log 1, "2";
+  kill( 9, $hash->{PID} ) if( $hash->{PID} );
+
+Log 1, "1";
   close($hash->{FH}) if($hash->{FH});
+Log 1, "1.1";
   delete($hash->{FH});
+Log 1, "1.2";
   delete($hash->{FD});
+Log 1, "1.3";
 
   return if( !$hash->{PID} );
-
-  kill( 9, $hash->{PID} );
   delete $hash->{PID};
 
+Log 1, "3";
+
+  readingsSingleUpdate($hash, 'state', 'running', 1 );
   Log3 $name, 3, "$name: stopped logfile watcher";
 
   delete $hash->{PARTIAL};
   delete($selectlist{$name});
+Log 1, "4";
 }
 sub
 UnifiVideo_startLogWatcher($)
@@ -467,6 +480,8 @@ UnifiVideo_startLogWatcher($)
 
     $selectlist{$name} = $hash;
 
+    readingsSingleUpdate($hash, 'state', 'watching', 1 );
+
     Log3 $name, 3, "$name: started logfile watcher";
   } else {
     Log3 $name, 2, "$name: failed to start logfile watcher";
@@ -480,6 +495,8 @@ UnifiVideo_Connect($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+
+  return if( IsDisabled($name) );
 
   my $apiKey = AttrVal($name, 'apiKey', undef);
   if( !$apiKey ) {
@@ -505,7 +522,7 @@ UnifiVideo_Connect($)
   $param->{callback} = \&UnifiVideo_parseHttpAnswer;
   HttpUtils_NonblockingGet( $param );
 
-  UnifiVideo_startLogWatcher( $hash );
+  UnifiVideo_startLogWatcher( $hash ) if( !$hash->{PID} );
 
   return undef;
 }
@@ -553,12 +570,24 @@ UnifiVideo_Attr($$$)
   my $orig = $attrVal;
 
   my $hash = $defs{$name};
-  if( $attrName eq "disable" ) {
-  } elsif( $attrName eq "sshUser" ) {
+  if( $attrName eq 'disable' ) {
+    if( $cmd eq "set" && $attrVal ) {
+      UnifiVideo_killLogWatcher($hash);
+      readingsSingleUpdate($hash, 'state', 'disabled', 1 );
+
+    } else {
+      readingsSingleUpdate($hash, 'state', 'running', 1 );
+      $attr{$name}{$attrName} = 0;
+      UnifiVideo_Connect($hash);
+
+    }
+
+  } elsif( $attrName eq 'sshUser' ) {
     if( $cmd eq "set" && $attrVal ) {
       $attr{$name}{$attrName} = $attrVal;
     } else {
       delete $attr{$name}{$attrName};
+      UnifiVideo_killLogWatcher($hash);
     }
 
     UnifiVideo_Connect($hash);
@@ -566,10 +595,7 @@ UnifiVideo_Attr($$$)
   } elsif( $attrName eq 'apiKey' ) {
     if( $cmd eq "set" && $attrVal ) {
 
-      if( $attrVal =~ m/^crypt:/ ) {
-        return;
-
-      }
+      return if( $attrVal =~ m/^crypt:/ );
 
       $attrVal = UnifiVideo_encrypt($attrVal);
 
