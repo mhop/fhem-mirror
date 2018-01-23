@@ -232,16 +232,16 @@ sub FB_CALLLIST_Set($@)
         if(AttrVal($name, "create-readings", "0") eq "1")
         {
             readingsBeginUpdate($hash);
+            
             readingsBulkUpdate($hash, "numberOfCalls", 0, 1);
 
-            for my $reading (keys %{$hash->{READINGS}})
+            for my $reading (grep { /^\d+-/ } keys %{$hash->{READINGS}})
             {
                 readingsBulkUpdate($hash, $reading, "");
+                readingsDelete($hash, $reading);
             }
 
             readingsEndUpdate($hash, 1);
-
-            CommandDeleteReading($hash->{CL}, $name.' \d+-.*');
         }
 
         # Inform all FHEMWEB clients
@@ -989,12 +989,10 @@ sub FB_CALLLIST_createReadings($)
     for my $reading (grep { /^(\d+)-/ and ($1 > @item_list) } keys %{$hash->{READINGS}})
     {
         readingsBulkUpdate($hash, $reading, "");
-        push @delete_readings, $reading;
+        readingsDelete($hash, $_) ;
     }
 
     readingsEndUpdate($hash, 1);
-
-    map { CommandDeleteReading(undef, "$name $_") } @delete_readings;
 
     return undef;
 }
