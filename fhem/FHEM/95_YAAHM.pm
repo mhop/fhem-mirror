@@ -32,7 +32,6 @@ package main;
 use strict;
 use warnings;
 use vars qw(%defs);		        # FHEM device/button definitions
-use vars qw(%intAt);		    # FHEM at definitions
 use vars qw($FW_ME);
 use vars qw($FW_inform);
 use vars qw($FW_headerlines);
@@ -48,7 +47,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.33";
+my $yaahmversion    = "1.43";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -61,6 +60,7 @@ my %yaahm_transtable_EN = (
     "manual"            =>  "Manual Time",
     "exceptly"          =>  "exceptionally",
     "undecid"           =>  "not decidable",
+    "off"               =>  "off",
     "swoff"             =>  "switched off",
     "and"               =>  "and",
     "clock"             =>  "",
@@ -152,6 +152,7 @@ my %yaahm_transtable_EN = (
     "clock"             =>  "Uhr",
     "exceptly"          =>  "ausnahmsweise",
     "undecid"           =>  "nicht bestimmbar",
+    "off"               =>  "Aus",
     "swoff"             =>  "ausgeschaltet",
     "and"               =>  "und",
     "active"            =>  "Aktiv",
@@ -334,7 +335,7 @@ my @csstate1 = ("#53f3c7","#ff9458","#f554e2","#fd5777");
 
 #-- temporary fix for update purpose
 sub YAAHM_restore($$){};
-sub YAAHM_sayWeeklyTime($$$){};
+sub YAAHM_setWeeklyTime($){};
 
 #########################################################################################
 #
@@ -948,7 +949,8 @@ sub YAAHM_Get($@) {
 
 sub YAAHM_save($) {
   my ($hash) = @_;
-  $hash->{DATA}{"savedate"} = sprintf("%s",localtime(time));
+  my $date = localtime(time);
+  $hash->{DATA}{"savedate"} = $date;
   readingsSingleUpdate( $hash, "savedate", $hash->{DATA}{"savedate"}, 1 ); 
   my $json   = JSON->new->utf8;
   my $jhash0 = eval{ $json->encode( $hash->{DATA} ) };
@@ -1235,7 +1237,10 @@ sub YAAHM_nextWeeklyTime {
   }
   
   #-- check value - may be empty
-  if( $time ne ""){
+  if( $time eq "" || $time eq "default" ){
+    $time = "";      
+  #-- nontrivial
+  }else{
     #-- off=ok, do nothing
     if( $time eq "off"){
     #-- time=ok, check
@@ -1253,17 +1258,10 @@ sub YAAHM_nextWeeklyTime {
     }
   }
   
-  #-- weekly profile times
-  my $sg0;
-  if( ReadingsVal($name.".wtimer_".$i.".IF","mode","") ne "disabled" ){
-    $sg0 = $time;
-  }else{
-    $sg0 = "off";
-  }       
-  $hash->{DATA}{"WT"}[$i]{"next"} = $sg0; 
+  #-- all logic in setweeklytime     
+  $hash->{DATA}{"WT"}[$i]{"next"} = $time; 
   YAAHM_setWeeklyTime($hash);                                                   
    
-  readingsEndUpdate($hash,1);
 }
 
 #########################################################################################
@@ -1694,128 +1692,138 @@ sub YAAHM_setWeeklyTime($) {
   
   #-- iterate over timers
   for( my $i=0;$i<int( @{$hash->{DATA}{"WT"}} );$i++){
-  
-    #-- TODO: inconsistency, time is off although only timer disabled
-    #-- lowest priority is the waketable - provided, the timer device is enabled
-    if( ReadingsVal($name.".wtimer_".$i.".IF","mode","") ne "disabled" ){
-      $sg0 = $hash->{DATA}{"WT"}[$i]{ $weeklytable[$hash->{DATA}{"DD"}[0]{"weekday"}] } ;
-      $sg1 = $hash->{DATA}{"WT"}[$i]{ $weeklytable[$hash->{DATA}{"DD"}[1]{"weekday"}] };
-      $ng  = $hash->{DATA}{"WT"}[$i]{ "next" };
-      $sg0en = "enabled";
-      $sg1en = "enabled";
-    }else{
+    #-- obtain next time spec => will override all
+    $ng  = $hash->{DATA}{"WT"}[$i]{ "next" };
+    #-- highest priority is a disabled timer - no wakeup at all
+    if( ReadingsVal($name.".wtimer_".$i.".IF","mode","") eq "disabled" ){
       $sg0 = "off";
       $sg1 = "off";
-      $ng  = "off";
       $sg0en = "disabled (timer)";
       $sg1en = "disabled (timer)";
-    }
-   
-    #-- next higher priority is to check for daytype 
-    my $wupad = $hash->{DATA}{"WT"}[$i]{"acti_d"}.",workday,weekend"; 
-    if( ($sg0 !~ /^off/) && (index($wupad, $hash->{DATA}{"DD"}[0]{"daytype"}) == -1) ){
-      $sg0mod = "off (".substr(ReadingsVal($name,"tr_todayType",""),0,3).")";
-      $sg0en  = "disabled (".ReadingsVal($name,"todayType","").")";
+    #-- if the timer is enabled, we'll use its timing values
     }else{
-      $sg0mod = $sg0;
-      $sg0en  = "enabled"
-        if( $sg0en !~ /^disabled/);
-    }
-    if( ($sg1 !~ /^off/) && (index($wupad, $hash->{DATA}{"DD"}[1]{"daytype"}) == -1) ){
-      $sg1mod = "off (".substr(ReadingsVal($name,"tr_tomorrowType",""),0,3).")";
-      $sg1en  = "disabled (".ReadingsVal($name,"todayType","").")";
-    }else{
-      $sg1mod = $sg1;
-      $sg1en  = "enabled"
-        if( $sg1en !~ /^disabled/);
-    }
-    
-    #-- next higher priority is to check for housemode (only today !)
-    my $wupam = $hash->{DATA}{"WT"}[$i]{"acti_m"}.",normal";
-    if( ($sg0mod !~ /^off/) && (index($wupam, ReadingsVal($name,"housemode","")) == -1) ){
-      $sg0mod = "off (".substr(ReadingsVal($name,"tr_housemode",""),0,3).")";
-      $sg0en  = "disabled (".ReadingsVal($name,"housemode","").")";
-    }
-      
-    #-- highest priority is a "next" time specification
-    #-- current time
-    my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
-    my $lga = sprintf("%02d%02d",$hour,$min);
-    #-- today's waketime
-    my $tga = $sg0;
-    $tga    =~ s/://;
-    #-- tomorrow's waketime
-    my $tgm = $sg1;
-    $tgm    =~ s/://;
-    #-- "next" input
-    my $nga = (defined $ng)?$ng:"";
-    $nga    =~ s/://;
-    
-    #-- "next" is empty
-    if( $nga eq "" ){
-      $ring_0 = $sg0;
-      $ring_1 = $sg1;
-      $ng     = "";
-      $hash->{DATA}{"WT"}[$i]{ "next" }="";
-    #-- "next" is the same as today and today not over
-    }elsif( ($nga eq $tga) && ($tga > $lga)){
-      $ring_0 = $sg0;
-      $ring_1 = $sg1;
-      $ng     = "";
-      $hash->{DATA}{"WT"}[$i]{ "next" }="";
-    #-- "next" is the same as tomorrow and today over
-    }elsif( ($nga eq $tgm) && ($tga < $lga)){
-      $ring_0 = $sg0;
-      $ring_1 = $sg1;
-      $ng     = "";
-      $hash->{DATA}{"WT"}[$i]{ "next" }="";
-    #-- "next" is off
-    }elsif( $nga eq "off" ){
-      #-- today's waketime not over => we mean today
-      if( $tga ne "off" && ($tga > $lga)){
-        if( $sg0mod !~ /^off/ ){
-          $sg0mod = "off (man)";
-          $ring_0 = "off";
-          $ring_1 = $sg1;
-        }
-      #-- today's waketime over => we mean tomorrow
+      $sg0 = $hash->{DATA}{"WT"}[$i]{ $weeklytable[$hash->{DATA}{"DD"}[0]{"weekday"}] } ;
+      $sg1 = $hash->{DATA}{"WT"}[$i]{ $weeklytable[$hash->{DATA}{"DD"}[1]{"weekday"}] };
+      $sg0en = "enabled";
+      $sg1en = "enabled";
+      #-- next higher priority for "off" is daytype 
+      my $wupad = $hash->{DATA}{"WT"}[$i]{"acti_d"}.",workday,weekend"; 
+      #-- start with tomorrow
+      if( index($wupad, $hash->{DATA}{"DD"}[1]{"daytype"}) == -1 ){
+        $sg1mod = "off (".substr(ReadingsVal($name,"tr_tomorrowType",""),0,3).")";
+        $sg1en  = "disabled (".ReadingsVal($name,"tomorrowType","").")";
+      }elsif( ($hash->{DATA}{"DD"}[1]{"vacflag"} == 1 ) && index($wupad,"vacation") == -1 ){
+        $sg1mod = "off (".substr($yaahm_tt->{"vacation"},0,3).")";
+        $sg1en  = "disabled (vacation)";
       }else{
-        if( $sg1mod !~ /^off/ ){
-          $sg1mod = "off (man)";
-          $ring_0 = $sg0;
-          $ring_1 = "$sg1 (off)";
-        }
+        $sg1mod = $sg1;
       }
-    #-- "next" is nontrivial timespec
-    }else{
-      #-- "next" after current time => we mean today
-      if( $nga > $lga ){
-        #-- only restore standard setting (do we come here at all ?)
-        if( $ng eq $sg0 ){
+      #-- because today we might also have an influence of housemode
+      if( index($wupad, $hash->{DATA}{"DD"}[0]{"daytype"}) == -1 ){
+        $sg0mod = "off (".substr(ReadingsVal($name,"tr_todayType",""),0,3).")";
+        $sg0en  = "disabled (".ReadingsVal($name,"todayType","").")";
+      }elsif( ($hash->{DATA}{"DD"}[0]{"vacflag"} == 1 ) && index($wupad,"vacation") == -1 ){
+        $sg0mod = "off (".substr($yaahm_tt->{"vacation"},0,3).")";
+        $sg0en  = "disabled (vacation)";
+      }else{
+      #-- next higher priority for "off" (only today !) is housemode 
+        my $wupam = $hash->{DATA}{"WT"}[$i]{"acti_m"}.",normal";
+        if( index($wupam, ReadingsVal($name,"housemode","")) == -1 ){
+          $sg0mod = "off (".substr(ReadingsVal($name,"tr_housemode",""),0,3).")";
+          $sg0en  = "disabled (".ReadingsVal($name,"housemode","").")";
+        }else{
           $sg0mod = $sg0;
-          $ring_0 = $sg0;
-          $ng     = "";
-          $hash->{DATA}{"WT"}[$i]{ "next" } = "";
-        }else{
-          $sg0mod = "$ng (man)";
-          $ring_0 = $ng;
         }
-        $ring_1 = $sg1;
-      #-- "next" before current time => we mean tomorrow
-      }else{
-        #-- only restore standard setting (do we come here at all ?)
-        if( $ng eq $sg1 ){
-          $sg0mod = $sg1;
-          $ring_1 = $sg1;
-          $ng     = "";
-          $hash->{DATA}{"WT"}[$i]{ "next" } = "";
-        }else{
-          $sg1mod = "$ng (man)";
-          $ring_1 = "$sg1 ($ng)";
-        }
+      }   
+    }  
+    #Log 1,"====> AFTER INITIAL CHECK TIMER $i sg0=$sg0  sg0mod=$sg0mod  sg1=$sg1  sg1mod=$sg1mod  ng=$ng";
+    #-- no "next" time specification
+    if( !defined($ng) || $ng eq "" ){
+      $ring_0 = $sg0;
+      $ring_1 = $sg1;
+    #-- highest priority is a "next" time specification
+    }else{
+      #-- current time
+      my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
+      my $lga = sprintf("%02d%02d",$hour,$min);
+      #-- today's waketime
+      my $tga = $sg0;
+      $tga    =~ s/://;
+      #-- tomorrow's waketime
+      my $tgm = $sg1;
+      $tgm    =~ s/://;
+      #-- "next" input
+      my $nga = (defined $ng)?$ng:"";
+      $nga    =~ s/://;
+      #-- "next" is the same as todays waketime and todays waketime not over => restore !
+      if( ($nga eq $tga) && ($tga > $lga)){
         $ring_0 = $sg0;
+        $ring_1 = $sg1;
+        $ng     = "";
+        $hash->{DATA}{"WT"}[$i]{ "next" }="";
+      #-- "next" is the same as tomorrows waketime and todays waketime over => restore !
+      }elsif( ($nga eq $tgm) && ($tga < $lga)){
+        $ring_0 = $sg0;
+        $ring_1 = $sg1;
+        $ng     = "";
+        $hash->{DATA}{"WT"}[$i]{ "next" }="";
+      #-- "next" is off
+      }elsif( $nga eq "off" ){
+        #-- today's waketime not over => we mean today
+        if( $tga ne "off" && ($tga > $lga)){
+          if( $sg0mod !~ /^off/ ){
+            $sg0mod = "off (man)";
+            $ring_0 = "off";
+            $ring_1 = $sg1;
+          }
+        #-- today's waketime over => we mean tomorrow
+        }else{
+          if( $sg1mod !~ /^off/ ){
+            $sg1mod = "off (man)";
+            $ring_0 = $sg0;
+            $ring_1 = "$sg1 (off)";
+          }
+        }
+      #-- "next" is nontrivial timespec
+      }else{
+        #-- "next" after current time => we mean today
+        if( $nga > $lga ){
+          #-- the same as original waketime => restore ! (do we come here at all ?)
+          #if( $ng eq $sg0 ){
+          #  $sg0mod = $sg0;
+          #  $ring_0 = $sg0;
+          #  $ng     = "";
+          #  $hash->{DATA}{"WT"}[$i]{ "next" } = "";
+          #-- new manual waketime tomorrow
+          #}else{
+            $sg0mod = "$ng (man)";
+            $ring_0 = $ng;
+          #}
+          $ring_1 = $sg1;
+        #-- "next" before current time => we mean tomorrow
+        }else{
+          #-- the same as original waketime => restore ! (do we come here at all ?)
+          #if( $ng eq $sg1 ){
+          #  $sg0mod = $sg1;
+          #  $ring_1 = $sg1;
+          #  $ng     = "";
+          #  $hash->{DATA}{"WT"}[$i]{ "next" } = "";
+          #}else{
+            $sg1mod = "$ng (man)";
+            $ring_1 = "$sg1 ($ng)";
+          #}
+          $ring_0 = $sg0;
+        }
       }
     }
+    $hash->{DATA}{"WT"}[$i]{"ring_0"} = $ring_0; 
+    $hash->{DATA}{"WT"}[$i]{"ring_1"} = $ring_1; 
+    $hash->{DATA}{"WT"}[$i]{"ring_0x"} = $sg0mod; 
+    $hash->{DATA}{"WT"}[$i]{"ring_1x"} = $sg1mod;  
+    $hash->{DATA}{"WT"}[$i]{"ring_0e"} = $sg0en;  
+    $hash->{DATA}{"WT"}[$i]{"ring_1e"} = $sg1en;  
+    #Log 1,"====> AFTER FINAL   CHECK TIMER $i sg0=$sg0  sg0mod=$sg0mod  sg1=$sg1  sg1mod=$sg1mod  ng=$ng";
+    #Log 1,"                                   ".$hash->{DATA}{"WT"}[$i]{"ring_0x"}."               ".$hash->{DATA}{"WT"}[$i]{"ring_1x"}; 
     #-- notation: 
     #  today_i    is today's waketime of timer i   
     #  tomorrow_i is tomorrow's waketime of timer i
@@ -1834,13 +1842,12 @@ sub YAAHM_setWeeklyTime($) {
     readingsBulkUpdate( $hash, "tomorrow_".$i."_e",$sg1en );
     readingsBulkUpdate( $hash, "ring_".$i,$ring_0 );    
     readingsBulkUpdate( $hash, "ring_".$i."_1",$ring_1 ); 
+    readingsBulkUpdate( $hash, "ring_".$i."x",$sg0mod );    
+    readingsBulkUpdate( $hash, "ring_".$i."_1x",$sg1mod ); 
     readingsBulkUpdate( $hash, "next_".$i,$ng );    
-    $hash->{DATA}{"WT"}[$i]{"ring_0"} = $ring_0; 
-    $hash->{DATA}{"WT"}[$i]{"ring_1"} = $ring_1; 
-    $hash->{DATA}{"WT"}[$i]{"ring_0x"} = $sg0mod; 
-    $hash->{DATA}{"WT"}[$i]{"ring_1x"} = $sg1mod;  
-    readingsEndUpdate($hash,1);
-    YAAHM_sayWeeklyTime($hash,$i,0);                                         
+   
+    readingsEndUpdate($hash,1);  
+    YAAHM_sayWeeklyTime($hash,$i,0);                                   
   }
 }
 
@@ -1856,7 +1863,7 @@ sub YAAHM_sayWeeklyTime($$$) {
   my ($hash,$timer,$sp) = @_;
   my $name = $hash->{NAME};
   
-  my ($tod,$tom,$ton,$hl,$ml,$tl,$ht,$mt,$tt,$tsay,$chg,$msg,$hw,$mw,$pt);
+  my ($tod,$tom,$ton,$hl,$ml,$tl,$ht,$mt,$tt,$tsay,$chg,$msg,$hw,$mw,$pt,$rea);
   
   #--determine which timer (duplicate check when coming from set)
   
@@ -1865,33 +1872,29 @@ sub YAAHM_sayWeeklyTime($$$) {
     Log3 $name,1,"[YAAHM_sayNextTime] ".$msg;
     return $msg;
   }
-
-  $tod = $hash->{DATA}{"WT"}[$timer]{"ring_0"};
-  $tom = $hash->{DATA}{"WT"}[$timer]{"ring_1"};
-  $ton = $hash->{DATA}{"WT"}[$timer]{"next"};
-  $msg = $hash->{DATA}{"WT"}[$timer]{"name"};
   
- ($hl,$ml) = split(':',strftime('%H:%M', localtime(time)));
-  $tl = 60*$hl+$ml;
+  #-- init message
+  $msg  = $hash->{DATA}{"WT"}[$timer]{"name"};
 
-  #-- today off AND tomorrow any time, off or special time
-  if( $tod eq "off" ){
+  #-- get timer values from readings, because these include vacation settings and special time
+  $tod  = $hash->{DATA}{"WT"}[$timer]{"ring_0x"};
+  $tom  = $hash->{DATA}{"WT"}[$timer]{"ring_1x"};
+
+  #-- current local time
+  ($hl,$ml) = split(':',strftime('%H:%M', localtime(time)));
+  $tl = 60*$hl+$ml;
+  
+  #-- today off AND tomorrow any time or off
+  if( $tod =~ /^off.*/ ){
     #-- special time
-    if( ($ton =~ /(\d?\d):(\d\d)(:(\d\d))?/) && ($tom ne $ton) ){
-      $hw = $1*1;
-      $mw = $2*1;
-      $pt = sprintf("%d:%02d",$hw,$mw)." ".lc($yaahm_tt->{"tomorrow"});    
-      $msg .= " ".lc($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"exceptly"}." $hw ".$yaahm_tt->{"clock"};
-      $msg .=" $mw"
-       if( $mw != 0 );
-    }elsif( $tom =~ /(\d?\d):(\d\d)(:(\d\d))?/ && $tom !~ /.*\(off\)$/ ){
+    if( $tom =~ /(\d?\d):(\d\d)(:(\d\d))?/ && $tom !~ /.*\(off\)$/ ){
       $hw = $1*1;
       $mw = $2*1;
       $pt = sprintf("%d:%02d",$hw,$mw)." ".lc($yaahm_tt->{"tomorrow"});
       $msg .= " ".lc($yaahm_tt->{"tomorrow"})." $hw ".$yaahm_tt->{"clock"};
       $msg .=" $mw"
        if( $mw != 0 );
-    }elsif( $tom eq "off" || $tom =~ /.*\(off\)$/ ){
+    }elsif( $tom =~ /^off/ || $tom =~ /.*\(off\)$/ ){
       $pt   = "off ".lc($yaahm_tt->{"today"})." ".$yaahm_tt->{"and"}." ".lc($yaahm_tt->{"tomorrow"});
       $msg .= " ".lc($yaahm_tt->{"today"})." ".$yaahm_tt->{"and"}." ".lc($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"swoff"};
     }else{
@@ -1901,7 +1904,7 @@ sub YAAHM_sayWeeklyTime($$$) {
   #-- today nontrivial => compare this time with current time
   }elsif( $tod =~ /(\d?\d):(\d\d)(:(\d\d))?/ ){
     #Log 1,"===========> |$1|$2|$3|$4";
-    ($ht,$mt) = split(':',$tod);
+    ($ht,$mt) = split('[\s:]',$tod);
     $tt=60*$ht+$mt;
     #-- wakeup later today
     if( $tt >= $tl ){
@@ -1928,6 +1931,9 @@ sub YAAHM_sayWeeklyTime($$$) {
       $msg .= " ".lc($yaahm_tt->{"tomorrow"})." $hw ".$yaahm_tt->{"clock"};
       $msg .=" $mw"
         if( $mw != 0 );
+    }elsif( $tom =~ /^off/ || $tom =~ /.*\(off\)$/ ){
+      $pt   = "off ".lc($yaahm_tt->{"tomorrow"});
+      $msg .= " ".lc($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"swoff"};
     }else{
       $pt   = $yaahm_tt->{"undecid"};
       $msg .= " ".$yaahm_tt->{"undecid"};
@@ -2262,12 +2268,14 @@ sub YAAHM_GetDayStatus($) {
   $hash->{DATA}{"DD"}[0]{"weekday"}   = (strftime('%w', localtime(time))+6)%7;
   $hash->{DATA}{"DD"}[0]{"daytype"}   = "workday";
   $hash->{DATA}{"DD"}[0]{"desc"}      = $yaahm_tt->{"workday"};
+  $hash->{DATA}{"DD"}[0]{"vacflag"}   = 0; 
   
   $tomtype = "workday";
   $hash->{DATA}{"DD"}[1]{"date"}      = $stom;
   $hash->{DATA}{"DD"}[1]{"weekday"}   = (strftime('%w', localtime(time+86400))+6)%7;
   $hash->{DATA}{"DD"}[1]{"daytype"}   = "workday";
   $hash->{DATA}{"DD"}[1]{"desc"}      = $yaahm_tt->{"workday"};
+  $hash->{DATA}{"DD"}[1]{"vacflag"}   = 0;
 
   #-- vacation = vacdays has higher priority
   my $vacdayDevs = AttrVal( $name, "vacationDevices", "" );
@@ -2280,13 +2288,13 @@ sub YAAHM_GetDayStatus($) {
       if ( $tod ne "none" ) {
         $todaydesc = $tod;
         $todaytype = "vacday";
-        Log3 $name, 1,"[YAAHM] found today=vacation \"$todaydesc\" in holiday $vacdayDev";
+        Log3 $name, 5,"[YAAHM] found today=vacation \"$todaydesc\" in holiday $vacdayDev";
       }
       $tod = holiday_refresh( $vacdayDev, $stom );
       if ( $tod ne "none" ) {
         $tomdesc = $tod;
         $tomtype = "vacday";
-        Log3 $name, 1,"[YAAHM] found tomorrow=vacation \"$tomdesc\" in holiday $vacdayDev";
+        Log3 $name, 5,"[YAAHM] found tomorrow=vacation \"$tomdesc\" in holiday $vacdayDev";
       } 
     #-- device of type calendar
     }elsif( IsDevice($vacdayDev, "Calendar" )){
@@ -2310,14 +2318,14 @@ sub YAAHM_GetDayStatus($) {
           if( ($rete>=0) && ($rets<=0) ){
             $todaydesc = $chunks[5];
             $todaytype = "vacation";
-            Log3 $name, 1,"[YAAHM] found today=vacation \"$todaydesc\" in calendar $vacdayDev";
+            Log3 $name, 5,"[YAAHM] found today=vacation \"$todaydesc\" in calendar $vacdayDev";
           }    
           $rets  = ($sday[2]-$tmor[2])*365+($sday[1]-$tmor[1])*31+($sday[0]-$tmor[0]);
           $rete  = ($eday[2]-$tmor[2])*365+($eday[1]-$tmor[1])*31+($eday[0]-$tmor[0]);
           if( ($rete>=0) && ($rets<=0) ){
             $tomdesc = $chunks[5];
             $tomtype = "vacation";
-            Log3 $name, 1,"[YAAHM] found tomorrow=vacation \"$tomdesc\" in calendar $vacdayDev";
+            Log3 $name, 5,"[YAAHM] found tomorrow=vacation \"$tomdesc\" in calendar $vacdayDev";
           }
         }
       }  
@@ -2329,15 +2337,15 @@ sub YAAHM_GetDayStatus($) {
   if( $todaytype eq "vacation" ){
     $hash->{DATA}{"DD"}[0]{"daytype"}    = "vacation";
     $hash->{DATA}{"DD"}[0]{"desc"}       = $todaydesc;
-  }else{
+    $hash->{DATA}{"DD"}[0]{"vacflag"}    = 1;
   }
   if( $tomtype eq "vacation" ){
     $hash->{DATA}{"DD"}[1]{"daytype"}    = "vacation";
     $hash->{DATA}{"DD"}[1]{"desc"}       = $tomdesc;
-  }else{
+    $hash->{DATA}{"DD"}[1]{"vacflag"}    = 1;
   }
   
-  #-- weekend has higher priority
+  #-- weekend has higher priority 
   if( strftime('%u', localtime(time)) > 5){
     $todaytype = "weekend";
     if( $hash->{DATA}{"DD"}[0]{"daytype"} ne "workday" ){
@@ -2355,7 +2363,7 @@ sub YAAHM_GetDayStatus($) {
     }else{
       $hash->{DATA}{"DD"}[1]{"desc"}       = $yaahm_tt->{"weekend"};
     }
-    $hash->{DATA}{"DD"}[1]{"daytype"}    = "weekend";
+    $hash->{DATA}{"DD"}[1]{"daytype"}   = "weekend";
   }
     
   #-- holidays have the highest priority
@@ -3022,7 +3030,7 @@ sub YAAHM_timewidget($){
   FW_pO 	 '<path d="M 0 0 '.$x_morning.' '.$y_morning.' A '.$radius.' '.$radius.' 0 0 1 '.$x_evening.' '.$y_evening.' Z" fill="url(#grad1)"/>';
   
   #-- evening to sunset sector
-  $dir = ( $ss < $ev ) ? 0 : 1;
+  $dir = ( $ss < $ev ) ? 1 : 0;
   FW_pO 	 '<path d="M 0 0 '.$x_evening.' '.$y_evening.' A '.$radius.' '.$radius.' 0 0 '.$dir.' '.$x_sunset.' '.$y_sunset.' Z" fill="url(#grad2)"/>';
   
   #-- midnight line
@@ -3097,7 +3105,6 @@ sub YAAHM_toptable($){
     my ($styl,$stym,$styr);
     my $ret = "";
     YAAHM_GetDayStatus($hash);
- 
     #--
     my $lockstate = ($hash->{READINGS}{lockstate}{VAL}) ? $hash->{READINGS}{lockstate}{VAL} : "unlocked";
     my $showhelper = ($lockstate eq "unlocked") ? 1 : 0; 
@@ -3149,7 +3156,7 @@ sub YAAHM_toptable($){
             for( my $i=0; $i<$cols; $i++){
               if( $i < int(@modes)){
                 $ret .= "<td width=\"120px\"><input type=\"button\" id=\"b_".$modes[$i]."\" value=\"".$yaahm_tt->{$modes[$i]}.
-                        "\" style=\"height:20px; width:120px;\" onclick=\"javascript:yaahm_mode('$name','".$modes[$i]."')\"/></td>";
+                        "\" style=\"width:120px;\" onclick=\"javascript:yaahm_mode('$name','".$modes[$i]."')\"/></td>";
               }else{
                 $ret .= "<td width=\"120px\"></td>";
               }
@@ -3162,7 +3169,7 @@ sub YAAHM_toptable($){
             for( my $i=0; $i<$cols; $i++){
               if( $i < int(@states)){
                 $ret .= "<td width=\"120px\"><input type=\"button\" id=\"b_".$states[$i]."\" value=\"".$yaahm_tt->{$states[$i]}.
-                        "\" style=\"height:20px; width:120px;\" onclick=\"javascript:yaahm_state('$name','".$states[$i]."')\"/></td>";
+                        "\" style=\"width:120px;\" onclick=\"javascript:yaahm_state('$name','".$states[$i]."')\"/></td>";
               }else{
                 $ret .= "<td width=\"120px\"></td>";
               }
@@ -3251,17 +3258,9 @@ sub YAAHM_toptable($){
       }   
 
       #-- ring times
-      my $ring_0   =  $hash->{DATA}{"WT"}[$i]{"ring_0x"}; 
-      my $ring_0_e = ReadingsVal($name,"today_".$i."_e","");
-      if( $ring_0_e=~ /^disabled \((.*)\)/ ){
-        $ring_0    = 'off ('.substr($yaahm_tt->{$1},0,3).')';
-      }
-      my $ring_1   = $hash->{DATA}{"WT"}[$i]{"ring_1x"};
-      my $ring_1_e = ReadingsVal($name,"tomorrow_".$i."_e","");
-      if( $ring_1_e=~ /^disabled \((.*)\)/ ){
-        $ring_1    = 'off ('.substr($yaahm_tt->{$1},0,3).')';
-      }
-      my $wake     = $hash->{DATA}{"WT"}[$i]{"wake"};
+      my $ring_0x   =  $hash->{DATA}{"WT"}[$i]{"ring_0x"}; 
+      my $ring_1x   = $hash->{DATA}{"WT"}[$i]{"ring_1x"};
+      my $wake      = $hash->{DATA}{"WT"}[$i]{"wake"};
       
       #-- border styles
  
@@ -3280,8 +3279,8 @@ sub YAAHM_toptable($){
       }  
       $ret.="<td style=\"padding:5px;$styl\">".$wupn.
             "</td><td style=\"text-align:center;width:30px;padding:5px;$stym\">$ts</td>".
-            "<td style=\"padding:5px;$stym\"><div class=\"dval\" informId=\"$name-ring_$i\">".$ring_0."</div></td>".
-            "<td style=\"padding:5px;$stym\"><div class=\"dval\" informId=\"$name-ring_".$i."_1\">".$ring_1."</div></td>".
+            "<td style=\"padding:5px;$stym\"><div class=\"dval\" informId=\"$name-ring_".$i."x\">".$ring_0x."</div></td>".
+            "<td style=\"padding:5px;$stym\"><div class=\"dval\" informId=\"$name-ring_".$i."_1x\">".$ring_1x."</div></td>".
             "<td style=\"padding:5px;$styr\"><div class=\"dval\" informId=\"$name-tr_wake_$i\">".$wake."</div></td></tr>\n";
     }
     $ret .= "</table></td></tr>\n";
@@ -3616,8 +3615,12 @@ sub YAAHM_Longtable($){
              <li><a name="yaahm_manualnext"></a>
                     <code>set &lt;name&gt; manualnext &lt;timernumber&gt; &lt;time&gt;</code><br/>
                     <code>set &lt;name&gt; manualnext &lt;timername&gt; &lt;time&gt;</code><br/>
-                    For the weekly timer identified by its number (starting at 0) or its name, set the next ring time manually. The time specification &lt;time&gt;must be in the format hh:mm or "off"
-                    If the time specification &lt;time&gt; is later than the current time, it will be used for today. If it is earlier than the current time, it will be used tomorrow.
+                    For the weekly timer identified by its number (starting at 0) or its name, set the next ring time manually. The time specification &lt;time&gt;must be in the format hh:mm, or "off", or "default".
+                    <ul>
+                    <li>If the time specification &lt;time&gt; is later than the current time, it will be used for today. If it is earlier than the current time, it will be used tomorrow.</li>
+                    <li>If the time specification is "off", the next pending waketime will be ignored.</li>
+                   <li>If the time specification id "default", the manual waketime is removed and the value from the weekly schedule will be used.</li>
+                   </ul>
                   </li>
              <li><a name="yaahm_mode">
                     <code>set &lt;name&gt; mode normal | party | absence | donotdisturb</code>

@@ -1,15 +1,20 @@
 //########################################################################################
 // yaahm.js
-// Version 1.30
+// Version 1.4
 // See 95_YAAHM for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
 
 function encodeParm(oldval) {
     var newval;
-    newval = oldval.replace(/\+/g, '%2B');
+    newval = oldval.replace(/"/g, '%27');
     newval = newval.replace(/#/g, '%23');
-    newval = newval.replace(/"/g, '%27');
+    newval = newval.replace(/\+/g, '%2B');
+    newval = newval.replace(/&/g, '%26');
+    newval = newval.replace(/'/g, '%27');
+    newval = newval.replace(/=/g, '%3D');
+    newval = newval.replace(/\?/g, '%3F');
+    newval = newval.replace(/\|/g, '%7C');
     return newval;
 }
 
