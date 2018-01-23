@@ -790,7 +790,8 @@ sub Babble_Normalize($$){
     if( $word[0] =~ /^gut.*/){
       $subcat = 1;
       $device="zeit";
-      $reading=$word[1];
+      $reading="zeit";
+      $value=$word[1];
       $reserve=$word[2]
         if( $word[2] );
       $verb="schalten";
@@ -1894,7 +1895,7 @@ sub Babble_Html($)
           $rot .= "<td class=\"col3\" colspan=\"3\" style=\"text-align:left;border-right:1px dotted gray;border-bottom: 1px dotted gray;border-top:1px solid gray;border-bottom-right-radius:10px; padding:2px;\">";        
           $rot .= "<input type=\"text\" name=\"d_help\" size=\"51\" maxlength=\"1024\" value=\"".$hlp."\"/></td>"; 
           $rot .= "<td style=\"text-align:left;padding-right:10px; border-top:1px solid gray\">".
-                  "<input type=\"button\" id=\"d_addrow\" onclick=\"babble_addrow('".$name."',$devcount,$tblrow)\" value=\"".$babble_tt->{"add"}."\" style=\"width:100px;\"/>$tblrow-$devcount.$devrow</td></tr>\n";
+                  "<input type=\"button\" id=\"d_addrow\" onclick=\"babble_addrow('".$name."',$devcount,$tblrow)\" value=\"".$babble_tt->{"add"}."\" style=\"width:100px;\"/></td></tr>\n";#$tblrow-$devcount.$devrow
  
           foreach my $place (keys %{$hash->{DATA}{"command"}{$lbdev}}){
             foreach my $verb (keys %{$hash->{DATA}{"command"}{$lbdev}{$place}}){
@@ -1913,7 +1914,7 @@ sub Babble_Html($)
                         "<td class=\"col3\"><select name=\"d_verb\">".$vblist."</select></td>".
                         "<td class=\"col3\"><select name=\"d_verbpart\">".$vpmlist."</select></td>\n";  
                 $rot .= "<td class=\"col3\"  style=\"text-align:left;padding:2px\"><input type=\"text\" name=\"d_command\" size=\"30\" maxlength=\"512\" value=\"".$cmd."\"/></td>";
-                $rot .= "<td><input type=\"button\" id=\"d_remrow\" onclick=\"babble_remrow('".$name."',$devcount,$tblrow)\" value=\"".$babble_tt->{"remove"}."\" style=\"width:100px;\"/>$tblrow-$devcount.$devrow</td></tr>\n";
+                $rot .= "<td><input type=\"button\" id=\"d_remrow\" onclick=\"babble_remrow('".$name."',$devcount,$tblrow)\" value=\"".$babble_tt->{"remove"}."\" style=\"width:100px;\"/></td></tr>\n";#$tblrow-$devcount.$devrow
               }
            }
         }
