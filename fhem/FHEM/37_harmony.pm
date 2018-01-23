@@ -1019,6 +1019,7 @@ harmony_Read($)
             if( defined($decoded->{sleepTimerId}) ) {
               if( $decoded->{sleepTimerId} == -1 ) {
                 delete $hash->{sleeptimer};
+                DoTrigger( $name, "sleeptimer: expired" );
               } else {
                 harmony_sendEngineGet($hash, "gettimerinterval", "timerId=$decoded->{sleepTimerId}");
               }
@@ -1104,6 +1105,7 @@ harmony_Read($)
 
           } elsif( $content =~ m/engine\?gettimerinterval/ && $decoded ) {
             $hash->{sleeptimer} = FmtDateTime( gettimeofday() + $decoded->{interval} );
+            DoTrigger( $name, "sleeptimer: $hash->{sleeptimer}" );
 
           } elsif( $content =~ m/firmware\?/ && $decoded ) {
             Log3 $name, 4, "$name: firmware: $cdata";
