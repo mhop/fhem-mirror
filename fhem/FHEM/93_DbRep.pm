@@ -36,6 +36,11 @@
 #
 ###########################################################################################################################
 #  Versions History:
+#
+# 7.5.4        24.01.2018       delseqdoubl_DoParse reviewed to optimize memory usage, executeBeforeDump executeAfterDump 
+#                               now available for "delSeqDoublets"
+# 7.5.3        23.01.2018       new attribute "ftpDumpFilesKeep", version management added to FTP-usage
+# 7.5.2        23.01.2018       fix typo DumpRowsCurrrent, dumpFilesKeep can be set to "0", commandref revised
 # 7.5.1        20.01.2018       DumpDone changed to create background_processing_time before execute "executeAfterProc" 
 #                               Commandref updated
 # 7.5.0        16.01.2018       DbRep_OutputWriteToDB, set options display/writeToDB for (max|min|sum|average|diff)Value
@@ -288,7 +293,7 @@ use Encode qw(encode_utf8);
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);      # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.5.1";
+my $DbRepVersion = "7.5.4";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -320,21 +325,22 @@ sub DbRep_Initialize($) {
 					   "dumpDirRemote ".
 					   "dumpMemlimit ".
 					   "dumpSpeed ".
-					   "dumpFilesKeep:1,2,3,4,5,6,7,8,9,10 ".
+					   "dumpFilesKeep:0,1,2,3,4,5,6,7,8,9,10 ".
 					   "executeBeforeProc ".
 					   "executeAfterProc ".
                        "expimpfile ".
 					   "fetchRoute:ascent,descent ".
-					   "ftpUse:1,0 ".
-					   "ftpUser ".
-					   "ftpUseSSL:1,0 ".
 					   "ftpDebug:1,0 ".
 					   "ftpDir ".
+                       "ftpDumpFilesKeep:1,2,3,4,5,6,7,8,9,10 ".
 					   "ftpPassive:1,0 ".
 					   "ftpPwd ".
 					   "ftpPort ".
 					   "ftpServer ".
 					   "ftpTimeout ".
+					   "ftpUse:1,0 ".
+					   "ftpUser ".
+					   "ftpUseSSL:1,0 ".
                        "aggregation:hour,day,week,month,no ".
 					   "diffAccept ".
 					   "limit ".
@@ -515,6 +521,16 @@ sub DbRep_Set($@) {
        return undef;
   }
   
+  if ($opt =~ m/delSeqDoublets/ && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
+      if ($prop =~ /delete/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
+          return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
+      } 
+      DbRep_beforeproc($hash, "delSeq");	  
+      DbRep_Main($hash,$opt,$prop); 
+      return undef;      
+  } 
+  
   if ($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) {
       $setlist = "Unknown argument $opt, choose one of ".
                 (($hash->{ROLE} ne "Agent")?"cancelDump:noArg ":"");
@@ -529,7 +545,7 @@ sub DbRep_Set($@) {
   } 
   
   #######################################################################################################
-  ##        keine Aktionen außer Backup/Restore solange Reopen xxxx im DbLog-Device läuft
+  ##        keine Aktionen außer die über diesem Eintrag solange Reopen xxxx im DbLog-Device läuft
   #######################################################################################################
   if ($hash->{dbloghash}{HELPER}{REOPEN_RUNS} && $opt !~ /\?/) {
       my $ro = (split(" ",FmtDateTime(gettimeofday()+$hash->{dbloghash}{HELPER}{REOPEN_RUNS})))[1];
@@ -543,13 +559,6 @@ sub DbRep_Set($@) {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my $table = $prop?$prop:"history";
       DbRep_Main($hash,$opt,$table);
-      
-  } elsif ($opt =~ m/delSeqDoublets/ && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
-      if ($prop =~ /delete/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
-          return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
-      } 
-      DbRep_Main($hash,$opt,$prop);
       
   } elsif ($opt =~ /fetchrows/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
@@ -4154,15 +4163,16 @@ sub delseqdoubl_DoParse($) {
  $selspec = "DEVICE,READING,TIMESTAMP,VALUE";
   
  # SQL zusammenstellen für DB-Abfrage
- $sql = createSelectSql($hash,$table,$selspec,$device,$reading,"?","?","ORDER BY TIMESTAMP ASC");
+ $sql = createSelectSql($hash,$table,$selspec,$device,$reading,"?","?","ORDER BY DEVICE,READING,TIMESTAMP ASC");
  $sth = $dbh->prepare_cached($sql);
  
  # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
- my @row_array;
  my @remain;
  my @todel; 
- my $ndel = 0;
- my $rt   = 0;
+ my $nremain = 0;
+ my $ntodel  = 0;
+ my $ndel    = 0;
+ my $rt      = 0;
  
  no warnings 'uninitialized'; 
  
@@ -4177,7 +4187,7 @@ sub delseqdoubl_DoParse($) {
      $st = [gettimeofday];
      
      # SQL zusammenstellen für Logausgabe
-	 my $sql1 = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');  
+	 my $sql1 = createSelectSql($hash,$table,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');  
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql1"); 
  
 	 eval{$sth->execute($runtime_string_first, $runtime_string_next);};
@@ -4191,89 +4201,80 @@ sub delseqdoubl_DoParse($) {
  
      # SQL-Laufzeit ermitteln
      $rt = $rt+tv_interval($st);
- 
-     @row_array = map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."\n" } @{$sth->fetchall_arrayref()};
-     
-     $nrows = $#row_array+1;                # Anzahl der Ergebniselemente  
-     # s/ /_ESC_/ for @row_array;           # Leerzeichen in TIMESTAMP escapen
- 
+        
      # Beginn Löschlogik, Zusammenstellen der löschenden DS (warping)
 	 # Die Arrays @remain, @sel enthalten die VERBLEIBENDEN Datensätze
-     my $i = 0;
      my (@sel,@warp);
      my ($or,$oor,$odev,$oread,$oval,$ooval,$ndev,$nread,$nval);
 	 
-	 my @sort = sort @row_array;                                        # Reihenfolge device,reading sortieren
-     foreach my $nr (@sort) {
-         if($i == 0 || $i == $#sort) {
-	         push (@sel,$nr);
-	     } else {                 
-			 ($ndev,$nread,undef,undef,$nval) = split("_ESC_", $nr);    # Werte des aktuellen Elements
-	         $or = pop @sel;                                            # das letzte Element der Liste                         
-			 ($odev,$oread,undef,undef,$oval) = split("_ESC_", $or);    # Value des letzten Elements
-             if (looks_like_number($oval) && $var) {                    # Varianz +- falls $val numerischer Wert
-                 $var1 = $oval + $var;
-                 $var2 = $oval - $var;
-             } else {
-                 undef $var1;
-                 undef $var2;
-             }
-	         $oor = pop @sel;                                           # das vorletzte Element der Liste
-		     $ooval = (split '_ESC_', $oor)[-1];                        # Value des vorletzten Elements
-		     if ($ndev.$nread ne $odev.$oread) {
-		         push (@sel,$oor);
-		         push (@sel,$or);
-			     push (@sel,$nr);
-			 } elsif ($ooval eq $oval || (($var1 && ($ooval <= $var1)) && ($var2 && ($var2 <= $ooval))) ) {
-		         push (@sel,$oor);
-			     push (@sel,$nr);
-                 # Log3 ($name, 5, "DbRep $name -> warping: $or");
-                 push (@warp,$or);                                      # Array der zu löschenden Datensätze
-                 if ($opt =~ /delete/ && $or) {                         # delete Datensätze
-				     my ($dev,$read,$date,$time,$val) = split("_ESC_", $or);
-					 my $dt = $date." ".$time;
-					 chomp($val);
-					 $dev  =~ s/'/''/g;                                 # escape ' with ''
-					 $read =~ s/'/''/g;                                 # escape ' with ''
-					 $val  =~ s/'/''/g;                                 # escape ' with ''
-					 $st = [gettimeofday];
-					 my $dsql = "delete FROM $table where TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val';";
-					 my $sthd = $dbh->prepare($dsql); 
-                     Log3 ($name, 4, "DbRep $name - SQL execute: $dsql"); 
+     foreach my $nr (map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3] } @{$sth->fetchall_arrayref()}) {               
+	     ($ndev,$nread,undef,undef,$nval) = split("_ESC_", $nr);    # Werte des aktuellen Elements
+	     $or = pop @sel;                                            # das letzte Element der Liste                         
+         ($odev,$oread,undef,undef,$oval) = split("_ESC_", $or);    # Value des letzten Elements      
+         if (looks_like_number($oval) && $var) {                    # Varianz +- falls $val numerischer Wert
+             $var1 = $oval + $var;
+             $var2 = $oval - $var;
+         } else {
+             undef $var1;
+             undef $var2;
+         }
+	     $oor = pop @sel;                                           # das vorletzte Element der Liste
+		 $ooval = (split '_ESC_', $oor)[-1];                        # Value des vorletzten Elements
+		 if ($ndev.$nread ne $odev.$oread) {
+		     push (@sel,$oor);
+		     push (@sel,$or);
+		     push (@sel,$nr);
+		 } elsif (($ooval eq $oval && $oval eq $nval) || ($var1 && $var2 && ($ooval <= $var1) && ($var2 <= $ooval) && ($nval <= $var1) && ($var2 <= $nval)) ) {
+		     push (@sel,$oor);
+		     push (@sel,$nr);
+             push (@warp,$or);                                      # Array der zu löschenden Datensätze
+             if ($opt =~ /delete/ && $or) {                         # delete Datensätze
+		         my ($dev,$read,$date,$time,$val) = split("_ESC_", $or);
+				 my $dt = $date." ".$time;
+				 chomp($val);
+				 $dev  =~ s/'/''/g;                                 # escape ' with ''
+				 $read =~ s/'/''/g;                                 # escape ' with ''
+				 $val  =~ s/'/''/g;                                 # escape ' with ''
+				 $st = [gettimeofday];
+				 my $dsql = "delete FROM $table where TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val';";
+				 my $sthd = $dbh->prepare($dsql); 
+                 Log3 ($name, 4, "DbRep $name - SQL execute: $dsql"); 
 					 
-					 eval {$sthd->execute();};
-					 if ($@) {
-                         $err = encode_base64($@,"");
-                         Log3 ($name, 2, "DbRep $name - $@");
-                         $dbh->disconnect;
-                         Log3 ($name, 4, "DbRep $name -> BlockingCall delseqdoubl_DoParse finished");
-                         return "$name|''|''|$err|''|$opt";
-                     } 
-					 $ndel = $ndel+$sthd->rows;
-                     $dbh->commit() if(!$dbh->{AutoCommit});
+				 eval {$sthd->execute();};
+				 if ($@) {
+                     $err = encode_base64($@,"");
+                     Log3 ($name, 2, "DbRep $name - $@");
+                     $dbh->disconnect;
+                     Log3 ($name, 4, "DbRep $name -> BlockingCall delseqdoubl_DoParse finished");
+                     return "$name|''|''|$err|''|$opt";
+                 } 
+				 $ndel = $ndel+$sthd->rows;
+                 $dbh->commit() if(!$dbh->{AutoCommit});
 					 
-					 $rt = $rt+tv_interval($st);
-				 }				 
-		     } else {
-		         push (@sel,$oor);
-		         push (@sel,$or);
-			     push (@sel,$nr);
-		     }
-	     }
-     $i++;
-     }	 
-
- push(@remain,@sel) if(@sel);      # die verbleibenden Datensätze nach Ausführung
- push(@todel,@warp) if(@warp);     # die zu löschenden Datensätze
- # Ende Löschlogik
+				 $rt = $rt+tv_interval($st);
+			 }				 
+		 } else {
+		     push (@sel,$oor);
+		     push (@sel,$or);
+		     push (@sel,$nr);
+		 }
+     }
+     if(@sel && $opt =~ /adviceRemain/) {
+         # die verbleibenden Datensätze nach Ausführung (nur zur Anzeige) 
+         push(@remain,@sel) if($#remain+1 < $limit);      
+     }
+     if(@warp && $opt =~ /adviceDelete/) {
+         # die zu löschenden Datensätze (nur zur Anzeige)
+         push(@todel,@warp) if($#todel+1 < $limit);    
+     }
+     $nremain = $nremain + $#sel if(@sel);
+     $ntodel = $ntodel + $#warp if(@warp);
  }
- 
- my $nremain = $#remain+1; 
- my $ntodel  = $#todel+1; 
+  
  my $retn = ($opt =~ /adviceRemain/)?$nremain:($opt =~ /adviceDelete/)?$ntodel:$ndel; 
 
  my @retarray = ($opt =~ /adviceRemain/)?@remain:($opt =~ /adviceDelete/)?@todel:" "; 
- splice(@retarray,$limit+10);
+ # splice(@retarray,$limit+10);
  if ($utf8 && @retarray) {
      $rowlist = Encode::encode_utf8(join('|', @retarray));
  } elsif(@retarray) {
@@ -4319,6 +4320,7 @@ sub delseqdoubl_ParseDone($) {
   my @row;
   my $l = 1;
   my $reading_runtime_string;
+  my $erread;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall delseqdoubl_ParseDone");
   
@@ -4329,6 +4331,9 @@ sub delseqdoubl_ParseDone($) {
       Log3 ($name, 4, "DbRep $name -> BlockingCall delseqdoubl_ParseDone finished");
       return;
   } 
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "delSeq");
   
   # Readingaufbereitung
   readingsBeginUpdate($hash);
@@ -4355,6 +4360,7 @@ sub delseqdoubl_ParseDone($) {
 		  $l++;
       }
   }
+  
   use warnings;
   my $sfx = AttrVal("global", "language", "EN");
   $sfx = ($sfx eq "EN" ? "" : "_$sfx");
@@ -5536,7 +5542,7 @@ sub mysql_DoDumpClientSide($) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
-     return "$name|''|$err|''|''|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''|''";
  }
  
  # SQL-Startzeit
@@ -5551,7 +5557,7 @@ sub mysql_DoDumpClientSide($) {
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''|''";
  }
   
  my @mysql_version = $sth->fetchrow;
@@ -5605,7 +5611,7 @@ sub mysql_DoDumpClientSide($) {
      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''|''";
  }
     
  while ( $value = $sth->fetchrow_hashref()) {
@@ -5670,7 +5676,7 @@ sub mysql_DoDumpClientSide($) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''|''";
  }
 
  if($optimize_tables_beforedump) {
@@ -5679,7 +5685,7 @@ sub mysql_DoDumpClientSide($) {
      ($err,$db_MB_start,$db_MB_end) = mysql_optimize_tables($hash,$dbh,@tablenames);
 	 if ($err) {
 	     $err = encode_base64($err,"");
-		 return "$name|''|$err|''|''|''|''|''|''";
+		 return "$name|''|$err|''|''|''|''|''|''|''";
 	 }
  }
     
@@ -5708,7 +5714,7 @@ sub mysql_DoDumpClientSide($) {
 			 $err = encode_base64($@,"");
              Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 			 $dbh->disconnect;
-             return "$name|''|$err|''|''|''|''|''|''";
+             return "$name|''|$err|''|''|''|''|''|''|''";
          }
 	     $db_tables{$tablename}{Rows} = $sth->fetchrow;
          $sth->finish;  
@@ -5750,7 +5756,7 @@ sub mysql_DoDumpClientSide($) {
      Log3 ($name, 2, "DbRep $name - $err");
 	 $err = encode_base64($err,"");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
-     return "$name|''|$err|''|''|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''|''";
  } else {
      Log3 ($name, 5, "DbRep $name - New dumpfile $sql_file has been created.");
  }
@@ -5786,7 +5792,7 @@ sub mysql_DoDumpClientSide($) {
 			 $err = encode_base64($@,"");
              Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 			 $dbh->disconnect;
-             return "$name|''|$err|''|''|''|''|''|''";
+             return "$name|''|$err|''|''|''|''|''|''|''";
          }
          
 		 @ergebnis = $sth->fetchrow;
@@ -5823,7 +5829,7 @@ sub mysql_DoDumpClientSide($) {
 				 $err = encode_base64($@,"");
                  Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 				 $dbh->disconnect;
-                 return "$name|''|$err|''|''|''|''|''|''";
+                 return "$name|''|$err|''|''|''|''|''|''|''";
              }
              
 			 while (@ar = $sth->fetchrow) {
@@ -5859,7 +5865,7 @@ sub mysql_DoDumpClientSide($) {
 					 $err = encode_base64($@,"");
                      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 					 $dbh->disconnect;
-                     return "$name|''|$err|''|''|''|''|''|''";
+                     return "$name|''|$err|''|''|''|''|''|''|''";
                  }
                     
 				 while ( @ar = $sth->fetchrow) {
@@ -5913,9 +5919,11 @@ sub mysql_DoDumpClientSide($) {
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
  
- # Dumpfile per FTP senden
- my ($ftperr,$ftpmsg) = sendftp($hash,$sql_file); 
+ # Dumpfile per FTP senden und versionieren
+ my ($ftperr,$ftpmsg,@ftpfd) = sendftp($hash,$backupfile); 
  my $ftp = $ftperr?encode_base64($ftperr,""):$ftpmsg?encode_base64($ftpmsg,""):0;
+ my $ffd = join(", ", @ftpfd);
+ $ffd    = $ffd?encode_base64($ffd,""):0;
  
  # alte Dumpfiles löschen
  my @fd  = deldumpfiles($hash,$backupfile);
@@ -5933,7 +5941,7 @@ sub mysql_DoDumpClientSide($) {
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname, total time used: ".sprintf("%.0f",$brt)." sec.");
  Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
  
-return "$name|$rt|''|$sql_file|$drc|$drh|$fsize|$ftp|$bfd";
+return "$name|$rt|''|$sql_file|$drc|$drh|$fsize|$ftp|$bfd|$ffd";
 }
 
 ####################################################################################################
@@ -5968,7 +5976,7 @@ sub mysql_DoDumpServerSide($) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
-     return "$name|''|$err|''|''|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''|''";
  }
  
  # Eigenschaften der vorhandenen Tabellen ermitteln (SHOW TABLE STATUS -> Rows sind nicht exakt !!)
@@ -5987,7 +5995,7 @@ sub mysql_DoDumpServerSide($) {
      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''|''";
  }
     
  while ( $value = $sth->fetchrow_hashref()) {
@@ -6016,7 +6024,7 @@ sub mysql_DoDumpServerSide($) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''|''";
  }
  
  if($optimize_tables_beforedump) {
@@ -6025,7 +6033,7 @@ sub mysql_DoDumpServerSide($) {
      ($err,$db_MB_start,$db_MB_end) = mysql_optimize_tables($hash,$dbh,@tablenames);
 	 if ($err) {
 	     $err = encode_base64($err,"");
-		 return "$name|''|$err|''|''|''|''|''|''";
+		 return "$name|''|$err|''|''|''|''|''|''|''";
 	 }
  }
  
@@ -6056,7 +6064,7 @@ sub mysql_DoDumpServerSide($) {
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
 	 $dbh->disconnect;
-     return "$name|''|$err|''|''|''|''|''|''";     
+     return "$name|''|$err|''|''|''|''|''|''|''";     
   }
   
  $sth->finish;
@@ -6074,9 +6082,11 @@ sub mysql_DoDumpServerSide($) {
  Log3 ($name, 3, "DbRep $name - Number of exported datasets: $drh");
  Log3 ($name, 3, "DbRep $name - Size of backupfile: ".byte_output($filesize));
  
- # Dumpfile per FTP senden
- my ($ftperr,$ftpmsg) = sendftp($hash,$bfile); 
+ # Dumpfile per FTP senden und versionieren
+ my ($ftperr,$ftpmsg,@ftpfd) = sendftp($hash,$bfile); 
  my $ftp = $ftperr?encode_base64($ftperr,""):$ftpmsg?encode_base64($ftpmsg,""):0;
+ my $ffd = join(", ", @ftpfd);
+ $ffd    = $ffd?encode_base64($ffd,""):0;
  
  # alte Dumpfiles löschen
  my @fd  = deldumpfiles($hash,$bfile);
@@ -6094,7 +6104,7 @@ sub mysql_DoDumpServerSide($) {
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used: ".sprintf("%.0f",$brt)." seconds");
  Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
  
-return "$name|$rt|''|$dump_path_rem$bfile|n.a.|$drh|$fsize|$ftp|$bfd";
+return "$name|$rt|''|$dump_path_rem$bfile|n.a.|$drh|$fsize|$ftp|$bfd|$ffd";
 }
 
 ####################################################################################################
@@ -6128,7 +6138,7 @@ sub sqlite_DoDump($) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
-     return "$name|''|$err|''|''|''|''|''|''";
+     return "$name|''|$err|''|''|''|''|''|''|''";
  }
  
  if($optimize_tables_beforedump) {
@@ -6149,7 +6159,7 @@ sub sqlite_DoDump($) {
          Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
 		 $sth->finish;
 		 $dbh->disconnect;
-         return "$name|''|$err|''|''|''|''|''|''";     
+         return "$name|''|$err|''|''|''|''|''|''|''";     
 	 }
 	 
 	 # Endgröße ermitteln
@@ -6181,7 +6191,7 @@ sub sqlite_DoDump($) {
      Log3 ($name, 2, "DbRep $name - $@");
      Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
      $dbh->disconnect;
-     return "$name|''|$err|''|''|''|''|''|''";     
+     return "$name|''|$err|''|''|''|''|''|''|''";     
  }
   
  $dbh->disconnect;
@@ -6196,9 +6206,11 @@ sub sqlite_DoDump($) {
  my $fsize    = byte_output($filesize);
  Log3 ($name, 3, "DbRep $name - Size of backupfile: ".$fsize);
  
- # Dumpfile per FTP senden
- my ($ftperr,$ftpmsg) = sendftp($hash,$bfile); 
+ # Dumpfile per FTP senden und versionieren
+ my ($ftperr,$ftpmsg,@ftpfd) = sendftp($hash,$bfile); 
  my $ftp = $ftperr?encode_base64($ftperr,""):$ftpmsg?encode_base64($ftpmsg,""):0;
+ my $ffd = join(", ", @ftpfd);
+ $ffd    = $ffd?encode_base64($ffd,""):0;
  
  # alte Dumpfiles löschen
  my @fd  = deldumpfiles($hash,$bfile);
@@ -6215,7 +6227,7 @@ sub sqlite_DoDump($) {
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used: ".sprintf("%.0f",$brt)." seconds");
  Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
  
-return "$name|$rt|''|$dump_path$bfile|n.a.|n.a.|$fsize|$ftp|$bfd";
+return "$name|$rt|''|$dump_path$bfile|n.a.|n.a.|$fsize|$ftp|$bfd|$ffd";
 }
 
 ####################################################################################################
@@ -6234,6 +6246,7 @@ sub DumpDone($) {
   my $fs         = $a[6]?decode_base64($a[6]):undef;
   my $ftp        = $a[7]?decode_base64($a[7]):undef;
   my $bfd        = $a[8]?decode_base64($a[8]):undef;
+  my $ffd        = $a[9]?decode_base64($a[9]):undef;
   my $name       = $hash->{NAME};
   my $erread;
   
@@ -6256,9 +6269,10 @@ sub DumpDone($) {
   ReadingsBulkUpdateValue($hash, "DumpFileCreated", $bfile);
   ReadingsBulkUpdateValue($hash, "DumpFileCreatedSize", $fs);
   ReadingsBulkUpdateValue($hash, "DumpFilesDeleted", $bfd);
-  ReadingsBulkUpdateValue($hash, "DumpRowsCurrrent", $drc);
+  ReadingsBulkUpdateValue($hash, "DumpRowsCurrent", $drc);
   ReadingsBulkUpdateValue($hash, "DumpRowsHistory", $drh);
   ReadingsBulkUpdateValue($hash, "FTP_Message", $ftp) if($ftp);
+  ReadingsBulkUpdateValue($hash, "FTP_DumpFilesDeleted", $ffd) if($ffd);
   ReadingsBulkUpdateValue($hash, "background_processing_time", sprintf("%.4f",$brt));
   readingsEndUpdate($hash, 1);
 
@@ -6502,10 +6516,16 @@ sub ParseAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh = $hash->{DBH}; 
+  my $erread;
   
   $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
-
+  
+  # Befehl nach Procedure ausführen
+  no warnings 'uninitialized'; 
+  $erread = DbRep_afterproc($hash, "command");
+  $erread = ", ".(split("but", $erread))[1] if($erread);    
+  
   $dbh->disconnect() if(defined($dbh));
   ReadingsSingleUpdateValue ($hash,"state",$cause, 1);
   
@@ -7203,6 +7223,10 @@ sub sendftp ($$) {
   my $ftpPwd        = AttrVal($name,"ftpPwd",undef);
   my $ftpPassive    = AttrVal($name,"ftpPassive",0);
   my $ftpDebug      = AttrVal($name,"ftpDebug",0);
+  my $fdfk          = AttrVal($name,"ftpDumpFilesKeep", 3);
+  my $pfix          = (split '\.', $bfile)[-1];
+  my $dbname        = (split '_', $bfile)[0];
+  my $ftpl          = $dbname."_.*".$pfix;
   my ($ftperr,$ftpmsg,$ftp);
   
   # kein FTP verwenden oder möglich
@@ -7286,8 +7310,23 @@ sub sendftp ($$) {
       $ftpmsg = "FTP: ".$file." transferred successfully to ".$ftpServer." into dir ".$ftpDir; 
       Log3($name, 3, "DbRep $name - $ftpmsg");	  
   }
+  
+  # Versionsverwaltung FTP-Verzeichnis
+  my (@ftl,@ftpfd);
+  if($ftpuseSSL) {
+      @ftl = sort grep {/^$ftpl$/} $ftp->nlst();
+  } else {
+      @ftl = sort grep {/^$ftpl$/} @{$ftp->ls()};
+  }
+  Log3($name, 5, "DbRep $name - FTP: filelist of \"$ftpDir\": @ftl");
+  my $max = int(@ftl)-$fdfk;
+  for(my $i = 0; $i < $max; $i++) {
+      push(@ftpfd, $ftl[$i]);
+      Log3($name, 3, "DbRep $name - FTP: deleting old dumpfile '$ftl[$i]' ");
+      $ftp->delete($ftl[$i]);
+  }
 
-return ($ftperr,$ftpmsg);
+return ($ftperr,$ftpmsg,@ftpfd);
 }
 
 ####################################################################################################
@@ -7685,7 +7724,7 @@ return;
      <li> automatic rename of device names in datasets and other DbRep-definitions after FHEM "rename" command (see <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Execution of arbitrary user specific SQL-commands </li>
 	 <li> creation of backups of the database in running state non-blocking (MySQL, SQLite) </li>
-	 <li> transfer dumpfiles to a FTP server after backup </li>
+	 <li> transfer dumpfiles to a FTP server after backup incl. version control</li>
 	 <li> restore of SQLite-dumps and MySQL serverSide-backups non-blocking </li>
 	 <li> optimize the connected database (optimizeTables, vacuum) </li>
 	 <li> report of existing database processes (MySQL) </li>
@@ -7757,7 +7796,7 @@ return;
  
  <ul><ul>
     <li><b> averageValue [display | writeToDB]</b> 
-                                 - calculates the average value of database column "VALUE" between period given by 
+                                 - calculates the arithmetical average of database column "VALUE" between period given by 
                                  timestamp-<a href="#DbRepattr">attributes</a> which are set. 
                                  The reading to evaluate must be specified using attribute "reading".  <br>
                                  
@@ -7823,7 +7862,10 @@ return;
 								 The amount of datasets to show by commands "delSeqDoublets adviceDelete", "delSeqDoublets adviceRemain" is 
 								 initially limited (default: 1000) and can be adjusted by <a href="#DbRepattr">attribute</a> "limit".
 								 The adjustment of "limit" has no impact to the "delSeqDoublets delete" function, but affects <b>ONLY</b> the 
-								 display of the data.	 <br><br>			 
+								 display of the data.  <br>
+							     Before and after this "delSeqDoublets" it is possible to execute a FHEM command or Perl-script 
+                                 (please see <a href="#DbRepattr">attributes</a>  "executeBeforeProc" and "executeAfterProc"). 
+                                 <br><br>                                 
 								  
 								 <ul>
 								 <b>Example</b> - the remaining datasets after executing delete-option are are marked as <b>bold</b>: <br><br>
@@ -7953,7 +7995,9 @@ return;
                                  
 								 After a successfull finished dump the old dumpfiles are deleted and only the number of files 
                                  defined by attribute "dumpFilesKeep" (default: 3) remain in the target directory 
-                                 "dumpDirLocal". <br><br>
+                                 "dumpDirLocal". If "dumpFilesKeep = 0" is set, all
+                                 dumpfiles (also the current created file), are deleted. This setting can be helpful, if FTP transmission is used
+                                 and the created dumps are only keep remain in the FTP destination directory. <br><br>
 
 								 The <b>naming convention of dump files</b> is:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sql <br><br>
 								 
@@ -8024,7 +8068,9 @@ return;
 
 								 <b><u>FTP-Transfer after Dump</u></b> <br>
 								 If those possibility is be used, the <a href="#DbRepattr">attribute</a> "ftpUse" or 
-								 "ftpUseSSL" has to be set. The latter if encoding for FTP is to be used. <br>
+								 "ftpUseSSL" has to be set. The latter if encoding for FTP is to be used. 
+                                 The module also carries the version control of dump files in FTP-destination by attribute 
+                                 "ftpDumpFilesKeep". <br>
 								 Further <a href="#DbRepattr">attributes</a> are: <br><br>
 								 
 	                               <ul>
@@ -8035,7 +8081,8 @@ return;
                                       <tr><td> ftpUseSSL   </td><td>: FTP Transfer with SSL encoding after dump </td></tr>
                                       <tr><td> ftpDebug    </td><td>: debugging of FTP communication for diagnostics </td></tr>
 	                                  <tr><td> ftpDir      </td><td>: directory on FTP-server in which the file will be send into (default: "/") </td></tr>
-	                                  <tr><td> ftpPassive  </td><td>: set if passive FTP is to be used </td></tr>
+	                                  <tr><td> ftpDumpFilesKeep </td><td>: leave the number of dump files in FTP-destination &lt;ftpDir&gt; (default: 3) </td></tr>
+                                      <tr><td> ftpPassive  </td><td>: set if passive FTP is to be used </td></tr>
 	                                  <tr><td> ftpPort     </td><td>: FTP-Port, default: 21 </td></tr>
 									  <tr><td> ftpPwd      </td><td>: password of FTP-User, not set by default </td></tr>
 									  <tr><td> ftpServer   </td><td>: name or IP-address of FTP-server. <b>absolutely essential !</b> </td></tr>
@@ -8069,7 +8116,9 @@ return;
                                  "executeAfterProc" and "optimizeTablesBeforeDump". <br>
                                  
 								 After a successfull finished dump the old dumpfiles are deleted and only the number of attribute 
-								 "dumpFilesKeep" (default: 3) remain in the target directory "dumpDirLocal". <br><br>
+								 "dumpFilesKeep" (default: 3) remain in the target directory "dumpDirLocal". If "dumpFilesKeep = 0" is set, all
+                                 dumpfiles (also the current created file), are deleted. This setting can be helpful, if FTP transmission is used
+                                 and the created dumps are only keep remain in the FTP destination directory. <br><br>
 
 								 The <b>naming convention of dump files</b> is:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sqlitebkp <br><br>
 					 
@@ -8581,6 +8630,9 @@ sub bdump {
   
   <li><b>ftpDir </b>          - directory on FTP-server in which the file will be send into (default: "/"). </li> <br>
   
+  <li><b>ftpDumpFilesKeep </b> - leave the number of dump files in FTP-destination &lt;ftpDir&gt; (default: 3). Are there more 
+                                (older) dump files present, these files are deleted after a new dump was transfered successfully. </li> <br>   
+  
   <li><b>ftpPassive </b>      - set if passive FTP is to be used </li> <br>
   
   <li><b>ftpPort </b>         - FTP-Port, default: 21 </li> <br>
@@ -8723,7 +8775,7 @@ sub bdump {
 		<br>  
         
                                 
-  <li><b>timeYearPeriod </b> - Get by this attribute an annual time period will be determined for database data selection. 
+  <li><b>timeYearPeriod </b> - By this attribute an annual time period will be determined for database data selection. 
                                The time limits are calculated dynamically during execution time. Every time an annual period is determined. 
                                Periods of less than a year are not possible to set. <br>
                                This attribute is particularly intended to make reports synchronous to an account period, e.g. of an energy- or gas provider.
@@ -8985,7 +9037,7 @@ sub bdump {
 	      Befehl (siehe <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Ausführen von beliebigen Benutzer spezifischen SQL-Kommandos </li>
 	 <li> Backups der FHEM-Datenbank im laufenden Betrieb erstellen (MySQL, SQLite) </li>
-	 <li> senden des Dumpfiles zu einem FTP-Server nach dem Backup </li>
+	 <li> senden des Dumpfiles zu einem FTP-Server nach dem Backup incl. Versionsverwaltung </li>
 	 <li> Restore von SQLite-Dumps und MySQL serverSide-Backups </li>
 	 <li> Optimierung der angeschlossenen Datenbank (optimizeTables, vacuum) </li>
 	 <li> Ausgabe der existierenden Datenbankprozesse (MySQL) </li>
@@ -9056,8 +9108,8 @@ sub bdump {
  
  <ul><ul>
     <li><b> averageValue [display | writeToDB]</b> 
-                                 - berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den gegebenen 
-	                             Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
+                                 - berechnet den arithmetische Mittelwert (Durchschnittswert) des Datenbankfelds "VALUE" in den 
+                                 gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
                                  Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
 								 angegeben sein. <br>
                                  Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
@@ -9127,7 +9179,10 @@ sub bdump {
 								 Die Anzahl der anzuzeigenden Datensätze der Kommandos "delSeqDoublets adviceDelete", "delSeqDoublets adviceRemain" ist 
 								 zunächst begrenzt (default 1000) und kann durch das <a href="#DbRepattr">Attribut</a> "limit" angepasst werden.
 								 Die Einstellung von "limit" hat keinen Einfluss auf die "delSeqDoublets delete" Funktion, sondern beeinflusst <b>NUR</b> die 
-								 Anzeige der Daten.	 <br><br>						   
+								 Anzeige der Daten.	 <br>
+                                 Vor und nach der Ausführung von "delSeqDoublets" kann ein FHEM-Kommando bzw. Perl-Routine ausgeführt werden. 
+                                 (siehe <a href="#DbRepattr">Attribute</a>  "executeBeforeProc", "executeAfterProc")
+                                 <br><br>						   
 								  
 								 <ul>
 								 <b>Beispiel</b> - die nach Verwendung der delete-Option in der DB verbleibenden Datensätze sind <b>fett</b>
@@ -9189,7 +9244,7 @@ sub bdump {
                                  </ul>
           
     <li><b> diffValue [display | writeToDB] </b>    
-                                 - berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow / timeOlderThan". 
+                                 - berechnet den Differenzwert des Datenbankfelds "VALUE" in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow / timeOlderThan". 
                                  Es muss das auszuwertende Reading im Attribut "reading" angegeben sein. 
                                  Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. <br>								 
                                  Es wird immer die Differenz aus dem Value-Wert des ersten verfügbaren Datensatzes und dem Value-Wert des letzten verfügbaren Datensatzes innerhalb der angegebenen
@@ -9253,8 +9308,10 @@ sub bdump {
                                  
 								 Die für "dumpMySQL clientSide" relevanten Attribute sind "dumpComment", "dumpDirLocal", "dumpMemlimit", 
 								 "dumpSpeed ", "dumpFilesKeep", "executeBeforeProc", "executeAfterProc" und "optimizeTablesBeforeDump". <br>
-								 Nach einem erfolgreichen Dump werden alte Dumpfiles gelöscht und nur die Anzahl Files definiert durch
-                                 das Attribut "dumpFilesKeep" (default: 3) verbleibt im Zielverzeichnis "dumpDirLocal". <br><br>
+								 Nach einem erfolgreichen Dump werden alte Dumpfiles gelöscht und nur die Anzahl Files, definiert durch
+                                 das Attribut "dumpFilesKeep" (default: 3), verbleibt im Zielverzeichnis "dumpDirLocal". Falls "dumpFilesKeep = 0" gesetzt, werden
+                                 alle Dumpfiles (auch das aktuell erstellte File), gelöscht. Diese Einstellung kann sinnvoll sein, wenn FTP aktiviert ist
+                                 und die erzeugten Dumps nur im FTP-Zielverzeichnis erhalten bleiben sollen. <br><br>
 								 
 								 Die <b>Namenskonvention der Dumpfiles</b> ist:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sql <br><br>
 								 
@@ -9325,7 +9382,9 @@ sub bdump {
 								 <b><u>FTP Transfer nach Dump</u></b> <br>
 								 Wenn diese Möglichkeit genutzt werden soll, ist das <a href="#DbRepattr">Attribut</a> "ftpUse" oder 
 								 "ftpUseSSL" zu setzen. Letzteres gilt wenn eine verschlüsselte Übertragung genutzt werden soll. <br>
-								 Weitere <a href="#DbRepattr">Attribute</a> sind: <br><br>
+                                 Das Modul übernimmt ebenfalls die Versionierung der Dumpfiles im FTP-Zielverzeichnis mit Hilfe des Attributes 
+                                 "ftpDumpFilesKeep".                                 
+								 Für die FTP-Übertragung relevante <a href="#DbRepattr">Attribute</a> sind: <br><br>
 								 
 	                               <ul>
                                    <table>  
@@ -9335,7 +9394,8 @@ sub bdump {
                                       <tr><td> ftpUseSSL   </td><td>: FTP Transfer mit SSL Verschlüsselung nach dem Dump wird eingeschaltet </td></tr>
                                       <tr><td> ftpDebug    </td><td>: Debugging des FTP Verkehrs zur Fehlersuche </td></tr>
 	                                  <tr><td> ftpDir      </td><td>: Verzeichnis auf dem FTP-Server in welches das File übertragen werden soll (default: "/") </td></tr>
-	                                  <tr><td> ftpPassive  </td><td>: setzen wenn passives FTP verwendet werden soll </td></tr>
+	                                  <tr><td> ftpDumpFilesKeep </td><td>: Es wird die angegebene Anzahl Dumpfiles im &lt;ftpDir&gt; belassen (default: 3) </td></tr>
+                                      <tr><td> ftpPassive  </td><td>: setzen wenn passives FTP verwendet werden soll </td></tr>
 	                                  <tr><td> ftpPort     </td><td>: FTP-Port, default: 21 </td></tr>
 									  <tr><td> ftpPwd      </td><td>: Passwort des FTP-Users, default nicht gesetzt </td></tr>
 									  <tr><td> ftpServer   </td><td>: Name oder IP-Adresse des FTP-Servers. <b>notwendig !</b> </td></tr>
@@ -9367,8 +9427,10 @@ sub bdump {
                                  
 								 Die für diese Funktion relevanten Attribute sind "dumpDirLocal", "dumpFilesKeep", "executeBeforeProc", 
                                  "executeAfterProc" und "optimizeTablesBeforeDump". <br>
-								 Nach einem erfolgreichen Dump werden alte Dumpfiles gelöscht und nur die Anzahl Files definiert durch das 
-                                 Attribut "dumpFilesKeep" (default: 3) verbleibt im Zielverzeichnis "dumpDirLocal". <br><br>
+								 Nach einem erfolgreichen Dump werden alte Dumpfiles gelöscht und nur die Anzahl Files, definiert durch das 
+                                 Attribut "dumpFilesKeep" (default: 3), verbleibt im Zielverzeichnis "dumpDirLocal". Falls "dumpFilesKeep = 0" gesetzt, werden
+                                 alle Dumpfiles (auch das aktuell erstellte File), gelöscht. Diese Einstellung kann sinnvoll sein, wenn FTP aktiviert ist
+                                 und die erzeugten Dumps nur im FTP-Zielverzeichnis erhalten bleiben sollen. <br><br>
 								 
 								 Die <b>Namenskonvention der Dumpfiles</b> ist:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sqlitebkp <br><br>
 								 
@@ -9441,7 +9503,7 @@ sub bdump {
                                  </ul>    
     
     <li><b> maxValue [display | writeToDB] </b>     
-                                 - berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
+                                 - berechnet den Maximalwert des Datenbankfelds "VALUE" in den Zeitgrenzen 
 	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
                                  Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
 								 angegeben sein. 
@@ -9468,7 +9530,7 @@ sub bdump {
                                  </li> <br>
                                  
     <li><b> minValue [display | writeToDB]</b>     
-                                 - berechnet den Minimalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
+                                 - berechnet den Minimalwert des Datenbankfelds "VALUE" in den Zeitgrenzen 
 	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
                                  Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
 								 angegeben sein. 
@@ -9583,7 +9645,7 @@ sub bdump {
                                  </ul>
 								 
     <li><b> sumValue [display | writeToDB]</b>     
-                                 - berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen 
+                                 - berechnet die Summenwerte des Datenbankfelds "VALUE" in den Zeitgrenzen 
 	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
                                  Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" 
 								 angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
@@ -9819,7 +9881,7 @@ sub bdump {
   <li><b>dumpSpeed </b>       - Anzahl der abgerufenen Zeilen aus der Quelldatenbank (default: 10000) pro Select durch "dumpMySQL ClientSide". 
                                 Dieser Parameter hat direkten Einfluß auf die Laufzeit und den Ressourcenverbrauch zur Laufzeit.  </li> <br>
 
-  <li><b>dumpFilesKeep </b>   - Es wird die angegeben Anzahl Dumpfiles im Dumpdir gelassen (default: 3). Sind mehr (ältere) Dumpfiles 
+  <li><b>dumpFilesKeep </b>   - Es wird die angegebene Anzahl Dumpfiles im Dumpdir belassen (default: 3). Sind mehr (ältere) Dumpfiles 
                                 vorhanden, werden diese gelöscht nachdem ein neuer Dump erfolgreich erstellt wurde. Das globale
 								Attribut "archivesort" wird berücksichtigt. </li> <br> 
   
@@ -9896,6 +9958,10 @@ sub bdump {
   <li><b>ftpDebug </b>        - Debugging der FTP Kommunikation zur Fehlersuche. </li> <br>
   
   <li><b>ftpDir </b>          - Verzeichnis des FTP-Servers in welches das File übertragen werden soll (default: "/"). </li> <br>
+  
+  <li><b>ftpDumpFilesKeep </b> - Es wird die angegebene Anzahl Dumpfiles im &lt;ftpDir&gt; belassen (default: 3). Sind mehr 
+                                (ältere) Dumpfiles vorhanden, werden diese gelöscht nachdem ein neuer Dump erfolgreich 
+                                übertragen wurde. </li> <br> 
   
   <li><b>ftpPassive </b>      - setzen wenn passives FTP verwendet werden soll </li> <br>
   
