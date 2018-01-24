@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  73_PRESENCE: following attributes were renamed:
+                          * ping_count => pingCount
+                          * fritzbox_speed => fritzboxCheckSpeed
+                          * bluetooth_hci_device => bluetoothHciDevice
+                          existing configuration will be converted automatically
   - bugfix:  74_XiaomiBTLESens: fix error messages
   - feature: 46_TeslaPowerwall2AC: Powerwalls overwiev
   - feature: 73_PRESENCE: new set commands overrideInterval and clearOverride

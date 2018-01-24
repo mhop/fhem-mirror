@@ -47,16 +47,22 @@ PRESENCE_Initialize($)
     $hash->{UndefFn}  = "PRESENCE_Undef";
     $hash->{AttrFn}   = "PRESENCE_Attr";
     $hash->{AttrList} = "do_not_notify:0,1 ".
-                       "disable:0,1 ".
-                       "disabledForIntervals ".
-                       "fritzbox_speed:0,1 ".
-                       "ping_count:1,2,3,4,5,6,7,8,9,10 ".
-                       "bluetooth_hci_device ".
-                       "absenceThreshold ".
-                       "presenceThreshold ".
-                       "absenceTimeout ".
-                       "presenceTimeout ".
-                       "powerCmd ".$readingFnAttributes;
+                        "disable:0,1 ".
+                        "disabledForIntervals ".
+                        "fritzboxCheckSpeed:0,1 ".
+                        "pingCount:1,2,3,4,5,6,7,8,9,10 ".
+                        "bluetoothHciDevice ".
+                        "absenceThreshold ".
+                        "presenceThreshold ".
+                        "absenceTimeout ".
+                        "presenceTimeout ".
+                        "powerCmd ".
+                        $readingFnAttributes;
+                        
+    $hash->{AttrRenameMap} = { "ping_count" => "pingCount",
+                               "bluetooth_hci_device" => "bluetoothHciDevice",
+                               "fritzbox_speed" => "fritzboxCheckSpeed"
+                             };
 
 }
 
@@ -662,17 +668,17 @@ sub PRESENCE_StartLocalScan($;$)
         if($mode eq "local-bluetooth")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode local-bluetooth";
-            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "bluetooth_hci_device", ""), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "bluetoothHciDevice", ""), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
         }
         elsif($mode eq "lan-ping")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode lan-ping";
-            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "ping_count", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "pingCount", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
         }
         elsif($mode eq "fritzbox")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode fritzbox";
-            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "fritzbox_speed", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "fritzboxCheckSpeed", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
         }
         elsif($mode eq "shellscript")
         {
@@ -1120,19 +1126,13 @@ sub PRESENCE_ProcessLocalScan($)
 
     if($a[2] eq "present")
     {
-        readingsBulkUpdate($hash, "device_name", $a[3]) if(defined($a[3]) and $hash->{MODE} =~ /^(lan-bluetooth|local-bluetooth)$/ );
+        readingsBulkUpdate($hash, "device_name", $a[3]) if($hash->{MODE} =~ /^(lan-bluetooth|local-bluetooth)$/ and defined($a[3]));
 
-        if($hash->{MODE} eq "fritzbox" and defined($a[4]))
-        {
-            readingsBulkUpdate($hash, "speed", $a[4]);
-        }
+        readingsBulkUpdate($hash, "speed", $a[4]) if($hash->{MODE} eq "fritzbox" and defined($a[4]));
     }
     elsif($a[2] eq "absent")
     {
-        if($hash->{MODE} eq "fritzbox" and defined($a[4]))
-        {
-            readingsBulkUpdate($hash, "speed", $a[4]);
-        }
+        readingsBulkUpdate($hash, "speed", $a[4])  if($hash->{MODE} eq "fritzbox" and defined($a[4]));
     }
     elsif($a[2] eq "error")
     {
@@ -1441,7 +1441,7 @@ sub PRESENCE_setNotfiyDev($)
   <li>present-check-interval - The interval in seconds between each presence check in case the device is <i>present</i>. Otherwise the normal check-interval will be used.</li>
   </ul>
   <br><br>
-  <a name="PRESENCEdefine"></a>
+  <a name="PRESENCE_define"></a>
   <b>Define</b><br><br>
   <ul><b>Mode: lan-ping</b><br><br>
     <code>define &lt;name&gt; PRESENCE lan-ping &lt;ip-address&gt; [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
@@ -1622,7 +1622,7 @@ Options:
 
   </ul>
   <br>
-  <a name="PRESENCEset"></a>
+  <a name="PRESENCE_set"></a>
   <b>Set</b>
   <ul>
   <li><b>statusRequest</b> - Schedules an immediatly check.</li>
@@ -1632,7 +1632,7 @@ Options:
   </ul>
   <br>
 
-  <a name="PRESENCEget"></a>
+  <a name="PRESENCE_get"></a>
   <b>Get</b>
   <ul>
   N/A
@@ -1683,12 +1683,12 @@ Options:
     the regular check interval.
     <br><br>
     Default Value is 3 (number of check retries)<br><br>
-    <li><a name="PRESENCE_ping_count">ping_count</a></li> (Only in mode "ping" applicable)<br>
+    <li><a name="PRESENCE_pingCount">pingCount</a></li> (Only in mode "ping" applicable)<br>
     Changes the count of the used ping packets to recognize a present state. Depending on your network performance sometimes a packet can be lost or blocked.<br><br>
     Default Value is 4 (packets)<br><br>
-    <li><a name="PRESENCE_bluetooth_hci_device">bluetooth_hci_device</a></li> (Only in Mode "local-bluetooth" applicable)<br>
+    <li><a name="PRESENCE_bluetoothHciDevice">bluetoothHciDevice</a></li> (Only in Mode "local-bluetooth" applicable)<br>
     Set a specific bluetooth HCI device to use for scanning. If you have multiple bluetooth modules connected, you can select a specific one to use for scanning (e.g. hci0, hci1, ...).<br><br>
-    <li><a name="PRESENCE_fritzbox_speed">fritzbox_speed</a></li> (Only in Mode "fritzbox" applicable)<br>
+    <li><a name="PRESENCE_fritzboxCheckSpeed">fritzboxCheckSpeed</a></li> (Only in Mode "fritzbox" applicable)<br>
     When this attribute is enabled, the network speed is checked in addition to the device state.<br>
     This only makes sense for wireless devices connected directly to the FritzBox.
     <br><br>
@@ -1715,20 +1715,24 @@ Options:
   </ul>
   <br>
 
-  <a name="PRESENCEevents"></a>
-  <b>Generated Events:</b><br><br>
+  <a name="PRESENCE_events"></a>
+  <b>Generated readings/events:</b><br><br>
   <ul>
-    <u>General Events:</u><br><br>
+    <u>General readings/events:</u><br><br>
     <ul>
-    <li><b>state</b>: (absent|maybe absent|present|disabled|error|timeout) - The state of the device, check errors or "disabled" when the <a href="#PRESENCE_disable">disable</a> attribute is enabled</li>
-    <li><b>presence</b>: (absent|maybe absent|present) - The state of the device. The value "maybe absent" only occurs if <a href="#PRESENCE_absenceThreshold">absenceThreshold</a> is activated.</li>
+    <li><b>state</b>: (absent|maybe absent|present|maybe present|disabled|error|timeout) - The state of the device, check errors or "disabled" when the <a href="#PRESENCE_disable">disable</a> attribute is enabled</li>
+    <li><b>presence</b>: (absent|maybe absent|present|maybe present) - The presence state of the device. The value "maybe absent" only occurs if <a href="#PRESENCE_absenceThreshold">absenceThreshold</a> is activated. The value "maybe present" only occurs if <a href="#PRESENCE_presenceThreshold">presenceThreshold</a> is activated.</li>
     <li><b>powerCmd</b>: (executed|failed) - power command was executed or has failed</li>
     </ul><br><br>
-    <u>Bluetooth specific events:</u><br><br>
+    <u>Bluetooth specific readings/events:</u><br><br>
     <ul>
     <li><b>device_name</b>: $name - The name of the Bluetooth device in case it's present</li>
     </ul><br><br>
-    <u>presenced/collectord specific events:</u><br><br>
+    <u>FRITZ!Box specific readings/events:</u><br><br>
+    <ul>
+    <li><b>speed</b>: $speed - The current speed of the checked device if attribute <a href="#PRESENCE_fritzboxCheckSpeed">fritzboxCheckSpeed</a> is activated</li>
+    </ul><br><br>
+    <u>presenced/collectord specific readings/events:</u><br><br>
     <ul>
     <li><b>command_accepted</b>: $command_accepted (yes|no) - Was the last command acknowleged and accepted by the presenced or collectord?</li>
     <li><b>room</b>: $room - If the module is connected with a collector daemon this event shows the room, where the device is located (as defined in the collectord config file)</li>
@@ -1763,7 +1767,7 @@ Options:
   <li>present-check-interval - Das Pr&uuml;finterval in Sekunden, wenn ein Ger&auml;t anwesend (<i>present</i>) ist. Falls nicht angegeben, wird der Wert aus check-interval verwendet</li>
   </ul>
   <br><br>
-  <a name="PRESENCEdefine"></a>
+  <a name="PRESENCE_define"></a>
   <b>Define</b><br><br>
   <ul><b>Modus: lan-ping</b><br><br>
     <code>define &lt;name&gt; PRESENCE lan-ping &lt;IP-Addresse oder Hostname&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
@@ -1947,7 +1951,7 @@ Options:
   </ul>
   <br>
 
-  <a name="PRESENCEset"></a>
+  <a name="PRESENCE_set"></a>
   <b>Set</b>
   <ul>
   <li><b>statusRequest</b> - Startet einen sofortigen Check.</li>
@@ -1957,14 +1961,14 @@ Options:
   </ul>
   <br>
 
-  <a name="PRESENCEget"></a>
+  <a name="PRESENCE_get"></a>
   <b>Get</b>
   <ul>
   N/A
   </ul>
   <br>
 
-  <a name="PRESENCEattr"></a>
+  <a name="PRESENCE_attr"></a>
   <b>Attributes</b><br><br>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
@@ -2007,14 +2011,14 @@ Options:
     innerhalb des in retryInterval konfigurierten Interval ausgeführt um in kürzerer Zeit ein valides Ergebnis zu erhalten.
     <br><br>
     Standardwert ist 3 Wiederholungen<br><br>
-    <li><a name="PRESENCE_ping_count">ping_count</a></li> (Nur im Modus "ping" anwendbar)<br>
+    <li><a name="PRESENCE_pingCount">pingCount</a></li> (Nur im Modus "ping" anwendbar)<br>
     Ver&auml;ndert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen.
     Je nach Netzwerkstabilit&auml;t k&ouml;nnen erste Pakete verloren gehen oder blockiert werden.<br><br>
     Standardwert ist 4 (Versuche)<br><br>
-    <li><a name="PRESENCE_bluetooth_hci_device">bluetooth_hci_device</a></li> (Nur im Modus "local-bluetooth" anwendbar)<br>
+    <li><a name="PRESENCE_bluetoothHciDevice">bluetoothHciDevice</a></li> (Nur im Modus "local-bluetooth" anwendbar)<br>
     Sofern man mehrere Bluetooth-Empf&auml;nger verf&uuml;gbar hat, kann man mit diesem Attribut ein bestimmten Empf&auml;nger ausw&auml;hlen, welcher zur Erkennung verwendet werden soll (bspw. hci0, hci1, ...). Es muss dabei ein vorhandener HCI-Ger&auml;tename angegeben werden wie z.B. <code>hci0</code>.
     <br><br>
-    <li><a name="PRESENCE_fritzbox_speed">fritzbox_speed</a></li> (Nur im Modus "fritzbox")<br>
+    <li><a name="PRESENCE_fritzboxCheckSpeed">fritzboxCheckSpeed</a></li> (Nur im Modus "fritzbox")<br>
     Zus&auml;tzlich zum Status des Ger&auml;ts wird die aktuelle Verbindungsgeschwindigkeit ausgegeben<br>
     Das macht nur bei WLAN Ger&auml;ten Sinn, die direkt mit der FritzBox verbunden sind. Bei abwesenden Ger&auml;ten wird als Geschwindigkeit 0 ausgegeben.
     <br><br>
@@ -2041,20 +2045,24 @@ Options:
     </ul>
   <br>
 
-  <a name="PRESENCEevents"></a>
-  <b>Generierte Events:</b><br><br>
+  <a name="PRESENCE_events"></a>
+  <b>Generierte Readings/Events:</b><br><br>
   <ul>
-    <u>Generelle Events:</u><br><br>
+    <u>Generelle ReadingsEvents:</u><br><br>
     <ul>
-    <li><b>state</b>: (absent|maybe absent|present|disabled|error|timeout) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend) oder "disabled" wenn das <a href="#PRESENCE_disable">disable</a>-Attribut aktiviert ist</li>
-    <li><b>presence</b>: (absent|maybe absent|present) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend). Der Wert "maybe absent" (vielleicht abwesend) tritt nur auf, sofern das Attribut <a href="#PRESENCE_absenceThreshold">absenceThreshold</a> aktiviert ist.</li>
+    <li><b>state</b>: (absent|maybe absent|present|maybe present|disabled|error|timeout) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend) oder "disabled" wenn das <a href="#PRESENCE_disable">disable</a>-Attribut aktiviert ist</li>
+    <li><b>presence</b>: (absent|maybe absent|present|maybe present) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend). Der Wert "maybe absent" (vielleicht abwesend) tritt nur auf, sofern das Attribut <a href="#PRESENCE_absenceThreshold">absenceThreshold</a> aktiviert ist. Der Wert "maybe present" (vielleicht anwesend) tritt nur auf, sofern das Attribut <a href="#PRESENCE_presenceThreshold">presenceThreshold</a> aktiviert ist.</li>
     <li><b>powerCmd</b>: (executed|failed) - Ausf&uuml;hrung des power-Befehls war erfolgreich.</li>
     </ul><br><br>
-    <u>Bluetooth-spezifische Events:</u><br><br>
+    <u>Bluetooth-spezifische Readings/Events:</u><br><br>
     <ul>
     <li><b>device_name</b>: $name - Der Name des Bluetooth-Ger&auml;tes, wenn es anwesend (Status: present) ist</li>
     </ul><br><br>
-    <u>presenced-/collectord-spezifische Events:</u><br><br>
+    <u>FRITZ!Box-spezifische Readings/Events:</u><br><br>
+    <ul>
+    <li><b>speed</b>: $speed - Die Netzwerkdeschwindigkeit des Ger&auml;tes, sofern das Attribut <a href="#PRESENCE_fritzboxCheckSpeed">fritzboxCheckSpeed</a> aktiviert ist.</li>
+    </ul><br><br>
+    <u>presenced-/collectord-spezifische Readings/Events:</u><br><br>
     <ul>
     <li><b>command_accepted</b>: $command_accepted (yes|no) - Wurde das letzte Kommando an den presenced/collectord akzeptiert (yes = ja, no = nein)?</li>
     <li><b>room</b>: $room - Wenn das Modul mit einem collectord verbunden ist, zeigt dieses Event den Raum an, in welchem dieses Ger&auml;t erkannt wurde (Raumname entsprechend der Konfigurationsdatei des collectord)</li>
