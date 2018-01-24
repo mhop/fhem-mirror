@@ -41,6 +41,7 @@ use strict;
 use warnings;
 
 use Device::Firmata::Constants qw/ :all /;
+use GPUtils qw(:all);
 
 ########################################################################################
 # 
@@ -98,12 +99,14 @@ sub Define($) {
     $hash->{ASYNCHRONOUS} = 0;  
   
     #-- module version
-	$hash->{version}      = "7.05";
+    $hash->{version}      = "7.05";
     main::Log3 $hash->{NAME},1,"OWX_FRM::Define warning: version ".$hash->{version}." not identical to OWX version ".$main::owx_version
       if( $hash->{version} ne $main::owx_version);
    
-    #-- call low level init function for the device
-    main::InternalTimer(time()+55, "OWX_FRM::Init", $self,0);
+    #-- register IODev InitFn to be called by FRM after connection to Firmata device is initialized
+    $hash->{IODev} = $main::defs{$hash->{HWDEVICE}};
+    $main::modules{$main::defs{$hash->{NAME}}{TYPE}}->{InitFn} = "OWX_FRM::Init";
+
     return undef;
 }
 
@@ -154,7 +157,10 @@ sub Alarms() {
 	my $pin     = $hash->{PIN};
 	return 0 unless ( defined $firmata and defined $pin );
 	$hash->{ALARMDEVS} = undef;			
-	$firmata->onewire_search_alarms($hash->{PIN});
+	eval {
+		$firmata->onewire_search_alarms($hash->{PIN});
+	};
+	return 0 if ($@);
 	my $times = main::AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
 	for (my $i=0;$i<$times;$i++) {
 		if (main::FRM_poll($hash->{IODev})) {
@@ -182,6 +188,12 @@ sub Alarms() {
 
 sub Init() {
   my ($self) = @_;
+  
+  if (defined($self->{OWX})) {
+    # class method called with parent hash instead of class hash as 1st parameter, fix
+    $self = $self->{OWX};
+  }
+  
   my $hash   = $self->{hash};
   my $dev    = $hash->{DeviceName};
   my $name   = $hash->{NAME};
@@ -193,24 +205,32 @@ sub Init() {
   
   my @args = ($pin);  
   $hash->{IODev} = $main::defs{$hash->{HWDEVICE}};
+  
+  #-- 10_FRM.pm is broken
+  #-- possible workaround
+  $main::attr{$name}{IODev} = $hash->{IODev}->{NAME};
   my $ret = main::FRM_Init_Pin_Client($hash,\@args,PIN_ONEWIRE);
+  
   if (defined $ret){
     $msg = "Error ".$ret;
     main::Log3 $name,1,"OWX_FRM::Init ".$msg;
     return $msg;
   }
   
-  my $firmata = main::FRM_Client_FirmataDevice($hash);
-		
-  $hash->{FRM_OWX_CORRELATIONID} = 0;
-  $firmata->observe_onewire($pin,\&observer,$hash);
-		
-  $hash->{FRM_OWX_REPLIES} = {};
-  $hash->{DEVS} = [];
-  if ( main::AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
-	$firmata->onewire_config($pin,1);
-  }
-	 
+  eval {
+    my $firmata = main::FRM_Client_FirmataDevice($hash);
+    
+    $hash->{FRM_OWX_CORRELATIONID} = 0;
+    $firmata->observe_onewire($pin,\&observer,$hash);
+    
+    $hash->{FRM_OWX_REPLIES} = {};
+    $hash->{DEVS} = [];
+    if ( main::AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
+      $firmata->onewire_config($pin,1);
+    }
+  };
+  return GP_Catch($@) if ($@);
+  
   $hash->{STATE}="Initialized";
   main::InternalTimer(main::gettimeofday()+10, "OWX_Discover", $hash,0);
   return undef;
@@ -264,7 +284,7 @@ sub Complex ($$$$) {
 	}
 	
 	#-- has receive part
-    if ( $numread > 0 ) {
+	if ( $numread > 0 ) {
 	  $ow_command->{"read"} = $numread;
 	  #Firmata sends 0-address on read after skip
 	  $owx_dev = '00.000000000000.00' unless defined $owx_dev;
@@ -278,15 +298,19 @@ sub Complex ($$$$) {
 		$hash->{FRM_OWX_CORRELATIONID} = ($id + 1) & 0xFFFF;
 	}
 	
-	$firmata->onewire_command_series( $pin, $ow_command );
-		
+	eval {
+		$firmata->onewire_command_series( $pin, $ow_command );
+	};
+	return 0 if ($@);
+	
+	my $oldResLength = length($res);
 	if ($numread) {
 	  my $times = main::AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
 	  for (my $i=0;$i<$times;$i++) {
 	    if (main::FRM_poll($hash->{IODev})) {
 	  	  if (defined $hash->{FRM_OWX_REPLIES}->{$owx_dev}) {
 		    $res .= $hash->{FRM_OWX_REPLIES}->{$owx_dev};
-		    main::OWX_WDBGL($name,5,"OWX_FRM::Complex receiving inside loop no. $i ",$res);
+		    main::OWX_WDBGL($name,5,"OWX_FRM::Complex receiving inside loop no. $i (" . (length($res) - $oldResLength) . " bytes received) ",$res);
 		    return $res;
 		  }
 		} else {
@@ -295,7 +319,7 @@ sub Complex ($$$$) {
 	  }
 	}
 
-	main::OWX_WDBGL($name,5,"OWX_FRM::Complex receiving outside loop ",$res);
+	main::OWX_WDBGL($name,5,"OWX_FRM::Complex receiving outside loop (" . (length($res) - $oldResLength) . " bytes received) ", $res);
 	return $res;
 }
 
@@ -325,10 +349,13 @@ sub Discover ($) {
 	return 0 unless ( defined $firmata and defined $pin );
 	my $old_devices = $hash->{DEVS};
 	$hash->{DEVS} = undef;			
-	my $res = $firmata->onewire_search($hash->{PIN});
-	#main::Log 1,"=============> result from search is $res, iodev is ".$hash->{IODev};
+	eval {
+		my $res = $firmata->onewire_search($hash->{PIN});
+		#main::Log 1,"=============> result from search is $res, iodev is ".$hash->{IODev};
+	};
+	return 0 if ($@);
 	my $times = main::AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
-    #main::Log 1,"===========> olddevices = $old_devices, tries =$times";
+	#main::Log 1,"===========> olddevices = $old_devices, tries =$times";
 	for (my $i=0;$i<$times;$i++) {
 		if (main::FRM_poll($hash->{IODev})) {
 			if (defined $hash->{DEVS}) {
@@ -409,9 +436,11 @@ sub Reset() {
 	my $firmata = $frm->{FirmataDevice};
 	my $pin     = $hash->{PIN};
 	return undef unless ( defined $firmata and defined $pin );
-
-	$firmata->onewire_reset($pin);
-	
+	eval {
+		$firmata->onewire_reset($pin);
+	};
+	return 0 if ($@);
+  
 	return 1;
 }
 
@@ -537,8 +566,13 @@ sub Write(@) {
 		$hash->{FRM_OWX_CORRELATIONID} = ($id + 1) & 0xFFFF;
 	#}
 	
-	$firmata->onewire_command_series( $pin, $ow_command );
-	
+	eval {
+		$firmata->onewire_command_series( $pin, $ow_command );
+	};
+	if ($@) { 
+		main::Log3 $name,1,"OWX_FRM::Write device $name exception " . GP_Catch($@);
+		return 0 
+	}
 }
 
 #######################################################################################
@@ -630,11 +664,15 @@ sub firmata_to_device
 
 <a name="OWX_FRM"></a>
 <h3>OWX_FRM</h3>
+<ul>
 See <a href="/fhem/docs/commandref.html#OWX">OWX</a>
+</ul>
 =end html
 =begin html_DE
 
 <a name="OWX_FRM"></a>
 <h3>OWX_FRM</h3>
+<ul>
 <a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#OWX">OWX</a> 
+</ul>
 =end html_DE
