@@ -300,8 +300,8 @@ sub XiaomiBTLESens_stateRequest($) {
             if( XiaomiBTLESens_CallBattery_IsUpdateTimeAgeToOld($hash,$CallBatteryAge{AttrVal($name,'BatteryFirmwareAge','24h')}) );
 
             if( $hash->{helper}{CallSensDataCounter} < 1 ) {
-                XiaomiBTLESens_CreateParamGatttool($hash,'write',$XiaomiModels{AttrVal($name,'model','')}{wdata},$XiaomiModels{AttrVal($name,'model','')}{wdataValue});
-                $hash->{helper}{CallSensDataCounter} = $hash->{helper}{CallSensDataCounter} + 1;
+                    XiaomiBTLESens_CreateParamGatttool($hash,'write',$XiaomiModels{AttrVal($name,'model','')}{wdata},$XiaomiModels{AttrVal($name,'model','')}{wdataValue});
+                    $hash->{helper}{CallSensDataCounter} = $hash->{helper}{CallSensDataCounter} + 1;
                 
             } else {
                 $readings{'lastGattError'} = 'charWrite faild';

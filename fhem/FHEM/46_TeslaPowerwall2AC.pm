@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.2.3";
+my $version = "0.4.0";
 
 
 
@@ -231,6 +231,7 @@ sub TeslaPowerwall2AC_Notify($$) {
 
     TeslaPowerwall2AC_Timer_GetData($hash) if( grep /^INITIALIZED$/,@{$events}
                                                 or grep /^DELETEATTR.$name.disable$/,@{$events}
+                                                or grep /^DELETEATTR.$name.interval$/,@{$events}
                                                 or (grep /^DEFINED.$name$/,@{$events} and $init_done) );
     return;
 }
@@ -489,15 +490,20 @@ sub TeslaPowerwall2AC_ReadingsProcessing_Powerwalls($$) {
     
     
     if( ref($decode_json->{powerwalls}) eq "ARRAY" and scalar(@{$decode_json->{powerwalls}}) > 0 ) {
-    
+        my $i = 0;
+        
         foreach my $powerwall (@{$decode_json->{powerwalls}}) {
             if( ref($powerwall) eq "HASH" ) {
             
                 while( my ($r,$v) = each %{$powerwall} ) {
-                    $readings{$r}   = $v;
+                    $readings{'wall_'.$i.'_'.$r}   = $v;
                 }
+                
+                $i++;
             }
         }
+        
+        $readings{'numberOfWalls'}   = $i;
 
     } else {
         $readings{'error'} = 'aggregates response is not a Array';
