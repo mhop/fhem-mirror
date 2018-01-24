@@ -386,7 +386,7 @@ sub BRAVIA_Set($@) {
                 BRAVIA_Set( $hash, $name, "channelDown" );
             }
             elsif ( $cmd eq "WOL" ) {
-              $macAddr = AttrVal( $name, "macaddr", "" );
+              my $macAddr = AttrVal( $name, "macaddr", "" );
 	            $macAddr = ReadingsVal( $name, "macAddr", "") if ($macAddr eq "");
 	            BRAVIA_wake( $name, $macAddr ) if ( $macAddr ne "" && $macAddr ne "-" );
 	          }
