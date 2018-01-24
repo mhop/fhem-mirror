@@ -43,7 +43,7 @@ my $alarmlinkname   = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "4.0";
+my $alarmversion    = "4.01";
 
 my %alarm_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -805,10 +805,13 @@ sub Alarm_Arm($$$$$){
    #-- disarming implies canceling as well
    }elsif( ($act eq "disarm") &&  ($xec ne "disarmed")) {
       #-- delete stale delayed arm
-      fhem('delete alarm'.$level.'.arm.dly' )
-         if( defined $defs{'alarm'.$level.'.arm.dly'});
+      if( defined $defs{'alarm'.$level.'.arm.dly'}){
+        fhem('delete alarm'.$level.'.arm.dly' )
+      #-- really kill active alarm
+      }else{
+        Alarm_Exec($name,$level,"program","disarm","cancel");
+      }
       $hash->{DATA}{"armstate"}{"level".$level} = "disarmed";
-      Alarm_Exec($name,$level,"program","disarm","cancel");
       #-- update state display
       readingsSingleUpdate( $hash, "level".$level,"disarmed",1 );
       readingsSingleUpdate( $hash, "state", Alarm_getstate($hash)." ".$hash->{READINGS}{"short"}{VAL}, 1 );

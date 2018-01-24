@@ -42,7 +42,7 @@ use JSON;      # imports encode_json, decode_json, to_json and from_json.
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.01";
+my $babbleversion    = "1.06";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -166,7 +166,7 @@ sub Babble_Initialize ($) {
   #$hash->{AttrFn}      = "Babble_Attr";
   my $attst            = "lockstate:locked,unlocked helpFunc testParm0 testParm1 testParm2 testParm3 ".
                          "remoteFHEM0 remoteFHEM1 remoteFHEM2 remoteFHEM3 remoteFunc0 remoteFunc1 remoteFunc2 remoteFunc3 remoteToken0 remoteToken1 remoteToken2 remoteToken3 ".
-                         "babbleDevices babblePlaces babbleVerbs babbleVerbParts babblePrepos babbleQuests babbleArticles babbleStatus babbleWrites babbleTimes";
+                         "babbleDevices babblePlaces babbleNotPlaces babbleVerbs babbleVerbParts babblePrepos babbleQuests babbleArticles babbleStatus babbleWrites babbleTimes";
   $hash->{AttrList}    = $attst;
   
   if( !defined($babble_tt) ){
@@ -790,7 +790,7 @@ sub Babble_Normalize($$){
     if( $word[0] =~ /^gut.*/){
       $subcat = 1;
       $device="zeit";
-      $reading="zeit";
+      $reading="status";
       $value=$word[1];
       $reserve=$word[2]
         if( $word[2] );
@@ -1065,7 +1065,7 @@ sub Babble_TestIt{
         }
       }
     }
-  }else{
+  }elsif( $exflag==1 ){
     my $func  = AttrVal($name,"helpFunc",undef);  
     if( $func && $func ne "" ){
       my $help = defined($hash->{DATA}{"help"}{$device}) ? $hash->{DATA}{"help"}{$device} : "";
@@ -1081,7 +1081,11 @@ sub Babble_TestIt{
       }
       $func =~ s/\$HELP/$help/g;
       $res = eval($func);
+    }else{
+      $str .= "==> command not found and help function undefined";
     }
+  }else{
+    $str .= "==> command not found";
   }
   return $str;
 }
@@ -1532,6 +1536,8 @@ sub Babble_getplaces($$$) {
   my %rooms;    # intermediate hash of all rooms
   my @special;  # intermediate array of all special places for Babble
   my @places;   # intermediate array of rooms/all babble places
+  
+  my $nop = AttrVal($name,"babbleNotPlaces","");
  
   #--generate a new list
   if( $type eq "new" ){
@@ -1543,6 +1549,7 @@ sub Babble_getplaces($$$) {
       foreach my $r (split(",", AttrVal($d, "room", "Unsorted"))) {
         next if($hre && $r =~ m/$hre/);
         next if($r eq "Unsorted" || $r eq "hidden" || $r eq $babblehiddenroom || $r eq $babblepublicroom );
+        next if (index($nop, $r) != -1);
         $rooms{$r}{$d} = 1;
       }
     }
@@ -2025,6 +2032,8 @@ sub Babble_Html($)
                 <br/>csrfToken for addressing a certain remote FHEM device</li>
             <li><a name="babblePlaces"><code>attr &lt;name&gt; babblePlaces <place_1> <place_2> ...</code></a>
                 <br />space separated list of special places to be identified in speech</li>
+            <li><a name="babbleNotPlaces"><code>attr &lt;name&gt; babbleNoPlaces <place_1> <place_2> ...</code></a>
+                <br />space separated list of rooms (in the local FHEM device) that should <i>not</i> appear in the list of place</li>
             <li><a name="babbleStatus"><code>attr &lt;name&gt; babbleStatus <status_1> <status_2> ...</code></a>
                 <br />space separated list of status identifiers to be identified in speech. Example: <code>Status Value Weather Time</code></li>        
             <li><a name="babblePrepos"><code>attr &lt;name&gt; babblePrepos <prepo_1> <prepo_2> ...</code></a>

@@ -1,6 +1,6 @@
 //########################################################################################
 // alarm.js
-// Version 4.0
+// Version 4.01
 // See 95_Alarm for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
@@ -13,6 +13,9 @@ var req = new XMLHttpRequest();
 req.open('GET', document.location, false);
 req.send(null);
 var csrfToken = req.getResponseHeader('X-FHEM-csrfToken');
+if( csrfToken == null ){
+    csrfToken = "null";
+}
 
 //------------------------------------------------------------------------------------------------------
 // encode Parameters for URL

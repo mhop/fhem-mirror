@@ -1,9 +1,25 @@
 //########################################################################################
 // yaahm.js
-// Version 1.4
+// Version 1.45
 // See 95_YAAHM for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
+
+//------------------------------------------------------------------------------------------------------
+// Determine csrfToken
+//------------------------------------------------------------------------------------------------------
+
+var req = new XMLHttpRequest();
+req.open('GET', document.location, false);
+req.send(null);
+var csrfToken = req.getResponseHeader('X-FHEM-csrfToken');
+if( csrfToken == null ){
+    csrfToken = "null";
+}
+
+//------------------------------------------------------------------------------------------------------
+// encode Parameters for URL
+//------------------------------------------------------------------------------------------------------
 
 function encodeParm(oldval) {
     var newval;
@@ -56,7 +72,7 @@ function yaahm_setAttribute(name, attr, val) {
         location = location.substr(0, location.length -1);
     }
     var url = document.location.protocol + "//" + document.location.host + location;
-    FW_cmd(url + '?XHR=1&cmd.' + name + '=attr ' + name + ' ' + encodeParm(attr) + ' ' + encodeParm(val));
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=attr ' + name + ' ' + encodeParm(attr) + ' ' + encodeParm(val));
 }
 
 //------------------------------------------------------------------------------------------------------
@@ -73,7 +89,7 @@ function yaahm_mode(name, targetmode) {
     }
     var url = document.location.protocol + "//" + document.location.host + location;
     
-    FW_cmd(url + '?XHR=1&cmd.' + name + '={main::YAAHM_mode("' + name + '","' + targetmode + '")}');
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '={main::YAAHM_mode("' + name + '","' + targetmode + '")}');
 }
 
 function yaahm_state(name, targetstate) {
@@ -83,7 +99,7 @@ function yaahm_state(name, targetstate) {
     }
     var url = document.location.protocol + "//" + document.location.host + location;
     
-    FW_cmd(url + '?XHR=1&cmd.' + name + '={main::YAAHM_state("' + name + '","' + targetstate + '")}');
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '={main::YAAHM_state("' + name + '","' + targetstate + '")}');
 }
 
 function yaahm_setnext(name, i) {
@@ -100,7 +116,7 @@ function yaahm_setnext(name, i) {
         nval = "undef";
     }
     
-    FW_cmd(url + '?XHR=1&cmd.' + name + '={main::YAAHM_nextWeeklyTime("' + name + '","next_' + i + '","' + nval + '")}');
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '={main::YAAHM_nextWeeklyTime("' + name + '","next_' + i + '","' + nval + '")}');
 }
 
 //------------------------------------------------------------------------------------------------------
@@ -287,11 +303,11 @@ function yaahm_startDayTimer(name) {
             aval2 = $("input[name='actid" + dailykeys[i] + "']:checked").map(function () {
                 return $(this).val();
             }).get();
-            FW_cmd(url + '?XHR=1&cmd.' + name + '={main::YAAHM_setParm("' + name + '","dt","' + dailykeys[i] + '",' + '"' + sval + '","' + eval + '","' + xval + '","' + aval1 + ';' + aval2 + '")}');
+            FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '={main::YAAHM_setParm("' + name + '","dt","' + dailykeys[i] + '",' + '"' + sval + '","' + eval + '","' + xval + '","' + aval1 + ';' + aval2 + '")}');
         }
     }
     // really start it now
-    FW_cmd(url + '?XHR=1&cmd.' + name + ' ={main::YAAHM_startDayTimer("' + name + '")}');
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + ' ={main::YAAHM_startDayTimer("' + name + '")}');
     
     // change link
     $('#dtlink').html('<a href="/fhem?detail=' + name + '.dtimer.IF">' + name + '.dtimer.IF</a>');
@@ -346,10 +362,10 @@ function yaahm_startWeeklyTimer(name) {
             }
         }
         
-        FW_cmd(url + '?XHR=1&cmd.' + name + '={main::YAAHM_setParm("' + name + '","wt","' + i + '","' + xval + '","' + nval + '","' + aval1 + '","' + aval2 + '","' + sval.join('","') + '")}');
+        FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '={main::YAAHM_setParm("' + name + '","wt","' + i + '","' + xval + '","' + nval + '","' + aval1 + '","' + aval2 + '","' + sval.join('","') + '")}');
     }
     // really start it now
-    FW_cmd(url + '?XHR=1&cmd.' + name + ' ={main::YAAHM_startWeeklyTimer("' + name + '")}');
+    FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + ' ={main::YAAHM_startWeeklyTimer("' + name + '")}');
     
     // change links
     for (var i = 0; i < weeklyno; i++) {

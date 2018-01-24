@@ -47,7 +47,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.43";
+my $yaahmversion    = "1.45";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 

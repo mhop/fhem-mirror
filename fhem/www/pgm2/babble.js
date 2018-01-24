@@ -1,6 +1,6 @@
 //########################################################################################
 // babble.js
-// Version 1.04
+// Version 1.06
 // See 95_Babble for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
@@ -13,6 +13,9 @@ var req = new XMLHttpRequest();
 req.open('GET', document.location, false);
 req.send(null);
 var csrfToken = req.getResponseHeader('X-FHEM-csrfToken');
+if( csrfToken == null ){
+    csrfToken = "null";
+}
 
 //------------------------------------------------------------------------------------------------------
 // encode Parameters for URL
@@ -37,9 +40,6 @@ function encodeParm(oldval) {
 // Add and remove places and verbs
 //------------------------------------------------------------------------------------------------------
 
-function reload() {
-    //location.reload()
-}
 
 function dialog1(message) {
     $('<div></div>').appendTo('body').html('<div><h6>' + message + '</h6></div>').dialog({
