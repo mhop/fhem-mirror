@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_DOIFtools: blockinginfo added to running timer info
   - change:  73_PRESENCE: following attributes were renamed:
                           * ping_count => pingCount
                           * fritzbox_speed => fritzboxCheckSpeed

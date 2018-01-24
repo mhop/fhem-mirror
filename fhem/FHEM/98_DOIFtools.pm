@@ -275,7 +275,7 @@ function doiftoolsAddLookUp () {
       txt += "</table>Attributes<table class='block wide attributes' style='font-size:12px'><br>";
       row = 0;
       for (var item in dev.Attributes) {
-        if (item.match(/(userReadings|wait|setList)/) ) {dev.Attributes[item] = "<pre>"+dev.Attributes[item]+"</pre>"}
+        if (item.match(/(userReadings|wait|setList|uiTable)/) ) {dev.Attributes[item] = "<pre>"+dev.Attributes[item]+"</pre>"}
         var cla = ((row++&1)?"odd":"even");
         txt += "<tr class='"+cla+"'><td>"+item+"</td><td>"+dev.Attributes[item]+"</td></tr>\n";
       }
@@ -1504,6 +1504,7 @@ sub DOIFtools_Get($@)
       }
       $ret .= join("",@ret);
       $ret = $ret ? "Found running wait_timer for:\n\n$ret" : "No running wait_timer found.";
+      $ret .= "\n\n".fhem("blockinginfo",1);
       return $ret;
       
   } elsif ($arg eq "SetAttrIconForDOIF") {
@@ -1873,7 +1874,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <b>statisticsReport</b> erstellt einen Bericht aus der laufenden Datenerfassung.<br><br>Die Statistik kann genutzt werden, um Geräte mit hohen Ereignisaufkommen zu erkennen. Bei einer hohen Rate, sollte im Interesse der Systemperformance geprüft werden, ob die <a href="https://wiki.fhem.de/wiki/Event">Events</a> eingeschränkt werden können. Werden keine Events eines Gerätes weiterverarbeitet, kann das Attribut <i>event-on-change-reading</i> auf <i>none</i> oder eine andere Zeichenfolge, die im Gerät nicht als Readingname vorkommt, gesetzt werden.<br>
         <br>
         <code>get &lt;name&gt; runningTimerInDOIF</code><br>
-        <b>runningTimerInDOIF</b> zeigt eine Liste der laufenden Timer. Damit kann entschieden werden, ob bei einem Neustart wichtige Timer gelöscht werden und der Neustart ggf. verschoben werden sollte.<br>
+        <b>runningTimerInDOIF</b> zeigt eine Liste der laufenden Timer. Damit kann entschieden werden, ob bei einem Neustart wichtige Timer gelöscht werden und der Neustart ggf. verschoben werden sollte. Zeigt nachrichtlich das Ergebnis von blockinginfo an.<br>
         <br>
         <code>get &lt;name&gt; SetAttrIconForDOIF &lt;DOIF names for setting the attribute icon to helper_doif&gt;</code><br>
         <b>SetAttrIconForDOIF</b> setzt für die ausgewählten DOIF das Attribut <i>icon</i> auf <i>helper_doif</i>.<br>
