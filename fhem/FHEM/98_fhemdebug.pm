@@ -107,6 +107,7 @@ fhemdebug_memusage($)
   eval "use Devel::Size";
   return $@ if($@);
 
+  my %bl = ("main::modules::MAX"=>1, HTTPMOD=>1);
   $Devel::Size::warn = 0;
   my @param = split(" ", $param);
   my $max = 50;
@@ -127,18 +128,34 @@ fhemdebug_memusage($)
           $fn->($fn, $h->{$n}, "$mname$n");
           next;
         }
-        next if(main->can("$mname$n"));
+        next if(main->can("$mname$n")); # functions
 
         if($mname eq "main::" && 
-          ($n eq "modules" || $n eq "defs" || $n eq "readyfnlist")) {
+          ($n eq "modules" || $n eq "defs" || $n eq "readyfnlist" ||
+           $n eq "selectlist" || $n eq "intAt" || $n eq "attr" ||
+           $n eq "ntfyHash")) {
           for my $mn (keys %{$main::{$n}}) {
-            Log 5, "$mname$n::$mn";
-            $ts{"$mname$n::$mn"} = Devel::Size::total_size($main::{$n}{$mn});
+            my $name = "$mname${n}::$mn";
+            if($mname eq "main::" && $n eq "defs" && $bl{$defs{$mn}{TYPE}}) {
+              Log 5, "$name TYPE on the blackList, skipping it";
+              next;
+            }
+            if($bl{$name}) {
+              Log 5, "$name on the blackList, skipping it";
+              next;
+            }
+            Log 5, $name;       # Crash-debugging
+            $ts{$name} = Devel::Size::total_size($main::{$n}{$mn});
           }
           
         } else {
-          Log 5, "$mname$n";
-          $ts{"$mname$n"} = Devel::Size::total_size($h->{$n});
+          my $name = "$mname$n";
+          if($bl{$name}) {
+            Log 5, "$name (on the blackList, skipping it)";
+            next;
+          }
+          Log 5, $name;       # Crash-debugging
+          $ts{$name} = Devel::Size::total_size($h->{$n});
 
         }
       }
@@ -193,7 +210,7 @@ fhemdebug_memusage($)
         functions and some other data structures. memusage tries to avoid to
         call it for such data structures, but as the problem is not identified,
         it may crash your currently running instance. It works for me, but make
-        sure you saved your fhem.cfg before coalling it.</li>
+        sure you saved your fhem.cfg before calling it.</li>
       <li>The known data structures modules and defs are reported in more
         detail.</li>
       </ul>
