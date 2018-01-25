@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.5.5        25.01.2018       minor change in delSeqDoublets
 # 7.5.4        24.01.2018       delseqdoubl_DoParse reviewed to optimize memory usage, executeBeforeDump executeAfterDump 
 #                               now available for "delSeqDoublets"
 # 7.5.3        23.01.2018       new attribute "ftpDumpFilesKeep", version management added to FTP-usage
@@ -293,7 +294,7 @@ use Encode qw(encode_utf8);
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);      # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.5.4";
+my $DbRepVersion = "7.5.5";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -4203,12 +4204,12 @@ sub delseqdoubl_DoParse($) {
      $rt = $rt+tv_interval($st);
         
      # Beginn Löschlogik, Zusammenstellen der löschenden DS (warping)
-	 # Die Arrays @remain, @sel enthalten die VERBLEIBENDEN Datensätze
+	 # Array @sel -> die VERBLEIBENDEN Datensätze, @warp -> die zu löschenden Datensätze
      my (@sel,@warp);
      my ($or,$oor,$odev,$oread,$oval,$ooval,$ndev,$nread,$nval);
-	 
+     my $i = 0;
      foreach my $nr (map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3] } @{$sth->fetchall_arrayref()}) {               
-	     ($ndev,$nread,undef,undef,$nval) = split("_ESC_", $nr);    # Werte des aktuellen Elements
+         ($ndev,$nread,undef,undef,$nval) = split("_ESC_", $nr);    # Werte des aktuellen Elements
 	     $or = pop @sel;                                            # das letzte Element der Liste                         
          ($odev,$oread,undef,undef,$oval) = split("_ESC_", $or);    # Value des letzten Elements      
          if (looks_like_number($oval) && $var) {                    # Varianz +- falls $val numerischer Wert
@@ -4221,13 +4222,14 @@ sub delseqdoubl_DoParse($) {
 	     $oor = pop @sel;                                           # das vorletzte Element der Liste
 		 $ooval = (split '_ESC_', $oor)[-1];                        # Value des vorletzten Elements
 		 if ($ndev.$nread ne $odev.$oread) {
-		     push (@sel,$oor);
-		     push (@sel,$or);
+             $i = 0;                                                # neues Device/Reading in einer Periode -> ooor soll erhalten bleiben
+		     push (@sel,$oor) if($oor);
+		     push (@sel,$or) if($or);
 		     push (@sel,$nr);
-		 } elsif (($ooval eq $oval && $oval eq $nval) || ($var1 && $var2 && ($ooval <= $var1) && ($var2 <= $ooval) && ($nval <= $var1) && ($var2 <= $nval)) ) {
+		 } elsif ($i>=2 && ($ooval eq $oval && $oval eq $nval) || ($i>=2 && $var1 && $var2 && ($ooval <= $var1) && ($var2 <= $ooval) && ($nval <= $var1) && ($var2 <= $nval)) ) {
 		     push (@sel,$oor);
 		     push (@sel,$nr);
-             push (@warp,$or);                                      # Array der zu löschenden Datensätze
+             push (@warp,$or);                                      # Array der zu löschenden Datensätze				 
              if ($opt =~ /delete/ && $or) {                         # delete Datensätze
 		         my ($dev,$read,$date,$time,$val) = split("_ESC_", $or);
 				 my $dt = $date." ".$time;
@@ -4252,12 +4254,13 @@ sub delseqdoubl_DoParse($) {
                  $dbh->commit() if(!$dbh->{AutoCommit});
 					 
 				 $rt = $rt+tv_interval($st);
-			 }				 
-		 } else {
-		     push (@sel,$oor);
-		     push (@sel,$or);
+			 }		 
+         } else {
+		     push (@sel,$oor) if($oor);
+		     push (@sel,$or) if($or);
 		     push (@sel,$nr);
 		 }
+         $i++;
      }
      if(@sel && $opt =~ /adviceRemain/) {
          # die verbleibenden Datensätze nach Ausführung (nur zur Anzeige) 
@@ -4267,14 +4270,18 @@ sub delseqdoubl_DoParse($) {
          # die zu löschenden Datensätze (nur zur Anzeige)
          push(@todel,@warp) if($#todel+1 < $limit);    
      }
-     $nremain = $nremain + $#sel if(@sel);
-     $ntodel = $ntodel + $#warp if(@warp);
+
+     $nremain = $nremain + $#sel+1 if(@sel);
+     $ntodel = $ntodel + $#warp+1 if(@warp);
+     my $sum = $nremain+$ntodel;
+     Log3 ($name, 3, "DbRep $name -> rows analyzed by \"$hash->{LASTCMD}\": $sum") if($sum && $opt =~ /advice/); 
  }
+ 
+ Log3 ($name, 3, "DbRep $name -> rows deleted by \"$hash->{LASTCMD}\": $ndel") if($ndel);
   
  my $retn = ($opt =~ /adviceRemain/)?$nremain:($opt =~ /adviceDelete/)?$ntodel:$ndel; 
 
  my @retarray = ($opt =~ /adviceRemain/)?@remain:($opt =~ /adviceDelete/)?@todel:" "; 
- # splice(@retarray,$limit+10);
  if ($utf8 && @retarray) {
      $rowlist = Encode::encode_utf8(join('|', @retarray));
  } elsif(@retarray) {
