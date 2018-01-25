@@ -21,6 +21,7 @@ table.room,table.block.wide,table.fileList {
   border-radius:0;
   border-spacing:0;
   border-top:1px solid gray;
+  border-bottom:1px solid gray;
 }
 table.block.wide td > div { padding:0 4px; }
 
