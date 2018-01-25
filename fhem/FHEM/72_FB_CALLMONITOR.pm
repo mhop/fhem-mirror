@@ -74,7 +74,12 @@ FB_CALLMONITOR_Initialize($)
                          "fritzbox-remote-phonebook-exclude ".
                          "fritzbox-remote-timeout ".
                          "fritzbox-user ".
+                         "apiKeySearchCh ".
+                         "apiKeyKlicktelDe ".
                          $readingFnAttributes;
+                         
+
+     
 }
 
 #####################################
@@ -352,19 +357,25 @@ FB_CALLMONITOR_Read($)
         44 => "Answering_Machine_5"
     );
     
-    my $buf = DevIo_SimpleRead($hash);
+    my $received = DevIo_SimpleRead($hash);
+    my $buffer = $hash->{PARTIAL};
     
-    return "" if(!defined($buf) or IsDisabled($hash->{NAME}));
+    return "" if(!defined($received) or IsDisabled($hash->{NAME}));
     
     my $name = $hash->{NAME};
     my @array;
   
-    my $data = $buf;
     my $area_code = AttrVal($name, "local-area-code", "");
     my $country_code = AttrVal($name, "country-code", "0049");
     
-    foreach $data (split(/;\r\n/m, $buf))
+    $buffer .= $received;
+     
+    while($buffer =~ m/\n/)
     {
+        my $data;
+        
+        ($data, $buffer) = split("\n", $buffer, 2);
+        
         chomp $data;
     
         my $external_number = undef;
@@ -493,7 +504,7 @@ FB_CALLMONITOR_Read($)
 }
 
 #####################################
-# Reconnects to FritzBox in case of disconnects
+# catches error message during connection setup
 sub
 FB_CALLMONITOR_DevIoCallback($$)
 {
@@ -671,11 +682,23 @@ FB_CALLMONITOR_reverseSearch($$)
                     Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using klicktel.de for reverse search of $number because of non-german number";
                 }
                 else
-                {            
+                {      
+                    my $api_key = AttrVal($name, "apiKeyKlicktelDe", undef);
+                    
+                    unless(defined($api_key))
+                    {
+                        Log3 $name, 1, "FB_CALLMONITOR ($name) - WARNING! no API key for klicktel.de configured. Please obtain an API key from http://openapi.klicktel.de and set attribute apiKeyKlicktelDe with your key";
+   
+                        # use old key    
+                        Log3 $name, 1, "FB_CALLMONITOR ($name) - using generic API key for reverse search via klicktel.de. WILL BE REMOVED IN A FUTURE RELEASE!";  
+                        $api_key = "0de6139a49055c37b9b2d7bb3933cb7b";
+                    }   
+                    
                     $number =~ s/^0049/0/; # remove country code
                     Log3 $name, 4, "FB_CALLMONITOR ($name) - using klicktel.de for reverse search of $number";
 
-                    $result = GetFileFromURL("http://openapi.klicktel.de/searchapi/invers?key=0de6139a49055c37b9b2d7bb3933cb7b&number=".$number, 5, undef, 1);
+                    $result = GetFileFromURL("http://openapi.klicktel.de/searchapi/invers?key=".urlEncode($api_key)."&number=".$number, 5, undef, 1);
+                    
                     if(not defined($result))
                     {
                         if(AttrVal($name, "reverse-search-cache", "0") eq "1")
@@ -751,11 +774,22 @@ FB_CALLMONITOR_reverseSearch($$)
                 }
                 else
                 {            
+                    my $api_key = AttrVal($name, "apiKeySearchCh", undef);
+                    
+                    unless(defined($api_key))
+                    {
+                        Log3 $name, 1, "FB_CALLMONITOR ($name) - WARNING! no API key for swiss.ch configured. Please obtain an API key from https://tel.search.ch/api/getkey and set attribute apiKeySearchCh with your key";
+   
+                        # use old key    
+                        Log3 $name, 1, "FB_CALLMONITOR ($name) - using generic API key for reverse search via search.ch. WILL BE REMOVED IN A FUTURE RELEASE";  
+                        $api_key = "b0b1207cb7c9d0048867de887aa9a4fd";
+                    }
+                    
                     $number =~ s/^0041/0/; # remove country code
             
                     Log3 $name, 4, "FB_CALLMONITOR ($name) - using search.ch for reverse search of $number";
 
-                    $result = GetFileFromURL("http://tel.search.ch/api/?key=b0b1207cb7c9d0048867de887aa9a4fd&maxnum=1&was=".$number, 5, undef, 1);
+                    $result = GetFileFromURL("http://tel.search.ch/api/?key=".urlEncode($api_key)."&maxnum=1&was=".$number, 5, undef, 1);
                     if(not defined($result))
                     {
                         if(AttrVal($name, "reverse-search-cache", "0") eq "1")
@@ -1592,7 +1626,7 @@ sub FB_CALLMONITOR_readRemotePhonebookViaTR064($$;$)
         Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data";
         return  "received http code ".$param->{code}." without any data";
     }
-
+    
     return (undef, $phonebook); 
 }
 
@@ -1949,7 +1983,7 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
   <br><br>
   This module work with any FritzBox Fon model.
   <br><br>
-  
+   
   <a name="FB_CALLMONITOR_define"></a>
   <b>Define</b>
   <ul>
@@ -2060,7 +2094,11 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
     Default Value: <i>empty</i> (all phonebooks should be used, no exclusions)<br><br>
     <li><a name="FB_CALLMONITOR_fritzbox-user">fritzbox-user</a> &lt;username&gt;</li>
     Use the given user for remote connect to obtain the phonebook (see <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>). This attribute is only needed, if you use multiple users on your FritzBox.<br><br>
-    </ul>
+    <li><a name="FB_CALLMONITOR_apiKeyKlicktelDe">apiKeyKlicktelDe</a> &lt;API-Key&gt;</li>
+    A private API key from <a href="http://openapi.klicktel.de" target="_new">klicktel Open API</a> to perform a reverse search via klicktel.de (see attribute <a href=#FB_CALLMONITOR_reverse-search">reverse-search</a>). Without an API key, no reverse search via klicktel.de is not possible<br><br>
+    <li><a name="FB_CALLMONITOR_apiKeySearchCh">apiKeySearchCh</a> &lt;API-Key&gt;</li>
+    A private API key from <a href="https://tel.search.ch/api/getkey" target="_new">tel.search.ch</a> to perform a reverse search via search.ch (see attribute <a href=#FB_CALLMONITOR_reverse-search">reverse-search</a>). Without an API key, no reverse search via search.ch is not possible<br><br>
+  </ul>
   <br>
  
   <a name="FB_CALLMONITOR_events"></a>
@@ -2227,6 +2265,10 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
     Standardm&auml;&szlig;ig ist diese Funktion deaktiviert (alle Telefonb&uuml;cher werden eingelesen)<br><br>
     <li><a name="FB_CALLMONITOR_fritzbox-user">fritzbox-user</a> &lt;Username&gt;</li>
     Der Username f&uuml;r das Telnet-Interface, sofern das Telefonbuch direkt von der FritzBox geladen werden soll (siehe Attribut: <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>). Dieses Attribut ist nur notwendig, wenn mehrere Benutzer auf der FritzBox konfiguriert sind.<br><br>
+    <li><a name="FB_CALLMONITOR_apiKeyKlicktelDe">apiKeyKlicktelDe</a> &lt;API-Key&gt;</li>
+    Der private API-Key von <a href="http://openapi.klicktel.de" target="_new">klicktel Open API</a> um eine R&uuml;ckw&auml;rtssuche via klicktel.de durchzuf&uuml;hren (siehe Attribut <a href=#FB_CALLMONITOR_reverse-search">reverse-search</a>). Ohne einen solchen API-Key ist eine R&uuml;ckw&auml;rtssuche via klicktel.de nicht m&ouml;glich<br><br>
+    <li><a name="FB_CALLMONITOR_apiKeySearchCh">apiKeySearchCh</a> &lt;API-Key&gt;</li>
+    Der private API-Key von <a href="https://tel.search.ch/api/getkey" target="_new">tel.search.ch</a> um eine R&uuml;ckw&auml;rtssuche via search.ch durchzuf&uuml;hren (siehe Attribut <a href=#FB_CALLMONITOR_reverse-search">reverse-search</a>). Ohne einen solchen API-Key ist eine R&uuml;ckw&auml;rtssuche via search.ch nicht m&ouml;glich<br><br>
     </ul>
   <br>
  

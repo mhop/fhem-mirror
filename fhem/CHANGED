@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  72_FB_CALLMONITOR: new attribute apiKeyKlicktelDe and 
+                                apiKeySearchCh to configure own private API keys
+                                for reverse search via klicktel.de or search.ch
   - feature: 93_DbRep: V7.5.4, dumpFilesKeep can be set to "0", new attribute 
                        "ftpDumpFilesKeep" for version management on FTP, 
                        delSeqDoublets optimized for consumption of resources
