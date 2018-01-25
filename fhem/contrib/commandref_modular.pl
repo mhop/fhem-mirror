@@ -76,7 +76,7 @@ for my $lang (@lang) {
         $modData{$mName}{type}=$1 if($l =~ m/^=item\s+(helper|command|device)/);
         $modData{$mName}{$1}  =$2 if($l =~ m/^=item\s+(summary[^ ]*)\s(.*)$/);
         $modData{$mName}{modLinks}{$1} = 1
-                 if($l =~ m/<a\s+name=['"]([^ '"]+)['"]>/ && $1 !~ m/^$mName/);
+                 if($l =~ m/<a\s+name=['"]([^ '"]+)['"]>/);
       }
       close(FH);
     }
