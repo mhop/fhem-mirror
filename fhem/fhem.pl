@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2017
+#  (c) 2005-2018
 #  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
