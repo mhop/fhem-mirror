@@ -2487,7 +2487,7 @@ plotAsPng(@)
         In plotmode gnuplot-scroll(-svg) or SVG the given time-range will be
         used, and no scrolling for this SVG will be possible. Needed e.g. for
         looking at last-years data without scrolling.<br><br> If the value is
-        one of hour, day, &lt;N&gt;days, week, month, year than set the zoom
+        one of hour, day, &lt;N&gt;days, week, month, year then set the zoom
         level for this SVG independently of the user specified zoom-level. This
         is useful for pages with multiple plots: one of the plots is best
         viewed in with the default (day) zoom, the other one with a week
@@ -2711,23 +2711,21 @@ plotAsPng(@)
 
     <a name="fixedrange"></a>
     <li>fixedrange [offset]<br>
-      Version 1<br>
+      Erste Alternative:<br>
       Enth&auml;lt zwei Zeit-Spezifikationen in der Schreibweise YYYY-MM-DD,
-      getrennt durch ein Leerzeichen. Im Plotmodus gnuplot-scroll(-svg) oder
-      SVG wird das vorgegebene Intervall verwendet und ein Scrolling der
-      Zeitachse ist nicht m&ouml;glich. Dies wird z.B. verwendet, um sich die
-      Daten des vergangenen Jahres ohne Scrollen anzusehen.<br><br>   
+      getrennt durch ein Leerzeichen. scrollen der Zeitachse ist nicht
+      m&ouml;glich, es wird z.B. verwendet, um sich die Daten verschiedener
+      Jahre auf eine Seite anzusehen.<br><br>
 
-      Version 2<br>
-      Wenn der Wert entweder Tag, &lt;N&gt;Tage, Woche, Monat oder Jahr lautet,
-      kann der Zoom-Level f&uuml;r dieses SVG unabh&auml;ngig vom
+      Zweite Alternative:<br>
+      Wenn der Wert entweder hour, day, &lt;N&gt;days, week, month oder year
+      lautet, kann der Zoom-Level f&uuml;r dieses SVG unabh&auml;ngig vom
       User-spezifischen Zoom eingestellt werden. Diese Einstellung ist
       n&uuml;tzlich f&uuml;r mehrere Plots auf einer Seite: Eine Grafik ist mit
       dem Standard-Zoom am aussagekr&auml;ftigsten, die anderen mit einem Zoom
-      &uuml;ber eine Woche.
-      Der optionale ganzzahlige Parameter [offset] setzt ein anderes
-      Zeitintervall (z.B. letztes Jahr: <code> fixedrange year -1</code>,
-      vorgestern: <code> fixedrange day -2</code>).
+      &uuml;ber eine Woche. Der optionale ganzzahlige Parameter [offset] setzt
+      ein anderes Zeitintervall (z.B. letztes Jahr: <code>fixedrange year
+      -1</code>, vorgestern:<code> fixedrange day -2</code>).
       </li><br>
 
     <a name="label"></a>
