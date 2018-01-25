@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.7.1      25.01.2018       fix typo in commandref
 # 3.7.0      21.01.2018       parsed event with Log 5 added, configCheck enhanced by configuration read check
 # 3.6.5      19.01.2018       fix lot of logentries if disabled and db not available
 # 3.6.4      17.01.2018       improve DbLog_Shutdown, extend configCheck by shutdown preparation check
@@ -179,7 +180,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.7.0";
+my $DbLogVersion = "3.7.1";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -666,7 +667,7 @@ sub DbLog_Set($@) {
 		
         Log3($name, 3, "DbLog $name: $crows cache rows exported to $outfile.");
 		
-		if ($a[-1] =~ m/^purgecache/i) {
+		if (lc($a[-1]) =~ m/^purgecache/i) {
 	        delete $hash->{cache};
             readingsSingleUpdate($hash, 'CacheUsage', 0, 1);
 			Log3($name, 3, "DbLog $name: Cache purged after exporting rows to $outfile.");
@@ -3439,6 +3440,8 @@ sub DbLog_AddLog($$$) {
   
   return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
   
+  $value = DbLog_charfilter($value) if(AttrVal($name, "useCharfilter",0));
+  
   # Funktion aus Attr valueFn validieren
   if( $value_fn =~ m/^\s*(\{.*\})\s*$/s ) {
       $value_fn = $1;
@@ -3523,7 +3526,6 @@ sub DbLog_AddLog($$$) {
           ($dev_name,$dev_type,$event,$dev_reading,$read_val,$ut) = DbLog_cutCol($hash,$dev_name,$dev_type,$event,$dev_reading,$read_val,$ut);
   
           my $row = ($ts."|".$dev_name."|".$dev_type."|".$event."|".$dev_reading."|".$read_val."|".$ut);
-		  $row    = DbLog_charfilter($row) if(AttrVal($name, "useCharfilter",0));
           Log3 $hash->{NAME}, 3, "DbLog $name -> addLog created - TS: $ts, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $dev_reading, Value: $read_val, Unit: $ut"
 		      if(!AttrVal($name, "suppressAddLogV3",0));
 		  use warnings;
@@ -5206,13 +5208,13 @@ sub checkUsePK ($$){
       <ul> This function deletes all readings except reading "state". </ul><br>
 
 	<a name="DbLogsetexportCache"></a>
-    <code>set &lt;name&gt; exportCache [nopurge | purgeCache] </code><br><br>
+    <code>set &lt;name&gt; exportCache [nopurge | purgecache] </code><br><br>
       <ul>If DbLog is operating in asynchronous mode, it's possible to exoprt the cache content into a textfile.
 	  The file will be written to the directory (global->modpath)/log/ by default setting. The detination directory can be
 	  changed by the <a href="#DbLogattr">attribute</a> expimpdir. <br>
 	  The filename will be generated automatically and is built by a prefix "cache_", followed by DbLog-devicename and the
 	  present timestmp, e.g. "cache_LogDB_2017-03-23_22-13-55". <br>
-      There are two options possible, "nopurge" respectively "purgeCache". The option determines whether the cache content 
+      There are two options possible, "nopurge" respectively "purgecache". The option determines whether the cache content 
 	  will be deleted after export or not.
 	  Using option "nopurge" (default) the cache content will be preserved. <br>
       The <a href="#DbLogattr">attribute</a> "exportCacheAppend" defines, whether every export process creates a new export file 
@@ -6162,13 +6164,13 @@ sub checkUsePK ($$){
       <ul>Identisch zu Funktion "deleteOldDays" wobei deleteOldDaysNbl nicht blockierend ausgeführt wird. </ul><br>	  
 
 	<a name="DbLogsetexportCache"></a>
-    <code>set &lt;name&gt; exportCache [nopurge | purgeCache] </code><br><br>
+    <code>set &lt;name&gt; exportCache [nopurge | purgecache] </code><br><br>
       <ul>Wenn DbLog im asynchronen Modus betrieben wird, kann der Cache mit diesem Befehl in ein Textfile geschrieben
 	  werden. Das File wird per Default in dem Verzeichnis (global->modpath)/log/ erstellt. Das Zielverzeichnis kann mit
 	  dem <a href="#DbLogattr">Attribut</a> "expimpdir" geändert werden. <br>
 	  Der Name des Files wird automatisch generiert und enthält den Präfix "cache_", gefolgt von dem DbLog-Devicenamen und
 	  dem aktuellen Zeitstempel, z.B. "cache_LogDB_2017-03-23_22-13-55". <br>
-      Mit den Optionen "nopurge" bzw. "purgeCache" wird festgelegt, ob der Cacheinhalt nach dem Export gelöscht werden
+      Mit den Optionen "nopurge" bzw. "purgecache" wird festgelegt, ob der Cacheinhalt nach dem Export gelöscht werden
       soll oder nicht. Mit "nopurge" (default) bleibt der Cacheinhalt erhalten. <br>
       Das <a href="#DbLogattr">Attribut</a> "exportCacheAppend" bestimmt dabei, ob mit jedem Exportvorgang ein neues Exportfile 
       angelegt wird (default) oder der Cacheinhalt an das bestehende (neueste) Exportfile angehängt wird.      
