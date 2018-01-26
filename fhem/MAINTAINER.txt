@@ -191,6 +191,7 @@ FHEM/36_EMT7110.pm           HCS                  Sonstige Systeme
 FHEM/36_Level.pm             HCS                  Sonstige Systeme
 FHEM/36_Vallox.pm            Skjall               http://forum.fhem.de/index.php/topic,71325.0.html
 FHEM/36_WMBUS.pm             kaihs                Sonstige Systeme
+FHEM/37_NotifyAndroidTV.pm   justme1968           Multimedia
 FHEM/37_SHC.pm               rr2000               Sonstige Systeme
 FHEM/37_SHCdev.pm            rr2000               Sonstige Systeme
 FHEM/37_Spotify.pm           neumann              Multimedia
