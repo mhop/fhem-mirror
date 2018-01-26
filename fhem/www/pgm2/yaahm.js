@@ -10,7 +10,7 @@
 //------------------------------------------------------------------------------------------------------
 
 var req = new XMLHttpRequest();
-req.open('GET', document.location, false);
+req.open('HEAD', document.location.href, false);
 req.send(null);
 var csrfToken = req.getResponseHeader('X-FHEM-csrfToken');
 if( csrfToken == null ){

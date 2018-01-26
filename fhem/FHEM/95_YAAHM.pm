@@ -47,7 +47,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.45";
+my $yaahmversion    = "1.46";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -1235,6 +1235,8 @@ sub YAAHM_nextWeeklyTime {
     Log3 $name,1,"[YAAHM_nextWeeklyTime] ".$msg;
     return $msg;
   }
+  
+  $time = lc($time);
   
   #-- check value - may be empty
   if( $time eq "" || $time eq "default" ){

@@ -1,6 +1,6 @@
 //########################################################################################
 // babble.js
-// Version 1.06
+// Version 1.08
 // See 95_Babble for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
@@ -10,7 +10,7 @@
 //------------------------------------------------------------------------------------------------------
 
 var req = new XMLHttpRequest();
-req.open('GET', document.location, false);
+req.open('HEAD', document.location.href, false);
 req.send(null);
 var csrfToken = req.getResponseHeader('X-FHEM-csrfToken');
 if( csrfToken == null ){

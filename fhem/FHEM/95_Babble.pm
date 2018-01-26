@@ -42,7 +42,7 @@ use JSON;      # imports encode_json, decode_json, to_json and from_json.
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.07";
+my $babbleversion    = "1.08";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",

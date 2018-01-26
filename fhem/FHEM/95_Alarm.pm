@@ -43,7 +43,7 @@ my $alarmlinkname   = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "4.02";
+my $alarmversion    = "4.03";
 
 my %alarm_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -1115,7 +1115,7 @@ sub Alarm_widget($){
   
   #-- no webarg, check direct parameter. TODO: order
   if( !defined($name) || $name eq "" ){
-    if( $arg   =~ /^name=(\w*)&gstate=(.+)&dstate=(.+)&size=(\d+x\d+)/ ){
+    if( $arg   =~ /^name=(\w*)&gstate=(.+)&dstate=(.*)&size=(\d+x\d+)/ ){
        $name   = $1;
        $gstate  = $2;
        $dstate  = $3;
