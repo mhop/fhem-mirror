@@ -10,13 +10,13 @@
 # 0.01 2017-05-24 Smag Decoding/sniffing signals, Binary-keycode-decoding for on, off, stop, favourite and p2 (pairing).
 # 0.02 2017-05-25 Smag Tests with CUL/COC and Signalduino. Successful signalrepeat to device via Signalduino.
 # 0.03 2017-07-23 Smag initial template
-# 0.04 2017-07-24 Smag Changed binary device-define to much more easier hex-code (28bit+channel). 
+# 0.04 2017-07-24 Smag Changed binary device-define to much more easier hex-code (28bit+channel).
 # 0.10 2017-07-30 Smag Siro-Parse implemented. First alpha-version went out for Byte09 and det
-# 0.11 2017-07-30 Smag, Byte09 updated module 
+# 0.11 2017-07-30 Smag, Byte09 updated module
 # 0.12 2017-08-02 Byte Subroutine X_internaltset komplett entfernt, Zusammenlegung mit X_set
 #                 Byte Variablen bereinigt
 #		          		Byte Code bereinigt
-#		          		Byte Einführung "readings", "lastmsg" und "aktMsg" inkl. Unixtime 
+#		          		Byte Einführung "readings", "lastmsg" und "aktMsg" inkl. Unixtime
 # 0.13 2017-08-03 Byte Senden eines doppelten Stoppbefehls abgefangen, keine Hardwaremittelanfahrt durch zweimaliges Stopp mehr möglich
 # 0.14 2017-08-04 Byte Attr SignalLongStopRepeats eingeführt. Anzahl der Repeats für Longstop (Favourite). undef = 15
 # 0.15 2017-08-05 Byte Attr "timer" eingeführt. Enthält die Zeit zwischen zwei ausgeführten Befehlen zur Positionsberechnung
@@ -37,10 +37,10 @@
 # 	   			  		Operation_mode 1 eingeführt. ( Repeatermodus )
 # 0.25 2017-08-26 Byte diverse Korrekturen, Codebereinigung, Anfahrt der HW_Favorit Position über FB im Mode 1 möglich
 # 0.26 2017-08-26 Byte Commandref Deutsch hinzugefügt
-# 0.27 2017-08-29 Byte Define von Devices, die eine Kanal nutzen der bereits von einem Device genutzt wird (channel / send_channel_mode1) wird unterbunden 
+# 0.27 2017-08-29 Byte Define von Devices, die eine Kanal nutzen der bereits von einem Device genutzt wird (channel / send_channel_mode1) wird unterbunden
 # 	   			  		Debug_Attr (0/1) eingefügt - es werden diverse redings angelegt und kein Befehl physisch anden Rollo gesendet - nur Fehlersuche
 # 0.28 2017-09-02 ByteFehler bei Stateaktualisierung in Zusammenhang mit Stop bei Favoritenanfahrt behoben
-# 0.29 2017-08-29 Byte Define von Devices, die einen Kanal nutzen, der bereits von einem Device genutzt wird (channel / send_channel_mode1) wird unterbunden 
+# 0.29 2017-08-29 Byte Define von Devices, die einen Kanal nutzen, der bereits von einem Device genutzt wird (channel / send_channel_mode1) wird unterbunden
 #						Debug_Attr (0/1) eingefügt - es werden diverse redings angelegt und kein Befehl physisch anden Rollo gesendet - nur Fehlersuche
 #				  		Set favorite und Attr prog_fav_sequence eingeführt - programmierung derHardware_Favorite_Position
 #				  		Codebereinigung
@@ -49,11 +49,11 @@
 # 0.31 2017-09-10 Byte Commandref ergänzt Deutsch/Englisch
 # 0.32 2017-09-16 Byte Fehlerkorrekturen
 # 0.34 2017-09-17 Invers Dokumentation, Byte Korrekturen Log
-# 0.35 2017-09-24 Byte Fehlerkorrekturen , Einbau Device  mit Kanal 0 als Gruppendevice ( noch gesperrt ) . Attribut "channel" enfernt , Kanalwahl nur noch über das Device möglich . 
-# 0.36 2017-09-24 Byte Device0 Favoritenanfahrt und Positionsanfahrt durch FHEM möglich 
+# 0.35 2017-09-24 Byte Fehlerkorrekturen , Einbau Device  mit Kanal 0 als Gruppendevice ( noch gesperrt ) . Attribut "channel" enfernt , Kanalwahl nur noch über das Device möglich .
+# 0.36 2017-09-24 Byte Device0 Favoritenanfahrt und Positionsanfahrt durch FHEM möglich
 # 0.37 2017-09-25 SMag Prerelease-Vorbereitungen. Codeformatierung, Fehlerkorrekturen, Textkorrekturen.
 # 0.38 2017-09-27 optimierung sub Siro_Setgroup($) -> laufzeitverbesserung
-# 
+#
 # 0.39 2017-10-14 Byte Log überarbeitet / Parse überarbeitet / Define überarbeitet / interne Datenstruktur geändert / Internals überarbeitet / Groupdevice ( Kanal 0 ) möglich . Fehlerkorrekturen / attribut down_for_timer und up_for_timer eingebaut
 # 0.40 2017-10-15	Byte Code bereinigt
 # 0.41 2017-10-17	Byte anpassung der %Sets je nach device ( groupdevice )
@@ -64,1859 +64,1992 @@
 # 0.46 2017-05-11	Byte fehler bei fhem-neustart behoben
 # 0.47 2017-11-11	Byte attr Disable zugefügt.
 # 0.47 2017-02-12	Byte/Dr Smag  Quickfix ERB15LE
+# 0.48 2018-26-01	Byte New Readings 'operating_seconds' / 'last_reset_os'
 ################################################################################################################
 # Todo's:
-# - 
-# - 
+# -
+# -
 ###############################################################################################################
 
-
 package main;
-
 
 use strict;
 use warnings;
 my $version = "V 0.48";
 
 my %codes = (
-	"55" => "stop",			# Stop the current movement or move to custom position
-	"11" => "off",			# Move "up"
-	"33" => "on",			# Move "down"
-	"CC" => "prog",			# Programming-Mode (Remote-control-key: P2)
+    "55" => "stop",    # Stop the current movement or move to custom position
+    "11" => "off",     # Move "up"
+    "33" => "on",      # Move "down"
+    "CC" => "prog",    # Programming-Mode (Remote-control-key: P2)
 );
 
 my %sets = (
-	"open" => "noArg",
-	"close" => "noArg",
-	"off" => "noArg",
-	"stop" => "noArg",
-	"on" => "noArg",
-	"fav" => "noArg",
-	"prog" => "noArg",
-	"prog_stop" => "noArg",
-	"position" => "slider,0,1,100",	    # Wird nur bei vorhandenen time_to attributen gesetzt
-	"state" => "noArg" ,
-	"set_favorite" => "noArg",
-	"down_for_timer" => "textField",
-	"up_for_timer" => "textField"	
-	
+    "open"      => "noArg",
+    "close"     => "noArg",
+    "off"       => "noArg",
+    "stop"      => "noArg",
+    "on"        => "noArg",
+    "fav"       => "noArg",
+    "prog"      => "noArg",
+    "prog_stop" => "noArg",
+    "position" =>
+      "slider,0,1,100",    # Wird nur bei vorhandenen time_to attributen gesetzt
+    "state"                   => "noArg",
+    "set_favorite"            => "noArg",
+    "down_for_timer"          => "textField",
+    "reset_operating_seconds" => "noArg",
+    "up_for_timer"            => "textField",
+
 );
 
 my %sendCommands = (
-	"off" => "off",
-	"stop" => "stop",
-	"on" => "on",
-	"open" => "off",
-	"close" => "on",
-	"fav" => "fav",
-	"prog" => "prog",
-	"set_favorite" => "setfav" 
+    "off"          => "off",
+    "stop"         => "stop",
+    "on"           => "on",
+    "open"         => "off",
+    "close"        => "on",
+    "fav"          => "fav",
+    "prog"         => "prog",
+    "set_favorite" => "setfav"
 );
 
-my %siro_c2b;         
+my %siro_c2b;
 
-my %models = ( 
-	siroblinds => 'blinds', 
-	siroshutter => 'shutter' 
-); 
-	
+my %models = (
+    siroblinds  => 'blinds',
+    siroshutter => 'shutter'
+);
+
 #################################################################
 sub Siro_Initialize($) {
-	my ($hash) = @_;
+    my ($hash) = @_;
 
-	# Map commands from web interface to codes used in Siro
-	foreach my $k ( keys %codes ) {
-		$siro_c2b{ $codes{$k} } = $k;
-	}
-	$hash->{SetFn}		= "Siro_Set";
-	$hash->{NotifyFn}   = "Siro_Notify";
-	$hash->{ShutdownFn}		= "Siro_Shutdown";
-	#$hash->{StateFn} 	= "Siro_SetState"; #change  
-	$hash->{DefFn}   	= "Siro_Define";
-	$hash->{UndefFn}	= "Siro_Undef";
-	$hash->{DeleteFn}	= "Siro_Delete";
-	$hash->{ParseFn}  	= "Siro_Parse";
-	$hash->{AttrFn}  	= "Siro_Attr";
-	$hash->{Match}     	= "^P72#[A-Fa-f0-9]+";
-	$hash->{AttrList} = " IODev"
-	  . " disable:0,1"
-	  . " SignalRepeats:1,2,3,4,5,6,7,8,9"
-	  . " SignalLongStopRepeats:10,15,20,40,45,50"
-	  . " channel_send_mode_1:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
-	  . " $readingFnAttributes"
-	  . " setList"
-	  . " ignore:0,1"
-	  . " dummy:1,0"
-#	  . " model:siroblinds,siroshutter"
-	  . " time_to_open"                  
-	  . " time_to_close"	
-	  . " time_down_to_favorite"         
-	  . " hash"
-	  . " operation_mode:0,1"
-	  . " debug_mode:0,1"
-	  . " down_limit_mode_1:slider,0,1,100"
-	  . " down_auto_stop:slider,0,1,100"
-	  . " invers_position:0,1"
-	  . " prog_fav_sequence";
+    # Map commands from web interface to codes used in Siro
+    foreach my $k ( keys %codes ) {
+        $siro_c2b{ $codes{$k} } = $k;
+    }
+    $hash->{SetFn}      = "Siro_Set";
+    $hash->{NotifyFn}   = "Siro_Notify";
+    $hash->{ShutdownFn} = "Siro_Shutdown";
 
-	
-	$hash->{AutoCreate} =
-	{ 
-		"Siro.*" => 
-		{ 
-			ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", 
-			FILTER => "%NAME",
-			autocreateThreshold => "2:10" 
-		} 
-	};
+    #$hash->{StateFn} 	= "Siro_SetState"; #change
+    $hash->{DefFn}    = "Siro_Define";
+    $hash->{UndefFn}  = "Siro_Undef";
+    $hash->{DeleteFn} = "Siro_Delete";
+    $hash->{ParseFn}  = "Siro_Parse";
+    $hash->{AttrFn}   = "Siro_Attr";
+    $hash->{Match}    = "^P72#[A-Fa-f0-9]+";
+    $hash->{AttrList} =
+        " IODev"
+      . " disable:0,1"
+      . " SignalRepeats:1,2,3,4,5,6,7,8,9"
+      . " SignalLongStopRepeats:10,15,20,40,45,50"
+      . " channel_send_mode_1:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
+      . " $readingFnAttributes"
+      . " setList"
+      . " ignore:0,1"
+      . " dummy:1,0"
 
-	$hash->{NOTIFYDEV} = "global";
-	Siro_LoadHelper($hash) if($init_done);
+      #	  . " model:siroblinds,siroshutter"
+      . " time_to_open"
+      . " time_to_close"
+      . " time_down_to_favorite" . " hash"
+      . " operation_mode:0,1"
+      . " debug_mode:0,1"
+      . " down_limit_mode_1:slider,0,1,100"
+      . " down_auto_stop:slider,0,1,100"
+      . " invers_position:0,1"
+      . " prog_fav_sequence";
+
+    $hash->{AutoCreate} = {
+        "Siro.*" => {
+            ATTR   => "event-min-interval:.*:300 event-on-change-reading:.*",
+            FILTER => "%NAME",
+            autocreateThreshold => "2:10"
+        }
+    };
+
+    $hash->{NOTIFYDEV} = "global";
+    Siro_LoadHelper($hash) if ($init_done);
 }
 
 #################################################################
 sub Siro_Define($$) {
-	my ( $hash, $def ) = @_;
-	my @a = split( "[ \t][ \t]*", $def );
+    my ( $hash, $def ) = @_;
+    my @a = split( "[ \t][ \t]*", $def );
 
-	my $u = "Wrong syntax: define <name> Siro id ";
-	my $askedchannel; # Angefragter kanal
+    my $u = "Wrong syntax: define <name> Siro id ";
+    my $askedchannel;    # Angefragter kanal
 
-	# Fail early and display syntax help
-	if ( int(@a) < 3 ) {
-		return $u;
-	}
-	
-	if ( $a[2] =~ m/^[A-Fa-f0-9]{8}$/i ){
-		$hash->{ID} = uc(substr($a[2], 0, 7));
-		$hash->{CHANNEL} = sprintf( "%d", hex(substr($a[2], 7, 1)) );
-		$askedchannel=sprintf( "%d", hex(substr($a[2], 7, 1)) );;
-	} 
-	else
-	{
-		return "Define $a[0]: wrong address format: specify a 8 char hex value (id=7 chars, channel=1 char) . Example A23B7C51. The last hexchar identifies the channel. -> ID=A23B7C5, Channel=1. "
-	}
+    # Fail early and display syntax help
+    if ( int(@a) < 3 ) {
+        return $u;
+    }
 
-	my $test;
-	my $device;
-	my $chanm1;
-	my $chan;
-	my @channels = ('','0','1','2','3','4','5','6','7','8','9');
-	my @testchannels; # Enthält alle Kanäle die in Benutzung sind
-	my @keys;
-	my @values; 
-	my $testname;
-	
-	$hash->{Version}		= $version;
-	my $name  = $a[0];
-	# Log3($name, 0, "Siro_define: $hash->{helper}{position} ");
-	# if ($hash->{helper}{position} eq '')
-	# {
-		# $hash->{helper}{position}="0";
-		# $hash->{helper}{aktMsg} = "stop".' '.'0'.' '.gettimeofday();
-		# $hash->{helper}{lastMsg} = "stop".' '.'0'.' '.gettimeofday();
-		# $hash->{helper}{lastProg} ="0";
-		# $hash->{helper}{lastparse_stop} ="stop".' '.gettimeofday();
-		# $hash->{helper}{lastparse} ="";
-		# $hash->{helper}{parse_aborted} ="0";
-	# }
-	
-	
-	my $tn = TimeNow(); #Wird wohl nicht benötigt?!?! down_limit_mode_1
-	
-	if ($askedchannel ne "0")
-	{	
-		#Setzen der vordefinierten Attribute
-		$attr{$name}{devStateIcon} ="{return '.*:fts_shutter_1w_'.(int(\x{24}state/10)*10)}" if(!defined ($attr{$name}{devStateIcon})); #TMP_Byte09 !defined
-		
-		$attr{$name}{webCmd} ="stop:on:off:fav:position" if (!defined ($attr{$name}{webCmd})); 
-		$attr{$name}{down_limit_mode_1} ="100" if (!defined ($attr{$name}{down_limit_mode_1})); 
-		$attr{$name}{prog_fav_sequence} ="prog,2,stop,2,stop" if (!defined ($attr{$name}{prog_fav_sequence}));    
-		#$attr{$name}{room} ="Siro" if (!defined ($attr{$name}{genericDeviceType}));                           
-		$attr{$name}{SignalLongStopRepeats} ="15" if (!defined ($attr{$name}{SignalLongStopRepeats}));             
-		$attr{$name}{SignalRepeats} ="8" if (!defined ($attr{$name}{SignalRepeats}));                     
-		$attr{$name}{operation_mode} ="0" if (!defined ($attr{$name}{operation_mode})); 
-		$attr{$name}{down_auto_stop} ="100" if (!defined ($attr{$name}{down_auto_stop}));
-		$attr{$name}{invers_position} ="0" if (!defined ($attr{$name}{invers_position}));
-	}
-	else
-	{
-		$attr{$name}{devStateIcon} ="{return '.*:fts_shutter_1w_'.(int(\x{24}state/10)*10)}" if(!defined ($attr{$name}{devStateIcon})); #TMP_Byte09 !defined
-		$attr{$name}{webCmd} ="stop:on:off:fav:position" if (!defined ($attr{$name}{webCmd}));    
-		#$attr{$name}{room} ="Siro" if (!defined ($attr{$name}{genericDeviceType}));                           
-		$attr{$name}{SignalLongStopRepeats} ="15" if (!defined ($attr{$name}{SignalLongStopRepeats}));             
-		$attr{$name}{SignalRepeats} ="8" if (!defined ($attr{$name}{SignalRepeats}));                 
-		#$attr{$name}{SignalRepeats} ="2";
-		$attr{$name}{down_auto_stop} ="100" if (!defined ($attr{$name}{down_auto_stop}));
-		$attr{$name}{invers_position} ="0" if (!defined ($attr{$name}{invers_position}));
-	}
-	my $code  = uc($a[2]);
-	my $ncode = 1;
-	
-	my $devpointer = $hash->{ID}.$hash->{CHANNEL};
-	$hash->{CODE}{ $ncode++ } = $code;
-	$modules{Siro}{defptr}{$devpointer} = $hash;
-	
-	Log3($name, 5, "Siro_define: angelegtes Device - code -> $code name -> $name hash -> $hash ");
+    if ( $a[2] =~ m/^[A-Fa-f0-9]{8}$/i ) {
+        $hash->{ID} = uc( substr( $a[2], 0, 7 ) );
+        $hash->{CHANNEL} = sprintf( "%d", hex( substr( $a[2], 7, 1 ) ) );
+        $askedchannel = sprintf( "%d", hex( substr( $a[2], 7, 1 ) ) );
+    }
+    else {
+        return
+"Define $a[0]: wrong address format: specify a 8 char hex value (id=7 chars, channel=1 char) . Example A23B7C51. The last hexchar identifies the channel. -> ID=A23B7C5, Channel=1. ";
+    }
 
-	AssignIoPort($hash);
+    my $test;
+    my $device;
+    my $chanm1;
+    my $chan;
+    my @channels = ( '', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' );
+    my @testchannels;    # Enthält alle Kanäle die in Benutzung sind
+    my @keys;
+    my @values;
+    my $testname;
+
+    $hash->{Version} = $version;
+    my $name = $a[0];
+
+    # Log3($name, 0, "Siro_define: $hash->{helper}{position} ");
+    # if ($hash->{helper}{position} eq '')
+    # {
+    # $hash->{helper}{position}="0";
+    # $hash->{helper}{aktMsg} = "stop".' '.'0'.' '.gettimeofday();
+    # $hash->{helper}{lastMsg} = "stop".' '.'0'.' '.gettimeofday();
+    # $hash->{helper}{lastProg} ="0";
+    # $hash->{helper}{lastparse_stop} ="stop".' '.gettimeofday();
+    # $hash->{helper}{lastparse} ="";
+    # $hash->{helper}{parse_aborted} ="0";
+    # }
+
+    my $tn = TimeNow();    #Wird wohl nicht benötigt?!?! down_limit_mode_1
+
+    if ( $askedchannel ne "0" ) {
+
+        #Setzen der vordefinierten Attribute
+        $attr{$name}{devStateIcon} =
+          "{return '.*:fts_shutter_1w_'.(int(\x{24}state/10)*10)}"
+          if ( !defined( $attr{$name}{devStateIcon} ) );    #TMP_Byte09 !defined
+
+        $attr{$name}{webCmd} = "stop:on:off:fav:position"
+          if ( !defined( $attr{$name}{webCmd} ) );
+        $attr{$name}{down_limit_mode_1} = "100"
+          if ( !defined( $attr{$name}{down_limit_mode_1} ) );
+        $attr{$name}{prog_fav_sequence} = "prog,2,stop,2,stop"
+          if ( !defined( $attr{$name}{prog_fav_sequence} ) );
+
+    #$attr{$name}{room} ="Siro" if (!defined ($attr{$name}{genericDeviceType}));
+        $attr{$name}{SignalLongStopRepeats} = "15"
+          if ( !defined( $attr{$name}{SignalLongStopRepeats} ) );
+        $attr{$name}{SignalRepeats} = "8"
+          if ( !defined( $attr{$name}{SignalRepeats} ) );
+        $attr{$name}{operation_mode} = "0"
+          if ( !defined( $attr{$name}{operation_mode} ) );
+        $attr{$name}{down_auto_stop} = "100"
+          if ( !defined( $attr{$name}{down_auto_stop} ) );
+        $attr{$name}{invers_position} = "0"
+          if ( !defined( $attr{$name}{invers_position} ) );
+    }
+    else {
+        $attr{$name}{devStateIcon} =
+          "{return '.*:fts_shutter_1w_'.(int(\x{24}state/10)*10)}"
+          if ( !defined( $attr{$name}{devStateIcon} ) );    #TMP_Byte09 !defined
+        $attr{$name}{webCmd} = "stop:on:off:fav:position"
+          if ( !defined( $attr{$name}{webCmd} ) );
+
+    #$attr{$name}{room} ="Siro" if (!defined ($attr{$name}{genericDeviceType}));
+        $attr{$name}{SignalLongStopRepeats} = "15"
+          if ( !defined( $attr{$name}{SignalLongStopRepeats} ) );
+        $attr{$name}{SignalRepeats} = "8"
+          if ( !defined( $attr{$name}{SignalRepeats} ) );
+
+        #$attr{$name}{SignalRepeats} ="2";
+        $attr{$name}{down_auto_stop} = "100"
+          if ( !defined( $attr{$name}{down_auto_stop} ) );
+        $attr{$name}{invers_position} = "0"
+          if ( !defined( $attr{$name}{invers_position} ) );
+    }
+    my $code  = uc( $a[2] );
+    my $ncode = 1;
+
+    my $devpointer = $hash->{ID} . $hash->{CHANNEL};
+    $hash->{CODE}{ $ncode++ } = $code;
+    $modules{Siro}{defptr}{$devpointer} = $hash;
+
+    Log3( $name, 5,
+"Siro_define: angelegtes Device - code -> $code name -> $name hash -> $hash "
+    );
+
+    AssignIoPort($hash);
 }
 
 #################################################################
-sub Siro_Undef($$) 
-{	
+sub Siro_Undef($$) {
 
-	my ( $hash, $name) = @_; 
-	delete( $modules{Siro}{defptr}{$hash} );
-	return undef;
+    my ( $hash, $name ) = @_;
+    delete( $modules{Siro}{defptr}{$hash} );
+    return undef;
 }
 
 #################################################################
-sub Siro_Shutdown($)
-{
-	my ( $hash ) = @_;
-	my $name = $hash->{NAME};
-	
-	
-	
-	
-	
-	 readingsSingleUpdate($hash, ".aktMsg",$hash->{helper}{aktMsg}, 0);
-	 readingsSingleUpdate($hash, ".lastMsg",$hash->{helper}{lastMsg}, 0);
-	 readingsSingleUpdate($hash, ".lastProg",$hash->{helper}{lastProg}, 0);
-	 readingsSingleUpdate($hash, ".lastparse",$hash->{helper}{lastparse}, 0);
-	 readingsSingleUpdate($hash, ".lastparse_stop",$hash->{helper}{lastparse_stop}, 0);
-	 readingsSingleUpdate($hash, ".parse_aborted",$hash->{helper}{parse_aborted}, 0);
-	 readingsSingleUpdate($hash, ".positionsave",$hash->{helper}{position}, 0);
-	 readingsSingleUpdate($hash, ".positiontimer",$hash->{helper}{positiontimer}, 0);
-	
-	return;
+sub Siro_Shutdown($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    readingsSingleUpdate( $hash, ".aktMsg",    $hash->{helper}{aktMsg},    0 );
+    readingsSingleUpdate( $hash, ".lastMsg",   $hash->{helper}{lastMsg},   0 );
+    readingsSingleUpdate( $hash, ".lastProg",  $hash->{helper}{lastProg},  0 );
+    readingsSingleUpdate( $hash, ".lastparse", $hash->{helper}{lastparse}, 0 );
+    readingsSingleUpdate( $hash, ".lastparse_stop",
+        $hash->{helper}{lastparse_stop}, 0 );
+    readingsSingleUpdate( $hash, ".parse_aborted",
+        $hash->{helper}{parse_aborted}, 0 );
+    readingsSingleUpdate( $hash, ".positionsave", $hash->{helper}{position},
+        0 );
+    readingsSingleUpdate( $hash, ".positiontimer",
+        $hash->{helper}{positiontimer}, 0 );
+
+    return;
 }
 
 #################################################################
-sub Siro_LoadHelper($)
-{
-	my ( $hash ) = @_;
-	my $name = $hash->{NAME};
-	
-	
-	
-	my $save =	ReadingsVal($name, '.aktMsg', 'undef');
-	if ($save eq 'undef')
-		{
-		Log3($name, 5, "Siro: Helper lade new device");
-			 $hash->{helper}{position}="0";
-			 $hash->{helper}{aktMsg} = "stop".' '.'0'.' '.gettimeofday();
-			 $hash->{helper}{lastMsg} = "stop".' '.'0'.' '.gettimeofday();
-			 $hash->{helper}{lastProg} ="0";
-			 $hash->{helper}{lastparse_stop} ="stop".' '.gettimeofday();
-			 $hash->{helper}{lastparse} ="";
-			 $hash->{helper}{parse_aborted} ="0";
-		}
-	
-	else
-		{
-		Log3($name, 5, "Siro: Helper lade bestandsdaten");
-			 $hash->{helper}{aktMsg} = ReadingsVal($name, '.aktMsg', '');
-			 $hash->{helper}{lastMsg} = ReadingsVal($name, '.lastMsg', '');
-			 $hash->{helper}{lastparse} = ReadingsVal($name, '.lastparse', '');
-			 $hash->{helper}{lastProg} = ReadingsVal($name, '.lastProg', '');
-			 $hash->{helper}{lastparse_stop} = ReadingsVal($name, '.lastparse_stop', '');
-			 $hash->{helper}{parse_aborted} = ReadingsVal($name, '.parse_aborted', '');
-			 $hash->{helper}{position} = ReadingsVal($name, '.positionsave', '');
-			 $hash->{helper}{positiontimer} = ReadingsVal($name, '.positiontimer', '');
-			readingsSingleUpdate($hash, "position",ReadingsVal($name, '.positionsave', '0'), 0);
-			readingsSingleUpdate($hash, "state",ReadingsVal($name, '.positionsave', '0'), 0);
-		}
-	Log3($name, 5, "Siro: Helper initialisiert: positionsave ".ReadingsVal($name, '.positionsave', '0')." ");
-	Log3($name, 5, "Siro: Helper initialisiert: state ".ReadingsVal($name, 'state', '0')." ");
-	Log3($name, 5, "Siro: Helper initialisiert: position ".ReadingsVal($name, 'position', '0')." ");
-	return;
+sub Siro_LoadHelper($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    my $save = ReadingsVal( $name, '.aktMsg', 'undef' );
+    if ( $save eq 'undef' ) {
+        Log3( $name, 5, "Siro: Helper lade new device" );
+        $hash->{helper}{position} = "0";
+        $hash->{helper}{aktMsg}   = "stop" . ' ' . '0' . ' ' . gettimeofday();
+        $hash->{helper}{lastMsg}  = "stop" . ' ' . '0' . ' ' . gettimeofday();
+        $hash->{helper}{lastProg} = "0";
+        $hash->{helper}{lastparse_stop} = "stop" . ' ' . gettimeofday();
+        $hash->{helper}{lastparse}      = "";
+        $hash->{helper}{parse_aborted}  = "0";
+    }
+
+    else {
+        Log3( $name, 5, "Siro: Helper lade bestandsdaten" );
+        $hash->{helper}{aktMsg}    = ReadingsVal( $name, '.aktMsg',    '' );
+        $hash->{helper}{lastMsg}   = ReadingsVal( $name, '.lastMsg',   '' );
+        $hash->{helper}{lastparse} = ReadingsVal( $name, '.lastparse', '' );
+        $hash->{helper}{lastProg}  = ReadingsVal( $name, '.lastProg',  '' );
+        $hash->{helper}{lastparse_stop} =
+          ReadingsVal( $name, '.lastparse_stop', '' );
+        $hash->{helper}{parse_aborted} =
+          ReadingsVal( $name, '.parse_aborted', '' );
+        $hash->{helper}{position} = ReadingsVal( $name, '.positionsave', '' );
+        $hash->{helper}{positiontimer} =
+          ReadingsVal( $name, '.positiontimer', '' );
+        readingsSingleUpdate( $hash, "position",
+            ReadingsVal( $name, '.positionsave', '0' ), 0 );
+        readingsSingleUpdate( $hash, "state",
+            ReadingsVal( $name, '.positionsave', '0' ), 0 );
+    }
+    Log3( $name, 5,
+            "Siro: Helper initialisiert: positionsave "
+          . ReadingsVal( $name, '.positionsave', '0' )
+          . " " );
+    Log3( $name, 5,
+            "Siro: Helper initialisiert: state "
+          . ReadingsVal( $name, 'state', '0' )
+          . " " );
+    Log3( $name, 5,
+            "Siro: Helper initialisiert: position "
+          . ReadingsVal( $name, 'position', '0' )
+          . " " );
+    return;
 }
 
 #################################################################
 
-sub Siro_Notify($$)
-	{
-		my ($own_hash, $dev_hash) = @_;
-		my $ownName = $own_hash->{NAME}; # own name / hash
-		
-		my $devName = $dev_hash->{NAME}; # Device that created the events
-		my $events = deviceEvents($dev_hash, 1);
+sub Siro_Notify($$) {
+    my ( $own_hash, $dev_hash ) = @_;
+    my $ownName = $own_hash->{NAME};    # own name / hash
 
-		if($devName eq "global" && grep(m/^INITIALIZED|REREADCFG$/, @{$events}))
-			{
-				Siro_LoadHelper($own_hash);
-			}
-	return;	
-	}
+    my $devName = $dev_hash->{NAME};            # Device that created the events
+    my $events = deviceEvents( $dev_hash, 1 );
+
+    if ( $devName eq "global"
+        && grep( m/^INITIALIZED|REREADCFG$/, @{$events} ) )
+    {
+        Siro_LoadHelper($own_hash);
+    }
+    return;
+}
 #################################################################
 
+sub Siro_Delete($$) {
+    my ( $hash, $name ) = @_;
 
-sub Siro_Delete($$)    
-{                     
-	my ( $hash, $name ) = @_; 
-	
-	return undef;
+    return undef;
 }
 
 #################################################################
-sub Siro_SendCommand($@)
-{
-	my ($hash, @args) = @_;
-	my $ret = undef;
-	my $cmd = $args[0];       						# Command as text (on, off, stop, prog)
-	my $message;              						# IO-Message (full)
-	my $chan;                 						# Channel
-	my $binChannel;           						# Binary channel
-	my $SignalRepeats;								#
-	my $name = $hash->{NAME};
-	my $binHash;
-	my $bin;                  						# Full binary IO-Message 
-	my $binCommand;
-	my $numberOfArgs  = int(@args);
-	my $command = $siro_c2b{ $cmd };
-	my $io = $hash->{IODev};						# IO-Device (SIGNALduino)
-	
-	my $debug = AttrVal($name,'debug_mode', '0');
+sub Siro_SendCommand($@) {
+    my ( $hash, @args ) = @_;
+    my $ret = undef;
+    my $cmd = $args[0];    # Command as text (on, off, stop, prog)
+    my $message;           # IO-Message (full)
+    my $chan;              # Channel
+    my $binChannel;        # Binary channel
+    my $SignalRepeats;     #
+    my $name = $hash->{NAME};
+    my $binHash;
+    my $bin;               # Full binary IO-Message
+    my $binCommand;
+    my $numberOfArgs = int(@args);
+    my $command      = $siro_c2b{$cmd};
+    my $io           = $hash->{IODev};    # IO-Device (SIGNALduino)
 
-	Log3($name, 5, "Siro_sendCommand: hash -> $hash - $name -> cmd :$cmd: - args -> @args");
+    if ( $cmd eq 'on' || $cmd eq 'off' ) {
 
-	if ($args[2] eq "longstop")
-	{
-		$SignalRepeats =AttrVal($name,'SignalLongStopRepeats', '15')
-	}
-	else
-	{
-	  $SignalRepeats = AttrVal($name,'SignalRepeats', '10');
-	}
+        # setze startzeit
+        $hash->{helper}{motorstart} = gettimeofday();
 
-	my $operationmode = AttrVal($name,'operation_mode', 'on');
+        #ReadingsVal( $name, '.positionsave', '' );
+    }
 
-	Log3($name, 5, "Siro_sendCommand: operationmode -> $operationmode");
+    if ( $cmd eq 'stop'
+        && gettimeofday() - $hash->{helper}{motorstart} <
+        AttrVal( $name, 'time_to_open', 0 )
+        && $hash->{CHANNEL} ne '0' )
+    {
+        my $addtime      = gettimeofday() - $hash->{helper}{motorstart};
+        my $oldmotortime = ReadingsVal( $name, 'operating_seconds', 0 );
+        my $newtime      = $oldmotortime + $addtime;
+        my $rounded      = int( 100 * $newtime + 0.5 ) / 100;
+        readingsSingleUpdate( $hash, "operating_seconds", $rounded, 1 );
+    }
 
-	if ($operationmode eq '1')
-	{
-	$chan = AttrVal($name,'channel_send_mode_1', $hash->{CHANNEL});
-	Log3($name, 5, "Siro_sendCommand: channel für OM1  -> $chan");
-	}
-	else
-	{
-		$chan = AttrVal($name,'channel', undef);
-		if (!defined($chan))
-		{
-			$chan = $hash->{CHANNEL};
-		}
-	}
-		
-	if ($chan eq "0")
-	{	
-		Log3($name, 5, "Siro_sendCommand: Aborted not sent on a channel 0 request ");
-		return;
-	}
-		
-	$binChannel = sprintf("%04b",$chan);
-	#Log3($name, 5, "Siro set channel: $chan ($binChannel) for $io->{NAME}");
-	
-	my $value = $name ." ". join(" ", @args);
-	
-	$binHash = sprintf( "%028b", hex( $hash->{ID} ) );
-	Log3 $io, 5, "Siro_sendCommand: BinHash: = $binHash";
-	
-	$binCommand = sprintf( "%08b", hex( $command ) );
-	Log3 $io, 5, "Siro_sendCommand: BinCommand: = $binCommand";
-	
-	$bin = 	$binHash . $binChannel . $binCommand; # Binary code to send
-	Log3 $io, 5, "Siro_sendCommand: Siro set value = $value";
-	
-	$message = 'P72#' . $bin . '#R' . $SignalRepeats;
-	
-	
-	if ($debug eq "1")
-	{
-		readingsSingleUpdate($hash, "DEBUG_SEND","$name -> message :$message: ", 1);
-	} 
-	else
-	{
-	Log3 $io, 5, "Siro_sendCommand: Siro_sendCommand: $name -> message :$message: ";
-		IOWrite($hash, 'sendMsg', $message);
-	}
-	
-	my $devicename =$hash->{IODev};
-	
-	Log3($name, 5, "Siro_sendCommand: name -> $name command -> $cmd ");
-	#Log3($name, 3, "Siro_sendCommand: execute comand $cmd - sendMsg to $devicename channel $chan -> $message ");
-	
-	return $ret;
+    my $debug = AttrVal( $name, 'debug_mode', '0' );
+
+    Log3( $name, 5,
+        "Siro_sendCommand: hash -> $hash - $name -> cmd :$cmd: - args -> @args"
+    );
+
+    if ( $args[2] eq "longstop" ) {
+        $SignalRepeats = AttrVal( $name, 'SignalLongStopRepeats', '15' );
+    }
+    else {
+        $SignalRepeats = AttrVal( $name, 'SignalRepeats', '10' );
+    }
+
+    my $operationmode = AttrVal( $name, 'operation_mode', 'on' );
+
+    Log3( $name, 5, "Siro_sendCommand: operationmode -> $operationmode" );
+
+    if ( $operationmode eq '1' ) {
+        $chan = AttrVal( $name, 'channel_send_mode_1', $hash->{CHANNEL} );
+        Log3( $name, 5, "Siro_sendCommand: channel für OM1  -> $chan" );
+    }
+    else {
+        $chan = AttrVal( $name, 'channel', undef );
+        if ( !defined($chan) ) {
+            $chan = $hash->{CHANNEL};
+        }
+    }
+
+    if ( $chan eq "0" ) {
+        Log3( $name, 5,
+            "Siro_sendCommand: Aborted not sent on a channel 0 request " );
+        return;
+    }
+
+    $binChannel = sprintf( "%04b", $chan );
+
+    #Log3($name, 5, "Siro set channel: $chan ($binChannel) for $io->{NAME}");
+
+    my $value = $name . " " . join( " ", @args );
+
+    $binHash = sprintf( "%028b", hex( $hash->{ID} ) );
+    Log3 $io, 5, "Siro_sendCommand: BinHash: = $binHash";
+
+    $binCommand = sprintf( "%08b", hex($command) );
+    Log3 $io, 5, "Siro_sendCommand: BinCommand: = $binCommand";
+
+    $bin = $binHash . $binChannel . $binCommand;    # Binary code to send
+    Log3 $io, 5, "Siro_sendCommand: Siro set value = $value";
+
+    $message = 'P72#' . $bin . '#R' . $SignalRepeats;
+
+    if ( $debug eq "1" ) {
+        readingsSingleUpdate( $hash, "DEBUG_SEND",
+            "$name -> message :$message: ", 1 );
+    }
+    else {
+        Log3 $io, 5,
+          "Siro_sendCommand: Siro_sendCommand: $name -> message :$message: ";
+        IOWrite( $hash, 'sendMsg', $message );
+    }
+
+    my $devicename = $hash->{IODev};
+
+    Log3( $name, 2,
+"Siro_sendCommand: name -> $name command -> $cmd  channel -> $chan bincmd -> $binCommand "
+    );
+
+#Log3($name, 3, "Siro_sendCommand: execute comand $cmd - sendMsg to $devicename channel $chan -> $message ");
+
+    return $ret;
 }
 
 #################################################################
-sub Siro_Parse($$) 
-{
-	my $debug='';
-	my @args;
-	my ($hash, $msg) = @_;
-	my $doubelmsgtime = 2;  # zeit in sek in der doppelte nachrichten blockiert werden
-	my $favcheck =$doubelmsgtime+1; # zeit in der ein zweiter stop kommen muss/darf für fav
-	my $testid = substr($msg, 4, 8);
-	my $testcmd = substr($msg, 12, 2);
-	my $timediff;  
-	
-	
-	my $name = $hash->{NAME};
-	return "" if(IsDisabled($name));
-	if(my $lh = $modules{Siro}{defptr}{$testid})
-		{
-			my $name = $lh->{NAME};
-			Log3 $hash, 3, "Siro_Parse: Incomming msg from IODevice $testid - $name device is defined";
-			if (defined ($name) && $testcmd ne "54" ) # prüfe auf doppele msg falls gerät vorhanden und cmd nicht stop
-				{	
-				Log3 $lh, 5, "Siro_Parse: Incomming msg $msg from IODevice name/DEF $testid - Hash -> $lh";
+sub Siro_Parse($$) {
+    my $debug = '';
+    my @args;
+    my ( $hash, $msg ) = @_;
+    my $doubelmsgtime =
+      2;    # zeit in sek in der doppelte nachrichten blockiert werden
+    my $favcheck = $doubelmsgtime +
+      1;    # zeit in der ein zweiter stop kommen muss/darf für fav
+    my $testid  = substr( $msg, 4,  8 );
+    my $testcmd = substr( $msg, 12, 2 );
+    my $timediff;
 
-				my $testparsetime = gettimeofday();
-				my $lastparse = $lh->{helper}{lastparse};
-				my @lastparsearray =split(/ /,$lastparse);
-				if (!defined($lastparsearray[1])){$lastparsearray[1] = 0};
-				if (!defined($lastparsearray[0])){$lastparsearray[0] = ""};
-				$timediff = $testparsetime-$lastparsearray[1];
-				my $abort ="false";
-							
-				Log3 $lh, 5, "Siro_Parse: test doublemsg ";
-				Log3 $lh, 5, "Siro_Parse: lastparsearray[0] -> $lastparsearray[0] ";
-				Log3 $lh, 5, "Siro_Parse: lastparsearray[1] -> $lastparsearray[1] ";
-				Log3 $lh, 5, "Siro_Parse: testparsetime -> $testparsetime ";
-				Log3 $lh, 5, "Siro_Parse: timediff -> $timediff ";
-						
-					if ($msg eq $lastparsearray[0])
-					{
-							
-						if ($timediff < $doubelmsgtime )
-						{
-								
-						$abort ="true";
-						}
-					}
-				$lh->{helper}{lastparse} = "$msg $testparsetime";
-					if ($abort eq "true")
-					{
-					Log3 $lh, 4, "Siro_Parse: aborted , doublemsg ";
-					return $name;
-					}
-							
-				Log3 $lh, 4, "Siro_Parse: not aborted , no doublemsg ";
-			}
-	
-			my (undef ,$rawData) = split("#",$msg);
-			my $hlen = length($rawData);
-			my $blen = $hlen * 4;
-			my $bitData = unpack("B$blen", pack("H$hlen", $rawData));
-	
-			Log3 $hash, 5, "Siro_Parse: msg = $rawData length: $msg";  
-			Log3 $hash, 5, "Siro_Parse: rawData = $rawData length: $hlen";
-			Log3 $hash, 5, "Siro_Parse: converted to bits: $bitData";
-	
-			my $id = substr($rawData, 0, 7);                            # The first 7 hexcodes are the ID
-			my $BitChannel = substr($bitData, 28, 4);                   # Not needed atm
-			my $channel = sprintf( "%d", hex(substr($rawData, 7, 1)) ); # The last hexcode-char defines the channel
-			my $channelhex = substr($rawData, 7, 1) ; # tmp
-			my $cmd = sprintf( "%d", hex(substr($rawData, 8, 1)) );
-			my $newstate = $codes{ $cmd . $cmd};                        # Set new state
-			my $deviceCode = $id . $channelhex;       					# Tmp change channel -> channelhex. The device-code is a combination of id and channel
-    
-			$debug=$debug."id-".$id." ";
-	
-			Log3 $hash, 5, "Siro_Parse: device ID: $id";
-			Log3 $hash, 5, "Siro_Parse: Channel: $channel";
-			Log3 $hash, 5, "Siro_Parse: Cmd: $cmd  Newstate: $newstate";
-			Log3 $hash, 5, "Siro_Parse: deviceCode: $deviceCode";
-	
-			if (defined ($name) && $testcmd eq "54" ) # prüfe auf doppele msg falls gerät vorhanden und cmd stop
-			{	
-				# Log3 $lh, 5, "Siro_Parse: prüfung auf douplestop ";
-				my $testparsetime = gettimeofday();
-				my $lastparsestop = $lh->{helper}{lastparse_stop};
-				my $parseaborted = $lh->{helper}{parse_aborted};
-				my @lastparsestoparray =split(/ /,$lastparsestop);
-				my $timediff = $testparsetime-$lastparsestoparray[1];
-				my $abort ="false";
-				$parseaborted=0 if (!defined ($parseaborted));
-				
-				Log3 $lh, 5, "Siro_Parse: test doublestop ";
-				Log3 $lh, 5, "Siro_Parse: lastparsearray[0] -> $lastparsestoparray[0] ";
-				Log3 $lh, 5, "Siro_Parse: lastparsearray[1] -> $lastparsestoparray[1] ";
-				Log3 $lh, 5, "Siro_Parse: testparsetime -> $testparsetime ";
-				Log3 $lh, 5, "Siro_Parse: timediff -> $timediff ";
-				Log3 $lh, 5, "Siro_Parse: parseaborted -> $parseaborted ";
-					
-					 if ($newstate eq $lastparsestoparray[0])
-						 {
-						
-						 if ($timediff < 3 )
-							 {
-								 $abort ="true";
-								 $parseaborted++;
-							 }
-					
-						 }
-					 if ($abort eq "true" && $parseaborted < 8 )
-						 {
-							 $lh->{helper}{parse_aborted}=$parseaborted;
-							 Log3 $lh, 5, "Siro_Parse: aborted , doublestop ";
-							 return $name;
-						 }
-						
-						
-					 $lh->{helper}{lastparse_stop} = "$newstate $testparsetime";
-					
-					 if ( $parseaborted >= 7 )
-						 {
-							 $parseaborted = 0;
-							 $lh->{helper}{parse_aborted}=$parseaborted;
-							 $testparsetime = gettimeofday();
-							 $lh->{helper}{lastparse_stop} = "$newstate $testparsetime";
-							 if ($newstate eq "stop")
-								 {
-								 Log3 $lh, 3, "Siro_Parse: double_msg signal_favoritenanfahrt erkannt ";
-								 $newstate="fav";
-								 $args[0]="fav";
-								 }
-						 }
-			}
-	
-			if (defined ($name)) 
-			{
-				$args[0]=$newstate;
-				my $parseaborted = 0;
-				$lh->{helper}{parse_aborted}=$parseaborted;
-		
-				$debug=$debug.' '.$name;  
-				my $operationmode = AttrVal($name,'operation_mode', '0');
-				my $debugmode = AttrVal($name,'debug_mode', '0');
-				my $chan;
-				if ($operationmode eq '0')
-					{
-						$chan = AttrVal($name,'channel', undef);
-						if (!defined($chan)) 
-							{
-							$chan = $lh->{CHANNEL};
-							}
-					}
-					
-				if ($operationmode eq '1')
-					{
-						$chan = AttrVal($name,'channel', undef);
-						if (!defined($chan)) 
-							{
-							$chan = $lh->{CHANNEL};
-							}
-					}	
-						
-				my $aktMsg = $lh->{helper}{aktMsg} ;
-				my @last_action_array=split(/ /,$aktMsg);
-				my $lastaction = $last_action_array[0];
-				my $lastaction_position = $last_action_array[1];
-				my $lastaction_time = $last_action_array[2];
+    my $name = $hash->{NAME};
+    return "" if ( IsDisabled($name) );
+    if ( my $lh = $modules{Siro}{defptr}{$testid} ) {
+        my $name = $lh->{NAME};
+        Log3 $hash, 3,
+"Siro_Parse: Incomming msg from IODevice $testid - $name device is defined";
+        if ( defined($name)
+            && $testcmd ne "54"
+          )    # prüfe auf doppele msg falls gerät vorhanden und cmd nicht stop
+        {
+            Log3 $lh, 5,
+"Siro_Parse: Incomming msg $msg from IODevice name/DEF $testid - Hash -> $lh";
 
-				readingsSingleUpdate($lh, "parsestate", $newstate, 1);
-				
-				Log3 $lh, 5, "Siro_Parse:  $name $newstate";
-				Log3 $lh, 5, "Siro_Parse: operationmode -> $operationmode";
-				
-				if ($operationmode ne '1' || $chan eq "0")
-					{
-						Log3 $lh, 5, "Siro_Parse: set mode to physical";
-						$lh->{helper}{MODE}  = "physical";
-						$debug=$debug.' physical';  
-					}
-				else
-					{
-						$lh->{helper}{MODE}  = "repeater";
-						$debug=$debug.' repeater'; 
-					}
-				
-				if ($chan eq "0")
-					{
-				
-						$args[1]="physical";
-						$debug=$debug.' physical'; 
-					}
-				
-				Log3 $lh, 2, "Siro_Parse -> Siro_Set: $lh, $name, @args";
-				
-				Siro_Set($lh, $name, @args) ;
-				$debug=$debug.' '.$lh;
-				
-				if($debugmode eq "1")
-					{
-						readingsSingleUpdate($lh, "DEBUG_PARSE",$debug, 1);
-					}
-				##############################################
-				# Return list of affected devices
-				#my ( $hash, $name, @args ) = @_;
-				##############################################
-				return $name;
-			}
-	}
-	else
-	{
-	
-		my (undef ,$rawData) = split("#",$msg);
-		my $hlen = length($rawData);
-		my $blen = $hlen * 4;
-		my $bitData = unpack("B$blen", pack("H$hlen", $rawData));
-		
-		Log3 $hash, 5, "Siro_Parse: msg = $rawData length: $msg";  
-		Log3 $hash, 5, "Siro_Parse: rawData = $rawData length: $hlen";
-		Log3 $hash, 5, "Siro_Parse: converted to bits: $bitData";
-		
-		my $id = substr($rawData, 0, 7);                            # The first 7 hexcodes are the ID
-		my $BitChannel = substr($bitData, 28, 4);                   # Not needed atm
-		my $channel = sprintf( "%d", hex(substr($rawData, 7, 1)) ); # The last hexcode-char defines the channel
-		my $channelhex = substr($rawData, 7, 1) ; # tmp
-		my $cmd = sprintf( "%d", hex(substr($rawData, 8, 1)) );
-		my $newstate = $codes{ $cmd . $cmd};                        # Set new state
-		my $deviceCode = $id . $channelhex;       					# Tmp change channel -> channelhex. The device-code is a combination of id and channel
-		
-		$debug=$debug."id-".$id." ";
-		
-		Log3 $hash, 5, "Siro_Parse: device ID: $id";
-		Log3 $hash, 5, "Siro_Parse: Channel: $channel";
-		Log3 $hash, 5, "Siro_Parse: Cmd: $cmd  Newstate: $newstate";
-		Log3 $hash, 5, "Siro_Parse: deviceCode: $deviceCode";
-	
-		Log3 $hash, 2, "Siro unknown device $deviceCode, please define it";
-		return "UNDEFINED Siro_$deviceCode Siro $deviceCode";
-	}
+            my $testparsetime  = gettimeofday();
+            my $lastparse      = $lh->{helper}{lastparse};
+            my @lastparsearray = split( / /, $lastparse );
+            if ( !defined( $lastparsearray[1] ) ) { $lastparsearray[1] = 0 }
+            if ( !defined( $lastparsearray[0] ) ) { $lastparsearray[0] = "" }
+            $timediff = $testparsetime - $lastparsearray[1];
+            my $abort = "false";
+
+            Log3 $lh, 5, "Siro_Parse: test doublemsg ";
+            Log3 $lh, 5, "Siro_Parse: lastparsearray[0] -> $lastparsearray[0] ";
+            Log3 $lh, 5, "Siro_Parse: lastparsearray[1] -> $lastparsearray[1] ";
+            Log3 $lh, 5, "Siro_Parse: testparsetime -> $testparsetime ";
+            Log3 $lh, 5, "Siro_Parse: timediff -> $timediff ";
+
+            if ( $msg eq $lastparsearray[0] ) {
+
+                if ( $timediff < $doubelmsgtime ) {
+
+                    $abort = "true";
+                }
+            }
+            $lh->{helper}{lastparse} = "$msg $testparsetime";
+            if ( $abort eq "true" ) {
+                Log3 $lh, 4, "Siro_Parse: aborted , doublemsg ";
+                return $name;
+            }
+
+            Log3 $lh, 4, "Siro_Parse: not aborted , no doublemsg ";
+        }
+
+        my ( undef, $rawData ) = split( "#", $msg );
+        my $hlen    = length($rawData);
+        my $blen    = $hlen * 4;
+        my $bitData = unpack( "B$blen", pack( "H$hlen", $rawData ) );
+
+        Log3 $hash, 5, "Siro_Parse: msg = $rawData length: $msg";
+        Log3 $hash, 5, "Siro_Parse: rawData = $rawData length: $hlen";
+        Log3 $hash, 5, "Siro_Parse: converted to bits: $bitData";
+
+        my $id = substr( $rawData, 0, 7 );    # The first 7 hexcodes are the ID
+        my $BitChannel = substr( $bitData, 28, 4 );    # Not needed atm
+        my $channel = sprintf( "%d", hex( substr( $rawData, 7, 1 ) ) )
+          ;    # The last hexcode-char defines the channel
+        my $channelhex = substr( $rawData, 7, 1 );    # tmp
+        my $cmd = sprintf( "%d", hex( substr( $rawData, 8, 1 ) ) );
+        my $newstate   = $codes{ $cmd . $cmd };       # Set new state
+        my $deviceCode = $id
+          . $channelhex
+          ; # Tmp change channel -> channelhex. The device-code is a combination of id and channel
+
+        $debug = $debug . "id-" . $id . " ";
+
+        Log3 $hash, 5, "Siro_Parse: device ID: $id";
+        Log3 $hash, 5, "Siro_Parse: Channel: $channel";
+        Log3 $hash, 5, "Siro_Parse: Cmd: $cmd  Newstate: $newstate";
+        Log3 $hash, 5, "Siro_Parse: deviceCode: $deviceCode";
+
+        if ( defined($name)
+            && $testcmd eq
+            "54" )    # prüfe auf doppele msg falls gerät vorhanden und cmd stop
+        {
+            # Log3 $lh, 5, "Siro_Parse: prüfung auf douplestop ";
+            my $testparsetime      = gettimeofday();
+            my $lastparsestop      = $lh->{helper}{lastparse_stop};
+            my $parseaborted       = $lh->{helper}{parse_aborted};
+            my @lastparsestoparray = split( / /, $lastparsestop );
+            my $timediff           = $testparsetime - $lastparsestoparray[1];
+            my $abort              = "false";
+            $parseaborted = 0 if ( !defined($parseaborted) );
+
+            Log3 $lh, 5, "Siro_Parse: test doublestop ";
+            Log3 $lh, 5,
+              "Siro_Parse: lastparsearray[0] -> $lastparsestoparray[0] ";
+            Log3 $lh, 5,
+              "Siro_Parse: lastparsearray[1] -> $lastparsestoparray[1] ";
+            Log3 $lh, 5, "Siro_Parse: testparsetime -> $testparsetime ";
+            Log3 $lh, 5, "Siro_Parse: timediff -> $timediff ";
+            Log3 $lh, 5, "Siro_Parse: parseaborted -> $parseaborted ";
+
+            if ( $newstate eq $lastparsestoparray[0] ) {
+
+                if ( $timediff < 3 ) {
+                    $abort = "true";
+                    $parseaborted++;
+                }
+
+            }
+            if ( $abort eq "true" && $parseaborted < 8 ) {
+                $lh->{helper}{parse_aborted} = $parseaborted;
+                Log3 $lh, 5, "Siro_Parse: aborted , doublestop ";
+                return $name;
+            }
+
+            $lh->{helper}{lastparse_stop} = "$newstate $testparsetime";
+
+            if ( $parseaborted >= 7 ) {
+                $parseaborted                 = 0;
+                $lh->{helper}{parse_aborted}  = $parseaborted;
+                $testparsetime                = gettimeofday();
+                $lh->{helper}{lastparse_stop} = "$newstate $testparsetime";
+                if ( $newstate eq "stop" ) {
+                    Log3 $lh, 3,
+                      "Siro_Parse: double_msg signal_favoritenanfahrt erkannt ";
+                    $newstate = "fav";
+                    $args[0] = "fav";
+                }
+            }
+        }
+
+        if ( defined($name) ) {
+            $args[0] = $newstate;
+            my $parseaborted = 0;
+            $lh->{helper}{parse_aborted} = $parseaborted;
+
+            $debug = $debug . ' ' . $name;
+            my $operationmode = AttrVal( $name, 'operation_mode', '0' );
+            my $debugmode     = AttrVal( $name, 'debug_mode',     '0' );
+            my $chan;
+            if ( $operationmode eq '0' ) {
+                $chan = AttrVal( $name, 'channel', undef );
+                if ( !defined($chan) ) {
+                    $chan = $lh->{CHANNEL};
+                }
+            }
+
+            if ( $operationmode eq '1' ) {
+                $chan = AttrVal( $name, 'channel', undef );
+                if ( !defined($chan) ) {
+                    $chan = $lh->{CHANNEL};
+                }
+            }
+
+            my $aktMsg              = $lh->{helper}{aktMsg};
+            my @last_action_array   = split( / /, $aktMsg );
+            my $lastaction          = $last_action_array[0];
+            my $lastaction_position = $last_action_array[1];
+            my $lastaction_time     = $last_action_array[2];
+
+            readingsSingleUpdate( $lh, "parsestate", $newstate, 1 );
+
+            Log3 $lh, 5, "Siro_Parse:  $name $newstate";
+            Log3 $lh, 5, "Siro_Parse: operationmode -> $operationmode";
+
+            if ( $operationmode ne '1' || $chan eq "0" ) {
+                Log3 $lh, 5, "Siro_Parse: set mode to physical";
+                $lh->{helper}{MODE} = "physical";
+                $debug = $debug . ' physical';
+            }
+            else {
+                $lh->{helper}{MODE} = "repeater";
+                $debug = $debug . ' repeater';
+            }
+
+            if ( $chan eq "0" ) {
+
+                $args[1] = "physical";
+                $debug = $debug . ' physical';
+            }
+
+            Log3 $lh, 2, "Siro_Parse -> Siro_Set: $lh, $name, @args";
+
+            Siro_Set( $lh, $name, @args );
+            $debug = $debug . ' ' . $lh;
+
+            if ( $debugmode eq "1" ) {
+                readingsSingleUpdate( $lh, "DEBUG_PARSE", $debug, 1 );
+            }
+            ##############################################
+            # Return list of affected devices
+            #my ( $hash, $name, @args ) = @_;
+            ##############################################
+            return $name;
+        }
+    }
+    else {
+
+        my ( undef, $rawData ) = split( "#", $msg );
+        my $hlen    = length($rawData);
+        my $blen    = $hlen * 4;
+        my $bitData = unpack( "B$blen", pack( "H$hlen", $rawData ) );
+
+        Log3 $hash, 5, "Siro_Parse: msg = $rawData length: $msg";
+        Log3 $hash, 5, "Siro_Parse: rawData = $rawData length: $hlen";
+        Log3 $hash, 5, "Siro_Parse: converted to bits: $bitData";
+
+        my $id = substr( $rawData, 0, 7 );    # The first 7 hexcodes are the ID
+        my $BitChannel = substr( $bitData, 28, 4 );    # Not needed atm
+        my $channel = sprintf( "%d", hex( substr( $rawData, 7, 1 ) ) )
+          ;    # The last hexcode-char defines the channel
+        my $channelhex = substr( $rawData, 7, 1 );    # tmp
+        my $cmd = sprintf( "%d", hex( substr( $rawData, 8, 1 ) ) );
+        my $newstate   = $codes{ $cmd . $cmd };       # Set new state
+        my $deviceCode = $id
+          . $channelhex
+          ; # Tmp change channel -> channelhex. The device-code is a combination of id and channel
+
+        $debug = $debug . "id-" . $id . " ";
+
+        Log3 $hash, 5, "Siro_Parse: device ID: $id";
+        Log3 $hash, 5, "Siro_Parse: Channel: $channel";
+        Log3 $hash, 5, "Siro_Parse: Cmd: $cmd  Newstate: $newstate";
+        Log3 $hash, 5, "Siro_Parse: deviceCode: $deviceCode";
+
+        Log3 $hash, 2, "Siro unknown device $deviceCode, please define it";
+        return "UNDEFINED Siro_$deviceCode Siro $deviceCode";
+    }
 }
 
 #############################################################
 
-sub Siro_Attr(@) 
-{
-	my ($cmd,$name,$aName,$aVal) = @_;
-	my $hash = $defs{$name};
-	return "\"Siro Attr: \" $name does not exist" if (!defined($hash));
-	my $channel = ($hash->{CHANNEL});
-	
-	if ($channel eq "0")
-	{
-		my @notallowed = ("prog_fav_sequence", "time_to_open", "time_to_close", "operation_mode", "channel_send_mode_1", "time_down_to_favorite");
-		foreach my $test (@notallowed) 
-		{
-			if ($test eq $aName ){return "\"Siro Attr: \" $name is a group device, the attribute $aName $aVal is not allowed here.";}
-		}
-	}
-	
-	return undef if (!defined($name));
-	return undef if (!defined($aName));
-	#return undef if (!defined($aVal));
+sub Siro_Attr(@) {
+    my ( $cmd, $name, $aName, $aVal ) = @_;
+    my $hash = $defs{$name};
+    return "\"Siro Attr: \" $name does not exist" if ( !defined($hash) );
+    my $channel = ( $hash->{CHANNEL} );
 
-	if ($cmd eq "set") 
-	{
-		if ($aName eq "debug_mode" && $aVal eq "0")
-		{
-			Log3 $hash, 5, "debug_mode: reading deleted";
-			delete ($hash->{READINGS}{DEBUG_SEND});	
-			delete ($hash->{READINGS}{DEBUG_PARSE});
-			delete ($hash->{READINGS}{DEBUG_SET});
-		}
-		
-		if ($aName eq "debug_mode" && $aVal eq "1")
-		{
-			readingsSingleUpdate($hash, "DEBUG_SEND","aktiv", 1);
-			readingsSingleUpdate($hash, "DEBUG_PARSE","aktiv", 1);
-			readingsSingleUpdate($hash, "DEBUG_SET","aktiv", 1);
-			Log3 $hash, 5, "debug_mode: create reading";
-		}
-		
-		if ($aName eq "invers_position")
-		{
-		
-			if ( $aVal eq "0" )
-				{
-				my $oldicon = "{return '.*:fts_shutter_1w_'.(100-(int(\$state/10)*10))}";
-				Log3 $hash, 3, "Siro_Attr: change attr old -> $attr{$name}{devStateIcon} $oldicon";
-				if ($attr{$name}{devStateIcon} eq $oldicon)
-					{
-					Log3 $hash, 3, "Siro_Attr: ersetzt";
-					$attr{$name}{devStateIcon} ="{return '.*:fts_shutter_1w_'.(int(\$state/10)*10)}" ;
-					}
-				if (defined ($attr{$name}{down_auto_stop}))
-					{
-					my $autostop = AttrVal($name,'down_auto_stop', 'undef');	
-					$autostop = 100 - $autostop;
-					$attr{$name}{down_auto_stop} =$autostop; 
-					}
-					
-				my $oldstate =$hash->{helper}{position};
-				
-				#Log3 $hash, 0, "Siro_Attr: ";
-if(!defined $oldstate){$oldstate=0}; 
+    if ( $channel eq "0" ) {
+        my @notallowed = (
+            "prog_fav_sequence",   "time_to_open",
+            "time_to_close",       "operation_mode",
+            "channel_send_mode_1", "time_down_to_favorite"
+        );
+        foreach my $test (@notallowed) {
+            if ( $test eq $aName ) {
+                return
+"\"Siro Attr: \" $name is a group device, the attribute $aName $aVal is not allowed here.";
+            }
+        }
+    }
 
+    return undef if ( !defined($name) );
+    return undef if ( !defined($aName) );
 
+    #return undef if (!defined($aVal));
 
+    if ( $cmd eq "set" ) {
+        if ( $aName eq "debug_mode" && $aVal eq "0" ) {
+            Log3 $hash, 5, "debug_mode: reading deleted";
+            delete( $hash->{READINGS}{DEBUG_SEND} );
+            delete( $hash->{READINGS}{DEBUG_PARSE} );
+            delete( $hash->{READINGS}{DEBUG_SET} );
+        }
 
-				my $newState =  $oldstate;
-				my $updateState;
-				Log3 $hash, 3, "Siro_Attr: state old -> $oldstate new -> $newState";
-				Siro_UpdateState( $hash, $newState, '', $updateState, 1 );
-				
-				}
-		
-			if ( $aVal eq "1" )
-				{
-				my $oldicon = "{return '.*:fts_shutter_1w_'.(int(\$state/10)*10)}";
-				Log3 $hash, 3, "Siro_Attr: change attr old -> $attr{$name}{devStateIcon} $oldicon";
-				if ($attr{$name}{devStateIcon} eq $oldicon)
-					{
-					Log3 $hash, 3, "Siro_Attr: ersetzt";
-					$attr{$name}{devStateIcon} ="{return '.*:fts_shutter_1w_'.(100-(int(\$state/10)*10))}" ;
-					}
-				if (defined ($attr{$name}{down_auto_stop}))
-					{
-					my $autostop = AttrVal($name,'down_auto_stop', 'undef');	
-					$autostop = 100 - $autostop;
-					$attr{$name}{down_auto_stop} =$autostop; 
-					}	
-				my $oldstate =$hash->{helper}{position};
-				my $newState = 100 - $oldstate;
-				my $updateState;
-				Log3 $hash, 3, "Siro_Attr: state old -> $oldstate new -> $newState";
-				Siro_UpdateState( $hash, $newState, '', $updateState, 1 );	
-				}
-		}
-	}
-	
-	if ($cmd eq "del") 
-		{
-		if ($aName eq "invers_position")
-			{
-			my $oldicon = "{return '.*:fts_shutter_1w_'.(100-(int(\$state/10)*10))}";
-			
-			Log3 $hash, 3, "Siro_Attr delete invers: change attr old -> $attr{$name}{devStateIcon} $oldicon";
-			if ($attr{$name}{devStateIcon} eq $oldicon)
-				{
-				Log3 $hash, 3, "Siro_Attr: ersetzt";
-				$attr{$name}{devStateIcon} ="{return '.*:fts_shutter_1w_'.(int(\$state/10)*10)}" ;
-				}
-			my $oldstate =$hash->{helper}{position};
-			my $newState =  $oldstate;
-			my $updateState;
-			Log3 $hash, 3, "Siro_Attr: state old -> $oldstate new -> $newState";
-			Siro_UpdateState( $hash, $newState, '', $updateState, 1 );	
-			}
-		}
-	return undef;
+        if ( $aName eq "debug_mode" && $aVal eq "1" ) {
+            readingsSingleUpdate( $hash, "DEBUG_SEND",  "aktiv", 1 );
+            readingsSingleUpdate( $hash, "DEBUG_PARSE", "aktiv", 1 );
+            readingsSingleUpdate( $hash, "DEBUG_SET",   "aktiv", 1 );
+            Log3 $hash, 5, "debug_mode: create reading";
+        }
+
+        if ( $aName eq "invers_position" ) {
+
+            if ( $aVal eq "0" ) {
+                my $oldicon =
+                  "{return '.*:fts_shutter_1w_'.(100-(int(\$state/10)*10))}";
+                Log3 $hash, 3,
+"Siro_Attr: change attr old -> $attr{$name}{devStateIcon} $oldicon";
+                if ( $attr{$name}{devStateIcon} eq $oldicon ) {
+                    Log3 $hash, 3, "Siro_Attr: ersetzt";
+                    $attr{$name}{devStateIcon} =
+                      "{return '.*:fts_shutter_1w_'.(int(\$state/10)*10)}";
+                }
+                if ( defined( $attr{$name}{down_auto_stop} ) ) {
+                    my $autostop = AttrVal( $name, 'down_auto_stop', 'undef' );
+                    $autostop = 100 - $autostop;
+                    $attr{$name}{down_auto_stop} = $autostop;
+                }
+
+                my $oldstate = $hash->{helper}{position};
+
+                #Log3 $hash, 0, "Siro_Attr: ";
+                if ( !defined $oldstate ) { $oldstate = 0 }
+
+                my $newState = $oldstate;
+                my $updateState;
+                Log3 $hash, 3,
+                  "Siro_Attr: state old -> $oldstate new -> $newState";
+                Siro_UpdateState( $hash, $newState, '', $updateState, 1 );
+
+            }
+
+            if ( $aVal eq "1" ) {
+                my $oldicon =
+                  "{return '.*:fts_shutter_1w_'.(int(\$state/10)*10)}";
+                Log3 $hash, 3,
+"Siro_Attr: change attr old -> $attr{$name}{devStateIcon} $oldicon";
+                if ( $attr{$name}{devStateIcon} eq $oldicon ) {
+                    Log3 $hash, 3, "Siro_Attr: ersetzt";
+                    $attr{$name}{devStateIcon} =
+"{return '.*:fts_shutter_1w_'.(100-(int(\$state/10)*10))}";
+                }
+                if ( defined( $attr{$name}{down_auto_stop} ) ) {
+                    my $autostop = AttrVal( $name, 'down_auto_stop', 'undef' );
+                    $autostop = 100 - $autostop;
+                    $attr{$name}{down_auto_stop} = $autostop;
+                }
+                my $oldstate = $hash->{helper}{position};
+                my $newState = 100 - $oldstate;
+                my $updateState;
+                Log3 $hash, 3,
+                  "Siro_Attr: state old -> $oldstate new -> $newState";
+                Siro_UpdateState( $hash, $newState, '', $updateState, 1 );
+            }
+        }
+    }
+
+    if ( $cmd eq "del" ) {
+        if ( $aName eq "invers_position" ) {
+            my $oldicon =
+              "{return '.*:fts_shutter_1w_'.(100-(int(\$state/10)*10))}";
+
+            Log3 $hash, 3,
+"Siro_Attr delete invers: change attr old -> $attr{$name}{devStateIcon} $oldicon";
+            if ( $attr{$name}{devStateIcon} eq $oldicon ) {
+                Log3 $hash, 3, "Siro_Attr: ersetzt";
+                $attr{$name}{devStateIcon} =
+                  "{return '.*:fts_shutter_1w_'.(int(\$state/10)*10)}";
+            }
+            my $oldstate = $hash->{helper}{position};
+            my $newState = $oldstate;
+            my $updateState;
+            Log3 $hash, 3, "Siro_Attr: state old -> $oldstate new -> $newState";
+            Siro_UpdateState( $hash, $newState, '', $updateState, 1 );
+        }
+    }
+    return undef;
 }
 
 #################################################################
 
 # Call with hash, name, virtual/send, set-args
-sub Siro_Set($@)
-{
+sub Siro_Set($@) {
 
-my $testtimestart = gettimeofday();
-	my $debug;
-	my ( $hash, $name, @args ) = @_;
-	return "" if(IsDisabled($name));
-	# Set without argument  #parseonly
-	my $numberOfArgs  = int(@args);
-	my $nodrive = "false";
-	$args[2]="0";
-	my $action ="no action";
+    my $testtimestart = gettimeofday();
+    my $debug;
+    my ( $hash, $name, @args ) = @_;
+    return "" if ( IsDisabled($name) );
 
-	return "Siro_set: No set value specified" if ( $numberOfArgs < 1 );
-	
-	my $cmd = $args[0];	
-	my $invers = AttrVal($name,'invers_position', '0');
-	my $runningaction = ReadingsVal($name, 'action', 'no action');
-	my $runningtime = 0;
-	
-	
-	# teste auf hilfsvariablen
-	my $save =	ReadingsVal($name, '.aktMsg', 'undef');
-	if ($save eq 'undef')
-		{
-			$hash->{helper}{position}="0";
-			$hash->{helper}{aktMsg} = "stop".' '.'0'.' '.gettimeofday();
-			$hash->{helper}{lastMsg} = "stop".' '.'0'.' '.gettimeofday();
-			$hash->{helper}{lastProg} ="0";
-			$hash->{helper}{lastparse_stop} ="stop".' '.gettimeofday();
-			$hash->{helper}{lastparse} ="";
-			$hash->{helper}{parse_aborted} ="0";
-			 
-			readingsSingleUpdate($hash, ".aktMsg",$hash->{helper}{aktMsg}, 0);
-			readingsSingleUpdate($hash, ".lastMsg",$hash->{helper}{lastMsg}, 0);
-			readingsSingleUpdate($hash, ".lastProg",$hash->{helper}{lastProg}, 0);
-			readingsSingleUpdate($hash, ".lastparse",$hash->{helper}{lastparse}, 0);
-			readingsSingleUpdate($hash, ".lastparse_stop",$hash->{helper}{lastparse_stop}, 0);
-			readingsSingleUpdate($hash, ".parse_aborted",$hash->{helper}{parse_aborted}, 0);
-			readingsSingleUpdate($hash, ".positionsave",$hash->{helper}{position}, 0);
-			readingsSingleUpdate($hash, ".positiontimer",$hash->{helper}{positiontimer}, 0);
-		}
-	######################################### für ECHO
-	if ( $cmd =~ /^\d+$/) 
-	{
-		if ($cmd >= 0 && $cmd <= 100)
-		{
-			$args[0] ="position";
-			$args[1] =$cmd;
-			$cmd = "position";
-		}
-	}
-	#########################################
-	
-	
-	#diverse befehle bei laufender aktion abfangen
-	if 	(($cmd eq "position" || $cmd eq 'up_for_timer' || $cmd eq 'on_for_timer') && $runningaction ne 'no action')
-		{
-	
-			my $restartmsg = $name.' '.$args[0].' '.$args[1];
-			Log3($name,3,"Siro_Set: laufende action gefunden - restart msg -> $restartmsg ");
-			InternalTimer(gettimeofday()+0,"Siro_Restartcmd",$restartmsg); 
-			$args[0] ="stop";
-			$args[1] ='';
-			$cmd = "stop";
-	
-		}
-	
-	
-	
-	
-	
-	#########################################	
-	# invertiere position
-	if 	($cmd eq "position" && $invers eq "1")
-		{
-		my $noinvers = $args[1];
-		my $inversposition = 100 - $args[1];
-		$args[1] = $inversposition; 
-		Log3($name,3,"Siro_Set: invertiere Position - input -> $noinvers - inverted -> $inversposition ");	
-		}
-	#########################################
-	
-	#########################################
-	if (!defined $args[2])
-		{
-		$args[2]='';
-		}
-	
-	if (!defined $args[1])
-		{
-		$args[2]='0';
-		$args[1]=''; 
-		}
+    # Set without argument  #parseonly
+    my $numberOfArgs = int(@args);
+    my $nodrive      = "false";
+    $args[2] = "0";
+    my $action = "no action";
 
-	if ($args[1] eq "physical")
-		{
-			$hash->{helper}{MODE}  = "physical";
-		}
+    return "Siro_set: No set value specified" if ( $numberOfArgs < 1 );
 
-	if (!defined($hash)){return;}
-	if (!defined($name)){return;}
-	
-	$debug = "$hash, $name, @args";
-	
-	if ($cmd ne "?")
-	{
-		Log3($name,5,"Siro_Set: aufgerufen -> cmd -> $cmd args -> @args ");	
-	}
-	#########################################
-	
-	# up/down for timer mappen auf on/off und timer für stop setzen 
-	if ($cmd eq 'up_for_timer')
-	{
-		Log3($name,5,"Siro_Set: up_for_timer @args $args[1]");
-		$cmd ="off";
-		
-		InternalTimer($testtimestart+$args[1], "Siro_Stop", $hash, 0); # State auf Stopp
-		$args[0] =$cmd;
-		$action = 'up for timer '.$args[1];
-		readingsSingleUpdate($hash, "action",$action, 1); #tmp
-	}
-	
-	if ($cmd eq 'down_for_timer')
-	{
-		Log3($name,3,"Siro_Set: down_for_timer @args $args[1]");
-		$cmd ="on";
-		readingsSingleUpdate($hash, "action",'down for timer '.$args[1], 1); #tmp
-		InternalTimer($testtimestart+$args[1], "Siro_Stop", $hash, 0); # State auf Stopp
-		$args[0] =$cmd;
-		$action = 'down for timer '.$args[1];
-		readingsSingleUpdate($hash, "action",$action, 1); #tmp
-	}
-	#########################################
-	
-	# diverse befehle auf bekannte befehle mappen
-	if ($cmd eq 'open')
-		{
-			$cmd ="off";
-			$args[0] =$cmd;
-		}
-	
-	if ($cmd eq 'close')
-		{
-			$cmd ="on";
-			$args[0] =$cmd;
-		}
-	#########################################
-	
-	$hash->{Version}		= $version;
-	
-	# diverse attr einlesen
-	my $debugmode = AttrVal($name,'debug_mode', '0');
-	my $testchannel = $hash->{CHANNEL};
-	my $timetoopen = AttrVal($name,'time_to_open', 'undef'); # fahrzeit komplett runter
-	my $timetoclose = AttrVal($name,'time_to_close', 'undef'); # fahrzeit komplett hoch
-	my $operationmode = AttrVal($name,'operation_mode', '0'); # mode 0 normal / 1 repeater
-	my $limitedmode="off";
-	my $downlimit = AttrVal($name,'down_limit_mode_1', '100'); # maximale runterfahrt im mode 1
-	my $autostop = AttrVal($name,'down_auto_stop', '100'); # automatischer stop bei runterfahrt
-	#########################################
-	
-	# sets an device anpassen
-	if ($testchannel ne "0")
-		{
-		
-			 %sets = (
-				"open" => "noArg",
-				"close" => "noArg",
-				"off" => "noArg",
-				"stop" => "noArg",
-				"on" => "noArg",
-				"fav" => "noArg",
-				"prog" => "noArg",
-				"prog_stop" => "noArg",
-				"position" => "slider,0,1,100",	    # Wird nur bei vorhandenen time_to attributen gesetzt
-				"state" => "noArg" ,
-				"set_favorite" => "noArg",
-				"down_for_timer" => "textField",
-				"up_for_timer" => "textField"	# Ggf. entfernen (Alexa)
-				);
-				
-			if($timetoopen eq 'undef' || $timetoclose eq 'undef')
-				{
-					if ($attr{$name}{webCmd} eq "stop:on:off:fav:position")
-						{
-							$attr{$name}{webCmd} ="stop:on:off:fav"; 
-						}
-				
-					$limitedmode="on";
-					$hash->{INFO} = "limited function without ATTR time_to_open / time_to_close / time_down_to_favorite";
-				}
-			else
-				{
-					if ($attr{$name}{webCmd} eq "stop:on:off:fav")
-					{
-						$attr{$name}{webCmd} ="stop:on:off:fav:position"; 
-					}
-					delete($hash->{INFO});
-					
-				
-				}
-		}
-	else # this block is for groupdevicec ( channel 0 )
-		{
-				Log3($name,5,"Siro_Set: Groupdevice erkannt ");
-				
-				 %sets = (
-				"open" => "noArg",
-				"close" => "noArg",
-				"off" => "noArg",
-				"stop" => "noArg",
-				"on" => "noArg",
-				"fav" => "noArg",
-				#"prog" => "noArg",
-				#"prog_stop" => "noArg",
-				"position" => "slider,0,1,100",	    # Wird nur bei vorhandenen time_to attributen gesetzt
-				"state" => "noArg" ,
-				#"set_favorite" => "noArg",
-				"down_for_timer" => "textField",
-				"up_for_timer" => "textField"	
-				);
-				
-			if ($cmd  ne "?")   #change
-				{	
-					my $timetoopen = "15";
-					my $timetoclose = "15";
-					my $testhashtmp ="";
-					my $testhashtmp1 ="";
-					my $namex ="";
-					my $testid ="";
-					my $id = $hash->{ID};
-					my @grouphash;
-					my @groupnames;
-					
-					@groupnames = Siro_Testgroup($hash,$id); 
-					
-					$hash->{INFO} = "This is a group Device with limited functions affected the following devices:\n @groupnames";
-					my $groupcommand = $cmd.",".$args[0].",".$args[1].",".$hash;
-				
-					$hash->{helper}{groupcommand} = $groupcommand;
-					InternalTimer(gettimeofday()+0,"Siro_Setgroup",$hash,1); 
-				}
-			$hash->{helper}{MODE}="physical"; 
-		}
-	#########################################
-	
-	# Check for unknown arguments
-	if(!exists($sets{$cmd})) 
-		{
-			my @cList;
-			# Overwrite %sets with setList
-			my $atts = AttrVal($name,'setList',"");
-			my %setlist = split("[: ][ ]*", $atts);
-			foreach my $k (sort keys %sets)
-				{
-				my $opts = undef;
-				$opts = $sets{$k};
-				$opts = $setlist{$k} if(exists($setlist{$k}));
-				if (defined($opts)) 
-						{
-						push(@cList,$k . ':' . $opts);
-						}
-						else
-						{
-						push (@cList,$k);
-						}
-				} # end foreach
-			return "Unknown argument $cmd, choose one of " . join(" ", @cList);
-		} 
+    my $cmd           = $args[0];
+    my $invers        = AttrVal( $name, 'invers_position', '0' );
+    my $runningaction = ReadingsVal( $name, 'action', 'no action' );
+    my $runningtime   = 0;
+
+    # teste auf hilfsvariablen
+    my $save = ReadingsVal( $name, '.aktMsg', 'undef' );
+    if ( $save eq 'undef' ) {
+        $hash->{helper}{position} = "0";
+        $hash->{helper}{aktMsg}   = "stop" . ' ' . '0' . ' ' . gettimeofday();
+        $hash->{helper}{lastMsg}  = "stop" . ' ' . '0' . ' ' . gettimeofday();
+        $hash->{helper}{lastProg} = "0";
+        $hash->{helper}{lastparse_stop} = "stop" . ' ' . gettimeofday();
+        $hash->{helper}{lastparse}      = "";
+        $hash->{helper}{parse_aborted}  = "0";
+
+        readingsSingleUpdate( $hash, ".aktMsg",  $hash->{helper}{aktMsg},  0 );
+        readingsSingleUpdate( $hash, ".lastMsg", $hash->{helper}{lastMsg}, 0 );
+        readingsSingleUpdate( $hash, ".lastProg", $hash->{helper}{lastProg},
+            0 );
+        readingsSingleUpdate( $hash, ".lastparse", $hash->{helper}{lastparse},
+            0 );
+        readingsSingleUpdate( $hash, ".lastparse_stop",
+            $hash->{helper}{lastparse_stop}, 0 );
+        readingsSingleUpdate( $hash, ".parse_aborted",
+            $hash->{helper}{parse_aborted}, 0 );
+        readingsSingleUpdate( $hash, ".positionsave",
+            $hash->{helper}{position}, 0 );
+        readingsSingleUpdate( $hash, ".positiontimer",
+            $hash->{helper}{positiontimer}, 0 );
+    }
+    ######################################### für ECHO
+    if ( $cmd =~ /^\d+$/ ) {
+        if ( $cmd >= 0 && $cmd <= 100 ) {
+            $args[0] = "position";
+            $args[1] = $cmd;
+            $cmd     = "position";
+        }
+    }
     #########################################
-	
-	# undefinierte attr time to open/close abfangen
-	if(($timetoopen eq 'undef' || $timetoclose eq 'undef') && $testchannel ne "0")
-		{
-			Log3($name,1,"Siro_Set:limited function without definition of time_to_close and time_to_open. Please define this attributes.");
-			$nodrive ="true";
-			$timetoopen=1;
-			$timetoclose=1;
-		}
-	#########################################
 
-	# progmodus setzen
-	if ($cmd eq "prog") 
-		{
-			$hash->{helper}{lastProg} = gettimeofday()+180; # 3 min programmiermodus
-		}
-	
-	if ($cmd eq "prog_stop") 
-		{
-			$hash->{helper}{lastProg} = gettimeofday();
-			return; 
-		}
-	#########################################
-	
-	# favoritenposition speichern
-	if ($cmd eq "set_favorite") 
-		{
-			if($debugmode eq "1")
-				{
-					readingsSingleUpdate($hash, "DEBUG_SET",'setze Favorite', 1);	
-				}
-			my $sequence;
-			my $sequenceraw = AttrVal($name,'prog_fav_sequence', '');
-			if (defined ($attr{$name}{time_down_to_favorite}))
-				{
-				
-				$sequence = $sequenceraw.',2,'.$sequenceraw;
-				Log3($name,0,"Siro_Set: delete and set favorit -> $sequence");
-				}
-			else
-				{
-				 $sequence = $sequenceraw ;
-				 Log3($name,0,"Siro_Set: set favorit -> $sequence");
-				}
-			
-			$hash->{sequence} = $sequence; # 3 Min Programmiermodus
-			InternalTimer(gettimeofday()+1,"Siro_Sequence",$hash,0); # State auf stop setzen nach Erreichen der Fahrdauer
-			Log3($name,1,"Siro_Set:setting new favorite");
-			return;
-		}
-	#########################################
-	
-	# variablenberechnung für folgende funktionen
-	my $check='check';
-	my $bmode = $hash->{helper}{aktMsg};
-	if ($bmode eq "repeater")
-		{
-			$check ='nocheck';
-		}
-	my $ondirekttime = 	$timetoclose/100; # Zeit für 1 Prozent Runterfahrt
-	my $offdirekttime = $timetoopen/100;  # Zeit für 1 Prozent Hochfahrt
-	#my $runningtime;
-	my $timetorun;
-	my $newposstate;
-	if (defined ($args[1]))
-		{
-		 if ( $args[1]=~ /^\d+$/) 
-			{
-				$newposstate = $args[1];# Anzufahrende Position in Prozent   
-				Log3($name,5,"Siro_Set:newposstate -> $newposstate");
-				$timetorun = $timetoclose/100*$newposstate;	# Laufzeit von 0 prozent }bis zur anzufahrenden Position
-			}
-		}
-	my $virtual; # Kontrollvariable der Positionsanfahrt
-	my $newState;
-	my $updateState;
-	my $positiondrive;
-	my $state = $hash->{STATE};
-	my $aktMsg = $hash->{helper}{aktMsg} ;
-	my @last_action_array=split(/ /,$aktMsg);
-	my $lastaction = $last_action_array[0];
-	my $lastaction_position = $last_action_array[1];
-	my $lastaction_time = $last_action_array[2];
-	my $befMsg = $hash->{helper}{lastMsg};
-	my @before_action_array=split(/ /,$befMsg);
-	my $beforeaction_position = $before_action_array[1];
-	my $timebetweenmsg = $testtimestart-$last_action_array[2];# Zeit zwischen dem aktuellen und letzten Befehl
-	$timebetweenmsg = (int($timebetweenmsg*10)/10);
-	my $oldposition;  # Alter Stand in Prozent
-	my $newposition ; # Errechnende Positionsänderung in Prozent - > bei on plus alten Stand 
-	my $finalposition;# Erreichter Rollostand in Prozent für state;
-	my $time_to_favorite = AttrVal($name,'time_down_to_favorite', 'undef');
-	my $favorit_position;
-	my $mode = $hash->{helper}{MODE};# Betriebsmodus virtual, physicalFP
-	my $lastprogmode = $hash->{helper}{lastProg};
-	my $testprogmode = $testtimestart;
-	my $testprog = int($testprogmode) - int($lastprogmode);
-	my $oldstate = ReadingsVal($name, 'state', 100);
-	
-	Log3($name,5,"Siro_set: test auf double stop");
-	Log3($name,5,"Siro_set: testprogmode -> $testprogmode");
-	Log3($name,5,"Siro_set: lastprogmode -> $lastprogmode");
-	Log3($name,5,"Siro_set: lastaction -> $lastaction");
-	Log3($name,5,"Siro_set: cmd -> $cmd");
-	
-	# verhindern eines doppelten stoppbefehls ausser progmodus 1
-	if ($testprogmode > $lastprogmode)	# Doppelten Stoppbefehl verhindern, ausser progmodus aktiv
-		{
-			if ($lastaction eq 'stop' && $cmd eq 'stop' && $check ne 'nocheck')
-			{
-				Log3($name,5,"Siro_set: double stop, action aborted");
-				readingsSingleUpdate($hash, "prog_mode", "inaktiv "  , 1);
-				if($debugmode eq "1")
-					{
-						$debug = "Siro_set: double stop, action aborted";
-						readingsSingleUpdate($hash, "DEBUG_SET",$debug, 1);
-					}
-				return;
-			} 
-		}
-	else
-		{
-			$testprog = $testprog*-1;
-			$virtual = "virtual";
-			readingsSingleUpdate($hash, "prog_mode", "$testprog"  , 1);
-		
-		}
-	#########################################
+    #diverse befehle bei laufender aktion abfangen
+    if (
+        (
+               $cmd eq "position"
+            || $cmd eq 'up_for_timer'
+            || $cmd eq 'on_for_timer'
+        )
+        && $runningaction ne 'no action'
+      )
+    {
 
-	# invertierung position
-	if 	( $invers eq "1")
-		{
-		 $oldstate = 100 - $oldstate;
-		 $autostop = 100 - $autostop;
-		}
-	#########################################
-	
-	Log3($name,5,"Siro_Set: teste autostop: $autostop < 100  $oldstate < $autostop - $cmd");
-	
-	# erkennung autostopfunktiuon
-	if ($cmd eq "on" && $autostop < 100 && $oldstate < $autostop )
-		{
-			$cmd="position";
-			$args[1]=$autostop;
-			$newposstate = $args[1];		 # position autostop
-			$timetorun = $timetoclose/100*$newposstate;	
-			Log3($name,1,"Siro_Set: autostop gefunden mapping auf position erfolgt: $newposstate  ");
-		}
-	#########################################
-	
-	# erkennung downlimit funktion
-	if ($downlimit < 100 && $operationmode eq "1")
-		{
-			if ($cmd eq 'position' && $downlimit < $newposstate)
-				{
-					$args[1]=$downlimit;
-					$newposstate = $args[1];		# Anzufahrende Position in Prozent   
-					$timetorun = $timetoclose/100*$newposstate;	
-					Log3($name,1,"Siro_Set: drive down limit reached: $newposstate ");
-				}
-			if ($cmd eq 'on')
-				{
-					$cmd="position";
-					$args[1]=$downlimit;
-					$newposstate = $args[1];		# Anzufahrende Position in Prozent   
-					$timetorun = $timetoclose/100*$newposstate;	
-					Log3($name,1,"Siro_Set: drive down limit reached: $newposstate  ");
-				}
-		}
-	#########################################
-	
-	# on/off Umschaltung ohne zwischenzeitliches Anhalten
-	if ($cmd eq 'on' && $timebetweenmsg < $timetoopen && $lastaction eq 'off') # Prüfe auf direkte Umschaltung on - off
-		{
-			$oldposition =  $beforeaction_position; 
-			$newposition = $timebetweenmsg/$offdirekttime;
-			$finalposition = $oldposition-$newposition;
-			if ($limitedmode eq "on")
-				{
-					$finalposition ="50";
-				}
-			$hash->{helper}{lastMsg} = $aktMsg;
-			$hash->{helper}{aktMsg} = "stop".' '.int($finalposition).' '.gettimeofday();
-			$hash->{helper}{positiontimer} = $timebetweenmsg;
-			$hash->{helper}{position} = int($finalposition);
-			
-			if ($mode ne "physical")
-				{
-					Siro_SendCommand($hash, 'stop');
-				}
-			$aktMsg = $hash->{helper}{aktMsg} ;
-			@last_action_array=split(/ /,$aktMsg);
-			$lastaction = $last_action_array[0];
-			$lastaction_position = $last_action_array[1];
-			$lastaction_time = $last_action_array[2];
-			$befMsg = $hash->{helper}{lastMsg};
-			@before_action_array=split(/ /,$befMsg);
-			$beforeaction_position = $before_action_array[1];
-			$timebetweenmsg = $testtimestart-$last_action_array[2]; # Zeit zwischen dem aktuellen und letzten Befehl
-			$timebetweenmsg = (int($timebetweenmsg*10)/10);								
-		}
-	#########################################
-	
-	# off/on Umschaltung ohne zwischenzeitliches Anhalten
-	if ($cmd eq 'off' && $timebetweenmsg < $timetoclose && $lastaction eq 'on')
-		{
-			$oldposition =  $beforeaction_position; 
-			$newposition = $timebetweenmsg/$ondirekttime;
-			$finalposition = $oldposition+$newposition;
-			if ($limitedmode eq "on")
-				{
-					$finalposition ="50";
-				}
-			$hash->{helper}{lastMsg} = $aktMsg;
-			$hash->{helper}{aktMsg} = "stop".' '.int($finalposition).' '.gettimeofday();
-			$hash->{helper}{positiontimer} = $timebetweenmsg;
-			
-			if ($mode ne "physical")
-				{
-					Siro_SendCommand($hash, 'stop');
-				}
-			$aktMsg = $hash->{helper}{aktMsg} ;
-			@last_action_array=split(/ /,$aktMsg);
-			$lastaction = $last_action_array[0];
-			$lastaction_position = $last_action_array[1];
-			$lastaction_time = $last_action_array[2];
-			$befMsg = $hash->{helper}{lastMsg};
-			@before_action_array=split(/ /,$befMsg);
-			$beforeaction_position = $before_action_array[1];
-			$timebetweenmsg = gettimeofday()-$last_action_array[2]; # Zeit zwischen dem aktuellen und letzten Befehl
-			$timebetweenmsg = (int($timebetweenmsg*10)/10);		
-		}	
-	#########################################
-	
-	# Positionsberechnung bei einem Stopp-Befehl 
-	if ($cmd eq 'stop')
-	{
-		# lösche interne timer - setze reading action auf no action
-		
-		readingsSingleUpdate($hash, "action",'no action', 1); 
-		RemoveInternalTimer($hash);
-				
-		Log3($name,5,"Siro_Set: cmd stop  timebetweenmsg -> $timebetweenmsg ondirekttime -> $ondirekttime offdirekttime -> $offdirekttime ");
-		
-		$oldposition =  $beforeaction_position; 
-		if ($ondirekttime eq "0" || $offdirekttime eq "0") # Fehler division durch 0 abfanken bei ungesetzten attributen
-			{
-				Log3($name,5,"Siro_Set: cmd stop -> Positionserrechnung ohne gesetzte Attribute , Finalposition wird auf 50 gesetzt ");
-				$finalposition ="50";
-				$args[1] = $finalposition;
-			}
-		else
-		{
-			Log3($name,5,"Siro_Set: stop - Lastaction -> $lastaction $lastaction_position $oldposition");
-			if ($lastaction eq 'position')
-				{
-					if ( $lastaction_position > $oldposition)
-						{
-						$lastaction="on";
-						}
-					else
-						{
-						$lastaction="off";				
-						}
-						
-				}
-			if ($lastaction eq 'on')# Letzte Fahrt runter (on)
-				{
-					$newposition = $timebetweenmsg/$ondirekttime;
-					$finalposition = $oldposition+$newposition;
-				}   
-			elsif ($lastaction eq 'off')# Letzte Fahrt hoch (off)
-				{
-					$newposition = $timebetweenmsg/$offdirekttime;
-					$finalposition = $oldposition-$newposition;
-				}
-			elsif ($lastaction eq 'fav')# Letzte Fahrt unbekannt
-				{
-					#Fahrtrichtung ermitteln - dafür Position von lastmsg nehmen $beforeaction_position
-					$favorit_position =$time_to_favorite/$ondirekttime;
-					Log3($name,5,"Siro_Set: drive to position aborted (target position:$favorit_position %) : (begin possition $beforeaction_position %) ");
-					
-				if ($favorit_position < $beforeaction_position)# Fahrt hoch
-					{
-						$newposition = $timebetweenmsg/$offdirekttime;
-						$finalposition = $oldposition-$newposition;
-					} 
-					
-				if ($favorit_position > $beforeaction_position)# Fahrt runter
-					{
-					$newposition = $timebetweenmsg/$ondirekttime;
-					$finalposition = $oldposition+$newposition;
-					} 
-					
-					Log3($name,5,"Siro_Set position: $finalposition ");	
-				}
-				
-			if ($finalposition < 0){$finalposition = 0;}
-			if ($finalposition > 100){$finalposition = 100;}  
-			if ($limitedmode eq "on"){$finalposition ="50";}
-			$finalposition = int($finalposition); # abrunden
-			$args[1] = $finalposition;
-		}
-	}
-	######################################### 
-	
-	# Hardware-Favorit anfahren 
-	if ($cmd eq 'fav')
-	{
-	Log3($name,5,"Siro_Set fav: $cmd ");
-		if (!defined $time_to_favorite)
-			{
-				$time_to_favorite=5;
-			} # Tmp ggf. ändern 
-		
-		# if ( $time_to_favorite eq "undef")
-			# {
-				# $time_to_favorite=5;
-				# #return;
-			# } 
-	
-		if ($ondirekttime eq "0" || $offdirekttime eq "0") # Fehler division durch 0 abfanken bei ungesetzten attributen
-			{
-				Log3($name,1,"Siro_Set: set cmd fav -> Favoritberechnung ohne gesetzte Attribute , aktion nicht möglich");
-				return;
-			}
-	
-		$favorit_position =$time_to_favorite/$ondirekttime;  # Errechnet nur die Position, die von oben angefahren wurde. pos
-		$args[0] = $cmd;
-		$args[1] = int($favorit_position);
-		
-		if($time_to_favorite eq 'undef')
-			{
-				Log3($name,1,"Siro_Set: function position limited without attr time_down_to_favorite");
-				$time_to_favorite ="1";
-				$args[1] ="50";
-				# new
-				if ($mode ne "physical")
-				{
-				$args[2] = 'longstop';
-				$args[0] = 'stop';
-				Siro_SendCommand($hash, @args);
-				readingsSingleUpdate($hash, "position",'50', 1); 
-				readingsSingleUpdate($hash, "state",'50', 1);
-				}
-				return;
-			}
-		
-		$args[2] = 'longstop';
-		$hash->{helper}{lastMsg} = $aktMsg;
-		$hash->{helper}{aktMsg} = $args[0].' '.$args[1].' '.gettimeofday();
-		$hash->{helper}{positiontimer} = $timebetweenmsg;
-		$cmd ='stop';
-		$args[0] = $cmd;
-		
-		if ($mode ne "physical")
-			{
-				Siro_SendCommand($hash, @args);
-			}
-		
-		my $position = $hash->{helper}{position}; # Position für die Zeitberechnung speichern
-		$hash->{helper}{position}=int($favorit_position);
-		Siro_UpdateState( $hash, int($favorit_position), '', '', 1 );
-		#Fahrtrichtung ermitteln - dafür Position von lastmsg nehmen $beforeaction_position
-		$runningtime = 0;
-		
-		if ($favorit_position < $position)# Fahrt hoch
-			{
-				readingsSingleUpdate($hash, "action",'up to favorite', 1); #tmp
-				my $change = $position - $favorit_position; # änderung in %
-				$runningtime = $change*$offdirekttime;
-			} 
-		
-		if ($favorit_position > $position)# Fahrt runter
-			{
-				readingsSingleUpdate($hash, "action",'down to favorite', 1); #tmp
-				my $change = $favorit_position - $position ; # Änderung in %
-				$runningtime = $change*$ondirekttime;
-			}
-		 
-		InternalTimer($testtimestart+$runningtime,"Siro_Position_fav",$hash,0); # state auf Stopp setzen nach Erreichen der Fahrtdauer
-		return;
-	}
-	#########################################
-	
-	# Teste auf Position '0' oder '100' -> Mappen auf 'on' oder 'off'
-	if ($cmd eq 'on'){$args[1] = "100";}
-	if ($cmd eq 'off'){$args[1] = "0";}
-	#########################################
-	
-	#Aktualisierung des Timers (Zeit zwischen den Befehlen, lastmsg und aktmsg)
-	$hash->{helper}{lastMsg} = $hash->{helper}{aktMsg};
-	$hash->{helper}{aktMsg} = $args[0].' '.$args[1].' '.gettimeofday();
-	$hash->{helper}{positiontimer} = $timebetweenmsg;
-	#########################################
-	
-	if ( defined($newposstate) )
-		{
-			if($newposstate eq "0")
-				{
-					$cmd="off";
-					Log3($name,5,"recognized position  0 ");
-				} 
-			elsif ($newposstate eq "100")
-				{
-					$cmd="on";
-					Log3($name,5,"recognized position 100 ");
-				}
-		}								
-			  
-	# Direkte Positionsanfahrt 
-	if ($cmd eq 'position')
-		{
-		Log3($name,5,"Siro_Set: nodrive -> $nodrive");
-		if (($ondirekttime eq "0" || $offdirekttime eq "0" || $nodrive eq "true") && $testchannel ne "0" ) 		# Fehler division durch 0 abfanken bei ungesetzten attributen
-			{
-				Log3($name,1,"Siro_Set: Positionsanfahrt ohne gesetzte Attribute , aktion nicht möglich -> abbruch");
-				return "Positionsanfahrt ohne gesetzte Attribute time_to_open und time_to_close nicht moeglich";
-			}
-			my $aktposition=$hash->{helper}{position};  
-			# Fahrt nach oben
-			if ($newposstate < $aktposition)
-				{
-					if ($action eq "no action")
-					{
-					$action = 'up to position '.$newposstate;
-					readingsSingleUpdate($hash, "action",$action, 1); #tmp
-					} 
-					$cmd='off';
-					my $percenttorun = $aktposition-$newposstate;
-					$runningtime = $percenttorun*$offdirekttime;
-					$timetorun=$runningtime;
-					Log3($name,5,"Siro_Set: direkt positiondrive: -> timing:($runningtime = $percenttorun*$offdirekttime) -> open runningtime:$runningtime - modification in % :$percenttorun");
-				}
-			#Fahrt nach unten
-			if ($newposstate > $aktposition)
-				{
-					if ($action eq "no action")
-					{
-					$action = 'down to position '.$newposstate;
-					readingsSingleUpdate($hash, "action",$action, 1); #tmp
-					} 
-					$cmd='on';
-					my $percenttorun = $newposstate-$aktposition;
-					$runningtime = $percenttorun*$ondirekttime;
-					$timetorun=$runningtime;
-					Log3($name,5,"Siro_Set: direkt positiondrive: -> timing: ($runningtime = $percenttorun*$ondirekttime) -> close runningtime:$runningtime - modification in % :$percenttorun");
-				} 
-			$virtual = "virtual"; # keine Stateänderung
-			Log3($name,5,"Siro_Set: direkt positiondrive: -> setting timer to $runningtime");
-			InternalTimer($testtimestart+$runningtime,"Siro_Position_down_stop",$hash,0); 
-		}
-	#########################################
-	
-	# abarbeitung weiterer befehle 
-	if($cmd eq 'on') 
-		{
-		if ($action eq "no action")
-			{
-				$action = 'down ';
-				readingsSingleUpdate($hash, "action",$action, 1); #tmp
-				# voraussichtliche fahrzeit berechnen bis 100%
-				my $aktposition=$hash->{helper}{position}; 
-				my $percenttorun = 100 - $aktposition;
-				$runningtime = $percenttorun*$ondirekttime;
-				$timetorun=$runningtime;
-				Log3($name,4,"Siro_Set: aktposition -> $aktposition - percenttorun -> $percenttorun - ondirekttime -> $ondirekttime");
-				Log3($name,4,"Siro_Set: voraussichtliche fahrdauer bis 100%: -> $runningtime");
-				InternalTimer(gettimeofday()+$timetorun+1, "Siro_Stopaction", $hash, 0); # action auf Stopp
-			}
-		$newState = '100';
-		$positiondrive = 100;
-		} 
-	elsif($cmd eq 'off') 
-		{
-		if ($action eq "no action")
-			{
-				$action = 'up ';
-				readingsSingleUpdate($hash, "action",$action, 1); #tmp
-				# voraussichtliche fahrzeit berechnen bis 0%
-				my $aktposition=$hash->{helper}{position}; 
-				my $percenttorun = $aktposition;
-				$runningtime = $percenttorun*$offdirekttime;
-				$timetorun=$runningtime;
-				Log3($name,4,"Siro_Set: aktposition -> $aktposition - percenttorun -> $percenttorun - offdirekttime -> $offdirekttime");
-				Log3($name,4,"Siro_Set: voraussichtliche fahrdauer bis 0%: -> $runningtime");
-				InternalTimer(gettimeofday()+$timetorun+1, "Siro_Stopaction", $hash, 0); # action auf Stopp
-			}
-		$newState = '0';
-		$positiondrive = 0;
-		} 
-	elsif($cmd eq 'stop') 
-		{
-			$newState = $finalposition;
-			$positiondrive = $finalposition;
-		} 
-	elsif($cmd eq 'fav')
-		{
-		  $newState = $favorit_position;
-		  $positiondrive = $favorit_position;
-		}
-	else 
-		{
-			$newState = $state;   #todo: Was mache ich mit der Positiondrive?
-		}
+        my $restartmsg = $name . ' ' . $args[0] . ' ' . $args[1];
+        Log3( $name, 3,
+            "Siro_Set: laufende action gefunden - restart msg -> $restartmsg "
+        );
+        InternalTimer( gettimeofday() + 0, "Siro_Restartcmd", $restartmsg );
+        $args[0] = "stop";
+        $args[1] = '';
+        $cmd     = "stop";
+
+    }
+
+    #########################################
+    # invertiere position
+    if ( $cmd eq "position" && $invers eq "1" ) {
+        my $noinvers       = $args[1];
+        my $inversposition = 100 - $args[1];
+        $args[1] = $inversposition;
+        Log3( $name, 3,
+"Siro_Set: invertiere Position - input -> $noinvers - inverted -> $inversposition "
+        );
+    }
+    #########################################gettimeofday();
+
+    if ( $cmd eq "reset_operating_seconds" ) {
+        readingsSingleUpdate( $hash, "operating_seconds", '0', 1 );    #tmp
+        readingsSingleUpdate( $hash, ".last_reset_operating_seconds",
+            gettimeofday(), 0 );
+
+        return;
+    }
+
+    # test anzahl der Tage
+    if ( $hash->{CHANNEL} ne '0' ) {
+        my $oldtime =
+          ReadingsVal( $name, '.last_reset_operating_seconds', gettimeofday() );
+
+        my $sec = gettimeofday() - $oldtime;
+        my $min = int( $sec / 60 );
+        $sec = $sec - ( $min * 60 );
+        my $hour = int( $min / 60 );
+        $min = $min - ( $hour * 60 );
+        my $day = int( $hour / 24 );
+        $hour = $hour - ( $day * 24 );
+
+        # my $running = sprintf("%d %02d:%02d:%02d",$day,$hour,$min,$sec);
+
+        if ( ReadingsVal( $name, 'last_reset_os', '' ) ne $day ) {
+            readingsSingleUpdate( $hash, "last_reset_os", $day, 1 );
+        }
+    }
+    else
+
+    {
+        readingsDelete( $hash, 'last_reset_os' );
+        readingsDelete( $hash, 'operating_seconds' );
+    }
+    #########################################
+    if ( !defined $args[2] ) {
+        $args[2] = '';
+    }
+
+    if ( !defined $args[1] ) {
+        $args[2] = '0';
+        $args[1] = '';
+    }
+
+    if ( $args[1] eq "physical" ) {
+        $hash->{helper}{MODE} = "physical";
+    }
+
+    if ( !defined($hash) ) { return; }
+    if ( !defined($name) ) { return; }
+
+    $debug = "$hash, $name, @args";
+
+    if ( $cmd ne "?" ) {
+        Log3( $name, 5, "Siro_Set: aufgerufen -> cmd -> $cmd args -> @args " );
+    }
+    #########################################
+
+    # up/down for timer mappen auf on/off und timer für stop setzen
+    if ( $cmd eq 'up_for_timer' ) {
+        Log3( $name, 5, "Siro_Set: up_for_timer @args $args[1]" );
+        $cmd = "off";
+
+        InternalTimer( $testtimestart + $args[1], "Siro_Stop", $hash, 0 )
+          ;    # State auf Stopp
+        $args[0] = $cmd;
+        $action = 'up for timer ' . $args[1];
+        readingsSingleUpdate( $hash, "action", $action, 1 );    #tmp
+    }
+
+    if ( $cmd eq 'down_for_timer' ) {
+        Log3( $name, 3, "Siro_Set: down_for_timer @args $args[1]" );
+        $cmd = "on";
+        readingsSingleUpdate( $hash, "action", 'down for timer ' . $args[1],
+            1 );                                                #tmp
+        InternalTimer( $testtimestart + $args[1], "Siro_Stop", $hash, 0 )
+          ;    # State auf Stopp
+        $args[0] = $cmd;
+        $action = 'down for timer ' . $args[1];
+        readingsSingleUpdate( $hash, "action", $action, 1 );    #tmp
+    }
+    #########################################
+
+    # diverse befehle auf bekannte befehle mappen
+    if ( $cmd eq 'open' ) {
+        $cmd = "off";
+        $args[0] = $cmd;
+    }
+
+    if ( $cmd eq 'close' ) {
+        $cmd = "on";
+        $args[0] = $cmd;
+    }
+    #########################################
+
+    $hash->{Version} = $version;
+
+    # diverse attr einlesen
+    my $debugmode = AttrVal( $name, 'debug_mode', '0' );
+    my $testchannel = $hash->{CHANNEL};
+    my $timetoopen =
+      AttrVal( $name, 'time_to_open', 'undef' );    # fahrzeit komplett runter
+    my $timetoclose =
+      AttrVal( $name, 'time_to_close', 'undef' );    # fahrzeit komplett hoch
+    my $operationmode =
+      AttrVal( $name, 'operation_mode', '0' );    # mode 0 normal / 1 repeater
+    my $limitedmode = "off";
+    my $downlimit = AttrVal( $name, 'down_limit_mode_1', '100' )
+      ;    # maximale runterfahrt im mode 1
+    my $autostop = AttrVal( $name, 'down_auto_stop', '100' )
+      ;    # automatischer stop bei runterfahrt
+    #########################################
+
+    # sets an device anpassen
+    if ( $testchannel ne "0" ) {
+
+        %sets = (
+            "open"      => "noArg",
+            "close"     => "noArg",
+            "off"       => "noArg",
+            "stop"      => "noArg",
+            "on"        => "noArg",
+            "fav"       => "noArg",
+            "prog"      => "noArg",
+            "prog_stop" => "noArg",
+            "position"  => "slider,0,1,100"
+            ,    # Wird nur bei vorhandenen time_to attributen gesetzt
+            "state"                   => "noArg",
+            "set_favorite"            => "noArg",
+            "down_for_timer"          => "textField",
+            "reset_operating_seconds" => "noArg",
+            "up_for_timer"            => "textField"    # Ggf. entfernen (Alexa)
+        );
+
+        if ( $timetoopen eq 'undef' || $timetoclose eq 'undef' ) {
+            if ( $attr{$name}{webCmd} eq "stop:on:off:fav:position" ) {
+                $attr{$name}{webCmd} = "stop:on:off:fav";
+            }
+
+            $limitedmode = "on";
+            $hash->{INFO} =
+"limited function without ATTR time_to_open / time_to_close / time_down_to_favorite";
+        }
+        else {
+            if ( $attr{$name}{webCmd} eq "stop:on:off:fav" ) {
+                $attr{$name}{webCmd} = "stop:on:off:fav:position";
+            }
+            delete( $hash->{INFO} );
+
+        }
+    }
+    else    # this block is for groupdevicec ( channel 0 )
+    {
+        Log3( $name, 5, "Siro_Set: Groupdevice erkannt " );
+
+        %sets = (
+            "open"  => "noArg",
+            "close" => "noArg",
+            "off"   => "noArg",
+            "stop"  => "noArg",
+            "on"    => "noArg",
+            "fav"   => "noArg",
+
+            #"prog" => "noArg",
+            #"prog_stop" => "noArg",
+            "position" => "slider,0,1,100"
+            ,    # Wird nur bei vorhandenen time_to attributen gesetzt
+            "state" => "noArg",
+
+            #"set_favorite" => "noArg",
+            "down_for_timer" => "textField",
+            "up_for_timer"   => "textField"
+        );
+
+        if ( $cmd ne "?" )    #change
+        {
+            my $timetoopen   = "15";
+            my $timetoclose  = "15";
+            my $testhashtmp  = "";
+            my $testhashtmp1 = "";
+            my $namex        = "";
+            my $testid       = "";
+            my $id           = $hash->{ID};
+            my @grouphash;
+            my @groupnames;
+
+            @groupnames = Siro_Testgroup( $hash, $id );
+
+            $hash->{INFO} =
+"This is a group Device with limited functions affected the following devices:\n @groupnames";
+            my $groupcommand =
+              $cmd . "," . $args[0] . "," . $args[1] . "," . $hash;
+
+            $hash->{helper}{groupcommand} = $groupcommand;
+            InternalTimer( gettimeofday() + 0, "Siro_Setgroup", $hash, 1 );
+        }
+        $hash->{helper}{MODE} = "physical";
+    }
+    #########################################
+
+    # Check for unknown arguments
+    if ( !exists( $sets{$cmd} ) ) {
+        my @cList;
+
+        # Overwrite %sets with setList
+        my $atts = AttrVal( $name, 'setList', "" );
+        my %setlist = split( "[: ][ ]*", $atts );
+        foreach my $k ( sort keys %sets ) {
+            my $opts = undef;
+            $opts = $sets{$k};
+            $opts = $setlist{$k} if ( exists( $setlist{$k} ) );
+            if ( defined($opts) ) {
+                push( @cList, $k . ':' . $opts );
+            }
+            else {
+                push( @cList, $k );
+            }
+        }    # end foreach
+        return "Unknown argument $cmd, choose one of " . join( " ", @cList );
+    }
+    #########################################
+
+    # undefinierte attr time to open/close abfangen
+    if ( ( $timetoopen eq 'undef' || $timetoclose eq 'undef' )
+        && $testchannel ne "0" )
+    {
+        Log3( $name, 1,
+"Siro_Set:limited function without definition of time_to_close and time_to_open. Please define this attributes."
+        );
+        $nodrive     = "true";
+        $timetoopen  = 1;
+        $timetoclose = 1;
+    }
+    #########################################
+
+    # progmodus setzen
+    if ( $cmd eq "prog" ) {
+        $hash->{helper}{lastProg} =
+          gettimeofday() + 180;    # 3 min programmiermodus
+    }
+
+    if ( $cmd eq "prog_stop" ) {
+        $hash->{helper}{lastProg} = gettimeofday();
+        return;
+    }
+    #########################################
+
+    # favoritenposition speichern
+    if ( $cmd eq "set_favorite" ) {
+        if ( $debugmode eq "1" ) {
+            readingsSingleUpdate( $hash, "DEBUG_SET", 'setze Favorite', 1 );
+        }
+        my $sequence;
+        my $sequenceraw = AttrVal( $name, 'prog_fav_sequence', '' );
+        if ( defined( $attr{$name}{time_down_to_favorite} ) ) {
+
+            $sequence = $sequenceraw . ',2,' . $sequenceraw;
+            Log3( $name, 0, "Siro_Set: delete and set favorit -> $sequence" );
+        }
+        else {
+            $sequence = $sequenceraw;
+            Log3( $name, 0, "Siro_Set: set favorit -> $sequence" );
+        }
+
+        $hash->{sequence} = $sequence;    # 3 Min Programmiermodus
+        InternalTimer( gettimeofday() + 1, "Siro_Sequence", $hash, 0 )
+          ;    # State auf stop setzen nach Erreichen der Fahrdauer
+        Log3( $name, 1, "Siro_Set:setting new favorite" );
+        return;
+    }
+    #########################################
+
+    # variablenberechnung für folgende funktionen
+    my $check = 'check';
+    my $bmode = $hash->{helper}{aktMsg};
+    if ( $bmode eq "repeater" ) {
+        $check = 'nocheck';
+    }
+    my $ondirekttime  = $timetoclose / 100;    # Zeit für 1 Prozent Runterfahrt
+    my $offdirekttime = $timetoopen / 100;     # Zeit für 1 Prozent Hochfahrt
+                                               #my $runningtime;
+    my $timetorun;
+    my $newposstate;
+    if ( defined( $args[1] ) ) {
+        if ( $args[1] =~ /^\d+$/ ) {
+            $newposstate = $args[1];    # Anzufahrende Position in Prozent
+            Log3( $name, 5, "Siro_Set:newposstate -> $newposstate" );
+            $timetorun =
+              $timetoclose / 100 *
+              $newposstate
+              ;    # Laufzeit von 0 prozent }bis zur anzufahrenden Position
+        }
+    }
+    my $virtual;    # Kontrollvariable der Positionsanfahrt
+    my $newState;
+    my $updateState;
+    my $positiondrive;
+    my $state                 = $hash->{STATE};
+    my $aktMsg                = $hash->{helper}{aktMsg};
+    my @last_action_array     = split( / /, $aktMsg );
+    my $lastaction            = $last_action_array[0];
+    my $lastaction_position   = $last_action_array[1];
+    my $lastaction_time       = $last_action_array[2];
+    my $befMsg                = $hash->{helper}{lastMsg};
+    my @before_action_array   = split( / /, $befMsg );
+    my $beforeaction_position = $before_action_array[1];
+    my $timebetweenmsg =
+      $testtimestart -
+      $last_action_array[2];    # Zeit zwischen dem aktuellen und letzten Befehl
+    $timebetweenmsg = ( int( $timebetweenmsg * 10 ) / 10 );
+    my $oldposition;            # Alter Stand in Prozent
+    my $newposition
+      ;   # Errechnende Positionsänderung in Prozent - > bei on plus alten Stand
+    my $finalposition;    # Erreichter Rollostand in Prozent für state;
+    my $time_to_favorite = AttrVal( $name, 'time_down_to_favorite', 'undef' );
+    my $favorit_position;
+    my $mode = $hash->{helper}{MODE};    # Betriebsmodus virtual, physicalFP
+    my $lastprogmode = $hash->{helper}{lastProg};
+    my $testprogmode = $testtimestart;
+    my $testprog     = int($testprogmode) - int($lastprogmode);
+    my $oldstate     = ReadingsVal( $name, 'state', 100 );
+
+    Log3( $name, 5, "Siro_set: test auf double stop" );
+    Log3( $name, 5, "Siro_set: testprogmode -> $testprogmode" );
+    Log3( $name, 5, "Siro_set: lastprogmode -> $lastprogmode" );
+    Log3( $name, 5, "Siro_set: lastaction -> $lastaction" );
+    Log3( $name, 5, "Siro_set: cmd -> $cmd" );
+
+    # verhindern eines doppelten stoppbefehls ausser progmodus 1
+    if ( $testprogmode > $lastprogmode
+      )    # Doppelten Stoppbefehl verhindern, ausser progmodus aktiv
+    {
+        if ( $lastaction eq 'stop' && $cmd eq 'stop' && $check ne 'nocheck' ) {
+            Log3( $name, 5, "Siro_set: double stop, action aborted" );
+            readingsSingleUpdate( $hash, "prog_mode", "inaktiv ", 1 );
+            if ( $debugmode eq "1" ) {
+                $debug = "Siro_set: double stop, action aborted";
+                readingsSingleUpdate( $hash, "DEBUG_SET", $debug, 1 );
+            }
+            return;
+        }
+    }
+    else {
+        $testprog = $testprog * -1;
+        $virtual  = "virtual";
+        readingsSingleUpdate( $hash, "prog_mode", "$testprog", 1 );
+
+    }
+    #########################################
+
+    # invertierung position
+    if ( $invers eq "1" ) {
+        $oldstate = 100 - $oldstate;
+        $autostop = 100 - $autostop;
+    }
+    #########################################
+
+    Log3( $name, 5,
+"Siro_Set: teste autostop: $autostop < 100  $oldstate < $autostop - $cmd"
+    );
+
+    # erkennung autostopfunktiuon
+    if ( $cmd eq "on" && $autostop < 100 && $oldstate < $autostop ) {
+        $cmd         = "position";
+        $args[1]     = $autostop;
+        $newposstate = $args[1];                            # position autostop
+        $timetorun   = $timetoclose / 100 * $newposstate;
+        Log3( $name, 1,
+"Siro_Set: autostop gefunden mapping auf position erfolgt: $newposstate  "
+        );
+    }
+    #########################################
+
+    # erkennung downlimit funktion
+    if ( $downlimit < 100 && $operationmode eq "1" ) {
+        if ( $cmd eq 'position' && $downlimit < $newposstate ) {
+            $args[1] = $downlimit;
+            $newposstate = $args[1];    # Anzufahrende Position in Prozent
+            $timetorun = $timetoclose / 100 * $newposstate;
+            Log3( $name, 1,
+                "Siro_Set: drive down limit reached: $newposstate " );
+        }
+        if ( $cmd eq 'on' ) {
+            $cmd         = "position";
+            $args[1]     = $downlimit;
+            $newposstate = $args[1];     # Anzufahrende Position in Prozent
+            $timetorun = $timetoclose / 100 * $newposstate;
+            Log3( $name, 1,
+                "Siro_Set: drive down limit reached: $newposstate  " );
+        }
+    }
+    #########################################
+
+    # on/off Umschaltung ohne zwischenzeitliches Anhalten
+    if (   $cmd eq 'on'
+        && $timebetweenmsg < $timetoopen
+        && $lastaction eq 'off' )    # Prüfe auf direkte Umschaltung on - off
+    {
+        $oldposition   = $beforeaction_position;
+        $newposition   = $timebetweenmsg / $offdirekttime;
+        $finalposition = $oldposition - $newposition;
+        if ( $limitedmode eq "on" ) {
+            $finalposition = "50";
+        }
+        $hash->{helper}{lastMsg} = $aktMsg;
+        $hash->{helper}{aktMsg} =
+          "stop" . ' ' . int($finalposition) . ' ' . gettimeofday();
+        $hash->{helper}{positiontimer} = $timebetweenmsg;
+        $hash->{helper}{position}      = int($finalposition);
+
+        if ( $mode ne "physical" ) {
+            Siro_SendCommand( $hash, 'stop' );
+        }
+        $aktMsg                = $hash->{helper}{aktMsg};
+        @last_action_array     = split( / /, $aktMsg );
+        $lastaction            = $last_action_array[0];
+        $lastaction_position   = $last_action_array[1];
+        $lastaction_time       = $last_action_array[2];
+        $befMsg                = $hash->{helper}{lastMsg};
+        @before_action_array   = split( / /, $befMsg );
+        $beforeaction_position = $before_action_array[1];
+        $timebetweenmsg =
+          $testtimestart -
+          $last_action_array[2]
+          ;    # Zeit zwischen dem aktuellen und letzten Befehl
+        $timebetweenmsg = ( int( $timebetweenmsg * 10 ) / 10 );
+    }
+    #########################################
+
+    # off/on Umschaltung ohne zwischenzeitliches Anhalten
+    if (   $cmd eq 'off'
+        && $timebetweenmsg < $timetoclose
+        && $lastaction eq 'on' )
+    {
+        $oldposition   = $beforeaction_position;
+        $newposition   = $timebetweenmsg / $ondirekttime;
+        $finalposition = $oldposition + $newposition;
+        if ( $limitedmode eq "on" ) {
+            $finalposition = "50";
+        }
+        $hash->{helper}{lastMsg} = $aktMsg;
+        $hash->{helper}{aktMsg} =
+          "stop" . ' ' . int($finalposition) . ' ' . gettimeofday();
+        $hash->{helper}{positiontimer} = $timebetweenmsg;
+
+        if ( $mode ne "physical" ) {
+            Siro_SendCommand( $hash, 'stop' );
+        }
+        $aktMsg                = $hash->{helper}{aktMsg};
+        @last_action_array     = split( / /, $aktMsg );
+        $lastaction            = $last_action_array[0];
+        $lastaction_position   = $last_action_array[1];
+        $lastaction_time       = $last_action_array[2];
+        $befMsg                = $hash->{helper}{lastMsg};
+        @before_action_array   = split( / /, $befMsg );
+        $beforeaction_position = $before_action_array[1];
+        $timebetweenmsg =
+          gettimeofday() -
+          $last_action_array[2]
+          ;    # Zeit zwischen dem aktuellen und letzten Befehl
+        $timebetweenmsg = ( int( $timebetweenmsg * 10 ) / 10 );
+    }
+    #########################################
+
+    # Positionsberechnung bei einem Stopp-Befehl
+    if ( $cmd eq 'stop' ) {
+
+        # lösche interne timer - setze reading action auf no action
+
+        readingsSingleUpdate( $hash, "action", 'no action', 1 );
+        RemoveInternalTimer($hash);
+
+        Log3( $name, 5,
+"Siro_Set: cmd stop  timebetweenmsg -> $timebetweenmsg ondirekttime -> $ondirekttime offdirekttime -> $offdirekttime "
+        );
+
+        $oldposition = $beforeaction_position;
+        if (   $ondirekttime eq "0"
+            || $offdirekttime eq
+            "0" )  # Fehler division durch 0 abfanken bei ungesetzten attributen
+        {
+            Log3( $name, 5,
+"Siro_Set: cmd stop -> Positionserrechnung ohne gesetzte Attribute , Finalposition wird auf 50 gesetzt "
+            );
+            $finalposition = "50";
+            $args[1] = $finalposition;
+        }
+        else {
+            Log3( $name, 5,
+"Siro_Set: stop - Lastaction -> $lastaction $lastaction_position $oldposition"
+            );
+            if ( $lastaction eq 'position' ) {
+                if ( $lastaction_position > $oldposition ) {
+                    $lastaction = "on";
+                }
+                else {
+                    $lastaction = "off";
+                }
+
+            }
+            if ( $lastaction eq 'on' )    # Letzte Fahrt runter (on)
+            {
+                $newposition   = $timebetweenmsg / $ondirekttime;
+                $finalposition = $oldposition + $newposition;
+            }
+            elsif ( $lastaction eq 'off' )    # Letzte Fahrt hoch (off)
+            {
+                $newposition   = $timebetweenmsg / $offdirekttime;
+                $finalposition = $oldposition - $newposition;
+            }
+            elsif ( $lastaction eq 'fav' )    # Letzte Fahrt unbekannt
+            {
+#Fahrtrichtung ermitteln - dafür Position von lastmsg nehmen $beforeaction_position
+                $favorit_position = $time_to_favorite / $ondirekttime;
+                Log3( $name, 5,
+"Siro_Set: drive to position aborted (target position:$favorit_position %) : (begin possition $beforeaction_position %) "
+                );
+
+                if ( $favorit_position < $beforeaction_position )   # Fahrt hoch
+                {
+                    $newposition   = $timebetweenmsg / $offdirekttime;
+                    $finalposition = $oldposition - $newposition;
+                }
+
+                if ( $favorit_position > $beforeaction_position ) # Fahrt runter
+                {
+                    $newposition   = $timebetweenmsg / $ondirekttime;
+                    $finalposition = $oldposition + $newposition;
+                }
+
+                Log3( $name, 5, "Siro_Set position: $finalposition " );
+            }
+
+            if ( $finalposition < 0 )   { $finalposition = 0; }
+            if ( $finalposition > 100 ) { $finalposition = 100; }
+            if ( $limitedmode eq "on" ) { $finalposition = "50"; }
+            $finalposition = int($finalposition);                 # abrunden
+            $args[1] = $finalposition;
+        }
+    }
+    #########################################
+
+    # Hardware-Favorit anfahren
+    if ( $cmd eq 'fav' ) {
+        Log3( $name, 5, "Siro_Set fav: $cmd " );
+        if ( !defined $time_to_favorite ) {
+            $time_to_favorite = 5;
+        }    # Tmp ggf. ändern
+
+        # if ( $time_to_favorite eq "undef")
+        # {
+        # $time_to_favorite=5;
+        # #return;
+        # }
+
+        if (   $ondirekttime eq "0"
+            || $offdirekttime eq
+            "0" )  # Fehler division durch 0 abfanken bei ungesetzten attributen
+        {
+            Log3( $name, 1,
+"Siro_Set: set cmd fav -> Favoritberechnung ohne gesetzte Attribute , aktion nicht möglich"
+            );
+            return;
+        }
+
+        $favorit_position =
+          $time_to_favorite /
+          $ondirekttime
+          ;    # Errechnet nur die Position, die von oben angefahren wurde. pos
+        $args[0] = $cmd;
+        $args[1] = int($favorit_position);
+
+        if ( $time_to_favorite eq 'undef' ) {
+            Log3( $name, 1,
+"Siro_Set: function position limited without attr time_down_to_favorite"
+            );
+            $time_to_favorite = "1";
+            $args[1] = "50";
+
+            # new
+            if ( $mode ne "physical" ) {
+                $args[2] = 'longstop';
+                $args[0] = 'stop';
+                Siro_SendCommand( $hash, @args );
+                readingsSingleUpdate( $hash, "position", '50', 1 );
+                readingsSingleUpdate( $hash, "state",    '50', 1 );
+            }
+            return;
+        }
+
+        $args[2] = 'longstop';
+        $hash->{helper}{lastMsg} = $aktMsg;
+        $hash->{helper}{aktMsg} =
+          $args[0] . ' ' . $args[1] . ' ' . gettimeofday();
+        $hash->{helper}{positiontimer} = $timebetweenmsg;
+        $cmd                           = 'stop';
+        $args[0]                       = $cmd;
+
+        if ( $mode ne "physical" ) {
+            Siro_SendCommand( $hash, @args );
+        }
+
+        my $position =
+          $hash->{helper}{position}; # Position für die Zeitberechnung speichern
+        $hash->{helper}{position} = int($favorit_position);
+        Siro_UpdateState( $hash, int($favorit_position), '', '', 1 );
+
+#Fahrtrichtung ermitteln - dafür Position von lastmsg nehmen $beforeaction_position
+        $runningtime = 0;
+
+        if ( $favorit_position < $position )    # Fahrt hoch
+        {
+            readingsSingleUpdate( $hash, "action", 'up to favorite', 1 );   #tmp
+            my $change = $position - $favorit_position;    # änderung in %
+            $runningtime = $change * $offdirekttime;
+        }
+
+        if ( $favorit_position > $position )               # Fahrt runter
+        {
+            readingsSingleUpdate( $hash, "action", 'down to favorite', 1 ); #tmp
+            my $change = $favorit_position - $position;    # Änderung in %
+            $runningtime = $change * $ondirekttime;
+        }
+
+        InternalTimer( $testtimestart + $runningtime,
+            "Siro_Position_fav", $hash, 0 )
+          ;    # state auf Stopp setzen nach Erreichen der Fahrtdauer
+        return;
+    }
+    #########################################
+
+    # Teste auf Position '0' oder '100' -> Mappen auf 'on' oder 'off'
+    if ( $cmd eq 'on' )  { $args[1] = "100"; }
+    if ( $cmd eq 'off' ) { $args[1] = "0"; }
+    #########################################
+
+    #Aktualisierung des Timers (Zeit zwischen den Befehlen, lastmsg und aktmsg)
+    $hash->{helper}{lastMsg} = $hash->{helper}{aktMsg};
+    $hash->{helper}{aktMsg}  = $args[0] . ' ' . $args[1] . ' ' . gettimeofday();
+    $hash->{helper}{positiontimer} = $timebetweenmsg;
+    #########################################
+
+    if ( defined($newposstate) ) {
+        if ( $newposstate eq "0" ) {
+            $cmd = "off";
+            Log3( $name, 5, "recognized position  0 " );
+        }
+        elsif ( $newposstate eq "100" ) {
+            $cmd = "on";
+            Log3( $name, 5, "recognized position 100 " );
+        }
+    }
+
+    # Direkte Positionsanfahrt
+    if ( $cmd eq 'position' ) {
+        Log3( $name, 5, "Siro_Set: nodrive -> $nodrive" );
+        if (
+            (
+                   $ondirekttime eq "0"
+                || $offdirekttime eq "0"
+                || $nodrive eq "true"
+            )
+            && $testchannel ne "0"
+          )    # Fehler division durch 0 abfanken bei ungesetzten attributen
+        {
+            Log3( $name, 1,
+"Siro_Set: Positionsanfahrt ohne gesetzte Attribute , aktion nicht möglich -> abbruch"
+            );
+            return
+"Positionsanfahrt ohne gesetzte Attribute time_to_open und time_to_close nicht moeglich";
+        }
+        my $aktposition = $hash->{helper}{position};
+
+        # Fahrt nach oben
+        if ( $newposstate < $aktposition ) {
+            if ( $action eq "no action" ) {
+                $action = 'up to position ' . $newposstate;
+                readingsSingleUpdate( $hash, "action", $action, 1 );    #tmp
+            }
+            $cmd = 'off';
+            my $percenttorun = $aktposition - $newposstate;
+            $runningtime = $percenttorun * $offdirekttime;
+            $timetorun   = $runningtime;
+            Log3( $name, 5,
+"Siro_Set: direkt positiondrive: -> timing:($runningtime = $percenttorun*$offdirekttime) -> open runningtime:$runningtime - modification in % :$percenttorun"
+            );
+        }
+
+        #Fahrt nach unten
+        if ( $newposstate > $aktposition ) {
+            if ( $action eq "no action" ) {
+                $action = 'down to position ' . $newposstate;
+                readingsSingleUpdate( $hash, "action", $action, 1 );    #tmp
+            }
+            $cmd = 'on';
+            my $percenttorun = $newposstate - $aktposition;
+            $runningtime = $percenttorun * $ondirekttime;
+            $timetorun   = $runningtime;
+            Log3( $name, 5,
+"Siro_Set: direkt positiondrive: -> timing: ($runningtime = $percenttorun*$ondirekttime) -> close runningtime:$runningtime - modification in % :$percenttorun"
+            );
+        }
+        $virtual = "virtual";    # keine Stateänderung
+        Log3( $name, 5,
+            "Siro_Set: direkt positiondrive: -> setting timer to $runningtime"
+        );
+        InternalTimer( $testtimestart + $runningtime,
+            "Siro_Position_down_stop", $hash, 0 );
+    }
+    #########################################
+
+    # abarbeitung weiterer befehle
+    if ( $cmd eq 'on' ) {
+        if ( $action eq "no action" ) {
+            $action = 'down ';
+            readingsSingleUpdate( $hash, "action", $action, 1 );    #tmp
+                   # voraussichtliche fahrzeit berechnen bis 100%
+            my $aktposition  = $hash->{helper}{position};
+            my $percenttorun = 100 - $aktposition;
+            $runningtime = $percenttorun * $ondirekttime;
+            $timetorun   = $runningtime;
+            Log3( $name, 4,
+"Siro_Set: aktposition -> $aktposition - percenttorun -> $percenttorun - ondirekttime -> $ondirekttime"
+            );
+            Log3( $name, 4,
+                "Siro_Set: voraussichtliche fahrdauer bis 100%: -> $runningtime"
+            );
+            InternalTimer( gettimeofday() + $timetorun + 1,
+                "Siro_Stopaction", $hash, 0 );    # action auf Stopp
+        }
+        $newState      = '100';
+        $positiondrive = 100;
+    }
+    elsif ( $cmd eq 'off' ) {
+        if ( $action eq "no action" ) {
+            $action = 'up ';
+            readingsSingleUpdate( $hash, "action", $action, 1 );    #tmp
+                   # voraussichtliche fahrzeit berechnen bis 0%
+            my $aktposition  = $hash->{helper}{position};
+            my $percenttorun = $aktposition;
+            $runningtime = $percenttorun * $offdirekttime;
+            $timetorun   = $runningtime;
+            Log3( $name, 4,
+"Siro_Set: aktposition -> $aktposition - percenttorun -> $percenttorun - offdirekttime -> $offdirekttime"
+            );
+            Log3( $name, 4,
+                "Siro_Set: voraussichtliche fahrdauer bis 0%: -> $runningtime"
+            );
+            InternalTimer( gettimeofday() + $timetorun + 1,
+                "Siro_Stopaction", $hash, 0 );    # action auf Stopp
+        }
+        $newState      = '0';
+        $positiondrive = 0;
+    }
+    elsif ( $cmd eq 'stop' ) {
+        $newState      = $finalposition;
+        $positiondrive = $finalposition;
+    }
+    elsif ( $cmd eq 'fav' ) {
+        $newState      = $favorit_position;
+        $positiondrive = $favorit_position;
+    }
+    else {
+        $newState = $state;    #todo: Was mache ich mit der Positiondrive?
+    }
 #########################################
 
-	if (!defined($virtual)){$virtual = "";}
-	if (!defined($newposstate)){$newposstate = 0;}
-	if (!defined($newposstate)){$newposstate = 0;}
+    if ( !defined($virtual) )     { $virtual     = ""; }
+    if ( !defined($newposstate) ) { $newposstate = 0; }
+    if ( !defined($newposstate) ) { $newposstate = 0; }
 
-	if ($virtual ne "virtual")   # Kein Stateupdate beim Anfahren einer Position 
-		{
-		
-			if ($newposstate < 0){$newposstate = 0;}
-			if ($newposstate > 100){$newposstate = 100;}
-			$hash->{helper}{position}=$positiondrive;
-			Log3($name,5,"Siro_Set: stateupdate erfolgt -> $positiondrive");
-			
-			#########################################	
-			# invertiere position
-			if 	( $invers eq "1")
-				{
-				my $noinvers = $newState;
-				my $inversposition = 100 - $newState;
-				$newState = $inversposition; 
-				
-				
-				Log3($name,3,"Siro_Set: invertiere Position vor setstate - berechnet -> $noinvers - inverted -> $newState ");	
-				}
-			#########################################
-			
-			
-			
-			Siro_UpdateState( $hash, $newState, '', $updateState, 1 );
-		} 
-	else
-		{
-			Log3($name,5,"Siro_Set: kein stateupdate erfolgt");
-			#Setze readings positiondrive und positiontime
-			if ($newposstate < 0){$newposstate = 0;}
-			if ($newposstate > 100){$newposstate = 100;}
-			$hash->{helper}{position}=$newposstate;
-		}
+    if ( $virtual ne "virtual" ) # Kein Stateupdate beim Anfahren einer Position
+    {
 
-	$args[0] = $cmd;
-	
-	if (!defined($mode)){$mode ="virtual"};
-	
-	if($debugmode eq "1")
-	{
-		readingsSingleUpdate($hash, "DEBUG_SET",$debug, 1);
-	}
-	
-	if ($mode ne "physical")
-	{
-		Log3($name,3,"Siro_set: handing over to Siro_Send_Command with following arguments: @args");
-		Siro_SendCommand($hash, @args);
-	}
-	
-	$hash->{helper}{MODE} = "virtual";
-	$hash->{helper}{LastMODE} = $mode;
-	my $testtimeend = gettimeofday();
-	$runningtime =$testtimeend - $testtimestart;
-	Log3($name,5,"Siro_set: runningtime -> $runningtime");
-	
-	return ;
-} 
+        if ( $newposstate < 0 )   { $newposstate = 0; }
+        if ( $newposstate > 100 ) { $newposstate = 100; }
+        $hash->{helper}{position} = $positiondrive;
+        Log3( $name, 5, "Siro_Set: stateupdate erfolgt -> $positiondrive" );
+
+        #########################################
+        # invertiere position
+        if ( $invers eq "1" ) {
+            my $noinvers       = $newState;
+            my $inversposition = 100 - $newState;
+            $newState = $inversposition;
+
+            Log3( $name, 3,
+"Siro_Set: invertiere Position vor setstate - berechnet -> $noinvers - inverted -> $newState "
+            );
+        }
+        #########################################
+
+        Siro_UpdateState( $hash, $newState, '', $updateState, 1 );
+    }
+    else {
+        Log3( $name, 5, "Siro_Set: kein stateupdate erfolgt" );
+
+        #Setze readings positiondrive und positiontime
+        if ( $newposstate < 0 )   { $newposstate = 0; }
+        if ( $newposstate > 100 ) { $newposstate = 100; }
+        $hash->{helper}{position} = $newposstate;
+    }
+
+    $args[0] = $cmd;
+
+    if ( !defined($mode) ) { $mode = "virtual" }
+
+    if ( $debugmode eq "1" ) {
+        readingsSingleUpdate( $hash, "DEBUG_SET", $debug, 1 );
+    }
+
+    if ( $mode ne "physical" ) {
+        Log3( $name, 5,
+"Siro_set: handing over to Siro_Send_Command with following arguments: @args"
+        );
+        Siro_SendCommand( $hash, @args );
+    }
+
+    $hash->{helper}{MODE}     = "virtual";
+    $hash->{helper}{LastMODE} = $mode;
+    my $testtimeend = gettimeofday();
+    $runningtime = $testtimeend - $testtimestart;
+    Log3( $name, 5, "Siro_set: runningtime -> $runningtime" );
+
+    return;
+}
 
 ###########################################################################
 
-sub Siro_UpdateState($$$$$) 
-{
-	my ($hash, $newState, $move, $updateState, $doTrigger) = @_;
-	readingsBeginUpdate($hash);
-	if ($newState < 0){$newState = 0;}
-	if ($newState > 100){$newState = 100;}
-	readingsBulkUpdate($hash,"state",$newState);
-	readingsBulkUpdate($hash,"position",$newState);
-	$hash->{state} = $newState;
-	#$hash->{helper}{position} = $newState;
-	readingsEndUpdate($hash, $doTrigger);
-} 
+sub Siro_UpdateState($$$$$) {
+    my ( $hash, $newState, $move, $updateState, $doTrigger ) = @_;
+    readingsBeginUpdate($hash);
+    if ( $newState < 0 )   { $newState = 0; }
+    if ( $newState > 100 ) { $newState = 100; }
+    readingsBulkUpdate( $hash, "state",    $newState );
+    readingsBulkUpdate( $hash, "position", $newState );
+    $hash->{state} = $newState;
 
-#################################################################
-
-sub Siro_Position_down_start($)
-{
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	#my $timetoopen = AttrVal($name,'time_to_open', 'undef'); #tmp
-	#my $timetoclose = AttrVal($name,'time_to_close', 'undef');#tmp
-	my @args;
-	$args[0] = 'on';
-	my $virtual='virtual';
-	Siro_SendCommand($hash, @args,, $virtual);
-	Log3 $name, 5, "Siro_Position_down_start: completed";
-	return;
-}
-#################################################################
-sub Siro_Position_down_stop($)
-{
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	my @args;
-	$args[0] = 'stop';
-	if (!defined($args[1])){$args[1]="";}
-	my $virtual='virtual';
-	Siro_SendCommand($hash, @args, $virtual);
-	my $positiondrive=$hash->{helper}{position};
-	my $aktMsg = $hash->{helper}{aktMsg};
-	$hash->{helper}{lastMsg} = $aktMsg;
-	#$hash->{helper}{aktMsg} =  $args[0].' '.$args[1].' '.gettimeofday();
-	$hash->{helper}{aktMsg} =  $args[0].' '.$positiondrive.' '.gettimeofday();
-	
-	# invertiere position
-		my $invers = AttrVal($name,'invers_position', '0');
-
-	if 	( $invers eq "1")
-		{
-		my $noinvers = $positiondrive;
-		my $inversposition = 100 - $positiondrive;
-		$positiondrive = $inversposition; 
-		
-		
-		Log3($name,3,"Siro_Set: invertiere Position vor setstate - berechnet -> $noinvers - inverted -> $positiondrive ");	
-		}
-	readingsSingleUpdate($hash, "action",'no action', 1); #tmp	
-	Siro_UpdateState( $hash, $positiondrive, '', '', 1 );
-	Log3 $name, 5, "Siro_Position_down_stop: completed -> state:$positiondrive ";
-	return;
-}
-#################################################################
-sub Siro_Position_fav($)
-{
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	my @args;
-	my $aktMsg = $hash->{helper}{aktMsg};
-	$hash->{helper}{lastMsg} = $aktMsg;
-	my @last_action_array=split(/ /,$aktMsg);
-	$hash->{helper}{aktMsg} =  'stop'.' '.$last_action_array[1].' '.gettimeofday();
-	readingsSingleUpdate($hash, "action",'no action', 1); #tmp
-	Log3 $name, 5, "Siro_Position_fav: completed";
-	return;
+    #$hash->{helper}{position} = $newState;
+    readingsEndUpdate( $hash, $doTrigger );
 }
 
 #################################################################
 
-sub Siro_Sequence($)
-{
+sub Siro_Position_down_start($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
 
-	my $debug;               
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	Log3($name,1,"Siro_Sequence:START");
-	my @args;
-	my @sequence = split(/,/,$hash->{sequence});
-	my $debugmode = AttrVal($name,'debug_mode', '0');
-	my $cmd = shift @sequence;
-	my $timer = shift @sequence;
-	$debug=$debug.' '.$cmd.' '.$timer.' '.@sequence;
-	$hash->{sequence} = join(",",@sequence); # 3 min Programmiermodus
-	$args[0]=$cmd;
-	Siro_SendCommand($hash, @args, 'virtual');
-	
-	if ( defined($timer) )
-	{
-		InternalTimer(gettimeofday()+$timer, "Siro_Sequence", $hash, 0); 
-    $debug=$debug.'- Erneute Aufrufsequenz';
-	}
-	else
-	{
-		$debug=$debug.'- Sequenz beendet, ATTR time_to _fav neu berechnet und gesetzt, progmode beendet';
-		readingsSingleUpdate($hash, "prog_mode", "inaktiv "  , 1);
-		delete($hash->{sequence});
-		my $timetoclose = AttrVal($name,'time_to_close', '10');
-		my $ondirekttime = 	$timetoclose/100; 	 		 # Zeit für 1 Prozent Runterfahrt
-		my $position = $hash->{helper}{position};
-		my $newfav = $ondirekttime * $position;  	 	
-		$attr{$name}{time_down_to_favorite} = $newfav;
-	}
-	if($debugmode eq "1")
-	{
-		readingsSingleUpdate($hash, "DEBUG_SEQUENCE",$debug, 1);
-	}
-	
-	Log3 $name, 5, "Siro_Sequence: completed";	
-  return;
+    #my $timetoopen = AttrVal($name,'time_to_open', 'undef'); #tmp
+    #my $timetoclose = AttrVal($name,'time_to_close', 'undef');#tmp
+    my @args;
+    $args[0] = 'on';
+    my $virtual = 'virtual';
+    Siro_SendCommand( $hash, @args,, $virtual );
+    Log3 $name, 5, "Siro_Position_down_start: completed";
+    return;
+}
+#################################################################
+sub Siro_Position_down_stop($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my @args;
+    $args[0] = 'stop';
+    if ( !defined( $args[1] ) ) { $args[1] = ""; }
+    my $virtual = 'virtual';
+    Siro_SendCommand( $hash, @args, $virtual );
+    my $positiondrive = $hash->{helper}{position};
+    my $aktMsg        = $hash->{helper}{aktMsg};
+    $hash->{helper}{lastMsg} = $aktMsg;
+
+    #$hash->{helper}{aktMsg} =  $args[0].' '.$args[1].' '.gettimeofday();
+    $hash->{helper}{aktMsg} =
+      $args[0] . ' ' . $positiondrive . ' ' . gettimeofday();
+
+    # invertiere position
+    my $invers = AttrVal( $name, 'invers_position', '0' );
+
+    if ( $invers eq "1" ) {
+        my $noinvers       = $positiondrive;
+        my $inversposition = 100 - $positiondrive;
+        $positiondrive = $inversposition;
+
+        Log3( $name, 3,
+"Siro_Set: invertiere Position vor setstate - berechnet -> $noinvers - inverted -> $positiondrive "
+        );
+    }
+    readingsSingleUpdate( $hash, "action", 'no action', 1 );    #tmp
+    Siro_UpdateState( $hash, $positiondrive, '', '', 1 );
+    Log3 $name, 5,
+      "Siro_Position_down_stop: completed -> state:$positiondrive ";
+    return;
+}
+#################################################################
+sub Siro_Position_fav($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my @args;
+    my $aktMsg = $hash->{helper}{aktMsg};
+    $hash->{helper}{lastMsg} = $aktMsg;
+    my @last_action_array = split( / /, $aktMsg );
+    $hash->{helper}{aktMsg} =
+      'stop' . ' ' . $last_action_array[1] . ' ' . gettimeofday();
+    readingsSingleUpdate( $hash, "action", 'no action', 1 );    #tmp
+
+    #my $addtime = gettimeofday() - $hash->{helper}{motorstart};
+    #my $oldmotortime = ReadingsVal( $name, 'operating_seconds', 0 );
+    #my $newtime = $oldmotortime + $addtime;
+    #my $rounded = int(100 * $newtime + 0.5) / 100;
+    #readingsSingleUpdate( $hash, "operating_seconds",$rounded , 1 );
+
+    Log3 $name, 5, "Siro_Position_fav: completed";
+    return;
+}
+
+#################################################################
+
+sub Siro_Sequence($) {
+
+    my $debug;
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    Log3( $name, 1, "Siro_Sequence:START" );
+    my @args;
+    my @sequence = split( /,/, $hash->{sequence} );
+    my $debugmode = AttrVal( $name, 'debug_mode', '0' );
+    my $cmd       = shift @sequence;
+    my $timer     = shift @sequence;
+    $debug = $debug . ' ' . $cmd . ' ' . $timer . ' ' . @sequence;
+    $hash->{sequence} = join( ",", @sequence );    # 3 min Programmiermodus
+    $args[0] = $cmd;
+    Siro_SendCommand( $hash, @args, 'virtual' );
+
+    if ( defined($timer) ) {
+        InternalTimer( gettimeofday() + $timer, "Siro_Sequence", $hash, 0 );
+        $debug = $debug . '- Erneute Aufrufsequenz';
+    }
+    else {
+        $debug = $debug
+          . '- Sequenz beendet, ATTR time_to _fav neu berechnet und gesetzt, progmode beendet';
+        readingsSingleUpdate( $hash, "prog_mode", "inaktiv ", 1 );
+        delete( $hash->{sequence} );
+        my $timetoclose = AttrVal( $name, 'time_to_close', '10' );
+        my $ondirekttime = $timetoclose / 100;  # Zeit für 1 Prozent Runterfahrt
+        my $position = $hash->{helper}{position};
+        my $newfav   = $ondirekttime * $position;
+        $attr{$name}{time_down_to_favorite} = $newfav;
+    }
+    if ( $debugmode eq "1" ) {
+        readingsSingleUpdate( $hash, "DEBUG_SEQUENCE", $debug, 1 );
+    }
+
+    Log3 $name, 5, "Siro_Sequence: completed";
+    return;
 }
 ###############################################################
 
-sub Siro_Setgroup($)
-{
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	my $grouphashraw=$hash->{helper}{affected_devices_h};	
-	my @grouphash=split(/,/,$grouphashraw);
-	my $groupnamesraw=$hash->{helper}{affected_devices_n};
-	my @groupnames=split(/,/,$groupnamesraw);
-	my $groupcommandraw=$hash->{helper}{groupcommand};
-	my @groupcommand=split(/,/,$groupcommandraw);
-	Log3($name,5,"Siro_Setgroup : @groupnames -> $groupcommandraw  ");
+sub Siro_Setgroup($) {
+    my ($hash)       = @_;
+    my $name         = $hash->{NAME};
+    my $grouphashraw = $hash->{helper}{affected_devices_h};
+    my @grouphash       = split( /,/, $grouphashraw );
+    my $groupnamesraw   = $hash->{helper}{affected_devices_n};
+    my @groupnames      = split( /,/, $groupnamesraw );
+    my $groupcommandraw = $hash->{helper}{groupcommand};
+    my @groupcommand    = split( /,/, $groupcommandraw );
+    Log3( $name, 5, "Siro_Setgroup : @groupnames -> $groupcommandraw  " );
 
-	my $count =0;
-	
-	foreach my $senddevice(@groupnames) 
-	{
-		my @args;
-		#Log3($name,5,"----------------------------");
-		Log3($name,5,"Siro_Setgroup: count -> $count ");
-		Log3($name,5,"Siro_Setgroup: senddevice -> $senddevice ");
-		Log3($name,5,"Siro_Setgroup: testhash -> $grouphash[$count] ");
-		Log3($name,5,"Siro_Setgroup: command -> $groupcommand[1] $groupcommand[2] ");
-		#Log3($name,5,"----------------------------");
-		$args[0]=$groupcommand[1];
-		$args[1]=$groupcommand[2];
-		Log3($name,5,"Siro_Setgroup: aufruf -> $grouphash[$count],$senddevice, @args  ");
-		Log3($name,5,"Siro_Setgroup: set $senddevice $groupcommand[1] $groupcommand[2]");
-		#my $cs = "set Siro_5B417081 on";
-		my $cs ="set $senddevice $groupcommand[0] $groupcommand[2]";
-		my $client_hash = $grouphash[$count];
-		Log3($name,5,"Siro_Setgroup: command -> ".$cs);
-		my $errors  = AnalyzeCommandChain(undef, $cs);;
-		
-		$count++;
-	}
-	return;
+    my $count = 0;
+
+    foreach my $senddevice (@groupnames) {
+        my @args;
+
+        #Log3($name,5,"----------------------------");
+        Log3( $name, 5, "Siro_Setgroup: count -> $count " );
+        Log3( $name, 5, "Siro_Setgroup: senddevice -> $senddevice " );
+        Log3( $name, 5, "Siro_Setgroup: testhash -> $grouphash[$count] " );
+        Log3( $name, 5,
+            "Siro_Setgroup: command -> $groupcommand[1] $groupcommand[2] " );
+
+        #Log3($name,5,"----------------------------");
+        $args[0] = $groupcommand[1];
+        $args[1] = $groupcommand[2];
+        Log3( $name, 5,
+            "Siro_Setgroup: aufruf -> $grouphash[$count],$senddevice, @args  "
+        );
+        Log3( $name, 5,
+            "Siro_Setgroup: set $senddevice $groupcommand[1] $groupcommand[2]"
+        );
+
+        #my $cs = "set Siro_5B417081 on";
+        my $cs          = "set $senddevice $groupcommand[0] $groupcommand[2]";
+        my $client_hash = $grouphash[$count];
+        Log3( $name, 5, "Siro_Setgroup: command -> " . $cs );
+        my $errors = AnalyzeCommandChain( undef, $cs );
+
+        $count++;
+    }
+    return;
 }
 ###############################################################
 
-sub Siro_Stop($)
-{
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	my @args;
-	$args[0] = "stop";
-	#my ( $hash, $name, @args ) = @_;
-	readingsSingleUpdate($hash, "action",'no action', 1); #tmp
-	Log3($name,0,"Siro_Stop: x-for-timer stop -> @args  ");
-	Siro_Set($hash, $name, @args);
-	
-	return;
+sub Siro_Stop($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my @args;
+    $args[0] = "stop";
+
+    #my ( $hash, $name, @args ) = @_;
+    readingsSingleUpdate( $hash, "action", 'no action', 1 );    #tmp
+    Log3( $name, 0, "Siro_Stop: x-for-timer stop -> @args  " );
+    Siro_Set( $hash, $name, @args );
+
+    return;
 }
 ###############################################################
 
-sub Siro_Restartcmd($)
-{
-	my $incomming = $_[0];
-	my @msgarray=split(/ /,$incomming);
-	my $name = $msgarray[1];
-	#my $hash = $msgarray[1];
-	#my $name = $hash->{NAME};
-	my $cs ="set $incomming";
-	Log3($name,3,"Siro_Restartcmd: incomming -> $incomming ");
-	Log3($name,3,"Siro_Restartcmd: command -> ".$cs);
-		
-	my $errors  = AnalyzeCommandChain(undef, $cs);
-	
-	return;
+sub Siro_Restartcmd($) {
+    my $incomming = $_[0];
+    my @msgarray  = split( / /, $incomming );
+    my $name      = $msgarray[1];
+
+    #my $hash = $msgarray[1];
+    #my $name = $hash->{NAME};
+    my $cs = "set $incomming";
+    Log3( $name, 3, "Siro_Restartcmd: incomming -> $incomming " );
+    Log3( $name, 3, "Siro_Restartcmd: command -> " . $cs );
+
+    my $errors = AnalyzeCommandChain( undef, $cs );
+
+    return;
 }
 ###############################################################
 
-sub Siro_Stopaction($)
-{
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	Log3($name,5,"Siro_Stopaction: setze no action ");
-	readingsSingleUpdate($hash, "action",'no action', 1); #tmp
-	return;
+sub Siro_Stopaction($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    Log3( $name, 5, "Siro_Stopaction: setze no action " );
+    readingsSingleUpdate( $hash, "action", 'no action', 1 );    #tmp
+
+    if ( $hash->{CHANNEL} ne '0' ) {
+
+        my $addtime      = gettimeofday() - $hash->{helper}{motorstart};
+        my $oldmotortime = ReadingsVal( $name, 'operating_seconds', 0 );
+        my $newtime      = $oldmotortime + $addtime;
+        my $rounded      = int( 100 * $newtime + 0.5 ) / 100;
+        readingsSingleUpdate( $hash, "operating_seconds", $rounded, 1 );
+    }
+    return;
 }
 ###############################################################readingsSingleUpdate($hash, "action",$action, 1); #tmp
-sub Siro_Testgroup($$)
-{
-my ( $hash, $id ) = @_;
-my $name = $hash->{NAME};
-my $testid;
-my $testidchan;
-my @groupnames;
-my @grouphash;
+sub Siro_Testgroup($$) {
+    my ( $hash, $id ) = @_;
+    my $name = $hash->{NAME};
+    my $testid;
+    my $testidchan;
+    my @groupnames;
+    my @grouphash;
 
-foreach my $testdevices(keys %{$modules{Siro}{defptr}})#
-		{
-		 
-			$testid = substr($testdevices, 0, 7);
-			$testidchan = substr($testdevices, 7, 1);
-			Log3($name,5,"Siro_Testgroup: groupdevice search device $testid -> test device -> $testdevices-$testidchan ");
-			 if ($id eq $testid )
-			 {
-				my $lh = $modules{Siro}{defptr}{$testdevices}; #def	
-				my $namex = $lh->{NAME}; 
-				my $channelx = $lh->{CHANNEL};
-				Log3($name,5,"Siro_Testgroup: device for group found -> $namex lh -$lh");
-					 if ($channelx ne "0")
-					 {
-						Log3($name,5,"Siro_Testgroup: device for group found -> $namex hash -> $lh");
-						push(@groupnames,$namex);
-						push(@grouphash,$lh); # betreffendes hash zur gruppe zufügen
-					 }
-			 }	  
-		}
-		
-		my $hashstring;
-		foreach my $target (@grouphash)
-		{
-			$hashstring=$hashstring.$target.",";
-		}
-		chop($hashstring);
-		$hash->{helper}{affected_devices_h} = "$hashstring";
-		
-		my $devicestring;
-		foreach my $target (@groupnames)
-		{
-			$devicestring=$devicestring.$target.",";
-		}
-		
-		chop($devicestring);
-		$hash->{helper}{affected_devices_n} = $devicestring;
-		
-		return @groupnames;
-	}
-	
+    foreach my $testdevices ( keys %{ $modules{Siro}{defptr} } )    #
+    {
+
+        $testid     = substr( $testdevices, 0, 7 );
+        $testidchan = substr( $testdevices, 7, 1 );
+        Log3( $name, 5,
+"Siro_Testgroup: groupdevice search device $testid -> test device -> $testdevices-$testidchan "
+        );
+        if ( $id eq $testid ) {
+            my $lh       = $modules{Siro}{defptr}{$testdevices};    #def
+            my $namex    = $lh->{NAME};
+            my $channelx = $lh->{CHANNEL};
+            Log3( $name, 5,
+                "Siro_Testgroup: device for group found -> $namex lh -$lh" );
+            if ( $channelx ne "0" ) {
+                Log3( $name, 5,
+"Siro_Testgroup: device for group found -> $namex hash -> $lh"
+                );
+                push( @groupnames, $namex );
+                push( @grouphash, $lh );  # betreffendes hash zur gruppe zufügen
+            }
+        }
+    }
+
+    my $hashstring;
+    foreach my $target (@grouphash) {
+        $hashstring = $hashstring . $target . ",";
+    }
+    chop($hashstring);
+    $hash->{helper}{affected_devices_h} = "$hashstring";
+
+    my $devicestring;
+    foreach my $target (@groupnames) {
+        $devicestring = $devicestring . $target . ",";
+    }
+
+    chop($devicestring);
+    $hash->{helper}{affected_devices_n} = $devicestring;
+
+    return @groupnames;
+}
+
 #############################################
- sub Siro_icon($)
- {
- #return 'fts_shutter_1w_'.(int($state/10)*10);
-	my ($id) = @_;
-	my $lh = $modules{Siro}{defptr}{$id};
-	my $position =$lh->{helper}{position};
- 
- 
- 
- 
- my $xsvg ="<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>
+sub Siro_icon($) {
+
+    #return 'fts_shutter_1w_'.(int($state/10)*10);
+    my ($id)     = @_;
+    my $lh       = $modules{Siro}{defptr}{$id};
+    my $position = $lh->{helper}{position};
+
+    my $xsvg = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
@@ -1952,9 +2085,9 @@ Created by potrace 1.8, written by Peter Selinger 2001-2007
 </svg>
 ";
 
- return $xsvg;
- 
- }
+    return $xsvg;
+
+}
 1;
 
 =pod
