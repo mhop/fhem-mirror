@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  72_FB_CALLMONITOR: reverse search provider klicktel.de is
+                                DEPRECATED and will be removed in a future 
+                                release. please use dasoertliche.de instead.
+                                attribute apiKeyKlicktelDe removed
   - bugfix:  93_DbLog: V3.7.1, fix typo in commandref
   - change:  93_DbRep: V7.5.5, minor corrections in delSeqDoublets
   - change:  72_FB_CALLMONITOR: new attribute apiKeyKlicktelDe and 
