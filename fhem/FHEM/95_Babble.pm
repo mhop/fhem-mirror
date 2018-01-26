@@ -42,7 +42,7 @@ use JSON;      # imports encode_json, decode_json, to_json and from_json.
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.06";
+my $babbleversion    = "1.07";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -1419,7 +1419,7 @@ sub Babble_getdevs($$) {
            $hash->{DATA}{"devcontacts"}{$lbdev}[1] = $fhemdev;
            $hash->{DATA}{"devcontacts"}{$lbdev}[2] = 0;
            $devshash{$lbdev} = 1;
-           if( !defined(@devsalias{$sbdev}) ){
+           if( !defined($devsalias{$sbdev}) ){
              $devsalias{$sbdev}[0]=$ig;
            }else{
              push(@{$devsalias{$sbdev}},$ig);
@@ -1450,10 +1450,10 @@ sub Babble_getdevs($$) {
         $hash->{DATA}{"devcontacts"}{$lbdev}[1] = $fhemdev;
         $hash->{DATA}{"devcontacts"}{$lbdev}[2] = $contact;
         $devshash{$lbdev} = 1;
-        if( !defined(@devsalias{$sbdev}) ){
+        if( !defined($devsalias{$sbdev}) ){
           $devsalias{$sbdev}[0]=$ig;
         }else{
-          push(@{devsalias{$sbdev}},$ig);
+          push(@{$devsalias{$sbdev}},$ig);
         }
         $ig++;
         #-- safeguard against empty device
