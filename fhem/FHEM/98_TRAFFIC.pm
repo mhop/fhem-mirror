@@ -43,6 +43,7 @@
 #   2017-04-21 added buttons to save current map settings, renamed attribute GoogleMapsLocation to GoogleMapsCenter
 #   2017-04-22 v1.3.2 stroke supports weight and opacity, minor fixes
 #   2017-12-51 v1.3.3 catch JSON decode issue, addedn Dbog_splitFn, added reading summary, new attr GoogleMapsFixedMap, net attr alternatives, new reading alternatives, alternatives, lighter&thinner on map
+#   2018-01-26 v1.3.4 fixed Dbog_splitFn, improved exception handling 
 #
 ##############################################################################
 
@@ -59,18 +60,18 @@ use JSON;
 die "MIME::Base64 missing!" unless(eval{require MIME::Base64});
 die "JSON missing!" unless(eval{require JSON});
 
-
 sub TRAFFIC_Initialize($);
 sub TRAFFIC_Define($$);
 sub TRAFFIC_Undef($$);
 sub TRAFFIC_Set($@);
 sub TRAFFIC_Attr(@);
 sub TRAFFIC_GetUpdate($);
+sub TRAFFIC_DbLog_split;
 
 my %TRcmds = (
     'update' => 'noArg',
 );
-my $TRVersion = '1.3.3';
+my $TRVersion = '1.3.4';
 
 sub TRAFFIC_Initialize($){
 
@@ -88,8 +89,8 @@ sub TRAFFIC_Initialize($){
     $data{FWEXT}{"/TRAFFIC"}{FUNC} = "TRAFFIC";
     $data{FWEXT}{"/TRAFFIC"}{FORKABLE} = 1; 
 
-    $hash->{FW_detailFn} = "TRAFFIC_fhemwebFn";
-    $hash->{DbLog_splitFn} = "X_DbLog_split";
+    $hash->{FW_detailFn}   = "TRAFFIC_fhemwebFn";
+    $hash->{DbLog_splitFn} = "TRAFFIC_DbLog_split";
 
 }
 
@@ -520,14 +521,14 @@ sub TRAFFIC_DoUpdate(){
     my $name = $hash->{NAME};
     my ($sec,$min,$hour,$dayn,$month,$year,$wday,$yday,$isdst) = localtime(time);
 
-    Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC_DoUpdate start";
+    Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC DoUpdate start";
 
     if ( $hash->{INTERVAL}) {
         RemoveInternalTimer ($hash);
         my $nextTrigger = gettimeofday() + $hash->{INTERVAL};
         $hash->{TRIGGERTIME}     = $nextTrigger;
         $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
-        InternalTimer($nextTrigger, "TRAFFIC_DoUpdate", $hash, 0);            
+        InternalTimer($nextTrigger, "TRAFFIC_StartUpdate", $hash, 0);
         Log3 $hash, 4, "TRAFFIC: ($name) internal interval timer set to call GetUpdate again in " . int($hash->{INTERVAL}). " seconds";
     }
     
@@ -589,7 +590,6 @@ sub TRAFFIC_DoUpdate(){
         Log3 $hash, 1, "TRAFFIC: ($name) decode_json on googles return failed, cant continue";
         Log3 $hash, 5, "TRAFFIC: ($name) received: ".Dumper($body->decoded_content);
         my %errorReturn = ('status' => 'API error','action' => 'retry');                        
-        #fixme: handle this and schedule a retry        
         return "$name;;;$direction;;;".encode_json(\%errorReturn);
     };
     my $json = decode_json($body->decoded_content);
@@ -658,8 +658,8 @@ sub TRAFFIC_DoUpdate(){
     }
     
     
-    Log3 $hash, 5, "TRAFFIC: ($name) returning from TRAFFIC_DoUpdate: ".encode_json($returnJSON);
-    Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC_DoUpdate done";
+    Log3 $hash, 5, "TRAFFIC: ($name) returning from TRAFFIC DoUpdate: ".encode_json($returnJSON);
+    Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC DoUpdate done";
     return "$name;;;$direction;;;".encode_json($returnJSON);
 }
 
@@ -673,18 +673,19 @@ sub TRAFFIC_FinishUpdate($){
     my $json = decode_json($rawJson);
     
     # before we update anything, check if the status contains error, if yes -> retry
-    if(defined($json->{'status'}) && $json->{'status'} =~ m/error/){
+    if(defined($json->{'status'}) && $json->{'status'} =~ m/error/i){   # this handles potential JSON decode issues and retries
         if ($json->{'action'} eq 'retry'){
-            Log3 $hash, 1, "TRAFFIC: ($name) TRAFFIC_doUpdate returned an error \"".$json->{'status'}. "\" will schedule a retry in 5 seconds";
+            Log3 $hash, 1, "TRAFFIC: ($name) TRAFFIC doUpdate returned an error \"".$json->{'status'}. "\" will schedule a retry in 5 seconds";
             RemoveInternalTimer ($hash);
             my $nextTrigger = gettimeofday() + 5;
             $hash->{TRIGGERTIME}     = $nextTrigger;
             $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
-            InternalTimer($nextTrigger, "TRAFFIC_DoUpdate", $hash, 0);
+            InternalTimer($nextTrigger, "TRAFFIC_StartUpdate", $hash, 0);
         }else{
-            Log3 $hash, 1, "TRAFFIC: ($name) TRAFFIC_doUpdate returned an error: ".$json->{'status'};
+            Log3 $hash, 1, "TRAFFIC: ($name) TRAFFIC doUpdate returned an error: ".$json->{'status'};
         }
-    }else{
+        
+    }else{ #JSON decode did not return an error, lets update the device
     
     Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC_FinishUpdate start";
     readingsBeginUpdate($hash);
@@ -710,10 +711,6 @@ sub TRAFFIC_FinishUpdate($){
             readingsBulkUpdate($hash,$readingName,$readings->{$readingName});
         }
     }
-    
-    if(defined($json->{'READINGS'}->{'status'}) && $json->{'READINGS'}->{'status'} eq 'UNKNOWN_ERROR'){ # UNKNOWN_ERROR indicates a directions request could not be processed due to a server error. The request may succeed if you try again.
-        InternalTimer(gettimeofday() + 3, "TRAFFIC_StartUpdate", $hash, 0); 
-    }
 
     if(my $stateReading = AttrVal($name,"stateReading",undef)){
         Log3 $hash, 5, "TRAFFIC: ($name) stateReading defined, override state";
@@ -724,6 +721,15 @@ sub TRAFFIC_FinishUpdate($){
             Log3 $hash, 1, "TRAFFIC: ($name) stateReading $stateReading not found";
         }
     }
+    # if Google returned an error, we gonna try again in 3 seconds
+    if(defined($json->{'READINGS'}->{'status'}) && $json->{'READINGS'}->{'status'} =~ m/error/i){ # UNKNOWN_ERROR indicates a directions request could not be processed due to a server error. The request may succeed if you try again.
+        Log3 $hash, 1, "TRAFFIC: ($name) auto-retry as Google returned an error: ".$json->{'READINGS'}->{'status'};
+        InternalTimer(gettimeofday() + 3, "TRAFFIC_StartUpdate", $hash, 0); 
+    }elsif(defined($hash->{READINGS}->{'error_message'})){
+        Log3 $hash, 3, "TRAFFIC: ($name) removing reading error_message, status: ".$json->{'READINGS'}->{'status'};
+        fhem("deletereading $name error_message");
+    }
+
     readingsEndUpdate($hash, $dotrigger);
     Log3 $hash, 4, "TRAFFIC: ($name) TRAFFIC_FinishUpdate done";
     Log3 $hash, 5, "TRAFFIC: ($name) Helper: ".Dumper($hash->{helper}); 
@@ -746,6 +752,58 @@ sub TRAFFIC(){
 
     FW_pO $web;
     return ($FW_RETTYPE, $FW_RET);
+}
+
+sub TRAFFIC_DbLog_split($) {
+    my ($event, $device) = @_;
+    my $hash = $defs{$device};
+    Log3 $hash, 5, "TRAFFIC: ($device) TRAFFIC_DbLog_split received event $event on device $device";
+    
+    my $readings;   # this holds all possible readings and their units
+        $readings->{'update'} = 'text';
+        $readings->{'duration'} = 'text';
+        $readings->{'duration_in_traffic'} = 'text';
+        $readings->{'distance'} = 'text';
+        $readings->{'state'} = 'text';
+        $readings->{'status'} = 'text';
+        $readings->{'eta'} = 'time';
+        $readings->{'summary'} = 'text';
+        $readings->{'alternatives'} = 'text';
+        $readings->{'delay'} = 'text';
+        $readings->{'delay_min'} = 'min';
+        $readings->{'error_message'} = 'text';
+        $readings->{'duration_min'} = 'min';
+        $readings->{'duration_in_traffic_min'} = 'min';
+        $readings->{'duration_sec'} = 'sec';
+        $readings->{'duration_in_traffic_sec'} = 'sec';
+        $readings->{'distance'} = 'km';
+        $readings->{'average_duration_min'} = 'min';
+        $readings->{'average_duration_in_traffic_min'} = 'min';
+        $readings->{'average_delay_min'} = 'min';
+        $readings->{'average_duration_min'} = 'min';
+        $readings->{'average_duration_in_traffic_min'} = 'min';
+        $readings->{'average_delay_min'} = 'min';
+
+    my ($reading, $value, $unit) = "";
+
+    my @parts = split(/ /,$event);
+    $reading = shift @parts;
+    $reading =~ tr/://d;
+    $reading =~ s/^return_//;
+    $value = join(" ",@parts);
+    
+    if($readings->{$reading}){
+        $unit = $readings->{$reading};
+        $value =~ s/$unit$//; #try to remove the unit from the value
+    }else{
+        Log3 $hash, 5, "TRAFFIC: ($device) TRAFFIC_DbLog_split auto detect unit for reading $reading value $value";
+        $unit = 'min' if ($reading) =~ m/_min$/;
+        $unit = 'sec' if ($reading) =~ m/_sec$/;
+        $unit = 'km' if ($reading) =~ m/_km$/;
+    }
+    
+    Log3 $hash, 5, "TRAFFIC: ($device) TRAFFIC_DbLog_split returning $reading, $value, $unit";
+    return ($reading, $value, $unit);
 }
 
 sub prettySeconds {
