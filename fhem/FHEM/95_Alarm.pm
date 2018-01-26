@@ -43,7 +43,7 @@ my $alarmlinkname   = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "4.01";
+my $alarmversion    = "4.02";
 
 my %alarm_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -748,10 +748,10 @@ sub Alarm_Arm($$$$$){
    if( ($act eq "arm") && ( $xac ne "armed")  ){
       my $xdl     = AttrVal($name, "armdelay", 0);
       my $cmdwait = AttrVal($name, "armwait", 0);
-      my $cmdact  = AttrVal($name, "armact", 0);
       
       #-- immediate arming
       if( ($xdl eq '')||($xdl eq '0:00')||($xdl eq '00:00')||($evt eq "delay") ){
+         my $cmdact  = AttrVal($name, "armact", 0);
          #-- update state display
          $hash->{DATA}{"armstate"}{"level".$level} = "armed";
          readingsSingleUpdate( $hash, "level".$level,"armed",1 );
@@ -778,20 +778,9 @@ sub Alarm_Arm($$$$$){
          readingsSingleUpdate( $hash, "state", Alarm_getstate($hash)." ".$hash->{READINGS}{"short"}{VAL}, 1 );
          #-- save new state
          Alarm_save($hash);
-         #--transform commands from fhem to perl level
-         my @cmdactarr = split(/;/,$cmdact);
-         my $cmdactf;
-         if( int(@cmdactarr) == 1 ){
-           $cmdactf   = "fhem(\"".$cmdact."\");;";
-         }else{
-           $cmdactf   = '';
-             for(my $i=0;$i<int(@cmdactarr);$i++){
-               $cmdactf.="fhem(\"".$cmdactarr[$i]."\");;";
-           }
-         }
          #-- compose commands TODO
-         $cmd = sprintf("defmod alarm%1d.arm.dly at +00:%02d:%02d {Alarm_Arm(\"%s\",%1d,\"%s\",\"delay\",\"arm\");;%s}",
-            $level,$1,$2,$name,$level,$dev,$cmdactf);
+         $cmd = sprintf("defmod alarm%1d.arm.dly at +00:%02d:%02d {Alarm_Arm(\"%s\",%1d,\"%s\",\"delay\",\"arm\")}",
+            $level,$1,$2,$name,$level,$dev);
          $msg = "[Alarm $level] will be armed from alarmSensor $dev with event $evt, delay $xdl"; 
          #-- define new delayed arm
          fhem($cmd); 
