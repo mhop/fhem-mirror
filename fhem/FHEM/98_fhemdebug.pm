@@ -107,7 +107,7 @@ fhemdebug_memusage($)
   eval "use Devel::Size";
   return $@ if($@);
 
-  my %bl = ("main::modules::MAX"=>1, HTTPMOD=>1);
+  my %bl = ("main::modules::MAX"=>1, HTTPMOD=>1, DbRep=>1);
   $Devel::Size::warn = 0;
   my @param = split(" ", $param);
   my $max = 50;
