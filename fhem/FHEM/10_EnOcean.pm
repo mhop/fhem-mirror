@@ -1,10 +1,14 @@
 ##############################################
 # $Id$
+
 package main;
 
 use strict;
 use warnings;
 my $cryptFunc;
+my $xmlFunc;
+my $xml;
+
 eval "use Crypt::Rijndael";
 if ($@) {
   $cryptFunc = 0;
@@ -16,6 +20,21 @@ if ($@) {
   $cryptFunc = 0;
 } else {
   $cryptFunc = $cryptFunc == 1 ? 1 : 0;
+}
+
+eval "use XML::Simple";
+if ($@) {
+  $xmlFunc = 0;
+} else {
+  $xmlFunc = 1;
+  $xml = new XML::Simple;
+}
+
+eval "use Data::Dumper";
+if ($@) {
+  $xmlFunc = 0;
+} else {
+  $xmlFunc = $xmlFunc == 1 ? 1 : 0;
 }
 
 use SetExtensions;
@@ -366,11 +385,11 @@ my %EnO_eepConfig = (
   "G5.07.01" => {attr => {subType => "occupSensor.01", eep => "A5-07-01", manufID => "00D", model => 'tracker'}, GPLOT => "EnO_motion:Motion,EnO_voltage4current4:Voltage/Current,"},
   "G5.10.12" => {attr => {subType => "roomSensorControl.01", eep => "A5-10-12", manufID => "00D", scaleMax => 40, scaleMin => 0, scaleDecimals => 1}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
-  "H5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "TF", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
+  "H5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
-  "H5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "TF", sensorMode => 'pushbutton', settingAccuracy => "high", teachMethod => "confirm", webCmd => "opens:stop:closes"}},
+  "H5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "Eltako_TF", sensorMode => 'pushbutton', settingAccuracy => "high", teachMethod => "confirm", webCmd => "opens:stop:closes"}},
   "M5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", webCmd => "on:off"}},
-  "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "TF", teachMethod => "confirm", webCmd => "on:off"}},
+  "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off"}},
   "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,"},
   "L6.02.01" => {attr => {subType => "smokeDetector.02", eep => "F6-05-02", manufID => "00D"}},
   "ZZ.ZZ.ZZ" => {attr => {subType => "raw"}},
@@ -398,16 +417,23 @@ my %EnO_extendedRemoteFunctionCode = (
   0x252 => "remoteRepeaterFilter" # set
 );
 
-my @EnO_models = qw (
-  other
-  FAE14 FHK14 FHK61
-  FSA12 FSB14 FSB61 FSB70
-  FSM12 FSM61
-  FT55
-  FTS12
-  TF
-  OEM
-  tracker
+my %EnO_models = (
+  "Eltako_FAE14" => {attr => {manufID => "00D"}},
+  "Eltako_FHK14" => {attr => {manufID => "00D"}},
+  "Eltako_FHK61" => {attr => {manufID => "00D"}},
+  "Eltako_FSA12" => {attr => {manufID => "00D"}},
+  "Eltako_FSB14" => {attr => {manufID => "00D"}},
+  "Eltako_FSB61" => {attr => {manufID => "00D"}},
+  "Eltako_FSB70" => {attr => {manufID => "00D"}},
+  "Eltako_FSM12" => {attr => {manufID => "00D"}},
+  "Eltako_FSM61" => {attr => {manufID => "00D"}},
+  "Eltako_FT55" => {attr => {manufID => "00D"}},
+  "Eltako_FTS12" => {attr => {manufID => "00D"}},
+  "Eltako_TF"=> {attr => {manufID => "00D"}},
+  "Holter_OEM" => {attr => {pidCtrl => "off"}},
+  "Micropelt_MVA004" => {attr => {remoteCode => "FFFFFFFE", remoteEEP => "A5-20-01", remoteID => "getNextID", remoteManagement => "manager"}, xml => {productID => "0x004900000000", xmlDescrLocation => "/FHEM/lib/EnO_ReCom_Device_Descr.xml"}},
+  other => {},
+  tracker => {}
 );
 
 my @EnO_defaultChannel = ("all", "input", 0..29);
@@ -670,7 +696,7 @@ EnOcean_Initialize($)
                       "eep gpDef gwCmd:" . join(",", sort @EnO_gwCmd) . " humitity humidityRefDev " .
                       "keyRcv keySnd macAlgo:no,3,4 measurementCtrl:disable,enable " .
                       "manufID:" . join(",", sort keys %EnO_manuf) . " " .
-                      "model:" . join(",", @EnO_models) . " " .
+                      "model:" . join(",", sort keys %EnO_models) . " " .
                       "observe:on,off observeCmdRepetition:1,2,3,4,5 observeErrorAction observeInterval observeLogic:and,or " .
                       #observeCmds observeExeptions
                       "observeRefDev pidActorErrorAction:errorPos,freeze pidActorCallBeforeSetting pidActorErrorPos " .
@@ -704,6 +730,11 @@ EnOcean_Initialize($)
   } else {
     Log3 undef, 2, "EnOcean Cryptographic functions are not available.";
   }
+  if ($xmlFunc == 1){
+    Log3 undef, 2, "EnOcean XML functions available.";
+  } else {
+    Log3 undef, 2, "EnOcean XML functions are not available.";
+  }
   return undef;
 }
 
@@ -722,7 +753,7 @@ sub EnOcean_Define($$) {
     while (($autocreateName, $autocreateHash) = each(%defs)) {
       last if ($defs{$autocreateName}{TYPE} eq "autocreate");
     }
-    $autocreateDeviceRoom = AttrVal($autocreateName, "device_room", $autocreateDeviceRoom);
+    $autocreateDeviceRoom = AttrVal($autocreateName, "device_room", $autocreateDeviceRoom) if (defined $autocreateName);
     $autocreateDeviceRoom = 'EnOcean' if ($autocreateDeviceRoom eq '%TYPE');
     $autocreateDeviceRoom = $name if ($autocreateDeviceRoom eq '%NAME');
     $autocreateDeviceRoom = AttrVal($name, "room", $autocreateDeviceRoom);
@@ -1004,6 +1035,7 @@ sub EnOcean_Define($$) {
     $hash->{helper}{stopped} = 0;
     #$hash->{helper}{adjust} = '';
   }
+
   # all notifys needed
   #$hash->{NOTIFYDEV} = "global";
   Log3 $name, 5, "EnOcean_define for device $name executed.";
@@ -2741,8 +2773,8 @@ sub EnOcean_Set($@)
         $updateState = 2;
 
       } else {
-        $cmdList .= "setpointTemp:slider,10,1,30 " if (AttrVal($name, "pidCtrl", 'on') eq 'on' || AttrVal($name, "model", '') eq 'OEM');
-        $cmdList .= "setpoint:slider,0,5,100 " if (AttrVal($name, "pidCtrl", 'on') eq 'off' && AttrVal($name, "model", '') ne 'OEM');
+        $cmdList .= "setpointTemp:slider,10,1,30 " if (AttrVal($name, "pidCtrl", 'on') eq 'on' || AttrVal($name, "model", '') eq 'Holter_OEM');
+        $cmdList .= "setpoint:slider,0,5,100 " if (AttrVal($name, "pidCtrl", 'on') eq 'off' && AttrVal($name, "model", '') ne 'Holter_OEM');
         $cmdList .= "runInit:noArg valveCloses:noArg valveOpens:noArg";
         return "Unknown command " . $cmd . ", choose one of " . $cmdList;
       }
@@ -3018,7 +3050,7 @@ sub EnOcean_Set($@)
         if($cmd eq "teach") {
           # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
           #$data = sprintf "%02X000000", $gwCmdID;
-          if ($model eq 'TF') {
+          if ($model =~ m/TF$/) {
             $data = "E0400D80";
           } else {
             $data = "E047FF80";
@@ -3045,7 +3077,7 @@ sub EnOcean_Set($@)
           SetExtensionsCancel($hash);
           $data = sprintf "%02X%04X%02X", $gwCmdID, $time, $setCmd;
         } elsif ($cmd eq "off") {
-          if ($model eq "FSA12") {
+          if ($model =~ m/FSA12$/) {
             $setCmd = 0x0E;
           } else {
             $setCmd = 8;
@@ -3103,7 +3135,7 @@ sub EnOcean_Set($@)
           # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
           #$data = "E047FF80";
           # teach-in Eltako
-          if ($model eq 'TF') {
+          if ($model =~ m/TF$/) {
             $data = "E0400D80";
           } else {
             $data = "02000000";
@@ -5883,8 +5915,8 @@ sub EnOcean_Set($@)
       my $humidityThreshold = ReadingsVal($name, "humidityThreshold", 'default');
       $humidityThreshold = $humidityThreshold eq 'default' ? 127 : $humidityThreshold;
       my $startTimerMode = 0;
-      my $tempThreshold = ReadingsVal($name, "roomTempSet", 'default');;
-      $tempThreshold = $tempThreshold eq 'default' ? 127 : $tempThreshold;
+      my $tempThreshold = ReadingsVal($name, "roomTempSet", 'default');
+      $tempThreshold = $tempThreshold eq 'default' ? 0 : $tempThreshold;
       my $ventilation = 15;
       if ($cmd eq "ventilation") {
         $ventilation = $a[1];
@@ -5973,11 +6005,12 @@ sub EnOcean_Set($@)
         $tempThreshold = $a[1];
         if (defined $tempThreshold) {
           if ($tempThreshold eq 'default') {
-            $tempThreshold = 127;
+            $tempThreshold = 0;
             readingsSingleUpdate($hash, "roomTempSet", 'default', 1);
           } elsif ($tempThreshold =~ m/^[+-]?\d+$/ && $tempThreshold >= - 63 && $tempThreshold <= 63) {
             readingsSingleUpdate($hash, "roomTempSet", $tempThreshold, 1);
-            $tempThreshold = abs($tempThreshold) | 0x40 if ($tempThreshold < 0);
+            $tempThreshold += 64;
+            #$tempThreshold = abs($tempThreshold) | 0x40 if ($tempThreshold < 0);
           } else {
             return "Usage: $cmd variable is wrong, choose default|-63 ... 63." ;
           }
@@ -7075,7 +7108,7 @@ sub EnOcean_Parse($$)
       RemoveInternalTimer($hash->{helper}{alarmTimer});
       InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
 
-    } elsif ($model eq "FAE14" || $model eq "FHK14" || $model eq "FHK61") {
+    } elsif ($model =~ m/FAE14|FHK14|FHK61$/) {
       # heating/cooling relay FAE14, FHK14, untested
       $event = "controllerMode";
       if ($db[0] == 0x30) {
@@ -7200,13 +7233,10 @@ sub EnOcean_Parse($$)
       }
       # released events are disturbing when using a remote, since it overwrites
       # the "real" state immediately. In the case of an Eltako FSB14, FSB61 ...
-      # the state should remain released. (by Thomas)
+      # the state should remain released.
       if ($msg =~ m/released$/ &&
           AttrVal($name, "sensorMode", "switch") ne "pushbutton" &&
-          $model ne "FT55" && $model ne "FSB14" &&
-          $model ne "FSB61" && $model ne "FSB70" &&
-          $model ne "FSM12" && $model ne "FSM61" &&
-          $model ne "FTS12") {
+          $model !~ m/(FT55|FSB14|FSB61|FSB70|FSM12|FSM61|FTS12)$/) {
         $event = "buttons";
         $msg = "released";
       } else {
@@ -10978,16 +11008,20 @@ sub EnOcean_Parse($$)
           CommandDeleteReading(undef, "$name airQuality2");
         }
         my $outdoorTemp = ($db[8] & 0xFE) >> 1;
-        $outdoorTemp -= $outdoorTemp if ($outdoorTemp & 0x40);
+        #$outdoorTemp -= $outdoorTemp if ($outdoorTemp & 0x40);
+        $outdoorTemp -= 64;
         push @event, "3:outdoorTemp:$outdoorTemp";
         my $supplyTemp = ($db[8] & 1) << 6 | ($db[7] & 0xFC) >> 2;
-        $supplyTemp -= $supplyTemp if ($supplyTemp & 0x40);
+        #$supplyTemp -= $supplyTemp if ($supplyTemp & 0x40);
+        $supplyTemp -= 64;
         push @event, "3:supplyTemp:$supplyTemp";
         my $roomTemp = ($db[7] & 3) << 5 | ($db[6] & 0xF8) >> 3;
-        $roomTemp -= $roomTemp if ($roomTemp & 0x40);
+        #$roomTemp -= $roomTemp if ($roomTemp & 0x40);
+        $roomTemp -= 64;
         push @event, "3:roomTemp:$roomTemp";
         my $exhaustTemp = ($db[6] & 7) << 4 | ($db[5] & 0xF0) >> 4;
-        $exhaustTemp -= $exhaustTemp if ($exhaustTemp & 0x40);
+        #$exhaustTemp -= $exhaustTemp if ($exhaustTemp & 0x40);
+        $exhaustTemp -= 64;
         push @event, "3:exhaustTemp:$exhaustTemp";
         push @event, "3:supplyAirFlow:". (($db[5] & 0x0F) << 2 | ($db[4] & 0xFC) >> 2);
         push @event, "3:exhaustAirFlow:" . (($db[4] & 3) << 8 | $db[3]);
@@ -12304,6 +12338,42 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "model") {
+    if (!defined $attrVal){
+
+    } else {
+      # set model specific attributes
+      foreach my $attrCntr (keys %{$EnO_models{$attrVal}{attr}}) {
+        if ($attrCntr eq "remoteID") {
+          if (exists $hash->{DEF}) {
+            $attr{$name}{$attrCntr} = $hash->{DEF};
+          } else {
+            $attr{$name}{$attrCntr} = EnOcean_CheckSenderID($EnO_models{$attrVal}{attr}{$attrCntr}, $hash->{IODev}{NAME}, "00000000");
+          }
+        } else {
+          $attr{$name}{$attrCntr} = $EnO_models{$attrVal}{attr}{$attrCntr};
+        }
+      }
+      if (exists $EnO_models{$attrVal}{xml}) {
+        # read xml device description to $hash->{helper}
+        if ($xmlFunc == 1) {
+          my $xmlFile = $attr{global}{modpath} . $EnO_models{$attrVal}{xml}{xmlDescrLocation};
+          if (-e -f -r $xmlFile) {
+            $hash->{helper} = $xml->XMLin($xmlFile);
+            if (exists $hash->{helper}{Device}) {
+
+            } else {
+              Log3 $name, 2, "EnOcean $name <attr> Device Description not defined";
+            }
+          } else {
+            Log3 $name, 2, "EnOcean $name <attr> Device Description file $xmlFile not exists";
+          }
+        } else {
+          Log3 $name, 2, "EnOcean $name <attr> XML functions are not available";
+        }
+      }
+    }
+
   } elsif ($attrName eq "gpDef") {
     if (!defined $attrVal){
 
@@ -12955,7 +13025,7 @@ sub EnOcean_Notify(@)
       }
       # teach-in response actions
       # delete temporary teach-in response device, see V9333_02
-      #Log3($name, 2, "EnOcean $name <notify> DEFINED $definedName");
+      Log3($name, 2, "EnOcean $name <notify> DEFINED $definedName");
 
     } elsif ($devName eq "global" && $s =~ m/^INITIALIZED$/) {
       # assign remote management defptr
@@ -12977,6 +13047,7 @@ sub EnOcean_Notify(@)
         my @getCmd = ($name, 'state');
         EnOcean_Get($hash, @getCmd);
       }
+      EnOcean_ReadDevDesc(undef, $hash);
       #Log3($name, 2, "EnOcean $name <notify> INITIALIZED");
 
     } elsif ($devName eq "global" && $s =~ m/^REREADCFG$/) {
@@ -12996,6 +13067,7 @@ sub EnOcean_Notify(@)
         }
       }
 
+      EnOcean_ReadDevDesc(undef, $hash);
       #Log3($name, 2, "EnOcean $name <notify> REREADCFG");
 
     } elsif ($devName eq "global" && $s =~ m/^ATTR ([^ ]*) ([^ ]*) ([^ ]*)$/) {
@@ -15162,6 +15234,40 @@ sub EnOcean_setTeachConfirmWaitHash($) {
 }
 
 #
+sub EnOcean_ReadDevDesc($$) {
+  # read xml device description to $hash->{helper}
+  my ($ctrl, $hash) = @_;
+  my $name = $hash->{NAME};
+  if ($xmlFunc == 0) {
+    Log3 $name, 2, "EnOcean $name XML functions are not available";
+    return;
+  }
+  if (exists($hash->{TYPE}) && $hash->{TYPE} eq 'EnOcean' && exists($attr{$name}{model})) {
+    if (exists $EnO_models{$attr{$name}{model}}) {
+      if (exists $EnO_models{$attr{$name}{model}}{xml}{xmlDescrLocation}) {
+        my $xmlFile = $attr{global}{modpath} . $EnO_models{$attr{$name}{model}}{xml}{xmlDescrLocation};
+        if (-e -f -r $xmlFile) {
+          my $xmlData = $xml->XMLin($xmlFile);
+          $hash->{helper} = $xmlData;
+          if (exists $xmlData->{Device}) {
+            Log3 $name, 5, "EnOcean $name Beginn Device Description";
+            Log3 $name, 5, "###";
+            Log3 $name, 5, Dumper($xmlData);
+            Log3 $name, 5, "###";
+            Log3 $name, 5, "EnOcean $name End Device Description";
+          } else {
+            Log3 $name, 2, "EnOcean $name Device Description not defined";
+          }
+        } else {
+          Log3 $name, 2, "EnOcean $name Device Description file $xmlFile not exists";
+        }
+      }
+    }
+  }
+  return;
+}
+
+#
 sub EnOcean_helperClear($) {
   my ($functionHash) = @_;
   my $function = $functionHash->{function};
@@ -17006,7 +17112,7 @@ EnOcean_Delete($$)
     created by autocreate. To control the device, it must be bidirectional paired,
     see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.<br>
     The OEM version of the Holter SmartDrive MX has an internal PID controller. This function is activated by
-    attr <device> model OEM and attr <device> pidCtrl off.<br>
+    attr <device> model Holter_OEM and attr <device> pidCtrl off.<br>
     The command is not sent until the device wakes up and sends a message, usually
     every 5 minutes.
     </li>
@@ -17129,7 +17235,7 @@ EnOcean_Delete($$)
         The attr subType must be gateway and gwCmd must be switching. This is done if the device was
         created by autocreate.<br>
         For Eltako devices attributes must be set manually. For Eltako FSA12 attribute model must be set
-        to FSA12.
+        to Eltako_FSA12.
      </li>
      <br><br>
 
@@ -17392,7 +17498,7 @@ EnOcean_Delete($$)
       <a href="#shutTime">shutTime</a> and <a href="#shutTimeCloses">shutTimeCloses</a>,
       are set correctly.
       If <a href="#EnOcean_settingAccuracy">settingAccuracy</a> is set to high, the run-time is sent in 1/10 increments.<br>
-      Set attr subType to manufProfile, manufID to 00D and attr model to FSB14|FSB61|FSB70|TF manually.<br>
+      Set attr subType to manufProfile, manufID to 00D and attr model to Eltako_FSB14|FSB61|FSB70|TF manually.<br>
       Use the sensor type "Szenentaster/PC" for Eltako devices.
     </li>
     <br><br>
@@ -18647,7 +18753,7 @@ EnOcean_Delete($$)
          <li>state: &lt;BtnX&gt;[,&lt;BtnY&gt;] [released]</li>
      </ul><br>
          The status of the device may become "released", this is not the case for a normal switch.<br>
-         Set attr model to FT55|FSM12|FSM61|FTS12 or attr sensorMode to pushbutton manually.
+         Set attr model to Eltako_FT55|FSM12|FSM61|FTS12 or attr sensorMode to pushbutton manually.
      </li>
      <br><br>
 
@@ -18701,7 +18807,7 @@ EnOcean_Delete($$)
          <li>energyHoldOff: normal|holdoff</li>
          <li>buttons: pressed|released</li>
      </ul><br>
-        Set attr subType to switch and model to FAE14|FHK14 manually. In addition
+        Set attr subType to switch and model to Eltako_FAE14|FHK14 manually. In addition
         every telegram received from a teached-in temperature sensor (e.g. FTR55H)
         is repeated as a confirmation telegram from the Heating/Cooling Relay
         FAE14, FHK14. In this case set attr subType to e. g. roomSensorControl.05
@@ -20030,7 +20136,7 @@ EnOcean_Delete($$)
         if the command position is sent or the reading state was changed
         manually to open or closed.<br>
         Set attr subType file, attr manufID to 00D and attr model to
-        FSB14|FSB61|FSB70 manually.
+        Eltako_FSB14|FSB61|FSB70 manually.
      </li>
      <br><br>
 
