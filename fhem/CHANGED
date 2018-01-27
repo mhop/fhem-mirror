@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: attr: -a and -r Options added (Forum #83414)
   - feature: 20_FRM_IN: added Firmata 2.5 feature PIN_MODE_PULLUP
                         note: requires perl-firmata 0.64
   - change:  74_Unifi: SSIDs-Readings and drop-downs use goodReadingName()
