@@ -235,7 +235,7 @@ FW_Define($$)
   my ($hash, $def) = @_;
   my ($name, $type, $port, $global) = split("[ \t]+", $def);
   return "Usage: define <name> FHEMWEB [IPV6:]<tcp-portnr> [global]"
-        if($port !~ m/^(IPV6:)?\d+$/ || ($global && $global ne "global"));
+        if($port !~ m/^(IPV6:)?\d+$/);
 
   FW_Undef($hash, undef) if($hash->{OLDDEF}); # modify
 
@@ -3259,11 +3259,11 @@ FW_widgetOverride($$)
   <a name="FHEMWEBdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FHEMWEB &lt;tcp-portnr&gt; [global]</code>
+    <code>define &lt;name&gt; FHEMWEB &lt;tcp-portnr&gt; [global|IP]</code>
     <br><br>
     Enable the webfrontend on port &lt;tcp-portnr&gt;. If global is specified,
     then requests from all interfaces (not only localhost / 127.0.0.1) are
-    serviced.<br>
+    serviced. If IP is specified, then FHEMWEB will only listen on this IP.<br>
     To enable listening on IPV6 see the comments <a href="#telnet">here</a>.
     <br>
   </ul>
@@ -3946,11 +3946,12 @@ FW_widgetOverride($$)
   <a name="FHEMWEBdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FHEMWEB &lt;tcp-portnr&gt; [global]</code>
+    <code>define &lt;name&gt; FHEMWEB &lt;tcp-portnr&gt; [global|IP]</code>
     <br><br>
     Aktiviert das Webfrontend auf dem Port &lt;tcp-portnr&gt;. Mit dem
     Parameter global werden Anfragen von allen Netzwerkschnittstellen
-    akzeptiert (nicht nur vom localhost / 127.0.0.1) .  <br>
+    akzeptiert (nicht nur vom localhost / 127.0.0.1). Falls IP angegeben wurde,
+    dann werden nur Anfragen an diese IP Adresse akzeptiert.  <br>
 
     Informationen f&uuml;r den Betrieb mit IPv6 finden Sie <a
     href="#telnet">hier</a>.<br>
