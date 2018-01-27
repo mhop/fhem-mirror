@@ -103,7 +103,7 @@ FHEM/19_VBUSIF.pm            Tobias/pejonp        Sonstige Systeme
 FHEM/20_FRM_AD.pm            jensb                Sonstige Systeme
 FHEM/20_FRM_ROTENC.pm        ntruchsess           Sonstige Systeme
 FHEM/20_FRM_I2C.pm           ntruchsess           Sonstige Systeme
-FHEM/20_FRM_IN.pm            ntruchsess           Sonstige Systeme
+FHEM/20_FRM_IN.pm            jensb                Sonstige Systeme
 FHEM/20_FRM_LCD.pm           ntruchsess           Sonstige Systeme (deprecated)
 FHEM/20_FRM_OUT.pm           jensb                Sonstige Systeme
 FHEM/20_FRM_PWM.pm           jensb                Sonstige Systeme
