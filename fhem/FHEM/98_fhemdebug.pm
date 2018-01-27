@@ -107,67 +107,53 @@ fhemdebug_memusage($)
   eval "use Devel::Size";
   return $@ if($@);
 
-  my %bl = ("main::modules::MAX"=>1, HTTPMOD=>1, DbRep=>1);
   $Devel::Size::warn = 0;
   my @param = split(" ", $param);
   my $max = 50;
   my $re;
   $max = pop(@param) if(@param > 1 && $param[$#param] =~ m/^\d+$/);
   $re  = pop(@param) if(@param > 1);
-
   my %ts;
-  my $collectSize = sub($$$)
+  my %mh = (defs=>1, modules=>1, selectlist=>1, attr=>1, readyfnlist=>1);
+
+  my $collectSize = sub($$$$)
   {
-    my ($fn, $h, $mname) = @_;
-    return if($h->{__IN__CS__}); # save us from endless recursion
+    my ($fn, $h, $mname,$cleanUp) = @_;
+    return 0 if($h->{__IN__CS__}); # save us from endless recursion
+    return 0 if($h->{__IN__CSS__} && !$cleanUp);
+    $h->{__IN__CSS__} = 1 if(!$cleanUp);
     $h->{__IN__CS__} = 1;
-    eval {
-      foreach my $n (keys %$h) {
-        next if(!$n || $n =~ m/^[^A-Za-z]$/);
-        if($n =~ m/::$/) {
-          $fn->($fn, $h->{$n}, "$mname$n");
-          next;
-        }
-        next if(main->can("$mname$n")); # functions
+    my $sum = 0;
+    foreach my $n (sort keys %$h) {
+      next if(!$n || $n =~ m/^[^A-Za-z]$/ || $n eq "__IN__CS__");
 
-        if($mname eq "main::" && 
-          ($n eq "modules" || $n eq "defs" || $n eq "readyfnlist" ||
-           $n eq "selectlist" || $n eq "intAt" || $n eq "attr" ||
-           $n eq "ntfyHash")) {
-          for my $mn (keys %{$main::{$n}}) {
-            my $name = "$mname${n}::$mn";
-            if($mname eq "main::" && $n eq "defs" && $bl{$defs{$mn}{TYPE}}) {
-              Log 5, "$name TYPE on the blackList, skipping it";
-              next;
-            }
-            if($bl{$name}) {
-              Log 5, "$name on the blackList, skipping it";
-              next;
-            }
-            Log 5, $name;       # Crash-debugging
-            $ts{$name} = Devel::Size::total_size($main::{$n}{$mn});
-          }
-          
-        } else {
-          my $name = "$mname$n";
-          if($bl{$name}) {
-            Log 5, "$name (on the blackList, skipping it)";
-            next;
-          }
-          Log 5, $name;       # Crash-debugging
-          $ts{$name} = Devel::Size::total_size($h->{$n});
+      my $ref = ref $h->{$n};
+      my $name = ($mname eq "main::" ? "$mname$n" : "${mname}::$n");
+      $ref = "HASH" if(!$ref && $mname eq "main::" && $mh{$n});
+      next if($n eq "main::" || $n eq "IODev" || 
+              $ref eq "CODE" || main->can("$mname$n"));
+      Log 5, " CHECK $name / $mname / $n / $ref";     # Crash-debugging
+      if($ref eq "HASH") {
+        $sum += $fn->($fn, $h->{$n}, $name, $cleanUp); 
 
-        }
+      } else {
+        my $sz = Devel::Size::size($h->{$n});
+        $ts{$name} = $sz if(!$cleanUp);
+        $sum += $sz;
       }
-    };
-    delete $h->{__IN__CS__};
-    Log 1, "collectSize $mname: $@" if($@);
+    }
+    delete($h->{__IN__CS__});
+    delete($h->{__IN__CSS__}) if($cleanUp);
+    $sum += Devel::Size::size($h);
+    $ts{$mname} = $sum if($mname ne "main::" && !$cleanUp);
+    return $sum;
   };
-  $collectSize->($collectSize, \%main::, "main::");
+  $collectSize->($collectSize, \%main::, "main::", 0);
+  $collectSize->($collectSize, \%main::, "main::", 1);
 
   my @sts = sort { $ts{$b} <=> $ts{$a} } keys %ts;
   my @ret;
-  for(my $i=0; $i < int(@sts); $i++) {
+  for(my $i=0; $i < @sts; $i++) {
     next if($re && $sts[$i] !~ m/$re/);
     push @ret, sprintf("%4d. %-30s %8d", $i+1,substr($sts[$i],6),$ts{$sts[$i]});
     last if(@ret >= $max);
@@ -206,13 +192,14 @@ fhemdebug_memusage($)
       <ul>
       <li>this function depends on the Devel::Size module, so this must be
         installed first.</li>
-      <li>The used function Devel::Size::total_size crashes perl (and FHEM) for
+      <li>The used function Devel::Size::size may crash perl (and FHEM) for
         functions and some other data structures. memusage tries to avoid to
         call it for such data structures, but as the problem is not identified,
         it may crash your currently running instance. It works for me, but make
         sure you saved your fhem.cfg before calling it.</li>
-      <li>The known data structures modules and defs are reported in more
-        detail.</li>
+      <li>To avoid the crash, the size of same data is not computed, so the
+        size reported is probably inaccurate, it should only be used as a hint.
+        </li>
       </ul>
     </li>
   </ul>
