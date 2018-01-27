@@ -208,6 +208,10 @@ $(document).ready(function(){
   if(location.hash)
     loadOneDoc(location.hash.substr(1), fd_lang);
 
+  $(window).bind('hashchange', function() {
+    loadOneDoc(location.hash.substr(1), fd_lang);
+  });
+
   $("a[name=loadAll]").show().click(function(e){
     e.preventDefault();
     $("a[name=loadAll]").hide();
