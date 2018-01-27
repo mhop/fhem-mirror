@@ -3,6 +3,7 @@
 #
 #     98_Heating_Control.pm
 #     written by Dietmar Ortmann
+#     Maintained by igami since 02-2018
 #
 #     This file is part of fhem.
 #
@@ -36,7 +37,7 @@ sub Heating_Control_Initialize($)
 
 # Consumer
   $hash->{SetFn}   = "Heating_Control_Set";
-  $hash->{AttrFn}  = "Heating_Control_Attr";  
+  $hash->{AttrFn}  = "Heating_Control_Attr";
   $hash->{DefFn}   = "Heating_Control_Define";
   $hash->{UndefFn} = "Heating_Control_Undef";
   $hash->{GetFn}   = "Heating_Control_Get";
@@ -47,21 +48,21 @@ sub Heating_Control_Initialize($)
 ################################################################################
 sub Heating_Control_Set($@) {
   my ($hash, @a) = @_;
- 
+
   return "no set value specified" if(int(@a) < 2);
   return "Unknown argument $a[1], choose one of enable disable " if($a[1] eq "?");
-  
+
   my $name = shift @a;
   my $v = join(" ", @a);
 
   Log3 $hash, 3, "[$name] set $name $v";
-  
+
   if      ($v eq "enable") {
-     fhem("attr $name disable 0"); 
+     fhem("attr $name disable 0");
   } elsif ($v eq "disable") {
-     fhem("attr $name disable 1"); 
+     fhem("attr $name disable 1");
   }
-  return undef;  
+  return undef;
 }
 ########################################################################
 sub Heating_Control_Get($@) {
@@ -92,8 +93,8 @@ sub Heating_Control_SetTimerOfDay($) {
 ########################################################################
 sub Heating_Control_Attr($$$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
-  
-  WeekdayTimer_Attr($cmd, $name, $attrName, $attrVal);  
+
+  WeekdayTimer_Attr($cmd, $name, $attrName, $attrVal);
   return undef;
 }
 ########################################################################
@@ -101,15 +102,15 @@ sub Heating_Control_SetTimer($) {
   my ($hash) = @_;
   WeekdayTimer_DeleteTimer($hash);
   WeekdayTimer_SetTimer($hash);
-}  
+}
 ########################################################################
 sub Heating_Control_SetTemp($) {
   my ($name) = @_;
-  
+
   my $hash = $modules{Heating_Control}{defptr}{$name};
   if(defined $hash) {
      Heating_Control_SetTimer($hash);
-  }   
+  }
 }
 ########################################################################
 sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
@@ -170,12 +171,12 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
     <ul><b>profile</b><br>
       Define the weekly profile. All timings are separated by space. A switchingtime is defined
       by the following example: <br><br>
-      
+
       <ul><b>[&lt;weekdays&gt;|]&lt;time&gt;|&lt;parameter&gt;</b></ul><br>
-      
+
       <u>weekdays:</u> optional, if not set every day of the week is used.<br>
         Otherwise you can define a day with its number or its shortname.<br>
-        <ul> 
+        <ul>
         <li>0,su  sunday</li>
         <li>1,mo  monday</li>
         <li>2,tu  tuesday</li>
@@ -236,26 +237,26 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         <code>define HeizStatus2 notify Heating:. * {Heating_Control_SetAllTemps()}</code>
         <br><p>
         Some definitions without comment:
-        <code><pre> 
-        define hc    Heating_Control  HeizungKueche de        7|23:35|25        34|23:30|22 23:30|16 23:15|22     8|23:45|16 
-        define hc    Heating_Control  HeizungKueche de        fr,$we|23:35|25   34|23:30|22 23:30|16 23:15|22    12|23:45|16  
-        define hc    Heating_Control  HeizungKueche de        20:35|25          34|14:30|22 21:30|16 21:15|22    12|23:00|16 
-        
-        define hw    Heating_Control  HeizungKueche de        mo-so, $we|{sunrise_abs_dat($date)}|18      mo-so, $we|{sunset_abs_dat($date)}|22  
-        define ht    Heating_Control  HeizungKueche de        mo-so,!$we|{sunrise_abs_dat($date)}|18      mo-so,!$we|{sunset_abs_dat($date)}|22 
-        
-        define hh    Heating_Control  HeizungKueche de        {sunrise_abs_dat($date)}|19           {sunset_abs_dat($date)}|21  
-        define hx    Heating_Control  HeizungKueche de        22:35|25  23:00|16    
-        </code></pre>
-        
-        the list of days can be set globaly for the whole  Heating_Control:<p>
-        
         <code><pre>
-        define HeizungWohnen_an_wt    Heating_Control HeizungWohnen de  !$we     09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   $we     09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   78      09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   57      09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de  fr,$we   09:00|19  (heizungAnAus("Ein"))  
+        define hc    Heating_Control  HeizungKueche de        7|23:35|25        34|23:30|22 23:30|16 23:15|22     8|23:45|16
+        define hc    Heating_Control  HeizungKueche de        fr,$we|23:35|25   34|23:30|22 23:30|16 23:15|22    12|23:45|16
+        define hc    Heating_Control  HeizungKueche de        20:35|25          34|14:30|22 21:30|16 21:15|22    12|23:00|16
+
+        define hw    Heating_Control  HeizungKueche de        mo-so, $we|{sunrise_abs_dat($date)}|18      mo-so, $we|{sunset_abs_dat($date)}|22
+        define ht    Heating_Control  HeizungKueche de        mo-so,!$we|{sunrise_abs_dat($date)}|18      mo-so,!$we|{sunset_abs_dat($date)}|22
+
+        define hh    Heating_Control  HeizungKueche de        {sunrise_abs_dat($date)}|19           {sunset_abs_dat($date)}|21
+        define hx    Heating_Control  HeizungKueche de        22:35|25  23:00|16
+        </code></pre>
+
+        the list of days can be set globaly for the whole  Heating_Control:<p>
+
+        <code><pre>
+        define HeizungWohnen_an_wt    Heating_Control HeizungWohnen de  !$we     09:00|19  (heizungAnAus("Ein"))
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   $we     09:00|19  (heizungAnAus("Ein"))
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   78      09:00|19  (heizungAnAus("Ein"))
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   57      09:00|19  (heizungAnAus("Ein"))
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de  fr,$we   09:00|19  (heizungAnAus("Ein"))
         </code></pre>
 
       An example to be able to temporarily boost the temperature for one hour:
@@ -267,9 +268,9 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
       define HeatingBath_Boost dummy
       attr HeatingBath_Boost setList state:0,23,24,25
       attr HeatingBath_Boost webCmd state
-      define di_ResetBoostBath DOIF ([HeatingBath_Boost] > 0) 
-         ({Heating_Control_SetAllTemps()}, defmod di_ResetBoostBath_Reset at +01:00:00 set HeatingBath_Boost 0) 
-        DOELSE 
+      define di_ResetBoostBath DOIF ([HeatingBath_Boost] > 0)
+         ({Heating_Control_SetAllTemps()}, defmod di_ResetBoostBath_Reset at +01:00:00 set HeatingBath_Boost 0)
+        DOELSE
          ({Heating_Control_SetAllTemps()})
       attr di_ResetBoostBath do always
       </code></pre>
@@ -288,7 +289,7 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
       </code></pre>
       Now you can set "HeatingBath_Boost" in the web interface for a one-hour boost of 3 degrees in the bath.
       (you can trigger that using the PRESENCE function using your girlfriend's device... grin).
-      
+
       Easy to extend this with a vacation timer using another dummy variable, here <code>VacationTemp</code>.<br>
       Then you can use the command
       <code>defmod defVacationEnd at 2016-12-30T00:00:00 set VacationTemp off, {Heating_Control_SetAllTemps()}</code>
@@ -308,7 +309,7 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
       }
       </code></pre>
       Pray that the device does not restart during your vacation, as the <code>define defVacationEnd ... at </code> is volatile and will be lost at restart!
-                
+
     </ul>
   </ul>
 
@@ -321,32 +322,32 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
   <a name="Heating_ControlLogattr"></a>
   <b>Attributes</b>
   <ul>
-    <li>delayedExecutionCond <br> 
-    defines a delay Function. When returning true, the switching of the device is delayed until the function retruns a false value. The behavior is just like a windowsensor. 
-   
+    <li>delayedExecutionCond <br>
+    defines a delay Function. When returning true, the switching of the device is delayed until the function retruns a false value. The behavior is just like a windowsensor.
+
     <br><br>
     <b>Example:</b>
     <pre>
-    attr hc delayedExecutionCond isDelayed("%HEATING_CONTROL","%WEEKDAYTIMER","%TIME","%NAME","%EVENT")  
+    attr hc delayedExecutionCond isDelayed("%HEATING_CONTROL","%WEEKDAYTIMER","%TIME","%NAME","%EVENT")
     </pre>
     the parameters %HEATING_CONTROL(timer name) %TIME %NAME(device name) %EVENT are replaced at runtime by the correct value.
 
     <br><br>
-    <b>Example of a function:</b>    
+    <b>Example of a function:</b>
     <pre>
     sub isDelayed($$$$$) {
        my($hc, $wdt, $tim, $nam, $event ) = @_;
-       
+
        my $theSunIsStillshining = ...
-    
-       return ($tim eq "16:30" && $theSunIsStillshining) ;    
+
+       return ($tim eq "16:30" && $theSunIsStillshining) ;
     }
-    </pre>        
+    </pre>
     </li>
-    <li>switchInThePast<br> 
+    <li>switchInThePast<br>
     defines that the depending device will be switched in the past in definition and startup phase when the device is not recognized as a heating.
     Heatings are always switched in the past.
-    </li>    
+    </li>
 
     <li><a href="#disable">disable</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
@@ -404,19 +405,19 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
       <u>Wochentage:</u> optionale Angabe, falls nicht gesetzt wird der Schaltpunkt jeden Tag ausgef&uumlhrt.
         F&uumlr die Tage an denen dieser Schaltpunkt aktiv sein soll, ist jeder Tag mit seiner
         Tagesnummer (Mo=1, ..., So=0) oder Name des Tages (Mo, Di, ..., So) einzusetzen.<br><br>
-        <ul> 
+        <ul>
         <li>0,so  Sonntag</li>
         <li>1,mo  Montag</li>
         <li>2,di  Dienstag</li>
         <li>3,mi  Mittwoch</li>
         <li>4 ...</li>
         <li>7,$we  Wochenende  ($we)</li>
-        <li>8,!$we Wochentag  (!$we)</li> 
+        <li>8,!$we Wochentag  (!$we)</li>
         </ul><br>
-         Es ist m&oumlglich $we or !$we in der Tagesliste zu definieren. 
+         Es ist m&oumlglich $we or !$we in der Tagesliste zu definieren.
          So ist es auf einfache Art m&oumlglich die Schaltzeitpunkte f&uumlr das Wochenende oder Wochetage zu definieren.
-         $we und!$we werden als 7 bzw. 8 spezifiziert, wenn die numerische Variante der Tagesliste gew&aumlhlt wird.<br><br> 
-      <u>Uhrzeit:</u>Angabe der Uhrzeit zu der geschaltet werden soll, Format: HH:MM:[SS](HH im 24 Stunden Format) oder eine Perlfunction wie {sunrise_abs()}. 
+         $we und!$we werden als 7 bzw. 8 spezifiziert, wenn die numerische Variante der Tagesliste gew&aumlhlt wird.<br><br>
+      <u>Uhrzeit:</u>Angabe der Uhrzeit zu der geschaltet werden soll, Format: HH:MM:[SS](HH im 24 Stunden Format) oder eine Perlfunction wie {sunrise_abs()}.
       In {} kannst du die Variable $date(epoch) nutzen, um die Schaltzeiten der Woche zu berechnen. Beispiel: {sunrise_abs_dat($date)}<br><br>
 
       <u>Parameter:</u>Angabe der zu setzenden Temperatur als Zahl mit Format 99.9 oder als symbolische Konstante <b>eco</b>
@@ -468,24 +469,24 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         <code>define HeizStatus2            notify Heizung:.*                          {Heating_Control_SetAllTemps()}</code>
         <br><p>
         Einige Definitionen ohne weitere Erkl&aumlrung:
-        <code><pre> 
-        define hc    Heating_Control  HeizungKueche de        7|23:35|25        34|23:30|22 23:30|16 23:15|22     8|23:45|16 
-        define hc    Heating_Control  HeizungKueche de        fr,$we|23:35|25   34|23:30|22 23:30|16 23:15|22    12|23:45|16  
-        define hc    Heating_Control  HeizungKueche de        20:35|25          34|14:30|22 21:30|16 21:15|22    12|23:00|16 
-        
-        define hw    Heating_Control  HeizungKueche de        mo-so, $we|{sunrise_abs_dat($date)}|18      mo-so, $we|{sunset_abs_dat($date)}|22  
-        define ht    Heating_Control  HeizungKueche de        mo-so,!$we|{sunrise_abs_dat($date)}|18      mo-so,!$we|{sunset_abs_dat($date)}|22 
-        
-        define hh    Heating_Control  HeizungKueche de        {sunrise_abs_dat($date)}|19           {sunset_abs_dat($date)}|21  
-        define hx    Heating_Control  HeizungKueche de        22:35|25  23:00|16    
+        <code><pre>
+        define hc    Heating_Control  HeizungKueche de        7|23:35|25        34|23:30|22 23:30|16 23:15|22     8|23:45|16
+        define hc    Heating_Control  HeizungKueche de        fr,$we|23:35|25   34|23:30|22 23:30|16 23:15|22    12|23:45|16
+        define hc    Heating_Control  HeizungKueche de        20:35|25          34|14:30|22 21:30|16 21:15|22    12|23:00|16
+
+        define hw    Heating_Control  HeizungKueche de        mo-so, $we|{sunrise_abs_dat($date)}|18      mo-so, $we|{sunset_abs_dat($date)}|22
+        define ht    Heating_Control  HeizungKueche de        mo-so,!$we|{sunrise_abs_dat($date)}|18      mo-so,!$we|{sunset_abs_dat($date)}|22
+
+        define hh    Heating_Control  HeizungKueche de        {sunrise_abs_dat($date)}|19           {sunset_abs_dat($date)}|21
+        define hx    Heating_Control  HeizungKueche de        22:35|25  23:00|16
         </code></pre>
         Die Tagesliste kann global f&uumlr das ganze Heating_Control angegeben werden:<p>
         <code><pre>
-        define HeizungWohnen_an_wt    Heating_Control HeizungWohnen de  !$we     09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   $we     09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   78      09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   57      09:00|19  (heizungAnAus("Ein"))  
-        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de  fr,$we   09:00|19  (heizungAnAus("Ein"))  
+        define HeizungWohnen_an_wt    Heating_Control HeizungWohnen de  !$we     09:00|19  (heizungAnAus("Ein"))
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   $we     09:00|19  (heizungAnAus("Ein"))
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   78      09:00|19  (heizungAnAus("Ein"))
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   57      09:00|19  (heizungAnAus("Ein"))
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de  fr,$we   09:00|19  (heizungAnAus("Ein"))
         </code></pre>
 
        es ist möglich den Parameter als Perlcode zu spezifizieren:<p>
@@ -493,12 +494,12 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         ...   7|23:35|{getParameter(13,"this")}   7|23:36|{getParameter(14,"that")}
         </code></pre>
         ein detailiertes Beispiel ist in Heating_Control(EN) beschrieben<p>
-        
+
     </ul>
   </ul>
 
   <a name="Heating_Controlset"></a>
-  <b>Set</b> 
+  <b>Set</b>
 
     <code><b><font size="+1">set &lt;name&gt; &lt;value&gt;</font></b></code>
     <br><br>
@@ -513,7 +514,7 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
       <code>set hc disable</code><br>
       <code>set hc enable</code><br>
     </ul>
-  </ul>  
+  </ul>
 
   <a name="Heating_Controlget"></a>
   <b>Get</b> <ul>N/A</ul><br>
@@ -522,33 +523,33 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
   <b>Attributes</b>
   <ul>
     <li>delayedExecutionCond <br>
-    definiert eine Veroegerungsfunktion. Wenn die Funktion wahr liefert, wird die Schaltung des Geraets solage verzoegert, bis die Funktion wieder falsch liefert. Das Verhalten entspricht einem Fensterkontakt. 
-    
+    definiert eine Veroegerungsfunktion. Wenn die Funktion wahr liefert, wird die Schaltung des Geraets solage verzoegert, bis die Funktion wieder falsch liefert. Das Verhalten entspricht einem Fensterkontakt.
+
     <br><br>
-    <b>Beispiel:</b>    
+    <b>Beispiel:</b>
     <pre>
-    attr wd delayedExecutionCond isDelayed("$HEATING_CONTROL","$WEEKDAYTIMER","$TIME","$NAME","$EVENT")  
+    attr wd delayedExecutionCond isDelayed("$HEATING_CONTROL","$WEEKDAYTIMER","$TIME","$NAME","$EVENT")
     </pre>
     Die Parameter $HEATING_CONTROL(timer Name) $TIME $NAME(device Name) $EVENT werden zur Laufzeit durch die echten Werte ersetzt.
-    
+
     <br><br>
-    <b>Beispielfunktion:</b>    
+    <b>Beispielfunktion:</b>
     <pre>
     sub isDelayed($$$$$) {
        my($hc, $wdt, $tim, $nam, $event ) = @_;
-       
+
        my $theSunIsStillshining = ...
-    
-       return ($tim eq "16:30" && $theSunIsStillshining) ;    
+
+       return ($tim eq "16:30" && $theSunIsStillshining) ;
     }
-    </pre>        
+    </pre>
     </li>
-    <li>switchInThePast<br> 
+    <li>switchInThePast<br>
     Definiert, dass ein abh&aumlngiges Ger&aumlt in der Start- oder Definitionsphase mit einem Wert aus der Vergangheit geschaltet wird auch wenn das Ger&aumlt nicht als Heizung erkannt wurde.
     Heizungen werden immer mit einem Wert aus der Vergangenheit geschaltet.
-    </li>    
+    </li>
 
-    
+
     <li><a href="#disable">disable</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
@@ -558,4 +559,3 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
 
 =end html_DE
 =cut
-

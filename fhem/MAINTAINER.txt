@@ -33,7 +33,7 @@ FHEM/00_NetzerI2C.pm         klausw               Sonstige Systeme
 FHEM/00_OWX.pm               pahenning            1Wire
 FHEM/00_OWX_ASYNC            ntruchsess           1Wire
 FHEM/00_RPII2C               klausw               Einplatinencomputer
-FHEM/00_SIGNALduino.pm       Sidey           	  Sonstige Systeme
+FHEM/00_SIGNALduino.pm       Sidey                Sonstige Systeme
 FHEM/00_SONOS.pm             Reinerlein           Multimedia
 FHEM/00_TCM.pm               klaus-schauer        EnOcean
 FHEM/00_THZ.pm               immiimmi             Heizungssteuerung/Raumklima
@@ -272,7 +272,7 @@ FHEM/57_CALVIEW.pm           chris1284            Unterstuetzende Dienste/Kalend
 FHEM/59_HCS.pm               hjr                  Automatisierung (oder auch PM)
 FHEM/59_LuftdatenInfo        igami                Bastelecke
 FHEM/59_OPENWEATHER.pm       tupol                Unterstuetzende Dienste/Wettermodule (Link als PM an tupol)
-FHEM/59_Twilight.pm          dietmar63            Unterstuetzende Dienste/Wettermodule
+FHEM/59_Twilight.pm          igami                Unterstuetzende Dienste/Wettermodule
 FHEM/59_PROPLANTA.pm         tupol                Unterstuetzende Dienste/Wettermodule (Link als PM an tupol)
 FHEM/59_WWO.pm               baumrasen            Unterstuetzende Dienste/Wettermodule
 FHEM/59_Weather.pm           neubert              Unterstuetzende Dienste/Wettermodule
@@ -414,7 +414,7 @@ FHEM/98_EDIPLUG.pm           Wzut                 Sonstige Systeme
 FHEM/98_FReplacer.pm         stefanstrobel        Sonstiges
 FHEM/98_GEOFANCY.pm          loredo               Unterstuetzende Dienste
 FHEM/98_HMinfo.pm            martinp876           HomeMatic
-FHEM/98_Heating_Control.pm   dietmar63            Unterstuetzende Dienste
+FHEM/98_Heating_Control.pm   igami                Unterstuetzende Dienste
 FHEM/98_HTTPMOD.pm           stefanstrobel        Sonstiges
 FHEM/98_Arducounter.pm       stefanstrobel        Sonstiges
 FHEM/98_Hyperion.pm          DeeSPe               Beleuchtung
@@ -426,14 +426,14 @@ FHEM/98_ModbusAttr.pm        stefanstrobel        Sonstiges
 FHEM/98_ModbusSET.pm         stefanstrobel        Sonstiges
 FHEM/98_ModbusTrovis5576.pm  Reinerlein           Heizungssteuerung/Raumklima
 FHEM/98_PID20.pm             John                 Automatisierung
-FHEM/98_RandomTimer.pm       dietmar63            Unterstuetzende Dienste/Kalendermodule
+FHEM/98_RandomTimer.pm       igami                Unterstuetzende Dienste/Kalendermodule
 FHEM/98_SVG.pm               rudolfkoenig         Frontends/SVG/Plots/logProxy
 FHEM/98_THRESHOLD.pm         damian-s             Automatisierung
 FHEM/98_TRAFFIC.pm           jmike                Unterstuetzende Dienste
 FHEM/98_UbiquitiPM.pm        Wzut                 Sonstige Systeme
 FHEM/98_UbiquitiOut.pm       Wzut                 Sonstige Systeme
 FHEM/98_Verkehrsinfo.pm      martins              Unterstuetzende Dienste
-FHEM/98_WeekdayTimer.pm      dietmar63            Unterstuetzende Dienste
+FHEM/98_WeekdayTimer.pm      igami                Unterstuetzende Dienste
 FHEM/98_WOL.pm               dietmar63            Unterstuetzende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         Automatisierung
 FHEM/96_allowed.pm           rudolfkoenig         Automatisierung
@@ -464,7 +464,7 @@ FHEM/98_monitoring.pm        igami                Automatisierung
 FHEM/98_notice.pm            mfr69bs              Sonstiges
 FHEM/98_pilight.pm           andreas-fey          Unterstuetzende Dienste
 FHEM/98_ping                 mattwire             Sonstiges
-FHEM/98_powerMap             loredo               Unterstuetzende Dienste
+FHEM/98_powerMap             igami                Unterstuetzende Dienste
 FHEM/98_QRCode.pm            Benni                Unterstuetzende Dienste
 FHEM/98_rain.pm              baumrasen            Sonstiges
 FHEM/98_restore.pm           rudolfkoenig         Sonstiges

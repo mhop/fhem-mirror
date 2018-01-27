@@ -1,5 +1,6 @@
 ###############################################################################
 # $Id$
+#     Maintained by igami since 02-2018
 #
 # TODO
 # - document how to include powerMap for other module maintainers

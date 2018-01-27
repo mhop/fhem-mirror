@@ -4,6 +4,7 @@
 #     59_Twilight.pm
 #     Copyright by Sebastian Stuecker
 #     erweitert von Dietmar Ortmann
+#     Maintained by igami since 02-2018
 #
 #     used algorithm see:          http://lexikon.astronomie.info/zeitgleichung/
 #
@@ -37,7 +38,7 @@ use warnings;
 use POSIX;
 use HttpUtils;
 use Math::Trig;
-use Time::Local 'timelocal_nocheck'; 
+use Time::Local 'timelocal_nocheck';
 
 sub Twilight_calc($$);
 sub Twilight_my_gmt_offset();
@@ -108,30 +109,30 @@ sub Twilight_Define($$)
   if(int(@a)>4) { if ($a[4] =~ /^[\+-]*[0-9]*\.*[0-9]*$/ && $a[4] !~ /^[\. ]*$/ ) {
      $indoor_horizon  = $a[4];
  	   if($indoor_horizon > 20) { $indoor_horizon=20;}
-       # minimal indoor_horizon makes values like  civil_sunset and civil_sunrise   	   
+       # minimal indoor_horizon makes values like  civil_sunset and civil_sunrise
 	   if($indoor_horizon <  -6) { $indoor_horizon= -6;}
   }else{
      return "Argument Indoor_Horizon is not a valid number";}
   }
-   
+
   $hash->{WEATHER_HORIZON}  = 0;
   $hash->{INDOOR_HORIZON} = $indoor_horizon;
   $hash->{LATITUDE}       = $latitude;
   $hash->{LONGITUDE}      = $longitude;
   $hash->{WEATHER}        = $weather;
-  $hash->{VERSUCHE}       = 0; 
+  $hash->{VERSUCHE}       = 0;
   $hash->{DEFINE}         = 1;
   $hash->{CONDITION}      = 50;
   $hash->{SUNPOS_OFFSET}  = 5*60;
- 
+
   $attr{$name}{verbose} = 4    if ($name =~ /^tst.*$/ );
- 
+
   my $mHash = { HASH=>$hash };
-  Twilight_sunpos($mHash);  
+  Twilight_sunpos($mHash);
   Twilight_Midnight($mHash);
 
   delete $hash->{DEFINE};
-  
+
   return undef;
 }
 ################################################################################
@@ -152,14 +153,14 @@ sub myInternalTimer($$$$$) {
    my ($modifier, $tim, $callback, $hash, $waitIfInitNotDone) = @_;
 
    my $timerName = "$hash->{NAME}_$modifier";
-   my $mHash = { HASH=>$hash, NAME=>"$hash->{NAME}_$modifier", MODIFIER=>$modifier};  
+   my $mHash = { HASH=>$hash, NAME=>"$hash->{NAME}_$modifier", MODIFIER=>$modifier};
    if (defined($hash->{TIMER}{$timerName})) {
       Log3 $hash, 1, "[$hash->{NAME}] possible overwriting of timer $timerName - please delete first";
       stacktrace();
    } else {
       $hash->{TIMER}{$timerName} = $mHash;
    }
-   
+
    Log3 $hash, 5, "[$hash->{NAME}] setting  Timer: $timerName " . FmtDateTime($tim);
    InternalTimer($tim, $callback, $mHash, $waitIfInitNotDone);
    return $mHash;
@@ -191,12 +192,12 @@ sub myRemoveInternalTimer($$) {
 ################################################################################
 sub myGetHashIndirekt ($$) {
   my ($myHash, $function) = @_;
-  
+
   if (!defined($myHash->{HASH})) {
-    Log 3, "[$function] myHash not valid"; 
+    Log 3, "[$function] myHash not valid";
     return undef;
-  };  
-  return $myHash->{HASH};  
+  };
+  return $myHash->{HASH};
 }
 ################################################################################
 sub Twilight_midnight_seconds($) {
@@ -207,12 +208,12 @@ sub Twilight_midnight_seconds($) {
 }
 ################################################################################
 #sub Twilight_ssTimeAsEpoch($) {
-#   my ($zeit) = @_; 
+#   my ($zeit) = @_;
 #   my ($hour, $min, $sec) = split(":",$zeit);
 #
 #   my $days=0;
-#   if ($hour>=24) {$days = 1; $hour -=24}; 
-#   
+#   if ($hour>=24) {$days = 1; $hour -=24};
+#
 #   my @jetzt_arr = localtime(time());
 #   #Stunden               Minuten               Sekunden
 #   $jetzt_arr[2]  = $hour; $jetzt_arr[1] = $min; $jetzt_arr[0] = $sec;
@@ -224,21 +225,21 @@ sub Twilight_midnight_seconds($) {
 ################################################################################
 sub Twilight_calc($$) {
    my ($deg, $idx) = @_;
-   
+
    my $midnight = time() - Twilight_midnight_seconds(time());
 
    my $sr = sunrise_abs("Horizon=$deg");
    my $ss = sunset_abs ("Horizon=$deg");
 
    my ($srhour, $srmin, $srsec) = split(":",$sr); $srhour -= 24 if($srhour>=24);
-   my ($sshour, $ssmin, $sssec) = split(":",$ss); $sshour -= 24 if($sshour>=24); 
+   my ($sshour, $ssmin, $sssec) = split(":",$ss); $sshour -= 24 if($sshour>=24);
 
    my $sr1 = $midnight + 3600*$srhour+60*$srmin+$srsec;
    my $ss1 = $midnight + 3600*$sshour+60*$ssmin+$sssec;
-   
-   return (0,0) if (abs ($sr1 - $ss1) < 30);   
+
+   return (0,0) if (abs ($sr1 - $ss1) < 30);
    #return Twilight_ssTimeAsEpoch($sr) + 0.01*$idx,
-   #       Twilight_ssTimeAsEpoch($ss) - 0.01*$idx; 
+   #       Twilight_ssTimeAsEpoch($ss) - 0.01*$idx;
    return ($sr1 + 0.01*$idx), ($ss1 - 0.01*$idx);
 }
 ################################################################################
@@ -258,32 +259,32 @@ sub Twilight_TwilightTimes(@) {
   foreach my $horizon (@horizons) {
     $idx++; next if ($whitchTimes eq "weather" && !($horizon =~ m/weather/) );
 
-    my ($name, $deg) = split(":", $horizon);   
-    my $sr = "sr$name"; my $ss = "ss$name";    
+    my ($name, $deg) = split(":", $horizon);
+    my $sr = "sr$name"; my $ss = "ss$name";
     $hash->{TW}{$sr}{NAME}   = $sr;   $hash->{TW}{$ss}{NAME}  = $ss;
     $hash->{TW}{$sr}{DEG}    = $deg;  $hash->{TW}{$ss}{DEG}   = $deg;
     $hash->{TW}{$sr}{LIGHT}  = $idx+1;$hash->{TW}{$ss}{LIGHT} = $idx;
     $hash->{TW}{$sr}{STATE}  = $idx+1;$hash->{TW}{$ss}{STATE} = 12 - $idx;
     $hash->{TW}{$sr}{SWIP}   = $swip; $hash->{TW}{$ss}{SWIP}  = $swip;
-    
+
     ($hash->{TW}{$sr}{TIME}, $hash->{TW}{$ss}{TIME}) = Twilight_calc ($deg, $idx);
-    
+
     if ($hash->{TW}{$sr}{TIME} == 0) {
        Log3 $hash, 4, "[$Name] hint: $hash->{TW}{$sr}{NAME},  $hash->{TW}{$ss}{NAME} are not defined(HORIZON=$deg)";
     }
   }
-  $attr{global}{latitude}  = $lat; 
-  $attr{global}{longitude} = $long; 
+  $attr{global}{latitude}  = $lat;
+  $attr{global}{longitude} = $long;
 # ------------------------------------------------------------------------------
   readingsBeginUpdate ($hash);
   foreach my $ereignis (keys %{$hash->{TW}}) {
     next if ($whitchTimes eq "weather" && !($ereignis =~ m/weather/) );
     readingsBulkUpdate($hash, $ereignis, $hash->{TW}{$ereignis}{TIME} == 0 ? "undefined" : FmtTime($hash->{TW}{$ereignis}{TIME}));
-  } 
+  }
   if ($hash->{CONDITION} != 50 ) {
      readingsBulkUpdate  ($hash,"condition",    $hash->{CONDITION});
      readingsBulkUpdate  ($hash,"condition_txt",$hash->{CONDITION_TXT});
-  }   
+  }
   readingsEndUpdate   ($hash, defined($hash->{LOCAL} ? 0 : 1));
 # ------------------------------------------------------------------------------
   my @horizonsOhneDeg = map {my($e, $deg)=split(":",$_); "$e"} @horizons;
@@ -296,18 +297,18 @@ sub Twilight_TwilightTimes(@) {
   my $lastMitternacht     = $now-$secSinceMidnight;
   my $nextMitternacht     = ($secSinceMidnight > 12*3600) ? $lastMitternacht+24*3600 : $lastMitternacht;
   my $jetztIstMitternacht = abs($now+5-$nextMitternacht)<=10;
-  
+
   my @keyListe = qw "DEG LIGHT STATE SWIP TIME NAMENEXT";
   foreach my $ereignis (sort keys %{$hash->{TW}}) {
     next if ($whitchTimes eq "weather" && !($ereignis =~ m/weather/) );
-    
+
     myRemoveInternalTimer($ereignis, $hash); # if(!$jetztIstMitternacht);
     if($hash->{TW}{$ereignis}{TIME} > 0) {
       $myHash = myInternalTimer($ereignis, $hash->{TW}{$ereignis}{TIME}, "Twilight_fireEvent", $hash, 0);
-      map {$myHash->{$_} = $hash->{TW}{$ereignis}{$_} } @keyListe; 
+      map {$myHash->{$_} = $hash->{TW}{$ereignis}{$_} } @keyListe;
     }
   }
-# ------------------------------------------------------------------------------  
+# ------------------------------------------------------------------------------
   return 1;
 }
 ################################################################################
@@ -318,7 +319,7 @@ sub Twilight_fireEvent($) {
    return if (!defined($hash));
 
    my $name          = $hash->{NAME};
-                    
+
    my $event         = $myHash->{MODIFIER};
    my $deg           = $myHash->{DEG};
    my $light         = $myHash->{LIGHT};
@@ -330,18 +331,18 @@ sub Twilight_fireEvent($) {
 
    my $delta      = int($eventTime - time());
    my $oldState   = ReadingsVal($name,"state","0");
-       
+
    my $nextEventTime = ($hash->{TW}{$nextEvent}{TIME} > 0) ? FmtTime($hash->{TW}{$nextEvent}{TIME}) : "undefined";
-   
+
    my $doTrigger = !(defined($hash->{LOCAL})) && ( abs($delta)<6 || $swip  && $state gt $oldState);
   #Log3 $hash, 3, "[$hash->{NAME}] swip-delta-oldState-doTrigger===>$swip/$delta/$oldState/$doTrigger";
-  
+
    Log3 $hash, 4,
      sprintf  ("[$hash->{NAME}] %-10s %-19s  ",        $event,     FmtDateTime($eventTime)).
-     sprintf  ("(%2d/$light/%+5.1f°/$doTrigger)   ",   $state,     $deg).        
+     sprintf  ("(%2d/$light/%+5.1f°/$doTrigger)   ",   $state,     $deg).
      sprintf  ("===> %-10s %-19s  ",                   $nextEvent, $nextEventTime);
 
-     
+
    readingsBeginUpdate($hash);
    readingsBulkUpdate ($hash, "state",           $state);
    readingsBulkUpdate ($hash, "light",           $light);
@@ -355,11 +356,11 @@ sub Twilight_fireEvent($) {
 }
 ################################################################################
 sub Twilight_Midnight($) {
-  my ($myHash) = @_;  
+  my ($myHash) = @_;
   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
-  return if (!defined($hash));   
-  
-  $hash->{SWIP} = 0;  
+  return if (!defined($hash));
+
+  $hash->{SWIP} = 0;
   my $param = Twilight_CreateHttpParameterAndGetData($myHash, "Mid");
 }
 ################################################################################
@@ -367,24 +368,24 @@ sub Twilight_Midnight($) {
 sub Twilight_WeatherTimerUpdate($) {
   my ($myHash) = @_;
   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
-  return if (!defined($hash));   
+  return if (!defined($hash));
 
-  $hash->{SWIP} = 1;  
+  $hash->{SWIP} = 1;
   my $param = Twilight_CreateHttpParameterAndGetData($myHash, "weather");
-}   
+}
 ################################################################################
 sub Twilight_CreateHttpParameterAndGetData($$) {
   my ($myHash, $mode) = @_;
   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
-  return if (!defined($hash));   
-  
+  return if (!defined($hash));
+
   my $location = $hash->{WEATHER};
   my $verbose  = AttrVal($hash->{NAME}, "verbose", 3 );
-  
+
   my $URL = "http://query.yahooapis.com/v1/public/yql?q=select%%20*%%20from%%20weather.forecast%%20where%%20woeid=%s%%20and%%20u=%%27c%%27&format=%s&env=store%%3A%%2F%%2Fdatatables.org%%2Falltableswithkeys";
   my $url = sprintf($URL, $location, "json");
   Log3 $hash, 4, "[$hash->{NAME}] url=$url";
-  
+
   my $param = {
       url        => $url,
       timeout    => defined($hash->{DEFINE}) ? 10 :10,
@@ -394,23 +395,23 @@ sub Twilight_CreateHttpParameterAndGetData($$) {
       header     => "User-Agent: Mozilla/5.0\r\nAccept: application/xml",
       callback   => \&Twilight_WeatherCallback,
       mode       => $mode };
-  
+
   if (defined($hash->{DEFINE})) {
     delete $param->{callback};
     my ($err, $result) = HttpUtils_BlockingGet($param);
     Twilight_WeatherCallback($param, $err, $result);
   } else {
     HttpUtils_NonblockingGet($param);
-  }  
-  
+  }
+
 }
 ################################################################################
 sub Twilight_WeatherCallback(@) {
   my ($param, $err, $result) = @_;
-  
+
   my $hash = $param->{hash};
   return if (!defined($hash));
-  
+
   if ($err) {
     Log3 $hash, 3, "[$hash->{NAME}] got no weather info from yahoo. Error code: $err";
     $result = undef;
@@ -418,22 +419,22 @@ sub Twilight_WeatherCallback(@) {
      Log3 $hash, 4, "[$hash->{NAME}] got weather info from yahoo for $hash->{WEATHER}";
      Log3 $hash, 5, "[$hash->{NAME}] answer=$result" if defined $result;
   }
-  
+
   Twilight_getWeatherHorizon($hash, $result);
-  #$hash->{CONDITION} = 50; 
-  
+  #$hash->{CONDITION} = 50;
+
   if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} <= 10) {
      $hash->{VERSUCHE} += 1;
      Twilight_RepeatTimerSet($hash, $param->{mode});
      return;
   }
-  
+
   Twilight_TwilightTimes      ($hash, $param->{mode}, $result);
-  
+
   Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed to get valid weather data from yahoo"   if ($hash->{CONDITION} != 50 && $hash->{VERSUCHE} >  0);
   Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed got NO valid weather data from yahoo"   if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} >  0);
-  $hash->{VERSUCHE} = 0; 
-  
+  $hash->{VERSUCHE} = 0;
+
   Twilight_StandardTimerSet   ($hash);
 }
 ################################################################################
@@ -446,8 +447,8 @@ sub Twilight_RepeatTimerSet($$) {
      myInternalTimer   ("Midnight", $midnight, "Twilight_Midnight", $hash, 0);
   } else {
      myInternalTimer   ("Midnight", $midnight, "Twilight_WeatherTimerUpdate", $hash, 0);
-  }  
-  
+  }
+
 }
 ################################################################################
 sub Twilight_StandardTimerSet($) {
@@ -484,13 +485,13 @@ sub Twilight_sunposTimerSet($) {
 sub Twilight_getWeatherHorizon(@)
 {
   my ($hash, $result) = @_;
-  
+
   my $location=$hash->{WEATHER};
   if ($location == 0)  {
      $hash->{WEATHER_HORIZON}="0";
-     $hash->{CONDITION}="0";  
+     $hash->{CONDITION}="0";
      return 1;
-  } 
+  }
 
   my $mod = "[".$hash->{NAME} ."] ";
   my @faktor_cond_code = (10,10,10,10, 9, 7, 7, 7, 7, 7,
@@ -504,39 +505,39 @@ sub Twilight_getWeatherHorizon(@)
 
   my ($cond_code, $cond_txt, $temperatur, $aktTemp);
   if (defined($result)) {
-  
+
     # ersetze in result(json) ": durch "=>
     # dadurch entsteht ein Perlausdruck, der direkt geparst werden kann
-     
+
      my $perlAusdruck = $result;
        #$perlAusdruck = "<h1>could";
         $perlAusdruck =~ s/("[\w ]+")(\s*)(:)/$1=>/g;
         $perlAusdruck =~ s/null/undef/g;
         $perlAusdruck =~ s/true/1/g;
         $perlAusdruck =~ s/false/0/g;
-        $perlAusdruck = 'return ' .$perlAusdruck;        
-     
+        $perlAusdruck = 'return ' .$perlAusdruck;
+
      my $anonymSub = eval "sub {$perlAusdruck}";
      Log3 $hash, 3, "[$hash->{NAME}] error $@ parsing $result"   if($@);
      if (!$@) {
-        my $resHash = $anonymSub->() if ($anonymSub gt ""); 
+        my $resHash = $anonymSub->() if ($anonymSub gt "");
         Log3 $hash, 3, "[$hash->{NAME}] error $@ parsing $result"   if($@);
        #Log3 $hash, 3, "jsonAsPerl". Dumper $resHash->{query}{results}{channel}{item}{condition};
        if (!$@) {
-   
+
           $cond_code  = $resHash->{query}{results}{channel}{item}{condition}{code};
           $cond_txt   = $resHash->{query}{results}{channel}{item}{condition}{text};
           $temperatur = $resHash->{query}{results}{channel}{item}{condition}{temp};
-       }   
+       }
      }
   }
-  
+
   # wenn kein Code ermittelt werden kann, wird ein Pseudocode gesetzt
   if (!defined($cond_code) ) {
      $cond_code  = "50";         # eigener neutraler Code
      $cond_txt   = "undefined";
      $temperatur = "undefined";
-  } else {  
+  } else {
      $hash->{WEATHER_CORRECTION} = $faktor_cond_code[$cond_code] / 25 * 20;
      $hash->{WEATHER_HORIZON}    = $hash->{WEATHER_CORRECTION} + $hash->{INDOOR_HORIZON};
      $hash->{CONDITION}          = $cond_code;
@@ -544,15 +545,15 @@ sub Twilight_getWeatherHorizon(@)
      $hash->{TEMPERATUR}         = $temperatur;
      Log3 $hash, 4, "[$hash->{NAME}] $cond_code=$cond_txt $temperatur, correction: $hash->{WEATHER_CORRECTION}°";
   }
-  
-  my $doy         = strftime("%j",localtime);    
+
+  my $doy         = strftime("%j",localtime);
   my $declination =  0.4095*sin(0.016906*($doy-80.086));
   if($hash->{WEATHER_HORIZON} > (89-$hash->{LATITUDE}+$declination) ){
      $hash->{WEATHER_HORIZON} =  89-$hash->{LATITUDE}+$declination;
   }
-  
+
   return 1;
-  
+
 }
 ################################################################################
 sub Twilight_sunpos($)
@@ -640,7 +641,7 @@ sub Twilight_sunpos($)
   my $twilight = int(($dElevation+12.0)/18.0 * 1000)/10;
      $twilight = 100 if ($twilight>100);
      $twilight = 0   if ($twilight<  0);
-	 
+
   my $twilight_weather	 ;
 
   if( (my $ExtWeather = AttrVal($hashName, "useExtWeather", "")) eq "") {
@@ -648,17 +649,17 @@ sub Twilight_sunpos($)
 	    Log3 $hash, 5, "[$hash->{NAME}] " . "Original weather readings";
   } else {
 	   my($extDev,$extReading) = split(":",$ExtWeather);
-	   my $extWeatherHorizont = ReadingsVal($extDev,$extReading,-1); 
+	   my $extWeatherHorizont = ReadingsVal($extDev,$extReading,-1);
 	   if ($extWeatherHorizont >= 0){
 		     $extWeatherHorizont = 100 if ($extWeatherHorizont > 100);
-		     Log3 $hash, 5, "[$hash->{NAME}] " . "New weather readings from: ".$extDev.":".$extReading.":".$extWeatherHorizont;	
+		     Log3 $hash, 5, "[$hash->{NAME}] " . "New weather readings from: ".$extDev.":".$extReading.":".$extWeatherHorizont;
 		     $twilight_weather = $twilight - int(0.007 * ($extWeatherHorizont ** 2)); ## SCM: 100% clouds => 30% light (rough estimation)
 	   } else {
 		     $twilight_weather = int(($dElevation-$hash->{WEATHER_HORIZON}+12.0)/18.0 * 1000)/10;
-		     Log3 $hash, 3, "[$hash->{NAME}] " . "Error with external readings from: ".$extDev.":".$extReading." , taking original weather readings";	 
+		     Log3 $hash, 3, "[$hash->{NAME}] " . "Error with external readings from: ".$extDev.":".$extReading." , taking original weather readings";
 	   }
-  } 
-  
+  }
+
   $twilight_weather = 100 if ($twilight_weather>100);
   $twilight_weather = 0   if ($twilight_weather<  0);
 
@@ -759,7 +760,7 @@ sub twilight($$$$) {
     <br><br>
   <b>indoor_horizon</b>
   <br>
-	   The parameter <b>indoor_horizon</b> gives a virtual horizon, that shall be used for calculation of indoor twilight. Minimal value -6 means indoor values are the same like civil values. 
+	   The parameter <b>indoor_horizon</b> gives a virtual horizon, that shall be used for calculation of indoor twilight. Minimal value -6 means indoor values are the same like civil values.
 	   indoor_horizon 0 means indoor values are the same as real values. indoor_horizon > 0 means earlier indoor sunset resp. later indoor sunrise.
     <br><br>
   <b>Weather_Position</b>
@@ -899,8 +900,8 @@ Example:
     <br><br>
   <b>indoor_horizon</b>
   <br>
-	   Der Parameter <b>indoor_horizon</b> bestimmt einen virtuellen Horizont, der f&uuml;r die Berechnung der D&auml;mmerung innerhalb von R&auml;men genutzt werden kann. Minimalwert ist -6 (ergibt gleichen Wert wie Zivile D&auml;mmerung). Bei 0 fallen 
-	   indoor- und realer D&aumlmmerungswert zusammen. Werte gr&oumlsser 0 ergeben fr&uumlhere Werte für den Abend bzw. sp&aumltere f&uumlr den Morgen.   
+	   Der Parameter <b>indoor_horizon</b> bestimmt einen virtuellen Horizont, der f&uuml;r die Berechnung der D&auml;mmerung innerhalb von R&auml;men genutzt werden kann. Minimalwert ist -6 (ergibt gleichen Wert wie Zivile D&auml;mmerung). Bei 0 fallen
+	   indoor- und realer D&aumlmmerungswert zusammen. Werte gr&oumlsser 0 ergeben fr&uumlhere Werte für den Abend bzw. sp&aumltere f&uumlr den Morgen.
     <br><br>
   <b>Weather_Position</b>
   <br>
@@ -925,7 +926,7 @@ Example:
  <b>Azimut, Elevation, Twilight (Seitenwinkel, Höhenwinkel, D&auml;mmerung)</b>
  <br>
    Das Modul berechnet zus&auml;tzlich Azimuth und Elevation der Sonne. Diese Werte k&ouml;nnen zur Rolladensteuerung verwendet werden.<br><br>
-   
+
 Das Reading <b>Twilight</b> wird als neuer "(twi)light" Wert hinzugef&uuml;gt. Er wird aus der Elevation der Sonne mit folgender Formel abgeleitet: (Elevation+12)/18 * 100). Das erlaubt eine detailliertere Kontrolle der Lampen w&auml;hrend Sonnenauf - und untergang. Dieser Wert ist zwischen 0% und 100% wenn die Elevation zwischen -12&deg; und 6&deg;
 
    <br><br>
@@ -990,7 +991,7 @@ Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte E
 	<li><b>useExtWeather &lt;device&gt;:&lt;reading&gt;</b></li>
 	Nutzt Daten von einem anderen Device um <b>twilight_weather</b> zu berechnen.<br/>
 	Das Reading sollte sich im Intervall zwischen 0 und 100 bewegen, z.B. das Reading <b>c_clouds</b> in einem<b><a href="#openweathermap">openweathermap</a></b> device, bei dem 0 heiteren und 100 bedeckten Himmel bedeuten.
-	Wird diese Attribut genutzt , werden Wettereffekte wie Starkregen oder Gewitter fuer die Berechnung von <b>twilight_weather</b> nicht mehr herangezogen.   
+	Wird diese Attribut genutzt , werden Wettereffekte wie Starkregen oder Gewitter fuer die Berechnung von <b>twilight_weather</b> nicht mehr herangezogen.
   </ul>
   <br>
 

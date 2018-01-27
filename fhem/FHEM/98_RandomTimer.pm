@@ -3,6 +3,7 @@
 #
 #     98_RandomTimer_Initialize.pm
 #     written by Dietmar Ortmann
+#     Maintained by igami since 02-2018
 #
 #     This file is part of fhem.
 #
@@ -96,7 +97,7 @@ sub RandomTimer_Define($$)
      if(!($timeToSwitch =~  m/^[0-9]{2,4}$/i));
 
   RandomTimer_setSwitchmode ($hash, "800/200") if (!defined $hash->{helper}{SWITCHMODE});
-   
+
   $hash->{NAME}                   = $name;
   $hash->{DEVICE}                 = $device;
   $hash->{helper}{TIMESPEC_START} = $timespec_start;
@@ -107,11 +108,11 @@ sub RandomTimer_Define($$)
   $hash->{helper}{S_REP}          = $srep;
   $hash->{helper}{S_REL}          = $srel;
   $hash->{COMMAND}                = Value($hash->{DEVICE});
-  
+
   #$attr{$name}{verbose} = 4;
-  
+
   readingsSingleUpdate ($hash,  "TimeToSwitch", $hash->{helper}{TIMETOSWITCH}, 1);
-  
+
   myRemoveInternalTimer("SetTimer", $hash);
   myInternalTimer      ("SetTimer", time(), "RandomTimer_SetTimer", $hash, 0);
 
@@ -125,50 +126,50 @@ sub RandomTimer_SetTimer($) {
 
   my $now = time();
   my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($now);
-  
+
   RandomTimer_setActive($hash, 0);
   RandomTimer_schaltZeitenErmitteln($hash, $now);
   RandomTimer_setState($hash);
-  
+
   Log3 $hash, 4, "[".$hash->{NAME}."]" . " timings  RandomTimer on $hash->{DEVICE}: "
    . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{startTime})) . " - "
    . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{stopTime}));
-  
+
   my $secToMidnight = 24*3600 -(3600*$hour + 60*$min + $sec);
-  
+
   my $setExecTime = max($now, $hash->{helper}{startTime});
   myRemoveInternalTimer("Exec",     $hash);
   myInternalTimer      ("Exec",     $setExecTime, "RandomTimer_Exec", $hash, 0);
 
   if ($hash->{helper}{REP} gt "") {
-     my $setTimerTime = max($now+$secToMidnight + 15, 
+     my $setTimerTime = max($now+$secToMidnight + 15,
                             $hash->{helper}{stopTime}) + $hash->{helper}{TIMETOSWITCH}+15;
      myRemoveInternalTimer("SetTimer", $hash);
      myInternalTimer      ("SetTimer", $setTimerTime, "RandomTimer_SetTimer", $hash, 0);
   }
 }
 ########################################################################
-# define Test RandomTimer  +00:00:05 Brunnen +00:05:00 60 ; 
-# attr Test room RandomTimerX                             ; 
+# define Test RandomTimer  +00:00:05 Brunnen +00:05:00 60 ;
+# attr Test room RandomTimerX                             ;
 # attr Test verbose 5                                     ;
 # define ds at +00:00:30 attr Test disable 1              ;
 #
 # delete  RT_Test; define RT_Test RandomTimer *22:00:00 Brunnen 23:00:00 300
-# set RT_Test disable 0 
+# set RT_Test disable 0
 # delete  RT_Test
 sub RandomTimer_Exec($) {
    my ($myHash) = @_;
-   
+
    my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
    return if (!defined($hash));
-   
+
    my $now = time();
-   
+
    # Wenn aktiv aber disabled, dann timer abschalten, Meldung ausgeben.
    my $active          = RandomTimer_isAktive($hash);
    my $disabled        = RandomTimer_isDisabled($hash);
    my $stopTimeReached = RandomTimer_stopTimeReached($hash);
-   
+
    if ($active) {
       # wenn temporär ausgeschaltet
       if ($disabled) {
@@ -207,16 +208,16 @@ sub RandomTimer_Exec($) {
          RandomTimer_setActive($hash,0);
          return;
       }
-      if (!$disabled) { 
+      if (!$disabled) {
          if ($now>$hash->{helper}{startTime} && $now<$hash->{helper}{stopTime}) {
             Log3 $hash, 3, "[".$hash->{NAME}."]"." starting RandomTimer on $hash->{DEVICE}: "
                . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{startTime})) . " - "
                . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{stopTime}));
             RandomTimer_setActive($hash,1);
-         }          
+         }
       }
    }
-   
+
    RandomTimer_setState($hash);
    if ($now>$hash->{helper}{startTime} && $now<$hash->{helper}{stopTime}) {
       RandomTimer_device_toggle($hash) if (!$disabled);
@@ -254,7 +255,7 @@ sub RandomTimer_down($) {
 ########################################################################
 sub RandomTimer_setState($) {
   my ($hash) = @_;
-     
+
   if (RandomTimer_isDisabled($hash)) {
     #$hash->{STATE}  = "disabled";
      readingsSingleUpdate ($hash,  "state",  "disabled", 0);
@@ -262,20 +263,20 @@ sub RandomTimer_setState($) {
      my $state = $hash->{helper}{active} ? "on" : "off";
      readingsSingleUpdate ($hash,  "state", $state,  1);
   }
-  
+
 }
 ########################################################################
 sub RandomTimer_Attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
 
   my $hash = $defs{$name};
-  
+
   if( $attrName ~~ ["switchmode"] ) {
      RandomTimer_setSwitchmode($hash, $attrVal);
   }
-  
+
   if( $attrName ~~ ["disable","disableCond"] ) {
-     
+
     # Schaltung vorziehen, damit bei einem disable abgeschaltet wird.
     myRemoveInternalTimer("Exec", $hash);
     myInternalTimer      ("Exec", time()+1, "RandomTimer_Exec", $hash, 0);
@@ -288,7 +289,7 @@ sub RandomTimer_setSwitchmode ($$) {
    my ($hash, $attrVal) = @_;
    my $mod = "[".$hash->{NAME} ."] ";
 
-                            
+
    if(!($attrVal =~  m/^([0-9]{1,3})\/([0-9]{1,3})$/i)) {
       Log3 undef, 3, $mod . "invalid switchMode <$attrVal>, use 999/999";
    } else {
@@ -317,7 +318,7 @@ sub RandomTimer_schaltZeitenErmitteln ($$) {
 
   RandomTimer_startZeitErmitteln($hash, $now);
   RandomTimer_stopZeitErmitteln ($hash, $now);
-  
+
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash,  "Startzeit", FmtDateTime($hash->{helper}{startTime}));
   readingsBulkUpdate ($hash,  "Stoppzeit", FmtDateTime($hash->{helper}{stopTime}));
@@ -385,7 +386,7 @@ sub RandomTimer_stopZeitErmitteln  ($$) {
    } else {
       $stopTime = RandomTimer_zeitBerechnen($now, $hour, $min, $sec);
    }
-   
+
    if (!AttrVal($hash->{NAME}, "forceStoptimeSameDay", 0)) {
       if ($hash->{helper}{startTime} > $stopTime) {
          $stopTime  = RandomTimer_addDays($stopTime, 1);
@@ -403,9 +404,9 @@ sub RandomTimer_device_toggle ($) {
     if ($status ne "on" && $status ne "off" ) {
        Log3 $hash, 3, "[".$hash->{NAME}."]"." result of function Value($hash->{DEVICE}) must be 'on' or 'off'";
     }
-    
-    my $sigma = ($status eq "on") 
-       ? $hash->{helper}{SIGMAWHENON} 
+
+    my $sigma = ($status eq "on")
+       ? $hash->{helper}{SIGMAWHENON}
        : $hash->{helper}{SIGMAWHENOFF};
 
     my $zufall = int(rand(1000));
@@ -413,13 +414,13 @@ sub RandomTimer_device_toggle ($) {
 
     if ($zufall < $sigma ) {
        $hash->{COMMAND}  = ($status eq "on") ? "off" : "on";
-       RandomTimer_device_switch($hash); 
+       RandomTimer_device_switch($hash);
     }
 }
 ########################################################################
 sub RandomTimer_device_switch ($) {
    my ($hash) = @_;
-   
+
    my $command = "set @ $hash->{COMMAND}";
    if ($hash->{COMMAND} eq "on") {
       $command = AttrVal($hash->{NAME}, "onCmd", $command);
@@ -438,17 +439,17 @@ sub RandomTimer_device_switch ($) {
 ########################################################################
 sub RandomTimer_isDisabled($) {
    my ($hash) = @_;
-   
-   my $disable = AttrVal($hash->{NAME}, "disable", 0 );   
+
+   my $disable = AttrVal($hash->{NAME}, "disable", 0 );
    return $disable if($disable);
-   
+
    my $disableCond = AttrVal($hash->{NAME}, "disableCond", "nf" );
    if ($disableCond eq "nf") {
      return 0;
-   } else {   
+   } else {
       $disable = eval ($disableCond);
       if ($@) {
-         $@ =~ s/\n/ /g; 
+         $@ =~ s/\n/ /g;
          Log3 ($hash, 3, "[$hash->{NAME}] ERROR: " . $@ . " EVALUATING " . $disableCond);
       }
       return $disable;
@@ -459,7 +460,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
 
   foreach my $hc ( sort keys %{$modules{RandomTimer}{defptr}} ) {
      my $hash = $modules{RandomTimer}{defptr}{$hc};
-    
+
      my $myHash->{HASH}=$hash;
      RandomTimer_SetTimer($myHash);
      Log3 undef, 3, "RandomTimer_Wakeup() for $hash->{NAME} done!";
@@ -470,7 +471,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
 1;
 
 =pod
-=item device 
+=item device
 =item summary    imitates the random switch functionality of a timer clock (FS20 ZSU)
 =item summary_DE bildet die Zufallsfunktion einer Zeitschaltuhr nach
 =begin html
@@ -562,7 +563,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
         <b>Examples</b>
         <pre>
         attr   ZufallsTimerZ         disableCond      (!isVerreist())
-        attr   ZufallsTimerZ         disableCond      (Value("presenceDummy") ne "present")      
+        attr   ZufallsTimerZ         disableCond      (Value("presenceDummy") ne "present")
         </pre>
     </li>
 
@@ -589,8 +590,8 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
         </pre>
     </li>
 
-    the decision to switch on or off depends on the state of the device and is evaluated by the funktion Value(<device>). Value() must 
-    evaluate one of the values "on" or "off". The behavior of devices that do not evaluate one of those values can be corrected by defining a statFormat:  
+    the decision to switch on or off depends on the state of the device and is evaluated by the funktion Value(<device>). Value() must
+    evaluate one of the values "on" or "off". The behavior of devices that do not evaluate one of those values can be corrected by defining a statFormat:
     <pre>
        attr stateFormat  EDIPlug_01  {(ReadingsVal("EDIPlug_01","state","nF") =~ m/(ON|on)/i)  ? "on" : "off" }
     </pre>
@@ -598,8 +599,8 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
     <pre>
        [EDIPlug] result of function Value(EDIPlug_01) must be 'on' or 'off'
     </pre>
-        
-    
+
+
     <li><a name="switchmode">switchmode</a><br>
         Setting the switchmode you can influence the behavior of switching on/off.
         The parameter has the Format 999/999 and the default ist 800/200. The values are in "per mill".
@@ -610,7 +611,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
         attr   ZufallsTimerZ         switchmode  400/400
         </pre>
     </li>
- 
+
    </ul>
 =end html
 =cut
