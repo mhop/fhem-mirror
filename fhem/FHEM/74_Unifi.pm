@@ -12,6 +12,8 @@
 #  - bugfix:  74_Unifi: fixed blockClient
 # V2.1.2
 #  - feature: 74_Unifi: new Readings for WLAN-states, fixed Warning
+# V2.1.3
+#  - change:  74_Unifi: SSIDs-Readings and drop-downs use goodReadingName()
 
 
 package main;
@@ -182,7 +184,7 @@ sub Unifi_Set($@) {
     
     if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|clear|poeMode|blockClient|unblockClient|enableWLAN|disableWLAN|switchSiteLEDs/) {
         return "Unknown argument $setName, choose one of update:noArg "
-               ."clear:all,readings,clientData "
+               ."clear:all,readings,clientData,allData "
                .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "archiveAlerts:noArg " : "")
                .(($apNames && Unifi_CONNECTED($hash)) ? "restartAP:all,$apNames setLocateAP:all,$apNames unsetLocateAP:all,$apNames " : "")
                .(($clientNames && Unifi_CONNECTED($hash)) ? "disconnectClient:all,$clientNames " : "")
@@ -243,22 +245,22 @@ sub Unifi_Set($@) {
                 Unifi_SwitchSiteLEDs_Send($hash,$state);
             }
             elsif ($setName eq 'disableWLAN') {
-                my $wlan = Unifi_SSIDs($hash,$setVal,'makeID');
-                if (defined $hash->{wlans}->{$wlan}) {
-                    my $wlanconf = $hash->{wlans}->{$wlan};
+                my $wlanid = Unifi_SSIDs($hash,$setVal,'makeID');
+                if (defined $hash->{wlans}->{$wlanid}) {
+                    my $wlanconf = $hash->{wlans}->{$wlanid};
                     $wlanconf->{enabled}=JSON::false;
-                    Unifi_WlanconfRest_Send($hash,$wlan,$wlanconf);
+                    Unifi_WlanconfRest_Send($hash,$wlanid,$wlanconf);
                 }
                 else {
                     return "$hash->{NAME}: Unknown SSID '$setVal' in command '$setName', choose one of: all,$SSIDs";
                 }
             }
             elsif ($setName eq 'enableWLAN') {
-                my $wlan = Unifi_SSIDs($hash,$setVal,'makeID');
-                if (defined $hash->{wlans}->{$wlan}) {
-                    my $wlanconf = $hash->{wlans}->{$wlan};
+                my $wlanid = Unifi_SSIDs($hash,$setVal,'makeID');
+                if (defined $hash->{wlans}->{$wlanid}) {
+                    my $wlanconf = $hash->{wlans}->{$wlanid};
                     $wlanconf->{enabled}=JSON::true;
-                    Unifi_WlanconfRest_Send($hash,$wlan,$wlanconf);
+                    Unifi_WlanconfRest_Send($hash,$wlanid,$wlanconf);
                 }
                 else {
                     return "$hash->{NAME}: Unknown SSID '$setVal' in command '$setName', choose one of: all,$SSIDs";
@@ -387,8 +389,17 @@ sub Unifi_Set($@) {
                     delete $hash->{READINGS}->{$_} if($_ ne 'state');
                 }
             }
-            if ($setVal eq 'clientData' || $setVal eq 'all') {
+            if ($setVal eq 'clientData') {
                 %{$hash->{clients}} = ();
+            }
+            if ($setVal eq 'allData' || $setVal eq 'all') {
+                %{$hash->{clients}} = ();
+                %{$hash->{wlans}} = ();
+                %{$hash->{wlan_health}} = ();
+                %{$hash->{accespoints}} = ();
+                # %{$hash->{events}} = ();
+                %{$hash->{wlangroups}} = ();
+                # %{$hash->{alerts_unarchived}} = ();
             }
         }
     }
@@ -1012,7 +1023,7 @@ sub Unifi_SetClientReadings($) {
             readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
             readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
             readingsBulkUpdate($hash,$clientName."_snr",$clientRef->{rssi});
-            readingsBulkUpdate($hash,$clientName."_essid",$clientRef->{essid});
+            readingsBulkUpdate($hash,$clientName."_essid",makeReadingName($clientRef->{essid}));
             readingsBulkUpdate($hash,$clientName."_accesspoint",$apName);
             readingsBulkUpdate($hash,$clientName,'connected');
         }
@@ -1053,7 +1064,7 @@ sub Unifi_SetAccesspointReadings($) {
         
         if (defined $apRef->{vap_table} && scalar @{$apRef->{vap_table}}) {
             for my $vap (@{$apRef->{vap_table}}) {
-                $essid .= $vap->{essid}.',';
+                $essid .= makeReadingName($vap->{essid}).',';
             }
             $essid =~ s/.$//;
         } else {
@@ -1092,7 +1103,7 @@ sub Unifi_SetWlanReadings($) {
     my ($wlanName,$wlanRef);
     for my $wlanID (keys %{$hash->{wlans}}) {
         $wlanRef = $hash->{wlans}->{$wlanID};
-        $wlanName = $wlanRef->{name};        
+        $wlanName = makeReadingName($wlanRef->{name});        
         readingsBulkUpdate($hash,'-WLAN_'.$wlanName.'_state',($wlanRef->{enabled} == JSON::true) ? 'enabled' : 'disabled');
     }
     
@@ -1476,15 +1487,15 @@ sub Unifi_SSIDs($@){
     
     if(defined $ID && defined $W && $W eq 'makeName') {   # Return Name from ID
         $wlanRef = $hash->{wlans}->{$ID};
-        if (defined $wlanRef->{name} && $wlanRef->{name} =~ /^([\w\.\-]+)$/) {
-            $ID = $1;
+        if (defined $wlanRef->{name} ){ #&& $wlanRef->{name} =~ /^([\w\.\-]+)$/) {
+            $ID = makeReadingName($wlanRef->{name});
         }
         return $ID;
     }
     elsif (defined $ID && defined $W && $W eq 'makeID') {   # Return ID from Name 
         for (keys %{$hash->{wlans}}) {
             $wlanRef = $hash->{wlans}->{$_};
-            if (defined $wlanRef->{name} && $wlanRef->{name} eq $ID) {
+            if (defined $wlanRef->{name} && makeReadingName($wlanRef->{name}) eq $ID) {
                 $ID = $_;
                 last;
             }
@@ -1708,8 +1719,8 @@ Or you can use the other readings or set and get features to control your unifi-
     <li><code>set &lt;name&gt; update</code><br>
     Makes immediately a manual update. </li>
     <br>
-    <li><code>set &lt;name&gt; clear &lt;readings|clientData|all&gt;</code><br>
-    Clears the readings, clientData or all. </li>
+    <li><code>set &lt;name&gt; clear &lt;readings|clientData|allData|all&gt;</code><br>
+    Clears the readings, clientData, all Unifi data or all (readings and data). </li>
     <br>
     <li><code>set &lt;name&gt; archiveAlerts</code><br>
     Archive all unarchived Alerts. </li>
