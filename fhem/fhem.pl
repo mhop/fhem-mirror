@@ -2668,11 +2668,13 @@ sub
 CommandAttr($$)
 {
   my ($cl, $param) = @_;
-  my ($ret, @a);
+  my ($ret, $append, $remove, @a);
 
+  $append = ($param =~ s/^-a //);
+  $remove = ($param =~ s/^-r //);
   @a = split(" ", $param, 3) if($param);
 
-  return "Usage: attr <name> <attrname> [<attrvalue>]\n$namedef"
+  return "Usage: attr [-a|-r] <name> <attrname> [<attrvalue>]\n$namedef"
            if(@a && @a < 2);
 
   my @rets;
@@ -2680,6 +2682,7 @@ CommandAttr($$)
 
     my $hash = $defs{$sdev};
     my $attrName = $a[1];
+    my $attrVal = $a[2];
     if(!defined($hash)) {
       push @rets, "Please define $sdev first" if($init_done);#define -ignoreErr
       next;
@@ -2710,15 +2713,25 @@ CommandAttr($$)
       }
     }
 
-    if($attrName eq 'disable' and $a[2] && $a[2] eq 'toggle') {
-       $a[2] = IsDisabled($sdev) ? 0 : 1;
+    if($append && $attrVal && $attr{$sdev} && $attr{$sdev}{$attrName}) {
+      $attrVal = $attr{$sdev}{$attrName} . 
+                        ($attrVal =~ m/^,/ ? $attrVal : " $attrVal");
+    }
+    if($remove && $attrVal && $attr{$sdev} && $attr{$sdev}{$attrName}) {
+      my $v = $attr{$sdev}{$attrName};
+      $v =~ s/\s*$attrVal\s*//;
+      $attrVal = $v;
+    }
+
+    if($attrName eq 'disable' and $attrVal && $attrVal eq 'toggle') {
+       $attrVal = IsDisabled($sdev) ? 0 : 1;
     }
 
     if($attrName eq "userReadings") {
 
       my @userReadings;
       # myReading1[:trigger1] [modifier1] { codecodecode1 }, ...
-      my $arg= $a[2];
+      my $arg= $attrVal;
 
       # matches myReading1[:trigger2] { codecode1 }
       my $regexi= '\s*([\w.-]+)(:\S*)?\s+((\w+)\s+)?({.*?})\s*';
@@ -2755,7 +2768,7 @@ CommandAttr($$)
     if($attrName eq "eventMap") {
       delete $hash->{".eventMapHash"};
       delete $hash->{".eventMapCmd"};
-      $attr{$sdev}{eventMap} = (defined $a[2] ? $a[2] : 1);
+      $attr{$sdev}{eventMap} = (defined $attrVal ? $attrVal : 1);
       my $r = ReplaceEventMap($sdev, "test", 1); # refresh eventMapCmd
       if($r =~ m/^ERROR in eventMap for /) {
         delete($attr{$sdev}{eventMap});
@@ -2773,11 +2786,11 @@ CommandAttr($$)
                                   pv=>{"%name"=>1, "%state"=>1, "%type"=>1} },
     );
 
-    if(defined($a[2]) && $ra{$attrName} && $init_done) {
-      my ($lval,$rp) = ($a[2], $ra{$attrName}{p});
+    if(defined($attrVal) && $ra{$attrName} && $init_done) {
+      my ($lval,$rp) = ($attrVal, $ra{$attrName}{p});
 
       if($rp && $lval =~ m/$rp/) {
-        my $err = perlSyntaxCheck($a[2], %{$ra{$attrName}{pv}});
+        my $err = perlSyntaxCheck($attrVal, %{$ra{$attrName}{pv}});
         return "attr $sdev $a[1]: $err" if($err);
 
       } else {
@@ -2792,8 +2805,8 @@ CommandAttr($$)
     }
 
     if($fhemdebug && $sdev eq "global") {
-      $a[2] = "-" if($attrName eq "logfile");
-      $a[2] = 5   if($attrName eq "verbose");
+      $attrVal = "-" if($attrName eq "logfile");
+      $attrVal = 5   if($attrName eq "verbose");
     }
     $ret = CallFn($sdev, "AttrFn", "set", @a);
     if($ret) {
@@ -2801,27 +2814,27 @@ CommandAttr($$)
       next;
     }
 
-    my $val = $a[2];
+    my $val = $attrVal;
     $val = 1 if(!defined($val));
     $attr{$sdev}{$attrName} = $val;
 
     if($attrName eq "IODev") {
-      if(!$a[2] || !defined($defs{$a[2]})) {
+      if(!$attrVal || !defined($defs{$attrVal})) {
         if($init_done) {
-          push @rets,"$sdev: unknown IODev $a[2] specified";
+          push @rets,"$sdev: unknown IODev $attrVal specified";
         } else {
           $hash->{IODevMissing} = 1;
-          $hash->{IODevName} = $a[2];
+          $hash->{IODevName} = $attrVal;
         }
         next;
       }
 
-      my $ioname = $a[2];
+      my $ioname = $attrVal;
       $hash->{IODev} = $defs{$ioname};
       delete($defs{$ioname}{".clientArray"}); # Force a recompute
     }
     if($attrName eq "stateFormat" && $init_done) {
-      my $err = perlSyntaxCheck($a[2], ("%name"=>""));
+      my $err = perlSyntaxCheck($attrVal, ("%name"=>""));
       return $err if($err);
       evalStateFormat($hash);
     }

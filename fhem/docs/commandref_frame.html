@@ -675,7 +675,7 @@ The following local attributes are used by a wider range of devices:
 <a name="attr"></a>
 <h3>attr</h3>
 <ul>
-  <code>attr &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
+  <code>attr [-a|-r] &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;]</code><br>
 
   <br>Set an attribute for a device defined by <a href="#define">define</a>.
   You can define your own <a href="#attributes">attributes</a> too to use them
@@ -685,19 +685,27 @@ The following local attributes are used by a wider range of devices:
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.
   After setting the attribute, the global event "ATTR" will be generated.
-  <br><br>
+  <br>
+  If the option -a is specified, append the given value to the currently
+  existing value. Note: if the value does not start with a comma (,), then a
+  space will be added automatically to the old value before appending the
+  new.<br>
+  With the -r option one can remove a part of an attribute value.<br>
+  <br>
 
   Examples:
-  <ul>
-    <code>attr global verbose 3</code><br>
-    <code>attr lamp room kitchen</code><br>
-    <code>attr lamp group lights</code><br>
-    <code>attr lamp loglevel 6</code><br>
-    <code>attr weatherstation event-on-update-reading wind,temperature,humidity</code><br>
-    <code>attr weatherstation event-on-change-reading israining</code><br>
-    <code>attr weatherstation event-on-change-reading israining,state</code><br>
-    <code>attr heating stateFormat Temp:measured-temp, Valve:actuator</code><br>
-  </ul>
+  <ul><code>
+    attr global verbose 3<br>
+    attr lamp room kitchen<br>
+    attr lamp group lights<br>
+    attr lamp loglevel 6<br>
+    attr weatherstation event-on-update-reading wind,temperature,humidity<br>
+    attr weatherstation event-on-change-reading israining<br>
+    attr weatherstation event-on-change-reading israining,state<br>
+    attr heating stateFormat Temp:measured-temp, Valve:actuator<br>
+    attr -a TYPE=SVG room ,SvgRoom</br>
+    attr -r TYPE=SVG room ,SvgRoom</br>
+  </code></ul>
   <br>
 
   Notes:<br>

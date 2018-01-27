@@ -685,7 +685,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="attr"></a>
 <h3>attr</h3>
 <ul>
-  <code>attr &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
+  <code>attr [-a|-r] &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;]</code><br>
 
   <br>
    Dieser Befehl setzt ein Attribut f&uuml;r ein Ger&auml;t welches mit <a
@@ -702,17 +702,26 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   Nach der Durchf&uuml;hrung das globale Ereignis "ATTR" wird generiert.
   <br>
 
+  Falls die Option -a spezifiziert ist, dann wird value zum aktuellen Wert
+  hinzugef&uuml;gt. Achtung: falls value nicht mit einem Komma (,)
+  anf&auml;ngt, dann wird es mit einem Leerzeichen angeh&auml;ngt.
+  <br>
+  Mit der -r Option kann man Teile eines Attributes wieder entfernen.<br>
+  <br>
+
   Beispiele:
-  <ul>
-    <code>attr global verbose 3</code><br>
-    <code>attr lamp room kitchen</code><br>
-    <code>attr lamp group lights</code><br>
-    <code>attr lamp loglevel 6</code><br>
-    <code>attr weatherstation event-on-update-reading wind,temperature,humidity</code><br>
-    <code>attr weatherstation event-on-change-reading israining</code><br>
-    <code>attr weatherstation event-on-change-reading israining,state</code><br>
-    <code>attr heating stateFormat Temp:measured-temp, Valve:actuator</code><br>
-  </ul>
+  <ul><code>
+    attr global verbose 3<br>
+    attr lamp room kitchen<br>
+    attr lamp group lights<br>
+    attr lamp loglevel 6<br>
+    attr weatherstation event-on-update-reading wind,temperature,humidity<br>
+    attr weatherstation event-on-change-reading israining<br>
+    attr weatherstation event-on-change-reading israining,state<br>
+    attr heating stateFormat Temp:measured-temp, Valve:actuator<br>
+    attr -a TYPE=SVG room ,SvgRoom</br>
+    attr -r TYPE=SVG room ,SvgRoom</br>
+  </code></ul>
   <br>
 
   Bemerkungen:<br>
