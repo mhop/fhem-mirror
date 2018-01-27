@@ -271,13 +271,15 @@ sub CUL_HM_updateConfig($){
       next;
     }
     CUL_HM_ID2PeerList($name,"",1); # update peerList out of peerIDs
-
+    CUL_HM_getMId($hash); # need to set regLst in helper
+    
     my $chn = substr($id."00",6,2);
     my $st  = CUL_HM_Get($hash,$name,"param","subType");
     my $md  = CUL_HM_Get($hash,$name,"param","model");
     
     my $dHash = CUL_HM_getDeviceHash($hash);
-    $dHash->{helper}{role}{prs} = 1 if(CUL_HM_Set($hash,$name,"?") =~ m/press/ && $st ne "virtual");
+    $dHash->{helper}{role}{prs} = 1 if($hash->{helper}{regLst} =~ m/3p/);
+
     foreach my $rName ("D-firmware","D-serialNr",".D-devInfo",".D-stc"){
       # move certain attributes to readings for future handling
       my $aName = $rName;
@@ -4101,7 +4103,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
 
   my $id = CUL_HM_IoId($defs{$devName});
-  if(length($id) != 6 ){# have to try to find an IO
+  if(length($id) != 6 ){# have to try to find an IO $devName
     CUL_HM_assignIO($defs{$devName});
     $id = CUL_HM_IoId($defs{$devName});
     return "no IO device identified" if(length($id) != 6 );
@@ -4617,7 +4619,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my (undef,undef,$duration,$ramp) = @a; #date prepared extention to entdate
     if ($cmd eq "on-till"){
       # to be extended to handle end date as well
-      my (undef,$eH,$eM,$eSec)  = GetTimeSpec($duration);
+      my ($info,$eH,$eM,$eSec)  = GetTimeSpec($duration);
+      return "enter time: $info" if($info && $info !~ m/Wrong/);
+      
       $eSec += $eH*3600 + $eM*60;
       my @lt = localtime;
       my $ltSec = $lt[2]*3600+$lt[1]*60+$lt[0];# actually strip of date
@@ -5704,7 +5708,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                  || !$pHash->{helper}{role}
                  || !$pHash->{helper}{role}{prs});
         $rxt = CUL_HM_getRxType($pHash);
-        $peerFlag = ($rxt & 0x02)?"B4":"A4";#burst
+        $peerFlag = ($rxt & 0x02) ? "B4" : "A4"; #burst
         CUL_HM_PushCmdStack($pHash,"++${peerFlag}$modeCode$dst$peer$pc");
         $snd = 1;
         foreach my $pCh(grep /$peer/,@peerLchn){
@@ -9012,7 +9016,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
           && defined $hash->{IODev})){#don't change while send in process
     return; 
   }
-  my $oldIODev = $hash->{IODev} ? $hash->{IODev} : "";
+  my $oldIODev = ($hash->{IODev} && $hash->{IODev}{NAME}) ? $hash->{IODev} : "-";
   my $newIODev = "";
   my $haveIOList = 0;
   my $ioCCU = $hash->{helper}{io}{vccu};
@@ -9056,8 +9060,8 @@ sub CUL_HM_assignIO($){ #check and assign IO
 
   if ($oldIODev ne $newIODev) {# have a change - Assign the device at IO and remove from old one
     my $ID = CUL_HM_hash2Id($hash);
-    
-    if (   $oldIODev
+    if (   $oldIODev 
+        && $oldIODev ne "-"
         && $oldIODev ne $newIODev
         && ReadingsVal($oldIODev->{NAME},"state","") ne "disconnected"
 #        && InternalVal($oldIODev->{NAME},"XmitOpen",1) != 0
