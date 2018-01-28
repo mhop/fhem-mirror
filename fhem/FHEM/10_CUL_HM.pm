@@ -278,7 +278,7 @@ sub CUL_HM_updateConfig($){
     my $md  = CUL_HM_Get($hash,$name,"param","model");
     
     my $dHash = CUL_HM_getDeviceHash($hash);
-    $dHash->{helper}{role}{prs} = 1 if($hash->{helper}{regLst} =~ m/3p/);
+    $dHash->{helper}{role}{prs} = 1 if($hash->{helper}{regLst} && $hash->{helper}{regLst} =~ m/3p/);
 
     foreach my $rName ("D-firmware","D-serialNr",".D-devInfo",".D-stc"){
       # move certain attributes to readings for future handling
