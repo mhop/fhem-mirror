@@ -125,6 +125,7 @@ NotifyAndroidTV_parseHttpAnswer($$$)
 
   if( $err ) {
     Log3 $name, 2, "NotifyAndroidTV ($name) - got error while sending notificaton $err";
+    readingsSingleUpdate($hash,"lastError", $err, 1);
     if( $param->{cl} && $param->{cl}{canAsyncOutput} ) {
       asyncOutput( $param->{cl}, "got error while sending notification $err\n" );
     }
