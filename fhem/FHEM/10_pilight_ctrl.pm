@@ -51,6 +51,7 @@
 # V 1.24 2017-04-22 - FIX: GS-iwds07 support
 # V 1.25 2017-04-23 - FIX: react only of global::INITIALIZED m/^INITIALIZED$/
 # V 1.26 2017-09-03 - FIX: heitech support
+# V 1.27 2018-01-28 - NEW: handle bh1750 illuminance sensor as weather station
 ############################################## 
 package main;
 
@@ -430,7 +431,7 @@ sub pilight_ctrl_Write($@)
           case m/mumbi/         {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
           case m/brennenstuhl/  {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
           case m/pollin/        {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
-          case m/heitech/		{$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
+          case m/heitech/		    {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
           case m/impuls/        {$code .= "\"systemcode\":$id,\"programcode\":$unit,";}
           case m/rsl366/        {$code .= "\"systemcode\":$id,\"programcode\":$unit,";}
           case m/daycom/        { if (!defined($syscode)) {
@@ -859,6 +860,9 @@ sub pilight_ctrl_Parse($$)
     case m/teknihall/   {$protoID = 4;}
     case m/oregon_21/   {$protoID = 4;}
     
+    #handle illuminance sensor as weather station - workaround
+    case m/bh1750/      {$protoID = 4;}
+    
     #gpio temperature, humidity sensors
     case m/dht11/       {$protoID = 4;}
     case m/dht22/       {$protoID = 4;}
@@ -915,6 +919,8 @@ sub pilight_ctrl_Parse($$)
         $piTempData .= ",windavg:$data->{$s}{windavg}"          if (defined($data->{$s}{windavg}));
         $piTempData .= ",winddir:$data->{$s}{winddir}"          if (defined($data->{$s}{winddir}));
         $piTempData .= ",windgust:$data->{$s}{windgust}"        if (defined($data->{$s}{windgust}));
+        #workaround illuminance sensor
+        $piTempData .= ",illuminance:$data->{$s}{illuminance}"  if (defined($data->{$s}{illuminance}));
         
         my $msg = "PITEMP,$proto,$id$piTempData";
         Log3 $me, 4, "$me(Dispatch): $msg";

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 10_pilight_ctrl: support bh1750 illuminance sensor
   - feature: 71_YAMAHA_NP: Added player readings support for
                            airplay and spotify inputs.
   - change:  93_DbLog:V3.8.0, log events containing pipe "|" possible
