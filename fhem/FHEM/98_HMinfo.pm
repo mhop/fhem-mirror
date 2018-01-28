@@ -1655,7 +1655,12 @@ sub HMinfo_SetFn($@) {#########################################################
     # save config only if register are complete
     $ret = HMinfo_archConfig($hash,$name,$opt,($a[0]?$a[0]:""));
   }
-
+  elsif($cmd eq "x-deviceReplace") {##action: deviceReplace--------------------
+    # replace a device with a new one
+    $ret = HMinfo_deviceReplace($name,$a[0],$a[1]);
+  }
+  
+  
   ### redirect set commands to get - thus the command also work in webCmd
   elsif($cmd ne '?' && HMinfo_GetFn($hash,$name,"?") =~ m/\b$cmd\b/){##----------------
     unshift @a,"-f",$filter if ($filter);
@@ -1672,6 +1677,7 @@ sub HMinfo_SetFn($@) {#########################################################
             ,"update:noArg"
             ,"cpRegs"
             ,"tempList"
+            ,"x-deviceReplace"
             ,"tempListG:verify,status,save,restore,genPlot"
             ,"templateDef","templateSet","templateDel","templateExe"
             );
@@ -1694,6 +1700,7 @@ sub HMInfo_help(){ ############################################################
            ."\n set verifyConfig [-typeFilter-] -file-             # compare curent date with configfile,report differences"
            ."\n set autoReadReg [-typeFilter-]                     # trigger update readings if attr autoReadReg is set"
            ."\n set tempList [-typeFilter-][save|restore|verify|status|genPlot][-filename-]# handle tempList of thermostat devices"
+           ."\n set x-deviceReplace <old device> <new device>      # WARNING:replace a device with another"
            ."\n  ---infos---"
            ."\n set update                                         # update HMindfo counts"
            ."\n get register [-typeFilter-]                        # devicefilter parse devicename. Partial strings supported"
@@ -2121,6 +2128,201 @@ sub HMinfo_archConfigPost($)  {################################################
   push @{$modules{CUL_HM}{helper}{confUpdt}},@arr;
   delete $defs{$name}{nb}{$id};
   return ;
+}
+
+sub HMinfo_deviceReplace($$$){
+  my ($hmName,$oldDev,$newDev) = @_;
+  my $logH = $defs{$hmName};
+  
+  my $preReply = $defs{$hmName}{helper}{devRepl}?$defs{$hmName}{helper}{devRepl}:"empty";
+  $defs{$hmName}{helper}{devRepl} = "empty";# remove task. 
+  
+  return "only valid for CUL_HM devices" if(  !$defs{$oldDev}{helper}{role}{dev} 
+                                            ||!$defs{$newDev}{helper}{role}{dev} );
+  return "use 2 different devices" if ($oldDev eq $newDev);
+  
+  my $execMode     = 0;# replace will be 2 stage: execMode 0 will not execute any action
+  my $prepComplete = 0; # if preparation is aboard (prepComplete =0) the attempt will be ignored
+  my $ret = "deviceRepleace - actions";
+  if ( $preReply eq $oldDev."-".$newDev){
+    $execMode = 1;
+    $ret .= "\n        ==>EXECUTING: set $hmName x-deviceReplace $oldDev $newDev";
+  }
+  else{
+    $ret .= "\n       --- CAUTION: this command will reprogramm fhem AND the devices incl peers";
+    $ret .= "\n           $oldDev will be replaced by $newDev  ";
+    $ret .= "\n           $oldDev can be removed after execution.";
+    $ret .= "\n           Peers of the device will also be reprogrammed ";
+    $ret .= "\n           command execution may be pending in cmdQueue depending on the device types ";
+    $ret .= "\n           thoroughly check the protocoll events";
+    $ret .= "\n           NOTE: The command is not revertable!";
+    $ret .= "\n                 The command can only be executed once!";
+    $ret .= "\n        ==>TO EXECUTE THE COMMAND ISSUE AGAIN: set $hmName x-deviceReplace $oldDev $newDev";
+    $ret .= "\n";
+  }
+  
+  #create hash to map old and new device
+  my %rnHash;
+  $rnHash{old}{dev}=$oldDev;
+  $rnHash{new}{dev}=$newDev;
+  
+  my $oldID = $defs{$oldDev}{DEF}; # device ID old
+  my $newID = $defs{$newDev}{DEF}; # device ID new
+  foreach my $i(grep /channel_../,keys %{$defs{$oldDev}}){
+    # each channel of old device needs a pendant in new
+    return "channels incompatible for $oldDev: $i" if (!$defs{$oldDev}{$i} || ! defined $defs{$defs{$oldDev}{$i}});
+    $rnHash{old}{$i}=$defs{$oldDev}{$i};
+
+    if ($defs{$newDev}{$i} && defined $defs{$defs{$newDev}{$i}}){
+      $rnHash{new}{$i}=$defs{$newDev}{$i};
+      return "new channel $i already has peers" if(defined $attr{$rnHash{$_}{new}}{peerIDs} 
+                                                   &&      $attr{$rnHash{$_}{new}}{peerIDs} ne "0000000");
+    }
+    else{
+      return "channel list incompatible for $newDev: $i";
+    }
+  }
+  # each old channel has a pendant in new channel
+  # lets begin
+  #1  --- foreach entity  => rename old>"old-".<name> and new><name>
+  #2  --- foreach channel => copy peers (peerBulk)
+  #3  --- foreach channel => copy registerlist (regBulk)
+  #4  --- foreach channel => copy templates 
+  #5  --- foreach peer (search)
+  #5a                           => add new peering
+  #5b                           => apply reglist for new peer
+  #5c                           => remove old peering
+  #5d                           => update peer templates
+  
+  
+  my @rename = ();# logging only
+  {#1  --- foreach entity  => rename old=>"old-".<name> and new=><name>
+    push @rename,"1) rename";
+    foreach my $i(sort keys %{$rnHash{old}}){
+      my $old = $rnHash{old}{$i};
+      if ($execMode){
+        AnalyzeCommand("","rename $old old-$old");
+        AnalyzeCommand("","rename $rnHash{new}{$i} $old");
+      }
+      push @rename,"1)- $oldDev - $i: rename $old old-$old";
+      push @rename,"1)- $newDev - $i: $rnHash{new}{$i} $old";
+    }
+    if ($execMode){
+      foreach my $name(keys %{$rnHash{old}}){# correct hash internal for further processing
+        $rnHash{new}{$name} = $rnHash{old}{$name};
+        $rnHash{old}{$name} = "old-".$rnHash{old}{$name};
+      }
+    }
+  }
+  {#2  --- foreach channel => copy peers (peerBulk) from old to new
+    push @rename,"2) copy peers from old to new";
+    foreach my $ch(sort keys %{$rnHash{old}}){
+      my ($nameO,$nameN) = ($rnHash{old}{$ch},$rnHash{new}{$ch});
+      next if(!defined $attr{$nameO}{peerIDs});
+      my $peerList = join(",",grep !/(00000000|$oldID..)/, split(",",$attr{$nameO}{peerIDs}));
+      if ($execMode){
+        CUL_HM_Set($defs{$nameN},$nameN,"peerBulk",$peerList,"set") if($peerList);
+      }
+      push @rename,"2)-      $ch: set $nameN peerBulk $peerList" if($peerList);
+    }
+  }
+  {#3  --- foreach channel => copy registerlist (regBulk)
+    push @rename,"3) copy registerlist from old to new";
+    foreach my $ch(sort keys %{$rnHash{old}}){
+      my ($nameO,$nameN) = ($rnHash{old}{$ch},$rnHash{new}{$ch});
+      foreach my $regL(sort  grep /RegL_..\./,keys %{$defs{$nameO}{READINGS}}){
+        my $regLp = $regL; 
+        $regLp =~ s/^\.//;#remove leading '.' 
+        if ($execMode){
+          CUL_HM_Set($defs{$nameN},$nameN,"regBulk",$regLp,$defs{$nameO}{READINGS}{$regL}{VAL});
+        }
+        push @rename,"3)-      $ch: set $nameN regBulk $regLp ...";
+      }
+    }
+  }
+  {#4  --- foreach channel => copy templates 
+    push @rename,"4) copy templates from old to new";
+    if (eval "defined(&HMinfo_templateDel)"){# check templates
+      foreach my $ch(sort keys %{$rnHash{old}}){
+        my ($nameO,$nameN) = ($rnHash{old}{$ch},$rnHash{new}{$ch});
+        if($defs{$nameO}{helper}{tmpl}){
+          foreach(sort keys %{$defs{$nameO}{helper}{tmpl}}){
+            my ($pSet,$tmplID) = split(">",$_);
+            my @p = split(" ",$defs{$nameO}{helper}{tmpl}{$_});
+            if ($execMode){
+              HMinfo_templateSet($nameN,$tmplID,$pSet,@p);
+            }
+            push @rename,"4)-      $ch: templateSet $nameN,$tmplID,$pSet ".join(",",@p);
+          }
+        }
+      }
+    }
+  }
+  {#5  --- foreach peer (search) - remove peers old peer and set new
+    push @rename,"5) for peer devices: remove ols peers";
+    foreach my $ch(sort keys %{$rnHash{old}}){
+      my ($nameO,$nameN) = ($rnHash{old}{$ch},$rnHash{new}{$ch});
+      next if (!$attr{$nameO}{peerIDs});
+      foreach my $pId(grep !/(00000000|$oldID..)/, split(",",$attr{$nameO}{peerIDs})){
+        my ($oChId,$nChId) = (substr($defs{$nameO}{DEF}."01",0,8)
+                             ,substr($defs{$nameN}{DEF}."01",0,8));# obey that device may be channel 01
+        my $peerName = CUL_HM_id2Name($pId);
+
+        { #5a) add new peering
+          if ($execMode){
+            CUL_HM_Set($defs{$peerName},$peerName,"peerBulk",$nChId,"set");  #set new in peer
+          }
+          push @rename,"5)-5a)-  $ch: set $peerName peerBulk $nChId set";
+        }
+        { #5b) apply reglist for new peer
+          foreach my $regL( grep /RegL_..\.$nameO/,keys %{$defs{$peerName}{READINGS}}){
+            my $regLp = $regL; 
+            $regLp =~ s/^\.//;#remove leading '.' 
+            if ($execMode){
+              CUL_HM_Set($defs{$peerName},$peerName,"regBulk",$regLp,$defs{$peerName}{READINGS}{$regL}{VAL});
+            }
+            push @rename,"5)-5b)-  $ch: set $peerName regBulk $regLp ...";
+          }
+        }
+        { #5c) remove old peering
+          if ($execMode){
+            CUL_HM_Set($defs{$peerName},$peerName,"peerBulk",$oChId,"unset");#remove old from peer          
+          }
+          push @rename,"5)-5c)-  $ch: set $peerName peerBulk $oChId unset";
+        }
+        { #5d) update peer templates
+          if (eval "defined(&HMinfo_templateDel)"){# check templates
+            if($defs{$peerName}{helper}{tmpl}){
+              foreach(keys %{$defs{$peerName}{helper}{tmpl}}){
+                my ($pSet,$tmplID) = split(">",$_);
+                $pSet =~ s/$nameO/$nameN/;
+                my @p = split(" ",$defs{$peerName}{helper}{tmpl}{$_});
+                if ($execMode){
+                  HMinfo_templateSet($peerName,$tmplID,$pSet,@p);
+                }
+                push @rename,"5)-5d)-  $ch: templateSet $peerName,$tmplID,$pSet ".join(",",@p);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  push @rename,"5)-5a) add new peering";
+  push @rename,"5)-5b) apply reglist for new peer";
+  push @rename,"5)-5c) remove old peering";
+  push @rename,"5)-5d) update peer templates";
+  foreach my $prt(sort @rename){# logging
+    $prt =~ s/.\)\-/   /;
+    $prt =~ s/   ..\)\-/       /;
+    if ($execMode){ Log3 ($logH,3,"Rename: $prt");}
+    else          { $ret .= "\n    $prt";         }      
+  }
+  if (!$execMode){# we passed preparation mode. Remember to execute it next time
+    $defs{$hmName}{helper}{devRepl} = $oldDev."-".$newDev;
+  }
+
+  return $ret;
 }
 
 sub HMinfo_configCheck ($){ ###################################################
@@ -3005,7 +3207,13 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfotemplateExe">templateExe</a> &lt;template&gt; <br>
           executes the register write once again if necessary (e.g. a device had a reset)<br>
       </li>
-
+      <li><a name="#HMinfodeviceReplace">x-deviceReplace</a> &lt;oldDevice&gt; &lt;newDevice&gt; <br>
+          replacement of an old or broken device with a replacement. The replacement needs to be compatible - FHEM will check this partly. It is up to the user to use it carefully. <br>
+          The command needs to be executed twice for safety reasons. The first call will return with CAUTION remark. Once issued a second time the old device will be renamed, the new one will be named as the old one. Then all peerings, register and templates are corrected as best as posible. <br>
+          NOTE: once the command is executed devices will be reconfigured. This cannot be reverted automatically.  <br>
+          Replay of teh old confg-files will NOT restore the former configurations since also registers changed! Exception: proper and complete usage of templates!<br>
+          In case the device is configured using templates with respect to registers a verification of the procedure is very much secure. Otherwise it is up to the user to supervice message flow for transmission failures. <br>
+      </li>
   </ul>
   <br>
 
@@ -3450,6 +3658,14 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfotemplateExe">templateExe</a> &lt;template&gt; <br>
           führt das templateSet erneut aus. Die Register werden nochmals geschrieben, falls sie nicht zum template passen. <br>
       </li>
+      <li><a name="#HMinfodeviceReplace">x-deviceReplace</a> &lt;oldDevice&gt; &lt;newDevice&gt; <br>
+          Ersetzen eines alten oder defekten Device. Das neue Ersatzdevice muss kompatibel zum Alten sein - FHEM prüft das nur rudimentär. Der Anwender sollt es sorgsam prüfen.<br>
+          Das Kommando muss aus Sicherheitsgründen 2-fach ausgeführt werden. Der erste Aufruf wird mit einem CAUTION quittiert. Nach Auslösen den Kommandos ein 2. mal werden die Devices umbenannt und umkonfiguriert. Er werden alle peerings, Register und Templates im neuen Device UND allen peers umgestellt.<br>
+          ACHTUNG: Nach dem Auslösen kann die Änderung nicht mehr automatisch rückgängig gemacht werden. Manuell ist das natürlich möglich.<br> 
+          Auch ein ückspring auf eine ältere Konfiguration erlaubt KEIN Rückgängigmachen!!!<br>          
+          Sollte das Device und seine Kanäle über Templates definiert sein  - also die Registerlisten - kann im Falle von Problemen in der Übertragung - problemlos wieder hergestellt werden. <br>
+      </li>
+
     </ul>
   </ul>
   <br>
