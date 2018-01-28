@@ -13025,7 +13025,7 @@ sub EnOcean_Notify(@)
       }
       # teach-in response actions
       # delete temporary teach-in response device, see V9333_02
-      Log3($name, 2, "EnOcean $name <notify> DEFINED $definedName");
+      #Log3($name, 2, "EnOcean $name <notify> DEFINED $definedName");
 
     } elsif ($devName eq "global" && $s =~ m/^INITIALIZED$/) {
       # assign remote management defptr
