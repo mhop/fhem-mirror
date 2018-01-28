@@ -71,7 +71,7 @@ sub TRAFFIC_DbLog_split;
 my %TRcmds = (
     'update' => 'noArg',
 );
-my $TRVersion = '1.3.4';
+my $TRVersion = '1.3.5';
 
 sub TRAFFIC_Initialize($){
 
@@ -789,11 +789,15 @@ sub TRAFFIC_DbLog_split($) {
     my @parts = split(/ /,$event);
     $reading = shift @parts;
     $reading =~ tr/://d;
-    $reading =~ s/^return_//;
+    my $alternativeReading = $reading;
+    $alternativeReading =~ s/^return_//; 
     $value = join(" ",@parts);
     
     if($readings->{$reading}){
         $unit = $readings->{$reading};
+        $value =~ s/$unit$//; #try to remove the unit from the value
+    }elsif($readings->{$alternativeReading}){
+        $unit = $readings->{$alternativeReading};
         $value =~ s/$unit$//; #try to remove the unit from the value
     }else{
         Log3 $hash, 5, "TRAFFIC: ($device) TRAFFIC_DbLog_split auto detect unit for reading $reading value $value";

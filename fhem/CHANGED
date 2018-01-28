@@ -1,12 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_TRAFFIC: v1.3.5, fixed return readings in DbLog_SplitFn
   - feature: attr: -a and -r Options added (Forum #83414)
   - feature: 20_FRM_IN: added Firmata 2.5 feature PIN_MODE_PULLUP
                         note: requires perl-firmata 0.64
   - change:  74_Unifi: SSIDs-Readings and drop-downs use goodReadingName()
   - feature: new module 37_NotifyAndroidTV.pm to send notifications
              to Notifications for Android TV/Fire TV apps (justme1968)
-  - bugfix: 98_TRAFFIC: v1.3.4, fixed DbLog_SplitFn, misc improvements 
+  - bugfix:  98_TRAFFIC: v1.3.4, fixed DbLog_SplitFn, misc improvements 
   - change:  72_FB_CALLMONITOR: reverse search provider klicktel.de is
                                 DEPRECATED and will be removed in a future 
                                 release. please use dasoertliche.de instead.
