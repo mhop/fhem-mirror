@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.8.0      26.01.2018       escape "|" in events to log events containing it
 # 3.7.1      25.01.2018       fix typo in commandref
 # 3.7.0      21.01.2018       parsed event with Log 5 added, configCheck enhanced by configuration read check
 # 3.6.5      19.01.2018       fix lot of logentries if disabled and db not available
@@ -180,7 +181,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.7.1";
+my $DbLogVersion = "3.8.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -1222,6 +1223,7 @@ sub DbLog_Log($$) {
 	      if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
 			  my $timestamp = $ts_0;
               $timestamp = $dev_hash->{CHANGETIME}[$i] if(defined($dev_hash->{CHANGETIME}[$i]));
+              $event =~ s/\|/_ESC_/g;    # escape Pipe "|"
               
               my @r = DbLog_ParseEvent($dev_name, $dev_type, $event);
 			  $reading = $r[0];
@@ -1362,7 +1364,7 @@ sub DbLog_Log($$) {
           return if($hash->{HELPER}{REOPEN_RUNS});	  
           my $error = DbLog_Push($hash, $vb4show, @row_array);
           Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error" if($vb4show);
-		  
+		 
           my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
           my $evt    = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
           readingsSingleUpdate($hash, "state", $state, $evt);
@@ -1445,6 +1447,7 @@ sub DbLog_Push(@) {
   
   foreach my $row (@row_array) {
       my @a = split("\\|",$row);
+      s/_ESC_/\|/g for @a;                    # escaped Pipe return to "|"
 	  push(@timestamp, "$a[0]"); 
 	  push(@device, "$a[1]");   
 	  push(@type, "$a[2]");  
@@ -1850,7 +1853,8 @@ sub DbLog_PushAsync(@) {
   my $ceti = $#row_array+1;
   
   foreach my $row (@row_array) {
-      my @a = split("\\|",$row);
+      my @a = split("\\|",$row);       
+      s/_ESC_/\|/g for @a;                    # escaped Pipe return to "|"
 	  push(@timestamp, "$a[0]"); 
 	  push(@device, "$a[1]");   
 	  push(@type, "$a[2]");  
@@ -1984,6 +1988,7 @@ sub DbLog_PushAsync(@) {
 		      Log3 $hash->{NAME}, 4, "DbLog $name -> $ceti of $ceti events inserted into table history".($usepkh?" using PK on columns $pkh":"");
 		  } else {
 		      Log3 $hash->{NAME}, 4, "DbLog $name -> ".($ceti-$nins_hist)." of $ceti events inserted into table history".($usepkh?" using PK on columns $pkh":"");
+              s/\|/_ESC_/g for @n2hist;       # escape Pipe "|"
               $rowlist = join('§', @n2hist);
 			  $rowlist = encode_base64($rowlist,""); 			  
 		  }

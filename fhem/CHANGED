@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog:V3.8.0, log events containing pipe "|" possible
   - bugfix:  98_TRAFFIC: v1.3.5, fixed return readings in DbLog_SplitFn
   - feature: attr: -a and -r Options added (Forum #83414)
   - feature: 20_FRM_IN: added Firmata 2.5 feature PIN_MODE_PULLUP
