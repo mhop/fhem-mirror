@@ -1863,7 +1863,7 @@ sub YAMAHA_NP_ParseResponse
               if(AttrVal($name, "autoUpdatePlayerReadings", "1") eq "1" )
               {
                 # Inputs don't use any player readings. Blank them.
-                if($input !~ m/^(aux|digital|spotify|airplay)/)
+                if($input !~ m/^(aux|digital)/)
                 {
                   YAMAHA_NP_SendCmd($hash, "GET:Player,Play_Info:GetParam", "statusRequest", "playerStatus", 0);        
                 }
