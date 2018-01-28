@@ -44,6 +44,8 @@
 #   2017-04-22 v1.3.2 stroke supports weight and opacity, minor fixes
 #   2017-12-51 v1.3.3 catch JSON decode issue, addedn Dbog_splitFn, added reading summary, new attr GoogleMapsFixedMap, net attr alternatives, new reading alternatives, alternatives, lighter&thinner on map
 #   2018-01-26 v1.3.4 fixed Dbog_splitFn, improved exception handling 
+#   2018-01-28 v1.3.5 fixed Dbog_splitFn again
+#   2018-01-28 v1.3.6 removed perl warning on module load
 #
 ##############################################################################
 
@@ -66,12 +68,12 @@ sub TRAFFIC_Undef($$);
 sub TRAFFIC_Set($@);
 sub TRAFFIC_Attr(@);
 sub TRAFFIC_GetUpdate($);
-sub TRAFFIC_DbLog_split;
+sub TRAFFIC_DbLog_split($);
 
 my %TRcmds = (
     'update' => 'noArg',
 );
-my $TRVersion = '1.3.5';
+my $TRVersion = '1.3.6';
 
 sub TRAFFIC_Initialize($){
 
