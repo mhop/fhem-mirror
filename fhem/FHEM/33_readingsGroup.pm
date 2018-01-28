@@ -1700,7 +1700,7 @@ readingsGroup_Attr($$$;$)
 =pod
 =item helper
 =item summary    display a formated collection of readings from devices
-=item summary_DE Stellt eine formatierte Readings von Ger&auml;te dar
+=item summary_DE Stellt eine formatierte Darstellung aus Readings von Ger&auml;te bereit
 =begin html
 
 <a name="readingsGroup"></a>
@@ -1964,4 +1964,249 @@ readingsGroup_Attr($$$;$)
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="readingsGroup"></a>
+<h3>readingsGroup</h3>
+<ul>
+  Zeigt eine Sammlung von Messwerten von einem oder mehreren Ger&auml;ten an.
+
+  <br><br>
+  <a name="readingsGroup_Define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; readingsGroup &lt;device&gt;[:regex] [&lt;device-2&gt;[:regex-2]] ... [&lt;device-n&gt;[:regex-n]]</code><br>
+    <br>
+
+    Anmerkungen:
+    <ul>
+	  <li>&lt;device&gt; kann die Form INTERNAL=VALUE haben, wobei INTERNAL der Name eines internen Wertes ist und VALUE ein Regex.</li>
+      <li>&lt;device&gt; kann die Form ATTRIBUTE&VALUE haben, wobei ATTRIBUTE der Name eines Attributs ist und VALUE ein Regex.</li>
+	  <li>&lt;device&gt; kann die Form &lt;STRING&gt; oder &lt;{perl}&gt; haben, wobei STRING oder die von Perl zur&uuml;ckgegebene Zeichenfolge als Zeile in die Readings List eingef&uuml;gt wird. Wird &uuml;bersprungen, wenn STRING undef ist.</li>
+      <li>&lt;device&gt; kann ein devspec sein (siehe <a href="#devspec">devspec</a>) mit mindestens einem FILTER-Ausdruck sein.</li>
+	  <li>Wenn Regex eine Komma separarierte Liste ist, werden die Reading-Values in einer einzelnen Zeile angezeigt.</li>
+      <li>Wenn Regex mit einem "+" beginnt, wird es mit den internen Werten (Internals) des Ger&auml;ts anstelle der Readings verglichen.</li>
+	  <li>Wenn Regex mit einem '?' beginnt, wird es mit den Attributen des Ger&auml;ts verglichen und nicht mit den Werten (Readings) verglichen.</li>
+	  <li>Wenn Regex mit einem '!' beginnt, wird die Anzeige des Wertes erzwungen, auch wenn kein Reading mit diesem Namen verf&uuml;gbar ist.</li>
+	  <li>Wenn Regex mit einem '$' beginnt, ist die Berechnung mit Wert-Spalten und Zeilen m&ouml;glich.</li>
+	  <li>Die folgenden <a href="#set">"set magic"</a> Pr&auml;fixe und Suffixe k&ouml;nnen mit Regex verwendet werden:
+         <ul>
+           <li>Sie k&ouml;nnen anstelle von + und ? ein Pr&auml;fix i :, r: oder a: verwenden. Analog zur devspec-Filterung.</li>
+           <li>Der Suffix :d ruft die erste Nummer ab.</li>
+           <li>Der Suffix :i ruft den ganzzahligen Teil der ersten Zahl ab.</li>
+           <li>Der Suffix :r&lt;n&gt; ruft die erste Zahl ab und rundet sie auf &lt;n&gt; Nachkommastellen ab. Wenn <n> fehlt, wird es auf eine Dezimalstelle gerundet.</li>
+		   <li>Der Suffix :t gibt den Zeitstempel zur&uuml;ck (funktioniert nur mit Readings).</li>
+           <li>Der Suffix :sec gibt die Anzahl der Sekunden seit dem das Reading gesetzt wurde zur&uuml;ck. Wahrscheinlich nicht n&uuml;tzlich mit readingsGroups.</li>
+		 </ul></li>
+      <li>Regex kann von der Form &lt;regex&gt;@device sein, um Readings von einem anderen Ger&auml;t zu verwenden.<br>
+		  Wenn der Ger&auml;tename mit einem '!' beginnt, wird die Anzeige deaktiviert. Verwenden Sie in Verbindung mit ! den Reading-Name.</li>
+      <li>Regex kann die Form &lt;regex&gt;@{perl} haben, um Readings von einem anderen Ger&auml;t zu verwenden.</li>
+      <li>Regex kann von der Form &lt;STRING&gt; oder &lt;{perl}[@readings]&gt; sein, wobei STRING oder die von Perl zur&uuml;ckgegebene Zeichenfolge als Reading eingef&uuml;gt wird, oder:
+          <ul><li>das Element wird &uuml;bersprungen, wenn STRING undef ist</li>
+              <li>wenn STRING br ist, wird eine neue Zeile gestartet</li>
+              <li>wenn STRING hr ist, wird eine horizontale Linie eingef&uuml;gt</li>
+              <li>wenn STRING tfoot ist, wird der Tabellenfu&szlig; gestartet</li>
+              <li>wenn STRING die Form hat, %ICON[%CMD] ICON wird als Name eines Symbols anstelle von Text und CMD als der Befehl verwendet, der ausgef&uuml;hrt werden soll, wenn auf das Symbol geklickt wird. Siehe auch die Befehlsattribute.</li></ul>
+          Wenn Readings aktualisiert werden, wird der Perl-Ausdruck bei Longpoll-Aktualisierungen erneut ausgewertet.</li>
+      <li>Wenn der erste Regex '@&lt;index&gt;' ist, gibt es den Index der folgenden Regex an, mit dem die Messwerte gruppiert werden sollen. Wenn Erfassungsgruppen verwendet werden, k&ouml;nnen sie durch #&lt;number&gt; refferenziert werden. z.Bsp:<br><ul>
+          <code>&lt;IP-Adress&gt;&lt;Hostname&gt;&lt;MAC&gt;&lt;Vendor&gt;<br>
+          nmap:@2,<#1>,(.*)_hostname,#1_macAddress,#1_macVendor</code></ul></li>
+      <li>F&uuml;r interne Werte (Internals) und Attribute ist longpoll update nicht m&ouml;glich. Aktualisieren Sie die Seite, um die Werte zu aktualisieren.</li>
+      <li>Der Ausdruck &lt;{perl}&gt; ist auf Ausdr&uuml;cke ohne Leerzeichen beschr&auml;nkt. Es ist am besten, eine kleine Sub in 99_myUtils.pm aufzurufen, anstatt einen complexen Ausdruck im Define zu haben.</li>
+    </ul><br>
+
+    Beispiele:
+    <ul>
+      <code>
+        define batteries readingsGroup .*:battery</code><br>
+      <br>
+        <code>define temperatures readingsGroup s300th.*:temperature</code><br>
+        <code>define temperatures readingsGroup TYPE=CUL_WS:temperature</code><br>
+      <br>
+        <code>define culRSSI readingsGroup cul_RSSI=.*:+cul_RSSI</code><br>
+      <br>
+        <code>define heizung readingsGroup t1:temperature t2:temperature t3:temperature<br>
+        attr heizung notime 1<br>
+        attr heizung mapping {'t1.temperature' => 'Vorlauf', 't2.temperature' => 'R&amp;uuml;cklauf', 't3.temperature' => 'Zirkulation'}<br>
+        attr heizung style style="font-size:20px"<br>
+      <br>
+        define systemStatus readingsGroup sysstat<br>
+        attr systemStatus notime 1<br>
+        attr systemStatus nostate 1<br>
+        attr systemStatus mapping {'load' => 'Systemauslastung', 'temperature' => 'Systemtemperatur in &amp;deg;C'}<br>
+      <br>
+        define Verbrauch readingsGroup TYPE=PCA301:state,power,consumption<br>
+        attr Verbrauch mapping %ALIAS<br>
+        attr Verbrauch nameStyle style="font-weight:bold"<br>
+        attr Verbrauch style style="font-size:20px"<br>
+        attr Verbrauch valueFormat {power => "%.1f W", consumption => "%.2f kWh"}<br>
+        attr Verbrauch valueIcon { state => '%devStateIcon' }<br>
+        attr Verbrauch valueStyle {($READING eq "power" && $VALUE > 150)?'style="color:red"':'style="color:green"'}<br>
+      <br>
+        define rg_battery readingsGroup TYPE=LaCrosse:[Bb]attery<br>
+        attr rg_battery alias Batteriestatus<br>
+        attr rg_battery commands { "battery.low" => "set %DEVICE replaceBatteryForSec 60" }<br>
+        attr rg_battery valueIcon {'battery.ok' => 'batterie', 'battery.low' => 'batterie@red'}<br>
+      <br>
+        define rgMediaPlayer readingsGroup myMediaPlayer:currentTitle,<>,totaltime,<br>,currentAlbum,<>,currentArtist,<br>,volume,<{if(ReadingsVal($DEVICE,"playStatus","")eq"paused"){"%rc_PLAY%set+$DEVICE+play"}else{"%rc_PAUSE%set+$DEVICE+pause"}}@playStatus>,playStatus<br>
+        attr rgMediaPlayer commands { "playStatus.paused" => "set %DEVICE play", "playStatus.playing" => "set %DEVICE pause" }<br>
+        attr rgMediaPlayer mapping &nbsp;<br>
+        attr rgMediaPlayer notime 1<br>
+        attr rgMediaPlayer valueFormat { "volume" => "Volume: %i" }<br>
+        #attr rgMediaPlayer valueIcon { "playStatus.paused" => "rc_PLAY", "playStatus.playing" => "rc_PAUSE" }<br>
+      </code><br>
+    </ul>
+  </ul><br>
+
+  <a name="readingsGroup_Set"></a>
+    <b>Set</b>
+    <ul>
+      <li>hide<br>
+      Alle sichtbaren Instanzen dieser ReadingsGroup werden ausgeblendet</li>
+      <li>show<br>
+      Zeigt alle sichtbaren Instanzen dieser ReadingsGroup an</li>
+      <li>toggle<br>
+      Schaltet den versteckten / angezeigten Zustand aller sichtbaren Instanzen dieser ReadingsGroup an.</li>
+      <li>toggle2<br>
+      schaltet den erweiterten / kollabierten Zustand aller sichtbaren Instanzen dieser ReadingsGroup an.</li>
+    </ul><br>
+
+  <a name="readingsGroup_Get"></a>
+    <b>Get</b>
+    <ul>
+    </ul><br>
+
+  <a name="readingsGroup_Attr"></a>
+    <b>Attribute</b>
+    <ul>
+      <li>alwaysTrigger<br>
+        1 -> alwaysTrigger Ereignisse aktualisieren auch wenn nicht sichtbar.<br>
+        2 -> trigger Ereignisse f&uuml;r berechnete Werte.</li><br>
+      <li>disable<br>
+        1 -> Deaktivieren der Benachrichtigung Verarbeitung und Longpoll-Updates. Hinweis: Dadurch wird auch die Umbenennung und L&ouml;schbehandlung deaktiviert.<br>
+        2 -> Deaktivieren der HTML-Tabellenerstellung<br>
+        3 -> Deaktivieren der HTML-Erstellung vollst&auml;ndig</li><br>
+      <li>sortDevices<br>
+        1 -> Sortieren der Ger&auml;teliste alphabetisch. Verwenden Sie das erste von sortby oder alias oder name, das f&uuml;r jedes Ger&auml;t definiert ist.</li>
+      <li>noheading<br>
+        Wenn sie auf 1 gesetzt ist, hat die Readings-Tabelle keine &Uuml;berschrift.</li><br>
+      <li>nolinks<br>
+        Deaktiviert die HTML-Links von der &Uuml;berschrift und den Readings-Namen.</li><br>
+      <li>nostate<br>
+        Wenn der Wert 1 ist, wird der Status nicht ber&uuml;cksichtigt.</li><br>
+      <li>nonames<br>
+        Wenn der Wert auf 1 gesetzt ist, wird der Readings-Name / Zeilentitel nicht angezeigt.</li><br>
+      <li>notime<br>
+        Wenn der Wert auf 1 gesetzt, wird der Readings-Timestamp nicht angezeigt.</li><br>
+      <li>mapping<br>
+        Kann ein einfacher String oder ein in {} eingeschlossener Perl-Ausdruck sein, der einen Hash zur&uuml;ckgibt, der den Reading-Name dem angezeigten Namen zuordnet. 
+		Der Schl&uuml;ssel kann entweder der Name des Readings oder &lt;device&gt;.&lt;reading&gt; oder &lt;reading&gt;.&lt;value&gt; oder &lt;device&gt;.&lt;reading&gt;.&lt;value&gt; sein.
+        %DEVICE, %ALIAS, %ROOM, %GROUP, %ROW und %READING werden durch den Ger&auml;tenamen, Ger&auml;tealias, Raumattribut ersetzt. Sie k&ouml;nnen diesen Keywords auch ein Pr&auml;fix voranstellen $ anstatt von %. Beispiele:<br>
+          <code>attr temperatures mapping $DEVICE-$READING</code><br>
+          <code>attr temperatures mapping {temperature => "%DEVICE Temperatur"}</code>
+        </li><br>
+      <li>separator<br>
+        Das zu verwendende Trennzeichen zwischen dem Ger&auml;tealias und dem Reading-Namen, wenn keine Zuordnung angegeben ist, standardgem&auml;&szlig; ':' 
+        Ein Leerzeichen wird so dargestellt <code>&amp;nbsp;</code></li><br>
+      <li>setList<br>
+        Eine durch Leerzeichen getrennte Liste von Befehlen, die zur&uuml;ckgegeben werden "set name ?",
+        Das FHEMWEB-Frontend kann also ein Dropdown-Men&uuml; erstellen und An / Aus-Schalter anbieten.
+        Set-Befehle, die nicht in dieser Liste enthalten sind, werden zur&uuml;ckgewiesen.</li><br>
+      <li>setFn<br>
+        Perl-Ausdruck, der f&uuml;r die Befehle aus der setList ausgef&uuml;hrt wird. Es hat Zugriff auf $CMD und $ARGS.</li><br>
+      <li>style<br>
+        Geben Sie einen HTML-Stil f&uuml;r die Readings-Tabelle an, z.Bsp:<br>
+          <code>attr temperatures style style="font-size:20px"</code></li><br>
+      <li>cellStyle<br>
+        Geben Sie einen HTML-Stil f&uuml;r eine Zelle der Readings-Tabelle an. Normale Zeilen und Spalten werden gez&auml;hlt beginnend mit 1,
+        Die Zeilen&uuml;berschriften beginnt mit der Spaltennummer 0. Perl-Code hat Zugriff auf $ROW und $COLUMN. Schl&uuml;ssel f&uuml;r Hash-Lookup k&ouml;nnen sein: 
+        r:#, c:# oder r:#,c:# , z.Bsp:<br>
+          <code>attr temperatures cellStyle { "c:0" => 'style="text-align:right"' }</code></li><br>
+      <li>nameStyle<br>
+        Geben Sie einen HTML-Stil f&uuml;r die Readings-Namen an, z.Bsp:<br>
+          <code>attr temperatures nameStyle style="font-weight:bold"</code></li><br>
+      <li>valueStyle<br>
+        Geben Sie einen HTML-Stil f&uuml;r die Readings-Werte an, z.Bsp:<br>
+          <code>attr temperatures valueStyle style="text-align:right"</code></li><br>
+      <li>valueColumn<br>
+        Geben Sie die Mindestspalte an, in der ein Messwert angezeigt werden soll. z.Bsp:<br>
+          <code>attr temperatures valueColumn { temperature => 2 }</code></li><br>
+      <li>valueColumns<br>
+        Geben Sie einen HTML-Colspan f&uuml;r die Readings-Werte an, z.Bsp:<br>
+          <code>attr wzReceiverRG valueColumns { eventdescription => 'colspan="4"' }</code></li><br>
+      <li>valueFormat<br>
+        Geben Sie eine Sprintf-Stilformat-Zeichenfolge an, die zum Anzeigen der Readings-Werte verwendet wird. Wenn die Formatzeichenfolge undef ist 
+        wird dieser Messwert &uuml;bersprungen. Es kann als String angegeben werden, ein Perl-Ausdruck, der einen Hash- oder Perl-Ausdruck zur&uuml;ckgibt, der einen String zur&uuml;ckgibt, z.Bsp:<br>
+          <code>attr temperatures valueFormat %.1f &deg;C</code><br>
+          <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%i %" }</code><br>
+          <code>attr temperatures valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li><br>
+      <li>valuePrefix<br>
+        Text, der dem Readings-Wert vorangestellt wird</li><br>
+      <li>valueSuffix<br>
+        Text, der nach dem Readings-Wert angeh&auml;ngt wird<br>
+          <code>attr temperatures valueFormat { temperature => "%.1f", humidity => "%i" }</code><br>
+          <code>attr temperatures valueSuffix { temperature => "&deg;C", humidity => " %" }</code></li><br>
+      <li>nameIcon<br>
+        Geben Sie das Symbol an, das anstelle des Readings-Name verwendet werden soll. Es kann ein einfacher String oder ein in {} eingeschlossener Perl-Ausdruck sein, der einen Hash zur&uuml;ckgibt, der dem Readings-Name den Icon-Namen zuordnet. z.Bsp:<br>
+          <code>attr devices nameIcon $DEVICE</code></li><br>
+      <li>valueIcon<br>
+        Geben Sie ein Symbol an, das anstelle des Readings-Wert verwendet werden soll. Es kann ein einfacher String oder ein in {} eingeschlossener Perl-Ausdruck sein, der einen Hash zur&uuml;ckgibt, der dem Readings-Wert dem Symbolnamen zuordnet. z.Bsp:<br>
+          <code>attr devices valueIcon $VALUE</code><br>
+          <code>attr devices valueIcon {state => '%VALUE'}</code><br>
+          <code>attr devices valueIcon {state => '%devStateIcon'}</code><br>
+          <code>attr rgMediaPlayer valueIcon { "playStatus.paused" => "rc_PLAY", "playStatus.playing" => "rc_PAUSE" }</code></li><br>
+      <li>commands<br>
+        Kann auf verschiedene Arten verwendet werden:
+        <ul>
+        <li>Um ein Reading oder ein Symbol anklickbar zu machen, indem Sie direkt den Befehl angeben, der ausgef&uuml;hrt werden soll. z.Bsp:<br>
+        <code>attr rgMediaPlayer commands { "playStatus.paused" => "set %DEVICE play", "playStatus.playing" => "set %DEVICE pause" }</code></li>
+        <li>Wenn der zugeordnete Befehl die Form &lt;command&gt;:[&lt;modifier&gt;] hat, wird das normale <a href="#FHEMWEB">FHEMWEB</a> webCmd-Widget f&uuml;r <Modifikator> f&uuml;r diesen commands verwendet. z.Bsp:<br>
+        <code>attr rgMediaPlayer commands { volume => "volume:slider,0,1,100" }</code><br>
+        <code>attr lights commands { pct => "pct:", dim => "dim:" }</code></li>
+        <li>commands k&ouml;nnen f&uuml;r Attribute verwendet werden. z.Bsp:<br>
+        <code>attr <rg> commands { disable => "disable:" }</code></li>
+        </ul></li><br>
+      <li>visibility<br>
+        Wenn sie auf hidden oder hideable eingestellt ist, wird eine kleine Schaltfl&auml;che links neben dem Namen der Readings-Group angezeigt, um den Inhalt der Readings-Group zu erweitern / auszublenden. Wenn eine Readings-Group erweitert wird, werden alle anderen Gruppen derselben Gruppe ausgeblendet.<br>
+        <ul>
+        hidden -> Standardm&auml;&szlig;ig ist hidden aktiv, kann jedoch erweitert werden.<br>
+        hideable -> Standardm&auml;&szlig;ig ist hideable aktiv, kann jedoch ausgeblendet werden.<br><br>
+        </ul>
+        Wenn diese Option auf "collapsed" oder "collapsible" eingestellt ist, erkennt readingsGroup die Specials &lt;-&gt;,&lt;+&gt; und &lt;+-&gt; als die ersten Elemente von
+        eine Linie, um dieser Linie ein + oder - Symbol hinzuzuf&uuml;gen. Durch Klicken auf das + oder - Symbol wird zwischen erweitertem und reduziertem Zustand umgeschaltet. Wenn eine Readings-Group erweitert wird, werden alle anderen Gruppen in der gleichen Gruppe ausgeblendet.
+        <ul>
+        - -> Die Linie wird im expandierten Zustand sichtbar sein.<br>
+        + -> Die Linie wird im zusammengefalteten Zustand angezeigt.<br>
+        +- -> Die Linie wird in beiden Zust&auml;nden sichtbar sein.<br>
+        <br>
+        collapsed -> Der Standardstatus ist reduziert, kann jedoch erweitert werden.<br>
+        collapsible -> Der Standardstatus ist sichtbar, kann jedoch minimiert werden.<br><br></li>
+        </ul>
+        <li>headerRows<br><br>
+        </li>
+        <li>sortColumn<br>
+          &gt; 0 -> sortiert die Tabelle automatisch nach dem Laden der Seite nach dieser Spalte<br>
+          0 -> sortiert Sie nicht automatisch, sondern durch Klicken auf eine Spalten&uuml;berschrift<br>
+          &lt; 0 -> sortiert die Tabelle automatisch nach dem Laden der Seite nach dieser Spalte
+        </li>
+        <br><li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
+    </ul><br>
+
+      F&uuml;r die Hash-Version aller Zuordnungsattribute kann ein Standardwert angegeben werden mit <code>{ '' => &lt;default&gt; }</code>.<br><br>
+
+      Die Stilattribute k&ouml;nnen auch einen in {} eingeschlossenen Perl-Ausdruck enthalten, der die zu verwendende Stilzeichenfolge zur&uuml;ckgibt. F&uuml;r nameStyle und valueStyle, kann der Perl-Code $DEVICE,$READING,$VALUE und $NUM verwendet werden. z.Bsp:<br>
+      <ul>
+          <code>attr batteries valueStyle {($VALUE ne "ok")?'style="color:red"':'style="color:green"'}</code><br>
+          <code>attr temperatures valueStyle {($DEVICE =~ m/aussen/)?'style="color:green"':'style="color:red"'}</code>
+      </ul><br>
+
+      Hinweis: Nur valueStyle, valueFomat, valueIcon und <{...}@reading> werden bei Longpoll-Updates ausgewertet und valueStyle muss f&uuml;r jeden m&ouml;glichen Wert einen nicht leeren Stil zur&uuml;ckgeben. Alle anderen Perl-Ausdr&uuml;cke werden nur einmal w&auml;hrend der HTML-Erstellung ausgewertet und geben keine Wertupdates mit longpoll wieder. 
+      Aktualisieren Sie die Seite, um den dynamischen Stil zu aktualisieren. F&uuml;r nameStyle funktioniert das Farbattribut momentan nicht, die font -... und background Attribute funktionieren.<br><br>
+
+      Berechnung: Bitte sehen Sie sich daf&uuml;r diese <a href="http://www.fhemwiki.de/wiki/ReadingsGroup#Berechnungen">Beschreibung</a> an in der Wiki.<br>
+      z.Bsp: <code>define rg readingsGroup .*:temperature rg:$avg</code>
+      
+</ul>
+
+=end html_DE
 =cut
