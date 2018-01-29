@@ -47,7 +47,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.46";
+my $yaahmversion    = "1.47";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -1886,16 +1886,25 @@ sub YAAHM_sayWeeklyTime($$$) {
   ($hl,$ml) = split(':',strftime('%H:%M', localtime(time)));
   $tl = 60*$hl+$ml;
   
-  #-- today off AND tomorrow any time or off
+  #-- today off AND tomorrow any time or off => compare this time with current time
   if( $tod =~ /^off.*/ ){
-    #-- special time
+    #-- tomorrow any time
     if( $tom =~ /(\d?\d):(\d\d)(:(\d\d))?/ && $tom !~ /.*\(off\)$/ ){
-      $hw = $1*1;
-      $mw = $2*1;
-      $pt = sprintf("%d:%02d",$hw,$mw)." ".lc($yaahm_tt->{"tomorrow"});
-      $msg .= " ".lc($yaahm_tt->{"tomorrow"})." $hw ".$yaahm_tt->{"clock"};
-      $msg .=" $mw"
-       if( $mw != 0 );
+      #Log 1,"===========> |$1|$2|$3|$4";
+      ($ht,$mt) = split('[\s:]',$tom);
+      $tt=60*$ht+$mt;
+      #-- wakeup tomorrow later than now
+      if( $tt < $tl ){
+        $hw = $1*1;
+        $mw = $2*1;
+        $pt = sprintf("%d:%02d",$hw,$mw)." ".lc($yaahm_tt->{"tomorrow"});
+        $msg .= " ".lc($yaahm_tt->{"tomorrow"})." $hw ".$yaahm_tt->{"clock"};
+        $msg .=" $mw"
+         if( $mw != 0 );
+      }else{
+        $pt   = "off ".lc($yaahm_tt->{"today"});
+        $msg .= " ".lc($yaahm_tt->{"today"})." ".$yaahm_tt->{"swoff"}; 
+      }
     }elsif( $tom =~ /^off/ || $tom =~ /.*\(off\)$/ ){
       $pt   = "off ".lc($yaahm_tt->{"today"})." ".$yaahm_tt->{"and"}." ".lc($yaahm_tt->{"tomorrow"});
       $msg .= " ".lc($yaahm_tt->{"today"})." ".$yaahm_tt->{"and"}." ".lc($yaahm_tt->{"tomorrow"})." ".$yaahm_tt->{"swoff"};
