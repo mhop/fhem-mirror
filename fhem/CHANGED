@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  88_HMCCU: Version 4.2
+  - new:     88_HMCCURPCPROC: Sub process based RPC server for HMCCU.
   - feature: 73_PRESENCE: new collectord package (RSSI based room selection
                           for BTLE devices (lepresenced), ping command for
                           daemon monitoring, systemd service unit

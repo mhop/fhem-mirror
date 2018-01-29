@@ -4,9 +4,9 @@
 #
 #  $Id$
 #
-#  Version 4.1.003
+#  Version 4.2
 #
-#  (c) 2017 zap (zap01 <at> t-online <dot> de)
+#  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
 ######################################################################
 #
@@ -15,7 +15,7 @@
 #
 #  set <name> config [device] <parameter>=<value> [...]
 #  set <name> control <value>
-#  set <name> datapoint <datapoint> <value>
+#  set <name> datapoint <datapoint> <value> [...]
 #  set <name> defaults
 #  set <name> devstate <value>
 #  set <name> <stateval_cmds>
@@ -33,9 +33,8 @@
 #  get <name> devstate
 #  get <name> update
 #
-#  attr <name> ccuackstate { 0 | 1 }
 #  attr <name> ccucalculate <value>:<reading>[:<dp-list>][...]
-#  attr <name> ccuflags { altread, nochn0, trace }
+#  attr <name> ccuflags { ackState, nochn0, trace }
 #  attr <name> ccuget { State | Value }
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingfilter <filter-rule>[;...]
@@ -82,8 +81,8 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "IODev ccuackstate:0,1 ccucalculate ".
-		"ccuflags:multiple-strict,altread,nochn0,trace ccureadingfilter ".
+	$hash->{AttrList} = "IODev ccucalculate ".
+		"ccuflags:multiple-strict,ackState,nochn0,trace ccureadingfilter ".
 		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ".
 		"ccureadingname:textField-long ".
 		"ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint ".
@@ -219,20 +218,28 @@ sub HMCCUCHN_Set ($@)
 	my $rc;
 
 	if ($opt eq 'datapoint') {
-		my $objname = shift @$a;
-		my $objvalue = shift @$a;
+		my $usage = "Usage: set $name datapoint {datapoint} {value} [...]";
+		my %dpval;
+		while (my $objname = shift @$a) {
+			my $objvalue = shift @$a;
 
-		return HMCCU_SetError ($hash, "Usage: set $name datapoint {datapoint} {value}")
-		   if (!defined ($objname) || !defined ($objvalue));
-		return HMCCU_SetError ($hash, -8)
-			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $objname, 2));
+			return HMCCU_SetError ($hash, $usage) if (!defined ($objvalue));
+			return HMCCU_SetError ($hash, -8)
+				if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $objname, 2));
 		   
-		$objvalue =~ s/\\_/%20/g;
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
+			$objvalue =~ s/\\_/%20/g;
+			$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
 
-		$objname = $ccuif.'.'.$ccuaddr.'.'.$objname;
-		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+			$objname = $ccuif.'.'.$ccuaddr.'.'.$objname;
+			$dpval{$objname} = $objvalue;
+		}
+
+		return HMCCU_SetError ($hash, $usage) if (scalar (keys %dpval) < 1);
+		
+		foreach my $dpt (keys %dpval) {
+			$rc = HMCCU_SetDatapoint ($hash, $dpt, $dpval{$dpt});
+			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		}
 
 		return HMCCU_SetState ($hash, "OK");
 	}
@@ -623,12 +630,13 @@ sub HMCCUCHN_Get ($@)
         Valid parameters can be listed by using commands 'get configdesc' or 'get configlist'.
         With option 'device' specified parameters are set in device instead of channel.
       </li><br/>
-      <li><b>set &lt;name&gt; datapoint &lt;datapoint&gt; &lt;value&gt;</b><br/>
-        Set value of a datapoint of a CCU channel. If parameter <i>value</i> contains special
+      <li><b>set &lt;name&gt; datapoint &lt;datapoint&gt; &lt;value&gt; [...]</b><br/>
+        Set datapoint values of a CCU channel. If parameter <i>value</i> contains special
         character \_ it's substituted by blank.
         <br/><br/>
         Examples:<br/>
-        <code>set temp_control datapoint SET_TEMPERATURE 21</code>
+        <code>set temp_control datapoint SET_TEMPERATURE 21</code><br/>
+        <code>set temp_control datapoint AUTO_MODE 1 SET_TEMPERATURE 21</code>
       </li><br/>
       <li><b>set &lt;name&gt; defaults</b><br/>
    		Set default attributes for CCU device type. Default attributes are only available for
@@ -745,10 +753,6 @@ sub HMCCUCHN_Get ($@)
       To reduce the amount of events it's recommended to set attribute 'event-on-change-reading'
       to '.*'.
       <br/><br/>
-      <li><b>ccuackstate {<u>0</u> | 1}</b><br/>
-         If set to 1 state will be set to result of command (i.e. 'OK'). Otherwise state is only
-         updated if value of state datapoint has changed.
-      </li><br/>
       <li><b>ccucalculate &lt;value-type&gt;:&lt;reading&gt;[:&lt;dp-list&gt;[;...]</b><br/>
       	Calculate special values like dewpoint based on datapoints specified in
       	<i>dp-list</i>. The result is stored in <i>reading</i>. The following <i>values</i>
@@ -766,6 +770,7 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
       <li><b>ccuflags {nochn0, trace}</b><br/>
       	Control behaviour of device:<br/>
+      	ackState: Acknowledge command execution by setting STATE to error or success.<br/>
       	nochn0: Prevent update of status channel 0 datapoints / readings.<br/>
       	trace: Write log file information for operations related to this device.
       </li><br/>
@@ -915,16 +920,21 @@ sub HMCCUCHN_Get ($@)
          set my_switch on
          </code>
       </li><br/>
-      <li><b>stripnumber [&lt;datapoint-expr&gt;!]{<u>0</u>|1|2|-n}[;...]</b><br/>
-      	Remove trailing digits or zeroes from floating point numbers and/or round floating
-      	point numbers. If attribute is negative (-0 is valid) floating point values are rounded
+      <li><b>stripnumber [&lt;datapoint-expr&gt;!]{<u>0</u>|1|2|-n|%fmt}[;...]</b><br/>
+      	Remove trailing digits or zeroes from floating point numbers, round or format
+      	numbers. If attribute is negative (-0 is valid) floating point values are rounded
       	to the specified number of digits before they are stored in readings. The meaning of
-      	values 0-2 is:<br/>
+      	values 0,1,2 is:<br/>
       	0 = Floating point numbers are stored as read from CCU (i.e. with trailing zeros)<br/>
       	1 = Trailing zeros are stripped from floating point numbers except one digit.<br/>
    		2 = All trailing zeros are stripped from floating point numbers.<br/>
+   		With %fmt one can specify any valid sprintf() format string.<br/>
    		If <i>datapoint-expr</i> is specified the formatting applies only to datapoints 
-   		matching the regular expression.
+   		matching the regular expression.<br/>
+   		Example:<br>
+   		<code>
+   		attr myDev stripnumber TEMPERATURE!%.2f degree
+   		</code>
       </li><br/>
       <li><b>substexcl &lt;reading-expr&gt;</b><br/>
       	Exclude values of readings matching <i>reading-expr</i> from substitution. This is helpful

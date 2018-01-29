@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.1.002
+#  Version 4.2
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -71,21 +71,30 @@ use vars qw(%HMCCU_SCRIPTS);
 	substitute       => "STATE!(0|false):off,(1|true):on;WORKING!(0|false):no,(1|true):yes",
 	webCmd           => "press"
 	},
-	"HM-LC-Sw1-Pl-2|HMIP-PS" => {
+	"HM-LC-Sw1-Pl-2|HM-LC-Sw1-Pl-DN-R1" => {
 	_description     => "Steckdose",
-	_channels        => "1,3",
+	_channels        => "1",
 	ccureadingfilter => "STATE",
-	controldatapoint => "STATE",
 	statedatapoint   => "STATE",
 	statevals        => "on:true,off:false",
 	substitute       => "STATE!(1|true):on,(0|false):off",
-	webCmd           => "control",
-	widgetOverride   => "control:uzsuToggle,off,on"
+	webCmd           => "devstate",
+	widgetOverride   => "devstate:uzsuToggle,off,on"
+	},
+	"HMIP-PS" => {
+	_description     => "Steckdose",
+	_channels        => "3",
+	ccureadingfilter => "STATE",
+	statedatapoint   => "STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(1|true):on,(0|false):off",
+	webCmd           => "devstate",
+	widgetOverride   => "devstate:uzsuToggle,off,on"
 	},
 "HM-LC-Dim1L-Pl|HM-LC-Dim1L-Pl-2|HM-LC-Dim1L-CV|HM-LC-Dim2L-CV|HM-LC-Dim2L-SM|HM-LC-Dim1L-Pl-3|HM-LC-Dim1L-CV-2" => {
 	_description     => "Funk-Anschnitt-Dimmaktor",
 	_channels        => "1",
-	ccureadingfilter => "(^LEVEL$|DIRECTION)",
+	ccureadingfilter => "(^LEVEL\$|DIRECTION)",
 	ccuscaleval      => "LEVEL:0:1:0:100",
 	cmdIcon          => "on:general_an off:general_aus",
 	controldatapoint => "LEVEL",
@@ -101,7 +110,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	"HM-LC-Dim1PWM-CV|HM-LC-Dim1PWM-CV-2" => {
 	_description     => "Funk-PWM-Dimmaktor",
 	_channels        => "1",
-	ccureadingfilter => "(^LEVEL$|DIRECTION)",
+	ccureadingfilter => "(^LEVEL\$|DIRECTION)",
 	ccuscaleval      => "LEVEL:0:1:0:100",
 	cmdIcon          => "on:general_an off:general_aus",
 	controldatapoint => "LEVEL",
@@ -172,6 +181,28 @@ use vars qw(%HMCCU_SCRIPTS);
 	substitute       => "STATE!(true|1):on,(false|0):off",
 	webCmd           => "control",
 	widgetOverride   => "control:uzsuToggle,off,on"
+	},
+	"HM-LC-Sw2PBU-FM" => {
+	_description     => "Funk-Schaltaktor 2-fach",
+	_channels        => "1,2",
+	ccureadingfilter => "STATE",
+	controldatapoint => "STATE",
+	statedatapoint   => "STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(true|1):on,(false|0):off",
+	webCmd           => "control",
+	widgetOverride   => "control:uzsuToggle,off,on"	
+	},
+	"HmIP-BSM" => {
+	_description     => "Schalt-Mess-Aktor",
+	_channels        => "4",
+	ccureadingfilter => "STATE",
+	statedatapoint   => "STATE",
+	controldatapoint => "STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(true|1):on,(false|0):off",
+	webCmd           => "control",
+	widgetOverride   => "control:uzsuToggle,off,on"		
 	},
 	"HM-SCI-3-FM" => {
 	_description     => "3 Kanal Schliesserkontakt",
@@ -293,6 +324,14 @@ use vars qw(%HMCCU_SCRIPTS);
 	statedatapoint   => "STATE",
 	substitute       => "ERROR_ALARM_TEST!0:no,1:failed;ERROR_SMOKE_CHAMBER!0:no,1:degraded"	
 	},
+	"HmIP-SWSD" => {
+	_description     => "Funk-Rauchmelder",
+	_channels        => "1",
+	ccureadingfilter => "(ALARM_STATUS|TEST_RESULT|ERROR_CODE)",
+	eventMap         => "/datapoint SMOKE_DETECTOR_COMMAND  0:reservedAlarmOff/datapoint SMOKE_DETECTOR_COMMAND  1:intrusionAlarmOff/datapoint SMOKE_DETECTOR_COMMAND  2:intrusionAlarmOn/datapoint SMOKE_DETECTOR_COMMAND  3:smokeTest/datapoint SMOKE_DETECTOR_COMMAND  4:comTest/datapoint SMOKE_DETECTOR_COMMAND  5:comTestRepeat/",
+	statedatapoint   => "SMOKE_DETECTOR_ALARM_STATUS",
+	substitute       => "SMOKE_DETECTOR_ALARM_STATUS!0:noAlarm,1:primaryAlarm,2:intrusionAlarm,3:secondaryAlarm;SMOKE_DETECTOR_TEST_RESULT!0:none,1:smokeTestOK,2:smokeTestFailed,3:comTestSent,4:comTestOK"
+	},
 	"HM-Sec-SFA-SM" => {
 	_description     => "Alarmsirene",
 	_channels        => "1",
@@ -340,9 +379,9 @@ use vars qw(%HMCCU_SCRIPTS);
 %HMCCU_DEV_DEFAULTS = (
    "CCU2" => {
    _description     => "HomeMatic CCU2",
-   "ccudef-readingfilter" => '^(LOW_?BAT|UNREACH)$',
+   "ccudef-readingfilter" => '^(LOW_?BAT|UNREACH)\$',
    "ccudef-readingformat" => 'datapoint',
-   "ccudef-readingname"   => '^(.+\.)?AES_KEY$:sign;^(.+\.)?LOW_?BAT$:battery;^(.+\.)?BATTERY_STATE$:batteryLevel;^(.+\.)?UNREACH$:Activity;^(.+\.)?TEMPERATURE$:+temperature;^(.+\.)?SET_TEMPERATURE$:+desired-temp;^(.+\.)?HUMIDITY$:+humidity;^(.+\.)?LEVEL$:+pct;^(.+\.)?CONTROL_MODE$:+controlMode',
+   "ccudef-readingname"   => '^(.+\.)?AES_KEY\$:sign;^(.+\.)?LOW_?BAT\$:battery;^(.+\.)?BATTERY_STATE\$:batteryLevel;^(.+\.)?UNREACH\$:Activity;^(.+\.)?TEMPERATURE\$:+temperature;^(.+\.)?SET_TEMPERATURE\$:+desired-temp;^(.+\.)?HUMIDITY\$:+humidity;^(.+\.)?LEVEL\$:+pct;^(.+\.)?CONTROL_MODE\$:+controlMode',
    "ccudef-substitute"    => 'AES_KEY!(0|false):off,(1|true):on;LOWBAT,LOW_BAT!(0|false):ok,(1|true):low;UNREACH!(0|false):alive,(1|true):dead;MOTION!(0|false):noMotion,(1|true):motion;DIRECTION!0:stop,1:up,2:down,3:undefined;WORKING!0:false,1:true;INHIBIT!(0|false):unlocked,(1|true):locked'
    },
 	"HM-Sec-SCo|HM-Sec-SC|HM-Sec-SC-2|HMIP-SWDO" => {
@@ -388,25 +427,23 @@ use vars qw(%HMCCU_SCRIPTS);
 	substitute       => "STATE!(0|false):off,(1|true):on;WORKING!(0|false):no,(1|true):yes",
 	webCmd           => "press"
 	},
-	"HM-LC-Sw1-Pl-2" => {
+	"HM-LC-Sw1-Pl-2|HM-LC-Sw1-Pl-DN-R1" => {
 	_description     => "Steckdose",
 	ccureadingfilter => "STATE",
-	controldatapoint => "1.STATE",
 	statedatapoint   => "1.STATE",
 	statevals        => "on:true,off:false",
 	substitute       => "STATE!(1|true):on,(0|false):off",
-	webCmd           => "control",
-	widgetOverride   => "control:uzsuToggle,off,on"
+	webCmd           => "devstate",
+	widgetOverride   => "devstate:uzsuToggle,off,on"
 	},
 	"HMIP-PS" => {
 	_description     => "Steckdose IP",
 	ccureadingfilter => "STATE",
-	controldatapoint => "3.STATE",
 	statedatapoint   => "3.STATE",
 	statevals        => "on:1,off:0",
 	substitute       => "STATE!(1|true):on,(0|false):off",
-	webCmd           => "control",
-	widgetOverride   => "control:uzsuToggle,off,on"
+	webCmd           => "devstate",
+	widgetOverride   => "devstate:uzsuToggle,off,on"
 	},
 	"HM-ES-PMSw1-Pl|HM-ES-PMSw1-Pl-DN-R1|HM-ES-PMSw1-Pl-DN-R2|HM-ES-PMSw1-Pl-DN-R3|HM-ES-PMSw1-Pl-DN-R4|HM-ES-PMSw1-Pl-DN-R5" => {
 	_description     => "Steckdose mit Energiemessung",
@@ -421,7 +458,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	},
 	"HMIP-PSM" => {
 	_description     => "Steckdose mit Energiemessung IP",
-	ccureadingfilter => "(STATE|CURRENT|^ENERGY_COUNTER$|POWER)",
+	ccureadingfilter => "(STATE|CURRENT|^ENERGY_COUNTER\$|POWER)",
 	controldatapoint => "3.STATE",
 	statedatapoint   => "3.STATE",
 	statevals        => "on:true,off:false",
@@ -431,7 +468,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	widgetOverride   => "control:uzsuToggle,off,on"
 	},	"HM-LC-Dim1L-Pl|HM-LC-Dim1L-Pl-2|HM-LC-Dim1L-CV|HM-LC-Dim2L-CV|HM-LC-Dim2L-SM|HM-LC-Dim1L-Pl-3|HM-LC-Dim1L-CV-2" => {
 	_description     => "Funk-Anschnitt-Dimmaktor",
-	ccureadingfilter => "(^LEVEL$|DIRECTION)",
+	ccureadingfilter => "(^LEVEL\$|DIRECTION)",
 	ccuscaleval      => "LEVEL:0:1:0:100",
 	cmdIcon          => "on:general_an off:general_aus",
 	controldatapoint => "1.LEVEL",
@@ -446,7 +483,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	},
 	"HM-LC-Dim1PWM-CV|HM-LC-Dim1PWM-CV-2" => {
 	_description     => "Funk-PWM-Dimmaktor",
-	ccureadingfilter => "(^LEVEL$|DIRECTION)",
+	ccureadingfilter => "(^LEVEL\$|DIRECTION)",
 	ccuscaleval      => "LEVEL:0:1:0:100",
 	cmdIcon          => "on:general_an off:general_aus",
 	controldatapoint => "1.LEVEL",
@@ -505,6 +542,26 @@ use vars qw(%HMCCU_SCRIPTS);
 	substitute       => "STATE!(true|1):on,(false|0):off",
 	webCmd           => "control",
 	widgetOverride   => "control:uzsuToggle,off,on"
+	},
+	"HM-LC-Sw2PBU-FM" => {
+	_description     => "Funk-Schaltaktor 2-fach",
+	ccureadingfilter => "STATE",
+	controldatapoint => "1.STATE",
+	statedatapoint   => "1.STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(true|1):on,(false|0):off",
+	webCmd           => "control",
+	widgetOverride   => "control:uzsuToggle,off,on"	
+	},
+	"HmIP-BSM" => {
+	_description     => "Schalt-Mess-Aktor",
+	ccureadingfilter => "(STATE|PRESS)",
+	statedatapoint   => "4.STATE",
+	controldatapoint => "4.STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(true|1):on,(false|0):off",
+	webCmd           => "control",
+	widgetOverride   => "control:uzsuToggle,off,on"		
 	},
 	"HM-LC-SW4-BA-PCB|HM-SCI-3-FM" => {
 	_description     => "4 Kanal Funk Schaltaktor für Batteriebetrieb, 3 Kanal Schließerkontakt",
@@ -678,6 +735,13 @@ use vars qw(%HMCCU_SCRIPTS);
 	ccureadingfilter => "STATE",
 	statedatapoint   => "1.STATE",
 	substitute       => "STATE!(0|false):ok,(1|true):alarm"
+	},
+	"HmIP-SWSD" => {
+	_description     => "Funk-Rauchmelder",
+	ccureadingfilter => "(ALARM_STATUS|TEST_RESULT|ERROR_CODE)",
+	eventMap         => "/datapoint 1.SMOKE_DETECTOR_COMMAND  0:reservedAlarmOff/datapoint 1.SMOKE_DETECTOR_COMMAND  1:intrusionAlarmOff/datapoint 1.SMOKE_DETECTOR_COMMAND  2:intrusionAlarmOn/datapoint 1.SMOKE_DETECTOR_COMMAND  3:smokeTest/datapoint 1.SMOKE_DETECTOR_COMMAND  4:comTest/datapoint 1.SMOKE_DETECTOR_COMMAND  5:comTestRepeat/",
+	statedatapoint   => "SMOKE_DETECTOR_ALARM_STATUS",
+	substitute       => "SMOKE_DETECTOR_ALARM_STATUS!0:noAlarm,1:primaryAlarm,2:intrusionAlarm,3:secondaryAlarm;SMOKE_DETECTOR_TEST_RESULT!0:none,1:smokeTestOK,2:smokeTestFailed,3:comTestSent,4:comTestOK"
 	},
 	"HM-Sec-SFA-SM" => {
 	_description     => "Alarmsirene",
@@ -934,13 +998,39 @@ else {
 }
 		)
 	},
+	"GetDevice" => {
+		description => "Query CCU device or channel",
+		syntax      => "name",
+		parameters  => 1,
+		code        => qq(
+object odev=dom.GetObject("\$name");
+if (odev) {
+  if (odev.IsTypeOf (OT_CHANNEL)) {
+    string devid = odev.Device();
+    odev = dom.GetObject (devid);
+  }
+
+  string intid=odev.Interface();
+  string intna=dom.GetObject(intid).Name();
+  string chnid;
+  integer cc=0;
+  foreach (chnid, odev.Channels()) {
+    object ochn=dom.GetObject(chnid);
+    WriteLine("C;" # ochn.Address() # ";" # ochn.Name() # ";" # ochn.ChnDirection());
+    cc=cc+1;
+  }
+  WriteLine("D;" # intna # ";" # odev.Address() # ";" # odev.Name() # ";" # odev.HssType() # ";" # cc);
+}
+		)
+	},
 	"GetDeviceList" => {
-		description => "Query CCU devices and channels",
+		description => "Query CCU devices, channels and interfaces",
 		syntax      => "",
 		parameters  => 0,
 		code        => qq(
 string devid;
 string chnid;
+string sifId;
 foreach(devid, root.Devices().EnumUsedIDs()) {
    object odev=dom.GetObject(devid);
    string intid=odev.Interface();
@@ -952,6 +1042,12 @@ foreach(devid, root.Devices().EnumUsedIDs()) {
       cc=cc+1;
    }
    WriteLine("D;" # intna # ";" # odev.Address() # ";" # odev.Name() # ";" # odev.HssType() # ";" # cc);
+}
+foreach(sifId, root.Interfaces().EnumIDs()) {
+  object oIf=dom.GetObject(sifId);
+  if (oIf) {
+    WriteLine("I;" # oIf.Name() # ';' # oIf.InterfaceInfo() # ';' # oIf.InterfaceUrl());
+  }
 }
 		)
 	},
@@ -1025,6 +1121,8 @@ string sDevList = "\$list";
 foreach (sDevice, sDevList.Split(",")) {
   object odev = dom.GetObject (sDevice);
   if (odev) {
+    string intid = odev.Interface();
+    string intna = dom.GetObject(intid).Name();
     string sType = odev.HssType();
     foreach (chnid, odev.Channels()) {
       object ochn = dom.GetObject(chnid);
@@ -1035,7 +1133,7 @@ foreach (sDevice, sDevList.Split(",")) {
           object oDP = dom.GetObject(sDPId);
           if (oDP) {
             string sDPName = oDP.Name().StrValueByIndex(".",2);
-            WriteLine (sAddr # ";" # sType # ";" # sChnNo # ";" # sDPName # ";" # oDP.ValueType() # ";" # oDP.Operations());
+            WriteLine (intna # ";" # sAddr # ";" # sType # ";" # sChnNo # ";" # sDPName # ";" # oDP.ValueType() # ";" # oDP.Operations());
           }
         }
       }
@@ -1062,6 +1160,50 @@ foreach (sChannel, sChnList.Split(",")) {
       }
     }
   }
+}
+		)
+	},
+	"GetInterfaceList" => {
+		description => "Get CCU RPC interfaces",
+		syntax      => "",
+		parameters  => 0,
+		code        => qq(
+string sifId;
+foreach(sifId, root.Interfaces().EnumIDs()) {
+  object oIf = dom.GetObject(sifId);
+  if (oIf) {
+    WriteLine (oIf.Name() # ';' # oIf.InterfaceInfo() # ';' # oIf.InterfaceUrl());
+  }
+}
+		)
+	},
+	"ClearUnreachable" => {
+		description => "Clear device unreachable alarms in CCU",
+		syntax      => "",
+		parameters  => 0,
+		code        => qq(
+string itemID;
+string address;
+object aldp_obj;
+foreach(itemID, dom.GetObject(ID_DEVICES).EnumUsedIDs()) {
+  address = dom.GetObject(itemID).Address();
+  aldp_obj = dom.GetObject("AL-" # address # ":0.STICKY_UNREACH");
+  if (aldp_obj) {
+    if (aldp_obj.Value()) {
+      aldp_obj.AlReceipt();
+    }
+  }
+}
+		)
+	},
+	"GetNameByAddress" => {
+		description => "Get device or channel name by address",
+		syntax      => "iface, address",
+		parameters  => 2,
+		code        => qq(
+object lObjDevice = xmlrpc.GetObjectByHSSAddress(interfaces.Get("\$iface"),"\$address");
+if (lObjDevice) {
+  WriteLine (lObjDevice.Name());
 }
 		)
 	}
