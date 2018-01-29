@@ -1512,6 +1512,8 @@ Options:
      PID file for storing the local process id (Default: /var/run/presenced.pid)
   -d, --daemon
      detach from terminal and run as background daemon
+  -n, --no-timestamps
+     do not output timestamps in log messages
   -v, --verbose
      Print detailed log output
   -h, --help
@@ -1527,8 +1529,7 @@ Options:
     The presenced is available as:<br><br>
     <ul>
     <li>direct perl script file: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
-    <li>.deb package for Debian (noarch): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/presenced-1.4.deb" target="_new">presenced-1.4.deb</a></li>
-    <li>.deb package for Raspberry Pi (raspbian): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.4.deb" target="_new">presenced-rpi-1.4.deb</a></li>
+    <li>.deb package for Debian/Raspbian (noarch): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/presenced-1.5.deb" target="_new">presenced-1.5.deb</a></li>
     </ul>
     </ul><br><br>
         <u>lepresenced</u><br><br>
@@ -1584,6 +1585,8 @@ Options:
      PID file for storing the local process id (Default: /var/run/collectord.pid)
   -d, --daemon
      detach from terminal and run as background daemon
+  -n, --no-timestamps
+     do not output timestamps in log messages
   -v, --verbose
      Print detailed log output
   -l, --logfile &lt;logfile&gt;
@@ -1855,8 +1858,7 @@ Options:
     Der presenced ist zum Download verf&uuml;gbar als:<br><br>
     <ul>
     <li>Perl Skript: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
-    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/presenced-1.4.deb" target="_new">presenced-1.4.deb</a></li>
-    <li>.deb Paket f&uuml;r Raspberry Pi (raspbian): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.4.deb" target="_new">presenced-rpi-1.4.deb</a></li>
+    <li>.deb Paket f&uuml;r Debian/Raspbian (architekturunabh&auml;ngig): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/presenced-1.5.deb" target="_new">presenced-1.5.deb</a></li>
     </ul>
     </ul><br><br>
     <u>lepresenced</u><br><br>

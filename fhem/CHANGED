@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 73_PRESENCE: new presenced deb package (ping command, systemd)
   - feature: 93_DbRep: V7.6.1, data with "|" in value are possible to process,
                        attr "sqlCmdHistoryLength" to use sqlCmdHistory list,
                        attr "fetchMarkDuplicates" to highlight multiple data
@@ -7,7 +8,7 @@
   - new:     88_HMCCURPCPROC: Sub process based RPC server for HMCCU.
   - feature: 73_PRESENCE: new collectord package (RSSI based room selection
                           for BTLE devices (lepresenced), ping command for
-                          daemon monitoring, systemd service unit
+                          daemon monitoring, systemd service unit)
   - bugfix:  93_DbLog: use of uninitialized value $txt if addlog has no value
   - feature: 33_readingsGroup: added german commandref (by HomeAuto_User)
   - feature: 10_pilight_ctrl: support bh1750 illuminance sensor
