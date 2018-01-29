@@ -34,7 +34,6 @@ package main;
 use strict;
 use warnings;
 use vars qw(%defs);		        # FHEM device/button definitions
-use vars qw(%intAt);		    # FHEM at definitions
 use vars qw($FW_RET);           # Returned data (html)
 use vars qw($FW_RETTYPE);       # image/png or the like
 use vars qw($FW_wname);         # Web instance
@@ -43,7 +42,7 @@ use Time::Local;
 
 #########################
 # Global variables
-my $postmeversion  = "2.04";
+my $postmeversion  = "2.06";
 my $FW_encoding    = "UTF-8";
 
 #########################################################################################
@@ -1504,10 +1503,12 @@ sub PostMe_widget($) {
 =pod
 =item helper
 =item summary to set up a system of sticky notes, similar to Post-Its&trade;
+=item summary_DE zur Definition eines Systems von Klebezetteln ähnlich des Post-Its&trade;
 =begin html
 
    <a name="PostMe"></a>
         <h3>PostMe</h3>
+        <ul>
         <p> FHEM module to set up a system of sticky notes, similar to Post-Its&trade;</p>
 
         <a name="PostMedefine"></a>
@@ -1653,12 +1654,14 @@ sub PostMe_widget($) {
                     >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>
+        </ul>
 =end html
 =begin html_DE
 
 <a name="PostMe"></a>
 <h3>PostMe</h3>
-<a href="https://wiki.fhem.de/wiki/Modul_PostMe">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/commandref.html#PostMe">PostMe</a> 
-
+<ul>
+<a href="https://wiki.fhem.de/wiki/Modul_PostMe">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#PostMe">PostMe</a> 
+</ul>
 =end html_DE
 =cut
