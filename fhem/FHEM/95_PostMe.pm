@@ -42,7 +42,7 @@ use Time::Local;
 
 #########################
 # Global variables
-my $postmeversion  = "2.06";
+my $postmeversion  = "2.07";
 my $FW_encoding    = "UTF-8";
 
 #########################################################################################
@@ -1233,7 +1233,8 @@ sub PostMe_detailFn(){
            'else document.getElementById("val_get'.$pmname.'").style.visibility = "visible";};</script>';
            
   $html .= '<table><tr><td>'.
-           '<form method="post" action="/fhem" autocomplete="off"><input type="hidden" name="detail" value="'.$pmname.'"/><input type="hidden" name="dev.set'.$pmname.'" value="'.$pmname.'"/>'.
+           '<form method="post" action="/fhem" autocomplete="off"><input id="pm.setter" type="hidden" name="fwcsrf" value="none"/>'.
+           '<input type="hidden" name="detail" value="'.$pmname.'"/><input type="hidden" name="dev.set'.$pmname.'" value="'.$pmname.'"/>'.
            '<input type="submit" name="cmd.set'.$pmname.'" value="set" class="set"/><div class="set downText">&nbsp;'.$pmname.'&nbsp;</div>'.
            '<select  id="sel_set'.$pmname.'" informId="sel_set'.$pmname.'" name="arg.set'.$pmname.'" class="set" style="width:100px;" '.
            'onchange="dc1(this.selectedIndex)">'.
@@ -1245,7 +1246,8 @@ sub PostMe_detailFn(){
            '<input type="hidden" id="val_set'.$pmname.'" informId="val_set'.$pmname.'" name="val.set'.$pmname.'" class="set" size="30" value="'.$pmfirst.'"/></form></td></tr>';
   
   $html .= '<tr><td>'.
-           '<form method="post" action="/fhem" autocomplete="off"><input type="hidden" name="detail" value="'.$pmname.'"/><input type="hidden" name="dev.get'.$pmname.'" value="'.$pmname.'"/>'.
+           '<form method="post" action="/fhem" autocomplete="off"><input id="pm.getter" type="hidden" name="fwcsrf" value="none"/>'.
+           '<input type="hidden" name="detail" value="'.$pmname.'"/><input type="hidden" name="dev.get'.$pmname.'" value="'.$pmname.'"/>'.
            '<input type="submit" name="cmd.get'.$pmname.'" value="get" class="get"/><div class="get downText">&nbsp;'.$pmname.'&nbsp;</div>'.
            '<select id="sel_get'.$pmname.'" informId="sel_get'.$pmname.'" name="arg.get'.$pmname.'" class="get" style="width:100px;" '.
            'onchange="dc2(this.selectedIndex)">'.
@@ -1254,6 +1256,10 @@ sub PostMe_detailFn(){
            '</select>'.
            '<select type="hidden" id="val_get'.$pmname.'" informId="val_get'.$pmname.'" name="val.get'.$pmname.'" class="get">'.$pmoption.'</select>'.
            '</form></td></tr></table>';
+           
+   $html .= '<script type="text/javascript">var req = new XMLHttpRequest();req.open(\'GET\', document.location.href, false);req.send(null);'.
+           'var csrfToken = req.getResponseHeader(\'X-FHEM-csrfToken\');if( csrfToken == null ){csrfToken = "null";}'.
+           'document.getElementById("pm.setter").value=csrfToken;document.getElementById("pm.getter").value=csrfToken;</script>';
 
   return $html;
 
