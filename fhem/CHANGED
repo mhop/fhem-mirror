@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_DbRep: V7.6.1, data with "|" in value are possible to process,
+                       attr "sqlCmdHistoryLength" to use sqlCmdHistory list,
+                       attr "fetchMarkDuplicates" to highlight multiple data
   - update:  88_HMCCU: Version 4.2
   - new:     88_HMCCURPCPROC: Sub process based RPC server for HMCCU.
   - feature: 73_PRESENCE: new collectord package (RSSI based room selection

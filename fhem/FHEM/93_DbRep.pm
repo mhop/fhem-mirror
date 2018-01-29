@@ -36,7 +36,12 @@
 #
 ###########################################################################################################################
 #  Versions History:
-#
+#    
+# 7.6.1        27.01.2018       new attribute "sqlCmdHistoryLength" and "fetchMarkDuplicates" for highlighting multiple
+#                               datasets by fetchrows
+# 7.6.0        26.01.2018       events containing "|" possible in fetchrows & delSeqDoublets, fetchrows displays multiple  
+#                               $k entries with timestamp suffix $k (as index), sqlCmdHistory (avaiable if sqlCmd was 
+#                               executed)
 # 7.5.5        25.01.2018       minor change in delSeqDoublets
 # 7.5.4        24.01.2018       delseqdoubl_DoParse reviewed to optimize memory usage, executeBeforeDump executeAfterDump 
 #                               now available for "delSeqDoublets"
@@ -287,14 +292,16 @@ use Scalar::Util qw(looks_like_number);
 eval "use DBI;1" or my $DbRepMMDBI = "DBI";
 use DBI::Const::GetInfoType;
 use Blocking;
+use Color;                           # colorpicker Widget
 use Time::Local;
 use Encode qw(encode_utf8);
-# no if $] >= 5.017011, warnings => 'experimental';  
+# no if $] >= 5.018000, warnings => 'experimental';
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';  
 
 sub DbRep_Main($$;$);
-sub DbLog_cutCol($$$$$$$);      # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
+sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.5.5";
+my $DbRepVersion = "7.6.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -310,7 +317,8 @@ my %dbrep_col = ("DEVICE"  => 64,
 sub DbRep_Initialize($) {
  my ($hash) = @_;
  $hash->{DefFn}        = "DbRep_Define";
- $hash->{UndefFn}      = "DbRep_Undef"; 
+ $hash->{UndefFn}      = "DbRep_Undef";
+ $hash->{ShutdownFn}   = "DbRep_Shutdown"; 
  $hash->{NotifyFn}     = "DbRep_Notify";
  $hash->{SetFn}        = "DbRep_Set";
  $hash->{GetFn}        = "DbRep_Get";
@@ -331,6 +339,7 @@ sub DbRep_Initialize($) {
 					   "executeAfterProc ".
                        "expimpfile ".
 					   "fetchRoute:ascent,descent ".
+                       "fetchMarkDuplicates:red,blue,brown,green,orange ".
 					   "ftpDebug:1,0 ".
 					   "ftpDir ".
                        "ftpDumpFilesKeep:1,2,3,4,5,6,7,8,9,10 ".
@@ -355,6 +364,7 @@ sub DbRep_Initialize($) {
                        "showVariables ".
                        "showStatus ".
                        "showTableInfo ".
+                       "sqlCmdHistoryLength:0,5,10,15,20,25,30,35,40,45,50 ".
 					   "sqlResultFormat:separated,mline,sline,table,json ".
 					   "sqlResultFieldSep:|,:,\/ ".
 					   "timeYearPeriod ".
@@ -391,12 +401,16 @@ sub DbRep_Define($@) {
   $hash->{ROLE}                = AttrVal($name, "role", "Client");
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
   $hash->{VERSION}             = $DbRepVersion;
-  
   $hash->{NOTIFYDEV}           = "global,".$name;                     # nur Events dieser Devices an DbRep_Notify weiterleiten 
-  
   my $dbconn                   = $defs{$a[2]}{dbconn};
   $hash->{DATABASE}            = (split(/;|=/, $dbconn))[1];
   $hash->{UTF8}                = defined($defs{$a[2]}{UTF8})?$defs{$a[2]}{UTF8}:0;
+  
+  my ($err,$hl)                = DbRep_getCmdFile($name."_sqlCmdList");
+  if(!$err) {
+      $hash->{HELPER}{SQLHIST} = $hl;
+      Log3 ($name, 4, "DbRep $name - history sql commandlist read from file ".$attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep");
+  }
   
   RemoveInternalTimer($hash);
   InternalTimer(time+5, 'DbRep_firstconnect', $hash, 0);
@@ -445,6 +459,9 @@ sub DbRep_Set($@) {
   closedir(DIR);
   my $cj = @bkps?join(",",reverse(sort @bkps)):" ";
   
+  # Drop-Down Liste bisherige Befehle in "sqlCmd" erstellen
+  my $hl = $hash->{HELPER}{SQLHIST}.",___purge_historylist___" if($hash->{HELPER}{SQLHIST});
+  
   my $setlist = "Unknown argument $opt, choose one of ".
                 (($hash->{ROLE} ne "Agent")?"sumValue:display,writeToDB ":"").
                 (($hash->{ROLE} ne "Agent")?"averageValue:display,writeToDB ":"").
@@ -459,7 +476,8 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"fetchrows:history,current ":"").  
                 (($hash->{ROLE} ne "Agent")?"diffValue:display,writeToDB ":"").   
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
-				(($hash->{ROLE} ne "Agent")?"sqlCmd ":"").
+                (($hash->{ROLE} ne "Agent")?"sqlCmd ":"").
+                (($hash->{ROLE} ne "Agent" && $hl)?"sqlCmdHistory:".$hl." ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"dumpMySQL:clientSide,serverSide ":"").
@@ -674,14 +692,26 @@ sub DbRep_Set($@) {
       }
       DbRep_Main($hash,$opt);
       
-  } elsif ($opt eq "sqlCmd") {
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-      # Execute a generic sql command
+  } elsif ($opt =~ /sqlCmd|sqlCmdHistory/) {
       return "\"set $opt\" needs at least an argument" if ( @a < 3 );
       # remove arg 0, 1 to get SQL command
-      shift @a;
-      shift @a;
-      my $sqlcmd = join( " ", @a );
+      my $sqlcmd;
+      if($opt eq "sqlCmd") {
+          shift @a;
+          shift @a;
+          $sqlcmd = join(" ", @a);
+      }
+      if($opt eq "sqlCmdHistory") {
+          $prop =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+          $prop =~ s/<c>/,/g;          
+          $sqlcmd = $prop;
+          if($sqlcmd eq "___purge_historylist___") {
+              delete($hash->{HELPER}{SQLHIST});
+              DbRep_setCmdFile($name."_sqlCmdList","",$hash);         # Löschen der sql History Liste im DbRep-Keyfile
+              return "SQL command historylist of $name deleted.";
+          }
+      }
+      $hash->{LASTCMD} = $sqlcmd?"$opt $sqlcmd":"$opt";
 	  if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return " Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }  
@@ -799,6 +829,7 @@ sub DbRep_Attr($$$$) {
 						 dumpSpeed
 						 optimizeTablesBeforeDump
                          seqDoubletsVariance
+                         sqlCmdHistoryLength
 						 timeYearPeriod
                          timestamp_begin
                          timestamp_end
@@ -812,10 +843,8 @@ sub DbRep_Attr($$$$) {
             $do = ($aVal) ? 1 : 0;
         }
         $do = 0 if($cmd eq "del");
-        my $val   = ($do == 1 ?  "disabled" : "initialized");
-  
+        my $val = ($do == 1 ?  "disabled" : "initialized");
 		ReadingsSingleUpdateValue ($hash, "state", $val, 1);
-        
         if ($do == 0) {
             RemoveInternalTimer($hash);
             InternalTimer(time+5, 'DbRep_firstconnect', $hash, 0);
@@ -823,7 +852,6 @@ sub DbRep_Attr($$$$) {
             my $dbh = $hash->{DBH};
             $dbh->disconnect() if($dbh);
         }
-        
     }
     
     if ($cmd eq "set" && $hash->{ROLE} eq "Agent") {
@@ -838,6 +866,17 @@ sub DbRep_Attr($$$$) {
             $hash->{HELPER}{RDPFDEL} = $aVal;
         } else {
             delete $hash->{HELPER}{RDPFDEL} if($hash->{HELPER}{RDPFDEL});
+        }
+    }
+    
+    if ($aName eq "sqlCmdHistoryLength") {
+        if($cmd eq "set") {
+            $do = ($aVal) ? 1 : 0;
+        }
+        $do = 0 if($cmd eq "del");
+        if ($do == 0) {
+            delete($hash->{HELPER}{SQLHIST});
+            DbRep_setCmdFile($name."_sqlCmdList","",$hash);         # Löschen der sql History Liste im DbRep-Keyfile
         }
     }
 	
@@ -1071,10 +1110,25 @@ sub DbRep_Undef($$) {
  BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
  BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER})); 
  BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
+
+ DbRep_delread($hash,1);
     
 return undef;
 }
 
+###################################################################################
+# DbRep_Shutdown
+###################################################################################
+sub DbRep_Shutdown($) {  
+  my ($hash) = @_;
+ 
+  my $dbh = $hash->{DBH}; 
+  $dbh->disconnect() if(defined($dbh)); 
+  DbRep_delread($hash,1);
+  RemoveInternalTimer($hash);
+  
+return undef; 
+}
 
 ###################################################################################
 # First Init DB Connect 
@@ -1282,7 +1336,7 @@ sub DbRep_Main($$;$) {
  } elsif ($opt =~ /deviceRename|readingRename/) { 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("devren_Push", "$name", "devren_Done", $to, "ParseAborted", $hash);   
          
- } elsif ($opt eq "sqlCmd" ) {
+ } elsif ($opt =~ /sqlCmd/ ) {
     # Execute a generic sql command
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "ParseAborted", $hash);     
  }
@@ -4033,6 +4087,7 @@ sub fetchrows_DoParse($) {
  $nrows = $#row_array+1;                # Anzahl der Ergebniselemente  
  pop @row_array if($nrows>$limit);      # das zuviel selektierte Element wegpoppen wenn Limit überschritten
  
+ s/\|/_E#S#C_/g for @row_array;         # escape Pipe "|"
  if ($utf8) {
      $rowlist = Encode::encode_utf8(join('|', @row_array));
  } else {
@@ -4073,6 +4128,9 @@ sub fetchrows_ParseDone($) {
   my $name       = $hash->{NAME};
   my $reading    = AttrVal($name, "reading", undef);
   my $limit      = AttrVal($name, "limit", 1000);
+  my $color      = "<html><span style='color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";'>";  # Highlighting doppelter DB-Einträge
+  $color =~ s/#// if($color =~ /red|blue|brown|green|orange/);
+  my $ecolor     = "</span></html>";   # Ende Highlighting
   my @i;
   my @row;
   my $reading_runtime_string;
@@ -4088,28 +4146,51 @@ sub fetchrows_ParseDone($) {
   } 
   
   my @row_array = split("\\|", $rowlist);
+  s/_E#S#C_/\|/g for @row_array;                    # escaped Pipe return to "|"
   
   Log3 ($name, 5, "DbRep $name - row_array decoded: @row_array");
   
   # Readingaufbereitung
   readingsBeginUpdate($hash);
-  
+  my $orow;
+  my $dz = 1;                      # Index des Vorkommens im Selektionsarray
   foreach my $row (@row_array) {
-      my @a = split("_ESC_", $row, 6);
+      if($orow) {
+          if($orow eq $row) {
+              $dz++;
+              
+          } else {
+              $dz = 1;
+          }
+      }
+      $orow = $row;
+      if($dz > 1) {
+          # Hervorhebung von multiplen Datensätzen
+          # $dz = "<html><span style='color: ".$color.";'>".$dz."</span></html>";
+      }
+      my @a = split("_ESC_", $row, 6);     
       my $dev = $a[0];
       my $rea = $a[1];
       $a[3]   =~ s/:/-/g;          # substituieren unsupported characters ":" -> siehe fhem.pl
       my $ts  = $a[2]."_".$a[3];
       my $val = $a[4];
 	  my $unt = $a[5];
-             
+      $val = $unt?$val." ".$unt:$val;
+      
       if ($reading && AttrVal($hash->{NAME}, "readingNameMap", "")) {
-          $reading_runtime_string = $ts."__".AttrVal($hash->{NAME}, "readingNameMap", "") ;
+          if($dz > 1 && AttrVal($name, "fetchMarkDuplicates", undef)) {
+              $reading_runtime_string = $ts."__".$color.$dz."__".AttrVal($hash->{NAME}, "readingNameMap", "").$ecolor;
+          } else {
+              $reading_runtime_string = $ts."__".$dz."__".AttrVal($hash->{NAME}, "readingNameMap", "");
+          }
       } else {
-          $reading_runtime_string = $ts."__".$dev."__".$rea;
+          if($dz > 1 && AttrVal($name, "fetchMarkDuplicates", undef)) {
+              $reading_runtime_string = $ts."__".$color.$dz."__".$dev."__".$rea.$ecolor;
+          } else {
+              $reading_runtime_string = $ts."__".$dz."__".$dev."__".$rea;
+          }
       }
-             
-	  $val = $unt?$val." ".$unt:$val;
+     
 	  ReadingsBulkUpdateValue($hash, $reading_runtime_string, $val);
   }
   my $sfx = AttrVal("global", "language", "EN");
@@ -4281,7 +4362,8 @@ sub delseqdoubl_DoParse($) {
   
  my $retn = ($opt =~ /adviceRemain/)?$nremain:($opt =~ /adviceDelete/)?$ntodel:$ndel; 
 
- my @retarray = ($opt =~ /adviceRemain/)?@remain:($opt =~ /adviceDelete/)?@todel:" "; 
+ my @retarray = ($opt =~ /adviceRemain/)?@remain:($opt =~ /adviceDelete/)?@todel:" ";
+ s/\|/_E#S#C_/g for @retarray;         # escape Pipe "|" 
  if ($utf8 && @retarray) {
      $rowlist = Encode::encode_utf8(join('|', @retarray));
  } elsif(@retarray) {
@@ -4348,13 +4430,14 @@ sub delseqdoubl_ParseDone($) {
   no warnings 'uninitialized'; 
   if ($opt !~ /delete/ && $rowlist) {
       my @row_array = split("\\|", $rowlist);
+      s/_E#S#C_/\|/g for @row_array;        # escaped Pipe return to "|"
       Log3 ($name, 5, "DbRep $name - row_array decoded: @row_array");
       foreach my $row (@row_array) {
 	      last if($l >= $limit);
           my @a = split("_ESC_", $row, 5); 
 		  my $dev = $a[0];
           my $rea = $a[1];
-          $a[3]   =~ s/:/-/g;          # substituieren unsupported characters ":" -> siehe fhem.pl
+          $a[3]   =~ s/:/-/g;               # substituieren unsupported characters ":" -> siehe fhem.pl
           my $ts  = $a[2]."_".$a[3];
           my $val = $a[4];
              
@@ -4898,7 +4981,6 @@ sub sqlCmd_ParseDone($) {
   
   Log3 ($name, 5, "DbRep $name - SQL result decoded: $rowstring") if($rowstring);
   
-  # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
   
   # Readingaufbereitung
@@ -4906,6 +4988,20 @@ sub sqlCmd_ParseDone($) {
 
   ReadingsBulkUpdateValue ($hash, "sqlCmd", $cmd); 
   ReadingsBulkUpdateValue ($hash, "sqlResultNumRows", $nrows);
+  
+  # Drop-Down Liste bisherige sqlCmd-Befehle füllen und in Key-File sichern
+  # my $hl      = $hash->{HELPER}{SQLHIST};
+  my @sqlhist = split(",",$hash->{HELPER}{SQLHIST});
+  $cmd =~ s/\s/&nbsp;/g;
+  $cmd =~ s/,/<c>/g;
+  my $hlc = AttrVal($name, "sqlCmdHistoryLength", 0);                       # Anzahl der Einträge in Drop-Down Liste
+  if(!@sqlhist || (@sqlhist && !($cmd ~~ @sqlhist))) {
+      unshift @sqlhist,$cmd;
+      pop @sqlhist if(@sqlhist > $hlc);
+      my $hl = join(",",@sqlhist);
+      $hash->{HELPER}{SQLHIST} = $hl;
+      DbRep_setCmdFile($name."_sqlCmdList",$hl,$hash);       
+  }
   
   if ($srf eq "sline") {
       $rowstring =~ s/§/]|[/g;
@@ -7011,13 +7107,25 @@ return;
 ####################################################################################################
 #                 delete Readings before new operation
 ####################################################################################################
-sub DbRep_delread($) {
+sub DbRep_delread($;$$) {
  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
- my ($hash) = @_;
+ my ($hash,$shutdown) = @_;
  my $name   = $hash->{NAME};
- my @allrds = keys%{$defs{$name}{READINGS}}; 
+ my @allrds = keys%{$defs{$name}{READINGS}};
+ if($shutdown) {
+     my $do = 0;
+     foreach my $key(@allrds) {
+         # Highlighted Readings löschen und save statefile wegen Inkompatibilitär beim Restart
+         if($key =~ /<html><span/) {
+             $do = 1;
+             delete($defs{$name}{READINGS}{$key});
+         }
+     }
+     WriteStatefile() if($do == 1);
+     return undef;
+ } 
  my @rdpfdel = split(",", $hash->{HELPER}{RDPFDEL}) if($hash->{HELPER}{RDPFDEL});
- if (@rdpfdel) {
+ if(@rdpfdel) {
      foreach my $key(@allrds) {
          # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
          my $dodel = 1;
@@ -7099,6 +7207,74 @@ sub byte_output ($) {
     $ret.=' '.$suffix;
 
 return $ret;
+}
+
+####################################################################################################
+#                      Schreibroutine in DbRep Keyvalue-File
+####################################################################################################
+sub DbRep_setCmdFile($$$) {
+  my ($key,$value,$hash) = @_;
+  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
+  
+  my $param = {
+               FileName   => $fName,
+               ForceType  => "file",
+              };
+  my ($err, @old) = FileRead($param);
+  
+  DbRep_createCmdFile($hash) if($err); 
+  
+  my @new;
+  my $fnd;
+  foreach my $l (@old) {
+    if($l =~ m/^$key:/) {
+      $fnd = 1;
+      push @new, "$key:$value" if(defined($value));
+    } else {
+      push @new, $l;
+    }
+  }
+  push @new, "$key:$value" if(!$fnd && defined($value));
+
+return FileWrite($param, @new);
+}
+
+####################################################################################################
+#                           anlegen Keyvalue-File für DbRep wenn nicht vorhanden
+####################################################################################################
+sub DbRep_createCmdFile ($) {
+  my ($hash) = @_;
+  my $fName  = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
+  
+  my $param = {
+               FileName   => $fName,
+               ForceType  => "file",
+              };
+  my @new;
+  push(@new, "# This file is auto generated from 93_DbRep.",
+             "# Please do not modify, move or delete it.",
+             "");
+
+return FileWrite($param, @new);
+}
+
+####################################################################################################
+#                       Leseroutine aus DbRep Keyvalue-File
+####################################################################################################
+sub DbRep_getCmdFile($) {
+  my ($key) = @_;
+  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
+  my $param = {
+               FileName   => $fName,
+               ForceType  => "file",
+              };
+  my ($err, @l) = FileRead($param);
+  return ($err, undef) if($err);
+  for my $l (@l) {
+    return (undef, $1) if($l =~ m/^$key:(.*)/);
+  }
+
+return (undef, undef);
 }
 
 ####################################################################################################
@@ -7720,7 +7896,8 @@ return;
      <ul><ul>
      <li> Selection of all datasets within adjustable time limits. </li>
      <li> Exposure of datasets of a Device/Reading-combination within adjustable time limits. </li>
-     <li> Selecion of datasets by usage of dynamically calclated time limits at execution time. </li>
+     <li> Selection of datasets by usage of dynamically calclated time limits at execution time. </li>
+     <li> Highlighting doublets when select and display datasets (fetchrows) </li>
      <li> Calculation of quantity of datasets of a Device/Reading-combination within adjustable time limits and several aggregations. </li>
      <li> The calculation of summary-, difference-, maximum-, minimum- and averageValues of numeric readings within adjustable time limits and several aggregations. </li>
      <li> write back results of summary-, difference-, maximum-, minimum- and average calculation into the database </li>
@@ -7737,7 +7914,7 @@ return;
 	 <li> report of existing database processes (MySQL) </li>
 	 <li> purge content of current-table </li>
 	 <li> fill up the current-table with a (tunable) extract of the history-table</li>
-	 <li> delete consecutive datasets (clearing up consecutive doublets) </li>
+	 <li> delete consecutive datasets with different timestamp but same values (clearing up consecutive doublets) </li>
      </ul></ul>
      <br>
      
@@ -7768,6 +7945,7 @@ return;
   Time::Local     <br>
   Scalar::Util    <br>
   DBI             <br>
+  Color           (FHEM-module) <br>
   Blocking        (FHEM-module) <br><br>
   
   Due to performance reason the following index should be created in addition: <br>
@@ -8048,9 +8226,9 @@ return;
 
                                  <ul>                                 
                                  <b>Example: </b> <br>
-                                 attr &lt;DbRep-device&gt; dumpDirRemote /volume1/ApplicationBackup/dumps_FHEM/ <br>
-								 attr &lt;DbRep-device&gt; dumpDirLocal /sds1/backup/dumps_FHEM/ <br>
-								 attr &lt;DbRep-device&gt; dumpFilesKeep 2 <br><br>
+                                 attr &lt;name&gt; dumpDirRemote /volume1/ApplicationBackup/dumps_FHEM/ <br>
+								 attr &lt;name&gt; dumpDirLocal /sds1/backup/dumps_FHEM/ <br>
+								 attr &lt;name&gt; dumpFilesKeep 2 <br><br>
 								 
                                  # The dump will be created remote on the MySQL-Server in directory 
 								 '/volume1/ApplicationBackup/dumps_FHEM/'. <br>
@@ -8129,12 +8307,12 @@ return;
 
 								 The <b>naming convention of dump files</b> is:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sqlitebkp <br><br>
 					 
-                                 The database can be restored by command "set &lt;DbRep-device&gt; restoreSQLite &lt;filename&gt;" <br>
+                                 The database can be restored by command "set &lt;name&gt; restoreSQLite &lt;filename&gt;" <br>
                                  The created dump file can be transfered to a FTP-server. Please see explanations about FTP-
                                  transfer in topic "dumpMySQL". <br><br>
 								 </li><br>
 								 
-    <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format between period given by timestamp. 
+    <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format of time period set by time attributes. 
                                  Limitations of selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading. 
                                  The filename will be defined by <a href="#DbRepattr">attribute</a> "expimpfile". <br> 
                                  By setting attribute "aggregation" the export of datasets will be splitted into time slices 
@@ -8144,12 +8322,64 @@ return;
                                  is exported and avoid the "died prematurely" error.                                  
                                  </li> <br>
                                  
-    <li><b> fetchrows [history|current] </b>    -  provides <b>all</b> table-entries (default: history) 
-	                                               between period given by timestamp-<a href="#DbRepattr">attributes</a>. 
-                                                   A possibly aggregation set will <b>not</b> be considered.  <br>
-												   The direction of data selection can be determined by <a href="#DbRepattr">attribute</a> 
-												   "fetchRoute". <br>  
-												   </li> <br>
+    <li><b> fetchrows [history|current] </b>    
+                              -  provides <b>all</b> table entries (default: history) 
+	                             of time period set by time <a href="#DbRepattr">attributes</a> respectively selection conditions
+                                 by attributes "device" and "reading". 
+                                 An aggregation set will <b>not</b> be considered.  <br>
+								 The direction of data selection can be determined by <a href="#DbRepattr">attribute</a> 
+								 "fetchRoute". <br><br>
+                                 
+                                 Every reading of result is composed of the dataset timestring , an index, the device name
+                                 and the reading name.
+                                 The function has the capability to reconize multiple occuring datasets (doublets).
+                                 Such doublets are marked by an index > 1. <br>
+                                 Doublets can be highlighted in terms of color by setting attribut e"fetchMarkDuplicates". <br><br>
+                                 
+                                 <b>Note:</b> <br>
+                                 Highlighted readings are not displayed again after restart or rereadcfg because of they are not
+                                 saved in statefile. <br><br>
+                                 
+                                 This attribute is preallocated with some colors, but can be changed by colorpicker-widget: <br><br>
+                                 
+                                 <ul>
+                                 <code>
+                                 attr &lt;DbRep-Device&gt; widgetOverride fetchMarkDuplicates:colorpicker
+                                 </code>
+                                 </ul>                                 
+                                 <br>
+                                 
+                                 The readings of result are composed like the following sceme: <br><br>
+                                 
+                                 <ul>
+                                 <b>Example:</b> <br>
+                                 2017-10-22_03-04-43__1__SMA_Energymeter__Bezug_WirkP_Kosten_Diff <br>
+                                 # &lt;date&gt;_&lt;time&gt;__&lt;index&gt;__&lt;device&gt;__&lt;reading&gt;
+                                 </ul>                                 
+                                 <br>
+
+                                 For a better overview the relevant attributes are listed here in a table: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>fetchRoute</b>            </td><td>: direction of selection read in database </td></tr>
+                                      <tr><td> <b>limit</b>                 </td><td>: limits the number of datasets to select and display </td></tr>
+                                      <tr><td> <b>fetchMarkDuplicates</b>   </td><td>: Highlighting of found doublets </td></tr>
+                                      <tr><td> <b>device</b>                </td><td>: select only datasets which are contain &lt;device&gt; </td></tr>
+                                      <tr><td> <b>reading</b>               </td><td>: select only datasets which are contain &lt;reading&gt; </td></tr>
+                                      <tr><td> <b>time.*</b>                </td><td>: A number of attributes to limit selection by time </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>                                 
+
+								 <b>Note:</b> <br>
+                                 Although the module is designed non-blocking, a huge number of selection result (huge number of rows) 
+								 can overwhelm the browser session respectively FHEMWEB. 
+								 Due to the sample space can be limited by <a href="#DbRepattrlimit">attribute</a> "limit". 
+                                 Of course ths attribute can be increased if your system capabilities allow a higher workload. <br><br>
+								 </li> <br> 
                                  
     <li><b> insert </b>       -  use it to insert data ito table "history" manually. Input values for Date, Time and Value are mandatory. The database fields for Type and Event will be filled in with "manual" automatically and the values of Device, Reading will be get from set <a href="#DbRepattr">attributes</a>.  <br><br>
                                  
@@ -8278,9 +8508,10 @@ return;
 	<li><b> sqlCmd </b>        - executes an arbitrary user specific command. <br>
                                  If the command contains a operation to delete data, the <a href="#DbRepattr">attribute</a> 
 								 "allowDeletion" has to be set for security reason. <br>
-                                 The statement doesn't consider limitations by attributes device and/or reading. <br>
-								 If the <a href="#DbRepattr">attributes</a> "timestamp_begin" respectively "timestamp_end" 
-								 should assumed in the statement, you can use the placeholder "<b>§timestamp_begin§</b>" respectively
+                                 The statement doesn't consider limitations by attributes "device", "reading", "time.*" 
+                                 respectively "aggregation". <br>
+								 If the <a href="#DbRepattr">attribute</a> "timestamp_begin" respectively "timestamp_end" 
+								 is assumed in the statement, it is possible to use placeholder "<b>§timestamp_begin§</b>" respectively
 								 "<b>§timestamp_end§</b>" on suitable place. <br><br>
 								 
 	                             <ul>
@@ -8304,16 +8535,39 @@ return;
 								 The result of the statement will be shown in <a href="#DbRepReadings">Reading</a> "SqlResult".
 							     The formatting of result can be choosen by <a href="#DbRepattr">attribute</a> "sqlResultFormat", as well as the used
 								 field separator can be determined by <a href="#DbRepattr">attribute</a> "sqlResultFieldSep". <br><br>
-								 
+							
+                                 The module provides a command history once a sqlCmd command was executed successfully.
+                                 To use this option, activate the attribute "sqlCmdHistoryLength" with list lenght you want. <br><br>
+                                 
+                                 For a better overview the relevant attributes for sqlCmd are listed in a table: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>allowDeletion</b>       </td><td>: activates capabilty to delete datasets </td></tr>
+                                      <tr><td> <b>sqlResultFormat</b>     </td><td>: determines presentation style of command result </td></tr>
+                                      <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result </td></tr>
+                                      <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: activates command history and length </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>  
+
 								 <b>Note:</b> <br>
                                  Even though the module works non-blocking regarding to database operations, a huge 
 								 sample space (number of rows/readings) could block the browser session respectively 
 								 FHEMWEB.								 
 								 If you are unsure about the result of the statement, you should preventively add a limit to 
 								 the statement. <br><br>
-                                 
 								 </li><br>
-                                 </ul>  								 
+                                 </ul>  
+
+    <li><b> sqlCmdHistory </b>   - If history is activated by <a href="#DbRepattr">attribute</a> "sqlCmdHistoryLength", an already
+                                   successfully executed sqlCmd-command can be repeated from a drop-down list. <br>
+                                   By execution of the last list entry, "__purge_historylist__", the list itself can be deleted. <br>
+								   If the statement contains "," this character is displayed as "&lt;c&gt;" in the history 
+                                   list due to technical restrictions. <br>
+                                   </li><br>								 
 
 	<li><b> sumValue [display | writeToDB]</b>     
                                  - calculates the summary of database column "VALUE" between period given by 
@@ -8502,15 +8756,15 @@ return;
   
                                 <ul>
 							    <b>Examples:</b> <br>
-								<code>attr &lt;Name&gt; device TYPE=DbRep</code> <br>
+								<code>attr &lt;name&gt; device TYPE=DbRep</code> <br>
 								# select datasets of active present devices with Type "DbRep" <br> 
-								<code>attr &lt;Name&gt; device MySTP_5000</code> <br>
+								<code>attr &lt;name&gt; device MySTP_5000</code> <br>
 								# select datasets of device "MySTP_5000" <br> 
-								<code>attr &lt;Name&gt; device SMA.*</code> <br>
+								<code>attr &lt;name&gt; device SMA.*</code> <br>
 								# select datasets of devices starting with "SMA" <br> 
-								<code>attr &lt;Name&gt; device SMA_Energymeter,MySTP_5000</code> <br>
+								<code>attr &lt;name&gt; device SMA_Energymeter,MySTP_5000</code> <br>
 								# select datasets of devices "SMA_Energymeter" and "MySTP_5000" <br>
-								<code>attr &lt;Name&gt; device %5000</code> <br>
+								<code>attr &lt;name&gt; device %5000</code> <br>
 								# select datasets of devices ending with "5000" <br>  								
 								</ul>
 								<br><br>
@@ -8569,8 +8823,8 @@ return;
 
                                 <ul>
 							    <b>Example:</b> <br><br>
-								attr &lt;DbRep-device&gt; executeAfterProc set og_gz_westfenster off; <br>
-								attr &lt;DbRep-device&gt; executeAfterProc {adump ("&lt;DbRep-device&gt;")} <br><br>
+								attr &lt;name&gt; executeAfterProc set og_gz_westfenster off; <br>
+								attr &lt;name&gt; executeAfterProc {adump ("&lt;name&gt;")} <br><br>
 								
 								# "adump" is a function defined in 99_myUtils.pm e.g.: <br>
 								
@@ -8592,8 +8846,8 @@ sub adump {
 
                                 <ul>
 							    <b>Example:</b> <br><br>
-								attr &lt;DbRep-device&gt; executeBeforeProc set og_gz_westfenster on; <br>
-								attr &lt;DbRep-device&gt; executeBeforeProc {bdump ("&lt;DbRep-device&gt;")} <br><br>
+								attr &lt;name&gt; executeBeforeProc set og_gz_westfenster on; <br>
+								attr &lt;name&gt; executeBeforeProc {bdump ("&lt;name&gt;")} <br><br>
 								
 								# "bdump" is a function defined in 99_myUtils.pm e.g.: <br>
 								
@@ -8611,6 +8865,9 @@ sub bdump {
 </li>
 
   <li><b>expimpfile </b>      - Path/filename for data export/import </li> <br>
+  
+  <li><b>fetchMarkDuplicates </b> 
+                              - Highlighting of multiple occuring datasets in result of "fetchrows" command </li> <br>
   
   <li><b>fetchRoute [descent | ascent] </b>  - specify the direction of data selection of the fetchrows-command. <br><br>
                                                           <ul>
@@ -8675,9 +8932,9 @@ sub bdump {
 								
                                 <ul>
 							    <b>Examples:</b> <br>
-								<code>attr &lt;Name&gt; reading etotal</code> <br> 
-								<code>attr &lt;Name&gt; reading et%</code> <br>
-								<code>attr &lt;Name&gt; reading etotal,etoday</code> <br>
+								<code>attr &lt;name&gt; reading etotal</code> <br> 
+								<code>attr &lt;name&gt; reading et%</code> <br>
+								<code>attr &lt;name&gt; reading etotal,etoday</code> <br>
 								</ul>
 								<br><br>
 
@@ -8689,15 +8946,15 @@ sub bdump {
   <li><b>readingPreventFromDel </b>  - comma separated list of readings which are should prevent from deletion when a 
                                        new operation starts  </li> <br>
                                        
-  <li><b>seqDoubletsVariance </b> - accepted variance (+/-) for the command "set &lt;Name&gt; delSeqDoublets". <br>
+  <li><b>seqDoubletsVariance </b> - accepted variance (+/-) for the command "set &lt;name&gt; delSeqDoublets". <br>
                                     The value of this attribute describes the variance up to it consecutive numeric values (VALUE) of
                                     datasets are handled as identical and should be deleted. "seqDoubletsVariance" is an absolut numerical value, 
                                     which is used as a positive as well as a negative variance. </li> <br>
 
                                     <ul>
 							        <b>Examples:</b> <br>
-								    <code>attr &lt;Name&gt; seqDoubletsVariance 0.0014 </code> <br>
-								    <code>attr &lt;Name&gt; seqDoubletsVariance 1.45   </code> <br>
+								    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014 </code> <br>
+								    <code>attr &lt;name&gt; seqDoubletsVariance 1.45   </code> <br>
 								    </ul>
 								    <br><br> 
 
@@ -8705,38 +8962,47 @@ sub bdump {
                                 for the sql-requests. This is not calculated for a single sql-statement, but the summary 
 								of all sql-statements necessara for within an executed DbRep-function in background. </li> <br>
 
-  <li><b>showStatus </b>      - limits the sample space of command "get ... dbstatus". SQL-Wildcard (%) can be used.    </li> <br>
+  <li><b>showStatus </b>      - limits the sample space of command "get &lt;name&gt; dbstatus". SQL-Wildcard (%) can be used.    </li> <br>
 
                                 <ul>
-                                Example:    attr ... showStatus %uptime%,%qcache%  <br>
+                                <b>Example: </b><br>
+                                attr &lt;name&gt; showStatus %uptime%,%qcache%  <br>
                                 # Only readings with containing "uptime" and "qcache" in name will be shown <br>
                                 </ul><br>  
   
-  <li><b>showVariables </b>   - limits the sample space of command "get ... dbvars". SQL-Wildcard (%) can be used. </li> <br>
+  <li><b>showVariables </b>   - limits the sample space of command "get &lt;name&gt; dbvars". SQL-Wildcard (%) can be used. </li> <br>
 
                                 <ul>
-                                Example:    attr ... showVariables %version%,%query_cache% <br>
+                                <b>Example: </b><br>
+                                attr &lt;name&gt; showVariables %version%,%query_cache% <br>
                                 # Only readings with containing "version" and "query_cache" in name will be shown <br>
                                 </ul><br>  
                               
-  <li><b>showSvrInfo </b>     - limits the sample space of command "get ... svrinfo". SQL-Wildcard (%) can be used.    </li> <br>
+  <li><b>showSvrInfo </b>     - limits the sample space of command "get &lt;name&gt; svrinfo". SQL-Wildcard (%) can be used.    </li> <br>
 
                                 <ul>
-                                Example:    attr ... showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
+                                <b>Example: </b><br>
+                                attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
                                 # Only readings with containing "SQL_CATALOG_TERM" and "NAME" in name will be shown <br>
                                 </ul><br>  
                               
-  <li><b>showTableInfo </b>   - limits the tablename which is selected by command "get ... tableinfo". SQL-Wildcard 
+  <li><b>showTableInfo </b>   - limits the tablename which is selected by command "get &lt;name&gt; tableinfo". SQL-Wildcard 
                                 (%) can be used.   </li> <br>
 
                                 <ul>
-                                Example:    attr ... showTableInfo current,history  <br>
+                                <b>Example: </b><br>
+                                attr &lt;name&gt; showTableInfo current,history  <br>
                                 # Only informations about tables "current" and "history" will be shown <br>
                                 </ul><br>  
 								
-  <li><b>sqlResultFieldSep </b> - determines the used field separator (default: "|") in the result of command "set ... sqlCmd".  </li> <br>
+  <li><b>sqlCmdHistoryLength </b> 
+                              - activates the command history of "sqlCmd" and determines the length of it  </li> <br>
 
-  <li><b>sqlResultFormat </b> - determines the formatting of the "set ... sqlCmd" command result. possible options are: <br><br>
+  
+  <li><b>sqlResultFieldSep </b> - determines the used field separator (default: "|") in the result of command "set &lt;name&gt; sqlCmd".  </li> <br>
+
+  <li><b>sqlResultFormat </b> - determines the formatting of the "set &lt;name&gt; sqlCmd" command result. 
+                                Possible options are: <br><br>
                                 <ul>
                                 <b>separated </b> - every line of the result will be generated sequentially in a single 
 								                    reading. (default) <br><br>
@@ -8790,7 +9056,7 @@ sub bdump {
                                
                                <ul>
 							   <b>Example:</b> <br><br>
-							   attr &lt;DbRep-device&gt; timeYearPeriod 06-25 06-24 <br><br>
+							   attr &lt;name&gt; timeYearPeriod 06-25 06-24 <br><br>
 								
 							   # evaluates the database within the time limits 25. june AAAA and 24. june BBBB. <br>
                                # The year AAAA respectively year BBBB is calculated dynamically depending of the current date. <br>
@@ -8831,8 +9097,8 @@ sub bdump {
   
                                 <ul>
 							    <b>Example:</b> <br><br>
-								attr &lt;DbRep-device&gt; timestamp_begin current_year_begin <br>
-								attr &lt;DbRep-device&gt; timestamp_end  current_year_end <br><br>
+								attr &lt;name&gt; timestamp_begin current_year_begin <br>
+								attr &lt;name&gt; timestamp_end  current_year_end <br><br>
 								
 								# Analyzes the database between the time limits of the current year. <br>
 								</ul>
@@ -8850,13 +9116,13 @@ sub bdump {
 
                                 <ul>
 							    <b>Examples for input format:</b> <br>
-								<code>attr &lt;Name&gt; timeDiffToNow 86400</code> <br>
+								<code>attr &lt;name&gt; timeDiffToNow 86400</code> <br>
                                 # the start time is set to "current time - 86400 seconds" <br>
-								<code>attr &lt;Name&gt; timeDiffToNow d:2 h:3 m:2 s:10</code> <br>
+								<code>attr &lt;name&gt; timeDiffToNow d:2 h:3 m:2 s:10</code> <br>
                                 # the start time is set to "current time - 2 days 3 hours 2 minutes 10 seconds" <br>							
-								<code>attr &lt;Name&gt; timeDiffToNow m:600</code> <br> 
+								<code>attr &lt;name&gt; timeDiffToNow m:600</code> <br> 
                                 # the start time is set to "current time - 600 minutes" gesetzt <br>
-								<code>attr &lt;Name&gt; timeDiffToNow h:2.5</code> <br>
+								<code>attr &lt;name&gt; timeDiffToNow h:2.5</code> <br>
                                 # the start time is set to "current time - 2,5 hours" <br>
 								</ul>
 								<br><br>								
@@ -9027,9 +9293,10 @@ sub bdump {
   Aktuell werden folgende Operationen unterstützt: <br><br>
   
      <ul><ul>
-     <li> Selektion aller Datensätze innerhalb einstellbarer Zeitgrenzen. </li>
+     <li> Selektion aller Datensätze innerhalb einstellbarer Zeitgrenzen </li>
      <li> Darstellung der Datensätze einer Device/Reading-Kombination innerhalb einstellbarer Zeitgrenzen. </li>
      <li> Selektion der Datensätze unter Verwendung von dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt. </li>
+     <li> Dubletten-Hervorhebung bei Datensatzanzeige (fetchrows) </li>
      <li> Berechnung der Anzahl von Datensätzen einer Device/Reading-Kombination unter Berücksichtigung von Zeitgrenzen 
 	      und verschiedenen Aggregationen. </li>
      <li> Die Berechnung von Summen-, Differenz-, Maximum-, Minimum- und Durchschnittswerten numerischer Readings 
@@ -9050,7 +9317,7 @@ sub bdump {
 	 <li> Ausgabe der existierenden Datenbankprozesse (MySQL) </li>
 	 <li> leeren der current-Tabelle </li>
 	 <li> Auffüllen der current-Tabelle mit einem (einstellbaren) Extrakt der history-Tabelle</li>
-     <li> Bereinigung sequentiell aufeinander folgender Datensätze (sequentielle Dublettenbereinigung) </li>
+     <li> Bereinigung sequentiell aufeinander folgender Datensätze mit unterschiedlichen Zeitstempel aber gleichen Werten (sequentielle Dublettenbereinigung) </li>
 	 </ul></ul>
      <br>
      
@@ -9080,6 +9347,7 @@ sub bdump {
   Time::Local     <br>
   Scalar::Util    <br>
   DBI             <br>
+  Color           (FHEM-Modul) <br>
   Blocking        (FHEM-Modul) <br><br>
   
   Aus Performancegründen sollten zusätzlich folgender Index erstellt werden: <br>
@@ -9361,9 +9629,9 @@ sub bdump {
 
                                  <ul>                                 
                                  <b>Beispiel: </b> <br>
-                                 attr &lt;DbRep-device&gt; dumpDirRemote /volume1/ApplicationBackup/dumps_FHEM/ <br>
-								 attr &lt;DbRep-device&gt; dumpDirLocal /sds1/backup/dumps_FHEM/ <br>
-								 attr &lt;DbRep-device&gt; dumpFilesKeep 2 <br><br>
+                                 attr &lt;name&gt; dumpDirRemote /volume1/ApplicationBackup/dumps_FHEM/ <br>
+								 attr &lt;name&gt; dumpDirLocal /sds1/backup/dumps_FHEM/ <br>
+								 attr &lt;name&gt; dumpFilesKeep 2 <br><br>
 								 
                                  # Der Dump wird remote auf dem MySQL-Server im Verzeichnis '/volume1/ApplicationBackup/dumps_FHEM/' 
 								   erstellt. <br>
@@ -9441,7 +9709,7 @@ sub bdump {
 								 
 								 Die <b>Namenskonvention der Dumpfiles</b> ist:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sqlitebkp <br><br>
 								 
-								 Die Datenbank kann mit "set &lt;DbRep-device&gt; restoreSQLite &lt;Filename&gt;" wiederhergestellt 
+								 Die Datenbank kann mit "set &lt;name&gt; restoreSQLite &lt;Filename&gt;" wiederhergestellt 
                                  werden. <br>
                                  Das erstellte Dumpfile kann auf einen FTP-Server übertragen werden. Siehe dazu die Erläuterungen
                                  unter "dumpMySQL". <br><br>
@@ -9458,20 +9726,67 @@ sub bdump {
         
     <li><b> fetchrows [history|current] </b>    
                                  -  liefert <b>alle</b> Tabelleneinträge (default: history) 
-	                             in den gegebenen Zeitgrenzen (siehe <a href="#DbRepattr">Attribute</a>). 
-                                 Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt. <br>
+	                             in den gegebenen Zeitgrenzen bzw. Selektionsbedingungen durch die <a href="#DbRepattr">Attribute</a> 
+                                 "device" und "reading".
+                                 Eine evtl. gesetzte Aggregation wird dabei <b>nicht</b> berücksichtigt. <br>
 								 Die Leserichtung in der Datenbank kann durch das <a href="#DbRepattr">Attribut</a> 
 								 "fetchRoute" bestimmt werden. <br><br>
+                                 
+                                 Jedes Ergebnisreading setzt sich aus dem Timestring des Datensatzes, einem Index, dem Device
+                                 und dem Reading zusammen.
+                                 Die Funktion fetchrows ist in der Lage mehrfach vorkommende Datensätze (Dubletten) zu erkennen.
+                                 Solche Dubletten sind mit einem Index > 1 gekennzeichnet. <br>
+                                 Dubletten können mit dem Attribut "fetchMarkDuplicates" farblich hervorgehoben werden. <br><br>
+                                 
+                                 <b>Hinweis:</b> <br>
+                                 Hervorgehobene Readings werden nach einem Restart bzw. nach rereadcfg nicht mehr angezeigt da
+                                 sie nicht im statefile gesichert werden (Verletzung erlaubter Readingnamen durch Formatierung). 
+                                 <br><br>                
+                                 
+                                 Dieses Attribut ist mit einigen Farben vorbelegt, kann aber mit dem colorpicker-Widget 
+                                 überschrieben werden: <br><br>
+                                 
+                                 <ul>
+                                 <code>
+                                 attr &lt;name&gt; widgetOverride fetchMarkDuplicates:colorpicker
+                                 </code>
+                                 </ul>                                 
+                                 <br>
+                                 
+                                 Die Ergebnisreadings von fetchrows sind nach folgendem Schema aufgebaut: <br><br>
+                                 
+                                 <ul>
+                                 <b>Beispiel:</b> <br>
+                                 2017-10-22_03-04-43__1__SMA_Energymeter__Bezug_WirkP_Kosten_Diff <br>
+                                 # &lt;Datum&gt;_&lt;Zeit&gt;__&lt;Index&gt;__&lt;Device&gt;__&lt;Reading&gt;
+                                 </ul>                                 
+                                 <br>
+
+                                 Zur besseren Übersicht sind die zur Steuerung von fetchrows relevanten Attribute hier noch einmal
+                                 dargestellt: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>fetchRoute</b>            </td><td>: Leserichtung des Selekts innerhalb der Datenbank </td></tr>
+                                      <tr><td> <b>limit</b>                 </td><td>: begrenzt die Anzahl zu selektierenden bzw. anzuzeigenden Datensätze  </td></tr>
+                                      <tr><td> <b>fetchMarkDuplicates</b>   </td><td>: Hervorhebung von gefundenen Dubletten </td></tr>
+                                      <tr><td> <b>device</b>                </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>               </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                      <tr><td> <b>time.*</b>                </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>                                 
 
 								 <b>Hinweis:</b> <br>
                                  Auch wenn das Modul bezüglich der Datenbankabfrage nichtblockierend arbeitet, kann eine 
 								 zu große Ergebnismenge (Anzahl Zeilen bzw. Readings) die Browsersesssion bzw. FHEMWEB 
 								 blockieren. Aus diesem Grund wird die Ergebnismenge mit dem 
 								 <a href="#DbRepattrlimit">Attribut</a> "limit" begrenzt. Bei Bedarf kann dieses Attribut 
-								 geändert werden falls eine Anpassung der Selektionsbedingungen nicht möglich oder 
+								 geändert werden, falls eine Anpassung der Selektionsbedingungen nicht möglich oder 
 								 gewünscht ist. <br><br>
-								 </li> <br>
-								 								 
+								 </li> <br> 								 
        
     <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
                                  Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
@@ -9615,7 +9930,7 @@ sub bdump {
                                  Enthält dieses Kommando eine Delete-Operation, muss zur Sicherheit das 
 								 <a href="#DbRepattr">Attribut</a> "allowDeletion" gesetzt sein. <br>
                                  Bei der Ausführung dieses Kommandos werden keine Einschränkungen durch gesetzte Attribute
-                                 device und/oder reading berücksichtigt. <br>
+                                 "device", "reading", "time.*" bzw. "aggregation" berücksichtigt. <br>
 								 Sollen die im Modul gesetzten <a href="#DbRepattr">Attribute</a> "timestamp_begin" bzw. 
 								 "timestamp_end" im Statement berücksichtigt werden, können die Platzhalter 
 								 "<b>§timestamp_begin§</b>" bzw. "<b>§timestamp_end§</b>" dafür verwendet werden. <br><br>
@@ -9641,39 +9956,66 @@ sub bdump {
 								 Das Ergebnis des Statements wird im <a href="#DbRepReadings">Reading</a> "SqlResult" dargestellt.
 								 Die Ergebnis-Formatierung kann durch das <a href="#DbRepattr">Attribut</a> "sqlResultFormat" ausgewählt, sowie der verwendete
 								 Feldtrenner durch das <a href="#DbRepattr">Attribut</a> "sqlResultFieldSep" festgelegt werden. <br><br>
-								 
+                                 
+                                 Das Modul stellt optional eine Kommando-Historie zur Verfügung sobald ein SQL-Kommando erfolgreich 
+                                 ausgeführt wurde.
+                                 Um diese Option zu nutzen, ist das Attribut "sqlCmdHistoryLength" mit der gewünschten Listenlänge
+                                 zu aktivieren. <br><br>
+                                 
+                                 Zur besseren Übersicht sind die zur Steuerung von sqlCmd relevanten Attribute hier noch einmal
+                                 dargestellt: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>allowDeletion</b>       </td><td>: aktiviert Löschmöglichkeit </td></tr>
+                                      <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnis fest  </td></tr>
+                                      <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
+                                      <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: Aktivierung Kommando-Historie und deren Umfang</td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>  
+                                 
 								 <b>Hinweis:</b> <br>
                                  Auch wenn das Modul bezüglich der Datenbankabfrage nichtblockierend arbeitet, kann eine 
 								 zu große Ergebnismenge (Anzahl Zeilen bzw. Readings) die Browsersesssion bzw. FHEMWEB 
 								 blockieren. Wenn man sich unsicher ist, sollte man vorsorglich dem Statement ein Limit 
 								 hinzufügen. <br><br>
                                  </li> <br>
-								 
                                  </ul>
+                                 
+    <li><b> sqlCmdHistory </b>   - Wenn mit dem <a href="#DbRepattr">Attribut</a> "sqlCmdHistoryLength" aktiviert, kann
+                                   aus einer Liste ein bereits erfolgreich ausgeführtes sqlCmd-Kommando wiederholt werden. <br>
+                                   Mit Ausführung des letzten Eintrags der Liste, "__purge_historylist__", kann die Liste gelöscht 
+                                   werden. <br>
+                                   Falls das Statement "," enthält, wird dieses Zeichen aus technischen Gründen in der 
+                                   History-Liste als "&lt;c&gt;" dargestellt. <br>
+								   </li><br>
 								 
     <li><b> sumValue [display | writeToDB]</b>     
-                                 - berechnet die Summenwerte des Datenbankfelds "VALUE" in den Zeitgrenzen 
-	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
-                                 Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" 
-								 angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
-								 Readings in die Datenbank geschrieben werden.  <br>
+                                 - Berechnet die Summenwerte des Datenbankfelds "VALUE" in den Zeitgrenzen 
+	                               (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
+                                   Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" 
+								   angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
+								   Readings in die Datenbank geschrieben werden.  <br>
                                  
-                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
-                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
-                                 in der Datenbank gespeichert. <br>
-                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
-                                 Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
-                                 Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
-                                 abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
-                                 Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
+                                   Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                   der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
+                                   in der Datenbank gespeichert. <br>
+                                   Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
+                                   Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
+                                   Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
+                                   abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
+                                   Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
                                  
-                                 <ul>
-                                 <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
-                                 sum_day_totalpac <br>
-                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
-                                 </li> <br>
-                                 </ul>
-                                 </li> <br>
+                                   <ul>
+                                   <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
+                                   sum_day_totalpac <br>
+                                   # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
+                                   </li> <br>
+                                   </ul>
+                                   </li> <br>
 								 
 	<li><b> tableCurrentFillup </b> - Die current-Tabelle wird mit einem Extrakt der history-Tabelle aufgefüllt. 
 	                                  Die <a href="#DbRepattr">Attribute</a> zur Zeiteinschränkung bzw. device, reading werden ausgewertet.
@@ -9839,11 +10181,11 @@ sub bdump {
   
                                 <ul>
 							    <b>Beispiele:</b> <br>
-								<code>attr &lt;Name&gt; device TYPE=DbRep</code> <br>
-								<code>attr &lt;Name&gt; device MySTP_5000</code> <br> 
-								<code>attr &lt;Name&gt; device SMA.*,MySTP.*</code> <br> 
-								<code>attr &lt;Name&gt; device SMA_Energymeter,MySTP_5000</code> <br>
-								<code>attr &lt;Name&gt; device %5000</code> <br>
+								<code>attr &lt;name&gt; device TYPE=DbRep</code> <br>
+								<code>attr &lt;name&gt; device MySTP_5000</code> <br> 
+								<code>attr &lt;name&gt; device SMA.*,MySTP.*</code> <br> 
+								<code>attr &lt;name&gt; device SMA_Energymeter,MySTP_5000</code> <br>
+								<code>attr &lt;name&gt; device %5000</code> <br>
 								</ul>
 								<br><br>
 
@@ -9897,8 +10239,8 @@ sub bdump {
 
                                 <ul>
 							    <b>Beispiel:</b> <br><br>
-								attr &lt;DbRep-device&gt; executeAfterProc set og_gz_westfenster off; <br>
-								attr &lt;DbRep-device&gt; executeAfterProc {adump ("&lt;DbRep-device&gt;")} <br><br>
+								attr &lt;name&gt; executeAfterProc set og_gz_westfenster off; <br>
+								attr &lt;name&gt; executeAfterProc {adump ("&lt;name&gt;")} <br><br>
 								
 								# "adump" ist eine in 99_myUtils definierte Funktion. <br>
 								
@@ -9920,8 +10262,8 @@ sub adump {
 
                                 <ul>
 							    <b>Beispiel:</b> <br><br>
-								attr &lt;DbRep-device&gt; executeBeforeProc set og_gz_westfenster on; <br>
-								attr &lt;DbRep-device&gt; executeBeforeProc {bdump ("&lt;DbRep-device&gt;")} <br><br>
+								attr &lt;name&gt; executeBeforeProc set og_gz_westfenster on; <br>
+								attr &lt;name&gt; executeBeforeProc {bdump ("&lt;name&gt;")} <br><br>
 								
 								# "bdump" ist eine in 99_myUtils definierte Funktion. <br>
 								
@@ -9939,6 +10281,9 @@ sub bdump {
 </li>
   
   <li><b>expimpfile </b>      - Pfad/Dateiname für Export/Import in/aus einem File.  </li> <br>
+  
+  <li><b>fetchMarkDuplicates </b> 
+                              - Markierung von mehrfach vorkommenden Datensätzen im Ergebnis des "fetchrows" Kommandos </li> <br>
   
   <li><b>fetchRoute [descent | ascent] </b>  - bestimmt die Leserichtung des fetchrows-Befehl. <br><br>
                                                           <ul>
@@ -10004,9 +10349,9 @@ sub bdump {
 								
                                 <ul>
 							    <b>Beispiele:</b> <br>
-								<code>attr &lt;Name&gt; reading etotal</code> <br>
-								<code>attr &lt;Name&gt; reading et%</code> <br>
-								<code>attr &lt;Name&gt; reading etotal,etoday</code> <br>
+								<code>attr &lt;name&gt; reading etotal</code> <br>
+								<code>attr &lt;name&gt; reading et%</code> <br>
+								<code>attr &lt;name&gt; reading etotal,etoday</code> <br>
 								</ul>
 								<br><br>
   
@@ -10018,15 +10363,15 @@ sub bdump {
   <li><b>role </b>            - die Rolle des DbRep-Device. Standard ist "Client". Die Rolle "Agent" ist im Abschnitt 
                                 <a href="#DbRepAutoRename">DbRep-Agent</a> beschrieben.   </li> <br>
 								
-  <li><b>seqDoubletsVariance </b> - akzeptierte Abweichung (+/-) für das Kommando "set &lt;Name&gt; delSeqDoublets". <br>
+  <li><b>seqDoubletsVariance </b> - akzeptierte Abweichung (+/-) für das Kommando "set &lt;name&gt; delSeqDoublets". <br>
                                     Der Wert des Attributs beschreibt die Abweichung bis zu der aufeinanderfolgende numerische Werte (VALUE) von 
                                     Datensätze als gleich angesehen und gelöscht werden sollen. "seqDoubletsVariance" ist ein absoluter Zahlenwert, 
                                     der sowohl als positive als auch negative Abweichung verwendet wird. </li> <br>
 
                                     <ul>
 							        <b>Beispiele:</b> <br>
-								    <code>attr &lt;Name&gt; seqDoubletsVariance 0.0014 </code> <br>
-								    <code>attr &lt;Name&gt; seqDoubletsVariance 1.45   </code> <br>
+								    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014 </code> <br>
+								    <code>attr &lt;name&gt; seqDoubletsVariance 1.45   </code> <br>
 								    </ul>
 								    <br><br>                                     
                                 
@@ -10035,37 +10380,44 @@ sub bdump {
 								SQl-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der jeweiligen 
 								Funktion betrachtet.   </li> <br>
 								
-  <li><b>showStatus </b>      - grenzt die Ergebnismenge des Befehls "get ... dbstatus" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
+  <li><b>showStatus </b>      - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; dbstatus" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
 
                                 <ul>
-                                Bespiel:    attr ... showStatus %uptime%,%qcache%  <br>
+                                <b>Bespiel: </b> <br>  
+                                attr &lt;name&gt; showStatus %uptime%,%qcache%  <br>
                                 # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthalten <br>
                                 </ul><br>  
   
-  <li><b>showVariables </b>   - grenzt die Ergebnismenge des Befehls "get ... dbvars" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
+  <li><b>showVariables </b>   - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; dbvars" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
 
                                 <ul>
-                                Bespiel:    attr ... showVariables %version%,%query_cache% <br>
+                                <b>Bespiel: </b> <br>
+                                attr &lt;name&gt; showVariables %version%,%query_cache% <br>
                                 # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten <br>
                                 </ul><br>  
                               
-  <li><b>showSvrInfo </b>     - grenzt die Ergebnismenge des Befehls "get ... svrinfo" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
+  <li><b>showSvrInfo </b>     - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; svrinfo" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
 
                                 <ul>
-                                Bespiel:    attr ... showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
+                                <b>Bespiel: </b> <br>
+                                attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%  <br>
                                 # Es werden nur Readings erzeugt die im Namen "SQL_CATALOG_TERM" und "NAME" enthalten <br>
                                 </ul><br>  
                               
-  <li><b>showTableInfo </b>   - grenzt die Ergebnismenge des Befehls "get ... tableinfo" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
+  <li><b>showTableInfo </b>   - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; tableinfo" ein. Es können SQL-Wildcard (%) verwendet werden.    </li> <br>
 
                                 <ul>
-                                Bespiel:    attr ... showTableInfo current,history  <br>
+                                <b>Bespiel: </b> <br>
+                                attr &lt;name&gt; showTableInfo current,history  <br>
                                 # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
                                 </ul><br>  
 
   <li><b>sqlResultFieldSep </b> - legt den verwendeten Feldseparator (default: "|") im Ergebnis des Kommandos "set ... sqlCmd" fest.    </li> <br>
+  
+  <li><b>sqlCmdHistoryLength </b> 
+                              - aktiviert die Kommandohistorie von "sqlCmd" und legt deren Länge fest  </li> <br>
 								
-  <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses des Kommandos "set ... sqlCmd" fest. 
+  <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses des Kommandos "set &lt;name&gt; sqlCmd" fest. 
                                 Mögliche Optionen sind: <br><br>
   
 								<ul>
@@ -10118,7 +10470,7 @@ sub bdump {
                                
                                <ul>
 							   <b>Beispiel:</b> <br><br>
-							   attr &lt;DbRep-device&gt; timeYearPeriod 06-25 06-24 <br><br>
+							   attr &lt;name&gt; timeYearPeriod 06-25 06-24 <br><br>
 								
 							   # wertet die Datenbank in den Zeitgrenzen 25. Juni AAAA bis 24. Juni BBBB aus. <br>
                                # Das Jahr AAAA bzw. BBBB wird in Abhängigkeit des aktuellen Datums errechnet. <br>
@@ -10162,8 +10514,8 @@ sub bdump {
 
                                 <ul>
 							    <b>Beispiel:</b> <br><br>
-								attr &lt;DbRep-device&gt; timestamp_begin current_year_begin <br>
-								attr &lt;DbRep-device&gt; timestamp_end  current_year_end <br><br>
+								attr &lt;name&gt; timestamp_begin current_year_begin <br>
+								attr &lt;name&gt; timestamp_end  current_year_end <br><br>
 								
 								# Wertet die Datenbank in den Zeitgrenzen des aktuellen Jahres aus. <br>
 								</ul>
@@ -10182,13 +10534,13 @@ sub bdump {
 								
                                 <ul>
 							    <b>Eingabeformat Beispiel:</b> <br>
-								<code>attr &lt;Name&gt; timeDiffToNow 86400</code> <br>
+								<code>attr &lt;name&gt; timeDiffToNow 86400</code> <br>
                                 # die Startzeit wird auf "aktuelle Zeit - 86400 Sekunden" gesetzt <br>
-								<code>attr &lt;Name&gt; timeDiffToNow d:2 h:3 m:2 s:10</code> <br>
+								<code>attr &lt;name&gt; timeDiffToNow d:2 h:3 m:2 s:10</code> <br>
                                 # die Startzeit wird auf "aktuelle Zeit - 2 Tage 3 Stunden 2 Minuten 10 Sekunden" gesetzt <br>							
-								<code>attr &lt;Name&gt; timeDiffToNow m:600</code> <br> 
+								<code>attr &lt;name&gt; timeDiffToNow m:600</code> <br> 
                                 # die Startzeit wird auf "aktuelle Zeit - 600 Minuten" gesetzt <br>
-								<code>attr &lt;Name&gt; timeDiffToNow h:2.5</code> <br>
+								<code>attr &lt;name&gt; timeDiffToNow h:2.5</code> <br>
                                 # die Startzeit wird auf "aktuelle Zeit - 2,5 Stunden" gesetzt <br>
 								</ul>
 								<br><br>
