@@ -63,15 +63,17 @@ my $opt_v = 0;
 my $opt_p = 5111;
 my $opt_P = "/var/run/".basename($0).".pid";
 my $opt_l;
+my $opt_n;
 
 Getopt::Long::Configure('bundling');
 GetOptions(
-            "d"   => \$opt_d, "daemon"     => \$opt_d,
-            "v+"  => \$opt_v, "verbose+"   => \$opt_v,
-            "l=s" => \$opt_l, "logfile=s"  => \$opt_l,
-            "p=i" => \$opt_p, "port=i"     => \$opt_p,
-            "P=s" => \$opt_P, "pid-file=s" => \$opt_P,
-            "h"   => \$opt_h, "help"       => \$opt_h
+            "d"   => \$opt_d, "daemon"        => \$opt_d,
+            "n"   => \$opt_n, "no-timestamps" => \$opt_n,
+            "v+"  => \$opt_v, "verbose+"      => \$opt_v,
+            "l=s" => \$opt_l, "logfile=s"     => \$opt_l,
+            "p=i" => \$opt_p, "port=i"        => \$opt_p,
+            "P=s" => \$opt_P, "pid-file=s"    => \$opt_P,
+            "h"   => \$opt_h, "help"          => \$opt_h
           );
 
 
@@ -80,8 +82,8 @@ Log 1, "started with PID $$";
 
 if(-e "$opt_P")
 {
-         print timestamp()." another process already running (PID file found at $opt_P)\n";
-         print timestamp()." aborted...\n";
+         print timestamp()."another process already running (PID file found at $opt_P)\n";
+         print timestamp()."aborted...\n";
     exit 1;
 }
 
@@ -97,6 +99,8 @@ sub print_usage ()
     print "     PID file for storing the local process id (Default: /var/run/".basename($0).".pid)\n";
     print "  -d, --daemon\n";
     print "     detach from terminal and run as background daemon\n";
+    print "  -n, --no-timestamps\n";
+    print "     do not output timestamps in log messages\n"; 
     print "  -v, --verbose\n";
     print "     Print detailed log output\n";
     print "  -h, --help\n";
@@ -172,6 +176,8 @@ while(1)
             {
                 $new_client = $server->accept();
                 
+                setsockopt($new_client, SOL_SOCKET, SO_KEEPALIVE, 1); # activate keep-alive
+                
                 $listener->add($new_client);
                 Log 1, "new connection from ".$new_client->peerhost().":".$new_client->peerport();
             }
@@ -184,7 +190,7 @@ while(1)
                 {
                     $buf =~ s/(^\s*|\s*$)//g;
 
-                    if($buf =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*\|\s*\d+\s*$/)
+                    if($buf =~ /^\s*(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\s*\|\s*\d+\s*$/i)
                     {
                         $client->send("command accepted\n");
                         Log 2, "received new command from ".$client->peerhost().":".$client->peerport()." - $buf";
@@ -243,6 +249,18 @@ while(1)
                         {
                             $client->send("no command running\n");
                         }
+                    }
+                    elsif(lc($buf) =~ /^\s*ping\s*$/)
+                    {
+                        Log 2, "received ping command from client ".$client->peerhost().":".$client->peerport(); 
+                        $client->send("pong\n");
+
+                        Log 1, "closed connection from ".$client->peerhost().":".$client->peerport();
+                        $listener->remove($client);
+                    
+                        shutdown($client, 2);
+                        close $client;
+                        $client = undef;
                     }
                     else
                     {        
@@ -396,7 +414,8 @@ sub doQuery($$)
 
 sub timestamp()
 {
-    return POSIX::strftime("%Y-%m-%d %H:%M:%S",localtime);
+    return POSIX::strftime("%Y-%m-%d %H:%M:%S - ",localtime) unless($opt_n);
+    return "";
 }
 
 
@@ -421,7 +440,7 @@ sub Log($$)
             open (LOGFILE, ">&STDOUT") or die("cannot open STDOUT");
         }
 
-        print LOGFILE "\r".timestamp()." - ".($opt_v >= 2 ? ($thread > 0 ? "(Thread $thread)" : "(Main Thread)")." - ":"").$message."\n";
+        print LOGFILE ($opt_l?"":"\r").timestamp().($opt_v >= 2 ? ($thread > 0 ? "(Thread $thread)" : "(Main Thread)")." - ":"").$message."\n";
         
         close(LOGFILE);
     }
