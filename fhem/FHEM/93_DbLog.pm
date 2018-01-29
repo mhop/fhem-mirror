@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.8.1      29.01.2018       Use of uninitialized value $txt if addlog has no value
 # 3.8.0      26.01.2018       escape "|" in events to log events containing it
 # 3.7.1      25.01.2018       fix typo in commandref
 # 3.7.0      21.01.2018       parsed event with Log 5 added, configCheck enhanced by configuration read check
@@ -181,7 +182,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.8.0";
+my $DbLogVersion = "3.8.1";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -3445,8 +3446,6 @@ sub DbLog_AddLog($$$) {
   
   return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
   
-  $value = DbLog_charfilter($value) if(AttrVal($name, "useCharfilter",0));
-  
   # Funktion aus Attr valueFn validieren
   if( $value_fn =~ m/^\s*(\{.*\})\s*$/s ) {
       $value_fn = $1;
@@ -3529,7 +3528,12 @@ sub DbLog_AddLog($$$) {
 	      no warnings 'uninitialized'; 
           # Daten auf maximale Länge beschneiden
           ($dev_name,$dev_type,$event,$dev_reading,$read_val,$ut) = DbLog_cutCol($hash,$dev_name,$dev_type,$event,$dev_reading,$read_val,$ut);
-  
+          
+          if(AttrVal($name, "useCharfilter",0)) {
+              $dev_reading = DbLog_charfilter($dev_reading);
+              $read_val    = DbLog_charfilter($read_val);
+          }
+          
           my $row = ($ts."|".$dev_name."|".$dev_type."|".$event."|".$dev_reading."|".$read_val."|".$ut);
           Log3 $hash->{NAME}, 3, "DbLog $name -> addLog created - TS: $ts, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $dev_reading, Value: $read_val, Unit: $ut"
 		      if(!AttrVal($name, "suppressAddLogV3",0));
