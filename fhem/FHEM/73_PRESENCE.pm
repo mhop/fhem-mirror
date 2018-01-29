@@ -604,15 +604,15 @@ PRESENCE_Read($)
         {
             readingsBulkUpdate($hash, "command_accepted", "no");
         }
-        elsif($line =~ /socket_closed;(.+?)$/)
+        elsif($line =~ /socket_closed;(?:room='?)?(.+?)'?$/)
         {
             Log3 $name, 3, "PRESENCE ($name) - collectord lost connection to room $1";
         }
-        elsif($line =~ /socket_reconnected;(.+?)$/)
+        elsif($line =~ /socket_reconnected;(?:room='?)?(.+?)'?$/)
         {
             Log3 $name , 3, "PRESENCE ($name) - collectord reconnected to room $1";
         }
-        elsif($line =~ /error;(.+?)$/)
+        elsif($line =~ /error;(?:room='?)?(.+?)'?$/)
         {
             Log3 $name, 3, "PRESENCE ($name) - room $1 cannot execute hcitool to check device";
         }
