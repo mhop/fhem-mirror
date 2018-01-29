@@ -50,6 +50,8 @@ my $buf;
 
 sub Log($$);
 sub parseParams($;$);
+sub closeClientConnection($);
+sub stopClientThreads($);
 
 my $opt_d;
 my $opt_h;
@@ -58,6 +60,7 @@ my $opt_p = 5222;
 my $opt_P = "/var/run/".basename($0).".pid";
 my $opt_l;
 my $opt_c;
+my $opt_n;
 
 my %config;
 
@@ -88,13 +91,14 @@ $SIG{__WARN__} = sub {
 
 Getopt::Long::Configure('bundling');
 GetOptions(
-        "d"     => \$opt_d, "daemon"       => \$opt_d,
-        "v+"    => \$opt_v, "verbose+"     => \$opt_v,
-        "l=s"   => \$opt_l, "logfile=s"    => \$opt_l,
-        "c=s"   => \$opt_c, "configfile=s" => \$opt_c,
-        "p=i"   => \$opt_p, "port=i"       => \$opt_p,
-        "P=s"   => \$opt_P, "pid-file=s"   => \$opt_P,
-        "h"     => \$opt_h, "help"         => \$opt_h
+        "d"     => \$opt_d, "daemon"        => \$opt_d,
+        "n"     => \$opt_n, "no-timestamps" => \$opt_n,
+        "v+"    => \$opt_v, "verbose+"      => \$opt_v,
+        "l=s"   => \$opt_l, "logfile=s"     => \$opt_l,
+        "c=s"   => \$opt_c, "configfile=s"  => \$opt_c,
+        "p=i"   => \$opt_p, "port=i"        => \$opt_p,
+        "P=s"   => \$opt_P, "pid-file=s"    => \$opt_P,
+        "h"     => \$opt_h, "help"          => \$opt_h
         );
 
 
@@ -113,6 +117,8 @@ sub print_usage () {
         print "     PID file for storing the local process id (Default: /var/run/".basename($0).".pid)\n";
         print "  -d, --daemon\n";
         print "     detach from terminal and run as background daemon\n";
+        print "  -n, --no-timestamps\n";
+        print "     do not output timestamps in log messages\n";        
         print "  -v, --verbose\n";
         print "     Print detailed log output (can be used multiple times to increase the loglevel, max. 2 times)\n";
         print "  -l, --logfile <logfile>\n";
@@ -129,8 +135,8 @@ if($opt_h)
 
 if(-e "$opt_P")
 {
-         print STDERR timestamp()." another process already running (PID file found at $opt_P)\n";
-         print STDERR timestamp()." aborted...\n";
+         print STDERR timestamp()."another process already running (PID file found at $opt_P)\n";
+         print STDERR timestamp()."aborted...\n";
     exit 1;
 }
 
@@ -294,6 +300,8 @@ while(1)
             {
                 $new_client = $server->accept();
                 
+                setsockopt($new_client, SOL_SOCKET, SO_KEEPALIVE, 1); # activate keep-alive
+                
                 $listener->add($new_client);
                 Log 1, "new connection from ".$new_client->peerhost().":".$new_client->peerport();
             }
@@ -385,18 +393,20 @@ while(1)
                         {
                             my $uuid = $socket_to_handle{$client};
                             
-                            # get all threads for this socket and send them a termination signal
+                            # get all threads for this socket and send them a now command
                             foreach my $room (keys %{$handle{$uuid}{threads}})
                             {
                                 Log 2, "signalling thread ".$handle{$uuid}{threads}{$room}->tid()." to send \"now\"-request for room $room for client ".$client->peerhost(); 
+                                
                                 $queues{$handle{$uuid}{threads}{$room}->tid()}->enqueue("now");
+                                
+                                # delete state and room data to get a fresh state
                                 $state{$uuid}{rooms}{$room}{state} = "" if(exists($state{$uuid}{rooms}{$room}));
                                 delete($state{$uuid}{rooms}{$room}{data});
                             }
                             
                             delete($state{$uuid}{lastresult}) if(exists($state{$uuid}{lastresult}));
                             $client->send("command accepted\n");
-                            
                         }
                         else
                         {
@@ -409,24 +419,9 @@ while(1)
                         Log 1, "received stop command from client ".$client->peerhost(); 
                         
                         # just to be sure if the client has really a running request
-                        if(defined($socket_to_handle{$client}))
+                        if(stopClientThreads($client))
                         {
-                            my $uuid = $socket_to_handle{$client};
-                            
-                            # get all threads for this socket and send them a termination signal
-                            foreach my $room (keys %{$handle{$uuid}{threads}})
-                            {
-                                Log 2, "killing thread ".$handle{$uuid}{threads}{$room}->tid()." for room $room for client ".$client->peerhost(); 
-                                $queues{$handle{$uuid}{threads}{$room}->tid()}->enqueue("stop");
-                                delete($handle{$uuid}{threads}{$room});
-                            }
-                            
-                            # when all threads are signaled, delete all relationship entry for this client
-                            delete($handle{$uuid});
-                            delete($socket_to_handle{$client});
-                            
                             $client->send("command accepted\n");
-                            
                         }
                         else
                         {
@@ -434,7 +429,13 @@ while(1)
                             $client->send("no command running\n");
                         }
                     }
-
+                    elsif(lc($buf) =~ /^\s*ping\s*$/) # 
+                    {
+                        Log 1, "received ping command from client ".$client->peerhost(); 
+                        $client->send("pong\n");
+                        
+                        closeClientConnection($client);
+                    } 
                     else
                     {    # if the message does not match a regular command or a stop signal, just tell the client and make a entry for logging.
                         $client->send("command rejected\n");
@@ -444,31 +445,7 @@ while(1)
                 }
                 else  # if the message is not defined (EOF) the connection was closed. Now let's clean up
                 {
-                    # make a log entry and remove the socket from the socket selector
-                    Log 1, "closed connection from ".$client->peerhost();
-                    $listener->remove($client);
-                    
-                    
-                    # if there is a running command, stop it first and clean up (same as stop command, see above)
-                    if(defined($socket_to_handle{$client}))
-                    {
-                        my $uuid = $socket_to_handle{$client};
-                        
-                        # get all threads for this socket and send them a termination signal
-                        foreach my $room (keys %{$handle{$uuid}{threads}})
-                        {
-                            Log 2, "killing thread ".$handle{$uuid}{threads}{$room}->tid()." for room $room for client ".$client->peerhost(); 
-                            $queues{$handle{$uuid}{threads}{$room}->tid()}->enqueue("stop");
-                            delete($handle{$uuid}{threads}{$room});
-                        }
-                        
-                        # when all threads are signaled, delete all relationship entry for this client
-                        delete($handle{$uuid});
-                        delete($socket_to_handle{$client});
-                    }
-                    
-                    # now close the socket, that's it
-                    close $client;
+                    closeClientConnection($client);
                 }
             }
         }
@@ -846,7 +823,7 @@ sub readConfig
 
     if($errorcount)
     { 
-        print STDERR timestamp()." found $errorcount config errors. exiting....\n";
+        print STDERR timestamp()."found $errorcount config errors. exiting....\n";
         exit 2;
     }
     else
@@ -974,7 +951,8 @@ sub generateUUID
 
 sub timestamp
 {
-    return POSIX::strftime("%Y-%m-%d %H:%M:%S",localtime);
+    return POSIX::strftime("%Y-%m-%d %H:%M:%S - ",localtime) unless($opt_n);
+    return "";
 }
 
 
@@ -999,7 +977,7 @@ sub Log($$)
             open (LOGFILE, ">&STDOUT") or die("cannot open STDOUT");
         }
 
-        print LOGFILE ($opt_l?"":"\r").timestamp()." - ".($opt_v >= 2 ? ($thread > 0 ? "(Thread $thread)" : "(Main Thread)")." - ":"").$message."\n";
+        print LOGFILE ($opt_l?"":"\r").timestamp().($opt_v >= 2 ? ($thread > 0 ? "(Thread $thread)" : "(Main Thread)")." - ":"").$message."\n";
 
         close(LOGFILE);
     }
@@ -1072,4 +1050,48 @@ sub parseParams($;$)
   }
 
   return(\@a, \%h);
+}
+
+sub closeClientConnection($)
+{
+    my ($client) = @_;
+    
+    # make a log entry and remove the socket from the socket selector
+    Log 1, "closed connection from ".$client->peerhost();
+    $listener->remove($client); 
+
+    # if there is a running command, stop it first and clean up 
+    stopClientThreads($client);
+
+    # now close the socket, that's it
+    close $client;
+}
+
+sub stopClientThreads($)
+{
+    my ($client) = @_;
+    
+    # if there is a running command, stop it first and clean up (same as stop command, see above)
+    if(defined($socket_to_handle{$client}))
+    {
+        my $uuid = $socket_to_handle{$client};
+        
+        # get all threads for this socket and send them a termination signal
+        foreach my $room (keys %{$handle{$uuid}{threads}})
+        {
+            Log 2, "killing thread ".$handle{$uuid}{threads}{$room}->tid()." for room $room for client ".$client->peerhost(); 
+            $queues{$handle{$uuid}{threads}{$room}->tid()}->enqueue("stop");
+            delete($handle{$uuid}{threads}{$room});
+        }
+        
+        # when all threads are signaled, delete all relationship entry for this client
+        delete($handle{$uuid});
+        delete($socket_to_handle{$client});
+        
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
 }
