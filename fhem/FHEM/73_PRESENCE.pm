@@ -1616,7 +1616,7 @@ Options:
 
     <ul>
     <li>direct perl script file: <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
-    <li>.deb package for Debian (noarch): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/collectord-1.7.deb" target="_new">collectord-1.7.deb</a></li>
+    <li>.deb package for Debian (noarch): <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/collectord-1.8.deb" target="_new">collectord-1.8.deb</a></li>
     </ul>
     </ul><br><br>
 
@@ -1945,7 +1945,7 @@ Options:
 
     <ul>
     <li>Perl Skript:  <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
-    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/collectord-1.7.deb" target="_new">collectord-1.7.deb</a></li>
+    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="https://svn.fhem.de/trac/export/HEAD/trunk/fhem/contrib/PRESENCE/deb/collectord-1.8.deb" target="_new">collectord-1.8.deb</a></li>
     </ul>
     </ul>
   </ul>
