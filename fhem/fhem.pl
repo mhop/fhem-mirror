@@ -2808,7 +2808,7 @@ CommandAttr($$)
       $attrVal = "-" if($attrName eq "logfile");
       $attrVal = 5   if($attrName eq "verbose");
     }
-    $ret = CallFn($sdev, "AttrFn", "set", $attrName, $attrVal);
+    $ret = CallFn($sdev, "AttrFn", "set", $a[0], $attrName, $attrVal);
     if($ret) {
       push @rets, $ret;
       next;
