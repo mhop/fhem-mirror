@@ -2708,7 +2708,7 @@ CommandAttr($$)
       }
       if(!$found) {
         push @rets, "$sdev: unknown attribute $attrName. ".
-                        "Type 'attr $a[0] ?' for a detailed list.";
+                        "Type 'attr $sdev ?' for a detailed list.";
         next;
       }
     }
@@ -2762,7 +2762,6 @@ CommandAttr($$)
       $hash->{'.userReadings'}= \@userReadings;
     } 
 
-    $a[0] = $sdev;
     my $oVal = ($attr{$sdev} ? $attr{$sdev}{$attrName} : "");
 
     if($attrName eq "eventMap") {
@@ -2791,12 +2790,12 @@ CommandAttr($$)
 
       if($rp && $lval =~ m/$rp/) {
         my $err = perlSyntaxCheck($attrVal, %{$ra{$attrName}{pv}});
-        return "attr $sdev $a[1]: $err" if($err);
+        return "attr $sdev $attrName: $err" if($err);
 
       } else {
         for my $v (split($ra{$attrName}{s}, $lval)) {
           $v =~ s/$ra{$attrName}{r}// if($ra{$attrName}{r});
-          my $err = "Argument $v for attr $sdev $a[1] is not a valid regexp";
+          my $err ="Argument $v for attr $sdev $attrName is not a valid regexp";
           return "$err: use .* instead of *" if($v =~ /^\*/); # no err in eval!?
           eval { "Hallo" =~ m/^$v$/ };
           return "$err: $@" if($@);
