@@ -2682,7 +2682,7 @@ CommandAttr($$)
 
     my $hash = $defs{$sdev};
     my $attrName = $a[1];
-    my $attrVal = $a[2];
+    my $attrVal = (defined($a[2]) ? $a[2] : 1);
     if(!defined($hash)) {
       push @rets, "Please define $sdev first" if($init_done);#define -ignoreErr
       next;
@@ -2713,17 +2713,17 @@ CommandAttr($$)
       }
     }
 
-    if($append && $attrVal && $attr{$sdev} && $attr{$sdev}{$attrName}) {
+    if($append && $attr{$sdev} && $attr{$sdev}{$attrName}) {
       $attrVal = $attr{$sdev}{$attrName} . 
                         ($attrVal =~ m/^,/ ? $attrVal : " $attrVal");
     }
-    if($remove && $attrVal && $attr{$sdev} && $attr{$sdev}{$attrName}) {
+    if($remove && $attr{$sdev} && $attr{$sdev}{$attrName}) {
       my $v = $attr{$sdev}{$attrName};
       $v =~ s/\s*$attrVal\s*//;
       $attrVal = $v;
     }
 
-    if($attrName eq 'disable' and $attrVal && $attrVal eq 'toggle') {
+    if($attrName eq 'disable' && $attrVal eq 'toggle') {
        $attrVal = IsDisabled($sdev) ? 0 : 1;
     }
 
@@ -2768,7 +2768,7 @@ CommandAttr($$)
     if($attrName eq "eventMap") {
       delete $hash->{".eventMapHash"};
       delete $hash->{".eventMapCmd"};
-      $attr{$sdev}{eventMap} = (defined $attrVal ? $attrVal : 1);
+      $attr{$sdev}{eventMap} = $attrVal;
       my $r = ReplaceEventMap($sdev, "test", 1); # refresh eventMapCmd
       if($r =~ m/^ERROR in eventMap for /) {
         delete($attr{$sdev}{eventMap});
@@ -2786,7 +2786,7 @@ CommandAttr($$)
                                   pv=>{"%name"=>1, "%state"=>1, "%type"=>1} },
     );
 
-    if(defined($attrVal) && $ra{$attrName} && $init_done) {
+    if($ra{$attrName} && $init_done) {
       my ($lval,$rp) = ($attrVal, $ra{$attrName}{p});
 
       if($rp && $lval =~ m/$rp/) {
@@ -2808,15 +2808,13 @@ CommandAttr($$)
       $attrVal = "-" if($attrName eq "logfile");
       $attrVal = 5   if($attrName eq "verbose");
     }
-    $ret = CallFn($sdev, "AttrFn", "set", @a);
+    $ret = CallFn($sdev, "AttrFn", "set", $attrName, $attrVal);
     if($ret) {
       push @rets, $ret;
       next;
     }
 
-    my $val = $attrVal;
-    $val = 1 if(!defined($val));
-    $attr{$sdev}{$attrName} = $val;
+    $attr{$sdev}{$attrName} = $attrVal;
 
     if($attrName eq "IODev") {
       if(!$attrVal || !defined($defs{$attrVal})) {
@@ -2838,9 +2836,9 @@ CommandAttr($$)
       return $err if($err);
       evalStateFormat($hash);
     }
-    addStructChange("attr", $sdev, "$attrName $val")
-        if(!defined($oVal) || $oVal ne $val);
-    DoTrigger("global", "ATTR $sdev $attrName $val", 1) if($init_done);
+    addStructChange("attr", $sdev, "$attrName $attrVal")
+        if(!defined($oVal) || $oVal ne $attrVal);
+    DoTrigger("global", "ATTR $sdev $attrName $attrVal", 1) if($init_done);
 
   }
 
