@@ -918,57 +918,46 @@ sub FB_CALLLIST_list2html($)
         $ret .= "</td></tr>";
     }
 
-    if(AttrVal($name, "disable", "0") ne "3")
+
+    $ret .= "<tr><td>";
+    $ret .= '<div class="fhemWidget" informId="'.$name.'" cmd="" arg="fbcalllist" dev="'.$name.'">'; # div tag to support inform updates
+    $ret .= '<table class="block wide fbcalllist"'.((AttrVal($name, "disable", "0") eq "3") ? ' style="display:none;"' : '').'>';
+
+    $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), 'class="fbcalllist header"'.((AttrVal($name, "no-table-header", "0") eq "1") ? ' style="display:none;"' : ''),'');
+
+    if(AttrVal($name,'disable',"0") eq "2")
     {
-        $ret .= "<tr><td>";
-        $ret .= '<div class="fhemWidget" informId="'.$name.'" cmd="" arg="fbcalllist" dev="'.$name.'">'; # div tag to support inform updates
-        $ret .= '<table class="block wide fbcalllist">';
+        my $string = '<div style="color:#ff8888;"><i>'.((AttrVal($name, "language", "en") eq "de") ? "deaktiviert" : "disabled").'</i></div>';
 
-        $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), 'class="fbcalllist header"'.((AttrVal($name, "no-table-header", "0") eq "1") ? ' style="display:none;"' : ''),'');
+        my @columns = split(",",AttrVal($name, "visible-columns", $hash->{helper}{DEFAULT_COLUMN_ORDER}));
+        my $additional_columns = scalar(@columns);
 
-        if(AttrVal($name,'disable',"0") eq "2")
+        $ret .= '<tr align="center" name="empty"><td style="padding:10px;" colspan="'.$additional_columns.'">'.$string.'</td></tr>';
+    }
+    else
+    {
+        my @item_list = FB_CALLLIST_getAllItemLines($hash);
+
+        if(@item_list > 0)
         {
-            my $string = '<div style="color:#ff8888;"><i>'.((AttrVal($name, "language", "en") eq "de") ? "deaktiviert" : "disabled").'</i></div>';
+            foreach $line (@item_list)
+            {
+                $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, $line, 'number="'.$line->{line}.'" index="'.$line->{index}.'" class="fbcalllist item '.($line->{line} % 2 == 1 ? "odd" : "even").'"', 'class="fbcalllist cell" '.$td_style);
+            }
+        }
+        else
+        {
+            my $string = ((AttrVal($name, "language", "en") eq "de") ? "leer" : "empty");
 
             my @columns = split(",",AttrVal($name, "visible-columns", $hash->{helper}{DEFAULT_COLUMN_ORDER}));
             my $additional_columns = scalar(@columns);
 
-            $ret .= '<tr align="center" name="empty"><td style="padding:10px;" colspan="'.$additional_columns.'">'.$string.'</td></tr>';
+            $ret .= '<tr align="center" name="empty"><td style="padding:10px;" colspan="'.$additional_columns.'"><i>'.$string.'</i></td></tr>';
         }
-        else
-        {
-            my @item_list = FB_CALLLIST_getAllItemLines($hash);
-
-            if(@item_list > 0)
-            {
-                foreach $line (@item_list)
-                {
-                    $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, $line, 'number="'.$line->{line}.'" index="'.$line->{index}.'" class="fbcalllist item '.($line->{line} % 2 == 1 ? "odd" : "even").'"', 'class="fbcalllist cell" '.$td_style);
-                }
-            }
-            else
-            {
-                my $string;
-
-                if(AttrVal($name, "language", "en") eq "de")
-                {
-                    $string = "leer";
-                }
-                else
-                {
-                    $string = "empty";
-                }
-
-                my @columns = split(",",AttrVal($name, "visible-columns", $hash->{helper}{DEFAULT_COLUMN_ORDER}));
-                my $additional_columns = scalar(@columns);
-
-                $ret .= '<tr align="center" name="empty"><td style="padding:10px;" colspan="'.$additional_columns.'"><i>'.$string.'</i></td></tr>';
-            }
-        }
-
-        $ret .= "</table></div>";
-        $ret .= "</td></tr>";
     }
+
+    $ret .= "</table></div>";
+    $ret .= "</td></tr>";
 
     $ret .= "</table>";
 
