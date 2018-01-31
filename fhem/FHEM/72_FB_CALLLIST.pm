@@ -58,7 +58,8 @@ FB_CALLLIST_Initialize($)
                           "list-order:ascending,descending ".
                           "answMachine-is-missed-call:0,1 ".
                           "language:de,en ".
-                          "disable:0,1 ".
+                          "disable:0,1,2,3 ".
+                          "processEventsWhileDisabled:0,1 ".
                           "number-cmd ".
                           "disabledForIntervals ".
                           "do_not_notify:0,1 ".
@@ -232,7 +233,7 @@ sub FB_CALLLIST_Set($@)
         if(AttrVal($name, "create-readings", "0") eq "1")
         {
             readingsBeginUpdate($hash);
-            
+
             readingsBulkUpdate($hash, "numberOfCalls", 0, 1);
 
             for my $reading (grep { /^\d+-/ } keys %{$hash->{READINGS}})
@@ -389,7 +390,7 @@ sub FB_CALLLIST_Notify($$)
 
     my $fb = $dev->{NAME};
 
-    return undef if(IsDisabled($name));
+    return undef if(IsDisabled($name) and AttrVal($name, "processEventsWhileDisabled", "0") eq "0");
     return undef if($fb ne $hash->{FB});
     return undef if(!grep(m/^event:/,@{$events}));
 
@@ -498,14 +499,18 @@ sub FB_CALLLIST_Notify($$)
     # clean up the list
     FB_CALLLIST_cleanupList($hash);
 
+    # save current list state to file/configDB
+    FB_CALLLIST_saveList($hash);
+
+    return undef if(IsDisabled($name));
+
     # inform about changes of current call index
     FB_CALLLIST_updateOneItemInFHEMWEB($hash,$data->{internal_index});
 
     # Update readings
     FB_CALLLIST_createReadings($hash);
 
-    # save current list state to file/configDB
-    FB_CALLLIST_saveList($hash);
+
 }
 
 ############################################################################################################
@@ -904,9 +909,7 @@ sub FB_CALLLIST_list2html($)
     my $td_style = 'style="padding-left:6px;padding-right:6px;"';
     my $line;
 
-
-
-    my $ret .= "<table>";
+    my $ret .= '<table class="fbcalllist-container">';
 
     if(AttrVal($name, "no-heading", "0") eq "0" and defined($FW_ME) and defined($FW_subdir))
     {
@@ -915,42 +918,59 @@ sub FB_CALLLIST_list2html($)
         $ret .= "</td></tr>";
     }
 
-    $ret .= "<tr><td>";
-    $ret .= '<div class="fhemWidget" informId="'.$name.'" cmd="" arg="fbcalllist" dev="'.$name.'">'; # div tag to support inform updates
-    $ret .= '<table class="block fbcalllist">';
-
-    $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), 'class="fbcalllist header"','') if(AttrVal($name, "no-table-header", "0") eq "0");
-
-    my @item_list = FB_CALLLIST_getAllItemLines($hash);
-
-    if(@item_list > 0)
+    if(AttrVal($name, "disable", "0") ne "3")
     {
-        foreach $line (@item_list)
-        {
-            $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, $line, 'number="'.$line->{line}.'" index="'.$line->{index}.'" class="fbcalllist item '.($line->{line} % 2 == 1 ? "odd" : "even").'"', 'class="fbcalllist cell" '.$td_style);
-        }
-    }
-    else
-    {
-        my $string;
+        $ret .= "<tr><td>";
+        $ret .= '<div class="fhemWidget" informId="'.$name.'" cmd="" arg="fbcalllist" dev="'.$name.'">'; # div tag to support inform updates
+        $ret .= '<table class="block wide fbcalllist">';
 
-        if(AttrVal($name, "language", "en") eq "de")
+        $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), 'class="fbcalllist header"'.((AttrVal($name, "no-table-header", "0") eq "1") ? ' style="display:none;"' : ''),'');
+
+        if(AttrVal($name,'disable',"0") eq "2")
         {
-            $string = "leer";
+            my $string = '<div style="color:#ff8888;"><i>'.((AttrVal($name, "language", "en") eq "de") ? "deaktiviert" : "disabled").'</i></div>';
+
+            my @columns = split(",",AttrVal($name, "visible-columns", $hash->{helper}{DEFAULT_COLUMN_ORDER}));
+            my $additional_columns = scalar(@columns);
+
+            $ret .= '<tr align="center" name="empty"><td style="padding:10px;" colspan="'.$additional_columns.'">'.$string.'</td></tr>';
         }
         else
         {
-            $string = "empty";
+            my @item_list = FB_CALLLIST_getAllItemLines($hash);
+
+            if(@item_list > 0)
+            {
+                foreach $line (@item_list)
+                {
+                    $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, $line, 'number="'.$line->{line}.'" index="'.$line->{index}.'" class="fbcalllist item '.($line->{line} % 2 == 1 ? "odd" : "even").'"', 'class="fbcalllist cell" '.$td_style);
+                }
+            }
+            else
+            {
+                my $string;
+
+                if(AttrVal($name, "language", "en") eq "de")
+                {
+                    $string = "leer";
+                }
+                else
+                {
+                    $string = "empty";
+                }
+
+                my @columns = split(",",AttrVal($name, "visible-columns", $hash->{helper}{DEFAULT_COLUMN_ORDER}));
+                my $additional_columns = scalar(@columns);
+
+                $ret .= '<tr align="center" name="empty"><td style="padding:10px;" colspan="'.$additional_columns.'"><i>'.$string.'</i></td></tr>';
+            }
         }
 
-        my @columns = split(",",AttrVal($name, "visible-columns", $hash->{helper}{DEFAULT_COLUMN_ORDER}));
-        my $additional_columns = scalar(@columns);
-
-        $ret .= '<tr align="center" name="empty"><td style="padding:10px;" colspan="'.$additional_columns.'"><i>'.$string.'</i></td></tr>';
+        $ret .= "</table></div>";
+        $ret .= "</td></tr>";
     }
 
-    $ret .= "</table></div>";
-    $ret .= "</td></tr></table>";
+    $ret .= "</table>";
 
     return $ret;
 }
@@ -1124,7 +1144,7 @@ sub FB_CALLLIST_loadList($)
     }
     else
     {
-         Log3 $name, 5, "FB_CALLLIST ($name) - no list found for restoring";
+        Log3 $name, 5, "FB_CALLLIST ($name) - no list found for restoring";
     }
 }
 
@@ -1250,7 +1270,7 @@ sub FB_CALLLIST_deleteItem($;$)
 
     if(FB_CALLLIST_createOrderedIndexList($hash))
     {
-        FW_directNotify($name, "{\"action\":\"delete\",\"index\":\"$index\"}", 1) if(defined($FW_ME) and $index);
+        FW_directNotify($name, '{"action":"delete","index":"'.$index.'"}', 1) if(defined($FW_ME) and $index);
     }
     else
     {
@@ -1270,7 +1290,7 @@ sub FB_CALLLIST_deleteItem($;$)
             $string = "empty";
         }
 
-        FW_directNotify($name, "{\"action\":\"clear\",\"content\":\"$string\"}", 1);
+        FW_directNotify($name, '{"action":"clear","content":"'.$string.'"}', 1);
     }
 }
 
@@ -1284,20 +1304,38 @@ sub FB_CALLLIST_updateFhemWebClients($)
 
     return undef unless($init_done);
 
-    if(my @list = FB_CALLLIST_getAllItemLines($hash))
+    if(IsDisabled($name))
     {
-        Log3 $name, 5, "FB_CALLLIST ($name) - inform all FHEMWEB clients";
+        my $string = "<div style='color:#ff8888;'><i>".((AttrVal($name, "language", "en") eq "de") ? "deaktiviert" : "disabled").'</i></div>';
 
-        # inform all FHEMWEB clients about changes
-        foreach my $line (@list)
+        if(AttrVal($name,"disable","0") eq "2")
         {
-            my $json = FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
-            FW_directNotify($name, "{\"action\":\"update\",\"index\":\"".$line->{index}."\",\"order\":\"".AttrVal($name, "list-order","descending")."\",\"item\":$json}", 1);
+            FW_directNotify($name, '{"action":"clear","content":"'.$string.'"}', 1);
+        }
+        elsif(AttrVal($name,"disable","0") eq "3")
+        {
+            FW_directNotify($name, '{"action":"hide"}', 1);
         }
     }
     else
     {
-        FB_CALLLIST_deleteItem($hash);
+        if(my @list = FB_CALLLIST_getAllItemLines($hash))
+        {
+            Log3 $name, 5, "FB_CALLLIST ($name) - inform all FHEMWEB clients";
+
+            # inform all FHEMWEB clients about changes
+            foreach my $line (@list)
+            {
+                my $json = FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
+                FW_directNotify($name, '{"action":"update","index":"'.$line->{index}.'","order":"'.AttrVal($name, "list-order","descending").'","item":'.$json.'}', 1);
+            }
+        }
+        else
+        {
+            FB_CALLLIST_deleteItem($hash);
+        }
+
+        FW_directNotify($name, '{"action":"show"}', 1);
     }
 }
 
@@ -1314,7 +1352,7 @@ sub FB_CALLLIST_updateOneItemInFHEMWEB($$)
 
     my $json = FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
 
-    FW_directNotify($name, "{\"action\":\"update\",\"index\":\"$index\",\"order\":\"".AttrVal($name, "list-order","descending")."\",\"item\":$json}", 1);
+    FW_directNotify($name, '{"action":"update","index":"'.$index.'","order":"'.AttrVal($name, "list-order","descending").'","item":'.$json.'}', 1);
 
     return undef;
 }
@@ -1455,19 +1493,30 @@ sub FB_CALLLIST_returnTableHeader($)
     Possible values: 0 =&gt; no readings will be created, 1 =&gt; readings and events will be created.<br>
     Default Value is 0 (no readings will be created)<br><br>
 
-    <li><a name="FB_CALLLIST_disable">disable</a> 0,1</li>
-    Optional attribute to disable the call list update. When disabled, call events will be processed and the list wouldn't be updated accordingly.
+    <li><a name="FB_CALLLIST_disable">disable</a> 0,1,2,3</li>
+    Optional attribute to disable the call list. When disabled, call events will not be processed and the list wouldn't be updated accordingly. Depending on the value, the call list can
     <br><br>
-    Possible values: 0 =&gt; FB_CALLLIST is activated, 1 =&gt; FB_CALLLIST is deactivated.<br>
+    Possible values:<ul>
+    <li>0 =&gt; FB_CALLLIST is activated, proccess events and updates the table</li>
+    <li>1 =&gt; Events will NOT be processed. table will NOT be updated (stays as it is)</li>
+    <li>2 =&gt; Events will NOT be processed. table just shows "disabled" (no items)</li>
+    <li>3 =&gt; Events will NOT be processed. table will NOT be shown entirely</li>
+    </ul><br>
     Default Value is 0 (activated)<br><br>
 
-    <li><a name="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...</li>
-    Optional attribute to disable the call list update during a specific time interval. The attribute contains a space separated list of HH:MM tupels.
+    <li><a name="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH:MM...</li>
+    Optional attribute to disable event processing and updates of the call list during a specific time interval. The attribute contains a space separated list of HH:MM tupels.
     If the current time is between any of these time specifications, the callist will be disabled and no longer updated.
     Instead of HH:MM you can also specify HH or HH:MM:SS.
     <br><br>To specify an interval spawning midnight, you have to specify two intervals, e.g.:
     <pre>23:00-24:00 00:00-01:00</pre>
     Default Value is <i>empty</i> (no intervals defined, calllist is always active)<br><br>
+
+    <li><a name="FB_CALLLIST_processEventsWhileDisabled">processEventsWhileDisabled</a> 0,1</li>
+    If enabled, events where still be processed, even FB_CALLLIST is disabled (see <a href="#FB_CALLLIST_disable">disable</a> and <a href="#FB_CALLLIST_disabledForIntervals">disabledForIntervals</a>). So after re-enabling FB_CALLLIST, all calls during disabled state are completely available.
+    <br><br>
+    Possible values: 0 =&gt; no event processing when FB_CALLIST is disabled, 1 =&gt; events are still processed, even FB_CALLLIST is disabled<br>
+    Default Value is 0 (no event processing when disabled)<br><br>
 
     <li><a name="FB_CALLLIST_expire-calls-after">expire-calls-after</a> &lt;time frame&gt;</li>
     Optional attribute to automatically delete finished calls which are older than a given time frame. If a finished call is older than this time frame, it will be deleted from the list.
@@ -1708,20 +1757,32 @@ sub FB_CALLLIST_returnTableHeader($)
     Standardwert ist  <i>nicht gesetzt</i> (Keine Zuordnung, es werden die Originalwerte verwendet)
     <br><br>
 
-    <li><a name="FB_CALLLIST_disable">disable</a> 0,1</li>
-    Optionales Attribut zur Deaktivierung der Anrufliste. Es werden dann keine Anruf-Events mehr verarbeitet und die Liste nicht weiter aktualisiert.
+    <li><a name="FB_CALLLIST_disable">disable</a> 0,1,2,3</li>
+    Optionales Attribut zur Deaktivierung der Anrufliste. Sofern aktiviert, werden keine Anruf-Events mehr verarbeitet und die Liste nicht weiter aktualisiert. Je nach gesetztem Wert verh&auml;lt sich FB_CALLLIST unterschiedlich.
     <br><br>
-    M&ouml;gliche Werte: 0 =&gt; Anrufliste ist aktiv, 1 =&gt; Anrufliste ist deaktiviert.<br>
+    M&ouml;gliche Werte:<ul>
+      <li>0 =&gt; Anrufliste ist aktiv, verarbeitet Events und aktualisiert die Darstellung kontinuierlich.</li>
+      <li>1 =&gt; Events werden NICHT verarbeitet. Die Darstellung wird NICHT aktualisiert (bleibt wie sie ist).</li>
+      <li>2 =&gt; Events werden NICHT verarbeitet. Die Darstellung zeigt nur "disabled" an (keine Eintr&auml;ge mehr).</li>
+      <li>3 =&gt; Events werden NICHT verarbeitet. Die Liste wird NICHT mehr angezeigt.</li>
+      </ul><br>
     Standardwert ist 0 (aktiv)<br><br>
 
-    <li><a name="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...</li>
+    <li><a name="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH:MM...</li>
     Optionales Attribut zur Deaktivierung der Anrufliste innerhalb von bestimmten Zeitintervallen.
     Das Argument ist eine Leerzeichen-getrennte Liste von Minuszeichen-getrennten HH:MM Paaren (Stunde : Minute).
-    Falls die aktuelle Uhrzeit zwischen diese Werte f&auml;llt, dann wird die Ausf&uuml;hrung, wie bei <a href="#FB_CALLLIST_disable">disable</a>, ausgesetzt.
+    Falls die aktuelle Uhrzeit zwischen diese Werte f&auml;llt, dann wird die Ausf&uuml;hrung, wie bei <a href="#FB_CALLLIST_disable">disable</a> gleich 1, ausgesetzt.
     Statt HH:MM kann man auch HH oder HH:MM:SS angeben.<br><br>
     Um einen Intervall um Mitternacht zu spezifizieren, muss man zwei einzelne Intervalle angeben, z.Bsp.:
     <pre>23:00-24:00 00:00-01:00</pre>
     Standardwert ist <i>nicht gesetzt</i> (dauerhaft aktiv)<br><br>
+
+    <li><a name="FB_CALLLIST_processEventsWhileDisabled">processEventsWhileDisabled</a> 0,1</li>
+    Sofern gesetzt, werden Events weiterhin verarbeitet, selbst wenn FB_CALLLIST deaktiviert ist (siehe <a href="FB_CALLLIST_disable">disabled</a> und <a href="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a>).
+    Sobald FB_CALLLIST wieder aktiviert wurde, stehen sämtliche Anrufe, w&auml;hrend FB_CALLLIST deaktiviert war, zur Verf&uuml;gung.
+    <br><br>
+    M&ouml;gliche Werte: 0 =&gt; keine Eventverabeitung wenn FB_CALLLIST deaktiviert ist, 1 =&gt; Events werden trotz deaktiviert FB_CALLLIST intern weiterhin verarbeitet.<br>
+    Standardwert ist 0 (keine Eventverabeitung wenn deaktiviert)<br><br>
 
     <li><a name="FB_CALLLIST_expire-calls-after">expire-calls-after</a> &lt;Zeitfenster&gt;</li>
     Optionales Attribut um beendete Anrufe nach einem angegeben Zeitfenster automatisch aus der Anrufliste zu l&ouml;schen.

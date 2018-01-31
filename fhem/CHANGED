@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 72_FB_CALLLIST: enhanced possibilities to disable a FB_CALLLIST
+                             definition (via attribute "disable")
+                             new attribute processEventsWhileDisabled
   - feature: 73_PRESENCE: new presenced deb package (ping command, systemd)
   - feature: 93_DbRep: V7.6.1, data with "|" in value are possible to process,
                        attr "sqlCmdHistoryLength" to use sqlCmdHistory list,

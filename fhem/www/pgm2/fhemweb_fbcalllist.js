@@ -23,7 +23,7 @@ function FW_processCallListUpdate(data)
         if(!table.find("tr[name=empty]").length)
         {
             table.find("tr[number]").remove();
-            table.append("<tr align=\"center\" name=\"empty\"><td style=\"padding:10px;\" colspan=\""+table.find("tr.header td").length+"\"><i>"+json_data.content+"</i></td></tr>");
+            table.append("<tr align=\"center\" name=\"empty\"><td style=\"padding:10px;\" colspan=\""+table.find("tr.header td").length+"\">"+json_data.content+"</td></tr>");
         }
         return;
     }
@@ -33,6 +33,20 @@ function FW_processCallListUpdate(data)
     {
         table.find("tr[index='"+json_data.index+"']").remove();
         FW_FbCalllistUpdateRowNumbers(table);
+        return;
+    }
+
+    // hide the complete table
+    if(json_data.action == "hide")
+    {
+        table.hide();
+        return;
+    }
+
+    // show the complete table
+    if(json_data.action == "show")
+    {
+        table.show();
         return;
     }
 
@@ -77,6 +91,7 @@ function FW_processCallListUpdate(data)
             }
             FW_FbCalllistUpdateRowNumbers(table);
         }
+        return;
     }
 }
 
