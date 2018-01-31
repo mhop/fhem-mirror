@@ -92,6 +92,7 @@ sub Unifi_Initialize($$) {
                          ."ignoreWirelessClients:1,0 "
                          ."httpLoglevel:1,2,3,4,5 "
                          ."eventPeriod "
+                         ."deprecatedClientNames:1,0 "
                          .$readingFnAttributes;
 }
 ###############################################################################
@@ -111,6 +112,7 @@ sub Unifi_Define($$) {
         unifi     => { 
             CONNECTED   => 0,
             eventPeriod => int(AttrVal($name,"eventPeriod",24)),
+            deprecatedClientNames => int(AttrVal($name,"deprecatedClientNames",1)),
             interval    => $a[6] || 30,
             version     => $a[8] || 4,
             url         => "https://".$a[2].(($a[3] == 443) ? '' : ':'.$a[3]).'/api/s/'.(($a[7]) ? $a[7] : 'default').'/',
@@ -194,6 +196,9 @@ sub Unifi_Set($@) {
     else {
         Log3 $name, 4, "$name: set $setName";
         
+        if (defined $hash->{unifi}->{deprecatedClientNames} && $hash->{unifi}->{deprecatedClientNames} eq 1){
+            Log3 $name, 2, "$name: deprecated use of Attribute 'deprecatedClientNames' (see commandref for details).";
+        }
         if (Unifi_CONNECTED($hash)) {
             if ($setName eq 'disconnectClient') {
                 if ($setVal && $setVal ne 'all') {
@@ -537,6 +542,13 @@ sub Unifi_Attr(@) {
             }
             $hash->{unifi}->{eventPeriod} = int($attr_value);
         }
+        elsif($attr_name eq "deprecatedClientNames") {
+            if (!looks_like_number($attr_value) || int($attr_value) < 0 || int($attr_value) > 1) {
+                return "$name: Value \"$attr_value\" is not allowed.\n"
+                       ."deprecatedClientNames must be a number between 0 and 1."
+            }
+            $hash->{unifi}->{deprecatedClientNames} = int($attr_value);
+        }
     }
     elsif($cmd eq "del") {
         if($attr_name eq "disable" && Unifi_CONNECTED($hash) eq "disabled") {
@@ -548,6 +560,9 @@ sub Unifi_Attr(@) {
         }
         elsif($attr_name eq "eventPeriod") {
             $hash->{unifi}->{eventPeriod} = 24;
+        }
+        elsif($attr_name eq "deprecatedClientNames") {
+            $hash->{unifi}->{deprecatedClientNames} = 1;
         }
     }
     return undef;
@@ -1444,10 +1459,23 @@ sub Unifi_ClientNames($@) {
     
     if(defined $ID && defined $W && $W eq 'makeAlias') {   # Return Alias from ID
         $clientRef = $hash->{clients}->{$ID};
-        if (   ($devAliases && $devAliases =~ /$ID:(.+?)(\s|$)/)
+        if (defined $hash->{unifi}->{deprecatedClientNames} && $hash->{unifi}->{deprecatedClientNames} eq 0){
+            my $goodName="";
+            $goodName=makeReadingName($clientRef->{name}) if defined $clientRef->{name};
+            my $goodHostname="";
+            $goodHostname=makeReadingName($clientRef->{hostname}) if defined $clientRef->{hostname};
+            if (   ($devAliases && $devAliases =~ /$ID:(.+?)(\s|$)/)
+                || ($devAliases && defined $clientRef->{name} && $devAliases =~ /$goodName:(.+?)(\s|$)/)
+                || ($devAliases && defined $clientRef->{hostname} && $devAliases =~ /$goodHostname:(.+?)(\s|$)/)
+                || ($goodName =~ /(.+)/)
+                || ($goodHostname =~ /(.+)/)
+               ) {
+                $ID = $1;
+            }
+        }elsif (   ($devAliases && $devAliases =~ /$ID:(.+?)(\s|$)/)
             || ($devAliases && defined $clientRef->{name} && $devAliases =~ /$clientRef->{name}:(.+?)(\s|$)/)
             || ($devAliases && defined $clientRef->{hostname} && $devAliases =~ /$clientRef->{hostname}:(.+?)(\s|$)/)
-            || (defined $clientRef->{name} && $clientRef->{name} =~ /^([\w\.\-]+)$/) 
+            || (defined $clientRef->{name} && $clientRef->{name} =~ /^([\w\.\-]+)$/)
             || (defined $clientRef->{hostname} && $clientRef->{hostname} =~ /^([\w\.\-]+)$/)
            ) {
             $ID = $1;
@@ -1457,11 +1485,13 @@ sub Unifi_ClientNames($@) {
     elsif (defined $ID && defined $W && $W eq 'makeID') {   # Return ID from Alias
         for my $clientID (keys %{$hash->{clients}}) {
             $clientRef = $hash->{clients}->{$clientID};
+            my $goodName=makeReadingName($clientRef->{name}) if defined $clientRef->{name};
+            my $goodHostname=makeReadingName($clientRef->{hostname}) if defined $clientRef->{hostname};
             if (   ($devAliases && $devAliases =~ /$clientID:$ID/)
-                || ($devAliases && defined $clientRef->{name} && $devAliases =~ /$clientRef->{name}:$ID/)
-                || ($devAliases && defined $clientRef->{hostname} && $devAliases =~ /$clientRef->{hostname}:$ID/)
-                || (defined $clientRef->{name} && $clientRef->{name} eq $ID) 
-                || (defined $clientRef->{hostname} && $clientRef->{hostname} eq $ID)
+                || ($devAliases && defined $clientRef->{name} && ($devAliases =~ /$clientRef->{name}:$ID/ || $devAliases =~ /$goodName:$ID/) )
+                || ($devAliases && defined $clientRef->{hostname} && ($devAliases =~ /$clientRef->{hostname}:$ID/ || $devAliases =~ /$goodHostname:$ID/) )
+                || (defined $clientRef->{name} && ($clientRef->{name} eq $ID || $goodName eq $ID) ) 
+                || (defined $clientRef->{hostname} && ($clientRef->{hostname} eq $ID || $goodHostname eq $ID) )
                ) {
                 $ID = $clientID;
                 last;
@@ -1516,12 +1546,12 @@ sub Unifi_SSIDs($@){
 sub Unifi_ApNames($@) {
     my ($hash,$ID,$W) = @_;
     
-    my $clientRef;
+    my $apRef;
     
     if(defined $ID && defined $W && $W eq 'makeName') {   # Return Name or IP from ID
-        $clientRef = $hash->{accespoints}->{$ID};
-        if (   (defined $clientRef->{name} && $clientRef->{name} =~ /^([\w\.\-]+)$/) 
-            || (defined $clientRef->{ip} && $clientRef->{ip} =~ /^([\w\.\-]+)$/)
+        $apRef = $hash->{accespoints}->{$ID};
+        if (   (defined $apRef->{name} && $apRef->{name} =~ /^([\w\.\-]+)$/) 
+            || (defined $apRef->{ip} && $apRef->{ip} =~ /^([\w\.\-]+)$/)
            ) {
             $ID = $1;
         }
@@ -1529,9 +1559,9 @@ sub Unifi_ApNames($@) {
     }
     elsif (defined $ID && defined $W && $W eq 'makeID') {   # Return ID from Name or IP
         for (keys %{$hash->{accespoints}}) {
-            $clientRef = $hash->{accespoints}->{$_};
-            if (   (defined $clientRef->{name} && $clientRef->{name} eq $ID) 
-                || (defined $clientRef->{ip} && $clientRef->{ip} eq $ID)
+            $apRef = $hash->{accespoints}->{$_};
+            if (   (defined $apRef->{name} && $apRef->{name} eq $ID) 
+                || (defined $apRef->{ip} && $apRef->{ip} eq $ID)
                ) {
                 $ID = $_;
                 last;
@@ -1792,6 +1822,12 @@ Or you can use the other readings or set and get features to control your unifi-
     <li>attr httpLoglevel <1,2,3,4,5><br>
     Can be used to debug the HttpUtils-Module. Set it smaller or equal as your 'global verbose level'.<br>
     <code>default: 5</code></li>
+    <br>
+    <li>attr deprecatedClientNames <0,1><br>
+    Client-names in reading-names, reading-values and drop-down-lists can be set in two ways. Both ways generate the client-name in follwing order: 1. Attribute devAlias; 2. client-alias in Unifi;3. hostname;4. internal unifi-id.<br>
+    1: Deprecated. Valid characters for unifi-client-alias or hostname are [a-z][A-Z][0-9][-][.]<br>
+    0: All invalid characters are replaced by using makeReadingName() in fhem.pl.<br> 
+    <code>default: 1 (if module is defined and/or attribute is not set)</code></li>
     <br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 </ul>
