@@ -226,6 +226,14 @@ FHEMWEB_Initialize($)
       FW_readIcons($pe);
     }
   }
+
+  eval { require Digest::SHA; };
+  if($@) {
+    Log 4, $@;
+    Log 3, "FHEMWEB: Can't load Digest::SHA, ".
+           "longpoll via websocket is not available";
+  }
+  $FW_use_sha = 1;
 }
 
 #####################################
@@ -340,7 +348,7 @@ FW_Read($$)
     }
   }
 
-  if($hash->{websocket}) { # Work in Progress (Forum #59713)
+  if($hash->{websocket}) { # 59713
     my $fin  = (ord(substr($hash->{BUF},0,1)) & 0x80)?1:0;
     my $op   = (ord(substr($hash->{BUF},0,1)) & 0x0F);
     my $mask = (ord(substr($hash->{BUF},1,1)) & 0x80)?1:0;
@@ -461,6 +469,8 @@ FW_Read($$)
   $hash->{LASTACCESS} = $now;
 
   $FW_userAgent = $FW_httpheader{"User-Agent"};
+  $FW_userAgent = "" if(!defined($FW_userAgent));
+
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
   $FW_CSRF = (defined($defs{$FW_wname}{CSRFTOKEN}) ?
                 "&fwcsrf=".$defs{$FW_wname}{CSRFTOKEN} : "");
@@ -682,7 +692,7 @@ FW_closeConn($)
   my ($hash) = @_;
   if(!$hash->{inform} && !$hash->{BUF}) { # Forum #41125
     my $cc = AttrVal($hash->{SNAME}, "closeConn",
-                        $FW_userAgent && $FW_userAgent=~m/(iPhone|iPad|iPod)/);
+                     $FW_userAgent =~ m/(iPhone|iPad|iPod)/);
     if(!$FW_httpheader{Connection} || $cc) {
       TcpServer_Close($hash, 1);
     }
@@ -989,7 +999,8 @@ FW_answerCall($)
 
   my $csrf= ($FW_CSRF ? "fwcsrf='$defs{$FW_wname}{CSRFTOKEN}'" : "");
   my $gen = 'generated="'.(time()-1).'"';
-  my $lp = 'longpoll="'.AttrVal($FW_wname,"longpoll",1).'"';
+  my $lp = 'longpoll="'.AttrVal($FW_wname,"longpoll",
+                 $FW_use_sha && $FW_userAgent=~m/Chrome/ ? "websocket": 1).'"';
   $FW_id = $FW_chash->{NR} if( !$FW_id );
 
   my $dataAttr = FW_dataAttr();
@@ -2566,13 +2577,8 @@ FW_Attr(@)
   }
 
   if($attrName eq "longpoll" && $type eq "set" && $param[0] eq "websocket") {
-    eval { require Digest::SHA; };
-    if($@) {
-      Log3 $FW_wname, 1, $@;
-      return "$devName: Can't load Digest::SHA, no websocket";
-      return -1;
-    }
-    $FW_use_sha = 1;
+    return "$devName: Could not load Digest::SHA on startup, no websocket"
+        if(!$FW_use_sha);
   }
 
   return $retMsg;
@@ -3614,12 +3620,12 @@ FW_widgetOverride($$)
        </li><br>
 
     <a name="longpoll"></a>
-    <li>longpoll<br>
-        Affects devices states in the room overview only.<br>
-        In this mode status update is refreshed more or less instantaneously,
-        and state change (on/off only) is done without requesting a complete
-        refresh from the server.
-        Default is on.
+    <li>longpoll [0|1|websocket]<br>
+        If activated, the browser is notifed when device states, readings or
+        attributes are changed, a reload of the page is not necessary.
+        Default is 1 (on), use 0 to deactivate it.<br>
+        If websocket is specified, then this API is used to notify the browser,
+        else HTTP longpoll. Note: some older browser do not implement websocket.
         </li>
         <br>
 
@@ -4311,11 +4317,14 @@ FW_widgetOverride($$)
        </li><br>
 
     <a name="longpoll"></a>
-    <li>longpoll<br>
-        Dies betrifft die Aktualisierung der Ger&auml;testati in der
-        Weboberfl&auml;che. Ist longpoll aktiviert, werden
-        Status&auml;nderungen sofort im Browser dargestellt. ohne die Seite
-        manuell neu laden zu m&uuml;ssen. Standard ist aktiviert.
+    <li>longpoll [0|1|websocket]<br>
+        Falls gesetzt, FHEMWEB benachrichtigt den Browser, wenn
+        Ger&auml;testatuus, Readings or Attribute sich &auml;ndern, ein
+        Neuladen der Seite ist nicht notwendig. Zum deaktivieren 0 verwenden.
+        <br>
+        Falls websocket spezifiziert ist, l&auml;uft die Benachrichtigung des
+        Browsers &uuml;ber dieses Verfahren sonst &uuml;ber HTTP longpoll.
+        Achtung: &auml;ltere Browser haben keine websocket Implementierung.
         </li><br>
 
 
