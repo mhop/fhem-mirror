@@ -131,9 +131,10 @@ fhemdebug_memusage($)
       my $name = ($mname eq "main::" ? "$mname$n" : "${mname}::$n");
       $ref = "HASH" if(!$ref && $mname eq "main::" && $mh{$n});
       next if($n eq "main::" || $n eq "IODev" || 
-              $ref eq "CODE" || main->can("$mname$n") || $ref =~ m/::/);
-      Log 5, " CHECK $name / $mname / $n / $ref";     # Crash-debugging
+              $ref eq "CODE" || main->can($name) || $ref =~ m/::/);
+      Log 5, " Check $name / $mname / $n / $ref";     # Crash-debugging
       if($ref eq "HASH") {
+        next if($mname ne "main::defs" && $h->{$n}{TYPE} && $h->{$n}{NAME});
         $sum += $fn->($fn, $h->{$n}, $name, $cleanUp); 
 
       } else {
