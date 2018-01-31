@@ -1,4 +1,4 @@
-REV 16044
+REV 16051
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -25,7 +25,7 @@ UPD 2018-01-30_07:45:02 233772 ./CHANGED
 UPD 2018-01-28_07:45:02 36419 ./MAINTAINER.txt
 UPD 2018-01-06_07:45:03 39329 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
-UPD 2018-01-28_07:45:05 143544 ./fhem.pl
+UPD 2018-01-31_07:45:05 143455 ./fhem.pl
 UPD 2015-11-07_07:45:11 21944 FHEM/00_CM11.pm
 UPD 2017-09-09_07:45:02 56979 FHEM/00_CUL.pm
 UPD 2017-05-10_07:45:02 76972 FHEM/00_DFPlayerMini.pm
@@ -482,7 +482,7 @@ UPD 2016-01-31_07:45:12 926 FHEM/98_deletefile.pm
 UPD 2018-01-20_07:45:02 34352 FHEM/98_dewpoint.pm
 UPD 2016-12-03_07:45:16 5092 FHEM/98_dummy.pm
 UPD 2017-03-16_07:45:02 10243 FHEM/98_expandJSON.pm
-UPD 2018-01-28_07:45:02 5829 FHEM/98_fhemdebug.pm
+UPD 2018-01-31_07:45:02 5846 FHEM/98_fhemdebug.pm
 UPD 2017-08-03_07:45:02 11113 FHEM/98_fheminfo.pm
 UPD 2017-10-11_07:45:02 9129 FHEM/98_help.pm
 UPD 2017-02-13_07:45:02 44023 FHEM/98_logProxy.pm
@@ -662,10 +662,10 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-01-30_07:45:04 3329075 docs/commandref.html
-UPD 2018-01-30_07:45:05 2033497 docs/commandref_DE.html
-UPD 2018-01-28_07:45:02 74341 docs/commandref_frame.html
-UPD 2018-01-28_07:45:02 83748 docs/commandref_frame_DE.html
+UPD 2018-01-31_07:45:04 3329128 docs/commandref.html
+UPD 2018-01-31_07:45:05 2033556 docs/commandref_DE.html
+UPD 2018-01-31_07:45:02 74394 docs/commandref_frame.html
+UPD 2018-01-31_07:45:02 83807 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
