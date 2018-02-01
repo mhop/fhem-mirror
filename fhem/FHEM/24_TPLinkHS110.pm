@@ -113,6 +113,7 @@ sub TPLinkHS110_Get($$)
 		$json = decode_json($data);
 	} or do {
 		Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
+                Log3 $hash, 5, "TPLinkHS110: $name json-raw: $data";
 		return;
 	};
 
@@ -151,7 +152,9 @@ sub TPLinkHS110_Get($$)
 		eval {
 			$realtimejson = decode_json($rdata);
 		} or do {
-			Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
+			Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting realtime data";
+                        Log3 $hash, 5, "TPLinkHS110: $name json-raw: $rdata";
+                        readingsEndUpdate($hash, 1);
 			return;
 		};
 		foreach my $key2 (sort keys %{$realtimejson->{'emeter'}->{'get_realtime'}}) {
@@ -190,7 +193,8 @@ sub TPLinkHS110_Get($$)
 			if ($count) { readingsBulkUpdate($hash, "daily_average", $total/$count)};
 			1;
 		} or do {
-			Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
+			Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting daily stat data";
+                        readingsEndUpdate($hash, 1);
 			return;
 		};
 	}
