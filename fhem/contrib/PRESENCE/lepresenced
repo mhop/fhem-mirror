@@ -9,7 +9,7 @@
 # checks for one or multiple bluetooth *low energy* devices for their
 # presence state and reports it to the 73_PRESENCE.pm module.
 #
-# Copyright (C) 2015-2016 P. Reinhardt, pr-fhem (at) reinhardtweb (dot) de
+# Copyright (C) 2015-2018 P. Reinhardt, pr-fhem (at) reinhardtweb (dot) de
 #
 # This script free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@ use constant DEFAULT_RSSI_THRESHOLD     => 10;
 use constant RSSI_WINDOW                => 10;
 
 use constant ME                         => 'lepresenced';
-use constant VERSION                    => '0.83';
+use constant VERSION                    => '0.9';
 
 use constant PIDFILE                    => '/var/run/' . ME . '.pid';
 
@@ -72,9 +72,9 @@ use constant {
 
 my %devices :shared;
 my @clients = ();
-my $syslog_level;
+my ($log_level, $log_target);
 my $debug;
-my ($beacons_hcitool, $beacons_hcidump) : shared;
+my ($beacons_hcitool, $beacons_hcidump) : shared = (0, 0);
 
 sub syslogw {
   return if (scalar(@_) < 2);
@@ -87,7 +87,13 @@ sub syslogw {
     my ($format, @args) = @_;
     $logmessage = sprintf("[tid:%i] %s: $format", threads->self()->tid(), (caller(1))[3] // 'main', @args);
   }
-  syslog($priority, $logmessage) if ($syslog_level >= $priority);
+  if ($log_level >= $priority) {
+    if ($log_target eq 'syslog') {
+      syslog($priority, $logmessage) if ($log_level >= $priority);
+    } elsif ($log_target eq 'stdout' && !$debug) {
+      printf("%s\n", $logmessage);
+    }
+  }
   printf("%s\n", $logmessage) if ($debug);
 }
 
@@ -102,10 +108,12 @@ sub error_exit {
 
 sub usage_exit() {
   print("usage:\n");
-  printf("\t%s --bluetoothdevice <bluetooth device> --listenaddress <listen address> --listenport <listen port> --loglevel <log level> --daemon\n", ME);
-  printf("\t%s -b <bluetooth device> -a <listen address> -p <listen port> -l <log level> -d\n", ME);
+  printf("\t%s --bluetoothdevice <bluetooth device> --listenaddress <listen address> --listenport <listen port> --loglevel <log level> --logtarget <log target> --daemon\n", ME);
+  printf("\t%s -b <bluetooth device> -a <listen address> -p <listen port> -l <log level> -t <log target> -d\n", ME);
   print("valid log levels:\n");
   print("\tLOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG. Default: LOG_INFO\n");
+  print("valid log targets:\n");
+  print("\tsyslog, stdout. Default: syslog\n");
   print("optional arguments:\n");
   print("\t--debug - print extensive debug output to stdout (mutually exclusive with --daemon).\n");
   print("\t--legacymode - legacy mode without rssi detection. Use if you do not have hcidump installed.\n");
@@ -122,7 +130,8 @@ sub parse_options() {
   my $daemonize                   = 0;
   my $listen_address              = "0.0.0.0";
   my $listen_port                 = "5333";
-  my $syslog_level                = "LOG_INFO";
+  my $log_target                  = "syslog";
+  my $log_level                   = "LOG_INFO";
   my $debug                       = 0;
   my $legacy_mode                 = 0;
   my $rssi_threshold              = DEFAULT_RSSI_THRESHOLD;
@@ -132,7 +141,8 @@ sub parse_options() {
     'daemon|daemonize|d!'         => \$daemonize,
     'listenaddress|address|a=s'   => \$listen_address,
     'listenport|port|p=i'         => \$listen_port,
-    'loglevel|l=s'                => \$syslog_level,
+    'loglevel|l=s'                => \$log_level,
+    'logtarget|t=s'               => \$log_target,
     'debug!'                      => \$debug,
     'legacymode|legacy!'          => \$legacy_mode,
     'rssithreshold=i'             => \$rssi_threshold,
@@ -141,11 +151,12 @@ sub parse_options() {
   usage_exit() if ($rssi_threshold < 5);
   
   $listen_address =~ m/^\d+\.\d+\.\d+\.\d+$/ or usage_exit();
-  $syslog_level =~ m/^LOG_(EMERG|ALERT|CRIT|ERR|WARNING|NOTICE|INFO|DEBUG)$/ or usage_exit();
-  $syslog_level = eval($syslog_level);
+  $log_level =~ m/^LOG_(EMERG|ALERT|CRIT|ERR|WARNING|NOTICE|INFO|DEBUG)$/ or usage_exit();
+  $log_target =~ m/^(syslog|stdout)$/ or usage_exit();
+  $log_level = eval($log_level);
   $daemonize = 0 if ($debug);
   
-  return ($device, $daemonize, $listen_address, $listen_port, $syslog_level, $debug, $legacy_mode, $rssi_threshold);
+  return ($device, $daemonize, $listen_address, $listen_port, $log_level, $log_target, $debug, $legacy_mode, $rssi_threshold);
 }
 
 sub sanity_check($) {
@@ -323,16 +334,23 @@ sub handle_command($$) {
       $client->{'next_check'} = 0; #now
     }
     print $current_client "command accepted\n"
-  } elsif ($buf =~ m/^\s*stop\s*$/) {
+	} elsif ($buf =~ m/^\s*ping\s*$/) {
+			syslogw(LOG_DEBUG, "Received ping command from client %s:%i.", $current_client->peerhost(), $current_client->peerport());
+			my ($min_age, $max_age, $devices) = gather_stats();
+			print $current_client sprintf("pong [clients=%i;devices=%i;min_age=%s;max_age=%s;beacons_hcitool=%i;beacons_hcidump=%i;beacons_diff=%i]\n",
+				scalar(@clients), $devices, $min_age // '%', $max_age // '%', $beacons_hcitool, $beacons_hcidump, abs($beacons_hcitool - $beacons_hcidump));
+			return(1);
+	} elsif ($buf =~ m/^\s*stop\s*$/) {
     # Stop does not make sense when scanning permanently
     syslogw(LOG_DEBUG, "Received stop command from client %s:%i. Pretending to care and ignoring...", $current_client->peerhost(), $current_client->peerport());
     print $current_client "no command running\n" # ToDo: Does the FHEM module even care?
   } else {
     syslogw(LOG_WARNING, "Received unknown command: '%s'.", $buf);
   }
+	return(0);
 }
 
-sub stats_task() {
+sub gather_stats() {
   my ($min_age, $max_age, $devices);
   {
     lock(%devices);
@@ -343,6 +361,11 @@ sub stats_task() {
       $max_age = $age if (!defined($max_age) || $age > $max_age);
     }
   }
+	return($min_age, $max_age, $devices);
+}
+
+sub stats_task() {
+	my ($min_age, $max_age, $devices) = gather_stats();
   syslogw(LOG_INFO, "Active clients: %i, known devices: %i (min/max age: %s/%s), received beacons (hcitool/hcidump/difference): %i/%i/%i",
     scalar(@clients), $devices, $min_age // '%', $max_age // '%', $beacons_hcitool, $beacons_hcidump, abs($beacons_hcitool - $beacons_hcidump));
 }
@@ -379,7 +402,7 @@ sub cleanup_task() {
 }
 
 openlog(ME, 'pid', LOG_USER);
-(my $device, my $daemonize, my $listen_address, my $listen_port, $syslog_level, $debug, my $legacy_mode, my $rssi_threshold) = parse_options();
+(my $device, my $daemonize, my $listen_address, my $listen_port, $log_level, $log_target, $debug, my $legacy_mode, my $rssi_threshold) = parse_options();
 
   local $SIG{INT} = local $SIG{TERM} = local $SIG{HUP} = sub {
     syslogw(LOG_NOTICE, "Caught signal, cleaning up and exiting...");
@@ -389,7 +412,7 @@ openlog(ME, 'pid', LOG_USER);
   };
 
 syslogw(LOG_NOTICE, "Version %s started (device: %s, listen addr: %s, listen port: %s, daemonize: %i, legacy mode: %i, rssi threshold: %i, log level: %i, debug: %i).",
-    VERSION, $device, $listen_address, $listen_port, $daemonize, $legacy_mode, $rssi_threshold, $syslog_level, $debug);
+    VERSION, $device, $listen_address, $listen_port, $daemonize, $legacy_mode, $rssi_threshold, $log_level, $debug);
 
 sanity_check($legacy_mode);
 daemonize('root', 'root', PIDFILE) if $daemonize;
@@ -426,10 +449,13 @@ for(;;) {
       syslogw(LOG_INFO, "Connection from %s:%s. Connected clients: %i.", $client_socket->peerhost(), $client_socket->peerport(), $select->count()-1);
     } else {
       sysread ($current_client, my $buf, INET_RECV_BUFFER);
+			
+			my $disconnect;
       if ($buf) {
         chomp($buf);
-        handle_command($buf, $current_client);
-      } else {
+        $disconnect = handle_command($buf, $current_client);
+      }
+			if (!$buf || $disconnect) {
         $select->remove($current_client);
         @clients = grep {$_->{'handle'} != $current_client} @clients;
         syslogw(LOG_INFO, "Client %s:%s disconnected. Connected clients: %i.", $current_client->peerhost(), $current_client->peerport(), $select->count()-1);
