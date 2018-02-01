@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCU: Fixed missing events after get vars command
+                       Fixed state after RPC server start
   - change:  74_Unifi: SSIDs-Readings and drop-downs use goodReadingName()
   - feature: 72_FB_CALLLIST: enhanced possibilities to disable a FB_CALLLIST
                              definition (via attribute "disable")

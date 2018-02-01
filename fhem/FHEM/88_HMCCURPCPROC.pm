@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.0
+#  Version 1.0.001
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.0';
+my $HMCCURPCPROC_VERSION = '1.0.001';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -277,6 +277,7 @@ sub HMCCURPCPROC_Define ($$)
 	$attr{$name}{verbose} = 2;
 
 	HMCCURPCPROC_ResetRPCState ($hash);
+	HMCCURPCPROC_SetState ($hash, 'Initialized');
 	
 	return undef;
 }

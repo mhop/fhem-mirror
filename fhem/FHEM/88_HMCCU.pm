@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2
+#  Version 4.2.001
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -51,9 +51,8 @@
 #  attr <name> ccudef-readingname <rules>
 #  attr <name> ccudef-substitute <subst_rule>
 #  attr <name> ccudefaults <filename>
-#  attr <name> ccuflags { ackState,intrpc,extrpc,procrpc,dptnocheck,noagg,logEvents }
+#  attr <name> ccuflags { intrpc,extrpc,procrpc,dptnocheck,noagg,logEvents,noReadings }
 #  attr <name> ccuget { State | Value }
-#  attr <name> ccureadings { 0 | 1 }
 #  attr <name> parfile <parfile>
 #  attr <name> rpcevtimeout <seconds>
 #  attr <name> rpcinterfaces { BidCos-Wired, BidCos-RF, HmIP-RF, VirtualDevices, Homegear, HVL }
@@ -105,7 +104,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.2';
+my $HMCCU_VERSION = '4.2.001';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -196,7 +195,7 @@ my $HMCCU_FLAGS_NCD = $HMCCU_FLAG_NAME | $HMCCU_FLAG_CHANNEL | $HMCCU_FLAG_DATAP
 # Default values
 my $HMCCU_DEF_HMSTATE = '^0\.UNREACH!(1|true):unreachable;^[0-9]\.LOW_?BAT!(1|true):warn_battery';
 
-# Placeholder for external addresses
+# Placeholder for external addresses (i.e. HVL)
 my $HMCCU_EXT_ADDR = 'ZZZ0000000';
 
 # Binary RPC data types
@@ -361,8 +360,8 @@ sub HMCCU_Initialize ($)
 		" ccudef-hmstatevals:textField-long ccudef-substitute:textField-long".
 		" ccudef-readingname:textField-long ccudef-readingfilter:textField-long".
 		" ccudef-readingformat:name,namelc,address,addresslc,datapoint,datapointlc".
-		" ccuflags:multiple-strict,ackState,extrpc,intrpc,procrpc,dptnocheck,noagg,nohmstate,logEvents".
-		" ccureadings:0,1 rpcdevice rpcinterval:2,3,5,7,10 rpcqueue".
+		" ccuflags:multiple-strict,extrpc,intrpc,procrpc,dptnocheck,noagg,nohmstate,logEvents,noReadings".
+		" rpcdevice rpcinterval:2,3,5,7,10 rpcqueue".
 		" rpcport:multiple-strict,".join(',',sort keys %HMCCU_RPC_NUMPORT).
 		" rpcserver:on,off rpcserveraddr rpcserverport rpctimeout rpcevtimeout parfile substitute".
 		" ccuget:Value,State ".
@@ -394,10 +393,11 @@ sub HMCCU_Define ($$)
 	}
 	
 	# Get CCU IP address
+	$hash->{ccuip} = 'N/A';
 	my $ccuname = inet_aton ($hash->{host});
 	if (defined ($ccuname)) {
-        my $ccuip = inet_ntoa ($ccuname);
-        $hash->{ccuip} = defined ($ccuip) ? $ccuip : 'N/A';
+      my $ccuip = inet_ntoa ($ccuname);
+      $hash->{ccuip} = $ccuip if (defined ($ccuip));
 	}
 
 	# Get CCU number (if more than one)
@@ -412,7 +412,6 @@ sub HMCCU_Define ($$)
 			my $ch = $defs{$d};
 			next if (!exists ($ch->{TYPE}));
 			$ccucount++ if ($ch->{TYPE} eq 'HMCCU' && $ch != $hash);
-			$ccucount++ if ($ch->{TYPE} eq 'HMCCURPC' && $ch->{noiodev} == 1);
 		}
 		$hash->{CCUNum} = $ccucount+1;
 	}
@@ -477,7 +476,10 @@ sub HMCCU_Attr ($@)
 			return HMCCU_SetError ($hash, "Syntax error in attribute ccuaggregate") if ($rc == 0);
 		}
 		elsif ($attrname eq 'ccuackstate') {
-			return "HMCCU: Attribute ccuackstate is depricated. Use ccuflags with ackState instead";
+			return "HMCCU: Attribute ccuackstate is depricated. Use ccuflags with 'ackState' instead";
+		}
+		elsif ($attrname eq 'ccureadings') {
+			return "HMCCU: Attribute ccureadings is depricated. Use ccuflags with 'noReadings' instead";
 		}
 		elsif ($attrname eq 'ccuflags') {
 			my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
@@ -1147,7 +1149,7 @@ sub HMCCU_Set ($@)
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	$options .= ",restart" if ($ccuflags !~ /(extrpc|procrpc)/);
 	my $stripchar = AttrVal ($name, "stripchar", '');
-	my $ccureadings = AttrVal ($name, "ccureadings", 1);
+	my $ccureadings = AttrVal ($name, "ccureadings", $ccuflags =~ /noReadings/ ? 0 : 1);
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hash);
 	my $substitute = HMCCU_GetAttrSubstitute ($hash, $hash);
 
@@ -1364,7 +1366,7 @@ sub HMCCU_Get ($@)
 		if ($opt ne 'rpcstate' && HMCCU_IsRPCStateBlocking ($hash));
 
 	my $ccuflags = AttrVal ($name, "ccuflags", "null");
-	my $ccureadings = AttrVal ($name, "ccureadings", 1);
+	my $ccureadings = AttrVal ($name, "ccureadings", $ccuflags =~ /noReadings/ ? 0 : 1);
 	my $parfile = AttrVal ($name, "parfile", '');
 
 	my $readname;
@@ -1411,7 +1413,6 @@ sub HMCCU_Get ($@)
 	elsif ($opt eq 'vars') {
 		my $varname = shift @$a;
 		$usage = "Usage: get $name vars {regexp}[,...]";
-
 		return HMCCU_SetError ($hash, $usage) if (!defined ($varname));
 
 		($rc, $result) = HMCCU_GetVariables ($hash, $varname);
@@ -2188,11 +2189,12 @@ sub HMCCU_SetState ($@)
 	my ($hash, $text, $retval) = @_;
 	my $name = $hash->{NAME};
 
-	my $defackstate = $hash->{TYPE} eq 'HMCCU' ? 'ackState' : 'null';
-	my $ccuflags = AttrVal ($name, 'ccuflags', $defackstate);
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
+	$ccuflags .= ',ackState' if ($hash->{TYPE} eq 'HMCCU' && $ccuflags !~ /ackState/);
 	
 	if (defined ($hash) && defined ($text) && $ccuflags =~ /ackState/) {
-		readingsSingleUpdate ($hash, "state", $text, 1);
+		readingsSingleUpdate ($hash, 'state', $text, 1)
+			if (ReadingsVal ($name, 'state', '') ne $text);
 	}
 
 	return $retval;
@@ -2235,7 +2237,6 @@ sub HMCCU_SetRPCState ($@)
 		# Determine overall process state
 		$f = 1 if ($statecount{"running"}+$statecount{"error"} == scalar (@iflist));
 		$f = 2 if ($statecount{"inactive"}+$statecount{"error"} == scalar (@iflist));
-		return undef if ($f == 0);
 	}
 
 	if ($state ne $hash->{RPCState}) {
@@ -2245,7 +2246,7 @@ sub HMCCU_SetRPCState ($@)
 
 		if ($f > 0) {
 			# Running or inactive
-			HMCCU_SetState ($hash, 'OK') if (ReadingsVal ($name, 'state', '') eq 'busy');
+			HMCCU_SetState ($hash, 'OK');
 			HMCCU_Log ($hash, 1, "All RPC servers $state", undef);
 			DoTrigger ($name, "RPC server $state");
 		
@@ -2257,7 +2258,7 @@ sub HMCCU_SetRPCState ($@)
 		}
 		else {
 			# Starting or stopping
-			HMCCU_SetState ($hash, 'busy') if (ReadingsVal ($name, 'state', '') ne 'busy');
+			HMCCU_SetState ($hash, 'busy');
 		}
 
 		HMCCU_Log ($hash, 4, "Set rpcstate to $state", undef);
@@ -5186,12 +5187,10 @@ sub HMCCU_GetDatapoint ($@)
 	return (-3, $value) if (!defined ($hmccu_hash));
 	return (-4, $value) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'deleted');
 
-	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
 	my ($statechn, $statedpt, $controlchn, $controldpt) = HMCCU_GetSpecialDatapoints (
 	   $hash, '', 'STATE', '', '');
 	my $ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value');
-#	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 
 	my $url = 'http://'.$hmccu_hash->{host}.':8181/do.exe?r1=dom.GetObject("';
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $param,
@@ -5388,10 +5387,12 @@ sub HMCCU_ScaleValue ($$$$)
 sub HMCCU_GetVariables ($$)
 {
 	my ($hash, $pattern) = @_;
+	my $name = $hash->{NAME};
 	my $count = 0;
 	my $result = '';
 
-	my $ccureadings = AttrVal ($hash->{NAME}, 'ccureadings', 1);
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
+	my $ccureadings = AttrVal ($name, 'ccureadings', $ccuflags =~ /noReadings/ ? 0 : 1);
 
 	my $response = HMCCU_HMScriptExt ($hash, "!GetVariables", undef);
 	return (-2, $response) if ($response eq '' || $response =~ /^ERROR:.*/);
@@ -5409,7 +5410,7 @@ sub HMCCU_GetVariables ($$)
 		$count++;
 	}
 
-	readingsEndUpdate ($hash, 1) if ($hash->{TYPE} ne 'HMCCU' && $ccureadings);
+	readingsEndUpdate ($hash, 1) if ($ccureadings);
 
 	return ($count, $result);
 }
@@ -5631,7 +5632,7 @@ sub HMCCU_RPCGetConfig ($$$$)
 	return (-4, $result) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'deleted');
 
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
+	my $ccureadings = AttrVal ($name, 'ccureadings', $ccuflags =~ /noReadings/ ? 0 : 1);
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
 	my $substitute = HMCCU_GetAttrSubstitute ($hash, $hmccu_hash);
 	
@@ -6990,10 +6991,12 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       <li><b>ccuflags {extrpc, procprc, <u>intrpc</u>}</b><br/>
       	Control behaviour of several HMCCU functions:<br/>
       	ackState - Acknowledge command execution by setting STATE to error or success.<br/>
+      	dptnocheck - Do not check within set or get commands if datapoint is valid<br/>
       	intrpc - Use internal RPC server. This is the default.<br/>
       	extrpc - Use external RPC server provided by module HMCCURPC. If no HMCCURPC device
       	exists HMCCU will create one after command 'set rpcserver on'.<br/>
-      	dptnocheck - Do not check within set or get commands if datapoint is valid<br/>
+      	logEvents - Write events from CCU into FHEM logfile<br/>
+      	noReadings - Do not write readings<br/>
       </li><br/>
       <li><b>ccuget {State | <u>Value</u>}</b><br/>
          Set read access method for CCU channel datapoints. Method 'State' is slower than
@@ -7001,8 +7004,8 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
          is queried. Default is 'Value'.
       </li><br/>
       <li><b>ccureadings {0 | <u>1</u>}</b><br/>
-         If set to 1 values read from CCU will be stored as readings. Otherwise output
-         is displayed in browser window.
+         Deprecated. Readings are written by default. To deactivate readings set flag noReadings
+         in attribute ccuflags.
       </li><br/>
       <li><b>parfile &lt;filename&gt;</b><br/>
          Define parameter file for command 'get parfile'.
