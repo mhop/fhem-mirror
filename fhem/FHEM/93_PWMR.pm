@@ -46,6 +46,7 @@
 # 14.12.16 GA add implement get previousTemps
 # 01.08.17 GA add documentation for attribute disable
 # 27.12.17 GA add handle "off" as c_tempFrostProtect and "on" as c_tempC in getDesiredTempFrom (valid form Homematic)
+# 31.01.18 GA add support for stateFormat
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -119,7 +120,7 @@ PWMR_Initialize($)
   $hash->{UndefFn}   = "PWMR_Undef";
   $hash->{AttrFn}    = "PWMR_Attr";
 
-  $hash->{AttrList}  = "disable:1,0 loglevel:0,1,2,3,4,5 event-on-change-reading event-min-interval ".
+  $hash->{AttrList}  = "disable:1,0 loglevel:0,1,2,3,4,5 ".
 			"frostProtect:0,1 ".
 			"autoCalcTemp:0,1 ".
 			"desiredTempFrom ".
@@ -134,7 +135,7 @@ PWMR_Initialize($)
 			"tempRule4 ".
 			"tempRule5 ".
 			"valueFormat:textField-long ".
- 			"";
+ 			" ".$readingFnAttributes;
 
 }
 
@@ -210,7 +211,6 @@ PWMR_CalcDesiredTemp($)
 
         Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: desired-temp was manualy set until ".
           $hash->{READINGS}{"desired-temp"}{TIME});
-        #$hash->{STATE}     = "ManualSetUntil";
         return undef;
       }
       else
@@ -220,16 +220,6 @@ PWMR_CalcDesiredTemp($)
       }
     }
   }
-
-  #if ($hash->{READINGS}{"desired-temp"}{TIME} gt TimeNow()) {
-  #  Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: desired-temp was manualy set until ".
-  #      $hash->{READINGS}{"desired-temp"}{TIME});
-  #
-  #  $hash->{STATE}     = "ManualSetUntil";
-  #  return undef;
-  #} else {
-  #  Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: calc desired-temp");
-  #}
 
   ####################
   # frost protection
@@ -249,7 +239,8 @@ PWMR_CalcDesiredTemp($)
     #push @{$hash->{CHANGED}}, "desired-temp $hash->{c_tempFrostProtect}";
     #DoTrigger($name, undef);
  
-    $hash->{STATE}     = "FrostProtect";
+    #$hash->{STATE}     = "FrostProtect";
+    readingsSingleUpdate ($hash,  "state", "FrostProtect", 1);
     return undef;
   }
 
@@ -259,7 +250,8 @@ PWMR_CalcDesiredTemp($)
   if ($hash->{c_autoCalcTemp} > 0 ) {
     if ($hash->{c_desiredTempFrom} eq "") {
 
-      $hash->{STATE}     = "Calculating";
+      #$hash->{STATE}     = "Calculating";
+      readingsSingleUpdate ($hash,  "state", "Calculating", 1);
   
       my @time = localtime();
       my $wday = $time[6];
@@ -344,7 +336,8 @@ PWMR_CalcDesiredTemp($)
         }
       }
     } else { # $hash->{c_desiredTempFrom} is set
-      $hash->{STATE}     = "From $hash->{d_name}";
+      #$hash->{STATE}     = "From $hash->{d_name}";
+      readingsSingleUpdate ($hash,  "state", "From $hash->{d_name}", 1);
 
       my $newTemp = PWMR_getDesiredTempFrom ($hash, $defs{$hash->{d_name}}, $hash->{d_reading}, $hash->{d_regexpTemp});
 
@@ -357,7 +350,8 @@ PWMR_CalcDesiredTemp($)
   
     }
   } else {
-    $hash->{STATE}     = "Manual";
+    #$hash->{STATE}     = "Manual";
+    readingsSingleUpdate ($hash,  "state", "Manual", 1);
   }
 
   #DoTrigger($name, undef);
@@ -459,9 +453,11 @@ PWMR_Set($@)
     readingsBeginUpdate ($hash);
     readingsBulkUpdate ($hash,  "desired-temp", sprintf ("%.01f", $a[2]));
     if ($hash->{c_autoCalcTemp} == 0) {
-      $hash->{STATE}     = "Manual";
+      #$hash->{STATE}     = "Manual";
+      readingsBulkUpdate ($hash,  "state", "Manual");
     } else {
-      $hash->{STATE}     = "ManualSetUntil ".FmtTime($now + $duration);
+      #$hash->{STATE}     = "ManualSetUntil ".FmtTime($now + $duration);
+      readingsBulkUpdate ($hash,  "state", "ManualSetUntil ".FmtTime($now + $duration));
       readingsBulkUpdate ($hash,  "desired-temp-until", FmtDateTime($now + $duration));
     }
     readingsEndUpdate($hash, 1);
@@ -804,7 +800,8 @@ PWMR_Define($$)
 
   readingsSingleUpdate ($hash,  "actorState", "unknown", 0);
 
-  $hash->{STATE}       = "Initialized";
+  #$hash->{STATE}       = "Initialized";
+  readingsSingleUpdate ($hash,  "state", "Initialized", 1);
 
   # values for calculation of desired-temp
 
@@ -1473,7 +1470,8 @@ PWMR_Attr(@)
       PWMR_NormalizeRules($hash);
     } elsif ($attrname eq "autoCalcTemp") {
       $hash->{c_autoCalcTemp} = 1;
-      $hash->{STATE}     = "Calculating";
+      #$hash->{STATE}     = "Calculating";
+      readingsSingleUpdate ($hash,  "state", "Calculating", 1);
       PWMR_NormalizeRules($hash);
     } 
 
@@ -1500,13 +1498,16 @@ PWMR_Attr(@)
   } elsif ($attrname eq "autoCalcTemp") {                       # autoCalcTemp 0/1
     if ($attrval eq 0) {
       $hash->{c_autoCalcTemp} = 0;
-      $hash->{STATE}     = "Manual";
+      #$hash->{STATE}     = "Manual";
+      readingsSingleUpdate ($hash,  "state", "Manual", 1);
     } elsif ( $attrval eq 1) {
       $hash->{c_autoCalcTemp} = 1;
-      $hash->{STATE}     = "Calculating";
+      #$hash->{STATE}     = "Calculating";
+      readingsSingleUpdate ($hash,  "state", "Calculating", 1);
     } elsif ($attrval eq "") {
       $hash->{c_autoCalcTemp} = 1;
-      $hash->{STATE}     = "Calculating";
+      #$hash->{STATE}     = "Calculating";
+      readingsSingleUpdate ($hash,  "state", "Calculating", 1);
     } else {
       return "valid values are 0 or 1";
     }
