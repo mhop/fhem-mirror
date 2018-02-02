@@ -30,6 +30,7 @@
 # 30.11.17 GA fix clear roomsToStayOn and roomsToStayOnList if not used
 # 05.12.17 GA add extend helper for last pulses by $roomsWaitOffset{$wkey}
 # 13.12.17 GA fix consider $roomsWaitOffset{$wkey} in oldpulse set for each room
+# 31.01.18 GA add support for stateFormat
 
 ##############################################
 # $Id$
@@ -83,8 +84,9 @@ PWM_Initialize($)
   $hash->{UndefFn}   = "PWM_Undef";
   $hash->{AttrFn}    = "PWM_Attr";
 
-  $hash->{AttrList}  = "disable:1,0 event-on-change-reading event-min-interval valveProtectIdlePeriod overallHeatingSwitchRef:pulseMax,pulseSum,pulseAvg,pulseAvg2,pulseAvg3,avgPulseRoomsOn".
-		       " overallHeatingSwitchThresholdTemp";
+  $hash->{AttrList}  = "disable:1,0 valveProtectIdlePeriod overallHeatingSwitchRef:pulseMax,pulseSum,pulseAvg,pulseAvg2,pulseAvg3,avgPulseRoomsOn".
+		       " overallHeatingSwitchThresholdTemup ".$readingFnAttributes;
+
   #$hash->{GetList}   = "status timers";
 
 }
@@ -116,7 +118,8 @@ PWM_Calculate($)
 
   if (defined($attr{$name}{disable}) and $attr{$name}{disable} == 1) {
     Log3 ($hash, 3, "PWM_Calculate $name");
-    $hash->{STATE} = "disabled";
+    #$hash->{STATE} = "disabled";
+    readingsSingleUpdate ($hash,  "state", "disabled", 1);
     readingsSingleUpdate ($hash,  "lastrun", "disabled", 0);
     return;
   }
@@ -127,10 +130,9 @@ PWM_Calculate($)
 
   readingsBeginUpdate ($hash);
 
-  #$hash->{STATE} = "lastrun: ".TimeNow();
-  #$hash->{STATE} = "calculating";
   readingsBulkUpdate ($hash,  "lastrun", "calculating");
-  $hash->{STATE} = "lastrun: ".$hash->{READINGS}{lastrun}{TIME};
+  #$hash->{STATE} = "lastrun: ".$hash->{READINGS}{lastrun}{TIME};
+  readingsBulkUpdate ($hash,  "state", "lastrun: ".$hash->{READINGS}{lastrun}{TIME});
 
   # loop over all devices
   #  fetch all PWMR devices
@@ -895,9 +897,6 @@ Log3 ($hash, 1, "PWM_Get $name collect $room->{NAME} $reading");
   } else {
     return "Unknown argument $a[1], choose one of status timers";
   }
-  
-  #return $hash->{READINGS}{STATE}{VAL};
-  #return $hash->{STATE};
 }
 
 #############################
