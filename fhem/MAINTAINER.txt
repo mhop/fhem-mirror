@@ -385,6 +385,8 @@ FHEM/93_DbLog.pm             Tobias/DS_Starter    Automatisierung
 FHEM/93_DbRep.pm             DS_Starter           Sonstiges
 FHEM/93_Log2Syslog.pm        DS_Starter           Automatisierung
 FHEM/93_FHEM2FHEM.pm         rudolfkoenig         Automatisierung
+FHEM/93_PWMR.pm              jamesgo              Heizungssteuerung/Raumklima
+FHEM/94_PWM.pm               jamesgo              Heizungssteuerung/Raumklima
 FHEM/95_FLOORPLAN.pm         ulimaass             Frontends/FLOORPLAN
 FHEM/95_Alarm.pm             pahenning            Unterstützende Dienste
 FHEM/95_Astro.pm             pahenning            Unterstützende Dienste
@@ -412,6 +414,7 @@ FHEM/98_DOIF.pm              damian-s             Automatisierung/DOIF
 FHEM/98_DOIFtools.pm         Ellert               Automatisierung/DOIF
 FHEM/98_EDIPLUG.pm           Wzut                 Sonstige Systeme
 FHEM/98_FReplacer.pm         stefanstrobel        Sonstiges
+FHEM/98_GAEBUS.pm            jamesgo              Heizungssteuerung/Raumklima
 FHEM/98_GEOFANCY.pm          loredo               Unterstuetzende Dienste
 FHEM/98_HMinfo.pm            martinp876           HomeMatic
 FHEM/98_Heating_Control.pm   igami                Unterstuetzende Dienste
