@@ -978,6 +978,30 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-RC-4-2"         =>{ localResDis     =>1}
 
  ,"HM-LC-Dim1L-Pl"    =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib     =>1}
+ ,"HM-HM-LC-DW-WM"    =>{ confBtnTime     =>1,
+                         ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1
+                         ,logicCombination=>1
+                         ,speedMultiply   =>1
+                         ,ActionTypeDim   =>1,
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
+                         ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
+                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         ,OnTimeMode      =>1,OffTimeMode     =>1,OnDlyMode       =>1
+                         ,OffDlyBlink     =>1,OnLvlPrio       =>1
+                         ,DimJtOn         =>1,DimJtDlyOn      =>1,DimJtRampOff    =>1
+                         ,DimJtOff        =>1,DimJtDlyOff     =>1,DimJtRampOn     =>1
+                         ,OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1
+                         ,RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1
+                         ,DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1
+                         ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
+                         ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
+                         ,DimElsActionType=>1
+                         ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
+                         ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
+                         ,lgMultiExec     =>1,shMultiExec     =>1
+                        }
+
  ,"HM-LC-Dim1L-CV-2"  =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib     =>1
                          ,logicCombination=>1
                          ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
@@ -1179,8 +1203,6 @@ $culHmRegModel{"HM-RC-Key4-2"}          = $culHmRegModel{"HM-RC-4-2"};
 $culHmRegModel{"Schueco_263-131"}       =                                   #rf_s_1conf_644
 $culHmRegModel{"HM-LC-Bl1PBU-FM"}       = $culHmRegModel{"HM-LC-Sw1PBU-FM"};
 
-$culHmRegModel{"HM-DW-WM"}              = $culHmRegModel{"HM-LC-Dim1PWM-CV-2"};
-
 $culHmRegModel{"HM-SEC-WDS-2"}          = $culHmRegModel{"HM-SEC-WDS"};                                        
                                         
 $culHmRegModel{"ROTO_ZEL-STG-RM-FWT"}   = $culHmRegModel{"HM-CC-TC"};
@@ -1297,6 +1319,7 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
  ,"HM-Sen-MDIR-WM5501"=>{ peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1
                          ,ledOnTime       =>1,transmitTryMax  =>1,localResDis     =>1
                         }
+
  ,"HM-LC-RGBW-WM01"   =>{ OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
                          ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
                          ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
@@ -1311,9 +1334,12 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
                          ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
                          ,lgMultiExec     =>1,shMultiExec     =>1
                         }
- ,"HM-LC-RGBW-WM02"   =>{ ActHsvCol       =>1
-                         ,waRed           =>1,waGreen         =>1,waBlue          =>1}
+ ,"HM-LC-RGBW-WM02"   =>{ ActHsvCol       =>1,waRed           =>1,waGreen         =>1,waBlue          =>1}
  ,"HM-LC-RGBW-WM03"   =>{ ActColPrgm      =>1,ActMinBoarder   =>1,ActMaxBoarder   =>1,colChangeSpeed  =>1}
+
+ ,"HM-HM-LC-DW-WM01"  =>{ characteristic  =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1}
+ ,"HM-HM-LC-DW-WM02"  =>{ characteristic  =>1,charactLvlLimit =>1,charactColAssign=>1,charactBase     =>1}
+ 
  ,"HM-Sen-LI-O00"     =>{ txMinDly        =>1,txThresPercent  =>1}
  ,"SensoTimer-ST-601" =>{ humDesVal       =>1,watDuration     =>1,eco_days        =>1,
                          ,wat1_hour       =>1,wat1_min        =>1, 
