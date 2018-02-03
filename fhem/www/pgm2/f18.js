@@ -1,7 +1,7 @@
 "use strict";
 FW_version["f18.js"] = "$Id$";
 
-// TODO: rewrite menu, dashboard, floorplan, Firefox-svg-coloring
+// TODO: rewrite menu, dashboard, floorplan
 var f18_attr, f18_aCol, f18_sd, f18_isMobile, f18_icon={}, f18_move=false;
 var f18_small = (screen.width < 480 || screen.height < 480);
 
@@ -399,6 +399,9 @@ f18_setCss(why)
     $("head style#fhemweb_css").before(style);
   else
     $("head").append(style);
+
+  $("head meta[name=theme-color]").remove();
+  $("head").append('<meta name="theme-color" content="#'+cols.bg+'">');
 }
 
 // SVG color tuning
@@ -425,15 +428,17 @@ f18_svgSetCols(svg)
       if(n<  0) n = 0;
       n = n.toString(16);
       if(n.length < 2)
-        n = "0"+length;
+        n = "0"+n;
       r += n;
     }
     return r;
   }
 
+  // SVG background gradient: .css does not work in Firefox, has to use .attr
   var stA = $(svg).find("> defs > #gr_bg").children();
-  $(stA[0]).css("stop-color", addCol(cols.bg, 10));
-  $(stA[1]).css("stop-color", addCol(cols.bg, -10));
+  var so = "; stop-opacity:1;";
+  $(stA[0]).attr("style", "stop-color:#"+addCol(cols.bg,10)+so);
+  $(stA[1]).attr("style", "stop-color:#"+addCol(cols.bg,-10)+so);
 }
 
 // font-awesome
