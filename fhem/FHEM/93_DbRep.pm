@@ -37,6 +37,8 @@
 ###########################################################################################################################
 #  Versions History:
 #    
+# 7.7.0        29.01.2018       attribute "averageCalcForm", calculation sceme "avgDailyMeanGWS", "avgArithmeticMean" for 
+#                               averageValue
 # 7.6.1        27.01.2018       new attribute "sqlCmdHistoryLength" and "fetchMarkDuplicates" for highlighting multiple
 #                               datasets by fetchrows
 # 7.6.0        26.01.2018       events containing "|" possible in fetchrows & delSeqDoublets, fetchrows displays multiple  
@@ -328,6 +330,7 @@ sub DbRep_Initialize($) {
  $hash->{AttrList} =   "disable:1,0 ".
                        "reading ".                       
                        "allowDeletion:1,0 ".
+                       "averageCalcForm:avgArithmeticMean,avgDailyMeanGWS ".
                        "device " .
 					   "dumpComment ".
 					   "dumpDirLocal ".
@@ -1294,8 +1297,10 @@ sub DbRep_Main($$;$) {
      my $table = $prop;
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$table§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
 	 
- } elsif ($opt eq "averageValue") {      
+ } elsif ($opt eq "averageValue") { 
+     Log3 ($name, 4, "DbRep $name - averageValue calculation sceme: ".AttrVal($name,"averageCalcForm","avgArithmeticMean"));
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$prop§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
+ 
  } elsif ($opt eq "fetchrows") {
      my $table = $prop;             
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$table|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
@@ -1897,7 +1902,8 @@ sub averval_DoParse($) {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
- my ($dbh,$sql,$sth,$err,$selspec);
+ my $acf        = AttrVal($name, "averageCalcForm", "avgArithmeticMean");     # Festlegung Berechnungsschema f. Mittelwert
+ my ($dbh,$sql,$sth,$err,$selspec,$addon);
 
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -1923,22 +1929,31 @@ sub averval_DoParse($) {
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");
 
- #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
- if ($dbloghash->{MODEL} eq "POSTGRESQL") {
-     $selspec = "AVG(VALUE::numeric)";
- } elsif ($dbloghash->{MODEL} eq "MYSQL") {
-     $selspec = "AVG(VALUE)";
- } elsif ($dbloghash->{MODEL} eq "SQLITE") {
-     $selspec = "AVG(VALUE)";
- } else {
-     $selspec = "AVG(VALUE)";
+ if($acf eq "avgArithmeticMean") {
+     # arithmetischer Mittelwert
+     # vorbereiten der DB-Abfrage, DB-Modell-abhaengig
+     $addon = '';
+     if ($dbloghash->{MODEL} eq "POSTGRESQL") {
+         $selspec = "AVG(VALUE::numeric)";
+     } elsif ($dbloghash->{MODEL} eq "MYSQL") {
+         $selspec = "AVG(VALUE)";
+     } elsif ($dbloghash->{MODEL} eq "SQLITE") {
+         $selspec = "AVG(VALUE)";
+     } else {
+         $selspec = "AVG(VALUE)";
+     }
+ } elsif ($acf eq "avgDailyMeanGWS") {
+     # Tagesmittelwert Temperaturen nach Schema des deutechen Wetterdienstes
+     # SELECT VALUE FROM history WHERE DEVICE="MyWetter" AND READING="temperature" AND TIMESTAMP >= "2018-01-28 $i:00:00" AND TIMESTAMP <= "2018-01-28 ($i+1):00:00" ORDER BY TIMESTAMP DESC LIMIT 1; 
+     $addon   = 'ORDER BY TIMESTAMP DESC LIMIT 1';
+     $selspec = "VALUE";
  }
   
  # SQL zusammenstellen für DB-Abfrage
  if ($IsTimeSet || $IsAggrSet) {
-     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"?","?",'');
+     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"?","?",$addon);
  } else {
-     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'');
+     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,$addon);
  }
  
  eval{$sth = $dbh->prepare($sql);};
@@ -1961,36 +1976,96 @@ sub averval_DoParse($) {
      my $runtime_string_first  = $a[1];
      my $runtime_string_next   = $a[2];
      
-     # SQL zusammenstellen für Logging
-	 if ($IsTimeSet || $IsAggrSet) {
-	     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",''); 
-     }
-	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
+     if($acf eq "avgArithmeticMean") {
+         # SQL zusammenstellen für Logging
+	     if ($IsTimeSet || $IsAggrSet) {
+	         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon); 
+         }
+	     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
      
-     if ($IsTimeSet || $IsAggrSet) {
-	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
-	 } else {
-	     eval{$sth->execute();};	 
-	 }
-	 if ($@) {
-         $err = encode_base64($@,"");
-         Log3 ($name, 2, "DbRep $name - $@");
-         $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
-         return "$name|''|$device|$reading|''|$err|''";
-     }
+         if ($IsTimeSet || $IsAggrSet) {
+	         eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+	     } else {
+	         eval{$sth->execute();};	 
+	     }
+	     if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - $@");
+             $dbh->disconnect;
+             Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
+             return "$name|''|$device|$reading|''|$err|''";
+         }
 	 
-     # DB-Abfrage -> Ergebnis in @arr aufnehmen
-     my @line = $sth->fetchrow_array();
+         my @line = $sth->fetchrow_array();
      
-     Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);
+         Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);
 	 
-     if(AttrVal($name, "aggregation", "") eq "hour") {
-         my @rsf = split(/[" "\|":"]/,$runtime_string_first);
-         $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";  
-     } else {
-         my @rsf = split(" ",$runtime_string_first);
-         $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|"; 
+         if(AttrVal($name, "aggregation", "") eq "hour") {
+             my @rsf = split(/[" "\|":"]/,$runtime_string_first);
+             $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";  
+         } else {
+             my @rsf = split(" ",$runtime_string_first);
+             $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|"; 
+         }
+     
+     } elsif ($acf eq "avgDailyMeanGWS") {
+         # Berechnung des Tagesmittelwertes (Temperatur) nach der Vorschrift des deutschen Wetterdienstes
+         # Berechnung der Tagesmittel aus 24 Stundenwerten, Bezugszeit für einen Tag i.d.R. 23:51 UTC des 
+         # Vortages bis 23:50 UTC, d.h. 00:51 bis 23:50 MEZ 
+         # Wenn mehr als 3 Stundenwerte fehlen -> Berechnung aus den 4 Hauptterminen (00, 06, 12, 18 UTC), 
+         # d.h. 01, 07, 13, 19 MEZ
+         # https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html
+         my $sum = 0;
+         my $anz = 0;                   # Anzahl der Messwerte am Tag
+         my($t01,$t07,$t13,$t19);       # Temperaturen der Haupttermine
+         my ($bdate,undef) = split(" ",$runtime_string_first);
+         for my $i (0..23) {
+             my $bsel = $bdate." ".sprintf("%02d",$i).":00:00";
+             my $esel  = ($i<23)?$bdate." ".sprintf("%02d",$i+1).":00:00":$runtime_string_next;
+	         if ($IsTimeSet || $IsAggrSet) {
+	             $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$bsel'","'$esel'",$addon); 
+             }
+	         Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
+     
+             if ($IsTimeSet || $IsAggrSet) {
+	             eval{$sth->execute($bsel, $esel);};
+	         } else {
+	             eval{$sth->execute();};	 
+	         }
+	         if ($@) {
+                 $err = encode_base64($@,"");
+                 Log3 ($name, 2, "DbRep $name - $@");
+                 $dbh->disconnect;
+                 Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
+                 return "$name|''|$device|$reading|''|$err|''";
+             }
+             my $val = $sth->fetchrow_array();
+     
+             Log3 ($name, 5, "DbRep $name - SQL result: $val") if($val);        
+             if(defined($val) && looks_like_number($val)) {
+                 $sum = $sum + $val;
+                 $t01 = $val if($val && $i == 00);   # Wert f. Stunde 01 ist zw. letzter Wert vor 01
+                 $t07 = $val if($val && $i == 06);
+                 $t13 = $val if($val && $i == 12);
+                 $t19 = $val if($val && $i == 18);
+                 $anz++;
+             }
+         }
+         if($anz >= 21) {        
+             $sum = $sum/24;
+         } elsif ($anz >= 4 && $t01 && $t07 && $t13 && $t19) {
+             $sum = ($t01+$t07+$t13+$t19)/4;
+         } else {
+             $sum = "insufficient values";
+         }
+ 
+         if(AttrVal($name, "aggregation", "") eq "hour") {
+             my @rsf = split(/[" "\|":"]/,$runtime_string_first);
+             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";  
+         } else {
+             my @rsf = split(" ",$runtime_string_first);
+             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|"; 
+         }      
      }
  }   
   
@@ -2042,7 +2117,7 @@ sub averval_ParseDone($) {
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5]?decode_base64($a[5]):undef;
-  my $irowdone  = $a[6];
+  my $irowdone   = $a[6];
   my $reading_runtime_string;
   
   Log3 ($name, 4, "DbRep $name -> Start BlockingCall averval_ParseDone");
@@ -2057,6 +2132,13 @@ sub averval_ParseDone($) {
   
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
+  
+  my $acf = AttrVal($name, "averageCalcForm", "avgArithmeticMean");
+  if($acf eq "avgArithmeticMean") {
+      $acf = "AM"
+  } elsif ($acf eq "avgDailyMeanGWS") {
+      $acf = "DMGWS";
+  }
   
   # Readingaufbereitung
   readingsBeginUpdate($hash);
@@ -2073,10 +2155,13 @@ sub averval_ParseDone($) {
       } else {
           my $ds   = $device."__" if ($device);
           my $rds  = $reading."__" if ($reading);
-          $reading_runtime_string = $rsf.$ds.$rds."AVERAGE__".$runtime_string;
+          $reading_runtime_string = $rsf.$ds.$rds."AVG".$acf."__".$runtime_string;
       }
-         
-	  ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
+      if($acf eq "DMGWS") {
+	      ReadingsBulkUpdateValue ($hash, $reading_runtime_string, looks_like_number($c)?sprintf("%.1f",$c):$c);
+      } else {
+          ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
+      }
   }
 
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
@@ -4008,8 +4093,8 @@ sub devren_Done($) {
   readingsEndUpdate($hash, 1);
   
   if ($urow != 0) {
-      Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - DEVICE renamed in \"$hash->{DATABASE}\", old: \"$old\", new: \"$new\", amount: $urow ") if($renmode eq "devren"); 
-	  Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - READING renamed in \"$hash->{DATABASE}\", old: \"$old\", new: \"$new\", amount: $urow ") if($renmode eq "readren"); 
+      Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - DEVICE renamed in \"$hash->{DATABASE}\", old: \"$old\", new: \"$new\", number: $urow ") if($renmode eq "devren"); 
+	  Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - READING renamed in \"$hash->{DATABASE}\", old: \"$old\", new: \"$new\", number: $urow ") if($renmode eq "readren"); 
   } else {
       Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old device \"$old\" was not found in database \"$hash->{DATABASE}\" ") if($renmode eq "devren");
       Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old reading \"$old\" was not found in database \"$hash->{DATABASE}\" ") if($renmode eq "readren"); 	  
@@ -4907,7 +4992,7 @@ sub sqlCmd_DoParse($) {
       Log3 ($name, 4, "DbRep $name - SQL result: @line");
       my $row = join("$srs", @line);
       
-	  # im Ergebnis immer § ersetzen (wegen join Delimiter "§")
+	  # join Delimiter "§" escapen
 	  $row =~ s/§/|°escaped°|/g;
       
       push(@rows, $row);
@@ -6812,6 +6897,10 @@ sub checktimeaggr ($) {
      $aggregation = ($aggregation eq "no")?"day":$aggregation;       # wenn Aggregation "no", für delSeqDoublets immer "day" setzen
 	 $IsAggrSet   = 1;
  }
+ if($hash->{LASTCMD} =~ /averageValue/ && AttrVal($name,"averageCalcForm","avgArithmeticMean") eq "avgDailyMeanGWS") {
+     $aggregation = "day";       # für Tagesmittelwertberechnung des deuteschen Wetterdienstes immer "day"
+	 $IsAggrSet   = 1;
+ }
  if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup/) {
 	 $IsAggrSet   = 0;
 	 $aggregation = "no";
@@ -7981,9 +8070,22 @@ return;
  
  <ul><ul>
     <li><b> averageValue [display | writeToDB]</b> 
-                                 - calculates the arithmetical average of database column "VALUE" between period given by 
+                                 - calculates the average value of database column "VALUE" between period given by 
                                  timestamp-<a href="#DbRepattr">attributes</a> which are set. 
-                                 The reading to evaluate must be specified using attribute "reading".  <br>
+                                 The reading to evaluate must be specified by attribute "reading".  <br>
+                                 By attribute "averageCalcForm" the calculation variant for average determination will be configured.
+                                 At the moment the following methods are implemented: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>avgArithmeticMean</b>  </td><td>: the arithmetic average is calculated (default) </td></tr>
+                                      <tr><td> <b>avgDailyMeanGWS</b>    </td><td>: calculates the daily medium temperature according the 
+                                                                                    <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>specifications</a> of german weather service. <br>
+                                                                                    This variant uses aggregation "day" automatically. </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
                                  
                                  Is no or the option "display" specified, the results are only displayed. Using 
                                  option "writeToDB" the calculated results are stored in the database with a new reading
@@ -8747,6 +8849,9 @@ return;
 								aggregation don't happens but the output contaims all values of Device/Reading in the defined time period.  </li> <br>
 
   <li><b>allowDeletion </b>   - unlocks the delete-function  </li> <br>
+  
+  <li><b>averageCalcForm </b> - specifies the calculation variant of average peak by "averageValue".                                 
+                                </li><br>
 
   <li><b>device </b>          - Selection of a particular device. <br>
                                 You can specify <a href="https://fhem.de/commandref.html#devspec">device specifications (devspec)</a>. <br> 
@@ -9151,7 +9256,7 @@ sub bdump {
         return;
         }
   	    </pre>        
-							   The interface activation takes place by setting the subroutine name in the attribute.
+							   The interface activation takes place by setting the subroutine name into the attribute.
                                Optional you may set a Reading:Value combination (Regex) as argument. If no Regex is 
 							   specified, all value combinations will be evaluated as "true" (related to .*:.*). 
 							   <br><br>
@@ -9383,10 +9488,25 @@ sub bdump {
  
  <ul><ul>
     <li><b> averageValue [display | writeToDB]</b> 
-                                 - berechnet den arithmetische Mittelwert (Durchschnittswert) des Datenbankfelds "VALUE" in den 
+                                 - berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den 
                                  gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
                                  Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
 								 angegeben sein. <br>
+                                 Mit dem Attribut "averageCalcForm" wird die Berechnungsvariante zur Mittelwertermittlung definiert.
+                                 Zur Zeit sind folgende Varianten implementiert: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>avgArithmeticMean</b>  </td><td>: es wird der arithmetische Mittelwert berechnet 
+                                                                                    (default) </td></tr>
+                                      <tr><td> <b>avgDailyMeanGWS</b>    </td><td>: berechnet die Tagesmitteltemperatur entsprechend den
+                                                                                    <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Vorschriften</a> des Deutschen Wetterdienstes. <br>
+                                                                                    Diese Variante verwendet automatisch die Aggregation "day". </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+                                   
                                  Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
                                  der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
                                  in der Datenbank gespeichert. <br>
@@ -10171,6 +10291,9 @@ sub bdump {
   <li><b>aggregation </b>     - Zusammenfassung der Device/Reading-Selektionen in Stunden,Tages,Kalenderwochen,Kalendermonaten oder "no". Liefert z.B. die Anzahl der DB-Einträge am Tag (countEntries), Summation von Differenzwerten eines Readings (sumValue), usw. Mit Aggregation "no" (default) erfolgt keine Zusammenfassung in einem Zeitraum sondern die Ausgabe ergibt alle Werte eines Device/Readings zwischen den definierten Zeiträumen.  </li> <br>
 
   <li><b>allowDeletion </b>   - schaltet die Löschfunktion des Moduls frei   </li> <br>
+  
+  <li><b>averageCalcForm </b> - legt die Berechnungsvariante für die Ermittlung des Durchschnittswertes mit "averageValue" fest.                                 
+                                </li><br>
 
   <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes Device. <br>
                                 Es können <a href="https://fhem.de/commandref_DE.html#devspec">Geräte-Spezifikationen (devspec)</a>
@@ -10197,16 +10320,16 @@ sub bdump {
 								Es enthält eine Liste der relevanten Wertepaare. Mit verbose 3 werden diese Datensätze ebenfalls im Logfile protokolliert.
 								</li> <br> 
 
-                              <ul>
-							  Beispiel Ausgabe im Logfile beim Überschreiten von diffAccept=10: <br><br>
+                                  <ul>
+							      Beispiel Ausgabe im Logfile beim Überschreiten von diffAccept=10: <br><br>
 							  
-                              DbRep Rep.STP5000.etotal -> data ignored while calc diffValue due to threshold overrun (diffAccept = 10): <br>
-							  2016-04-09 08:50:50 0.0340 -> 2016-04-09 12:42:01 13.3440 <br><br>
+                                  DbRep Rep.STP5000.etotal -> data ignored while calc diffValue due to threshold overrun (diffAccept = 10): <br>
+							      2016-04-09 08:50:50 0.0340 -> 2016-04-09 12:42:01 13.3440 <br><br>
 							  
-                              # Der erste Datensatz mit einem Wert von 0.0340 ist untypisch gering zum nächsten Wert 13.3440 und führt zu einem zu hohen
-							    Differenzwert. <br>
-							  # Es ist zu entscheiden ob der Datensatz gelöscht, ignoriert, oder das Attribut diffAccept angepasst werden sollte. 
-                              </ul><br> 
+                                  # Der erste Datensatz mit einem Wert von 0.0340 ist untypisch gering zum nächsten Wert 13.3440 und führt zu einem zu hohen
+							      Differenzwert. <br>
+							      # Es ist zu entscheiden ob der Datensatz gelöscht, ignoriert, oder das Attribut diffAccept angepasst werden sollte. 
+                                  </ul><br> 
 							  
   <li><b>disable </b>         - deaktiviert das Modul   </li> <br>
   
@@ -10571,7 +10694,7 @@ sub bdump {
         }
   	    </pre>
 	                           
-							   Die Aktivierung der Schnittstelle erfogt durch Setzen des Funktionsnames im Attribut. 
+							   Die Aktivierung der Schnittstelle erfogt durch Setzen des Funktionsnamens im Attribut. 
 							   Optional kann ein Reading:Value Regex als Argument angegeben werden. Wird kein Regex 
 							   angegeben, werden alle Wertekombinationen als "wahr" gewertet (entspricht .*:.*). 
 							   <br><br>
