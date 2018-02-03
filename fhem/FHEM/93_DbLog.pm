@@ -16,6 +16,9 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.8.3      03.02.2018       call execmemcache only syncInterval/2 if cacheLimit reached and DB is not reachable, fix handling of
+#                             "$@" in DbLog_PushAsync 
+# 3.8.2      31.01.2018       RaiseError => 1 in DbLog_ConnectPush, DbLog_ConnectNewDBH, configCheck improved
 # 3.8.1      29.01.2018       Use of uninitialized value $txt if addlog has no value
 # 3.8.0      26.01.2018       escape "|" in events to log events containing it
 # 3.7.1      25.01.2018       fix typo in commandref
@@ -182,7 +185,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.8.1";
+my $DbLogVersion = "3.8.3";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -543,7 +546,10 @@ sub DbLog_Set($@) {
 		if (!$a[2]) {
 		    Log3($name, 3, "DbLog $name: Reopen requested.");
             DbLog_ConnectPush($hash);
-			delete $hash->{HELPER}{REOPEN_RUNS};
+            if($hash->{HELPER}{REOPEN_RUNS}) {
+			    delete $hash->{HELPER}{REOPEN_RUNS};
+                RemoveInternalTimer($hash, "reopen");
+            }
 			DbLog_execmemcache($hash) if($async);
             $ret = "Reopen executed.";
 		} else {
@@ -1345,8 +1351,13 @@ sub DbLog_Log($$) {
 	                  }
 					  # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
 					  if($memcount >= $clim) {
-					      Log3 $hash->{NAME}, 5, "DbLog $name -> Number of cache entries reached cachelimit $clim - start database sync.";
-					      DbLog_execmemcache($hash);
+                          my $lmlr     = $hash->{HELPER}{LASTLIMITRUNTIME};
+                          my $syncival = AttrVal($name, "syncInterval", 30);
+                          if(!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
+					          Log3 $hash->{NAME}, 4, "DbLog $name -> Number of cache entries reached cachelimit $clim - start database sync.";
+					          DbLog_execmemcache($hash);
+                              $hash->{HELPER}{LASTLIMITRUNTIME} = gettimeofday();
+                          }
 					  }
 					  # Notify-Routine Laufzeit ermitteln
                       $net = tv_interval($nst);
@@ -1365,11 +1376,6 @@ sub DbLog_Log($$) {
           return if($hash->{HELPER}{REOPEN_RUNS});	  
           my $error = DbLog_Push($hash, $vb4show, @row_array);
           Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error" if($vb4show);
-		 
-          my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
-          my $evt    = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-          readingsSingleUpdate($hash, "state", $state, $evt);
-          $hash->{HELPER}{OLDSTATE} = $state;
 		  
 		  # Notify-Routine Laufzeit ermitteln
           $net = tv_interval($nst);
@@ -1401,7 +1407,7 @@ sub DbLog_Push(@) {
   # andererseite kein "MySQL-Server has gone away" Fehler
   if ($nh) {
       $dbh = DbLog_ConnectNewDBH($hash);
-	  return "Can't connect to database." if(!$dbh);
+	  return if(!$dbh);
   } else {
       $dbh = $hash->{DBHP};
       eval {
@@ -1417,9 +1423,6 @@ sub DbLog_Push(@) {
           $dbh = $hash->{DBHP};
       }
   } 
-  
-  $dbh->{RaiseError} = 1; 
-  $dbh->{PrintError} = 0;
   
   my ($useac,$useta) = DbLog_commitMode($hash);
   my $ac = ($dbh->{AutoCommit})?"ON":"OFF";
@@ -1664,8 +1667,7 @@ sub DbLog_Push(@) {
   if ($errorh) {
       $error = $errorh;
   }
-  $dbh->{RaiseError} = 0; 
-  $dbh->{PrintError} = 1;
+
   $dbh->disconnect if ($nh);
 
 return Encode::encode_utf8($error);
@@ -1824,16 +1826,16 @@ sub DbLog_PushAsync(@) {
       # Server default
       eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, mysql_enable_utf8 => $utf8 });};
   }
-  my $ac = ($dbh->{AutoCommit})?"ON":"OFF";
-  my $tm = ($useta)?"ON":"OFF";
-  Log3 $hash->{NAME}, 4, "DbLog $name -> AutoCommit mode: $ac, Transaction mode: $tm";
-  
   if ($@) {
       $error = encode_base64($@,"");
       Log3 ($name, 2, "DbLog $name - Error: $@");
       Log3 ($name, 5, "DbLog $name -> DbLog_PushAsync finished");
       return "$name|$error|0|$rowlist";
   }
+  
+  my $ac = ($dbh->{AutoCommit})?"ON":"OFF";
+  my $tm = ($useta)?"ON":"OFF";
+  Log3 $hash->{NAME}, 4, "DbLog $name -> AutoCommit mode: $ac, Transaction mode: $tm";
   
   # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
   my ($usepkh,$usepkc,$pkh,$pkc);
@@ -2007,8 +2009,9 @@ sub DbLog_PushAsync(@) {
   };
   
   if ($@) {
-      Log3 $hash->{NAME}, 2, "DbLog $name -> Error table history - $@";
-	  $errorh = $@;
+      $errorh = $@;
+      Log3 $hash->{NAME}, 2, "DbLog $name -> Error table history - $errorh";
+      $error = encode_base64($errorh,"");
       $rowlback = $rowlist;	
   } 
   
@@ -2084,10 +2087,6 @@ sub DbLog_PushAsync(@) {
   
   # SQL-Laufzeit ermitteln
   my $rt = tv_interval($st);
-
-  if ($errorh) {
-	  $error = encode_base64($errorh,"");
-  }
   
   Log3 ($name, 5, "DbLog $name -> DbLog_PushAsync finished");
 
@@ -2141,9 +2140,9 @@ sub DbLog_PushAsyncDone ($) {
       readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt));
       readingsEndUpdate($hash, 1);
   }
- 
-  my $state    = $error?$error:(IsDisabled($name))?"disabled":"connected";
-  my $evt      = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
+  
+  my $state = $error?$error:(IsDisabled($name))?"disabled":"connected";
+  my $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
   readingsSingleUpdate($hash, "state", $state, $evt);
   $hash->{HELPER}{OLDSTATE} = $state;
  
@@ -2154,6 +2153,7 @@ sub DbLog_PushAsyncDone ($) {
 	  delete($defs{$name}{READINGS}{CacheUsage});
   }
   delete $hash->{HELPER}{".RUNNING_PID"};
+  delete $hash->{HELPER}{LASTLIMITRUNTIME} if(!$error);
   Log3 ($name, 5, "DbLog $name -> DbLog_PushAsyncDone finished"); 
 return;
 }
@@ -2169,6 +2169,7 @@ sub DbLog_PushAsyncAborted(@) {
   Log3 ($name, 2, "DbLog $name -> ".$hash->{HELPER}{".RUNNING_PID"}{fn}." ".$cause) if(!$hash->{HELPER}{SHUTDOWNSEQ});
   readingsSingleUpdate($hash,"state",$cause, 1);
   delete $hash->{HELPER}{".RUNNING_PID"};
+  delete $hash->{HELPER}{LASTLIMITRUNTIME};
 }
 
 
@@ -2269,23 +2270,27 @@ sub DbLog_ConnectPush($;$$) {
 
   my ($useac,$useta) = DbLog_commitMode($hash);
   if(!$useac) {
-      eval {$dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, AutoCommit => 0, mysql_enable_utf8 => $utf8 });};
+      eval {$dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, mysql_enable_utf8 => $utf8 });};
   } elsif($useac == 1) {
-      eval {$dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, AutoCommit => 1, mysql_enable_utf8 => $utf8 });};
+      eval {$dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $utf8 });};
   } else {
       # Server default
-      eval {$dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, mysql_enable_utf8 => $utf8 });};
+      eval {$dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, mysql_enable_utf8 => $utf8 });};
   }  
    
   if($@) {
-      readingsSingleUpdate($hash, 'state', $@, 1);
 	  Log3 $hash->{NAME}, 3, "DbLog $name - Error: $@";
   }
   
   if(!$dbhp) {
     RemoveInternalTimer($hash, "DbLog_ConnectPush");
     Log3 $hash->{NAME}, 4, "DbLog $name - Trying to connect to database";
-    readingsSingleUpdate($hash, 'state', 'disconnected', 1);
+    
+    my $state = $@?$@:(IsDisabled($name))?"disabled":"disconnected";
+    my $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
+    readingsSingleUpdate($hash, "state", $state, $evt);
+    $hash->{HELPER}{OLDSTATE} = $state;  
+    
     InternalTimer(time+5, 'DbLog_ConnectPush', $hash, 0);
     Log3 $hash->{NAME}, 4, "DbLog $name - Waiting for database connection";
     return 0;
@@ -2321,16 +2326,20 @@ sub DbLog_ConnectNewDBH($) {
  
   my ($useac,$useta) = DbLog_commitMode($hash);
   if(!$useac) {
-      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, AutoCommit => 0, mysql_enable_utf8 => $utf8 });};
+      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, mysql_enable_utf8 => $utf8 });};
   } elsif($useac == 1) {
-      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, AutoCommit => 1, mysql_enable_utf8 => $utf8 });};
+      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $utf8 });};
   } else {
       # Server default
-      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, mysql_enable_utf8 => $utf8 });};
+      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, mysql_enable_utf8 => $utf8 });};
   } 
  
   if($@) {
     Log3($name, 2, "DbLog $name - $@");
+    my $state = $@?$@:(IsDisabled($name))?"disabled":"disconnected";
+    my $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
+    readingsSingleUpdate($hash, "state", $state, $evt);
+    $hash->{HELPER}{OLDSTATE} = $state;
   }
   
   if($dbh) {
@@ -2920,11 +2929,17 @@ sub DbLog_configcheck($) {
   my $dbname  = (split(/;|=/, $dbconn))[1];
   my ($check, $rec,%dbconfig);
   
+  ### Start
+  ####################################################################### 
+  $check  = "<html>";
+  $check .= "<u><b>Result of DbLog version check</u></b><br><br>";
+  $check .= "Used DbLog version: $hash->{VERSION} <br>";
+  $check .= "<b>Recommendation:</b> Your running version may be the current one. Please check for updates of DbLog periodically. <br><br>";
+  
   ### Configuration read check
   #######################################################################
-  $check  = "<html>";
   $check .= "<u><b>Result of configuration read check</u></b><br><br>";
-  my $st  = configDBUsed()?"configDB (don't forget upload configutaion file if changed)":"file";
+  my $st  = configDBUsed()?"configDB (don't forget upload configuration file if changed)":"file";
   $check .= "Connection parameter store type: $st <br>";
   my ($err, @config) = FileRead($hash->{CONFIGURATION});
   if (!$err) {
@@ -3007,7 +3022,7 @@ sub DbLog_configcheck($) {
 	  } else {
 	      $rec = "WARNING - you are running asynchronous mode that is recommended, but the value of global device attribute \"blockingCallMax\" is set quite small. <br>";
 	      $rec .= "This may cause problems in operation. It is recommended to <b>increase</b> the <b>global blockingCallMax</b> attribute."; 
-	  }
+	  } 
   } else {
       $rec  = "Switch $name to the asynchronous logmode by setting the 'asyncMode' attribute. The advantage of this mode is to log events non-blocking. <br>";
 	  $rec .= "There are attributes 'syncInterval' and 'cacheLimit' relevant for this working mode. <br>";
@@ -3040,7 +3055,28 @@ sub DbLog_configcheck($) {
 	  }
 	  $check .= "<b>Recommendation:</b> $rec <br><br>";
   }
-		
+  
+  ### Check Plot Erstellungsmodus
+  #######################################################################
+      $check .= "<u><b>Result of plot generation method check</u></b><br><br>";
+	  my @webdvs = devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
+	  my $forks = 1;
+	  my $wall;
+      foreach (@webdvs) {
+	      my $web = $_;
+		  $wall  .= $web.": plotfork=".AttrVal($web,"plotfork",0)."<br>";
+		  $forks  = 0 if(!AttrVal($web,"plotfork",0));
+	  }
+      if(!$forks) {
+	      $check .= "WARNING - at least one of your FHEMWEB devices have attribute \"plotfork = 1\" not set. This may cause blocking situations when creating plots. <br>";
+		  $check .= $wall;
+		  $rec    = "You should set attribute \"plotfork = 1\" in relevant devices";
+	  } else {
+		  $check .= $wall;
+	      $rec = "settings o.k.";
+	  }	         
+	  $check .= "<b>Recommendation:</b> $rec <br><br>"; 
+  
   ### Check Spaltenbreite history
   #######################################################################
   my (@sr_dev,@sr_typ,@sr_evt,@sr_rdg,@sr_val,@sr_unt);
@@ -3109,11 +3145,11 @@ sub DbLog_configcheck($) {
 	      $rec .= "VALUE: $columns{VALUE} <br>";
 	      $rec .= "UNIT: $columns{UNIT} <br><br>";
           $rec .= "You can change the column width in database by a statement like <b>'alter table history modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
-          $rec .= "You can do it for example by executing 'sqlCMD' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
-	      $rec .= "The field width used by the module can be adjusted by attributes 'colEvent', 'colReading', 'colValue'.";
+          $rec .= "You can do it for example by executing 'sqlCmd' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
+	      $rec .= "Alternatively the field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
       } else {
-	      $rec  = "WARNING - The relation between column width in table history and the field width used by device $name should be equal but it differs. ";
-		  $rec .= "The field width used by the module can be adjusted by attributes 'colEvent', 'colReading', 'colValue'. ";
+	      $rec  = "WARNING - The relation between column width in table history and the field width used by device $name should be equal but it differs.";
+		  $rec .= "The field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
 		  $rec .= "Because you use SQLite this is only a warning. Normally the database can handle these differences. ";
 	  }
   }
@@ -3188,11 +3224,11 @@ sub DbLog_configcheck($) {
 	          $rec .= "VALUE: $columns{VALUE} <br>";
 	          $rec .= "UNIT: $columns{UNIT} <br><br>";
               $rec .= "You can change the column width in database by a statement like <b>'alter table current modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
-              $rec .= "You can do it for example by executing 'sqlCMD' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
-	          $rec .= "The field width used by the module can be adjusted by attributes 'colEvent', 'colReading', 'colValue',";
+              $rec .= "You can do it for example by executing 'sqlCmd' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
+	          $rec .= "Alternatively the field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
           } else {
 	          $rec  = "WARNING - The relation between column width in table current and the field width used by device $name should be equal but it differs. ";
-		      $rec .= "The field width used by the module can be adjusted by attributes 'colEvent', 'colReading', 'colValue'. ";
+		      $rec .= "The field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
 		      $rec .= "Because you use SQLite this is only a warning. Normally the database can handle these differences. ";
 	      }
 	  }
@@ -3316,7 +3352,7 @@ sub DbLog_configcheck($) {
 	  if($dbmodel =~ /MYSQL/) {
           @dix = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Report_Idx'");
 	      if (!@dix) {
-	          $check .= "You use at least one DbRep-device assigned to $name, but the recommended index 'Report_Idx' is missing. <br>";
+	          $check .= "At least one DbRep-device assigned to $name is used, but the recommended index 'Report_Idx' is missing. <br>";
 	          $rec    = "You can create the index by executing statement <b>'CREATE INDEX Report_Idx ON `history` (TIMESTAMP, READING) USING BTREE;'</b> <br>";
 		      $rec   .= "Depending on your database size this command may running a long time. <br>";
 		      $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
@@ -3325,7 +3361,7 @@ sub DbLog_configcheck($) {
               @dix_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Report_Idx' and Column_name='READING'");
               @dix_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM history where Key_name='Report_Idx' and Column_name='TIMESTAMP'");
               if (@dix_rdg && @dix_tsp) {
-			      $check .= "You use at least one DbRep-device assigned to $name. ";
+			      $check .= "At least one DbRep-device assigned to $name is used. ";
                   $check .= "Index 'Report_Idx' exists and contains recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
               } else {  
@@ -3390,7 +3426,7 @@ sub DbLog_configcheck($) {
 	      }
       }
   } else {
-      $check .= "You don't use any DbRep-device assigned to $name. Hence an index for DbRep isn't needed. <br>";
+      $check .= "No DbRep-device assigned to $name is used. Hence an index for DbRep isn't needed. <br>";
       $rec    = "settings o.k.";
   }
   $check .= "<b>Recommendation:</b> $rec <br><br>";
@@ -4937,7 +4973,7 @@ sub reopen ($){
   if(DbLog_ConnectPush($hash)) {
       # Statusbit "Kein Schreiben in DB erlauben" löschen
       my $delay = delete $hash->{HELPER}{REOPEN_RUNS};
-	  Log3($name, 2, "DbLog $name: Database connection reopened (it was $delay seconds closed).");
+	  Log3($name, 2, "DbLog $name: Database connection reopened (it was $delay seconds closed).") if($delay);
 	  readingsSingleUpdate($hash, "state", "reopened", 1);
 	  $hash->{HELPER}{OLDSTATE} = "reopened";
 	  DbLog_execmemcache($hash) if($async);
@@ -5554,7 +5590,7 @@ sub checkUsePK ($$){
 	 
        In asynchronous logging mode the content of cache will be written into the database and cleared if the number &lt;n&gt; datasets
 	   in cache has reached (default: 500). Thereby the timer of asynchronous logging mode will be set new to the value of 
-	   attribute "syncInterval". <br>
+	   attribute "syncInterval". In case of error the next write attempt will be started at the earliest after syncInterval/2. <br>
      </ul>
   </ul>
   <br>
@@ -6562,7 +6598,7 @@ sub checkUsePK ($$){
 	 
        Im asynchronen Logmodus wird der Cache in die Datenbank weggeschrieben und geleert wenn die Anzahl &lt;n&gt; Datensätze
        im Cache erreicht ist (Default: 500). Der Timer des asynchronen Logmodus wird dabei neu auf den Wert des Attributs "syncInterval" 
-       gesetzt. <br>
+       gesetzt. Im Fehlerfall wird ein erneuter Schreibversuch frühestens nach syncInterval/2 gestartet. <br>
      </ul>
   </ul>
   <br>
