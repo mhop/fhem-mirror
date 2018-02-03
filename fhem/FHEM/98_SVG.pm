@@ -175,20 +175,6 @@ SVG_Rename($$)
   SVG_Set($hash, $new, "copyGplotFile");   # Forum #59786
 }
 
-##################
-sub
-SVG_FwDetail($@)
-{
-  my ($d, $text, $nobr)= @_;
-  return "" if(AttrVal($d, "group", ""));
-  my $alias= AttrVal($d, "alias", $d);
-
-  my $ret = ($nobr ? "" : "<br>");
-  $ret .= "$text " if($text);
-  $ret .= FW_pH("detail=$d", $alias,0, "SVGlabel SVG_$d", 1,0) if(!$FW_subdir);
-  $ret .= "<br>";
-  return $ret;
-}
 
 
 sub
@@ -246,10 +232,12 @@ SVG_FwFn($$$$)
   if((!$pageHash || !$pageHash->{buttons}) &&
      AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
 
+    $ret .= '<div class="SVGlabel" data-name="svgZoomControl">';
     $ret .= SVG_zoomLink("zoom=-1", "Zoom-in", "zoom in");
     $ret .= SVG_zoomLink("zoom=1",  "Zoom-out","zoom out");
     $ret .= SVG_zoomLink("off=-1",  "Prev",    "prev");
     $ret .= SVG_zoomLink("off=1",   "Next",    "next");
+    $ret .= '</div>';
     $pageHash->{buttons} = 1 if($pageHash);
     $ret .= "<br>";
   }
@@ -321,8 +309,13 @@ SVG_FwFn($$$$)
     }
 
   } else {
-    $ret .= SVG_FwDetail($d, "", 1) if(!$FW_hiddenroom{detail});
-
+    if(!AttrVal($d, "group", "") && !$FW_subdir) {
+      my $alias = AttrVal($d, "alias", $d);
+      my $clAdd = "\" data-name=\"$d";
+      $clAdd .= "\" style=\"display:none;" if($FW_hiddenroom{detail});
+      $ret .= FW_pH("detail=$d", $alias, 0, "SVGlabel SVG_$d $clAdd", 1, 0);
+      $ret .= "<br>";
+    }
   }
 
   return $ret;

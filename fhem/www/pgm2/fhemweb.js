@@ -457,7 +457,10 @@ FW_csrfRefresh(callback)
 function
 FW_cmd(arg, callback)
 {
-  log("FW_cmd:"+arg);
+  if(arg.length < 120)
+    log("FW_cmd:"+arg);
+  else
+    log("FW_cmd:"+arg.substr(0,120)+"...");
   $.ajax({
     url:addcsrf(arg)+'&fw_id='+$("body").attr('fw_id'),
     method:'POST',
