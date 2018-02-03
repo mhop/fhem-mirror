@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #    
+# 7.7.1        03.02.2018       minor fix in DbRep_firstconnect if IsDisabled
 # 7.7.0        29.01.2018       attribute "averageCalcForm", calculation sceme "avgDailyMeanGWS", "avgArithmeticMean" for 
 #                               averageValue
 # 7.6.1        27.01.2018       new attribute "sqlCmdHistoryLength" and "fetchMarkDuplicates" for highlighting multiple
@@ -303,7 +304,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.6.1";
+my $DbRepVersion = "7.7.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -1143,20 +1144,20 @@ sub DbRep_firstconnect($) {
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbconn         = $hash->{dbloghash}{dbconn};
 
-if ($init_done == 1 && !IsDisabled($name)) {
-  
-  if ( !DbRep_Connect($hash) ) {
-      Log3 ($name, 2, "DbRep $name - DB connect failed. Credentials of database $hash->{DATABASE} are valid and database reachable ?");
-	  ReadingsSingleUpdateValue ($hash, "state", "disconnected", 1);
+  return if(IsDisabled($name));
+  if ($init_done == 1) {
+      if ( !DbRep_Connect($hash) ) {
+          Log3 ($name, 2, "DbRep $name - DB connect failed. Credentials of database $hash->{DATABASE} are valid and database reachable ?");
+	      ReadingsSingleUpdateValue ($hash, "state", "disconnected", 1);
+      } else {
+          Log3 ($name, 4, "DbRep $name - Connectiontest to db $dbconn successful");
+          my $dbh = $hash->{DBH}; 
+          $dbh->disconnect();
+      }
   } else {
-      Log3 ($name, 4, "DbRep $name - Connectiontest to db $dbconn successful");
-      my $dbh = $hash->{DBH}; 
-      $dbh->disconnect();
-  }
-} else {
      RemoveInternalTimer($hash, "DbRep_firstconnect");
      InternalTimer(time+1, "DbRep_firstconnect", $hash, 0);
-}
+  }
 
 return;
 }
