@@ -368,10 +368,10 @@ Device specific attributes are documented in the corresponding device section.
         </code></ul>
         The explicit variant of this attribute has the following syntax:
         <ul><code>
-        attr store eventMap { dev=>{"on"=>"open"}, usr=>{"open"=>"on"} }<br>
-        attr store eventMap { dev=>{"^on(-for-timer)?(.*)"=>"open$2"},
-                              usr=>{"^open(.*)"=>"on$1"},
-                              fw=>{"^open(.*)"=>"open"} }
+        attr store eventMap { dev=>{'on'=>'open'}, usr=>{'open'=>'on'} }<br>
+        attr store eventMap { dev=>{'^on(-for-timer)?(.*)'=>'open$2'},
+                              usr=>{'^open(.*)'=>'on$1'},
+                              fw=>{'^open(.*)'=>'open'} }
         </code></ul>
         This variant must be used, if the mapping is not symmetrical, the first
         part (dev) representing the device to user mapping, i.e. if the device

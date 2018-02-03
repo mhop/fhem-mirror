@@ -371,10 +371,10 @@ Ger&auml;t dokumentiert.
       </code></ul>
       Die explizite Variante dieses Attributes hat folgenden Syntax:
       <ul><code>
-      attr store eventMap { dev=>{"on"=>"open"}, usr=>{"open"=>"on"} }<br>
-      attr store eventMap { dev=>{"^on(-for-timer)?(.*)"=>"open$2"},
-                            usr=>{"^open(.*)"=>"on$1"},
-                            fw=>{"^open(.*)"=>"open"} }
+      attr store eventMap { dev=>{'on'=>'open'}, usr=>{'open'=>'on'} }<br>
+      attr store eventMap { dev=>{'^on(-for-timer)?(.*)'=>'open$2'},
+                            usr=>{'^open(.*)'=>'on$1'},
+                            fw=>{'^open(.*)'=>'open'} }
       </code></ul>
       Diese Variante muss dann verwendet werden, falls das Mapping nicht
       symmetrisch ist. Der erste Teil (dev) spezifiziert dabei die Richtung
