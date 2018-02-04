@@ -577,121 +577,121 @@ my %sets539only =(
   
 
 my %sets206 = (
-  "p01RoomTempDay"	        	=> {parent=>"p01-p12",      argMin => "10", 	argMax =>  "30", 	unit =>" °C"},
-  "p02RoomTempNight"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "30", 	unit =>" °C"},
-  "p03RoomTempStandby"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "30", 	unit =>" °C"},
-  "p04DHWsetTempDay"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "55", 	unit =>" °C"},
-  "p05DHWsetTempNight"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "55", 	unit =>" °C"},
-  "p06DHWsetTempStandby"        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "55", 	unit =>" °C"},
-  "p07FanStageDay"	        	=> {parent=>"p01-p12",      argMin => "0", 		argMax =>   "3", 	unit =>""},
-  "p08FanStageNight"	        => {parent=>"p01-p12",      argMin => "0", 		argMax =>   "3", 	unit =>""},
-  "p09FanStageStandby"	        => {parent=>"p01-p12",      argMin => "0", 		argMax =>   "3", 	unit =>""},
-  "p10HCTempManual"	        	=> {parent=>"p01-p12",      argMin => "10", 	argMax =>  "65", 	unit =>" °C"},
-  "p11DHWsetTempManual"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>  "65", 	unit =>" °C"},
-  "p12FanStageManual"           => {parent=>"p01-p12",      argMin => "0", 		argMax =>   "3", 	unit =>""},
-  "p13GradientHC1"			    => {parent=>"pHeat1", 		argMin => "0", 		argMax =>   "5", 	unit =>""},
-  "p14LowEndHC1"			    => {parent=>"pHeat1", 		argMin => "0", 		argMax =>  "20", 	unit =>" K"},
-  "p15RoomInfluenceHC1"			=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>  "10",	unit =>""},
-  "p16GradientHC2"		    	=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>   "5",	unit =>""},
-  "p17LowEndHC2"		    	=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>  "10", 	unit =>" K"},
-  "p18RoomInfluenceHC2"			=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>  "10",	unit =>""},
-  "p19FlowProportionHC1"		=> {parent=>"pHeat1", 		argMin => "0", 		argMax => "100",	unit =>" %"},
-  "p20FlowProportionHC2"		=> {parent=>"pHeat1", 		argMin => "0", 		argMax => "100",	unit =>" %"},
-  "p21Hyst1"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>   "10", 	unit =>" K"},
-  "p22Hyst2"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>   "10", 	unit =>" K"},
-  "p23Hyst3"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>    "5", 	unit =>" K"},
-  "p24Hyst4"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>    "5", 	unit =>" K"},
-  "p25Hyst5"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>    "5", 	unit =>" K"},
-  "p29HystAsymmetry"			=> {parent=>"pHeat2", 		argMin => "1", 		argMax =>    "5",	unit =>""},
-  "p30integralComponent"		=> {parent=>"pHeat2", 		argMin => "10", 	argMax =>  "999",	unit =>" Kmin"},
-  "p32HystDHW"			    	=> {parent=>"pDHW", 		argMin => "2", 		argMax =>   "10", 	unit =>" K"},
-  "p33BoosterTimeoutDHW"		=> {parent=>"pDHW", 		argMin => "0",		argMax =>  "240",	unit =>" min"},
-  "p34TempLimitBoostDHW"    	=> {parent=>"pDHW", 		argMin => "-10", 	argMax =>   "10", 	unit =>" °C"},
-  "p35PasteurisationInterval"  	=> {parent=>"pDHW", 		argMin => "3", 		argMax =>   "30", 	unit =>" Tage"},
-  "p36MaxDurationDHWLoad"    	=> {parent=>"pDHW", 		argMin => "6", 		argMax =>   "12", 	unit =>" h"},
-  "p37Fanstage1AirflowInlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
-  "p38Fanstage2AirflowInlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
-  "p39Fanstage3AirflowInlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
-  "p40Fanstage1AirflowOutlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
-  "p41Fanstage2AirflowOutlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
-  "p42Fanstage3AirflowOutlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	unit =>" m3/h"},
-  "p43UnschedVent3"				=> {parent=>"pFan", 		argMin => "0", 		argMax =>  "1000",	unit =>" min"},
-  "p44UnschedVent2"				=> {parent=>"pFan", 		argMin => "0", 		argMax =>  "1000",	unit =>" min"},
-  "p45UnschedVent1"				=> {parent=>"pFan", 		argMin => "0", 		argMax =>  "1000",	unit =>" min"},
-  "p46UnschedVent0"	        	=> {parent=>"pFan", 		argMin => "0", 		argMax =>  "1000",	unit =>" min"},
-  "p47CompressorRestartDelay"	=> {parent=>"pDefrostEva", 	argMin => "0", 		argMax =>  "20",	unit =>" min"},
-  "p48MainFanSpeed"	        	=> {parent=>"pDefrostEva", 	argMin => "0", 		argMax =>  "100",	unit =>" %"},
-  "p49SummerModeTemp"			=> {parent=>"pHeat2", 		argMin => "10", 	argMax =>   "24",	unit =>" °C"},
-  "p50SummerModeHysteresis"		=> {parent=>"pHeat2", 		argMin => "1", 		argMax =>    "5",	unit =>" K"},
-  "p54MinPumpCycles"			=> {parent=>"pCircPump", 	argMin => "1",  	argMax =>   "24",	unit =>" /Tag"},
-  "p55MaxPumpCycles"			=> {parent=>"pCircPump", 	argMin => "25", 	argMax =>  "288",	unit =>" /Tag"},
-  "p56OutTempMaxPumpCycles"		=> {parent=>"pCircPump", 	argMin => "0",  	argMax =>   "20",	unit =>" °C"},
-  "p57OutTempMinPumpCycles"		=> {parent=>"pCircPump", 	argMin => "0",  	argMax =>   "25",	unit =>" °C"},
-  "p58SuppressTempCaptPumpStart"=> {parent=>"pCircPump", 	argMin => "0",  	argMax =>   "120",	unit =>" s"},
-  "p75PassiveCooling"			=> {parent=>"pFan", 		argMin => "0", 		argMax =>    "1",	unit =>""},
-  "p77OutTempFilterTime"		=> {parent=>"pHeat2", 		argMin => "0",  	argMax =>   "24", 	unit =>" h"},
-  "p78DualModePoint"			=> {parent=>"pHeat2", 		argMin => "-10", 	argMax =>   "20",	unit =>" °C"},
-  "p79BoosterTimeoutHC"			=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>   "60",	unit =>" min"},
-  "p80EnableSolar"              => {parent=>"pSolar",       argMin => "0", 		argMax =>   "1", 	unit =>""},
-  "pClockDay"                   => {parent=>"sTimedate",    argMin => "1", 		argMax =>  "31", 	unit =>""},
-  "pClockMonth"                 => {parent=>"sTimedate",    argMin => "1", 		argMax =>  "12", 	unit =>""},
-  "pClockYear"                  => {parent=>"sTimedate",    argMin => "12", 	argMax =>  "20", 	unit =>""},
-  "pClockHour"                  => {parent=>"sTimedate",    argMin => "0", 		argMax =>  "23", 	unit =>""},
-  "pClockMinutes"               => {parent=>"sTimedate",    argMin => "0", 		argMax =>  "59", 	unit =>""},
-  "progDHWStartTime"            => {parent=>"pDHWProg",     argMin => "00:00",  argMax =>  "23:59", unit =>""},
-  "progDHWEndTime"              => {parent=>"pDHWProg",     argMin => "00:00", 	argMax =>  "23:59", unit =>""},
-  "progDHWEnable"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progDHWMonday"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progDHWTuesday"              => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progDHWWednesday"            => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progDHWThursday"             => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progDHWFriday"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progDHWSaturday"             => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progDHWSunday"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC1StartTime"            => {parent=>"pHeatProg",    argMin => "00:00", 	argMax =>  "23:59", unit =>""}, 
-  "progHC1EndTime"              => {parent=>"pHeatProg",    argMin => "00:00", 	argMax =>  "23:59", unit =>""},
-  "progHC1Enable"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC1Monday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC1Tuesday"              => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC1Wednesday"            => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC1Thursday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC1Friday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC1Saturday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC1Sunday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC2StartTime"            => {parent=>"pHeatProg",    argMin => "00:00", 	argMax =>  "23:59", unit =>""}, 
-  "progHC2EndTime"              => {parent=>"pHeatProg",    argMin => "00:00", 	argMax =>  "23:59", unit =>""},
-  "progHC2Enable"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC2Monday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC2Tuesday"              => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC2Wednesday"            => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC2Thursday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC2Friday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC2Saturday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progHC2Sunday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN1StartTime"           => {parent=>"pFanProg",     argMin => "00:00",	argMax =>  "23:59", unit =>""}, 
-  "progFAN1EndTime"             => {parent=>"pFanProg",     argMin => "00:00",	argMax =>  "23:59", unit =>""},
-  "progFAN1Enable"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN1Monday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN1Tuesday"             => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN1Wednesday"           => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN1Thursday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN1Friday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN1Saturday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN1Sunday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN2StartTime"           => {parent=>"pFanProg",     argMin => "00:00", 	argMax =>  "23:59", unit =>""}, 
-  "progFAN2EndTime"             => {parent=>"pFanProg",     argMin => "00:00", 	argMax =>  "23:59", unit =>""},
-  "progFAN2Enable"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN2Monday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN2Tuesday"             => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN2Wednesday"           => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN2Thursday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN2Friday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN2Saturday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""},
-  "progFAN2Sunday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>  "1", 	unit =>""}  
+  "p01RoomTempDay"	        	=> {parent=>"p01-p12",      argMin => "10", 	argMax =>   "30", 	type =>"pclean", unit =>" °C"},
+  "p02RoomTempNight"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>   "30", 	type =>"pclean", unit =>" °C"},
+  "p03RoomTempStandby"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>   "30", 	type =>"pclean", unit =>" °C"},
+  "p04DHWsetTempDay"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>   "55", 	type =>"pclean", unit =>" °C"},
+  "p05DHWsetTempNight"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>   "55", 	type =>"pclean", unit =>" °C"},
+  "p06DHWsetTempStandby"        => {parent=>"p01-p12",      argMin => "10", 	argMax =>   "55", 	type =>"pclean", unit =>" °C"},
+  "p07FanStageDay"	        	=> {parent=>"p01-p12",      argMin => "0", 		argMax =>    "3", 	type =>"pclean", unit =>""},
+  "p08FanStageNight"	        => {parent=>"p01-p12",      argMin => "0", 		argMax =>    "3", 	type =>"pclean", unit =>""},
+  "p09FanStageStandby"	        => {parent=>"p01-p12",      argMin => "0", 		argMax =>    "3", 	type =>"pclean", unit =>""},
+  "p10HCTempManual"	        	=> {parent=>"p01-p12",      argMin => "10", 	argMax =>   "65", 	type =>"pclean", unit =>" °C"},
+  "p11DHWsetTempManual"	        => {parent=>"p01-p12",      argMin => "10", 	argMax =>   "65", 	type =>"pclean", unit =>" °C"},
+  "p12FanStageManual"           => {parent=>"p01-p12",      argMin => "0", 		argMax =>    "3", 	type =>"pclean", unit =>""},
+  "p13GradientHC1"			    => {parent=>"pHeat1", 		argMin => "0", 		argMax =>    "5", 	type =>"pclean", unit =>""},
+  "p14LowEndHC1"			    => {parent=>"pHeat1", 		argMin => "0", 		argMax =>   "20", 	type =>"pclean", unit =>" K"},
+  "p15RoomInfluenceHC1"			=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>   "10",	type =>"pclean", unit =>""},
+  "p16GradientHC2"		    	=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>    "5",	type =>"pclean", unit =>""},
+  "p17LowEndHC2"		    	=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>   "10", 	type =>"pclean", unit =>" K"},
+  "p18RoomInfluenceHC2"			=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>   "10",	type =>"pclean", unit =>""},
+  "p19FlowProportionHC1"		=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>  "100",	type =>"pclean", unit =>" %"},
+  "p20FlowProportionHC2"		=> {parent=>"pHeat1", 		argMin => "0", 		argMax =>  "100",	type =>"pclean", unit =>" %"},
+  "p21Hyst1"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>   "10", 	type =>"pclean", unit =>" K"},
+  "p22Hyst2"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>   "10", 	type =>"pclean", unit =>" K"},
+  "p23Hyst3"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>    "5", 	type =>"pclean", unit =>" K"},
+  "p24Hyst4"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>    "5", 	type =>"pclean", unit =>" K"},
+  "p25Hyst5"			    	=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>    "5", 	type =>"pclean", unit =>" K"},
+  "p29HystAsymmetry"			=> {parent=>"pHeat2", 		argMin => "1", 		argMax =>    "5",	type =>"pclean", unit =>""},
+  "p30integralComponent"		=> {parent=>"pHeat2", 		argMin => "10", 	argMax =>  "999",	type =>"pclean", unit =>" Kmin"},
+  "p32HystDHW"			    	=> {parent=>"pDHW", 		argMin => "2", 		argMax =>   "10", 	type =>"pclean", unit =>" K"},
+  "p33BoosterTimeoutDHW"		=> {parent=>"pDHW", 		argMin => "0",		argMax =>  "240",	type =>"pclean", unit =>" min"},
+  "p34TempLimitBoostDHW"    	=> {parent=>"pDHW", 		argMin => "-10", 	argMax =>   "10", 	type =>"pclean", unit =>" °C"},
+  "p35PasteurisationInterval"  	=> {parent=>"pDHW", 		argMin => "3", 		argMax =>   "30", 	type =>"pclean", unit =>" Days"},
+  "p36MaxDurationDHWLoad"    	=> {parent=>"pDHW", 		argMin => "6", 		argMax =>   "12", 	type =>"pclean", unit =>" h"},
+  "p37Fanstage1AirflowInlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	type =>"pclean", unit =>" m3/h"},
+  "p38Fanstage2AirflowInlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	type =>"pclean", unit =>" m3/h"},
+  "p39Fanstage3AirflowInlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	type =>"pclean", unit =>" m3/h"},
+  "p40Fanstage1AirflowOutlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	type =>"pclean", unit =>" m3/h"},
+  "p41Fanstage2AirflowOutlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	type =>"pclean", unit =>" m3/h"},
+  "p42Fanstage3AirflowOutlet"	=> {parent=>"pFan", 		argMin => "60", 	argMax =>  "250",	type =>"pclean", unit =>" m3/h"},
+  "p43UnschedVent3"				=> {parent=>"pFan", 		argMin => "0", 		argMax => "1000",	type =>"pclean", unit =>" min"},
+  "p44UnschedVent2"				=> {parent=>"pFan", 		argMin => "0", 		argMax => "1000",	type =>"pclean", unit =>" min"},
+  "p45UnschedVent1"				=> {parent=>"pFan", 		argMin => "0", 		argMax => "1000",	type =>"pclean", unit =>" min"},
+  "p46UnschedVent0"	        	=> {parent=>"pFan", 		argMin => "0", 		argMax => "1000",	type =>"pclean", unit =>" min"},
+  "p47CompressorRestartDelay"	=> {parent=>"pDefrostEva", 	argMin => "0", 		argMax =>   "20",	type =>"pclean", unit =>" min"},
+  "p48MainFanSpeed"	        	=> {parent=>"pDefrostEva", 	argMin => "0", 		argMax =>  "100",	type =>"pclean", unit =>" %"},
+  "p49SummerModeTemp"			=> {parent=>"pHeat2", 		argMin => "10", 	argMax =>   "24",	type =>"pclean", unit =>" °C"},
+  "p50SummerModeHysteresis"		=> {parent=>"pHeat2", 		argMin => "1", 		argMax =>    "5",	type =>"pclean", unit =>" K"},
+  "p54MinPumpCycles"			=> {parent=>"pCircPump", 	argMin => "1",  	argMax =>   "24",	type =>"pclean", unit =>" /Day"},
+  "p55MaxPumpCycles"			=> {parent=>"pCircPump", 	argMin => "25", 	argMax =>  "288",	type =>"pclean", unit =>" /Day"},
+  "p56OutTempMaxPumpCycles"		=> {parent=>"pCircPump", 	argMin => "0",  	argMax =>   "20",	type =>"pclean", unit =>" °C"},
+  "p57OutTempMinPumpCycles"		=> {parent=>"pCircPump", 	argMin => "0",  	argMax =>   "25",	type =>"pclean", unit =>" °C"},
+  "p58SuppressTempCaptPumpStart"=> {parent=>"pCircPump", 	argMin => "0",  	argMax =>  "120",	type =>"pclean", unit =>" s"},
+  "p75PassiveCooling"			=> {parent=>"pFan", 		argMin => "0", 		argMax =>    "1",	type =>"pclean", unit =>""},
+  "p77OutTempFilterTime"		=> {parent=>"pHeat2", 		argMin => "0",  	argMax =>   "24", 	type =>"pclean", unit =>" h"},
+  "p78DualModePoint"			=> {parent=>"pHeat2", 		argMin => "-10", 	argMax =>   "20",	type =>"pclean", unit =>" °C"},
+  "p79BoosterTimeoutHC"			=> {parent=>"pHeat2", 		argMin => "0", 		argMax =>   "60",	type =>"pclean", unit =>" min"},
+  "p80EnableSolar"              => {parent=>"pSolar",       argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "pClockDay"                   => {parent=>"sTimedate",    argMin => "1", 		argMax =>   "31", 	type =>"pclean", unit =>""},
+  "pClockMonth"                 => {parent=>"sTimedate",    argMin => "1", 		argMax =>   "12", 	type =>"pclean", unit =>""},
+  "pClockYear"                  => {parent=>"sTimedate",    argMin => "12", 	argMax =>   "20", 	type =>"pclean", unit =>""},
+  "pClockHour"                  => {parent=>"sTimedate",    argMin => "0", 		argMax =>   "23", 	type =>"pclean", unit =>""},
+  "pClockMinutes"               => {parent=>"sTimedate",    argMin => "0", 		argMax =>   "59", 	type =>"pclean", unit =>""},
+  "progDHWStartTime"            => {parent=>"pDHWProg",     argMin => "00:00",  argMax => "23:59",  type =>"ptime",  unit =>""},
+  "progDHWEndTime"              => {parent=>"pDHWProg",     argMin => "00:00", 	argMax => "23:59",  type =>"ptime",  unit =>""},
+  "progDHWEnable"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progDHWMonday"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progDHWTuesday"              => {parent=>"pDHWProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progDHWWednesday"            => {parent=>"pDHWProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progDHWThursday"             => {parent=>"pDHWProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progDHWFriday"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progDHWSaturday"             => {parent=>"pDHWProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progDHWSunday"               => {parent=>"pDHWProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC1StartTime"            => {parent=>"pHeatProg",    argMin => "00:00", 	argMax => "23:59",  type =>"ptime",  unit =>""}, 
+  "progHC1EndTime"              => {parent=>"pHeatProg",    argMin => "00:00", 	argMax => "23:59",  type =>"ptime",  unit =>""},
+  "progHC1Enable"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC1Monday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC1Tuesday"              => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC1Wednesday"            => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC1Thursday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC1Friday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC1Saturday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC1Sunday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC2StartTime"            => {parent=>"pHeatProg",    argMin => "00:00", 	argMax => "23:59",  type =>"ptime",  unit =>""}, 
+  "progHC2EndTime"              => {parent=>"pHeatProg",    argMin => "00:00", 	argMax => "23:59",  type =>"ptime",  unit =>""},
+  "progHC2Enable"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC2Monday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC2Tuesday"              => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC2Wednesday"            => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC2Thursday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC2Friday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC2Saturday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progHC2Sunday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN1StartTime"           => {parent=>"pFanProg",     argMin => "00:00",	argMax => "23:59",  type =>"ptime",  unit =>""}, 
+  "progFAN1EndTime"             => {parent=>"pFanProg",     argMin => "00:00",	argMax => "23:59",  type =>"ütime",  unit =>""},
+  "progFAN1Enable"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN1Monday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN1Tuesday"             => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN1Wednesday"           => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN1Thursday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN1Friday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN1Saturday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN1Sunday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN2StartTime"           => {parent=>"pFanProg",     argMin => "00:00", 	argMax =>  "23:59", type =>"ptime",  unit =>""}, 
+  "progFAN2EndTime"             => {parent=>"pFanProg",     argMin => "00:00", 	argMax =>  "23:59", type =>"ptime",  unit =>""},
+  "progFAN2Enable"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN2Monday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN2Tuesday"             => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN2Wednesday"           => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN2Thursday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN2Friday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN2Saturday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
+  "progFAN2Sunday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""}  
  );
 
 my %setsonly214 = (
-  "ResetErrors"			=> {cmd2=>"F8",     argMin =>   "0", argMax =>  "0",	type =>"0clean",  unit =>""}
+  "ResetErrors"			        => {cmd2=>"F8",             argMin =>   "0",    argMax =>    "0",	type =>"0clean", unit =>""}
 );
 
 
@@ -1115,37 +1115,37 @@ sub THZ_Set($@){
       my $value = $sets{$key};
       $setList .= $key;
       #if (($value->{type} eq "0clean" or $value->{type} eq "1clean") and $value->{unit} eq "") {
-      if (($value->{type} eq "0clean" or $value->{type} eq "1clean")) {
-	  #if (($value->{argMax} - $value->{argMin})<2 ) {$setList .= ":uzsuToggle," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
-	  if (($value->{argMax} - $value->{argMin})<13 ) {$setList .= ":uzsuSelectRadio," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
-	  else  					 {$setList .= ":textField ";}
-	  #else						 {$setList .= ":slider,$value->{argMin},1,$value->{argMax} ";}
-	  #else						 {$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:1 " ;}
+      if ($value->{type} =~ /clean/ ) {
+        #if (($value->{argMax} - $value->{argMin})<2 ) {$setList .= ":uzsuToggle," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
+        if (($value->{argMax} - $value->{argMin})<13 ) {$setList .= ":uzsuSelectRadio," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
+        else  					 {$setList .= ":textField ";}
+        #else						 {$setList .= ":slider,$value->{argMin},1,$value->{argMax} ";}
+        #else						 {$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:1 " ;}
 	  }
       elsif ($value->{type} eq "2opmode"){
-	  $setList .= ":" . join (",", (sort {lc $a cmp lc $b} values %OpMode)) . " ";
-	  #$setList .= ":uzsuSelectRadio," . join (",", (sort {lc $a cmp lc $b} values %OpMode)) . " ";
-	  #attr Mythz widgetOverride pOpMode:uzsuDropDown,automatic,standby
+        $setList .= ":" . join (",", (sort {lc $a cmp lc $b} values %OpMode)) . " ";
+        #$setList .= ":uzsuSelectRadio," . join (",", (sort {lc $a cmp lc $b} values %OpMode)) . " ";
+        #attr Mythz widgetOverride pOpMode:uzsuDropDown,automatic,standby
 	  }
       #elsif ($value->{type} eq "9holy"){
-	  #$setList .= ":time ";
-	  # $setList .= ":textField ";
+        #$setList .= ":time ";
+        # $setList .= ":textField ";
 	  # }
-     # elsif ($value->{type} eq "5temp") {
-	#   $setList .= ":slider,$value->{argMin},0.1,$value->{argMax},1 "  ;
-      	    #$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:0.1 "  ;
+      #elsif ($value->{type} eq "5temp") {
+        #   $setList .= ":slider,$value->{argMin},0.1,$value->{argMax},1 "  ;
+      	#$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:0.1 "  ;
 	    #$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:0.1,angleOffset:-125,angleArc:250 "
 	    #attr Mythz widgetOverride p01RoomTempDayHC1:knob,min:22,max:26,step:0.1,angleOffset:-125,angleArc:250
 	    #attr Mythz widgetOverride p01RoomTempDayHC1:slider,$value->{argMin},0.1,$value->{argMax}
 	    #attr Mythz widgetOverride p01RoomTempDayHC1:uzsuDropDown,21,29
 	    #attr Mythz widgetOverride p01RoomTempDayHC1:uzsuSelectRadio,44,234,21
-	 #  }
+	 # }
       #elsif ($value->{type} eq "6gradient") {
-	  #   $setList .= ":slider,$value->{argMin},0.01,$value->{argMax},1 " ;
-	  #$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:0.01 "  ;
+        #   $setList .= ":slider,$value->{argMin},0.01,$value->{argMax},1 " ;
+        #$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:0.01 "  ;
 	  #   }
       else {
-      #$setList .= ":textField ";
+        #$setList .= ":textField ";
       $setList .= " ";
       }
     }
@@ -1161,9 +1161,13 @@ sub THZ_Set($@){
   my $argMin = $cmdhash->{argMin};
   
   #-- check the parameter range
-  if	($cmdhash->{type} =~ /7prog|8party/) {          
+  if ($cmdhash->{type} =~ /ptime/) {          
+    $arg1=undef;
+    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.")  and ($arg !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )) ;
+    }
+  elsif ($cmdhash->{type} =~ /7prog|8party/) {          
     ($arg, $arg1)=split('--', $arg);
-    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.") and ($arg1 ne "n.a.") and (($arg1 gt $argMax) or ($arg1 lt $argMin) or ($arg gt $argMax) or ($arg lt $argMin)) ) ;
+    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.") and ($arg1 ne "n.a.") and (($arg !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )  or ($arg1 !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )) ) ;
     }
   elsif ($cmdhash->{type} eq "2opmode") {
     $arg1=undef;
