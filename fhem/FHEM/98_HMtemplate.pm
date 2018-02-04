@@ -90,7 +90,7 @@ sub HMtemplate_Attr(@) {#######################################################
       #burstRx  =>{min=>0,max=>255  ,c=>'lit',f=>'',t=>'device reacts on Burst'    ,lit=>{off=>0,on=>1}},
       #MaxTimeF =>{min=>0,max=>25.5 ,c=>''   ,f=>10,t=>"max time first direction." ,lit=>{unused=>25.5}},
       my $rN = substr($attrName,4);
-      my $ty = (AttrVal($name,"tpl_type","") =~ m/peer-/)?"lg":""; #RegDef for long and short is identical. Just extend to any sh or lg
+      my $ty = (AttrVal($name,"tpl_type",InternalVal($name,"tpl_type","")) =~ m/peer-both/) ? "" : "lg"; #RegDef for long and short is identical. Just extend to any sh or lg
       my $calc = $culHmRegDef->{$ty.$rN}{c};
       if ($attr{$name}{tpl_params} && $attr{$name}{tpl_params} =~ m/\b$attrVal\b/){
         # allow any parameter in any string
@@ -157,7 +157,6 @@ sub HMtemplate_Attr(@) {#######################################################
       my $paramSold = join(",",split(" ",$attr{$name}{tpl_params}));
       #$modules{HMtemplate}{AttrList} =~ s/$paramSold/$paramSnew/g;
       $modules{HMtemplate}{AttrList} = join(" ",@at);
-      Log 1,"General \n   $paramSnew\n   $paramSold".join("\n   ".split(" ","$modules{HMtemplate}{AttrList}"));
       
       $hash->{tpl_Param} = $attrVal;
     }
