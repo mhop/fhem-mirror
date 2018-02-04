@@ -165,7 +165,6 @@ sub HUEDevice_Initialize($)
   $hash->{GetFn}    = "HUEDevice_Get";
   $hash->{AttrFn}   = "HUEDevice_Attr";
   $hash->{AttrList} = "IODev ".
-                      "createActionReadings:1,0 ".
                       "delayedUpdate:1 ".
                       "ignoreReachable:1,0 ".
                       "realtimePicker:1,0 ".
@@ -194,6 +193,24 @@ HUEDevice_devStateIcon($)
   my $name = $hash->{NAME};
 
   if( $hash->{helper}->{devtype} && $hash->{helper}->{devtype} eq 'G' ) {
+    if( $hash->{IODev} ) {
+      my $createGroupReadings = AttrVal($hash->{IODev}{NAME},"createGroupReadings",undef);
+      if( defined($createGroupReadings) ) {
+        return undef if( $createGroupReadings && !AttrVal($hash->{NAME},"createGroupReadings", 1) );
+        return undef if( !$createGroupReadings && !AttrVal($hash->{NAME},"createGroupReadings", undef) );
+
+        return ".*:light_question:toggle" if( !$hash->{helper}{reachable} );
+
+        return ".*:off:toggle" if( ReadingsVal($name,"onoff","0") eq "0" );
+
+        my $pct = ReadingsVal($name,"pct","100");
+        my $s = $dim_values{int($pct/7)};
+        $s="on" if( $pct eq "100" );
+
+        return ".*:$s:toggle";
+      }
+    }
+
     #return ".*:off:toggle" if( !ReadingsVal($name,'any_on',0) );
     #return ".*:on:toggle" if( ReadingsVal($name,'any_on',0) );
 
@@ -336,6 +353,9 @@ sub HUEDevice_Define($$)
 
     my $icon_path = AttrVal("WEB", "iconPath", "default:fhemSVG:openautomation" );
     $attr{$name}{'color-icons'} = 2 if( !defined( $attr{$name}{'color-icons'} ) && $icon_path =~ m/openautomation/ );
+
+    addToDevAttrList($name, "createActionReadings:1,0");
+    addToDevAttrList($name, "createGroupReadings,0");
 
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
     $hash->{DEF} = "sensor $id $args[3] IODev=$iodev" if( $iodev );
@@ -983,29 +1003,15 @@ sub
 HUEDevice_ReadFromServer($@)
 {
   my ($hash,@a) = @_;
-
   my $name = $hash->{NAME};
+
+  #return if(IsDummy($name) || IsIgnored($name));
+
   no strict "refs";
   my $ret;
   unshift(@a,$name);
   #$ret = IOWrite($hash, @a);
   $ret = IOWrite($hash,$hash,@a);
-  use strict "refs";
-  return $ret;
-  return if(IsDummy($name) || IsIgnored($name));
-  my $iohash = $hash->{IODev};
-  if(!$iohash ||
-     !$iohash->{TYPE} ||
-     !$modules{$iohash->{TYPE}} ||
-     !$modules{$iohash->{TYPE}}{WriteFn}) {
-    Log3 $name, 5, "No I/O device or WriteFn found for $name";
-    return;
-  }
-
-  no strict "refs";
-  #my $ret;
-  unshift(@a,$name);
-  $ret = &{$modules{$iohash->{TYPE}}{WriteFn}}($iohash, @a);
   use strict "refs";
   return $ret;
 }
@@ -1051,6 +1057,7 @@ HUEDevice_GetUpdate($)
   }
 
   HUEDevice_Parse($hash,$result);
+  HUEBridge_updateGroups($hash->{IODev}, $hash->{ID});
 }
 
 sub
@@ -1104,7 +1111,7 @@ HUEDevice_Parse($$)
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
     if( $result->{lights} ) {
-      $hash->{lights} = join( ",", @{$result->{lights}} );
+      $hash->{lights} = join( ",", sort { $a <=> $b } @{$result->{lights}} );
     } else {
       $hash->{lights} = '';
     }
@@ -1626,6 +1633,8 @@ HUEDevice_Attr($$$;$)
       2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
     <li>createActionReadings<br>
       create readings for the last action in group devices</li>
+    <li>createGroupReadings<br>
+      create 'artificial' readings for group devices. default depends on the createGroupReadings setting in the bridge device.</li>
     <li>ignoreReachable<br>
       ignore the reachable state that is reported by the hue bridge. assume the device is allways reachable.</li>
     <li>setList<br>

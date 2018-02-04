@@ -33,7 +33,7 @@ sub HUEBridge_Initialize($)
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{AttrFn}   = "HUEBridge_Attr";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList} = "key disable:1 disabledForIntervals httpUtils:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
+  $hash->{AttrList} = "key disable:1 disabledForIntervals createGroupReadings:1,0 httpUtils:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
 }
 
 sub
@@ -1004,6 +1004,112 @@ HUEBridge_GetUpdate($)
   return undef;
 }
 
+my %dim_values = (
+   0 => "dim06%",
+   1 => "dim12%",
+   2 => "dim18%",
+   3 => "dim25%",
+   4 => "dim31%",
+   5 => "dim37%",
+   6 => "dim43%",
+   7 => "dim50%",
+   8 => "dim56%",
+   9 => "dim62%",
+  10 => "dim68%",
+  11 => "dim75%",
+  12 => "dim81%",
+  13 => "dim87%",
+  14 => "dim93%",
+);
+sub
+HUEBridge_updateGroups($$)
+{
+  my($hash,$lights) = @_;
+  my $name = $hash->{NAME};
+  my $createGroupReadings = AttrVal($hash->{NAME},"createGroupReadings",undef);
+  return if( !defined($createGroupReadings) );
+  $createGroupReadings = ($createGroupReadings eq "1");
+
+  my $groups = {};
+  foreach my $light ( split(',', $lights) ) {
+    foreach my $chash ( values %{$modules{HUEDevice}{defptr}} ) {
+      next if( !$chash->{IODev} );
+      next if( !$chash->{lights} );
+      next if( $chash->{IODev}{NAME} ne $name );
+      next if( $chash->{helper}{devtype} ne 'G' );
+      next if( ",$chash->{lights}," !~ m/,$light,/ );
+      next if( $createGroupReadings && !AttrVal($chash->{NAME},"createGroupReadings", 1) );
+      next if( !$createGroupReadings && !AttrVal($chash->{NAME},"createGroupReadings", undef) );
+
+      $groups->{$chash->{ID}} = $chash;
+    }
+  }
+
+  foreach my $chash ( values %{$groups} ) {
+    my $count = 0;
+    my %readings;
+    foreach my $light ( split(',', $chash->{lights}) ) {
+      next if( !$light );
+      my $current = $modules{HUEDevice}{defptr}{"$name-$light"}{helper};
+
+      $readings{ct} += $current->{ct};
+      $readings{bri} += $current->{bri};
+      $readings{pct} += $current->{pct};
+      $readings{sat} += $current->{sat};
+
+      $readings{on} |= $current->{on};
+      $readings{reachable} |= $current->{reachable};
+
+      if( !defined($readings{alert}) ) {
+        $readings{alert} = $current->{alert};
+      } elsif( $readings{alert} ne $current->{alert} ) {
+        $readings{alert} = "nonuniform";
+      }
+      if( !defined($readings{colormode}) ) {
+        $readings{colormode} = $current->{colormode};
+      } elsif( $readings{colormode} ne $current->{colormode} ) {
+        $readings{colormode} = "nonuniform";
+      }
+      if( !defined($readings{effect}) ) {
+        $readings{effect} = $current->{effect};
+      } elsif( $readings{effect} ne $current->{effect} ) {
+        $readings{effect} = "nonuniform";
+      }
+
+      ++$count;
+    }
+    $readings{ct} = int($readings{ct} / $count + 0.5);
+    $readings{bri} = int($readings{bri} / $count + 0.5);
+    $readings{pct} = int($readings{pct} / $count + 0.5);
+    $readings{sat} = int($readings{sat} / $count + 0.5);
+
+    if( $readings{on} ) {
+      if( $readings{pct} > 0
+          && $readings{pct} < 100  ) {
+        $readings{state} = $dim_values{int($readings{pct}/7)};
+      }
+      $readings{state} = 'off' if( $readings{pct} == 0 );
+      $readings{state} = 'on' if( $readings{pct} == 100 );
+
+    } else {
+      $readings{pct} = 0;
+      $readings{state} = 'off';
+    }
+
+    readingsBeginUpdate($chash);
+      foreach my $key ( keys %readings ) {
+        if( defined($readings{$key}) ) {
+          my $reading = $key;
+          $reading = 'onoff' if( $reading eq 'on' );
+          readingsBulkUpdate($chash, $reading, $readings{$key}, 1) if( !defined($chash->{helper}{$key}) || $chash->{helper}{$key} ne $readings{$key} );
+          $chash->{helper}{$key} = $readings{$key};
+        }
+      }
+    readingsEndUpdate($chash,1);
+  }
+
+}
+
 sub
 HUEBridge_Parse($$)
 {
@@ -1147,7 +1253,8 @@ HUEBridge_Autocreate($;$)
   return "created $autocreated devices";
 }
 
-sub HUEBridge_ProcessResponse($$)
+sub
+HUEBridge_ProcessResponse($$)
 {
   my ($hash,$obj) = @_;
   my $name = $hash->{NAME};
@@ -1155,14 +1262,12 @@ sub HUEBridge_ProcessResponse($$)
   #Log3 $name, 3, ref($obj);
   #Log3 $name, 3, "Receiving: " . Dumper $obj;
 
-  if( ref($obj) eq 'ARRAY' )
-    {
-      if( defined($obj->[0]->{error}))
-        {
-          my $error = $obj->[0]->{error}->{'description'};
+  if( ref($obj) eq 'ARRAY' ) {
+    if( defined($obj->[0]->{error})) {
+      my $error = $obj->[0]->{error}->{'description'};
 
-          readingsSingleUpdate($hash, 'lastError', $error, 1 );
-        }
+      readingsSingleUpdate($hash, 'lastError', $error, 1 );
+    }
 
     if( !AttrVal( $name,'queryAfterSet', 1 ) ) {
       my $successes;
@@ -1187,7 +1292,6 @@ sub HUEBridge_ProcessResponse($$)
                   $successes++;
                 }
               }
-
             }
           }
 
@@ -1198,23 +1302,26 @@ sub HUEBridge_ProcessResponse($$)
         }
       }
 
+      my $changed = "";
       foreach my $id ( keys %json ) {
         my $code = $name ."-". $id;
         if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
           #$json{$id}->{state}->{reachable} = 1;
-          HUEDevice_Parse( $chash, $json{$id} );
+          if( HUEDevice_Parse( $chash, $json{$id} ) ) {
+            $changed .= "," if( $changed );
+            $changed .= $chash->{ID};
+          }
         }
       }
+      HUEBridge_updateGroups($hash, $changed) if( $changed );
     }
 
-      #return undef if( !$errors && $successes );
+    #return undef if( !$errors && $successes );
 
-      return ($obj->[0]);
-    }
-  elsif( ref($obj) eq 'HASH' )
-    {
-      return $obj;
-    }
+    return ($obj->[0]);
+  } elsif( ref($obj) eq 'HASH' ) {
+    return $obj;
+  }
 
   return undef;
 }
@@ -1439,21 +1546,20 @@ HUEBridge_dispatch($$$;$)
 
     my $type = $param->{type};
 
-    if( ref($json) eq 'ARRAY' )
-      {
-        HUEBridge_ProcessResponse($hash,$json) if( !$queryAfterSet );
+    if( ref($json) eq 'ARRAY' ) {
+      HUEBridge_ProcessResponse($hash,$json) if( !$queryAfterSet );
 
-        if( defined($json->[0]->{error}))
-          {
-            my $error = $json->[0]->{error}->{'description'};
+      if( defined($json->[0]->{error}))
+        {
+          my $error = $json->[0]->{error}->{'description'};
 
-            readingsSingleUpdate($hash, 'lastError', $error, 1 );
+          readingsSingleUpdate($hash, 'lastError', $error, 1 );
 
-            Log3 $name, 3, $error;
-          }
+          Log3 $name, 3, $error;
+        }
 
-        #return ($json->[0]);
-      }
+      #return ($json->[0]);
+    }
 
     if( $hash == $param->{chash} ) {
       if( !defined($type) ) {
@@ -1492,17 +1598,22 @@ HUEBridge_dispatch($$$;$)
       }
 
       if( $type eq 'lights' ) {
+        my $changed = "";
         my $lights = $json;
         foreach my $id ( keys %{$lights} ) {
           my $code = $name ."-". $id;
           my $chash = $modules{HUEDevice}{defptr}{$code};
 
           if( defined($chash) ) {
-            HUEDevice_Parse($chash,$lights->{$id});
+            if( HUEDevice_Parse($chash,$lights->{$id}) ) {
+              $changed .= "," if( $changed );
+              $changed .= $chash->{ID};
+            }
           } else {
             Log3 $name, 2, "$name: message for unknow device received: $code";
           }
         }
+        HUEBridge_updateGroups($hash, $changed) if( $changed );
 
       } elsif( $type =~ m/^config$/ ) {
         HUEBridge_Parse($hash,$json);
@@ -1514,7 +1625,9 @@ HUEBridge_dispatch($$$;$)
       }
 
     } elsif( $type =~ m/^lights\/(\d*)$/ ) {
-      HUEDevice_Parse($param->{chash},$json);
+      if( HUEDevice_Parse($param->{chash},$json) ) {
+        HUEBridge_updateGroups($hash, $param->{chash}{ID});
+      }
 
     } elsif( $type =~ m/^groups\/(\d*)$/ ) {
       HUEDevice_Parse($param->{chash},$json);
@@ -1828,6 +1941,11 @@ HUEBridge_Attr($$$)
       1 -> the bridge will poll all lights in one go instead of each device polling itself independently<br>
       2 -> the bridge will poll all devices in one go instead of each device polling itself independently<br>
       default is 1.</li>
+    <li>createGroupReadings<br>
+      create 'artificial' readings for group devices.</li>
+      0 -> create readings only for group devices where createGroupReadings ist set to 1
+      1 -> create readings for all group devices where createGroupReadings ist not set or set to 1
+      undef -> do nothing
     <li>queryAfterSet<br>
       the bridge will request the real device state after a set command. default is 1.</li>
     <li>noshutdown<br>
