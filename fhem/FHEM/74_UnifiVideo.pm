@@ -428,23 +428,15 @@ UnifiVideo_killLogWatcher($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-Log 1, "!!!!!!!";
 
-Log 1, "2";
   kill( 9, $hash->{PID} ) if( $hash->{PID} );
 
-Log 1, "1";
   close($hash->{FH}) if($hash->{FH});
-Log 1, "1.1";
   delete($hash->{FH});
-Log 1, "1.2";
   delete($hash->{FD});
-Log 1, "1.3";
 
   return if( !$hash->{PID} );
   delete $hash->{PID};
-
-Log 1, "3";
 
   readingsSingleUpdate($hash, 'state', 'running', 1 );
   Log3 $name, 3, "$name: stopped logfile watcher";
