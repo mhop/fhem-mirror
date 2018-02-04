@@ -1110,6 +1110,8 @@ sub CUL_HM_Parse($$) {#########################################################
  
   return "" if($mh{msgStat} && $mh{msgStat} eq 'NACK');# lowlevel error
 
+  $mh{rectm} = gettimeofday(); # take reception time 
+  $mh{tmStr} = FmtDateTime($mh{rectm});
   $mh{p} = "" if(!defined($mh{p})); # generate some abreviations 
   my @mI = unpack '(A2)*',$mh{p}; # split message info to bytes
   $mh{mStp} = $mI[0] ? $mI[0] : ""; #message subtype
@@ -1132,7 +1134,7 @@ sub CUL_HM_Parse($$) {#########################################################
     DoTrigger("global","UNDEFINED $sname CUL_HM $mh{src}");
     $mh{devH}  = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
     $mh{devH}->{IODev} = $iohash;
-    $mh{devH}->{helper}{io}{nextSend} = gettimeofday()+0.09 if(!defined($mh{devH}->{helper}{io}{nextSend}));# io couldn't set
+    $mh{devH}->{helper}{io}{nextSend} = $mh{rectm}+0.09 if(!defined($mh{devH}->{helper}{io}{nextSend}));# io couldn't set
   }
 
   my @entities = ("global"); #additional entities with events to be notifies
@@ -1391,7 +1393,6 @@ sub CUL_HM_Parse($$) {#########################################################
   my $target = " (to $mh{dstN})";
   $mh{st} = AttrVal($mh{devN}, "subType", "");
   $mh{md} = AttrVal($mh{devN}, "model"  , "");
-  my $tn = TimeNow();
   CUL_HM_storeRssi($mh{devN}
                   ,"at_".(($mh{mFlgH}&0x40)?"rpt_":"").$mh{ioName} # repeater?
                   ,$mh{myRSSI}
@@ -1404,12 +1405,12 @@ sub CUL_HM_Parse($$) {#########################################################
     if(   $mh{devH}->{helper}{rpt}                           #was responded
        && $mh{devH}->{helper}{rpt}{IO}  eq $mh{ioName}           #from same IO
        && $mh{devH}->{helper}{rpt}{flg} eq substr($mh{msg},5,1)  #not from repeater
-       && $mh{devH}->{helper}{rpt}{ts}  < gettimeofday()-0.24 # again if older then 240ms (typ repeat time)
+       && $mh{devH}->{helper}{rpt}{ts}  < $mh{rectm}-0.24 # again if older then 240ms (typ repeat time)
                                                           #todo: hack since HMLAN sends duplicate status messages
        ){
       my $ack = $mh{devH}->{helper}{rpt}{ack};#shorthand
       my $i=0;
-      $mh{devH}->{helper}{rpt}{ts} = gettimeofday();
+      $mh{devH}->{helper}{rpt}{ts} = $mh{rectm};
       CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]
                    .($mh{devH}->{helper}{aesAuthBytes}
                       ?$mh{devH}->{helper}{aesAuthBytes}
@@ -1435,7 +1436,7 @@ sub CUL_HM_Parse($$) {#########################################################
   my $parse = CUL_HM_parseCommon($iohash,\%mh);
   $mh{devH}->{lastMsg} = $msgX;# is used in parseCommon  and need previous setting. so set it here
 
-  push @evtEt,[$mh{devH},1,"powerOn:$tn"] if($parse eq "powerOn");
+  push @evtEt,[$mh{devH},1,"powerOn:$mh{tmStr}"] if($parse eq "powerOn");
   push @evtEt,[$mh{devH},1,""]            if($parse eq "parsed"); # msg is parsed but may
                                                              # be processed further
 
@@ -1974,7 +1975,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{shash},1,"state:$val$stateExt"];
 
       if ($val eq "rain"){#--- handle lastRain---
-        $mh{shash}->{helper}{lastRain} = $tn;
+        $mh{shash}->{helper}{lastRain} = $mh{tmStr};
       }
       elsif ($val eq "dry" && $mh{shash}->{helper}{lastRain}){
         push @evtEt,[$mh{shash},0,"lastRain:$mh{shash}->{helper}{lastRain}"];
@@ -2013,7 +2014,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     if ($pon){# we have power ON, perform action
       if($mh{devH}->{helper}{PONtest}){
-        push @evtEt,[$mh{devH},1,"powerOn:$tn",];
+        push @evtEt,[$mh{devH},1,"powerOn:$mh{tmStr}",];
         $mh{devH}->{helper}{PONtest} = 0;
       }
       CUL_HM_Set($hHash,$hHash->{NAME},"off")
@@ -2154,7 +2155,7 @@ sub CUL_HM_Parse($$) {#########################################################
          #        chn3 (virtual chan) and not used up to now
          #        info from it is likely a power on!
         if($mh{devH}->{helper}{PONtest} && $mh{chn} == 3){
-          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+          push @evtEt,[$mh{devH},1,"powerOn:$mh{tmStr}",] ;
           $mh{devH}->{helper}{PONtest} = 0;
         }
       }
@@ -2268,7 +2269,7 @@ sub CUL_HM_Parse($$) {#########################################################
         if (AttrVal($disName,"param","") =~ m/reWriteDisplay(..)/){
           my $delay = $1;
           RemoveInternalTimer($disName.":reWriteDisplay");
-          InternalTimer(gettimeofday()+$delay,"CUL_HM_reWriteDisplay", $disName.":reWriteDisplay", 0);
+          InternalTimer($mh{tmStr}+$delay,"CUL_HM_reWriteDisplay", $disName.":reWriteDisplay", 0);
         }
       }
     }
@@ -2329,7 +2330,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{cHash},1,"deviceMsg:$vs$target"] if($mh{chnM} ne "00");
       push @evtEt,[$mh{cHash},1,"state:$vs$stateExt"];
       push @evtEt,[$mh{cHash},1,"timedOn:$timedOn"];
-      push @evtEt,[$mh{devH} ,1,"powerOn:$tn",]                            if ($chn == 0) ;
+      push @evtEt,[$mh{devH} ,1,"powerOn:$mh{tmStr}",]  if ($chn == 0) ;
       push @evtEt,[$mh{devH} ,1,"sabotageError:".(($err&0x04)?"on" :"off")];
       push @evtEt,[$mh{devH} ,1,"battery:"      .(($err&0x80)?"low":"ok" )];
     }
@@ -2399,7 +2400,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my $eo = ReadingsVal($mh{shash}->{NAME},"gasCntOffset",0);
       if($eCnt == 0 && hex($mh{mNo}) < 3 ){
         if($mh{devH}->{helper}{PONtest}){
-          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+          push @evtEt,[$mh{devH},1,"powerOn:$mh{tmStr}",] ;
           $mh{devH}->{helper}{PONtest} = 0;
         }
         $eo += ReadingsVal($mh{shash}->{NAME},"gasCnt",0);
@@ -2429,7 +2430,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my $eo = ReadingsVal($mh{shash}->{NAME},"energyOffset",0);
       if($eCnt == 0 && hex($mh{mNo}) < 3 && !$mh{shash}->{helper}{pon}){
         if($mh{devH}->{helper}{PONtest}){
-          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+          push @evtEt,[$mh{devH},1,"powerOn:$mh{tmStr}",] ;
           $mh{devH}->{helper}{PONtest} = 0;
         }
         $eo += $el;
@@ -2499,7 +2500,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my $eo = ReadingsVal($mh{shash}->{NAME},"energyOffset",0);
       if($eCnt == 0 && hex($mh{mNo}) < 3 && !$mh{shash}->{helper}{pon}){
         if($mh{devH}->{helper}{PONtest}){
-          push @evtEt,[$mh{devH},1,"powerOn:$tn",] if ($mh{md} !~ m/^HM-ES-PMSw1/);
+          push @evtEt,[$mh{devH},1,"powerOn:$mh{tmStr}",] if ($mh{md} !~ m/^HM-ES-PMSw1/);
           $mh{devH}->{helper}{PONtest} = 0;
         }
         $eo += $el;
@@ -2626,8 +2627,8 @@ sub CUL_HM_Parse($$) {#########################################################
       if ($nextTr){
         $nextTr = (15 << ($nextTr >> 4) - 4); # strange mapping of literals
         RemoveInternalTimer($mh{cName}.":motionCheck");
-        InternalTimer(gettimeofday()+$nextTr+2,"CUL_HM_motionCheck", $mh{cName}.":motionCheck", 0);
-        $mh{cHash}->{helper}{moStart} = gettimeofday() if (!defined $mh{cHash}->{helper}{moStart});
+        InternalTimer($mh{rectm}+$nextTr+2,"CUL_HM_motionCheck", $mh{cName}.":motionCheck", 0);
+        $mh{cHash}->{helper}{moStart} = $mh{rectm} if (!defined $mh{cHash}->{helper}{moStart});
       }
       else{
         $nextTr = "none ";
@@ -2669,13 +2670,13 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$mh{cHash},1,"alarmTest:"   .(($err&0x02)?"failed"  :"ok")];
         push @evtEt,[$mh{cHash},1,"smokeChamber:".(($err&0x04)?"degraded":"ok")];
         if(length($mh{p}) == 8 && $mh{mNo} eq "80"){
-          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+          push @evtEt,[$mh{devH},1,"powerOn:$mh{tmStr}",] ;
         }
         CUL_HM_parseSDteam_2($mh{mTp},$mh{src},$mh{dst},$mh{p});
       }
       else{
         if($mh{devH}->{helper}{PONtest} &&(length($mh{p}) == 8 && $mh{mNo} eq "00")){
-          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+          push @evtEt,[$mh{devH},1,"powerOn:$mh{tmStr}",] ;
           $mh{devH}->{helper}{PONtest} = 0;
         }
       }
@@ -2801,7 +2802,7 @@ sub CUL_HM_Parse($$) {#########################################################
       CUL_HM_unQEntity($mh{devN},"qReqStat");
       if ($err & 0x30) { # uncertain - we have to check
         CUL_HM_stateUpdatDly($mh{devN},13) if(ReadingsVal($mh{devN},"uncertain","no") eq "no");
-        InternalTimer(gettimeofday()+20,"CUL_HM_readValIfTO", $mh{devN}.":uncertain:permanent", 0);
+        InternalTimer($mh{rectm}+20,"CUL_HM_readValIfTO", $mh{devN}.":uncertain:permanent", 0);
         $state = " (uncertain)";
       }
       push @evtEt,[$mh{shash},1,"unknown:40"] if($err&0x40);
@@ -2920,7 +2921,7 @@ sub CUL_HM_Parse($$) {#########################################################
     $mh{devH}->{helper}{rpt}{IO}  = $mh{ioName};
     $mh{devH}->{helper}{rpt}{flg} = substr($mh{msg},5,1);
     $mh{devH}->{helper}{rpt}{ack} = \@ack;
-    $mh{devH}->{helper}{rpt}{ts}  = gettimeofday();
+    $mh{devH}->{helper}{rpt}{ts}  = $mh{rectm};
     my $i=0;
     my $rr = $respRemoved;
     CUL_HM_SndCmd($ack[$i++],$ack[$i++]
@@ -3279,7 +3280,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           delete $chnhash->{helper}{getCfgList};
           delete $chnhash->{helper}{getCfgListNo};
           CUL_HM_rmOldRegs($chnName);
-          $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = TimeNow();
+          $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = $mhp->{rectm};
         }
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
@@ -4103,7 +4104,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
 
   my $id = CUL_HM_IoId($defs{$devName});
-  if(length($id) != 6 ){# have to try to find an IO $devName
+  if(length($id) != 6 && $hash->{DEF} ne "000000" ){# have to try to find an IO $devName
     CUL_HM_assignIO($defs{$devName});
     $id = CUL_HM_IoId($defs{$devName});
     return "no IO device identified" if(length($id) != 6 );
@@ -5383,7 +5384,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $addr = hex($addr);
     }
     my $prep = "";
-    if ($a[2] =~ m/^(prep|exec)$/){
+    if (defined($a[2]) && $a[2] =~ m/^(prep|exec)$/){
       $prep = $a[2];
       splice  @a,2,1;#remove prep
     }
@@ -6204,6 +6205,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
       return "$cmd requires VCCU with hmKeys"                     if ($newKeyIdx == 0);
       return "$cmd needs old key with index ".(hex($oldKeyIdx)/2) if (!defined($oldKey));
+      return "$cmd key with index ".$newKeyIdx." allready in use by device"
+          if ($newKeyIdx == (hex($oldKeyIdx)/2));
 
       my $newKey = $keys{$newKeyIdx};
       my $payload1 = pack("CCa8nN",1                      #changekey?
@@ -8275,7 +8278,7 @@ sub CUL_HM_getChnList($){ # get reglist assotioted with a channel
     $cLst = $chnN if ($cLst eq "-");
     next if ($Lst eq "p" || $cLst eq "-");# no list, just peers
     foreach my $aaa (grep /$chnN/,split('\.',$cLst)){
-      $Lst .= "p" if($Lst == 3 || $Lst == 4 || $aaa =~ m/p/);
+      $Lst .= "p" if($Lst =~ m/^[34]$/ || $aaa =~ m/p/);
       $Lst =~ s/ //g;
       $chRl .= ",".$Lst;
     }
@@ -8873,7 +8876,7 @@ sub CUL_HM_storeRssi(@){
   return if (!$val || !$name|| !defined  $defs{$name});
   my $hash = $defs{$name};
   if (AttrVal($peerName,"subType","") eq "virtual"){
-    my $h = InternalVal($name,"IODev","");#CUL_HM_name2IoName($peerName);
+    my $h = InternalVal($name,"IODev",undef);#CUL_HM_name2IoName($peerName);
     return if (!$h);
     $peerName = $h->{NAME};
   }
