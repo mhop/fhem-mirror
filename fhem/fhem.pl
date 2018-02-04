@@ -2247,6 +2247,8 @@ CommandSetReading($$)
       ($err, @b) = ReplaceSetMagic($hash, 3, @a);
       delete $hash->{CL};
     }
+    return "WARNING: unsupported character in reading $b[1] ".
+           "(not A-Za-z/\\d_\\.-)" if(!goodReadingName($b[1]));
     readingsSingleUpdate($defs{$sdev}, $b[1], $b[2], 1);
   }
   return join("\n", @rets);
@@ -2760,7 +2762,7 @@ CommandAttr($$)
         $arg= defined($8) ? $8 : "";
       }
       $hash->{'.userReadings'}= \@userReadings;
-    } 
+    }
 
     my $oVal = ($attr{$sdev} ? $attr{$sdev}{$attrName} : "");
 
