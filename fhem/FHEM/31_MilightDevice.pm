@@ -2354,6 +2354,8 @@ sub MilightDevice_roundfunc($) {
 1;
 
 =pod
+=item device
+=item summary This module represents a Milight LED Bulb or LED strip controller
 =begin html
 
 <a name="MilightDevice"></a>

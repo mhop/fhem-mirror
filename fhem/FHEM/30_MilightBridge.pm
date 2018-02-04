@@ -63,13 +63,13 @@ sub MilightBridge_Define($$)
 
   return "Usage: define <name> MilightBridge <host/ip:port>"  if(@args < 3);
 
-  my ($name, $type, $host) = @args;
+  my ($name, $type, $hostandport) = @args;
 
   $hash->{Clients} = ":MilightDevice:";
   my %matchList = ( "1:MilightDevice" => ".*" );
   $hash->{MatchList} = \%matchList;
 
-  my ($host, $port) = split(":", $host);
+  my ($host, $port) = split(":", $hostandport);
   # Parameters
   $hash->{HOST} = $host;
   # Set Port (Default 8899, old bridge (V2) uses 50000
@@ -415,14 +415,7 @@ sub MilightBridge_CmdQueue_Send(@)
     #Log3 ($hash, 5, "$hash->{NAME}_cmdQueue_Send: cmdLastSent: $hash->{cmdLastSent}; Next: ".(gettimeofday()+($hash->{INTERVAL}/1000)));
 
     # Remove any existing timers and trigger a new one
-    foreach my $args (keys %intAt)
-    {
-      if (($intAt{$args}{ARG} eq $hash) && ($intAt{$args}{FN} eq 'MilightBridge_CmdQueue_Send'))
-      {
-        Log3 ($hash, 5, "$hash->{NAME}_CmdQueue_Send: Remove timer at: ".$intAt{$args}{TRIGGERTIME});
-        delete($intAt{$args});
-      }
-    }
+    RemoveInternalTimer($hash, 'MilightBridge_CmdQueue_Send');
     InternalTimer(gettimeofday()+($hash->{INTERVAL}/1000), "MilightBridge_CmdQueue_Send", $hash, 0);
   }
 
@@ -433,6 +426,8 @@ sub MilightBridge_CmdQueue_Send(@)
 1;
 
 =pod
+=item device
+=item summary Interface to a Milight Bridge connected to the network using a Wifi connection
 =begin html
 
 <a name="MilightBridge"></a>
