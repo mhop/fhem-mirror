@@ -1146,7 +1146,7 @@ sub PRESENCE_ProcessLocalScan($)
     #Schedule the next check within $timeout if it is a regular run
     if($local eq "0")
     {
-        my $seconds = ($a[2] eq "present" ? $hash->{INTERVAL_PRESENT} : $hash->{INTERVAL_NORMAL});
+        my $seconds = (($a[2] eq "present") ? $hash->{INTERVAL_PRESENT} : $hash->{INTERVAL_NORMAL});
 
         $seconds = $hash->{INTERVAL_OVERRIDED} if($hash->{INTERVAL_OVERRIDED});
 
