@@ -249,6 +249,7 @@ FHEM/51_Netzer.pm            klausw               Sonstige Systeme
 FHEM/51_RPI_GPIO.pm          klausw               Einplatinencomputer
 FHEM/52_I2C_DS1307           ntruchsess           Sonstige Systeme
 FHEM/52_I2C_EEPROM.pm        klausw               Sonstige Systeme
+FHEM/52_I2C_EMC1001.pm       eisler               Sonstige Systeme
 FHEM/52_I2C_LCD              ntruchsess           Sonstige Systeme
 FHEM/52_I2C_BME280           klausw               Sonstige Systeme
 FHEM/52_I2C_K30              yoda_gh              Sonstige Systeme
