@@ -2269,7 +2269,7 @@ sub CUL_HM_Parse($$) {#########################################################
         if (AttrVal($disName,"param","") =~ m/reWriteDisplay(..)/){
           my $delay = $1;
           RemoveInternalTimer($disName.":reWriteDisplay");
-          InternalTimer($mh{tmStr}+$delay,"CUL_HM_reWriteDisplay", $disName.":reWriteDisplay", 0);
+          InternalTimer($mh{rectm}+$delay,"CUL_HM_reWriteDisplay", $disName.":reWriteDisplay", 0);
         }
       }
     }
@@ -3280,7 +3280,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           delete $chnhash->{helper}{getCfgList};
           delete $chnhash->{helper}{getCfgListNo};
           CUL_HM_rmOldRegs($chnName);
-          $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = $mhp->{rectm};
+          $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = $mhp->{tmStr};
         }
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
@@ -3498,6 +3498,11 @@ sub CUL_HM_parseCommon(@){#####################################################
 }
 sub CUL_HM_m_setCh($$){### add channel identification to Message Hash
   my ($mhp,$chn) = @_;
+##  ($mh{msg},$mh{msgStat},$mh{myRSSI},$mh{msgIO},$mh{auth}) = split(":",$msgIn,5);
+#  ($mhp->{t},$mhp->{len},$mhp->{mNo},$mhp->{mFlg},$mhp->{mTp},$mhp->{src},$mhp->{dst},$mhp->{p}) = unpack 'A1A2A2A2A2A6A6A*',$mhp->{msg};
+#  $$mhp->{mFlgH} = hex($mhp->{mFlg});
+# if    (mhp->{mTp} =~ m/^(10|02)$/ ){$chn = substr($mhp->{p},2,2)}
+# elsif (mhp->{mTp} =~ m/^4.$/ )        {$chn = substr($mhp->{p},0,2)}
   $mhp->{chnM}  = $chn;
   $mhp->{chnraw}= hex($mhp->{chnM});
   $mhp->{chn}   = $mhp->{chnraw} & 0x3f;
