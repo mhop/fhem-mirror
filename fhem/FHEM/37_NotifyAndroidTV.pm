@@ -186,9 +186,12 @@ NotifyAndroidTV_Set($$@)
 
     Log3 $name, 5, "$name: using icon $param_h->{icon}";
 
+    my $icon;
     local( *FH ) ;
-    open( FH, $param_h->{icon} );
-    my $icon = do { local( $/ ) ; <FH> } ;
+    if( open( FH, $param_h->{icon} ) ) {
+      $icon = do { local( $/ ) ; <FH> } ;
+      close( FH );
+    }
 
     return "icon not found: $param_h->{icon}" if( !$icon );
     delete $param_h->{icon};
@@ -202,8 +205,10 @@ NotifyAndroidTV_Set($$@)
       Log3 $name, 5, "$name: using image $param_h->{image}";
 
       local( *FH ) ;
-      open( FH, $param_h->{image} );
-      my $image = do { local( $/ ) ; <FH> } ;
+      if( open( FH, $param_h->{image} ) ) {
+        $image = do { local( $/ ) ; <FH> } ;
+        close(FH);
+      }
 
       return "image not found: $param_h->{image}" if( !$image );
       delete $param_h->{image};
