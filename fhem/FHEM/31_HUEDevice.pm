@@ -1057,7 +1057,7 @@ HUEDevice_GetUpdate($)
   }
 
   HUEDevice_Parse($hash,$result);
-  HUEBridge_updateGroups($hash->{IODev}, $hash->{ID});
+  HUEBridge_updateGroups($hash->{IODev}, $hash->{ID}) if( $hash->{IODev}{TYPE} eq 'HUEBridge' );
 }
 
 sub
