@@ -591,9 +591,9 @@ sub Unifi_Get($@) {
         my $returnedVoucherCode = "";
         if(defined $returnedVoucher->{_id}){
             $returnedVoucherCode = $returnedVoucher->{code};
-            if ($hash->{hotspot}->{voucherCache}->{$getVal}->{setCmd} ne ""){ 
+            #if (defined $hash->{hotspot}->{voucherCache}->{$getVal}->{setCmd}){ 
                 $hash->{hotspot}->{voucherCache}->{$getVal}->{$returnedVoucher->{_id}}->{delivered_at} = time();
-            }
+            #}
         }
         return $returnedVoucherCode;
     }
@@ -1242,11 +1242,13 @@ sub Unifi_SetVoucherReadings($) {
     #für jeden Vouchercache den nächsten Vouchercode als Reading anzeigen
     for my $cache (keys %{$hash->{hotspot}->{voucherCache}}) {
         if(ref($hash->{hotspot}->{voucherCache}->{$cache}) eq "HASH"){
-            my $voucher=Unifi_getNextVoucherForNote($hash,$cache);
-            if(ref($voucher) eq "HASH"){
-                readingsBulkUpdate($hash,"-VC_".$cache,$voucher->{code});
-            }else{
-                readingsBulkUpdate($hash,"-VC_".$cache,"-");
+            if(defined $hash->{hotspot}->{voucherCache}->{$cache}->{setCmd}){
+                my $voucher=Unifi_getNextVoucherForNote($hash,$cache);
+                if(ref($voucher) eq "HASH"){
+                    readingsBulkUpdate($hash,"-VC_".$cache,$voucher->{code});
+                }else{
+                    readingsBulkUpdate($hash,"-VC_".$cache,"-");
+                }
             }
         }
     }
