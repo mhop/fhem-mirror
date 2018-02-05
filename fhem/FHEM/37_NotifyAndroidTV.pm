@@ -158,7 +158,13 @@ NotifyAndroidTV_Set($$@)
     my $error;
     foreach my $option (keys %{$param_h}) {
       if( $options->{$option} ) {
-        $param_h->{$option} = $options->{$option}{$param_h->{$option}};
+        if( defined( $options->{$option}{$param_h->{$option}}) ) {
+          $param_h->{$option} = $options->{$option}{$param_h->{$option}};
+        } elsif( grep {$_==$param_h->{$option}} values $options->{$option} )  {
+          $param_h->{$option} = $param_h->{$option};
+        } else {
+          $param_h->{$option} = undef;
+        }
 
         if( !defined($param_h->{$option}) ) {
           $error .= "\n";
@@ -302,7 +308,7 @@ NotifyAndroidTV_Attr($$$)
 <ul>
   This module allows you to send notifications to the
   <a href ='https://play.google.com/store/apps/details?id=de.cyberdream.androidtv.notifications.google'>
-  Notifications for Android TV</a> and 
+  Notifications for Android TV</a> and
   <a href ='https://www.amazon.de/Christian-Fees-Notifications-for-Fire/dp/B00OESCXEK'>
   Notifications for Fire TV</a> apps.
   <br><br>
@@ -322,7 +328,8 @@ NotifyAndroidTV_Attr($$$)
   <b>Set</b>
   <ul>
     <li>msg [options] &lt;message&gt;<br>
-    possible options are: bkgcolor, interrupt, position, transparency, duration, offset, offsety, type, icon, title, imageurl. use <code>set &lt;name&gt; notify</code> to see valid values.</li>
+    possible options are: bkgcolor, interrupt, position, transparency, duration, offset, offsety, width, type, icon, image, title, imageurl. use <code>set &lt;name&gt; notify</code> to see valid values.<br>
+    it is better to use imageurl instad of image as it is non blocking!</li>
   </ul><br>
 
   <a name="NotifyAndroidTV_Get"></a>
