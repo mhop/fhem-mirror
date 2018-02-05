@@ -17,6 +17,12 @@ my $options = { position => { 'bottom-right' => 0,
                               'top-left' => 3,
                               'center' => 4,
                             },
+                width => { 'default' => 0,
+                          'narrow' => 1,
+                          'small' => 2,
+                          'wide' => 3,
+                          'extrawide' => 4,
+                        },
                 transparency => { 'default' => 0,
                                   '0%' => 1,
                                   '25%' => 2,
@@ -37,17 +43,18 @@ my $options = { position => { 'bottom-right' => 0,
                               'amber' => '#FFC107',
                               'pink' => '#E91E63',
                             },
-                type => { '0' => 0,
-                          '1' => 1,
-                          '2' => 2,
-                          '3' => 3,
-                          '4' => 4,
-                          '5' => 5,
+                type => { 'complete' => 0,
+                          'titleonly' => 1,
+                          'nameonly' => 2,
+                          'icononly' => 3,
+                          'noicon' => 4,
+                          'short' => 5,
                         },
                 duration => undef,
                 offset => undef,
                 offsety => undef,
                 icon => undef,
+                image => undef,
                 title => undef,
                 imageurl => undef,
              };
@@ -166,6 +173,7 @@ NotifyAndroidTV_Set($$@)
     $param_h->{offsety} = 0 if( !$param_h->{offsety} );
     $param_h->{transparency} = 0 if( !$param_h->{transparency} );
 
+
     $param_h->{icon} = 'fhemicon.png' if( !$param_h->{icon} );
     $param_h->{icon} .= ".png" if( $param_h->{icon} !~ '\.' );
     $param_h->{icon} = "$FW_icondir/default/$param_h->{icon}" if( $param_h->{icon} !~ '^/' );
@@ -180,6 +188,22 @@ NotifyAndroidTV_Set($$@)
     delete $param_h->{icon};
 
 
+    my $image;
+    if( $param_h->{image} ) {
+      $param_h->{image} .= ".jpg" if( $param_h->{image} !~ '\.' );
+      $param_h->{image} = "$FW_icondir/default/$param_h->{image}" if( $param_h->{image} !~ '^/' );
+
+      Log3 $name, 5, "$name: using image $param_h->{image}";
+
+      local( *FH ) ;
+      open( FH, $param_h->{image} );
+      my $image = do { local( $/ ) ; <FH> } ;
+
+      return "image not found: $param_h->{image}" if( !$image );
+      delete $param_h->{image};
+    }
+
+
     if( !$txt ) {
       my $usage = "usage: set $name msg";
       foreach my $option ( sort keys %{$options}) {
@@ -189,12 +213,6 @@ NotifyAndroidTV_Set($$@)
           $usage .= " [$option=<$option>]";
         }
       }
-      #$usage .= " [duration=<duration>]";
-      #$usage .= " [offset=<offset>]";
-      #$usage .= " [offsety=<offsety>]";
-      #$usage .= " [icon=<filename>]";
-      #$usage .= " [title=<title>]";
-      #$usage .= " [imageurl=<url>]";
       $usage .= " <message>";
 
       return $usage;
@@ -218,6 +236,7 @@ NotifyAndroidTV_Set($$@)
     Log3 $name, 5, $param->{data};
 
     $param->{data} .= NotifyAndroidTV_addFormField('filename', $icon, "filename=\"fhemicon.png\"\r\nContent-Type: application/octet-stream");
+    $param->{data} .= NotifyAndroidTV_addFormField('filename2', $image, "filename=\"fhemicon.png\"\r\nContent-Type: application/octet-stream") if( $image );
     $param->{data} .= "--boundary--";
 
     Log3 $name, 4, "NotifyAndroidTV ($name) - send notification ";
