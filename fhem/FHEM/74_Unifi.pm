@@ -3,17 +3,19 @@
 
 # CHANGED
 ##############################################################################
-# V2.0
+# V 2.0
 #  - feature: 74_Unifi: add new set commands to block/unblock clients,
 #                       enable/disable WLAN, new client-Reading essid
-# V2.1
+# V 2.1
 #  - feature: 74_Unifi: add new set command to en-/disable Site Status-LEDs
-# V2.1.1
+# V 2.1.1
 #  - bugfix:  74_Unifi: fixed blockClient
-# V2.1.2
+# V 2.1.2
 #  - feature: 74_Unifi: new Readings for WLAN-states, fixed Warning
-# V2.1.3
+# V 2.1.3
 #  - change:  74_Unifi: SSIDs-Readings and drop-downs use goodReadingName()
+# V 2.1.4
+#  - feature: 74_Unifi: added voucher-functions
 
 
 package main;
@@ -71,6 +73,13 @@ sub Unifi_SwitchSiteLEDs_Send($$);
 sub Unifi_SwitchSiteLEDs_Receive($);
 sub Unifi_WlanconfRest_Send($$@);
 sub Unifi_WlanconfRest_Receive($);
+sub Unifi_GetVoucherList_Send($);
+sub Unifi_GetVoucherList_Receive($);
+sub Unifi_CreateVoucher_Send($%);
+sub Unifi_CreateVoucher_Receive($);
+sub Unifi_SetVoucherReadings($);
+sub Unifi_initVoucherCache($);
+sub Unifi_getNextVoucherForNote($$);
 sub Unifi_NextUpdateFn($$);
 sub Unifi_ReceiveFailure($$);
 sub Unifi_CONNECTED($@);
@@ -93,6 +102,7 @@ sub Unifi_Initialize($$) {
                          ."httpLoglevel:1,2,3,4,5 "
                          ."eventPeriod "
                          ."deprecatedClientNames:1,0 "
+                         ."voucherCache "
                          .$readingFnAttributes;
 }
 ###############################################################################
@@ -106,6 +116,7 @@ sub Unifi_Define($$) {
     return "Wrong syntax: <interval> too small, must be at least 5"          if($a[6] && $a[6] < 5);
     return "Wrong syntax: <version> is not a valid number! Must be 3 or 4."  if($a[8] && (!looks_like_number($a[8]) || $a[8] !~ /3|4/));
     
+    #TODO: Passwort verschlüsseln! (ala Harmony?)
     my $name = $a[0];
     %$hash = (   %$hash,
         NOTIFYDEV => 'global',
@@ -170,12 +181,14 @@ sub Unifi_Notify($$) {
 sub Unifi_Set($@) {
     my ($hash,@a) = @_;
     return "\"set $hash->{NAME}\" needs at least an argument" if ( @a < 2 );
-    my ($name,$setName,$setVal,$setVal2,$setVal3) = @a;
+    # setVal4 enthält nur erstes Wort der note für voucher!!! 
+    # in Doku aufgenommen, dass genau drei Leerzeichen enthalten sein müssen, also note keine Leerzeichen enthalten kann
+    my ($name,$setName,$setVal,$setVal2,$setVal3,$setVal4) = @a;
 
     Log3 $name, 5, "$name: set called with $setName " . ($setVal ? $setVal : "") if ($setName ne "?");
 
     if(Unifi_CONNECTED($hash) eq 'disabled' && $setName !~ /clear/) {
-        return "Unknown argument $setName, choose one of clear:all,readings,clientData";
+        return "Unknown argument $setName, choose one of clear:all,readings,clientData,voucherCache";
         Log3 $name, 5, "$name: set called with $setName but device is disabled!" if($setName ne "?");
         return undef;
     }
@@ -184,13 +197,13 @@ sub Unifi_Set($@) {
     my $apNames = Unifi_ApNames($hash);
     my $SSIDs = Unifi_SSIDs($hash);
     
-    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|clear|poeMode|blockClient|unblockClient|enableWLAN|disableWLAN|switchSiteLEDs/) {
+    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|clear|poeMode|blockClient|unblockClient|enableWLAN|disableWLAN|switchSiteLEDs|createVoucher/) {
         return "Unknown argument $setName, choose one of update:noArg "
-               ."clear:all,readings,clientData,allData "
+               ."clear:all,readings,clientData,allData,voucherCache "
                .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "archiveAlerts:noArg " : "")
                .(($apNames && Unifi_CONNECTED($hash)) ? "restartAP:all,$apNames setLocateAP:all,$apNames unsetLocateAP:all,$apNames " : "")
                .(($clientNames && Unifi_CONNECTED($hash)) ? "disconnectClient:all,$clientNames " : "")
-               ."poeMode enableWLAN:$SSIDs disableWLAN:$SSIDs "
+               ."poeMode createVoucher enableWLAN:$SSIDs disableWLAN:$SSIDs "
                ."blockClient:$clientNames unblockClient:$clientNames switchSiteLEDs:on,off";
     }
     else {
@@ -383,6 +396,19 @@ sub Unifi_Set($@) {
                     Unifi_ApCmd_Send($hash,'unset-locate',keys(%{$hash->{accespoints}}));
                 }
             }
+            elsif ($setName eq 'createVoucher') {
+                if (!looks_like_number($setVal) || int($setVal) < 1 || 
+                    !looks_like_number($setVal2) || int($setVal2) < 1 || 
+                    !looks_like_number($setVal3) || int($setVal3) < 1 || 
+                    $setVal4 eq "") {
+                    return "$hash->{NAME} $setName: First three arguments (expire, n, quota) must be numeric. Forth argument is note of voucher."
+                }
+                if ($setVal4 =~ /,/) {
+                    return "$hash->{NAME} $setName: Note of voucher has invalid character (,)."
+                }
+                my %params=("expire"=>$setVal,"n"=>$setVal2,"quota"=>$setVal3,"note"=>$setVal4);
+                Unifi_CreateVoucher_Send($hash, %params);
+            }
         } 
         if ($setName eq 'update') {
             RemoveInternalTimer($hash);
@@ -406,6 +432,12 @@ sub Unifi_Set($@) {
                 %{$hash->{wlangroups}} = ();
                 # %{$hash->{alerts_unarchived}} = ();
             }
+            if ($setVal eq 'voucherCache' || $setVal eq 'all') {
+                my $cache_attr_value=$hash->{hotspot}->{voucherCache}->{attr_value};
+                %{$hash->{hotspot}->{voucherCache}} = ();
+                $hash->{hotspot}->{voucherCache}->{attr_value} = $cache_attr_value;
+                Unifi_initVoucherCache($hash);
+            }
         }
     }
     return undef;
@@ -416,15 +448,35 @@ sub Unifi_Get($@) {
     my ($hash,@a) = @_;
 	return "\"get $hash->{NAME}\" needs at least one argument" if ( @a < 2 );
     my ($name,$getName,$getVal) = @a;
+    if (defined $getVal){
+        Log3 $name, 5, "$name: get called with $getName $getVal." ;
+    }else{
+        Log3 $name, 5, "$name: get called with $getName.";
+    }
+    
+    my %voucherNotesHash= ();
+    my $voucherNote = '';
+    if(defined $hash->{hotspot}->{vouchers}[0]){
+        for my $voucher (@{$hash->{hotspot}->{vouchers}}) {
+            if(defined $voucher->{note} && $voucher->{note} =~ /^((?!,).)*$/ && $voucher->{note} ne ""){
+                $voucherNote = $voucher->{note};
+                $voucherNote =~ s/( )/&nbsp;/og;
+                $voucherNotesHash{$voucherNote}=$voucherNote;
+            }else{
+                Log3 $name, 4, "$name Info: vouchers without note or containing comma(,) in note or with empty note are ignored in drop-downs.";
+            }
+        }
+    }
+    my $voucherNotes=join(",", keys %voucherNotesHash);
     
     my $clientNames = Unifi_ClientNames($hash);
     
-    if($getName !~ /events|clientData|unarchivedAlerts|poeState/) {
+    if($getName !~ /events|clientData|unarchivedAlerts|poeState|voucherList|voucher/) {
         return "Unknown argument $getName, choose one of "
                .((defined $hash->{events}[0] && scalar @{$hash->{events}}) ? "events:noArg " : "")
                .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "unarchivedAlerts:noArg " : "")
                .(($clientNames) ? "clientData:all,$clientNames " : "")
-               ."poeState";
+               ."poeState voucherList:all,$voucherNotes voucher:$voucherNotes";
     }
     elsif ($getName eq 'poeState') {
         my $poeState;
@@ -503,6 +555,48 @@ sub Unifi_Get($@) {
             return "$hash->{NAME}: Unknown client '$getVal' in command '$getName', choose one of: all,$clientNames";
         }
     }
+    elsif ($getName eq 'voucherList' && defined $hash->{hotspot}->{vouchers}[0]) {
+        my $anzahl=0;
+        my $vouchers = "==================================================================\n";
+        for my $voucher (@{$hash->{hotspot}->{vouchers}}) {
+            my $note= '';
+            if(defined $voucher->{note}){
+                $note=$voucher->{note};
+            }
+            my $gv=$getVal;
+            $note =~ tr/a-zA-ZÄÖÜäöüß_0-9.,//cd;
+            $gv =~ tr/a-zA-ZÄÖÜäöüß_0-9.,//cd;
+     
+            if($gv eq 'all' || ( ($gv =~ /^$note/) && $note ne '')){
+                for (sort keys %{$voucher}) {
+                    if ($_ !~ /^(_id|admin_name|for_hotspot|qos_overwrite|site_id|create_time)$/) {
+                        $vouchers .= "$_ = ".((defined $voucher->{$_}) ? $voucher->{$_} : '')."\n";
+                    }
+                }
+                if(defined $hash->{hotspot}->{voucherCache}->{$note}->{$voucher->{_id}}->{delivered_at}){
+                        $vouchers .= "delivered_at = ".localtime($hash->{hotspot}->{voucherCache}->{$note}->{$voucher->{_id}}->{delivered_at})."\n";
+                }
+                $vouchers .= "==================================================================\n";
+                $anzahl+=1;
+            }
+        }
+        $vouchers .= "Count: ".$anzahl."\n";
+        return $vouchers;
+    }
+    elsif ($getName eq 'voucher' && defined $hash->{hotspot}->{vouchers}[0]) {
+        my $returnedVoucher = Unifi_getNextVoucherForNote($hash,$getVal);
+        if ($returnedVoucher eq ""){
+            return "VoucherCache for $getVal is not defined!";
+        }
+        my $returnedVoucherCode = "";
+        if(defined $returnedVoucher->{_id}){
+            $returnedVoucherCode = $returnedVoucher->{code};
+            if ($hash->{hotspot}->{voucherCache}->{$getVal}->{setCmd} ne ""){ 
+                $hash->{hotspot}->{voucherCache}->{$getVal}->{$returnedVoucher->{_id}}->{delivered_at} = time();
+            }
+        }
+        return $returnedVoucherCode;
+    }
     return undef;
 }
 ###############################################################################
@@ -549,6 +643,14 @@ sub Unifi_Attr(@) {
             }
             $hash->{unifi}->{deprecatedClientNames} = int($attr_value);
         }
+        elsif($attr_name eq "voucherCache") {
+            #ToDo: nächste Zeile entfernen wenn in Unifi_initVoucherCache das Löschen alter Caches implementiert ist
+            # So löscht man die delivery_at der verbleibenden Caches mit
+            # Ist aber ja nur ein kurzzeitiges Problem, da die delivery_at eh nach 2 Stunden entfernt werden, daher egal.
+            $hash->{hotspot}->{voucherCache}=();
+            $hash->{hotspot}->{voucherCache}->{attr_value} = $attr_value;
+            return Unifi_initVoucherCache($hash);
+        }
     }
     elsif($cmd eq "del") {
         if($attr_name eq "disable" && Unifi_CONNECTED($hash) eq "disabled") {
@@ -563,6 +665,9 @@ sub Unifi_Attr(@) {
         }
         elsif($attr_name eq "deprecatedClientNames") {
             $hash->{unifi}->{deprecatedClientNames} = 1;
+        }
+        elsif($attr_name eq "voucherCache") {
+            %{$hash->{hotspot}->{voucherCache}} = ();
         }
     }
     return undef;
@@ -585,6 +690,7 @@ sub Unifi_DoUpdate($@) {
             Unifi_GetClients_Send => [\&Unifi_GetClients_Send,'Unifi_GetClients_Receive',\&Unifi_GetClients_Receive],
             Unifi_GetAccesspoints_Send => [\&Unifi_GetAccesspoints_Send,'Unifi_GetAccesspoints_Receive',\&Unifi_GetAccesspoints_Receive],
             Unifi_GetWlans_Send => [\&Unifi_GetWlans_Send,'Unifi_GetWlans_Receive',\&Unifi_GetWlans_Receive],
+            Unifi_GetVoucherList_Send => [\&Unifi_GetVoucherList_Send,'Unifi_GetVoucherList_Receive',\&Unifi_GetVoucherList_Receive],
             Unifi_GetUnarchivedAlerts_Send => [\&Unifi_GetUnarchivedAlerts_Send,'Unifi_GetUnarchivedAlerts_Receive',\&Unifi_GetUnarchivedAlerts_Receive],
             Unifi_GetEvents_Send => [\&Unifi_GetEvents_Send,'Unifi_GetEvents_Receive',\&Unifi_GetEvents_Receive],
             # Unifi_GetWlanGroups_Send => [\&Unifi_GetWlanGroups_Send,'Unifi_GetWlanGroups_Receive',\&Unifi_GetWlanGroups_Receive],
@@ -760,6 +866,7 @@ sub Unifi_GetWlans_Receive($) {
                     #Ich musste diese Zeile rausnehmen, sonst ist das Json für enable/disableWLAN bei offenem WLAN (ohne Passphrase) falsch 
                     #Aussternen geht nicht, sonst wird das PW unter Umständen darauf geändert.
                     #$hash->{wlans}->{$h->{_id}}->{x_passphrase} = '***'; # Don't show passphrase in list
+                    delete $hash->{wlans}->{$h->{_id}}->{x_passphrase};
                 }
             }
             else { Unifi_ReceiveFailure($hash,$data->{meta}); }
@@ -992,6 +1099,7 @@ sub Unifi_ProcessUpdate($) {
     Unifi_SetClientReadings($hash);
     Unifi_SetAccesspointReadings($hash);
     Unifi_SetWlanReadings($hash);
+    Unifi_SetVoucherReadings($hash);
     ## WLANGROUPS ???
     #'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''#
     readingsEndUpdate($hash,1);
@@ -1123,6 +1231,25 @@ sub Unifi_SetWlanReadings($) {
     }
     
     return undef;
+}
+
+###############################################################################
+
+sub Unifi_SetVoucherReadings($) {
+    my ($hash) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed.";
+    #für jeden Vouchercache den nächsten Vouchercode als Reading anzeigen
+    for my $cache (keys %{$hash->{hotspot}->{voucherCache}}) {
+        if(ref($hash->{hotspot}->{voucherCache}->{$cache}) eq "HASH"){
+            my $voucher=Unifi_getNextVoucherForNote($hash,$cache);
+            if(ref($voucher) eq "HASH"){
+                readingsBulkUpdate($hash,"-VC_".$cache,$voucher->{code});
+            }else{
+                readingsBulkUpdate($hash,"-VC_".$cache,"-");
+            }
+        }
+    }
 }
 ###############################################################################
 
@@ -1332,6 +1459,114 @@ sub Unifi_WlanconfRest_Receive($) {
             Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
         }
     }
+    return undef;
+}
+
+###############################################################################
+sub Unifi_GetVoucherList_Send($) {
+    my ($hash) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    HttpUtils_NonblockingGet( {
+                 %{$hash->{httpParams}},
+        method   => "GET",
+        url      => $hash->{unifi}->{url}."stat/voucher",
+        callback => \&Unifi_GetVoucherList_Receive,
+    } );
+    return undef;
+}
+#######################################
+
+sub Unifi_GetVoucherList_Receive($) {
+    my ($param, $err, $data) = @_;
+    my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    if ($err ne "") {
+        Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+    }
+    elsif ($data ne "") {
+        my $dataString=$data;
+        if ($param->{code} == 200 || $param->{code} == 400  || $param->{code} == 401) {
+            eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+            if ($data->{meta}->{rc} eq "ok") {
+                Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";              
+                $hash->{hotspot}->{vouchers} = $data->{data}; #array
+            }
+            else { Unifi_ReceiveFailure($hash,$data->{meta}); }
+        } else {
+            Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+        }
+        # VoucherCache bereinigen um bereits verwendete / zu lange gecachte Voucher
+        my $cachetime=time() - 2 * 60 * 60; #Maximal zwei Stunden
+        for my $cache (keys %{$hash->{hotspot}->{voucherCache}}) {
+            my $expand=0;
+            if(ref($hash->{hotspot}->{voucherCache}->{$cache}) eq "HASH"){
+                for my $voucher (keys %{$hash->{hotspot}->{voucherCache}->{$cache}}) {
+                    if(ref($hash->{hotspot}->{voucherCache}->{$cache}->{$voucher}) eq "HASH" && defined $hash->{hotspot}->{voucherCache}->{$cache}->{$voucher}->{delivered_at}){
+                        if($hash->{hotspot}->{voucherCache}->{$cache}->{$voucher}->{delivered_at} lt $cachetime){
+                            delete $hash->{hotspot}->{voucherCache}->{$cache}->{$voucher};
+                        }
+                    }
+                }
+                #wenn Cache zu leer neue Voucher anlegen
+                if($expand==0){ #Der Unifi-Controller mag es nicht, wenn man kurz  hintereinander zwei requests sendet, daher gleich mehrere auf einmal
+                    my $minSize=$hash->{hotspot}->{voucherCache}->{$cache}->{minSize};
+                    my $aktSize=$dataString =~ s/"note" : "$cache"//g;
+                    if(defined $minSize && $aktSize<$minSize){
+                        my $setCmd=$hash->{hotspot}->{voucherCache}->{$cache}->{setCmd};
+                        my @words=split("[ \t][ \t]*", $setCmd);
+                        my %params=("expire"=>$words[0],"n"=>$words[1],"quota"=>$words[2],"note"=>$words[3]);
+                        Log3 $name, 3, "$name ($self) - expand VoucherCache ($cache).";
+                        Unifi_CreateVoucher_Send($hash, %params);
+                        $expand=1;
+                    }
+                }
+            }
+        }
+    }
+    Unifi_NextUpdateFn($hash,$self);
+    return undef;
+}
+###############################################################################
+
+sub Unifi_CreateVoucher_Send($%) {
+    my ($hash,%a)=@_;
+    my $expire = $a{"expire"};
+    my $n = $a{"n"};
+    my $quota = $a{"quota"};
+    my $note = $a{"note"};
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed. expire: ".$expire." - n: ".$n." - quota: ".$quota." - note: ".$note."    -    ".%a;
+        
+    HttpUtils_NonblockingGet( {
+                 %{$hash->{httpParams}},
+        url      => $hash->{unifi}->{url}."cmd/hotspot",
+        callback => \&Unifi_CreateVoucher_Receive,
+        data     => "{'cmd': 'create-voucher', 'expire': '".$expire."', 'n': '".$n."', 'quota': '".$quota."', 'note': '".$note."'}",
+    } );
+   
+    return undef;
+}
+#######################################
+
+sub Unifi_CreateVoucher_Receive($) {
+    my ($param, $err, $data) = @_;
+    my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+    Log3 $name, 3, "$name ($self) - executed.";
+    
+    if ($err ne "") {
+        Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+    }
+    elsif ($data ne "") {
+        if ($param->{code} == 200 || $param->{code} == 400  || $param->{code} == 401) {
+            eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+        } else {
+            Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+        }
+    }
+    # der Voucher ist im Unifi-Modul dann erst mit dem nächsten Update enthalten.
     return undef;
 }
 ###############################################################################
@@ -1581,6 +1816,64 @@ sub Unifi_ApNames($@) {
 }
 ###############################################################################
 
+sub Unifi_initVoucherCache($){
+    my ($hash) = @_;
+    my @voucherCaches=split(/,/, $hash->{hotspot}->{voucherCache}->{attr_value});
+    my @notes=();
+    foreach(@voucherCaches){
+        my $voucherCache=$_;
+        my @words=split("[ \t][ \t]*", $voucherCache);
+        if (scalar(@words) !=4){
+            return "$hash->{NAME} voucherCache: Four arguments per cache needed!."
+        }
+        if (!looks_like_number($words[0]) || int($words[0]) < 1 || 
+            !looks_like_number($words[1]) || int($words[1]) < 1 || 
+            !looks_like_number($words[2]) || int($words[2]) < 1 
+            ) {
+            return "$hash->{NAME} voucherCache: First three arguments (expire, n, quota) must be numeric."
+        }
+        my $note=$words[3];
+        push(@notes,$note);
+        $hash->{hotspot}->{voucherCache}->{$note}->{setCmd} = $voucherCache;
+        $hash->{hotspot}->{voucherCache}->{$note}->{minSize} = $words[1];
+    }
+    #ToDo: Löschen nicht mehr verwendeter Caches
+    # dazu iterieren über $hash->{hotspot}->{voucherCache}
+    # immer wenn es darin setCmd gibt ist oder war es ein Cache, ansonsten ist es attr_value
+    # wenn $hash->{hotspot}->{voucherCache}->{$note} nicht in @notes, dann löschen
+    return undef;
+}
+###############################################################################
+
+sub Unifi_getNextVoucherForNote($$){
+    my ($hash,$getVal)=@_;
+    my $deliverytime=time();
+    my $returnedVoucher="";
+    for my $voucher (@{$hash->{hotspot}->{vouchers}}) {
+        my $note= '';
+        if(defined $voucher->{note}){
+            $note=$voucher->{note};
+        }
+        my $gv=$getVal;
+        $note =~ tr/a-zA-ZÄÖÜäöüß_0-9.,//cd;
+        $gv =~ tr/a-zA-ZÄÖÜäöüß_0-9.,//cd;
+ 
+        if($gv eq 'all' || ( ($gv =~ /^$note/) && $note ne '')){
+            if(! defined $hash->{hotspot}->{voucherCache}->{$getVal}->{$voucher->{_id}}->{delivered_at}){
+                $returnedVoucher=$voucher;
+                last;
+            }else{
+                if($hash->{hotspot}->{voucherCache}->{$getVal}->{$voucher->{_id}}->{delivered_at} < $deliverytime){
+                    $deliverytime=$hash->{hotspot}->{voucherCache}->{$getVal}->{$voucher->{_id}}->{delivered_at};
+                    $returnedVoucher=$voucher;
+                }
+            }
+        }
+    }
+    return $returnedVoucher;
+}
+###############################################################################
+
 sub Unifi_NextUpdateFn($$) {
     my ($hash,$fn) = @_;
     
@@ -1749,8 +2042,8 @@ Or you can use the other readings or set and get features to control your unifi-
     <li><code>set &lt;name&gt; update</code><br>
     Makes immediately a manual update. </li>
     <br>
-    <li><code>set &lt;name&gt; clear &lt;readings|clientData|allData|all&gt;</code><br>
-    Clears the readings, clientData, all Unifi data or all (readings and data). </li>
+    <li><code>set &lt;name&gt; clear &lt;readings|clientData|voucherCache|all&gt;</code><br>
+    Clears the readings, clientData, voucherCache or all. </li>
     <br>
     <li><code>set &lt;name&gt; archiveAlerts</code><br>
     Archive all unarchived Alerts. </li>
@@ -1778,6 +2071,8 @@ Or you can use the other readings or set and get features to control your unifi-
     Enables WLAN with &lt;ssid&gt;</li>
     <li><code>set &lt;name&gt; switchSiteLEDs &lt;on|off&gt;</code><br>
     Enables or disables the Status-LED settings of the site.</li>
+    <li><code>set &lt;name&gt; createVoucher &lt;expire&gt; &lt;n&gt; &lt;quota&gt; &lt;note&gt;</code><br>
+    Creates &lt;n&gt; vouchers that expires after &lt;expire&gt; minutes, are usable &lt;quota&gt;-times with a &lt;note&gt;no spaces in note allowed</li>
 </ul>
 
 
@@ -1795,6 +2090,10 @@ Or you can use the other readings or set and get features to control your unifi-
     Show all unarchived Alerts.</li>
     <li><code>get &lt;name&gt; poeState [name|mac|id]</code><br>
     Show port PoE state.</li>
+    <li><code>get &lt;name&gt; voucher [note]</code><br>
+    Show next voucher-code with specified note. If &lt;note&gt; is used in voucherCache the voucher will be marked as delivered</li>
+    <li><code>get &lt;name&gt; voucherList [all|note]</code><br>
+    Show list of vouchers (all or with specified note only).</li>
 </ul>
 
 
@@ -1816,6 +2115,16 @@ Or you can use the other readings or set and get features to control your unifi-
     If set to 1 the module will be stopped and no updates are performed.<br>
     If set to 0 the automatic updating will performed.</li>
     <br>
+    <li>attr ignoreWiredClients &lt;1|0&gt;<br>
+    With this attribute you can disable readings for wired clients. <br>
+    If set to 1 readings for wired clients are not generated.<br>
+    If set to 0 or not defined, readings for wired clients will be generated.</li>
+    <br>
+    <li>attr ignoreWirelessClients &lt;1|0&gt;<br>
+    With this attribute you can disable readings for wireless clients. <br>
+    If set to 1 readings for wireless clients are not generated.<br>
+    If set to 0 or not defined, readings for wireless clients will be generated.</li>
+    <br>
     <li>attr <a href="#verbose">verbose</a> 5<br>
     This attribute will help you if something does not work as espected.</li>
     <br>
@@ -1829,6 +2138,15 @@ Or you can use the other readings or set and get features to control your unifi-
     0: All invalid characters are replaced by using makeReadingName() in fhem.pl.<br> 
     <code>default: 1 (if module is defined and/or attribute is not set)</code></li>
     <br>
+    <li>attr voucherCache  &lt;expire n quota note, ...&gt;<br>
+    Define voucher-cache(s). Comma separeted list of four parameters that are separated by spaces; no spaces in note!.<br>
+    By calling <code>get voucher &lt;note&gt;</code> the delivery-time of the voucher will be saved in the cache. 
+    The voucher with the oldest delivery-time will be returned by <code>get voucher &lt;note&gt;</code>.
+    If the voucher is not used for 2 hours, the delivery-time in the cache will be deleted.<br>
+    <code>e.g.: 120 2 1 2h,180 5 2 3h</code> defines two caches.<br>
+    The first cache has a min size of 2 vouchers. The vouchers expire after 120 minutes and can be used one-time.<br>
+    The second cache has a min size of 5 vouchers. The vouchers expire after 180 minutes and can be used two-times.</li>
+    <br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 </ul>
 
@@ -1839,6 +2157,7 @@ Or you can use the other readings or set and get features to control your unifi-
     <li>Each AP has 3 readings for state (can be 'ok' or 'error'), essid's and count of connected-clients.</li>
     <li>The unifi-controller has 6 readings for event-count in configured 'timePeriod', unarchived-alert count, accesspoint count, overall wlan-state (can be 'ok', 'warning', or other?), connected user count and connected guest count. </li>
     <li>The Unifi-device reading 'state' represents the connection-state to the unifi-controller (can be 'connected', 'disconnected', 'initialized' and 'disabled').</li>
+    <li>Each voucher-cache has a reading with the next free voucher code.</li>
 </ul>
 <br>
 
