@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     98_freezemon: initial check-in 
   - feature: 74_Unifi: added voucher-functions
   - change: 30_MilightBridge: Use new RemoveInternalTimer function
   - new:     52_I2C_EMC1001.pm: initial check in
