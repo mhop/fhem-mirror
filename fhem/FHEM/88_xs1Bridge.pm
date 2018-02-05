@@ -26,12 +26,14 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 use Net::Ping;					# Ping Test Verbindung
 
+#$| = 1;		#Puffern abschalten, Hilfreich für PEARL WARNINGS Search
+
 sub xs1Bridge_Initialize($) {
 	my ($hash) = @_;
 	
 	$hash->{WriteFn}    = "xs1Bridge_Write";
-	$hash->{Clients}    = ":xs1Device:";
-	$hash->{MatchList}  = { "1:xs1Device"   =>	'[A][k][t][o][r]_[0-6][0-9].*|[S][e][n][s][o][r]_[0-6][0-9].*' };	## https://regex101.com/ Testfunktion
+	$hash->{Clients}    = ":xs1Dev:";
+	$hash->{MatchList}  = { "1:xs1Dev"   =>	'[x][s][1][D][e][v][#][A][k][t][o][r]#[0-6][0-9].*|[x][s][1][D][e][v][#][S][e][n][s][o][r]#[0-6][0-9].*' };	## https://regex101.com/ Testfunktion
 	
 	$hash->{DefFn}		=	"xs1Bridge_Define";
 	$hash->{AttrFn}  	= 	"xs1Bridge_Attr";  
@@ -39,7 +41,10 @@ sub xs1Bridge_Initialize($) {
 	$hash->{AttrList}	=	"debug:0,1 ".
 							"disable:0,1 ".
 							"ignore:0,1 ".
-							"interval:30,60,180,360 ";							
+							"interval:30,60,180,360 ".
+							"update_only_difference:0,1 ".
+							"view_Device_name:0,1 ".
+							"view_Device_function:0,1 ";
 							##$readingFnAttributes;		## die Standardattribute von FHEM
 							
 	foreach my $d(sort keys %{$modules{xs1Bridge}{defptr}}) {
@@ -53,6 +58,9 @@ sub xs1Bridge_Define($$) {
 	my $name = $hash->{NAME};							## Der Definitionsname, mit dem das Gerät angelegt wurde.
 	my $typ = $hash->{TYPE};							## Der Modulname, mit welchem die Definition angelegt wurde.
 	my $debug = AttrVal($hash->{NAME},"debug",0);
+	my $viewDeviceName = AttrVal($hash->{NAME},"view_Device_name",0);
+	my $viewDeviceFunction = AttrVal($hash->{NAME},"view_Device_function",0);
+	my $update_only_difference = AttrVal($hash->{NAME},"update_only_difference",0);
 	
 	return "Usage: define <name> $name <ip>"  if(@arg != 3);
 	return "Cannot define xs1Bridge device. Perl modul ${missingModul}is missing." if ( $missingModul );
@@ -64,7 +72,7 @@ sub xs1Bridge_Define($$) {
 	if (&xs1Bridge_Ping == 1) {				## IP - Check
 	$hash->{STATE} = "Initialized";			## Der Status des Modules nach Initialisierung.
 	$hash->{TIME} = time();					## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.06";				## Version
+	$hash->{VERSION} = "1.09";				## Version
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
@@ -91,17 +99,17 @@ sub xs1Bridge_Attr(@) {
 	my $typ = $hash->{TYPE};
 	my $interval = 0;
 	my $debug = AttrVal($hash->{NAME},"debug",0);
+	my $viewDeviceName = AttrVal($hash->{NAME},"view_Device_name",0);
+	my $viewDeviceFunction = AttrVal($hash->{NAME},"view_Device_function",0);
+	my $update_only_difference = AttrVal($hash->{NAME},"update_only_difference",0);
 	
 	# $cmd  - Vorgangsart - kann die Werte "del" (löschen) oder "set" (setzen) annehmen
 	# $name - Gerätename
 	# $attrName/$attrValue sind Attribut-Name und Attribut-Wert
    
-	Debug " $typ: xs1_Attr | Attributes $attrName = $attrValue" if($debug);
-
 	if ($cmd eq "set") {											## Handling bei set .. attribute
 		RemoveInternalTimer($hash);									## Timer löschen
-		Debug " $typ: xs1_Attr | Cmd:$cmd | RemoveInternalTimer" if($debug);
-
+		Debug " $typ: Attr | Cmd:$cmd | RemoveInternalTimer" if($debug);
 		if ($attrName eq "interval") {								## Abfrage Attribute
 			if (($attrValue !~ /^\d*$/) || ($attrValue < 10))		## Bildschirmausgabe - Hinweis Wert zu klein
 			{
@@ -116,17 +124,63 @@ sub xs1Bridge_Attr(@) {
 			elsif ($attrValue eq "0") {								## Handling bei attribute disable 0
 			readingsSingleUpdate($hash, "state", "active", 1);
 			}
+		}elsif ($attrName eq "view_Device_function") {
+			if ($attrValue eq "1") {								## Handling bei attribute disable 1
+			Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
+			}
+			elsif ($attrValue eq "0") {								## Handling bei attribute disable 0
+			Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
+			}
+		}elsif ($attrName eq "view_Device_name") {
+			if ($attrValue eq "1") {								## Handling bei attribute disable 1
+			Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
+			}
+			elsif ($attrValue eq "0") {								## Handling bei attribute disable 0
+				Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
+				for my $i (0..64) {
+				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
+				delete $hash->{READINGS}{"Sensor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
+				}
+			}
+		}elsif ($attrName eq "update_only_difference") {
+			if ($attrValue eq "1") {								## Handling bei attribute disable 1
+			Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
+			}
+			elsif ($attrValue eq "0") {								## Handling bei attribute disable 0
+				Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
+				for my $i (0..64) {
+				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
+				}
+			}
 		}
 	}
 	
 	if ($cmd eq "del") {											## Handling bei del ... attribute
 		if ($attrName eq "disable" && !defined $attrValue) {
 		readingsSingleUpdate($hash, "state", "active", 1);
-		Debug " $typ: xs1_Attr | Cmd:$cmd | $attrName=$attrValue" if($debug);
+		Debug " $typ: Attr | Cmd:$cmd | $attrName=$attrValue" if($debug);
 		}
-		if ($attrName eq "interval") {
+		elsif ($attrName eq "interval") {
 		RemoveInternalTimer($hash);
-		Debug " $typ: xs1_Attr | Cmd:$cmd | $attrName" if($debug);
+		Debug " $typ: Attr | Cmd:$cmd | $attrName" if($debug);
+		}
+		elsif ($attrName eq "view_Device_function") {
+			Log3 $name, 3, "$typ: Attribut view_Device_function delete";
+			for my $i (0..64) {
+				for my $i2 (1..4) {
+					delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_function_".$i2} if($hash->{READINGS});
+				}
+			}
+		}
+		elsif ($attrName eq "view_Device_name") {
+			Log3 $name, 3, "$typ: Attribut view_Device_name delete";
+			for my $i (0..64) {
+				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
+				delete $hash->{READINGS}{"Sensor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
+			}
+		}
+		elsif ($attrName eq "update_only_difference") {
+			Log3 $name, 3, "$typ: Attribut update_only_difference delete";
 		}
 		
 	}
@@ -134,7 +188,7 @@ sub xs1Bridge_Attr(@) {
 	if ($hash->{STATE} eq "active") {
 		RemoveInternalTimer($hash);
 		InternalTimer(gettimeofday()+$interval, "xs1Bridge_GetUpDate", $hash);
-		Debug " $typ: xs1_Attr | RemoveInternalTimer + InternalTimer" if($debug);
+		Debug " $typ: Attr | RemoveInternalTimer + InternalTimer" if($debug);
 		}
 	return undef;
 }
@@ -145,7 +199,7 @@ sub xs1Bridge_Delete($$) {
 	return undef;
 }
 
-sub xs1Bridge_Ping() {			## Check before Define
+sub xs1Bridge_Ping() {				## Check IP before Define
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my $typ = $hash->{TYPE};
@@ -186,82 +240,167 @@ sub xs1Bridge_GetUpDate() {
 	my $debug = AttrVal($hash->{NAME},"debug",0);
 	my $disable = AttrVal($name, "disable", 0);
 	my $interval = AttrVal($name, "interval", 60);
+	my $viewDeviceName = AttrVal($hash->{NAME},"view_Device_name",0);
+	my $viewDeviceFunction = AttrVal($hash->{NAME},"view_Device_function",0);
+	my $update_only_difference = AttrVal($hash->{NAME},"update_only_difference",0);
 
 	if (AttrVal($hash->{NAME},"disable",0) == 0) {
 		RemoveInternalTimer($hash);
 		InternalTimer(gettimeofday()+$interval, "xs1Bridge_GetUpDate", $hash);
 		Debug "\n ------------- ERROR CHECK - START -------------" if($debug);
-		Debug " $typ: xs1Bridge_GetUpDate | RemoveInternalTimer + InternalTimer" if($debug);
+		Debug " $typ: GetUpDate | RemoveInternalTimer + InternalTimer" if($debug);
 		#Log3 $name, 3, "$typ: xs1Bridge_GetUpDate | RemoveInternalTimer + InternalTimer";
 
 		if ($state eq "Initialized") {
-			readingsSingleUpdate($hash, "state", "active", 1);
+			readingsSingleUpdate($hash, "state", "active", 0);
 		}
 
-		my $xs1_check = "-";
+		my $xs1Dev_check = "ERROR";
 
-		if($modules{xs1Device} && $modules{xs1Device}{LOADED}) {						## Check Modul
-			Debug " $typ: xs1Bridge_GetUpDate | Modul xs1Device loaded" if($debug);
-			$xs1_check = "ok";
+		#if($modules{xs1Dev} && $modules{xs1Dev}{LOADED}) {		## Check Modul vorhanden + geladen
+		if($modules{xs1Dev}) {									## Check Modul vorhanden
+			$xs1Dev_check = "ok";
+			Debug " $typ: GetUpDate | Modul xs1Dev_check = $xs1Dev_check" if($debug);
 		} else {
-			Debug " $typ: xs1Bridge_GetUpDate | Modul xs1Device can´t load! Please check it to be available!" if($debug);
+			Debug " $typ: GetUpDate ERROR | Modul xs1Dev not existent! Please check it to be available!" if($debug);
+			#Log3 $name, 3, "$typ: GetUpDate | xs1Dev_check = $xs1Dev_check";
 		}
 
 		### JSON Abfrage - Schleife
-		for my $i (0..4) {
+		for my $i (0..3) {
 			my $adress = "http://".$hash->{xs1_ip}.$cmd.$cmdtyp[$i];
-			Debug " $typ: xs1Bridge_GetUpDate | Adresse: $adress" if($debug);
+			Debug " $typ: GetUpDate | Adresse: $adress" if($debug);
      
 			my $ua = LWP::UserAgent->new;									## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
 			my $resp = $ua->request(HTTP::Request->new(GET => $adress));
+			Debug " $typ: GetUpDate | Adresse HTTP request Code: ".$resp->code if($debug);
 			if ($resp->code != "200") {										## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
-				Log3 $name, 3, "$typ: xs1Bridge_GetUpDate | HTTP GET error code ".$resp->code." -> no JSON-query";
-				if ($i == 0 || $i == 1 || $i == 2 || $i == 3) {last};		## ERROR JSON-query -> Abbruch schleife
+				Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no JSON-query";
+				last;		## ERROR JSON-query -> Abbruch schleife
 			}
 			
-			my ($json) = get( $adress ) =~ /[^(]*[}]/g;					## cut cname( + ) am Ende von Ausgabe -> ARRAY Struktur
-			my $json_utf8 = eval {encode_utf8( $json )};						## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
-			my $decoded = eval {decode_json( $json_utf8 )};
-
-			if ($i <= 1 ) {               	### xs1 Aktoren / Sensoren
+			my $json;
+			my $json_utf8;
+			my $decoded;
+			
+			if (defined($adress)) {
+			($json) = get( $adress ) =~ /[^(]*[}]/g;		## cut cname( + ) am Ende von Ausgabe -> ARRAY Struktur als Antwort vom xs1
+			$json_utf8 = eval {encode_utf8( $json )};		## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
+			$decoded = eval {decode_json( $json_utf8 )};	## auswertbares ARAAY
+			} else {
+			Log3 $name, 3, "$typ: Adresse:$adress undefined";
+			last;
+			}
+			
+			if ($i <= 1 ) {     ### xs1 Aktoren / Sensoren
+				#my $resp = $ua->request(HTTP::Request->new(GET => $adress));	## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
+				if ($resp->code != "200") {										## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
+					Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no JSON-query";
+					last;		## ERROR JSON-query -> Abbruch schleife
+				}
+				
+				#Log3 $name, 3, "$typ: GetUpDate | adresse=".$adress;
+				
+				my $data;
 				my @array = @{ $decoded->{$arrayname[$i]} };
-				foreach my $f ( @array ) {
+					foreach my $f ( @array ) {
 					if ($f->{"type"} ne "disabled") {
-						Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." | ".$f->{"type"}." | ".$f->{"name"}." | ". $f->{"value"} if($debug);
-						my $data = "-";
-						if ($i == 0)		### xs1 Aktoren nur update bei differenten Wert
-						{
-							my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}), "unknown");	## Readings Wert
-							my $newState = $f->{"value"};																		## ARRAY Wert xs1 aktuell
-							Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." oldState=$oldState newState=$newState" if($debug);
-							if ($oldState ne $newState) {
-							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , $f->{"value"}, 1);
-							$data = $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$f->{"type"}."_".$f->{"value"};
+						my $xs1Dev = "xs1Dev";
+						
+						### Aktoren spezifisch
+						my $xs1_function1 = "-";
+						my $xs1_function2 = "-";
+						my $xs1_function3 = "-";
+						my $xs1_function4 = "-";
+
+						if ($i == 0) {
+							### xs1 Aktoren nur update bei differenten Wert
+							if ($update_only_difference == 1) {
+								my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}), "unknown");	## Readings Wert
+								my $newState = $f->{"value"};																		## ARRAY Wert xs1 aktuell
+								
+								Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." oldState=$oldState newState=$newState" if($debug);
+									
+								if ($oldState ne $newState) {
+									readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , $f->{"value"}, 0);
+								}
+							}
+							
+							### xs1 Aktoren / Funktion != disable
+							my @array2 = @{ $decoded->{'actuator'}->[($f->{"id"})-1]->{$arrayname[4]} };
+							my $i2 = 0;							## Funktionscounter
+
+							foreach my $f2 ( @array2 ) {
+								$i2 = $i2+1;
+
+								if ($viewDeviceFunction == 1) {
+									my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$arrayname[4]."_".$i2, "unknown");		## Readings Wert
+									my $newState = $f2->{'type'};		## ARRAY Wert xs1 aktuell
+
+									if ($f2->{"type"} ne "disabled") {  ## Funktion != function -> type disable
+										if ($oldState ne $newState) {
+											readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$arrayname[4]."_".$i2 , $f2->{"type"} , 0);
+										}
+									}
+								} else {
+									if ($f2->{"type"} ne "disabled") {  ## Funktion != function -> type disable
+									
+										if ($i2 == 1) {
+										$xs1_function1 = $f2->{"type"};
+										}elsif ($i2 == 2) {
+										$xs1_function2 = $f2->{"type"};
+										}elsif ($i2 == 3) {
+										$xs1_function3 = $f2->{"type"};
+										}elsif ($i2 == 4) {
+										$xs1_function4 = $f2->{"type"};
+										}
+									}
+								}
 							}
 						}
-						else
-						{
-							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , $f->{"value"}, 1);
-							$data = $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$f->{"type"}."_".$f->{"value"};
+						
+						### Value der Aktoren | Sensoren
+						if ($i == 1 || $i == 0 && $update_only_difference == 0) {		# Aktoren | Sensoren im intervall
+							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , $f->{"value"}, 0);
+							$data = $xs1Dev."#".$readingsname[$i]."#".sprintf("%02d", $f->{"id"})."#".$f->{"type"}."#".$f->{"value"}."#"."$xs1_function1"."#"."$xs1_function2"."#"."$xs1_function3"."#"."$xs1_function4"."#".$f->{"name"};
+						} elsif ($i == 0 && $update_only_difference == 1) {				# Aktoren separat wenn update_only_difference Option aktiv für xs1Bridge
+							$data = $xs1Dev."#".$readingsname[$i]."#".sprintf("%02d", $f->{"id"})."#".$f->{"type"}."#".$f->{"value"}."#"."$xs1_function1"."#"."$xs1_function2"."#"."$xs1_function3"."#"."$xs1_function4"."#".$f->{"name"};
 						}
-						if ($xs1_check eq "ok") {
-							Debug " $typ: Dispatch -> $data" if($debug);
-							Dispatch($hash,$data,undef);												## Dispatch an xs1Device Modul
+						
+						### Ausgaben je Typ unterschiedlich !!!
+						Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." | ".$f->{"type"}." | ".$f->{"name"}." | ". $f->{"value"}." | "."F1 $xs1_function1 | F2 $xs1_function2 | F3 $xs1_function3 | F4 $xs1_function4" if($debug == 1 && $i == 0);
+						Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." | ".$f->{"type"}." | ".$f->{"name"}." | ". $f->{"value"} if($debug == 1 && $i != 0);
+
+						### Namen der Aktoren | Sensoren
+						if ($viewDeviceName == 1) {
+							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_name" , $f->{"name"} , 0);
+						}
+							
+						### Dispatch an xs1Device Modul						
+						if ($xs1Dev_check eq "ok") {
+							#Log3 $name, 3, " $typ: GetUpDate | Dispatch -> $data";
+							Debug " $typ: GetUpDate | Dispatch -> $data" if($debug);
+							Dispatch($hash,$data,undef) if($data);
 						}
 					}
 				}
-
-			} elsif ($i == 2) {           ### xs1 Info´s
+			} elsif ($i == 2) {     ### xs1 Info´s
+				#my $resp = $ua->request(HTTP::Request->new(GET => $adress));	## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
+				if ($resp->code != "200") {										## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
+					Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no JSON-query";
+					last;			## ERROR JSON-query -> Abbruch schleife
+				}
+				
 				my $features;
 				my $features_i=0;
 				while (defined $decoded->{'info'}{'features'}->[$features_i]) {
-				$features.= $decoded->{'info'}{'features'}->[$features_i]." ";
-				$features_i++;
+					$features.= $decoded->{'info'}{'features'}->[$features_i]." ";
+					$features_i++;
 				}
 				
-				my @xs1_readings = ("xs1_devicename","xs1_bootloader","xs1_hardware","xs1_features","xs1_firmware","xs1_mac","xs1_uptime");
+				my @xs1_readings = ("xs1_devicename","xs1_bootloader","xs1_hardware","xs1_features","xs1_firmware","xs1_mac","xs1_start");
 				my @xs1_decoded = ($decoded->{'info'}{'devicename'} , $decoded->{'info'}{'bootloader'} , $decoded->{'info'}{'hardware'} , $features , $decoded->{'info'}{'firmware'} , $decoded->{'info'}{'mac'} , FmtDateTime(time()-($decoded->{'info'}{'uptime'})));
-				# xs1_uptime wird teilweise je nach Laufzeit mit aktualisiert (+-1 Sekunde) -> Systemabhängig
+				# xs1_start wird teilweise je nach Laufzeit mit aktualisiert (+-1 Sekunde) -> Systemabhängig
 				
 				my $i2 = 0;
 				readingsBeginUpdate($hash);
@@ -273,7 +412,7 @@ sub xs1Bridge_GetUpDate() {
 						readingsBulkUpdate($hash, $xs1_readings[$i2] , $xs1_decoded[$i2]);	
 					}
 				}
-				readingsEndUpdate($hash, 1);
+				readingsEndUpdate($hash, 0);
             
 				Debug " $typ: xs1_devicename: ".$decoded->{'info'}{'devicename'} if($debug);
 				Debug " $typ: xs1_bootloader: ".$decoded->{'info'}{'bootloader'} if($debug);
@@ -281,45 +420,34 @@ sub xs1Bridge_GetUpDate() {
 				Debug " $typ: xs1_features: ".$features if($debug);
 				Debug " $typ: xs1_firmware: ".$decoded->{'info'}{'firmware'} if($debug);
 				Debug " $typ: xs1_mac: ".$decoded->{'info'}{'mac'} if($debug);
-				Debug " $typ: xs1_uptime: ".$decoded->{'info'}{'uptime'} if($debug);
+				Debug " $typ: xs1_start: ".$decoded->{'info'}{'uptime'} if($debug);
             
-			} elsif ($i == 3) {				### xs1 Timers
+			} elsif ($i == 3) {			### xs1 Timers
+				#my $resp = $ua->request(HTTP::Request->new(GET => $adress));	## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
+				if ($resp->code != "200") {										## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
+					Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no JSON-query";
+					last;				## ERROR JSON-query -> Abbruch schleife
+				}
+				
 				my @array = @{ $decoded->{$arrayname[$i]} };
 				foreach my $f ( @array ) {
 					my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}), "unknown");	## Readings Wert
-					my $newState = FmtDateTime($f->{"next"});															## ARRAY Wert xs1 aktuell
+					my $newState = FmtDateTime($f->{"next"});			## ARRAY Wert xs1 aktuell
 					
 					if ($f->{"type"} ne "disabled") {
-						if ($oldState ne $newState) {																		## Update Reading nur bei Wertänderung
-							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , FmtDateTime($f->{"next"}), 1);
+						if ($oldState ne $newState) {					## Update Reading nur bei Wertänderung
+							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , FmtDateTime($f->{"next"}), 0);
 						}
 						Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." | ".$f->{"name"}." | ".$f->{"type"}." | ". $f->{"next"} if($debug);
 					}
-					elsif($oldState ne "unknown") {		## deaktive Timer mit Wert werden als Reading entfernt
-						Log3 $name, 3, "$typ: xs1Bridge_GetUpDate | ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." is deactive in xs1";
+					elsif($oldState ne "unknown") {						## deaktive Timer mit Wert werden als Reading entfernt
+						Log3 $name, 3, "$typ: GetUpDate | ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." is deactive in xs1";
 						delete $defs{$name}{READINGS}{$readingsname[$i]."_".sprintf("%02d", $f->{"id"})};
 					}
 				}
-			} elsif ($i == 4) {				### xs1 Aktoren / Funktion != disable
-				my @array2 = @{ $decoded->{$arrayname[0]} };
-				foreach my $f2 ( @array2 ) {
-            
-					if ($f2->{"type"} ne "disabled") {           ## Funktion != actuator -> type disable
-						my @array = @{ $decoded->{'actuator'}->[($f2->{"id"})-1]->{$arrayname[$i]} };
-						my $i3 = 0;                               ## Funktionscounter
-
-						foreach my $f3 ( @array ) {
-							$i3 = $i3+1;
-							if ($f3->{"type"} ne "disabled") {  ## Funktion != function -> type disable
-								Debug " $typ: ".$readingsname[0]."_".sprintf("%02d", $f2->{"id"})." | ".$f2->{"type"}." | ".$arrayname[$i]."_".$i3." | ".$f3->{"type"} if($debug);
-								#readingsSingleUpdate($hash, $readingsname[0]."_".sprintf("%02d", $f2->{"id"})."_".$arrayname[$i]."_".$i3 , $f3->{"type"} , 1);
-							}
-						}
-					}
-				}     
 			}
-		 
-			if ($i < 4) {
+	 
+			if ($i < 3) {
 				Debug "\n ------------- ERROR CHECK - SUB -------------" if($debug);
 			}
 			### Schleifen Ende ###
@@ -331,11 +459,49 @@ sub xs1Bridge_GetUpDate() {
 
 sub xs1Bridge_Write($)				## Zustellen von Daten via IOWrite() vom logischen zum physischen Modul 
 {
-	my ($hash, $Aktor_ID, $cmd) = @_;
+	my ($hash, $Aktor_ID, $xs1_typ, $cmd) = @_;
 	my $name = $hash->{NAME};
 	my $typ = $hash->{TYPE};
+	my $xs1_ip = $hash->{xs1_ip};
    
-	Log3 $name, 3, "$typ: xs1Bridge_Write | Aktor_ID=$Aktor_ID, cmd=$cmd";
+	Log3 $name, 3, "$typ: Write | Device=$Aktor_ID xs1_typ=$xs1_typ cmd=$cmd Parameter for xs1";
+
+	## http://xmodulo.com/how-to-send-http-get-or-post-request-in-perl.html
+	## Anfrage (Client -> XS1): http://192.168.1.242/control?callback=cname&cmd=set_state_actuator&number=1&value=50
+
+	$Aktor_ID = substr($Aktor_ID, 1,2);
+
+	if ($xs1_typ eq "switch") {
+		Log3 $name, 3, "$typ: Write | xs1_typ=$xs1_typ cmd=$cmd";
+		
+		if ($cmd eq "off") {
+		$cmd = 0;
+		} elsif ($cmd eq "on") {
+		$cmd = 100;
+		}
+	} elsif ($xs1_typ eq "dimmer") {
+		Log3 $name, 3, "$typ: Write | xs1_typ=$xs1_typ cmd=$cmd";
+
+	}
+
+	my $json;
+	my $json_utf8;
+	my $decoded;
+	my $xs1cmd = "http://$xs1_ip/control?callback=cname&cmd=set_state_actuator&number=$Aktor_ID&value=$cmd";
+	
+	my $ua = LWP::UserAgent->new;									## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
+	my $resp = $ua->request(HTTP::Request->new(GET => $xs1cmd));
+	
+	if ($resp->code != "200") {										## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
+		Log3 $name, 3, "$typ: Write | cmd=".$xs1cmd." - HTTP GET error code ".$resp->code." -> no Control possible";
+		return undef;
+	} else {
+		Log3 $name, 3, "$typ: Write | Send to xs1 -> $xs1cmd";
+		
+		($json) = get( $xs1cmd ) =~ /[^(]*[}]/g;		## cut cname( + ) am Ende von Ausgabe -> ARRAY Struktur als Antwort vom xs1
+		$json_utf8 = eval {encode_utf8( $json )};		## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
+		$decoded = eval {decode_json( $json_utf8 )};	## auswertbares ARAAY
+	}
 }
 
 sub xs1Bridge_Undef($$)    
@@ -345,6 +511,7 @@ sub xs1Bridge_Undef($$)
 	
 	RemoveInternalTimer($hash);
 	Log3 $name, 3, "$typ: Device with Name: $name delete";
+	delete $modules{xs1Bridge}{defptr}{BRIDGE} if( defined($modules{xs1Bridge}{defptr}{BRIDGE}) );
 	return undef;                  
 }
 
@@ -357,7 +524,7 @@ sub xs1Bridge_Undef($$)
 
 =pod
 =item summary    Connection of the device xs1 from EZControl
-=item summary_DE Anbindung des Gerates xs1 der Firma EZControl
+=item summary_DE Anbindung des Ger&auml;tes xs1 der Firma EZControl
 =begin html
 
 <a name="xs1Bridge"></a>
@@ -366,7 +533,8 @@ sub xs1Bridge_Undef($$)
 	With this module you can read out the device xs1 from EZcontrol. There will be actors | Sensors | Timer | Information read from xs1 and written in readings. With each read only readings are created or updated, which are also defined and active in xs1. Actor | Sensor or timer definitions which are deactivated in xs1 are NOT read.
 	<br><br>
 
-	The module was developed based on the firmware version v4-Beta of the xs1. There may be errors due to different adjustments within the manufacturer's firmware.<br><br>
+	The module was developed based on the firmware version v4-Beta of the xs1. There may be errors due to different adjustments within the manufacturer's firmware.<br>
+	Testet firmware: v4.0.0.5326 (Beta) <br><br>
 
 	<a name="xs1Bridge_define"></a>
 	<b>Define</b><br>
@@ -403,19 +571,33 @@ sub xs1Bridge_Undef($$)
 		<i>For actuators, only different states are updated in the set interval.</i><br>
 		<i>Sensors are always updated in intervals, regardless of the status.</i><br>
 		(Default, interval 60)
+		</li><br>
+		<li>update_only_difference (0,1)<br>
+		The actuators defined in xs1 are only updated when the value changes.<br>
+		(Default, update_only_difference 0)</li><br>
+		<li>view_Device_name (0,1)<br>
+		The actor names defined in xs1 are read as Reading.<br>
+		(Default, view_Device_name 0)<br>
+		</li><br>
+		<li>view_Device_function (0,1)<br>
+		The actuator functions defined in xs1 are read out as Reading.<br>
+		(Default, view_Device_function 0)<br>
 		</li><br><br>
 	</ul>
 	<b>explanation:</b>
 	<ul>
 		<li>various Readings:</li>
 		<ul>
-		Aktor_(01-64): &nbsp;&nbsp;&nbsp;defined actuator in the device<br>
-		Sensor_(01-64): defined sensor in the device<br>
-		Timer_(01-128): defined timer in the device<br>
-		xs1_bootloader: Firmwareversion Bootloader<br>
-		xs1_features: &nbsp;&nbsp;&nbsp;&nbsp;purchased feature when buying (A = send | B = receive | C = Skripte/Makros | D = Media Access)<br>
-		xs1_firmware: &nbsp;&nbsp;&nbsp;Firmwareversion<br>
-		xs1_uptime: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;device start<br>
+		<li>Aktor_(01-64)</li> defined actuator in the device<br>
+		<li>Aktor_(01-64)_name</li> defined actor name in the device<br>
+		<li>Aktor_(01-64)_function(1-4)</li> defined actuator function in the device<br>
+		<li>Sensor_(01-64)</li> defined sensor in the device<br>
+		<li>Sensor_(01-64)_name</li> defined sensor name in the device<br>
+		<li>Timer_(01-128)</li> defined timer in the device<br>
+		<li>xs1_bootloader</li> version of bootloader<br>
+		<li>xs1_features</li> purchased feature when buying (A = send | B = receive | C = Skripte/Makros | D = Media Access)<br>
+		<li>xs1_firmware</li> firmware number<br>
+		<li>xs1_start</li> device start<br>
 		</ul><br>
 		<li>The message "<code>HTTP GET error code 500 -> no JSON-query </code>" in the log file says that there was no query for a short time.</li>
 	</ul>
@@ -430,7 +612,8 @@ sub xs1Bridge_Undef($$)
 	Es werden Aktoren | Sensoren | Timer | Informationen vom xs1 ausgelesen und in Readings geschrieben. Bei jedem Auslesen werden nur Readings angelegt bzw. aktualisiert, welche auch im xs1 definiert und aktiv sind. Aktor | Sensor bzw. Timer Definitionen welche deaktiviert sind im xs1, werden NICHT ausgelesen.
 	<br><br>
 
-	Das Modul wurde entwickelt basierend auf dem Firmwarestand v4-Beta des xs1. Es kann aufgrund von unterschiedlichen Anpassungen innerhalb der Firmware des Herstellers zu Fehlern kommen.<br><br>
+	Das Modul wurde entwickelt basierend auf dem Firmwarestand v4-Beta des xs1. Es kann aufgrund von unterschiedlichen Anpassungen innerhalb der Firmware des Herstellers zu Fehlern kommen.<br>
+	Getestete Firmware: v4.0.0.5326 (Beta) <br><br>
 
 	<a name="xs1Bridge_define"></a>
 	<b>Define</b><br>
@@ -467,19 +650,33 @@ sub xs1Bridge_Undef($$)
 		<i>Bei Aktoren werden nur unterschiedliche Zustände aktualisiert im eingestellten Intervall.</i><br>
 		<i>Sensoren werden unabhängig vom Zustand immer im Intervall aktualisiert.</i><br>
 		(Default, interval 60)
+		</li><br>
+		<li>update_only_difference (0,1)<br>
+		Die Aktoren welche im xs1 definiert wurden, werden nur bei Wert&auml;nderung aktualisiert.<br>
+		(Default, update_only_difference 0)</li><br>
+		<li>view_Device_name (0,1)<br>
+		Die Aktor Namen welche im xs1 definiert wurden, werden als Reading ausgelesen.<br>
+		(Default, view_Device_name 0)<br>
+		</li><br>
+		<li>view_Device_function (0,1)<br>
+		Die Aktor Funktionen welche im xs1 definiert wurden, werden als Reading ausgelesen.<br>
+		(Default, view_Device_function 0)<br>
 		</li><br><br>
 	</ul>
 	<b>Erl&auml;uterung:</b>
 	<ul>
 		<li>Auszug Readings:</li>
 		<ul>
-		Aktor_(01-64): &nbsp;&nbsp;&nbsp;definierter Aktor im Ger&auml;t<br>
-		Sensor_(01-64): definierter Sensor im Ger&auml;t<br>
-		Timer_(01-128): definierter Timer im Ger&auml;t<br>
-		xs1_bootloader: Firmwareversion des Bootloaders<br>
-		xs1_features: &nbsp;&nbsp;&nbsp;&nbsp;erworbene Feature beim Kauf (A = SENDEN | B = EMPFANGEN | C = Skripte/Makros | D = Speicherkartenzugriff)<br>
-		xs1_firmware: &nbsp;&nbsp;&nbsp;Firmwareversion<br>
-		xs1_uptime: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Gerätestart<br>
+		<li>Aktor_(01-64)</li> definierter Aktor mit jeweiligem Zustand im Ger&auml;t<br>
+		<li>Aktor_(01-64)_name</li> definierter Aktorname im Ger&auml;t<br>
+		<li>Aktor_(01-64)_function(1-4)</li> definierte Aktorfunktion im Ger&auml;t<br>
+		<li>Sensor_(01-64)</li> definierter Sensor im Ger&auml;t<br>
+		<li>Sensor_(01-64)</li> definierter Sensorname im Ger&auml;t<br>
+		<li>Timer_(01-128)</li> definierter Timer im Ger&auml;t<br>
+		<li>xs1_bootloader</li> Firmwareversion des Bootloaders<br>
+		<li>xs1_features</li> erworbene Feature beim Kauf (A = SENDEN | B = EMPFANGEN | C = Skripte/Makros | D = Speicherkartenzugriff)<br>
+		<li>xs1_firmware</li> Firmwareversion<br>
+		<li>xs1_start</li> Gerätestart<br>
 		</ul><br>
 		<li>Die Meldung "<code>HTTP GET error code 500 -> no JSON-query </code>" im Logfile besagt, das kurzzeitig keine Abfrage erfolgen konnte.</li>
 	</ul>
