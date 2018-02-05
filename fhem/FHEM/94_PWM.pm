@@ -31,6 +31,7 @@
 # 05.12.17 GA add extend helper for last pulses by $roomsWaitOffset{$wkey}
 # 13.12.17 GA fix consider $roomsWaitOffset{$wkey} in oldpulse set for each room
 # 31.01.18 GA add support for stateFormat
+# 05.02.18 GA fix typo overallHeatingSwitchThresholdTemup
 
 ##############################################
 # $Id$
@@ -85,7 +86,7 @@ PWM_Initialize($)
   $hash->{AttrFn}    = "PWM_Attr";
 
   $hash->{AttrList}  = "disable:1,0 valveProtectIdlePeriod overallHeatingSwitchRef:pulseMax,pulseSum,pulseAvg,pulseAvg2,pulseAvg3,avgPulseRoomsOn".
-		       " overallHeatingSwitchThresholdTemup ".$readingFnAttributes;
+		       " overallHeatingSwitchThresholdTemp ".$readingFnAttributes;
 
   #$hash->{GetList}   = "status timers";
 
