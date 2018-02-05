@@ -457,6 +457,7 @@ FHEM/98_dummy.pm             rudolfkoenig         Automatisierung
 FHEM/98_expandJSON.pm        dev0                 Unterstuetzende Dienste
 FHEM/98_fheminfo.pm          betateilchen         Sonstiges
 FHEM/98_fhemdebug.pm         rudolfkoenig         Sonstiges
+FHEM/98_freezemon            KernSani             Unterstuetzende Dienste 	
 FHEM/98_GoogleAuth.pm        betateilchen         Unterstuetzende Dienste
 FHEM/98_GOOGLECAST.pm        dominikkarall        Multimedia
 FHEM/98_help.pm              betateilchen         Sonstiges
