@@ -355,7 +355,7 @@ sub HUEDevice_Define($$)
     $attr{$name}{'color-icons'} = 2 if( !defined( $attr{$name}{'color-icons'} ) && $icon_path =~ m/openautomation/ );
 
     addToDevAttrList($name, "createActionReadings:1,0");
-    addToDevAttrList($name, "createGroupReadings,0");
+    addToDevAttrList($name, "createGroupReadings:1,0");
 
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
     $hash->{DEF} = "sensor $id $args[3] IODev=$iodev" if( $iodev );
