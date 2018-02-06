@@ -72,7 +72,7 @@ sub xs1Bridge_Define($$) {
 	if (&xs1Bridge_Ping == 1) {				## IP - Check
 	$hash->{STATE} = "Initialized";			## Der Status des Modules nach Initialisierung.
 	$hash->{TIME} = time();					## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.09";				## Version
+	$hash->{VERSION} = "1.10";				## Version
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
@@ -252,7 +252,7 @@ sub xs1Bridge_GetUpDate() {
 		#Log3 $name, 3, "$typ: xs1Bridge_GetUpDate | RemoveInternalTimer + InternalTimer";
 
 		if ($state eq "Initialized") {
-			readingsSingleUpdate($hash, "state", "active", 0);
+			readingsSingleUpdate($hash, "state", "active", 1);
 		}
 
 		my $xs1Dev_check = "ERROR";
@@ -317,12 +317,12 @@ sub xs1Bridge_GetUpDate() {
 							### xs1 Aktoren nur update bei differenten Wert
 							if ($update_only_difference == 1) {
 								my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}), "unknown");	## Readings Wert
-								my $newState = $f->{"value"};																		## ARRAY Wert xs1 aktuell
+								my $newState = sprintf("%.1f" , $f->{"value"});																		## ARRAY Wert xs1 aktuell
 								
 								Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." oldState=$oldState newState=$newState" if($debug);
 									
 								if ($oldState ne $newState) {
-									readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , $f->{"value"}, 0);
+									readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , $newState, 1);
 								}
 							}
 							
@@ -333,13 +333,14 @@ sub xs1Bridge_GetUpDate() {
 							foreach my $f2 ( @array2 ) {
 								$i2 = $i2+1;
 
+								### xs1 Option - Ansicht Funktionsname
 								if ($viewDeviceFunction == 1) {
 									my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$arrayname[4]."_".$i2, "unknown");		## Readings Wert
 									my $newState = $f2->{'type'};		## ARRAY Wert xs1 aktuell
 
 									if ($f2->{"type"} ne "disabled") {  ## Funktion != function -> type disable
 										if ($oldState ne $newState) {
-											readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$arrayname[4]."_".$i2 , $f2->{"type"} , 0);
+											readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$arrayname[4]."_".$i2 , $f2->{"type"} , 1);
 										}
 									}
 								} else {
@@ -360,11 +361,11 @@ sub xs1Bridge_GetUpDate() {
 						}
 						
 						### Value der Aktoren | Sensoren
-						if ($i == 1 || $i == 0 && $update_only_difference == 0) {		# Aktoren | Sensoren im intervall
-							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , $f->{"value"}, 0);
-							$data = $xs1Dev."#".$readingsname[$i]."#".sprintf("%02d", $f->{"id"})."#".$f->{"type"}."#".$f->{"value"}."#"."$xs1_function1"."#"."$xs1_function2"."#"."$xs1_function3"."#"."$xs1_function4"."#".$f->{"name"};
-						} elsif ($i == 0 && $update_only_difference == 1) {				# Aktoren separat wenn update_only_difference Option aktiv für xs1Bridge
-							$data = $xs1Dev."#".$readingsname[$i]."#".sprintf("%02d", $f->{"id"})."#".$f->{"type"}."#".$f->{"value"}."#"."$xs1_function1"."#"."$xs1_function2"."#"."$xs1_function3"."#"."$xs1_function4"."#".$f->{"name"};
+						if ($i == 1 || $i == 0 && $update_only_difference == 0) {		# Aktoren | Sensoren im intervall - Format 0.0 bzw. 37.0 wie aus xs1
+							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , sprintf("%.1f" , $f->{"value"}), 1);
+							$data = $xs1Dev."#".$readingsname[$i]."#".sprintf("%02d", $f->{"id"})."#".$f->{"type"}."#".sprintf("%.1f" , $f->{"value"})."#"."$xs1_function1"."#"."$xs1_function2"."#"."$xs1_function3"."#"."$xs1_function4"."#".$f->{"name"};
+						} elsif ($i == 0 && $update_only_difference == 1){				# Aktoren | nur bei DIFF - Format 0.0 bzw. 37.0 wie aus xs1
+							$data = $xs1Dev."#".$readingsname[$i]."#".sprintf("%02d", $f->{"id"})."#".$f->{"type"}."#".sprintf("%.1f" , $f->{"value"})."#"."$xs1_function1"."#"."$xs1_function2"."#"."$xs1_function3"."#"."$xs1_function4"."#".$f->{"name"};
 						}
 						
 						### Ausgaben je Typ unterschiedlich !!!
@@ -373,12 +374,12 @@ sub xs1Bridge_GetUpDate() {
 
 						### Namen der Aktoren | Sensoren
 						if ($viewDeviceName == 1) {
-							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_name" , $f->{"name"} , 0);
+							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_name" , $f->{"name"} , 1);
 						}
 							
 						### Dispatch an xs1Device Modul						
 						if ($xs1Dev_check eq "ok") {
-							#Log3 $name, 3, " $typ: GetUpDate | Dispatch -> $data";
+															  
 							Debug " $typ: GetUpDate | Dispatch -> $data" if($debug);
 							Dispatch($hash,$data,undef) if($data);
 						}
@@ -412,7 +413,7 @@ sub xs1Bridge_GetUpDate() {
 						readingsBulkUpdate($hash, $xs1_readings[$i2] , $xs1_decoded[$i2]);	
 					}
 				}
-				readingsEndUpdate($hash, 0);
+				readingsEndUpdate($hash, 1);
             
 				Debug " $typ: xs1_devicename: ".$decoded->{'info'}{'devicename'} if($debug);
 				Debug " $typ: xs1_bootloader: ".$decoded->{'info'}{'bootloader'} if($debug);
@@ -436,7 +437,7 @@ sub xs1Bridge_GetUpDate() {
 					
 					if ($f->{"type"} ne "disabled") {
 						if ($oldState ne $newState) {					## Update Reading nur bei Wertänderung
-							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , FmtDateTime($f->{"next"}), 0);
+							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , FmtDateTime($f->{"next"}), 1);
 						}
 						Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." | ".$f->{"name"}." | ".$f->{"type"}." | ". $f->{"next"} if($debug);
 					}
@@ -472,15 +473,15 @@ sub xs1Bridge_Write($)				## Zustellen von Daten via IOWrite() vom logischen zum
 	$Aktor_ID = substr($Aktor_ID, 1,2);
 
 	if ($xs1_typ eq "switch") {
-		Log3 $name, 3, "$typ: Write | xs1_typ=$xs1_typ cmd=$cmd";
-		
+		Log3 $name, 3, "$typ: Write | you control the $xs1_typ";
+  
 		if ($cmd eq "off") {
 		$cmd = 0;
 		} elsif ($cmd eq "on") {
 		$cmd = 100;
 		}
 	} elsif ($xs1_typ eq "dimmer") {
-		Log3 $name, 3, "$typ: Write | xs1_typ=$xs1_typ cmd=$cmd";
+		Log3 $name, 3, "$typ: Write | you control the $xs1_typ";
 
 	}
 
