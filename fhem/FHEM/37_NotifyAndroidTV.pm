@@ -160,7 +160,7 @@ NotifyAndroidTV_Set($$@)
       if( $options->{$option} ) {
         if( defined( $options->{$option}{$param_h->{$option}}) ) {
           $param_h->{$option} = $options->{$option}{$param_h->{$option}};
-        } elsif( grep {$_==$param_h->{$option}} values $options->{$option} )  {
+        } elsif( grep {$_==$param_h->{$option}} values %{$options->{$option}} )  {
           $param_h->{$option} = $param_h->{$option};
         } else {
           $param_h->{$option} = undef;
