@@ -113,7 +113,7 @@ sub MOBILEALERTS_Set ($$@) {
     if ( $cmd eq "clear" ) {
         if ( $args[0] eq "readings" ) {
             for ( keys %{ $hash->{READINGS} } ) {
-                delete $hash->{READINGS}->{$_} if ( $_ ne 'state' );
+                readingsDelete($hash, $_) if ( $_ ne 'state' );
             }
             return undef;
         }
@@ -210,7 +210,7 @@ sub MOBILEALERTS_Parse ($$) {
 sub MOBILEALERTS_Parse_02_ce ($$) {
     my ( $hash, $message ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
-        "MA10100" );
+        "MA10100/MA10101" );
     MOBILEALERTS_Parse_ce( $hash, $message );
 }
 
@@ -520,6 +520,7 @@ sub MOBILEALERTS_Parse_e2 ($$) {
     MOBILEALERTS_readingsBulkUpdate( $hash, 0, "txCounter",
         MOBILEALERTS_decodeTxCounter($txCounter) );
     MOBILEALERTS_readingsBulkUpdate( $hash, 0, "direction", $dirTable[$dir] );
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "directionInt", $dir );
     MOBILEALERTS_readingsBulkUpdate( $hash, 0, "windSpeed", $windSpeed );
     MOBILEALERTS_readingsBulkUpdate( $hash, 0, "gustSpeed", $gustSpeed );
     MOBILEALERTS_readingsBulkUpdate( $hash, 0, "state",
@@ -831,7 +832,7 @@ sub MOBILEALERTS_convertEventTimeString($$) {
 sub MOBILEALERTS_readingsBulkUpdate($$$$@) {
     my ( $hash, $expert, $reading, $value, $changed ) = @_;
     if ( $expert > $hash->{".expertMode"} ) {
-        delete $hash->{READINGS}{$reading};
+        readingsDelete($hash, $reading);
         return undef;
     }
     my $i = $#{ $hash->{CHANGED} };
@@ -845,7 +846,7 @@ sub MOBILEALERTS_readingsBulkUpdate($$$$@) {
 sub MOBILEALERTS_readingsBulkUpdateIfChanged($$$$@) {
     my ( $hash, $expert, $reading, $value, $changed ) = @_;
     if ( $expert > $hash->{".expertMode"} ) {
-        delete $hash->{READINGS}{$reading};
+        readingsDelete($hash, $reading);
         return undef;
     }
     my $i = $#{ $hash->{CHANGED} };
@@ -1033,7 +1034,7 @@ sub MOBILEALERTS_ActionDetector($) {
   The MOBILEALERTS is a fhem module for the german MobileAlerts devices and TFA WEATHERHUB devices.
   <br><br>
   The fhem module represents a MobileAlerts device. The connection is provided by the <a href="#MOBILEALERTSGW">MOBILELAERTSGW</a> module.
-  Currently supported: MA10100, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000<br>
+  Currently supported: MA10100, MA10101, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000<br>
   Supported but untested: ./.<br>
   <br>
 
@@ -1063,7 +1064,7 @@ sub MOBILEALERTS_ActionDetector($) {
     <li>wetness<br>Shows if sensor detects water.</li>
     <li>lastEvent, lastEvent&lt;X&gt; ,lastEventString, lastEvent&lt;X&gt;String<br>Time when last event (rain) happend (MA10650 only).</li>
     <li>mmRain, mmRainActHour, mmRainLastHour, mmRainActDay, mmRainYesterday<br>Rain since reset of counter, current hour, last hour, current day, yesterday.</li>
-    <li>direction<br>Direction of wind.</li>
+    <li>direction, directionInt<br>Direction of wind.</li>
     <li>windSpeed, gustSpeed<br>Windspeed.</li>
   </ul>
   <br>  
@@ -1112,7 +1113,7 @@ sub MOBILEALERTS_ActionDetector($) {
   <br><br>
   Dieses FHEM Modul stellt jeweils ein MobileAlerts Ger&auml;t dar. Die Verbindung wird durch das 
   <a href="#MOBILEALERTSGW">MOBILELAERTSGW</a> Modul bereitgestellt.<br>
-  Aktuell werden unterst&uuml;zt: MA10100, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000<br>
+  Aktuell werden unterst&uuml;zt: MA10100, MA10101, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000<br>
   Unterst&uuml;zt aber ungetestet: ./.<br>
   <br>
 
@@ -1142,7 +1143,7 @@ sub MOBILEALERTS_ActionDetector($) {
     <li>wetness<br>Zeigt ob der Sensors Wasser entdeckt.</li>
     <li>lastEvent, lastEvent&lt;X&gt; ,lastEventString, lastEvent&lt;X&gt;String<br>Zeitpunkt wann das letzte Event (Regen) stattgefunden hat (nur MA10650).</li>
     <li>mmRain, mmRainActHour, mmRainLastHour, mmRainActDay, mmRainYesterday<br>Regen seit dem letzten Reset des Counters, in der aktuellen Stunde, seit der letzten Stunden, am aktuellen Tagn, gestern.</li>
-    <li>direction<br>Richtung des Winds.</li>
+    <li>direction, directionInt<br>Richtung des Winds.</li>
     <li>windSpeed, gustSpeed<br>Windgeschwindigkeit.</li>
   </ul>
   <br>    

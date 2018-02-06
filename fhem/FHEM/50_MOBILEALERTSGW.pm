@@ -150,7 +150,7 @@ sub MOBILEALERTSGW_Set ($$@) {
     if ( $cmd eq "clear" ) {
         if ( $args[0] eq "readings" ) {
             for ( keys %{ $hash->{READINGS} } ) {
-                delete $hash->{READINGS}->{$_} if ( $_ ne 'state' );
+                readingsDelete($hash, $_) if ( $_ ne 'state' );
             }
             return undef;
         }
