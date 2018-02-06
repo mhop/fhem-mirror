@@ -22,6 +22,7 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.09:	fixed incomplete renaming of Attribute fm_freezeThreshold
 #		0.0.08:	trimming of very long lines in "get freeze" 
 #				start freezemon only after INITIALIZED|REREADCFG (and as late as possible)
 #		0.0.07:	just for fun - added some color to "get freeze"
@@ -46,7 +47,7 @@
 ##############################################################################
 ##############################################################################
 # 	  Todo:
-#	  	currently nothing...
+#	  	adjust to optimized handleTimeout
 #		
 # 		
 # 		
@@ -64,7 +65,7 @@ use B qw(svref_2object);
 
 
 
-my $version     = "0.0.07";
+my $version     = "0.0.09";
 
 ###################################
 sub freezemon_Initialize($) {
@@ -119,7 +120,7 @@ sub freezemon_Define($$) {
 		my $next = int(gettimeofday()) + 1; 
 		$hash->{helper}{TIMER} = $next;
 		InternalTimer($next, 'freezemon_ProcessTimer', $hash, 0);
-		Log3 $name, 2, "FreezeMon: $name ready to watch out for delays greater than ".AttrVal($name, "fm_freezeTime",1)." second(s)";
+		Log3 $name, 2, "FreezeMon: $name ready to watch out for delays greater than ".AttrVal($name, "fm_freezeThreshold",1)." second(s)";
 	}
 	$hash->{VERSION} = $version;
     
@@ -148,7 +149,7 @@ sub freezemon_Notify($$)
 	my $next = int(gettimeofday()) + 1; 
 	$hash->{helper}{TIMER} = $next;
 	InternalTimer($next, 'freezemon_ProcessTimer', $hash, 0);
-	Log3 $name, 2, "FreezeMon: $name ready to watch out for delays greater than ".AttrVal($name, "fm_freezeTime",1)." second(s)";
+	Log3 $name, 2, "FreezeMon: $name ready to watch out for delays greater than ".AttrVal($name, "fm_freezeThreshold",1)." second(s)";
  }
 ###################################
 sub freezemon_ProcessTimer($)
@@ -163,7 +164,7 @@ sub freezemon_ProcessTimer($)
   
   
   #Check Freezes
-  if ($freeze > AttrVal($name, "fm_freezeTime",1))
+  if ($freeze > AttrVal($name, "fm_freezeThreshold",1))
   {
 	my $dev = $hash->{helper}{apptime};
 	my $guys = "";
@@ -490,7 +491,7 @@ if(%prioQueues) {
   <b>Attributes</b>
 		<ul>
 			<ul>
-				<li>fm_freezeTime: Value in seconds (Default: 1) - Only freezes longer than fmFreezeTime will be considered as a freeze</li>
+				<li>fm_freezeThreshold: Value in seconds (Default: 1) - Only freezes longer than fm_freezeThreshold will be considered as a freeze</li>
 				<li>fm_forceApptime: When FREEZEMON is active, apptime will automatically be started (if not yet active)</li>
 				<li>fm_log: dynamic loglevel, takes a string like 10:1 5:2 1:3 , which means: freezes > 10 seconds will be logged with loglevel 1 , >5 seconds with loglevel 2 etc...</li>
 				<li>disable: activate/deactivate freeze detection</li>
@@ -554,7 +555,7 @@ if(%prioQueues) {
   <b>Attribute</b>
   <ul>
 		<ul>
-			<li>fm_freezeTime: Wert in Sekunden (Default: 1) - Nur Freezes länger als fmFreezeTime werden als Freeze betrachtet </li>
+			<li>fm_freezeThreshold: Wert in Sekunden (Default: 1) - Nur Freezes länger als fm_freezeThreshold werden als Freeze betrachtet </li>
 			<li>fm_forceApptime: Wenn FREEZEMON aktiv ist wird automatisch apptime gestartet (falls nicht aktiv)</li>
 			<li>fm_log: dynamischer Loglevel, nimmt einen String der Form 10:1 5:2 1:3 entgegen, was bedeutet: Freezes > 10 Sekunden werden mit Loglevel 1 geloggt, >5 Sekunden mit Loglevel 2 usw...</li>
 			<li>disable: aktivieren/deaktivieren der Freeze-Erkennung</li>
