@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.8.4      07.02.2018       minor fixes of "$@", code review, eval for userCommand, DbLog_ExecSQL1 (forum:#83973)
 # 3.8.3      03.02.2018       call execmemcache only syncInterval/2 if cacheLimit reached and DB is not reachable, fix handling of
 #                             "$@" in DbLog_PushAsync 
 # 3.8.2      31.01.2018       RaiseError => 1 in DbLog_ConnectPush, DbLog_ConnectNewDBH, configCheck improved
@@ -79,8 +80,8 @@
 # 2.16.8     06.05.2017       in valueFN $VALUE and $UNIT can now be set to '' or 0
 # 2.16.7     20.04.2017       fix $now at addLog
 # 2.16.6     18.04.2017       AddLog set lasttime, lastvalue of dev_name, dev_reading
-# 2.16.5     16.04.2017       checkUsePK changed again, new attribute noSupportPK
-# 2.16.4     15.04.2017       commandref completed, checkUsePK changed (@usepkh = "", @usepkc = "")
+# 2.16.5     16.04.2017       DbLog_checkUsePK changed again, new attribute noSupportPK
+# 2.16.4     15.04.2017       commandref completed, DbLog_checkUsePK changed (@usepkh = "", @usepkc = "")
 # 2.16.3     07.04.2017       evaluate reading in DbLog_AddLog as regular expression
 # 2.16.2     06.04.2017       sub DbLog_cutCol for cutting fields to maximum length, return to "$lv = "" if(!$lv);" because
 #                             of problems with MinIntervall, DbLogType-Logging in database cycle verbose 5, make $TIMESTAMP
@@ -122,14 +123,14 @@
 #                             for SQLite databases
 # 2.11.1     30.01.2017       output to central logfile enhanced for DbLog_Push
 # 2.11       28.01.2017       DbLog_connect substituted by DbLog_connectPush completely
-# 2.10.8     27.01.2017       setinternalcols delayed at fhem start
-# 2.10.7     25.01.2017       $hash->{HELPER}{COLSET} in setinternalcols, DbLog_Push changed due to 
+# 2.10.8     27.01.2017       DbLog_setinternalcols delayed at fhem start
+# 2.10.7     25.01.2017       $hash->{HELPER}{COLSET} in DbLog_setinternalcols, DbLog_Push changed due to 
 #                             issue Turning on AutoCommit failed
 # 2.10.6     24.01.2017       DbLog_connect changed "connect_cashed" to "connect", DbLog_Get, chartQuery now uses 
 #                             DbLog_ConnectNewDBH, Attr asyncMode changed -> delete reading cacheusage reliable if mode was switched
 # 2.10.5     23.01.2017       count, userCommand, deleteOldDays now uses DbLog_ConnectNewDBH
 #                             DbLog_Push line 1107 changed
-# 2.10.4     22.01.2017       new sub setinternalcols, new attributes colEvent, colReading, colValue
+# 2.10.4     22.01.2017       new sub DbLog_setinternalcols, new attributes colEvent, colReading, colValue
 # 2.10.3     21.01.2017       query of cacheEvents changed, attr timeout adjustable
 # 2.10.2     19.01.2017       ReduceLog now uses DbLog_ConnectNewDBH -> makes start of ReduceLog stable
 # 2.10.1     19.01.2017       commandref edited, cache events don't get lost even if other errors than "db not available" occure  
@@ -185,7 +186,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.8.3";
+my $DbLogVersion = "3.8.4";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -300,7 +301,7 @@ sub DbLog_Define($@)
   }
   
   # set used COLUMNS
-  InternalTimer(gettimeofday()+2, "setinternalcols", $hash, 0);
+  InternalTimer(gettimeofday()+2, "DbLog_setinternalcols", $hash, 0);
 
   readingsSingleUpdate($hash, 'state', 'waiting for connection', 1);
   DbLog_ConnectPush($hash);
@@ -382,7 +383,7 @@ sub DbLog_Attr(@) {
       if ($cmd eq "set" && $aVal) {
           unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 !";}
 	  }
-	  InternalTimer(gettimeofday()+0.5, "setinternalcols", $hash, 0);
+	  InternalTimer(gettimeofday()+0.5, "DbLog_setinternalcols", $hash, 0);
   }
   
   if($aName eq "asyncMode") {
@@ -570,7 +571,7 @@ sub DbLog_Set($@) {
 			my $ts = (split(" ",FmtDateTime(gettimeofday()+$a[2])))[1];
 			Log3($name, 2, "DbLog $name: Connection closed until $ts ($a[2] seconds).");
 			readingsSingleUpdate($hash, "state", "closed until $ts ($a[2] seconds)", 1);
-            InternalTimer(gettimeofday()+$a[2], "reopen", $hash, 0);			
+            InternalTimer(gettimeofday()+$a[2], "DbLog_reopen", $hash, 0);			
 		}
     }
     elsif ($a[1] eq 'rereadcfg') {
@@ -739,7 +740,6 @@ sub DbLog_Set($@) {
 			return;
         } else {
             Log3($name, 4, "DbLog $name: Records count requested.");
-            
 			my $c = $dbh->selectrow_array('SELECT count(*) FROM history');
             readingsSingleUpdate($hash, 'countHistory', $c ,1);
             $c = $dbh->selectrow_array('SELECT count(*) FROM current');
@@ -814,8 +814,16 @@ sub DbLog_Set($@) {
             shift(@cmd); shift(@cmd);
             $sql = join(" ",@cmd);
             readingsSingleUpdate($hash, 'userCommand', $sql, 1);
-            $c = $dbh->selectrow_array($sql);
-			my $res = (defined($c))?$c:"no result";
+            $dbh->{RaiseError} = 1; 
+            $dbh->{PrintError} = 0;
+            my $error;
+            eval { $c = $dbh->selectrow_array($sql); };
+			if($@) {
+                $error = $@;
+                Log3($name, 1, "DbLog $name: DBLog_Set - $error");               
+            }
+            
+            my $res = $error?$error:(defined($c))?$c:"no result";
 			Log3($name, 4, "DbLog $name: DBLog_Set - userCommand - result: $res");
             readingsSingleUpdate($hash, 'userCommandResult', $res ,1);
 			$dbh->disconnect();
@@ -1376,6 +1384,11 @@ sub DbLog_Log($$) {
           return if($hash->{HELPER}{REOPEN_RUNS});	  
           my $error = DbLog_Push($hash, $vb4show, @row_array);
           Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error" if($vb4show);
+          
+          my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
+          my $evt    = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
+          readingsSingleUpdate($hash, "state", $state, $evt);
+          $hash->{HELPER}{OLDSTATE} = $state;
 		  
 		  # Notify-Routine Laufzeit ermitteln
           $net = tv_interval($nst);
@@ -1424,6 +1437,9 @@ sub DbLog_Push(@) {
       }
   } 
   
+  $dbh->{RaiseError} = 1; 
+  $dbh->{PrintError} = 0;
+  
   my ($useac,$useta) = DbLog_commitMode($hash);
   my $ac = ($dbh->{AutoCommit})?"ON":"OFF";
   my $tm = ($useta)?"ON":"OFF";
@@ -1437,7 +1453,7 @@ sub DbLog_Push(@) {
   # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
   my ($usepkh,$usepkc,$pkh,$pkc);
   if (!$supk) {
-      ($usepkh,$usepkc,$pkh,$pkc) = checkUsePK($hash,$dbh);
+      ($usepkh,$usepkc,$pkh,$pkc) = DbLog_checkUsePK($hash,$dbh);
   } else {
       Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key usage suppressed by attribute noSupportPK";
   }
@@ -1667,7 +1683,8 @@ sub DbLog_Push(@) {
   if ($errorh) {
       $error = $errorh;
   }
-
+  $dbh->{RaiseError} = 0; 
+  $dbh->{PrintError} = 1;
   $dbh->disconnect if ($nh);
 
 return Encode::encode_utf8($error);
@@ -1840,7 +1857,7 @@ sub DbLog_PushAsync(@) {
   # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
   my ($usepkh,$usepkc,$pkh,$pkc);
   if (!$supk) {
-      ($usepkh,$usepkc,$pkh,$pkc) = checkUsePK($hash,$dbh);
+      ($usepkh,$usepkc,$pkh,$pkc) = DbLog_checkUsePK($hash,$dbh);
   } else {
       Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key usage suppressed by attribute noSupportPK";
   }
@@ -2266,6 +2283,11 @@ sub DbLog_ConnectPush($;$$) {
   
   return 0 if(IsDisabled($name));
   
+  if($init_done != 1) {
+      InternalTimer(gettimeofday()+5, "DbLog_ConnectPush", $hash, 0);
+	  return;
+  }
+  
   Log3 $hash->{NAME}, 3, "DbLog $name - Creating Push-Handle to database $dbconn with user $dbuser" if(!$get);
 
   my ($useac,$useta) = DbLog_commitMode($hash);
@@ -2279,7 +2301,7 @@ sub DbLog_ConnectPush($;$$) {
   }  
    
   if($@) {
-	  Log3 $hash->{NAME}, 3, "DbLog $name - Error: $@";
+	  Log3 $hash->{NAME}, 2, "DbLog $name - Error: $@";
   }
   
   if(!$dbhp) {
@@ -2291,10 +2313,13 @@ sub DbLog_ConnectPush($;$$) {
     readingsSingleUpdate($hash, "state", $state, $evt);
     $hash->{HELPER}{OLDSTATE} = $state;  
     
-    InternalTimer(time+5, 'DbLog_ConnectPush', $hash, 0);
+    InternalTimer(gettimeofday()+5, 'DbLog_ConnectPush', $hash, 0);
     Log3 $hash->{NAME}, 4, "DbLog $name - Waiting for database connection";
     return 0;
   }
+  
+  $dbhp->{RaiseError} = 0; 
+  $dbhp->{PrintError} = 1;
 
   Log3 $hash->{NAME}, 3, "DbLog $name - Push-Handle to db $dbconn created" if(!$get);
   Log3 $hash->{NAME}, 3, "DbLog $name - UTF8 support enabled" if($utf8 && $hash->{MODEL} eq "MYSQL" && !$get);
@@ -2343,6 +2368,8 @@ sub DbLog_ConnectNewDBH($) {
   }
   
   if($dbh) {
+      $dbh->{RaiseError} = 0; 
+      $dbh->{PrintError} = 1;
       return $dbh;
   } else {
       return 0;
@@ -2384,10 +2411,12 @@ sub DbLog_ExecSQL($$)
 sub DbLog_ExecSQL1($$$)
 {
   my ($hash,$dbh,$sql)= @_;
-
-  my $sth = $dbh->do($sql);
-  if(!$sth) {
-    Log3 $hash->{NAME}, 2, "DBLog error: " . $DBI::errstr;
+  $dbh->{RaiseError} = 1; 
+  $dbh->{PrintError} = 0;
+  my $sth;
+  eval { $sth = $dbh->do($sql); };
+  if($@) {
+    Log3 $hash->{NAME}, 2, "DBLog error: $@";
     return 0;
   }
   return $sth;
@@ -4039,7 +4068,6 @@ sub DbLog_reduceLogNbl($) {
         # Server default
         eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1 });};
     }
-	
     if ($@) {
         my $err = encode_base64($@,"");
         Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
@@ -4447,17 +4475,16 @@ sub DbLog_deldaysNbl($) {
       # Server default
       eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1 });};
   }
-
-  my $ac = ($dbh->{AutoCommit})?"ON":"OFF";
-  my $tm = ($useta)?"ON":"OFF";
-  Log3 $hash->{NAME}, 4, "DbLog $name -> AutoCommit mode: $ac, Transaction mode: $tm";
-  
   if ($@) {
       $error = encode_base64($@,"");
       Log3 ($name, 2, "DbLog $name - Error: $@");
       Log3 ($name, 5, "DbLog $name -> DbLog_deldaysNbl finished");
       return "$name|0|0|$error"; 
   }
+  
+  my $ac = ($dbh->{AutoCommit})?"ON":"OFF";
+  my $tm = ($useta)?"ON":"OFF";
+  Log3 $hash->{NAME}, 4, "DbLog $name -> AutoCommit mode: $ac, Transaction mode: $tm";
   
   $cmd = "delete from history where TIMESTAMP < ";
   if ($hash->{MODEL} eq 'SQLITE') { 
@@ -4539,6 +4566,162 @@ sub DbLog_deldaysNbl_done($) {
   delete $hash->{HELPER}{DELDAYS_PID};
   Log3 ($name, 5, "DbLog $name -> DbLog_deldaysNbl_done finished");
 return;
+}
+
+################################################################
+# benutzte DB-Feldlängen in Helper und Internals setzen
+################################################################
+sub DbLog_setinternalcols ($){
+  my ($hash)= @_;
+  my $name = $hash->{NAME};
+
+  $hash->{HELPER}{DEVICECOL}   = $columns{DEVICE};
+  $hash->{HELPER}{TYPECOL}     = $columns{TYPE};
+  $hash->{HELPER}{EVENTCOL}    = AttrVal($name, "colEvent", $columns{EVENT});
+  $hash->{HELPER}{READINGCOL}  = AttrVal($name, "colReading", $columns{READING});
+  $hash->{HELPER}{VALUECOL}    = AttrVal($name, "colValue", $columns{VALUE});
+  $hash->{HELPER}{UNITCOL}     = $columns{UNIT};
+  
+  $hash->{COLUMNS} = "field length used for Device: $hash->{HELPER}{DEVICECOL}, Type: $hash->{HELPER}{TYPECOL}, Event: $hash->{HELPER}{EVENTCOL}, Reading: $hash->{HELPER}{READINGCOL}, Value: $hash->{HELPER}{VALUECOL}, Unit: $hash->{HELPER}{UNITCOL} ";
+
+  # Statusbit "Columns sind gesetzt"
+  $hash->{HELPER}{COLSET} = 1;
+
+return;
+}
+
+################################################################
+# reopen DB-Connection nach Ablauf set ... reopen [n] seconds
+################################################################
+sub DbLog_reopen ($){
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $async  = AttrVal($name, "asyncMode", undef);
+  
+  RemoveInternalTimer($hash, "DbLog_reopen");
+  
+  if(DbLog_ConnectPush($hash)) {
+      # Statusbit "Kein Schreiben in DB erlauben" löschen
+      my $delay = delete $hash->{HELPER}{REOPEN_RUNS};
+	  Log3($name, 2, "DbLog $name: Database connection reopened (it was $delay seconds closed).") if($delay);
+	  readingsSingleUpdate($hash, "state", "reopened", 1);
+	  $hash->{HELPER}{OLDSTATE} = "reopened";
+	  DbLog_execmemcache($hash) if($async);
+  } else {
+      InternalTimer(gettimeofday()+30, "DbLog_reopen", $hash, 0);		
+  }
+  
+return;
+}
+
+################################################################
+# check ob primary key genutzt wird
+################################################################
+sub DbLog_checkUsePK ($$){
+  my ($hash,$dbh) = @_;
+  my $name   = $hash->{NAME};
+  my $dbconn = $hash->{dbconn};
+  my $upkh = 0;
+  my $upkc = 0;
+  my (@pkh,@pkc);
+  
+  my $db = (split("=",(split(";",$dbconn))[0]))[1];
+  eval {@pkh = $dbh->primary_key( undef, undef, 'history' );};
+  eval {@pkc = $dbh->primary_key( undef, undef, 'current' );};
+  my $pkh = (!@pkh || @pkh eq "")?"none":join(",",@pkh);
+  my $pkc = (!@pkc || @pkc eq "")?"none":join(",",@pkc);
+  $pkh =~ tr/"//d;
+  $pkc =~ tr/"//d;
+  $upkh = 1 if(@pkh && @pkh ne "none");
+  $upkc = 1 if(@pkc && @pkc ne "none");
+  Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.history: $pkh";
+  Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.current: $pkc";
+
+  return ($upkh,$upkc,$pkh,$pkc);
+}
+
+################################################################
+#  Routine für FHEMWEB Detailanzeige
+################################################################
+sub DbLog_fhemwebFn($$$$) {
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+
+  my $ret;
+  my $newIdx=1;
+  while($defs{"SVG_${d}_$newIdx"}) {
+      $newIdx++;
+  }
+  my $name = "SVG_${d}_$newIdx";
+  $ret .= FW_pH("cmd=define $name SVG $d:templateDB:HISTORY;".
+                 "set $name copyGplotFile&detail=$name",
+                 "<div class=\"dval\">Create SVG plot from DbLog</div>", 0, "dval", 1);
+return $ret;
+}
+
+################################################################
+#  Dropdown-Menü cuurent-Tabelle SVG-Editor
+################################################################
+sub DbLog_sampleDataFn($$$$$) {
+  my ($dlName, $dlog, $max, $conf, $wName) = @_;
+  my $desc = "Device:Reading";
+  my @htmlArr;
+  my @example;
+  my @colregs;
+  my $counter;
+  my $currentPresent = AttrVal($dlName,'DbLogType','History');  
+  
+  my $dbhf = DbLog_ConnectNewDBH($defs{$dlName});
+  return if(!$dbhf);
+  
+  # check presence of table current
+  # avoids fhem from crash if table 'current' is not present and attr DbLogType is set to /Current/
+  my $prescurr = eval {$dbhf->selectrow_array("select count(*) from current");} || 0;
+  Log3($dlName, 5, "DbLog $dlName: Table current present : $prescurr (0 = not present or no content)");
+  
+  if($currentPresent =~ m/Current|SampleFill/ && $prescurr) {
+    # Table Current present, use it for sample data
+    my $query = "select device,reading from current where device <> '' group by device,reading";
+    my $sth = $dbhf->prepare( $query );  
+    $sth->execute();
+    while (my @line = $sth->fetchrow_array()) {
+      $counter++;
+      push (@example, join (" ",@line)) if($counter <= 8); # show max 8 examples
+      push (@colregs, "$line[0]:$line[1]"); # push all eventTypes to selection list
+    }
+	$dbhf->disconnect(); 
+    my $cols = join(",", sort { "\L$a" cmp "\L$b" } @colregs);
+
+    $max = 8 if($max > 8);
+    for(my $r=0; $r < $max; $r++) {
+      my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
+      my $ret = "";
+      $ret .= SVG_sel("par_${r}_0", $cols, "$f[0]:$f[1]");
+#      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
+#      $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
+#      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
+      push @htmlArr, $ret;
+    }
+
+  } else {
+  # Table Current not present, so create an empty input field
+    push @example, "No sample data due to missing table 'Current'";
+
+    $max = 8 if($max > 8);
+    for(my $r=0; $r < $max; $r++) {
+      my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
+      my $ret = "";
+      no warnings 'uninitialized';            # Forum:74690, bug unitialized
+      $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20);   
+	  use warnings;
+#      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
+#      $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
+#      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
+      push @htmlArr, $ret;
+    }
+
+  }
+
+return ($desc, \@htmlArr, join("<br>", @example));
 }
 
 ################################################################
@@ -4831,85 +5014,6 @@ sub chartQuery($@) {
 return $jsonstring;
 }
 
-#########################
-sub DbLog_fhemwebFn($$$$) {
-  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
-
-   my $ret;
-   my $newIdx=1;
-   while($defs{"SVG_${d}_$newIdx"}) {
-     $newIdx++;
-   }
-   my $name = "SVG_${d}_$newIdx";
-   $ret .= FW_pH("cmd=define $name SVG $d:templateDB:HISTORY;".
-                  "set $name copyGplotFile&detail=$name",
-                  "<div class=\"dval\">Create SVG plot from DbLog</div>", 0, "dval", 1);
-return $ret;
-}
-
-sub DbLog_sampleDataFn($$$$$) {
-  my ($dlName, $dlog, $max, $conf, $wName) = @_;
-  my $desc = "Device:Reading";
-  my @htmlArr;
-  my @example;
-  my @colregs;
-  my $counter;
-  my $currentPresent = AttrVal($dlName,'DbLogType','History');  
-  
-  my $dbhf = DbLog_ConnectNewDBH($defs{$dlName});
-  return if(!$dbhf);
-  
-  # check presence of table current
-  # avoids fhem from crash if table 'current' is not present and attr DbLogType is set to /Current/
-  my $prescurr = eval {$dbhf->selectrow_array("select count(*) from current");} || 0;
-  Log3($dlName, 5, "DbLog $dlName: Table current present : $prescurr (0 = not present or no content)");
-  
-  if($currentPresent =~ m/Current|SampleFill/ && $prescurr) {
-    # Table Current present, use it for sample data
-    my $query = "select device,reading from current where device <> '' group by device,reading";
-    my $sth = $dbhf->prepare( $query );  
-    $sth->execute();
-    while (my @line = $sth->fetchrow_array()) {
-      $counter++;
-      push (@example, join (" ",@line)) if($counter <= 8); # show max 8 examples
-      push (@colregs, "$line[0]:$line[1]"); # push all eventTypes to selection list
-    }
-	$dbhf->disconnect(); 
-    my $cols = join(",", sort { "\L$a" cmp "\L$b" } @colregs);
-
-    $max = 8 if($max > 8);
-    for(my $r=0; $r < $max; $r++) {
-      my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
-      my $ret = "";
-      $ret .= SVG_sel("par_${r}_0", $cols, "$f[0]:$f[1]");
-#      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
-#      $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
-#      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
-      push @htmlArr, $ret;
-    }
-
-  } else {
-  # Table Current not present, so create an empty input field
-    push @example, "No sample data due to missing table 'Current'";
-
-    $max = 8 if($max > 8);
-    for(my $r=0; $r < $max; $r++) {
-      my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
-      my $ret = "";
-      no warnings 'uninitialized';            # Forum:74690, bug unitialized
-      $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20);   
-	  use warnings;
-#      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
-#      $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
-#      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
-      push @htmlArr, $ret;
-    }
-
-  }
-
-return ($desc, \@htmlArr, join("<br>", @example));
-}
-
 #
 # get <dbLog> ReadingsVal       <device> <reading> <default>
 # get <dbLog> ReadingsTimestamp <device> <reading> <default>
@@ -4936,78 +5040,6 @@ sub dbReadings($@) {
   return $reading   if $a[1] eq 'ReadingsVal';
   return $timestamp if $a[1] eq 'ReadingsTimestamp';
   return "Syntax error: $a[1]";
-}
-
-################################################################
-# benutzte DB-Feldlängen in Helper und Internals setzen
-################################################################
-sub setinternalcols ($){
-  my ($hash)= @_;
-  my $name = $hash->{NAME};
-
-  $hash->{HELPER}{DEVICECOL}   = $columns{DEVICE};
-  $hash->{HELPER}{TYPECOL}     = $columns{TYPE};
-  $hash->{HELPER}{EVENTCOL}    = AttrVal($name, "colEvent", $columns{EVENT});
-  $hash->{HELPER}{READINGCOL}  = AttrVal($name, "colReading", $columns{READING});
-  $hash->{HELPER}{VALUECOL}    = AttrVal($name, "colValue", $columns{VALUE});
-  $hash->{HELPER}{UNITCOL}     = $columns{UNIT};
-  
-  $hash->{COLUMNS} = "field length used for Device: $hash->{HELPER}{DEVICECOL}, Type: $hash->{HELPER}{TYPECOL}, Event: $hash->{HELPER}{EVENTCOL}, Reading: $hash->{HELPER}{READINGCOL}, Value: $hash->{HELPER}{VALUECOL}, Unit: $hash->{HELPER}{UNITCOL} ";
-
-  # Statusbit "Columns sind gesetzt"
-  $hash->{HELPER}{COLSET} = 1;
-
-return;
-}
-
-################################################################
-# reopen DB-Connection nach Ablauf set ... reopen [n] seconds
-################################################################
-sub reopen ($){
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
-  my $async  = AttrVal($name, "asyncMode", undef);
-  
-  RemoveInternalTimer($hash, "reopen");
-  
-  if(DbLog_ConnectPush($hash)) {
-      # Statusbit "Kein Schreiben in DB erlauben" löschen
-      my $delay = delete $hash->{HELPER}{REOPEN_RUNS};
-	  Log3($name, 2, "DbLog $name: Database connection reopened (it was $delay seconds closed).") if($delay);
-	  readingsSingleUpdate($hash, "state", "reopened", 1);
-	  $hash->{HELPER}{OLDSTATE} = "reopened";
-	  DbLog_execmemcache($hash) if($async);
-  } else {
-      InternalTimer(gettimeofday()+30, "reopen", $hash, 0);		
-  }
-  
-return;
-}
-
-################################################################
-# check ob primary key genutzt wird
-################################################################
-sub checkUsePK ($$){
-  my ($hash,$dbh) = @_;
-  my $name   = $hash->{NAME};
-  my $dbconn = $hash->{dbconn};
-  my $upkh = 0;
-  my $upkc = 0;
-  my (@pkh,@pkc);
-  
-  my $db = (split("=",(split(";",$dbconn))[0]))[1];
-  eval {@pkh = $dbh->primary_key( undef, undef, 'history' );};
-  eval {@pkc = $dbh->primary_key( undef, undef, 'current' );};
-  my $pkh = (!@pkh || @pkh eq "")?"none":join(",",@pkh);
-  my $pkc = (!@pkc || @pkc eq "")?"none":join(",",@pkc);
-  $pkh =~ tr/"//d;
-  $pkc =~ tr/"//d;
-  $upkh = 1 if(@pkh && @pkh ne "none");
-  $upkc = 1 if(@pkc && @pkc ne "none");
-  Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.history: $pkh";
-  Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key used in $db.current: $pkc";
-
-  return ($upkh,$upkc,$pkh,$pkc);
 }
 
 1;
