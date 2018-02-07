@@ -67,17 +67,18 @@ NotifyAndroidTV_Initialize($)
   $hash->{DefFn}    = "NotifyAndroidTV_Define";
   $hash->{UndefFn}  = "NotifyAndroidTV_Undefine";
   $hash->{SetFn}    = "NotifyAndroidTV_Set";
-  #$hash->{AttrFn}   = "NotifyAndroidTV_Attr";
+  $hash->{AttrFn}   = "NotifyAndroidTV_Attr";
   #$hash->{AttrList} = "defaultIcon";
 
   foreach my $option (keys %{$options}) {
     $hash->{AttrList} .= ' ' if( $hash->{AttrList} );
-    $hash->{AttrList} .= "NotifyAndroidTV#$option";
+    #$hash->{AttrList} .= "NotifyAndroidTV#$option";
+    $hash->{AttrList} .= "default". ucfirst $option;
     if( $options->{$option} ) {
       $hash->{AttrList} .= ":select,". join( ',', sort keys %{$options->{$option}} )
     }
   }
-  delete $hash->{AttrList};
+  #delete $hash->{AttrList};
 }
 
 #####################################
@@ -149,7 +150,7 @@ NotifyAndroidTV_Set($$@)
 
   my $list = 'msg';
 
-  if( $cmd eq 'msg' || $cmd eq 'notify' ) {
+  if( $cmd && ($cmd eq 'msg' || $cmd eq 'notify') ) {
     my ($param_a, $param_h) = parseParams(\@params);
 
     my $txt = join( ' ', @{$param_a} );
@@ -175,10 +176,19 @@ NotifyAndroidTV_Set($$@)
 
     return "error: $error" if( $error );
 
+    foreach my $option (keys %{$options}) {
+      if( !defined($param_h->{$option}) ) {
+        if( my $default = AttrVal($name, "default". ucfirst $option, undef) ) {
+          $param_h->{$option} = $default;
+        }
+      }
+    }
+
     $param_h->{offset} = 0 if( !$param_h->{offset} );
     $param_h->{offsety} = 0 if( !$param_h->{offsety} );
     $param_h->{transparency} = 0 if( !$param_h->{transparency} );
 
+return Dumper $param_h;
 
     $param_h->{icon} = 'fhemicon.png' if( !$param_h->{icon} );
     $param_h->{icon} .= ".png" if( $param_h->{icon} !~ '\.' );
@@ -199,8 +209,8 @@ NotifyAndroidTV_Set($$@)
 
     my $image;
     if( $param_h->{image} ) {
-      $param_h->{image} .= ".jpg" if( $param_h->{image} !~ '\.' );
-      $param_h->{image} = "$FW_icondir/default/$param_h->{image}" if( $param_h->{image} !~ '^/' );
+      #$param_h->{image} .= ".jpg" if( $param_h->{image} !~ '\.' );
+      #$param_h->{image} = "$FW_icondir/default/$param_h->{image}" if( $param_h->{image} !~ '^/' );
 
       Log3 $name, 5, "$name: using image $param_h->{image}";
 
@@ -215,9 +225,9 @@ NotifyAndroidTV_Set($$@)
     }
 
 
-    if( !$txt ) {
+    if( !$txt && !$image && !$param_h->{imageurl} ) {
       my $usage = "usage: set $name msg";
-      foreach my $option ( sort keys %{$options}) {
+      foreach my $option (sort keys %{$options}) {
         if( $options->{$option} ) {
           $usage .= " [$option=". join( '|', sort keys %{$options->{$option}} ). "]";
         } else {
@@ -293,8 +303,11 @@ NotifyAndroidTV_Attr($$$)
 
 
   if( $cmd eq "set" ) {
-    if($options->{$attrName} && !defined($options->{$attrName}{$attrVal})) {
-      return "$attrName value must be one of: ". join( ' ', sort keys %{$options->{$attrName}} );
+    if( $attrName =~ m/default(.*)/ ) {
+      my $option = lcfirst $1;
+      if($options->{$option} && !defined($options->{$option}{$attrVal})) {
+        return "$attrName value must be one of: ". join( ' ', sort keys %{$options->{$option}} );
+      }
     }
   }
 
