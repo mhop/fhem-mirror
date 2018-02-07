@@ -22,6 +22,9 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.10:	added set commands active, inactive and clear
+#				added gplot files
+#				minor bug fixes				
 #		0.0.09:	fixed incomplete renaming of Attribute fm_freezeThreshold
 #		0.0.08:	trimming of very long lines in "get freeze" 
 #				start freezemon only after INITIALIZED|REREADCFG (and as late as possible)
@@ -48,8 +51,7 @@
 ##############################################################################
 # 	  Todo:
 #	  	adjust to optimized handleTimeout
-#		
-# 		
+# 		logs/plots
 # 		
 ##############################################################################
 
@@ -65,7 +67,7 @@ use B qw(svref_2object);
 
 
 
-my $version     = "0.0.09";
+my $version     = "0.0.10";
 
 ###################################
 sub freezemon_Initialize($) {
@@ -77,7 +79,7 @@ sub freezemon_Initialize($) {
       ( "fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log");
 
     $hash->{GetFn}    = "freezemon_Get";
-    #$hash->{SetFn}    = "freezemon_Set";
+    $hash->{SetFn}    = "freezemon_Set";
     $hash->{DefFn}    = "freezemon_Define";
     $hash->{UndefFn}  = "freezemon_Undefine";
 	$hash->{NotifyFn}  = "freezemon_Notify";
@@ -88,7 +90,7 @@ sub freezemon_Initialize($) {
 	
 	
 	#map new Attribute names
-	$hash->{AttrRenameMap} = { "fmForceApptime:0,1" => "fm_forceApptime:0,1",
+	$hash->{AttrRenameMap} = { "fmForceApptime" => "fm_forceApptime:",
                            "fmFreezeTime" => "fm_freezeThreshold"
 							};
 	
@@ -112,15 +114,15 @@ sub freezemon_Define($$) {
     Log3 $name, 3, "freezemon defined $name $type";
 
     $hash->{VERSION} = $version;
-    $hash->{STATE}   = "Initialized";
 	$hash->{NAME} = $name;
 
 	# start the timer
 	if (!IsDisabled($name) && $init_done) {
-		my $next = int(gettimeofday()) + 1; 
-		$hash->{helper}{TIMER} = $next;
-		InternalTimer($next, 'freezemon_ProcessTimer', $hash, 0);
-		Log3 $name, 2, "FreezeMon: $name ready to watch out for delays greater than ".AttrVal($name, "fm_freezeThreshold",1)." second(s)";
+		freezemon_start($hash)
+	}
+	else {
+		$hash->{STATE} = "inactive";
+		$hash->{helper}{DISABLED} = 1;
 	}
 	$hash->{VERSION} = $version;
     
@@ -145,11 +147,8 @@ sub freezemon_Notify($$)
 	
 	return "" if(IsDisabled($name)); # Return without any further action if the module is disabled
 	return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$events}));
-  
-	my $next = int(gettimeofday()) + 1; 
-	$hash->{helper}{TIMER} = $next;
-	InternalTimer($next, 'freezemon_ProcessTimer', $hash, 0);
-	Log3 $name, 2, "FreezeMon: $name ready to watch out for delays greater than ".AttrVal($name, "fm_freezeThreshold",1)." second(s)";
+	
+	freezemon_start($hash);
  }
 ###################################
 sub freezemon_ProcessTimer($)
@@ -259,6 +258,46 @@ sub freezemon_ProcessTimer($)
   $hash->{helper}{TIMER} = int($now) + 1;
   InternalTimer($hash->{helper}{TIMER}, 'freezemon_ProcessTimer', $hash, 0);
 }
+###################################
+sub freezemon_Set($@)
+{
+	my ( $hash, $name, $cmd, @args ) = @_;
+
+	return "\"set $name\" needs at least one argument" unless(defined($cmd));
+
+	if($cmd eq "inactive")	{
+		RemoveInternalTimer($hash);
+		readingsSingleUpdate($hash, "state", "inactive",1);
+		$hash->{helper}{DISABLED} = 1;
+	}
+	elsif($cmd eq "active")	{
+		if (IsDisabled($name)) {
+			freezemon_start($hash);
+		} else {
+			return "Freezemon $name is already active";
+		}
+	}
+	elsif($cmd eq "clear") {
+		readingsBeginUpdate($hash);
+		readingsBulkUpdate($hash, "fcDayLast", 0, 1);
+		readingsBulkUpdate($hash, "ftDayLast", 0, 1);
+		readingsBulkUpdate($hash, "fcDay", 0, 1);
+		readingsBulkUpdate($hash, "ftDay", 0, 1);
+		readingsBulkUpdate($hash, ".lastDay", "", 1);
+		readingsBulkUpdate($hash, ".fm_freezes", "", 1);
+		if (!IsDisabled($name)) {
+			readingsBulkUpdate($hash, "state", "initialized", 1);
+		}
+		readingsBulkUpdate($hash, "freezeTime", 0, 1);
+		readingsBulkUpdate($hash, "freezeDevice","", 1);
+		readingsEndUpdate($hash,1);
+	}
+	else
+	{
+		return "Unknown argument $cmd, choose one of active:noArg inactive:noArg clear:noArg";
+	}
+return undef;
+}
 
 ###################################
 sub freezemon_Get($@) {
@@ -336,26 +375,18 @@ sub freezemon_Attr($) {
 		if ( $aName eq "disable" ) {
 			if ($aVal == 1) {
 				RemoveInternalTimer($hash);
+				readingsSingleUpdate($hash, "state", "inactive",1);
 				$hash->{helper}{DISABLED} = 1;
-				readingsSingleUpdate($hash, "state", "disabled",1);
 			}
 			elsif ($aVal == 0)  {
-				readingsSingleUpdate($hash, "state", "initialized",0) if(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1);
-				$hash->{helper}{DISABLED} = 0;
-				my $next = int(gettimeofday()) + 1;
-				$hash->{helper}{TIMER} = $next;
-				InternalTimer($hash->{helper}{TIMER}, 'freezemon_ProcessTimer', $hash, 0);
+				freezemon_start($hash);
 			}
 
 		}
 	}
 	elsif ( $cmd eq "del" ) {
 		if ( $aName eq "disable" ) {
-			readingsSingleUpdate($hash, "state", "initialized",0) if(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1);
-			$hash->{helper}{DISABLED} = 0;
-			my $next = int(gettimeofday()) + 1;
-			$hash->{helper}{TIMER} = $next;
-			InternalTimer($hash->{helper}{TIMER}, 'freezemon_ProcessTimer', $hash, 0);
+			freezemon_start($hash);
 		}
     }
 
@@ -366,6 +397,21 @@ sub freezemon_Attr($) {
 
 ###################################
 # Helper Functions                #
+###################################
+
+###################################
+sub freezemon_start($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	readingsSingleUpdate($hash, "state", "initialized",0) if(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1);
+	$hash->{helper}{DISABLED} = 0;
+	my $next = int(gettimeofday()) + 1; 
+	$hash->{helper}{TIMER} = $next;
+	InternalTimer($next, 'freezemon_ProcessTimer', $hash, 0);
+	Log3 $name, 2, "FreezeMon: $name ready to watch out for delays greater than ".AttrVal($name, "fm_freezeThreshold",1)." second(s)";
+}
+
 ###################################
 sub freezemon_apptime() {
 my @intAtKeys = keys(%intAt);
@@ -465,7 +511,11 @@ if(%prioQueues) {
   <a name="freezemonSet"></a>
   <b>Set</b>
   <ul>
-  Currently no SET commands are supported.<br><br>
+	<ul>
+		<li>inactive: disables the device (similar to attribute "disable", however without the need to save</li>
+		<li>active: reactivates the device after it was set inactive</li>
+		<li>clear: clears all readings (including the list of the last 20 freezes.)</li>
+	</ul>
   </ul>	
 <a name="freezemonGet"></a>
   <b>Get</b>
@@ -497,7 +547,28 @@ if(%prioQueues) {
 				<li>disable: activate/deactivate freeze detection</li>
 			</ul>
 		</ul>
-	</ul>
+	  <b>Additional Information</b>
+  A Filelog for the device can be created as follows: (Assumption: device is called freezemon, otherwise replace accordingly)<br><br>
+  <code>define FileLog_freezemon FileLog %L/FileLog_freezemon.log freezemon</code><br><br>
+  
+  In case you're using configDb, import the gplot files:<br>
+  <code>configDB fileimport ./www/gplot/freezemon_gplot.gplot</code><br>
+  <code>configDB fileimport ./www/gplot/freezemon_day.gplot</code><br><br>
+  
+  In case you're using DbLog, adjust the gplot files accordingly.<br><br>
+  
+  Create plot with individual freezes:<br><br>
+  <code>define SVG_FileLog_freezemon SVG FileLog_freezemon:freezemon:CURRENT</code><br>
+  <code>attr SVG_FileLog_freezemon plotReplace TL={"Freezes today: ".$data{max1}." - Longest Freeze ".sprintf("%.2f ",$data{max2}) }</code><br><br>
+  
+  Create plot with daily sums:<br><br>
+  <code>define SVG_FileLog_freezemon_day SVG FileLog_freezemon:freezemon_day:CURRENT</code><br>
+  <code>attr SVG_FileLog_freezemon_day fixedrange month</code><br>
+  <code>attr SVG_FileLog_freezemon_day plotReplace TL={"Max Freezes: ".$data{max1}." - Max Freezetime ".sprintf("%.2f ",$data{max2}) }</code><br>
+  
+</ul>
+
+</ul>
 </div>
 
 =end html
@@ -528,8 +599,13 @@ if(%prioQueues) {
 	</ul>
   <a name="freezemonSet"></a>
   <b>Set</b>
-  <ul>
-	Derzeit gibt es keine SET Kommandos<br><br>
+	<ul>
+		<ul>
+		<li>inactive: deaktiviert das Device (identisch zum Attribut "disable", aber ohne die Notwendigkeit su "saven".</li>
+		<li>active: reaktiviert das Device nachdem es auf inactive gesetzt wurde</li>
+		<li>clear: Löscht alle readings (inklusive der Liste der letzten 20 Freezes).</li>
+	</ul>
+
   </ul>	
   <a name="freezemonGet"></a>
   <b>Get</b>
@@ -561,6 +637,25 @@ if(%prioQueues) {
 			<li>disable: aktivieren/deaktivieren der Freeze-Erkennung</li>
 		</ul>
   </ul>
+  <b>Zusätzliche Infos</b>
+  Ein Filelog für das Device kann wie folgt angelegt werden: (Annahme: Das Device heisst freezemon, ansonsten entsprechend ersetzen)<br><br>
+  <code>define FileLog_freezemon FileLog %L/FileLog_freezemon.log freezemon</code><br><br>
+  
+  Bei Verwendung von configDb, die gplot files importieren:<br>
+  <code>configDB fileimport ./www/gplot/freezemon_gplot.gplot</code><br>
+  <code>configDB fileimport ./www/gplot/freezemon_day.gplot</code><br><br>
+  
+  Bei Verwendung von DbLog, die gplot files entsprechend anpassen.<br><br>
+  
+  Ein plot mit den einzelnen Freezes:<br><br>
+  <code>define SVG_FileLog_freezemon SVG FileLog_freezemon:freezemon:CURRENT</code><br>
+  <code>attr SVG_FileLog_freezemon plotReplace TL={"Freezes today: ".$data{max1}." - Longest Freeze ".sprintf("%.2f ",$data{max2}) }</code><br><br>
+  
+  Ein Plot mit den Tageswerten:<br><br>
+  <code>define SVG_FileLog_freezemon_day SVG FileLog_freezemon:freezemon_day:CURRENT</code><br>
+  <code>attr SVG_FileLog_freezemon_day fixedrange month</code><br>
+  <code>attr SVG_FileLog_freezemon_day plotReplace TL={"Max Freezes: ".$data{max1}." - Max Freezetime ".sprintf("%.2f ",$data{max2}) }</code><br>
+  
 </ul>
 </div>
 

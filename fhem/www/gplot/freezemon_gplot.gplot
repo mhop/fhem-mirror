@@ -1,0 +1,22 @@
+# Simple plot for Freezemon 
+# Created by KernSani 2018-02-07 19:21:40
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<TL>'
+set ytics 
+set y2tics 
+set grid
+set ylabel "Freezecount"
+set y2label "Freezetime"
+
+#FileLog_freezemon 4:freezemon.fcDay\x3a::
+#FileLog_freezemon 4:freezemon.ftDay\x3a::
+#FileLog_freezemon 4:freezemon.freezeTime\x3a::
+
+plot "<IN>" using 1:2 axes x1y1 title 'FreezeCount' ls l1 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'FreezeTime' ls l0 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Freeze' ls l2 lw 1 with points
