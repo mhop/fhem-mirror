@@ -22,13 +22,14 @@
 #
 ################################################################################
 
-my $module_version = "1.10";
+my $module_version = "1.12";
 
 package main;
 
 use strict;
 use warnings;
 use POSIX;
+use Encode;
 
 sub expandJSON_expand($$$$;$$);  # Forum #66761
 
@@ -175,7 +176,7 @@ sub expandJSON_decode($$$$) {
   my ($name,$type) = ($hash->{NAME},$hash->{TYPE});
   my $dhash = $defs{$dname};
   my $h;
-  eval { $h = decode_json($dvalue); 1; };
+  eval { $h = decode_json(encode_utf8($dvalue)); 1; };
   if ( $@ ) {
     Log3 $name, 2, "$type $name: Bad JSON: $dname $dreading: $dvalue";
     Log3 $name, 2, "$type $name: $@";
@@ -217,6 +218,12 @@ sub expandJSON_expand($$$$;$$) {
           if $reading =~ m/^$hash->{t_regexp}$/;
       }
     }
+  }
+  elsif( ref( $ref ) eq "JSON::PP::Boolean" ) { # Forum #82734
+    (my $reading = $sPrefix.$prefix) =~ s/[^A-Za-z\d_\.\-\/]/_/g;
+    $reading = substr($reading, 0, -1); #remove tailing _
+    readingsBulkUpdate($dhash, $reading, $ref ? 1 : 0) 
+      if $reading =~ m/^$hash->{t_regexp}$/;
   }
 }
 
