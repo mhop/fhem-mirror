@@ -884,7 +884,7 @@ sub EventDoIf
   my $dev=$hash->{helper}{triggerDev};
   my $eventa=$hash->{helper}{triggerEvents};
   if ($check) {
-    if ($dev ne $n) {
+    if ($dev eq "" or $dev ne $n) {
       if (defined $filter) {
         return ($default)
       } else {
@@ -892,7 +892,7 @@ sub EventDoIf
       }
     }
   } else {
-    if ($n and $dev !~ /$n/) {
+    if ($dev eq "" or $n and $dev !~ /$n/) {
       if (defined $filter) {
         return ($default)
       } else {
@@ -2947,6 +2947,7 @@ DOIF_Set($@)
       delete ($defs{$hash->{NAME}}{READINGS}{last_cmd});
       readingsSingleUpdate ($hash,"mode","enabled",1)
   } elsif ($arg eq "checkall" ) {
+    $hash->{helper}{triggerDev}="";
     DOIF_Trigger ($hash,$pn,1);
   } elsif ($arg =~ /^cmd_(.*)/ ) {
     if (ReadingsVal($pn,"mode","") ne "disabled") {
