@@ -76,8 +76,7 @@ sub CommandConfigdb($$) {
 			
 			if ($dbtype eq 'SQLITE') {
 				(undef,$source) = split (/=/, $dbconn);
-				my $dbtables = "fhemversions fhemconfig fhemstate fhemb64filesave";
-				my $dumpcmd = "echo '.dump ".$dbtables."' | sqlite3 $source $gzip > $target";
+				my $dumpcmd = "echo '.dump fhem%' | sqlite3 $source $gzip > $target";
 				Log 4,"configDB: $dumpcmd";
 				$ret        = qx($dumpcmd);
 				return $ret if $ret; # return error message if available
