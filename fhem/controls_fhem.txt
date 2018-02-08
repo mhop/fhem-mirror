@@ -1,4 +1,4 @@
-REV 16105
+REV 16111
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,11 +21,11 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-02-07_07:45:03 235110 ./CHANGED
+UPD 2018-02-08_07:45:02 235257 ./CHANGED
 UPD 2018-02-06_07:45:02 36796 ./MAINTAINER.txt
 UPD 2018-01-06_07:45:03 39329 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
-UPD 2018-02-05_07:45:06 143581 ./fhem.pl
+UPD 2018-02-08_07:45:05 143587 ./fhem.pl
 UPD 2015-11-07_07:45:11 21944 FHEM/00_CM11.pm
 UPD 2017-09-09_07:45:02 56979 FHEM/00_CUL.pm
 UPD 2017-05-10_07:45:02 76972 FHEM/00_DFPlayerMini.pm
@@ -204,7 +204,7 @@ UPD 2016-08-23_07:45:12 9997 FHEM/36_PCA301.pm
 UPD 2017-11-03_07:45:02 17579 FHEM/36_PrecipitationSensor.pm
 UPD 2017-06-29_07:45:02 52978 FHEM/36_Vallox.pm
 UPD 2017-11-09_07:45:02 22669 FHEM/36_WMBUS.pm
-UPD 2018-02-07_07:45:03 10026 FHEM/37_NotifyAndroidTV.pm
+UPD 2018-02-08_07:45:02 10463 FHEM/37_NotifyAndroidTV.pm
 UPD 2015-07-28_14:05:31 10162 FHEM/37_SHC.pm
 UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
 UPD 2017-09-03_07:45:02 55116 FHEM/37_Spotify.pm
@@ -401,8 +401,8 @@ UPD 2017-09-04_07:45:02 10369 FHEM/91_sequence.pm
 UPD 2017-08-14_07:45:02 14785 FHEM/91_watchdog.pm
 UPD 2018-01-14_07:45:02 55981 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
-UPD 2018-02-04_07:45:02 326004 FHEM/93_DbLog.pm
-UPD 2018-02-04_07:45:02 536965 FHEM/93_DbRep.pm
+UPD 2018-02-08_07:45:02 327452 FHEM/93_DbLog.pm
+UPD 2018-02-08_07:45:02 540157 FHEM/93_DbRep.pm
 UPD 2017-09-06_07:45:02 17463 FHEM/93_FHEM2FHEM.pm
 UPD 2017-11-24_07:45:02 41381 FHEM/93_Log2Syslog.pm
 UPD 2018-02-03_07:45:02 66822 FHEM/93_PWMR.pm
@@ -485,7 +485,7 @@ UPD 2016-12-03_07:45:16 5092 FHEM/98_dummy.pm
 UPD 2017-03-16_07:45:02 10243 FHEM/98_expandJSON.pm
 UPD 2018-02-01_07:45:02 5918 FHEM/98_fhemdebug.pm
 UPD 2017-08-03_07:45:02 11113 FHEM/98_fheminfo.pm
-UPD 2018-02-07_07:45:03 19132 FHEM/98_freezemon.pm
+UPD 2018-02-08_07:45:02 22786 FHEM/98_freezemon.pm
 UPD 2017-10-11_07:45:02 9129 FHEM/98_help.pm
 UPD 2017-02-13_07:45:02 44023 FHEM/98_logProxy.pm
 UPD 2017-12-10_07:45:03 52575 FHEM/98_monitoring.pm
@@ -664,8 +664,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-02-07_07:45:04 3340237 docs/commandref.html
-UPD 2018-02-07_07:45:06 2042245 docs/commandref_DE.html
+UPD 2018-02-08_07:45:04 3341994 docs/commandref.html
+UPD 2018-02-08_07:45:05 2044011 docs/commandref_DE.html
 UPD 2018-02-04_07:45:02 74394 docs/commandref_frame.html
 UPD 2018-02-04_07:45:02 83807 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
@@ -795,6 +795,8 @@ UPD 2015-07-28_14:05:32 641 www/gplot/dayAvgTemp5rain11.gplot
 UPD 2015-07-28_14:05:32 713 www/gplot/esa2000.gplot
 UPD 2015-07-28_14:05:32 729 www/gplot/fht.gplot
 UPD 2015-07-28_14:05:32 533 www/gplot/fht80tf.gplot
+UPD 2018-02-08_07:45:02 562 www/gplot/freezemon_day.gplot
+UPD 2018-02-08_07:45:02 658 www/gplot/freezemon_gplot.gplot
 UPD 2015-07-28_14:05:32 595 www/gplot/fs20.gplot
 UPD 2015-07-28_14:05:32 1208 www/gplot/garden.gplot
 UPD 2015-07-28_14:05:32 787 www/gplot/hm-rt.gplot
