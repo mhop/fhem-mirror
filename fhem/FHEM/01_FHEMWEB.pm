@@ -149,6 +149,7 @@ FHEMWEB_Initialize($)
     csrfToken
     csrfTokenHTTPHeader:0,1
     alarmTimeout
+    allowedHttpMethods
     allowedCommands
     allowfrom
     basicAuth
@@ -419,7 +420,8 @@ FW_Read($$)
   my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3)
         if($FW_httpheader[0]);
   $method = "" if(!$method);
-  if($method !~ m/^(GET|POST)$/i){
+  my $ahm = AttrVal($FW_wname, "allowedHttpMethods", "GET|POST");
+  if($method !~ m/^($ahm)$/i){
     my $retCode = ($method eq "OPTIONS") ? "200 OK" : "405 Method Not Allowed";
     TcpServer_WriteBlocking($FW_chash,
       "HTTP/1.1 $retCode\r\n" .
@@ -3338,6 +3340,15 @@ FW_widgetOverride($$)
         instance from now on.
     </li><br>
 
+    <li>allowedHttpMethods<br>
+      FHEMWEB implements the GET, POST and OPTIONS HTTP methods. Some external
+      devices require the HEAD method, which is not implemented correctly in
+      FHEMWEB, as FHEMWEB always returns a body, which, according to the spec,
+      is wrong. As in some cases this not a problem, enabling GET may work.
+      To do this, set this attribute to GET|POST|HEAD, default ist GET|POST.
+      OPTIONS is always enabled.
+      </li><br>
+
     <a name="closeConn"></a>
     <li>closeConn<br>
       If set, a TCP Connection will only serve one HTTP request. Seems to
@@ -4027,6 +4038,17 @@ FW_widgetOverride($$)
         href="#allowed">allowed</a> Ger&auml;t angelegt werden, und sind
         f&uuml;r eine FHEMWEB Instanz unerw&uuml;nscht.
     </li><br>
+
+    <li>allowedHttpMethods</br>
+      FHEMWEB implementiert die HTTP Methoden GET, POST und OPTIONS. Manche
+      externe Ger&auml;te ben&ouml;tigen HEAD, das ist aber in FHEMWEB nicht
+      korrekt implementiert, da FHEMWEB immer ein body zur&uuml;ckliefert, was
+      laut Spec falsch ist. Da ein body in manchen F&auml;llen kein Problem
+      ist, kann man HEAD durch setzen dieses Attributes auf HEAD|POST|HEAD
+      aktivieren, die Voreinstellung ist HEAD|POST. OPTIONS ist immer
+      aktiviert.
+      </li><br>
+
 
      <a name="closeConn"></a>
      <li>closeConn<br>
