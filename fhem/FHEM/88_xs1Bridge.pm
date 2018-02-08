@@ -3,11 +3,11 @@
 #################################################################
 # physisches Modul - Verbindung zur Hardware
 #
-# note / ToDo´s:
-# .
-# .
-# .
-# 
+# note / ToDo´s / Bugs:
+#
+#
+#
+#
 #################################################################
 
 package main;
@@ -37,6 +37,7 @@ sub xs1Bridge_Initialize($) {
 	
 	$hash->{DefFn}		=	"xs1Bridge_Define";
 	$hash->{AttrFn}  	= 	"xs1Bridge_Attr";  
+	$hash->{NotifyFn}   =	"xs1Bridge_Notify";
 	$hash->{UndefFn}	=	"xs1Bridge_Undef";
 	$hash->{AttrList}	=	"debug:0,1 ".
 							"disable:0,1 ".
@@ -91,6 +92,7 @@ sub xs1Bridge_Define($$) {
    {
    return "ERROR - Host IP $xs1_ip is not reachable. Please check!";
    }
+   
 }
 
 sub xs1Bridge_Attr(@) {
@@ -284,12 +286,12 @@ sub xs1Bridge_GetUpDate() {
 			my $decoded;
 			
 			if (defined($adress)) {
-			($json) = get( $adress ) =~ /[^(]*[}]/g;		## cut cname( + ) am Ende von Ausgabe -> ARRAY Struktur als Antwort vom xs1
-			$json_utf8 = eval {encode_utf8( $json )};		## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
-			$decoded = eval {decode_json( $json_utf8 )};	## auswertbares ARAAY
+				($json) = get( $adress ) =~ /[^(]*[}]/g;		## cut cname( + ) am Ende von Ausgabe -> ARRAY Struktur als Antwort vom xs1
+				$json_utf8 = eval {encode_utf8( $json )};		## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
+				$decoded = eval {decode_json( $json_utf8 )};	## auswertbares ARAAY
 			} else {
-			Log3 $name, 3, "$typ: Adresse:$adress undefined";
-			last;
+				Log3 $name, 3, "$typ: Adresse:$adress undefined";
+				last;
 			}
 			
 			if ($i <= 1 ) {     ### xs1 Aktoren / Sensoren
@@ -299,11 +301,16 @@ sub xs1Bridge_GetUpDate() {
 					last;		## ERROR JSON-query -> Abbruch schleife
 				}
 				
-				#Log3 $name, 3, "$typ: GetUpDate | adresse=".$adress;
-				
 				my $data;
-				my @array = @{ $decoded->{$arrayname[$i]} };
-					foreach my $f ( @array ) {
+				my @array;
+				if (defined $decoded->{$arrayname[$i]}) {
+					@array = @{ $decoded->{$arrayname[$i]} };
+				} else {
+					Log3 $name, 3, "$typ: GetUpDate | ARRAY-ERROR xs1 -> no Data in loop $i";
+					last;
+				}
+				
+				foreach my $f ( @array ) {
 					if ($f->{"type"} ne "disabled") {
 						my $xs1Dev = "xs1Dev";
 						
@@ -317,7 +324,7 @@ sub xs1Bridge_GetUpDate() {
 							### xs1 Aktoren nur update bei differenten Wert
 							if ($update_only_difference == 1) {
 								my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}), "unknown");	## Readings Wert
-								my $newState = sprintf("%.1f" , $f->{"value"});																		## ARRAY Wert xs1 aktuell
+								my $newState = sprintf("%.1f" , $f->{"value"});														## ARRAY Wert xs1 aktuell
 								
 								Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." oldState=$oldState newState=$newState" if($debug);
 									
@@ -379,7 +386,6 @@ sub xs1Bridge_GetUpDate() {
 							
 						### Dispatch an xs1Device Modul						
 						if ($xs1Dev_check eq "ok") {
-															  
 							Debug " $typ: GetUpDate | Dispatch -> $data" if($debug);
 							Dispatch($hash,$data,undef) if($data);
 						}
@@ -404,10 +410,16 @@ sub xs1Bridge_GetUpDate() {
 				# xs1_start wird teilweise je nach Laufzeit mit aktualisiert (+-1 Sekunde) -> Systemabhängig
 				
 				my $i2 = 0;
+				my $newState;
 				readingsBeginUpdate($hash);
 				for my $i2 (0..6) {
 					my $oldState = ReadingsVal($name, $xs1_readings[$i2], "unknown");		## Readings Wert
-					my $newState = $xs1_decoded[$i2];										## ARRAY Wert xs1 aktuell
+					if (defined $xs1_decoded[$i2]) {
+						$newState = $xs1_decoded[$i2];										## ARRAY Wert xs1 aktuell
+					} else {
+						Log3 $name, 3, "$typ: GetUpDate | ARRAY-ERROR xs1 -> no Data in loop $i|$i2";
+						last;
+					}
 					
 					if ($oldState ne $newState) {											## Update Reading nur bei Wertänderung
 						readingsBulkUpdate($hash, $xs1_readings[$i2] , $xs1_decoded[$i2]);	
@@ -465,24 +477,16 @@ sub xs1Bridge_Write($)				## Zustellen von Daten via IOWrite() vom logischen zum
 	my $typ = $hash->{TYPE};
 	my $xs1_ip = $hash->{xs1_ip};
    
-	Log3 $name, 3, "$typ: Write | Device=$Aktor_ID xs1_typ=$xs1_typ cmd=$cmd Parameter for xs1";
-
-	## http://xmodulo.com/how-to-send-http-get-or-post-request-in-perl.html
-	## Anfrage (Client -> XS1): http://192.168.1.242/control?callback=cname&cmd=set_state_actuator&number=1&value=50
+   ## Anfrage (Client -> XS1): http://192.168.1.242/control?callback=cname&cmd=set_state_actuator&number=1&value=50
 
 	$Aktor_ID = substr($Aktor_ID, 1,2);
 
 	if ($xs1_typ eq "switch") {
-		Log3 $name, 3, "$typ: Write | you control the $xs1_typ";
-  
 		if ($cmd eq "off") {
-		$cmd = 0;
+			$cmd = 0;
 		} elsif ($cmd eq "on") {
-		$cmd = 100;
+			$cmd = 100;
 		}
-	} elsif ($xs1_typ eq "dimmer") {
-		Log3 $name, 3, "$typ: Write | you control the $xs1_typ";
-
 	}
 
 	my $json;
@@ -500,9 +504,14 @@ sub xs1Bridge_Write($)				## Zustellen von Daten via IOWrite() vom logischen zum
 		Log3 $name, 3, "$typ: Write | Send to xs1 -> $xs1cmd";
 		
 		($json) = get( $xs1cmd ) =~ /[^(]*[}]/g;		## cut cname( + ) am Ende von Ausgabe -> ARRAY Struktur als Antwort vom xs1
-		$json_utf8 = eval {encode_utf8( $json )};		## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
-		$decoded = eval {decode_json( $json_utf8 )};	## auswertbares ARAAY
+		#$json_utf8 = eval {encode_utf8( $json )};		## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
+		#$decoded = eval {decode_json( $json_utf8 )};	## auswertbares ARAAY
 	}
+}
+
+sub xs1Bridge_Notify($$)    
+{                     
+
 }
 
 sub xs1Bridge_Undef($$)    

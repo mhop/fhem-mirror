@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_xs1Bridge: fix Code
   - bugfix:  74_XiaomiBTLESens: fix many bugs with ssh connection, fix negativ
                                 temperature bug
   - feature: 93_DbRep:V7.8.1, new command "eraseReadings", some fixes
