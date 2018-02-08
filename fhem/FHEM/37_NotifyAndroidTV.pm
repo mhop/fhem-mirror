@@ -187,7 +187,10 @@ NotifyAndroidTV_Set($$@)
     $param_h->{offset} = 0 if( !$param_h->{offset} );
     $param_h->{offsety} = 0 if( !$param_h->{offsety} );
     $param_h->{transparency} = 0 if( !$param_h->{transparency} );
-
+    if( $param_h->{duration} && $param_h->{duration} eq 'unlimited' ) {
+      $param_h->{duration} = 15;
+      $param_h->{interrupt} = 1;
+    }
 
     if( !$txt && !$param_h->{icon} && !$param_h->{image} && !$param_h->{imageurl} ) {
       my $usage = "usage: set $name msg";
