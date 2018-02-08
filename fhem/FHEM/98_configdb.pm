@@ -76,7 +76,8 @@ sub CommandConfigdb($$) {
 			
 			if ($dbtype eq 'SQLITE') {
 				(undef,$source) = split (/=/, $dbconn);
-				my $dumpcmd = "echo '.dump' | sqlite3 $source $gzip > $target";
+				my $dbtables = "fhemversions fhemconfig fhemstate fhemb64filesave";
+				my $dumpcmd = "echo '.dump ".$dbtables."' | sqlite3 $source $gzip > $target";
 				Log 4,"configDB: $dumpcmd";
 				$ret        = qx($dumpcmd);
 				return $ret if $ret; # return error message if available
@@ -87,7 +88,8 @@ sub CommandConfigdb($$) {
 				(undef,$dbname)     = split (/=/,$dbname);
 				(undef,$dbhostname) = split (/=/,$dbhostname);
 				(undef,$dbport)     = split (/=/,$dbport);
-				my $dumpcmd = "mysqldump --user=$dbuser --password=$dbpass --host=$dbhostname --port=$dbport -Q $dbname $gzip > $target";
+				my $dbtables = "fhemversions fhemconfig fhemstate fhemb64filesave";
+				my $dumpcmd = "mysqldump --user=$dbuser --password=$dbpass --host=$dbhostname --port=$dbport -Q $dbname $dbtables $gzip > $target";
 				Log 4,"configDB: $dumpcmd";
 				$ret        = qx($dumpcmd);
 				return $ret if $ret;
@@ -99,7 +101,8 @@ sub CommandConfigdb($$) {
 				(undef,$dbname)     = split (/=/,$dbname);
 				(undef,$dbhostname) = split (/=/,$dbhostname);
 				(undef,$dbport)     = split (/=/,$dbport);
-				my $dumpcmd = "PGPASSWORD=$dbpass pg_dump -U $dbuser -h $dbhostname -p $dbport $dbname $gzip > $target";
+				my $dbtables = "-t fhemversions -t fhemconfig -t fhemstate -t fhemb64filesave";
+				my $dumpcmd = "PGPASSWORD=$dbpass pg_dump -U $dbuser -h $dbhostname -p $dbport $dbname $dbtables $gzip > $target";
 				Log 4,"configDB: $dumpcmd";
 				$ret        = qx($dumpcmd);
 				return $ret if $ret;
