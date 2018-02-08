@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 1/2018
-my $thzversion = "0.176"; 
+my $thzversion = "0.177"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -167,7 +167,28 @@ my %parsinghash = (
 	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 1],
 	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 1]
 	      ],
-  "E8fan"	=> [["statusAFC: ",         4, 4, "hex", 1], 	    # 0=init air flow calibration (16:00) 4=normal fan operation
+  "E8fan"	=> [["x4: ",                4, 4, "hex", 1], 	   
+            [" x8: ",                   8, 4, "hex", 1], 	    
+			[" x12: ",                  12, 4, "hex", 1], 		
+			[" x16: ",                  16, 4, "hex", 1], 	
+			[" x20: ",                  20, 4, "hex", 1],
+			[" x24: ",                  24, 4, "hex", 1], 		
+			[" x28: ",                  28, 4, "hex", 1],
+			[" x32: ",                  32, 4, "hex", 1],		
+			[" x36: ",                  36, 4, "hex", 1],
+			[" x40: ",                  40, 4, "hex", 1],		
+			[" x44: ",                  44, 4, "hex", 1],
+			[" x48: ",                  48, 4, "hex", 1], 			
+			[" x52: ",                  52, 4, "hex", 1],
+            [" x56: ",                  56, 4, "hex", 1],
+            [" inputFanSpeed: ",        58, 2, "hex", 1],           #measured speed in %
+            [" outputFanSpeed: ",       60, 2, "hex", 1],           #measured speed  in %
+			[" pFanstageXAirflowInlet: ", 62, 4, "hex", 1],    #m3/h  corresponding to p37Fanstage1AirflowInlet or p38Fanstage2AirflowInlet
+			[" pFanstageXAirflowOutlet: ", 66, 4, "hex", 1],    #m3/h corresponding to p40Fanstage1AirflowOutlet or p41Fanstage2AirflowOutlet
+			[" inputFanPower: ",        70, 2, "hex", 1],             #tested
+			[" outputFanPower: ",       72, 2, "hex", 1],	          #tested 		
+		  ],
+  "E8fan206" => [["statusAFC: ",         4, 4, "hex", 1], 	    # 0=init air flow calibration (16:00) 4=normal fan operation
             [" supplyFanSpeedCAL: ",    8, 4, "hex", 60], 	    # calibration speed
 			[" exhaustFanSpeedCAL: ",   12, 4, "hex", 60], 		
 			[" supplyFanAirflowCAL: ",  16, 4, "hex", 100], 	# calibration air flow volume
@@ -764,8 +785,8 @@ my %getsonly2xx = (
   "sSol"			    => {cmd2=>"16", type =>"16sol",    unit =>""},
   "p01-p12"			    => {cmd2=>"17", type =>"17pxx206", unit =>""},
   "sProgram"  			=> {cmd2=>"EE", type =>"EEprg206", unit =>""},
-  "sFan"  				=> {cmd2=>"E8", type =>"E8fan",    unit =>""},
-  "sControl"  			=> {cmd2=>"F2", type =>"F2ctrl", unit =>""},
+  "sFan"  				=> {cmd2=>"E8", type =>"E8fan206", unit =>""},
+  "sControl"  			=> {cmd2=>"F2", type =>"F2ctrl",   unit =>""},
   "sDHW"			    => {cmd2=>"F3", type =>"F3dhw",    unit =>""},
   "sHC2"			    => {cmd2=>"F5", type =>"F5hc2",    unit =>""},
   "sSystem"			    => {cmd2=>"F6", type =>"F6sys206", unit =>""},
