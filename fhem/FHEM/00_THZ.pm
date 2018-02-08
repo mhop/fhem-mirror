@@ -181,12 +181,12 @@ my %parsinghash = (
 			[" x48: ",                  48, 4, "hex", 1], 			
 			[" x52: ",                  52, 4, "hex", 1],
             [" x56: ",                  56, 4, "hex", 1],
-            [" inputFanSpeed: ",        58, 2, "hex", 1],           #measured speed in %
-            [" outputFanSpeed: ",       60, 2, "hex", 1],           #measured speed  in %
-			[" pFanstageXAirflowInlet: ", 62, 4, "hex", 1],    #m3/h  corresponding to p37Fanstage1AirflowInlet or p38Fanstage2AirflowInlet
+            [" inputFanSpeed: ",        58, 2, "hex", 1],           #like in sGlobal
+            [" outputFanSpeed: ",       60, 2, "hex", 1],           #like in sGlobal
+			[" pFanstageXAirflowInlet: ", 62, 4, "hex", 1],     #m3/h  corresponding to p37Fanstage1AirflowInlet or p38Fanstage2AirflowInlet
 			[" pFanstageXAirflowOutlet: ", 66, 4, "hex", 1],    #m3/h corresponding to p40Fanstage1AirflowOutlet or p41Fanstage2AirflowOutlet
-			[" inputFanPower: ",        70, 2, "hex", 1],             #tested
-			[" outputFanPower: ",       72, 2, "hex", 1],	          #tested 		
+			[" inputFanPower: ",        70, 2, "hex", 1],             # like in sGlobal
+			[" outputFanPower: ",       72, 2, "hex", 1],	          # like in sGlobal		
 		  ],
   "E8fan206" => [["statusAFC: ",         4, 4, "hex", 1], 	    # 0=init air flow calibration (16:00) 4=normal fan operation
             [" supplyFanSpeedCAL: ",    8, 4, "hex", 60], 	    # calibration speed
