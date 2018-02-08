@@ -47,6 +47,7 @@
 # 01.08.17 GA add documentation for attribute disable
 # 27.12.17 GA add handle "off" as c_tempFrostProtect and "on" as c_tempC in getDesiredTempFrom (valid form Homematic)
 # 31.01.18 GA add support for stateFormat
+# 08.02.18 GA fix PID_I_previousTemps was shortened to c_PID_DLookBackCnt instead of c_PID_ILookBackCnt in define
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -685,7 +686,7 @@ PWMR_Define($$)
     Log3 ($hash, 4, "content of IBuffer is @{$IBuffer}");
 
     # cut Buffer if it is too large
-    while (scalar @{$IBuffer} > $hash->{c_PID_DLookBackCnt}) {
+    while (scalar @{$IBuffer} > $hash->{c_PID_ILookBackCnt}) {
       my $v = shift @{$IBuffer};
     }
 
