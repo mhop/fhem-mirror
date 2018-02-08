@@ -188,7 +188,21 @@ NotifyAndroidTV_Set($$@)
     $param_h->{offsety} = 0 if( !$param_h->{offsety} );
     $param_h->{transparency} = 0 if( !$param_h->{transparency} );
 
-return Dumper $param_h;
+
+    if( !$txt && !$param_h->{icon} && !$param_h->{image} && !$param_h->{imageurl} ) {
+      my $usage = "usage: set $name msg";
+      foreach my $option (sort keys %{$options}) {
+        if( $options->{$option} ) {
+          $usage .= " [$option=". join( '|', sort keys %{$options->{$option}} ). "]";
+        } else {
+          $usage .= " [$option=<$option>]";
+        }
+      }
+      $usage .= " <message>";
+
+      return $usage;
+    }
+
 
     $param_h->{icon} = 'fhemicon.png' if( !$param_h->{icon} );
     $param_h->{icon} .= ".png" if( $param_h->{icon} !~ '\.' );
@@ -224,20 +238,6 @@ return Dumper $param_h;
       delete $param_h->{image};
     }
 
-
-    if( !$txt && !$image && !$param_h->{imageurl} ) {
-      my $usage = "usage: set $name msg";
-      foreach my $option (sort keys %{$options}) {
-        if( $options->{$option} ) {
-          $usage .= " [$option=". join( '|', sort keys %{$options->{$option}} ). "]";
-        } else {
-          $usage .= " [$option=<$option>]";
-        }
-      }
-      $usage .= " <message>";
-
-      return $usage;
-    }
 
     my $param;
     $param->{url}        = "http://$hash->{host}:7676/";
