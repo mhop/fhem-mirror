@@ -42,7 +42,7 @@ use JSON;      # imports encode_json, decode_json, to_json and from_json.
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.08";
+my $babbleversion    = "1.09";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -1493,7 +1493,10 @@ sub Babble_antistupidity($) {
   
   my $name  = $hash->{NAME};
   my $regexp = $hash->{DATA}{"re_places"};
-  my $imax = int(@{$hash->{DATA}{"devs"}});
+  my $devs = $hash->{DATA}{"devs"};
+  return 
+    if( !defined($regexp) || !defined($devs) );
+  my $imax = int(@{$devs});
   for( my $i=0; $i<$imax; $i++){
     my $dev = lc($hash->{DATA}{"devs"}[$i]);
     Log 1,"[Babble] Baaaaah ! It is not a good idea to name a device $dev similar to a place in Babble"
