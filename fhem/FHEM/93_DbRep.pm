@@ -37,8 +37,10 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.9.0        09.02.2018       new attribute "avgTimeWeightMean" (time weight mean calculation), code review of selection
+#                               routines, maxValue handle negative values correctly, 
+#                               one security second for correct create TimeArray in normRelativeTime
 # 7.8.1        04.02.2018       bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp
-#                               is fully set ("date time"), code review, bugfix last dataset is not selected if timestamp
 #                               is fully set ("date time"), fix "$runtime_string_next = "$runtime_string_next.999";" if 
 #                               $runtime_string_next is part of sql-execute place holder AND contains date+time
 # 7.8.0        04.02.2018       new command "eraseReadings"  
@@ -309,7 +311,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.8.1";
+my $DbRepVersion = "7.9.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -336,7 +338,7 @@ sub DbRep_Initialize($) {
  $hash->{AttrList} =   "disable:1,0 ".
                        "reading ".                       
                        "allowDeletion:1,0 ".
-                       "averageCalcForm:avgArithmeticMean,avgDailyMeanGWS ".
+                       "averageCalcForm:avgArithmeticMean,avgDailyMeanGWS,avgTimeWeightMean ".
                        "device " .
 					   "dumpComment ".
 					   "dumpDirLocal ".
@@ -648,7 +650,7 @@ sub DbRep_Set($@) {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
       if ($prop) {
           if (!AttrVal($hash->{NAME}, "device", "") || !AttrVal($hash->{NAME}, "reading", "") ) {
-              return "One or both of attributes \"device\", \"reading\" is not set. It's mandatory to set both to complete dataset for manual insert !";
+              return "One or both of attributes \"device\", \"reading\" are not set. It's mandatory to set both to complete dataset for manual insert !";
           }
           
           # Attribute device & reading dürfen kein SQL-Wildcard % enthalten
@@ -1956,26 +1958,13 @@ sub averval_DoParse($) {
          $selspec = "AVG(VALUE)";
      }
  } elsif ($acf eq "avgDailyMeanGWS") {
-     # Tagesmittelwert Temperaturen nach Schema des deutechen Wetterdienstes
+     # Tagesmittelwert Temperaturen nach Schema des deutschen Wetterdienstes
      # SELECT VALUE FROM history WHERE DEVICE="MyWetter" AND READING="temperature" AND TIMESTAMP >= "2018-01-28 $i:00:00" AND TIMESTAMP <= "2018-01-28 ($i+1):00:00" ORDER BY TIMESTAMP DESC LIMIT 1; 
-     $addon   = 'ORDER BY TIMESTAMP DESC LIMIT 1';
+     $addon   = "ORDER BY TIMESTAMP DESC LIMIT 1";
      $selspec = "VALUE";
- }
-  
- # SQL zusammenstellen für DB-Abfrage
- if ($IsTimeSet || $IsAggrSet) {
-     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"?","?",$addon);
- } else {
-     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,$addon);
- }
- 
- eval{$sth = $dbh->prepare($sql);};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     $dbh->disconnect;
-     Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err";
+ } elsif ($acf eq "avgTimeWeightMean") {
+     $addon = "ORDER BY TIMESTAMP ASC";
+     $selspec = "TIMESTAMP,VALUE";
  }
 	 
  # SQL-Startzeit
@@ -1990,20 +1979,18 @@ sub averval_DoParse($) {
      my $runtime_string_next   = $a[2];
      
      if($acf eq "avgArithmeticMean") {
-         # SQL zusammenstellen für Logging
-	     if ($IsTimeSet || $IsAggrSet) {
-	         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon); 
-         }
-	     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
-     
+         # arithmetischer Mittelwert (Standard)
+         #           
          if ($IsTimeSet || $IsAggrSet) {
-             if($runtime_string_next =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
-                 $runtime_string_next = "$runtime_string_next.999";
-             }
-	         eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+             $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon); 
 	     } else {
-	         eval{$sth->execute();};	 
+	         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,$addon);
 	     }
+         Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+         
+         eval{ $sth = $dbh->prepare($sql);
+               $sth->execute();
+             };	         
 	     if ($@) {
              $err = encode_base64($@,"");
              Log3 ($name, 2, "DbRep $name - $@");
@@ -2031,23 +2018,21 @@ sub averval_DoParse($) {
          # Wenn mehr als 3 Stundenwerte fehlen -> Berechnung aus den 4 Hauptterminen (00, 06, 12, 18 UTC), 
          # d.h. 01, 07, 13, 19 MEZ
          # https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html
+         #
          my $sum = 0;
          my $anz = 0;                   # Anzahl der Messwerte am Tag
          my($t01,$t07,$t13,$t19);       # Temperaturen der Haupttermine
          my ($bdate,undef) = split(" ",$runtime_string_first);
          for my $i (0..23) {
              my $bsel = $bdate." ".sprintf("%02d",$i).":00:00";
-             my $esel  = ($i<23)?$bdate." ".sprintf("%02d",$i+1).":00:00":$runtime_string_next;
-	         if ($IsTimeSet || $IsAggrSet) {
-	             $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$bsel'","'$esel'",$addon); 
-             }
-	         Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
+             my $esel  = ($i<23)?$bdate." ".sprintf("%02d",$i).":59:59":$runtime_string_next;
+
+	         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$bsel'","'$esel'",$addon);
+             Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
-             if ($IsTimeSet || $IsAggrSet) {
-	             eval{$sth->execute($bsel, $esel);};
-	         } else {
-	             eval{$sth->execute();};	 
-	         }
+             eval{ $sth = $dbh->prepare($sql);
+                   $sth->execute();
+                 };	
 	         if ($@) {
                  $err = encode_base64($@,"");
                  Log3 ($name, 2, "DbRep $name - $@");
@@ -2056,10 +2041,10 @@ sub averval_DoParse($) {
                  return "$name|''|$device|$reading|''|$err|''";
              }
              my $val = $sth->fetchrow_array();
-     
-             Log3 ($name, 5, "DbRep $name - SQL result: $val") if($val);        
+             Log3 ($name, 5, "DbRep $name - SQL result: $val") if($val); 
+             $val = DbRep_numval ($val);    # nichtnumerische Zeichen eliminieren			 
              if(defined($val) && looks_like_number($val)) {
-                 $sum = $sum + $val;
+                 $sum += $val;
                  $t01 = $val if($val && $i == 00);   # Wert f. Stunde 01 ist zw. letzter Wert vor 01
                  $t07 = $val if($val && $i == 06);
                  $t13 = $val if($val && $i == 12);
@@ -2082,6 +2067,91 @@ sub averval_DoParse($) {
              my @rsf = split(" ",$runtime_string_first);
              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|"; 
          }      
+     
+     } elsif ($acf eq "avgTimeWeightMean") {
+         # zeitgewichteten Mittelwert berechnen
+         # http://massmatics.de/merkzettel/#!837:Gewichteter_Mittelwert
+         #
+         # $tsum = timestamp letzter Messpunkt - timestamp erster Messpunkt
+         # $t1 = timestamp wert1
+         # $t2 = timestamp wert2
+         # $dt = $t2 - $t1
+         # $t1 = $t2 
+         # .....
+         # (val1*$dt/$tsum) + (val2*$dt/$tsum) + .... + (valn*$dt/$tsum)
+         #
+         
+         # gesamte Zeitspanne $tsum zwischen ersten und letzten Datensatz der Zeitscheibe ermitteln
+         my ($tsum,$tf,$tl,$tn,$to,$dt,$val,$val1);
+         my $sum = 0;
+         my $addonf = 'ORDER BY TIMESTAMP ASC LIMIT 1';
+         my $addonl = 'ORDER BY TIMESTAMP DESC LIMIT 1';
+         my $sqlf   = createSelectSql($hash,"history","TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addonf);
+         my $sqll   = createSelectSql($hash,"history","TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addonl);
+         
+         eval { $tf = ($dbh->selectrow_array($sqlf))[0];
+                $tl = ($dbh->selectrow_array($sqll))[0];
+              };
+	     if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - $@");
+             $dbh->disconnect;
+             Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
+             return "$name|''|$device|$reading|''|$err|''";
+         }
+         
+         if(!$tf || !$tl) {
+             # kein Start- und/oder Ende Timestamp in Zeitscheibe vorhanden -> keine Werteberechnung möglich
+             $sum = "insufficient values";
+         } else {
+             my ($yyyyf, $mmf, $ddf, $hhf, $minf, $secf) = ($tf =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+             my ($yyyyl, $mml, $ddl, $hhl, $minl, $secl) = ($tl =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+             $tsum = (timelocal($secl, $minl, $hhl, $ddl, $mml-1, $yyyyl-1900))-(timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900));          
+         
+             if ($IsTimeSet || $IsAggrSet) {
+                 $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
+	         } else {
+	             $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,$addon); 
+	         }
+             Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
+             
+             eval{ $sth = $dbh->prepare($sql);
+                   $sth->execute();
+                 };		         
+             if ($@) {
+                 $err = encode_base64($@,"");
+                 Log3 ($name, 2, "DbRep $name - $@");
+                 $dbh->disconnect;
+                 Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
+                 return "$name|''|$device|$reading|''|$err|''";
+             }         
+
+             my @twm_array =  map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
+             
+             foreach my $twmrow (@twm_array) {
+                 ($tn,$val) = split("_ESC_",$twmrow);
+				 $val = DbRep_numval ($val);    # nichtnumerische Zeichen eliminieren
+                 my ($yyyyt1, $mmt1, $ddt1, $hht1, $mint1, $sect1) = ($tn =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+                 $tn = timelocal($sect1, $mint1, $hht1, $ddt1, $mmt1-1, $yyyyt1-1900);
+                 if(!$to) {
+                     $val1 = $val;
+                     $to = $tn;
+                     next;
+                 }
+                 $dt = $tn - $to;
+                 $sum += $val1*($dt/$tsum);
+                 $val1 = $val;
+                 $to = $tn;
+                 
+             }             
+         }              
+         if(AttrVal($name, "aggregation", "") eq "hour") {
+             my @rsf = split(/[" "\|":"]/,$runtime_string_first);
+             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";  
+         } else {
+             my @rsf = split(" ",$runtime_string_first);
+             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|"; 
+         } 
      }
  }   
   
@@ -2154,6 +2224,8 @@ sub averval_ParseDone($) {
       $acf = "AM"
   } elsif ($acf eq "avgDailyMeanGWS") {
       $acf = "DMGWS";
+  } elsif ($acf eq "avgTimeWeightMean") {
+      $acf = "TWM";
   }
   
   # Readingaufbereitung
@@ -2227,22 +2299,6 @@ sub count_DoParse($) {
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
-
- # SQL zusammenstellen für DB-Abfrage
- if ($IsTimeSet || $IsAggrSet) {
-     $sql = createSelectSql($hash,$table,"COUNT(*)",$device,$reading,"?","?",'');
- } else {
-     $sql = createSelectSql($hash,$table,"COUNT(*)",$device,$reading,undef,undef,''); 
- }
- 
- eval{$sth = $dbh->prepare($sql);};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     $dbh->disconnect;
-     Log3 ($name, 4, "DbRep $name -> BlockingCall count_DoParse finished");
-     return "$name|''|$device|$reading|''|$err|$table";
- }
  
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -2253,22 +2309,18 @@ sub count_DoParse($) {
      my @a                     = split("#", $row);
      my $runtime_string        = $a[0];
      my $runtime_string_first  = $a[1];
-     my $runtime_string_next   = $a[2];
-     
-     # SQL zusammenstellen für Logging
-     if ($IsTimeSet || $IsAggrSet) {
-	     $sql = createSelectSql($hash,$table,"COUNT(*)",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
-     }
-     Log3($name, 4, "DbRep $name - SQL execute: $sql");        
+     my $runtime_string_next   = $a[2];      
 
      if ($IsTimeSet || $IsAggrSet) {
-         if($runtime_string_next =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
-             $runtime_string_next = "$runtime_string_next.999";
-         }
-	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+         $sql = createSelectSql($hash,$table,"COUNT(*)",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
 	 } else {
-	     eval{$sth->execute();};	 
+	     $sql = createSelectSql($hash,$table,"COUNT(*)",$device,$reading,undef,undef,''); 
 	 }
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+     
+     eval{ $sth = $dbh->prepare($sql);
+           $sth->execute();
+         };	
      if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -2357,8 +2409,8 @@ sub count_ParseDone($) {
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
           $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
       } else {
-          my $ds   = $device."__" if ($device);
-          my $rds  = $reading."__" if ($reading);
+          my $ds  = $device."__" if ($device);
+          my $rds = $reading."__" if ($reading);
           $reading_runtime_string = $rsf.$ds.$rds."COUNT_".$table."__".$runtime_string;
       }
          
@@ -2411,22 +2463,6 @@ sub maxval_DoParse($) {
  # Timestampstring to Array
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");   
-
- # SQL zusammenstellen für DB-Operation
- if ($IsTimeSet || $IsAggrSet) {
-     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"?","?","ORDER BY TIMESTAMP");
- } else {
-     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");
- }
- 
- eval{$sth = $dbh->prepare($sql);};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     $dbh->disconnect;
-     Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err|''";
- }
  
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -2439,22 +2475,18 @@ sub maxval_DoParse($) {
      my $runtime_string_first  = $a[1];
      my $runtime_string_next   = $a[2];    
      
-     # SQL zusammenstellen für Logausgabe
-	 if ($IsTimeSet || $IsAggrSet) {
-	     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");
-     }
-	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
-     
      $runtime_string = encode_base64($runtime_string,"");   
      
      if ($IsTimeSet || $IsAggrSet) {
-         if($runtime_string_next =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
-             $runtime_string_next = "$runtime_string_next.999";
-         }
-	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+         $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");
 	 } else {
-	     eval{$sth->execute();};	 
+	     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");	 
 	 }
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+     
+     eval{ $sth = $dbh->prepare($sql);
+           $sth->execute();
+         };	
      if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -2488,9 +2520,7 @@ sub maxval_DoParse($) {
  #---------- Berechnung Ergebnishash maxValue ------------------------ 
  my $i = 1;
  my %rh = ();
- my $lastruntimestring;
- my $row_max_time; 
- my $max_value = 0;
+ my ($lastruntimestring,$row_max_time,$max_value);
   
  foreach my $row (@row_array) {
      my @a = split("[ \t][ \t]*", $row);
@@ -2514,7 +2544,7 @@ sub maxval_DoParse($) {
      Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value");
             
      if ($runtime_string eq $lastruntimestring) {
-         if ($value >= $max_value) {
+         if (!defined($max_value) || $value >= $max_value) {
              $max_value    = $value;
              $row_max_time = $timestamp;
              $rh{$runtime_string} = $runtime_string."|".$max_value."|".$row_max_time;            
@@ -2522,8 +2552,8 @@ sub maxval_DoParse($) {
      } else {
          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen 
          $lastruntimestring = $runtime_string;
-         $max_value         = 0;
-         if ($value >= $max_value) {
+         undef $max_value;
+         if (!defined($max_value) || $value >= $max_value) {
              $max_value    = $value;
              $row_max_time = $timestamp;
              $rh{$runtime_string} = $runtime_string."|".$max_value."|".$row_max_time; 
@@ -2672,22 +2702,6 @@ sub minval_DoParse($) {
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");   
  
- # SQL zusammenstellen für DB-Operation
- if ($IsTimeSet || $IsAggrSet) {
-     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"?","?","ORDER BY TIMESTAMP");
- } else {
-     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");
- }
- 
- eval{$sth = $dbh->prepare($sql);};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     $dbh->disconnect;
-     Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err|''";
- }
- 
  # SQL-Startzeit
  my $st = [gettimeofday];
  
@@ -2699,22 +2713,18 @@ sub minval_DoParse($) {
      my $runtime_string_first  = $a[1];
      my $runtime_string_next   = $a[2];   
      
-     # SQL zusammenstellen für Logausgabe
-	 if ($IsTimeSet || $IsAggrSet) {
-	     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");
-     }
-	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
-     
      $runtime_string = encode_base64($runtime_string,"");
      
      if ($IsTimeSet || $IsAggrSet) {
-         if($runtime_string_next =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
-             $runtime_string_next = "$runtime_string_next.999";
-         }
-	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+         $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP"); 
 	 } else {
-	     eval{$sth->execute();};	 
+	     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");	 
 	 }
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+     
+     eval{ $sth = $dbh->prepare($sql);
+           $sth->execute();
+         };	
      if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -2778,7 +2788,7 @@ sub minval_DoParse($) {
      $rh{$runtime_string} = $runtime_string."|".$min_value."|".$timestamp if ($i == 1);  # minValue des ersten SQL-Statements in hash einfügen
       
      if ($runtime_string eq $lastruntimestring) {
-         if ($value < $min_value) {
+         if (!defined($min_value) || $value < $min_value) {
              $min_value    = $value;
              $row_min_time = $timestamp;
              $rh{$runtime_string} = $runtime_string."|".$min_value."|".$row_min_time;            
@@ -2945,15 +2955,6 @@ sub diffval_DoParse($) {
  # SQL-Startzeit
  my $st = [gettimeofday];
  
- # SQL zusammenstellen für DB-Operation
- if ($IsTimeSet || $IsAggrSet) {
-     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"?","?",'');
- } else {
-     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'');
- }
- 
- $sth = $dbh->prepare($sql); 
- 
  # DB-Abfrage zeilenweise für jeden Array-Eintrag
  my @row_array;
  my @array;
@@ -2965,16 +2966,9 @@ sub diffval_DoParse($) {
      my $runtime_string_next   = $a[2];  
      $runtime_string           = encode_base64($runtime_string,""); 
      
-     # SQL zusammenstellen für Logausgabe
-	 if ($IsTimeSet || $IsAggrSet) {
-	     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",''); 
-     } 
-     Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
-     
 	 if($dbmodel eq "MYSQL") {
 	     eval {$dbh->do("set \@V:= 0, \@diff:= 0, \@diffTotal:= 0, \@RB:= 1;");};   # @\RB = Resetbit wenn neues Selektionsintervall beginnt
      }
-	 
 	 if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -2984,13 +2978,15 @@ sub diffval_DoParse($) {
      }
 	 
      if ($IsTimeSet || $IsAggrSet) {
-         if($runtime_string_next =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
-             $runtime_string_next = "$runtime_string_next.999";
-         }
-	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
 	 } else {
-	     eval{$sth->execute();};	 
+	     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,''); 
 	 }
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+     
+     eval{ $sth = $dbh->prepare($sql);
+           $sth->execute();
+         };	
      if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -3325,22 +3321,6 @@ sub sumval_DoParse($) {
  } else {
      $selspec = "SUM(VALUE)";
  }
-  
- # SQL zusammenstellen für DB-Abfrage
- if ($IsTimeSet || $IsAggrSet) {
-     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"?","?",'');
- } else {
-     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'');
- }
- 
- eval{$sth = $dbh->prepare($sql);};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     $dbh->disconnect;
-     Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
-     return "$name|''|$device|$reading|''|$err|''";
- }
 	
  # SQL-Startzeit
  my $st = [gettimeofday];  
@@ -3351,22 +3331,18 @@ sub sumval_DoParse($) {
      my @a                     = split("#", $row);
      my $runtime_string        = $a[0];
      my $runtime_string_first  = $a[1];
-     my $runtime_string_next   = $a[2];
-     
-     # SQL zusammenstellen für Logging
-	 if ($IsTimeSet || $IsAggrSet) {
-	     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');    
-     } 
-	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql");        
+     my $runtime_string_next   = $a[2];       
      
      if ($IsTimeSet || $IsAggrSet) {
-         if($runtime_string_next =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
-             $runtime_string_next = "$runtime_string_next.999";
-         }
-	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
 	 } else {
-	     eval{$sth->execute();};	 
+         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'');
 	 }
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+     
+     eval{ $sth = $dbh->prepare($sql);
+           $sth->execute();
+         };	
 	 if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -4198,7 +4174,7 @@ sub fetchrows_DoParse($) {
  
  no warnings 'uninitialized'; 
  my @row_array = map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."_ESC_".$_->[4]."\n" } @{$sth->fetchall_arrayref()}; 
- 
+
  use warnings;
  $nrows = $#row_array+1;                # Anzahl der Ergebniselemente  
  pop @row_array if($nrows>$limit);      # das zuviel selektierte Element wegpoppen wenn Limit überschritten
@@ -4628,49 +4604,30 @@ sub expfile_DoParse($) {
  my @ts = split("\\|", $ts);
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
  
- # SQL zusammenstellen für DB-Abfrage
-  if ($IsTimeSet || $IsAggrSet) {
-     $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"?","?","ORDER BY TIMESTAMP");  
- } else {
-     $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");  
- }
- 
- eval{$sth = $dbh->prepare($sql);};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     $dbh->disconnect;
-     Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
-     return "$name|''|''|$err|''|''";
- }
- 
  # SQL-Startzeit
  my $st = [gettimeofday];
  
  # DB-Abfrage zeilenweise für jeden Array-Eintrag
  my $arrstr;
  my $nrows = 0;
+ my $addon = "ORDER BY TIMESTAMP";
  no warnings 'uninitialized'; 
  foreach my $row (@ts) {
      my @a                     = split("#", $row);
      my $runtime_string        = $a[0];
      my $runtime_string_first  = $a[1];
-     my $runtime_string_next   = $a[2];
-     
-     # SQL zusammenstellen für Logging
-	 if ($IsTimeSet || $IsAggrSet) {
-	     $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");    
-     } 
-	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql");    
+     my $runtime_string_next   = $a[2];   
  
      if ($IsTimeSet || $IsAggrSet) {
-         if($runtime_string_next =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
-             $runtime_string_next = "$runtime_string_next.999";
-         }
-	     eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+         $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
 	 } else {
-	     eval{$sth->execute();};	 
+         $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,undef,undef,$addon);
 	 }
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+     
+     eval{ $sth = $dbh->prepare($sql);
+           $sth->execute();
+         };	
 	 if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
@@ -4680,11 +4637,12 @@ sub expfile_DoParse($) {
      } 
  
      while (my $row = $sth->fetchrow_arrayref) {
-        print FH DbRep_charfilter(join(',', map { s{"}{""}g; "\"$_\"";} @$row)), "\n";
-        Log3 ($name, 5, "DbRep $name -> write row:  @$row");
-        # Anzahl der Datensätze
-        $nrows++;
+         print FH DbRep_charfilter(join(',', map { s{"}{""}g; "\"$_\"";} @$row)), "\n";
+         Log3 ($name, 5, "DbRep $name -> write row:  @$row");
+         # Anzahl der Datensätze
+         $nrows++;
      }
+ 
  }     
  close(FH);
 
@@ -7092,9 +7050,9 @@ sub normRelativeTime ($) {
 	 no warnings 'uninitialized'; 
 	 Log3($name, 4, "DbRep $name - timeDiffToNow - day: $d, hour: $h, min: $m, sec: $s ");
 	 use warnings;
-     $d = $d?($d*86400):0;
-     $h = $h?($h*3600):0;
-     $m = $m?($m*60):0;
+     $d = $d?($d*86400)+1:0;      # one security second for correct create TimeArray
+     $h = $h?($h*3600)+1:0;
+     $m = $m?($m*60)+1:0;
      $s = $s?$s:0;
 
      $tdtn = $d + $h + $m +$s;
@@ -7122,9 +7080,9 @@ sub normRelativeTime ($) {
 	 no warnings 'uninitialized'; 
 	 Log3($name, 4, "DbRep $name - timeDiffToNow - day: $d, hour: $h, min: $m, sec: $s ");
 	 use warnings;
-     $d = $d?($d*86400):0;
-     $h = $h?($h*3600):0;
-     $m = $m?($m*60):0;
+     $d = $d?($d*86400)+1:0;            # one security second for correct create TimeArray
+     $h = $h?($h*3600)+1:0;
+     $m = $m?($m*60)+1:0;
      $s = $s?$s:0;
 
      $toth = $d + $h + $m +$s;
@@ -7960,6 +7918,17 @@ sub DbRep_checkUsePK ($$){
 return ($upkh,$upkc,$pkh,$pkc);
 }
 
+################################################################
+# extrahiert aus dem übergebenen Wert nur die Zahl
+################################################################
+sub DbRep_numval ($){
+  my ($val) = @_;
+  return undef if(!defined($val));
+  $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
+  
+return $val;
+}
+
 ####################################################################################################
 #                 Test-Sub zu Testzwecken
 ####################################################################################################
@@ -8127,7 +8096,8 @@ return;
                                       <tr><td> <b>avgDailyMeanGWS</b>    </td><td>: calculates the daily medium temperature according the 
                                                                                     <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>specifications</a> of german weather service. <br>
                                                                                     This variant uses aggregation "day" automatically. </td></tr>
-                                   </table>
+                                      <tr><td> <b>avgTimeWeightMean</b>  </td><td>: calcultes a time weighted average mean value is calculated </td></tr>
+								   </table>
 	                               </ul>
 	                               <br>
                                  
@@ -9551,7 +9521,8 @@ sub bdump {
                                       <tr><td> <b>avgDailyMeanGWS</b>    </td><td>: berechnet die Tagesmitteltemperatur entsprechend den
                                                                                     <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Vorschriften</a> des Deutschen Wetterdienstes. <br>
                                                                                     Diese Variante verwendet automatisch die Aggregation "day". </td></tr>
-                                   </table>
+                                      <tr><td> <b>avgTimeWeightMean</b>  </td><td>: berechnet den zeitgewichteten Mittelwert </td></tr>
+								   </table>
 	                               </ul>
 	                               <br>
                                    
@@ -10873,4 +10844,4 @@ sub bdump {
 </ul>
 
 =end html_DE
-=cut
+=cu
