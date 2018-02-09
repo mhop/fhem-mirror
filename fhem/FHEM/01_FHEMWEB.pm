@@ -4044,8 +4044,8 @@ FW_widgetOverride($$)
       externe Ger&auml;te ben&ouml;tigen HEAD, das ist aber in FHEMWEB nicht
       korrekt implementiert, da FHEMWEB immer ein body zur&uuml;ckliefert, was
       laut Spec falsch ist. Da ein body in manchen F&auml;llen kein Problem
-      ist, kann man HEAD durch setzen dieses Attributes auf HEAD|POST|HEAD
-      aktivieren, die Voreinstellung ist HEAD|POST. OPTIONS ist immer
+      ist, kann man HEAD durch setzen dieses Attributes auf GET|POST|HEAD
+      aktivieren, die Voreinstellung ist GET|POST. OPTIONS ist immer
       aktiviert.
       </li><br>
 
