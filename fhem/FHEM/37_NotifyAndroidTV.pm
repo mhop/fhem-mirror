@@ -267,8 +267,7 @@ NotifyAndroidTV_Set($$@)
     }
     Log3 $name, 5, $param->{data};
 
-    $param->{data} .= NotifyAndroidTV_addFormField('filename', $icon, "filename=\"fhemicon.png\"\r\nContent-Type: application/octet-stream") if( !defined($param_h->{type})
-         || ($param_h->{type} != $options->{type}{titleonly} && $param_h->{type} != $options->{type}{nameonly} ) );
+    $param->{data} .= NotifyAndroidTV_addFormField('filename', $icon, "filename=\"fhemicon.png\"\r\nContent-Type: application/octet-stream") if( $param_h->{icon} || !($image || $param_h->{imageurl}) );
     $param->{data} .= NotifyAndroidTV_addFormField('filename2', $image, "filename=\"image.png\"\r\nContent-Type: application/octet-stream") if( $image );
     $param->{data} .= "--boundary--";
 
