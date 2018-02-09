@@ -192,7 +192,7 @@ NotifyAndroidTV_Set($$@)
       $param_h->{interrupt} = 1;
     }
 
-    if( !$txt && !$param_h->{icon} && !$param_h->{image} && !$param_h->{imageurl} ) {
+    if( $txt && $txt eq '?' ) {
       my $usage = "usage: set $name msg";
       foreach my $option (sort keys %{$options}) {
         if( $options->{$option} ) {
@@ -359,6 +359,7 @@ NotifyAndroidTV_Attr($$$)
   <ul>
     <li>msg [options] &lt;message&gt;<br>
     possible options are: bkgcolor, interrupt, position, transparency, duration, offset, offsety, width, type, icon, image, title, imageurl. use <code>set &lt;name&gt; notify</code> to see valid values.<br>
+    <code>set nb msg ?</code> shows a help text<br>
     it is better to use imageurl instad of image as it is non blocking!<br>
     image can be given as <code>image={&lt;perlCode&gt;}</code></li>
   </ul><br>
