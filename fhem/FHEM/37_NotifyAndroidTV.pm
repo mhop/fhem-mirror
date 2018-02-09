@@ -225,7 +225,15 @@ NotifyAndroidTV_Set($$@)
 
 
     my $image;
-    if( $param_h->{image} ) {
+    if( $param_h->{image} && $param_h->{image} =~ m/^{.*}$/ ) {
+      $image = eval $param_h->{image};
+      if( $@ ) {
+        Log3 $name, 5, "$name: $@";
+        return $@;
+      }
+      return "empty image returned from perl code" if(!$image);
+
+    } elsif( $param_h->{image} ) {
       #$param_h->{image} .= ".jpg" if( $param_h->{image} !~ '\.' );
       #$param_h->{image} = "$FW_icondir/default/$param_h->{image}" if( $param_h->{image} !~ '^/' );
 
@@ -350,7 +358,8 @@ NotifyAndroidTV_Attr($$$)
   <ul>
     <li>msg [options] &lt;message&gt;<br>
     possible options are: bkgcolor, interrupt, position, transparency, duration, offset, offsety, width, type, icon, image, title, imageurl. use <code>set &lt;name&gt; notify</code> to see valid values.<br>
-    it is better to use imageurl instad of image as it is non blocking!</li>
+    it is better to use imageurl instad of image as it is non blocking!<br>
+    image can be given as <code>image={&lt;perlCode&gt;}</code></li>
   </ul><br>
 
   <a name="NotifyAndroidTV_Get"></a>
