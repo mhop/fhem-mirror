@@ -14,6 +14,8 @@ use warnings;
 use JSON;         #libjson-perl
 use Data::Dumper;
 
+use Storable qw(dclone);
+
 use vars qw(%defs);
 use vars qw($FW_ME);
 use vars qw($FW_wname);
@@ -80,6 +82,17 @@ sub weekprofile_timeToMinutes($)
   my ($hours, $minutes) = split(':',$time, 2);
 
   return $hours * 60 + $minutes;
+}
+############################################## 
+sub myAttrVal($$$)
+{
+	my ($me,$name,$def) = @_;
+	my $val = AttrVal($me, $name, $def);
+	
+	if (defined($val) && ($name eq 'tempON' || $name eq 'tempOFF')) { 
+	  $val = sprintf("%.1f", $val);
+	}
+	return $val;
 }
 ############################################## 
 sub weekprofile_getDeviceType($$;$)
@@ -209,8 +222,8 @@ sub weekprofile_readDayProfile($@)
   for(my $i = 0; $i < scalar(@temps); $i+=1){
 	Log3 $me, 4, "$me(ReadDayProfile): temp $i $temps[$i]";
     $temps[$i] =~s/[^\d.]//g; #only numbers
-    my $tempON = AttrVal($me, "tempON", undef);
-    my $tempOFF = AttrVal($me, "tempOFF", undef);
+    my $tempON = myAttrVal($me, "tempON", undef);
+    my $tempOFF = myAttrVal($me, "tempOFF", undef);
   
     $temps[$i] =~s/$tempOFF/off/g if (defined($tempOFF)); # temp off
     $temps[$i] =~s/$tempON/on/g   if (defined($tempON));  # temp on
@@ -290,6 +303,8 @@ sub weekprofile_sendDevProfile(@)
 
   my $devPrf = weekprofile_readDevProfile($device,$type,$me);
   
+  
+  
   # only send changed days
   my @dayToTransfer = ();
   foreach my $day (@shortDays){
@@ -302,7 +317,7 @@ sub weekprofile_sendDevProfile(@)
     }
     
     my $equal = 1;
-    for (my $i = 0; $i < $tmpCnt; $i++) {
+    for (my $i = 0; $i < $tmpCnt; $i++) {	  
       if ( ($prf->{DATA}->{$day}->{"temp"}[$i] ne $devPrf->{$day}->{"temp"}[$i] ) ||
             $prf->{DATA}->{$day}->{"time"}[$i] ne $devPrf->{$day}->{"time"}[$i] ) {
         $equal = 0; 
@@ -321,19 +336,33 @@ sub weekprofile_sendDevProfile(@)
     return undef;
   }
   
+  #make a copy because of replacements 
+  my $prfData= dclone($prf->{DATA});  
+  my $tempON = myAttrVal($me, "tempON", "30.5");
+  my $tempOFF = myAttrVal($me, "tempOFF", "4.5");
+  
+  #replace variables with values  
+  foreach my $day (@dayToTransfer){
+	my $tmpCnt =  scalar(@{$prfData->{$day}->{"temp"}});
+	for (my $i = 0; $i < $tmpCnt; $i++) {
+      $prfData->{$day}->{"temp"}[$i] = $tempON  if ($prfData->{$day}->{"temp"}[$i] =~/on/i);
+	  $prfData->{$day}->{"temp"}[$i] = $tempOFF if ($prfData->{$day}->{"temp"}[$i] =~/off/i);
+	}
+  }
+    
   my $cmd;
   if($type eq "MAX") {
     $cmd = "set $device weekProfile ";
     foreach my $day (@dayToTransfer){
-      my $tmpCnt =  scalar(@{$prf->{DATA}->{$day}->{"temp"}});
+      my $tmpCnt =  scalar(@{$prfData->{$day}->{"temp"}});
       
       $cmd.=$day.' ';
       
       for (my $i = 0; $i < $tmpCnt; $i++) {
-        my $endTime = $prf->{DATA}->{$day}->{"time"}[$i];
+        my $endTime = $prfData->{$day}->{"time"}[$i];
         
         $endTime = ($endTime eq "24:00") ? ' ' : ','.$endTime.',';
-        $cmd.=$prf->{DATA}->{$day}->{"temp"}[$i].$endTime;
+        $cmd.=$prfData->{$day}->{"temp"}[$i].$endTime;
       }
     }
   } elsif ($type eq "CUL_HM") {
@@ -344,9 +373,9 @@ sub weekprofile_sendDevProfile(@)
       $cmd .= $day;
       $cmd .= ($k < $dayCnt-1) ? " prep": " exec";
       
-      my $tmpCnt =  scalar(@{$prf->{DATA}->{$day}->{"temp"}});      
+      my $tmpCnt =  scalar(@{$prfData->{$day}->{"temp"}});      
       for (my $i = 0; $i < $tmpCnt; $i++) {
-        $cmd .= " ".$prf->{DATA}->{$day}->{"time"}[$i]." ".$prf->{DATA}->{$day}->{"temp"}[$i];
+        $cmd .= " ".$prfData->{$day}->{"time"}[$i]." ".$prfData->{$day}->{"temp"}[$i];
       }
       $cmd .= ($k < $dayCnt-1) ? "; ": "";
       $k++;
@@ -361,10 +390,10 @@ sub weekprofile_sendDevProfile(@)
       my $dpTime = "P1_ENDTIME_$reading";
       my $dpTemp = "P1_TEMPERATURE_$reading";
    
-      my $tmpCnt =  scalar(@{$prf->{DATA}->{$day}->{"temp"}});      
+      my $tmpCnt =  scalar(@{$prfData->{$day}->{"temp"}});      
       for (my $i = 0; $i < $tmpCnt; $i++) {
-        $cmd .= " " . $dpTemp . "_" . ($i + 1) . "=" . $prf->{DATA}->{$day}->{"temp"}[$i];
-        $cmd .= " " . $dpTime . "_" . ($i + 1) . "=" . weekprofile_timeToMinutes($prf->{DATA}->{$day}->{"time"}[$i]);
+        $cmd .= " " . $dpTemp . "_" . ($i + 1) . "=" . $prfData->{$day}->{"temp"}[$i];
+        $cmd .= " " . $dpTime . "_" . ($i + 1) . "=" . weekprofile_timeToMinutes($prfData->{$day}->{"time"}[$i]);
       }
       
       #$cmd .= ($k < $dayCnt-1) ? "; ": "";
@@ -1031,12 +1060,12 @@ sub weekprofile_Attr($$$)
   return if (!defined($attrVal));
   
   Log3 $me, 5, "$me(weekprofile_Attr): $cmd, $attrName, $attrVal";
-  
+    
   $attr{$me}{$attrName} = $attrVal;
   weekprofile_writeProfilesToFile($hash) if ($attrName eq 'configFile');
   
   if ($attrName eq 'tempON') {	  
-	  my $tempOFF = AttrVal($me, "tempOFF", $attrVal);
+	  my $tempOFF = myAttrVal($me, "tempOFF", $attrVal);
 	  if ($tempOFF > $attrVal) {
 		  Log3 $me, 2, "$me(weekprofile_Attr): warning: tempON must be bigger than tempOFF";
 		 
@@ -1044,7 +1073,7 @@ sub weekprofile_Attr($$$)
   }
   
   if ($attrName eq 'tempOFF') {
-	  my $tempON = AttrVal($me, "tempON", $attrVal);
+	  my $tempON = myAttrVal($me, "tempON", $attrVal);
 	  if ($tempON < $attrVal) {
 		  Log3 $me, 2, "$me(weekprofile_Attr): warning: tempOFF must be smaller than tempON";
 	  }
