@@ -20,7 +20,9 @@ use POSIX;
 use LWP::Simple;
 use Time::Local;
 
-my $missingModul = "";
+my $missingModul	= "";
+my $xs1_security 	= 0;		# disable Funktion sobald 10x keine Verbindung (Schutzabschaltung)
+
 eval "use Encode qw(encode encode_utf8 decode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
@@ -73,7 +75,7 @@ sub xs1Bridge_Define($$) {
 	if (&xs1Bridge_Ping == 1) {				## IP - Check
 	$hash->{STATE} = "Initialized";			## Der Status des Modules nach Initialisierung.
 	$hash->{TIME} = time();					## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.10";				## Version
+	$hash->{VERSION} = "1.11";				## Version
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
@@ -86,6 +88,9 @@ sub xs1Bridge_Define($$) {
 	InternalTimer(gettimeofday()+$attr{$name}{interval}, "xs1Bridge_GetUpDate", $hash);		## set Timer
 
 	Log3 $name, 3, "$typ: Modul defined with xs1_ip: $xs1_ip";
+	
+	fhem("define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log ".$arg[0]);			## Logfil define
+	fhem("attr FileLog_xs1Bridge room xs1");												## Logfile in xs1 room
 	return undef;
    }
    else
@@ -124,6 +129,7 @@ sub xs1Bridge_Attr(@) {
 			readingsSingleUpdate($hash, "state", "deactive", 1);
 			}
 			elsif ($attrValue eq "0") {								## Handling bei attribute disable 0
+			$xs1_security = 0;
 			readingsSingleUpdate($hash, "state", "active", 1);
 			}
 		}elsif ($attrName eq "view_Device_function") {
@@ -225,13 +231,16 @@ sub xs1Bridge_GetUpDate() {
 	my $name = $hash->{NAME};
 	my $typ = $hash->{TYPE};
 	my $state = $hash->{STATE};
+	my $xs1_uptimeStart = $hash->{helper}{xs1_uptimeStart};
+	my $xs1_uptimeOld = $hash->{helper}{xs1_uptimeOld};
+	my $xs1_uptimeNew = $hash->{helper}{xs1_uptimeNew};
 	my $def;
 	
 	#http://x.x.x.x/control?callback=cname&cmd=...
-	#get_list_actuators        - list all actuators
-	#get_list_sensors          - list all sensors
-	#get_list_timers           - list all timers
-	#get_config_info           - list all device info´s
+	#get_list_actuators        - list all actuators			i0
+	#get_list_sensors          - list all sensors			i1
+	#get_list_timers           - list all timers			i3
+	#get_config_info           - list all device info´s		i2
 	#get_protocol_info         - list protocol info´s
    
 	my $cmd = "/control?callback=cname&cmd=";
@@ -246,8 +255,8 @@ sub xs1Bridge_GetUpDate() {
 	my $viewDeviceFunction = AttrVal($hash->{NAME},"view_Device_function",0);
 	my $update_only_difference = AttrVal($hash->{NAME},"update_only_difference",0);
 
-	if (AttrVal($hash->{NAME},"disable",0) == 0) {
-		RemoveInternalTimer($hash);
+	if (AttrVal($hash->{NAME},"disable",0) == 0 && $xs1_security <= 10) {
+		RemoveInternalTimer($hash);									## Timer löschen
 		InternalTimer(gettimeofday()+$interval, "xs1Bridge_GetUpDate", $hash);
 		Debug "\n ------------- ERROR CHECK - START -------------" if($debug);
 		Debug " $typ: GetUpDate | RemoveInternalTimer + InternalTimer" if($debug);
@@ -277,7 +286,8 @@ sub xs1Bridge_GetUpDate() {
 			my $resp = $ua->request(HTTP::Request->new(GET => $adress));
 			Debug " $typ: GetUpDate | Adresse HTTP request Code: ".$resp->code if($debug);
 			if ($resp->code != "200") {										## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
-				Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no JSON-query";
+				Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no Data";
+				$xs1_security++;
 				last;		## ERROR JSON-query -> Abbruch schleife
 			}
 			
@@ -295,9 +305,8 @@ sub xs1Bridge_GetUpDate() {
 			}
 			
 			if ($i <= 1 ) {     ### xs1 Aktoren / Sensoren
-				#my $resp = $ua->request(HTTP::Request->new(GET => $adress));	## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
 				if ($resp->code != "200") {										## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
-					Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no JSON-query";
+					Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no Data";
 					last;		## ERROR JSON-query -> Abbruch schleife
 				}
 				
@@ -347,7 +356,7 @@ sub xs1Bridge_GetUpDate() {
 
 									if ($f2->{"type"} ne "disabled") {  ## Funktion != function -> type disable
 										if ($oldState ne $newState) {
-											readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$arrayname[4]."_".$i2 , $f2->{"type"} , 1);
+											readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$arrayname[4]."_".$i2 , $f2->{"type"} , 0);
 										}
 									}
 								} else {
@@ -381,7 +390,7 @@ sub xs1Bridge_GetUpDate() {
 
 						### Namen der Aktoren | Sensoren
 						if ($viewDeviceName == 1) {
-							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_name" , $f->{"name"} , 1);
+							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_name" , $f->{"name"} , 0);
 						}
 							
 						### Dispatch an xs1Device Modul						
@@ -391,54 +400,50 @@ sub xs1Bridge_GetUpDate() {
 						}
 					}
 				}
-			} elsif ($i == 2) {     ### xs1 Info´s
-				#my $resp = $ua->request(HTTP::Request->new(GET => $adress));	## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
-				if ($resp->code != "200") {										## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
-					Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no JSON-query";
-					last;			## ERROR JSON-query -> Abbruch schleife
+			} elsif ($i == 2) {     ### xs1 Info´s nur bei uptime Änderung
+				if ($resp->code != "200") {		## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
+					Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no Data";
+					last;						## ERROR JSON-query -> Abbruch schleife
 				}
 				
 				my $features;
 				my $features_i=0;
-				while (defined $decoded->{'info'}{'features'}->[$features_i]) {
-					$features.= $decoded->{'info'}{'features'}->[$features_i]." ";
-					$features_i++;
-				}
 				
-				my @xs1_readings = ("xs1_devicename","xs1_bootloader","xs1_hardware","xs1_features","xs1_firmware","xs1_mac","xs1_start");
-				my @xs1_decoded = ($decoded->{'info'}{'devicename'} , $decoded->{'info'}{'bootloader'} , $decoded->{'info'}{'hardware'} , $features , $decoded->{'info'}{'firmware'} , $decoded->{'info'}{'mac'} , FmtDateTime(time()-($decoded->{'info'}{'uptime'})));
-				# xs1_start wird teilweise je nach Laufzeit mit aktualisiert (+-1 Sekunde) -> Systemabhängig
+				my @xs1_readings = ("xs1_start","xs1_devicename","xs1_bootloader","xs1_hardware","xs1_features","xs1_firmware","xs1_mac","xs1_dhcp");
+				my @xs1_decoded = (FmtDateTime(time()-($decoded->{'info'}{'uptime'})) , $decoded->{'info'}{'devicename'} , $decoded->{'info'}{'bootloader'} , $decoded->{'info'}{'hardware'} , $features , $decoded->{'info'}{'firmware'} , $decoded->{'info'}{'mac'} , $decoded->{'info'}{'autoip'});
 				
-				my $i2 = 0;
-				my $newState;
-				readingsBeginUpdate($hash);
-				for my $i2 (0..6) {
-					my $oldState = ReadingsVal($name, $xs1_readings[$i2], "unknown");		## Readings Wert
-					if (defined $xs1_decoded[$i2]) {
-						$newState = $xs1_decoded[$i2];										## ARRAY Wert xs1 aktuell
-					} else {
-						Log3 $name, 3, "$typ: GetUpDate | ARRAY-ERROR xs1 -> no Data in loop $i|$i2";
-						last;
+				my $oldState = ReadingsVal($name, $xs1_readings[0], "2000-01-01 03:33:33");	## Readings Wert
+				my @oldstate = split (/[-,:,\s\/]/, $oldState); 							## Split $year, $month, $mday, $hour, $min, $sec
+				$oldState = fhemTimeGm($oldstate[5], $oldstate[4], $oldstate[3], $oldstate[2], $oldstate[1]-1, $oldstate[0]-1900); 	## Verarbeitung $sec, $min, $hour, $mday, $month-1, $year-1900
+				
+				my $newState = FmtDateTime(time()-($decoded->{'info'}{'uptime'}));			## ARRAY uptime Wert xs1 aktuell
+				my @newState = split (/[-,:,\s\/]/, $newState); 							## Split $year, $month, $mday, $hour, $min, $sec
+				$newState = fhemTimeGm($newState[5], $newState[4], $newState[3], $newState[2], $newState[1]-1, $newState[0]-1900); 	## Verarbeitung $sec, $min, $hour, $mday, $month-1, $year-1900
+				
+				if (abs($oldState - $newState) > 5) {	## Vergleich mit 5 Sekunden Tolleranz je Verabeitungszeit Netzwerk | DLAN | CPU
+					readingsBeginUpdate($hash);
+					for my $i2 (0..7) {
+						if ($i2 == 4) {
+								while (defined $decoded->{'info'}{'features'}->[$features_i]) {
+								$features.= $decoded->{'info'}{'features'}->[$features_i]." ";
+								$features_i++;
+							}
+							$xs1_decoded[4] = $features;	## ARRAY Wert xs1_decoded wird definiert
+						}
+						if (defined $xs1_decoded[$i2]) {
+
+							readingsBulkUpdate($hash, $xs1_readings[$i2] , $xs1_decoded[$i2]);
+							Debug " $typ: ".$xs1_readings[$i2].": ".$xs1_decoded[$i2] if($debug);
+						} else {
+							Log3 $name, 3, "$typ: GetUpDate | ARRAY-ERROR xs1 -> no Data in loop $i|$i2";
+							last;
+						}
 					}
-					
-					if ($oldState ne $newState) {											## Update Reading nur bei Wertänderung
-						readingsBulkUpdate($hash, $xs1_readings[$i2] , $xs1_decoded[$i2]);	
-					}
+					readingsEndUpdate($hash, 1);
 				}
-				readingsEndUpdate($hash, 1);
-            
-				Debug " $typ: xs1_devicename: ".$decoded->{'info'}{'devicename'} if($debug);
-				Debug " $typ: xs1_bootloader: ".$decoded->{'info'}{'bootloader'} if($debug);
-				Debug " $typ: xs1_hardware: ".$decoded->{'info'}{'hardware'} if($debug);
-				Debug " $typ: xs1_features: ".$features if($debug);
-				Debug " $typ: xs1_firmware: ".$decoded->{'info'}{'firmware'} if($debug);
-				Debug " $typ: xs1_mac: ".$decoded->{'info'}{'mac'} if($debug);
-				Debug " $typ: xs1_start: ".$decoded->{'info'}{'uptime'} if($debug);
-            
 			} elsif ($i == 3) {			### xs1 Timers
-				#my $resp = $ua->request(HTTP::Request->new(GET => $adress));	## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
-				if ($resp->code != "200") {										## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
-					Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no JSON-query";
+				if ($resp->code != "200") {								## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
+					Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no Data";
 					last;				## ERROR JSON-query -> Abbruch schleife
 				}
 				
@@ -452,8 +457,7 @@ sub xs1Bridge_GetUpDate() {
 							readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , FmtDateTime($f->{"next"}), 1);
 						}
 						Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." | ".$f->{"name"}." | ".$f->{"type"}." | ". $f->{"next"} if($debug);
-					}
-					elsif($oldState ne "unknown") {						## deaktive Timer mit Wert werden als Reading entfernt
+					} elsif ($oldState ne "unknown") {					## deaktive Timer mit Wert werden als Reading entfernt
 						Log3 $name, 3, "$typ: GetUpDate | ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." is deactive in xs1";
 						delete $defs{$name}{READINGS}{$readingsname[$i]."_".sprintf("%02d", $f->{"id"})};
 					}
@@ -467,6 +471,13 @@ sub xs1Bridge_GetUpDate() {
 		}
       	
 		Debug "\n ------------- ERROR CHECK - ALL END -------------\n " if($debug);
+	}
+	
+	if ($xs1_security == 10) {									## Abschaltung xs1 nach 10 Verbindungsversuchen
+		$attr{$name}{disable}	= "1";
+		readingsSingleUpdate($hash, "state", "deactive", 1);
+		RemoveInternalTimer($hash);								## Timer löschen
+		Log3 $name, 3, "$typ: GetUpDate | connection ERROR -> xs1 set to disable! Device not reachable after 10 attempts";
 	}
 }
 
@@ -605,11 +616,15 @@ sub xs1Bridge_Undef($$)
 		<li>Sensor_(01-64)_name</li> defined sensor name in the device<br>
 		<li>Timer_(01-128)</li> defined timer in the device<br>
 		<li>xs1_bootloader</li> version of bootloader<br>
+		<li>xs1_dhcp</li> DHCP on/off<br>
 		<li>xs1_features</li> purchased feature when buying (A = send | B = receive | C = Skripte/Makros | D = Media Access)<br>
 		<li>xs1_firmware</li> firmware number<br>
 		<li>xs1_start</li> device start<br>
 		</ul><br>
-		<li>The message "<code>HTTP GET error code 500 -> no JSON-query </code>" in the log file says that there was no query for a short time.</li>
+		<li>The message "<code>HTTP GET error code 500 -> no Data </code>" in the log file says that there was no query for a short time.</li>
+		<li>If the device has not been connected after 10 connection attempts, the module will switch on < disable > !</li><br>
+		<li>Create logfile automatically after define | scheme: <code>define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log &lt;name&gt;</code><br>
+			The following values ​​are recorded in logfile: Aktor_(01-64) or Sensor_(01-64) values | Timer | xs1-status information</li>
 	</ul>
 </ul>
 =end html
@@ -684,11 +699,15 @@ sub xs1Bridge_Undef($$)
 		<li>Sensor_(01-64)</li> definierter Sensorname im Ger&auml;t<br>
 		<li>Timer_(01-128)</li> definierter Timer im Ger&auml;t<br>
 		<li>xs1_bootloader</li> Firmwareversion des Bootloaders<br>
+		<li>xs1_dhcp</li> DHCP an/aus<br>
 		<li>xs1_features</li> erworbene Feature beim Kauf (A = SENDEN | B = EMPFANGEN | C = Skripte/Makros | D = Speicherkartenzugriff)<br>
 		<li>xs1_firmware</li> Firmwareversion<br>
-		<li>xs1_start</li> Gerätestart<br>
+		<li>xs1_start</li> Ger&auml;testart<br>
 		</ul><br>
-		<li>Die Meldung "<code>HTTP GET error code 500 -> no JSON-query </code>" im Logfile besagt, das kurzzeitig keine Abfrage erfolgen konnte.</li>
+		<li>Die Meldung "<code>HTTP GET error code 500 -> no Data </code>" im Logfile besagt, das kurzzeitig keine Abfrage erfolgen konnte.</li>
+		<li>Sollte das Ger&auml;t nach 10 Verbindungsversuchen ebenfalls keine Verbindung erhalten haben, so schaltet das Modul auf < disable > !</li><br>
+		<li>Logfile Erstellung erfolgt automatisch nach dem definieren. | Schema: <code>define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log &lt;Name&gt;</code><br>
+			Folgende Werte werden im Logfile erfasst: Aktor_(01-64) bzw. Sensor_(01-64) Werte | Timer | xs1-Statusinformationen</li>
 	</ul>
 </ul>
 =end html_DE
