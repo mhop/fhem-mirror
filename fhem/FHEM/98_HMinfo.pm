@@ -755,41 +755,30 @@ sub HMinfo_tempList(@) { ######################################################
       }
     }
     my  @oldList;
-    if (-f $fName ){
-      open(aRead, "$fName") || return("Can't open $fName: $!");
-      my $skip = 0;
-      while(<aRead>){
-        chomp;
-        my $line = $_;
-        $line =~ s/\r//g;
-        if ($line =~ m/entities:(.*)/){
-          my $eFound = $1;
-          if (grep /\b$eFound\b/,@chList){
-            # renew this entry
-            $skip = 1;
-          }
-          else{
-            $skip = 0;
-          }
+    
+    my ($err,@RLines) = FileRead($fName);
+    return "file: $fName error:$err"  if ($err);
+    my $skip = 0;
+    foreach(@RLines){
+      chomp;
+      my $line = $_;
+      $line =~ s/\r//g;
+      if ($line =~ m/entities:(.*)/){
+        my $eFound = $1;
+        if (grep /\b$eFound\b/,@chList){
+          # renew this entry
+          $skip = 1;
         }
-        push @oldList,$line if (!$skip);
+        else{
+          $skip = 0;
+        }
       }
-      close(aRead);
+      push @oldList,$line if (!$skip);
     }
-   open(aSave, ">$fName") || return("Can't open $fName: $!");
-   foreach my $line (@oldList,@storeList){
-     print aSave "\n$line";
-#     my @tl = sort grep /tempList(P[123])?[SMFWT]/,keys %{$defs{$chN}{READINGS}};
-#     if (scalar @tl != 7 && scalar @tl != 21){
-#       print aSave "\nincomplete:$chN only data for ".join(",",@tl);
-#       push @incmpl,$chN;
-#       next;
-#     }
-#     foreach my $rd (@tl){
-#       print aSave "\n$rd>$defs{$chN}{READINGS}{$rd}{VAL}";
-#     }
-   }
-   close(aSave);
+    my @WLines = grep !/^$/,(@oldList,@storeList);
+    $err = FileWrite($fName,@WLines);
+    return "file: $fName error write:$err"  if ($err);
+
     $ret = "incomplete data for ".join("\n     ",@incmpl) if (scalar@incmpl);
   }
   elsif ($action =~ m/(verify|restore)/){
@@ -818,7 +807,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
   return "no entities selected" if (!scalar @el);
 
   $fName = HMinfo_tempListDefFn($fName);
-  $tmpl =  $fName.":".$tmpl                              if($tmpl);
+  $tmpl =  $fName.":".$tmpl if($tmpl);
   my @rs;
   foreach my $name (@el){
    my $tmplDev = $tmpl ? $tmpl
@@ -866,16 +855,17 @@ sub HMinfo_tempListTmplView() { ###############################################
     }
   }
   @tlFiles = HMinfo_noDup(@tlFiles);
-  foreach my $fn (@tlFiles){#################################
-    if (!(-r $fn)){
-      push @tlFileMiss,$fn;
+  foreach my $fName (@tlFiles){#################################
+    my ($err,@RLines) = FileRead($fName);
+    if ($err){
+      push @tlFileMiss,"$fName - $err";
       next;
     }
-    open(aSave, "$fn") || return("Can't open $fn: $!");
-    push @tNfound,"$fn:";
-    my $l = length($fn)+3;
+
+    push @tNfound,"$fName:";
+    my $l = length($fName)+3;
     my $spc = sprintf("%${l}s"," ");
-    while(<aSave>){
+    foreach(@RLines){
       chomp;
       my $line = $_;
       $line =~ s/\r//g;
@@ -888,7 +878,6 @@ sub HMinfo_tempListTmplView() { ###############################################
         }
       }  
     }
-    close (aSave);
   }
   foreach my $d (keys %tlEntitys){
     $tlEntitys{$d}{c} = CUL_HM_tempListTmpl($d,"verify",$tlEntitys{$d}{t});
@@ -931,21 +920,21 @@ sub HMinfo_listOfTempTemplates() { ############################################
   my @tFiles = split(";",AttrVal($n,"configTempFile","tempList.cfg"));
   my $tDefault = $dir.$tFiles[0].":";
   my @tmpl;
-  foreach my $fn (map{$dir.$_}@tFiles){
-    next if (!(-r $fn));
-
-    open(aSave, "$fn") || return("Can't open $fn: $!");
-    while(<aSave>){
+  
+  foreach my $fName (map{$dir.$_}@tFiles){
+    my ($err,@RLines) = FileRead($fName);
+    next if ($err);
+    
+    foreach(@RLines){
       chomp;
       my $line = $_;
       $line =~ s/\r//g;
       if($line =~ m/^entities:(.*)/){
         my $l =$1;
         $l =~s/.*://;
-        push @tmpl,map{"$fn:$_"}split(",",$l);
+        push @tmpl,map{"$fName:$_"}split(",",$l);
       }  
     }
-    close (aSave);
   }
   @tmpl = map{s/$tDefault//;$_} @tmpl;
   $defs{$n}{helper}{weekplanList}     = \@tmpl;
@@ -958,10 +947,9 @@ sub HMinfo_listOfTempTemplates() { ############################################
 }
 
 sub HMinfo_tempListTmplGenLog($$) { ###########################################
-  my ($hiN,$fN) = @_;
+  my ($hiN,$fName) = @_;
+  $fName = HMinfo_tempListDefFn($fName);
 
-  $fN = HMinfo_tempListDefFn($fN);
-  open(fnRead, $fN) || return("Can't open file: $!");
   my @eNl = ();
   my %wdl = ( tempListSun =>"02"
              ,tempListMon =>"03"
@@ -971,7 +959,11 @@ sub HMinfo_tempListTmplGenLog($$) { ###########################################
              ,tempListFri =>"07"
              ,tempListSat =>"08");
   my @plotL;
-  while(<fnRead>){
+  
+  my ($err,@RLines) = FileRead($fName);
+  return "file: $fName error:$err"  if ($err);
+
+  foreach(@RLines){
     chomp;
     my $line = $_;
 
@@ -1001,51 +993,52 @@ sub HMinfo_tempListTmplGenLog($$) { ###########################################
       }
     }
   }
-  close (fnRead);
-  open(fnSave, ">${fN}.log") || return("Can't openfile for write: $!");
+  
+  my @WLines;
   my %eNh;
   foreach (sort @plotL){
-    print fnSave "\n$_";
+    push @WLines,$_;
     my (undef,$eN) = split " ",$_;
     $eNh{$eN} = 1;
   }
-  close (fnSave);
-  HMinfo_tempListTmplGenGplot($fN,keys %eNh);
+  $err = FileWrite($fName,@WLines);
+  return "file: $fName error write:$err"  if ($err);
+  HMinfo_tempListTmplGenGplot($fName,keys %eNh);
 }
 sub HMinfo_tempListTmplGenGplot(@) { ##########################################
-  my ($fN,@eN) = @_;
-  my $fNfull = $fN;
-  $fN =~ s/.cfg$//; # remove extention
-  $fN =~ s/.*\///; # remove directory
-#define weekLogF FileLog ./setup/tempList.cfg.log none
-#define wp SVG weekLogF:tempList:CURRENT
-#attr wp fixedrange week
-#attr wp startDate 2000-01-02
-  if (!defined($defs{"${fN}_Log"})){
-    CommandDefine(undef,"${fN}_Log FileLog ${fNfull}.log none");
+  my ($fName,@eN) = @_;
+  my $fNfull = $fName;
+  $fName =~ s/.cfg$//; # remove extention
+  $fName =~ s/.*\///; # remove directory
+      #define weekLogF FileLog ./setup/tempList.cfg.log none
+      #define wp SVG weekLogF:tempList:CURRENT
+      #attr wp fixedrange week
+      #attr wp startDate 2000-01-02
+  if (!defined($defs{"${fName}_Log"})){
+    CommandDefine(undef,"${fName}_Log FileLog ${fNfull}.log none");
   }
-  if (!defined($defs{"${fN}_SVG"})){
-    CommandDefine(undef,"${fN}_SVG SVG ${fN}_Log:${fN}:CURRENT");
-    CommandAttr(undef, "${fN}_SVG fixedrange week");
-    CommandAttr(undef, "${fN}_SVG startDate 2000-01-02");
+  if (!defined($defs{"${fName}_SVG"})){
+    CommandDefine(undef,"${fName}_SVG SVG ${fName}_Log:${fName}:CURRENT");
+    CommandAttr(undef, "${fName}_SVG fixedrange week");
+    CommandAttr(undef, "${fName}_SVG startDate 2000-01-02");
   }
 
-  $fN = "./www/gplot/$fN.gplot";
-  open(bSave, ">$fN") || return("Can't open $fN for write: $!");
-  print bSave "\n# Created by FHEM/98_HMInfo.pm, "
-             ."\nset terminal png transparent size <SIZE> crop"
-             ."\nset output '<OUT>.png'"
-             ."\nset xdata time"
-             ."\nset timefmt \"%Y-%m-%d_%H:%M:%S\""
-             ."\nset xlabel \" \""
-             ."\nset title 'weekplan'"
-             ."\nset ytics "
-             ."\nset grid ytics"
-             ."\nset ylabel \"Temperature\""
-             ."\nset y2tics "
-             ."\nset y2label \"invisib\""
-             ."\nset y2range [99:99]"
-             ."\n";
+  $fName = "./www/gplot/$fName.gplot";
+  my @WLines;
+  push @WLines,"# Created by FHEM/98_HMInfo.pm, ";
+  push @WLines,"set terminal png transparent size <SIZE> crop";
+  push @WLines,"set output '<OUT>.png'";
+  push @WLines,"set xdata time";
+  push @WLines,"set timefmt \"%Y-%m-%d_%H:%M:%S\"";
+  push @WLines,"set xlabel \" \"";
+  push @WLines,"set title 'weekplan'";
+  push @WLines,"set ytics ";
+  push @WLines,"set grid ytics";
+  push @WLines,"set ylabel \"Temperature\"";
+  push @WLines,"set y2tics ";
+  push @WLines,"set y2label \"invisib\"";
+  push @WLines,"set y2range [99:99]";
+  push @WLines," ";
 
   my $cnt = 0;
   my ($func,$plot) = ("","\n\nplot");
@@ -1057,8 +1050,9 @@ sub HMinfo_tempListTmplGenGplot(@) { ##########################################
     }
   }
   
-  print bSave  $func.$plot;
-  close (bSave);
+  push @WLines,$func.$plot;
+  my $err = FileWrite($fName,@WLines);
+  return "file: $fName error write:$err"  if ($err);
 }
 
 sub HMinfo_getEntities(@) { ###################################################
