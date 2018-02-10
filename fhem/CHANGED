@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_XiaomiBTLESens: fix humidity bug than temperature is lower 10
   - feature: 88_xs1Bridge: automatic Logfile after define | feature extension
   - changed: 98_weekprofile: send values for on/off instead of "on"/"off"
   - feature: 93_DbRep: V7.9.0, new attribute "avgTimeWeightMean" (averageValue)

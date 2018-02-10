@@ -47,17 +47,17 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.7";
+my $version = "2.0.8";
 
 
 
 
 my %XiaomiModels = (
-        flowerSens      => {'rdata' => '0x35'  ,'wdata' => '0x33'  ,'wdataValue' => 'A01F' ,'battery' => '0x38' ,'firmware' => '0x38'},
-        thermoHygroSens => {'wdata' => '0x10'  ,'wdataValue' => '0100' ,'battery' => '0x18' ,'firmware' => '0x24' ,'devicename' => '0x3'},
+        flowerSens      => {'rdata' => '0x35' ,'wdata' => '0x33' ,'wdataValue' => 'A01F' ,'wdatalisten' => 0 ,'battery' => '0x38' ,'firmware' => '0x38'},
+        thermoHygroSens => {'wdata' => '0x10' ,'wdataValue' => '0100' ,'wdatalisten' => 1 ,'battery' => '0x18' ,'firmware' => '0x24' ,'devicename' => '0x3'},
     );
 
-my %CallBatteryAge = (  '8h'    => 28800,
+my %CallBatteryAge = (          '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
                                 '32h'   => 115200,
@@ -223,9 +223,9 @@ sub XiaomiBTLESens_Attr(@) {
         RemoveInternalTimer($hash);
         
         if( $cmd eq "set" ) {
-            if( $attrVal < 300 ) {
-                Log3 $name, 3, "XiaomiBTLESens ($name) - interval too small, please use something >= 300 (sec), default is 3600 (sec)";
-                return "interval too small, please use something >= 300 (sec), default is 3600 (sec)";
+            if( $attrVal < 120 ) {
+                Log3 $name, 3, "XiaomiBTLESens ($name) - interval too small, please use something >= 120 (sec), default is 300 (sec)";
+                return "interval too small, please use something >= 120 (sec), default is 300 (sec)";
             } else {
                 $hash->{INTERVAL} = $attrVal;
                 Log3 $name, 3, "XiaomiBTLESens ($name) - set interval to $attrVal";
@@ -329,7 +329,7 @@ sub XiaomiBTLESens_stateRequestTimer($) {
 
     XiaomiBTLESens_stateRequest($hash) if( $init_done );
 
-    InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(600)), "XiaomiBTLESens_stateRequestTimer", $hash );
+    InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(90)), "XiaomiBTLESens_stateRequestTimer", $hash );
     
     Log3 $name, 4, "XiaomiBTLESens ($name) - stateRequestTimer: Call Request Timer";
 }
@@ -416,7 +416,7 @@ sub XiaomiBTLESens_CreateParamGatttool($@) {
         Log3 $name, 5, "XiaomiBTLESens ($name) - Read XiaomiBTLESens_ExecGatttool_Run $name|$mac|$mod|$handle";
 
      } elsif( $mod eq 'write' ) {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle."|".$value, "XiaomiBTLESens_ExecGatttool_Done", 60, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
+        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle."|".$value."|".$XiaomiModels{AttrVal($name,'model','')}{wdatalisten}, "XiaomiBTLESens_ExecGatttool_Done", 60, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
         
         readingsSingleUpdate($hash,"state","write sensor data",1);
     
@@ -428,14 +428,14 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
 
     my $string      = shift;
     
-    my ($name,$mac,$gattCmd,$handle,$value) = split("\\|", $string);
-    my $sshHost                             = AttrVal($name,"sshHost","none");
+    my ($name,$mac,$gattCmd,$handle,$value,$listen) = split("\\|", $string);
+    my $sshHost                                     = AttrVal($name,"sshHost","none");
     my $gatttool;
     my $json_notification;
 
 
-    $gatttool                               = qx(which gatttool) if($sshHost eq 'none');
-    $gatttool                               = qx(ssh $sshHost 'which gatttool') if($sshHost ne 'none');
+    $gatttool                                       = qx(which gatttool) if($sshHost eq 'none');
+    $gatttool                                       = qx(ssh $sshHost 'which gatttool') if($sshHost ne 'none');
     chomp $gatttool;
     
     if(defined($gatttool) and ($gatttool)) {
@@ -443,9 +443,21 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
         my $cmd;
         my $loop;
         my @gtResult;
-        my $wait    = 1;
-        my $sshHost = AttrVal($name,"sshHost","none");
-        my $hci     = AttrVal($name,"hciDevice","hci0");
+        my $wait                                    = 1;
+        my $sshHost                                 = AttrVal($name,"sshHost","none");
+        my $hci                                     = AttrVal($name,"hciDevice","hci0");
+        
+        $cmd                                        = "ssh $sshHost '" if($sshHost ne 'none');
+        $cmd                                        .= "timeout 5 " if($listen);
+        $cmd                                        .= "gatttool -i $hci -b $mac ";
+        $cmd                                        .= "--char-read -a $handle" if($gattCmd eq 'read');
+        $cmd                                        .= "--char-write-req -a $handle -n $value" if($gattCmd eq 'write');
+        $cmd                                        .= " --listen" if($listen);
+        $cmd                                        .= " 2>&1 /dev/null";
+        $cmd                                        .= "'" if($sshHost ne 'none');
+
+        $cmd                                        = "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'" if($sshHost ne 'none' and $gattCmd eq 'write' and AttrVal($name,"model","none") eq 'flowerSens');
+        
         
         while($wait) {
         
@@ -460,31 +472,20 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
                 $wait = 0;
             }
         }
-        
-        $cmd .= "ssh $sshHost '" if($sshHost ne 'none');
-        $cmd .= "gatttool -i $hci -b $mac ";
-        $cmd .= "--char-read -a $handle" if($gattCmd eq 'read');
-        $cmd .= "--char-write-req -a $handle -n $value" if($gattCmd eq 'write');
-        $cmd .= " 2>&1 /dev/null";
-        $cmd .= "'" if($sshHost ne 'none');
-        $cmd = "ssh $sshHost 'timeout 5 gatttool -i $hci -b $mac --char-write-req -a $handle -n $value --listen 2>&1 /dev/null'" if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
-        $cmd = "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'" if($sshHost ne 'none' and $gattCmd eq 'write' and AttrVal($name,"model","none") eq 'flowerSens');
-        
+
         $loop = 0;
         do {
+
+            Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: call gatttool with command: $cmd and loop $loop";
             
-            Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: call gatttool with command $cmd and loop $loop";
-            @gtResult = split(": ",qx($cmd)); # unless( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
-            #@gtResult = split(",",qx($cmd)) if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
+            @gtResult = split(": ",qx($cmd));
+
             Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool loop result ".join(",", @gtResult);
             $loop++;
-            
-            ($gtResult[1]) = split("\n",$gtResult[1]) if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
-            $gtResult[1] =~ s/\\n//g if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
-            
+
             $gtResult[0] = 'connect error'
             unless( defined($gtResult[0]) );
-            
+
         } while( $loop < 5 and $gtResult[0] eq 'connect error' );
         
         Log3 $name, 4, "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool result ".join(",", @gtResult);
@@ -494,7 +495,12 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
 
         $gtResult[1] = 'no data response'
         unless( defined($gtResult[1]) );
-        
+
+        if( $gtResult[1] ne 'no data response' and $listen ) {
+            ($gtResult[1]) = split("\n",$gtResult[1]);
+            $gtResult[1] =~ s/\\n//g;
+        }
+
         $json_notification = XiaomiBTLESens_encodeJSON($gtResult[1]);
         
         if($gtResult[1] =~ /^([0-9a-f]{2}(\s?))*$/) {
@@ -700,12 +706,20 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x10($$) {
     
     
     Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x10";
+    
+    my @numberOfHex = split(' ',$notification);
 
     $notification =~ s/\s+//g;
 
+    
     $readings{'temperature'}    = pack('H*',substr($notification,4,8));
-    $readings{'humidity'}       = pack('H*',substr($notification,18,8));
-        
+    
+    if( scalar(@numberOfHex) < 14 ) {
+        $readings{'humidity'}       = pack('H*',substr($notification,16,8));
+    } else {
+        $readings{'humidity'}       = pack('H*',substr($notification,18,8));
+    }
+
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
 }
