@@ -2,7 +2,7 @@ This file describes the changes to made in a FHEM installation when upgrading
 _to_ the named version from an older version. It describes no new features,
 only features not working anymore.  It may or may not work to set "attr global
 featurelevel X.Y" (where X.Y is the old FHEM version, e.g. 5.6) in order to
-enable to old feature.
+enable the old feature.
 
 - 2015-11-15 (5.7)
   - In the evaluated perl expression $value{DEVICE} is not set any more, use
