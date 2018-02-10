@@ -557,7 +557,18 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{HM_CMDNR}    = int(rand(250));# should be different from previous
     CUL_HM_prtInit ($hash);
     $hash->{helper}{io}{vccu} = "";
-    $hash->{helper}{io}{prefIO} = "";
+    $hash->{helper}{io}{prefIO} = undef;
+
+    if (   $HMid ne "000000"
+        && eval "defined(&TSCUL_RestoreHMDev)") {
+      my $restoredIOname = TSCUL_RestoreHMDev($hash, $HMid); # noansi: restore IODev from TSCUL before the first CUL_HM_assignIO
+      if (defined($restoredIOname)) {
+        $hash->{IODev}                                 = $defs{$restoredIOname};
+        $hash->{helper}{io}{restoredIO}                = $restoredIOname; # noansi: until attributes are filled, this should be the first choice
+        @{$hash->{helper}{mRssi}{io}{$restoredIOname}} = (100,100);       # noansi: set IO high rssi for first autoassign
+      }
+    }
+
     CUL_HM_assignIO($hash)if (!$init_done && $HMid ne "000000");
   }
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
@@ -824,7 +835,7 @@ sub CUL_HM_Attr(@) {#################################
       
       my ($ioCCU,$prefIO) = split(":",$attrVal,2);
       $hash->{helper}{io}{vccu}   = $ioCCU;
-      delete $hash->{helper}{io}{prefIO};
+      $hash->{helper}{io}{prefIO} = undef;
       if ($prefIO){
         my @prefIOA; 
         if ($init_done){@prefIOA = grep /.+/,map{$defs{$_} ? $_ : ""} split(",",$prefIO);} 
@@ -839,8 +850,8 @@ sub CUL_HM_Attr(@) {#################################
       }
     }
     else{
-      $hash->{helper}{io}{vccu} = "";
-      $hash->{helper}{io}{prefIO} = "";
+      $hash->{helper}{io}{vccu}   = "";
+      $hash->{helper}{io}{prefIO} = undef;
     }
   }
   elsif($attrName eq "autoReadReg"){
@@ -1190,44 +1201,61 @@ sub CUL_HM_Parse($$) {#########################################################
     $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devN}$/,@entities);
     return (CUL_HM_pushEvnts(),$mh{devN},@entities);
   }
-  
+
+  my $IOchanged = 0; # track a change of IO dev to ensure aesCommReq validation
+
   if (   !defined $mh{devH}->{IODev}
       || !defined $mh{devH}->{IODev}{NAME}){
-    Log3 $mh{devH},1,"CUL_HM $mh{devN} error: no IO deviced!!! correkt it";
-    $mh{devH}->{IODev} = $iohash;
+    $IOchanged += CUL_HM_assignIO($mh{devH}); # this way the init and remove work even on startup for TSCUL.
+    if (   !defined $mh{devH}->{IODev}
+        || !defined $mh{devH}->{IODev}{NAME}){
+      Log3 $mh{devH},1,"CUL_HM $mh{src} error: no IO deviced!!! correct it";
+      $mh{devH}->{IODev} = $iohash;
+      $IOchanged = 1;
+    }
   }
-
-  my $oldIo = $mh{devH}{IODev}{NAME};
-  CUL_HM_assignIO($mh{devH}); #this way the init and remove work even on startup for TSCUL
 
   $respRemoved = 0;  #set to 'no response in this message' at start
   $mh{shash}  = $mh{devH};                # source hash - will be redirected to channel if applicable
   my $ioId = CUL_HM_h2IoId($mh{devH}->{IODev});
   $ioId = $mh{id} if(!$ioId);
 
+  CUL_HM_storeRssi($mh{devN}
+                  ,"at_".(($mh{mFlgH}&0x40)?"rpt_":"").$mh{ioName} # repeater?
+                  ,$mh{myRSSI}
+                  ,$mh{mNo});
   #----------CUL aesCommReq handling---------
-  my $aComReq = AttrVal($mh{devN},"aesCommReq",0);
-  my $dRfMode = AttrVal($mh{devH}{IODev}{NAME},"rfmode","");
-  my $dIoOk   = ($mh{devH}{IODev}{NAME} eq $mh{ioName}) ? 1 : 0;
-  if (   $aComReq                  #aesCommReq enabled for device
-      && !$dIoOk                   #message not received on assigned IO
-      && $mh{msgStat} !~ m/AES/) { #IO did not already do AES processing for us
+  my $oldIo     = $mh{devH}{IODev}->{NAME};
+  my $aComReq   = AttrVal($mh{devN},"aesCommReq",0); #aesCommReq enabled for device 
+  my $dIoOk     = ($mh{devH}{IODev}{NAME} eq $mh{ioName}) ? 1 : 0;
+  my $aIoAESCap = (   $mh{devH}{IODev}->{helper}{VTS_AES}
+                   || AttrVal($mh{devH}{IODev}->{NAME},"rfmode","") ne "HomeMatic" ) ? 1 : 0; # assigned IO AES cappable
+  $mh{devH}->{helper}{aesAuthBytes} = $mh{auth} if($mh{auth}); # let CUL_HM ACK with authbytes. tsculfw does default ACK automatically only. A default ACK may just update a default ACK in tsculfw buffer
+  if (   $aComReq                      #aesCommReq enabled for device
+      && (!$dIoOk || $IOchanged)       #message not received on assigned IO or change in IO
+      && ($mh{msgStat} !~ m/^AES/) ) { #receiving IO did not already do AES processing for us
  
-    CUL_HM_assignIO($mh{devH}); #update IO in case of roaming
-    if (   !$dIoOk                                       #current IO not selected as new IO
-        || $dRfMode ne "HomeMatic"                       #new IO is not CUL
-        || AttrVal($oldIo,"rfmode","") ne "HomeMatic") { #old IO is not CUL
+    my $oldIoAESCap = $aIoAESCap;
+    $IOchanged += CUL_HM_assignIO($mh{devH}); #update IO in case of roaming
+    $aIoAESCap = (   $mh{devH}{IODev}->{helper}{VTS_AES}
+                  || AttrVal($mh{devH}{IODev}->{NAME},"rfmode","") ne "HomeMatic" ) ? 1 : 0; # newly assigned IO AES cappable
+    $dIoOk     = ($mh{devH}{IODev}->{NAME} eq $mh{ioName}) ? 1 : 0; # newly assigned IO received message
+    if (   !$dIoOk                      #message not received on assigned new IO
+        || $IOchanged                   #IO changed, so AES state is unkown
+        || $oldIoAESCap                 #old IO is AES cappable (not standard CUL) and should have handled it, as it was set to do so
+        || $aIoAESCap   ) {             #new IO is AES cappable (not standard CUL), but did not handle it as it was not set to do so
       Log3 $mh{devH},5,"CUL_HM ignoring message for ${oldIo} received on $mh{ioName}";
       #Do not process message further, the assigned IO has to handle it
       $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devN}$/,@entities);
       return (CUL_HM_pushEvnts(),$mh{devN});
     }
   }
-  if (   $dRfMode eq "HomeMatic"   # $mh{devH}->{IODev}->{TYPE} eq "CUL"
+  #----------CUL aesCommReq handling---------
+  if (   !$aIoAESCap               #IO is not aesCommReq cappable (standard CUL)
+      && $aComReq                  #aesCommReq enabled for device
       && $dIoOk                    #message received on assigned IO
       && $cryptFunc == 1 
-      && $ioId eq $mh{dst}
-      && $aComReq) {               #aesCommReq enabled for device
+      && $ioId eq $mh{dst}) {
 
     if ($mh{devH}->{helper}{aesCommRq}{msgStat}) {
       #----------Message was already handled, pass on result---------
@@ -1277,14 +1305,13 @@ sub CUL_HM_Parse($$) {#########################################################
     } 
     else {
       my $doAES = 1;
-      my $chn ;
+      my $chn;
       if($mh{mTp} =~ m/^4[01]/){ #someone is triggered##########
-        CUL_HM_m_setCh(\%mh,$mI[0]);
         $chn = $mI[0];
       } 
       elsif ($mh{mTp} eq "10") {
-        if ($mh{mStp} =~ m/^0[46]/) {
-          CUL_HM_m_setCh(\%mh,$mI[1]);
+        if ($mh{mStp} =~ m/^0[456]/) {
+          $chn = $mI[1];
         } 
         elsif ($mh{mStp} eq "01") {
           $doAES = 0;
@@ -1297,7 +1324,7 @@ sub CUL_HM_Parse($$) {#########################################################
         $doAES = 0;
       }
 
-      if ($doAES && $chn && defined(CUL_HM_id2Hash($mh{src}.sprintf("%02X",$chn)))) {
+      if ($doAES && defined $chn && defined(CUL_HM_id2Hash($mh{src}.sprintf("%02X",$chn)))) {
         CUL_HM_m_setCh(\%mh,$mI[0]);
       }
     
@@ -1325,7 +1352,7 @@ sub CUL_HM_Parse($$) {#########################################################
           $mh{msgStat}="AESpending";
         } 
         else {
-          $mh{devH}->{helper}{aesCommRq}{msg} = "";
+          delete($mh{devH}->{helper}{aesCommRq});  # cleanup CUL aesCommReq -> we can check it in CUL_HM_assignIO not to change IO while CUL aesCommReq in progress
           Log3 $mh{cHash},1,"CUL_HM $mh{devN} required key $mh{kNo} not defined in VCCU!";
         }
       } 
@@ -1336,21 +1363,21 @@ sub CUL_HM_Parse($$) {#########################################################
   }
 
  if ($mh{msgStat}){
-    if   ($mh{msgStat} =~ m/AESKey/){
+    if   ($mh{msgStat} =~ m/^AESKey/){
       push @evtEt,[$mh{devH},1,"aesKeyNbr:".substr($mh{msgStat},7)];
       $mh{msgStat} = ""; # already processed
     }
-    elsif($mh{msgStat} =~ m/AESpending/){# AES communication pending
+    elsif($mh{msgStat} =~ m/^AESpending/){# AES communication pending
       push @evtEt,[$mh{devH},1,"aesCommToDev:pending"];
       if ($mh{mTyp} eq "0204") {
-        my (undef,undef,$aesKeyNbr) = unpack'A2A12A2',$mh{p};
+        my $aesKeyNbr = substr($mh{p},14,2);
         push @evtEt,[$mh{devH},1,"aesKeyNbr:".$aesKeyNbr] if (defined $aesKeyNbr);
       }
       #Do not process message further, as it may be faked
       $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devN}$/,@entities);
       return (CUL_HM_pushEvnts(),$mh{devN});
     }
-    elsif($mh{msgStat} =~ m/AESCom/){# AES communication to central
+    elsif($mh{msgStat} =~ m/^AESCom/){# AES communication to central
       my $aesStat = substr($mh{msgStat},7);
       push @evtEt,[$mh{devH},1,"aesCommToDev:".$aesStat];
       ### General may need substential rework
@@ -1393,10 +1420,6 @@ sub CUL_HM_Parse($$) {#########################################################
   my $target = " (to $mh{dstN})";
   $mh{st} = AttrVal($mh{devN}, "subType", "");
   $mh{md} = AttrVal($mh{devN}, "model"  , "");
-  CUL_HM_storeRssi($mh{devN}
-                  ,"at_".(($mh{mFlgH}&0x40)?"rpt_":"").$mh{ioName} # repeater?
-                  ,$mh{myRSSI}
-                  ,$mh{mNo});
 
   # +++++ check for duplicate or repeat ++++
   my $msgX = "No:$mh{mNo} - t:$mh{mTp} s:$mh{src} d:$mh{dst} ".($mh{p}?$mh{p}:"");
@@ -3498,11 +3521,6 @@ sub CUL_HM_parseCommon(@){#####################################################
 }
 sub CUL_HM_m_setCh($$){### add channel identification to Message Hash
   my ($mhp,$chn) = @_;
-##  ($mh{msg},$mh{msgStat},$mh{myRSSI},$mh{msgIO},$mh{auth}) = split(":",$msgIn,5);
-#  ($mhp->{t},$mhp->{len},$mhp->{mNo},$mhp->{mFlg},$mhp->{mTp},$mhp->{src},$mhp->{dst},$mhp->{p}) = unpack 'A1A2A2A2A2A6A6A*',$mhp->{msg};
-#  $$mhp->{mFlgH} = hex($mhp->{mFlg});
-# if    (mhp->{mTp} =~ m/^(10|02)$/ ){$chn = substr($mhp->{p},2,2)}
-# elsif (mhp->{mTp} =~ m/^4.$/ )        {$chn = substr($mhp->{p},0,2)}
   $mhp->{chnM}  = $chn;
   $mhp->{chnraw}= hex($mhp->{chnM});
   $mhp->{chn}   = $mhp->{chnraw} & 0x3f;
@@ -8886,24 +8904,34 @@ sub CUL_HM_storeRssi(@){
     $peerName = $h->{NAME};
   }
   else{
-    return if (length($peerName)<3);
+    return if (length($peerName) < 3);
   }
   
   if ($peerName =~ m/^at_/){
-    if ($hash->{helper}{mRssi}{mNo} ne $mNo){# new message
-      delete $hash->{helper}{mRssi};
-      $hash->{helper}{mRssi}{mNo} = $mNo;
+    my $hhmrssi = $hash->{helper}{mRssi};
+    if ($hhmrssi->{mNo} ne $mNo){# new message
+      foreach my $n (keys %{$hhmrssi->{io}}) {
+        pop(@{$hhmrssi->{io}{$n}}); # take one from all IOs rssi
+      }
+      $hhmrssi->{mNo} = $mNo;
     }
     
     my ($mVal,$mPn) = ($val,substr($peerName,3));
     if ($mPn =~ m/^rpt_(.*)/){# map repeater to io device, use max rssi
       $mPn = $1;
-      $mVal = $hash->{helper}{mRssi}{io}{$mPn} 
-            if(   $hash->{helper}{mRssi}{io}{$mPn} 
-               && $hash->{helper}{mRssi}{io}{$mPn} > $mVal);
+      $mVal = @{$hhmrssi->{io}{$mPn}}[0]
+            if(   @{$hhmrssi->{io}{$mPn}}[0] 
+               && @{$hhmrssi->{io}{$mPn}}[0] > $mVal);
     }
-    $mVal +=2 if(CUL_HM_name2IoName($name) eq $mPn);
-    $hash->{helper}{mRssi}{io}{$mPn} = $mVal;
+    if(CUL_HM_name2IoName($name) eq $mPn){
+      if    ($mVal > -50 ) {$mVal += 8 ;}
+      elsif ($mVal > -60 ) {$mVal += 6 ;}
+      elsif ($mVal > -70 ) {$mVal += 4 ;}
+      else                 {$mVal += 2 ;}      
+    }
+    @{$hhmrssi->{io}{$mPn}} = ($mVal,$mVal); # save last rssi twice
+                                             # -> allow tolerance for one missed reception even with good rssi
+                                             # -> reduce useless IO switching
   }
   
   $hash->{helper}{rssi}{$peerName}{lst} = $val;
@@ -9016,33 +9044,40 @@ sub CUL_HM_UpdtCentralState($){
   $state = "IOs_ok" if (!$state);
   CUL_HM_UpdtReadSingle($defs{$name},"state",$state,1);
 }
-sub CUL_HM_assignIO($){ #check and assign IO
+sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   # assign IO device
   my $hash = shift;
+  my $result = 0; # default: IO unchanged
   if (!defined $hash->{helper}{prt}{sProc}
       || (   $hash->{helper}{prt}{sProc} == 1
-          && defined $hash->{IODev})){#don't change while send in process
-    return; 
+          && defined $hash->{IODev})             #don't change while send in process
+      || defined($hash->{helper}{aesCommRq})) {  #don't change while CUL aesCommReq in progress
+    return $result; # IO unchanged 
   }
-  my $oldIODev = ($hash->{IODev} && $hash->{IODev}{NAME}) ? $hash->{IODev} : "-";
-  my $newIODev = "";
-  my $haveIOList = 0;
-  my $ioCCU = $hash->{helper}{io}{vccu};
+  my $oldIODev = ($hash->{IODev} && $hash->{IODev}{NAME}) ? $hash->{IODev} : undef;
+  my $newIODev;
 
+  my $ioCCU = $hash->{helper}{io}{vccu};
+  my $haveIOList = 0;
+  my @ioccu;
   if (   $ioCCU
       && defined $defs{$ioCCU} 
       && AttrVal($ioCCU,"model","") eq "CCU-FHEM"
       && ref($defs{$ioCCU}{helper}{io}{ioList}) eq 'ARRAY'){
     $haveIOList = 1;
-    my @ioccu = @{$defs{$ioCCU}{helper}{io}{ioList}};
-    my @ios = ((sort {$hash->{helper}{mRssi}{io}{$b} <=> 
-                    $hash->{helper}{mRssi}{io}{$a} } 
-                    grep {defined $hash->{helper}{mRssi}{io}{$_}} @ioccu)
-                  ,(grep {!defined $hash->{helper}{mRssi}{io}{$_}} @ioccu));
+    @ioccu = @{$defs{$ioCCU}{helper}{io}{ioList}};
+    my @ios = ((sort {@{$hash->{helper}{mRssi}{io}{$b}}[0] <=> 
+                      @{$hash->{helper}{mRssi}{io}{$a}}[0] } 
+                   (grep { defined @{$hash->{helper}{mRssi}{io}{$_}}[0]} @ioccu))
+                  ,(grep {!defined @{$hash->{helper}{mRssi}{io}{$_}}[0]} @ioccu));
     unshift @ios,@{$hash->{helper}{io}{prefIO}} if ($hash->{helper}{io}{prefIO});# set prefIO to first choice
-
+    if ($hash->{helper}{io}{restoredIO}) { # set restoredIO to very first choice
+      unshift @ios,$hash->{helper}{io}{restoredIO};
+      delete ($hash->{helper}{io}{restoredIO}) if ($init_done); # we have a user choice, delete restore data
+      Log3 $hash->{NAME}, 0, "CUL_HM_assignIO ".$hash->{NAME}." autoassign restoredIO used";
+    }
     foreach my $iom (@ios){
-      last if ($iom eq "none"); # if "none" is detected stop vccu auto assignment and try normal      
+      last if ($iom eq "none"); # if "none" is detected stop vccu auto assignment and try normal
       next if (  !$defs{$iom}
                || ReadingsVal($iom,"state","") eq "disconnected"
                || InternalVal($iom,"XmitOpen",1) == 0);          # HMLAN/HMUSB/TSCUL?
@@ -9052,40 +9087,67 @@ sub CUL_HM_assignIO($){ #check and assign IO
     }
   }
 
-  if (!$newIODev) {# not assigned thru CCU - try normal
-    return if (!$oldIODev);# no IOdev by now - can't help
-    $newIODev = $oldIODev;
-    my $dIo = AttrVal($hash->{NAME},"IODev","");
-    if (  $defs{$dIo} 
-        &&(!$oldIODev || $dIo ne $oldIODev->{NAME})) {
-      $newIODev = $defs{$dIo}; # assign according to Attribut
+  if (!defined $newIODev) {# not assigned thru CCU - try normal
+    return 0 if (!$oldIODev);# no IOdev by now - can't help
+    $newIODev = $oldIODev; # try keep the last one, if defined
+    my $dIo = AttrVal($hash->{NAME},"IODev",""); # if no VCCU is used, attr IODev is the first choice. But if VCCU is used, attr IODev must not be used for restore to work! Then it should be removed from attributes!
+    if ($defs{$dIo}) {
+      if (   !defined($oldIODevH->{NAME})
+          || ($oldIODevH->{NAME} ne $dIo) ) {
+        $newIODev = $defs{$dIo}; # assign according to Attribut
+        delete ($hash->{helper}{io}{restoredIO}) if ($init_done); # we have a user choice, delete restore data
+        Log3 $hash->{NAME}, 0, "CUL_HM_assignIO ".$hash->{NAME}." attr IODev used";
+      }
     }
-    elsif (!$defs{$dIo}) {
-      AssignIoPort($hash); #let kernal decide
-      $newIODev = $hash->{IODev};
+    else {
+      if ($hash->{helper}{io}{restoredIO}) {
+        $newIODev = $defs{$hash->{helper}{io}{restoredIO}};
+        delete ($hash->{helper}{io}{restoredIO}) if ($init_done); # delete restore data
+        Log3 $hash->{NAME}, 0, "CUL_HM_assignIO ".$hash->{NAME}." restoredIO used";
+      }
+      else {
+        AssignIoPort($hash); #let kernal decide, but it is quite time consuming! Only to be used as very last chance!
+        $newIODev = $hash->{IODev};
+        Log3 $hash->{NAME}, 0, "CUL_HM_assignIO ".$hash->{NAME}." AssignIoPort used";
+      }
     }
   }
 
-  if ($oldIODev ne $newIODev) {# have a change - Assign the device at IO and remove from old one
+  if (   defined($newIODev)
+      && (   !defined($oldIODev)
+          || ($oldIODev != $newIODev) ) ) {
     my $ID = CUL_HM_hash2Id($hash);
-    if (   $oldIODev 
-        && $oldIODev ne "-"
-        && $oldIODev ne $newIODev
-        && ReadingsVal($oldIODev->{NAME},"state","") ne "disconnected"
-#        && InternalVal($oldIODev->{NAME},"XmitOpen",1) != 0
-        &&(  $oldIODev->{helper}{VTS_AES} #if this unselected IO is TSCUL 0.14+ we have to remove the device from IO
-           || (   $oldIODev->{TYPE} && $oldIODev->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/ ))) {#if this unselected IO is HMLAN we have to remove the device from IO
-      IOWrite($hash, "", "remove:".$ID); # remove assignment from old IO
+    if ($haveIOList) {
+      my $lIODevH;
+      foreach my $ioLd (@ioccu) { # remove on all unassigend IOs to ensure a consistant state of assignments in IO devices!
+                                  # IO has to keep track about and really remove just if required
+        $lIODevH = $defs{$ioLd};
+        next if (   !defined($lIODevH)
+                 || ($lIODevH == $newIODevH) );
+        if (ReadingsVal($ioLd,"state","") ne "disconnected") {
+          if (   $lIODevH->{helper}{VTS_AES} #if this unselected IO is TSCUL 0.14+ we have to remove the device from IO, as it starts with "historical" assignment data
+              || (   defined($oldIODev)
+                  && ($lIODevH == $oldIODev) # HMLAN/HMUARTLGW always start with clean peerlist? At least it tries to.
+                  && $lIODevH->{TYPE}
+                  && $lIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/s
+                  ) #if this unselected IO is HMLAN we have to remove the device from IO
+              ) {
+            $hash->{IODev} = $lIODevH; # temporary assignment for IOWrite to work on each IO!
+            IOWrite($hash, "", "remove:".$ID);
+          }
+        }
+      }
     }
 
     $hash->{IODev} = $newIODev; # finally assign IO
     
-    if (   $newIODev->{TYPE} && $newIODev->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/                 #if selected IO IO is HMLAN we have to set the device in IO
-        || (   $newIODev->{helper}{VTS_AES} 
-            && $hash->{helper}{io}{newChn})){
+    if (   ($newIODev->{TYPE} && $newIODev->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/)
+        || (   $newIODev->{helper}{VTS_AES})){
       IOWrite($hash, "", "init:".$ID); # assign to new IO
     }
-  }
+   $result = 1; # IO changed
+   }
+ return $result;
 }
 
 sub CUL_HM_stateUpdatDly($$){#delayed queue of status-request
@@ -9502,8 +9564,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                               : "./tempList.cfg";
   }
   
-  return "file: $fName for $name does not exist"  if (!(-e $fName));
-  open(aSave, "$fName") || return("Can't open $fName: $!");
+  my ($err,@RLines) = FileRead($fName);
+  return "file: $fName error:$err"  if ($err);
+#  return "file: $fName for $name does not exist"  if (!(-e $fName));
+#  open(aSave, "$fName") || return("Can't open $fName: $!");
   my $found = 0;
   my @entryFail = ();
   my @exec = ();
@@ -9549,7 +9613,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
     }
   }
   else{
-    while(<aSave>){
+    foreach(@RLines){
+#    while(<aSave>){
       chomp;
       my $line = $_;
       $line =~ s/\r//g;
@@ -9561,8 +9626,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           $eN =~ s/ //g;
           $found = 1 if ($eN eq $tmpl);
         }
-      }
-    
+      }    
       elsif($found == 1 && $line =~ m/(R_)?(P[123])?(_?._)?tempList[SMFWT].*\>/){
         my ($prg,$tln,$val);
         $prg = $1 if ($line =~ m/P(.)_/);
@@ -9637,7 +9701,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
     my @param = split(" ",$_);
     CUL_HM_Set($defs{$param[0]},@param);
   }
-  close(aSave);
+#  close(aSave);
   return $ret;
 }
 
