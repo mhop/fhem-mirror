@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.8";
+my $version = "2.0.9";
 
 
 
@@ -409,14 +409,14 @@ sub XiaomiBTLESens_CreateParamGatttool($@) {
     Log3 $name, 4, "XiaomiBTLESens ($name) - Run CreateParamGatttool with mod: $mod";
     
      if( $mod eq 'read' ) {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle, "XiaomiBTLESens_ExecGatttool_Done", 60, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
+        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle, "XiaomiBTLESens_ExecGatttool_Done", 90, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
         
         readingsSingleUpdate($hash,"state","read sensor data",1);
     
         Log3 $name, 5, "XiaomiBTLESens ($name) - Read XiaomiBTLESens_ExecGatttool_Run $name|$mac|$mod|$handle";
 
      } elsif( $mod eq 'write' ) {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle."|".$value."|".$XiaomiModels{AttrVal($name,'model','')}{wdatalisten}, "XiaomiBTLESens_ExecGatttool_Done", 60, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
+        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle."|".$value."|".$XiaomiModels{AttrVal($name,'model','')}{wdatalisten}, "XiaomiBTLESens_ExecGatttool_Done", 90, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
         
         readingsSingleUpdate($hash,"state","write sensor data",1);
     
@@ -448,7 +448,7 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
         my $hci                                     = AttrVal($name,"hciDevice","hci0");
         
         $cmd                                        = "ssh $sshHost '" if($sshHost ne 'none');
-        $cmd                                        .= "timeout 5 " if($listen);
+        $cmd                                        .= "timeout 10 " if($listen);
         $cmd                                        .= "gatttool -i $hci -b $mac ";
         $cmd                                        .= "--char-read -a $handle" if($gattCmd eq 'read');
         $cmd                                        .= "--char-write-req -a $handle -n $value" if($gattCmd eq 'write');
@@ -706,6 +706,9 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x10($$) {
     
     
     Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x10";
+    
+    return XiaomiBTLESens_stateRequest($hash)
+    unless($notification =~ /^([0-9a-f]{2}(\s?))*$/);
     
     my @numberOfHex = split(' ',$notification);
 
