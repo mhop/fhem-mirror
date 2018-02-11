@@ -9123,7 +9123,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
                                   # IO has to keep track about and really remove just if required
         $lIODevH = $defs{$ioLd};
         next if (   !defined($lIODevH)
-                 || ($lIODevH == $newIODevH) );
+                 || ($lIODevH == $newIODev) );
         if (ReadingsVal($ioLd,"state","") ne "disconnected") {
           if (   $lIODevH->{helper}{VTS_AES} #if this unselected IO is TSCUL 0.14+ we have to remove the device from IO, as it starts with "historical" assignment data
               || (   defined($oldIODev)
