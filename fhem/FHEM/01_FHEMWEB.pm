@@ -964,6 +964,24 @@ FW_answerCall($)
   FW_pO sprintf($cssTemplate, "pgm2/jquery-ui.min.css");
   map { FW_pO sprintf($cssTemplate, $_); }
                         split(" ", AttrVal($FW_wname, "CssFiles", ""));
+
+  my $sd = AttrVal($FW_wname, "styleData", ""); # Avoid flicker in f18
+  if($sd && $sd =~ m/"$FW_sp":/s) {
+    my $bg;
+    $bg = $1 if($FW_room && $sd =~ m/"Room\.$FW_room\.cols.bg": "([^"]*)"/s);
+    $bg = $1 if(!defined($bg) && $sd =~ m/"cols.bg": "([^"]*)"/s);
+
+    my $bgImg;
+    $bgImg = $1 if($FW_room && $sd =~ m/"Room\.$FW_room\.bgImg": "([^"]*)"/s);
+    $bgImg = $1 if(!defined($bgImg) && $sd =~ m/"bgImg": "([^"]*)"/s);
+
+    FW_pO "<style id='style_css'>";
+    FW_pO "body { background-color:#$bg; }" if($bg);
+    FW_pO "body { background-image:url($FW_ME/images/background/$bgImg); }"
+        if($bgImg);
+    FW_pO "</style>";
+  }
+
   my $css = AttrVal($FW_wname, "Css", "");
   FW_pO "<style id='fhemweb_css'>$css</style>\n" if($css);
 

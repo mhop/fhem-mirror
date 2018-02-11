@@ -817,16 +817,18 @@ FW_rawDef()
   });
 }
 
+var FW_arrowDown, FW_arrowRight;
 function
 FW_treeMenu()
 {
-  var col = 'rgb(39, 135, 38)';
   var a = $("a").get(0);
+  var col = 'rgb(39, 135, 38)';
   if(window.getComputedStyle && a)
     col = getComputedStyle(a,null).getPropertyValue('color'); 
-  var arrowRight='data:image/svg+xml;utf8,<svg viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path fill="gray" d="M1171 960q0 13-10 23l-466 466q-10 10-23 10t-23-10l-50-50q-10-10-10-23t10-23l393-393-393-393q-10-10-10-23t10-23l50-50q10-10 23-10t23 10l466 466q10 10 10 23z"/></svg>'
-        .replace('gray', col);
-  var arrowDown=arrowRight.replace('/>',' transform="rotate(90,896,896)"/>');
+  FW_arrowRight = 'data:image/svg+xml;utf8,<svg viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path fill="gray" d="M1171 960q0 13-10 23l-466 466q-10 10-23 10t-23-10l-50-50q-10-10-10-23t10-23l393-393-393-393q-10-10-10-23t10-23l50-50q10-10 23-10t23 10l466 466q10 10 10 23z"/></svg>'
+      .replace('gray', col);
+  FW_arrowDown =FW_arrowRight.replace('/>',' transform="rotate(90,896,896)"/>');
+
   var fnd;
 
   $("div#menu table.room").each(function(){     // one loop per Block
@@ -871,7 +873,7 @@ FW_treeMenu()
     $(t).find("tr[data-mTree]").not(".level0").hide();
     $(t).find("tr.menuTree").click(function(){treeClick(this)});
     $(t).find("tr.menuTree > td > div > div")
-        .css("background-image", "url('"+arrowRight+"')");
+        .css("background-image", "url('"+FW_arrowRight+"')");
     var selRoom = $("div#content").attr("room");
     if(selRoom) {
       var ta = selRoom.split("->"), nxt="";
@@ -888,11 +890,11 @@ FW_treeMenu()
     var tgt = FW_escapeSelector($(el).attr("data-nxt"));
     if($(el).hasClass("closed")) {
       $(el).closest("table").find("tr[data-mTree="+tgt+"]").show();
-      $(el).find("div>div").css("background-image", "url('"+arrowDown+"')");
+      $(el).find("div>div").css("background-image", "url('"+FW_arrowDown+"')");
     } else {
       $(el).closest("table").find("tr[data-mTree^="+tgt+"]")
         .hide().addClass("closed");
-      $(el).find("div>div").css("background-image", "url('"+arrowRight+"')");
+      $(el).find("div>div").css("background-image", "url('"+FW_arrowRight+"')");
     }
     $(el).toggleClass("closed");
     $(el).toggleClass("open");

@@ -1,19 +1,21 @@
 "use strict";
 FW_version["f18.js"] = "$Id$";
 
-// TODO: rewrite menu, floorplan
-var f18_attr, f18_aCol, f18_sd, f18_isMobile, f18_icon={}, f18_hasPos;
+// TODO: hierMenu,absPos,floorplan,f18style.css
+var f18_attr, f18_aCol, f18_sd, f18_isMobile, f18_icon={}, f18_hasPos, f18_room;
 var f18_small = (screen.width < 480 || screen.height < 480);
 
 $(window).resize(f18_resize);
 $(document).ready(function(){
 
+  f18_room  = $("div#content").attr("room");
   f18_sd = $("body").attr("data-styleData");
   if(f18_sd) {
     eval("f18_sd="+f18_sd);
     if(!f18_sd)
       f18_sd = {};
     f18_attr = f18_sd.f18;
+    delete(f18_attr.cols); // fix the past
 
   } else {
     f18_sd = {};
@@ -74,8 +76,9 @@ f18_menu()
   function
   fixMenu()
   {
-    $("#menuScrollArea #logo").css("display", f18_attr.hideLogo?"none":"block");
-    if(f18_attr["Pinned.menu"]) {
+    $("#menuScrollArea #logo").css("display", 
+        f18_getAttr("hideLogo") ? "none" : "block");
+    if(f18_getAttr("Pinned.menu")) {
       $("body").addClass("pinnedMenu");
       $("#menu").removeClass("visible");
       $("#content").css("left", (parseInt($("div#menu").width())+20)+"px");
@@ -98,24 +101,22 @@ f18_tables()
 
   $("#content .devType").each(function(){
     var el = this, grp = $(el).text();
-    f18_addPin(el, "room."+FW_urlParams.room+".grp."+grp, true,
+    f18_addPin(el, "Room."+FW_urlParams.room+".grp."+grp, true,
     function(isFixed){
       var ntr = $(el).closest("tr").next("tr");
       isFixed ? $(ntr).show() : $(ntr).hide();
     });
-    if(f18_attr.showDragger)
-      f18_addDragger(el);
     f18_setPos(el);
+    if(f18_getAttr("showDragger"))
+      f18_addDragger(el);
   });
 
   $("div.SVGlabel").each(function(){
-    if(f18_attr.showDragger)
-      f18_addDragger(this);
     f18_setPos(this);
+    if(f18_getAttr("showDragger"))
+      f18_addDragger(this);
   });
 
-  if(f18_hasPos || f18_attr.showDragger)
-    $("div.pinHeader:not(.menu) div.pin").hide();
 
   if(FW_urlParams.detail) {
     $("div.makeTable > span").each(function(){
@@ -130,163 +131,269 @@ f18_tables()
     });
   }
 
-  if(FW_urlParams.cmd == "style%20select") {
-    var row=0;
-
-    var addRow = function(name, desc, val)
-    {
-      $("table.f18colors")
-        .append("<tr class='ar_"+name+" "+(++row%2 ? "even":"odd")+"'>"+
-                  "<td "+(val ? "" : "colspan='2'")+">"+
-                        "<div class='col1'>"+desc+"</div></td>"+
-                  (val ? "<td><div class='col2'>"+val+"</div></div></td>" : '')+
-                "</tr>");
-    };
-
-    var addHider = function(name, desc, fn)
-    {
-      addRow(name, desc, "<input type='checkbox'>");
-      $("table.f18colors tr.ar_"+name+" input")
-        .prop("checked", f18_attr[name])
-        .click(function(){
-          var c = $(this).is(":checked");
-          f18_setAttr(name, c);
-          fn(c);
-        });
-    };
-
-    var addColorChooser = function(name, desc)
-    {
-      addRow(name, desc, "<div class='cp'></div>");
-      FW_replaceWidget("table.f18colors tr.ar_"+name+" div.col2 div.cp", name,
-        ["colorpicker","RGB"], f18_attr.cols[name], name, "rgb", undefined,
-        function(value) {
-          f18_attr.cols[name] = value;
-          f18_setAttr();
-          f18_setCss(name);
-        });
-    };
-
-
-    $("div#content > table").append("<tr class='f18'></tr>");
-
-    $("tr.f18").append("<div class='fileList f18colors'>f18 special</div>");
-    $("div.f18colors").css("margin-top", "20px");
-    $("tr.f18").append("<table class='block wide f18colors'></table>");
-
-    var addColors = function()
-    {
-      $("table.f18colors")
-        .append("<tr class='reset' "+(++row%2 ? "even":"odd")+"'>"+
-                  "<td colspan='2'><div class='col1'>Preset colors: "+
-                     "<a href='#'>default</a> "+
-                     "<a href='#'>light</a> "+
-                     "<a href='#'>dark</a> "+
-                  "</div></td>"+
-                "</tr>");
-      $("table.f18colors tr.reset a").click(function(){
-        row = 0;
-        $("table.f18colors").html("");
-        f18_resetCol($(this).text());
-        f18_setCss('preset');
-        f18_setAttr();
-        addColors();
-      });
-      addColorChooser("bg",      "Background");
-      addColorChooser("fg",      "Foreground");
-      addColorChooser("link",    "Link");
-      addColorChooser("evenrow", "Even row");
-      addColorChooser("oddrow",  "Odd row");
-      addColorChooser("header",  "Header row");
-      addColorChooser("menu",    "Menu");
-      addColorChooser("sel",     "Menu:Selected");
-      addColorChooser("inpBack", "Input bg");
-      $("table.f18colors input").attr("size", 8);
-
-      addRow("editStyle", "<a href='#'>Additional CSS</a>");
-      $("table.f18colors tr.ar_editStyle a").click(function(){
-        $('body').append(
-          '<div id="editdlg" style="display:none">'+
-            '<textarea id="f18_cssEd" rows="25" cols="60" style="width:99%"/>'+
-          '</div>');
-
-        $("#f18_cssEd").val($("head #fhemweb_css").html());
-        $('#editdlg').dialog(
-          { modal:true, closeOnEscape:true, width:$(window).width()*3/4,
-            height:$(window).height()*3/4, title:$(this).text(),
-            close:function(){ $('#editdlg').remove(); },
-            buttons:[
-            { text: "Cancel",click:function(){$(this).dialog('close')}},
-            { text: "OK", click:function(){
-
-              if(!$("head #fhemweb_css"))
-                $("head").append("<style id='fhemweb_css'>\n</style>");
-              var txt = $("#f18_cssEd").val();
-              $("head #fhemweb_css").html(txt);
-              var wn = $("body").attr("data-webName");
-              FW_cmd(FW_root+"?cmd=attr "+wn+" Css "+
-                     encodeURIComponent(txt.replace(/;/g,";;"))+"&XHR=1");
-              $(this).dialog('close');
-            }}]
-          });
-      });
-
-      addRow("empty", "&nbsp;");
-      addHider("hidePin", "Hide pin", function(c){
-        $("div.pinHeader div.pin").css("display", c ? "none":"block");
-      });
-      addHider("hideLogo", "Hide logo", f18_menu);
-      addHider("rightMenu", "MenuBtn right on SmallScreen", function(c){
-        $("body").toggleClass("rightMenu");
-      });
-      addHider("savePinChanges", "Save pin changes", function(){});
-      addHider("showDragger", "Dragging active", function(c){
-        if(c) {
-          $("div.fileList").each(function(){ f18_addDragger(this) });
-          $("div.pinHeader:not(.menu) div.pin").hide();
-        } else {
-          $("div.pinHeader div.dragger").remove();
-        }
-      });
-
-    };
-    loadScript("pgm2/fhemweb_colorpicker.js", addColors);
-  }
+  if(FW_urlParams.cmd == "style%20select") 
+    f18_special();
 
   if(FW_urlParams.cmd == "style%20list" ||
-     FW_urlParams.cmd == "style%20select") {
-    $("div.fileList").each(function(){
-      var el = this, grp = $(el).text();
-      f18_addPin(el, "style.list."+grp, true,
-      function(isFixed){
-        var ntr = $(el).next("table");
-        isFixed ? $(ntr).show() : $(ntr).hide();
-      });
-      if(f18_attr.showDragger)
-        f18_addDragger(el);
-      f18_setPos(el);
-    });
-    if(f18_hasPos || f18_attr.showDragger)
-      $("div.pinHeader:not(.menu) div.pin").hide();
-  }
+     FW_urlParams.cmd == "style%20select") 
+    $("div.fileList").each(function(){ f18_addPinToStyleDiv(this) });
+
+  if(f18_hasPos || f18_getAttr("showDragger"))
+    $("div.pinHeader:not(.menu) div.pin").hide();
 }
+
+function
+f18_special()
+{
+  var row, room='all', appendTo;
+
+  var attr = function(attrName, inRoom)
+  { 
+    if(inRoom && room != "all") {
+      var val = f18_attr["Room."+room+"."+attrName];
+      if(val != undefined)
+        return val;
+    }
+    return f18_attr[attrName];
+  };
+
+  var setAttr = function(attrName, attrVal, inRoom)
+  { 
+    if(inRoom && room != "all")
+      attrName = "Room."+room+"."+attrName;
+    f18_setAttr(attrName, attrVal);
+  };
+
+  var addRow = function(name, desc, val)
+  {
+    $(appendTo)
+      .append("<tr class='ar_"+name+" "+(++row%2 ? "even":"odd")+"'>"+
+                "<td "+(val ? "" : "colspan='2'")+">"+
+                      "<div class='col1'>"+desc+"</div></td>"+
+                (val ? "<td><div class='col2'>"+val+"</div></div></td>" : '')+
+              "</tr>");
+  };
+
+  var addHider = function(name, inRoom, desc, fn)
+  {
+    addRow(name, desc, "<input type='checkbox'>");
+    $(appendTo+" tr.ar_"+name+" input")
+      .prop("checked", attr(name, inRoom))
+      .click(function(){
+        var c = $(this).is(":checked");
+        setAttr(name, c, inRoom);
+        fn(c);
+      });
+  };
+
+  var addColorChooser = function(name, desc)
+  {
+    addRow(name, desc, "<div class='cp'></div>");
+    FW_replaceWidget(appendTo+" tr.ar_"+name+" div.col2 div.cp", name,
+      ["colorpicker","RGB"], attr("cols."+name, true), name, "rgb", undefined,
+      function(value) {
+        setAttr("cols."+name, value, true);
+        f18_setCss(name);
+      });
+  };
+
+// call drawspecial after got the roomlist...
+  var f18_drawSpecial = function()
+  {
+    var roomHash={};
+
+    var cleanRoom = function(){
+      for(var k in f18_attr) {
+        var m = k.match(/^room\.([^.]*)\..*/);
+        if(m && !roomHash[m[1]])
+          delete f18_attr[k];
+      }
+    };
+
+    row = 0;
+    $("div#content tr.f18").remove();
+
+    $("div#content > table").append("<tr id='f18rs' class='f18'></tr>");
+    $("tr#f18rs").append("<div class='fileList f18colors'>f18 special</div>");
+    $("tr#f18rs").append("<table id='f18ts' class='block wide'></table>");
+    appendTo = "table#f18ts";
+
+    addHider("rightMenu", false, "MenuBtn right<br>on SmallScreen", function(c){
+      $("body").toggleClass("rightMenu");
+    });
+    addHider("savePinChanges", false, "Save pin changes", function(){});
+    addHider("showDragger", false, "Dragging active", function(c){
+      if(c) {
+        $("div.fileList").each(function(){ f18_addDragger(this) });
+        $("div.pinHeader:not(.menu) div.pin").hide();
+      } else {
+        $("div.pinHeader div.dragger").remove();
+      }
+    });
+
+    addRow("editStyle", "<a href='#'>Additional CSS</a>");
+    $(appendTo+" tr.ar_editStyle a").click(function(){
+      $('body').append(
+        '<div id="editdlg" style="display:none">'+
+          '<textarea id="f18_cssEd" rows="25" cols="60" style="width:99%"/>'+
+        '</div>');
+
+      $("#f18_cssEd").val($("head #fhemweb_css").html());
+      $('#editdlg').dialog(
+        { modal:true, closeOnEscape:true, width:$(window).width()*3/4,
+          height:$(window).height()*3/4, title:$(this).text(),
+          close:function(){ $('#editdlg').remove(); },
+          buttons:[
+          { text: "Cancel",click:function(){$(this).dialog('close')}},
+          { text: "OK", click:function(){
+
+            if(!$("head #fhemweb_css"))
+              $("head").append("<style id='fhemweb_css'>\n</style>");
+            var txt = $("#f18_cssEd").val();
+            $("head #fhemweb_css").html(txt);
+            var wn = $("body").attr("data-webName");
+            FW_cmd(FW_root+"?cmd=attr "+wn+" Css "+
+                   encodeURIComponent(txt.replace(/;/g,";;"))+"&XHR=1");
+            $(this).dialog('close');
+          }}]
+        });
+    });
+
+
+    $("div#content > table").append("<tr id='f18rr' class='f18'></tr>");
+    $("tr#f18rr").append("<div class='fileList f18colors'>"+
+                         "f18: Room specific</div>");
+    $("tr#f18rr").append("<table id='f18tr' class='block wide'></table>");
+    appendTo = "table#f18tr";
+
+    addRow("room", "Target", '<select><option>all</option></select>');
+    FW_cmd(FW_root+"?cmd=JsonList2 .* room&XHR=1", function(data) {
+      var d = eval("JSON.parse(data);");
+      for(var i1=0; i1<d.Results.length; i1++) {
+        var rname = d.Results[i1].Attributes.room;
+        if(!rname || rname == "hidden")
+          continue;
+        var rl = rname.split(",")
+        for(var i2=0; i2<rl.length; i2++)
+          roomHash[rl[i2]] = true;
+      }
+      cleanRoom();
+      var rArr = Object.keys(roomHash); rArr.sort();
+      $(appendTo+" tr.ar_room select")
+        .html("<option>all</option><option>"+
+                rArr.join("</option><option>")+
+              "</option>")
+        .change(function(e){ 
+          room = $(e.target).val(); 
+          f18_drawSpecial();
+        });
+      $("tr.ar_room select").val(room);
+    });
+    addRow("reset", "Preset colors: "+
+                   "<a href='#'>default</a> "+
+                   "<a href='#'>light</a> "+
+                   "<a href='#'>dark</a> "+
+                   (room=='all' ? '': "<a href='#'>like:all</a>"));
+    $(appendTo+" tr.ar_reset a").click(function(){
+      var txt = $(this).text();
+      if(txt == "like:all") {
+        delete(roomHash[room]);
+        cleanRoom();
+      } else {
+        f18_resetCol(txt, room);
+        if(room == "all")
+          f18_setCss('preset');
+      }
+      f18_setAttr();
+      f18_drawSpecial();
+    });
+    addColorChooser("bg",      "Background");
+    addColorChooser("fg",      "Foreground");
+    addColorChooser("link",    "Link");
+    addColorChooser("evenrow", "Even row");
+    addColorChooser("oddrow",  "Odd row");
+    addColorChooser("header",  "Header row");
+    addColorChooser("menu",    "Menu");
+    addColorChooser("sel",     "Menu:Selected");
+    addColorChooser("inpBack", "Input bg");
+    $("table.f18colors input").attr("size", 8);
+
+    var bgImg = attr("bgImg", true);
+    addRow("bgImg", "<a href='#'>Background image: <span>"+
+                    (bgImg ? bgImg : "none")+"</span></a>");
+    $(appendTo+" tr.ar_bgImg a").click(function(){
+      FW_cmd(FW_root+'?cmd='+
+      '{ join("\\n",FW_fileList("$FW_icondir/background/*.(jpg|png)")) }&XHR=1',
+      function(data) {
+        if(data)
+          data += "none";
+        var imgList = data.split(/\n/);
+        FW_okDialog("List of files in www/images/background:<br><ul>"+
+              "<a href='#'>"+imgList.join("</a><br><a href='#'>")+'</a></ul>');
+        $("#FW_okDialog a").click(function(){
+          var txt = $(this).text();
+          setAttr("bgImg", txt == 'none' ? undefined : txt, true);
+          $(appendTo+" tr.ar_bgImg span").html(txt);
+          f18_setCss("bgImg");
+        });
+      });
+      
+    });
+
+    addHider("hideLogo", true, "Hide logo", f18_menu);
+    addHider("hideInput", true, "Hide input", f18_menu);
+    addHider("hidePin", true, "Hide pin", function(c){
+      if(f18_hasPos || f18_getAttr("showDragger"))
+        $("div.pinHeader.menu div.pin").css("display", c ? "none":"block");
+      else
+        $("div.pinHeader div.pin").css("display", c ? "none":"block");
+    });
+
+    $("div.f18colors").css("margin-top", "20px");
+    $("tr.f18 div.fileList").each(function(e){f18_addPinToStyleDiv(this)});
+  };
+  loadScript("pgm2/fhemweb_colorpicker.js", f18_drawSpecial);
+}
+
+function
+f18_addPinToStyleDiv(el)
+{
+  var grp = $(el).text();
+  f18_addPin(el, "style.list."+grp, true,
+  function(isFixed){
+    var ntr = $(el).next("table");
+    isFixed ? $(ntr).show() : $(ntr).hide();
+  });
+  if(f18_getAttr("showDragger"))
+    f18_addDragger(el);
+  f18_setPos(el);
+  if(f18_hasPos || f18_getAttr("showDragger"))
+    $("div.pinHeader:not(.menu) div.pin").hide();
+}
+
 
 function
 f18_resize()
 {
   var w=$(window).width();
   log("f18.js W:"+w+" S:"+screen.width);
+  var hl = f18_getAttr("hideLogo"),
+      hi = f18_getAttr("hideInput"),
+      pm = f18_getAttr("Pinned.menu");
 
   var diff = 0;
-  diff += f18_attr.hideLogo ? 0 : 40;
-  diff += f18_attr["Pinned.menu"] ? 0 : 44;
-  $("input.maininput").css("width", (w-(FW_isiOS ? 40 : 30)-diff)+'px');
+  diff += hl ? 0 : 40;
+  diff += pm ? 0 : 44;
+  $("input.maininput")
+    .css("width", (w-(FW_isiOS ? 40 : 30)-diff)+'px')
+    .css("display", hi ? "none":"block");
+  $("#menu,#content").css("top", (hi && pm && hl) ? "10px" : "50px");
 }
 
 function
 f18_addPin(el, name, defVal, fn, hidePin)
 {
-  var init = f18_attr["Pinned."+name];
+  var init = f18_getAttr("Pinned."+name);
   if(init == undefined)
     init = defVal;
   $("<div class='pin'></div>")
@@ -301,7 +408,7 @@ f18_addPin(el, name, defVal, fn, hidePin)
   $(el)
     .addClass(init ? "pinIn" : "")
     .css("cursor", "pointer")
-    .css("display", (f18_attr.hidePin || hidePin) ? "none" : "block")
+    .css("display", (f18_getAttr("hidePin") || hidePin) ? "none" : "block")
     .click(function(){
       var nextVal = !$(el).hasClass("pinIn");
       $(el).toggleClass("pinIn");
@@ -372,19 +479,33 @@ f18_setPos(el)
 }
 
 function
+f18_getAttr(attrName)
+{
+  if(f18_room != undefined) {
+    var val = f18_attr["Room."+f18_room+"."+attrName];
+    if(val != undefined)
+      return val
+  }
+  return f18_attr[attrName];
+}
+
+function
 f18_setAttr(name, value)
 {
   if(name)
     f18_attr[name]=value;
+  if(name && value == undefined)
+    delete f18_attr[name];
   if(name && name.indexOf("Pinned.") == 0 && !f18_attr.savePinChanges)
     return;
+
   var wn = $("body").attr("data-webName");
   FW_cmd(FW_root+"?cmd=attr "+wn+" styleData "+
-        encodeURIComponent(JSON.stringify(f18_sd, null, 2))+"&XHR=1");
+         encodeURIComponent(JSON.stringify(f18_sd, undefined, 1))+"&XHR=1");
 }
 
 function
-f18_resetCol(name)
+f18_resetCol(name, room)
 {
   var cols = {
     "default":{ bg:     "FFFFE7", fg:    "000000", link:   "278727", 
@@ -397,66 +518,62 @@ f18_resetCol(name)
                 evenrow:"333333", oddrow:"111111", header: "222222",
                 menu:   "111111", sel:   "333333", inpBack:"444444" }
   };
-  f18_attr.cols = name ? cols[name] : cols["default"];
+  var col = (name ? cols[name] : cols["default"]);
+  var prefix = (room && room != 'all' ? "Room."+room+".cols." : "cols.");
+  for(var c in col)
+    f18_attr[prefix+c] = col[c];
 }
 
 // Put all the colors into a head style tag, send background changes to FHEM
 function
 f18_setCss(why)
 {
-  var cols = f18_attr.cols;
   var style = "";
+  function col(n) { return f18_getAttr("cols."+n, true) };
   function bg(c) { return "{ background:#"+c+"; fill:#"+c+"; }\n" }
   function fg(c) { return "{ color:#"+c+"; }\n" }
-  style += ".col_fg, body, input, textarea "+fg(cols.fg);
-  style += ".col_bg, body, #menu, textarea, input, option "+bg(cols.bg);
-  style += ".col_link, a, .handle, .fhemlog, input[type=submit], select "+
-                 "{color:#"+cols.link+"; stroke:#"+cols.link+";}\n";
-  style += "svg:not([fill]):not(.jssvg) { fill:#"+cols.link+"; }\n";
-  style += ".col_evenrow, table.block,div.block "+bg(cols.evenrow);
-  style += ".col_oddrow,table.block tr.odd,table.block tr.sel "+bg(cols.oddrow);
-  style += ".col_header "+bg(cols.header);
-  style += ".col_menu, table.room "+bg(cols.menu);
-  style += ".col_sel, table.room tr.sel "+bg(cols.sel);
-  style += ".col_inpBack, input "+bg(cols.inpBack);
-  if(cols.bg == "FFFFE7") // default
-    style += "div.pinHeader.menu {background:#"+cols.sel+";}\n";
+  style += ".col_fg, body, input, textarea "+fg(col("fg"));
+  style += ".col_bg, #menu, textarea, input, option "+bg(col("bg"));
+  style += ".col_link, a, .handle, .fhemlog, input[type=submit], select, "+
+           "div.ui-widget-content a "+
+           "{color:#"+col("link")+"!important; stroke:#"+col("link")+";}\n";
+  style += "svg:not([fill]):not(.jssvg) { fill:#"+col("link")+"; }\n";
+  style += ".col_evenrow, table.block,div.block "+bg(col("evenrow"));
+  style += ".col_oddrow,table.block tr.odd,table.block tr.sel "+
+        bg(col("oddrow"));
+  style += ".col_header "+bg(col("header"));
+  style += ".col_menu, table.room "+bg(col("menu"));
+  style += ".col_sel, table.room tr.sel "+bg(col("sel"));
+  style += ".col_inpBack, input "+bg(col("inpBack"));
+  if(col("bg") == "FFFFE7") // default
+    style += "div.pinHeader.menu {background:#"+col("sel")+";}\n";
 
-  style += "div.ui-dialog-titlebar "+bg(cols.header);
-  style += "div.ui-widget-content "+bg(cols.bg);
-  style += "div.ui-widget-content, .ui-button-text "+fg(cols.fg+"!important");
-  style += "div.ui-dialog { border:1px solid #"+cols.link+"; }";
-  style += "button.ui-button { background:#"+cols.oddrow+"!important; "+
-                              "border:1px solid #"+cols.link+"!important; }\n";
+  style += "div.ui-dialog-titlebar "+bg(col("header"));
+  style += "div.ui-widget-content "+bg(col("bg"));
+  style += "div.ui-widget-content, .ui-button-text "+fg(col("fg")+"!important");
+  style += "div.ui-dialog { border:1px solid #"+col("link")+"; }";
+  style += "button.ui-button { background:#"+col("oddrow")+"!important; "+
+                            "border:1px solid #"+col("link")+"!important; }\n";
 
   if(typeof DashboardDraggable  != "undefined") {
     var db = "#dashboard ";
-    style += db+".dashboard_widgetheader "+bg(cols.header);
-    style += db+".dashboard_tabnav "+bg(cols.menu+"!important");
-    style += db+".ui-widget-header .ui-state-default "+bg(cols.menu);
-    style += db+".ui-widget-header .ui-state-active "+bg(cols.sel);
-    style += db+".ui-widget-header "+fg(cols.fg+"!important;");
+    style += db+".dashboard_widgetheader "+bg(col("header"));
+    style += db+".dashboard_tabnav "+bg(col("menu")+"!important");
+    style += db+".ui-widget-header .ui-state-default "+bg(col("menu"));
+    style += db+".ui-widget-header .ui-state-active "+bg(col("sel"));
+    style += db+".ui-widget-header "+fg(col("fg")+"!important;");
     style += db+".ui-widget-header li { border:none!important; }";
-    style += db+".ui-widget-content a "+fg(cols.link+"!important" );
+    style += db+".ui-widget-content a "+fg(col("link")+"!important" );
+  }
+  var bgImg = f18_getAttr("bgImg", true);
+  if(bgImg) {
+    style += 'body { background-image: url('+FW_root+
+                     '/images/background/'+bgImg+');}';
+  } else {
+    style += "body "+bg(col("bg"));
   }
 
   $("head style#f18_css").remove();
-  if(why == 'preset' || why == 'bg') { // Add background to css to avoid flicker
-    if(!$("head #fhemweb_css").length)
-      $("head").append("<style id='fhemweb_css'>\n</style>");
-    var otxt = $("head #fhemweb_css").html(), ntxt = otxt;
-    if(!ntxt)
-      ntxt = "";
-    ntxt = ntxt.replace(/^body,#menu { background:[^;]*; }[\r\n]*/m,'');
-    ntxt += "body,#menu { background:#"+cols.bg+"; }\n";
-    if(ntxt != otxt) {
-      $("head #fhemweb_css").html(ntxt);
-      var wn = $("body").attr("data-webName");
-      FW_cmd(FW_root+"?cmd=attr "+wn+" Css "+
-             encodeURIComponent(ntxt.replace(/;/g,";;"))+"&XHR=1");
-    }
-  }
-
   style = "<style id='f18_css'>"+style+"</style>";
   if($("head style#fhemweb_css").length)
     $("head style#fhemweb_css").before(style);
@@ -464,20 +581,36 @@ f18_setCss(why)
     $("head").append(style);
 
   $("head meta[name=theme-color]").remove();
-  $("head").append('<meta name="theme-color" content="#'+cols.bg+'">');
+  $("head").append('<meta name="theme-color" content="#'+col("bg")+'">');
+
+  // Recolor the menu arrows. CSS does not apply to such SVGs :(
+  if(why=='init' || why=='preset' || why=='link') {
+    var a = $("a").get(0);
+    if(window.getComputedStyle && a) {
+      var col = getComputedStyle(a,null).getPropertyValue('color');
+      FW_arrowRight = FW_arrowRight.replace(/rgb[^)]*\)/,col);
+      FW_arrowDown  = FW_arrowDown.replace(/rgb[^)]*\)/,col);
+      $("div#menu table.room tr.menuTree > td > div > div")
+        .css("background-image", "url('"+FW_arrowRight+"')");
+      $("div#menu table.room tr.menuTree.open > td > div > div")
+        .css("background-image", "url('"+FW_arrowDown+"')");
+    }
+  }
+
 }
 
 // SVG color tuning
 function
 f18_svgSetCols(svg)
 {
+  function col(n) { return f18_getAttr("cols."+n, true) };
+
   if(!svg || !svg.getAttribute("data-origin"))
     return;
 
   var style = $(svg).find("> style").first();
   var sTxt = $(style).text();
-  var cols = f18_attr.cols;
-  sTxt = sTxt.replace(/font-family:Times/, "fill:#"+cols.fg);
+  sTxt = sTxt.replace(/font-family:Times/, "fill:#"+col("fg"));
   $(style).text(sTxt);
 
   function
@@ -500,8 +633,8 @@ f18_svgSetCols(svg)
   // SVG background gradient: .css does not work in Firefox, has to use .attr
   var stA = $(svg).find("> defs > #gr_bg").children();
   var so = "; stop-opacity:1;";
-  $(stA[0]).attr("style", "stop-color:#"+addCol(cols.bg,10)+so);
-  $(stA[1]).attr("style", "stop-color:#"+addCol(cols.bg,-10)+so);
+  $(stA[0]).attr("style", "stop-color:#"+addCol(col("bg"),10)+so);
+  $(stA[1]).attr("style", "stop-color:#"+addCol(col("bg"),-10)+so);
 }
 
 // font-awesome
