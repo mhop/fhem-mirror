@@ -1,0 +1,87 @@
+//########################################################################################
+// general.rive
+// Version 0.1
+// See 95_Babble.pm for licensing
+//########################################################################################
+//# Prof. Dr. Peter A. Henning
+
++ hallo
+- Hallo, ich bin <bot name2>. Wer bist Du ?
+    
++ wer bist du
+- Hallo, ich bin <bot name2>. Wer bist Du ?
+
++ hallo *
+* <star> == <bot name> => Hallo. Wer bist Du ?
+- Ich heisse nicht <star>, sondern <bot name2>. Wer bist Du ?
+
++ ich bin *
+* <formal> == <bot master> => Gerne zu Diensten, Meister! <set name=<formal>>
+* <formal> == <bot name> => Sehr schoen, wir haben denselben Namen! <set name=<formal>>
+* <formal> == <get name> => Das sagtest Du schon. Komm zur Sache, <get name>!
+* <get name> == undefined  => <set name=<formal>>Schoen, Dich kennenzulernen, <get name>!
+- <set oldname=<get name>><set name=<formal>>
+^ Ich dachte, Dein Name sei <get oldname>? Bitte noch einmal! <set name=undefined>
+
++ was kannst du * * tun
+- Ich kann <star1> Dich das Haus steuern
+- Ich kann ganz verschiedene Dinge im Haus schalten und steuern
+
++ welche (orte|ortsangaben) kennst du
+- <call>places</call>
+
++ was kannst du (steuern|schalten)
+- <call>devices</call>
+    
++ (welche|welches) * kennst du
+- <call>devices</call>
+    
++ wie kannst du * (steuern|schalten)
+- <call>devhelp <star></call>
+
++ was ist *
+- <call>devhelp <star></call>
+
+
+// object to get known devices
+> object devices perl
+  my $hash = $main::defs{"Babble"};
+  my $str;
+  if( defined($hash->{DATA}{"devsalias"}) ){
+    my @da = keys %{$hash->{DATA}{"devsalias"}};
+    my $dl = pop @da;
+    $str = "Ich kenne die folgenden Ger\xc3\xa4te: ".join(", ",@da)." und ".$dl;
+  }else{
+    $str = "Ich kann keine Ger\xc3\xa4te finden";
+  }   
+  return $str;
+< object
+
+// object to get known places
+> object places perl
+  my $hash = $main::defs{"Babble"};
+  my $str;
+  if( defined($hash->{DATA}{"places"}) ){
+    my @pa = @{$hash->{DATA}{"places"}};
+    my $pl = pop @pa;
+    $str = "Ich kenne die folgenden Orte: ".join(", ",@pa)." und ".$pl;
+  }else{
+    $str = "Ich kann leider keine Orte finden";
+  }   
+  return $str;
+< object
+
+// object to get help text for a device
+> object devhelp perl
+  my ($rs, $bdev) = @_;
+  my $lbdev  = lc($bdev);
+  my $hash   = $main::defs{"Babble"};
+  my $str    = $hash->{DATA}{"help"}{$lbdev};
+  if( !defined($str) || $str eq "" ){
+    $str = "Keine Ahnung, das Ger\xc3\xa4t $bdev kenne ich nicht";
+  }
+  return $str;
+< object
+
+
+    

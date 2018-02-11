@@ -1,0 +1,21 @@
+//########################################################################################
+// begin.rive
+// Version 0.1
+// See 95_Babble.pm for licensing
+//########################################################################################
+//# Prof. Dr. Peter A. Henning
+! version = 2.0
+
+// Bot variables
+// Name of house spirit in writing
+! var name  = Jeannie
+// Name of house spirit in speaking
+! var name2 = dschini
+// Name of house master
+! var master = Peter
+
+// Substitutions for house spirit name
+! sub jenny     = jeannie
+! sub tini      = jeannie
+
+
