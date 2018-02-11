@@ -5,7 +5,7 @@
 # Usage: zwavealliance.images.parse downloaddir
 # Downloaddir is filled with the following script:
 # i=1
-# while test $i -lt 2680
+# while test $i -lt 3000
 # do
 #   echo $i
 #   wget -O $i -q http://products.z-wavealliance.org/products/$i/XML
@@ -30,7 +30,7 @@ for my $fn (sort { $a <=> $b } @files) {
   while(my $l = <FH>) {
     chomp($l);
 
-    $em  = empty if($l =~ m,<h2>Oh no ... we encountered an error!</h2>,);
+    $em  = 'empty' if($l =~ m,<h2>Oh no ... we encountered an error!</h2>,);
     $bn  = $1 if($l =~ m,<Brand>(.*)</Brand>,);
     $mi  = $1 if($l =~ m,<ManufacturerId>0x(....)</ManufacturerId>,);
     $pti = $1 if($l =~ m,<ProductTypeId>0x(....)</ProductTypeId>,);
@@ -39,16 +39,16 @@ for my $fn (sort { $a <=> $b } @files) {
 
   }
   close(FH);
-  if($mi eq '' && $pti eq '' && $pi eq '' && -s $path eq 4880) {
-    printf "DELETE empty $path\n";
-    next;
-  }
   if($em eq 'empty') {
-    printf "Empty for $fn\n";
+    printf "No data for $fn, deleting the file\n";
+    # in the hope that somebody will fix the file
+    unlink("$ARGV[0]/$fn");
     next;
   }
   if($mi eq '' || $pti eq '' || $pi eq '') {
-    printf "Missing parameters for $fn: $bn/$mi/$pti/$pi\n";
+    printf "Missing parameters for $fn: Brand:$bn, ManufId:$mi, ProductType:$pti, ProductId:$pi, deleting the file\n";
+    # in the hope that somebody will fix the file
+    unlink("$ARGV[0]/$fn");
     next;
   }
   printf OF "%s-%s-%s,%s,%s,%s\n", $mi,$pti,$pi,$fn,$pic,$bn;
