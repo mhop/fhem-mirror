@@ -5142,7 +5142,7 @@ ZWave_fhemwebFn($$$$)
   my $iodev = $defs{$d}{IODev}{NAME};
   my $hs = AttrVal($iodev, "helpSites", $zwave_activeHelpSites);
   for my $n (split(",", $hs)) {
-    my $link = $zwave_link{$n}{$model};
+    my $link = $zwave_link{$n}{lc($model)};
     next if(!$link);
     $pl .= "<div class='detLink ZWPepper'>";
     my $url = ($n eq "alliance" ?
@@ -5152,7 +5152,7 @@ ZWave_fhemwebFn($$$$)
     $pl .= "</div>";
   }
 
-  my $img = ZWave_getPic($iodev, $model);
+  my $img = ZWave_getPic($iodev, lc($model));
   if($img && !$FW_ss) {
     $pl .= "<div class='img'".($FW_tp?"":" style='float:right'").">";
     $pl .= "<img style='max-width:96;max-height:96px;' src='$img'>";
