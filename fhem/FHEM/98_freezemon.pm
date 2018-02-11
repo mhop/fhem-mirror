@@ -22,6 +22,10 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.11:	added date to "get freeze" popup
+#				fixed readingsbulkupdate behaviour	
+#				fixed that freezemon is inactive after restart	
+#				removed gplots
 #		0.0.10:	added set commands active, inactive and clear
 #				added gplot files
 #				minor bug fixes				
@@ -51,7 +55,7 @@
 ##############################################################################
 # 	  Todo:
 #	  	adjust to optimized handleTimeout
-# 		logs/plots
+#		
 # 		
 ##############################################################################
 
@@ -117,10 +121,11 @@ sub freezemon_Define($$) {
 	$hash->{NAME} = $name;
 
 	# start the timer
+	Log3 $name, 5, "[$name] => Define IsDisabled:".IsDisabled($name)." init_done:$init_done";
 	if (!IsDisabled($name) && $init_done) {
 		freezemon_start($hash)
 	}
-	else {
+	elsif (IsDisabled($name)) {
 		$hash->{STATE} = "inactive";
 		$hash->{helper}{DISABLED} = 1;
 	}
@@ -165,6 +170,7 @@ sub freezemon_ProcessTimer($)
   #Check Freezes
   if ($freeze > AttrVal($name, "fm_freezeThreshold",1))
   {
+	
 	my $dev = $hash->{helper}{apptime};
 	my $guys = "";
 	$dev //= "";
@@ -193,7 +199,7 @@ sub freezemon_ProcessTimer($)
 	# Build hash with 20 last freezes
 	my @freezes = ();
 	push @freezes, split(",", ReadingsVal($name,".fm_freezes",undef));
-	push @freezes, "s:$start e:$end f:$freeze d:$dev";
+	push @freezes, strftime("%Y-%m-%d",localtime).": s:$start e:$end f:$freeze d:$dev";
 	while (keys @freezes > 20) { 
 		shift @freezes;
 	}
@@ -213,12 +219,12 @@ sub freezemon_ProcessTimer($)
 	my $fcDay = ReadingsVal($name,"fcDay",0)+1;
 	my $ftDay = ReadingsVal($name,"ftDay",0)+$freeze;
 	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, ".fm_freezes", $freezelist, 1);
-	readingsBulkUpdate($hash, "state", "s:$start e:$end f:$freeze d:$dev", 1);
-	readingsBulkUpdate($hash, "freezeTime", $freeze, 1);
-	readingsBulkUpdate($hash, "fcDay", $fcDay, 1);
-	readingsBulkUpdate($hash, "ftDay", $ftDay, 1);
-	readingsBulkUpdate($hash, "freezeDevice",$dev, 1);
+	readingsBulkUpdate($hash, ".fm_freezes", $freezelist, 0);
+	readingsBulkUpdate($hash, "state", "s:$start e:$end f:$freeze d:$dev");
+	readingsBulkUpdate($hash, "freezeTime", $freeze);
+	readingsBulkUpdate($hash, "fcDay", $fcDay);
+	readingsBulkUpdate($hash, "ftDay", $ftDay);
+	readingsBulkUpdate($hash, "freezeDevice",$dev);
 	readingsEndUpdate($hash,1);
   }
 
@@ -227,8 +233,7 @@ sub freezemon_ProcessTimer($)
   $hash->{helper}{intCount} += 1;
   if ($hash->{helper}{intCount} >= 60) {
 	$hash->{helper}{intCount} = 0;
-	  Log3 $name, 5, "FreezeMon: $name Checking some stuff";
-
+	  
 	  #Update dayLast readings if we have a new day
 		my $last = ReadingsVal($name,".lastDay","");
 		my $dnow = strftime("%Y-%m-%d",localtime);
@@ -240,11 +245,11 @@ sub freezemon_ProcessTimer($)
 			my $fcDay = ReadingsVal($name,"fcDay",0);
 			my $ftDay = ReadingsVal($name,"ftDay",0);
 			readingsBeginUpdate($hash);
-			readingsBulkUpdate($hash, "fcDayLast", $fcDay, 1);
-			readingsBulkUpdate($hash, "ftDayLast", $ftDay, 1);
-			readingsBulkUpdate($hash, "fcDay", 0, 1);
-			readingsBulkUpdate($hash, "ftDay", 0, 1);
-			readingsBulkUpdate($hash, ".lastDay", $dnow, 1);
+			readingsBulkUpdate($hash, "fcDayLast", $fcDay);
+			readingsBulkUpdate($hash, "ftDayLast", $ftDay);
+			readingsBulkUpdate($hash, "fcDay", 0);
+			readingsBulkUpdate($hash, "ftDay", 0);
+			readingsBulkUpdate($hash, ".lastDay", $dnow, 0);
 			readingsEndUpdate($hash,1);
 		}
 
@@ -440,19 +445,28 @@ foreach my $i (@intAtSort) {
       $cv = svref_2object($fn);
       $fnname = $cv->GV->NAME;
 	  $ret .= $intAt{$i}{TRIGGERTIME}."-".$fnname;
+	  Log3 undef, 3, "Freezemon: Reference found: ".ref($fn)."/$fnname/$fn";
     }
 	else {
 		$ret .= $intAt{$i}{TRIGGERTIME}."-".$fn;
 	}
 	 $arg = $intAt{$i}{ARG};
+	 		 
 	
 	 $shortarg = (defined($arg)?$arg:"");
 	 if (ref($shortarg) eq "HASH") {
+		
 		 if (!defined($shortarg->{NAME})) {
-		 $shortarg = "N/A";
+			$shortarg = "N/A";
 		 }
 		 else {
-		 $shortarg = $shortarg->{NAME};
+			 $shortarg = $shortarg->{NAME};
+			 
+			 if( $fn eq 'notify_Exec' || $fn eq "DOIF_TimerTrigger") {
+				Log3 undef, 3, "Freezemon: found a DOIF or notify $fn".Dumper($arg);
+				#my $events = deviceEvents($arg[1], AttrVal($arg[0]->{NAME}, "addStateEvent", 0));
+				#$shortarg .= ">>".join( ',', @{$events})."<<";
+			 }
 		 }
 	 }
 	 ($shortarg,undef) = split(/:|;/,$shortarg,2);
@@ -547,25 +561,7 @@ if(%prioQueues) {
 				<li>disable: activate/deactivate freeze detection</li>
 			</ul>
 		</ul>
-	  <b>Additional Information</b>
-  A Filelog for the device can be created as follows: (Assumption: device is called freezemon, otherwise replace accordingly)<br><br>
-  <code>define FileLog_freezemon FileLog %L/FileLog_freezemon.log freezemon</code><br><br>
-  
-  In case you're using configDb, import the gplot files:<br>
-  <code>configDB fileimport ./www/gplot/freezemon_gplot.gplot</code><br>
-  <code>configDB fileimport ./www/gplot/freezemon_day.gplot</code><br><br>
-  
-  In case you're using DbLog, adjust the gplot files accordingly.<br><br>
-  
-  Create plot with individual freezes:<br><br>
-  <code>define SVG_FileLog_freezemon SVG FileLog_freezemon:freezemon:CURRENT</code><br>
-  <code>attr SVG_FileLog_freezemon plotReplace TL={"Freezes today: ".$data{max1}." - Longest Freeze ".sprintf("%.2f ",$data{max2}) }</code><br><br>
-  
-  Create plot with daily sums:<br><br>
-  <code>define SVG_FileLog_freezemon_day SVG FileLog_freezemon:freezemon_day:CURRENT</code><br>
-  <code>attr SVG_FileLog_freezemon_day fixedrange month</code><br>
-  <code>attr SVG_FileLog_freezemon_day plotReplace TL={"Max Freezes: ".$data{max1}." - Max Freezetime ".sprintf("%.2f ",$data{max2}) }</code><br>
-  
+
 </ul>
 
 </ul>
@@ -637,24 +633,6 @@ if(%prioQueues) {
 			<li>disable: aktivieren/deaktivieren der Freeze-Erkennung</li>
 		</ul>
   </ul>
-  <b>Zusätzliche Infos</b>
-  Ein Filelog für das Device kann wie folgt angelegt werden: (Annahme: Das Device heisst freezemon, ansonsten entsprechend ersetzen)<br><br>
-  <code>define FileLog_freezemon FileLog %L/FileLog_freezemon.log freezemon</code><br><br>
-  
-  Bei Verwendung von configDb, die gplot files importieren:<br>
-  <code>configDB fileimport ./www/gplot/freezemon_gplot.gplot</code><br>
-  <code>configDB fileimport ./www/gplot/freezemon_day.gplot</code><br><br>
-  
-  Bei Verwendung von DbLog, die gplot files entsprechend anpassen.<br><br>
-  
-  Ein plot mit den einzelnen Freezes:<br><br>
-  <code>define SVG_FileLog_freezemon SVG FileLog_freezemon:freezemon:CURRENT</code><br>
-  <code>attr SVG_FileLog_freezemon plotReplace TL={"Freezes today: ".$data{max1}." - Longest Freeze ".sprintf("%.2f ",$data{max2}) }</code><br><br>
-  
-  Ein Plot mit den Tageswerten:<br><br>
-  <code>define SVG_FileLog_freezemon_day SVG FileLog_freezemon:freezemon_day:CURRENT</code><br>
-  <code>attr SVG_FileLog_freezemon_day fixedrange month</code><br>
-  <code>attr SVG_FileLog_freezemon_day plotReplace TL={"Max Freezes: ".$data{max1}." - Max Freezetime ".sprintf("%.2f ",$data{max2}) }</code><br>
   
 </ul>
 </div>
