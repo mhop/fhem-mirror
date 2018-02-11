@@ -345,7 +345,7 @@ FHEM/75_msgConfig.pm         loredo               Automatisierung
 FHEM/76_msgDialog.pm         igami                Frontends/Sprachsteuerung
 FHEM/76_MSGFile.pm           gandy                Automatisierung
 FHEM/76_MSGMail.pm           gandy                Automatisierung
-FHEM/76_SMAInverter.pm       DS_Starter/sct14675  Sonstige Systeme
+FHEM/76_SMAInverter.pm       sct14675/DS_Starter  Sonstige Systeme
 FHEM/77_UWZ.pm               CoolTux              Unterstuetzende Dienste/Wettermodule
 FHEM/77_SMAEM.pm             VolkerKettenbach     Sonstige Systeme
 FHEM/77_SMASTP.pm            VolkerKettenbach     Sonstige Systeme
