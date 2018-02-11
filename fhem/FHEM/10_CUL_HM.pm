@@ -9092,8 +9092,8 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
     $newIODev = $oldIODev; # try keep the last one, if defined
     my $dIo = AttrVal($hash->{NAME},"IODev",""); # if no VCCU is used, attr IODev is the first choice. But if VCCU is used, attr IODev must not be used for restore to work! Then it should be removed from attributes!
     if ($defs{$dIo}) {
-      if (   !defined($oldIODevH->{NAME})
-          || ($oldIODevH->{NAME} ne $dIo) ) {
+      if (   !defined($oldIODev->{NAME})
+          || ($oldIODev->{NAME} ne $dIo) ) {
         $newIODev = $defs{$dIo}; # assign according to Attribut
         delete ($hash->{helper}{io}{restoredIO}) if ($init_done); # we have a user choice, delete restore data
         Log3 $hash->{NAME}, 0, "CUL_HM_assignIO ".$hash->{NAME}." attr IODev used";
