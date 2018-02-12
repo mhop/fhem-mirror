@@ -37,9 +37,10 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.10.0       10.02.2018       bugfix delete attr timeYearPeriod if set other time attributes, new "changeValue" command
 # 7.9.0        09.02.2018       new attribute "avgTimeWeightMean" (time weight mean calculation), code review of selection
 #                               routines, maxValue handle negative values correctly, 
-#                               one security second for correct create TimeArray in normRelativeTime
+#                               one security second for correct create TimeArray in DbRep_normRelTime
 # 7.8.1        04.02.2018       bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp
 #                               is fully set ("date time"), fix "$runtime_string_next = "$runtime_string_next.999";" if 
 #                               $runtime_string_next is part of sql-execute place holder AND contains date+time
@@ -76,7 +77,7 @@
 # 7.1.0        22.12.2017       new attribute timeYearPeriod for reports correspondig to e.g. electricity billing,
 #                               bugfix connection check is running after restart allthough dev is disabled 
 # 7.0.0        18.12.2017       don't set $runtime_string_first,$runtime_string_next,$ts if time/aggregation-attributes 
-#                               not set, devren_Push redesigned, new command get blockinginfo, identify if reopen is 
+#                               not set, change_Push redesigned, new command get blockinginfo, identify if reopen is 
 #                               running on dblog-device and postpone the set-command
 # 6.4.3        17.12.2017       bugfix in delSeqDoublets, fetchrows if datasets contain characters like "' <blank> and s.o.
 # 6.4.2        15.12.2017       change "delSeqDoublets" to respect attribute "limit" (adviceDelete,adviceRemain), 
@@ -311,7 +312,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.9.0";
+my $DbRepVersion = "7.10.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -477,6 +478,7 @@ sub DbRep_Set($@) {
                 "eraseReadings:noArg ".
                 (($hash->{ROLE} ne "Agent")?"sumValue:display,writeToDB ":"").
                 (($hash->{ROLE} ne "Agent")?"averageValue:display,writeToDB ":"").
+                (($hash->{ROLE} ne "Agent")?"changeValue ":"").
                 (($hash->{ROLE} ne "Agent")?"delEntries:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"delSeqDoublets:adviceRemain,adviceDelete,delete ":"").
                 "deviceRename ".
@@ -631,7 +633,7 @@ sub DbRep_Set($@) {
   } elsif ($opt eq "deviceRename") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my ($olddev, $newdev) = split(",",$prop);
-      if (!$olddev || !$newdev) {return "Both entries \"old device name\", \"new device name\" are needed. Use \"set ... deviceRename olddevname,newdevname\" ";}
+      if (!$olddev || !$newdev) {return "Both entries \"old device name\", \"new device name\" are needed. Use \"set $name deviceRename olddevname,newdevname\" ";}
       $hash->{HELPER}{OLDDEV}  = $olddev;
       $hash->{HELPER}{NEWDEV}  = $newdev;
 	  $hash->{HELPER}{RENMODE} = "devren";
@@ -640,7 +642,7 @@ sub DbRep_Set($@) {
   } elsif ($opt eq "readingRename") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my ($oldread, $newread) = split(",",$prop);
-      if (!$oldread || !$newread) {return "Both entries \"old reading name\", \"new reading name\" are needed. Use \"set ... readingRename oldreadingname,newreadingname\" ";}
+      if (!$oldread || !$newread) {return "Both entries \"old reading name\", \"new reading name\" are needed. Use \"set $name readingRename oldreadingname,newreadingname\" ";}
       $hash->{HELPER}{OLDREAD} = $oldread;
       $hash->{HELPER}{NEWREAD} = $newread;
 	  $hash->{HELPER}{RENMODE} = "readren";
@@ -735,6 +737,20 @@ sub DbRep_Set($@) {
           return " Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }  
       DbRep_Main($hash,$opt,$sqlcmd);
+	 
+  } elsif ($opt =~ /changeValue/) {
+      shift @a;
+      shift @a;
+      $prop = join(" ", @a);
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+      unless($prop =~ m/^(".*",".*")$/) {return "Both entries \"old value\", \"new value\" are needed. Use \"set $name changeValue \"old value\",\"new value\" (use quotes)";}
+      my ($oldval,$newval)     = split(/","/,$prop);
+      $oldval =~ s/"//g;
+      $newval =~ s/"//g;
+      $hash->{HELPER}{OLDVAL}  = $oldval;
+      $hash->{HELPER}{NEWVAL}  = $newval;
+	  $hash->{HELPER}{RENMODE} = "changeval";
+      DbRep_Main($hash,$opt);
 	 
   } else {
       return "$setlist";
@@ -1003,6 +1019,7 @@ sub DbRep_Attr($$$$) {
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
             delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
+            delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
         } 
 		if ($aName eq "timeOlderThan") {
             unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[dhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ )
@@ -1010,6 +1027,7 @@ sub DbRep_Attr($$$$) {
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
             delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
+            delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
         }
 		if ($aName eq "dumpMemlimit" || $aName eq "dumpSpeed") {
             unless ($aVal =~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 without decimal places.";}
@@ -1294,7 +1312,7 @@ sub DbRep_Main($$;$) {
  # zentrales Timestamp-Array und Zeitgrenzen bereitstellen
  my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next);
  my $ts = "no_aggregation";                                        # Dummy für eine Select-Schleife wenn != $IsTimeSet || $IsAggrSet
- my ($IsTimeSet,$IsAggrSet,$aggregation) = checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash); 
  if($IsTimeSet || $IsAggrSet) {
      ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = DbRep_createTimeArray($hash,$aggregation,$opt);
  } else {
@@ -1353,8 +1371,8 @@ sub DbRep_Main($$;$) {
  } elsif ($opt eq "insert") { 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
          
- } elsif ($opt =~ /deviceRename|readingRename/) { 
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("devren_Push", "$name", "devren_Done", $to, "ParseAborted", $hash);   
+ } elsif ($opt =~ /deviceRename|readingRename|changeValue/) { 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("change_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "change_Done", $to, "ParseAborted", $hash);   
          
  } elsif ($opt =~ /sqlCmd/ ) {
     # Execute a generic sql command
@@ -1631,7 +1649,7 @@ sub DbRep_createTimeArray($$$) {
  ######################################################################################
  # Umwandeln in Epochesekunden Beginn
  my $epoch_seconds_begin = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
- my ($timeolderthan,$timedifftonow) = normRelativeTime($hash);
+ my ($timeolderthan,$timedifftonow) = DbRep_normRelTime($hash);
  
  if($timedifftonow) {
      $epoch_seconds_begin = time() - $timedifftonow;
@@ -1937,7 +1955,7 @@ sub averval_DoParse($) {
  no warnings 'uninitialized'; 
   
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
  
  # Timestampstring to Array
@@ -2142,7 +2160,8 @@ sub averval_DoParse($) {
                  $sum += $val1*($dt/$tsum);
                  $val1 = $val;
                  $to = $tn;
-                 
+                 Log3 ($name, 5, "DbRep $name - data element: $twmrow");
+                 Log3 ($name, 5, "DbRep $name - time sum: $tsum, delta time: $dt, value: $val1, twm: ".$val1*($dt/$tsum));
              }             
          }              
          if(AttrVal($name, "aggregation", "") eq "hour") {
@@ -2293,7 +2312,7 @@ sub count_DoParse($) {
  no warnings 'uninitialized'; 
  
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet,$aggregation) = checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
   
  # Timestampstring to Array
@@ -2457,7 +2476,7 @@ sub maxval_DoParse($) {
  no warnings 'uninitialized'; 
  
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
   
  # Timestampstring to Array
@@ -2695,7 +2714,7 @@ sub minval_DoParse($) {
  no warnings 'uninitialized'; 
   
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
  
  # Timestampstring to Array
@@ -2938,7 +2957,7 @@ sub diffval_DoParse($) {
  no warnings 'uninitialized'; 
   
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
  
  # Timestampstring to Array
@@ -3304,7 +3323,7 @@ sub sumval_DoParse($) {
  no warnings 'uninitialized'; 
   
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
  
  # Timestampstring to Array
@@ -3489,7 +3508,7 @@ sub del_DoParse($) {
  }
  
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
  
  # SQL zusammenstellen für DB-Operation
@@ -3769,7 +3788,7 @@ sub currentfillup_Push($) {
  my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbh);
  
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
  
  ($devs,$danz,$reading,$ranz) = specsForSql($hash,$device,$reading);
@@ -3955,27 +3974,29 @@ return;
 ####################################################################################################
 # nichtblockierendes DB deviceRename / readingRename
 ####################################################################################################
-sub devren_Push($) {
- my ($name)     = @_;
+sub change_Push($) {
+ my ($string) = @_;
+ my ($name,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $table      = "history";
  my ($dbh,$err,$sql);
  
  # Background-Startzeit
  my $bst = [gettimeofday];
 
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall devren_Push");
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall change_Push");
  
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Push finished");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall change_Push finished");
      return "$name|''|''|$err";
  }
  
@@ -4017,7 +4038,33 @@ sub devren_Push($) {
 	 $sql = "UPDATE history SET TIMESTAMP=TIMESTAMP,READING='$new' WHERE READING='$old'; ";
 	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
 	 $sth = $dbh->prepare($sql) ;
- }     
+     
+ } elsif ($renmode eq "changeval") {
+     $old = delete $hash->{HELPER}{OLDVAL};
+     $new = delete $hash->{HELPER}{NEWVAL};
+     
+	 # SQL zusammenstellen für DB-Operation
+     Log3 ($name, 5, "DbRep $name -> Change old value \"$old\" to new value \"$new\" in database $dblogname ");
+	 
+	 # prepare DB operation
+	 $old =~ s/'/''/g;       # escape ' with ''
+	 $new =~ s/'/''/g;       # escape ' with ''
+     my $d = AttrVal($name,"device","%");
+     my $r = AttrVal($name,"reading","%");
+     
+     # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+     my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
+     Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
+ 
+     # SQL zusammenstellen für DB-Update
+     if ($IsTimeSet) {
+         $sql = DbRep_createUpdateSql($hash,$table,"TIMESTAMP=TIMESTAMP,VALUE='$new' WHERE VALUE='$old'",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
+     } else {
+         $sql = DbRep_createUpdateSql($hash,$table,"TIMESTAMP=TIMESTAMP,VALUE='$new' WHERE VALUE='$old'",$device,$reading,undef,undef,'');
+     }
+	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
+	 $sth = $dbh->prepare($sql) ;
+ }         
  
  my $urow;
  eval { $sth->execute(); };
@@ -4027,11 +4074,15 @@ sub devren_Push($) {
  
  if ($@) {
      $err = encode_base64($@,"");
-	 my $m = ($renmode eq "devren")?"device":"reading";
-     Log3 ($name, 2, "DbRep $name - Failed to rename old $m name \"$old\" to new $m name \"$new\": $@");
+     if($renmode ne "changeValue") {
+	     my $m = ($renmode eq "devren")?"device":"reading";
+         Log3 ($name, 2, "DbRep $name - Failed to rename old $m name \"$old\" to new $m name \"$new\": $@");
+     } else {
+         Log3 ($name, 2, "DbRep $name - Failed to change old value \"$old\" to new value \"$new\": $@");
+     }
 	 $dbh->rollback() if(!$dbh->{AutoCommit});
      $dbh->disconnect();
-     Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Push finished");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall change_Push finished");
      return "$name|''|''|$err";
  } else {
      $dbh->commit() if(!$dbh->{AutoCommit});
@@ -4042,7 +4093,7 @@ sub devren_Push($) {
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
  
- Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Push finished");
+ Log3 ($name, 4, "DbRep $name -> BlockingCall change_Push finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -4055,7 +4106,7 @@ sub devren_Push($) {
 ####################################################################################################
 # Auswertungsroutine DB deviceRename
 ####################################################################################################
-sub devren_Done($) {
+sub change_Done($) {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -4067,7 +4118,7 @@ sub devren_Done($) {
   my $old        = $a[4];
   my $new        = $a[5]; 
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall devren_Done");
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall change_Done");
   
   my $renmode = delete $hash->{HELPER}{RENMODE};
   
@@ -4075,7 +4126,7 @@ sub devren_Done($) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Done finished");
+      Log3 ($name, 4, "DbRep $name -> BlockingCall change_Done finished");
       return;
   } 
 
@@ -4095,6 +4146,11 @@ sub devren_Done($) {
       ReadingsBulkUpdateValue ($hash, "reading_not_renamed", "Warning - old: ".$old." not found, not renamed to new: ".$new) 
 	      if ($urow == 0);
   }
+  if($renmode eq "changeval") {
+	  ReadingsBulkUpdateValue ($hash, "value_changed", "old: ".$old." to new: ".$new)  if($urow != 0);
+      ReadingsBulkUpdateValue ($hash, "value_not_changed", "Warning - old: ".$old." not found, not changed to new: ".$new) 
+	      if ($urow == 0);
+  }
   
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
@@ -4108,11 +4164,10 @@ sub devren_Done($) {
   }
 
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall devren_Done finished");
+  Log3 ($name, 4, "DbRep $name -> BlockingCall change_Done finished");
   
 return;
 }
-
 
 ####################################################################################################
 # nichtblockierende DB-Abfrage fetchrows
@@ -4146,7 +4201,7 @@ sub fetchrows_DoParse($) {
  }
 
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
  
  # SQL zusammenstellen für DB-Abfrage
@@ -4597,7 +4652,7 @@ sub expfile_DoParse($) {
  }
  
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
  
  # Timestampstring to Array
@@ -6106,7 +6161,7 @@ sub mysql_DoDumpClientSide($) {
  $ffd    = $ffd?encode_base64($ffd,""):0;
  
  # alte Dumpfiles löschen
- my @fd  = deldumpfiles($hash,$backupfile);
+ my @fd  = DbRep_deldumpfiles($hash,$backupfile);
  my $bfd = join(", ", @fd );
  $bfd    = $bfd?encode_base64($bfd,""):0;
 
@@ -6269,7 +6324,7 @@ sub mysql_DoDumpServerSide($) {
  $ffd    = $ffd?encode_base64($ffd,""):0;
  
  # alte Dumpfiles löschen
- my @fd  = deldumpfiles($hash,$bfile);
+ my @fd  = DbRep_deldumpfiles($hash,$bfile);
  my $bfd = join(", ", @fd );
  $bfd    = $bfd?encode_base64($bfd,""):0;
  
@@ -6393,7 +6448,7 @@ sub sqlite_DoDump($) {
  $ffd    = $ffd?encode_base64($ffd,""):0;
  
  # alte Dumpfiles löschen
- my @fd  = deldumpfiles($hash,$bfile);
+ my @fd  = DbRep_deldumpfiles($hash,$bfile);
  my $bfd = join(", ", @fd );
  $bfd    = $bfd?encode_base64($bfd,""):0;
  
@@ -6807,6 +6862,43 @@ return $sql;
 }
 
 ####################################################################################################
+#  SQL-Statement zusammenstellen für DB-Updates
+####################################################################################################
+sub DbRep_createUpdateSql($$$$$$$$) {
+ my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
+ my $name    = $hash->{NAME};
+ my $dbmodel = $hash->{dbloghash}{MODEL};
+ my ($sql,$devs,$danz,$ranz);
+ my $tnfull = 0;
+ 
+ ($devs,$danz,$reading,$ranz) = specsForSql($hash,$device,$reading);
+ 
+ if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
+     $tnfull = 1;
+ }
+
+ $sql = "UPDATE $table SET $selspec AND ";
+ $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
+ $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
+ $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
+ $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
+ $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
+ $sql .= "READING IN ($reading) AND "    if($ranz > 1);
+ if (($tf && $tn)) {
+     $sql .= "TIMESTAMP >= $tf AND TIMESTAMP ".($tnfull?"<=":"<")." $tn ";
+ } else {
+     if ($dbmodel eq "POSTGRESQL") {
+	     $sql .= "true ";
+	 } else {
+	      $sql .= "1 ";
+	 }
+ }
+ $sql .= "$addon;";
+
+return $sql;
+}
+
+####################################################################################################
 #  SQL-Statement zusammenstellen für Löschvorgänge
 ####################################################################################################
 sub createDeleteSql($$$$$$$) {
@@ -6880,7 +6972,7 @@ return ($devs,$danz,$reading,$ranz);
 #    Check ob Zeitgrenzen bzw. Aggregation gesetzt sind, evtl. übertseuern (je nach Funktion)
 #    Return "1" wenn Bedingung erfüllt, sonst "0"
 ####################################################################################################
-sub checktimeaggr ($) {
+sub DbRep_checktimeaggr ($) {
  my ($hash)      = @_;
  my $name        = $hash->{NAME};
  my $IsTimeSet   = 0;
@@ -6903,7 +6995,7 @@ sub checktimeaggr ($) {
      $aggregation = "day";       # für Tagesmittelwertberechnung des deuteschen Wetterdienstes immer "day"
 	 $IsAggrSet   = 1;
  }
- if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup/) {
+ if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|changeValue|tableCurrentFillup/) {
 	 $IsAggrSet   = 0;
 	 $aggregation = "no";
  }
@@ -7022,7 +7114,7 @@ return;
 #
 # liefert die Attribute timeOlderThan, timeDiffToNow als Sekunden normiert zurück
 ####################################################################################################
-sub normRelativeTime ($) {
+sub DbRep_normRelTime ($) {
  my ($hash) = @_;
  my $name = $hash->{NAME};
  my $tdtn = AttrVal($name, "timeDiffToNow", undef);
@@ -7443,7 +7535,7 @@ return (undef,$db_MB_start,$db_MB_end);
 ####################################################################################################
 #             Dump-Files im dumpDirLocal löschen bis auf die letzten "n" 
 ####################################################################################################
-sub deldumpfiles ($$) {
+sub DbRep_deldumpfiles ($$) {
   my ($hash,$bfile) = @_; 
   my $name          = $hash->{NAME};
   my $dbloghash     = $hash->{dbloghash};
@@ -7691,7 +7783,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
   }
   
   no warnings 'uninitialized';
-  (undef,undef,$aggr) = checktimeaggr($hash);
+  (undef,undef,$aggr) = DbRep_checktimeaggr($hash);
   $reading = $optxt."_".$aggr."_".$reading;
   
   $type = $defs{$device}{TYPE} if($defs{$device});                # $type vom Device ableiten
@@ -8006,7 +8098,8 @@ return;
      <li> The deletion of datasets. The containment of deletion can be done by Device and/or Reading as well as fix or dynamically calculated time limits at execution time. </li>
      <li> export of datasets to file (CSV-format). </li>
      <li> import of datasets from file (CSV-Format). </li>
-     <li> rename of device names in datasets </li>
+     <li> rename of device/readings in datasets </li>
+     <li> change of reading values in the database </li>
      <li> automatic rename of device names in datasets and other DbRep-definitions after FHEM "rename" command (see <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Execution of arbitrary user specific SQL-commands </li>
 	 <li> creation of backups of the database in running state non-blocking (MySQL, SQLite) </li>
@@ -8117,11 +8210,47 @@ return;
                                  </ul>
                                  </li><br>
                                  
+    <li><b> cancelDump </b>   -  stops a running database dump. </li> <br>
+                                 
+    <li><b> changeValue </b>  -  changes the saved value of readings.
+                                 If the selection is limited to particular device/reading-combinations by  
+                                 <a href="#DbRepattr">attribute</a> "device" respectively "reading", it is considered as well
+                                 as possibly defined time limits by time attributes (time.*).  <br>
+                                 If no limits are set, the whole database is scanned and the specified value will be 
+                                 changed. <br><br>
+                                 
+                                 <ul>
+                                 <b>Example: </b> <br>
+                                 set &lt;name&gt; changeValue "&lt;old string&gt;","&lt;new string&gt;"  <br>               
+                                 # the old string will be changed to new string.  <br>
+                                 # Both strings may contain spaces. The strings have to be quoted and separated by comma.
+                                 <br><br>
+                                 
+                                 Summarized the attributes to control changeValue are: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>device</b>    </td><td>: selection only of datasets which contain &lt;device&gt; </td></tr>
+                                      <tr><td> <b>reading</b>   </td><td>: selection only of datasets which contain &lt;reading&gt; enthalten </td></tr>
+                                      <tr><td> <b>time.*</b>    </td><td>: a number of attributes to limit selection by time </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>
+								 
+								 <b>Note:</b> <br>
+                                 Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
+                                 is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br> 
+                                 </li> <br>
+                                 </ul>
+                                 
     <li><b> countEntries [history|current] </b> -  provides the number of table-entries (default: history) between period set 
 	                                               by timestamp-<a href="#DbRepattr">attributes</a> if set. 
                                                    If timestamp-attributes are not set, all entries of the table will be count. 
 												   The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to 
 												   limit the evaluation.  </li> <br>
+                                                   
                            
     <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or 
 	                             Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow/timeOlderThan". <br><br>
@@ -8211,7 +8340,8 @@ return;
                                  <a href="#DbRepattr">attributes</a> device and/or reading will not be considered.  <br><br>
                                  
                                  <ul>
-                                 <b>input format: </b>  set &lt;name&gt; deviceRename &lt;old device name&gt;,&lt;new device name&gt;  <br>               
+                                 <b>Example: </b> <br> 
+                                 set &lt;name&gt; deviceRename &lt;old device name&gt;,&lt;new device name&gt;  <br>               
                                  # The amount of renamed device names (datasets) will be displayed in reading "device_renamed". <br>
                                  # If the device name to be renamed was not found in the database, a WARNUNG will appear in reading "device_not_renamed". <br>
                                  # Appropriate entries will be written to Logfile if verbose >= 3 is set.
@@ -8597,7 +8727,8 @@ return;
                                  <a href="#DbRepattr">attributes</a> device and/or reading will not be considered.  <br><br>
                                  
                                  <ul>
-                                 <b>input format: </b>  set &lt;name&gt; readingRename &lt;old reading name&gt;,&lt;new reading name&gt;  <br>               
+                                 <b>Example: </b> <br> 
+                                 set &lt;name&gt; readingRename &lt;old reading name&gt;,&lt;new reading name&gt;  <br>               
                                  # The amount of renamed reading names (datasets) will be displayed in reading "reading_renamed". <br>
                                  # If the reading name to be renamed was not found in the database, a WARNUNG will appear in reading "reading_not_renamed". <br>
                                  # Appropriate entries will be written to Logfile if verbose >= 3 is set.
@@ -9429,7 +9560,8 @@ sub bdump {
 	      dynamisch berechneter Zeitgrenzen zum Ausführungszeitpunkt erfolgen. </li>
      <li> Export von Datensätzen in ein File im CSV-Format </li>
      <li> Import von Datensätzen aus File im CSV-Format </li>
-     <li> Umbenennen von Device-Namen in Datenbanksätzen </li>
+     <li> Umbenennen von Device/Readings in Datenbanksätzen </li>
+     <li> Ändern von Reading-Werten (VALUES) in der Datenbank </li>
      <li> automatisches Umbenennen von Device-Namen in Datenbanksätzen und DbRep-Definitionen nach FHEM "rename" 
 	      Befehl (siehe <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
 	 <li> Ausführen von beliebigen Benutzer spezifischen SQL-Kommandos </li>
@@ -9543,6 +9675,39 @@ sub bdump {
                                  </ul>
 
     <li><b> cancelDump </b>   -  bricht einen laufenden Datenbankdump ab. </li> <br>
+    
+    <li><b> changeValue </b>  -  ändert den gespeicherten Wert eines Readings.
+                                 Ist die Selektion auf bestimmte Device/Reading-Kombinationen durch die 
+                                 <a href="#DbRepattr">Attribute</a> "device" bzw. "reading" beschränkt, werden sie genauso 
+                                 berücksichtigt wie gesetzte Zeitgrenzen (Attribute time.*).  <br>
+                                 Fehlen diese Beschränkungen, wird die gesamte Datenbank durchsucht und der angegebene Wert 
+                                 geändert. <br><br>
+                                 
+                                 <ul>
+                                 <b>Beispiel: </b> <br>
+                                 set &lt;name&gt; changeValue "&lt;alter String&gt;","&lt;neuer String&gt;"  <br>               
+                                 # der alte String wird in den neuen String geändert.  <br>
+                                 # Beide Strings können Leerzeichen enthalten. Die Werte sind in Quotes zu setzen und durch Komma zu trennen.
+                                 <br><br>
+                                 
+                                 Zusammengefasst sind die zur Steuerung von changeValue relevanten Attribute: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>device</b>    </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>   </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                      <tr><td> <b>time.*</b>    </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>
+								 
+								 <b>Hinweis:</b> <br>
+                                 Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
+                                 im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden (Tabellen-Lock). <br><br> 
+                                 </li> <br>
+                                 </ul>
 								 
     <li><b> countEntries [history | current] </b> 
                                  -  liefert die Anzahl der Tabelleneinträge (default: history) in den gegebenen 
@@ -9645,7 +9810,8 @@ sub bdump {
 								 Reading werden nicht berücksichtigt.  <br><br>
                                  
                                  <ul>
-                                 <b>Eingabeformat: </b>  set &lt;name&gt; deviceRename &lt;alter Devicename&gt;,&lt;neuer Devicename&gt;  <br>               
+                                 <b>Beispiel: </b><br>  
+                                 set &lt;name&gt; deviceRename &lt;alter Devicename&gt;,&lt;neuer Devicename&gt;  <br>               
                                  # Die Anzahl der umbenannten Device-Datensätze wird im Reading "device_renamed" ausgegeben. <br>
                                  # Wird der umzubenennende Gerätename in der Datenbank nicht gefunden, wird eine WARNUNG im Reading "device_not_renamed" ausgegeben. <br>
                                  # Entsprechende Einträge erfolgen auch im Logfile mit verbose=3
@@ -10039,7 +10205,8 @@ sub bdump {
 								 Device bzw. Reading werden nicht berücksichtigt.  <br><br>
                                  
                                  <ul>
-                                 <b>Eingabeformat: </b>  set &lt;name&gt; readingRename &lt;alter Readingname&gt;,&lt;neuer Readingname&gt;  <br>               
+                                 <b>Beispiel: </b><br>  
+                                 set &lt;name&gt; readingRename &lt;alter Readingname&gt;,&lt;neuer Readingname&gt;  <br>               
                                  # Die Anzahl der umbenannten Device-Datensätze wird im Reading "reading_renamed" 
 								   ausgegeben. <br>
                                  # Wird der umzubenennende Readingname in der Datenbank nicht gefunden, wird eine 
