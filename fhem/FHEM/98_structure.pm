@@ -375,11 +375,36 @@ sub
 structure_Set($@)
 {
   my ($hash, @list) = @_;
+  my $me = $hash->{NAME};
   my $ret = "";
   my %pars;
 
   # see Forum # 28623 for .cachedHelp
   return $hash->{".cachedHelp"} if($list[1] eq "?" && $hash->{".cachedHelp"});
+
+  my @devList = @{$hash->{".memberList"}};
+  if(@list > 1 && $list[$#list] eq "reverse") {
+    pop @list;
+    @devList = reverse @devList;
+  }
+
+  if($list[1] =~ m/^(save|restore)StructState$/) {
+    return "Usage: set $me $list[1] readingName" if(@list != 3);
+    return "Bad reading name $list[2]" if(!goodReadingName($list[2]));
+
+    if($1 eq "save") {
+      readingsSingleUpdate($hash, $list[2],
+                   join(",", map { ReadingsVal($_,"state","on") } @devList), 1);
+      return;
+    }
+
+    my @sl = split(",", ReadingsVal($me, $list[2], ""));
+    for(my $i1=0; $i1<@devList && $i1<@sl; $i1++) {
+      AnalyzeCommand($hash->{CL}, "set $devList[$i1] $sl[$i1]");
+    }
+    return;
+  }
+
   $hash->{INSET} = 1;
   my $startAsyncProcessing;
 
@@ -395,26 +420,21 @@ structure_Set($@)
     }
   }
 
-  my @devList = @{$hash->{".memberList"}};
-  if(@list > 1 && $list[$#list] eq "reverse") {
-    pop @list;
-    @devList = reverse @devList;
-  }
   foreach my $d (@devList) {
     next if(!$defs{$d});
     if($defs{$d}{INSET}) {
-      Log3 $hash, 1, "ERROR: endless loop detected for $d in " . $hash->{NAME};
+      Log3 $hash, 1, "ERROR: endless loop detected for $d in $me";
       next;
     }
 
     if($attr{$d} && $attr{$d}{structexclude}) {
       my $se = $attr{$d}{structexclude};
-      next if($hash->{NAME} =~ m/$se/);
+      next if($me =~ m/$se/);
     }
 
     my $dl0 = $defs{$d};
     my $is_structure = defined($dl0) && $dl0->{TYPE} eq "structure";
-    my $async_delay = AttrVal($hash->{NAME}, "async_delay", undef);
+    my $async_delay = AttrVal($me, "async_delay", undef);
 
     my $cmd;
     if(!$filter) {
@@ -456,9 +476,11 @@ structure_Set($@)
   if(defined($startAsyncProcessing)) {
     InternalTimer(gettimeofday(), "structure_asyncQueue", $hash, 0);
   }
+
   return $ret if($list[1] ne "?");
   $hash->{".cachedHelp"} = "Unknown argument ?, choose one of " .
-                join(" ", sort keys(%pars));
+                join(" ", sort keys(%pars)).
+                     " saveStructState restoreStructState";
   return $hash->{".cachedHelp"};
 }
 
@@ -578,7 +600,16 @@ structure_Attr($@)
   <a name="structureset"></a>
   <b>Set</b>
   <ul>
-    Every set command is propagated to the attached devices. Exception: if an
+    <li>saveStructState &lt;readingName&gt;<br>
+      The state reading of all members is stored comma separated in the
+      specified readingName.
+      </li><br>
+    <li>restoreStructState &lt;readingName&gt;<br>
+      The state of all members will be restored from readingName by calling
+      "set memberName storedStateValue".
+      </li><br>
+    Every other set command is propagated to the attached devices. Exception:
+    if an
     attached device has an attribute structexclude, and the attribute value
     matches (as a regexp) the name of the current structure.<br>
     If the set is of the form <code>set &lt;structure&gt;
@@ -757,7 +788,16 @@ structure_Attr($@)
   <a name="structureset"></a>
   <b>Set</b>
   <ul>
-    Jedes set Kommando wird an alle Devices dieser Struktur weitergegeben.<br>
+    <li>saveStructState &lt;readingName&gt;<br>
+      Der Status (genauer: state Reading) aller Mitglieder wird im angegebenen
+      Reading Komma separiert gespeichert.
+      </li><br>
+    <li>restoreStructState &lt;readingName&gt;<br>
+      Der Status der Mitglieder wird aus dem angegebenen Reading gelesen, und
+      via "set Mitgliedsname StatusWert" gesetzt.
+      </li><br>
+    Jedes andere set Kommando wird an alle Devices dieser Struktur
+    weitergegeben.<br>
     Aussnahme: das Attribut structexclude ist in einem Device definiert und
     dessen Attributwert matched als Regexp zum Namen der aktuellen
     Struktur.<br> Wenn das set Kommando diese Form hat <code>set
