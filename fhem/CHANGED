@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_xs1Bridge: fix Filelog check
   - new:     39_Talk2Fhem: new module for language control
   - feature: 70_BRAVIA: TV input select for all active tuners
                         Channel selection by channel uri

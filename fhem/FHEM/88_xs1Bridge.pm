@@ -64,40 +64,42 @@ sub xs1Bridge_Define($$) {
 	my $viewDeviceName = AttrVal($hash->{NAME},"view_Device_name",0);
 	my $viewDeviceFunction = AttrVal($hash->{NAME},"view_Device_function",0);
 	my $update_only_difference = AttrVal($hash->{NAME},"update_only_difference",0);
-	
+
 	return "Usage: define <name> $name <ip>"  if(@arg != 3);
 	return "Cannot define xs1Bridge device. Perl modul ${missingModul}is missing." if ( $missingModul );
-	
+
 	# Parameter Define
 	my $xs1_ip = $arg[2];					## Zusatzparameter 1 bei Define - ggf. nur in Sub
 	$hash->{xs1_ip} = $xs1_ip;
 
 	if (&xs1Bridge_Ping == 1) {				## IP - Check
-	$hash->{STATE} = "Initialized";			## Der Status des Modules nach Initialisierung.
-	$hash->{TIME} = time();					## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.11";				## Version
-	$hash->{BRIDGE}	= 1;
+		$hash->{STATE} = "Initialized";		## Der Status des Modules nach Initialisierung.
+		$hash->{TIME} = time();				## Zeitstempel, derzeit vom anlegen des Moduls
+		$hash->{VERSION} = "1.12";			## Version
+		$hash->{BRIDGE}	= 1;
 	
-	# Attribut gesetzt
-	$attr{$name}{disable}	= "0";
-	$attr{$name}{interval}	= "60";
-	$attr{$name}{room}		= "xs1"	if( not defined( $attr{$name}{room} ) );
+		# Attribut gesetzt
+		$attr{$name}{disable}	= "0";
+		$attr{$name}{interval}	= "60";
+		$attr{$name}{room}		= "xs1"	if( not defined( $attr{$name}{room} ) );
 	
-	$modules{xs1Bridge}{defptr}{BRIDGE} = $hash;
+		$modules{xs1Bridge}{defptr}{BRIDGE} = $hash;
 	
-	InternalTimer(gettimeofday()+$attr{$name}{interval}, "xs1Bridge_GetUpDate", $hash);		## set Timer
+		InternalTimer(gettimeofday()+$attr{$name}{interval}, "xs1Bridge_GetUpDate", $hash);		## set Timer
 
-	Log3 $name, 3, "$typ: Modul defined with xs1_ip: $xs1_ip";
+		Log3 $name, 3, "$typ: Modul defined with xs1_ip: $xs1_ip";
 	
-	fhem("define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log ".$arg[0]);			## Logfil define
-	fhem("attr FileLog_xs1Bridge room xs1");												## Logfile in xs1 room
-	return undef;
-   }
-   else
-   {
-   return "ERROR - Host IP $xs1_ip is not reachable. Please check!";
-   }
-   
+		if(!defined($defs{'FileLog_xs1Bridge'})) {												## Logfile existent check
+			fhem("define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log ".$arg[0]);		## Logfile define
+			fhem("attr FileLog_xs1Bridge room xs1");											## Logfile in xs1 room
+		}
+		return undef;
+	}
+	else
+	{
+		return "ERROR - Host IP $xs1_ip is not reachable. Please check!" if(!defined($defs{$name}));
+		return undef; "$typ: ERROR - Host IP $xs1_ip is not reachable. Please check!" if(defined($defs{$name}));
+	}
 }
 
 sub xs1Bridge_Attr(@) {
@@ -281,27 +283,24 @@ sub xs1Bridge_GetUpDate() {
 		for my $i (0..3) {
 			my $adress = "http://".$hash->{xs1_ip}.$cmd.$cmdtyp[$i];
 			Debug " $typ: GetUpDate | Adresse: $adress" if($debug);
-     
-			my $ua = LWP::UserAgent->new;									## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
-			my $resp = $ua->request(HTTP::Request->new(GET => $adress));
-			Debug " $typ: GetUpDate | Adresse HTTP request Code: ".$resp->code if($debug);
-			if ($resp->code != "200") {										## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
-				Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no Data";
-				$xs1_security++;
-				last;		## ERROR JSON-query -> Abbruch schleife
-			}
-			
+
 			my $json;
 			my $json_utf8;
-			my $decoded;
-			
-			if (defined($adress)) {
+			my $decoded;			
+			my $ua = LWP::UserAgent->new;									## CHECK JSON Adresse -> JSON-query, sonst FHEM shutdown
+			my $resp = $ua->request(HTTP::Request->new(GET => $adress));
+
+			Debug " $typ: GetUpDate | Adresse HTTP request Code: ".$resp->code if($debug);
+
+			## Get $adress Antwort, OK dann ARRAY Verarbeitung, n.iO ABBRUCH
+			if ($resp->code == "200") {							## http://search.cpan.org/~oalders/HTTP-Message-6.13/lib/HTTP/Status.pm
 				($json) = get( $adress ) =~ /[^(]*[}]/g;		## cut cname( + ) am Ende von Ausgabe -> ARRAY Struktur als Antwort vom xs1
 				$json_utf8 = eval {encode_utf8( $json )};		## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
 				$decoded = eval {decode_json( $json_utf8 )};	## auswertbares ARAAY
-			} else {
-				Log3 $name, 3, "$typ: Adresse:$adress undefined";
-				last;
+			} else {		
+				Log3 $name, 3, "$typ: GetUpDate | cmdtyp=".$cmdtyp[$i]." - HTTP GET error code ".$resp->code." -> no Data";
+				$xs1_security++;
+				last;		## ERROR JSON-query -> Abbruch schleife
 			}
 			
 			if ($i <= 1 ) {     ### xs1 Aktoren / Sensoren
