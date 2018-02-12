@@ -397,7 +397,6 @@ UnifiVideo_Read($)
         $json = [] if( !$json );
         my $i = 0;
         foreach my $entry (@{$json->{data}}) {
-          next if( $entry->{deleted} );
           last if( $entry->{mac} eq $cam );
           ++$i;
           }
