@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 70_BRAVIA: TV input select for all active tuners
+                        Channel selection by channel uri
+                        Optimized fetch of app and input presets
   - feature: 98_structure: saveStructState/restoreStructState (Forum #84154)
   - bugfix:  74_XiaomiBTLESens: fix corrupt character for temperature
   - bugfix:  74_XiaomiBTLESens: fix humidity bug than temperature is lower 10
