@@ -323,7 +323,7 @@ f18_special()
                     (bgImg ? bgImg : "none")+"</span></a>");
     $(appendTo+" tr.ar_bgImg a").click(function(){
       FW_cmd(FW_root+'?cmd='+
-      '{ join("\\n",FW_fileList("$FW_icondir/background/*.(jpg|png)")) }&XHR=1',
+      '{join("\\n",FW_fileList("$FW_icondir/background/.*.(jpg|png)"))}&XHR=1',
       function(data) {
         if(data)
           data += "none";
@@ -534,8 +534,8 @@ f18_setCss(why)
   function fg(c) { return "{ color:#"+c+"; }\n" }
   style += ".col_fg, body, input, textarea "+fg(col("fg"));
   style += ".col_bg, #menu, textarea, input, option "+bg(col("bg"));
-  style += ".col_link, a, .handle, .fhemlog, input[type=submit], select, "+
-           "div.ui-widget-content a "+
+  style += ".col_link,a:not(.changed),.handle,.fhemlog,input[type=submit],"+
+           "select,div.ui-widget-content a "+
            "{color:#"+col("link")+"!important; stroke:#"+col("link")+";}\n";
   style += "svg:not([fill]):not(.jssvg) { fill:#"+col("link")+"; }\n";
   style += ".col_evenrow, table.block,div.block "+bg(col("evenrow"));
