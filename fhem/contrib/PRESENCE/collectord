@@ -72,12 +72,10 @@ my %handle;
 my %socket_to_handle;
 
 
-
 $SIG{__DIE__} = sub {
     my ($msg) = @_;
 
     Log 1, "PERL ERROR: $msg";
-
 };
 
 
@@ -85,7 +83,6 @@ $SIG{__WARN__} = sub {
     my ($msg) = @_;
 
     Log 1, "PERL WARN: $msg";
-
 };
 
 
@@ -118,7 +115,7 @@ sub print_usage () {
         print "  -d, --daemon\n";
         print "     detach from terminal and run as background daemon\n";
         print "  -n, --no-timestamps\n";
-        print "     do not output timestamps in log messages\n";        
+        print "     do not output timestamps in log messages\n";
         print "  -v, --verbose\n";
         print "     Print detailed log output (can be used multiple times to increase the loglevel, max. 2 times)\n";
         print "  -l, --logfile <logfile>\n";
@@ -145,16 +142,12 @@ if(not $opt_c)
     print STDERR "no config file provided\n\n";
     print_usage();
     exit 1;
-
-
 }
 
 if(not -e "$opt_c" or not -r "$opt_c")
 {
-
     print STDERR "config-file $opt_c could not be loaded\n";
     exit 1;
-
 }
 
 Log 0, "started with PID $$";
@@ -185,8 +178,6 @@ Log 1, "created socket on ".$server->sockhost()." with port ".$server->sockport(
 
 my $listener = IO::Select->new();
 $listener->add($server);
-
-
 
 my @new_handles;
 my %child_handles;
@@ -228,20 +219,19 @@ while(1)
             Log 2, "cleaning up status values (UUID: $uuid)";
             delete $state{$uuid};
         }
-    
     }
-    
+
     # process all status messages from all threads via status queue
     while($status_queue->pending)
     {
         my ($uuid,$room,$value,$data) = split(";", $status_queue->dequeue, 4);
-        
+
         Log 2, "processing state message for device ".(defined($name)?$name." ":"")."in room $room (UUID: $uuid) - value: $value".(defined($data) ? " - data: $data" : "");
-        
+
         if(not $value =~ /^(absence|present)$/)
         {
             $handle{$uuid}{client}->send("$value;room=$room\n") if(defined($handle{$uuid}{client}));
-            
+
             if($value eq "socket_closed")
             {
                 delete($state{$uuid}{rooms}{$room});
@@ -250,7 +240,7 @@ while(1)
         else
         {
             $state{$uuid}{rooms}{$room}{state} = $value;
-            
+
             if(defined($data))
             {
                 $state{$uuid}{rooms}{$room}{data} = $data;
@@ -259,9 +249,9 @@ while(1)
             {
                 delete $state{$uuid}{rooms}{$room}{data};
             }
-        
+
             my $result = aggregateRooms($state{$uuid}{rooms});
-            
+
             if(defined($result))
             {
                 if(not defined($state{$uuid}{lastresult}{value}) or (($state{$uuid}{lastresult}{value} eq "$result" and ($state{$uuid}{lastresult}{timestamp} + $handle{$uuid}{timeout}) < time()) or $state{$uuid}{lastresult}{value} ne "$result"))
@@ -274,21 +264,17 @@ while(1)
                     }
                 }
             }
-        
         }
-        
+
         #print Dumper(\%state);
     }
-    
-    
+
     # If a thread has something reported via Log Queue, print it out if verbose is activated
     while($log_queue->pending)
     {
-        Log 2, $log_queue->dequeue; 
+        Log 2, $log_queue->dequeue;
     }
-    
-    
-    
+
     # If a INET socket has anything to report
     if(@new_handles = $listener->can_read(1))
     {
@@ -299,9 +285,9 @@ while(1)
             if($client == $server)
             {
                 $new_client = $server->accept();
-                
+
                 setsockopt($new_client, SOL_SOCKET, SO_KEEPALIVE, 1); # activate keep-alive
-                
+
                 $listener->add($new_client);
                 Log 1, "new connection from ".$new_client->peerhost().":".$new_client->peerport();
             }
@@ -309,33 +295,33 @@ while(1)
             {
                 $buf = '';
                 $buf = <$client>;
-                
+
                 # if the message is defined, it is a real message, else the connection is closed (EOF)
                 if($buf)
                 {
                     # replace leading and trailing white spaces
                     $buf =~ s/(^\s*|\s*$)//g;
-                    
+
                     # if the message is a new command, accept the command and create threads for all rooms to process the command
                     if($buf =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*\|\s*\d+\s*$/)
-                    {      
+                    {
                         # send the acknowledgment back to the sender
                         $client->send("command accepted\n");
                         Log 2, "received new command from ".$client->peerhost().":".$client->peerport()." - $buf";
-                        
-                        # Split the message into bluetooth address and the timeout value 
+
+                        # Split the message into bluetooth address and the timeout value
                         # (timeout is ignored within the collectord, as it is given by configuration)
                         ($address, $timeout) = split("\\|", $buf);
 
                         # remove any containing white spaces
                         $address =~ s/\s*//g;
                         $timeout =~ s/\s*//g;
-                                             
+
                         # if the client has already a request running, stop at first the old request
                         if(defined($socket_to_handle{$client}))
                         {
                             my $uuid = $socket_to_handle{$client};
-                            
+
                             # get all threads for this socket and send them a termination signal
                             foreach my $room (keys %{$handle{$uuid}{threads}})
                             {
@@ -344,7 +330,7 @@ while(1)
                                 $state{$uuid}{rooms}{$room}{state} = "" if(exists($state{$uuid}{rooms}{$room}));
                                 delete($state{$uuid}{rooms}{$room}{data});
                             }
-                            
+
                             $handle{$uuid}{timeout} = $timeout;
                             $state{$uuid}{lastresult}{timestamp} = 0;
                         }
@@ -356,27 +342,27 @@ while(1)
                                 $socket_to_handle{$client} = generateUUID();
                                 Log 2, "generating new UUID for client ".$client->peerhost()." - ".$socket_to_handle{$client};
                             }
-                        
+
                             my $uuid = $socket_to_handle{$client};
-                        
+
                             $handle{$uuid}{address} = $address;
                             $handle{$uuid}{client} = $client;
                             $handle{$uuid}{timeout} = $timeout;
-                        
+
                             $state{$uuid}{lastresult}{value} = "absence";
                             $state{$uuid}{lastresult}{timestamp} = 0;
-                        
+
                             # create a new reqester thread for each configured room to perform the query
                             while (my ($room, $value) = each %config)
-                            {                                
+                            {
                                 $thread_counter++;
                                 $queues{$thread_counter} = Thread::Queue->new();
                                 my $new_thread = threads->new(\&doQuery, ($value, $room, $address, $uuid));
-                                Log 1, "created thread ".$new_thread->tid()." for processing device $address in room $room for peer ".$client->peerhost()." (UUID: $uuid)";     
-                                
+                                Log 1, "created thread ".$new_thread->tid()." for processing device $address in room $room for peer ".$client->peerhost()." (UUID: $uuid)";
+
                                 # detach from the thread, so the thread starts processing independantly
                                 $new_thread->detach();
-                                
+
                                 # save the socket/room relationship to know which thread belongs to which client request (for stop command)
                                 $handle{$uuid}{threads}{$room} = $new_thread;
                                 $state{$uuid}{rooms}{$room}{state} = "";
@@ -386,25 +372,25 @@ while(1)
                     }
                     elsif(lc($buf) =~ /^\s*now\s*$/) # if a now command is received, all threads need to be signaled to send a now command to the presenced server
                     {
-                        Log 2, "received now command from client ".$client->peerhost(); 
-                        
+                        Log 2, "received now command from client ".$client->peerhost();
+
                         # just to be sure if the client has really a running request
                         if(defined($socket_to_handle{$client}))
                         {
                             my $uuid = $socket_to_handle{$client};
-                            
+
                             # get all threads for this socket and send them a now command
                             foreach my $room (keys %{$handle{$uuid}{threads}})
                             {
-                                Log 2, "signalling thread ".$handle{$uuid}{threads}{$room}->tid()." to send \"now\"-request for room $room for client ".$client->peerhost(); 
-                                
+                                Log 2, "signalling thread ".$handle{$uuid}{threads}{$room}->tid()." to send \"now\"-request for room $room for client ".$client->peerhost();
+
                                 $queues{$handle{$uuid}{threads}{$room}->tid()}->enqueue("now");
-                                
+
                                 # delete state and room data to get a fresh state
                                 $state{$uuid}{rooms}{$room}{state} = "" if(exists($state{$uuid}{rooms}{$room}));
                                 delete($state{$uuid}{rooms}{$room}{data});
                             }
-                            
+
                             delete($state{$uuid}{lastresult}) if(exists($state{$uuid}{lastresult}));
                             $client->send("command accepted\n");
                         }
@@ -416,8 +402,8 @@ while(1)
                     }
                     elsif(lc($buf) =~ /^\s*stop\s*$/) # if a stop command is received, the running request threads must be stopped
                     {
-                        Log 1, "received stop command from client ".$client->peerhost(); 
-                        
+                        Log 1, "received stop command from client ".$client->peerhost();
+
                         # just to be sure if the client has really a running request
                         if(stopClientThreads($client))
                         {
@@ -429,18 +415,18 @@ while(1)
                             $client->send("no command running\n");
                         }
                     }
-                    elsif(lc($buf) =~ /^\s*ping\s*$/) # 
+                    elsif(lc($buf) =~ /^\s*ping\s*$/) #
                     {
-                        Log 1, "received ping command from client ".$client->peerhost(); 
+                        Log 1, "received ping command from client ".$client->peerhost();
                         $client->send("pong\n");
-                        
+
                         closeClientConnection($client);
-                    } 
+                    }
                     else
                     {    # if the message does not match a regular command or a stop signal, just tell the client and make a entry for logging.
                         $client->send("command rejected\n");
-                        Log 1, "received invalid command >>$buf<< from client ".$client->peerhost(); 
-                    }    
+                        Log 1, "received invalid command >>$buf<< from client ".$client->peerhost();
+                    }
 
                 }
                 else  # if the message is not defined (EOF) the connection was closed. Now let's clean up
@@ -455,7 +441,7 @@ while(1)
     if(defined($sig_received))
     {
         Log 1, "Caught $sig_received exiting";
-        unlink($opt_P); 
+        unlink($opt_P);
         Log 1, "removed PID-File $opt_P";
         Log 1, "server shutdown";
         exit;
@@ -471,11 +457,11 @@ Log 2, "leaving main loop";
 ########################################################################################################################
 
 
-# to fork the process from the terminal 
+# to fork the process from the terminal
 sub daemonize
 {
     POSIX::setsid or die "setsid $!";
-    
+
     my $pid = fork();
 
     if($pid < 0)
@@ -503,7 +489,6 @@ sub daemonize
 # the thread subroutine which performs a request for a specific room
 sub doQuery($$$)
 {
-
     my ($do_config, $do_room, $do_address, $do_uuid) = @_;
     my $return;
     my $socket;
@@ -513,13 +498,13 @@ sub doQuery($$$)
     my @client_handle;
     my $reconnect_count = 0;
     my $client_socket = undef;
-    
+
     my $last_contact = gettimeofday();
-    
+
     my $cmd;
     my $previous_state = "absence";
     my $current_state = "absence";
-    
+
     $client_socket = new IO::Socket::INET (
         PeerHost => $values{address},
         PeerPort => $values{port},
@@ -537,30 +522,30 @@ sub doQuery($$$)
         $client_socket->send($do_address."|".$values{absence_timeout}."\n");
     }
     else
-    {   
+    {
         $selector->remove($client_socket);
         $client_socket = undef;
     }
-    
+
     # thread main loop
     THREADLOOP: while($run)
     {
-    
+
         if(defined($client_socket) and not $last_contact > (gettimeofday() - ($current_state eq "absence" ? $values{absence_timeout} : $values{presence_timeout}) - 60))
         {
             $log_queue->enqueue(threads->tid()."|$do_room socket to ".$values{address}.":".$values{port}." did not report anything in expected time, resetting socket (last contact: ".strftime("%Y-%m-%d %H:%M:%S", localtime($last_contact)).")");
-            
+
             $selector->remove($client_socket);
             $client_socket->shutdown(2);
             close($client_socket);
             $client_socket = undef;
         }
-    
+
         if(exists($queues{threads->tid()}) and $queues{threads->tid()}->pending)
         {
             $cmd = $queues{threads->tid()}->dequeue;
             $log_queue->enqueue(threads->tid()."|received command: $cmd");
-            
+
             if($cmd eq "now")
             {
                 $log_queue->enqueue(threads->tid()."|sending \"now\" command to ".$values{address}.":".$values{port});
@@ -580,9 +565,9 @@ sub doQuery($$$)
             elsif($cmd =~ /^new\|/)
             {
                 ($cmd, $do_address) = split("\\|", $cmd);
-                
+
                 $log_queue->enqueue(threads->tid()."|sending new address $do_address to ".$values{address}.":".$values{port});
-            
+
                 if($current_state eq "present")
                 {
                     $client_socket->send($do_address."|".$values{presence_timeout}."\n") if(defined($client_socket));
@@ -593,7 +578,7 @@ sub doQuery($$$)
                 }
             }
         }
-    
+
         if(not defined($client_socket))
         {
             # if it's the first occurance
@@ -601,11 +586,11 @@ sub doQuery($$$)
             {
                 # Tell this the client;
                 $status_queue->enqueue("$do_uuid;$do_room;socket_closed");
-                    
+
                 # create a log message
                 $log_queue->enqueue(threads->tid()."|$do_room socket to ".$values{address}.":".$values{port}." for device $do_address closed. Trying to reconnect...");
             }
-            
+
             # now try to re-establish the connection
             $client_socket = new IO::Socket::INET (
                 PeerHost => $values{address},
@@ -615,19 +600,19 @@ sub doQuery($$$)
                 KeepAlive => 1,
                 Blocking => 1
             ) or ( $reconnect_count++ );
-            
+
             if(defined($client_socket))
             {
                 # give a success message
                 $log_queue->enqueue(threads->tid()."|$do_room reconnected to ".$values{address}.":".$values{port}." after $reconnect_count tries for device $do_address (UUID: $do_uuid)");
                 $status_queue->enqueue("$do_uuid;$do_room;socket_reconnected");
-                
+
                 # reset the reconnect counter
                 $reconnect_count = 0;
-                
+
                 # set the last contact date to now
                 $last_contact = gettimeofday();
-                
+
                 # add the new established socket to the IO selector for incoming data monitoring.
                 $selector->add($client_socket);
                 # send the given address to the presence daemon
@@ -638,27 +623,26 @@ sub doQuery($$$)
                 sleep(9);
             }
         }
-    
+
         # if the socket has a message available
         if(@client_handle = $selector->can_read(1))
         {
-            
             # get all socket handles which has a message available
             foreach my $local_client (@client_handle)
             {
                 # get the message from the socket handle
                 $return = <$local_client>;
-                
+
                 # if the message is defined (not EOF) handle the message...
                 if($return)
                 {
-                
+
                     # set the last contact date
                     $last_contact = gettimeofday();
-                
+
                     # remove trailing whitespaces and newlines
                     chomp($return);
-                    
+
                     # if the message is "command accepted"
                     if($return =~ /command accepted/)
                     {
@@ -673,37 +657,37 @@ sub doQuery($$$)
                     {
                         # put the message to the status queue with uuid for identification and the room name
                         $status_queue->enqueue("$do_uuid;$do_room;".$return);
-                        
+
                         # if the state changes from present to absence
                         if(defined($previous_state) and $previous_state eq "present" and  lc($return) =~ /^absence/)
                         {
                             # log the timout change to the log queue
                             $log_queue->enqueue(threads->tid()."|$do_room changing to absence timeout (".$values{absence_timeout}.") for device $do_address");
-                            
+
                             $current_state = "absence";
-                            
+
                             # send the new command with the configured absence timeout
                             $local_client->send($do_address."|".$values{absence_timeout}."\n");
                         }
                         elsif(defined($previous_state) and $previous_state eq "absence" and  lc($return) =~ /^present/)
                         {
                             $log_queue->enqueue(threads->tid()."|$do_room changing to presence timeout (".$values{presence_timeout}.") for device $do_address");
-                            
+
                             $current_state = "present";
-                            
+
                             # if the state changes from absence to present, set the presence timeout
                             $local_client->send($do_address."|".$values{presence_timeout}."\n");
                         }
-                        
+
                         # set the previous state to the current state
                         ($previous_state, undef) = split(";", lc($return));
                     }
                 }
                 else # the socket is EOF which means the connection was closed
-                {    
-                    
+                {
+
                     $selector->remove($local_client);
-                    
+
                     $local_client->shutdown(2);
                     close($local_client);
                     $client_socket = undef;
@@ -715,11 +699,8 @@ sub doQuery($$$)
     $log_queue->enqueue(threads->tid()."|exiting thread");
 }
 
-
-
 sub readConfig
 {
-
     my ($ini) = @_;
 
     my $section;
@@ -733,73 +714,76 @@ sub readConfig
     %config = ();
 
     open (INI, "$ini") or (print STDERR timestamp()."Can't open $ini: $!\n" and exit(1));
-        while (<INI>) {
-            chomp;
-            if (/^\s*?\[([^\]\n\r]+?)\]/) {
-                $section = $1;
-                
-            }
-            if (/^\s*(\w+?)=(.+?)\s*(#.*)?$/ and defined($section)) {
-                $keyword = $1;
-                $value = $2 ;
-                # put them into hash
-                $config{$section}{$keyword} = $value;
-            }
+
+    while (<INI>)
+    {
+        chomp;
+
+        if (/^\s*?\[([^\]\n\r]+?)\]/)
+        {
+            $section = $1;
         }
+
+        if (/^\s*(\w+?)=(.+?)\s*(#.*)?$/ and defined($section))
+        {
+            $keyword = $1;
+            $value = $2 ;
+            # put them into hash
+            $config{$section}{$keyword} = $value;
+        }
+    }
+
     close (INI);
-    
 
     # validating config
     foreach my $room (keys %config)
     {
-
         if(not exists($config{$room}{address}))
         {
-                Log 0, "room $room has no value for address configured";
-                $errorcount++;
+            Log 0, "room $room has no value for address configured";
+            $errorcount++;
         }
         else
         {
             if(not $config{$room}{address} =~ /^[a-zA-Z0-9.-]+$/)
             {
-            Log 0, "no valid address for room $room found: ".$config{$room}{address};
-            $errorcount++;
+                Log 0, "no valid address for room $room found: ".$config{$room}{address};
+                $errorcount++;
             }
-        
         }
-    
+
         if(not exists($config{$room}{port}))
         {
-                Log 0, "room >>$room<< has no value for >>port<< configured";
-                $errorcount++;
+            Log 0, "room >>$room<< has no value for >>port<< configured";
+            $errorcount++;
         }
         else
         {
             if(not $config{$room}{port} =~ /^\d+$/)
             {
-            Log 0, "value >>port<< for room >>$room<< is not a number: ".$config{$room}{port};
-            $errorcount++;
+                Log 0, "value >>port<< for room >>$room<< is not a number: ".$config{$room}{port};
+                $errorcount++;
             }
         }
-        
+
         if(not exists($config{$room}{absence_timeout}))
         {
-                Log 0, "room >>$room<< has no value for >>absence_timeout<< configured";
-                $errorcount++;
+            Log 0, "room >>$room<< has no value for >>absence_timeout<< configured";
+            $errorcount++;
         }
         else
         {
             if(not $config{$room}{absence_timeout} =~ /^\d+$/)
             {
-            Log 0, "value >>absence_timeout<< value for room >>$room<< is not a number: ".$config{$room}{absence_timeout};
-            $errorcount++;
+                Log 0, "value >>absence_timeout<< value for room >>$room<< is not a number: ".$config{$room}{absence_timeout};
+                $errorcount++;
             }
         }
-    
+
         if(not exists($config{$room}{presence_timeout}))
         {
-                Log 0, "room >>$room<< has no value for >>presence_timeout<< configured";
-                $errorcount++;
+            Log 0, "room >>$room<< has no value for >>presence_timeout<< configured";
+            $errorcount++;
         }
         else
         {
@@ -809,7 +793,7 @@ sub readConfig
             $errorcount++;
             }
         }
- 
+
         foreach my $param (keys %{$config{$room}})
         {
             if(not $param =~ /(address|port|absence_timeout|presence_timeout)/)
@@ -822,7 +806,7 @@ sub readConfig
     }
 
     if($errorcount)
-    { 
+    {
         print STDERR timestamp()."found $errorcount config errors. exiting....\n";
         exit 2;
     }
@@ -832,10 +816,8 @@ sub readConfig
     }
 }
 
-
 sub aggregateRooms
 {
-
     my ($hash) = @_;
 
     my $previous = "absence";
@@ -845,16 +827,16 @@ sub aggregateRooms
     my $key;
 
     my $first_key;
-    
+
     # get all present rooms
     foreach $key  (keys %$hash)
     {
         my $room_hash = $hash->{$key};
-        
+
         if(defined($room_hash->{state}) and $room_hash->{state} ne "")
         {
             my ($value, $data) = split(";", $hash->{$key});
-            
+
             if($room_hash->{state} eq "present")
             {
                 push @rooms, $key;
@@ -862,31 +844,30 @@ sub aggregateRooms
         }
         else
         {
-            # if one room has no result return undef 
+            # if one room has no result return undef
             return undef;
         }
     }
-    
- 
+
     # if multiple rooms are present, try selection by highest RSSI
     if(@rooms > 0)
-    {      
+    {
         my $rssi_addon_data_key = "rssi";
         my $rssi_available = 1;
         my $highest_value;
         my $highest_key;
-    
+
         foreach $key (@rooms)
         {
             my $data = $hash->{$key}{data};
-            
+
             if(defined($data))
             {
                 my ($a,$h) = parseParams($data,';');
-                
+
                 if(@{$a} == 1 and keys(%{$h}) == 0) # old presenced device name => convert to new style
                 {
-                    $hash->{$key}{data} = "device_name='".$hash->{$key}{data}."'"; 
+                    $hash->{$key}{data} = "device_name='".$hash->{$key}{data}."'";
                     $rssi_available = 0;
                 }
                 elsif(@{$a} == 0 and keys(%{$h}) > 0) # new addon data style
@@ -913,7 +894,7 @@ sub aggregateRooms
                 }
             }
         }
-        
+
         if($rssi_available and defined($highest_key))
         {
             Log 2, "successful RSSI comparisation (highest $rssi_addon_data_key value $highest_value found in room $highest_key" if(@rooms > 1);
@@ -923,12 +904,11 @@ sub aggregateRooms
 
     if(@rooms > 0)
     {
-        my $rssi_data = join(";", map("rssi_".$_."='".$rssi_results{$_}."'", map {s/\s+/_/rg } keys %rssi_results));
-        my $ret = "present".
-                (defined($hroom) ? ";room='".$hroom."'" : "").
-                ";rooms='".join(",",sort  @rooms)."'".
-                (defined($hroom) ? ";".$hash->{$hroom}{data} : (defined($hash->{$rooms[0]}{data}) ? ";".$hash->{$rooms[0]}{data} : "")).
-                (defined($rssi_data) ? ";".$rssi_data : "");
+        return "present".
+               ";rooms='".join(",",sort  @rooms)."'".
+               (defined($hroom) ? ";room='".$hroom."'" : "").
+               (%rssi_results ? ";".join(";", map { "rssi_".($_ =~ s/\s+/_/gr)."='".$rssi_results{$_}."'" } keys %rssi_results) : "").
+               (defined($hroom) ? ";".$hash->{$hroom}{data} : (defined($hash->{$rooms[0]}{data}) ? ";".$hash->{$rooms[0]}{data} : ""));
     }
     else
     {
@@ -965,7 +945,7 @@ sub Log($$)
     {
         ($thread, $message) = split("\\|", $message);
     }
-    
+
     if($loglevel <= $opt_v)
     {
         if($opt_l)
@@ -1055,12 +1035,12 @@ sub parseParams($;$)
 sub closeClientConnection($)
 {
     my ($client) = @_;
-    
+
     # make a log entry and remove the socket from the socket selector
     Log 1, "closed connection from ".$client->peerhost();
-    $listener->remove($client); 
+    $listener->remove($client);
 
-    # if there is a running command, stop it first and clean up 
+    # if there is a running command, stop it first and clean up
     stopClientThreads($client);
 
     # now close the socket, that's it
@@ -1070,24 +1050,24 @@ sub closeClientConnection($)
 sub stopClientThreads($)
 {
     my ($client) = @_;
-    
+
     # if there is a running command, stop it first and clean up (same as stop command, see above)
     if(defined($socket_to_handle{$client}))
     {
         my $uuid = $socket_to_handle{$client};
-        
+
         # get all threads for this socket and send them a termination signal
         foreach my $room (keys %{$handle{$uuid}{threads}})
         {
-            Log 2, "killing thread ".$handle{$uuid}{threads}{$room}->tid()." for room $room for client ".$client->peerhost(); 
+            Log 2, "killing thread ".$handle{$uuid}{threads}{$room}->tid()." for room $room for client ".$client->peerhost();
             $queues{$handle{$uuid}{threads}{$room}->tid()}->enqueue("stop");
             delete($handle{$uuid}{threads}{$room});
         }
-        
+
         # when all threads are signaled, delete all relationship entry for this client
         delete($handle{$uuid});
         delete($socket_to_handle{$client});
-        
+
         return 1;
     }
     else
