@@ -42,6 +42,14 @@ use vars qw(%HMCCU_SCRIPTS);
 	statedatapoint   => "STATE",
 	substitute       => "STATE!(0|false):closed,(1|true):open"
 	},
+	"HmIP-SWDO-I" => {
+	_description     => "Tuer/Fensterkontakt verdeckt",
+	_channels        => "1",
+	ccureadingfilter => "STATE",
+	hmstatevals      => "SABOTAGE!1:sabotage",
+	statedatapoint   => "STATE",
+	substitute       => "STATE!(0|false):closed,(1|true):open"
+	},
 	"HM-Sec-RHS|HM-Sec-RHS-2" => {
 	_description     => "Fenster Drehgriffkontakt",
 	_channels        => "1",
@@ -388,6 +396,13 @@ use vars qw(%HMCCU_SCRIPTS);
 	_description     => "Tuer/Fensterkontakt optisch und magnetisch",
 	ccureadingfilter => "STATE",
 	hmstatevals      => "ERROR!7:sabotage;SABOTAGE!1:sabotage",
+	statedatapoint   => "1.STATE",
+	substitute       => "STATE!(0|false):closed,(1|true):open"
+	},
+	"HmIP-SWDO-I" => {
+	_description     => "Tuer/Fensterkontakt verdeckt",
+	ccureadingfilter => "STATE",
+	hmstatevals      => "SABOTAGE!1:sabotage",
 	statedatapoint   => "1.STATE",
 	substitute       => "STATE!(0|false):closed,(1|true):open"
 	},

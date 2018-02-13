@@ -1556,13 +1556,13 @@ sub HMCCURPC_RPCServerStarted ($$)
 #		$hash->{hmccu}{rpcstarttime} = 0;
 		HMCCURPC_SetRPCState ($hash, "running", "All RPC servers running");
 		HMCCURPC_SetState ($hash, "OK");
-		if (defined ($hmccu_hash)) {
-			HMCCU_SetState ($hmccu_hash, "OK");
-			($c_ok, $c_err) = HMCCU_UpdateClients ($hmccu_hash, '.*', 'Attr', 0, undef);
-			Log3 $name, 2, "HMCCURPC: Updated devices. Success=$c_ok Failed=$c_err";
-		}
+# 		if (defined ($hmccu_hash)) {
+# 			HMCCU_SetState ($hmccu_hash, "OK");
+# 			($c_ok, $c_err) = HMCCU_UpdateClients ($hmccu_hash, '.*', 'Attr', 0, undef);
+# 			Log3 $name, 2, "HMCCURPC: Updated devices. Success=$c_ok Failed=$c_err";
+# 		}
 		RemoveInternalTimer ($hash);
-		DoTrigger ($name, "RPC server running");
+#		DoTrigger ($name, "RPC server running");
 	}
 	
 	return ($run, $c_ok, $c_err);
@@ -2441,15 +2441,23 @@ sub HMCCURPC_EncDouble ($)
 {
 	my ($v) = @_;
  
-	my $s = $v < 0 ? -1.0 : 1.0;
-	my $l = log (abs($v))/log (2);
-	my $f = $l;
-       
-	if ($l-int ($l) > 0) {
-		$f = ($l < 0) ? -int (abs ($l)+1.0) : int ($l);
+# 	my $s = $v < 0 ? -1.0 : 1.0;
+# 	my $l = log (abs($v))/log (2);
+# 	my $f = $l;
+#        
+# 	if ($l-int ($l) > 0) {
+# 		$f = ($l < 0) ? -int (abs ($l)+1.0) : int ($l);
+# 	}
+# 	my $e = $f+1;
+# 	my $m = int ($s*$v*2**-$e*0x40000000);
+
+	my $m = 0;
+	my $e = 0;
+	
+	if ($v != 0.0) {
+		$e = int(log(abs($v))/log(2.0))+1;
+		$m = int($v/(2**$e)*0x40000000);
 	}
-	my $e = $f+1;
-	my $m = int ($s*$v*2**-$e*0x40000000);
        
 	return pack ('NNN', $BINRPC_DOUBLE, $m, $e);
 }
@@ -2664,10 +2672,17 @@ sub HMCCURPC_DecDouble ($$)
 
 	return (undef, undef) if ($i+8 > length ($d));
 	
-	my $m = unpack ('N', substr ($d, $i, 4));
-	my $e = unpack ('N', substr ($d, $i+4, 4));
+# 	my $m = unpack ('N', substr ($d, $i, 4));
+# 	my $e = unpack ('N', substr ($d, $i+4, 4));
+# 	
+# 	return (sprintf ("%.6f",$m/0x40000000*(2**$e)), 8);
 	
-	return (sprintf ("%.6f",$m/0x40000000*(2**$e)), 8);
+	my $m = unpack ('l', reverse (substr ($d, $i, 4)));
+	my $e = unpack ('l', reverse (substr ($d, $i+4, 4)));	
+	$m = $m/(1<<30);
+	my $v = $m*(2**$e);
+
+	return (sprintf ("%.6f",$v), 8);
 }
 
 ######################################################################

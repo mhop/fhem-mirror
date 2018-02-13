@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.0.001
+#  Version 1.0.002
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.0.001';
+my $HMCCURPCPROC_VERSION = '1.0.002';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -590,7 +590,9 @@ sub HMCCURPCPROC_SetRPCState ($$$$)
 	my ($hash, $state, $msg, $level) = @_;
 	my $name = $hash->{NAME};
 	my $hmccu_hash = $hash->{IODev};
-		
+	
+	return undef if (exists ($hash->{RPCState}) && $hash->{RPCState} eq $state);
+
 	$hash->{hmccu}{rpc}{state} = $state;
 	$hash->{RPCState} = $state;
 	
@@ -822,7 +824,7 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 		# Input:  TO|clkey|Time
 		# Output: TO, clkey, Port, Time
 		#
-		if ($evttimeout > 0) {
+		if ($evttimeout > 0 && $evttimeout >= $t[0]) {
 			Log3 $name, 2, "HMCCURPCPROC: [$name] Received no events from interface $clkey for ".$t[0]." seconds";
 			$hash->{ccustate} = 'timeout';
 			if ($hash->{RPCState} eq 'running' && $ccuflags =~ /reconnect/) {
@@ -1257,12 +1259,12 @@ sub HMCCURPCPROC_CleanupIO ($)
 		delete $hash->{FD} if (defined ($hash->{FD}));
 	}
 	if (defined ($hash->{hmccu}{sockchild})) {
-		Log3 $name, 2, "HMCCURPCPROC: [$name] Close child socket";
+		Log3 $name, 3, "HMCCURPCPROC: [$name] Close child socket";
 		$hash->{hmccu}{sockchild}->close ();
 		delete $hash->{hmccu}{sockchild};
 	}
 	if (defined ($hash->{hmccu}{sockparent})) {
-		Log3 $name, 2, "HMCCURPCPROC: [$name] Close parent socket";
+		Log3 $name, 3, "HMCCURPCPROC: [$name] Close parent socket";
 		$hash->{hmccu}{sockparent}->close ();
 		delete $hash->{hmccu}{sockparent};
 	}
@@ -2080,16 +2082,24 @@ sub HMCCURPCPROC_EncDouble ($)
 {
 	my ($v) = @_;
  
-	my $s = $v < 0 ? -1.0 : 1.0;
-	my $l = log (abs($v))/log (2);
-	my $f = $l;
-       
-	if ($l-int ($l) > 0) {
-		$f = ($l < 0) ? -int (abs ($l)+1.0) : int ($l);
+#	my $s = $v < 0 ? -1.0 : 1.0;
+# 	my $l = $v != 0.0 ? log (abs($v))/log (2) : 0.0;
+# 	my $f = $l;
+#        
+# 	if ($l-int ($l) > 0) {
+# 		$f = ($l < 0) ? -int (abs ($l)+1.0) : int ($l);
+# 	}
+# 	my $e = $f+1;
+# 	my $m = int ($v*2**-$e*0x40000000);
+
+	my $m = 0;
+	my $e = 0;
+	
+	if ($v != 0.0) {
+		$e = int(log(abs($v))/log(2.0))+1;
+		$m = int($v/(2**$e)*0x40000000);
 	}
-	my $e = $f+1;
-	my $m = int ($s*$v*2**-$e*0x40000000);
-       
+	        
 	return pack ('NNN', $BINRPC_DOUBLE, $m, $e);
 }
 
@@ -2303,10 +2313,12 @@ sub HMCCURPCPROC_DecDouble ($$)
 
 	return (undef, undef) if ($i+8 > length ($d));
 	
-	my $m = unpack ('N', substr ($d, $i, 4));
-	my $e = unpack ('N', substr ($d, $i+4, 4));
-	
-	return (sprintf ("%.6f",$m/0x40000000*(2**$e)), 8);
+	my $m = unpack ('l', reverse (substr ($d, $i, 4)));
+	my $e = unpack ('l', reverse (substr ($d, $i+4, 4)));	
+	$m = $m/(1<<30);
+	my $v = $m*(2**$e);
+
+	return (sprintf ("%.6f",$v), 8);
 }
 
 ######################################################################

@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.001
+#  Version 4.2.002
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -104,7 +104,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.2.001';
+my $HMCCU_VERSION = '4.2.002';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -1271,6 +1271,7 @@ sub HMCCU_Set ($@)
 	}
 	elsif ($opt eq 'rpcserver') {
 		my $action = shift @$a;
+		$action = shift @$a if ($action eq $opt);
 		$usage = "Usage: set $name $opt {'on'|'off'|'restart'}";
 
 		return HMCCU_SetError ($hash, $usage)
@@ -2201,8 +2202,10 @@ sub HMCCU_SetState ($@)
 }
 
 ######################################################################
-# Set state of RPC server.
-# Parameters iface and msg are optional.
+# Set state of RPC server. Update all client devices if overall state
+# is 'running'.
+# Parameters iface and msg are optional. If iface is set function
+# was called by HMCCURPCPROC device.
 ######################################################################
 
 sub HMCCU_SetRPCState ($@)
@@ -2212,11 +2215,21 @@ sub HMCCU_SetRPCState ($@)
 
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $filter;
-	my $f = 0;  # Overall process states: 0=starting/stopping, 1=running/error, 2=stopped/error
+	my $rpcstate = $state;
 	
-	if ($ccuflags =~ /(intrpc|extrpc)/) {
-		$f = 1 if ($state eq 'running');
-		$f = 2 if ($state eq 'inactive');
+	if ($ccuflags =~ /(intrpc|extrpc)/ || $ccuflags !~ /(intrpc|extrpc|procrpc)/) {
+		if ($state ne $hash->{RPCState}) {
+			$hash->{RPCState} = $state;
+			readingsSingleUpdate ($hash, "rpcstate", $state, 1);
+			HMCCU_Log ($hash, 4, "Set rpcstate to $state", undef);
+			HMCCU_Log ($hash, 1, $msg, undef) if (defined ($msg));
+			HMCCU_Log ($hash, 1, "All RPC servers $state", undef);
+			DoTrigger ($name, "RPC server $state");
+			if ($state eq 'running') {
+				my ($c_ok, $c_err) = HMCCU_UpdateClients ($hash, '.*', 'Attr', 0, $filter);
+				HMCCU_Log ($hash, 2, "Updated devices. Success=$c_ok Failed=$c_err", undef);
+			}
+		}
 	}
 	elsif (defined ($iface) && $ccuflags =~ /procrpc/) {
 		# Set interface state
@@ -2224,47 +2237,50 @@ sub HMCCU_SetRPCState ($@)
 		$hash->{hmccu}{interfaces}{$ifname}{state} = $state if (defined ($ifname));
 		
 		# Count number of processes in state running, error or inactive
-		my %statecount = ("running" => 0, "error" => 0, "inactive" => 0);
+		# Prepare filter for updating client devices
+		my %stc = ("running" => 0, "error" => 0, "inactive" => 0);
 		my @iflist = HMCCU_GetRPCInterfaceList ($hash);
 		foreach my $i (@iflist) {
 			my $st = $hash->{hmccu}{interfaces}{$i}{state};
-			$statecount{$st}++ if (exists ($statecount{$st}));
+			$stc{$st}++ if (exists ($stc{$st}));
 			if ($hash->{hmccu}{interfaces}{$i}{manager} eq 'HMCCU') {
 				$filter = defined ($filter) ? "$filter|$i" : $i;
 			}
 		}
 		
 		# Determine overall process state
-		$f = 1 if ($statecount{"running"}+$statecount{"error"} == scalar (@iflist));
-		$f = 2 if ($statecount{"inactive"}+$statecount{"error"} == scalar (@iflist));
-	}
+		my $rpcstate = 'null';
+		$rpcstate = "running" if ($stc{"running"} == scalar (@iflist));
+		$rpcstate = "inactive" if ($stc{"inactive"} == scalar (@iflist));
+		$rpcstate = "error" if ($stc{"error"} == scalar (@iflist));
 
-	if ($state ne $hash->{RPCState}) {
-		# Update RPC state
-		$hash->{RPCState} = $state;
-		readingsSingleUpdate ($hash, "rpcstate", $state, 1);
-
-		if ($f > 0) {
-			# Running or inactive
-			HMCCU_SetState ($hash, 'OK');
-			HMCCU_Log ($hash, 1, "All RPC servers $state", undef);
-			DoTrigger ($name, "RPC server $state");
-		
-			if ($f == 1) {
-				# If RPC process(es) running update all devices where interface is managed by HMCCU
-				my ($c_ok, $c_err) = HMCCU_UpdateClients ($hash, '.*', 'Attr', 0, $filter);
-				Log3 $name, 2, "HMCCU: Updated devices. Success=$c_ok Failed=$c_err";
+		if ($rpcstate =~ /^(running|inactive|error)$/) {
+			if ($rpcstate ne $hash->{RPCState}) {
+				$hash->{RPCState} = $rpcstate;
+				readingsSingleUpdate ($hash, "rpcstate", $rpcstate, 1);
+				HMCCU_Log ($hash, 4, "Set rpcstate to $rpcstate", undef);
+				HMCCU_Log ($hash, 1, $msg, undef) if (defined ($msg));
+				HMCCU_Log ($hash, 1, "All RPC servers $rpcstate", undef);
+				DoTrigger ($name, "RPC server $rpcstate");
+				if ($rpcstate eq 'running') {
+					my ($c_ok, $c_err) = HMCCU_UpdateClients ($hash, '.*', 'Attr', 0, $filter);
+					HMCCU_Log ($hash, 2, "Updated devices. Success=$c_ok Failed=$c_err", undef);
+				}
 			}
 		}
-		else {
-			# Starting or stopping
-			HMCCU_SetState ($hash, 'busy');
-		}
-
-		HMCCU_Log ($hash, 4, "Set rpcstate to $state", undef);
-		HMCCU_Log ($hash, 1, $msg, undef) if (defined ($msg));
 	}
-		
+
+	# Set I/O device state
+	if ($rpcstate eq 'running' || $rpcstate eq 'inactive') {
+		HMCCU_SetState ($hash, "OK");
+	}
+	elsif ($rpcstate eq 'error') {
+		HMCCU_SetState ($hash, "error");
+	}
+	else {
+		HMCCU_SetState ($hash, "busy");
+	}
+	
 	return undef;
 }
 
@@ -3422,13 +3438,13 @@ sub HMCCU_IsRPCServerRunning ($$$)
 			$c = $r;
 		}
 	}
-	elsif ($ccuflags =~ /procprc/) {
+	elsif ($ccuflags =~ /procrpc/) {
 		@$pids = () if (defined ($pids));
 		my @iflist = HMCCU_GetRPCInterfaceList ($hash);
 		foreach my $ifname (@iflist) {
 			my ($rpcdev, $save) = HMCCU_GetRPCDevice ($hash, 0, $ifname);
 			next if ($rpcdev eq '');
-			my ($rc, $msg) = HMCCURPCPROC_CheckProcessState ($defs{$rpcdev}, 'running');
+			my $rc = HMCCURPCPROC_CheckProcessState ($defs{$rpcdev}, 'running');
 			if ($rc < 0 || $rc > 1) {
 				push (@$pids, $rc);
 				$c++;
@@ -5038,7 +5054,7 @@ sub HMCCU_ReadRPCQueue ($)
 			
 		# Output statistic counters
 		foreach my $cnt (sort keys %{$hash->{hmccu}{ev}}) {
-			Log3 $name, 2, "HMCCU: Eventcount $cnt = ".$hash->{hmccu}{ev}{$cnt};
+			Log3 $name, 3, "HMCCU: Eventcount $cnt = ".$hash->{hmccu}{ev}{$cnt};
 		}
 	}
 
@@ -6988,7 +7004,7 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       	practice for creating a custom default attribute file is by exporting predefined default
       	attributes from HMCCU with command 'get exportdefaults'.
       </li><br/>
-      <li><b>ccuflags {extrpc, procprc, <u>intrpc</u>}</b><br/>
+      <li><b>ccuflags {extrpc, procrpc, <u>intrpc</u>}</b><br/>
       	Control behaviour of several HMCCU functions:<br/>
       	ackState - Acknowledge command execution by setting STATE to error or success.<br/>
       	dptnocheck - Do not check within set or get commands if datapoint is valid<br/>

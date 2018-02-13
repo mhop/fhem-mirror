@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2
+#  Version 4.2.001
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -760,11 +760,10 @@ sub HMCCUCHN_Get ($@)
       	dewpoint = calculate dewpoint, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;<br/>
       	abshumidity = calculate absolute humidity, <i>dp-list</i> = &lt;temperature&gt;,&lt;humidity&gt;<br/>
       	inc = increment datapoint value considering reset of datapoint, <i>dp-list</i> = &lt;counter-datapoint&gt;<br/>
-      	inc = increment datapoint value considering reset of datapoint, <i>dp-list</i> = &lt;counter-datapoint&gt;<br/>
       	min = calculate minimum continuously, <i>dp-list</i> = &lt;datapoint&gt;<br/>
       	max = calculate maximum continuously, <i>dp-list</i> = &lt;datapoint&gt;<br/>
       	sum = calculate sum continuously, <i>dp-list</i> = &lt;datapoint&gt;<br/>
-      	avg = calculate average continuously, <i>dp-list</i> = &lt;datapoint&gt;
+      	avg = calculate average continuously, <i>dp-list</i> = &lt;datapoint&gt;<br/>
       	Example:<br/>
       	<code>dewpoint:taupunkt:1.TEMPERATURE,1.HUMIDITY</code>
       </li><br/>
