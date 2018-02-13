@@ -499,7 +499,7 @@ sub OBIS_Parse($$)
 											$rmsg =~ $OBIS_codes{$code};
 											my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1.".".$2} // $OBIS_channels{$1.".".$2} // $channel;
 											my $chan=$3+0 > 0 ? "_Ch$3" : "";
-											if (AttrVal($name,"ExtChannels","off") eq "on") {$chan.=".$4" if $4;}
+											if (AttrVal($name,"extChannels","off") eq "on") {$chan.=".$4" if $4;}
     										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
 												if($1==1) {
     												Log3($hash,4,"Set ".$L.$chan." to ".((looks_like_number($3) ? $6+0 : $5) +AttrVal($name,"offset_energy",0)));
