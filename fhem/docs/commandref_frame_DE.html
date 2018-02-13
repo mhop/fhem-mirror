@@ -264,7 +264,8 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
       Um die Bedingung zu negieren, muss NAME!=WERT verwendet werden.
       Um die Suche einzugrenzen, kann man als Praefix i: f&uuml;r internal
       Werte, r: f&uuml;r Reading-Namen und a: f&uuml;r Attribute verwenden,
-      siehe das Beispiel unten.
+      siehe das Beispiel unten. Gro&szlig;-/Kleinschreibung wird durch die
+      Verwendung von ~ oder !~ ignoriert.
       </li>
   <li>Falls die Spezifikation von :FILTER=NAME=WERT gefolgt wird,
       dann wird die zuvor gefundene Liste durch diesen neuen Ausdruck
@@ -279,6 +280,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <code>set room=kitchen:FILTER=STATE=on off</code><br>
     <code>set room=kitchen:FILTER=STATE!=off off</code><br>
     <code>list disabled=</code><br>
+    <code>list room~office</code><br>
     <code>list TYPE=FS20 STATE</code><br>
     <code>list i:TYPE=FS20 STATE</code><br>
   </ul>
