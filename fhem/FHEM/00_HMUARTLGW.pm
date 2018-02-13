@@ -1880,7 +1880,7 @@ sub HMUARTLGW_Attr(@)
 			$attr{$name}{$aName} = "$no:".
 				(($val =~ m /^[0-9A-Fa-f]{32}$/ )
 				 ? $val
-				 : unpack('H*', md5($val)));
+				 : unpack('H*', Digest::MD5::md5($val)));
 			$retVal = "$aName set to $attr{$name}{$aName}"
 				if($aVal ne $attr{$name}{$aName});
 		} else {
