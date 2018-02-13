@@ -251,7 +251,7 @@ sub LaCrosse_Parse($$) {
     #                                 |---------- Low battery
 
     @bytes = split( ' ', substr($msg, 5) );
-
+    
     return "" if(@bytes < 14);
 
     $addr = sprintf( "%02X", $bytes[0] );
@@ -561,15 +561,15 @@ sub LaCrosse_Parse($$) {
       readingsBulkUpdate($rhash, "windDirectionText", $windDirectionText );
     }
 
-    if ($typeNumber > 0 && $pressure != 0xFFFF) {
+    if ($typeNumber > 1 && $pressure != 0xFFFF) {
       readingsBulkUpdate($rhash, "pressure", $pressure );
     }
   
-    if ($typeNumber > 0  && $gas1 != 0xFFFFFF) {
+    if ($typeNumber > 1  && $gas1 != 0xFFFFFF) {
       readingsBulkUpdate($rhash, "gas1", $gas1 );
     }
   
-    if ($typeNumber > 0 && $gas2 != 0xFFFFFF) {
+    if ($typeNumber > 1 && $gas2 != 0xFFFFFF) {
       readingsBulkUpdate($rhash, "gas2", $gas2 );
     }
   
@@ -585,7 +585,7 @@ sub LaCrosse_Parse($$) {
       readingsBulkUpdate($rhash, "voltage", $voltage );
     }
     
-    if ($typeNumber > 0 && $debug != 0xFFFFFF) {
+    if ($typeNumber > 1 && $debug != 0xFFFFFF) {
       readingsBulkUpdate($rhash, "debug", $debug );
     }
 
