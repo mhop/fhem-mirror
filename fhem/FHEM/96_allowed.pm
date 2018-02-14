@@ -146,6 +146,7 @@ allowed_Authenticate($$$$)
       }
 
     }
+    Log3 $me, 4, "Login denied for $user via $cl->{NAME}" if(!$pwok);
 
     # Add Cookie header ONLY if authentication with basicAuth was succesful
     if($pwok && (!defined($authcookie) || $secret ne $authcookie)) {
