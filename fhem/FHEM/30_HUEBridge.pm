@@ -1089,13 +1089,13 @@ HUEBridge_updateGroups($$)
       $readings{pct} = 0;
       $readings{state} = 'off';
     }
+    $readings{onoff} =  $readings{on}?'1':'0';
+    delete $readings{on};
 
     readingsBeginUpdate($chash);
       foreach my $key ( keys %readings ) {
         if( defined($readings{$key}) ) {
-          my $reading = $key;
-          $reading = 'onoff' if( $reading eq 'on' );
-          readingsBulkUpdate($chash, $reading, $readings{$key}, 1) if( !defined($chash->{helper}{$key}) || $chash->{helper}{$key} ne $readings{$key} );
+          readingsBulkUpdate($chash, $key, $readings{$key}, 1) if( !defined($chash->{helper}{$key}) || $chash->{helper}{$key} ne $readings{$key} );
           $chash->{helper}{$key} = $readings{$key};
         }
       }
