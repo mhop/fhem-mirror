@@ -79,14 +79,14 @@ allowed_Authorize($$$$)
     return 0 if(!$me->{allowedCommands});
     # Return 0: allow stacking with other instances, see Forum#46380
     return 0 if($me->{allowedCommands} =~ m/\b\Q$arg\E\b/);
-    Log3 $me, 4, "Forbidden command $arg for $cl->{NAME}";
+    Log3 $me, 3, "Forbidden command $arg for $cl->{NAME}";
     return 2;
   }
 
   if($type eq "devicename") {
     return 0 if(!$me->{allowedDevices});
     return if($me->{allowedDevices} =~ m/\b\Q$arg\E\b/);
-    Log3 $me, 4, "Forbidden device $arg for $cl->{NAME}";
+    Log3 $me, 3, "Forbidden device $arg for $cl->{NAME}";
     return 2;
   }
 
@@ -146,7 +146,7 @@ allowed_Authenticate($$$$)
       }
 
     }
-    Log3 $me, 4, "Login denied for $user via $cl->{NAME}" if(!$pwok);
+    Log3 $me, 3, "Login denied for $user via $cl->{NAME}" if(!$pwok);
 
     # Add Cookie header ONLY if authentication with basicAuth was succesful
     if($pwok && (!defined($authcookie) || $secret ne $authcookie)) {
