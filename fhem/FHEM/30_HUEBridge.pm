@@ -105,6 +105,7 @@ HUEBridge_Read($)
           my $chash = $modules{HUEDevice}{defptr}{$code};
           if( defined($chash) ) {
             HUEDevice_Parse($chash,$obj);
+            HUEBridge_updateGroups($hash, $chash->{ID}) if( !$chash->{helper}{devtype} );
           } else {
             Log3 $name, 4, "$name: message for unknow device received: $code";
           }
