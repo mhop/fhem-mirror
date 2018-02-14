@@ -632,7 +632,11 @@ HUEBridge_Set($@)
       HUEDevice_SetParam(undef, \%obj, $cmd, $value, $value2);
     }
 
-    my $result = HUEBridge_Call($hash, undef, "scenes/$arg/lights/$light/state", \%obj, 'PUT');
+    my $result;
+    if( $hash->{helper}{apiversion} && $hash->{helper}{apiversion} >= (1<<16) + (11<<8) ) {
+      $result = HUEBridge_Call($hash, undef, "scenes/$arg/lights/$light/state", \%obj, 'PUT');
+    else
+      $result = HUEBridge_Call($hash, undef, "scenes/$arg/lightstates/$light", \%obj, 'PUT');
     return $result->{error}{description} if( $result->{error} );
 
     return undef;
