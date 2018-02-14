@@ -22,6 +22,7 @@ package main;
 use strict;
 use warnings;
 use Color;
+use vars qw($FW_CSRF);
 
 sub DOIF_cmd ($$$$);
 sub DOIF_Notify ($$);
