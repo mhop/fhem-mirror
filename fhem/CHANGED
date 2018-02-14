@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_PRESENCE: new collectord .deb package fixing perl warnings
   - bugfix:  88_HMCCU: fixed CUxD bug and minor bugs
   - feature: 93_DbRep: V7.10.0, new "changeValue" command, minor fixes
   - bugfix:  88_xs1Bridge: fix Filelog check
