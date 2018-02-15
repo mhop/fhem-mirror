@@ -64,11 +64,14 @@ sub xs1Bridge_Define($$) {
 	return "Your IP is not valid. Please Check!" if not($arg[2] =~ /[0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}/s);
 	return "Cannot define xs1Bridge device. Perl modul ${missingModul}is missing." if ( $missingModul );
 
+	my $xs1check;
 	my $p = Net::Ping->new("tcp", 2);
 	if(!($p->ping("$arg[2]", 2))) {
-		return "Your IP is not reachable. Please Check!";
+		$xs1check = 1 ;
 	}
 	$p->close();
+	
+	return "Your IP is not reachable. Please Check!" if ($xs1check == 1);
 	
 	# Parameter Define
 	my $xs1_ip = $arg[2];				## Zusatzparameter 1 bei Define - ggf. nur in Sub
