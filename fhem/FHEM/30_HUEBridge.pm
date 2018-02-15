@@ -1924,6 +1924,10 @@ HUEBridge_Attr($$$)
   <ul>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+    <li>httpUtils<br>
+      0 -> use HttpUtils_BlockingGet<br>
+      1 -> use HttpUtils_NonblockingGet<br>
+      not set -> use old module specific implementation</li>
     <li>pollDevices<br>
       1 -> the bridge will poll all lights in one go instead of each device polling itself independently<br>
       2 -> the bridge will poll all devices in one go instead of each device polling itself independently<br>
