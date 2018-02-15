@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.35";     # Version of this module
+my $module_version    = "1.36";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -71,6 +71,7 @@ my %ESPEasy_setCmds = (
   "pwmfade"        => "3",
   "pulse"          => "3",
   "longpulse"      => "3",
+  "longpulse_ms"   => "3",
   "servo"          => "3",
   "lcd"            => "3",
   "lcdcmd"         => "1",
@@ -124,6 +125,7 @@ my %ESPEasy_setCmdsUsage = (
   "pwm"            => "pwm <pin> <level>",
   "pulse"          => "pulse <pin> <0|1|off|on> <duration>",
   "longpulse"      => "longpulse <pin> <0|1|off|on> <duration>",
+  "longpulse_ms"   => "longpulse_ms <pin> <0|1|off|on> <duration>",
   "servo"          => "servo <servoNo> <pin> <position>",
   "lcd"            => "lcd <row> <col> <text>",
   "lcdcmd"         => "lcdcmd <on|off|clear>",
@@ -3156,10 +3158,18 @@ sub ESPEasy_removeGit($)
     </li><br>
 
     <li><a name="ESPEasy_device_set_logpulse">LongPulse</a><br>
-      Direct pulse control of output pins<br>
+      Direct pulse control of output pins (duration in s)<br>
       <ul>
         <li>arguments: <code>&lt;pin&gt; &lt;0|1|off|on&gt; &lt;duration&gt;</code></li>
         <li>example: <code>set &lt;esp&gt; longpulse 14 on 10</code></li>
+      </ul>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_logpulse_ms">LongPulse_ms</a><br>
+      Direct pulse control of output pins (duration in ms)<br>
+      <ul>
+        <li>arguments: <code>&lt;pin&gt; &lt;0|1|off|on&gt; &lt;duration&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; longpulse_ms 14 on 10000</code></li>
       </ul>
     </li><br>
 
