@@ -678,9 +678,11 @@ sub FRITZBOX_Readout_Start($)
    if( $interval != 0 ) {
       RemoveInternalTimer($hash->{helper}{TimerReadout});
       InternalTimer(gettimeofday()+$interval, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
-      readingsSingleUpdate($hash, "state", "disabled", 1)     if AttrVal($name, "disable", 0 ) == 1;
-      return undef if( AttrVal($name, "disable", 0 ) == 1 );
-  }
+      if( AttrVal( $name, "disable", 0 ) == 1 ) {
+		readingsSingleUpdate( $hash, "state", "disabled", 1 );
+		return undef;
+	  }
+   }
 
 # Kill running process if "set update" is used
    if ( exists( $hash->{helper}{READOUT_RUNNING_PID} ) && $hash->{fhem}{LOCAL} == 1 ) {
