@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.11.0       12.02.2018       new command "repairSQLite" to repair a corrupted SQLite database
 # 7.10.0       10.02.2018       bugfix delete attr timeYearPeriod if set other time attributes, new "changeValue" command
 # 7.9.0        09.02.2018       new attribute "avgTimeWeightMean" (time weight mean calculation), code review of selection
 #                               routines, maxValue handle negative values correctly, 
@@ -123,11 +124,11 @@
 # 5.4.0        03.07.2017       restoreMySQL - restore of csv-files (from dumpServerSide), 
 #                               RestoreRowsHistory/ DumpRowsHistory, Commandref revised
 # 5.3.1        28.06.2017       vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised
-# 5.3.0        26.06.2017       change of mysql_optimize_tables, new command optimizeTables
+# 5.3.0        26.06.2017       change of DbRep_mysqlOptimizeTables, new command optimizeTables
 # 5.2.1        25.06.2017       bugfix in sqlCmd_DoParse (PRAGMA, UTF8, SHOW)
 # 5.2.0        14.06.2017       UTF-8 support for MySQL (fetchrows, srvinfo, expfile, impfile, insert)
 # 5.1.0        13.06.2017       column "UNIT" added to fetchrow result
-# 5.0.6        13.06.2017       add Aria engine to mysql_optimize_tables
+# 5.0.6        13.06.2017       add Aria engine to DbRep_mysqlOptimizeTables
 # 5.0.5        12.06.2017       bugfixes in DumpAborted, some changes in dumpMySQL, optimizeTablesBeforeDump added to
 #                               mysql_DoDumpServerSide, new reading DumpFileCreatedSize
 # 5.0.4        09.06.2017       some improvements and changes of mysql_DoDump, commandref revised, new attributes 
@@ -312,7 +313,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.10.0";
+my $DbRepVersion = "7.11.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -496,6 +497,7 @@ sub DbRep_Set($@) {
 				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"dumpMySQL:clientSide,serverSide ":"").
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/ )?"dumpSQLite:noArg ":"").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/ )?"repairSQLite ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"optimizeTables:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/ )?"vacuum:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)?"restoreMySQL:".$cj." ":"").
@@ -539,6 +541,29 @@ sub DbRep_Set($@) {
        return undef;
   }
   
+  if ($opt eq "repairSQLite" && $hash->{ROLE} ne "Agent") {
+       $prop = $prop?$prop:36000;
+       if($prop) {
+           unless($prop =~ /^(\d+)$/) { return " The Value of $opt is not valid. Use only figures 0-9 without decimal places !";};
+           # unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
+       }
+       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+       Log3 ($name, 3, "DbRep $name - ################################################################");
+       Log3 ($name, 3, "DbRep $name - ###                New SQLite repair attempt                 ###");
+       Log3 ($name, 3, "DbRep $name - ################################################################"); 
+       Log3 ($name, 3, "DbRep $name - start repair attempt of database ".$hash->{DATABASE}); 
+       # closetime Datenbank
+       my $dbloghash = $hash->{dbloghash};
+       my $dbl = $dbloghash->{NAME};
+       CommandSet(undef,"$dbl reopen $prop");
+       
+	   # Befehl vor Procedure ausführen
+       DbRep_beforeproc($hash, "repair");
+       
+	   DbRep_Main($hash,$opt);
+       return undef;
+  }
+  
   if ($opt =~ /restoreMySQL|restoreSQLite/ && $hash->{ROLE} ne "Agent") {
        $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
        Log3 ($name, 3, "DbRep $name - ################################################################");
@@ -576,11 +601,24 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"cancelDump:noArg ":"");
   }
   
+  if ($hash->{HELPER}{RUNNING_REPAIR}) {
+      $setlist = "Unknown argument $opt, choose one of ".
+                (($hash->{ROLE} ne "Agent")?"cancelRepair:noArg ":"");
+  }
+  
   if ($opt eq "cancelDump" && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
 	  Log3 ($name, 3, "DbRep $name -> running Dump has been canceled");
 	  ReadingsSingleUpdateValue ($hash, "state", "Dump canceled", 1);
+      return undef;
+  } 
+  
+  if ($opt eq "cancelRepair" && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+      BlockingKill($hash->{HELPER}{RUNNING_REPAIR});
+	  Log3 ($name, 3, "DbRep $name -> running Repair has been canceled");
+	  ReadingsSingleUpdateValue ($hash, "state", "Repair canceled", 1);
       return undef;
   } 
   
@@ -1247,8 +1285,11 @@ sub DbRep_Main($$;$) {
  # Entkommentieren für Testroutine im Vordergrund
  # testexit($hash);
  
- return if( ($hash->{HELPER}{RUNNING_BACKUP_CLIENT} || 
-             $hash->{HELPER}{RUNNING_BCKPREST_SERVER}) && $opt !~ /dumpMySQL|restoreMySQL/ );
+ return if( ($hash->{HELPER}{RUNNING_BACKUP_CLIENT}   || 
+             $hash->{HELPER}{RUNNING_BCKPREST_SERVER} ||
+             $hash->{HELPER}{RUNNING_REPAIR}          ||
+             $hash->{HELPER}{RUNNING_OPTIMIZE})       && 
+             $opt !~ /dumpMySQL|restoreMySQL|dumpSQLite|restoreSQLite|optimizeTables|vacuum|repairSQLite/ );
  
  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
  DbRep_delread($hash);
@@ -1276,6 +1317,7 @@ sub DbRep_Main($$;$) {
  
  if ($opt =~ /restoreMySQL/) {	
      BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
+     BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
      $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_RestoreServerSide", "$name|$prop", "RestoreDone", $to, "RestoreAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "restore database is running - be patient and see Logfile !", 1);
      return;
@@ -1283,15 +1325,26 @@ sub DbRep_Main($$;$) {
  
  if ($opt =~ /restoreSQLite/) {	
      BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
+     BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
      $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("sqlite_Restore", "$name|$prop", "RestoreDone", $to, "RestoreAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "restore database is running - be patient and see Logfile !", 1);
      return;
  }
  
  if ($opt =~ /optimizeTables|vacuum/) {	
-     BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE})); 
+     BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
+     BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));     
      $hash->{HELPER}{RUNNING_OPTIMIZE} = BlockingCall("DbRep_optimizeTables", "$name", "OptimizeDone", $to, "OptimizeAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "optimize tables is running - be patient and see Logfile !", 1);
+     return;
+ }
+ 
+ if ($opt =~ /repairSQLite/) {	
+     BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
+     BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
+     BlockingKill($hash->{HELPER}{RUNNING_REPAIR}) if (exists($hash->{HELPER}{RUNNING_REPAIR}));
+     $hash->{HELPER}{RUNNING_REPAIR} = BlockingCall("sqlite_Repair", "$name", "RepairDone", $to, "RepairAborted", $hash);
+	 ReadingsSingleUpdateValue ($hash, "state", "repair database is running - be patient and see Logfile !", 1);
      return;
  }
  
@@ -1936,6 +1989,7 @@ sub averval_DoParse($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $acf        = AttrVal($name, "averageCalcForm", "avgArithmeticMean");     # Festlegung Berechnungsschema f. Mittelwert
+ my $qlf        = "avg";
  my ($dbh,$sql,$sth,$err,$selspec,$addon);
 
  # Background-Startzeit
@@ -1975,14 +2029,17 @@ sub averval_DoParse($) {
      } else {
          $selspec = "AVG(VALUE)";
      }
+     $qlf = "avgam";
  } elsif ($acf eq "avgDailyMeanGWS") {
      # Tagesmittelwert Temperaturen nach Schema des deutschen Wetterdienstes
      # SELECT VALUE FROM history WHERE DEVICE="MyWetter" AND READING="temperature" AND TIMESTAMP >= "2018-01-28 $i:00:00" AND TIMESTAMP <= "2018-01-28 ($i+1):00:00" ORDER BY TIMESTAMP DESC LIMIT 1; 
      $addon   = "ORDER BY TIMESTAMP DESC LIMIT 1";
      $selspec = "VALUE";
+     $qlf     = "avgdmgws";
  } elsif ($acf eq "avgTimeWeightMean") {
-     $addon = "ORDER BY TIMESTAMP ASC";
+     $addon   = "ORDER BY TIMESTAMP ASC";
      $selspec = "TIMESTAMP,VALUE";
+     $qlf     = "avgtwm";
  }
 	 
  # SQL-Startzeit
@@ -2161,7 +2218,7 @@ sub averval_DoParse($) {
                  $val1 = $val;
                  $to = $tn;
                  Log3 ($name, 5, "DbRep $name - data element: $twmrow");
-                 Log3 ($name, 5, "DbRep $name - time sum: $tsum, delta time: $dt, value: $val1, twm: ".$val1*($dt/$tsum));
+                 Log3 ($name, 5, "DbRep $name - time sum: $tsum, delta time: $dt, value: $val1, twm: ".$val1*($dt/$tsum));                 
              }             
          }              
          if(AttrVal($name, "aggregation", "") eq "hour") {
@@ -2183,7 +2240,7 @@ sub averval_DoParse($) {
  # Ergebnisse in Datenbank schreiben
  my ($wrt,$irowdone);
  if($prop =~ /writeToDB/) {
-     ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$arrstr,"avg");
+     ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$arrstr,$qlf);
      if ($err) {
          Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
          $err = encode_base64($err,"");
@@ -3791,7 +3848,7 @@ sub currentfillup_Push($) {
  my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
  
- ($devs,$danz,$reading,$ranz) = specsForSql($hash,$device,$reading);
+ ($devs,$danz,$reading,$ranz) = DbRep_specsForSql($hash,$device,$reading);
   
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -5557,7 +5614,7 @@ sub DbRep_optimizeTables($) {
 
      # Tabellen optimieren 
 	 $hash->{HELPER}{DBTABLES} = \%db_tables;
-     ($err,$db_MB_start,$db_MB_end) = mysql_optimize_tables($hash,$dbh,@tablenames);
+     ($err,$db_MB_start,$db_MB_end) = DbRep_mysqlOptimizeTables($hash,$dbh,@tablenames);
 	 if ($err) {
 	     $err = encode_base64($err,"");
 		 return "$name|''|$err|''|''";
@@ -5917,7 +5974,7 @@ sub mysql_DoDumpClientSide($) {
  if($optimize_tables_beforedump) {
      # Tabellen optimieren vor dem Dump
 	 $hash->{HELPER}{DBTABLES} = \%db_tables;
-     ($err,$db_MB_start,$db_MB_end) = mysql_optimize_tables($hash,$dbh,@tablenames);
+     ($err,$db_MB_start,$db_MB_end) = DbRep_mysqlOptimizeTables($hash,$dbh,@tablenames);
 	 if ($err) {
 	     $err = encode_base64($err,"");
 		 return "$name|''|$err|''|''|''|''|''|''|''";
@@ -6155,7 +6212,7 @@ sub mysql_DoDumpClientSide($) {
  my $rt = tv_interval($st);
  
  # Dumpfile per FTP senden und versionieren
- my ($ftperr,$ftpmsg,@ftpfd) = sendftp($hash,$backupfile); 
+ my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp($hash,$backupfile); 
  my $ftp = $ftperr?encode_base64($ftperr,""):$ftpmsg?encode_base64($ftpmsg,""):0;
  my $ffd = join(", ", @ftpfd);
  $ffd    = $ffd?encode_base64($ffd,""):0;
@@ -6265,7 +6322,7 @@ sub mysql_DoDumpServerSide($) {
  if($optimize_tables_beforedump) {
      # Tabellen optimieren vor dem Dump
 	 $hash->{HELPER}{DBTABLES} = \%db_tables;
-     ($err,$db_MB_start,$db_MB_end) = mysql_optimize_tables($hash,$dbh,@tablenames);
+     ($err,$db_MB_start,$db_MB_end) = DbRep_mysqlOptimizeTables($hash,$dbh,@tablenames);
 	 if ($err) {
 	     $err = encode_base64($err,"");
 		 return "$name|''|$err|''|''|''|''|''|''|''";
@@ -6318,7 +6375,7 @@ sub mysql_DoDumpServerSide($) {
  Log3 ($name, 3, "DbRep $name - Size of backupfile: ".DbRep_byteOutput($filesize));
  
  # Dumpfile per FTP senden und versionieren
- my ($ftperr,$ftpmsg,@ftpfd) = sendftp($hash,$bfile); 
+ my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp($hash,$bfile); 
  my $ftp = $ftperr?encode_base64($ftperr,""):$ftpmsg?encode_base64($ftpmsg,""):0;
  my $ffd = join(", ", @ftpfd);
  $ffd    = $ffd?encode_base64($ffd,""):0;
@@ -6375,7 +6432,7 @@ sub sqlite_DoDump($) {
      Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
      return "$name|''|$err|''|''|''|''|''|''|''";
  }
- 
+  
  if($optimize_tables_beforedump) {
      # Vacuum vor Dump
 	 # Anfangsgröße ermitteln
@@ -6442,7 +6499,7 @@ sub sqlite_DoDump($) {
  Log3 ($name, 3, "DbRep $name - Size of backupfile: ".$fsize);
  
  # Dumpfile per FTP senden und versionieren
- my ($ftperr,$ftpmsg,@ftpfd) = sendftp($hash,$bfile); 
+ my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp($hash,$bfile); 
  my $ftp = $ftperr?encode_base64($ftperr,""):$ftpmsg?encode_base64($ftpmsg,""):0;
  my $ffd = join(", ", @ftpfd);
  $ffd    = $ffd?encode_base64($ffd,""):0;
@@ -6523,6 +6580,155 @@ sub DumpDone($) {
 
   Log3 ($name, 4, "DbRep $name -> BlockingCall DumpDone finished");
   
+return;
+}
+
+####################################################################################################
+#                                      Dump-Routine SQLite
+####################################################################################################
+sub sqlite_Repair($) {
+ my ($name)       = @_;
+ my $hash         = $defs{$name};
+ my $dbloghash    = $hash->{dbloghash};
+ my $db           = $hash->{DATABASE};
+ my $dbname       = (split /[\/]/, $db)[-1];
+ my $dbpath       = (split /$dbname/, $db)[0];
+ my $dblogname    = $dbloghash->{NAME};
+ my $sqlfile      = $dbpath."dump_all.sql";
+ my ($c,$clog,$ret,$err);
+ 
+ Log3 ($name, 5, "DbRep $name -> Start BlockingCall sqlite_Repair");
+
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+  
+ $c = "echo \".mode insert\n.output $sqlfile\n.dump\n.exit\" | sqlite3 $db; ";
+ $clog = $c;
+ $clog =~ s/\n/ /g;
+ Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
+ $ret = system qq($c);
+ if($ret) {
+     $err = "Error in step \"dump corrupt database\" - see logfile";
+     $err = encode_base64($err,"");
+     return "$name|''|$err";
+ }
+ 
+ $c = "mv $db $db.corrupt";
+ $clog = $c;
+ $clog =~ s/\n/ /g;
+ Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
+ $ret = system qq($c);
+ if($ret) {
+     $err = "Error in step \"move atabase to corrupt-db\" - see logfile";
+     $err = encode_base64($err,"");
+     return "$name|''|$err";
+ }
+ 
+ $c = "echo \".read $sqlfile\n.exit\" | sqlite3 $db;";
+ $clog = $c;
+ $clog =~ s/\n/ /g;
+ Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
+ $ret = system qq($c);
+ if($ret) {
+     $err = "Error in step \"read dump to new database\" - see logfile";
+     $err = encode_base64($err,"");
+     return "$name|''|$err";
+ }
+ 
+ $c = "rm $sqlfile";
+ $clog = $c;
+ $clog =~ s/\n/ /g;
+ Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
+ $ret = system qq($c);
+ if($ret) {
+     $err = "Error in step \"delete $sqlfile\" - see logfile";
+     $err = encode_base64($err,"");
+     return "$name|''|$err";
+ }
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+ 
+ Log3 ($name, 5, "DbRep $name -> BlockingCall sqlite_Repair finished");
+ 
+return "$name|$brt|0";
+}
+
+####################################################################################################
+#             Auswertungsroutine der nicht blockierenden DB-Funktion Dump
+####################################################################################################
+sub RepairDone($) {
+  my ($string)   = @_;
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $brt        = $a[1];
+  my $err        = $a[2]?decode_base64($a[2]):undef;
+  my $dbloghash  = $hash->{dbloghash};
+  my $name       = $hash->{NAME};
+  my $erread;
+  
+  Log3 ($name, 5, "DbRep $name -> Start BlockingCall RepairDone");
+  
+  delete($hash->{HELPER}{RUNNING_REPAIR});
+  
+  # Datenbankverbindung in DbLog wieder öffenen
+  my $dbl = $dbloghash->{NAME};
+  CommandSet(undef,"$dbl reopen");
+  
+  if ($err) {
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      Log3 ($name, 4, "DbRep $name -> BlockingCall RepairDone finished");
+      return;
+  } 
+ 
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+  
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateValue($hash, "background_processing_time", sprintf("%.4f",$brt));
+  readingsEndUpdate($hash, 1);
+
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "repair");
+  
+  my $state = $erread?$erread:"Repair finished $hash->{DATABASE}";
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateTimeState($hash,undef,undef,$state);
+  readingsEndUpdate($hash, 1);
+
+  Log3 ($name, 3, "DbRep $name - Database repair $hash->{DATABASE} finished. - total time used: ".sprintf("%.0f",$brt)." seconds.");
+  Log3 ($name, 5, "DbRep $name -> BlockingCall RepairDone finished");
+  
+return;
+}
+
+####################################################################################################
+#                    Abbruchroutine Repair SQlite
+####################################################################################################
+sub RepairAborted(@) {
+  my ($hash,$cause) = @_;
+  my $name      = $hash->{NAME};
+  my $dbh       = $hash->{DBH}; 
+  my $dbloghash = $hash->{dbloghash};
+  my $erread;
+  
+  $cause = $cause?$cause:"Timeout: process terminated";
+  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_REPAIR}{fn} pid:$hash->{HELPER}{RUNNING_REPAIR}{pid} $cause");
+  
+  # Datenbankverbindung in DbLog wieder öffenen
+  my $dbl = $dbloghash->{NAME};
+  CommandSet(undef,"$dbl reopen");
+  
+  # Befehl nach Procedure ausführen
+  no warnings 'uninitialized'; 
+  $erread = DbRep_afterproc($hash, "repair");
+  $erread = ", ".(split("but", $erread))[1] if($erread);    
+  
+  $dbh->disconnect() if(defined($dbh));
+  ReadingsSingleUpdateValue ($hash,"state",$cause, 1);
+  
+  delete($hash->{HELPER}{RUNNING_REPAIR});
 return;
 }
 
@@ -6834,7 +7040,7 @@ sub createSelectSql($$$$$$$$) {
  my ($sql,$devs,$danz,$ranz);
  my $tnfull = 0;
  
- ($devs,$danz,$reading,$ranz) = specsForSql($hash,$device,$reading);
+ ($devs,$danz,$reading,$ranz) = DbRep_specsForSql($hash,$device,$reading);
  
  if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
@@ -6871,7 +7077,7 @@ sub DbRep_createUpdateSql($$$$$$$$) {
  my ($sql,$devs,$danz,$ranz);
  my $tnfull = 0;
  
- ($devs,$danz,$reading,$ranz) = specsForSql($hash,$device,$reading);
+ ($devs,$danz,$reading,$ranz) = DbRep_specsForSql($hash,$device,$reading);
  
  if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
@@ -6913,7 +7119,7 @@ sub createDeleteSql($$$$$$$) {
 	 return $sql;
  }
  
- ($devs,$danz,$reading,$ranz) = specsForSql($hash,$device,$reading);
+ ($devs,$danz,$reading,$ranz) = DbRep_specsForSql($hash,$device,$reading);
  
  if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
@@ -6942,7 +7148,7 @@ return $sql;
 ####################################################################################################
 #               Ableiten von Device, Reading-Spezifikationen 
 ####################################################################################################
-sub specsForSql($$$) {
+sub DbRep_specsForSql($$$) {
  my ($hash,$device,$reading) = @_;
  my $name    = $hash->{NAME};
  
@@ -7463,7 +7669,7 @@ return (undef, undef);
 ####################################################################################################
 #             Tabellenoptimierung MySQL
 ####################################################################################################
-sub mysql_optimize_tables ($$@) {
+sub DbRep_mysqlOptimizeTables ($$@) {
   my ($hash,$dbh,@tablenames) = @_;
   my $name   = $hash->{NAME};
   my $dbname = $hash->{DATABASE};
@@ -7572,7 +7778,7 @@ return @fd;
 ####################################################################################################
 #             erzeugtes Dump-File aus dumpDirLocal zum FTP-Server übertragen 
 ####################################################################################################
-sub sendftp ($$) {
+sub DbRep_sendftp ($$) {
   my ($hash,$bfile) = @_; 
   my $name          = $hash->{NAME};
   my $dbloghash     = $hash->{dbloghash};
@@ -7693,17 +7899,6 @@ sub sendftp ($$) {
   }
 
 return ($ftperr,$ftpmsg,@ftpfd);
-}
-
-####################################################################################################
-# Browser Refresh nach DB-Abfrage
-####################################################################################################
-sub browser_refresh($) { 
-  my ($hash) = @_;                                                                     
-  RemoveInternalTimer($hash, "browser_refresh");
-  {FW_directNotify("#FHEMWEB:WEB", "location.reload('true')", "")};
-  #  map { FW_directNotify("#FHEMWEB:$_", "location.reload(true)", "") } devspec2array("WEB.*");
-return;
 }
 
 ####################################################################################################
@@ -8022,6 +8217,17 @@ return $val;
 }
 
 ####################################################################################################
+# Browser Refresh nach DB-Abfrage
+####################################################################################################
+sub browser_refresh($) { 
+  my ($hash) = @_;                                                                     
+  RemoveInternalTimer($hash, "browser_refresh");
+  {FW_directNotify("#FHEMWEB:WEB", "location.reload('true')", "")};
+  #  map { FW_directNotify("#FHEMWEB:$_", "location.reload(true)", "") } devspec2array("WEB.*");
+return;
+}
+
+####################################################################################################
 #                 Test-Sub zu Testzwecken
 ####################################################################################################
 sub testexit ($) {
@@ -8110,6 +8316,7 @@ return;
 	 <li> purge content of current-table </li>
 	 <li> fill up the current-table with a (tunable) extract of the history-table</li>
 	 <li> delete consecutive datasets with different timestamp but same values (clearing up consecutive doublets) </li>
+     <li> Repair of a corrupted SQLite database ("database disk image is malformed") </li>
      </ul></ul>
      <br>
      
@@ -8205,7 +8412,7 @@ return;
                                  
                                  <ul>
                                  <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
-                                 avg_day_totalpac <br>
+                                 avgam_day_totalpac <br>
                                  # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>                         
                                  </ul>
                                  </li><br>
@@ -8738,7 +8945,31 @@ return;
                                  Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
                                  is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br> 
                                  </li> <br>
-                                 </ul> 
+                                 </ul>
+
+    <li><b> repairSQLite </b>  - repairs a corrupted SQLite database. <br>
+                                 A corruption is usally existent when the error message "database disk image is malformed"
+                                 appears in reading "state" of the connected DbLog-device.
+                                 If the command was started, the connected DbLog-device will firstly disconnected from the 
+                                 database for 10 hours (36000 seconds) automatically (breakup time). After the repair is
+                                 finished, the DbLog-device will be connected to the (repaired) database immediately. <br>
+								 As an argument the command can be completed by a differing breakup time (in seconds). <br>
+                                 The corrupted database is saved as &lt;database&gt;.corrupt in same directory.   <br><br>
+                                 
+                                 <ul>
+                                 <b>Example: </b><br>  
+                                 set &lt;name&gt; repairSQLite  <br>               
+                                 # the database is trying to repair, breakup time is 10 hours <br>
+                                 set &lt;name&gt; repairSQLite 600 <br>   
+                                 # the database is trying to repair, breakup time is 10 minutes
+                                 <br><br>
+								 
+								 <b>Note:</b> <br>
+                                 It can't be guaranteed, that the repair attempt proceed successfully and no data loss will result. 
+                                 Depending from corruption severity data loss may occur or the repair will fail even though
+                                 no error appears during the repair process. Please make sure a valid backup took place ! <br><br> 
+                                 </li> <br>
+                                 </ul> 	                                 
 								 
     <li><b> restoreMySQL &lt;file&gt;.csv </b>  - imports the content of table history from a serverSide-backup. <br>
                                  The function provides a drop-down-list of files which can be used for restore.
@@ -9573,7 +9804,8 @@ sub bdump {
 	 <li> leeren der current-Tabelle </li>
 	 <li> Auffüllen der current-Tabelle mit einem (einstellbaren) Extrakt der history-Tabelle</li>
      <li> Bereinigung sequentiell aufeinander folgender Datensätze mit unterschiedlichen Zeitstempel aber gleichen Werten (sequentielle Dublettenbereinigung) </li>
-	 </ul></ul>
+	 <li> Reparatur einer korrupten SQLite Datenbank ("database disk image is malformed") </li>
+     </ul></ul>
      <br>
      
   Zur Aktivierung der Funktion "Autorename" wird dem definierten DbRep-Device mit dem Attribut "role" die Rolle "Agent" zugewiesen. Die Standardrolle nach Definition
@@ -9669,7 +9901,7 @@ sub bdump {
                                  
                                  <ul>
                                  <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
-                                 avg_day_totalpac <br>
+                                 avgam_day_totalpac <br>
                                  # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
                                  </li> <br>
                                  </ul>
@@ -10218,7 +10450,32 @@ sub bdump {
                                  Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
                                  im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden (Tabellen-Lock). <br><br> 
                                  </li> <br>
-                                 </ul>  								 
+                                 </ul>  
+
+    <li><b> repairSQLite </b>  - repariert eine korrupte SQLite-Datenbank. <br>
+                                 Eine Korruption liegt im Allgemeinen vor wenn die Fehlermitteilung "database disk image is malformed"
+                                 im state des DbLog-Devices erscheint.
+                                 Wird dieses Kommando gestartet, wird das angeschlossene DbLog-Device zunächst automatisch für 10 Stunden
+                                 (36000 Sekunden) von der Datenbank getrennt (Trennungszeit). Nach Abschluss der Reparatur erfolgt 
+                                 wieder eine sofortige Neuverbindung zur reparierten Datenbank. <br>
+								 Dem Befehl kann eine abweichende Trennungszeit (in Sekunden) als Argument angegeben werden. <br>
+                                 Die korrupte Datenbank wird als &lt;database&gt;.corrupt im gleichen Verzeichnis gespeichert.                                  <br><br>
+                                 
+                                 <ul>
+                                 <b>Beispiel: </b><br>  
+                                 set &lt;name&gt; repairSQLite  <br>               
+                                 # Die Datenbank wird repariert, Trennungszeit beträgt 10 Stunden <br>
+                                 set &lt;name&gt; repairSQLite 600 <br>   
+                                 # Die Datenbank wird repariert, Trennungszeit beträgt 10 Minuten
+                                 <br><br>
+								 
+								 <b>Hinweis:</b> <br>
+                                 Es ist nicht garantiert, dass die Reparatur erfolgreich verläuft und keine Daten verloren gehen. 
+                                 Je nach Schwere der Korruption kann Datenverlust auftreten oder die Reparatur scheitern, auch wenn
+                                 kein Fehler im Ablauf signalisiert wird. Ein Backup der Datenbank sollte unbedingt vorhanden 
+                                 sein ! <br><br> 
+                                 </li> <br>
+                                 </ul> 								 
 
     <li><b> restoreMySQL &lt;File&gt;.csv </b>  - importiert den Inhalt der history-Tabelle aus einem serverSide-Backup. <br>
                                  Die Funktion stellt über eine Drop-Down Liste eine Dateiauswahl für den Restore zur Verfügung.
