@@ -652,7 +652,6 @@ sub HMinfo_paramCheck(@) { ####################################################
   my @idMismatch;
   my @ccuUndef;
   my @perfIoUndef;
-  my @aesInval;
   foreach my $eName (@entities){
     if ($defs{$eName}{helper}{role}{dev}){
       my $ehash = $defs{$eName};
@@ -675,8 +674,6 @@ sub HMinfo_paramCheck(@) { ####################################################
         }
       }
       if (!$IoDev)                  { push @noIoDev,$eName;}
-      elsif (AttrVal($eName,"aesCommReq",0) && $IoDev->{TYPE} ne "HMLAN")
-                                    { push @aesInval,"$eName ";}
                                     
       if (   !$defs{$eName}{helper}{role}{vrt} 
           && AttrVal($eName,"model","") ne "CCU-FHEM"){
@@ -691,7 +688,6 @@ sub HMinfo_paramCheck(@) { ####################################################
   $ret .="\n\n no IO device assigned"             ."\n    ".(join "\n    ",sort @noIoDev)    if (@noIoDev);
   $ret .="\n\n PairedTo missing/unknown"          ."\n    ".(join "\n    ",sort @noID)       if (@noID);
   $ret .="\n\n PairedTo mismatch to IODev"        ."\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
-  $ret .="\n\n aesCommReq set, IO not compatibel" ."\n    ".(join "\n    ",sort @aesInval)   if (@aesInval);
   $ret .="\n\n IOgrp: CCU not found"              ."\n    ".(join "\n    ",sort @ccuUndef)   if (@ccuUndef);
   $ret .="\n\n IOgrp: prefered IO undefined"      ."\n    ".(join "\n    ",sort @perfIoUndef)if (@perfIoUndef);
  return  $ret;
@@ -703,6 +699,11 @@ sub HMinfo_tempList(@) { ######################################################
   $action = "" if (!$action);
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
   my $ret;
+  
+  if (not -f $fName) { #create file if necessary
+    open(aSave, ">$fName") || return("Can't open $fName: $!");
+    print aSave "#init\n";
+  }
 
   if    ($action eq "save"){
 #    foreach my $eN(HMinfo_getEntities("d")){#search and select channel
@@ -1001,6 +1002,10 @@ sub HMinfo_tempListTmplGenLog($$) { ###########################################
     my (undef,$eN) = split " ",$_;
     $eNh{$eN} = 1;
   }
+  if (not -f $fName) { #create file if necessary
+    open(aSave, ">$fName") || return("Can't open $fName: $!");
+    print aSave "#init\n";
+  }
   $err = FileWrite($fName,@WLines);
   return "file: $fName error write:$err"  if ($err);
   HMinfo_tempListTmplGenGplot($fName,keys %eNh);
@@ -1050,6 +1055,10 @@ sub HMinfo_tempListTmplGenGplot(@) { ##########################################
     }
   }
   
+  if (not -f $fName) { #create file if necessary
+    open(aSave, ">$fName") || return("Can't open $fName: $!");
+    print aSave "#init\n";
+  }
   push @WLines,$func.$plot;
   my $err = FileWrite($fName,@WLines);
   return "file: $fName error write:$err"  if ($err);
