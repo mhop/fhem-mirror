@@ -7,9 +7,12 @@
 # FHEM module to communicate with Google Cast devices
 # e.g. Chromecast Video, Chromecast Audio, Google Home
 #
-# Version: 2.0.2
+# Version: 2.0.3
 #
 #############################################################
+#
+# v2.0.3 - 20180217
+# - CHANGE:   increase speak limit to 500 characters
 #
 # v2.0.2 - 20180106
 # - FEATURE:  support speak command for TTS
@@ -135,7 +138,7 @@ sub GOOGLECAST_Initialize($) {
     $hash->{AttrList} = "favoriteURL_1 favoriteURL_2 favoriteURL_3 favoriteURL_4 ".
                         "favoriteURL_5 ".$readingFnAttributes;
 
-    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.0.2";
+    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.0.3";
 
     return undef;
 }
@@ -298,7 +301,7 @@ sub GOOGLECAST_setSpeak {
     my ($hash, $ttsText) = @_;
 
     my $ttsLang = AttrVal($hash->{NAME}, "ttsLanguage", "de");
-    return "GOOGLECAST: Maximum text length is 100 characters." if(length($ttsText) > 100);
+    return "GOOGLECAST: Maximum text length is 500 characters." if(length($ttsText) > 500);
 
     $ttsText = uri_escape($ttsText);
     my $ttsUrl = "http://translate.google.com/translate_tts?tl=$ttsLang&client=tw-ob&q=$ttsText";
