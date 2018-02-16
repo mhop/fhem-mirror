@@ -1310,13 +1310,19 @@ sub CUL_HM_Parse($$) {#########################################################
         $chn = $mI[0];
       } 
       elsif ($mh{mTp} eq "10") {
-        if ($mh{mStp} =~ m/^0[456]/) {
+        if ($mh{mStp} =~ m/^0[46]/) {
           $chn = $mI[1];
         } 
-        elsif ($mh{mStp} eq "01") {
-          $doAES = 0;
+        elsif ($mh{mStp} eq "05") {
+          if ($mI[7] ne "00") { #m:1E A010 4CF663 1743BF 0500(00000000)(07)(00)  # 00 is finish packet
+            $chn = $mI[1];
+          }
+          else {
+            $doAES = 0;
+          }
         }
-        elsif (!($mh{mFlgH} & 0x20)) { #response required Flag
+        elsif (   $mh{mStp} eq "01"
+              ||!($mh{mFlgH} & 0x20)) { #response required Flag
           $doAES = 0;
         }
       } 
@@ -10738,8 +10744,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><a href="#showtime">showtime</a></li>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
       <li><a name="CUL_HMaesCommReq">aesCommReq</a>
-           if set HMLAN/USB is forced to request AES signature before sending ACK to the device.<br>
-           This funktion strictly works with HMLAN/USB - it doesn't work for CUL type IOs.<br>
+           if set IO is forced to request AES signature before sending ACK to the device.<br>
           </li>
       <li><a name="#CUL_HMactAutoTry">actAutoTry</a>
            actAutoTry 0_off,1_on<br>
@@ -12119,8 +12124,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><a href="#showtime">showtime</a></li> 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
       <li><a name="CUL_HMaesCommReq">aesCommReq</a>
-           wenn gesetzt wird HMLAN/USB AES signature anfordern bevor ACK zum Device gesendet wird.<br>
-           Die Funktion abeitet aktuell nur mit HMLAN/USB.<br>
+           wenn gesetzt wird IO AES signature anfordern bevor ACK zum Device gesendet wird.<br>
       </li>
       <li><a name="#CUL_HMactAutoTry">actAutoTry</a>
          actAutoTry 0_off,1_on<br>
