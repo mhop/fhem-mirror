@@ -502,7 +502,7 @@ sub freezemon_apptime() {
             $cv     = svref_2object($fn);
             $fnname = $cv->GV->NAME;
             $ret .= $intAt{$i}{TRIGGERTIME} . "-" . $fnname;
-            Log3 undef, 3, "Freezemon: Reference found: " . ref($fn) . "/$fnname/$fn";
+            Log3 undef, 5, "Freezemon: Reference found: " . ref($fn) . "/$fnname/$fn";
         }
         else {
             $ret .= $intAt{$i}{TRIGGERTIME} . "-" . $fn;
@@ -552,7 +552,7 @@ sub freezemon_apptime() {
     if (%prioQueues) {
         my $nice  = minNum( keys %prioQueues );
         my $entry = shift( @{ $prioQueues{$nice} } );
-        Log3 undef, 3, "Freezemon: found a prioQueue" . Dumper($entry);
+        Log3 undef, 5, "Freezemon: found a prioQueue" . Dumper($entry);
         $cv     = svref_2object( $entry->{fn} );
         $fnname = $cv->GV->NAME;
         $ret .= ":" . $shortarg;
