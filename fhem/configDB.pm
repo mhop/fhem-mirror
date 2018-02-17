@@ -126,6 +126,8 @@
 #
 # 2017-08-31 - changed   improve table_info for migration check
 #
+# 2018-02-17 - changed.  remove experimenatal cache functions
+#
 ##############################################################################
 =cut
 
@@ -395,10 +397,10 @@ sub cfgDB_AttrRead($) {
 sub cfgDB_FileRead($) {
 	my ($filename) = @_;
 
-    if ($configDB{cache}{$filename} && $configDB{attr}{useCache}) {
-      Log3(undef, 4, "configDB serving from cache: $filename");
-      return (undef,split(/\n/,$configDB{cache}{$filename}));
-    }
+#    if ($configDB{cache}{$filename} && $configDB{attr}{useCache}) {
+#      Log3(undef, 4, "configDB serving from cache: $filename");
+#      return (undef,split(/\n/,$configDB{cache}{$filename}));
+#    }
 
 	Log3(undef, 4, "configDB reading file: $filename");
 	my ($err, @ret, $counter);
@@ -411,10 +413,10 @@ sub cfgDB_FileRead($) {
 	$blobContent = decode_base64($blobContent) if ($blobContent);
 	$counter = length($blobContent);
 	if($counter) {
-	    if ($configDB{attr}{useCache}) {
-           Log3(undef,4,"configDB caching: $filename");
-           $configDB{cache}{$filename} = $blobContent;
-        }
+#	    if ($configDB{attr}{useCache}) {
+#           Log3(undef,4,"configDB caching: $filename");
+#           $configDB{cache}{$filename} = $blobContent;
+#        }
 		@ret = split(/\n/,$blobContent);
 		$err = "";
 	} else {
@@ -425,10 +427,10 @@ sub cfgDB_FileRead($) {
 }
 sub cfgDB_FileWrite($@) {
 	my ($filename,@content) = @_;
-    if ($configDB{attr}{useCache}) {
-       Log3(undef,4,"configDB delete from cache: $filename");
-       $configDB{cache}{$filename} = undef;
-    }
+#    if ($configDB{attr}{useCache}) {
+#       Log3(undef,4,"configDB delete from cache: $filename");
+#       $configDB{cache}{$filename} = undef;
+#    }
 	Log3(undef, 4, "configDB writing file: $filename");
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
