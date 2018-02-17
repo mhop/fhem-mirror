@@ -26,6 +26,7 @@
 #################################################################################################
 # Versions History done by DS_Starter
 #
+# 3.1.0    12.02.2018     extend error handling in define
 # 3.0.1    26.11.2017     use abort cause of BlockingCall
 # 3.0.0    29.09.2017     make SMAEM ready for multimeter usage
 # 2.9.1    29.05.2017     DbLog_splitFn added, some function names adapted
@@ -52,7 +53,7 @@ use bignum;
 use IO::Socket::Multicast;
 use Blocking;
 
-my $SMAEMVersion = "3.0.1";
+my $SMAEMVersion = "3.1.0";
 
 ###############################################################
 #                  SMAEM Initialize
@@ -83,6 +84,7 @@ sub SMAEM_Define($$) {
   my ($hash, $def) = @_;
   my $name= $hash->{NAME};
   my ($success, $gridin_sum, $gridout_sum);
+  my $socket;
   
   $hash->{INTERVAL}              = 60 ;
   $hash->{VERSION}               = $SMAEMVersion;
@@ -90,12 +92,19 @@ sub SMAEM_Define($$) {
   $hash->{HELPER}{STARTTIME}     = time();
     
   Log3 $hash, 3, "SMAEM $name - Opening multicast socket...";
-  my $socket = IO::Socket::Multicast->new(
+  eval {
+  $socket = IO::Socket::Multicast->new(
            Proto     => 'udp',
            LocalPort => '9522',
            ReuseAddr => '1',
            ReusePort => defined(&ReusePort) ? 1 : 0,
-  ) or return "Can't bind : $@";
+  ); };
+  if($@) {
+      Log3 $hash, 1, "SMAEM $name - Can't bind: $@";
+      return;      
+  }
+  
+  Log3 $hash, 3, "SMAEM $name - Multicast socket opened";
   
   $socket->mcast_add('239.12.255.254');
 
