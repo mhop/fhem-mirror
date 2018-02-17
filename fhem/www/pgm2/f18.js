@@ -1,7 +1,7 @@
 "use strict";
 FW_version["f18.js"] = "$Id$";
 
-// TODO: hierMenu,absPos,floorplan,f18style.css
+// TODO: hierMenu,absPos,floorplan,f18style.css,menuBorder,SVGcolors,PWA:push
 var f18_attr, f18_aCol, f18_sd, f18_isMobile, f18_icon={}, f18_hasPos, f18_room;
 var f18_small = (screen.width < 480 || screen.height < 480);
 
@@ -267,8 +267,9 @@ f18_special()
     appendTo = "table#f18tr";
 
     addRow("room", "Target", '<select><option>all</option></select>');
-    FW_cmd(FW_root+"?cmd=JsonList2 .* room&XHR=1", function(data) {
-      var d = eval("JSON.parse(data);");
+    FW_cmd(FW_root+"?cmd=jsonlist2 .* room&XHR=1", function(data) {
+      var d;
+      try { d=JSON.parse(data); } catch(e){ log(data); return FW_okDialog(e); }
       for(var i1=0; i1<d.Results.length; i1++) {
         var rname = d.Results[i1].Attributes.room;
         if(!rname || rname == "hidden")
