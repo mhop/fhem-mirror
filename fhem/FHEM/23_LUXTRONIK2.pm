@@ -40,8 +40,7 @@ use warnings;
 use Blocking;
 use IO::Socket; 
 use Time::HiRes qw/ time /;
-use Net::Telnet;
-eval "use Data::Dumper;1" or $missingModul .= "Data::Dumper ";
+eval "use Net::Telnet;1" or $missingModul .= "Net::Telnet ";
 
 sub LUXTRONIK2_doStatisticThermalPower ($$$$$$$$$);
 sub LUXTRONIK2_doStatisticMinMax ($$$);
@@ -85,13 +84,15 @@ LUXTRONIK2_Initialize($)
                  "allowSetParameter:0,1 ".
                  "autoSynchClock:slider,10,5,300 ".
                  "boilerVolumn ".
+                 "compressor2ElectricalPowerWatt ".
+                 "doStatistics:0,1 ".
                  "heatPumpElectricalPowerFactor ".
                  "heatPumpElectricalPowerWatt ".
                  "heatRodElectricalPowerWatt ".
-                 "compressor2ElectricalPowerWatt ".
-                 "doStatistics:0,1 ".
                  "ignoreFirmwareCheck:0,1 ".
                  "statusHTML ".
+                 "userHeatpumpParameters ".
+                 "userHeatpumpValues ".
                 $readingFnAttributes;
 }
 
@@ -403,171 +404,21 @@ sub LUXTRONIK2_DoUpdate($)
   my $hash = $defs{$name};
   my $host = $hash->{HOST};
   my $port = $hash->{PORT};
-  my @heatpump_values;
-  my @heatpump_parameters;
-  my @heatpump_visibility;
+  
   my $count=0;
   my $result="";
+  my $firstLoop;
+  
+  # Read raw data and handle error return
   my $readingStartTime = time();
-  
-  LUXTRONIK2_Log $name, 5, "Opening connection to $host:$port";
-  my $socket = new IO::Socket::INET (  
-                  PeerAddr => $host, 
-                  PeerPort => $port,
-                   #   Type = SOCK_STREAM, # probably needed on some systems
-                   Proto => 'tcp'
-      );
-  if (!$socket) {
-      LUXTRONIK2_Log $name, 1, "Could not open connection to host $host:$port";
-      return "$name|0|Can't connect to $host:$port";
-  }
-  $socket->autoflush(1);
-  
-############################ 
-#Fetch operational values (FOV)
-############################ 
-  LUXTRONIK2_Log $name, 5, "Ask host for operational values";
-  $socket->send( pack( "N2", (3004,0) ) );
-
-  LUXTRONIK2_Log $name, 5, "Start to receive operational values";
- #(FOV) read first 4 bytes of response -> should be request_echo = 3004
-  $socket->recv( $result,4, MSG_WAITALL );
-  $count = unpack("N", $result);
-  if($count != 3004) {
-      LUXTRONIK2_Log $name, 2, "Fetching operational values - wrong echo of request 3004: ".length($result)." -> ".$count;
-       $socket->close();
-      return "$name|0|3004 != $count";
-  }
- 
- #(FOV) read next 4 bytes of response -> should be status = 0
-  $socket->recv($result,4, MSG_WAITALL );
-  $count = unpack("N", $result);
-  if($count > 0) {
-      LUXTRONIK2_Log $name, 4, "Parameter on target changed, restart parameter reading after 5 seconds";
-     $socket->close();
-      return "$name|2|Status = $count - parameter on target changed, restart device reading after 5 seconds";
-  }
-  
- #(FOV) read next 4 bytes of response -> should be count_calc_values > 0
-  $socket->recv($result,4, MSG_WAITALL );
-  my $count_calc_values = unpack("N", $result);
-  if($count_calc_values == 0) {
-      LUXTRONIK2_Log $name, 2, "Fetching operational values - 0 values announced: ".length($result)." -> ".$count_calc_values;
-     $socket->close();
-      return "$name|0|0 values read";
-  }
-  
- #(FOV) read remaining response -> should be previous number of parameters
-  $socket->recv( $result, $count_calc_values*4, MSG_WAITALL ); 
-  if( length($result) != $count_calc_values*4 ) {
-      LUXTRONIK2_Log $name, 1, "Operational values length check: ".length($result)." should have been ". $count_calc_values * 4;
-      $socket->close();
-      return "$name|0|Number of values read mismatch ( $!)\n";
-  }
-  
- #(FOV) unpack response in array
-  @heatpump_values = unpack("N$count_calc_values", $result);
-  if(scalar(@heatpump_values) != $count_calc_values) {
-      LUXTRONIK2_Log $name, 2, "Unpacking problem by operation values: ".scalar(@heatpump_values)." instead of ".$count_calc_values;
-      $socket->close();
-      return "$name|0|Unpacking problem of operational values";
-  
-  }
-
-  LUXTRONIK2_Log $name, 5, "$count_calc_values operational values received";
- 
-############################ 
-#Fetch set parameters (FSP)
-############################ 
-  LUXTRONIK2_Log $name, 5, "Ask host for set parameters";
-  $socket->send( pack( "N2", (3003,0) ) );
-
-  LUXTRONIK2_Log $name, 5, "Start to receive set parameters";
- #(FSP) read first 4 bytes of response -> should be request_echo=3003
-  $socket->recv($result,4, MSG_WAITALL );
-  $count = unpack("N", $result);
-  if($count != 3003) {
-      LUXTRONIK2_Log $name, 2, "Wrong echo of request 3003: ".length($result)." -> ".$count;
-      $socket->close();
-      return "$name|0|3003 != 3003";
-  }
-  
- #(FSP) read next 4 bytes of response -> should be number_of_parameters > 0
-  $socket->recv($result,4, MSG_WAITALL );
-  my $count_set_parameter = unpack("N", $result);
-  if($count_set_parameter == 0) {
-      LUXTRONIK2_Log $name, 2, "0 parameter read: ".length($result)." -> ".$count_set_parameter;
-     $socket->close();
-      return "$name|0|0 parameter read";
-  }
-  
- #(FSP) read remaining response -> should be previous number of parameters
-   $socket->recv( $result, $count_set_parameter*4, MSG_WAITALL ); 
-
-  if( length($result) != $count_set_parameter*4 ) {
-     LUXTRONIK2_Log $name, 1, "Parameter length check: ".length($result)." should have been ". ($count_set_parameter * 4);
-     $socket->close();
-      return "$name|0|Number of parameters read mismatch ( $!)\n";
-  }
-
-  @heatpump_parameters = unpack("N$count_set_parameter", $result);
-  if(scalar(@heatpump_parameters) != $count_set_parameter) {
-      LUXTRONIK2_Log $name, 2, "Unpacking problem by set parameter: ".scalar(@heatpump_parameters)." instead of ".$count_set_parameter;
-     $socket->close();
-      return "$name|0|Unpacking problem of set parameters";
-  }
-
-  LUXTRONIK2_Log $name, 5, "$count_set_parameter set values received";
-
-############################ 
-#Fetch Visibility Attributes (FVA)
-############################ 
-  LUXTRONIK2_Log $name, 5, "Ask host for visibility attributes";
-  $socket->send( pack( "N2", (3005,0) ) );
-
-  LUXTRONIK2_Log $name, 5, "Start to receive visibility attributes";
- #(FVA) read first 4 bytes of response -> should be request_echo=3005
-  $socket->recv($result,4, MSG_WAITALL );
-  $count = unpack("N", $result);
-  if($count != 3005) {
-      LUXTRONIK2_Log $name, 2, "Wrong echo of request 3005: ".length($result)." -> ".$count;
-      $socket->close();
-      return "$name|0|3005 != $count";
-  }
-  
- #(FVA) read next 4 bytes of response -> should be number_of_Visibility_Attributes > 0
-  $socket->recv($result,4, MSG_WAITALL );
-  my $countVisibAttr = unpack("N", $result);
-  if($countVisibAttr == 0) {
-      LUXTRONIK2_Log $name, 2, "0 visibility attributes announced: ".length($result)." -> ".$countVisibAttr;
-      $socket->close();
-      return "$name|0|0 visibility attributes announced";
-  }
-  
- #(FVA) read remaining response bytewise -> should be previous number of parameters
-  $socket->recv( $result, $countVisibAttr, MSG_WAITALL ); 
-   if( length( $result ) != $countVisibAttr ) {
-      LUXTRONIK2_Log $name, 1, "Visibility attributes length check: ".length($result)." should have been ". $countVisibAttr;
-      $socket->close();
-      return "$name|0|Number of Visibility attributes read mismatch ( $!)\n";
-   }
-
-  @heatpump_visibility = unpack("C$countVisibAttr", $result);
-  if(scalar(@heatpump_visibility) != $countVisibAttr) {
-      LUXTRONIK2_Log $name, 2, "Unpacking problem by visibility attributes: ".scalar(@heatpump_visibility)." instead of ".$countVisibAttr;
-      $socket->close();
-      return "$name|0|Unpacking problem of visibility attributes";
-  }
-
-  LUXTRONIK2_Log $name, 5, "$countVisibAttr visibility attributs received";
-
-####################################  
-
-  LUXTRONIK2_Log $name, 5, "Closing connection to host $host";
-  $socket->close();
-
+  my ($state, $msg , $retValues, $retParameters, $retVisibility) = LUXTRONIK2_ReadData ($name);
   my $readingEndTime = time();
-
+  
+  return ("$name|$state|$msg")      if $state != 1 ;
+  my @heatpump_values = @$retValues;
+  my @heatpump_parameters = @$retParameters;
+  my @heatpump_visibility = @$retVisibility;
+  
 #return certain readings for further processing
   # 0 - name
   my $return_str="$name";
@@ -662,9 +513,9 @@ sub LUXTRONIK2_DoUpdate($)
   # 43 - bivalentLevel
   $return_str .= "|".$heatpump_values[79];
   # 44 - Number of calculated values
-  $return_str .= "|".$count_calc_values;
+  $return_str .= "|".scalar(@heatpump_values);
   # 45 - Number of set parameters
-  $return_str .= "|".$count_set_parameter;
+  $return_str .= "|".scalar(@heatpump_parameters);
   # 46 - opStateHeating
   $return_str .= "|".$heatpump_values[125];
   # 47 - deltaHeatingReduction
@@ -680,7 +531,7 @@ sub LUXTRONIK2_DoUpdate($)
   # 52 - counterHoursSolar
   $return_str .= "|". ($heatpump_visibility[248]==1 ? $heatpump_values[161] : "no");
   # 53 - Number of visibility attributes
-  $return_str .= "|".$countVisibAttr;
+  $return_str .= "|".scalar(@heatpump_visibility);
   # 54 - returnTemperatureSetBack
   $return_str .= "|".$heatpump_parameters[1];
   # 55 - mixer1FlowTemperature
@@ -728,7 +579,26 @@ sub LUXTRONIK2_DoUpdate($)
    $return_str .= "|". ($heatpump_visibility[63]==1 ? $heatpump_values[52] : "no");
   # 75 - 2ndHeatSource1
     $return_str .= "|". ($heatpump_visibility[59]==1 ? $heatpump_values[48] : "no");
- 
+  # 76 userReadings (attributs: userHeatpumpParameters and userHeatpumpValues)
+    $return_str .= "|";
+    $firstLoop = 1;
+    my @userReadings = split /,/, AttrVal( $name, "userHeatpumpParameters", "" );
+    foreach (@userReadings) {
+      $return_str .= ","     unless $firstLoop;
+      $firstLoop = 0;
+      my ($rIndex, $rName) = split / /, trim($_);
+      $rName = "userParameter$rIndex"  if $rName eq "";
+      $return_str .= $rName." ".$heatpump_parameters[$rIndex];
+    }
+    @userReadings = split /,/, AttrVal( $name, "userHeatpumpValues", "" );
+    foreach (@userReadings) {
+      $return_str .= ","     unless $firstLoop;
+      $firstLoop = 0;
+      my ($rIndex, $rName) = split / /, trim($_);
+      $rName = "userValue$rIndex"  if $rName eq "";
+      $return_str .= $rName." ".$heatpump_values[$rIndex];
+    }
+
    return $return_str;
 }
 
@@ -751,7 +621,7 @@ LUXTRONIK2_UpdateDone($)
 
   my $cop = 0;
 
-  LUXTRONIK2_Log $hash, 5, $string;
+  LUXTRONIK2_Log $hash, 4, $string;
 
   #Define Status Messages
   my %wpOpStat1 = ( 0 => "Waermepumpe laeuft",
@@ -1198,7 +1068,14 @@ LUXTRONIK2_UpdateDone($)
          readingsBulkUpdate($hash, "heatingCycle", "discontinued"); 
       }
          
-      readingsEndUpdate($hash,1);
+      # 76 userHeatpumpParameters
+      my @userReadings = split /,/, $a[76];
+      foreach (@userReadings) {
+        my( $rName, $rValue) = split / /, $_;
+        readingsBulkUpdate($hash, $rName, $rValue);
+      }
+          
+     readingsEndUpdate($hash,1);
      
      $hash->{helper}{fetched_calc_values} = $a[44];
      $hash->{helper}{fetched_parameters} = $a[45];
@@ -2498,7 +2375,11 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <a name="LUXTRONIK2get"></a>
   <b>Get</b>
   <ul>
-      Es wurde noch kein "get" implementiert ...
+      <li><code>rawData</code>
+      <br>
+      Zeigt alle von der Steuerung auslesbaren Parameter und Betriebswerte an.<br>
+      Diese k&ouml;nnen dann mit den Attributen "userHeatpumpParameters" und "userHeatpumpValues" einem Ger&auml;tewert zugeordnet werden.
+      </li><br>
   </ul>
   <br>
   
@@ -2550,10 +2431,21 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
       </li><br>
     <li><code>statusHTML</code>
       <br>
-      wenn gesetzt, dann wird ein HTML-formatierter Wert "floorplanHTML" erzeugt, 
+      Wenn gesetzt, dann wird ein HTML-formatierter Wert "floorplanHTML" erzeugt, 
       welcher vom Modul <a href="#FLOORPLAN">FLOORPLAN</a> genutzt werden kann.<br>
       Momentan wird nur gepr&uuml;ft, ob der Wert dieses Attributes ungleich NULL ist, 
       der entsprechende Ger&auml;tewerte besteht aus dem aktuellen W&auml;rmepumpenstatus und der Heizwassertemperatur.
+      </li><br>
+    <li><code>userHeatpumpParameters &lt;Index [Name][,Index2 [Name2],Index3 [Name3] ...]&gt;</code>
+      <br>
+      Erlaubt das Auslesen der Werte benutzerspezifischer Parameter. Die Indizes der verf&uml;gbaren Parameterwerte k&ouml;nnen mit dem get-Befehl "rawData" ermittelt werden.<br> 
+      Der jeweilige Index-Wert wird entweder als "user"-Ger&auml;tewert oder unter dem angegebenen Namen angezeigt. In der Attributdefinition kann der Name hinter den Index getrennt durch ein Leerzeichen geschrieben werden.<br>
+      Mehrere Indizes werden durch Kommas getrennt.<br>
+      Nicht mehr benötigte Gerätewerte können mit dem FHEM-Befehl <a href="#deletereading">deleteReading</a> gelöscht werden.
+      </li><br>
+    <li><code>userHeatpumpValues &lt;Index Name[,Index2 Name2,Index3 Name3 ...]&gt;</code>
+      <br> 
+      Erlaubt das Auslesen benutzerspezifische Betriebswerte. Vorgehen wie bei userHeatpumpParameters
       </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a>
     </li><br>
