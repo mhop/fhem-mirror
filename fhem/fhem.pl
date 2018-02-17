@@ -1116,7 +1116,7 @@ AnalyzeCommand($$;$)
   $cmd =~ s/^[ \t]*//;
   if($evalSpecials) {
     map { my $n = substr($_,1); my $v = $evalSpecials->{$_};
-          $cmd =~ s/\$$n/$v/g; } keys %{$evalSpecials};
+          $cmd =~ s/\$$n/$v/g; } sort { $b cmp $a } keys %{$evalSpecials};
     $evalSpecials = undef if(!$calledFromChain || $calledFromChain ne "ACC");
   }
   my ($fn, $param) = split("[ \t][ \t]*", $cmd, 2);
