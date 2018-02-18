@@ -255,8 +255,8 @@ use vars qw($fhemForked);       # 1 in a fhemFork()'ed process, else undef
 $selectTimestamp = gettimeofday();
 $cvsid = '$Id$';
 
-my $AttrList = "alias comment:textField-long eventMap group room ".
-               "suppressReading userReadings:textField-long ".
+my $AttrList = "alias comment:textField-long eventMap:textField-long ".
+               "group room suppressReading userReadings:textField-long ".
                "verbose:0,1,2,3,4,5";
 
 my $currcfgfile="";             # current config/include file
@@ -3981,7 +3981,7 @@ ReplaceEventMap($$$)
 }
 
 # $dir: 0:usr,$str is array pointer, 1:dev, $str is string
-# perl notation: { dev=>{"re1"=>"Evt1",...}, dpy=>{"re2"=>"Set 1",...}}
+# perl notation: { dev=>{"re1"=>"Evt1",...}, fw=>{"re1"=>"Set 1",...}}
 sub
 ReplaceEventMap2($$$)
 {

@@ -60,19 +60,18 @@ SetExtensions($$@)
 
   my $hasOn  = ($list =~ m/(^| )on\b/);
   my $hasOff = ($list =~ m/(^| )off\b/);
-  my $value = Value($name);
-  my $em = AttrVal($name, "eventMap", undef);
-  if($em) {
-    if(!$hasOn || !$hasOff) {
-      $hasOn  = ($em =~ m/:on\b/)  if(!$hasOn);
-      $hasOff = ($em =~ m/:off\b/) if(!$hasOff);
+
+  if((!$hasOn || !$hasOff) && AttrVal($name, "eventMap", undef)) {
+    if(!$hasOn) {
+      my (undef,$value) = ReplaceEventMap($name, [$name, "on"], 0);
+      $hasOn = ($value ne "on");
     }
-    # Following is fix for P#1: /B0:on/on-for-timer 300:5Min/
-    # $cmd = ReplaceEventMap($name, $cmd, 1) if($cmd ne "?");
-    # Has problem with P#2 (Forum #28855): /on-for-timer 300:5Min/on:Ein/
-    # Workaround for P#1 /on-for-timer 300:5Min/on-for-timer:on-for-timer/B0:on/
-    (undef,$value) = ReplaceEventMap($name, [$name, $value], 0) if($cmd ne "?");
+    if(!$hasOff) {
+      my (undef,$value) = ReplaceEventMap($name, [$name, "off"], 0);
+      $hasOff = ($value ne "off");
+    }
   }
+
   if(!$hasOn || !$hasOff) { # No extension
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -169,6 +168,7 @@ SetExtensions($$@)
     }
     
   } elsif($cmd eq "toggle") {
+    my $value = Value($name);
     $value = ($1==0 ? "off" : "on") if($value =~ m/dim (\d+)/); # Forum #49391
     SE_DoSet($name, $value =~ m/^on/ ? "off" : "on");
 
