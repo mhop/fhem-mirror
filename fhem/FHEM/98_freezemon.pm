@@ -22,6 +22,8 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.13:	added extended Details attribute
+#				optimization of logging
 #		0.0.12:	problem with older perl versions (Forum #764462)
 #				Small improvement in device detection
 #				added ignoreDev and ignorMode attribute
@@ -71,7 +73,7 @@ use POSIX;
 use Time::HiRes qw(gettimeofday);
 use B qw(svref_2object);
 
-my $version = "0.0.12";
+my $version = "0.0.13";
 
 ###################################
 sub freezemon_Initialize($) {
@@ -80,7 +82,7 @@ sub freezemon_Initialize($) {
 
     # Module specific attributes
     my @freezemon_attr =
-      ("fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all");
+      ("fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all fm_extDetail:0,1");
 
     $hash->{GetFn}             = "freezemon_Get";
     $hash->{SetFn}             = "freezemon_Set";
@@ -177,7 +179,7 @@ sub freezemon_ProcessTimer($) {
 
         # Find the internal timers that are still in the hash
         my @olddev = split( " ", $dev );
-        my @newdev = split( " ", freezemon_apptime() );
+        my @newdev = split( " ", freezemon_apptime($hash) );
 
         my %nd = map { $_ => 1 } @newdev;
         foreach my $d (@olddev) {
@@ -242,7 +244,7 @@ sub freezemon_ProcessTimer($) {
 
             # Build hash with 20 last freezes
             my @freezes = ();
-            push @freezes, split( ",", ReadingsVal( $name, ".fm_freezes", undef ) );
+            push @freezes, split( ",", ReadingsVal( $name, ".fm_freezes", "" ) );
             push @freezes, strftime( "%Y-%m-%d", localtime ) . ": s:$start e:$end f:$freeze d:$dev";
 
             #while (keys @freezes > 20) {       #problem with older Perl versions
@@ -314,7 +316,7 @@ sub freezemon_ProcessTimer($) {
 
     # start next timer
     $hash->{helper}{fn}      = "";
-    $hash->{helper}{apptime} = freezemon_apptime();
+    $hash->{helper}{apptime} = freezemon_apptime($hash);
     $hash->{helper}{TIMER}   = int($now) + 1;
     InternalTimer( $hash->{helper}{TIMER}, 'freezemon_ProcessTimer', $hash, 0 );
 }
@@ -472,7 +474,10 @@ sub freezemon_start($) {
 }
 
 ###################################
-sub freezemon_apptime() {
+sub freezemon_apptime($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
     my @intAtKeys    = keys(%intAt);
     my $now          = gettimeofday();
     my $minCoverExec = 10;               # Let's see if we can find more if we look ahead further
@@ -502,7 +507,7 @@ sub freezemon_apptime() {
             $cv     = svref_2object($fn);
             $fnname = $cv->GV->NAME;
             $ret .= $intAt{$i}{TRIGGERTIME} . "-" . $fnname;
-            Log3 undef, 5, "Freezemon: Reference found: " . ref($fn) . "/$fnname/$fn";
+            Log3 $name, 5, "Freezemon: Reference found: " . ref($fn) . "/$fnname/$fn";
         }
         else {
             $ret .= $intAt{$i}{TRIGGERTIME} . "-" . $fn;
@@ -512,16 +517,21 @@ sub freezemon_apptime() {
         $shortarg = ( defined($arg) ? $arg : "" );
         if ( ref($shortarg) eq "HASH" ) {
             if ( !defined( $shortarg->{NAME} ) ) {
-                if ( $fn eq "BlockingKill" ) {
-                    $shortarg = $shortarg->{abortArg}{NAME};
-                }
-                elsif ( $fn eq "HttpUtils_Err" ) {
-                    $shortarg = $shortarg->{hash}{hash}{NAME};
-                }
-                else {
-                    Log3 undef, 5, "Freezemon: found something without a name $fn" . Dumper($shortarg);
-                    $shortarg = "N/A";
-                }
+				if (AttrVal($name,"fm_extDetail",0) == 1) {
+					if ( $fn eq "BlockingKill" ) {
+						$shortarg = $shortarg->{abortArg}{NAME};
+					}
+					elsif ( $fn eq "HttpUtils_Err" ) {
+						$shortarg = $shortarg->{hash}{hash}{NAME};
+					}
+					else {
+						Log3 $name, 5, "Freezemon: found something without a name $fn" . Dumper($shortarg);
+						$shortarg = "N/A";
+					}
+				}
+				else {
+					$shortarg = "N/A";
+				}
             }
             else {
                 $shortarg = $shortarg->{NAME};
@@ -533,15 +543,15 @@ sub freezemon_apptime() {
                 $shortarg = $deref->{'hash'}{NAME};    #at least in DOIF_TimerTrigger
             }
             else {
-                Log3 undef, 5, "Freezemon: found a REF $fn " . Dumper( ${$arg} );
+                Log3 $name, 5, "Freezemon: found a REF $fn " . Dumper( ${$arg} );
             }
         }
         else {
-            #Log3 undef, 3, "Freezemon: found something that's not a HASH $fn ".ref($shortarg)." ".Dumper($shortarg);
+            #Log3 $name, 3, "Freezemon: found something that's not a HASH $fn ".ref($shortarg)." ".Dumper($shortarg);
             $shortarg = "N/A";
         }
         if ( !$shortarg ) {
-            Log3 undef, 5, "Freezemon: something went wrong $fn " . Dumper($arg);
+            Log3 $name, 5, "Freezemon: something went wrong $fn " . Dumper($arg);
             $shortarg = "";
         }
         else {
@@ -552,7 +562,7 @@ sub freezemon_apptime() {
     if (%prioQueues) {
         my $nice  = minNum( keys %prioQueues );
         my $entry = shift( @{ $prioQueues{$nice} } );
-        Log3 undef, 5, "Freezemon: found a prioQueue" . Dumper($entry);
+        Log3 $name, 5, "Freezemon: found a prioQueue" . Dumper($entry);
         $cv     = svref_2object( $entry->{fn} );
         $fnname = $cv->GV->NAME;
         $ret .= ":" . $shortarg;
@@ -632,6 +642,7 @@ sub freezemon_apptime() {
   <b>Attributes</b>
 		<ul>
 			<ul>
+				<li>fm_extDetail: provides in some cases extended details for recognized freezes. In some cases it was reported that FHEM crashes, so please be careful.</li>
 				<li>fm_freezeThreshold: Value in seconds (Default: 1) - Only freezes longer than fm_freezeThreshold will be considered as a freeze</li>
 				<li>fm_forceApptime: When FREEZEMON is active, apptime will automatically be started (if not yet active)</li>
 				<li>fm_ignoreDev: list of comma separated Device names. If all devices possibly causing a freeze are in the list, the freeze will be ignored (not logged)</li>
@@ -710,6 +721,7 @@ sub freezemon_apptime() {
   <b>Attribute</b>
   <ul>
 		<ul>
+			<li>fm_extDetail: stellt in einigen Fällen zusätzliche Details bei erkannten Freezes zur Verfügung. In wenigen Fällen wurde berichtet, dass FHEM crasht, also vorsichtig verwenden.</li>
 			<li>fm_freezeThreshold: Wert in Sekunden (Default: 1) - Nur Freezes lÃ¤nger als fm_freezeThreshold werden als Freeze betrachtet </li>
 			<li>fm_forceApptime: Wenn FREEZEMON aktiv ist wird automatisch apptime gestartet (falls nicht aktiv)</li>
 			<li>fm_ignoreDev: Liste von Komma-getrennten Devices. Wenn einzelne mÃ¶glicherweise einen Freeze verursachenden Device in dieser Liste sind, wird der Freeze ignoriert (nicht geloggt). Bitte das Attribut fm_ignoreMode beachten</li>
