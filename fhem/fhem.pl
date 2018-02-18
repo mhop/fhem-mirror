@@ -237,7 +237,8 @@ use vars qw(%data);             # Hash for user data
 use vars qw(%defaultattr);      # Default attributes, used by FHEM2FHEM
 use vars qw(%defs);             # FHEM device/button definitions
 use vars qw(%inform);           # Used by telnet_ActivateInform
-use vars qw(%intAt);            # Internal at timer hash, global for benchmark
+use vars qw(%intAt);            # Internal timer hash, used by apptime
+use vars qw(@intAtA);           # Internal timer array
 use vars qw(%logInform);        # Used by FHEMWEB/Event-Monitor
 use vars qw(%modules);          # List of loaded modules (device/log/etc)
 use vars qw(%ntfyHash);         # hash of devices needed to be notified.
@@ -3069,29 +3070,21 @@ HandleTimeout()
   }
 
   $nextat = 0;
-  #############
-  # Check the internal list.
-  foreach my $i (sort { $intAt{$a}{TRIGGERTIME} <=>
-                        $intAt{$b}{TRIGGERTIME} }
-                 grep { $intAt{$_}{TRIGGERTIME} <= $now } # sort is slow
-                        keys %intAt) {
-    $i = "" if(!defined($i)); # Forum #40598
-    next if(!$intAt{$i}); # deleted in the loop
-    my $tim = $intAt{$i}{TRIGGERTIME};
-    my $fn = $intAt{$i}{FN};
-    if(!defined($tim) || !defined($fn)) {
-      delete($intAt{$i});
-      next;
+  while(@intAtA) {
+    my $at = $intAtA[0];
+    my $tim = $at->{TRIGGERTIME};
+    if($tim && $tim > $now) {
+      $nextat = $tim;
+      last;
     }
-    no strict "refs";
-    &{$fn}($intAt{$i}{ARG});
-    use strict "refs";
-    delete($intAt{$i});
-  }
+    delete $intAt{$at->{atNr}} if($at->{atNr});
+    shift(@intAtA);
 
-  foreach my $i (keys %intAt) {
-    my $tim = $intAt{$i}{TRIGGERTIME};
-    $nextat = $tim if(defined($tim) && (!$nextat || $nextat > $tim));
+    if($tim && $at->{FN}) {
+      no strict "refs";
+      &{$at->{FN}}($at->{ARG});
+      use strict "refs";
+    }
   }
 
   if(%prioQueues) {
@@ -3128,11 +3121,27 @@ InternalTimer($$$;$)
     use strict "refs";
     return;
   }
-  $intAt{$intAtCnt}{TRIGGERTIME} = $tim;
-  $intAt{$intAtCnt}{FN} = $fn;
-  $intAt{$intAtCnt}{ARG} = $arg;
-  $intAtCnt++;
+
   $nextat = $tim if(!$nextat || $nextat > $tim);
+  my %h = (TRIGGERTIME=>$tim, FN=>$fn, ARG=>$arg, atNr=>++$intAtCnt);
+  $intAt{$h{atNr}} = \%h;
+
+  if(!@intAtA) {
+    push @intAtA, \%h;
+    return;
+  }
+
+  my $idx = $#intAtA;      # binary insert
+  my ($lowerIdx,$upperIdx) = (0, $idx);
+  while($lowerIdx <= $upperIdx) {
+    $idx = int(($upperIdx-$lowerIdx)/2)+$lowerIdx;
+    if($tim >= $intAtA[$idx]->{TRIGGERTIME}) {
+      $lowerIdx = ++$idx;
+    } else {
+      $upperIdx = $idx-1;
+    }
+  }
+  splice(@intAtA, $idx, 0, \%h);
 }
 
 sub
@@ -3140,10 +3149,16 @@ RemoveInternalTimer($;$)
 {
   my ($arg, $fn) = @_;
   return if(!$arg && !$fn);
-  foreach my $a (keys %intAt) {
-    my ($ia, $if) = ($intAt{$a}{ARG}, $intAt{$a}{FN});
-    delete($intAt{$a}) if((!$arg || ($ia && $ia eq $arg)) &&
-                          (!$fn  || ($if && $if eq $fn)));
+
+  for(my $i=0; $i<@intAtA; $i++)  {
+    my ($ia, $if) = ($intAtA[$i]->{ARG}, $intAtA[$i]->{FN});
+    if((!$arg || ($ia && $ia eq $arg)) &&
+       (!$fn  || ($if && $if eq $fn))) {
+      my $t = $intAtA[$i]->{atNr};
+      delete $intAt{$t} if($intAt{$t});
+      splice @intAtA, $i, 1;
+      $i--;
+    }
   }
 }
 
