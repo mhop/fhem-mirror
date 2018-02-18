@@ -695,9 +695,13 @@ function FW_weekprofileBack(widget)
   if (widget.JMPBACK){
     var isInIframe = (window.location != window.parent.location) ? true : false;
     if (isInIframe) {
-      parent.history.back();
+      parent.history.back();      
     } else
-      window.history.back();
+      if (document.referrer) {
+            window.location.assign(document.referrer)
+      } else {
+        window.history.back() //maybe problems with reload
+        }       
   }
   else {
     widget.MODE = "SHOW";
