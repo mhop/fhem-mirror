@@ -146,6 +146,8 @@
 #   2017-09-06  new attribute reAuthAlways to do the defined authentication steps 
 #               before each get / set / getupdate regardless of any reAuthRegex setting or similar.
 #   2018-01-18  added preProcessRegex e.g. to fix broken JSON data in a response
+#   2018-02-10  modify handling of attribute removeBuf since httpUtils doesn't expose its buffer anymore, 
+#               Instead new attribute showBody to explicitely show a formatted version of the http response body (header is already shown)
 #
 
 #
@@ -211,7 +213,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.4.1 - 18.1.2018';
+my $HTTPMOD_Version = '3.4.2 - 10.2.2018';
 
 #
 # FHEM module intitialisation
@@ -274,7 +276,8 @@ sub HTTPMOD_Initialize($)
 
       "showMatched:0,1 " .
       "showError:0,1 " .
-      "removeBuf:0,1 " .
+      "showBody " .                     # expose the http response body as internal
+      #"removeBuf:0,1 " .               # httpUtils doesn't expose buf anymore
       "preProcessRegex " .
       
       "parseFunction1 " .
@@ -2178,7 +2181,7 @@ sub HTTPMOD_GetCookies($$)
 sub HTTPMOD_InitParsers($$)
 {
     my ($hash, $body) = @_;
-    my $name    = $hash->{NAME};
+    my $name = $hash->{NAME};
 
     # initialize parsers
     if ($hash->{JSONEnabled} && $body) {
@@ -2441,7 +2444,10 @@ sub HTTPMOD_Read($$$)
     $buffer = ($header ? $header . "\r\n\r\n" . $body : $body);      # for matching sid / reauth
     $buffer = $buffer . "\r\n\r\n" . $err if ($err);                 # for matching reauth
     
-    delete $hash->{buf} if (AttrVal($name, "removeBuf", 0));
+    #delete $hash->{buf} if (AttrVal($name, "removeBuf", 0));
+    if (AttrVal($name, "showBody", 0)) {
+        $hash->{httpbody} = $body;
+    }
     
     HTTPMOD_InitParsers($hash, $body);   
     HTTPMOD_GetCookies($hash, $header) if (AttrVal($name, "enableCookies", 0));   
@@ -3545,8 +3551,10 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
             if set to 1 then HTTPMOD will create a reading and event with the Name LAST_ERROR 
             that contains the error message of the last error returned from HttpUtils. 
         <li><b>removeBuf</b></li>
-            if set to 1 then HTTPMOD removes the internal named buf when a HTTP-response has been
-            received. $hash->{buf} is used internally be Fhem httpUtils and in some use cases it is desireable to remove this internal after reception because it contains a very long response which looks ugly in Fhemweb.
+            This attribute has been removed. If set to 1 then HTTPMOD used to removes the internal named buf when a HTTP-response had been
+            received. $hash->{buf} is used internally be Fhem httpUtils and used to be visible. This behavior of httpUtils has changed so removeBuf has become obsolete.
+        <li><b>showBody</b></li>
+            if set to 1 then the body of http responses will be visible as internal httpbody.
             
         <li><b>timeout</b></li>
             time in seconds to wait for an answer. Default value is 2
