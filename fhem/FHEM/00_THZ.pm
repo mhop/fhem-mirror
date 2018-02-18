@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 1/2018
-my $thzversion = "0.177"; 
+my $thzversion = "0.178"; 
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -167,26 +167,12 @@ my %parsinghash = (
 	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 1],
 	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 1]
 	      ],
-  "E8fan"	=> [["x4: ",                4, 4, "hex", 1], 	   
-            [" x8: ",                   8, 4, "hex", 1], 	    
-			[" x12: ",                  12, 4, "hex", 1], 		
-			[" x16: ",                  16, 4, "hex", 1], 	
-			[" x20: ",                  20, 4, "hex", 1],
-			[" x24: ",                  24, 4, "hex", 1], 		
-			[" x28: ",                  28, 4, "hex", 1],
-			[" x32: ",                  32, 4, "hex", 1],		
-			[" x36: ",                  36, 4, "hex", 1],
-			[" x40: ",                  40, 4, "hex", 1],		
-			[" x44: ",                  44, 4, "hex", 1],
-			[" x48: ",                  48, 4, "hex", 1], 			
-			[" x52: ",                  52, 4, "hex", 1],
-            [" x56: ",                  56, 4, "hex", 1],
-            [" inputFanSpeed: ",        58, 2, "hex", 1],           #like in sGlobal
-            [" outputFanSpeed: ",       60, 2, "hex", 1],           #like in sGlobal
-			[" pFanstageXAirflowInlet: ", 62, 4, "hex", 1],     #m3/h  corresponding to p37Fanstage1AirflowInlet or p38Fanstage2AirflowInlet
-			[" pFanstageXAirflowOutlet: ", 66, 4, "hex", 1],    #m3/h corresponding to p40Fanstage1AirflowOutlet or p41Fanstage2AirflowOutlet
-			[" inputFanPower: ",        70, 2, "hex", 1],             # like in sGlobal
-			[" outputFanPower: ",       72, 2, "hex", 1],	          # like in sGlobal		
+  "E8fan"	=> [[" inputFanSpeed: ",        58, 2, "hex", 1],    # like in sGlobal
+            [" outputFanSpeed: ",           60, 2, "hex", 1],    # like in sGlobal
+			[" pFanstageXAirflowInlet: ",   62, 4, "hex", 1],    # m3/h  corresponding to p37Fanstage1AirflowInlet or p38Fanstage2AirflowInlet
+			[" pFanstageXAirflowOutlet: ",  66, 4, "hex", 1],    # m3/h corresponding to p40Fanstage1AirflowOutlet or p41Fanstage2AirflowOutlet
+			[" inputFanPower: ",            70, 2, "hex", 1],    # like in sGlobal
+			[" outputFanPower: ",           72, 2, "hex", 1],	 # like in sGlobal		
 		  ],
   "E8fan206" => [["statusAFC: ",         4, 4, "hex", 1], 	    # 0=init air flow calibration (16:00) 4=normal fan operation
             [" supplyFanSpeedCAL: ",    8, 4, "hex", 60], 	    # calibration speed
@@ -294,7 +280,7 @@ my %parsinghash = (
 	      [" actualPower_Qc: ",	    94, 8, "esp_mant", 1],	[" actualPower_Pel: ",		102, 8, "esp_mant", 1],
 	      [" collectorTemp: ",	    4,  4, "hex2int", 10],	[" insideTemp: ",		    32, 4, "hex2int", 10] 
 	      ],
-  "FBglob206" => [["outsideTemp: ", 8, 4, "hex2int", 10],	[" flowTemp: ",		        12, 4, "hex2int", 10],
+  "FBglob214" => [["outsideTemp: ", 8, 4, "hex2int", 10],	[" flowTemp: ",		        12, 4, "hex2int", 10],
 	      [" returnTemp: ",		    16, 4, "hex2int", 10],  [" hotGasTemp: ", 	        20, 4, "hex2int", 10],
 	      [" dhwTemp: ",	 	    24, 4, "hex2int", 10],  [" flowTempHC2: ",	        28, 4, "hex2int", 10],
 	      [" evaporatorTemp: ",	    36, 4, "hex2int", 10],  [" condenserTemp: ",	    40, 4, "hex2int", 10],
@@ -302,8 +288,29 @@ my %parsinghash = (
 	      [" heatPipeValve: ",	    45, 1, "bit3", 1],      [" diverterValve: ",		45, 1, "bit2", 1],
 	      [" dhwPump: ",		    45, 1, "bit1", 1],      [" heatingCircuitPump: ",	45, 1, "bit0", 1],
 	      [" solarPump: ",		    44, 1, "bit2", 1],      [" compressor: ",		    44, 1, "bit0", 1],
-	      [" boosterStage3: ",	    44, 1, "bit3", 1],      [" boosterStage2: ",		44, 1, "n.a.", 1],
+          [" boosterStage2: ",	    44, 1, "bit3", 1],      [" boosterStage3: ",		44, 1, "n.a.", 1],
 	      [" boosterStage1: ",	    44, 1, "bit1", 1],      [" highPressureSensor: ",	54, 1, "bit3", 1],
+	      [" lowPressureSensor: ",	54, 1, "bit2", 1],      [" evaporatorIceMonitor: ",	55, 1, "bit3", 1],
+	      [" signalAnode: ",	    54, 1, "bit1", 1],      [" evuRelease: ",		    48, 1, "n.a.", 1],
+	      [" ovenFireplace: ",	    54, 1, "bit0", 1],      [" STB: ",			        48, 1, "n.a.", 1],
+	      [" outputVentilatorPower: ",48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 255/100],         
+          [" outputVentilatorSpeed: ",56, 2, "hex", 1],	    [" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
+          [" outsideTempFiltered: ",64, 4, "hex2int", 10],	[" relHumidity: ",		    70, 4, "n.a.", 1],
+          [" dewPoint: ",		    5, 4, "n.a.", 1],
+	      [" P_Nd: ",		        5, 4, "n.a.", 1],	    [" P_Hd: ",			        5, 4, "n.a.", 1],
+	      [" actualPower_Qc: ",	    5, 8, "n.a.", 1],	    [" actualPower_Pel: ",		5, 8, "n.a.", 1],
+	      [" collectorTemp: ",	    4,  4, "hex2int", 10],	[" insideTemp: ",		    32, 4, "hex2int", 10]
+	      ],
+  "FBglob206" => [["outsideTemp: ", 8, 4, "hex2int", 10],	[" flowTemp: ",		        12, 4, "hex2int", 10],
+	      [" returnTemp: ",		    16, 4, "hex2int", 10],  [" hotGasTemp: ", 	        20, 4, "hex2int", 10],
+	      [" dhwTemp: ",		    24, 4, "hex2int", 10],  [" flowTempHC2: ",	        28, 4, "hex2int", 10],
+	      [" evaporatorTemp: ",	    36, 4, "hex2int", 10],  [" condenserTemp: ",	    40, 4, "hex2int", 10],
+	      [" mixerOpen: ",		    47, 1, "bit1", 1],      [" mixerClosed: ",		    47, 1, "bit0", 1],
+	      [" heatPipeValve: ",	    45, 1, "bit3", 1],      [" diverterValve: ",		45, 1, "bit2", 1],
+	      [" dhwPump: ",		    45, 1, "bit1", 1],      [" heatingCircuitPump: ",	45, 1, "bit0", 1],
+	      [" solarPump: ",		    44, 1, "n.a", 1],      	[" compressor: ",		    44, 1, "bit0", 1],
+	      [" boosterStage3: ",	    44, 1, "bit3", 1],      [" boosterStage2: ",		44, 1, "bit2", 1], 	      
+          [" boosterStage1: ",	    44, 1, "bit1", 1],      [" highPressureSensor: ",	54, 1, "bit3", 1],
 	      [" lowPressureSensor: ",	54, 1, "bit2", 1],      [" evaporatorIceMonitor: ",	55, 1, "bit3", 1],
 	      [" signalAnode: ",	    54, 1, "bit1", 1],      [" evuRelease: ",		    48, 1, "n.a.", 1],
 	      [" ovenFireplace: ",	    54, 1, "bit0", 1],      [" STB: ",			        48, 1, "n.a.", 1],
@@ -432,6 +439,7 @@ my %sets439539common = (
   "p55MaxPumpCycles"			=> {cmd2=>"0A05B7", argMin =>  "25", argMax =>  "200",	type =>"1clean",  unit =>""},
   "p56OutTempMaxPumpCycles"		=> {cmd2=>"0A05B9", argMin =>  "0",  argMax =>   "20",	type =>"5temp",  unit =>" °C"},
   "p57OutTempMinPumpCycles"		=> {cmd2=>"0A05BA", argMin =>  "0",  argMax =>   "25",	type =>"5temp",  unit =>" °C"},
+  "p58SuppressTempCaptPumpStart" => {cmd2=>"0A0611", argMin =>  "0",  argMax =>  "120",	type =>"1clean",  unit =>" s"},
   "p76RoomThermCorrection"		=> {cmd2=>"0A0109", argMin =>  "-5", argMax =>    "5", 	type =>"4temp",  unit =>" K"},
   "p77OutThermFilterTime"		=> {cmd2=>"0A010C", argMin =>  "1",  argMax =>   "24", 	type =>"0clean",  unit =>" h"},
   "p35PasteurisationInterval"	=> {cmd2=>"0A0586", argMin =>  "1",  argMax =>   "30", 	type =>"1clean",  unit =>""},
@@ -790,7 +798,6 @@ my %getsonly2xx = (
   "sDHW"			    => {cmd2=>"F3", type =>"F3dhw",    unit =>""},
   "sHC2"			    => {cmd2=>"F5", type =>"F5hc2",    unit =>""},
   "sSystem"			    => {cmd2=>"F6", type =>"F6sys206", unit =>""},
-  "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob206", unit =>""},  
   "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime206", unit =>""},
   "inputVentilatorSpeed"=> {parent=>"sGlobal",              unit =>" %"},
   "outputVentilatorSpeed"=>{parent=>"sGlobal",              unit =>" %"},
@@ -804,7 +811,7 @@ my %getsonly206 = (
   "pFan"              	=> {cmd2=>"01", type =>"01pxx206", unit =>""},
   "sLast10errors"     	=> {cmd2=>"D1", type =>"D1last206", unit =>""},
   "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm",   unit =>""},
-  "sFirmware-Id" 		=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
+  "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob206", unit =>""}
  );
 
 my %getsonly214 = (
@@ -812,10 +819,11 @@ my %getsonly214 = (
   "pExpert"			    => {cmd2=>"02", type =>"02pxx206", unit =>""},
   "sControl"  			=> {cmd2=>"F2", type =>"F2type", unit =>""},
   "sHC1"			    => {cmd2=>"F4", type =>"F4hc1214",    unit =>""},
-  "sLVR"  				=> {cmd2=>"E8", type =>"E8tyype", unit =>""},
-  "sF0"  				=> {cmd2=>"F0", type =>"F0type", unit =>""},
-  "sF1"  				=> {cmd2=>"F1", type =>"F1type", unit =>""},
-  "sEF"  				=> {cmd2=>"EF", type =>"EFtype", unit =>""},
+  #"sLVR"  				=> {cmd2=>"E8", type =>"E8tyype", unit =>""},
+  #"sF0"  				=> {cmd2=>"F0", type =>"F0type", unit =>""},
+  #"sF1"  				=> {cmd2=>"F1", type =>"F1type", unit =>""},
+  #"sEF"  				=> {cmd2=>"EF", type =>"EFtype", unit =>""},
+  "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob214", unit =>""}  
  ); 
 
 
