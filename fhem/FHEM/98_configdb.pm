@@ -59,63 +59,65 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('dump') {
-
-			my ($dbconn,$dbuser,$dbpass,$dbtype)  = _cfgDB_readConfig();
-			my ($dbname,$dbhostname,$dbport,$gzip,$mp,$ret,$size,$source,$target,$ts);
-			$ts     = strftime('%Y-%m-%d_%H-%M-%S',localtime);
-			$mp     = $configDB{attr}{'dumpPath'};
-			$mp   //= AttrVal('global','modpath','.').'/log';
-			$target = "$mp/configDB_$ts.dump";
-
-			if (lc($param1) eq 'unzipped') {
-				$gzip = '';
-			} else {
-				$gzip    = '| gzip -c';
-				$target .= '.gz';
-			}
-			
-			if ($dbtype eq 'SQLITE') {
-				(undef,$source) = split (/=/, $dbconn);
-				my $dumpcmd = "echo '.dump fhem%' | sqlite3 $source $gzip > $target";
-				Log 4,"configDB: $dumpcmd";
-				$ret        = qx($dumpcmd);
-				return $ret if $ret; # return error message if available
-
-			} elsif ($dbtype eq 'MYSQL') {
-				($dbname,$dbhostname,$dbport) = split (/;/,$dbconn);
-				$dbport //= '=3306';
-				(undef,$dbname)     = split (/=/,$dbname);
-				(undef,$dbhostname) = split (/=/,$dbhostname);
-				(undef,$dbport)     = split (/=/,$dbport);
-				my $dbtables = "fhemversions fhemconfig fhemstate fhemb64filesave";
-				my $dumpcmd = "mysqldump --user=$dbuser --password=$dbpass --host=$dbhostname --port=$dbport -Q $dbname $dbtables $gzip > $target";
-				Log 4,"configDB: $dumpcmd";
-				$ret        = qx($dumpcmd);
-				return $ret if $ret;
-				$source = $dbname;
-
-			} elsif ($dbtype eq 'POSTGRESQL') {
-				($dbname,$dbhostname,$dbport) = split (/;/,$dbconn);
-				$dbport //= '=5432';
-				(undef,$dbname)     = split (/=/,$dbname);
-				(undef,$dbhostname) = split (/=/,$dbhostname);
-				(undef,$dbport)     = split (/=/,$dbport);
-				my $dbtables = "-t fhemversions -t fhemconfig -t fhemstate -t fhemb64filesave";
-				my $dumpcmd = "PGPASSWORD=$dbpass pg_dump -U $dbuser -h $dbhostname -p $dbport $dbname $dbtables $gzip > $target";
-				Log 4,"configDB: $dumpcmd";
-				$ret        = qx($dumpcmd);
-				return $ret if $ret;
-				$source     = $dbname;
-
-			} else {
-				return "configdb dump not supported for $dbtype!";
-			}
-
-			$size = -s $target;
-			$size //= 0;
-			$ret  = "configDB dumped $size bytes\nfrom: $source\n  to: $target";
-			return $ret;
+			return _cfgDB_dump($param1);
 		}
+
+# 			my ($dbconn,$dbuser,$dbpass,$dbtype)  = _cfgDB_readConfig();
+# 			my ($dbname,$dbhostname,$dbport,$gzip,$mp,$ret,$size,$source,$target,$ts);
+# 			$ts     = strftime('%Y-%m-%d_%H-%M-%S',localtime);
+# 			$mp     = $configDB{attr}{'dumpPath'};
+# 			$mp   //= AttrVal('global','modpath','.').'/log';
+# 			$target = "$mp/configDB_$ts.dump";
+# 
+# 			if (lc($param1) eq 'unzipped') {
+# 				$gzip = '';
+# 			} else {
+# 				$gzip    = '| gzip -c';
+# 				$target .= '.gz';
+# 			}
+# 			
+# 			if ($dbtype eq 'SQLITE') {
+# 				(undef,$source) = split (/=/, $dbconn);
+# 				my $dumpcmd = "echo '.dump fhem%' | sqlite3 $source $gzip > $target";
+# 				Log 4,"configDB: $dumpcmd";
+# 				$ret        = qx($dumpcmd);
+# 				return $ret if $ret; # return error message if available
+# 
+# 			} elsif ($dbtype eq 'MYSQL') {
+# 				($dbname,$dbhostname,$dbport) = split (/;/,$dbconn);
+# 				$dbport //= '=3306';
+# 				(undef,$dbname)     = split (/=/,$dbname);
+# 				(undef,$dbhostname) = split (/=/,$dbhostname);
+# 				(undef,$dbport)     = split (/=/,$dbport);
+# 				my $dbtables = "fhemversions fhemconfig fhemstate fhemb64filesave";
+# 				my $dumpcmd = "mysqldump --user=$dbuser --password=$dbpass --host=$dbhostname --port=$dbport -Q $dbname $dbtables $gzip > $target";
+# 				Log 4,"configDB: $dumpcmd";
+# 				$ret        = qx($dumpcmd);
+# 				return $ret if $ret;
+# 				$source = $dbname;
+# 
+# 			} elsif ($dbtype eq 'POSTGRESQL') {
+# 				($dbname,$dbhostname,$dbport) = split (/;/,$dbconn);
+# 				$dbport //= '=5432';
+# 				(undef,$dbname)     = split (/=/,$dbname);
+# 				(undef,$dbhostname) = split (/=/,$dbhostname);
+# 				(undef,$dbport)     = split (/=/,$dbport);
+# 				my $dbtables = "-t fhemversions -t fhemconfig -t fhemstate -t fhemb64filesave";
+# 				my $dumpcmd = "PGPASSWORD=$dbpass pg_dump -U $dbuser -h $dbhostname -p $dbport $dbname $dbtables $gzip > $target";
+# 				Log 4,"configDB: $dumpcmd";
+# 				$ret        = qx($dumpcmd);
+# 				return $ret if $ret;
+# 				$source     = $dbname;
+# 
+# 			} else {
+# 				return "configdb dump not supported for $dbtype!";
+# 			}
+# 
+# 			$size = -s $target;
+# 			$size //= 0;
+# 			$ret  = "configDB dumped $size bytes\nfrom: $source\n  to: $target";
+# 			return $ret;
+# 		}
 
 		when ('diff') {
 			return "\n Syntax: configdb diff <device> <version>" if @a != 3;
