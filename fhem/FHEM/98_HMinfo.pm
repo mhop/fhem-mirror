@@ -700,11 +700,6 @@ sub HMinfo_tempList(@) { ######################################################
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
   my $ret;
   
-  if (not -f $fName) { #create file if necessary
-    open(aSave, ">$fName") || return("Can't open $fName: $!");
-    print aSave "#init\n";
-  }
-
   if    ($action eq "save"){
 #    foreach my $eN(HMinfo_getEntities("d")){#search and select channel
 #      my $md = AttrVal($eN,"model","");
@@ -758,7 +753,7 @@ sub HMinfo_tempList(@) { ######################################################
     my  @oldList;
     
     my ($err,@RLines) = FileRead($fName);
-    return "file: $fName error:$err"  if ($err);
+    push (@RLines, "#init")  if ($err);
     my $skip = 0;
     foreach(@RLines){
       chomp;
@@ -900,13 +895,13 @@ sub HMinfo_tempListTmplView() { ###############################################
   return $ret;
 }
 sub HMinfo_tempListDefFn(@) { #################################################
-  #return Default filename for tempList
   my ($fn) = shift;
   $fn = "" if (!defined $fn);
   my $ret = "";
-  my ($n) =devspec2array("TYPE=HMinfo");
-  $ret .= "$attr{global}{modpath}/"                  if (!$fn || $fn !~ m/^\//);  #no path? add modpath
-  $ret .= AttrVal($n,"configDir",".")."/"            if (!$fn || $fn !~ m/..*\//);#no dir?  add defDir
+  my ($n) = devspec2array("TYPE=HMinfo");
+  $ret .= "$attr{global}{modpath}/"                  if (    !$fn  || $fn  !~ m/^\//);  #no path? add modpath
+  $ret .= AttrVal($n,"configDir",".")."/"            if (    !$ret || $ret !~ m/..*\//
+                                                         && (!$fn  || $fn  !~ m/^\//));#no dir?  add defDir
   if (!$fn){                                                                      #set filename
     my ($f) = split(",",AttrVal($n,"configTempFile","tempList.cfg"));
     $ret .= $f;
@@ -1002,10 +997,6 @@ sub HMinfo_tempListTmplGenLog($$) { ###########################################
     my (undef,$eN) = split " ",$_;
     $eNh{$eN} = 1;
   }
-  if (not -f $fName) { #create file if necessary
-    open(aSave, ">$fName") || return("Can't open $fName: $!");
-    print aSave "#init\n";
-  }
   $err = FileWrite($fName,@WLines);
   return "file: $fName error write:$err"  if ($err);
   HMinfo_tempListTmplGenGplot($fName,keys %eNh);
@@ -1055,10 +1046,6 @@ sub HMinfo_tempListTmplGenGplot(@) { ##########################################
     }
   }
   
-  if (not -f $fName) { #create file if necessary
-    open(aSave, ">$fName") || return("Can't open $fName: $!");
-    print aSave "#init\n";
-  }
   push @WLines,$func.$plot;
   my $err = FileWrite($fName,@WLines);
   return "file: $fName error write:$err"  if ($err);
