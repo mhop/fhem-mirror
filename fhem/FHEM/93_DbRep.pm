@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.13.0       17.02.2018       changeValue can handle perl code {} as "new string"
 # 7.12.0       16.02.2018       compression of dumpfile, restore of compressed files possible
 # 7.11.0       12.02.2018       new command "repairSQLite" to repair a corrupted SQLite database
 # 7.10.0       10.02.2018       bugfix delete attr timeYearPeriod if set other time attributes, new "changeValue" command
@@ -105,11 +106,11 @@
 #                               commandref revised, minor fixes
 # 5.8.6        30.10.2017       don't limit attr reading, device if the attr contains a list
 # 5.8.5        19.10.2017       filter unwanted characters in "procinfo"-result 
-# 5.8.4        17.10.2017       createSelectSql, DbRep_createDeleteSql, currentfillup_Push switch to devspec 
-# 5.8.3        16.10.2017       change to use createSelectSql: minValue,diffValue - DbRep_createDeleteSql: delEntries
+# 5.8.4        17.10.2017       DbRep_createSelectSql, DbRep_createDeleteSql, currentfillup_Push switch to devspec 
+# 5.8.3        16.10.2017       change to use DbRep_createSelectSql: minValue,diffValue - DbRep_createDeleteSql: delEntries
 # 5.8.2        15.10.2017       sub DbRep_createTimeArray
-# 5.8.1        15.10.2017       change to use createSelectSql: sumValue,averageValue,exportToFile,maxValue
-# 5.8.0        15.10.2017       adapt createSelectSql for better performance if time/aggregation not set, 
+# 5.8.1        15.10.2017       change to use DbRep_createSelectSql: sumValue,averageValue,exportToFile,maxValue
+# 5.8.0        15.10.2017       adapt DbRep_createSelectSql for better performance if time/aggregation not set, 
 #                               can set table as flexible argument for countEntries, fetchrows (default: history),
 #                               minor fixes
 # 5.7.1        13.10.2017       tableCurrentFillup fix for PostgreSQL, commandref revised
@@ -316,7 +317,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.12.0";
+my $DbRepVersion = "7.13.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -563,7 +564,6 @@ sub DbRep_Set($@) {
        
 	   # Befehl vor Procedure ausführen
        DbRep_beforeproc($hash, "repair");
-       
 	   DbRep_Main($hash,$opt);
        return undef;
   }
@@ -785,13 +785,28 @@ sub DbRep_Set($@) {
       shift @a;
       $prop = join(" ", @a);
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-      unless($prop =~ m/^(".*",".*")$/) {return "Both entries \"old value\", \"new value\" are needed. Use \"set $name changeValue \"old value\",\"new value\" (use quotes)";}
-      my ($oldval,$newval)     = split(/","/,$prop);
-      $oldval =~ s/"//g;
-      $newval =~ s/"//g;
+      unless($prop =~ m/^\s*(".*",".*")\s*$/) {return "Both entries \"old string\", \"new string\" are needed. Use \"set $name changeValue \"old string\",\"new string\" (use quotes)";}
+      my $complex = 0;
+      my ($oldval,$newval) = ($prop =~ /^\s*"(.*?)","(.*?)"\s*$/);
+
+      if($newval =~ m/[{}]/) {
+          if($newval =~ m/^\s*(\{.*\})\s*$/s) {
+              $newval  = $1;
+              $complex = 1;
+              my %specials = (
+                 "%VALUE" => $name,
+                 "%UNIT" => $name,
+              );
+              $newval = EvalSpecials($newval, %specials);
+          } else {
+              return "The expression of \"new string\" has to be included in \"{ }\" ";
+          }
+      }
+      $hash->{HELPER}{COMPLEX} = $complex;
       $hash->{HELPER}{OLDVAL}  = $oldval;
       $hash->{HELPER}{NEWVAL}  = $newval;
-	  $hash->{HELPER}{RENMODE} = "changeval";
+      $hash->{HELPER}{RENMODE} = "changeval";
+      DbRep_beforeproc($hash, "changeval");
       DbRep_Main($hash,$opt);
 	 
   } else {
@@ -1428,9 +1443,12 @@ sub DbRep_Main($$;$) {
  } elsif ($opt eq "insert") { 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
          
- } elsif ($opt =~ /deviceRename|readingRename|changeValue/) { 
+ } elsif ($opt =~ /deviceRename|readingRename/) { 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("change_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "change_Done", $to, "ParseAborted", $hash);   
          
+ } elsif ($opt =~ /changeValue/) {
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("changeval_Push", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts", "change_Done", $to, "ParseAborted", $hash);   
+     
  } elsif ($opt =~ /sqlCmd/ ) {
     # Execute a generic sql command
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "ParseAborted", $hash);     
@@ -2061,9 +2079,9 @@ sub averval_DoParse($) {
          # arithmetischer Mittelwert (Standard)
          #           
          if ($IsTimeSet || $IsAggrSet) {
-             $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon); 
+             $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon); 
 	     } else {
-	         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,$addon);
+	         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,$addon);
 	     }
          Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
          
@@ -2106,7 +2124,7 @@ sub averval_DoParse($) {
              my $bsel = $bdate." ".sprintf("%02d",$i).":00:00";
              my $esel  = ($i<23)?$bdate." ".sprintf("%02d",$i).":59:59":$runtime_string_next;
 
-	         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$bsel'","'$esel'",$addon);
+	         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$bsel'","'$esel'",$addon);
              Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
              eval{ $sth = $dbh->prepare($sql);
@@ -2165,8 +2183,8 @@ sub averval_DoParse($) {
          my $sum = 0;
          my $addonf = 'ORDER BY TIMESTAMP ASC LIMIT 1';
          my $addonl = 'ORDER BY TIMESTAMP DESC LIMIT 1';
-         my $sqlf   = createSelectSql($hash,"history","TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addonf);
-         my $sqll   = createSelectSql($hash,"history","TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addonl);
+         my $sqlf   = DbRep_createSelectSql($hash,"history","TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addonf);
+         my $sqll   = DbRep_createSelectSql($hash,"history","TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addonl);
          
          eval { $tf = ($dbh->selectrow_array($sqlf))[0];
                 $tl = ($dbh->selectrow_array($sqll))[0];
@@ -2188,9 +2206,9 @@ sub averval_DoParse($) {
              $tsum = (timelocal($secl, $minl, $hhl, $ddl, $mml-1, $yyyyl-1900))-(timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900));          
          
              if ($IsTimeSet || $IsAggrSet) {
-                 $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
+                 $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
 	         } else {
-	             $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,$addon); 
+	             $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,$addon); 
 	         }
              Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
              
@@ -2392,9 +2410,9 @@ sub count_DoParse($) {
      my $runtime_string_next   = $a[2];      
 
      if ($IsTimeSet || $IsAggrSet) {
-         $sql = createSelectSql($hash,$table,"COUNT(*)",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
+         $sql = DbRep_createSelectSql($hash,$table,"COUNT(*)",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
 	 } else {
-	     $sql = createSelectSql($hash,$table,"COUNT(*)",$device,$reading,undef,undef,''); 
+	     $sql = DbRep_createSelectSql($hash,$table,"COUNT(*)",$device,$reading,undef,undef,''); 
 	 }
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
@@ -2558,9 +2576,9 @@ sub maxval_DoParse($) {
      $runtime_string = encode_base64($runtime_string,"");   
      
      if ($IsTimeSet || $IsAggrSet) {
-         $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");
+         $sql = DbRep_createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP");
 	 } else {
-	     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");	 
+	     $sql = DbRep_createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");	 
 	 }
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
@@ -2796,9 +2814,9 @@ sub minval_DoParse($) {
      $runtime_string = encode_base64($runtime_string,"");
      
      if ($IsTimeSet || $IsAggrSet) {
-         $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP"); 
+         $sql = DbRep_createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP"); 
 	 } else {
-	     $sql = createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");	 
+	     $sql = DbRep_createSelectSql($hash,"history","VALUE,TIMESTAMP",$device,$reading,undef,undef,"ORDER BY TIMESTAMP");	 
 	 }
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
@@ -3058,9 +3076,9 @@ sub diffval_DoParse($) {
      }
 	 
      if ($IsTimeSet || $IsAggrSet) {
-         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
+         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
 	 } else {
-	     $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,''); 
+	     $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,''); 
 	 }
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
@@ -3414,9 +3432,9 @@ sub sumval_DoParse($) {
      my $runtime_string_next   = $a[2];       
      
      if ($IsTimeSet || $IsAggrSet) {
-         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
+         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
 	 } else {
-         $sql = createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'');
+         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'');
 	 }
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
@@ -4100,47 +4118,17 @@ sub change_Push($) {
 	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
 	 $sth = $dbh->prepare($sql) ;
      
- } elsif ($renmode eq "changeval") {
-     $old = delete $hash->{HELPER}{OLDVAL};
-     $new = delete $hash->{HELPER}{NEWVAL};
-     
-	 # SQL zusammenstellen für DB-Operation
-     Log3 ($name, 5, "DbRep $name -> Change old value \"$old\" to new value \"$new\" in database $dblogname ");
-	 
-	 # prepare DB operation
-	 $old =~ s/'/''/g;       # escape ' with ''
-	 $new =~ s/'/''/g;       # escape ' with ''
-     my $d = AttrVal($name,"device","%");
-     my $r = AttrVal($name,"reading","%");
-     
-     # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
-     my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
-     Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
- 
-     # SQL zusammenstellen für DB-Update
-     if ($IsTimeSet) {
-         $sql = DbRep_createUpdateSql($hash,$table,"TIMESTAMP=TIMESTAMP,VALUE='$new' WHERE VALUE='$old'",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
-     } else {
-         $sql = DbRep_createUpdateSql($hash,$table,"TIMESTAMP=TIMESTAMP,VALUE='$new' WHERE VALUE='$old'",$device,$reading,undef,undef,'');
-     }
-	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
-	 $sth = $dbh->prepare($sql) ;
- }         
- 
- my $urow;
- eval { $sth->execute(); };
+ }          
  
  $old =~ s/''/'/g;       # escape back 
  $new =~ s/''/'/g;       # escape back 
  
+ my $urow;
+ eval { $sth->execute(); };
  if ($@) {
      $err = encode_base64($@,"");
-     if($renmode ne "changeValue") {
-	     my $m = ($renmode eq "devren")?"device":"reading";
-         Log3 ($name, 2, "DbRep $name - Failed to rename old $m name \"$old\" to new $m name \"$new\": $@");
-     } else {
-         Log3 ($name, 2, "DbRep $name - Failed to change old value \"$old\" to new value \"$new\": $@");
-     }
+	 my $m = ($renmode eq "devren")?"device":"reading";
+     Log3 ($name, 2, "DbRep $name - Failed to rename old $m name \"$old\" to new $m name \"$new\": $@");
 	 $dbh->rollback() if(!$dbh->{AutoCommit});
      $dbh->disconnect();
      Log3 ($name, 4, "DbRep $name -> BlockingCall change_Push finished");
@@ -4165,7 +4153,194 @@ sub change_Push($) {
 }
 
 ####################################################################################################
-# Auswertungsroutine DB deviceRename
+# nichtblockierendes DB deviceRename / readingRename
+####################################################################################################
+sub changeval_Push($) {
+ my ($string) = @_;
+ my ($name,$device,$reading,$runtime_string_first,$runtime_string_next,$ts) = split("\\§", $string);
+ my $hash       = $defs{$name};
+ my $dbloghash  = $hash->{dbloghash};
+ my $dbconn     = $dbloghash->{dbconn};
+ my $dbuser     = $dbloghash->{dbuser};
+ my $dblogname  = $dbloghash->{NAME};
+ my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $table      = "history";
+ my $complex    = $hash->{HELPER}{COMPLEX};     # einfache oder komplexe Werteersetzung
+ my ($dbh,$err,$sql,$urow);
+ 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall changeval_Push");
+ 
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
+ 
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
+     return "$name|''|''|$err";
+ }
+
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+ 
+ my ($sth,$old,$new);
+ eval { $dbh->begin_work() if($dbh->{AutoCommit}); };   # Transaktion wenn gewünscht und autocommit ein
+ if ($@) {
+     Log3($name, 2, "DbRep $name -> Error start transaction - $@");
+ }
+ 
+ if (!$complex) {
+     $old = delete $hash->{HELPER}{OLDVAL};
+     $new = delete $hash->{HELPER}{NEWVAL};
+     
+	 # SQL zusammenstellen für DB-Operation
+     Log3 ($name, 5, "DbRep $name -> Change old value \"$old\" to new value \"$new\" in database $dblogname ");
+	 
+	 # prepare DB operation
+	 $old =~ s/'/''/g;       # escape ' with ''
+	 $new =~ s/'/''/g;       # escape ' with ''
+ 
+     # SQL zusammenstellen für DB-Update
+     my $addon = $old =~ /%/?"WHERE VALUE LIKE '$old'":"WHERE VALUE='$old'";
+     if ($IsTimeSet) {
+         $sql = DbRep_createUpdateSql($hash,$table,"TIMESTAMP=TIMESTAMP,VALUE='$new' $addon",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
+     } else {
+         $sql = DbRep_createUpdateSql($hash,$table,"TIMESTAMP=TIMESTAMP,VALUE='$new' $addon",$device,$reading,undef,undef,'');
+     }
+	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
+	 $sth = $dbh->prepare($sql) ;
+     
+     $old =~ s/''/'/g;       # escape back 
+     $new =~ s/''/'/g;       # escape back 
+ 
+     eval { $sth->execute(); };
+     if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - Failed to change old value \"$old\" to new value \"$new\": $@");
+	     $dbh->rollback() if(!$dbh->{AutoCommit});
+         $dbh->disconnect();
+         Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
+         return "$name|''|''|$err";
+     } else {
+         $dbh->commit() if(!$dbh->{AutoCommit});
+         $urow = $sth->rows;
+     }
+     
+ } else {
+     $old = delete $hash->{HELPER}{OLDVAL};
+     $new = delete $hash->{HELPER}{NEWVAL};
+     $old =~ s/'/''/g;       # escape ' with ''
+     
+     # Timestampstring to Array
+     my @ts = split("\\|", $ts);
+     Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");
+     
+     # DB-Abfrage zeilenweise für jeden Array-Eintrag
+     $urow = 0;
+     my $selspec = "DEVICE,READING,TIMESTAMP,VALUE,UNIT";
+     my $addon   = $old =~ /%/?"AND VALUE LIKE '$old'":"AND VALUE='$old'";
+     foreach my $row (@ts) {
+         my @a                     = split("#", $row);
+         my $runtime_string        = $a[0];
+         my $runtime_string_first  = $a[1];
+         my $runtime_string_next   = $a[2];
+         
+         if ($IsTimeSet || $IsAggrSet) {
+             $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon); 
+	     } else {
+	         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,$addon);
+	     }
+         Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+         
+         eval{ $sth = $dbh->prepare($sql);
+               $sth->execute();
+             };	         
+	     if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - $@");
+             $dbh->disconnect;
+             Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
+             return "$name|''|''|$err";
+         }
+         
+         no warnings 'uninitialized'; 
+         #                     DEVICE   _ESC_  READING  _ESC_     DATE _ESC_ TIME        _ESC_  VALUE    _ESC_   UNIT
+         my @row_array = map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."_ESC_".$_->[4]."\n" } @{$sth->fetchall_arrayref()}; 
+         use warnings;
+         
+         Log3 ($name, 4, "DbRep $name - Now change values of selected array ... "); 
+         
+         foreach my $upd (@row_array) {
+             # für jeden selektierten (zu ändernden) Datensatz Userfunktion anwenden und updaten
+             my ($device,$reading,$date,$time,$value,$unit) = ($upd =~ /^(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)$/);
+         
+             my $oval  = $value;  # Selektkriterium für Update alter Valuewert
+             my $VALUE = $value;
+ 	         my $UNIT  = $unit;
+             eval $new;
+	         if ($@) {
+                 $err = encode_base64($@,"");
+                 Log3 ($name, 2, "DbRep $name - $@");
+                 $dbh->disconnect;
+                 Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
+                 return "$name|''|''|$err";
+             }
+             
+             $value = $VALUE if(defined $VALUE);
+ 	         $unit  = $UNIT  if(defined $UNIT);
+             # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
+             (undef,undef,undef,undef,$value,$unit) = DbLog_cutCol($hash->{dbloghash},undef,undef,undef,undef,$value,$unit);
+             
+             $value =~ s/'/''/g;       # escape ' with ''
+             $unit  =~ s/'/''/g;       # escape ' with ''
+             
+             # SQL zusammenstellen für DB-Update
+             $sql = "UPDATE history SET TIMESTAMP=TIMESTAMP,VALUE='$value',UNIT='$unit' WHERE TIMESTAMP = '$date $time' AND DEVICE = '$device' AND READING = '$reading' AND VALUE='$oval'";
+	         Log3 ($name, 5, "DbRep $name - SQL execute: $sql"); 
+	         $sth = $dbh->prepare($sql) ;
+     
+             $value =~ s/''/'/g;       # escape back 
+             $unit  =~ s/''/'/g;       # escape back 
+ 
+             eval { $sth->execute(); };
+             if ($@) {
+                 $err = encode_base64($@,"");
+                 Log3 ($name, 2, "DbRep $name - Failed to change old value \"$old\" to new value \"$new\": $@");
+	             $dbh->rollback() if(!$dbh->{AutoCommit});
+                 $dbh->disconnect();
+                 Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
+                 return "$name|''|''|$err";
+             } else {
+                 $dbh->commit() if(!$dbh->{AutoCommit});
+                 $urow++;
+             }
+         }
+     }
+ }
+ 
+ $dbh->disconnect();
+
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+ 
+ Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
+ return "$name|$urow|$rt|0|$old|$new";
+}
+
+####################################################################################################
+# Auswertungsroutine DB deviceRename/readingRename/changeValue
 ####################################################################################################
 sub change_Done($) {
   my ($string) = @_;
@@ -4216,12 +4391,17 @@ sub change_Done($) {
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
   
+  # Befehl nach Procedure ausführen
+  my $erread = DbRep_afterproc($hash, $renmode);
+  
   if ($urow != 0) {
       Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - DEVICE renamed in \"$hash->{DATABASE}\", old: \"$old\", new: \"$new\", number: $urow ") if($renmode eq "devren"); 
 	  Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - READING renamed in \"$hash->{DATABASE}\", old: \"$old\", new: \"$new\", number: $urow ") if($renmode eq "readren"); 
+	  Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - VALUE changed in \"$hash->{DATABASE}\", old: \"$old\", new: \"$new\", number: $urow ") if($renmode eq "changeval");  
   } else {
       Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old device \"$old\" was not found in database \"$hash->{DATABASE}\" ") if($renmode eq "devren");
-      Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old reading \"$old\" was not found in database \"$hash->{DATABASE}\" ") if($renmode eq "readren"); 	  
+      Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old reading \"$old\" was not found in database \"$hash->{DATABASE}\" ") if($renmode eq "readren"); 	
+	  Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old value \"$old\" not found in database \"$hash->{DATABASE}\" ") if($renmode eq "changeval");        
   }
 
   delete($hash->{HELPER}{RUNNING_PID});
@@ -4267,9 +4447,9 @@ sub fetchrows_DoParse($) {
  
  # SQL zusammenstellen für DB-Abfrage
  if ($IsTimeSet) {
-     $sql = createSelectSql($hash,$table,"DEVICE,READING,TIMESTAMP,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit+1));
+     $sql = DbRep_createSelectSql($hash,$table,"DEVICE,READING,TIMESTAMP,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit+1));
  } else {
-     $sql = createSelectSql($hash,$table,"DEVICE,READING,TIMESTAMP,VALUE,UNIT",$device,$reading,undef,undef,"ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit+1));
+     $sql = DbRep_createSelectSql($hash,$table,"DEVICE,READING,TIMESTAMP,VALUE,UNIT",$device,$reading,undef,undef,"ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit+1));
  }
  
  $sth = $dbh->prepare($sql);
@@ -4453,7 +4633,7 @@ sub delseqdoubl_DoParse($) {
  $selspec = "DEVICE,READING,TIMESTAMP,VALUE";
   
  # SQL zusammenstellen für DB-Abfrage
- $sql = createSelectSql($hash,$table,$selspec,$device,$reading,"?","?","ORDER BY DEVICE,READING,TIMESTAMP ASC");
+ $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"?","?","ORDER BY DEVICE,READING,TIMESTAMP ASC");
  $sth = $dbh->prepare_cached($sql);
  
  # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
@@ -4477,7 +4657,7 @@ sub delseqdoubl_DoParse($) {
      $st = [gettimeofday];
      
      # SQL zusammenstellen für Logausgabe
-	 my $sql1 = createSelectSql($hash,$table,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');  
+	 my $sql1 = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');  
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql1"); 
  
 	 eval{$sth->execute($runtime_string_first, $runtime_string_next);};
@@ -4735,9 +4915,9 @@ sub expfile_DoParse($) {
      my $runtime_string_next   = $a[2];   
  
      if ($IsTimeSet || $IsAggrSet) {
-         $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
+         $sql = DbRep_createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
 	 } else {
-         $sql = createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,undef,undef,$addon);
+         $sql = DbRep_createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,undef,undef,$addon);
 	 }
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
@@ -7081,7 +7261,7 @@ return;
 ####################################################################################################
 #  SQL-Statement zusammenstellen für DB-Abfrage
 ####################################################################################################
-sub createSelectSql($$$$$$$$) {
+sub DbRep_createSelectSql($$$$$$$$) {
  my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
  my $name    = $hash->{NAME};
  my $dbmodel = $hash->{dbloghash}{MODEL};
@@ -7246,15 +7426,24 @@ sub DbRep_checktimeaggr ($) {
 	 $IsAggrSet   = 1;
  }
  if($hash->{LASTCMD} =~ /averageValue/ && AttrVal($name,"averageCalcForm","avgArithmeticMean") eq "avgDailyMeanGWS") {
-     $aggregation = "day";       # für Tagesmittelwertberechnung des deuteschen Wetterdienstes immer "day"
+     $aggregation = "day";       # für Tagesmittelwertberechnung des deutschen Wetterdienstes immer "day"
 	 $IsAggrSet   = 1;
  }
- if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|changeValue|tableCurrentFillup/) {
+ if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup/) {
 	 $IsAggrSet   = 0;
 	 $aggregation = "no";
  }
  if($hash->{LASTCMD} =~ /deviceRename|readingRename/) {
 	 $IsTimeSet = 0;
+ }  
+ if($hash->{LASTCMD} =~ /changeValue/) {
+	 if($hash->{HELPER}{COMPLEX}) {
+         $IsAggrSet   = 1;
+	     $aggregation = "day";  
+     } else {
+         $IsAggrSet   = 0;
+	     $aggregation = "no";     
+     }
  }  
 
 return ($IsTimeSet,$IsAggrSet,$aggregation);
@@ -8537,21 +8726,48 @@ return;
                                  changed. <br><br>
                                  
                                  <ul>
-                                 <b>Example: </b> <br>
-                                 set &lt;name&gt; changeValue "&lt;old string&gt;","&lt;new string&gt;"  <br>               
-                                 # the old string will be changed to new string.  <br>
-                                 # Both strings may contain spaces. The strings have to be quoted and separated by comma.
+                                 <b>Syntax: </b> <br>
+                                 set &lt;name&gt; changeValue "&lt;old string&gt;","&lt;new string&gt;"  <br><br>
+                                 
+                                 The strings have to be quoted and separated by comma.
+                                 A "string" can be: <br>
+                                 
+<pre>
+&lt;old string&gt; : * a simple string with/without spaces, e.g. "OL 12"
+               * a string with usage of SQL-wildcard, e.g. "%OL%"
+                 
+&lt;new string&gt; : * a simple string with/without spaces, e.g. "12 kWh"
+               * Perl code embedded in {}, e.g. {$VALUE = (split(",",$VALUE))[1]}. 
+                 The perl expression the variables $VALUE and $UNIT are committed to. The variables are changable within
+                 the perl code. The returned value of VALUE and UNIT are saved into the database field 
+                 VALUE respectively UNIT of the dataset.                        
+</pre>
+                                 
+                                 <b>Examples: </b> <br>
+                                 set &lt;name&gt; changeValue "OL","12 OL"  <br>               
+                                 # the old field value "OL" is changed to "12 OL".  <br><br>
+                                 
+                                 set &lt;name&gt; changeValue "%OL%","12 OL"  <br>
+                                 # contains the field VALUE the substring "OL", it is changed to "12 OL". <br><br>
+                                 
+                                 set &lt;name&gt; changeValue "12 kWh","{$VALUE,$UNIT = split(" ",$VALUE)}"  <br>
+                                 # the old field value "12 kWh" is splitted to VALUE=12 and UNIT=kWh and saved into the database fields <br><br>
+
+                                 set &lt;name&gt; changeValue "24%","{$VALUE = (split(" ",$VALUE))[0]}"  <br>
+                                 # if the old field value begins with "24", it is splitted and VALUE=24 is saved (e.g. "24 kWh")
                                  <br><br>
                                  
-                                 Summarized the attributes to control changeValue are: <br><br>
+                                 Summarized the relevant attributes to control function changeValue are: <br><br>
 
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>device</b>    </td><td>: selection only of datasets which contain &lt;device&gt; </td></tr>
-                                      <tr><td> <b>reading</b>   </td><td>: selection only of datasets which contain &lt;reading&gt; enthalten </td></tr>
-                                      <tr><td> <b>time.*</b>    </td><td>: a number of attributes to limit selection by time </td></tr>
-                                   </table>
+                                      <tr><td> <b>device</b>            </td><td>: selection only of datasets which contain &lt;device&gt; </td></tr>
+                                      <tr><td> <b>reading</b>           </td><td>: selection only of datasets which contain &lt;reading&gt; </td></tr>
+                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
+ 	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: execute a FHEM command (or perl-routine) before start of changeValue </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>  </td><td>: execute a FHEM command (or perl-routine) after changeValue is finished </td></tr>
+                                      </table>
 	                               </ul>
 	                               <br>
 	                               <br>
@@ -10068,10 +10284,35 @@ sub bdump {
                                  geändert. <br><br>
                                  
                                  <ul>
-                                 <b>Beispiel: </b> <br>
-                                 set &lt;name&gt; changeValue "&lt;alter String&gt;","&lt;neuer String&gt;"  <br>               
-                                 # der alte String wird in den neuen String geändert.  <br>
-                                 # Beide Strings können Leerzeichen enthalten. Die Werte sind in Quotes zu setzen und durch Komma zu trennen.
+                                 <b>Syntax: </b> <br>
+                                 set &lt;name&gt; changeValue "&lt;alter String&gt;","&lt;neuer String&gt;"  <br><br>
+                                 
+                                 Die Strings werden in Doppelstrich eingeschlossen und durch Komma getrennt. 
+                                 Dabei kann "String" sein: <br>
+                                 
+<pre>
+&lt;alter String&gt; : * ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12"
+                 * ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%"
+                 
+&lt;neuer String&gt; : * ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh"
+                 * Perl Code eingeschlossen in {}, z.B. {$VALUE = (split(",",$VALUE))[1]}. 
+                   Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb
+                   des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld 
+                   VALUE bzw. UNIT des Datensatzes gespeichert.                        
+</pre>
+                                 
+                                 <b>Beispiele: </b> <br>
+                                 set &lt;name&gt; changeValue "OL","12 OL"  <br>               
+                                 # der alte Feldwert "OL" wird in "12 OL" geändert.  <br><br>
+                                 
+                                 set &lt;name&gt; changeValue "%OL%","12 OL"  <br>
+                                 # enthält das Feld VALUE den Teilstring "OL", wird es in "12 OL" geändert. <br><br>
+                                 
+                                 set &lt;name&gt; changeValue "12 kWh","{$VALUE,$UNIT = split(" ",$VALUE)}"  <br>
+                                 # der alte Feldwert "12 kWh" wird in VALUE=12 und UNIT=kWh gesplittet und in den Datenbankfeldern gespeichert <br><br>
+
+                                 set &lt;name&gt; changeValue "24%","{$VALUE = (split(" ",$VALUE))[0]}"  <br>
+                                 # beginnt der alte Feldwert mit "24", wird er gesplittet und VALUE=24 gespeichert (z.B. "24 kWh")
                                  <br><br>
                                  
                                  Zusammengefasst sind die zur Steuerung von changeValue relevanten Attribute: <br><br>
@@ -10079,10 +10320,12 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>device</b>    </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>reading</b>   </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
-                                      <tr><td> <b>time.*</b>    </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                   </table>
+                                      <tr><td> <b>device</b>            </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>           </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                      <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start changeValue </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>  </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende changeValue </td></tr>
+                                      </table>
 	                               </ul>
 	                               <br>
 	                               <br>
