@@ -47,7 +47,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.47";
+my $yaahmversion    = "1.48";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -732,6 +732,10 @@ sub YAAHM_Set($@) {
      YAAHM_InternalTimer("check",time()+ $args[0], "YAAHM_checkstate", $hash, 0);
    
    #-----------------------------------------------------------
+   }elsif ( $cmd =~ /^correctstate.*/ ) {
+     YAAHM_correctstate($hash);
+   
+   #-----------------------------------------------------------
    }elsif ( $cmd =~ /^time.*/ ) {
 	 return YAAHM_time($name,$args[0],$exec);
   
@@ -839,7 +843,7 @@ sub YAAHM_Set($@) {
      my $str =  "";
 	 return "[YAAHM] Unknown argument " . $cmd . ", choose one of".
 	   " manualnext time:".join(',',@times)." mode:".join(',',@modes).
-	   " state:".join(',',@states)." locked:noArg unlocked:noArg save:noArg checkstate:0,5,10 restore:noArg initialize:noArg createWeekly deleteWeekly";
+	   " state:".join(',',@states)." locked:noArg unlocked:noArg save:noArg correctstate:noArg checkstate:0,5,10 restore:noArg initialize:noArg createWeekly deleteWeekly";
    }
 }
 
@@ -1091,6 +1095,8 @@ sub YAAHM_setParm($@) {
 #
 # Parameter name = name of the YAAHM device
 #
+# Careful: $exec=0 is needed in case we want to prevent execution of helper here
+#
 #########################################################################################
 
 sub YAAHM_time {
@@ -1178,7 +1184,7 @@ sub YAAHM_time {
   
   #-- helper function not executed, e.g. by call from external timer
   return
-    if( !defined($exec) );
+    if( !defined($exec) || $exec==0);
   
   #-- execute the helper function
   my $xval;  
@@ -1205,6 +1211,7 @@ sub YAAHM_time {
     $msg  .= "Simulation ".$xval;
   }
   if( $exec==1 ){
+    Log3 $name,1,"[YAAHM_time] ecxecuting $xval";
     fhem($xval);
   }elsif( $exec==0 ){
     Log3 $name,1,"[YAAHM_time] ".$msg;
@@ -1462,6 +1469,65 @@ sub YAAHM_checkstate($) {
 
 #########################################################################################
 #
+# YAAHM_correctstate - correct state devices
+#
+# Parameter someHash =  either internal hash of timer 
+#                       => need to dereference it for getting device hash
+#                       or device hash
+#
+#########################################################################################
+
+sub YAAHM_correctstate($) {
+  my ($someHash) = @_;
+  
+  my $hash;
+  if( defined($someHash->{HASH}) ){
+    $hash = $someHash->{HASH};
+  }else{
+    $hash = $someHash;
+  }
+  my $name = $hash->{NAME};
+  
+  Log3 $name, 1,"[YAAHM_correctstate] on device ".$hash->{NAME}." called";
+  
+  my $istate;
+  my $cstate = defined($hash->{DATA}{"HSM"}{"state"}) ? $hash->{DATA}{"HSM"}{"state"} : "";
+  
+  return undef 
+  if( !defined($attr{$name}{"stateDevices"}) );
+    
+  for($istate=0;$istate<int(@states);$istate++){
+    last 
+      if($states[$istate] eq $cstate);
+  }
+  
+  my (@devlist,@devl);
+  my ($dev,$devs,$devh,);
+  my @devf = ();
+  my $isf  = 0;
+   
+  @devlist = split(',',$attr{$name}{"stateDevices"});
+  foreach my $devc (@devlist) {
+    @devl = split(':',$devc);
+    $dev  = $devl[0];
+    $devs = $devl[$istate+1];
+    if( defined($devs) && ($devs ne "") ){
+      $devh = Value($dev);
+      if( $devs ne $devh ){
+        Log3 $name, 1,"[YAAHM_correctstate] calling set ".$dev." ".$devs;
+        fhem("set ".$dev." ".$devs);
+        $isf = 1;
+      }
+    }
+  }
+  
+  YAAHM_checkstate($hash)
+    if($isf == 1);
+  return undef
+}
+
+#########################################################################################
+#
 # YAAHM_informer - Tell FHEMWEB to inform this page
 #
 # Parameter me = hash of FHEMWEB instance
@@ -1576,7 +1642,9 @@ sub YAAHM_startDayTimer($) {
     my $f2 = defined($defaultdailytable{$key}[1]);
     my $f3 = defined($hash->{DATA}{"DT"}{$key}[2]) && $hash->{DATA}{"DT"}{$key}[2] ne "";
 
-    my $xval = "{YAAHM_time('".$name."','".$key."')},".$hash->{DATA}{"DT"}{$key}[2];
+    #-- uh oh, double execution of functions !!! Do this in YAAHM_time, NOT in timer
+    #my $xval = "{YAAHM_time('".$name."','".$key."')},".$hash->{DATA}{"DT"}{$key}[2];
+    my $xval = "{YAAHM_time('".$name."','".$key."',1)}";
     
     #-- entries in the default table with no entry are single-timers
     if( !$f1 and !$f2 ){
@@ -1651,12 +1719,12 @@ sub YAAHM_startWeeklyTimer($) {
     $res .= "\nand ([" .$name. ":housemode] =~ \"".$v4a."\")";
     $res .= "\nand ([" .$name. ":todayType] =~ \"".$v4b."\")";
     
-    #-- action
+    #-- action - explicitly in timer, not in YAAHM_time
     my $xval = "";
     if( $i==0 ){
-      $xval  = "{YAAHM_time('".$name."','wakeup')},".$hash->{DATA}{"WT"}[$i]{"action"};
+      $xval  = "{YAAHM_time('".$name."','wakeup',0)},".$hash->{DATA}{"WT"}[$i]{"action"};
     }elsif( $i==1 ){
-      $xval  = "{YAAHM_time('".$name."','sleep')},".$hash->{DATA}{"WT"}[$i]{"action"};
+      $xval  = "{YAAHM_time('".$name."','sleep',0)},".$hash->{DATA}{"WT"}[$i]{"action"};
     }else{
       $xval  = $hash->{DATA}{"WT"}[$i]{"action"};
     }
@@ -3664,6 +3732,15 @@ sub YAAHM_Longtable($){
                   The actual changes to certain devices are made by an external <a href="#yaahm_statehelper">stateHelper function</a>. If these external devices are in their proper state 
                   for a particular house (security) state can be checked automatically, see the attribute  <a href="#yaahm_statedevices">stateDevices</a>
                 </li>      
+              <li><a name="yaahm_checkstate">
+                    <code>set &lt;name&gt; checkstate 0|5|10</code>
+                </a>
+                <br/>Check the house (security) state for each of the devices defined in the stateDevices attribute in 0, 5 or 10 seconds from now</li>
+              <li><a name="yaahm_correctstate">
+                    <code>set &lt;name&gt; correctstate</code>
+                </a>
+                <br/>Try to correct the house (security) state, by issueing a FHEM command <i>set &lt;device&gt; &lt;targetstate&gt;</i> 
+                for each of the devices defined in the stateDevices attribute and not in the proper state for the given house (security) state</li>
              <li><a name="yaahm_createweekly">
                     <code>set &lt;name&gt; createWeekly &lt;string&gt;</code>
                 </a>

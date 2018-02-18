@@ -1,6 +1,6 @@
 //########################################################################################
 // general.rive
-// Version 0.1
+// Version 0.2
 // See 95_Babble.pm for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
@@ -38,6 +38,15 @@
     
 + wie kannst du * (steuern|schalten)
 - <call>devhelp <star></call>
+
++ wie kannst du (den|das|die) * (steuern|schalten)
+- <call>devhelp <star2></call>
+
++ was kannst du (mit|bei) * (machen|steuern|schalten)
+- <call>devhelp <star2></call>
+
++ was kannst du (mit|bei) (dem|der|den) * (machen|steuern|schalten)
+- <call>devhelp <star3></call>
 
 + was ist *
 - <call>devhelp <star></call>

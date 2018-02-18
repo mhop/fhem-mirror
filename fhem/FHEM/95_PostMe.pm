@@ -185,10 +185,10 @@ sub PostMe_Check($$) {
    for( $loop=1;$loop<=$cnop;$loop++){
      $res = ReadingsVal($devname, sprintf("postme%02dName",$loop), undef);
      last 
-       if($res eq $listname);
+       if(lc($res) eq lc($listname));
    }
    #-- no PostMe with this name
-   if( $res ne $listname ){
+   if( lc($res) ne lc($listname) ){
      return undef;
    }else{
      return $loop;

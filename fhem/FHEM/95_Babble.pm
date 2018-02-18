@@ -53,7 +53,7 @@ if  (eval {require RiveScript;1;} ne 1) {
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.1";
+my $babbleversion    = "1.2";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -83,10 +83,11 @@ my %babble_transtable_EN = (
     "verb"              =>  "Verb",
     "target"            =>  "Target",
     "result"            =>  "Result",
+    "unknown"           =>  "unknown",
     "infinitive"        =>  "Infinitive",
     "conjugations"      =>  "Conjugations and Variations",
     "helptext"          =>  "Help Text",
-    "speak"             =>  "Speak",
+    "speak"             =>  "Please speak",
     "followedby"        =>  "followed by",
     "placespec"         =>  "a place specification",
     "dnu"               =>  "Sorry, I did not understand this",
@@ -136,10 +137,11 @@ my %babble_transtable_EN = (
     "verb"              =>  "Verb",
     "target"            =>  "Ziel",
     "result"            =>  "Ergebnis",
+    "unknown"           =>  "unbekannt",
     "infinitive"        =>  "Infinitiv",
     "conjugations"      =>  "Konjugationen und Variationen",
     "helptext"          =>  "Hilfetext",
-    "speak"             =>  "Sprich",
+    "speak"             =>  "Bitte sprich",
     "followedby"        =>  "gefolgt von",
     "placespec"         =>  "einer Ortsangabe",
     "dnu"               =>  "Es tut mir leid, das habe ich nicht verstanden",
@@ -181,7 +183,7 @@ sub Babble_Initialize ($) {
   #$hash->{AttrFn}      = "Babble_Attr";
   my $attst            = "lockstate:locked,unlocked helpFunc noChatBot:0,1 testParm0 testParm1 testParm2 testParm3 ".
                          "remoteFHEM0 remoteFHEM1 remoteFHEM2 remoteFHEM3 remoteFunc0 remoteFunc1 remoteFunc2 remoteFunc3 remoteToken0 remoteToken1 remoteToken2 remoteToken3 ".
-                         "babbleIds babbleDevices babblePlaces babbleNotPlaces babbleVerbs babbleVerbParts babblePrepos babbleQuests babbleArticles babbleStatus babbleWrites babbleTimes";
+                         "babbleIds babblePreSubs babbleDevices babblePlaces babbleNotPlaces babbleVerbs babbleVerbParts babblePrepos babbleQuests babbleArticles babbleStatus babbleWrites babbleTimes";
   $hash->{AttrList}    = $attst;
   
   if( !defined($babble_tt) ){
@@ -443,6 +445,7 @@ sub Babble_save($) {
   my $jhash0 = eval{ $json->encode( $hash->{DATA} ) };
   if( ReadingsVal($name,"lockstate","locked") ne "locked" ){
     my $error  = FileWrite("babbleFILE",$jhash0);
+    Log3 $name, 1, "         ".Dumper($jhash0);
     #Log3 $name,1,"[Babble_save] error=$error";
   }else{
     Log3 $name, 1, "[Babble] attempt to save data failed due to lockstate";
@@ -623,17 +626,16 @@ sub Babble_Normalize($$){
   
   #-- normalize special phrases
   my $sentmod = $sentence;
-  $sentmod =~ s/we((ck)|g) ?zeit/wecker/;
-  $sentmod =~ s/wecken um/stelle den wecker auf/;
-  $sentmod =~ s/^wecker/den wecker/;
-  $sentmod =~ s/beleuchtung/licht/;
-  $sentmod =~ s/\szimmer/_zimmer/;
-  $sentmod =~ s/(((zur?)|(von))\s)?(\w+)\sliste/$5_liste/;
-  $sentmod =~ s/\ssichern/ zusichern/;
-  $sentmod =~ s/unscharf\s?/aus/;
-  $sentmod =~ s/scharf\s?/ein/;
-  $sentmod =~ s/wider\s/wider/;
-            
+  my $pairs = AttrVal($name,"babblePreSubs",undef);
+  if( $pairs ){
+    my @subs=split(' ',$pairs);
+    for( my $i=0; $i<int(@subs); $i++ ){
+      my ($t,$r) = split( ':',$subs[$i],2 );
+      $t =~ s/\\s/ /g;
+      $r =~ s/\\s/ /g;
+      $sentmod =~ s/$t/$r/;
+    }
+  }
   my @word = split(' ',$sentmod,15);
   my $len  = int(@word);
   
@@ -922,13 +924,8 @@ sub Babble_Normalize($$){
         $verb      = $word[1];
         shift(@xord);
         $reading   = join(" ",@xord);
-      #-- (device) [prepo] öffnen
-      #}elsif( $reserve =~ /^öffne.*/ ){
-      #  $subsubcat = 6;
-      #  $reading = "";
-      # $verb    = "öffnen";
       #-- (arti) (device) [prepo] verb
-      }elsif( $reserve =~ s/^$hash->{DATA}{"re_verbsi"}\s// ){
+      }elsif( $reserve =~ s/^$hash->{DATA}{"re_verbsi"}\s?// ){
         $subsubcat = 6;
         $verb      = $1;
         $reading   = $reserve;
@@ -949,16 +946,10 @@ sub Babble_Normalize($$){
     }
   }
   #-- normalize devices
-  $device = "golf" 
-    if( $device =~/golfplatz/);
   $device = "haus" 
     if( $device =~/hauses/);
-  $device = "haustür" 
-    if( $device =~/hauseingangstür/);
   $device = "wecker" 
     if( $device =~/we((ck)|g).*/);
-  $device = "alarm" 
-    if( $device =~/alarm.*/);
   $place = "wohnzimmer"
     if( ($device eq "licht") && ($place eq ""));
   if( $device eq "außenlicht" ){
@@ -984,6 +975,14 @@ sub Babble_Normalize($$){
   #-- value
   $value=substr($sentmod,index($sentmod,"auf")+4)
     if( ($reading && $reading eq "auf") || ($reserve && $reserve eq "auf") );
+    
+  $value=substr($sentmod,index($sentmod,"hinzufügen")+11)
+    if( $reserve && $reserve =~ /hinzufügen (.*)/ );
+  
+  if( $verb && $verb eq "entfernen" ){
+    $value = $reading;
+    $reading = "ent";
+  }
     
   if( $value =~ /.*uhr.*/ ){
     $value = Babble_timecorrector($value);
@@ -1083,9 +1082,9 @@ sub Babble_TestIt{
   my $hash  = $defs{$name};
   
   my ($device,$verb,$reading,$value,$article,$reserve,$place,$cat) = Babble_Normalize($name,$sentence);
-  $verb = "" 
+  $verb = "none" 
     if( !$verb );
-  $reading = "" 
+  $reading = "none" 
     if( !$reading );
   
   my $str="[Babble_Normalize] ".$babble_tt->{"input"}.":  $sentence\n".
@@ -1093,13 +1092,16 @@ sub Babble_TestIt{
           $babble_tt->{"device"}."=$device ".$babble_tt->{"place"}."=$place ".
           $babble_tt->{"verb"}."=$verb ".$babble_tt->{"target"}."=$reading / $value";
           
-  my $cmd = $hash->{DATA}{"command"}{$device}{$place}{$verb}{$reading};
-  my $res = "";
+  my $cmd  = $hash->{DATA}{"command"}{$device}{$place}{$verb}{$reading};
+  my $res  = "";
+  my $star = "";
   
-  #-- no - but maybe we have an alias device ?
+  #-- not directly - but maybe we have an alias device ?
   if( (!defined($cmd) || $cmd eq "") && defined($device) ){
     my $alidev  = $device;
+    #-- remove trailing numbers 
     $alidev      =~s/_\d+$//g; 
+    #-- number of real devices for this alias device
     my $numalias = (defined($hash->{DATA}{"devsalias"}{$alidev})) ? int(@{$hash->{DATA}{"devsalias"}{$alidev}}) : 0;
     for (my $i=0;$i<$numalias ;$i++){
       my $ig = $hash->{DATA}{"devsalias"}{$alidev}[$i];
@@ -1114,10 +1116,31 @@ sub Babble_TestIt{
       }
     }
   }   
+  
+  #-- not directly - but maybe we have a device which is an extension of an alias device
+  if( (!defined($cmd) || $cmd eq "") && defined($device) ){
+    my $realdev  = $device;
+    foreach my $stardev (keys $hash->{DATA}{"devsalias"}){
+      if(index($stardev,'*')!=-1){
+        my $starrexp = $stardev;
+        $starrexp    =~ s/\*/\(\.\*\)/;
+        if( $realdev =~ /$starrexp/ ){
+          $star = $1;
+          $cmd = $hash->{DATA}{"command"}{$stardev}{$place}{$verb}{$reading};
+          if( defined($cmd) && $cmd ne "" ){
+            $device = $stardev;
+            last;
+          }
+        }
+      }
+    }
+  }   
+  
   #-- command found, execute if permitted
   if( defined($cmd) && $cmd ne "" ){
     #-- substitution
     $cmd =~ s/\$DEV/$device/g;
+    $cmd =~ s/\$STAR/$star/g;
     $cmd =~ s/\$VALUE/$value/g;
     for( my $i=0;$i<4;$i++){
       $parms[$i] = AttrVal($name,"testParm".$i,undef)
@@ -1224,10 +1247,15 @@ sub Babble_DoIt{
   my $hash  = $defs{$name};
   
   my ($device,$verb,$reading,$value,$article,$reserve,$place,$cat) = Babble_Normalize($name,$sentence);
+  $verb = "none" 
+    if( !$verb );
+  $reading = "none" 
+    if( !$reading );
   my $cmd = $hash->{DATA}{"command"}{$device}{$place}{$verb}{$reading}; 
   my $res = "";
+  my $star= "";
   
-   #-- no - but maybe we have an alias device ?
+   #-- not directly - but maybe we have an alias device ?
   if( !defined($cmd) || $cmd eq "" ){
     my $alidev  = $device;
     $alidev      =~s/_\d+$//g; 
@@ -1242,6 +1270,25 @@ sub Babble_DoIt{
       if( defined($cmd) && $cmd ne "" ){
         $device = $lbdev;
         last;
+      }
+    }
+  }   
+  
+  #-- not directly - but maybe we have a device which is an extension of an alias device
+  if( (!defined($cmd) || $cmd eq "") && defined($device) ){
+    my $realdev  = $device;
+    foreach my $stardev (keys $hash->{DATA}{"devsalias"}){
+      if(index($stardev,'*')!=-1){
+        my $starrexp = $stardev;
+        $starrexp    =~ s/\*/\(\.\*\)/;
+        if( $realdev =~ /$starrexp/ ){
+          $star = $1;
+          $cmd = $hash->{DATA}{"command"}{$stardev}{$place}{$verb}{$reading};
+          if( defined($cmd) && $cmd ne "" ){
+            $device = $stardev;
+            last;
+          }
+        }
       }
     }
   }   
@@ -1509,9 +1556,8 @@ sub Babble_RemCmd($$$$$){
    $target="none"
      if( $target eq "");
      
-   Log 1,"[Babble_RemCmd] Deleting from hash: $bdev.$place.$verb.$target";
+   Log3 $name, 1,"[Babble_RemCmd] Deleting from hash: $bdev.$place.$verb.$target => ".$hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target};
    delete($hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target});
-  
 }
 
 #########################################################################################
@@ -1811,6 +1857,7 @@ sub Babble_getverbs($$$) {
   #-- just do something with the current list
   }elsif( $type eq "html" ){
     my @verbsi=@{$hash->{DATA}{"verbsi"}};
+    my $fnd = 0;
     #-- output
     if( !defined($sel) ){
       return "<option></option><option>".join("</option><option>",@verbsi)."</option>";
@@ -1818,9 +1865,17 @@ sub Babble_getverbs($$$) {
       my $ret = ($sel eq "none") ? '<option selected="selected">' : '<option>';
       $ret .= '</option>';
       for( my $i=0;$i<int(@verbsi);$i++){
-        $ret .= (lc($sel) eq lc($verbsi[$i]) ) ? '<option selected="selected">' : '<option>';
+        if( lc($sel) eq lc($verbsi[$i]) ) {
+          $ret .=  '<option selected="selected">';
+          $fnd = 1;
+        }else{
+          $ret .=  '<option>';
+        }
         $ret .= $verbsi[$i].'</option>';
       }
+      #if( $fnd==0 ){
+      #  $ret .= '<option selected="selected" value="unknown">'.$babble_tt->{"unknown"}.'</option>';
+      #}
       return $ret;
     }
     
@@ -2081,7 +2136,11 @@ sub Babble_Html($)
           $rot .= "<input type=\"text\" name=\"d_help\" size=\"51\" maxlength=\"1024\" value=\"".$hlp."\"/></td>"; 
           $rot .= "<td style=\"text-align:left;padding-right:10px; border-top:1px solid gray\">".
                   "<input type=\"button\" id=\"d_addrow\" onclick=\"babble_addrow('".$name."',$devcount,$tblrow)\" value=\"".$babble_tt->{"add"}."\" style=\"width:100px;\"/></td></tr>\n";#$tblrow-$devcount.$devrow
- 
+                  
+          #my $json   = JSON->new->utf8;
+          #my $jhash0 = eval{ $json->encode( $hash->{DATA}{"command"}{$lbdev} ) };
+          #Log3 $name, 1, "\n\n\n\n $lbdev ========>".Dumper($jhash0);
+
           foreach my $place (keys %{$hash->{DATA}{"command"}{$lbdev}}){
             foreach my $verb (keys %{$hash->{DATA}{"command"}{$lbdev}{$place}}){
               foreach my $target (keys %{$hash->{DATA}{"command"}{$lbdev}{$place}{$verb}}){
@@ -2201,13 +2260,16 @@ sub Babble_Html($)
                 <li>a FHEM Device name</li>
                 <li>an integer 1..3, indication which of the <i>remoteFHEM</i> functions to be called</li>
                 </ul>
+                The Babble device name may contain a <b>*</b>-character. If this is the case, it will be considered a regular expression, with the star replaced by <b>(.*)</b>. 
+                When using Babble with a natural language sentence whose device part matches this regular expression, the character group addressed by the star sequence is placed in the variable 
+                <code>$STAR</code>, and used to replace this value in the command sequence.
                 </li>
             <li><a name="helpFunc"><code>attr &lt;name&gt; helpFunc &lt;function name&rt;</code></a>
                 <br/>name of a help function which is used in case no command is found for a certain device. When this function is called, the strings $DEV, $HELP, $PARM[0|1|2...]
                 will be replaced by the devicename identified by Babble, the help text for this device and parameters passed to the Babble_DoIt function</li>
             <li><a name="testParm"><code>attr &lt;name&gt; testParm(0|1|2|3) &lt;string&rt;</code></a>
                 <br/>if a command is not really excuted, but only tested, the values of these attributes will be used to substitute the strings $PARM[0|1|2...]
-                in the tested command</li>
+                in the tested command</li>            
             <li><a name="noChatBot"><code>attr &lt;name&gt; noChatBot 0|1</code></a>
                 <br/>if this attribute is set to 1, a local RiveScript interpreter will be ignored even though it is present in the system</li>
             <li><a name="remoteFHEM"><code>attr &lt;name&gt; remoteFHEM(0|1|2|3) &lt;IP address:port&rt;</code></a>
@@ -2218,6 +2280,9 @@ sub Babble_Html($)
                 <br/>csrfToken for addressing a certain remote FHEM device</li>
             <li><a name="babbleIds"><code>attr &lt;name&gt; babbleIds <id_1> <id_2> ...</code></a>
                 <br />space separated list of identities by which babble may be addressed</li>
+            <li><a name="babblePreSubs"><code>attr &lt;name&gt; babbleSubs <regexp1>:<replacement1>,<regexp2>:<replacement2>, ...</code></a>
+                <br/>space separated list of regular expressions and their replacements - this will be used on the initial sentence submitted to Babble 
+                (Note: a space in the regexp must be replaced by \s). </li>
             <li><a name="babblePlaces"><code>attr &lt;name&gt; babblePlaces <place_1> <place_2> ...</code></a>
                 <br />space separated list of special places to be identified in speech</li>
             <li><a name="babbleNotPlaces"><code>attr &lt;name&gt; babbleNoPlaces <place_1> <place_2> ...</code></a>

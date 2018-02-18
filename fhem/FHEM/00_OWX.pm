@@ -85,11 +85,11 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
    "qstatus" => "P"
 );
 
-#-- These occur in a pulldown menu as settable values for the bus master
+#-- These occur in a pulldown menu as settable values for the bus master 
+#   (expert mode: all, standard mode: only reopen)
 %sets = (
    "close"        => "c", 
-   "open"         => "o", 
-   "closeopen"    => "co" ,
+   "open"         => "O", 
    "reopen"       => "R",
    "discover"     => "C",
    "detect"       => "T",
@@ -98,7 +98,7 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version="7.06";
+$owx_version="7.08";
 
 #-- debugging now verbosity, this is just for backward compatibility
 $owx_debug=0;
@@ -130,6 +130,7 @@ sub OWX_Initialize ($) {
   $hash->{AttrFn}  = "OWX_Attr";
   $hash->{AttrList}= "asynchronous:0,1 dokick:0,1 ".
                      "interval timeout opendelay expert:0_def,1_detail ".
+                     "IODev ".
                      $readingFnAttributes;    
 }
 
@@ -1045,41 +1046,30 @@ sub OWX_Set($@) {
   my $name = shift @a;
   my $res  = 0;
 
-  #-- for the selector: which values are possible
+  #-- for the selector: all values are possible for expert, otherwise only reopen
   return ( (AttrVal($name,"expert","") eq "1_detail") ? join(":noArg ", sort keys %sets).":noArg" : "reopen:noArg")
     if(!defined($sets{$a[0]}));
   return "OWX_Set: With unknown argument $a[0], choose one of " .
      ( (AttrVal($name,"expert","") eq "1_detail") ? join(" ", sort keys %sets) : "reopen")
     if(!defined($sets{$a[0]}));
-  
-  #-- Set reopen
-  if( $a[0] eq "reopen" ){
-    DevIo_OpenDev($hash, 1, undef);
-    $res = 0;
-  }
-  
-  #-- expert mode
-  #-- Set closedev
-  if( $a[0] eq "close" ){
-    OWX_WDBGL($name,1,"====> CLOSING DEVICE",main::DevIo_CloseDev($hash));
-    $res = 0;
-  }
-  
-  #-- Set opendev
+
+  my $owx   = $hash->{OWX};
+
+  #-- Set open
   if( $a[0] eq "open" ){
-    OWX_WDBGL($name,1,"====> OPENING DEVICE",main::DevIo_OpenDev($hash,0,undef));
+    $owx->Open();
     $res = 0;
-  }
-  
-  #-- Set closeopendev
-  if( $a[0] eq "closeopen" ){
-    OWX_WDBGL($name,1,"====> CLOSING DEVICE",main::DevIo_CloseDev($hash));
-    OWX_WDBGL($name,1,"      OPENING DEVICE",main::DevIo_OpenDev($hash, 0, undef));  
+  } 
+
+  #-- Set close
+  if( $a[0] eq "close" ){
+    $owx->Close();
+    $res = 0;
   }
   
   #-- Set reopen
   if( $a[0] eq "reopen" ){
-    OWX_WDBGL($name,1,"====> REOPENING DEVICE",main::DevIo_OpenDev($hash, 1, undef));
+    $owx->Reopen();
     $res = 0;
   }
   
@@ -1697,7 +1687,7 @@ sub OWX_WDBGL($$$$) {
             <li><a name="owx_reopen">
                     <code>set &lt;name&gt; reopen</code>
                 </a>
-                <br />re-opens the interface ans re-initializes the 1-Wire bus.
+                <br />re-opens the interface and re-initializes the 1-Wire bus.
             </li>
         </ul>
         <br />
