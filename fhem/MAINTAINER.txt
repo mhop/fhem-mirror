@@ -204,8 +204,8 @@ FHEM/38_netatmo.pm           markus-m             http://forum.fhem.de/index.php
 FHEM/38_CO20.pm              markus-m             Sonstiges
 FHEM/38_JawboneUp.pm         domschl              Sonstiges
 FHEM/39_alexa.pm             justme1968           Frontends/Sprachsteuerung
-FHEM/39_Talk2Fhem.pm         Phill                Frontends/Sprachsteuerung
 FHEM/39_siri.pm              justme1968           Frontends/Sprachsteuerung
+FHEM/39_Talk2Fhem.pm         Phill                Frontends/Sprachsteuerung
 FHEM/40_RFXCOM.pm            wherzig              RFXTRX
 FHEM/41_OREGON.pm            Sidey/Ralf9          Sonstiges
 FHEM/42_RFXMETER.pm          wherzig              RFXTRX

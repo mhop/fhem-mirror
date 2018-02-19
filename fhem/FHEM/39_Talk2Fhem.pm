@@ -57,14 +57,15 @@
 #			Zahlenwörter in Zeitphrase konvertieren
 #			Eventgesteurte Befehle
 #			Leerer set parameter löst den letzten befehl nochmal aus
-# 10.02.2018 0.4.0	set CLEARTRIGGERS
+# 10.02.2018 0.4.0
+#			set CLEARTRIGGERS
 #			wieder Erkennung verbessert
 #			Logikfehler bei verschachtelten Sätzen mit "und" behoben
 #			Neue pass checks float, numeral
 #			Extraktion des Klammernarrays auch bei Keylistenselector $n@
 #			Bug on none existing namelists
 #			Fhem $_ modifikations bug behoben
-# 		    	Log ausgaben verbessert
+# 		    Log ausgaben verbessert
 #			Neues Attribut T2F_if
 #			Neues Attribut T2F_origin
 #			Neuer GET standardfilter
@@ -72,9 +73,16 @@
 #			Neue Variable $IF
 #			Errormessages detaliert
 #			Neuer Get @keylist @modlist 
-# 12.02.2018 0.4.1	Community Notes
+# 12.02.2018 0.4.1
+#			Community Notes
 #			Nested Modifikations
 #			Neuer Get modificationtypes
+# 19.02.2018 0.4.2
+#			pass word changed
+#			english adjust
+#			nested bracket crash in arraymod fixed
+#			syntaxissues on extendet commands fixed
+#			umlautfix
 ################################################################
 # TODO:
 # 
@@ -92,20 +100,14 @@ use POSIX;
 use Data::Dumper;
 use Time::Local;
 use Text::ParseWords;
+use Text::Balanced qw(extract_multiple extract_bracketed);
 use Encode qw(decode encode);
 my %Talk2Fhem_globals;
 
 
-$Talk2Fhem_globals{version}="0.4.1";
+$Talk2Fhem_globals{version}="0.4.2";
 
 $Talk2Fhem_globals{EN}{erase} = ['\bplease\b', '\balso\b', '^msgtext:'];
-$Talk2Fhem_globals{EN}{pass} = {
-	true	=> '^(yes|1|true|on|open|up|bright.*)$',
-	false	=> '^(no|0|false|off|close|down|dark.*)$',
-	integer	=> '\d+',
-	word	=> '\b(\S{4,})\b',
-	empty	=> '^\s*$'
-}; 
 $Talk2Fhem_globals{EN}{numbers} = {
 '^one\S*' => 1
 ,'^(two|twice)' => 2
@@ -119,7 +121,26 @@ $Talk2Fhem_globals{EN}{numbers} = {
 ,'^ten\S*' => 10
 ,'^eleven\S*' => 11
 ,'^twelve\S*' => 12
-};$Talk2Fhem_globals{EN}{datephrase} = {
+};
+$Talk2Fhem_globals{DE}{numberre} = join("|", ('\d+', keys %{$Talk2Fhem_globals{DE}{numbers}}));
+$Talk2Fhem_globals{EN}{pass} = {
+	true	=> '^(yes|1|true|on|open|up|bright.*)$',
+	false	=> '^(no|0|false|off|close|down|dark.*)$',
+	numeral	=> {re=>"($Talk2Fhem_globals{EN}{numberre})",fc=>sub{
+						return ($_[0]) if $_[0] =~ /\d+/;
+						my $v = $_[0];
+						foreach ( keys %{$Talk2Fhem_globals{EN}{numbers}} ) {
+							my $tmp = Talk2Fhem_escapeumlauts($_);
+							last if ($v =~ s/$tmp/$Talk2Fhem_globals{EN}{numbers}{$_}/i);
+						}
+						return($v);}
+						},
+	integer	=> '\b(\d+)\b',
+	float	=> {re=>'\b(\d+)(\s*[,.])?(\s*(\d+))?\b',fc=>'"$1".("$4"?".$4":"")'},
+	word	=> '\b(\w{4,})\b',
+	empty	=> '^\s*$'
+};
+$Talk2Fhem_globals{EN}{datephrase} = {
 	'tomorrow'=> {days=>1}
 ,	'day after tomorrow'=> {days=>2}
 ,	'yesterday'=> {days=>-1}
@@ -194,7 +215,7 @@ $Talk2Fhem_globals{DE}{pass} = {
 						},
 	integer	=> '\b(\d+)\b',
 	float	=> {re=>'\b(\d+)(\s*[,.])?(\s*(\d+))?\b',fc=>'"$1".("$4"?".$4":"")'},
-	word	=> '\b(\S{4,})\b',
+	word	=> '\b(\w{4,})\b',
 	empty	=> '^\s*$'
 }; 
 $Talk2Fhem_globals{DE}{datephrase} = {
@@ -330,6 +351,9 @@ sub Talk2Fhem_Loadphrase($$$) {
 	my $i=0;
 	while ($i <= $#h) { 
 		my $elmnt = $h[$i];
+		my @a = $$elmnt{key}=~/(?<!\\)\(/g;
+		my @b = $$elmnt{key}=~/(?<!\\)\)/g;
+		return("Error while parsing Definition HASH.\nOdd numbers of brackets ():\n".$$elmnt{key}) unless $#a eq $#b;
 		if ($$elmnt{key} eq '$include') {
 			T2FL $hash->{NAME}, 4, "Loading Configfile $$elmnt{val}";
 
@@ -357,8 +381,12 @@ sub Talk2Fhem_Loadphrase($$$) {
 				#Log 1, "Hallo: ".$1;
 				my %r;
 					my $harr = Talk2Fhem_parseArray($1, undef, 1);
-					for (@$harr) {
-						my $h = Talk2Fhem_parseArray($_, "=>", /^[^=]*=>[\t\s\n]*[^"']/);
+					for my $el (@$harr) {
+						my @test = split(/[\s\t]*=>[\t\s\n]*/,$el,2);
+						my $t = $test[1] =~ /^[^"']/;
+						#Log 1, Dumper @test;
+						#Log 1, Dumper $t;
+						my $h = Talk2Fhem_parseArray($el, '\s*=>[\t\s\n]*', $t);
 						#my @arr = /(.*?)=>(.*)/; 
 						#$h = Talk2Fhem_parseArray($_, "=>", 1) if $$h[0]=~ /answer/;
 						
@@ -372,7 +400,6 @@ sub Talk2Fhem_Loadphrase($$$) {
 			my $tmp=$$elmnt{val};
 			$$elmnt{val} = undef;
 			$$elmnt{val}{($target eq "phrase") ? "cmd" : $target} = $tmp;
-#			$$elmnt{val}{cmd} = $tmp;
 		} 
 		
 		#alternative syntax wenn nur ein value
@@ -775,7 +802,9 @@ sub Talk2Fhem_realtrim($)
 sub Talk2Fhem_normalize($)
 { 
    my $string = shift;
-   $string =~ s/\s{2,}|\b\w\b|\t|\n|['".,;:\!\?]/ /g;
+   #mach probleme bei "ue" 
+#   $string =~ s/\s{2,}|\b\w\b|\t|\n|['".,;:\!\?]/ /g;
+   $string =~ s/\s{2,}|[\s\t,.]\w[\s\t,.]|\t|\n|['".,;:\!\?]/ /g;
    return $string;
 }
 
@@ -910,7 +939,6 @@ $txt =~ s/$origin//;
 $origin = $&;
 $txt = Talk2Fhem_normalize(Talk2Fhem_realtrim($txt));
 readingsSingleUpdate($me, "origin", $origin, 1);	
-
 #Zeiten könnten auch ein und enthalten deswegen nicht wenn auf und eine Zahl folgt
 my @cmds = split(/ und (?!$Talk2Fhem_globals{DE}{numberre})/, $txt);
 
@@ -1418,8 +1446,15 @@ my %react;
 						# wenn kein @array in klammer clipno
 						unless (defined($hitnokeylist[$clipno])) {
 							T2FL($myname, 5, "Clipnumber $clipno is no array! Try to extract by seperator '|'");
-							my @cs = map { my @t = split('\|', $_ =~ s/^\(|\)$//gr); \@t } $$phr{key} =~ /(?<!\\)\((?!\?).*?\)/g;
-							@keywords = @{$cs[($clipno-1)]};
+#							my @cs = map { my @t = split('\|', $_ =~ s/^\(|\)$//gr); \@t } $$phr{key} =~ /(?<!\\)\((?!\?).*?\)/g;
+#							my @cs = map { my @t = split('\|', $_ =~ s/^\(|\)$//gr); \@t } $$phr{key} =~ /(?<! \\ ) \( (?! \? ) (?: (?R) | [^()]+ )+ \) /xg;
+							my $locked = $$phr{key};
+							my @cs = extract_multiple($locked, [sub { extract_bracketed($_[0], '()') }, qr/\S+/]);
+#							@keywords = @{$cs[($clipno-1)]};
+#							Log 1, Dumper @cs;
+#							Log 1, "-----> ".$$phr{key};
+							@keywords = split('\|', $cs[($clipno-1)] =~ s/^\(|\)$//gr);
+#							Log 1, Dumper @keywords;
 							#wenn keine Liste in Klammer ist
 							if ($#keywords == -1) {
 								Talk2Fhem_err($myname, T2FL($myname, 1, "Clipnumber $clipno includes no array or integer in '$$phr{key}!"),$res,1);
@@ -1432,6 +1467,7 @@ my %react;
 						T2FL($myname, 4, "Searching position of $d in @keywords");
 						my $i=0;
 						foreach (@keywords) {
+#							if ($d =~ /^\Q$_\E$/i) {
 							if ($d =~ /^$_$/i) {
 								unless (defined($$hash[$i])) {
 									my $err = T2FL($myname, 1, "Not enough elements in modwordlist! Position $i in (@$hash) doesn't exist.");
