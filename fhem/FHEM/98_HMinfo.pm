@@ -898,13 +898,15 @@ sub HMinfo_tempListDefFn(@) { #################################################
   my ($fn) = shift;
   $fn = "" if (!defined $fn);
   my $ret = "";
-  my ($n) = devspec2array("TYPE=HMinfo");
-  $ret .= "$attr{global}{modpath}/"                  if (    !$fn  || $fn  !~ m/^\//);  #no path? add modpath
-  $ret .= AttrVal($n,"configDir",".")."/"            if (    !$ret || $ret !~ m/..*\//
-                                                         && (!$fn  || $fn  !~ m/^\//));#no dir?  add defDir
-  if (!$fn){                                                                      #set filename
-    my ($f) = split(",",AttrVal($n,"configTempFile","tempList.cfg"));
-    $ret .= $f;
+  
+  if($fn !~ m/\//){   # filename already with path - dont change
+    my ($n) = devspec2array("TYPE=HMinfo");
+    $ret .= AttrVal($n,"configDir",".")."/"            if ( !$fn  || $fn  !~ m/^\//);#no dir?  add defDir
+    $ret  = AttrVal("global","modpath",".")."/$ret"    if ( !$ret || $ret !~ m/^\//);#no path? add modpath
+    if (!$fn){          #set filename
+      my ($f) = split(",",AttrVal($n,"configTempFile","tempList.cfg"));
+      $ret .= $f;
+    }
   }
   return $ret.$fn;
 }
