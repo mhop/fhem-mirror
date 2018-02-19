@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.8.5      16.02.2018       changed ParseEvent for Zwave
 # 3.8.4      07.02.2018       minor fixes of "$@", code review, eval for userCommand, DbLog_ExecSQL1 (forum:#83973)
 # 3.8.3      03.02.2018       call execmemcache only syncInterval/2 if cacheLimit reached and DB is not reachable, fix handling of
 #                             "$@" in DbLog_PushAsync 
@@ -186,7 +187,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.8.4";
+my $DbLogVersion = "3.8.5";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -949,14 +950,22 @@ sub DbLog_ParseEvent($$$)
       }
   }
   
-  # FBDECT or ZWAVE
-  elsif (($type eq "FBDECT") || ($type eq "ZWAVE")) {
-    if ( $value=~/([\.\d]+)\s([a-z].*)/i ) {
+  # ZWAVE
+  elsif ($type eq "ZWAVE") {
+    if ( $value=~/([-\.\d]+)\s([a-z].*)/i ) {
      $value = $1;
      $unit  = $2;
     }
   }
 
+  # FBDECT
+  elsif ($type eq "FBDECT") {
+    if ( $value=~/([\.\d]+)\s([a-z].*)/i ) {
+     $value = $1;
+     $unit  = $2;
+    }
+  }
+  
   # MAX
   elsif(($type eq "MAX")) {
     $unit= "°C" if(lc($reading) =~ m/temp/);
