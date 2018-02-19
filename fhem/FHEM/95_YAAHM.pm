@@ -47,7 +47,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.48";
+my $yaahmversion    = "1.49";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -1417,7 +1417,7 @@ sub YAAHM_checkstate($) {
   
   my $next;
   
-  $next = gettimeofday()+AttrVal($name,"stateInterval",1)*60;
+  $next = gettimeofday()+AttrVal($name,"stateInterval",60)*60;
   
   YAAHM_RemoveInternalTimer("check",$hash);
   YAAHM_InternalTimer("check",$next, "YAAHM_checkstate", $hash, 0);
