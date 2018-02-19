@@ -59,7 +59,7 @@ sub MQTT_Initialize($) {
   $hash->{NotifyFn}   = "MQTT::Notify";
   $hash->{AttrFn}     = "MQTT::Attr";
 
-  $hash->{AttrList} = "keep-alive "."last-will "."on-connect on-disconnect on-timeout ".$main::readingFnAttributes;
+  $hash->{AttrList} = "keep-alive "."last-will client-id "."on-connect on-disconnect on-timeout ".$main::readingFnAttributes;
 }
 
 package MQTT;
@@ -564,9 +564,10 @@ sub send_connect($) {
   my $pass = getKeyValue($name."_pass");
   
   my $lw = AttrVal($name,"last-will",undef);
+  my $clientId = AttrVal($name,"client-id",undef);
   my ($willqos, $willretain,$willtopic, $willmessage) = parsePublishCmdStr($lw);
   
-  return send_message($hash, message_type => MQTT_CONNECT, keep_alive_timer => $hash->{timeout}, user_name => $user, password => $pass, will_topic => $willtopic,  will_message => $willmessage, will_retain => $willretain, will_qos => $willqos);
+  return send_message($hash, message_type => MQTT_CONNECT, keep_alive_timer => $hash->{timeout}, user_name => $user, password => $pass, client_id=>$clientId, will_topic => $willtopic,  will_message => $willmessage, will_retain => $willretain, will_qos => $willqos);
 };
 
 sub send_publish($@) {
@@ -876,6 +877,14 @@ sub client_stop($) {
          </p>
       <p>example:<br/>
       <code>attr mqtt last-will /fhem/status crashed</code>
+      </p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; client-id client id</code><br/>
+         redefines client id
+      </p>
+      <p>example:<br/>
+      <code>attr mqtt client-id fhem1234567</code>
       </p>
     </li>
     <li>
