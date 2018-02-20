@@ -53,7 +53,7 @@ if  (eval {require RiveScript;1;} ne 1) {
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.22";
+my $babbleversion    = "1.23";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -1339,6 +1339,12 @@ sub Babble_DoIt{
       if ($reply eq "ERR: No Reply Matched");
     my $func  = AttrVal($name,"helpFunc",undef);  
     if( $func && $func ne "" ){
+      #-- substitution
+      $func =~ s/\$DEV/$device/g;
+      $func =~ s/\$VALUE/$value/g;
+      for(my $i=0;$i<int(@parms);$i++){
+        $func =~ s/\$PARM$i/$parms[$i]/g;
+      }
       $func =~ s/\$HELP/$reply/g;
       $res = eval($func)
     }
