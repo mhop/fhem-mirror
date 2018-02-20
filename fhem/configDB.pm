@@ -579,6 +579,7 @@ sub cfgDB_SaveState() {
 		if(defined($val) &&
 			$val ne "unknown" &&
 			$val ne "Initialized" &&
+			$val ne "" &&
 			$val ne "???") {
 			$val =~ s/;/;;/g;
 			$val =~ s/\n/\\\n/g;
