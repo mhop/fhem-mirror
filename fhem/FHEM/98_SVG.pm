@@ -1056,19 +1056,19 @@ SVG_calcOffsets($$)
 
   } elsif($zoom eq "year") {
     my @l = localtime($now);
+    $l[5] += ($off-1);
     if(SVG_Attr($FW_wname, $wl, "endPlotToday", undef)) {
-      $l[5] += ($off-1); # 00:00 off+1 years ago
       $SVG_devs{$d}{from} = SVG_tspec(3, 0, @l);
       $l[5]++; $l[2]=23; $l[1]=59; # today, 23:59
       $SVG_devs{$d}{to}   = SVG_tspec(0, 59, @l);
 
     } elsif(SVG_Attr($FW_wname, $wl, "endPlotNow", undef)) {
-      $l[5] += ($off-1); # Now, off+1 years ago
       $SVG_devs{$d}{from} = SVG_tspec(0, $l[0], @l);
       $l[5]++; # now
       $SVG_devs{$d}{to}   = SVG_tspec(0, $l[0], @l);
 
     } else {
+      $l[5]++;
       $SVG_devs{$d}{from} = SVG_tspec(0, 0, 0, 0, 0, 1, 0,$l[5]);#Jan01 00:00:00
       $SVG_devs{$d}{to}   = SVG_tspec(0,59,59,59,23,31,11,$l[5]);#Dec31 23:59:59
     }
