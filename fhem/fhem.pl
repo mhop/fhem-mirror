@@ -266,7 +266,7 @@ my $duplidx=0;                  # helper for the above pool
 my $evalSpecials;               # Used by EvalSpecials->AnalyzeCommand
 my $intAtCnt=0;
 my $logopened = 0;              # logfile opened or using stdout
-my $namedef = "where <name> is a single device name, a list separated by komma (,) or a regexp. See the devspec section in the commandref.html for details.\n";
+my $namedef = "where <name> is a single device name, a list separated by comma (,) or a regexp. See the devspec section in the commandref.html for details.\n";
 my $rcvdquit;                   # Used for quit handling in init files
 my $readingsUpdateDelayTrigger; # needed internally
 my $gotSig;                     # non-undef if got a signal
