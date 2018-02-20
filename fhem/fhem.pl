@@ -2876,7 +2876,8 @@ CommandSetstate($$)
   my ($cl, $param) = @_;
 
   my @a = split(" ", $param, 2);
-  return "Usage: setstate <name> <state>\n$namedef" if(@a != 2);
+  my $addMsg = ($init_done ? "" : "Bogus command was: setstate $param");
+  return "Usage: setstate <name> <state>\n${namedef}$addMsg" if(@a != 2);
 
   my @rets;
   foreach my $sdev (devspec2array($a[0],$cl)) {
