@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  53_GHoma: plugs with energy measurement implemented
+                      reading energy now in kWh / SetExtensions / DbLog_splitFn
   - change:  93_DbRep: commandref revised
   - change:  93_DbLog: V3.8.5, Parse Event for Zwave changed
   - feature: 00_MQTT: new attribute "client-id"

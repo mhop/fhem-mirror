@@ -105,9 +105,10 @@ sub GHoma_Initialize($) {			#
   $hash->{AttrFn}   = "GHoma_Attr";
   $hash->{StateFn}  = "GHoma_State";
   $hash->{AttrList} = "restoreOnStartup:last,on,off restoreOnReinit:last,on,off blocklocal:yes,no ".
-                      "allowfrom connectTimeout connectInterval";
+                      "allowfrom connectTimeout connectInterval $readingFnAttributes";
   $hash->{noAutocreatedFilelog} = 1;		# kein Filelog bei Autocreate anlegen
-  $hash->{ShutdownFn} = "GHoma_Shutdown";
+  $hash->{ShutdownFn}	 = "GHoma_Shutdown";
+  $hash->{DbLog_splitFn} = "GHoma_DbLog_splitFn";
 }
 #####################################
 sub GHoma_ClientConnect($) {		# im Mom unnuetz
@@ -376,7 +377,7 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
 			my $value=$values{unpack('H*',substr($_,19,1))};
 			if (defined($value)) {
 				my ($high,$mid,$low)=unpack('CCC',substr($_,21,3));
-				readingsBulkUpdate($hash, $value, ($high*65536+$mid*256+$low)/100);
+				readingsBulkUpdate($hash, $value, ($high*65536+$mid*256+$low)/($value eq 'energy' ? 1000 : 100));
 			} else {
 				# readingsBulkUpdate($hash, 'message_'.unpack('H*',substr($_,19,1)), unpack('H*',substr($_,20)));
 				Log3 $name, 3, "$name unknown control message Id: " . unpack('H*',substr($_,19,1)) . " value: " . unpack('H*',substr($_,20));
@@ -501,6 +502,24 @@ sub GHoma_udpbroad {
   }
   $socket->close();
 
+}
+
+sub GHoma_DbLog_splitFn($) {  			# Einheiten
+    my ($event) = @_;
+    Log3 undef, 5, "in DbLog_splitFn empfangen: $event"; 
+    my ($reading, $value, $unit) = "";
+
+    my @parts = split(/ /,$event);
+    $reading = shift @parts;
+    $reading =~ tr/://d;
+    $value = $parts[0];
+    $unit = "W" 	if(lc($reading) =~ m/power/);
+    $unit = "kWh" 	if(lc($reading) =~ m/energy/);
+    $unit = "V" 	if(lc($reading) =~ m/voltage/);
+    $unit = "A" 	if(lc($reading) =~ m/current/);
+    $unit = "Hz" 	if(lc($reading) =~ m/frequency/);
+    $unit = "W" 	if(lc($reading) =~ m/maxpower/);
+    return ($reading, $value, $unit);
 }
 
 1;
