@@ -83,6 +83,8 @@
 #			nested bracket crash in arraymod fixed
 #			syntaxissues on extendet commands fixed
 #			umlautfix
+# 20.02.2018 0.4.3
+#			Bug that not load attributes at bootup fixed
 ################################################################
 # TODO:
 # 
@@ -90,7 +92,7 @@
 # get compare lists
 # answerx
 # klammern in keywordlists sollen die $n nummerierung nicht beeinflussen
-# 
+#  
 
 package main;
 
@@ -105,7 +107,7 @@ use Encode qw(decode encode);
 my %Talk2Fhem_globals;
 
 
-$Talk2Fhem_globals{version}="0.4.2";
+$Talk2Fhem_globals{version}="0.4.3";
 
 $Talk2Fhem_globals{EN}{erase} = ['\bplease\b', '\balso\b', '^msgtext:'];
 $Talk2Fhem_globals{EN}{numbers} = {
@@ -739,7 +741,7 @@ sub Talk2Fhem_Attr(@)
   	# $cmd  - Vorgangsart - kann die Werte "del" (löschen) oder "set" (setzen) annehmen
 	# $name - Gerätename
 	# $attrName/$attrValue sind Attribut-Name und Attribut-Wert
-    
+    return unless $init_done;
 	#Log 1, Dumper @_;
 	if ($attrName eq "T2F_keywordlist" or $attrName eq "T2F_modwordlist") {
 		$defs{$name}{helper}{phrase} = undef;
