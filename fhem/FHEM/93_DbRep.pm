@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.13.1       20.02.2018       commandref revised
 # 7.13.0       17.02.2018       changeValue can handle perl code {} as "new string"
 # 7.12.0       16.02.2018       compression of dumpfile, restore of compressed files possible
 # 7.11.0       12.02.2018       new command "repairSQLite" to repair a corrupted SQLite database
@@ -317,7 +318,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.13.0";
+my $DbRepVersion = "7.13.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -9360,6 +9361,9 @@ return;
 								 is assumed in the statement, it is possible to use placeholder "<b>§timestamp_begin§</b>" respectively
 								 "<b>§timestamp_end§</b>" on suitable place. <br><br>
 								 
+								 If you want update a dataset, you have to add "TIMESTAMP=TIMESTAMP" to the update-statement to avoid changing the 
+								 original timestamp. <br><br>
+								 
 	                             <ul>
                                  <b>Examples of SQL-statements: </b> <br><br> 
 								 <ul>
@@ -9372,7 +9376,7 @@ return;
                                  <li>set &lt;name&gt; sqlCmd select sum(VALUE) as 'Einspeisung am 04.05.2017', count(*) as 'Anzahl' FROM history where `READING` = "Einspeisung_WirkP_Zaehler_Diff" and TIMESTAMP between '2017-05-04' AND '2017-05-05' </li>
                                  <li>set &lt;name&gt; sqlCmd delete from current  </li>
                                  <li>set &lt;name&gt; sqlCmd delete from history where TIMESTAMP < "2016-05-06 00:00:00" </li>
-                                 <li>set &lt;name&gt; sqlCmd update history set VALUE='TestVa$$ue$' WHERE VALUE='TestValue' </li>
+                                 <li>set &lt;name&gt; sqlCmd update history set TIMESTAMP=TIMESTAMP,VALUE='Val' WHERE VALUE='TestValue' </li>
                                  <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
                                  <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>    
                                  </ul>
@@ -10939,6 +10943,9 @@ sub bdump {
 								 "timestamp_end" im Statement berücksichtigt werden, können die Platzhalter 
 								 "<b>§timestamp_begin§</b>" bzw. "<b>§timestamp_end§</b>" dafür verwendet werden. <br><br>
 								 
+								 Soll ein Datensatz upgedated werden, ist dem Statement "TIMESTAMP=TIMESTAMP" hinzuzufügen um eine Änderung des
+								 originalen Timestamps zu verhindern. <br><br>
+								 
 	                             <ul>
                                  <b>Beispiele für Statements: </b> <br><br> 
 								 <ul>
@@ -10951,7 +10958,7 @@ sub bdump {
                                  <li>set &lt;name&gt; sqlCmd select sum(VALUE) as 'Einspeisung am 04.05.2017', count(*) as 'Anzahl' FROM history where `READING` = "Einspeisung_WirkP_Zaehler_Diff" and TIMESTAMP between '2017-05-04' AND '2017-05-05' </li>
                                  <li>set &lt;name&gt; sqlCmd delete from current  </li>
                                  <li>set &lt;name&gt; sqlCmd delete from history where TIMESTAMP < "2016-05-06 00:00:00" </li>
-                                 <li>set &lt;name&gt; sqlCmd update history set VALUE='TestVa$$ue$' WHERE VALUE='TestValue' </li>
+                                 <li>set &lt;name&gt; sqlCmd update history set TIMESTAMP=TIMESTAMP,VALUE='Val' WHERE VALUE='TestValue' </li>
                                  <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
                                  <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>    
                                  </ul>
