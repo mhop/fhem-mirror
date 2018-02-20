@@ -53,7 +53,7 @@ if  (eval {require RiveScript;1;} ne 1) {
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.2";
+my $babbleversion    = "1.22";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -1120,7 +1120,7 @@ sub Babble_TestIt{
   #-- not directly - but maybe we have a device which is an extension of an alias device
   if( (!defined($cmd) || $cmd eq "") && defined($device) ){
     my $realdev  = $device;
-    foreach my $stardev (keys $hash->{DATA}{"devsalias"}){
+    foreach my $stardev (keys %{$hash->{DATA}{"devsalias"}}){
       if(index($stardev,'*')!=-1){
         my $starrexp = $stardev;
         $starrexp    =~ s/\*/\(\.\*\)/;
@@ -1277,7 +1277,7 @@ sub Babble_DoIt{
   #-- not directly - but maybe we have a device which is an extension of an alias device
   if( (!defined($cmd) || $cmd eq "") && defined($device) ){
     my $realdev  = $device;
-    foreach my $stardev (keys $hash->{DATA}{"devsalias"}){
+    foreach my $stardev (keys %{$hash->{DATA}{"devsalias"}}){
       if(index($stardev,'*')!=-1){
         my $starrexp = $stardev;
         $starrexp    =~ s/\*/\(\.\*\)/;
@@ -2272,7 +2272,7 @@ sub Babble_Html($)
                 in the tested command</li>            
             <li><a name="noChatBot"><code>attr &lt;name&gt; noChatBot 0|1</code></a>
                 <br/>if this attribute is set to 1, a local RiveScript interpreter will be ignored even though it is present in the system</li>
-            <li><a name="remoteFHEM"><code>attr &lt;name&gt; remoteFHEM(0|1|2|3) &lt;IP address:port&rt;</code></a>
+            <li><a name="remoteFHEM"><code>attr &lt;name&gt; remoteFHEM(0|1|2|3) [&lt;user&gt;:&lt;password&gt;@]&lt;IP address:port&rt;</code></a>
                 <br/>IP address and port for a remote FHEM installation</li>
             <li><a name="remoteFunc"><code>attr &lt;name&gt; remoteFunc(0|1|2|3) &lt;function name&rt;</code></a>
                 <br/>name of a Perl function that is called for addressing a certain remote FHEM device</li>
