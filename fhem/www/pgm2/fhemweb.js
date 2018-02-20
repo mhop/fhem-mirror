@@ -834,7 +834,7 @@ FW_treeMenu()
   $("div#menu table.room").each(function(){     // one loop per Block
     var t = this, ma = {};
     $(t).find("td > div > a > span").each(function(e){
-      var span = this, spanTxt = $(span).text();
+      var span = this, spanTxt = $(span).text().replace(/,/g,'');
       var ta = spanTxt.split("->");
       if(ta.length <= 1)
         return;
