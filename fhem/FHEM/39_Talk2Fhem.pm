@@ -85,6 +85,7 @@
 #			umlautfix
 # 20.02.2018 0.4.3
 #			Bug that not load attributes at bootup fixed
+#			Function normalication updated
 ################################################################
 # TODO:
 # 
@@ -806,7 +807,7 @@ sub Talk2Fhem_normalize($)
    my $string = shift;
    #mach probleme bei "ue" 
 #   $string =~ s/\s{2,}|\b\w\b|\t|\n|['".,;:\!\?]/ /g;
-   $string =~ s/\s{2,}|[\s\t,.]\w[\s\t,.]|\t|\n|['".,;:\!\?]/ /g;
+   $string =~ s/\s{2,}|\t|\n|['".,;:\!\?]/ /g;
    return $string;
 }
 
