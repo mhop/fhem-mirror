@@ -76,7 +76,6 @@ fakeRoku_Define($$)
 
   my $name = $a[0];
   my $id = $a[2];
-  $id = undef;
 
   $hash->{NAME} = $name;
   $hash->{ID} = $id?$id:'';
@@ -90,7 +89,7 @@ fakeRoku_Define($$)
   $hash->{"HAS_IO::Socket::Multicast"} = $fakeRoku_hasMulticast;
 
   $hash->{serial} = md5_hex(getUniqueId());
-  $hash->{serial} .= ":$hash->{ID}" if( $hash->{ID} );
+  $hash->{serial} .= "-$hash->{ID}" if( $hash->{ID} );
 
   $hash->{fhemHostname} = hostname();
   $hash->{fhemIP} = fakeRoku_getLocalIP();
