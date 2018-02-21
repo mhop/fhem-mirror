@@ -86,6 +86,9 @@
 # 20.02.2018 0.4.3
 #			Bug that not load attributes at bootup fixed
 #			Function normalication updated
+# 21.02.2018 0.4.4
+#			bracket extraction bug fixed
+#			def not load at bootup fixed
 ################################################################
 # TODO:
 # 
@@ -108,7 +111,7 @@ use Encode qw(decode encode);
 my %Talk2Fhem_globals;
 
 
-$Talk2Fhem_globals{version}="0.4.3";
+$Talk2Fhem_globals{version}="0.4.4";
 
 $Talk2Fhem_globals{EN}{erase} = ['\bplease\b', '\balso\b', '^msgtext:'];
 $Talk2Fhem_globals{EN}{numbers} = {
@@ -323,10 +326,11 @@ sub Talk2Fhem_Define($$)
 	my $dev = shift(@def);
 
 
-	$error = Talk2Fhem_Loadphrase($hash, "phrase", "@def");
-
 	($_ = Talk2Fhem_loadList($hash, "T2F_keywordlist")) && return;
 	($_ = Talk2Fhem_loadList($hash, "T2F_modwordlist")) && return;
+
+	$error = Talk2Fhem_Loadphrase($hash, "phrase", "@def");
+
 
 	T2FL($name, 1, $error) if $error;
 #	T2FL($name, 5, "T2F Phrasehash:\n".Dumper($Talk2Fhem_phrase{$name})) unless $error;
@@ -544,6 +548,9 @@ sub Talk2Fhem_Set($@)
 		#my $txt = s/[^\x00-\xFF]//g;
 		#my $txt = decode("utf8", "@args");
 		my $txt = "@args";
+		Talk2Fhem_loadList($hash, "T2F_keywordlist") unless $hash->{helper}{T2F_keywordlist};
+		Talk2Fhem_loadList($hash, "T2F_modwordlist") unless $hash->{helper}{T2F_modwordlist};
+
 		Talk2Fhem_Loadphrase($hash, "phrase", $hash->{DEF}) unless $hash->{helper}{phrase}; 
 		Talk2Fhem_Loadphrase($hash, "if", AttrVal($name, "T2F_if","")) if (AttrVal($name, "T2F_if",0) and ! $hash->{helper}{if}); 
 		
@@ -1452,9 +1459,11 @@ my %react;
 #							my @cs = map { my @t = split('\|', $_ =~ s/^\(|\)$//gr); \@t } $$phr{key} =~ /(?<!\\)\((?!\?).*?\)/g;
 #							my @cs = map { my @t = split('\|', $_ =~ s/^\(|\)$//gr); \@t } $$phr{key} =~ /(?<! \\ ) \( (?! \? ) (?: (?R) | [^()]+ )+ \) /xg;
 							my $locked = $$phr{key};
-							my @cs = extract_multiple($locked, [sub { extract_bracketed($_[0], '()') }, qr/\S+/]);
+							my @cs = extract_multiple($locked, [sub { extract_bracketed($_[0], '()') }]);
 #							@keywords = @{$cs[($clipno-1)]};
-#							Log 1, Dumper @cs;
+							#Log 1, Dumper @cs;
+							@cs = grep { /^\(/ } @cs;
+							#Log 1, Dumper @cs;
 #							Log 1, "-----> ".$$phr{key};
 							@keywords = split('\|', $cs[($clipno-1)] =~ s/^\(|\)$//gr);
 #							Log 1, Dumper @keywords;
