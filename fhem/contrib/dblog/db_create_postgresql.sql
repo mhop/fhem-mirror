@@ -53,7 +53,7 @@ ALTER TABLE fhem.current OWNER TO fhem;
 --
 
 CREATE TABLE history (
-    "timestamp" timestamp without time zone,
+    "timestamp" timestamp without time zone default CURRENT_TIMESTAMP,
     device character varying(64),
     type character varying(64),
     event character varying(512),
