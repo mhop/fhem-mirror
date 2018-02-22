@@ -53,7 +53,7 @@ if  (eval {require RiveScript;1;} ne 1) {
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.23";
+my $babbleversion    = "1.24";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -87,6 +87,7 @@ my %babble_transtable_EN = (
     "infinitive"        =>  "Infinitive",
     "conjugations"      =>  "Conjugations and Variations",
     "helptext"          =>  "Help Text",
+    "confirm"           =>  "Confirmation",
     "speak"             =>  "Please speak",
     "followedby"        =>  "followed by",
     "placespec"         =>  "a place specification",
@@ -141,6 +142,7 @@ my %babble_transtable_EN = (
     "infinitive"        =>  "Infinitiv",
     "conjugations"      =>  "Konjugationen und Variationen",
     "helptext"          =>  "Hilfetext",
+    "confirm"           =>  "Bestätigung",
     "speak"             =>  "Bitte sprich",
     "followedby"        =>  "gefolgt von",
     "placespec"         =>  "einer Ortsangabe",
@@ -181,7 +183,7 @@ sub Babble_Initialize ($) {
   $hash->{GetFn}       = "Babble_Get";
   $hash->{UndefFn}     = "Babble_Undef";   
   #$hash->{AttrFn}      = "Babble_Attr";
-  my $attst            = "lockstate:locked,unlocked helpFunc noChatBot:0,1 testParm0 testParm1 testParm2 testParm3 ".
+  my $attst            = "lockstate:locked,unlocked helpFunc confirmFunc noChatBot:0,1 testParm0 testParm1 testParm2 testParm3 ".
                          "remoteFHEM0 remoteFHEM1 remoteFHEM2 remoteFHEM3 remoteFunc0 remoteFunc1 remoteFunc2 remoteFunc3 remoteToken0 remoteToken1 remoteToken2 remoteToken3 ".
                          "babbleIds babblePreSubs babbleDevices babblePlaces babbleNotPlaces babbleVerbs babbleVerbParts babblePrepos babbleQuests babbleArticles babbleStatus babbleWrites babbleTimes";
   $hash->{AttrList}    = $attst;
@@ -445,8 +447,9 @@ sub Babble_save($) {
   my $jhash0 = eval{ $json->encode( $hash->{DATA} ) };
   if( ReadingsVal($name,"lockstate","locked") ne "locked" ){
     my $error  = FileWrite("babbleFILE",$jhash0);
-    Log3 $name, 1, "         ".Dumper($jhash0);
-    #Log3 $name,1,"[Babble_save] error=$error";
+    #Log3 $name, 1, "         ".Dumper($jhash0);
+    
+    Log3 $name,1,"[Babble_save]";
   }else{
     Log3 $name, 1, "[Babble] attempt to save data failed due to lockstate";
     Log3 $name, 5, "         ".Dumper($jhash0);
@@ -505,99 +508,99 @@ sub Babble_Test($) {
  
   my $name = $hash->{NAME};
   my $str = "";
-  $str .= "\nA.1:".Babble_TestIt($name,"guten morgen",0);
-  $str .= "\nA.2:".Babble_TestIt($name,"gute nacht",0);
-  $str .= "\nA.3:".Babble_TestIt($name,"guten morgen jeannie",0);
-  $str .= "\nA.4:".Babble_TestIt($name,"gute nacht jeannie",0);
+  $str .= "\nA.1:".Babble_DoIt($name,"guten morgen","testit",0);
+  $str .= "\nA.2:".Babble_DoIt($name,"gute nacht","testit",0);
+  $str .= "\nA.3:".Babble_DoIt($name,"guten morgen jeannie","testit",0);
+  $str .= "\nA.4:".Babble_DoIt($name,"gute nacht jeannie","testit",0);
   $str .= "\n";
-  $str .= "\nB.1:".Babble_TestIt($name,"schalte das gerät an",0);
-  $str .= "\nB.2:".Babble_TestIt($name,"schalte gerät an",0);
-  $str .= "\nB.3:".Babble_TestIt($name,"mach das gerät an",0);
-  $str .= "\nB.4:".Babble_TestIt($name,"das gerät ausschalten",0);
-  $str .= "\nB.5:".Babble_TestIt($name,"gerät ausschalten",0);
-  $str .= "\nB.6:".Babble_TestIt($name,"das gerät ausmachen",0);
-  $str .= "\nB.7:".Babble_TestIt($name,"gerät anmachen",0);
-  $str .= "\nB.8:".Babble_TestIt($name,"schalte beleuchtung an",0);
-  $str .= "\nB.9:".Babble_TestIt($name,"licht anschalten",0);
+  $str .= "\nB.1:".Babble_DoIt($name,"schalte das gerät an","testit",0);
+  $str .= "\nB.2:".Babble_DoIt($name,"schalte gerät an","testit",0);
+  $str .= "\nB.3:".Babble_DoIt($name,"mach das gerät an","testit",0);
+  $str .= "\nB.4:".Babble_DoIt($name,"das gerät ausschalten","testit",0);
+  $str .= "\nB.5:".Babble_DoIt($name,"gerät ausschalten","testit",0);
+  $str .= "\nB.6:".Babble_DoIt($name,"das gerät ausmachen","testit",0);
+  $str .= "\nB.7:".Babble_DoIt($name,"gerät anmachen","testit",0);
+  $str .= "\nB.8:".Babble_DoIt($name,"schalte beleuchtung an","testit",0);
+  $str .= "\nB.9:".Babble_DoIt($name,"licht anschalten","testit",0);
   $str .= "\n";
-  $str .= "\nC.1:".Babble_TestIt($name,"wie ist der wert von gerät",0);
-  $str .= "\nC.2:".Babble_TestIt($name,"wie ist wert von gerät",0);
-  $str .= "\nC.3:".Babble_TestIt($name,"wie ist der wert gerät",0);
-  $str .= "\nC.4:".Babble_TestIt($name,"wie ist wert gerät",0);
-  $str .= "\nC.4:".Babble_TestIt($name,"sage den status von gerät",0);
-  $str .= "\nC.5:".Babble_TestIt($name,"sage status von gerät",0);
-  $str .= "\nC.6:".Babble_TestIt($name,"sage status gerät",0);
+  $str .= "\nC.1:".Babble_DoIt($name,"wie ist der wert von gerät","testit",0);
+  $str .= "\nC.2:".Babble_DoIt($name,"wie ist wert von gerät","testit",0);
+  $str .= "\nC.3:".Babble_DoIt($name,"wie ist der wert gerät","testit",0);
+  $str .= "\nC.4:".Babble_DoIt($name,"wie ist wert gerät","testit",0);
+  $str .= "\nC.4:".Babble_DoIt($name,"sage den status von gerät","testit",0);
+  $str .= "\nC.5:".Babble_DoIt($name,"sage status von gerät","testit",0);
+  $str .= "\nC.6:".Babble_DoIt($name,"sage status gerät","testit",0);
   $str .= "\n";
-  $str .= "\nD.1:".Babble_TestIt($name,"wie ist das wetter von morgen",0);
-  $str .= "\nD.2:".Babble_TestIt($name,"wie ist wetter von morgen",0);
-  $str .= "\nD.3:".Babble_TestIt($name,"wie ist das wetter morgen",0);
-  $str .= "\nD.4:".Babble_TestIt($name,"wie ist wetter morgen",0);
-  $str .= "\nD.5:".Babble_TestIt($name,"wie ist morgen das wetter",0);
-  $str .= "\nD.6:".Babble_TestIt($name,"wie ist morgen wetter",0);
-  $str .= "\nD.7:".Babble_TestIt($name,"wetter von morgen",0);
-  $str .= "\nD.8:".Babble_TestIt($name,"wetter morgen",0);
+  $str .= "\nD.1:".Babble_DoIt($name,"wie ist das wetter von morgen","testit",0);
+  $str .= "\nD.2:".Babble_DoIt($name,"wie ist wetter von morgen","testit",0);
+  $str .= "\nD.3:".Babble_DoIt($name,"wie ist das wetter morgen","testit",0);
+  $str .= "\nD.4:".Babble_DoIt($name,"wie ist wetter morgen","testit",0);
+  $str .= "\nD.5:".Babble_DoIt($name,"wie ist morgen das wetter","testit",0);
+  $str .= "\nD.6:".Babble_DoIt($name,"wie ist morgen wetter","testit",0);
+  $str .= "\nD.7:".Babble_DoIt($name,"wetter von morgen","testit",0);
+  $str .= "\nD.8:".Babble_DoIt($name,"wetter morgen","testit",0);
   $str .= "\n";
-  $str .= "\nF.1:".Babble_TestIt($name,"schalte den wecker aus",0);
-  $str .= "\nF.2:".Babble_TestIt($name,"schalte wecker aus",0);
-  $str .= "\nF.3:".Babble_TestIt($name,"den wecker ausschalten",0);
-  $str .= "\nF.4:".Babble_TestIt($name,"wecker ausschalten",0);
-  $str .= "\nF.5:".Babble_TestIt($name,"wie ist die weckzeit",0);
-  $str .= "\nF.6:".Babble_TestIt($name,"wie ist der status des weckers",0);
-  $str .= "\nF.7:".Babble_TestIt($name,"weckzeit ansagen",0);
-  $str .= "\nF.8:".Babble_TestIt($name,"weckzeit",0);
-  $str .= "\nF.9:".Babble_TestIt($name,"wecken um 4 uhr 3",0);
-  $str .= "\nF.10:".Babble_TestIt($name,"stelle den wecker auf 17:00",0);
-  $str .= "\nF.11:".Babble_TestIt($name,"wecken um 13:12 Uhr",0);
+  $str .= "\nF.1:".Babble_DoIt($name,"schalte den wecker aus","testit",0);
+  $str .= "\nF.2:".Babble_DoIt($name,"schalte wecker aus","testit",0);
+  $str .= "\nF.3:".Babble_DoIt($name,"den wecker ausschalten","testit",0);
+  $str .= "\nF.4:".Babble_DoIt($name,"wecker ausschalten","testit",0);
+  $str .= "\nF.5:".Babble_DoIt($name,"wie ist die weckzeit","testit",0);
+  $str .= "\nF.6:".Babble_DoIt($name,"wie ist der status des weckers","testit",0);
+  $str .= "\nF.7:".Babble_DoIt($name,"weckzeit ansagen","testit",0);
+  $str .= "\nF.8:".Babble_DoIt($name,"weckzeit","testit",0);
+  $str .= "\nF.9:".Babble_DoIt($name,"wecken um 4 uhr 3","testit",0);
+  $str .= "\nF.10:".Babble_DoIt($name,"stelle den wecker auf 17:00","testit",0);
+  $str .= "\nF.11:".Babble_DoIt($name,"wecken um 13:12 Uhr","testit",0);
   $str .= "\n";
-  $str .= "\nG.1:".Babble_TestIt($name,"das haus ansagen",0);
-  $str .= "\nG.2:".Babble_TestIt($name,"haus ansagen",0);
-  $str .= "\nG.3:".Babble_TestIt($name,"haus status",0);
-  $str .= "\nG.4:".Babble_TestIt($name,"wie ist der status des hauses",0);
-  $str .= "\nG.5:".Babble_TestIt($name,"wie ist der status vom haus",0);
-  $str .= "\nG.6:".Babble_TestIt($name,"das haus sichern",0);
-  $str .= "\nG.7:".Babble_TestIt($name,"sichere das haus",0);
-  $str .= "\nG.8:".Babble_TestIt($name,"haus sichern",0);
-  $str .= "\nG.9:".Babble_TestIt($name,"das haus entsichern",0);
-  $str .= "\nG.10:".Babble_TestIt($name,"haus entsichern",0);
-  $str .= "\nG.11:".Babble_TestIt($name,"haustür öffnen",0);
-  $str .= "\nG.12:".Babble_TestIt($name,"die haustür öffnen",0);
-  $str .= "\nG.13:".Babble_TestIt($name,"öffne die haustür",0);
-  $str .= "\nG.14:".Babble_TestIt($name,"schließe die haustür zu",0);
-  $str .= "\nG.15:".Babble_TestIt($name,"schließe die haustür auf",0);
+  $str .= "\nG.1:".Babble_DoIt($name,"das haus ansagen","testit",0);
+  $str .= "\nG.2:".Babble_DoIt($name,"haus ansagen","testit",0);
+  $str .= "\nG.3:".Babble_DoIt($name,"haus status","testit",0);
+  $str .= "\nG.4:".Babble_DoIt($name,"wie ist der status des hauses","testit",0);
+  $str .= "\nG.5:".Babble_DoIt($name,"wie ist der status vom haus","testit",0);
+  $str .= "\nG.6:".Babble_DoIt($name,"das haus sichern","testit",0);
+  $str .= "\nG.7:".Babble_DoIt($name,"sichere das haus","testit",0);
+  $str .= "\nG.8:".Babble_DoIt($name,"haus sichern","testit",0);
+  $str .= "\nG.9:".Babble_DoIt($name,"das haus entsichern","testit",0);
+  $str .= "\nG.10:".Babble_DoIt($name,"haus entsichern","testit",0);
+  $str .= "\nG.11:".Babble_DoIt($name,"haustür öffnen","testit",0);
+  $str .= "\nG.12:".Babble_DoIt($name,"die haustür öffnen","testit",0);
+  $str .= "\nG.13:".Babble_DoIt($name,"öffne die haustür","testit",0);
+  $str .= "\nG.14:".Babble_DoIt($name,"schließe die haustür zu","testit",0);
+  $str .= "\nG.15:".Babble_DoIt($name,"schließe die haustür auf","testit",0);
   $str .= "\n";
-  $str .= "\nH.1:".Babble_TestIt($name,"alarmanlage einschalten",0);
-  $str .= "\nH.1:".Babble_TestIt($name,"alarmanlage ein schalten",0);
-  $str .= "\nH.1:".Babble_TestIt($name,"die alarmanlage scharfschalten",0);
-  $str .= "\nH.2:".Babble_TestIt($name,"alarmanlage unscharf schalten",0);
-  $str .= "\nH.2:".Babble_TestIt($name,"die alarmanlage ausschalten",0);
-  $str .= "\nH.3:".Babble_TestIt($name,"schalte die alarmanlage scharf",0);
-  $str .= "\nH.4:".Babble_TestIt($name,"schalte den alarm an",0);
-  $str .= "\nH.5:".Babble_TestIt($name,"alarm wider rufen",0);
-  $str .= "\nH.6:".Babble_TestIt($name,"alarm widerrufen",0);
+  $str .= "\nH.1:".Babble_DoIt($name,"alarmanlage einschalten","testit",0);
+  $str .= "\nH.1:".Babble_DoIt($name,"alarmanlage ein schalten","testit",0);
+  $str .= "\nH.1:".Babble_DoIt($name,"die alarmanlage scharfschalten","testit",0);
+  $str .= "\nH.2:".Babble_DoIt($name,"alarmanlage unscharf schalten","testit",0);
+  $str .= "\nH.2:".Babble_DoIt($name,"die alarmanlage ausschalten","testit",0);
+  $str .= "\nH.3:".Babble_DoIt($name,"schalte die alarmanlage scharf","testit",0);
+  $str .= "\nH.4:".Babble_DoIt($name,"schalte den alarm an","testit",0);
+  $str .= "\nH.5:".Babble_DoIt($name,"alarm wider rufen","testit",0);
+  $str .= "\nH.6:".Babble_DoIt($name,"alarm widerrufen","testit",0);
   $str .= "\n";
-  $str .= "\nI.1:".Babble_TestIt($name,"schalte beleuchtung in sitzgruppe an",0);
-  $str .= "\nI.2:".Babble_TestIt($name,"schalte beleuchtung in der sitzgruppe an",0);
-  $str .= "\nI.3:".Babble_TestIt($name,"mach die beleuchtung auf terrasse an",0);
-  $str .= "\nI.4:".Babble_TestIt($name,"mache außen die beleuchtung aus",0);
-  $str .= "\nI.5:".Babble_TestIt($name,"wie ist die temperatur im badezimmer",0);
-  $str .= "\nI.6:".Babble_TestIt($name,"wie ist die feuchte in dominics zimmer",0);
-  $str .= "\nI.7:".Babble_TestIt($name,"wie ist die feuchte in dem schlafzimmer",0);
-  $str .= "\nI.8:".Babble_TestIt($name,"wie ist der status der tür im schlafzimmer",0);
-  $str .= "\nI.9:".Babble_TestIt($name,"status tür schlafzimmer",0);
-  $str .= "\nI.10:".Babble_TestIt($name,"status der tür schlafzimmer",0);
-  $str .= "\nI.11:".Babble_TestIt($name,"status tür im schlafzimmer",0);
-  $str .= "\nI.12:".Babble_TestIt($name,"status der tür im schlafzimmer",0);
+  $str .= "\nI.1:".Babble_DoIt($name,"schalte beleuchtung in sitzgruppe an","testit",0);
+  $str .= "\nI.2:".Babble_DoIt($name,"schalte beleuchtung in der sitzgruppe an","testit",0);
+  $str .= "\nI.3:".Babble_DoIt($name,"mach die beleuchtung auf terrasse an","testit",0);
+  $str .= "\nI.4:".Babble_DoIt($name,"mache außen die beleuchtung aus","testit",0);
+  $str .= "\nI.5:".Babble_DoIt($name,"wie ist die temperatur im badezimmer","testit",0);
+  $str .= "\nI.6:".Babble_DoIt($name,"wie ist die feuchte in dominics zimmer","testit",0);
+  $str .= "\nI.7:".Babble_DoIt($name,"wie ist die feuchte in dem schlafzimmer","testit",0);
+  $str .= "\nI.8:".Babble_DoIt($name,"wie ist der status der tür im schlafzimmer","testit",0);
+  $str .= "\nI.9:".Babble_DoIt($name,"status tür schlafzimmer","testit",0);
+  $str .= "\nI.10:".Babble_DoIt($name,"status der tür schlafzimmer","testit",0);
+  $str .= "\nI.11:".Babble_DoIt($name,"status tür im schlafzimmer","testit",0);
+  $str .= "\nI.12:".Babble_DoIt($name,"status der tür im schlafzimmer","testit",0);
   $str .= "\n";
-  $str .= "\nJ.1:".Babble_TestIt($name,"stelle bei gerät den wert auf 8",0);
-  $str .= "\nJ.2:".Babble_TestIt($name,"stelle am gerät wert auf 9",0);
-  $str .= "\nJ.3:".Babble_TestIt($name,"stelle bei harmony den kanal auf 10",0);
-  $str .= "\nJ.4:".Babble_TestIt($name,"stelle am fernseher die lautstärke auf 11",0);
+  $str .= "\nJ.1:".Babble_DoIt($name,"stelle bei gerät den wert auf 8","testit",0);
+  $str .= "\nJ.2:".Babble_DoIt($name,"stelle am gerät wert auf 9","testit",0);
+  $str .= "\nJ.3:".Babble_DoIt($name,"stelle bei harmony den kanal auf 10","testit",0);
+  $str .= "\nJ.4:".Babble_DoIt($name,"stelle am fernseher die lautstärke auf 11","testit",0);
   $str .= "\n";
-  $str .= "\nK.1:".Babble_TestIt($name,"zur einkaufsliste hinzufügen bratheringe",0);
-  $str .= "\nK.2:".Babble_TestIt($name,"zu peters liste hinzufügen ticket münchen besorgen",0);
-  $str .= "\nK.3:".Babble_TestIt($name,"von dominics liste entfernen schmieröl",0);
-  $str .= "\nK.4:".Babble_TestIt($name,"baumarktliste löschen",0);
-  $str .= "\nK.5:".Babble_TestIt($name,"einkaufsliste senden",0);
+  $str .= "\nK.1:".Babble_DoIt($name,"zur einkaufsliste hinzufügen bratheringe","testit",0);
+  $str .= "\nK.2:".Babble_DoIt($name,"zu peters liste hinzufügen ticket münchen besorgen","testit",0);
+  $str .= "\nK.3:".Babble_DoIt($name,"von dominics liste entfernen schmieröl","testit",0);
+  $str .= "\nK.4:".Babble_DoIt($name,"baumarktliste löschen","testit",0);
+  $str .= "\nK.5:".Babble_DoIt($name,"einkaufsliste senden","testit",0);
  
  return $str;
   
@@ -1071,171 +1074,6 @@ sub Babble_getcsrf($$$){
 
 ########################################################################################
 #
-# Babble_TestIt 
-# 
-# Parameter name  = name of the babble definition
-#
-#########################################################################################
-
-sub Babble_TestIt{
-  my ($name,$sentence,$exflag,@parms) = @_;
-  my $hash  = $defs{$name};
-  
-  my ($device,$verb,$reading,$value,$article,$reserve,$place,$cat) = Babble_Normalize($name,$sentence);
-  $verb = "none" 
-    if( !$verb );
-  $reading = "none" 
-    if( !$reading );
-  
-  my $str="[Babble_Normalize] ".$babble_tt->{"input"}.":  $sentence\n".
-          "                       ".$babble_tt->{"result"}.": Category=$cat: ".
-          $babble_tt->{"device"}."=$device ".$babble_tt->{"place"}."=$place ".
-          $babble_tt->{"verb"}."=$verb ".$babble_tt->{"target"}."=$reading / $value";
-          
-  my $cmd  = $hash->{DATA}{"command"}{$device}{$place}{$verb}{$reading};
-  my $res  = "";
-  my $star = "";
-  
-  #-- not directly - but maybe we have an alias device ?
-  if( (!defined($cmd) || $cmd eq "") && defined($device) ){
-    my $alidev  = $device;
-    #-- remove trailing numbers 
-    $alidev      =~s/_\d+$//g; 
-    #-- number of real devices for this alias device
-    my $numalias = (defined($hash->{DATA}{"devsalias"}{$alidev})) ? int(@{$hash->{DATA}{"devsalias"}{$alidev}}) : 0;
-    for (my $i=0;$i<$numalias ;$i++){
-      my $ig = $hash->{DATA}{"devsalias"}{$alidev}[$i];
-      my $bdev    = $hash->{DATA}{"devs"}[$ig];
-      my $lbdev   = lc($bdev);
-      next
-        if( $lbdev eq $device );
-      $cmd = $hash->{DATA}{"command"}{$lbdev}{$place}{$verb}{$reading};
-      if( defined($cmd) && $cmd ne "" ){
-        $device = $lbdev;
-        last;
-      }
-    }
-  }   
-  
-  #-- not directly - but maybe we have a device which is an extension of an alias device
-  if( (!defined($cmd) || $cmd eq "") && defined($device) ){
-    my $realdev  = $device;
-    foreach my $stardev (keys %{$hash->{DATA}{"devsalias"}}){
-      if(index($stardev,'*')!=-1){
-        my $starrexp = $stardev;
-        $starrexp    =~ s/\*/\(\.\*\)/;
-        if( $realdev =~ /$starrexp/ ){
-          $star = $1;
-          $cmd = $hash->{DATA}{"command"}{$stardev}{$place}{$verb}{$reading};
-          if( defined($cmd) && $cmd ne "" ){
-            $device = $stardev;
-            last;
-          }
-        }
-      }
-    }
-  }   
-  
-  #-- command found, execute if permitted
-  if( defined($cmd) && $cmd ne "" ){
-    #-- substitution
-    $cmd =~ s/\$DEV/$device/g;
-    $cmd =~ s/\$STAR/$star/g;
-    $cmd =~ s/\$VALUE/$value/g;
-    for( my $i=0;$i<4;$i++){
-      $parms[$i] = AttrVal($name,"testParm".$i,undef)
-        if( !defined($parms[$i]) && AttrVal($name,"testParm".$i,undef));
-    }
-    for(my $i=0;$i<int(@parms);$i++){
-      $cmd =~ s/\$PARM$i/$parms[$i]/g;
-    }
-    $str .= "==> $cmd";
-    if( $exflag==1 ){
-       my $contact = $hash->{DATA}{"devcontacts"}{$device}[2];
-       my $fhemdev = $hash->{DATA}{"devcontacts"}{$device}[1];
-       if( $contact == 0 ){
-         $res = fhem($cmd);
-       }else{
-         my $ip    = AttrVal($name,"remoteFHEM".$contact,undef);
-         my $token = AttrVal($name,"remoteToken".$contact,undef);
-         my $func  = AttrVal($name,"remoteFunc".$contact,undef);  
-         if( $func && $func ne "" ){
-           $res = eval($func."(\"".$cmd."\")")
-         }else{
-           $cmd =~ s/\s/\%20/g;
-           my $url    = "http://".$ip."/fhem?XHR=1&fwcsrf=".$token."&cmd.$fhemdev=$cmd";
-           HttpUtils_NonblockingGet({
-             url => $url,
-             callback => sub($$$){} 
-           });
-        }
-      }
-      #-- confirm execution
-      my $func  = AttrVal($name,"helpFunc",undef);  
-      if( $func && $func ne "" ){
-        $func =~ s/\$HELP/OhKee/g;
-        $res = eval($func);
-      }
-    }
-    
-  #-- no command found, but chatbot available
-  }elsif( $rive==1 && AttrVal($name,"noChatBot",0) != 1){
-    #-- Create a new RiveScript interpreter
-    Babble_createRive($hash)
-      if( !defined($hash->{Rive}) );
-  
-    chomp ($sentence);
-    my $rs = $hash->{Rive};
-    my $reply = $rs->reply ('localuser',$sentence);
-    $reply = $babble_tt->{dnu}
-      if ($reply eq "ERR: No Reply Matched");
-    $str .= "==> ".$reply;
-    
-    if( $exflag==1 ){
-      my $func  = AttrVal($name,"helpFunc",undef);  
-      if( $func && $func ne "" ){
-        #-- substitution
-        $func =~ s/\$DEV/$device/g;
-        $func =~ s/\$VALUE/$value/g;
-        for( my $i=0;$i<4;$i++){
-          $parms[$i] = AttrVal($name,"testParm".$i,undef)
-            if( !defined($parms[$i]) && AttrVal($name,"testParm".$i,undef));
-        }
-        for(my $i=0;$i<int(@parms);$i++){
-          $func =~ s/\$PARM$i/$parms[$i]/g;
-        }
-        $func =~ s/\$HELP/$reply/g;
-        $res = eval($func);
-      }
-    }
-  #-- no command found and chatbot unavailable 
-  }elsif( $exflag==1 ){
-    my $func  = AttrVal($name,"helpFunc",undef);  
-    if( $func && $func ne "" ){
-      my $help = defined($hash->{DATA}{"help"}{$device}) ? $hash->{DATA}{"help"}{$device} : "";
-      #-- substitution
-      $func =~ s/\$DEV/$device/g;
-      $func =~ s/\$VALUE/$value/g;
-      for( my $i=0;$i<4;$i++){
-        $parms[$i] = AttrVal($name,"testParm".$i,undef)
-          if( !defined($parms[$i]) && AttrVal($name,"testParm".$i,undef));
-      }
-      for(my $i=0;$i<int(@parms);$i++){
-        $func =~ s/\$PARM$i/$parms[$i]/g;
-      }
-      $func =~ s/\$HELP/$help/g;
-      $res = eval($func);
-    }else{
-      $str .= "==> command not found and help function undefined";
-    }
-  }else{
-    $str .= "==> command not found";
-  }
-  return $str;
-}
-
-########################################################################################
-#
 # Babble_DoIt
 # 
 # Parameter name  = name of the babble definition
@@ -1246,16 +1084,41 @@ sub Babble_DoIt{
   my ($name,$sentence,@parms) = @_;
   my $hash  = $defs{$name};
   
+  chomp ($sentence);
+  my $testit = 0;
+  my $exflag = 0;
+  my $confirm= 0;
+  my $res    = "";
+  my $str    = "";
+  my $star   = "";
+  my $reply  = "";
+  
+  #-- semantic analysis
   my ($device,$verb,$reading,$value,$article,$reserve,$place,$cat) = Babble_Normalize($name,$sentence);
   $verb = "none" 
     if( !$verb );
   $reading = "none" 
     if( !$reading );
-  my $cmd = $hash->{DATA}{"command"}{$device}{$place}{$verb}{$reading}; 
-  my $res = "";
-  my $star= "";
   
-   #-- not directly - but maybe we have an alias device ?
+  if($parms[0]="testit"){
+    $testit = 1;
+    shift @parms;
+    $exflag = $parms[0];
+    shift @parms;
+    for( my $i=0;$i<4;$i++){
+      $parms[$i] = AttrVal($name,"testParm".$i,undef)
+        if( !defined($parms[$i]) && AttrVal($name,"testParm".$i,undef));
+    }   
+    $str="[Babble_Normalize] ".$babble_tt->{"input"}.":  $sentence\n".
+          "                       ".$babble_tt->{"result"}.": Category=$cat: ".
+          $babble_tt->{"device"}."=$device ".$babble_tt->{"place"}."=$place ".
+          $babble_tt->{"verb"}."=$verb ".$babble_tt->{"target"}."=$reading / $value";
+  }
+  
+  #-- find command directly
+  my $cmd = $hash->{DATA}{"command"}{$device}{$place}{$verb}{$reading}; 
+  
+  #-- not directly - but maybe we have an alias device ?
   if( !defined($cmd) || $cmd eq "" ){
     my $alidev  = $device;
     $alidev      =~s/_\d+$//g; 
@@ -1293,77 +1156,106 @@ sub Babble_DoIt{
     }
   }   
   
+  #-- command found after all
   if( defined($cmd) && $cmd ne "" ){
+    #-- confirmation ?
+    if( index($cmd,"\$CONFIRM") != -1 ){
+      $confirm=1;
+      $cmd =~ s/;;\$CONFIRM$//;
+    } 
     #-- substitution
     $cmd =~ s/\$DEV/$device/g;
     $cmd =~ s/\$VALUE/$value/g;
     for(my $i=0;$i<int(@parms);$i++){
       $cmd =~ s/\$PARM$i/$parms[$i]/g;
     }
-    Log 1,"[Babble_DoIt] Executing from hash: $device.$place.$verb.$reading/$value";
-    my $contact = $hash->{DATA}{"devcontacts"}{$device}[2];
-    my $fhemdev = $hash->{DATA}{"devcontacts"}{$device}[1];
-    if( $contact == 0 ){
-      $res = fhem($cmd);
-    }else{
-      my $ip    = AttrVal($name,"remoteFHEM".$contact,undef);
-      my $token = AttrVal($name,"remoteToken".$contact,undef);
-      my $func  = AttrVal($name,"remoteFunc".$contact,undef);  
-      if( $func && $func ne "" ){
-        $res = eval($func."(\"".$cmd."\")")
+    if( $testit==0 || ($testit==1 && $exflag==1 )){
+      Log3 $name,1,"[Babble_DoIt] Executing from hash: $device.$place.$verb.$reading/$value  ";
+      my $contact = $hash->{DATA}{"devcontacts"}{$device}[2];
+      my $fhemdev = $hash->{DATA}{"devcontacts"}{$device}[1];
+      if( $contact == 0 ){
+        $res = fhem($cmd);
       }else{
-        $cmd =~ s/\s/\%20/g;
-        my $url    = "http://".$ip."/fhem?XHR=1&amp;fwcsrf=".$token."&amp;cmd.$fhemdev=$cmd";
-        HttpUtils_NonblockingGet({
-          url => $url,
-          callback => sub($$$){} 
-        });
+        my $ip    = AttrVal($name,"remoteFHEM".$contact,undef);
+        my $token = AttrVal($name,"remoteToken".$contact,undef);
+        my $func  = AttrVal($name,"remoteFunc".$contact,undef);  
+        if( $func && $func ne "" ){
+          $res = eval($func."(\"".$cmd."\")")
+        }else{
+          $cmd =~ s/\s/\%20/g;
+          my $url    = "http://".$ip."/fhem?XHR=1&amp;fwcsrf=".$token."&amp;cmd.$fhemdev=$cmd";
+          HttpUtils_NonblockingGet({
+            url => $url,
+            callback => sub($$$){} 
+          });
+        }
+      }
+      #-- confirm execution
+      my $func  = AttrVal($name,"confirmFunc",undef);  
+      if( $confirm ){
+        if ($func && $func ne "" ){
+          #-- substitution
+          $func =~ s/\$DEV/$device/g;
+          $func =~ s/\$VALUE/$value/g;
+          for(my $i=0;$i<int(@parms);$i++){
+            $func =~ s/\$PARM$i/$parms[$i]/g;
+          }
+          $res = fhem($func);   
+        }else{
+          Log3 $name,1,"[Babble_DoIt] requesting confirmation, but no attribute confirmFunc defined";
+        }
       }
     }
-    #-- confirm execution
-    my $func  = AttrVal($name,"helpFunc",undef);  
-    if( $func && $func ne "" ){
-      $func =~ s/\$HELP/OhKee/g;
-      $res = eval($func);
-    }
-  #-- no command found, but chatbot available
-  }elsif( $rive==1  && AttrVal($name,"noChatBot",0) != 1){
-    #-- Create a new RiveScript interpreter
-    Babble_createRive($hash)
-      if( !defined($hash->{Rive}) );
-  
-    chomp ($sentence);
-    my $rs = $hash->{Rive};
-    my $reply = $rs->reply ('localuser',$sentence);
-    $reply = $babble_tt->{dnu}
-      if ($reply eq "ERR: No Reply Matched");
-    my $func  = AttrVal($name,"helpFunc",undef);  
-    if( $func && $func ne "" ){
-      #-- substitution
-      $func =~ s/\$DEV/$device/g;
-      $func =~ s/\$VALUE/$value/g;
-      for(my $i=0;$i<int(@parms);$i++){
-        $func =~ s/\$PARM$i/$parms[$i]/g;
-      }
-      $func =~ s/\$HELP/$reply/g;
-      $res = eval($func)
-    }
-  #-- no command found and chatbot unavailable 
-  }else{
-    my $func  = AttrVal($name,"helpFunc",undef);  
-    if( $func && $func ne "" ){
-      my $help = defined($hash->{DATA}{"help"}{$device}) ? $hash->{DATA}{"help"}{$device} : "";
-      #-- substitution
-      $func =~ s/\$DEV/$device/g;
-      $func =~ s/\$VALUE/$value/g;
-      for(my $i=0;$i<int(@parms);$i++){
-        $func =~ s/\$PARM$i/$parms[$i]/g;
-      }
-      $func =~ s/\$HELP/$help/g;
-      $res = eval($func)
+    #-- what to do in conclusion
+    if( $testit==0 ){
+      return undef;   
     }else{
-      Log 1,"[Babble_DoIt] Command $device.$place.$verb.$reading/$value undefined, help function not given";
+      $str .= "==> $cmd";
+      return $str;
     }
+ 
+  #-- no command found, acquire alternate text
+  }else{
+    #-- ChatBot available
+    if( $rive==1  && AttrVal($name,"noChatBot",0) != 1){
+      #-- Create a new RiveScript interpreter
+      Babble_createRive($hash)
+        if( !defined($hash->{Rive}) );
+      my $rs = $hash->{Rive};
+      $reply = $rs->reply ('localuser',$sentence);
+      $reply = $babble_tt->{dnu}
+        if ($reply eq "ERR: No Reply Matched");
+    #-- no chatbot, use help text directly
+    }else{
+      $reply = defined($hash->{DATA}{"help"}{$device}) ? $hash->{DATA}{"help"}{$device} : "";
+    }  
+    #-- get help function
+   my $func  = AttrVal($name,"helpFunc",undef);  
+   if( $func && $func ne "" ){
+      #-- substitution
+      $func =~ s/\$HELP/$reply/g;
+      $func =~ s/\$DEV/$device/g;
+      $func =~ s/\$VALUE/$value/g;
+      for(my $i=0;$i<int(@parms);$i++){
+        $func =~ s/\$PARM$i/$parms[$i]/g;
+      }    
+      if( $testit==0 ){
+        $res = eval($func);
+        return "";
+      }elsif($testit==1 && $exflag==1 ){
+        $res = eval($func);
+        return $str." ".$reply;
+      }else{
+        return $str." ".$func;
+      }    
+    #-- no command, testing, no execution 
+    }elsif( $testit==1 ){
+      Log 1,"[Babble_DoIt] Command $device.$place.$verb.$reading/$value undefined, reply = $reply";
+      $str = $reply;
+    }else{
+      $str = "";
+    }
+    return $str;
   } 
 }
 
@@ -2088,7 +1980,7 @@ sub Babble_Html($)
     $rot .= "<tr><td colspan=\"3\"><table class=\"block wide\" id=\"devstable\">\n"; 
     $rot .= "<tr class=\"odd\"><td class=\"col1\" style=\"text-align:left;padding-right:10px;\">".$babble_tt->{"fhemname"}."</td><td class=\"col2\" style=\"text-align:left\">".$babble_tt->{"device"}."</td>\n".
             "<td class=\"col3\">".$babble_tt->{"place"}."</td><td class=\"col3\">".$babble_tt->{"verb"}."</td><td class=\"col3\">".$babble_tt->{"target"}."</td>\n".
-            "<td class=\"col3\">".$babble_tt->{"action"}."</td><td class=\"col3\"><input type=\"button\" id=\"d_save\" onclick=\"babble_savedevs('".$name."')\" value=\"".$babble_tt->{"save"}.
+            "<td class=\"col3\">".$babble_tt->{"action"}."</td><td class=\"col3\">".$babble_tt->{"confirm"}."</td><td class=\"col3\"><input type=\"button\" id=\"d_save\" onclick=\"babble_savedevs('".$name."')\" value=\"".$babble_tt->{"save"}.
                         "\" style=\"width:100px;\"/></td></tr>\n";
     #-- loop over all unique devices to get some sorting
     if( defined($hash->{DATA}{"devsalias"}) ){
@@ -2111,6 +2003,7 @@ sub Babble_Html($)
               $hlp .= $babble_tt->{"placespec"}.", ".$babble_tt->{"followedby"}." ";
             }
           }
+          my $checked;
           my $fhemdev = $hash->{DATA}{"devcontacts"}{$lbdev}[1];
           my $contact = $hash->{DATA}{"devcontacts"}{$lbdev}[2];
            
@@ -2138,7 +2031,7 @@ sub Babble_Html($)
           $rot .= "</td>\n<td class=\"col2\" style=\"text-align:left;  border-top:1px solid gray;padding:2px\">$bdev</td>\n";  
           $rot .= "</td>\n<td class=\"col2\" style=\"text-align:right; border-left:1px dotted gray; border-bottom: 1px dotted gray;border-top:1px solid gray;border-bottom-left-radius:10px; padding:2px\">".$babble_tt->{"helptext"}."&rarr;</td>";
           #-- helptext
-          $rot .= "<td class=\"col3\" colspan=\"3\" style=\"text-align:left;border-right:1px dotted gray;border-bottom: 1px dotted gray;border-top:1px solid gray;border-bottom-right-radius:10px; padding:2px;\">";        
+          $rot .= "<td class=\"col3\" colspan=\"4\" style=\"text-align:left;border-right:1px dotted gray;border-bottom: 1px dotted gray;border-top:1px solid gray;border-bottom-right-radius:10px; padding:2px;\">";        
           $rot .= "<input type=\"text\" name=\"d_help\" size=\"51\" maxlength=\"1024\" value=\"".$hlp."\"/></td>"; 
           $rot .= "<td style=\"text-align:left;padding-right:10px; border-top:1px solid gray\">".
                   "<input type=\"button\" id=\"d_addrow\" onclick=\"babble_addrow('".$name."',$devcount,$tblrow)\" value=\"".$babble_tt->{"add"}."\" style=\"width:100px;\"/></td></tr>\n";#$tblrow-$devcount.$devrow
@@ -2150,7 +2043,13 @@ sub Babble_Html($)
           foreach my $place (keys %{$hash->{DATA}{"command"}{$lbdev}}){
             foreach my $verb (keys %{$hash->{DATA}{"command"}{$lbdev}{$place}}){
               foreach my $target (keys %{$hash->{DATA}{"command"}{$lbdev}{$place}{$verb}}){
-                my $cmd = $hash->{DATA}{"command"}{$lbdev}{$place}{$verb}{$target};
+                my $cmd     = $hash->{DATA}{"command"}{$lbdev}{$place}{$verb}{$target};
+                if( index($cmd,"\$CONFIRM") != -1 ){
+                  $checked = "checked=\"checked\" ";
+                  $cmd =~ s/;;\$CONFIRM$//;
+                }else{
+                  $checked="";
+                }
                 $tblrow++;
                 $devrow++;
               
@@ -2164,6 +2063,7 @@ sub Babble_Html($)
                         "<td class=\"col3\"><select name=\"d_verb\">".$vblist."</select></td>".
                         "<td class=\"col3\"><select name=\"d_verbpart\">".$vpmlist."</select></td>\n";  
                 $rot .= "<td class=\"col3\"  style=\"text-align:left;padding:2px\"><input type=\"text\" name=\"d_command\" size=\"30\" maxlength=\"512\" value=\"".$cmd."\"/></td>";
+                $rot .= "<td class=\"col3\"><input type=\"checkbox\" name=\"d_confirm\"$checked</td>";
                 $rot .= "<td><input type=\"button\" id=\"d_remrow\" onclick=\"babble_remrow('".$name."',$devcount,$tblrow)\" value=\"".$babble_tt->{"remove"}."\" style=\"width:100px;\"/></td></tr>\n";#$tblrow-$devcount.$devrow
               }
            }
@@ -2275,7 +2175,10 @@ sub Babble_Html($)
                 will be replaced by the devicename identified by Babble, the help text for this device and parameters passed to the Babble_DoIt function</li>
             <li><a name="testParm"><code>attr &lt;name&gt; testParm(0|1|2|3) &lt;string&rt;</code></a>
                 <br/>if a command is not really excuted, but only tested, the values of these attributes will be used to substitute the strings $PARM[0|1|2...]
-                in the tested command</li>            
+                in the tested command</li>       
+            <li><a name="confirmFunc"><code>attr &lt;name&gt; confirmFunc &lt;function name&rt;</code></a>
+                <br/>name of a confirmation function which is used in case a command is exceuted. When this function is called, the strings $DEV, $HELP, $PARM[0|1|2...]
+                will be replaced by the devicename identified by Babble, the help text for this device and parameters passed to the Babble_DoIt function</li>     
             <li><a name="noChatBot"><code>attr &lt;name&gt; noChatBot 0|1</code></a>
                 <br/>if this attribute is set to 1, a local RiveScript interpreter will be ignored even though it is present in the system</li>
             <li><a name="remoteFHEM"><code>attr &lt;name&gt; remoteFHEM(0|1|2|3) [&lt;user&gt;:&lt;password&gt;@]&lt;IP address:port&rt;</code></a>

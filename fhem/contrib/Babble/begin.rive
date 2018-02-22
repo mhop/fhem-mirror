@@ -15,7 +15,6 @@
 ! var master = Peter
 
 // Substitutions for house spirit name
-! sub jenny     = jeannie
-! sub tini      = jeannie
-
+! sub jenny     = Jeannie
+! sub tini      = Jeannie
 

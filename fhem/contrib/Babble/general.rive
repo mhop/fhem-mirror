@@ -1,12 +1,22 @@
 //########################################################################################
 // general.rive
-// Version 0.2
+// Version 0.3
 // See 95_Babble.pm for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
+//########################################################################################
+//# IMPORTANT: Save this file with UTF8 encoding. If you do not understand how to do this,
+//#            execute recode 
+//#
+//# \xc3\xa4 = Ã¤ = ae
+//#          = Ã¶ = oe
+//#          = Ã¼ = ue
+//#          = Ã = ss
+//#
+//########################################################################################
 
 + hallo
-- Hallo, ich bin <bot name2>. Wer bist Du ?
+- Hallo, ich bin <bot name2>. Ã¤Ã¶Ã¼Ã Wer bist Du ?
     
 + wer bist du
 - Hallo, ich bin <bot name2>. Wer bist Du ?
@@ -23,8 +33,8 @@
 - <set oldname=<get name>><set name=<formal>>
 ^ Ich dachte, Dein Name sei <get oldname>? Bitte noch einmal! <set name=undefined>
 
-+ was kannst du * * tun
-- Ich kann <star1> Dich das Haus steuern
++ was kannst du fÃ¼r mich tun
+- Ich kann fÃ¼r Dich das Haus steuern
 - Ich kann ganz verschiedene Dinge im Haus schalten und steuern
 
 + welche (orte|ortsangaben) kennst du
@@ -48,9 +58,19 @@
 + was kannst du (mit|bei) (dem|der|den) * (machen|steuern|schalten)
 - <call>devhelp <star3></call>
 
++ was ist golf
+- Das bedeutet, dass komische Leute in karierten Hosen mit lustigen kleinen Autos auf dem Rasen herumfahren. <call>devhelp golf</call> {weight=50}
+- <call>devhelp golf</call>{weight=50}
+
++ was ist gong
+- Damit weckst Du Dominic aus dem DornrÃ¶s-chenschlaf {weight=50}
+- <call>devhelp gong</call>{weight=50}
+
++ mir ist (warm|heiÃ|heiss)
+- Wenn dir <star1> ist, kann ich die Heizung ausstellen. Oder du Ã¶ffnest ein Fenster.
+
 + was ist *
 - <call>devhelp <star></call>
-
 
 // object to get known devices
 > object devices perl

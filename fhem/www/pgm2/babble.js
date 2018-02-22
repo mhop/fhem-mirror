@@ -1,6 +1,6 @@
 //########################################################################################
 // babble.js
-// Version 1.08
+// Version 1.2
 // See 95_Babble for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
@@ -286,6 +286,11 @@ function babble_savedevs(name) {
             field = table.rows[rowdev + j].cells[5].getElementsByTagName("input")[0];
             cmd = field.value;
             //
+            field = table.rows[rowdev + j].cells[6].getElementsByTagName("input")[0];
+            if( field.checked == true ){
+                cmd = cmd + ";;$CONFIRM";
+            }
+            //
             cmd = '{Babble_ModCmd("' + name + '","' + bdev + '","' + place + '","' + verb + '","' + target + '","' + encodeParm(cmd) + '")}';
             FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=' + cmd);
         }
@@ -305,7 +310,7 @@ function babble_testit(name) {
        exflag=0;
     }
     var url = document.location.protocol + "//" + document.location.host + "/fhem";
-    var cmd = '{Babble_TestIt("' + name + '","' + encodeParm(sentence) + '",' + exflag + ')}';
+    var cmd = '{Babble_DoIt("' + name + '","' + encodeParm(sentence) + '","testit",' + exflag + ')}';
   
     httpRequest = new XMLHttpRequest();
     httpRequest.open("GET", url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=' + cmd, true);
