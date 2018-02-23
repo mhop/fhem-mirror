@@ -815,6 +815,8 @@ sub client_start($) {
     $client->{message_ids}->{$msgid}++;
     readingsSingleUpdate($client,"transmission-state","subscribe sent",1);
   }
+  
+  return undef;
 };
 
 sub client_stop($) {
