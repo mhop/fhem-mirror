@@ -23,6 +23,7 @@ use strict;
 use warnings;
 use Time::Local;
 use Color;
+use vars qw(%FW_rooms %FW_groups);
 
 sub DOIFtools_Initialize($);
 sub DOIFtools_Set($@);
@@ -45,7 +46,7 @@ sub DOIFtools_logWrapper($);
 sub DOIFtoolsCounterReset($);
 sub DOIFtoolsDeleteStatReadings;
 
-my @DOIFtools_we = [0,0,0,0,0,0,0,0];
+my @DOIFtools_we = (0,0,0,0,0,0,0,0);
 my $DOIFtoolsJSfuncEM = <<'EOF';
 <script type="text/javascript">
 //functions
@@ -459,8 +460,9 @@ sub DOIFtools_fhemwebFn($$$$) {
   }
   # Event Monitor
   my $a0 = ReadingsVal($d,".eM", "off") eq "on" ? "off" : "on"; 
-  $ret .= "<div class=\"dval\"><table>";
+  $ret .= "<div class=\"dval\"><table class='block wide'>";
   $ret .= "<tr><td><span title=\"toggle to switch event monitor on/off\">Event monitor: <a href=\"$FW_ME?detail=$d&amp;cmd.$d=setreading $d .eM $a0$FW_CSRF\">toggle</a>&nbsp;&nbsp;</span>";
+  # Shortcuts
   if (!AttrVal($d,"DOIFtoolsHideModulShortcuts",0)) {
     $ret .= "Shortcuts: ";
     $ret .= "<a href=\"$FW_ME?detail=$d&amp;cmd.$d=reload 98_DOIFtools.pm$FW_CSRF\">reload DOIFtools</a>&nbsp;&nbsp;" if(ReadingsVal($d,".debug",""));
@@ -471,7 +473,7 @@ sub DOIFtools_fhemwebFn($$$$) {
   }
   $ret .= "</td></tr>";
   if (AttrVal($d,"DOIFtoolsMyShortcuts","")) {
-  $ret .= "<tr><td>";
+    $ret .= "<tr><td>";
     my @sc = split(",",AttrVal($d,"DOIFtoolsMyShortcuts",""));
     for (my $i = 0; $i < @sc; $i+=2) {
       if ($sc[$i] =~ m/^\#\#(.*)/) {
@@ -576,17 +578,18 @@ sub DOIFtools_Notify($$) {
   my $events = deviceEvents($source,1);
   return if( !$events );
   # \@DOIFtools_we aktualisieren
-  if ($sn eq AttrVal("global","holiday2we","")) {
-    my $we;
-    my $val;
-    my $a;
-    my $b;
-    for (my $i = 0; $i < 8; $i++) { 
-      $DOIFtools_we[$i] = 0;
-      $val = CommandGet(undef,"$sn days $i");
-      if($val) {
-        ($a, $b) = ReplaceEventMap($sn, [$sn, $val], 0);
-        $DOIFtools_we[$i] = 1 if($b ne "none");
+  if ((",".AttrVal("global","holiday2we","").",") =~ /\,$sn\,/) {
+    @DOIFtools_we = (0,0,0,0,0,0,0,0);
+    foreach my $item (split(",",AttrVal("global","holiday2we",""))) {
+      my $val;
+      my $a;
+      my $b;
+      for (my $i = 0; $i < 8; $i++) { 
+        $val = CommandGet(undef,"$item days $i");
+        if($val) {
+          ($a, $b) = ReplaceEventMap($item, [$item, $val], 0);
+          $DOIFtools_we[$i] = 1 if($b ne "none");
+        }
       }
     }
   }

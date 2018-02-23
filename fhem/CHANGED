@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_DOIFtools: support for multiple holiday files in holiday2we for
+             next timer calculation
   - change:  53_GHoma: plugs with energy measurement implemented
                       reading energy now in kWh / SetExtensions / DbLog_splitFn
   - change:  93_DbRep: commandref revised
