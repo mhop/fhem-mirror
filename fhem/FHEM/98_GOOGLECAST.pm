@@ -1,6 +1,6 @@
 #############################################################
 #
-# GOOGLECAST.pm (c) by Dominik Karall, 2016-2017
+# GOOGLECAST.pm (c) by Dominik Karall, 2016-2018
 # dominik karall at gmail dot com
 # $Id$
 #
@@ -718,13 +718,11 @@ PYTHON_CODE_END
 <h3>GOOGLECAST</h3>
 <ul>
   GOOGLECAST is used to control your Google Cast device<br><br>
-        <b>Note</b><br>Following packages are required:
+        <b>Note</b><br>Make sure, that python3 is used by default, check with python --version. Following packages are required:
         <ul>
-          <li>sudo apt-get install libwww-perl python-enum34 python-dev libextutils-makemaker-cpanfile-perl python-pip cpanminus</li>
-          <li>sudo pip install netifaces</li>
-          <li>sudo pip install enum34</li>
-          <li>sudo pip install pychromecast --upgrade</li>
-          <li>sudo pip install youtube-dl --upgrade</li>
+          <li>sudo apt-get install libwww-perl python-enum34 python-dev libextutils-makemaker-cpanfile-perl python3-pip cpanminus</li>
+          <li>sudo pip3 install pychromecast --upgrade</li>
+          <li>sudo pip3 install youtube-dl --upgrade</li>
           <li>sudo cpanm Inline::Python</li>
         </ul>
 
