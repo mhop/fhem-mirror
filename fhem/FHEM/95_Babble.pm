@@ -1100,7 +1100,7 @@ sub Babble_DoIt{
   $reading = "none" 
     if( !$reading );
   
-  if($parms[0]="testit"){
+  if( defined(@parms) && $parms[0]=="testit"){
     $testit = 1;
     shift @parms;
     $exflag = $parms[0];
