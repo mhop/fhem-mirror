@@ -188,7 +188,8 @@ sub Attr($$$$) {
     };
     $attribute =~ /^publishSet(_?)(.*)/ and do {
       if ($command eq "set") {
-        my @values = split ("[ \t]+",$value);
+        my ( $aa, $bb ) = parseParams($value);
+        my @values = @{$aa};
         my $topic = pop @values;
         $hash->{publishSets}->{$2} = {
           'values' => \@values,

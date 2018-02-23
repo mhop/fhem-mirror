@@ -66,7 +66,7 @@ package MQTT;
 
 use Exporter ('import');
 @EXPORT = ();
-@EXPORT_OK = qw(send_publish send_subscribe send_unsubscribe client_attr client_subscribe_topic client_unsubscribe_topic topic_to_regexp);
+@EXPORT_OK = qw(send_publish send_subscribe send_unsubscribe client_attr client_subscribe_topic client_unsubscribe_topic topic_to_regexp parseParams);
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 use strict;
@@ -242,6 +242,82 @@ sub Set($@) {
   };
 }
 
+sub parseParams($;$$) {
+
+    my ( $cmd, $separator, $joiner ) = @_;
+    $separator = ' '        if ( !$separator );
+    $joiner    = $separator if ( !$joiner );   # needed if separator is a regexp
+    my ( @a, %h );
+
+    my @params;
+    if ( ref($cmd) eq 'ARRAY' ) {
+        @params = @{$cmd};
+    }
+    else {
+        @params = split( $separator, $cmd );
+    }
+
+    while (@params) {
+        my $param = shift(@params);
+        next if ( $param eq "" );
+        my ( $key, $value ) = split( ':', $param, 2 );
+
+        if ( !defined($value) ) {
+            $value = $key;
+            $key   = undef;
+
+        # the key can not start with a { -> it must be a perl expression # vim:}
+        }
+        elsif ( $key =~ m/^\s*{/ ) {    # for vim: }
+            $value = $param;
+            $key   = undef;
+        }
+
+        #collect all parts until the closing ' or "
+        while ( $param && $value =~ m/^('|")/ && $value !~ m/$1$/ ) {
+            my $next = shift(@params);
+            last if ( !defined($next) );
+            $value .= $joiner . $next;
+        }
+
+        #remove matching ' or " from the start and end
+        if ( $value =~ m/^('|")/ && $value =~ m/$1$/ ) {
+            $value =~ s/^.(.*).$/$1/;
+        }
+
+        #collect all parts until opening { and closing } are matched
+        if ( $value =~ m/^\s*{/ ) {    # } for match
+            my $count = 0;
+            for my $i ( 0 .. length($value) - 1 ) {
+                my $c = substr( $value, $i, 1 );
+                ++$count if ( $c eq '{' );
+                --$count if ( $c eq '}' );
+            }
+
+            while ( $param && $count != 0 ) {
+                my $next = shift(@params);
+                last if ( !defined($next) );
+                $value .= $joiner . $next;
+
+                for my $i ( 0 .. length($next) - 1 ) {
+                    my $c = substr( $next, $i, 1 );
+                    ++$count if ( $c eq '{' );
+                    --$count if ( $c eq '}' );
+                }
+            }
+        }
+
+        if ( defined($key) ) {
+            $h{$key} = $value;
+        }
+        else {
+            push @a, $value;
+        }
+
+    }
+    return ( \@a, \%h );
+}
+
 sub parsePublishCmdStr($) {
   my ($str) = @_;
 
@@ -257,51 +333,46 @@ sub parsePublishCmdStr($) {
   return undef;
 }
 
-sub parsePublishCmd(@) {
-  my @a = @_;
-  # [qos:?] [retain:?] topic value
-  
-  return undef if(!@a);
-  return undef if(scalar(@a)<1);
-  
-  my $qos = 0;
-  my $retain = 0;
-  my $topic = undef;
-  my $value = "\0";
-  my $expression = undef;
-  
-  while (scalar(@a)>0) {
-    my $av = shift(@a);
-    if($av =~ /\{.*\}/) {
-      $expression = $av;
-      next;
+sub parsePublishCmd(@) { 
+    my @a = @_;
+    my ( $aa, $bb ) = parseParams(\@a);
+
+    my $qos        = 0;
+    my $retain     = 0;
+    my $topic      = undef;
+    my $value      = "\0";
+    my $expression = undef;
+
+    if ( exists( $bb->{'qos'} ) ) {
+        $qos = $bb->{'qos'};
     }
-    my ($pn,$pv) = split(":",$av);
-    if(defined($pv)) {
-      if($pn eq "qos") {
-        if($pv >=0 && $pv <=2) {
-          $qos = $pv;
-        }
-      } elsif($pn eq "retain") {
-        if($pv >=0 && $pv <=1) {
-          $retain = $pv;
-        }
-      } else {
-        # ignore
-        next;
-      }
-    } else {
-      $topic = $av;
-      last;
+
+    if ( exists $bb->{'retain'} ) {
+        $retain = $bb->{'retain'};
     }
-  }
-  
-  if(scalar(@a)>0) {
-    $value = join(" ", @a);
-  }
-  
-  return undef unless $topic || $expression;  
-  return ($qos, $retain,$topic, $value, $expression);
+
+    my @aaa = ();
+    my @xaa = @{$aa};
+
+    while ( scalar(@xaa) > 0 ) {
+        my $av = shift @xaa;
+        if ( $av =~ /\{.*\}/ ) {
+            $expression = $av;
+            next;
+        }
+        else {
+            push @aaa, $av;
+        }
+    }
+
+    $topic = shift(@aaa);
+
+    if ( scalar(@aaa) > 0 ) {
+        $value = join( " ", @aaa );
+    }
+    return undef unless $topic || $expression;
+    return ( $qos, $retain, $topic, $value, $expression );
+
 }
 
 sub Notify($$) {
