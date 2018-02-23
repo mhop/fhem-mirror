@@ -53,7 +53,7 @@ if  (eval {require RiveScript;1;} ne 1) {
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.24";
+my $babbleversion    = "1.25";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -1931,7 +1931,8 @@ sub Babble_Html($)
     $ret .= "var newplace = '<select name=\"d_place\">".Babble_getplaces($hash,"html","none")."</select>';\n";
     $ret .= "var newverbs = '<select name=\"d_verb\">".Babble_getverbs($hash, "html","none")."</select>';\n";
     $ret .= "var newtargs = '<select name=\"d_verbpart\">".Babble_getwords($hash,"targets","html","none")."</select>';\n";
-    $ret .= "var newfield = '<input type=\"text\" name=\"d_command\" size=\"30\" maxlength=\"512\" value=\"FHEM command\"/>';\n";
+    $ret .= "var newfield = '<input type=\"text\" name=\"d_command\" size=\"30\" maxlength=\"512\" value=\"FHEM command\">';\n";
+    $ret .= "var newcheck = '<input type=\"checkbox\" name=\"d_confirm\">';\n";
  
     $rot .= "</script>\n";
     

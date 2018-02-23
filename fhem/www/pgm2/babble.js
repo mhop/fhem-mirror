@@ -1,6 +1,6 @@
 //########################################################################################
 // babble.js
-// Version 1.2
+// Version 1.25
 // See 95_Babble for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
@@ -181,11 +181,13 @@ function babble_addrow(name, devx, rowx) {
     var cell4 = row.insertCell(4);
     var cell5 = row.insertCell(5);
     var cell6 = row.insertCell(6);
+    var cell7 = row.insertCell(7);
     //copy from existing row if such a row exists
     cell2.innerHTML = newplace;
     cell3.innerHTML = newverbs;
     cell4.innerHTML = newtargs;
     cell5.innerHTML = newfield;
+    cell6.innerHTML = newcheck;
 }
 
 function babble_remrow(name, devx, rowx) {
