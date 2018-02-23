@@ -7,9 +7,13 @@
 # FHEM module to communicate with Google Cast devices
 # e.g. Chromecast Video, Chromecast Audio, Google Home
 #
-# Version: 2.0.3
+# Version: 2.1.0
 #
 #############################################################
+#
+# v2.1.0 - 20180218
+# - BUGFIX:   one more socket_client fix
+# - BUGFIX:   offline state fix
 #
 # v2.0.3 - 20180217
 # - CHANGE:   increase speak limit to 500 characters
@@ -138,7 +142,7 @@ sub GOOGLECAST_Initialize($) {
     $hash->{AttrList} = "favoriteURL_1 favoriteURL_2 favoriteURL_3 favoriteURL_4 ".
                         "favoriteURL_5 ".$readingFnAttributes;
 
-    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.0.3";
+    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.1.0";
 
     return undef;
 }
@@ -156,6 +160,7 @@ sub GOOGLECAST_Define($$) {
         Log3 $hash, 3, "GOOGLECAST: $a[2] initializing...";
         $hash->{CCNAME} = $a[2];
         GOOGLECAST_updateReading($hash, "presence", "offline");
+        GOOGLECAST_updateReading($hash, "state", "offline");
         GOOGLECAST_initDevice($hash);
     }
 
@@ -562,8 +567,10 @@ sub GOOGLECAST_checkConnection {
     if($@ || !defined($selectlist{"GOOGLECAST-".$hash->{NAME}})) {
         Log3 $hash, 4, "GOOGLECAST ($hash->{NAME}): checkConnection, connection failure, reconnect...";
         delete($selectlist{"GOOGLECAST-".$hash->{NAME}});
+        $hash->{helper}{ccdevice}->{socket_client}->_cleanup();
         GOOGLECAST_initDevice($hash);
         GOOGLECAST_updateReading($hash, "presence", "offline");
+        GOOGLECAST_updateReading($hash, "state", "offline");
         return undef;
     }
 
@@ -587,8 +594,10 @@ sub GOOGLECAST_Read {
         eval {
             delete($selectlist{$name});
         };
+        $hash->{helper}{ccdevice}->{socket_client}->_cleanup();
         GOOGLECAST_initDevice($hash);
         GOOGLECAST_updateReading($hash, "presence", "offline");
+        GOOGLECAST_updateReading($hash, "state", "offline");
         return undef;
     }
 
