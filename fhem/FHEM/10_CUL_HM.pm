@@ -3889,7 +3889,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     else{#ignore e.g. for virtuals
     }
     if( !$roleV &&($roleD || $roleC)        ){foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
-    if(($st eq "virtual"||!$st)    && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_ ".$culHmGlobalSetsVrtDev->{$_}      }};
+    if(( $roleV || !$st)           && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_ ".$culHmGlobalSetsVrtDev->{$_}      }};
     if( !$roleV                    && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_ ".${$culHmSubTypeDevSets->{$st}}{$_}}};
     if( !$roleV                    && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_ ".$culHmGlobalSetsChn->{$_}         }};
     if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_ ".${$culHmSubTypeSets->{$st}}{$_}   }};
@@ -4013,9 +4013,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my $fkt   = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
   
   my $oCmd = $cmd;# we extend press to press/L/S if press is defined
-  if ( $cmd =~ m/^press/){# substitude pressL/S with press for cmd search
-    $cmd = (InternalVal($name,"peerList","")) ? "press" : "?";
-  }
+  $cmd = "press" if ($cmd =~ m/^press/);# substitude pressL/S with press for cmd search
   
   my $h = undef;
   $h = $culHmGlobalSets->{$cmd}         if(                !$roleV                    &&($roleD || $roleC));
@@ -4132,113 +4130,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "$cmd requires parameter: $h";
   }
 
-  my $id = CUL_HM_IoId($defs{$devName});
-  if(length($id) != 6 && $hash->{DEF} ne "000000" ){# have to try to find an IO $devName
-    CUL_HM_assignIO($defs{$devName});
-    $id = CUL_HM_IoId($defs{$devName});
-    return "no IO device identified" if(length($id) != 6 );
-  }
+  my $id; # define id of IO device for later usage
   
-
-  #convert 'old' commands to current methodes like regSet and regBulk...
-  # Unify the interface
-  if(   $cmd eq "sign"){
-    splice @a,1,0,"regSet";# make hash,regSet,reg,value
-  }
-  elsif($cmd eq "unpair"){
-    splice @a,1,3, ("regSet","pairCentral","000000");
-  }
-  elsif($cmd eq "ilum") { ################################################# reg
-    return "$a[2] not specified. choose 0-15 for brightness"  if ($a[2]>15);
-    return "$a[3] not specified. choose 0-127 for duration"   if ($a[3]>127);
-    return "unsupported for channel, use $devName"            if (!$roleD);
-    splice @a,1,3, ("regBulk","RegL_00.",sprintf("04:%02X",$a[2]),sprintf("08:%02X",$a[3]*2));
-  }
-  elsif($cmd eq "text") { ################################################# reg
-    my ($bn,$l1, $l2) = ($chn,$a[2],$a[3]); # Create CONFIG_WRITE_INDEX string
-    if ($roleD){# if used on device.
-      return "$a[2] is not a button number" if($a[2] !~ m/^\d*$/ || $a[2] < 1);
-      return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
-      $bn = $a[2]*2-($a[3] eq "on" ? 0 : 1);
-      ($l1, $l2) = ($a[4],$a[5]);
-      $chn = sprintf("%02X",$bn)
-      }
-    else{
-      return "to many parameter. Try set $a[0] text $a[2] $a[3]" if($a[4]);
-    }
-    my $s = 54;
-    $l1 =~ s/\\_/ /g;
-    $l1 = substr($l1."\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 0, 12);
-    $l1 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
-
-    $s = 70;
-    $l2 =~ s/\\_/ /g;
-    $l2 = substr($l2."\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 0, 12);
-    $l2 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
-    @a = ($a[0],"regBulk","RegL_01.",split(" ",$l1.$l2));
-  }
-  elsif($cmd =~ m/^(displayMode|displayTemp|displayTempUnit|controlMode)/) {
-    if ($md =~ m/^(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){#controlMode different for RT
-      splice @a,1,3, ("regSet",$a[1],$a[2]);
-      push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
-    }
-  }
-  elsif($cmd eq "partyMode") { ################################################
-    my ($eH,$eM,$days,$prep) = ("","","","");
-    if ($a[2] =~ m/^(prep|exec)$/){
-      $prep = $a[2];
-      splice  @a,2,1;#remove prep
-    }
-    $days = $a[3];
-    ($eH,$eM)  = split(':',$a[2]);
-
-    my ($s,$m,$h) = localtime();
-    return "$eH:$eM passed at $h:$m. Please enter time in the feature" 
-                                                            if ($days == 0 && ($h+($m/60))>=($eH+($eM/60)) );
-    return "$eM illegal - use 00 or 30 minutes only"        if ($eM !~ m/^(00|30)$/);
-    return "$eH illegal - hour must be between 0 and 23"    if ($eH < 0 || $eH > 23);
-    return "$days illegal - days must be between 0 and 200" if ($days < 0 || $days > 200);
-    $eH += 128 if ($eM eq "30");
-
-    my $cHash = CUL_HM_id2Hash($dst."02");
-    $cHash->{helper}{partyReg} = sprintf("61%02X62%02X0000",$eH,$days);
-    $cHash->{helper}{partyReg} =~ s/(..)(..)/ $1:$2/g;
-    if ($cHash->{READINGS}{"RegL_06."}){#remove old settings
-      $cHash->{READINGS}{"RegL_06."}{VAL} =~ s/ 61:.*//;
-      $cHash->{READINGS}{"RegL_06."}{VAL} =~ s/ 00:00//;
-      $cHash->{READINGS}{"RegL_06."}{VAL} .= $cHash->{helper}{partyReg};
-    }
-    else{
-      $cHash->{READINGS}{"RegL_06."}{VAL} = $cHash->{helper}{partyReg};
-    }
-    CUL_HM_pushConfig($hash,$id,$dst,2,"000000","00",6,
-                      sprintf("61%02X62%02X",$eH,$days),$prep);
-    splice @a,1,3, ("regSet","controlMode","party");
-    splice @a,2,0, ($prep) if ($prep);
-    push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
-  }
-
-  $cmd = $a[1];# get converted command
-
-  #if chn cmd is executed on device but refers to a channel? 
-  my $chnHash = (!$roleC && $modules{CUL_HM}{defptr}{$dst."01"})?
-                 $modules{CUL_HM}{defptr}{$dst."01"}:$hash;
-  my $devHash = CUL_HM_getDeviceHash($hash);
-  my $state = "set_".join(" ", @a[1..(int(@a)-1)]);
-  return "device on readonly. $cmd disabled" 
-        if($activeCmds{$cmd} && CUL_HM_getAttrInt($name,"readOnly") );
-
-  if   ($cmd eq "raw") {  #####################################################
-    return "Usage: set $a[0] $cmd data [data ...]" if(@a < 3);
-    $state = "";
-    my $msg = $a[2];
-    foreach my $sub (@a[3..$#a]) {
-      last if ($sub !~ m/^[A-F0-9]*$/);
-      $msg .= $sub;      
-    }
-    CUL_HM_PushCmdStack($hash, $msg);
-  }
-  elsif($cmd eq "clear") { ####################################################
+  ###------------------- commands requiring no IO action -------------------###
+  my $nonIOcmd = 1;
+  if(   $cmd eq "clear") { ####################################################
     my (undef,undef,$sectIn) = @a;
     my @sectL;
     if ($sectIn eq "all") {
@@ -4318,18 +4214,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
             foreach (grep /^sabotageAttack/,keys %{$hash->{READINGS}});
      }
     }
-    $state = "";
-  }
-  elsif($cmd eq "reset") { ####################################################
-    CUL_HM_PushCmdStack($hash,"++".$flag."11".$id.$dst."0400");
-  }
-  elsif($cmd eq "burstXmit") { ################################################
-    $state = "";
-    $hash->{helper}{prt}{brstWu}=1;# start burst wakeup
-    CUL_HM_SndCmd($hash,"++B112$id$dst");
   }
   elsif($cmd eq "defIgnUnknown") { ############################################
-    $state = "";
     foreach (map {substr($_,8)} 
              grep /^unknown_......$/,
              keys %{$hash->{READINGS}}){
@@ -4341,7 +4227,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
   }
   elsif($cmd eq "deviceRename") { #############################################
-    $state = "";
     my $newName = $a[2];
     my @chLst = ("device");# entry 00 is unsed
     if ($roleV){
@@ -4370,6 +4255,204 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       CommandRename(undef,$cName.' '.$chLst[$no]);
     }
     CommandRename(undef,$name.' '.$newName);#and the device itself
+  }
+  elsif($cmd eq "tempListTmpl") { #############################################
+    my $action = "verify";#defaults
+    my ($template,$fn);
+    for my $ax ($a[2],$a[3]){
+      next if (!$ax);
+      if ($ax =~ m/^(verify|restore)$/){
+        $action = $ax;
+      }
+      else{
+        $template = $ax;
+      }
+    }
+    ($fn,$template) = split(":",($template?$template
+                                          :AttrVal($name,"tempListTmpl",$name)));
+    if ($modules{HMinfo}){
+      if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
+      else{            $template = HMinfo_tempListDefFn($fn).":$template";}
+    }
+    else{
+      if (!$template){ $template = "./tempList.cfg:$fn";}
+      else{            $template = "$fn:$template"     ;}
+    }
+    my $ret = CUL_HM_tempListTmpl($name,$action,$template);
+    $ret = "verifed with no faults" if (!$ret && $action eq "verify");
+    return $ret;
+  }
+  elsif($cmd eq "tempTmplSet") { ##############################################
+	return "template missing" if (!defined $a[2]);
+	CommandAttr(undef, "$name tempListTmpl $a[2]");
+
+    my ($fn,$template) = split(":",AttrVal($name,"tempListTmpl",$name));
+    if ($modules{HMinfo}){
+      if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
+      else{            $template = HMinfo_tempListDefFn($fn).":$template";}
+    }
+    else{
+      if (!$template){ $template = "./tempList.cfg:$fn";}
+      else{            $template = "$fn:$template"     ;}
+    }
+    CUL_HM_tempListTmpl($name,"restore",$template);
+  }
+  elsif($cmd eq "templateDel") { ##############################################
+	return "template missing" if (!defined $a[2]);
+    my ($p,$t) = split(">",$a[2]);
+    HMinfo_templateDel($name,$t,$p) if (eval "defined(&HMinfo_templateDel)");
+    return;
+  }
+  elsif($cmd eq "virtual") { ##################################################
+    my (undef,undef,$maxBtnNo) = @a;
+    return "please give a number between 1 and 50"
+       if ($maxBtnNo < 1 ||$maxBtnNo > 50);# arbitrary - 255 should be max
+    return $name." already defines as ".$attr{$name}{subType}
+       if ($attr{$name}{subType} && $attr{$name}{subType} ne "virtual");
+    $attr{$name}{subType} = "virtual";
+    $attr{$name}{model}   = "virtual_".$maxBtnNo 
+       if (!$attr{$name}{model} ||$attr{$name}{model} =~ m/^virtual_/);
+    my $devId = $hash->{DEF};
+    for (my $btn=1;$btn <= $maxBtnNo;$btn++){
+      my $chnName = $name."_Btn".$btn;
+      my $chnId = $devId.sprintf("%02X",$btn);
+      CommandDefine(undef,"$chnName CUL_HM $chnId")
+          if (!$modules{CUL_HM}{defptr}{$chnId});
+    }
+    foreach my $channel (keys %{$hash}){# remove higher numbers
+      my $chNo;
+      $chNo = $1 if($channel =~ m/^channel_(.*)/);
+      next if (!defined($chNo));
+      CommandDelete(undef,$hash->{$channel})
+            if (hex($chNo) > $maxBtnNo);
+    }
+    CUL_HM_queueUpdtCfg($name);
+    CUL_HM_UpdtCentral($name) if ($md eq "CCU_FHEM");
+  }
+  elsif($cmd eq "update") { ###################################################
+    if ($md eq "ActionDetector"){
+      CUL_HM_ActCheck("ActionDetector");
+    }
+    else{
+      CUL_HM_UpdtCentral($name);
+    }
+  }
+  else{                     #command which requires IO#########################
+    $id = CUL_HM_IoId($defs{$devName});
+    if(length($id) != 6 && $hash->{DEF} ne "000000" ){# have to try to find an IO $devName
+      CUL_HM_assignIO($defs{$devName});
+      $id = CUL_HM_IoId($defs{$devName});
+    }
+    return "no IO device identified" if(length($id) != 6 && $st ne 'virtual');
+    $nonIOcmd = 0;
+  }
+  return ("",1) if($nonIOcmd);# we are done already
+
+  #convert 'old' commands to current methods like regSet and regBulk...
+  # Unify the interface
+  if(   $cmd eq "sign"){ ######################################################
+    splice @a,1,0,"regSet";# make hash,regSet,reg,value
+  }
+  elsif($cmd eq "unpair"){ ####################################################
+    splice @a,1,3, ("regSet","pairCentral","000000");
+  }
+  elsif($cmd eq "ilum") { ################################################# reg
+    return "$a[2] not specified. choose 0-15 for brightness"  if ($a[2]>15);
+    return "$a[3] not specified. choose 0-127 for duration"   if ($a[3]>127);
+    return "unsupported for channel, use $devName"            if (!$roleD);
+    splice @a,1,3, ("regBulk","RegL_00.",sprintf("04:%02X",$a[2]),sprintf("08:%02X",$a[3]*2));
+  }
+  elsif($cmd eq "text") { ################################################# reg
+    my ($bn,$l1, $l2) = ($chn,$a[2],$a[3]); # Create CONFIG_WRITE_INDEX string
+    if ($roleD){# if used on device.
+      return "$a[2] is not a button number" if($a[2] !~ m/^\d*$/ || $a[2] < 1);
+      return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
+      $bn = $a[2]*2-($a[3] eq "on" ? 0 : 1);
+      ($l1, $l2) = ($a[4],$a[5]);
+      $chn = sprintf("%02X",$bn)
+      }
+    else{
+      return "to many parameter. Try set $a[0] text $a[2] $a[3]" if($a[4]);
+    }
+    my $s = 54;
+    $l1 =~ s/\\_/ /g;
+    $l1 = substr($l1."\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 0, 12);
+    $l1 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
+
+    $s = 70;
+    $l2 =~ s/\\_/ /g;
+    $l2 = substr($l2."\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 0, 12);
+    $l2 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
+    @a = ($a[0],"regBulk","RegL_01.",split(" ",$l1.$l2));
+  }
+  elsif($cmd =~ m/^(displayMode|displayTemp|displayTempUnit|controlMode)/) { ##
+    if ($md =~ m/^(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){#controlMode different for RT
+      splice @a,1,3, ("regSet",$a[1],$a[2]);
+      push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
+    }
+  }
+  elsif($cmd eq "partyMode") { ################################################
+    my ($eH,$eM,$days,$prep) = ("","","","");
+    if ($a[2] =~ m/^(prep|exec)$/){
+      $prep = $a[2];
+      splice  @a,2,1;#remove prep
+    }
+    $days = $a[3];
+    ($eH,$eM)  = split(':',$a[2]);
+
+    my ($s,$m,$h) = localtime();
+    return "$eH:$eM passed at $h:$m. Please enter time in the feature" 
+                                                            if ($days == 0 && ($h+($m/60))>=($eH+($eM/60)) );
+    return "$eM illegal - use 00 or 30 minutes only"        if ($eM !~ m/^(00|30)$/);
+    return "$eH illegal - hour must be between 0 and 23"    if ($eH < 0 || $eH > 23);
+    return "$days illegal - days must be between 0 and 200" if ($days < 0 || $days > 200);
+    $eH += 128 if ($eM eq "30");
+
+    my $cHash = CUL_HM_id2Hash($dst."02");
+    $cHash->{helper}{partyReg} = sprintf("61%02X62%02X0000",$eH,$days);
+    $cHash->{helper}{partyReg} =~ s/(..)(..)/ $1:$2/g;
+    if ($cHash->{READINGS}{"RegL_06."}){#remove old settings
+      $cHash->{READINGS}{"RegL_06."}{VAL} =~ s/ 61:.*//;
+      $cHash->{READINGS}{"RegL_06."}{VAL} =~ s/ 00:00//;
+      $cHash->{READINGS}{"RegL_06."}{VAL} .= $cHash->{helper}{partyReg};
+    }
+    else{
+      $cHash->{READINGS}{"RegL_06."}{VAL} = $cHash->{helper}{partyReg};
+    }
+    CUL_HM_pushConfig($hash,$id,$dst,2,"000000","00",6,
+                      sprintf("61%02X62%02X",$eH,$days),$prep);
+    splice @a,1,3, ("regSet","controlMode","party");
+    splice @a,2,0, ($prep) if ($prep);
+    push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
+  }
+
+  $cmd = $a[1];# get converted command
+
+  #if chn cmd is executed on device but refers to a channel? 
+  my $chnHash = (!$roleC && $modules{CUL_HM}{defptr}{$dst."01"})?
+                 $modules{CUL_HM}{defptr}{$dst."01"}:$hash;
+  my $devHash = CUL_HM_getDeviceHash($hash);
+  my $state = "set_".join(" ", @a[1..(int(@a)-1)]);
+  return "device on readonly. $cmd disabled" 
+        if($activeCmds{$cmd} && CUL_HM_getAttrInt($name,"readOnly") );
+
+  if   ($cmd eq "raw") {  #####################################################
+    return "Usage: set $a[0] $cmd data [data ...]" if(@a < 3);
+    $state = "";
+    my $msg = $a[2];
+    foreach my $sub (@a[3..$#a]) {
+      last if ($sub !~ m/^[A-F0-9]*$/);
+      $msg .= $sub;      
+    }
+    CUL_HM_PushCmdStack($hash, $msg);
+  }
+  elsif($cmd eq "reset") { ####################################################
+    CUL_HM_PushCmdStack($hash,"++".$flag."11".$id.$dst."0400");
+  }
+  elsif($cmd eq "burstXmit") { ################################################
+    $state = "";
+    $hash->{helper}{prt}{brstWu}=1;# start burst wakeup
+    CUL_HM_SndCmd($hash,"++B112$id$dst");
   }
 
   elsif($cmd eq "statusRequest") { ############################################
@@ -5362,19 +5445,19 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       CUL_HM_PushCmdStack($hash,'++'.$flag."11$id$dst"."8604$temp");
 
       my $idTch = ($md =~ m/^HM-CC-RT-DN/ ? $dst."05" : $dst."02");
-      my @teamList = ( split(",",AttrVal(CUL_HM_id2Name($dst."05"),"peerIDs","")) # peers of RT team
-                      ,split(",",AttrVal(CUL_HM_id2Name($dst."02"),"peerIDs","")) # peers RT/TC team
-                      ,CUL_HM_name2Id($name)                                                              # myself
+      my @teamList = ( CUL_HM_name2Id($name)                                      # myself
                       );
-      foreach my $tId (@teamList){
+      push @teamList,( split(",",AttrVal(CUL_HM_id2Name($dst."05"),"peerIDs","")) # peers of RT team
+                      ,split(",",AttrVal(CUL_HM_id2Name($dst."02"),"peerIDs","")) # peers RT/TC team
+                      ) if($md =~ m/^HM-CC-RT-DN/) ;
+      foreach my $tId (grep !/00000000/,@teamList){
         $tId = substr($tId,0,6);
         my $teamD = CUL_HM_id2Name($tId);
-        my $teamCh = ("HM-CC-RT-DN" eq AttrVal($teamD,"model","")) ? "04" #what is the controls channel of the peer?
-                                                                   : "02";
+        my $teamCh = (AttrVal($teamD,"model","") =~ m/HM-CC-RT-DN/) ? "04" #what is the controls channel of the peer?
+                                                                    : "02";
         my $teamC = CUL_HM_id2Name($tId.$teamCh);
         
-        next if (!defined $defs{$teamC} );
-        
+        next if (!defined $defs{$teamC} );       
         CUL_HM_PushCmdStack($defs{$teamD},'++'.$flag."11$id$tId"."86$teamCh$temp");
         CUL_HM_UpdtReadSingle($defs{$teamC},"state",$state,1);
         if (   $tId ne $dst 
@@ -5454,56 +5537,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $msg .= sprintf(" %02d:%02d %.1f", $h, $m, $a[$idx+1]);
     }
     CUL_HM_pushConfig($hash, $id, $dst, $prgChn,0,0,$list, $data,$prep);
-  }
-  elsif($cmd eq "tempListTmpl") { #############################################
-    $state= "";
-    my $action = "verify";#defaults
-    my ($template,$fn);
-    for my $ax ($a[2],$a[3]){
-      next if (!$ax);
-      if ($ax =~ m/^(verify|restore)$/){
-        $action = $ax;
-      }
-      else{
-        $template = $ax;
-      }
-    }
-    ($fn,$template) = split(":",($template?$template
-                                          :AttrVal($name,"tempListTmpl",$name)));
-    if ($modules{HMinfo}){
-      if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
-      else{            $template = HMinfo_tempListDefFn($fn).":$template";}
-    }
-    else{
-      if (!$template){ $template = "./tempList.cfg:$fn";}
-      else{            $template = "$fn:$template"     ;}
-    }
-    my $ret = CUL_HM_tempListTmpl($name,$action,$template);
-    $ret = "verifed with no faults" if (!$ret && $action eq "verify");
-    return $ret;
-  }
-  elsif($cmd eq "tempTmplSet") { ##############################################
-    $state= "";
-	return "template missing" if (!defined $a[2]);
-	CommandAttr(undef, "$name tempListTmpl $a[2]");
-
-    my ($fn,$template) = split(":",AttrVal($name,"tempListTmpl",$name));
-    if ($modules{HMinfo}){
-      if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
-      else{            $template = HMinfo_tempListDefFn($fn).":$template";}
-    }
-    else{
-      if (!$template){ $template = "./tempList.cfg:$fn";}
-      else{            $template = "$fn:$template"     ;}
-    }
-    CUL_HM_tempListTmpl($name,"restore",$template);
-  }
-  elsif($cmd eq "templateDel") { ##############################################
-    $state= "";
-	return "template missing" if (!defined $a[2]);
-    my ($p,$t) = split(">",$a[2]);
-    HMinfo_templateDel($name,$t,$p) if (eval "defined(&HMinfo_templateDel)");
-    return;
   }
   elsif($cmd eq "sysTime") { ##################################################
     $state = "";
@@ -5654,43 +5687,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
    }
   }
 
-  elsif($cmd eq "virtual") { ##################################################
-    $state = "";
-    my (undef,undef,$maxBtnNo) = @a;
-    return "please give a number between 1 and 50"
-       if ($maxBtnNo < 1 ||$maxBtnNo > 50);# arbitrary - 255 should be max
-    return $name." already defines as ".$attr{$name}{subType}
-       if ($attr{$name}{subType} && $attr{$name}{subType} ne "virtual");
-    $attr{$name}{subType} = "virtual";
-    $attr{$name}{model}   = "virtual_".$maxBtnNo 
-       if (!$attr{$name}{model} ||$attr{$name}{model} =~ m/^virtual_/);
-    my $devId = $hash->{DEF};
-    for (my $btn=1;$btn <= $maxBtnNo;$btn++){
-      my $chnName = $name."_Btn".$btn;
-      my $chnId = $devId.sprintf("%02X",$btn);
-      CommandDefine(undef,"$chnName CUL_HM $chnId")
-          if (!$modules{CUL_HM}{defptr}{$chnId});
-    }
-    foreach my $channel (keys %{$hash}){# remove higher numbers
-      my $chNo;
-      $chNo = $1 if($channel =~ m/^channel_(.*)/);
-      next if (!defined($chNo));
-      CommandDelete(undef,$hash->{$channel})
-            if (hex($chNo) > $maxBtnNo);
-    }
-    CUL_HM_UpdtCentral($name) if ($md eq "CCU_FHEM");
-  }
-  elsif($cmd eq "update") { ###################################################
-    $state = "";
-    if ($md eq "ActionDetector"){
-      CUL_HM_ActCheck("ActionDetector");
-    }
-    else{
-      CUL_HM_UpdtCentral($name);
-    }
-  }
-
-  elsif($cmd =~ m/^(press|event)(S|L)/) { ######################################
+  elsif($cmd =~ m/^(press|event)(S|L)/) { #####################################
     #press          =>"-peer-        [-repCount(long only)-] [-repDelay-] ..."
     #event          =>"-peer- -cond- [-repCount(long only)-] [-repDelay-] ..."
     my ($trig,$type,$peer) = ($1,$2,$a[2]);
@@ -6185,7 +6182,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "hmPairForSec") { #############################################
     $state = "";
-    my $arg = $a[2]?$a[2]:"";
+    my $arg = $a[2] ? $a[2] : "";
     $arg = 60 if( $arg !~ m/^\d+$/);
     CUL_HM_RemoveHMPair("hmPairForSec:$name");
     $hash->{hmPair} = 1;
@@ -6274,7 +6271,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
   my $rxType = CUL_HM_getRxType($devHash);
   Log3 $name,3,"CUL_HM set $name $act";
-  if($rxType & 0x01){#allways
+  if($rxType & 0x01){#always
     CUL_HM_ProcessCmdStack($devHash);
   }
   elsif($devHash->{cmdStack}                  &&
@@ -6295,7 +6292,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       CUL_HM_SndCmd($devHash,"++B112$id$dst");
     }
   }
-  return ("",1);# no not generate trigger outof command
+  return ("",1);# no not generate trigger out of command
 }
 
 #+++++++++++++++++ set/get support subroutines+++++++++++++++++++++++++++++++++
@@ -9474,7 +9471,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
   return @lsNo;
 }
 
-sub CUL_HM_complConfigTest($){# Q - check register consistancy some time later
+sub CUL_HM_complConfigTest($){# Q - check register consistency some time later
   my $name = shift;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   push @{$modules{CUL_HM}{helper}{confCheckArr}},$name;
@@ -9483,12 +9480,12 @@ sub CUL_HM_complConfigTest($){# Q - check register consistancy some time later
     InternalTimer(gettimeofday()+ 1800,"CUL_HM_complConfigTO","CUL_HM_complConfigTO", 0);
   }
 }
-sub CUL_HM_complConfigTestRm($){# Q - check register consistancy some time later
+sub CUL_HM_complConfigTestRm($){# Q - check register consistency some time later
   my $name = shift;
   my $mQ = $modules{CUL_HM}{helper}{confCheckArr};
   @{$mQ} = grep !/^$name$/,@{$mQ};
 }
-sub CUL_HM_complConfigTO($)  {# now perform consistancy check of register
+sub CUL_HM_complConfigTO($)  {# now perform consistency check of register
   my @arr = @{$modules{CUL_HM}{helper}{confCheckArr}};
   @{$modules{CUL_HM}{helper}{confCheckArr}} = ();
   CUL_HM_complConfig($_) foreach (CUL_HM_noDup(@arr));
