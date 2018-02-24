@@ -1,14 +1,15 @@
 #############################################################
 #
-# EQ3BT.pm (c) by Dominik Karall, 2016-2017
+# EQ3BT.pm (c) by Dominik Karall, 2016-2018
 # dominik karall at gmail dot com
 # $Id$
 #
 # FHEM module to communicate with EQ-3 Bluetooth thermostats
 #
-# Version: 2.0.3
-#
 #############################################################
+#
+# v2.0.4 - 20180224
+# - FEATURE: support childlock
 #
 # v2.0.3 - 20171218
 # - FEATURE: support maxRetries and timeout attribute
@@ -170,7 +171,7 @@ sub EQ3BT_Define($$) {
     my $sshHost;
     
     $hash->{STATE} = "initialized";
-    $hash->{VERSION} = "2.0.3";
+    $hash->{VERSION} = "2.0.4";
     Log3 $hash, 3, "EQ3BT: EQ-3 Bluetooth Thermostat ".$hash->{VERSION};
     
     if (int(@a) > 4) {
@@ -254,7 +255,7 @@ sub EQ3BT_Set($@) {
     my ($hash, $name, @params) = @_;
     my $workType = shift(@params);
     my $list = "desiredTemperature:slider,4.5,0.5,29.5,1 updateStatus:noArg boost:on,off mode:manual,automatic eco:noArg comfort:noArg ".
-               "resetErrorCounters:noArg resetConsumption:noArg";
+               "resetErrorCounters:noArg resetConsumption:noArg childlock:on,off";
 
     # check parameters for set function
     if($workType eq "?") {
@@ -673,8 +674,8 @@ sub EQ3BT_processNotification {
         my $isBoost = (hex($vals[2]) & 4) >> 2;
         my $dst  = (hex($vals[2]) & 8) >> 3;
         my $wndOpen = (hex($vals[2]) & 16) >> 4;
-        my $unknown = (hex($vals[2]) & 32) >> 5;
-        $unknown = (hex($vals[2]) & 64) >> 6;
+        my $locked = (hex($vals[2]) & 32) >> 5;
+        my $unknown = (hex($vals[2]) & 64) >> 6;
         my $isLowBattery = (hex($vals[2]) & 128) >> 7;
         my $batteryStr = "ok";
         if($isLowBattery > 0) {
@@ -709,6 +710,7 @@ sub EQ3BT_processNotification {
         readingsSingleUpdate($hash, "valvePosition", $pct, 1);
         #changes below this line will set lastchangeby
         EQ3BT_readingsSingleUpdateIfChanged($hash, "windowOpen", $wndOpen, 1);
+        EQ3BT_readingsSingleUpdateIfChanged($hash, "childlock", $locked, 1);
         EQ3BT_readingsSingleUpdateIfChanged($hash, "ecoMode", $eco, 1);
         EQ3BT_readingsSingleUpdateIfChanged($hash, "battery", $batteryStr, 1);
         EQ3BT_readingsSingleUpdateIfChanged($hash, "boost", $isBoost, 1);
@@ -744,7 +746,26 @@ sub EQ3BT_setNightmode($) {
 }
 
 sub EQ3BT_setChildlock($$) {
-    my ($hash, $desiredState) = @_;
+    my ($hash, $onoff) = @_;
+    my $name = $hash->{NAME};
+    my $data = "01";
+    $data = "00" if($onoff eq "off");
+    
+    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setChildlock|0x0411|80".$data, "EQ3BT_processGatttoolResult", 60, "EQ3BT_killGatttool", $hash);
+    return undef;
+}
+
+sub EQ3BT_setChildlockSuccessful {
+    my ($hash, $handle, $value) = @_;
+    my $val = (hex($value) - 0x8000);
+    readingsSingleUpdate($hash, "childlock", $val, 1);
+    return undef;
+}
+
+sub EQ3BT_setChildlockRetry {
+    my ($hash) = @_;
+    EQ3BT_retryGatttool($hash, "setChildlock");
+    return undef;
 }
 
 sub EQ3BT_setHolidaymode($$) {
