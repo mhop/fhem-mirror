@@ -8,36 +8,37 @@ use warnings;
 use SetExtensions;
 
 my %devices = (
-    "40"    => "RolloTron Standard",
-    "41"    => "RolloTron Comfort Slave",
-    "42"    => "Rohrmotor-Aktor",
-    "43"    => "Universalaktor",
-    "46"    => "Steckdosenaktor",
-    "47"    => "Rohrmotor Steuerung",
-    "48"    => "Dimmaktor",
-    "49"    => "Rohrmotor",
-    "4B"    => "Connect-Aktor",
-    "4C"    => "Troll Basis",
-    "4E"    => "SX5",
-    "61"    => "RolloTron Comfort Master",
-    "62"    => "Super Fake Device",
-    "65"    => "Bewegungsmelder",
-    "69"    => "Umweltsensor",
-    "70"    => "Troll Comfort DuoFern",
-    "71"    => "Troll Comfort DuoFern (Lichtmodus)",
-    "73"    => "Raumthermostat",
-    "74"    => "Wandtaster 6fach 230V",
-    "A0"    => "Handsender (6 Gruppen-48 Geraete)",
-    "A1"    => "Handsender (1 Gruppe-48 Geraete)",
-    "A2"    => "Handsender (6 Gruppen-1 Geraet)",
-    "A3"    => "Handsender (1 Gruppe-1 Geraet)",
-    "A4"    => "Wandtaster",
-    "A5"    => "Sonnensensor",
-    "A7"    => "Funksender UP",
-    "A8"    => "HomeTimer",
-    "AA"    => "Markisenwaechter",
-    "AB"    => "Rauchmelder",
-    "AD"    => "Wandtaster 6fach Bat",
+    "40"    => {"name" => "RolloTron Standard"                },
+    "41"    => {"name" => "RolloTron Comfort Slave"           },
+    "42"    => {"name" => "Rohrmotor-Aktor"                   },
+    "43"    => {"name" => "Universalaktor",                   "chans" => ["01", "02"] },
+    "46"    => {"name" => "Steckdosenaktor"                   },
+    "47"    => {"name" => "Rohrmotor Steuerung",              "format" => "23a"},
+    "48"    => {"name" => "Dimmaktor"                         },
+    "49"    => {"name" => "Rohrmotor"                         },
+    "4B"    => {"name" => "Connect-Aktor"                     },
+    "4C"    => {"name" => "Troll Basis"                       },
+    "4E"    => {"name" => "SX5",                              "format" => "24a"},
+    "61"    => {"name" => "RolloTron Comfort Master"          },
+    "62"    => {"name" => "Super Fake Device"                 },
+    "65"    => {"name" => "Bewegungsmelder",                  "chans" => ["01"]},
+    "69"    => {"name" => "Umweltsensor",                     "format" => "23a", "chans" => ["01"]},
+    "70"    => {"name" => "Troll Comfort DuoFern"             },
+    "71"    => {"name" => "Troll Comfort DuoFern (Lichtmodus)"},
+    "73"    => {"name" => "Raumthermostat"                    },
+    "74"    => {"name" => "Wandtaster 6fach 230V",            "chans" => ["01"]},
+    "A0"    => {"name" => "Handsender (6 Gruppen-48 Geraete)" },
+    "A1"    => {"name" => "Handsender (1 Gruppe-48 Geraete)"  },
+    "A2"    => {"name" => "Handsender (6 Gruppen-1 Geraet)"   },
+    "A3"    => {"name" => "Handsender (1 Gruppe-1 Geraet)"    },
+    "A4"    => {"name" => "Wandtaster"                        },
+    "A5"    => {"name" => "Sonnensensor"                      },
+    "A7"    => {"name" => "Funksender UP"                     },
+    "A8"    => {"name" => "HomeTimer"                         },
+    "AA"    => {"name" => "Markisenwaechter"                  },
+    "AB"    => {"name" => "Rauchmelder"                       },
+    "AD"    => {"name" => "Wandtaster 6fach Bat"              },
+    "E0"    => {"name" => "Handzentrale"                      },
 );
 
 my %sensorMsg = (
@@ -68,138 +69,234 @@ my %sensorMsg = (
     "0E03"    => {"name" => "on",          "chan" => 6, "state" => "Btn03"},        
 );
 
-my %deadTimes = (
-    0x00    => "off",
-    0x10    => "short(160ms)",
-    0x20    => "long(480ms)",
-    0x30    => "individual",
+
+my %statusGroups = (
+  "21"  => [100,101,102,104,105,106,111,112,113,114,50],
+  "22"  => [1,2,3,4,5,6,7,8,9,10],
+  "23"  => [102,107,109,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,140,141,50],
+  "23a" => [102,107,109,115,116,117,118,119,120,121,122,123,124,125,126,127,133,140,141,50],
+  "24"  => [102,107,115,116,117,118,119,120,121,122,123,124,125,126,127,140,141,400,402,50],
+  "24a" => [102,107,115,123,124,400,402,404,405,406,407,408,409,410,411,50],
+  "25"  => [300,301,302,303,304,305,306,307,308,309,310,311,312,313],
+  "26"  => [],
+  "27"  => [160,161,162,163,164,165,166,167,168,169,170,171],
 );
 
-my %closingTimes = (
-    0x00    => "off",
-    0x01    => "30",
-    0x02    => "60",
-    0x03    => "90",
-    0x04    => "120",
-    0x05    => "150",
-    0x06    => "180",
-    0x07    => "210",
-    0x08    => "240",
-    0x09    => "error",
-    0x0A    => "error",
-    0x0B    => "error",
-    0x0C    => "error",
-    0x0D    => "error",
-    0x0E    => "error",
-    0x0F    => "error",
+
+my %statusMapping = (
+  "onOff"     => ["off", "on"],
+  "upDown"    => ["up", "down"],
+  "moving"    => ["stop","stop"],
+  "motor"     => ["off", "short(160ms)", "long(480ms)", "individual"],
+  "closeT"    => ["off", "30", "60", "90", "120", "150", "180", "210", "240"],
+  "openS"     => ["error", "11", "15", "19"], 
+  "scale10"   => [10,0],
+  "scaleF1"   => [2,80],
+  "scaleF2"   => [10,400],
 );
 
-my %openSpeeds = (
-    0x00    => "error",
-    0x10    => "11",
-    0x20    => "15",
-    0x30    => "19",
+     
+my %statusIds = (
+  1   => {"name" => "level",                                                    "chan" => { "01" => {"position" => 7, "from" => 0, "to" => 6},
+                                                                                            "02" => {"position" => 6, "from" => 0, "to" => 6}}},
+  2   => {"name" => "timeAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 0, "to" => 0},
+                                                                                            "02" => {"position" => 2, "from" => 0, "to" => 0}}},
+  3   => {"name" => "duskAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 1, "to" => 1},
+                                                                                            "02" => {"position" => 2, "from" => 1, "to" => 1}}},
+  4   => {"name" => "dawnAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 6, "to" => 6},
+                                                                                            "02" => {"position" => 2, "from" => 6, "to" => 6}}},
+  5   => {"name" => "sunAutomatic",         "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 2, "to" => 2},
+                                                                                            "02" => {"position" => 2, "from" => 2, "to" => 2}}},
+  6   => {"name" => "manualMode",           "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 5, "to" => 5},
+                                                                                            "02" => {"position" => 2, "from" => 5, "to" => 5}}},
+  7   => {"name" => "modeChange",           "map" => "onOff",                   "chan" => { "01" => {"position" => 7, "from" => 7, "to" => 7},
+                                                                                            "02" => {"position" => 6, "from" => 7, "to" => 7}}},
+  8   => {"name" => "sunMode",              "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 4, "to" => 4},
+                                                                                            "02" => {"position" => 2, "from" => 4, "to" => 4}}},
+  9   => {"name" => "stairwellFunction",    "map" => "onOff",                   "chan" => { "01" => {"position" => 4, "from" => 7, "to" => 7},
+                                                                                            "02" => {"position" => 0, "from" => 7, "to" => 7}}},
+  10  => {"name" => "stairwellTime",        "map" => "scale10",                 "chan" => { "01" => {"position" => 5, "from" => 0, "to" => 14},
+                                                                                            "02" => {"position" => 1, "from" => 0, "to" => 14}}},
+  50  => {"name" => "moving",               "map" => "moving",                  "chan" => { "01" => {"position" => 0, "from" => 0, "to" => 0},
+                                                                                            "02" => {"position" => 0, "from" => 0, "to" => 0}}},    
+  100 => {"name" => "sunAutomatic",         "map" => "onOff",                   "chan" => { "01" => {"position" => 0, "from" => 2, "to" => 2}}},
+  101 => {"name" => "timeAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 0, "from" => 0, "to" => 0}}},
+  102 => {"name" => "position",             "invert" => 100,                    "chan" => { "01" => {"position" => 7, "from" => 0, "to" => 6}}},
+  104 => {"name" => "duskAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 0, "from" => 3, "to" => 3}}},
+  105 => {"name" => "dawnAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 1, "from" => 3, "to" => 3}}},
+  106 => {"name" => "manualMode",           "map" => "onOff",                   "chan" => { "01" => {"position" => 0, "from" => 7, "to" => 7}}},
+  107 => {"name" => "manualMode",           "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 5, "to" => 5}}},
+  109 => {"name" => "runningTime",                                              "chan" => { "01" => {"position" => 6, "from" => 0, "to" => 7}}},
+  111 => {"name" => "sunPosition",          "invert" => 100,                    "chan" => { "01" => {"position" => 6, "from" => 0, "to" => 6}}},
+  112 => {"name" => "ventilatingPosition",  "invert" => 100,                    "chan" => { "01" => {"position" => 2, "from" => 0, "to" => 6}}},
+  113 => {"name" => "ventilatingMode",      "map" => "onOff",                   "chan" => { "01" => {"position" => 2, "from" => 7, "to" => 7}}},
+  114 => {"name" => "sunMode",              "map" => "onOff",                   "chan" => { "01" => {"position" => 6, "from" => 7, "to" => 7}}},
+  115 => {"name" => "timeAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 0, "to" => 0}}},
+  116 => {"name" => "sunAutomatic",         "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 2, "to" => 2}}},
+  117 => {"name" => "dawnAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 2, "from" => 1, "to" => 1}}},
+  118 => {"name" => "duskAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 1, "to" => 1}}},
+  119 => {"name" => "rainAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 7, "to" => 7}}},
+  120 => {"name" => "windAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 6, "to" => 6}}},
+  121 => {"name" => "sunPosition",          "invert" => 100,                    "chan" => { "01" => {"position" => 5, "from" => 0, "to" => 6}}},
+  122 => {"name" => "sunMode",              "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 4, "to" => 4}}},
+  123 => {"name" => "ventilatingPosition",  "invert" => 100,                    "chan" => { "01" => {"position" => 4, "from" => 0, "to" => 6}}},
+  124 => {"name" => "ventilatingMode",      "map" => "onOff",                   "chan" => { "01" => {"position" => 4, "from" => 7, "to" => 7}}},
+  125 => {"name" => "reversal",             "map" => "onOff",                   "chan" => { "01" => {"position" => 7, "from" => 7, "to" => 7}}},
+  126 => {"name" => "rainDirection",        "map" => "upDown",                  "chan" => { "01" => {"position" => 2, "from" => 3, "to" => 3}}},
+  127 => {"name" => "windDirection",        "map" => "upDown",                  "chan" => { "01" => {"position" => 2, "from" => 2, "to" => 2}}},
+  128 => {"name" => "slatRunTime",                                              "chan" => { "01" => {"position" => 0, "from" => 0, "to" => 5}}},
+  129 => {"name" => "tiltAfterMoveLevel",   "map" => "onOff",                   "chan" => { "01" => {"position" => 0, "from" => 6, "to" => 6}}},
+  130 => {"name" => "tiltInVentPos",        "map" => "onOff",                   "chan" => { "01" => {"position" => 0, "from" => 7, "to" => 7}}},
+  131 => {"name" => "defaultSlatPos",                                           "chan" => { "01" => {"position" => 1, "from" => 0, "to" => 6}}},
+  132 => {"name" => "tiltAfterStopDown",    "map" => "onOff",                   "chan" => { "01" => {"position" => 1, "from" => 7, "to" => 7}}},
+  133 => {"name" => "motorDeadTime",        "map" => "motor",                   "chan" => { "01" => {"position" => 2, "from" => 4, "to" => 5}}},
+  134 => {"name" => "tiltInSunPos",         "map" => "onOff",                   "chan" => { "01" => {"position" => 5, "from" => 7, "to" => 7}}},
+  135 => {"name" => "slatPosition",                                             "chan" => { "01" => {"position" => 9, "from" => 0, "to" => 6}}},
+  136 => {"name" => "blindsMode",           "map" => "onOff",                   "chan" => { "01" => {"position" => 9, "from" => 7, "to" => 7}}},
+  140 => {"name" => "windMode",             "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 3, "to" => 3}}},
+  141 => {"name" => "rainMode",             "map" => "onOff",                   "chan" => { "01" => {"position" => 2, "from" => 0, "to" => 0}}},
+  160 => {"name" => "temperatureThreshold1","map" => "scaleF1",                 "chan" => { "01" => {"position" => 4, "from" => 0, "to" => 7}}},
+  161 => {"name" => "temperatureThreshold2","map" => "scaleF1",                 "chan" => { "01" => {"position" => 5, "from" => 0, "to" => 7}}},
+  162 => {"name" => "temperatureThreshold3","map" => "scaleF1",                 "chan" => { "01" => {"position" => 6, "from" => 0, "to" => 7}}},
+  163 => {"name" => "temperatureThreshold4","map" => "scaleF1",                 "chan" => { "01" => {"position" => 7, "from" => 0, "to" => 7}}},
+  164 => {"name" => "desired-temp",         "map" => "scaleF1",                 "chan" => { "01" => {"position" => 9, "from" => 0, "to" => 7}}},
+  165 => {"name" => "measured-temp",        "map" => "scaleF2",                 "chan" => { "01" => {"position" => 1, "from" => 0, "to" => 10}}},
+  166 => {"name" => "output",               "map" => "onOff",                   "chan" => { "01" => {"position" => 0, "from" => 3, "to" => 3}}},
+  167 => {"name" => "manualOverride",       "map" => "onOff",                   "chan" => { "01" => {"position" => 0, "from" => 4, "to" => 4}}},
+  168 => {"name" => "actTempLimit",                                             "chan" => { "01" => {"position" => 0, "from" => 5, "to" => 6}}},
+  169 => {"name" => "timeAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 2, "from" => 3, "to" => 3}}},
+  170 => {"name" => "manualMode",           "map" => "onOff",                   "chan" => { "01" => {"position" => 2, "from" => 4, "to" => 4}}},
+  171 => {"name" => "measured-temp2",       "map" => "scaleF2",                 "chan" => { "01" => {"position" => 3, "from" => 0, "to" => 10}}},
+  300 => {"name" => "level",                                                    "chan" => { "01" => {"position" => 7, "from" => 0, "to" => 6}}},
+  301 => {"name" => "manualMode",           "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 5, "to" => 5}}},
+  302 => {"name" => "timeAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 0, "to" => 0}}},
+  303 => {"name" => "duskAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 1, "to" => 1}}},
+  304 => {"name" => "sunAutomatic",         "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 2, "to" => 2}}},
+  305 => {"name" => "sunMode",              "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 4, "to" => 4}}},
+  306 => {"name" => "dawnAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 6, "to" => 6}}},
+  307 => {"name" => "runningTime",                                              "chan" => { "01" => {"position" => 5, "from" => 0, "to" => 7}}},
+  308 => {"name" => "intermediateValue",                                        "chan" => { "01" => {"position" => 6, "from" => 0, "to" => 6}}},
+  309 => {"name" => "intermediateMode",     "map" => "onOff",                   "chan" => { "01" => {"position" => 6, "from" => 7, "to" => 7}}},
+  310 => {"name" => "modeChange",           "map" => "onOff",                   "chan" => { "01" => {"position" => 7, "from" => 7, "to" => 7}}},
+  311 => {"name" => "stairwellFunction",    "map" => "onOff",                   "chan" => { "01" => {"position" => 1, "from" => 7, "to" => 7}}},
+  312 => {"name" => "stairwellTime",        "map" => "scale10",                 "chan" => { "01" => {"position" => 2, "from" => 0, "to" => 14}}},
+  313 => {"name" => "saveIntermediateOnStop","map" => "onOff",                  "chan" => { "01" => {"position" => 3, "from" => 7, "to" => 7}}},
+  400 => {"name" => "obstacle",                                                 "chan" => { "01" => {"position" => 2, "from" => 4, "to" => 4}}},
+  401 => {"name" => "obstacleDetection",    "map" => "onOff",                   "chan" => { "01" => {"position" => 2, "from" => 5, "to" => 5}}},
+  402 => {"name" => "block",                                                    "chan" => { "01" => {"position" => 2, "from" => 6, "to" => 6}}},
+  403 => {"name" => "blockDetection",       "map" => "onOff",                   "chan" => { "01" => {"position" => 2, "from" => 7, "to" => 7}}},
+  404 => {"name" => "lightCurtain",                                             "chan" => { "01" => {"position" => 0, "from" => 7, "to" => 7}}},
+  405 => {"name" => "automaticClosing",     "map" => "closeT",                  "chan" => { "01" => {"position" => 1, "from" => 0, "to" => 3}}},
+  406 => {"name" => "openSpeed",            "map" => "openS",                   "chan" => { "01" => {"position" => 1, "from" => 4, "to" => 6}}},
+  407 => {"name" => "2000cycleAlarm",       "map" => "onOff",                   "chan" => { "01" => {"position" => 1, "from" => 7, "to" => 7}}},
+  408 => {"name" => "wicketDoor",           "map" => "onOff",                   "chan" => { "01" => {"position" => 5, "from" => 7, "to" => 7}}},
+  409 => {"name" => "backJump",             "map" => "onOff",                   "chan" => { "01" => {"position" => 9, "from" => 0, "to" => 0}}},
+  410 => {"name" => "10minuteAlarm",        "map" => "onOff",                   "chan" => { "01" => {"position" => 9, "from" => 1, "to" => 1}}},
+  411 => {"name" => "light",                "map" => "onOff",                   "chan" => { "01" => {"position" => 9, "from" => 2, "to" => 2}}},
+  999 => {"name" => "version",                                                  "chan" => { "01" => {"position" => 8, "from" => 0, "to" => 7},
+                                                                                            "02" => {"position" => 8, "from" => 0, "to" => 7}}},        
 );
+
 
 my %commands = (                             
-  "remotePair"           => {"noArg"    => "06010000000000000000"},
-  "remoteUnpair"         => {"noArg"    => "06020000000000000000"},
-  "up"                   => {"noArg"    => "0701tt00000000000000"},
-  "stop"                 => {"noArg"    => "07020000000000000000"},
-  "down"                 => {"noArg"    => "0703tt00000000000000"},
-  "position"             => {"value"    => "0707ttnn000000000000"},
-  "level"                => {"value"    => "0707ttnn000000000000"},
-  "sunMode"              => {"on"       => "070801FF000000000000",
-                             "off"      => "070A0100000000000000"},
-  "dusk"                 => {"noArg"    => "070901FF000000000000"},
-  "reversal"             => {"noArg"    => "070C0000000000000000"},
-  "modeChange"           => {"noArg"    => "070C0000000000000000"},
-  "windMode"             => {"on"       => "070D01FF000000000000",
-                             "off"      => "070E0100000000000000"},
-  "rainMode"             => {"on"       => "071101FF000000000000",
-                             "off"      => "07120100000000000000"},
-  "dawn"                 => {"noArg"    => "071301FF000000000000"},
-  "rainDirection"        => {"down"     => "071400FD000000000000",
-                             "up"       => "071400FE000000000000"},
-  "windDirection"        => {"down"     => "071500FD000000000000",
-                             "up"       => "071500FE000000000000"},
-  "tempUp"               => {"noArg"    => "0718tt00000000000000"}, 
-  "tempDown"             => {"noArg"    => "0719tt00000000000000"}, 
-  "toggle"               => {"noArg"    => "071A0000000000000000"},
-  "slatPosition"         => {"value"    => "071B00000000nn000000"},
-  "desired-temp"         => {"temp1"    => "0722tt0000wwww000000"},
-  "sunAutomatic"         => {"on"       => "080100FD000000000000",
-                             "off"      => "080100FE000000000000"},
-  "sunPosition"          => {"value"    => "080100nn000000000000"},
-  "ventilatingMode"      => {"on"       => "080200FD000000000000",
-                             "off"      => "080200FE000000000000"},
-  "ventilatingPosition"  => {"value"    => "080200nn000000000000"},
-  "intermediateMode"     => {"on"       => "080200FD000000000000",
-                             "off"      => "080200FE000000000000"},
-  "intermediateValue"    => {"value"    => "080200nn000000000000"},
-  "saveIntermediateOnStop"=>{"on"       => "080200FB000000000000",
-                             "off"      => "080200FC000000000000"},
-  "runningTime"          => {"value3"   => "0803nn00000000000000"},
-  "timeAutomatic"        => {"on"       => "080400FD000000000000",
-                             "off"      => "080400FE000000000000"},
-  "duskAutomatic"        => {"on"       => "080500FD000000000000",
-                             "off"      => "080500FE000000000000"},                           
-  "manualMode"           => {"on"       => "080600FD000000000000",
-                             "off"      => "080600FE000000000000"},
-  "windAutomatic"        => {"on"       => "080700FD000000000000",
-                             "off"      => "080700FE000000000000"},
-  "rainAutomatic"        => {"on"       => "080800FD000000000000",
-                             "off"      => "080800FE000000000000"},                                                      
-  "dawnAutomatic"        => {"on"       => "080900FD000000000000",
-                             "off"      => "080900FE000000000000"},
-  "tiltInSunPos"         => {"on"       => "080C00FD000000000000",
-                             "off"      => "080C00FE000000000000"},                           
-  "tiltInVentPos"        => {"on"       => "080D00FD000000000000",
-                             "off"      => "080D00FE000000000000"},
-  "tiltAfterMoveLevel"   => {"on"       => "080E00FD000000000000",
-                             "off"      => "080E00FE000000000000"},
-  "tiltAfterStopDown"    => {"on"       => "080F00FD000000000000",
-                             "off"      => "080F00FE000000000000"},                           
-  "defaultSlatPos"       => {"value"    => "0810nn00000000000000"},
-  "blindsMode"           => {"on"       => "081100FD000000000000",
-                             "off"      => "081100FE000000000000"}, 
-  "slatRunTime"          => {"value4"   => "0812nn00000000000000"},                                                        
-  "motorDeadTime"        => {"off"      => "08130000000000000000",
-                             "short"    => "08130100000000000000",
-                             "long"     => "08130200000000000000"},
-  "stairwellFunction"    => {"on"       => "081400FD000000000000",
-                             "off"      => "081400FE000000000000"},
-  "stairwellTime"        => {"value2"   => "08140000wwww00000000"},
-  "reset"                => {"settings" => "0815CB00000000000000",
-                             "full"     => "0815CC00000000000000"},
-  "10minuteAlarm"        => {"on"       => "081700FD000000000000",
-                             "off"      => "081700FE000000000000"},
-  "automaticClosing"     => {"off"      => "08180000000000000000",
-                             "30"       => "08180001000000000000",
-                             "60"       => "08180002000000000000",
-                             "90"       => "08180003000000000000",
-                             "120"      => "08180004000000000000",
-                             "150"      => "08180005000000000000",
-                             "180"      => "08180006000000000000",
-                             "210"      => "08180007000000000000",
-                             "240"      => "08180008000000000000"},
-  "2000cycleAlarm"       => {"on"       => "081900FD000000000000",
-                             "off"      => "081900FE000000000000"},
-  "openSpeed"            => {"11"       => "081A0001000000000000",
-                             "15"       => "081A0002000000000000",
-                             "19"       => "081A0003000000000000"},
-  "backJump"             => {"on"       => "081B00FD000000000000",
-                             "off"      => "081B00FE000000000000"},
-  "temperatureThreshold1"=> {"temp2"    => "081E00000001nn000000"},                           
-  "temperatureThreshold2"=> {"temp2"    => "081E0000000200nn0000"},
-  "temperatureThreshold3"=> {"temp2"    => "081E000000040000nn00"},
-  "temperatureThreshold4"=> {"temp2"    => "081E00000008000000nn"},
-  "actTempLimit"         => {"1"        => "081Ett00001000000000",
-                             "2"        => "081Ett00003000000000",
-                             "3"        => "081Ett00005000000000",
-                             "4"        => "081Ett00007000000000"},                        
-  "on"                   => {"noArg"    => "0E03tt00000000000000"},
-  "off"                  => {"noArg"    => "0E02tt00000000000000"},                                                                                                             
+  "remotePair"           => {"cmd" => {"noArg"    => "06010000000000000000"}},
+  "remoteUnpair"         => {"cmd" => {"noArg"    => "06020000000000000000"}},
+  "up"                   => {"cmd" => {"noArg"    => "0701tt00000000000000"}},
+  "stop"                 => {"cmd" => {"noArg"    => "07020000000000000000"}},
+  "down"                 => {"cmd" => {"noArg"    => "0703tt00000000000000"}},
+  "position"             => {"cmd" => {"value"    => "0707ttnn000000000000"}, "invert" => 100},
+  "level"                => {"cmd" => {"value"    => "0707ttnn000000000000"}},
+  "sunMode"              => {"cmd" => {"on"       => "070801FF000000000000",
+                                       "off"      => "070A0100000000000000"}},
+  "dusk"                 => {"cmd" => {"noArg"    => "070901FF000000000000"}},
+  "reversal"             => {"cmd" => {"noArg"    => "070C0000000000000000"}},
+  "modeChange"           => {"cmd" => {"noArg"    => "070C0000000000000000"}},
+  "windMode"             => {"cmd" => {"on"       => "070D01FF000000000000",
+                                       "off"      => "070E0100000000000000"}},
+  "rainMode"             => {"cmd" => {"on"       => "071101FF000000000000",
+                                       "off"      => "07120100000000000000"}},
+  "dawn"                 => {"cmd" => {"noArg"    => "071301FF000000000000"}},
+  "rainDirection"        => {"cmd" => {"down"     => "071400FD000000000000",
+                                       "up"       => "071400FE000000000000"}},
+  "windDirection"        => {"cmd" => {"down"     => "071500FD000000000000",
+                                       "up"       => "071500FE000000000000"}},
+  "tempUp"               => {"cmd" => {"noArg"    => "0718tt00000000000000"}}, 
+  "tempDown"             => {"cmd" => {"noArg"    => "0719tt00000000000000"}}, 
+  "toggle"               => {"cmd" => {"noArg"    => "071A0000000000000000"}},
+  "slatPosition"         => {"cmd" => {"value"    => "071B00000000nn000000"}},
+  "desired-temp"         => {"cmd" => {"value"    => "0722tt0000wwww000000"}, "min" => -40, "max" => 80, "multi" => 10,  "offset" => 400 },
+  "sunAutomatic"         => {"cmd" => {"on"       => "080100FD000000000000",
+                                       "off"      => "080100FE000000000000"}},
+  "sunPosition"          => {"cmd" => {"value"    => "080100nn000000000000"}, "invert" => 100},
+  "ventilatingMode"      => {"cmd" => {"on"       => "080200FD000000000000",
+                                       "off"      => "080200FE000000000000"}},
+  "ventilatingPosition"  => {"cmd" => {"value"    => "080200nn000000000000"}, "invert" => 100},
+  "intermediateMode"     => {"cmd" => {"on"       => "080200FD000000000000",
+                                       "off"      => "080200FE000000000000"}},
+  "intermediateValue"    => {"cmd" => {"value"    => "080200nn000000000000"}},
+  "saveIntermediateOnStop"=>{"cmd" => {"on"       => "080200FB000000000000",
+                                       "off"      => "080200FC000000000000"}},
+  "runningTime"          => {"cmd" => {"value"    => "0803nn00000000000000"}, "min" => 0, "max" => 150 },
+  "timeAutomatic"        => {"cmd" => {"on"       => "080400FD000000000000",
+                                       "off"      => "080400FE000000000000"}},
+  "duskAutomatic"        => {"cmd" => {"on"       => "080500FD000000000000",
+                                       "off"      => "080500FE000000000000"}},                           
+  "manualMode"           => {"cmd" => {"on"       => "080600FD000000000000",
+                                       "off"      => "080600FE000000000000"}},
+  "windAutomatic"        => {"cmd" => {"on"       => "080700FD000000000000",
+                                       "off"      => "080700FE000000000000"}},
+  "rainAutomatic"        => {"cmd" => {"on"       => "080800FD000000000000",
+                                       "off"      => "080800FE000000000000"}},                                                      
+  "dawnAutomatic"        => {"cmd" => {"on"       => "080900FD000000000000",
+                                       "off"      => "080900FE000000000000"}},
+  "tiltInSunPos"         => {"cmd" => {"on"       => "080C00FD000000000000",
+                                       "off"      => "080C00FE000000000000"}},                           
+  "tiltInVentPos"        => {"cmd" => {"on"       => "080D00FD000000000000",
+                                       "off"      => "080D00FE000000000000"}},
+  "tiltAfterMoveLevel"   => {"cmd" => {"on"       => "080E00FD000000000000",
+                                       "off"      => "080E00FE000000000000"}},
+  "tiltAfterStopDown"    => {"cmd" => {"on"       => "080F00FD000000000000",
+                                       "off"      => "080F00FE000000000000"}},                           
+  "defaultSlatPos"       => {"cmd" => {"value"    => "0810nn00000000000000"}},
+  "blindsMode"           => {"cmd" => {"on"       => "081100FD000000000000",
+                                       "off"      => "081100FE000000000000"}}, 
+  "slatRunTime"          => {"cmd" => {"value"    => "0812nn00000000000000"}, "min" => 0, "max" => 50 },                                                        
+  "motorDeadTime"        => {"cmd" => {"off"      => "08130000000000000000",
+                                       "short"    => "08130100000000000000",
+                                       "long"     => "08130200000000000000"}},
+  "stairwellFunction"    => {"cmd" => {"on"       => "081400FD000000000000",
+                                       "off"      => "081400FE000000000000"}},
+  "stairwellTime"        => {"cmd" => {"value"    => "08140000wwww00000000"}, "min" => 0, "max" => 3200, "multi" => 10},
+  "reset"                => {"cmd" => {"settings" => "0815CB00000000000000",
+                                       "full"     => "0815CC00000000000000"}},
+  "10minuteAlarm"        => {"cmd" => {"on"       => "081700FD000000000000",
+                                       "off"      => "081700FE000000000000"}},
+  "automaticClosing"     => {"cmd" => {"off"      => "08180000000000000000",
+                                       "30"       => "08180001000000000000",
+                                       "60"       => "08180002000000000000",
+                                       "90"       => "08180003000000000000",
+                                       "120"      => "08180004000000000000",
+                                       "150"      => "08180005000000000000",
+                                       "180"      => "08180006000000000000",
+                                       "210"      => "08180007000000000000",
+                                       "240"      => "08180008000000000000"}},
+  "2000cycleAlarm"       => {"cmd" => {"on"       => "081900FD000000000000",
+                                       "off"      => "081900FE000000000000"}},
+  "openSpeed"            => {"cmd" => {"11"       => "081A0001000000000000",
+                                       "15"       => "081A0002000000000000",
+                                       "19"       => "081A0003000000000000"}},
+  "backJump"             => {"cmd" => {"on"       => "081B00FD000000000000",
+                                       "off"      => "081B00FE000000000000"}},
+  "temperatureThreshold1"=> {"cmd" => {"value"    => "081E00000001nn000000"}, "min" => -40, "max" => 80, "multi" => 2,  "offset" => 80 },                           
+  "temperatureThreshold2"=> {"cmd" => {"value"    => "081E0000000200nn0000"}, "min" => -40, "max" => 80, "multi" => 2,  "offset" => 80 },
+  "temperatureThreshold3"=> {"cmd" => {"value"    => "081E000000040000nn00"}, "min" => -40, "max" => 80, "multi" => 2,  "offset" => 80 },
+  "temperatureThreshold4"=> {"cmd" => {"value"    => "081E00000008000000nn"}, "min" => -40, "max" => 80, "multi" => 2,  "offset" => 80 },
+  "actTempLimit"         => {"cmd" => {"1"        => "081Ett00001000000000",
+                                       "2"        => "081Ett00003000000000",
+                                       "3"        => "081Ett00005000000000",
+                                       "4"        => "081Ett00007000000000"}},                        
+  "on"                   => {"cmd" => {"noArg"    => "0E03tt00000000000000"}},
+  "off"                  => {"cmd" => {"noArg"    => "0E02tt00000000000000"}},                                                                                                             
 );
 
 my %wCmds = (                             
@@ -256,6 +353,15 @@ my %setsBasic = (
   "remoteUnpair:noArg"                  => "",   
 );
 
+my %setsReset = (
+  "reset:settings,full"                 => "",   
+);
+
+my %setsPair = (
+  "remotePair:noArg"                    => "",
+  "remoteUnpair:noArg"                  => "",   
+);
+
 my %setsDefaultRollerShutter = (
   "getStatus:noArg"                     => "",
   "up:noArg"                            => "",
@@ -304,7 +410,7 @@ my %setsBlinds = (
   "tiltAfterMoveLevel:on,off"          => "",
   "tiltAfterStopDown:on,off"           => "",
   "defaultSlatPos:slider,0,1,100"      => "",
-  "slatRunTime:slider,0,100,5000"      => "",
+  "slatRunTime:slider,0,1,50"          => "",
   "slatPosition:slider,0,1,100"        => "",   
 );                            
 
@@ -438,7 +544,7 @@ DUOFERN_Initialize($)
   $hash->{ParseFn}   = "DUOFERN_Parse";
   $hash->{RenameFn}  = "DUOFERN_Rename";
   $hash->{AttrFn}    = "DUOFERN_Attr";
-  $hash->{AttrList}  = "IODev timeout toggleUpDown ignore:1,0 ". $readingFnAttributes;
+  $hash->{AttrList}  = "IODev timeout toggleUpDown ignore:1,0 positionInverse:1,0 ". $readingFnAttributes;
   #$hash->{AutoCreate}=
   #      { "DUOFERN" => { GPLOT => "", FILTER => "%NAME" } };
 }
@@ -465,16 +571,16 @@ DUOFERN_Set($@)
   %sets = (%setsBasic, %setsDefaultRollerShutter, %setsTroll, ("blindsMode:on,off"=> "")) if ($hash->{CODE} =~ /^(42|4B|4C|70)..../);
   %sets = (%setsBasic, %setsDefaultRollerShutter, %setsTroll)                 if ($hash->{CODE} =~ /^47..../);
   %sets = (%setsBasic, %setsDefaultRollerShutter)                             if ($hash->{CODE} =~ /^(40|41|61)..../);
-  %sets = (%setsBasic, %setsUmweltsensor)                                     if ($hash->{CODE} =~ /^69....$/);
+  %sets = (%setsReset, %setsUmweltsensor)                                     if ($hash->{CODE} =~ /^69....$/);
   %sets = (%setsUmweltsensor00)                                               if ($hash->{CODE} =~ /^69....00/);  
-  %sets = (%setsDefaultRollerShutter, %setsUmweltsensor01)                    if ($hash->{CODE} =~ /^69....01/);
-  %sets = (%setsSwitchActor)                                                  if ($hash->{CODE} =~ /^43....(01|02)/);
-  %sets = (%setsBasic, "getStatus:noArg"=> "")                                if ($hash->{CODE} =~ /^(43|65|74)....$/);
+  %sets = (%setsDefaultRollerShutter, %setsUmweltsensor01, %setsPair)         if ($hash->{CODE} =~ /^69....01/);
+  %sets = (%setsSwitchActor, %setsPair)                                       if ($hash->{CODE} =~ /^43....(01|02)/);
+  %sets = (%setsReset, "getStatus:noArg"=> "")                                if ($hash->{CODE} =~ /^(43|65|74)....$/);
   %sets = (%setsBasic, %setsSwitchActor)                                      if ($hash->{CODE} =~ /^(46|71)..../);
   %sets = (%setsBasic, %setsSX5)                                              if ($hash->{CODE} =~ /^4E..../);
   %sets = (%setsBasic, %setsDimmer)                                           if ($hash->{CODE} =~ /^48..../);
   %sets = (%setsBasic, %setsThermostat)                                       if ($hash->{CODE} =~ /^73..../);
-  %sets = (%setsSwitchActor)                                                  if ($hash->{CODE} =~ /^(65|74)....01/);
+  %sets = (%setsSwitchActor, %setsPair)                                       if ($hash->{CODE} =~ /^(65|74)....01/);
 
   my $blindsMode=ReadingsVal($name, "blindsMode", "off");
   %sets = (%sets, %setsBlinds)    if ($blindsMode eq "on");
@@ -668,6 +774,7 @@ DUOFERN_Set($@)
     my $timer ="00";
     my $buf;
     my $command;
+    my $positionInverse = AttrVal($name,"positionInverse",0);
     
     if ($cmd eq "remotePair") {
       $buf = $duoCommand2;
@@ -677,53 +784,27 @@ DUOFERN_Set($@)
     
     $chanNo = $hash->{chanNo} if ($hash->{chanNo});
     
-    if(exists $commands{$cmd}{noArg}) {
+    if(exists $commands{$cmd}{cmd}{noArg}) {
       $timer= "01" if ($arg && ($arg eq "timer"));
       $subCmd = "noArg";
       $argV = "00";
       
-    } elsif (exists $commands{$cmd}{value}) {
+    } elsif (exists $commands{$cmd}{cmd}{value}) {
       $timer= "01" if ($arg2 && ($arg2 eq "timer"));
+      my $maxArg = (exists $commands{$cmd}{max}     ? $commands{$cmd}{max}    : 100);
+      my $minArg = (exists $commands{$cmd}{min}     ? $commands{$cmd}{min}    : 0);
+      my $mulArg = (exists $commands{$cmd}{multi}   ? $commands{$cmd}{multi}  : 1);
+      my $offArg = (exists $commands{$cmd}{offset}  ? $commands{$cmd}{offset} : 0);
+      $maxArg = 255 if (($code =~ m/^48..../) && ($cmd eq "runningTime"));
       return "Missing argument" if (!defined($arg)); 
-      return "Wrong argument $arg" if ($arg !~ m/^\d+$/ || $arg < 0 || $arg > 100);	
+      return "Wrong argument $arg" if ($arg !~ m/^\d+(\.\d+|)$/ || $arg < $minArg || $arg > $maxArg);	
       $subCmd = "value";
-      $argV = sprintf "%02x", $arg ;
-      
-    } elsif (exists $commands{$cmd}{value2}) {
-      return "Missing argument" if (!defined($arg)); 
-      return "Wrong argument $arg" if ($arg !~ m/^\d+$/ || $arg < 0 || $arg > 3200); 
-      $subCmd = "value2";
-      $argW = sprintf "%04x", $arg * 10;
-    
-    } elsif (exists $commands{$cmd}{value3}) {
-      my $maxArg = 150;
-      $maxArg = 255 if ($code =~ m/^48..../); 
-      $timer= "01" if ($arg2 && ($arg2 eq "timer"));
-      return "Missing argument" if (!defined($arg)); 
-      return "Wrong argument $arg" if ($arg !~ m/^\d+$/ || $arg < 0 || $arg > $maxArg); 
-      $subCmd = "value3";
-      $argV = sprintf "%02x", $arg ;
-    
-    } elsif (exists $commands{$cmd}{value4}) {
-      $timer= "01" if ($arg2 && ($arg2 eq "timer"));
-      return "Missing argument" if (!defined($arg)); 
-      return "Wrong argument $arg" if ($arg !~ m/^\d+$/ || $arg < 0 || $arg > 5000);
-      $arg = $arg/100; 
-      $subCmd = "value4";
-      $argV = sprintf "%02x", $arg ;
-    
-    } elsif (exists $commands{$cmd}{temp1}) {
-      return "Missing argument" if (!defined($arg)); 
-      return "Wrong argument $arg" if ($arg !~ m/^\d+(\.\d+|)$/ || $arg < -40 || $arg > 80); 
-      $subCmd = "temp1";
-      $argW = sprintf "%04x", ($arg * 10) + 400;
-    
-    } elsif (exists $commands{$cmd}{temp2}) {
-      return "Missing argument" if (!defined($arg)); 
-      return "Wrong argument $arg" if ($arg !~ m/^\d+(\.\d+|)$/ || $arg < -40 || $arg > 80); 
-      $subCmd = "temp2";
-      $argV = sprintf "%02x", ($arg * 2) + 80;
-                 
+      if((exists $commands{$cmd}{invert}) && ($positionInverse eq "1")) {
+        $arg = $commands{$cmd}{invert} - $arg;
+      }
+      $argV = sprintf "%02x", $arg * $mulArg + $offArg;
+      $argW = sprintf "%04x", $arg * $mulArg + $offArg;
+                             
     } else {
       return "Missing argument" if (!defined($arg));
       $timer= "01" if ($arg2 && ($arg2 eq "timer")); 
@@ -731,14 +812,18 @@ DUOFERN_Set($@)
       $argV = "00";
     }
     
-    return "Wrong argument $arg" if (!exists $commands{$cmd}{$subCmd});
-    
+    return "Wrong argument $arg" if (!exists $commands{$cmd}{cmd}{$subCmd});
+             
     my $position      = ReadingsVal($name, "position", -1);
     my $toggleUpDown  = AttrVal($name, "toggleUpDown", "0");
     my $moving        = ReadingsVal($name, "moving", "stop");
     my $timeAutomatic = ReadingsVal($name, "timeAutomatic", "on");
     my $dawnAutomatic = ReadingsVal($name, "dawnAutomatic", "on");
     my $duskAutomatic = ReadingsVal($name, "duskAutomatic", "on");
+    
+    if(($positionInverse eq "1")) {
+      $position = 100 - $position;
+    }
         
     if ($moving ne "stop") {
       if ($cmd =~ m/^(up|down|toggle)$/) {
@@ -765,7 +850,7 @@ DUOFERN_Set($@)
       }
     }
     
-    $command = $commands{$cmd}{$subCmd};
+    $command = $commands{$cmd}{cmd}{$subCmd};
     
     $buf =~ s/yyyyyy/$code/;
     $buf =~ s/nnnnnnnnnnnnnnnnnnnn/$command/;
@@ -827,7 +912,8 @@ DUOFERN_Define($$)
   AssignIoPort($hash);
   
   if (exists $devices{substr($hash->{CODE},0,2)}) {
-  	$hash->{SUBTYPE} = $devices{substr($hash->{CODE},0,2)};
+  	$hash->{SUBTYPE} = $devices{substr($hash->{CODE},0,2)}{name};
+  	$hash->{MODEL} = $devices{substr($hash->{CODE},0,2)}{name};
   } else {
   	$hash->{SUBTYPE} = "unknown";
   }
@@ -947,355 +1033,117 @@ DUOFERN_Parse($$)
     my $format = substr($msg, 6, 2);
     my $ver    = substr($msg, 24, 1).".".substr($msg, 25, 1);
     my $state;   
+    my @chHash;
+    
+    if(exists $devices{substr($code,0,2)}{format}) {
+      $format = $devices{substr($code,0,2)}{format};
+    }
     
     readingsSingleUpdate($hash, "version", $ver, 0);
     
     RemoveInternalTimer($hash);
     delete $hash->{helper}{timeout};
     
-    #Bewegungsmelder, Wettersensor, Mehrfachwandtaster
-    if ($code =~ m/^(65|69|74)..../) {
+    if(exists $devices{substr($code,0,2)}{chans}) {
       readingsSingleUpdate($hash, "state", "OK", 1);
-      $def01 = $modules{DUOFERN}{defptr}{$code."01"};
-      if(!$def01) {
-        DoTrigger("global","UNDEFINED DUOFERN_$code"."_actor DUOFERN $code"."01");
-        $def01 = $modules{DUOFERN}{defptr}{$code."01"};
-      }
-    
-    #Universalaktor  
-    } elsif ($code =~ m/^43..../) {
-      readingsSingleUpdate($hash, "state", "OK", 1);
-      $def01 = $modules{DUOFERN}{defptr}{$code."01"};
-      if(!$def01) {
-	    DoTrigger("global","UNDEFINED DUOFERN_$code"."_01 DUOFERN $code"."01");
-	    $def01 = $modules{DUOFERN}{defptr}{$code."01"};
-	  }
-	  $def02 = $modules{DUOFERN}{defptr}{$code."02"};
-      if(!$def02) {
-        DoTrigger("global","UNDEFINED DUOFERN_$code"."_02 DUOFERN $code"."02");
-        $def02 = $modules{DUOFERN}{defptr}{$code."02"};
-      }
-    } 
-       
-    $hash = $def01 if ($def01);
-    
-    #RolloTron
-    if ($format eq "21") {
-      my $pos         =  hex(substr($msg, 22, 2)) & 0x7F;
-      my $ventPos     =  hex(substr($msg, 12, 2)) & 0x7F;
-      my $ventMode    = (hex(substr($msg, 12, 2)) & 0x80 ? "on" : "off");
-      my $sunPos      =  hex(substr($msg, 20, 2)) & 0x7F;
-      my $sunMode     = (hex(substr($msg, 20, 2)) & 0x80 ? "on" : "off");
-      my $timerAuto   = (hex(substr($msg,  8, 2)) & 0x01 ? "on" : "off");
-      my $sunAuto     = (hex(substr($msg,  8, 2)) & 0x04 ? "on" : "off");
-      my $dawnAuto    = (hex(substr($msg, 10, 2)) & 0x08 ? "on" : "off");
-      my $duskAuto    = (hex(substr($msg,  8, 2)) & 0x08 ? "on" : "off");
-      my $manualMode  = (hex(substr($msg,  8, 2)) & 0x80 ? "on" : "off");
-      
-      $state = $pos;
-      $state = "opened"   if ($pos == 0);
-      $state = "closed"   if ($pos == 100);
-      
-      readingsBeginUpdate($hash); 
-      readingsBulkUpdate($hash, "ventilatingPosition",  $ventPos,     1);
-      readingsBulkUpdate($hash, "ventilatingMode",      $ventMode,    1);
-      readingsBulkUpdate($hash, "sunPosition",          $sunPos,      1);
-      readingsBulkUpdate($hash, "sunMode",              $sunMode,     1);
-      readingsBulkUpdate($hash, "timeAutomatic",        $timerAuto,   1);
-      readingsBulkUpdate($hash, "sunAutomatic",         $sunAuto,     1);
-      readingsBulkUpdate($hash, "dawnAutomatic",        $dawnAuto,    1);
-      readingsBulkUpdate($hash, "duskAutomatic",        $duskAuto,    1);
-      readingsBulkUpdate($hash, "manualMode",           $manualMode,  1);
-      readingsBulkUpdate($hash, "position",             $pos        , 1);
-      readingsBulkUpdate($hash, "state",                $state      , 1);
-      readingsBulkUpdate($hash, "moving",               "stop"      , 1);
-      readingsEndUpdate($hash, 1); # Notify is done by Dispatch
-    
-    #Universal Aktor, Steckdosenaktor, Troll Comfort DuoFern (Lichtmodus) 
-    } elsif ($format eq "22") {  
-      my $level             =  hex(substr($msg, 22, 2)) & 0x7F;
-      my $modeChange        = (hex(substr($msg, 22, 2)) & 0x80 ? "on" : "off");
-      my $sunMode           = (hex(substr($msg, 14, 2)) & 0x10 ? "on" : "off");
-      my $timerAuto         = (hex(substr($msg, 14, 2)) & 0x01 ? "on" : "off");
-      my $sunAuto           = (hex(substr($msg, 14, 2)) & 0x04 ? "on" : "off");
-      my $dawnAuto          = (hex(substr($msg, 14, 2)) & 0x40 ? "on" : "off");
-      my $duskAuto          = (hex(substr($msg, 14, 2)) & 0x02 ? "on" : "off");
-      my $manualMode        = (hex(substr($msg, 14, 2)) & 0x20 ? "on" : "off");
-      my $stairwellFunction = (hex(substr($msg, 16, 4)) & 0x8000 ? "on" : "off");
-      my $stairwellTime     = (hex(substr($msg, 16, 4)) & 0x7FFF) / 10;
-      
-      $state = $level;
-      $state = "off"   if ($level == 0);
-      $state = "on"    if ($level == 100);
-      
-      readingsBeginUpdate($hash); 
-      readingsBulkUpdate($hash, "sunMode",              $sunMode,     1);
-      readingsBulkUpdate($hash, "timeAutomatic",        $timerAuto,   1);
-      readingsBulkUpdate($hash, "sunAutomatic",         $sunAuto,     1);
-      readingsBulkUpdate($hash, "dawnAutomatic",        $dawnAuto,    1);
-      readingsBulkUpdate($hash, "duskAutomatic",        $duskAuto,    1);
-      readingsBulkUpdate($hash, "manualMode",           $manualMode,  1);
-      readingsBulkUpdate($hash, "modeChange",           $modeChange,  1);
-      readingsBulkUpdate($hash, "stairwellFunction",    $stairwellFunction,  1);
-      readingsBulkUpdate($hash, "stairwellTime",        $stairwellTime,  1);
-      readingsBulkUpdate($hash, "level",                $level        , 1);
-      readingsBulkUpdate($hash, "state",                $state      , 1);
-      readingsEndUpdate($hash, 1); # Notify is done by Dispatch
-      
-      if ($def02) {
-        $hash = $def02;
-        $level             =  hex(substr($msg, 20, 2)) & 0x7F;
-        $modeChange        = (hex(substr($msg, 20, 2)) & 0x80 ? "on" : "off");
-        $sunMode           = (hex(substr($msg, 12, 2)) & 0x10 ? "on" : "off");
-        $timerAuto         = (hex(substr($msg, 12, 2)) & 0x01 ? "on" : "off");
-        $sunAuto           = (hex(substr($msg, 12, 2)) & 0x04 ? "on" : "off");
-        $dawnAuto          = (hex(substr($msg, 12, 2)) & 0x40 ? "on" : "off");
-        $duskAuto          = (hex(substr($msg, 12, 2)) & 0x02 ? "on" : "off");
-        $manualMode        = (hex(substr($msg, 12, 2)) & 0x20 ? "on" : "off");
-        $stairwellFunction = (hex(substr($msg,  8, 4)) & 0x8000 ? "on" : "off");
-        $stairwellTime     = (hex(substr($msg,  8, 4)) & 0x7FFF) / 10;
+      foreach my $chan (@{$devices{substr($code,0,2)}{chans}}) {
+        my $defChan = $modules{DUOFERN}{defptr}{$code.$chan};
+        if(!$defChan) {
+          DoTrigger("global","UNDEFINED DUOFERN_$code"."_$chan DUOFERN $code".$chan);
+          $defChan = $modules{DUOFERN}{defptr}{$code.$chan};
+        }
+        push(@chHash,$defChan);
+      }     
+    } else {
+      push(@chHash,$hash);
+    }
         
-        $state = $level;
-        $state = "off"   if ($level == 0);
-        $state = "on"    if ($level == 100);
+    if(exists $statusGroups{$format}) {
+      foreach my $hashA (@chHash){
+        my %statusValue;
+        my $positionInverse = AttrVal($name,"positionInverse",0);
         
-        readingsBeginUpdate($hash); 
-        readingsBulkUpdate($hash, "sunMode",              $sunMode,     1);
-        readingsBulkUpdate($hash, "timeAutomatic",        $timerAuto,   1);
-        readingsBulkUpdate($hash, "sunAutomatic",         $sunAuto,     1);
-        readingsBulkUpdate($hash, "dawnAutomatic",        $dawnAuto,    1);
-        readingsBulkUpdate($hash, "duskAutomatic",        $duskAuto,    1);
-        readingsBulkUpdate($hash, "manualMode",           $manualMode,  1);
-        readingsBulkUpdate($hash, "modeChange",           $modeChange,  1);
-        readingsBulkUpdate($hash, "stairwellFunction",    $stairwellFunction,  1);
-        readingsBulkUpdate($hash, "stairwellTime",        $stairwellTime,  1);
-        readingsBulkUpdate($hash, "level",                $level        , 1);
-        readingsBulkUpdate($hash, "state",                $state      , 1);
-        readingsEndUpdate($hash, 1); # Notify is done by Dispatch	
-      }
-      
-    #Troll, Rohrmotor-Aktor, Rohrmotor Steuerung, Connect-Aktor, Umweltsensor     
-    } elsif ($format eq "23") {
-      my $pos               =  hex(substr($msg, 22, 2)) & 0x7F;
-      my $reversal          = (hex(substr($msg, 22, 2)) & 0x80 ? "on" : "off");
-      my $ventPos           =  hex(substr($msg, 16, 2)) & 0x7F;
-      my $ventMode          = (hex(substr($msg, 16, 2)) & 0x80 ? "on" : "off");
-      my $sunPos            =  hex(substr($msg, 18, 2)) & 0x7F;
-      my $sunMode           = (hex(substr($msg, 14, 2)) & 0x10 ? "on" : "off");
-      my $timerAuto         = (hex(substr($msg, 14, 2)) & 0x01 ? "on" : "off");
-      my $sunAuto           = (hex(substr($msg, 14, 2)) & 0x04 ? "on" : "off");
-      my $dawnAuto          = (hex(substr($msg, 12, 2)) & 0x02 ? "on" : "off");
-      my $duskAuto          = (hex(substr($msg, 14, 2)) & 0x02 ? "on" : "off");
-      my $manualMode        = (hex(substr($msg, 14, 2)) & 0x20 ? "on" : "off");
-      my $windAuto          = (hex(substr($msg, 14, 2)) & 0x40 ? "on" : "off");
-      my $windMode          = (hex(substr($msg, 14, 2)) & 0x08 ? "on" : "off");
-      my $windDir           = (hex(substr($msg, 12, 2)) & 0x04 ? "down" : "up");
-      my $rainAuto          = (hex(substr($msg, 14, 2)) & 0x80 ? "on" : "off");
-      my $rainMode          = (hex(substr($msg, 12, 2)) & 0x01 ? "on" : "off");
-      my $rainDir           = (hex(substr($msg, 12, 2)) & 0x08 ? "down" : "up");
-      my $runningTime       =  hex(substr($msg, 20, 2));
-      my $deadTime          =  hex(substr($msg, 12, 2)) & 0x30;
-      my $blindsMode        = (hex(substr($msg, 26, 2)) & 0x80 ? "on" : "off");
-      my $tiltInSunPos      = (hex(substr($msg, 18, 2)) & 0x80 ? "on" : "off");
-      my $tiltInVentPos     = (hex(substr($msg,  8, 2)) & 0x80 ? "on" : "off");
-      my $tiltAfterMoveLevel= (hex(substr($msg,  8, 2)) & 0x40 ? "on" : "off");
-      my $tiltAfterStopDown = (hex(substr($msg, 10, 2)) & 0x80 ? "on" : "off");
-      my $defaultSlatPos    =  hex(substr($msg, 10, 2)) & 0x7F;
-      my $slatRunTime       =  hex(substr($msg,  8, 2)) & 0x3F;
-      my $slatPosition      =  hex(substr($msg, 26, 2)) & 0x7F; 
-      
-      $state = $pos;
-      $state = "opened"   if ($pos == 0);
-      $state = "closed"   if ($pos == 100);
-      
-      readingsBeginUpdate($hash); 
-      readingsBulkUpdate($hash, "ventilatingPosition",  $ventPos,     1);
-      readingsBulkUpdate($hash, "ventilatingMode",      $ventMode   , 1);
-      readingsBulkUpdate($hash, "sunPosition",          $sunPos     , 1);
-      readingsBulkUpdate($hash, "sunMode",              $sunMode    , 1);
-      readingsBulkUpdate($hash, "timeAutomatic",        $timerAuto  , 1);
-      readingsBulkUpdate($hash, "sunAutomatic",         $sunAuto    , 1);
-      readingsBulkUpdate($hash, "dawnAutomatic",        $dawnAuto   , 1);
-      readingsBulkUpdate($hash, "duskAutomatic",        $duskAuto   , 1);
-      readingsBulkUpdate($hash, "manualMode",           $manualMode , 1);
-      readingsBulkUpdate($hash, "windAutomatic",        $windAuto   , 1);
-      readingsBulkUpdate($hash, "windMode",             $windMode   , 1);
-      readingsBulkUpdate($hash, "windDirection",        $windDir    , 1);
-      readingsBulkUpdate($hash, "rainAutomatic",        $rainAuto   , 1);
-      readingsBulkUpdate($hash, "rainMode",             $rainMode   , 1);
-      readingsBulkUpdate($hash, "rainDirection",        $rainDir    , 1);
-      readingsBulkUpdate($hash, "runningTime",          $runningTime, 1);
-      readingsBulkUpdate($hash, "motorDeadTime",        $deadTimes{$deadTime}, 1);
-      readingsBulkUpdate($hash, "position",             $pos        , 1);
-      readingsBulkUpdate($hash, "reversal",             $reversal   , 1);
-      readingsBulkUpdate($hash, "blindsMode",           $blindsMode , 1);
-      
-       if ($blindsMode eq "on") {
-         readingsBulkUpdate($hash, "tiltInSunPos",      $tiltInSunPos , 1);
-         readingsBulkUpdate($hash, "tiltInVentPos",     $tiltInVentPos , 1);
-         readingsBulkUpdate($hash, "tiltAfterMoveLevel",$tiltAfterMoveLevel , 1);
-         readingsBulkUpdate($hash, "tiltAfterStopDown", $tiltAfterStopDown , 1);
-         readingsBulkUpdate($hash, "defaultSlatPos",    $defaultSlatPos , 1);
-         readingsBulkUpdate($hash, "slatRunTime",       $slatRunTime , 1);
-         readingsBulkUpdate($hash, "slatPosition",      $slatPosition , 1);
-       } else {
-         delete($hash->{READINGS}{tiltInSunPos});
-         delete($hash->{READINGS}{tiltInVentPos});
-         delete($hash->{READINGS}{tiltAfterMoveLevel});
-         delete($hash->{READINGS}{tiltAfterStopDown});
-         delete($hash->{READINGS}{defaultSlatPos});
-         delete($hash->{READINGS}{slatRunTime});
-         delete($hash->{READINGS}{slatPosition});
-       }
-      
-      readingsBulkUpdate($hash, "moving",               "stop"      , 1);
-      readingsBulkUpdate($hash, "state",                $state      , 1);
-      readingsEndUpdate($hash, 1); # Notify is done by Dispatch
-      
-    #Rohrmotor, SX5   
-    } elsif ($format eq "24") {  
-      my $pos         =  hex(substr($msg, 22, 2)) & 0x7F;
-      my $reversal    = (hex(substr($msg, 22, 2)) & 0x80 ? "on" : "off");
-      my $ventPos     =  hex(substr($msg, 16, 2)) & 0x7F;
-      my $ventMode    = (hex(substr($msg, 16, 2)) & 0x80 ? "on" : "off");
-      my $sunPos      =  hex(substr($msg, 18, 2)) & 0x7F;
-      my $sunMode     = (hex(substr($msg, 14, 2)) & 0x10 ? "on" : "off");
-      my $timerAuto   = (hex(substr($msg, 14, 2)) & 0x01 ? "on" : "off");
-      my $sunAuto     = (hex(substr($msg, 14, 2)) & 0x04 ? "on" : "off");
-      my $dawnAuto    = (hex(substr($msg, 12, 2)) & 0x02 ? "on" : "off");
-      my $duskAuto    = (hex(substr($msg, 14, 2)) & 0x02 ? "on" : "off");
-      my $manualMode  = (hex(substr($msg, 14, 2)) & 0x20 ? "on" : "off");
-      my $windAuto    = (hex(substr($msg, 14, 2)) & 0x40 ? "on" : "off");
-      my $windMode    = (hex(substr($msg, 14, 2)) & 0x08 ? "on" : "off");
-      my $windDir     = (hex(substr($msg, 12, 2)) & 0x04 ? "down" : "up");
-      my $rainAuto    = (hex(substr($msg, 14, 2)) & 0x80 ? "on" : "off");
-      my $rainMode    = (hex(substr($msg, 12, 2)) & 0x01 ? "on" : "off");
-      my $rainDir     = (hex(substr($msg, 12, 2)) & 0x08 ? "down" : "up");
-      my $obstacle    = (hex(substr($msg, 12, 2)) & 0x10 ? "1" : "0");
-      my $block       = (hex(substr($msg, 12, 2)) & 0x40 ? "1" : "0");
-      my $lightCurtain= (hex(substr($msg,  8, 2)) & 0x80 ? "1" : "0");
-      my $autoClose   =  hex(substr($msg, 10, 2)) & 0x0F;
-      my $openSpeed   =  hex(substr($msg, 10, 2)) & 0x30;
-      my $alert2000   = (hex(substr($msg, 10, 2)) & 0x80 ? "on" : "off");
-      my $backJump    = (hex(substr($msg, 26, 2)) & 0x01 ? "on" : "off");
-      my $alert10     = (hex(substr($msg, 26, 2)) & 0x02 ? "on" : "off");
-      
-      $state = $pos;
-      $state = "opened"   if ($pos == 0);
-      $state = "closed"   if ($pos == 100);
-      $state = "light curtain" if ($lightCurtain eq "1");
-      $state = "obstacle" if ($obstacle eq "1");
-      $state = "block"    if ($block eq "1");
-      
-      readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash, "manualMode",           $manualMode , 1);
-      readingsBulkUpdate($hash, "timeAutomatic",        $timerAuto  , 1);
-      readingsBulkUpdate($hash, "ventilatingPosition",  $ventPos    , 1);
-      readingsBulkUpdate($hash, "ventilatingMode",      $ventMode   , 1);
-      readingsBulkUpdate($hash, "position",             $pos        , 1);
-      readingsBulkUpdate($hash, "state",                $state      , 1);
-      readingsBulkUpdate($hash, "obstacle",             $obstacle   , 1);
-      readingsBulkUpdate($hash, "block",                $block      , 1);
-      readingsBulkUpdate($hash, "moving",               "stop"      , 1);
-      
-      if ($code =~ m/^4E..../) { #SX5
-        readingsBulkUpdate($hash, "10minuteAlarm",        $alert10    , 1);
-        readingsBulkUpdate($hash, "automaticClosing",     $closingTimes{$autoClose}  , 1);
-        readingsBulkUpdate($hash, "2000cycleAlarm",       $alert2000  , 1);
-        readingsBulkUpdate($hash, "openSpeed",            $openSpeeds{$openSpeed}  , 1);
-        readingsBulkUpdate($hash, "backJump",             $backJump   , 1);
-        readingsBulkUpdate($hash, "lightCurtain",         $lightCurtain      , 1);
-      } else {
-        readingsBulkUpdate($hash, "sunPosition",          $sunPos     , 1);
-        readingsBulkUpdate($hash, "sunMode",              $sunMode    , 1);      
-        readingsBulkUpdate($hash, "sunAutomatic",         $sunAuto    , 1);
-        readingsBulkUpdate($hash, "dawnAutomatic",        $dawnAuto   , 1);
-        readingsBulkUpdate($hash, "duskAutomatic",        $duskAuto   , 1);     
-        readingsBulkUpdate($hash, "windAutomatic",        $windAuto   , 1);
-        readingsBulkUpdate($hash, "windMode",             $windMode   , 1);
-        readingsBulkUpdate($hash, "windDirection",        $windDir    , 1);
-        readingsBulkUpdate($hash, "rainAutomatic",        $rainAuto   , 1);
-        readingsBulkUpdate($hash, "rainMode",             $rainMode   , 1);
-        readingsBulkUpdate($hash, "rainDirection",        $rainDir    , 1);
-        readingsBulkUpdate($hash, "reversal",             $reversal   , 1);
-           
-      }
-      
-      readingsEndUpdate($hash, 1); # Notify is done by Dispatch
-    
-    #Dimmaktor
-    } elsif ($format eq "25") {  
-      my $stairwellFunction = (hex(substr($msg, 10, 4)) & 0x8000 ? "on" : "off");
-      my $stairwellTime     = (hex(substr($msg, 10, 4)) & 0x7FFF) / 10;
-      my $timerAuto         = (hex(substr($msg, 14, 2)) & 0x01 ? "on" : "off");
-      my $duskAuto          = (hex(substr($msg, 14, 2)) & 0x02 ? "on" : "off");
-      my $sunAuto           = (hex(substr($msg, 14, 2)) & 0x04 ? "on" : "off");
-      my $sunMode           = (hex(substr($msg, 14, 2)) & 0x08 ? "on" : "off");
-      my $manualMode        = (hex(substr($msg, 14, 2)) & 0x20 ? "on" : "off");
-      my $dawnAuto          = (hex(substr($msg, 14, 2)) & 0x40 ? "on" : "off");
-      my $intemedSave       = (hex(substr($msg, 14, 2)) & 0x80 ? "on" : "off");
-      my $runningTime       =  hex(substr($msg, 18, 2));
-      my $intemedVal        =  hex(substr($msg, 20, 2)) & 0x7F;
-      my $intermedMode      = (hex(substr($msg, 20, 2)) & 0x80 ? "on" : "off");
-      my $level             =  hex(substr($msg, 22, 2)) & 0x7F;
-      my $modeChange        = (hex(substr($msg, 22, 2)) & 0x80 ? "on" : "off");
-      
-      $state = $level;
-      $state = "off"   if ($level == 0);
-      $state = "on"    if ($level == 100);
-       
-      readingsBeginUpdate($hash); 
-      readingsBulkUpdate($hash, "stairwellFunction",      $stairwellFunction,  1);
-      readingsBulkUpdate($hash, "stairwellTime",          $stairwellTime,  1);
-      readingsBulkUpdate($hash, "timeAutomatic",          $timerAuto    , 1);
-      readingsBulkUpdate($hash, "duskAutomatic",          $duskAuto     , 1);
-      readingsBulkUpdate($hash, "sunAutomatic",           $sunAuto      , 1);
-      readingsBulkUpdate($hash, "sunMode",                $sunMode      , 1);
-      readingsBulkUpdate($hash, "manualMode",             $manualMode   , 1);
-      readingsBulkUpdate($hash, "dawnAutomatic",          $dawnAuto     , 1);
-      readingsBulkUpdate($hash, "saveIntermediateOnStop", $intemedSave  , 1);  
-      readingsBulkUpdate($hash, "runningTime",            $runningTime  , 1);
-      readingsBulkUpdate($hash, "intermediateValue",      $intemedVal   , 1);
-      readingsBulkUpdate($hash, "intermediateMode",       $intermedMode , 1);
-      readingsBulkUpdate($hash, "level",                  $level        , 1);
-      readingsBulkUpdate($hash, "modeChange",             $modeChange   , 1);
-      readingsBulkUpdate($hash, "state",                  $state        , 1);
-      readingsEndUpdate($hash, 1); # Notify is done by Dispatch  
-
-    #Thermostat
-    } elsif ($format eq "27") {  
-      my $temperature1      = sprintf("%0.1f", ((hex(substr($msg, 8,  4)) & 0x07FF)-400)/10);
-      my $temperature2      = sprintf("%0.1f", ((hex(substr($msg, 12, 4)) & 0x07FF)-400)/10);
-      my $tempThreshold1    = sprintf("%0.1f", (hex(substr($msg, 16, 2))-80)/2);
-      my $tempThreshold2    = sprintf("%0.1f", (hex(substr($msg, 18, 2))-80)/2);
-      my $tempThreshold3    = sprintf("%0.1f", (hex(substr($msg, 20, 2))-80)/2);
-      my $tempThreshold4    = sprintf("%0.1f", (hex(substr($msg, 22, 2))-80)/2);
-      my $desiredTemp       = sprintf("%0.1f", (hex(substr($msg, 26, 2))-80)/2);
-      my $output            = (hex(substr($msg,  8, 2)) & 0x08 ? "on" : "off");
-      my $manualOverride    = (hex(substr($msg,  8, 2)) & 0x10 ? "on" : "off");
-      my $actTempLimit      = (hex(substr($msg,  8, 2)) & 0x60)>>5;
-      my $timerAuto         = (hex(substr($msg, 12, 2)) & 0x08 ? "on" : "off");
-      my $manualMode        = (hex(substr($msg, 12, 2)) & 0x10 ? "on" : "off");
-      
-      $state = "T: $temperature1 desired: $desiredTemp";
-       
-      readingsBeginUpdate($hash); 
-      readingsBulkUpdate($hash, "measured-temp",          $temperature1,    1);
-      readingsBulkUpdate($hash, "measured-temp2",         $temperature2,    1);
-      readingsBulkUpdate($hash, "temperatureThreshold1",  $tempThreshold1,  1);
-      readingsBulkUpdate($hash, "temperatureThreshold2",  $tempThreshold2,  1);
-      readingsBulkUpdate($hash, "temperatureThreshold3",  $tempThreshold3,  1);
-      readingsBulkUpdate($hash, "temperatureThreshold4",  $tempThreshold4,  1);
-      readingsBulkUpdate($hash, "desired-temp",           $desiredTemp,     1);
-      readingsBulkUpdate($hash, "output",                 $output,          1);
-      readingsBulkUpdate($hash, "manualOverride",         $manualOverride,  1);
-      readingsBulkUpdate($hash, "actTempLimit",           $actTempLimit,    1);
-      readingsBulkUpdate($hash, "timeAutomatic",          $timerAuto,       1);
-      readingsBulkUpdate($hash, "manualMode",             $manualMode,      1);
-      
-      readingsBulkUpdate($hash, "state",                  $state,           1);
-      readingsEndUpdate($hash, 1); # Notify is done by Dispatch  
+        readingsBeginUpdate($hashA);
+        
+        foreach my $statusId (@{$statusGroups{$format}}) {
+     
+          if(exists $statusIds{$statusId}) {
             
+            my $chan= (exists $hashA->{chanNo} ? $hashA->{chanNo} : "01");
+            
+            my $stName  = $statusIds{$statusId}{name};
+            my $stPos   = $statusIds{$statusId}{chan}{$chan}{position};    
+            my $stFrom  = $statusIds{$statusId}{chan}{$chan}{from};
+            my $stTo    = $statusIds{$statusId}{chan}{$chan}{to};
+            my $stLen   = $stTo - $stFrom + 1;
+            
+            my $value = hex(substr($msg, ($stLen > 8 ? 6 : 8) + $stPos*2, ($stLen > 8 ? 4 : 2)));
+            $value = ($value >> $stFrom) & ((1<<$stLen) - 1);
+            
+            if((exists $statusIds{$statusId}{invert}) && ($positionInverse eq "1")) {
+              $value = $statusIds{$statusId}{invert} - $value;
+            }
+            
+            if((exists $statusIds{$statusId}{map}) && (exists $statusMapping{$statusIds{$statusId}{map}})) {
+              
+              if ($statusIds{$statusId}{map} =~ m/scaleF.*/) {
+                $value = sprintf("%0.1f",($value - $statusMapping{$statusIds{$statusId}{map}}[1]) / $statusMapping{$statusIds{$statusId}{map}}[0]);
+              } elsif ($statusIds{$statusId}{map} =~ m/scale.*/) {
+                $value = ($value - $statusMapping{$statusIds{$statusId}{map}}[1]) / $statusMapping{$statusIds{$statusId}{map}}[0];
+              } else {
+                $value = $statusMapping{$statusIds{$statusId}{map}}[$value];
+              }    
+            }
+            
+            $statusValue{$stName} = $value;
+            readingsBulkUpdate($hashA, $stName,  $value,     1);
+          }
+        }
+        
+        if (defined($statusValue{blindsMode}) && ($statusValue{blindsMode} eq "off")) {
+          delete($hash->{READINGS}{tiltInSunPos});
+          delete($hash->{READINGS}{tiltInVentPos});
+          delete($hash->{READINGS}{tiltAfterMoveLevel});
+          delete($hash->{READINGS}{tiltAfterStopDown});
+          delete($hash->{READINGS}{defaultSlatPos});
+          delete($hash->{READINGS}{slatRunTime});
+          delete($hash->{READINGS}{slatPosition});
+        }
+        
+        $state = "x";
+        if ($format =~ m/^(21|23|23a|24|24a)/) { 
+          $state = $statusValue{position} if defined($statusValue{position});
+          if($positionInverse eq "1") {
+            $state = "opened"   if ($state eq "100");
+            $state = "closed"   if ($state eq "0");
+          } else {
+            $state = "opened"   if ($state eq "0");
+            $state = "closed"   if ($state eq "100");
+          }      
+        
+        } elsif ($format =~ m/^(22|25)/) {  
+          $state = $statusValue{level} if defined($statusValue{level});
+          $state = "off"   if ($state eq "0");
+          $state = "on"    if ($state eq "100");
+                     
+        } elsif ($format =~ m/^(27)/) {  
+          my $temperature1 = "x";
+          my $desiredTemp  = "x";
+          $temperature1 = $statusValue{"measured-temp"} if defined($statusValue{"measured-temp"});
+          $desiredTemp  = $statusValue{"desired-temp"} if defined($statusValue{"desired-temp"});
+          $state = "T: $temperature1 desired: $desiredTemp";
+                 
+        }      
+        
+        $state = "light curtain"  if (defined($statusValue{"lightCurtain"}) && $statusValue{"lightCurtain"} eq "1");
+        $state = "obstacle"       if (defined($statusValue{"obstacle"}) && $statusValue{"obstacle"} eq "1");
+        $state = "block"          if (defined($statusValue{"block"}) && $statusValue{"block"} eq "1");
+        readingsBulkUpdate($hashA, "state",  $state,     1);
+          
+        readingsEndUpdate($hashA, 1); # Notify is done by Dispatch 
+        DoTrigger($hashA->{NAME}, undef);
+      }
+
     } else {
       Log3 $hash, 3, "DUOFERN unknown msg: $msg";
     }
@@ -1939,6 +1787,9 @@ DUOFERN_StatusTimeout($)
         </li><br>
     <li><b>toggleUpDown</b><br>
         If attribute is set, a stop command is send instead of the up or down command if the roller shutter is moving.
+        </li><br>
+    <li><b>positionInverse</b><br>
+        If attribute is set, the position value of the roller shutter is inverted.
         </li><br>
   </ul>
   <br>
