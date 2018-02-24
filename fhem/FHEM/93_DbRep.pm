@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.13.2       24.02.2018       DbRep_firstconnect changed, bug fix in DbRep_collaggstr for aggregation = month
 # 7.13.1       20.02.2018       commandref revised
 # 7.13.0       17.02.2018       changeValue can handle perl code {} as "new string"
 # 7.12.0       16.02.2018       compression of dumpfile, restore of compressed files possible
@@ -318,7 +319,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.13.1";
+my $DbRepVersion = "7.13.2";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -1235,6 +1236,7 @@ sub DbRep_firstconnect($) {
   $hash->{dbloghash} = $defs{$dblogdevice};
   my $dbconn         = $hash->{dbloghash}{dbconn};
 
+  RemoveInternalTimer($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
   if ($init_done == 1) {
       if ( !DbRep_Connect($hash) ) {
@@ -1246,7 +1248,6 @@ sub DbRep_firstconnect($) {
           $dbh->disconnect();
       }
   } else {
-     RemoveInternalTimer($hash, "DbRep_firstconnect");
      InternalTimer(time+1, "DbRep_firstconnect", $hash, 0);
   }
 
@@ -1791,7 +1792,7 @@ sub DbRep_createTimeArray($$$) {
  } elsif ($aggregation eq "week") {
      $aggsec = 604800;
  } elsif ($aggregation eq "month") {
-     $aggsec = 2678400;
+     $aggsec = 2678400;                      # Initialwert, wird in DbRep_collaggstr für jeden Monat berechnet
  } elsif ($aggregation eq "no") {
      $aggsec = 1;
  } else {
@@ -1866,15 +1867,17 @@ sub DbRep_collaggstr($$$$) {
          # Monatsaggregation
          if ($aggregation eq "month") {
              $runtime_orig = $runtime;
-             $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
              
              # Hilfsrechnungen
              my $rm   = strftime "%m", localtime($runtime);                    # Monat des aktuell laufenden Startdatums d. SQL-Select
              my $ry   = strftime "%Y", localtime($runtime);                    # Jahr des aktuell laufenden Startdatums d. SQL-Select
-             my $dim  = $rm-2?30+($rm*3%7<4):28+!($ry%4||$ry%400*!($ry%100));  # Anzahl Tage des aktuell laufenden Monats f. SQL-Select
+             my $dim  = $rm-2?30+($rm*3%7<4):28+!($ry%4||$ry%400*!($ry%100));  # Anzahl Tage des aktuell laufenden Monats
              Log3 ($name, 5, "DbRep $name - act year:  $ry, act month: $rm, days in month: $dim, endyear: $yestr, endmonth: $mestr"); 
-                     
-             $runtime_string       = strftime "%Y-%m", localtime($runtime);                            # für Readingname
+             $aggsec = $dim * 86400;
+             
+             $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+                                  
+             $runtime_string = strftime "%Y-%m", localtime($runtime);          # für Readingname
              
              if ($i==1) {
                  # nur im ersten Durchlauf
@@ -1888,7 +1891,8 @@ sub DbRep_collaggstr($$$$) {
                 
              } else {
                  if(($runtime) > $epoch_seconds_end) {
-                     $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>11);                     
+                     #$runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>11);  # ausgebaut 24.02.2018
+                     $runtime_string_first = strftime "%Y-%m-01", localtime($runtime);                      
                      $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
                      $ll=1;
                  } else {
