@@ -53,7 +53,7 @@ if  (eval {require RiveScript;1;} ne 1) {
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.25";
+my $babbleversion    = "1.26";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -1100,7 +1100,7 @@ sub Babble_DoIt{
   $reading = "none" 
     if( !$reading );
   
-  if( defined(@parms) && $parms[0]=="testit"){
+  if( defined(@parms) && $parms[0] eq "testit"){
     $testit = 1;
     shift @parms;
     $exflag = $parms[0];

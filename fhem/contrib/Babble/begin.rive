@@ -9,8 +9,6 @@
 // Bot variables
 // Name of house spirit in writing
 ! var name  = Jeannie
-// Name of house spirit in speaking
-! var name2 = dschini
 // Name of house master
 ! var master = Peter
 

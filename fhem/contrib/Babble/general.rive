@@ -16,14 +16,14 @@
 //########################################################################################
 
 + hallo
-- Hallo, ich bin <bot name2>. Ã¤Ã¶Ã¼Ã Wer bist Du ?
+- Hallo, ich bin <bot name>. Wer bist Du ?
     
 + wer bist du
-- Hallo, ich bin <bot name2>. Wer bist Du ?
+- Hallo, ich bin <bot name>. Wer bist Du ?
 
 + hallo *
 * <star> == <bot name> => Hallo. Wer bist Du ?
-- Ich heisse nicht <star>, sondern <bot name2>. Wer bist Du ?
+- Ich heisse nicht <star>, sondern <bot name>. Wer bist Du ?
 
 + ich bin *
 * <formal> == <bot master> => Gerne zu Diensten, Meister! <set name=<formal>>
@@ -65,9 +65,6 @@
 + was ist gong
 - Damit weckst Du Dominic aus dem DornrÃ¶s-chenschlaf {weight=50}
 - <call>devhelp gong</call>{weight=50}
-
-+ mir ist (warm|heiÃ|heiss)
-- Wenn dir <star1> ist, kann ich die Heizung ausstellen. Oder du Ã¶ffnest ein Fenster.
 
 + was ist *
 - <call>devhelp <star></call>
