@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_ElectricityCalculator: Spelling error "di(s)abled" corrected
+  - bugfix:  73_GasCalculator:         Spelling error "di(s)abled" corrected
+  - bugfix:  73_WaterCalculator:       Spelling error "di(s)abled" corrected
   - bugfix:  93_DbRep: V7.13.2, fix of aggregation month
   - feature: 00_MQTT: topic with space or colon
   - bugfix:  98_GOOGLECAST: fix open connections and state value
