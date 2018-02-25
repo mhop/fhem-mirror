@@ -22,6 +22,8 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.14:	Issue with prioQueues (#769427)
+#				Fixed German Umlauts in German Commandref			
 #		0.0.13:	added extended Details attribute
 #				optimization of logging
 #		0.0.12:	problem with older perl versions (Forum #764462)
@@ -30,7 +32,7 @@
 #		0.0.11:	added date to "get freeze" popup
 #				fixed readingsbulkupdate behaviour
 #				fixed that freezemon is inactive after restart
-#				removed gplots 
+#				removed gplots
 #		0.0.10:	added set commands active, inactive and clear
 #				added gplot files
 #				minor bug fixes
@@ -73,7 +75,8 @@ use POSIX;
 use Time::HiRes qw(gettimeofday);
 use B qw(svref_2object);
 
-my $version = "0.0.13";
+
+my $version = "0.0.14";
 
 ###################################
 sub freezemon_Initialize($) {
@@ -82,7 +85,9 @@ sub freezemon_Initialize($) {
 
     # Module specific attributes
     my @freezemon_attr =
-      ("fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all fm_extDetail:0,1");
+      (
+"fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all fm_extDetail:0,1"
+      );
 
     $hash->{GetFn}             = "freezemon_Get";
     $hash->{SetFn}             = "freezemon_Set";
@@ -179,8 +184,11 @@ sub freezemon_ProcessTimer($) {
 
         # Find the internal timers that are still in the hash
         my @olddev = split( " ", $dev );
+		#Log3 $name, 5, "FreezeMon $name passing olddevs: $dev";
+        
         my @newdev = split( " ", freezemon_apptime($hash) );
-
+		#Log3 $name, 5, "FreezeMon $name passing newdevs: ".join(" ",@newdev);
+		
         my %nd = map { $_ => 1 } @newdev;
         foreach my $d (@olddev) {
             if ( !exists( $nd{$d} ) ) {
@@ -517,21 +525,22 @@ sub freezemon_apptime($) {
         $shortarg = ( defined($arg) ? $arg : "" );
         if ( ref($shortarg) eq "HASH" ) {
             if ( !defined( $shortarg->{NAME} ) ) {
-				if (AttrVal($name,"fm_extDetail",0) == 1) {
-					if ( $fn eq "BlockingKill" ) {
-						$shortarg = $shortarg->{abortArg}{NAME};
-					}
-					elsif ( $fn eq "HttpUtils_Err" ) {
-						$shortarg = $shortarg->{hash}{hash}{NAME};
-					}
-					else {
-						Log3 $name, 5, "Freezemon: found something without a name $fn" . Dumper($shortarg);
-						$shortarg = "N/A";
-					}
-				}
-				else {
-					$shortarg = "N/A";
-				}
+                if ( AttrVal( $name, "fm_extDetail", 0 ) == 1 ) {
+                    if ( $fn eq "BlockingKill" or $fn eq "BlockingStart") {
+                        $shortarg = $shortarg->{abortArg}{NAME};
+						Log3 $name, 5, "Freezemon: found $fn " . Dumper($shortarg) ;
+                    }
+                    elsif ( $fn eq "HttpUtils_Err" ) {
+                        $shortarg = $shortarg->{hash}{hash}{NAME};
+                    }
+                    else {
+                        Log3 $name, 5, "Freezemon: found something without a name $fn" . Dumper($shortarg);
+                        $shortarg = "N/A";
+                    }
+                }
+                else {
+                    $shortarg = "N/A";
+                }
             }
             else {
                 $shortarg = $shortarg->{NAME};
@@ -560,26 +569,35 @@ sub freezemon_apptime($) {
         $ret .= ":" . $shortarg . " ";
     }
     if (%prioQueues) {
-        my $nice  = minNum( keys %prioQueues );
-        my $entry = shift( @{ $prioQueues{$nice} } );
-        Log3 $name, 5, "Freezemon: found a prioQueue" . Dumper($entry);
-        $cv     = svref_2object( $entry->{fn} );
-        $fnname = $cv->GV->NAME;
-        $ret .= ":" . $shortarg;
-        $shortarg = ( defined( $entry->{arg} ) ? $entry->{arg} : "" );
-        if ( ref($shortarg) eq "HASH" ) {
-
-            if ( !defined( $shortarg->{NAME} ) ) {
-                $shortarg = "N/A";
-            }
-            else {
-                $shortarg = $shortarg->{NAME};
-            }
-        }
-        ( $shortarg, undef ) = split( /:|;/, $shortarg, 2 );
-        $ret .= ":" . $shortarg . " ";
+	
+		foreach my $prio (keys %prioQueues) {
+			foreach my $entry (@{$prioQueues{$prio}}) {
+				#Log3 $name, 5, "Freezemon: entry is ".Dumper($entry);
+				$cv     = svref_2object( $entry->{fn});
+				$fnname = $cv->GV->NAME;
+				$ret .= "prio-" . $fnname;
+				
+				$shortarg = ( defined( $entry->{arg} ) ? $entry->{arg} : "" );
+				#Log3 $name, 5, "Freezemon: found a prioQueue arg ".ref($shortarg);
+				if ( ref($shortarg) eq "HASH" ) {
+					if ( !defined( $shortarg->{NAME} ) ) {
+						$shortarg = "N/A";
+             		}
+					else {
+						$shortarg = $shortarg->{NAME};
+             		}
+         		}
+				elsif ( ref($shortarg) eq "ARRAY" ) {
+					$shortarg = $entry->{arg};
+				}
+				
+				( $shortarg, undef ) = split( /:|;/, $shortarg, 2 );
+				$ret .= ":" . $shortarg . " ";
+				#Log3 $name, 5, "Freezemon: found a prioQueue, returning $ret";
+			}
+		}
     }
-
+	
     return $ret;
 }
 
@@ -658,7 +676,7 @@ sub freezemon_apptime($) {
 
 </ul>
 
-</ul>
+
 </div>
 
 =end html
@@ -669,14 +687,14 @@ sub freezemon_apptime($) {
 	<h3>freezemon</h3>
 	<div>
 	<ul>
-		FREEZEMON Ã¼berwacht - Ã¤hnlich wie PERFMON mÃ¶gliche Freezes, allerdings ist FREEZEMON ein echtes Modul und hat daher:<br>
+		FREEZEMON Überwacht - Ähnlich wie PERFMON mögliche Freezes, allerdings ist FREEZEMON ein echtes Modul und hat daher:<br>
 		<ul>
-		<li>Readings - die geloggt werden kÃ¶nnen und damit viel einfacher ausgewertet werden kÃ¶nnen</li>
+		<li>Readings - die geloggt werden können und damit viel einfacher ausgewertet werden können</li>
 		<li>Attribute - mit denen das Verhalten von freezemon beeinflusst werden kann</li>
-		<li>zusÃ¤tzliche FunktionalitÃ¤t - die versucht das den Freeze verursachende Device zu identifizieren</li>
+		<li>zusÃ¤tzliche Funktionalität - die versucht das den Freeze verursachende Device zu identifizieren</li>
 		</ul>
-		Ich wÃ¼rde empfehlen, PERFMON zu deaktivieren, wenn FREEZEMON aktiv ist, da beide auf die selbe Art Freezes erkennen und dann nur alles doppelt kommt.
-		<b>Bitte beachten!</b> FREEZEMON versucht nur intelligent zu erraten, welches Device einen freeze verursacht haben kÃ¶nnte (basierend auf den Timern die laufen sollten). Es gibt eine Menge anderer Faktoren (intern oder extern) die einen Freeze verursachen kÃ¶nnen. FREEZEMON ersetzt keine detaillierte Analyse. Das Modul versucht nur Hinweise zu geben, was optimiert werden kÃ¶nnte.<br><br>
+		Ich würde empfehlen, PERFMON zu deaktivieren, wenn FREEZEMON aktiv ist, da beide auf die selbe Art Freezes erkennen und dann nur alles doppelt kommt.
+		<b>Bitte beachten!</b> FREEZEMON versucht nur intelligent zu erraten, welches Device einen freeze verursacht haben könnte (basierend auf den Timern die laufen sollten). Es gibt eine Menge anderer Faktoren (intern oder extern) die einen Freeze verursachen können. FREEZEMON ersetzt keine detaillierte Analyse. Das Modul versucht nur Hinweise zu geben, was optimiert werden könnte.<br><br>
 		<br>
 		<br>
 	<a name="freezemonDefine"></a>
@@ -693,14 +711,14 @@ sub freezemon_apptime($) {
 		<ul>
 		<li>inactive: deaktiviert das Device (identisch zum Attribut "disable", aber ohne die Notwendigkeit su "saven".</li>
 		<li>active: reaktiviert das Device nachdem es auf inactive gesetzt wurde</li>
-		<li>clear: LÃ¶scht alle readings (inklusive der Liste der letzten 20 Freezes).</li>
+		<li>clear: Löscht alle readings (inklusive der Liste der letzten 20 Freezes).</li>
 	</ul>
 
   </ul>	
   <a name="freezemonGet"></a>
   <b>Get</b>
   <ul>
-  freeze: gibt die letzten 20 freezes zurÃ¼ck (in Kompakter Darstellung, wie im state) - Dies dient einem schnellen Ãœberblick, fÃ¼r detailliertere Auswertungen empfehle ich die Daten zu loggen.<br><br>
+  freeze: gibt die letzten 20 freezes zurück (in Kompakter Darstellung, wie im state) - Dies dient einem schnellen Überblick, für detailliertere Auswertungen empfehle ich die Daten zu loggen.<br><br>
   </ul>
 
   <a name="freezemonReadings"></a>
@@ -708,7 +726,7 @@ sub freezemon_apptime($) {
   <ul>
 		<ul>
 			<li>freezeTime: Dauer des Freezes</li>
-			<li>freezeDevice: Liste von mÃ¶glicherweise den Freeze auslÃ¶senden Funktionen(Devices)</li>
+			<li>freezeDevice: Liste von möglicherweise den Freeze auslösenden Funktionen(Devices)</li>
 			<li>fcDay: kumulierte Anzahl der Freezes pro Tag</li>
 			<li>ftDay: kumulierte Dauer der Freezes pro Tag </li>
 			<li>fcDayLast: speichert die kumulierte Anzahl der Freezes des vergangenen Tages (um tageweise plots zu erstellen)</li>
@@ -722,12 +740,12 @@ sub freezemon_apptime($) {
   <ul>
 		<ul>
 			<li>fm_extDetail: stellt in einigen Fällen zusätzliche Details bei erkannten Freezes zur Verfügung. In wenigen Fällen wurde berichtet, dass FHEM crasht, also vorsichtig verwenden.</li>
-			<li>fm_freezeThreshold: Wert in Sekunden (Default: 1) - Nur Freezes lÃ¤nger als fm_freezeThreshold werden als Freeze betrachtet </li>
+			<li>fm_freezeThreshold: Wert in Sekunden (Default: 1) - Nur Freezes länger als fm_freezeThreshold werden als Freeze betrachtet </li>
 			<li>fm_forceApptime: Wenn FREEZEMON aktiv ist wird automatisch apptime gestartet (falls nicht aktiv)</li>
-			<li>fm_ignoreDev: Liste von Komma-getrennten Devices. Wenn einzelne mÃ¶glicherweise einen Freeze verursachenden Device in dieser Liste sind, wird der Freeze ignoriert (nicht geloggt). Bitte das Attribut fm_ignoreMode beachten</li>
+			<li>fm_ignoreDev: Liste von Komma-getrennten Devices. Wenn einzelne möglicherweise einen Freeze verursachenden Device in dieser Liste sind, wird der Freeze ignoriert (nicht geloggt). Bitte das Attribut fm_ignoreMode beachten</li>
 			<li>fm_ignoreMode: Kann die Werte off,single oder all annehmen. Wenn in fm_ignoreDev Devices angegeben sind wirken sich der ignoreMode wie folgt aus: <br>
-					all: Ein Freeze wird nur dann ignoriert, wenn alle mÃ¶glicherweise den Freeze verursachenden Devices in der Ignore-Liste enthalten sind. Dies fÃ¼hrt unter UmstÃ¤nden dazu, dass mehr Freezes geloggt werden als erwartet.<br>
-					single: Ein Freeze wird ignoriert, sobald ein mÃ¶glicher Verursacher in der Ignorierliste enthalten ist. Dies fÃ¼hrt mÃ¶glicherweise dazu, dass Freezes Ã¼bersehen werden.<br>
+					all: Ein Freeze wird nur dann ignoriert, wenn alle möglicherweise den Freeze verursachenden Devices in der Ignore-Liste enthalten sind. Dies führt unter Umständen dazu, dass mehr Freezes geloggt werden als erwartet.<br>
+					single: Ein Freeze wird ignoriert, sobald ein möglicher Verursacher in der Ignorierliste enthalten ist. Dies führt möglicherweise dazu, dass Freezes übersehen werden.<br>
 					off: Alle Freezes werden geloggt.<br>
 					Sofern das Attribut nicht gesetzt ist, aber Ignore-Devices angegeben sind, wird im Modus "all" ignoriert.</li>
 			<li>fm_log: dynamischer Loglevel, nimmt einen String der Form 10:1 5:2 1:3 entgegen, was bedeutet: Freezes > 10 Sekunden werden mit Loglevel 1 geloggt, >5 Sekunden mit Loglevel 2 usw...</li>
