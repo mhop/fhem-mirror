@@ -5843,7 +5843,6 @@ s2Hex($)
   <li>battery<br>
     return the charge of the battery in %, as battery:value % or battery:low
     </li>
-    </li>
 
   <br><br><b>CLASS DOOR_LOCK_LOGGING, V1 (deprecated)</b>
   <li>doorLockLoggingRecordsSupported<br>

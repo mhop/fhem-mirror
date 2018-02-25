@@ -15,7 +15,7 @@ use warnings;
 my $noWarnings = grep $_ eq '-noWarnings', @ARGV;
 my ($verify) = grep $_ =~ /\.pm$/ , @ARGV;
 
-use constant TAGS => qw{ul li code b i u table tr td div};
+use constant TAGS => qw{ul li code b i u table tr td div h4 h3};
 
 sub generateModuleCommandref($$;$$);
 
@@ -176,7 +176,11 @@ generateModuleCommandref($$;$$)
         $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
           $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
-          $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi) if($tagcount{$tag} > 0);
+          $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
+          if($tagcount{$tag} < 0) {
+            print "*** $lang $fPath: negative tagcount for $tag, line $line\n";
+            $tagcount{$tag} = 0;
+          }
           $llwct{$tag} = $line if(!$tagcount{$tag});
         }
 
