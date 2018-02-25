@@ -912,14 +912,10 @@ SVG_substcfg($$$$$$)
 }
 
 sub
-SVG_tspec($$@)
+SVG_tspec(@)
 {
-  my ($n,$e) = (shift,shift);
-  for(my $i=1; $i<$n; $i++) {
-    $_[$i] = 0;
-  }
   return sprintf("%04d-%02d-%02d_%02d:%02d:%02d",
-                 $_[5]+1900,$_[4]+1,$_[3],$_[2],$_[1],$e);
+                 $_[5]+1900,$_[4]+1,$_[3],$_[2],$_[1],$_[0]);
 }
 
 ##################
@@ -978,48 +974,47 @@ SVG_calcOffsets($$)
     if($endPlotNow) {
       my $t = int(($now + $off*3600 - 3600)/300.0)*300 + 300;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} = SVG_tspec(1,0,@l);
-      @l = localtime($t+3600);
-      $SVG_devs{$d}{to}   = SVG_tspec(1,1,@l);
+      $SVG_devs{$d}{from} = SVG_tspec(@l);
+      @l = localtime($t+3599);
+      $SVG_devs{$d}{to}   = SVG_tspec(@l);
     } else { 
-      my $t = $now + $off*3600;
+      my $t = int($now/3600)*3600 + $off*3600;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} = SVG_tspec(2,0,@l);
-      @l = localtime($t+3600);
-      $SVG_devs{$d}{to}   = SVG_tspec(2,1,@l);
+      $SVG_devs{$d}{from} = SVG_tspec(@l);
+      @l = localtime($t+3600-1);
+      $SVG_devs{$d}{to}   = SVG_tspec(@l);
     }
 
   } elsif($zoom eq "qday") {
     if($endPlotNow) {
-      my $t = int(($now + $off*21600 - 21600)/300.0)*300 + 300;
+      my $t = int($now/300)*300 + ($off-1)*21600;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} = SVG_tspec(1,0,@l);
-      @l = localtime($t+21600);
-      $SVG_devs{$d}{to}   = SVG_tspec(1,1,@l);
+      $SVG_devs{$d}{from} = SVG_tspec( 0,$l[1],$l[2],$l[3],$l[4],$l[5]);
+      @l = localtime($t+21600-1);
+      $SVG_devs{$d}{to}   = SVG_tspec(59,$l[1],$l[2],$l[3],$l[4],$l[5]);
     } else { 
-      my $t = $now + $off*21600;
+      my $t = int($now/3600)*3600 + $off*21600;
       my @l = localtime($t);
       $l[2] = int($l[2]/6)*6;
-      $SVG_devs{$d}{from} = SVG_tspec(2,0,@l);
-      @l = localtime($t+21600);
-      $l[2] = int($l[2]/6)*6;
-      $SVG_devs{$d}{to}   = SVG_tspec(2,1,@l);
+      $SVG_devs{$d}{from} = SVG_tspec( 0, 0,$l[2],$l[3],$l[4],$l[5]);
+      $l[2] += 5;
+      $SVG_devs{$d}{to}   = SVG_tspec(59,59,$l[2],$l[3],$l[4],$l[5]);
     }
 
   } elsif($zoom =~ m/^(\d+)?day/) {
     my $nDays = $1 ? ($1-1) : 0;
     if($endPlotNow) {
-      my $t = int(($now + ($off-$nDays-1)*86400)/900.0)*900 + 900;
+      my $t = int($now/300)*300 + ($off-$nDays-1)*86400;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} = SVG_tspec(1,0,@l);
-      @l = localtime($t+(1+$nDays)*86400);
-      $SVG_devs{$d}{to}   = SVG_tspec(1,1,@l);
+      $SVG_devs{$d}{from} = SVG_tspec(0,$l[1],$l[2],$l[3],$l[4],$l[5]);
+      @l = localtime($t+(1+$nDays)*86400-1);
+      $SVG_devs{$d}{to}   = SVG_tspec(59,$l[1],$l[2],$l[3],$l[4],$l[5]);
     } else { 
       my $t = $now + ($off-$nDays)*86400;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
-      @l = localtime($t+(1+$nDays)*86400);
-      $SVG_devs{$d}{to}   = SVG_tspec(3,1,@l);
+      $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0,$l[3],$l[4],$l[5]);
+      @l = localtime($t+$nDays*86400);
+      $SVG_devs{$d}{to}   = SVG_tspec(59,59,23,$l[3],$l[4],$l[5]);
     }
 
   } elsif($zoom eq "week") {
@@ -1029,48 +1024,54 @@ SVG_calcOffsets($$)
     $start += 7 if($start < 0);
     my $t = $now - ($start*86400) + ($off*86400)*7;
     @l = localtime($t);
-    $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
-    @l = localtime($t+7*86400);
-    $SVG_devs{$d}{to}   = SVG_tspec(3,1,@l);
+    $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0,$l[3],$l[4],$l[5]);
+    @l = localtime($t+6*86400);
+    $SVG_devs{$d}{to}   = SVG_tspec(59,59,23,$l[3],$l[4],$l[5]);
 
  } elsif($zoom eq "month") {
-    my ($endDay, @l);
-    if(SVG_Attr($FW_wname, $wl, "endPlotToday", undef)) {
-      @l = localtime($now+86400);
-      $endDay = $l[3];
-      $off--;
-    } else {
-      @l = localtime($now);
-      $endDay = 1;
-    }
+    my ($sd,$ed,$sm,$em,$sy,$ey);
+    my @l = localtime($now);
     while($off < -12) { # Correct the year
       $off += 12; $l[5]--;
     }
     $l[4] += $off;
     $l[4] += 12, $l[5]-- if($l[4] < 0);
-    $l[3] = $endDay;
-    $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
-    $l[4]++;
-    $l[4] = 0, $l[5]++ if($l[4] == 12);
-    $SVG_devs{$d}{to}   = SVG_tspec(3,1,@l);
+    my @me = (31,28,31,30,31,30,31,31,30,31,30,31);
+
+    if(SVG_Attr($FW_wname, $wl, "endPlotToday", undef)) {
+      $sy = $ey = $l[5];
+      $sm = $l[4]-1; $em = $l[4];
+      $sm += 12, $sy-- if($sm < 0);
+      $sd = $l[3]+1; $ed = $l[3];
+      $sd = $me[$sm] if($sd > $me[$sm]);
+
+    } else {
+      $sy = $ey = $l[5];
+      $sm = $em = $l[4];
+      $sd = 1; $ed = $me[$l[4]];
+      $ed++ if($l[4]==1 && !(($sy+1900)%4)); # leap year
+    }
+    $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0,$sd,$sm,$sy);
+    $SVG_devs{$d}{to}   = SVG_tspec(59,59,23,$ed,$em,$ey);
 
   } elsif($zoom eq "year") {
     my @l = localtime($now);
     $l[5] += ($off-1);
     if(SVG_Attr($FW_wname, $wl, "endPlotToday", undef)) {
-      $SVG_devs{$d}{from} = SVG_tspec(3, 0, @l);
-      $l[5]++; $l[2]=23; $l[1]=59; # today, 23:59
-      $SVG_devs{$d}{to}   = SVG_tspec(0, 59, @l);
+      $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0,$l[3],$l[4],$l[5]);
+      $l[5]++; # today, 23:59
+      $SVG_devs{$d}{to}   = SVG_tspec(59,59,23,$l[3],$l[4],$l[5]);
 
     } elsif(SVG_Attr($FW_wname, $wl, "endPlotNow", undef)) {
       $SVG_devs{$d}{from} = SVG_tspec(0, $l[0], @l);
+      $SVG_devs{$d}{from} = SVG_tspec(@l);
       $l[5]++; # now
-      $SVG_devs{$d}{to}   = SVG_tspec(0, $l[0], @l);
+      $SVG_devs{$d}{to}   = SVG_tspec(@l);
 
     } else {
       $l[5]++;
-      $SVG_devs{$d}{from} = SVG_tspec(0, 0, 0, 0, 0, 1, 0,$l[5]);#Jan01 00:00:00
-      $SVG_devs{$d}{to}   = SVG_tspec(0,59,59,59,23,31,11,$l[5]);#Dec31 23:59:59
+      $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0, 1, 0,$l[5]); #Jan01 00:00:00
+      $SVG_devs{$d}{to}   = SVG_tspec(59,59,23,31,11,$l[5]); #Dec31 23:59:59
     }
   }
 }
