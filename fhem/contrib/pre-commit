@@ -12,7 +12,7 @@ my $arg="-t $txn";
 #my $arg="-r $txn";      # local testing
 my @lang = ("EN", "DE");
 my $exitCode = 0;
-use constant TAGS => qw{ul li code b i u td tr table div};
+use constant TAGS => qw{ul li code b i u table tr td div h4 h3};
 
 my $log = `$svnlook log $arg $repos`;
 if($log !~ m/^.*:.*$/s) {
@@ -124,7 +124,11 @@ foreach my $row (split("\n", $fList)) {
         foreach $tag (TAGS) {
           my $ot = ($tagcount{$tag} ? $tagcount{$tag} : 0);
           $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
-          $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi) if($tagcount{$tag} > 0);
+          $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
+          if($tagcount{$tag} < 0) {
+            print "*** $lang $fPath: negative tagcount for $tag, line $line\n";
+            $tagcount{$tag} = 0;
+          }
           $llwct{$tag} = $line if(!$llwct{$tag} || ($ot && !$tagcount{$tag}));
         }
       }
