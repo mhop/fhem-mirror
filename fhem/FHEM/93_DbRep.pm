@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.13.3       25.02.2018       commandref revised (forum:#84953)
 # 7.13.2       24.02.2018       DbRep_firstconnect changed, bug fix in DbRep_collaggstr for aggregation = month
 # 7.13.1       20.02.2018       commandref revised
 # 7.13.0       17.02.2018       changeValue can handle perl code {} as "new string"
@@ -319,7 +320,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.13.2";
+my $DbRepVersion = "7.13.3";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -9445,7 +9446,6 @@ return;
                                  # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>                         
                                  </li> <br>
                                  </ul>
-                                 </li> <br>
 		
 	<li><b> tableCurrentFillup </b> - the current-table will be filled u with an extract of the history-table.  
 	                                  The <a href="#DbRepattr">attributes</a> for limiting time and device, reading are considered.
@@ -10835,7 +10835,6 @@ sub bdump {
                                  # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
                                  </li> <br>
                                  </ul>                                
-                                 </li> <br>
                                  
     <li><b> minValue [display | writeToDB]</b>     
                                  - berechnet den Minimalwert des Datenbankfelds "VALUE" in den Zeitgrenzen 
@@ -10862,7 +10861,6 @@ sub bdump {
                                  # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
                                  </li> <br>
                                  </ul>                                 
-                                 </li> <br>
 								 
 	<li><b> optimizeTables </b> - optimiert die Tabellen in der angeschlossenen Datenbank (MySQL). <br>
 								  Vor und nach der Optimierung kann ein FHEM-Kommando ausgeführt werden. 
@@ -11030,7 +11028,6 @@ sub bdump {
                                    # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
                                    </li> <br>
                                    </ul>
-                                   </li> <br>
 								 
 	<li><b> tableCurrentFillup </b> - Die current-Tabelle wird mit einem Extrakt der history-Tabelle aufgefüllt. 
 	                                  Die <a href="#DbRepattr">Attribute</a> zur Zeiteinschränkung bzw. device, reading werden ausgewertet.
