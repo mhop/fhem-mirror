@@ -1,7 +1,7 @@
 "use strict";
 FW_version["f18.js"] = "$Id$";
 
-// TODO: hierMenu,absPos,floorplan,f18style.css,menuBorder,SVGcolors,PWA:push
+// TODO: absPos,hierMenu+Pin,menuBorder,f18style.css,SVGcolors,floorplan
 var f18_attr, f18_aCol, f18_sd, f18_isMobile, f18_icon={}, f18_hasPos, f18_room;
 var f18_small = (screen.width < 480 || screen.height < 480);
 
