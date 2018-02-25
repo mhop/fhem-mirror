@@ -139,7 +139,7 @@ sub ElectricityCalculator_Attr(@)
 	my $name                   = $a[1];
 	my $hash                   = $defs{$name};
 	
-	### Check whether "disbale" attribute has been provided
+	### Check whether "disable" attribute has been provided
 	if ($a[2] eq "disable")
 	{
 		if    ($a[3] eq 0)
