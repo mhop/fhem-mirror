@@ -234,6 +234,8 @@ my %fbhttp_readings = (
 #  tist => 'sprintf("temperature:%.1f C (measured)", $val/2)', # Forum #57644
    tsoll           => 'sprintf("desired-temp:%s", $val)',
    members         => '"members:$val"',
+   devicelock      => '"devicelock:".($val ? "yes":"no")',
+   errorcode       => '"errorcode:".($ecTxt{$val} ? $ecTxt{$val} : ">$val<")',
 );
 
 sub
@@ -255,6 +257,14 @@ FBDECT_ParseHttp($$$)
             8=>"tempSensor",
             9=>"switch",
            10=>"repeater");
+  my %ecTxt = (0 => "noError (0)",
+               1 => "notMounted (1)",
+               2 => "valveShortOrBatteryEmpty (2)",
+               3 => "valveStuck (3)",
+               4 => "installationPreparation (4)",
+               5 => "installationInProgress (5)",
+               6 => "installationIsAdapting (6)");
+
   my $lsn = int($h{functionbitmask});
   my @fb;
   map { push @fb, $ll{$_} if((1<<$_) & $lsn) } sort keys %ll;
