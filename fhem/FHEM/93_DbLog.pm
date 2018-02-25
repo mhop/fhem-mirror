@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.8.6      25.02.2018       commandref revised (forum:#84953)
 # 3.8.5      16.02.2018       changed ParseEvent for Zwave
 # 3.8.4      07.02.2018       minor fixes of "$@", code review, eval for userCommand, DbLog_ExecSQL1 (forum:#83973)
 # 3.8.3      03.02.2018       call execmemcache only syncInterval/2 if cacheLimit reached and DB is not reachable, fix handling of
@@ -187,7 +188,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.8.5";
+my $DbLogVersion = "3.8.6";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -5095,14 +5096,14 @@ sub dbReadings($@) {
   <code>current</code> and <code>history</code>.
   <br><br>
   
-  The columns have the following meaning:: <br><br>
+  The columns have the following meaning: <br><br>
   
 	<ul>
     <table>  
     <colgroup> <col width=5%> <col width=95%> </colgroup>
       <tr><td> TIMESTAMP </td><td>: timestamp of event, e.g. <code>2007-12-30 21:45:22</code> </td></tr>
       <tr><td> DEVICE    </td><td>: device name, e.g. <code>Wetterstation</code> </td></tr>
-      <tr><td> TYPE      </td><td>: device type, e.g. <code>KS300</code> </code> </td></tr>
+      <tr><td> TYPE      </td><td>: device type, e.g. <code>KS300</code> </td></tr>
       <tr><td> EVENT     </td><td>: event specification as full string, e.g. <code>humidity: 71 (%)</code> </td></tr>
 	  <tr><td> READING   </td><td>: name of reading extracted from event, e.g. <code>humidity</code> </td></tr>
 	  <tr><td> VALUE     </td><td>: actual reading extracted from event, e.g. <code>71</code> </td></tr>
@@ -6051,7 +6052,7 @@ sub dbReadings($@) {
     <colgroup> <col width=5%> <col width=95%> </colgroup>
       <tr><td> TIMESTAMP </td><td>: Zeitpunkt des Events, z.B. <code>2007-12-30 21:45:22</code> </td></tr>
       <tr><td> DEVICE    </td><td>: Name des Devices, z.B. <code>Wetterstation</code> </td></tr>
-      <tr><td> TYPE      </td><td>: Type des Devices, z.B. <code>KS300</code> </code> </td></tr>
+      <tr><td> TYPE      </td><td>: Type des Devices, z.B. <code>KS300</code> </td></tr>
       <tr><td> EVENT     </td><td>: das auftretende Event als volle Zeichenkette, z.B. <code>humidity: 71 (%)</code> </td></tr>
 	  <tr><td> READING   </td><td>: Name des Readings, ermittelt aus dem Event, z.B. <code>humidity</code> </td></tr>
 	  <tr><td> VALUE     </td><td>: aktueller Wert des Readings, ermittelt aus dem Event, z.B. <code>humidity</code> </td></tr>
