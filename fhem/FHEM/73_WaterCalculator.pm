@@ -139,7 +139,7 @@ sub WaterCalculator_Attr(@)
 	my $name                   = $a[1];
 	my $hash                   = $defs{$name};
 	
-	### Check whether "disbale" attribute has been provided
+	### Check whether "disable" attribute has been provided
 	if ($a[2] eq "disable")
 	{
 		if    ($a[3] eq 0)
@@ -148,7 +148,7 @@ sub WaterCalculator_Attr(@)
 		}
 		elsif ($a[3] eq 1)		
 		{	
-			$hash->{STATE} = "diabled";
+			$hash->{STATE} = "disabled";
 		}
 	}
 	
