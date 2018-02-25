@@ -613,7 +613,7 @@ CUL_TCM97001_Parse($$)
             $hasmode = TRUE;
             $hasbatcheck = TRUE;
             $haschannel = TRUE;
-            $id3 = $idType2
+            $id3 = $idType2;
         } else {
             $name = "Unknown";
         }
@@ -1683,7 +1683,9 @@ CUL_TCM97001_Parse($$)
       $state="$state H: $valH";
       Log3 $name, 4, "$iodev: CUL_TCM97001 $msgtype $name $id3 T: $val H: $valH"; 
     } else {
-      $msgtype = "other";
+      if ($model eq "W174") {
+        $msgtype = "other";
+      }
       Log3 $name, 4, "$iodev: CUL_TCM97001 $msgtype $name $id3";
       #Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3 ";
     }
