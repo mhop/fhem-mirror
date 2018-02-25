@@ -1069,10 +1069,12 @@ LUXTRONIK2_UpdateDone($)
       }
          
       # 76 userHeatpumpParameters
-      my @userReadings = split /,/, $a[76];
-      foreach (@userReadings) {
-        my( $rName, $rValue) = split / /, $_;
-        readingsBulkUpdate($hash, $rName, $rValue);
+      if (defined $a[76]) {
+        my @userReadings = split /,/, $a[76];
+        foreach (@userReadings) {
+          my( $rName, $rValue) = split / /, $_;
+          readingsBulkUpdate($hash, $rName, $rValue);
+        }
       }
           
      readingsEndUpdate($hash,1);
