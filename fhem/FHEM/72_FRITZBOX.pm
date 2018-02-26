@@ -870,7 +870,8 @@ sub FRITZBOX_API_Check_Run($)
       my $content  = $response->content;
       # FRITZBOX_Log $hash, 5, "jason_boxinfo returned: $content";
 
-      FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1)    if $content =~ /<j:Name>(.*)<\/j:Name>/;
+      FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1)   if ( $content =~ /<j:Name>(.*)<\/j:Name>/ );    
+      
       FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)    if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
       FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1)    if $content =~ /<j:Version>(.*)<\/j:Version>/;
     
@@ -1833,6 +1834,7 @@ sub FRITZBOX_Readout_Process($$)
             $rValue .= " (old)" if $values{box_fwUpdate} eq "1";
          }
          elsif ($rName eq "box_model") {
+            $hash->{MODEL} = $rValue;
             $rValue .= " [".$values{box_oem}."]" if $values{box_oem};
          }
          if ($rName !~ /->|box_fwUpdate|box_oem|readoutTime/) {
@@ -4816,7 +4818,6 @@ sub FRITZBOX_fritztris($)
 
 <a name="FRITZBOX"></a>
 <h3>FRITZBOX</h3>
-(en | <a href="http://fhem.de/commandref_DE.html#FRITZBOX">de</a>)
 <div> 
 <ul>
    Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as
@@ -5186,7 +5187,6 @@ sub FRITZBOX_fritztris($)
 
 <a name="FRITZBOX"></a>
 <h3>FRITZBOX</h3>
-(<a href="http://fhem.de/commandref.html#FRITZBOX">en</a> | de)
 <div> 
 <ul>
    Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. MP3-Dateien und Text (Text2Speech) k&ouml;nnen als Klingelton oder einem angerufenen Telefon abgespielt werden.
