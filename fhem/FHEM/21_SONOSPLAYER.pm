@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, January 2018
+# SONOSPLAYER.pm (c) by Reiner Leins, February 2018
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -82,6 +82,7 @@ my %gets = (
 	'QueueWithCovers' => '',
 	'Alarm' => 'ID',
 	'EthernetPortStatus' => 'PortNum(0..3)',
+	'WifiPortStatus' => '',
 	'SupportLinks' => '',
 	'PossibleRoomIcons' => '',
 	'SearchlistCategories' => ''
@@ -508,13 +509,24 @@ sub SONOSPLAYER_Get($@) {
 	} elsif (lc($reading) eq 'ethernetportstatus') {
 		my $portNum = $a[2];
 		
-		SONOS_readingsSingleUpdate($hash, 'LastActionResult', 'Portstatus properly returned', 1);
+		SONOS_readingsSingleUpdate($hash, 'LastActionResult', 'Ethernet-Portstatus properly returned', 1);
 	
 		my $url = ReadingsVal($name, 'location', '');
 		$url =~ s/(^http:\/\/.*?)\/.*/$1\/status\/enetports/;
 		
 		my $statusPage = GetFileFromURL($url);
 		return (($1 == 0) ? 'Inactive' : 'Active') if ($statusPage =~ m/<Port port='$portNum'><Link>(\d+)<\/Link><Speed>.*?<\/Speed><\/Port>/i);
+		return 'Inactive';
+	} elsif (lc($reading) eq 'wifiportstatus') {
+		my $portNum = $a[2];
+		
+		SONOS_readingsSingleUpdate($hash, 'LastActionResult', 'Wifi-Portstatus properly returned', 1);
+	
+		my $url = ReadingsVal($name, 'location', '');
+		$url =~ s/(^http:\/\/.*?)\/.*/$1\/status\/ifconfig/;
+		
+		my $statusPage = GetFileFromURL($url);
+		return 'Active' if ($statusPage =~ m/(ath0 +?Link encap:Ethernet)/i);
 		return 'Inactive';
 	} elsif (lc($reading) eq 'supportlinks') {
 		my $playerurl = ReadingsVal($name, 'location', '');
@@ -1556,6 +1568,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_getter_SupportLinks">
 <b><code>SupportLinks</code></b></a>
 <br /> Shows a list with direct links to the player-support-sites.</li>
+<li><a name="SONOSPLAYER_getter_WifiPortStatus">
+<b><code>WifiPortStatus</code></b></a>
+<br /> Gets the Wifi-Portstatus. Can be 'Active' or 'Inactive'.</li>
 </ul></li>
 <li><b>Lists</b><ul>
 <li><a name="SONOSPLAYER_getter_Favourites">
@@ -1937,6 +1952,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_getter_SupportLinks">
 <b><code>SupportLinks</code></b></a>
 <br /> Ausnahmefall. Diese Get-Anweisung liefert eine Liste mit passenden Links zu den Supportseiten des Player.</li>
+<li><a name="SONOSPLAYER_getter_WifiPortStatus">
+<b><code>WifiPortStatus</code></b></a>
+<br /> Liefert den Wifi-Portstatus. Kann 'Active' oder 'Inactive' liefern.</li>
 </ul></li>
 <li><b>Listen</b><ul>
 <li><a name="SONOSPLAYER_getter_Favourites">

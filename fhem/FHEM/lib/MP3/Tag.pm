@@ -2607,7 +2607,7 @@ sub parse_prepare {
     my ($self, $pattern) = @_;
     $pattern = "^\Q$pattern\E\$";
     # unquote %. and %=. and %={WHATEVER} and %{WHATEVER}
-    $pattern =~ s<(\\%(?:\\=)?(\w|\\{(?:\w|\\[^\w\\{}]|\\\\\\[\\{}])*\\}|\\\W))>
+    $pattern =~ s<(\\%(?:\\=)?(\w|\\\{(?:\w|\\[^\w\\\{}]|\\\\\\[\\\{}])*\\}|\\\W))>
 		 ( __unquote($1) )ge;
     # $pattern =~ s/(\\%(?:\\=)?)(\w|\\(\W))/$unquote{$1}$+/g;
     return $self->parse_rex_prepare($pattern);
