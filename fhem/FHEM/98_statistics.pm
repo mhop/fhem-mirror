@@ -1040,7 +1040,7 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
          }
          else {
             my $newValue = 0;
-            $newValue = "00:00:00"     if $statKey !~ /_Count:$/;
+            $newValue = "00:00:00"     if $statKey !~ /_Count$/;
             $newValue = $hidden{$statKey}       if defined $hidden{$statKey};
             # statistics_storeSingularReadings  
             # $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
