@@ -5,7 +5,7 @@
 #
 # $Id$
 #
-# Changed, adopted and new copyrighted by Reiner Leins (Reinerlein), (c) in April 2017
+# Changed, adopted and new copyrighted by Reiner Leins (Reinerlein), (c) in February 2018
 # Original Copyright by Andreas Kwasnik (gemx)
 #
 # Fhem is free software: you can redistribute it and/or modify
@@ -23,6 +23,11 @@
 #
 ########################################################################################
 # Changelog
+# 26.02.2018
+#	Es gab einen Fehler bei der prozentualen Positionsberechnung. Nun wird ein Dezimalbruch zwischen 0.0 und 100.0 ausgegeben, den man mit dem Attribut "PositionPercentFormat" z.B. auch auf mehrere Nachkommastellen formatieren kann.
+#	Heartbeat und 3facher Verbindungsversuch wurden wieder abgeschafft, da es keinen Vorteil gebracht hat.
+#	Der Verbindungsaufbau über die Fhem-Schnittstelle DevIO wird nun sauber durchgeführt und gehalten, sodass das Wiederverbinden sauber klappt
+#	Einige neue Readings, um bei den verschiedenen Quellen auch die echten Quell-Infos zu erhalten (und nicht nur einen zusammengesetzten Titel)
 # 18.04.2017
 #	Es gibt ein neues Reading "PositionPercent", welches die aktuelle Postion als Prozentangabe enthält
 #	Bei einem Disconnect wird nun 3x versucht eine neue Verbindung aufzubauen
@@ -89,7 +94,7 @@ sub MEDIAPORTAL_Initialize($) {
 	$hash->{DefFn} = 'MEDIAPORTAL_Define';
 	$hash->{UndefFn} = 'MEDIAPORTAL_Undef';
 	$hash->{AttrFn} = 'MEDIAPORTAL_Attribute';
-	$hash->{AttrList} = 'authmethod:none,userpassword,passcode,both username password HeartbeatInterval generateNowPlayingUpdateEvents:1,0 macaddress '.$readingFnAttributes;
+	$hash->{AttrList} = 'authmethod:none,userpassword,passcode,both username password HeartbeatInterval generateNowPlayingUpdateEvents:1,0 PositionPercentFormat macaddress '.$readingFnAttributes;
 	
 	$hash->{STATE} = 'Initialized';
 }
@@ -179,7 +184,7 @@ sub MEDIAPORTAL_Attribute($@) {
 		# Wenn die Verbindung gestartet werden muss...
 		if (!$attrValue) {
 			MEDIAPORTAL_Log $devName, 5, 'Call AttributeFn: Start Connection...';
-			DevIo_OpenDev($hash, 0, 'MEDIAPORTAL_DoInit');
+			DevIo_OpenDev($hash, 1, 'MEDIAPORTAL_DoInit');
 		}
 	}
 	
@@ -208,8 +213,8 @@ sub MEDIAPORTAL_DoInit($) {
 		}
 	}
 	
-	RemoveInternalTimer($hash);
-	InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval), 'MEDIAPORTAL_GetIntervalStatus', $hash, 0) if AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval);
+	#RemoveInternalTimer($hash);
+	#InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval), 'MEDIAPORTAL_GetIntervalStatus', $hash, 0) if AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval);
 	
 	return undef;
 }
@@ -221,6 +226,8 @@ sub MEDIAPORTAL_DoInit($) {
 ########################################################################################
 sub MEDIAPORTAL_Ready($) {
 	my ($hash) = @_;
+	
+	MEDIAPORTAL_Log $hash->{NAME}, 4, "Ready-Call";
 	
 	return DevIo_OpenDev($hash, 1, 'MEDIAPORTAL_DoInit');
 }
@@ -355,8 +362,8 @@ sub MEDIAPORTAL_Set($@) {
 			MEDIAPORTAL_Wakeup($macaddress);
 			
 			$hash->{GraceRetries} = 0;
-			MEDIAPORTAL_Set($hash, ($hash->{NAME}, 'reconnect'));
-			InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval), 'MEDIAPORTAL_GetIntervalStatus', $hash, 0);
+			#MEDIAPORTAL_Set($hash, ($hash->{NAME}, 'reconnect'));
+			#InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval), 'MEDIAPORTAL_GetIntervalStatus', $hash, 0);
 			
 			return 'WakeUp-Signal sent!';
 		} else {
@@ -419,13 +426,13 @@ sub MEDIAPORTAL_Set($@) {
 	} elsif ($cname eq "reconnect") {
 		DevIo_CloseDev($hash);
 		select(undef, undef, undef, 0.2);
-		DevIo_OpenDev($hash, 0, 'MEDIAPORTAL_DoInit');
+		DevIo_OpenDev($hash, 1, 'MEDIAPORTAL_DoInit');
 		
 		return undef;
 	} elsif ($cname eq "window") {
 		my $param = $a[2];
 		if (!looks_like_number($param)) {
-			my %plugins = %{eval(ReadingsVal($hash->{NAME}, 'Plugins', '{}'))};
+			my %plugins = %{eval(ReadingsVal($hash->{NAME}, 'Plugins', '()'))};
 			$param =~ s/\%20/ /g;
 			$param = $plugins{$param};
 		}
@@ -433,7 +440,7 @@ sub MEDIAPORTAL_Set($@) {
 	} else {
 		my %plugins = ();
 		eval {
-			%plugins = %{eval(ReadingsVal($hash->{NAME}, 'Plugins', '{}'))};
+			%plugins = %{eval(ReadingsVal($hash->{NAME}, 'Plugins', '()'))};
 		};
 		return "Unknown command '$cname', choose one of wakeup:noArg sleep:noArg connect:noArg reconnect:noArg command:".join(',', split(/ /, $mpcommands))." key Volume:slider,0,1,100 powermode:".join(',', split(/ /, $powermodes))." playfile playchannel playradiochannel playlist window".((scalar(keys(%plugins)) != 0) ? ':'.join(',', map { s/ /%20/g; $_; } sort(keys(%plugins))) : '');
 	}
@@ -559,7 +566,7 @@ sub MEDIAPORTAL_ProcessMessage($$) {
 			readingsBulkUpdate($hash, 'Duration', MEDIAPORTAL_ConvertSecondsToTime($json->{Duration}));
 			readingsBulkUpdate($hash, 'Position', MEDIAPORTAL_ConvertSecondsToTime($json->{Position}));
 			if ($json->{Duration}) {
-				readingsBulkUpdate($hash, 'PositionPercent', $json->{Position} / $json->{Duration});
+				readingsBulkUpdate($hash, 'PositionPercent', sprintf(AttrVal($hash->{NAME}, 'PositionPercentFormat', '%.1f'), 100 * $json->{Position} / $json->{Duration}));
 			} else {
 				readingsBulkUpdate($hash, 'PositionPercent', 0);
 			}
@@ -570,24 +577,53 @@ sub MEDIAPORTAL_ProcessMessage($$) {
 			readingsBulkUpdate($hash, 'nextTitle', '');
 			readingsBulkUpdate($hash, 'nextDescription', '');
 			
+			# Special MediaInformations...
+			if ($json->{IsTv}) {
+				readingsBulkUpdate($hash, 'mediaType', 'tv');
+			} else {
+				readingsBulkUpdate($hash, 'mediaType', '');
+			}
+			readingsBulkUpdate($hash, 'tvChannel', '');
+			readingsBulkUpdate($hash, 'tvCurrentProgramName', '');
+			readingsBulkUpdate($hash, 'tvNextProgramName', '');
+			readingsBulkUpdate($hash, 'movieTitle', '');
+			readingsBulkUpdate($hash, 'seriesName', '');
+			readingsBulkUpdate($hash, 'seriesSeason', '');
+			readingsBulkUpdate($hash, 'seriesEpisode', '');
+			readingsBulkUpdate($hash, 'seriesTitle', '');
+			readingsBulkUpdate($hash, 'recordingChannel', '');
+			readingsBulkUpdate($hash, 'recordingProgramName', '');
+			
 			if (defined($json->{MediaInfo})) {
+				readingsBulkUpdate($hash, 'mediaType', $json->{MediaInfo}{MediaType}) if ($json->{MediaInfo}{MediaType});
+				
 				if ($json->{MediaInfo}{MediaType} eq 'tv') {
 					readingsBulkUpdate($hash, 'Title', $json->{MediaInfo}{ChannelName}.' - '.$json->{MediaInfo}{CurrentProgramName});
 					readingsBulkUpdate($hash, 'Description', $json->{MediaInfo}{CurrentProgramDescription});
+					readingsBulkUpdate($hash, 'tvChannel', $json->{MediaInfo}{ChannelName});
+					readingsBulkUpdate($hash, 'tvCurrentProgramName', $json->{MediaInfo}{CurrentProgramName});
 					
 					if (defined($json->{MediaInfo}{NextProgramName})) {
 						readingsBulkUpdate($hash, 'nextTitle', $json->{MediaInfo}{ChannelName}.' - '.$json->{MediaInfo}{NextProgramName});
 						readingsBulkUpdate($hash, 'nextDescription', $json->{MediaInfo}{NextProgramDescription});
+						readingsBulkUpdate($hash, 'tvNextProgramName', $json->{MediaInfo}{NextProgramName});
 					}
 				} elsif ($json->{MediaInfo}{MediaType} eq 'movie') {
 					readingsBulkUpdate($hash, 'Title', $json->{MediaInfo}{Title});
 					readingsBulkUpdate($hash, 'Description', $json->{MediaInfo}{Summary});
+					readingsBulkUpdate($hash, 'movieTitle', $json->{MediaInfo}{Title});
 				} elsif ($json->{MediaInfo}{MediaType} eq 'series') {
-					readingsBulkUpdate($hash, 'Title', $json->{MediaInfo}{Series}.' '.$json->{MediaInfo}{Season}.'x'.$json->{MediaInfo}{Episode}.' - '.$json->{MediaInfo}{Title});
+					readingsBulkUpdate($hash, 'Title', $json->{MediaInfo}{Series}.' S'.sprintf("%02d", $json->{MediaInfo}{Season}).'E'.sprintf("%02d", $json->{MediaInfo}{Episode}).' - '.$json->{MediaInfo}{Title});
 					readingsBulkUpdate($hash, 'Description', $json->{MediaInfo}{Plot});
+					readingsBulkUpdate($hash, 'seriesName', $json->{MediaInfo}{Series});
+					readingsBulkUpdate($hash, 'seriesSeason', $json->{MediaInfo}{Season});
+					readingsBulkUpdate($hash, 'seriesEpisode', $json->{MediaInfo}{Episode});
+					readingsBulkUpdate($hash, 'seriesTitle', $json->{MediaInfo}{Title});
 				} elsif ($json->{MediaInfo}{MediaType} eq 'recording') {
 					readingsBulkUpdate($hash, 'Title', $json->{MediaInfo}{ChannelName}.' - '.$json->{MediaInfo}{ProgramName});
 					readingsBulkUpdate($hash, 'Description', $json->{MediaInfo}{ProgramDescription});
+					readingsBulkUpdate($hash, 'recordingChannel', $json->{MediaInfo}{ChannelName});
+					readingsBulkUpdate($hash, 'recordingProgramName', $json->{MediaInfo}{ProgramName});
 				} else {
 					MEDIAPORTAL_Log $hash->{NAME}, 0, 'Unbekannte MediaInfo für "'.$json->{MediaInfo}{MediaType}.'" geliefert, aber nicht verarbeitet. Bitte diese komplette Information ins Forum einstellen: '.Dumper($json->{MediaInfo});
 				}
@@ -611,6 +647,11 @@ sub MEDIAPORTAL_ProcessMessage($$) {
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash, 'Duration', MEDIAPORTAL_ConvertSecondsToTime($json->{Duration}));
 			readingsBulkUpdate($hash, 'Position', MEDIAPORTAL_ConvertSecondsToTime($json->{Position}));
+			if ($json->{Duration}) {
+				readingsBulkUpdate($hash, 'PositionPercent', sprintf(AttrVal($hash->{NAME}, 'PositionPercentFormat', '%.1f'), 100 * $json->{Position} / $json->{Duration}));
+			} else {
+				readingsBulkUpdate($hash, 'PositionPercent', 0);
+			}
 			readingsEndUpdate($hash, AttrVal($hash->{NAME}, 'generateNowPlayingUpdateEvents', 0));
 		} elsif ($json->{Type} eq "properties") {
 			MEDIAPORTAL_Log $hash->{NAME}, 4, 'PROPERTIES received.';
@@ -755,6 +796,18 @@ sub MEDIAPORTAL_DoWakeup($;$$) {
 
 ########################################################################################
 #
+#  MEDIAPORTAL_GetTimeSeconds
+#
+########################################################################################
+sub MEDIAPORTAL_GetTimeSeconds($) {
+	my ($timeStr) = @_;
+	
+	return MEDIAPORTAL_Max(int($1)*3600 + int($2)*60 + int($3), 1) if ($timeStr =~ m/(\d+):(\d+):(\d+)/);
+	return 0;
+}
+
+########################################################################################
+#
 #  MEDIAPORTAL_ConvertSecondsToTime
 #
 ########################################################################################
@@ -763,6 +816,15 @@ sub MEDIAPORTAL_ConvertSecondsToTime($) {
 	
 	return sprintf('%01d:%02d:%02d', $seconds / 3600, ($seconds%3600) / 60, $seconds%60) if ($seconds > 0);
 	return '0:00:00';
+}
+
+########################################################################################
+#
+#  MEDIAPORTAL_Max
+#
+########################################################################################
+sub MEDIAPORTAL_Max($$) {
+	$_[$_[0] < $_[1]]
 }
 
 ########################################################################################
