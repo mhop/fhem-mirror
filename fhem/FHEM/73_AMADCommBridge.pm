@@ -2,11 +2,12 @@
 # 
 # Developed with Kate
 #
-#  (c) 2015-2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2015-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
 #       - Jens Wohlgemuth       Thanks for Commandref
+#       - Schlimbo              Tasker integration and Tasker Commandref
 #
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -74,8 +75,9 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.8";
-my $flowsetversion = "4.0.13";
+
+my $modulversion = "4.2.0";
+my $flowsetversion = "4.2.0";
 
 
 
@@ -153,7 +155,7 @@ sub AMADCommBridge_Define($$) {
     $hash->{VERSIONFLOWSET} = $flowsetversion;
 
 
-    $attr{$name}{room} = "AMAD" if( !defined( $attr{$name}{room} ) );
+    CommandAttr(undef,"$name room AMAD") if(AttrVal($name,'room','none') eq 'none');
     
     Log3 $name, 3, "AMADCommBridge ($name) - defined AMADCommBridge with Socketport $port";
 
@@ -246,24 +248,51 @@ sub AMADCommBridge_Set($@) {
 
 sub AMADCommBridge_Write($@) {
 
-    my ($hash,$amad_id,$uri,$header,$method)    = @_;
+    my ($hash,$amad_id,$uri,$path,$header,$method)    = @_;
     my $name                                    = $hash->{NAME};
+    my $dhash                                   = $modules{AMADDevice}{defptr}{$amad_id};
+    my $param;
+    my $remoteServer                            = AttrVal($dhash->{NAME},'remoteServer','Automagic');
 
 
-    HttpUtils_NonblockingGet(
-        {
-            url         => "http://" . $uri,
-            timeout     => 15,
-            hash        => $hash,
-            amad_id     => $amad_id,
-            method      => $method,
-            header      => $header,
-            doTrigger   => 1,
-            callback    => \&AMADCommBridge_ErrorHandling,
-        }
-    );
+    Log3 $name, 4, "AMADCommBridge ($name) - AMADCommBridge_Write Path: $path";
     
-    Log3 $name, 5, "AMADCommBridge ($name) - Send with URI: $uri, HEADER: $header, METHOD: $method";
+    
+    if($remoteServer ne 'Automagic' and $path =~ /\?/) {
+        $path .= "&amad_id=$amad_id";
+    } elsif($remoteServer ne 'Automagic') {
+        $path .= "?amad_id=$amad_id";
+    }
+
+    return readingsSingleUpdate($dhash,'lastSetCommand',$path,1)
+    if( $remoteServer eq 'other' );
+
+    $param = { url => "http://" . $uri . $path, timeout => 15, hash => $hash, amad_id => $amad_id, method => $method, header => $header . "\r\namadid: $amad_id", doTrigger => 1, callback => \&AMADCommBridge_ErrorHandling } if($remoteServer eq 'Automagic');
+
+
+    $param =    {   url => "http://" . $uri . "/",
+                    data => "{\"message\":\"AMAD=:=$path\", \"sender\":\"AMAD\", \"ttl\":60, \"communication_base_params\":{\"type\":\"Message\", \"fallback\":false, \"via\":\"Wifi\"},\"version\":\"1.62\"}",
+                    timeout => 15, hash => $hash, amad_id => $amad_id, method => $method,
+                    header => "agent: TeleHeater/2.2.3\r\nUser-Agent: TeleHeater/2.2.3\r\nAccept: application/json",
+                    doTrigger => 1, callback => \&AMADCommBridge_ErrorHandling 
+                } if($remoteServer eq 'Autoremote');
+
+
+    $param =    {   url => "http://" . $uri . "/",
+                    data => "device=AMAD&cmd=".urlEncode($path),
+                    timeout => 15, hash => $hash, amad_id => $amad_id, method => $method,
+                    header => "agent: TeleHeater/2.2.3\r\nUser-Agent: TeleHeater/2.2.3\r\nAccept: application/json",
+                    doTrigger => 1, callback => \&AMADCommBridge_ErrorHandling 
+                } if($remoteServer eq 'TNES');
+
+
+
+    my $logtext = "AMADCommBridge ($name) - Send with remoteServer: $remoteServer URL: $param->{url}, HEADER: $param->{header}, METHOD: $method";
+        $logtext .= ", DATA: $param->{data}" if( $remoteServer ne 'Automagic' );
+    Log3 $name, 5, "$logtext";
+    
+
+    HttpUtils_NonblockingGet($param) if( defined($param) );
 }
 
 sub AMADCommBridge_ErrorHandling($$$) {
@@ -637,9 +666,10 @@ sub AMADCommBridge_ProcessRead($$) {
     my $response;
     my $c;
     
+    my $fhempath = $attr{global}{modpath};
+    
     if ( $data =~ /currentFlowsetUpdate.xml/ ) {
 
-        my $fhempath = $attr{global}{modpath};
         $response = qx(cat $fhempath/FHEM/lib/74_AMADautomagicFlowset_$flowsetversion.xml);
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
@@ -649,9 +679,20 @@ sub AMADCommBridge_ProcessRead($$) {
             $response;
 
         return;
-    }
+        
+    } elsif( $data =~ /currentTaskersetUpdate.prj.xml/ ) {
     
-    elsif ( $data =~ /installFlow_([^.]*.xml)/ ) {
+        $response = qx(cat $fhempath/FHEM/lib/74_AMADtaskerset_$flowsetversion.prj.xml);
+        $c = $hash->{CD};
+        print $c "HTTP/1.1 200 OK\r\n",
+            "Content-Type: text/plain\r\n",
+            "Connection: close\r\n",
+            "Content-Length: ".length($response)."\r\n\r\n",
+            $response;
+
+        return;
+    
+    } elsif ( $data =~ /installFlow_([^.]*.xml)/ ) {
 
         if( defined($1) ){
             $response = qx(cat /tmp/$1);
@@ -767,11 +808,11 @@ sub AMADCommBridge_ResponseProcessing($$) {
 
 
 
-    if( !defined($amad_id) ) {
-        readingsSingleUpdate( $bhash, "transmitterERROR", $hash->{NAME}." has no device name sends", 1 ) if( AttrVal( $bname, "expertMode", 0 ) eq "1" );
-        Log3 $bname, 4, "AMADCommBridge ($name) - ERROR - no device name given. please check your global variable in automagic";
+    if( !defined($amad_id) or !defined($fhemDevice) ) {
+        readingsSingleUpdate( $bhash, "transmitterERROR", $hash->{NAME}." has no correct amad_id", 1 );
+        Log3 $bname, 4, "AMADCommBridge ($name) - ERROR - no device name given. please check your global variable amad_id in automagic";
         
-        $response = "header lines: \r\n AMADCommBridge receive no device name. please check your global variable in automagic\r\n FHEM to do nothing\r\n";
+        $response = "header lines: \r\n AMADCommBridge receive no device name. please check your global variable amad_id in automagic\r\n FHEM to do nothing\r\n";
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
             "Content-Type: text/plain\r\n",
@@ -1005,8 +1046,21 @@ sub AMADCommBridge_ParseMsg($$) {
     <br>
     This statement creates a new AMADCommBridge device named AMADBridge.
   </ul></br>
+  The APP Automagic or Tasker can be used on the Android device.</br>
+  <br>
+  <b>For Autoremote:</b><br>
   In the following, only the Flowset has to be installed on the Android device and the Flow 'First Run Assistant' run. (Simply press the Homebutton)</br>
-  The wizard then guides you through the setup of your AMAD device and ensures that at the end of the installation process the Android device is created as an AMAD device in FHEM.
+  The wizard then guides you through the setup of your AMAD device and ensures that at the end of the installation process the Android device is created as an AMAD device in FHEM.</br>
+  <br>
+  <b>For Tasker:</b><br>
+  When using Tasker, the Tasker-project must be loaded onto the Android device and imported into Tasker via the import function.<br>
+  For the initial setup on the Android device there is an Tasker input mask (Scene), in which the required parameters (device name, device IP, bridgeport etc.)</br>
+  can be entered, these fields are filled (if possible) automatically, but can also be adjusted manually.</br>
+  To do this, run the "AMAD" task.</br>
+  For quick access, a Tasker shortcut can also be created on the home screen for this task.</br>
+  Information on the individual settings can be obtained by touching the respective text field.</br>
+  If all entries are complete, the AMAD Device can be created via the button "create Device".</br>
+  For control commands from FHEM to Tasker, the APP "Autoremote" or "Tasker Network Event Server (TNES)" is additionally required.
   </ul>
   <br><br>
   <a name="AMADCommBridgereadings"></a>
@@ -1066,8 +1120,21 @@ sub AMADCommBridge_ParseMsg($$) {
     <br>
     Diese Anweisung erstellt ein neues AMADCommBridge Device Namens AMADBridge. 
   </ul></br>
+  Es kann wahlweise die APP Automagic oder Tasker auf dem Android Ger&auml;t verwendet werden.
+  <br>
+  <b>F&uuml;r Autoremote:</b><br>
   Im folgenden mu&szlig; lediglich das Flowset auf dem Android Ger&auml;t installiert werden und der Flow 'First Run Assistent' ausgef&uuml;hrt werden. (einfach den Homebutton drücken)</br>
-  Der Assistent geleitet Dich dann durch die Einrichtung Deines AMAD Ger&auml;tes und sorgt daf&uuml;r das am Ende des Installationsprozess das Androidger&auml;t als AMAD Device in FHEM angelegt wird.
+  Der Assistent geleitet Dich dann durch die Einrichtung Deines AMAD Ger&auml;tes und sorgt daf&uuml;r das am Ende des Installationsprozess das Androidger&auml;t als AMAD Device in FHEM angelegt wird.</br>
+  <br>
+  <b>F&uuml;r Tasker:</b><br>
+  Bei Verwendung von Tasker muss das Tasker-Projekt auf das Android Ger&auml;t geladen und in Tasker &uuml;ber die Import Funktion importiert werden.<br>
+  F&uuml;r die Ersteinrichtung auf dem Android Ger&auml;t gibt es eine Eingabemaske (Scene), in der die ben&ouml;tigten Parameter (Device Name, Device IP, Bridgeport usw.)</br>
+  eingegeben werden k&ouml;nnen, diese Felder werden (soweit m&ouml;glich) automatisch bef&uuml;llt, k&ouml;nnen aber auch manuell angepasst werden.</br>
+  Hierf&uuml;r den Task &quot;AMAD&quot; ausf&uuml;hren.</br>
+  F&uuml;r schnellen Zugriff kann f&uuml;r diesen Task auch ein Tasker-Shortcut auf dem Homescreen angelegt werden.</br>
+  Infos zu den einzelnen Einstellungen erh&auml;lt man durch einen Touch auf das jeweiligen Textfeld.</br>
+  Sind alle Eingaben vollst&auml;ndig, kann das AMAD Device &uuml;ber die Schaltfl&auml;che &quot;create Device&quot; erstellt werden.</br>
+  Damit Steuerbefehle von FHEM zu Tasker funktionieren wird zus&auml;tzlich noch die APP "Autoremote" oder "Tasker Network Event Server (TNES)" ben&ouml;tigt.
   </ul>
   <br><br>
   <a name="AMADCommBridgereadings"></a>

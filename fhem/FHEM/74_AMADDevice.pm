@@ -2,11 +2,12 @@
 # 
 # Developed with Kate
 #
-#  (c) 2015-2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2015-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
 #       - Jens Wohlgemuth       Thanks for Commandref
+#       - Schlimbo              Tasker integration and Tasker Commandref
 #
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -58,14 +59,16 @@ eval "use Encode qw(encode encode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $modulversion = "4.0.13";
-my $flowsetversion = "4.0.13";
+
+my $modulversion = "4.2.0";
+my $flowsetversion = "4.2.0";
 
 
 
 
 # Declare functions
 sub AMADDevice_Attr(@);
+sub AMADDevice_Notify($$);
 sub AMADDevice_checkDeviceState($);
 sub AMADDevice_decrypt($);
 sub AMADDevice_Define($$);
@@ -96,6 +99,7 @@ sub AMADDevice_Initialize($) {
     $hash->{DefFn}      = "AMADDevice_Define";
     $hash->{UndefFn}    = "AMADDevice_Undef";
     $hash->{AttrFn}     = "AMADDevice_Attr";
+    $hash->{NotifyFn}   = "AMADDevice_Notify";
     $hash->{ParseFn}    = "AMADDevice_Parse";
     
     $hash->{AttrList}   = "setOpenApp ".
@@ -120,9 +124,10 @@ sub AMADDevice_Initialize($) {
                 "setAPSSID ".
                 "root:0,1 ".
                 "disable:1 ".
+                "IODev ".
                 "remoteServer:Automagic,Autoremote,TNES,other ".
                 "setTakePictureResolution:800x600,1024x768,1280x720,1600x1200,1920x1080 ".
-                "IODev ".
+                "setTakePictureCamera:Back,Front ".
                 $readingFnAttributes;
     
     foreach my $d(sort keys %{$modules{AMADDevice}{defptr}}) {
@@ -140,29 +145,32 @@ sub AMADDevice_Define($$) {
     
     return "too few parameters: define <name> AMADDevice <HOST-IP> <amad_id> <remoteServer>" if( @a != 5 );
     return "Cannot define a AMAD device. Perl modul $missingModul is missing." if ( $missingModul );
-    
+
 
     my $name                                    = $a[0];
     my $host                                    = $a[2];
     my $amad_id                                 = $a[3];
     my $remoteServer                            = $a[4];
     
-    $hash->{DEF} = "$host $amad_id Automagic" if( $remoteServer ne 'Automagic' );
-
     $hash->{HOST}                               = $host;
     $hash->{AMAD_ID}                            = $amad_id;
-    $hash->{PORT}                               = 8090;
     $hash->{VERSIONMODUL}                       = $modulversion;
     $hash->{VERSIONFLOWSET}                     = $flowsetversion;
+    $hash->{NOTIFYDEV}                          = "global,$name";
+    
+    $hash->{PORT}                               = 8090 if($remoteServer eq 'Automagic');
+    $hash->{PORT}                               = 1817 if($remoteServer eq 'Autoremote');
+    $hash->{PORT}                               = 8765 if($remoteServer eq 'TNES');
+    $hash->{PORT}                               = 1111 if($remoteServer eq 'other');        # Dummy Port for other
+    
     $hash->{helper}{infoErrorCounter}           = 0;
     $hash->{helper}{setCmdErrorCounter}         = 0;
     $hash->{helper}{deviceStateErrorCounter}    = 0;
 
 
 
-    
     CommandAttr(undef,"$name IODev $modules{AMADCommBridge}{defptr}{BRIDGE}->{NAME}") if(AttrVal($name,'IODev','none') eq 'none');
-    
+
     my $iodev           = AttrVal($name,'IODev','none');
     
     AssignIoPort($hash,$iodev) if( !$hash->{IODev} );
@@ -181,14 +189,18 @@ sub AMADDevice_Define($$) {
     return "AMADDevice device $name on AMADCommBridge $iodev already defined."
     if( defined($d) && $d->{IODev} == $hash->{IODev} && $d->{NAME} ne $name );
 
-    Log3 $name, 3, "AMADDevice ($name) - defined with AMAD_ID: $amad_id on port $hash->{PORT}";
+    
 
-    $attr{$name}{room} = "AMAD" if( !defined( $attr{$name}{room} ) );
+    CommandAttr(undef,"$name room AMAD") if(AttrVal($name,'room','none') eq 'none');
+    CommandAttr(undef,"$name remoteServer $remoteServer") if(AttrVal($name,'remoteServer','none') eq 'none');
         
     readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged( $hash, "state", "initialized",1);
     readingsBulkUpdateIfChanged( $hash, "deviceState", "unknown",1);
     readingsEndUpdate($hash,1);
+    
+    
+    Log3 $name, 3, "AMADDevice ($name) - defined with AMAD_ID: $amad_id on port $hash->{PORT}";
         
 
     if( $init_done ) {
@@ -225,7 +237,30 @@ sub AMADDevice_Attr(@) {
     
     my $orig = $attrVal;
 
-    if( $attrName eq "disable" ) {
+    if( $attrName eq "remoteServer" ) {
+        if( $cmd eq "set" ) {
+            if( $attrVal eq "Automagic" ) {
+                $hash->{PORT}   = 8090;
+                Log3 $name, 3, "AMADDevice ($name) - set remoteServer to Automagic";
+            
+            } elsif( $attrVal eq "Autoremote" ) {
+                $hash->{PORT}   = 1817;
+                Log3 $name, 3, "AMADDevice ($name) - set remoteServer to Autoremote";
+            
+            } elsif( $attrVal eq "TNES" ) {
+                $hash->{PORT}   = 8765;
+                Log3 $name, 3, "AMADDevice ($name) - set remoteServer to TNES";
+            
+            } elsif( $attrVal eq "other" ) {
+                $hash->{PORT}   = 1111;
+                Log3 $name, 3, "AMADDevice ($name) - set remoteServer to other";
+            }
+            
+            $hash->{DEF} = "$hash->{HOST} $hash->{AMAD_ID} $attrVal";
+        }
+    }
+    
+    elsif( $attrName eq "disable" ) {
         if( $cmd eq "set" ) {
             if( $attrVal eq "0" ) {
             
@@ -270,17 +305,6 @@ sub AMADDevice_Attr(@) {
         }
     }
     
-    elsif( $attrName eq "setAPSSID" ) {
-        if( $cmd eq "set" && $attrVal ) {
-        
-            AMADDevice_statusRequest($hash);
-            
-        } else {
-        
-            AMADDevice_statusRequest($hash);
-        }
-    }
-    
     elsif( $attrName eq "setUserFlowState" ) {
         if( $cmd eq "del" ) {
         
@@ -303,6 +327,25 @@ sub AMADDevice_Attr(@) {
     }
     
     return undef;
+}
+
+sub AMADDevice_Notify($$) {
+
+    my ($hash,$dev) = @_;
+    my $name = $hash->{NAME};
+    return if (IsDisabled($name));
+    
+    my $devname = $dev->{NAME};
+    my $devtype = $dev->{TYPE};
+    my $events = deviceEvents($dev,1);
+    return if (!$events);
+
+
+    AMADDevice_statusRequest($hash) if( (grep /^DELETEATTR.$name.setAPSSID$/,@{$events}
+                                                    or grep /^ATTR.$name.setAPSSID.*/,@{$events} )
+                                                    and $init_done and $devname eq 'global' );
+
+    return;
 }
 
 sub AMADDevice_GetUpdate($) {
@@ -334,8 +377,9 @@ sub AMADDevice_statusRequest($) {
     my $host                = $hash->{HOST};
     my $port                = $hash->{PORT};
     my $amad_id             = $hash->{AMAD_ID};
-    my $uri;
+    my $uri                 = $hash->{HOST} . ":" . $hash->{PORT};
     my $header              = 'Connection: close';
+    my $path;
     my $method;
     
     
@@ -346,13 +390,15 @@ sub AMADDevice_statusRequest($) {
     my $fhemCtlMode     = AttrVal($hash->{IODev}->{NAME},'fhemControlMode','none' );
     my $bport           = $hash->{IODev}->{PORT};
 
+    $header  .= "\r\nfhemip: $fhemip\r\nfhemdevice: $name\r\nactivetask: $activetask\r\napssid: $apssid\r\nbport: $bport\r\nuserflowstate: $userFlowState\r\nfhemctlmode: $fhemCtlMode";
+    
+    $method  = "GET" if( AttrVal($name,'remoteServer','Automagic') eq 'Automagic' );
+    $method  = "POST" if (AttrVal($name,'remoteServer','Automagic') ne 'Automagic' );
+    
+    $path     ="/fhem-amad/deviceInfo/";       # Pfad muß so im Automagic als http request Trigger drin stehen
 
-    $uri     = $host . ":" . $port . "/fhem-amad/deviceInfo/";       # Pfad muß so im Automagic als http request Trigger drin stehen
-    $header  .= "\r\nfhemip: $fhemip\r\nfhemdevice: $name\r\nactivetask: $activetask\r\napssid: $apssid\r\nbport: $bport\r\nuserflowstate: $userFlowState\r\namadid: $amad_id\r\nfhemctlmode: $fhemCtlMode";
-    $method  = "GET";
-    
-    
-    IOWrite($hash,$amad_id,$uri,$header,$method);
+
+    IOWrite($hash,$amad_id,$uri,$path,$header,$method);
     Log3 $name, 5, "AMADDevice ($name) - IOWrite: $uri $method IODevHash=$hash->{IODev}";
 }
 
@@ -385,14 +431,20 @@ sub AMADDevice_WriteReadings($$) {
         readingsBulkUpdateIfChanged($hash, $t, $v, 1)   if( defined( $v ) and ($t ne 'deviceState'
                                                             or $t ne 'incomingCallerName'
                                                             or $t ne 'incomingCallerNumber'
+                                                            or $t ne 'incomingTelegramMessage'
+                                                            or $t ne 'incomingSmsMessage'
+                                                            or $t ne 'incomingWhatsAppMessage'
                                                             or $t ne 'nfcLastTagID')
                                                         );
 
         readingsBulkUpdateIfChanged( $hash, $t, ($v / AttrVal($name,'setVolFactor',1)) ) if( $t eq 'volume' and AttrVal($name,'setVolFactor',1) > 1 );
         readingsBulkUpdate( $hash, '.'.$t, $v ) if( $t eq 'deviceState' );
-        readingsBulkUpdate( $hash, $t, $v ) if( $t eq 'incomingCallerName'
+        readingsBulkUpdate( $hash, $t, $v ) if( defined( $v ) and ($t eq 'incomingCallerName'
                                                     or $t eq 'incomingCallerNumber'
-                                                    or $t eq 'nfcLastTagID'
+                                                    or $t eq 'incomingTelegramMessage'
+                                                    or $t eq 'incomingSmsMessage'
+                                                    or $t eq 'incomingWhatsAppMessage'
+                                                    or $t eq 'nfcLastTagID')
                                             );
     }
     
@@ -423,29 +475,31 @@ sub AMADDevice_Set($$@) {
     my ($hash, $name, @aa)  = @_;
     my ($cmd, @args)        = @aa;
 
-    my $host                = $hash->{HOST};
-    my $port                = $hash->{PORT};
     my $amad_id             = $hash->{AMAD_ID};
-    my $uri;
     my $header              = 'Connection: close';
+    my $uri                 = $hash->{HOST} . ":" . $hash->{PORT};
+    my $path;
     my $method;
+    
+    my @playerList          = ('GoogleMusic','SamsungMusic','AmazonMusic','SpotifyMusic','TuneinRadio','AldiMusic','YouTube','YouTubeKids','VlcPlayer','Audible','Deezer');
+    my @playerCmd           = ('mediaPlay','mediaStop','mediaNext','mediaBack');
     
     my $volMax              = AttrVal($name,'setVolMax',15);
     my $notifyVolMax        = AttrVal($name,'setNotifyVolMax',7);
     my $ringSoundVolMax     = AttrVal($name,'setRingSoundVolMax',7);
-
+    
 
     if( lc $cmd eq 'screenmsg' ) {
         my $msg = join( " ", @args );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/screenMsg?message=".urlEncode($msg);
+        $path   = "/fhem-amad/setCommands/screenMsg?message=".urlEncode($msg);
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'ttsmsg' ) {
         my ($msg,$speed,$lang,$ttsmsgvol)   = AMADDevice_CreateTtsMsgValue($hash,@args);
         
-        $uri                                = $host . ":" . $port . "/fhem-amad/setCommands/ttsMsg?message=".urlEncode($msg)."&msgspeed=".$speed."&msglang=".$lang."&msgvol=".$ttsmsgvol;
+        $path   = "/fhem-amad/setCommands/ttsMsg?message=".urlEncode($msg)."&msgspeed=".$speed."&msglang=".$lang."&msgvol=".$ttsmsgvol;
         $method                             = "POST";
     }
     
@@ -453,58 +507,59 @@ sub AMADDevice_Set($$@) {
         my $datas           = join( " ", @args );
         my ($flow,$state)   = split( ":", $datas);
 
-        $uri                = $host . ":" . $port . "/fhem-amad/setCommands/flowState?flowstate=".$state."&flowname=".urlEncode($flow);
+        $path   = "/fhem-amad/setCommands/flowState?flowstate=".$state."&flowname=".urlEncode($flow);
         $method     = "POST";
     }
     
     elsif( lc $cmd eq 'userflowrun' ) {
         my $flow            = join( " ", @args );
 
-        $uri                = $host . ":" . $port . "/fhem-amad/setCommands/flowRun?flowname=".urlEncode($flow);
+        $path   = "/fhem-amad/setCommands/flowRun?flowname=".urlEncode($flow);
         $method     = "POST";
     }
     
     elsif( lc $cmd eq 'volume' or $cmd eq 'mute' or $cmd =~ 'volume[Down|Up]' ) {
         my $vol     = AMADDevice_CreateVolumeValue($hash,$cmd,@args);
     
-        $uri        = $host . ":" . $port . "/fhem-amad/setCommands/setVolume?volume=$vol";
+        $path   = "/fhem-amad/setCommands/setVolume?volume=$vol";
         $method     = "POST";
     }
     
     elsif( lc $cmd eq 'volumenotification' ) {
-        my $vol = join( " ", @args );
+        my $volnote = join( " ", @args );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setNotifiVolume?notifivolume=$vol";
+        $path   = "/fhem-amad/setCommands/setNotifiVolume?notifivolume=$volnote";
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'volumeringsound' ) {
-        my $vol = join( " ", @args );
+        my $volring = join( " ", @args );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setRingSoundVolume?ringsoundvolume=$vol";
+        $path   = "/fhem-amad/setCommands/setRingSoundVolume?ringsoundvolume=$volring";
         $method = "POST";
     }
     
     elsif( lc $cmd =~ /^media/ ) {
-        my $btn = join( " ", @args );
+        my $mplayer = join( " ", @args );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/multimediaControl?mplayer=".$cmd."&button=".$btn;
+        $path   = "/fhem-amad/setCommands/multimediaControl?button=".$cmd."&mplayer=".$mplayer;
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'screenbrightness' ) {
         my $bri = join( " ", @args );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setBrightness?brightness=$bri";
+        $path   = "/fhem-amad/setCommands/setBrightness?brightness=$bri";
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'screen' ) {
         my $mod = join( " ", @args );
 
-        $uri        = AMADDevice_CreateScreenValue($hash,$mod);
+
+        $path        = AMADDevice_CreateScreenValue($hash,$mod);
         return "Please set \"setScreenlockPIN\" Attribut first"
-        unless($uri ne 'NO PIN');
+        unless($path ne 'NO PIN');
         $method     = "POST";
     }
     
@@ -512,19 +567,19 @@ sub AMADDevice_Set($$@) {
     
         my $mod = join( " ", @args );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setScreenOrientation?orientation=$mod";
+        $path   = "/fhem-amad/setCommands/setScreenOrientation?orientation=$mod";
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'activatevoiceinput' ) {
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setvoicecmd";
+        $path   = "/fhem-amad/setCommands/setvoicecmd";
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'screenfullscreen' ) {
         my $mod = join( " ", @args );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setScreenFullscreen?fullscreen=$mod";
+        $path   = "/fhem-amad/setCommands/setScreenFullscreen?fullscreen=$mod";
         $method = "POST";
         readingsSingleUpdate( $hash, $cmd, $mod, 1 );
     }
@@ -534,7 +589,7 @@ sub AMADDevice_Set($$@) {
         my $browser = AttrVal( $name, "setOpenUrlBrowser", "com.android.chrome|com.google.android.apps.chrome.Main" );
         my @browserapp = split( /\|/, $browser );
 
-        $uri     = $host . ":" . $port . "/fhem-amad/setCommands/openURL?url=".$openurl."&browserapp=".$browserapp[0]."&browserappclass=".$browserapp[1];
+        $path   = "/fhem-amad/setCommands/openURL?url=".$openurl."&browserapp=".$browserapp[0]."&browserappclass=".$browserapp[1];
         $method     = "POST";
     }
     
@@ -542,14 +597,14 @@ sub AMADDevice_Set($$@) {
         my $value   = join( " ", @args );
         my @alarm   = split( ":", $value );
 
-        $uri        = $host . ":" . $port . "/fhem-amad/setCommands/setAlarm?hour=".$alarm[0]."&minute=".$alarm[1];
+        $path   = "/fhem-amad/setCommands/setAlarm?hour=".$alarm[0]."&minute=".$alarm[1];
         $method     = "POST";
     }
     
     elsif (lc $cmd eq 'timer') {
         my $timer   = join( " ", @args );
 
-        $uri        = $host . ":" . $port . "/fhem-amad/setCommands/setTimer?minute=$timer";
+        $path   = "/fhem-amad/setCommands/setTimer?minute=$timer";
         $method     = "POST";
     }
 
@@ -562,21 +617,21 @@ sub AMADDevice_Set($$@) {
     elsif( lc $cmd eq 'openapp' ) {
         my $app = join( " ", @args );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/openApp?app=".$app;
+        $path   = "/fhem-amad/setCommands/openApp?app=".$app;
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'nfc' ) {
         my $mod = join( " ", @args );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setnfc?nfc=".$mod;
+        $path   = "/fhem-amad/setCommands/setnfc?nfc=".$mod;
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'system' ) {
         my $systemcmd   = join( " ", @args );
 
-        $uri            = $host . ":" . $port . "/fhem-amad/setCommands/systemcommand?syscmd=$systemcmd";
+        $path   = "/fhem-amad/setCommands/systemcommand?syscmd=$systemcmd";
         $method         = "POST";
         readingsSingleUpdate( $hash, "airplanemode", "on", 1 ) if( $systemcmd eq "airplanemodeON" );
         readingsSingleUpdate( $hash, "deviceState", "offline", 1 ) if( $systemcmd eq "airplanemodeON" || $systemcmd eq "shutdown" );
@@ -585,14 +640,14 @@ sub AMADDevice_Set($$@) {
     elsif( lc $cmd eq 'donotdisturb' ) {
         my $disturbmod  = join( " ", @args );
 
-        $uri            = $host . ":" . $port . "/fhem-amad/setCommands/donotdisturb?disturbmod=$disturbmod";
+        $path   = "/fhem-amad/setCommands/donotdisturb?disturbmod=$disturbmod";
         $method         = "POST";
     }
     
     elsif( lc $cmd eq 'bluetooth' ) {
         my $mod = join( " ", @args );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setbluetooth?bluetooth=$mod";
+        $path   = "/fhem-amad/setCommands/setbluetooth?bluetooth=$mod";
         $method = "POST";
     }
     
@@ -600,7 +655,7 @@ sub AMADDevice_Set($$@) {
         my $notify      = join( " ", @args );
         my $filepath    = AttrVal( $name, "setNotifySndFilePath", "/storage/emulated/0/Notifications/" );
 
-        $uri            = $host . ":" . $port . "/fhem-amad/setCommands/playnotifysnd?notifyfile=".$notify."&notifypath=".$filepath;
+        $path   = "/fhem-amad/setCommands/playnotifysnd?notifyfile=".$notify."&notifypath=".$filepath;
         $method         = "POST";
     }
     
@@ -608,26 +663,26 @@ sub AMADDevice_Set($$@) {
         my $swToBtDevice = join( " ", @args );    
 
         my ($swToBtMac,$btDeviceOne,$btDeviceTwo) = AMADDevice_CreateChangeBtDeviceValue($hash,$swToBtDevice);
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setbtdevice?swToBtDeviceMac=".$swToBtMac."&btDeviceOne=".$btDeviceOne."&btDeviceTwo=".$btDeviceTwo;
+        $path   = "/fhem-amad/setCommands/setbtdevice?swToBtDeviceMac=".$swToBtMac."&btDeviceOne=".$btDeviceOne."&btDeviceTwo=".$btDeviceTwo;
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'clearnotificationbar' ) {
         my $appname = join( " ", @args );
 
-        $uri        = $host . ":" . $port . "/fhem-amad/setCommands/clearnotificationbar?app=$appname";
+        $path   = "/fhem-amad/setCommands/clearnotificationbar?app=$appname";
         $method     = "POST";
     }
     
     elsif( lc $cmd eq 'vibrate' ) {
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/setvibrate";
+        $path   = "/fhem-amad/setCommands/setvibrate";
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'showhomescreen' ) {
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/showhomescreen";
+        $path   = "/fhem-amad/setCommands/showhomescreen";
         $method = "POST";
     }
     
@@ -635,7 +690,11 @@ sub AMADDevice_Set($$@) {
 
         return "Please set \"setTakePictureResolution\" Attribut first"
         unless(AttrVal($name,'setTakePictureResolution','none') ne 'none');
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/takepicture?pictureresolution=" . AttrVal($name,'setTakePictureResolution','none');
+        
+        return "Please set \"setTakePictureCamera\" Attribut first"
+        unless(AttrVal($name,'setTakePictureCamera','none') ne 'none');
+        
+        $path   = "/fhem-amad/setCommands/takepicture?pictureresolution=".AttrVal($name,'setTakePictureResolution','none')."&picturecamera=".AttrVal($name,'setTakePictureCamera','none');
         $method = "POST";
     }
     
@@ -647,14 +706,14 @@ sub AMADDevice_Set($$@) {
         $exkey2 = "" if( !$exkey2 );
         $exval2 = "" if( !$exval2 );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/sendIntent?action=".$action."&exkey1=".$exkey1."&exval1=".$exval1."&exkey2=".$exkey2."&exval2=".$exval2;
+        $path   = "/fhem-amad/setCommands/sendIntent?action=".$action."&exkey1=".$exkey1."&exval1=".$exval1."&exkey2=".$exkey2."&exval2=".$exval2;
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'installflowsource' ) {
         my $flowname    = join( " ", @args );
 
-        $uri            = $host . ":" . $port . "/fhem-amad/setCommands/installFlow?flowname=$flowname";
+        $path   = "/fhem-amad/setCommands/installFlow?flowname=$flowname";
         $method         = "POST";
     }
     
@@ -663,25 +722,30 @@ sub AMADDevice_Set($$@) {
         my ($callnumber, $time) = split( "[ \t][ \t]*", $string );
         $time   = "none" if( !$time );
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/openCall?callnumber=".$callnumber."&hanguptime=".$time;
+        $path   = "/fhem-amad/setCommands/openCall?callnumber=".$callnumber."&hanguptime=".$time;
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'closecall' ) {
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/closeCall";
+        $path   = "/fhem-amad/setCommands/closeCall";
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'startdaydream' ) {
 
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/startDaydream";
+        $path   = "/fhem-amad/setCommands/startDaydream";
         $method = "POST";
     }
     
     elsif( lc $cmd eq 'currentflowsetupdate' ) {
 
-        $uri    = $host . ":" . $port . "/fhem-amad/currentFlowsetUpdate";
+        if( ReadingsVal($name,'flowsetVersionAtDevice','') lt '4.1.99.6' ) {
+            $path   = "/fhem-amad/currentFlowsetUpdate";
+        } else {
+            $path   = "/fhem-amad/setCommands/currentFlowsetUpdate";
+        }
+        
         $method = "POST";
     }
     
@@ -689,7 +753,7 @@ sub AMADDevice_Set($$@) {
         my $string = join( " ", @args );
         my ($smsmessage, $smsnumber) = split( "\\|", $string );
     
-        $uri    = $host . ":" . $port . "/fhem-amad/setCommands/sendSms?smsmessage=".urlEncode($smsmessage)."&smsnumber=".$smsnumber;
+        $path   = "/fhem-amad/setCommands/sendSms?smsmessage=".urlEncode($smsmessage)."&smsnumber=".$smsnumber;
         $method = "POST";
         
     } else {
@@ -697,8 +761,13 @@ sub AMADDevice_Set($$@) {
         my $apps = AttrVal( $name, "setOpenApp", "none" );
         my $btdev = AttrVal( $name, "setBluetoothDevice", "none" );
         
+
+        my $list = '';
+        foreach(@playerCmd) {
+            $list .= $_ . ':' . join(',',@playerList) . ' ';
+        }
         
-        my $list = "screenMsg ttsMsg mediaGoogleMusic:play/pause,stop,next,back mediaSamsungMusic:play/pause,stop,next,back mediaAmazonMusic:play/pause,stop,next,back mediaSpotifyMusic:play/pause,stop,next,back mediaTuneinRadio:play/pause,stop,next,back mediaAldiMusic:play/pause,stop,next,back mediaYouTube:play/pause,stop,next,back mediaYouTubeKids:play/pause,stop,next,back mediaVlcPlayer:play/pause,stop,next,back mediaAudible:play/pause,stop,next,back screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState userFlowRun sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg takePicture:noArg";
+        $list .= "screenMsg ttsMsg screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState userFlowRun sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg takePicture:noArg";
 
         $list .= " screenOrientation:auto,landscape,portrait"   if( AttrVal( $name, "setScreenOrientation", "0" ) eq "1" );
         $list .= " screenFullscreen:on,off"                     if( AttrVal( $name, "setFullscreen", "0" ) eq "1" );
@@ -714,9 +783,9 @@ sub AMADDevice_Set($$@) {
 
         return "Unknown argument $cmd, choose one of $list";
     }
-
-
-    IOWrite($hash,$amad_id,$uri,$header,$method);
+    
+    
+    IOWrite($hash,$amad_id,$uri,$path,$header,$method);
     Log3 $name, 5, "AMADDevice ($name) - IOWrite: $uri $method IODevHash=$hash->{IODev}";
 
     return undef;
@@ -751,7 +820,7 @@ sub AMADDevice_Parse($$) {
             
     } else {
 
-        return "UNDEFINED $fhemDevice AMADDevice $decode_json->{firstrun}{'amaddevice_ip'} $decode_json->{amad}{'amad_id'} Automagic";
+        return "UNDEFINED $fhemDevice AMADDevice $decode_json->{firstrun}{'amaddevice_ip'} $decode_json->{amad}{'amad_id'} $decode_json->{firstrun}{remoteserver}";
     }
 }
 
@@ -864,11 +933,18 @@ sub AMADDevice_CreateTtsMsgValue($@) {
     
     my $name        = $hash->{NAME};
     my $msg;
-    my $speed       = AttrVal( $name, "setTtsMsgSpeed", "1.0" );
+    my $speed;
+
     my $lang        = AttrVal( $name, "setTtsMsgLang","de" );
     my $ttsmsgvol   = AttrVal( $name, "setTtsMsgVol","none");
     
-    
+    if( AttrVal($name,"remoteServer","Automagic") ne 'Automagic') {
+        $speed = AttrVal( $name, "setTtsMsgSpeed", "5" );
+    } else {
+        $speed = AttrVal( $name, "setTtsMsgSpeed", "1.0" );
+    }
+
+
     $msg    = join( " ", @args );
     
     unless($args[0] ne '&en;' and $args[0] ne '&de;') {
@@ -885,13 +961,10 @@ sub AMADDevice_CreateScreenValue($$) {
 
     my $name            = $hash->{NAME};
     my $scot            = AttrVal( $name, "setScreenOnForTimer", undef );
-    my $host            = $hash->{HOST};
-    my $port            = $hash->{PORT};
-    my $uri;
     $scot               = 60 if( !$scot );
 
     if ($mod eq "on" or $mod eq "off") {
-        return ($host . ":" . $port . "/fhem-amad/setCommands/setScreenOnOff?screen=".$mod."&screenontime=".$scot);
+        return ("/fhem-amad/setCommands/setScreenOnOff?screen=".$mod."&screenontime=".$scot);
     }
 
     elsif ($mod eq "lock" or $mod eq "unlock") {
@@ -900,7 +973,7 @@ sub AMADDevice_CreateScreenValue($$) {
         my $PIN = AttrVal( $name, "setScreenlockPIN", undef );
         $PIN = AMADDevice_decrypt($PIN);
 
-        return ($host . ":" . $port . "/fhem-amad/setCommands/screenlock?lockmod=".$mod."&lockPIN=".$PIN);
+        return ("/fhem-amad/setCommands/screenlock?lockmod=".$mod."&lockPIN=".$PIN);
     }
 }
 
@@ -938,19 +1011,28 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
 <ul>
   <u><b>AMAD - Automagic Android Device</b></u>
   <br>
-  This module integrates Android devices into FHEM and displays several settings <b><u>using the Android app "Automagic"</u></b>.
+  This module integrates Android devices into FHEM and displays several settings <b><u>using the Android app "Automagic" or "Tasker"</u></b>.
   Automagic is comparable to the "Tasker" app for automating tasks and configuration settings. But Automagic is more user-friendly. The "Automagic Premium" app currently costs EUR 2.90.
   <br>
-  Any information retrievable by Automagic can be displayed in FHEM by this module. Just define your own Automagic-"flow" and send the data to the AMADCommBridge. One even can control several actions on Android devices.
+  Any information retrievable by Automagic/Tasker can be displayed in FHEM by this module. Just define your own Automagic-"flow" or Tasker-"task" and send the data to the AMADCommBridge. One even can control several actions on Android devices.
   <br>
-  To be able to make use of all these functions the Automagic app and additional flows need to be installed on the Android device. The flows can be retrieved from the FHEM directory, the app can be bought in Google Play Store.
+  To be able to make use of all these functions the Automagic/Tasker app and additional flows/Tasker-project need to be installed on the Android device. The flows/Tasker-project can be retrieved from the FHEM directory, the app can be bought in Google Play Store.
   <br><br>
   <b>How to use AMADDevice?</b>
   <ul>
     <li>first, make sure that the AMADCommBridge in FHEM was defined</li>
-    <li>install the "Automagic Premium" app from the PlayStore</li>
-    <li>install the flowset 74_AMADDeviceautomagicFlowset$VERSION.xml file from the $INSTALLFHEM/FHEM/lib/ directory on the Android device</li>
-    <li>activate the "installation assistant" Flow in Automagic. If one now sends Automagic into the background, e.g. Homebutton, the assistant starts and creates automatically a FHEM device for the android device</li>
+    <li><b>Using Autoremote</b></li>
+        <ul>
+        <li>install the "Automagic Premium" app from the PlayStore</li>
+        <li>install the flowset 74_AMADDeviceautomagicFlowset$VERSION.xml file from the $INSTALLFHEM/FHEM/lib/ directory on the Android device</li>
+        <li>activate the "installation assistant" Flow in Automagic. If one now sends Automagic into the background, e.g. Homebutton, the assistant starts and creates automatically a FHEM device for the android device</li>
+        </ul>
+    <li><b>Using Tasker</b></li>
+        <ul>
+        <li>install the "Tasker" app from the PlayStore</li>
+        <li>install the Tasker-project 74_AMADtaskerset_$VERSION.prj.xml file from the $INSTALLFHEM/FHEM/lib/ directory on the Android device</li>
+        <li>run the "AMAD" task in Tasker and make your initial setup, by pressing the "create Device" button it will automatically create the device in FHEM</li>
+        </ul>
   </ul>
   <br><br>
   <u><b>Define a AMADDevice device by hand.</b></u>
@@ -966,7 +1048,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
       <code>define WandTabletWohnzimmer AMADDevice 192.168.0.23 123456 IODev=NAME_des_AMADCommBridge_Devices</code><br>
     </ul>
     <br>
-    In this case, an AMADDevice is created by hand. The AMAD_ID, here 123456, must also be entered exactly as a global variable in Automagic.
+    In this case, an AMADDevice is created by hand. The AMAD_ID, here 123456, must also be entered exactly as a global variable in Automagic/Tasker.
   </ul>
   <br><br><br>
   <a name="AMADDevicereadings"></a>
@@ -974,19 +1056,19 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <ul>
     <li>airplanemode - on/off, state of the aeroplane mode</li>
     <li>androidVersion - currently installed version of Android</li>
-    <li>automagicState - state of the Automagic App <b>(prerequisite Android >4.3). In case you have Android >4.3 and the reading says "not supported", you need to enable Automagic inside Android / Settings / Sound & notification / Notification access</b></li>
-    <li>batteryHealth - the health of the battery (1=unknown, 2=good, 3=overheat, 4=dead, 5=over voltage, 6=unspecified failure, 7=cold)</li>
-    <li>batterytemperature - the temperature of the battery</li>
+    <li>automagicState - state of the Automagic or Tasker App <b>(prerequisite Android >4.3). In case you have Android >4.3 and the reading says "not supported", you need to enable Automagic/Tasker inside Android / Settings / Sound & notification / Notification access</b></li>
+    <li>batteryHealth - the health of the battery (1=unknown, 2=good, 3=overheat, 4=dead, 5=over voltage, 6=unspecified failure, 7=cold) (Automagic only)</li>
+    <li>batterytemperature - the temperature of the battery (Automagic only)</li>
     <li>bluetooth - on/off, bluetooth state</li>
-    <li>checkActiveTask - state of an app (needs to be defined beforehand). 0=not active or not active in foreground, 1=active in foreground, <b>see note below</b></li>
-    <li>connectedBTdevices - list of all devices connected via bluetooth</li>
-    <li>connectedBTdevicesMAC - list of MAC addresses of all devices connected via bluetooth</li>
-    <li>currentMusicAlbum - currently playing album of mediaplayer</li>
-    <li>currentMusicApp - currently playing player app (Amazon Music, Google Play Music, Google Play Video, Spotify, YouTube, TuneIn Player, Aldi Life Music)</li>
-    <li>currentMusicArtist - currently playing artist of mediaplayer</li>
-    <li>currentMusicIcon - cover of currently play album<b>Noch nicht fertig implementiert</b></li>
-    <li>currentMusicState - state of currently/last used mediaplayer</li>
-    <li>currentMusicTrack - currently playing song title of mediaplayer</li>
+    <li>checkActiveTask - state of an app (needs to be defined beforehand). 0=not active or not active in foreground, 1=active in foreground, <b>see note below</b> (Automagic only)</li>
+    <li>connectedBTdevices - list of all devices connected via bluetooth (Automagic only)</li>
+    <li>connectedBTdevicesMAC - list of MAC addresses of all devices connected via bluetooth (Automagic only)</li>
+    <li>currentMusicAlbum - currently playing album of mediaplayer (Automagic only)</li>
+    <li>currentMusicApp - currently playing player app (Amazon Music, Google Play Music, Google Play Video, Spotify, YouTube, TuneIn Player, Aldi Life Music) (Automagic only)</li>
+    <li>currentMusicArtist - currently playing artist of mediaplayer (Automagic only)</li>
+    <li>currentMusicIcon - cover of currently play album <b>Not yet fully implemented</b> (Automagic only)</li>
+    <li>currentMusicState - state of currently/last used mediaplayer (Automagic only)</li>
+    <li>currentMusicTrack - currently playing song title of mediaplayer (Automagic only)</li>
     <li>daydream - on/off, daydream currently active</li>
     <li>deviceState - state of Android devices. unknown, online, offline.</li>
     <li>doNotDisturb - state of do not Disturb Mode</li>
@@ -996,8 +1078,9 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>flowsetVersionAtDevice - currently installed version of the flowsets on the Android device</li>
     <li>incomingCallerName - Callername from last Call</li>
     <li>incomingCallerNumber - Callernumber from last Call</li>
-    <li>incommingWhatsAppMessageFrom - last WhatsApp message</li>
-    <li>incommingWhatsTelegramMessageFrom - last telegram message</li>
+    <li>incomingWhatsAppMessage - last WhatsApp message</li>
+    <li>incomingTelegramMessage - last telegram message</li>
+    <li>incomingSmsMessage - last SMS message</li>
     <li>intentRadioName - name of the most-recent streamed intent radio</li>
     <li>intentRadioState - state of intent radio player</li>
     <li>keyguardSet - 0/1 keyguard set, 0=no 1=yes, does not indicate whether it is currently active</li>
@@ -1009,16 +1092,16 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>nextAlarmState - alert/done, current state of "Clock" stock-app</li>
     <li>nextAlarmTime - currently set time of alarm</li>
     <li>nfc - state of nfc service on/off</li>
-    <li>nfcLastTagID - nfc_id of last scan nfc Tag / In order for the ID to be recognized correctly, the trigger NFC TagIDs must be processed in Flow NFC Tag Support and the TagId's Commase-separated must be entered.</li>
+    <li>nfcLastTagID - nfc_id of last scan nfc Tag / In order for the ID to be recognized correctly, the trigger NFC TagIDs must be processed in Flow NFC Tag Support and the TagId's Commase-separated must be entered. (Automagic only)</li>
     <li>powerLevel - state of battery in %</li>
     <li>powerPlugged - 0=no/1,2=yes, power supply connected</li>
     <li>screen - on locked,unlocked/off locked,unlocked, state of display</li>
     <li>screenBrightness - 0-255, level of screen-brightness</li>
-    <li>screenFullscreen - on/off, full screen mode</li>
+    <li>screenFullscreen - on/off, full screen mode (Automagic only)</li>
     <li>screenOrientation - Landscape/Portrait, screen orientation (horizontal,vertical)</li>
     <li>screenOrientationMode - auto/manual, mode for screen orientation</li>
     <li>state - current state of AMAD device</li>
-    <li>userFlowState - current state of a Flow, established under setUserFlowState Attribut</li>
+    <li>userFlowState - current state of a Flow, established under setUserFlowState Attribut (Automagic only)</li>
     <li>volume - media volume setting</li>
     <li>volumeNotification - notification volume setting</li>
     <li>wiredHeadsetPlugged - 0/1 headset plugged out or in</li>
@@ -1033,19 +1116,15 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <ul>
     <li>activateVoiceInput - start voice input on Android device</li>
     <li>bluetooth - on/off, switch bluetooth on/off</li>
-    <li>clearNotificationBar - All/Automagic, deletes all or only Automagic notifications in status bar</li>
+    <li>clearNotificationBar - All/Automagic, deletes all or only Automagic/Tasker notifications in status bar</li>
     <li>closeCall - hang up a running call</li>
-    <li>currentFlowsetUpdate - start flowset update on Android device</li>
-    <li>installFlowSource - install a Automagic flow on device, <u>XML file must be stored in /tmp/ with extension xml</u>. <b>Example:</b> <i>set TabletWohnzimmer installFlowSource WlanUebwerwachen.xml</i></li>
+    <li>currentFlowsetUpdate - start flowset/Tasker-project update on Android device</li>
+    <li>installFlowSource - install a Automagic flow on device, <u>XML file must be stored in /tmp/ with extension xml</u>. <b>Example:</b> <i>set TabletWohnzimmer installFlowSource WlanUebwerwachen.xml</i> (Automagic only)</li>
     <li>doNotDisturb - sets the do not Disturb Mode, always Disturb, never Disturb, alarmClockOnly alarm Clock only, onlyImportant only important Disturbs</li>
-    <li>mediaAmazonMusic - play/stop/next/back , controlling the amazon music media player</li>
-    <li>mediaGoogleMusic - play/stop/next/back , controlling the google play music media player</li>
-    <li>mediaSpotifyMusic - play/stop/next/back , controlling the spotify media player</li>
-    <li>mediaTuneinRadio - play/stop/next/back , controlling the TuneinRadio media player</li>
-    <li>mediaAldiMusic - play/stop/next/back , controlling the Aldi music media player</li>
-    <li>mediaAudible - play/stop/next/back , controlling the Audible media player</li>
-    <li>mediaYouTube - play/stop/next/back , controlling the YouTube media player</li>
-    <li>mediaVlcPlayer - play/stop/next/back , controlling the VLC media player</li>
+    <li>mediaPlay - play command to media App</li>
+    <li>mediaStop - stop command to media App</li>
+    <li>mediaNext - skip Forward command to media App</li>
+    <li>mediaBack - skip Backward to media App</li>
     <li>nextAlarmTime - sets the alarm time. Only valid for the next 24 hours.</li>
     <li>notifySndFile - plays a media-file <b>which by default needs to be stored in the folder "/storage/emulated/0/Notifications/" of the Android device. You may use the attribute setNotifySndFilePath for defining a different folder.</b></li>
     <li>openCall - initial a call and hang up after optional time / set DEVICE openCall 0176354 10 call this number and hang up after 10s</li>
@@ -1057,8 +1136,8 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>statusRequest - Get a new status report of Android device. Not all readings can be updated using a statusRequest as some readings are only updated if the value of the reading changes.</li>
     <li>timer - set a countdown timer in the "Clock" stock app. Only minutes are allowed as parameter.</li>
     <li>ttsMsg - send a message which will be played as voice message (to change laguage temporary set first character &en; or &de;)</li>
-    <li>userFlowState - set Flow/s active or inactive,<b><i>set Nexus7Wohnzimmer Badezimmer:inactive vorheizen</i> or <i>set Nexus7Wohnzimmer Badezimmer vorheizen,Nachtlicht Steven:inactive</i></b></li>
-    <li>userFlowRun - executes the specified flow</li>
+    <li>userFlowState - set Flow/Tasker-profile active or inactive,<b><i>set Nexus7Wohnzimmer Badezimmer:inactive vorheizen</i> or <i>set Nexus7Wohnzimmer Badezimmer vorheizen,Nachtlicht Steven:inactive</i></b></li>
+    <li>userFlowRun - executes the specified flow/task</li>
     <li>vibrate - vibrate Android device</li>
     <li>volume - set media volume. Works on internal speaker or, if connected, bluetooth speaker or speaker connected via stereo jack</li>
     <li>volumeNotification - set notifications volume</li>
@@ -1066,13 +1145,13 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <br>
   <b>Set (depending on attribute values)</b>
   <ul>
-    <li>changetoBtDevice - switch to another bluetooth device. <b>Attribute setBluetoothDevice needs to be set. See note below!</b></li>
+    <li>changetoBtDevice - switch to another bluetooth device. <b>Attribute setBluetoothDevice needs to be set. See note below!</b> (Automagic only)</li>
     <li>nfc - activate or deactivate the nfc Modul on/off. <b>attribute root</b></li>
     <li>openApp - start an app. <b>attribute setOpenApp</b></li>
     <li>openURL - opens a URLS in the standard browser as long as no other browser is set by the <b>attribute setOpenUrlBrowser</b>.<b>Example:</b><i> attr Tablet setOpenUrlBrowser de.ozerov.fully|de.ozerov.fully.MainActivity, first parameter: package name, second parameter: Class Name</i></li>
-    <li>screen - on/off/lock/unlock, switch screen on/off or lock/unlock screen. In Automagic "Preferences" the "Device admin functions" need to be enabled, otherwise "Screen off" does not work. <b>attribute setScreenOnForTimer</b> changes the time the display remains switched on!</li>
-    <li>screenFullscreen - on/off, activates/deactivates full screen mode. <b>attribute setFullscreen</b></li>
-    <li>screenLock - Locks screen with request for PIN. <b>attribute setScreenlockPIN - enter PIN here. Only use numbers, 4-16 numbers required.</b></li>
+    <li>screen - on/off/lock/unlock, switch screen on/off or lock/unlock screen. In Automagic "Preferences" the "Device admin functions" need to be enabled, otherwise "Screen off" does not work. <b>attribute setScreenOnForTimer</b> changes the time the display remains switched on! (Tasker supports only "off" command)</li>
+    <li>screenFullscreen - on/off, activates/deactivates full screen mode. <b>attribute setFullscreen</b> (Automagic only)</li>
+    <li>screenLock - Locks screen with request for PIN. <b>attribute setScreenlockPIN - enter PIN here. Only use numbers, 4-16 numbers required.</b> (Automagic only)</li>
     <li>screenOrientation - Auto,Landscape,Portait, set screen orientation (automatic, horizontal, vertical). <b>attribute setScreenOrientation</b></li>
     <li>system - issue system command (only with rooted Android devices). reboot,shutdown,airplanemodeON (can only be switched ON) <b>attribute root</b>, in Automagic "Preferences" "Root functions" need to be enabled.</li>
     <li>takePicture - take a camera picture <b>Attribut setTakePictureResolution</b></li>
@@ -1081,12 +1160,13 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <a name="AMADDeviceattribut"></a>
   <b>Attribut</b>
   <ul>
-    <li>setAPSSID - set WLAN AccesPoint SSID to prevent WLAN sleeps</li>
+    <li>setAPSSID - set WLAN AccesPoint SSID to prevent WLAN sleeps (Automagic only)</li>
     <li>setNotifySndFilePath - set systempath to notifyfile (default /storage/emulated/0/Notifications/</li>
-    <li>setTtsMsgSpeed - set speaking speed for TTS (Value between 0.5 - 4.0, 0.5 Step) default is 1.0</li>
+    <li>setTtsMsgSpeed - set speaking speed for TTS (For Automagic: Value between 0.5 - 4.0, 0.5 Step, default: 1.0)(For Tasker: Value between 1 - 10, 1 Step, default: 5)</li>
     <li>setTtsMsgLang - set speaking language for TTS, de or en (default is de)</li>
     <li>setTtsMsgVol - is set, change automatically the media audio end set it back</li>
-    <li>set setTakePictureResolution - set the camera resolution for takePicture action</li>
+    <li>set setTakePictureResolution - set the camera resolution for takePicture action (800x600,1024x768,1280x720,1600x1200,1920x1080)</li>
+    <li>setTakePictureCamera - which camera do you use (Back,Front).</li>
     <br>
     To be able to use "openApp" the corresponding attribute "setOpenApp" needs to contain the app package name.
     <br><br>
@@ -1117,19 +1197,28 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
 <ul>
   <u><b>AMADDevice - Automagic Android Device</b></u>
   <br>
-  Dieses Modul liefert, <b><u>in Verbindung mit der Android APP Automagic</u></b>, diverse Informationen von Android Ger&auml;ten.
-  Die AndroidAPP Automagic (welche nicht von mir stammt und 2.90 Euro kostet) funktioniert wie Tasker, ist aber bei weitem User freundlicher.
+  Dieses Modul liefert, <b><u>in Verbindung mit der Android APP Automagic oder Tasker</u></b>, diverse Informationen von Android Ger&auml;ten.
+  Die Android APP Automagic (welche nicht von mir stammt und 2.90 Euro kostet) funktioniert wie Tasker, ist aber bei weitem User freundlicher.
   <br>
-  Mit etwas Einarbeitung k&ouml;nnen jegliche Informationen welche Automagic bereit stellt in FHEM angezeigt werden. Hierzu bedarf es lediglich eines eigenen Flows welcher seine Daten an die AMADDeviceCommBridge sendet. Das Modul gibt auch die M&ouml;glichkeit Androidger&auml;te zu steuern.
+  Mit etwas Einarbeitung k&ouml;nnen jegliche Informationen welche Automagic/Tasker bereit stellt in FHEM angezeigt werden. Hierzu bedarf es lediglich eines eigenen Flows/Task welcher seine Daten an die AMADDeviceCommBridge sendet. Das Modul gibt auch die M&ouml;glichkeit Androidger&auml;te zu steuern.
   <br>
-  F&uuml;r all diese Aktionen und Informationen wird auf dem Androidger&auml;t "Automagic" und ein so genannter Flow ben&ouml;tigt. Die App ist &uuml;ber den Google PlayStore zu beziehen. Das ben&ouml;tigte Flowset bekommt man aus dem FHEM Verzeichnis.
+  F&uuml;r all diese Aktionen und Informationen wird auf dem Androidger&auml;t "Automagic/Tasker" und ein so genannter Flow/Task ben&ouml;tigt. Die App ist &uuml;ber den Google PlayStore zu beziehen. Das ben&ouml;tigte Flowset/Tasker-Projekt bekommt man aus dem FHEM Verzeichnis.
   <br><br>
   <b>Wie genau verwendet man nun AMADDevice?</b>
   <ul>
     <li>stelle sicher das als aller erstes die AMADCommBridge in FHEM definiert wurde</li>
-    <li>installiere die App "Automagic Premium" aus dem PlayStore.</li>
-    <li>installiere das Flowset 74_AMADDeviceautomagicFlowset$VERSION.xml aus dem Ordner $INSTALLFHEM/FHEM/lib/ auf dem Androidger&auml;t</li>
-    <li>aktiviere den Installationsassistanten Flow in Automagic. Wenn man nun Automagic in den Hintergrund schickt, z.B. Hometaste dr&uuml;cken, startet der Assistant und legt automatisch ein Device für das Androidger&auml;t an.</li>
+    <li><b>Bei verwendung von Autoremote</b></li>
+        <ul>
+        <li>installiere die App "Automagic Premium" aus dem PlayStore.</li>
+        <li>installiere das Flowset 74_AMADDeviceautomagicFlowset$VERSION.xml aus dem Ordner $INSTALLFHEM/FHEM/lib/ auf dem Androidger&auml;t</li>
+        <li>aktiviere den Installationsassistanten Flow in Automagic. Wenn man nun Automagic in den Hintergrund schickt, z.B. Hometaste dr&uuml;cken, startet der Assistant und legt automatisch ein Device für das Androidger&auml;t an.</li>
+        </ul>
+    <li><b>Bei verwendung von Tasker</b></li>
+        <ul>
+        <li>installiere die App "Tasker" aus dem PlayStore.</li>
+        <li>installiere das Tasker Projekt 74_AMADtaskerset_$VERSION.prj.xml aus dem Ordner $INSTALLFHEM/FHEM/lib/ auf dem Androidger&auml;t</li>
+        <li>Starte den Task "AMAD", es erscheint eine Eingabemaske in der alle Einstellungen vorgenommen werden k&ouml;nnen, durch einen Klick auf "create Device" wird das Ger&auml;t in FHEM erstellt.</li>
+        </ul>
   </ul>
   <br><br>
   <u><b>Ein AMADDevice Ger&auml;t von Hand anlegen.</b></u>
@@ -1145,7 +1234,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
       <code>define WandTabletWohnzimmer AMADDevice 192.168.0.23 123456 IODev=NAME_des_AMADCommBridge_Devices</code><br>
     </ul>
     <br>
-    In diesem Fall wird ein AMADDevice von Hand angelegt. Die AMAD_ID, hier 123456, mu&szlig; auch exakt so als globale Variable in Automagic eingetragen sein.
+    In diesem Fall wird ein AMADDevice von Hand angelegt. Die AMAD_ID, hier 123456, mu&szlig; auch exakt so als globale Variable in Automagic/Tasker eingetragen sein.
   </ul>
   <br><br><br>
   <a name="AMADDevicereadings"></a>
@@ -1153,19 +1242,19 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <ul>
     <li>airplanemode - Status des Flugmodus</li>
     <li>androidVersion - aktuell installierte Androidversion</li>
-    <li>automagicState - Statusmeldungen von der AutomagicApp <b>(Voraussetzung Android >4.3). Ist Android gr&ouml;&szlig;er 4.3 vorhanden und im Reading steht "wird nicht unterst&uuml;tzt", mu&szlig; in den Androideinstellungen unter Ton und Benachrichtigungen -> Benachrichtigungszugriff ein Haken f&uuml;r Automagic gesetzt werden</b></li>
-    <li>batteryHealth - Zustand der Battery (1=unbekannt, 2=gut, 3=&Uuml;berhitzt, 4=tot, 5=&Uumlberspannung, 6=unbekannter Fehler, 7=kalt)</li>
-    <li>batterytemperature - Temperatur der Batterie</li>
+    <li>automagicState - Statusmeldungen von der Automagic oder Tasker App <b>(Voraussetzung Android >4.3). Ist Android gr&ouml;&szlig;er 4.3 vorhanden und im Reading steht "wird nicht unterst&uuml;tzt", mu&szlig; in den Androideinstellungen unter Ton und Benachrichtigungen -> Benachrichtigungszugriff ein Haken f&uuml;r Automagic/Tasker gesetzt werden</b></li>
+    <li>batteryHealth - Zustand der Battery (1=unbekannt, 2=gut, 3=&Uuml;berhitzt, 4=tot, 5=&Uumlberspannung, 6=unbekannter Fehler, 7=kalt) (nur Automagic)</li>
+    <li>batterytemperature - Temperatur der Batterie (nur Automagic)</li>
     <li>bluetooth - on/off, Bluetooth Status an oder aus</li>
-    <li>checkActiveTask - Zustand einer zuvor definierten APP. 0=nicht aktiv oder nicht aktiv im Vordergrund, 1=aktiv im Vordergrund, <b>siehe Hinweis unten</b></li>
-    <li>connectedBTdevices - eine Liste der verbundenen Ger&auml;t</li>
-    <li>connectedBTdevicesMAC - eine Liste der MAC Adressen aller verbundender BT Ger&auml;te</li>
-    <li>currentMusicAlbum - aktuell abgespieltes Musikalbum des verwendeten Mediaplayers</li>
-    <li>currentMusicApp - aktuell verwendeter Mediaplayer (Amazon Music, Google Play Music, Google Play Video, Spotify, YouTube, TuneIn Player, Aldi Life Music)</li>
-    <li>currentMusicArtist - aktuell abgespielter Musikinterpret des verwendeten Mediaplayers</li>
-    <li>currentMusicIcon - Cover vom aktuell abgespielten Album <b>Noch nicht fertig implementiert</b></li>
-    <li>currentMusicState - Status des aktuellen/zuletzt verwendeten Mediaplayers</li>
-    <li>currentMusicTrack - aktuell abgespielter Musiktitel des verwendeten Mediaplayers</li>
+    <li>checkActiveTask - Zustand einer zuvor definierten APP. 0=nicht aktiv oder nicht aktiv im Vordergrund, 1=aktiv im Vordergrund, <b>siehe Hinweis unten</b> (nur Automagic)</li>
+    <li>connectedBTdevices - eine Liste der verbundenen Ger&auml;t (nur Automagic)</li>
+    <li>connectedBTdevicesMAC - eine Liste der MAC Adressen aller verbundender BT Ger&auml;te (nur Automagic)</li>
+    <li>currentMusicAlbum - aktuell abgespieltes Musikalbum des verwendeten Mediaplayers (nur Automagic)</li>
+    <li>currentMusicApp - aktuell verwendeter Mediaplayer (Amazon Music, Google Play Music, Google Play Video, Spotify, YouTube, TuneIn Player, Aldi Life Music) (nur Automagic)</li>
+    <li>currentMusicArtist - aktuell abgespielter Musikinterpret des verwendeten Mediaplayers (nur Automagic)</li>
+    <li>currentMusicIcon - Cover vom aktuell abgespielten Album <b>Noch nicht fertig implementiert</b> (nur Automagic)</li>
+    <li>currentMusicState - Status des aktuellen/zuletzt verwendeten Mediaplayers (nur Automagic)</li>
+    <li>currentMusicTrack - aktuell abgespielter Musiktitel des verwendeten Mediaplayers (nur Automagic)</li>
     <li>daydream - on/off, Daydream gestartet oder nicht</li>
     <li>deviceState - Status des Androidger&auml;tes. unknown, online, offline.</li>
     <li>doNotDisturb - aktueller Status des nicht st&ouml;ren Modus</li>
@@ -1175,8 +1264,9 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>flowsetVersionAtDevice - aktuell installierte Flowsetversion auf dem Device</li>
     <li>incomingCallerName - Anrufername des eingehenden Anrufes</li>
     <li>incomingCallerNumber - Anrufernummer des eingehenden Anrufes</li>
-    <li>incommingWhatsAppMessageFrom - letzte WhatsApp Nachricht</li>
-    <li>incommingWhatsTelegramMessageFrom - letzte Telegram Nachricht</li>
+    <li>incomingWhatsAppMessage - letzte WhatsApp Nachricht</li>
+    <li>incomingTelegramMessage - letzte Telegram Nachricht</li>
+    <li>incomingSmsMessage - letzte SMS Nachricht</li>
     <li>intentRadioName - zuletzt gesrreamter Intent Radio Name</li>
     <li>intentRadioState - Status des IntentRadio Players</li>
     <li>keyguardSet - 0/1 Displaysperre gesetzt 0=nein 1=ja, bedeutet nicht das sie gerade aktiv ist</li>
@@ -1188,16 +1278,16 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>nextAlarmState - aktueller Status des <i>"Androidinternen"</i> Weckers</li>
     <li>nextAlarmTime - aktive Alarmzeit</li>
     <li>nfc - Status des NFC on/off</li>
-    <li>nfcLastTagID - nfc_id des zu letzt gescannten Tag's / Damit die ID korrekt erkannt wird muss im Flow NFC Tag Support der Trigger NFC TagIDs bearbeitet werden und die TagId's Kommasepariert eingetragen werden.</li>
+    <li>nfcLastTagID - nfc_id des zu letzt gescannten Tag's / Damit die ID korrekt erkannt wird muss im Flow NFC Tag Support der Trigger NFC TagIDs bearbeitet werden und die TagId's Kommasepariert eingetragen werden. (nur Automagic)</li>
     <li>powerLevel - Status der Batterie in %</li>
     <li>powerPlugged - Netzteil angeschlossen? 0=NEIN, 1|2=JA</li>
     <li>screen - on locked/unlocked, off locked/unlocked gibt an ob der Bildschirm an oder aus ist und gleichzeitig gesperrt oder nicht gesperrt</li>
     <li>screenBrightness - Bildschirmhelligkeit von 0-255</li>
-    <li>screenFullscreen - on/off, Vollbildmodus (An,Aus)</li>
+    <li>screenFullscreen - on/off, Vollbildmodus (An,Aus) (nur Automagic)</li>
     <li>screenOrientation - Landscape,Portrait, Bildschirmausrichtung (Horizontal,Vertikal)</li>
     <li>screenOrientationMode - auto/manual, Modus f&uuml;r die Ausrichtung (Automatisch, Manuell)</li>
     <li>state - aktueller Status</li>
-    <li>userFlowState - aktueller Status eines Flows, festgelegt unter dem setUserFlowState Attribut</li>
+    <li>userFlowState - aktueller Status eines Flows, festgelegt unter dem setUserFlowState Attribut (nur Automagic)</li>
     <li>volume - Media Lautst&auml;rkewert</li>
     <li>volumeNotification - Benachrichtigungs Lautst&auml;rke</li>
     <li>wiredHeadsetPlugged - 0/1 gibt an ob ein Headset eingesteckt ist oder nicht</li>
@@ -1212,19 +1302,15 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <ul>
     <li>activateVoiceInput - aktiviert die Spracheingabe</li>
     <li>bluetooth - on/off, aktiviert/deaktiviert Bluetooth</li>
-    <li>clearNotificationBar - All,Automagic, l&ouml;scht alle Meldungen oder nur die Automagic Meldungen in der Statusleiste</li>
+    <li>clearNotificationBar - All,Automagic, l&ouml;scht alle Meldungen oder nur die Automagic/Tasker Meldungen in der Statusleiste</li>
     <li>closeCall - beendet einen laufenden Anruf</li>
-    <li>currentFlowsetUpdate - f&uuml;rt ein Flowsetupdate auf dem Device durch</li>
+    <li>currentFlowsetUpdate - f&uuml;rt ein Flowset/Tasker-Projekt update auf dem Device durch</li>
     <li>doNotDisturb - schaltet den nicht st&ouml;ren Modus, always immer st&ouml;ren, never niemals st&ouml;ren, alarmClockOnly nur Wecker darf st&ouml;ren, onlyImportant nur wichtige St&ouml;rungen</li>
-    <li>installFlowSource - installiert einen Flow auf dem Device, <u>das XML File muss unter /tmp/ liegen und die Endung xml haben</u>. <b>Bsp:</b> <i>set TabletWohnzimmer installFlowSource WlanUebwerwachen.xml</i></li>
-    <li>mediaAmazonMusic - play, stop, next, back  ,steuert den Amazon Musik Mediaplayer</li>
-    <li>mediaGoogleMusic - play, stop, next, back  ,steuert den Google Play Musik Mediaplayer</li>
-    <li>mediaSpotifyMusic - play, stop, next, back  ,steuert den Spotify Mediaplayer</li>
-    <li>mediaTuneinRadio - play, stop, next, back  ,steuert den TuneIn Radio Mediaplayer</li>
-    <li>mediaAldiMusic - play, stop, next, back  ,steuert den Aldi Musik Mediaplayer</li>
-    <li>mediaAudible - play, stop, next, back  ,steuert den Audible Mediaplayer</li>
-    <li>mediaYouTube - play, stop, next, back  ,steuert den YouTube Mediaplayer</li>
-    <li>mediaVlcPlayer - play, stop, next, back  ,steuert den VLC Mediaplayer</li>
+    <li>installFlowSource - installiert einen Flow auf dem Device, <u>das XML File muss unter /tmp/ liegen und die Endung xml haben</u>. <b>Bsp:</b> <i>set TabletWohnzimmer installFlowSource WlanUebwerwachen.xml</i> (nur Automagic)</li>
+    <li>mediaPlay - play Befehl zur Media App</li>
+    <li>mediaStop - stop Befehl zur Media App</li>
+    <li>mediaNext - nächster Titel Befehl zur Media App</li>
+    <li>mediaBack - vorheriger Titel zur Media App</li>
     <li>nextAlarmTime - setzt die Alarmzeit. gilt aber nur innerhalb der n&auml;chsten 24Std.</li>
     <li>openCall - ruft eine Nummer an und legt optional nach X Sekunden auf / set DEVICE openCall 01736458 10 / ruft die Nummer an und beendet den Anruf nach 10s</li>
     <li>screenBrightness - setzt die Bildschirmhelligkeit, von 0-255.</li>
@@ -1235,26 +1321,26 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>statusRequest - Fordert einen neuen Statusreport beim Device an. Es k&ouml;nnen nicht von allen Readings per statusRequest die Daten geholt werden. Einige wenige geben nur bei Status&auml;nderung ihren Status wieder.</li>
     <li>timer - setzt einen Timer innerhalb der als Standard definierten ClockAPP auf dem Device. Es k&ouml;nnen nur Minuten angegeben werden.</li>
     <li>ttsMsg - versendet eine Nachricht welche als Sprachnachricht ausgegeben wird (um die Sprache für diese eine Durchsage zu ändern setze vor Deinem eigentlichen Text &en; oder &de;)</li>
-    <li>userFlowState - aktiviert oder deaktiviert einen oder mehrere Flows,<b><i>set Nexus7Wohnzimmer Badezimmer vorheizen:inactive</i> oder <i>set Nexus7Wohnzimmer Badezimmer vorheizen,Nachtlicht Steven:inactive</i></b></li>
-    <li>userFlowRun - führt den angegebenen Flow aus</li>
+    <li>userFlowState - aktiviert oder deaktiviert einen oder mehrere Flows/Tasker-Profile,<b><i>set Nexus7Wohnzimmer Badezimmer vorheizen:inactive</i> oder <i>set Nexus7Wohnzimmer Badezimmer vorheizen,Nachtlicht Steven:inactive</i></b></li>
+    <li>userFlowRun - führt den angegebenen Flow/Task aus</li>
     <li>vibrate - l&auml;sst das Androidger&auml;t vibrieren</li>
     <li>volume - setzt die Medialautst&auml;rke. Entweder die internen Lautsprecher oder sofern angeschlossen die Bluetoothlautsprecher und per Klinkenstecker angeschlossene Lautsprecher, + oder - vor dem Wert reduziert die aktuelle Lautst&auml;rke um den Wert. Der maximale Sliderwert kann &uuml;ber das Attribut setVolMax geregelt werden.</li>
-    <li>volumeUp - erh&oumlh;t die Lautst&auml;rke um den angegeben Wert im entsprechenden Attribut. Ist kein Attribut angegeben wird per default 2 genommen.</li>
+    <li>volumeUp - erh&ouml;ht die Lautst&auml;rke um den angegeben Wert im entsprechenden Attribut. Ist kein Attribut angegeben wird per default 2 genommen.</li>
     <li>volumeDown - reduziert die Lautst&auml;rke um den angegeben Wert im entsprechenden Attribut. Ist kein Attribut angegeben wird per default 2 genommen.</li>
     <li>volumeNotification - setzt die Benachrichtigungslautst&auml;rke.</li>
   </ul>
   <br>
   <b>Set abh&auml;ngig von gesetzten Attributen</b>
   <ul>
-    <li>changetoBtDevice - wechselt zu einem anderen Bluetooth Ger&auml;t. <b>Attribut setBluetoothDevice mu&szlig; gesetzt sein. Siehe Hinweis unten!</b></li>
+    <li>changetoBtDevice - wechselt zu einem anderen Bluetooth Ger&auml;t. <b>Attribut setBluetoothDevice mu&szlig; gesetzt sein. Siehe Hinweis unten!</b> (nur Automagic)</li>
     <li>notifySndFile - spielt die angegebene Mediadatei auf dem Androidger&auml;t ab. <b>Die aufzurufende Mediadatei sollte sich im Ordner /storage/emulated/0/Notifications/ befinden. Ist dies nicht der Fall kann man &uuml;ber das Attribut setNotifySndFilePath einen Pfad vorgeben.</b></li>
     <li>nfc -  schaltet nfc an oder aus /on/off<b>Attribut root</b></li>
     <li>openApp - &ouml;ffnet eine ausgew&auml;hlte App. <b>Attribut setOpenApp</b></li>
     <li>openURL - &ouml;ffnet eine URL im Standardbrowser, sofern kein anderer Browser &uuml;ber das <b>Attribut setOpenUrlBrowser</b> ausgew&auml;hlt wurde.<b> Bsp:</b><i> attr Tablet setOpenUrlBrowser de.ozerov.fully|de.ozerov.fully.MainActivity, das erste ist der Package Name und das zweite der Class Name</i></li>
-    <li>screen - on/off/lock/unlock schaltet den Bildschirm ein/aus oder sperrt/entsperrt ihn, in den Automagic Einstellungen muss "Admin Funktion" gesetzt werden sonst funktioniert "Screen off" nicht. <b>Attribut setScreenOnForTimer</b> &auml;ndert die Zeit wie lange das Display an bleiben soll!</li>
+    <li>screen - on/off/lock/unlock schaltet den Bildschirm ein/aus oder sperrt/entsperrt ihn, in den Automagic Einstellungen muss "Admin Funktion" gesetzt werden sonst funktioniert "Screen off" nicht. <b>Attribut setScreenOnForTimer</b> &auml;ndert die Zeit wie lange das Display an bleiben soll! (Tasker unterst&uuml;tzt nur "screen off")</li>
     <li>screenFullscreen - on/off, (aktiviert/deaktiviert) den Vollbildmodus. <b>Attribut setFullscreen</b></li>
     <li>screenLock - Sperrt den Bildschirm mit Pinabfrage. <b>Attribut setScreenlockPIN - hier die Pin daf&uuml;r eingeben. Erlaubt sind nur Zahlen. Es m&uuml;&szlig;en mindestens 4, bis max 16 Zeichen verwendet werden.</b></li>
-    <li>screenOrientation - Auto,Landscape,Portait,  aktiviert die Bildschirmausrichtung (Automatisch,Horizontal,Vertikal). <b>Attribut setScreenOrientation</b></li>
+    <li>screenOrientation - Auto,Landscape,Portait, aktiviert die Bildschirmausrichtung (Automatisch,Horizontal,Vertikal). <b>Attribut setScreenOrientation</b> (Tasker unterst&uuml;tzt nur Auto on/off)</li>
     <li>system - setzt Systembefehle ab (nur bei gerootetet Ger&auml;en). reboot,shutdown,airplanemodeON (kann nur aktiviert werden) <b>Attribut root</b>, in den Automagic Einstellungen muss "Root Funktion" gesetzt werden</li>
     <li>takePicture - löst die Kamera aus für ein Foto <b>Attribut setTakePictureResolution</b></li>
   </ul>
@@ -1263,15 +1349,16 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <b>Attribute</b>
   <ul>
     <li>setNotifySndFilePath - setzt den korrekten Systempfad zur Notifydatei (default ist /storage/emulated/0/Notifications/</li>
-    <li>setTtsMsgSpeed - setzt die Sprachgeschwindigkeit bei der Sprachausgabe(Werte zwischen 0.5 bis 4.0 in 0.5er Schritten) default ist 1.0</li>
+    <li>setTtsMsgSpeed - setzt die Sprachgeschwindigkeit bei der Sprachausgabe(Für Automagic: Werte zwischen 0.5 bis 4.0 in 0.5er Schritten, default:1.0)(Für Tasker: Werte zwischen 1 bis 10 in 1er Schritten, default:5)</li>
     <li>setTtsMsgLang - setzt die Sprache bei der Sprachausgabe, de oder en (default ist de)</li>
     <li>setTtsMsgVol - wenn gesetzt wird der Wert als neues Media Volume f&uuml; die Sprachansage verwendet und danach wieder der alte Wert eingestellt</li>
     <li>setVolUpDownStep - setzt den Step f&uuml;r volumeUp und volumeDown</li>
     <li>setVolMax - setzt die maximale Volume Gr&uoml;e f&uuml;r den Slider</li>
     <li>setNotifyVolMax - setzt den maximalen Lautst&auml;rkewert für Benachrichtigungslautst&auml;rke f&uuml;r den Slider</li>
     <li>setRingSoundVolMax - setzt den maximalen Lautst&auml;rkewert für Klingellautst&auml;rke f&uuml;r den Slider</li>
-    <li>setAPSSID - setzt die AccessPoint SSID um ein WLAN sleep zu verhindern</li>
-    <li>setTakePictureResolution - welche Kameraauflösung soll verwendet werden?</li>
+    <li>setAPSSID - setzt die AccessPoint SSID um ein WLAN sleep zu verhindern (nur Automagic)</li>
+    <li>setTakePictureResolution - welche Kameraauflösung soll verwendet werden? (800x600,1024x768,1280x720,1600x1200,1920x1080)</li>
+    <li>setTakePictureCamera - welche Kamera soll verwendet werden (Back,Front).</li>
     <br>
     Um openApp verwenden zu k&ouml;nnen, muss als Attribut der Package Name der App angegeben werden.
     <br><br>
