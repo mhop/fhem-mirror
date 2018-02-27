@@ -318,10 +318,14 @@ sub FRITZBOX_Attr($@)
       }
    }
 
-   if ( $aName =~ /fritzBoxIP|m3uFileLocal|m3uFileURL/ && $hash->{APICHECKED} == 1 || $aName eq "disable" ) {
+   # Stop the sub if FHEM is not initialized yet
+  return undef    unless $init_done;
+  
+   if ( $aName =~ /fritzBoxIP|m3uFileLocal|m3uFileURL/ && $hash->{APICHECKED} == 1 
+        || $aName eq "disable" ) {
       $hash->{APICHECKED} = 0;
       RemoveInternalTimer($hash->{helper}{TimerReadout});
-      InternalTimer(gettimeofday(), "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
+      InternalTimer(gettimeofday()+1, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
       # FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
    }
 
@@ -657,7 +661,11 @@ sub FRITZBOX_Readout_Start($)
 
    my $runFn;
    
-   my $disable = AttrVal( $name, "disable", 0 );
+   if( AttrVal( $name, "disable", 0 ) == 1 ) {
+      RemoveInternalTimer($hash->{helper}{TimerReadout});
+      readingsSingleUpdate( $hash, "state", "disabled", 1 );
+      return undef;
+    }
 
 # Set timer value (min. 60)
    $hash->{INTERVAL} = AttrVal( $name, "INTERVAL",  $hash->{INTERVAL} );
@@ -666,7 +674,7 @@ sub FRITZBOX_Readout_Start($)
    my $interval = $hash->{INTERVAL};
    
 # First run is an API check
-   unless ( $hash->{APICHECKED} && ! $disable ) {
+   unless ( $hash->{APICHECKED} ) {
       $interval = 10;
       $hash->{STATE} = "Check APIs";
       $runFn = "FRITZBOX_API_Check_Run";
@@ -680,10 +688,6 @@ sub FRITZBOX_Readout_Start($)
    if( $interval != 0 ) {
       RemoveInternalTimer($hash->{helper}{TimerReadout});
       InternalTimer(gettimeofday()+$interval, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
-      if( $disable ) {
-        readingsSingleUpdate( $hash, "state", "disabled", 1 );
-        return undef;
-      }
    }
 
 # Kill running process if "set update" is used
