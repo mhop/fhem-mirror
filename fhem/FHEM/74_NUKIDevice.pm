@@ -33,7 +33,7 @@ use warnings;
 use JSON;
 
 
-my $version = "0.6.1";
+my $version = "0.6.2";
 
 
 
@@ -414,7 +414,11 @@ sub NUKIDevice_Parse($$) {
     
     #########################################
     #### verarbeiten des JSON Strings #######
-    my $decode_json = decode_json($result);
+    my $decode_json = eval{decode_json($result)};
+    if($@){
+        Log3 $name, 3, "NUKIDevice ($name) - JSON error while request: $@";
+        return;
+    }
     
     
     if( ref($decode_json) ne "HASH" ) {
@@ -526,8 +530,12 @@ sub NUKIDevice_CGI() {
         Log3 $name, 3, "NUKIDevice ($name) - invalid json detected: $json";
         return "NUKIDevice ($name) - invalid json detected: $json";
     }
-    
-    my $decode_json = decode_json($json);
+
+    my $decode_json = eval{decode_json($json)};
+    if($@){
+        Log3 $name, 3, "NUKIDevice ($name) - JSON error while request: $@";
+        return;
+    }
     
     
     if( ref($decode_json) eq "HASH" ) {
