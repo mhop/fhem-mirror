@@ -53,7 +53,7 @@ if  (eval {require RiveScript;1;} ne 1) {
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.26";
+my $babbleversion    = "1.31";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -183,7 +183,7 @@ sub Babble_Initialize ($) {
   $hash->{GetFn}       = "Babble_Get";
   $hash->{UndefFn}     = "Babble_Undef";   
   #$hash->{AttrFn}      = "Babble_Attr";
-  my $attst            = "lockstate:locked,unlocked helpFunc confirmFunc noChatBot:0,1 testParm0 testParm1 testParm2 testParm3 ".
+  my $attst            = "lockstate:locked,unlocked helpFunc confirmFunc noChatBot:0,1 dnuFile testParm0 testParm1 testParm2 testParm3 ".
                          "remoteFHEM0 remoteFHEM1 remoteFHEM2 remoteFHEM3 remoteFunc0 remoteFunc1 remoteFunc2 remoteFunc3 remoteToken0 remoteToken1 remoteToken2 remoteToken3 ".
                          "babbleIds babblePreSubs babbleDevices babblePlaces babbleNotPlaces babbleVerbs babbleVerbParts babblePrepos babbleQuests babbleArticles babbleStatus babbleWrites babbleTimes";
   $hash->{AttrList}    = $attst;
@@ -1100,7 +1100,7 @@ sub Babble_DoIt{
   $reading = "none" 
     if( !$reading );
   
-  if( defined(@parms) && $parms[0] eq "testit"){
+  if( @parms && $parms[0] eq "testit"){
     $testit = 1;
     shift @parms;
     $exflag = $parms[0];
@@ -1190,6 +1190,7 @@ sub Babble_DoIt{
           });
         }
       }
+      
       #-- confirm execution
       my $func  = AttrVal($name,"confirmFunc",undef);  
       if( $confirm ){
@@ -1202,7 +1203,7 @@ sub Babble_DoIt{
           }
           $res = fhem($func);   
         }else{
-          Log3 $name,1,"[Babble_DoIt] requesting confirmation, but no attribute confirmFunc defined";
+          Log3 $name,1,"[Babble_DoIt] Warning: requesting confirmation, but no attribute confirmFunc defined";
         }
       }
     }
@@ -1223,8 +1224,18 @@ sub Babble_DoIt{
         if( !defined($hash->{Rive}) );
       my $rs = $hash->{Rive};
       $reply = $rs->reply ('localuser',$sentence);
-      $reply = $babble_tt->{dnu}
-        if ($reply eq "ERR: No Reply Matched");
+      if ($reply eq "ERR: No Reply Matched"){
+        $reply = $babble_tt->{dnu};
+        my $dnufile = AttrVal($name,"dnuFile",undef);
+        if( $dnufile ){
+          open(my $fh, '>>', $dnufile);
+          print $fh $sentence." => Category=$cat: ".
+          $babble_tt->{"device"}."=$device ".$babble_tt->{"place"}."=$place ".
+          $babble_tt->{"verb"}."=$verb ".$babble_tt->{"target"}."=$reading / $value\n";
+          close $fh;
+        }
+      }
+        
     #-- no chatbot, use help text directly
     }else{
       $reply = defined($hash->{DATA}{"help"}{$device}) ? $hash->{DATA}{"help"}{$device} : "";
@@ -2176,7 +2187,9 @@ sub Babble_Html($)
                 will be replaced by the devicename identified by Babble, the help text for this device and parameters passed to the Babble_DoIt function</li>
             <li><a name="testParm"><code>attr &lt;name&gt; testParm(0|1|2|3) &lt;string&rt;</code></a>
                 <br/>if a command is not really excuted, but only tested, the values of these attributes will be used to substitute the strings $PARM[0|1|2...]
-                in the tested command</li>       
+                in the tested command</li>  
+            <li><a name="dnuFile"><code>attr &lt;name&gt; dnuFile &lt;filename&rt;</code></a>
+                <br/>if this filename is given, every sentence that could not be analyzed is stored in this file</li>       
             <li><a name="confirmFunc"><code>attr &lt;name&gt; confirmFunc &lt;function name&rt;</code></a>
                 <br/>name of a confirmation function which is used in case a command is exceuted. When this function is called, the strings $DEV, $HELP, $PARM[0|1|2...]
                 will be replaced by the devicename identified by Babble, the help text for this device and parameters passed to the Babble_DoIt function</li>     
