@@ -193,7 +193,7 @@ weblink_FwFn($$$$)
       E.g.:<br>
       <ul>
         <code>
-        define yw weblink iframe http://weather.yahooapis.com/forecastrss?w=650272&u=c<br>
+        define yw weblink iframe http://weather.yahooapis.com/forecastrss?w=650272&amp;u=c<br>
         attr yw htmlattr width="480" height="560"<br>
         </code>
       </ul></li>

@@ -619,7 +619,7 @@ FBDECT_Undef($$)
 <ul>
   Dieses Modul wird verwendet, um AVM FRITZ!DECT Ger&auml;te via FHEM zu
   steuern, siehe auch das <a href="#FBAHA">FBAHA</a> oder <a
-  href="#FBAHAHTTP">FBAHAHTTP</a> Modul f&uumlr die Anbindung an das FRITZ!Box.
+  href="#FBAHAHTTP">FBAHAHTTP</a> Modul f&uuml;r die Anbindung an das FRITZ!Box.
   <br><br>
   <a name="FBDECTdefine"></a>
   <b>Define</b>
@@ -644,7 +644,7 @@ FBDECT_Undef($$)
   <ul>
   <li>on/off<br>
     Ger&auml;t einschalten bzw. ausschalten.</li>
-  <li>desired-temp &lt;value&/gt;<br>
+  <li>desired-temp &lt;value&gt;<br>
     Gew&uuml;nschte Temperatur beim Comet DECT setzen (nur mit FBAHAHTTP als
     IODev).
     </li>

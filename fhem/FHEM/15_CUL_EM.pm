@@ -443,7 +443,7 @@ CUL_EM_Parse($$)
     <li><a href="#eventMap">eventMap</a></li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="maxPeak">maxPeak</a> &lt;number&gt;<br>
-      Gibt den maximal m&ouml;glichen Spitzenwert f&uumlr das EM-Meter an 
+      Gibt den maximal m&ouml;glichen Spitzenwert f&uuml;r das EM-Meter an 
       ("TOP:"-Wert in Logdatei). Spitzenwerte gr&ouml;&szlig;er als dieser 
       Wert gelten als EM-Lesefehler und werden ignoriert.
       Wenn es z.B. nicht m&ouml;glich ist mehr zu 40kW Leistung 

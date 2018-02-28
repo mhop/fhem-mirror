@@ -290,7 +290,7 @@ average_Notify($$)
       feeding unit. In the first case, the time between the events plays an
       important role, in the second case not. Default is integral.
     <li>nominmax</li>
-      don't compute min and max values. Default is 0 (compute min & max).
+      don't compute min and max values. Default is 0 (compute min &amp; max).
     <li>noaverage</li>
       don't compute average values. Default is 0 (compute avarage).
   </ul>

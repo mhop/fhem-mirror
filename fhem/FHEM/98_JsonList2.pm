@@ -135,7 +135,7 @@ CommandJsonList2($$)
   This is a command, to be issued on the command line (FHEMWEB or telnet
   interface). Can also be called via HTTP by
   <ul>
-  http://fhemhost:8083/fhem?cmd=jsonlist2&XHR=1
+  http://fhemhost:8083/fhem?cmd=jsonlist2&amp;XHR=1
   </ul>
   Returns an JSON tree of the internal values, readings and attributes of the
   requested definitions.<br>
@@ -158,7 +158,7 @@ CommandJsonList2($$)
   Dieses Befehl sollte in der FHEMWEB oder telnet Eingabezeile ausgef&uuml;hrt
   werden, kann aber auch direkt &uuml;ber HTTP abgerufen werden &uuml;ber 
   <ul>
-  http://fhemhost:8083/fhem?cmd=jsonlist2&XHR=1
+  http://fhemhost:8083/fhem?cmd=jsonlist2&amp;XHR=1
   </ul>
   Es liefert die JSON Darstellung der internen Variablen, Readings und
   Attribute zur&uuml;ck.<br>

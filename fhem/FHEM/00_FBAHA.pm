@@ -536,7 +536,7 @@ FBAHA_Ready($)
     Eintrag, siehe auch "get devList".
     </li>
   <li>reopen<br>
-    Schlie&szlig;t und &oulm;ffnet die Verbindung zum AHA Server. Nur f&uuml;r
+    Schlie&szlig;t und &ouml;ffnet die Verbindung zum AHA Server. Nur f&uuml;r
     debugging.
     </li>
   <li>reregister<br>

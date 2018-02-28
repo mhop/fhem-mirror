@@ -404,7 +404,7 @@ telnet_ActivateInform($)
     [global|hostname]</code><br>
 
     or<br>
-    <code>define &lt;name&gt; telnet &lt;servername&gt:&lt;portNumber&gt;</code>
+    <code>define &lt;name&gt; telnet &lt;servername&gt;:&lt;portNumber&gt;</code>
     <br><br>
 
     First form, <b>server</b> mode:<br>
@@ -532,7 +532,7 @@ telnet_ActivateInform($)
     <code>define &lt;name&gt; telnet &lt;portNumber&gt;
     [global|hostname]</code><br> oder<br>
 
-    <code>define &lt;name&gt; telnet &lt;servername&gt:&lt;portNummer&gt;</code>
+    <code>define &lt;name&gt; telnet &lt;servername&gt;:&lt;portNummer&gt;</code>
     <br><br>
 
     Erste Form, <b>Server</b>-mode:<br>

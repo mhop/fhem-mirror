@@ -1193,7 +1193,7 @@ FHT_State($$$$)
 
       <li>date setzt Jahr, Monat und Tag auf lokale Zeit</li><br>
 
-      <li>refreshvalues ist ein Alias f&uumlr report1 255 report2 255</li><br>
+      <li>refreshvalues ist ein Alias f&uuml;r report1 255 report2 255</li><br>
 
       <li>Alle *-temp Werte brauchen eine Temperatur als Argument welche auf
           0.5&deg;C gerundet wird.<br> Temperatur Werte m&uuml;ssen zwischen

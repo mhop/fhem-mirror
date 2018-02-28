@@ -3622,7 +3622,7 @@ FW_widgetOverride($$)
         Set the icon for a device in the room overview. There is an
         icon-chooser in FHEMWEB to ease this task.  Setting icons for the room
         itself is indirect: there must exist an icon with the name
-        ico<ROOMNAME>.png in the iconPath.
+        ico&lt;ROOMNAME&gt;.png in the iconPath.
         </li>
         <br>
 

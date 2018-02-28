@@ -2554,13 +2554,13 @@ plotAsPng(@)
       With this attribute you can use the same .gplot file for multiple devices
       with the same logdevice.
       <ul><b>Example:</b><br>
-        <li>#FileLog <SPEC1><br>
-            with: attr <SVGdevice> plotfunction "4:IR\x3a:0:"<br>
+        <li>#FileLog &lt;SPEC1&gt;<br>
+            with: attr &lt;SVGdevice&gt; plotfunction "4:IR\x3a:0:"<br>
             instead of<br>  
             #FileLog 4:IR\x3a:0:
         </li>
-        <li>#DbLog <SPEC1><br>
-            with: attr <SVGdevice> plotfunction
+        <li>#DbLog &lt;SPEC1&gt;<br>
+            with: attr &lt;SVGdevice&gt; plotfunction
             "Garage_Raumtemp:temperature::"<br> instead of<br>
             #DbLog Garage_Raumtemp:temperature::
         </li>
@@ -2772,7 +2772,7 @@ plotAsPng(@)
       </ul>
       Die Werte minAll und maxAll (die das Minimum/Maximum aller Werte
       repr&auml;sentieren) sind ebenfals im data hash vorhanden.
-      <br>&Uumlberholt, wird durch das plotReplace Attribut abgel&ouml;st.
+      <br>&Uuml;berholt, wird durch das plotReplace Attribut abgel&ouml;st.
       </li><br>
 
     <li><a href="#nrAxis">nrAxis</a></li><br>
@@ -2802,7 +2802,7 @@ plotAsPng(@)
             <code>#DbLog Garage_Raumtemp:temperature::</code>
           </li>
       </ul>
-      &Uumlberholt, wird durch das plotReplace Attribut abgel&ouml;st.
+      &Uuml;berholt, wird durch das plotReplace Attribut abgel&ouml;st.
     </li><br>
 
     <li><a href="#plotmode">plotmode</a></li><br>
@@ -2837,7 +2837,7 @@ plotAsPng(@)
       Zeichenfolge &lt;TL&gt; in der .gplot-Datei ersetzt wird.
       Standardm&auml;&szlig;ig wird als &lt;TL&gt; der Dateiname des Logfiles
       eingesetzt.
-      <br>&Uumlberholt, wird durch das plotReplace Attribut abgel&ouml;st.
+      <br>&Uuml;berholt, wird durch das plotReplace Attribut abgel&ouml;st.
       </li><br>
 
   </ul> 

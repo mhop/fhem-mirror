@@ -1167,13 +1167,13 @@ ZWDongle_Ready($)
 
   <li>routeFor &lt;device&gt; &lt;hop1&gt; &lt;hop2&gt; &lt;hop3&gt;
                &lt;hop4&gt; &lt;speed&gt;<br>
-    set priority routing for &ltdevice&gt. &ltdevice&gt and &lt;hopN&gt are
+    set priority routing for &lt;device&gt;. &lt;device&gt; and &lt;hopN&gt are
     either device name or decimal nodeId or 0 for unused.<br>
     &lt;speed&gt;: 1=9,6kbps; 2=40kbps; 3=100kbps
     </li>
 
   <li>sendNIF &lt;device&gt;<br>
-    Send NIF to the specified &lt;device&g.
+    Send NIF to the specified &lt;device&gt;.
     &lt;device&gt; is either device name or decimal nodeId.
     </li>
 

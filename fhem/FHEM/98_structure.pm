@@ -616,7 +616,7 @@ structure_Attr($@)
     [FILTER=&lt;filter&gt;] &lt;type-specific&gt;</code> then
     :FILTER=&lt;filter&gt; will be appended to the device name in the
     propagated set for the attached devices like this: <code>set
-    <devN>:FILTER=&lt;filter&gt; &lt;type-specific&gt;</code><br>
+    &lt;devN&gt;:FILTER=&lt;filter&gt; &lt;type-specific&gt;</code><br>
     If the last set parameter is "reverse", then execute the set commands in
     the reverse order.
   </ul>
@@ -803,7 +803,7 @@ structure_Attr($@)
     Struktur.<br> Wenn das set Kommando diese Form hat <code>set
     &lt;structure&gt; [FILTER=&lt;filter&gt;] &lt;type-specific&gt;</code> wird
     :FILTER=&lt;filter&gt; bei der Weitergebe der set an jeden Devicenamen wie
-    folgt angehängt: <code>set <devN>:FILTER=&lt;filter&gt;
+    folgt angeh&auml;ngt: <code>set &lt;devN&gt;:FILTER=&lt;filter&gt;
     &lt;type-specific&gt;</code><br>
     Falls der letzte Parameter reverse ist, dann werden die Befehle in der
     umgekehrten Reihenfolge ausgef&uuml;hrt.

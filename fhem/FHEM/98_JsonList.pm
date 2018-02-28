@@ -417,10 +417,10 @@ CommandJsonList($$)
         "list": "Global",
         "devices": [
           {
-            "DEF": "<no definition>",
+            "DEF": "&lt;no definition&gt;",
             "NAME": "global",
             "NR": "1",
-            "STATE": "<no definition>",
+            "STATE": "&lt;no definition&gt;",
             "TYPE": "Global",
             "currentlogfile": "/var/log/fhem/fhem-2011-12.log",
             "logfile": "/var/log/fhem/fhem-%Y-%m.log",

@@ -461,7 +461,7 @@ holiday_FW_detailFn($$$$)
       <code>get &lt;name&gt; yesterday</code><br>
       <code>get &lt;name&gt; today</code><br>
       <code>get &lt;name&gt; tomorrow</code><br>
-      <code>get &lt;name&gt; days <offset></code><br>
+      <code>get &lt;name&gt; days &lt;offset&gt;</code><br>
       <br><br>
       Return the holiday name of the specified date or the text none.
       <br><br>
@@ -591,7 +591,7 @@ holiday_FW_detailFn($$$$)
       <code>get &lt;name&gt; yesterday</code><br>
       <code>get &lt;name&gt; today</code><br>
       <code>get &lt;name&gt; tomorrow</code><br>
-      <code>get &lt;name&gt; days <offset></code><br>
+      <code>get &lt;name&gt; days &lt;offset&gt;</code><br>
       <br><br>
       Gibt den Name des Feiertages zum angebenenen Datum zur&uuml;ck oder den
       Text none.
