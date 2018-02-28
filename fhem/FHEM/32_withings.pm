@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 04 / 2017-06-25
+# Release 05 / 2018-03-01
 
 package main;
 
@@ -677,7 +677,7 @@ sub withings_connect($) {
   foreach my $d (keys %defs) {
     next if(!defined($defs{$d}));
     next if($defs{$d}{TYPE} ne "autocreate");
-    return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
+    return undef if(IsDisabled($defs{$d}{NAME}));
   }
 
   my $autocreated = 0;
@@ -717,6 +717,12 @@ sub withings_connect($) {
       my $d = $modules{$hash->{TYPE}}{defptr}{"D$device->{deviceid}"};
       $d->{association} = $device->{association} if($device->{association});
 
+      #get user from association
+      if(defined($device->{deviceproperties})){
+        $d->{User} = $device->{deviceproperties}{linkuserid} if(defined($device->{deviceproperties}{linkuserid}));
+        $d->{color} = $device->{deviceproperties}{product_color} if(defined($device->{deviceproperties}{product_color}));
+      }
+      
       Log3 $name, 2, "$name: device '$device->{deviceid}' already defined";
       next;
     }
@@ -794,6 +800,12 @@ sub withings_autocreate($) {
     if( defined($modules{$hash->{TYPE}}{defptr}{"D$device->{deviceid}"}) ) {
       my $d = $modules{$hash->{TYPE}}{defptr}{"D$device->{deviceid}"};
       $d->{association} = $device->{association} if($device->{association});
+
+      #get user from association
+      if(defined($device->{deviceproperties})){
+        $d->{User} = $device->{deviceproperties}{linkuserid} if(defined($device->{deviceproperties}{linkuserid}));
+        $d->{color} = $device->{deviceproperties}{product_color} if(defined($device->{deviceproperties}{product_color}));
+      }
 
       Log3 $name, 2, "$name: device '$device->{deviceid}' already defined";
       next;
@@ -1449,7 +1461,7 @@ sub withings_poll($;$) {
 
   RemoveInternalTimer($hash);
 
-  return undef if(AttrVal($name,"disable",0) eq "1");
+  return undef if(IsDisabled($name));
 
 
   my $resolve = inet_aton("healthmate.withings.com");
@@ -1575,6 +1587,17 @@ sub withings_getUserReadingsDaily($) {
       enddate => int($enddate),
       callback => \&withings_Dispatch,
   });
+
+#  HttpUtils_NonblockingGet({
+#    url => "https://scalews.health.nokia.com/cgi-bin/v2/activity",
+#    timeout => 60,
+#    noshutdown => 1,
+#    data => {sessionid => $hash->{IODev}->{SessionKey},  userid=> $hash->{User}, startdateymd => $startdateymd, enddateymd => $enddateymd, appname => 'hmw', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getbyuserid'},
+#      hash => $hash,
+#      type => 'userDailyActivity',
+#      enddate => int($enddate),
+#      callback => \&withings_Dispatch,
+#  });
 
   my ($seconds) = gettimeofday();
   $hash->{LAST_POLL} = FmtDateTime( $seconds );
@@ -1760,8 +1783,8 @@ sub withings_parseMeasureGroups($$) {
   my $name = $hash->{NAME};
   #parse
   Log3 "withings", 5, "$name: parsemeasuregroups";
-  my ($now) = time;
-  my $lastupdate = ReadingsVal( $name, ".lastData", 0 );
+  my ($now) = int(time);
+  my $lastupdate = ReadingsVal( $name, ".lastData", ($now-21*24*60*60) );
   my $newlastupdate = $lastupdate;
 
     $hash->{status} = $json->{status};
@@ -1828,7 +1851,7 @@ sub withings_parseMeasurements($$) {
   #parse
   Log3 "withings", 5, "$name: parsemeasurements";
   my ($now) = time;
-  my $lastupdate = ReadingsVal( $name, ".lastData", 0 );
+  my $lastupdate = ReadingsVal( $name, ".lastData", ($now-21*24*60*60) );
   my $newlastupdate = $lastupdate;
   my $i = 0;
 
@@ -1917,7 +1940,7 @@ sub withings_parseAggregate($$) {
 
   #return undef;
   my ($now) = time;
-  my $lastupdate = ReadingsVal( $name, ".lastAggregate", 0 );
+  my $lastupdate = ReadingsVal( $name, ".lastAggregate", ($now-21*24*60*60) );
   my $newlastupdate = $lastupdate;
   my $i = 0;
   my $unfinished;
@@ -2031,7 +2054,7 @@ sub withings_parseActivity($$) {
   Log3 "withings", 5, "$name: parseactivity";
 
   my ($now) = time;
-  my $lastupdate = ReadingsVal( $name, ".lastActivity", 0 );
+  my $lastupdate = ReadingsVal( $name, ".lastActivity", ($now-21*24*60*60) );
   my $newlastupdate = $lastupdate;
   my $i = 0;
   my $unfinished;
@@ -2140,8 +2163,8 @@ sub withings_parseVasistas($$;$) {
   Log3 "withings", 5, "$name: parsevasistas";
 
   my ($now) = time;
-  my $lastupdate = ReadingsVal( $name, ".lastData", 0 );
-  $lastupdate = ReadingsVal( $name, ".lastDebug", 0 ) if($datatype =~ /Debug/);
+  my $lastupdate = ReadingsVal( $name, ".lastData", ($now-21*24*60*60) );
+  $lastupdate = ReadingsVal( $name, ".lastDebug", ($now-21*24*60*60) ) if($datatype =~ /Debug/);
 
   if( $json ) {
     $hash->{status} = $json->{status};
@@ -2254,7 +2277,7 @@ sub withings_parseTimeline($$) {
   Log3 "withings", 5, "$name: parsemetimeline ";
 
   my ($now) = time;
-  my $lastupdate = ReadingsVal( $name, ".lastAlert", 0 );
+  my $lastupdate = ReadingsVal( $name, ".lastAlert", ($now-21*24*60*60) );
   my $newlastupdate = $lastupdate;
 
     $hash->{status} = $json->{status};
@@ -2344,8 +2367,8 @@ sub withings_parseEvents($$) {
   #parse
   Log3 "withings", 5, "$name: parseevents";
   my ($now) = time;
-  my $lastupdate = ReadingsVal( $name, ".lastData", 0 );
-  my $lastalertupdate = ReadingsVal( $name, ".lastAlert", 0 );
+  my $lastupdate = ReadingsVal( $name, ".lastData", ($now-21*24*60*60) );
+  my $lastalertupdate = ReadingsVal( $name, ".lastAlert", ($now-21*24*60*60) );
   my $newlastupdate = $lastupdate;
 
     $hash->{status} = $json->{status};
