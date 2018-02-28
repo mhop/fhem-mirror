@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.14.0       28.02.2018       syncStandby
 # 7.13.3       25.02.2018       commandref revised (forum:#84953)
 # 7.13.2       24.02.2018       DbRep_firstconnect changed, bug fix in DbRep_collaggstr for aggregation = month
 # 7.13.1       20.02.2018       commandref revised
@@ -64,7 +65,7 @@
 #                               now available for "delSeqDoublets"
 # 7.5.3        23.01.2018       new attribute "ftpDumpFilesKeep", version management added to FTP-usage
 # 7.5.2        23.01.2018       fix typo DumpRowsCurrrent, dumpFilesKeep can be set to "0", commandref revised
-# 7.5.1        20.01.2018       DumpDone changed to create background_processing_time before execute "executeAfterProc" 
+# 7.5.1        20.01.2018       DbRep_DumpDone changed to create background_processing_time before execute "executeAfterProc" 
 #                               Commandref updated
 # 7.5.0        16.01.2018       DbRep_OutputWriteToDB, set options display/writeToDB for (max|min|sum|average|diff)Value
 # 7.4.1        14.01.2018       fix old dumpfiles not deleted by dumpMySQL clientSide
@@ -134,7 +135,7 @@
 # 5.2.0        14.06.2017       UTF-8 support for MySQL (fetchrows, srvinfo, expfile, impfile, insert)
 # 5.1.0        13.06.2017       column "UNIT" added to fetchrow result
 # 5.0.6        13.06.2017       add Aria engine to DbRep_mysqlOptimizeTables
-# 5.0.5        12.06.2017       bugfixes in DumpAborted, some changes in dumpMySQL, optimizeTablesBeforeDump added to
+# 5.0.5        12.06.2017       bugfixes in DbRep_DumpAborted, some changes in dumpMySQL, optimizeTablesBeforeDump added to
 #                               mysql_DoDumpServerSide, new reading DumpFileCreatedSize
 # 5.0.4        09.06.2017       some improvements and changes of mysql_DoDump, commandref revised, new attributes 
 #                               executeBeforeDump, executeAfterDump
@@ -320,7 +321,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.13.3";
+my $DbRepVersion = "7.14.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -501,6 +502,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlCmd ":"").
                 (($hash->{ROLE} ne "Agent" && $hl)?"sqlCmdHistory:".$hl." ":"").
+                (($hash->{ROLE} ne "Agent")?"syncStandby ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"dumpMySQL:clientSide,serverSide ":"").
@@ -812,6 +814,14 @@ sub DbRep_Set($@) {
       DbRep_beforeproc($hash, "changeval");
       DbRep_Main($hash,$opt);
 	 
+  }  elsif ($opt =~ m/syncStandby/ && $hash->{ROLE} ne "Agent") {   
+      unless($prop) {return "A DbLog-device (standby) is needed to sync. Use \"set $name syncStandby <DbLog-standby name>\" ";}
+      if(!exists($defs{$prop}) || $defs{$prop}->{TYPE} ne "DbLog") {
+          return "The device \"$prop\" doesn't exist or is not a DbLog-device. ";
+      }
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
+      DbRep_Main($hash,$opt,$prop);
+      
   } else {
       return "$setlist";
   }  
@@ -859,14 +869,14 @@ sub DbRep_Get($@) {
       return "The operation \"$opt\" isn't available with database type $dbmodel" if ($dbmodel ne 'MYSQL');
 	  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
       DbRep_delread($hash);  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
-      $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "ParseAborted", $hash);    
+      $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "DbRep_ParseAborted", $hash);    
   
   } elsif ($opt eq "svrinfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       DbRep_delread($hash); 
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
-      $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "ParseAborted", $hash);      
+      $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "DbRep_ParseAborted", $hash);      
   
   } elsif ($opt eq "blockinginfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
@@ -1323,15 +1333,15 @@ sub DbRep_Main($$;$) {
      
      if($dbmodel =~ /MYSQL/) {
 	     if ($prop eq "serverSide") {
-	         $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_DoDumpServerSide", "$name", "DumpDone", $to, "DumpAborted", $hash);
+	         $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_DoDumpServerSide", "$name", "DbRep_DumpDone", $to, "DbRep_DumpAborted", $hash);
 		     ReadingsSingleUpdateValue ($hash, "state", "serverSide Dump is running - be patient and see Logfile !", 1);
 	     } else {
-	         $hash->{HELPER}{RUNNING_BACKUP_CLIENT} = BlockingCall("mysql_DoDumpClientSide", "$name", "DumpDone", $to, "DumpAborted", $hash);
+	         $hash->{HELPER}{RUNNING_BACKUP_CLIENT} = BlockingCall("mysql_DoDumpClientSide", "$name", "DbRep_DumpDone", $to, "DbRep_DumpAborted", $hash);
 		     ReadingsSingleUpdateValue ($hash, "state", "clientSide Dump is running - be patient and see Logfile !", 1);
 	     }
      }
      if($dbmodel =~ /SQLITE/) {
-         $hash->{HELPER}{RUNNING_BACKUP_CLIENT} = BlockingCall("sqlite_DoDump", "$name", "DumpDone", $to, "DumpAborted", $hash);
+         $hash->{HELPER}{RUNNING_BACKUP_CLIENT} = BlockingCall("DbRep_sqliteDoDump", "$name", "DbRep_DumpDone", $to, "DbRep_DumpAborted", $hash);
          ReadingsSingleUpdateValue ($hash, "state", "SQLite Dump is running - be patient and see Logfile !", 1);    
      }
      return;
@@ -1340,7 +1350,7 @@ sub DbRep_Main($$;$) {
  if ($opt =~ /restoreMySQL/) {	
      BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
      BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
-     $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_RestoreServerSide", "$name|$prop", "RestoreDone", $to, "RestoreAborted", $hash);
+     $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_RestoreServerSide", "$name|$prop", "DbRep_restoreDone", $to, "DbRep_restoreAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "restore database is running - be patient and see Logfile !", 1);
      return;
  }
@@ -1348,7 +1358,7 @@ sub DbRep_Main($$;$) {
  if ($opt =~ /restoreSQLite/) {	
      BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
      BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
-     $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("sqlite_Restore", "$name|$prop", "RestoreDone", $to, "RestoreAborted", $hash);
+     $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("DbRep_sqliteRestore", "$name|$prop", "DbRep_restoreDone", $to, "DbRep_restoreAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "restore database is running - be patient and see Logfile !", 1);
      return;
  }
@@ -1356,7 +1366,7 @@ sub DbRep_Main($$;$) {
  if ($opt =~ /optimizeTables|vacuum/) {	
      BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
      BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));     
-     $hash->{HELPER}{RUNNING_OPTIMIZE} = BlockingCall("DbRep_optimizeTables", "$name", "OptimizeDone", $to, "OptimizeAborted", $hash);
+     $hash->{HELPER}{RUNNING_OPTIMIZE} = BlockingCall("DbRep_optimizeTables", "$name", "DbRep_OptimizeDone", $to, "DbRep_OptimizeAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "optimize tables is running - be patient and see Logfile !", 1);
      return;
  }
@@ -1365,7 +1375,7 @@ sub DbRep_Main($$;$) {
      BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
      BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
      BlockingKill($hash->{HELPER}{RUNNING_REPAIR}) if (exists($hash->{HELPER}{RUNNING_REPAIR}));
-     $hash->{HELPER}{RUNNING_REPAIR} = BlockingCall("sqlite_Repair", "$name", "RepairDone", $to, "RepairAborted", $hash);
+     $hash->{HELPER}{RUNNING_REPAIR} = BlockingCall("DbRep_sqliteRepair", "$name", "DbRep_RepairDone", $to, "DbRep_RepairAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "repair database is running - be patient and see Logfile !", 1);
      return;
  }
@@ -1399,64 +1409,69 @@ sub DbRep_Main($$;$) {
  
  #####  Funktionsaufrufe ##### 
  if ($opt eq "sumValue") {
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$prop§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$prop§$ts", "sumval_ParseDone", $to, "DbRep_ParseAborted", $hash);
 	 
  } elsif ($opt =~ m/countEntries/) {
      my $table = $prop;
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$table§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$table§$device§$reading§$ts", "count_ParseDone", $to, "DbRep_ParseAborted", $hash);
 	 
  } elsif ($opt eq "averageValue") { 
      Log3 ($name, 4, "DbRep $name - averageValue calculation sceme: ".AttrVal($name,"averageCalcForm","avgArithmeticMean"));
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$prop§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$prop§$ts", "averval_ParseDone", $to, "DbRep_ParseAborted", $hash); 
  
  } elsif ($opt eq "fetchrows") {
      my $table = $prop;             
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$table|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$table|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "DbRep_ParseAborted", $hash);
     
  } elsif ($opt =~ /delSeqDoublets/) {
      my $cmd = $prop?$prop:"adviceRemain"; 
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);
     
  } elsif ($opt eq "exportToFile") {            
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name§$device§$reading§$ts", "expfile_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name§$device§$reading§$ts", "expfile_ParseDone", $to, "DbRep_ParseAborted", $hash);
     
  } elsif ($opt eq "importFromFile") {             
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name", "impfile_PushDone", $to, "ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name", "impfile_PushDone", $to, "DbRep_ParseAborted", $hash);
     
  } elsif ($opt eq "maxValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$prop§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$prop§$ts", "maxval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
          
  } elsif ($opt eq "minValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$prop§$ts", "minval_ParseDone", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$prop§$ts", "minval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
          
  } elsif ($opt eq "delEntries") {         
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "DbRep_ParseAborted", $hash);        
  
  } elsif ($opt eq "tableCurrentPurge") {
      undef $runtime_string_first;
      undef $runtime_string_next;      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|current|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|current|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "DbRep_ParseAborted", $hash);        
  
  } elsif ($opt eq "tableCurrentFillup") {         
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "currentfillup_Done", $to, "ParseAborted", $hash);        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "currentfillup_Done", $to, "DbRep_ParseAborted", $hash);        
  
  } elsif ($opt eq "diffValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$prop§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$prop§$ts", "diffval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
          
  } elsif ($opt eq "insert") { 
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "DbRep_ParseAborted", $hash);   
          
  } elsif ($opt =~ /deviceRename|readingRename/) { 
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("change_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "change_Done", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("change_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "change_Done", $to, "DbRep_ParseAborted", $hash);   
          
  } elsif ($opt =~ /changeValue/) {
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("changeval_Push", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts", "change_Done", $to, "ParseAborted", $hash);   
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("changeval_Push", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts", "change_Done", $to, "DbRep_ParseAborted", $hash);   
      
  } elsif ($opt =~ /sqlCmd/ ) {
     # Execute a generic sql command
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "ParseAborted", $hash);     
+    $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "DbRep_ParseAborted", $hash);     
+ 
+ } elsif ($opt =~ /syncStandby/ ) {
+    # Befehl vor Procedure ausführen
+    DbRep_beforeproc($hash, "syncStandby");
+    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_syncStandby", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts§$prop", "DbRep_syncStandbyDone", $to, "DbRep_ParseAborted", $hash);     
  }
-
+                              
 $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
 return;
 }
@@ -2022,14 +2037,11 @@ sub averval_DoParse($) {
 
  # Background-Startzeit
  my $bst = [gettimeofday];
- 
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall averval_DoParse");
 
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
      return "$name|''|$device|$reading|''|$err|''";
  }
      
@@ -2098,7 +2110,6 @@ sub averval_DoParse($) {
              $err = encode_base64($@,"");
              Log3 ($name, 2, "DbRep $name - $@");
              $dbh->disconnect;
-             Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
              return "$name|''|$device|$reading|''|$err|''";
          }
 	 
@@ -2140,7 +2151,6 @@ sub averval_DoParse($) {
                  $err = encode_base64($@,"");
                  Log3 ($name, 2, "DbRep $name - $@");
                  $dbh->disconnect;
-                 Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
                  return "$name|''|$device|$reading|''|$err|''";
              }
              my $val = $sth->fetchrow_array();
@@ -2199,7 +2209,6 @@ sub averval_DoParse($) {
              $err = encode_base64($@,"");
              Log3 ($name, 2, "DbRep $name - $@");
              $dbh->disconnect;
-             Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
              return "$name|''|$device|$reading|''|$err|''";
          }
          
@@ -2225,7 +2234,6 @@ sub averval_DoParse($) {
                  $err = encode_base64($@,"");
                  Log3 ($name, 2, "DbRep $name - $@");
                  $dbh->disconnect;
-                 Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
                  return "$name|''|$device|$reading|''|$err|''";
              }         
 
@@ -2272,7 +2280,6 @@ sub averval_DoParse($) {
      if ($err) {
          Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
          $err = encode_base64($err,"");
-         Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
          return "$name|''|$device|$reading|''|$err|''";
      }
      $rt = $rt+$wrt;
@@ -2280,8 +2287,6 @@ sub averval_DoParse($) {
   
  # Daten müssen als Einzeiler zurückgegeben werden
  $arrstr = encode_base64($arrstr,"");
- 
- Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -2310,13 +2315,10 @@ sub averval_ParseDone($) {
   my $irowdone   = $a[6];
   my $reading_runtime_string;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall averval_ParseDone");
-  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall averval_ParseDone finished");
       return;
   }
   
@@ -2361,7 +2363,6 @@ sub averval_ParseDone($) {
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall averval_ParseDone finished");
   
 return;
 }
@@ -2383,13 +2384,10 @@ sub count_DoParse($) {
  # Background-Startzeit
  my $bst = [gettimeofday];
  
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall count_DoParse");
- 
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall count_DoParse finished");
      return "$name|''|$device|$reading|''|$err|$table";
  }
      
@@ -2429,7 +2427,6 @@ sub count_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall count_DoParse finished");
          return "$name|''|$device|$reading|''|$err|$table";
      }
 	 
@@ -2455,8 +2452,6 @@ sub count_DoParse($) {
  
  # Daten müssen als Einzeiler zurückgegeben werden
  $arrstr = encode_base64($arrstr,"");
- 
- Log3 ($name, 4, "DbRep $name -> BlockingCall count_DoParse finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -2485,13 +2480,10 @@ sub count_ParseDone($) {
   my $table      = $a[6];
   my $reading_runtime_string;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall count_ParseDone");
-  
    if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall count_ParseDone finished");
       return;
   }
   
@@ -2525,7 +2517,6 @@ sub count_ParseDone($) {
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall count_ParseDone finished");
   
 return;
 }
@@ -2546,14 +2537,11 @@ sub maxval_DoParse($) {
 
  # Background-Startzeit
  my $bst = [gettimeofday];
-
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall maxval_DoParse");
   
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
      return "$name|''|$device|$reading|''|$err|''";
  }
      
@@ -2595,7 +2583,6 @@ sub maxval_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
          return "$name|''|$device|$reading|''|$err|''";
      } 
          
@@ -2641,7 +2628,6 @@ sub maxval_DoParse($) {
      if (!looks_like_number($value)) {
          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in maxValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
          $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
-         Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
          return "$name|''|$device|$reading|''|$err|''";
      }
       
@@ -2682,15 +2668,12 @@ sub maxval_DoParse($) {
      if ($err) {
          Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
          $err = encode_base64($err,"");
-         Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
          return "$name|''|$device|$reading|''|$err|''";
      }
      $rt = $rt+$wrt;
  }
  
  my $rowlist = encode_base64($rows,"");
-  
- Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_DoParse finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -2719,13 +2702,10 @@ sub maxval_ParseDone($) {
   my $irowdone  = $a[6];
   my $reading_runtime_string;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall maxval_ParseDone");
-  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_ParseDone finished");
       return;
   }
   
@@ -2763,7 +2743,6 @@ sub maxval_ParseDone($) {
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_ParseDone finished");
   
 return;
 }
@@ -2784,14 +2763,11 @@ sub minval_DoParse($) {
 
  # Background-Startzeit
  my $bst = [gettimeofday];
-
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall minval_DoParse");
   
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
      return "$name|''|$device|$reading|''|$err|''";
  }
      
@@ -2833,7 +2809,6 @@ sub minval_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
          return "$name|''|$device|$reading|''|$err|''";
      } 
          
@@ -2883,7 +2858,6 @@ sub minval_DoParse($) {
          # $a[-1] =~ s/\s+$//g;
          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in minValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
          $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
-         Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
          return "$name|''|$device|$reading|''|$err|''";
      }
       
@@ -2923,15 +2897,12 @@ sub minval_DoParse($) {
      if ($err) {
          Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
          $err = encode_base64($err,"");
-         Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
          return "$name|''|$device|$reading|''|$err|''";
      }
      $rt = $rt+$wrt;
  }
  
  my $rowlist = encode_base64($rows,"");
-  
- Log3 ($name, 4, "DbRep $name -> BlockingCall minval_DoParse finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -2960,13 +2931,10 @@ sub minval_ParseDone($) {
   my $irowdone  = $a[6];
   my $reading_runtime_string;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall minval_ParseDone");
-  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall minval_ParseDone finished");
       return;
   }
   
@@ -3004,7 +2972,6 @@ sub minval_ParseDone($) {
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall minval_ParseDone finished");
   
 return;
 }
@@ -3026,15 +2993,12 @@ sub diffval_DoParse($) {
 
  # Background-Startzeit
  my $bst = [gettimeofday];
- 
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall diffval_DoParse");
   
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
      return "$name|''|$device|$reading|''|''|''|$err|''";
  }
      
@@ -3077,7 +3041,6 @@ sub diffval_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
          return "$name|''|$device|$reading|''|''|''|$err|''";
      }
 	 
@@ -3095,7 +3058,6 @@ sub diffval_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
          return "$name|''|$device|$reading|''|''|''|$err|''";
      
 	 } else {
@@ -3185,7 +3147,6 @@ sub diffval_DoParse($) {
           $a[3] =~ s/\s+$//g;
           Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
           $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
-          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
           return "$name|''|$device|$reading|''|''|''|$err|''";
       }
 
@@ -3269,15 +3230,12 @@ sub diffval_DoParse($) {
      if ($err) {
          Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
          $err = encode_base64($err,"");
-         Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
          return "$name|''|$device|$reading|''|''|''|$err|''";
      }
      $rt = $rt+$wrt;
  }
  
  my $rowlist = encode_base64($rows,"");
-  
- Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -3309,13 +3267,10 @@ sub diffval_ParseDone($) {
   my $reading_runtime_string;
   my $difflimit  = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptoert werden (Ausreißer eliminieren)AttrVal($name, "diffAccept", "20");
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall diffval_ParseDone");
-  
    if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
       return;
   }
 
@@ -3372,7 +3327,6 @@ sub diffval_ParseDone($) {
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
   
 return;
 }
@@ -3394,13 +3348,10 @@ sub sumval_DoParse($) {
  # Background-Startzeit
  my $bst = [gettimeofday];
  
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall sumval_DoParse");
- 
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
      return "$name|''|$device|$reading|''|$err|''";
  }
      
@@ -3451,7 +3402,6 @@ sub sumval_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
          return "$name|''|$device|$reading|''|$err|''";
      }
 	 
@@ -3482,7 +3432,6 @@ sub sumval_DoParse($) {
      if ($err) {
          Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
          $err = encode_base64($err,"");
-         Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
          return "$name|''|$device|$reading|''|$err|''";
      }
      $rt = $rt+$wrt;
@@ -3490,8 +3439,6 @@ sub sumval_DoParse($) {
   
  # Daten müssen als Einzeiler zurückgegeben werden
  $arrstr = encode_base64($arrstr,"");
- 
- Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_DoParse finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -3520,13 +3467,10 @@ sub sumval_ParseDone($) {
   my $irowdone   = $a[6];
   my $reading_runtime_string;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall sumval_ParseDone");
-  
    if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_ParseDone finished");
       return;
   }
   
@@ -3559,7 +3503,6 @@ sub sumval_ParseDone($) {
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});  
-  Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_ParseDone finished");
   
 return;
 }
@@ -3581,14 +3524,11 @@ sub del_DoParse($) {
  # Background-Startzeit
  my $bst = [gettimeofday];
  
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall del_DoParse");
- 
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall del_DoParse finished");
      return "$name|''|''|$err|''|''|''";
  }
  
@@ -3615,7 +3555,6 @@ sub del_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
-     Log3 ($name, 4, "DbRep $name -> BlockingCall del_DoParse finished");
      return "$name|''|''|$err|''|''|''";
  } 
      
@@ -3627,7 +3566,6 @@ sub del_DoParse($) {
  my $rt = tv_interval($st);
  
  Log3 ($name, 5, "DbRep $name - Number of deleted rows: $rows");
- Log3 ($name, 4, "DbRep $name -> BlockingCall del_DoParse finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -3655,13 +3593,10 @@ sub del_ParseDone($) {
   my $reading    = $a[6];
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g; 
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall del_ParseDone");
-  
    if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall del_ParseDone finished");
       return;
   }
  
@@ -3689,7 +3624,6 @@ sub del_ParseDone($) {
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall del_ParseDone finished");
   
 return;
 }
@@ -3710,8 +3644,6 @@ sub insert_Push($) {
  
  # Background-Startzeit
  my $bst = [gettimeofday];
-
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall insert_Push");
  
  my $dbh;
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
@@ -3719,12 +3651,11 @@ sub insert_Push($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
      return "$name|''|''|$err";
  }
  
  # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
- my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbh);
+ my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
   
  my $i_timestamp = $hash->{HELPER}{I_TIMESTAMP};
  my $i_device    = $hash->{HELPER}{I_DEVICE};
@@ -3753,7 +3684,6 @@ sub insert_Push($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
 	 $dbh->disconnect();
      return "$name|''|''|$err";
  }
@@ -3768,7 +3698,6 @@ sub insert_Push($) {
      Log3 ($name, 2, "DbRep $name - Insert new dataset into database failed".($usepkh?" (possible PK violation) ":": ")."$@");
      $dbh->rollback();
      $dbh->disconnect();
-     Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
      return "$name|''|''|$err";
  } else {
      $dbh->commit();
@@ -3778,8 +3707,6 @@ sub insert_Push($) {
 
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
- 
- Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -3802,8 +3729,6 @@ sub insert_Done($) {
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[3]?decode_base64($a[3]):undef;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall insert_Done");
-  
   my $i_timestamp = delete $hash->{HELPER}{I_TIMESTAMP};
   my $i_device    = delete $hash->{HELPER}{I_DEVICE};
   my $i_type      = delete $hash->{HELPER}{I_TYPE};
@@ -3816,7 +3741,6 @@ sub insert_Done($) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Done finished");
       return;
   } 
 
@@ -3834,7 +3758,6 @@ sub insert_Done($) {
   Log3 ($name, 5, "DbRep $name - Inserted into database $hash->{DATABASE} table 'history': Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");  
 
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Done finished");
   
 return;
 }
@@ -3856,8 +3779,6 @@ sub currentfillup_Push($) {
  
  # Background-Startzeit
  my $bst = [gettimeofday];
-
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall currentfillup_Push");
  
  my $dbh;
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
@@ -3865,12 +3786,11 @@ sub currentfillup_Push($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Push finished");
      return "$name|''|''|$err|''|''";
  }
  
  # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
- my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbh);
+ my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
  
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
  my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
@@ -3970,7 +3890,6 @@ sub currentfillup_Push($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Push finished");
 	 $dbh->disconnect();
      return "$name|''|''|$err|''|''";
  }
@@ -3985,7 +3904,6 @@ sub currentfillup_Push($) {
      Log3 ($name, 2, "DbRep $name - Insert new dataset into database failed".($usepkh?" (possible PK violation) ":": ")."$@");
      $dbh->rollback();
      $dbh->disconnect();
-     Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Push finished");
      return "$name|''|''|$err|''|''";
  } else {
      $dbh->commit();
@@ -3995,8 +3913,6 @@ sub currentfillup_Push($) {
  
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
- 
- Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -4024,13 +3940,10 @@ sub currentfillup_Done($) {
   undef $device if ($device =~ m(^%$));
   undef $reading if ($reading =~ m(^%$));
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall currentfillup_Done"); 
-  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Done finished");
       return;
   } 
 
@@ -4051,7 +3964,6 @@ sub currentfillup_Done($) {
   Log3 ($name, 3, "DbRep $name - Table '$hash->{DATABASE}'.'current' filled up with rows: $rowstr");
 
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall currentfillup_Done finished");
   
 return;
 }
@@ -4073,15 +3985,12 @@ sub change_Push($) {
  
  # Background-Startzeit
  my $bst = [gettimeofday];
-
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall change_Push");
  
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall change_Push finished");
      return "$name|''|''|$err";
  }
  
@@ -4137,7 +4046,6 @@ sub change_Push($) {
      Log3 ($name, 2, "DbRep $name - Failed to rename old $m name \"$old\" to new $m name \"$new\": $@");
 	 $dbh->rollback() if(!$dbh->{AutoCommit});
      $dbh->disconnect();
-     Log3 ($name, 4, "DbRep $name -> BlockingCall change_Push finished");
      return "$name|''|''|$err";
  } else {
      $dbh->commit() if(!$dbh->{AutoCommit});
@@ -4147,8 +4055,6 @@ sub change_Push($) {
 
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
- 
- Log3 ($name, 4, "DbRep $name -> BlockingCall change_Push finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -4176,15 +4082,12 @@ sub changeval_Push($) {
  
  # Background-Startzeit
  my $bst = [gettimeofday];
-
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall changeval_Push");
  
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
  
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
      return "$name|''|''|$err";
  }
 
@@ -4231,7 +4134,6 @@ sub changeval_Push($) {
          Log3 ($name, 2, "DbRep $name - Failed to change old value \"$old\" to new value \"$new\": $@");
 	     $dbh->rollback() if(!$dbh->{AutoCommit});
          $dbh->disconnect();
-         Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
          return "$name|''|''|$err";
      } else {
          $dbh->commit() if(!$dbh->{AutoCommit});
@@ -4271,7 +4173,6 @@ sub changeval_Push($) {
              $err = encode_base64($@,"");
              Log3 ($name, 2, "DbRep $name - $@");
              $dbh->disconnect;
-             Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
              return "$name|''|''|$err";
          }
          
@@ -4294,7 +4195,6 @@ sub changeval_Push($) {
                  $err = encode_base64($@,"");
                  Log3 ($name, 2, "DbRep $name - $@");
                  $dbh->disconnect;
-                 Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
                  return "$name|''|''|$err";
              }
              
@@ -4320,7 +4220,6 @@ sub changeval_Push($) {
                  Log3 ($name, 2, "DbRep $name - Failed to change old value \"$old\" to new value \"$new\": $@");
 	             $dbh->rollback() if(!$dbh->{AutoCommit});
                  $dbh->disconnect();
-                 Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
                  return "$name|''|''|$err";
              } else {
                  $dbh->commit() if(!$dbh->{AutoCommit});
@@ -4334,8 +4233,6 @@ sub changeval_Push($) {
 
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
- 
- Log3 ($name, 4, "DbRep $name -> BlockingCall changeval_Push finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -4360,15 +4257,15 @@ sub change_Done($) {
   my $old        = $a[4];
   my $new        = $a[5]; 
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall change_Done");
-  
   my $renmode = delete $hash->{HELPER}{RENMODE};
+  
+  # Befehl nach Procedure ausführen
+  my $erread = DbRep_afterproc($hash, $renmode);
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall change_Done finished");
       return;
   } 
 
@@ -4397,9 +4294,6 @@ sub change_Done($) {
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
   
-  # Befehl nach Procedure ausführen
-  my $erread = DbRep_afterproc($hash, $renmode);
-  
   if ($urow != 0) {
       Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - DEVICE renamed in \"$hash->{DATABASE}\", old: \"$old\", new: \"$new\", number: $urow ") if($renmode eq "devren"); 
 	  Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - READING renamed in \"$hash->{DATABASE}\", old: \"$old\", new: \"$new\", number: $urow ") if($renmode eq "readren"); 
@@ -4411,7 +4305,6 @@ sub change_Done($) {
   }
 
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall change_Done finished");
   
 return;
 }
@@ -4437,13 +4330,10 @@ sub fetchrows_DoParse($) {
  # Background-Startzeit
  my $bst = [gettimeofday];
 
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall fetchrows_DoParse");
-
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_DoParse finished");
      return "$name|''|''|$err|''";
  }
 
@@ -4470,7 +4360,6 @@ sub fetchrows_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
-     Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_DoParse finished");
      return "$name|''|''|$err|''";
  } 
  
@@ -4496,8 +4385,6 @@ sub fetchrows_DoParse($) {
  
  # Daten müssen als Einzeiler zurückgegeben werden
  $rowlist = encode_base64($rowlist,"");
- 
- Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_DoParse finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -4529,13 +4416,10 @@ sub fetchrows_ParseDone($) {
   my @row;
   my $reading_runtime_string;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall fetchrows_ParseDone");
-  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_ParseDone finished");
       return;
   } 
   
@@ -4596,7 +4480,6 @@ sub fetchrows_ParseDone($) {
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_ParseDone finished");
   
 return;
 }
@@ -4622,13 +4505,10 @@ sub delseqdoubl_DoParse($) {
  # Background-Startzeit
  my $bst = [gettimeofday];
 
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall delseqdoubl_DoParse");
-
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall delseqdoubl_DoParse finished");
      return "$name|''|''|$err|''|$opt";
  }
 
@@ -4671,7 +4551,6 @@ sub delseqdoubl_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall delseqdoubl_DoParse finished");
          return "$name|''|''|$err|''|$opt";
      } 
  
@@ -4722,7 +4601,6 @@ sub delseqdoubl_DoParse($) {
                      $err = encode_base64($@,"");
                      Log3 ($name, 2, "DbRep $name - $@");
                      $dbh->disconnect;
-                     Log3 ($name, 4, "DbRep $name -> BlockingCall delseqdoubl_DoParse finished");
                      return "$name|''|''|$err|''|$opt";
                  } 
 				 $ndel = $ndel+$sthd->rows;
@@ -4774,8 +4652,6 @@ sub delseqdoubl_DoParse($) {
  # Daten müssen als Einzeiler zurückgegeben werden
  $rowlist = encode_base64($rowlist,"");
  
- Log3 ($name, 4, "DbRep $name -> BlockingCall delseqdoubl_DoParse finished");
- 
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
 
@@ -4805,13 +4681,10 @@ sub delseqdoubl_ParseDone($) {
   my $reading_runtime_string;
   my $erread;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall delseqdoubl_ParseDone");
-  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall delseqdoubl_ParseDone finished");
       return;
   } 
   
@@ -4856,7 +4729,6 @@ sub delseqdoubl_ParseDone($) {
   readingsEndUpdate($hash, 1);
 
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall delseqdoubl_ParseDone finished");
 return;
 }
 
@@ -4878,15 +4750,12 @@ sub expfile_DoParse($) {
 
  # Background-Startzeit
  my $bst = [gettimeofday];
- 
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall expfile_DoParse");
 
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
      return "$name|''|''|$err|''|''";
  }
  
@@ -4934,7 +4803,6 @@ sub expfile_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
          return "$name|''|''|$err|''|''";
      } 
  
@@ -4953,8 +4821,6 @@ sub expfile_DoParse($) {
 
  $sth->finish;
  $dbh->disconnect;
- 
- Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_DoParse finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -4981,13 +4847,10 @@ sub expfile_ParseDone($) {
   my $reading    = $a[5];
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g; 
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall expfile_ParseDone");
-  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_ParseDone finished");
       return;
   } 
  
@@ -5006,9 +4869,7 @@ sub expfile_ParseDone($) {
   my $rows = $ds.$rds.$nrows;
   Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file ".AttrVal($name, "expimpfile", undef).": $rows.");
 
-
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall expfile_ParseDone finished");
   
 return;
 }
@@ -5031,28 +4892,24 @@ sub impfile_Push($) {
 
  # Background-Startzeit
  my $bst = [gettimeofday];
- 
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall impfile_Push");
 
  my $dbh;
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
      return "$name|''|''|$err";
  }
  
  # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
- my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbh);
+ my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
  
  my $infile = AttrVal($name, "expimpfile", undef);
  if (open(FH, "<:utf8", "$infile")) {
      binmode (FH) if(!$utf8);
  } else {
      $err = encode_base64("could not open ".$infile.": ".$!,"");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
      return "$name|''|''|$err";
  }
  
@@ -5080,7 +4937,6 @@ sub impfile_Push($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
 	 $dbh->disconnect();
      return "$name|''|''|$err";
  }
@@ -5115,7 +4971,6 @@ sub impfile_Push($) {
          Log3 ($name, 2, "DbRep $name -> ERROR - Import from file $infile was not done. Invalid date/time field format in row $irowcount.");    
          close(FH);
          $dbh->rollback;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
          return "$name|''|''|$err";
      }
      
@@ -5140,7 +4995,6 @@ sub impfile_Push($) {
              close(FH);
              $dbh->rollback;
              $dbh->disconnect;
-             Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
              return "$name|''|''|$err";
          } else {
              $irowdone++
@@ -5153,7 +5007,6 @@ sub impfile_Push($) {
          close(FH);
          $dbh->rollback;
          $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
          return "$name|''|''|$err";
      }   
  }
@@ -5164,8 +5017,6 @@ sub impfile_Push($) {
  
  # SQL-Laufzeit ermitteln
  my $rt = tv_interval($st);
- 
- Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_Push finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -5188,13 +5039,10 @@ sub impfile_PushDone($) {
   my $err        = $a[3]?decode_base64($a[3]):undef;
   my $name       = $hash->{NAME};
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall impfile_PushDone");
-  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_PushDone finished");
       return;
   } 
  
@@ -5211,7 +5059,6 @@ sub impfile_PushDone($) {
   Log3 ($name, 3, "DbRep $name - Number of imported datasets to $hash->{DATABASE} from file ".AttrVal($name, "expimpfile", undef).": $irowdone");  
 
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall impfile_PushDone finished");
   
 return;
 }
@@ -5237,15 +5084,12 @@ sub sqlCmd_DoParse($) {
   # Background-Startzeit
   my $bst = [gettimeofday];
 
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall sqlCmd_DoParse");
-
   my $dbh;
-  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
+  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  
   if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlCmd_DoParse finished");
      return "$name|''|$opt|$cmd|''|''|$err";
   }
      
@@ -5275,7 +5119,6 @@ sub sqlCmd_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - ERROR - $@");
      $dbh->disconnect;
-     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlCmd_DoParse finished");
      return "$name|''|$opt|$sql|''|''|$err";       
   }
  
@@ -5300,7 +5143,6 @@ sub sqlCmd_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - ERROR - $@");
          $dbh->disconnect;
-         Log3 ($name, 4, "DbRep $name -> BlockingCall sqlCmd_DoParse finished");
          return "$name|''|$opt|$sql|''|''|$err";       
      }
 	 
@@ -5319,8 +5161,6 @@ sub sqlCmd_DoParse($) {
   # Daten müssen als Einzeiler zurückgegeben werden
   my $rowstring = join("§", @rows); 
   $rowstring = encode_base64($rowstring,"");
-
-  Log3 ($name, 4, "DbRep $name -> BlockingCall count_DoParse finished");
 
   # Background-Laufzeit ermitteln
   my $brt = tv_interval($bst);
@@ -5348,13 +5188,10 @@ sub sqlCmd_ParseDone($) {
   my $srf        = AttrVal($name, "sqlResultFormat", "separated");
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall sqlCmd_ParseDone");
-  
   if ($err) {
     ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
     ReadingsSingleUpdateValue ($hash, "state", "error", 1);
     delete($hash->{HELPER}{RUNNING_PID});
-    Log3 ($name, 4, "DbRep $name -> BlockingCall sqlCmd_ParseDone finished");
     return;
   }
   
@@ -5446,7 +5283,6 @@ sub sqlCmd_ParseDone($) {
   readingsEndUpdate($hash, 1);
   
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall count_ParseDone finished");
   
 return;
 }
@@ -5474,14 +5310,11 @@ sub dbmeta_DoParse($) {
  # Background-Startzeit
  my $bst = [gettimeofday];
  
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall dbmeta_DoParse");
- 
  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
      return "$name|''|''|''|$err";
  }
  
@@ -5508,7 +5341,6 @@ sub dbmeta_DoParse($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
-     Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
      return "$name|''|''|''|$err";
  }
  
@@ -5534,7 +5366,6 @@ sub dbmeta_DoParse($) {
              $err = encode_base64($@,"");
              Log3 ($name, 2, "DbRep $name - $@");
              $dbh->disconnect;
-             Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
              return "$name|''|''|''|$err";
          
 		 } else {
@@ -5613,7 +5444,6 @@ sub dbmeta_DoParse($) {
              $err = encode_base64($@,"");
              Log3 ($name, 2, "DbRep $name - $@");
              $dbh->disconnect;
-             Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
              return "$name|''|''|''|$err";
          } else {
 		     # kein error bei sql-execute
@@ -5632,7 +5462,6 @@ sub dbmeta_DoParse($) {
              $err = encode_base64($@,"");
              Log3 ($name, 2, "DbRep $name - $@");
              $dbh->disconnect;
-             Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
              return "$name|''|''|''|$err";
          } else {
 		     if($utf8) {
@@ -5653,8 +5482,6 @@ sub dbmeta_DoParse($) {
  
  # Daten müssen als Einzeiler zurückgegeben werden
  $rowlist = encode_base64($rowlist,"");
- 
- Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_DoParse finished");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -5678,13 +5505,10 @@ sub dbmeta_ParseDone($) {
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[4]?decode_base64($a[4]):undef;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall dbmeta_ParseDone");
-  
    if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
-      Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_ParseDone finished");
       return;
   }
     
@@ -5715,7 +5539,6 @@ sub dbmeta_ParseDone($) {
   # InternalTimer(time+0.5, "browser_refresh", $hash, 0);
   
   delete($hash->{HELPER}{RUNNING_PID});
-  Log3 ($name, 4, "DbRep $name -> BlockingCall dbmeta_ParseDone finished");
   
 return;
 }
@@ -5737,8 +5560,6 @@ sub DbRep_optimizeTables($) {
  my ($dbh,$sth,$query,$err,$r,$db_MB_start,$db_MB_end);
  my (%db_tables,@tablenames);
  
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall DbRep_optimizeTables");
- 
  # Background-Startzeit
  my $bst = [gettimeofday];
  
@@ -5747,7 +5568,6 @@ sub DbRep_optimizeTables($) {
  if ($@) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
      return "$name|''|$err|''|''";
  }
  
@@ -5767,7 +5587,6 @@ sub DbRep_optimizeTables($) {
      if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
-         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
 		 $sth->finish;
 		 $dbh->disconnect;
          return "$name|''|$err|''|''";
@@ -5796,7 +5615,6 @@ sub DbRep_optimizeTables($) {
          $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
 	     Log3 ($name, 2, "DbRep $name - $err");
 	     $err = encode_base64($@,"");
-         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
 		 $sth->finish;
 		 $dbh->disconnect;
          return "$name|''|$err|''|''";
@@ -5825,7 +5643,6 @@ sub DbRep_optimizeTables($) {
 	 if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! SQLite-Error: ".$@);
-         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
 		 $sth->finish;
 		 $dbh->disconnect;
          return "$name|''|$err|''|''";
@@ -5846,7 +5663,6 @@ sub DbRep_optimizeTables($) {
      if ($@) {
 	     $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! PostgreSQL-Error: ".$@);
-         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
 	     $sth->finish;
 	     $dbh->disconnect;
          return "$name|''|$err|''|''";
@@ -5869,7 +5685,6 @@ sub DbRep_optimizeTables($) {
 	 if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! PostgreSQL-Error: ".$@);
-         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
 		 $sth->finish;
 		 $dbh->disconnect;
          return "$name|''|$err|''|''";
@@ -5884,7 +5699,6 @@ sub DbRep_optimizeTables($) {
      if ($@) {
 	     $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! PostgreSQL-Error: ".$@);
-         Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
 	     $sth->finish;
 	     $dbh->disconnect;
          return "$name|''|$err|''|''";
@@ -5908,8 +5722,6 @@ sub DbRep_optimizeTables($) {
  $rt = $rt.",".$brt;
  
  Log3 ($name, 3, "DbRep $name - Optimize tables of database $dbname finished, total time used: ".sprintf("%.0f",$brt)." sec.");
-
- Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
  
 return "$name|$rt|''|$db_MB_start|$db_MB_end";
 }
@@ -5917,7 +5729,7 @@ return "$name|$rt|''|$db_MB_start|$db_MB_end";
 ####################################################################################################
 #             Auswertungsroutine optimize tables
 ####################################################################################################
-sub OptimizeDone($) {
+sub DbRep_OptimizeDone($) {
   my ($string)     = @_;
   my @a            = split("\\|",$string);
   my $hash         = $defs{$a[0]};
@@ -5929,14 +5741,11 @@ sub OptimizeDone($) {
   my $name         = $hash->{NAME};
   my $erread;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall OptimizeDone");
-  
   delete($hash->{HELPER}{RUNNING_OPTIMIZE});
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      Log3 ($name, 4, "DbRep $name -> BlockingCall OptimizeDone finished");
       return;
   } 
  
@@ -5957,8 +5766,6 @@ sub OptimizeDone($) {
   readingsEndUpdate($hash, 1);
 
   Log3 ($name, 3, "DbRep $name - Optimize tables finished successfully. ");
-
-  Log3 ($name, 4, "DbRep $name -> BlockingCall OptimizeDone finished");
   
 return;
 }
@@ -5998,8 +5805,6 @@ sub mysql_DoDumpClientSide($) {
  # Background-Startzeit
  my $bst = [gettimeofday];
  
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall mysql_DoDumpClientSide");
- 
  Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname'");
 
  #####################  Beginn Dump  ######################## 
@@ -6023,7 +5828,6 @@ sub mysql_DoDumpClientSide($) {
  if ($@) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
      return "$name|''|$err|''|''|''|''|''|''|''";
  }
  
@@ -6037,7 +5841,6 @@ sub mysql_DoDumpClientSide($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 	 $dbh->disconnect;
      return "$name|''|$err|''|''|''|''|''|''|''";
  }
@@ -6091,7 +5894,6 @@ sub mysql_DoDumpClientSide($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 	 $dbh->disconnect;
      return "$name|''|$err|''|''|''|''|''|''|''";
  }
@@ -6156,7 +5958,6 @@ sub mysql_DoDumpClientSide($) {
      $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
 	 Log3 ($name, 2, "DbRep $name - $err");
 	 $err = encode_base64($@,"");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 	 $dbh->disconnect;
      return "$name|''|$err|''|''|''|''|''|''|''";
  }
@@ -6194,7 +5995,6 @@ sub mysql_DoDumpClientSide($) {
 		     $err = "Fatal error sending Query '".$sql_create."' ! MySQL-Error: ".$@;
              Log3 ($name, 2, "DbRep $name - $err");
 			 $err = encode_base64($@,"");
-             Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 			 $dbh->disconnect;
              return "$name|''|$err|''|''|''|''|''|''|''";
          }
@@ -6237,7 +6037,6 @@ sub mysql_DoDumpClientSide($) {
  if ($err) {
      Log3 ($name, 2, "DbRep $name - $err");
 	 $err = encode_base64($err,"");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
      return "$name|''|$err|''|''|''|''|''|''|''";
  } else {
      Log3 ($name, 5, "DbRep $name - New dumpfile $sql_file has been created.");
@@ -6272,7 +6071,6 @@ sub mysql_DoDumpClientSide($) {
 			 $err = "Fatal error sending Query '".$sql_create."' ! MySQL-Error: ".$@;
              Log3 ($name, 2, "DbRep $name - $err");
 			 $err = encode_base64($@,"");
-             Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 			 $dbh->disconnect;
              return "$name|''|$err|''|''|''|''|''|''|''";
          }
@@ -6309,7 +6107,6 @@ sub mysql_DoDumpClientSide($) {
 				 $err = "Fatal error sending Query '".$sql_create."' ! MySQL-Error: ".$@;
                  Log3 ($name, 2, "DbRep $name - $err");
 				 $err = encode_base64($@,"");
-                 Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 				 $dbh->disconnect;
                  return "$name|''|$err|''|''|''|''|''|''|''";
              }
@@ -6345,7 +6142,6 @@ sub mysql_DoDumpClientSide($) {
 				     $err = "Fatal error sending Query '".$sql_daten."' ! MySQL-Error: ".$@;
                      Log3 ($name, 2, "DbRep $name - $err");
 					 $err = encode_base64($@,"");
-                     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
 					 $dbh->disconnect;
                      return "$name|''|$err|''|''|''|''|''|''|''";
                  }
@@ -6429,7 +6225,6 @@ sub mysql_DoDumpClientSide($) {
  $fsize = encode_base64($fsize,"");
  
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname, total time used: ".sprintf("%.0f",$brt)." sec.");
- Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpClientSide finished");
  
 return "$name|$rt|''|$dump_path$backupfile|$drc|$drh|$fsize|$ftp|$bfd|$ffd";
 }
@@ -6455,8 +6250,6 @@ sub mysql_DoDumpServerSide($) {
  my ($dbh,$sth,$err,$db_MB_start,$db_MB_end,$drh);
  my (%db_tables,@tablenames);
  
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall mysql_DoDumpServerSide");
- 
  # Background-Startzeit
  my $bst = [gettimeofday];
  
@@ -6465,7 +6258,6 @@ sub mysql_DoDumpServerSide($) {
  if ($@) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
      return "$name|''|$err|''|''|''|''|''|''|''";
  }
  
@@ -6483,7 +6275,6 @@ sub mysql_DoDumpServerSide($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
 	 $dbh->disconnect;
      return "$name|''|$err|''|''|''|''|''|''|''";
  }
@@ -6512,7 +6303,6 @@ sub mysql_DoDumpServerSide($) {
      $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
 	 Log3 ($name, 2, "DbRep $name - $err");
 	 $err = encode_base64($@,"");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
 	 $dbh->disconnect;
      return "$name|''|$err|''|''|''|''|''|''|''";
  }
@@ -6552,7 +6342,6 @@ sub mysql_DoDumpServerSide($) {
      # error bei sql-execute
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
 	 $dbh->disconnect;
      return "$name|''|$err|''|''|''|''|''|''|''";     
   }
@@ -6599,7 +6388,6 @@ sub mysql_DoDumpServerSide($) {
  $rt = $rt.",".$brt;
  
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used: ".sprintf("%.0f",$brt)." seconds");
- Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_DoDumpServerSide finished");
  
 return "$name|$rt|''|$dump_path_rem$bfile|n.a.|$drh|$fsize|$ftp|$bfd|$ffd";
 }
@@ -6607,7 +6395,7 @@ return "$name|$rt|''|$dump_path_rem$bfile|n.a.|$drh|$fsize|$ftp|$bfd|$ffd";
 ####################################################################################################
 #                                      Dump-Routine SQLite
 ####################################################################################################
-sub sqlite_DoDump($) {
+sub DbRep_sqliteDoDump($) {
  my ($name)                     = @_;
  my $hash                       = $defs{$name};
  my $dbloghash                  = $hash->{dbloghash};
@@ -6624,8 +6412,6 @@ sub sqlite_DoDump($) {
  my $ead                        = AttrVal($name, "executeAfterProc", undef);
  my ($dbh,$err,$db_MB,$r,$query,$sth);
  
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall sqlite_DoDump");
- 
  # Background-Startzeit
  my $bst = [gettimeofday];
  
@@ -6634,7 +6420,6 @@ sub sqlite_DoDump($) {
  if ($@) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
      return "$name|''|$err|''|''|''|''|''|''|''";
  }
   
@@ -6653,7 +6438,6 @@ sub sqlite_DoDump($) {
 	 if ($@) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! SQLite-Error: ".$@);
-         Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
 		 $sth->finish;
 		 $dbh->disconnect;
          return "$name|''|$err|''|''|''|''|''|''|''";     
@@ -6686,7 +6470,6 @@ sub sqlite_DoDump($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
      $dbh->disconnect;
      return "$name|''|$err|''|''|''|''|''|''|''";     
  }
@@ -6729,7 +6512,6 @@ sub sqlite_DoDump($) {
  $rt = $rt.",".$brt;
  
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used: ".sprintf("%.0f",$brt)." seconds");
- Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
  
 return "$name|$rt|''|$dump_path$bfile|n.a.|n.a.|$fsize|$ftp|$bfd|$ffd";
 }
@@ -6737,7 +6519,7 @@ return "$name|$rt|''|$dump_path$bfile|n.a.|n.a.|$fsize|$ftp|$bfd|$ffd";
 ####################################################################################################
 #             Auswertungsroutine der nicht blockierenden DB-Funktion Dump
 ####################################################################################################
-sub DumpDone($) {
+sub DbRep_DumpDone($) {
   my ($string)   = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -6754,15 +6536,12 @@ sub DumpDone($) {
   my $name       = $hash->{NAME};
   my $erread;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall DumpDone");
-  
   delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      Log3 ($name, 4, "DbRep $name -> BlockingCall DumpDone finished");
       return;
   } 
  
@@ -6789,8 +6568,6 @@ sub DumpDone($) {
   readingsEndUpdate($hash, 1);
 
   Log3 ($name, 3, "DbRep $name - Database dump finished successfully. ");
-
-  Log3 ($name, 4, "DbRep $name -> BlockingCall DumpDone finished");
   
 return;
 }
@@ -6798,7 +6575,7 @@ return;
 ####################################################################################################
 #                                      Dump-Routine SQLite
 ####################################################################################################
-sub sqlite_Repair($) {
+sub DbRep_sqliteRepair($) {
  my ($name)       = @_;
  my $hash         = $defs{$name};
  my $dbloghash    = $hash->{dbloghash};
@@ -6808,8 +6585,6 @@ sub sqlite_Repair($) {
  my $dblogname    = $dbloghash->{NAME};
  my $sqlfile      = $dbpath."dump_all.sql";
  my ($c,$clog,$ret,$err);
- 
- Log3 ($name, 5, "DbRep $name -> Start BlockingCall sqlite_Repair");
 
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -6861,15 +6636,13 @@ sub sqlite_Repair($) {
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
  
- Log3 ($name, 5, "DbRep $name -> BlockingCall sqlite_Repair finished");
- 
 return "$name|$brt|0";
 }
 
 ####################################################################################################
 #             Auswertungsroutine der nicht blockierenden DB-Funktion Dump
 ####################################################################################################
-sub RepairDone($) {
+sub DbRep_RepairDone($) {
   my ($string)   = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -6878,8 +6651,6 @@ sub RepairDone($) {
   my $dbloghash  = $hash->{dbloghash};
   my $name       = $hash->{NAME};
   my $erread;
-  
-  Log3 ($name, 5, "DbRep $name -> Start BlockingCall RepairDone");
   
   delete($hash->{HELPER}{RUNNING_REPAIR});
   
@@ -6890,7 +6661,6 @@ sub RepairDone($) {
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      Log3 ($name, 4, "DbRep $name -> BlockingCall RepairDone finished");
       return;
   } 
  
@@ -6910,44 +6680,14 @@ sub RepairDone($) {
   readingsEndUpdate($hash, 1);
 
   Log3 ($name, 3, "DbRep $name - Database repair $hash->{DATABASE} finished. - total time used: ".sprintf("%.0f",$brt)." seconds.");
-  Log3 ($name, 5, "DbRep $name -> BlockingCall RepairDone finished");
   
-return;
-}
-
-####################################################################################################
-#                    Abbruchroutine Repair SQlite
-####################################################################################################
-sub RepairAborted(@) {
-  my ($hash,$cause) = @_;
-  my $name      = $hash->{NAME};
-  my $dbh       = $hash->{DBH}; 
-  my $dbloghash = $hash->{dbloghash};
-  my $erread;
-  
-  $cause = $cause?$cause:"Timeout: process terminated";
-  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_REPAIR}{fn} pid:$hash->{HELPER}{RUNNING_REPAIR}{pid} $cause");
-  
-  # Datenbankverbindung in DbLog wieder öffenen
-  my $dbl = $dbloghash->{NAME};
-  CommandSet(undef,"$dbl reopen");
-  
-  # Befehl nach Procedure ausführen
-  no warnings 'uninitialized'; 
-  $erread = DbRep_afterproc($hash, "repair");
-  $erread = ", ".(split("but", $erread))[1] if($erread);    
-  
-  $dbh->disconnect() if(defined($dbh));
-  ReadingsSingleUpdateValue ($hash,"state",$cause, 1);
-  
-  delete($hash->{HELPER}{RUNNING_REPAIR});
 return;
 }
 
 ####################################################################################################
 #                                     Restore SQLite
 ####################################################################################################
-sub sqlite_Restore ($) {
+sub DbRep_sqliteRestore ($) {
  my ($string) = @_;
  my ($name,$bfile) = split("\\|", $string);
  my $hash          = $defs{$name};
@@ -6963,8 +6703,6 @@ sub sqlite_Restore ($) {
  my $ead           = AttrVal($name, "executeAfterProc", undef);
  my ($dbh,$err,$dbname);
  
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall sqlite_Restore");
- 
  # Background-Startzeit
  my $bst = [gettimeofday];
  
@@ -6973,7 +6711,6 @@ sub sqlite_Restore ($) {
  if ($@) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_Restore finished");
      return "$name|''|$err|''|''";
  }
  
@@ -6981,7 +6718,6 @@ sub sqlite_Restore ($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
      $dbh->disconnect;
      return "$name|''|$err|''|''";     
  }
@@ -6993,7 +6729,6 @@ sub sqlite_Restore ($) {
      ($err,$bfile) = DbRep_dumpUnCompress($hash,$bfile);
      if ($err) {
          $err = encode_base64($err,"");
-         Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
          $dbh->disconnect;
          return "$name|''|$err|''|''";  
      }
@@ -7008,7 +6743,6 @@ sub sqlite_Restore ($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
      $dbh->disconnect;
      return "$name|''|$err|''|''";       
  }
@@ -7024,7 +6758,6 @@ sub sqlite_Restore ($) {
  $rt = $rt.",".$brt;
  
  Log3 ($name, 3, "DbRep $name - Restore of $dump_path$bfile into '$dbname' finished - total time used: ".sprintf("%.0f",$brt)." seconds.");
- Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_Restore finished");
  
 return "$name|$rt|''|$dump_path$bfile|n.a.";
 }
@@ -7047,8 +6780,6 @@ sub mysql_RestoreServerSide($) {
  my $table               = "history";
  my ($dbh,$sth,$err,$drh);
  
- Log3 ($name, 4, "DbRep $name -> Start BlockingCall mysql_RestoreServerSide");
- 
  # Background-Startzeit
  my $bst = [gettimeofday];
  
@@ -7057,7 +6788,6 @@ sub mysql_RestoreServerSide($) {
  if ($@) {
 	 $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_RestoreServerSide finished");
      return "$name|''|$err|''|''";   
  }
  
@@ -7066,7 +6796,6 @@ sub mysql_RestoreServerSide($) {
      ($err,$bfile) = DbRep_dumpUnCompress($hash,$bfile);
      if ($err) {
          $err = encode_base64($err,"");
-         Log3 ($name, 4, "DbRep $name -> BlockingCall sqlite_DoDump finished");
          $dbh->disconnect;
          return "$name|''|$err|''|''";  
      }
@@ -7087,7 +6816,6 @@ sub mysql_RestoreServerSide($) {
      # error bei sql-execute
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_RestoreServerSide finished");
 	 $dbh->disconnect;
      return "$name|''|$err|''|''";     
   }
@@ -7104,7 +6832,6 @@ sub mysql_RestoreServerSide($) {
  $rt = $rt.",".$brt;
  
  Log3 ($name, 3, "DbRep $name - Restore of $dump_path_rem$bfile into '$dbname', '$table' finished - total time used: ".sprintf("%.0f",$brt)." seconds.");
- Log3 ($name, 4, "DbRep $name -> BlockingCall mysql_RestoreServerSide finished");
  
 return "$name|$rt|''|$dump_path_rem$bfile|n.a.";
 }
@@ -7112,7 +6839,7 @@ return "$name|$rt|''|$dump_path_rem$bfile|n.a.";
 ####################################################################################################
 #                                  Auswertungsroutine Restore
 ####################################################################################################
-sub RestoreDone($) {
+sub DbRep_restoreDone($) {
   my ($string)   = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -7124,15 +6851,12 @@ sub RestoreDone($) {
   my $name       = $hash->{NAME};
   my $erread;
   
-  Log3 ($name, 4, "DbRep $name -> Start BlockingCall RestoreDone");
-  
   delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      Log3 ($name, 4, "DbRep $name -> BlockingCall RestoreDone finished");
       return;
   } 
   
@@ -7149,8 +6873,160 @@ sub RestoreDone($) {
   readingsEndUpdate($hash, 1);
 
   Log3 ($name, 3, "DbRep $name - Database restore finished successfully. ");
+  
+return;
+}
 
-  Log3 ($name, 4, "DbRep $name -> BlockingCall RestoreDone finished");
+####################################################################################################
+#      Übertragung Datensätze in weitere DB
+####################################################################################################
+sub DbRep_syncStandby($) {
+ my ($string) = @_;
+ my ($name,$device,$reading,$runtime_string_first,$runtime_string_next,$ts,$stbyname) = split("\\§", $string);
+ my $hash       = $defs{$name};
+ my $table      = "history";
+ my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+ my ($dbh,$dbhstby,$err,$sql,$irows,$irowdone);
+ # Quell-DB
+ my $dbloghash  = $hash->{dbloghash};
+ my $dbconn     = $dbloghash->{dbconn};
+ my $dbuser     = $dbloghash->{dbuser};
+ my $dblogname  = $dbloghash->{NAME};
+ my $dbpassword = $attr{"sec$dblogname"}{secret};
+ # Standby-DB
+ my $stbyhash   = $defs{$stbyname};
+ my $stbyconn   = $stbyhash->{dbconn};
+ my $stbyuser   = $stbyhash->{dbuser};
+ my $stbypasswd = $attr{"sec$stbyname"}{secret};
+ my $stbyutf8   = defined($stbyhash->{UTF8})?$stbyhash->{UTF8}:0;
+ 
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
+ # Verbindung zur Quell-DB
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $utf8 });};
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     return "$name|''|''|$err";
+ }
+ 
+ # Verbindung zur Standby-DB
+ eval {$dbhstby = DBI->connect("dbi:$stbyconn", $stbyuser, $stbypasswd, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $stbyutf8 });};
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     return "$name|''|''|$err";
+ }
+ 
+ # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
+ Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+ 
+ my ($sth,$old,$new);
+ eval { $dbh->begin_work() if($dbh->{AutoCommit}); };   # Transaktion wenn gewünscht und autocommit ein
+ if ($@) {
+     Log3($name, 2, "DbRep $name -> Error start transaction - $@");
+ }
+     
+ # Timestampstring to Array
+ my @ts = split("\\|", $ts);
+ Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");
+     
+ # DB-Abfrage zeilenweise für jeden Array-Eintrag
+ $irows    = 0;
+ $irowdone = 0;
+ my $selspec = "TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT";
+ my $addon   = '';
+ foreach my $row (@ts) {
+     my @a                     = split("#", $row);
+     my $runtime_string        = $a[0];
+     my $runtime_string_first  = $a[1];
+     my $runtime_string_next   = $a[2];
+         
+     if ($IsTimeSet || $IsAggrSet) {
+         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon); 
+     } else {
+         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,$addon);
+     }
+     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+         
+     eval{ $sth = $dbh->prepare($sql);
+           $sth->execute();
+         };	         
+     if ($@) {
+         $err = encode_base64($@,"");
+         Log3 ($name, 2, "DbRep $name - $@");
+         $dbh->disconnect;
+         return "$name|''|''|$err";
+     }
+         
+     no warnings 'uninitialized'; 
+     #                          DATE _ESC_ TIME      _ESC_  DEVICE   _ESC_  TYPE    _ESC_   EVENT    _ESC_  READING  _ESC_   VALUE   _ESC_   UNIT
+     my @row_array = map { ($_->[0] =~ s/ /_ESC_/r)."_ESC_".$_->[1]."_ESC_".$_->[2]."_ESC_".$_->[3]."_ESC_".$_->[4]."_ESC_".$_->[5]."_ESC_".$_->[6] } @{$sth->fetchall_arrayref()}; 
+     use warnings;
+         
+     (undef,$irowdone,$err) = DbRep_WriteToDB($name,$dbhstby,$stbyhash,"0",@row_array) if(@row_array);
+     if ($err) {
+         Log3 ($name, 2, "DbRep $name - $err");
+         $err = encode_base64($err,"");
+         $dbh->disconnect;
+         $dbhstby->disconnect();
+         return "$name|''|''|$err";
+     }
+     $irows += $irowdone;
+ }
+ 
+ $dbh->disconnect();
+ $dbhstby->disconnect();
+
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
+ return "$name|$irows|$rt|0";
+}
+
+####################################################################################################
+#         Auswertungsroutine Übertragung Datensätze in weitere DB
+####################################################################################################
+sub DbRep_syncStandbyDone($) {
+  my ($string) = @_;
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $name       = $hash->{NAME};
+  my $irows      = $a[1];
+  my $bt         = $a[2];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[3]?decode_base64($a[3]):undef;
+  
+  if ($err) {
+      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      delete($hash->{HELPER}{RUNNING_PID});
+      Log3 ($name, 4, "DbRep $name -> BlockingCall change_Done finished");
+      return;
+  } 
+
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+  
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateValue ($hash, "number_lines_inserted_Standby", $irows); 
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  readingsEndUpdate($hash, 1);
+  
+  # Befehl nach Procedure ausführen
+  my $erread = DbRep_afterproc($hash, "syncStandby");
+
+  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -7158,7 +7034,7 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Timeout Restore
 ####################################################################################################
-sub RestoreAborted(@) {
+sub DbRep_restoreAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh  = $hash->{DBH}; 
@@ -7187,7 +7063,7 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Timeout DB-Abfrage
 ####################################################################################################
-sub ParseAborted(@) {
+sub DbRep_ParseAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh = $hash->{DBH}; 
@@ -7211,7 +7087,7 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Timeout DB-Dump
 ####################################################################################################
-sub DumpAborted(@) {
+sub DbRep_DumpAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh  = $hash->{DBH}; 
@@ -7240,7 +7116,7 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Timeout DB-Abfrage
 ####################################################################################################
-sub OptimizeAborted(@) {
+sub DbRep_OptimizeAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh  = $hash->{DBH}; 
@@ -7261,6 +7137,35 @@ sub OptimizeAborted(@) {
   Log3 ($name, 2, "DbRep $name - Database optimize aborted by \"$cause\" ");
   
   delete($hash->{HELPER}{RUNNING_OPTIMIZE}); 
+return;
+}
+
+####################################################################################################
+#                    Abbruchroutine Repair SQlite
+####################################################################################################
+sub DbRep_RepairAborted(@) {
+  my ($hash,$cause) = @_;
+  my $name      = $hash->{NAME};
+  my $dbh       = $hash->{DBH}; 
+  my $dbloghash = $hash->{dbloghash};
+  my $erread;
+  
+  $cause = $cause?$cause:"Timeout: process terminated";
+  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_REPAIR}{fn} pid:$hash->{HELPER}{RUNNING_REPAIR}{pid} $cause");
+  
+  # Datenbankverbindung in DbLog wieder öffenen
+  my $dbl = $dbloghash->{NAME};
+  CommandSet(undef,"$dbl reopen");
+  
+  # Befehl nach Procedure ausführen
+  no warnings 'uninitialized'; 
+  $erread = DbRep_afterproc($hash, "repair");
+  $erread = ", ".(split("but", $erread))[1] if($erread);    
+  
+  $dbh->disconnect() if(defined($dbh));
+  ReadingsSingleUpdateValue ($hash,"state",$cause, 1);
+  
+  delete($hash->{HELPER}{RUNNING_REPAIR});
 return;
 }
 
@@ -7451,6 +7356,12 @@ sub DbRep_checktimeaggr ($) {
 	     $aggregation = "no";     
      }
  }  
+ if($hash->{LASTCMD} =~ /syncStandby/ ) {
+     if($aggregation !~ /day|hour|week/) {
+         $aggregation = "day";
+	     $IsAggrSet   = 1;
+     }
+ }
 
 return ($IsTimeSet,$IsAggrSet,$aggregation);
 }
@@ -7929,7 +7840,6 @@ sub DbRep_mysqlOptimizeTables ($$@) {
 	   };
   if ($@) {
       Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
-      Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
 	  $sth->finish;
 	  $dbh->disconnect;
       return ($@,undef,undef);
@@ -7966,7 +7876,6 @@ sub DbRep_mysqlOptimizeTables ($$@) {
   eval { $sth->execute; };
   if ($@) {
       Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
-      Log3 ($name, 4, "DbRep $name -> BlockingCall DbRep_optimizeTables finished");
 	  $sth->finish;
 	  $dbh->disconnect;
       return ($@,undef,undef);
@@ -8337,7 +8246,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
   
   if (@row_array) {
       # Schreibzyklus aktivieren
-      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, mysql_enable_utf8 => $utf8 });};
+      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $utf8 });};
       if ($@) {
           $err = $@;
           Log3 ($name, 2, "DbRep $name - $@");
@@ -8347,7 +8256,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
       # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
       my ($usepkh,$usepkc,$pkh,$pkc);
       if (!$supk) {
-          ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbh);
+          ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
       } else {
           Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key usage suppressed by attribute noSupportPK in DbLog \"$dblogname\"";
       }
@@ -8482,13 +8391,161 @@ sub DbRep_OutputWriteToDB($$$$$) {
 return ($wrt,$irowdone,$err);
 }
 
+####################################################################################################
+#                              Werte eines Array in DB schreiben
+# Übergabe-Array: $date_ESC_$time_ESC_$device_ESC_$type_ESC_$event_ESC_$reading_ESC_$value_ESC_$unit
+# $histupd = 1 wenn history update, $histupd = 0 nur gistory insert
+#
+####################################################################################################
+sub DbRep_WriteToDB($$$@) {
+  my ($name,$dbh,$dbloghash,$histupd,@row_array) = @_;
+  my $hash      = $defs{$name};
+  my $dblogname = $dbloghash->{NAME};
+  my $DbLogType = AttrVal($dbloghash->{NAME}, "DbLogType", "History");
+  my $supk      = AttrVal($dbloghash->{NAME}, "noSupportPK", 0);
+  my $wrt       = 0;
+  my $irowdone  = 0;
+  my ($sth_ih,$sth_uh,$sth_ic,$sth_uc,$err);
+         
+  # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
+  my ($usepkh,$usepkc,$pkh,$pkc);
+  if (!$supk) {
+      ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
+  } else {
+      Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key usage suppressed by attribute noSupportPK in DbLog \"$dblogname\"";
+  }
+      
+  if (lc($DbLogType) =~ m(history)) {
+      # insert history mit/ohne primary key
+      if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
+          eval { $sth_ih = $dbh->prepare_cached("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+      } elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
+          eval { $sth_ih = $dbh->prepare_cached("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+      } elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+          eval { $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
+      } else {
+          eval { $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+      }
+      if ($@) {
+          $err = $@;
+          Log3 ($name, 2, "DbRep $name - $@");
+          return ($wrt,$irowdone,$err);
+      }
+	  # update history mit/ohne primary key
+      if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
+	      $sth_uh = $dbh->prepare("REPLACE INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?)"); 
+	  } elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {  
+	      $sth_uh = $dbh->prepare("INSERT OR REPLACE INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?)");
+	  } elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+	      $sth_uh = $dbh->prepare("INSERT INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
+	                               DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
+							       VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
+	  } else {
+	      $sth_uh = $dbh->prepare("UPDATE history SET TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (TIMESTAMP=?) AND (DEVICE=?) AND (READING=?)");
+	  }
+  }
+      
+  if (lc($DbLogType) =~ m(current) ) {
+      # insert current mit/ohne primary key
+      if ($usepkc && $dbloghash->{MODEL} eq 'MYSQL') {
+          eval { $sth_ic = $dbh->prepare("INSERT IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };	  
+      } elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {
+          eval { $sth_ic = $dbh->prepare("INSERT OR IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+      } elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+          eval { $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
+      } else {
+          # old behavior
+          eval { $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+      }
+      if ($@) {
+          $err = $@;
+          Log3 ($name, 2, "DbRep $name - $@");
+          return ($wrt,$irowdone,$err);
+      }
+      # update current mit/ohne primary key
+      if ($usepkc && $dbloghash->{MODEL} eq 'MYSQL') {
+	      $sth_uc = $dbh->prepare("REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); 
+      } elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {  
+	      $sth_uc = $dbh->prepare("INSERT OR REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+      } elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+	      $sth_uc = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
+	                               DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
+							       VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
+      } else {
+          $sth_uc = $dbh->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
+      }
+  }
+      
+  eval { $dbh->begin_work() if($dbh->{AutoCommit}); };
+  if ($@) {
+      Log3($name, 2, "DbRep $name -> Error start transaction for history - $@");
+  }
+      
+  Log3 $hash->{NAME}, 5, "DbRep $name - data prepared to db write:"; 
+      
+  # SQL-Startzeit
+  my $wst = [gettimeofday]; 
+      
+  my $ihs = 0;
+  my $uhs = 0;
+  foreach my $row (@row_array) {
+      my ($date,$time,$device,$type,$event,$reading,$value,$unit) = ($row =~ /^(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)$/);
+      Log3 $hash->{NAME}, 5, "DbRep $name - $row";     
+      my $timestamp = $date." ".$time;
+          
+      eval {
+          # update oder insert history
+          if (lc($DbLogType) =~ m(history) ) {
+              my $rv_uh = 0;
+              if($histupd) {
+                  $rv_uh = $sth_uh->execute($type,$event,$value,$unit,$timestamp,$device,$reading); 
+              }
+			  if ($rv_uh == 0) {
+			      $sth_ih->execute($timestamp,$device,$type,$event,$reading,$value,$unit);
+				  $ihs++; 
+			  } else {
+			      $uhs++;
+			  }
+          }
+          # update oder insert current
+          if (lc($DbLogType) =~ m(current) ) {
+              my $rv_uc = $sth_uc->execute($timestamp,$type,$event,$value,$unit,$device,$reading);
+              if ($rv_uc == 0) {
+                  $sth_ic->execute($timestamp,$device,$type,$event,$reading,$value,$unit);
+              }
+          }
+      };
+ 
+      if ($@) {
+          $err = $@;
+          Log3 ($name, 2, "DbRep $name - $@");
+          $dbh->rollback;
+          $ihs = 0;
+          $uhs = 0;
+          return ($wrt,0,$err);
+      } else {
+          $irowdone++;
+      }
+  }    
+      
+  eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+      
+  Log3 $hash->{NAME}, 3, "DbRep $name - number of lines updated in \"$dblogname\": $uhs" if($uhs); 
+  Log3 $hash->{NAME}, 3, "DbRep $name - number of lines inserted into \"$dblogname\": $ihs" if($ihs); 
+      
+  # SQL-Laufzeit ermitteln
+  $wrt = tv_interval($wst);
+  
+return ($wrt,$irowdone,$err);
+}
+
 ################################################################
 # check ob primary key genutzt wird
 ################################################################
-sub DbRep_checkUsePK ($$){
-  my ($hash,$dbh) = @_;
-  my $name           = $hash->{NAME};
-  my $dbconn         = $hash->{dbloghash}{dbconn};
+sub DbRep_checkUsePK ($$$){
+  my ($hash,$dbloghash,$dbh) = @_;
+  my $name       = $hash->{NAME};
+  my $dbconn     = $dbloghash->{dbconn};
   my $upkh = 0;
   my $upkc = 0;
   my (@pkh,@pkc);
@@ -8620,6 +8677,7 @@ return;
 	 <li> fill up the current-table with a (tunable) extract of the history-table</li>
 	 <li> delete consecutive datasets with different timestamp but same values (clearing up consecutive doublets) </li>
      <li> Repair of a corrupted SQLite database ("database disk image is malformed") </li>
+     <li> transmission of datasets from source database into another (Standby) database (syncStandby) </li>
      </ul></ul>
      <br>
      
@@ -9446,6 +9504,35 @@ return;
                                  # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>                         
                                  </li> <br>
                                  </ul>
+                                 <br>
+                                 
+    <li><b> syncStandby &lt;DbLog-Device Standby&gt; </b>    
+                                 -  datasets of the connected database (source) are transmitted into another database 
+                                 (Standby-database). <br>
+                                 Here the "&lt;DbLog-Device Standby&gt;" is the DbLog-Device what is connected to the 
+                                 Standby-database. <br><br>
+                                 All the datasets which are determined by timestamp-<a href="#DbRepattrlimit">attributes</a>
+                                 or respectively the attributes "device", "reading" are transmitted. <br>
+                                 The datasets are transmitted in time slices accordingly to the adjusted aggregation.
+                                 If the attribute "aggregation" has value "no" or "month", the datasets are transmitted 
+                                 automatically in daily time slices into standby-database. 
+                                 Source- and Standby-database can be of different types.
+								 <br><br>
+
+                                 The relevant attributes to control the syncStandby function are: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>aggregation</b>  </td><td>: adjustment of time slices for data transmission (hour,day,week) </td></tr>
+                                      <tr><td> <b>device</b>       </td><td>: transmit only datasets which are contain &lt;device&gt; </td></tr>
+                                      <tr><td> <b>reading</b>      </td><td>: transmit only datasets which are contain &lt;reading&gt; </td></tr>
+                                      <tr><td> <b>time.*</b>       </td><td>: A number of attributes to limit selection by time  </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>                                 
+								 </li> <br>
 		
 	<li><b> tableCurrentFillup </b> - the current-table will be filled u with an extract of the history-table.  
 	                                  The <a href="#DbRepattr">attributes</a> for limiting time and device, reading are considered.
@@ -10179,6 +10266,7 @@ sub bdump {
 	 <li> Auffüllen der current-Tabelle mit einem (einstellbaren) Extrakt der history-Tabelle</li>
      <li> Bereinigung sequentiell aufeinander folgender Datensätze mit unterschiedlichen Zeitstempel aber gleichen Werten (sequentielle Dublettenbereinigung) </li>
 	 <li> Reparatur einer korrupten SQLite Datenbank ("database disk image is malformed") </li>
+     <li> Übertragung von Datensätzen aus der Quelldatenbank in eine andere (Standby) Datenbank (syncStandby) </li>
      </ul></ul>
      <br>
      
@@ -10191,7 +10279,10 @@ sub bdump {
   "userExitFn" beschrieben. <br><br>
   
   FHEM-Forum: <br>
-  <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">Modul 93_DbRep - Reporting und Management von Datenbankinhalten (DbLog)</a>.<br><br>
+  <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">Modul 93_DbRep - Reporting und Management von Datenbankinhalten (DbLog)</a>. <br><br>
+  
+  FHEM-Wiki: <br>
+  <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten">DbRep - Reporting und Management von DbLog-Datenbankinhalten</a>. <br><br>
  
   <b>Voraussetzungen </b> <br><br>
   
@@ -10436,8 +10527,7 @@ sub bdump {
                                  </li>
 								 <br>
 								 <br>
-                                 
-								 
+                             
     <li><b> deviceRename </b> -  benennt den Namen eines Device innerhalb der angeschlossenen Datenbank (Internal 
 	                             DATABASE) um.
                                  Der Gerätename wird immer in der <b>gesamten</b> Datenbank umgesetzt. Eventuell gesetzte 
@@ -11028,6 +11118,35 @@ sub bdump {
                                    # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>                         
                                    </li> <br>
                                    </ul>
+                                   <br>
+                                   
+    <li><b> syncStandby &lt;DbLog-Device Standby&gt; </b>    
+                                 -  Es werden die Datensätze aus der angeschlossenen Datenbank (Quelle) direkt in eine weitere 
+                                 Datenbank (Standby-Datenbank) übertragen. 
+                                 Dabei ist "&lt;DbLog-Device Standby&gt;" das DbLog-Device, welches mit der Standby-Datenbank
+                                 verbunden ist. <br><br>
+                                 Es werden alle Datensätze übertragen, die durch Timestamp-<a href="#DbRepattrlimit">Attribute</a>
+                                 bzw. die Attribute "device", "reading" bestimmt sind. <br>
+                                 Die Datensätze werden dabei in Zeitscheiben entsprechend der eingestellten Aggregation übertragen.
+                                 Hat das Attribut "aggregation" den Wert "no" oder "month", werden die Datensätze automatisch 
+                                 in Tageszeitscheiben zur Standby-Datenbank übertragen. 
+                                 Quell- und Standby-Datenbank können unterschiedlichen Typs sein.
+								 <br><br>
+
+                                 Die zur Steuerung der syncStandby Funktion relevanten Attribute sind: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>aggregation</b>  </td><td>: Einstellung der Zeitscheiben zur Übertragung (hour,day,week) </td></tr>
+                                      <tr><td> <b>device</b>       </td><td>: Übertragung nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>      </td><td>: Übertragung nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                      <tr><td> <b>time.*</b>       </td><td>: Attribute zur Zeitabgrenzung der zu übertragenden Datensätze.  </td></tr>
+                                   </table>
+	                               </ul>
+	                               <br>
+	                               <br>                                 
+								 </li> <br>
 								 
 	<li><b> tableCurrentFillup </b> - Die current-Tabelle wird mit einem Extrakt der history-Tabelle aufgefüllt. 
 	                                  Die <a href="#DbRepattr">Attribute</a> zur Zeiteinschränkung bzw. device, reading werden ausgewertet.
