@@ -39,7 +39,7 @@ fakeRoku_Initialize($)
   #$hash->{SetFn}    = "fakeRoku_Set";
   #$hash->{GetFn}    = "fakeRoku_Get";
   $hash->{AttrFn}   = "fakeRoku_Attr";
-  $hash->{AttrList} = "disable:1,0 favourites fhemIP httpPort reusePort:1,0";
+  $hash->{AttrList} = "disable:1,0 favourites fhemIP httpPort reusePort:1,0 serial";
 }
 
 #####################################
@@ -88,8 +88,10 @@ fakeRoku_Define($$)
   return "install IO::Socket::Multicast to use autodiscovery" if(!$fakeRoku_hasMulticast);
   $hash->{"HAS_IO::Socket::Multicast"} = $fakeRoku_hasMulticast;
 
-  $hash->{serial} = md5_hex(getUniqueId());
-  $hash->{serial} .= "-$hash->{ID}" if( $hash->{ID} );
+  $hash->{helper}{serial} = md5_hex(getUniqueId());
+  $hash->{helper}{serial} .= "-$hash->{ID}" if( $hash->{ID} );
+
+  $attr{$name}{serial} = $hash->{helper}{serial} if( !defined($attr{$name}{serial}) );
 
   $hash->{fhemHostname} = hostname();
   $hash->{fhemIP} = fakeRoku_getLocalIP();
@@ -470,7 +472,7 @@ fakeRoku_Parse($$;$$$)
         $msg .= fakeRoku_hash2header( { 'Cache-Control' => 'max-age=300',
                                                      'ST' => 'roku:ecp',
                                                'Location' => "http://$hash->{fhemIP}:$hash->{helper}{listener}{PORT}/",
-                                                    'USN' => "uuid:roku:ecp:$hash->{serial}", } );
+                                                    'USN' => "uuid:roku:ecp:". AttrVal($name,'serial',$hash->{helper}{serial}), } );
         $msg .= "\r\n";
 
         my $sin = sockaddr_in($peerport, inet_aton($peerhost));
@@ -848,6 +850,7 @@ Log 1, "!!!!!!!!!!";
       not set -> set ReusePort on multicast socket if SO_REUSEPORT flag ist known. should work in most cases.<br>
       0 -> don't set ReusePort on multicast socket<br>
       1 -> set ReusePort on multicast socket</li>
+    <li>serial</li>
   </ul>
 
 </ul><br>
