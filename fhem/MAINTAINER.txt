@@ -324,6 +324,7 @@ FHEM/71_YAMAHA_NP.pm         ra666ack             Multimedia
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          Unterstuetzende Dienste
 FHEM/72_FB_CALLLIST.pm       markusbloch          Frontends
 FHEM/72_FRITZBOX.pm          tupol                FRITZBOX (link als PM an tupol)
+FHEM/72_XiaomiDevice.pm      markus-m             Sonstige Systeme
 FHEM/73_ElectricityCalculator.pm Sailor           http://forum.fhem.de/index.php/topic,57106.0.html
 FHEM/73_GasCalculator        Sailor               http://forum.fhem.de/index.php/topic,47909.0.html
 FHEM/73_km200.pm             Sailor               http://forum.fhem.de/index.php/topic,25540.0.html

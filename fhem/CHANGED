@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   72_XiaomiDevice: added new module for Xiaomi WiFi devices
   - feature: 93_DbRep: V7.14.0, new command syncStandby
   - bugfix:  21_HEOS: decode_json() in a eval, fix play_previous
   - bugfix:  73_NUKIBridge/74_NUKIDevice: decode_json() in a eval
@@ -26,7 +27,7 @@
   - feature: 93_DbRep: V7.12.0, compression of dumpfile, restore of compressed
                        files possible
   - change:  77_SMAEM: V3.1.0, extend error handling in define
-  -bugfix:   73_ElectricityCalculator: Min dt for calc. reduced from 30 to 1 s
+  - bugfix:  73_ElectricityCalculator: Min dt for calc. reduced from 30 to 1 s
   - feature: 93_DbRep: V7.11.0, "repairSQLite" to repair a corrupted SQLite DB
   - bugfix:  88_xs1Bridge: code changeover + safety connection check
   - bugfix:  73_PRESENCE: new collectord .deb package fixing perl warnings
