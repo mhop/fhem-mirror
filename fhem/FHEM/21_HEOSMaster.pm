@@ -65,7 +65,7 @@ eval "use Encode;1" or $missingModul .= "Encode ";
 
 
 
-my $version = "1.0.2";
+my $version = "1.0.3";
 
 my %heosCmds = (
     'enableChangeEvents'        => 'system/register_for_change_events?enable=',
@@ -94,7 +94,7 @@ my %heosCmds = (
     'setMute'                   => 'player/set_mute?',
     'setGroupMute'              => 'group/set_mute?',
     'playNext'                  => 'player/play_next?',
-    'playPrev'                  => 'player/play_prev?',
+    'playPrev'                  => 'player/play_previous?',
     'playPresetStation'         => 'browse/play_preset?',
     'playInput'                 => 'browse/play_input?',
     'playStream'                => 'browse/play_stream?',
@@ -228,7 +228,7 @@ sub HEOSMaster_Undef($$) {
     HEOSMaster_Close($hash);
     delete $modules{HEOSMaster}{defptr}{$hash->{HOST}};
     
-    Log3 $name, 3, "HEOSPlayer ($name) - device $name deleted";
+    Log3 $name, 3, "HEOSMaster ($name) - device $name deleted";
     return undef;
 }
 
@@ -514,7 +514,12 @@ sub HEOSMaster_ProcessRead($$) {
     
         $hash->{LAST_RECV} = time();
         Log3 $name, 5, "HEOSMaster ($name) - Decoding JSON message. Length: " . length($json) . " Content: " . $json;
-        my $obj = decode_json($json);
+
+        my $obj = eval{decode_json($json)};
+        if($@){
+            Log3 $name, 3, "HEOSMaster ($name) - JSON error while request: $@";
+            return;
+        }
         
         if(defined($obj->{heos})) {
         
@@ -548,7 +553,11 @@ sub HEOSMaster_ResponseProcessing($$) {
     unless( defined($json));
 
     Log3 $name, 4, "HEOSMaster ($name) - JSON detected!";
-    $decode_json = decode_json(encode_utf8($json));
+    $decode_json = eval{decode_json(encode_utf8($json))};
+    if($@){
+        Log3 $name, 3, "HEOSMaster ($name) - JSON error while request: $@";
+        return;
+    }
 
     return Log3 $name, 3, "HEOSMaster ($name) - decode_json has no Hash"
     unless(ref($decode_json) eq "HASH");

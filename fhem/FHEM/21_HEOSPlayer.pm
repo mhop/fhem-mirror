@@ -39,7 +39,7 @@ use Encode qw(encode_utf8);
 use URI::Escape;
 #use Data::Dumper;
 
-my $version = "1.0.2";
+my $version = "1.0.3";
 
 
 
@@ -790,8 +790,13 @@ sub HEOSPlayer_Parse($$) {
     my $decode_json;
     my $code;
 
+
+    $decode_json = eval{decode_json(encode_utf8($json))};
+    if($@){
+        Log3 $name, 3, "HEOSPlayer ($name) - JSON error while request: $@";
+        return;
+    }
     
-    $decode_json    = decode_json(encode_utf8($json));
     Log3 $name, 4, "HEOSPlayer - ParseFn wurde aufgerufen";
     if( defined($decode_json->{pid}) ) {
     

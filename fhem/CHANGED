@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  21_HEOS: decode_json() in a eval, fix play_previous
   - bugfix:  73_NUKIBridge/74_NUKIDevice: decode_json() in a eval
   - Update:  73_AMADCommBridge/74AMADDevice: 4.2 new Version with Tasker Support
   - bugfix:  14_CUL_TCM97001: Fix temperature reading
