@@ -128,7 +128,7 @@ sub getUniqueId();
 sub latin1ToUtf8($);
 sub myrename($$$);
 sub notifyRegexpChanged($$);
-sub parseParams($;$$);
+sub parseParams($;$$$);
 sub perlSyntaxCheck($%);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
@@ -5164,11 +5164,12 @@ perlSyntaxCheck($%)
 
 #####################################
 sub
-parseParams($;$$)
+parseParams($;$$$)
 {
-  my($cmd, $separator, $joiner) = @_;
+  my($cmd, $separator, $joiner, $keyvalueseparator) = @_;
   $separator = ' ' if(!$separator);
   $joiner = $separator if(!$joiner); # needed if separator is a regexp
+  $keyvalueseparator = '=' if(!$keyvalueseparator);
   my(@a, %h);
 
   my @params;
@@ -5181,7 +5182,7 @@ parseParams($;$$)
   while (@params) {
     my $param = shift(@params);
     next if($param eq "");
-    my ($key, $value) = split( '=', $param, 2 );
+    my ($key, $value) = split( $keyvalueseparator, $param, 2 );
 
     if( !defined( $value ) ) {
       $value = $key;
