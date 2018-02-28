@@ -85,7 +85,7 @@ allowed_Authorize($$$$)
 
   if($type eq "devicename") {
     return 0 if(!$me->{allowedDevices});
-    return if($me->{allowedDevices} =~ m/\b\Q$arg\E\b/);
+    return 1 if($me->{allowedDevices} =~ m/\b\Q$arg\E\b/);
     Log3 $me, 3, "Forbidden device $arg for $cl->{NAME}";
     return 2;
   }
