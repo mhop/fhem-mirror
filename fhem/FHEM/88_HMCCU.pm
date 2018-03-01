@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.002
+#  Version 4.2.003
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -51,8 +51,9 @@
 #  attr <name> ccudef-readingname <rules>
 #  attr <name> ccudef-substitute <subst_rule>
 #  attr <name> ccudefaults <filename>
-#  attr <name> ccuflags { intrpc,extrpc,procrpc,dptnocheck,noagg,logEvents,noReadings }
+#  attr <name> ccuflags { intrpc,extrpc,procrpc,dptnocheck,noagg,logEvents,noReadings,nonBlocking }
 #  attr <name> ccuget { State | Value }
+#  attr <name> ccuReqTimeout <seconds>
 #  attr <name> parfile <parfile>
 #  attr <name> rpcevtimeout <seconds>
 #  attr <name> rpcinterfaces { BidCos-Wired, BidCos-RF, HmIP-RF, VirtualDevices, Homegear, HVL }
@@ -104,7 +105,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.2.002';
+my $HMCCU_VERSION = '4.2.003';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -120,6 +121,7 @@ my $HMCCU_TIMEOUT_WRITE = 0.001;
 my $HMCCU_TIMEOUT_ACCEPT = 1;
 my $HMCCU_TIMEOUT_EVENT = 600;
 my $HMCCU_STATISTICS = 500;
+my $HMCCU_TIMEOUT_REQUEST = 4;
 
 # RPC port name by port number
 my %HMCCU_RPC_NUMPORT = (
@@ -360,8 +362,8 @@ sub HMCCU_Initialize ($)
 		" ccudef-hmstatevals:textField-long ccudef-substitute:textField-long".
 		" ccudef-readingname:textField-long ccudef-readingfilter:textField-long".
 		" ccudef-readingformat:name,namelc,address,addresslc,datapoint,datapointlc".
-		" ccuflags:multiple-strict,extrpc,intrpc,procrpc,dptnocheck,noagg,nohmstate,logEvents,noReadings".
-		" rpcdevice rpcinterval:2,3,5,7,10 rpcqueue".
+		" ccuflags:multiple-strict,extrpc,intrpc,procrpc,dptnocheck,noagg,nohmstate,logEvents,noReadings,nonBlocking".
+		" ccuReqTimeout rpcdevice rpcinterval:2,3,5,7,10 rpcqueue".
 		" rpcport:multiple-strict,".join(',',sort keys %HMCCU_RPC_NUMPORT).
 		" rpcserver:on,off rpcserveraddr rpcserverport rpctimeout rpcevtimeout parfile substitute".
 		" ccuget:Value,State ".
@@ -381,7 +383,7 @@ sub HMCCU_Define ($$)
 	
 	$hash->{host} = $$a[2];
 	$hash->{Clients} = ':HMCCUDEV:HMCCUCHN:HMCCURPC:HMCCURPCPROC:';
-	
+
 	# Check if TCL-Rega process is running on CCU
 	my $timeout = exists ($h->{waitforccu}) ? $h->{waitforccu} : 0;
 	if (HMCCU_TCPPing ($hash->{host}, 8181, $timeout)) {
@@ -1150,6 +1152,7 @@ sub HMCCU_Set ($@)
 	$options .= ",restart" if ($ccuflags !~ /(extrpc|procrpc)/);
 	my $stripchar = AttrVal ($name, "stripchar", '');
 	my $ccureadings = AttrVal ($name, "ccureadings", $ccuflags =~ /noReadings/ ? 0 : 1);
+	my $ccureqtimeout = AttrVal ($name, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hash);
 	my $substitute = HMCCU_GetAttrSubstitute ($hash, $hash);
 
@@ -1206,7 +1209,7 @@ sub HMCCU_Set ($@)
 		return HMCCU_SetError ($hash, $usage) if (!defined ($program));
 
 		my $url = qq(http://$host:8181/do.exe?r1=dom.GetObject("$program").ProgramExecute());
-		$response = GetFileFromURL ($url);
+		$response = GetFileFromURL ($url, $ccureqtimeout);
 		$response =~ m/<r1>(.*)<\/r1>/;
 		my $value = $1;
 		
@@ -2400,27 +2403,23 @@ sub HMCCU_SubstVariables ($$$)
 	}
 	
 	# Substitute datapoint variables by value
-#	foreach my $dp (keys %{$clhash->{hmccu}{dp}}) {
 	foreach my $dp (@varlist) {
 		my ($chn, $dpt) = split (/\./, $dp);
-		if (defined ($clhash->{hmccu}{dp}{$dp}{VAL})) {
-# 			my $value = HMCCU_FormatReadingValue ($clhash, $clhash->{hmccu}{dp}{$dp}{VAL});
-# 			$text =~ s/\$\{$dp\}/$value/g;
-# 			$text =~ s/\$\{$dpt\}/$value/g;
-			$text =~ s/\$\{?$dp\}?/$clhash->{hmccu}{dp}{$dp}{VAL}/g;
-			$text =~ s/\$\{?$dpt\}?/$clhash->{hmccu}{dp}{$dp}{VAL}/g;
-		}
-		if (defined ($clhash->{hmccu}{dp}{$dp}{OVAL})) {
-			$text =~ s/\$\$\{?$dp\}?/$clhash->{hmccu}{dp}{$dp}{OVAL}/g;
-			$text =~ s/\$\$\{?$dpt\}?/$clhash->{hmccu}{dp}{$dp}{OVAL}/g;
+		if (defined ($clhash->{hmccu}{dp}{$dp}{OSVAL})) {
+			$text =~ s/\$\$\{?$dp\}?/$clhash->{hmccu}{dp}{$dp}{OSVAL}/g;
+			$text =~ s/\$\$\{?$dpt\}?/$clhash->{hmccu}{dp}{$dp}{OSVAL}/g;
 		}
 		if (defined ($clhash->{hmccu}{dp}{$dp}{SVAL})) {
-			$text =~ s/\%\{?$dp\}?/$clhash->{hmccu}{dp}{$dp}{SVAL}/g;
-			$text =~ s/\%\{?$dpt\}?/$clhash->{hmccu}{dp}{$dp}{SVAL}/g;
+			$text =~ s/\$\{?$dp\}?/$clhash->{hmccu}{dp}{$dp}{SVAL}/g;
+			$text =~ s/\$\{?$dpt\}?/$clhash->{hmccu}{dp}{$dp}{SVAL}/g;
 		}
-		if (defined ($clhash->{hmccu}{dp}{$dp}{OSVAL})) {
-			$text =~ s/\%\%\{?$dp\}?/$clhash->{hmccu}{dp}{$dp}{OSVAL}/g;
-			$text =~ s/\%\%\{?$dpt\}?/$clhash->{hmccu}{dp}{$dp}{OSVAL}/g;
+		if (defined ($clhash->{hmccu}{dp}{$dp}{OVAL})) {
+			$text =~ s/\%\%\{?$dp\}?/$clhash->{hmccu}{dp}{$dp}{OVAL}/g;
+			$text =~ s/\%\%\{?$dpt\}?/$clhash->{hmccu}{dp}{$dp}{OVAL}/g;
+		}
+		if (defined ($clhash->{hmccu}{dp}{$dp}{VAL})) {
+			$text =~ s/\%\{?$dp\}?/$clhash->{hmccu}{dp}{$dp}{VAL}/g;
+			$text =~ s/\%\{?$dpt\}?/$clhash->{hmccu}{dp}{$dp}{VAL}/g;
 		}
 	}
 	
@@ -2885,7 +2884,6 @@ sub HMCCU_UpdatePeers ($$$$)
 		next if (!defined ($act));
 		HMCCU_Trace ($clt_hash, 2, $fnc, "vars=$vars, cond=$cond, type=$type, act=$act");
 		next if ($cond !~ /$chndpt/);
-		HMCCU_Trace ($clt_hash, 2, $fnc, "eval $cond");
 		
 		# Check if rule is affected by datapoint update
 		my $ex = 0;
@@ -2902,6 +2900,7 @@ sub HMCCU_UpdatePeers ($$$$)
 		# Substitute variables and evaluate condition		
 		$cond = HMCCU_SubstVariables ($clt_hash, $cond, $vars);
 		my $e = eval "$cond";
+		HMCCU_Trace ($clt_hash, 2, $fnc, "eval $cond = $e") if (defined ($e));
 		HMCCU_Trace ($clt_hash, 2, $fnc, "Error in eval $cond") if (!defined ($e));
 		HMCCU_Trace ($clt_hash, 2, $fnc, "NoMatch in eval $cond") if (defined ($e) && $e eq '');
 		next if (!defined ($e) || $e eq '');
@@ -3027,7 +3026,8 @@ sub HMCCU_GetRPCServerInfo ($$$)
 }
 
 ######################################################################
-# Check if RPC interface is of specified type
+# Check if RPC interface is of specified type.
+# Parameter type is A for XML or B for binary.
 ######################################################################
 
 sub HMCCU_IsRPCType ($$$)
@@ -3539,9 +3539,10 @@ sub HMCCU_GetFirmwareVersions ($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
+	my $ccureqtimeout = AttrVal ($name, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
 	
 	my $url = "http://www.eq-3.de/service/downloads.html";
-	my $response = GetFileFromURL ($url, 4, "suchtext=&suche_in=&downloadart=11");
+	my $response = GetFileFromURL ($url, $ccureqtimeout, "suchtext=&suche_in=&downloadart=11");
 #	my @changebc = $response =~ m/href="(Downloads\/Software\/Firmware\/changelog_[^"]+)/g;
 #	my @changeip = $response =~ m/href="(Downloads\/Software\/Firmware\/Homematic IP\/changelog_[^"]+)/g;
 	my @download = $response =~ m/<a.href="(Downloads\/Software\/Firmware\/[^"]+)/g;
@@ -4101,7 +4102,8 @@ sub HMCCU_GetSwitchDatapoint ($$$)
 
 ######################################################################
 # Check if datapoint is valid.
-# Parameter chn can be a channel address or a channel number.
+# Parameter chn can be a channel address or a channel number. If dpt
+# contains a channel number parameter chn should be set to undef.
 # Parameter dpt can contain a channel number.
 # Parameter oper specifies access flag:
 #   1 = datapoint readable
@@ -4390,9 +4392,11 @@ sub HMCCU_SplitChnAddr ($)
 sub HMCCU_GetCCUObjectAttribute ($$$)
 {
 	my ($hash, $object, $attr) = @_;
+	my $name = $hash->{NAME};
+	my $ccureqtimeout = AttrVal ($name, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
 
 	my $url = 'http://'.$hash->{host}.':8181/do.exe?r1=dom.GetObject("'.$object.'").'.$attr;
-	my $response = GetFileFromURL ($url);
+	my $response = GetFileFromURL ($url, $ccureqtimeout);
 	if (defined ($response) && $response !~ /<r1>null</) {
 		if ($response =~ /<r1>(.+)<\/r1>/) {
 			return $1;
@@ -5113,10 +5117,6 @@ sub HMCCU_HMScriptExt ($$$)
 	my $code = $hmscript;
 	my $scrname = '';
 
-	if ($hash->{TYPE} ne 'HMCCU') {
-		Log3 $name, 2, "HMCCU: HMScriptExt called with hash of type ".$hash->{TYPE}.", Dev=$name, script=$hmscript";
-	}
-	
 	# Check for internal script
 	if ($hmscript =~ /^!(.*)$/) {
 		$scrname = $1;
@@ -5165,12 +5165,17 @@ sub HMCCU_HMScriptExt ($$$)
 	my $url = "http://".$host.":8181/tclrega.exe";
 	my $ua = new LWP::UserAgent ();
 	my $response = $ua->post($url, Content => $code);
- 	return "ERROR: HMScript failed. ".$response->status_line() if (! $response->is_success ());
-
-	my $output = $response->content;
-	$output =~ s/<xml>.*<\/xml>//;
-	$output =~ s/\r//g;
-	return $output;
+	if ($response->is_success ()) {
+		my $output = $response->content;
+		$output =~ s/<xml>.*<\/xml>//;
+		$output =~ s/\r//g;
+		return $output;
+	}
+	else {
+		my $msg = $response->status_line();
+		Log3 $name, 2, "HMCCU: HMScript failed. $msg";
+ 		return "ERROR: HMScript failed. $msg";
+	}
 }
 
 ######################################################################
@@ -5207,6 +5212,7 @@ sub HMCCU_GetDatapoint ($@)
 	my ($statechn, $statedpt, $controlchn, $controldpt) = HMCCU_GetSpecialDatapoints (
 	   $hash, '', 'STATE', '', '');
 	my $ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value');
+	my $ccureqtimeout = AttrVal ($hmccu_hash->{NAME}, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
 
 	my $url = 'http://'.$hmccu_hash->{host}.':8181/do.exe?r1=dom.GetObject("';
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $param,
@@ -5224,7 +5230,7 @@ sub HMCCU_GetDatapoint ($@)
 
 	HMCCU_Trace ($hash, 2, $fnc, "URL=$url, param=$param, ccuget=$ccuget");
 
-	my $rawresponse = GetFileFromURL ($url);
+	my $rawresponse = GetFileFromURL ($url, $ccureqtimeout);
 	my $response = $rawresponse;
 	$response =~ m/<r1>(.*)<\/r1>/;
 	$value = $1;
@@ -5263,6 +5269,7 @@ sub HMCCU_SetDatapoint ($$$)
 	my $name = $hmccu_hash->{NAME};
 	my $cdname = $hash->{NAME};
 	
+	my $ccureqtimeout = AttrVal ($name, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
 	my $ccuverify = AttrVal ($cdname, 'ccuverify', 0); 
 
@@ -5309,7 +5316,7 @@ sub HMCCU_SetDatapoint ($$$)
 
 	my $addr = $add.":".$chn;
 	
-	my $response = GetFileFromURL ($url);
+	my $response = GetFileFromURL ($url, $ccureqtimeout);
 	HMCCU_Trace ($hash, 2, $fnc,
 		"Addr=$addr Name=$nam<br>".
 		"Script response = \n".(defined ($response) ? $response: 'undef')."<br>".
@@ -5443,6 +5450,7 @@ sub HMCCU_SetVariable ($$$$$)
 {
 	my ($hash, $varname, $value, $vartype, $params) = @_;
 	my $name = $hash->{NAME};
+	my $ccureqtimeout = AttrVal ($name, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
 	
 	my %varfnc = (
 		"bool" => "!CreateBoolVariable", "list", "!CreateListVariable",
@@ -5453,7 +5461,7 @@ sub HMCCU_SetVariable ($$$$$)
 		my $url = 'http://'.$hash->{host}.':8181/do.exe?r1=dom.GetObject("'.$varname.
 			'").State("'.$value.'")';
 
-		my $response = GetFileFromURL ($url);
+		my $response = GetFileFromURL ($url, $ccureqtimeout);
 		return HMCCU_Log ($hash, 1, "URL=$url", -2)
 			if (!defined ($response) || $response =~ /<r1>null</);
 	}
@@ -6373,10 +6381,7 @@ sub HMCCU_TCPPing ($$$)
 		my $t = time ();
 	
 		while (time () < $t+$timeout) {
-			if (HMCCU_TCPConnect ($addr, $port)) {
-				sleep (30);
-				return 1;
-			}
+			return 1 if (HMCCU_TCPConnect ($addr, $port));
 			sleep (20);
 		}
 		
@@ -7019,6 +7024,11 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
          'Value' because each request is sent to the device. With method 'Value' only CCU
          is queried. Default is 'Value'.
       </li><br/>
+      <li><b>ccuReqTimeout &lt;Seconds&gt;</b><br/>
+      	Set timeout for CCU request. Default is 4 seconds. This timeout affects several
+      	set and get commands, i.e. "set datapoint" or "set var". If a command runs into
+      	a timeout FHEM will block for <i>Seconds</i>.
+      </li>
       <li><b>ccureadings {0 | <u>1</u>}</b><br/>
          Deprecated. Readings are written by default. To deactivate readings set flag noReadings
          in attribute ccuflags.

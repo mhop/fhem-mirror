@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCU: Fixed bug in attribute peer
   - bugfix:  32_withings, 38_netatmo: maintenance update
   - added:   72_XiaomiDevice: added new module for Xiaomi WiFi devices
   - feature: 93_DbRep: V7.14.0, new command syncStandby
