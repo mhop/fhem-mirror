@@ -37,13 +37,14 @@ sub xs1Bridge_Initialize($) {
 	$hash->{AttrFn}  	= 	"xs1Bridge_Attr";  
 	$hash->{UndefFn}	=	"xs1Bridge_Undef";
 	$hash->{AttrList}	=	"debug:0,1 ".
-								"disable:0,1 ".
-								"ignore:0,1 ".
-								"interval:30,60,180,360 ".
-								"update_only_difference:0,1 ".
-								"view_Device_name:0,1 ".
-								"view_Device_function:0,1 ";
-								##$readingFnAttributes;		## die Standardattribute von FHEM
+							"disable:0,1 ".
+							"ignore:0,1 ".
+							"interval:30,60,180,360 ".
+							"update_only_difference:0,1 ".
+							"view_Device_name:0,1 ".
+							"view_Device_function:0,1 ".
+							"xs1_control:0,1 ";
+							##$readingFnAttributes;		## die Standardattribute von FHEM
 							
 	foreach my $d(sort keys %{$modules{xs1Bridge}{defptr}}) {
         my $hash = $modules{xs1Bridge}{defptr}{$d};
@@ -64,14 +65,15 @@ sub xs1Bridge_Define($$) {
 	return "Your IP is not valid. Please Check!" if not($arg[2] =~ /[0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}/s);
 	return "Cannot define xs1Bridge device. Perl modul ${missingModul}is missing." if ( $missingModul );
 
-	my $xs1check;
-	my $p = Net::Ping->new("tcp", 2);
-	if(!($p->ping("$arg[2]", 2))) {
-		$xs1check = 1 ;
+	my $xs1check = 0;
+	if(!defined $modules{xs1Bridge}) {
+		my $p = Net::Ping->new("tcp", 2);
+		if(!($p->ping("$arg[2]", 2))) {
+			$xs1check = 1;
+		}
+		$p->close();
+		return "Your IP is not reachable. Please Check!" if ($xs1check == 1);
 	}
-	$p->close();
-	
-	return "Your IP is not reachable. Please Check!" if ($xs1check == 1);
 	
 	# Parameter Define
 	my $xs1_ip = $arg[2];				## Zusatzparameter 1 bei Define - ggf. nur in Sub
@@ -83,9 +85,10 @@ sub xs1Bridge_Define($$) {
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
-	$attr{$name}{disable}	= "0";
-	$attr{$name}{interval}	= "60";
-	$attr{$name}{room}		= "xs1"	if( not defined( $attr{$name}{room} ) );
+	$attr{$name}{disable}		= "0";
+	$attr{$name}{interval}		= "60";
+	$attr{$name}{room}			= "xs1"	if( not defined( $attr{$name}{room} ) );
+	$attr{$name}{xs1_control}	= "0";
 	
 	$modules{xs1Bridge}{defptr}{BRIDGE} = $hash;
 	
@@ -110,6 +113,7 @@ sub xs1Bridge_Attr(@) {
 	my $viewDeviceName = AttrVal($hash->{NAME},"view_Device_name",0);
 	my $viewDeviceFunction = AttrVal($hash->{NAME},"view_Device_function",0);
 	my $update_only_difference = AttrVal($hash->{NAME},"update_only_difference",0);
+	my $xs1_control = AttrVal($hash->{NAME},"xs1_control",0);
 	
 	# $cmd  - Vorgangsart - kann die Werte "del" (löschen) oder "set" (setzen) annehmen
 	# $name - Gerätename
@@ -159,6 +163,13 @@ sub xs1Bridge_Attr(@) {
 				Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
 				for my $i (0..64) {
 				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
+				}
+			}
+		}elsif ($attrName eq "xs1_control") {
+			if ($attrValue eq "1") {								## Handling bei attribute disable 1
+				if(! $modules{xs1Dev}) {							## Check Modul vorhanden
+					$attr{$name}{xs1_control}	= "0";
+					return "Module xs1Dev is non-existent or still under development. Please wait"
 				}
 			}
 		}
@@ -232,7 +243,8 @@ sub xs1Bridge_GetUpDate() {
 	my $viewDeviceName = AttrVal($hash->{NAME},"view_Device_name",0);
 	my $viewDeviceFunction = AttrVal($hash->{NAME},"view_Device_function",0);
 	my $update_only_difference = AttrVal($hash->{NAME},"update_only_difference",0);
-
+	my $xs1_control = AttrVal($hash->{NAME},"xs1_control",0);
+	
 	if (AttrVal($hash->{NAME},"disable",0) == 0 && $xs1_ConnectionTry <= 5) {
 		RemoveInternalTimer($hash);									## Timer löschen
 		InternalTimer(gettimeofday()+$interval, "xs1Bridge_GetUpDate", $hash);
@@ -283,9 +295,10 @@ sub xs1Bridge_GetUpDate() {
 				# ERROR Message
 				# http://192.168.2.5/control?callback=cname&cmd=get_list_actuators: Can't connect(1) to http://192.168.2.5:80: IO::Socket::INET: connect: No route to host
 				# http://192.168.2.5/control?callback=cname&cmd=get_config_info: empty answer received
+				# http://192.168.2.5/control?callback=cname&cmd=get_config_info: Select timeout/error: 
 				
-				($Http_err) = $Http_err =~ /[:]\s.*/g;
-				Log3 $name, 3, "$typ: GetUpDate | Try=$xs1_ConnectionTry loop=$i | Error".$Http_err;
+				#($Http_err) = $Http_err =~ /[:]\s.*/g;
+				Log3 $name, 3, "$typ: GetUpDate | Try=$xs1_ConnectionTry loop=$i | Error: ".$Http_err;
 				$xs1_ConnectionTry++;
 				last;											## Abbruch Schleife
 			} elsif ($Http_data ne "") {						## HTTP Requests, OK dann ARRAY Verarbeitung
@@ -293,7 +306,6 @@ sub xs1Bridge_GetUpDate() {
 				$json_utf8 = eval {encode_utf8( $json )};		## UTF-8 character Bearbeitung, da xs1 TempSensoren ERROR
 				$decoded = eval {decode_json( $json_utf8 )};
 				$xs1_ConnectionTry 	= 1;			
-			
 			
 				if ($i <= 1 ) {     ### xs1 Aktoren / Sensoren
 					my $xs1_data;
@@ -381,7 +393,7 @@ sub xs1Bridge_GetUpDate() {
 							}
 							
 							### Dispatch an xs1Device Modul						
-							if ($xs1Dev_check eq "ok") {
+							if ($xs1Dev_check eq "ok" && $xs1_control == 1) {
 								Debug " $typ: GetUpDate | Dispatch: $xs1_data" if($debug);
 								Dispatch($hash,$xs1_data,undef) if($xs1_data);
 							}
@@ -460,7 +472,7 @@ sub xs1Bridge_GetUpDate() {
 
 sub xs1Bridge_Write($)			## Zustellen von Daten via IOWrite() vom logischen zum physischen Modul 
 {
-	my ($hash, $Aktor_ID, $xs1_typ, $cmd) = @_;
+	my ($hash, $Aktor_ID, $xs1_typ, $cmd, $cmd2) = @_;
 	my $name = $hash->{NAME};
 	my $typ = $hash->{TYPE};
 	my $xs1_ip = $hash->{xs1_ip};
@@ -469,16 +481,16 @@ sub xs1Bridge_Write($)			## Zustellen von Daten via IOWrite() vom logischen zum 
 
 	$Aktor_ID = substr($Aktor_ID, 1,2);
 
-	if ($xs1_typ eq "switch") {
+	my $xs1cmd;
+	if ($xs1_typ eq "switch") {		## Anpassung Sendebefehl xs1
+		$xs1cmd = "http://$xs1_ip/control?callback=cname&cmd=set_state_actuator&number=$Aktor_ID&$cmd2";
+	} elsif ($xs1_typ eq "dimmer") {
 		if ($cmd eq "off") {
 			$cmd = 0;
-		} elsif ($cmd eq "on") {
-			$cmd = 100;
 		}
+		$xs1cmd = "http://$xs1_ip/control?callback=cname&cmd=set_state_actuator&number=$Aktor_ID&value=$cmd";
 	}
 
-	my $xs1cmd = "http://$xs1_ip/control?callback=cname&cmd=set_state_actuator&number=$Aktor_ID&value=$cmd";
-	
 	### HTTP Requests #### Start ####
 	my $connection;
 	my $Http_err 	= "";
@@ -589,6 +601,10 @@ sub xs1Bridge_Undef($$)
 		<li>view_Device_function (0,1)<br>
 		The actuator functions defined in xs1 are read out as Reading.<br>
 		(Default, view_Device_function 0)<br>
+		</li><br>
+		<li>xs1_control (0,1)<br>
+		Option to control the xs1. After activating this, the xs1Dev module creates each actuator and sensor in FHEM.<br>
+		(Default, xs1_control 0)<br>
 		</li><br><br>
 	</ul>
 	<b>explanation:</b>
@@ -607,7 +623,8 @@ sub xs1Bridge_Undef($$)
 		<li>xs1_firmware</li> firmware number<br>
 		<li>xs1_start</li> device start<br>
 		</ul><br>
-		<li>The message "<code>... Can't connect ...</code>" in the system logfile says that there was no query for a short time.</li>
+		<li>The message "<code>... Can't connect ...</code>" or "<code>ERROR: empty answer received</code>" in the system logfile says that there was no query for a short time.<br>
+		(This can happen more often with DLAN.)<br><br></li>
 		<li>If the device has not been connected after 5 connection attempts, the module will switch on < disable > !</li><br>
 		<li>Create logfile automatically after define | scheme: <code>define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log &lt;name&gt;</code><br>
 			The following values ​​are recorded in logfile: Aktor_(01-64) or Sensor_(01-64) values | Timer | xs1-status information</li>
@@ -619,7 +636,7 @@ sub xs1Bridge_Undef($$)
 <a name="xs1Bridge"></a>
 <h3>xs1Bridge</h3>
 <ul>
-	Mit diesem Modul können Sie das Gerät xs1 der Firma <a href="http://www.ezcontrol.de/">EZcontrol</a> auslesen. Das Modul ruft die Daten des xs1 via der Kommunikationsschnittstelle ab. Mit einem HTTP GET Requests erhält man die Antworten in Textform welche im Datenformat JSON (JavaScript Object Notation) ausgegeben werden. 
+	Mit diesem Modul k&ouml;nnen Sie das Gerät xs1 der Firma <a href="http://www.ezcontrol.de/">EZcontrol</a> auslesen. Das Modul ruft die Daten des xs1 via der Kommunikationsschnittstelle ab. Mit einem HTTP GET Requests erh&auml;lt man die Antworten in Textform welche im Datenformat JSON (JavaScript Object Notation) ausgegeben werden. 
 	Es werden Aktoren | Sensoren | Timer | Informationen vom xs1 ausgelesen und in Readings geschrieben. Bei jedem Auslesen werden nur Readings angelegt bzw. aktualisiert, welche auch im xs1 definiert und aktiv sind. Aktor | Sensor bzw. Timer Definitionen welche deaktiviert sind im xs1, werden NICHT ausgelesen.
 	<br><br>
 
@@ -632,7 +649,7 @@ sub xs1Bridge_Undef($$)
 		<code>define &lt;name&gt; xs1Bridge &lt;IP&gt; </code>
 		<br><br>
 
-		Ein anlegen des Modules ohne Angabe der IP vom xs1 ist nicht möglich. Sollte die IP bei der Moduldefinierung nicht erreichbar sein, so bricht der Define Vorgang ab.
+		Ein anlegen des Modules ohne Angabe der IP vom xs1 ist nicht m&ouml;glich. Sollte die IP bei der Moduldefinierung nicht erreichbar sein, so bricht der Define Vorgang ab.
 			<ul>
 			<li><code>&lt;IP&gt;</code> ist IP-Adresse im lokalen Netzwerk.</li>
 			</ul><br>
@@ -658,7 +675,7 @@ sub xs1Bridge_Undef($$)
 		</li><br>
 		<li>interval (30,60,180,360)<br>
 		Das ist der Intervall in Sekunden, in dem die Readings neu gelesen werden vom xs1.<br>
-		<i>Bei Aktoren werden nur unterschiedliche Zustände aktualisiert im eingestellten Intervall.</i><br>
+		<i>Bei Aktoren werden nur unterschiedliche Zust&auml;nde aktualisiert im eingestellten Intervall.</i><br>
 		<i>Sensoren werden unabhängig vom Zustand immer im Intervall aktualisiert.</i><br>
 		(Default, interval 60)
 		</li><br>
@@ -672,6 +689,10 @@ sub xs1Bridge_Undef($$)
 		<li>view_Device_function (0,1)<br>
 		Die Aktor Funktionen welche im xs1 definiert wurden, werden als Reading ausgelesen.<br>
 		(Default, view_Device_function 0)<br>
+		</li><br>
+		<li>xs1_control (0,1)<br>
+		Die Freigabe zur Steuerung des xs1. Nach Aktivierung dieser, wird durch das xs1Dev Modul jeder Aktor und Sensor in FHEM angelegt.<br>
+		(Default, xs1_control 0)<br>
 		</li><br><br>
 	</ul>
 	<b>Erl&auml;uterung:</b>
@@ -690,7 +711,8 @@ sub xs1Bridge_Undef($$)
 		<li>xs1_firmware</li> Firmwareversion<br>
 		<li>xs1_start</li> Ger&auml;testart<br>
 		</ul><br>
-		<li>Die Meldung "<code>... Can't connect ...</code>" im System-Logfile besagt, das kurzzeitig keine Abfrage erfolgen konnte.</li>
+		<li>Die Meldung "<code>Error: Can't connect ...</code>" oder "<code>ERROR: empty answer received</code>" im System-Logfile, besagt das kurzzeitig keine Abfrage erfolgen konnte.<br>
+		(Das kann h&auml;ufiger bei DLAN vorkommen.)<br><br></li>
 		<li>Sollte das Ger&auml;t nach 5 Verbindungsversuchen ebenfalls keine Verbindung erhalten haben, so schaltet das Modul auf < disable > !</li><br>
 		<li>Logfile Erstellung erfolgt automatisch nach dem definieren. | Schema: <code>define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log &lt;Name&gt;</code><br>
 			Folgende Werte werden im Logfile erfasst: Aktor_(01-64) bzw. Sensor_(01-64) Werte | Timer | xs1-Statusinformationen</li>
