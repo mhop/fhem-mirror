@@ -89,7 +89,7 @@ CommandCmdAlias($$$)
       my %specials= ("%EVENT" => $param);
       my $exec = EvalSpecials($h->{NEWCMD}, %specials);
       $h->{InExec} = 1;
-      my $r =  AnalyzeCommandChain(undef, $exec);
+      my $r =  AnalyzeCommandChain($cl, $exec);
       delete $h->{InExec};
       return $r;
     }
