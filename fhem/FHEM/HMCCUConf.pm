@@ -155,6 +155,14 @@ use vars qw(%HMCCU_SCRIPTS);
 	statevals        => "press:true",
 	substitute       => "PRESS_SHORT,PRESS_LONG,PRESS_CONT!(1|true):pressed,(0|false):released;PRESS_LONG_RELEASE!(0|false):no,(1|true):yes"
 	},
+	"HmIP-WRC6" => {
+	_description     => "Wandtaster 6-fach",
+	_channels        => "1,2,3,4,5,6",
+	ccureadingfilter => "PRESS",
+	statedatapoint   => "PRESS_SHORT",
+	statevals        => "press:true",
+	substitute       => "PRESS_SHORT,PRESS_LONG!(1|true):pressed,(0|false):released"
+	},
 	"HM-SwI-3-FM" => {
 	_description     => "Funk-Schalterschnittstelle",
 	_channels        => "1,2,3",
@@ -252,17 +260,18 @@ use vars qw(%HMCCU_SCRIPTS);
 	statevals        => "on:true,off:false",
 	substitute       => "STATE!(1|true):on,(0|false):off"	
 	},
-	"HM-LC-Bl1PBU-FM|HM-LC-Bl1-FM|HM-LC-Bl1-SM|HM-LC-BlX|HM-LC-Bl1-SM-2|HM-LC-Bl1-FM-2" => {
+	"HM-LC-Bl1PBU-FM|HM-LC-Bl1-FM|HM-LC-Bl1-SM|HM-LC-BlX|HM-LC-Bl1-SM-2|HM-LC-Bl1-FM-2|HM-LC-Ja1PBU-FM" => {
 	_description     => "Jalousienaktor",
 	_channels        => "1",
 	ccureadingfilter => "(LEVEL|INHIBIT|DIRECTION|WORKING)",
+	ccureadingname   => "LEVEL:+pct",
 	ccuscaleval      => "LEVEL:0:1:0:100",
 	cmdIcon          => "up:fts_shutter_up stop:fts_shutter_manual down:fts_shutter_down",
 	controldatapoint => "LEVEL",
 	eventMap         => "/datapoint STOP true:stop/datapoint LEVEL 0:down/datapoint LEVEL 100:up/",
 	statedatapoint   => "LEVEL",
 	stripnumber      => 1,
-	substexcl        => "control",
+	substexcl        => "control|pct",
 	substitute       => "LEVEL!#0-0:closed,#100-100:open;DIRECTION!0:stop,1:up,2:down,3:undefined;WORKING!(0|false):no,(1|true):yes",
 	webCmd           => "control:up:stop:down",
 	widgetOverride   => "control:slider,0,10,100"
@@ -531,6 +540,11 @@ use vars qw(%HMCCU_SCRIPTS);
 	ccureadingfilter => "PRESS",
 	substitute       => "PRESS_SHORT,PRESS_LONG,PRESS_CONT!(1|true):pressed,(0|false):released;PRESS_LONG_RELEASE!(0|false):no,(1|true):yes"
 	},
+	"HmIP-WRC6" => {
+	_description     => "Wandtaster 6-fach",
+	ccureadingfilter => "PRESS",
+	substitute       => "PRESS_SHORT,PRESS_LONG!(1|true):pressed,(0|false):released"
+	},
 	"HM-SwI-3-FM" => {
 	_description     => "Funk-Schalterschnittstelle",
 	ccureadingfilter => "PRESS",
@@ -590,7 +604,14 @@ use vars qw(%HMCCU_SCRIPTS);
 	statevals        => "on:true,off:false",
 	substitute       => "STATE!(1|true):on,(0|false):off;WORKING!(1|true):yes,(0|false):no"	
 	},
-	"HM-LC-Bl1PBU-FM|HM-LC-Bl1-FM|HM-LC-Bl1-SM|HM-LC-BlX|HM-LC-Bl1-SM-2|HM-LC-Bl1-FM-2" => {
+	"HM-LC-Sw1-Pl|HM-LC-Sw1-Pl-2|HM-LC-Sw1-SM|HM-LC-Sw1-FM|HM-LC-Sw1-PB-FM" => {
+	_description     => "1 Kanal Funk-Schaltaktor",
+	ccureadingfilter => "STATE",
+	statedatapoint   => "1.STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(1|true):on,(0|false):off"	
+	},
+	"HM-LC-Bl1PBU-FM|HM-LC-Bl1-FM|HM-LC-Bl1-SM|HM-LC-BlX|HM-LC-Bl1-SM-2|HM-LC-Bl1-FM-2|HM-LC-Ja1PBU-FM" => {
 	_description     => "Jalousienaktor",
 	ccureadingfilter => "(LEVEL|INHIBIT|DIRECTION|WORKING)",
 	ccuscaleval      => "LEVEL:0:1:0:100",
