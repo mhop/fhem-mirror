@@ -38,7 +38,6 @@ my %health_index = (  0 => "healthy",
                       4 => "unhealthy",
                       5 => "unknown", );
 
-
 sub
 netatmo_Initialize($)
 {
@@ -440,7 +439,6 @@ netatmo_Define($$)
   $hash->{STATE} = "Initialized";
 
   $hash->{NOTIFYDEV} = "global";
-
 
   if( $init_done ) {
     netatmo_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
@@ -1655,7 +1653,7 @@ netatmo_requestDeviceReadings($@)
 
   return undef if( !defined($hash->{IODev}) );
 
-  Log3 $name, 5, "$name: requestDeviceReadings start ($id $type $module)";
+  Log3 $name, 5, "$name: requestDeviceReadings ($id ".(!$type?"-":$type)." ".(!$module?"-":$module).")";
 
   my $iohash = $hash->{IODev};
   $type = $hash->{dataTypes} if( !$type );
@@ -3327,7 +3325,7 @@ netatmo_parseReadings($$;$)
   }
 
   if( $json ) {
-    $hash->{status} = $json->{status};
+    $hash->{status} = $json->{status} if($json->{status});
     $hash->{status} = $json->{error}{message} if( $json->{error} );
 
     my $lastupdate = ReadingsVal( $name, ".lastupdate", 0 );
@@ -3369,21 +3367,21 @@ netatmo_parseReadings($$;$)
             }
 
 
-            if(($rname eq "noise" && int($reading) > 150) || ($rname eq "temperature" && int($reading) > 60) || ($rname eq "humidity" && int($reading) > 100) || ($rname eq "pressure" && int($reading) < 500))
+            if($reading ne "undefined" && (($rname eq "noise" && int($reading) > 150) || ($rname eq "temperature" && int($reading) > 60) || ($rname eq "humidity" && int($reading) > 100) || ($rname eq "pressure" && int($reading) < 500)))
             {
               Log3 $name, 1, "$name netatmo - invalid reading: $rname: ".Dumper($reading)." \n    ".Dumper($reading_names);
              next;
             }
 
-            if($rname eq "health_idx"){
+            if($reading ne "undefined" && $rname eq "health_idx"){
               $reading = $health_index{$reading};
             }
 
-            if($rname =~ /temperature/){
+            if($reading ne "undefined" && $rname =~ /temperature/){
               $reading = sprintf( "%.1f", $reading);
             }
 
-            if($rname eq "rain" && $reading > 0)
+            if($reading ne "undefined" && $rname eq "rain" && $reading > 0)
             {
               my $rain_sum = ReadingsVal($name,"rain_sum",0);
               $rain_sum += $reading;
