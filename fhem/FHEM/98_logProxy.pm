@@ -1335,7 +1335,7 @@ logProxy_Get($@)
         </ul>
 
     <li>ConstX:&lt;time&gt;,&lt;y&gt;[,&lt;y2&gt;]<br>
-      Will draw a vertical line (or point) at &lttime&gt; between &lt;y&gt; to &lt;y2&gt;.<br>
+      Will draw a vertical line (or point) at &lt;time&gt; between &lt;y&gt; to &lt;y2&gt;.<br>
       Everything after the : is evaluated as a perl expression that hast to return one time string and one or two y values.<br>
       Examples:
       <ul>
@@ -1345,8 +1345,8 @@ logProxy_Get($@)
         <code>#logProxy ConstX:logProxy_shiftTime($from,60*60*2),$data{min1},$data{max1}</code><br>
       </ul></li><br>
 
-    <li>ConstY:&ltvalue&gt;[,&lt;from&gt;[,&lt;to&gt;]]<br>
-      Will draw a horizontal line at &ltvalue&gt;, optional only between the from and to times.<br>
+    <li>ConstY:&lt;value&gt;[,&lt;from&gt;[,&lt;to&gt;]]<br>
+      Will draw a horizontal line at &lt;value&gt;, optional only between the from and to times.<br>
       Everything after the : is evaluated as a perl expression that hast to return one value and optionaly one or two time strings.<br>
       Examples:
       <ul>
@@ -1357,12 +1357,12 @@ logProxy_Get($@)
         <code>#logProxy ConstY:$data{avg2},logProxy_shiftTime($from,60*60*12),logProxy_shiftTime($from,-60*60*12)</code>
       </ul></li><br>
 
-    <li>Polar:[&ltoptions&gt;]:&lt;values&gt;<br>
+    <li>Polar:[&lt;options&gt;]:&lt;values&gt;<br>
       Will draw a polar/spiderweb diagram with the given values. &lt;values&gt; has to evaluate to a perl array.<br>
       If &lt;values&gt; contains numbers these values are plottet and the last value will be connected to the first.<br>
       If &lt;values&gt; contains strings these strings are used as labels for the segments.<br>
       The axis are drawn automaticaly if the values are strings or if no values are given but the segments option is set.<br>
-      The corrosponding SVG device should have the plotsize attribute set (eg: attr <mySvg> plotsize 340,300) and the used gplot file has to contain xrange and yrange entries and the x- and y-axis labes should be switched off with xtics, ytics  and y2tics entries.<br>
+      The corrosponding SVG device should have the plotsize attribute set (eg: attr &lt;mySvg&gt; plotsize 340,300) and the used gplot file has to contain xrange and yrange entries and the x- and y-axis labes should be switched off with xtics, ytics  and y2tics entries.<br>
       The following example will plot the temperature and desiredTemperature values of all devices named MAX.*:
       <ul>
         <code>set xtics ()</code><br>
@@ -1377,10 +1377,10 @@ logProxy_Get($@)
         <code>#logProxy Polar::{[map{ReadingsVal($_,"temperature",0)}devspec2array("MAX.*")]}</code><br>
         <code>#logProxy Polar::{[devspec2array("MAX.*")]}</code><br><br>
 
-        <code>plot "<IN>" using 1:2 axes x1y1 title 'Ist' ls l0 lw 1 with lines,\</code><br>
-        <code>plot "<IN>" using 1:2 axes x1y1 title 'Soll' ls l1fill lw 1 with lines,\</code><br>
-        <code>plot "<IN>" using 1:2 axes x1y1 notitle ls l0 lw 1 with points,\</code><br>
-        <code>plot "<IN>" using 1:2 axes x1y1 notitle  ls l2 lw 1 with lines,\</code><br>
+        <code>plot "&lt;IN&gt;" using 1:2 axes x1y1 title 'Ist' ls l0 lw 1 with lines,\</code><br>
+        <code>plot "&lt;IN&gt;" using 1:2 axes x1y1 title 'Soll' ls l1fill lw 1 with lines,\</code><br>
+        <code>plot "&lt;IN&gt;" using 1:2 axes x1y1 notitle ls l0 lw 1 with points,\</code><br>
+        <code>plot "&lt;IN&gt;" using 1:2 axes x1y1 notitle  ls l2 lw 1 with lines,\</code><br>
       </ul><br>
       options is a comma separated list of zero or more of:<br>
         <ul>
@@ -1397,7 +1397,7 @@ logProxy_Get($@)
         </ul>
       </li><br>
 
-    <li>Func:&ltperl expression&gt;<br>
+    <li>Func:&lt;perl expression&gt;<br>
       Specifies a perl expression that returns the data to be plotted and its min, max and last value. It can not contain
       space or : characters. The data has to be
       one string of newline separated entries of the form: <code>yyyy-mm-dd_hh:mm:ss value</code><br>Example:
@@ -1446,8 +1446,8 @@ logProxy_Get($@)
     <code>#FileLog 4:&lt;SPEC1&gt;:consumption\x3a::</code><br><br>
     will become:<br><br>
     <code>#logProxy DbLog:&lt;myDb&gt;:&lt;myDevice&gt;:&lt;myReading&gt;</code></br>
-    <code>#logProxy FileLog:FileLog_&lt;SPEC1&gt;:4:<SPEC1>.power\x3a::</code><br>
-    <code>#logProxy FileLog:FileLog_&lt;SPEC1&gt;:4:<SPEC1>.consumption\x3a::</code><br>
+    <code>#logProxy FileLog:FileLog_&lt;SPEC1&gt;:4:&lt;SPEC1&gt;.power\x3a::</code><br>
+    <code>#logProxy FileLog:FileLog_&lt;SPEC1&gt;:4:&lt;SPEC1&gt;.consumption\x3a::</code><br>
   </ul>
 
 </ul>

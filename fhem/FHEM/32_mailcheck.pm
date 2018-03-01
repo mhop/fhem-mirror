@@ -520,7 +520,7 @@ mailcheck_Read($)
   <ul>
     <code>define &lt;name&gt; mailcheck &lt;host&gt; &lt;user&gt; &lt;password&gt; [&lt;folder&gt;]</code><br>
     <br>
-    &lt;user&gt; and <lt>&lt;password&gt; can be of the form {perl-code}. no spaces are allowed. for both evals $NAME and $HOST is set to the name and host of the mailcheck device and $USER is set to the user in the password eval.
+    &lt;user&gt; and &lt;password&gt; can be of the form {perl-code}. no spaces are allowed. for both evals $NAME and $HOST is set to the name and host of the mailcheck device and $USER is set to the user in the password eval.
     <br>
 
     Defines a mailcheck device.<br><br>

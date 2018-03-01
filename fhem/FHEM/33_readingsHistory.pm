@@ -740,7 +740,7 @@ readingsHistory_Attr($$$)
     <ul>
       <li>&lt;device&gt; can be of the form INTERNAL=VALUE where INTERNAL is the name of an internal value and VALUE is a regex.</li>
       <li>If regex is a comma separatet list it will be used as an enumeration of allowed readings.</li>
-      <li>if no device/reading argument is given only lines with 'set <device> add ...' are displayed.</li>
+      <li>if no device/reading argument is given only lines with 'set &lt;device&gt; add ...' are displayed.</li>
     </ul><br>
 
     Examples:

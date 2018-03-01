@@ -410,7 +410,7 @@ readingsProxy_Attr($$$;$)
         has access to $DEVICE, $READING, $CMD and $ARGS.<br>
         undef -> do nothing<br>
         ""    -> pass through<br>
-        (<value>,1) -> directly return <value>, don't call parent getFn<br>
+        (&lt;value&gt;,1) -> directly return &lt;value&gt;, don't call parent getFn<br>
         everything else -> use this instead</li>
       <li>setFn<br>
         perl expresion that will return the set command forwarded to the parent device.

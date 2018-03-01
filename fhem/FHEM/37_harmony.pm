@@ -1865,11 +1865,11 @@ harmony_decrypt($)
   <a name="harmony_Set"></a>
   <b>Set</b>
   <ul>
-    <li>activity &lt;id&gt;|&ltname&gt; [&lt;channel&gt;]<br>
+    <li>activity &lt;id&gt;|&lt;name&gt; [&lt;channel&gt;]<br>
       switch to this activit and optionally switch to &lt;channel&gt;</li>
     <li>channel &lt;channel&gt;<br>
       switch to &lt;channel&gt; in the current activity</li>
-    <li>command [&lt;id&gt;|&ltname&gt;] &lt;command&gt; [duration=&lt;duration&gt;]<br>
+    <li>command [&lt;id&gt;|&lt;name&gt;] &lt;command&gt; [duration=&lt;duration&gt;]<br>
       send the given ir command for the current activity or for the given device</li>
     <li>getConfig<br>
       request the configuration from the hub</li>
@@ -1885,7 +1885,7 @@ harmony_decrypt($)
       default -> 60 minutes</li>
     <li>sync<br>
       syncs the hub to the myHarmony config</li>
-    <li>hidDevice [&lt;id&gt;|&ltname&gt;]<br>
+    <li>hidDevice [&lt;id&gt;|&lt;name&gt;]<br>
       sets the target device for keyboard commands, if no device is given -> set the target to the
       default device for the current activity.</li>
     <li>text &lt;text&gt;<br>
@@ -1894,7 +1894,7 @@ harmony_decrypt($)
       moves the cursor by bluetooth/smart keaboard dongle. &lt;direction&gt; can be one of: up, down, left, right, pageUp, pageDown, home, end.</li>
     <li>special &lt;key&gt;<br>
       sends special key by bluetooth/smart keaboard dongle. &lt;key&gt; can be one of: previousTrack, nextTrack, stop, playPause, volumeUp, volumeDown, mute.</li>
-    <li>autocreate [&lt;id&gt;|&ltname&gt;]<br>
+    <li>autocreate [&lt;id&gt;|&lt;name&gt;]<br>
       creates a fhem device for a single/all device(s) in the harmony hub. if activities are startet the state
       of these devices will be updatet with the power state defined in these activites.</li>
     <li>update<br>
@@ -1909,7 +1909,7 @@ harmony_decrypt($)
     <li>active<br>
       activates the current device (see inactive).</li>
   </ul>
-  The command, hidDevice, text, cursor and special commmands are also available for the autocreated devices. The &lt;id&gt;|&ltname&gt; paramter hast to be omitted.<br><br>
+  The command, hidDevice, text, cursor and special commmands are also available for the autocreated devices. The &lt;id&gt;|&lt;name&gt; paramter hast to be omitted.<br><br>
 
   <a name="harmony_Get"></a>
   <b>Get</b>
@@ -1919,19 +1919,19 @@ harmony_decrypt($)
       parm = power -> list power state for each device in activity</li>
     <li>devices [&lt;param&gt;]<br>
       lists all devices</li>
-    <li>commands [&lt;id&gt;|&ltname&gt;]<br>
+    <li>commands [&lt;id&gt;|&lt;name&gt;]<br>
       lists the commands for the specified activity or for all activities</li>
-    <li>deviceCommands [&lt;id&gt;|&ltname&gt;]<br>
+    <li>deviceCommands [&lt;id&gt;|&lt;name&gt;]<br>
       lists the commands for the specified device or for all devices</li>
-    <li>activityDetail [&lt;id&gt;|&ltname&gt;]</li>
-    <li>deviceDetail [&lt;id&gt;|&ltname&gt;]</li>
+    <li>activityDetail [&lt;id&gt;|&lt;name&gt;]</li>
+    <li>deviceDetail [&lt;id&gt;|&lt;name&gt;]</li>
     <li>configDetail</li>
     <li>currentActivity<br>
       returns the current activity name</li>
     <li>showAccount<br>
       display obfuscated user and password in cleartext</li>
   </ul>
-  The commands commmand is also available for the autocreated devices. The &lt;id&gt;|&ltname&gt; paramter hast to be omitted.<br><br>
+  The commands commmand is also available for the autocreated devices. The &lt;id&gt;|&lt;name&gt; paramter hast to be omitted.<br><br>
 
 
   <a name="harmony_Attr"></a>

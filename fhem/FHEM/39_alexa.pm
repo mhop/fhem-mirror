@@ -714,7 +714,7 @@ alexa_Attr($$$)
   <b>Set</b>
   <ul>
     <li>reload [name]<br>
-      Reloads the device <it>name</it> or all devices in alexa-fhem. Subsequently you have to start a device discovery
+      Reloads the device <code>name</code> or all devices in alexa-fhem. Subsequently you have to start a device discovery
       for the home automation skill in the amazon alexa app.</li>
   </ul>
 

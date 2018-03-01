@@ -1865,8 +1865,8 @@ HUEBridge_Attr($$$)
       Create fhem devices for all bridge devices.</li>
     <li>autodetect<br>
       Initiate the detection of new ZigBee devices. After aproximately one minute any newly detected
-      devices can be listed with <code>get <bridge> devices</code> and the corresponding fhem devices
-      can be created by <code>set <bridge> autocreate</code>.</li>
+      devices can be listed with <code>get &lt;bridge&gt; devices</code> and the corresponding fhem devices
+      can be created by <code>set &lt;bridge&gt; autocreate</code>.</li>
     <li>delete &lt;name&gt;|&lt;id&gt;<br>
       Deletes the given device in the bridge and deletes the associated fhem device.</li>
     <li>creategroup &lt;name&gt; &lt;lights&gt;<br>

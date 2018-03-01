@@ -55,7 +55,7 @@ CommandCopy($$)
 =pod
 =item command
 =item summary    copy a fhem device
-=item summary_DE kopiert ein FHEM Ger&aauml;t
+=item summary_DE kopiert ein FHEM Ger&auml;t
 =begin html
 
 <a name="copy"></a>

@@ -1718,7 +1718,7 @@ readingsGroup_Attr($$$;$)
     Notes:
     <ul>
       <li>&lt;device&gt; can be of the form INTERNAL=VALUE where INTERNAL is the name of an internal value and VALUE is a regex.</li>
-      <li>&lt;device&gt; can be of the form ATTRIBUTE&VALUE where ATTRIBUTE is the name of an attribute and VALUE is a regex.</li>
+      <li>&lt;device&gt; can be of the form ATTRIBUTE&amp;VALUE where ATTRIBUTE is the name of an attribute and VALUE is a regex.</li>
       <li>&lt;device&gt; can be of the form &lt;STRING&gt; or &lt;{perl}&gt; where STRING or the string returned by perl is
           inserted as a line in the readings list. skipped if STRING is undef.</li>
       <li>&lt;device&gt; can be a devspec (see <a href="#devspec">devspec</a>) with at least one FILTER expression.</li>
@@ -1732,7 +1732,7 @@ readingsGroup_Attr($$$;$)
            <li>You can use an i:, r: or a: prefix instead of + and ? analogue to the devspec filtering.</li>
            <li>The suffix :d retrieves the first number.</li>
            <li>The suffix :i retrieves the integer part of the first number.</li>
-           <li>The suffix :r&lt;n&gt; retrieves the first number and rounds it to &lt;n&gt; decimal places. If <n> is missing, then rounds it to one decimal place.</li>
+           <li>The suffix :r&lt;n&gt; retrieves the first number and rounds it to &lt;n&gt; decimal places. If &lt;n&gt; is missing, then rounds it to one decimal place.</li>
            <li>The suffix :t returns the timestamp (works only for readings).</li>
            <li>The suffix :sec returns the number of seconds since the reading was set. probably not realy usefull with readingsGroups.</li>
          </ul></li>
@@ -1994,7 +1994,7 @@ readingsGroup_Attr($$$;$)
            <li>Sie k&ouml;nnen anstelle von + und ? ein Pr&auml;fix i :, r: oder a: verwenden. Analog zur devspec-Filterung.</li>
            <li>Der Suffix :d ruft die erste Nummer ab.</li>
            <li>Der Suffix :i ruft den ganzzahligen Teil der ersten Zahl ab.</li>
-           <li>Der Suffix :r&lt;n&gt; ruft die erste Zahl ab und rundet sie auf &lt;n&gt; Nachkommastellen ab. Wenn <n> fehlt, wird es auf eine Dezimalstelle gerundet.</li>
+           <li>Der Suffix :r&lt;n&gt; ruft die erste Zahl ab und rundet sie auf &lt;n&gt; Nachkommastellen ab. Wenn &lt;n&gt; fehlt, wird es auf eine Dezimalstelle gerundet.</li>
 		   <li>Der Suffix :t gibt den Zeitstempel zur&uuml;ck (funktioniert nur mit Readings).</li>
            <li>Der Suffix :sec gibt die Anzahl der Sekunden seit dem das Reading gesetzt wurde zur&uuml;ck. Wahrscheinlich nicht n&uuml;tzlich mit readingsGroups.</li>
 		 </ul></li>
