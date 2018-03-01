@@ -193,14 +193,18 @@ sub I2C_LM75A_GetTemp ($$) {
 	my @raw = split(" ",$rawdata);
 
 	my $temperature = 0;
-	if(($raw[0] & 0x80) > 0) {
-		$temperature = 0xffffff00;
-	}
+#	if(($raw[0] & 0x80) > 0) {
+#		$temperature = 0xffffff00;
+#	}
 #	$temperature |= ($raw[0] & 0x7f) << 1;
 #	$temperature |= (($raw[1] >> 7) & 1);
 
-  	my $temperature_11_bit = ($raw[0]<<8 | $raw[1]) >> 5; # Compute 11-bit temperature output value  
+  	my $temperature_11_bit = ($raw[0] << 8 | $raw[1]) >> 5; # Compute 11-bit temperature output value  
 	$temperature = ($temperature_11_bit) * 0.125; # Compute temperature in °C  
+	if(($raw[0] & 0x80) > 0) { # check for negative value
+#		$temperature *= -1;
+		$temperature -= 256.000;
+	}
 
 #	$temperature = $temperature / 2;
     	Log3 $hash, 5, "temperature: $temperature";    
