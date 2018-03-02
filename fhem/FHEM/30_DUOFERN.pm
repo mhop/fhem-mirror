@@ -1138,7 +1138,7 @@ DUOFERN_Parse($$)
         $state = "light curtain"  if (defined($statusValue{"lightCurtain"}) && $statusValue{"lightCurtain"} eq "1");
         $state = "obstacle"       if (defined($statusValue{"obstacle"}) && $statusValue{"obstacle"} eq "1");
         $state = "block"          if (defined($statusValue{"block"}) && $statusValue{"block"} eq "1");
-        readingsBulkUpdate($hashA, "state",  $state,     1);
+        readingsBulkUpdate($hashA, "state",  $state,     1) if ($state ne "x");
           
         readingsEndUpdate($hashA, 1); # Notify is done by Dispatch 
         DoTrigger($hashA->{NAME}, undef);
