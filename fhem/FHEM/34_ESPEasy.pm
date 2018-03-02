@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.36";     # Version of this module
+my $module_version    = "1.37";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -604,6 +604,9 @@ sub ESPEasy_Set($$@)
       elsif ($params[$pp-1] =~ m/^on$/i) {
         $state = 1;
       }
+      elsif ($params[$pp-1] =~ m/^toggle$/i) {
+        $state = "toggle";
+      }
       else {
         Log3 $name, 2, "$type $name: $cmd ".join(" ",@params)." => unknown argument: '$params[$pp-1]'";
         return undef;
@@ -613,9 +616,10 @@ sub ESPEasy_Set($$@)
     }
 
     if ($cmd eq "help") {
-      my $usage = $ESPEasy_setCmdsUsage{$params[0]};
-      $usage     =~ s/Note:/\nNote:/g;
-      return "Usage: set $name $usage";
+      my $eecmd = $params[0];
+      my $usage = $ESPEasy_setCmdsUsage{$eecmd};
+      $usage     =~ s/Note:/\nNote:/g if $usage;
+      return $usage ? "Usage: set $name $usage" : "unknown command or help not available for '$eecmd'";
     }
 
     if ($cmd eq "statusrequest") {
