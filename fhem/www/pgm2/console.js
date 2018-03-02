@@ -84,14 +84,14 @@ consFill()
 
   var loc = (""+location).replace(/\?.*/,"");
   if($("body").attr("longpoll") == "websocket") {
-    if(consConn) {
+    if(consConn)
       consConn.close();
-    }
     consConn = new WebSocket(loc.replace(/[&?].*/,'')
                                 .replace(/^http/i, "ws")+query);
     consConn.onclose = 
     consConn.onerror = 
     consConn.onmessage = consUpdate;
+    setTimeout(function(){FW_wsPing(consConn);}, 30000);
 
   } else {
     if(consConn) {

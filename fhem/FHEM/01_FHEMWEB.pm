@@ -817,7 +817,7 @@ FW_answerCall($)
   $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
                                                 $FW_tp ? "640,160" : "800,160");
   my ($cmd, $cmddev) = FW_digestCgi($arg);
-  if($cmd && $FW_CSRF && $cmd !~ m/style (list|select)/) {
+  if($cmd && $FW_CSRF && $cmd !~ m/style (list|select|eventMonitor)/) {
     my $supplied = defined($FW_webArgs{fwcsrf}) ? $FW_webArgs{fwcsrf} : "";
     my $want = $defs{$FW_wname}{CSRFTOKEN};
     if($supplied ne $want) {
@@ -2394,7 +2394,8 @@ FW_pH(@)
   my ($link, $txt, $td, $class, $doRet,$nonl) = @_;
   my $ret;
 
-  $link .= $FW_CSRF if($link =~ m/cmd/ && $link !~m/cmd=style%20(list|select)/);
+  $link .= $FW_CSRF if($link =~ m/cmd/ &&
+                       $link !~m/cmd=style%20(list|select|eventMonitor)/);
   $link = ($link =~ m,^/,) ? $link : "$FW_ME$FW_subdir?$link";
   
   # Using onclick, as href starts safari in a webapp.
