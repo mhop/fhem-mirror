@@ -89,14 +89,26 @@
 # 21.02.2018 0.4.4
 #			bracket extraction bug fixed
 #			def not load at bootup fixed
+# 03.03.2018 0.4.5
+#			timephrase modified
+#			recognize order in hash replacement
+#			Commandref fix unwanted characters
+#			possibility of nested brackets in modifiacator 
+#			stabitility fixes in user regexp
+#			replace ; to ;; in timecommands
+#			Add 1 day if timecode is in past in hour phrases
+#			Added async warning if keywordlist is unkown
 ################################################################
 # TODO:
 # 
 # device verundung durch regexp klammern? eher durch try and error
-# get compare lists
 # answerx
+#
 # klammern in keywordlists sollen die $n nummerierung nicht beeinflussen
-#  
+# in keywordlists sind vermutlich nur maximal eine klammerebene möglich direkte regex arrays sind endlos verschachtelbar
+# zusätzlich unmodifizierte zeit greifbar machen
+# timephrase kombies morgen früh um 9 uhr ist unzuverlässig. evtl order einführen, dann kann auch die splittung weg
+# viertel zeitphrasen
 
 package main;
 
@@ -111,7 +123,7 @@ use Encode qw(decode encode);
 my %Talk2Fhem_globals;
 
 
-$Talk2Fhem_globals{version}="0.4.4";
+$Talk2Fhem_globals{version}="0.4.5";
 
 $Talk2Fhem_globals{EN}{erase} = ['\bplease\b', '\balso\b', '^msgtext:'];
 $Talk2Fhem_globals{EN}{numbers} = {
@@ -225,7 +237,7 @@ $Talk2Fhem_globals{DE}{pass} = {
 	empty	=> '^\s*$'
 }; 
 $Talk2Fhem_globals{DE}{datephrase} = {
-	'(?<!guten )morgen'=> {days=>1}
+	'morgen'=> {days=>1}
 ,	'übermorgen'=> {days=>2}
 ,	'gestern'=> {days=>-1}
 ,	'vorgestern'=> {days=>-2}
@@ -245,6 +257,7 @@ $Talk2Fhem_globals{DE}{datephrase} = {
 ,	'in ('.$Talk2Fhem_globals{DE}{numberre}.') tag(\S\S)?'=> {days=>'"$1"'}
 ,	'am (\d\S*(\s\d+)?)'=> {date=>'"$1"'}
 };
+# fc modify time. $_[0] = ermittelte zeit. Zugriff auf $1 $2 usw
 $Talk2Fhem_globals{DE}{timephrase} = {
 	'(in|und|nach)? ('.$Talk2Fhem_globals{DE}{numberre}.') stunde.?' => {hour=>'"$2"'}
 ,	'(in|und|nach)? ('.$Talk2Fhem_globals{DE}{numberre}.') minute.?' => {min=>'"$2"'}
@@ -254,10 +267,17 @@ $Talk2Fhem_globals{DE}{timephrase} = {
 ,	'später' => {hour=>1}
 ,	'jetzt' => {unix=>'time'}
 ,	'sofort' => {unix=>'time'}
-,	'um ('.$Talk2Fhem_globals{DE}{numberre}.') (uhr)?' => {time=>'"$1"'}
-,	'um ('.$Talk2Fhem_globals{DE}{numberre}.') uhr ('.$Talk2Fhem_globals{DE}{numberre}.')' => {hour=>'"$1"', min=>'"$1"'} ############ ZU TESTEN
+,	'um (\d+\s?\:\s?\d+|'.$Talk2Fhem_globals{DE}{numberre}.') (uhr)?' => {
+		time=>'"$1"',
+		fc=>sub () {(($_[0] + 3600) < time) ? ($_[0]+3600*24) : $_[0] }
+	}
+,	'um ('.$Talk2Fhem_globals{DE}{numberre}.') uhr ('.$Talk2Fhem_globals{DE}{numberre}.')' => {
+		hour=>'"$1"', 
+		min=>'"$1"', 
+		fc=>sub () {(($_[0] + 3600) < time) ? ($_[0]+3600*24) : $_[0] }
+	} ############ ZU TESTEN
 ,	'früh' => {time=>'"09:00"'}
-,	'(?<!guten )abends?' => {time=>'"18:00"'}
+,	'abends?' => {time=>'"18:00"'}
 ,	'nachmittags?' => {time=>'"16:00"'}
 ,	'vormittags?' => {time=>'"10:30"'}
 ,	'mittags?' => {time=>'"12:00"'}
@@ -314,7 +334,7 @@ sub Talk2Fhem_Define($$)
 	$hash->{STATE} = "Loading";
 	
 	if ($def =~ /^\S+ Talk2Fhem$/) {
-		$hash->{DEF} = "";
+		$hash->{DEF} = "# <regex> = <command>\n# Examples:\n# timer (löschen|zurück)\t= set \$NAME cleartimers\n# ereignis\\S* (löschen|zurück)\t= set \$NAME cleartriggers";
 		
 		return;
 	}
@@ -432,7 +452,9 @@ sub Talk2Fhem_Loadphrase($$$) {
 			if ($1) {
 				$keylistname = $2; 
 				unless ($keylist{$keylistname}) {
-					return(T2FL($hash, 1, "Unkown keywordlist $1. In phrase: $phr"));
+					asyncOutput($hash->{CL}, "Warning: Unkown keywordlist $1. In phrase: $phr");
+					next;
+					#return(T2FL($hash, 1, "Unkown keywordlist $1. In phrase: $phr"));
 				}
 				my $re = join("|", @{$keylist{$keylistname}});
 				$phr =~ s/@(\w+)/$re/;
@@ -568,7 +590,7 @@ sub Talk2Fhem_Set($@)
 				#Ausführen
 			if ($res{cmds}) {
 				for my $h (@{$res{cmds}}) {
-					my $fhemcmd = ($$h{at}?Talk2Fhem_mkattime($name, $$h{at})." ":"").$$h{cmd};
+					my $fhemcmd = ($$h{at}?Talk2Fhem_mkattime($name, $$h{at})." ":"").($$h{cmd} =~ s/;/;;/gr );
 					
 					unless ($$h{ifs}) { # kein IF
 										
@@ -814,7 +836,7 @@ sub Talk2Fhem_normalize($)
    my $string = shift;
    #mach probleme bei "ue" 
 #   $string =~ s/\s{2,}|\b\w\b|\t|\n|['".,;:\!\?]/ /g;
-   $string =~ s/\s{2,}|\t|\n|['".,;:\!\?]/ /g;
+   $string =~ s/\s{2,}|\t|\n|['".,;\!\?]/ /g;
    return $string;
 }
 
@@ -949,8 +971,20 @@ $txt =~ s/$origin//;
 $origin = $&;
 $txt = Talk2Fhem_normalize(Talk2Fhem_realtrim($txt));
 readingsSingleUpdate($me, "origin", $origin, 1);	
+
+#:START
 #Zeiten könnten auch ein und enthalten deswegen nicht wenn auf und eine Zahl folgt
 my @cmds = split(/ und (?!$Talk2Fhem_globals{DE}{numberre})/, $txt);
+# CHECK if $cmd[0] hit Talk2Fhem_test. Unless dont split. And make a deeper analysis.
+#if ($#cmd)
+# before test remove time and if phrases simple	
+#	unless (Talk2Fhem_test($me, $cmds[0])) {
+#	Nun schauen wir mal was vor und nach dem und ist.
+#	könnte phrasentreffer auf kompletten satz ausschluss geben
+#	
+#	}
+#}
+
 
 
 foreach (@cmds) {
@@ -1030,7 +1064,7 @@ if (%lastcmd and
 }
 #wieder wird nicht mehr benötigt
 $cmd =~ s/\bwieder\b|^(dann|danach) / /g;
-$cmd = Talk2Fhem_filter($myname, $cmd);
+$cmd = Talk2Fhem_normalize(Talk2Fhem_realtrim(Talk2Fhem_filter($myname, $cmd)));
 
 T2FL($myname, 4, "Command left: '$cmd'") if $rawcmd ne $cmd;
 	
@@ -1092,6 +1126,7 @@ my $disu = AttrVal($myname, "T2F_disableumlautescaping", 0);
 			my %tf = %{$tp{$key}};
 			T2FL($myname, 4, "Timephrase found: =~ s/\\b$key\\b/");
 			foreach my $datemod (keys(%tf)) {
+				next if $datemod eq "fc";
 				# Suche Ersetzungsvariablen
 				my $dmstore = $tf{$datemod};
 				while ($tf{$datemod} =~ /\$(\d+)/) {
@@ -1123,7 +1158,7 @@ my $disu = AttrVal($myname, "T2F_disableumlautescaping", 0);
 				} elsif ($datemod eq "hour") {
 					$evt = POSIX::mktime($now[0],$now[1],($now[2]+$tf{hour}),$lt[3],$lt[4],$lt[5]) || 0;
 				} elsif ($datemod eq "time") {
-					my @t = split(":", $tf{time});
+					my @t = map { s/\s//gr } split(":", $tf{time});
 					$evt = POSIX::mktime($t[2] || 0,$t[1] || 0,$t[0],$lt[3],$lt[4],$lt[5]) || 0;
 				} elsif ($datemod eq "date") {
 					my @t = split(/\.|\s/, $tf{date});
@@ -1137,6 +1172,14 @@ my $disu = AttrVal($myname, "T2F_disableumlautescaping", 0);
 			}
 			@lt = localtime($evt);
 		}
+	
+	if ($tp{$key}{fc}) {
+		if (ref $tp{$key}{fc} eq "CODE") {
+			my $lock = $evt;
+			$evt = &{$tp{$key}{fc}}($evt);
+			T2FL($myname, 4, "Time modified by function. ".$evt) if $lock != $evt;
+		}
+	}
 	}
 return($evt);
 }
@@ -1174,7 +1217,7 @@ T2FL($myname, 5, "$myname Evaluate search:\n$cmd =~ /$$phr{key}/i") if ref $res;
 for my $fphr (@fphrs) {
 #	if (my @d = ($cmd =~ qr/$fphr/i)){
 	if ($fphr =~ s/^\?//){
-		my @d = ($cmd =~ /$fphr/i);
+		my @d = (eval { $cmd =~ /$fphr/i});
 		my $m = $&;
 		#Log 1, "A: ".$fphr;
 		#Log 1, "A: ".Dumper $m;
@@ -1195,8 +1238,8 @@ for my $fphr (@fphrs) {
 		$punmatch =~ s/$m//gi;
 		#$cmd =~ s/$m//gi;
 	} elsif ($fphr =~ /^\!/) {
-		return if ($cmd =~ /$'/i);
-	} elsif (my @d = ($cmd =~ /$fphr/i)){
+		return if (eval { $cmd =~ /$'/i });
+	} elsif (my @d = (eval { $cmd =~ /$fphr/i } )){
 		my $m = $&;
 		$pmatch .= $m;
 		$punmatch =~ s/$m//gi;
@@ -1293,11 +1336,25 @@ my %react;
 			T2FL($myname, 4, "Replaced bracket: $raw -> $do") if $raw ne $do;
 
 
-			while ($do =~ s/(.*)\$(\d+)(\[|\{|\()(.*?)(\]|\}|\))/$1###/) {
-				#Klammer aus Value in Hash überführen
+#			while ($do =~ s/(.*)\$(\d+)(\[|\{|\()(.*?)(?3)/$1###/) {
+#			while ($do =~ s/(.*)\$(\d+)(\[|\{|\()(.*?)(\]|\}|\))/$1###/) {
+			while ($do =~ /(.*)\$(\d+)(?=\[|\{|\()/) {
+				my $pre = $1;
 				my $clipno = $2;
-				my $uhash = $4;
-				my $utype = $3;
+				my $post = $';
+
+				my ($found, $rest) = extract_bracketed( $post, '{}[]()' );
+				unless ($found) {
+					Talk2Fhem_err($myname, T2FL($myname, 1, "'$raw': Fehler in Kommandoteilmodifikator Nr. '\$$clipno' nach: '$pre'"),$res,1);
+					return(0);
+				}
+				#Klammer aus Value in Hash überführen
+				$do = $pre."###".$rest;
+				$found =~ /(.)(.*)./;
+				my $utype = $1;
+				my $uhash = $2;
+				
+				
 				T2FL($myname, 4, "Advanced bracket replacement. \$$clipno$uhash = $do");
 				if ($uhash =~ /@(\w+)/) {
 					if ($modlist{$1}) {
@@ -1319,10 +1376,11 @@ my %react;
 					$hash = Talk2Fhem_parseArray($uhash)
 				} elsif ($utype eq "{") {
 					#$hash = eval($uhash)
-					my $harr = Talk2Fhem_parseArray($uhash);
+					my $harr = Talk2Fhem_parseArray($uhash); my $i=0;
 					for (@$harr) {
 						my $h = Talk2Fhem_parseArray($_, "=>");
-						$$hash{$$h[0]} = $$h[1];					
+						$$hash{$$h[0]} = {val=>$$h[1],order=>$i++};
+										
 					}
 				} elsif ($utype eq "(") {
 				##### klappt nicht weil in while regex nicht bis zur schließenden klammer getriggert wird wenn vorher ein } oder ] kommt
@@ -1348,9 +1406,9 @@ my %react;
 				if (ref($hash) eq "HASH") {
 					T2FL($myname, 5, "HASH evaluation:\n".Dumper($hash));
 					#my $passed=0;
-					foreach my $h (keys(%$hash)) {
+					foreach my $h (sort {$$hash{$a}{order} <=> $$hash{$b}{order} } keys(%$hash)) {
 						#sollte eigentlich in den syntaxcheck
-						unless (defined $$hash{$h}) {
+						unless (defined $$hash{$h}{val}) {
 							T2FL($myname, 1, "Empty replacementstring! $h");
 							#return(0);							
 							next;							
@@ -1381,7 +1439,7 @@ my %react;
 						$re = Talk2Fhem_escapeumlauts($re, $disu);
 						
 						if ($d =~ qr/$re/i) {
-							my $rp = $$hash{$h};
+							my $rp = $$hash{$h}{val};
 							if (ref $fc eq "CODE") {
 								T2FL($myname,5,"Functionmod '$fc' $rp");
 								my @res = $d =~ qr/$re/i;
@@ -1397,11 +1455,11 @@ my %react;
 						}
 					}
 					# empty != undef
-#					if (defined($d) and $d =~ qr/${$Talk2Fhem{pass}}{empty}/ and ($$hash{empty} or (! $$hash{empty} and $$hash{else}))) {
+#					if (defined($d) and $d =~ qr/${$Talk2Fhem{pass}}{empty}/ and ($$hash{empty}{val} or (! $$hash{empty}{val} and $$hash{else}{val}))) {
 					# empty  undef
 					if (! defined($d) or $d =~ qr/${$Talk2Fhem{pass}}{empty}/) {
 							#$d existiert nicht
-							my $e = ($$hash{empty} || $$hash{else});
+							my $e = ($$hash{empty}{val} || $$hash{else}{val});
 							T2FL($myname, 5, "Empty word replace with '$e'");
 							$do =~ s/###/$e/;
 					}					
@@ -1410,9 +1468,9 @@ my %react;
 					######### 
 					if ($do =~ /###/) {
 						#Vergleich fehlgeschlagen
-						if ($$hash{else}) {
-							T2FL($myname, 5, "Unkown word '$d' replace with '$$hash{else}'");
-							$do =~ s/###/$$hash{else}/;
+						if ($$hash{else}{val}) {
+							T2FL($myname, 5, "Unkown word '$d' replace with '$$hash{else}{val}'");
+							$do =~ s/###/$$hash{else}{val}/;
 						} else {
 							T2FL($myname, 1, "HASH Replacement Failed! $do");
 							#%$res = undef; 
@@ -1458,15 +1516,33 @@ my %react;
 							T2FL($myname, 5, "Clipnumber $clipno is no array! Try to extract by seperator '|'");
 #							my @cs = map { my @t = split('\|', $_ =~ s/^\(|\)$//gr); \@t } $$phr{key} =~ /(?<!\\)\((?!\?).*?\)/g;
 #							my @cs = map { my @t = split('\|', $_ =~ s/^\(|\)$//gr); \@t } $$phr{key} =~ /(?<! \\ ) \( (?! \? ) (?: (?R) | [^()]+ )+ \) /xg;
-							my $locked = $$phr{key};
-							my @cs = extract_multiple($locked, [sub { extract_bracketed($_[0], '()') }]);
+							# Klammern extrahieren
+							my @cs = ($$phr{key});
+							for (my $i=0; $i<=$#cs; $i++) {
+								my $c = $cs[$i];
+								if ($c =~ /^\(\?.*\)$/) {
+									# Perl Special bracket delete it.
+									splice(@cs, $i, 1);
+									$c = $cs[$i];
+								}
+								(my $locked = $c) =~ s/^\((.*)\)$/$1/g;
+								my @add = extract_multiple($locked, [sub { extract_bracketed($_[0], '()') }],undef, 1);
+								splice(@cs, ($i+1) ,0 , @add);
+								last if $i > 10;
+							}
+							
+
 #							@keywords = @{$cs[($clipno-1)]};
-							#Log 1, Dumper @cs;
-							@cs = grep { /^\(/ } @cs;
-							#Log 1, Dumper @cs;
-#							Log 1, "-----> ".$$phr{key};
-							@keywords = split('\|', $cs[($clipno-1)] =~ s/^\(|\)$//gr);
-#							Log 1, Dumper @keywords;
+#							Log 1, Dumper @cs;
+#							@cs = grep { /^\(/ } @cs;
+#							Log 1, Dumper @cs;
+#							Log 1, "-----> ".$cs[($clipno-1)];
+							(my $clip = $cs[($clipno)]) =~ s/^\(|\)$//g;
+#							push(@keywords, split('\|', $clip) extract_bracketed($clip, '()'));
+							@keywords = map { /^\(/ ? $_ : split('\|', $_=~s/^\||\|$//gr) } extract_multiple($clip, [sub { extract_bracketed($_[0], '()') }]);
+#							@keywords = split('\|',);
+							
+							#Log 1, Dumper @keywords;
 							#wenn keine Liste in Klammer ist
 							if ($#keywords == -1) {
 								Talk2Fhem_err($myname, T2FL($myname, 1, "Clipnumber $clipno includes no array or integer in '$$phr{key}!"),$res,1);
@@ -1475,12 +1551,13 @@ my %react;
 						} else {
 							@keywords = @{$keylist{$hitnokeylist[$clipno]}};
 						}
+						T2FL($myname, 4, "Searching position of $d in @keywords");
 						@keywords = map { Talk2Fhem_escapeumlauts($_, $disu) } @keywords;
 						T2FL($myname, 4, "Searching position of $d in @keywords");
 						my $i=0;
 						foreach (@keywords) {
 #							if ($d =~ /^\Q$_\E$/i) {
-							if ($d =~ /^$_$/i) {
+							if (eval{$d =~ /^$_$/i}) {
 								unless (defined($$hash[$i])) {
 									my $err = T2FL($myname, 1, "Not enough elements in modwordlist! Position $i in (@$hash) doesn't exist.");
 									if ($else eq "") {
@@ -1628,6 +1705,10 @@ return($_[2]);
 		The command part begins after the equals sign with a space, tab, or newline. <br> <br>
         <code>&lt;regexp&gt; = &lt;command&gt;</code>
         <br><br>
+        <b>Short refernce:</b>
+        <br>
+        <code>&lt;RegExpPart&gt; [&amp;&amp; [?!]&lt;RegExpPart_n&gt;] = [ &lt;FHEM command&gt; | { &lt;Perl code&gt; } | (&lt;option&gt; =&gt; '&lt;wert&gt;' , ... ) ]</code>
+        <br><br>
         Example: <code>helo world = {Log 1, Helo World}</code>
         <br><br>
 		Everything after a hashtag '#' is ignored until the end of the line.
@@ -1673,7 +1754,7 @@ return($_[2]);
 			<li>$n[&lt;list&gt;]<br>
 			Comma separated list: [value1,value2,...,[else,value], [empty,value]] or [@modwordlist]<br>
 			If $n is a number, the word at that position in &lt;list&gt; is selected.<br><br>
-			If $n is a text, it searches for a list in its parenthesis in the <regexp> part. (a|b|c) or (@keywordlist)
+			If $n is a text, it searches for a list in its parenthesis in the &lt;regexp&gt; part. (a|b|c) or (@keywordlist)
 			In this list, $n is searched for and successively positioned in &lt;list&gt; chosen for $n.
 	        <br>Example: <code>light .* (kitchen|corridor|bad) (\S*) on = set $1[dev_a,dev_b,dev_c] $2{true =&gt; on,false =&gt; off}</code>
 			</li>
@@ -1683,8 +1764,8 @@ return($_[2]);
 		Environment variables::
 		<ul>
 			There are a number of variables that can be accessed in the &lt;command&gt;-part.
-			<li><b>$&</b> Contains all found words </li>
-			<li><b>!$&</b> Contains the rest that was not included by RegExp</li>
+			<li><b>$&amp;</b> Contains all found words </li>
+			<li><b>!$&amp;</b> Contains the rest that was not included by RegExp</li>
 			<li><b>$DATE</b> Contains the time and date text of the voice </li>
 			<li><b>$AGAIN</b> Contains the word again if it is a command again</li>
 			<li><b>$TIME</b> Contains the found time.</li>
@@ -1793,7 +1874,7 @@ return($_[2]);
 			</li>
             <li><i>T2F_origin</i><br>
 				A RegExp which is generally removed and whose output can be accessed via $0. <br>
-				Can be used for<user mapping.</li>
+				Can be used for user mapping.</li>
             <li><i>T2F_language</i>DE|EN<br>
 				The used language can be set via the global attribute "language". Or overwritten with this attribute.
 			</li>
@@ -1814,9 +1895,9 @@ return($_[2]);
 <a name="Talk2Fhem"></a>
 <h3>Talk2Fhem</h3>
 <ul>
-    Das Modul <i>Talk2Fhem</i> stellt eine Verbindung zwischen natürlicher Sprache und FHEM Befehlen her.
-	Die Konfiguration erfolgt dabei komfortabel über das FHEM Webfrontend.<br>
-	Für eine genauere Beschreibung und weiterführende Beispiele siehe  <a href="http://wiki.fhem.de/wiki/Modul_Talk2Fhem">Talk2Fhem Wiki</a>.
+    Das Modul <i>Talk2Fhem</i> stellt eine Verbindung zwischen nat&uuml;rlicher Sprache und FHEM Befehlen her.
+	Die Konfiguration erfolgt dabei komfortabel &uuml;ber das FHEM Webfrontend.<br>
+	F&uuml;r eine genauere Beschreibung und weiterf&uuml;hrende Beispiele siehe  <a href="http://wiki.fhem.de/wiki/Modul_Talk2Fhem">Talk2Fhem Wiki</a>.
     <br><br>
     <a name="Talk2Fhemdefine"></a>
     <b>Define</b>
@@ -1827,22 +1908,26 @@ return($_[2]);
         <br><br>
         Die eigentliche Konfigration sollte erst auf der FHEM Seite erfolgen.
         <br><br>
-		Die einzelnen Sprachphrasen werden Zeile für Zeile konfiguriert. Hierbei fängt eine Konfiguration
-		immer mit dem Regulärem Ausdruck an, gefolgt von mindestens einem Leerzeichen oder Tabulator gefolgt
+		Die einzelnen Sprachphrasen werden Zeile f&uuml;r Zeile konfiguriert. Hierbei f&auml;ngt eine Konfiguration
+		immer mit dem Regul&auml;rem Ausdruck an, gefolgt von mindestens einem Leerzeichen oder Tabulator gefolgt
 		von einem Gleichheitszeichen.<br>
-		Der Kommandoteil fängt nach dem Gleichheitszeichen mit einem Leerzeichen, Tabulator oder Zeilenumbruch an.<br><br>
+		Der Kommandoteil f&auml;ngt nach dem Gleichheitszeichen mit einem Leerzeichen, Tabulator oder Zeilenumbruch an.<br><br>
         <code>&lt;regexp&gt; = &lt;command&gt;</code>
+        <br><br>
+        <b>Kurzreferenz:</b>
+        <br>
+        <code>&lt;RegExpPart&gt; [&amp;&amp; [?!]&lt;RegExpPart_n&gt;] = [ &lt;FHEM command&gt; | { &lt;Perl code&gt; } | (&lt;option&gt; =&gt; '&lt;wert&gt;' , ... ) ]</code>
         <br><br>
         Beispiel: <code>hallo welt = {Log 1, Hallo Welt}</code>
         <br><br>
 		Alles nach einem Hashtag '#' wird bis zum Zeilenende ignoriert.
         <br><br>
 		&lt;regexp&gt;
-		<ul>Regulärer Ausdruck der den Text beschreibt, bei dem das Kommando ausgeführt werden soll</ul>
+		<ul>Regul&auml;rer Ausdruck der den Text beschreibt, bei dem das Kommando ausgef&uuml;hrt werden soll</ul>
         <br><br>
 		&lt;command&gt;
 		<ul>
-			Der ausführende Teil. Folgende Formate sind Zulässig:
+			Der ausf&uuml;hrende Teil. Folgende Formate sind Zul&auml;ssig:
 			<li>FHEM Kommando</li>
 			<li>{Perlcode}</li>
 			<li>(&lt;option&gt; =&gt; '&lt;wert&gt;' , ... )</li>
@@ -1850,51 +1935,51 @@ return($_[2]);
 				<br><i>&lt;option&gt;</i><br>
 				<li><b>cmd</b><br>FHEM Kommando wie oben</li>
 				<li><b>offset</b><br>Ganzzahliger Wert in Sekunden der auf den Zeitpunkt addiert wird</li>
-				<li><b>answer</b><br>Perl Code dessen Rückgabe in das Reading answer geschrieben wird</li>
+				<li><b>answer</b><br>Perl Code dessen R&uuml;ckgabe in das Reading answer geschrieben wird</li>
 			</ul>
 		</ul>
 		<br>
-		Klammerüberführung:
+		Klammer&uuml;berf&uuml;hrung:
 		<ul>
-			Im Regulärem Ausdruck gesetzte Klammern können in den Kommandoteil mit $1, $2, [...], $n überführt und
-			modifiziert werden. Folgende Modifizierungsmöglichkeiten stehen hierbei zur Verfügung.
-			<li>$n<br>Ohne Änderung direkt das Wort überführen.</li>
+			Im Regul&auml;rem Ausdruck gesetzte Klammern k&ouml;nnen in den Kommandoteil mit $1, $2, [...], $n &uuml;berf&uuml;hrt und
+			modifiziert werden. Folgende Modifizierungsm&ouml;glichkeiten stehen hierbei zur Verf&uuml;gung.
+			<li>$n<br>Ohne &Auml;nderung direkt das Wort &uuml;berf&uuml;hren.</li>
 			<li>$n{&lt;typ&gt; =&gt; &lt;wert&gt;}<br>
 			Die Typen sind:<br>
 			true, false, integer, float, numeral, /&lt;regexp&gt;/, word, empty, else<br>
 			<b>true</b> entspricht: ja|1|true|wahr|ein|eins.*|auf.*|..?ffnen|an.*|rauf.*|hoch.*|laut.*|hell.*<br>
 			<b>false</b> entspricht: nein|0|false|falsch|aus.*|null|zu.*|schlie..?en|runter.*|ab.*|leise.*|dunk.*<br>
-			<b>integer</b> Wort enthält eine Zahl
-			<b>float</b> Wort enthält eine Gleitkommazahl
+			<b>integer</b> Wort enth&auml;lt eine Zahl
+			<b>float</b> Wort enth&auml;lt eine Gleitkommazahl
 			<b>numeral</b> Word ist ein Zahlenwort oder Zahl <br>
 			<b>/&lt;regexp&gt;/</b> Wort entspricht der &lt;regexp&gt;
-			<b>word</b> Wort enthält gleich oder mehr als 4 Zeichen
-			<b>empty</b> Wort enthält eine Leere Zeichenkette
-			<b>else</b> Falls keines der Fälle zutrifft
-			Wird ein &lt;typ&gt; identifiziert wird für $n der &lt;wert&gt; eingesetzt<br>
+			<b>word</b> Wort enth&auml;lt gleich oder mehr als 4 Zeichen
+			<b>empty</b> Wort enth&auml;lt eine Leere Zeichenkette
+			<b>else</b> Falls keines der F&auml;lle zutrifft
+			Wird ein &lt;typ&gt; identifiziert wird f&uuml;r $n der &lt;wert&gt; eingesetzt<br>
 	        Beispiel: <code>licht (\S*) = set light $1{true =&gt; on,false =&gt; off}</code>
 			</li>
 			<li>$n[&lt;list&gt;]<br>
 			Kommaseparierte Liste: [wert1,wert2,...,[else,value], [empty,value]] oder [@modwordlist]<br>
-			Ist $n eine Zahl, wird das Wort das an dieser Position in &lt;list&gt; steht gewählt.<br><br>
-			Ist $n ein Text wird in der zugehörigen Klammer im &lt;regexp&gt;-Teil nach einer Liste gesucht. (a|b|c) oder (@keywordlist)
-			In dieser Liste, wird nach $n gesucht und bei erfolg dessen Position in &lt;list&gt; für $n gewählt.
-	        <br>Beispiel: <code>licht .* (küche|flur|bad) (\S*) an = set $1[dev_a,dev_b,dev_c] $2{true =&gt; on,false =&gt; off}</code>
+			Ist $n eine Zahl, wird das Wort das an dieser Position in &lt;list&gt; steht gew&auml;hlt.<br><br>
+			Ist $n ein Text wird in der zugeh&ouml;rigen Klammer im &lt;regexp&gt;-Teil nach einer Liste gesucht. (a|b|c) oder (@keywordlist)
+			In dieser Liste, wird nach $n gesucht und bei erfolg dessen Position in &lt;list&gt; f&uuml;r $n gew&auml;hlt.
+	        <br>Beispiel: <code>licht .* (k&uuml;che|flur|bad) (\S*) an = set $1[dev_a,dev_b,dev_c] $2{true =&gt; on,false =&gt; off}</code>
 			</li>
-			<li>$n@<br>Das Wort wird so übernommen wie es in der Liste im &lt;regexp&gt;-Teil steht.</li>
+			<li>$n@<br>Das Wort wird so &uuml;bernommen wie es in der Liste im &lt;regexp&gt;-Teil steht.</li>
 		</ul>
 		<br>
 		Umgebungsvariablen:
 		<ul>
-			Es stehen eine Reihe von Variablen zur Verfügung auf die im &lt;command&gt;-Teil zugegriffen werden können.
-			<li><b>$&</b> Enthält alle gefundenen Wörter</li>
-			<li><b>!$&</b> Enthält den Rest der nicht von der RegExp eingeschlossen wurde</li>
-			<li><b>$DATE</b> Enthält den Zeit und Datumstext des Sprachbefehls</li>
-			<li><b>$AGAIN</b> Enthält das Wort wieder wenn es sich um ein wieder Kommando handelt</li>
-			<li><b>$TIME</b> Enthält die erkannte Zeit.</li>
-			<li><b>$NAME</b> Enthält den Devicenamen.</li>
-			<li><b>$IF</b> Enthält den Text der erkannten T2F_if Konfiguration.</li>
-			<li><b>$0</b> Enthält den Text der erkannten T2F_origin RegExp.</li>
+			Es stehen eine Reihe von Variablen zur Verf&uuml;gung auf die im &lt;command&gt;-Teil zugegriffen werden k&ouml;nnen.
+			<li><b>$&amp;</b> Enth&auml;lt alle gefundenen W&ouml;rter</li>
+			<li><b>!$&amp;</b> Enth&auml;lt den Rest der nicht von der RegExp eingeschlossen wurde</li>
+			<li><b>$DATE</b> Enth&auml;lt den Zeit und Datumstext des Sprachbefehls</li>
+			<li><b>$AGAIN</b> Enth&auml;lt das Wort wieder wenn es sich um ein wieder Kommando handelt</li>
+			<li><b>$TIME</b> Enth&auml;lt die erkannte Zeit.</li>
+			<li><b>$NAME</b> Enth&auml;lt den Devicenamen.</li>
+			<li><b>$IF</b> Enth&auml;lt den Text der erkannten T2F_if Konfiguration.</li>
+			<li><b>$0</b> Enth&auml;lt den Text der erkannten T2F_origin RegExp.</li>
 		</ul>
 		
 	</ul>
@@ -1905,8 +1990,8 @@ return($_[2]);
     <ul>
         <code>set &lt;name&gt; [!]&lt;text&gt;</code>
         <br><br>
-        Über das <i>set</i> Kommando wird der zu interpretierende Text an das Modul gesendet.
-		Schaue unter <a href="http://fhem.de/commandref.html#set">commandref#set</a> für weiterführende Hilfe.
+        &Uuml;ber das <i>set</i> Kommando wird der zu interpretierende Text an das Modul gesendet.
+		Schaue unter <a href="http://fhem.de/commandref.html#set">commandref#set</a> f&uuml;r weiterf&uuml;hrende Hilfe.
 		<li>cleartimers</li> Entfernt die wartenden zeitbezogenen Kommandos 
 		<li>cleartriggers</li> Entfernt die wartenden ereignisbezogenen Kommandos
     </ul>
@@ -1916,21 +2001,21 @@ return($_[2]);
     <b>Get</b><br>
         <code>get &lt;name&gt; &lt;option&gt;</code>
         <br><br>
-        Über <i>get</i> lassen sich Informationen aus dem Modul auslesen.
-        Siehe <a href="http://fhem.de/commandref.html#get">commandref#get</a> für weitere Informationen zu "get".
+        &Uuml;ber <i>get</i> lassen sich Informationen aus dem Modul auslesen.
+        Siehe <a href="http://fhem.de/commandref.html#get">commandref#get</a> f&uuml;r weitere Informationen zu "get".
     <br><br>
         &lt;option&gt;
 		<ul>
               <li><i>@keywordlist</i> <i>@modwordlist</i><br>
-                  Vergleich der zwei Listen Wort für Wort</li>
+                  Vergleich der zwei Listen Wort f&uuml;r Wort</li>
               <li><i>keylistno</i><br>
                   Eine Auflistung der Konfigurierten "Keyword"-Listen. Zur einfacheren Positionierung der "Modword"-Listen</li>
               <li><i>log</i><br>
-                  Zeigt die Logeinträge des letzten Kommandos</li>
+                  Zeigt die Logeintr&auml;ge des letzten Kommandos</li>
               <li><i>modificationtypes</i><br>
                   Zeigt die RegExp der Modifikationstypen. </li>
               <li><i>standardfilter</i><br>
-                  Lädt den Standardfilter und schreibt ihn in das Attribut T2F_filter wenn er leer ist</li>
+                  L&auml;dt den Standardfilter und schreibt ihn in das Attribut T2F_filter wenn er leer ist</li>
               <li><i>version</i><br>
                   Die Modulversion</li>
         </ul>
@@ -1941,34 +2026,34 @@ return($_[2]);
     <b>Readings</b>
     <ul>
 		<li><i>set</i><br>
-			Enthält den zuletzt über "set" gesendeten Text.
+			Enth&auml;lt den zuletzt &uuml;ber "set" gesendeten Text.
 		</li>
 		<li><i>cmds</i><br>
-			Enthält das zuletzt ausgeführte Kommando. Wird auch bei disable=1 gesetzt.
+			Enth&auml;lt das zuletzt ausgef&uuml;hrte Kommando. Wird auch bei disable=1 gesetzt.
 		</li>
 		<li><i>answer</i><br>
-			Enthält den Antworttext des letzten Befehls.
+			Enth&auml;lt den Antworttext des letzten Befehls.
 		</li>
 		<li><i>err</i><br>
-			Enthält die letzte Fehlermeldung.<br>
-			"No match" Übereinstimmung mit keiner RegExp.<br>
+			Enth&auml;lt die letzte Fehlermeldung.<br>
+			"No match" &Uuml;bereinstimmung mit keiner RegExp.<br>
 			"Error on Command" siehe FHEM log.
 		</li>
 		<li><i>response</i><br>
-			Enthällt die Rüclgabe des FHEM Befhels.
+			Enth&auml;llt die R&uuml;ckgabe des FHEM Befhels.
 		</li>
 		<li><i>origin</i><br>
-			Enthält die gefundene Zeichenkette der in dem Attribut T2F_origin definierten RegExp.
+			Enth&auml;lt die gefundene Zeichenkette der in dem Attribut T2F_origin definierten RegExp.
 		</li>
 		<li><i>status</i><br>
-			Enthält den Status der Ausgabe.
+			Enth&auml;lt den Status der Ausgabe.
 			response, disabled, err, answers, done
 		</li>
 		<li><i>ifs</i><br>
-			Enthält die Bedingungen bei denen das Kommando ausgeführt werden wird.
+			Enth&auml;lt die Bedingungen bei denen das Kommando ausgef&uuml;hrt werden wird.
 		</li>
 		<li><i>notifies</i><br>
-			Enthält eine Auflistung der Devices die für die aktuell wartenden bedingten Kommandos relevant sind. Auf diesen Devices liegt ein internes notify.
+			Enth&auml;lt eine Auflistung der Devices die f&uuml;r die aktuell wartenden bedingten Kommandos relevant sind. Auf diesen Devices liegt ein internes notify.
 		</li>
     </ul>
 
@@ -1979,37 +2064,37 @@ return($_[2]);
     <ul>
         <code>attr &lt;name&gt; &lt;attribute&gt; &lt;value&gt;</code>
         <br><br>
-        Siehe <a href="http://fhem.de/commandref.html#attr">commandref#attr</a> für weitere Informationen zu den Attributen.
+        Siehe <a href="http://fhem.de/commandref.html#attr">commandref#attr</a> f&uuml;r weitere Informationen zu den Attributen.
         <br><br>
         Attribute:
         <ul>
             <li><i>T2F_keywordlist</i> &lt;name&gt; = &lt;list&gt;<br>
-                Eine Komma seperierte Liste von Schlüsselwörtern wie z.B.: Räumen, Namen, Farben usw...<br>
-				Mit anderen Worten, mit natürlichem Namen benannte Sachen.
+                Eine Komma seperierte Liste von Schl&uuml;sselw&ouml;rtern wie z.B.: R&auml;umen, Namen, Farben usw...<br>
+				Mit anderen Worten, mit nat&uuml;rlichem Namen benannte Sachen.
             </li>
             <li><i>T2F_modwordlist</i> &lt;name&gt; = &lt;list&gt;<br>
-                Eine Komma seperierte Liste von Ersetzungswörten die für die Schlüsselwörter eingesetzt werden. 
-				z.B.: Gerätenamen in FHEM<br>
+                Eine Komma seperierte Liste von Ersetzungsw&ouml;rten die f&uuml;r die Schl&uuml;sselw&ouml;rter eingesetzt werden. 
+				z.B.: Ger&auml;tenamen in FHEM<br>
             </li>
             <li><i>T2F_if</i><br>
 				Eine Auflistung von ereignisgesteuerten Konfigurationen. Die Syntax ist die der Definition. Kommandoteil ist eine IF Bedingung.<br>
-				z.B.: wenn .*?tür = [door] eq "open"
+				z.B.: wenn .*?t&uuml;r = [door] eq "open"
 			</li>
             <li><i>T2F_filter</i><br>
 				Kommaseparierte Liste von RegExp die generell entfernt werden.<br>
 				Standard: \bbitte\b,\bauch\b,\bkann\b,\bsoll\b 
 			</li>
             <li><i>T2F_origin</i><br>
-				Eine RegExp die generell entfernt wird und deren Ausgabe über $0 angesprochen werden kann.<br>
-				Kann für eine Benutzerzuordnung verwendet werden.
+				Eine RegExp die generell entfernt wird und deren Ausgabe &uuml;ber $0 angesprochen werden kann.<br>
+				Kann f&uuml;r eine Benutzerzuordnung verwendet werden.
 			</li>
             <li><i>T2F_language</i>DE|EN<br>
-				Die verwendete Sprache kann über das globale Attribut "language" gesetzt werden. Oder über dieses Attribut überschrieben werden. 
+				Die verwendete Sprache kann &uuml;ber das globale Attribut "language" gesetzt werden. Oder &uuml;ber dieses Attribut &uuml;berschrieben werden. 
 			</li>
 			<li><i>T2F_disableumlautescaping</i> &lt;0|1&gt;<br>
 				Deaktiviert das Konvertieren der Umlaute in "\S\S?"</li>
             <li><i>disable</i> &lt;0|1&gt;<br>
-                Kann zu Testzwecken verwendet werden. Steht das Attribut auf 1, wird das FHEM-Kommando nicht ausgeführt
+                Kann zu Testzwecken verwendet werden. Steht das Attribut auf 1, wird das FHEM-Kommando nicht ausgef&uuml;hrt
 				aber in das Reading cmds geschrieben.
             </li>
         </ul>
