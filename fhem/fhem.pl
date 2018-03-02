@@ -1161,7 +1161,10 @@ AnalyzeCommand($$;$)
 
   return "Unknown command $fn, try help." if(!$cmds{$fn} || !$cmds{$fn}{Fn});
 
-  return "Forbidden command $fn." if($cl && !Authorized($cl,"cmd",$fn));
+  return "Forbidden command $fn."
+        if($cl && 
+           $cmd !~ m/^(set|get|attr)\s+[^ ]+\s+\?$/ &&
+           !Authorized($cl, "cmd", $fn));
 
   if($cl && $cmds{$fn}{ClientFilter} &&
      $cl->{TYPE} !~ m/$cmds{$fn}{ClientFilter}/) {
@@ -1785,7 +1788,7 @@ CommandSet($$)
   return "Usage: set <name> <type-dependent-options>\n$namedef" if(int(@a)<1);
 
   my @rets;
-  foreach my $sdev (devspec2array($a[0], $cl)) {
+  foreach my $sdev (devspec2array($a[0], $a[1] && $a[1] eq "?" ? undef : $cl)) {
 
     $a[0] = $sdev;
     $defs{$sdev}->{CL} = $cl if($defs{$sdev});
@@ -1809,7 +1812,7 @@ CommandGet($$)
 
 
   my @rets;
-  foreach my $sdev (devspec2array($a[0], $cl)) {
+  foreach my $sdev (devspec2array($a[0], $a[1] && $a[1] eq "?" ? undef : $cl)) {
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
       next;
@@ -2683,7 +2686,7 @@ CommandAttr($$)
            if(@a && @a < 2);
 
   my @rets;
-  foreach my $sdev (devspec2array($a[0],$cl)) {
+  foreach my $sdev (devspec2array($a[0], $a[1] && $a[1] eq "?" ? undef : $cl)) {
 
     my $hash = $defs{$sdev};
     my $attrName = $a[1];
