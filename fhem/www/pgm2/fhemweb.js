@@ -10,7 +10,7 @@ var FW_isiOS = navigator.userAgent.match(/(iPad|iPhone|iPod)/);
 var FW_scripts = {}, FW_links = {};
 var FW_docReady = false, FW_longpollType, FW_csrfToken, FW_csrfOk=true;
 var FW_root = "/fhem";  // root
-var FW_availableJs=[];
+var FW_availableJs={};
 var FW_urlParams={};
 var embedLoadRetry = 100;
 
