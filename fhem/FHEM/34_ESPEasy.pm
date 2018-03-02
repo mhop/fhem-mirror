@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.37";     # Version of this module
+my $module_version    = "1.38";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -3461,10 +3461,10 @@ sub ESPEasy_removeGit($)
       Supported protocols are: NEC, JVC, RC5, RC6, SAMSUNG, SONY, PANASONIC at
       the moment. As long as official documentation is missing you can find
       some details here:
-      <a href="http://www.letscontrolit.com/forum/viewtopic.php?f=5&t=328" target="_NEW">
+      <a href="http://www.letscontrolit.com/forum/viewtopic.php?f=5&amp;t=328" target="_NEW">
       IR Transmitter thread #1</a> and  
       <a 
-      href="https://www.letscontrolit.com/forum/viewtopic.php?t=328&start=61" target="_NEW">
+      href="https://www.letscontrolit.com/forum/viewtopic.php?t=328&amp;start=61" target="_NEW">
       IR Transmitter thread #61</a>.<br>
       <ul>
         <li>
