@@ -1057,8 +1057,8 @@ HUEBridge_updateGroups($$)
       $readings{pct} += $current->{pct};
       $readings{sat} += $current->{sat};
 
-      $readings{on} |= $current->{on};
-      $readings{reachable} |= $current->{reachable};
+      $readings{on} |= ($current->{on}?'1':'0');
+      $readings{reachable} |= ($current->{reachable}?'1':'0');
 
       if( !defined($readings{alert}) ) {
         $readings{alert} = $current->{alert};
@@ -1095,7 +1095,7 @@ HUEBridge_updateGroups($$)
       $readings{pct} = 0;
       $readings{state} = 'off';
     }
-    $readings{onoff} =  $readings{on}?'1':'0';
+    $readings{onoff} =  $readings{on};
     delete $readings{on};
 
     readingsBeginUpdate($chash);
