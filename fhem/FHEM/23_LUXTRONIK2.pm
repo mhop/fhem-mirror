@@ -1020,6 +1020,7 @@ LUXTRONIK2_UpdateDone($)
      $value = $wpType{$a[31]};
      $value = "unbekannt (".$a[31].")" unless $value;
      readingsBulkUpdate($hash,"typeHeatpump",$value);
+     $hash->{MODEL} = $value;
      readingsBulkUpdate($hash,"typeSerial",$a[65])       if $a[65] ne "";
 
    # Solar
