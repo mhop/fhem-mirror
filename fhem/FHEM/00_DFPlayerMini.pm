@@ -1720,7 +1720,7 @@ sub DFPlayerMini_Notify($$)
   <li>
   tts &lt;text to translate to speech&gt;<br>
   <code>TTSDev</code> is used to calculate the MD5 hash of &lt;text to translate to speech&gt;. It then tries to play the file with this hash value.
-  If no reading for such a file exists and if the attribute <code>rememberMissingTTS</code> is set, a new reading Missing_MD5<md5> with <text to translate to speech> as its
+  If no reading for such a file exists and if the attribute <code>rememberMissingTTS</code> is set, a new reading Missing_MD5&lt;md5&gt; with &lt;text to translate to speech&gt; as its
   value is created.
   <br>Prerequisites:<br>
   This only works if this text had been translated earlier and the resulting mp3 file was stored in the cache directory of TTSDev. 
@@ -1953,7 +1953,7 @@ sub DFPlayerMini_Notify($$)
   <li>
   tts &lt;Text der in Sprache &uuml;bersetzt werden soll&gt;<br>
   <code>TTSDev</code> wird verwendet um den MD5 Hash von &lt;Text der in Sprache &uuml;bersetzt werden soll&gt; zu berechnen. Anschlie&szlig;end wird versucht die Datei mit diesem Hash abzuspielen.
-  Wenn kein Reading f&uuml;r diesen Hash existiert und das wenn das Attribute <code>rememberMissingTTS</code> gesetzt ist dann wird ein neues Reading Missing_MD5<md5> 
+  Wenn kein Reading f&uuml;r diesen Hash existiert und das wenn das Attribute <code>rememberMissingTTS</code> gesetzt ist dann wird ein neues Reading Missing_MD5&lt;md5&gt; 
   mit dem Wert &lt;Text der in Sprache &uuml;bersetzt werden soll&gt; angelegt.
   <br>Voraussetzungen:<br>
   Das funktioniert nur, wenn vorher der zu &uuml;bersetzende Text bereits einmal &uuml;bersetzt wurde und die daraus resultierende MP3 Datei im cache Verzeichnis
