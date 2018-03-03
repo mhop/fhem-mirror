@@ -65,6 +65,7 @@
 # 0.47 2017-11-11	Byte attr Disable zugefügt.
 # 0.47 2017-02-12	Byte/Dr Smag  Quickfix ERB15LE
 # 0.48 2018-26-01	Byte New Readings 'operating_seconds' / 'last_reset_os'
+# 0.49 2018-03-03	Byte Fix for Signalduino V 3.3.1-RC2 SIGNALduino cc1101
 ################################################################################################################
 # Todo's:
 # -
@@ -75,7 +76,7 @@ package main;
 
 use strict;
 use warnings;
-my $version = "V 0.48";
+my $version = "V 0.49";
 
 my %codes = (
     "55" => "stop",    # Stop the current movement or move to custom position
@@ -481,7 +482,38 @@ sub Siro_SendCommand($@) {
     else {
         Log3 $io, 5,
           "Siro_sendCommand: Siro_sendCommand: $name -> message :$message: ";
-        IOWrite( $hash, 'sendMsg', $message );
+		  
+		  if ( $args[2] eq "longstop" && $SignalRepeats > 35)
+		  {
+			  my $newsignalrepeats = int($SignalRepeats/3);
+			   Log3( $name, 5,"Siro_sendCommand: found oversized Longstop -> newlongstop $newsignalrepeats * 15  " );
+			  my $testrepeats = $newsignalrepeats*3;
+			  my $lastrepeats = $SignalRepeats-$testrepeats;
+			  Log3( $name, 5,"Siro_sendCommand: found oversized Longstop -> Block 1-3 repeats 15  " );
+			   Log3( $name, 5,"Siro_sendCommand: found oversized Longstop -> Block 4 repeats $lastrepeats  " );
+			  $message = 'P72#' . $bin . '#R' . $newsignalrepeats;
+			  IOWrite( $hash, 'sendMsg', $message );
+			  Log3 $io, 5,"Siro_sendCommand: Siro_sendCommand: Block1 ";
+			  Log3( $name, 5,"Siro_sendCommand: found oversized Longstop -> send Block 1  " );
+			  IOWrite( $hash, 'sendMsg', $message );
+			  Log3 $io, 5,"Siro_sendCommand: Siro_sendCommand: Block2 ";
+			  Log3( $name, 5,"Siro_sendCommand: found oversized Longstop -> send Block 2  " );
+			  IOWrite( $hash, 'sendMsg', $message );
+			  Log3 $io, 5,"Siro_sendCommand: Siro_sendCommand: Block3 ";
+			  Log3( $name, 5,"Siro_sendCommand: found oversized Longstop -> send Block 3  " );
+			  if ($lastrepeats > 0)
+					  {
+					  $message = 'P72#' . $bin . '#R' . $lastrepeats;
+					  IOWrite( $hash, 'sendMsg', $message );
+					  Log3 $io, 5,"Siro_sendCommand: Siro_sendCommand: Block3 ";
+					  Log3( $name, 5,"Siro_sendCommand: found oversized Longstop -> send Block 4  " );
+				  }
+			  
+			  }
+		  else
+			{
+			IOWrite( $hash, 'sendMsg', $message );
+			}
     }
 
     my $devicename = $hash->{IODev};
