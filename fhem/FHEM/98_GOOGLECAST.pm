@@ -7,9 +7,13 @@
 # FHEM module to communicate with Google Cast devices
 # e.g. Chromecast Video, Chromecast Audio, Google Home
 #
-# Version: 2.1.0
+# Version: 2.1.1
 #
 #############################################################
+#
+# v2.1.1 - 20180303
+# - BUGFIX:   fix crash on connection failures
+# - BUGFIX:   update FHEM socket on pychromecast reconnect
 #
 # v2.1.0 - 20180218
 # - BUGFIX:   one more socket_client fix
@@ -142,7 +146,7 @@ sub GOOGLECAST_Initialize($) {
     $hash->{AttrList} = "favoriteURL_1 favoriteURL_2 favoriteURL_3 favoriteURL_4 ".
                         "favoriteURL_5 ".$readingFnAttributes;
 
-    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.1.0";
+    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.1.1";
 
     return undef;
 }
@@ -310,6 +314,7 @@ sub GOOGLECAST_setSpeak {
 
     $ttsText = uri_escape($ttsText);
     my $ttsUrl = "http://translate.google.com/translate_tts?tl=$ttsLang&client=tw-ob&q=$ttsText";
+    Log3 $hash, 4, "GOOGLECAST($hash->{NAME}): setSpeak $ttsUrl";
 
     eval {
         $hash->{helper}{ccdevice}->{media_controller}->play_media($ttsUrl, "audio/mpeg");
@@ -364,7 +369,8 @@ sub GOOGLECAST_setPlayMedia_String {
     if($videoUrl ne "") {
         GOOGLECAST_setPlayMedia($hash, $videoUrl);
     } else {
-        GOOGLECAST_setPlayMedia($hash, $origUrl);
+        Log3 $hash, 3, "GOOGLECAST($name): setPlayMedia_String, youtube-dl couldn't find video";
+        #GOOGLECAST_setPlayMedia($hash, $origUrl);
     }
 }
 
@@ -406,6 +412,7 @@ sub GOOGLECAST_setPlayYtDlBlocking {
     eval {
         $videoUrl = GOOGLECAST_getYTVideoURLPython($ytUrl);
     };
+
 
     return $name."|".$videoUrl."|".$ytUrl;
 }
@@ -548,8 +555,12 @@ sub GOOGLECAST_addSocketToMainloop {
     my ($hash) = @_;
     my $sock;
 
+    #delete any previous sockets
+    delete($selectlist{"GOOGLECAST-".$hash->{NAME}});
+
     eval {
         $sock = $hash->{helper}{ccdevice}->{socket_client}->get_socket();
+        $hash->{helper}{currentsock} = $sock;
     };
 
     my $chash = GOOGLECAST_newChash($hash, $sock, {NAME => "GOOGLECAST-".$hash->{NAME}});
@@ -567,11 +578,20 @@ sub GOOGLECAST_checkConnection {
     if($@ || !defined($selectlist{"GOOGLECAST-".$hash->{NAME}})) {
         Log3 $hash, 4, "GOOGLECAST ($hash->{NAME}): checkConnection, connection failure, reconnect...";
         delete($selectlist{"GOOGLECAST-".$hash->{NAME}});
-        $hash->{helper}{ccdevice}->{socket_client}->_cleanup();
+        $hash->{helper}{ccdevice}->{socket_client}->_cleanup() if(defined($hash->{helper}{ccdevice}->{socket_client}->get_socket()));
         GOOGLECAST_initDevice($hash);
         GOOGLECAST_updateReading($hash, "presence", "offline");
         GOOGLECAST_updateReading($hash, "state", "offline");
         return undef;
+    } else {
+        #update socket
+        my $sock = $hash->{helper}{ccdevice}->{socket_client}->get_socket();
+        if(defined($sock) && $hash->{helper}{currentsock} ne $sock) {
+            GOOGLECAST_addSocketToMainloop($hash);
+            Log3 $hash, 4, "GOOGLECAST ($hash->{NAME}): checkConnection, pychromecast reconnected-update fhem socket";
+        } elsif(!defined($sock)) {
+            Log3 $hash, 4, "GOOGLECAST ($hash->{NAME}): checkConnection, pychromecast socket=NULL";
+        }
     }
 
     InternalTimer(gettimeofday()+10, "GOOGLECAST_checkConnection", $hash, 0);
@@ -594,7 +614,7 @@ sub GOOGLECAST_Read {
         eval {
             delete($selectlist{$name});
         };
-        $hash->{helper}{ccdevice}->{socket_client}->_cleanup();
+        $hash->{helper}{ccdevice}->{socket_client}->_cleanup() if(defined($hash->{helper}{ccdevice}->{socket_client}->get_socket()));
         GOOGLECAST_initDevice($hash);
         GOOGLECAST_updateReading($hash, "presence", "offline");
         GOOGLECAST_updateReading($hash, "state", "offline");
@@ -676,11 +696,7 @@ def GOOGLECAST_createChromecastPython(ip, port, uuid, model_name, friendly_name)
 def GOOGLECAST_getYTVideoURLPython(yt_url):
     ydl = youtube_dl.YoutubeDL({'forceurl': True, 'simulate': True, 'quiet': '1', 'no_warnings': '1', 'skip_download': True, 'format': 'best', 'youtube_include_dash_manifest': False})
 
-    with ydl:
-        result = ydl.extract_info(
-            yt_url,
-            download=False # We just want to extract the info
-    )
+    result = ydl.extract_info(yt_url, download=False)
 
     if 'entries' in result:
         # Can be a playlist or a list of videos
@@ -718,12 +734,12 @@ PYTHON_CODE_END
 <h3>GOOGLECAST</h3>
 <ul>
   GOOGLECAST is used to control your Google Cast device<br><br>
-        <b>Note</b><br>Make sure, that python3 is used by default, check with python --version. Following packages are required:
+        <b>Note</b><br>Make sure that python3 is installed. Following packages are required:
         <ul>
           <li>sudo apt-get install libwww-perl python-enum34 python-dev libextutils-makemaker-cpanfile-perl python3-pip cpanminus</li>
           <li>sudo pip3 install pychromecast --upgrade</li>
           <li>sudo pip3 install youtube-dl --upgrade</li>
-          <li>sudo cpanm Inline::Python</li>
+          <li>sudo INLINE_PYTHON_EXECUTABLE=/usr/bin/python3 cpanm Inline::Python</li>
         </ul>
 
   <br>
