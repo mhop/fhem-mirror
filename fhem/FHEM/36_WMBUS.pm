@@ -583,7 +583,7 @@ WMBUS_Attr(@)
   <a name="WMBUSdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt; [&lt:MessageEncoding&gt;]]|&lt;bHexCode&gt;</code> <br>
+    <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt; [&lt;MessageEncoding&gt;]]|&lt;bHexCode&gt;</code> <br>
     <br>
     Normalerweise wird ein WMBus Device nicht manuell angelegt. Dies geschieht automatisch bem Empfang der ersten Nachrichten eines Ger&auml;tes &uuml;ber den 
     fhem <a href="#autocreate">autocreate</a> Mechanismus.
