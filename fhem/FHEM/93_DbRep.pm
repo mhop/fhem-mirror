@@ -37,7 +37,8 @@
 ###########################################################################################################################
 #  Versions History:
 #  
-# 7.14.0       28.02.2018       syncStandby
+# 7.14.1       01.03.2018       currentfillup_Push bugfix for PostgreSQL
+# 7.14.0       26.02.2018       syncStandby
 # 7.13.3       25.02.2018       commandref revised (forum:#84953)
 # 7.13.2       24.02.2018       DbRep_firstconnect changed, bug fix in DbRep_collaggstr for aggregation = month
 # 7.13.1       20.02.2018       commandref revised
@@ -321,7 +322,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.14.0";
+my $DbRepVersion = "7.14.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -3834,19 +3835,19 @@ sub currentfillup_Push($) {
 	 $sql .= "group by timestamp,device,reading ;";
  
  } elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
-     $sql  = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT '$runtime_string_next',device,reading FROM history where ";
-     $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
-     $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
-     $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
-     $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
-     $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
-     $sql .= "READING IN ($reading) AND "    if($ranz > 1);
-     if ($IsTimeSet) {
-	     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-     } else {
-         $sql .= "true ";
-     }
-	 $sql .= "group by device,reading ORDER BY 2 ASC, 3 ASC ON CONFLICT DO NOTHING; ";
+         $sql  = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where ";
+         $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
+         $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
+         $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
+         $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
+         $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
+         $sql .= "READING IN ($reading) AND "    if($ranz > 1);
+         if ($IsTimeSet) {
+	         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
+         } else {
+             $sql .= "true ";
+         }
+	 $sql .= "group by device,reading ON CONFLICT ($pkc) DO NOTHING; ";
  
  } else {
      if($dbloghash->{MODEL} ne 'POSTGRESQL') {
@@ -3866,7 +3867,7 @@ sub currentfillup_Push($) {
 	     $sql .= "group by device,reading ;";
 	 } else {
 	     # PostgreSQL
-         $sql  = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT '$runtime_string_next',device,reading FROM history where ";
+         $sql  = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where ";
          $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
          $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
          $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
@@ -3878,8 +3879,7 @@ sub currentfillup_Push($) {
          } else {
              $sql .= "true ";
          }
-	     $sql .= "group by device,reading ORDER BY 2 ASC, 3 ASC;";
-	 
+	     $sql .= "group by device,reading;";
 	 }
  }
  
