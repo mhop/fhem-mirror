@@ -398,17 +398,18 @@ sub freezemon_Get($@) {
     #get the logfiles
     my $lf = AttrVal( $name, "fm_logFile", "" );
     $lf =~ m,^(.*)/([^/%]*).*$,;
-    my $p       = $1;
+    my $path    = $1;
     my $pattern = $2;
+    $path =~ s/%L/$attr{global}{logdir}/g if ( $path =~ m/%/ && $attr{global}{logdir} );
     my @fl;
 
     my $sfl;
-    if ( opendir( DH, $p ) ) {
+    if ( opendir( DH, $path ) ) {
         while ( my $f = readdir(DH) ) {
             push( @fl, $f ) if ( $f =~ /$pattern.*/ );
         }
         closedir(DH);
-        @fl = sort { ( CORE::stat("$p/$b") )[9] <=> ( CORE::stat("$p/$a") )[9] } @fl;
+        @fl = sort { ( CORE::stat("$path/$b") )[9] <=> ( CORE::stat("$path/$a") )[9] } @fl;
     }
     my $sfl = join( ",", @fl );
     $usage .= $sfl;
@@ -431,6 +432,7 @@ sub freezemon_Get($@) {
                 }
             }
             $_ =~ s/(?<=.{240}).{1,}$/.../;
+            $_ =~ s/&%%CSRF%%/$FW_CSRF/;
             $ret .= "<font color='$colors[$loglevel-1]'><b>" . $loglevel . "</b></font> - " . $_ . "<br>";
 
         }
@@ -447,8 +449,7 @@ sub freezemon_Get($@) {
         }
 
         # Build the complete path (using global logfile parameter if necessary)
-        my $path = "$p/$gf";
-        $path =~ s/%L/$attr{global}{logdir}/g if ( $path =~ m/%/ && $attr{global}{logdir} );
+        $path = "$path/$gf";
 
         if ( !open( my $fh, $path ) ) {
             return "Couldn't open $path";
@@ -498,7 +499,16 @@ sub freezemon_Attr($) {
         }
         if ( $aName eq "fm_logFile" ) {
             if ( $aVal ne "" ) {
-                freezemon_install_log_wrapper($hash);
+                $aVal =~ m,^(.*)/([^/]*)$,;
+                my $path = $1;
+                $path =~ s/%L/$attr{global}{logdir}/g if ( $path =~ m/%/ && $attr{global}{logdir} );
+                if ( opendir( DH, $path ) ) {
+                    freezemon_install_log_wrapper($hash);
+                    closedir(DH);
+                }
+                else {
+                    return "Attribute " . $aName . ": $path is not a valid directory";
+                }
             }
             else {
                 return "Attribute " . $aName . ": Enter a valid path or delete the attribute to disable.";
@@ -795,7 +805,7 @@ sub freezemon_dump_log($$$) {
 ###################################
 sub freezemon_logLink($$) {
     my ( $name, $link ) = @_;
-    my $ret = FW_pH( "$FW_ME/fhem?cmd=" . urlEncode("get $name log $link"), " [Log]", 1, "", 1, 1 );
+    my $ret = "<a href='$FW_ME?cmd=" . urlEncode("get $name log $link") . "&%%CSRF%%'> [Log]</a>";
     return $ret;
 }
 
