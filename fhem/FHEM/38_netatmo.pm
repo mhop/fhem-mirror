@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 16 / 2018-03-01
+# Release 17 / 2018-03-03
 
 package main;
 
@@ -1098,7 +1098,7 @@ netatmo_initDevice($)
   $hash->{last_seen} = FmtDateTime($device->{last_seen}) if(defined($device->{last_seen}));
   $hash->{wifi_status} = $device->{wifi_status} if(defined($device->{wifi_status}));
   $hash->{rf_status} = $device->{rf_status} if(defined($device->{rf_status}));
-  #$hash->{battery_percent} = $device->{battery_percent} if(defined($device->{battery_percent}));
+  $hash->{battery_percent} = $device->{battery_percent} if(defined($device->{battery_percent}));
   $hash->{battery_vp} = $device->{battery_vp} if(defined($device->{battery_vp}));
 
   if( $device->{place} ) {
@@ -1148,7 +1148,6 @@ netatmo_initDevice($)
   return undef if(IsDisabled($name) || !defined($name));
 
   InternalTimer(gettimeofday()+90, "netatmo_poll", $hash);
-  #netatmo_poll($hash);
 
 }
 
@@ -1701,7 +1700,6 @@ netatmo_initHome($@)
   my %data = (access_token => $iohash->{access_token}, home_id => $hash->{Home});
 
   my $lastupdate = ReadingsVal( $name, ".lastupdate", undef );
-  #$data{"size"} = 1;#$lastupdate if( defined($lastupdate) );
 
   Log3 $name, 3, "$name initHome (gethomedata)";
 
@@ -1882,7 +1880,6 @@ netatmo_pollHeatingRoom($@)
   return Log3 $name, 1, "$name: No app access token was found! (pollHeatingRoom)" if(!defined($iohash->{access_token_app}));
 
   $hash->{openRequests} = 0 if ( !defined(  $hash->{openRequests}) );
-  my @types = split( ',', $hash->{dataTypes} ) if(defined($hash->{dataTypes}));
   Log3 $name, 4, "$name: pollHeatingRoom types [".$hash->{dataTypes} . "] for room [".$hash->{Room}."]" if(defined($hash->{dataTypes}));
 
   my $lastupdate = ReadingsVal( $name, ".lastupdate", undef );
@@ -3410,7 +3407,13 @@ netatmo_parseReadings($$;$)
 #        readingsSingleUpdate($hash, ".lastupdate", $last_time, 0);
       }
     
-      if(defined($last_time) && int($last_time) > 0 && defined($step_time)) {
+      
+      if(defined(AttrVal($name, "interval", undef))){
+        $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL};
+        RemoveInternalTimer($hash, "netatmo_poll");
+        InternalTimer($hash->{helper}{NEXT_POLL}, "netatmo_poll", $hash);
+        Log3 $name, 3, "$name: next fixed interval update for device ($requested) at ".FmtDateTime($hash->{helper}{NEXT_POLL});
+      } elsif(defined($last_time) && int($last_time) > 0 && defined($step_time)) {
         my $nextdata = $last_time + 2*$step_time + 10 + int(rand(20));
         
         if($hash->{SUBTYPE} eq "MODULE")
@@ -3441,6 +3444,7 @@ netatmo_parseReadings($$;$)
         }
         elsif($nextdata >= (gettimeofday()+280))
         {
+          $nextdata = $nextdata + 10 + int(rand(20));
           RemoveInternalTimer($hash, "netatmo_poll");
           InternalTimer($nextdata, "netatmo_poll", $hash);
           $hash->{helper}{NEXT_POLL} = $nextdata;
@@ -3457,6 +3461,18 @@ netatmo_parseReadings($$;$)
           Log3 $name, 2, "$name: invalid time for dynamic update ($requested): ".FmtDateTime($nextdata);
           }
         }
+      } elsif(defined($last_time) && int($last_time) > 0) {
+        my $nextdata = int($last_time)+(12*60);
+        $nextdata = int(gettimeofday()+280) if($nextdata <= (gettimeofday()+280));
+        RemoveInternalTimer($hash, "netatmo_poll");
+        InternalTimer($nextdata, "netatmo_poll", $hash);
+        $hash->{helper}{NEXT_POLL} = $nextdata;
+        Log3 $name, 3, "$name: next predictive update for device ($requested) at ".FmtDateTime($nextdata);
+      } else {
+        $hash->{helper}{NEXT_POLL} = int(gettimeofday())+(12*60);
+        RemoveInternalTimer($hash, "netatmo_poll");
+        InternalTimer($hash->{helper}{NEXT_POLL}, "netatmo_poll", $hash);
+        Log3 $name, 3, "$name: next fixed update for device ($requested) at ".FmtDateTime($hash->{helper}{NEXT_POLL});
       }
     }
   }
@@ -5436,7 +5452,7 @@ netatmo_pollDevice($)
 
   if( $hash->{Module} )
   {
-    my @types = split( ',', $hash->{dataTypes} ) if(defined($hash->{dataTypes}));
+    my @types = split( ' ', $hash->{dataTypes} ) if(defined($hash->{dataTypes}));
     Log3 $name, 4, "$name: pollDevice types [".$hash->{dataTypes} . "] for modules [".$hash->{Module}."]" if(defined($hash->{dataTypes}));
 
     my $lastupdate = ReadingsVal( $hash->{NAME}, ".lastupdate", undef );
@@ -5447,10 +5463,8 @@ netatmo_pollDevice($)
     readingsSingleUpdate($hash, ".lastupdate", $lastupdate, 0) if(int(@types)>0);
     
     foreach my $module (split( ' ', $hash->{Module} ) ) {
-      #$type = shift(@types) if( $module and @types);
-      foreach my $type (@types) {
-        netatmo_requestDeviceReadings( $hash, $hash->{Device}, $type, ($module ne $hash->{Device})?$module:undef );# if($type);
-      }
+      my $type = shift(@types) if( $module and @types);
+      netatmo_requestDeviceReadings( $hash, $hash->{Device}, $type, ($module ne $hash->{Device})?$module:undef );# if($type);
     }
   }
   elsif( defined($hash->{Lat}) )
@@ -5927,7 +5941,7 @@ netatmo_Get($$@)
           $ret .= "\t $addr" if(defined($addr));
 
           #$ret .= "\n\tdefine netatmo_P$device->{_id} netatmo PUBLIC $device->{_id} $ext" if( $station );
-          my $definelink = "<a href=\"#\" onclick=\"javascript:window.open((\'".$FW_ME."?cmd=define netatmo_D".$idname." netatmo+++PUBLIC ".$device->{_id}." ".$ext.$csrftoken."\').replace('+++',' '), 'definewindow');\">=&gt; </a>";
+          my $definelink = "<a href=\"#\" onclick=\"javascript:window.open((\'".$FW_ME."?cmd=define netatmo_D".$idname." net+++atmo PUBLIC ".$device->{_id}." ".$ext.$csrftoken."\').replace('+++',''), 'definewindow');\">=&gt; </a>";
           $ret =~ s/$device->{_id}/$definelink/;
         }
       } else {

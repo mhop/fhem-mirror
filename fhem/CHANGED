@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  38_netatmo: fixed public stations update, added fixed interval
   - bugfix:  93_DbRep: V7.14.1, bugfix for PostgreSQL
   - added:   88_xs1Dev: added new module for control xs1
   - changed: 88_xs1Bridge: changed for another module

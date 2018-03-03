@@ -6,7 +6,9 @@
 #  2018 Markus Moises < vorname at nachname . de >
 #
 #  This module connects to Xiaomi Smart Home WiFi devices
-#  Currently supported: AirPurifier2, Robot Vacuum, Smart Fan, UV Humidifier, Lamps
+#  Currently supported: AirPurifier, Robot Vacuum, Smart Fan, UV Humidifier, Lamps
+#
+#  https://forum.fhem.de/index.php/topic,73052.0.html
 #
 ##############################################################################
 #
