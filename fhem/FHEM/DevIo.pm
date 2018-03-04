@@ -211,7 +211,7 @@ DevIo_OpenDev($$$;$)
 
   my $doCb = sub ($) {
     my ($r) = @_;
-    Log3 $name, 3, "Can't connect to $dev: $r" if(!$reopen && $r);
+    Log3 $name, 1, "Can't connect to $dev: $r" if(!$reopen && $r);
     $callback->($hash,$r) if($callback);
     return $r;
   };
@@ -279,7 +279,7 @@ DevIo_OpenDev($$$;$)
     }
 
     if(!$conn) {
-      Log3 $name, 3, "Can't connect to $dev: $!" if(!$reopen);
+      Log3 $name, 1, "Can't connect to $dev: $!" if(!$reopen);
       $readyfnlist{"$name.$dev"} = $hash;
       DevIo_setStates($hash, "disconnected");
       return &$doCb("");
@@ -297,7 +297,7 @@ DevIo_OpenDev($$$;$)
       $hash->{IODevPort} = $devPort if (defined($devPort));
       $hash->{IODevParameters} = $baudrate if (defined($baudrate));
       if (!CallFn($devName, "IOOpenFn", $hash)) {
-        Log3 $name, 3, "Can't open $dev!";
+        Log3 $name, 1, "Can't open $dev!";
         DevIo_setStates($hash, "disconnected");
         return &$doCb("");
       }
@@ -324,7 +324,7 @@ DevIo_OpenDev($$$;$)
         $conn->setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1) if(defined($conn));
 
       } else {
-        Log3 $name, 3, "Can't connect to $dev: $!" if(!$reopen && $!);
+        Log3 $name, 1, "Can't connect to $dev: $!" if(!$reopen && $!);
         $readyfnlist{"$name.$dev"} = $hash;
         DevIo_setStates($hash, "disconnected");
         $hash->{NEXT_OPEN} = time() + $nextOpenDelay;
@@ -364,7 +364,7 @@ DevIo_OpenDev($$$;$)
 
     if(!open($po, "+<$dev")) {
       return &$doCb(undef) if($reopen);
-      Log3 $name, 3, "Can't open $dev: $!";
+      Log3 $name, 1, "Can't open $dev: $!";
       $readyfnlist{"$name.$dev"} = $hash;
       DevIo_setStates($hash, "disconnected");
       return &$doCb("");
@@ -401,7 +401,7 @@ DevIo_OpenDev($$$;$)
 
     if(!$po) {
       return &$doCb(undef) if($reopen);
-      Log3 $name, 3, "Can't open $dev: $!";
+      Log3 $name, 1, "Can't open $dev: $!";
       $readyfnlist{"$name.$dev"} = $hash;
       DevIo_setStates($hash, "disconnected");
       return &$doCb("");
