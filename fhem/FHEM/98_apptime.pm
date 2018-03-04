@@ -4,6 +4,8 @@
 # based on $Id$
 ################################################################
 
+# for use with fhem.pl 16214+ due to change in timers
+
 #####################################################
 #
 package main;
@@ -15,9 +17,13 @@ use B qw(svref_2object);
 use vars qw(%defs);		# FHEM device/button definitions
 use vars qw(%intAt);
 use vars qw($nextat);
+use vars qw(@intAtA);   # Internal timer array (new!)
+use vars qw(%prioQueues);     
 
 sub apptime_getTiming($$$@);
 sub apptime_Initialize($);
+
+use constant DEBUG_OUTPUT_INTATA => 0;
 
 my $apptimeStatus;
 
@@ -33,8 +39,6 @@ my $maxintatlen    = 0;
 my $maxintatdone   = 0;
 my $minTmrHandleTm = 1000000;
 my $maxTmrHandleTm = 0;
-my $minintatsorttm = 1000000;
-my $maxintatsorttm = 0;
 
 my $totDly         = 0;
 my $totCnt         = 0;
@@ -42,81 +46,76 @@ my $totCnt         = 0;
 sub HandleTimeout() {
   return undef if(!$nextat);
 
-  my $minCoverWait = 0.00; # 0.01 by Rudi, but it should be set only on systems that need it!?!
-  my $minCoverExec = 2; # look ahead due to execution time of firing timers
+  if (DEBUG_OUTPUT_INTATA) {
+    my $ms = 0;
+    my $n = int(@intAtA);
+    my $j;
+    for ($j=0; $j < ($n-1); $j++) {
+      if (!defined($intAtA[$j])) {
+        Log 0, "Error in intAtA, undefined element $j/$n\n";
+      }
+      elsif (!defined($intAtA[$j]->{TRIGGERTIME})) {
+        Log 0, "Error in intAtA, undefined tim $j/$n\n";
+      }
+      next if ($intAtA[$j]->{TRIGGERTIME} <= $intAtA[$j+1]->{TRIGGERTIME});
+      if (!$ms) {
+        Log 0, "Error in intAtA, sortErr $j/$n\n";
+        $ms = 1;
+      }
+    }
+    $j = $n-1;
+    if (!defined($intAtA[$j])) {
+      Log 0, "Error in intAtA, undefined element $j/$n\n";
+    }
+    elsif (!defined($intAtA[$j]->{TRIGGERTIME})) {
+      Log 0, "Error in intAtA, undefined tim $j/$n\n";
+    }
+  }
 
   my $now = gettimeofday();
-  my $dtnext = $nextat-$now;
-  if($dtnext > $minCoverWait) { # need to cover min delay at least
+  if($now < $nextat) {
     $selectTimestamp = $now;
-    return $dtnext;
+    return ($nextat-$now);
   }
 
   my $handleStart = $now;
 
   #############
   # Check the internal list.
-  my @intAtKeys = keys(%intAt);
-
-  my @intAtSort = (sort {$intAt{$a}{TRIGGERTIME} <=>
-                         $intAt{$b}{TRIGGERTIME} }
-                    (grep {($intAt{$_}->{TRIGGERTIME}-$now) <= $minCoverExec}
-                       @intAtKeys)); # get the timers to execute due to timeout and sort ascending by time
-
-  my $intatsorttm = gettimeofday()-$now;
-
-  $intatlen = int(@intAtKeys);
+  $intatlen = int(@intAtA);
   $maxintatlen = $intatlen if ($maxintatlen < $intatlen);
 
   my $nd = 0;
 
-  my ($tim,$fn,$arg,$fnname,$shortarg,$cv);
+  my ($fn,$arg,$fnname,$shortarg,$cv);
   $nextat = 0;
-  foreach my $i (@intAtSort) {
-    $i = "" if(!defined($i)); # Forum #40598
-    next if(!$intAt{$i}); # deleted in the loop
-    $tim = $intAt{$i}{TRIGGERTIME};
-    $fn = $intAt{$i}{FN};
-    if(!defined($fn) || !defined($tim)) { # clean up bad entries
-      delete($intAt{$i});
-      next;
-    }
-    if ($tim - gettimeofday() > $minCoverWait) {
-      $nextat = $tim; # execution time not reached yet
+  while(@intAtA) { # may be changed by timer execution !
+    my $at = $intAtA[0];
+    my $tim = $at->{TRIGGERTIME};
+    if($tim && $tim > $now) {
+      $nextat = $tim;
       last;
     }
-    $arg = $intAt{$i}{ARG};
+    delete $intAt{$at->{atNr}} if($at->{atNr}); # "handling" of old %intAt
+    shift(@intAtA);
 
+    $fn = $at->{FN};
     $fnname = $fn;
     if (ref($fn) ne "") {
       $cv = svref_2object($fn);
       $fnname = $cv->GV->NAME;
     }
+    $arg = $at->{ARG};
     $shortarg = (defined($arg)?$arg:"");
     $shortarg = "HASH_unnamed" if (   (ref($shortarg) eq "HASH")
                                    && !defined($shortarg->{NAME}) );
     ($shortarg,undef) = split(/:|;/,$shortarg,2); # for special long args with delim ;
-    apptime_getTiming("global","tmr-".$fnname.";".$shortarg, $fn, $tim, $arg); # this can delete a timer and can add a timer not covered by the current loops TRIGGERTIME sorted list
+    apptime_getTiming("global","tmr-".$fnname.";".$shortarg, $fn, $tim, $arg); # this can delete a timer and can add a timer
     $nd++;
 
-    delete($intAt{$i});
   }
+
   $maxintatdone = $nd if ($maxintatdone < $nd);
-
-  $now = gettimeofday();
-
-  foreach my $i (keys(%intAt)) { #(keys(%intAt)) (@intAtKeys)
-    $i = "" if(!defined($i)); # Forum #40598
-    next if(!$intAt{$i}); # deleted in the loop
-    $tim = $intAt{$i}{TRIGGERTIME};
-    $nextat = $tim if (   defined($tim)
-                       && (   !$nextat # find the next time to trigger
-                           || ($nextat > $tim) ) );
-  }
-
-  $intatsorttm += gettimeofday() - $now;
-  $minintatsorttm = $intatsorttm if ($minintatsorttm > $intatsorttm);
-  $maxintatsorttm = $intatsorttm if ($maxintatsorttm < $intatsorttm);
 
   $now = gettimeofday();
 
@@ -145,8 +144,7 @@ sub HandleTimeout() {
 
   return undef if !$nextat;
  
-  $dtnext = $nextat-$now;
-  return ($dtnext > $minCoverWait) ? $dtnext : $minCoverWait; # need to cover min delay at least
+  return ($now < $nextat) ? ($nextat-$now) : 0;
 }
 sub CallFn(@) {
   my $d = shift;
@@ -228,16 +226,16 @@ sub apptime_CommandDispTiming($$@) {
   $sFld = "max" if (!$sFld);
   $top = "top" if (!$top);
   my %fld = (name=>0,function=>1,max=>2,count=>3,total=>4,average=>5,maxDly=>6,avgDly=>7,cont=>98,pause=>98,clear=>99,timer=>2,nice=>2);
-  return "$sFld undefined field, use one of ".join(",",keys %fld)
+  return "$sFld undefined field, use one of ".join(",",sort keys %fld)
         if(!defined $fld{$sFld});
   my @bmArr;
   my @a = map{"$defs{$_}:$_"} keys (%defs); # prepare mapping hash 2 name
   $_ =~ s/[HASH\(\)]//g foreach(@a);
  
-  if ($sFld eq "pause"){# no further collection of data, clear also
+  if    ($sFld eq "pause"){# no further collection of data, clear also
     $apptimeStatus  = 0;#stop collecting data
   }
-  elsif ($sFld eq "cont"){# no further collection of data, clear also
+  elsif ($sFld eq "cont") {# further collection of data, clear also
     $apptimeStatus  = 1;#continue collecting data
   }
   elsif ($sFld eq "timer"){
@@ -245,7 +243,7 @@ sub apptime_CommandDispTiming($$@) {
     $filter = defined($filter)?$filter:"";
     $filter = "\^tmr-.*".$filter if ($filter !~ /^\^tmr-/);
   }
-  elsif ($sFld eq "nice"){
+  elsif ($sFld eq "nice") {
     $sFld = "max";
     $filter = defined($filter)?$filter:"";
     $filter = "\^nice-.*".$filter if ($filter !~ /^\^nice-/);
@@ -259,8 +257,6 @@ sub apptime_CommandDispTiming($$@) {
       $totCnt         = 0;
       $maxintatlen    = 0;
       $maxintatdone   = 0;
-      $minintatsorttm = 1000000;
-      $maxintatsorttm = 0;
     }
     elsif ($sFld =~ m/(pause|cont)/){
     }
@@ -304,7 +300,6 @@ sub apptime_CommandDispTiming($$@) {
   else         {@bmArr = sort { $b->[$field] cmp $a->[$field] } @bmArr;}
   my $ret = sprintf("active-timers: %d; max-active timers: %d; max-timer-load: %d  ",$intatlen,$maxintatlen,$maxintatdone);
   $ret .= sprintf("min-tmrHandlingTm: %0.1fms; max-tmrHandlingTm: %0.1fms; totAvgDly: %0.1fms\n",$minTmrHandleTm*1000,$maxTmrHandleTm*1000,($totCnt?$totDly/$totCnt*1000:0));
-  $ret .= sprintf("min-timersortTm: %0.1fms; max-timersortTm: %0.1fms\n",$minintatsorttm*1000,$maxintatsorttm*1000);
   $ret .= ($apptimeStatus ? "" : "------ apptime PAUSED data collection ----------\n")
             .sprintf("\n %-40s %-35s %6s %8s %10s %8s %8s %8s %-15s %s",
                      "name","function","max","count","total","average","maxDly","avgDly","TS Max call","param Max call");
@@ -370,7 +365,7 @@ sub apptime_CommandDispTiming($$@) {
                 Continue data collection after pause.
             </p>
           </dd>
-      <dt><code><kbd>apptime [count|funktion|average|clear|max|name|total] [all]</kbd></code></dt>
+      <dt><code><kbd>apptime [count|function|average|clear|max|name|total] [all]</kbd></code></dt>
         <dd>
             <p>
                 Display a table sorted by the field selected.
