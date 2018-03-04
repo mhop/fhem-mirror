@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.14.2       04.03.2018       fix perl warning
 # 7.14.1       01.03.2018       currentfillup_Push bugfix for PostgreSQL
 # 7.14.0       26.02.2018       syncStandby
 # 7.13.3       25.02.2018       commandref revised (forum:#84953)
@@ -322,7 +323,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.14.1";
+my $DbRepVersion = "7.14.2";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -1799,7 +1800,7 @@ sub DbRep_createTimeArray($$$) {
  $wdadd = 172800 if($wd eq "Sa");                                       # wenn Start am "Sa" dann nächste Grenze +2 Tage
  $wdadd = 86400  if($wd eq "So");                                       # wenn Start am "So" dann nächste Grenze +1 Tage
              
- Log3 ($name, 5, "DbRep $name - weekday of start for selection: $wd  ->  wdadd: $wdadd"); 
+ Log3 ($name, 5, "DbRep $name - weekday of start for selection: $wd  ->  wdadd: $wdadd") if($wdadd); 
  
  my $aggsec;
  if ($aggregation eq "hour") {
