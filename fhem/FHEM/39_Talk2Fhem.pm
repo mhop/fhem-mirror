@@ -98,6 +98,10 @@
 #			replace ; to ;; in timecommands
 #			Add 1 day if timecode is in past in hour phrases
 #			Added async warning if keywordlist is unkown
+#	04.03.2018	0.4.6
+#			Breacket decoding bug fixed
+#
+#
 ################################################################
 # TODO:
 # 
@@ -109,6 +113,9 @@
 # zusätzlich unmodifizierte zeit greifbar machen
 # timephrase kombies morgen früh um 9 uhr ist unzuverlässig. evtl order einführen, dann kann auch die splittung weg
 # viertel zeitphrasen
+# - regexp
+#vordefinierte regex zu verfügung stellen
+#		(i[nm]|vor|auf|unter|hinter)? ?(de[rmn]|die|das)? ?
 
 package main;
 
@@ -123,7 +130,7 @@ use Encode qw(decode encode);
 my %Talk2Fhem_globals;
 
 
-$Talk2Fhem_globals{version}="0.4.5";
+$Talk2Fhem_globals{version}="0.4.6";
 
 $Talk2Fhem_globals{EN}{erase} = ['\bplease\b', '\balso\b', '^msgtext:'];
 $Talk2Fhem_globals{EN}{numbers} = {
@@ -552,13 +559,13 @@ sub Talk2Fhem_Set($@)
 {
 	my ( $hash, $name, @args ) = @_;
 	(return "\"set $name\" needs at least one argument") unless(scalar(@args));
-    (return "Unknown argument ?, choose one of ! cleartriggers:noArg cleartimers:noArg") if($args[0] eq "?");
+	(return "Unknown argument ?, choose one of ! cleartriggers:noArg cleartimers:noArg") if($args[0] eq "?");
 	
 	if ($hash->{STATE} ne "Initialized") {
 		#Fülle nur cmds array
- 	} elsif ($args[0] eq "cleartimers") {
+	} elsif ($args[0] eq "cleartimers") {
 		AnalyzeCommand($hash->{CL}, "delete at_".$name."_.*");
- 	} elsif ($args[0] eq "cleartriggers") {
+	} elsif ($args[0] eq "cleartriggers") {
 		
 		$$hash{helper}{notifies} = [];
 		Talk2Fhem_UpdND($hash);
@@ -767,11 +774,11 @@ sub Talk2Fhem_Get($$@)
 sub Talk2Fhem_Attr(@)
 {
 	my ( $cmd, $name, $attrName, $attrValue ) = @_;
-    
-  	# $cmd  - Vorgangsart - kann die Werte "del" (löschen) oder "set" (setzen) annehmen
+	
+	# $cmd  - Vorgangsart - kann die Werte "del" (löschen) oder "set" (setzen) annehmen
 	# $name - Gerätename
 	# $attrName/$attrValue sind Attribut-Name und Attribut-Wert
-    return unless $init_done;
+	return unless $init_done;
 	#Log 1, Dumper @_;
 	if ($attrName eq "T2F_keywordlist" or $attrName eq "T2F_modwordlist") {
 		$defs{$name}{helper}{phrase} = undef;
@@ -893,9 +900,12 @@ my $list = (shift || AttrVal($hash->{NAME}, $type, ""));
 	$list = Talk2Fhem_parseParams($list);
 	#Log 1, Dumper $list;
 	return ("Error while parsing Keywordlist.\n$list" ) unless(ref($list) eq "HASH");
+	delete $hash->{helper}{T2F_andwordlist};
+	delete $hash->{helper}{$type};
 	foreach (keys %$list) {
 #			$$list{$_} = Talk2Fhem_parseArray($$list{$_});			
-		$hash->{helper}{$type}{$_} = Talk2Fhem_parseArray($$list{$_});			
+		$hash->{helper}{T2F_andwordlist}{$_} = Talk2Fhem_parseArray($$list{$_}) if /^\&/;
+		$hash->{helper}{$type}{s/^\&//r} = Talk2Fhem_parseArray($$list{$_});
 	}
 	
 #		my $modlist = Talk2Fhem_parseParams(AttrVal($name, "T2F_modwordlist", ""));;
@@ -978,12 +988,19 @@ my @cmds = split(/ und (?!$Talk2Fhem_globals{DE}{numberre})/, $txt);
 # CHECK if $cmd[0] hit Talk2Fhem_test. Unless dont split. And make a deeper analysis.
 #if ($#cmd)
 # before test remove time and if phrases simple	
-#	unless (Talk2Fhem_test($me, $cmds[0])) {
+#	unless (Talk2Fhem_test($me, $cmds[0]))
 #	Nun schauen wir mal was vor und nach dem und ist.
 #	könnte phrasentreffer auf kompletten satz ausschluss geben
-#	
-#	}
+
+
+# Tiefe UND analyse
+#for (@cmd) {
+
 #}
+
+#print Dumper $$me{helper}{T2F_andwordlist};
+
+#return;
 
 
 
@@ -1215,7 +1232,7 @@ my $punmatch = $cmd;
 my @dir = ($$spec{origin});
 T2FL($myname, 5, "$myname Evaluate search:\n$cmd =~ /$$phr{key}/i") if ref $res;
 for my $fphr (@fphrs) {
-#	if (my @d = ($cmd =~ qr/$fphr/i)){
+#	if (my @d = ($cmd =~ qr/$fphr/i))
 	if ($fphr =~ s/^\?//){
 		my @d = (eval { $cmd =~ /$fphr/i});
 		my $m = $&;
@@ -1517,9 +1534,12 @@ my %react;
 #							my @cs = map { my @t = split('\|', $_ =~ s/^\(|\)$//gr); \@t } $$phr{key} =~ /(?<!\\)\((?!\?).*?\)/g;
 #							my @cs = map { my @t = split('\|', $_ =~ s/^\(|\)$//gr); \@t } $$phr{key} =~ /(?<! \\ ) \( (?! \? ) (?: (?R) | [^()]+ )+ \) /xg;
 							# Klammern extrahieren
-							my @cs = ($$phr{key});
+							my @cs = ("onlysometext".$$phr{key});
+							#unshift(@cs, undef) if $$phr{key} =~ /^\(/;
 							for (my $i=0; $i<=$#cs; $i++) {
 								my $c = $cs[$i];
+#T2FL($myname, 5, "C: ".Dumper $c);
+
 								if ($c =~ /^\(\?.*\)$/) {
 									# Perl Special bracket delete it.
 									splice(@cs, $i, 1);
@@ -1531,15 +1551,18 @@ my %react;
 								last if $i > 10;
 							}
 							
-
+#T2FL($myname, 5, "CS: ".Dumper @cs);
+							
 #							@keywords = @{$cs[($clipno-1)]};
 #							Log 1, Dumper @cs;
 #							@cs = grep { /^\(/ } @cs;
 #							Log 1, Dumper @cs;
 #							Log 1, "-----> ".$cs[($clipno-1)];
 							(my $clip = $cs[($clipno)]) =~ s/^\(|\)$//g;
+#T2FL($myname, 5, "clip: ".Dumper $clip);
 #							push(@keywords, split('\|', $clip) extract_bracketed($clip, '()'));
 							@keywords = map { /^\(/ ? $_ : split('\|', $_=~s/^\||\|$//gr) } extract_multiple($clip, [sub { extract_bracketed($_[0], '()') }]);
+#T2FL($myname, 5, "keywords: ".Dumper @keywords);
 #							@keywords = split('\|',);
 							
 							#Log 1, Dumper @keywords;
@@ -1551,7 +1574,7 @@ my %react;
 						} else {
 							@keywords = @{$keylist{$hitnokeylist[$clipno]}};
 						}
-						T2FL($myname, 4, "Searching position of $d in @keywords");
+#						T2FL($myname, 4, "Searching position of $d in @keywords");
 						@keywords = map { Talk2Fhem_escapeumlauts($_, $disu) } @keywords;
 						T2FL($myname, 4, "Searching position of $d in @keywords");
 						my $i=0;
@@ -1686,36 +1709,36 @@ return($_[2]);
 <a name="Talk2Fhem"></a>
 <h3>Talk2Fhem</h3>
 <ul>
-    The module <i>Talk2Fhem</i> is a connection between natural language and FHEM commands.
+	The module <i>Talk2Fhem</i> is a connection between natural language and FHEM commands.
 	The configuration is carried out conveniently via the FHEM web frontend.<br>
 	For a more detailed description and further examples see <a href="http://wiki.fhem.de/wiki/Modul_Talk2Fhem">Talk2Fhem Wiki</a>.
 	<br><br>
-    <a name="Talk2Fhemdefine"></a>
-    <b>Define</b>
-    <ul>
-        <code>define &lt;name&gt; Talk2Fhem</code>
-        <br><br>
-        Example: <code>define talk Talk2Fhem</code>
-        <br><br>
-        The actual configuration should first be done on the FHEM side.
-        <br><br>
+	<a name="Talk2Fhemdefine"></a>
+	<b>Define</b>
+	<ul>
+		<code>define &lt;name&gt; Talk2Fhem</code>
+		<br><br>
+		Example: <code>define talk Talk2Fhem</code>
+		<br><br>
+		The actual configuration should first be done on the FHEM side.
+		<br><br>
 		The individual language phrases are configured line by line. A configuration
 		always starts by the regular expression, followed by at least one space or tab
 		from an equal sign. <br>
 		The command part begins after the equals sign with a space, tab, or newline. <br> <br>
-        <code>&lt;regexp&gt; = &lt;command&gt;</code>
-        <br><br>
-        <b>Short refernce:</b>
-        <br>
-        <code>&lt;RegExpPart&gt; [&amp;&amp; [?!]&lt;RegExpPart_n&gt;] = [ &lt;FHEM command&gt; | { &lt;Perl code&gt; } | (&lt;option&gt; =&gt; '&lt;wert&gt;' , ... ) ]</code>
-        <br><br>
-        Example: <code>helo world = {Log 1, Helo World}</code>
-        <br><br>
+		<code>&lt;regexp&gt; = &lt;command&gt;</code>
+		<br><br>
+		<b>Short refernce:</b>
+		<br>
+		<code>&lt;RegExpPart&gt; [&amp;&amp; [?!]&lt;RegExpPart_n&gt;] = [ &lt;FHEM command&gt; | { &lt;Perl code&gt; } | (&lt;option&gt; =&gt; '&lt;wert&gt;' , ... ) ]</code>
+		<br><br>
+		Example: <code>helo world = {Log 1, Helo World}</code>
+		<br><br>
 		Everything after a hashtag '#' is ignored until the end of the line.
-        <br><br>
+		<br><br>
 		&lt;regexp&gt;
 		<ul>Regular expression describing the text at which the command should be executed</ul>
-        <br><br>
+		<br><br>
 		&lt;command&gt;
 		<ul>
 			The executive part. The following formats are allowed:
@@ -1774,47 +1797,47 @@ return($_[2]);
 			<li><b>$0</b> Contains the text of the detected T2F_origin regexp.</li>
 		</ul>	
 	</ul>
-    <br>
-    
-    <a name="Talk2Fhemset"></a>
-    <b>Set</b><br>
-    <ul>
-        <code>set &lt;name&gt; [!]&lt;text&gt;</code>
-        <br><br>
-        The text is sent to the module via the <i>set</i> command.
+	<br>
+	
+	<a name="Talk2Fhemset"></a>
+	<b>Set</b><br>
+	<ul>
+		<code>set &lt;name&gt; [!]&lt;text&gt;</code>
+		<br><br>
+		The text is sent to the module via the <i>set</i> command.
 		See <a href="http://fhem.de/commandref.html#set">commandref#set</a> for more help.
 		<li>cleartimers</li> Removes the pending time-related commands
 		<li>cleartriggers</li> Removes the pending event-related commands
-    </ul>
-    <br>
+	</ul>
+	<br>
 
-    <a name="Talk2Fhemget"></a>
-    <b>Get</b><br>
-        <code>get &lt;name&gt; &lt;option&gt;</code>
-        <br><br>
+	<a name="Talk2Fhemget"></a>
+	<b>Get</b><br>
+		<code>get &lt;name&gt; &lt;option&gt;</code>
+		<br><br>
 		Information can be read from the module via <i>get</i>.
         See <a href="http://fhem.de/commandref.html#get">commandref#get</a> for more information on "get".    <br><br>
-        &lt;option&gt;
+		&lt;option&gt;
 		<ul>
-              <li><i>@keywordlist</i> <i>@modwordlist</i><br>
-                  Compare the two lists word by word.</li>
-              <li><i>keylistno</i><br>
-                  A list of the configured "keyword" lists. For easier positioning of "modword" lists </li>
-              <li><i>log</i><br>
-                  Shows the log entries of the last command </li>
-              <li><i>modificationtypes</i><br>
-                  Shows the regexp of the modificationtypes. </li>
-              <li><i>standardfilter</i><br>
-                  Load the standartfilter and print it in the Attribute T2F_filter if its empty </li>
-              <li><i>version</i><br>
-                  The module version</li>
-        </ul>
+			  <li><i>@keywordlist</i> <i>@modwordlist</i><br>
+				  Compare the two lists word by word.</li>
+			  <li><i>keylistno</i><br>
+				  A list of the configured "keyword" lists. For easier positioning of "modword" lists </li>
+			  <li><i>log</i><br>
+				  Shows the log entries of the last command </li>
+			  <li><i>modificationtypes</i><br>
+				  Shows the regexp of the modificationtypes. </li>
+			  <li><i>standardfilter</i><br>
+				  Load the standartfilter and print it in the Attribute T2F_filter if its empty </li>
+			  <li><i>version</i><br>
+				  The module version</li>
+		</ul>
 
-    <br>
+	<br>
 
 	<a name="Talk2Fhemreadings"></a>
-    <b>Readings</b>
-    <ul>
+	<b>Readings</b>
+	<ul>
 		<li><i>set</i><br>
 			Contains the last text sent via "set".
 		</li>
@@ -1845,37 +1868,37 @@ return($_[2]);
 		<li><i>notifies</i><br>
 			Contains a list of the devices that are relevant for the currently waiting conditional commands. There is an internal notify on these devices.
 		</li>
-    </ul>
+	</ul>
 
-    <br>
-     
-    <a name="Talk2Fhemattr"></a>
-    <b>Attribute</b>
-    <ul>
-        <code>attr &lt;name&gt; &lt;attribute&gt; &lt;value&gt;</code>
-        <br><br>
-        See <a href="http://fhem.de/commandref.html#attr">commandref#attr</a> for more information about the attributes.
-        <br><br>
-        Attributes:
-        <ul>
-            <li><i>T2F_keywordlist</i> &lt;name&gt; = &lt;list&gt;<br>
+	<br>
+	 
+	<a name="Talk2Fhemattr"></a>
+	<b>Attribute</b>
+	<ul>
+		<code>attr &lt;name&gt; &lt;attribute&gt; &lt;value&gt;</code>
+		<br><br>
+		See <a href="http://fhem.de/commandref.html#attr">commandref#attr</a> for more information about the attributes.
+		<br><br>
+		Attributes:
+		<ul>
+			<li><i>T2F_keywordlist</i> &lt;name&gt; = &lt;list&gt;<br>
 				A comma-separated list of keywords such as: rooms, names, colors, etc ... <br>
 				In other words, things named with a natural name.            </li>
-            <li><i>T2F_modwordlist</i> &lt;name&gt; = &lt;list&gt;<br>
+			<li><i>T2F_modwordlist</i> &lt;name&gt; = &lt;list&gt;<br>
 				A comma seperated list of substitution words used for the keywords.
 				For example: device names in FHEM <br>            </li>
-            <li><i>T2F_if</i><br>
+			<li><i>T2F_if</i><br>
 				A collection of event-driven configurations. The syntax is that of the definition. Command part is an IF condition. <br>
 				z.B.: (when|if) .*?door = [door] eq "open"
 			</li>
-            <li><i>T2F_filter</i><br>
+			<li><i>T2F_filter</i><br>
 				Comma-separated list of RegExp generally removed. <br>
 				Standard: \bplease\b,\balso\b
 			</li>
-            <li><i>T2F_origin</i><br>
+			<li><i>T2F_origin</i><br>
 				A RegExp which is generally removed and whose output can be accessed via $0. <br>
 				Can be used for user mapping.</li>
-            <li><i>T2F_language</i>DE|EN<br>
+			<li><i>T2F_language</i>DE|EN<br>
 				The used language can be set via the global attribute "language". Or overwritten with this attribute.
 			</li>
 			<li><i>T2F_disableumlautescaping</i> &lt;0|1&gt;<br>
@@ -1883,9 +1906,9 @@ return($_[2]);
 			<li><i>disable</i> &lt;0|1&gt;<br>
 				Can be used for test purposes. If the attribute is set to 1, the FHEM command is not executed
 				but written in reading cmds.
-            </li>
-        </ul>
-    </ul>
+			</li>
+		</ul>
+	</ul>
 </ul>
 
 
@@ -1895,36 +1918,36 @@ return($_[2]);
 <a name="Talk2Fhem"></a>
 <h3>Talk2Fhem</h3>
 <ul>
-    Das Modul <i>Talk2Fhem</i> stellt eine Verbindung zwischen nat&uuml;rlicher Sprache und FHEM Befehlen her.
+	Das Modul <i>Talk2Fhem</i> stellt eine Verbindung zwischen nat&uuml;rlicher Sprache und FHEM Befehlen her.
 	Die Konfiguration erfolgt dabei komfortabel &uuml;ber das FHEM Webfrontend.<br>
 	F&uuml;r eine genauere Beschreibung und weiterf&uuml;hrende Beispiele siehe  <a href="http://wiki.fhem.de/wiki/Modul_Talk2Fhem">Talk2Fhem Wiki</a>.
-    <br><br>
-    <a name="Talk2Fhemdefine"></a>
-    <b>Define</b>
-    <ul>
-        <code>define &lt;name&gt; Talk2Fhem</code>
-        <br><br>
-        Beispiel: <code>define talk Talk2Fhem</code>
-        <br><br>
-        Die eigentliche Konfigration sollte erst auf der FHEM Seite erfolgen.
-        <br><br>
+	<br><br>
+	<a name="Talk2Fhemdefine"></a>
+	<b>Define</b>
+	<ul>
+		<code>define &lt;name&gt; Talk2Fhem</code>
+		<br><br>
+		Beispiel: <code>define talk Talk2Fhem</code>
+		<br><br>
+		Die eigentliche Konfigration sollte erst auf der FHEM Seite erfolgen.
+		<br><br>
 		Die einzelnen Sprachphrasen werden Zeile f&uuml;r Zeile konfiguriert. Hierbei f&auml;ngt eine Konfiguration
 		immer mit dem Regul&auml;rem Ausdruck an, gefolgt von mindestens einem Leerzeichen oder Tabulator gefolgt
 		von einem Gleichheitszeichen.<br>
 		Der Kommandoteil f&auml;ngt nach dem Gleichheitszeichen mit einem Leerzeichen, Tabulator oder Zeilenumbruch an.<br><br>
-        <code>&lt;regexp&gt; = &lt;command&gt;</code>
-        <br><br>
-        <b>Kurzreferenz:</b>
-        <br>
-        <code>&lt;RegExpPart&gt; [&amp;&amp; [?!]&lt;RegExpPart_n&gt;] = [ &lt;FHEM command&gt; | { &lt;Perl code&gt; } | (&lt;option&gt; =&gt; '&lt;wert&gt;' , ... ) ]</code>
-        <br><br>
-        Beispiel: <code>hallo welt = {Log 1, Hallo Welt}</code>
-        <br><br>
+		<code>&lt;regexp&gt; = &lt;command&gt;</code>
+		<br><br>
+		<b>Kurzreferenz:</b>
+		<br>
+		<code>&lt;RegExpPart&gt; [&amp;&amp; [?!]&lt;RegExpPart_n&gt;] = [ &lt;FHEM command&gt; | { &lt;Perl code&gt; } | (&lt;option&gt; =&gt; '&lt;wert&gt;' , ... ) ]</code>
+		<br><br>
+		Beispiel: <code>hallo welt = {Log 1, Hallo Welt}</code>
+		<br><br>
 		Alles nach einem Hashtag '#' wird bis zum Zeilenende ignoriert.
-        <br><br>
+		<br><br>
 		&lt;regexp&gt;
 		<ul>Regul&auml;rer Ausdruck der den Text beschreibt, bei dem das Kommando ausgef&uuml;hrt werden soll</ul>
-        <br><br>
+		<br><br>
 		&lt;command&gt;
 		<ul>
 			Der ausf&uuml;hrende Teil. Folgende Formate sind Zul&auml;ssig:
@@ -1983,48 +2006,48 @@ return($_[2]);
 		</ul>
 		
 	</ul>
-    <br>
-    
-    <a name="Talk2Fhemset"></a>
-    <b>Set</b><br>
-    <ul>
-        <code>set &lt;name&gt; [!]&lt;text&gt;</code>
-        <br><br>
-        &Uuml;ber das <i>set</i> Kommando wird der zu interpretierende Text an das Modul gesendet.
+	<br>
+	
+	<a name="Talk2Fhemset"></a>
+	<b>Set</b><br>
+	<ul>
+		<code>set &lt;name&gt; [!]&lt;text&gt;</code>
+		<br><br>
+		&Uuml;ber das <i>set</i> Kommando wird der zu interpretierende Text an das Modul gesendet.
 		Schaue unter <a href="http://fhem.de/commandref.html#set">commandref#set</a> f&uuml;r weiterf&uuml;hrende Hilfe.
 		<li>cleartimers</li> Entfernt die wartenden zeitbezogenen Kommandos 
 		<li>cleartriggers</li> Entfernt die wartenden ereignisbezogenen Kommandos
-    </ul>
-    <br>
+	</ul>
+	<br>
 
-    <a name="Talk2Fhemget"></a>
-    <b>Get</b><br>
-        <code>get &lt;name&gt; &lt;option&gt;</code>
-        <br><br>
-        &Uuml;ber <i>get</i> lassen sich Informationen aus dem Modul auslesen.
-        Siehe <a href="http://fhem.de/commandref.html#get">commandref#get</a> f&uuml;r weitere Informationen zu "get".
-    <br><br>
-        &lt;option&gt;
+	<a name="Talk2Fhemget"></a>
+	<b>Get</b><br>
+		<code>get &lt;name&gt; &lt;option&gt;</code>
+		<br><br>
+		&Uuml;ber <i>get</i> lassen sich Informationen aus dem Modul auslesen.
+		Siehe <a href="http://fhem.de/commandref.html#get">commandref#get</a> f&uuml;r weitere Informationen zu "get".
+	<br><br>
+		&lt;option&gt;
 		<ul>
-              <li><i>@keywordlist</i> <i>@modwordlist</i><br>
-                  Vergleich der zwei Listen Wort f&uuml;r Wort</li>
-              <li><i>keylistno</i><br>
-                  Eine Auflistung der Konfigurierten "Keyword"-Listen. Zur einfacheren Positionierung der "Modword"-Listen</li>
-              <li><i>log</i><br>
-                  Zeigt die Logeintr&auml;ge des letzten Kommandos</li>
-              <li><i>modificationtypes</i><br>
-                  Zeigt die RegExp der Modifikationstypen. </li>
-              <li><i>standardfilter</i><br>
-                  L&auml;dt den Standardfilter und schreibt ihn in das Attribut T2F_filter wenn er leer ist</li>
-              <li><i>version</i><br>
-                  Die Modulversion</li>
-        </ul>
+			  <li><i>@keywordlist</i> <i>@modwordlist</i><br>
+				  Vergleich der zwei Listen Wort f&uuml;r Wort</li>
+			  <li><i>keylistno</i><br>
+				  Eine Auflistung der Konfigurierten "Keyword"-Listen. Zur einfacheren Positionierung der "Modword"-Listen</li>
+			  <li><i>log</i><br>
+				  Zeigt die Logeintr&auml;ge des letzten Kommandos</li>
+			  <li><i>modificationtypes</i><br>
+				  Zeigt die RegExp der Modifikationstypen. </li>
+			  <li><i>standardfilter</i><br>
+				  L&auml;dt den Standardfilter und schreibt ihn in das Attribut T2F_filter wenn er leer ist</li>
+			  <li><i>version</i><br>
+				  Die Modulversion</li>
+		</ul>
 
-    <br>
+	<br>
 
 	<a name="Talk2Fhemreadings"></a>
-    <b>Readings</b>
-    <ul>
+	<b>Readings</b>
+	<ul>
 		<li><i>set</i><br>
 			Enth&auml;lt den zuletzt &uuml;ber "set" gesendeten Text.
 		</li>
@@ -2055,50 +2078,50 @@ return($_[2]);
 		<li><i>notifies</i><br>
 			Enth&auml;lt eine Auflistung der Devices die f&uuml;r die aktuell wartenden bedingten Kommandos relevant sind. Auf diesen Devices liegt ein internes notify.
 		</li>
-    </ul>
+	</ul>
 
-    <br>
-    
-    <a name="Talk2Fhemattr"></a>
-    <b>Attribute</b>
-    <ul>
-        <code>attr &lt;name&gt; &lt;attribute&gt; &lt;value&gt;</code>
-        <br><br>
-        Siehe <a href="http://fhem.de/commandref.html#attr">commandref#attr</a> f&uuml;r weitere Informationen zu den Attributen.
-        <br><br>
-        Attribute:
-        <ul>
-            <li><i>T2F_keywordlist</i> &lt;name&gt; = &lt;list&gt;<br>
-                Eine Komma seperierte Liste von Schl&uuml;sselw&ouml;rtern wie z.B.: R&auml;umen, Namen, Farben usw...<br>
+	<br>
+	
+	<a name="Talk2Fhemattr"></a>
+	<b>Attribute</b>
+	<ul>
+		<code>attr &lt;name&gt; &lt;attribute&gt; &lt;value&gt;</code>
+		<br><br>
+		Siehe <a href="http://fhem.de/commandref.html#attr">commandref#attr</a> f&uuml;r weitere Informationen zu den Attributen.
+		<br><br>
+		Attribute:
+		<ul>
+			<li><i>T2F_keywordlist</i> &lt;name&gt; = &lt;list&gt;<br>
+				Eine Komma seperierte Liste von Schl&uuml;sselw&ouml;rtern wie z.B.: R&auml;umen, Namen, Farben usw...<br>
 				Mit anderen Worten, mit nat&uuml;rlichem Namen benannte Sachen.
-            </li>
-            <li><i>T2F_modwordlist</i> &lt;name&gt; = &lt;list&gt;<br>
-                Eine Komma seperierte Liste von Ersetzungsw&ouml;rten die f&uuml;r die Schl&uuml;sselw&ouml;rter eingesetzt werden. 
+			</li>
+			<li><i>T2F_modwordlist</i> &lt;name&gt; = &lt;list&gt;<br>
+				Eine Komma seperierte Liste von Ersetzungsw&ouml;rten die f&uuml;r die Schl&uuml;sselw&ouml;rter eingesetzt werden. 
 				z.B.: Ger&auml;tenamen in FHEM<br>
-            </li>
-            <li><i>T2F_if</i><br>
+			</li>
+			<li><i>T2F_if</i><br>
 				Eine Auflistung von ereignisgesteuerten Konfigurationen. Die Syntax ist die der Definition. Kommandoteil ist eine IF Bedingung.<br>
 				z.B.: wenn .*?t&uuml;r = [door] eq "open"
 			</li>
-            <li><i>T2F_filter</i><br>
+			<li><i>T2F_filter</i><br>
 				Kommaseparierte Liste von RegExp die generell entfernt werden.<br>
 				Standard: \bbitte\b,\bauch\b,\bkann\b,\bsoll\b 
 			</li>
-            <li><i>T2F_origin</i><br>
+			<li><i>T2F_origin</i><br>
 				Eine RegExp die generell entfernt wird und deren Ausgabe &uuml;ber $0 angesprochen werden kann.<br>
 				Kann f&uuml;r eine Benutzerzuordnung verwendet werden.
 			</li>
-            <li><i>T2F_language</i>DE|EN<br>
+			<li><i>T2F_language</i>DE|EN<br>
 				Die verwendete Sprache kann &uuml;ber das globale Attribut "language" gesetzt werden. Oder &uuml;ber dieses Attribut &uuml;berschrieben werden. 
 			</li>
 			<li><i>T2F_disableumlautescaping</i> &lt;0|1&gt;<br>
 				Deaktiviert das Konvertieren der Umlaute in "\S\S?"</li>
-            <li><i>disable</i> &lt;0|1&gt;<br>
-                Kann zu Testzwecken verwendet werden. Steht das Attribut auf 1, wird das FHEM-Kommando nicht ausgef&uuml;hrt
+			<li><i>disable</i> &lt;0|1&gt;<br>
+				Kann zu Testzwecken verwendet werden. Steht das Attribut auf 1, wird das FHEM-Kommando nicht ausgef&uuml;hrt
 				aber in das Reading cmds geschrieben.
-            </li>
-        </ul>
-    </ul>
+			</li>
+		</ul>
+	</ul>
 </ul>
 
 
