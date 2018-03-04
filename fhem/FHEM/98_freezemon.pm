@@ -22,6 +22,8 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.16:	Minor Logging changes
+#				AUto-delete Logfiles via fm_logKeep
 #		0.0.15:	New InternalTimer Handling (#81365) - Thanks to Ansgar (noansi)
 #				New logging function (fm_logFile, fm_logExtraSeconds) incl. get function - Thanks Andy (gandy)
 #				Fixed unescaped characters in commandref (helmut, #84992)
@@ -75,9 +77,10 @@ use warnings;
 use Data::Dumper;
 use POSIX;
 use Time::HiRes qw(gettimeofday);
+use Time::HiRes qw(tv_interval);
 use B qw(svref_2object);
 
-my $version  = "0.0.15";
+my $version  = "0.0.16";
 my @logqueue = ();
 
 ###################################
@@ -88,7 +91,7 @@ sub freezemon_Initialize($) {
     # Module specific attributes
     my @freezemon_attr =
       (
-"fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all fm_extDetail:0,1 fm_logExtraSeconds fm_logFile"
+"fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all fm_extDetail:0,1 fm_logExtraSeconds fm_logFile fm_logKeep"
       );
 
     $hash->{GetFn}             = "freezemon_Get";
@@ -175,6 +178,16 @@ sub freezemon_ProcessTimer($) {
 
     #Check Freezes
     if ( $freeze > AttrVal( $name, "fm_freezeThreshold", 1 ) ) {
+        my ( $seconds, $microseconds ) = gettimeofday();
+        my $t0  = [gettimeofday];
+        my @t   = localtime($seconds);
+        my $tim = sprintf(
+            "%04d.%02d.%02d %02d:%02d:%02d.%03d",
+            $t[5] + 1900,
+            $t[4] + 1,
+            $t[3], $t[2], $t[1], $t[0], $microseconds / 1000
+        );
+        Log3 $name, 5, "[Freezemon] $name: ----------- Starting Freeze handling at $tim ---------------------";
 
         my $dev  = $hash->{helper}{apptime};
         my $guys = "";
@@ -223,7 +236,7 @@ sub freezemon_ProcessTimer($) {
             if ( $imode eq "all" ) {
                 foreach my $d ( values %devs ) {
                     if ( !exists( $id{$d} ) ) {
-                        Log3 $name, 5, "[Freezemon] $name logging $dev in $imode mode, because $d is not ignored";
+                        Log3 $name, 5, "[Freezemon] $name logging: $dev in $imode mode, because $d is not ignored";
                         $exists = 1;
                         last;
                     }
@@ -265,7 +278,7 @@ sub freezemon_ProcessTimer($) {
 
             #  Create Log(
             my $msg = strftime(
-                "[Freezemon] $name possible freeze starting at %H:%M:%S, delay is $freeze possibly caused by $dev",
+                "[Freezemon] $name: possible freeze starting at %H:%M:%S, delay is $freeze possibly caused by $dev",
                 localtime( $hash->{helper}{TIMER} ) );
 
             my $log = freezemon_dump_log( $hash, $hash->{helper}{TIMER}, $msg );
@@ -300,6 +313,17 @@ sub freezemon_ProcessTimer($) {
         else {
             Log3 $name, 5, "[Freezemon] $name - $dev was ignored";
         }
+        ( $seconds, $microseconds ) = gettimeofday();
+        @t   = localtime($seconds);
+        $tim = sprintf(
+            "%04d.%02d.%02d %02d:%02d:%02d.%03d",
+            $t[5] + 1900,
+            $t[4] + 1,
+            $t[3], $t[2], $t[1], $t[0], $microseconds / 1000
+        );
+        my $ms = tv_interval($t0);
+        Log3 $name, 5, "[Freezemon] $name: ----------- Ending Freeze handling at $tim after $ms --------";
+
     }
     freezemon_purge_log_before( $hash, $hash->{helper}{TIMER} - AttrVal( $name, "fm_logExtraSeconds", 0 ) )
       if ( AttrVal( $name, "fm_logFile", "" ) ne "" );
@@ -333,6 +357,18 @@ sub freezemon_ProcessTimer($) {
         {
             fhem( "apptime", 1 );
         }
+
+        # let's get rid of old logs
+        if ( my $keep = AttrVal( $name, "fm_logKeep", undef ) ) {
+            my @fl   = freezemon_getLogFiles( $name, 1 );
+            my $path = freezemon_getLogPath($name);
+            my $max  = scalar(@fl) - $keep;
+            for ( my $i = 0 ; $i < $max ; $i++ ) {
+                Log3 $name, 3, "[Freezemon] $name: Deleting $fl[$i]";
+                unlink("$path/$fl[$i]");
+            }
+        }
+
     }
 
     # start next timer
@@ -344,11 +380,8 @@ sub freezemon_ProcessTimer($) {
 ###################################
 sub freezemon_Set($@) {
     my ( $hash, $name, $cmd, @args ) = @_;
-
-    #my $usage         = 'Unknown argument $args[1], choose one of freeze:noArg log:abc,cde';
-
-    #return $usage if ( !defined( $args[1] ) );
-
+	my $usage = "Unknown argument $cmd, choose one of active:noArg inactive:noArg clear:noArg";
+	
     return "\"set $name\" needs at least one argument" unless ( defined($cmd) );
 
     if ( $cmd eq "inactive" ) {
@@ -380,7 +413,7 @@ sub freezemon_Set($@) {
         readingsEndUpdate( $hash, 1 );
     }
     else {
-        return "Unknown argument $cmd, choose one of active:noArg inactive:noArg clear:noArg";
+        return $usage;
     }
     return undef;
 }
@@ -393,29 +426,17 @@ sub freezemon_Get($@) {
     my $ret   = "";
     my $usage = 'Unknown argument $a[1], choose one of freeze:noArg log:';
 
-    return $usage if ( !defined( $a[1] ) );
+    return "\"get $name\" needs at least one argument" unless ( defined($a[1]) );
 
     #get the logfiles
-    my $lf = AttrVal( $name, "fm_logFile", "" );
-    $lf =~ m,^(.*)/([^/%]*).*$,;
-    my $path    = $1;
-    my $pattern = $2;
-    $path =~ s/%L/$attr{global}{logdir}/g if ( $path =~ m/%/ && $attr{global}{logdir} );
-    my @fl;
+    my @fl = freezemon_getLogFiles($name);
 
-    my $sfl;
-    if ( opendir( DH, $path ) ) {
-        while ( my $f = readdir(DH) ) {
-            push( @fl, $f ) if ( $f =~ /$pattern.*/ );
-        }
-        closedir(DH);
-        @fl = sort { ( CORE::stat("$path/$b") )[9] <=> ( CORE::stat("$path/$a") )[9] } @fl;
-    }
     my $sfl = join( ",", @fl );
     $usage .= $sfl;
 
     # Get freeze entries
     if ( $a[1] eq "freeze" ) {
+
         my @colors = ( "red", "yellow", "green", "white", "gray" );
         my @freezes = split( ",", ReadingsVal( $name, ".fm_freezes", "" ) );
         foreach (@freezes) {
@@ -436,7 +457,7 @@ sub freezemon_Get($@) {
             $ret .= "<font color='$colors[$loglevel-1]'><b>" . $loglevel . "</b></font> - " . $_ . "<br>";
 
         }
-        Log3 $name, 5, "Get entries: $ret";
+
         return "<html>" . $ret . "</html>";
     }
     elsif ( $a[1] eq "log" ) {
@@ -447,6 +468,7 @@ sub freezemon_Get($@) {
         if ( $gf =~ m,^(.*)/([^/]*)$, ) {
             $gf = $2;
         }
+        my $path = freezemon_getLogPath($name);
 
         # Build the complete path (using global logfile parameter if necessary)
         $path = "$path/$gf";
@@ -489,15 +511,18 @@ sub freezemon_Attr($) {
                 return "Attribute " . $aName . " is either 0 or 1";
             }
         }
-        if ( $aName eq "fm_freezeThreshold" ) {
+        elsif ( $aName eq "fm_freezeThreshold" ) {
             if ( !looks_like_number($aVal) ) {
                 return "Attribute " . $aName . " has to be a number (seconds) ";
             }
         }
-        if ( $aName eq "fm_freezeThreshold" ) {
+        elsif ( $aName eq "fm_logKeep" ) {
+            if ( !looks_like_number($aVal) or $aVal <= 0) {
+                return "Attribute " . $aName . " has to be a number > 0";
+            }
 
         }
-        if ( $aName eq "fm_logFile" ) {
+        elsif ( $aName eq "fm_logFile" ) {
             if ( $aVal ne "" ) {
                 $aVal =~ m,^(.*)/([^/]*)$,;
                 my $path = $1;
@@ -514,8 +539,7 @@ sub freezemon_Attr($) {
                 return "Attribute " . $aName . ": Enter a valid path or delete the attribute to disable.";
             }
         }
-
-        if ( $aName eq "disable" ) {
+        elsif ( $aName eq "disable" ) {
             if ( $aVal == 1 ) {
                 RemoveInternalTimer($hash);
                 readingsSingleUpdate( $hash, "state", "inactive", 1 );
@@ -531,9 +555,9 @@ sub freezemon_Attr($) {
         if ( $aName eq "disable" ) {
             freezemon_start($hash);
         }
-        if ( $aName eq "fm_logFile" ) {
+        elsif ( $aName eq "fm_logFile" ) {
             my $status = Log3( "", 100, "" );
-            Log3( "", 0, "[FREEZEMON] $name: Unwrapping Log3" );
+            Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
             *main::Log3 = $hash->{helper}{Log3};
         }
 
@@ -634,6 +658,9 @@ sub freezemon_apptime($) {
                     elsif ( $fn eq "HttpUtils_Err" ) {
                         $shortarg = $shortarg->{hash}{hash}{NAME};
                     }
+					elsif ( $fn="FileLog_dailySwitch") {
+						$shortarg = $shortarg->{NotifyFn};
+					}
                     else {
                         Log3 $name, 5, "[Freezemon] $name found something without a name $fn" . Dumper($shortarg);
                         $shortarg = "N/A";
@@ -736,13 +763,13 @@ sub freezemon_install_log_wrapper($) {
     $name = "FreezeMon" unless defined($name);
     my $status = Log3( "", 99, "" );
     if ( !defined($status) || $status ne "already wrapped" ) {
-        Log3( "", 0, "[FREEZEMON] $name: Wrapping Log3" );
+        Log3( "", 0, "[Freezemon] $name: Wrapping Log3" );
         $hash->{helper}{Log3} = \&Log3;
         *main::Log3 = freezemon_wrap_Log3( \&Log3 );
     }
     else {
-        Log3( "", 0, "[FREEZEMON] $name: Log3 is already wrapped" );
-        Log3( "", 0, "[FREEZEMON] $name: status=$status" );
+        Log3( "", 0, "[Freezemon] $name: Log3 is already wrapped" );
+        Log3( "", 0, "[Freezemon] $name: status=$status" );
     }
 }
 ###################################
@@ -752,14 +779,14 @@ sub freezemon_purge_log_before($$) {
     my @t    = localtime($before);
     my $tim  = sprintf( "%04d.%02d.%02d %02d:%02d:%02d.%03d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0], 0 );
 
-    #Log3 $hash, 5, "[FREEZEMON] $name: purging log entries before $tim.";
+    #Log3 $hash, 5, "[Freezemon] $name: purging log entries before $tim.";
     my $cnt = 0;
     while ( scalar @logqueue > 0 && $logqueue[0]->[0] < $before ) {
         shift @logqueue;
         $cnt += 1;
     }
 
-    #Log3 $hash, 5, "[FREEZEMON] $name: $cnt entries purged from logqueue, size is now ".(scalar @logqueue);
+    #Log3 $hash, 5, "[Freezemon] $name: $cnt entries purged from logqueue, size is now ".(scalar @logqueue);
 }
 ###################################
 sub freezemon_dump_log($$$) {
@@ -772,7 +799,7 @@ sub freezemon_dump_log($$$) {
     my $currlogfile = ResolveDateWildcards( AttrVal( $name, "fm_logFile", undef ), @t );
 
     return unless defined($currlogfile) && $currlogfile ne "";
-    Log3 $hash, 3, "[FREEZEMON] $name: dumping " . ( scalar @logqueue ) . " log entries to $currlogfile";
+    Log3 $hash, 3, "[Freezemon] $name: dumping " . ( scalar @logqueue ) . " log entries to $currlogfile";
 
     open( fm_LOG, ">>$currlogfile" ) || return ("Can't open $currlogfile: $!");
 
@@ -798,8 +825,10 @@ sub freezemon_dump_log($$$) {
         print fm_LOG "$tim $loglevel: $text\n";
         $last_ts = $ts;
     }
+
     print fm_LOG $msg . "\n";
     close(fm_LOG);
+
     return $currlogfile;
 }
 ###################################
@@ -807,6 +836,41 @@ sub freezemon_logLink($$) {
     my ( $name, $link ) = @_;
     my $ret = "<a href='$FW_ME?cmd=" . urlEncode("get $name log $link") . "&%%CSRF%%'> [Log]</a>";
     return $ret;
+}
+###################################
+sub freezemon_getLogFiles($;$) {
+    my ( $name, $reverse ) = @_;
+    my @fl;
+
+    my $path = freezemon_getLogPath($name);
+    return @fl if ( !$path );
+    my $lf = AttrVal( $name, "fm_logFile", "" );
+    $lf =~ m,^(.*)/([^/%]*).*$,;
+    my $pattern = $2;
+
+    if ( opendir( DH, $path ) ) {
+        while ( my $f = readdir(DH) ) {
+            push( @fl, $f ) if ( $f =~ /$pattern.*/ );
+        }
+        closedir(DH);
+        if ( !$reverse ) {
+            @fl = sort { ( CORE::stat("$path/$b") )[9] <=> ( CORE::stat("$path/$a") )[9] } @fl;
+        }
+        else {
+            @fl = sort { ( CORE::stat("$path/$a") )[9] <=> ( CORE::stat("$path/$b") )[9] } @fl;
+        }
+    }
+    return @fl;
+}
+###################################
+sub freezemon_getLogPath($) {
+    my ($name) = @_;
+    my $lf = AttrVal( $name, "fm_logFile", "" );
+    return undef if $lf eq "";
+    $lf =~ m,^(.*)/([^/%]*).*$,;
+    my $path = $1;
+    $path =~ s/%L/$attr{global}{logdir}/g if ( $path =~ m/%/ && $attr{global}{logdir} );
+    return $path;
 }
 
 1;
@@ -885,6 +949,7 @@ sub freezemon_logLink($$) {
 				<li>fm_log: dynamic loglevel, takes a string like 10:1 5:2 1:3 , which means: freezes > 10 seconds will be logged with loglevel 1 , >5 seconds with loglevel 2 etc...</li>
 				<li>fm_logFile: takes a valid file name (like e.g. ./log/freeze-%Y%m%d-%H%M%S.log). If set, logs messages of loglevel 5 (even if global loglevel is < 5) before a freeze in separate file.</li>
 				<li>fm_logExtraSeconds: defines how much seconds before the freeze are logged (if fm_logFile is set)</li>
+				<li>fm_logKeep: A number that defines how many logFiles should be kept. If set all logfiles except the latest n freezemon logfiles will be deleted regularly.</li>
 				<li>disable: activate/deactivate freeze detection</li>
 			</ul>
 		</ul>
@@ -969,7 +1034,7 @@ sub freezemon_logLink($$) {
 			<li>fm_log: dynamischer Loglevel, nimmt einen String der Form 10:1 5:2 1:3 entgegen, was bedeutet: Freezes > 10 Sekunden werden mit Loglevel 1 geloggt, >5 Sekunden mit Loglevel 2 usw...</li>
 			<li>fm_logFile: ist ein gültiger Filename (wie z.B. ./log/freeze-%Y%m%d-%H%M%S.log). Wenn gesetzt, werdn Meldungen auf Loglevel 5 (auch wenn global Loglevel < 5 ist) vor einem Freeze in einem seperaten File geloggt.</li>
 			<li>fm_logExtraSeconds: definiert wieviele Sekunden vor dem Freeze geloggt werden (wenn fm logFile gesetzt ist)</li>
-			
+			<li>fm_logKeep: Eine Zahl, die angibt wieviele Logfiles behalten werden sollen. Wenn gesetzt, werden alle Logfiles ausser den letzten n Freezemon Logfiles regelmäßig gelöscht.</li>
 			<li>disable: aktivieren/deaktivieren der Freeze-Erkennung</li>
 		</ul>
   </ul>
