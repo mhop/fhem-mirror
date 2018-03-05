@@ -101,11 +101,13 @@
 #	04.03.2018	0.4.6
 #			Breacket decoding bug fixed
 #	04.02.2018	0.5.0
-#			Feature: Target Radiusing 
-#			
-#			
-#			
-#			
+#			Feature: Object radiusing 
+#	05.02.2018	0.5.1
+#			Semicolon adding concretized
+#			Problem with first letter umlaut in type modificator fixed
+#			Fixed problems Attributes not ready
+#			Matched/Unmatched corrected
+#			Else in arraymodifikation expanded
 ################################################################
 # TODO:
 # 
@@ -134,11 +136,12 @@ use Encode qw(decode encode);
 my %Talk2Fhem_globals;
 
 
-$Talk2Fhem_globals{version}="0.5.0";
+$Talk2Fhem_globals{version}="0.5.1";
 
 $Talk2Fhem_globals{EN}{erase} = ['\bplease\b', '\balso\b', '^msgtext:'];
 $Talk2Fhem_globals{EN}{numbers} = {
-'^one\S*' => 1
+'zero' => 0
+,'^one\S*' => 1
 ,'^(two|twice)' => 2
 ,'^(three|third)' => 3
 ,'^four\S*' => 4
@@ -216,7 +219,8 @@ $Talk2Fhem_globals{DE}{erase} = ['\bbitte\b', '\bauch\b','\bkann\b', '\bsoll\b']
 #	true	=> '^(ja|1|true|wahr|ein|eins.*|auf.*|öffnen|an.*|rauf.*|hoch.*|laut.*|hell.*)$',
 #	false	=> '^(nein|0|false|falsch|aus.*|null|zu.*|schlie\S\S?en|runter.*|ab.*|leise.*|dunk.*)$',
 $Talk2Fhem_globals{DE}{numbers} = {
-'(ein\S*|erste\S*)' => 1
+'null' => 0
+,'(ein\S*|erste\S*)' => 1
 ,'zwei\S*' => 2
 ,'(drei\S*|dritt\S*)' => 3
 ,'vier\S*' => 4
@@ -231,7 +235,7 @@ $Talk2Fhem_globals{DE}{numbers} = {
 };
 $Talk2Fhem_globals{DE}{numberre} = join("|", ('\d+', keys %{$Talk2Fhem_globals{DE}{numbers}}));
 $Talk2Fhem_globals{DE}{pass} = {
-	true	=> '\b(ja|1|true|wahr|ein|eins.*|auf.*|öffnen|an.*|rauf.*|hoch.*|laut.*|hell.*|start.*|(ab)?spiele\S?)\b',
+	true	=> '\b(ja|1|true|wahr|ein|eins.*|auf.*|\S*ffnen|an.*|rauf.*|hoch.*|laut.*|hell.*|start.*|(ab)?spiele\S?)\b',
 	false	=> '\b(nein|0|false|falsch|aus.*|null|zu.*|schlie\S\S?en|runter.*|ab.*|leise.*|dunk.*|stop.*|beende\S?)\b',
 	numeral	=> {re=>"($Talk2Fhem_globals{DE}{numberre})",fc=>sub{
 						return ($_[0]) if $_[0] =~ /\d+/;
@@ -356,18 +360,17 @@ sub Talk2Fhem_Define($$)
 	my $name = shift(@def);
 	my $dev = shift(@def);
 
-
-	($_ = Talk2Fhem_loadList($hash, "T2F_keywordlist")) && return;
-	($_ = Talk2Fhem_loadList($hash, "T2F_modwordlist")) && return;
-
-	$error = Talk2Fhem_Loadphrase($hash, "phrase", "@def");
-
-
-	T2FL($name, 1, $error) if $error;
-#	T2FL($name, 5, "T2F Phrasehash:\n".Dumper($Talk2Fhem_phrase{$name})) unless $error;
-	T2FL($name, 5, "T2F Phrasehash:\n".Dumper($hash->{helper}{phrase})) unless $error;
-	
 	$hash->{STATE} = "Initialized";
+	if ($init_done) {
+		($_ = Talk2Fhem_loadList($hash, "T2F_keywordlist")) && return;
+		($_ = Talk2Fhem_loadList($hash, "T2F_modwordlist")) && return;
+		$error = Talk2Fhem_Loadphrase($hash, "phrase", "@def");
+		T2FL($name, 1, $error) if $error;
+	#	T2FL($name, 5, "T2F Phrasehash:\n".Dumper($Talk2Fhem_phrase{$name})) unless $error;
+		T2FL($name, 5, "T2F Phrasehash:\n".Dumper($hash->{helper}{phrase})) unless $error;
+		$hash->{STATE} = "Ready";
+	}
+	
 	return $error;
 }
 
@@ -565,7 +568,7 @@ sub Talk2Fhem_Set($@)
 	(return "\"set $name\" needs at least one argument") unless(scalar(@args));
 	(return "Unknown argument ?, choose one of ! cleartriggers:noArg cleartimers:noArg") if($args[0] eq "?");
 	
-	if ($hash->{STATE} ne "Initialized") {
+	if ($hash->{STATE} ne "Ready") {
 		#Fülle nur cmds array
 	} elsif ($args[0] eq "cleartimers") {
 		AnalyzeCommand($hash->{CL}, "delete at_".$name."_.*");
@@ -589,7 +592,7 @@ sub Talk2Fhem_Set($@)
 		
 		readingsSingleUpdate($hash, "set", "$txt", 1);	
 
-		$hash->{STATE} = "Initialized";
+		$hash->{STATE} = "Ready";
 		
 		$hash->{STATE} = "Working";
 		
@@ -601,7 +604,7 @@ sub Talk2Fhem_Set($@)
 				#Ausführen
 			if ($res{cmds}) {
 				for my $h (@{$res{cmds}}) {
-					my $fhemcmd = ($$h{at}?Talk2Fhem_mkattime($name, $$h{at})." ":"").($$h{cmd} =~ s/;/;;/gr );
+					my $fhemcmd = ($$h{at}?Talk2Fhem_mkattime($name, $$h{at})." ":"").($$h{at}?($$h{cmd} =~ s/;/;;/gr):$$h{cmd});
 					
 					unless ($$h{ifs}) { # kein IF
 										
@@ -657,7 +660,7 @@ sub Talk2Fhem_Set($@)
 		
 
 	}
-	$hash->{STATE} = "Initialized";
+	$hash->{STATE} = "Ready";
 	return;
 }
 
@@ -902,7 +905,6 @@ my $type = shift;
 my $list = (shift || AttrVal($hash->{NAME}, $type, ""));
 
 	$list = Talk2Fhem_parseParams($list);
-	#Log 1, Dumper $list;
 	return ("Error while parsing Keywordlist.\n$list" ) unless(ref($list) eq "HASH");
 	delete $hash->{helper}{T2F_andwordlist} if $type eq "T2F_keywordlist";
 	delete $hash->{helper}{$type};
@@ -911,6 +913,7 @@ my $list = (shift || AttrVal($hash->{NAME}, $type, ""));
 		$hash->{helper}{T2F_andwordlist}{$_} = Talk2Fhem_parseArray($$list{$_}) if /^\&/;
 		$hash->{helper}{$type}{s/^\&//r} = Talk2Fhem_parseArray($$list{$_});
 	}
+	
 	
 #		my $modlist = Talk2Fhem_parseParams(AttrVal($name, "T2F_modwordlist", ""));;
 #		return ("Error while parsing Modwordlist.\n$modlist" ) unless(ref($modlist) eq "HASH");
@@ -1006,11 +1009,12 @@ my @regtargets;
 for (keys %{$me->{helper}{T2F_andwordlist}}) { push(@regtargets, \@{$me->{helper}{T2F_andwordlist}{$_}}) };
 my $reg = '\b'.${art}.'('.join("|",map { @$_ } @regtargets).')\b';
 
-
+Log 1, $reg;
 my @andlockinfo; #my @sets;
 
 for (@regtargets) {
 	my $regtarget = join("|", @$_);
+Log 1, $regtarget;
 
 	#	d Satzteil  x Teilposition  y cmds Position
 	my $d=0; my $x=0; my $y=0; my $prepost; my $prepre;
@@ -1313,7 +1317,7 @@ T2FL($myname, 5, "$myname Evaluate search:\n$cmd =~ /$$phr{key}/i") if ref $res;
 for my $fphr (@fphrs) {
 #	if (my @d = ($cmd =~ qr/$fphr/i))
 	if ($fphr =~ s/^\?//){
-		my @d = (eval { $cmd =~ /$fphr/i});
+		my @d = ($cmd =~ /$fphr/i);
 		my $m = $&;
 		#Log 1, "A: ".$fphr;
 		#Log 1, "A: ".Dumper $m;
@@ -1335,7 +1339,7 @@ for my $fphr (@fphrs) {
 		#$cmd =~ s/$m//gi;
 	} elsif ($fphr =~ /^\!/) {
 		return if (eval { $cmd =~ /$'/i });
-	} elsif (my @d = (eval { $cmd =~ /$fphr/i } )){
+	} elsif (my @d = ($cmd =~ /$fphr/i ) ){
 		my $m = $&;
 		$pmatch .= $m;
 		$punmatch =~ s/$m//gi;
@@ -1496,7 +1500,7 @@ my %react;
 				}
 				my $d = ($$spec{dir} and ($clipno) == $mainbracket) ? $$spec{dir} : $dir[$clipno];
 				
-				T2FL($myname, 4, "Keyword (".($clipno)."): '".Dumper($d)."'"); 
+				T2FL($myname, 4, "Keyword (".($clipno)."): '$d'"); 
 				
 				# Wort übersetzen
 				if (ref($hash) eq "HASH") {
@@ -1590,20 +1594,29 @@ my %react;
 
 					T2FL($myname, 5, "ARRAY evaluation: else: $else empty: $empty\narray: @$hash");
 #					if (($d =~ qr/${$Talk2Fhem{pass}}{empty}/) and defined($d)) {
+					my $intd = $d;
+					foreach ( keys %{$Talk2Fhem_globals{Talk2Fhem_language($myname)}{numbers}} ) {
+						my $tmp = Talk2Fhem_escapeumlauts($_, $disu);
+						if ($d =~ /$tmp/i) {
+							$intd = $Talk2Fhem_globals{Talk2Fhem_language($myname)}{numbers}{$_};
+							last;
+						};
+					}
+					T2FL($myname, 5, "Numeral word found. '$d' converted to; $intd");
 					if (($d =~ qr/${$Talk2Fhem{pass}}{empty}/) or ! defined($d)) {
 						T2FL($myname, 5, "Empty word replace with! $empty");
 						$do =~ s/###/$empty/;				
-					} elsif (IsInt($d)) {
-						unless ($$hash[$d]) {
-							my $err = T2FL($myname, 3, "Field #$d doesn't exist in Array!");
+					} elsif (IsInt($intd)) {
+						unless ($$hash[$intd]) {
+							my $err = T2FL($myname, 3, "Field #$intd doesn't exist in Array!");
 							if ($else eq "") {
 								Talk2Fhem_err($myname, $err, $res,1);
 								return(0);
 							}
 						
 						} else {
-							T2FL($myname, 5, "Integer ($d) used for array selection! $$hash[$d]");
-							$do =~ s/###/$$hash[$d]/ if $$hash[$d];
+							T2FL($myname, 5, "Integer ($intd) used for array selection! $$hash[$intd]");
+							$do =~ s/###/$$hash[$intd]/ if $$hash[$intd];
 						}
 					} elsif ($d) {
 						my @keywords;
@@ -1640,14 +1653,35 @@ my %react;
 							(my $clip = $cs[($clipno)]) =~ s/^\(|\)$//g;
 #T2FL($myname, 5, "clip: ".Dumper $clip);
 #							push(@keywords, split('\|', $clip) extract_bracketed($clip, '()'));
-							@keywords = map { /^\(/ ? $_ : split('\|', $_=~s/^\||\|$//gr) } extract_multiple($clip, [sub { extract_bracketed($_[0], '()') }]);
+							my @extract;
+							for (extract_multiple($clip, [sub { extract_bracketed($_[0], '()') }])) {
+#T2FL($myname, 5, "EM: ".Dumper $_);
+								if ($_ =~ /^\(/) {
+									push (@extract, "") if ($#extract eq -1);
+									$extract[$#extract] .= $_;
+									next;}
+								if (s/^\|// or /^[^(]/) {
+									if ($_ ne "") {
+										push(@extract, split('\|', $_));
+									} else {
+										push(@extract, "");
+									}
+								} else {
+									push (@extract, "") if ($#extract eq -1);
+									$extract[$#extract] .= $_;
+								}
+							}
+#T2FL($myname, 5, "A: ".Dumper @extract);
+							#@keywords = map { /^\(/ ? $_ : split('\|', $_=~s/^\||\|$//gr) } extract_multiple($clip, [sub { extract_bracketed($_[0], '()') }]);
+							@keywords = @extract;
 #T2FL($myname, 5, "keywords: ".Dumper @keywords);
 #							@keywords = split('\|',);
 							
 							#Log 1, Dumper @keywords;
 							#wenn keine Liste in Klammer ist
-							if ($#keywords == -1) {
-								Talk2Fhem_err($myname, T2FL($myname, 1, "Clipnumber $clipno includes no array or integer in '$$phr{key}!"),$res,1);
+							my $err = T2FL($myname, 1, "Clipnumber $clipno includes no array or integer in '$$phr{key}!");
+							if ($#keywords == -1 and $else eq "") {
+								Talk2Fhem_err($myname, $err,$res,1);
 								return(0);								
 							}
 						} else {
@@ -1655,7 +1689,7 @@ my %react;
 						}
 #						T2FL($myname, 4, "Searching position of $d in @keywords");
 						@keywords = map { Talk2Fhem_escapeumlauts($_, $disu) } @keywords;
-						T2FL($myname, 4, "Searching position of $d in @keywords");
+						T2FL($myname, 4, "Searching position of '$d' in '@keywords'");
 						my $i=0;
 						foreach (@keywords) {
 #							if ($d =~ /^\Q$_\E$/i) {
@@ -1667,6 +1701,7 @@ my %react;
 										return(0);
 									}
 								} else {
+									T2FL($myname, 5, "Found '$d' at position $i");
 									$do =~ s/###/$$hash[$i]/;
 								}
 							}
