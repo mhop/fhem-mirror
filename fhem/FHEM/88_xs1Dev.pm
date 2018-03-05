@@ -168,7 +168,7 @@ sub xs1Dev_Set ($$@)
 	
 		Debug " -------------- ERROR CHECK - START --------------" if($debug);
 		
-		$cmdList = $cmdListNew if($xs1_typ eq "switch" || $xs1_typ eq "dimmer");
+		$cmdList = $cmdListNew if($xs1_typ eq "switch" || $xs1_typ eq "dimmer" || $xs1_typ eq "shutter");
 		#$cmdList .= "dim:slider,0,6.25,100 dimup dimdown" if ($xs1_typ eq "dimmer");
 		my $cmdFound = index($cmdListNew, $cmd);	## check cmd in cmdListNew
 	
@@ -183,7 +183,8 @@ sub xs1Dev_Set ($$@)
 				}
 				SetExtensionsCancel($hash);
 			} else {
-				if($xs1_typ eq "switch") {	############## Funktion switch ##############
+				############## Funktion switch ##############
+				if($xs1_typ eq "switch") {
 					Debug " $name: Set | xs1_function 1=$xs1_function[0] 2=$xs1_function[1] 3=$xs1_function[2] 4=$xs1_function[3]" if($debug);
 					if ($cmdFound >= 0) {	## cmdFound in welchem Funktionsplatz xs1
 						for my $i (0 .. 3) {
@@ -194,7 +195,9 @@ sub xs1Dev_Set ($$@)
 						}
 					}
 					return "Wrong set argument, choose one of $cmdList" if($cmdFound < 0);
-				} elsif ($xs1_typ eq "dimmer") { 	############## Funktion dimmer ##############
+				} 
+				############## Funktion dimmer ##############
+				elsif ($xs1_typ eq "dimmer") {
 
 					Debug " $name: Set | xs1_typ=$xs1_typ cmd=$cmd" if ( not defined ($args[0]) );
 					Debug " $name: Set | xs1_typ=$xs1_typ cmd=$cmd args0=".$args[0] if ( defined ($args[0]) && $cmd ne "?");
@@ -230,26 +233,36 @@ sub xs1Dev_Set ($$@)
 							$cmd = $cmd." $newState";
 						}
 					
-					#} elsif ($cmd eq "dim_down") { # Umsetzung "anderer Befehl"
-					
-					#} elsif ($cmd eq "dim_up") {  # Umsetzung "anderer Befehl"
-					
 					}
 					
-				} elsif ($xs1_typ ne "dimmer" && $xs1_typ ne "switch" && $xs1_typ ne "undefined") {		## alles außer Dimmer || Switch
-					Log3 $name, 2, "$name: Set | xs1_typ=$xs1_typ are not supported (loop not dimmer & switch)";
-					return "xs1_typ=$xs1_typ are not supported (loop not dimmer & switch)";
+				} 
+				############## Funktion shutter ##############
+				elsif ($xs1_typ eq "shutter") {
+					Debug " $name: Set | xs1_function 1=$xs1_function[0] 2=$xs1_function[1] 3=$xs1_function[2] 4=$xs1_function[3]" if($debug);
+					if ($cmdFound >= 0) {	## cmdFound in welchem Funktionsplatz xs1
+						for my $i (0 .. 3) {
+							if ($xs1_function[$i] eq $cmd) {
+								$cmd2 = "function=".($i+1);
+								Debug " $name: Set | cmd=$cmd cmd2=$cmd2 on xs1_function place".($i+1) if($debug);
+							}
+						}
+					}
+					return "Wrong set argument, choose one of $cmdList" if($cmdFound < 0);
+				} 
+				############## alles Andere ##############
+				elsif ($xs1_typ ne "dimmer" && $xs1_typ ne "switch" && $xs1_typ ne "undefined") {
+					Log3 $name, 2, "$name: Set | xs1_typ=$xs1_typ are not supported. Please inform me!";
+					return "xs1_typ=$xs1_typ are not supported. Please inform me!";
 				}
 			}
 		}
 	
 		if(defined($hash->{IODev}->{NAME})) {
-			Debug " $name: Set | xs1_ID=$xs1_ID xs1_typ=$xs1_typ cmd=$cmd cmd2=$cmd2" if($debug && $xs1_typ ne "temperature" && $xs1_typ ne "hygrometer");
-			if ($xs1_typ eq "switch" || $xs1_typ eq "dimmer") {
+			if ($xs1_typ eq "switch" || $xs1_typ eq "dimmer" || $xs1_typ eq "shutter") {
+				Debug " $name: Set IOWrite | xs1_ID=$xs1_ID xs1_typ=$xs1_typ cmd=$cmd cmd2=$cmd2" if($debug && $xs1_typ ne "temperature" && $xs1_typ ne "hygrometer");
 				IOWrite($hash, $xs1_ID, $xs1_typ, $cmd, $cmd2);
-				
 				readingsSingleUpdate($hash, "state", $cmd , 1);			
-			}
+			} else { Log3 $name, 2, "$name: Device $xs1_typ are not supported for Dispatch"; }
 		} else {
 			return "no IODev define. Please define xs1Bridge.";
 		}
@@ -261,7 +274,7 @@ sub xs1Dev_Set ($$@)
 	return undef;
 }
 
-sub xs1Dev_Parse($$)				## Input Bridge
+sub xs1Dev_Parse($$)				## Input Data from 88_xs1Bridge
 {
 	my ( $io_hash, $data) = @_;		## $io_hash = ezControl -> def. Name von xs1Bridge
 
@@ -298,7 +311,7 @@ sub xs1Dev_Parse($$)				## Input Bridge
 			$hash->{xs1_function4} = $xs1_f4;
 		}
 		
-		if ($xs1_typ2 eq "switch") {				# switch on | off mod for FHEM Default
+		if ($xs1_typ2 eq "switch") {				## switch on | off mod for FHEM Default
 			if ($xs1_value == 0) { $xs1_value = "off"; }
 				elsif ($xs1_value == 100) { $xs1_value = "on"; }
 			readingsSingleUpdate($hash, "state", $xs1_value ,1);	# Aktor | Sensor Update value
@@ -309,21 +322,21 @@ sub xs1Dev_Parse($$)				## Input Bridge
 				$attr{$name}{devStateIcon} = "dim_up:dimup dim_down:dimdown" if( not defined( $attr{$name}{devStateIcon} ) );
 			}
 			
-		} elsif ($xs1_typ2 eq "temperature") {		# temperature typ
-			my $xs1_value_new = "T: ".$xs1_value;	# temperature mod for FHEM Default
+		} elsif ($xs1_typ2 eq "temperature") {		## temperature typ
+			my $xs1_value_new = "T: ".$xs1_value;	## temperature mod for FHEM Default
 
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash, "state", $xs1_value_new);
 			readingsBulkUpdate($hash, "temperature", $xs1_value);
 			readingsEndUpdate($hash, 1);
-		} elsif ($xs1_typ2 eq "hygrometer") {		# hygrometer typ
-			my $xs1_value_new = "H: ".$xs1_value;	# hygrometer mod for FHEM Default
+		} elsif ($xs1_typ2 eq "hygrometer") {		## hygrometer typ
+			my $xs1_value_new = "H: ".$xs1_value;	## hygrometer mod for FHEM Default
 
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash, "state", $xs1_value_new);
 			readingsBulkUpdate($hash, "humidity", $xs1_value);
 			readingsEndUpdate($hash, 1);
-		} elsif ($xs1_typ2 eq "dimmer") {			# dimmer
+		} elsif ($xs1_typ2 eq "dimmer") {			## dimmer
 			
 			## RegEx devStateIcon da Symbole nicht durchweg von 0 - 100 | dim_up | dim_down
 			$attr{$name}{devStateIcon} = 	"dim0[1-6]\\D%:dim06% dim[7-9]\\D|dim[1][0-2]%:dim12% dim[1][3-8]%:dim18% \n"
@@ -340,7 +353,12 @@ sub xs1Dev_Parse($$)				## Input Bridge
 			}
 			
 			readingsSingleUpdate($hash, "state", $xs1_value ,1);
+		}  elsif ($xs1_typ2 eq "shutter") {			## shutter on | off mod for FHEM Default
+			if ($xs1_value == 0) { $xs1_value = "off"; }
+				elsif ($xs1_value == 100) { $xs1_value = "on"; }
+			readingsSingleUpdate($hash, "state", $xs1_value ,1);
 		}
+		
 	}
 	
 	return $name;

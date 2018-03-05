@@ -318,10 +318,13 @@ sub xs1Bridge_GetUpDate() {
 						last;
 					}
 				
+					my $i3 = 0;		## Counter für real Werte in xs1, da sonst Verschiebungen wenn User ID´s verschiebt, NOTWENDIG!
+					
 					foreach my $f ( @array ) {
+						$i3++;
 						if ($f->{"type"} ne "disabled") {
 							my $xs1Dev = "xs1Dev";
-						
+													
 							### Aktoren spezifisch
 							my $xs1_function1 = "-";
 							my $xs1_function2 = "-";
@@ -331,65 +334,71 @@ sub xs1Bridge_GetUpDate() {
 							if ($i == 0) {
 								### xs1 Aktoren nur update bei differenten Wert
 								if ($update_only_difference == 1) {
-									my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}), "unknown");	## Readings Wert
+									my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $i3), "unknown");	## Readings Wert
 									my $newState = sprintf("%.1f" , $f->{"value"});														## ARRAY Wert xs1 aktuell
 								
-									Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." oldState=$oldState newState=$newState" if($debug);
+									Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $i3)." oldState=$oldState newState=$newState" if($debug);
 									
 									if ($oldState ne $newState) {
-										readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , $newState, 1);
+										readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $i3) , $newState, 0);
 									}
 								}
 							
 								### xs1 Aktoren / Funktion != disable
-								my @array2 = @{ $decoded->{'actuator'}->[($f->{"id"})-1]->{$arrayname[4]} };
+								my @array2 = @{ $decoded->{'actuator'}->[$i3-1]->{$arrayname[4]} };
 								my $i2 = 0;									## Funktionscounter
 
 								foreach my $f2 ( @array2 ) {
-									$i2 = $i2+1;
+									$i2++;
 
 									### xs1 Option - Ansicht Funktionsname
 									if ($viewDeviceFunction == 1) {
-										my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$arrayname[4]."_".$i2, "unknown");		## Readings Wert
+										my $oldState = ReadingsVal($name, $readingsname[$i]."_".sprintf("%02d", $i3)."_".$arrayname[4]."_".$i2, "unknown");		## Readings Wert
 										my $newState = $f2->{'type'};		## ARRAY Wert xs1 aktuell
+
+										if ($oldState ne "unknown" && $newState eq "disabled") { 	## FunktionReading del bei disable
+											Debug " $typ: "."Aktor_".sprintf("%02d", $i3)."_function_".$i2." are disabled" if($debug);
+											delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i3)."_function_".$i2} if($hash->{READINGS});
+										}
 
 										if ($f2->{"type"} ne "disabled") {  ## Funktion != function -> type disable
 											if ($oldState ne $newState) {
-												readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_".$arrayname[4]."_".$i2 , $f2->{"type"} , 0);
-											}
-										}
-									} else {
-										if ($f2->{"type"} ne "disabled") {  ## Funktion != function -> type disable
-
-											if ($i2 == 1) {
-											$xs1_function1 = $f2->{"type"};
-											}elsif ($i2 == 2) {
-											$xs1_function2 = $f2->{"type"};
-											}elsif ($i2 == 3) {
-											$xs1_function3 = $f2->{"type"};
-											}elsif ($i2 == 4) {
-											$xs1_function4 = $f2->{"type"};
+												readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $i3)."_".$arrayname[4]."_".$i2 , $f2->{"type"} , 1);
 											}
 										}
 									}
+									
+									if ($f2->{"type"} ne "disabled") {  ## Funktion != function -> type disable
+
+										if ($i2 == 1) {
+											$xs1_function1 = $f2->{"type"};
+										}elsif ($i2 == 2) {
+											$xs1_function2 = $f2->{"type"};
+										}elsif ($i2 == 3) {
+											$xs1_function3 = $f2->{"type"};
+										}elsif ($i2 == 4) {
+											$xs1_function4 = $f2->{"type"};
+										}
+									}
+									
 								}
 							}
 						
 							### Value der Aktoren | Sensoren
 							if ($i == 1 || $i == 0 && $update_only_difference == 0) {		# Aktoren | Sensoren im intervall - Format 0.0 bzw. 37.0 wie aus xs1
-								readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"}) , sprintf("%.1f" , $f->{"value"}), 1);
-								$xs1_data = $xs1Dev."#".$readingsname[$i]."#".sprintf("%02d", $f->{"id"})."#".$f->{"type"}."#".sprintf("%.1f" , $f->{"value"})."#"."$xs1_function1"."#"."$xs1_function2"."#"."$xs1_function3"."#"."$xs1_function4"."#".$f->{"name"};
+								readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $i3) , sprintf("%.1f" , $f->{"value"}), 0);
+								$xs1_data = $xs1Dev."#".$readingsname[$i]."#".sprintf("%02d", $i3)."#".$f->{"type"}."#".sprintf("%.1f" , $f->{"value"})."#"."$xs1_function1"."#"."$xs1_function2"."#"."$xs1_function3"."#"."$xs1_function4"."#".$f->{"name"};
 							} elsif ($i == 0 && $update_only_difference == 1){				# Aktoren | nur bei DIFF - Format 0.0 bzw. 37.0 wie aus xs1
-								$xs1_data = $xs1Dev."#".$readingsname[$i]."#".sprintf("%02d", $f->{"id"})."#".$f->{"type"}."#".sprintf("%.1f" , $f->{"value"})."#"."$xs1_function1"."#"."$xs1_function2"."#"."$xs1_function3"."#"."$xs1_function4"."#".$f->{"name"};
+								$xs1_data = $xs1Dev."#".$readingsname[$i]."#".sprintf("%02d", $i3)."#".$f->{"type"}."#".sprintf("%.1f" , $f->{"value"})."#"."$xs1_function1"."#"."$xs1_function2"."#"."$xs1_function3"."#"."$xs1_function4"."#".$f->{"name"};
 							}
 						
 							### Ausgaben je Typ unterschiedlich !!!
-							Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." | ".$f->{"type"}." | ".$f->{"name"}." | ". $f->{"value"}." | "."F1 $xs1_function1 | F2 $xs1_function2 | F3 $xs1_function3 | F4 $xs1_function4" if($debug == 1 && $i == 0);
-							Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $f->{"id"})." | ".$f->{"type"}." | ".$f->{"name"}." | ". $f->{"value"} if($debug == 1 && $i != 0);
+							Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $i3)." | ".$f->{"type"}." | ".$f->{"name"}." | ". $f->{"value"}." | "."F1 $xs1_function1 | F2 $xs1_function2 | F3 $xs1_function3 | F4 $xs1_function4" if($debug == 1 && $i == 0);
+							Debug " $typ: ".$readingsname[$i]."_".sprintf("%02d", $i3)." | ".$f->{"type"}." | ".$f->{"name"}." | ". $f->{"value"} if($debug == 1 && $i != 0);
 
 							### Namen der Aktoren | Sensoren
 							if ($viewDeviceName == 1) {
-								readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $f->{"id"})."_name" , $f->{"name"} , 0);
+								readingsSingleUpdate($hash, $readingsname[$i]."_".sprintf("%02d", $i3)."_name" , $f->{"name"} , 0);
 							}
 							
 							### Dispatch an xs1Device Modul						
@@ -397,6 +406,17 @@ sub xs1Bridge_GetUpDate() {
 								Debug " $typ: GetUpDate | Dispatch: $xs1_data" if($debug);
 								Dispatch($hash,$xs1_data,undef) if($xs1_data);
 							}
+						} else {
+						#### ID bzw. Speicherplatz xs1 ist disabled | Reading are delete ####
+							delete $hash->{READINGS}{$readingsname[$i]."_".sprintf("%02d", $i3)} if($hash->{READINGS});
+							delete $hash->{READINGS}{$readingsname[$i]."_".sprintf("%02d", $i3)."_name"} if($hash->{READINGS});
+							
+							if ($i == 0) {
+								for my $count (1..4) {
+									delete $hash->{READINGS}{$readingsname[$i]."_".sprintf("%02d", $i3)."_function_".$count} if($hash->{READINGS});
+								}
+							}
+						#### #### #### ####
 						}
 					}
 				} elsif ($i == 2) {     ### xs1 Info´s nur bei uptime Änderung
@@ -482,13 +502,17 @@ sub xs1Bridge_Write($)			## Zustellen von Daten via IOWrite() vom logischen zum 
 	$Aktor_ID = substr($Aktor_ID, 1,2);
 
 	my $xs1cmd;
-	if ($xs1_typ eq "switch") {		## Anpassung Sendebefehl xs1
+	if ($xs1_typ eq "switch" || $xs1_typ eq "shutter") {		## Anpassung Sendebefehl xs1
 		$xs1cmd = "http://$xs1_ip/control?callback=cname&cmd=set_state_actuator&number=$Aktor_ID&$cmd2";
 	} elsif ($xs1_typ eq "dimmer") {
 		if ($cmd eq "off") {
 			$cmd = 0;
 		}
 		$xs1cmd = "http://$xs1_ip/control?callback=cname&cmd=set_state_actuator&number=$Aktor_ID&value=$cmd";
+	} else {
+	### keine Verarbeitung zum senden ####
+	Log3 $name, 3, "$typ: Write | $xs1_typ not control xs1";
+	last;
 	}
 
 	### HTTP Requests #### Start ####
@@ -627,7 +651,7 @@ sub xs1Bridge_Undef($$)
 		(This can happen more often with DLAN.)<br><br></li>
 		<li>If the device has not been connected after 5 connection attempts, the module will switch on < disable > !</li><br>
 		<li>Create logfile automatically after define | scheme: <code>define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log &lt;name&gt;</code><br>
-			The following values ​​are recorded in logfile: Aktor_(01-64) or Sensor_(01-64) values | Timer | xs1-status information</li>
+			The following values ​​are recorded in logfile: Timer | xs1-status information</li>
 	</ul>
 </ul>
 =end html
@@ -715,7 +739,7 @@ sub xs1Bridge_Undef($$)
 		(Das kann h&auml;ufiger bei DLAN vorkommen.)<br><br></li>
 		<li>Sollte das Ger&auml;t nach 5 Verbindungsversuchen ebenfalls keine Verbindung erhalten haben, so schaltet das Modul auf < disable > !</li><br>
 		<li>Logfile Erstellung erfolgt automatisch nach dem definieren. | Schema: <code>define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log &lt;Name&gt;</code><br>
-			Folgende Werte werden im Logfile erfasst: Aktor_(01-64) bzw. Sensor_(01-64) Werte | Timer | xs1-Statusinformationen</li>
+			Folgende Werte werden im Logfile erfasst: Timer | xs1-Statusinformationen</li>
 	</ul>
 </ul>
 =end html_DE
