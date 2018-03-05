@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: V3.8.7, no change limits got fron SVG
   - bugfix:  88_xs1Dev: new type shutter integrated (Forum #85137)
   - bugfix:  88_xs1Bridge: actuator functions incorrect (Forum #85137)
   - bugfix:  93_DbRep: fix perl warning

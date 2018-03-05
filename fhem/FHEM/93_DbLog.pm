@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.8.7      28.02.2018       changed DbLog_sampleDataFn - no change limits got fron SVG, commandref revised
 # 3.8.6      25.02.2018       commandref revised (forum:#84953)
 # 3.8.5      16.02.2018       changed ParseEvent for Zwave
 # 3.8.4      07.02.2018       minor fixes of "$@", code review, eval for userCommand, DbLog_ExecSQL1 (forum:#83973)
@@ -188,7 +189,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.8.6";
+my $DbLogVersion = "3.8.7";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -1204,8 +1205,8 @@ sub DbLog_Log($$) {
       Log3 $name, 4, "DbLog $name -> number of events received: $max for device: $dev_name";
   }
   
-  # Devices ausschließen durch Attribut "excludeDevs" (nur wenn kein $hash->{NOTIFYDEV} oder $hash->{NOTIFYDEV} = .*)
-  if(!$hash->{NOTIFYDEV} || $hash->{NOTIFYDEV} eq ".*") {
+  # Devices ausschließen durch Attribut "excludeDevs" (nur wenn kein $hash->{NOTIFYDEV})
+  if(!$hash->{NOTIFYDEV}) {
       my $exc = AttrVal($name, "excludeDevs", "");
 	  $exc    =~ s/\s/,/g;
 	  my @exdvs = devspec2array($exc);
@@ -2978,7 +2979,7 @@ sub DbLog_configcheck($) {
   ### Configuration read check
   #######################################################################
   $check .= "<u><b>Result of configuration read check</u></b><br><br>";
-  my $st  = configDBUsed()?"configDB (don't forget upload configuration file if changed)":"file";
+  my $st  = configDBUsed()?"configDB (don't forget upload configuration file if changed. Use \"configdb filelist\" and look for your configuration file.)":"file";
   $check .= "Connection parameter store type: $st <br>";
   my ($err, @config) = FileRead($hash->{CONFIGURATION});
   if (!$err) {
@@ -3537,6 +3538,7 @@ sub DbLog_AddLog($$$) {
   my $devspec = join(':',@dc);
   
   my @exdvs = devspec2array($devspec);
+  Log3 $name, 4, "DbLog $name -> Addlog known devices by devspec: @exdvs";
   foreach (@exdvs) {
       $dev_name = $_;
       if(!$defs{$dev_name}) {
@@ -4682,7 +4684,7 @@ sub DbLog_sampleDataFn($$$$$) {
   
   my $dbhf = DbLog_ConnectNewDBH($defs{$dlName});
   return if(!$dbhf);
-  
+
   # check presence of table current
   # avoids fhem from crash if table 'current' is not present and attr DbLogType is set to /Current/
   my $prescurr = eval {$dbhf->selectrow_array("select count(*) from current");} || 0;
@@ -4695,13 +4697,13 @@ sub DbLog_sampleDataFn($$$$$) {
     $sth->execute();
     while (my @line = $sth->fetchrow_array()) {
       $counter++;
-      push (@example, join (" ",@line)) if($counter <= 8); # show max 8 examples
-      push (@colregs, "$line[0]:$line[1]"); # push all eventTypes to selection list
+      push (@example, join (" ",@line)) if($counter <= 8);   # show max 8 examples
+      push (@colregs, "$line[0]:$line[1]");                  # push all eventTypes to selection list
     }
 	$dbhf->disconnect(); 
     my $cols = join(",", sort { "\L$a" cmp "\L$b" } @colregs);
 
-    $max = 8 if($max > 8);
+    # $max = 8 if($max > 8);                                 # auskommentiert 27.02.2018, Notwendigkeit unklar (forum:#76008)
     for(my $r=0; $r < $max; $r++) {
       my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
       my $ret = "";
@@ -4716,11 +4718,11 @@ sub DbLog_sampleDataFn($$$$$) {
   # Table Current not present, so create an empty input field
     push @example, "No sample data due to missing table 'Current'";
 
-    $max = 8 if($max > 8);
+    # $max = 8 if($max > 8);                                 # auskommentiert 27.02.2018, Notwendigkeit unklar (forum:#76008)
     for(my $r=0; $r < $max; $r++) {
       my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
       my $ret = "";
-      no warnings 'uninitialized';            # Forum:74690, bug unitialized
+      no warnings 'uninitialized';                           # Forum:74690, bug unitialized
       $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20);   
 	  use warnings;
 #      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
@@ -5150,7 +5152,7 @@ sub dbReadings($@) {
     ## for MySQL                                                      
     ####################################################################################
     #%dbconfig= (                                                    
-    #    connection => "mysql:database=fhem;host=db;port=3306",       
+    #    connection => "mysql:database=fhem;host=&lt;database host&gt;;port=3306",       
     #    user => "fhemuser",                                          
     #    password => "fhempassword",
     #    # optional enable(1) / disable(0) UTF-8 support (at least V 4.042 is necessary) 	
@@ -5161,7 +5163,7 @@ sub dbReadings($@) {
     ## for PostgreSQL                                                
     ####################################################################################
     #%dbconfig= (                                                   
-    #    connection => "Pg:database=fhem;host=localhost",        
+    #    connection => "Pg:database=fhem;host=&lt;database host&gt;",        
     #    user => "fhemuser",                                     
     #    password => "fhempassword"                              
     #);                                                              
@@ -5765,7 +5767,8 @@ sub dbReadings($@) {
 	  
       A new Attribute DbLogExclude will be propagated to all Devices if DBLog is used. 
 	  DbLogExclude will work as regexp to exclude defined readings to log. Each individual regexp-group are separated by comma. 
-      If a MinInterval is set, the logentry is dropped if the defined interval is not reached and value vs. lastvalue is eqal. <br>
+      If a MinInterval is set, the logentry is dropped if the defined interval is not reached and value vs. lastvalue is eqal. 
+      <br><br>
     
 	  <b>Example</b> <br>
       <code>attr MyDevice1 DbLogExclude .*</code> <br>
@@ -5780,12 +5783,11 @@ sub dbReadings($@) {
 	   attr &lt;device&gt; excludeDevs &lt;devspec1&gt;,&lt;devspec2&gt;,&lt;devspec..&gt; 
 	   </code><br>
       
-	   The devices "devspec1", "devspec2" up to "devspec.." will be excluded from logging into database. This attribute 
-	   will only be evaluated if internal "NOTIFYDEV" is not defined or if DbLog-define ".*:.*" (that means all devices 
-	   should be logged) is set. 
+	   The devices "devspec1", "devspec2" up to "devspec.." are excluded from logging into database. This attribute 
+	   will only be evaluated if internal "NOTIFYDEV" is not defined. 
 	   Thereby devices can be explicit excluded from logging. The devices to exclude can be specified as 
 	   <a href="#devspec">device-specification</a>. 
-	   For further informations about devspec please see <a href="#devspec">device-specification</a>.  <br>
+	   For further informations about devspec please see <a href="#devspec">device-specification</a>.  <br><br>
 	   
 	   <b>Example</b> <br>
        <code>
@@ -5806,7 +5808,7 @@ sub dbReadings($@) {
 	   If the cache content will be exported by <a href="#DbLogsetexportCache">"exportCache"</a> or the "importCachefile"
 	   command, the file will be written into or read from that directory. The default directory is 
 	   "(global->modpath)/log/". 
-	   Make sure the specified directory is existing and writable. <br>
+	   Make sure the specified directory is existing and writable. <br><br>
 	   
 	  <b>Example</b> <br>
       <code>
@@ -6102,7 +6104,7 @@ sub dbReadings($@) {
     ## for MySQL                                                      
     ####################################################################################
     #%dbconfig= (                                                    
-    #    connection => "mysql:database=fhem;host=db;port=3306",       
+    #    connection => "mysql:database=fhem;host=&lt;database host&gt;;port=3306",    
     #    user => "fhemuser",                                          
     #    password => "fhempassword",
     #    # optional enable(1) / disable(0) UTF-8 support (at least V 4.042 is necessary) 	
@@ -6113,7 +6115,7 @@ sub dbReadings($@) {
     ## for PostgreSQL                                                
     ####################################################################################
     #%dbconfig= (                                                   
-    #    connection => "Pg:database=fhem;host=localhost",        
+    #    connection => "Pg:database=fhem;host=&lt;database host&gt;",        
     #    user => "fhemuser",                                     
     #    password => "fhempassword"                              
     #);                                                              
@@ -6778,7 +6780,7 @@ sub dbReadings($@) {
       Wenn DbLog genutzt wird, wird in alle Devices das Attribut <i>DbLogExclude</i> propagiert. 
 	  Der Wert des Attributes wird als Regexp ausgewertet und schliesst die damit matchenden Readings von einem Logging aus. 
 	  Einzelne Regexp werden durch Kommata getrennt. Ist MinIntervall angegeben, so wird der Logeintrag nur
-      dann nicht geloggt, wenn das Intervall noch nicht erreicht und der Wert des Readings sich nicht verändert hat. <br>
+      dann nicht geloggt, wenn das Intervall noch nicht erreicht und der Wert des Readings sich nicht verändert hat. <br><br>
     
 	  <b>Beispiel</b> <br>
       <code>attr MyDevice1 DbLogExclude .*</code> <br>
@@ -6793,11 +6795,11 @@ sub dbReadings($@) {
 	   attr &lt;device&gt; excludeDevs &lt;devspec1&gt;,&lt;devspec2&gt;,&lt;devspec..&gt; 
 	   </code><br>
       
-	   Die Devices "devspec1", "devspec2" bis "devspec.." werden vom Logging in der Datenbank ausgeschlossen. 
-	   Diese Attribut wirkt nur wenn kein Internal "NOTIFYDEV" vorhanden ist bzw. im Define des DbLog-Devices ".*:.*" 
-	   (d.h. alle Devices werden geloggt) angegeben wurde. Dadurch können Devices explizit vom Logging ausgeschlossen werden. 
+	   Die Devices "devspec1", "devspec2" bis "devspec.." werden vom Logging in die Datenbank ausgeschlossen. 
+	   Diese Attribut wirkt nur wenn kein Internal "NOTIFYDEV" vorhanden ist. 
+       Dadurch können Devices explizit vom Logging ausgeschlossen werden. 
 	   Die auszuschließenden Devices können als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. 
-	   Für weitere Details bezüglich devspec siehe <a href="#devspec">Geräte-Spezifikation</a>.  <br>
+	   Für weitere Details bezüglich devspec siehe <a href="#devspec">Geräte-Spezifikation</a>.  <br><br>
 	   
 	  <b>Beispiel</b> <br>
       <code>
@@ -6816,7 +6818,7 @@ sub dbReadings($@) {
       
 	   In diesem Verzeichnis wird das Cachefile beim Export angelegt bzw. beim Import gesucht. Siehe set-Kommandos 
 	   <a href="#DbLogsetexportCache">"exportCache"</a> bzw. "importCachefile". Das Default-Verzeichnis ist "(global->modpath)/log/". 
-	   Das im Attribut angegebene Verzeichnis muss vorhanden und beschreibbar sein. <br>
+	   Das im Attribut angegebene Verzeichnis muss vorhanden und beschreibbar sein. <br><br>
 	   
 	  <b>Beispiel</b> <br>
       <code>
