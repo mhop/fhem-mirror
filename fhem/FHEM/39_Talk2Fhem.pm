@@ -100,8 +100,12 @@
 #			Added async warning if keywordlist is unkown
 #	04.03.2018	0.4.6
 #			Breacket decoding bug fixed
-#
-#
+#	04.02.2018	0.5.0
+#			Feature: Target Radiusing 
+#			
+#			
+#			
+#			
 ################################################################
 # TODO:
 # 
@@ -130,7 +134,7 @@ use Encode qw(decode encode);
 my %Talk2Fhem_globals;
 
 
-$Talk2Fhem_globals{version}="0.4.6";
+$Talk2Fhem_globals{version}="0.5.0";
 
 $Talk2Fhem_globals{EN}{erase} = ['\bplease\b', '\balso\b', '^msgtext:'];
 $Talk2Fhem_globals{EN}{numbers} = {
@@ -900,7 +904,7 @@ my $list = (shift || AttrVal($hash->{NAME}, $type, ""));
 	$list = Talk2Fhem_parseParams($list);
 	#Log 1, Dumper $list;
 	return ("Error while parsing Keywordlist.\n$list" ) unless(ref($list) eq "HASH");
-	delete $hash->{helper}{T2F_andwordlist};
+	delete $hash->{helper}{T2F_andwordlist} if $type eq "T2F_keywordlist";
 	delete $hash->{helper}{$type};
 	foreach (keys %$list) {
 #			$$list{$_} = Talk2Fhem_parseArray($$list{$_});			
@@ -991,18 +995,93 @@ my @cmds = split(/ und (?!$Talk2Fhem_globals{DE}{numberre})/, $txt);
 #	unless (Talk2Fhem_test($me, $cmds[0]))
 #	Nun schauen wir mal was vor und nach dem und ist.
 #	könnte phrasentreffer auf kompletten satz ausschluss geben
-
+@cmds = grep { $_ } @cmds;
 
 # Tiefe UND analyse
-#for (@cmd) {
 
-#}
+# Präposition und Artikel
+my $art = '(([ai][nm]|beim?|auf|unter|hinter|über|vo[rnm]) )?((de[rmns]|die|das) )?';
+my $uart = '(eine?[smnr]?)';
+my @regtargets;
+for (keys %{$me->{helper}{T2F_andwordlist}}) { push(@regtargets, \@{$me->{helper}{T2F_andwordlist}{$_}}) };
+my $reg = '\b'.${art}.'('.join("|",map { @$_ } @regtargets).')\b';
 
-#print Dumper $$me{helper}{T2F_andwordlist};
 
-#return;
+my @andlockinfo; #my @sets;
 
+for (@regtargets) {
+	my $regtarget = join("|", @$_);
 
+	#	d Satzteil  x Teilposition  y cmds Position
+	my $d=0; my $x=0; my $y=0; my $prepost; my $prepre;
+	for (@cmds) {
+	#	erkenne target
+		if (/\s?\b(${art})(${regtarget})\b/i)
+			{
+				my ($pre,$post,$target) = ($`,$',$&);   
+				my @targets=($target);
+				# weitere targets. Bei Auflistungen ohne und
+				while ($post =~ s/(,|\s)+(${art}(${regtarget}))\b//i) {
+				 push(@targets, $2);
+				};	
+				my $xx = -1;
+				# Fülle andlockinfo hash
+				for (@targets) {
+					my $s = $andlockinfo[$d]{count}++;
+					my $ref = \%{$andlockinfo[$d]{part}[$x+(++$xx)]};
+					# füge targets hinzu mit korregierten leerzeichen
+					$$ref{target} .= ((($$ref{target}||"")!~/\s$/ and $_!~/^\s/)?" ":"").$_;
+					$$ref{no} = $y;
+					$$ref{pre} = $pre || undef;
+					if ($post) {
+						#entferne Targets anderer Kategorien
+						$post =~ s/\s?$reg\s?/ /gi;
+						$post = undef if $post =~ /^\s*$/;
+						$$ref{post} = $post || undef;
+					}
+				}
+				$x += $xx if $xx ne -1;
+				$andlockinfo[$d]{pre} = ($pre || $prepre) if $pre || $prepre;# and !$andlockinfo[$d]{pre};
+				$andlockinfo[$d]{post} = ($post || $prepost) if $post || $prepost;# and !$andlockinfo[$d]{post};
+
+				$prepost=undef; $prepre=undef;
+				# wenn es ein post existiert fange neuen Satzteil an und speichere pre und post
+				if ($andlockinfo[$d]{count} > 1 and $post) {
+					$prepost = $andlockinfo[$d]{post};
+					$prepre = $andlockinfo[$d]{pre};					
+					$d++;
+					$x=-1;
+				}
+			}
+		else { 
+			$d++; $x=-1;
+		}
+	$x++; $y++;
+	}
+}
+
+#print Dumper @andlockinfo;
+
+#Bilde komplette Sätze und füge nicht berücksichtigte sätze an richtiger position ein
+my @ncmds; my $o=0;
+for (my $i=0;$i<=$#andlockinfo;$i++) {
+my $a = $andlockinfo[$i];
+	if (ref $a) {
+		for ($o..($$a{part}[0]{no}-1)) {
+			push(@ncmds, $cmds[$_]);
+		}
+    for my $p (@{$$a{part}}) {
+
+    push(@ncmds, ($$p{pre}//$$a{pre}||"").$$p{target}.($$p{post}//$$a{post}||""));
+    $o = $$p{no}+1;
+    }
+	}
+}
+push(@ncmds, splice(@cmds,$o));
+
+@cmds = @ncmds ? @ncmds : @cmds;
+
+T2FL($myname, 4, "After correction:\n".(join("\n", @cmds)));
 
 foreach (@cmds) {
  next unless $_;
