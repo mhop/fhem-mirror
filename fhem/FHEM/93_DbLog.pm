@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.8.8      05.03.2018       fix device doesn't exit if configuration couldn't be read
 # 3.8.7      28.02.2018       changed DbLog_sampleDataFn - no change limits got fron SVG, commandref revised
 # 3.8.6      25.02.2018       commandref revised (forum:#84953)
 # 3.8.5      16.02.2018       changed ParseEvent for Zwave
@@ -189,7 +190,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.8.7";
+my $DbLogVersion = "3.8.8";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -300,7 +301,7 @@ sub DbLog_Define($@)
   if ($ret) {
       # return on error while reading configuration
 	  Log3($hash->{NAME}, 1, "DbLog $hash->{NAME} - Error while reading $hash->{CONFIGURATION}: '$ret' ");
-      return; 
+      return $ret; 
   }
   
   # set used COLUMNS
