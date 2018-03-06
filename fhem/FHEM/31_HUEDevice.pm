@@ -1252,7 +1252,7 @@ HUEDevice_Parse($$)
       $readings{state} = $state->{status} if( defined($state->{status}) );
       $readings{state} = $state->{flag}?'1':'0' if( defined($state->{flag}) );
       $readings{state} = $state->{open}?'open':'closed' if( defined($state->{open}) );
-      $readings{state} = $state->{lightlevel} if( defined($state->{lightlevel}) );
+      $readings{state} = $state->{lightlevel} if( defined($state->{lightlevel}) && !defined($state->{lux}) );
       $readings{state} = $state->{buttonevent} if( defined($state->{buttonevent}) );
       $readings{state} = $state->{presence}?'motion':'nomotion' if( defined($state->{presence}) );
 
