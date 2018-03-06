@@ -2206,6 +2206,12 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
        <li><code>INTERVAL &lt;polling interval&gt;</code><br>
          Polling interval in seconds
        </li><br>
+      <li><code>heatingCurveEndPoint &lt;Temperarature&gt;</code><br>
+         Sets the heating curve parameter. Adjustable in 0.1 steps.
+      </li><br>
+      <li><code>heatingCurveOffset &lt;Temperarature&gt;</code><br>
+         Sets the heating curve parameter. Adjustable in 0.1 steps.
+      </li><br>
       <li><code>hotWaterTemperatureTarget &lt;temperature&gt;</code><br>
          Target temperature of domestic hot water boiler in &deg;C
          </li><br>
@@ -2223,7 +2229,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          </li><br>
      <li><code>returnTemperatureHyst &lt;Temperature&gt;</code>
          <br>
-         Hysteresis of the returnTemperatureTarget of the heating controller . 0.5 K till 3 K. Adjustable in 0.1 steps.
+         Hysteresis of the returnTemperatureTarget of the heating controller. 0.5 K till 3 K. Adjustable in 0.1 steps.
          </li><br>
      <li><code>returnTemperatureSetBack &lt;Temperature&gt;</code>
          <br>
@@ -2239,9 +2245,19 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
    
    <a name="LUXTRONIK2get"></a>
    <b>Get</b>
-   <ul>
-      No get implemented yet ...
-   </ul>
+  <ul>
+      <li><code>heatingCurveParameter &lt;OutsideTemp1 SetTemp1 OutsideTemp2 SetTemp2&gt;</code>
+      <br>
+      Determines based on two points on the heating curve the respective heat curve parameter <i>heatingCurveEndPoint</i> and <i>heatingCurveOffset</i>.<br>
+      These parameter can be set via the respective set commands.
+      </li>
+      <br>
+      <li><code>rawData</code>
+      <br>
+      Shows a table with all parameter and operational values returned by the controller.<br>
+      They can be assigned to device readings via the attributes <i>userHeatpumpParameters</i> und <i>userHeatpumpValues</i>.
+      </li><br>
+  </ul>
    <br>
   
    <a name="LUXTRONIK2attr"></a>
@@ -2288,6 +2304,17 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          If set, a HTML-formatted reading named "floorplanHTML" is created. It can be used with the <a href="#FLOORPLAN">FLOORPLAN</a> module.
          <br>
          Currently, if the value of this attribute is not NULL, the corresponding reading consists of the current status of the heat pump and the temperature of the water.
+         </li><br>
+       <li><code>userHeatpumpParameters &lt;Index [Name][,Index2 [Name2],Index3 [Name3] ...]&gt;</code>
+         <br>
+         Allows to continuousely read the value of certian controler parameters. The index number of the parameter can be determined with the get command <i>rawData</i><br> 
+         In the attribute definition, a name can be writen behind the index number separated by a space. The respective parameter value will either be shown with the prefix "userParameter..." or under the given name. <br>
+         Multiple indexes are separated by a comma.<br>
+         If the readings are not used anymore the can be deleted with the FHEM command <a href="#deletereading">deleteReading</a>.
+         </li><br>
+       <li><code>userHeatpumpValues &lt;Index Name[,Index2 Name2,Index3 Name3 ...]&gt;</code>
+         <br> 
+         Allows to read out specific operational values. Proceed as with <i>userHeatpumpParameters</i>.
          </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
@@ -2336,6 +2363,12 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          Dieser Wert muss entsprechend des vorhandenen oder geplanten Tarifes zum jeweiligen Zeitpunkt z.B. durch den FHEM-Befehl "at" gesetzt werden.<br>
          0 = tariflos 
       </li><br>
+      <li><code>heatingCurveEndPoint &lt;Temperaratur&gt;</code><br>
+         Einstellung des Heizkurvenparameters. In 0.1er Schritten einstellbar.
+      </li><br>
+      <li><code>heatingCurveOffset &lt;Temperaratur&gt;</code><br>
+         Einstellung des Heizkurvenparameters. In 0.1er Schritten einstellbar.
+      </li><br>
       <li><code>hotWaterCircPumpDeaerate &lt;on | off&gt;</code><br>
          Schaltet die externe Warmwasser-Zirkulationspumpe an oder aus. Durch die Zirkulation wird das Abk&uuml;hlen des Warmwassers in den Hausleitungen verhindert. Der W&auml;rmeverbrauch steigt jedoch drastisch.
          <br>
@@ -2378,10 +2411,16 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <a name="LUXTRONIK2get"></a>
   <b>Get</b>
   <ul>
+      <li><code>heatingCurveParameter &lt;Aussentemp1 Solltemp1 Aussentemp2 Solltemp2&gt;</code>
+      <br>
+      Ermittelt rekursiv anhand zweier Punkte auf der Heizkurve die entsprechenden Heizkurvenparameter <i>heatingCurveEndPoint</i> und <i>heatingCurveOffset</i>.<br>
+      Diese k&ouml;nnen dann &uuml;ber die entsprechenden set-Befehl einstellt werden.
+      </li>
+      <br>
       <li><code>rawData</code>
       <br>
       Zeigt alle von der Steuerung auslesbaren Parameter und Betriebswerte an.<br>
-      Diese k&ouml;nnen dann mit den Attributen "userHeatpumpParameters" und "userHeatpumpValues" einem Ger&auml;tewert zugeordnet werden.
+      Diese k&ouml;nnen dann mit den Attributen <i>userHeatpumpParameters</i> und <i>userHeatpumpValues</i> einem Ger&auml;tewert zugeordnet werden.
       </li><br>
   </ul>
   <br>
@@ -2441,14 +2480,14 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
       </li><br>
     <li><code>userHeatpumpParameters &lt;Index [Name][,Index2 [Name2],Index3 [Name3] ...]&gt;</code>
       <br>
-      Erlaubt das Auslesen der Werte benutzerspezifischer Parameter. Die Indizes der verf&uml;gbaren Parameterwerte k&ouml;nnen mit dem get-Befehl "rawData" ermittelt werden.<br> 
-      Der jeweilige Index-Wert wird entweder als "user"-Ger&auml;tewert oder unter dem angegebenen Namen angezeigt. In der Attributdefinition kann der Name hinter den Index getrennt durch ein Leerzeichen geschrieben werden.<br>
+      Erlaubt das Auslesen der Werte benutzerspezifischer Parameter. Die Indizes der verf&uml;gbaren Parameterwerte k&ouml;nnen mit dem get-Befehl <i>rawData</i> ermittelt werden.<br> 
+      In der Attributdefinition kann der Name hinter den Index getrennt durch ein Leerzeichen geschrieben werden. Der jeweilige Parameter-Wert wird entweder mit dem Präfix "userParameter..." oder unter dem angegebenen Namen angezeigt. <br>
       Mehrere Indizes werden durch Kommas getrennt.<br>
-      Nicht mehr benötigte Gerätewerte können mit dem FHEM-Befehl <a href="#deletereading">deleteReading</a> gelöscht werden.
+      Nicht mehr ben&ouml;tigte Ger&auml;tewerte k&ouml;nnen mit dem FHEM-Befehl <a href="#deletereading">deleteReading</a> gel&ouml;scht werden.
       </li><br>
     <li><code>userHeatpumpValues &lt;Index Name[,Index2 Name2,Index3 Name3 ...]&gt;</code>
       <br> 
-      Erlaubt das Auslesen benutzerspezifische Betriebswerte. Vorgehen wie bei userHeatpumpParameters
+      Erlaubt das Auslesen benutzerspezifische Betriebswerte. Vorgehen wie bei <i>userHeatpumpParameters</i>.
       </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a>
     </li><br>
