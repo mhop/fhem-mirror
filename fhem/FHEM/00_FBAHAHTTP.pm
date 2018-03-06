@@ -128,9 +128,10 @@ FBAHAHTTP_Poll($)
     return $ret if($ret);
   }
   my $sid = $hash->{".SID"};
+  my $host = ($hash->{DEF} =~ m/^http/i ? $hash->{DEF} : "http://$hash->{DEF}");
 
   HttpUtils_NonblockingGet({
-    url=>"http://$hash->{DEF}/webservices/homeautoswitch.lua?sid=$sid".
+    url=>"$host/webservices/homeautoswitch.lua?sid=$sid".
          "&switchcmd=getdevicelistinfos",
     loglevel => AttrVal($name, "verbose", 4),
     timeout => AttrVal($name, "fbTimeout", 4),
@@ -221,8 +222,9 @@ FBAHAHTTP_ProcessStack($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $msg = $hash->{CmdStack}->[0];
+  my $host = ($hash->{DEF} =~ m/^http/i ? $hash->{DEF} : "http://$hash->{DEF}");
   HttpUtils_NonblockingGet({
-    url=>"http://$hash->{DEF}/webservices/homeautoswitch.lua?$msg",
+    url=>"$host/webservices/homeautoswitch.lua?$msg",
     loglevel => AttrVal($name, "verbose", 4),
     timeout => AttrVal($name, "fbTimeout", 4),
     callback => sub {
@@ -311,6 +313,9 @@ FBAHAHTTP_Write($$$)
     <ul>
       <code>define fb1 FBAHAHTTP fritz.box</code><br>
     </ul>
+    Note: to specify HTTPS for the connection use https://fritz.box as
+    hostname. To explicitly specify the port, postfix the hostname with :port,
+    as in https://fritz.box:443
   </ul>
   <br>
 

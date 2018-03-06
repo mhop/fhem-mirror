@@ -12,10 +12,18 @@ my ($lastOkPw, $lastOkUser, $lastOkHost, $lastOkTime) =("", "", 0);
 sub FB_checkPw(@);
 
 sub
+FB_host2URL($)
+{
+  my ($h) = @_;
+  return "$h/" if($h =~ m/^http/i);
+  return "http://$h/";
+}
+
+sub
 FB_doCheckPW($$$)
 {
   my ($host, $user, $pw) = @_;
-  my $data = GetFileFromURL("http://$host/login_sid.lua", undef, undef, 1);
+  my $data = GetFileFromURL(FB_host2URL($host)."login_sid.lua",undef,undef,1);
   return undef if(!$data);
 
   my $chl="";
@@ -28,14 +36,14 @@ FB_doCheckPW($$$)
     my @d = ( "login:command/response=$chlAnsw",
               "getpage=../html/de/internet/connect_status.txt" );
     $data = join("&", map {join("=", map {urlEncode($_)} split("=",$_,2))} @d);
-    $data = GetFileFromURL("http://$host/cgi-bin/webcm", undef, $data, 1);
+    $data = GetFileFromURL(FB_host2URL($host)."cgi-bin/webcm", undef, $data, 1);
     my $isOk = ($data =~ m/checkStatus/);
     return $isOk;
 
   } else {                            # FritzOS >= 5.50
     my @d = ( "response=$chlAnsw", "page=/login_sid.lua" );
     $data = join("&", map {join("=", map {urlEncode($_)} split("=",$_,2))} @d);
-    my $url = "http://$host/login_sid.lua";
+    my $url = FB_host2URL($host)."login_sid.lua";
     $url .= "?username=$user" if($user);
 
     $data = GetFileFromURL($url, undef, $data, 1);
