@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  72_FB_CALLMONITOR: fixing reverse search via dasoertliche.de
   - feature: 39_Talk2Fhem: V0.5 Object radiusing
   - bugfix:  93_DbLog: V3.8.8, no exit if configuration couldn't be read
   - change:  93_DbLog: V3.8.7, no change limits got fron SVG

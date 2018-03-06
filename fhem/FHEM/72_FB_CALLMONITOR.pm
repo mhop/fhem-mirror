@@ -732,8 +732,8 @@ FB_CALLMONITOR_reverseSearch($$)
                     }
                     else
                     {
-                        #Log 2, $result;
-                        if($result =~ m,<a href="http\://.+?\.dasoertliche\.de.+?".+?class="name ".+?><span class="">(.+?)</span>,)
+                        #Debug($result);
+                        if($result =~ m,<a href="[^"]*form_name=detail[^"]*".+?class="name ".+?><span class="">(.+?)</span>,)
                         {
                             $invert_match = $1;
                             $invert_match = FB_CALLMONITOR_html2txt($invert_match);
