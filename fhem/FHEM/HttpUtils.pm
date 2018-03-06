@@ -574,6 +574,11 @@ HttpUtils_Connect2($)
         RemoveInternalTimer(\%timerHash);
         my ($err, $ret, $redirect) = HttpUtils_ParseAnswer($hash);
         $hash->{callback}($hash, $err, $ret) if(!$redirect);
+
+      } elsif($hash->{incrementalTimeout}) {    # Forum #85307
+        RemoveInternalTimer(\%timerHash);
+        InternalTimer(gettimeofday()+$hash->{timeout},
+                      "HttpUtils_Err", \%timerHash);
       }
     };
 
@@ -842,7 +847,7 @@ HttpUtils_ParseAnswer($)
 #    digest(0),hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
 #    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
 #    method($data?"POST":"GET"),keepalive(0),sslargs({}),user(),pwd()
-#    compress(1)
+#    compress(1), incrementalTimeout(0)
 # Example:
 #   { HttpUtils_NonblockingGet({ url=>"http://fhem.de/MAINTAINER.txt",
 #     callback=>sub($$$){ Log 1,"ERR:$_[1] DATA:".length($_[2]) } }) }
