@@ -1261,6 +1261,8 @@ HUEDevice_Parse($$)
       $readings{daylight} = $state->{daylight}?'1':'0' if( defined($state->{daylight}) );
       $readings{temperature} = $state->{temperature} * 0.01 if( defined($state->{temperature}) );
       $readings{pressure} = $state->{pressure} if( defined($state->{pressure}) );
+      $readings{lightlevel} = $state->{lightlevel} if( defined($state->{lightlevel}) );
+      $readings{lux} = $state->{lux} if( defined($state->{lux}) );
     }
 
     if( scalar keys %readings ) {
