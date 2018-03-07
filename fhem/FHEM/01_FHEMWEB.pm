@@ -374,6 +374,7 @@ FW_Read($$)
     #  substr( $data, $i, 1, substr( $data, $i, 1, ) ^ substr($mask, $i% , 1) );
     #}
     #Log 1, "Received via websocket: ".unpack("H*",$data);
+    $hash->{BUF} = "";
     return;
   }
 
@@ -678,7 +679,11 @@ FW_AsyncOutput($$)
   # find the longpoll connection with the same fw_id as the page that was the
   # origin of the get command
   my $fwid = $hash->{FW_ID};
-  return if(!$fwid);
+  if(!$fwid) {
+    Log3 $hash->{SNAME}, 4, "AsyncOutput from $hash->{NAME} without FW_ID";
+    return;
+  }
+  Log3 $hash->{SNAME}, 4, "AsyncOutput from $hash->{NAME}";
   $hash = $FW_id2inform{$fwid};
   if($hash) {
     FW_addToWritebuffer($hash, $data."\n");
