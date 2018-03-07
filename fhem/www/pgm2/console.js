@@ -8,7 +8,7 @@ var consLastIndex = 0;
 var withLog = 0;
 var mustScroll = 1;
 
-log("Console is opening");
+log("Event monitor is starting");
 
 function
 cons_closeConn()
@@ -91,7 +91,7 @@ consFill()
     consConn.onclose = 
     consConn.onerror = 
     consConn.onmessage = consUpdate;
-    setTimeout(function(){FW_wsPing(consConn);}, 30000);
+    consConn.onopen = function(){FW_wsPing(consConn);};
 
   } else {
     if(consConn) {
