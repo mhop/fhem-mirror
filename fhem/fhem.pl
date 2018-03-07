@@ -85,8 +85,13 @@ sub Log($$);
 sub Log3($$$);
 sub OldTimestamp($);
 sub OldValue($);
+sub OldReadingsAge($$$;$);
+sub OldReadingsNum($$$;$);
+sub OldReadingsTimestamp($$$);
+sub OldReadingsVal($$$);
 sub OpenLogfile($);
 sub PrintHash($$);
+sub ReadingsAge($$$;$);
 sub ReadingsNum($$$;$);
 sub ReadingsTimestamp($$$);
 sub ReadingsVal($$$);
@@ -346,8 +351,19 @@ $modules{Global}{AttrFn} = "GlobalAttr";
 use vars qw($readingFnAttributes);
 $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
                        "event-aggregator event-min-interval ".
-                       "stateFormat:textField-long timestamp-on-change-reading";
-
+                       "stateFormat:textField-long timestamp-on-change-reading ".
+                       "oldreadings";
+my %ra = (
+  "suppressReading"            => { s=>"\n" },
+  "event-aggregator"           => { s=>",", c=>".attraggr" },
+  "event-on-update-reading"    => { s=>",", c=>".attreour" },
+  "event-on-change-reading"    => { s=>",", c=>".attreocr",   r=>":.*" },
+  "timestamp-on-change-reading"=> { s=>",", c=>".attrtocr" },
+  "event-min-interval"         => { s=>",", c=>".attrminint", r=>";.*" },
+  "oldreadings"                => { s=>",", c=>".or" },
+  "devStateIcon"               => { s=>" ", r=>":.*", p=>"^{.*}\$",
+                                    pv=>{"%name"=>1, "%state"=>1, "%type"=>1} },
+);
 
 %cmds = (
   "?"       => { ReplacedBy => "help" },
@@ -2133,8 +2149,13 @@ CommandDeleteAttr($$)
 
     $a[0] = $sdev;
     
-    if($a[1] && $a[1] eq "userReadings") {
-      delete($defs{$sdev}{'.userReadings'});
+    if($a[1]) {
+      if($a[1] eq "userReadings") {
+        delete($defs{$sdev}{'.userReadings'});
+      } elsif($ra{$a[1]}) {
+        my $cache = $ra{$a[1]}{c};
+        delete $defs{$sdev}{$cache} if( $cache );
+      }
     }
 
     my $ret = CallFn($sdev, "AttrFn", "del", @a);
@@ -2222,7 +2243,7 @@ CommandDeleteReading($$)
 
     foreach my $reading (grep { /$readingspec/ }
                                 keys %{$defs{$sdev}{READINGS}} ) {
-      delete($defs{$sdev}{READINGS}{$reading});
+      readingsDelete($defs{$sdev}, $reading);
       push @rets, "Deleted reading $reading for device $sdev";
     }
     
@@ -2783,31 +2804,25 @@ CommandAttr($$)
       }
     }
 
-    my %ra = (
-      "suppressReading"            => { s=>"\n" },
-      "event-on-update-reading"    => { s=>"," },
-      "event-on-change-reading"    => { s=>",", r=>":.*" },
-      "timestamp-on-change-reading"=> { s=>"," },
-      "event-min-interval"         => { s=>",", r=>";.*" },
-      "devStateIcon"               => { s=>" ", r=>":.*", p=>"^{.*}\$",
-                                  pv=>{"%name"=>1, "%state"=>1, "%type"=>1} },
-    );
-
-    if($ra{$attrName} && $init_done) {
-      my ($lval,$rp) = ($attrVal, $ra{$attrName}{p});
+    if($ra{$attrName}) {
+      my ($lval,$rp,$cache) = ($attrVal, $ra{$attrName}{p}, $ra{$attrName}{c});
 
       if($rp && $lval =~ m/$rp/) {
         my $err = perlSyntaxCheck($attrVal, %{$ra{$attrName}{pv}});
         return "attr $sdev $attrName: $err" if($err);
 
       } else {
-        for my $v (split($ra{$attrName}{s}, $lval)) {
+        delete $hash->{$cache} if( $cache );
+
+        my @a = split($ra{$attrName}{s}, $lval) ;
+        for my $v (@a) {
           $v =~ s/$ra{$attrName}{r}// if($ra{$attrName}{r});
           my $err ="Argument $v for attr $sdev $attrName is not a valid regexp";
           return "$err: use .* instead of *" if($v =~ /^\*/); # no err in eval!?
           eval { "Hallo" =~ m/^$v$/ };
           return "$err: $@" if($@);
         }
+        $hash->{$cache} = \@a if( $cache );
       }
     }
 
@@ -4131,6 +4146,52 @@ InternalNum($$$;$)
 }
 
 sub
+OldReadingsVal($$$)
+{
+  my ($d,$n,$default) = @_;
+  if(defined($defs{$d}) &&
+     defined($defs{$d}{OLDREADINGS}) &&
+     defined($defs{$d}{OLDREADINGS}{$n}) &&
+     defined($defs{$d}{OLDREADINGS}{$n}{VAL})) {
+     return $defs{$d}{OLDREADINGS}{$n}{VAL};
+  }
+  return $default;
+}
+
+sub
+OldReadingsNum($$$;$)
+{
+  my ($d,$n,$default,$round) = @_;
+  my $val = OldReadingsVal($d,$n,$default);
+  return undef if(!defined($val));
+  $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
+  $val = round($val,$round) if($round);
+  return $val;
+}
+
+sub
+OldReadingsTimestamp($$$)
+{
+  my ($d,$n,$default) = @_;
+  if(defined($defs{$d}) &&
+     defined($defs{$d}{OLDREADINGS}) &&
+     defined($defs{$d}{OLDREADINGS}{$n}) &&
+     defined($defs{$d}{OLDREADINGS}{$n}{TIME})) {
+     return $defs{$d}{OLDREADINGS}{$n}{TIME};
+  }
+  return $default;
+}
+
+sub
+OldReadingsAge($$$)
+{
+  my ($device,$reading,$default) = @_;
+  my $ts = OldReadingsTimestamp($device,$reading,undef);
+  return int(gettimeofday() - time_str2num($ts)) if(defined($ts));
+  return $default;
+}
+
+sub
 ReadingsVal($$$)
 {
   my ($d,$n,$default) = @_;
@@ -4229,6 +4290,16 @@ sub
 setReadingsVal($$$$)
 {
   my ($hash,$rname,$val,$ts) = @_;
+
+  if( $hash->{".or"} && grep($rname =~ m/^$_$/, @{$hash->{".or"}}) ) {
+    if( $hash->{READINGS}{$rname} && 
+        $hash->{READINGS}{$rname}{VAL} &&
+        $hash->{READINGS}{$rname}{VAL} ne $val ) {
+      $hash->{OLDREADINGS}{$rname}{VAL} = $hash->{READINGS}{$rname}{VAL};
+      $hash->{OLDREADINGS}{$rname}{TIME} = $hash->{READINGS}{$rname}{TIME};
+    }
+  }
+
   $hash->{READINGS}{$rname}{VAL} = $val;
   $hash->{READINGS}{$rname}{TIME} = $ts;
 }
@@ -4274,37 +4345,6 @@ readingsBeginUpdate($)
   my $fmtDateTime = FmtDateTime($now);
   $hash->{".updateTime"} = $now; # in seconds since the epoch
   $hash->{".updateTimestamp"} = $fmtDateTime;
-
-  my $attrminint = AttrVal($name, "event-min-interval", undef);
-  if($attrminint) {
-    my @a = split(/,/,$attrminint);
-    $hash->{".attrminint"} = \@a;
-  }
-  
-  my $attraggr = AttrVal($name, "event-aggregator", undef);
-  if($attraggr) {
-    my @a = split(/,/,$attraggr);
-    $hash->{".attraggr"} = \@a;
-  }
-
-  my $attreocr= AttrVal($name, "event-on-change-reading", undef);
-  if($attreocr) {
-    my @a = split(/,/,$attreocr);
-    $hash->{".attreocr"} = \@a;
-  }
-  
-  my $attreour= AttrVal($name, "event-on-update-reading", undef);
-  if($attreour) {
-    my @a = split(/,/,$attreour);
-    $hash->{".attreour"} = \@a;
-  }
-
-  my $attrtocr= AttrVal($name, "timestamp-on-change-reading", undef);
-  if($attrtocr) {
-    my @a = split(/,/,$attrtocr);
-    $hash->{".attrtocr"} = \@a;
-  }
-
 
   $hash->{CHANGED}= () if(!defined($hash->{CHANGED}));
   return $fmtDateTime;
@@ -4430,11 +4470,6 @@ readingsEndUpdate($$)
   # turn off updating mode
   delete $hash->{".updateTimestamp"};
   delete $hash->{".updateTime"};
-  delete $hash->{".attreour"};
-  delete $hash->{".attreocr"};
-  delete $hash->{".attraggr"};
-  delete $hash->{".attrminint"};
-  delete $hash->{".attrtocr"};
 
 
   # propagate changes
@@ -4629,6 +4664,7 @@ readingsDelete($$)
 {
   my ($hash,$reading) = @_;
   delete $hash->{READINGS}{$reading};
+  delete $hash->{OLDREADINGS}{$reading};
 }
 
 ##############################################################################
