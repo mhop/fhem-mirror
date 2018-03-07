@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.14.3       07.03.2018       DbRep_firstconnect changed - get lowest timestamp in database, DbRep_Connect deleted
 # 7.14.2       04.03.2018       fix perl warning
 # 7.14.1       01.03.2018       currentfillup_Push bugfix for PostgreSQL
 # 7.14.0       26.02.2018       syncStandby
@@ -323,7 +324,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.14.2";
+my $DbRepVersion = "7.14.3";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -437,7 +438,7 @@ sub DbRep_Define($@) {
   }
   
   RemoveInternalTimer($hash);
-  InternalTimer(time+5, 'DbRep_firstconnect', $hash, 0);
+  InternalTimer(gettimeofday()+int(rand(45)), 'DbRep_firstconnect', $hash, 0);
   
   Log3 ($name, 4, "DbRep $name - initialized");
   ReadingsSingleUpdateValue ($hash, 'state', 'initialized', 1);
@@ -850,6 +851,7 @@ sub DbRep_Get($@) {
   my $getlist = "Unknown argument $opt, choose one of ".
                 "svrinfo:noArg ".
 				"blockinginfo:noArg ".
+                "minTimestamp:noArg ".
                 (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
                 (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
 				(($dbmodel eq "MYSQL")?"procinfo:noArg ":"").
@@ -886,9 +888,15 @@ sub DbRep_Get($@) {
       DbRep_delread($hash); 
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);   
 	  DbRep_getblockinginfo($hash);	  
-  }
-  else 
-  {
+  
+  } elsif ($opt eq "minTimestamp") {
+      return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+      DbRep_delread($hash); 
+      ReadingsSingleUpdateValue ($hash, "state", "running", 1);   
+	  DbRep_firstconnect($hash);	  
+  
+  } else {
       return "$getlist";
   } 
   
@@ -1240,68 +1248,134 @@ return undef;
 }
 
 ###################################################################################
-# First Init DB Connect 
+#        First Init DB Connect 
+#        Verbindung zur DB aufbauen und den Timestamp des ältesten 
+#        Datensatzes ermitteln
 ###################################################################################
 sub DbRep_firstconnect($) {
-  my ($hash)= @_;
-  my $name           = $hash->{NAME};
-  my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
-  $hash->{dbloghash} = $defs{$dblogdevice};
-  my $dbconn         = $hash->{dbloghash}{dbconn};
+  my ($hash) = @_;
+  my $name       = $hash->{NAME};
+  my $to         = "10";
+  my $dbloghash  = $hash->{dbloghash};
+  my $dbconn     = $dbloghash->{dbconn};
+  my $dbuser     = $dbloghash->{dbuser};
 
   RemoveInternalTimer($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
   if ($init_done == 1) {
-      if ( !DbRep_Connect($hash) ) {
-          Log3 ($name, 2, "DbRep $name - DB connect failed. Credentials of database $hash->{DATABASE} are valid and database reachable ?");
-	      ReadingsSingleUpdateValue ($hash, "state", "disconnected", 1);
-      } else {
-          Log3 ($name, 4, "DbRep $name - Connectiontest to db $dbconn successful");
-          my $dbh = $hash->{DBH}; 
-          $dbh->disconnect();
-      }
+      Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser") if($hash->{LASTCMD} ne "minTimestamp");
+      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_getMinTs", "$name", "DbRep_getMinTsDone", $to, "DbRep_getMinTsAborted", $hash);        
   } else {
-     InternalTimer(time+1, "DbRep_firstconnect", $hash, 0);
+      InternalTimer(time+1, "DbRep_firstconnect", $hash, 0);
   }
 
 return;
 }
 
-###################################################################################
-# DB Connect
-###################################################################################
-sub DbRep_Connect($) {
-  my ($hash)= @_;
+####################################################################################################
+#     den ältesten Datensatz (Timestamp) in der DB bestimmen 
+####################################################################################################
+sub DbRep_getMinTs($) {
+ my ($name)     = @_;
+ my $hash       = $defs{$name};
+ my $dbloghash  = $hash->{dbloghash};
+ my $dbconn     = $dbloghash->{dbconn};
+ my $dbuser     = $dbloghash->{dbuser};
+ my $dblogname  = $dbloghash->{NAME};
+ my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $mintsdef   = "1970-01-01 01:00:00";
+ my ($dbh,$sql,$err,$mints);
+
+ # Background-Startzeit
+ my $bst = [gettimeofday];
+ 
+ eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 }); };
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     return "$name|''|''|$err";
+ }
+ 
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+ 
+ eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
+ 
+ $dbh->disconnect;
+ 
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+ 
+ $mints = $mints?encode_base64($mints,""):encode_base64($mintsdef,"");
+ 
+ # Background-Laufzeit ermitteln
+ my $brt = tv_interval($bst);
+
+ $rt = $rt.",".$brt;
+ 
+ return "$name|$mints|$rt|0";
+}
+
+####################################################################################################
+# Auswertungsroutine den ältesten Datensatz (Timestamp) in der DB bestimmen 
+####################################################################################################
+sub DbRep_getMinTsDone($) {
+  my ($string) = @_;
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
   my $name       = $hash->{NAME};
-  my $dbloghash  = $hash->{dbloghash};
-  my $dbconn     = $dbloghash->{dbconn};
-  my $dbuser     = $dbloghash->{dbuser};
-  my $dblogname  = $dbloghash->{NAME};
-  my $dbpassword = $attr{"sec$dblogname"}{secret};
-  my $dbh;
+  my $mints      = decode_base64($a[1]);
+  my $bt         = $a[2];
+  my ($rt,$brt)  = split(",", $bt);
+  my $err        = $a[3]?decode_base64($a[3]):undef;
+  my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
+  $hash->{dbloghash} = $defs{$dblogdevice};
+  my $dbconn         = $hash->{dbloghash}{dbconn};
   
-  if(IsDisabled($name)) {
-      ReadingsSingleUpdateValue ($hash, 'state', 'disabled', 1);
-      return undef;
+   if ($err) {
+      readingsBeginUpdate($hash);
+      ReadingsBulkUpdateValue ($hash, "errortext", $err);
+      ReadingsBulkUpdateValue ($hash, "state", "disconnected");
+      readingsEndUpdate($hash, 1);
+      delete($hash->{HELPER}{RUNNING_PID});
+      Log3 ($name, 2, "DbRep $name - DB connect failed. Make sure credentials of database $hash->{DATABASE} are valid and database is reachable.");
+      return;
   }
   
-  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1 });};
+  $hash->{HELPER}{MINTS} = $mints;
+  my $state = ($hash->{LASTCMD} eq "minTimestamp")?"done":"connected";
 
-  if(!$dbh) {
-    RemoveInternalTimer($hash);
-    Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser");
-    ReadingsSingleUpdateValue ($hash, 'state', 'disconnected', 1);
-    InternalTimer(time+5, 'DbRep_Connect', $hash, 0);
-    Log3 ($name, 3, "DbRep $name - Waiting for database connection");
-    return 0;
-  }
-
-  $hash->{DBH} = $dbh;
-
-  ReadingsSingleUpdateValue ($hash, "state", "connected", 1);
-  Log3 ($name, 3, "DbRep $name - connected");
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset", $mints) if($hash->{LASTCMD} eq "minTimestamp");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
+  readingsEndUpdate($hash, 1);
   
-return 1;
+  Log3 ($name, 4, "DbRep $name - Connectiontest to db $dbconn successful") if($hash->{LASTCMD} ne "minTimestamp");
+  
+  $hash->{HELPER}{MINTS} = $mints;
+  
+  delete($hash->{HELPER}{RUNNING_PID});
+  
+return;
+}
+
+####################################################################################################
+#             Abbruchroutine den ältesten Datensatz (Timestamp) in der DB bestimmen 
+####################################################################################################
+sub DbRep_getMinTsAborted(@) {
+  my ($hash,$cause) = @_;
+  my $name = $hash->{NAME};
+  
+  $cause = $cause?$cause:"Timeout: process terminated";
+  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
+  
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateValue ($hash, "errortext", $cause);
+  ReadingsBulkUpdateValue ($hash, "state", "disconnected");
+  readingsEndUpdate($hash, 1);
+  
+  delete($hash->{HELPER}{RUNNING_PID});
+return;
 }
 
 ################################################################################################################
@@ -1488,7 +1562,7 @@ sub DbRep_createTimeArray($$$) {
  # year   als Jahre seit 1900 
  # $mon   als 0..11
  # $time = timelocal( $sec, $min, $hour, $mday, $mon, $year ); 
- my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);     # Istzeit Ableitung
+ my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);       # Istzeit Ableitung
  my ($tsbegin,$tsend,$dim,$tsub,$tadd);
  my ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear);
  
@@ -1496,7 +1570,8 @@ sub DbRep_createTimeArray($$$) {
  #  absolute Auswertungszeiträume statische und dynamische (Beginn / Ende) berechnen 
  ######################################################################################
  
- $tsbegin = AttrVal($name, "timestamp_begin", "1970-01-01 01:00:00");
+ my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";  # Timestamp des 1. Datensatzes verwenden falls ermittelt
+ $tsbegin = AttrVal($name, "timestamp_begin", $mints);
  $tsbegin = DbRep_formatpicker($tsbegin);
  $tsend = AttrVal($name, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
  $tsend = DbRep_formatpicker($tsend);
@@ -7182,7 +7257,7 @@ sub DbRep_createSelectSql($$$$$$$$) {
  
  ($devs,$danz,$reading,$ranz) = DbRep_specsForSql($hash,$device,$reading);
  
- if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
+ if($tn && $tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
  }
  
@@ -9560,8 +9635,10 @@ return;
   
   <b>For all evaluation variants (except sqlCmd,deviceRename,readingRename) applies: </b> <br>
   In addition to the needed reading the device can be complemented to restrict the datasets for reporting / function. 
-  If no time limit attribute is set but aggregation is set, the period from '1970-01-01 01:00:00' to the current date/time will be used as 
-  selection criterion. If both time limit attribute and aggregation isn't set, the selection on database is runnung without timestamp criterion.
+  If no time limit attribute is set but aggregation is set, the period from the oldest dataset in database to the current 
+  date/time will be used as selection criterion. If the oldest dataset wasn't identified, then '1970-01-01 01:00:00' is used
+  as start date (see get &lt;name&gt; "minTimestamp" also).
+  If both time limit attribute and aggregation isn't set, the selection on database is runnung without timestamp criterion.
   <br><br>
   
   <b>Note: </b> <br>
@@ -9620,7 +9697,13 @@ return;
                                  # Only readings containing "version" and "query_cache" in name will be created
                                  </li> 
                                  <br><br>
-                                 </ul>    
+                                 </ul>  
+
+    <li><b> minTimestamp </b> - Identifies the oldest timestamp in the database (will be executed implicitely at FHEM start).
+                                The timestamp is used as begin of data selection if no time attribut is set to determine the
+                                start date.                                
+                                </li>     
+                                <br><br>                                     
 
     <li><b> procinfo </b> - reports the existing database processes in a summary table (only MySQL). <br>
 	                        Typically only the own processes of the connection user (set in DbLog configuration file) will be
@@ -11174,8 +11257,11 @@ sub bdump {
   
   <b>Für alle Auswertungsvarianten (Ausnahme sqlCmd,deviceRename,readingRename) gilt: </b> <br>
   Zusätzlich zu dem auszuwertenden Reading kann das Device mit angegeben werden um das Reporting nach diesen Kriterien einzuschränken. 
-  Sind keine Zeitgrenzen-Attribute angegeben aber Aggregation ist gesetzt, wird '1970-01-01 01:00:00' und das aktuelle Datum/Zeit als 
-  Zeitgrenze genutzt. Sind weder Zeitgrenzen-Attribute noch Aggregation angegeben, wird die Datenselektion ohne Timestamp-Einschränkungen
+  Sind keine Zeitgrenzen-Attribute angegeben jedoch das Aggregations-Attribut gesetzt, wird der Zeitstempel des ältesten 
+  Datensatzes in der Datenbank als Startdatum und das aktuelle Datum/die aktuelle Zeit als Zeitgrenze genutzt.
+  Konnte der älteste Datensatz in der Datenbank nicht ermittelt werden, wird '1970-01-01 01:00:00' als Selektionsstart
+  genutzt (siehe get &lt;name&gt; minTimestamp).
+  Sind weder Zeitgrenzen-Attribute noch Aggregation angegeben, wird die Datenselektion ohne Timestamp-Einschränkungen
   ausgeführt.  
   <br><br>
   
@@ -11235,7 +11321,14 @@ sub bdump {
                                  # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten
                                  </li> 
                                  <br><br>
-                                 </ul>                               
+                                 </ul>  
+
+    <li><b> minTimestamp </b> - Ermittelt den Zeitstempel des ältesten Datensatzes in der Datenbank (wird implizit beim Start von
+                                FHEM ausgeführt).
+                                Der Zeitstempel wird als Selektionsbeginn verwendet wenn kein Zeitattribut den Selektionsbeginn
+                                festlegt.                                
+                                </li>     
+                                <br><br>                                 
 
     <li><b> procinfo </b> - Listet die existierenden Datenbank-Prozesse in einer Tabelle auf (nur MySQL). <br>
 	                        Typischerweise werden nur die Prozesse des Verbindungsusers (angegeben in DbLog-Konfiguration)
