@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  72_FB_CALLLIST: fix broken german umlaut in timestamps on 
+                             perl version >= 5.22
   - bugfix:  72_FB_CALLMONITOR: fixing reverse search via dasoertliche.de
   - feature: 39_Talk2Fhem: V0.5 Object radiusing
   - bugfix:  93_DbLog: V3.8.8, no exit if configuration couldn't be read

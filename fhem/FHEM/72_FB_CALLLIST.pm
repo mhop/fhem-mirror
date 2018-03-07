@@ -29,6 +29,7 @@ package main;
 use strict;
 use warnings;
 
+use POSIX;
 use MIME::Base64;
 use Data::Dumper;
 use HttpUtils;
@@ -825,7 +826,7 @@ sub FB_CALLLIST_index2line($$)
                         line => $count,      # internal line identifier for JavaScript, must be present
                         row => $count,       # column "row" to display or not
                         state =>  FB_CALLLIST_returnCallState($hash, $index),
-                        timestamp => strftime(AttrVal($name, "time-format-string", "%a, %d %b %Y %H:%M:%S"), localtime($index)),
+                        timestamp => FB_CALLLIST_strftime(AttrVal($name, "time-format-string", "%a, %d %b %Y %H:%M:%S"), localtime($index)),
                         name => ($data->{external_name} eq "unknown" ? "-" : $data->{external_name}),
                         number =>  $data->{external_number},
                         external => ($data->{external_connection} ? ((exists($hash->{helper}{EXTERNAL_MAP}) and exists($hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}})) ? $hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}} : $data->{external_connection} ) : "-"),
@@ -1387,6 +1388,29 @@ sub FB_CALLLIST_returnTableHeader($)
     return $line;
 }
 
+#####################################
+# In newer perl versions (>=5.22) POSIX::strftime() returns special chars in ISO-8859 instead of active locale (see: https://forum.fhem.de/index.php/topic,85132.msg777667.html#msg777667 )
+sub FB_CALLLIST_strftime(@)
+{
+    my $string = POSIX::strftime(@_);
+
+    $string =~ s/\xe4/ä/g;
+    $string =~ s/\xc4/Ä/g;
+    $string =~ s/\xf6/ö/g;
+    $string =~ s/\xd6/Ö/g;
+    $string =~ s/\xfc/ü/g;
+    $string =~ s/\xdc/Ü/g;
+    $string =~ s/\xdf/ß/g;
+    $string =~ s/\xdf/ß/g;
+    $string =~ s/\xe1/á/g;
+    $string =~ s/\xe9/é/g;
+    $string =~ s/\xc1/Á/g;
+    $string =~ s/\xc9/É/g;
+
+    return $string;
+}
+
+
 1;
 
 =pod
@@ -1768,7 +1792,7 @@ sub FB_CALLLIST_returnTableHeader($)
 
     <li><a name="FB_CALLLIST_processEventsWhileDisabled">processEventsWhileDisabled</a> 0,1</li>
     Sofern gesetzt, werden Events weiterhin verarbeitet, selbst wenn FB_CALLLIST deaktiviert ist (siehe <a href="FB_CALLLIST_disable">disabled</a> und <a href="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a>).
-    Sobald FB_CALLLIST wieder aktiviert wurde, stehen sämtliche Anrufe, w&auml;hrend FB_CALLLIST deaktiviert war, zur Verf&uuml;gung.
+    Sobald FB_CALLLIST wieder aktiviert wurde, stehen s&auml;mtliche Anrufe, w&auml;hrend FB_CALLLIST deaktiviert war, zur Verf&uuml;gung.
     <br><br>
     M&ouml;gliche Werte: 0 =&gt; keine Eventverabeitung wenn FB_CALLLIST deaktiviert ist, 1 =&gt; Events werden trotz deaktiviert FB_CALLLIST intern weiterhin verarbeitet.<br>
     Standardwert ist 0 (keine Eventverabeitung wenn deaktiviert)<br><br>
