@@ -1263,6 +1263,10 @@ HUEDevice_Parse($$)
       $readings{pressure} = $state->{pressure} if( defined($state->{pressure}) );
       $readings{lightlevel} = $state->{lightlevel} if( defined($state->{lightlevel}) );
       $readings{lux} = $state->{lux} if( defined($state->{lux}) );
+      $readings{power} = $state->{power} if( defined($state->{power}) );
+      $readings{voltage} = $state->{voltage} if( defined($state->{voltage}) );
+      $readings{current} = $state->{current} if( defined($state->{current}) );
+      $readings{consumption} = $state->{consumption} if( defined($state->{consumption}) );
     }
 
     if( scalar keys %readings ) {
