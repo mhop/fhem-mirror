@@ -593,6 +593,14 @@ Ger&auml;t dokumentiert.
     event-on-change-reading auch spezifiziert ist, dann werden sie mit ODER
     kombiniert, d.h. wenn einer der beiden Bedingungen wahr ist.
     </li>
+          
+    <a name="oldreadings"></a>
+    <li>oldreadings<br>
+    Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
+    Readings.  regex sind erlaubt. F&uuml;r jedes Reading aus der Liste
+    speichert FHEM intern den vorherigen Wert wenn sich das Reading
+    &auml;ndert. Zum Zugriff auf die Werte gibt es die OldReadings.* Routinen.
+    </li>     
 
     <a name="userReadings"></a>
     <li>userReadings<br>
@@ -1919,6 +1927,20 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         <br>
         gibt das Alter des Readings in Sekunden zur&uuml;ck.
         </li><br>
+
+      <li>
+        OldReadingsVal(&lt;devicename&gt;,&lt;reading&gt;
+                        ,&lt;defaultvalue&gt;)<br>
+        OldReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,
+                        &lt;defaultvalue&gt;,&lt;round&gt;)<br>
+        OldReadingsTimestamp(&lt;devicename&gt;,&lt;reading&gt;
+                        ,&lt;defaultvalue&gt;)<br>         
+        OldReadingsAge(&lt;devicename&gt;,&lt;reading&gt;,&lt;
+                        defaultvalue&gt;)<br>
+        analog zu den Routinen oben, aber zum Zugriff auf die vorherigen Werte.
+        siehe: <a href="#oldreadings">oldreadings</a><br>
+        </li><br>
+
       <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
         Gibt das entsprechende Attribut des Ger&auml;tes zur&uuml;ck

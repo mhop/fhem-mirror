@@ -581,7 +581,13 @@ attribute list if you want to know if a device supports these attributes.  <br>
     of the matched type. If event-on-change-reading is also specified, they are
     combined with OR: if one of them is true, the event is generated.
     </li>
-    <p>
+
+    <a name="oldreadings"></a>
+    <li>oldreadings<br>
+    This attribute takes a comma-separated list of readings. You may use
+    regular expressions in that list. For each reading in the list FHEM will
+    internaly store the previous value if the readings value changes. To access
+    the storead value use the OldReadings.* functions.</li>
 
     <a name="userReadings"></a>
     <li>userReadings<br>
@@ -1774,6 +1780,20 @@ The following local attributes are used by a wider range of devices:
         <br>
         returns the age of the reading in seconds.
         </li><br>
+
+      <li>
+        OldReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,
+                        &lt;defaultvalue&gt;)<br>
+        OldReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,
+                        &lt;defaultvalue&gt;,&lt;round&gt;)<br>
+        OldReadingsTimestamp(&lt;devicename&gt;,&lt;
+                        reading&gt;,&lt;defaultvalue&gt;)<br>
+        OldReadingsAge(&lt;devicename&gt;,&lt;reading&gt;,
+                        &lt;defaultvalue&gt;)<br>
+        similar to the above functions, but used to access the previous values.
+        see: <a href="#oldreadings">oldreadings</a>
+        </li><br>
+
       <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
         Return the attribute of the device
