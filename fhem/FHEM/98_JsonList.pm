@@ -392,8 +392,8 @@ CommandJsonList($$)
 
 =pod
 =item command
-=item summary    show device data in JSON format (deprecated, use JsonList2!)
-=item summary_DE zeigt Ger&auml;tedaten in JSON Format (&uuml;berholt, bitte JSonList verwenden)
+=item summary    show device data in JSON format (deprecated, use JsonList2)
+=item summary_DE zeigt Ger&auml;tedaten in JSON Format (&uuml;berholt, bitte JSonList2 verwenden)
 =begin html
 
 <a name="JsonList"></a>
