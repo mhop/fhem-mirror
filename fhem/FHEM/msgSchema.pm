@@ -91,6 +91,19 @@ my $db = {
             },
         },
 
+        'FULLY' => {
+            'Normal'        => 'set %DEVICE% speak %MSGSHRT%',
+            'ShortPrio'     => 'set %DEVICE% speak %SHOUTOUT%',
+            'Short'         => 'set %DEVICE% speak %SHOUTOUT%',
+            'defaultValues' => {
+                'ShortPrio' => {
+                    'SHOUTOUT' => 'Achtung!',
+                },
+                'Short' => {
+                    'SHOUTOUT' => 'Hinweis!',
+                },
+            },
+        },
     },
 
     'light' => {
