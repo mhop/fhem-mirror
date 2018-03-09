@@ -17,6 +17,9 @@
 # Alarms
 # Complex
 # Discover
+# Open
+# Close
+# Reopen
 # Read
 # Ready
 # Verify
@@ -53,7 +56,9 @@ sub new($) {
 	my ($class,$hash) = @_;
 
 	return bless {
-		hash => $hash
+		hash => $hash,
+	    #-- module version
+        version => "7.08";
 	}, $class;
 }
 
@@ -98,8 +103,6 @@ sub Define($) {
     $hash->{PIN}          = $pin;
     $hash->{ASYNCHRONOUS} = 0;  
   
-    #-- module version
-    $hash->{version}      = "7.05";
     main::Log3 $hash->{NAME},1,"OWX_FRM::Define warning: version ".$hash->{version}." not identical to OWX version ".$main::owx_version
       if( $hash->{version} ne $main::owx_version);
    
@@ -173,6 +176,16 @@ sub Alarms() {
 	}
 	$hash->{ALARMDEVS} = [];
 	return 1;
+}
+
+########################################################################################
+#
+# Reopen - Reopen Device
+#
+########################################################################################
+
+sub Reopen () {
+  main::Log 1,"[OWX_FRM] Warning: ->Reopen currently not defined
 }
 
 ########################################################################################
@@ -369,6 +382,31 @@ sub Discover ($) {
 	$hash->{DEVS} = $old_devices;
 	return 1;
 }
+
+
+########################################################################################
+#
+# Open - Open Device
+#
+########################################################################################
+
+sub Open () {
+  my ($self) = @_;
+  my $hash = $self->{hash};
+}
+
+########################################################################################
+#
+# Close - Close Device
+#
+########################################################################################
+
+sub Close () {
+  my ($self) = @_;
+  my $hash = $self->{hash};
+ 
+}
+
 
 #######################################################################################
 #

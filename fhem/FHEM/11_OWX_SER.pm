@@ -17,6 +17,9 @@
 # Alarms
 # Complex
 # Discover
+# Open
+# Close
+# Reopen
 # Init
 # Read
 # Ready
@@ -55,6 +58,8 @@ sub new($) {
 	return bless {
 		#-- OWX device
 		hash => $hash,
+		#-- module version
+	    version => "7.08",
 		#-- baud rate serial interface
 		baud => 9600,
 		#-- 16 byte search string
@@ -91,9 +96,7 @@ sub Define ($) {
     $hash->{DeviceName}   = $dev;
     $hash->{ASYNCHRONOUS} = 0;  
   
-    #-- module version
-	$hash->{version}      = "7.05";
-    main::Log3 $hash->{NAME},1,"OWX_SER::Define warning: version ".$hash->{version}." not identical to OWX version ".$main::owx_version
+    main::Log3 $hash->{NAME},1,"OWX_SER::Define warning: version ".$self->{version}." not identical to OWX version ".$main::owx_version
       if( $hash->{version} ne $main::owx_version);
       
     #-- call low level init function for the device
@@ -283,6 +286,47 @@ sub Discover () {
 }
 
 ########################################################################################
+#
+# Open - Open Device
+#
+########################################################################################
+
+sub Open () {
+  my ($self) = @_;
+  my $hash = $self->{hash};
+  #return main::DevIo_OpenDev($hash,1,"main::OWX_Init")
+  
+  return main::DevIo_OpenDev($hash,1,undef)
+}
+
+########################################################################################
+#
+# Close - Close Device
+#
+########################################################################################
+
+sub Close () {
+  my ($self) = @_;
+  my $hash = $self->{hash};
+  
+  return main::DevIo_CloseDev($hash);
+}
+
+########################################################################################
+#
+# Reopen - Reopen Device
+#
+########################################################################################
+
+sub Reopen () {
+  my ($self) = @_;
+  my $hash = $self->{hash};
+  
+  main::DevIo_CloseDev($hash);
+  return main::DevIo_OpenDev($hash,1,undef)
+}
+
+########################################################################################
 # 
 # Init - Initialize the 1-wire device
 #
@@ -297,12 +341,7 @@ sub Init() {
   my $name     = $hash->{NAME};
   
   main::Log3 $name,5,"OWX_SER::Init called on device $dev for bus $name, state is ".$hash->{STATE};
-  
-  #if($hash->{STATE} ne "opened"){
-  #XXX
-    #main::DevIo_CloseDev($hash);
-    main::DevIo_OpenDev($hash,0,undef);
-  #}
+  main::DevIo_OpenDev($hash,0,undef);
   my $hwdevice = $hash->{USBDev};
     
   if( !($hwdevice)){
@@ -876,11 +915,15 @@ sub SearchLow ($) {
 
 <a name="OWX_SER"></a>
 <h3>OWX_SER</h3>
+<ul>
 See <a href="/fhem/docs/commandref.html#OWX">OWX</a>
+</ul>
 =end html
 =begin html_DE
 
 <a name="OWX_SER"></a>
 <h3>OWX_SER</h3>
+<ul>
 <a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#OWX">OWX</a> 
+</ul>
 =end html_DE

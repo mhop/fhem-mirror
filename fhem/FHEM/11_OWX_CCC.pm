@@ -17,6 +17,9 @@
 # Alarms
 # Complex
 # Discover
+# Open
+# Close
+# Reopen
 # Init
 # Read
 # ReadLow
@@ -51,7 +54,7 @@ sub new($) {
 	return bless {
 		hash => $hash,
 	    #-- module version
-		version => "7.05"
+		version => "7.08"
 	}, $class;
 }
 
@@ -81,7 +84,6 @@ sub Define($) {
     my $dev  = $a[2];
     $hash->{DeviceName} = $dev;
     
-    
     #-- Second step in case of CUNO: See if we can open it
     my $msg = "OWX_CCC::Define COC/CUNO device $dev";
     #-- hash des COC/CUNO
@@ -109,8 +111,6 @@ sub Define($) {
     #-- reset the 1-Wire system in COC/CUNO
     main::CUL_SimpleWrite($hwdevice, "Oi");
       
-    #-- module version
-	$hash->{version}      = "7.0beta2";
     main::Log3 $name,1,"OWX_CCC::Define warning: version ".$hash->{version}." not identical to OWX version ".$main::owx_version
       if( $hash->{version} ne $main::owx_version);
       
@@ -294,6 +294,39 @@ sub Discover () {
     main::Log3 $name,1, "OWX_CCC::Discover No answer to device search";
     return 0;
   }
+}
+
+########################################################################################
+#
+# Open - Open Device
+#
+########################################################################################
+
+sub Open () {
+  my ($self) = @_;
+  my $hash = $self->{hash};
+}
+
+########################################################################################
+#
+# Close - Close Device
+#
+########################################################################################
+
+sub Close () {
+  my ($self) = @_;
+  my $hash = $self->{hash};
+ 
+}
+
+########################################################################################
+#
+# Reopen - Reopen Device
+#
+########################################################################################
+
+sub Reopen () {
+  main::Log 1,"[OWX_CCC] Warning: ->Reopen currently not defined
 }
 
 ########################################################################################
@@ -598,11 +631,15 @@ sub Write(@) {
 
 <a name="OWX_CCC"></a>
 <h3>OWX_CCC</h3>
+<ul>
 See <a href="/fhem/docs/commandref.html#OWX">OWX</a>
+</ul>
 =end html
 =begin html_DE
 
 <a name="OWX_CCC"></a>
 <h3>OWX_CCC</h3>
+<ul>
 <a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#OWX">OWX</a> 
+</ul>
 =end html_DE
