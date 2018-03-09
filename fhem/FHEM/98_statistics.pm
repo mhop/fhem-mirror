@@ -124,7 +124,6 @@ sub statistics_Initialize($)
   $hash->{DefFn}     = "statistics_Define";
   $hash->{UndefFn}   = "statistics_Undefine";
   $hash->{NotifyFn}  = "statistics_Notify";
-  $hash->{NOTIFYDEV} = "global";
   $hash->{SetFn}     = "statistics_Set";
 
   $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
@@ -155,13 +154,16 @@ sub statistics_Define($$)
 
   my $name = $a[0];
   my $devName = $a[2];
-
+  
   if (@a == 4) {$hash->{PREFIX} = $a[3];}
   else {$hash->{PREFIX} = "stat";}
  
   eval { "Hallo" =~ m/^$devName$/ };
   return "Bad regexp: $@"  if($@);
   $hash->{DEV_REGEXP} = $devName;
+
+  # Only global and the devices in devName should trigger the notify sub of statistics
+  $hash->{NOTIFYDEV} = "global,".$devName;
 
   $hash->{STATE} = "Waiting for notifications";
   $hash->{fhem}{modulVersion} = '$Date$';
@@ -1158,7 +1160,6 @@ sub statistics_UpdateDevReading($$$$)
 
 <a name="statistics"></a>
 <h3>statistics</h3>
-(en | <a href="http://fhem.de/commandref_DE.html#statistics">de</a>)
 <div>
 <ul>
   This modul calculates for certain readings of given devices statistical values and adds them to the devices.
@@ -1326,7 +1327,6 @@ sub statistics_UpdateDevReading($$$$)
 
 <a name="statistics"></a>
 <h3>statistics</h3>
-(<a href="http://fhem.de/commandref.html#statistics">en</a> | de)
 <div>
 <ul>
   Dieses Modul wertet von den angegebenen Ger&auml;ten (als regul&auml;rer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
