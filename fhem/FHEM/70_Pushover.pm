@@ -354,17 +354,34 @@ sub Pushover_SendCommand($$;$\%) {
         $http_proto = "http";
     }
 
-    $cmd .= "&" if ( $cmd ne "" );
-    $cmd .= "token=" . $hash->{APP_TOKEN};
+    my %header = (
+        Agent            => 'FHEM-Pushover/1.0.0',
+        'User-Agent'     => 'FHEM-Pushover/1.0.0',
+        Accept           => 'application/json;charset=UTF-8',
+        'Accept-Charset' => 'UTF-8',
+    );
+
+    my $multipart = 0;
+    if ( $cmd =~ /^--(.+)\r?\nContent-Disposition:/im ) {
+        $multipart = 1;
+
+        $header{'Content-Type'} = "multipart/form-data; boundary=" . $1;
+        Log3 $name, 5,
+          "Pushover $name: Sending as content type " . $header{'Content-Type'};
+    }
 
     if ( !defined( $type->{USER_KEY} ) ) {
-        $cmd .= "&user=" . $hash->{USER_KEY};
+        $cmd = Pushover_HttpForm( $cmd, $multipart,
+            { "user" => $hash->{USER_KEY}, "token" => $hash->{APP_TOKEN} } );
     }
     else {
         Log3 $name, 4,
           "Pushover $name: USER_KEY found in device name: " . $type->{USER_KEY};
-        $cmd .= "&user=" . $type->{USER_KEY};
+        $cmd = Pushover_HttpForm( $cmd, $multipart,
+            { "user" => $type->{USER_KEY}, "token" => $hash->{APP_TOKEN} } );
     }
+
+    $cmd .= "--" if ($multipart);
 
     my $URL;
     my $response;
@@ -417,12 +434,7 @@ sub Pushover_SendCommand($$;$\%) {
                 callback    => \&Pushover_ReceiveCommand,
                 httpversion => "1.1",
                 loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
-                header      => {
-                    Agent            => 'FHEM-Pushover/1.0.0',
-                    'User-Agent'     => 'FHEM-Pushover/1.0.0',
-                    Accept           => 'application/json;charset=UTF-8',
-                    'Accept-Charset' => 'UTF-8',
-                },
+                header      => \%header,
 
                 # sslargs => {
                 #     SSL_verify_mode => 'SSL_verify_PEER',
@@ -455,12 +467,7 @@ sub Pushover_SendCommand($$;$\%) {
                 callback    => \&Pushover_ReceiveCommand,
                 httpversion => "1.1",
                 loglevel    => AttrVal( $name, "httpLoglevel", 4 ),
-                header      => {
-                    Agent            => 'FHEM-Pushover/1.0.0',
-                    'User-Agent'     => 'FHEM-Pushover/1.0.0',
-                    Accept           => 'application/json;charset=UTF-8',
-                    'Accept-Charset' => 'UTF-8',
-                },
+                header      => \%header,
             }
         );
     }
@@ -1097,6 +1104,8 @@ sub Pushover_SetMessage2 ($$$$) {
           if ( defined( $h->{cancel_id} )
             && $values{priority}
             && $values{priority} == 2 );
+
+        $values{attachment} = $h->{attachment} ? $h->{attachment} : undef;
     }
 
     # glances
@@ -1159,117 +1168,31 @@ sub Pushover_SetMessage2 ($$$$) {
           );
     }
 
-    my $body;
-    $body = "title=" . urlEncode( $values{title} )
-      if ( defined( $values{title} ) );
+    # set timestamp if desired
+    $values{timestamp} = int( time() )
+      if ( !$values{timestamp}
+        && 1 == AttrVal( $hash->{NAME}, "timestamp", 0 ) );
 
-    if ( $values{message} ) {
-        if ( $values{message} =~ /^\s*nohtml:\s*(.*)$/i ) {
-            Log3 $name, 4,
-              "Pushover $name: explicitly ignoring HTML tags in message";
-            $values{message} = $1;
-        }
-        elsif ( $values{message} =~
-            m/\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>|\<br\s?\/?\>/i )
-        {
-            Log3 $name, 4, "Pushover $name: handling message with HTML content";
-            $body .= "&html=1";
-
-            # replace \n by <br /> but ignore \\n
-            $values{message} =~ s/(?<!\\)(\\n)/<br \/>/g;
-        }
-
-        # HttpUtil's urlEncode() does not handle \n but would escape %
-        # so we encode first
-        $values{message} = urlEncode( $values{message} );
-
-        # replace any URL-encoded \n with their hex equivalent but ignore \\n
-        $values{message} =~ s/(?<!%5c)(%5cn)/%0a/g;
-
-        # replace any URL-encoded \\n by \n
-        $values{message} =~ s/%5c%5cn/%5cn/g;
-
-        $body .= "&message=" . $values{message};
-    }
-
-    elsif ( $values{text} ) {
-
-        # HttpUtil's urlEncode() does not handle \n but would escape %
-        # so we encode first
-        $values{text} = urlEncode( $values{text} );
-
-        # replace any URL-encoded \n with their hex equivalent but ignore \\n
-        $values{text} =~ s/(?<!%5c)(%5cn)/%0a/g;
-
-        # replace any URL-encoded \\n by \n
-        $values{text} =~ s/%5c%5cn/%5cn/g;
-
-        $body .= "&text=" . $values{text};
-    }
-
-    if ( $values{subtext} ) {
-
-        # HttpUtil's urlEncode() does not handle \n but would escape %
-        # so we encode first
-        $values{subtext} = urlEncode( $values{subtext} );
-
-        # replace any URL-encoded \n with their hex equivalent but ignore \\n
-        $values{subtext} =~ s/(?<!%5c)(%5cn)/%0a/g;
-
-        # replace any URL-encoded \\n by \n
-        $values{subtext} =~ s/%5c%5cn/%5cn/g;
-
-        $body .= "&subtext=" . $values{subtext};
-    }
-
-    if ( defined( $values{count} ) ) {
-        $body .= "&count=" . $values{count};
-    }
-
-    if ( defined( $values{percent} ) ) {
-        $body .= "&percent=" . $values{percent};
-    }
-
-    if ( $values{device} ) {
-        $body .= "&device=" . $values{device};
-    }
-
-    if ( $values{priority} ) {
+    # correct priority
+    if ( defined( $values{priority} ) ) {
         $values{priority} = 2  if ( $values{priority} > 2 );
         $values{priority} = -2 if ( $values{priority} < -2 );
-        $body .= "&priority=" . $values{priority};
+
+        # callback
+        if ( $callback && $values{priority} > 1 ) {
+            Log3 $name, 5,
+              "Pushover $name: Adding emergency callback URL $callback";
+            $values{callback} = $callback;
+        }
     }
 
-    if ( $values{sound} ) {
-        $body .= "&sound=" . $values{sound};
-    }
-
-    if ( defined( $values{retry} ) ) {
-        $body .= "&retry=" . $values{retry};
-    }
-
-    if ( defined( $values{expire} ) ) {
-        $body .= "&expire=" . $values{expire};
-
+    if ( $values{expire} ) {
         $values{cbNr} = round( time(), 0 ) + $values{expire};
         my $cbReading = "cb_" . $values{cbNr};
         until ( ReadingsVal( $name, $cbReading, "" ) eq "" ) {
             $values{cbNr}++;
             $cbReading = "cb_" . $values{cbNr};
         }
-    }
-
-    if ( $values{timestamp} ) {
-        $body .= "&timestamp=" . $values{timestamp};
-    }
-    elsif ( 1 == AttrVal( $hash->{NAME}, "timestamp", 0 ) ) {
-        $body .= "&timestamp=" . int( time() );
-    }
-
-    if ( $callback && $values{priority} && $values{priority} > 1 ) {
-        Log3 $name, 5,
-          "Pushover $name: Adding emergency callback URL $callback";
-        $body .= "&callback=" . $callback;
     }
 
     if (   $values{url_title}
@@ -1300,12 +1223,42 @@ sub Pushover_SetMessage2 ($$$$) {
 "Pushover $name: Adding supplementary URL '$values{url_title}' ($url) with "
           . "action '$values{action}' (expires after $values{expire} => "
           . "$values{cbNr})";
-        $body =
-            $body
-          . "&url_title="
-          . urlEncode( $values{url_title} ) . "&url="
-          . urlEncode($url);
+
+        $values{url} = $url;
     }
+
+    # generate body text
+    my $body;
+    my $multipart = 0;
+    $multipart = 1 if ( $values{attachment} );
+
+    if ( defined( $values{message} ) ) {
+        if ( $values{message} =~ /^\s*nohtml:\s*(.*)$/i ) {
+            Log3 $name, 4,
+              "Pushover $name: explicitly ignoring HTML tags in message";
+            $values{message} = $1;
+        }
+        elsif ( $values{message} =~
+            m/\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>|\<br\s?\/?\>/i )
+        {
+            Log3 $name, 4, "Pushover $name: handling message with HTML content";
+            $body = Pushover_HttpForm( $body, $multipart, "html", "1" );
+
+            # replace \n by <br /> but ignore \\n
+            $values{message} =~ s/(?<!\\)(\\n)/<br \/>/g;
+        }
+    }
+
+    if ( defined( $values{attachment} ) ) {
+        my $path =
+          "file://"
+          . AttrVal( $name, "storage", AttrVal( "global", "modpath", "." ) );
+        $path .= "/" unless ( $path =~ /\/$/ );
+
+        $values{attachment} = $path . $values{attachment};
+    }
+
+    $body = Pushover_HttpForm( $body, $multipart, \%values );
 
     # cleanup callback readings
     keys %{ $hash->{READINGS} };
@@ -1396,6 +1349,82 @@ sub Pushover_CancelMessage ($$$$) {
     return $return;
 }
 
+sub Pushover_HttpForm ($$$;$) {
+    my ( $ret, $multipart, $h, $v ) = @_;
+    $h = { $h => $v } unless ( ref $h eq "HASH" );
+
+    my $boundary = "--msgsgmnt";
+
+    keys %$h;
+    while ( my ( $n, $val ) = each %$h ) {
+        next unless ( defined($val) );
+        $v = $val;
+
+        # multipart/form-data
+        if ($multipart) {
+            $ret = "--$boundary"
+              unless ( $ret && $ret ne "" );
+
+            if ( $multipart eq "2" || $v =~ /^file:\/\/(.*)/i ) {
+                $v = $1 if ( defined($1) );
+                next unless ( $v =~ /(\w|[-.])+$/ );
+                my $fn = $0;
+
+                my ( $err, @content ) =
+                  FileRead( { FileName => $v, ForceType => "file" } );
+                if ( defined($err) ) {
+                    Log 5, "Pushover_HttpForm: Unable to read file $v: $err";
+                    next;
+                }
+
+                my $MIMEtype = filename2MIMEType($v);
+                $v = join( $/, @content );
+                $ret .=
+                    "\r\nContent-Disposition: form-data; "
+                  . "name=\"$n\"; "
+                  . "filename=\"$fn\""
+                  . "\r\nContent-Type: $MIMEtype";
+            }
+            else {
+                $ret .= "\r\nContent-Disposition: form-data; name=\"$n\"";
+                $v =~ s/\\n/\r\n/g;
+            }
+
+            $ret .= "\r\n\r\n$v\r\n--$boundary";
+        }
+
+        # application/x-www-form-urlencoded
+        else {
+            $ret = Pushover_HttpUri( $ret, $n, $v );
+        }
+
+    }
+
+    return $ret;
+}
+
+sub Pushover_HttpUri ($$;$) {
+    my ( $uri, $h, $v ) = @_;
+    $h = { $h => $v } unless ( ref $h eq "HASH" );
+
+    keys %$h;
+    while ( my ( $n, $val ) = each %$h ) {
+        $v = urlEncode($val);
+
+        # replace any URL-encoded \n with their hex equivalent
+        # but ignore \\n
+        $v =~ s/(?<!%5c)(%5cn)/%0a/g;
+
+        # replace any URL-encoded \\n by \n
+        $v =~ s/%5c%5cn/%5cn/g;
+
+        $uri .= "&" if ($uri);
+        $uri .= "$n=$v";
+    }
+
+    return $uri;
+}
+
 1;
 
 ###############################################################################
@@ -1460,6 +1489,7 @@ sub Pushover_CancelMessage ($$$$) {
     <code><b>cancel_id</b>&nbsp;</code> - type: text - Custom ID to immediate expire messages with priority &gt;=2 and disable reoccuring notification.<br>
     <code><b>timestamp</b>&nbsp;</code> - type: integer - A Unix timestamp of your message's date and time to display to the user, rather than the time your message is received by the Pushover servers. Takes precendence over attribute timestamp=1.<br>
     <code><b>sound</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text -  The name of one of the <a href="https://pushover.net/api#sounds">sounds</a> supported by device clients to override the user's default sound choice.<br>
+    <code><b>attachment</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - type: text -  Path to an image file that should be attached to the message. The base path is relative to the FHEM directory and may be overwritten using the storage attribute.<br>
     <br>
     Examples:
     <ul>
@@ -1470,6 +1500,7 @@ sub Pushover_CancelMessage ($$$$) {
       <code>set Pushover1 msg message="Pushover message using explicit option for text content." This part of the text will be ignored.</code><br>
       <code>set Pushover1 msg This is a message with a title. title="This is a subject"</code><br>
       <code>set Pushover1 msg title="This is a subject, too!" This is another message with a title set at the beginning of the command.</code><br>
+      <code>set Pushover1 msg This message has an attachment! attachment="demolog/pictures/p1.jpg"</code><br>
       <code>set Pushover1 msg title=Emergency priority=2 retry=30 expire=3600 Security issue in living room.</code><br>
       <code>set Pushover1 msg title=Link Have a look to this website: url_title="Open" action="http://fhem.de/" expire=3600</code><br>
       <code>set Pushover1 msg title=Hint expire=3600 This is a reminder to do something. Action will expire in 1h. url_title="Click here for action" action="set device something"</code><br>
@@ -1577,6 +1608,9 @@ sub Pushover_CancelMessage ($$$$) {
     <li><a name="PushoverAttrsound"></a><code>sound</code><br>
         Will be used as the default sound if sound argument is missing. If left blank the adjusted sound of the app will be used. 
     </li>
+    <li><a name="PushoverAttrstorage"></a><code>storage</code><br>
+        Will be used as the default path when sending attachments, otherwise global attribute modpath will be used.
+    </li>
   </ul>
   <br>
   <a name="PushoverEvents"></a>
@@ -1637,12 +1671,13 @@ sub Pushover_CancelMessage ($$$$) {
     <code><b>title</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text - Dein Nachrichten Titel, andernfalls wird der App Name wie in der Pushover API festgelegt verwendet.<br>
     <code><b>action</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text - Entweder ein auszuf&uuml;hrendes FHEM Kommando, wenn der Empf&auml;nger den Link anklickt oder eine <a href="https://pushover.net/api#urls">supplementary URL</a>, die mit der Nachricht zusammen angezeigt werden soll.<br>
     <code><b>url_title</b>&nbsp;</code> - Typ: Text - Ein Titel f&uuml;r das FHEM Kommando oder die supplementary URL, andernfalls wird die URL direkt angezeigt.<br>
-    <code><b>priority</b>&nbsp;&nbsp;</code> - Type: Integer - Sende mit -2, um keine/n Benachrichtigung/Alarm zu generieren. Sende mit -1, um immer eine lautlose Benachrichtigung zu senden. Sende mit 1, um die Nachricht mit <a href="https://pushover.net/api#priority">hoher Priorit&auml;t</a> anzuzeigen und die Ruhezeiten des Empf&auml;ngers zu umgehen. Oder sende mit 2, um zus&auml;tzlich eine Best&auml;tigung des Empf&auml;ngers anzufordern.<br>
-    <code><b>retry</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Type: Integer - Verpflichtend bei einer Nachrichten Priorit&auml;t &gt;= 2.<br>
-    <code><b>expire</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Type: Integer - Verpflichtend bei einer Nachrichten Priorit&auml;t &gt;= 2.<br>
-    <code><b>cancel_id</b>&nbsp;</code> - type: text - Benutzerdefinierte ID, um Nachrichten mit einer Priorit&auml;t &gt;= 2 sofort ablaufen zu lassen und die wiederholte Benachrichtigung auszuschalten.<br>
-    <code><b>timestamp</b>&nbsp;</code> - Type: Integer - Ein Unix Zeitstempfel mit Datum und Uhrzeit deiner Nachricht, die dem Empf&auml;nger statt der Uhrzeit des Einganges auf den Pushover Servern angezeigt wird. Hat Vorrang bei gesetztem Attribut timestamp=1.<br>
+    <code><b>priority</b>&nbsp;&nbsp;</code> - Typ: Integer - Sende mit -2, um keine/n Benachrichtigung/Alarm zu generieren. Sende mit -1, um immer eine lautlose Benachrichtigung zu senden. Sende mit 1, um die Nachricht mit <a href="https://pushover.net/api#priority">hoher Priorit&auml;t</a> anzuzeigen und die Ruhezeiten des Empf&auml;ngers zu umgehen. Oder sende mit 2, um zus&auml;tzlich eine Best&auml;tigung des Empf&auml;ngers anzufordern.<br>
+    <code><b>retry</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Integer - Verpflichtend bei einer Nachrichten Priorit&auml;t &gt;= 2.<br>
+    <code><b>expire</b>&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Integer - Verpflichtend bei einer Nachrichten Priorit&auml;t &gt;= 2.<br>
+    <code><b>cancel_id</b>&nbsp;</code> - Typ: Text - Benutzerdefinierte ID, um Nachrichten mit einer Priorit&auml;t &gt;= 2 sofort ablaufen zu lassen und die wiederholte Benachrichtigung auszuschalten.<br>
+    <code><b>timestamp</b>&nbsp;</code> - Typ: Integer - Ein Unix Zeitstempfel mit Datum und Uhrzeit deiner Nachricht, die dem Empf&auml;nger statt der Uhrzeit des Einganges auf den Pushover Servern angezeigt wird. Hat Vorrang bei gesetztem Attribut timestamp=1.<br>
     <code><b>sound</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text -  Der Name eines vom Empf&auml;ngerger&auml;t unterst&uuml;tzten <a href="https://pushover.net/api#sounds">Klangs</a>, um den vom Empf&auml;nger ausgew&auml;hlten Klang zu &uuml;berschreiben.<br>
+    <code><b>attachment</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> - Typ: Text -  Pfad zu einer Bilddatei, welche an die Nachricht angeh&auml;ngt werden soll. Der Basispfad ist relativ zum FHEM Verzeichnis und kann &uuml;ber das storage Attribut &uuml;berschrieben werden.<br>
     <br>
     Beispiele:
     <ul>
@@ -1652,6 +1687,7 @@ sub Pushover_CancelMessage ($$$$) {
       <code>set Pushover1 msg 'Eine andere Pushover Nachricht in einfachen Anf&auml;hrungszeichen.'</code><br>
       <code>set Pushover1 msg message="Pushover Nachricht, die die explizite Nachrichten Option f&uuml;r den Textinhalt verwendet." Dieser Teil des Textes wird ignoriert.</code><br>
       <code>set Pushover1 msg Dies ist eine Nachricht mit einem Titel. title="Dies ist ein Betreff"</code><br>
+      <code>set Pushover1 msg Diese Nachricht hat einen Anhang! attachment="demolog/pictures/p1.jpg"</code><br>
       <code>set Pushover1 msg title="Dies ist auch ein Betreff!" Dies ist eine weitere Nachricht mit einem Titel, der am Anfang des Kommandos gesetzt ist.</code><br>
       <code>set Pushover1 msg title=Notfall priority=2 retry=30 expire=3600 Sicherheits-Alarm im Wohnzimmer.</code><br>
       <code>set Pushover1 msg title=Link Schau dir mal diese Website an: url_title="&Ouml;ffnen" action="http://fhem.de/" expire=3600</code><br>
@@ -1758,6 +1794,9 @@ sub Pushover_CancelMessage ($$$$) {
     </li>
     <li><a name="PushoverAttrsound"></a><code>sound</code><br>
         Wird beim Senden als Titel verwendet, sofern dieser nicht als Aufrufargument angegeben wurde. Kann auch generell entfallen, dann wird der eingestellte Ton der App verwendet.
+    </li>
+    <li><a name="PushoverAttrstorage"></a><code>storage</code><br>
+        Wird als Standardpfad beim Versand von Anh&auml;ngen verwendet, ansonsten wird das globale Attribut modpath benutzt.
     </li>
   </ul>
   <br>
