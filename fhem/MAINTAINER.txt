@@ -416,7 +416,6 @@ FHEM/98_CULflash.pm          rudolfkoenig         Sonstiges
 FHEM/98_DLNARenderer.pm      dominikkarall        Multimedia
 FHEM/98_DOIF.pm              damian-s             Automatisierung/DOIF
 FHEM/98_DOIFtools.pm         Ellert               Automatisierung/DOIF
-FHEM/98_EDIPLUG.pm           Wzut                 Sonstige Systeme
 FHEM/98_FReplacer.pm         stefanstrobel        Sonstiges
 FHEM/98_GAEBUS.pm            jamesgo              Heizungssteuerung/Raumklima
 FHEM/98_GEOFANCY.pm          loredo               Unterstuetzende Dienste
@@ -533,6 +532,7 @@ contrib/23_WEBTHERM.pm       betateilchen/sachag  Sonstiges
 contrib/70_ONKYO_AVR_PULL.pm loredo               Multimedia
 contrib/92_rsyslog.pm        DS_Starter           Automatisierung
 contrib/98_exportdevice.pm   loredo               Sonstiges
+contrib/98_EDIPLUG.pm        Wzut                 Sonstige Systeme
 contrib/98_FileLogConvert.pm DeeSPe               Automatisierung
 contrib/betateilchen/*       betateilchen         Sonstiges
 holiday/by_ext.holiday       loredo               Sonstiges
