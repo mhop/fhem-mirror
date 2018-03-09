@@ -69,6 +69,7 @@ sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
   my %meterTypes = ( ITF => "80 GetMeasuredValue.cgi" 
                     ,EFR => "80 json.txt"
                   ,LS110 => "80 a?f=j"
+                  ,LS120 => "80 a?f=j"
                   );
 
  ##############################################################
@@ -81,10 +82,12 @@ sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
     [3, "meterType", "meterType", 0, 0] # {"meterId": "0000000061015736", "meterType": "Simplex", "interval": 0, "entry": [
    ,[4, "timestamp", "deviceTime", 0, 0] # {"timestamp": 1389296286, "periodEntries": [
    ,[3, "cnt", "electricityConsumed", 3, 1] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
+   ,[3, "cs0", "electricityConsumed", 3, 1] 
    ,[3, "energy", "electricityConsumed", 3, 1] # {"status":"ok","result":[{"energy":ENERGY,"energyOut":ENERGYOUT,"time":TIME},...]}
    ,[3, "energyOUT", "electricityProduced", 3, 1] # {"status":"ok","result":[{"energy":ENERGY,"energyOut":ENERGYOUT,"time":TIME},...]}
    ,[3, "power", "electricityPower", 3, 1] # {"status":"ok","result":[{"power":POWER,"time":TIME}]}
    ,[3, "pwr", "electricityPower", 1, 0] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
+   ,[3, "ps0", "electricityPower", 1, 0] 
    ,[1, "010000090B00", "deviceTime", 0, 0] #   { "obis":"010000090B00","value":"dd.mm.yyyy,hh:mm"}
    ,[2, "0.0.0", "meterID", 0, 0] # {"obis": "0.0.0", "scale": 0, "value": 1627477814, "unit": "", "valueString": "0000000061015736" }, 
    ,[1, "0100000000FF", "meterID", 0, 0] #  #   { "obis":"0100000000FF","value":"xxxxx"},
@@ -192,12 +195,11 @@ JSONMETER_Define($$)
 
   $hash->{NAME} = $name;
 
-  $hash->{STATE}      = "Initializing" if $interval > 0;
-  $hash->{STATE}      = "Manual mode" if $interval == 0;
-  $hash->{HOST}       = $host if $type ne "file";
-  $hash->{INTERVAL}   = $interval;
-  $hash->{NOTIFYDEV}  = "global";
-  $hash->{deviceType} = $type;
+  $hash->{STATE}    = "Initializing" if $interval > 0;
+  $hash->{STATE}    = "Manual mode" if $interval == 0;
+  $hash->{HOST}     = $host if $type ne "file";
+  $hash->{INTERVAL} = $interval;
+  $hash->{MODEL}    = $type;
 
   RemoveInternalTimer($hash);
   #Get first data after 13 seconds
@@ -358,7 +360,7 @@ JSONMETER_GetUpdate($)
 {
    my ($hash) = @_;
    my $name = $hash->{NAME};
-   my $type = $hash->{deviceType};
+   my $type = $hash->{MODEL};
    
    
    if(!$hash->{LOCAL} && $hash->{INTERVAL} > 0) {
@@ -388,7 +390,7 @@ sub JSONMETER_GetJsonFile ($)
     my ($name) = @_;
     my $returnStr;
     my $hash = $defs{$name};
-    my $type = $hash->{deviceType};
+    my $type = $hash->{MODEL};
     my $ip = "";
     $ip = $hash->{HOST} if defined $hash->{HOST};
     
@@ -954,7 +956,8 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>attr <device> pathString ?LogName=<i>user</i>&LogPSWD=<i>password</i></code>
             </li>
-         <li><b>LS110</b> - <a href="http://www.youless.nl/productdetails/product/ls110.html">YouLess LS110</a> network sensor (counter) for electro mechanical electricity meter</li>
+         <li><b>LS110</b> - <a href="http://www.youless.nl/downloads-ls110.html">YouLess LS110</a> network sensor (counter) for electro mechanical electricity meter</li>
+         <li><b>LS120</b> - <a href="http://www.youless.nl/winkel/product/ls120.html">YouLess LS120</a> new model</li>
          <li><b>url</b> - use the URL defined via the attributes 'pathString' and 'port'</li>
          <li><b>file</b> - use the file defined via the attribute 'pathString' (positioned in the FHEM file system)</li>
      </ul>
@@ -1086,7 +1089,8 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login-Information wird &uuml;ber das Attribute 'pathstring' angegeben.
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>?LogName=<i>Benutzer</i>&LogPSWD=<i>Passwort</i></code></li>
-         <li><b>LS110</b> - <a href="http://www.youless.nl/productdetails/product/ls110.html">YouLess LS110</a> Netzwerkf&auml;higer Sensor f&uuml;r elektromechanische Stromz&auml;hler</li>
+         <li><b>LS110</b> - <a href="http://www.youless.nl/downloads-ls110.html">YouLess LS110</a> Netzwerkf&auml;higer Sensor f&uuml;r elektromechanische Stromz&auml;hler</li>
+         <li><b>LS120</b> - <a href="http://www.youless.nl/winkel/product/ls120.html">YouLess LS120</a> Neues Modell</li>
          <li><b>url</b> - benutzt die URL, welche durch das Attribut 'pathString' und 'port' definiert wird.</li>
          <li><b>file</b> - benutzt die Datei, welche durch das Attribut 'pathString' definiert wird (im FHEM Dateisystem)</li>
       </ul>
