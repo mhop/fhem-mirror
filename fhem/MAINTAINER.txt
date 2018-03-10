@@ -353,9 +353,7 @@ FHEM/77_SMAEM.pm             VolkerKettenbach     Sonstige Systeme
 FHEM/77_SMASTP.pm            VolkerKettenbach     Sonstige Systeme
 FHEM/79_BDKM.pm              arnoaugustin         Heizungssteuerung/Raumklima (bitte auch PM)
 FHEM/80_M232.pm              neubert              Sonstige Systeme
-FHEM/80_xxLG7000.pm          markusbloch          Multimedia
 FHEM/81_M232Counter.pm       neubert              Sonstige Systeme
-FHEM/82_LGTV.pm              markusbloch          Multimedia
 FHEM/82_LGTV_IP12.pm         markusbloch          Multimedia
 FHEM/82_LGTV_WebOS.pm        CoolTux              Multimedia
 FHEM/82_M232Voltage.pm       neubert              Sonstige Systeme
@@ -425,7 +423,6 @@ FHEM/98_HTTPMOD.pm           stefanstrobel        Sonstiges
 FHEM/98_Arducounter.pm       stefanstrobel        Sonstiges
 FHEM/98_Hyperion.pm          DeeSPe               Beleuchtung
 FHEM/98_IF.pm                damian-s             Automatisierung
-FHEM/98_JsonList.pm          mfr69bs              Automatisierung
 FHEM/98_JsonList2.pm         rudolfkoenig         Automatisierung
 FHEM/98_Modbus.pm            stefanstrobel        Sonstiges
 FHEM/98_ModbusAttr.pm        stefanstrobel        Sonstiges
