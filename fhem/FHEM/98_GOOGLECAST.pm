@@ -7,9 +7,13 @@
 # FHEM module to communicate with Google Cast devices
 # e.g. Chromecast Video, Chromecast Audio, Google Home
 #
-# Version: 2.1.1
+# Version: 2.1.2
 #
 #############################################################
+#
+# v2.1.2 - 20180310
+# - BUGFIX:   fix speak, play, displayWebsite
+# - FEATURE:  added German commandref (thx@Sailor)
 #
 # v2.1.1 - 20180303
 # - BUGFIX:   fix crash on connection failures
@@ -146,7 +150,7 @@ sub GOOGLECAST_Initialize($) {
     $hash->{AttrList} = "favoriteURL_1 favoriteURL_2 favoriteURL_3 favoriteURL_4 ".
                         "favoriteURL_5 ".$readingFnAttributes;
 
-    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.1.1";
+    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.1.2";
 
     return undef;
 }
@@ -176,7 +180,7 @@ sub GOOGLECAST_findChromecasts {
     my ($name) = split("\\|", $string);
     my $result = "$name";
 
-    my @ccResult = GOOGLECAST_findChromecastsPython();
+    my @ccResult = GOOGLECAST_PyFindChromecasts();
     foreach my $ref_cc (@ccResult) {
         my @cc = @$ref_cc;
         $result .= "|CCDEVICE|".$cc[0]."|".$cc[1]."|".$cc[2]."|".$cc[3]."|".Encode::encode('UTF-8', $cc[4]);
@@ -206,7 +210,7 @@ sub GOOGLECAST_findChromecastsResult {
         if($ccResult[$i] eq "CCDEVICE" and $ccResult[$i+5] eq $devName) {
             Log3 $hash, 4, "GOOGLECAST ($hash->{NAME}): init cast device $devName";
             eval {
-              $hash->{helper}{ccdevice} = GOOGLECAST_createChromecastPython($ccResult[$i+1],$ccResult[$i+2],$ccResult[$i+3],$ccResult[$i+4],$ccResult[$i+5]);
+              $hash->{helper}{ccdevice} = GOOGLECAST_PyCreateChromecast($ccResult[$i+1],$ccResult[$i+2],$ccResult[$i+3],$ccResult[$i+4],$ccResult[$i+5]);
             };
             if($@) {
               $hash->{helper}{ccdevice} = "";
@@ -301,7 +305,7 @@ sub GOOGLECAST_setWebsite {
     my ($hash, $url) = @_;
 
     eval {
-       GOOGLECAST_loadDashCast($hash->{helper}{ccdevice}, $url);
+       GOOGLECAST_PyLoadDashCast($hash->{helper}{ccdevice}, $url);
     };
 }
 
@@ -317,7 +321,7 @@ sub GOOGLECAST_setSpeak {
     Log3 $hash, 4, "GOOGLECAST($hash->{NAME}): setSpeak $ttsUrl";
 
     eval {
-        $hash->{helper}{ccdevice}->{media_controller}->play_media($ttsUrl, "audio/mpeg");
+        GOOGLECAST_PyPlayMedia($hash->{helper}{ccdevice}, $ttsUrl, "audio/mpeg");
     };
     return undef;
 }
@@ -333,7 +337,7 @@ sub GOOGLECAST_setPlayType {
     } else {
         eval {
             Log3 $hash, 4, "GOOGLECAST($hash->{NAME}): start play_media";
-            $hash->{helper}{ccdevice}->{media_controller}->play_media($url, $mime);
+            GOOGLECAST_PyPlayMedia($hash->{helper}{ccdevice}, $url, $mime);
         };
     }
 
@@ -410,7 +414,7 @@ sub GOOGLECAST_setPlayYtDlBlocking {
     my $videoUrl = "";
 
     eval {
-        $videoUrl = GOOGLECAST_getYTVideoURLPython($ytUrl);
+        $videoUrl = GOOGLECAST_PyGetYTVideoURL($ytUrl);
     };
 
 
@@ -452,7 +456,7 @@ sub GOOGLECAST_setPlay {
         #https://github.com/rg3/youtube-dl/blob/master/docs/supportedsites.md
         GOOGLECAST_setPlayMedia($hash, $url);
     } else {
-        GOOGLECAST_playYouTube($hash->{helper}{ccdevice}, $url);
+        GOOGLECAST_PyPlayYouTube($hash->{helper}{ccdevice}, $url);
     }
 
     return undef;
@@ -684,16 +688,22 @@ import youtube_dl
 import pychromecast.controllers.dashcast as dashcast
 import pychromecast.controllers.youtube as youtube
 
-def GOOGLECAST_findChromecastsPython():
+def GOOGLECAST_PyFindChromecasts():
     logging.basicConfig(level=logging.CRITICAL)
     return pychromecast.discovery.discover_chromecasts()
 
-def GOOGLECAST_createChromecastPython(ip, port, uuid, model_name, friendly_name):
+def GOOGLECAST_PyCreateChromecast(ip, port, uuid, model_name, friendly_name):
     logging.basicConfig(level=logging.CRITICAL)
-    cast = pychromecast._get_chromecast_from_host((ip, int(port), uuid, model_name, friendly_name), blocking=False, timeout=0.1, tries=1, retry_wait=0.1)
+    cast = pychromecast._get_chromecast_from_host((ip.decode("utf-8"), int(port), uuid.decode("utf-8"), model_name.decode("utf-8"), friendly_name.decode("utf-8")), blocking=False, timeout=0.1, tries=1, retry_wait=0.1)
     return cast
 
-def GOOGLECAST_getYTVideoURLPython(yt_url):
+def GOOGLECAST_PyPlayMedia(cast, url, mime):
+    logging.basicConfig(level=logging.CRITICAL)
+    cast.play_media(url.decode("utf-8"), mime.decode("utf-8"))
+    return undef
+
+def GOOGLECAST_PyGetYTVideoURL(yt_url):
+    yt_url = yt_url.decode("utf-8")
     ydl = youtube_dl.YoutubeDL({'forceurl': True, 'simulate': True, 'quiet': '1', 'no_warnings': '1', 'skip_download': True, 'format': 'best', 'youtube_include_dash_manifest': False})
 
     result = ydl.extract_info(yt_url, download=False)
@@ -708,12 +718,14 @@ def GOOGLECAST_getYTVideoURLPython(yt_url):
     video_url = video['url']
     return video_url
 
-def GOOGLECAST_loadDashCast(cast, url):
+def GOOGLECAST_PyLoadDashCast(cast, url):
+    url = url.decode("utf-8")
     d = dashcast.DashCastController()
     cast.register_handler(d)
     d.load_url(url,reload_seconds=60)
 
-def GOOGLECAST_playYouTube(cast, videoId):
+def GOOGLECAST_PyPlayYouTube(cast, videoId):
+    videoId = videoId.decode("utf-8")
     yt = youtube.YouTubeController()
     cast.register_handler(yt)
     yt.play_video(videoId)
@@ -801,5 +813,77 @@ PYTHON_CODE_END
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="GOOGLECAST"></a>
+<h3>GOOGLECAST</h3>
+<ul>
+  GOOGLECAST wird zur Steueung deines Google Cast Devices verwendet<br><br>
+        <b>Note</b><br>Es ist sicherzustellen, dass  python3 installiert ist. Zus&auml;tzlich werden folgende Pakete ben&ouml;tigt:
+        <ul>
+          <li>sudo apt-get install libwww-perl python-enum34 python-dev libextutils-makemaker-cpanfile-perl python3-pip cpanminus</li>
+          <li>sudo pip3 install pychromecast --upgrade</li>
+          <li>sudo pip3 install youtube-dl --upgrade</li>
+          <li>sudo INLINE_PYTHON_EXECUTABLE=/usr/bin/python3 cpanm Inline::Python</li>
+        </ul>
+
+  <br>
+  <br>
+  <a name="GOOGLECASTdefine" id="GOOGLECASTdefine"></a>
+    <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; GOOGLECAST &lt;name&gt;</code><br>
+    <br>
+    Beispiel:
+    <ul>
+      <code>define livingroom.chromecast GOOGLECAST livingroom</code><br><br>
+      Warte ein paar Sekunden bis das Ger&auml;t als ONLINE angezeigt wird...<br><br>
+      <code>set livingroom.chromecast play https://www.youtube.com/watch?v=YE7VzlLtp-4</code><br>
+    </ul>
+    <br>
+    Die folgenden Medienformate werden unterst&uuml;tzt:<br>
+    <a href="https://developers.google.com/cast/docs/media">Unterst&uuml;tzte Medienformate</a><br>
+    Das Abspielen mittels youtube-dl funktioniert f&uuml;r die folgenden URLs:<br>
+    <a href="https://rg3.github.io/youtube-dl/supportedsites.html">Unterst&uuml;tzte youtube-dl - Seiten</a><br>
+    <br>
+  </ul>
+
+  <br>
+
+  <a name="GOOGLECASTset" id="GOOGLECASTset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
+               Die folgenden Befehle sind definiert:<br><br>
+        <ul>
+          <li><code><b>play</b> URL</code> &nbsp;&nbsp;-&nbsp;&nbsp; Abspielen einer URL</li>
+          <li><code><b>play</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; Abspielen im Sinne von Wiederaufnahme eines zuvor pausierten Abspielvorgangs</li>
+          <li><code><b>playFavorite</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; spielt die URL aus den Favoriten favoriteURL_[1-5] ab</li>
+          <li><code><b>stop</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; unterbricht den augenblicklichen Abspielvorgang</li>
+          <li><code><b>pause</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; pause</li>
+          <li><code><b>quitApp</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; schlie&szlig;t die gegenw&auml;rtige Applikation wie beispielsweise YouTube</li>
+          <li><code><b>skip</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; unterbricht das gegenw&auml;rtige Kapitel bzw. Lied und springt zum N&auml;chsten</li>
+          <li><code><b>rewind</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; springt zum Anfang des gegenw&auml;rtigen Kapitels bzw. Liedes</li>
+          <li><code><b>displayWebsite</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; anzeigen einer Webseite auf Chromecast Video</li>
+        </ul>
+    <br>
+    </ul>
+    
+    <a name="GOOGLECASTattr" id="GOOGLECASTattr"></a>
+        <b>Attribute</b>
+          <ul>
+            <li><code><b>favoriteURL_[1-5]</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; Abspeichern von URL - Favoriten um mittels playFavorite [1-5] - Befehl abgespielt zu werden.</li>
+         </ul>
+         <br>
+
+    <a name="GOOGLECASTget" id="GOOGLECASTget"></a>
+        <b>Get</b>
+          <ul>
+            <code>n/a</code>
+         </ul>
+         <br>
+
+</ul>
+=end html_DE
 =cut
 
