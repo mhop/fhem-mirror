@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: V3.8.9, commandref revised
   - feature: fhem.pl: OldReading* added (Forum #85406)
   - feature: 93_DbRep: V7.14.3, minTimestamp - get lowest timestamp in database
   - bugfix:  72_FB_CALLLIST: fix broken german umlaut in timestamps on 

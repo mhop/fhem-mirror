@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.8.9      10.03.2018       commandref revised
 # 3.8.8      05.03.2018       fix device doesn't exit if configuration couldn't be read
 # 3.8.7      28.02.2018       changed DbLog_sampleDataFn - no change limits got fron SVG, commandref revised
 # 3.8.6      25.02.2018       commandref revised (forum:#84953)
@@ -190,7 +191,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.8.8";
+my $DbLogVersion = "3.8.9";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -5092,7 +5093,11 @@ sub dbReadings($@) {
   <b>Preparations</b> <br><br>
   
   At first you need to setup the database. <br>
-  Sample code and Scripts to prepare a MySQL/PostgreSQL/SQLite database you can find in <code>contrib/dblog/&lt;DBType&gt;_create.sql</code>.
+  Sample code and Scripts to prepare a MySQL/PostgreSQL/SQLite database you can find in 
+  <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/dblog">SVN -&gt; contrib/dblog/db_create_&lt;DBType&gt;.sql</a>. <br>
+  (<b>Caution:</b> The local FHEM-Installation subdirectory ./contrib/dblog doesn't contain the freshest scripts !!) 
+  <br><br>
+  
   The database contains two tables: <code>current</code> and <code>history</code>. <br>
   The latter contains all events whereas the former only contains the last event for any given reading and device. 
   Please consider the <a href="#DbLogattr">attribute</a> DbLogType implicitly to determine the usage of tables  
@@ -5118,8 +5123,10 @@ sub dbReadings($@) {
 	
   <b>create index</b> <br>
   Due to reading performance, e.g. on creation of SVG-plots, it is very important that the <b>index "Search_Idx"</b>
-  or a comparable index (e.g. a primary key) is applied. A sample code for creation of that index is also available at the mentioned scripts in
-  <code>contrib/dblog/&lt;DBType&gt;_create.sql</code>. <br><br>
+  or a comparable index (e.g. a primary key) is applied. 
+  A sample code for creation of that index is also available in mentioned scripts of
+  <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/dblog">SVN -&gt; contrib/dblog/db_create_&lt;DBType&gt;.sql</a>. 
+  <br><br>
   
   The index "Search_Idx" can be created, e.g. in database 'fhem', by these statements (also subsequently): <br><br>
   
@@ -5235,6 +5242,25 @@ sub dbReadings($@) {
     By using <a href="https://fhem.de/commandref.html#SVG">SVG</a> database content can be visualized. <br>
  	Beyond that the module <a href="https://fhem.de/commandref.html#DbRep">DbRep</a> can be used to prepare tabular 
 	database reports or you can manage the database content with available functions of that module. 
+	<br><br><br>
+    
+	<b>Troubleshooting</b> <br><br>
+    If after successful definition the DbLog-device doesn't work as expected, the following notes may help:  
+    <br><br>
+    
+    <ul>
+    <li> Have the preparatory steps as described in commandref been done ? (install software components, create tables and index) </li>
+    <li> Was "set &lt;name&gt; configCheck" executed after definition and potential errors fixed or rather the hints implemented ? </li>
+    <li> If configDB is used ... has the database configuration file been imported into configDB (e.g. by "configDB fileimport ./db.conf") ? </li>
+    <li> When creating a SVG-plot and no drop-down list with proposed values appear -> set attribute "DbLogType" to "Current/History". </li>
+    </ul>
+    <br>
+    
+    If the notes don't lead to success, please increase verbose level of the DbLog-device to 4 or 5 and observe entries in
+	logfile relating to the DbLog-device.
+    
+    For problem analysis please post the output of "list &lt;name&gt;", the result of "set &lt;name&gt; configCheck" and the 
+    logfile entries of DbLog-device to the forum thread.
 	<br><br>
 	
   </ul>
@@ -6039,8 +6065,12 @@ sub dbReadings($@) {
   <b>Vorbereitungen</b> <br><br>
   
   Zunächst muss die Datenbank angelegt werden. <br>
-  Beispielcode bzw. Scripts zum Erstellen einer MySQL/PostgreSQL/SQLite Datenbank ist in <code>contrib/dblog/&lt;DBType&gt;_create.sql</code> 
-  enthalten.
+  Beispielcode bzw. Scripts zum Erstellen einer MySQL/PostgreSQL/SQLite Datenbank ist im 
+  <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/dblog">SVN -&gt; contrib/dblog/db_create_&lt;DBType&gt;.sql</a>
+  enthalten. <br>
+  (<b>Achtung:</b> Die lokale FHEM-Installation enthält im Unterverzeichnis ./contrib/dblog nicht die aktuellsten 
+  Scripte !!) <br><br>
+  
   Die Datenbank beinhaltet 2 Tabellen: <code>current</code> und <code>history</code>. <br>
   Die Tabelle <code>current</code> enthält den letzten Stand pro Device und Reading. <br>
   In der Tabelle <code>history</code> sind alle Events historisch gespeichert. <br>
@@ -6081,8 +6111,9 @@ sub dbReadings($@) {
 	</ul>
 	<br>
   
-  Der Code zur Anlage ist ebenfalls mit in den Scripten in
-  <code>contrib/dblog/&lt;DBType&gt;_create.sql</code> enthalten. <br><br>
+  Der Code zur Anlage ist ebenfalls in den Scripten
+  <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/dblog">SVN -&gt; contrib/dblog/db_create_&lt;DBType&gt;.sql</a> 
+  enthalten. <br><br>
 	
   Für die Verbindung zur Datenbank wird eine <b>Konfigurationsdatei</b> verwendet. 
   Die Konfiguration ist in einer sparaten Datei abgelegt um das Datenbankpasswort nicht in Klartext in der 
@@ -6189,6 +6220,25 @@ sub dbReadings($@) {
     Mit Hilfe <a href="https://fhem.de/commandref_DE.html#SVG">SVG</a> können Datenbankinhalte visualisiert werden. <br>
  	Darüber hinaus kann das Modul <a href="https://fhem.de/commandref_DE.html#DbRep">DbRep</a> genutzt werden um tabellarische 
 	Datenbankauswertungen anzufertigen oder den Datenbankinhalt mit den zur Verfügung stehenden Funktionen zu verwalten. 
+	<br><br><br>
+    
+	<b>Troubleshooting</b> <br><br>
+    Wenn nach der erfolgreichen Definition das DbLog-Device nicht wie erwartet arbeitet,  
+    können folgende Hinweise hilfreich sein: <br><br>
+    
+    <ul>
+    <li> Wurden die vorbereitenden Schritte gemacht, die in der commandref beschrieben sind ? (Softwarekomponenten installieren, Tabellen, Index anlegen) </li>
+    <li> Wurde ein "set &lt;name&gt; configCheck" nach dem Define durchgeführt und eventuelle Fehler beseitigt bzw. Empfehlungen umgesetzt ? </li>
+    <li> Falls configDB in Benutzung ... wurde das DB-Konfigurationsfile in configDB importiert (z.B. mit "configDB fileimport ./db.conf") ? </li>
+    <li> Beim Anlegen eines SVG-Plots erscheint keine Drop-Down Liste mit Vorschlagswerten -> Attribut "DbLogType" auf "Current/History" setzen. </li>
+    </ul>
+    <br>
+    
+    Sollten diese Hinweise nicht zum Erfolg führen, bitte den verbose-Level im DbLog Device auf 4 oder 5 hochsetzen und 
+    die Einträge bezüglich des DbLog-Device im Logfile beachten.
+    
+    Zur Problemanalyse bitte die Ausgabe von "list &lt;name&gt;", das Ergebnis von "set &lt;name&gt; configCheck" und die 
+    Ausgaben des DbLog-Device im Logfile im Forumthread posten.
 	<br><br>
 	
   </ul>
