@@ -175,6 +175,8 @@ USF1000_Parse($$)
 1;
 
 =pod
+=item summary    USF1000S ultrasonic level transmitter communicating over FHZ
+=item summary_DE USF1000S Ultraschall-F&uuml;llstandsmesser angebunden &uuml;ber FHZ
 =begin html
 
 <a name="USF1000"></a>

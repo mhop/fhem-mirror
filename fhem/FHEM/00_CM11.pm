@@ -740,6 +740,8 @@ CM11_Ready($$)
 1;
 
 =pod
+=item summary    CM11 PC interface to receive and send X10 messages
+=item summary_DE CM11 PC Interface zum Empfangen und Senden von X10
 =begin html
 
 <a name="CM11"></a>

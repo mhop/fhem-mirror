@@ -117,6 +117,8 @@ M232Voltage_Define($$)
 1;
 
 =pod
+=item summary    analog input of ELV M232 module
+=item summary_DE analoger Anschluss eines ELV-M232-Moduls
 =begin html
 
 <a name="M232Voltage"></a>

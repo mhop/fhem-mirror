@@ -533,6 +533,8 @@ X10_Parse($$)
 1;
 
 =pod
+=item summary    devices communicating via the X10 protocol
+=item summary_DE Anbindung von X10-Ger&auml;ten
 =begin html
 
 <a name="X10"></a>

@@ -126,6 +126,8 @@ sub HXB_Read($)
 
 
 =pod
+=item summary    receive multicast messages from Hexabus devices
+=item summary_DE empfange Multicast-Nachrichten von Hexabus-Ger&auml;ten
 =begin html
 
 <a name="HXB"></a>

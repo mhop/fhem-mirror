@@ -254,6 +254,8 @@ M232Counter_Define($$)
 1;
 
 =pod
+=item summary    digital input of a ELV M232 module
+=item summary_DE digitaler Eingang eines ELV-M232-Moduls
 =begin html
 
 <a name="M232Counter"></a>

@@ -280,6 +280,8 @@ HXBDevice_Parse($$)
 #############################
 
 =pod
+=item summary    receive multicast messages from a Hexabus device
+=item summary_DE empfange Multicast-Nachrichten von einem Hexabus-Ger&auml;
 =begin html
 
 <a name="HXBDevice"></a>

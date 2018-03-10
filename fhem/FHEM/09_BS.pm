@@ -127,6 +127,8 @@ BS_Parse($$)
 1;
 
 =pod
+=item summary    BS brightness sensor communicating over FHZ
+=item summary_DE BS Helligkeitssenor angebunden &uuml;ber FHZ
 =begin html
 
 <a name="BS"></a>

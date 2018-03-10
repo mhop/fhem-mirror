@@ -347,6 +347,8 @@ DONE:
 1;
 
 =pod
+=item summary    connection to ELV M232 module
+=item summary_DE Anbindung eines ELV-M232-Moduls
 =begin html
 
 <a name="M232"></a>
