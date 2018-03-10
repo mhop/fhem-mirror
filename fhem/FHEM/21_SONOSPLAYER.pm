@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, February 2018
+# SONOSPLAYER.pm (c) by Reiner Leins, March 2018
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -210,7 +210,7 @@ sub SONOSPLAYER_Define ($$) {
 	my ($hash, $def) = @_;
 	
 	# Check if we just want a modify...
-	if ($hash->{NAME}) {
+	if (defined($hash->{OLDDEF})) {
 		SONOS_Log undef, 1, 'Modify SonosPlayer-Device: '.$hash->{NAME};
 		
 		# Alle Timer entfernen...
@@ -297,29 +297,26 @@ sub SONOSPLAYER_Detail($$$;$) {
 ########################################################################################
 sub SONOSPLAYER_Attribute($$$@) {
 	my ($mode, $devName, $attrName, $attrValue) = @_;
+	my $hash = SONOS_getSonosPlayerByName($devName);
 	
 	if ($mode eq 'set') {
 		if ($attrName =~ m/^(min|max)Volume(|Headphone)$/) {
-			my $hash = SONOS_getSonosPlayerByName($devName);
-			
 			SONOS_DoWork($hash->{UDN}, 'setMinMaxVolumes', $attrName, $attrValue);
+		} elsif ($attrName eq 'disable' && $attrValue == 0) {
+			SONOS_DoWork($hash->{UDN}, 'setAttribute', $attrName, $attrValue);
+			SONOS_DoWork('SONOS', 'rescanNetwork');
 		} elsif ($attrName =~ m/^(getTitleInfoFromMaster|stopSleeptimerInAction|saveSleeptimerInAction)$/) {
-			my $hash = SONOS_getSonosPlayerByName($devName);
-			
 			SONOS_DoWork($hash->{UDN}, 'setAttribute', $attrName, $attrValue);
 		}
 	} elsif ($mode eq 'del') {
 		if ($attrName =~ m/^minVolume(|Headphone)$/) {
-			my $hash = SONOS_getSonosPlayerByName($devName);
-			
 			SONOS_DoWork($hash->{UDN}, 'setMinMaxVolumes', $attrName, 0);
 		} elsif ($attrName =~ m/^maxVolume(|Headphone)$/) {
-			my $hash = SONOS_getSonosPlayerByName($devName);
-			
 			SONOS_DoWork($hash->{UDN}, 'setMinMaxVolumes', $attrName, 100);
+		} elsif ($attrName eq 'disable') {
+			SONOS_DoWork($hash->{UDN}, 'deleteAttribute', $attrName);
+			SONOS_DoWork('SONOS', 'rescanNetwork');
 		} elsif ($attrName =~ m/^(getTitleInfoFromMaster|stopSleeptimerInAction|saveSleeptimerInAction)$/) {
-			my $hash = SONOS_getSonosPlayerByName($devName);
-			
 			SONOS_DoWork($hash->{UDN}, 'deleteAttribute', $attrName);
 		}
 	}
@@ -422,7 +419,7 @@ sub SONOSPLAYER_SimulateCurrentTrackPosition() {
 	
 	my $trackPositionSec = 0;
 	if (ReadingsVal($hash->{NAME}, 'transportState', 'STOPPED') eq 'PLAYING') {
-		$trackPositionSec = time - SONOS_GetTimeFromString(ReadingsTimestamp($hash->{NAME}, 'currentTrackPositionSec', 0)) + ReadingsVal($hash->{NAME}, 'currentTrackPositionSec', 0);
+		$trackPositionSec = sprintf("%.0f", time - SONOS_GetTimeFromString(ReadingsTimestamp($hash->{NAME}, 'currentTrackPositionSec', 0)) + ReadingsVal($hash->{NAME}, 'currentTrackPositionSec', 0));
 	} else {
 		$trackPositionSec = ReadingsVal($hash->{NAME}, 'currentTrackPositionSec', 0);
 	}
@@ -914,7 +911,7 @@ sub SONOSPLAYER_Set($@) {
 				my $udnShort = $1 if ($dHash->{UDN} =~ m/(.*)_MR/); 
 				
 				# Wenn dieses Quell-Device eine Playbar ist, dann den optischen Eingang als Quelle wählen...
-				if (ReadingsVal($dHash->{NAME}, 'playerType', '') eq 'S9') {
+				if ((ReadingsVal($dHash->{NAME}, 'playerType', '') eq 'S9') || (ReadingsVal($dHash->{NAME}, 'playerType', '') eq 'S11')) {
 					# Das ganze geht nur bei dem eigenen Eingang, ansonsten eine Gruppenwiedergabe starten
 					if ($dHash->{NAME} eq $hash->{NAME}) {
 						$value = 'x-sonos-htastream:'.$udnShort.':spdif';

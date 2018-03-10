@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, February 2018
+# SONOS.pm (c) by Reiner Leins, March 2018
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -51,6 +51,13 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 10.03.2018
+#	Die PlayBase kann nun auch den SPDIF-Eingang aktivieren (wie die PlayBar)
+#	Wenn man über Alexa Musik hört, wird das aktuelle Cover nun auch angezeigt.
+#	Wenn ein Player nach einem Neustart disabled war, und während des Betriebs enabled wird, wird nun versucht ihn wiederzufinden.
+#	Wenn ein Player disabled oder disappeared ist, wird ein Proxy-Cover-Zugriffsversuch auf diesen Player unterbunden.
+#	Ein Modify-Befehlsaufruf wird nun am Vorhandensein von $hash->{OLDDEF} erkannt.
+#	Bei einigen PERL-Installationen stand im Reading 'currentTrackPositionSimulatedSec' eine Kommazahl (da sie von time() aus berechnet wird). Diese Zahl wird nun gerundet.
 # 26.02.2018
 #	ComObjectTransportQueue in Client_ReceiveQueue umbenannt.
 #	If-Abfrage um die can_read-Schleife im SubProzess eingebaut, Um Signalunterbrechungen zu berücksichtigen.
@@ -71,10 +78,6 @@
 #	Die Angabe in LastProcessAnswer ist nicht Zeitumstellungsfest. Der Wert wurde nun umgestellt auf epoch-Zeit.
 #	Der Verweis auf %intAt wurde entfernt. Die Variable wurde sowieso nie verwendet.
 #	Warnungsunterdrückung von 'mumpitzstuff' eingebaut.
-# 28.09.2017
-#	Provider-Icons werden wieder korrekt ermittelt
-#	Das Verarbeiten der Arbeitsschlange im SubProcess wurde optimiert
-#	Die Fehlermeldung mit den redundanten Argumenten bei sprintf wurde umgestellt.
 #
 ########################################################################################
 #
@@ -694,22 +697,41 @@ sub SONOS_FhemWebCallback($) {
 		my $albumurl = uri_unescape($1) if ($URL =~ m/^\/proxy\/aa\?url=(.*)/i);
 		$albumurl =~ s/&apos;/'/ig;
 		
+		SONOS_Log undef, 5, 'FHEMWEB-AlbumURL: '.$albumurl;
+		
 		# Nur für Sonos-Player den Proxy spielen (und für Spotify-Links)
 		my $ip = '';
 		$ip = $1 if ($albumurl =~ m/^http:\/\/(.*?)[:\/]/i);
+		my $player_found = 0;
+		my $player_inactive = 0;
 		for my $player (SONOS_getAllSonosplayerDevices()) {
 			if (ReadingsVal($player->{NAME}, 'location', '') =~ m/^http:\/\/$ip:/i) {
-				undef($ip);
+				if ((ReadingsVal($player->{NAME}, 'presence', '') eq 'disappeared') || AttrVal($player->{NAME}, 'disable', 0)) {
+					$player_inactive = 1;
+				}
+				
+				$player_found = 1;
 				last;
 			}
 		}
-		return ("text/html; charset=UTF8", 'Call for Non-Sonos-Player: '.$URL) 
-			if (defined($ip) 
-			&& $albumurl !~ /\.cloudfront.net\//i 
-			&& $albumurl !~ /\.scdn.co\//i 
-			&& $albumurl !~ /sonos-logo\.ws\.sonos\.com\//i 
-			&& $albumurl !~ /\.tunein\.com/i 
-			&& $albumurl !~ /\/music\/image\?/i);
+		
+		SONOS_Log undef, 5, 'FHEMWEB-PlayerFound: '.$player_found;
+		SONOS_Log undef, 5, 'FHEMWEB-PlayerInactive: '.$player_inactive;
+		
+		# Für Inaktive oder andere Player, einfach das leere Cover liefern...
+		if (!$player_found) {
+			if ($albumurl !~ /\.cloudfront.net\//i 
+				&& $albumurl !~ /\.scdn.co\//i 
+				&& $albumurl !~ /sonos-logo\.ws\.sonos\.com\//i 
+				&& $albumurl !~ /\.tunein\.com/i 
+				&& $albumurl !~ /\/music\/image\?/i
+				&& $albumurl !~ /media-amazon\.com/i) {
+				return ("text/html; charset=UTF8", 'Call for Non-Sonos-Player: '.$URL);
+			}
+		} elsif ($player_inactive) {
+			FW_serveSpecial('sonos_empty', 'jpg', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
+			return (undef, undef);
+		}
 		
 		# Generierter Dateiname für die Cache-Funktionalitaet
 		my $albumHash;
@@ -892,7 +914,7 @@ sub SONOS_Define($$) {
 	my @a = split("[ \t]+", $def);
 	
 	# Check if we just want a modify...
-	if ($hash->{NAME}) {
+	if (defined($hash->{OLDDEF})) {
 		SONOS_Log undef, 1, 'Modify Device: '.$hash->{NAME};
 		
 		# Alle Timer entfernen...
@@ -1601,8 +1623,8 @@ sub SONOS_Read($) {
 					$nextName = 'Next';
 				}
 					
-				my $tempURI = $3;
-				my $groundURL = $4;
+				my $tempURI = uri_unescape($3);
+				my $groundURL = uri_unescape($4);
 				my $currentValue;
 			
 				my $srcURI = '';
@@ -2375,7 +2397,7 @@ sub SONOS_DoWork($$;@) {
 #
 ########################################################################################
 sub SONOS_Discover() {
-	SONOS_Log undef, 3, 'UPnP-Thread gestartet.';
+	SONOS_Log undef, 1, 'UPnP-Thread gestartet.';
 	
 	$SIG{'PIPE'} = 'IGNORE';
 	$SIG{'CHLD'} = 'IGNORE';
@@ -2443,7 +2465,7 @@ sub SONOS_Discover() {
 	
 	SONOS_SaveBookmarkValues();
 	
-	SONOS_Log undef, 3, 'UPnP-Thread wurde beendet.';
+	SONOS_Log undef, 1, 'UPnP-Thread wurde beendet.';
 	$SONOS_Thread = -1;
 	
 	return 1;
@@ -5201,7 +5223,10 @@ sub SONOS_GetTrackProvider($;$) {
 	}
 	
 	my ($a, $b, $c) = eval {
-		my %musicServices = %{eval(SONOS_Client_Data_Retreive('undef', 'reading', 'MusicServicesList', '()'))};
+		my $musicServicesReading = SONOS_Client_Data_Retreive('undef', 'reading', 'MusicServicesList', undef);
+		my %musicServices = ();
+		%musicServices = %{eval($musicServicesReading)} if (defined($musicServicesReading));
+		
 		if ($songURI =~ m/sid=(\d+)/i) {
 			my $sid = $1;
 			
@@ -6823,11 +6848,11 @@ sub SONOS_TransportCallback($$) {
 		my $tempURI = '';
 		$tempURI = ($1) if ($tempURIground =~ m/<upnp:albumArtURI>(.*?)<\/upnp:albumArtURI>/i);
 		# Wenn in der URI bereits ein kompletter Pfad drinsteht, dann diese Basis verwenden (passiert bei Wiedergabe vom iPad z.B.)
-		if ($tempURI =~ m/^(http:\/\/.*?\/)(.*)/) {
+		if ($tempURI =~ m/^(http(s|):\/\/.*?\/)(.*)/) {
 			$groundURL = $1;
-			$tempURI = $2;
+			$tempURI = $3;
 		}
-		SONOS_Client_Notifier('ProcessCover:'.$udn.':0:'.$tempURI.':'.$groundURL);
+		SONOS_Client_Notifier('ProcessCover:'.$udn.':0:'.SONOS_URI_Escape($tempURI).':'.SONOS_URI_Escape($groundURL));
 		
 		# Auch hier den XML-Parser verhindern, und alles per regulärem Ausdruck ermitteln...
 		if ($currentTrackMetaData =~ m/<dc:title>x-(sonosapi|rincon)-(stream|mp3radio):.*?<\/dc:title>/) {
@@ -6894,7 +6919,7 @@ sub SONOS_TransportCallback($$) {
 				}
 				SONOS_Client_Notifier('SetCurrent:Artist:');
 				
-				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/input_default.jpg:');
+				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:'.SONOS_URI_Escape('/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/input_default.jpg').':');
 			} elsif ($currentTrackURI =~ m/x-sonos-dock:(RINCON_[\dA-Z]+)/) {
 				# Dock-Wiedergabe feststellen, und dann andere Informationen anzeigen
 				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentAlbum', SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1)));
@@ -6906,7 +6931,7 @@ sub SONOS_TransportCallback($$) {
 				
 				$SONOS_BookmarkSpeicher{OldTitles}{$udn} = SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentTitle', $tmpTitle);
 				
-				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/input_dock.jpg:');
+				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:'.SONOS_URI_Escape('/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/input_dock.jpg').':');
 			} elsif ($currentTrackURI =~ m/x-sonos-htastream:(RINCON_[\dA-Z]+):spdif/) {
 				# LineIn-Wiedergabe der Playbar feststellen, und dann andere Informationen anzeigen
 				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1));
@@ -6915,7 +6940,7 @@ sub SONOS_TransportCallback($$) {
 				
 				$SONOS_BookmarkSpeicher{OldTitles}{$udn} = 'SPDIF-Wiedergabe von '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
 				
-				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/input_tv.jpg:');
+				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:'.SONOS_URI_Escape('/'.SONOS_Client_Data_Retreive('undef', 'attr', 'webname', 'fhem').'/sonos/cover/input_tv.jpg').':');
 			} else {
 				# Titel ermitteln
 				if ($currentTrackMetaData =~ m/<dc:title>(.*?)<\/dc:title>/i) {
@@ -6977,7 +7002,7 @@ sub SONOS_TransportCallback($$) {
 		
 		$tempURI = '';
 		$tempURI = ($1) if ($tempURIground =~ m/<upnp:albumArtURI>(.*?)<\/upnp:albumArtURI>/i);
-		SONOS_Client_Notifier('ProcessCover:'.$udn.':1:'.$tempURI.':'.$groundURL);
+		SONOS_Client_Notifier('ProcessCover:'.$udn.':1:'.SONOS_URI_Escape($tempURI).':'.SONOS_URI_Escape($groundURL));
 		
 		SONOS_Client_Notifier('SetCurrent:nextTitle:'.$1) if ($nextTrackMetaData =~ m/<dc:title>(.*?)<\/dc:title>/i);
 		
@@ -10016,7 +10041,12 @@ sub SONOS_Client_Data_Refresh($$$$) {
 	
 	SONOS_Log undef, 4, 'SONOS_Client_Data_Refresh('.(defined($sendCommand) ? $sendCommand : 'undef').", $udn, $name, ".(defined($value) ? $value : 'undef').')';
 	
-	$SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name} = $value;
+	if (!defined($value)) {
+		undef($SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name});
+	} else {
+		$SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name} = $value;
+	}
+	
 	if (defined($sendCommand) && ($sendCommand ne '')) {
 		SONOS_Client_Notifier($sendCommand.':'.$udn.':'.$name.':'.(defined($value) ? $value : 'undef'));
 	}
