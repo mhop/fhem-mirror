@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.4.2";
+my $HOMEMODE_version = "1.4.3";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -1174,8 +1174,17 @@ sub HOMEMODE_RESIDENTS($;$)
   my $name = $hash->{NAME};
   my $events = deviceEvents($defs{$dev},1);
   my $devtype = $defs{$dev}->{TYPE};
+  Log3 $name,5,"$name: HOMEMODE_RESIDENTS dev: $dev type: $devtype";
   my $lad = ReadingsVal($name,"lastActivityByResident","");
   my $mode;
+  # my $emh = ReplaceEventMap($dev,"home",1);
+  my $ema = ReplaceEventMap($dev,"absent",1);
+  # my $emaw = ReplaceEventMap($dev,"awoken",1);
+  my $emas = ReplaceEventMap($dev,"asleep",1);
+  my $emp = ReplaceEventMap($dev,"present",1);
+  my $emg = ReplaceEventMap($dev,"gone",1);
+  # my $emgs = ReplaceEventMap($dev,"gotosleep",1);
+  my $emn = ReplaceEventMap($dev,"none",1);
   if (grep /^state:\s/,@{$events})
   {
     foreach (@{$events})
@@ -1206,23 +1215,25 @@ sub HOMEMODE_RESIDENTS($;$)
       $rx =~ s/,/|/g;
       CommandSet(undef,"$name:FILTER=location!=underway location underway") if (ReadingsVal($name,"state","") =~ /^absent|gone$/ && !devspec2array("$rx:FILTER=wayhome=1"));
     }
-    if (grep /^presence:\sabsent$/,@{$events})
+    if (grep /^presence:\s$ema$/,@{$events})
     {
+      Log3 $name,5,"$name: HOMEMODE_RESIDENTS dev: $dev - presence: $ema";
       push @commands,AttrVal($name,"HomeCMDpresence-absent-resident","") if (AttrVal($name,"HomeCMDpresence-absent-resident",undef));
       push @commands,AttrVal($name,"HomeCMDpresence-absent-$dev","") if (AttrVal($name,"HomeCMDpresence-absent-$dev",undef));
       readingsSingleUpdate($hash,"lastAbsentByResident",$dev,1);
     }
-    elsif (grep /^presence:\spresent$/,@{$events})
+    elsif (grep /^presence:\s$emp$/,@{$events})
     {
+      Log3 $name,5,"$name: HOMEMODE_RESIDENTS dev: $dev - presence: $emp";
       push @commands,AttrVal($name,"HomeCMDpresence-present-resident","") if (AttrVal($name,"HomeCMDpresence-present-resident",undef));
       push @commands,AttrVal($name,"HomeCMDpresence-present-$dev","") if (AttrVal($name,"HomeCMDpresence-present-$dev",undef));
       readingsSingleUpdate($hash,"lastPresentByResident",$dev,1);
     }
     if ($mode)
     {
-      if ($mode =~ /^home|awoken$/ && AttrNum($name,"HomeAutoAwoken",0))
+      if ($mode =~ /^(home|awoken)$/ && AttrNum($name,"HomeAutoAwoken",0))
       {
-        if ($mode eq "home" && ReadingsVal($dev,"lastState","") eq "asleep")
+        if ($mode eq "home" && ReadingsVal($dev,"lastState","") eq $emas)
         {
           AnalyzeCommandChain(undef,"sleep 0.1; set $dev:FILTER=state!=awoken state awoken");
           return;
@@ -1234,7 +1245,7 @@ sub HOMEMODE_RESIDENTS($;$)
           CommandDefine(undef,"atTmp_awoken_".$dev."_$name at +$hours set $dev:FILTER=state=awoken state home");
         }
       }
-      if ($mode eq "home" && ReadingsVal($dev,"lastState","") =~ /^(absent|[gn]one)$/ && AttrNum($name,"HomeAutoArrival",0))
+      if ($mode eq "home" && ReadingsVal($dev,"lastState","") =~ /^($ema|$emn|$emg)$/ && AttrNum($name,"HomeAutoArrival",0))
       {
         my $hours = HOMEMODE_hourMaker(AttrNum($name,"HomeAutoArrival",0));
         AnalyzeCommandChain(undef,"sleep 0.1; set $dev:FILTER=location!=arrival location arrival");
@@ -1253,7 +1264,7 @@ sub HOMEMODE_RESIDENTS($;$)
       readingsBulkUpdate($hash,"lastActivityByResident",$dev);
       readingsBulkUpdate($hash,"lastAsleepByResident",$dev) if ($mode eq "asleep");
       readingsBulkUpdate($hash,"lastAwokenByResident",$dev) if ($mode eq "awoken");
-      readingsBulkUpdate($hash,"lastGoneByResident",$dev) if ($mode =~ /^(gone|none)$/);
+      readingsBulkUpdate($hash,"lastGoneByResident",$dev) if ($mode =~ /^[gn]one$/);
       readingsBulkUpdate($hash,"lastGotosleepByResident",$dev) if ($mode eq "gotosleep");
       readingsBulkUpdate($hash,"prevActivityByResident",$lad);
       readingsEndUpdate($hash,1);
@@ -3189,15 +3200,20 @@ sub HOMEMODE_PowerEnergy($;$$$)
   my $name = $hash->{NAME};
   if ($trigger && $read && defined $val)
   {
-    foreach (split /,/,$hash->{SENSORSENERGY})
+    my @spec = devspec2array($hash->{SENSORSENERGY});
+    if (@spec > 1)
     {
-      next unless ($_ ne $trigger);
-      my $v = ReadingsNum($_,$read,0);
-      $val += $v if ($v && $v > 0);
+      foreach (split /,/,$hash->{SENSORSENERGY})
+      {
+        next unless ($_ ne $trigger);
+        my $v = ReadingsNum($_,$read,0);
+        $val += $v if ($v && $v > 0);
+      }
     }
     return if ($val < 0);
     $val = sprintf("%.2f",$val);
-    readingsSingleUpdate($hash,$read,$val,1);
+    my $r = $read eq (split " ",AttrVal($name,"HomeSensorsPowerEnergyReadings","power energy"))[0] ? "power" : "energy";
+    readingsSingleUpdate($hash,$r,$val,1);
   }
   else
   {
