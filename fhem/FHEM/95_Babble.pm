@@ -53,7 +53,7 @@ if  (eval {require RiveScript;1;} ne 1) {
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.31";
+my $babbleversion    = "1.32";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -439,12 +439,11 @@ sub Babble_Get($@) {
 
 sub Babble_save($) {
   my ($hash) = @_;
-  my $date = localtime(time);
+  my $date = TimeNow();
   my $name = $hash->{NAME};
   $hash->{DATA}{"savedate"} = $date;
-  readingsSingleUpdate( $hash, "savedate", $hash->{DATA}{"savedate"}, 1 ); 
-  my $json   = JSON->new->utf8;
-  my $jhash0 = eval{ $json->encode( $hash->{DATA} ) };
+  readingsSingleUpdate( $hash, "savedate", $date, 1 ); 
+  my $jhash0 = toJSON($hash->{DATA});
   if( ReadingsVal($name,"lockstate","locked") ne "locked" ){
     my $error  = FileWrite("babbleFILE",$jhash0);
     #Log3 $name, 1, "         ".Dumper($jhash0);
@@ -1702,7 +1701,7 @@ sub Babble_getplaces($$$) {
     @{$hash->{DATA}{"places"}}  = @places;
     $hash->{DATA}{"re_places"}  = lc("((".join(")|(",@places)."))");
   
-    Babble_save($hash);
+    #Babble_save($hash);
     return;
   #-- just do something with the current list
   }elsif( $type eq "html" ){
@@ -1845,7 +1844,7 @@ sub Babble_getwords($$$$) {
       $hash->{DATA}{"re_writes"} = lc("((".join(")|(",@words)."))");
     }
     delete($hash->{DATA}{"pronouns"});
-    Babble_save($hash);
+    #Babble_save($hash);
     return;
     
   #-- just do something with the current list
