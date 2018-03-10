@@ -43,7 +43,7 @@ my $alarmlinkname   = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "4.03";
+my $alarmversion    = "4.05";
 
 my %alarm_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -269,7 +269,6 @@ sub Alarm_transform($){
   Alarm_save($hash)
     if( $md==1 );
 }
-
 
 #########################################################################################
 #
@@ -510,11 +509,10 @@ sub Alarm_escape($$){
 
 sub Alarm_save($) {
   my ($hash) = @_;
-  my $date = localtime(time);
+  my $date = TimeNow();
   $hash->{DATA}{"savedate"} = $date;
-  readingsSingleUpdate( $hash, "savedate", $hash->{DATA}{"savedate"}, 1 ); 
-  my $json   = JSON->new->utf8;
-  my $jhash0 = eval{ $json->encode( $hash->{DATA} ) };
+  readingsSingleUpdate( $hash, "savedate", $date, 1 ); 
+  my $jhash0 = toJSON($hash->{DATA});
   my $error  = FileWrite("AlarmFILE",$jhash0);
   #Log 1,"[Alarm_save] error=$error";
   return;
@@ -1271,6 +1269,8 @@ sub Alarm_Html($)
           $al .= $i.",";
           $at .= $s.",";
         }
+      }else{
+        $detailstate .= "-";
       }
       $ret .= $s."'";
       $ret .= ",'"
