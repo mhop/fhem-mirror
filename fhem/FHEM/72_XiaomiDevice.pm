@@ -533,7 +533,7 @@ sub XiaomiDevice_Set($$@) {
     $list  .=  ' carpet_mode:on,off' if($hash->{model} ne "rockrobo.vacuum.v1");
     $list  .=  '  sleep:noArg wakeup:noArg';
 
-    $list  .=  ' fan_power:slider,1,1,100' if($hash->{model} eq "rockrobo.vacuum.v1");
+    $list  .=  ' fan_power:slider,1,1,100' if(defined($hash->{model}) && $hash->{model} eq "rockrobo.vacuum.v1");
     $list  .=  ' cleaning_mode:quiet,balanced,turbo,max,mop';
     
 
@@ -1529,7 +1529,7 @@ sub XiaomiDevice_GetSettings($)
   $hash->{helper}{packet}{$packetid} = "get_sound_volume";
   XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_sound_volume","params":[""]}' );
 
-  return undef if($hash->{model} eq "rockrobo.vacuum.v1");
+  return undef if(defined($hash->{model}) && $hash->{model} eq "rockrobo.vacuum.v1");
   
   $packetid = $hash->{helper}{packetid};
   $hash->{helper}{packetid} = $packetid+1;
