@@ -1,7 +1,7 @@
 package OWNet ;
 
 # OWNet module for perl
-# $Id: OWNet.pm,v 1.24 2013/02/02 11:41:28 alfille Exp $
+# $Id$
 #
 # Paul H Alfille -- copyright 2007
 # Part of the OWFS suite:
@@ -97,17 +97,17 @@ Pressure scale can also be specified in the I<address>. Same syntax as the other
 
 =over
 
-=item --mbar     millibar (default)
+=item -mbar     millibar (default)
 
-=item --atm      atmosphere
+=item -atm      atmosphere
 
-=item --mmHg     mm Mercury
+=item -mmHg     mm Mercury
 
-=item --inHg     inch Mercury
+=item -inHg     inch Mercury
 
-=item --psi      pounds per inch^2
+=item -psi      pounds per inch^2
 
-=item --Pa       pascal
+=item -Pa       pascal
 
 =back
 
@@ -133,7 +133,15 @@ Show directories that are themselves directories with a '/' suffix ( e.g. /10.67
 
 =over
 
-=item -slash  show directory elements
+=item --slash  show directory elements
+
+=back
+
+Trim whitespace from numeric values
+
+=over
+
+=item -trim  trim spaces
 
 =back
 
@@ -204,7 +212,7 @@ my $PERSISTENCE_BIT = 0x04 ;
 my $DEFAULT_SG = 0x100 + 0x2 + 0x8 ;
 my $DEFAULT_BLOCK_LENGTH = 33000 ;
 
-our $VERSION=(split(/ /,q[$Revision: 1.24 $]))[1] ;
+our $VERSION=(split(/ /,q[$Revision$]))[1] ;
 
 sub _new($$) {
 	my ($self,$addr) = @_ ;
@@ -245,6 +253,11 @@ sub _new($$) {
 		$format = 0x1000000 , last FORMAT if $addr =~ /-fi/ ;
 	}
 
+	my $trim = 0 ;
+	TRIM: {
+		$trim = 0x00000040 , last TRIM if $addr =~ /-trim/ ;
+	}
+
 	# Verbose flag
 	$self->{VERBOSE} = 1 if $addr =~ /-v/i ;
 	
@@ -267,7 +280,7 @@ sub _new($$) {
 
 	$self->{ADDR} = $addr ;
 	$self->{PORT} = $port ;
-	$self->{SG} = $DEFAULT_SG + $tempscale + $presscale + $format ;
+	$self->{SG} = $DEFAULT_SG + $tempscale + $presscale + $format + $trim ;
 	$self->{VER} = 0 ;
 }
 
@@ -354,8 +367,8 @@ sub _BonjourLookup($) {
 sub _ToServer ($$$$;$) {
 	my ($self, $msg_type, $size, $offset, $payload_data) = @_ ;
 	my $f = "N6" ;
-	my $payload_length = length($payload_data) + 1 ;
-	$f .= 'Z'.$payload_length ;
+	my $payload_length = length($payload_data);
+	$f .= 'A'.$payload_length ;
 	my $message = pack($f,$self->{VER},$payload_length,$msg_type,$self->{SG}|$self->{PERSIST},$size,$offset,$payload_data) ;
 
 	# try to send
@@ -438,8 +451,6 @@ Error (and undef return value) if:
 
 =item 2 No B<owserver> at I<address>
 
-=item
-
 =back
 
 =cut
@@ -488,8 +499,6 @@ Error (and undef return value) if:
 =item 3 Bad I<path>
 
 =item 4 I<path> not a readable device property
-
-=item
 
 =back
 
@@ -541,8 +550,6 @@ Error (and undef return value) if:
 
 =item 5 I<value> incorrect size or format
 
-=item
-
 =back
 
 =cut
@@ -591,8 +598,6 @@ Error (and undef return value) if:
 =item 3 Bad I<path>
 
 =item 4 I<path> not a directory
-
-=item
 
 =back
 
@@ -668,8 +673,6 @@ Error (and undef return value) if:
 =item 3 Bad I<path>
 
 =item 4 I<path> not a device
-
-=item
 
 =back
 

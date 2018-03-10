@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  lib/OWNet.pm: updated to latest version from
+             https://sourceforge.net/p/owfs/code/ci/master/tree/module/
+             ownet/perl5/OWNet/lib/OWNet.pm
   - feature: 66_ECMD: new attribute stop
   - change:  93_DbLog: V3.8.9, commandref revised
   - feature: fhem.pl: OldReading* added (Forum #85406)
