@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  49_TBot_List: deleteonly lists / internal changes 
+  - change:  50_TelegramBot: more silent cmds, caption formatting,several fixes 
   - change:  lib/OWNet.pm: updated to latest version from
              https://sourceforge.net/p/owfs/code/ci/master/tree/module/
              ownet/perl5/OWNet/lib/OWNet.pm
