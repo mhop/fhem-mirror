@@ -2782,7 +2782,7 @@ sub SIGNALduino_ParseHttpResponse
     	{
 	    	my $filename;
 	    	
-	    	if ($param->{httpheader} =~ /Content-Disposition: attachment;filename=\"?([-+.\w]+)?\"/)
+	    	if ($param->{httpheader} =~ /Content-Disposition: attachment;.?filename=\"?([-+.\w]+)?\"?/)
 			{ 
 				$filename = $1;
 			} else {  # Filename via path if not specifyied via Content-Disposition
