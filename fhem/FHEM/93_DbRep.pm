@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.14.4       11.03.2018       increased timeout of BlockingCall in DbRep_firstconnect
 # 7.14.3       07.03.2018       DbRep_firstconnect changed - get lowest timestamp in database, DbRep_Connect deleted
 # 7.14.2       04.03.2018       fix perl warning
 # 7.14.1       01.03.2018       currentfillup_Push bugfix for PostgreSQL
@@ -324,7 +325,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.14.3";
+my $DbRepVersion = "7.14.4";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -1255,7 +1256,7 @@ return undef;
 sub DbRep_firstconnect($) {
   my ($hash) = @_;
   my $name       = $hash->{NAME};
-  my $to         = "10";
+  my $to         = "120";
   my $dbloghash  = $hash->{dbloghash};
   my $dbconn     = $dbloghash->{dbconn};
   my $dbuser     = $dbloghash->{dbuser};
@@ -1265,6 +1266,7 @@ sub DbRep_firstconnect($) {
   if ($init_done == 1) {
       Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser") if($hash->{LASTCMD} ne "minTimestamp");
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_getMinTs", "$name", "DbRep_getMinTsDone", $to, "DbRep_getMinTsAborted", $hash);        
+      $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
   } else {
       InternalTimer(time+1, "DbRep_firstconnect", $hash, 0);
   }
