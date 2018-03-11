@@ -24,6 +24,7 @@
 # ABU 20160116 fixed motd-error due to debug-mode
 # ABU 20160122 fixed doku, changed return value for EIB_Set from undef to "", reintegrated multiple group sending
 # ABU 20160123 fixed issue for sending with additional groups
+# ABU 20180311 added summary in description
 
 package main;
 
@@ -1247,6 +1248,8 @@ eib_name2hex($)
 1;
 
 =pod
+=item summary    Communicates to EIB via TUL (deprecated, use KNX)
+=item summary_DE Kommuniziert mit EIB über TUL (veraltet, nutze KNX)
 =begin html
 
 <a name="EIB"></a>
