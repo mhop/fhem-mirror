@@ -7,9 +7,12 @@
 # FHEM module to communicate with Google Cast devices
 # e.g. Chromecast Video, Chromecast Audio, Google Home
 #
-# Version: 2.1.2
+# Version: 2.1.3
 #
 #############################################################
+#
+# v2.1.3 - 20180311
+# - BUGFIX:   fix umlauts for device name readings
 #
 # v2.1.2 - 20180310
 # - BUGFIX:   fix speak, play, displayWebsite
@@ -150,7 +153,7 @@ sub GOOGLECAST_Initialize($) {
     $hash->{AttrList} = "favoriteURL_1 favoriteURL_2 favoriteURL_3 favoriteURL_4 ".
                         "favoriteURL_5 ".$readingFnAttributes;
 
-    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.1.2";
+    Log3 $hash, 3, "GOOGLECAST: GoogleCast v2.1.3";
 
     return undef;
 }
@@ -626,7 +629,7 @@ sub GOOGLECAST_Read {
     }
 
     GOOGLECAST_updateReading($hash, "presence", "online");
-    GOOGLECAST_updateReading($hash, "name", $hash->{helper}{ccdevice}->{name});
+    GOOGLECAST_updateReading($hash, "name", Encode::encode("UTF-8", $hash->{helper}{ccdevice}->{name}));
     GOOGLECAST_updateReading($hash, "model", $hash->{helper}{ccdevice}->{model_name});
     GOOGLECAST_updateReading($hash, "uuid", $hash->{helper}{ccdevice}->{uuid});
     GOOGLECAST_updateReading($hash, "castType", $hash->{helper}{ccdevice}->{cast_type});
