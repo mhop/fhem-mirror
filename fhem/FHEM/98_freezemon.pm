@@ -22,8 +22,11 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.17:	fixed Warning when fm_logFile is not maintained
+#				Freeze-Handling non-blocking
+#				New attribute fm_whitelistSub
 #		0.0.16:	Minor Logging changes
-#				AUto-delete Logfiles via fm_logKeep
+#				Auto-delete Logfiles via fm_logKeep
 #		0.0.15:	New InternalTimer Handling (#81365) - Thanks to Ansgar (noansi)
 #				New logging function (fm_logFile, fm_logExtraSeconds) incl. get function - Thanks Andy (gandy)
 #				Fixed unescaped characters in commandref (helmut, #84992)
@@ -79,8 +82,9 @@ use POSIX;
 use Time::HiRes qw(gettimeofday);
 use Time::HiRes qw(tv_interval);
 use B qw(svref_2object);
+use Blocking;
 
-my $version  = "0.0.16";
+my $version  = "0.0.17";
 my @logqueue = ();
 
 ###################################
@@ -91,7 +95,7 @@ sub freezemon_Initialize($) {
     # Module specific attributes
     my @freezemon_attr =
       (
-"fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all fm_extDetail:0,1 fm_logExtraSeconds fm_logFile fm_logKeep"
+"fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all fm_extDetail:0,1 fm_logExtraSeconds fm_logFile fm_logKeep fm_whitelistSub"
       );
 
     $hash->{GetFn}             = "freezemon_Get";
@@ -151,6 +155,7 @@ sub freezemon_Undefine($$) {
     my ( $hash, $name ) = @_;
 
     RemoveInternalTimer($hash);
+    BlockingKill( $hash->{helper}{blocking}{pid} ) if ( defined( $hash->{helper}{blocking}{pid} ) );
 
     return undef;
 }
@@ -167,6 +172,34 @@ sub freezemon_Notify($$) {
     freezemon_start($hash);
 }
 ###################################
+sub freezemon_processFreeze($) {
+
+    #my ($name) = @_;
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    #my $hash = $defs{$name};
+    my $log = freezemon_dump_log( $hash, $hash->{helper}{TIMER}, $hash->{helper}{msg} );
+
+    return $name;
+}
+###################################
+sub freezemon_freezeDone($) {
+    my ($name) = @_;
+    my $hash = $defs{$name};
+    Log3 $name, 5, "[Freezemon] $name: Blocking Call with PID $hash->{helper}{blocking}{pid} ended";
+    delete( $hash->{helper}{blocking} );
+}
+
+###################################
+sub freezemon_freezeAbort($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    Log3 $name, 3, "[Freezemon] $name: Blocking Call with PID $hash->{helper}{blocking}{pid} aborted due to timeout";
+    delete( $hash->{helper}{blocking} );
+}
+
+###################################
 sub freezemon_ProcessTimer($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
@@ -178,6 +211,12 @@ sub freezemon_ProcessTimer($) {
 
     #Check Freezes
     if ( $freeze > AttrVal( $name, "fm_freezeThreshold", 1 ) ) {
+        delete $hash->{helper}{logqueue};
+        $hash->{helper}{logqueue} = \@logqueue;
+        $hash->{helper}{now}      = $now;
+        $hash->{helper}{freeze}   = $freeze;
+        my $now    = $hash->{helper}{now};
+        my $freeze = $hash->{helper}{freeze};
         my ( $seconds, $microseconds ) = gettimeofday();
         my $t0  = [gettimeofday];
         my @t   = localtime($seconds);
@@ -277,12 +316,21 @@ sub freezemon_ProcessTimer($) {
             }
 
             #  Create Log(
-            my $msg = strftime(
-                "[Freezemon] $name: possible freeze starting at %H:%M:%S, delay is $freeze possibly caused by $dev",
+            $hash->{helper}{msg} =
+              strftime(
+                "[Freezemon] $name: possible freeze starting at %H:%M:%S, delay is $freeze possibly caused by: $dev",
                 localtime( $hash->{helper}{TIMER} ) );
 
-            my $log = freezemon_dump_log( $hash, $hash->{helper}{TIMER}, $msg );
-            Log3 $name, $loglevel, $msg;
+            my @t = localtime($seconds);
+            my $log = ResolveDateWildcards( AttrVal( $name, "fm_logFile", undef ), @t );
+            $hash->{helper}{logfile} = $log;
+
+            $hash->{helper}{blocking} =
+              BlockingCall( "freezemon_processFreeze", $hash, "freezemon_freezeDone", 300, "freezemon_freezeAbort",
+                $hash );
+            Log3 $name, 5, "[Freezemon] $name: Blocking Call started with PID " . $hash->{helper}{blocking}{pid};
+
+            Log3 $name, $loglevel, $hash->{helper}{msg};
 
             # Build hash with 20 last freezes
             my @freezes = ();
@@ -323,7 +371,6 @@ sub freezemon_ProcessTimer($) {
         );
         my $ms = tv_interval($t0);
         Log3 $name, 5, "[Freezemon] $name: ----------- Ending Freeze handling at $tim after $ms --------";
-
     }
     freezemon_purge_log_before( $hash, $hash->{helper}{TIMER} - AttrVal( $name, "fm_logExtraSeconds", 0 ) )
       if ( AttrVal( $name, "fm_logFile", "" ) ne "" );
@@ -380,8 +427,8 @@ sub freezemon_ProcessTimer($) {
 ###################################
 sub freezemon_Set($@) {
     my ( $hash, $name, $cmd, @args ) = @_;
-	my $usage = "Unknown argument $cmd, choose one of active:noArg inactive:noArg clear:noArg";
-	
+    my $usage = "Unknown argument $cmd, choose one of active:noArg inactive:noArg clear:noArg";
+
     return "\"set $name\" needs at least one argument" unless ( defined($cmd) );
 
     if ( $cmd eq "inactive" ) {
@@ -426,7 +473,7 @@ sub freezemon_Get($@) {
     my $ret   = "";
     my $usage = 'Unknown argument $a[1], choose one of freeze:noArg log:';
 
-    return "\"get $name\" needs at least one argument" unless ( defined($a[1]) );
+    return "\"get $name\" needs at least one argument" unless ( defined( $a[1] ) );
 
     #get the logfiles
     my @fl = freezemon_getLogFiles($name);
@@ -517,7 +564,7 @@ sub freezemon_Attr($) {
             }
         }
         elsif ( $aName eq "fm_logKeep" ) {
-            if ( !looks_like_number($aVal) or $aVal <= 0) {
+            if ( !looks_like_number($aVal) or $aVal <= 0 ) {
                 return "Attribute " . $aName . " has to be a number > 0";
             }
 
@@ -613,6 +660,8 @@ sub freezemon_apptime($) {
     my $n = int(@intAtA);    # @intAtA is sorted ascending by time
     my $i = -1;
 
+    my %blacklist = map { $_ => 1 } split( ",", AttrVal( $name, "fm_whitelistSub", "" ) );
+
     #foreach my $i (@intAtSort) {
     while ( ++$i < $n ) {
 
@@ -630,6 +679,8 @@ sub freezemon_apptime($) {
 
         #$fn = $intAt{$i}{FN};
         $fn = $intAtA[$i]->{FN};
+
+        next if exists( $blacklist{$fn} );
 
         if ( ref($fn) ne "" ) {
             $cv     = svref_2object($fn);
@@ -653,14 +704,15 @@ sub freezemon_apptime($) {
                 if ( AttrVal( $name, "fm_extDetail", 0 ) == 1 ) {
                     if ( $fn eq "BlockingKill" or $fn eq "BlockingStart" ) {
                         $shortarg = $shortarg->{abortArg}{NAME};
-                        Log3 $name, 5, "[Freezemon] $name found $fn " . Dumper($shortarg);
                     }
                     elsif ( $fn eq "HttpUtils_Err" ) {
-                        $shortarg = $shortarg->{hash}{hash}{NAME};
+                        if ( defined( $shortarg->{hash}{hash}{NAME} ) ) {
+                            $shortarg = $shortarg->{hash}{hash}{NAME};
+                        }
                     }
-					elsif ( $fn="FileLog_dailySwitch") {
-						$shortarg = $shortarg->{NotifyFn};
-					}
+                    elsif ( $fn = "FileLog_dailySwitch" ) {
+                        $shortarg = $shortarg->{NotifyFn};
+                    }
                     else {
                         Log3 $name, 5, "[Freezemon] $name found something without a name $fn" . Dumper($shortarg);
                         $shortarg = "N/A";
@@ -687,7 +739,7 @@ sub freezemon_apptime($) {
         #Log3 $name, 3, "[Freezemon] $name found something that's not a HASH $fn ".ref($shortarg)." ".Dumper($shortarg);
             $shortarg = "N/A";
         }
-        if ( !$shortarg ) {
+        if ( !defined($shortarg) ) {
             Log3 $name, 5, "Freezemon: something went wrong $fn " . Dumper($arg);
             $shortarg = "";
         }
@@ -791,22 +843,24 @@ sub freezemon_purge_log_before($$) {
 ###################################
 sub freezemon_dump_log($$$) {
     my ( $hash, $start, $msg ) = @_;
-    return unless scalar @logqueue;
-    my $name = $hash->{NAME};
+    my $name  = $hash->{NAME};
+    my @queue = @{ $hash->{helper}{logqueue} };
+
+    return unless scalar @queue;
 
     my ( $seconds, $microseconds ) = gettimeofday();
-    my @t = localtime($seconds);
-    my $currlogfile = ResolveDateWildcards( AttrVal( $name, "fm_logFile", undef ), @t );
+
+    my $currlogfile = $hash->{helper}{logfile};
 
     return unless defined($currlogfile) && $currlogfile ne "";
-    Log3 $hash, 3, "[Freezemon] $name: dumping " . ( scalar @logqueue ) . " log entries to $currlogfile";
+    Log3 $hash, 3, "[Freezemon] $name: dumping " . ( scalar @queue ) . " log entries to $currlogfile";
 
     open( fm_LOG, ">>$currlogfile" ) || return ("Can't open $currlogfile: $!");
 
     print fm_LOG "=========================================================\n";
     print fm_LOG $msg . "\n";
     my $last_ts;
-    foreach my $entry (@logqueue) {
+    foreach my $entry (@queue) {
         my ( $ts, $dev, $loglevel, $text ) = @$entry;
         my $seconds = int($ts);
         my $microseconds = int( 1e6 * ( $ts - $seconds ) );
@@ -834,6 +888,7 @@ sub freezemon_dump_log($$$) {
 ###################################
 sub freezemon_logLink($$) {
     my ( $name, $link ) = @_;
+    return "" if !$link;
     my $ret = "<a href='$FW_ME?cmd=" . urlEncode("get $name log $link") . "&%%CSRF%%'> [Log]</a>";
     return $ret;
 }
@@ -950,6 +1005,7 @@ sub freezemon_getLogPath($) {
 				<li>fm_logFile: takes a valid file name (like e.g. ./log/freeze-%Y%m%d-%H%M%S.log). If set, logs messages of loglevel 5 (even if global loglevel is < 5) before a freeze in separate file.</li>
 				<li>fm_logExtraSeconds: defines how much seconds before the freeze are logged (if fm_logFile is set)</li>
 				<li>fm_logKeep: A number that defines how many logFiles should be kept. If set all logfiles except the latest n freezemon logfiles will be deleted regularly.</li>
+				<li>fm_whitelistSub: Comma-separated list of subroutines that you're sure that don't cause a freeze. Whitelisted Subs do not appear in the  "possibly caused by" list. Typically you would list subroutines here that frequently appear in the "possibly caused by" list, but you're really sure they are NOT the issue. Note: The subroutine is the initial part (before the devicename in brackets) in freezemon log messages.  </li>
 				<li>disable: activate/deactivate freeze detection</li>
 			</ul>
 		</ul>
@@ -1035,10 +1091,11 @@ sub freezemon_getLogPath($) {
 			<li>fm_logFile: ist ein gültiger Filename (wie z.B. ./log/freeze-%Y%m%d-%H%M%S.log). Wenn gesetzt, werdn Meldungen auf Loglevel 5 (auch wenn global Loglevel < 5 ist) vor einem Freeze in einem seperaten File geloggt.</li>
 			<li>fm_logExtraSeconds: definiert wieviele Sekunden vor dem Freeze geloggt werden (wenn fm logFile gesetzt ist)</li>
 			<li>fm_logKeep: Eine Zahl, die angibt wieviele Logfiles behalten werden sollen. Wenn gesetzt, werden alle Logfiles ausser den letzten n Freezemon Logfiles regelmäßig gelöscht.</li>
+			<li>fm_whitelistSub: Komma-getrennte Liste von Subroutinen wo du sicher bist, dass sie keinen Freeze verursachen. Whitelisted Subs erscheinen nicht in der "possibly caused by" Liste. Typischerweise listet man hier Subroutinen,  die regelmäßig in der "possibly caused by" Liste auftauchen, wo du aber wirklich sicher bist, dass sie nicht die Ursache sind. Anmerkung: Die Subroutine ist der initiale Teil (vor dem devicename in Klammern) in Freezemon Logmeldungen.</li>
 			<li>disable: aktivieren/deaktivieren der Freeze-Erkennung</li>
 		</ul>
   </ul>
-  
+
 </ul>
 </div> 
 
