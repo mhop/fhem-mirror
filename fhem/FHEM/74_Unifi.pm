@@ -16,6 +16,8 @@
 #  - change:  74_Unifi: SSIDs-Readings and drop-downs use goodReadingName()
 # V 2.1.4
 #  - feature: 74_Unifi: added voucher-functions
+# V 2.2
+#  - feature: 74_Unifi: added set updateClien, encrypt user and password
 
 
 package main;
@@ -69,6 +71,8 @@ sub Unifi_BlockClient_Send($@);
 sub Unifi_BlockClient_Receive($);
 sub Unifi_UnblockClient_Send($@);
 sub Unifi_UnblockClient_Receive($);
+sub Unifi_UpdateClient_Send($$);
+sub Unifi_UpdateClient_Receive($);
 sub Unifi_SwitchSiteLEDs_Send($$);
 sub Unifi_SwitchSiteLEDs_Receive($);
 sub Unifi_WlanconfRest_Send($$@);
@@ -83,6 +87,8 @@ sub Unifi_getNextVoucherForNote($$);
 sub Unifi_NextUpdateFn($$);
 sub Unifi_ReceiveFailure($$);
 sub Unifi_CONNECTED($@);
+sub Unifi_encrypt($);
+sub Unifi_encrypt($);
 sub Unifi_Whoami();
 sub Unifi_Whowasi();
 ##############################################################################}
@@ -138,13 +144,23 @@ sub Unifi_Define($$) {
         loglevel        => AttrVal($name,"httpLoglevel",5),
         sslargs         => { SSL_verify_mode => 0 },
     };
-    if($hash->{unifi}->{version} == 3) {
-        ( $hash->{httpParams}->{loginUrl} = $hash->{unifi}->{url} ) =~ s/api\/s.+/login/;
-        $hash->{httpParams}->{loginData} = "login=login&username=".$a[4]."&password=".$a[5];
-    }else {
-        ( $hash->{httpParams}->{loginUrl} = $hash->{unifi}->{url} ) =~ s/api\/s.+/api\/login/;
-        $hash->{httpParams}->{loginData} = '{"username":"'.$a[4].'", "password":"'.$a[5].'"}';
-    }
+    #if($hash->{unifi}->{version} == 3) {
+    #    ( $hash->{httpParams}->{loginUrl} = $hash->{unifi}->{url} ) =~ s/api\/s.+/login/;
+    #    $hash->{httpParams}->{loginData} = "login=login&username=".$a[4]."&password=".$a[5];
+    #}else {
+    #    ( $hash->{httpParams}->{loginUrl} = $hash->{unifi}->{url} ) =~ s/api\/s.+/api\/login/;
+    #    $hash->{httpParams}->{loginData} = '{"username":"'.$a[4].'", "password":"'.$a[5].'"}';
+    #}
+    
+    my $username = Unifi_encrypt($a[4]);
+    my $password = Unifi_encrypt($a[5]);    
+    $hash->{helper}{username} = $username;
+    $hash->{helper}{password} = $password;
+    my $define="$a[2] $a[3] $username $password";
+    $define.=" $a[6]" if($a[6]);
+    $define.=" $a[7]" if($a[7]);
+    $define.=" $a[8]" if($a[8]);
+    $hash->{DEF} = $define;
     
     Log3 $name, 5, "$name: Defined with url:$hash->{unifi}->{url}, interval:$hash->{unifi}->{interval}, version:$hash->{unifi}->{version}";
     return undef;
@@ -197,14 +213,14 @@ sub Unifi_Set($@) {
     my $apNames = Unifi_ApNames($hash);
     my $SSIDs = Unifi_SSIDs($hash);
     
-    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|clear|poeMode|blockClient|unblockClient|enableWLAN|disableWLAN|switchSiteLEDs|createVoucher/) {
+    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|updateClient|clear|poeMode|blockClient|unblockClient|enableWLAN|disableWLAN|switchSiteLEDs|createVoucher/) {
         return "Unknown argument $setName, choose one of update:noArg "
                ."clear:all,readings,clientData,allData,voucherCache "
                .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "archiveAlerts:noArg " : "")
                .(($apNames && Unifi_CONNECTED($hash)) ? "restartAP:all,$apNames setLocateAP:all,$apNames unsetLocateAP:all,$apNames " : "")
                .(($clientNames && Unifi_CONNECTED($hash)) ? "disconnectClient:all,$clientNames " : "")
                ."poeMode createVoucher enableWLAN:$SSIDs disableWLAN:$SSIDs "
-               ."blockClient:$clientNames unblockClient:$clientNames switchSiteLEDs:on,off";
+               ."blockClient:$clientNames unblockClient:$clientNames switchSiteLEDs:on,off updateClient";
     }
     else {
         Log3 $name, 4, "$name: set $setName";
@@ -283,6 +299,10 @@ sub Unifi_Set($@) {
                 else {
                     return "$hash->{NAME}: Unknown SSID '$setVal' in command '$setName', choose one of: all,$SSIDs";
                 }
+            }
+            elsif ($setName eq 'updateClient') {
+                return "enter mac of client" if( ! defined $setVal);
+                Unifi_UpdateClient_Send($hash,$setVal);
             }
             elsif ($setName eq 'poeMode') {
                 return "usage: $setName <name|mac|id> <port> <off|auto|passive|passthrough|restart>" if( !$setVal3 );
@@ -471,12 +491,12 @@ sub Unifi_Get($@) {
     
     my $clientNames = Unifi_ClientNames($hash);
     
-    if($getName !~ /events|clientData|unarchivedAlerts|poeState|voucherList|voucher/) {
+    if($getName !~ /events|clientData|unarchivedAlerts|poeState|voucherList|voucher|showAccount/) {
         return "Unknown argument $getName, choose one of "
                .((defined $hash->{events}[0] && scalar @{$hash->{events}}) ? "events:noArg " : "")
                .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "unarchivedAlerts:noArg " : "")
                .(($clientNames) ? "clientData:all,$clientNames " : "")
-               ."poeState voucherList:all,$voucherNotes voucher:$voucherNotes";
+               ."poeState voucherList:all,$voucherNotes voucher:$voucherNotes showAccount";
     }
     elsif ($getName eq 'poeState') {
         my $poeState;
@@ -597,6 +617,18 @@ sub Unifi_Get($@) {
         }
         return $returnedVoucherCode;
     }
+    elsif( $getName eq 'showAccount' ) {
+      my $user = $hash->{helper}{username};
+      my $password = $hash->{helper}{password};
+
+      return 'no user set' if( !$user );
+      return 'no password set' if( !$password );
+
+      $user = Unifi_decrypt( $user );
+      $password = Unifi_decrypt( $password );
+
+      return "user: $user\npassword: $password";
+    }
     return undef;
 }
 ###############################################################################
@@ -711,11 +743,23 @@ sub Unifi_Login_Send($) {
     my ($hash) = @_;
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
     Log3 $name, 5, "$name ($self) - executed.";
-    
+
+    my ($loginurl,$logindata);
+    my $user = $hash->{helper}{username};
+    my $password = $hash->{helper}{password};
+    $user = Unifi_decrypt( $user );
+    $password = Unifi_decrypt( $password );
+    if($hash->{unifi}->{version} == 3) {
+        ( $loginurl = $hash->{unifi}->{url} ) =~ s/api\/s.+/login/;
+        $logindata = "login=login&username=".$user."&password=".$password;
+    }else {
+        ( $loginurl = $hash->{unifi}->{url} ) =~ s/api\/s.+/api\/login/;
+        $logindata = '{"username":"'.$user.'", "password":"'.$password.'"}';
+    }
     HttpUtils_NonblockingGet( {
                  %{$hash->{httpParams}},
-        url      => $hash->{httpParams}->{loginUrl},
-        data     => $hash->{httpParams}->{loginData},
+        url      => $loginurl,
+        data     => $logindata,
         callback => \&Unifi_Login_Receive
     } );
     return undef;
@@ -1297,6 +1341,83 @@ sub Unifi_DisconnectClient_Receive($) {
         Unifi_DisconnectClient_Send($hash,@{$param->{clients}});
     }
     
+    return undef;
+}
+###############################################################################
+
+sub Unifi_UpdateClient_Send($$) {
+    my ($hash,$mac) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed with mac ".$mac;
+    
+    HttpUtils_NonblockingGet( {
+                 %{$hash->{httpParams}},
+        method   => "GET",
+        url      => $hash->{unifi}->{url}."stat/user/".$mac,
+        callback => \&Unifi_UpdateClient_Receive
+    } );
+    return undef;
+}
+###############################################################################
+sub Unifi_UpdateClient_Receive($) {
+    my ($param, $err, $data) = @_;
+    my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    if ($err ne "") {
+        Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+    }
+    elsif ($data ne "") {
+        if ($param->{code} == 200 || $param->{code} == 400  || $param->{code} == 401) {
+            eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+            
+            if ($data->{meta}->{rc} eq "ok") {
+                Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
+                
+                my $apNames = {};
+                for my $apID (keys %{$hash->{accespoints}}) {
+                  my $apRef = $hash->{accespoints}->{$apID};
+                  $apNames->{$apRef->{mac}} = $apRef->{name} ? $apRef->{name} : $apRef->{ip};
+                }
+                
+                #$hash->{unifi}->{connectedClients} = undef;
+                for my $h (@{$data->{data}}) {
+                    $hash->{unifi}->{connectedClients}->{$h->{user_id}} = 1;
+                    $hash->{clients}->{$h->{user_id}} = $h;
+                
+                    readingsBeginUpdate($hash);
+                    if(defined $h->{user_id}){
+                        $hash->{unifi}->{connectedClients}->{$h->{user_id}} = $h;
+                        $hash->{clients}->{$h->{user_id}} = $h;
+                        my $clientRef = $hash->{clients}->{$h->{user_id}};
+                        my $clientName = Unifi_ClientNames($hash,$h->{user_id},'makeAlias');
+                        my $apName = "unknown";
+                        if ($clientRef->{is_wired}
+                            &&  defined $clientRef->{sw_mac} && defined($apNames->{$clientRef->{sw_mac}}) ) {
+                          $apName = $apNames->{$clientRef->{sw_mac}};
+                        } elsif (defined $clientRef->{ap_mac} && defined($apNames->{$clientRef->{ap_mac}}) ) {
+                          $apName = $apNames->{$clientRef->{ap_mac}};
+                        }
+                        
+                        readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
+                        readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
+                        readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
+                        readingsBulkUpdate($hash,$clientName."_snr",$clientRef->{rssi});
+                        readingsBulkUpdate($hash,$clientName."_accesspoint",$apName);
+                        readingsBulkUpdate($hash,$clientName,'connected');
+                    }else{
+                        Log3 $name, 5, "$name ($self) - Client ".$h->{hostname}." previously connected is now disconnected.";
+                        readingsBulkUpdate($hash,$h->{hostname},'disconnected');
+                    }    
+                    readingsEndUpdate($hash,1);
+                }
+                #$hash->{clients}->{$data->{data}[0]->{user_id}} = $data->{data};
+            }
+            else { Unifi_ReceiveFailure($hash,$data->{meta}); }
+        } else {
+            Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+        }
+    }
     return undef;
 }
 ###############################################################################
@@ -1947,6 +2068,43 @@ sub Unifi_CONNECTED($@) {
         }
     }
 }
+
+###############################################################################
+
+sub
+Unifi_encrypt($)
+{
+  my ($decoded) = @_;
+  my $key = getUniqueId();
+  my $encoded;
+
+  return $decoded if( $decoded =~ /^crypt:(.*)/ );
+
+  for my $char (split //, $decoded) {
+    my $encode = chop($key);
+    $encoded .= sprintf("%.2x",ord($char)^ord($encode));
+    $key = $encode.$key;
+  }
+
+  return 'crypt:'. $encoded;
+}
+sub
+Unifi_decrypt($)
+{
+  my ($encoded) = @_;
+  my $key = getUniqueId();
+  my $decoded;
+
+  $encoded = $1 if( $encoded =~ /^crypt:(.*)/ );
+
+  for my $char (map { pack('C', hex($_)) } ($encoded =~ /(..)/g)) {
+    my $decode = chop($key);
+    $decoded .= chr(ord($char)^ord($decode));
+    $key = $decode.$key;
+  }
+
+  return $decoded;
+}
 ###############################################################################
 
 sub Unifi_Whoami()  { return (split('::',(caller(1))[3]))[1] || ''; }
@@ -2044,6 +2202,9 @@ Or you can use the other readings or set and get features to control your unifi-
     <li><code>set &lt;name&gt; update</code><br>
     Makes immediately a manual update. </li>
     <br>
+    <li><code>set &lt;name&gt; updateClient &lt;mac&gt;</code><br>
+    Makes immediately a manual update of the client specified by MAC-Adress. </li>
+    <br>
     <li><code>set &lt;name&gt; clear &lt;readings|clientData|voucherCache|all&gt;</code><br>
     Clears the readings, clientData, voucherCache or all. </li>
     <br>
@@ -2096,6 +2257,8 @@ Or you can use the other readings or set and get features to control your unifi-
     Show next voucher-code with specified note. If &lt;note&gt; is used in voucherCache the voucher will be marked as delivered</li>
     <li><code>get &lt;name&gt; voucherList [all|note]</code><br>
     Show list of vouchers (all or with specified note only).</li>
+    <li><code>get &lt;name&gt; showAccount</code><br>
+    Show decrypted user and passwort.</li>
 </ul>
 
 
