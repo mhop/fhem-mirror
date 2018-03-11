@@ -2276,7 +2276,6 @@ DOIF_Notify($$)
     $hash->{helper}{triggerDev}=$dev->{NAME};
     $hash->{helper}{event}=join(",",@{$eventa});
 
-    readingsSingleUpdate ($hash, "Device",$dev->{NAME},0);
     if ($hash->{readings}{all}) {
       foreach my $item (split(/ /,$hash->{readings}{all})) {
         ($device,$reading)=(split(":",$item));
@@ -2294,10 +2293,12 @@ DOIF_Notify($$)
       }
     }
     if ($hash->{trigger}{all}) {
-      foreach my $item (split(/ /,$hash->{trigger}{all})) {
+      if ($hash->{trigger}{all} =~ / $dev->{NAME} /) {
         readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_events",join(",",@{$eventa}),0);
       }
     }
+    
+    readingsSingleUpdate ($hash, "Device",$dev->{NAME},0);
     $ret=DOIF_Trigger($hash,$dev->{NAME});
   }
   
@@ -2581,9 +2582,14 @@ DOIF_SetTimer($$$)
       return $err;
   }
 
-  if ($second < 0 and $rel) {
-    readingsSingleUpdate ($hash,$timernr,"time offset: $second, negativ offset is not allowed",AttrVal($hash->{NAME},"timerevent","")?1:0);
-    return($timernr,"time offset: $second, negativ offset is not allowed");
+  if ($second < 0) {
+    if ($rel) {
+      readingsSingleUpdate ($hash,$timernr,"time offset: $second, negativ offset is not allowed",AttrVal($hash->{NAME},"timerevent","")?1:0);
+      return($timernr,"time offset: $second, negativ offset is not allowed");
+    } else {
+      readingsSingleUpdate ($hash,$timernr,"time in seconds: $second, negative times are not allowed",AttrVal($hash->{NAME},"timerevent","")?1:0);
+      return($timernr,"time in seconds: $second, negative times are not allowed");
+    }
   }
 
   my ($now, $microseconds) = gettimeofday();
@@ -2699,8 +2705,6 @@ sub
 DOIF_SleepTrigger ($)
 {
   my ($hash)=@_;
-  my $sleeptimer=$hash->{helper}{sleeptimer};
-  my $sleepsubtimer=$hash->{helper}{sleepsubtimer};
   my $pn = $hash->{NAME};
   $hash->{helper}{cur_cmd_nr}="wait_timer" if (!AttrVal($hash->{NAME},"selftrigger",""));
   $hash->{helper}{triggerEvents}=$hash->{helper}{timerevents};
@@ -2708,11 +2712,14 @@ DOIF_SleepTrigger ($)
   $hash->{helper}{event}=$hash->{helper}{timerevent};
   $hash->{helper}{triggerDev}=$hash->{helper}{timerdev};
   readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
+  my $sleeptimer=$hash->{helper}{sleeptimer};
+  my $sleepsubtimer=$hash->{helper}{sleepsubtimer};
   $hash->{helper}{sleeptimer}=-1;
   $hash->{helper}{sleepsubtimer}=-1;
   if (ReadingsVal($pn,"mode","") ne "disabled") {
     DOIF_cmd ($hash,$sleeptimer,$sleepsubtimer,$hash->{helper}{sleepdevice});
   }
+
   delete $hash->{helper}{cur_cmd_nr};
   return undef;
 }
