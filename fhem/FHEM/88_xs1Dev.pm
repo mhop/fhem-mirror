@@ -7,8 +7,8 @@
 # note / ToDo´s:
 # 
 # 
-#
-#
+# 
+# 
 #################################################################
 
 package main;
@@ -27,14 +27,14 @@ sub xs1Dev_Initialize($) {
 	$hash->{Match}			= 	"[x][s][1][D][e][v][_][A][k][t][o][r]_[0-6][0-9].*|[x][s][1][D][e][v][_][S][e][n][s][o][r]_[0-6][0-9].*";				## zum testen - https://regex101.com/
 	
 	$hash->{DefFn}			=	"xs1Dev_Define";
-	$hash->{AttrFn}			= 	"xs1Dev_Attr";
+	$hash->{AttrFn}		= 	"xs1Dev_Attr";
 	$hash->{ParseFn}		= 	"xs1Dev_Parse";
 	$hash->{SetFn}			=	"xs1Dev_Set";
 	$hash->{UndefFn}		=	"xs1Dev_Undef";
 	$hash->{AttrList}		=	"debug:0,1 ".
-								"IODev ".
-								"useSetExtensions:0,1 ".
-								$readingFnAttributes;
+									"IODev ".
+									"useSetExtensions:0,1 ".
+									$readingFnAttributes;
 
 	$hash->{AutoCreate}	= { "xs1Dev_Sensor_.*" => { GPLOT => "temp4hum4:Temp/Hum,", FILTER=>"%NAME",  } };
 	
@@ -96,16 +96,16 @@ sub xs1Dev_Define($$) {
 	
 	$hash->{STATE}			= "Defined";					## Der Status des Modules nach Initialisierung.
 	$hash->{TIME}			= time();						## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION}		= "1.12";						## Version
+	$hash->{VERSION}		= "1.15";						## Version
 	
 	$hash->{xs1_name}		= "undefined";					## Aktor | Sensor Name welcher def. im xs1
 	$hash->{xs1_typ}		= "undefined";					## xs1_Typ switch | hygrometer | temperature ...
 	
 	if ($xs1_typ1 eq "A"){
-		$hash->{xs1_function1}	= "undefined";				## xs1_Funktion zugeordnete Funktion 1
-		$hash->{xs1_function2}	= "undefined";				## xs1_Funktion zugeordnete Funktion 2
-		$hash->{xs1_function3}	= "undefined";				## xs1_Funktion zugeordnete Funktion 3
-		$hash->{xs1_function4}	= "undefined";				## xs1_Funktion zugeordnete Funktion 4
+		$hash->{xs1_function1}	= "undefined";			## xs1_Funktion zugeordnete Funktion 1
+		$hash->{xs1_function2}	= "undefined";			## xs1_Funktion zugeordnete Funktion 2
+		$hash->{xs1_function3}	= "undefined";			## xs1_Funktion zugeordnete Funktion 3
+		$hash->{xs1_function4}	= "undefined";			## xs1_Funktion zugeordnete Funktion 4
 	}
 
 	# Attribut gesetzt
@@ -168,11 +168,12 @@ sub xs1Dev_Set ($$@)
 	
 		Debug " -------------- ERROR CHECK - START --------------" if($debug);
 		
-		$cmdList = $cmdListNew if($xs1_typ eq "switch" || $xs1_typ eq "dimmer" || $xs1_typ eq "shutter");
+		#### Set cmdList bei switch || dimmer || shutter || timerswitch
+		$cmdList = $cmdListNew if($xs1_typ eq "switch" || $xs1_typ eq "dimmer" || $xs1_typ eq "shutter" || $xs1_typ eq "timerswitch");
 		#$cmdList .= "dim:slider,0,6.25,100 dimup dimdown" if ($xs1_typ eq "dimmer");
 		my $cmdFound = index($cmdListNew, $cmd);	## check cmd in cmdListNew
 	
-		Debug " $name: Set | SetExtensionsReady=$SetExtensionsReady cmdList=$cmdList" if($debug);
+		Debug " $name: Set | xs1_typ=$xs1_typ SetExtensionsReady=$SetExtensionsReady cmdList=$cmdList" if($debug);
 	
 		if ($cmdList ne "") {			## Set nur bei definierten Typ
 			if(AttrVal($name,"useSetExtensions",undef) || AttrVal($name,"useSetExtensions","0" && $SetExtensionsReady > 0)) {
@@ -236,8 +237,8 @@ sub xs1Dev_Set ($$@)
 					}
 					
 				} 
-				############## Funktion shutter ##############
-				elsif ($xs1_typ eq "shutter") {
+				############## Funktion shutter || timerswitch ##############
+				elsif ($xs1_typ eq "shutter" || $xs1_typ eq "timerswitch") {
 					Debug " $name: Set | xs1_function 1=$xs1_function[0] 2=$xs1_function[1] 3=$xs1_function[2] 4=$xs1_function[3]" if($debug);
 					if ($cmdFound >= 0) {	## cmdFound in welchem Funktionsplatz xs1
 						for my $i (0 .. 3) {
@@ -250,7 +251,7 @@ sub xs1Dev_Set ($$@)
 					return "Wrong set argument, choose one of $cmdList" if($cmdFound < 0);
 				} 
 				############## alles Andere ##############
-				elsif ($xs1_typ ne "dimmer" && $xs1_typ ne "switch" && $xs1_typ ne "undefined") {
+				elsif ($xs1_typ ne "undefined") {
 					Log3 $name, 2, "$name: Set | xs1_typ=$xs1_typ are not supported. Please inform me!";
 					return "xs1_typ=$xs1_typ are not supported. Please inform me!";
 				}
@@ -258,11 +259,14 @@ sub xs1Dev_Set ($$@)
 		}
 	
 		if(defined($hash->{IODev}->{NAME})) {
-			if ($xs1_typ eq "switch" || $xs1_typ eq "dimmer" || $xs1_typ eq "shutter") {
+			if ($xs1_typ eq "switch" || $xs1_typ eq "dimmer" || $xs1_typ eq "shutter" || $xs1_typ eq "timerswitch") {
 				Debug " $name: Set IOWrite | xs1_ID=$xs1_ID xs1_typ=$xs1_typ cmd=$cmd cmd2=$cmd2" if($debug && $xs1_typ ne "temperature" && $xs1_typ ne "hygrometer");
 				IOWrite($hash, $xs1_ID, $xs1_typ, $cmd, $cmd2);
 				readingsSingleUpdate($hash, "state", $cmd , 1);			
-			} else { Log3 $name, 2, "$name: Device $xs1_typ are not supported for Dispatch"; }
+			}
+			#else { 
+			#Log3 $name, 2, "$name: Device NOT SUPPORTED for Dispatch. In xs1 disabled.";
+			#}
 		} else {
 			return "no IODev define. Please define xs1Bridge.";
 		}
@@ -311,7 +315,8 @@ sub xs1Dev_Parse($$)				## Input Data from 88_xs1Bridge
 			$hash->{xs1_function4} = $xs1_f4;
 		}
 		
-		if ($xs1_typ2 eq "switch") {				## switch on | off mod for FHEM Default
+		#### Typ switch  | on | off mod for FHEM Default
+		if ($xs1_typ2 eq "switch") {
 			if ($xs1_value == 0) { $xs1_value = "off"; }
 				elsif ($xs1_value == 100) { $xs1_value = "on"; }
 			readingsSingleUpdate($hash, "state", $xs1_value ,1);	# Aktor | Sensor Update value
@@ -322,21 +327,27 @@ sub xs1Dev_Parse($$)				## Input Data from 88_xs1Bridge
 				$attr{$name}{devStateIcon} = "dim_up:dimup dim_down:dimdown" if( not defined( $attr{$name}{devStateIcon} ) );
 			}
 			
-		} elsif ($xs1_typ2 eq "temperature") {		## temperature typ
+		} 
+		#### Typ temperature
+		elsif ($xs1_typ2 eq "temperature") {
 			my $xs1_value_new = "T: ".$xs1_value;	## temperature mod for FHEM Default
 
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash, "state", $xs1_value_new);
 			readingsBulkUpdate($hash, "temperature", $xs1_value);
 			readingsEndUpdate($hash, 1);
-		} elsif ($xs1_typ2 eq "hygrometer") {		## hygrometer typ
+		} 
+		#### Typ hygrometer
+		elsif ($xs1_typ2 eq "hygrometer") {
 			my $xs1_value_new = "H: ".$xs1_value;	## hygrometer mod for FHEM Default
 
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash, "state", $xs1_value_new);
 			readingsBulkUpdate($hash, "humidity", $xs1_value);
 			readingsEndUpdate($hash, 1);
-		} elsif ($xs1_typ2 eq "dimmer") {			## dimmer
+		} 
+		#### Typ dimmer
+		elsif ($xs1_typ2 eq "dimmer") {
 			
 			## RegEx devStateIcon da Symbole nicht durchweg von 0 - 100 | dim_up | dim_down
 			$attr{$name}{devStateIcon} = 	"dim0[1-6]\\D%:dim06% dim[7-9]\\D|dim[1][0-2]%:dim12% dim[1][3-8]%:dim18% \n"
@@ -353,12 +364,19 @@ sub xs1Dev_Parse($$)				## Input Data from 88_xs1Bridge
 			}
 			
 			readingsSingleUpdate($hash, "state", $xs1_value ,1);
-		}  elsif ($xs1_typ2 eq "shutter") {			## shutter on | off mod for FHEM Default
+		}  
+		#### Typ shutter | on | off mod for FHEM Default
+		elsif ($xs1_typ2 eq "shutter") {
 			if ($xs1_value == 0) { $xs1_value = "off"; }
 				elsif ($xs1_value == 100) { $xs1_value = "on"; }
 			readingsSingleUpdate($hash, "state", $xs1_value ,1);
 		}
-		
+		#### Typ timerswitch | on | off mod for FHEM Default
+		elsif ($xs1_typ2 eq "timerswitch") {
+			if ($xs1_value == 0) { $xs1_value = "off"; }
+				elsif ($xs1_value == 100) { $xs1_value = "on"; }
+			readingsSingleUpdate($hash, "state", $xs1_value ,1);
+		}
 	}
 	
 	return $name;
@@ -446,7 +464,9 @@ sub xs1Dev_Undef($$)
 		xs1_function(1-4): defined function in the device<br>
 		xs1_name: defined name in the device<br>
 		xs1_typ: defined type in the device<br>
-		</ul>
+		</ul><br>
+	
+	<li>The following xs1 device types are already integrated: dimmer | shutter | switch | timerswitch</li>
 	</ul>
 </ul>
 =end html
@@ -513,8 +533,11 @@ sub xs1Dev_Undef($$)
 		xs1_function(1-4): definierte Funktion im Ger&auml;t<br>
 		xs1_name: definierter Name im Ger&auml;t<br>
 		xs1_typ: definierter Typ im Ger&auml;t<br>
-		</ul>
+		</ul><br>
+	
+	<li>Folgende xs1-Ger&aumltetypen sind bereits integriert: dimmer | shutter | switch | timerswitch</li>
 	</ul>
+		
 </ul>
 =end html_DE
 =cut
