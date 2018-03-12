@@ -3,9 +3,8 @@
 #################################################################
 # logisches Modul - einzelnes Gerät, über das mit physikalisches
 #					Modul kommuniziert werden kann
-#
-# note / ToDo´s:
 # 
+# note / ToDo´s:
 # 
 # 
 # 
@@ -27,14 +26,14 @@ sub xs1Dev_Initialize($) {
 	$hash->{Match}			= 	"[x][s][1][D][e][v][_][A][k][t][o][r]_[0-6][0-9].*|[x][s][1][D][e][v][_][S][e][n][s][o][r]_[0-6][0-9].*";				## zum testen - https://regex101.com/
 	
 	$hash->{DefFn}			=	"xs1Dev_Define";
-	$hash->{AttrFn}		= 	"xs1Dev_Attr";
+	$hash->{AttrFn}			= 	"xs1Dev_Attr";
 	$hash->{ParseFn}		= 	"xs1Dev_Parse";
 	$hash->{SetFn}			=	"xs1Dev_Set";
 	$hash->{UndefFn}		=	"xs1Dev_Undef";
 	$hash->{AttrList}		=	"debug:0,1 ".
-									"IODev ".
-									"useSetExtensions:0,1 ".
-									$readingFnAttributes;
+								"IODev ".
+								"useSetExtensions:0,1 ".
+								$readingFnAttributes;
 
 	$hash->{AutoCreate}	= { "xs1Dev_Sensor_.*" => { GPLOT => "temp4hum4:Temp/Hum,", FILTER=>"%NAME",  } };
 	
@@ -44,8 +43,9 @@ sub xs1Dev_Define($$) {
 	my ($hash, $def) = @_;
 	my @arg = split("[ \t][ \t]*", $def);
 
-   			#				0		1	  2		3
-	return "Usage: define <NAME> xs1Dev <Typ> <ID>  |  wrong number of arguments" if( @arg != 4 );
+   			#				0		1	  2		3     4
+	return "Usage: define <NAME> xs1Dev <Typ> <ID> IODev=  |  wrong number of arguments" if( @arg != 5);
+	return "Usage: define <NAME> xs1Dev <Typ> <ID> IODev=  |  wrong IODev argument" if not ( $arg[4] =~ m/IODev=([^\s]*)[a-zA-Z0-9]/);
 	return "Usage: define <NAME> xs1Dev <Typ> <ID>  |  wrong ID, must be 1-64" if ( $arg[3] <1 || $arg[3] >64);
 	return "Usage: define <NAME> xs1Dev <Typ> <ID>  |  wrong Typ, must be A or S" if ( $arg[2] ne "A" && $arg[2] ne "S");
 
@@ -53,21 +53,21 @@ sub xs1Dev_Define($$) {
 	my $iodev;
 	my $i = 0;
 
-	######## bisher unbenutzt - Schleife wo IODev= gefiltert wird aus define
+	#### Schleife (Durchlauf der Argumente @arg) wo IODev= gefiltert wird aus define | Dispatch
 	foreach my $param ( @arg ) {
-        if( $param =~ m/IODev=([^\s]*)/ ) {
+		if( $param =~ m/IODev=([^\s]*)/ ) {
 				$iodev = $1;
             splice( @arg, $i, 3 );
             last;
         }
         $i++;
 	}
-	########################################################################
+	###########################################################################################
 
 	my $name = $hash->{NAME};							## Der Definitionsname, mit dem das Gerät angelegt wurde.
 	my $typ = $hash->{TYPE};							## Der Modulname, mit welchem die Definition angelegt wurde.
    
-	#Log3 $name, 3, "$typ: Define arguments 0:$arg[0] | 1:$arg[1] | 2:$arg[2]";
+	#Log3 $name, 3, "$typ: Define arguments 0:$arg[0] | 1:$arg[1] | 2:$arg[2] | 3:$arg[3]";
 
 	# Parameter Define
 	my $xs1_ID = $arg[2];			## Zusatzparameter 1 bei Define - ggf. nur in Sub
@@ -96,7 +96,7 @@ sub xs1Dev_Define($$) {
 	
 	$hash->{STATE}			= "Defined";					## Der Status des Modules nach Initialisierung.
 	$hash->{TIME}			= time();						## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION}		= "1.15";						## Version
+	$hash->{VERSION}		= "1.16";						## Version
 	
 	$hash->{xs1_name}		= "undefined";					## Aktor | Sensor Name welcher def. im xs1
 	$hash->{xs1_typ}		= "undefined";					## xs1_Typ switch | hygrometer | temperature ...
@@ -110,13 +110,17 @@ sub xs1Dev_Define($$) {
 
 	# Attribut gesetzt
 	$attr{$name}{room}				= "xs1"	if( not defined( $attr{$name}{room} ) );
+
 	
 	AssignIoPort($hash,$iodev) if( !$hash->{IODev} );		## sucht nach einem passenden IO-Gerät (physikalische Definition)
-
-	# if(defined($hash->{IODev}->{NAME})) {
-        #Log3 $name, 5, "xs1Dev: $name - I/O device is " . $hash->{IODev}->{NAME};
-    # } else {
-		  #Log3 $name, 3, "xs1Dev: $name - no I/O device";
+	
+	if(defined($hash->{IODev}->{NAME})) {
+		Log3 $name, 4, "xs1Dev: $name - I/O device is " . $hash->{IODev}->{NAME};
+    } 
+	
+	# GENERELL in FHEM auf LOG1 genommen von Rudi
+	# else {
+		# Log3 $name, 3, "xs1Dev: $name - no I/O device";
     # }
 
 	# if(defined($hash->{IODev}->{xs1_ip})) {				## IP von xs1Bridge - Device aus HASH
@@ -291,18 +295,19 @@ sub xs1Dev_Parse($$)				## Input Data from 88_xs1Bridge
 	my $hash = $def;
 	$hash->{xs1_typ} = $xs1_typ2;
 	$hash->{xs1_name} = $xs1_name;
+	my $IODev = $io_hash->{NAME};
 
 	my $name = $hash->{NAME};			## xs1Dev_Aktor_01
 	my $typ = $hash->{TYPE};			## xs1Dev
 	$typ = "xs1Dev" if (!$def);			## Erstanlegung
 	
 	###### Define and values update ######
-	#Log3 $typ, 3, "$io_hash: Parse | Data: $xs1Dev | $xs1_readingsname | $xs1_ID | $xs1_typ2 | $xs1_value | $xs1_typ1" if (!$def);
+	#Log3 $typ, 3, "$typ: Parse | Data: $xs1Dev | $xs1_readingsname | $xs1_ID | $xs1_typ2 | $xs1_value | $xs1_typ1 | $IODev" if (!$def);
 
 	if(!$def) {
 			# "UNDEFINED xs1Dev_Aktor_12 xs1Dev A 12"
-			Log3 $name, 3, "$typ: Unknown device ".$xs1Dev."_".$xs1_readingsname."_"."$xs1_ID $xs1_ID $xs1_typ1, please define it";
-			return "UNDEFINED xs1Dev"."_".$xs1_readingsname."_"."$xs1_ID xs1Dev $xs1_typ1 $xs1_ID";
+			Log3 $name, 3, "$typ: Unknown device ".$xs1Dev."_".$xs1_readingsname."_"."$xs1_ID $xs1_ID $xs1_typ1 IODev=$IODev, please define it";
+			return "UNDEFINED xs1Dev"."_".$xs1_readingsname."_"."$xs1_ID xs1Dev $xs1_typ1 $xs1_ID IODev=$IODev";
 	} else {
 		#Log3 $name, 3, "$typ: device $xs1_readingsname"."_"."$xs1_ID xs1_value:$xs1_value xs1_typ2:$xs1_typ2";
 		
@@ -415,7 +420,7 @@ sub xs1Dev_Undef($$)
 	<a name="xs1Dev_define"></a>
 	<b>Define</b><br>
 		<ul>
-		<code>define &lt;name&gt; xs1Dev &lt;Typ&gt; &lt;ID&gt;</code>
+		<code>define &lt;name&gt; xs1Dev &lt;Typ&gt; &lt;ID&gt; IODev=&lt;NAME&gt;</code>
 		<br><br>
 
 		It is not possible to create the module without specifying type and ID of xs1.
@@ -427,7 +432,7 @@ sub xs1Dev_Undef($$)
 			</ul><br>
 		example:
 		<ul>
-		define xs1Dev_Aktor_02 xs1Dev A 02
+		define xs1Dev_Aktor_02 xs1Dev A 02 IODev=ezControl
 		</ul>	
 		</ul><br>
 	<b>Set</b>
@@ -484,7 +489,7 @@ sub xs1Dev_Undef($$)
 	<a name="xs1Dev_define"></a>
 	<b>Define</b><br>
 		<ul>
-		<code>define &lt;name&gt; xs1Dev &lt;Typ&gt; &lt;ID&gt;</code>
+		<code>define &lt;name&gt; xs1Dev &lt;Typ&gt; &lt;ID&gt; IODev=&lt;NAME&gt;</code>
 		<br><br>
 
 		Ein anlegen des Modules ohne Angabe des Typ und der ID vom xs1 ist nicht möglich.
@@ -496,7 +501,7 @@ sub xs1Dev_Undef($$)
 			</ul><br>
 		Beispiel:
 		<ul>
-		define xs1Dev_Aktor_02 xs1Dev A 02
+		define xs1Dev_Aktor_02 xs1Dev A 02 IODev=ezControl
 		</ul>	
 		</ul><br>
 	<b>Set</b>

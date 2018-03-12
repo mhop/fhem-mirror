@@ -4,7 +4,7 @@
 # physisches Modul - Verbindung zur Hardware
 #
 # note / ToDo´s / Bugs:
-# 
+# - Port Check
 # 
 # 
 # 
@@ -23,6 +23,7 @@ my $xs1_ConnectionTry 	= 1;	# disable Funktion sobald 10x keine Verbindung (Schu
 
 eval "use Encode qw(encode encode_utf8 decode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
+eval "use Net::Ping;1" or $missingModul .= "Net::Ping ";
 
 #$| = 1;		#Puffern abschalten, Hilfreich für PEARL WARNINGS Search
 
@@ -61,8 +62,11 @@ sub xs1Bridge_Define($$) {
 	my $viewDeviceFunction = AttrVal($hash->{NAME},"view_Device_function",0);
 	my $update_only_difference = AttrVal($hash->{NAME},"update_only_difference",0);
 
-	return "Usage: define <name> $name <ip>"  if(@arg != 3);
+					#		0		1	 2
+	return "Usage: define <NAME> $name <IP>"  if(@arg != 3);
+	#return "Usage: define <NAME> $name <IP> <PORT>"  if(@arg != 4);
 	return "Your IP is not valid. Please Check!" if not($arg[2] =~ /[0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}/s);
+	#return "Your PORT is not valid. Please Check!"  if not($arg[3] =~ /[0-9]{2,5}/s);
 	return "Cannot define xs1Bridge device. Perl modul ${missingModul}is missing." if ( $missingModul );
 
 	my $xs1check = 0;
@@ -81,7 +85,7 @@ sub xs1Bridge_Define($$) {
 	
 	$hash->{STATE} = "Initialized";		## Der Status des Modules nach Initialisierung.
 	$hash->{TIME} = time();				## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.15";			## Version
+	$hash->{VERSION} = "1.16";			## Version
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
@@ -139,17 +143,17 @@ sub xs1Bridge_Attr(@) {
 			readingsSingleUpdate($hash, "state", "active", 1);
 			}
 		}elsif ($attrName eq "view_Device_function") {
-			if ($attrValue eq "1") {								## Handling bei attribute disable 1
+			if ($attrValue eq "1") {								## Handling bei attribute view_Device_function 1
 			Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
 			}
-			elsif ($attrValue eq "0") {								## Handling bei attribute disable 0
+			elsif ($attrValue eq "0") {								## Handling bei attribute view_Device_function 0
 			Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
 			}
 		}elsif ($attrName eq "view_Device_name") {
-			if ($attrValue eq "1") {								## Handling bei attribute disable 1
+			if ($attrValue eq "1") {								## Handling bei attribute view_Device_name 1
 			Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
 			}
-			elsif ($attrValue eq "0") {								## Handling bei attribute disable 0
+			elsif ($attrValue eq "0") {								## Handling bei attribute view_Device_name 0
 				Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
 				for my $i (0..64) {
 				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
@@ -157,17 +161,17 @@ sub xs1Bridge_Attr(@) {
 				}
 			}
 		}elsif ($attrName eq "update_only_difference") {
-			if ($attrValue eq "1") {								## Handling bei attribute disable 1
+			if ($attrValue eq "1") {								## Handling bei attribute update_only_difference 1
 			Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
 			}
-			elsif ($attrValue eq "0") {								## Handling bei attribute disable 0
+			elsif ($attrValue eq "0") {								## Handling bei attribute update_only_difference 0
 				Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
 				for my $i (0..64) {
 				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
 				}
 			}
 		}elsif ($attrName eq "xs1_control") {
-			if ($attrValue eq "1") {								## Handling bei attribute disable 1
+			if ($attrValue eq "1") {								## Handling bei attribute xs1_control 1
 				if(! $modules{xs1Dev}) {							## Check Modul vorhanden
 					$attr{$name}{xs1_control}	= "0";
 					return "Module xs1Dev is non-existent or still under development. Please wait"
@@ -585,8 +589,8 @@ sub xs1Bridge_Undef($$)
 		if(defined($defs{$d}) && defined($defs{$d}{IODev}) && $defs{$d}{IODev} == $hash) {
 			Log3 $name, 3, "$typ: deleting IODev for $d";
 			delete $defs{$d}{IODev};
-      }
-  }
+		}
+	}
 	
 	Log3 $name, 3, "$typ: deleting Device with Name $name";
 	return undef;
@@ -616,7 +620,7 @@ sub xs1Bridge_Undef($$)
 	<a name="xs1Bridge_define"></a>
 	<b>Define</b><br>
 		<ul>
-		<code>define &lt;name&gt; xs1Bridge &lt;IP&gt; </code>
+		<code>define &lt;NAME&gt; xs1Bridge &lt;IP&gt;</code>
 		<br><br>
 
 		The module can not create without the IP of the xs1. If the IP can not be reached during module definition, the Define process is aborted.
@@ -704,7 +708,7 @@ sub xs1Bridge_Undef($$)
 	<a name="xs1Bridge_define"></a>
 	<b>Define</b><br>
 		<ul>
-		<code>define &lt;name&gt; xs1Bridge &lt;IP&gt; </code>
+		<code>define &lt;NAME&gt; xs1Bridge &lt;IP&gt;</code>
 		<br><br>
 
 		Ein anlegen des Modules ohne Angabe der IP vom xs1 ist nicht m&ouml;glich. Sollte die IP bei der Moduldefinierung nicht erreichbar sein, so bricht der Define Vorgang ab.
