@@ -65,7 +65,7 @@ FB_CALLMONITOR_Initialize($)
                          "answMachine-is-missed-call:0,1 ".
                          "check-deflections:0,1 ".
                          "reverse-search-cache-file ".
-                         "reverse-search:sortable-strict,phonebook,textfile,dasoertliche.de,search.ch,dasschnelle.at ".
+                         "reverse-search:sortable-strict,phonebook,textfile,dasoertliche.de,11880.com,search.ch,dasschnelle.at,herold.at ".
                          "reverse-search-cache:0,1 ".
                          "reverse-search-phonebook-file ".
                          "reverse-search-text-file ".
@@ -626,7 +626,7 @@ FB_CALLMONITOR_reverseSearch($$)
     my @attr_list = split("(,|\\|)", AttrVal($name, "reverse-search", ""));
     
     foreach my $method (@attr_list)
-    {
+    {     
         # Using internal phonebook if available and enabled
         if($method eq "phonebook")
         {
@@ -650,7 +650,7 @@ FB_CALLMONITOR_reverseSearch($$)
         }
 
         # Using user defined textfile 
-         elsif($method eq "textfile")
+        elsif($method eq "textfile")
         {
             if(exists($hash->{helper}{TEXTFILE}) and defined($hash->{helper}{TEXTFILE}{$number}))
             {
@@ -658,7 +658,8 @@ FB_CALLMONITOR_reverseSearch($$)
                 return $hash->{helper}{TEXTFILE}{$number};
             }
         }
-        elsif($method =~ /^(klicktel.de|dasoertliche.de|dasschnelle.at|search.ch)$/)
+        
+        else
         {      
             # Using Cache if enabled
             if(AttrVal($name, "reverse-search-cache", "0") eq "1" and defined($hash->{helper}{CACHE}{$number}))
@@ -751,6 +752,50 @@ FB_CALLMONITOR_reverseSearch($$)
                 }
             }
             
+             # Ask 11880.com
+            elsif($method eq "11880.com")
+            {
+                unless(($number =~ /^0?[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
+                {
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using 11880.com for reverse search of $number because of non-german number";
+                }
+                else
+                {            
+                    $number =~ s/^0049/0/; # remove country code
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - using 11880.com for reverse search of $number";
+
+                    $result = GetFileFromURL("https://www.11880.com/suche/".$number."/deutschland", 5, undef, 1);
+                    
+                    if(not defined($result))
+                    {   
+                        Log3 $name, 4, "FB_CALLMONITOR ($name) - unable to retrieve result for reverse search of $number via $method";
+                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+                        {
+                            $status = "timeout";
+                            undef($result);
+                        }
+                    }
+                    else
+                    {
+                        #Debug($result);
+                        if($result =~ m,<h1 [^>]*itemprop="name"[^>]*>([^<]+)</h1>,)
+                        {
+                            $invert_match = $1;
+                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                            undef($result);
+                            return $invert_match;
+                        }
+                        elsif(not $result =~ /Leider nichts gefunden/i)
+                        {
+                            Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from 11880.com. Please contact the FHEM community.";
+                        }
+                        
+                        $status = "unknown";
+                    }
+                }
+            }
+            
             # SWITZERLAND ONLY!!! Ask search.ch
             elsif($method eq  "search.ch")
             {
@@ -824,7 +869,7 @@ FB_CALLMONITOR_reverseSearch($$)
             {
                 unless(($number =~ /^0?[1-9]/ and $country_code eq "0043") or $number =~ /^0043/)
                 {
-                    Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using dasschnelle.at for reverse search of $number because of non-swiss number";
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using dasschnelle.at for reverse search of $number because of non-austrian number";
                 }
                 else
                 {            
@@ -865,6 +910,56 @@ FB_CALLMONITOR_reverseSearch($$)
                         $status = "unknown";
                     }
                 }
+            }
+            
+            # Austria ONLY!!! Ask herold.at
+            elsif($method eq "herold.at")
+            {
+                unless(($number =~ /^0?[1-9]/ and $country_code eq "0043") or $number =~ /^0043/)
+                {
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - skip using herold.at for reverse search of $number because of non-austrian number";
+                }
+                else
+                {            
+                    $number =~ s/^0043/0/; # remove country code
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - using herold.at for reverse search of $number";
+
+                    $result = GetFileFromURL("https://www.herold.at/gelbe-seiten/telefon_".$number."/", 5, undef, 1);
+                    
+                    if(not defined($result))
+                    {
+                        Log3 $name, 4, "FB_CALLMONITOR ($name) - unable to retrieve result for reverse search of $number via $method";
+                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+                        {
+                            $status = "timeout";
+                            undef($result);
+                        }
+                    }
+                    else
+                    {
+                        #Debug($result);
+                        if($result =~ m,data-clickpos="name"><span itemprop="name">([^<]+)</span>,)
+                        {
+                            $invert_match = $1;
+                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                            undef($result);
+                            return $invert_match;
+                        }
+                        elsif($result !~ /Wir konnten zu den eingegebenen Suchkriterien keine Ergebnisse finden/)
+                        {
+                            Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from herold.at. Please contact the FHEM community.";
+                        }
+                        
+                        $status = "unknown";
+                    }
+                }
+            }
+            
+            
+            else
+            {
+                Log3 $name, 3, "FB_CALLMONITOR ($name) - unknown reverse search method $method";
             }
         } 
     }
@@ -2023,7 +2118,7 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
     <br><br>
     Possible values: 0 =&gt; disabled, 1 =&gt; enabled (answering machine calls will be treated as "missed call").<br>
     Default Value is 0 (disabled)<br><br>
-    <li><a name="FB_CALLMONITOR_reverse-search">reverse-search</a> (phonebook,textfile,dasoertliche.de,search.ch,dasschnelle.at)</li>
+    <li><a name="FB_CALLMONITOR_reverse-search">reverse-search</a> (phonebook,textfile,dasoertliche.de,11880.com,search.ch,dasschnelle.at,herold.at)</li>
     Enables the reverse searching of the external number (at dial and call receiving).
     This attribute contains a comma separated list of providers which should be used to reverse search a name to a specific phone number. 
     The reverse search process will try to lookup the name according to the order of providers given in this attribute (from left to right). The first valid result from the given provider order will be used as reverse search result.
@@ -2109,7 +2204,7 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
 <h3>FB_CALLMONITOR</h3>
 <ul>
   Das Modul FB_CALLMONITOR verbindet sich zu einer AVM FritzBox Fon und verarbeitet
-  Telefonie-<a href="#FB_CALLMONITOR_events">Ereignisse</a>.(eingehende & ausgehende Telefonate)
+  Telefonie-<a href="#FB_CALLMONITOR_events">Ereignisse</a>.(eingehende &amp; ausgehende Telefonate)
   <br><br>
   Um dieses Modul nutzen zu k&ouml;nnen, muss der Callmonitor via Kurzwahl mit einem Telefon aktiviert werden.
  .<br><br>
@@ -2179,7 +2274,7 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
     <br><br>
     M&ouml;gliche Werte: 0 =&gt; deaktiviert, 1 =&gt; aktiviert (Anrufbeantworter gilt als "unbeantworteter Anruf").<br>
     Standardwert ist 0 (deaktiviert)<br><br>
-    <li><a name="FB_CALLMONITOR_reverse-search">reverse-search</a> (phonebook,dasoertliche.de,search.ch,dasschnelle.at)</li>
+    <li><a name="FB_CALLMONITOR_reverse-search">reverse-search</a> (phonebook,dasoertliche.de,11880.com,search.ch,dasschnelle.at,herold.at)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer (bei eingehenden/ausgehenden Anrufen).
     Dieses Attribut enth&auml;lt eine komma-separierte Liste mit allen Anbietern die f&uuml;r eine R&uuml;ckw&auml;rtssuche benutzt werden sollen.
     Die R&uuml;ckw&auml;rtssuche pr&uuml;ft in der gegebenen Reihenfolge (von links nach rechts) ob der entsprechende Anbieter (Telefonbuch, Textdatei oder Internetanbieter) die Rufnummer aufl&ouml;sen k&ouml;nnen.
@@ -2215,7 +2310,7 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
     Sofern FHEM auf einer FritzBox l&auml;uft (und nichts abweichendes angegeben wurde), wird das interne File /var/flash/phonebook verwendet. Alternativ kann man das Telefonbuch in der FritzBox-Weboberfl&auml;che exportieren und dieses verwenden<br><br>
     Standardwert ist /var/flash/phonebook (entspricht dem Pfad auf einer FritzBox)<br><br>
     <li><a name="FB_CALLMONITOR_remove-leading-zero">remove-leading-zero</a> 0,1</li>
-    Wenn dieses Attribut aktiviert ist, wird die f&uuml;hrende Null aus der externen Rufnummer (bei eingehenden & abgehenden Anrufen) entfernt. Dies ist z.B. notwendig bei Telefonanlagen.<br><br>
+    Wenn dieses Attribut aktiviert ist, wird die f&uuml;hrende Null aus der externen Rufnummer (bei eingehenden &amp; abgehenden Anrufen) entfernt. Dies ist z.B. notwendig bei Telefonanlagen.<br><br>
     M&ouml;gliche Werte: 0 =&gt; deaktiviert , 1 =&gt; aktiviert<br>
     Standardwert ist 0 (deaktiviert)<br><br>
     <li><a name="FB_CALLMONITOR_unique-call-ids">unique-call-ids</a> 0,1</li>
