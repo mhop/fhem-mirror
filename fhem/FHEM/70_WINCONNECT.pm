@@ -1,6 +1,9 @@
 # $Id$
 ############################################################################
-# 2017-12-29, v0.0.27
+# 2018-03-13, v0.0.28
+#
+# v0.0.28
+# - BUFIX:      [FEHMModul] - "printer_names"="no_printing"
 #
 # v0.0.27
 # - BUFIX:      [WinWebGUI] - Crash nach ca. 40-60 Sekunden
@@ -1156,7 +1159,7 @@ sub WINCONNECT_ReceiveCommand($) {
 			readingsBulkUpdateIfChanged( $hash, "os_RunTime_hours", "0" ); 
 			readingsBulkUpdateIfChanged( $hash, "os_RunTime_minutes", "0" ); 
 			readingsBulkUpdateIfChanged( $hash, "printer_aktiv", "false" );
-			readingsBulkUpdateIfChanged( $hash, "printer_names", "no_prining" );
+			readingsBulkUpdateIfChanged( $hash, "printer_names", "no_printing" );
 		}
     }
  
