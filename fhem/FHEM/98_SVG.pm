@@ -596,7 +596,7 @@ SVG_zoomLink($$$)
   if($d eq "zoom") {
 
     my $n = 0;
-    my @FW_zoom = ("hour","qday","day","week","month","year");
+    my @FW_zoom=("hour","qday","day","week","month","year","10years","20years");
     my %FW_zoom = map { $_, $n++ } @FW_zoom;
 
     $val = "day" if(!$val);
@@ -621,6 +621,10 @@ SVG_zoomLink($$$)
       $w_off = ($off < 0) ? $w_off*12: int($w_off/4);
     } elsif($val eq "year") {
       $w_off =                         int($w_off/12);
+    } elsif($val eq "10years") {
+      $w_off =                         int($w_off/120);
+    } elsif($val eq "20years") {
+      $w_off =                         int($w_off/240);
     }
     $cmd .= "zoom=$val;off=$w_off";
 
@@ -934,7 +938,8 @@ SVG_calcOffsets($$)
     $fr = AttrVal($wl, "fixedrange", undef);
     if($fr) {
       if($fr =~ "^(hour|qday|day|week|month|year)" ||
-         $fr =~ m/^\d+days$/ ) { #fixedrange with offset
+         $fr =~ m/^\d+days$/  || #fixedrange with offset
+         $fr =~ m/^\d+years$/ ) { #fixedrange with offset
         $frx=$fr; #fixedrange with offset
 
       } else {
@@ -1054,24 +1059,33 @@ SVG_calcOffsets($$)
     $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0,$sd,$sm,$sy);
     $SVG_devs{$d}{to}   = SVG_tspec(59,59,23,$ed,$em,$ey);
 
-  } elsif($zoom eq "year") {
+  } elsif($zoom =~ m/^(\d+)?year/) {
+    my $nyear = $1 ? ($1-1) : 0;
     my @l = localtime($now);
     $l[5] += ($off-1);
-    if(SVG_Attr($FW_wname, $wl, "endPlotToday", undef)) {
-      $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0,$l[3],$l[4],$l[5]);
+    if ($st) { #
+      $l[5]++;
+      $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0, 1, 0,$l[5] ); #Jan01 00:00:00
+      $SVG_devs{$d}{to}   = SVG_tspec(59,59,23,31,11,$l[5]+$nyear);
+
+    } elsif(SVG_Attr($FW_wname, $wl, "endPlotToday", undef)) {
+      $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0,$l[3],$l[4],$l[5] - $nyear);
       $l[5]++; # today, 23:59
       $SVG_devs{$d}{to}   = SVG_tspec(59,59,23,$l[3],$l[4],$l[5]);
 
     } elsif(SVG_Attr($FW_wname, $wl, "endPlotNow", undef)) {
-      $SVG_devs{$d}{from} = SVG_tspec(0, $l[0], @l);
-      $SVG_devs{$d}{from} = SVG_tspec(@l);
+      #$SVG_devs{$d}{from} = SVG_tspec(0, $l[0], @l);
+      $SVG_devs{$d}{from}  = SVG_tspec($l[0], $l[1], $l[2],$l[3],$l[4],
+                                       $l[5] - $nyear);
+      #$SVG_devs{$d}{from} = SVG_tspec(@l);
       $l[5]++; # now
       $SVG_devs{$d}{to}   = SVG_tspec(@l);
 
     } else {
       $l[5]++;
-      $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0, 1, 0,$l[5]); #Jan01 00:00:00
+      $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0, 1, 0,$l[5]-$nyear);
       $SVG_devs{$d}{to}   = SVG_tspec(59,59,23,31,11,$l[5]); #Dec31 23:59:59
+
     }
   }
 }
@@ -1599,17 +1613,31 @@ SVG_render($$$$$$$$$$)
 
   if($ddur <= 0.1) {
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 300; $tstep = 60;
+
   } elsif($ddur <= 0.5) {
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 3600; $tstep = 900;
+
   } elsif($ddur <= 1.1) {       # +0.1 -> DST
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 4*3600; $tstep = 3600;
+
   } elsif ($ddur <= 7.1) {
     $first_tag=". 6";   $tag=". 2 1"; $step = 24*3600; $tstep = 6*3600;
+
   } elsif ($ddur <= 31.1) {
     $first_tag=". 6";   $tag=". 2 1"; $step = 7*24*3600; $tstep = 24*3600;
     $aligntext = 1;
-  } else {
+
+  } elsif ($ddur <= 732.1) {
     $first_tag=". 6";   $tag=". 1";   $step = 28*24*3600; $tstep = 28*24*3600;
+    $aligntext = 2; $aligntics = 2;
+
+  } else {
+    $step = (($ddur / 365.2425) / 20) * 365 * 86400;
+    if($step < 365 * 86400) {
+      $step = 365 * 86400;
+    }
+    $tstep = $step;
+    $first_tag="";   $tag=". 6";
     $aligntext = 2; $aligntics = 2;
   }
 
@@ -2493,11 +2521,11 @@ plotAsPng(@)
         In plotmode gnuplot-scroll(-svg) or SVG the given time-range will be
         used, and no scrolling for this SVG will be possible. Needed e.g. for
         looking at last-years data without scrolling.<br><br> If the value is
-        one of hour, day, &lt;N&gt;days, week, month, year then set the zoom
-        level for this SVG independently of the user specified zoom-level. This
-        is useful for pages with multiple plots: one of the plots is best
-        viewed in with the default (day) zoom, the other one with a week
-        zoom.<br>
+        one of hour, day, &lt;N&gt;days, week, month, year, &lt;N&gt;years then 
+        set the zoom level for this SVG independently of the user specified
+        zoom-level. This is useful for pages with multiple plots: one of the
+        plots is best viewed in with the default (day) zoom, the other one with
+        a week zoom.<br>
 
         If given, the optional integer parameter offset refers to a different
         period (e.g. last year: fixedrange year -1, 2 days ago: fixedrange day
@@ -2724,14 +2752,15 @@ plotAsPng(@)
       Jahre auf eine Seite anzusehen.<br><br>
 
       Zweite Alternative:<br>
-      Wenn der Wert entweder hour, day, &lt;N&gt;days, week, month oder year
-      lautet, kann der Zoom-Level f&uuml;r dieses SVG unabh&auml;ngig vom
-      User-spezifischen Zoom eingestellt werden. Diese Einstellung ist
-      n&uuml;tzlich f&uuml;r mehrere Plots auf einer Seite: Eine Grafik ist mit
-      dem Standard-Zoom am aussagekr&auml;ftigsten, die anderen mit einem Zoom
-      &uuml;ber eine Woche. Der optionale ganzzahlige Parameter [offset] setzt
-      ein anderes Zeitintervall (z.B. letztes Jahr: <code>fixedrange year
-      -1</code>, vorgestern:<code> fixedrange day -2</code>).
+      Wenn der Wert entweder hour, day, &lt;N&gt;days, week, month, year oder
+      &lt;N&gt;years lautet, kann der Zoom-Level f&uuml;r dieses SVG 
+      unabh&auml;ngig vom User-spezifischen Zoom eingestellt werden. Diese 
+      Einstellung ist n&uuml;tzlich f&uuml;r mehrere Plots auf einer Seite: 
+      Eine Grafik ist mit dem Standard-Zoom am aussagekr&auml;ftigsten, die 
+      anderen mit einem Zoom &uuml;ber eine Woche. Der optionale ganzzahlige 
+      Parameter [offset] setzt ein anderes Zeitintervall (z.B. letztes Jahr: 
+      <code>fixedrange year -1</code>, vorgestern:
+      <code> fixedrange day -2</code>).
       </li><br>
 
     <a name="label"></a>
@@ -2873,7 +2902,7 @@ plotAsPng(@)
       Expression ausgewertet. Das Ergebnis muss in der Form [min:max] sein.
       </li>
   </ul>
-  Die sichtbarkeit des  Plot-Editors kann mit dem FHEMWEB Attribut <a
+  Die Sichtbarkeit des  Plot-Editors kann mit dem FHEMWEB Attribut <a
   href="#ploteditor">ploteditor</a> konfiguriert werden.
   <br>
 </ul>
