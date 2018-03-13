@@ -53,7 +53,7 @@ if  (eval {require RiveScript;1;} ne 1) {
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.32";
+my $babbleversion    = "1.33";
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -2046,15 +2046,16 @@ sub Babble_Html($)
           $rot .= "<input type=\"text\" name=\"d_help\" size=\"51\" maxlength=\"1024\" value=\"".$hlp."\"/></td>"; 
           $rot .= "<td style=\"text-align:left;padding-right:10px; border-top:1px solid gray\">".
                   "<input type=\"button\" id=\"d_addrow\" onclick=\"babble_addrow('".$name."',$devcount,$tblrow)\" value=\"".$babble_tt->{"add"}."\" style=\"width:100px;\"/></td></tr>\n";#$tblrow-$devcount.$devrow
-                  
-          #my $json   = JSON->new->utf8;
-          #my $jhash0 = eval{ $json->encode( $hash->{DATA}{"command"}{$lbdev} ) };
-          #Log3 $name, 1, "\n\n\n\n $lbdev ========>".Dumper($jhash0);
 
           foreach my $place (keys %{$hash->{DATA}{"command"}{$lbdev}}){
             foreach my $verb (keys %{$hash->{DATA}{"command"}{$lbdev}{$place}}){
               foreach my $target (keys %{$hash->{DATA}{"command"}{$lbdev}{$place}{$verb}}){
                 my $cmd     = $hash->{DATA}{"command"}{$lbdev}{$place}{$verb}{$target};
+                if( !defined($cmd) ){
+                  Log3 $name,1,"[Babble] Warning: Entry \$hash->{DATA}{\"command\"}{\"".$lbdev."\"}{\"".$place."\"}{\"".$verb."\"}{\"".$target."\"} is undefined";
+                  $cmd = "undefined"
+                }
+                
                 if( index($cmd,"\$CONFIRM") != -1 ){
                   $checked = "checked=\"checked\" ";
                   $cmd =~ s/;;\$CONFIRM$//;
