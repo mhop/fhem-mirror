@@ -151,7 +151,7 @@ sub XiaomiDevice_Define($$$) {
   };
   if(!$req3)
   {
-    Log3 $name, 2, "$name: Crypt::Cipher::AES not found";
+    Log3 $name, 4, "$name: Crypt::Cipher::AES not found";
     #$hash->{STATE} = "Crypt::Cipher::AES not found";
   } elsif(!defined($hash->{helper}{crypt}) || $hash->{helper}{crypt} ne "Rijndael") {
     $hash->{helper}{crypt} = "AES";
@@ -166,7 +166,7 @@ sub XiaomiDevice_Define($$$) {
   };
   if(!$req2)
   {
-    Log3 $name, 3, "$name: Crypt::Rijndael_PP not found";
+    Log3 $name, 4, "$name: Crypt::Rijndael_PP not found";
     #$hash->{STATE} = "Crypt::Rijndael_PP not found";
   } elsif(!defined($hash->{helper}{crypt}) || $hash->{helper}{crypt} ne "AES") {
     $hash->{helper}{crypt} = "Rijndael";
@@ -176,6 +176,7 @@ sub XiaomiDevice_Define($$$) {
 
   if(!$hash->{helper}{crypt})
   {
+    Log3 $name, 1, "$name: Crypt::Cipher::AES or Crypt::Rijndael_PP is required!";
     $hash->{STATE} = "Crypt::Cipher::AES or Crypt::Rijndael_PP is required!";
     $attr{$name}{disable} = "1";
     return undef;
@@ -203,7 +204,7 @@ sub XiaomiDevice_Define($$$) {
     };
     if(!$req3)
     {
-      Log3 $name, 3, "$name: Crypt::ECB not found while attemting to use an encrypted token";
+      Log3 $name, 2, "$name: Crypt::ECB not found while attempting to use an encrypted token";
       $hash->{STATE} = "Crypt::ECB not found";
       $attr{$name}{disable} = "1";
       return undef;

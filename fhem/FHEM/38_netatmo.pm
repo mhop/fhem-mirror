@@ -3480,7 +3480,13 @@ netatmo_parseReadings($$;$)
   {
     $hash->{status} = "error";
   }
-  readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
+
+  if($hash->{helper}{last_status_store} > 0 && $hash->{helper}{last_status_store} < (int(time) - $hash->{helper}{INTERVAL} - 7200) ) {
+    readingsSingleUpdate( $hash, "active", "dead", 1 );    
+  } else {
+    readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
+  }
+
 }
 
 
