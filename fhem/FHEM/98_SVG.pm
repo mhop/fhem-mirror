@@ -2331,6 +2331,7 @@ SVG_fmtTime($$)
   my @tarr = split("[ :]+", localtime($sec));
   my ($sep, $fmt) = split(" ", $sepfmt, 2);
   my $ret = "";
+  $fmt = "" if(!defined($fmt));
   for my $f (split(" ", $fmt)) {
     $ret .= $sep if($ret);
     $ret .= $tarr[$f];
