@@ -58,7 +58,7 @@ sub new($) {
 	return bless {
 		hash => $hash,
 	    #-- module version
-        version => "7.08";
+        version => "7.09";
 	}, $class;
 }
 
@@ -103,8 +103,8 @@ sub Define($) {
     $hash->{PIN}          = $pin;
     $hash->{ASYNCHRONOUS} = 0;  
   
-    main::Log3 $hash->{NAME},1,"OWX_FRM::Define warning: version ".$hash->{version}." not identical to OWX version ".$main::owx_version
-      if( $hash->{version} ne $main::owx_version);
+    main::Log3 $hash->{NAME},1,"OWX_FRM::Define warning: version ".$self->{version}." not identical to OWX version ".$main::owx_version
+      if( $self->{version} ne $main::owx_version);
    
     #-- register IODev InitFn to be called by FRM after connection to Firmata device is initialized
     $hash->{IODev} = $main::defs{$hash->{HWDEVICE}};
@@ -185,7 +185,7 @@ sub Alarms() {
 ########################################################################################
 
 sub Reopen () {
-  main::Log 1,"[OWX_FRM] Warning: ->Reopen currently not defined
+  main::Log 1,"[OWX_FRM] Warning: ->Reopen currently not defined";
 }
 
 ########################################################################################
