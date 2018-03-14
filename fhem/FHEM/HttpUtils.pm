@@ -72,7 +72,14 @@ HttpUtils_Close($)
   my ($hash) = @_;
   delete($hash->{FD});
   delete($selectlist{$hash});
-  $hash->{conn}->close() if(defined($hash->{conn}));
+  if(defined($hash->{conn})) {  # Forum #85640
+    my $ref = eval { $hash->{conn}->can('close') };
+    if($ref) {
+      $hash->{conn}->close();
+    } else {
+      stacktrace();
+    }
+  }
   delete($hash->{conn});
   delete($hash->{hu_sslAdded});
   delete($hash->{hu_filecount});

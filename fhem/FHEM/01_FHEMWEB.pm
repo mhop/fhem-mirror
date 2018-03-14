@@ -369,7 +369,7 @@ FW_Read($$)
       $i += 4;
     }
 
-    my $data = substr($hash->{BUF}, $i, $len);
+    #my $data = substr($hash->{BUF}, $i, $len);
     #for( my $i = 0; $i < $len; $i++ ) {
     #  substr( $data, $i, 1, substr( $data, $i, 1, ) ^ substr($mask, $i% , 1) );
     #}
