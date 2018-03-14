@@ -2705,6 +2705,8 @@ sub
 DOIF_SleepTrigger ($)
 {
   my ($hash)=@_;
+  my $sleeptimer=$hash->{helper}{sleeptimer};
+  my $sleepsubtimer=$hash->{helper}{sleepsubtimer};
   my $pn = $hash->{NAME};
   $hash->{helper}{cur_cmd_nr}="wait_timer" if (!AttrVal($hash->{NAME},"selftrigger",""));
   $hash->{helper}{triggerEvents}=$hash->{helper}{timerevents};
@@ -2712,8 +2714,6 @@ DOIF_SleepTrigger ($)
   $hash->{helper}{event}=$hash->{helper}{timerevent};
   $hash->{helper}{triggerDev}=$hash->{helper}{timerdev};
   readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
-  my $sleeptimer=$hash->{helper}{sleeptimer};
-  my $sleepsubtimer=$hash->{helper}{sleepsubtimer};
   $hash->{helper}{sleeptimer}=-1;
   $hash->{helper}{sleepsubtimer}=-1;
   if (ReadingsVal($pn,"mode","") ne "disabled") {
