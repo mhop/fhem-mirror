@@ -691,7 +691,7 @@ sub freezemon_apptime($) {
 
             #$ret .= $intAt{$i}{TRIGGERTIME} . "-" . $fnname;
             $ret .= $intAtA[$i]->{TRIGGERTIME} . "-" . $fnname;
-            Log3 $name, 5, "[Freezemon] $name Reference found: " . ref($fn) . "/$fnname/$fn";
+            #Log3 $name, 5, "[Freezemon] $name Reference found: " . ref($fn) . "/$fnname/$fn";
         }
         else {
             #$ret .= $intAt{$i}{TRIGGERTIME} . "-" . $fn;
@@ -706,7 +706,7 @@ sub freezemon_apptime($) {
             if ( !defined( $shortarg->{NAME} ) ) {
                 if ( AttrVal( $name, "fm_extDetail", 0 ) == 1 ) {
                     if ( $fn eq "BlockingKill" or $fn eq "BlockingStart" ) {
-                        $shortarg = $shortarg->{abortArg}{NAME};
+                        $shortarg = $shortarg->{abortArg}{NAME} if defined($shortarg->{abortArg}{NAME});
                     }
                     elsif ( $fn eq "HttpUtils_Err" ) {
                         if ( defined( $shortarg->{hash}{hash}{NAME} ) ) {
@@ -717,7 +717,7 @@ sub freezemon_apptime($) {
                         $shortarg = $shortarg->{NotifyFn};
                     }
                     else {
-                        Log3 $name, 5, "[Freezemon] $name found something without a name $fn" . Dumper($shortarg);
+                        #Log3 $name, 5, "[Freezemon] $name found something without a name $fn" . Dumper($shortarg);
                         $shortarg = "N/A";
                     }
                 }
@@ -735,7 +735,7 @@ sub freezemon_apptime($) {
                 $shortarg = $deref->{'hash'}{NAME};    #at least in DOIF_TimerTrigger
             }
             else {
-                Log3 $name, 5, "[Freezemon] $name  found a REF $fn " . Dumper( ${$arg} );
+                #Log3 $name, 5, "[Freezemon] $name  found a REF $fn " . Dumper( ${$arg} );
             }
         }
         else {
@@ -743,7 +743,7 @@ sub freezemon_apptime($) {
             $shortarg = "N/A";
         }
         if ( !defined($shortarg) ) {
-            Log3 $name, 5, "Freezemon: something went wrong $fn " . Dumper($arg);
+            #Log3 $name, 5, "Freezemon: something went wrong $fn " . Dumper($arg);
             $shortarg = "";
         }
         else {
