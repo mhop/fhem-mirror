@@ -22,6 +22,7 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.18:	fixed unnecessary call of blocking function
 #		0.0.17:	fixed Warning when fm_logFile is not maintained
 #				Freeze-Handling non-blocking
 #				New attribute fm_whitelistSub
@@ -84,7 +85,7 @@ use Time::HiRes qw(tv_interval);
 use B qw(svref_2object);
 use Blocking;
 
-my $version  = "0.0.17";
+my $version  = "0.0.18";
 my @logqueue = ();
 
 ###################################
@@ -174,11 +175,9 @@ sub freezemon_Notify($$) {
 ###################################
 sub freezemon_processFreeze($) {
 
-    #my ($name) = @_;
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
-    #my $hash = $defs{$name};
     my $log = freezemon_dump_log( $hash, $hash->{helper}{TIMER}, $hash->{helper}{msg} );
 
     return $name;
@@ -323,12 +322,16 @@ sub freezemon_ProcessTimer($) {
 
             my @t = localtime($seconds);
             my $log = ResolveDateWildcards( AttrVal( $name, "fm_logFile", undef ), @t );
-            $hash->{helper}{logfile} = $log;
 
-            $hash->{helper}{blocking} =
-              BlockingCall( "freezemon_processFreeze", $hash, "freezemon_freezeDone", 300, "freezemon_freezeAbort",
-                $hash );
-            Log3 $name, 5, "[Freezemon] $name: Blocking Call started with PID " . $hash->{helper}{blocking}{pid};
+            # BlockingCall for Logfile creation
+            if ( AttrVal( $name, "fm_logFile", "" ) ne "" ) {
+                $hash->{helper}{logfile} = $log;
+
+                $hash->{helper}{blocking} =
+                  BlockingCall( "freezemon_processFreeze", $hash, "freezemon_freezeDone", 300, "freezemon_freezeAbort",
+                    $hash );
+                Log3 $name, 5, "[Freezemon] $name: Blocking Call started with PID " . $hash->{helper}{blocking}{pid};
+            }
 
             Log3 $name, $loglevel, $hash->{helper}{msg};
 
