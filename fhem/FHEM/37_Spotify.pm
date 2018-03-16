@@ -16,6 +16,7 @@ use warnings;
 use JSON;
 
 use MIME::Base64;
+use List::Util qw/shuffle/;
 
 sub Spotify_Initialize($) {
     my ($hash) = @_;
@@ -93,7 +94,7 @@ sub Spotify_Set($$@) {
   } else {
   	$list .= ' playTrackByURI playContextByURI pause:noArg resume:noArg volume:slider,0,1,100 update:noArg';
   	$list .= ' skipToNext:noArg skipToPrevious:noArg seekToPosition repeat:one,all,off shuffle:on,off transferPlayback volumeFade:slider,0,1,100 playTrackByName playPlaylistByName togglePlayback';
-  	$list .= ' playSavedTracks playRandomTrackFromPlaylistByURI findTrackByName findArtistByName playArtistByName volumeUp volumeDown';
+  	$list .= ' playSavedTracks playRandomTrackFromPlaylistByURI randomPlayPlaylistByURI findTrackByName findArtistByName playArtistByName volumeUp volumeDown';
   }
 
   if($cmd eq 'code') {
@@ -122,6 +123,7 @@ sub Spotify_Set($$@) {
   return Spotify_togglePlayback($hash) if($cmd eq 'toggle' || $cmd eq 'togglePlayback');
   return Spotify_playSavedTracks($hash, $args[0], defined $args[1] ? join(' ', @args[1..$#args]) : undef) if($cmd eq 'playSavedTracks');
   return Spotify_playRandomTrackFromPlaylistByURI($hash, $args[0], $args[1], defined $args[2] ? join(' ', @args[2..$#args]) : undef) if($cmd eq 'playRandomTrackFromPlaylistByURI');
+  return Spotify_randomPlayPlaylistByURI($hash, $args[0], $args[1], defined $args[2] ? join(' ', @args[2..$#args]) : undef) if($cmd eq 'randomPlayPlaylistByURI');
   return Spotify_findTrackByName($hash, @args > 0 ? join(' ', @args) : undef) if($cmd eq 'findTrackByName');
   return Spotify_findArtistByName($hash, @args > 0 ? join(' ', @args) : undef) if($cmd eq 'findArtistByName');
   return Spotify_playArtistByName($hash, @args > 0 ? join(' ', @args) : undef) if($cmd eq 'playArtistByName');
@@ -562,6 +564,29 @@ sub Spotify_playRandomTrackFromPlaylistByURI($$$$) { # select a random track fro
 	Spotify_playTrackByURI($hash, \@uris, $device_id);
 	Log3 $name, 4, "$name: random track $selectedTrack->{uri} ($selectedTrack->{name}) from $uri";
 	return undef;
+}
+
+sub Spotify_randomPlayPlaylistByURI($$$$) { # play the playlist in random order
+    my ($hash, $uri, $limit, $device_id) = @_;
+    my $name = $hash->{NAME};
+    return 'wrong syntax: set <name> randomPlayPlaylistByURI <playlist_uri> [ <limit> ] [ <device_id> ]' if(!defined $uri);
+
+    my ($user_id, $playlist_id) = $uri =~ m/user:(.*):playlist:(.*)/;
+    return 'invalid playlist_uri' if(!defined $user_id || !defined $playlist_id);
+
+    $device_id = $limit . (defined $device_id ? " " . $device_id : "") if(defined $limit && $limit !~ /^[0-9]+$/);
+    $limit = undef if($limit !~ /^[0-9]+$/);
+
+    Spotify_apiRequest($hash, "users/$user_id/playlists/$playlist_id/tracks?fields=items(track(name,uri))". (defined $limit ? "&limit=$limit" : ""), undef, 'GET', 1);
+    my $result = $hash->{helper}{dispatch}{json}{items};
+    return 'could not find playlist' if(!defined $result);
+
+    my @uris = map { $_->{track}{uri} } @{$result};
+    @uris = shuffle(@uris);
+    $hash->{helper}{skipTrackLog} = 1;
+    Spotify_playTrackByURI($hash, \@uris, $device_id);
+    Log3 $name, 4, "$name: playing $uri in random order";
+    return undef;
 }
 
 sub Spotify_play($$$$$) { # any play command (colleciton or track)
