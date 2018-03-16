@@ -98,30 +98,32 @@
 #			replace ; to ;; in timecommands
 #			Add 1 day if timecode is in past in hour phrases
 #			Added async warning if keywordlist is unkown
-#	04.03.2018	0.4.6
+# 04.03.2018 0.4.6
 #			Breacket decoding bug fixed
-#	04.02.2018	0.5.0
+# 04.02.2018 0.5.0
 #			Feature: Object radiusing 
-#	05.02.2018	0.5.1
+# 05.02.2018 0.5.1
 #			Semicolon adding concretized
 #			Problem with first letter umlaut in type modificator fixed
 #			Fixed problems Attributes not ready
 #			Matched/Unmatched corrected
 #			Else in arraymodifikation expanded
+# 17.03.2018 0.5.2
+#			Startup bug fixed
+#			&& Regexp removes match from Command
+#			Time identification added
+#			Newlines in configuration now replaced by space
 ################################################################
 # TODO:
 # 
-# device verundung durch regexp klammern? eher durch try and error
 # answerx
 #
 # klammern in keywordlists sollen die $n nummerierung nicht beeinflussen
 # in keywordlists sind vermutlich nur maximal eine klammerebene möglich direkte regex arrays sind endlos verschachtelbar
 # zusätzlich unmodifizierte zeit greifbar machen
-# timephrase kombies morgen früh um 9 uhr ist unzuverlässig. evtl order einführen, dann kann auch die splittung weg
-# viertel zeitphrasen
-# - regexp
 #vordefinierte regex zu verfügung stellen
 #		(i[nm]|vor|auf|unter|hinter)? ?(de[rmn]|die|das)? ?
+# neue option notime: deaktiviert für diese Phrase die Zeitenerkennung
 
 package main;
 
@@ -136,7 +138,7 @@ use Encode qw(decode encode);
 my %Talk2Fhem_globals;
 
 
-$Talk2Fhem_globals{version}="0.5.1";
+$Talk2Fhem_globals{version}="0.5.2";
 
 $Talk2Fhem_globals{EN}{erase} = ['\bplease\b', '\balso\b', '^msgtext:'];
 $Talk2Fhem_globals{EN}{numbers} = {
@@ -219,10 +221,11 @@ $Talk2Fhem_globals{DE}{erase} = ['\bbitte\b', '\bauch\b','\bkann\b', '\bsoll\b']
 #	true	=> '^(ja|1|true|wahr|ein|eins.*|auf.*|öffnen|an.*|rauf.*|hoch.*|laut.*|hell.*)$',
 #	false	=> '^(nein|0|false|falsch|aus.*|null|zu.*|schlie\S\S?en|runter.*|ab.*|leise.*|dunk.*)$',
 $Talk2Fhem_globals{DE}{numbers} = {
+#ACHTUNG keine Klammern verwenden sonst ändert numberre die suchmuster positionen z.b. in get_time_by_phrase
 'null' => 0
-,'(ein\S*|erste\S*)' => 1
+,'ein\S*|erste\S*' => 1
 ,'zwei\S*' => 2
-,'(drei\S*|dritt\S*)' => 3
+,'drei\S*|dritt\S*' => 3
 ,'vier\S*' => 4
 ,'fünf\S*' => 5
 ,'sechs\S*' => 6
@@ -251,53 +254,118 @@ $Talk2Fhem_globals{DE}{pass} = {
 	word	=> '\b(\w{4,})\b',
 	empty	=> '^\s*$'
 }; 
-$Talk2Fhem_globals{DE}{datephrase} = {
-	'morgen'=> {days=>1}
-,	'übermorgen'=> {days=>2}
-,	'gestern'=> {days=>-1}
-,	'vorgestern'=> {days=>-2}
-,	'in ('.$Talk2Fhem_globals{DE}{numberre}.') woche\S?'=> {days=>'(7*$1)'}
-,	'in ('.$Talk2Fhem_globals{DE}{numberre}.') monat(\S\S)?'=> {month=>'"$1"'}
-,	'in ('.$Talk2Fhem_globals{DE}{numberre}.') jahr(\S\S)?'=> {year=>'"$1"'}
-,	'nächste.? woche'=> {days=>7}
-,	'nächste.? monat'=> {month=>1}
-,	'nächste.? jahr'=> {year=>1}
-,	'(am )?sonntag'=> {wday=>0}
-,	'(am )?montag'=> {wday=>1}
-,	'(am )?dienstag'=> {wday=>2}
-,	'(am )?mittwoch'=> {wday=>3}
-,	'(am )?donnerstag'=> {wday=>4}
-,	'(am )?freitag'=> {wday=>5}
-,	'(am )?samstag'=> {wday=>6}
-,	'in ('.$Talk2Fhem_globals{DE}{numberre}.') tag(\S\S)?'=> {days=>'"$1"'}
-,	'am (\d\S*(\s\d+)?)'=> {date=>'"$1"'}
-};
-# fc modify time. $_[0] = ermittelte zeit. Zugriff auf $1 $2 usw
-$Talk2Fhem_globals{DE}{timephrase} = {
-	'(in|und|nach)? ('.$Talk2Fhem_globals{DE}{numberre}.') stunde.?' => {hour=>'"$2"'}
-,	'(in|und|nach)? ('.$Talk2Fhem_globals{DE}{numberre}.') minute.?' => {min=>'"$2"'}
-,	'(in|und|nach)? ('.$Talk2Fhem_globals{DE}{numberre}.') sekunde.?' => {sec=>'"$2"'}
-,	'gleich' => {min=>3}
-,	'nachher' => {min=>30}
-,	'später' => {hour=>1}
-,	'jetzt' => {unix=>'time'}
-,	'sofort' => {unix=>'time'}
-,	'um (\d+\s?\:\s?\d+|'.$Talk2Fhem_globals{DE}{numberre}.') (uhr)?' => {
-		time=>'"$1"',
-		fc=>sub () {(($_[0] + 3600) < time) ? ($_[0]+3600*24) : $_[0] }
-	}
-,	'um ('.$Talk2Fhem_globals{DE}{numberre}.') uhr ('.$Talk2Fhem_globals{DE}{numberre}.')' => {
-		hour=>'"$1"', 
-		min=>'"$1"', 
-		fc=>sub () {(($_[0] + 3600) < time) ? ($_[0]+3600*24) : $_[0] }
-	} ############ ZU TESTEN
-,	'früh' => {time=>'"09:00"'}
-,	'abends?' => {time=>'"18:00"'}
-,	'nachmittags?' => {time=>'"16:00"'}
-,	'vormittags?' => {time=>'"10:30"'}
-,	'mittags?' => {time=>'"12:00"'}
-,	'heute'	=> {time=>'"12:00"'}
-};
+
+$Talk2Fhem_globals{DE}{dtspec} = [
+# ---------------------------------- DATUMPHRASEN -----------------------------------------
+	{phr=>'morgen', 			dtmod=>{days=>1}},
+	{phr=>'übermorgen', 		dtmod=>{days=>2}},
+	{phr=>'gestern', 			dtmod=>{days=>-1}},
+	{phr=>'vorgestern', 		dtmod=>{days=>-2}},
+	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') wochen?', 
+								dtmod=>{days=>'(7*$1)'}},
+	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') monat(en)?', 
+								dtmod=>{month=>'"$1"'}},
+	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') jahr(en)?', 
+								dtmod=>{year=>'"$1"'}},
+	{phr=>'nächste.? woche', 	dtmod=>{days=>7}},
+	{phr=>'nächste.? monat', 	dtmod=>{month=>1}},
+	{phr=>'nächste.? jahr',		dtmod=>{year=>1}},
+	{phr=>'(am )?sonntag', 		dtmod=>{wday=>0}},
+	{phr=>'(am )?montag', 		dtmod=>{wday=>1}},
+	{phr=>'(am )?dienstag', 	dtmod=>{wday=>2}},
+	{phr=>'(am )?mittwoch', 	dtmod=>{wday=>3}},
+	{phr=>'(am )?donnerstag', 	dtmod=>{wday=>4}},
+	{phr=>'(am )?freitag', 		dtmod=>{wday=>5}},
+	{phr=>'(am )?samstag', 		dtmod=>{wday=>6}},
+	{phr=>'in ('.$Talk2Fhem_globals{DE}{numberre}.') tag(en)?', 
+								dtmod=>{days=>'"$1"'}},
+	{phr=>'am (\d\S*(\s\d+)?)', dtmod=>{date=>'"$1"'}},
+# ---------------------------------- ZEITPHRASEN -----------------------------------------
+	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') stunden?', 
+								dtmod=>{hour=>'"$2"'}},
+	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') minuten?', 
+								dtmod=>{min=>'"$2"'}},
+	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') sekunden?', 
+								dtmod=>{sec=>'"$2"'}},
+	{phr=>'gleich', 			dtmod=>{min=>3}},
+	{phr=>'nachher', 			dtmod=>{min=>30}},
+	{phr=>'später', 			dtmod=>{hour=>1}},
+	{phr=>'heute', 				dtmod=>{notime=>'"12:00"'}},
+	{phr=>'nachts?',			dtmod=>{notime=>'"03:00"',pm=>0}},
+	{phr=>'früh', 				dtmod=>{notime=>'"09:00"',pm=>0}},
+	{phr=>'vormittags?',		dtmod=>{notime=>'"10:30"',pm=>0}},
+	{phr=>'abends?', 			dtmod=>{notime=>'"18:00"',pm=>1}},
+	{phr=>'nachmittags?', 		dtmod=>{notime=>'"16:00"',pm=>1}},
+	{phr=>'mittags?', 			dtmod=>{notime=>'"12:00"',pm=>1}},
+#!!!!!!!!!! heute nachmittag geht nicht bei den ersten 3
+# fc modify time. $_[0] = ermittelte zeit. Zugriff auf $1 $2 !unmodifiert! $_[1] = zeit der vorherigen erkennung $_[2] = phr $_[3] = dtmod !evaled! $_[4] = $pm
+# um 8:30 uhr um 8 : 30 uhr
+	{phr=>'um (\d+\s?\:\s?\d+)( uhr)?', 
+								dtmod=>{
+									time=>'"$1"',
+									fc=>sub () {
+										my $res = (($_[0] + 3600) < $_[1]) ? ($_[0]+3600*24) : $_[0];
+										# Füge 12 hinzu wenn explicit pm und zeit nicht abends
+										$res += 12*3600 if (defined($_[4]) and $_[4] and $1 =~ /^(0?[0-9]|1[0-2])/);
+										return($res);
+									}
+								}},
+#eventuell bei den beiden näcshten wenn es nachmittag ist nur 12 addieren 
+# um 8 uhr 30 um acht uhr zwölf 
+	{phr=>'um ('.$Talk2Fhem_globals{DE}{numberre}.') uhr ('.$Talk2Fhem_globals{DE}{numberre}.')', 
+								dtmod=>{
+									time=>'"$1:$2"', 
+									fc=>sub () {
+										my $res = (($_[0] + 3600) < $_[1]) ? ($_[0]+3600*24) : $_[0];
+										# Füge 12 hinzu wenn explicit pm und zeit nicht abends
+										$res += 12*3600 if (defined($_[4]) and $_[4] and $_[3]{time} =~ /^(0?[0-9]|1[0-2])/);
+										return($res);
+									}
+								}},
+# um 8 uhr um acht uhr
+	{phr=>'um ('.$Talk2Fhem_globals{DE}{numberre}.') uhr', 
+								dtmod=>{
+									time=>'"$1:00"', 
+									fc=>sub () {
+										my $res = (($_[0] + 3600) < $_[1]) ? ($_[0]+3600*24) : $_[0];
+										# Füge 12 hinzu wenn explicit pm und zeit nicht abends
+										$res += 12*3600 if (defined($_[4]) and $_[4] and $_[3]{time} =~ /^(0?[0-9]|1[0-2])/);
+										return($res);
+									}
+								}},
+# um 
+	{phr=>'um (halb|viertel vor|viertel nach|viertel|dreiviertel)? ?('.$Talk2Fhem_globals{DE}{numberre}.')', 
+								dtmod=>{
+									time=>'"$2"',
+									fc=>sub () { my $res=$_[0];
+											my @evt = localtime($_[0]);
+											if ($evt[2] < 13) {
+												my @now = localtime($_[1]);
+												if ($_[0] < $_[1] or $now[2] > 12) {
+													$res += 3600*12;
+												} 
+												if ($res < $_[1]) {
+													$res += 3600*12;
+												}
+											}
+											if ($1 eq "halb") {
+												$res -= 1800;
+											} elsif ($1 eq "viertel vor") {
+												$res -= 900;
+											} elsif ($1 eq "viertel nach") {
+												$res += 900;
+											} elsif ($1 eq "viertel") {
+												$res -= 2700;
+											} elsif ($1 eq "dreiviertel") {
+												$res -= 900;
+											}	
+											$res += 12*3600 if (defined($_[4]) and $_[4] and $_[3]{time} =~ /^(0?[0-9]|1[0-2])/);
+											return($res);
+										}
+								}},
+	{phr=>'jetzt',			 	dtmod=>{unix=>'time'}},
+	{phr=>'sofort', 			dtmod=>{unix=>'time'}},
+];
 
 
 sub Talk2Fhem_Initialize($);
@@ -568,9 +636,7 @@ sub Talk2Fhem_Set($@)
 	(return "\"set $name\" needs at least one argument") unless(scalar(@args));
 	(return "Unknown argument ?, choose one of ! cleartriggers:noArg cleartimers:noArg") if($args[0] eq "?");
 	
-	if ($hash->{STATE} ne "Ready") {
-		#Fülle nur cmds array
-	} elsif ($args[0] eq "cleartimers") {
+	if ($args[0] eq "cleartimers") {
 		AnalyzeCommand($hash->{CL}, "delete at_".$name."_.*");
 	} elsif ($args[0] eq "cleartriggers") {
 		
@@ -807,12 +873,12 @@ sub Talk2Fhem_Attr(@)
 	}
 		
 	
-	#elsif ($attrName eq "T2F_filter") {
+	#elsif ($attrName eq "T2F_filter") 
 		#Log 1, "HALLO".$defs{global}{STATE};  
 		#my $preattr = AttrVal($name, "T2F_filter", "");
 		#if ($preattr eq "") {
 		#	$_[3] = join(",", @{$Talk2Fhem_globals{Talk2Fhem_language($name)}{erase}}).",".$attrValue;
-		#}}
+		#
 	return undef;
 }
 
@@ -874,7 +940,7 @@ sub Talk2Fhem_parseParams($)
 	foreach my $line (split("\n", $val)) {
 		$line =~ s/#.*//;
 		$line = Talk2Fhem_realtrim($line);
-		$r .= $line;
+		$r .= ($r?" ":"").$line;
 	}
 	if ( wantarray ) {
 		push(@res, {key => $key, val => $r});
@@ -917,10 +983,10 @@ my $list = (shift || AttrVal($hash->{NAME}, $type, ""));
 	
 #		my $modlist = Talk2Fhem_parseParams(AttrVal($name, "T2F_modwordlist", ""));;
 #		return ("Error while parsing Modwordlist.\n$modlist" ) unless(ref($modlist) eq "HASH");
-#		foreach (keys %$modlist) {
+#		foreach (keys %$modlist) 
 ##			$$modlist{$_} = Talk2Fhem_parseArray($$modlist{$_});			
 #			$hash->{helper}{modlist}{$_} = Talk2Fhem_parseArray($$modlist{$_});			
-#		}
+#		
 }
 
 sub Talk2Fhem_language($) 
@@ -948,13 +1014,12 @@ return("define at_".$myname."_".$i."_".$d." at "
 	.":".sprintf("%02d", $ltevt[0]));
 }
 
-
 sub Talk2Fhem_exec($$$) {
 
 my %assires;
 my %lastcmd;
 
-sub Talk2Fhem_get_time_by_phrase($$$$$%);
+sub Talk2Fhem_get_time_by_phrase($$$$$@);
 sub Talk2Fhem_addevt($$$$;$$);
 sub Talk2Fhem_err($$$;$);
 sub Talk2Fhem_filter($$);
@@ -1009,12 +1074,10 @@ my @regtargets;
 for (keys %{$me->{helper}{T2F_andwordlist}}) { push(@regtargets, \@{$me->{helper}{T2F_andwordlist}{$_}}) };
 my $reg = '\b'.${art}.'('.join("|",map { @$_ } @regtargets).')\b';
 
-Log 1, $reg;
 my @andlockinfo; #my @sets;
 
 for (@regtargets) {
 	my $regtarget = join("|", @$_);
-Log 1, $regtarget;
 
 	#	d Satzteil  x Teilposition  y cmds Position
 	my $d=0; my $x=0; my $y=0; my $prepost; my $prepre;
@@ -1104,8 +1167,9 @@ if ($lastevt and ($cmd =~ /\bwieder |^(dann|danach).*/i)) {
 	T2FL($myname, 5, "Word again found. Reusing timeevent. ".localtime($lastevt)); 
 	$time = $lastevt;
 }
-my $evtime = Talk2Fhem_get_time_by_phrase($myname, $time, $time, \$cmd, \$specials, %{$Talk2Fhem{datephrase}});
-$evtime = Talk2Fhem_get_time_by_phrase($myname, $evtime, $time, \$cmd, \$specials, %{$Talk2Fhem{timephrase}});
+my $evtime = Talk2Fhem_get_time_by_phrase($myname, $time, $time, \$cmd, \$specials, @{$Talk2Fhem{dtspec}});
+#my $evtime = Talk2Fhem_get_time_by_phrase($myname, $time, $time, \$cmd, \$specials, %{$Talk2Fhem{datephrase}});
+#$evtime = Talk2Fhem_get_time_by_phrase($myname, $evtime, $time, \$cmd, \$specials, %{$Talk2Fhem{timephrase}});
 
 #T2FL($myname, 4, "Extracted Timephrase. '$$specials{timephrase}'") if $$specials{timephrase};
 T2FL($myname, 4, "Extracted Timephrase. '$$specials{timephrase}'") if $$specials{timephrase};
@@ -1210,77 +1274,107 @@ unless (ref($filter) eq "ARRAY") {
  return(Talk2Fhem_realtrim($cmd));
 }
 
-sub Talk2Fhem_get_time_by_phrase($$$$$%) {
-my ($myname, $evt, $now, $cmd, $spec, %tp) = @_;
+sub Talk2Fhem_get_time_by_phrase($$$$$@) {
+
+#$evt (@lt)  = Zeit bei der wir uns gerade befinden
+#$now (@now) = Grundlage bei Zeiten mit relativen Zeitangaben 
+
+my ($myname, $evt, $now, $cmd, $spec, @tp) = @_;
 #T2FL($myname, 5, "get_time_by_phrase. Using eventtime: ".localtime($evt)." now: ".localtime($now)." command: ".$$cmd);
 return(0) unless ($evt); 
 my @lt = localtime($evt);
 my @now = localtime($now);
 my $disu = AttrVal($myname, "T2F_disableumlautescaping", 0);
+my $pm; my $timeset;
 
-	foreach my $key (keys(%tp)) {
+	foreach my $e (@tp) {
+		my $key = $$e{phr};
+		my %tf = %{$$e{dtmod}};
 		my $esckey = Talk2Fhem_escapeumlauts($key, $disu);
 		my @opt = ($$cmd =~ /\b$esckey\b/i);
 		while ($$cmd =~ s/\b$esckey\b/ /i) {
 			$$$spec{timephrase} .= $&." ";
-			my %tf = %{$tp{$key}};
+			$pm = $tf{pm} if defined $tf{pm};
+			$timeset = $tf{notime} if defined $tf{notime};
+#			my %tf = %{$tp{$key}};
 			T2FL($myname, 4, "Timephrase found: =~ s/\\b$key\\b/");
 			foreach my $datemod (keys(%tf)) {
 				next if $datemod eq "fc";
+				next if $datemod eq "pm";
 				# Suche Ersetzungsvariablen
 				my $dmstore = $tf{$datemod};
 				while ($tf{$datemod} =~ /\$(\d+)/) {
-				my $d=$1;
-				my $v = $opt[($d-1)];
-				if ($v !~ /^\d+$/) {
-				#Log 1, "KEINE Zahl ".$v;
-					foreach ( keys %{$Talk2Fhem_globals{DE}{numbers}} ) {
-						my $tmp = Talk2Fhem_escapeumlauts($_, $disu);
-						last if ($v =~ s/$tmp/$Talk2Fhem_globals{DE}{numbers}{$_}/i);
+					my $d=$1;
+					my $v = $opt[($d-1)];
+					if ($v !~ /^\d+$/) {
+						foreach ( keys %{$Talk2Fhem_globals{DE}{numbers}} ) {
+							my $tmp = Talk2Fhem_escapeumlauts($_, $disu);
+							last if ($v =~ s/$tmp/$Talk2Fhem_globals{DE}{numbers}{$_}/i);
+							}
 					}
+					$tf{$datemod} =~ s/\$\d+/$v/;
 				}
-				$tf{$datemod} =~ s/\$\d+/$v/;
-				}
-				$tf{$datemod} = eval($tf{$datemod});
-				T2FL($myname, 5, "TIMEPHRASEDATA mod: '$datemod' raw: '$dmstore' result: '$tf{$datemod}' opt: '@opt'");
+				$tf{$datemod} = eval($tf{$datemod}); # Kalkulationen
+				T2FL($myname, 5, "TIMEPHRASEDATA mod: '$datemod' raw: '$dmstore' result: '$tf{$datemod}' opt: '@opt' pm: '$pm'" );
 				if ($datemod eq "days") {
-					$evt = POSIX::mktime(0,0,12,($lt[3]+$tf{days}),$lt[4],$lt[5]) || 0;
+					$evt = POSIX::mktime(0,0,0,($lt[3]+$tf{days}),$lt[4],$lt[5]) || 0;			
+					$timeset = "12:00";
 				} elsif ($datemod eq "wday") {
-					$evt = POSIX::mktime(0,0,12,($lt[3]-$lt[6]+$tf{wday}+(( $tf{wday} <= $lt[6] )?7:0)),$lt[4],$lt[5]) || 0;
+					$evt = POSIX::mktime(0,0,0,($lt[3]-$lt[6]+$tf{wday}+(( $tf{wday} <= $lt[6] )?7:0)),$lt[4],$lt[5]) || 0;
+					$timeset = "12:00";
 				} elsif ($datemod eq "year") {
-					$evt = POSIX::mktime(0,0,12,$lt[3],$lt[4],($lt[5]+$tf{year})) || 0;
+					$evt = POSIX::mktime(0,0,0,$lt[3],$lt[4],($lt[5]+$tf{year})) || 0;
+					$timeset = "12:00";
 				} elsif ($datemod eq "month") {
-					$evt = POSIX::mktime(0,0,12,$lt[3],($lt[4]+$tf{month}),$lt[5]) || 0;
+					$evt = POSIX::mktime(0,0,0,$lt[3],($lt[4]+$tf{month}),$lt[5]) || 0;
+					$timeset = "12:00";
 				} elsif ($datemod eq "sec") {
 					$evt = POSIX::mktime(($now[0]+$tf{sec}),$now[1],$now[2],$lt[3],$lt[4],$lt[5]) || 0;
+					$timeset = undef;
 				} elsif ($datemod eq "min") {
 					$evt = POSIX::mktime($now[0],($now[1]+$tf{min}),$now[2],$lt[3],$lt[4],$lt[5]) || 0;
+					$timeset = undef;
 				} elsif ($datemod eq "hour") {
 					$evt = POSIX::mktime($now[0],$now[1],($now[2]+$tf{hour}),$lt[3],$lt[4],$lt[5]) || 0;
+					$timeset = undef;
 				} elsif ($datemod eq "time") {
 					my @t = map { s/\s//gr } split(":", $tf{time});
 					$evt = POSIX::mktime($t[2] || 0,$t[1] || 0,$t[0],$lt[3],$lt[4],$lt[5]) || 0;
+					$timeset = undef;
 				} elsif ($datemod eq "date") {
 					my @t = split(/\.|\s/, $tf{date});
 					if ($t[1]) {$t[1]--} else {$t[1] = $now[4]+1}
 					if ($t[2]) {if (length($t[2]) eq 2) { $t[2] = "20".$t[2] }; $t[2]=$t[2]-1900} else {$t[2] = $now[5]}
 					$evt = POSIX::mktime(0,0,12,$t[0], $t[1], $t[2]) || 0;
+					$timeset = undef;
 				} elsif ($datemod eq "unix") {
 					$evt = localtime($tf{unix});
-				}
+					$timeset = undef;
+				} 
 				@now = localtime($evt);
 			}
 			@lt = localtime($evt);
-		}
-	
-	if ($tp{$key}{fc}) {
-		if (ref $tp{$key}{fc} eq "CODE") {
-			my $lock = $evt;
-			$evt = &{$tp{$key}{fc}}($evt);
-			T2FL($myname, 4, "Time modified by function. ".$evt) if $lock != $evt;
+
+			if ($tf{fc}) {
+				if (ref $tf{fc} eq "CODE") {
+					my $lock = $evt;
+					$evt = &{$tf{fc}}($evt, $now, $key, \%tf, $pm);
+					T2FL($myname, 4, "Time modified by function. ".$lock." -> ".$evt) if $lock != $evt;
+					#notwendig wenn fc ohne zeitsetzer ode notime steht $timeset = undef;
+				}
+			}
+			$now = $evt;
 		}
 	}
-	}
+
+#wenn keine Zeit gesetzt wurde setze $timeset.
+if ($timeset) {
+#Log 1, "TIMESET: $timeset";
+	my @t = split(":", $timeset);
+	my @lt = localtime($evt);
+	$evt = POSIX::mktime($t[2] || 0,$t[1] || 0,$t[0],$lt[3],$lt[4],$lt[5]) || 0;
+};
+
 return($evt);
 }
 
@@ -1310,7 +1404,7 @@ my @hitnokeylist = @{$$phr{hitnokeylist}};
 my @fphrs = @{$$phr{regexps}};
 
 my $pmatch;
-my $punmatch = $cmd;
+#my $punmatch = $cmd;
 
 my @dir = ($$spec{origin});
 T2FL($myname, 5, "$myname Evaluate search:\n$cmd =~ /$$phr{key}/i") if ref $res;
@@ -1318,6 +1412,7 @@ for my $fphr (@fphrs) {
 #	if (my @d = ($cmd =~ qr/$fphr/i))
 	if ($fphr =~ s/^\?//){
 		my @d = ($cmd =~ /$fphr/i);
+		
 		my $m = $&;
 		#Log 1, "A: ".$fphr;
 		#Log 1, "A: ".Dumper $m;
@@ -1335,15 +1430,15 @@ for my $fphr (@fphrs) {
 		
 		next if $m eq "?";
 		$pmatch .= $m;
-		$punmatch =~ s/$m//gi;
-		#$cmd =~ s/$m//gi;
+#		$punmatch =~ s/$m//gi;
+		$cmd =~ s/$m//gi;
 	} elsif ($fphr =~ /^\!/) {
 		return if (eval { $cmd =~ /$'/i });
 	} elsif (my @d = ($cmd =~ /$fphr/i ) ){
 		my $m = $&;
 		$pmatch .= $m;
-		$punmatch =~ s/$m//gi;
-		#$cmd =~ s/$m//gi;
+#		$punmatch =~ s/$m//gi;
+		$cmd =~ s/$m//gi;
 		# Klammerinhalt speichern wenn Klammer vorhanden
 		push(@dir, @d) if $fphr =~ /(?<!\\)\((?!\?)/;
 #		push(@dir, @d) if $fphr =~ /\((?!\?)/;
@@ -1352,10 +1447,11 @@ for my $fphr (@fphrs) {
 		#T2FL($myname, 5, "$myname No hit with:\n$cmd =~ /$fphr/i");
 		return;
 	}
+	$cmd = Talk2Fhem_normalize($cmd);
 }
 
 $$spec{match} = $pmatch;
-$$spec{unmatch} = $punmatch;
+$$spec{unmatch} = $cmd;
 
 return(1) unless ref $res;
 
@@ -1365,7 +1461,7 @@ T2FL($myname, 5, "Filled lists: ".Dumper @fphrs);
 T2FL($myname, 5, "Words: ".Dumper @dir);
 
 #$pmatch=Talk2Fhem_realtrim($pmatch);
-$punmatch=Talk2Fhem_realtrim($punmatch);
+my $punmatch=Talk2Fhem_realtrim($cmd);
 T2FL($myname, 5, "Match: ".$pmatch);
 T2FL($myname, 5, "Unmatch: ".$punmatch); 
 
@@ -1679,8 +1775,8 @@ my %react;
 							
 							#Log 1, Dumper @keywords;
 							#wenn keine Liste in Klammer ist
-							my $err = T2FL($myname, 1, "Clipnumber $clipno includes no array or integer in '$$phr{key}!");
 							if ($#keywords == -1 and $else eq "") {
+								my $err = T2FL($myname, 1, "Clipnumber $clipno includes no array or integer in '$$phr{key}!");
 								Talk2Fhem_err($myname, $err,$res,1);
 								return(0);								
 							}
@@ -1798,6 +1894,7 @@ sub Talk2Fhem_escapeumlauts($;$) {
 }
 
 }
+
 sub T2FL($$$) {
 Log3($_[0], $_[1], $_[2]);
 	my $h = $_[0];
