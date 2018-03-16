@@ -292,7 +292,7 @@ sub weekprofile_sendDevProfile(@)
   return "profile has no data" if (!defined($prf->{DATA}));
 
   if ($type eq "WEEKPROFILE") {
-      my $json = JSON->new;
+      my $json = JSON->new->allow_nonref;
       my $json_text = undef;
       
       eval ( $json_text = $json->encode($prf->{DATA}) );
@@ -628,7 +628,7 @@ sub weekprofile_Get($$@)
     return "profile $params[0] not found" if (!defined($prf));    
     return "profile $params[0] has no data" if (!defined($prf->{DATA}));
     
-    my $json = JSON->new;
+    my $json = JSON->new->allow_nonref;
     my $json_text = undef;
 
     eval { $json_text = $json->encode($prf->{DATA}) };
@@ -691,7 +691,7 @@ sub weekprofile_Get($$@)
   }
   
   if($cmd eq "sndDevList") {
-    my $json = JSON->new;
+    my $json = JSON->new->allow_nonref;
     my @sortDevList = sort {lc($a->{ALIAS}) cmp lc($b->{ALIAS})} @{$hash->{SNDDEVLIST}};
     my $json_text = undef;
     eval { $json_text = $json->encode(\@sortDevList) };
@@ -773,7 +773,7 @@ sub weekprofile_Set($$@)
     
     my $jsonData = $params[1];
 
-    my $json = JSON->new;
+    my $json = JSON->new->allow_nonref;
     my $data = undef;
 
     eval { $data = $json->decode($jsonData); };
@@ -1109,7 +1109,7 @@ sub weekprofile_writeProfilesToFile(@)
   print $fh "__version__=".$CONFIG_VERSION."\n";  
   
   Log3 $me, 5, "$me(writeProfileToFile): write profiles to $filename";
-  my $json = JSON->new;
+  my $json = JSON->new->allow_nonref;
   for (my $i = $start; $i < $prfCnt; $i++) {
     print $fh "entry=".$json->encode($hash->{PROFILES}[$i])."\n";
   }  
@@ -1142,7 +1142,7 @@ sub weekprofile_readProfilesFromFile(@)
   
   Log3 $me, 5, "$me(readProfilesFromFile): read profiles from $filename";
   
-  my $json = JSON->new;  
+  my $json = JSON->new->allow_nonref;  
   my $rowCnt = 0;
   my $version = undef;
   while (my $row = <$fh>) {
