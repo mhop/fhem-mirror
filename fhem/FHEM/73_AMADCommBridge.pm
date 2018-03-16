@@ -76,7 +76,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 
-my $modulversion = "4.2.0";
+my $modulversion = "4.2.1";
 my $flowsetversion = "4.2.0";
 
 
@@ -141,7 +141,7 @@ sub AMADCommBridge_Define($$) {
 
     
     return "too few parameters: define <name> AMADCommBridge '<tcp-port>'" if( @a < 2 and @a > 3 );
-    return "Cannot define a HEOS device. Perl modul $missingModul is missing." if ( $missingModul );
+    return "Cannot define a AMADCommBridge device. Perl modul $missingModul is missing." if ( $missingModul );
     
     my $name                = $a[0];
     
@@ -1061,7 +1061,6 @@ sub AMADCommBridge_ParseMsg($$) {
   Information on the individual settings can be obtained by touching the respective text field.</br>
   If all entries are complete, the AMAD Device can be created via the button "create Device".</br>
   For control commands from FHEM to Tasker, the APP "Autoremote" or "Tasker Network Event Server (TNES)" is additionally required.
-  </ul>
   <br><br>
   <a name="AMADCommBridgereadings"></a>
   <b>Readings</b>
@@ -1135,7 +1134,6 @@ sub AMADCommBridge_ParseMsg($$) {
   Infos zu den einzelnen Einstellungen erh&auml;lt man durch einen Touch auf das jeweiligen Textfeld.</br>
   Sind alle Eingaben vollst&auml;ndig, kann das AMAD Device &uuml;ber die Schaltfl&auml;che &quot;create Device&quot; erstellt werden.</br>
   Damit Steuerbefehle von FHEM zu Tasker funktionieren wird zus&auml;tzlich noch die APP "Autoremote" oder "Tasker Network Event Server (TNES)" ben&ouml;tigt.
-  </ul>
   <br><br>
   <a name="AMADCommBridgereadings"></a>
   <b>Readings</b>

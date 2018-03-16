@@ -60,7 +60,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 
-my $modulversion = "4.2.0";
+my $modulversion = "4.2.1";
 my $flowsetversion = "4.2.0";
 
 
@@ -144,7 +144,7 @@ sub AMADDevice_Define($$) {
     my @a = split( "[ \t]+", $def );
     
     return "too few parameters: define <name> AMADDevice <HOST-IP> <amad_id> <remoteServer>" if( @a != 5 );
-    return "Cannot define a AMAD device. Perl modul $missingModul is missing." if ( $missingModul );
+    return "Cannot define a AMADDevice device. Perl modul $missingModul is missing." if ( $missingModul );
 
 
     my $name                                    = $a[0];
@@ -1041,11 +1041,11 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <b>Define</b>
   <ul><br>
   10.6.9.10 1496497380000 IODev=AMADBridge
-    <code>define &lt;name&gt; AMADDevice &lt;IP-ADRESSE&gt; &lt;AMAD_ID&gt; IODev=&lt;IODEVICE&gt;</code>
+    <code>define &lt;name&gt; AMADDevice &lt;IP-ADRESSE&gt; &lt;AMAD_ID&gt; &lt;REMOTESERVER&gt;</code>
     <br><br>
     Example:
     <ul><br>
-      <code>define WandTabletWohnzimmer AMADDevice 192.168.0.23 123456 IODev=NAME_des_AMADCommBridge_Devices</code><br>
+      <code>define WandTabletWohnzimmer AMADDevice 192.168.0.23 123456 Automagic</code><br>
     </ul>
     <br>
     In this case, an AMADDevice is created by hand. The AMAD_ID, here 123456, must also be entered exactly as a global variable in Automagic/Tasker.
@@ -1227,11 +1227,11 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <b>Define</b>
   <ul><br>
   10.6.9.10 1496497380000 IODev=AMADBridge
-    <code>define &lt;name&gt; AMADDevice &lt;IP-ADRESSE&gt; &lt;AMAD_ID&gt; IODev=&lt;IODEVICE&gt;</code>
+    <code>define &lt;name&gt; AMADDevice &lt;IP-ADRESSE&gt; &lt;AMAD_ID&gt; &lt;REMOTESERVER&gt;</code>
     <br><br>
     Beispiel:
     <ul><br>
-      <code>define WandTabletWohnzimmer AMADDevice 192.168.0.23 123456 IODev=NAME_des_AMADCommBridge_Devices</code><br>
+      <code>define WandTabletWohnzimmer AMADDevice 192.168.0.23 123456 Automagic</code><br>
     </ul>
     <br>
     In diesem Fall wird ein AMADDevice von Hand angelegt. Die AMAD_ID, hier 123456, mu&szlig; auch exakt so als globale Variable in Automagic/Tasker eingetragen sein.
@@ -1243,7 +1243,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>airplanemode - Status des Flugmodus</li>
     <li>androidVersion - aktuell installierte Androidversion</li>
     <li>automagicState - Statusmeldungen von der Automagic oder Tasker App <b>(Voraussetzung Android >4.3). Ist Android gr&ouml;&szlig;er 4.3 vorhanden und im Reading steht "wird nicht unterst&uuml;tzt", mu&szlig; in den Androideinstellungen unter Ton und Benachrichtigungen -> Benachrichtigungszugriff ein Haken f&uuml;r Automagic/Tasker gesetzt werden</b></li>
-    <li>batteryHealth - Zustand der Battery (1=unbekannt, 2=gut, 3=&Uuml;berhitzt, 4=tot, 5=&Uumlberspannung, 6=unbekannter Fehler, 7=kalt) (nur Automagic)</li>
+    <li>batteryHealth - Zustand der Battery (1=unbekannt, 2=gut, 3=&Uuml;berhitzt, 4=tot, 5=&Uuml;berspannung, 6=unbekannter Fehler, 7=kalt) (nur Automagic)</li>
     <li>batterytemperature - Temperatur der Batterie (nur Automagic)</li>
     <li>bluetooth - on/off, Bluetooth Status an oder aus</li>
     <li>checkActiveTask - Zustand einer zuvor definierten APP. 0=nicht aktiv oder nicht aktiv im Vordergrund, 1=aktiv im Vordergrund, <b>siehe Hinweis unten</b> (nur Automagic)</li>
