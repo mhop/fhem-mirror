@@ -2162,8 +2162,8 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 
 =pod
 =item device
-=item summary Controls a Luxtronik 2.0 controller for heat pumps
-=item summary_DE Steuert eine Luxtronik 2.0 Heizungssteuerung für W&auml;rmepumpen.
+=item summary Connects with a Luxtronik 2.0 controller for heat pumps
+=item summary_DE Verbindet mit einer Luxtronik 2.0 Heizungssteuerung für W&auml;rmepumpen.
 
 =begin html
 
@@ -2171,9 +2171,8 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 <h3>LUXTRONIK2</h3>
 <div>
 <ul>
-  Luxtronik 2.0 is a heating controller used in <a href="http://www.alpha-innotec.de">Alpha Innotec</a>, Siemens Novelan (WPR NET) and Wolf Heiztechnik (BWL/BWS) heat pumps.
-  <br>
-  It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
+  Luxtronik 2.0 and 2.1 is a heating controller from <a href="http://www.alpha-innotec.de">Alpha InnoTec (AIT)</a> used in heat pumps of Alpha InnoTec, Buderus (Logamatic HMC20, HMC20 Z), CTA All-In-One (Aeroplus), Elco, Nibe (AP-AW10), Roth (ThermoAura&reg;, ThermoTerra), Novelan (WPR NET) and Wolf Heiztechnik (BWL/BWS).<br>
+  It has a built-in ethernet (RJ45) port, so it can be directly integrated into a local area network (LAN).
   <br>
   <i>The modul is reported to work with firmware: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77, V1.80, V1.81.</i>
   <br>
@@ -2329,9 +2328,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 <h3>LUXTRONIK2</h3>
 <div>
 <ul>
-  Die Luxtronik 2.0 ist eine Heizungssteuerung der Firma <a href="http://www.alpha-innotec.de">Alpha Innotec</a>, welche in W&auml;rmepumpen von Alpha Innotec, 
-  Siemens Novelan (WPR NET), Roth (ThermoAura®, ThermoTerra), Elco und Wolf Heiztechnik (BWL/BWS) verbaut ist.
-  Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
+  Die Luxtronik 2.0 and 2.1 ist eine Heizungssteuerung der Firma <a href="http://www.alpha-innotec.de">Alpha InnoTec AIT</a>, welche in W&auml;rmepumpen von Alpha InnoTec, Buderus (Logamatic HMC20, HMC20 Z), CTA All-In-One (Aeroplus), Elco, Nibe (AP-AW10), Roth (ThermoAura&reg;, ThermoTerra), Novelan (WPR NET) und Wolf Heiztechnik (BWL/BWS) verbaut ist. Sie besitzt einen Ethernet (RJ45) Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
   <br>
   <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77, V1.80, V1.81.</i>
   <br>
@@ -2480,8 +2477,8 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
       </li><br>
     <li><code>userHeatpumpParameters &lt;Index [Name][,Index2 [Name2],Index3 [Name3] ...]&gt;</code>
       <br>
-      Erlaubt das Auslesen der Werte benutzerspezifischer Parameter. Die Indizes der verf&uml;gbaren Parameterwerte k&ouml;nnen mit dem get-Befehl <i>rawData</i> ermittelt werden.<br> 
-      In der Attributdefinition kann der Name hinter den Index getrennt durch ein Leerzeichen geschrieben werden. Der jeweilige Parameter-Wert wird entweder mit dem Präfix "userParameter..." oder unter dem angegebenen Namen angezeigt. <br>
+      Erlaubt das Auslesen der Werte benutzerspezifischer Parameter. Die Indizes der verf&uuml;gbaren Parameterwerte k&ouml;nnen mit dem get-Befehl <i>rawData</i> ermittelt werden.<br> 
+      In der Attributdefinition kann der Name hinter den Index getrennt durch ein Leerzeichen geschrieben werden. Der jeweilige Parameter-Wert wird entweder mit dem Pr&auml;fix "userParameter..." oder unter dem angegebenen Namen angezeigt. <br>
       Mehrere Indizes werden durch Kommas getrennt.<br>
       Nicht mehr ben&ouml;tigte Ger&auml;tewerte k&ouml;nnen mit dem FHEM-Befehl <a href="#deletereading">deleteReading</a> gel&ouml;scht werden.
       </li><br>

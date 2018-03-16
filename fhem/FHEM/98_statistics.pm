@@ -61,7 +61,7 @@ sub statistics_UpdateDevReading($$$$);
 #     statisticType: 0=noStatistic | 1=minMaxAvg(daily) | 2=delta | 3=stateDuration | 4=tendency | 5=minMaxAvg(hourly)
 ##############################################################
   my %knownReadings = ( 
-    "brightness" => 1 
+    "brightness" => 5 
    ,"count" => 2 
    ,"current" => 1 
    ,"energy" => 2 
@@ -1155,7 +1155,7 @@ sub statistics_UpdateDevReading($$$$)
 =begin html
 
 =item helper
-=item summary Calculates for statistical values and adds them to the devices.
+=item summary Calculates statistical values and adds them to the devices.
 =item summary_DE Berechnet statistische Werte und f&uuml;gt sie dem Ger&auml;t hinzu.
 
 <a name="statistics"></a>
@@ -1173,11 +1173,11 @@ sub statistics_UpdateDevReading($$$$)
          <br>
          over a period of day, month and year:
          <br>
-         <i>brightness, current, energy_current, humidity, luminosity, temperature, voltage</i>
+         <i>current, energy_current, humidity, luminosity, temperature, voltage</i>
          <br>
          over a period of hour, day, month and year:
          <br>
-         <i>wind, wind_speed, windSpeed</i>
+         <i>brightness, wind, wind_speed, windSpeed</i>
       </li><br>
       <li><b>Tendency</b> over 1h, 2h, 3h und 6h: <i>pressure</i>
       </li><br>
@@ -1340,11 +1340,11 @@ sub statistics_UpdateDevReading($$$$)
          <br>
          &uuml;ber den Zeitraum Tag, Monat und Jahr:
          <br>
-         <i>brightness, current, energy_current, humidity, luminosity, temperature, voltage</i>
+         <i>current, energy_current, humidity, luminosity, temperature, voltage</i>
          <br>
          &uuml;ber den Zeitraum Stunde, Tag, Monat und Jahr:
          <br>
-         <i>wind, wind_speed, windSpeed</i>
+         <i>brightness, wind, wind_speed, windSpeed</i>
       </li><br>
       <li><b>Tendency</b> Tendenz &uuml;ber 1h, 2h, 3h und 6h: <i>pressure</i>
       </li><br>
