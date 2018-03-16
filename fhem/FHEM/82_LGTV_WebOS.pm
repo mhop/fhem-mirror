@@ -2,7 +2,7 @@
 # 
 # Developed with Kate
 #
-#  (c) 2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -53,21 +53,23 @@
 
 package main;
 
+my $missingModul = "";
+
 use strict;
 use warnings;
 
-use MIME::Base64;
-use IO::Socket::INET;
-use Digest::SHA qw(sha1_hex);
-use JSON qw(decode_json encode_json);
-use Encode qw(encode_utf8 decode_utf8);
-use Blocking;
+eval "use MIME::Base64;1" or $missingModul .= "MIME::Base64 ";
+eval "use IO::Socket::INET;1" or $missingModul .= "IO::Socket::INET ";
+eval "use Digest::SHA qw(sha1_hex);1" or $missingModul .= "Digest::SHA ";
+eval "use JSON qw(decode_json encode_json);1" or $missingModul .= "JSON ";
+eval "use Encode qw(encode_utf8 decode_utf8);1" or $missingModul .= "Encode ";
+eval "use Blocking;1" or $missingModul .= "Blocking ";
 
 
 
 
 
-my $version = "2.0.0";
+my $version = "2.0.3";
 
 
 
@@ -151,6 +153,7 @@ my %openApps = (
 
             'Maxdome'                   => 'maxdome',
             'AmazonVideo'               => 'lovefilm.de',
+            'AmazonVid'                 => 'amazon',
             'YouTube'                   => 'youtube.leanback.v4',
             'Netflix'                   => 'netflix',
             'TV'                        => 'com.webos.app.livetv',
@@ -174,6 +177,7 @@ my %openAppsPackageName = (
 
             'maxdome'                           => 'Maxdome',
             'lovefilm.de'                       => 'AmazonVideo',
+            'amazon'                            => 'AmazonVid',
             'youtube.leanback.v4'               => 'YouTube',
             'netflix'                           => 'Netflix',
             'com.webos.app.livetv'              => 'TV',
@@ -233,6 +237,7 @@ sub LGTV_WebOS_Define($$) {
     
 
     return "too few parameters: define <name> LGTV_WebOS <HOST>" if( @a != 3 );
+    return "Cannot define LGTV_WebOS device. Perl modul ${missingModul}is missing." if ( $missingModul );
     
 
 
@@ -816,7 +821,7 @@ sub LGTV_WebOS_ResponseProcessing($$) {
             return;
         }
         
-        my $decode_json     = decode_json(encode_utf8($json));
+        my $decode_json     = eval{decode_json(encode_utf8($json))};
         if($@){
             Log3 $name, 3, "LGTV_WebOS ($name) - JSON error while request: $@";
             return;
