@@ -598,7 +598,13 @@ sub LUXTRONIK2_DoUpdate($)
       $rName = "userValue$rIndex"  if $rName eq "";
       $return_str .= $rName." ".$heatpump_values[$rIndex];
     }
-
+  # 77 - VentSupplyAirTemp
+  $return_str .= "|".($heatpump_visibility[264]==1 ? $heatpump_values[159] : "no");;
+  # 78 - VentExhaustAirTemp
+  $return_str .= "|".($heatpump_visibility[265]==1 ? $heatpump_values[160] : "no");;
+  # 79 - opModeVentilation
+  $return_str .= "|".($heatpump_visibility[4]==1 ? $heatpump_parameters[894] : "no");;
+  
    return $return_str;
 }
 
@@ -687,6 +693,11 @@ LUXTRONIK2_UpdateDone($)
             70 => "MSW 8S",  71 => "MSW 10S",72 => "MSW 13S", 73 => "MSW 16S",
             74 => "MSW2-6S", 75 => "MSW4-16",76 => "LD2AG",   77 => "LWD90V",
             78 => "MSW3-12", 79 => "MSW3-12S");
+
+   my %ventMode = ( 0 => "Automatik",
+                    1 => "Party",
+                    2 => "Feuchte",
+                    3 => "Aus");
              
   my $counterRetry = $hash->{fhem}{counterRetry};
   $counterRetry++;    
@@ -880,7 +891,14 @@ LUXTRONIK2_UpdateDone($)
       }
      }
      readingsBulkUpdate($hash,"opStateHeating",$value);
-      
+
+   # Ventilation operating mode
+     if ( $a[79] ne "no" ) {
+       $value = $ventMode{$a[79]};
+       $value = "unbekannt (".$a[79].")" unless $value;
+       readingsBulkUpdate($hash,"opModeVentilation",$value);
+     } 
+     
    # Defrost times
       if ($compressor1 != $heatSourceMotor) {
          if ($hash->{fhem}{defrost}{mode} eq "none") {
@@ -968,6 +986,8 @@ LUXTRONIK2_UpdateDone($)
      if ($a[58] !~ /no/) {readingsBulkUpdate( $hash, "mixer2TargetTemperature",LUXTRONIK2_CalcTemp($a[58]));}
      if ($a[59] !~ /no/) {readingsBulkUpdate( $hash, "mixer3FlowTemperature",LUXTRONIK2_CalcTemp($a[59]));}
      if ($a[60] !~ /no/) {readingsBulkUpdate( $hash, "mixer3TargetTemperature",LUXTRONIK2_CalcTemp($a[60]));}
+     if ($a[77] !~ /no/) {readingsBulkUpdate( $hash, "VentSupplyAirTemperature",LUXTRONIK2_CalcTemp($a[77]));}
+     if ($a[78] !~ /no/) {readingsBulkUpdate( $hash, "VentExhaustAirTemperature",LUXTRONIK2_CalcTemp($a[78]));}
 
     # Operating hours (seconds->hours) and heat quantities   
      # LUXTRONIK2_storeReadings: $hash, $readingName, $value, $factor, $doStatistic, $electricalPower
