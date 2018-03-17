@@ -8880,7 +8880,7 @@ return;
                * a string with usage of SQL-wildcard, e.g. "%OL%"
                  
 &lt;new string&gt; : * a simple string with/without spaces, e.g. "12 kWh"
-               * Perl code embedded in {}, e.g. {$VALUE = (split(",",$VALUE))[0]}. 
+               * Perl code embedded in "{}" with quotes, e.g. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
                  The perl expression the variables $VALUE and $UNIT are committed to. The variables are changable within
                  the perl code. The returned value of VALUE and UNIT are saved into the database field 
                  VALUE respectively UNIT of the dataset.                        
@@ -8893,7 +8893,7 @@ return;
                                  set &lt;name&gt; changeValue "%OL%","12 OL"  <br>
                                  # contains the field VALUE the substring "OL", it is changed to "12 OL". <br><br>
                                  
-                                 set &lt;name&gt; changeValue "12 kWh","{$VALUE,$UNIT = split(" ",$VALUE)}"  <br>
+                                 set &lt;name&gt; changeValue "12 kWh","{($VALUE,$UNIT) = split(" ",$VALUE)}"  <br>
                                  # the old field value "12 kWh" is splitted to VALUE=12 and UNIT=kWh and saved into the database fields <br><br>
 
                                  set &lt;name&gt; changeValue "24%","{$VALUE = (split(" ",$VALUE))[0]}"  <br>
@@ -10481,7 +10481,7 @@ sub bdump {
                  * ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%"
                  
 &lt;neuer String&gt; : * ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh"
-                 * Perl Code eingeschlossen in {}, z.B. {$VALUE = (split(",",$VALUE))[0]}. 
+                 * Perl Code eingeschlossen in "{}" inkl. Quotes, z.B. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
                    Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb
                    des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld 
                    VALUE bzw. UNIT des Datensatzes gespeichert.                        
@@ -10494,7 +10494,7 @@ sub bdump {
                                  set &lt;name&gt; changeValue "%OL%","12 OL"  <br>
                                  # enthält das Feld VALUE den Teilstring "OL", wird es in "12 OL" geändert. <br><br>
                                  
-                                 set &lt;name&gt; changeValue "12 kWh","{$VALUE,$UNIT = split(" ",$VALUE)}"  <br>
+                                 set &lt;name&gt; changeValue "12 kWh","{($VALUE,$UNIT) = split(" ",$VALUE)}"  <br>
                                  # der alte Feldwert "12 kWh" wird in VALUE=12 und UNIT=kWh gesplittet und in den Datenbankfeldern gespeichert <br><br>
 
                                  set &lt;name&gt; changeValue "24%","{$VALUE = (split(" ",$VALUE))[0]}"  <br>
