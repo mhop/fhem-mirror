@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   88_xs1Bridge: added blacklist function
   - feature: 93_DbLog: V3.9.0, syntax of attribute excludeDevs enhanced
   - update:  39_Talk2Fhem: Timephrases added, bugfixes and some changes 
   - bugfix:  74_AMADCommBridge: fix Commandref

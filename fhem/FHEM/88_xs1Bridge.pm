@@ -4,7 +4,7 @@
 # physisches Modul - Verbindung zur Hardware
 #
 # note / ToDo´s / Bugs:
-# - Port Check
+# - Port Check ???
 # 
 # 
 # 
@@ -20,6 +20,7 @@ use Net::Ping;
 
 my $missingModul		= "";
 my $xs1_ConnectionTry 	= 1;	# disable Funktion sobald 10x keine Verbindung (Schutzabschaltung)
+my $xs1_id;
 
 eval "use Encode qw(encode encode_utf8 decode_utf8);1" or $missingModul .= "Encode ";
 eval "use JSON;1" or $missingModul .= "JSON ";
@@ -38,14 +39,15 @@ sub xs1Bridge_Initialize($) {
 	$hash->{AttrFn}  	= 	"xs1Bridge_Attr";  
 	$hash->{UndefFn}	=	"xs1Bridge_Undef";
 	$hash->{AttrList}	=	"debug:0,1 ".
-							"disable:0,1 ".
-							"ignore:0,1 ".
-							"interval:30,60,180,360 ".
-							"update_only_difference:0,1 ".
-							"view_Device_name:0,1 ".
-							"view_Device_function:0,1 ".
-							"xs1_control:0,1 ";
-							##$readingFnAttributes;		## die Standardattribute von FHEM
+								"ignore:0,1 ".
+								"update_only_difference:0,1 ".
+								"view_Device_name:0,1 ".
+								"view_Device_function:0,1 ".
+								"xs1_blackl_aktor ".
+								"xs1_blackl_sensor ".
+								"xs1_control:0,1 ".
+								"xs1_interval:0,30,60,180,360 ";
+								##$readingFnAttributes;		## die Standardattribute von FHEM
 							
 	foreach my $d(sort keys %{$modules{xs1Bridge}{defptr}}) {
         my $hash = $modules{xs1Bridge}{defptr}{$d};
@@ -83,26 +85,28 @@ sub xs1Bridge_Define($$) {
 	my $xs1_ip = $arg[2];				## Zusatzparameter 1 bei Define - ggf. nur in Sub
 	$hash->{xs1_ip} = $xs1_ip;
 	
-	$hash->{STATE} = "Initialized";		## Der Status des Modules nach Initialisierung.
+	$hash->{STATE} = "Initialized";	## Der Status des Modules nach Initialisierung.
 	$hash->{TIME} = time();				## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.16";			## Version
+	$hash->{VERSION} = "1.19";			## Version
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
-	$attr{$name}{disable}		= "0";
-	$attr{$name}{interval}		= "60";
+	$attr{$name}{xs1_interval}	= "60"	if( not defined( $attr{$name}{xs1_interval} ) );
 	$attr{$name}{room}			= "xs1"	if( not defined( $attr{$name}{room} ) );
-	$attr{$name}{xs1_control}	= "0";
+	$attr{$name}{xs1_control}	= "0"		if( not defined( $attr{$name}{xs1_control} ) );
 	
 	$modules{xs1Bridge}{defptr}{BRIDGE} = $hash;
 	
-	InternalTimer(gettimeofday()+$attr{$name}{interval}, "xs1Bridge_GetUpDate", $hash);		## set Timer
+	InternalTimer(gettimeofday()+$attr{$name}{xs1_interval}, "xs1Bridge_GetUpDate", $hash);		## set Timer
 
-	Log3 $name, 3, "$typ: Modul defined with xs1_ip: $xs1_ip";
+	#Log3 $name, 3, "$typ: IODev defined with xs1_ip: $xs1_ip";
 	
 	if(!defined($defs{'FileLog_xs1Bridge'})) {												## Logfile existent check
+		Log3 $name, 3, "$typ: FileLog_xs1Bridge ist NICHT definiert";
 		fhem("define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log ".$arg[0]);		## Logfile define
 		fhem("attr FileLog_xs1Bridge room xs1");											## Logfile in xs1 room
+	} else {
+		Log3 $name, 3, "$typ: FileLog_xs1Bridge ist definiert";
 	}
 
 	return undef;
@@ -112,12 +116,8 @@ sub xs1Bridge_Attr(@) {
 	my ($cmd,$name,$attrName,$attrValue) = @_;
 	my $hash = $defs{$name};
 	my $typ = $hash->{TYPE};
-	my $interval = 0;
 	my $debug = AttrVal($hash->{NAME},"debug",0);
-	my $viewDeviceName = AttrVal($hash->{NAME},"view_Device_name",0);
-	my $viewDeviceFunction = AttrVal($hash->{NAME},"view_Device_function",0);
-	my $update_only_difference = AttrVal($hash->{NAME},"update_only_difference",0);
-	my $xs1_control = AttrVal($hash->{NAME},"xs1_control",0);
+	my $xs1_interval = 0;
 	
 	# $cmd  - Vorgangsart - kann die Werte "del" (löschen) oder "set" (setzen) annehmen
 	# $name - Gerätename
@@ -125,35 +125,28 @@ sub xs1Bridge_Attr(@) {
    
 	#### Handling bei set .. attribute
 	if ($cmd eq "set") {
-		RemoveInternalTimer($hash);									## Timer löschen
+		RemoveInternalTimer($hash);											## Timer löschen
 		Debug " $typ: Attr | Cmd:$cmd | RemoveInternalTimer" if($debug);
-		if ($attrName eq "interval") {								## Abfrage Attribute
-			if (($attrValue !~ /^\d*$/) || ($attrValue < 10))
-			{
-			return "$typ: Interval is too small. Please define new Interval | (at least: 10 seconds)";
-			}
-			my $interval = $attrValue;
-		}
-		elsif ($attrName eq "disable") {
-			if ($attrValue eq "1") {								## Handling bei attribute disable 1
+		if ($attrName eq "xs1_interval" && $attrValue == 0) {			## Handling xs1_interval == 0
+			RemoveInternalTimer($hash);
 			readingsSingleUpdate($hash, "state", "deactive", 1);
-			}
-			elsif ($attrValue eq "0") {								## Handling bei attribute disable 0
+		}elsif ($attrName eq "xs1_interval" && $attrValue >= 30) {	## Handling xs1_interval >= 30
 			$xs1_ConnectionTry = 1;
+			my $xs1_interval = $attrValue;
+			InternalTimer(gettimeofday()+$xs1_interval, "xs1Bridge_GetUpDate", $hash);
 			readingsSingleUpdate($hash, "state", "active", 1);
-			}
 		}elsif ($attrName eq "view_Device_function") {
-			if ($attrValue eq "1") {								## Handling bei attribute view_Device_function 1
+			if ($attrValue eq "1") {								## Handling view_Device_function 1
 			Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
 			}
-			elsif ($attrValue eq "0") {								## Handling bei attribute view_Device_function 0
+			elsif ($attrValue eq "0") {							## Handling view_Device_function 0
 			Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
 			}
 		}elsif ($attrName eq "view_Device_name") {
-			if ($attrValue eq "1") {								## Handling bei attribute view_Device_name 1
+			if ($attrValue eq "1") {								## Handling view_Device_name 1
 			Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
 			}
-			elsif ($attrValue eq "0") {								## Handling bei attribute view_Device_name 0
+			elsif ($attrValue eq "0") {							## Handling view_Device_name 0
 				Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
 				for my $i (0..64) {
 				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
@@ -161,36 +154,41 @@ sub xs1Bridge_Attr(@) {
 				}
 			}
 		}elsif ($attrName eq "update_only_difference") {
-			if ($attrValue eq "1") {								## Handling bei attribute update_only_difference 1
+			if ($attrValue eq "1") {								## Handling update_only_difference 1
 			Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
 			}
-			elsif ($attrValue eq "0") {								## Handling bei attribute update_only_difference 0
+			elsif ($attrValue eq "0") {								## Handling update_only_difference 0
 				Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
 				for my $i (0..64) {
 				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
 				}
 			}
 		}elsif ($attrName eq "xs1_control") {
-			if ($attrValue eq "1") {								## Handling bei attribute xs1_control 1
+			if ($attrValue eq "1") {								## Handling xs1_control 1
 				if(! $modules{xs1Dev}) {							## Check Modul vorhanden
 					$attr{$name}{xs1_control}	= "0";
 					return "Module xs1Dev is non-existent or still under development. Please wait"
 				}
 			}
+			################# WUNSCH #################
+		}elsif ($attrName eq "xs1_blackl_aktor") {			## Handling xs1_blackl_aktor
+			#if ($attrValue eq "1") {
+				Log3 $name, 3, "$typ: Attribut xs1_blackl_aktor $attrValue";
+			#}
+		}elsif ($attrName eq "xs1_blackl_sensor") {			## Handling xs1_blackl_sensor
+			Log3 $name, 3, "$typ: Attribut xs1_blackl_sensor $attrValue";
 		}
+			################# WUNSCH ENDE #################
 	}
 	
 	#### Handling bei del ... attribute
 	if ($cmd eq "del") {
-		if ($attrName eq "disable" && !defined $attrValue) {
-		readingsSingleUpdate($hash, "state", "active", 1);
-		Debug " $typ: Attr | Cmd:$cmd | $attrName=$attrValue" if($debug);
+		if ($attrName eq "xs1_interval") {						## Handling deleteattr xs1_interval
+			RemoveInternalTimer($hash);
+			readingsSingleUpdate($hash, "state", "deactive", 1);
+			Debug " $typ: Attr | Cmd:$cmd | $attrName" if($debug);
 		}
-		elsif ($attrName eq "interval") {
-		RemoveInternalTimer($hash);
-		Debug " $typ: Attr | Cmd:$cmd | $attrName" if($debug);
-		}
-		elsif ($attrName eq "view_Device_function") {
+		elsif ($attrName eq "view_Device_function") {		## Handling deleteattr view_Device_function
 			Log3 $name, 3, "$typ: Attribut view_Device_function delete";
 			for my $i (0..64) {
 				for my $i2 (1..4) {
@@ -198,7 +196,7 @@ sub xs1Bridge_Attr(@) {
 				}
 			}
 		}
-		elsif ($attrName eq "view_Device_name") {
+		elsif ($attrName eq "view_Device_name") {				## Handling deleteattr view_Device_name
 			Log3 $name, 3, "$typ: Attribut view_Device_name delete";
 			for my $i (0..64) {
 				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
@@ -210,10 +208,10 @@ sub xs1Bridge_Attr(@) {
 		}
 	}
 
-	#### Handling bei state active
+	# #### Handling bei state active
 	if ($hash->{STATE} eq "active") {
 		RemoveInternalTimer($hash);
-		InternalTimer(gettimeofday()+$interval, "xs1Bridge_GetUpDate", $hash);
+		InternalTimer(gettimeofday()+$xs1_interval, "xs1Bridge_GetUpDate", $hash);
 		Debug " $typ: Attr | RemoveInternalTimer + InternalTimer" if($debug);
 	}
 	return undef;
@@ -244,17 +242,18 @@ sub xs1Bridge_GetUpDate() {
 	my @readingsname = ("Aktor","Sensor","","Timer","");
    
 	my $debug = AttrVal($hash->{NAME},"debug",0);
-	my $disable = AttrVal($name, "disable", 0);
-	my $interval = AttrVal($name, "interval", 60);
+	my $xs1_interval = AttrVal($name, "xs1_interval", 60);
 	my $viewDeviceName = AttrVal($hash->{NAME},"view_Device_name",0);
 	my $viewDeviceFunction = AttrVal($hash->{NAME},"view_Device_function",0);
 	my $update_only_difference = AttrVal($hash->{NAME},"update_only_difference",0);
 	my $xs1_control = AttrVal($hash->{NAME},"xs1_control",0);
+	my $xs1_blackl_aktor = AttrVal($hash->{NAME},"xs1_blackl_aktor",0);
+	my $xs1_blackl_sensor = AttrVal($hash->{NAME},"xs1_blackl_sensor",0);
 	
-	#### xs1Bridge disable Option = 0 -> aktiviert zum auslesen
-	if (AttrVal($hash->{NAME},"disable",0) == 0 && $xs1_ConnectionTry <= 5) {
+	#### xs1Bridge xs1_interval >= 10 -> aktiviert zum auslesen
+	if ($xs1_interval >= 10 && $xs1_ConnectionTry <= 5) {
 		RemoveInternalTimer($hash);									## Timer löschen
-		InternalTimer(gettimeofday()+$interval, "xs1Bridge_GetUpDate", $hash);
+		InternalTimer(gettimeofday()+$xs1_interval, "xs1Bridge_GetUpDate", $hash);
 		Debug " -------------- ERROR CHECK - START --------------" if($debug);
 		Debug " $typ: GetUpDate | RemoveInternalTimer + InternalTimer" if($debug);
 		#Log3 $name, 3, "$typ: xs1Bridge_GetUpDate | RemoveInternalTimer + InternalTimer";
@@ -333,7 +332,10 @@ sub xs1Bridge_GetUpDate() {
 					
 					foreach my $f ( @array ) {
 						$i3++;
-						if ($f->{"type"} ne "disabled") {
+						$xs1_id = $f->{"id"};
+						
+						#### Test ob Aktoren / Sensoren auf xs1_blackl
+						if ($f->{"type"} ne "disabled" && is_in_array($hash,$xs1_id,$i) == 0) {
 							my $xs1Dev = "xs1Dev";
 
 							#### Aktoren spezifisch
@@ -502,11 +504,11 @@ sub xs1Bridge_GetUpDate() {
 		Debug " ------------- ERROR CHECK - ALL END -------------\n " if($debug);
 	}
 	
-	if ($xs1_ConnectionTry == 6) {								## Abschaltung xs1 nach 10 Verbindungsversuchen
-		$attr{$name}{disable}	= "1";
+	if ($xs1_ConnectionTry == 6) {								## Abschaltung xs1 nach 5 Verbindungsversuchen
+		$attr{$name}{xs1_interval}	= "0";
 		readingsSingleUpdate($hash, "state", "deactive", 1);
 		RemoveInternalTimer($hash);								## Timer löschen
-		Log3 $name, 3, "$typ: GetUpDate | connection ERROR -> xs1 set to disable! Device not reachable after 10 attempts";
+		Log3 $name, 3, "$typ: GetUpDate | connection ERROR -> xs1 set to disable! Device not reachable after 5 attempts";
 	}
 }
 
@@ -584,6 +586,7 @@ sub xs1Bridge_Undef($$)
 	RemoveInternalTimer($hash);
 
 	delete $modules{xs1Bridge}{defptr}{BRIDGE} if( defined($modules{xs1Bridge}{defptr}{BRIDGE}) );
+	Log3 $name, 3, "$typ: deleting Device with Name $name";
 	
 	foreach my $d (sort keys %defs) {
 		if(defined($defs{$d}) && defined($defs{$d}{IODev}) && $defs{$d}{IODev} == $hash) {
@@ -592,9 +595,36 @@ sub xs1Bridge_Undef($$)
 		}
 	}
 	
-	Log3 $name, 3, "$typ: deleting Device with Name $name";
 	return undef;
 }
+
+
+##########################
+# eigene Sub
+
+sub is_in_array($$$)
+{
+	my ( $hash,$xs1_id,$i) = @_;
+	my $name = $hash->{NAME};
+	my $typ = $hash->{TYPE};
+	
+	my $xs1_blackl = AttrVal($hash->{NAME},"xs1_blackl_aktor",0) if ($i eq 0);
+	$xs1_blackl = AttrVal($hash->{NAME},"xs1_blackl_sensor",0) if ($i eq 1);
+
+	my @attr_array=split(/,/,$xs1_blackl);
+	if ( grep( /^$xs1_id$/, @attr_array ) ) {
+		#Log3 $name, 3, "$typ: is_in_array | id=$xs1_id auf xs1_blackl Aktoren" if ($i eq 0);
+		#Log3 $name, 3, "$typ: is_in_array | id=$xs1_id auf xs1_blackl Sensoren" if ($i eq 1);
+		return 1;
+	} else {
+		#Log3 $name, 3, "$typ: is_in_array | id=$xs1_id NICHT auf xs1_blackl Aktoren" if ($i eq 0);
+		#Log3 $name, 3, "$typ: is_in_array | id=$xs1_id NICHT auf xs1_blackl Sensoren" if ($i eq 1);
+		return 0;
+	}
+
+}
+
+##########################
 
 # Eval-Rückgabewert für erfolgreiches
 # Laden des Moduls
@@ -643,16 +673,6 @@ sub xs1Bridge_Undef($$)
 		This brings the module into a very detailed debug output in the logfile. Program parts can be checked and errors checked.<br>
 		(Default, debug 0)
 		</li><br>
-		<li>disable (0,1)<br>
-		This function deactivates the interval. With disable 1 no readings are updated.<br>
-		(Default, disable 0)
-		</li><br>
-		<li>interval (30,60,180,360)<br>
-		This is the interval in seconds at which readings are read from xs1<br>
-		<i>For actuators, only different states are updated in the set interval.</i><br>
-		<i>Sensors are always updated in intervals, regardless of the status.</i><br>
-		(Default, interval 60)
-		</li><br>
 		<li>update_only_difference (0,1)<br>
 		The actuators defined in xs1 are only updated when the value changes.<br>
 		(Default, update_only_difference 0)</li><br>
@@ -664,9 +684,23 @@ sub xs1Bridge_Undef($$)
 		The actuator functions defined in xs1 are read out as Reading.<br>
 		(Default, view_Device_function 0)<br>
 		</li><br>
+		<li>xs1_blackl_aktor<br>
+		A comma-separated blacklist of actuators, which should not be created automatically as soon as xs1_control = 1(aktiv).<br>
+		(Example: 2,40,3)<br>
+		</li><br>
+		<li>xs1_blackl_sensor<br>
+		A comma-separated blacklist of sensors, which should not be created automatically as soon as xs1_control = 1(aktiv).<br>
+		(Example: 3,37,55)<br>
+		</li><br>
 		<li>xs1_control (0,1)<br>
 		Option to control the xs1. After activating this, the xs1Dev module creates each actuator and sensor in FHEM.<br>
-		(Default, xs1_control 0)<br>
+		(Default, xs1_control 0)<br><br>
+		<li>xs1_interval (0,30,60,180,360)<br>
+		This is the interval in seconds at which readings are read from xs1<br>
+		<i>For actuators, only different states are updated in the set interval.</i><br>
+		<i>Sensors are always updated in intervals, regardless of the status.</i><br>
+		(Default, xs1_interval 60)
+		</li><br>
 		</li><br><br>
 	</ul>
 	<b>explanation:</b>
@@ -731,16 +765,6 @@ sub xs1Bridge_Undef($$)
 		Dies bringt das Modul in eine sehr ausf&uuml;hrliche Debug-Ausgabe im Logfile. Somit lassen sich Programmteile kontrollieren und Fehler &uuml;berpr&uuml;fen.<br>
 		(Default, debug 0)
 		</li><br>
-		<li>disable (0,1)<br>
-		Diese Funktion deaktiviert den Interval. Mit <code>disable 1</code> werden keine Readings aktualisiert.<br>
-		(Default, disable 0)
-		</li><br>
-		<li>interval (30,60,180,360)<br>
-		Das ist der Intervall in Sekunden, in dem die Readings neu gelesen werden vom xs1.<br>
-		<i>Bei Aktoren werden nur unterschiedliche Zust&auml;nde aktualisiert im eingestellten Intervall.</i><br>
-		<i>Sensoren werden unabhängig vom Zustand immer im Intervall aktualisiert.</i><br>
-		(Default, interval 60)
-		</li><br>
 		<li>update_only_difference (0,1)<br>
 		Die Aktoren welche im xs1 definiert wurden, werden nur bei Wert&auml;nderung aktualisiert.<br>
 		(Default, update_only_difference 0)</li><br>
@@ -752,9 +776,23 @@ sub xs1Bridge_Undef($$)
 		Die Aktor Funktionen welche im xs1 definiert wurden, werden als Reading ausgelesen.<br>
 		(Default, view_Device_function 0)<br>
 		</li><br>
+		<li>xs1_blackl_aktor<br>
+		Eine kommagetrennte Blacklist der Aktoren, welche nicht automatisch angelegt werden sollen sobald xs1_control = 1(aktiv).<br>
+		(Beispiel: 2,40,3)<br>
+		</li><br>
+		<li>xs1_blackl_sensor<br>
+		Eine kommagetrennte Blacklist der Sensoren, welche nicht automatisch angelegt werden sollen sobald xs1_control = 1(aktiv).<br>
+		(Beispiel: 3,37,55)<br>
+		</li><br>
 		<li>xs1_control (0,1)<br>
 		Die Freigabe zur Steuerung des xs1. Nach Aktivierung dieser, wird durch das xs1Dev Modul jeder Aktor und Sensor in FHEM angelegt.<br>
 		(Default, xs1_control 0)<br>
+		</li><br>
+		<li>xs1_interval (0,30,60,180,360)<br>
+		Das ist der Intervall in Sekunden, in dem die Readings neu gelesen werden vom xs1.<br>
+		<i>Bei Aktoren werden nur unterschiedliche Zust&auml;nde aktualisiert im eingestellten Intervall.</i><br>
+		<i>Sensoren werden unabhängig vom Zustand immer im Intervall aktualisiert.</i><br>
+		(Default, xs1_interval 60)
 		</li><br><br>
 	</ul>
 	<b>Erl&auml;uterung:</b>
