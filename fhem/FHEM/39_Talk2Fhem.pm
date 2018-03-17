@@ -113,6 +113,8 @@
 #			&& Regexp removes match from Command
 #			Time identification added
 #			Newlines in configuration now replaced by space
+# 18.03.2018 0.5.3
+#			Time identification fixes
 ################################################################
 # TODO:
 # 
@@ -128,17 +130,17 @@
 package main;
 
 use strict;
-use warnings;
+#use warnings; 
 use POSIX;
 use Data::Dumper;
 use Time::Local;
 use Text::ParseWords;
 use Text::Balanced qw(extract_multiple extract_bracketed);
-use Encode qw(decode encode);
+#use Encode qw(decode encode);
 my %Talk2Fhem_globals;
 
 
-$Talk2Fhem_globals{version}="0.5.2";
+$Talk2Fhem_globals{version}="0.5.3";
 
 $Talk2Fhem_globals{EN}{erase} = ['\bplease\b', '\balso\b', '^msgtext:'];
 $Talk2Fhem_globals{EN}{numbers} = {
@@ -262,11 +264,17 @@ $Talk2Fhem_globals{DE}{dtspec} = [
 	{phr=>'gestern', 			dtmod=>{days=>-1}},
 	{phr=>'vorgestern', 		dtmod=>{days=>-2}},
 	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') wochen?', 
-								dtmod=>{days=>'(7*$1)'}},
+								dtmod=>{days=>'(7*$2)'}},
 	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') monat(en)?', 
-								dtmod=>{month=>'"$1"'}},
+								dtmod=>{month=>'"$2"'}},
 	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') jahr(en)?', 
-								dtmod=>{year=>'"$1"'}},
+								dtmod=>{year=>'"$2"'}},
+	{phr=>'(in|und|nach) einem halben? jahr', 
+								dtmod=>{month=>6}},
+	{phr=>'(in|und|nach) einem viertel jahr', 
+								dtmod=>{month=>3}},
+	{phr=>'(in|und|nach) einem dreiviertel jahr', 
+								dtmod=>{month=>9}},
 	{phr=>'nächste.? woche', 	dtmod=>{days=>7}},
 	{phr=>'nächste.? monat', 	dtmod=>{month=>1}},
 	{phr=>'nächste.? jahr',		dtmod=>{year=>1}},
@@ -283,6 +291,15 @@ $Talk2Fhem_globals{DE}{dtspec} = [
 # ---------------------------------- ZEITPHRASEN -----------------------------------------
 	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') stunden?', 
 								dtmod=>{hour=>'"$2"'}},
+	{phr=>'(in|und|nach) einer (halben?|viertel|dreiviertel) ?stunde', 
+								dtmod=>{fc=>sub () {
+									my $res = $_[0];
+									if ($2=~/halbe/) {$res += 1800}
+									elsif ($2=~/^viertel$/) {$res += 900}
+									elsif ($2=~/^dreiviertel$/) {$res += 2700}
+									return $res;
+									}
+								}},
 	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') minuten?', 
 								dtmod=>{min=>'"$2"'}},
 	{phr=>'(in|und|nach) ('.$Talk2Fhem_globals{DE}{numberre}.') sekunden?', 
@@ -290,14 +307,13 @@ $Talk2Fhem_globals{DE}{dtspec} = [
 	{phr=>'gleich', 			dtmod=>{min=>3}},
 	{phr=>'nachher', 			dtmod=>{min=>30}},
 	{phr=>'später', 			dtmod=>{hour=>1}},
-	{phr=>'heute', 				dtmod=>{notime=>'"12:00"'}},
+	{phr=>'heute', 				dtmod=>{notime=>'"12:00"',time=>'"00:00"'}},
 	{phr=>'nachts?',			dtmod=>{notime=>'"03:00"',pm=>0}},
 	{phr=>'früh', 				dtmod=>{notime=>'"09:00"',pm=>0}},
 	{phr=>'vormittags?',		dtmod=>{notime=>'"10:30"',pm=>0}},
 	{phr=>'abends?', 			dtmod=>{notime=>'"18:00"',pm=>1}},
 	{phr=>'nachmittags?', 		dtmod=>{notime=>'"16:00"',pm=>1}},
 	{phr=>'mittags?', 			dtmod=>{notime=>'"12:00"',pm=>1}},
-#!!!!!!!!!! heute nachmittag geht nicht bei den ersten 3
 # fc modify time. $_[0] = ermittelte zeit. Zugriff auf $1 $2 !unmodifiert! $_[1] = zeit der vorherigen erkennung $_[2] = phr $_[3] = dtmod !evaled! $_[4] = $pm
 # um 8:30 uhr um 8 : 30 uhr
 	{phr=>'um (\d+\s?\:\s?\d+)( uhr)?', 
@@ -338,6 +354,11 @@ $Talk2Fhem_globals{DE}{dtspec} = [
 								dtmod=>{
 									time=>'"$2"',
 									fc=>sub () { my $res=$_[0];
+#									Log 1, "0 ".localtime($_[0]);
+#									Log 1, "1 ".localtime($_[1]);
+#									Log 1, "2 ".$_[2];
+#									Log 1, "3 ".$_[3];
+#									Log 1, "4 ".$_[4];
 											my @evt = localtime($_[0]);
 											if ($evt[2] < 13) {
 												my @now = localtime($_[1]);
@@ -1315,7 +1336,8 @@ my $pm; my $timeset;
 					$tf{$datemod} =~ s/\$\d+/$v/;
 				}
 				$tf{$datemod} = eval($tf{$datemod}); # Kalkulationen
-				T2FL($myname, 5, "TIMEPHRASEDATA mod: '$datemod' raw: '$dmstore' result: '$tf{$datemod}' opt: '@opt' pm: '$pm'" );
+				T2FL($myname, 5, "TIMEPHRASEDATA mod: '$datemod' raw: '$dmstore' result: '$tf{$datemod}' opt: '@opt' pm: '".($pm // "")."'" );
+
 				if ($datemod eq "days") {
 					$evt = POSIX::mktime(0,0,0,($lt[3]+$tf{days}),$lt[4],$lt[5]) || 0;			
 					$timeset = "12:00";
