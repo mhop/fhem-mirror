@@ -143,7 +143,7 @@ sub readingsDelete($$);
 sub redirectStdinStdErr();
 sub rejectDuplicate($$$);
 sub resolveAttrRename($$);
-sub restoreDir_init();
+sub restoreDir_init(;$);
 sub restoreDir_rmTree($);
 sub restoreDir_saveFile($$);
 sub restoreDir_mkDir($$$);
@@ -1591,7 +1591,7 @@ CommandSave($$)
     return;
   }
   my $restoreDir;
-  $restoreDir = restoreDir_init() if(!configDBUsed());
+  $restoreDir = restoreDir_init("save") if(!configDBUsed());
 
   @structChangeHist = ();
   DoTrigger("global", "SAVE", 1);
@@ -5404,8 +5404,9 @@ restoreDir_rmTree($)
 }
 
 sub
-restoreDir_init()
+restoreDir_init($)
 {
+  my ($subDir) = @_;
   my $root = $attr{global}{modpath};
 
   my $nDirs = AttrVal("global","restoreDirs", 3);
@@ -5416,6 +5417,7 @@ restoreDir_init()
   return "" if($nDirs == 0);
 
   my $rdName = "restoreDir";
+  $rdName .= "/$subDir" if($subDir);
   my @t = localtime(gettimeofday());
   my $restoreDir = sprintf("$rdName/%04d-%02d-%02d",
                         $t[5]+1900, $t[4]+1, $t[3]);
@@ -5426,7 +5428,7 @@ restoreDir_init()
     Log 1, "opendir $root/$rdName: $!";
     return "";
   }
-  my @oldDirs = sort grep { $_ !~ m/^\./ && $_ ne $restoreDir } readdir(DH);
+  my @oldDirs = sort grep { $_ =~ m/^20\d\d-\d\d-\d\d/ } readdir(DH);
   closedir(DH);
   while(int(@oldDirs) > $nDirs) {
     my $dir = "$root/$rdName/". shift(@oldDirs);

@@ -271,7 +271,7 @@ doUpdate($$$$)
   ###########################
   # read in & digest the local control file
   my $root = $attr{global}{modpath};
-  my $restoreDir = ($arg eq "check" ? "" : restoreDir_init());
+  my $restoreDir = ($arg eq "check" ? "" : restoreDir_init("update"));
 
   my @locList;
   if(($arg eq "check" || $arg eq "all") &&

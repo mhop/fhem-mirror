@@ -27,15 +27,20 @@ CommandRestore($$)
 {
   my ($cl,$param) = @_;
   my @args = split(/ +/,$param);
-  my $list = (@args > 0 && $args[0] eq "list");
-  shift @args if($list);
-  my $all = (@args > 0 && $args[0] eq "-a");
-  shift @args if($all);
-  my $filename = shift @args;
+
+  my $list;
+  $list = shift(@args) if(@args > 0 && $args[0] eq "list");
+
+  my $all;
+  $all = shift @args if(@args > 0 && $args[0] eq "-a");
+
+  my $filename;
+  $filename = shift @args if(@args > 0 && $args[0] !~ m/^-/);
+
   my $dest = $attr{global}{modpath};
   my $src = "$dest/restoreDir";
 
-  $list = 1 if(!$list && !$filename);
+  $list = 1 if(!$list && (!$filename || $filename !~ m/20\d\d-\d\d-\d\d/));
   return "Usage: restore [-a|list] filename|directory"
     if(@args);
 
@@ -55,13 +60,11 @@ CommandRestore($$)
 
   return "$filename is not available for restore" if(!-e "$src/$filename");
 
-  $filename .= "/" if($filename !~ m,/,); # needed for the regexp below
-  $filename =~ m,^([^/]*)/(.*)$,;
   $src = "$src/$filename";
-  $dest = "$dest/$2" if($2);
+  $dest = "$dest/$1" if($filename =~ m,20\d\d-\d\d-\d\d/(.*)$,);
 
-  return (-f $src ? restoreFile($src,$dest,$all) : restoreDir($src,$dest,$all)).
-        "\n\nrestore finished";
+  return (-f $src ? restoreFile($src,$dest,$all) :
+                    restoreDir( $src,$dest,$all) ).  "\n\nrestore finished";
 }
 
 sub
