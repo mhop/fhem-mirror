@@ -404,9 +404,8 @@ sub HMinfo_autoUpdate($){#in:name, send status-request#########################
   HMinfo_SetFn($defs{$name},$name,"update") if ($name);
   if (AttrVal($name,"autoArchive",undef) && 
       scalar(@{$modules{CUL_HM}{helper}{confUpdt}})){
-    my $fN = AttrVal($name,"configFilename","regSave.cfg");
-    $fN = AttrVal($name,"configDir",".")."\/".$fN if ($fN !~ m/\//);
-    HMinfo_archConfig($defs{$name},$name,"",$fN);
+    my $fn = HMinfo_getConfigFile($name,"configFilename",undef);
+    HMinfo_archConfig($defs{$name},$name,"",$fn);
   }
   InternalTimer(gettimeofday()+$defs{$name}{helper}{autoUpdate},
                 "HMinfo_autoUpdate","sUpdt:".$name,0)
@@ -897,18 +896,9 @@ sub HMinfo_tempListTmplView() { ###############################################
 sub HMinfo_tempListDefFn(@) { #################################################
   my ($fn) = shift;
   $fn = "" if (!defined $fn);
-  my $ret = "";
   
-  if($fn !~ m/\//){   # filename already with path - dont change
-    my ($n) = devspec2array("TYPE=HMinfo");
-    $ret .= AttrVal($n,"configDir",".")."/"            if ( !$fn  || $fn  !~ m/^\//);#no dir?  add defDir
-    $ret  = AttrVal("global","modpath",".")."/$ret"    if ( !$ret || $ret !~ m/^\//);#no path? add modpath
-    if (!$fn){          #set filename
-      my ($f) = split(",",AttrVal($n,"configTempFile","tempList.cfg"));
-      $ret .= $f;
-    }
-  }
-  return $ret.$fn;
+  my ($n) = devspec2array("TYPE=HMinfo");
+  return HMinfo_getConfigFile($n,"configTempFile",$fn);
 }
 sub HMinfo_listOfTempTemplates() { ############################################
   # search all entries in tempListFile
@@ -1599,14 +1589,11 @@ sub HMinfo_SetFn($@) {#########################################################
     return HMinfo_templateExe($opt,$filter,@a);
   }
   elsif($cmd eq "loadConfig") {##action: loadConfig----------------------------
-    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
     $ret = HMinfo_loadConfig($filter,$fn); 
   }
   elsif($cmd eq "verifyConfig"){##action: verifyConfig-------------------------
-    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
-          if ($fn !~ m/\//);
+    my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
 
     if ($hash->{CL}){
       my $id = ++$hash->{nb}{cnt};
@@ -1622,9 +1609,7 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd eq "purgeConfig"){##action: purgeConfig---------------------------
     my $id = ++$hash->{nb}{cnt};
-    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
-          if ($fn !~ m/\//);
+    my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
 
     my $bl = BlockingCall("HMinfo_purgeConfig", join(",",("$name;$id;none",$fn)), 
                           "HMinfo_bpPost", 30, 
@@ -1634,9 +1619,7 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd eq "saveConfig") {##action: saveConfig----------------------------
     my $id = ++$hash->{nb}{cnt};
-    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
-          if ($fn !~ m/\//);
+    my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
     my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name;$id;none",$fn,$opt,$filter)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
@@ -2074,12 +2057,10 @@ sub HMinfo_saveConfig($) {#####################################################
 sub HMinfo_archConfig($$$$) {##################################################
   # save config only if register are complete
   my ($hash,$name,$opt,$fN) = @_;
-  $fN = $fN?$fN:AttrVal($name,"configFilename","regSave.cfg");
-  $fN = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fN 
-        if ($fN !~ m/\//);
+  my $fn = HMinfo_getConfigFile($name,"configFilename",$fN);
   my $id = ++$hash->{nb}{cnt};
   my $bl = BlockingCall("HMinfo_archConfigExec", join(",",("$name;$id;none"
-                                                       ,$fN
+                                                       ,$fn
                                                        ,$opt)), 
                         "HMinfo_archConfigPost", 30, 
                         "HMinfo_bpAbort", "$name:$id");
@@ -2120,6 +2101,19 @@ sub HMinfo_archConfigPost($)  {################################################
   push @{$modules{CUL_HM}{helper}{confUpdt}},@arr;
   delete $defs{$name}{nb}{$id};
   return ;
+}
+
+sub HMinfo_getConfigFile($$$) {##################################################
+  my ($name,$configFile,$fnIn) = @_;#HmInfoName, ConfigFiletype
+  my %defaultFN = ( configFilename => "regSave.cfg"
+                   ,configTempFile => "tempList.cfg"
+                  );
+  my $fn = $fnIn ? $fnIn
+                 : AttrVal($name,$configFile,$defaultFN{$configFile});
+  
+  $fn = AttrVal($name,"configDir",".") ."\/".$fn  if ($fn !~ m/\//); 
+  $fn = AttrVal("global","modpath",".")."\/".$fn  if ($fn !~ m/^\//);
+  return $fn;
 }
 
 sub HMinfo_deviceReplace($$$){
