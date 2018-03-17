@@ -178,7 +178,8 @@ generateModuleCommandref($$;$$)
           $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
           $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
           if($tagcount{$tag} < 0) {
-            print "*** $lang $fPath: negative tagcount for $tag, line $line\n";
+            print "*** $lang $fPath: negative tagcount for $tag, line $line\n"
+                if(!$noWarnings);
             $tagcount{$tag} = 0;
           }
           $llwct{$tag} = $line if(!$tagcount{$tag});
