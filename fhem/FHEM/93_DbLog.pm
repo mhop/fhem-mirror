@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.9.0      17.03.2018       DbLog_ConnectPush state-handling changed, attribute excludeDevs enhanced in DbLog_Log
 # 3.8.9      10.03.2018       commandref revised
 # 3.8.8      05.03.2018       fix device doesn't exit if configuration couldn't be read
 # 3.8.7      28.02.2018       changed DbLog_sampleDataFn - no change limits got fron SVG, commandref revised
@@ -191,7 +192,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 
-my $DbLogVersion = "3.8.9";
+my $DbLogVersion = "3.9.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -1182,8 +1183,7 @@ sub DbLog_Log($$) {
   my $events = deviceEvents($dev_hash, AttrVal($name, "addStateEvent", 1));  
   return if(!$events);
   
-  my $max   = int(@{$events});
-  my $lcdev = lc($dev_name);
+  my $max = int(@{$events});
   
   # verbose4 Logs nur für Devices in Attr "verbose4Devs"
   my $vb4show  = 0;
@@ -1206,23 +1206,7 @@ sub DbLog_Log($$) {
       Log3 $name, 4, "DbLog $name -> ################################################################";
       Log3 $name, 4, "DbLog $name -> number of events received: $max for device: $dev_name";
   }
-  
-  # Devices ausschließen durch Attribut "excludeDevs" (nur wenn kein $hash->{NOTIFYDEV})
-  if(!$hash->{NOTIFYDEV}) {
-      my $exc = AttrVal($name, "excludeDevs", "");
-	  $exc    =~ s/\s/,/g;
-	  my @exdvs = devspec2array($exc);
-	  if(@exdvs) {
-	      # Log3 $name, 3, "DbLog $name -> excludeDevs: @exdvs";
-	      foreach (@exdvs) {
-		      if(lc($dev_name) eq lc($_)) {
-	              Log3 $name, 4, "DbLog $name -> Device: $dev_name excluded from database logging due to attribute \"excludeDevs\" restrictions" if($vb4show);
-	              return;
-		      }
-		  }
-	  }
-  }
-  
+    
   my $re                 = $hash->{REGEXP};
   my @row_array;
   my ($event,$reading,$value,$unit);
@@ -1243,6 +1227,7 @@ sub DbLog_Log($$) {
   #one Transaction
   eval {  
       for (my $i = 0; $i < $max; $i++) {
+          my $next = 0;
           my $event = $events->[$i];
           $event = "" if(!defined($event));
 		  $event = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
@@ -1260,7 +1245,40 @@ sub DbLog_Log($$) {
               if(!defined $reading) {$reading = "";}
               if(!defined $value) {$value = "";}
               if(!defined $unit || $unit eq "") {$unit = AttrVal("$dev_name", "unit", "");}
-              Log3 $name, 5, "DbLog $name -> parsed Event: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});  
+              
+              # Devices / Readings ausschließen durch Attribut "excludeDevs"
+              # attr <device> excludeDevs [<devspec>#]<Reading1>,[<devspec>#]<Reading2>,[<devspec>#]<Reading..>
+              my ($exc,@excldr,$ds,$rd,@exdvs);
+              $exc = AttrVal($name, "excludeDevs", "");
+              if($exc) {
+                  $exc    =~ s/[\s\n]/,/g;
+                  @excldr = split(",",$exc);
+                  foreach my $excl (@excldr) {
+                      ($ds,$rd) = split("#",$excl);
+	                  @exdvs = devspec2array($ds);
+	                  if(@exdvs) {
+                          # Log3 $name, 3, "DbLog $name -> excludeDevs: @exdvs";
+	                      foreach (@exdvs) {
+                              if($rd) {
+		                          if("$dev_name:$reading" =~ m/^$_:$rd$/) {
+	                                  Log3 $name, 4, "DbLog $name -> Device:Reading \"$dev_name:$reading\" global excluded from logging by attribute \"excludeDevs\" " if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
+                                      $next = 1;
+		                          }
+                              } else {
+		                          if($dev_name =~ m/^$_$/) {
+	                                  Log3 $name, 4, "DbLog $name -> Device \"$dev_name\" global excluded from logging by attribute \"excludeDevs\" " if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
+                                      $next = 1;
+		                          }                          
+                              }
+		                  }
+	                  }
+                  }
+                  next if($next); 
+              }
+			  	  
+			  Log3 $name, 5, "DbLog $name -> parsed Event: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});  
+		      Log3 $name, 5, "DbLog $name -> DbLogExclude of \"$dev_name\": $DbLogExclude" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"} && $DbLogExclude);
+		      Log3 $name, 5, "DbLog $name -> DbLogInclude of \"$dev_name\": $DbLogInclude" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"} && $DbLogInclude);
               
               #Je nach DBLogSelectionMode muss das vorgegebene Ergebnis der Include-, bzw. Exclude-Pruefung
               #entsprechend unterschiedlich vorbelegt sein.
@@ -2292,7 +2310,7 @@ sub DbLog_ConnectPush($;$$) {
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
-  my $dbhp;
+  my ($dbhp,$state,$evt,$err);
   
   return 0 if(IsDisabled($name));
   
@@ -2314,6 +2332,7 @@ sub DbLog_ConnectPush($;$$) {
   }  
    
   if($@) {
+      $err = $@;
 	  Log3 $hash->{NAME}, 2, "DbLog $name - Error: $@";
   }
   
@@ -2321,8 +2340,8 @@ sub DbLog_ConnectPush($;$$) {
     RemoveInternalTimer($hash, "DbLog_ConnectPush");
     Log3 $hash->{NAME}, 4, "DbLog $name - Trying to connect to database";
     
-    my $state = $@?$@:(IsDisabled($name))?"disabled":"disconnected";
-    my $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
+    $state = $err?$err:(IsDisabled($name))?"disabled":"disconnected";
+    $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
     readingsSingleUpdate($hash, "state", $state, $evt);
     $hash->{HELPER}{OLDSTATE} = $state;  
     
@@ -2336,7 +2355,12 @@ sub DbLog_ConnectPush($;$$) {
 
   Log3 $hash->{NAME}, 3, "DbLog $name - Push-Handle to db $dbconn created" if(!$get);
   Log3 $hash->{NAME}, 3, "DbLog $name - UTF8 support enabled" if($utf8 && $hash->{MODEL} eq "MYSQL" && !$get);
-  readingsSingleUpdate($hash, 'state', 'connected', 1) if(!$get);
+  if(!$get) {
+      $state = "connected";
+	  $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
+      readingsSingleUpdate($hash, "state", $state, $evt);
+      $hash->{HELPER}{OLDSTATE} = $state;
+  }
 
   $hash->{DBHP}= $dbhp;
   
@@ -3041,7 +3065,7 @@ sub DbLog_configcheck($) {
   if(!@ce || !@se) {
       $check .= "Connection to database was not successful. <br>";
       $check .= "<b>Recommendation:</b> Plese check logfile for further information. <br><br>";
-	  # $check .= "</html>";
+	  $check .= "</html>";
       return $check;
   }
   $check .= "<u><b>Result of encoding check</u></b><br><br>";
@@ -5186,7 +5210,7 @@ sub dbReadings($@) {
     #);                                                              
     ####################################################################################
 	</pre>
-	<br>
+	If configDB is used, the configuration file has to be uploaded into the configDB ! <br><br><br>
 	
 
   <a name="DbLogdefine"></a>
@@ -5807,22 +5831,31 @@ sub dbReadings($@) {
   <ul><b>excludeDevs</b>
      <ul>
 	   <code>
-	   attr &lt;device&gt; excludeDevs &lt;devspec1&gt;,&lt;devspec2&gt;,&lt;devspec..&gt; 
+	   attr &lt;device&gt; excludeDevs &lt;devspec1&gt;[#Reading],&lt;devspec2&gt;[#Reading],&lt;devspec...&gt; 
 	   </code><br>
       
-	   The devices "devspec1", "devspec2" up to "devspec.." are excluded from logging into database. This attribute 
-	   will only be evaluated if internal "NOTIFYDEV" is not defined. 
-	   Thereby devices can be explicit excluded from logging. The devices to exclude can be specified as 
-	   <a href="#devspec">device-specification</a>. 
-	   For further informations about devspec please see <a href="#devspec">device-specification</a>.  <br><br>
+	   The device/reading-combinations "devspec1#Reading", "devspec2#Reading" up to "devspec.." are globally excluded from 
+       logging into the database. <br>
+       The specification of a reading is optional. <br>       
+	   Thereby devices are explicit and consequently excluded from logging without consideration of another excludes or
+       includes (e.g. in DEF). 
+       The devices to exclude can be specified as <a href="#devspec">device-specification</a>. 
+       <br><br>
 	   
-	   <b>Example</b> <br>
+	   <b>Examples</b> <br>
        <code>
 	   attr &lt;device&gt; excludeDevs global,Log.*,Cam.*,TYPE=DbLog
 	   </code><br>
-	   # The devices global respectively devices starting with "Log" or "Cam" and devices with Type=DbLog 
-	   are excluded from database logging. <br>
-     </ul>
+	   # The devices global respectively devices starting with "Log" or "Cam" and devices with Type=DbLog are excluded from database logging. <br>
+       <code>
+	   attr &lt;device&gt; excludeDevs .*#.*Wirkleistung.*
+	   </code><br>
+	   # All device/reading-combinations which contain "Wirkleistung" in reading are excluded from logging. <br>
+       <code>
+       attr &lt;device&gt; excludeDevs SMA_Energymeter#Bezug_WirkP_Zaehler_Diff
+	   </code><br>
+	   # The event containing device "SMA_Energymeter" and reading "Bezug_WirkP_Zaehler_Diff" are excluded from logging. <br>
+       </ul>
   </ul>
   <br>
   
@@ -6088,7 +6121,7 @@ sub dbReadings($@) {
       <tr><td> TYPE      </td><td>: Type des Devices, z.B. <code>KS300</code> </td></tr>
       <tr><td> EVENT     </td><td>: das auftretende Event als volle Zeichenkette, z.B. <code>humidity: 71 (%)</code> </td></tr>
 	  <tr><td> READING   </td><td>: Name des Readings, ermittelt aus dem Event, z.B. <code>humidity</code> </td></tr>
-	  <tr><td> VALUE     </td><td>: aktueller Wert des Readings, ermittelt aus dem Event, z.B. <code>humidity</code> </td></tr>
+	  <tr><td> VALUE     </td><td>: aktueller Wert des Readings, ermittelt aus dem Event, z.B. <code>71</code> </td></tr>
 	  <tr><td> UNIT      </td><td>: Einheit, ermittelt aus dem Event, z.B. <code>%</code> </td></tr>
     </table>
 	</ul>
@@ -6162,8 +6195,7 @@ sub dbReadings($@) {
     #);                                                              
     ####################################################################################
 	</pre>
-	<br>
-	
+	Wird configDB genutzt, ist das Konfigurationsfile in die configDB hochzuladen ! <br><br><br>
 
   <a name="DbLogdefine"></a>
   <b>Define</b>
@@ -6843,12 +6875,14 @@ sub dbReadings($@) {
   <ul><b>excludeDevs</b>
      <ul>
 	   <code>
-	   attr &lt;device&gt; excludeDevs &lt;devspec1&gt;,&lt;devspec2&gt;,&lt;devspec..&gt; 
+	   attr &lt;device&gt; excludeDevs &lt;devspec1&gt;[#Reading],&lt;devspec2&gt;[#Reading],&lt;devspec...&gt; 
 	   </code><br>
       
-	   Die Devices "devspec1", "devspec2" bis "devspec.." werden vom Logging in die Datenbank ausgeschlossen. 
-	   Diese Attribut wirkt nur wenn kein Internal "NOTIFYDEV" vorhanden ist. 
-       Dadurch können Devices explizit vom Logging ausgeschlossen werden. 
+	   Die Device/Reading-Kombinationen "devspec1#Reading", "devspec2#Reading" bis "devspec..." werden vom Logging in die 
+       Datenbank global ausgeschlossen. <br>
+       Die Angabe eines auszuschließenden Readings ist optional. <br>
+       Somit können Device/Readings explizit bzw. konsequent vom Logging ausgeschlossen werden ohne Berücksichtigung anderer 
+       Excludes oder Includes (z.B. im DEF).
 	   Die auszuschließenden Devices können als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. 
 	   Für weitere Details bezüglich devspec siehe <a href="#devspec">Geräte-Spezifikation</a>.  <br><br>
 	   
@@ -6856,8 +6890,17 @@ sub dbReadings($@) {
       <code>
 	  attr &lt;device&gt; excludeDevs global,Log.*,Cam.*,TYPE=DbLog
 	  </code><br>
-	  # Es werden die Devices global bzw. Devices beginnend mit "Log" oder "Cam" bzw. Devices vom Typ "DbLog" vom Datenbanklogging ausgeschlossen. <br>
-     </ul>
+	  # Es werden die Devices global bzw. Devices beginnend mit "Log" oder "Cam" bzw. Devices vom Typ "DbLog" vom Logging ausgeschlossen. <br>
+      <code>
+	  attr &lt;device&gt; excludeDevs .*#.*Wirkleistung.*
+	  </code><br>
+	  # Es werden alle Device/Reading-Kombinationen mit "Wirkleistung" im Reading vom Logging ausgeschlossen. <br>
+      <code>
+      attr &lt;device&gt; excludeDevs SMA_Energymeter#Bezug_WirkP_Zaehler_Diff
+	  </code><br>
+	  # Es wird der Event mit Device "SMA_Energymeter" und Reading "Bezug_WirkP_Zaehler_Diff" vom Logging ausgeschlossen. <br>
+
+      </ul>
   </ul>
   <br>
 
