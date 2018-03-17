@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.14.5       17.03.2018       perl warnings of DbLog $dn,$dt,$evt,$rd in changeval_Push & complex
 # 7.14.4       11.03.2018       increased timeout of BlockingCall in DbRep_firstconnect
 # 7.14.3       07.03.2018       DbRep_firstconnect changed - get lowest timestamp in database, DbRep_Connect deleted
 # 7.14.2       04.03.2018       fix perl warning
@@ -325,7 +326,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.14.4";
+my $DbRepVersion = "7.14.5";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -4279,7 +4280,7 @@ sub changeval_Push($) {
              $value = $VALUE if(defined $VALUE);
  	         $unit  = $UNIT  if(defined $UNIT);
              # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
-             (undef,undef,undef,undef,$value,$unit) = DbLog_cutCol($hash->{dbloghash},undef,undef,undef,undef,$value,$unit);
+             (undef,undef,undef,undef,$value,$unit) = DbLog_cutCol($hash->{dbloghash},"1","1","1","1",$value,$unit);
              
              $value =~ s/'/''/g;       # escape ' with ''
              $unit  =~ s/'/''/g;       # escape ' with ''
@@ -8879,7 +8880,7 @@ return;
                * a string with usage of SQL-wildcard, e.g. "%OL%"
                  
 &lt;new string&gt; : * a simple string with/without spaces, e.g. "12 kWh"
-               * Perl code embedded in {}, e.g. {$VALUE = (split(",",$VALUE))[1]}. 
+               * Perl code embedded in {}, e.g. {$VALUE = (split(",",$VALUE))[0]}. 
                  The perl expression the variables $VALUE and $UNIT are committed to. The variables are changable within
                  the perl code. The returned value of VALUE and UNIT are saved into the database field 
                  VALUE respectively UNIT of the dataset.                        
@@ -10480,7 +10481,7 @@ sub bdump {
                  * ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%"
                  
 &lt;neuer String&gt; : * ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh"
-                 * Perl Code eingeschlossen in {}, z.B. {$VALUE = (split(",",$VALUE))[1]}. 
+                 * Perl Code eingeschlossen in {}, z.B. {$VALUE = (split(",",$VALUE))[0]}. 
                    Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb
                    des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld 
                    VALUE bzw. UNIT des Datensatzes gespeichert.                        
