@@ -1683,16 +1683,18 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     <a name="restoreDirs"></a>
     <li><a name="restoreDirs">restoreDirs</a><br>
         update sichert jede Datei vor dem &Uuml;berschreiben mit der neuen
-        Version aus dem Web. F&uuml;r diesen Zweck wird zuerst ein restoreDir
-        Verzeichnis in der global modpath Verzeichnis angelegt, und danach
-        ein Unterverzeichnis mit dem aktuellen Datum. In diesem Verzeichnis
-        werden vor dem &Uuml;berschreiben die alten Versionen der Dateien
-        gerettet. Die Voreinstellung ist 3, d.h. die letzten 3
-        Datums-Verzeichnisse werden aufgehoben, und die &auml;lteren entfernt.
+        Version aus dem Web. F&uuml;r diesen Zweck wird zuerst ein
+        restoreDir/update Verzeichnis in der global modpath Verzeichnis
+        angelegt, und danach ein Unterverzeichnis mit dem aktuellen Datum. In
+        diesem Verzeichnis werden vor dem &Uuml;berschreiben die alten
+        Versionen der Dateien gerettet. Die Voreinstellung ist 3, d.h. die
+        letzten 3 Datums-Verzeichnisse werden aufgehoben, und die &auml;lteren
+        entfernt.
         <br>
         Auch fhem.cfg und fhem.state wird auf diese Weise vor dem ausf&uuml;ren
-        von save gesichert. Zum restaurieren der alten Dateien kann man das
-        restore Befehl verwenden.<br>
+        von save gesichert, diesmal in das restoreDir/save Verzeichnis. Zum
+        restaurieren der alten Dateien kann man das restore Befehl
+        verwenden.<br>
         Falls man den Wert auf 0 setzt, dann ist dieses Feature deaktiviert.
         </li><br>
 
