@@ -269,6 +269,7 @@ FBDECT_ParseHttp($$$)
   my @fb;
   map { push @fb, $ll{$_} if((1<<$_) & $lsn) } sort keys %ll;
   my $fbprop = join(",", @fb);
+  $fbprop = "none" if(!$fbprop); # 85930
 
   my $dp = $modules{FBDECT}{defptr};
   my $hash = $dp->{"$ioName:$ain"};
