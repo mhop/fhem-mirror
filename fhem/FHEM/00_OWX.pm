@@ -98,7 +98,7 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version="7.08";
+$owx_version="7.10";
 
 #-- debugging now verbosity, this is just for backward compatibility
 $owx_debug=0;
@@ -190,7 +190,7 @@ sub OWX_Define ($$) {
     $hwdevice = OWX_I2C->new($hash);
     
   #-- check if we have a COC/CUNO interface attached  
-  }elsif( (defined( $defs{$dev}->{VERSION} ) ? $defs{$dev}->{VERSION} : "") =~ m/CSM|CUNO|MapleCUN...(4|5|6|7|C|D|E|F)/ ){
+  }elsif( $defs{$dev} && $defs{$dev}->{VERSION}  && $defs{$dev}->{VERSION} =~ m/CSM|CUNO|MapleCUN...(4|5|6|7|C|D|E|F)/ ){
      require "$attr{global}{modpath}/FHEM/11_OWX_CCC.pm";
      $hwdevice = OWX_CCC->new($hash);
     
