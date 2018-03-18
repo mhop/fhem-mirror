@@ -221,7 +221,8 @@ sub PIONEERAVR_Define($$) {
     # $hash->{helper}{INPUTNAMES} lists the default input names and their inputNr as provided by Pioneer.
     # This module tries to read those names and the alias names from the AVR receiver and tries to check if this input is enabled or disabled
     # So this list is just a fall back if the module can't read the names ...
-    # InputNr with player functions (play,pause,...) ("13","17","18","26","27","33","38","41","44","45","48","53");       # Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
+    # InputNr with player functions (play,pause,...) ("13","17","18","26","27","33","38","41","44","45","48","53");       
+    # Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
     # Additionally this module tries to get information from the Pioneer AVR
     #  - about the input level adjust
     #  - to which connector each input is connected.
@@ -261,7 +262,9 @@ sub PIONEERAVR_Define($$) {
         "41" => {"name" => "pandora",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "44" => {"name" => "mediaServer",       "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "45" => {"name" => "favorites",         "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "46" => {"name" => "airplay",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "48" => {"name" => "mhl",               "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
+        "49" => {"name" => "game",              "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"},
         "53" => {"name" => "spotify",           "aliasName" => "",  "enabled" => "1", "playerCommands" => "1"}
     };
   # ----------------Human Readable command mapping table for "set" commands-----------------------
@@ -2770,26 +2773,88 @@ sub PIONEERAVR_Read($)
                 readingsBulkUpdate( $hash, "stateAV", $stateAV )
                     if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
             }
+        # screen type and screen name for XC-HM72 (XC-HM72 has screen name in $9 and no screen update command)
+        } elsif ( $line =~ m/^(GCP)(\d{2})(\d)(\d)(\d)(\d)(\d)(.*)\"(.*)\"$/ ) {
+            # Format:
+            #   $2: screen type
+            #     00:Message
+            #     01:List
+            #     02:Playing(Play)
+            #     03:Playing(Pause)
+            #     04:Playing(Fwd)
+            #     05:Playing(Rev)
+            #     06:Playing(Stop)
+            #     99:Drawing invalid
+
+            #   $3: 0:Same hierarchy 1:Updated hierarchy (Next or Previous list)
+            #   $4: Top menu key flag
+            #     0:Invalidity
+            #     1:Effectiveness
+            #   $5: Tools (menu, edit,iPod Control) Key Information
+            #     0:Invalidity
+            #     1:Effectiveness
+            #   $6: Return Key Information
+            #     0:Invalidity
+            #     1:Effectiveness
+            #   $7: always 0
+            #   $8: 10 digits (XC-HM72) or nothing
+            #   $9: Screen name (UTF8) max. 128 byte
+            my $screenType = $hash->{helper}{SCREENTYPES}{$2};
+
+            readingsBulkUpdate( $hash, "screenType", $screenType );
+            readingsBulkUpdate( $hash, "screenName", $9 );
+            readingsBulkUpdate( $hash, "screenHierarchy", $3 );
+            readingsBulkUpdate( $hash, "screenTopMenuKey", $4 );
+            readingsBulkUpdate( $hash, "screenToolsKey", $5 );
+            readingsBulkUpdate( $hash, "screenReturnKey", $6 );
+
+            # to update the OSD/screen while playing from iPad/network a command has to be sent regulary
+            if ($2 eq "02" ) {
+                RemoveInternalTimer( $hash, "PIONEERAVR_screenUpdate" );
+                # It seems that XC-HM72 does not support the screen update command
+                ## reset screenUpdate timer -> again in 5s
+                #my $checkInterval = 5;
+                #my $next = gettimeofday() + $checkInterval;
+                #$hash->{helper}{nextScreenUpdate} = $next;
+                #InternalTimer( $next, "PIONEERAVR_screenUpdate", $hash, 0 );
+                #readingsBulkUpdate( $hash, "playStatus", "playing" );
+            } elsif ( $2 eq "03" ) {
+                readingsBulkUpdate( $hash, "playStatus", "paused" );            
+            } elsif ( $2 eq "04" ) {
+                readingsBulkUpdate( $hash, "playStatus", "fast-forward" );          
+            } elsif ( $2 eq "05" ) {
+                readingsBulkUpdate( $hash, "playStatus", "fast-rewind" );           
+            } elsif ( $2 eq "06" ) {
+                readingsBulkUpdate( $hash, "playStatus", "stopped" );           
+            }
+            
+            # stateAV
+            if ( $2 eq "02" || $2 eq "03" || $2 eq "04" || $2 eq "05" || $2 eq "06" ) {
+            
+                my $stateAV = PIONEERAVR_GetStateAV($hash);
+                readingsBulkUpdate( $hash, "stateAV", $stateAV )
+                    if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
+            }
         # Source information
-        } elsif ( $line =~ m/^(GHH)(\d{2})$/ ) {
+        } elsif ( $line =~ m/^(GHP|GHH)(\d{2})$/ ) {
             my $sourceInfo = $hash->{helper}{SOURCEINFO}{$2};
             readingsBulkUpdate( $hash, "sourceInfo", $sourceInfo );
             Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Screen source information: $2 $sourceInfo";
 
         # total screen lines
-        } elsif ( $line =~ m/^(GDH)(\d{5})(\d{5})(\d{5})$/ ) {
+        } elsif ( $line =~ m/^(GDP|GDH)(\d{5})(\d{5})(\d{5})$/ ) {
             readingsBulkUpdate( $hash, "screenLineNumberFirst", $2 + 0 );
             readingsBulkUpdate( $hash, "screenLineNumberLast", $3 + 0 );
             readingsBulkUpdate( $hash, "screenLineNumbersTotal", $4 + 0 );
             Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Screen Item number of line 1(5byte): $2, Item number of last line(5byte): $3, Total number of items List(5byte): $4 ";
 
         # Screen line numbers
-        } elsif ( $line =~ m/^(GBH|GBI)(\d{2})$/ ) {
+        } elsif ( $line =~ m/^(GBP|GBH|GBI)(\d{2})$/ ) {
             readingsBulkUpdate( $hash, "screenLineNumbers", $2 + 0 );
             Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: Screen line numbers = $2";
 
         # screenInformation
-        } elsif ( $line =~ m/^(GEH|GEI)(\d{2})(\d)(\d{2})\"(.*)\"$/ ) {
+        } elsif ( $line =~ m/^(GEP|GEH|GEI)(\d{2})(\d)(\d{2})\"(.*)\"$/ ) {
             # Format:
             #   $2: Line number
             #   $3: Focus (yes(1)/no(0)/greyed out(9)
