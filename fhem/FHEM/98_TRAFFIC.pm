@@ -46,6 +46,7 @@
 #   2018-01-26 v1.3.4 fixed Dbog_splitFn, improved exception handling 
 #   2018-01-28 v1.3.5 fixed Dbog_splitFn again
 #   2018-01-28 v1.3.6 removed perl warning on module load
+#   2018-03-02 v1.3.7 fixed issue with special character in readings, updateschedule supports multiple timeframes per day
 #
 ##############################################################################
 
@@ -54,7 +55,8 @@ package main;
 use strict;                          
 use warnings;                        
 use Data::Dumper;
-use Time::HiRes qw(gettimeofday);    
+use Time::HiRes qw(gettimeofday);
+use Time::Local;
 use LWP::Simple qw($ua get);
 use Blocking;
 use POSIX;
@@ -73,7 +75,7 @@ sub TRAFFIC_DbLog_split($);
 my %TRcmds = (
     'update' => 'noArg',
 );
-my $TRVersion = '1.3.6';
+my $TRVersion = '1.3.7';
 
 sub TRAFFIC_Initialize($){
 
@@ -456,21 +458,31 @@ sub TRAFFIC_StartUpdate($){
                     $upDay='';
                 }
                 Log3 $hash, 5, "TRAFFIC: ($name) parsed schedule to upFrom $upFrom, upTo $upTo, upDay $upDay, upInterval $upInterval";
+Log3 $hash, 2, "TRAFFIC: ($name) DEBUG  parsed schedule to upFrom $upFrom, upTo $upTo, upDay $upDay, upInterval $upInterval";
 
                 if(!$upFrom || !$upTo || !$upInterval){
                     Log3 $hash, 1, "TRAFIC: ($name) updateSchedule $upSched not defined correctly";
                 }else{
-                    if($hour >= $upFrom && $hour < $upTo){
+                    if($hour >= $upFrom && $hour < $upTo){ #if we are INSIDE the updateSchedule
                         if(!$upDay || $upDay == $wday ){
                             $nextTrigger = gettimeofday() + $upInterval;
-                            Log3 $hash, 4, "TRAFFIC: ($name) schedule from $upFrom to $upTo (on day $upDay) every $upInterval seconds, matches (current hour $hour), nextTrigger set to $nextTrigger";
+                            Log3 $hash, 4, "TRAFFIC: ($name) schedule $upSched matches ($upFrom to $upTo (on day $upDay) every $upInterval seconds), matches NOW (current hour $hour day $wday), nextTrigger set to $nextTrigger";
+Log3 $hash, 2, "TRAFFIC: ($name) DEBUG schedule $upSched matches ($upFrom to $upTo (on day $upDay) every $upInterval seconds), matches NOW (current hour $hour day $wday), nextTrigger set to $nextTrigger";
                             $hash->{UPDATESCHEDULE} = $upSched;
-                            last;
+                            last; # we have our next match, end the search
                         }else{
                             Log3 $hash, 4, "TRAFFIC: ($name) $upSched does match the time but not the day ($wday)";
+Log3 $hash, 2, "TRAFFIC: ($name) DEBUG $upSched does match the time but not the day ($wday)";
+                        }
+                    }elsif($hour < $upFrom && ( $wday == $upDay || !$upDay) ){ #get the next upcoming updateSchedule for today
+                        my $upcomingTrigger = timelocal(0,0,$upFrom,$mday,$mon,$year);
+Log3 $hash, 2, "TRAFFIC: ($name) DEBUG $upcomingTrigger <= $nextTrigger";                        
+                        if($upcomingTrigger <= $nextTrigger){
+                            $nextTrigger = $upcomingTrigger;
+Log3 $hash, 2, "TRAFFIC: ($name) DEBUG $upSched is the next upcoming updateSchedule, nextTrigger is generated to $nextTrigger";                        
                         }
                     }else{
-                        Log3 $hash, 5, "TRAFFIC: ($name) schedule $upSched does not match ($hour)";
+                        Log3 $hash, 5, "TRAFFIC: ($name) schedule $upSched does not match hour ($hour)";
                     }
                 }
             }
@@ -509,7 +521,7 @@ sub TRAFFIC_StartUpdate($){
 }
 
 sub TRAFFIC_AbortUpdate($){
-
+    # doto
 }
 
 
@@ -594,7 +606,7 @@ sub TRAFFIC_DoUpdate(){
         my %errorReturn = ('status' => 'API error','action' => 'retry');                        
         return "$name;;;$direction;;;".encode_json(\%errorReturn);
     };
-    my $json = decode_json($body->decoded_content);
+    my $json = JSON->new->utf8(0)->decode($body->decoded_content); #utf8 decoding to support special characters in return & readings
     
     
     my $duration_sec            = $json->{'routes'}[0]->{'legs'}[0]->{'duration'}->{'value'} ;
