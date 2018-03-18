@@ -1,4 +1,4 @@
-###############################################################
+﻿###############################################################
 # $Id$
 #
 #  72_FRITZBOX.pm 
@@ -4815,8 +4815,8 @@ sub FRITZBOX_fritztris($)
 
 =pod
 =item device
-=item summary Controls some features of a Fritz!Box router and Fritz!Fon.
-=item summary_DE Steuert gewisse Funktionen eines Fritz!Box Routers und verbundene Fritz!Fon.
+=item summary Controls some features of AVM's Fritz!Box router and repeater and Fritz!Fon.
+=item summary_DE Steuert einige Funktionen von AVM's Fritz!Box, Fritz!Repeater und Fritz!Fon.
 
 =begin html
 
@@ -4824,7 +4824,7 @@ sub FRITZBOX_fritztris($)
 <h3>FRITZBOX</h3>
 <div> 
 <ul>
-   Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as
+   Controls some features of a Fritz!Box router or Fritz!Repeater. Connected Fritz!Fon's (MT-F, MT-D, C3, C4, C5) can be used as
    signaling devices. MP3 files and Text2Speech can be played as ring tone or when calling phones.
    <br>
    For detail instructions, look at and please maintain the <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a>.
@@ -4910,7 +4910,7 @@ sub FRITZBOX_fritztris($)
          <br>
          <code>set fritzbox moh customer /var/InternerSpeicher/warnung.mp3</code>
          <br>
-         Changes the 'music on hold' of the Box. The parameter 'customer' allows to upload a mp3 file. Alternatively a text can be spoken with "say:". The music on hold has <u>always</u> a length of 8.2 s. It is played continousely during the broking of calls or if the modul rings a phone and the call is taken. So, it can be used to transmit little messages of 8 s.
+         Changes the 'music on hold' of the Box. The parameter 'customer' allows to upload a mp3 file. Alternatively a text can be spoken with "say:". The music on hold has <u>always</u> a length of 8.2 s. It is played continuously during the broking of calls or if the module rings a phone and the call is taken. So, it can be used to transmit little messages of 8 s.
          <br>
       </li><br>
 
@@ -4942,7 +4942,7 @@ sub FRITZBOX_fritztris($)
          Maximal 30 characters are allowed.
          <br/><br/>
          On Fritz!Fons the parameter 'say:' can be used to let the phone speak a message (max. 100 characters) instead of using the ringtone. 
-         Alternatively, a MP3 link (from a web server) can be played with 'play:'. This creates the internet radio station 'FHEM' and uses translate.google.com for text2speech. It will <u>always</u> play the complete text/sound. It will than ring with standard ring tone until the end of the 'ring duration' is reached.
+         Alternatively, a MP3 link (from a web server) can be played with 'play:'. This creates the web radio station 'FHEM' and uses translate.google.com for text2speech. It will <u>always</u> play the complete text/sound. It will than ring with standard ring tone until the end of the 'ring duration' is reached.
          Say and play <u>may</u> work only with one single Fritz!Fon at a time.
          <br>
          The behaviour may vary depending on the Fritz!OS.
@@ -5087,7 +5087,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>ringWithIntern &lt;1 | 2 | 3&gt;</code>
          <br>
-         To ring a fon a caller must always be specified. Default of this modul is 50 "ISDN:W&auml;hlhilfe".
+         To ring a phone a caller must always be specified. Default of this module is 50 "ISDN:Wählhilfe".
          <br>
          To show a message (default: "FHEM") during a ring the internal phone numbers 1-3 can be specified here.
          The concerned analog phone socket <u>must</u> exist.
@@ -5193,17 +5193,17 @@ sub FRITZBOX_fritztris($)
 <h3>FRITZBOX</h3>
 <div> 
 <ul>
-   Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. MP3-Dateien und Text (Text2Speech) k&ouml;nnen als Klingelton oder einem angerufenen Telefon abgespielt werden.
+   Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) können als Signalgeräte genutzt werden. MP3-Dateien und Text (Text2Speech) können als Klingelton oder einem angerufenen Telefon abgespielt werden.
    <br>
-   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
+   Für detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a> konsultieren und ergänzen.
    <br/><br/>
-   Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Web oder Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss <u>einmalig</u> das Passwort gesetzt werden.
+   Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box läuft (als root-Benutzer!). Ansonsten versucht es eine Web oder Telnet Verbindung zu "fritz.box" zu öffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. Für diesen Fernzugriff muss <u>einmalig</u> das Passwort gesetzt werden.
    <br/><br/>
-   Die Steuerung erfolgt teilweise &uuml;ber die offizielle TR-064-Schnittstelle und teilweise &uuml;ber undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern. Das Modul funktioniert am besten mit dem Fritz!OS 6.24. Bei den nachfolgenden Fritz!OS Versionen hat AVM einige interne Schnittstellen (telnet, webcm) ersatzlos gestrichen. <b>Einige Modul-Funktionen sind dadurch nicht oder nur eingeschr&auml;nkt verf&uuml;gbar (siehe Anmerkungen zu ben&ouml;tigten API).</b>
+   Die Steuerung erfolgt teilweise über die offizielle TR-064-Schnittstelle und teilweise über undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern. Das Modul funktioniert am besten mit dem Fritz!OS 6.24. Bei den nachfolgenden Fritz!OS Versionen hat AVM einige interne Schnittstellen (telnet, webcm) ersatzlos gestrichen. <b>Einige Modul-Funktionen sind dadurch nicht oder nur eingeschränkt verfügbar (siehe Anmerkungen zu benötigten API).</b>
    <br>
    Bitte auch die anderen Fritz!Box-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
-   <i>Das Modul nutzt das Perlmodule 'Net::Telnet', 'JSON::XS', 'LWP', 'SOAP::Lite' f&uuml;r den Fernzugriff.</i>
+   <i>Das Modul nutzt das Perlmodule 'Net::Telnet', 'JSON::XS', 'LWP', 'SOAP::Lite' für den Fernzugriff.</i>
    <br/><br/>
    <a name="FRITZBOXdefine"></a>
    <b>Define</b>
@@ -5229,15 +5229,15 @@ sub FRITZBOX_fritztris($)
          <br>
          Schaltet den Weckruf Nummer 1, 2 oder 3 an oder aus (Standard ist on). Setzt die Zeit und den Wochentag.
          <br>
-         Ben&ouml;tigt die API: Telnet oder webcm.
+         Benötigt die API: Telnet oder webcm.
       </li><br>
 
       <li><code>set &lt;name&gt; call &lt;number&gt; [Dauer] [say:Text|play:MP3URL]</code>
          <br>
-         Ruf f&uuml;r 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1 oder das Attribut 'ringWithIntern'). Wenn der Angerufene abnimmt, h&ouml;rt er die Wartemusik oder den angegebenen Text oder Klang.
+         Ruf für 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1 oder das Attribut 'ringWithIntern'). Wenn der Angerufene abnimmt, hört er die Wartemusik oder den angegebenen Text oder Klang.
          Der interne Telefonanschluss klingelt ebenfalls.
          <br>
-         "say:" und "play:" ben&ouml;tigen die API: Telnet oder webcm.
+         "say:" und "play:" benötigen die API: Telnet oder webcm.
       </li><br>
 
       <li><code>set &lt;name&gt; checkAPIs</code>
@@ -5247,33 +5247,33 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;MP3DateiInklusivePfad&gt;</code>
          <br>
-         L&auml;dt die MP3-Datei als Klingelton auf das angegebene Telefon. Die Datei muss im Dateisystem der Fritzbox liegen.
+         Lädt die MP3-Datei als Klingelton auf das angegebene Telefon. Die Datei muss im Dateisystem der Fritzbox liegen.
          <br>
-         Das Hochladen dauert etwa eine Minute bis der Klingelton verf&uuml;gbar ist. (API: Telnet)
+         Das Hochladen dauert etwa eine Minute bis der Klingelton verfügbar ist. (API: Telnet)
       </li><br>
 
       <li><code>set &lt;name&gt; dect &lt;on|off&gt;</code>
          <br>
          Schaltet die DECT-Basis der Box an oder aus.
          <br>
-         Ben&ouml;tigt die API: Telnet oder webcm.
+         Benötigt die API: Telnet oder webcm.
       </li><br>
 
       <li><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code>
          <br>
-         Schaltet die Rufumleitung (Nummer 1, 2 ...) f&uuml;r einzelne Rufnummern an oder aus.
+         Schaltet die Rufumleitung (Nummer 1, 2 ...) für einzelne Rufnummern an oder aus.
          <br>
-         Die Rufumleitung muss zuvor auf der Fritz!Box eingerichtet werden. Ben&ouml;tigt die API: Telnet oder webcm.
+         Die Rufumleitung muss zuvor auf der Fritz!Box eingerichtet werden. Benötigt die API: Telnet oder webcm.
          <br>
-         Achtung! Es lassen sich nur Rufumleitungen f&uuml;r einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abh&auml;ngigkeit von der anrufenden Nummer schalten. 
-         Es muss also ein <i>diversity</i>-Ger&auml;wert geben.
+         Achtung! Es lassen sich nur Rufumleitungen für einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abhängigkeit von der anrufenden Nummer schalten. 
+         Es muss also ein <i>diversity</i>-Geräwert geben.
          <br>
-         Ben&ouml;tigt die API: Telnet, webcm oder TR064 (>=6.50).
+         Benötigt die API: Telnet, webcm oder TR064 (>=6.50).
       </li><br>
 
       <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
          <br>
-         Schaltet das G&auml;ste-WLAN an oder aus. Das G&auml;ste-Passwort muss gesetzt sein. Wenn notwendig wird auch das normale WLAN angeschaltet.
+         Schaltet das Gäste-WLAN an oder aus. Das Gäste-Passwort muss gesetzt sein. Wenn notwendig wird auch das normale WLAN angeschaltet.
       </li><br>
 
       <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3DateiInklusivePfad|say:Text&gt;]</code>
@@ -5282,14 +5282,14 @@ sub FRITZBOX_fritztris($)
          <br>
          <code>set fritzbox moh customer /var/InternerSpeicher/warnung.mp3</code>
          <br>
-         &Auml;ndert die Wartemusik ('music on hold') der Box. Mit dem Parameter 'customer' kann eine eigene MP3-Datei aufgespielt werden.
-         Alternativ kann mit "say:" auch ein Text gesprochen werden. Die Wartemusik hat <u>immer</u> eine L&auml;nge von 8,13 s. Sie wird kontinuierlich w&auml;hrend des Makelns von Gespr&auml;chen aber auch bei Nutzung der internen W&auml;hlhilfe bis zum Abheben des rufenden Telefons abgespielt. Dadurch k&ouml;nnen &uuml;ber FHEM dem Angerufenen 8s-Nachrichten vorgespielt werden.
+         ändert die Wartemusik ('music on hold') der Box. Mit dem Parameter 'customer' kann eine eigene MP3-Datei aufgespielt werden.
+         Alternativ kann mit "say:" auch ein Text gesprochen werden. Die Wartemusik hat <u>immer</u> eine Länge von 8,13 s. Sie wird kontinuierlich während des Makelns von Gesprächen aber auch bei Nutzung der internen Wählhilfe bis zum Abheben des rufenden Telefons abgespielt. Dadurch können über FHEM dem Angerufenen 8s-Nachrichten vorgespielt werden.
          <br>
       </li><br>
       
       <li><code>set &lt;name&gt; password &lt;Passwort&gt;</code>
          <br>
-         Speichert das Passwort f&uuml;r den Fernzugriff &uuml;ber Telnet.
+         Speichert das Passwort für den Fernzugriff über Telnet.
       </li><br>
 
       <li><code>set &lt;name&gt; ring &lt;intNummern&gt; [Dauer [Klingelton]] [show:Text] [say:Text | play:Link]</code>
@@ -5301,24 +5301,24 @@ sub FRITZBOX_fritztris($)
          <br>
          <code>set fritzbox ring 610 10 play:http://raspberrypi/sound.mp3</code>
          </dd>
-         L&auml;sst die internen Nummern f&uuml;r "Dauer" Sekunden und (auf Fritz!Fons) mit dem angegebenen "Klingelton" klingeln.
+         Lässt die internen Nummern für "Dauer" Sekunden und (auf Fritz!Fons) mit dem angegebenen "Klingelton" klingeln.
          <br>
-         Mehrere interne Nummern m&uuml;ssen durch ein Komma (ohne Leerzeichen) getrennt werden.
+         Mehrere interne Nummern müssen durch ein Komma (ohne Leerzeichen) getrennt werden.
          <br>
-         Standard-Dauer ist 5 Sekunden. Es kann aber zu Verz&ouml;gerungen in der Fritz!Box kommen. Standard-Klingelton ist der interne Klingelton des Ger&auml;tes.
-         Der Klingelton wird f&uuml;r Rundrufe (9 oder 50) ignoriert. 
+         Standard-Dauer ist 5 Sekunden. Es kann aber zu Verzögerungen in der Fritz!Box kommen. Standard-Klingelton ist der interne Klingelton des Gerätes.
+         Der Klingelton wird für Rundrufe (9 oder 50) ignoriert. 
          <br>
-         Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche ebenfalls zur Nachrichten&uuml;bermittlung genutzt werden kann.
+         Wenn der Anruf angenommen wird, hört der Angerufene die Wartemusik (music on hold), welche ebenfalls zur Nachrichtenübermittlung genutzt werden kann.
          <br>
-         Die Parameter <i>Klingelton, show:, say:</i> und <i>play:</i> ben&ouml;tigen die API Telnet oder webcm.
+         Die Parameter <i>Klingelton, show:, say:</i> und <i>play:</i> benötigen die API Telnet oder webcm.
          <br/><br/>
          Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'show:' als Name des Anrufers angezeigt.
          Er darf maximal 30 Zeichen lang sein.
          <br/><br/>
          Auf Fritz!Fons wird der Text (max. 100 Zeichen) hinter dem Parameter 'say:' direkt angesagt und ersetzt den Klingelton.
          <br>
-         Alternativ kann mit 'play:' auch ein MP3-Link (vom einem Webserver) abgespielt werden. Dabei wird die Internetradiostation 39 'FHEM' erzeugt und translate.google.com f&uuml;r Text2Speech genutzt. Es wird <u>immer</u> der komplette Text/Klang abgespielt. Bis zum Ende der 'Klingeldauer' klingelt das Telefon dann mit seinem Standard-Klingelton.
-         Das Abspielen ist eventuell nicht auf mehreren Fritz!Fons gleichzeitig m&ouml;glich.
+         Alternativ kann mit 'play:' auch ein MP3-Link (vom einem Webserver) abgespielt werden. Dabei wird die Internetradiostation 39 'FHEM' erzeugt und translate.google.com für Text2Speech genutzt. Es wird <u>immer</u> der komplette Text/Klang abgespielt. Bis zum Ende der 'Klingeldauer' klingelt das Telefon dann mit seinem Standard-Klingelton.
+         Das Abspielen ist eventuell nicht auf mehreren Fritz!Fons gleichzeitig möglich.
          <br>
          Je nach Fritz!OS kann das beschriebene Verhalten abweichen.
          <br>
@@ -5326,17 +5326,17 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
          <br>
-         Sendet eine Email &uuml;ber den Emailbenachrichtigungsservice der als Push Service auf der Fritz!Box konfiguriert wurde.
-         Mit "\n" kann einen Zeilenumbruch im Textk&ouml;rper erzeut werden.
-         Alle Parameter k&ouml;nnen ausgelassen werden. Bitte kontrolliert, dass die Email nicht im Junk-Verzeichnis landet.
+         Sendet eine Email über den Emailbenachrichtigungsservice der als Push Service auf der Fritz!Box konfiguriert wurde.
+         Mit "\n" kann einen Zeilenumbruch im Textkörper erzeut werden.
+         Alle Parameter können ausgelassen werden. Bitte kontrolliert, dass die Email nicht im Junk-Verzeichnis landet.
          <br>
-         Ben&ouml;tigt einen Telnet Zugang zur Box.
+         Benötigt einen Telnet Zugang zur Box.
          <br>
       </li><br>
       
       <li><code>set &lt;name&gt; startRadio &lt;internalNumber&gt; [Name oder Nummer]</code>
          <br>
-         Startet das Internetradio auf dem angegebenen Fritz!Fon. Eine verf&uuml;gbare Radiostation kann &uuml;ber den Namen oder die (Ger&auml;tewert)Nummer ausgew&auml;hlt werden. Ansonsten wird die in der Box als Internetradio-Klingelton eingestellte Station abgespielt. (Also <b>nicht</b> die am Telefon ausgew&auml;hlte.)
+         Startet das Internetradio auf dem angegebenen Fritz!Fon. Eine verfügbare Radiostation kann über den Namen oder die (Gerätewert)Nummer ausgewählt werden. Ansonsten wird die in der Box als Internetradio-Klingelton eingestellte Station abgespielt. (Also <b>nicht</b> die am Telefon ausgewählte.)
          <br>
       </li><br>
       
@@ -5348,7 +5348,7 @@ sub FRITZBOX_fritztris($)
       
       <li><code>set &lt;name&gt; update</code>
          <br>
-         Startet eine Aktualisierung der Ger&auml;tewerte.
+         Startet eine Aktualisierung der Gerätewerte.
       </li><br>
       
       <li><code>set &lt;name&gt; wlan &lt;on|off&gt;</code>
@@ -5363,31 +5363,31 @@ sub FRITZBOX_fritztris($)
       <br>
       <li><code>get &lt;name&gt; ringTones</code>
          <br>
-         Zeigt die Liste der Klingelt&ouml;ne, die benutzt werden k&ouml;nnen.
+         Zeigt die Liste der Klingeltöne, die benutzt werden können.
       </li><br>
 
       <li><code>get &lt;name&gt; shellCommand &lt;Befehl&gt;</code>
          <br>
-         F&uuml;hrt den angegebenen Befehl auf der Fritz!Box-Shell aus und gibt das Ergebnis zur&uuml;ck.
-         Kann benutzt werden, um Shell-Befehle auszuf&uuml;hren, die nicht im Modul implementiert sind.
+         Führt den angegebenen Befehl auf der Fritz!Box-Shell aus und gibt das Ergebnis zurück.
+         Kann benutzt werden, um Shell-Befehle auszuführen, die nicht im Modul implementiert sind.
          <br>
-         Muss zuvor &uuml;ber das Attribute "allowShellCommand" freigeschaltet werden.
+         Muss zuvor über das Attribute "allowShellCommand" freigeschaltet werden.
       </li><br>
 
       <li><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[argName1 argValue1] ...] </code>
          <br>
-         F&uuml;hrt &uuml;ber TR-064 Aktionen aus (siehe <a href="http://avm.de/service/schnittstellen/">Schnittstellenbeschreibung</a> von AVM).
+         Führt über TR-064 Aktionen aus (siehe <a href="http://avm.de/service/schnittstellen/">Schnittstellenbeschreibung</a> von AVM).
          <br>
-         argValues mit Leerzeichen m&uuml;ssen in Anf&uuml;hrungszeichen eingeschlossen werden.
+         argValues mit Leerzeichen müssen in Anführungszeichen eingeschlossen werden.
          <br>
          Beispiel: <code>get Fritzbox tr064Command X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1</code>
          <br>
-         Muss zuvor &uuml;ber das Attribute "allowTR064Command" freigeschaltet werden.
+         Muss zuvor über das Attribute "allowTR064Command" freigeschaltet werden.
       </li><br>
 
       <li><code>get &lt;name&gt; tr064ServiceListe</code>
          <br>
-         Zeigt die Liste der TR-064-Dienste und Aktionen, die auf dem Ger&auml;t erlaubt sind.
+         Zeigt die Liste der TR-064-Dienste und Aktionen, die auf dem Gerät erlaubt sind.
       </li><br>
    </ul>  
   
@@ -5407,33 +5407,33 @@ sub FRITZBOX_fritztris($)
       
       <li><code>boxUser &lt;user name&gt;</code>
          <br>
-         Benutzername f&uuml;r den TR064- oder einen anderen webbasierten Zugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
-         Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribut definiert werden.
+         Benutzername für den TR064- oder einen anderen webbasierten Zugang. Normalerweise wird keine Benutzername für das Login benötigt.
+         Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer über dieses Attribut definiert werden.
       </li><br>
     
       <li><code>defaultCallerName &lt;Text&gt;</code>
          <br>
          Standard-Text, der auf dem angerufenen internen Telefon als "Anrufer" gezeigt wird.
          <br>
-         Dies erfolgt, indem w&auml;hrend des Klingelns tempor&auml;r der Name der internen anrufenden Nummer ge&auml;ndert wird.
+         Dies erfolgt, indem während des Klingelns temporär der Name der internen anrufenden Nummer geändert wird.
          <br>
          Es sind maximal 30 Zeichen erlaubt. Das Attribute "ringWithIntern" muss ebenfalls spezifiziert sein.
          <br>
-         Ben&ouml;tigt die API: Telnet oder webcmd      
+         Benötigt die API: Telnet oder webcmd      
          </li><br>
       
       <li><code>defaultUploadDir &lt;fritzBoxPath&gt;</code>
          <br>
-         Dies ist der Standard-Pfad der f&uuml;r Dateinamen benutzt wird, die nicht mit einem / (Schr&auml;gstrich) beginnen.
+         Dies ist der Standard-Pfad der für Dateinamen benutzt wird, die nicht mit einem / (Schrägstrich) beginnen.
          <br>
          Es muss ein Pfad auf der Fritz!Box sein. D.h., er sollte mit /var/InternerSpeicher starten, wenn es in Windows unter \\ip-address\fritz.nas erreichbar ist.
       </li><br>
 
       <li><code>forceTelnetConnection &lt;0 | 1&gt;</code>
          <br>
-         Erzwingt den Fernzugriff &uuml;ber Telnet (anstatt &uuml;ber die WebGUI oder TR-064).
+         Erzwingt den Fernzugriff über Telnet (anstatt über die WebGUI oder TR-064).
          <br>
-         Dieses Attribut muss bei &auml;lteren Ger&auml;ten/Firmware aktiviert werden.
+         Dieses Attribut muss bei älteren Geräten/Firmware aktiviert werden.
       </li><br>
 
       <li><code>fritzBoxIP &lt;IP-Adresse&gt;</code>
@@ -5443,31 +5443,31 @@ sub FRITZBOX_fritztris($)
      
       <li><code>INTERVAL &lt;Sekunden&gt;</code>
          <br>
-         Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste m&ouml;gliche Wert ist 60.
+         Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste mögliche Wert ist 60.
       </li><br>
 
       <li><code>ringWithIntern &lt;1 | 2 | 3&gt;</code>
          <br>
-         Um ein Telefon klingeln zu lassen, muss in der Fritzbox eine Anrufer (W&auml;hlhilfe, Wert 'box_stdDialPort') spezifiziert werden.
+         Um ein Telefon klingeln zu lassen, muss in der Fritzbox eine Anrufer (Wählhilfe, Wert 'box_stdDialPort') spezifiziert werden.
          <br>
-         Um w&auml;hrend des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interne Nummer 1-3 angegeben werden.
+         Um während des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interne Nummer 1-3 angegeben werden.
          Der entsprechende analoge Telefonanschluss muss vorhanden sein.
       </li><br>
 
       <li><code>telnetTimeOut &lt;Sekunden&gt;</code>
          <br>
-         Maximale Zeit, bis zu der w&auml;hrend einer Telnet-Sitzung auf Antwort gewartet wird. Standard ist 10 s.
+         Maximale Zeit, bis zu der während einer Telnet-Sitzung auf Antwort gewartet wird. Standard ist 10 s.
       </li><br>
 
       <li><code>telnetUser &lt;user name&gt;</code>
          <br>
-         Benutzername f&uuml;r den Telnetzugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
-         Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribut definiert werden.
+         Benutzername für den Telnetzugang. Normalerweise wird keine Benutzername für das Login benötigt.
+         Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer über dieses Attribut definiert werden.
       </li><br>
     
       <li><code>useGuiHack &lt;0 | 1&gt;</code>
          <br>
-         Falls die APIs der Box nicht mehr die &Auml;nderung des Klingeltones unterst&uuml;tzen (Fritz!OS >6.24), kann dieses Attribute entsprechend der <a href="http://www.fhemwiki.de/wiki/FRITZBOX#Klingelton-Einstellung_und_Abspielen_von_Sprachnachrichten_bei_Fritz.21OS-Versionen_.3E6.24">WIKI-Anleitung</a> genutzt werden.
+         Falls die APIs der Box nicht mehr die änderung des Klingeltones unterstützen (Fritz!OS >6.24), kann dieses Attribute entsprechend der <a href="http://www.fhemwiki.de/wiki/FRITZBOX#Klingelton-Einstellung_und_Abspielen_von_Sprachnachrichten_bei_Fritz.21OS-Versionen_.3E6.24">WIKI-Anleitung</a> genutzt werden.
       </li><br>
 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
@@ -5485,25 +5485,25 @@ sub FRITZBOX_fritztris($)
       <br>
       <li><b>box_dect</b> - Aktueller Status des DECT-Basis</li>
       <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
-      <li><b>box_guestWlan</b> - Aktueller Status des G&auml;ste-WLAN</li>
-      <li><b>box_guestWlanCount</b> - Anzahl der Ger&auml;te die &uuml;ber das G&auml;ste-WLAN verbunden sind</li>
-      <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des G&auml;ste-WLAN</li>
+      <li><b>box_guestWlan</b> - Aktueller Status des Gäste-WLAN</li>
+      <li><b>box_guestWlanCount</b> - Anzahl der Geräte die über das Gäste-WLAN verbunden sind</li>
+      <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des Gäste-WLAN</li>
       <li><b>box_ipExtern</b> - Internet IP der Fritz!Box</li>
       <li><b>box_model</b> - Fritz!Box-Modell</li>
       <li><b>box_moh</b> - Wartemusik-Einstellung</li>
       <li><b>box_powerRate</b> - aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
       <li><b>box_rateDown</b> - Download-Geschwindigkeit des letzten Intervals in kByte/s</li>
       <li><b>box_rateUp</b> - Upload-Geschwindigkeit des letzten Intervals in kByte/s</li>
-      <li><b>box_stdDialPort</b> - Anschluss der ger&auml;teseitig von der W&auml;hlhilfe genutzt wird</li>
-      <li><b>box_tr064</b> - Anwendungsschnittstelle TR-064 (wird auch von diesem Modul ben&ouml;tigt)</li>
+      <li><b>box_stdDialPort</b> - Anschluss der geräteseitig von der Wählhilfe genutzt wird</li>
+      <li><b>box_tr064</b> - Anwendungsschnittstelle TR-064 (wird auch von diesem Modul benötigt)</li>
       <li><b>box_tr069</b> - Provider-Fernwartung TR-069 (sicherheitsrelevant!)</li>
-      <li><b>box_wlanCount</b> - Anzahl der Ger&auml;te die &uuml;ber WLAN verbunden sind</li>
+      <li><b>box_wlanCount</b> - Anzahl der Geräte die über WLAN verbunden sind</li>
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
       
       <br>
       <li><b>dect</b><i>1</i> - Name des DECT Telefons <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Klingelton beim Wecken &uuml;ber das DECT Telefon <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Klingelton beim Wecken über das DECT Telefon <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_custRingTone</b> - Benutzerspezifischer Klingelton des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_fwVersion</b> - Firmware-Version des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_intern</b> - Interne Nummer des DECT Telefons <i>1</i></li>
@@ -5520,16 +5520,16 @@ sub FRITZBOX_fritztris($)
       <li><b>fon</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
       <li><b>fon</b><i>1</i><b>_out</b> - ausgehende Nummer des Anschlusses <i>1</i></li>
       <br>
-      <li><b>gsm_internet</b> - Internetverbindung errichtet &uuml;ber Mobilfunk-Stick </li>
-      <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalst&auml;rke (0-100)</li>
+      <li><b>gsm_internet</b> - Internetverbindung errichtet über Mobilfunk-Stick </li>
+      <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalstärke (0-100)</li>
       <li><b>gsm_state</b> - Status der Mobilfunk-Verbindung</li>
-      <li><b>gsm_technology</b> - GSM-Technologie, die f&uuml;r die Daten&uuml;bertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
+      <li><b>gsm_technology</b> - GSM-Technologie, die für die Datenübertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
-      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven Netzwerk-Ger&auml;tes.
+      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven Netzwerk-Gerätes.
       <br>
-      Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsst&auml;rke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Gast-Verbindungen werden mit "gWLAN" oder "gLAN" gekennzeichnet.
+      Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsstärke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Gast-Verbindungen werden mit "gWLAN" oder "gLAN" gekennzeichnet.
       <br>
-      Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
+      Inaktive oder entfernte Geräte erhalten zuerst den Werte "inactive" und werden beim nächsten Update gelöscht.</li>
       <br>
       <li><b>radio</b><i>01</i> - Name der Internetradiostation <i>01</i></li>
       <br>
@@ -5538,7 +5538,7 @@ sub FRITZBOX_fritztris($)
       <li><b>tam</b><i>1</i><b>_oldMsg</b> - Anzahl alter Nachrichten auf dem Anrufbeantworter <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_state</b> - Aktueller Status des Anrufbeantworters <i>1</i></li>
       <br>
-      <li><b>user</b><i>01</i> - Name von Nutzer/IP <i>1</i> f&uuml;r den eine Zugangsbeschr&auml;nkung (Kindersicherung) eingerichtet ist</li>
+      <li><b>user</b><i>01</i> - Name von Nutzer/IP <i>1</i> für den eine Zugangsbeschränkung (Kindersicherung) eingerichtet ist</li>
       <li><b>user</b><i>01</i>_thisMonthTime - Internetnutzung des Nutzers/IP <i>1</i> im aktuellen Monat (Kindersicherung)</li>
       <li><b>user</b><i>01</i>_todaySeconds - heutige Internetnutzung des Nutzers/IP <i>1</i> in Sekunden (Kindersicherung)</li>
       <li><b>user</b><i>01</i>_todayTime - heutige Internetnutzung des Nutzers/IP <i>1</i> (Kindersicherung)</li>

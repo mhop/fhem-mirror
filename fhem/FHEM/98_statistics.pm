@@ -1,4 +1,4 @@
-##############################################
+﻿##############################################
 # $Id$
 #
 #  98_statistic.pm
@@ -60,14 +60,26 @@ sub statistics_UpdateDevReading($$$$);
 # Syntax: readingName => statisticType
 #     statisticType: 0=noStatistic | 1=minMaxAvg(daily) | 2=delta | 3=stateDuration | 4=tendency | 5=minMaxAvg(hourly)
 ##############################################################
-  my %knownReadings = ( 
-    "brightness" => 5 
-   ,"count" => 2 
+  my %knownReadings = (
+    "ambientTemperature" => 5
+   ,"brightness" => 5 
+   ,"count" => 2
+   ,"counterHeatQHeating" =>2
+   ,"counterHeatQHotWater" =>2
+   ,"counterHeatQTotal" =>2
+   ,"counterHours2ndHeatSource1" =>2
+   ,"counterHours2ndHeatSource2" =>2
+   ,"counterHours2ndHeatSource3" =>2
+   ,"counterHoursHeatPump" =>2
+   ,"counterHoursHeating" =>2
+   ,"counterHoursHotWater" =>2
    ,"current" => 1 
    ,"energy" => 2 
    ,"energy_current" => 1 
    ,"energy_total" => 2 
    ,"energyCalc" => 2 
+   ,"heatSourceDefrostCounterAir" => 2
+   ,"heatSourceDefrostCounterReverse" => 2
    ,"Total.Energy" => 2 
    ,"humidity" => 1
    ,"lightsensor" => 3 
@@ -1156,7 +1168,7 @@ sub statistics_UpdateDevReading($$$$)
 
 =item helper
 =item summary Calculates statistical values and adds them to the devices.
-=item summary_DE Berechnet statistische Werte und f&uuml;gt sie dem Ger&auml;t hinzu.
+=item summary_DE Berechnet statistische Werte und fügt sie dem Gerät hinzu.
 
 <a name="statistics"></a>
 <h3>statistics</h3>
@@ -1329,53 +1341,52 @@ sub statistics_UpdateDevReading($$$$)
 <h3>statistics</h3>
 <div>
 <ul>
-  Dieses Modul wertet von den angegebenen Ger&auml;ten (als regul&auml;rer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
+  Dieses Modul wertet von den angegebenen Geräten (als regulärer Ausdruck) bestimmte Werte statistisch aus und fügt das Ergebnis den jeweiligen Geräten als neue Werte hinzu.
    <br>
-   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/Statistics"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
+   Für detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/Statistics"><b>FHEM-Wiki</b></a> konsultieren und ergänzen.
    <br>&nbsp;
    <br>
-   Es unterscheidet in vier Statistik-Typen denen bereits standardm&auml;ssig Ger&auml;tewerte zugeordnet sind:
+   Es unterscheidet in vier Statistik-Typen denen bereits standardmäßig Gerätewerte zugeordnet sind:
    <ul>
       <li><b>Min|Avg|Max</b> Minimum, Durchschnitt und Maximum von Momentanwerten:
          <br>
-         &uuml;ber den Zeitraum Tag, Monat und Jahr:
+         über den Zeitraum Tag, Monat und Jahr:
          <br>
-         <i>current, energy_current, humidity, luminosity, temperature, voltage</i>
+         <i>current, energy_current, humidity, luminosity, temperature, voltage, etc.</i>
          <br>
-         &uuml;ber den Zeitraum Stunde, Tag, Monat und Jahr:
+         über den Zeitraum Stunde, Tag, Monat und Jahr:
          <br>
-         <i>brightness, wind, wind_speed, windSpeed</i>
+         <i>brightness, wind, wind_speed, windSpeed, etc.</i>
       </li><br>
-      <li><b>Tendency</b> Tendenz &uuml;ber 1h, 2h, 3h und 6h: <i>pressure</i>
+      <li><b>Tendency</b> Tendenz über 1h, 2h, 3h und 6h: <i>pressure</i>
       </li><br>
       <li><b>Delta</b> Differenz zwischen Anfangs- und Endwerte innerhalb eines Zeitraums (Stunde, Tag, Monat, Jahr):
          <br>
-         <i>count, energy, energy_total, power, total, rain, rain_rate, rain_total</i>
+         <i>count, energy, energy_total, power, total, rain, rain_rate, rain_total, etc.</i>
       </li><br>
-      <li><b>Duration</b> Dauer und Anzahl der Zust&auml;nde (on, off, open, closed...) innerhalb eines Zeitraums (Tag, Monat, Jahr):
+      <li><b>Duration</b> Dauer und Anzahl der Zustände (on, off, open, closed...) innerhalb eines Zeitraums (Tag, Monat, Jahr):
          <br>
-         <i>lightsensor, lock, motion, Window, window, state (wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i>
+         <i>lightsensor, lock, motion, Window, window, state (wenn kein anderer Gerätewert gültig)</i>
       </li><br>
   </ul>
-  &Uuml;ber die <a href="#statisticsattr">Attribute</a> <code>deltaReadings, durationReadings, minAvgMaxReadings, tendencyReadings</code> k&ouml;nnen weitere Ger&auml;tewerte hinzugef&uuml;gt oder
-  einem anderen Statistik-Typ zugeordnet werden. 
+  Über die <a href="#statisticsattr">Attribute</a> <code>deltaReadings, durationReadings, minAvgMaxReadings, tendencyReadings</code> können weitere Gerätewerte hinzugefügt oder einem anderen Statistik-Typ zugeordnet werden. 
   <br>&nbsp;
   <br>
   
   <b>Define</b>
   <ul>
       <br>
-      <code>define &lt;Name&gt; statistics &lt;Ger&auml;teNameRegExp&gt; [Prefix]</code>
+      <code>define &lt;Name&gt; statistics &lt;GeräteNameRegExp&gt; [Prefix]</code>
       <br>
       Beispiel: <code>define Statistik statistics Wettersensor|Badsensor</code>
       <br>&nbsp;
-      <li><code>&lt;Ger&auml;teNameRegExp&gt;</code>
+      <li><code>&lt;GeräteNameRegExp&gt;</code>
          <br>
-         Regul&auml;rer Ausdruck f&uuml;r den Ger&auml;tenamen. <b>!!! Nicht die Ger&auml;tewerte !!!</b>
+         Regulärer Ausdruck für den Gerätenamen. <b>!!! Nicht die Gerätewerte !!!</b>
       </li><br>
       <li><code>[Prefix]</code>
          <br>
-         Optional. Der Prefix wird vor den Namen der statistischen Ger&auml;tewerte gesetzt. Standardm&auml;ssig <i>stat</i>
+         Optional. Der Prefix wird vor den Namen der statistischen Gerätewerte gesetzt. Standardmäßig <i>stat</i>
       </li><br>
    </ul>
   
@@ -1383,13 +1394,13 @@ sub statistics_UpdateDevReading($$$$)
    <b>Set</b>
    <ul>
       <br>
-      <li><code>resetStatistics &lt;All|Ger&auml;tename&gt;</code>
+      <li><code>resetStatistics &lt;All|Gerätename&gt;</code>
          <br>
-         Setzt die Statistiken der ausgew&auml;hlten Ger&auml;te zur&uuml;ck.
+         Setzt die Statistiken der ausgewählten Geräte zurück.
       </li><br>
       <li><code>doStatistics</code>
          <br>
-         Berechnet die aktuellen Statistiken aller beobachteten Ger&auml;te.
+         Berechnet die aktuellen Statistiken aller beobachteten Geräte.
       </li><br>
   </ul>
   <br>
@@ -1405,31 +1416,31 @@ sub statistics_UpdateDevReading($$$$)
       <br>
       <li><code>dayChangeTime &lt;Zeit&gt;</code>
          <br>
-         Uhrzeit des Tageswechsels. Standardm&auml;ssig 00:00. Bei Wetterdaten kann der Tageswechsel z.B. auf 6:50 gesetzt werden. 
+         Uhrzeit des Tageswechsels. Standardmäßig 00:00. Bei Wetterdaten kann der Tageswechsel z.B. auf 6:50 gesetzt werden. 
       </li><br>
-      <li><code>deltaReadings &lt;Ger&auml;tewerte&gt;</code>
+      <li><code>deltaReadings &lt;Gerätewerte&gt;</code>
          <br>
-         Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r welche die Differenz zwischen den Werten am Anfang und Ende einer Periode (Stunde/Tag/Monat/Jahr) bestimmt wird. 
+         Durch Kommas getrennte Liste von weiteren Gerätewerten, für welche die Differenz zwischen den Werten am Anfang und Ende einer Periode (Stunde/Tag/Monat/Jahr) bestimmt wird. 
       </li><br>
       <li><code>durationPeriodHour &lt; 1 | 0 &gt;</code>
          <br>
-         Wenn auf 1 gesetzt, dann werden f&uuml;r "durationReadings" auch st&uuml;ndliche Statistiken gebildet.
+         Wenn auf 1 gesetzt, dann werden für "durationReadings" auch stündliche Statistiken gebildet.
       </li><br>
-      <li><code>durationReadings &lt;Ger&auml;tewerte&gt;</code>
+      <li><code>durationReadings &lt;Gerätewerte&gt;</code>
          <br>
-         Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r welche die Dauer einzelner Ger&auml;tewerte innerhalb bestimmte Zeitr&auml;ume (Stunde/Tag/Monat/Jahr) erfasst wird.
+         Durch Kommas getrennte Liste von weiteren Gerätewerten, für welche die Dauer einzelner Gerätewerte innerhalb bestimmte Zeiträume (Stunde/Tag/Monat/Jahr) erfasst wird.
       </li><br>
-      <li><code>excludedReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;</code>
+      <li><code>excludedReadings &lt;GerätenameRegExp:GerätewertRegExp&gt;</code>
          <br>
-         Regul&auml;rer Ausdruck der Ger&auml;tewerte die nicht ausgewertet werden sollen.
+         Regulärer Ausdruck der Gerätewerte die nicht ausgewertet werden sollen.
          z.B. <code>FritzDect:current|Sensor_.*:humidity</code>
          <br>
       </li><br>
 
    <li><code>ignoreDefaultAssignments <code>&lt;0 | 1&gt;</code></code>
       <br>
-      Ignoriert die Standardzuordnung von Ger&auml;tewerten zu Statistiktypen..<br>
-      D.h., nur die Ger&auml;tewerte, die &uuml;ber Attribute den Statistiktypen zugeordnet sind, werden ausgewertet.
+      Ignoriert die Standardzuordnung von Gerätewerten zu Statistik-Typen..<br>
+      D.h., nur die Gerätewerte, die über Attribute den Statistik-Typen zugeordnet sind, werden ausgewertet.
       <br>
     </li><br>
      
@@ -1437,26 +1448,26 @@ sub statistics_UpdateDevReading($$$$)
          <br>
          noch nicht implementiert - Es werden keine gesammelten Statistiken angezeigt, sondern nur die unter "singularReadings" definierten Einzelwerte 
       </li><br>
-      <li><code>minAvgMaxReadings &lt;Ger&auml;tewerte&gt;</code>
+      <li><code>minAvgMaxReadings &lt;Gerätewerte&gt;</code>
          <br>
-         Durch Kommas getrennte Liste von Ger&auml;tewerten, f&uuml;r die in bestimmten Zeitr&auml;umen (Tag, Monat, Jahr) Minimum, Mittelwert und Maximum erfasst werden. 
+         Durch Kommas getrennte Liste von Gerätewerten, für die in bestimmten Zeiträumen (Tag, Monat, Jahr) Minimum, Mittelwert und Maximum erfasst werden. 
       </li><br>
       <li><code>periodChangePreset &lt;Sekunden&gt;</code>
          <br>
-         Start der Berechnung der periodischen Daten, standardm&auml;ssig 5 Sekunden vor der vollen Stunde,
+         Start der Berechnung der periodischen Daten, standardmäßig 5 Sekunden vor der vollen Stunde,
          <br>
-         Erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;&szlig;ert werden.
+         Erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergrößert werden.
          <br>
       </li><br>
-      <li><code>singularReadings &lt;Ger&auml;tRegExp:Ger&auml;teWertRegExp:Statistiktyp:Zeitraum&gt;</code>
+      <li><code>singularReadings &lt;GerätRegExp:GeräteWertRegExp:Statistiktyp:Zeitraum&gt;</code>
          <ul>
-            <li>Statistiktyp: Min|Avg|Max|Delta|<i>DurationState</i>|<span style="color:blue;">Tendency</span></li>
+            <li>Statistik-Typ: Min|Avg|Max|Delta|<i>DurationState</i>|<span style="color:blue;">Tendency</span></li>
             <li>Zeitraum: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>
          </ul>
-         Regul&auml;rer Ausdruck statistischer Werte, die <u>zus&auml;tzlich</u> auch als einzelne Werte gespeichert werden sollen.
+         Regulärer Ausdruck statistischer Werte, die <u>zusätzlich</u> auch als einzelne Werte gespeichert werden sollen.
          Erleichtert die Erzeugung von Plots und anderer Auswertungen (notify).
          <br>
-         F&uuml;r "duration"-Ger&auml;tewerte muss der Name des jeweiligen Statuswertes als <code>Statistiktyp</code> eingesetzt werden.
+         Für "duration"-Gerätewerte muss der Name des jeweiligen Statuswertes als <code>Statistiktyp</code> eingesetzt werden.
          <dt>Beispiel:</dt>
          <dd>
             <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
@@ -1464,30 +1475,30 @@ sub statistics_UpdateDevReading($$$$)
             <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
          </dd>
        </li><br>
-      <li><code>specialDeltaPeriods &lt;Ger&auml;t:Ger&auml;tewert:Zeitraum:Anzahl1:Anzahl2:...&gt;</code>
+      <li><code>specialDeltaPeriods &lt;Gerät:Gerätewert:Zeitraum:Anzahl1:Anzahl2:...&gt;</code>
          <br>
-         Erzeugt f&uuml;r die angegebenen "delta"-Ger&auml;tewerte zus&auml;tzliche Einzelwerte &uuml;ber die angegebene Anzahl eines Zeitraums (Hour, Day, Month).
+         Erzeugt für die angegebenen "delta"-Gerätewerte zusätzliche Einzelwerte über die angegebene Anzahl eines Zeitraums (Hour, Day, Month).
          <br>
-         Regul&auml;re Ausdr&uuml;cke k&ouml;nnen <u>nicht</u> genutzt werden. Es k&ouml;nnen auch mehrere Ger&auml;tewert und/oder Zeitr&auml;ume hinzugef&uuml;gt werden. Diese m&uuml;ssen durch Kommas (ohne Leerzeichen) getrennt werden.
+         Reguläre Ausdrücke können <u>nicht</u> genutzt werden. Es können auch mehrere Gerätewert und/oder Zeiträume hinzugefügt werden. Diese müssen durch Kommas (ohne Leerzeichen) getrennt werden.
          <br>
          <dt>Beispiel:</dt>
          <dd>
          <code>attr Statistik specialDeltaPeriods Wettersensor:rain:Hour:06:72:96</code>
          <br>
-         Dies erzeugt 3 zus&auml;tzliche Werte f&uuml;r die Regenmenge in den letzten 6, 72, 96 Stunden.
+         Dies erzeugt 3 zusätzliche Werte für die Regenmenge in den letzten 6, 72, 96 Stunden.
          <br>
          <code>attr Statistik specialDeltaPeriods Wettersensor:rain:Hour:48,Wettersensor:rain:Day:30,EZaehler:energy:Month:6:12</code>
          <br>
-         Dies erzeugt 4 zus&auml;tzliche Werte f&uuml;r die Regenmenge in den letzten 48 Stunden und den letzten 30 Tagen und den Energieverbrauch der letzten 6 und 12 Monate.
+         Dies erzeugt 4 zusätzliche Werte für die Regenmenge in den letzten 48 Stunden und den letzten 30 Tagen und den Energieverbrauch der letzten 6 und 12 Monate.
          </dd>
       </li><br>
       <li><code>specialDeltaPeriodHours</code>
          <br>
          veraltet
       </li><br>
-      <li><code>tendencyReadings &lt;Ger&auml;tewerte&gt;</code>
+      <li><code>tendencyReadings &lt;Gerätewerte&gt;</code>
          <br>
-         Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r die innerhalb bestimmter Zeitr&auml;ume (1h, 2h, 3h, 6h) die Differenz zwischen Anfangs- und Endwert ermittelt wird. 
+         Durch Kommas getrennte Liste von weiteren Gerätewerten, für die innerhalb bestimmter Zeiträume (1h, 2h, 3h, 6h) die Differenz zwischen Anfangs- und Endwert ermittelt wird. 
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a>
       </li><br>

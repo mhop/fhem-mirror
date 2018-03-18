@@ -1,4 +1,4 @@
-###############################################################
+﻿###############################################################
 # $Id$
 #
 #  70_JSONMETER.pm 
@@ -919,8 +919,8 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 =begin html
 
 =item device
-=item summary reads OBIS data from measurement units
-=item summary_DE liest OBIS Daten von Messger&auml;ten
+=item summary reads OBIS data from measurement devices
+=item summary_DE liest OBIS Daten von Messgeräten
 
 <a name="JSONMETER"></a>
 <h3>JSONMETER</h3>
@@ -930,7 +930,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
   <br>
   that provides OBIS compliant data in JSON format on a webserver or on the FHEM file system.
   <br>
-  It assumes normally, that the structur of the JSON data do not change.
+  It assumes normally, that the structure of the JSON data do not change.
   <br>
   &nbsp;
   <br>
@@ -949,7 +949,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
      The attribute 'pathString' can be used to add login information to the URL path of predefined devices.
      <br>&nbsp;
      <ul> 
-         <li><b>ITF</b> - FROETEC Simplex ME one tariff electrical meter (N-ENERGY) (<a href="http://www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
+         <li><b>ITF</b> - FROETEC Simplex ME one tariff electrical meter (N-ENERGY) (<a href="http://www.itf-froeschl.de">ITF Fröschl</a>)</li>
          <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub for electrical meter (EON, N-ENERGY and EnBW)
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;use the 'pathstring' attribute to specifiy your login information
@@ -1057,39 +1057,39 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 <h3>JSONMETER</h3>
 <div>
 <ul>
-  Dieses Modul liest Daten von Messger&auml;ten (z.B. Stromz&auml;hler, Gasz&auml;hler oder W&auml;rmez&auml;hler, so genannte Smartmeter),
-  welche <a href="http://de.wikipedia.org/wiki/OBIS-Kennzahlen">OBIS</a> kompatible Daten im JSON-Format auf einem Webserver oder auf dem FHEM-Dateisystem zur Verf&uuml;gung stellen.
+  Dieses Modul liest Daten von Messgeräten (z.B. Stromzähler, Gaszähler oder Wärmezähler, so genannte Smartmeter),
+  welche <a href="http://de.wikipedia.org/wiki/OBIS-Kennzahlen">OBIS</a> kompatible Daten im JSON-Format auf einem Webserver oder auf dem FHEM-Dateisystem zur Verfügung stellen.
   <br>
-   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/JSONMETER"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
+   Für detaillierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/JSONMETER"><b>FHEM-Wiki</b></a> konsultieren und ergänzen.
   <br>
   &nbsp;
   <br>
   
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; JSONMETER &lt;Ger&auml;tetyp&gt; [&lt;IP-Adresse&gt;] [Abfrageinterval]</code>
+    <code>define &lt;name&gt; JSONMETER &lt;Gerätetyp&gt; [&lt;IP-Adresse&gt;] [Abfrageinterval]</code>
     <br>
     Beispiel: <code>define Stromzaehler JSONMETER ITF 192.168.178.20 300</code>
     <br>&nbsp;
-    <li><code>[Abfrageinterval]</code>
+    <li><code>[Abfrageintervall]</code>
       <br>
-      Optional. Standardm&auml;ssig 300 Sekunden. Der kleinste m&ouml;gliche Wert ist 30.
+      Optional. Standardmäßig 300 Sekunden. Der kleinste mögliche Wert ist 30.
       <br> 
-      Bei 0 kann die Ger&auml;teabfrage nur manuell gestartet werden.
+      Bei 0 kann die Geräteabfrage nur manuell gestartet werden.
     </li><br>
-    <li><code>&lt;Ger&auml;tetyp&gt;</code>
+    <li><code>&lt;Gerätetyp&gt;</code>
       <br>
       Definiert den Pfad und den Port, um die JSON-Datei einzulesen.
       <br>
-      Mit dem Attribute 'pathString' k&ouml;nnen Login Information an den URL-Pfad von vordefinierten Ger&auml;te angehangen werden.
+      Mit dem Attribute 'pathString' können Login Information an den URL-Pfad von vordefinierten Geräte angehangen werden.
       <ul> 
-         <li><b>ITF</b> - FROETEC Simplex ME Eintarifz&auml;hler (N-ENERGY) (<a href="http://www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
-         <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub f&uuml;r Stromz&auml;hler (EON, N-ENERGY, EnBW)
+         <li><b>ITF</b> - FROETEC Simplex ME Eintarifzähler (N-ENERGY) (<a href="http://www.itf-froeschl.de">ITF Fröschl</a>)</li>
+         <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub für Stromzähler (EON, N-ENERGY, EnBW)
             <br>
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login-Information wird &uuml;ber das Attribute 'pathstring' angegeben.
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login-Information wird über das Attribute 'pathstring' angegeben.
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>?LogName=<i>Benutzer</i>&LogPSWD=<i>Passwort</i></code></li>
-         <li><b>LS110</b> - <a href="http://www.youless.nl/downloads-ls110.html">YouLess LS110</a> Netzwerkf&auml;higer Sensor f&uuml;r elektromechanische Stromz&auml;hler</li>
+         <li><b>LS110</b> - <a href="http://www.youless.nl/downloads-ls110.html">YouLess LS110</a> Netzwerkfähiger Sensor für elektromechanische Stromzähler</li>
          <li><b>LS120</b> - <a href="http://www.youless.nl/winkel/product/ls120.html">YouLess LS120</a> Neues Modell</li>
          <li><b>url</b> - benutzt die URL, welche durch das Attribut 'pathString' und 'port' definiert wird.</li>
          <li><b>file</b> - benutzt die Datei, welche durch das Attribut 'pathString' definiert wird (im FHEM Dateisystem)</li>
@@ -1102,7 +1102,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
   <ul>
        <li><code>activeTariff &lt; 0 - 9 &gt;</code>
          <br>
-         Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) f&uuml;r verschiedene Tarife (Doppelstromz&auml;hler), wenn der Stromz&auml;hler dies selbst nicht unterscheiden kann (z.B. LS110) oder wenn gepr&uuml;ft werden soll, ob ein zeitabh&auml;ngiger Tarif preiswerter w&auml;re. Dieser Wert muss entsprechend des vorhandenen oder geplanten Tarifes zum jeweiligen Zeitpunkt z.B. durch den FHEM-Befehl "at" gesetzt werden.<br>
+         Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) für verschiedene Tarife (Doppelstromzähler), wenn der Stromzähler dies selbst nicht unterscheiden kann (z.B. LS110) oder wenn geprüft werden soll, ob ein zeitabhängiger Tarif preiswerter wäre. Dieser Wert muss entsprechend des vorhandenen oder geplanten Tarifes zum jeweiligen Zeitpunkt z.B. durch den FHEM-Befehl "at" gesetzt werden.<br>
          0 = tariflos 
       </li><br>
      <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
@@ -1111,17 +1111,17 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
       </li><br>
       <li><code>resetStatistics &lt;statWerte&gt;</code>
          <br>
-         L&ouml;scht die ausgew&auml;hlten statisischen Werte: <i>all, statElectricityConsumed..., statElectricityConsumedTariff..., statElectricityPower...</i>
+         Löscht die ausgewählten statisischen Werte: <i>all, statElectricityConsumed..., statElectricityConsumedTariff..., statElectricityPower...</i>
  
          </li><br>
       <li><code>restartJsonAnalysis</code>
         <br>
-        Neustart der Analyse der json-Datei zum Auffinden bekannter Ger&auml;tewerte (kompatibel zum OBIS Standard).
-        Diese Analysie wird normaler Weise nur einmalig durchgef&uuml;hrt, nachdem Ger&auml;tewerte gefunden wurden.
+        Neustart der Analyse der json-Datei zum Auffinden bekannter Gerätewerte (kompatibel zum OBIS Standard).
+        Diese Analysie wird normaler Weise nur einmalig durchgeführt, nachdem Gerätewerte gefunden wurden.
         </li><br>
      <li><code>statusRequest</code>
          <br>
-         Aktualisieren der Ger&auml;tewerte</li>
+         Aktualisieren der Gerätewerte</li>
   </ul>
   <br>
 
@@ -1142,35 +1142,35 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
    <ul>
       <li><code>alwaysAnalyse &lt; 0 | 1 &gt;</code>
          <br>
-         F&uuml;hrt bei jeder Abfrage der Ger&auml;tewerte eine Analyse der JSON-Datenstruktur durch.
+         Führt bei jeder Abfrage der Gerätewerte eine Analyse der JSON-Datenstruktur durch.
          <br>
-         Dies ist sinnvoll, wenn sich die JSON-Struktur &auml;ndert. Normalerweise wird die analysierte Struktur
+         Dies ist sinnvoll, wenn sich die JSON-Struktur ändert. Normalerweise wird die analysierte Struktur
          zwischengespeichert, um die CPU-Last gering zu halten.
       </li><br>
       <li><code>doStatistics &lt; 0 | 1 &gt;</code>
          <br>
-         Bildet t&auml;gliche, monatliche und j&auml;hrliche Statistiken bestimmter Ger&auml;tewerte (Mittel/Min/Max oder kumulierte Werte).
-         F&uuml;r grafische Auswertungen k&ouml;nnen die Werte der Form 'stat<i>ReadingName</i><b>Last</b>' genutzt werden.
+         Bildet tägliche, monatliche und jährliche Statistiken bestimmter Gerätewerte (Mittel/Min/Max oder kumulierte Werte).
+         Für grafische Auswertungen können die Werte der Form 'stat<i>ReadingName</i><b>Last</b>' genutzt werden.
          </li><br>
       <li><code>pathString &lt;Zeichenkette&gt;</code>
          <ul>
-            <li>Ger&auml;tetyp 'file': definiert den lokalen Dateinamen und -pfad
+            <li>Gerätetyp 'file': definiert den lokalen Dateinamen und -pfad
                </li>
-            <li>Ger&auml;tetyp 'url': Definiert den URL-Pfad
+            <li>Gerätetyp 'url': Definiert den URL-Pfad
                </li>
-            <li>Andere: Kann benutzt werden um Login-Information zum URL Pfad von vordefinerten Ger&auml;ten hinzuzuf&uuml;gen
+            <li>Andere: Kann benutzt werden um Login-Information zum URL Pfad von vordefinierten Geräten hinzuzufügen
                </li>
          </ul>
       </li><br>
       <li><code>port &lt;Nummer&gt;</code>
       <br>
-      Beim Ger&auml;tetyp 'url' kann hier der URL-Port festgelegt werden. (standardm&auml;ssig 80)
+      Beim Gerätetyp 'url' kann hier der URL-Port festgelegt werden. (standardmäßig 80)
       </li><br>
       <li><code>timeOut &lt;Sekunden&gt;</code>
          <br>
-         Gibt an, nach wieviel Sekunden das Einlesen der Rohdaten abgebrochen werden soll. (standardm&auml;ssig 10)
+         Gibt an, nach wieviel Sekunden das Einlesen der Rohdaten abgebrochen werden soll. (standardmäßig 10)
          <br>
-         Die Laufzeit des Einlesevorganges wird bei "get <device> jsonFile" angezeigt.
+         Die Laufzeit des Einlesevorganges wird bei "get &lt;device&gt; jsonFile" angezeigt.
       </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>

@@ -1,4 +1,4 @@
-###############################################################
+﻿###############################################################
 # $Id$Date: $
 #
 #  23_LUXTRONIK2.pm 
@@ -8,7 +8,7 @@
 #
 #  Copyright notice
 #
-#  The modul reads and writes parameters of the heat pump controller 
+#  The module reads and writes parameters of the heat pump controller 
 #  Luxtronik 2.0 used in Alpha Innotec and Siemens Novelan (WPR NET) heat pumps.
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -85,7 +85,7 @@ LUXTRONIK2_Initialize($)
                  "autoSynchClock:slider,10,5,300 ".
                  "boilerVolumn ".
                  "compressor2ElectricalPowerWatt ".
-                 "doStatistics:0,1 ".
+                 "doStatistics:0,1,2 ".
                  "heatPumpElectricalPowerFactor ".
                  "heatPumpElectricalPowerWatt ".
                  "heatRodElectricalPowerWatt ".
@@ -289,7 +289,7 @@ LUXTRONIK2_Set($$@)
       $hash->{LOCAL} = 0;
       return $resultStr;
    }
-   elsif( int(@_)==4 && $cmd eq 'hotWaterCircPumpDeaerate' ) { # Einstellung->Entl�ftung
+   elsif( int(@_)==4 && $cmd eq 'hotWaterCircPumpDeaerate' ) { # Einstellung->Entlüftung
       Log3 $name, 3, "set $name $cmd $val";
       return "$name Error: Wrong parameter given for opModeHotWater, use Automatik,Party,Off"
          if $val !~ /on|off/;
@@ -598,9 +598,9 @@ sub LUXTRONIK2_DoUpdate($)
       $rName = "userValue$rIndex"  if $rName eq "";
       $return_str .= $rName." ".$heatpump_values[$rIndex];
     }
-  # 77 - VentSupplyAirTemp
+  # 77 - VentSupplyAirTemperature
   $return_str .= "|".($heatpump_visibility[264]==1 ? $heatpump_values[159] : "no");;
-  # 78 - VentExhaustAirTemp
+  # 78 - VentExhaustAirTemperature
   $return_str .= "|".($heatpump_visibility[265]==1 ? $heatpump_values[160] : "no");;
   # 79 - opModeVentilation
   $return_str .= "|".($heatpump_visibility[4]==1 ? $heatpump_parameters[894] : "no");;
@@ -696,7 +696,7 @@ LUXTRONIK2_UpdateDone($)
 
    my %ventMode = ( 0 => "Automatik",
                     1 => "Party",
-                    2 => "Feuchte",
+                    2 => "Feuchteschutz",
                     3 => "Aus");
              
   my $counterRetry = $hash->{fhem}{counterRetry};
@@ -782,8 +782,13 @@ LUXTRONIK2_UpdateDone($)
    }
 
    
-   # if selected, do all the statistic calculations
+   # if attribute doStatistic = 1 do all the statistic calculations
+   # if attribute doStatistic = 2 do only those statistic calculations not included in FHEM Module statistics
    if ( $doStatistic == 1) { 
+    # LUXTRONIK2_doStatisticMinMax $hash, $readingName, $value
+     LUXTRONIK2_doStatisticMinMax ( $hash, "statAmbientTemp", $ambientTemperature);
+   }
+   if ( $doStatistic >= 1) { 
       #LUXTRONIK2_doStatisticBoilerHeatUp $hash, $currOpHours, $currHQ, $currTemp, $opState, $target
       $value = LUXTRONIK2_doStatisticBoilerHeatUp ($hash, $a[35], $a[37]/10, $hotWaterTemperature, $opStateHeatPump3,$hotWaterTemperatureTarget);
       if ($value ne "") {
@@ -814,12 +819,7 @@ LUXTRONIK2_UpdateDone($)
       if ($value ne "") { readingsBulkUpdate($hash,"statThermalPowerBoiler",$value); }
       $value = LUXTRONIK2_doStatisticThermalPower ($hash, 0, $opStateHeatPump3, $a[36]/10, $a[34], $ambientTemperature, $heatSourceIN, $returnTemperatureTarget, $heatPumpPower);
       if ($value ne "") { readingsBulkUpdate($hash,"statThermalPowerHeating",$value); }
-      
-    # LUXTRONIK2_doStatisticMinMax $hash, $readingName, $value
-     LUXTRONIK2_doStatisticMinMax ( $hash, "statAmbientTemp", $ambientTemperature);
-
    }
-   
   #Operating status of heat pump
      my $opStateHeatPump1 = $wpOpStat1{$a[2]}; ##############
       $opStateHeatPump1 = "unbekannt (".$a[2].")" unless $opStateHeatPump1;
@@ -893,7 +893,7 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate($hash,"opStateHeating",$value);
 
    # Ventilation operating mode
-     if ( $a[79] ne "no" ) {
+     if ( $a[79] !~ /no/ ) {
        $value = $ventMode{$a[79]};
        $value = "unbekannt (".$a[79].")" unless $value;
        readingsBulkUpdate($hash,"opModeVentilation",$value);
@@ -913,6 +913,7 @@ LUXTRONIK2_UpdateDone($)
          $hash->{fhem}{defrost}{hsIn} = $heatSourceIN;
          $hash->{fhem}{defrost}{hsOut} = $heatSourceOUT;
       } 
+   # Defrost-Readings erstellen
       elsif ( $hash->{fhem}{defrost}{mode} ne "none" ) {
          my $value = "Mode: " . $hash->{fhem}{defrost}{mode} . " Time: ";
          $value .=  strftime ( "%M:%S", localtime( time() - $hash->{fhem}{defrost}{startTime} ) ); 
@@ -920,7 +921,16 @@ LUXTRONIK2_UpdateDone($)
          $value .= " hsIN: ".$hash->{fhem}{defrost}{hsInStart} . " - ". $hash->{fhem}{defrost}{hsIn};
          #$value .= " hsOUT: ".$hash->{fhem}{defrost}{hsOutStart} . " - ". $heatSourceOUT;
          readingsBulkUpdate( $hash, "heatSourceDefrostLast", $value);
+
+         my $rName = "heatSourceDefrostCounter";
+         $rName .= "Air"   if $hash->{fhem}{defrost}{mode} eq "air";
+         $rName .= "Reverse"   if $hash->{fhem}{defrost}{mode} eq "reverse";
+         my $rValue = ReadingsVal ( $name, $rName, 0 ) + 1;
+         readingsBulkUpdate ( $hash, $rName, 0 )      if $rValue == 1; #for statistics module
+         readingsBulkUpdate ( $hash, $rName, $rValue );
+
          $hash->{fhem}{defrost}{mode} = "none";
+
          #  16 => "Durchflussueberwachung"
          if ($opStateHeatPump3 == 16) { 
             readingsBulkUpdate( $hash, "heatSourceDefrostLastTimeout", "Amb: ".$hash->{fhem}{defrost}{amb}." hsIN: ".$hash->{fhem}{defrost}{hsIn}." hsOUT: ".$hash->{fhem}{defrost}{hsOut});
@@ -986,8 +996,8 @@ LUXTRONIK2_UpdateDone($)
      if ($a[58] !~ /no/) {readingsBulkUpdate( $hash, "mixer2TargetTemperature",LUXTRONIK2_CalcTemp($a[58]));}
      if ($a[59] !~ /no/) {readingsBulkUpdate( $hash, "mixer3FlowTemperature",LUXTRONIK2_CalcTemp($a[59]));}
      if ($a[60] !~ /no/) {readingsBulkUpdate( $hash, "mixer3TargetTemperature",LUXTRONIK2_CalcTemp($a[60]));}
-     if ($a[77] !~ /no/) {readingsBulkUpdate( $hash, "VentSupplyAirTemperature",LUXTRONIK2_CalcTemp($a[77]));}
-     if ($a[78] !~ /no/) {readingsBulkUpdate( $hash, "VentExhaustAirTemperature",LUXTRONIK2_CalcTemp($a[78]));}
+     if ($a[77] !~ /no/) {readingsBulkUpdate( $hash, "ventSupplyAirTemperature",LUXTRONIK2_CalcTemp($a[77]));}
+     if ($a[78] !~ /no/) {readingsBulkUpdate( $hash, "ventExhaustAirTemperature",LUXTRONIK2_CalcTemp($a[78]));}
 
     # Operating hours (seconds->hours) and heat quantities   
      # LUXTRONIK2_storeReadings: $hash, $readingName, $value, $factor, $doStatistic, $electricalPower
@@ -1071,7 +1081,7 @@ LUXTRONIK2_UpdateDone($)
       # $defrostValve = $a[67]; #AVout
       # $hotWaterBoilerValve = $a[9]; #BUP
       # $heatingSystemCircPump = $a[27]; #HUP
-      # 0=Heizen, 1=keine Anforderung, 3=Schaltspielzeit, 5=Brauchwasser, 7=Abtauen, 16=Durchfluss�berwachung
+      # 0=Heizen, 1=keine Anforderung, 3=Schaltspielzeit, 5=Brauchwasser, 7=Abtauen, 16=Durchflussüberwachung
       my $lastHeatingCycle = ReadingsVal($name, "heatingCycle", "");
       if ( $opStateHeatPump3 == 0 ) {
          readingsBulkUpdate($hash, "heatingCycle", "running");
@@ -1827,7 +1837,7 @@ LUXTRONIK2_doStatisticBoilerHeatUp ($$$$$$)
         #real (mixed) Temperature-Difference
         my $boilerVolumn = AttrVal($name, "boilerVolumn", 0);
         if ($boilerVolumn >0 ) {
-           # (delta T) [K] = W�rmemenge [kWh] / #Volumen [l] * ( 3.600 [kJ/kWh] / ( 4,179 [kJ/(kg*K)] (H2O W�rmekapazit�t bei 40�C) * 0,992 [kg/l] (H2O Dichte bei 40�C) ) [K/(kWh*l)] )  
+           # (delta T) [K] = Wärmemenge [kWh] / #Volumen [l] * ( 3.600 [kJ/kWh] / ( 4,179 [kJ/(kg*K)] (H2O Wärmekapazität bei 40°C) * 0,992 [kg/l] (H2O Dichte bei 40°C) ) [K/(kWh*l)] )  
            $value2 = 868.4 * $value3 / $boilerVolumn ;  
            $returnStr .= sprintf " realDT: %.0f", $value2;
         }
@@ -1907,8 +1917,8 @@ LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$)
 }   
 
 # Calculates single MaxMin Values and informs about end of day and month
-sub ######################################## 
-LUXTRONIK2_doStatisticMinMax ($$$) 
+######################################## 
+sub LUXTRONIK2_doStatisticMinMax ($$$) 
 {
    my ($hash, $readingName, $value) = @_;
    my $dummy;
@@ -2007,10 +2017,10 @@ LUXTRONIK2_doStatisticMinMaxSingle ($$$$)
    return;
 }
 
-sub ########################################
-LUXTRONIK2_storeReadings($$$$$$)
+########################################
+sub LUXTRONIK2_storeReadings($$$$$$)
 {
-   my ($hash, $readingName, $value, $factor, $doStatistics, $electricalPower) = @_;
+   my ($hash, $readingName, $value, $factor, $doStatistic, $electricalPower) = @_;
    
    if ($value eq "no" || $value == 0 ) { return; }
 
@@ -2019,12 +2029,12 @@ LUXTRONIK2_storeReadings($$$$$$)
    $readingName =~ s/counter//;
  
    # LUXTRONIK2_doStatisticDelta: $hash, $readingName, $value, $factor, $electricalPower
-   if ( $doStatistics == 1) { LUXTRONIK2_doStatisticDelta $hash, "stat".$readingName, $value, $factor, $electricalPower; }
+   if ( $doStatistic == 1) { LUXTRONIK2_doStatisticDelta $hash, "stat".$readingName, $value, $factor, $electricalPower; }
 }
 
 # Calculates deltas for day, month and year
-sub ######################################## 
-LUXTRONIK2_doStatisticDelta ($$$$$) 
+######################################## 
+sub LUXTRONIK2_doStatisticDelta ($$$$$) 
 {
    my ($hash, $readingName, $value, $factor, $electricalPower) = @_;
    my $name = $hash->{NAME};
@@ -2182,8 +2192,8 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 
 =pod
 =item device
-=item summary Connects with a Luxtronik 2.0 controller for heat pumps
-=item summary_DE Verbindet mit einer Luxtronik 2.0 Heizungssteuerung f�r W&auml;rmepumpen.
+=item summary Connects with a Luxtronik 2.0 controller for heat pumps.
+=item summary_DE Verbindet mit einer Luxtronik 2.0 Heizungssteuerung für Wärmepumpen.
 
 =begin html
 
@@ -2194,7 +2204,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   Luxtronik 2.0 and 2.1 is a heating controller from <a href="http://www.alpha-innotec.de">Alpha InnoTec (AIT)</a> used in heat pumps of Alpha InnoTec, Buderus (Logamatic HMC20, HMC20 Z), CTA All-In-One (Aeroplus), Elco, Nibe (AP-AW10), Roth (ThermoAura&reg;, ThermoTerra), Novelan (WPR NET) and Wolf Heiztechnik (BWL/BWS).<br>
   It has a built-in ethernet (RJ45) port, so it can be directly integrated into a local area network (LAN).
   <br>
-  <i>The modul is reported to work with firmware: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77, V1.80, V1.81.</i>
+  <i>The module is reported to work with firmware: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77, V1.80, V1.81.</i>
   <br>
   More Info on the particular <a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">page of FHEM-Wiki</a> (in German).
   <br>
@@ -2218,7 +2228,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
    <ul>A firmware check assures before each set operation that a heat pump with untested firmware is not damaged accidently.
        <li><code>activeTariff &lt; 0 - 9 &gt;</code>
          <br>
-         Allows the separate measurement of the consumption (doStatistics = 1) within different tariffs.<br>
+         Allows the separate measurement of the consumption (doStatistics = 1 or 2) within different tariffs.<br>
          This value must be set at the correct point of time in accordance to the existing or planned tariff <b>by the FHEM command "at"</b>.<br>
          0 = without separate tariffs
        </li><br>
@@ -2295,11 +2305,11 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
       <li><code>compressor2ElectricalPowerWatt</code><br>
          Electrical power of the 2nd compressor to calculated the COP and estimate electrical consumption (calculations not implemented yet)
          </li><br>
-      <li><code>doStatistics &lt; 0 | 1 &gt;</code>
+      <li><code>doStatistics &lt; 0 | 1 | 2 &gt;</code>
          <br>
-         Calculates statistic values: <i>statBoilerGradientHeatUp, statBoilerGradientCoolDown, statBoilerGradientCoolDownMin (boiler heat loss)</i>
+         1 or 2: Calculates statistic values: <i>statBoilerGradientHeatUp, statBoilerGradientCoolDown, statBoilerGradientCoolDownMin (boiler heat loss)</i>
          <br>
-         Builds daily, monthly and yearly statistics for certain readings (average/min/max or cumulated values).
+         1: Builds daily, monthly and yearly statistics for certain readings (average/min/max or cumulated values).
          <br>
          Logging and visualisation of the statistic should be done with readings of type 'stat<i>ReadingName</i><b>Last</b>'.
          </li><br>
@@ -2326,8 +2336,8 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          </li><br>
        <li><code>userHeatpumpParameters &lt;Index [Name][,Index2 [Name2],Index3 [Name3] ...]&gt;</code>
          <br>
-         Allows to continuousely read the value of certian controler parameters. The index number of the parameter can be determined with the get command <i>rawData</i><br> 
-         In the attribute definition, a name can be writen behind the index number separated by a space. The respective parameter value will either be shown with the prefix "userParameter..." or under the given name. <br>
+         Allows to continuously read the value of certain controler parameters. The index number of the parameter can be determined with the get command <i>rawData</i><br> 
+         In the attribute definition, a name can be written behind the index number separated by a space. The respective parameter value will either be shown with the prefix "userParameter..." or under the given name. <br>
          Multiple indexes are separated by a comma.<br>
          If the readings are not used anymore the can be deleted with the FHEM command <a href="#deletereading">deleteReading</a>.
          </li><br>
@@ -2348,9 +2358,9 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 <h3>LUXTRONIK2</h3>
 <div>
 <ul>
-  Die Luxtronik 2.0 and 2.1 ist eine Heizungssteuerung der Firma <a href="http://www.alpha-innotec.de">Alpha InnoTec AIT</a>, welche in W&auml;rmepumpen von Alpha InnoTec, Buderus (Logamatic HMC20, HMC20 Z), CTA All-In-One (Aeroplus), Elco, Nibe (AP-AW10), Roth (ThermoAura&reg;, ThermoTerra), Novelan (WPR NET) und Wolf Heiztechnik (BWL/BWS) verbaut ist. Sie besitzt einen Ethernet (RJ45) Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
+  Die Luxtronik 2.0 and 2.1 ist eine Heizungssteuerung der Firma <a href="http://www.alpha-innotec.de">Alpha InnoTec AIT</a>, welche in Wärmepumpen von Alpha InnoTec, Buderus (Logamatic HMC20, HMC20 Z), CTA All-In-One (Aeroplus), Elco, Nibe (AP-AW10), Roth (ThermoAura&reg;, ThermoTerra), Novelan (WPR NET) und Wolf Heiztechnik (BWL/BWS) verbaut ist. Sie besitzt einen Ethernet (RJ45) Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
   <br>
-  <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77, V1.80, V1.81.</i>
+  <i>Das Modul wurde bisher mit folgender Steuerung-Firmware getestet: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77, V1.80, V1.81.</i>
   <br>
   Mehr Infos im entsprechenden <u><a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">Artikel der FHEM-Wiki</a></u>.
   <br>&nbsp;
@@ -2360,9 +2370,9 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <ul>
     <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-Adresse[:Port]&gt; [Abfrageinterval]</code>
     <br>
-    Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste m&ouml;gliche Wert ist 10.
+    Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste mögliche Wert ist 10.
     <br>
-    Die Angabe des Portes kann gew&ouml;hnlich entfallen.
+    Die Angabe des Portes kann gewöhnlich entfallen.
     <br>
     Beispiel: <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
  
@@ -2372,36 +2382,36 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <a name="LUXTRONIK2set"></a>
   <b>Set</b><br>
   <ul>
-     Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpen mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden.
+     Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass Wärmepumpen mit ungetesteter Firmware nicht unabsichtlich beschädigt werden.
      <br>&nbsp;
        <li><code>activeTariff &lt; 0 - 9 &gt;</code>
          <br>
-         Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) f&uuml;r verschiedene Tarife (Doppelstromz&auml;hler)<br>
+         Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) für verschiedene Tarife (Doppelstromzähler)<br>
          Dieser Wert muss entsprechend des vorhandenen oder geplanten Tarifes zum jeweiligen Zeitpunkt z.B. durch den FHEM-Befehl "at" gesetzt werden.<br>
          0 = tariflos 
       </li><br>
-      <li><code>heatingCurveEndPoint &lt;Temperaratur&gt;</code><br>
-         Einstellung des Heizkurvenparameters. In 0.1er Schritten einstellbar.
+      <li><code>heatingCurveEndPoint &lt;Temperatur&gt;</code><br>
+         Einstellung des Heizkurven-Parameters. In 0.1er Schritten einstellbar.
       </li><br>
-      <li><code>heatingCurveOffset &lt;Temperaratur&gt;</code><br>
-         Einstellung des Heizkurvenparameters. In 0.1er Schritten einstellbar.
+      <li><code>heatingCurveOffset &lt;Temperatur&gt;</code><br>
+         Einstellung des Heizkurven-Parameters. In 0.1er Schritten einstellbar.
       </li><br>
       <li><code>hotWaterCircPumpDeaerate &lt;on | off&gt;</code><br>
-         Schaltet die externe Warmwasser-Zirkulationspumpe an oder aus. Durch die Zirkulation wird das Abk&uuml;hlen des Warmwassers in den Hausleitungen verhindert. Der W&auml;rmeverbrauch steigt jedoch drastisch.
+         Schaltet die externe Warmwasser-Zirkulationspumpe an oder aus. Durch die Zirkulation wird das Abkühlen des Warmwassers in den Hausleitungen verhindert. Der Wärmeverbrauch steigt jedoch drastisch.
          <br>
-         Achtung! Es wird die Entl&uuml;ftungsfunktion der Steuerung genutzt. Dadurch taktet die Pumpe jeweils 5 Minuten ein und 5 Minuten aus.
+         Achtung! Es wird die Entlüftungsfunktion der Steuerung genutzt. Dadurch taktet die Pumpe jeweils 5 Minuten ein und 5 Minuten aus.
          </li><br>
      <li><code>hotWaterTemperatureTarget &lt;Temperatur&gt;</code>
          <br>
-         Soll-Temperatur des Hei&szlig;wasserboilers in &deg;C
+         Soll-Temperatur des Heißwasserspeichers in °C
          </li><br>
       <li><code>opModeHotWater &lt;Betriebsmodus&gt;</code>
          <br>
-         Betriebsmodus des Hei&szlig;wasserboilers ( Auto | Party | Off )
+         Betriebsmodus des Heißwasserspeichers ( Auto | Party | Off )
          </li><br>
      <li><code>resetStatistics &lt;statWerte&gt;</code>
          <br>
-         L&ouml;scht die ausgew&auml;hlten statisischen Werte: <i>all, statBoilerGradientCoolDownMin, statAmbientTemp..., statElectricity..., statHours..., statHeatQ...</i>
+         Löscht die ausgewählten statistischen Werte: <i>all, statBoilerGradientCoolDownMin, statAmbientTemp..., statElectricity..., statHours..., statHeatQ...</i>
          </li><br>
      <li><code>returnTemperatureHyst &lt;Temperatur&gt;</code>
          <br>
@@ -2409,19 +2419,19 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          </li><br>
      <li><code>returnTemperatureSetBack &lt;Temperatur&gt;</code>
          <br>
-         Absenkung oder Anhebung der R&uuml;cklauftemperatur von -5 K bis + 5K. In 0.1er Schritten einstellbar.
+         Absenkung oder Anhebung der Rücklauftemperatur von -5 K bis + 5K. In 0.1er Schritten einstellbar.
          </li><br>
      <li><code>INTERVAL &lt;Sekunden&gt;</code>
          <br>
-         Abfrageinterval in Sekunden
+         Abfrageintervall in Sekunden
          </li><br>
      <li><code>statusRequest</code>
          <br>
-         Aktualisieren der Ger&auml;tewerte
+         Aktualisieren der Gerätewerte
          </li><br>
      <li><code>synchClockHeatPump</code>
          <br>
-         Abgleich der Uhr der Steuerung mit der FHEM Zeit. <b>Diese &Auml;nderung geht verloren, sobald die Steuerung ausgeschaltet wird!!</b></li>
+         Abgleich der Uhr der Steuerung mit der FHEM Zeit. <b>Diese Änderung geht verloren, sobald die Steuerung ausgeschaltet wird!!</b></li>
   </ul>
   <br>
   
@@ -2430,14 +2440,14 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <ul>
       <li><code>heatingCurveParameter &lt;Aussentemp1 Solltemp1 Aussentemp2 Solltemp2&gt;</code>
       <br>
-      Ermittelt rekursiv anhand zweier Punkte auf der Heizkurve die entsprechenden Heizkurvenparameter <i>heatingCurveEndPoint</i> und <i>heatingCurveOffset</i>.<br>
-      Diese k&ouml;nnen dann &uuml;ber die entsprechenden set-Befehl einstellt werden.
+      Ermittelt rekursiv anhand zweier Punkte auf der Heizkurve die entsprechenden Heizkurven-Parameter <i>heatingCurveEndPoint</i> und <i>heatingCurveOffset</i>.<br>
+      Diese können dann über die entsprechenden set-Befehl einstellt werden.
       </li>
       <br>
       <li><code>rawData</code>
       <br>
       Zeigt alle von der Steuerung auslesbaren Parameter und Betriebswerte an.<br>
-      Diese k&ouml;nnen dann mit den Attributen <i>userHeatpumpParameters</i> und <i>userHeatpumpValues</i> einem Ger&auml;tewert zugeordnet werden.
+      Diese können dann mit den Attributen <i>userHeatpumpParameters</i> und <i>userHeatpumpValues</i> einem Gerätewert zugeordnet werden.
       </li><br>
   </ul>
   <br>
@@ -2447,60 +2457,60 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <ul>
    <li><code>allowSetParameter &lt; 0 | 1 &gt;</code>
       <br>
-      Die internen <a href="#LUXTRONIK2set">Parameter</a> der W&auml;rmepumpensteuerung k&ouml;nnen
-      nur ge&auml;ndert werden, wenn dieses Attribut auf 1 gesetzt ist.
+      Die internen <a href="#LUXTRONIK2set">Parameter</a> der Wärmepumpensteuerung können
+      nur geändert werden, wenn dieses Attribut auf 1 gesetzt ist.
       </li><br>
    <li><code>autoSynchClock &lt;Zeitunterschied&gt;</code>
       <br>
-      Die Uhr der W&auml;rmepumpe wird automatisch korrigiert, wenn ein gewisser <i>Zeitunterschied</i> (10 s - 600 s) 
-      gegen&uuml;ber der FHEM Zeit erreicht ist. Zuvor wird die Kompatibilit&auml;t der Firmware &uuml;berpr&uuml;ft.<br>
-      <i>(Ein Ger&auml;tewert 'delayDeviceTimeCalc' &lt;= 2 s ist auf die internen Berechnungsintervale der
-      W&auml;rmepumpensteuerung zur&uuml;ckzuf&uuml;hren.)</i>
+      Die Uhr der Wärmepumpe wird automatisch korrigiert, wenn ein gewisser <i>Zeitunterschied</i> (10 s - 600 s) 
+      gegenüber der FHEM Zeit erreicht ist. Zuvor wird die Kompatibilität der Firmware überprüft.<br>
+      <i>(Ein Gerätewert 'delayDeviceTimeCalc' &lt;= 2 s ist auf die internen Berechnungsintervale der
+      Wärmepumpensteuerung zurückzuführen.)</i>
       </li><br>
     <li><code>compressor2ElectricalPowerWatt</code><br>
-      Betriebsleistung des zweiten Kompressors zur Berechung der Arbeitszahl (erzeugte W&auml;rme pro elektrische Energieeinheit)
-      und Absch&auml;tzung des elektrischen Verbrauches (Auswertungen noch nicht implementiert)
+      Betriebsleistung des zweiten Kompressors zur Berechnung der Arbeitszahl (erzeugte Wärme pro elektrische Energieeinheit)
+      und Abschätzung des elektrischen Verbrauches (Auswertungen noch nicht implementiert)
       </li><br>
-    <li><code>doStatistics &lt; 0 | 1 &gt;</code>
+    <li><code>doStatistics &lt; 0 | 1 | 2 &gt;</code>
       <br>
       Berechnet statistische Werte: <i>statBoilerGradientHeatUp, statBoilerGradientCoolDown,
-      statBoilerGradientCoolDownMin (W&auml;rmeverlust des Boilers)</i>
+      statBoilerGradientCoolDownMin (Wärmeverlust des Boilers)</i>
       <br>
-      Bildet t&auml;gliche, monatliche und j&auml;hrliche Statistiken bestimmter Ger&auml;tewerte.<br>
-      F&uuml;r grafische Auswertungen k&ouml;nnen die Werte der Form 'stat<i>ReadingName</i><b>Last</b>' genutzt werden.
+      Bildet tägliche, monatliche und jährliche Statistiken bestimmter Gerätewerte.<br>
+      Für grafische Auswertungen können die Werte der Form 'stat<i>ReadingName</i><b>Last</b>' genutzt werden.
       </li><br>
     <li><code>heatPumpElectricalPowerWatt &lt;E-Leistung in Watt&gt;</code><br>
-      Elektrische Leistungsaufnahme der W&auml;rmepumpe in Watt bei einer Vorlauftemperatur von 35 &deg;C zur Berechung der Arbeitszahl (erzeugte W&auml;rme pro elektrische Energieeinheit)
-      und Absch&auml;tzung des elektrischen Verbrauches
+      Elektrische Leistungsaufnahme der Wärmepumpe in Watt bei einer Vorlauftemperatur von 35 &deg;C zur Berechung der Arbeitszahl (erzeugte Wärme pro elektrische Energieeinheit)
+      und Abschätzung des elektrischen Verbrauches
       </li><br>
     <li><code>heatPumpElectricalPowerFactor</code><br>
-         &Auml;nderung der elektrischen Leistungsaufnahme pro 1 K Vorlauftemperaturdifferenz zu 35 &deg;C
+         änderung der elektrischen Leistungsaufnahme pro 1 K Vorlauftemperaturdifferenz zu 35 &deg;C
          <br>
          (z.B. 2% pro 1 K = 0,02)
          </li><br>
     <li><code>heatRodElectricalPowerWatt &lt;E-Leistung in Watt&gt;</code><br>
-      Elektrische Leistungsaufnahme der Heizst&auml;be in Watt zur Absch&auml;tzung des elektrischen Verbrauches
+      Elektrische Leistungsaufnahme der Heizstäbe in Watt zur Abschätzung des elektrischen Verbrauches
       </li><br>
    <li><code>ignoreFirmwareCheck &lt; 0 | 1 &gt;</code>
       <br>
-      Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpen
-      mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden. Wenn dieses Attribute auf 1
+      Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass Wärmepumpen
+      mit ungetester Firmware nicht unabsichtlich beschädigt werden. Wenn dieses Attribute auf 1
       gesetzt ist, dann wird der Firmware-Test ignoriert und neue Firmware kann getestet werden.
-      Dieses Attribut wird jedoch ignoriert, wenn die Steuerungs-Firmware bereits als nicht kompatibel berichtet wurde.
+      Dieses Attribut wird jedoch ignoriert, wenn die Steuerung-Firmware bereits als nicht kompatibel berichtet wurde.
       </li><br>
     <li><code>statusHTML</code>
       <br>
       Wenn gesetzt, dann wird ein HTML-formatierter Wert "floorplanHTML" erzeugt, 
       welcher vom Modul <a href="#FLOORPLAN">FLOORPLAN</a> genutzt werden kann.<br>
-      Momentan wird nur gepr&uuml;ft, ob der Wert dieses Attributes ungleich NULL ist, 
-      der entsprechende Ger&auml;tewerte besteht aus dem aktuellen W&auml;rmepumpenstatus und der Heizwassertemperatur.
+      Momentan wird nur geprüft, ob der Wert dieses Attributes ungleich NULL ist, 
+      der entsprechende Gerätewerte besteht aus dem aktuellen Wärmepumpenstatus und der Warmwassertemperatur.
       </li><br>
     <li><code>userHeatpumpParameters &lt;Index [Name][,Index2 [Name2],Index3 [Name3] ...]&gt;</code>
       <br>
-      Erlaubt das Auslesen der Werte benutzerspezifischer Parameter. Die Indizes der verf&uuml;gbaren Parameterwerte k&ouml;nnen mit dem get-Befehl <i>rawData</i> ermittelt werden.<br> 
-      In der Attributdefinition kann der Name hinter den Index getrennt durch ein Leerzeichen geschrieben werden. Der jeweilige Parameter-Wert wird entweder mit dem Pr&auml;fix "userParameter..." oder unter dem angegebenen Namen angezeigt. <br>
+      Erlaubt das Auslesen der Werte benutzerspezifischer Parameter. Die Indizes der verfügbaren Parameterwerte können mit dem get-Befehl <i>rawData</i> ermittelt werden.<br> 
+      In der Attributdefinition kann der Name hinter den Index getrennt durch ein Leerzeichen geschrieben werden. Der jeweilige Parameter-Wert wird entweder mit dem Präfix "userParameter..." oder unter dem angegebenen Namen angezeigt. <br>
       Mehrere Indizes werden durch Kommas getrennt.<br>
-      Nicht mehr ben&ouml;tigte Ger&auml;tewerte k&ouml;nnen mit dem FHEM-Befehl <a href="#deletereading">deleteReading</a> gel&ouml;scht werden.
+      Nicht mehr benötigte Gerätewerte können mit dem FHEM-Befehl <a href="#deletereading">deleteReading</a> gelöscht werden.
       </li><br>
     <li><code>userHeatpumpValues &lt;Index Name[,Index2 Name2,Index3 Name3 ...]&gt;</code>
       <br> 

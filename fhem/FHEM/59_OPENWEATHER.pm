@@ -1,4 +1,4 @@
-###############################################################
+﻿###############################################################
 # $Id$
 #
 #  59_OPENWEATHER.pm 
@@ -511,7 +511,7 @@ OPENWEATHER_Html($@)
 
    for(my $i=0; $i<=2; $i++) 
    {
-     $ret .= sprintf('<tr><td valign=top><b>%s</b></td><td>%s<br>min. %s &deg;C max. %s &deg;C<br>Nieders.risiko: %s %%<br>Wind: %s km/h aus %s</td></tr>',
+     $ret .= sprintf('<tr><td valign=top><b>%s</b></td><td>%s<br>min. %s °C max. %s °C<br>Nieders.risiko: %s %%<br>Wind: %s km/h aus %s</td></tr>',
          $i==0 ? "heute" : ReadingsVal($d, "fc".$i."_wday", "")
          , ReadingsVal($d, "fc".$i."_weather", "")
          , ReadingsVal($d, "fc".$i."_tempMin", ""), ReadingsVal($d, "fc".$i."_tempMax", "")
@@ -531,6 +531,10 @@ OPENWEATHER_Html($@)
 1;
 
 =pod
+=item device
+=item summary Extracts weather data via the "openweather" API of www.wetter.com.
+=item summary_DE Extrahiert Wetterdaten über die "openweather"-Schnittstelle von www.wetter.com.
+
 =begin html
 
 <a name="OPENWEATHER"></a>
@@ -541,7 +545,7 @@ OPENWEATHER_Html($@)
    <br>
    It requires a registration on this website to obtain the necessary parameters.
    <br>
-   It uses the perl moduls HTTP::Request, LWP::UserAgent, HTML::Parse and Digest::MD5.
+   It uses the perl modules HTTP::Request, LWP::UserAgent, HTML::Parse and Digest::MD5.
    <br/><br/>
    <a name="OPENWEATHERdefine"></a>
    <b>Define</b>
@@ -623,17 +627,17 @@ OPENWEATHER_Html($@)
    <ul>
       Note! The forecast values (in brackets) have first to be selected on the project setup page on wetter.com.
       <br/>&nbsp;<br/>
-      <li><b>fc</b><i>0|1|2</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2 days</i></li>
+      <li><b>fc</b><i>0|1|2</i><b>_...</b> - forecast values for <i>today|tomorrow|in 2 days</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - forecast values for <i>today</i> at <i>06|11|17|23</i> o'clock</li>
-      <li><b>fc</b><i>1</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature for <i>tommorrow</i> in &deg;C (tn,tx)</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>minimal</i> temperatur <i>today</i> at <i>06:00</i> o'clock in &deg;C</li>
+      <li><b>fc</b><i>1</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature for <i>tomorrow</i> in °C (tn,tx)</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>minimal</i> temperature<i>today</i> at <i>06:00</i> o'clock in °C</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b> - chance of rain <i>today</i> in % (pc)</li>
       <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - validity period in hours of the forecast values starting at <i>06:00</i> o'clock (p)</li>
       <li><b>fc</b><i>0</i><b>_weather</b> - weather situation <i>today</i> in German (w_txt)</li>
       <li><b>fc</b><i>0</i><b>_weatherCode</b> - code of weather situation <i>today</i> (w)</li>
       <li><b>fc</b><i>0</i><b>_wday</b> - German abbreviation of week day of <i>today</i> (d)</li>
       <li><b>fc</b><i>0</i><b>_wind</b> - wind speed <i>today</i> in km/h (ws)</li>
-      <li><b>fc</b><i>0</i><b>_windDir</b> - wind direction <i>today</i> in &deg; (degree) (wd)</li>
+      <li><b>fc</b><i>0</i><b>_windDir</b> - wind direction <i>today</i> in ° (degree) (wd)</li>
       <li><b>fc</b><i>0</i><b>_windDirTxt</b> - wind direction <i>today</i> in text form (wd_txt</li>
       <li>etc.</li>
    </ul>
@@ -650,18 +654,18 @@ OPENWEATHER_Html($@)
 <div> 
 <ul>
    <a name="OPENWEATHERdefine"></a>
-   Das Modul extrahiert  Wetterdaten &uuml;ber die <a href="http://www.wetter.com/apps_und_mehr/website/api/dokumentation">"openweather"-Schnittstelle (API)</a> von <a href="http://www.wetter.com">www.wetter.com</a>.
+   Das Modul extrahiert  Wetterdaten über die <a href="http://www.wetter.com/apps_und_mehr/website/api/dokumentation">"openweather"-Schnittstelle (API)</a> von <a href="http://www.wetter.com">www.wetter.com</a>.
    <br/>
    Zuvor ist eine Registrierung auf der Webseite notwendig.
    <br/>
-   Das Modul nutzt die Perlmodule HTTP::Request, LWP::UserAgent, HTML::Parse und Digest::MD5.
+   Das Modul nutzt die Perl-Module HTTP::Request, LWP::UserAgent, HTML::Parse und Digest::MD5.
    <br>
-   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/OPENWEATHER"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
+   Für detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/OPENWEATHER"><b>FHEM-Wiki</b></a> konsultieren und ergänzen.
       <br/><br/>
    <b>Define</b>
    <ul>
       <br>
-      <code>define &lt;name&gt; OPENWEATHER &lt;Projekt&gt; &lt;Ortscode&gt; &lt;apiSchl&uuml;ssel&gt; [Sprache]</code>
+      <code>define &lt;name&gt; OPENWEATHER &lt;Projekt&gt; &lt;Ortscode&gt; &lt;apiSchlüssel&gt; [Sprache]</code>
       <br>
       Beispiel:
       <br>
@@ -671,23 +675,23 @@ OPENWEATHER_Html($@)
       <br/><br/>
       <li><code>&lt;Projekt&gt;</code>
          <br>
-         Name des benutzerspezifischen 'openweather'-Projektes (erzeugt &uuml;ber ein Konto auf wetter.com).
+         Name des benutzerspezifischen 'openweather'-Projektes (erzeugt über ein Konto auf wetter.com).
       </li><br>
       <li><code>&lt;Ortscode&gt;</code>
          <br>
-         Code des Ortes, f&uuml;r den die Wettervorhersage ben&ouml;tigt wird. Er kann direkt aus der Adresszeile der jeweiligen Vorhersageseite genommen werden. Zum Beispiel <i>DE0009042</i> aus:
+         Code des Ortes, für den die Wettervorhersage ben&ouml;tigt wird. Er kann direkt aus der Adresszeile der jeweiligen Vorhersageseite genommen werden. Zum Beispiel <i>DE0009042</i> aus:
          <br>
          <i>http://www.wetter.com/wetter_aktuell/aktuelles_wetter/deutschland/rostock/<u>DE0009042</u>.html</i>
       </li><br>
-      <li><code>&lt;apiSchl&uuml;ssel&gt;</code>
+      <li><code>&lt;apiSchlüssel&gt;</code>
          <br>
-         Geheimer Schl&uuml;ssel, den man erh&auml;lt, nachdem man ein neues 'Openweather'-Projekt auf der Website registriert hat.
+         Geheimer Schlüssel, den man erhält, nachdem man ein neues 'Openweather'-Projekt auf der Website registriert hat.
       </li><br>
       <li><code>[Sprache]</code>
          <br>
-         Optional. Standardsprache f&uuml;r die Wettersituation ist Deutsch. Mit <i>en</i> kann man zu Englisch und mit <i>es</i> zu Spanisch wechseln.
+         Optional. Standardsprache für die Wettersituation ist Deutsch. Mit <i>en</i> kann man zu Englisch und mit <i>es</i> zu Spanisch wechseln.
       </li><br>
-      &Uuml;ber die Funktion <code>OPENWEATHER_Html</code> wird ein HTML-Code f&uuml;r ein vertikal arrangierte Wettervorhersage erzeugt.
+      &Uuml;ber die Funktion <code>OPENWEATHER_Html</code> wird ein HTML-Code für ein vertikal arrangierte Wettervorhersage erzeugt.
       <br>
       Beispiel:
       <br>
@@ -711,7 +715,7 @@ OPENWEATHER_Html($@)
       <br>
       <li><code>get &lt;name&gt; apiResponse</code>
          <br>
-         Zeigt die R&uuml;ckgabewerte der Website an.
+         Zeigt die Rückgabewerte der Website an.
       </li><br>
    </ul>  
 
@@ -721,11 +725,11 @@ OPENWEATHER_Html($@)
       <br>
       <li><code>disable &lt;0 | 1&gt;</code>
       <br>
-      Automatische Aktuallisierung ist angehalten, wenn der Wert auf 1 gesetzt wird.
+      Automatische Aktualisierung ist angehalten, wenn der Wert auf 1 gesetzt wird.
       </li><br>
-      <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
+      <li><code>INTERVAL &lt;Abfrageintervall&gt;</code>
          <br>
-         Abfrageinterval in Sekunden (Standard und kleinster Wert ist 3600 = 1 Stunde). 0 stoppt die automatische Aktualisierung
+         Abfrageintervall in Sekunden (Standard und kleinster Wert ist 3600 = 1 Stunde). 0 stoppt die automatische Aktualisierung
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
@@ -734,19 +738,19 @@ OPENWEATHER_Html($@)
    <a name="OPENWEATHERreading"></a>
    <b>Vorhersagewerte</b>
    <ul>
-      Wichtig! Die Vorhersagewerte (in Klammern) m&uuml;ssen zuerst in den Vorhersageeinstellungen des Projektes auf wetter.com ausgew&auml;hlt werden.
+      Wichtig! Die Vorhersagewerte (in Klammern) müssen zuerst in den Vorhersageeinstellungen des Projektes auf wetter.com ausgewählt werden.
       <br/>&nbsp;<br/>
-      <li><b>fc</b><i>0|1|2</i><b>_...</b> - Vorhersagewerte f&uuml;r <i>heute|morgen|&uuml;bermorgen</i></li>
-      <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - Vorhersagewerte f&uuml;r <i>heute</i> um <i>06|11|17|23</i> Uhr</li>
+      <li><b>fc</b><i>0|1|2</i><b>_...</b> - Vorhersagewerte für <i>heute|morgen|übermorgen</i></li>
+      <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - Vorhersagewerte für <i>heute</i> um <i>06|11|17|23</i> Uhr</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b> - <i>heutige</i> Niederschlagswahrscheinlichkeit in % (pc)</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>Mindest|Maximal</i>temperatur <i>heute</i> in &deg;C (tn, tx)</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>Mindest</i>temperatur <i>heute</i> um <i>06:00</i> Uhr in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - G&uuml;ltigkeitszeitraum der Prognose von <i>heute</i> ab <i>6:00 Uhr</i> in Stunden (p)</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>Mindest|Maximal</i>temperatur <i>heute</i> in °C (tn, tx)</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>Mindest</i>temperatur <i>heute</i> um <i>06:00</i> Uhr in °C</li>
+      <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - Gültigkeitszeitraum der Prognose von <i>heute</i> ab <i>6:00 Uhr</i> in Stunden (p)</li>
       <li><b>fc</b><i>0</i><b>_weather</b> - Wetterzustand <i>heute</i> (w_txt)</li>
       <li><b>fc</b><i>0</i><b>_weatherCode</b> - Code des Wetterzustand <i>heute</i> (w)</li>
-      <li><b>fc</b><i>0</i><b>_wday</b> - Abk&uuml;rzung des Wochentags von <i>heute</i> (d)</li>
+      <li><b>fc</b><i>0</i><b>_wday</b> - Abkürzung des Wochentags von <i>heute</i> (d)</li>
       <li><b>fc</b><i>0</i><b>_wind</b> - Windgeschwindigkeit <i>heute</i> in km/h (ws)</li>
-      <li><b>fc</b><i>0</i><b>_windDir</b> - Windrichtung <i>heute</i> in &deg; (Grad) (wd)</li>
+      <li><b>fc</b><i>0</i><b>_windDir</b> - Windrichtung <i>heute</i> in ° (Grad) (wd)</li>
       <li><b>fc</b><i>0</i><b>_windDirTxt</b> - Windrichtung <i>heute</i> in Textform (wd_txt)</li>
       <li>etc.</li>
    </ul>

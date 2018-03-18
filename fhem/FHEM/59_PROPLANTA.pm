@@ -1,4 +1,4 @@
-####################################################################################################
+﻿####################################################################################################
 # $Id$
 #
 #  59_PROPLANTA.pm 
@@ -68,7 +68,7 @@ my $curReadingType = 0;
       ,["Luftdruck", "pressure", 1]
       ,["Taupunkt", "dewPoint", 1]
       ,["Uhrzeit", "obsTime", 6]
-      ,["H�he der", "cloudBase", 8]
+      ,["Höhe der", "cloudBase", 8]
   );
 
   # 1 = Tag-ID, 2 = readingName, 3 = Tag-Type (see above)
@@ -147,7 +147,7 @@ my $curReadingType = 0;
      ,"gering" => 1
      ,"leicht" => 1
      ,"ja" => 1
-     ,"m&auml;&szlig;ig" => 2
+     ,"mäßig" => 2
      ,"stark" => 3
   );
 
@@ -156,13 +156,13 @@ my $curReadingType = 0;
      ,"Nordost" => 45
      ,"Ost-Nordost" => 68
      ,"Ost" => 90
-     ,"Ost-S�dost" => 113
-     ,"S�dost" => 135
-     ,"S�d-S�dost" => 158
-     ,"S�d" => 180
-     ,"S�d-S�dwest" => 203
-     ,"S�dwest" => 225
-     ,"West-S�dwest" => 248
+     ,"Ost-Südost" => 113
+     ,"Südost" => 135
+     ,"Süd-Südost" => 158
+     ,"Süd" => 180
+     ,"Süd-Südwest" => 203
+     ,"Südwest" => 225
+     ,"West-Südwest" => 248
      ,"West" => 270
      ,"West-Nordwest" => 203
      ,"Nordwest" => 225
@@ -367,10 +367,10 @@ sub start
       $text = $attr->{alt};
       $text =~ s/Windrichtung: //;
       $text = $winddir{$text} if defined $winddir{$text};
-      # $text =~ s/�/oe/;
-      # $text =~ s/�/ae/;
-      # $text =~ s/�/ue/;
-      # $text =~ s/�/ss/;
+      # $text =~ s/ö/oe/;
+      # $text =~ s/ä/ae/;
+      # $text =~ s/ü/ue/;
+      # $text =~ s/ß/ss/;
       push( @texte, $readingName . "|" . $text ); 
     # Image URL
       push( @texte, $readingName."Icon" . "|" . $attr->{src} ); 
@@ -461,7 +461,7 @@ sub PROPLANTA_Define($$)
    $lang = lc( $a[3] ) if int(@a) == 4;
 
    if ( $lang ne "")
-   { # {my $test="http://www.proplanta.de/Wetter/LOKALERORT-Wetter.html";; $test =~ s/LOKALERORT/M�nchen/g;; return $test;;}
+   { # {my $test="http://www.proplanta.de/Wetter/LOKALERORT-Wetter.html";; $test =~ s/LOKALERORT/München/g;; return $test;;}
       return "Wrong country code '$lang': use " . join(" | ",  keys( %url_template ) ) unless defined( $url_template{$lang} );
       my $URL = $url_template{$lang};
       my $ort_encode= $a[2];
@@ -722,7 +722,7 @@ sub PROPLANTA_Done($)
          if (defined $values{fc0_tempMin} && defined $values{fc0_tempMax})
          {
             $newState = "Tmin: " . $values{fc0_tempMin} . " Tmax: " . $values{fc0_tempMax};
-           # Achtung! Nach Mitternacht fehlen f�r 1 h die aktuellen Werte
+           # Achtung! Nach Mitternacht fehlen für 1 h die aktuellen Werte
             $newState .= " T: " . $values{temperature} . " H: " . $values{humidity} . " W: " . $values{wind} . " P: " .  $values{pressure}
                if defined $values{temperature} && defined $values{humidity} && defined $values{wind} && defined $values{pressure};
          }
@@ -776,7 +776,7 @@ PROPLANTA_Html(@)
   $ret .= "<tbody align=center>";
 # define MyForecast weblink htmlCode { PROPLANTA_Html("ProPlanta_Wetter") }
    for(my $i=0; $i<$days; $i++) {
-      $ret .= sprintf('<tr><td>%s</td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s&deg;C</td><td>%s&deg;C</td><td>%s %%</td><td>%s</td></tr>',
+      $ret .= sprintf('<tr><td>%s</td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s°C</td><td>%s°C</td><td>%s %%</td><td>%s</td></tr>',
           ReadingsVal($d, "fc".$i."_date", ""), 
           ReadingsVal($d, "fc".$i."_weatherMorning", ""), ReadingsVal($d, "fc".$i."_weatherMorningIcon", ""),
           ReadingsVal($d, "fc".$i."_weatherDay", ""), ReadingsVal($d, "fc".$i."_weatherDayIcon", ""),
@@ -788,7 +788,7 @@ PROPLANTA_Html(@)
          );
    }
   # for(my $i=0; $i<=4; $i++) {
-    # $ret .= sprintf('<tr><td>%s</td><td>%s: %s<br>min %s �C max %s �C<br>wind: %s km/h %s<br>precip: %s mm</td></tr>',
+    # $ret .= sprintf('<tr><td>%s</td><td>%s: %s<br>min %s °C max %s °C<br>wind: %s km/h %s<br>precip: %s mm</td></tr>',
         # WWOIconIMGTag(ReadingsVal($d, "fc${i}_weatherDayIcon", ""),$uselocal,$isday),
         # ReadingsVal($d, "fc${i}_date", ""),
         # ReadingsVal($d, "fc${i}_weatherDay", ""),
@@ -901,13 +901,13 @@ PROPLANTA_Html(@)
       <li><b>fc</b><i>0</i><b>_rad</b> - global radiation <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - amount of rainfall <i>today</i> at <i>15:00</i> o'clock in mm</li>
       <li><b>fc</b><i>0</i><b>_sun</b> - relative sun shine duration <i>today</i> in % (between sun rise and set)</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature <i>today</i> in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i> - temperatur <i>today</i> at <i>15:00</i> o'clock in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature <i>today</i> in °C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i> - temperatur <i>today</i> at <i>15:00</i> o'clock in °C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - weather situation <i>today morning|during day|in the evening|during night</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - icon of weather situation <i>today</i> by <i>day</i></li>
       <li><b>fc</b><i>0</i><b>_wind</b><i>15</i> - wind speed <i>today</i> at <i>15</i>:00 Uhr in km/h</li>
-      <li><b>fc</b><i>0</i><b>_windDir</b><i>15</i> - wind direction <i>today</i> at <i>15</i>:00 Uhr in &deg;</li>
+      <li><b>fc</b><i>0</i><b>_windDir</b><i>15</i> - wind direction <i>today</i> at <i>15</i>:00 Uhr in °</li>
       <li>etc.</li>
    </ul>
    <br>
@@ -925,18 +925,18 @@ PROPLANTA_Html(@)
    <a name="PROPLANTAdefine"></a>
    Das Modul extrahiert Wetterdaten von der Website <a href="http://www.proplanta.de">www.proplanta.de</a>.
    <br/>
-   Es stellt eine Vorhersage f&uuml;r 12 Tage zur Verf&uuml;gung - w&auml;hrend der ersten 7 Tage im 3-Stunden-Intervall.
+   Es stellt eine Vorhersage für 12 Tage zur Verfügung - während der ersten 7 Tage im 3-Stunden-Intervall.
    <br>
    Dieses Modul erzeugt eine hohe CPU-Last. Es wird deshalb empfohlen, die auszulesenden Vorhersagetage zu reduzieren.
    <br>
    <i>Es nutzt die Perl-Module HTTP::Request, LWP::UserAgent und HTML::Parse</i>.
    <br>
-   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/PROPLANTA"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
+   Für detaillierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/PROPLANTA"><b>FHEM-Wiki</b></a> konsultieren und ergänzen.
       <br/><br/>
    <b>Define</b>
    <ul>
       <br>
-      <code>define &lt;Name&gt; PROPLANTA [Stadt] [L&auml;ndercode]</code>
+      <code>define &lt;Name&gt; PROPLANTA [Stadt] [Ländercode]</code>
       <br>
       Beispiel:
       <br>
@@ -946,16 +946,16 @@ PROPLANTA_Html(@)
       <br>&nbsp;
       <li><code>[Stadt]</code>
          <br>
-         Optional. Die Stadt muss auf <a href="http://www.proplanta.de">www.proplanta.de</a> ausw&auml;hlbar sein. 
+         Optional. Die Stadt muss auf <a href="http://www.proplanta.de">www.proplanta.de</a> auswählbar sein. 
          <br>
-         Wichtig!! Auf die <b>gro&szlig;en</b> Anfangsbuchstaben achten.
+         Wichtig!! Auf die <b>großen</b> Anfangsbuchstaben achten.
          Leerzeichen im Stadtnamen werden durch ein + (Plus) ersetzt.
       </li><br>
-      <li><code>[L&auml;ndercode]</code>
+      <li><code>[Ländercode]</code>
          <br>
-         Optional. M&ouml;gliche Werte: de (Standard), at, ch, fr, it
+         Optional. Mögliche Werte: de (Standard), at, ch, fr, it
       </li><br>
-      &Uuml;ber die Funktion <code>PROPLANTA_Html</code> wird ein HTML-Code f&uuml;r eine Vorhersage f�r die angegebenen Anzahl Tage (standardm��ig 3) erzeugt.
+      Über die Funktion <code>PROPLANTA_Html</code> wird ein HTML-Code für eine Vorhersage für die angegebenen Anzahl Tage (standardmäßig 3) erzeugt.
       <br>
       Beispiel:
       <br>
@@ -980,15 +980,15 @@ PROPLANTA_Html(@)
       <br>
       <li><code>forecastDays &lt;4-14&gt;</code>
          <br>
-         Anzahl Tage, f&uuml;r die die Vorhersage ausgelesen werden soll. Standard ist 14 Tage (inkl. heute).
+         Anzahl Tage, für die die Vorhersage ausgelesen werden soll. Standard ist 14 Tage (inkl. heute).
       </li><br>
-      <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
+      <li><code>INTERVAL &lt;Abfrageintervall&gt;</code>
          <br>
-         Abfrageinterval in Sekunden (Standard 3600 = 1 Stunde)
+         Abfrageintervall in Sekunden (Standard 3600 = 1 Stunde)
       </li><br>
       <li><code>URL &lt;Internetadresse&gt;</code>
          <br>
-         Internetadresse, von der die Daten ausgelesen werden (&uuml;berschreibt die Werte im 'define'-Term)
+         Internetadresse, von der die Daten ausgelesen werden (überschreibt die Werte im 'define'-Term)
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
@@ -999,42 +999,42 @@ PROPLANTA_Html(@)
    <b>Vorhersagewerte</b>
    <ul>
       <br>
-      <li><b>fc</b><i>0|1|2|3...|13</i><b>_...</b> - Vorhersagewerte f&uumlr <i>heute|morgen|&uuml;bermorgen|in 3|...|13 Tagen</i></li>
-      <li><b>fc</b><i>0</i><b>_...<i>00|03|06|09|12|15|18|21</i></b> - Vorhersagewerte f&uumlr <i>heute</i> um <i>00|03|06|09|12|15|18|21</i> Uhr</li>
-      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day|Night</i> - <i>heutiges</i> Niederschlagsrisiko <i>tags&uuml;ber|nachts</i> in %</li>
+      <li><b>fc</b><i>0|1|2|3...|13</i><b>_...</b> - Vorhersagewerte für <i>heute|morgen|übermorgen|in 3|...|13 Tagen</i></li>
+      <li><b>fc</b><i>0</i><b>_...<i>00|03|06|09|12|15|18|21</i></b> - Vorhersagewerte für <i>heute</i> um <i>00|03|06|09|12|15|18|21</i> Uhr</li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day|Night</i> - <i>heutiges</i> Niederschlagsrisiko <i>tagsüber|nachts</i> in %</li>
       <li><b>fc</b><i>1</i><b>_chOfRain</b><i>15</i> - <i>morgiges</i> Niederschlagsrisiko um <i>15</i>:00 Uhr in %</li>
-      <li><b>fc</b><i>2</i><b>_cloud</b><i>15</i> - Wolkenbedeckungsgrad <i>&uuml;bermorgen</i> um <i>15</i>:00 Uhr in %</li>
-      <li><b>fc</b><i>0</i><b>_dew</b> - Taubildung <i>heute</i> (0=keine, 1=leicht, 2=m&auml;&szlig;ig, 3=stark)</li>
-      <li><b>fc</b><i>0</i><b>_evapor</b> - Verdunstung <i>heute</i> (0=keine, 1=gering, 2=m&auml;&szlig;ig, 3=stark)</li>
+      <li><b>fc</b><i>2</i><b>_cloud</b><i>15</i> - Wolkenbedeckungsgrad <i>übermorgen</i> um <i>15</i>:00 Uhr in %</li>
+      <li><b>fc</b><i>0</i><b>_dew</b> - Taubildung <i>heute</i> (0=keine, 1=leicht, 2=mäßig, 3=stark)</li>
+      <li><b>fc</b><i>0</i><b>_evapor</b> - Verdunstung <i>heute</i> (0=keine, 1=gering, 2=mäßig, 3=stark)</li>
       <li><b>fc</b><i>0</i><b>_frost</b> - Bodenfrost <i>heute</i> (0=nein, 1=ja)</li>
       <li><b>fc</b><i>1</i><b>_moon</b><i>Rise|Set</i> - Mond<i>auf|unter</i>gang <i>morgen</i></li>
       <li><b>fc</b><i>0</i><b>_rad</b> - Globalstrahlung <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - Niederschlagsmenge <i>heute</i> um <i>15</i>:00 Uhr in mm</li>
       <li><b>fc</b><i>0</i><b>_sun</b> - relative Sonnenscheindauer <i>heute</i> in % (zwischen Sonnenauf- und -untergang)</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>Minimal|Maximal</i>temperatur <i>heute</i> in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i> - Temperatur <i>heute</i> um <i>15</i>:00 Uhr in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>Minimal|Maximal</i>temperatur <i>heute</i> in °C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i> - Temperatur <i>heute</i> um <i>15</i>:00 Uhr in °C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>heute</i></li>
-      <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - Wetterzustand <i>heute morgen|tags&uuml;ber|abends|nachts</i></li>
-      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>heute tags&uuml;ber</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - Wetterzustand <i>heute morgen|tagsüber|abends|nachts</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>heute tagsüber</i></li>
       <li><b>fc</b><i>0</i><b>_wind</b><i>15</i> - Windgeschwindigkeit <i>heute</i> um <i>15</i>:00 Uhr in km/h</li>
-      <li><b>fc</b><i>0</i><b>_windDir</b><i>15</i> - Windrichtung <i>heute</i> um <i>15</i>:00 Uhr in &deg;</li>
+      <li><b>fc</b><i>0</i><b>_windDir</b><i>15</i> - Windrichtung <i>heute</i> um <i>15</i>:00 Uhr in °</li>
       <li>etc.</li>
    </ul>
    <br>
    <b>Aktuelle Werte</b>
    <ul>
       <br>
-      <li><b>cloudBase</b><i>Min|Max</i> - H&ouml;he der <i>minimalen|maximalen</i> Wolkenuntergrenze in m</li>
-      <li><b>dewPoint</b> - Taupunkt in &deg;C</li>
+      <li><b>cloudBase</b><i>Min|Max</i> - Höhe der <i>minimalen|maximalen</i> Wolkenuntergrenze in m</li>
+      <li><b>dewPoint</b> - Taupunkt in °C</li>
       <li><b>humidity</b> - relative Feuchtigkeit in %</li>
       <li><b>obs_time</b> - Uhrzeit der Wetterbeobachtung</li>
       <li><b>pressure</b> - Luftdruck in hPa</li>
-      <li><b>temperature</b> - Temperature in &deg;C</li>
+      <li><b>temperature</b> - Temperature in °C</li>
       <li><b>visibility</b> - Sichtweite in km</li>
       <li><b>weather</b> - Wetterzustand</li>
       <li><b>weatherIcon</b> - Icon Wetterzustand</li>
       <li><b>wind</b> - Windgeschwindigkeit in km/h</li>
-      <li><b>windDir</b> - Windrichtung in &deg;</li>
+      <li><b>windDir</b> - Windrichtung in °</li>
    </ul>
    <br><br>
 </ul>
