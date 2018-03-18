@@ -1,12 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  10_OWServer: autoselecting OWNet module
   - bugfix:  72_FB_CALLLIST: allow newlines in mapping attributes values
   - feature: 74_XiaomiBTLESens: add new set command resetBatteryTimestamp
   - bugfix:  93_DbRep: some perl warnings fixed
   - fhem.pl: restoreDir restructured (Forum #85801)
   - added:   88_xs1Bridge: added blacklist function
   - feature: 93_DbLog: V3.9.0, syntax of attribute excludeDevs enhanced
-  - update:  39_Talk2Fhem: Timephrases added, bugfixes and some changes 
+  - update:  39_Talk2Fhem: Timephrases added, bugfixes and some changes
   - bugfix:  74_AMADCommBridge: fix Commandref
   - bugfix:  82_LGTV_WebOS: fix litte typos fix eval bug
   - update:  21_HEOS: fix Use of uninitialized value {repeat}
@@ -17,8 +18,8 @@
                                 and herold.at (austrian)
   - change:  93_DbRep: V7.14.4, increased timeout of special function
   - feature: 74_Unifi: added set updateClient, encrypt user and password
-  - change:  49_TBot_List: deleteonly lists / internal changes 
-  - change:  50_TelegramBot: more silent cmds, caption formatting,several fixes 
+  - change:  49_TBot_List: deleteonly lists / internal changes
+  - change:  50_TelegramBot: more silent cmds, caption formatting,several fixes
   - change:  lib/OWNet.pm: updated to latest version from
              https://sourceforge.net/p/owfs/code/ci/master/tree/module/
              ownet/perl5/OWNet/lib/OWNet.pm
