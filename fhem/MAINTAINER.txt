@@ -134,7 +134,7 @@ FHEM/22_ALL3076.pm           sachag               Sonstiges
 FHEM/22_HOMEMODE.pm          DeeSPe               Automatisierung
 FHEM/23_ALL4027.pm           sachag               Sonstiges
 FHEM/23_KOSTALPIKO.pm        john                 CodeSchnipsel
-FHEM/23_LUXTRONIK2.pm        tupol                Sonstiges (link als PM an tupol)
+FHEM/23_LUXTRONIK2.pm        tupol                Heizungssteuerung/Raumklima (link als PM an tupol)
 FHEM/23_WEBIO.pm             sachag               Sonstiges
 FHEM/23_WEBIO_12DIGITAL.pm   sachag               Sonstiges
 FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  Sonstiges
