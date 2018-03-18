@@ -2548,12 +2548,13 @@ getAllAttr($;$)
   return "" if(!$defs{$d});
 
   my $list = $AttrList; # Global values
-  $list .= " " . $modules{$defs{$d}{TYPE}}{AttrList}
-        if($modules{$defs{$d}{TYPE}}{AttrList});
-  $list .= " " . $attr{global}{userattr}
-        if($attr{global}{userattr});
-  $list .= " " . $attr{$d}{userattr}
-        if($attr{$d} && $attr{$d}{userattr});
+  if($defs{$d}{".AttrList"}) {
+    $list .= " " . $defs{$d}{".AttrList"};
+  } elsif($modules{$defs{$d}{TYPE}}{AttrList}) {
+    $list .= " " . $modules{$defs{$d}{TYPE}}{AttrList};
+  }
+  $list .= " " . $attr{global}{userattr} if($attr{global}{userattr});
+  $list .= " " . $attr{$d}{userattr}     if($attr{$d} && $attr{$d}{userattr});
   $list .= " userattr";
   return $list;
 }
