@@ -5404,7 +5404,7 @@ restoreDir_rmTree($)
 }
 
 sub
-restoreDir_init($)
+restoreDir_init(;$)
 {
   my ($subDir) = @_;
   my $root = $attr{global}{modpath};
