@@ -115,7 +115,7 @@ sub FB_CALLLIST_Attr($@)
     {
         if($attrib eq "internal-number-filter")
         {
-            if( $value =~ m/^{.*}$/ )
+            if( $value =~ m/^{.*}$/s )
             {
                 my $table = eval $value;
 
@@ -143,7 +143,7 @@ sub FB_CALLLIST_Attr($@)
         }
         elsif($attrib eq "connection-mapping")
         {
-            if($value and $value =~ m/^{.*}$/ )
+            if($value and $value =~ m/^{.*}$/s )
             {
                 my $table = eval $value;
 
@@ -157,7 +157,7 @@ sub FB_CALLLIST_Attr($@)
         }
         elsif($attrib eq "icon-mapping")
         {
-            if($value and $value =~ m/^{.*}$/ )
+            if($value and $value =~ m/^{.*}$/s )
             {
                 my $table = eval $value;
 
@@ -171,7 +171,7 @@ sub FB_CALLLIST_Attr($@)
         }
         elsif($attrib eq "external-mapping")
         {
-            if($value and $value =~ m/^{.*}$/ )
+            if($value and $value =~ m/^{.*}$/s )
             {
                 my $table = eval $value;
 
