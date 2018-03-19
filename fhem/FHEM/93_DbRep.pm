@@ -37,6 +37,8 @@
 ###########################################################################################################################
 #  Versions History:
 #  
+# 7.14.6       18.03.2018       attribute expimpfile can use some kinds of wildcards (exportToFile, importFromFile 
+#                               adapted)
 # 7.14.5       17.03.2018       perl warnings of DbLog $dn,$dt,$evt,$rd in changeval_Push & complex
 # 7.14.4       11.03.2018       increased timeout of BlockingCall in DbRep_firstconnect
 # 7.14.3       07.03.2018       DbRep_firstconnect changed - get lowest timestamp in database, DbRep_Connect deleted
@@ -326,7 +328,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.14.5";
+my $DbRepVersion = "7.14.6";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -1507,10 +1509,10 @@ sub DbRep_Main($$;$) {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);
     
  } elsif ($opt eq "exportToFile") {            
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name§$device§$reading§$ts", "expfile_ParseDone", $to, "DbRep_ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name§$device§$reading§$runtime_string_first§$ts", "expfile_ParseDone", $to, "DbRep_ParseAborted", $hash);
     
  } elsif ($opt eq "importFromFile") {             
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name", "impfile_PushDone", $to, "DbRep_ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name|$runtime_string_first", "impfile_PushDone", $to, "DbRep_ParseAborted", $hash);
     
  } elsif ($opt eq "maxValue") {        
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$prop§$ts", "maxval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
@@ -4816,7 +4818,7 @@ return;
 ####################################################################################################
 sub expfile_DoParse($) {
  my ($string) = @_;
- my ($name, $device, $reading, $ts) = split("\\§", $string);
+ my ($name, $device, $reading, $rsf, $ts) = split("\\§", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -4835,15 +4837,19 @@ sub expfile_DoParse($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|''|$err|''|''";
+     return "$name|''|''|$err|''|''|''";
  }
  
- my $outfile = AttrVal($name, "expimpfile", undef);
+ $rsf        =~ s/[:\s]/_/g; 
+ my $outfile =  AttrVal($name, "expimpfile", undef);
+ $outfile    =~ s/%TSB/$rsf/g;
+ my @t = localtime;
+ $outfile = ResolveDateWildcards($outfile, @t);
  if (open(FH, ">:utf8", "$outfile")) {
      binmode (FH) if(!$utf8);
  } else {
      $err = encode_base64("could not open ".$outfile.": ".$!,"");
-     return "$name|''|''|$err";
+     return "$name|''|''|$err|''|''|''";
  }
  
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
@@ -4882,7 +4888,7 @@ sub expfile_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         return "$name|''|''|$err|''|''";
+         return "$name|''|''|$err|''|''|''";
      } 
  
      while (my $row = $sth->fetchrow_arrayref) {
@@ -4906,7 +4912,7 @@ sub expfile_DoParse($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$nrows|$rt|$err|$device|$reading";
+ return "$name|$nrows|$rt|$err|$device|$reading|$outfile";
 }
 
 ####################################################################################################
@@ -4925,6 +4931,7 @@ sub expfile_ParseDone($) {
      $device     =~ s/[^A-Za-z\/\d_\.-]/\//g; 
   my $reading    = $a[5];
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g; 
+  my $outfile    = $a[6];
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -4946,7 +4953,7 @@ sub expfile_ParseDone($) {
   readingsEndUpdate($hash, 1);
   
   my $rows = $ds.$rds.$nrows;
-  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file ".AttrVal($name, "expimpfile", undef).": $rows.");
+  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file $outfile: ".$rows);
 
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -4957,7 +4964,8 @@ return;
 # nichtblockierende DB-Funktion impfile
 ####################################################################################################
 sub impfile_Push($) {
- my ($name) = @_;
+ my ($string) = @_;
+ my ($name, $rsf) = split("\\|", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -4978,18 +4986,22 @@ sub impfile_Push($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|''|$err";
+     return "$name|''|''|$err|''";
  }
  
  # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
  my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
  
- my $infile = AttrVal($name, "expimpfile", undef);
+ $rsf        =~ s/[:\s]/_/g; 
+ my $infile =  AttrVal($name, "expimpfile", undef);
+ $infile    =~ s/%TSB/$rsf/g;
+ my @t = localtime;
+ $infile = ResolveDateWildcards($infile, @t);
  if (open(FH, "<:utf8", "$infile")) {
      binmode (FH) if(!$utf8);
  } else {
      $err = encode_base64("could not open ".$infile.": ".$!,"");
-     return "$name|''|''|$err";
+     return "$name|''|''|$err|''";
  }
  
  # only for this block because of warnings if details inline is not set
@@ -5017,7 +5029,7 @@ sub impfile_Push($) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
 	 $dbh->disconnect();
-     return "$name|''|''|$err";
+     return "$name|''|''|$err|''";
  }
  
  $dbh->begin_work();
@@ -5050,7 +5062,7 @@ sub impfile_Push($) {
          Log3 ($name, 2, "DbRep $name -> ERROR - Import from file $infile was not done. Invalid date/time field format in row $irowcount.");    
          close(FH);
          $dbh->rollback;
-         return "$name|''|''|$err";
+         return "$name|''|''|$err|''";
      }
      
      # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog DB create-scripts) beschneiden wenn nicht SQLite
@@ -5074,7 +5086,7 @@ sub impfile_Push($) {
              close(FH);
              $dbh->rollback;
              $dbh->disconnect;
-             return "$name|''|''|$err";
+             return "$name|''|''|$err|''";
          } else {
              $irowdone++
          }
@@ -5086,7 +5098,7 @@ sub impfile_Push($) {
          close(FH);
          $dbh->rollback;
          $dbh->disconnect;
-         return "$name|''|''|$err";
+         return "$name|''|''|$err|''";
      }   
  }
  
@@ -5102,7 +5114,7 @@ sub impfile_Push($) {
 
  $rt = $rt.",".$brt;
  
- return "$name|$irowdone|$rt|$err";
+ return "$name|$irowdone|$rt|$err|$infile";
 }
 
 ####################################################################################################
@@ -5117,6 +5129,7 @@ sub impfile_PushDone($) {
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[3]?decode_base64($a[3]):undef;
   my $name       = $hash->{NAME};
+  my $infile     = $a[4];
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -5135,7 +5148,7 @@ sub impfile_PushDone($) {
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
 
-  Log3 ($name, 3, "DbRep $name - Number of imported datasets to $hash->{DATABASE} from file ".AttrVal($name, "expimpfile", undef).": $irowdone");  
+  Log3 ($name, 3, "DbRep $name - Number of imported datasets to $hash->{DATABASE} from file $infile: $irowdone");  
 
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -9897,7 +9910,39 @@ sub bdump {
 </ul>
 </li>
 
-  <li><b>expimpfile </b>      - Path/filename for data export/import </li> <br>
+  <li><b>expimpfile </b>      - Path/filename for data export/import. <br><br>
+   
+                                The filename may contain wildcards which are replaced by corresponding values 
+                                (see subsequent table).
+                                Furthermore filename can contain %-wildcards of the POSIX strftime function of the underlying OS (see your 
+                                strftime manual). <br>
+                                About POSIX wildcard usage please see also explanations in <a href="https://fhem.de/commandref.html#FileLog">Filelog</a>. <br>
+                                <br>
+
+	                            <ul>
+                                  <table>  
+                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> %L    </td><td>: is replaced by the value of global logdir attribute </td></tr>
+                                      <tr><td> %TSB  </td><td>: is replaced by the (calculated) value of the timestamp_begin attribute </td></tr>                                    
+                                      <tr><td>       </td><td>  </td></tr>
+                                      <tr><td>       </td><td> <b>Common used POSIX-wildcards are:</b> </td></tr>
+                                      <tr><td> %d    </td><td>: day of month (01..31) </td></tr>
+                                      <tr><td> %m    </td><td>: month (01..12) </td></tr>
+                                      <tr><td> %Y    </td><td>: year (1970...) </td></tr>
+                                      <tr><td> %w    </td><td>: day of week (0..6);  0 represents Sunday </td></tr>
+                                      <tr><td> %j    </td><td>: day of year (001..366) </td></tr>
+                                      <tr><td> %U    </td><td>: week number of year with Sunday as first day of week (00..53) </td></tr>
+                                      <tr><td> %W    </td><td>: week number of year with Monday as first day of week (00..53) </td></tr>
+                                  </table>
+	                            </ul> 
+                                </li> <br>
+                                
+                                <ul>
+							    <b>Examples:</b> <br>
+								<code>attr &lt;name&gt; expimpfile /sds1/backup/exptest_%TSB.csv     </code> <br>
+                                <code>attr &lt;name&gt; expimpfile /sds1/backup/exptest_%Y-%m-%d.csv </code> <br>
+								</ul>
+								<br><br>
   
   <li><b>fetchMarkDuplicates </b> 
                               - Highlighting of multiple occuring datasets in result of "fetchrows" command </li> <br>
@@ -11513,7 +11558,38 @@ sub bdump {
 </ul>
 </li>
   
-  <li><b>expimpfile </b>      - Pfad/Dateiname für Export/Import in/aus einem File.  </li> <br>
+  <li><b>expimpfile </b>      - Pfad/Dateiname für Export/Import in/aus einem File.  <br><br>
+  
+                                Der Dateiname kann Platzhalter enthalten die gemäß der nachfolgenden Tabelle ersetzt werden.
+                                Weiterhin können %-wildcards der POSIX strftime-Funktion des darunterliegenden OS enthalten 
+                                sein (siehe auch strftime Beschreibung). <br>
+                                Zur POSIX Wildcardverwendung siehe auch die Erläuterungen zu <a href="https://fhem.de/commandref_DE.html#FileLog">Filelog</a>. <br>
+                                <br>
+
+	                            <ul>
+                                  <table>  
+                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> %L    </td><td>: wird ersetzt durch den Wert des global logdir Attributs </td></tr>
+                                      <tr><td> %TSB  </td><td>: wird ersetzt durch den (berechneten) Wert des timestamp_begin Attributs </td></tr>                                    
+                                      <tr><td>       </td><td>  </td></tr>
+                                      <tr><td>       </td><td> <b>Allgemein gebräuchliche POSIX-Wildcards sind:</b> </td></tr>
+                                      <tr><td> %d    </td><td>: Tag des Monats (01..31) </td></tr>
+                                      <tr><td> %m    </td><td>: Monat (01..12) </td></tr>
+                                      <tr><td> %Y    </td><td>: Jahr (1970...) </td></tr>
+                                      <tr><td> %w    </td><td>: Wochentag (0..6); beginnend mit Sonntag (0) </td></tr>
+                                      <tr><td> %j    </td><td>: Tag des Jahres (001..366) </td></tr>
+                                      <tr><td> %U    </td><td>: Wochennummer des Jahres, wobei Wochenbeginn = Sonntag (00..53) </td></tr>
+                                      <tr><td> %W    </td><td>: Wochennummer des Jahres, wobei Wochenbeginn = Montag (00..53) </td></tr>
+                                  </table>
+	                            </ul> 
+                                </li> <br>
+                                
+                                <ul>
+							    <b>Beispiele:</b> <br>
+								<code>attr &lt;name&gt; expimpfile /sds1/backup/exptest_%TSB.csv     </code> <br>
+                                <code>attr &lt;name&gt; expimpfile /sds1/backup/exptest_%Y-%m-%d.csv </code> <br>
+								</ul>
+								<br><br>
   
   <li><b>fetchMarkDuplicates </b> 
                               - Markierung von mehrfach vorkommenden Datensätzen im Ergebnis des "fetchrows" Kommandos </li> <br>
