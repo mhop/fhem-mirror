@@ -630,9 +630,9 @@ LUXTRONIK2_UpdateDone($)
   LUXTRONIK2_Log $hash, 4, $string;
 
   #Define Status Messages
-  my %wpOpStat1 = ( 0 => "Waermepumpe laeuft",
-            1 => "Waermepumpe steht",
-            2 => "Waermepumpe kommt",
+  my %wpOpStat1 = ( 0 => "WÃ¤rmepumpe lÃ¤uft",
+            1 => "WÃ¤rmepumpe steht",
+            2 => "WÃ¤rmepumpe kommt",
             4 => "Fehler",
             5 => "Abtauen",
             6 => "Warte auf LIN-Verbindung",
@@ -641,7 +641,7 @@ LUXTRONIK2_UpdateDone($)
             
   my %wpOpStat2 = ( 0 => "Heizbetrieb",
             1 => "Keine Anforderung",
-            2 => "Netz Einschaltverzoegerung",
+            2 => "Netz EinschaltverzÃ¶gerung",
             3 => "Schaltspielzeit",
             4 => "EVU Sperrzeit",
             5 => "Brauchwasser",
@@ -649,11 +649,11 @@ LUXTRONIK2_UpdateDone($)
             7 => "Abtauen",
             8 => "Pumpenvorlauf",
             9 => "Thermische Desinfektion",
-            10 => "Kuehlbetrieb",
+            10 => "KÃ¼hlbetrieb",
             12 => "Schwimmbad/Photovoltaik",
             13 => "Heizen_Ext_En",
             14 => "Brauchw_Ext_En",
-            16 => "Durchflussueberwachung",
+            16 => "DurchflussÃ¼berwachung",
             17 => "Elektrische Zusatzheizung" );
             
   my %wpMode = ( 0 => "Automatik",
@@ -726,7 +726,7 @@ LUXTRONIK2_UpdateDone($)
      }
     else {
        readingsSingleUpdate($hash,"state","Error: Reading skipped after $counterRetry tries",1);
-      LUXTRONIK2_Log $hash, 2, "Device reading skipped after $counterRetry tries with parameter change on target";
+      LUXTRONIK2_Log $hash, 2, "Device readout skipped after $counterRetry tries with parameter change on target";
     }
   }
 # Update readings
@@ -766,17 +766,17 @@ LUXTRONIK2_UpdateDone($)
    my $heatPumpPower = 0;
    my $heatRodPower = AttrVal($name, "heatRodElectricalPowerWatt", 0);
 
-   #WM[kW] = delta_Temp [K] * Durchfluss [l/h] / ( 3.600 [kJ/kWh] / ( 4,179 [kJ/(kg*K)] (H2O Wärmekapazität bei 30 & 40°C) * 0,994 [kg/l] (H2O Dichte bei 35°C) )  
+   #WM[kW] = delta_Temp [K] * Durchfluss [l/h] / ( 3.600 [kJ/kWh] / ( 4,179 [kJ/(kg*K)] (H2O WÃ¤rmekapazitÃ¤t bei 30 & 40Â°C) * 0,994 [kg/l] (H2O Dichte bei 35Â°C) )  
    my $thermalPower = 0;
-   # 0=Heizen, 5=Brauchwasser, 7=Abtauen, 16=Durchflussüberwachung 
+   # 0=Heizen, 5=Brauchwasser, 7=Abtauen, 16=DurchflussÃ¼berwachung 
    if ($opStateHeatPump3 =~ /^(0|5|16)$/) { 
-      if ($flowRate !~ /no|inconsistent/) { $thermalPower = abs($flowTemperature - $returnTemperature) * $flowRate / 866.65; } #Nur bei Wärmezählern
+      if ($flowRate !~ /no|inconsistent/) { $thermalPower = abs($flowTemperature - $returnTemperature) * $flowRate / 866.65; } #Nur bei WÃ¤rmezÃ¤hlern
       $heatPumpPower = AttrVal($name, "heatPumpElectricalPowerWatt", -1);
       $heatPumpPower *= (1 + ($flowTemperature-35) * AttrVal($name, "heatPumpElectricalPowerFactor", 0));
    }
-   if ($flowRate !~ /no|inconsistent/) { readingsBulkUpdate( $hash, "thermalPower", sprintf "%.1f", $thermalPower); } #Nur bei Wärmezählern
+   if ($flowRate !~ /no|inconsistent/) { readingsBulkUpdate( $hash, "thermalPower", sprintf "%.1f", $thermalPower); } #Nur bei WÃ¤rmezÃ¤hlern
    if ($heatPumpPower >-1 ) {    readingsBulkUpdate( $hash, "heatPumpElectricalPowerEstimated", sprintf "%.0f", $heatPumpPower); }
-   if ($heatPumpPower > 0 && $flowRate !~ /no|inconsistent/) { #Nur bei Wärmezählern
+   if ($heatPumpPower > 0 && $flowRate !~ /no|inconsistent/) { #Nur bei WÃ¤rmezÃ¤hlern
      $cop = $thermalPower * 1000 / $heatPumpPower;
      readingsBulkUpdate( $hash, "COP", sprintf "%.2f", $cop);
    }
@@ -869,28 +869,30 @@ LUXTRONIK2_UpdateDone($)
    # Heating operating state
      # Consider also heating limit
      if ($a[10] == 0 && $a[11] == 1
-          && $averageAmbientTemperature >= $thresholdHeatingLimit 
-          && ($returnTemperatureTarget eq $returnTemperatureTargetMin || $returnTemperatureTarget == 20 && $ambientTemperature<10)
-          ) {
-          if ($ambientTemperature>=10 ) {
-            $value = "Heizgrenze (Soll ".$returnTemperatureTargetMin." C)";
-          } 
-          else {
-            $value = "Frostschutz (Soll 20 C)";
-          }
-     } else {
+        && $averageAmbientTemperature >= $thresholdHeatingLimit 
+        && ($returnTemperatureTarget eq $returnTemperatureTargetMin || $returnTemperatureTarget == 20 && $ambientTemperature<10)
+        ) {
+        if ($ambientTemperature>=10 ) {
+          $value = "Heizgrenze (Soll ".$returnTemperatureTargetMin."Â°C)";
+        } 
+        else {
+          $value = "Frostschutz (Soll 20Â°C)";
+        }
+     }
+     else {
        $value = $heatingState{$a[46]};
       $value = "unbekannt (".$a[46].")" unless $value;
      # Consider heating reduction limit
       if ($a[46] == 0) {
         if ($thresholdTemperatureSetBack <= $ambientTemperature) { 
-          $value .= " ".LUXTRONIK2_CalcTemp($a[47])." C"; #° &deg; &#176; &#x00B0; 
-        } else {
-          $value = "Normal da < ".$thresholdTemperatureSetBack." C"; 
+          $value .= " ".LUXTRONIK2_CalcTemp($a[47])."Â°C"; #Â° &deg; &#176; &#x00B0; 
+        }
+        else {
+          $value = "Normal da < ".$thresholdTemperatureSetBack."Â°C"; 
         }
       }
-     }
-     readingsBulkUpdate($hash,"opStateHeating",$value);
+    }
+    readingsBulkUpdate($hash,"opStateHeating",$value);
 
    # Ventilation operating mode
      if ( $a[79] !~ /no/ ) {
@@ -913,7 +915,7 @@ LUXTRONIK2_UpdateDone($)
          $hash->{fhem}{defrost}{hsIn} = $heatSourceIN;
          $hash->{fhem}{defrost}{hsOut} = $heatSourceOUT;
       } 
-   # Defrost-Readings erstellen
+   # Defrost-Readings creation
       elsif ( $hash->{fhem}{defrost}{mode} ne "none" ) {
          my $value = "Mode: " . $hash->{fhem}{defrost}{mode} . " Time: ";
          $value .=  strftime ( "%M:%S", localtime( time() - $hash->{fhem}{defrost}{startTime} ) ); 
@@ -931,7 +933,7 @@ LUXTRONIK2_UpdateDone($)
 
          $hash->{fhem}{defrost}{mode} = "none";
 
-         #  16 => "Durchflussueberwachung"
+         #  16 => "DurchflussÃ¼berwachung"
          if ($opStateHeatPump3 == 16) { 
             readingsBulkUpdate( $hash, "heatSourceDefrostLastTimeout", "Amb: ".$hash->{fhem}{defrost}{amb}." hsIN: ".$hash->{fhem}{defrost}{hsIn}." hsOUT: ".$hash->{fhem}{defrost}{hsOut});
          }
@@ -1040,10 +1042,10 @@ LUXTRONIK2_UpdateDone($)
      my $firmware = $a[20];
      readingsBulkUpdate($hash,"firmware",$firmware);
      my $firmwareCheck = LUXTRONIK2_checkFirmware($firmware);
-     # if unknown firmware, ask at each startup to inform comunity
+     # if unknown firmware, ask at each startup to inform community
      if ($hash->{fhem}{alertFirmware} != 1 && $firmwareCheck eq "fwNotTested") {
       $hash->{fhem}{alertFirmware} = 1;
-      LUXTRONIK2_Log $hash, 2, "Alert: Host uses untested Firmware '$a[20]'. Please inform FHEM comunity about compatibility.";
+      LUXTRONIK2_Log $hash, 2, "Alert: Host uses untested Firmware '$a[20]'. Please inform FHEM community about compatibility.";
      }
      
    # Type of Heatpump  
@@ -1064,7 +1066,7 @@ LUXTRONIK2_UpdateDone($)
         $value .= "$opStateHeatPump1<br>\n";
         $value .= "$opStateHeatPump2<br>\n";
         $value .= "$opStateHeatPump3Txt<br>\n";
-        $value .= "Brauchwasser: ".$hotWaterTemperature."&deg;C";
+        $value .= "Brauchwasser: ".$hotWaterTemperature."Â°C";
         readingsBulkUpdate($hash,"floorplanHTML",$value);
      }
     # State update
@@ -1719,7 +1721,7 @@ LUXTRONIK2_doStatisticThermalPower ($$$$$$$$$)
       $last[6] = $targetTemp;
       $last[7] = $electricalPower;
    
-   } elsif ($last[0] == $MonitoredOpState && ($currOpState == $MonitoredOpState || $currOpState == 16) ) { #16=Durchflussüberwachung
+   } elsif ($last[0] == $MonitoredOpState && ($currOpState == $MonitoredOpState || $currOpState == 16) ) { #16=DurchflussÃ¼berwachung
    # Store intermediate values as long as the correct opMode runs
       $save = 1;
       $last[3] += $currAmbTemp;
@@ -1727,7 +1729,7 @@ LUXTRONIK2_doStatisticThermalPower ($$$$$$$$$)
       $last[5]++;
       $last[7] += $electricalPower;
 
-   } elsif ($last[0] == $MonitoredOpState && $currOpState != $MonitoredOpState && $currOpState != 16 ) { #16=Durchflussüberwachung
+   } elsif ($last[0] == $MonitoredOpState && $currOpState != $MonitoredOpState && $currOpState != 16 ) { #16=DurchflussÃ¼berwachung
    # Do statistics at the end of the monitored operation if it run at least 9.5 minutes
       $save = 1;
       $last[0] = $currOpState;

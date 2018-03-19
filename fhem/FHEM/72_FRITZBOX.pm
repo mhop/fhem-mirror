@@ -584,8 +584,15 @@ sub FRITZBOX_Get($@)
       my $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
       
       my $tmp;
-      if (ref $result->{result} eq "") {     $tmp = $result->{result}; }
-      else {      $tmp = Dumper ($result->{result}); }
+      if (defined $result->{Error} ) {      
+        $tmp = "ERROR:\n".Dumper ($result->{Error}); 
+      }
+      elsif (ref $result->{result} ) {  
+        $tmp = Dumper ($result->{result} ); 
+      }
+      else {                                 
+        $tmp = "Unexpected result: " . Dumper ($result); 
+      }
       return $returnStr . $tmp;
    }
    elsif( lc $cmd eq "ringtones" ) {
@@ -4637,16 +4644,24 @@ sub FRITZBOX_Web_Query($$@)
       return \%retHash;
    }
 
-   if ($response->content =~ /<html>|"pid": "logout"/) {
+   my $jsonText = $response->content;
+   
+   if ($jsonText =~ /<html>|"pid": "logout"/) {
       my %retHash = ("Error" => "Old SID not valid anymore.", "ResetSID" => "1");
       return \%retHash;
    }
 
+
+   if ( $jsonText !~ /{"/ ) {
+      chop $jsonText;
+      my %retHash = ("Error" => "no json string returned (".$jsonText.")", "ResetSID" => "1");
+      return \%retHash;
+   }
+   
 #################
-   # FRITZBOX_Log $hash, 3, "Response: ".$response->content;
+   #FRITZBOX_Log $hash, 3, "Response: ".$response->content;
 #################
 
-   my $jsonText = $response->content;
    # Remove illegal escape sequences
    $jsonText =~ s/\\'/'/g; #Hochkomma
    $jsonText =~ s/\\x\{[0-9a-f]\}//g; #delete control codes (as hex numbers)
@@ -4659,6 +4674,8 @@ sub FRITZBOX_Web_Query($$@)
    else {
       $jsonResult = JSON->new->latin1->decode( $jsonText );
    }
+   #Not a HASH reference at ./FHEM/72_FRITZBOX.pm line 4662.
+  # 2018.03.19 18:43:28 3: FRITZBOX: get Fritzbox luaQuery settings/sip
    $jsonResult->{sid} = $sid;
    $jsonResult->{Error} = $jsonResult->{error}  if defined $jsonResult->{error};
    return $jsonResult;
@@ -4815,7 +4832,7 @@ sub FRITZBOX_fritztris($)
 
 =pod
 =item device
-=item summary Controls some features of AVM's Fritz!Box router and repeater and Fritz!Fon.
+=item summary Controls some features of AVM's Fritz!Box, FRITZ!Repeater and Fritz!Fon.
 =item summary_DE Steuert einige Funktionen von AVM's Fritz!Box, Fritz!Repeater und Fritz!Fon.
 
 =begin html
