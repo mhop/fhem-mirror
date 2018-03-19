@@ -32,7 +32,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-my $version = "0.9.5";
+my $version = "0.9.6";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -258,6 +258,9 @@ sub WUup_send($) {
         elsif ( $key =~ /.*rainin$/ ) {
             $value = UConv::mm2in( $value, 4 );
         }
+        elsif ( $key eq "solarradiation" ) {
+            $value = ( $value / 126.7 );
+        }
         $data .= "&$key=$value";
     }
 
@@ -343,6 +346,7 @@ sub WUup_receive($) {
 #            timeout raised to 6s, fixed state error (thanks to mumpitzstuff)
 # 2017-10-16 fixed attributes
 # 2017-10-19 added set-command "update"
+# 2018-03-19 solarradiation calculated from lux to W/m² (thanks to dieter114)
 #
 ################################################################################
 
@@ -406,7 +410,8 @@ sub WUup_receive($) {
             network as parameter "tempf" (which indicates current temperature)
             <br/>
             Units get converted to angloamerican system automatically 
-            (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
+            (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/>
+            Solarradiation takes readings in lux and converts them to W/m&sup2;<br/><br/>
         <u>The following information is supported:</u>
         <ul>
             <li>winddir - [0-360 instantaneous wind direction]</li>
@@ -504,7 +509,8 @@ sub WUup_receive($) {
         (welches die aktuelle Temperatur angibt).
         <br />
         Einheiten werden automatisch ins anglo-amerikanische System umgerechnet. 
-        (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
+        (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/>
+        Solarradiation nimmt Readings in lux an und rechnet diese in W/m&sup2; um.<br/><br/>
         <u>Unterst&uuml;tzte Angaben</u>
         <ul>
             <li>Winddir - [0-360 momentane Windrichtung]</li>
