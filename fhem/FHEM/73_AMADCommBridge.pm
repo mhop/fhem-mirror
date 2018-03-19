@@ -76,7 +76,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 
-my $modulversion = "4.2.1";
+my $modulversion = "4.2.2";
 my $flowsetversion = "4.2.0";
 
 
@@ -122,7 +122,7 @@ sub AMADCommBridge_Initialize($) {
                           "debugJSON:0,1 ".
                           "enableSubCalls:0,1 ".
                           "disable:1 ".
-                          "allowFrom ".
+                          "allowfrom ".
                           $readingFnAttributes;
     
     foreach my $d(sort keys %{$modules{AMADCommBridge}{defptr}}) {

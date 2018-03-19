@@ -60,7 +60,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 
-my $modulversion = "4.2.1";
+my $modulversion = "4.2.2";
 my $flowsetversion = "4.2.0";
 
 
@@ -1021,7 +1021,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <b>How to use AMADDevice?</b>
   <ul>
     <li>first, make sure that the AMADCommBridge in FHEM was defined</li>
-    <li><b>Using Autoremote</b></li>
+    <li><b>Using Automagic</b></li>
         <ul>
         <li>install the "Automagic Premium" app from the PlayStore</li>
         <li>install the flowset 74_AMADDeviceautomagicFlowset$VERSION.xml file from the $INSTALLFHEM/FHEM/lib/ directory on the Android device</li>
@@ -1207,7 +1207,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <b>Wie genau verwendet man nun AMADDevice?</b>
   <ul>
     <li>stelle sicher das als aller erstes die AMADCommBridge in FHEM definiert wurde</li>
-    <li><b>Bei verwendung von Autoremote</b></li>
+    <li><b>Bei verwendung von Automagic</b></li>
         <ul>
         <li>installiere die App "Automagic Premium" aus dem PlayStore.</li>
         <li>installiere das Flowset 74_AMADDeviceautomagicFlowset$VERSION.xml aus dem Ordner $INSTALLFHEM/FHEM/lib/ auf dem Androidger&auml;t</li>

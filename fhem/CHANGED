@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 73_AMADCommBridge: fix Commandref, add allowfrom support
   - bugfix:  74_XiaomiBTLESens: Backslash found where operator expected
   - bugfix:  98_TRAFFIC: v1.3.7, fixed special characters and updateschedule
   - change:  10_OWServer: autoselecting OWNet module
