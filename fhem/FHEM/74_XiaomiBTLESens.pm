@@ -50,7 +50,7 @@ eval "use Blocking;1" or $missingModul .= "Blocking ";
 #use Data::Dumper;          only for Debugging
 
 
-my $version = "2.0.10";
+my $version = "2.0.11";
 
 
 
@@ -655,7 +655,7 @@ sub XiaomiBTLESens_FlowerSensHandle0x38($$) {
     my @dataBatFw   = split(" ",$notification);
 
     $readings{'batteryLevel'}   = hex("0x".$dataBatFw[0]);
-    $readings{'battery'}        = (hex("0x".$dataBatFw[0]) > 19 ? "ok" : "low");
+    $readings{'battery'}        = (hex("0x".$dataBatFw[0]) > 15 ? "ok" : "low");
     $readings{'firmware'}       = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
         
     $hash->{helper}{CallBattery} = 1;
@@ -848,8 +848,8 @@ sub XiaomiBTLESens_encodeJSON($) {
     my %response = (
         'gtResult'      => $gtResult
     );
-    
-    return encode_json \%response;
+
+    return encode_json(\%response);
 }
 
 ## Routinen damit Firmware und Batterie nur alle X male statt immer aufgerufen wird
