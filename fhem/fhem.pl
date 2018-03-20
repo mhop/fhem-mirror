@@ -149,6 +149,8 @@ sub restoreDir_saveFile($$);
 sub restoreDir_mkDir($$$);
 sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
+sub setAttrList($$);
+sub setDevAttrList($;$);
 sub toJSON($);
 sub utf8ToLatin1($);
 
@@ -3921,6 +3923,20 @@ sub
 addToAttrList($)
 {
   addToDevAttrList("global", shift);
+}
+
+# device specific attrList, overwrites module AttrList, user undef for $argList
+# to delete it
+sub
+setDevAttrList($;$)
+{
+  my ($dev,$argList) = @_;
+  return if(!$defs{$dev});
+  if(defined($argList)) {
+    $defs{$dev}{".AttrList"} = $argList;
+  } else {
+    delete($defs{$dev}{".AttrList"});
+  }
 }
 
 sub
