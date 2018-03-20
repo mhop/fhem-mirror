@@ -68,7 +68,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 
 
-my $version = "0.4.1";
+my $version = "0.4.2";
 
 
 
@@ -147,7 +147,10 @@ sub GardenaSmartBridge_Define($$) {
     
     my $username            = GardenaSmartBridge_encrypt($user);
     my $password            = GardenaSmartBridge_encrypt($pass);
-    Log3 $name, 3, "GardenaSmartBridge ($name) - encrypt $user/$pass to $username/$password" if($user ne $username || $pass ne $password);
+    
+    ## Ausgabe geändert wegen Forumempfehlung #85801
+    #Log3 $name, 3, "GardenaSmartBridge ($name) - encrypt $user/$pass to $username/$password" if($user ne $username || $pass ne $password);
+    Log3 $name, 3, "GardenaSmartBridge ($name) - encrypt username and password" if($user ne $username || $pass ne $password);
     $hash->{DEF} = "$username $password";
     
     $hash->{helper}{username} = $username;
