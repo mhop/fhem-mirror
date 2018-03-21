@@ -157,6 +157,7 @@ sub EQ3BT_Initialize($) {
     $hash->{SetFn}    = 'EQ3BT_Set';
     $hash->{AttrFn}   = 'EQ3BT_Attribute';
     $hash->{AttrList}  = 'sshHost maxRetries timeout '.
+                         'blockingCallLoglevel:2,3,4,5 '.
                             $readingFnAttributes;
     
     return undef;
@@ -172,6 +173,7 @@ sub EQ3BT_Define($$) {
     
     $hash->{STATE} = "initialized";
     $hash->{VERSION} = "2.0.4";
+    $hash->{loglevel} = 4;
     Log3 $hash, 3, "EQ3BT: EQ-3 Bluetooth Thermostat ".$hash->{VERSION};
     
     if (int(@a) > 4) {
@@ -236,13 +238,22 @@ sub EQ3BT_pairDevice {
 
 sub EQ3BT_Attribute($$$$) {
     my ($mode, $devName, $attrName, $attrValue) = @_;
+    my $hash    = $defs{$devName};
     
     if($mode eq "set") {
+        if( $attrName eq "blockingCallLoglevel" ) {
+            $hash->{loglevel} = $attrValue;
+            Log3 $devName, 3, "EQ3BT ($devName) - set blockingCallLoglevel to $attrValue";
+        }
         
     } elsif($mode eq "del") {
-        
+        if( $attrName eq "blockingCallLoglevel" ) {
+            $hash->{loglevel} = 4;
+            Log3 $devName, 3, "EQ3BT ($devName) - set blockingCallLoglevel to default";
+        }
     }
-    
+
+
     return undef;
 }
 
@@ -381,7 +392,7 @@ sub EQ3BT_setDesiredTemperature($$) {
     
     my $eq3Temp = sprintf("%02X", $desiredTemp * 2);
     
-    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setDesiredTemperature|0x0411|41".$eq3Temp, "EQ3BT_processGatttoolResult", 60, "EQ3BT_killGatttool", $hash);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setDesiredTemperature|0x0411|41".$eq3Temp, "EQ3BT_processGatttoolResult", 90, "EQ3BT_killGatttool", $hash);
     return undef;
 }
 
@@ -405,7 +416,7 @@ sub EQ3BT_setBoost {
     my $data = "01";
     $data = "00" if($onoff eq "off");
     
-    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setBoost|0x0411|45".$data, "EQ3BT_processGatttoolResult", 60, "EQ3BT_killGatttool", $hash);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setBoost|0x0411|45".$data, "EQ3BT_processGatttoolResult", 90, "EQ3BT_killGatttool", $hash);
     return undef;
 }
 
@@ -429,7 +440,7 @@ sub EQ3BT_setMode {
     my $data = "40";
     $data = "00" if($mode eq "automatic");
     
-    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setMode|0x0411|40".$data."|listen", "EQ3BT_processGatttoolResult", 60, "EQ3BT_killGatttool", $hash);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setMode|0x0411|40".$data."|listen", "EQ3BT_processGatttoolResult", 90, "EQ3BT_killGatttool", $hash);
     return undef;
 }
 
@@ -450,7 +461,7 @@ sub EQ3BT_setEco {
     my ($hash) = @_;
     my $name = $hash->{NAME};
     
-    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setEco|0x0411|44|listen", "EQ3BT_processGatttoolResult", 60, "EQ3BT_killGatttool", $hash);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setEco|0x0411|44|listen", "EQ3BT_processGatttoolResult", 90, "EQ3BT_killGatttool", $hash);
     return undef;
 }
 
@@ -471,7 +482,7 @@ sub EQ3BT_setComfort {
     my ($hash) = @_;
     my $name = $hash->{NAME};
     
-    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setComfort|0x0411|43|listen", "EQ3BT_processGatttoolResult", 60, "EQ3BT_killGatttool", $hash);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setComfort|0x0411|43|listen", "EQ3BT_processGatttoolResult", 90, "EQ3BT_killGatttool", $hash);
     return undef;
 }
 
@@ -490,29 +501,35 @@ sub EQ3BT_setComfortRetry {
 ### Gatttool functions ###
 sub EQ3BT_retryGatttool {
     my ($hash, $workType) = @_;
-    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $hash->{NAME}."|".$hash->{MAC}."|$workType|".$hash->{helper}{"handle$workType"}."|".$hash->{helper}{"value$workType"}."|".$hash->{helper}{"listen$workType"}, "EQ3BT_processGatttoolResult", 60, "EQ3BT_killGatttool", $hash);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $hash->{NAME}."|".$hash->{MAC}."|$workType|".$hash->{helper}{"handle$workType"}."|".$hash->{helper}{"value$workType"}."|listen", "EQ3BT_processGatttoolResult", 90, "EQ3BT_killGatttool", $hash);
     return undef;
 }
 
 sub EQ3BT_execGatttool($) {
     my ($string) = @_;
     my ($name, $mac, $workType, $handle, $value, $listen) = split("\\|", $string);
-    my $wait = 1;
-    my $hash = $main::defs{$name};
     
-    my $gatttool = qx(which gatttool);
+    my $hash            = $main::defs{$name};
+    
+    my $gatttool        = qx(which gatttool);
     chomp $gatttool;
     
     if(-x $gatttool) {
         my $gtResult;
         my $cmd;
+        my $wait        = 1;
         my $sshHost     = AttrVal($name,"sshHost","none");
-
+        my $hciDevice   = "hci".$hash->{helper}{hcidevices}[$hash->{helper}{currenthcidevice}];
+        
+        
         while($wait) {
-            my $grepGatttool = qx(ps ax| grep -E \'gatttool -b $mac\' | grep -v grep);
+        
+            my $grepGatttool;
+            $grepGatttool   = qx(ps ax| grep -E \'gatttool -i $hciDevice -b $mac\' | grep -v grep) if($sshHost eq 'none');
+            $grepGatttool   = qx(ssh $sshHost 'ps ax| grep -E "gatttool -i $hciDevice -b $mac" | grep -v grep') if($sshHost ne 'none');
+
             if(not $grepGatttool =~ /^\s*$/) {
-                #another gattool is running
-                Log3 $name, 5, "EQ3BT ($name): another gatttool process is running. waiting...";
+                Log3 $name, 4, "EQ3BT ($name) - ExecGatttool_Run: another gatttool process is running. waiting...";
                 sleep(1);
             } else {
                 $wait = 0;
@@ -525,26 +542,16 @@ sub EQ3BT_execGatttool($) {
             $value .= $currentDate;
         }
 
-        my $hciDevice = "hci".$hash->{helper}{hcidevices}[$hash->{helper}{currenthcidevice}];
-        #my $cmd = "gatttool -b $mac -i $hciDevice --char-write-req --handle=$handle --value=$value";
-        if( $sshHost ne 'none' ) {
-            $cmd = "ssh $sshHost 'gatttool -b $mac -i $hciDevice --char-write-req --handle=$handle --value=$value";
-        } else {
-            $cmd = "gatttool -b $mac -i $hciDevice --char-write-req --handle=$handle --value=$value";
-        }
         
-        if(defined($listen) && $listen eq "listen") {
-            $cmd = "timeout ".AttrVal($name, "timeout", 15)." ".$cmd." --listen";
-        }
-        
-        #redirect stderr to stdout
-        if( $sshHost ne 'none' ) {
-            $cmd .= " 2>&1'";
-        } else {
-            $cmd .= " 2>&1";
-        }
+        $cmd    = "ssh $sshHost '" if($sshHost ne 'none');
+        $cmd    .= "timeout 10 " if(defined($listen) and $listen eq "listen");
+        $cmd    .= "gatttool -i $hciDevice -b $mac ";
+        $cmd    .= "--char-write-req -a $handle -n $value";
+        $cmd    .= " --listen" if(defined($listen) and $listen eq "listen");
+        $cmd    .= " 2>&1 /dev/null";
+        $cmd    .= "'" if($sshHost ne 'none');
 
-        Log3 $name, 5, "EQ3BT ($name): $cmd";
+        Log3 $name, 4, "EQ3BT ($name): $cmd";
         $gtResult = qx($cmd);
         chomp $gtResult;
         my @gtResultArr = split("\n", $gtResult);
@@ -554,7 +561,7 @@ sub EQ3BT_execGatttool($) {
             if(defined($gtResultArr[1]) && $gtResultArr[1] =~ /Notification handle = 0x0421 value: (.*)/) {
                 return "$name|$mac|ok|$workType|$handle|$value|$1";
             } else {
-                if(defined($listen) && $listen eq "listen") {
+                if(defined($listen) and $listen eq "listen") {
                     return "$name|$mac|error|$workType|$handle|$value|notification missing";
                 } else {
                     return "$name|$mac|ok|$workType|$handle|$value";
@@ -751,7 +758,7 @@ sub EQ3BT_setChildlock($$) {
     my $data = "01";
     $data = "00" if($onoff eq "off");
     
-    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setChildlock|0x0411|80".$data, "EQ3BT_processGatttoolResult", 60, "EQ3BT_killGatttool", $hash);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("EQ3BT_execGatttool", $name."|".$hash->{MAC}."|setChildlock|0x0411|80".$data, "EQ3BT_processGatttoolResult", 90, "EQ3BT_killGatttool", $hash);
     return undef;
 }
 
@@ -809,8 +816,8 @@ sub EQ3BT_Get($$) {
 <h3>EQ3BT</h3>
 <ul>
   EQ3BT is used to control a EQ3 Bluetooth Smart Radiator Thermostat<br><br>
-	<b>Note:</b> The bluez package is required to run this module. Please check if gatttool executable is available on your system.
-		
+    <b>Note:</b> The bluez package is required to run this module. Please check if gatttool executable is available on your system.
+
   <br>
   <br>
   <a name="EQ3BTdefine" id="EQ3BTdefine"></a>

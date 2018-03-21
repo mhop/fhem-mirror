@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   74_HOMBOT: add commandref summary, code design
   - change:  73_GardenaSmartBridge: change logging output for username and
                                     password
   - feature: 93_DbRep: 7.14.6, attr expimpfile can use some kinds of wildcards
