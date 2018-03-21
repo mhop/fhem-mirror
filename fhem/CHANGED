@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 10_OWServer: added OWNet module version suggestion to define
   - feature: 49_SSCam: V3.4.0, new commands startTracking, stopTracking for
                        PTZ-Cams with object tracking capability
   - added:   74_HOMBOT: add commandref summary, code design
