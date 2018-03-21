@@ -27,6 +27,8 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 3.4.0  21.03.2018    new commands startTracking, stopTracking
+# 3.3.1  20.03.2018    new readings CapPTZObjTracking, CapPTZPresetNumber
 # 3.3.0  25.02.2018    code review, API bug fix of runview lastrec, commandref revised (forum:#84953)
 # 3.2.4  18.11.2017    fix bug don't retrieve SSCam_getptzlistpreset if cam is disabled
 # 3.2.3  08.10.2017    set optimizeParams, get caminfo (simple), minor bugfix, commandref revised
@@ -207,7 +209,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.3.0";
+my $SSCamVersion = "3.4.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -548,16 +550,19 @@ sub SSCam_Set($@) {
                  "credentials ".
                  "expmode:auto,day,night ".
                  "on ".
-                 "off ".
+                 "off:noArg ".
                  "motdetsc:disable,camera,SVS ".
-                 "snap ".
+                 "snap:noArg ".
 	     		 (AttrVal($name, "snapGalleryBoost",0)?(AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ":" ").
 	     		 "createSnapGallery:noArg ".
-                 "enable ".
-                 "disable ".
+                 "enable:noArg ".
+                 "disable:noArg ".
 				 "optimizeParams ".
                  "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open,lastsnap_fw ".
                  "stopView:noArg ".
+                 ((ReadingsVal("$name", "CapPTZObjTracking", "0") != 0) ? "startTracking:noArg " : "").
+                 ((ReadingsVal("$name", "CapPTZObjTracking", "0") != 0) ? "stopTracking:noArg " : "").
+                 ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZAbs", "false") ne "false") ? "goAbsPTZ"." " : ""). 
@@ -586,6 +591,16 @@ sub SSCam_Set($@) {
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       SSCam_camsnap($hash);
+        
+  } elsif ($opt eq "startTracking" && SSCam_IsModelCam($hash)) {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      if ($hash->{HELPER}{APIPTZMAXVER} < 5)  {return "Function \"$opt\" needs a higher version of Surveillance Station";}
+      SSCam_starttrack($hash);
+        
+  } elsif ($opt eq "stopTracking" && SSCam_IsModelCam($hash)) {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      if ($hash->{HELPER}{APIPTZMAXVER} < 5)  {return "Function \"$opt\" needs a higher version of Surveillance Station";}
+      SSCam_stoptrack($hash);
         
   } elsif ($opt eq "snapGallery" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1468,6 +1483,106 @@ sub SSCam_camsnap($) {
 		
     } else {
         InternalTimer(gettimeofday()+0.3, "SSCam_camsnap", $hash, 0);
+    }    
+}
+
+###############################################################################
+#                       Start Object Tracking
+###############################################################################
+sub SSCam_starttrack($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $errorcode;
+    my $error;
+    
+    RemoveInternalTimer($hash, "SSCam_starttrack");
+    return if(IsDisabled($name));
+    
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+        }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = SSCam_experror($hash,$errorcode);
+
+        # Setreading 
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        Log3($name, 2, "$name - ERROR - Object Tracking of Camera $camname can't switched on - $error");
+        
+        return;
+    }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {             
+        $hash->{OPMODE} = "startTrack";
+        $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+		
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        
+        SSCam_getapisites($hash);
+		
+    } else {
+        InternalTimer(gettimeofday()+0.9, "SSCam_starttrack", $hash, 0);
+    }    
+}
+
+###############################################################################
+#                       Stopp Object Tracking
+###############################################################################
+sub SSCam_stoptrack($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $errorcode;
+    my $error;
+    
+    RemoveInternalTimer($hash, "SSCam_stoptrack");
+    return if(IsDisabled($name));
+    
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+        }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = SSCam_experror($hash,$errorcode);
+
+        # Setreading 
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        Log3($name, 2, "$name - ERROR - Object Tracking of Camera $camname can't switched off - $error");
+        
+        return;
+    }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {             
+        $hash->{OPMODE} = "stopTrack";
+        $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+		
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        
+        SSCam_getapisites($hash);
+		
+    } else {
+        InternalTimer(gettimeofday()+0.9, "SSCam_stoptrack", $hash, 0);
     }    
 }
 
@@ -2936,11 +3051,19 @@ sub SSCam_camop ($) {
       Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&imgSize=\"0\"&idList=\"$snapid\"&_sid=\"$sid\"";
    
-   }elsif ($OpMode eq "gopreset") {
+   } elsif ($OpMode eq "gopreset") {
       # Preset wird angefahren
       $apiptzmaxver = ($apiptzmaxver >= 5)?4:$apiptzmaxver;
 	  $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "moving", 0); 
+   
+   } elsif ($OpMode eq "startTrack") {
+      # Object Tracking einschalten
+	  $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+   
+   } elsif ($OpMode eq "stopTrack") {
+      # Object Tracking stoppen
+	  $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&moveType=\"Stop\"&cameraId=\"$camid\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "runpatrol") {
       # eine Überwachungstour starten
@@ -3604,6 +3727,40 @@ sub SSCam_camop_parse ($) {
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been moved to absolute position \"posX=$hash->{HELPER}{GOPTZPOSX}\" and \"posY=$hash->{HELPER}{GOPTZPOSY}\"");
             
+			} elsif ($OpMode eq "startTrack") {
+                # Object Tracking wurde eingeschaltet
+                # falls Aufnahme noch läuft -> state = on setzen
+                if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
+                    readingsSingleUpdate($hash,"state", "on", 0); 
+                } else {
+                    readingsSingleUpdate($hash,"state", "off", 0); 
+                }
+                
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                                
+                # Logausgabe
+                Log3($name, 3, "$name - Object tracking of Camera $camname has been switched on");
+            
+			} elsif ($OpMode eq "stopTrack") {
+                # Object Tracking wurde eingeschaltet
+                # falls Aufnahme noch läuft -> state = on setzen
+                if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
+                    readingsSingleUpdate($hash,"state", "on", 0); 
+                } else {
+                    readingsSingleUpdate($hash,"state", "off", 0); 
+                }
+                
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                                
+                # Logausgabe
+                Log3($name, 3, "$name - Object tracking of Camera $camname has been stopped");
+            
 			} elsif ($OpMode eq "movestart") {
                 # ein "Move" in eine bestimmte Richtung wird durchgeführt                 
 
@@ -4072,7 +4229,9 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"CapPTZDirections",$data->{'data'}{'ptzDirection'});
                 readingsBulkUpdate($hash,"CapPTZFocus",$ptzfocus);
                 readingsBulkUpdate($hash,"CapPTZIris",$ptziris);
+                readingsBulkUpdate($hash,"CapPTZObjTracking",$data->{'data'}{'ptzHasObjTracking'});
                 readingsBulkUpdate($hash,"CapPTZPan",$ptzpan);
+                readingsBulkUpdate($hash,"CapPTZPresetNumber",$data->{'data'}{'ptzPresetNumber'});
                 readingsBulkUpdate($hash,"CapPTZTilt",$ptztilt);
                 readingsBulkUpdate($hash,"CapPTZZoom",$ptzzoom);
                 readingsBulkUpdate($hash,"Errorcode","none");
@@ -4750,9 +4909,10 @@ sub SSCam_experror {
 	   <li>switch the Surveillance Station HomeMode on/off and retrieve the HomeModeState </li>
 	   <li>show the stored credentials of a device </li>
 	   <li>fetch the Surveillance Station Logs, exploit the newest entry as reading  </li>
-	   <li>create a gallery of the last 1-10 snapshots (as a Popup or permanent weblink-Device)  </li><br>
+	   <li>Start/Stop Object Tracking (only supported PTZ-Cams with this capability)  </li>
     </ul>
    </ul>
+   <br>
    The recordings and snapshots will be stored in Synology Surveillance Station (SVS) and are managed like the other (normal) recordings / snapshots defined by Surveillance Station rules.<br>
    For example the recordings are stored for a defined time in Surveillance Station and will be deleted after that period.<br><br>
     
@@ -5308,6 +5468,24 @@ sub SSCam_experror {
   </ul>
   <br><br>
   
+  <ul>
+  <li><b> set &lt;name&gt; startTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM with tracking capability)</li> <br>
+  
+  Starts object tracking of camera.
+  The command is only available if surveillance station has recognise the object tracking capability of camera
+  (Reading "CapPTZObjTracking != 0").
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; stopTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM with tracking capability)</li> <br>
+  
+  Stops object tracking of camera.
+  The command is only available if surveillance station has recognise the object tracking capability of camera
+  (Reading "CapPTZObjTracking != 0").
+  </ul>
+  <br><br>
+  
  </ul>
 <br>
 
@@ -5689,7 +5867,9 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>CapPTZFocus</li>        </td><td>- mode of support for focus action  </td></tr>
     <tr><td><li>CapPTZHome</li>         </td><td>- Capability to perform home action  </td></tr>
     <tr><td><li>CapPTZIris</li>         </td><td>- mode of support for iris action  </td></tr>
+    <tr><td><li>CapPTZObjTracking</li>  </td><td>- Capability to perform objekt-tracking </td></tr>
     <tr><td><li>CapPTZPan</li>          </td><td>- Capability to perform pan action  </td></tr>
+    <tr><td><li>CapPTZPresetNumber</li> </td><td>- The maximum number of preset supported by the model. 0 stands for preset incapability  </td></tr>
     <tr><td><li>CapPTZTilt</li>         </td><td>- mode of support for tilt action  </td></tr>
     <tr><td><li>CapPTZZoom</li>         </td><td>- Capability to perform zoom action  </td></tr>
     <tr><td><li>DeviceType</li>         </td><td>- device type (Camera, Video_Server, PTZ, Fisheye)  </td></tr>
@@ -5755,9 +5935,12 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 	  <li>anzeigen der gespeicherten Anmeldeinformationen (Credentials)  </li>
 	  <li>Ein- bzw. Ausschalten des Surveillance Station HomeMode und abfragen des HomeMode-Status </li>
 	  <li>abrufen des Surveillance Station Logs, auswerten des neuesten Eintrags als Reading  </li>
-	  <li>erzeugen einer Gallerie der letzten 1-10 Schnappschüsse (als Popup oder permanentes Device)  </li><br>
+	  <li>erzeugen einer Gallerie der letzten 1-10 Schnappschüsse (als Popup oder permanentes Device)  </li>
+      <li>Start bzw. Stop Objekt Tracking (nur unterstützte PTZ-Kameras mit dieser Fähigkeit)  </li>
      </ul> 
     </ul>
+    <br>
+    
     Die Aufnahmen stehen in der Synology Surveillance Station (SVS) zur Verfügung und unterliegen, wie jede andere Aufnahme, den in der Synology Surveillance Station eingestellten Regeln. <br>
     So werden zum Beispiel die Aufnahmen entsprechend ihrer Archivierungsfrist gespeichert und dann gelöscht. <br><br>
     
@@ -6311,6 +6494,24 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a> Kommando anstatt "set" verwendet werden.
   </ul>
   <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; startTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM mit Tracking Fähigkeit)</li> <br>
+  
+  Startet Objekt Tracking der Kamera.
+  Der Befehl ist nur vorhanden wenn die Surveillance Station die Fähigkeit der Kamera zum Objekt Tracking erkannt hat
+  (Reading "CapPTZObjTracking != 0").
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; stopTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM mit Tracking Fähigkeit)</li> <br>
+  
+  Stoppt Objekt Tracking der Kamera.
+  Der Befehl ist nur vorhanden wenn die Surveillance Station die Fähigkeit der Kamera zum Objekt Tracking erkannt hat
+  (Reading "CapPTZObjTracking != 0").
+  </ul>
+  <br><br>
 
   </ul>
   <br>
@@ -6710,7 +6911,9 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>CapPTZFocus</li>        </td><td>- Art der Kameraunterstützung für Fokussierung  </td></tr>
     <tr><td><li>CapPTZHome</li>         </td><td>- Unterstützung der Kamera für Home-Position  </td></tr>
     <tr><td><li>CapPTZIris</li>         </td><td>- Unterstützung der Kamera für Iris-Aktion  </td></tr>
+    <tr><td><li>CapPTZObjTracking</li>  </td><td>- Unterstützung der Kamera für Objekt-Tracking </td></tr>
     <tr><td><li>CapPTZPan</li>          </td><td>- Unterstützung der Kamera für Pan-Aktion  </td></tr>
+    <tr><td><li>CapPTZPresetNumber</li> </td><td>- die maximale Anzahl unterstützter Presets. 0 steht für keine Preset-Unterstützung </td></tr>
     <tr><td><li>CapPTZTilt</li>         </td><td>- Unterstützung der Kamera für Tilt-Aktion  </td></tr>
     <tr><td><li>CapPTZZoom</li>         </td><td>- Unterstützung der Kamera für Zoom-Aktion  </td></tr>
     <tr><td><li>DeviceType</li>         </td><td>- Kameratyp (Camera, Video_Server, PTZ, Fisheye)  </td></tr>
