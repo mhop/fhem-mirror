@@ -140,6 +140,14 @@ my $curReadingType = 0;
       ,["WGESCHW_15", "wind15", 2]
       ,["WGESCHW_18", "wind18", 2]
       ,["WGESCHW_21", "wind21", 2]
+      ,["BGESCHW_0", "gust00", 2]
+      ,["BGESCHW_3", "gust03", 2]
+      ,["BGESCHW_6", "gust06", 2]
+      ,["BGESCHW_9", "gust09", 2]
+      ,["BGESCHW_12", "gust12", 2]
+      ,["BGESCHW_15", "gust15", 2]
+      ,["BGESCHW_18", "gust18", 2]
+      ,["BGESCHW_21", "gust21", 2]
   );
 
    my %intensity = ( "keine" => 0
