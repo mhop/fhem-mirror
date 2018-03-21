@@ -36,7 +36,10 @@
 #
 ###########################################################################################################################
 #  Versions History:
-#  
+# 
+# 7.14.8       21.03.2018       fix no save into database if value=0 (DbRep_OutputWriteToDB) 
+# 7.14.7       21.03.2018       exportToFile,importFromFile can use file as an argument and executeBeforeDump, 
+#                               executeAfterDump is considered
 # 7.14.6       18.03.2018       attribute expimpfile can use some kinds of wildcards (exportToFile, importFromFile 
 #                               adapted)
 # 7.14.5       17.03.2018       perl warnings of DbLog $dn,$dt,$evt,$rd in changeval_Push & complex
@@ -328,7 +331,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.14.6";
+my $DbRepVersion = "7.14.8";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -500,8 +503,8 @@ sub DbRep_Set($@) {
 				(($hash->{ROLE} ne "Agent")?"delSeqDoublets:adviceRemain,adviceDelete,delete ":"").
                 "deviceRename ".
 				(($hash->{ROLE} ne "Agent")?"readingRename ":"").
-                (($hash->{ROLE} ne "Agent")?"exportToFile:noArg ":"").
-                (($hash->{ROLE} ne "Agent")?"importFromFile:noArg ":"").
+                (($hash->{ROLE} ne "Agent")?"exportToFile ":"").
+                (($hash->{ROLE} ne "Agent")?"importFromFile ":"").
                 (($hash->{ROLE} ne "Agent")?"maxValue:display,writeToDB ":"").
                 (($hash->{ROLE} ne "Agent")?"minValue:display,writeToDB ":"").
                 (($hash->{ROLE} ne "Agent")?"fetchrows:history,current ":"").  
@@ -755,17 +758,19 @@ sub DbRep_Set($@) {
       
   } elsif ($opt eq "exportToFile" && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-      if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
-          return "The attribute \"expimpfile\" (path and filename) has to be set for export to file !";
+      my $f = $prop if($prop);
+      if (!AttrVal($hash->{NAME}, "expimpfile", "") && !$f) {
+          return "\"$opt\" needs a file as an argument or the attribute \"expimpfile\" (path and filename) to be set !";
       }
-      DbRep_Main($hash,$opt);
+      DbRep_Main($hash,$opt,$f);
       
   } elsif ($opt eq "importFromFile" && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-      if (!AttrVal($hash->{NAME}, "expimpfile", "")) {
-          return "The attribute \"expimpfile\" (path and filename) has to be set for import from file !";
+      my $f = $prop if($prop);
+      if (!AttrVal($hash->{NAME}, "expimpfile", "") && !$f) {
+          return "\"$opt\" needs a file as an argument or the attribute \"expimpfile\" (path and filename) to be set !";
       }
-      DbRep_Main($hash,$opt);
+      DbRep_Main($hash,$opt,$f);
       
   } elsif ($opt =~ /sqlCmd|sqlCmdHistory/) {
       return "\"set $opt\" needs at least an argument" if ( @a < 3 );
@@ -1508,11 +1513,15 @@ sub DbRep_Main($$;$) {
      my $cmd = $prop?$prop:"adviceRemain"; 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);
     
- } elsif ($opt eq "exportToFile") {            
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name§$device§$reading§$runtime_string_first§$ts", "expfile_ParseDone", $to, "DbRep_ParseAborted", $hash);
+ } elsif ($opt eq "exportToFile") {
+     my $file = $prop;
+     DbRep_beforeproc($hash, "export");
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name§$device§$reading§$runtime_string_first§$file§$ts", "expfile_ParseDone", $to, "DbRep_ParseAborted", $hash);
     
- } elsif ($opt eq "importFromFile") {             
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name|$runtime_string_first", "impfile_PushDone", $to, "DbRep_ParseAborted", $hash);
+ } elsif ($opt eq "importFromFile") { 
+     my $file = $prop;
+     DbRep_beforeproc($hash, "import");     
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name|$runtime_string_first|$file", "impfile_PushDone", $to, "DbRep_ParseAborted", $hash);
     
  } elsif ($opt eq "maxValue") {        
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$prop§$ts", "maxval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
@@ -4818,7 +4827,7 @@ return;
 ####################################################################################################
 sub expfile_DoParse($) {
  my ($string) = @_;
- my ($name, $device, $reading, $rsf, $ts) = split("\\§", $string);
+ my ($name, $device, $reading, $rsf, $file, $ts) = split("\\§", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -4841,7 +4850,7 @@ sub expfile_DoParse($) {
  }
  
  $rsf        =~ s/[:\s]/_/g; 
- my $outfile =  AttrVal($name, "expimpfile", undef);
+ my $outfile =  $file?$file:AttrVal($name, "expimpfile", undef);
  $outfile    =~ s/%TSB/$rsf/g;
  my @t = localtime;
  $outfile = ResolveDateWildcards($outfile, @t);
@@ -4932,6 +4941,10 @@ sub expfile_ParseDone($) {
   my $reading    = $a[5];
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g; 
   my $outfile    = $a[6];
+  my $erread;
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "export");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -4947,9 +4960,10 @@ sub expfile_ParseDone($) {
   my $rds  = $reading." -- " if ($reading);
   my $export_string = $ds.$rds." -- ROWS EXPORTED TO FILE -- ";
   
+  my $state = $erread?$erread:"done";
   readingsBeginUpdate($hash);
   ReadingsBulkUpdateValue ($hash, $export_string, $nrows); 
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
   
   my $rows = $ds.$rds.$nrows;
@@ -4965,7 +4979,7 @@ return;
 ####################################################################################################
 sub impfile_Push($) {
  my ($string) = @_;
- my ($name, $rsf) = split("\\|", $string);
+ my ($name, $rsf, $file) = split("\\|", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $hash->{dbloghash};
  my $dbconn     = $dbloghash->{dbconn};
@@ -4992,8 +5006,8 @@ sub impfile_Push($) {
  # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
  my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
  
- $rsf        =~ s/[:\s]/_/g; 
- my $infile =  AttrVal($name, "expimpfile", undef);
+ $rsf       =~ s/[:\s]/_/g; 
+ my $infile =  $file?$file:AttrVal($name, "expimpfile", undef);
  $infile    =~ s/%TSB/$rsf/g;
  my @t = localtime;
  $infile = ResolveDateWildcards($infile, @t);
@@ -5130,6 +5144,10 @@ sub impfile_PushDone($) {
   my $err        = $a[3]?decode_base64($a[3]):undef;
   my $name       = $hash->{NAME};
   my $infile     = $a[4];
+  my $erread;
+  
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "import");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -5143,9 +5161,10 @@ sub impfile_PushDone($) {
 
   my $import_string = " -- ROWS IMPORTED FROM FILE -- ";
   
+  my $state = $erread?$erread:"done";
   readingsBeginUpdate($hash);
   ReadingsBulkUpdateValue ($hash, $import_string, $irowdone);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
 
   Log3 ($name, 3, "DbRep $name - Number of imported datasets to $hash->{DATABASE} from file $infile: $irowdone");  
@@ -7659,7 +7678,7 @@ sub DbRep_beforeproc ($$) {
       Log3 ($name, 3, "DbRep $name - execute command before $txt: '$ebd' ");
 	  my $err = AnalyzeCommandChain(undef, $ebd);     
 	  if ($err) {
-          Log3 ($name, 2, "DbRep $name - command before $txt message: \"$err\" ");
+          Log3 ($name, 2, "DbRep $name - command message before $txt: \"$err\" ");
           my $erread = "Warning - message from command before $txt appeared";
 		  ReadingsSingleUpdateValue ($hash, "before".$txt."_message", $err, 1);
 		  ReadingsSingleUpdateValue ($hash, "state", $erread, 1);
@@ -7684,9 +7703,9 @@ sub DbRep_afterproc ($$) {
       Log3 ($name, 4, "DbRep $name - execute command after $txt: '$ead' ");
 	  my $err = AnalyzeCommandChain(undef, $ead);     
 	  if ($err) {
-          Log3 ($name, 2, "DbRep $name - command after $txt message: \"$err\" ");
+          Log3 ($name, 2, "DbRep $name - command message after $txt: \"$err\" ");
 		  ReadingsSingleUpdateValue ($hash, "after".$txt."_message", $err, 1);
-		  $erread = "Warning - $txt finished, but command after $txt message appeared";
+		  $erread = "Warning - $txt finished, but command message after $txt appeared";
       }
   }
 
@@ -8292,7 +8311,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
       foreach my $row (@arr) {
           my @a              = split("#", $row);
           my $runtime_string = $a[0];                             # Aggregations-Alias (nicht benötigt)
-          $value             = $a[1]?sprintf("%.4f",$a[1]):undef;
+          $value             = defined($a[1])?sprintf("%.4f",$a[1]):undef;
           $rsf               = $a[2];                             # Datum / Zeit für DB-Speicherung
           ($date,$time)      = split("_",$rsf);
           $time              =~ s/-/:/g if($time);
@@ -8317,7 +8336,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
       foreach my $key (sort(keys(%rh))) {
           my @k         = split("\\|",$rh{$key});
           $rsf          = $k[2];                               # Datum / Zeit für DB-Speicherung
-          $value        = $k[1]?sprintf("%.4f",$k[1]):undef;
+          $value        = defined($k[1])?sprintf("%.4f",$k[1]):undef;
           ($date,$time) = split("_",$rsf);
           $time         =~ s/-/:/g if($time);
       
@@ -9289,14 +9308,35 @@ return;
                                  contained in exception list defined by attribute "readingPreventFromDel".                                
                                  </li><br>
 								 
-    <li><b> exportToFile </b> -  exports DB-entries to a file in CSV-format of time period set by time attributes. 
-                                 Limitations of selections can be set by <a href="#DbRepattr">attributes</a> Device and/or Reading. 
-                                 The filename will be defined by <a href="#DbRepattr">attribute</a> "expimpfile". <br> 
+    <li><b> exportToFile [&lt;file&gt;] </b> 
+                                 -  exports DB-entries to a file in CSV-format of time period specified by time attributes. <br>
+                                 Limitation of selections can be done by <a href="#DbRepattr">attributes</a> device and/or 
+                                 reading. 
+                                 The filename can be defined by <a href="#DbRepattr">attribute</a> "expimpfile". <br>
+                                 Optionally a file can be specified as a command option (/path/file) and overloads a possibly  
+                                 defined attribute "expimpfile". The filename may contain wildcards as described
+                                 in attribute section of "expimpfile".
+                                 <br>
                                  By setting attribute "aggregation" the export of datasets will be splitted into time slices 
-                                 recording the specified aggregation. 
-                                 Is, for example, "aggregation = month" set, the data are selected in monthly packets and written
+                                 corresponding to the specified aggregation. 
+                                 If, for example, "aggregation = month" is set, the data are selected in monthly packets and written
                                  into the exportfile. Thereby the usage of main memory is optimized if very large amount of data
-                                 is exported and avoid the "died prematurely" error.                                  
+                                 is exported and avoid the "died prematurely" error. <br><br>
+
+                 	             The attributes relevant for this function are: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>aggregation</b>        </td><td>: determination of selection time slices </td></tr>
+                                      <tr><td> <b>device</b>             </td><td>: select only datasets which are contain &lt;device&gt; </td></tr>
+	                                  <tr><td> <b>reading</b>            </td><td>: select only datasets which are contain &lt;reading&gt; </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or perl-routine) before export </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or perl-routine) after export </td></tr>
+	                                  <tr><td> <b>expimpfile</b>         </td><td>: the name of exportfile </td></tr>
+                                      <tr><td> <b>time.*</b>             </td><td>: a number of attributes to limit selection by time </td></tr>
+                                   </table>
+	                               </ul>                                   
+                                 
                                  </li> <br>
                                  
     <li><b> fetchrows [history|current] </b>    
@@ -9376,20 +9416,39 @@ return;
                                  <br>
 								 </li>
                                  </ul>
-                                 
-    <li><b> importFromFile </b> - imports datasets in CSV format from file into database. The filename will be set by <a href="#DbRepattr">attribute</a> "expimpfile". <br><br>
+
+    <li><b> importFromFile [&lt;file&gt;] </b> 
+                                 - imports data in CSV format from file into database. <br>
+                                 The filename can be defined by <a href="#DbRepattr">attribute</a> "expimpfile". <br>
+                                 Optionally a file can be specified as a command option (/path/file) and overloads a possibly  
+                                 defined attribute "expimpfile". The filename may contain wildcards as described
+                                 in attribute section of "expimpfile". <br><br> 
                                  
                                  <ul>
-                                 <b>dataset format: </b>  "TIMESTAMP","DEVICE","TYPE","EVENT","READING","VALUE","UNIT"  <br><br>						 
+                                 <b>dataset format: </b> <br>
+                                 "TIMESTAMP","DEVICE","TYPE","EVENT","READING","VALUE","UNIT"  <br><br>						 
                                  # The fields "TIMESTAMP","DEVICE","TYPE","EVENT","READING" and "VALUE" have to be set. The field "UNIT" is optional.
                                  The file content will be imported transactional. That means all of the content will be imported or, in case of error, nothing of it. 
                                  If an extensive file will be used, DON'T set verbose = 5 because of a lot of datas would be written to the logfile in this case. 
                                  It could lead to blocking or overload FHEM ! <br><br>
                                  
-                                 <b>Example: </b>        "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""  <br>
+                                 <b>Example for a source dataset: </b> <br>
+                                 "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""  <br>
                                  <br>
+                                 
+                 	             The attributes relevant for this function are: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or perl-routine) before import </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or perl-routine) after import </td></tr>
+	                                  <tr><td> <b>expimpfile</b>         </td><td>: the name of exportfile </td></tr>
+                                   </table>
+	                               </ul>  
+                                   
                                  </li> <br>
-                                 </ul>    
+                                 </ul>  
+                                 <br>                                  
     
     <li><b> maxValue [display | writeToDB]</b>     
                                  - calculates the maximum value of database column "VALUE" between period given by 
@@ -10923,13 +10982,32 @@ sub bdump {
                                  Ausnahmeliste definiert mit Attribut "readingPreventFromDel" enthalten sind.                                
                                  </li><br>
                                  
-    <li><b> exportToFile </b> -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. 
-                                 Einschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein. 
-                                 Der Filename wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br>
+    <li><b> exportToFile [&lt;File&gt;] </b> 
+                                 -  exportiert DB-Einträge im CSV-Format in den gegebenen Zeitgrenzen. <br>
+                                 Einschränkungen durch die <a href="#DbRepattr">Attribute</a> "device" bzw. "reading" gehen in die Selektion mit ein.
+                                 Der Dateiname wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br>
+                                 Alternativ kann die Datei (/Pfad/Datei) als Kommando-Option angegeben werden und übersteuert ein 
+                                 eventuell gesetztes Attribut "expimpfile". Der Dateiname kann Wildcards enthalten (siehe Attribut "expimpfile").
+                                 <br>
                                  Durch das Attribut "aggregation" wird der Export der Datensätze in Zeitscheiben der angegebenen Aggregation 
                                  vorgenommen. Ist z.B. "aggregation = month" gesetzt, werden die Daten in monatlichen Paketen selektiert und in
                                  das Exportfile geschrieben. Dadurch wird die Hauptspeicherverwendung optimiert wenn sehr große Datenmengen
-                                 exportiert werden sollen und vermeidet den "died prematurely" Abbruchfehler.                                 
+                                 exportiert werden sollen und vermeidet den "died prematurely" Abbruchfehler. <br><br>
+
+                 	             Die für diese Funktion relevanten Attribute sind: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>aggregation</b>        </td><td>: Festlegung der Selektionspaketierung </td></tr>
+                                      <tr><td> <b>device</b>             </td><td>: Einschränkung des Exports auf ein bestimmtes Device  </td></tr>
+	                                  <tr><td> <b>reading</b>            </td><td>: Einschränkung des Exports auf ein bestimmtes Reading </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor dem Export ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) nach dem Export ausführen </td></tr>
+	                                  <tr><td> <b>expimpfile</b>         </td><td>: der Name des Exportfiles </td></tr>
+                                      <tr><td> <b>time.*</b>             </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                   </table>
+	                               </ul>
+	                                
                                  </li><br>
         
     <li><b> fetchrows [history|current] </b>    
@@ -11017,20 +11095,37 @@ sub bdump {
 								 </li>
                                  </ul>
     
-    <li><b> importFromFile </b> - importiert Datensätze im CSV-Format aus einem File in die Datenbank. Der Filename wird 
-	                              durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br><br>
+    <li><b> importFromFile [&lt;File&gt;] </b> 
+                                 - importiert Datensätze im CSV-Format aus einer Datei in die Datenbank. <br>
+                                 Der Dateiname wird durch das <a href="#DbRepattr">Attribut</a> "expimpfile" bestimmt. <br>
+                                 Alternativ kann die Datei (/Pfad/Datei) als Kommando-Option angegeben werden und übersteuert ein 
+                                 eventuell gesetztes Attribut "expimpfile". Der Dateiname kann Wildcards enthalten (siehe 
+                                 Attribut "expimpfile"). <br><br> 
                                  
                                  <ul>
-                                 <b>Datensatzformat: </b>  "TIMESTAMP","DEVICE","TYPE","EVENT","READING","VALUE","UNIT"  <br><br>              
+                                 <b>Datensatzformat: </b> <br>
+                                 "TIMESTAMP","DEVICE","TYPE","EVENT","READING","VALUE","UNIT"  <br><br>              
                                  # Die Felder "TIMESTAMP","DEVICE","TYPE","EVENT","READING" und "VALUE" müssen gesetzt sein. Das Feld "UNIT" ist optional.
                                  Der Fileinhalt wird als Transaktion importiert, d.h. es wird der Inhalt des gesamten Files oder, im Fehlerfall, kein Datensatz des Files importiert. 
-                                 Wird eine umfangreiche Datei mit vielen Datensätzen importiert sollte KEIN verbose=5 gesetzt werden. Es würden in diesem Fall sehr viele Sätze in
+                                 Wird eine umfangreiche Datei mit vielen Datensätzen importiert, sollte KEIN verbose=5 gesetzt werden. Es würden in diesem Fall sehr viele Sätze in
                                  das Logfile geschrieben werden was FHEM blockieren oder überlasten könnte. <br><br>
                                  
-                                 <b>Beispiel: </b>        "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""  <br>
+                                 <b>Beispiel: </b> <br>
+                                 "2016-09-25 08:53:56","STP_5000","SMAUTILS","etotal: 11859.573","etotal","11859.573",""  <br>
                                  <br>
+                                 
+                 	             Die für diese Funktion relevanten Attribute sind: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: FHEM Kommando (oder perl-Routine) vor dem Import ausführen </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder perl-Routine) nach dem Import ausführen </td></tr>
+	                                  <tr><td> <b>expimpfile</b>         </td><td>: der Name des Importfiles </td></tr>
+                                   </table>
+	                               </ul>
                                  </li> <br>
-                                 </ul>    
+                                 </ul>  
+                                 <br>                                 
     
     <li><b> maxValue [display | writeToDB] </b>     
                                  - berechnet den Maximalwert des Datenbankfelds "VALUE" in den Zeitgrenzen 
