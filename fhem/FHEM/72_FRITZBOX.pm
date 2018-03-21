@@ -585,10 +585,13 @@ sub FRITZBOX_Get($@)
       
       my $tmp;
       if (defined $result->{Error} ) {      
-        $tmp = "ERROR:\n".Dumper ($result->{Error}); 
+        $tmp = "ERROR: ".$result->{Error}; 
       }
-      elsif (ref $result->{result} ) {  
+      elsif (ref ($result->{result}) eq "ARRAY"  ) {  
         $tmp = Dumper ($result->{result} ); 
+      }
+      elsif (defined $result->{result} ) {  
+        $tmp = $result->{result}; 
       }
       else {                                 
         $tmp = "Unexpected result: " . Dumper ($result); 
@@ -1329,7 +1332,7 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&is_double_wlan=wlan:settings/feature_flags/DBDC"; # Box Feature
    $queryStr .= "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
    $queryStr .= "&box_wlan_5GHz=wlan:settings/ap_enabled_scnd"; # 2nd WLAN
-   $queryStr .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # Gäste WLAN
+   $queryStr .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # GÃ¤ste WLAN
    $queryStr .= "&box_guestWlanRemain=wlan:settings/guest_time_remain";
    $queryStr .= "&box_guestWlanRemain=wlan:settings/guest_time_remain";
    $queryStr .= "&TodayBytesReceivedHigh=inetstat:status/Today/BytesReceivedHigh";
@@ -1460,7 +1463,7 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
    
-# Dect-Geräteliste erstellen
+# Dect-GerÃ¤teliste erstellen
    $runNo = 0;
    foreach ( @{ $result->{dectUser} } ) {
       my $intern = $_->{Intern};
@@ -4464,7 +4467,7 @@ sub FRITZBOX_TR064_Init ($$)
 
 #   $hash->{TR064USER} = "dslf-config";
 
-   # jetzt die Zertifikatsüberprüfung (sofort) abschalten
+   # jetzt die ZertifikatsÃ¼berprÃ¼fung (sofort) abschalten
    BEGIN {
       $ENV{PERL_LWP_SSL_VERIFY_HOSTNAME}=0;
    }
@@ -4651,13 +4654,6 @@ sub FRITZBOX_Web_Query($$@)
       return \%retHash;
    }
 
-
-   if ( $jsonText !~ /{"/ ) {
-      chop $jsonText;
-      my %retHash = ("Error" => "no json string returned (".$jsonText.")", "ResetSID" => "1");
-      return \%retHash;
-   }
-   
 #################
    #FRITZBOX_Log $hash, 3, "Response: ".$response->content;
 #################
@@ -4676,6 +4672,11 @@ sub FRITZBOX_Web_Query($$@)
    }
    #Not a HASH reference at ./FHEM/72_FRITZBOX.pm line 4662.
   # 2018.03.19 18:43:28 3: FRITZBOX: get Fritzbox luaQuery settings/sip
+   if ( ref ($jsonResult) ne "HASH" ) {
+      chop $jsonText;
+      my %retHash = ("Error" => "no json string returned (".$jsonText.")", "ResetSID" => "1");
+      return \%retHash;
+   }
    $jsonResult->{sid} = $sid;
    $jsonResult->{Error} = $jsonResult->{error}  if defined $jsonResult->{error};
    return $jsonResult;
