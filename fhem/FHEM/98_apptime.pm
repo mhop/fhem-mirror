@@ -340,38 +340,38 @@ sub apptime_CommandDispTiming($$@) {
         <strong>Features</strong>
     </P>
     <dl>
-      <dt><code><kbd>apptime</kbd></code></dt>
+        <dt><code><kbd>apptime</kbd></code></dt>
         <dd>
             <p>
               <kbd>apptime</kbd> is started with the its first call and continously monitor operations.<br>
-              To unload apptime, <kbd>shutdown restart</kbd> is necessary.<br> </li>
+              To unload apptime, <kbd>shutdown restart</kbd> is necessary.<br>
             </p>
         </dd>
-      <dt><code><kbd>apptime clear</code></dt>
+        <dt><code><kbd>apptime clear</kbd></code></dt>
           <dd>
             <p>
                 Reset all counter and start from zero.
             </p>
-          </dd>
-      <dt><code><kbd>apptime pause</code></dt>
-          <dd>
+        </dd>
+        <dt><code><kbd>apptime pause</kbd></code></dt>
+        <dd>
             <p>
                 Suspend accumulation of data. Data is not cleared.
             </p>
-          </dd>
-      <dt><code><kbd>apptime cont</code></dt>
-          <dd>
+        </dd>
+        <dt><code><kbd>apptime cont</kbd></code></dt>
+        <dd>
             <p>
                 Continue data collection after pause.
             </p>
-          </dd>
-      <dt><code><kbd>apptime [count|function|average|clear|max|name|total] [all]</kbd></code></dt>
+        </dd>
+        <dt><code><kbd>apptime [count|function|average|clear|max|name|total] [all]</kbd></code></dt>
         <dd>
             <p>
                 Display a table sorted by the field selected.
             </p>
             <p>
-                <strong><kbd>all</kbd></strong> will display the complete table while by default only the top lines are printed.<
+                <strong><kbd>all</kbd></strong> will display the complete table while by default only the top lines are printed.
             </p>
         </dd>
     </dl>
@@ -379,7 +379,7 @@ sub apptime_CommandDispTiming($$@) {
         <strong>Columns:</strong>
     </p>
     <dl>
-      <dt><strong>name</strong></dt>
+        <dt><strong>name</strong></dt>
         <dd>
             <p>
                 Name of the entity executing the procedure.
@@ -389,47 +389,47 @@ sub apptime_CommandDispTiming($$@) {
                 By then it gives the name of the function to be called.
             </p>
         </dd>
-      <dt><strong>function</strong><dt>
-          <dd>
+        <dt><strong>function</strong></dt>
+        <dd>
             <p>
                 Procedure name which was executed.
             </p>
             <p>
                 If it is an <var>InternalTimer</var> call it gives its calling parameter.
             </p>
-          </dd>
-      <dt><strong>max</strong></dt>
+        </dd>
+        <dt><strong>max</strong></dt>
         <dd>
             <p>
                 Longest duration measured for this procedure in <abbr>ms</abbr>.
             </p>
         </dd>
-      <dt><strong>count</strong></dt>
+        <dt><strong>count</strong></dt>
         <dd>
             <p>
                 Number of calls for this procedure.
             </p>
         </dt>
-      <dt><strong>total</strong></dt>
+        <dt><strong>total</strong></dt>
         <dd>
             <p>
                 Accumulated duration of this procedure over all calls monitored.
             </p>
         </dd>
-      <dt><strong>average</strong></dt>
+        <dt><strong>average</strong></dt>
         <dd>
             <p>
                 Average time a call of this procedure takes.
             </p>
         </dd>
-      <dt><strong>maxDly</strong></dt>
+        <dt><strong>maxDly</strong></dt>
         <dd>
             <p>
                 Maximum delay of a timer call to its schedules time.
                 This column is not relevant for non-timer calls.
             </p>
         </dd>
-      <dt><strong>param Max call</strong></dt>
+        <dt><strong>param Max call</strong></dt>
         <dd>
             <p>
                 Gives the parameter of the call with the longest duration.
