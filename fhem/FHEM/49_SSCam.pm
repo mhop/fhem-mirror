@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 3.5.0  22.03.2018    new get command listPresets
 # 3.4.0  21.03.2018    new commands startTracking, stopTracking
 # 3.3.1  20.03.2018    new readings CapPTZObjTracking, CapPTZPresetNumber
 # 3.3.0  25.02.2018    code review, API bug fix of runview lastrec, commandref revised (forum:#84953)
@@ -209,7 +210,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.4.0";
+my $SSCamVersion = "3.5.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -337,6 +338,7 @@ sub SSCam_Define($@) {
   $hash->{HELPER}{APICAM}         = "SYNO.SurveillanceStation.Camera";
   $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";
   $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
+  $hash->{HELPER}{APIPRESET}      = "SYNO.SurveillanceStation.PTZ.Preset";
   $hash->{HELPER}{APICAMEVENT}    = "SYNO.SurveillanceStation.Camera.Event";
   $hash->{HELPER}{APIVIDEOSTM}    = "SYNO.SurveillanceStation.VideoStreaming";
   $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Streaming";
@@ -560,13 +562,13 @@ sub SSCam_Set($@) {
 				 "optimizeParams ".
                  "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open,lastsnap_fw ".
                  "stopView:noArg ".
-                 ((ReadingsVal("$name", "CapPTZObjTracking", "0") != 0) ? "startTracking:noArg " : "").
-                 ((ReadingsVal("$name", "CapPTZObjTracking", "0") != 0) ? "stopTracking:noArg " : "").
-                 ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "").
+                 ((ReadingsVal("$name", "CapPTZObjTracking", 0) != 0) ? "startTracking:noArg " : "").
+                 ((ReadingsVal("$name", "CapPTZObjTracking", 0) != 0) ? "stopTracking:noArg " : "").
+                 ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZAbs", "false") ne "false") ? "goAbsPTZ"." " : ""). 
-                 ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
+                 ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "");
   } else {
       # setlist für SVS Devices
       $setlist = "Unknown argument $opt, choose one of ".
@@ -871,6 +873,7 @@ sub SSCam_Get($@) {
 				   "caminfo:noArg ".
 		 		   ((AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))
 				       ?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ").
+                   ((ReadingsVal("$name", "CapPTZPresetNumber", 0) != 0) ? "listPresets:noArg " : "").
 				   "snapinfo:noArg ".
                    "svsinfo:noArg ".
                    "snapfileinfo:noArg ".
@@ -916,6 +919,12 @@ sub SSCam_Get($@) {
         SSCam_extlogargs($hash,$arg1) if($arg1);
         SSCam_extlogargs($hash,$arg2) if($arg2);
 		getsvslog($hash);
+                
+    } elsif ($opt eq "listPresets" && SSCam_IsModelCam($hash)) {
+	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+        # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
+	    SSCam_getclhash($hash,1);
+		SSCam_getpresets($hash);
                 
     } elsif ($opt eq "svsinfo") {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1509,7 +1518,6 @@ sub SSCam_starttrack($) {
         # Fehlertext zum Errorcode ermitteln
         $error = SSCam_experror($hash,$errorcode);
 
-        # Setreading 
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"Errorcode",$errorcode);
         readingsBulkUpdate($hash,"Error",$error);
@@ -1559,7 +1567,6 @@ sub SSCam_stoptrack($) {
         # Fehlertext zum Errorcode ermitteln
         $error = SSCam_experror($hash,$errorcode);
 
-        # Setreading 
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"Errorcode",$errorcode);
         readingsBulkUpdate($hash,"Error",$error);
@@ -1587,6 +1594,55 @@ sub SSCam_stoptrack($) {
 }
 
 ###############################################################################
+#                       Preset-Array abrufen
+###############################################################################
+sub SSCam_getpresets($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $errorcode;
+    my $error;
+    
+    RemoveInternalTimer($hash, "SSCam_getpresets");
+    return if(IsDisabled($name));
+    
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+        }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = SSCam_experror($hash,$errorcode);
+
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        Log3($name, 2, "$name - ERROR - Preset list of Camera $camname can't be get - $error");
+        
+        return;
+    }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {             
+        $hash->{OPMODE} = "getPresets";
+        $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+		
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        
+        SSCam_getapisites($hash);
+		
+    } else {
+        InternalTimer(gettimeofday()+1.2, "SSCam_getpresets", $hash, 0);
+    }    
+}
+
+###############################################################################
 #                         Kamera Liveview starten
 ###############################################################################
 sub SSCam_runliveview($) {
@@ -1608,7 +1664,7 @@ sub SSCam_runliveview($) {
         
         # Fehlertext zum Errorcode ermitteln
         $error = &SSCam_experror($hash,$errorcode);
-        # Setreading 
+
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"Errorcode",$errorcode);
         readingsBulkUpdate($hash,"Error",$error);
@@ -2404,6 +2460,7 @@ sub SSCam_getapisites($) {
    my $apicam      = $hash->{HELPER}{APICAM};                          
    my $apitakesnap = $hash->{HELPER}{APISNAPSHOT};
    my $apiptz      = $hash->{HELPER}{APIPTZ};
+   my $apipreset   = $hash->{HELPER}{APIPRESET};
    my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
    my $apicamevent = $hash->{HELPER}{APICAMEVENT};
    my $apievent    = $hash->{HELPER}{APIEVENT};
@@ -2430,7 +2487,7 @@ sub SSCam_getapisites($) {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm,$apilog";
+   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apipreset,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm,$apilog";
 
    Log3($name, 4, "$name - Call-Out now: $url");
    
@@ -2460,6 +2517,7 @@ sub SSCam_getapisites_parse ($) {
    my $apicam      = $hash->{HELPER}{APICAM};
    my $apitakesnap = $hash->{HELPER}{APISNAPSHOT};
    my $apiptz      = $hash->{HELPER}{APIPTZ};
+   my $apipreset   = $hash->{HELPER}{APIPRESET};
    my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
    my $apicamevent = $hash->{HELPER}{APICAMEVENT};
    my $apievent    = $hash->{HELPER}{APIEVENT};
@@ -2555,8 +2613,18 @@ sub SSCam_getapisites_parse ($) {
             $logstr = defined($apiptzpath) ? "Path of $apiptz selected: $apiptzpath" : "Path of $apiptz undefined - Surveillance Station may be stopped";
             Log3($name, 4, "$name - $logstr");
             $logstr = defined($apiptzmaxver) ? "MaxVersion of $apiptz: $apiptzmaxver" : "MaxVersion of $apiptz undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");				
+            Log3($name, 4, "$name - $logstr");	
 
+          # Pfad und Maxversion von "SYNO.SurveillanceStation.PTZ.Preset" ermitteln 
+            my $apipresetpath = $data->{'data'}->{$apipreset}->{'path'};
+            $apipresetpath =~ tr/_//d if (defined($apipresetpath));
+            my $apipresetmaxver = $data->{'data'}->{$apipreset}->{'maxVersion'};
+                            
+            $logstr = defined($apipresetpath) ? "Path of $apipreset selected: $apipresetpath" : "Path of $apipreset undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");
+            $logstr = defined($apipresetmaxver) ? "MaxVersion of $apipreset: $apipresetmaxver" : "MaxVersion of $apipreset undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");				
+			
           # Pfad und Maxversion von "SYNO.SurveillanceStation.Info" ermitteln
             my $apisvsinfopath = $data->{'data'}->{$apisvsinfo}->{'path'};
             $apisvsinfopath =~ tr/_//d if (defined($apisvsinfopath));
@@ -2720,6 +2788,8 @@ sub SSCam_getapisites_parse ($) {
             $hash->{HELPER}{APITAKESNAPMAXVER} = $apitakesnapmaxver;
             $hash->{HELPER}{APIPTZPATH}        = $apiptzpath;
             $hash->{HELPER}{APIPTZMAXVER}      = $apiptzmaxver;
+            $hash->{HELPER}{APIPRESETPATH}     = $apipresetpath;
+            $hash->{HELPER}{APIPRESETMAXVER}   = $apipresetmaxver;
             $hash->{HELPER}{APISVSINFOPATH}    = $apisvsinfopath;
             $hash->{HELPER}{APISVSINFOMAXVER}  = $apisvsinfomaxver;
             $hash->{HELPER}{APICAMEVENTPATH}   = $apicameventpath;
@@ -2986,6 +3056,9 @@ sub SSCam_camop ($) {
    my $apiptz            = $hash->{HELPER}{APIPTZ};
    my $apiptzpath        = $hash->{HELPER}{APIPTZPATH};
    my $apiptzmaxver      = $hash->{HELPER}{APIPTZMAXVER};
+   my $apipreset         = $hash->{HELPER}{APIPRESET};
+   my $apipresetpath     = $hash->{HELPER}{APIPRESETPATH};
+   my $apipresetmaxver   = $hash->{HELPER}{APIPRESETMAXVER};
    my $apisvsinfo        = $hash->{HELPER}{APISVSINFO};
    my $apisvsinfopath    = $hash->{HELPER}{APISVSINFOPATH};
    my $apisvsinfomaxver  = $hash->{HELPER}{APISVSINFOMAXVER};
@@ -3056,6 +3129,10 @@ sub SSCam_camop ($) {
       $apiptzmaxver = ($apiptzmaxver >= 5)?4:$apiptzmaxver;
 	  $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "moving", 0); 
+   
+   } elsif ($OpMode eq "getPresets") {
+      # Liste der Presets abrufen
+	  $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"Enum\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
    
    } elsif ($OpMode eq "startTrack") {
       # Object Tracking einschalten
@@ -3500,6 +3577,41 @@ sub SSCam_camop_parse ($) {
 				asyncOutput($hash->{HELPER}{CL}{1},"$log");
 				delete($hash->{HELPER}{CL});
             
+			} elsif ($OpMode eq "getPresets") {  
+                my %ap = ();
+				my $i  = 0;
+                while ($data->{'data'}->{'preset'}->[$i]) {
+                    my $pname  = $data->{'data'}->{'preset'}->[$i]{'name'};
+			        my $ptype  = $data->{'data'}->{'preset'}->[$i]{'type'};
+			        my $ppos   = $data->{'data'}->{'preset'}->[$i]{'position'};
+					my $pspeed = $data->{'data'}->{'preset'}->[$i]{'speed'};
+                    my $pextra = $data->{'data'}->{'preset'}->[$i]{'extra'};
+                    $ptype     = ($ptype == 1)?"Home":"Normal";
+                    $ap{$ppos} = "Name: $pname, Speed: $pspeed, Type: $ptype";
+					$i++;
+                }	
+                
+                my $enum;
+                foreach my $key (sort{$a <=>$b}keys%ap) { 
+                    $enum .= $key." => ".$ap{$key}."<br>";                 
+		        }
+                
+				$enum = "<html><b>Preset positions saved in camera \"$hash->{CAMNAME}\" </b> ".
+                        "(PresetNumber => Name: ..., Speed: ..., Type: ...) <br><br>$enum</html>";
+						        
+				# asyncOutput kann normalerweise etwa 100k uebertragen (siehe fhem.pl/addToWritebuffer() fuer Details)
+	            # bzw. https://forum.fhem.de/index.php/topic,77310.0.html				
+				
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+				
+				# Ausgabe Popup der Daten (nach readingsEndUpdate positionieren sonst 
+                # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)	    
+				asyncOutput($hash->{HELPER}{CL}{1},"$enum");
+				delete($hash->{HELPER}{CL});
+            
 			} elsif ($OpMode eq "setoptpar") { 
                 my $rid  = $data->{'data'}{'id'};    # Cam ID return wenn i.O.
 				my $ropt = $rid == $hash->{CAMID}?"none":"error in operation";
@@ -3729,12 +3841,6 @@ sub SSCam_camop_parse ($) {
             
 			} elsif ($OpMode eq "startTrack") {
                 # Object Tracking wurde eingeschaltet
-                # falls Aufnahme noch läuft -> state = on setzen
-                if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
-                    readingsSingleUpdate($hash,"state", "on", 0); 
-                } else {
-                    readingsSingleUpdate($hash,"state", "off", 0); 
-                }
                 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
@@ -3746,12 +3852,6 @@ sub SSCam_camop_parse ($) {
             
 			} elsif ($OpMode eq "stopTrack") {
                 # Object Tracking wurde eingeschaltet
-                # falls Aufnahme noch läuft -> state = on setzen
-                if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
-                    readingsSingleUpdate($hash,"state", "on", 0); 
-                } else {
-                    readingsSingleUpdate($hash,"state", "off", 0); 
-                }
                 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
@@ -3867,7 +3967,6 @@ sub SSCam_camop_parse ($) {
                     delete $defs{$name}{READINGS}{SVScustomPortHttps};
                 }
                                 
-                # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"SVScustomPortHttp",$data->{'data'}{'customizedPortHttp'});
                 readingsBulkUpdate($hash,"SVScustomPortHttps",$data->{'data'}{'customizedPortHttps'});
@@ -3998,44 +4097,33 @@ sub SSCam_camop_parse ($) {
                 $exposuremode = $data->{'data'}->{'cameras'}->[0]->{'exposure_mode'};
                 if ($exposuremode == 0) {
                     $exposuremode = "Auto";
-                    }
-                    elsif ($exposuremode == 1) {
+                } elsif ($exposuremode == 1) {
                     $exposuremode = "Day";
-                    }
-                    elsif ($exposuremode == 2) {
+                } elsif ($exposuremode == 2) {
                     $exposuremode = "Night";
-                    }
-                    elsif ($exposuremode == 3) {
+                } elsif ($exposuremode == 3) {
                     $exposuremode = "Schedule";
-                    }
-                    elsif ($exposuremode == 4) {
+                } elsif ($exposuremode == 4) {
                     $exposuremode = "Unknown";
-                    }
+                }
                     
                 $exposurecontrol = $data->{'data'}->{'cameras'}->[0]->{'exposure_control'};
                 if ($exposurecontrol == 0) {
                     $exposurecontrol = "Auto";
-                    }
-                    elsif ($exposurecontrol == 1) {
+                } elsif ($exposurecontrol == 1) {
                     $exposurecontrol = "50HZ";
-                    }
-                    elsif ($exposurecontrol == 2) {
+                } elsif ($exposurecontrol == 2) {
                     $exposurecontrol = "60HZ";
-                    }
-                    elsif ($exposurecontrol == 3) {
+                } elsif ($exposurecontrol == 3) {
                     $exposurecontrol = "Hold";
-                    }
-                    elsif ($exposurecontrol == 4) {
+                } elsif ($exposurecontrol == 4) {
                     $exposurecontrol = "Outdoor";
-                    }
-                    elsif ($exposurecontrol == 5) {
+                } elsif ($exposurecontrol == 5) {
                     $exposurecontrol = "None";
-                    }
-                    elsif ($exposurecontrol == 6) {
+                } elsif ($exposurecontrol == 6) {
                     $exposurecontrol = "Unknown";
-                    }
+                }
                     
-                # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamLiveMode",$camLiveMode);
                 readingsBulkUpdate($hash,"CamExposureMode",$exposuremode);
@@ -4083,7 +4171,6 @@ sub SSCam_camop_parse ($) {
                     $lastrecstoptime = sprintf "%02d:%02d:%02d" , $hour , $min , $sec ;
                 }
                 
-                # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamEventNum",$eventnum);
                 readingsBulkUpdate($hash,"CamLastRec",$lastrecord);               
@@ -5056,6 +5143,7 @@ sub SSCam_experror {
       <tr><td><li>get ... caminfo[all]       </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - observer    </li></td></tr>
 	  <tr><td><li>get ... listLog            </td><td> session: ServeillanceStation - observer    </li></td></tr>
+      <tr><td><li>get ... listPresets        </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - observer    </li></td></tr>
@@ -5555,6 +5643,13 @@ sub SSCam_experror {
   "LastLogEntry" will be created. <br>
   In the protocol-setup of the SVS you can adjust what data you want to log. For further informations please have a look at
   <a href="https://www.synology.com/en-uk/knowledgebase/Surveillance/help/SurveillanceStation/log_advanced">Synology Online-Help</a>.
+  </ul>
+  <br><br>  
+
+  <ul>
+  <li><b> get &lt;name&gt; listPresets </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
+  
+  Get a popup with a lists of presets saved for the camera.
   </ul>
   <br><br>   
   
@@ -6084,6 +6179,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
       <tr><td><li>get ... caminfo[all]       </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... listLog            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>get ... listPresets        </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
 	  <tr><td><li>get ... scanVirgin         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
@@ -6589,6 +6685,13 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   "LastLogEntry" erstellt. <br>
   Im Protokoll-Setup der SVS kann man einstellen was protokolliert werden soll. Für weitere Informationen 
   siehe <a href="https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/log_advanced">Synology Online-Hlfe</a>.
+  </ul>
+  <br><br> 
+  
+  <ul>
+  <li><b> get &lt;name&gt; listPresets </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
+  
+  Die für die Kamera gespeicherten Presets werden in einem Popup ausgegeben.
   </ul>
   <br><br> 
   
