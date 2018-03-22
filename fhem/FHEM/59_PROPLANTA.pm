@@ -826,9 +826,9 @@ PROPLANTA_Html(@)
    <br>
    The website provides a forecast for 12 days, for the first 7 days in a 3-hours-interval.
    <br>
-   This modul causes a high CPU load. It is recommended to reduce the number of captured forecast days.
+   This module causes a high CPU load. It is recommended to reduce the number of captured forecast days.
    <br>
-   It uses the perl moduls HTTP::Request, LWP::UserAgent and HTML::Parse.
+   It uses the perl modules HTTP::Request, LWP::UserAgent and HTML::Parse.
    <br/><br/>
    <a name="PROPLANTAdefine"></a>
    <b>Define</b>
@@ -905,12 +905,13 @@ PROPLANTA_Html(@)
       <li><b>fc</b><i>0</i><b>_dew</b> - dew formation <i>today</i> (0=none, 1=small, 2=medium, 3=strong)</li>
       <li><b>fc</b><i>0</i><b>_evapor</b> - evaporation <i>today</i> (0=none, 1=small, 2=medium, 3=strong)</li>
       <li><b>fc</b><i>0</i><b>_frost</b> - ground frost <i>today</i> (0=no, 1=yes)</li>
+      <li><b>fc</b><i>0</i><b>_gust</b><i>15</i> - maximal wind gusts <i>today</i> at <i>15</i>:00 o'clock in km/h</li>
       <li><b>fc</b><i>0</i><b>_moon</b><i>Rise|Set</i> - moon <i>rise|set today</i></li>
       <li><b>fc</b><i>0</i><b>_rad</b> - global radiation <i>today</i></li>
-      <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - amount of rainfall <i>today</i> at <i>15:00</i> o'clock in mm</li>
+      <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - amount of rainfall <i>today</i> at <i>15</i>:00 o'clock in mm</li>
       <li><b>fc</b><i>0</i><b>_sun</b> - relative sun shine duration <i>today</i> in % (between sun rise and set)</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature <i>today</i> in °C</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i> - temperatur <i>today</i> at <i>15:00</i> o'clock in °C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i> - temperatur <i>today</i> at <i>15</i>:00 o'clock in °C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - weather situation <i>today morning|during day|in the evening|during night</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - icon of weather situation <i>today</i> by <i>day</i></li>
@@ -956,8 +957,7 @@ PROPLANTA_Html(@)
          <br>
          Optional. Die Stadt muss auf <a href="http://www.proplanta.de">www.proplanta.de</a> auswählbar sein. 
          <br>
-         Wichtig!! Auf die <b>großen</b> Anfangsbuchstaben achten.
-         Leerzeichen im Stadtnamen werden durch ein + (Plus) ersetzt.
+         Wichtig!! Auf die <b>großen</b> Anfangsbuchstaben achten. Leerzeichen im Stadtnamen werden durch ein + (Plus) ersetzt.
       </li><br>
       <li><code>[Ländercode]</code>
          <br>
@@ -1015,6 +1015,7 @@ PROPLANTA_Html(@)
       <li><b>fc</b><i>0</i><b>_dew</b> - Taubildung <i>heute</i> (0=keine, 1=leicht, 2=mäßig, 3=stark)</li>
       <li><b>fc</b><i>0</i><b>_evapor</b> - Verdunstung <i>heute</i> (0=keine, 1=gering, 2=mäßig, 3=stark)</li>
       <li><b>fc</b><i>0</i><b>_frost</b> - Bodenfrost <i>heute</i> (0=nein, 1=ja)</li>
+      <li><b>fc</b><i>0</i><b>_gust</b><i>15</i> - maximale Windböen <i>heute</i> um <i>15</i>:00 Uhr in km/h</li>
       <li><b>fc</b><i>1</i><b>_moon</b><i>Rise|Set</i> - Mond<i>auf|unter</i>gang <i>morgen</i></li>
       <li><b>fc</b><i>0</i><b>_rad</b> - Globalstrahlung <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - Niederschlagsmenge <i>heute</i> um <i>15</i>:00 Uhr in mm</li>
@@ -1025,7 +1026,7 @@ PROPLANTA_Html(@)
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - Wetterzustand <i>heute morgen|tagsüber|abends|nachts</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>heute tagsüber</i></li>
       <li><b>fc</b><i>0</i><b>_wind</b><i>15</i> - Windgeschwindigkeit <i>heute</i> um <i>15</i>:00 Uhr in km/h</li>
-      <li><b>fc</b><i>0</i><b>_windDir</b><i>15</i> - Windrichtung <i>heute</i> um <i>15</i>:00 Uhr in °</li>
+      <li><b>fc</b><i>0</i><b>_windDir</b><i>15</i> - Windrichtung <i>heute</i> um <i>15</i>:00 Uhr in ° (Grad)</li>
       <li>etc.</li>
    </ul>
    <br>
@@ -1042,7 +1043,7 @@ PROPLANTA_Html(@)
       <li><b>weather</b> - Wetterzustand</li>
       <li><b>weatherIcon</b> - Icon Wetterzustand</li>
       <li><b>wind</b> - Windgeschwindigkeit in km/h</li>
-      <li><b>windDir</b> - Windrichtung in °</li>
+      <li><b>windDir</b> - Windrichtung in ° (Grad)</li>
    </ul>
    <br><br>
 </ul>
