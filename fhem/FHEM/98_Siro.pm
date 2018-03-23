@@ -544,7 +544,7 @@ sub Siro_Parse($$) {
     return "" if ( IsDisabled($name) );
     if ( my $lh = $modules{Siro}{defptr}{$testid} ) {
         my $name = $lh->{NAME};
-        Log3 $hash, 3,
+        Log3 $hash, 5,
 "Siro_Parse: Incomming msg from IODevice $testid - $name device is defined";
         if ( defined($name)
             && $testcmd ne "54"
