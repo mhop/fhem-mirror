@@ -3038,7 +3038,7 @@ DOIF_Define($$$)
     $cmd =~ s/\$SELF/$hash->{NAME}/g;
   }
   
-  if ($cmd eq "" or $cmd =~ /^ *\(/) {
+  if ($cmd eq "" or $cmd =~ /^\s*\(/) {
     $hash->{MODEL}="FHEM";  
     ($msg,$err)=CmdDoIf($hash,$cmd);
     #delete $defs{$hash->{NAME}}{".AttrList"};
@@ -5345,7 +5345,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 <br>
 Im Perl-Modus lassen sich insb. komplexere Abläufe innerhalb eines DOIF-Devices in Perl programmieren.
 Der Anwender hat mehr Einfluss auf den Ablauf der Steuerung als im FHEM-Modus. Einfache Perlkenntnise werden in diesem Modus vorausgesetzt.
-Im Unterschied zum FHEM-Modus, werden für die Steuerung unmittelbar keine Attribute benötigt. DOIF-spezifische Angaben in eckigen Klammern entsprechen vollständig den Angaben im DOIF FHEM-Modus. Deren Syntax kann im der obigen Beschreibung des FHEM-Modus nachgelesen werden.<br>
+Im Unterschied zum FHEM-Modus, werden für die Steuerung unmittelbar keine Attribute benötigt. DOIF-spezifische Angaben in eckigen Klammern entsprechen vollständig den Angaben im DOIF FHEM-Modus. Deren Syntax kann in der obigen Beschreibung des FHEM-Modus nachgelesen werden.<br>
 <br>
 Syntax Perl-Modus:<br>
 <br>
@@ -5357,7 +5357,7 @@ Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Pe
 FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem"..."</code> ausgeführt. Im Gegensatz zum FHEM-Modus können im Perl-Modus mehrere Blöcke unabhängig voneinander, ausgelöst durch einen Ereignis- oder Zeit-Trigger, ausgeführt werden. So kann die Funktionalität mehrer DOIF-Module im FHEM-Modus innerhalb eines DOIF-Moduls im Perl-Moduls realisiert werden.<br>
 <br>
 Die Anzahl der eigenen Timer ist im Gegensatz zu einem wait-Timer unbegrenzt.
-Zum Zeitpunkt der Definition, werden alle DOIF-spezifischen Angaben in Perl übersetzt, zum Zeitpunkt der Ausführung wird nur noch Perl ausgeführt, damit wird maximale Performance gewährleistet.<br>
+Zum Zeitpunkt der Definition werden alle DOIF-spezifischen Angaben in Perl übersetzt, zum Zeitpunkt der Ausführung wird nur noch Perl ausgeführt, damit wird maximale Performance gewährleistet.<br>
 <br>
 <a name="DOIF_Einfache_Anwendungsbeispiele_Perl"></a>
 <u>Einfache Anwendungsbeispiele (vgl. <a href="#DOIF_Einfache_Anwendungsbeispiele">Anwendungsbeispiele im FHEM-Modus</a>):</u><ol>
