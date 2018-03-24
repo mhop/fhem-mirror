@@ -910,9 +910,10 @@ sub _cfgDB_Migrate() {
 sub _cfgDB_Info($) {
 	my ($info2) = @_;
 	$info2 //= 'unknown';
-Debug ">$info2<";
 	my ($l, @r, $f);
 	for my $i (1..65){ $l .= '-';}
+
+    $configDB{attr}{private} //= 1;
 
 	push @r, $l;
 	push @r, " configDB Database Information";
