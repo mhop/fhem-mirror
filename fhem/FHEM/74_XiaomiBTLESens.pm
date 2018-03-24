@@ -50,7 +50,7 @@ eval "use Blocking;1" or $missingModul .= "Blocking ";
 #use Data::Dumper;          only for Debugging
 
 
-my $version = "2.0.11";
+my $version = "2.0.12";
 
 
 
@@ -922,8 +922,8 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
 
 =pod
 =item device
-=item summary       Modul to retrieves data from a Xiaomi BTLE Sensor
-=item summary_DE    Modul um Daten vom Xiaomi BTLE Sensor aus zu lesen
+=item summary       Modul to retrieves data from a Xiaomi BTLE Sensors
+=item summary_DE    Modul um Daten vom Xiaomi BTLE Sensoren aus zu lesen
 
 =begin html
 
@@ -946,7 +946,7 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
     </ul>
     <br>
     This statement creates a XiaomiBTLESens with the name Weihnachtskaktus and the Bluetooth Mac C4:7C:8D:62:42:6F.<br>
-    After the device has been created, the current data of the Xiaomi BTLE Sensor is automatically read from the device.
+    After the device has been created and the model attribut is set, the current data of the Xiaomi BTLE Sensor is automatically read from the device.
   </ul>
   <br><br>
   <a name="XiaomiBTLESensreadings"></a>
@@ -986,6 +986,8 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
     <li>disabledForIntervals - disable device for interval time (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
     <li>interval - interval in seconds for statusRequest</li>
     <li>minFertility - min fertility value for low warn event</li>
+    <li>hciDevice - select bluetooth dongle device</li>
+    <li>model - set model type</li>
     <li>maxFertility - max fertility value for High warn event</li>
     <li>minMoisture - min moisture value for low warn event</li>
     <li>maxMoisture - max moisture value for High warn event</li>
@@ -1025,7 +1027,7 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
     </ul>
     <br />
     Der Befehl legt ein Device vom Typ XiaomiBTLESens an mit dem Namen Weihnachtskaktus und der Bluetooth MAC C4:7C:8D:62:42:6F.<br />
-    Nach dem Anlegen des Device werden umgehend und automatisch die aktuellen Daten vom betroffenen Xiaomi BTLE Sensor gelesen.
+    Nach dem Anlegen des Device und setzen des korrekten model Attributes werden umgehend und automatisch die aktuellen Daten vom betroffenen Xiaomi BTLE Sensor gelesen.
   </ul>
   <br /><br />
   <a name="XiaomiBTLESensreadings"></a>
@@ -1036,6 +1038,7 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
     <li>batteryLevel - aktueller Ladestand der Batterie in Prozent.</li>
     <li>fertility - Wert des Fruchtbarkeitssensors (Bodenleitf&auml;higkeit)</li>
     <li>firmware - aktuelle Firmware-Version des BTLE Sensor</li>
+    <li>lastGattError - Fehlermeldungen vom gatttool</li>
     <li>lux - aktuelle Lichtintensit&auml;t</li>
     <li>moisture - aktueller Feuchtigkeitswert</li>
     <li>temperature - aktuelle Temperatur</li>
@@ -1044,15 +1047,8 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
   <a name="XiaomiBTLESensset"></a>
   <b>Set</b>
   <ul>
-    <li></li>
-    <br />
-  </ul>
-  <br /><br />
-  <a name="XiaomiBTLESensset"></a>
-  <b>Get</b>
-  <ul>
-    <li>devicename - setzt einen Devicenamen</li>
     <li>resetBatteryTimestamp - wenn die Batterie gewechselt wurde</li>
+    <li>devicename - setzt einen Devicenamen</li>
     <br />
   </ul>
   <br /><br />
@@ -1072,6 +1068,8 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
     <li>interval - Interval in Sekunden zwischen zwei Abfragen</li>
     <li>disabledForIntervals - deaktiviert das Gerät für den angegebenen Zeitinterval (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
     <li>minFertility - min Fruchtbarkeits-Grenzwert f&uuml;r ein Ereignis minFertility low </li>
+    <li>hciDevice - Auswahl bei mehreren Bluetooth Dongeln</li>
+    <li>model - setzt das Model</li>
     <li>maxFertility - max Fruchtbarkeits-Grenzwert f&uuml;r ein Ereignis maxFertility high </li>
     <li>minMoisture - min Feuchtigkeits-Grenzwert f&uuml;r ein Ereignis minMoisture low </li> 
     <li>maxMoisture - max Feuchtigkeits-Grenzwert f&uuml;r ein Ereignis maxMoisture high </li>
