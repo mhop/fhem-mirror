@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 # 
+# 7.15.0       24.03.2018       new command sqlSpecial
 # 7.14.8       21.03.2018       fix no save into database if value=0 (DbRep_OutputWriteToDB) 
 # 7.14.7       21.03.2018       exportToFile,importFromFile can use file as an argument and executeBeforeDump, 
 #                               executeAfterDump is considered
@@ -331,7 +332,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.14.8";
+my $DbRepVersion = "7.15.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -512,6 +513,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlCmd ":"").
                 (($hash->{ROLE} ne "Agent" && $hl)?"sqlCmdHistory:".$hl." ":"").
+                (($hash->{ROLE} ne "Agent")?"sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount ":"").
                 (($hash->{ROLE} ne "Agent")?"syncStandby ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
@@ -772,10 +774,13 @@ sub DbRep_Set($@) {
       }
       DbRep_Main($hash,$opt,$f);
       
-  } elsif ($opt =~ /sqlCmd|sqlCmdHistory/) {
+  } elsif ($opt =~ /sqlCmd|sqlSpecial|sqlCmdHistory/) {
       return "\"set $opt\" needs at least an argument" if ( @a < 3 );
       # remove arg 0, 1 to get SQL command
       my $sqlcmd;
+      if($opt eq "sqlSpecial") {
+          $sqlcmd = $prop;
+      }
       if($opt eq "sqlCmd") {
           shift @a;
           shift @a;
@@ -1552,8 +1557,19 @@ sub DbRep_Main($$;$) {
  } elsif ($opt =~ /changeValue/) {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("changeval_Push", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts", "change_Done", $to, "DbRep_ParseAborted", $hash);   
      
- } elsif ($opt =~ /sqlCmd/ ) {
-    # Execute a generic sql command
+ } elsif ($opt =~ /sqlCmd|sqlSpecial/ ) {
+    # Execute a generic sql command or special sql
+    if ($opt =~ /sqlSpecial/) {
+        if($prop eq "50mostFreqLogsLast2days") {
+            $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > (now() - interval 2 day)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
+            $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /SQLITE/);
+            $prop = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
+        } elsif ($prop eq "allDevReadCount") {
+            $prop = "select device, reading, count(*) from history group by DEVICE, READING;";
+        } elsif ($prop eq "allDevCount") {
+            $prop = "select device, count(*) from history group by DEVICE;";
+        }
+    }
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "DbRep_ParseAborted", $hash);     
  
  } elsif ($opt =~ /syncStandby/ ) {
@@ -9631,7 +9647,35 @@ return;
                                    By execution of the last list entry, "__purge_historylist__", the list itself can be deleted. <br>
 								   If the statement contains "," this character is displayed as "&lt;c&gt;" in the history 
                                    list due to technical restrictions. <br>
-                                   </li><br>								 
+                                   </li><br>	
+
+    <li><b> sqlSpecial </b>    - This function provides a drop-down list with a selection of prepared reportings. <br>
+								 The statements result is depicted in reading "SqlResult".
+								 The result can be formatted by <a href="#DbRepattr">attribute</a> "sqlResultFormat", 
+                                 a well as the used field separator by <a href="#DbRepattr">attribute</a> "sqlResultFieldSep". 
+                                 <br><br>
+
+                 	             The relevant attributes for this function are: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>sqlResultFormat</b>    </td><td>: determines the formatting of the result </td></tr>
+                                      <tr><td> <b>sqlResultFieldSep</b>  </td><td>: determines the used field separator in statement result </td></tr>
+                                   </table>
+	                               </ul>
+                                   <br>
+                                   
+                 	             The following predefined reportings are selectable: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>: reports the 50 most occuring log entries of the last 2 days </td></tr>
+                                      <tr><td> <b>allDevCount </b>             </td><td>: all devices occuring in database and their quantity </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>         </td><td>: all device/reading combinations occuring in database and their quantity </td></tr>
+                                   </table>
+	                               </ul>
+	                                
+                                 </li><br><br>                                   
 
 	<li><b> sumValue [display | writeToDB]</b>     
                                  - calculates the summary of database column "VALUE" between period given by 
@@ -10136,7 +10180,7 @@ sub bdump {
                               - activates the command history of "sqlCmd" and determines the length of it  </li> <br>
 
   
-  <li><b>sqlResultFieldSep </b> - determines the used field separator (default: "|") in the result of command "set &lt;name&gt; sqlCmd".  </li> <br>
+  <li><b>sqlResultFieldSep </b> - determines the used field separator (default: "|") in the result of some sql-commands.  </li> <br>
 
   <li><b>sqlResultFormat </b> - determines the formatting of the "set &lt;name&gt; sqlCmd" command result. 
                                 Possible options are: <br><br>
@@ -11322,6 +11366,35 @@ sub bdump {
                                    Falls das Statement "," enthält, wird dieses Zeichen aus technischen Gründen in der 
                                    History-Liste als "&lt;c&gt;" dargestellt. <br>
 								   </li><br>
+                                   
+    <li><b> sqlSpecial </b>    - Die Funktion bietet eine Drop-Downliste mit einer Auswahl vorbereiter Auswertungen
+                                 an. <br>
+								 Das Ergebnis des Statements wird im Reading "SqlResult" dargestellt.
+								 Die Ergebnis-Formatierung kann durch das <a href="#DbRepattr">Attribut</a> "sqlResultFormat" 
+                                 ausgewählt, sowie der verwendete Feldtrenner durch das <a href="#DbRepattr">Attribut</a> 
+                                 "sqlResultFieldSep" festgelegt werden. <br><br>
+
+                 	             Die für diese Funktion relevanten Attribute sind: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>sqlResultFormat</b>    </td><td>: Optionen der Ergebnisformatierung </td></tr>
+                                      <tr><td> <b>sqlResultFieldSep</b>  </td><td>: Auswahl des Trennzeichens zwischen Ergebnisfeldern </td></tr>
+                                   </table>
+	                               </ul>
+                                   <br>
+                                   
+                 	             Es sind die folgenden vordefinierte Auswertungen auswählbar: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>: ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage </td></tr>
+                                      <tr><td> <b>allDevCount </b>             </td><td>: alle in der Datenbank vorkommenden Devices und deren Anzahl </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>         </td><td>: alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl</td></tr>
+                                   </table>
+	                               </ul>
+	                                
+                                 </li><br><br>
 								 
     <li><b> sumValue [display | writeToDB]</b>     
                                  - Berechnet die Summenwerte des Datenbankfelds "VALUE" in den Zeitgrenzen 
