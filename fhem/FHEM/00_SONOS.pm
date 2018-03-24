@@ -51,6 +51,11 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 24.03.2018
+#	Einige Log-Ausgaben haben bei undefinierten Default-Übergaben Fehlermeldungen verursacht.
+#	Bei einigen Positionsabfragen an die Player wurden Sonderfälle (wie NOT_IMPLEMENTED) nicht berücksichtigt.
+#	Slider-Wertebereich für Bass und Treble auf den Bereich -10..10 korrigiert.
+#	Es gibt jetzt ein Reading "IsZoneGroup", das 0 oder 1 sein kann. Danach wird jetzt auch entschieden, ob eine Playersteuerung dargestellt wird, oder nicht.
 # 10.03.2018
 #	Die PlayBase kann nun auch den SPDIF-Eingang aktivieren (wie die PlayBar)
 #	Wenn man über Alexa Musik hört, wird das aktuelle Cover nun auch angezeigt.
@@ -70,14 +75,6 @@
 #	Der Initialwert von LastProcessAnswer (wird beim Start auf 0 gesetzt) wird nun korrekt berücksichtigt
 #	Bei ignoredIPs und bei usedOnlyIPs kann jetzt für jedes Komma-Getrennte Element auch ein regulärer Ausdruck stehen. Wird mit // umschlossen, und darf keine Doppelpunkte enthalten.
 #	Logausgabe im UPnP-Modul, welche Devices mit welchen Header-Angaben nun akzeptiert wurden (Ausgabe auf Level 5)
-# 23.12.2017
-#	Subscriptions-Refresh umgebaut.
-#	Devicenamen mit Punkt (.) funktionieren nun.
-#	Fehler mit "undefined value $value" behoben.
-#	GetTrackProvider liefert bei Nichtfinden in der MusicServicesList nun eine leere Angabe, und keine undefined.
-#	Die Angabe in LastProcessAnswer ist nicht Zeitumstellungsfest. Der Wert wurde nun umgestellt auf epoch-Zeit.
-#	Der Verweis auf %intAt wurde entfernt. Die Variable wurde sowieso nie verwendet.
-#	Warnungsunterdrückung von 'mumpitzstuff' eingebaut.
 #
 ########################################################################################
 #
@@ -2556,6 +2553,9 @@ sub SONOS_Discover_DoQueue($) {
 			if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 				if (SONOS_Client_Data_Retreive('undef', 'attr', 'getListsDirectlyToReadings', 0)) {
 					my $position = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime');
+					if ($position !~ /\d+:\d+:\d+/i) { # e.g. NOT_IMPLEMENTED
+						$position = '0:00:00';
+					}
 					
 					SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
 					my $modus = 'ReadingsBulkUpdate'.((SONOS_Client_Data_Retreive($udn, 'reading', 'currentStreamAudio', 0)) ? 'IfChanged' : '');
@@ -2565,7 +2565,11 @@ sub SONOS_Discover_DoQueue($) {
 					
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DirectlySet');
 				} else {
-					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.$SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime'));
+					my $position = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime');
+					if ($position !~ /\d+:\d+:\d+/i) { # e.g. NOT_IMPLEMENTED
+						$position = '0:00:00';
+					}
+					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.$position);
 				}
 			}
 		} elsif ($workType eq 'setCurrentTrackPosition') {
@@ -2582,6 +2586,9 @@ sub SONOS_Discover_DoQueue($) {
 					# Positionswerte abfragen...
 					my $result = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0);
 					my $pos = SONOS_GetTimeSeconds($result->getValue('RelTime'));
+					if ($pos !~ /\d+:\d+:\d+/i) { # e.g. NOT_IMPLEMENTED
+						$pos = '0:00:00';
+					}
 					my $duration = SONOS_GetTimeSeconds($result->getValue('TrackDuration'));
 					
 					# Neue Position berechnen...
@@ -2604,7 +2611,11 @@ sub SONOS_Discover_DoQueue($) {
 					$SONOS_AVTransportControlProxy{$udn}->Seek(0, 'REL_TIME', $value1);
 				}
 				
-				SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.$SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime'));
+				my $trackPosition = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime');
+				if ($trackPosition !~ /\d+:\d+:\d+/i) { # e.g. NOT_IMPLEMENTED
+					$trackPosition = '0:00:00';
+				}
+				SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.$trackPosition);
 			}
 		} elsif ($workType eq 'reportUnresponsiveDevice') {
 			my $value1 = $params[0];
@@ -4994,6 +5005,12 @@ sub SONOS_RestoreOldPlaystate() {
 	$SIG{'CHLD'} = 'IGNORE';
 	
 	$SIG{'INT'} = sub {
+		# Alle noch offenen Restore-Aufträge löschen..-
+		%SONOS_PlayerRestoreRunningUDN = ();
+		while ($SONOS_PlayerRestoreQueue->pending()) {
+			$SONOS_PlayerRestoreQueue->dequeue();
+		}
+		
 		$runEndlessLoop = 0;
 	};
 	
@@ -5117,6 +5134,9 @@ sub SONOS_PlayURITemp($$$) {
 		my $result = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0);
 		$old{Track} = $result->getValue('Track');
 		$old{RelTime} = $result->getValue('RelTime');
+		if ($old{RelTime} !~ /\d+:\d+:\d+/i) { # e.g. NOT_IMPLEMENTED
+			$old{RelTime} = '0:00:00';
+		}
 		
 		$result = $SONOS_AVTransportControlProxy{$udn}->GetMediaInfo(0);
 		$old{CurrentURI} = $result->getValue('CurrentURI');
@@ -5987,6 +6007,7 @@ sub SONOS_Discover_Callback($$$) {
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'fieldType', $fieldType);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'IsBonded', (($fieldType eq '') || ($fieldType eq 'LF') || ($fieldType eq 'LF_RF')) ? '0' : '1');
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'IsMaster', $master ? '1' : '0');
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'IsZoneBridge', $isZoneBridge ? '1' : '0');
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'MasterPlayer', $masterPlayerName);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'SlavePlayer', SONOS_Dumper(\@slavePlayerNames));
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'SlavePlayerNotBonded', SONOS_Dumper(\@slavePlayerNotBondedNames));
@@ -6014,8 +6035,13 @@ sub SONOS_Discover_Callback($$$) {
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackDurationSec', SONOS_GetTimeSeconds($result->getValue('TrackDuration')));
 					
 					my $modus = 'ReadingsBulkUpdate'.((SONOS_Client_Data_Retreive($udn, 'reading', 'currentStreamAudio', 0)) ? 'IfChanged' : '');
-					SONOS_Client_Data_Refresh($modus, $udn, 'currentTrackPosition', $result->getValue('RelTime'));
-					SONOS_Client_Data_Refresh($modus, $udn, 'currentTrackPositionSec', SONOS_GetTimeSeconds($result->getValue('RelTime')));
+					
+					my $trackPosition = $result->getValue('RelTime');
+					if ($trackPosition !~ /\d+:\d+:\d+/i) { # e.g. NOT_IMPLEMENTED
+						$trackPosition = '0:00:00';
+					}
+					SONOS_Client_Data_Refresh($modus, $udn, 'currentTrackPosition', $trackPosition);
+					SONOS_Client_Data_Refresh($modus, $udn, 'currentTrackPositionSec', SONOS_GetTimeSeconds($trackPosition));
 					
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrack', $result->getValue('Track'));
 					
@@ -10023,10 +10049,10 @@ sub SONOS_Client_Data_Retreive($$$$;$) {
 	
 	# Anfrage zulässig, also ausliefern...
 	if (defined($SONOS_Client_Data{Buffer}->{$udnBuffer}) && defined($SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name})) {
-		SONOS_Log undef, 4, "SONOS_Client_Data_Retreive($udnBuffer, $reading, $name, $default) -> ".$SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name} if (!$nologging);
+		SONOS_Log undef, 4, "SONOS_Client_Data_Retreive($udnBuffer, $reading, $name, ".((defined($default)) ? $default : 'undef').") -> ".$SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name} if (!$nologging);
 		return $SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name};
 	} else {
-		SONOS_Log undef, 4, "SONOS_Client_Data_Retreive($udnBuffer, $reading, $name, $default) -> DEFAULT" if (!$nologging);
+		SONOS_Log undef, 4, "SONOS_Client_Data_Retreive($udnBuffer, $reading, $name, ".((defined($default)) ? $default : 'undef').") -> DEFAULT" if (!$nologging);
 		return $default;
 	}
 }

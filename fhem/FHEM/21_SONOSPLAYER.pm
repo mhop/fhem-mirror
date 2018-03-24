@@ -129,8 +129,8 @@ my %sets = (
 	'VolumeRestore' => '',
 	'Balance' => 'balancevalue(-100..100)',
 	'Loudness' => 'state',
-	'Bass' => 'basslevel(0..100)',
-	'Treble' => 'treblelevel(0..100)',	
+	'Bass' => 'basslevel(-10..10)',
+	'Treble' => 'treblelevel(-10..10)',	
 	'CurrentTrackPosition' => 'timeposition',
 	'Track' => 'tracknumber|Random',
 	'currentTrack' => 'tracknumber',
@@ -256,7 +256,7 @@ sub SONOSPLAYER_Detail($$$;$) {
 	
 	my $hash = $defs{$d};
 	
-	return '' if (!ReadingsVal($d, 'IsMaster', 0) || (ReadingsVal($d, 'playerType', '') eq 'ZB100'));
+	return '' if (!ReadingsVal($d, 'IsMaster', 0) || (ReadingsVal($d, 'IsZoneBridge', 0) == 1));
 	
 	# Open incl. Inform-Div
 	my $html .= '<html><div informid="'.$d.'-display_covertitle">';
@@ -568,8 +568,8 @@ sub SONOSPLAYER_Set($@) {
 			if (AttrVal($hash, 'generateVolumeSlider', 1) == 1) {
 				$key = $key.':slider,0,1,100' if ($key eq 'Volume');
 				$key = $key.':slider,0,1,100' if ($key eq 'GroupVolume');
-				$key = $key.':slider,0,1,100' if ($key eq 'Treble');
-				$key = $key.':slider,0,1,100' if ($key eq 'Bass');
+				$key = $key.':slider,-10,1,10' if ($key eq 'Treble');
+				$key = $key.':slider,-10,1,10' if ($key eq 'Bass');
 				$key = $key.':slider,-100,1,100' if ($key eq 'Balance');
 				$key = $key.':slider,-15,1,15' if ($key eq 'SubGain');
 				$key = $key.':slider,-15,1,15' if ($key eq 'SurroundLevel');
