@@ -1,12 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: 10_OWServer: avoid init and autocreate on tentative connection
   - feature: 49_SSCam: 3.6.0, new setPreset command, minor changes
   - feature: 72_FB_CALLMONITOR: show a "not found" popup, when reverse search
                                 via get command fails
   - feature: 93_DbRep: V7.15.0, new command sqlSpecial
   - bugfix:  74_XiaomiBTLSens: fix commandref entrys
   - feature: 49_SSCam: V3.5.0, new get command listPresets
-  - change:  93_DbRep: V7.14.8, exportToFile,importFromFile can use file as an 
+  - change:  93_DbRep: V7.14.8, exportToFile,importFromFile can use file as an
                        argument, fix no save to database if value=0 (writeToDB)
   - feature: 10_OWServer: added OWNet module version suggestion to define
   - feature: 49_SSCam: V3.4.0, new commands startTracking, stopTracking for

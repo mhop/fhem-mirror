@@ -218,7 +218,7 @@ sub OWServer_loadOWNet($) {
   require $libfilename;
   Log3 $name, 3, "$name: OWNet version $OWNet_version loaded.";
 
-  my $owserver= OWServer_OpenDev($hash);
+  my $owserver= OWServer_TryOpenDev($hash);
   if(defined($owserver)) {
     my $version= $owserver->read("/system/configuration/version");
     Log3 $name, 3, "$name: owserver version $version found.";
@@ -267,7 +267,7 @@ OWServer_CloseDev($)
 
 ########################
 sub
-OWServer_OpenDev($)
+OWServer_TryOpenDev($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -279,6 +279,18 @@ OWServer_OpenDev($)
   my $owserver= OWNet->new($protocol);
   if($owserver) {
     Log3 $name, 3, "$name: Successfully connected to $protocol.";
+  } else {
+    Log3 $name, 2, "$name: Could not connect to $protocol.";
+  }
+  return $owserver
+}
+
+sub
+OWServer_OpenDev($)
+{
+  my ($hash) = @_;
+  my $owserver= OWServer_TryOpenDev($hash);
+  if(defined($owserver)) {
     $hash->{fhem}{owserver}= $owserver;
     readingsSingleUpdate($hash, "state", "CONNECTED", 1);
     my $ret  = OWServer_DoInit($hash);
