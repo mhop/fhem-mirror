@@ -369,7 +369,7 @@ sub _cfgDB_table_exists($$) {
       return 1 unless $@;
    }
    printf "table not found\n";
-   printf "don't worry about above messages!\n"
+   printf "don't worry about above messages!\n";
    return 0;
 }
 
