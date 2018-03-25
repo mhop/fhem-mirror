@@ -129,6 +129,9 @@
 # 2018-02-17 - changed   remove experimenatal cache functions
 # 2018-02-18 - changed   move dump processing to backend
 #
+# 2018-03-24 - changed   set privacy as default for username and password
+# 2018-03-25 - changed   move rescue modes from ENV to config file
+#
 ##############################################################################
 =cut
 
@@ -307,12 +310,7 @@ sub cfgDB_Init() {
 
 ### migrate fhembinfilesave to fhemb64filesave
 #    # check: fhembinfilesave exists?
-#    my $sth_test = $fhem_dbh->table_info(undef, 'public', "fhembinfilesave", 'TABLE');
-#       $sth_test->execute;
-#    my @info = $sth_test->fetchrow_array;
-#    my $exists = scalar @info;
     if (_cfgDB_table_exists($fhem_dbh,'fhembinfilesave')) {
-#       $sth_test->finish();
        # check: any files for migratione?
    	   $count = undef;
 	   $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhembinfilesave');
@@ -371,6 +369,7 @@ sub _cfgDB_table_exists($$) {
       return 1 unless $@;
    }
    printf "table not found\n";
+   printf "don't worry about above messages!\n"
    return 0;
 }
 
@@ -388,7 +387,6 @@ sub cfgDB_AttrRead($) {
 	while (@line = $sth->fetchrow_array()) {
 		if($line[1] eq 'configdb') {
            $configDB{attr}{$line[2]} = $line[3];
-#			$attr{configdb}{$line[2]} = $line[3];
 		} else {
 			push @rets, "attr $line[1] $line[2] $line[3]";
 		}
@@ -401,11 +399,6 @@ sub cfgDB_AttrRead($) {
 sub cfgDB_FileRead($) {
 	my ($filename) = @_;
 
-#    if ($configDB{cache}{$filename} && $configDB{attr}{useCache}) {
-#      Log3(undef, 4, "configDB serving from cache: $filename");
-#      return (undef,split(/\n/,$configDB{cache}{$filename}));
-#    }
-
 	Log3(undef, 4, "configDB reading file: $filename");
 	my ($err, @ret, $counter);
 	my $fhem_dbh = _cfgDB_Connect;
@@ -417,10 +410,6 @@ sub cfgDB_FileRead($) {
 	$blobContent = decode_base64($blobContent) if ($blobContent);
 	$counter = length($blobContent);
 	if($counter) {
-#	    if ($configDB{attr}{useCache}) {
-#           Log3(undef,4,"configDB caching: $filename");
-#           $configDB{cache}{$filename} = $blobContent;
-#        }
 		@ret = split(/\n/,$blobContent);
 		$err = "";
 	} else {
@@ -429,12 +418,9 @@ sub cfgDB_FileRead($) {
 	}
 	return ($err, @ret);
 }
+
 sub cfgDB_FileWrite($@) {
 	my ($filename,@content) = @_;
-#    if ($configDB{attr}{useCache}) {
-#       Log3(undef,4,"configDB delete from cache: $filename");
-#       $configDB{cache}{$filename} = undef;
-#    }
 	Log3(undef, 4, "configDB writing file: $filename");
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
@@ -445,6 +431,7 @@ sub cfgDB_FileWrite($@) {
 	$fhem_dbh->disconnect();
 	return;
 }
+
 sub cfgDB_FileUpdate($) {
 	my ($filename) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
@@ -538,7 +525,6 @@ sub cfgDB_SaveCfg(;$) {
 	}
 
 		foreach my $a (sort keys %{$configDB{attr}}) {
-#		foreach my $a (sort keys %{$attr{configdb}}) {
 			my $val = $configDB{attr}{$a};
 			next unless $val;
 			$val =~ s/;/;;/g;
@@ -1232,11 +1218,6 @@ sub _cfgDB_Filedelete($) {
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
 	$ret = ($ret > 0) ? 1 : undef;
-#	if($ret > 0) {
-#		$ret = "File $filename deleted from database.";
-#	} else {
-#		$ret = "File $filename not found in database.";
-#	}
 	return $ret;
 }
 
