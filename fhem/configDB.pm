@@ -230,10 +230,6 @@ my $cfgDB_dbpass	= $dbconfig{password};
 my $cfgDB_dbtype;
 my $cfgDB_filename;
 
-%dbconfig = ();
-@config   = ();
-$configs  = undef;
-$count    = undef;
 
 if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype ="POSTGRESQL";
@@ -246,15 +242,14 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype = "unknown";
 }
 
-#$configDB{attr}{nostate}     = 1 if($ENV{'cfgDB_nostate'});
-#$configDB{attr}{rescue}      = 1 if($ENV{'cfgDB_rescue'});
-#$configDB{attr}{loadversion} = $ENV{'cfgDB_version'} ? $ENV{'cfgDB_version'} : 0;
-
 $configDB{attr}{nostate}     = defined($dbconfig{nostate})     ? $dbconfig{nostate}     : 0;
 $configDB{attr}{rescue}      = defined($dbconfig{rescue})      ? $dbconfig{rescue}      : 0;
 $configDB{attr}{loadversion} = defined($dbconfig{loadversion}) ? $dbconfig{loadversion} : 0;
 
-#$configDB{attr}{rescue}  = 1;
+%dbconfig = ();
+@config   = ();
+$configs  = undef;
+$count    = undef;
 
 ##################################################
 # Basic functions needed for DB configuration
