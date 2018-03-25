@@ -246,9 +246,13 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype = "unknown";
 }
 
-$configDB{attr}{nostate}     = 1 if($ENV{'cfgDB_nostate'});
-$configDB{attr}{rescue}      = 1 if($ENV{'cfgDB_rescue'});
-$configDB{attr}{loadversion} = $ENV{'cfgDB_version'} ? $ENV{'cfgDB_version'} : 0;
+#$configDB{attr}{nostate}     = 1 if($ENV{'cfgDB_nostate'});
+#$configDB{attr}{rescue}      = 1 if($ENV{'cfgDB_rescue'});
+#$configDB{attr}{loadversion} = $ENV{'cfgDB_version'} ? $ENV{'cfgDB_version'} : 0;
+
+$configDB{attr}{nostate}     = defined($dbconfig{nostate})     ? $dbconfig{nostate}     : 0;
+$configDB{attr}{rescue}      = defined($dbconfig{rescue})      ? $dbconfig{rescue}      : 0;
+$configDB{attr}{loadversion} = defined($dbconfig{loadversion}) ? $dbconfig{loadversion} : 0;
 
 ##################################################
 # Basic functions needed for DB configuration
@@ -461,7 +465,7 @@ sub cfgDB_ReadAll($) {
 	my ($cl) = @_;
 	my ($ret, @dbconfig);
 
-	if (defined($configDB{attr}{rescue}) && ($configDB{attr}{rescue} == 1)) {
+	if ($configDB{attr}{rescue} == 1) {
 		Log (0, 'configDB starting in rescue mode!');
 		push (@dbconfig, 'attr global modpath .');
 		push (@dbconfig, 'attr global verbose 3');
@@ -472,7 +476,7 @@ sub cfgDB_ReadAll($) {
 		# add Config Rows to commandfile
 		@dbconfig = _cfgDB_ReadCfg(@dbconfig);
 		# add State Rows to commandfile
-		@dbconfig = _cfgDB_ReadState(@dbconfig) unless $configDB{attr}{nostate};
+		@dbconfig = _cfgDB_ReadState(@dbconfig) unless $configDB{attr}{nostate} == 1;
 	}
 
 	# AnalyzeCommandChain for all entries
