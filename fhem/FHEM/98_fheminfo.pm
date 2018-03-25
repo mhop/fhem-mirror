@@ -29,7 +29,7 @@ my $c_noModel = 'noModel';
 
 my %fhemInfo    = ();
 my @ignoreList  = qw(Global);
-my @noModelList = qw(readingsgroup doif lacrosse zwdongle wol weekdaytimer 
+my @noModelList = qw(readingsgroup lacrosse zwdongle wol weekdaytimer 
    cul_rfr solarview lw12 tscul knx dummy at archetype weather pushover twilight hminfo readingsgroup);
 
 sub fheminfo_Initialize($$) {
