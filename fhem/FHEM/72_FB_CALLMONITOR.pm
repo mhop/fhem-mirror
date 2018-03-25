@@ -416,7 +416,7 @@ FB_CALLMONITOR_Read($)
             }
             
             # Remove trailing hash sign and everything afterwards
-            $external_number =~ s/#.*$//;
+            $external_number =~ s/#.*$// unless($external_number =~ /^\*/); # Forum #85761
       
             $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(AttrVal($name, "reverse-search", "none") ne "none");
        
