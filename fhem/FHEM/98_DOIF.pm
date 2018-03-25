@@ -3038,7 +3038,7 @@ DOIF_Define($$$)
     $cmd =~ s/\$SELF/$hash->{NAME}/g;
   }
   
-  if ($cmd eq "" or $cmd =~ /^\s*\(/) {
+  if ($cmd =~ /^\s*(\(|$)/) {
     $hash->{MODEL}="FHEM";  
     ($msg,$err)=CmdDoIf($hash,$cmd);
     #delete $defs{$hash->{NAME}}{".AttrList"};
@@ -3824,7 +3824,7 @@ Fenster Status/Meldung:<br>
 <code>define di_Fenster DOIF (["^Window:open"]) <br>
 (push "Fenster $DEVICE wurde geöffnet. Es sind folgende Fenster offen: [@"^Window":state:"open"]")<br>
 DOELSEIF ([#"^Window:closed":state:"open"] == 0)<br>
-(push "alle Fenster geschlossen")</code><br>
+(push "alle Fenster geschlossen")<br>
 <br>
 attr di_Fenster do always<br>
 attr di_Fenster cmdState $DEVICE zuletzt geöffnet|alle geschlossen</code><br>
