@@ -54,7 +54,7 @@ sub new($) {
 	return bless {
 		hash => $hash,
 	    #-- module version
-		version => "7.08"
+		version => "7.10"
 	}, $class;
 }
 
@@ -111,8 +111,8 @@ sub Define($) {
     #-- reset the 1-Wire system in COC/CUNO
     main::CUL_SimpleWrite($hwdevice, "Oi");
       
-    main::Log3 $name,1,"OWX_CCC::Define warning: version ".$hash->{version}." not identical to OWX version ".$main::owx_version
-      if( $hash->{version} ne $main::owx_version);
+    main::Log3 $name,1,"OWX_CCC::Define warning: version ".$self->{version}." not identical to OWX version ".$main::owx_version
+      if( $self->{version} ne $main::owx_version);
       
     #-- call low level init function for the device
     $self->Init();
@@ -316,7 +316,6 @@ sub Open () {
 sub Close () {
   my ($self) = @_;
   my $hash = $self->{hash};
- 
 }
 
 ########################################################################################
@@ -326,7 +325,7 @@ sub Close () {
 ########################################################################################
 
 sub Reopen () {
-  main::Log 1,"[OWX_CCC] Warning: ->Reopen currently not defined
+  main::Log 1,"[OWX_CCC] Warning: ->Reopen currently not defined";
 }
 
 ########################################################################################
