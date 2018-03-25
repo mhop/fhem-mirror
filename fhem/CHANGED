@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 72_FB_CALLMONITOR: show a "not found" popup, when reverse search
+                                via get command fails
   - feature: 93_DbRep: V7.15.0, new command sqlSpecial
   - bugfix:  74_XiaomiBTLSens: fix commandref entrys
   - feature: 49_SSCam: V3.5.0, new get command listPresets

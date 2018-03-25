@@ -165,7 +165,11 @@ FB_CALLMONITOR_Get($@)
 
     if($arguments[1] eq "search" and int(@arguments) >= 3)
     {
-        return FB_CALLMONITOR_reverseSearch($hash, FB_CALLMONITOR_normalizePhoneNumber($hash, join '', @arguments[2..$#arguments]));
+        my $number = FB_CALLMONITOR_normalizePhoneNumber($hash, join '', @arguments[2..$#arguments]);
+        my $result = FB_CALLMONITOR_reverseSearch($hash, $number);
+        
+        return $result if(defined($result));
+        return "no reverse search result found for $number";
     }
     elsif($arguments[1] eq "showPhonebookIds" and exists($hash->{helper}{PHONEBOOK_NAMES}))
     {
