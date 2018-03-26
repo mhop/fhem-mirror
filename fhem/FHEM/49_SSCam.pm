@@ -27,7 +27,8 @@
 #########################################################################################################################
 #  Versions History:
 # 
-# 3.6.0  25.03.2018    setPreset command, changed SSCam_wdpollcaminfo, getcaminfoall
+# 3.7.0  26.03.2018    minor details of setPreset changed, new command delPreset
+# 3.6.0  25.03.2018    setPreset command, changed SSCam_wdpollcaminfo, SSCam_getcaminfoall
 # 3.5.0  22.03.2018    new get command listPresets
 # 3.4.0  21.03.2018    new commands startTracking, stopTracking
 # 3.3.1  20.03.2018    new readings CapPTZObjTracking, CapPTZPresetNumber
@@ -181,16 +182,16 @@
 #                      Var (Internals) "SERVERNAME" changed to "SERVERADDR",
 #                      minor change of Log messages,
 #                      Note: use rereadcfg in order to activate the changes
-#  1.5    04.01.2016   Function "Get" for creating Camera-Readings integrated,
+# 1.5     04.01.2016   Function "Get" for creating Camera-Readings integrated,
 #                      Attributs pollcaminfoall, pollnologging  added,
 #                      Function for Polling Cam-Infos added.
-#  1.4    23.12.2015   function "enable" and "disable" for SS-Cams added,
+# 1.4     23.12.2015   function "enable" and "disable" for SS-Cams added,
 #                      changed timout of Http-calls to a higher value
-#  1.3    19.12.2015   function "snap" for taking snapshots added,
+# 1.3     19.12.2015   function "snap" for taking snapshots added,
 #                      fixed a bug that functions may impact each other 
-#  1.2    14.12.2015   improve usage of verbose-modes
-#  1.1    13.12.2015   use of InternalTimer instead of fhem(sleep)
-#  1.0    12.12.2015   changed completly to HttpUtils_NonblockingGet for calling websites nonblocking, 
+# 1.2     14.12.2015   improve usage of verbose-modes
+# 1.1     13.12.2015   use of InternalTimer instead of fhem(sleep)
+# 1.0     12.12.2015   changed completly to HttpUtils_NonblockingGet for calling websites nonblocking, 
 #                      LWP is not needed anymore
 #
 #
@@ -211,7 +212,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.6.0";
+my $SSCamVersion = "3.7.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -554,6 +555,7 @@ sub SSCam_Set($@) {
       # selist für Cams
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials ".
+                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
                  "expmode:auto,day,night ".
                  "on ".
                  "off:noArg ".
@@ -565,7 +567,7 @@ sub SSCam_Set($@) {
                  "disable:noArg ".
 				 "optimizeParams ".
                  "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open,lastsnap_fw ".
-                 "setPreset ".
+                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setPreset ": "").
                  "stopView:noArg ".
                  ((ReadingsVal("$name", "CapPTZObjTracking", 0) != 0) ? "startTracking:noArg " : "").
                  ((ReadingsVal("$name", "CapPTZObjTracking", 0) != 0) ? "stopTracking:noArg " : "").
@@ -655,11 +657,11 @@ sub SSCam_Set($@) {
       
   } elsif ($opt eq "enable" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      camenable($hash);
+      SSCam_camenable($hash);
         
   } elsif ($opt eq "disable" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      camdisable($hash);
+      SSCam_camdisable($hash);
        
   } elsif ($opt eq "motdetsc" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -692,7 +694,7 @@ sub SSCam_Set($@) {
       $hash->{HELPER}{ACTIVE} = "off";  
 	  
 	  if($success) {
-	      getcaminfoall($hash,0);
+	      SSCam_getcaminfoall($hash,0);
 		  return "Username and Password saved successfully";
 	  } else {
 		   return "Error while saving Username / Password - see logfile for details";
@@ -716,10 +718,10 @@ sub SSCam_Set($@) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       if (!$prop) {return "Function \"goPreset\" needs a \"Presetname\" as an argument";}
             
-      @prop = split(/;/, $prop);
-      $prop = $prop[0];
-      @prop = split(/,/, $prop);
-      $prop = $prop[0];
+      #@prop = split(/;/, $prop);
+      #$prop = $prop[0];
+      #@prop = split(/,/, $prop);
+      #$prop = $prop[0];
       $hash->{HELPER}{GOPRESETNAME} = $prop;
       $hash->{HELPER}{PTZACTION}    = "gopreset";
       SSCam_doptzaction($hash);
@@ -737,10 +739,10 @@ sub SSCam_Set($@) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       if (!$prop) {return "Function \"runPatrol\" needs a \"Patrolname\" as an argument";}
             
-      @prop = split(/;/, $prop);
-      $prop = $prop[0];
-      @prop = split(/,/, $prop);
-      $prop = $prop[0];
+      #@prop = split(/;/, $prop);
+      #$prop = $prop[0];
+      #@prop = split(/,/, $prop);
+      #$prop = $prop[0];
       $hash->{HELPER}{GOPATROLNAME} = $prop;
       $hash->{HELPER}{PTZACTION}    = "runpatrol";
       SSCam_doptzaction($hash);
@@ -852,14 +854,20 @@ sub SSCam_Set($@) {
       SSCam_stopliveview($hash);            
         
   } elsif ($opt eq "setPreset" && SSCam_IsModelCam($hash)) {
-	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-		if (!$prop) {return "Syntax of function \"$opt\" was wrong. Please use \"set $name setPreset <PresetNumber> <PresetName> [<Speed>]\" ";}
-        $hash->{HELPER}{PNUMBER} = $prop;
-        $hash->{HELPER}{PNAME}   = $prop1?$prop1:$prop;  # wenn keine Presetname angegeben -> Presetnummer als Name verwenden
-        $hash->{HELPER}{PSPEED}  = $prop2;
-		SSCam_setPreset($hash);
+	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$prop) {return "Syntax of function \"$opt\" was wrong. Please use \"set $name setPreset <PresetNumber> <PresetName> [<Speed>]\" ";}
+      $hash->{HELPER}{PNUMBER} = $prop;
+      $hash->{HELPER}{PNAME}   = $prop1?$prop1:$prop;  # wenn keine Presetname angegeben -> Presetnummer als Name verwenden
+      $hash->{HELPER}{PSPEED}  = $prop2 if($prop2);
+	  SSCam_setPreset($hash);
                 
-    } else {
+  } elsif ($opt eq "delPreset" && SSCam_IsModelCam($hash)) {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      if (!$prop) {return "Function \"$opt\" needs a \"Presetname\" as argument";}      
+      $hash->{HELPER}{DELPRESETNAME} = $prop;
+      SSCam_delPreset($hash);
+        
+  } else {
       return "$setlist";
   }  
   
@@ -916,7 +924,7 @@ sub SSCam_Get($@) {
     } elsif ($opt eq "caminfoall") {
         # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
 		if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        getcaminfoall($hash,1);
+        SSCam_getcaminfoall($hash,1);
                 
     } elsif ($opt eq "homeModeState" && !SSCam_IsModelCam($hash)) {
 	    if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1005,7 +1013,7 @@ sub SSCam_Get($@) {
 		delete $hash->{HELPER}{APIPARSET};
 		delete $hash->{CAMID};
 		# "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
-        getcaminfoall($hash,1);
+        SSCam_getcaminfoall($hash,1);
     
 	} else {
         return "$getlist";
@@ -1215,7 +1223,7 @@ sub SSCam_wdpollcaminfo ($) {
             readingsSingleUpdate($hash,"state","polling",1) if(!SSCam_IsModelCam($hash));   # Polling-state bei einem SVS-Device setzten
 		    Log3($name, 3, "$name - Polling of $camname is activated - Pollinginterval: ".$attr{$name}{pollcaminfoall}." s");
             $hash->{HELPER}{OLDVALPOLL} = $attr{$name}{pollcaminfoall};                     # in $hash eintragen für späteren Vergleich (Changes von pollcaminfoall)
-            getcaminfoall($hash,0);  
+            SSCam_getcaminfoall($hash,0);  
         }
         
         my $lupd = ReadingsVal($name, "LastUpdateTime", 0);
@@ -1224,7 +1232,7 @@ sub SSCam_wdpollcaminfo ($) {
             $lupd = fhemTimeGm($sec, $min, $hour, $mday, $month, $year);
         }
         if( gettimeofday() < ($lupd + $attr{$name}{pollcaminfoall} + 20) ) {
-            getcaminfoall($hash,0);  
+            SSCam_getcaminfoall($hash,0);  
         }
         
     }
@@ -1669,7 +1677,7 @@ sub SSCam_getpresets($) {
 }
 
 ###############################################################################
-#                       ein Preset setzen
+#                       einen Preset setzen
 ###############################################################################
 sub SSCam_setPreset($) {
     my ($hash)   = @_;
@@ -1696,7 +1704,7 @@ sub SSCam_setPreset($) {
         readingsBulkUpdate($hash,"Error",$error);
         readingsEndUpdate($hash, 1);
     
-        Log3($name, 2, "$name - ERROR - Preset list of Camera $camname can't be get - $error");
+        Log3($name, 2, "$name - ERROR - Preset of Camera $camname can't be set - $error");
         
         return;
     }
@@ -1714,6 +1722,55 @@ sub SSCam_setPreset($) {
 		
     } else {
         InternalTimer(gettimeofday()+1.2, "SSCam_setPreset", $hash, 0);
+    }    
+}
+
+###############################################################################
+#                       einen Preset löschen
+###############################################################################
+sub SSCam_delPreset($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $errorcode;
+    my $error;
+    
+    RemoveInternalTimer($hash, "SSCam_delPreset");
+    return if(IsDisabled($name));
+    
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+        }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = SSCam_experror($hash,$errorcode);
+
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        Log3($name, 2, "$name - ERROR - Preset of Camera $camname can't be deleted - $error");
+        
+        return;
+    }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {             
+        $hash->{OPMODE} = "delPreset";
+        $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+		
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        
+        SSCam_getapisites($hash);
+		
+    } else {
+        InternalTimer(gettimeofday()+1.4, "SSCam_delPreset", $hash, 0);
     }    
 }
 
@@ -1950,12 +2007,12 @@ sub SSCam_doptzaction ($) {
 ###############################################################################
 #                         stoppen continoues move
 ###############################################################################
-sub movestop ($) {
+sub SSCam_movestop ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "movestop");
+    RemoveInternalTimer($hash, "SSCam_movestop");
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
@@ -1969,19 +2026,19 @@ sub movestop ($) {
         SSCam_getapisites($hash);
    
     } else {
-        InternalTimer(gettimeofday()+0.3, "movestop", $hash, 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_movestop", $hash, 0);
     }    
 }
 
 ###############################################################################
 #                           Kamera aktivieren
 ###############################################################################
-sub camenable ($) {
+sub SSCam_camenable ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "camenable");
+    RemoveInternalTimer($hash, "SSCam_camenable");
     return if(IsDisabled($name));
     
     # if (ReadingsVal("$name", "Availability", "disabled") eq "enabled") {return;}       # Kamera ist bereits enabled
@@ -2000,19 +2057,19 @@ sub camenable ($) {
         SSCam_getapisites($hash);
     
 	} else {
-        InternalTimer(gettimeofday()+0.5, "camenable", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "SSCam_camenable", $hash, 0);
     }    
 }
 
 ###############################################################################
 #                            Kamera deaktivieren
 ###############################################################################
-sub camdisable ($) {
+sub SSCam_camdisable ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "camdisable");
+    RemoveInternalTimer($hash, "SSCam_camdisable");
     return if(IsDisabled($name));
     
     # if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {return;}       # Kamera ist bereits disabled
@@ -2031,20 +2088,20 @@ sub camdisable ($) {
         SSCam_getapisites($hash);
 		
     } else {
-        InternalTimer(gettimeofday()+0.5, "camdisable", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "SSCam_camdisable", $hash, 0);
     }    
 }
 
 ###############################################################################
 #      Kamera alle Informationen abrufen (Get) bzw. Einstieg Polling
 ###############################################################################
-sub getcaminfoall ($$) {
+sub SSCam_getcaminfoall ($$) {
     my ($hash,$mode)   = @_;
     my $camname        = $hash->{CAMNAME};
     my $name           = $hash->{NAME};
     my ($now,$new);
     
-    RemoveInternalTimer($hash, "getcaminfoall");
+    RemoveInternalTimer($hash, "SSCam_getcaminfoall");
     return if(IsDisabled($name));
     
     RemoveInternalTimer($hash, "getsvsinfo");
@@ -2085,7 +2142,7 @@ sub getcaminfoall ($$) {
     
     if (defined($attr{$name}{pollcaminfoall})) {        
         $new = gettimeofday()+$attr{$name}{pollcaminfoall}; 
-        InternalTimer($new, "getcaminfoall", $hash, 0);
+        InternalTimer($new, "SSCam_getcaminfoall", $hash, 0);
 		
 		$now = FmtTime(gettimeofday());
         $new = FmtTime(gettimeofday()+$attr{$name}{pollcaminfoall});
@@ -2317,7 +2374,7 @@ sub sessionoff ($) {
 }
 
 ###########################################################################
-#   Kamera allgemeine Informationen abrufen (Get), sub von getcaminfoall
+#               Kamera allgemeine Informationen abrufen (Get) 
 ###########################################################################
 sub getcaminfo ($) {
     my ($hash)   = @_;
@@ -2343,7 +2400,7 @@ sub getcaminfo ($) {
 }
 
 ################################################################################
-#       Kamera Stream Urls abrufen (Get), Aufruf aus getcaminfoall
+#                      Kamera Stream Urls abrufen (Get)
 ################################################################################
 sub getStmUrlPath ($) {
     my ($hash)   = @_;
@@ -2370,7 +2427,7 @@ sub getStmUrlPath ($) {
 }
 
 ###########################################################################
-#          query SVS-Event information , sub von getcaminfoall
+#                         query SVS-Event information 
 ###########################################################################
 sub SSCam_geteventlist ($) {
     my ($hash)   = @_;
@@ -2396,7 +2453,7 @@ sub SSCam_geteventlist ($) {
 }
 
 ###########################################################################
-#     Enumerate motion detection parameters, sub von getcaminfoall
+#               Enumerate motion detection parameters
 ###########################################################################
 sub SSCam_getmotionenum ($) {
     my ($hash)   = @_;
@@ -2423,7 +2480,7 @@ sub SSCam_getmotionenum ($) {
 }
 
 ##########################################################################
-#    Capabilities von Kamera abrufen (Get), sub von getcaminfoall
+#             Capabilities von Kamera abrufen (Get)
 ##########################################################################
 sub SSCam_getcapabilities ($) {
     my ($hash)   = @_;
@@ -2449,7 +2506,7 @@ sub SSCam_getcapabilities ($) {
 }
 
 ##########################################################################
-#   PTZ Presets abrufen (Get), sub von getcaminfoall
+#                      PTZ Presets abrufen (Get)
 ##########################################################################
 sub SSCam_getptzlistpreset ($) {
     my ($hash)   = @_;
@@ -2484,7 +2541,7 @@ sub SSCam_getptzlistpreset ($) {
 }
 
 ##########################################################################
-#          PTZ Patrols abrufen (Get), sub von getcaminfoall
+#                    PTZ Patrols abrufen (Get)
 ##########################################################################
 sub SSCam_getptzlistpatrol ($) {
     my ($hash)   = @_;
@@ -3218,6 +3275,10 @@ sub SSCam_camop ($) {
 	      $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&cameraId=\"$camid\"&_sid=\"$sid\"";       
       }
       
+   } elsif ($OpMode eq "delPreset") {
+      # einen Preset löschen
+	  $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"DelPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{DELPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+   
    } elsif ($OpMode eq "startTrack") {
       # Object Tracking einschalten
 	  $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&cameraId=\"$camid\"&_sid=\"$sid\"";
@@ -3697,7 +3758,6 @@ sub SSCam_camop_parse ($) {
 				delete($hash->{HELPER}{CL});
             
 			} elsif ($OpMode eq "setPreset") {              
-
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
@@ -3706,9 +3766,19 @@ sub SSCam_camop_parse ($) {
                 my $pnumber = delete($hash->{HELPER}{PNUMBER});
                 my $pname   = delete($hash->{HELPER}{PNAME});
                 my $pspeed  = delete($hash->{HELPER}{PSPEED});                
-                $pspeed     = $pspeed?$pspeed:"3";
+                $pspeed     = $pspeed?$pspeed:"n.a.";
                 # Logausgabe
                 Log3($name, 3, "$name - Camera \"$camname\" preset \"$pname\" was saved to number $pnumber with speed $pspeed");
+                SSCam_getptzlistpreset($hash);
+            
+			} elsif ($OpMode eq "delPreset") {              
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                
+                my $dp = $hash->{HELPER}{DELPRESETNAME};               
+                Log3($name, 3, "$name - Preset \"$dp\" of camera \"$camname\" was deleted successfully");
                 SSCam_getptzlistpreset($hash);
             
 			} elsif ($OpMode eq "setoptpar") { 
@@ -3972,8 +4042,8 @@ sub SSCam_camop_parse ($) {
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname started move to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
                 
-                RemoveInternalTimer($hash, "movestop");
-                InternalTimer(gettimeofday()+($hash->{HELPER}{GOMOVETIME}), "movestop", $hash);
+                RemoveInternalTimer($hash, "SSCam_movestop");
+                InternalTimer(gettimeofday()+($hash->{HELPER}{GOMOVETIME}), "SSCam_movestop", $hash);
             
 			} elsif ($OpMode eq "movestop") {
                 # ein "Move" in eine bestimmte Richtung wurde durchgeführt 
@@ -5096,7 +5166,7 @@ sub SSCam_experror {
 	   <li>show the stored credentials of a device </li>
 	   <li>fetch the Surveillance Station Logs, exploit the newest entry as reading  </li>
 	   <li>Start/Stop Object Tracking (only supported PTZ-Cams with this capability)  </li>
-       <li>Set a Preset (at PTZ-cameras)  </li>
+       <li>Set/Delete a Preset (at PTZ-cameras)  </li>
     </ul>
    </ul>
    <br>
@@ -5226,6 +5296,7 @@ sub SSCam_experror {
       <tr><td><li>set ... on                 </td><td> session: ServeillanceStation - observer with enhanced privilege "manual recording" </li></td></tr>
       <tr><td><li>set ... off                </td><td> session: ServeillanceStation - observer with enhanced privilege "manual recording" </li></td></tr>
       <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - observer    </li></td></tr>
+      <tr><td><li>set ... delPreset          </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - manager       </li></td></tr>
@@ -5289,6 +5360,14 @@ sub SSCam_experror {
   you are able to manipulate the properties of the new snapshot gallery device. <br> 
   <br><br>
   </ul>
+  
+  <ul>
+  <li><b> set &lt;name&gt; delPreset &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
+  
+  Deletes a preset "&lt;PresetName&gt;". In FHEMWEB a drop-down list with current available presets is provieded.
+
+  </ul>
+  <br><br>
   
   <ul>
   <li><b> set &lt;name&gt; [enable|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
@@ -6144,7 +6223,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 	  <li>abrufen des Surveillance Station Logs, auswerten des neuesten Eintrags als Reading  </li>
 	  <li>erzeugen einer Gallerie der letzten 1-10 Schnappschüsse (als Popup oder permanentes Device)  </li>
       <li>Start bzw. Stop Objekt Tracking (nur unterstützte PTZ-Kameras mit dieser Fähigkeit)  </li>
-      <li>Setzen eines Presets (bei PTZ-Kameras)  </li>
+      <li>Setzen/Löschen eines Presets (bei PTZ-Kameras)  </li>
      </ul> 
     </ul>
     <br>
@@ -6273,6 +6352,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
       <table>
       <colgroup> <col width=20%> <col width=80%> </colgroup>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
+      <tr><td><li>set ... delPreset          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
@@ -6339,6 +6419,15 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   können die Eigenschaften der Schnappschußgallerie beeinflusst werden. <br> 
   <br><br>
   </ul>
+  
+  <ul>
+  <li><b> set &lt;name&gt; delPreset &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
+  
+  Löscht einen Preset "&lt;PresetName&gt;". Im FHEMWEB wird eine Drop-Down Liste der aktuell vorhandenen 
+  Presets angeboten.
+
+  </ul>
+  <br><br>
   
   <ul>
   <li><b> set &lt;name&gt; [enable|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>

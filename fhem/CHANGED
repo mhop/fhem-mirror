@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCam: 3.7.0, new delPreset command, minor fixes
   - bugfix: 10_OWServer: avoid init and autocreate on tentative connection
   - feature: 49_SSCam: 3.6.0, new setPreset command, minor changes
   - feature: 72_FB_CALLMONITOR: show a "not found" popup, when reverse search
