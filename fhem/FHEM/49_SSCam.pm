@@ -574,7 +574,7 @@ sub SSCam_Set($@) {
                  ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-                 ((ReadingsVal("$name", "CapPTZAbs", "false") ne "false") ? "goAbsPTZ"." " : ""). 
+                 (ReadingsVal("$name", "CapPTZAbs", 0) ? "goAbsPTZ"." " : ""). 
                  ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "");
   } else {
       # setlist für SVS Devices
@@ -3766,7 +3766,7 @@ sub SSCam_camop_parse ($) {
                 my $pnumber = delete($hash->{HELPER}{PNUMBER});
                 my $pname   = delete($hash->{HELPER}{PNAME});
                 my $pspeed  = delete($hash->{HELPER}{PSPEED});                
-                $pspeed     = $pspeed?$pspeed:"n.a.";
+                $pspeed     = $pspeed?$pspeed:"not set";
                 # Logausgabe
                 Log3($name, 3, "$name - Camera \"$camname\" preset \"$pname\" was saved to number $pnumber with speed $pspeed");
                 SSCam_getptzlistpreset($hash);
