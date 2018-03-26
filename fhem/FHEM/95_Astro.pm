@@ -47,7 +47,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.42;
+my $astroversion = 1.43;
 
 #-- These we may get on request
 my %gets = (
@@ -353,7 +353,13 @@ sub Astro_round($$) { my ($x,$n)=@_; return int(10**$n*$x+0.5)/10**$n};
 sub Astro_tzoffset($) {
     my ($t)   = @_;
     my $utc   = mktime(gmtime($t));
+    #-- the following does not properly calculate dst
     my $local = mktime(localtime($t));
+    my ($sec, $min, $hour, $day, $month, $year, $wday, $yday, $isdst) = localtime(time);
+    #-- correction
+    if($isdst == 1){
+      $local+=3600;
+    }
     return (($local - $utc)/36);
 }
 
@@ -1289,6 +1295,7 @@ sub Astro_Update($@) {
   $Date{hour} = $hour;
   $Date{min}  = $min;
   $Date{sec}  = $sec; 
+  $Date{isdst}= $isdst;
   #-- broken on windows
   #$Date{zonedelta} = (strftime "%z", localtime)/100;
   $Date{zonedelta} = Astro_tzoffset(time)/100;
@@ -1354,6 +1361,7 @@ sub Astro_Get($@) {
     $Date{hour} = $hour;
     $Date{min}  = $min;
     $Date{sec}  = $sec; 
+    $Date{isdst}= $isdst; 
     #-- broken on windows
     #$Date{zonedelta} = (strftime "%z", localtime)/100;
     $Date{zonedelta} = Astro_tzoffset(time)/100;
