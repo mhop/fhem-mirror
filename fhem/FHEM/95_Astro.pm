@@ -47,7 +47,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.43;
+my $astroversion = 1.44;
 
 #-- These we may get on request
 my %gets = (
@@ -91,6 +91,7 @@ my %astro_transtable_EN = (
     "twilightastro"     =>  "Astronomical twilight",
     "twilightcustom"    =>  "Custom twilight",
     "sign"              =>  "Zodiac sign",
+    "dst"               =>  "daylight saving time",
     #--
     "today"             =>  "Today",
     "tomorrow"          =>  "Tomorrow",
@@ -177,6 +178,7 @@ my %astro_transtable_EN = (
     "twilightastro"     =>  "Astronomische Dämmerung",
     "twilightcustom"    =>  "Konfigurierte Dämmerung",
     "sign"              =>  "Tierkreiszeichen",
+    "dst"               =>  "Sommerzeit",
     #--
     "today"             =>  "Heute",
     "tomorrow"          =>  "Morgen",
@@ -355,7 +357,8 @@ sub Astro_tzoffset($) {
     my $utc   = mktime(gmtime($t));
     #-- the following does not properly calculate dst
     my $local = mktime(localtime($t));
-    my ($sec, $min, $hour, $day, $month, $year, $wday, $yday, $isdst) = localtime(time);
+    #-- this is the correction
+    my $isdst = (localtime($t))[8];
     #-- correction
     if($isdst == 1){
       $local+=3600;
@@ -1152,8 +1155,8 @@ sub Astro_Compute($){
   $Astro{NauticTwilightEvening}   = Astro_HHMM($NauticTwilightEvening);
   $Astro{AstroTwilightMorning}    = Astro_HHMM($AstroTwilightMorning);
   $Astro{AstroTwilightEvening}    = Astro_HHMM($AstroTwilightEvening);
-  $Astro{CustomTwilightMorning}    = Astro_HHMM($CustomTwilightMorning);
-  $Astro{CustomTwilightEvening}    = Astro_HHMM($CustomTwilightEvening);
+  $Astro{CustomTwilightMorning}   = Astro_HHMM($CustomTwilightMorning);
+  $Astro{CustomTwilightEvening}   = Astro_HHMM($CustomTwilightEvening);
   
   #-- calculate data for the moon at given time
   my $moonCoor    = Astro_MoonPosition($sunCoor->{lon}, $sunCoor->{anomalyMean}, $TDT, $lon, $lat, $radius, $lmst*15.*$DEG);
@@ -1186,6 +1189,7 @@ sub Astro_Compute($){
   $Astro{ObsDate}= sprintf("%02d.%02d.%04d",$Date{day},$Date{month},$Date{year});
   $Astro{ObsTime}= sprintf("%02d:%02d:%02d",$Date{hour},$Date{min},$Date{sec});
   $Astro{ObsTimezone}= $Date{zonedelta};
+  $Astro{ObsIsDST}= $Date{isdst};
   
   #-- check season
   my $doj = $Date{dayofyear};
@@ -1345,6 +1349,7 @@ sub Astro_Get($@) {
       #-- broken on windows
       #$Date{zonedelta} = (strftime "%z", localtime($fTot))/100;
       $Date{zonedelta} = Astro_tzoffset($fTot)/100;
+      $Date{isdst}     = (localtime($fTot))[8];
       #-- half broken in windows
       $Date{dayofyear} = 1*strftime("%j", localtime($fTot));
     }else{
@@ -1386,7 +1391,8 @@ sub Astro_Get($@) {
     if( $wantsreading==1 ){
       return $Astro{$a[2]};
     }else{
-      my $ret=sprintf("%s %s %s \n",$astro_tt->{"date"},$Astro{ObsDate},$Astro{ObsTime});
+      my $ret=sprintf("%s %s %s",$astro_tt->{"date"},$Astro{ObsDate},$Astro{ObsTime});
+      $ret .= (($Astro{ObsIsDST}==1) ? " (".$astro_tt->{"dst"}.")\n" : "\n" );
       $ret .= sprintf("%s %.2f %s, %d %s\n",$astro_tt->{"jdate"},$Astro{ObsJD},$astro_tt->{"days"},$Astro{ObsDayofyear},$astro_tt->{"dayofyear"});
       $ret .= sprintf("%s %s, %s %2d\n",$astro_tt->{"season"},$Astro{ObsSeason},$astro_tt->{"timezone"},$Astro{ObsTimezone});
       $ret .= sprintf("%s %.5f° %s, %.5f° %s, %.0fm %s\n",$astro_tt->{"coord"},$Astro{ObsLon},$astro_tt->{"longitude"},
@@ -1458,6 +1464,7 @@ sub Astro_Get($@) {
         <li><i>JD</i> = Julian date</li>
         <li><i>Season,SeasonN</i> = String and numerical (0..3) value of season</li>
         <li><i>Time,Timezone</i> obvious meaning</li>
+        <li><i>IsDST</i> = 1 if running on daylight savings time, 0 otherwise</li>
         <li><i>GMST,ÖMST</i> = Greenwich and Local Mean Sidereal Time (in HH:MM)</li>
 	    </ul>
 	    <p>
