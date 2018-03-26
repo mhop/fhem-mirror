@@ -221,10 +221,15 @@ sub OWServer_loadOWNet($) {
   my $owserver= OWServer_TryOpenDev($hash);
   if(defined($owserver)) {
     my $version= $owserver->read("/system/configuration/version");
-    Log3 $name, 3, "$name: owserver version $version found.";
-    $hash->{OWSERVER_VERSION}= $version;
-    if($OWNet_version eq $version) {
-      Log3 $name, 3, "$name: Matching OWNet version already loaded.";
+    if(defined($version)) {
+      Log3 $name, 3, "$name: owserver version $version found.";
+      $hash->{OWSERVER_VERSION}= $version;
+      if($OWNet_version eq $version) {
+        Log3 $name, 3, "$name: Matching OWNet version already loaded.";
+        return $OWNet_version;
+      }
+    } else {
+      Log3 $name, 2, "$name: Could not read owserver version, using OWNet version $OWNet_version.";
       return $OWNet_version;
     }
     my $libfilename= OWServer_getOWNetfilename($version);
