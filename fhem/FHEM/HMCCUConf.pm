@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2
+#  Version 4.2.002
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -236,7 +236,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	statevals        => "on:true,off:false",
 	substitute       => "STATE!(1|true):on,(0|false):off;WORKING!(1|true):yes,(0|false):no"	
 	},
-	"HM-LC-Sw1-Pl|HM-LC-Sw1-Pl-2|HM-LC-Sw1-SM|HM-LC-Sw1-FM|HM-LC-Sw1-PB-FM" => {
+	"HM-LC-Sw1-Pl|HM-LC-Sw1-Pl-2|HM-LC-Sw1-SM|HM-LC-Sw1-FM|HM-LC-Sw1-PB-FM|HM-LC-Sw1-DR" => {
 	_description     => "1 Kanal Funk-Schaltaktor",
 	_channels        => "1",
 	ccureadingfilter => "STATE",
@@ -604,7 +604,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	statevals        => "on:true,off:false",
 	substitute       => "STATE!(1|true):on,(0|false):off;WORKING!(1|true):yes,(0|false):no"	
 	},
-	"HM-LC-Sw1-Pl|HM-LC-Sw1-Pl-2|HM-LC-Sw1-SM|HM-LC-Sw1-FM|HM-LC-Sw1-PB-FM" => {
+	"HM-LC-Sw1-Pl|HM-LC-Sw1-Pl-2|HM-LC-Sw1-SM|HM-LC-Sw1-FM|HM-LC-Sw1-PB-FM|HM-LC-Sw1-DR" => {
 	_description     => "1 Kanal Funk-Schaltaktor",
 	ccureadingfilter => "STATE",
 	statedatapoint   => "1.STATE",

@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2
+#  Version 4.2.001
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -310,7 +310,7 @@ sub HMCCUDEV_Set ($@)
 			}
 		
 			return HMCCU_SetError ($hash, -8)
-				if (!HMCCU_IsValidDatapoint ($hash, $ccutype, 0, $objname, 2));
+				if (!HMCCU_IsValidDatapoint ($hash, $ccutype, undef, $objname, 2));
 		   
 			$objvalue =~ s/\\_/%20/g;
 			$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
@@ -599,7 +599,7 @@ sub HMCCUDEV_Get ($@)
 		}
 
 		return HMCCU_SetError ($hash, -8)
-			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $0, $objname, 1));
+			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, undef, $objname, 1));
 
 		$objname = $ccuif.'.'.$ccuaddr.':'.$objname;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);

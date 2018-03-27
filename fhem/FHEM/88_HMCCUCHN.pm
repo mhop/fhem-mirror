@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.001
+#  Version 4.2.002
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #

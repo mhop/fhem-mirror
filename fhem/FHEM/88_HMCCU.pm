@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.003
+#  Version 4.2.004
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -37,7 +37,7 @@
 #  get <name> dump {devtypes|datapoints} [<filter>]
 #  get <name> dutycycle
 #  get <name> exportdefaults {filename}
-#  get <name> firmware
+#  get <name> firmware [{type-expr}|full]
 #  get <name> parfile [<parfile>]
 #  get <name> rpcevents
 #  get <name> rpcstate
@@ -105,7 +105,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.2.003';
+my $HMCCU_VERSION = '4.2.004';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -259,7 +259,7 @@ sub HMCCU_IsRPCStateBlocking ($);
 sub HMCCU_IsRPCServerRunning ($$$);
 sub HMCCU_GetDeviceInfo ($$$);
 sub HMCCU_FormatDeviceInfo ($);
-sub HMCCU_GetFirmwareVersions ($);
+sub HMCCU_GetFirmwareVersions ($$);
 sub HMCCU_GetDeviceList ($);
 sub HMCCU_GetDatapointList ($$$);
 sub HMCCU_FindDatapoint ($$$$$);
@@ -294,6 +294,9 @@ sub HMCCU_GetDeviceInterface ($$$);
 sub HMCCU_ResetRPCQueue ($$);
 sub HMCCU_ReadRPCQueue ($);
 sub HMCCU_ProcessEvent ($$);
+sub HMCCU_HMCommand ($$$);
+sub HMCCU_HMCommandNB ($$$);
+sub HMCCU_HMCommandCB ($$$);
 sub HMCCU_HMScriptExt ($$$);
 sub HMCCU_BulkUpdate ($$$$);
 sub HMCCU_GetDatapoint ($@);
@@ -1362,7 +1365,7 @@ sub HMCCU_Get ($@)
 	my $opt = shift @$a;
 	
 	my $options = "defaults:noArg exportdefaults devicelist dump dutycycle:noArg vars update".
-		" updateccu parfile configdesc firmware:noArg rpcevents:noArg rpcstate:noArg deviceinfo";
+		" updateccu parfile configdesc firmware rpcevents:noArg rpcstate:noArg deviceinfo";
 	my $usage = "HMCCU: Unknown argument $opt, choose one of $options";
 	my $host = $hash->{host};
 
@@ -1644,25 +1647,40 @@ sub HMCCU_Get ($@)
 		return HMCCU_SetState ($hash, "OK", "Read $dc duty cycle values");
 	}
 	elsif ($opt eq 'firmware') {
-		my $dc = HMCCU_GetFirmwareVersions ($hash);
+		my $devtype = shift @$a;
+		$devtype = '.*' if (!defined ($devtype));
+		my $dtexp = $devtype;
+		$dtexp = '.*' if ($devtype eq 'full');
+		my $dc = HMCCU_GetFirmwareVersions ($hash, $dtexp);
 		return "Found no firmware downloads" if ($dc == 0);
-		$result = "Found $dc firmware downloads.";
-		my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", undef, undef);
-		return $result if (scalar (@devlist) == 0);
-		
-		$result .= " Click on the new version number for download\n\n".
-			"Device                    Type                 Current Available Date\n".
-			"------------------------------------------------------------------------\n"; 
-		foreach my $dev (@devlist) {
-			my $ch = $defs{$dev};
-			my $ct = uc($ch->{ccutype});
-			next if (!defined ($ch->{firmware}));
-			next if (!exists ($hash->{hmccu}{type}{$ct}));
-			$result .= sprintf "%-25s %-20s %-7s <a href=\"http://www.eq-3.de/%s\">%-9s</a> %-10s\n",
-				$ch->{NAME}, $ct, $ch->{firmware}, $hash->{hmccu}{type}{$ct}{download},
-				$hash->{hmccu}{type}{$ct}{firmware}, $hash->{hmccu}{type}{$ct}{date};
+		$result = "Found $dc firmware downloads. Click on the new version number for download\n\n";
+		if ($devtype eq 'full') {
+			$result .= 
+				"Type                 Available Date\n".
+				"-----------------------------------------\n"; 
+			foreach my $ct (keys %{$hash->{hmccu}{type}}) {
+				$result .= sprintf "%-20s <a href=\"http://www.eq-3.de/%s\">%-9s</a> %-10s\n",
+					$ct, $hash->{hmccu}{type}{$ct}{download},
+					$hash->{hmccu}{type}{$ct}{firmware}, $hash->{hmccu}{type}{$ct}{date};
+			}
 		}
-		
+		else {
+			my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", undef, undef);
+			return $result if (scalar (@devlist) == 0);
+			$result .= 
+				"Device                    Type                 Current Available Date\n".
+				"---------------------------------------------------------------------------\n"; 
+			foreach my $dev (@devlist) {
+				my $ch = $defs{$dev};
+				my $ct = uc($ch->{ccutype});
+				my $fw = defined ($ch->{firmware}) ? $ch->{firmware} : 'N/A';
+				next if (!exists ($hash->{hmccu}{type}{$ct}));
+				$result .= sprintf "%-25s %-20s %-7s <a href=\"http://www.eq-3.de/%s\">%-9s</a> %-10s\n",
+					$ch->{NAME}, $ct, $fw, $hash->{hmccu}{type}{$ct}{download},
+					$hash->{hmccu}{type}{$ct}{firmware}, $hash->{hmccu}{type}{$ct}{date};
+			}
+		}
+				
 		return HMCCU_SetState ($hash, "OK", $result);
 	}
 	elsif ($opt eq 'defaults') {
@@ -3532,51 +3550,69 @@ sub HMCCU_FormatDeviceInfo ($)
 # Get available firmware versions from EQ-3 server.
 # Firmware version, date and download link are stored in hash
 # {hmccu}{type}{$type} in elements {firmware}, {date} and {download}.
+# Parameter type can be a regular expression matching valid Homematic
+# device types in upper case letters. Default is '.*'. 
 # Return number of available firmware downloads.
 ######################################################################
 
-sub HMCCU_GetFirmwareVersions ($)
+sub HMCCU_GetFirmwareVersions ($$)
 {
-	my ($hash) = @_;
+	my ($hash, $type) = @_;
 	my $name = $hash->{NAME};
 	my $ccureqtimeout = AttrVal ($name, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
 	
 	my $url = "http://www.eq-3.de/service/downloads.html";
 	my $response = GetFileFromURL ($url, $ccureqtimeout, "suchtext=&suche_in=&downloadart=11");
-#	my @changebc = $response =~ m/href="(Downloads\/Software\/Firmware\/changelog_[^"]+)/g;
-#	my @changeip = $response =~ m/href="(Downloads\/Software\/Firmware\/Homematic IP\/changelog_[^"]+)/g;
 	my @download = $response =~ m/<a.href="(Downloads\/Software\/Firmware\/[^"]+)/g;
 	my $dc = 0;
+	my @ts = localtime (time);
+	$ts[4] += 1;
+	$ts[5] += 1900;
 	
 	foreach my $dl (@download) {
-		my $dd;
-		my $mm;
-		my $yy;
-		my $date = '?';
+		my $dd = $ts[3];
+		my $mm = $ts[4];
+		my $yy = $ts[5];
 		my $fw;
+		my $date = "$dd.$mm.$yy";
 
 		my @path = split (/\//, $dl);
 		my $file = pop @path;
 		next if ($file !~ /(\.tgz|\.tar\.gz)/);
-
-#		Log3 $name, 2, "HMCCU: $file";
 		
-		$file =~ m/^(.+)_update_V([^.]+)/;
-		my ($dt, $rest) = ($1, $2);
+		$file =~ s/_update_V?/\|/;
+		my ($dt, $rest) = split (/\|/, $file);
+		next if (!defined ($rest));
 		$dt =~ s/_/-/g;
 		$dt = uc($dt);
-		if ($rest =~ /^([\d_]+)([0-9]{2})([0-9]{2})([0-9]{2})$/) {
+		
+		next if ($dt !~ /$type/);
+		
+		if ($rest =~ /^([\d_]+)([0-9]{2})([0-9]{2})([0-9]{2})\./) {
+			# Filename with version and date
 			($fw, $yy, $mm, $dd) = ($1, $2, $3, $4);
-			$date = "$dd.$mm.20$yy";
+			$yy += 2000 if ($yy < 100);
+			$date = "$dd.$mm.$yy";
 			$fw =~ s/_$//;
+		}
+		elsif ($rest =~ /^([\d_]+)\./) {
+			# Filename with version
+			$fw = $1;
 		}
 		else {
 			$fw = $rest;
 		}
 		$fw =~ s/_/\./g;
-		$fw =~ s/^V//;
-		$dc++;
 
+		# Compare firmware dates
+		if (exists ($hash->{hmccu}{type}{$dt}{date})) {
+			my ($dd1, $mm1, $yy1) = split (/\./, $hash->{hmccu}{type}{$dt}{date});
+			my $v1 = $yy1*10000+$mm1*100+$dd1;
+			my $v2 = $yy*10000+$mm*100+$dd;
+			next if ($v1 > $v2);
+		}
+
+		$dc++;		
 		$hash->{hmccu}{type}{$dt}{firmware} = $fw;
 		$hash->{hmccu}{type}{$dt}{date} = $date;
 		$hash->{hmccu}{type}{$dt}{download} = $dl;
@@ -4126,23 +4162,32 @@ sub HMCCU_IsValidDatapoint ($$$$$)
 	
 	my $ccuflags = AttrVal ($hmccu_hash->{NAME}, 'ccuflags', 'null');
 	return 1 if ($ccuflags =~ /dptnocheck/);
-
 	return 1 if (!exists ($hmccu_hash->{hmccu}{dp}));
 
-	my $chnno = $chn;
-	if (HMCCU_IsValidChannel ($hmccu_hash, $chn)) {
-		HMCCU_Trace ($hash, 2, $fnc, "$chn is a valid channel address");
-		my ($a, $c) = split(":",$chn);
-		$chnno = $c;
+	my $chnno;
+	if (defined ($chn)) {
+		if ($chn =~ /^[0-9]{1,2}$/) {
+			HMCCU_Trace ($hash, 2, $fnc, "$chn is a channel number");
+			$chnno = $chn;
+		}
+		elsif (HMCCU_IsValidChannel ($hmccu_hash, $chn)) {
+			HMCCU_Trace ($hash, 2, $fnc, "$chn is a valid channel address");
+			my ($a, $c) = split(":",$chn);
+			$chnno = $c;
+		}
+		else {
+			HMCCU_Trace ($hash, 2, $fnc, "$chn is not a valid channel address or number");
+			return 0;
+		}
 	}
-	else {
-		HMCCU_Trace ($hash, 2, $fnc, "$chn is not a valid channel address");
-	}
-	
-	if ($dpt =~ /^([0-9]{1,2})\.(.+)$/) {
+	elsif ($dpt =~ /^([0-9]{1,2})\.(.+)$/) {
 		$chnno = $1;
 		$dpt = $2;
 		HMCCU_Trace ($hash, 2, $fnc, "$dpt contains channel number");
+	}
+	else {
+		HMCCU_Trace ($hash, 2, $fnc, "channel number missing in datapoint $dpt");
+		return 0;
 	}
 	
 	HMCCU_Trace ($hash, 2, $fnc, "devtype=$devtype, chnno=$chnno, dpt=$dpt");
@@ -5098,6 +5143,79 @@ sub HMCCU_ReadRPCQueue ($)
 }
 
 ######################################################################
+# Execute Homematic command on CCU.
+# If parameter mode is 1 an empty string is a valid result.
+######################################################################
+
+sub HMCCU_HMCommand ($$$)
+{
+	my ($hash, $cmd, $mode) = @_;
+	my $name = $hash->{NAME};
+	my $fnc = "HMCommand";
+	
+	my $ccureqtimeout = AttrVal ($name, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
+	my $url = "http://".$hash->{host}.":8181/do.exe?r1=$cmd";
+	my $value;
+
+	HMCCU_Trace ($hash, 2, $fnc, "URL=$url");
+
+	my $response = GetFileFromURL ($url, $ccureqtimeout);
+	$response =~ m/<r1>(.*)<\/r1>/;
+	$value = $1;
+	
+	HMCCU_Trace ($hash, 2, $fnc, "Response = $response");
+
+	if ($mode == 1) {
+		return (defined ($value) && $value ne 'null') ? $value : undef;
+	}
+	else {
+		return (defined ($value) && $value ne '' && $value ne 'null') ? $value : undef;		
+	}
+}
+
+######################################################################
+# Execute Homematic command on CCU without waiting for response.
+######################################################################
+
+sub HMCCU_HMCommandNB ($$$)
+{
+	my ($hash, $cmd, $cbfunc) = @_;
+	my $name = $hash->{NAME};
+	my $fnc = "HMCommandNB";
+
+	my $hmccu_hash = HMCCU_GetHash ($hash);
+	my $ccureqtimeout = AttrVal ($hmccu_hash->{NAME}, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
+	my $url = "http://".$hmccu_hash->{host}.":8181/do.exe?r1=$cmd";
+
+	HMCCU_Trace ($hash, 2, $fnc, "URL=$url");
+
+	if (defined ($cbfunc)) {
+		my $param = { url => $url, timeout => $ccureqtimeout, method => "GET",
+			callback => $cbfunc, devhash => $hash };
+		HttpUtils_NonblockingGet ($param);
+	}
+	else {
+		my $param = { url => $url, timeout => $ccureqtimeout, method => "GET",
+			callback => \&HMCCU_HMCommandCB, devhash => $hash };
+		HttpUtils_NonblockingGet ($param);
+	}
+}
+
+######################################################################
+# Default callback function for non blocking CCU request.
+######################################################################
+
+sub HMCCU_HMCommandCB ($$$)
+{
+	my ($param, $err, $data) = @_;
+	my $hash = $param->{devhash};
+	my $fnc = "HMCommandCB";
+
+	HMCCU_Log ($hash, 2, "Error during CCU request. $err", undef) if ($err ne '');
+	HMCCU_Trace ($hash, 2, $fnc, "URL=".$param->{url}."<br>Response=$data");
+}
+
+######################################################################
 # Execute Homematic script on CCU.
 # Parameters: device-hash, script-code or script-name, parameter-hash
 # If content of hmscript starts with a ! the following text is treated
@@ -5270,6 +5388,7 @@ sub HMCCU_SetDatapoint ($$$)
 	my $cdname = $hash->{NAME};
 	
 	my $ccureqtimeout = AttrVal ($name, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
+	my $ccuflags = AttrVal ($name, "ccuflags", 'null');
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
 	my $ccuverify = AttrVal ($cdname, 'ccuverify', 0); 
 
@@ -5288,7 +5407,7 @@ sub HMCCU_SetDatapoint ($$$)
 		$param = $1;
 	}
 
-	my $url = 'http://'.$hmccu_hash->{host}.':8181/do.exe?r1=dom.GetObject("';
+	my $cmd = 'dom.GetObject("';
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $param,
 		$HMCCU_FLAG_INTERFACE);
 	return -1 if ($flags != $HMCCU_FLAGS_IACD && $flags != $HMCCU_FLAGS_NCD);
@@ -5306,28 +5425,32 @@ sub HMCCU_SetDatapoint ($$$)
 	}
 	
 	if ($flags == $HMCCU_FLAGS_IACD) {
-		$url .= $int.'.'.$add.':'.$chn.'.'.$dpt.'").State('.$value.')';
+		$cmd .= $int.'.'.$add.':'.$chn.'.'.$dpt.'").State('.$value.')';
 		$nam = HMCCU_GetChannelName ($hmccu_hash, $add.":".$chn, '');
 	}
 	elsif ($flags == $HMCCU_FLAGS_NCD) {
-		$url .= $nam.'").DPByHssDP("'.$dpt.'").State('.$value.')';
+		$cmd .= $nam.'").DPByHssDP("'.$dpt.'").State('.$value.')';
 		($add, $chn) = HMCCU_GetAddress ($hmccu_hash, $nam, '', '');
 	}
 
 	my $addr = $add.":".$chn;
-	
-	my $response = GetFileFromURL ($url, $ccureqtimeout);
+
+	if ($ccuflags =~ /nonBlocking/) {
+		HMCCU_HMCommandNB ($hash, $cmd, undef);
+		return 0;
+	}
+
+	# Execute command (blocking)
+	my $response = HMCCU_HMCommand ($hmccu_hash, $cmd, 1);
 	HMCCU_Trace ($hash, 2, $fnc,
 		"Addr=$addr Name=$nam<br>".
 		"Script response = \n".(defined ($response) ? $response: 'undef')."<br>".
-		"Script = \n".$url);
-	
-	return -2 if (!defined ($response) || $response =~ /<r1>null</);
+		"Script = \n".$cmd);
+	return -2 if (!defined ($response));
 
 	# Verify setting of datapoint value or update reading with new datapoint value
 	if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $addr, $dpt, 1)) {
 		if ($ccuverify == 1) {
-#			usleep (100000);
 			my ($rc, $result) = HMCCU_GetDatapoint ($hash, $param);
 			return $rc;
 		}
@@ -6900,9 +7023,12 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       <li><b>get &lt;name&gt; exportdefaults &lt;filename&gt;</b><br/>
       	Export default attributes into file.
       </li><br/>
-      <li><b>get &lt;name&gt; firmware</b><br/>
+      <li><b>get &lt;name&gt; firmware [{&lt;type-expr&gt; | full}]</b><br/>
       	Get available firmware downloads from eq-3.de. List FHEM devices with current and available
-      	firmware version. Firmware versions are only displayed after RPC server has been started.
+      	firmware version. By default only firmware version of defined HMCCUDEV or HMCCUCHN
+      	devices are listet. With option 'full' all available firmware versions are listed.
+      	With parameter <i>type-expr</i> one can filter displayed firmware versions by 
+      	Homematic device type.
       </li><br/>
       <li><b>get &lt;name&gt; parfile [&lt;parfile&gt;]</b><br/>
          Get values of all channels / datapoints specified in <i>parfile</i>. The parameter
@@ -7009,20 +7135,27 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
       	practice for creating a custom default attribute file is by exporting predefined default
       	attributes from HMCCU with command 'get exportdefaults'.
       </li><br/>
-      <li><b>ccuflags {extrpc, procrpc, <u>intrpc</u>}</b><br/>
-      	Control behaviour of several HMCCU functions:<br/>
+      <li><b>ccuflags {&lt;flags&gt;}</b><br/>
+      	Control behaviour of several HMCCU functions. Parameter <i>flags</i> is a comma
+      	seperated list of the following strings:<br/>
       	ackState - Acknowledge command execution by setting STATE to error or success.<br/>
       	dptnocheck - Do not check within set or get commands if datapoint is valid<br/>
       	intrpc - Use internal RPC server. This is the default.<br/>
       	extrpc - Use external RPC server provided by module HMCCURPC. If no HMCCURPC device
       	exists HMCCU will create one after command 'set rpcserver on'.<br/>
       	logEvents - Write events from CCU into FHEM logfile<br/>
-      	noReadings - Do not write readings<br/>
+      	nonBlocking - Use non blocking (asynchronous) CCU requests<br/>
+      	noReadings - Do not create or update readings<br/>
+      	procrpc - Use external RPC server provided by module HMCCPRPCPROC. During first RPC
+      	server start HMCCU will create a HMCCURPCPROC device for each interface confiugured
+      	in attribute 'rpcinterface'<br/>
+      	Flags intrpc, extrpc and procrpc cannot be combined.
       </li><br/>
       <li><b>ccuget {State | <u>Value</u>}</b><br/>
          Set read access method for CCU channel datapoints. Method 'State' is slower than
          'Value' because each request is sent to the device. With method 'Value' only CCU
-         is queried. Default is 'Value'.
+         is queried. Default is 'Value'. Method for write access to datapoints is always
+         'State'.
       </li><br/>
       <li><b>ccuReqTimeout &lt;Seconds&gt;</b><br/>
       	Set timeout for CCU request. Default is 4 seconds. This timeout affects several
