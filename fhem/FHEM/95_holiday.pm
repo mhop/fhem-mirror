@@ -340,7 +340,8 @@ holiday_FW_detailFn($$$$)
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
   return "" if($defs{$d}{READONLY});
-  return FW_pH("cmd=style edit $d.holiday",
+  my $cfgDB = (configDBUsed() ? "configDB" : "");
+  return FW_pH("cmd=style edit $d.holiday $cfgDB",
                "<div class=\"dval\">Edit $d.holiday</div>", 0, "dval", 1);
 }
 
