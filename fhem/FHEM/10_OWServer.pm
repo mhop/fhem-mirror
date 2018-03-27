@@ -364,7 +364,7 @@ OWServer_Read($@)
     InternalTimer(gettimeofday()+6, "OWServer_TimeoutChild", $pid, 0);
     if($pid == 0) {
       close READER;
-      $ret= OWNet::read($hash->{DEF},$path);
+      $ret= $hash->{fhem}{owserver}->read($path);
       $ret =~ s/^\s+//g if(defined($ret));
       my $r= defined($ret) ? $ret : "<undefined>";
       Log3 $hash, 5, "OWServer child read $path: $r";
