@@ -407,20 +407,20 @@ FB_CALLMONITOR_Read($)
                 $external_number =~ s/^(107\d\d|108\d\d)//g if($country_code eq "0041");
             }
             
-            if($external_number !~ /^0/ and $external_number !~ /^11/ and $area_code ne "")
+            if($external_number =~ /^\d/ and $external_number !~ /^0/ and $external_number !~ /^11/ and $area_code ne "")
             {
                 if($area_code =~ /^0[1-9]\d+$/ and $external_number =~ /^[1-9].+$/)
                 {
                     $external_number = $area_code.$external_number;
                 }
-                elsif(not $area_code =~ /^0[1-9]\d+$/)
+                elsif($area_code !~ /^0[1-9]\d+$/)
                 {
                     Log3 $name, 2, "FB_CALLMONITOR ($name) - given local area code '$area_code' is not an area code. therefore will be ignored";
                 }
             }
             
             # Remove trailing hash sign and everything afterwards
-            $external_number =~ s/#.*$// unless($external_number =~ /^\*/); # Forum #85761
+            $external_number =~ s/#.*$// if($external_number !~ /^\*/); # Forum #85761
       
             $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(AttrVal($name, "reverse-search", "none") ne "none");
        
