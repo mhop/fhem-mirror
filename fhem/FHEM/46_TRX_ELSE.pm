@@ -1,9 +1,11 @@
+# $Id$
 #################################################################################
 # 46_TRX_ELSE.pm
 #
 # FHEM module unkown RFXtrx433 messages
 #
 # Copyright (C) 2012-2016 Willi Herzig
+#	  Maintenance since 2018 by KernSani
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -26,8 +28,14 @@
 # 4: log unknown protocols
 # 5: log decoding hexlines for debugging
 #
-# $Id$ 
-package main;
+##############################################################################
+#
+#	CHANGELOG
+#	
+#	29.03.2018	Summary for Commandref
+#
+#
+##############################################################################package main;
 
 use strict;
 use warnings;
@@ -155,7 +163,11 @@ TRX_ELSE_Parse($$)
 1;
 
 =pod
+=item device
+=item summary    unhandled messages from TRX
+=item summary_DE unbekannte Nachrichten von TRX
 =begin html
+
 
 <a name="TRX_ELSE"></a>
 <h3>TRX_ELSE</h3>
