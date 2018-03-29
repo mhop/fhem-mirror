@@ -1,3 +1,4 @@
+# $Id$
 #################################################################################
 # 45_TRX.pm
 #
@@ -6,6 +7,7 @@
 # Derived from 00_CUL.pm: Copyright (C) Rudolf Koenig"
 #
 # Copyright (C) 2012-2016 Willi Herzig
+#	  Maintenance since 2018 by KernSani
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -23,8 +25,15 @@
 #
 # The GNU General Public License may also be found at http://www.gnu.org/licenses/gpl-2.0.html .
 #
-###########################
-# $Id$
+##############################################################################
+#
+#	CHANGELOG
+#	
+#	29.03.2018	Summary for Commandref
+#
+#
+##############################################################################
+
 package main;
 
 use strict;
@@ -552,6 +561,9 @@ TRX_Ready($)
 1;
 
 =pod
+=item device
+=item summary    connection to RFXtrx433 USB RF transmitters
+=item summary_DE Anbindung von RFXtrx433 USB Transceiver
 =begin html
 
 <a name="TRX"></a>
