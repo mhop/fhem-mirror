@@ -5,6 +5,7 @@
 #     FHEM module for X10, KD101, Visonic
 #
 #     Copyright (C) 2012/2013 Willi Herzig
+#	  Maintenance since 2018 by KernSani
 #
 #     This file is part of fhem.
 #
@@ -27,7 +28,15 @@
 # values for "set global verbose"
 # 4: log unknown protocols
 # 5: log decoding hexlines for debugging
+##############################################################################
 #
+#	CHANGELOG
+#	
+#	29.03.2018	Summary for Commandref
+#		
+#		
+##############################################################################
+
 package main;
 
 use strict;
@@ -582,6 +591,9 @@ TRX_SECURITY_Parse($$)
 1;
 
 =pod
+=item device
+=item summary    interprets messages of security sensors received by TRX
+=item summary_DE interpretiert Nachrichten von Sicherheitssensoren des TRX
 =begin html
 
 <a name="TRX_SECURITY"></a>
