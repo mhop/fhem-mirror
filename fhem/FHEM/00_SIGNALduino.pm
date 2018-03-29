@@ -8,7 +8,7 @@
 # The purpos is to use it as addition to the SIGNALduino which runs on an arduno nano or arduino uno.
 # It routes Messages serval Modules which are already integrated in FHEM. But there are also modules which comes with it.
 # N. Butzek, S. Butzek, 2014-2015
-# S.Butzek,Ralf9 2016-2017
+# S.Butzek,Ralf9 2016-2018
 
 package main;
 
@@ -19,6 +19,7 @@ use Data::Dumper qw(Dumper);
 use Scalar::Util qw(looks_like_number);
 no warnings 'portable';
 
+#$| = 1;		#Puffern abschalten, Hilfreich für PEARL WARNINGS Search
 #use POSIX qw( floor);  # can be removed
 #use Math::Round qw();
 
@@ -389,25 +390,10 @@ my %ProtocolListSIGNALduino  = (
 			length_max      => '56',
 			method          => \&SIGNALduino_AS # Call to process this message
 		}, 
-	"12"    => 			## hideki
+	"12"    => 			## Hideki
 		{
             name			=> 'Hideki protocol',	
-			id          	=> '12',
-			clockrange     	=> [420,510],                   # min, max better for Bresser Sensors, OK for hideki/Hideki/TFA too     
-			format 			=> 'manchester',	
-			preamble		=> 'P12#',						# prepend to converted message	
-			clientmodule    => 'hideki',   				# not used now
-			modulematch     => '^P12#75.+',  						# not used now
-			length_min      => '71',
-			length_max      => '128',
-			method          => \&SIGNALduino_Hideki,	# Call to process this message
-			polarity        => 'invert',			
-			
-		}, 	
-	"12.1"    => 			## hideki
-		{
-            name			=> 'Hideki protocol not invert',
-			comment		=> 'only for test of the firmware dev-r33_fixmc',
+			comment         => 'Hideki messages are sometimes received as inverted (check in sub)',
 			id          	=> '12',
 			clockrange     	=> [420,510],                   # min, max better for Bresser Sensors, OK for hideki/Hideki/TFA too     
 			format 			=> 'manchester',	
@@ -999,14 +985,15 @@ my %ProtocolListSIGNALduino  = (
 		{
             name			=> 'Maverick protocol',	
 			id          	=> '47',
-			clockrange     	=> [220,260],                   
+			clockrange     	=> [180,260],                   
 			format 			=> 'manchester',	
 			preamble		=> 'P47#',						# prepend to converted message	
-			clientmodule    => 'SD_WS_Maverick',   						# not used now
-			modulematch     => '^P47#.*',  					# not used now
+			clientmodule    => 'SD_WS_Maverick',   					
+			modulematch     => '^P47#[569A]{12}.*',  					
 			length_min      => '100',
 			length_max      => '108',
-			method          => \&SIGNALduino_Maverick		# Call to process this message
+			method          => \&SIGNALduino_Maverick,		# Call to process this message
+			#polarity		=> 'invert'
 		}, 			
      "48"    => 			## Joker Dostmann TFA
 		{
@@ -1643,6 +1630,7 @@ sub SIGNALduino_Connect($$)
 
 	# damit wird die err-msg nur einmal ausgegeben
 	if (!defined($hash->{disConnFlag}) && $err) {
+		SIGNALduino_Log3($hash, 3, "SIGNALduino $hash->{NAME}: ${err}");
 		Log3($hash, 3, "SIGNALduino $hash->{NAME}: ${err}");
 		$hash->{disConnFlag} = 1;
 	}
@@ -4813,9 +4801,17 @@ sub	SIGNALduino_Hideki()
 	
     Debug "$name: search in $bitData \n" if ($debug);
 	my $message_start = index($bitData,"10101110");
+	my $invert = 0;
+	
+	if ($message_start < 0) {
+	$bitData =~ tr/01/10/;									# invert message
+	$message_start = index($bitData,"10101110");			# 0x75 but in reverse order
+	$invert = 1;
+	}
+
 	if ($message_start >= 0 )   # 0x75 but in reverse order
 	{
-		Debug "$name: Hideki protocol detected \n" if ($debug);
+		Debug "$name: Hideki protocol (invert=$invert) detected \n" if ($debug);
 
 		# Todo: Mindest Laenge fuer startpunkt vorspringen 
 		# Todo: Wiederholung auch an das Modul weitergeben, damit es dort geprueft werden kann
@@ -4840,10 +4836,17 @@ sub	SIGNALduino_Hideki()
 
 			$hidekihex=$hidekihex.sprintf('%02X', oct("0b$byte"));
 		}
-		Log3 $name, 4, "$name: hideki protocol converted to hex: $hidekihex with " .$message_length ." bits, messagestart $message_start";
+		
+		if ($invert == 0) {
+			SIGNALduino_Log3 $name, 4, "$name: receive Hideki protocol not inverted";
+		} else {
+			SIGNALduino_Log3 $name, 4, "$name: receive Hideki protocol inverted";
+		}
+		SIGNALduino_Log3 $name, 4, "$name: Hideki protocol converted to hex: $hidekihex with " .$message_length ." bits, messagestart $message_start";
 
 		return  (1,$hidekihex); ## Return only the original bits, include length
 	}
+	SIGNALduino_Log3 $name, 4, "$name: hideki start pattern (10101110) not found";
 	return (-1,"Start pattern (10101110) not found");
 }
 
