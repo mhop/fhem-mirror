@@ -4,6 +4,9 @@
 # 46_TRX_WEATHER.pm
 # FHEM module to decode weather sensor messages for RFXtrx
 #
+#     Copyright (C) 2012-2016 by Willi Herzig (Willi.Herzig@gmail.com)
+#	  Maintenance since 2018 by KernSani
+#
 # The following devices are implemented to be received:
 #
 # temperature sensors (TEMP):
@@ -114,6 +117,14 @@
 # 4: log unknown prologtocols
 # 5: log decoding hexlines for debugging
 #
+##############################################################################
+#
+#	CHANGELOG
+#	
+#	29.03.2018	Summary for Commandref
+#				
+#				
+##############################################################################
 package main;
 
 use strict;
@@ -1783,6 +1794,9 @@ TRX_WEATHER_Parse($$)
 1;
 
 =pod
+=item device
+=item summary    interprets messages of weather sensors received by TRX
+=item summary_DE interpretiert Nachrichten von Wettersensoren des TRX
 =begin html
 
 <a name="TRX_WEATHER"></a>
