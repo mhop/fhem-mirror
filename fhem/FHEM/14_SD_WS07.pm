@@ -5,6 +5,23 @@
 # weather sensors like eas8007 which use the same protocol
 # Sidey79, Ralf9  2015-2017
 #
+#  Nexus sensor protocol with ID, temperature and optional humidity 
+#  also FreeTec NC-7345 sensors for FreeTec Weatherstation NC-7344. 
+#  
+#  the sensor sends 36 bits 12 times, 
+#  the packets are ppm modulated (distance coding) with a pulse of ~500 us 
+#  followed by a short gap of ~1000 us for a 0 bit or a long ~2000 us gap for a 
+#  1 bit, the sync gap is ~4000 us. 
+#  
+#  the data is grouped in 9 nibbles 
+#  [id0] [id1] [flags] [temp0] [temp1] [temp2] [const] [humi0] [humi1] 
+#  
+#  The 8-bit id changes when the battery is changed in the sensor. 
+#  flags are 4 bits B 0 C C, where B is the battery status: 1=OK, 0=LOW 
+#  and CC is the channel: 0=CH1, 1=CH2, 2=CH3 
+#  temp is 12 bit signed scaled by 10 
+#  const is always 1111 (0x0F) 
+#  humiditiy is 8 bits 
 
 package main;
 
@@ -20,17 +37,19 @@ SD_WS07_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^P7#[A-Fa-f0-9]{6}F[A-Fa-f0-9]{2}(#R[A-F0-9][A-F0-9]){0,1}\$";    ## pos 7 ist aktuell immer 0xF
+  $hash->{Match}     = "^P7#[A-Fa-f0-9]{6}F[A-Fa-f0-9]{2}";    ## pos 7 ist aktuell immer 0xF
   $hash->{DefFn}     = "SD_WS07_Define";
   $hash->{UndefFn}   = "SD_WS07_Undef";
   $hash->{ParseFn}   = "SD_WS07_Parse";
   $hash->{AttrFn}    = "SD_WS07_Attr";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
+                       "correction-hum correction-temp ".
                         "$readingFnAttributes ";
   $hash->{AutoCreate} =
-        { "SD_WS07.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,",  autocreateThreshold => "2:180"} };
-
-
+        {
+			"SD_WS07_TH_.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,",  autocreateThreshold => "2:180"},
+			"SD_WS07_T_.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4:Temp,",  autocreateThreshold => "2:180"}
+			};
 }
 
 #############################
@@ -73,10 +92,10 @@ SD_WS07_Parse($$)
   my ($iohash, $msg) = @_;
   #my $rawData = substr($msg, 2);
   my $name = $iohash->{NAME};
-  my (undef ,$rawData, $rssi) = split("#",$msg);
-  if (defined($rssi)) {
-	$rssi = hex(substr($rssi,1));
-	$rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
+  my (undef ,$rawData, $rssi) = split("#",$msg);	
+  if (defined($rssi)) {	
+	$rssi = hex(substr($rssi,1));	
+	$rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));	
   }
   #$protocol=~ s/^P(\d+)/$1/; # extract protocol
 
@@ -85,12 +104,7 @@ SD_WS07_Parse($$)
   my $blen = $hlen * 4;
   my $bitData = unpack("B$blen", pack("H$hlen", $rawData)); 
 
-  if (defined($rssi)) {
-	Log3 $name, 4, "$name SD_WS07_Parse  $model ($msg) length: $hlen RSSI = $rssi";
-  } else {
-	Log3 $name, 4, "$name SD_WS07_Parse  $model ($msg) length: $hlen";
-  }
-  
+  Log3 $name, 4, "$name SD_WS07: $msg, length=$hlen";
   
   #      4    8  9    12            24    28     36
   # 0011 0110 1  010  000100000010  1111  00111000 0000  eas8007
@@ -105,7 +119,7 @@ SD_WS07_Parse($$)
   #}
     my $bitData2 = substr($bitData,0,8) . ' ' . substr($bitData,8,1) . ' ' . substr($bitData,9,3);
        $bitData2 = $bitData2 . ' ' . substr($bitData,12,12) . ' ' . substr($bitData,24,4) . ' ' . substr($bitData,28,8);
-    Log3 $iohash, 5, $model . ' converted to bits: ' . $bitData2;
+    Log3 $iohash, 5, "$name SD_WS07: converted to bits: $bitData2";
     
     my $id = substr($rawData,0,2);
     my $bat = int(substr($bitData,8,1)) eq "1" ? "ok" : "low";
@@ -120,18 +134,20 @@ SD_WS07_Parse($$)
     } else {
     	$model=$model."_TH";		
     	if ($hum < 10 || $hum > 99) {
+    	    Log3 $iohash, 4, "$name: SD_WS07: err HUM: hum=$hum, msg=$msg" ;
     	    return '';
     	}
     }
     
     if ($temp > 700 && $temp < 3840) {
+      Log3 $iohash, 4, "$name: SD_WS07: err TEMP: temp=$temp, msg=$msg" ;
       return '';
     } elsif ($temp >= 3840) {        # negative Temperaturen, muss noch ueberprueft und optimiert werden 
-      $temp -= 4095;
+      $temp -= 4096;
     }  
     $temp /= 10;
     
-    Log3 $iohash, 4, "$name $model decoded protocolid: 7 sensor id=$id, channel=$channel, temp=$temp, hum=$hum, bat=$bat";
+    Log3 $iohash, 4, "$name SD_WS07: model=$model, id=$id, channel=$channel, temp=$temp, hum=$hum, bat=$bat";
 
     my $deviceCode;
     
@@ -139,7 +155,7 @@ SD_WS07_Parse($$)
 	if ( ($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/)))
 	{
 		$deviceCode=$model.'_'.$id.$channel;
-		Log3 $iohash,4, "$name using longid: $longids model: $model";
+		Log3 $iohash,4, "$name SD_WS07: using longid=$longids model=$model";
 	} else {
 		$deviceCode = $model . "_" . $channel;
 	}
@@ -150,7 +166,7 @@ SD_WS07_Parse($$)
     $def = $modules{SD_WS07}{defptr}{$deviceCode} if(!$def);
 
     if(!$def) {
-		Log3 $iohash, 1, "$name SD_WS07: UNDEFINED sensor $model detected, code $deviceCode";
+		Log3 $iohash, 1, "$name SD_WS07: UNDEFINED sensor $deviceCode detected, code $msg";
 		return "UNDEFINED $deviceCode SD_WS07 $deviceCode";
     }
         #Log3 $iohash, 3, 'SD_WS07: ' . $def->{NAME} . ' ' . $id;
@@ -159,17 +175,27 @@ SD_WS07_Parse($$)
 	$name = $hash->{NAME};
 	return "" if(IsIgnored($name));
 	
-	Log3 $name, 4, "$iohash->{NAME} SD_WS07: $name ($rawData)";  
+	#Log3 $name, 4, "$iohash->{NAME} SD_WS07: $name ($rawData)";  
 
 	if (!defined(AttrVal($hash->{NAME},"event-min-interval",undef)))
 	{
 		my $minsecs = AttrVal($iohash->{NAME},'minsecs',0);
 		if($hash->{lastReceive} && (time() - $hash->{lastReceive} < $minsecs)) {
-			Log3 $hash, 4, "$deviceCode Dropped due to short time. minsecs=$minsecs";
+			Log3 $hash, 4, "$iohash->{NAME} SD_WS07: $name $deviceCode dropped due to short time. minsecs=$minsecs";
 		  	return "";
 		}
 	}
+	
+	$hum += AttrVal($name, "correction-hum", 0);				# correction value for humidity (default 0 %)
+	if ($hum > 99) {
+		Log3 $name, 4, "$iohash->{NAME} SD_WS07: $name ERROR - Humidity unknown ($hum)";
+		return "";
+	}
+	
+	$temp += AttrVal($name, "correction-temp", 0);				# correction value for temperature (default 0 K)
+	Log3 $name, 4, "$iohash->{NAME} SD_WS07: $name id=$id, channel=$channel, temp=$temp, hum=$hum, bat=$bat";
 
+	
 	$hash->{lastReceive} = time();
 	$hash->{lastMSG} = $rawData;
 	$hash->{bitMSG} = $bitData2; 
@@ -180,17 +206,17 @@ SD_WS07_Parse($$)
     readingsBulkUpdate($hash, "state", $state);
     readingsBulkUpdate($hash, "temperature", $temp)  if ($temp ne"");
     readingsBulkUpdate($hash, "humidity", $hum)  if ($hum ne "" && $hum != 0 );
-    readingsBulkUpdate($hash, "battery", $bat) if ($bat ne "");
+    if ($bat ne "") {
+        #my $battery = ReadingsVal($name, "battery", "unknown");
+        #if ($bat ne $battery) {
+           readingsBulkUpdate($hash, "battery", $bat);
+        #}
+    }
     readingsBulkUpdate($hash, "channel", $channel) if ($channel ne "");
 
     readingsEndUpdate($hash, 1); # Notify is done by Dispatch
 
-    if(defined($rssi)) {
-		$hash->{RSSI} = $rssi;
-    }
-
 	return $name;
-
 }
 
 sub SD_WS07_Attr(@)
@@ -244,13 +270,19 @@ sub SD_WS07_Attr(@)
   <ul>
   	 <li>state (T: H:)</li>
      <li>temperature (&deg;C)</li>
-     <li>humidity: (the humidity 1-100)</li>
+     <li>humidity: (the humidity 10-99)</li>
      <li>battery: (low or ok)</li>
      <li>channel: (the channelnumberf)</li>
   </ul>
   <br>
   <b>Attributes</b>
   <ul>
+    <li>correction-temp<br>
+       Damit kann die Temperatur korrigiert werden. Z.B. mit 10 wird eine um 10 Grad hoehere Temperatur angezeigt.
+    </li>
+    <li>correction-hum<br>
+       Damit kann die Luftfeuchtigkeit korrigiert werden.
+    </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#showtime">showtime</a></li>
@@ -288,7 +320,7 @@ sub SD_WS07_Attr(@)
   <a name="SD_WS07_Define"></a>
   <b>Define</b> 
   <ul>Die empfangenen Sensoren werden automatisch angelegt.<br>
-  Die ID der angelegten Sensoren ist entweder der Kanal des Sensors, oder wenn das Attribut longid gesetzt ist, dann wird die ID aus dem Kanal und einer Reihe von Bits erzeugt, welche der Sensor beim Einschalten zufaellig vergibt.<br>
+  Die ID der angelegten Sensoren ist entweder der Kanal des Sensors, oder wenn das Attribut longid gesetzt ist, dann wird die ID aus dem Kanal und einer Reihe von Bits erzeugt, welche der Sensor beim Einschalten zuf&auml;llig vergibt.<br>
   </ul>
   <br>
   <a name="SD_WS07 Events"></a>
@@ -296,13 +328,19 @@ sub SD_WS07_Attr(@)
   <ul>
      <li>state: (T: H:)</li>
      <li>temperature: (&deg;C)</li>
-     <li>humidity: (Luftfeuchte (1-100)</li>
+     <li>humidity: (Luftfeuchte (10-99)</li>
      <li>battery: (low oder ok)</li>
      <li>channel: (Der Sensor Kanal)</li>
   </ul>
   <br>
   <b>Attribute</b>
   <ul>
+    <li>correction-temp<br>
+       Damit kann die Temperatur korrigiert werden. Z.B. mit 10 wird eine um 10 Grad h&ouml;here Temperatur angezeigt.
+    </li>
+    <li>correction-hum<br>
+       Damit kann die Luftfeuchtigkeit korrigiert werden.
+    </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#showtime">showtime</a></li>

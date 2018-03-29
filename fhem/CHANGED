@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: 14_SD_WS07: Error retrieving rssi value fixed
+  - feature: 14_SD_WS07: added correction-temp and correction-hum 
+                         added two models temp/temp-hum
   - change: 00_SIGNALduino: Protokoll 12.1 with protocol 12 (Hideki) 
                             combined and 12.1 removed
   - feature: 49_SSCam: 3.7.0, new delPreset command, minor fixes
