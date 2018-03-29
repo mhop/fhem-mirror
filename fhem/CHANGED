@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: 14_SD_WS_Maverick: reworked module, renamed readings
+                               added commandref
   - bugfix: 14_SD_WS07: Error retrieving rssi value fixed
   - feature: 14_SD_WS07: added correction-temp and correction-hum 
                          added two models temp/temp-hum
