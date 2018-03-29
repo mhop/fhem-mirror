@@ -1110,7 +1110,7 @@ sub TRX_LIGHT_Parse($$) {
 1;
 
 =pod
-=item helper
+=item device
 =item summary Sends and receive messages of lighting devices via TRX (RFXCOM)
 =item summary_DE Sendet und empfängt Nachrichten von Schaltaktoren via TRX (RFXCOM)
 =begin html
