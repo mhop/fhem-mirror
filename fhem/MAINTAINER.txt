@@ -223,15 +223,15 @@ FHEM/44_S7_S5Client.pm       charlie71            Sonstige Systeme
 FHEM/44_S7_S7Client.pm       charlie71            Sonstige Systeme
 FHEM/44_TEK603.pm            eisler               Sonstige Systeme
 FHEM/45_Plugwise.pm          icinger              Sonstige Systeme
-FHEM/45_TRX.pm               wherzig              RFXTRX
+FHEM/45_TRX.pm               KernSani             RFXTRX
 FHEM/46_PW_Circle.pm         icinger              Sonstige Systeme
 FHEM/46_PW_Scan.pm           icinger              Sonstige Systeme
 FHEM/46_PW_Sense.pm          icinger              Sonstige Systeme
 FHEM/46_PW_Switch.pm         icinger              Sonstige Systeme
-FHEM/46_TRX_ELSE.pm          wherzig              RFXTRX
-FHEM/46_TRX_LIGHT.pm         wherzig              RFXTRX
-FHEM/46_TRX_SECURITY.pm      wherzig              RFXTRX
-FHEM/46_TRX_WEATHER.pm       wherzig              RFXTRX
+FHEM/46_TRX_ELSE.pm          KernSani             RFXTRX
+FHEM/46_TRX_LIGHT.pm         KernSani             RFXTRX
+FHEM/46_TRX_SECURITY.pm      KernSani             RFXTRX
+FHEM/46_TRX_WEATHER.pm       KernSani             RFXTRX
 FHEM/46_SmartPi.pm           CoolTux              Sonstige Systeme
 FHEM/46_TeslaPowerwall2AC.pm CoolTux              Solaranlagen
 FHEM/46_Aqicn.pm             CoolTux              Sonstige Systeme
