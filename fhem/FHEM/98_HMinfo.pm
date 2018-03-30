@@ -834,7 +834,7 @@ sub HMinfo_tempListTmplView() { ###############################################
                                  ,devspec2array("TYPE=CUL_HM:FILTER=model=.*-TC.*:FILTER=chanNo=02")));
   my ($n) = devspec2array("TYPE=HMinfo");
   my $defFn = HMinfo_tempListDefFns();
-  my @tlFiles = split(";",$defFn);
+  my @tlFiles = split('[;,]',$defFn);
   $defFn = $defs{$n}{helper}{weekplanListDef};
   
   my @dWoTmpl;    # Device not using templates
@@ -906,7 +906,7 @@ sub HMinfo_listOfTempTemplates() { ############################################
   my ($n) =devspec2array("TYPE=HMinfo");
   my $dir = AttrVal($n,"configDir","$attr{global}{modpath}/")."/"; #no dir?  add defDir
   $dir = "./".$dir if ($dir !~ m/^(\.|\/)/);
-  my @tFiles = split(";",AttrVal($n,"configTempFile","tempList.cfg"));
+  my @tFiles = split('[;,]',AttrVal($n,"configTempFile","tempList.cfg"));
   my $tDefault = $dir.$tFiles[0].":";
   my @tmpl;
   
@@ -2114,7 +2114,7 @@ sub HMinfo_getConfigFile($$$) {################################################
   my $fn = $fnIn ? $fnIn
                  : AttrVal($name,$configFile,$defaultFN{$configFile});
   my @fns;# my file names - coud be more
-  foreach my $fnt (split(";",$fn)){
+  foreach my $fnt (split('[;,]',$fn)){
     $fnt = AttrVal($name,"configDir",".") ."\/".$fnt  if ($fnt !~ m/\//); 
     $fnt = AttrVal("global","modpath",".")."\/".$fnt  if ($fnt !~ m/^\//);
     push @fns,$fnt;
@@ -3288,7 +3288,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        <a ref="#HMinfoloadConfig">loadConfig</a><br>
        <a ref="#HMinfoverifyConfig">verifyConfig</a><br>
      </li>
-     <li><a name="#HMinfoconfigTempFile">configTempFile&lt;,configTempFile2&gt;&lt;,configTempFile2&gt; </a>
+     <li><a name="#HMinfoconfigTempFile">configTempFile&lt;;configTempFile2&gt;&lt;;configTempFile3&gt; </a>
         Liste of Templfiles (weekplan) which are considered in HMInfo and CUL_HM<br>
         Files are comma separated. The first file is default. Its name may be skipped when setting a tempalte.<br>
      </li>
@@ -3736,7 +3736,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
         <a ref="#HMinfopurgeConfig">purgeConfig</a>, 
         <a ref="#HMinfoloadConfig">loadConfig</a><br>
     </li>
-    <li><a name="#HMinfoconfigTempFile">configTempFile&lt;,configTempFile2&gt;&lt;,configTempFile3&gt; </a>
+    <li><a name="#HMinfoconfigTempFile">configTempFile&lt;;configTempFile2&gt;&lt;;configTempFile3&gt; </a>
         Liste der Templfiles (weekplan) welche in HM berücksichtigt werden<br>
         Die Files werden kommasepariert eingegeben. Das erste File ist der Default. Dessen Name muss beim Template nicht eingegeben werden.<br>
     </li>
