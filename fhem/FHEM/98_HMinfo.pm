@@ -775,6 +775,7 @@ sub HMinfo_tempList(@) { ######################################################
     return "file: $fName error write:$err"  if ($err);
 
     $ret = "incomplete data for ".join("\n     ",@incmpl) if (scalar@incmpl);
+    HMinfo_listOfTempTemplates(); # refresh - maybe there are new entries in the files. 
   }
   elsif ($action =~ m/(verify|restore)/){
     $ret = HMinfo_tempListTmpl($hiN,$filter,"",$action,$fName);
@@ -786,6 +787,7 @@ sub HMinfo_tempList(@) { ######################################################
 }
 sub HMinfo_tempListTmpl(@) { ##################################################
   my ($hiN,$filter,$tmpl,$action,$fName)=@_;
+  Log 1,"General ----- $action:$fName";
   $filter = "." if (!$filter);
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
   my $ret = "";
@@ -830,13 +832,12 @@ sub HMinfo_tempListTmplView() { ###############################################
   my %tlEntitys;
   $tlEntitys{$_}{v} = 1 foreach ((devspec2array("TYPE=CUL_HM:FILTER=model=HM-CC-RT.*:FILTER=chanNo=04")
                                  ,devspec2array("TYPE=CUL_HM:FILTER=model=.*-TC.*:FILTER=chanNo=02")));
-  my $defFn = HMinfo_tempListDefFn();
-  my @tlFiles = $defFn;
+  my ($n) = devspec2array("TYPE=HMinfo");
+  my $defFn = HMinfo_tempListDefFns();
+  my @tlFiles = split(";",$defFn);
+  $defFn = $defs{$n}{helper}{weekplanListDef};
   
-  
-  my @tlFileMiss;
-  my @tNfound;# templates found in files
-  my @dWoTmpl;# Device not using templates
+  my @dWoTmpl;    # Device not using templates
   foreach my $d (keys %tlEntitys){
     my ($tf,$tn) = split(":",AttrVal($d,"tempListTmpl","empty"));
     ($tf,$tn) = ($defFn,$tf) if (!defined $tn); # no file given, switch parameter
@@ -847,61 +848,61 @@ sub HMinfo_tempListTmplView() { ###############################################
     else{
       push @tlFiles,$tf;
       $tlEntitys{$d}{t} = ("$tf:".($tn eq "empty"?$d:$tn));
+      
+      $tlEntitys{$d}{c} = CUL_HM_tempListTmpl($d,"verify",$tlEntitys{$d}{t});
+      if ($tlEntitys{$d}{c}){
+        $tlEntitys{$d}{c} =~ s/\n//g;
+      }
+      else{
+        $tlEntitys{$d}{c} = "ok" if !($tlEntitys{$d}{c});
+      }
     }
   }
   @tlFiles = HMinfo_noDup(@tlFiles);
+
+  my @tlFileMiss;
   foreach my $fName (@tlFiles){#################################
     my ($err,@RLines) = FileRead($fName);
     if ($err){
       push @tlFileMiss,"$fName - $err";
       next;
     }
+  }
 
-    push @tNfound,"$fName:";
-    my $l = length($fName)+3;
-    my $spc = sprintf("%${l}s"," ");
-    foreach(@RLines){
-      chomp;
-      my $line = $_;
-      $line =~ s/\r//g;
-      next if($line =~ m/#/);
-      if($line =~ m/^entities:/){
-        $line =~s/.*://;
-        foreach my $eN (split(",",$line)){
-          $eN =~ s/ //g;
-          push @tNfound,$spc."$eN";
-        }
-      }  
-    }
+  my @tNfound;    # templates found in files
+  if ($defs{$n}{helper}{weekplanList}){
+    push @tNfound, (map{(($_ =~ m/:/) ? $_ : " defaultFile: $_" )}  @{$defs{hm}{helper}{weekplanList}});
   }
-  foreach my $d (keys %tlEntitys){
-    $tlEntitys{$d}{c} = CUL_HM_tempListTmpl($d,"verify",$tlEntitys{$d}{t});
-    if ($tlEntitys{$d}{c}){
-      $tlEntitys{$d}{c} =~ s/\n//g;
-    }
-    else{
-      $tlEntitys{$d}{c} = "ok" if !($tlEntitys{$d}{c});
-    }
-  }
+  
 
   ####################################################
   my $ret = "";
-  $ret .= "\nfiles referenced but not found:\n   " .join("\n      =>  ",@tlFileMiss) if (@tlFileMiss);
-  $ret .= "\navailable templates\n   "             .join("\n   "       ,@tNfound)    if (@tNfound);
+  $ret .= "\ndefault templatefile: $defFn\n   ";
+  $ret .= "\nfiles referenced but not found:\n   " .join("\n      =>  ",sort @tlFileMiss) if (@tlFileMiss);
+  $ret .= "\navailable templates\n   "             .join("\n   "       ,sort @tNfound)    if (@tNfound);
+  
   $ret .= "\n\n ---------components-----------\n  template : device : state\n";
-  $ret .= "\n     "        .join("\n     "        ,(sort map{"$tlEntitys{$_}{t} : $_ : $tlEntitys{$_}{c}" } keys %tlEntitys));
+  $ret .= "\n     "        .join("\n     "        ,(sort map{s/$defFn:/ defaultFile: /;$_}
+                                                         map{"$tlEntitys{$_}{t} : $_ : $tlEntitys{$_}{c}" } 
+                                                         keys %tlEntitys));
   $ret .= "\ndevices not using tempList templates:\n      =>  "   .join("\n      =>  ",@dWoTmpl) if (@dWoTmpl);
   return $ret;
 }
-sub HMinfo_tempListDefFn(@) { #################################################
+sub HMinfo_tempListDefFns(@) { #################################################
   my ($fn) = shift;
   $fn = "" if (!defined $fn);
   
   my ($n) = devspec2array("TYPE=HMinfo");
   return HMinfo_getConfigFile($n,"configTempFile",$fn);
 }
+sub HMinfo_tempListDefFn(@) { #################################################
+  my $fn = HMinfo_tempListDefFns(@_);
+  $fn =~ s/;.*//; # only use first file - this is default
+  return $fn;
+}
 sub HMinfo_listOfTempTemplates() { ############################################
   # search all entries in tempListFile
+  # provide helper: weekplanList & weekplanListDef
   my ($n) =devspec2array("TYPE=HMinfo");
   my $dir = AttrVal($n,"configDir","$attr{global}{modpath}/")."/"; #no dir?  add defDir
   $dir = "./".$dir if ($dir !~ m/^(\.|\/)/);
@@ -925,8 +926,10 @@ sub HMinfo_listOfTempTemplates() { ############################################
     }
   }
   @tmpl = map{s/$tDefault//;$_} @tmpl;
+  $defs{$n}{helper}{weekplanListDef}  = $tDefault;
+  $defs{$n}{helper}{weekplanListDef}  =~ s/://;
   $defs{$n}{helper}{weekplanList}     = \@tmpl;
-  my $at=$modules{CUL_HM};
+
   if ($modules{CUL_HM}{AttrList}){
     my $l = "none,defaultWeekplan,".join(",",@tmpl);
     $modules{CUL_HM}{AttrList} =~ s/ tempListTmpl(.*? )/ tempListTmpl:$l /;
@@ -1509,7 +1512,7 @@ sub HMinfo_SetFn($@) {#########################################################
   }
 
   $cmd = "?" if(!$cmd);# by default print options
-  if   ($cmd =~ m/^clear[G]?/ )     {##actionImmediate: clear parameter--------------
+  if   ($cmd =~ m/^clear[G]?/ )     {##actionImmediate: clear parameter--------
     my ($type) = @a;                               
     return "please enter what to clear" if (! $type);
     if ($type eq "msgStat" || $type eq "all" ){
@@ -1573,6 +1576,7 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd =~ m/tempList[G]?/){##handle thermostat templist from file -------
     my $action = $a[0]?$a[0]:"";
+    HMinfo_listOfTempTemplates(); # refresh - maybe there are new entries in the files. 
     if ( $action eq "genPlot"){#generatelog and gplot file 
       $ret = HMinfo_tempListTmplGenLog($name,$a[1]);
     }
@@ -1583,7 +1587,6 @@ sub HMinfo_SetFn($@) {#########################################################
       my $fn = HMinfo_tempListDefFn($a[1]);
       $ret = HMinfo_tempList($name,$filter,$action,$fn);
     }
-    HMinfo_listOfTempTemplates(); # execute post command - maybe there are new entries in the files. 
   }
   elsif($cmd eq "templateExe"){##template: see if it applies ------------------
     return HMinfo_templateExe($opt,$filter,@a);
@@ -2103,17 +2106,20 @@ sub HMinfo_archConfigPost($)  {################################################
   return ;
 }
 
-sub HMinfo_getConfigFile($$$) {##################################################
+sub HMinfo_getConfigFile($$$) {################################################
   my ($name,$configFile,$fnIn) = @_;#HmInfoName, ConfigFiletype
   my %defaultFN = ( configFilename => "regSave.cfg"
                    ,configTempFile => "tempList.cfg"
                   );
   my $fn = $fnIn ? $fnIn
                  : AttrVal($name,$configFile,$defaultFN{$configFile});
-  
-  $fn = AttrVal($name,"configDir",".") ."\/".$fn  if ($fn !~ m/\//); 
-  $fn = AttrVal("global","modpath",".")."\/".$fn  if ($fn !~ m/^\//);
-  return $fn;
+  my @fns;# my file names - coud be more
+  foreach my $fnt (split(";",$fn)){
+    $fnt = AttrVal($name,"configDir",".") ."\/".$fnt  if ($fnt !~ m/\//); 
+    $fnt = AttrVal("global","modpath",".")."\/".$fnt  if ($fnt !~ m/^\//);
+    push @fns,$fnt;
+  }
+  return join(";",@fns);
 }
 
 sub HMinfo_deviceReplace($$$){
@@ -3730,7 +3736,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
         <a ref="#HMinfopurgeConfig">purgeConfig</a>, 
         <a ref="#HMinfoloadConfig">loadConfig</a><br>
     </li>
-    <li><a name="#HMinfoconfigTempFile">configTempFile&lt;,configTempFile2&gt;&lt;,configTempFile2&gt; </a>
+    <li><a name="#HMinfoconfigTempFile">configTempFile&lt;,configTempFile2&gt;&lt;,configTempFile3&gt; </a>
         Liste der Templfiles (weekplan) welche in HM berücksichtigt werden<br>
         Die Files werden kommasepariert eingegeben. Das erste File ist der Default. Dessen Name muss beim Template nicht eingegeben werden.<br>
     </li>
