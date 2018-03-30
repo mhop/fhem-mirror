@@ -60,8 +60,8 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 
-my $modulversion = "4.2.2";
-my $flowsetversion = "4.2.0";
+my $modulversion = "4.2.3";
+my $flowsetversion = "4.2.1";
 
 
 
@@ -126,6 +126,7 @@ sub AMADDevice_Initialize($) {
                 "disable:1 ".
                 "IODev ".
                 "remoteServer:Automagic,Autoremote,TNES,other ".
+                "setTakeScreenshotResolution:1280x720,1920x1080,1920x1200 ".
                 "setTakePictureResolution:800x600,1024x768,1280x720,1600x1200,1920x1080 ".
                 "setTakePictureCamera:Back,Front ".
                 $readingFnAttributes;
@@ -187,7 +188,7 @@ sub AMADDevice_Define($$) {
     my $d = $modules{AMADDevice}{defptr}{$amad_id};
     
     return "AMADDevice device $name on AMADCommBridge $iodev already defined."
-    if( defined($d) && $d->{IODev} == $hash->{IODev} && $d->{NAME} ne $name );
+    if( defined($d) and $d->{IODev} == $hash->{IODev} and $d->{NAME} ne $name );
 
     
 
@@ -201,16 +202,7 @@ sub AMADDevice_Define($$) {
     
     
     Log3 $name, 3, "AMADDevice ($name) - defined with AMAD_ID: $amad_id on port $hash->{PORT}";
-        
 
-    if( $init_done ) {
-        
-        InternalTimer( gettimeofday()+3, "AMADDevice_GetUpdate", $hash, 0 ) if( ($hash->{HOST}) );
-            
-    } else {
-        
-        InternalTimer( gettimeofday()+15, "AMADDevice_GetUpdate", $hash, 0 ) if( ($hash->{HOST}) );
-    }
 
     $modules{AMADDevice}{defptr}{$amad_id} = $hash;
 
@@ -263,22 +255,15 @@ sub AMADDevice_Attr(@) {
     elsif( $attrName eq "disable" ) {
         if( $cmd eq "set" ) {
             if( $attrVal eq "0" ) {
-            
-                RemoveInternalTimer( $hash );
-                InternalTimer( gettimeofday()+2, "AMADDevice_GetUpdate", $hash, 0 ) if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "disabled" );
                 readingsSingleUpdate ( $hash, "state", "active", 1 );
                 Log3 $name, 3, "AMADDevice ($name) - enabled";
             } else {
-            
+                RemoveInternalTimer($hash);
                 readingsSingleUpdate ( $hash, "state", "disabled", 1 );
-                RemoveInternalTimer( $hash );
                 Log3 $name, 3, "AMADDevice ($name) - disabled";
             }
             
         } else {
-        
-            RemoveInternalTimer( $hash );
-            InternalTimer( gettimeofday()+2, "AMADDevice_GetUpdate", $hash, 0 ) if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "disabled" );
             readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "AMADDevice ($name) - enabled";
         }
@@ -290,12 +275,10 @@ sub AMADDevice_Attr(@) {
         }
         
         Log3 $name, 3, "AMADDevice ($name) - $cmd $attrName $attrVal and run statusRequest";
-        RemoveInternalTimer( $hash );
-        InternalTimer( gettimeofday(), "AMADDevice_GetUpdate", $hash, 0 )
     }
     
     elsif( $attrName eq "setScreenlockPIN" ) {
-        if( $cmd eq "set" && $attrVal ) {
+        if( $cmd eq "set" and $attrVal ) {
         
             $attrVal = AMADDevice_encrypt($attrVal);
             
@@ -312,14 +295,12 @@ sub AMADDevice_Attr(@) {
         }
         
         Log3 $name, 3, "AMADDevice ($name) - $cmd $attrName $attrVal and run statusRequest";
-        RemoveInternalTimer( $hash );
-        InternalTimer( gettimeofday(), "AMADDevice_GetUpdate", $hash, 0 )
     }
     
     
     
     if( $cmd eq "set" ) {
-        if( $attrVal && $orig ne $attrVal ) {
+        if( $attrVal and $orig ne $attrVal ) {
         
             $attr{$name}{$attrName} = $attrVal;
             return $attrName ." set to ". $attrVal if( $init_done );
@@ -342,8 +323,21 @@ sub AMADDevice_Notify($$) {
 
 
     AMADDevice_statusRequest($hash) if( (grep /^DELETEATTR.$name.setAPSSID$/,@{$events}
-                                                    or grep /^ATTR.$name.setAPSSID.*/,@{$events} )
+                                                    or grep /^ATTR.$name.setAPSSID.*/,@{$events}
+                                                    or grep /^DELETEATTR.$name.checkActiveTask$/,@{$events}
+                                                    or grep /^ATTR.$name.checkActiveTask.*/,@{$events}
+                                                    or grep /^DELETEATTR.$name.setUserFlowState$/,@{$events}
+                                                    or grep /^ATTR.$name.setUserFlowState.*/,@{$events})
                                                     and $init_done and $devname eq 'global' );
+
+    AMADDevice_GetUpdate($hash) if( (grep /^DEFINED.$name$/,@{$events}
+                                                    or grep /^INITIALIZED$/,@{$events}
+                                                    or grep /^MODIFIED.$name$/,@{$events})
+                                                    and $devname eq 'global' and $init_done  );
+                                                    
+    AMADDevice_checkDeviceState($hash) if( (grep /^DELETEATTR.$name.disable$/,@{$events}
+                                                    or grep /^ATTR.$name.disable.0$/,@{$events})
+                                                    and $devname eq 'global' and $init_done );
 
     return;
 }
@@ -354,8 +348,10 @@ sub AMADDevice_GetUpdate($) {
     my $name    = $hash->{NAME};
     my $bname   = $hash->{IODev}->{NAME};
     
-
-    if( $init_done && ( ReadingsVal( $name, "deviceState", "unknown" ) eq "unknown" or ReadingsVal( $name, "deviceState", "online" ) eq "online" ) && AttrVal( $name, "disable", 0 ) ne "1" && ReadingsVal( $bname, "fhemServerIP", "not set" ) ne "not set" ) {
+    
+    RemoveInternalTimer( $hash );
+    
+    if( $init_done and ( ReadingsVal( $name, "deviceState", "unknown" ) eq "unknown" or ReadingsVal( $name, "deviceState", "online" ) eq "online" ) and AttrVal( $name, "disable", 0 ) ne "1" and ReadingsVal( $bname, "fhemServerIP", "not set" ) ne "not set" ) {
 
         AMADDevice_statusRequest($hash);
         AMADDevice_checkDeviceState( $hash );
@@ -365,7 +361,7 @@ sub AMADDevice_GetUpdate($) {
         Log3 $name, 4, "AMADDevice ($name) - GetUpdate, FHEM or Device not ready yet";
         Log3 $name, 3, "AMADDevice ($bname) - GetUpdate, Please set $bname fhemServerIP <IP-FHEM> NOW!" if( ReadingsVal( $bname, "fhemServerIP", "none" ) eq "none" );
 
-        InternalTimer( gettimeofday()+15, "AMADDevice_GetUpdate", $hash, 0 );
+        InternalTimer( gettimeofday()+30, "AMADDevice_GetUpdate", $hash, 0 );
     }
 }
 
@@ -448,8 +444,8 @@ sub AMADDevice_WriteReadings($$) {
                                             );
     }
     
-    readingsBulkUpdateIfChanged( $hash, "deviceState", "offline", 1 ) if( $decode_json->{payload}{airplanemode} && $decode_json->{payload}{airplanemode} eq "on" );
-    readingsBulkUpdateIfChanged( $hash, "deviceState", "online", 1 ) if( $decode_json->{payload}{airplanemode} && $decode_json->{payload}{airplanemode} eq "off" );
+    readingsBulkUpdateIfChanged( $hash, "deviceState", "offline", 1 ) if( $decode_json->{payload}{airplanemode} and $decode_json->{payload}{airplanemode} eq "on" );
+    readingsBulkUpdateIfChanged( $hash, "deviceState", "online", 1 ) if( $decode_json->{payload}{airplanemode} and $decode_json->{payload}{airplanemode} eq "off" );
 
     readingsBulkUpdateIfChanged( $hash, "lastStatusRequestState", "statusRequest_done", 1 );
     
@@ -481,7 +477,8 @@ sub AMADDevice_Set($$@) {
     my $path;
     my $method;
     
-    my @playerList          = ('GoogleMusic','SamsungMusic','AmazonMusic','SpotifyMusic','TuneinRadio','AldiMusic','YouTube','YouTubeKids','VlcPlayer','Audible','Deezer');
+    my @playerList          = ('GoogleMusic','SamsungMusic','AmazonMusic','SpotifyMusic','TuneinRadio','AldiMusic','YouTube',
+                                'YouTubeKids','VlcPlayer','Audible','Deezer','Poweramp','MXPlayerPro');
     my @playerCmd           = ('mediaPlay','mediaStop','mediaNext','mediaBack');
     
     my $volMax              = AttrVal($name,'setVolMax',15);
@@ -634,7 +631,7 @@ sub AMADDevice_Set($$@) {
         $path   = "/fhem-amad/setCommands/systemcommand?syscmd=$systemcmd";
         $method         = "POST";
         readingsSingleUpdate( $hash, "airplanemode", "on", 1 ) if( $systemcmd eq "airplanemodeON" );
-        readingsSingleUpdate( $hash, "deviceState", "offline", 1 ) if( $systemcmd eq "airplanemodeON" || $systemcmd eq "shutdown" );
+        readingsSingleUpdate( $hash, "deviceState", "offline", 1 ) if( $systemcmd eq "airplanemodeON" or $systemcmd eq "shutdown" );
     }
     
     elsif( lc $cmd eq 'donotdisturb' ) {
@@ -695,6 +692,15 @@ sub AMADDevice_Set($$@) {
         unless(AttrVal($name,'setTakePictureCamera','none') ne 'none');
         
         $path   = "/fhem-amad/setCommands/takepicture?pictureresolution=".AttrVal($name,'setTakePictureResolution','none')."&picturecamera=".AttrVal($name,'setTakePictureCamera','none');
+        $method = "POST";
+    }
+    
+    elsif( lc $cmd eq 'takescreenshot' ) {
+
+        return "Please set \"setTakeScreenshotResolution\" Attribut first"
+        unless(AttrVal($name,'setTakeScreenshotResolution','none') ne 'none');
+        
+        $path   = "/fhem-amad/setCommands/takescreenshot?screenshotresolution=".AttrVal($name,'setTakeScreenshotResolution','none');
         $method = "POST";
     }
     
@@ -767,7 +773,7 @@ sub AMADDevice_Set($$@) {
             $list .= $_ . ':' . join(',',@playerList) . ' ';
         }
         
-        $list .= "screenMsg ttsMsg screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState userFlowRun sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg takePicture:noArg";
+        $list .= "screenMsg ttsMsg screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState userFlowRun sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg takePicture:noArg takeScreenshot:noArg";
 
         $list .= " screenOrientation:auto,landscape,portrait"   if( AttrVal( $name, "setScreenOrientation", "0" ) eq "1" );
         $list .= " screenFullscreen:on,off"                     if( AttrVal( $name, "setFullscreen", "0" ) eq "1" );
@@ -1155,6 +1161,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>screenOrientation - Auto,Landscape,Portait, set screen orientation (automatic, horizontal, vertical). <b>attribute setScreenOrientation</b></li>
     <li>system - issue system command (only with rooted Android devices). reboot,shutdown,airplanemodeON (can only be switched ON) <b>attribute root</b>, in Automagic "Preferences" "Root functions" need to be enabled.</li>
     <li>takePicture - take a camera picture <b>Attribut setTakePictureResolution</b></li>
+    <li>takeScreenshot - take a Screenshot picture <b>Attribut setTakeScreenshotResolution</b></li>
   </ul>
   <br><br>
   <a name="AMADDeviceattribut"></a>
@@ -1343,6 +1350,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>screenOrientation - Auto,Landscape,Portait, aktiviert die Bildschirmausrichtung (Automatisch,Horizontal,Vertikal). <b>Attribut setScreenOrientation</b> (Tasker unterst&uuml;tzt nur Auto on/off)</li>
     <li>system - setzt Systembefehle ab (nur bei gerootetet Ger&auml;en). reboot,shutdown,airplanemodeON (kann nur aktiviert werden) <b>Attribut root</b>, in den Automagic Einstellungen muss "Root Funktion" gesetzt werden</li>
     <li>takePicture - löst die Kamera aus für ein Foto <b>Attribut setTakePictureResolution</b></li>
+    <li>takeScreenshot - macht ein Screenshot <b>Attribut setTakeScreenshotResolution</b></li>
   </ul>
   <br><br>
   <a name="AMADDeviceattribute"></a>

@@ -3,7 +3,7 @@
 	<Profile sr="prof1005" ve="2">
 		<cdate>1516830496835</cdate>
 		<clp>true</clp>
-		<edate>1517341634125</edate>
+		<edate>1521847866660</edate>
 		<id>1005</id>
 		<mid0>1004</mid0>
 		<nme>AutoRemote AMAD</nme>
@@ -87,7 +87,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1006" ve="2">
 		<cdate>1516830496835</cdate>
 		<clp>true</clp>
-		<edate>1512646890239</edate>
+		<edate>1522170426416</edate>
 		<id>1006</id>
 		<mid0>984</mid0>
 		<mid1>973</mid1>
@@ -109,17 +109,17 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1007" ve="2">
 		<cdate>1516830496836</cdate>
 		<clp>true</clp>
-		<edate>1516907246352</edate>
+		<edate>1522170208960</edate>
 		<id>1007</id>
 		<mid0>991</mid0>
-		<nme>toGoAMAD</nme>
+		<nme>toGoAMAD_discon</nme>
 		<State sr="con0" ve="2">
 			<code>160</code>
 			<pin>true</pin>
 			<Str sr="arg0" ve="3">%AMAD_apssid</Str>
 			<Str sr="arg1" ve="3"/>
 			<Str sr="arg2" ve="3"/>
-			<Int sr="arg3" val="0"/>
+			<Int sr="arg3" val="2"/>
 		</State>
 		<State sr="con1" ve="2">
 			<code>165</code>
@@ -135,7 +135,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1008" ve="2">
 		<cdate>1516830496836</cdate>
 		<clp>true</clp>
-		<edate>1512646887184</edate>
+		<edate>1522170324153</edate>
 		<id>1008</id>
 		<mid0>968</mid0>
 		<mid1>974</mid1>
@@ -158,7 +158,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1010" ve="2">
 		<cdate>1516830496837</cdate>
 		<clp>true</clp>
-		<edate>1513116249338</edate>
+		<edate>1522170409344</edate>
 		<id>1010</id>
 		<mid0>992</mid0>
 		<nme>AMAD_screen_off</nme>
@@ -179,7 +179,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1011" ve="2">
 		<cdate>1516830496847</cdate>
 		<clp>true</clp>
-		<edate>1512646889105</edate>
+		<edate>1522170459538</edate>
 		<id>1011</id>
 		<mid0>942</mid0>
 		<mid1>927</mid1>
@@ -199,36 +199,10 @@ Way the message was sent (BT, Wifi, GCM)
 			</ConditionList>
 		</State>
 	</Profile>
-	<Profile sr="prof1012" ve="2">
-		<cdate>1516830496847</cdate>
-		<clp>true</clp>
-		<edate>1516488793383</edate>
-		<id>1012</id>
-		<mid0>952</mid0>
-		<nme>AMAD_IntentRadio</nme>
-		<Event sr="con0" ve="2">
-			<code>599</code>
-			<Str sr="arg0" ve="3">org.smblott.intentradio.STATE</Str>
-			<Int sr="arg1" val="0"/>
-			<Int sr="arg2" val="0"/>
-			<Str sr="arg3" ve="3"/>
-			<Str sr="arg4" ve="3"/>
-		</Event>
-		<State sr="con1" ve="2">
-			<code>165</code>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%AMAD_send</lhs>
-					<op>2</op>
-					<rhs>on</rhs>
-				</Condition>
-			</ConditionList>
-		</State>
-	</Profile>
 	<Profile sr="prof1013" ve="2">
 		<cdate>1516830496848</cdate>
 		<clp>true</clp>
-		<edate>1513424870080</edate>
+		<edate>1522170487667</edate>
 		<id>1013</id>
 		<mid0>983</mid0>
 		<mid1>932</mid1>
@@ -251,7 +225,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1014" ve="2">
 		<cdate>1516830496848</cdate>
 		<clp>true</clp>
-		<edate>1516474460529</edate>
+		<edate>1522170518179</edate>
 		<id>1014</id>
 		<mid0>964</mid0>
 		<nme>AMAD_SMS</nme>
@@ -276,7 +250,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1015" ve="2">
 		<cdate>1516830496849</cdate>
 		<clp>true</clp>
-		<edate>1513424843423</edate>
+		<edate>1522170537723</edate>
 		<id>1015</id>
 		<mid0>947</mid0>
 		<nme>AMAD_alarm_start</nme>
@@ -298,7 +272,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1016" ve="2">
 		<cdate>1516830496849</cdate>
 		<clp>true</clp>
-		<edate>1512646885163</edate>
+		<edate>1522170568706</edate>
 		<id>1016</id>
 		<mid0>988</mid0>
 		<mid1>926</mid1>
@@ -321,7 +295,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1017" ve="2">
 		<cdate>1516830496849</cdate>
 		<clp>true</clp>
-		<edate>1513424830740</edate>
+		<edate>1522170584399</edate>
 		<id>1017</id>
 		<mid0>963</mid0>
 		<nme>AMAD_alarm_done</nme>
@@ -388,7 +362,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1020" ve="2">
 		<cdate>1516830496858</cdate>
 		<clp>true</clp>
-		<edate>1513147652107</edate>
+		<edate>1522170599858</edate>
 		<id>1020</id>
 		<mid0>1000</mid0>
 		<nme>AMAD_screen_unlocked</nme>
@@ -409,7 +383,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1021" ve="2">
 		<cdate>1516830496872</cdate>
 		<clp>true</clp>
-		<edate>1512664308181</edate>
+		<edate>1522170630736</edate>
 		<id>1021</id>
 		<mid0>934</mid0>
 		<mid1>997</mid1>
@@ -431,7 +405,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1022" ve="2">
 		<cdate>1516830496883</cdate>
 		<clp>true</clp>
-		<edate>1512664382473</edate>
+		<edate>1522170659399</edate>
 		<id>1022</id>
 		<mid0>916</mid0>
 		<mid1>931</mid1>
@@ -454,7 +428,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1023" ve="2">
 		<cdate>1516830496883</cdate>
 		<clp>true</clp>
-		<edate>1513424824152</edate>
+		<edate>1522170678813</edate>
 		<id>1023</id>
 		<mid0>925</mid0>
 		<nme>AMAD_alarm</nme>
@@ -479,7 +453,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1024" ve="2">
 		<cdate>1516830496890</cdate>
 		<clp>true</clp>
-		<edate>1512646889713</edate>
+		<edate>1522170694436</edate>
 		<id>1024</id>
 		<mid0>972</mid0>
 		<nme>AMAD_InformationFlow</nme>
@@ -505,16 +479,16 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1025" ve="2">
 		<cdate>1516830496891</cdate>
 		<clp>true</clp>
-		<edate>1516907192240</edate>
+		<edate>1522170853234</edate>
 		<id>1025</id>
 		<mid0>1001</mid0>
-		<nme>toGoAMAD</nme>
+		<nme>toGoAMAD_con</nme>
 		<State sr="con0" ve="2">
 			<code>160</code>
 			<Str sr="arg0" ve="3">%AMAD_apssid</Str>
 			<Str sr="arg1" ve="3"/>
 			<Str sr="arg2" ve="3"/>
-			<Int sr="arg3" val="0"/>
+			<Int sr="arg3" val="2"/>
 		</State>
 		<State sr="con1" ve="2">
 			<code>165</code>
@@ -530,7 +504,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1026" ve="2">
 		<cdate>1516830496892</cdate>
 		<clp>true</clp>
-		<edate>1513424802623</edate>
+		<edate>1522170710421</edate>
 		<id>1026</id>
 		<mid0>1003</mid0>
 		<nme>AMAD_screen_on</nme>
@@ -551,7 +525,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1028" ve="2">
 		<cdate>1516830496892</cdate>
 		<clp>true</clp>
-		<edate>1512646676509</edate>
+		<edate>1522170738674</edate>
 		<id>1028</id>
 		<mid0>989</mid0>
 		<mid1>945</mid1>
@@ -622,7 +596,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1030" ve="2">
 		<cdate>1517260526109</cdate>
 		<clp>true</clp>
-		<edate>1517330678766</edate>
+		<edate>1522170754384</edate>
 		<id>1030</id>
 		<mid0>1031</mid0>
 		<nme>AMAD_Messenger</nme>
@@ -655,25 +629,137 @@ Telegram</label>
 			</ConditionList>
 		</State>
 	</Profile>
+	<Profile sr="prof1035" ve="2">
+		<cdate>1516830496891</cdate>
+		<clp>true</clp>
+		<edate>1522171174505</edate>
+		<id>1035</id>
+		<mid0>1055</mid0>
+		<nme>AMAD_Boot</nme>
+		<Event sr="con0" ve="2">
+			<code>411</code>
+			<pri>0</pri>
+		</Event>
+	</Profile>
+	<Profile sr="prof1065" ve="2">
+		<cdate>1439252230082</cdate>
+		<clp>true</clp>
+		<edate>1522171129360</edate>
+		<id>1065</id>
+		<mid0>1066</mid0>
+		<nme>AMAD_Media_PowerampTrack</nme>
+		<Event sr="con0" ve="2">
+			<code>599</code>
+			<Str sr="arg0" ve="3">com.maxmpz.audioplayer.TRACK_CHANGED</Str>
+			<Int sr="arg1" val="1"/>
+			<Int sr="arg2" val="0"/>
+			<Str sr="arg3" ve="3"/>
+			<Str sr="arg4" ve="3"/>
+		</Event>
+		<State sr="con1" ve="2">
+			<code>165</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</State>
+	</Profile>
+	<Profile sr="prof1071" ve="2">
+		<cdate>1439252230082</cdate>
+		<clp>true</clp>
+		<edate>1522171119557</edate>
+		<id>1071</id>
+		<mid0>1072</mid0>
+		<nme>AMAD_Media_PowerampState</nme>
+		<Event sr="con0" ve="2">
+			<code>599</code>
+			<Str sr="arg0" ve="3">com.maxmpz.audioplayer.STATUS_CHANGED</Str>
+			<Int sr="arg1" val="1"/>
+			<Int sr="arg2" val="0"/>
+			<Str sr="arg3" ve="3"/>
+			<Str sr="arg4" ve="3"/>
+		</Event>
+		<State sr="con1" ve="2">
+			<code>165</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</State>
+	</Profile>
+	<Profile sr="prof53" ve="2">
+		<cdate>1439252230082</cdate>
+		<clp>true</clp>
+		<edate>1522171145358</edate>
+		<id>53</id>
+		<mid0>850</mid0>
+		<nme>AMAD_Media_IntentRadio</nme>
+		<Event sr="con0" ve="2">
+			<code>599</code>
+			<Str sr="arg0" ve="3">org.smblott.intentradio.STATE</Str>
+			<Int sr="arg1" val="1"/>
+			<Int sr="arg2" val="0"/>
+			<Str sr="arg3" ve="3"/>
+			<Str sr="arg4" ve="3"/>
+		</Event>
+		<State sr="con1" ve="2">
+			<code>165</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</State>
+	</Profile>
+	<Profile sr="prof971" ve="2">
+		<cdate>1480692336275</cdate>
+		<clp>true</clp>
+		<edate>1522170774304</edate>
+		<id>971</id>
+		<mid0>1036</mid0>
+		<nme>AMAD_incomingCaller</nme>
+		<Event sr="con0" ve="2">
+			<code>6</code>
+			<Str sr="arg0" ve="3"/>
+		</Event>
+		<State sr="con1" ve="2">
+			<code>165</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_send</lhs>
+					<op>2</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</State>
+	</Profile>
 	<Project sr="proj0" ve="2">
 		<cdate>1502789371413</cdate>
 		<name>AMAD</name>
-		<pids>1020,1023,1016,1024,1013,1026,1017,1019,1014,1030,1010,1011,1007,1006,1028,1008,1012,1015,1005,1025,1022,1021,1029</pids>
-		<scenes>AMAD_settings,AMAD_Dialog_Message</scenes>
-		<tids>959,969,940,948,1003,989,999,956,922,996,923,1004,961,980,935,924,962,927,967,974,938,920,957,975,952,947,943,982,954,953,988,960,944,987,937,992,976,939,966,995,1000,914,1035,932,998,985,955,934,970,916,918,950,936,977,990,986,994,984,968,942,945,951,1031,979,972,973,978,946,925,926,1001,949,981,963,991,997,941,965,1002,993,931,958,983,964</tids>
+		<pids>1025,1023,1014,1011,971,1030,1016,1071,1019,1010,1021,1020,1024,1026,1035,1008,1029,1022,1006,1028,1015,1017,1007,1013,53,1065,1005</pids>
+		<scenes>AMAD_Dialog_Message,AMAD_settings</scenes>
+		<tids>924,948,960,935,950,916,987,995,1004,923,946,985,850,997,992,999,970,994,914,965,979,963,996,967,940,972,918,998,990,955,1036,982,1031,936,974,951,962,939,989,973,977,954,993,945,1002,920,991,937,975,949,1055,1063,927,976,959,956,953,1001,984,941,966,932,947,981,931,944,958,1072,986,969,934,1000,938,968,983,961,980,943,957,1003,978,1066,926,964,922,988,942,925</tids>
 		<Kid sr="Kid">
 			<feat0>android.hardware.camera:y</feat0>
 			<feat1>android.hardware.bluetooth:y</feat1>
 			<feat2>android.hardware.camera.flash:y</feat2>
 			<feat3>android.hardware.camera.front:y</feat3>
 			<feat4>android.hardware.wifi:y</feat4>
-			<launchID>963</launchID>
+			<launchID>965</launchID>
 			<mplug0>net.superblock.pushover</mplug0>
 			<mplug1>com.joaomgcd.autoremote</mplug1>
 			<mplug2>bidoismorgan.httpevent</mplug2>
 			<pkg>com.schlimbo.amad</pkg>
 			<vnme>1.0</vnme>
-			<vnum>8</vnum>
+			<vnum>10</vnum>
 		</Kid>
 		<Img sr="icon" ve="2">
 			<fle>/storage/emulated/0/Tasker/.icn/Eigene Icons/TaskerFHEM_icon.png</fle>
@@ -1604,13 +1690,14 @@ Bridge IP:</Str>
 	</Scene>
 	<Task sr="task1000">
 		<cdate>1503612579492</cdate>
-		<edate>1513147652107</edate>
+		<edate>1522170599858</edate>
 		<id>1000</id>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"screen": "on unlocked"</Str>
@@ -1620,9 +1707,10 @@ Bridge IP:</Str>
 	</Task>
 	<Task sr="task1001">
 		<cdate>1503691080060</cdate>
-		<edate>1516907192240</edate>
+		<edate>1522170853234</edate>
 		<id>1001</id>
 		<pri>100</pri>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>547</code>
 			<label>Enable set Profile</label>
@@ -1705,7 +1793,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task1002">
 		<cdate>1503089941004</cdate>
-		<edate>1512022429362</edate>
+		<edate>1521916029198</edate>
 		<id>1002</id>
 		<nme>AMAD_Beispiel_Set</nme>
 		<pri>100</pri>
@@ -1718,40 +1806,32 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Int sr="arg4" val="0"/>
 		</Action>
 		<Action sr="act1" ve="7">
-			<code>547</code>
-			<Str sr="arg0" ve="3">%fhemcmd</Str>
-			<Str sr="arg1" ve="3">set</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-		</Action>
-		<Action sr="act2" ve="7">
 			<code>130</code>
-			<label>Abfrage</label>
+			<label>set cmd</label>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
 				<var>%priority+1</var>
 			</Int>
-			<Str sr="arg2" ve="3">%fhemcmd</Str>
+			<Str sr="arg2" ve="3">set</Str>
 			<Str sr="arg3" ve="3">%setcmd</Str>
 			<Str sr="arg4" ve="3">%respset</Str>
 			<Int sr="arg5" val="0"/>
 		</Action>
-		<Action sr="act3" ve="7">
+		<Action sr="act2" ve="7">
 			<code>548</code>
 			<Str sr="arg0" ve="3">%respset</Str>
-			<Int sr="arg1" val="0"/>
+			<Int sr="arg1" val="1"/>
 		</Action>
 	</Task>
 	<Task sr="task1003">
 		<cdate>1503612579492</cdate>
-		<edate>1513147602338</edate>
+		<edate>1522170710421</edate>
 		<id>1003</id>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"screen": "on locked"</Str>
@@ -1761,7 +1841,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task1004">
 		<cdate>1503693866986</cdate>
-		<edate>1516474467797</edate>
+		<edate>1522175968545</edate>
 		<id>1004</id>
 		<nme>AMAD_SetCommands</nme>
 		<pri>100</pri>
@@ -2205,27 +2285,53 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			</ConditionList>
 		</Action>
 		<Action sr="act133" ve="7">
-			<code>38</code>
+			<code>548</code>
+			<Str sr="arg0" ve="3">AMAD: %command</Str>
+			<Int sr="arg1" val="1"/>
 		</Action>
 		<Action sr="act134" ve="7">
-			<code>38</code>
+			<code>43</code>
+			<label>takescreenshot</label>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%command</lhs>
+					<op>2</op>
+					<rhs>takescreenshot</rhs>
+				</Condition>
+			</ConditionList>
 		</Action>
 		<Action sr="act135" ve="7">
-			<code>43</code>
-			<label>wrong ID</label>
+			<code>176</code>
+			<Str sr="arg0" ve="3">AMADscreenshot</Str>
+			<Int sr="arg1" val="1"/>
 		</Action>
 		<Action sr="act136" ve="7">
 			<code>548</code>
-			<Str sr="arg0" ve="3">AMAD: Befehl mit falscher AMAD_ID empfangen</Str>
+			<Str sr="arg0" ve="3">AMAD: %command</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
 		<Action sr="act137" ve="7">
 			<code>38</code>
 		</Action>
+		<Action sr="act138" ve="7">
+			<code>38</code>
+		</Action>
+		<Action sr="act139" ve="7">
+			<code>43</code>
+			<label>wrong ID</label>
+		</Action>
 		<Action sr="act14" ve="7">
 			<code>39</code>
 			<Str sr="arg0" ve="3">%cmdpair</Str>
 			<Str sr="arg1" ve="3">%valueall()</Str>
+		</Action>
+		<Action sr="act140" ve="7">
+			<code>548</code>
+			<Str sr="arg0" ve="3">AMAD: Befehl mit falscher AMAD_ID empfangen</Str>
+			<Int sr="arg1" val="1"/>
+		</Action>
+		<Action sr="act141" ve="7">
+			<code>38</code>
 		</Action>
 		<Action sr="act15" ve="7">
 			<code>590</code>
@@ -3280,9 +3386,10 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task1031">
 		<cdate>1517260534313</cdate>
-		<edate>1517330678766</edate>
+		<edate>1522170754384</edate>
 		<id>1031</id>
 		<pri>100</pri>
+		<rty>2</rty>
 		<Action sr="act0" ve="7">
 			<code>37</code>
 			<ConditionList sr="if">
@@ -3324,9 +3431,9 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 		</Action>
 		<Action sr="act4" ve="7">
 			<code>547</code>
-			<label>incommingWhatsAppMessageFrom</label>
+			<label>incommingWhatsAppMessage</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">"incommingWhatsAppMessageFrom": "%evtprm2: %text"</Str>
+			<Str sr="arg1" ve="3">"incomingWhatsAppMessage": "%evtprm2 - %text"</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
@@ -3340,9 +3447,9 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 		</Action>
 		<Action sr="act5" ve="7">
 			<code>547</code>
-			<label>incommingTelegramMessageFrom</label>
+			<label>incommingTelegramMessage</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">"incommingTelegramMessageFrom": "%evtprm2: %text"</Str>
+			<Str sr="arg1" ve="3">"incomingTelegramMessage": "%evtprm2 - %text"</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
@@ -3358,7 +3465,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">%setreading</Str>
@@ -3369,12 +3476,178 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<code>38</code>
 		</Action>
 	</Task>
-	<Task sr="task1035">
+	<Task sr="task1036">
+		<cdate>1480692343404</cdate>
+		<edate>1522170774304</edate>
+		<id>1036</id>
+		<rty>1</rty>
+		<Action sr="act0" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%name</Str>
+			<Str sr="arg1" ve="3">%CNAME</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%name</Str>
+			<Str sr="arg1" ve="3">unbekannt</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%name</lhs>
+					<op>2</op>
+					<rhs>?</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%number</Str>
+			<Str sr="arg1" ve="3">%CNUM</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act3" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%number</Str>
+			<Str sr="arg1" ve="3">unterdrückt</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%number</lhs>
+					<op>2</op>
+					<rhs>0</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act4" ve="7">
+			<code>547</code>
+			<label>"incomingCallerName": "%name"</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"incomingCallerName": "%name"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act5" ve="7">
+			<code>547</code>
+			<label>"incomingCallerNumber": "%number"</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"incomingCallerNumber": "%number"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act6" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority+1</var>
+			</Int>
+			<Str sr="arg2" ve="3">setreading</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+	</Task>
+	<Task sr="task1055">
+		<cdate>1503691080060</cdate>
+		<edate>1522171174505</edate>
+		<id>1055</id>
+		<pri>100</pri>
+		<Action sr="act0" ve="7">
+			<code>37</code>
+			<ConditionList sr="if">
+				<bool0>And</bool0>
+				<Condition sr="c0" ve="3">
+					<lhs>%AMAD_remoteServer</lhs>
+					<op>2</op>
+					<rhs>Autoremote</rhs>
+				</Condition>
+				<Condition sr="c1" ve="3">
+					<lhs>%AMAD_toGo</lhs>
+					<op>3</op>
+					<rhs>on</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>785392305</code>
+			<se>false</se>
+			<Bundle sr="arg0">
+				<Vals sr="val">
+					<LedColor>&lt;null&gt;</LedColor>
+					<LedColor-type>java.lang.String</LedColor-type>
+					<LedOff>&lt;null&gt;</LedOff>
+					<LedOff-type>java.lang.String</LedOff-type>
+					<LedOn>&lt;null&gt;</LedOn>
+					<LedOn-type>java.lang.String</LedOn-type>
+					<NotificationIcon>/storage/emulated/0/Tasker/.icn/Eigene Icons/TaskerFHEM_icon.png</NotificationIcon>
+					<NotificationIcon-type>java.lang.String</NotificationIcon-type>
+					<NotificationText>&lt;null&gt;</NotificationText>
+					<NotificationText-type>java.lang.String</NotificationText-type>
+					<NotificationTitle>AMAD Autoremote Server</NotificationTitle>
+					<NotificationTitle-type>java.lang.String</NotificationTitle-type>
+					<PersistentNotification>true</PersistentNotification>
+					<PersistentNotification-type>java.lang.Boolean</PersistentNotification-type>
+					<UseWakelock>false</UseWakelock>
+					<UseWakelock-type>java.lang.Boolean</UseWakelock-type>
+					<com.twofortyfouram.locale.intent.extra.BLURB>
+Starting Wifi Service
+Persistent Notification: true
+Notification Title: AMAD Autoremote Server</com.twofortyfouram.locale.intent.extra.BLURB>
+					<com.twofortyfouram.locale.intent.extra.BLURB-type>java.lang.String</com.twofortyfouram.locale.intent.extra.BLURB-type>
+					<continuous>true</continuous>
+					<continuous-type>java.lang.Boolean</continuous-type>
+					<net.dinglisch.android.tasker.RELEVANT_VARIABLES>&lt;StringArray sr=""&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES0&gt;%err
+Error Code
+Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/b&amp;gt; and the action ends in error&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES0&gt;&lt;_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES1&gt;%errmsg
+Error Message
+Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/b&amp;gt; and the action ends in error&lt;/_array_net.dinglisch.android.tasker.RELEVANT_VARIABLES1&gt;&lt;/StringArray&gt;</net.dinglisch.android.tasker.RELEVANT_VARIABLES>
+					<net.dinglisch.android.tasker.RELEVANT_VARIABLES-type>[Ljava.lang.String;</net.dinglisch.android.tasker.RELEVANT_VARIABLES-type>
+					<net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS>FieldsToGet NotificationTitle NotificationText NotificationIcon LedColor LedOn LedOff plugininstanceid plugintypeid </net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS>
+					<net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS-type>java.lang.String</net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS-type>
+					<net.dinglisch.android.tasker.subbundled>true</net.dinglisch.android.tasker.subbundled>
+					<net.dinglisch.android.tasker.subbundled-type>java.lang.Boolean</net.dinglisch.android.tasker.subbundled-type>
+					<plugininstanceid>2136a7e4-dee6-446f-8c72-dc98e51af9d0</plugininstanceid>
+					<plugininstanceid-type>java.lang.String</plugininstanceid-type>
+					<plugintypeid>com.joaomgcd.autoremote.IntentWifiService</plugintypeid>
+					<plugintypeid-type>java.lang.String</plugintypeid-type>
+				</Vals>
+			</Bundle>
+			<Str sr="arg1" ve="3">com.joaomgcd.autoremote</Str>
+			<Str sr="arg2" ve="3">com.joaomgcd.autoremote.activity.ActivityConfigWifiService</Str>
+			<Int sr="arg3" val="0"/>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>38</code>
+		</Action>
+		<Action sr="act3" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_informations</Str>
+			<Int sr="arg1">
+				<var>%priority+1</var>
+			</Int>
+			<Str sr="arg2" ve="3"/>
+			<Str sr="arg3" ve="3"/>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+	</Task>
+	<Task sr="task1063">
 		<cdate>1512327302282</cdate>
-		<edate>1517344482249</edate>
-		<id>1035</id>
+		<edate>1522170036220</edate>
+		<id>1063</id>
 		<nme>AMAD_multimediaControl</nme>
 		<pri>100</pri>
+		<rty>2</rty>
 		<Action sr="act0" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%tpe_mplayer</Str>
@@ -4199,7 +4472,49 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			</ConditionList>
 		</Action>
 		<Action sr="act57" ve="7">
-			<code>38</code>
+			<code>43</code>
+			<label>MXPlayerPro</label>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_mplayer</lhs>
+					<op>2</op>
+					<rhs>MXPlayerPro</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act58" ve="7">
+			<code>443</code>
+			<Int sr="arg0" val="0"/>
+			<Int sr="arg1" val="1"/>
+			<App sr="arg2">
+				<appClass>com.mxtech.videoplayer.MediaButtonReceiver</appClass>
+				<appPkg>com.mxtech.videoplayer.pro</appPkg>
+				<label>MXPlayerPro</label>
+			</App>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_button</lhs>
+					<op>2</op>
+					<rhs>mediaNext</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act59" ve="7">
+			<code>443</code>
+			<Int sr="arg0" val="3"/>
+			<Int sr="arg1" val="1"/>
+			<App sr="arg2">
+				<appClass>com.mxtech.videoplayer.MediaButtonReceiver</appClass>
+				<appPkg>com.mxtech.videoplayer.pro</appPkg>
+				<label>MXPlayerPro</label>
+			</App>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_button</lhs>
+					<op>4</op>
+					<rhs>mediaPlay</rhs>
+				</Condition>
+			</ConditionList>
 		</Action>
 		<Action sr="act6" ve="7">
 			<code>443</code>
@@ -4217,6 +4532,122 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 					<rhs>mediaStop</rhs>
 				</Condition>
 			</ConditionList>
+		</Action>
+		<Action sr="act60" ve="7">
+			<code>443</code>
+			<Int sr="arg0" val="2"/>
+			<Int sr="arg1" val="1"/>
+			<App sr="arg2">
+				<appClass>com.mxtech.videoplayer.MediaButtonReceiver</appClass>
+				<appPkg>com.mxtech.videoplayer.pro</appPkg>
+				<label>MXPlayerPro</label>
+			</App>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_button</lhs>
+					<op>2</op>
+					<rhs>mediaBack</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act61" ve="7">
+			<code>443</code>
+			<Int sr="arg0" val="4"/>
+			<Int sr="arg1" val="1"/>
+			<App sr="arg2">
+				<appClass>com.mxtech.videoplayer.MediaButtonReceiver</appClass>
+				<appPkg>com.mxtech.videoplayer.pro</appPkg>
+				<label>MXPlayerPro</label>
+			</App>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_button</lhs>
+					<op>2</op>
+					<rhs>mediaStop</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act62" ve="7">
+			<code>43</code>
+			<label>Poweramp</label>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_mplayer</lhs>
+					<op>2</op>
+					<rhs>Poweramp</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act63" ve="7">
+			<code>443</code>
+			<Int sr="arg0" val="0"/>
+			<Int sr="arg1" val="1"/>
+			<App sr="arg2">
+				<appClass>com.maxmpz.audioplayer.player.PlayerMediaButtonReceiver</appClass>
+				<appPkg>com.maxmpz.audioplayer</appPkg>
+				<label>Poweramp</label>
+			</App>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_button</lhs>
+					<op>2</op>
+					<rhs>mediaNext</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act64" ve="7">
+			<code>443</code>
+			<Int sr="arg0" val="3"/>
+			<Int sr="arg1" val="1"/>
+			<App sr="arg2">
+				<appClass>com.maxmpz.audioplayer.player.PlayerMediaButtonReceiver</appClass>
+				<appPkg>com.maxmpz.audioplayer</appPkg>
+				<label>Poweramp</label>
+			</App>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_button</lhs>
+					<op>4</op>
+					<rhs>mediaPlay</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act65" ve="7">
+			<code>443</code>
+			<Int sr="arg0" val="2"/>
+			<Int sr="arg1" val="1"/>
+			<App sr="arg2">
+				<appClass>com.maxmpz.audioplayer.player.PlayerMediaButtonReceiver</appClass>
+				<appPkg>com.maxmpz.audioplayer</appPkg>
+				<label>Poweramp</label>
+			</App>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_button</lhs>
+					<op>2</op>
+					<rhs>mediaBack</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act66" ve="7">
+			<code>443</code>
+			<Int sr="arg0" val="4"/>
+			<Int sr="arg1" val="1"/>
+			<App sr="arg2">
+				<appClass>com.maxmpz.audioplayer.player.PlayerMediaButtonReceiver</appClass>
+				<appPkg>com.maxmpz.audioplayer</appPkg>
+				<label>Poweramp</label>
+			</App>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_button</lhs>
+					<op>2</op>
+					<rhs>mediaStop</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act67" ve="7">
+			<code>38</code>
 		</Action>
 		<Action sr="act7" ve="7">
 			<code>43</code>
@@ -4264,12 +4695,389 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			</ConditionList>
 		</Action>
 	</Task>
+	<Task sr="task1066">
+		<cdate>1439252234311</cdate>
+		<edate>1522171129360</edate>
+		<id>1066</id>
+		<pri>100</pri>
+		<rty>1</rty>
+		<Action sr="act0" ve="7">
+			<code>590</code>
+			<Str sr="arg0" ve="3">%track</Str>
+			<Str sr="arg1" ve="3">artist=</Str>
+			<Int sr="arg2" val="0"/>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>590</code>
+			<Str sr="arg0" ve="3">%track2</Str>
+			<Str sr="arg1" ve="3">, catUri</Str>
+			<Int sr="arg2" val="0"/>
+		</Action>
+		<Action sr="act10" ve="7">
+			<code>547</code>
+			<label>currentMusicTrack</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"currentMusicTrack": "%title"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act11" ve="7">
+			<code>547</code>
+			<label>currentMusicArtist</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"currentMusicArtist": "%artist"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act12" ve="7">
+			<code>547</code>
+			<label>currentMusicAlbum</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"currentMusicAlbum": "%album"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act13" ve="7">
+			<code>548</code>
+			<on>false</on>
+			<Str sr="arg0" ve="3">%title</Str>
+			<Int sr="arg1" val="0"/>
+		</Action>
+		<Action sr="act14" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority+1</var>
+			</Int>
+			<Str sr="arg2" ve="3">setreading</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%artist</Str>
+			<Str sr="arg1" ve="3">%track21</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act3" ve="7">
+			<code>590</code>
+			<Str sr="arg0" ve="3">%track</Str>
+			<Str sr="arg1" ve="3">album=</Str>
+			<Int sr="arg2" val="0"/>
+		</Action>
+		<Action sr="act4" ve="7">
+			<code>590</code>
+			<Str sr="arg0" ve="3">%track2</Str>
+			<Str sr="arg1" ve="3">, codec</Str>
+			<Int sr="arg2" val="0"/>
+		</Action>
+		<Action sr="act5" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%album</Str>
+			<Str sr="arg1" ve="3">%track21</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act6" ve="7">
+			<code>590</code>
+			<Str sr="arg0" ve="3">%track</Str>
+			<Str sr="arg1" ve="3">title=</Str>
+			<Int sr="arg2" val="0"/>
+		</Action>
+		<Action sr="act7" ve="7">
+			<code>590</code>
+			<Str sr="arg0" ve="3">%track2</Str>
+			<Str sr="arg1" ve="3">, sample</Str>
+			<Int sr="arg2" val="0"/>
+		</Action>
+		<Action sr="act8" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%title</Str>
+			<Str sr="arg1" ve="3">%track21</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act9" ve="7">
+			<code>547</code>
+			<label>currentMusicApp</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"currentMusicApp": "Poweramp"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+	</Task>
+	<Task sr="task1072">
+		<cdate>1439252234311</cdate>
+		<edate>1522171119557</edate>
+		<id>1072</id>
+		<pri>6</pri>
+		<rty>1</rty>
+		<Action sr="act0" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%state</Str>
+			<Str sr="arg1" ve="3">paused</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<bool0>And</bool0>
+				<Condition sr="c0" ve="3">
+					<lhs>%paused</lhs>
+					<op>2</op>
+					<rhs>true</rhs>
+				</Condition>
+				<Condition sr="c1" ve="3">
+					<lhs>%status</lhs>
+					<op>2</op>
+					<rhs>1</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%state</Str>
+			<Str sr="arg1" ve="3">playing</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<bool0>And</bool0>
+				<Condition sr="c0" ve="3">
+					<lhs>%paused</lhs>
+					<op>2</op>
+					<rhs>false</rhs>
+				</Condition>
+				<Condition sr="c1" ve="3">
+					<lhs>%status</lhs>
+					<op>2</op>
+					<rhs>1</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%state</Str>
+			<Str sr="arg1" ve="3">stopped</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%status</lhs>
+					<op>3</op>
+					<rhs>1</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act3" ve="7">
+			<code>547</code>
+			<label>currentMusicApp</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"currentMusicApp": "Poweramp"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act4" ve="7">
+			<code>547</code>
+			<label>currentMusicState</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"currentMusicState": "%state"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act5" ve="7">
+			<code>548</code>
+			<on>false</on>
+			<Str sr="arg0" ve="3">event: %evtprm1 
+Status: %status
+Position in sec: %pos
+PAUSED: %paused</Str>
+			<Int sr="arg1" val="1"/>
+		</Action>
+		<Action sr="act6" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority+1</var>
+			</Int>
+			<Str sr="arg2" ve="3">setreading</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+	</Task>
+	<Task sr="task850">
+		<cdate>1439252234311</cdate>
+		<edate>1522171145358</edate>
+		<id>850</id>
+		<pri>6</pri>
+		<rty>1</rty>
+		<Action sr="act0" ve="7">
+			<code>37</code>
+			<ConditionList sr="if">
+				<bool0>Or</bool0>
+				<Condition sr="c0" ve="3">
+					<lhs>%state</lhs>
+					<op>0</op>
+					<rhs>play</rhs>
+				</Condition>
+				<Condition sr="c1" ve="3">
+					<lhs>%state</lhs>
+					<op>0</op>
+					<rhs>play/buffering</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act1" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%status</Str>
+			<Str sr="arg1" ve="3">playing</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act10" ve="7">
+			<code>547</code>
+			<label>currentMusicArtist</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"currentMusicArtist": ""</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act11" ve="7">
+			<code>547</code>
+			<label>currentMusicAlbum</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"currentMusicAlbum": ""</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act12" ve="7">
+			<code>547</code>
+			<label>currentMusicIcon</label>
+			<on>false</on>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"currentMusicIcon": ""</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act13" ve="7">
+			<code>547</code>
+			<label>intentRadioName; intentRadioState</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"intentRadioName": "%name","intentRadioState": "%state"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act14" ve="7">
+			<code>548</code>
+			<on>false</on>
+			<Str sr="arg0" ve="3">event: %evtprm1 
+Status: %state : %status
+Name: %name
+URL: %url</Str>
+			<Int sr="arg1" val="1"/>
+		</Action>
+		<Action sr="act15" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority+1</var>
+			</Int>
+			<Str sr="arg2" ve="3">setreading</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+		<Action sr="act2" ve="7">
+			<code>43</code>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%state</lhs>
+					<op>0</op>
+					<rhs>play/pause</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act3" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%status</Str>
+			<Str sr="arg1" ve="3">paused</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act4" ve="7">
+			<code>43</code>
+		</Action>
+		<Action sr="act5" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%status</Str>
+			<Str sr="arg1" ve="3">stopped</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act6" ve="7">
+			<code>38</code>
+		</Action>
+		<Action sr="act7" ve="7">
+			<code>547</code>
+			<label>currentMusicApp</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">"currentMusicApp": "Intentradio"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act8" ve="7">
+			<code>547</code>
+			<label>currentMusicState</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"currentMusicState": "%status"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act9" ve="7">
+			<code>547</code>
+			<label>currentMusicTrack</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"currentMusicTrack": "%name"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%name</lhs>
+					<op>3</op>
+					<rhs>\%name</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+	</Task>
 	<Task sr="task914">
 		<cdate>1511727021932</cdate>
-		<edate>1512550454190</edate>
+		<edate>1522170056287</edate>
 		<id>914</id>
 		<nme>AMAD_getDeviceIP</nme>
 		<pri>100</pri>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>123</code>
 			<se>false</se>
@@ -4387,13 +5195,14 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task916">
 		<cdate>1503612289745</cdate>
-		<edate>1503612849987</edate>
+		<edate>1522170646550</edate>
 		<id>916</id>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"screenOrientation": "portrait"</Str>
@@ -4403,9 +5212,10 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task918">
 		<cdate>1512113548622</cdate>
-		<edate>1512113663305</edate>
+		<edate>1522170065077</edate>
 		<id>918</id>
 		<nme>AMAD_getDeviceName</nme>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%fhemdevice</Str>
@@ -6044,7 +6854,7 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 	</Task>
 	<Task sr="task925">
 		<cdate>1513276797078</cdate>
-		<edate>1513424688732</edate>
+		<edate>1522170678813</edate>
 		<id>925</id>
 		<Action sr="act0" ve="7">
 			<code>547</code>
@@ -6078,7 +6888,7 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">%setreading</Str>
@@ -6172,13 +6982,13 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 	</Task>
 	<Task sr="task926">
 		<cdate>1503690358282</cdate>
-		<edate>1503690362326</edate>
+		<edate>1522170568706</edate>
 		<id>926</id>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"dockingState": "undocked"</Str>
@@ -6188,13 +6998,13 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 	</Task>
 	<Task sr="task927">
 		<cdate>1511655849449</cdate>
-		<edate>1511655867388</edate>
+		<edate>1522170459538</edate>
 		<id>927</id>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"wiredHeadsetPlugged": "0"</Str>
@@ -6204,13 +7014,13 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 	</Task>
 	<Task sr="task931">
 		<cdate>1503612864622</cdate>
-		<edate>1512664382473</edate>
+		<edate>1522170659399</edate>
 		<id>931</id>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"screenOrientation": "landscape"</Str>
@@ -6220,13 +7030,13 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 	</Task>
 	<Task sr="task932">
 		<cdate>1503689826684</cdate>
-		<edate>1503689839417</edate>
+		<edate>1522170487667</edate>
 		<id>932</id>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"bluetooth": "off"</Str>
@@ -6236,13 +7046,14 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 	</Task>
 	<Task sr="task934">
 		<cdate>1503612697002</cdate>
-		<edate>1512664308181</edate>
+		<edate>1522170617392</edate>
 		<id>934</id>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"daydream": "on"</Str>
@@ -6252,58 +7063,29 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 	</Task>
 	<Task sr="task935">
 		<cdate>1503829156475</cdate>
-		<edate>1516226450970</edate>
+		<edate>1521313394014</edate>
 		<id>935</id>
 		<nme>AMAD_UpdateFlowset</nme>
 		<pri>100</pri>
 		<Action sr="act0" ve="7">
-			<code>548</code>
-			<label>Baustelle</label>
-			<Str sr="arg0" ve="3">AMAD: "set currentflowsetupdate'" wird noch nicht unterstützt</Str>
-			<Int sr="arg1" val="1"/>
-		</Action>
-		<Action sr="act1" ve="7">
-			<code>130</code>
-			<label>Baustelle</label>
-			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
-			<Int sr="arg1">
-				<var>%priority+1</var>
-			</Int>
-			<Str sr="arg2" ve="3">setreading</Str>
-			<Str sr="arg3" ve="3">"automagicState": "set currentflowsetupdate: not supported by Tasker"</Str>
-			<Str sr="arg4" ve="3"/>
-			<Int sr="arg5" val="0"/>
-		</Action>
-		<Action sr="act10" ve="7">
-			<code>548</code>
-			<Str sr="arg0" ve="3">AMAD: Download der Tasker Projekt Datei nicht möglich - Tasker Pfad nicht gefunden.</Str>
-			<Int sr="arg1" val="1"/>
-		</Action>
-		<Action sr="act11" ve="7">
-			<code>38</code>
-		</Action>
-		<Action sr="act2" ve="7">
-			<code>137</code>
-			<label>Baustelle</label>
-			<Int sr="arg0" val="0"/>
-			<Str sr="arg1" ve="3"/>
-		</Action>
-		<Action sr="act3" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%path</Str>
-			<Str sr="arg1" ve="3">/storage/emulated/0/Tasker/projects</Str>
+			<Str sr="arg1" ve="3">/storage/emulated/0/Tasker</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act4" ve="7">
+		<Action sr="act1" ve="7">
 			<code>342</code>
 			<Int sr="arg0" val="5"/>
 			<Str sr="arg1" ve="3">%path</Str>
 			<Str sr="arg2" ve="3">%exists</Str>
 			<Int sr="arg3" val="0"/>
 		</Action>
-		<Action sr="act5" ve="7">
+		<Action sr="act10" ve="7">
+			<code>38</code>
+		</Action>
+		<Action sr="act2" ve="7">
 			<code>37</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -6313,20 +7095,40 @@ TWlKU5rSlKY0pSlNaUpTmtKUpjSlfTWTSP4HD723A9m6n1sAAAAASUVORK5CYII=
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act6" ve="7">
+		<Action sr="act3" ve="7">
+			<code>342</code>
+			<Int sr="arg0" val="5"/>
+			<Str sr="arg1" ve="3">%path/projects</Str>
+			<Str sr="arg2" ve="3">%exists</Str>
+			<Int sr="arg3" val="0"/>
+		</Action>
+		<Action sr="act4" ve="7">
+			<code>409</code>
+			<Str sr="arg0" ve="3">%path/projects</Str>
+			<Int sr="arg1" val="0"/>
+			<Int sr="arg2" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%exists</lhs>
+					<op>2</op>
+					<rhs>false</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act5" ve="7">
 			<code>118</code>
 			<se>false</se>
 			<Str sr="arg0" ve="3">%AMAD_fhemip:%AMAD_bridgeport</Str>
-			<Str sr="arg1" ve="3">AMAD.prj.xml</Str>
+			<Str sr="arg1" ve="3">currentTaskersetUpdate.prj.xml</Str>
 			<Str sr="arg2" ve="3"/>
 			<Str sr="arg3" ve="3"/>
 			<Str sr="arg4" ve="3"/>
 			<Int sr="arg5" val="5"/>
 			<Str sr="arg6" ve="3">text/xml</Str>
-			<Str sr="arg7" ve="3">%path/AMAD.prj.xml</Str>
+			<Str sr="arg7" ve="3">%path/projects/AMAD.prj.xml</Str>
 			<Int sr="arg8" val="1"/>
 		</Action>
-		<Action sr="act7" ve="7">
+		<Action sr="act6" ve="7">
 			<code>548</code>
 			<Str sr="arg0" ve="3">AMAD: Beim Download der Tasker Projekt Datei ist ein Fehler augetreten.
 Code: %HTTPR</Str>
@@ -6339,7 +7141,7 @@ Code: %HTTPR</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act8" ve="7">
+		<Action sr="act7" ve="7">
 			<code>548</code>
 			<Str sr="arg0" ve="3">AMAD: Die aktuelle Tasker Projekt Datei wurde heruntergrladen und kann importiert werden.</Str>
 			<Int sr="arg1" val="1"/>
@@ -6351,8 +7153,13 @@ Code: %HTTPR</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act9" ve="7">
+		<Action sr="act8" ve="7">
 			<code>43</code>
+		</Action>
+		<Action sr="act9" ve="7">
+			<code>548</code>
+			<Str sr="arg0" ve="3">AMAD: Download der Tasker Projekt Datei nicht möglich - Tasker Pfad nicht gefunden.</Str>
+			<Int sr="arg1" val="1"/>
 		</Action>
 	</Task>
 	<Task sr="task936">
@@ -6555,13 +7362,14 @@ Code: %HTTPR</Str>
 	</Task>
 	<Task sr="task942">
 		<cdate>1511655705149</cdate>
-		<edate>1511655888647</edate>
+		<edate>1522170446838</edate>
 		<id>942</id>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"wiredHeadsetPlugged": "1"</Str>
@@ -6621,13 +7429,13 @@ Code: %HTTPR</Str>
 	</Task>
 	<Task sr="task945">
 		<cdate>1503690545406</cdate>
-		<edate>1503690559299</edate>
+		<edate>1522170738674</edate>
 		<id>945</id>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"powerPlugged": "0"</Str>
@@ -6670,13 +7478,14 @@ Code: %HTTPR</Str>
 	</Task>
 	<Task sr="task947">
 		<cdate>1513147701841</cdate>
-		<edate>1513277267125</edate>
+		<edate>1522170537723</edate>
 		<id>947</id>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"nextAlarmState": "alert","nextAlarmDay": "off","nextAlarmTime": "off"</Str>
@@ -6686,7 +7495,7 @@ Code: %HTTPR</Str>
 	</Task>
 	<Task sr="task948">
 		<cdate>1502789757098</cdate>
-		<edate>1516489272812</edate>
+		<edate>1522170011177</edate>
 		<id>948</id>
 		<nme>AMAD_SendData2CommBridge</nme>
 		<pri>100</pri>
@@ -7069,22 +7878,6 @@ Art der Steuerung von FHEM set Befehlen, welche über die Bridge als Steuerbefeh
 			<Int sr="arg1" val="1"/>
 		</Action>
 	</Task>
-	<Task sr="task952">
-		<cdate>1516488111428</cdate>
-		<edate>1516488697663</edate>
-		<id>952</id>
-		<Action sr="act0" ve="7">
-			<code>130</code>
-			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
-			<Int sr="arg1">
-				<var>%priority</var>
-			</Int>
-			<Str sr="arg2" ve="3">setreading</Str>
-			<Str sr="arg3" ve="3">"intentRadioName": "%name","intentRadioState": "%state"</Str>
-			<Str sr="arg4" ve="3"/>
-			<Int sr="arg5" val="0"/>
-		</Action>
-	</Task>
 	<Task sr="task953">
 		<cdate>1512506655696</cdate>
 		<edate>1512506655696</edate>
@@ -7261,7 +8054,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 	</Task>
 	<Task sr="task958">
 		<cdate>1503089941004</cdate>
-		<edate>1512684267061</edate>
+		<edate>1521920427996</edate>
 		<id>958</id>
 		<nme>AMAD_Beispiel_function</nme>
 		<pri>100</pri>
@@ -7311,7 +8104,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 	</Task>
 	<Task sr="task960">
 		<cdate>1502789397309</cdate>
-		<edate>1517252219734</edate>
+		<edate>1522175922571</edate>
 		<id>960</id>
 		<nme>AMAD_informations</nme>
 		<pri>100</pri>
@@ -7328,7 +8121,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<code>547</code>
 			<label>flowsetVersionAtDevice</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">"flowsetVersionAtDevice": "Tasker v0.23"</Str>
+			<Str sr="arg1" ve="3">"flowsetVersionAtDevice": "Tasker v0.26"</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
@@ -7428,142 +8221,6 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 		</Action>
 		<Action sr="act16" ve="7">
 			<code>547</code>
-			<label>incomingCallerName</label>
-			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">%setreading,"incomingCallerName": "%CNAME"</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<bool0>And</bool0>
-				<Condition sr="c0" ve="3">
-					<lhs>%CNAME</lhs>
-					<op>3</op>
-					<rhs>?</rhs>
-				</Condition>
-				<Condition sr="c1" ve="3">
-					<lhs>%CNAME</lhs>
-					<op>3</op>
-					<rhs>\%CNAME</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act17" ve="7">
-			<code>547</code>
-			<label>incomingCallerName: unknown</label>
-			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">%setreading,"incomingCallerName": "unknown"</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%CNAME</lhs>
-					<op>2</op>
-					<rhs>?</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act18" ve="7">
-			<code>547</code>
-			<label>incomingCallerNumber</label>
-			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">%setreading,"incomingCallerNumber": "%CNUM"</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<bool0>And</bool0>
-				<Condition sr="c0" ve="3">
-					<lhs>%CNUM</lhs>
-					<op>3</op>
-					<rhs>0</rhs>
-				</Condition>
-				<Condition sr="c1" ve="3">
-					<lhs>%CNUM</lhs>
-					<op>3</op>
-					<rhs>\%CNUM</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act19" ve="7">
-			<code>547</code>
-			<label>incomingCallerNumber: unknown</label>
-			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">%setreading,"incomingCallerNumber": "unknown"</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%CNUM</lhs>
-					<op>2</op>
-					<rhs>0</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act2" ve="7">
-			<code>547</code>
-			<label>deviceState</label>
-			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">%setreading,"deviceState": "online"</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-		</Action>
-		<Action sr="act20" ve="7">
-			<code>547</code>
-			<label>SMS Text</label>
-			<Str sr="arg0" ve="3">%text</Str>
-			<Str sr="arg1" ve="3">%SMSRB</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%SMSRB</lhs>
-					<op>12</op>
-					<rhs></rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act21" ve="7">
-			<code>598</code>
-			<Str sr="arg0" ve="3">%text</Str>
-			<Str sr="arg1" ve="3">%enter</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<Str sr="arg5" ve="3"/>
-			<Int sr="arg6" val="1"/>
-			<Str sr="arg7" ve="3"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%text</lhs>
-					<op>3</op>
-					<rhs>\%text</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act22" ve="7">
-			<code>547</code>
-			<label>incommingSmsText</label>
-			<on>false</on>
-			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">%setreading,"incommingSmsText": "%text"</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%text</lhs>
-					<op>3</op>
-					<rhs>\%text</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act23" ve="7">
-			<code>547</code>
 			<label>powerLevel</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
 			<Str sr="arg1" ve="3">%setreading,"powerLevel": "%BATT"</Str>
@@ -7578,7 +8235,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act24" ve="7">
+		<Action sr="act17" ve="7">
 			<code>664</code>
 			<label>Query locked</label>
 			<Str sr="arg0" ve="3">kgm</Str>
@@ -7593,7 +8250,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Str sr="arg8" ve="3"/>
 			<Str sr="arg9" ve="3"/>
 		</Action>
-		<Action sr="act25" ve="7">
+		<Action sr="act18" ve="7">
 			<code>664</code>
 			<label>Query locked</label>
 			<Str sr="arg0" ve="3">%locked</Str>
@@ -7608,7 +8265,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Str sr="arg8" ve="3"/>
 			<Str sr="arg9" ve="3"/>
 		</Action>
-		<Action sr="act26" ve="7">
+		<Action sr="act19" ve="7">
 			<code>547</code>
 			<label>screen</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7630,7 +8287,16 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act27" ve="7">
+		<Action sr="act2" ve="7">
+			<code>547</code>
+			<label>deviceState</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"deviceState": "online"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act20" ve="7">
 			<code>547</code>
 			<label>screen</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7652,7 +8318,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act28" ve="7">
+		<Action sr="act21" ve="7">
 			<code>547</code>
 			<label>screenBrightness</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7668,29 +8334,13 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act29" ve="7">
+		<Action sr="act22" ve="7">
 			<code>348</code>
 			<Int sr="arg0" val="1"/>
 			<Str sr="arg1" ve="3"/>
 			<Str sr="arg2" ve="3">%orientation</Str>
 		</Action>
-		<Action sr="act3" ve="7">
-			<code>547</code>
-			<label>airplanemode</label>
-			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">%setreading,"airplanemode": "%AIR"</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%AIR</lhs>
-					<op>12</op>
-					<rhs>\%AIR</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act30" ve="7">
+		<Action sr="act23" ve="7">
 			<code>547</code>
 			<label>screenOrientation</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7706,13 +8356,13 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act31" ve="7">
+		<Action sr="act24" ve="7">
 			<code>348</code>
 			<Int sr="arg0" val="0"/>
 			<Str sr="arg1" ve="3"/>
 			<Str sr="arg2" ve="3">%autorotate</Str>
 		</Action>
-		<Action sr="act32" ve="7">
+		<Action sr="act25" ve="7">
 			<code>547</code>
 			<label>screenOrientationMode</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7728,7 +8378,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act33" ve="7">
+		<Action sr="act26" ve="7">
 			<code>547</code>
 			<label>screenOrientationMode</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7744,7 +8394,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act34" ve="7">
+		<Action sr="act27" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%setstate</Str>
 			<Str sr="arg1" ve="3">inaktiv</Str>
@@ -7752,7 +8402,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act35" ve="7">
+		<Action sr="act28" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%infostate</Str>
 			<Str sr="arg1" ve="3">inaktiv</Str>
@@ -7760,7 +8410,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act36" ve="7">
+		<Action sr="act29" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%setstate</Str>
 			<Str sr="arg1" ve="3">aktiv</Str>
@@ -7787,7 +8437,23 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act37" ve="7">
+		<Action sr="act3" ve="7">
+			<code>547</code>
+			<label>airplanemode</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"airplanemode": "%AIR"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AIR</lhs>
+					<op>12</op>
+					<rhs>\%AIR</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act30" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%infostate</Str>
 			<Str sr="arg1" ve="3">aktiv</Str>
@@ -7808,7 +8474,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act38" ve="7">
+		<Action sr="act31" ve="7">
 			<code>547</code>
 			<label>flow_SetCommands</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7817,7 +8483,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act39" ve="7">
+		<Action sr="act32" ve="7">
 			<code>547</code>
 			<label>flow_informations</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7826,18 +8492,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act4" ve="7">
-			<code>130</code>
-			<Str sr="arg0" ve="3">AMAD_SDK2Name</Str>
-			<Int sr="arg1">
-				<var>%priority</var>
-			</Int>
-			<Str sr="arg2" ve="3"/>
-			<Str sr="arg3" ve="3"/>
-			<Str sr="arg4" ve="3">%androidversion</Str>
-			<Int sr="arg5" val="0"/>
-		</Action>
-		<Action sr="act40" ve="7">
+		<Action sr="act33" ve="7">
 			<code>547</code>
 			<label>volume</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7853,7 +8508,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act41" ve="7">
+		<Action sr="act34" ve="7">
 			<code>547</code>
 			<label>volumeNotification</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7869,7 +8524,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act42" ve="7">
+		<Action sr="act35" ve="7">
 			<code>664</code>
 			<label>Query Alarm</label>
 			<se>false</se>
@@ -7885,7 +8540,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Str sr="arg8" ve="3"/>
 			<Str sr="arg9" ve="3"/>
 		</Action>
-		<Action sr="act43" ve="7">
+		<Action sr="act36" ve="7">
 			<code>664</code>
 			<label>Query Alarm</label>
 			<se>false</se>
@@ -7901,7 +8556,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Str sr="arg8" ve="3"/>
 			<Str sr="arg9" ve="3"/>
 		</Action>
-		<Action sr="act44" ve="7">
+		<Action sr="act37" ve="7">
 			<code>37</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -7911,7 +8566,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act45" ve="7">
+		<Action sr="act38" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%blank</Str>
 			<Str sr="arg1" ve="3"> </Str>
@@ -7919,13 +8574,24 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act46" ve="7">
+		<Action sr="act39" ve="7">
 			<code>590</code>
 			<Str sr="arg0" ve="3">%alarm</Str>
 			<Str sr="arg1" ve="3">.,%blank</Str>
 			<Int sr="arg2" val="0"/>
 		</Action>
-		<Action sr="act47" ve="7">
+		<Action sr="act4" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SDK2Name</Str>
+			<Int sr="arg1">
+				<var>%priority</var>
+			</Int>
+			<Str sr="arg2" ve="3"/>
+			<Str sr="arg3" ve="3"/>
+			<Str sr="arg4" ve="3">%androidversion</Str>
+			<Int sr="arg5" val="0"/>
+		</Action>
+		<Action sr="act40" ve="7">
 			<code>547</code>
 			<label>nextAlarmDay</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7941,7 +8607,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act48" ve="7">
+		<Action sr="act41" ve="7">
 			<code>547</code>
 			<label>nextAlarmTime</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -7957,8 +8623,39 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act49" ve="7">
+		<Action sr="act42" ve="7">
 			<code>43</code>
+		</Action>
+		<Action sr="act43" ve="7">
+			<code>547</code>
+			<label>nextAlarmDay|Time</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"nextAlarmDay": "off","nextAlarmTime": "off"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act44" ve="7">
+			<code>38</code>
+		</Action>
+		<Action sr="act45" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%fhemcmd</Str>
+			<Str sr="arg1" ve="3">setreading</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+		</Action>
+		<Action sr="act46" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority</var>
+			</Int>
+			<Str sr="arg2" ve="3">%fhemcmd</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
 		</Action>
 		<Action sr="act5" ve="7">
 			<code>547</code>
@@ -7975,37 +8672,6 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 					<rhs>\%androidversion</rhs>
 				</Condition>
 			</ConditionList>
-		</Action>
-		<Action sr="act50" ve="7">
-			<code>547</code>
-			<label>nextAlarmDay|Time</label>
-			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">%setreading,"nextAlarmDay": "off","nextAlarmTime": "off"</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-		</Action>
-		<Action sr="act51" ve="7">
-			<code>38</code>
-		</Action>
-		<Action sr="act52" ve="7">
-			<code>547</code>
-			<Str sr="arg0" ve="3">%fhemcmd</Str>
-			<Str sr="arg1" ve="3">setreading</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-		</Action>
-		<Action sr="act53" ve="7">
-			<code>130</code>
-			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
-			<Int sr="arg1">
-				<var>%priority</var>
-			</Int>
-			<Str sr="arg2" ve="3">%fhemcmd</Str>
-			<Str sr="arg3" ve="3">%setreading</Str>
-			<Str sr="arg4" ve="3"/>
-			<Int sr="arg5" val="0"/>
 		</Action>
 		<Action sr="act6" ve="7">
 			<code>547</code>
@@ -8026,6 +8692,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 		<Action sr="act7" ve="7">
 			<code>547</code>
 			<label>currentMusicTrack</label>
+			<on>false</on>
 			<Str sr="arg0" ve="3">%setreading</Str>
 			<Str sr="arg1" ve="3">%setreading,"currentMusicTrack": "%MTRACK"</Str>
 			<Int sr="arg2" val="0"/>
@@ -8042,6 +8709,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 		<Action sr="act8" ve="7">
 			<code>547</code>
 			<label>currentMusicTrack: no player active</label>
+			<on>false</on>
 			<Str sr="arg0" ve="3">%setreading</Str>
 			<Str sr="arg1" ve="3">%setreading,"currentMusicTrack": "no player active"</Str>
 			<Int sr="arg2" val="0"/>
@@ -8095,8 +8763,9 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 	</Task>
 	<Task sr="task963">
 		<cdate>1513147872631</cdate>
-		<edate>1513276907496</edate>
+		<edate>1522170584399</edate>
 		<id>963</id>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>547</code>
 			<label>nextAlarmState</label>
@@ -8129,7 +8798,7 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">%setreading</Str>
@@ -8223,8 +8892,10 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 	</Task>
 	<Task sr="task964">
 		<cdate>1515785545040</cdate>
-		<edate>1515785680561</edate>
+		<edate>1522170518179</edate>
 		<id>964</id>
+		<pri>100</pri>
+		<rty>2</rty>
 		<Action sr="act0" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%enter</Str>
@@ -8270,9 +8941,9 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 		</Action>
 		<Action sr="act3" ve="7">
 			<code>547</code>
-			<label>incommingSmsText</label>
+			<label>incomingSmsMessage</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">"incommingSmsText": "%text"</Str>
+			<Str sr="arg1" ve="3">"incomingSmsMessage": "%SMSRN - %text"</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
@@ -8288,7 +8959,7 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">%setreading</Str>
@@ -9028,7 +9699,7 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 	</Task>
 	<Task sr="task967">
 		<cdate>1503260793343</cdate>
-		<edate>1515484018445</edate>
+		<edate>1522170096454</edate>
 		<id>967</id>
 		<nme>AMAD_VoiceControl</nme>
 		<pri>7</pri>
@@ -9155,13 +9826,14 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 	</Task>
 	<Task sr="task968">
 		<cdate>1511708774249</cdate>
-		<edate>1511708860118</edate>
+		<edate>1522170324153</edate>
 		<id>968</id>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"nfc": "on"</Str>
@@ -9271,14 +9943,14 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 	</Task>
 	<Task sr="task972">
 		<cdate>1502904145564</cdate>
-		<edate>1503611980132</edate>
+		<edate>1522170694436</edate>
 		<id>972</id>
 		<pri>100</pri>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_informations</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3"/>
 			<Str sr="arg3" ve="3"/>
@@ -9288,13 +9960,13 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 	</Task>
 	<Task sr="task973">
 		<cdate>1503689740378</cdate>
-		<edate>1503689753554</edate>
+		<edate>1522170426416</edate>
 		<id>973</id>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"airplanemode": "off"</Str>
@@ -9304,13 +9976,13 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 	</Task>
 	<Task sr="task974">
 		<cdate>1511708875113</cdate>
-		<edate>1511708893034</edate>
+		<edate>1522170312044</edate>
 		<id>974</id>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"nfc": "off"</Str>
@@ -10092,13 +10764,14 @@ Bitten prüfe die eingetragene Daten.</Str>
 	</Task>
 	<Task sr="task983">
 		<cdate>1503689793813</cdate>
-		<edate>1513275921434</edate>
+		<edate>1522170475742</edate>
 		<id>983</id>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"bluetooth": "on"</Str>
@@ -10108,13 +10781,14 @@ Bitten prüfe die eingetragene Daten.</Str>
 	</Task>
 	<Task sr="task984">
 		<cdate>1503689660711</cdate>
-		<edate>1511637650420</edate>
+		<edate>1522170338321</edate>
 		<id>984</id>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"airplanemode": "on"</Str>
@@ -10383,13 +11057,14 @@ Bitten prüfe die eingetragene Daten.</Str>
 	</Task>
 	<Task sr="task988">
 		<cdate>1503690306712</cdate>
-		<edate>1503690348078</edate>
+		<edate>1522170557175</edate>
 		<id>988</id>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"dockingState": "docked"</Str>
@@ -10399,13 +11074,13 @@ Bitten prüfe die eingetragene Daten.</Str>
 	</Task>
 	<Task sr="task989">
 		<cdate>1503690514289</cdate>
-		<edate>1503690532524</edate>
+		<edate>1522170725488</edate>
 		<id>989</id>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"powerPlugged": "1"</Str>
@@ -10430,9 +11105,10 @@ Bitten prüfe die eingetragene Daten.</Str>
 	</Task>
 	<Task sr="task991">
 		<cdate>1503692408945</cdate>
-		<edate>1516907246352</edate>
+		<edate>1522170208960</edate>
 		<id>991</id>
 		<pri>100</pri>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>547</code>
 			<label>disable send Profiles</label>
@@ -10519,8 +11195,9 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task992">
 		<cdate>1503612978140</cdate>
-		<edate>1513116249338</edate>
+		<edate>1522170409344</edate>
 		<id>992</id>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
 			<code>30</code>
 			<Int sr="arg0" val="0"/>
@@ -10607,7 +11284,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">%setreading</Str>
@@ -10918,13 +11595,13 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task997">
 		<cdate>1503612743210</cdate>
-		<edate>1512664299869</edate>
+		<edate>1522170630736</edate>
 		<id>997</id>
 		<Action sr="act0" ve="7">
 			<code>130</code>
 			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
 			<Int sr="arg1">
-				<var>%priority</var>
+				<var>%priority+1</var>
 			</Int>
 			<Str sr="arg2" ve="3">setreading</Str>
 			<Str sr="arg3" ve="3">"daydream": "off"</Str>
@@ -10944,10 +11621,26 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task999">
 		<cdate>1503611036750</cdate>
-		<edate>1513445150127</edate>
+		<edate>1522170108727</edate>
 		<id>999</id>
 		<nme>AMAD_SDK2Name</nme>
+		<rty>1</rty>
 		<Action sr="act0" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%androidversion</Str>
+			<Str sr="arg1" ve="3">8.1 Oreo</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%SDK</lhs>
+					<op>8</op>
+					<rhs>27</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act1" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">8.0 Oreo</Str>
@@ -10962,10 +11655,10 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act1" ve="7">
+		<Action sr="act10" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
-			<Str sr="arg1" ve="3">7.1 Nougat</Str>
+			<Str sr="arg1" ve="3">4.1 - 4.1.1  Jelly Bean</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
@@ -10973,11 +11666,11 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				<Condition sr="c0" ve="3">
 					<lhs>%SDK</lhs>
 					<op>8</op>
-					<rhs>25</rhs>
+					<rhs>16</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act10" ve="7">
+		<Action sr="act11" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.0.3 - 4.0.4 Ice Cream Sandwich MR1</Str>
@@ -10992,7 +11685,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act11" ve="7">
+		<Action sr="act12" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.0 - 4.0.2 Ice Cream Sandwich</Str>
@@ -11007,12 +11700,27 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act12" ve="7">
+		<Action sr="act13" ve="7">
 			<code>126</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
 		<Action sr="act2" ve="7">
+			<code>547</code>
+			<Str sr="arg0" ve="3">%androidversion</Str>
+			<Str sr="arg1" ve="3">7.1 Nougat</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%SDK</lhs>
+					<op>8</op>
+					<rhs>25</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act3" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">7.0 Nougat</Str>
@@ -11027,7 +11735,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act3" ve="7">
+		<Action sr="act4" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">6.0 Marshmallow</Str>
@@ -11042,7 +11750,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act4" ve="7">
+		<Action sr="act5" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">5.1 Lollipop MR1</Str>
@@ -11057,7 +11765,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act5" ve="7">
+		<Action sr="act6" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">5.0 Lollipop</Str>
@@ -11072,7 +11780,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act6" ve="7">
+		<Action sr="act7" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.4 KitKat</Str>
@@ -11087,7 +11795,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act7" ve="7">
+		<Action sr="act8" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.3 Jelly Bean MR2</Str>
@@ -11102,7 +11810,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act8" ve="7">
+		<Action sr="act9" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%androidversion</Str>
 			<Str sr="arg1" ve="3">4.2 - 4.2.2 Jelly Bean MR1</Str>
@@ -11114,21 +11822,6 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 					<lhs>%SDK</lhs>
 					<op>8</op>
 					<rhs>17</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act9" ve="7">
-			<code>547</code>
-			<Str sr="arg0" ve="3">%androidversion</Str>
-			<Str sr="arg1" ve="3">4.1 - 4.1.1  Jelly Bean</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%SDK</lhs>
-					<op>8</op>
-					<rhs>16</rhs>
 				</Condition>
 			</ConditionList>
 		</Action>
