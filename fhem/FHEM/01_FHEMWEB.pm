@@ -2311,7 +2311,8 @@ FW_style($$)
     $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
     $ret = FW_Set("","","rereadicons") if($isImg);
     DoTrigger("global", "FILEWRITE $filePath", 1) if(!$ret); # Forum #32592
-    $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved $fileName");
+    my $sfx = ($forceType eq "configDB" ? " to configDB" : "");
+    $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved $fileName$sfx");
     FW_style("style list", $ret);
     $ret = "";
 
