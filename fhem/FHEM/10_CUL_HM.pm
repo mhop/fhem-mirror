@@ -5393,9 +5393,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                 if (!$a[2] || $a[2] < 5 || $a[2] > 30 || !$a[6] );
       $temp = $a[2]*2;
       # party format 03.8.13 11:30 5.8.13 12:00
-      my ($sd,$sm,$sy) = split('\.',$a[3]);
+      my ($sd,$sm,$sy) = split('[\.-]',$a[3]);
       my ($sh,$smin)   = split(':' ,$a[4]);
-      my ($ed,$em,$ey) = split('\.',$a[5]);
+      my ($ed,$em,$ey) = split('[\.-]',$a[5]);
       my ($eh,$emin)   = split(':' ,$a[6]);
 
       return "wrong start day $sd"   if ($sd < 0 || $sd > 31);
@@ -9709,7 +9709,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   return $ret;
 }
 
-1;
+1;partyTemp
 
 =pod
 =item device
@@ -10386,7 +10386,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B>controlParty &lt;temp&gt;&lt;startDate&gt;&lt;startTime&gt;&lt;endDate&gt;&lt;endTime&gt;</B><br>
                 set control mode to party, define temp and timeframe.<br>
                 example:<br>
-                <code>set controlParty 15 03.8.13 20:30 5.8.13 11:30</code></li>
+                <code>set controlParty 15 03-8-13 20:30 5-8-13 11:30</code></li>
             <li><B>sysTime</B><br>
                 set time in climate channel to system time</li>
             <li><B>desired-temp &lt;temp&gt;</B><br>
@@ -11747,7 +11747,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B>controlParty &lt;temp&gt;&lt;startDate&gt;&lt;startTime&gt;&lt;endDate&gt;&lt;endTime&gt;</B><br>
               setzt die Steuerung in den Partymodus, definiert Temperatur und Zeitrahmen.<br>
               Beispiel:<br>
-              <code>set controlParty 15 03.8.13 20:30 5.8.13 11:30</code></li>
+              <code>set controlParty 15 03-8-13 20:30 5-8-13 11:30</code></li>
             <li><B>sysTime</B><br>
               setzt Zeit des Klimakanals auf die Systemzeit</li>
             <li><B>desired-temp &lt;temp&gt;</B><br>
