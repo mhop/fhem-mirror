@@ -100,23 +100,25 @@ sub _fi2_Count() {
          $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
       }
 
+      if ($model eq $c_noModel) {
 # 3. look for model information in attributes
-      $model = AttrVal($name,'model',$model);
+         $model = AttrVal($name,'model',$model);
 
 # 4. look for model information in readings
-      $model = ReadingsVal($name,'model',$model);
+         $model = ReadingsVal($name,'model',$model);
 
-      # special reading for BOSEST
-      $model = ReadingsVal($name,'type',$model)
-               if (lc($type) eq 'bosest');
-      # special reading for ZWave
-      if (lc($type) eq 'zwave') {
-         $model = ReadingsVal($name,'modelId',undef);
-         next unless (defined($model));
-         next if ($model =~ /^0x.... /);
-         $model = _fi2_zwave($model);
+         # special reading for BOSEST
+         $model = ReadingsVal($name,'type',$model)
+                  if (lc($type) eq 'bosest');
+         # special reading for ZWave
+         if (lc($type) eq 'zwave') {
+            $model = ReadingsVal($name,'modelId',undef);
+            next unless (defined($model));
+            next if ($model =~ /^0x.... /);
+            $model = _fi2_zwave($model);
+         }
       }
-      
+
 # 5. ignore model for some modules
       foreach my $i (@noModelList) {
          $model = $c_noModel if (lc($type) eq $i);
