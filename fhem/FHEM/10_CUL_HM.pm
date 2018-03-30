@@ -3578,7 +3578,7 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
     my $trgCnt = hex(substr($p,2,2));
     my $err = hex(substr($p,0,2));
     push @evtEt,[$sHash,1,"teamCall:from $dName:$trgCnt"];
-    push @evtEt,[$dHash,1,"battery:"   .(($err&0x80) ? "low":"ok")];
+    push @evtEt,[$dHash,1,"battery:"   .(($err&0x80) ? "low":"ok")] if (!$dHash->{helper}{role}{vrt});
     foreach (split ",",$attr{$sName}{peerIDs}){
       my $tHash = CUL_HM_id2Hash($_);
       push @evtEt,[$tHash,1,"teamCall:from $dName:$trgCnt"];
@@ -3670,7 +3670,7 @@ sub CUL_HM_parseSDteam_2(@){#handle SD team events
     push @evtEt,[$_,1,"state:$sProsa"];
     push @evtEt,[$_,1,"smoke_detect:$smokeSrc"];
   }
-  push @evtEt,[$dHash,1,"battery:"   .((hex($chn)&0x80) ? "low":"ok")];
+  push @evtEt,[$dHash,1,"battery:"   .((hex($chn)&0x80) ? "low":"ok")] if (!$dHash->{helper}{role}{vrt});
   push @evtEt,[$sHash,1,"eventNo:".$No];
   Log3 $sHash,5,"CUL_HM $sName sdTeam: no:$No state:$state aesNo:$aesKNo aesStr:$aesStr";
   
@@ -8950,7 +8950,8 @@ sub CUL_HM_storeRssi(@){
     $rssiP->{avg} += ($val - $rssiP->{avg}) /$rssiP->{cnt};
   }
   my $rssi;
-  foreach (keys %{$rssiP}){
+#  foreach (keys %{$rssiP}){
+  foreach ("cnt","min","max","avg","lst"){
     my $val = $rssiP->{$_}?$rssiP->{$_}:0;
     $rssi .= $_.":".(int($val*100)/100)." ";
   }
