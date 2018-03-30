@@ -9709,7 +9709,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   return $ret;
 }
 
-1;partyTemp
+1;
 
 =pod
 =item device
