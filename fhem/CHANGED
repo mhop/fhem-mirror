@@ -1,14 +1,15 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 57_Calendar: get ... vevents and much more (forum #86148)
   - feature: 73_AMADCommBridge/74_AMADDevice: add new mediaPlayer Support, add
                                               takeScreenshot function
   - feature: 14_Hideki: changed decrypting and improved crc check
   - change:  14_SD_WS_Maverick: reworked module, renamed readings
                                added commandref
   - bugfix:  14_SD_WS07: Error retrieving rssi value fixed
-  - feature: 14_SD_WS07: added correction-temp and correction-hum 
+  - feature: 14_SD_WS07: added correction-temp and correction-hum
                          added two models temp/temp-hum
-  - change:  00_SIGNALduino: Protokoll 12.1 with protocol 12 (Hideki) 
+  - change:  00_SIGNALduino: Protokoll 12.1 with protocol 12 (Hideki)
                             combined and 12.1 removed
   - feature: 49_SSCam: 3.7.0, new delPreset command, minor fixes
   - bugfix:  10_OWServer: avoid init and autocreate on tentative connection

@@ -26,6 +26,7 @@ use strict;
 use warnings;
 use HttpUtils;
 use Storable qw(freeze thaw);
+use POSIX qw(strftime);
 
 
 ##############################################
@@ -50,8 +51,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 # document ownCloud ical use
 # http://forum.fhem.de/index.php?topic=28667
 #
-# high load when parsing
-# http://forum.fhem.de/index.php/topic,40783.0.html
+
 
 
 =for comment
@@ -486,18 +486,46 @@ sub categories {
   return $self->{categories};
 }
 
-sub ts($$) {
-  my ($self,$tm)= @_;
-  return "" unless($tm);
-  my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($tm);
-  return sprintf("%02d.%02d.%4d %02d:%02d:%02d", $day,$month+1,$year+1900,$hour,$minute,$second);
+sub classfication {
+  my ($self)= @_;
+  return $self->{classification};
 }
 
-sub ts0($$) {
-  my ($self,$tm)= @_;
+sub ts {
+  my ($self,$tm,$tf)= @_;
   return "" unless($tm);
-  my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($tm);
-  return sprintf("%02d.%02d.%2d %02d:%02d", $day,$month+1,$year-100,$hour,$minute);
+  $tf= $tf // "%d.%m.%Y %H:%M";
+  return POSIX::strftime($tf, localtime($tm));
+}
+
+sub ts0 {
+  my ($self,$tm)= @_;
+  return $self->ts($tm, "%d.%m.%y %H:%M");
+}
+
+# duration as friendly string
+sub td {
+  # 20d
+  # 47h
+  # 5d 12h
+  # 8d 4:22'04
+  #
+  my ($self, $d)= @_;
+  return "" unless defined($d);
+  my $s= $d % 60; $d-= $s; $d/= 60;
+  my $m= $d % 60; $d-= $m; $d/= 60;
+  my $h= $d % 24; $d-= $h; $d/= 24;
+  if(24*$d+$h<= 72) { $h+= 24*$d; $d= 0; }
+  my @r= ();
+  push @r, sprintf("%dd", $d) if $d> 0;
+  if($m>0 || $s>0) {
+    my $t= sprintf("%d:%02d", $h, $m);
+    $t+= sprintf("\'%02d", $s) if $s> 0;
+    push @r, $t;
+  } else {
+    push @r, sprintf("%dh", $h) if $h> 0;
+  }
+  return join(" ", @r);
 }
 
 sub asText {
@@ -538,6 +566,30 @@ sub asDebug {
   );
 }
 
+sub formatted {
+  my ($self, $format, $timeformat)= @_;
+
+  my $t1= $self->{start};
+  my $T1= defined($t1) ? $self->ts($t1, $timeformat) : "";
+  my $t2= $self->{end};
+  my $T2= defined($t2) ? $self->ts($t2, $timeformat) : "";
+  my $a= $self->{alarm};
+  my $A= defined($a) ? $self->ts($a, $timeformat) : "";
+  my $S= $self->{summary}; $S=~s/\\,/,/g;
+  my $L= $self->{location}; $L=~s/\\,/,/g;
+  my $CA= $self->{categories};
+  my $CL= $self->{classification};
+  my $DS= $self->{description}; $DS=~s/\\,/,/g;
+  my $d= defined($t1) && defined($t2) ? $t2-$t1 : undef;
+  my $D= defined($d) ? $self->td($d) : "";
+  my $U= $self->uid();
+  my $M= sprintf("%9s", $self->getMode());
+
+  my $r= eval $format;
+  $r= $@ if $@;
+  return $r;
+}
+
 
 sub alarmTime {
   my ($self)= @_;
@@ -558,6 +610,7 @@ sub endTime {
 # returns 1 if time is before alarm time and before start time, else 0
 sub isUpcoming {
   my ($self,$t) = @_;
+  return 0 unless defined($t);
   if($self->{alarm}) {
     return $t< $self->{alarm} ? 1 : 0;
   } else {
@@ -605,7 +658,7 @@ sub isEnded {
   #main::Debug "  isAfterSeriesEnded? " . $self->isAfterSeriesEnded($t);
   #return 1 if($self->isAfterSeriesEnded($t));
   #main::Debug "   has end? " . (defined($self->{end}) ? 1 : 0);
-  return 0 unless(defined($self->{end}));
+  return 0 unless(defined($self->{end}) && defined($t));
   return $self->{end}<= $t ? 1 : 0;
 }
 
@@ -615,7 +668,11 @@ sub nextTime {
   push @times, $self->{start} if(defined($self->{start}));
   push @times, $self->{end} if(defined($self->{end}));
   unshift @times, $self->{alarm} if($self->{alarm});
-  @times= sort grep { $_ > $t } @times;
+  if(defined($t)) {
+      @times= sort grep { $_ > $t } @times;
+  } else {
+      @times= sort @times;
+  }
 
 #   main::Debug "Calendar: " . $self->asFull();
 #   main::Debug "Calendar: Start " . main::FmtDateTime($self->{start});
@@ -820,6 +877,10 @@ sub isException($) {
   return $self->hasKey("RECURRENCE-ID");
 }
 
+sub isCancelled($) {
+  my($self)= @_;
+  return (($self->valueOrDefault("STATUS","CONFIRMED") eq "CANCELLED") ? 1 : 0);
+}
 
 sub hasReferences($) {
   my($self)= @_;
@@ -1105,6 +1166,7 @@ sub makeEventDetails($$) {
   $event->{location}= $self->valueOrDefault("LOCATION", "");
   $event->{description}= $self->valueOrDefault("DESCRIPTION", "");
   $event->{categories}= $self->valueOrDefault("CATEGORIES", "");
+  $event->{classification}= $self->valueOrDefault("CLASS", "PUBLIC");
 
   return $event;
 }
@@ -1260,7 +1322,7 @@ sub addEventLimited($$$) {
 
 }
 
-sub createSingleEvent($$$) {
+sub createSingleEvent($$$$) {
 
     my ($self, $nextstart, $onCreateEvent)= @_;
 
@@ -1453,24 +1515,39 @@ sub createEvents($$$%) {
                     # BYDAY with prefix (e.g. -1SU or 2MO) is not recognized
                     my @bydays= split(',', $byday);
                     # we skip interval-1 weeks
-                    $nextstart = plusNSeconds($nextstart, 7*24*60*60, $interval-1);
+                    $nextstart = plusNSeconds($nextstart, 7*24*60*60, $interval-1) if ($n > 1);
                     my ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat);
-                    my $preventloop = 0;
+                    my $currentstart = 0;
+                    ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat) = localtime($nextstart);
+                    $nextstart = plusNSeconds($nextstart, 24*60*60, 7-$mwday) if ($n > 1 and $mwday > 0); # advance to next start of week
                     do {
                         $nextstart = plusNSeconds($nextstart, 24*60*60, 1); # forward day by day
                         ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat) =
                             localtime($nextstart);
                         #main::Debug "Skip to: start " . $event->ts($nextstart) . " = " . $weekdays[$mwday];
-                        $preventloop++;
-                        if($preventloop > 7) {
-                            main::Log3 undef, 2,
-                                "Calendar: something is wrong for RRULE $rrule in " .
-                                $self->asString();
-                            last;
+                        if($weekdays[$mwday] ~~ @bydays) {
+                            if (($currentstart > 0) && ($currentstart<= $until)) {
+                                $skip = 0;
+                                $event = $self->createSingleEvent($currentstart, $onCreateEvent);
+                                if($self->hasKey('EXDATE')) {
+                                    foreach my $exdate (@{$self->values("EXDATE")}) {
+                                        if($self->tm($exdate) == $event->start()) {
+                                            $event->setNote("EXDATE: $exdate");
+                                            $self->addSkippedEvent($event);
+                                            $skip++;
+                                            last;
+                                        }
+                                    }
+                                } # end of EXDATE
+                                $self->addEventLimited($t, $event) if ($skip == 0); # add current event
+                            }
+                            $currentstart = $nextstart;
                         }
                         #main::Debug "weekday= " . $weekdays[$mwday] . "($mwday), smartmatch " . join(" ",@bydays) ."= " . ($weekdays[$mwday] ~~ @bydays ? "yes" : "no");
-                    } until($weekdays[$mwday] ~~ @bydays);
-                }
+                    } until($weekdays[$mwday] eq "SU");
+                    #main::Debug $self->asString();
+                    $nextstart = $currentstart;
+                } # end of WEKKLY BYDAY
                 else {
                     # default WEEKLY handling
                     $nextstart = plusNSeconds($nextstart, 7*24*60*60, $interval);
@@ -1575,7 +1652,11 @@ sub Calendar_Initialize($) {
   $hash->{SetFn}   = "Calendar_Set";
   $hash->{AttrFn}   = "Calendar_Attr";
   $hash->{NotifyFn}= "Calendar_Notify";
-  $hash->{AttrList}=  "update:sync,async,none removevcalendar:0,1 cutoffOlderThan hideOlderThan hideLaterThan onCreateEvent SSLVerify:0,1 $readingFnAttributes";
+  $hash->{AttrList}=  "update:sync,async,none removevcalendar:0,1 " .
+  "cutoffOlderThan hideOlderThan hideLaterThan onCreateEvent " .
+  "ignoreCancelled:0,1 " .
+  "SSLVerify:0,1 defaultFormat defaultTimeFormat " .
+  $readingFnAttributes;
 }
 
 
@@ -1715,49 +1796,195 @@ sub Calendar_Set($@) {
 }
 
 ###################################
+# everything within matching single or double quotes is literally copied
+# everything within braces is literally copied, nesting braces is allowed
+# use \ to mask quotes and braces
+# parts are separated by one or more spaces
+sub Calendar_simpleParseWords($;$) {
+  my ($p,$separator)= @_;
+  $separator= " " unless defined($separator);
+
+  my $quote= undef;
+  my $braces= 0;
+  my @parts= (); # resultant array of space-separated parts
+  my @chars= split(//, $p); # split into characters
+  my $escape= 0; # escape mode off
+  my @part= (); # the current part
+  for my $c (@chars) {
+    #Debug "checking $c, quote is " . (defined($quote) ? $quote : "empty") . ", braces is $braces";
+    push @part, $c; # append the character to the current part
+    if($escape) { $escape= 0; next; } # continue and turn escape mode off if escape mode is on
+    if(($c eq $separator)  && !$braces && !defined($quote)) { # we have encountered a space outside quotes and braces
+      #Debug " break";
+      pop @part; # remove the space
+      push @parts, join("", @part) if(@part);  # add the completed part if non-empty
+      @part= ();
+      next;
+    }
+    $escape= ($c eq "\\"); next if($escape); # escape mode on
+    #Debug " not escaped";
+    if(($c eq "\"") || ($c eq "\'")) {
+      #Debug " quote";
+      if(defined($quote)) {
+        if($c eq $quote) { $quote= undef; }
+      } else {
+        $quote= $c;
+      }
+      next;
+    }
+    next if defined($quote);
+    if($c eq "{") { $braces++; next; } # opening brace
+    if($c eq "}") { # closing brace
+      return("closing brace without matching opening brace", undef) unless($braces);
+      $braces--;
+    }
+  }
+  return("opening quote $quote without matching closing quote", undef) if(defined($quote));
+  return("$braces opening brace(s) without matching closing brace(s)", undef) if($braces);
+  push @parts, join("", @part) if(@part);  # add the completed part
+  return(undef, \@parts);
+}
+
 sub Calendar_Get($@) {
 
   my ($hash, @a) = @_;
+  my $name= $hash->{NAME};
 
   my $t= time();
 
   my $eventsObj= $hash->{".fhem"}{events};
   my @events;
 
+  #Debug "Command line: " . join(" ", @a);
   my $cmd= $a[1];
   $cmd= "?" unless($cmd);
 
 
+  # --------------------------------------------------------------------------
   if($cmd eq "update") {
     # this is the same as set update for convenience
     Calendar_DisarmTimer($hash);
-    Calendar_GetUpdate($hash, $t, 0);
+    Calendar_GetUpdate($hash, $t, 0, 1);
     return undef;
   }
 
+  # --------------------------------------------------------------------------
   if($cmd eq "reload") {
     # this is the same as set reload for convenience
      Calendar_DisarmTimer($hash);
-     Calendar_GetUpdate($hash, $t, 1); # remove all events before update
+     Calendar_GetUpdate($hash, $t, 1, 1); # remove all events before update
      return undef;
   }
 
+  # --------------------------------------------------------------------------
   if($cmd eq "events") {
 
     # see https://forum.fhem.de/index.php/topic,46608.msg397309.html#msg397309 for ideas
-    # get myCalendar events filter:mode=alarm|start|upcoming format=custom:{ sprintf("...") } select:series=next,max=8,from=-3d,to=10d
+    # get myCalendar events
+    #   filter:mode=alarm|start|upcoming
+    #   format:custom={ sprintf("...") }
+    #   series:next=3
     # attr myCalendar defaultFormat <format>
 
+    my $format= AttrVal($name, "defaultFormat", '"$T1 $D $S"');
+    my $timeFormat= AttrVal($name, "defaultTimeFormat",'%d.%m %H:%M');
+    my @filters= ();
+    my $next= undef;
+
+    my ($paramerror, $arrayref)= Calendar_simpleParseWords(join(" ", @a));
+    return "$name: Parameter parse error: $paramerror" if(defined($paramerror));
+    my @a= @{$arrayref};
+    shift @a; shift @a; # remove name and "events"
+    for my $p (@a) {
+      ### format
+      if($p =~ /^format:(.+)$/) {
+        my $v= $1;
+        if($v eq "default") {
+          # as if it were not there at all
+        } elsif($v eq "full") {
+          $format= '"$U $M $A $T1-$T2 $S $CA $L"';
+        } elsif($v eq "text") {
+          $format= '"$T1 $S"';
+        } elsif($v =~ /^custom=['"](.+)['"]$/) {
+          $format= '"'.$1.'"';
+        } elsif($v =~ /^custom=(\{.+\})$/) {
+          $format= $1;
+          #Debug "Format=$format";
+        } else {
+          return "$name: Illegal format specification: $v";
+        }
+      ### timeFormat
+    } elsif($p =~ /^timeFormat:['"](.+)['"]$/) {
+        $timeFormat= $1;
+      ### filter
+      } elsif($p =~ /^filter:(.+)$/) {
+        my ($filtererror, $filterarrayref)= Calendar_simpleParseWords($1, ",");
+        return "$name: Filter parse error: $filtererror" if(defined($filtererror));
+        my @filterspecs= @{$filterarrayref};
+        for my $filterspec (@filterspecs) {
+          #Debug "Filter specification: $filterspec";
+          if($filterspec =~ /^mode==['"](.+)['"]$/) {
+              push @filters, { ref => \&filter_mode, param => $1 }
+          } elsif($filterspec =~ /^mode=~['"](.+)['"]$/) {
+              push @filters, { ref => \&filter_modes, param => $1 }
+          } elsif($filterspec =~ /^uid==['"](.+)['"]$/) {
+              push @filters, { ref => \&filter_uid, param => $1 }
+          } elsif($filterspec =~ /^uid=~['"](.+)['"]$/) {
+              push @filters, { ref => \&filter_uids, param => $1 }
+          } elsif($filterspec =~ /^field\((uid|mode|summary|description|location|categories|classification)\)==['"](.+)['"]$/) {
+                push @filters, { ref => \&filter_field, field => $1, param => $2 }
+          } elsif($filterspec =~ /^field\((uid|mode|summary|description|location|categories|classification)\)=~['"](.+)['"]$/) {
+                push @filters, { ref => \&filter_fields, field => $1, param => $2 }
+          } else {
+            return "$name: Illegal filter specification: $filterspec";
+          }
+        }
+      ### series
+    } elsif($p =~ /^series:(.+)$/) {
+        my ($serieserror,$seriesarrayref)= Calendar_simpleParseWords($1, ",");
+        return "$name: Series parse error: $serieserror" if(defined($serieserror));
+        my @seriesspecs= @{$seriesarrayref};
+        for my $seriesspec (@seriesspecs) {
+          if($seriesspec eq "next") {
+            $next= 1;
+            push(@filters, { ref => \&filter_notend });
+          } elsif($seriesspec =~ /next=([1-9]+\d*)/) {
+            $next= $1;
+            push(@filters, { ref => \&filter_notend });
+          } else {
+            return "$name: Illegal series specification: $seriesspec";
+          }
+        }
+      } else {
+        return "$name: Illegal parameter: $p";
+      }
+    }
+
     my @texts;
-    my @events= Calendar_GetEvents($hash, $t, undef, undef);
+    my @events= Calendar_GetEvents($hash, $t, @filters);
+    # special treatment for next
+    if(defined($next)) {
+        my %uids;  # remember the UIDs
+        # the @events are ordered by start time ascending
+        # they do contain all events that have not ended
+        @events = grep {
+            my $seen= $uids{$_->uid()} // 0;
+            $uids{$_->uid()}= ++$seen;
+            #Debug $_->uid() . " => " . $seen . ", next= $next";
+            $seen <= $next;
+        } @events;
+    }
+
     foreach my $event (@events) {
-        push @texts, $event->asFull();
+        push @texts, $event->formatted($format, $timeFormat);
+
     }
     return "" if($#texts<0);
     return join("\n", @texts);
 
   }
 
+  # --------------------------------------------------------------------------
   my @cmds2= qw/text full summary location description categories alarm start end uid debug/;
   if($cmd ~~ @cmds2) {
 
@@ -1799,8 +2026,8 @@ sub Calendar_Get($@) {
         $filterref= \&filter_uid;
         $param= $a[2];
     }
-
-    @events= Calendar_GetEvents($hash, $t, $filterref, $param);
+    my @filters= ( { ref => $filterref, param => $param } );
+    @events= Calendar_GetEvents($hash, $t, @filters);
 
     # special treatment for next
     if($filter eq "next") {
@@ -1881,7 +2108,7 @@ sub Calendar_Get($@) {
     return join(";", keys %uids);
 
   } else {
-    return "Unknown argument $cmd, choose one of update:noArg reload:noArg find text full summary location description categories alarm start end vcalendar:noArg vevents:noArg";
+    return "Unknown argument $cmd, choose one of update:noArg reload:noArg events find text full summary location description categories alarm start end vcalendar:noArg vevents:noArg";
   }
 
 }
@@ -1896,7 +2123,7 @@ sub Calendar_Wakeup($$) {
   my $t= time(); # baseline
   # we could arrive here 1 second before nextWakeTs for unknown reasons
   use constant delta => 5; # avoid waking up again in a few seconds
-  if($t>= $hash->{".fhem"}{nxtUpdtTs} - delta) {
+  if(defined($t) && ($t>= $hash->{".fhem"}{nxtUpdtTs} - delta)) {
     # GetUpdate does CheckTimes and RearmTimer asynchronously
     Calendar_GetUpdate($hash, $t, $removeall);
   } else {
@@ -1921,7 +2148,7 @@ sub Calendar_RearmTimer($$) {
         my $et= $e->nextTime($t);
         # we only consider times in the future to avoid multiple
         # invocations for calendar events with the event time
-        $nt= $et if(defined($et) && ($et< $nt) && ($et > $t));
+        $nt= $et if(defined($et) && defined($t) && ($et< $nt) && ($et > $t));
       }
   }
 
@@ -1979,6 +2206,14 @@ sub Calendar_GetSecondsFromTimeSpec($) {
 ###################################
 # Filters
 
+sub filter_mode($$) {
+    my ($event,$value)= @_;
+    my $hit;
+    eval { $hit= ($event->getMode() eq $value); };
+    return 0 if($@);
+    return $hit ? 1 : 0;
+}
+
 sub filter_modes($$) {
     my ($event,$regex)= @_;
     my $hit;
@@ -1991,6 +2226,23 @@ sub filter_uids($$) {
     my ($event,$regex)= @_;
     my $hit;
     eval { $hit= ($event->uid() =~ $regex); };
+    return 0 if($@);
+    #Debug "filter_uids: " . $event->uid() . "  $regex: $hit";
+    return $hit ? 1 : 0;
+}
+
+sub filter_field($$$) {
+    my ($event,$value,$field)= @_;
+    my $hit;
+    eval { $hit= ($event->{$field} eq $value); };
+    return 0 if($@);
+    return $hit ? 1 : 0;
+}
+
+sub filter_fields($$$) {
+    my ($event,$regex,$field)= @_;
+    my $hit;
+    eval { $hit= ($event->{$field} =~ $regex); };
     return 0 if($@);
     return $hit ? 1 : 0;
 }
@@ -2017,6 +2269,7 @@ sub filter_end($) {
 
 sub filter_notend($) {
     my ($event)= @_;
+    #Debug "filter_notend: event " . $event->{summary} . ", mode= " . $event->getMode();
     return $event->getMode() eq "end" ? 0 : 1;
 }
 
@@ -2044,9 +2297,9 @@ sub filter_reading($$) {
 
 
 ###################################
-sub Calendar_GetEvents($$$$) {
+sub Calendar_GetEvents($$@) {
 
-    my ($hash, $t, $filterref, $param)= @_;
+    my ($hash, $t, @filters)= @_;
     my $name= $hash->{NAME};
     my @result= ();
 
@@ -2081,8 +2334,18 @@ sub Calendar_GetEvents($$$$) {
         my $v= $vevents{$id};
         my @events= @{$v->{events}};
         foreach my $event (@events) {
-            if(defined($filterref)) {
-                next unless(&$filterref($event, $param));
+            if(@filters) {
+              my $match= 0;
+              for my $h (@filters) {
+                my $filter= \%$h;
+                my $filterref= $filter->{ref};
+                my $param = $filter->{param};
+                my $field = $filter->{field};
+                last unless(&$filterref($event, $param, $field));
+                $match++;
+              }
+              #Debug "Filter $filterref, Parameter $param, Match $match";
+              next unless $match==@filters;
             }
             if(defined($t1)) { next if(defined($event->end()) && $event->end() < $t1); }
             if(defined($t2)) { next if(defined($event->start()) && $event->start() > $t2); }
@@ -2094,9 +2357,9 @@ sub Calendar_GetEvents($$$$) {
 }
 
 ###################################
-sub Calendar_GetUpdate($$$) {
+sub Calendar_GetUpdate($$$;$) {
 
-  my ($hash, $t, $removeall) = @_;
+  my ($hash, $t, $removeall, $force) = @_;
   my $name= $hash->{NAME};
 
   $hash->{".fhem"}{lstUpdtTs}= $t;
@@ -2111,7 +2374,7 @@ sub Calendar_GetUpdate($$$) {
 
   # If update is disable, shortcut to time checking and rearming timer.
   # Why is this here and not in Calendar_Wakeup? Because the next update time needs to be set
-  if(AttrVal($hash->{NAME},"update","") eq "none") {
+  if(!$force && (AttrVal($hash->{NAME},"update","") eq "none")) {
     Calendar_CheckTimes($hash, $t);
     Calendar_RearmTimer($hash, $t);
     return;
@@ -2213,7 +2476,7 @@ sub Calendar_ProcessUpdate($$$) {
   if($errmsg or !defined($ics) or ("$ics" eq "") ) {
     Log3 $hash, 1, "Calendar $name: retrieved no or empty data";
     readingsSingleUpdate($hash, "state", "error (no or empty data)", 1);
-    Calendar_CheckAndRearm($hash, $t);
+    Calendar_CheckAndRearm($hash);
   } else {
     $hash->{".fhem"}{iCalendar}= $ics; # the plain text iCalendar
     $hash->{".fhem"}{t}= $t;
@@ -2584,13 +2847,13 @@ sub Calendar_UpdateCalendar($$) {
   Log3 $hash, 4, "Calendar $name: creating calendar events";
   #main::Debug "Calendar $name: creating calendar events";
 
+  my $ignoreCancelled= AttrVal($name, "ignoreCancelled", 0);
   foreach my $id (keys %vevents) {
         my $v= $vevents{$id};
-        if($v->isObsolete()) {
+        if($v->isObsolete() or ($ignoreCancelled and $v->isCancelled())) {
             $v->clearEvents();
             next;
         }
-
         my $onCreateEvent= AttrVal($name, "onCreateEvent", undef);
         if($v->hasChanged() or !$v->numEvents()) {
             #main::Debug "createEvents";
@@ -2741,7 +3004,6 @@ sub Calendar_CheckTimes($$) {
 
 #####################################
 
-# filter:next count:3
 sub CalendarAsHtml($;$) {
 
   my ($d,$o) = @_;
@@ -2750,6 +3012,27 @@ sub CalendarAsHtml($;$) {
         if(!$defs{$d} || $defs{$d}{TYPE} ne "Calendar");
 
   my $l= Calendar_Get($defs{$d}, split("[ \t]+", "- text $o"));
+  my @lines= split("\n", $l);
+
+  my $ret = '<table class="calendar">';
+
+  foreach my $line (@lines) {
+    my @fields= split(" ", $line, 3);
+    $ret.= sprintf("<tr><td>%s</td><td>%s</td><td>%s</td></tr>", @fields);
+  }
+  $ret .= '</table>';
+
+  return $ret;
+}
+
+sub CalendarEventsAsHtml($;$) {
+
+  my ($d,$parameters) = @_;
+  $d = "<none>" if(!$d);
+  return "$d is not a Calendar instance<br>"
+        if(!$defs{$d} || $defs{$d}{TYPE} ne "Calendar");
+
+  my $l= Calendar_Get($defs{$d}, split("[ \t]+", "- events $parameters"));
   my @lines= split("\n", $l);
 
   my $ret = '<table class="calendar">';
@@ -2810,16 +3093,15 @@ sub CalendarAsHtml($;$) {
       define SomeCalendar Calendar ical file /home/johndoe/calendar.ics
       </pre>
   </ul>
-  <br>
 
   <a name="Calendarset"></a>
   <b>Set </b><br><br>
   <ul>
-    <code>set &lt;name&gt; update</code><br>
-    Forces the retrieval of the calendar from the URL. The next automatic retrieval is scheduled to occur <code>interval</code> seconds later.<br><br>
+    <li><code>set &lt;name&gt; update</code><br>
+    Forces the retrieval of the calendar from the URL. The next automatic retrieval is scheduled to occur <code>interval</code> seconds later.<br><br></li>
 
-    <code>set &lt;name&gt; reload</code><br>
-    Same as <code>update</code> but all calendar events are removed first.<br><br>
+    <li><code>set &lt;name&gt; reload</code><br>
+    Same as <code>update</code> but all calendar events are removed first.<br><br></li>
 
   </ul>
   <br>
@@ -2828,18 +3110,151 @@ sub CalendarAsHtml($;$) {
   <a name="Calendarget"></a>
   <b>Get</b><br><br>
   <ul>
-    <code>get &lt;name&gt; update</code><br>
-    Same as  <code>set &lt;name&gt; update</code><br><br>
 
-    <code>get &lt;name&gt; reload</code><br>
-    Same as  <code>set &lt;name&gt; update</code><br><br>
+    <li><code>get &lt;name&gt; update</code><br>
+    Same as  <code>set &lt;name&gt; update</code><br><br></li>
 
-    <code>get &lt;name&gt; &lt;format&gt; &lt;filter&gt; [&lt;max&gt;]</code><br>
+    <li><code>get &lt;name&gt; reload</code><br>
+    Same as  <code>set &lt;name&gt; update</code><br><br></li>
+
+
+    <li><code>get &lt;name&gt; events [format:&lt;formatSpec&gt;] [timeFormat:&lt;timeFormatSpec&gt;] [filter:&lt;filterSpecs&gt;] [series:next[=&lt;max&gt;]]</code><br><br>
+    The swiss army knife for displaying calendar events.
+    Returns, line by line, information on the calendar events in the calendar &lt;name&gt;
+    according to formatting and filtering rules.
+    You can give none, one or several of the <code>format</code>,
+    <code>timeFormat</code>, <code>filter</code> and <code>series</code>
+    parameters and it makes even sense to give the <code>filter</code>
+    parameter several times.
+    <br><br>
+
+
+    The <u><code>format</code></u> parameter determines the overall formatting of the calendar event.
+    The following format specifications are available:<br><br>
+
+    <table>
+    <tr><th align="left">&lt;formatSpec&gt;</th><th align="left">content</th></tr>
+    <tr><td><code>default</code></td><td>the default format (see below)</td></tr>
+    <tr><td><code>full</code></td><td>same as <code>custom="$U $M $A $T1-$T2 $S $CA $L"</code></td></tr>
+    <tr><td><code>text</code></td><td>same as <code>custom="$T1 $S"</code></td></tr>
+    <tr><td><code>custom="&lt;formatString&gt;"</code></td><td> a custom format (see below)</td></tr>
+    <tr><td><code>custom="{ &lt;perl-code&gt; }"</code></td><td>a custom format (see below)</td></tr>
+    </table><br>
+    Single quotes (<code>'</code>) can be used instead of double quotes (<code>"</code>) in the
+    custom format.<br><br>
+    You can use the following variables in the <code>&lt;formatString&gt;</code> and in
+    the <code>&lt;perl-code&gt;</code>:<br><br>
+
+    <table>
+    <tr><th align="left">variable</th><th align="left">meaning</th></tr>
+    <tr><td><code>$t1</code></td><td>the start time in seconds since the epoch</td></tr>
+    <tr><td><code>$T1</code></td><td>the start time according to the time format</td></tr>
+    <tr><td><code>$t2</code></td><td>the end time in seconds since the epoch</td></tr>
+    <tr><td><code>$T2</code></td><td>the end time according to the time format</td></tr>
+    <tr><td><code>$a</code></td><td>the alarm time in seconds since the epoch</td></tr>
+    <tr><td><code>$A</code></td><td>the alarm time according to the time format</td></tr>
+    <tr><td><code>$d</code></td><td>the duration in seconds</td></tr>
+    <tr><td><code>$D</code></td><td>the duration in human-readable form</td></tr>
+    <tr><td><code>$S</code></td><td>the summary</td></tr>
+    <tr><td><code>$L</code></td><td>the location</td></tr>
+    <tr><td><code>$CA</code></td><td>the categories</td></tr>
+    <tr><td><code>$CL</code></td><td>the classification</td></tr>
+    <tr><td><code>$DS</code></td><td>the description</td></tr>
+    <tr><td><code>$U</code></td><td>the UID</td></tr>
+    <tr><td><code>$M</code></td><td>the mode</td></tr>
+    </table><br>
+    \, (masked comma) in summary, location and description is replaced by a comma but \n
+    (indicates newline) is untouched.<br><br>
+
+    If the <code>format</code> parameter is omitted, the custom format string
+    from the <code>defaultFormat</code> attribute is used. If this attribute
+    is not set, <code>"$T1 $D $S"</code> is used as default custom format string.
+    The last occurance wins if the <code>format</code>
+    parameter is given several times.<br><br>
+
+    Examples:<br>
+    <code>get MyCalendar events format:full</code><br>
+    <code>get MyCalendar events format:custom="$T1-$T2 $S \@ $L"</code><br>
+    <code>get MyCalendar events format:custom={ sprintf("%20s %8s", $S, $D) }</code><br><br>
+
+    The <u><code>timeFormat</code></u> parameter determines the formatting of
+    start, end and alarm times.<br><br>
+
+    You use the POSIX conversion specifications in the <code>&lt;timeFormatSpec&gt;</code>.
+    The web page <a href="http://strftime.net">strftime.net</a> has a nice builder
+    for <code>&lt;timeFormatSpec&gt;</code>.<br><br>
+
+    If the <code>timeFormat</code> parameter is omitted, the time format specification
+    from the <code>defaultTimeFormat</code> attribute is used. If this attribute
+    is not set, <code>"%d.%m.%Y %H:%M"</code> is used as default time format
+    specification.
+    Single quotes (<code>'</code>) or double quotes (<code>"</code>) can be
+    used to enclose the format specification.<br><br>
+
+    The last occurance wins if the parameter is given several times.<br><br>
+
+    Example:<br>
+    <code>get MyCalendar events timeFormat:"%e-%b-%Y" format:full</code><br><br>
+
+    The <u><code>filter</code></u> parameter restricts the calendar
+    events displayed to a subset. <code>&lt;filterSpecs&gt;</code> is a comma-separated
+    list of <code>&lt;filterSpec&gt;</code> specifications. All filters must apply for a
+    calendar event to be displayed. The parameter is cumulative: all separate
+    occurances of the parameter add to the list of filters.<br><br>
+
+    <table>
+    <tr><th align="left"><code>&lt;filterSpec&gt;</code></th><th align="left">description</th></tr>
+    <tr><td><code>uid=="&lt;uid&gt;"</code></td><td>UID is <code>&lt;uid&gt;</code><br>
+      same as <code>field(uid)=="&lt;uid&gt;"</code></td></tr>
+    <tr><td><code>uid=~"&lt;regex&gt;"</code></td><td>UID matches regular expression <code>&lt;regex&gt;</code><br>
+      same as <code>field(uid)=~"&lt;regex&gt;"</code></td></tr>
+    <tr><td><code>mode=="&lt;mode&gt;"</code></td><td>mode is <code>&lt;mode&gt;</code><br>
+      same as <code>field(mode)=="&lt;mode&gt;"</code></td></tr>
+    <tr><td><code>mode=~"&lt;regex&gt;"</code></td><td>mode matches regular expression <code>&lt;regex&gt;</code><br>
+      same as <code>field(mode)=~"&lt;regex&gt;"</code></td></tr>
+    <tr><td><code>field(&lt;field&gt;)=="&lt;value&gt;"</code></td><td>content of the field <code>&lt;field&gt;</code> is <code>&lt;value&gt;</code><br>
+      &lt;field&gt; is one of <code>uid</code>, <code>mode</code>, <code>summary</code>, <code>location</code>,
+      <code>description</code>, <code>categories</code>, <code>classification</code>
+      </td></tr>
+    <tr><td><code>field(&lt;field&gt;)=~"&lt;regex&gt;"</code></td><td>content of the field &lt;field&gt; matches &lt;regex&gt;<br>
+      &lt;field&gt; is one of <code>uid</code>, <code>mode</code>, <code>summary</code>, <code>location</code>,
+      <code>description</code>, <code>categories</code>, <code>classification</code><br>
+      </td></tr>
+    </table><br>
+    The double quotes (<code>"</code>) on the right hand side of a <code>&lt;filterSpec&gt;</code>
+    are not part of the value or regular expression. Single quotes (<code>'</code>) can be
+    used instead.<br><br>
+
+    Examples:<br>
+    <code>get MyCalendar filter:uid=="432dsafweq64yehdbwqhkd"</code><br>
+    <code>get MyCalendar filter:uid=~"^7"</code><br>
+    <code>get MyCalendar filter:mode=="alarm"</code><br>
+    <code>get MyCalendar filter:mode=~"alarm|upcoming"</code><br>
+    <code>get MyCalendar filter:field(summary)=~"Mama"</code><br>
+    <code>get MyCalendar filter:field(classification)=="PUBLIC"</code><br>
+    <code>get MyCalendar filter:field(summary)=~"Gelber Sack",mode=~"upcoming|start"</code><br>
+    <code>get MyCalendar filter:field(summary)=~"Gelber Sack" filter:mode=~"upcoming|start"</code>
+    <br><br>
+
+    The <u><code>series</code></u> parameter determines the display of
+    recurring events. <code>series:next</code> limits the display to the
+    next calendar event out of all calendar events in the series that have
+    not yet ended. <code>series:next=&lt;max&gt;</code> shows at most the
+    <code>&lt;max&gt;</code> next calendar events in the series.<br><br>
+
+    </li>
+
+    <li><code>get &lt;name&gt; &lt;format&gt; &lt;filter&gt; [&lt;max&gt;]</code><br>
+    This command is deprecated. Use <code>get &lt;name&gt;  events ...</code>
+    instead. Please inform the author of the module if you think that there
+    is anything this command can do what <code>get &lt;name&gt;  events ...</code>
+    cannot.<br><br>
+
     Returns, line by line, information on the calendar events in the calendar &lt;name&gt;. The content depends on the
     &lt;format&gt specifier:<br><br>
 
     <table>
-    <tr><th>&lt;format&gt;</th><th>content</th></tr>
+    <tr><th align="left">&lt;format&gt;</th><th align="left">content</th></tr>
     <tr><td>uid</td><td>the UID of the event</td></tr>
     <tr><td>text</td><td>a user-friendly textual representation, best suited for display</td></tr>
     <tr><td>summary</td><td>the content of the summary field (subject, title)</td></tr>
@@ -2853,10 +3268,10 @@ sub CalendarAsHtml($;$) {
     <tr><td>debug</td><td>like full with additional information for debugging purposes</td></tr>
     </table><br>
 
-    The &lt;filter&gt; specifier determines the selected subset of calendar events:<br><br>
+    The &lt;filter&gt; specifier determines the seriesed subset of calendar events:<br><br>
 
     <table>
-    <tr><th>&lt;filter&gt;</th><th>selection</th></tr>
+    <tr><th align="left">&lt;filter&gt;</th align="left"><th>seriesion</th></tr>
     <tr><td>mode=&lt;regex&gt;</td><td>all calendar events with mode matching the regular expression &lt;regex&gt</td></tr>
     <tr><td>&lt;mode&gt;</td><td>all calendar events in the mode &lt;mode&gt</td></tr>
     <tr><td>uid=&lt;regex&gt;</td><td>all calendar events identified by UIDs that match the regular expression &lt;regex&gt;.</td></tr>
@@ -2884,28 +3299,41 @@ sub CalendarAsHtml($;$) {
     <code>get MyCalendar text mode=alarm|start</code><br>
     <code>get MyCalendar text uid=.*6286.*</code><br>
     <br>
+    </li>
 
-    <code>get &lt;name&gt; find &lt;regexp&gt;</code><br>
+
+    <li><code>get &lt;name&gt; find &lt;regexp&gt;</code><br>
     Returns, line by line, the UIDs of all calendar events whose summary matches the regular expression
-    &lt;regexp&gt;.<br><br>
+    &lt;regexp&gt;.<br><br></li>
 
-    <code>get &lt;name&gt; vcalendar</code><br>
-    Returns the calendar in ICal format as retrieved from the source.<br><br>
+    <li><code>get &lt;name&gt; vcalendar</code><br>
+    Returns the calendar in ICal format as retrieved from the source.<br><br></li>
 
-    <code>get &lt;name&gt; vevents</code><br>
+    <li><code>get &lt;name&gt; vevents</code><br>
     Returns a list of all VEVENT entries in the calendar with additional information for
     debugging. Only properties that have been kept during processing of the source
     are shown. The list of calendar events created from each VEVENT entry is shown as well
-    as the list of calendar events that have been omitted.
+    as the list of calendar events that have been omitted.</li>
 
   </ul>
 
-  <br>
+  <br><br>
 
   <a name="Calendarattr"></a>
   <b>Attributes</b>
   <br><br>
   <ul>
+    <li><code>defaultFormat &lt;formatSpec&gt;</code><br>
+        Sets the default format for the <code>get &lt;name&gt; events</code>
+        command. The specification is explained there. You must enclose
+        the &lt;formatSpec&gt; in double quotes (") like input
+        in <code>attr myCalendar defaultFormat "$T1 $D $S"</code>.</li></p>
+
+    <li><code>defaultTimeFormat &lt;timeFormatSpec&gt;</code><br>
+      Sets the default time format for the <code>get &lt;name&gt;events</code>
+      command. The specification is explained there. Do not enclose
+      the &lt;timeFormatSpec&gt; in quotes.</li></p>
+
     <li><code>update sync|async|none</code><br>
         If this attribute is not set or if it is set to <code>sync</code>, the processing of
         the calendar is done in the foreground. Large calendars will block FHEM on slow
@@ -2966,9 +3394,16 @@ sub CalendarAsHtml($;$) {
         for local calendar installations (e.g. OwnCloud, NextCloud) without valid SSL certificate.
     </li><p>
 
+    <li><code>ignoreCancelled</code><br>
+        Set to 1 to ignore events with status "CANCELLED".
+        Set this attribute to 1 if calanedar events of a series are returned
+        although they are cancelled.
+    </li><p>
+
+
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
-  <br>
+  <br><br>
 
   <b>Description</b>
   <ul>
@@ -2986,6 +3421,8 @@ sub CalendarAsHtml($;$) {
   The module will get it most likely wrong
   if you have recurring calendar events with unrecognized or uninterpreted keywords.
   Out-of-order events and events excluded from a series (EXDATE) are handled.
+  Calendar events are only created within &pm;400 days around the time of the
+  last update.
   <p>
 
   Calendar events are created when FHEM is started or when the respective entry in the source
@@ -3028,7 +3465,6 @@ sub CalendarAsHtml($;$) {
   <tr><td>modeStarted</td><td>events that have just transitioned to start mode</td></tr>
   <tr><td>modeUpcoming</td><td>events in upcoming mode</td></tr>
   </table>
-  </ul>
   <p>
 
   For recurring events, usually several calendar events exists with the same UID. In such a case,
@@ -3038,9 +3474,12 @@ sub CalendarAsHtml($;$) {
   In particular, you will never see the UID of a series in modeEnd or modeEnded as long as the series
   has not yet ended - the UID will be in one of the other mode... readings. This means that you better
   do not trigger FHEM events for series based on mode... readings. See below for a recommendation.<p>
+  </ul>
+  <br>
 
   <b>Events</b>
-  <ul><br>
+  <br><br>
+  <ul>
   When the calendar was reloaded or updated or when an alarm, start or end time was reached, one
   FHEM event is created:<p>
 
@@ -3048,7 +3487,6 @@ sub CalendarAsHtml($;$) {
 
   When you receive this event, you can rely on the calendar's readings being in a consistent and
   most recent state.<p>
-
 
   When a calendar event has changed, two FHEM events are created:<p>
 
@@ -3061,15 +3499,13 @@ sub CalendarAsHtml($;$) {
   The recommended way of reacting on mode changes of calendar events is to get notified
   on the aforementioned FHEM events and do not check for the FHEM events triggered
   by a change of a mode reading.
-  <p>
+  <br><br>
   </ul>
 
   <a name="CalendarPlugIns"></a>
   <b>Plug-ins</b>
   <ul>
   <br>
-  This is experimental. Use with caution.<p>
-
   A plug-in is a piece of Perl code that modifies a calendar event on the fly. The Perl code operates on the
   hash reference <code>$e</code>. The most important elements are as follows:
 
@@ -3086,15 +3522,18 @@ sub CalendarAsHtml($;$) {
   summary, the following plug-in can be used:<br><br>
   <code>attr MyCalendar onCreateEvent { $e->{alarm}= $e->{start}-86400 if($e->{summary} =~ /Tonne/);; }</code><br>
   <br>The double semicolon masks the semicolon. <a href="#perl">Perl specials</a> cannot be used.<br>
+  <br>
+  To add a missing end time, the following plug-in can be used:<br><br>
+  <code>attr MyCalendar onCreateEvent { $e->{end}= $e->{start}+86400 unless(defined($e->{summary})) }</code><br>
   </ul>
   <br><br>
 
   <b>Usage scenarios</b>
-  <ul><br><br>
+  <ul><br>
     <i>Show all calendar events with details</i><br><br>
     <ul>
     <code>
-    get MyCalendar full all<br>
+    get MyCalendar events format:full<br>
     2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom     alarm 31.05.2012 17:00:00 07.06.2012 16:30:00-07.06.2012 18:00:00 Erna for coffee<br>
     992hydf4y44awer5466lhfdsr&shy;gl7tin6b6mckf8glmhui4&shy;googlecom  upcoming                     08.06.2012 00:00:00-09.06.2012 00:00:00 Vacation
     </code><br><br>
@@ -3103,7 +3542,7 @@ sub CalendarAsHtml($;$) {
     <i>Show calendar events in your photo frame</i><br><br>
     <ul>
     Put a line in the <a href="#RSSlayout">layout description</a> to show calendar events in alarm or start mode:<br><br>
-    <code>text 20 60 { fhem("get MyCalendar text next 2") }</code><br><br>
+    <code>text 20 60 { fhem("get MyCalendar events timeFormat:'%d.%m.%Y %H:%M' format:custom='$T1 $S' filter:mode=~'alarm|start') }</code><br><br>
     This may look like:<br><br>
     <code>
     07.06.12 16:30 Erna for coffee<br>
@@ -3133,42 +3572,79 @@ sub CalendarAsHtml($;$) {
     Think about a calendar with calendar events whose summaries (subjects, titles) are the names of devices in your fhem installation.
     You want the respective devices to switch on when the calendar event starts and to switch off when the calendar event ends.<br><br>
     <code>
-    define SwitchActorOn  notify MyCalendar:start:.* {
-                my $reading="$EVTPART0";;
-                my $uid= "$EVTPART1";;
-                my $actor= fhem("get MyCalendar summary $uid");;
+    define SwitchActorOn  notify MyCalendar:start:.* { \<br>
+                my $reading="$EVTPART0";; \<br>
+                my $uid= "$EVTPART1";; \<br>
+                my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
                 if(defined $actor) {
                    fhem("set $actor on")
-                }
+                } \<br>
     }<br><br>
-    define SwitchActorOff  notify MyCalendar:end:.* {
-                my $reading="$EVTPART0";;
-                my $uid= "$EVTPART1";;
-                my $actor= fhem("get MyCalendar summary $uid");;
+    define SwitchActorOff  notify MyCalendar:end:.* { \<br>
+                my $reading="$EVTPART0";; \<br>
+                my $uid= "$EVTPART1";; \<br>
+                my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
                 if(defined $actor) {
                    fhem("set $actor off")
-                }
+                } \<br>
     }
     </code><br><br>
     You can also do some logging:<br><br>
     <code>
-    define LogActors notify MyCalendar:(start|end):.* { my $reading= "$EVTPART0";; my $uid= "$EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; Log 3 $NAME, 1, "Actor: $actor, Reading $reading" }
+    define LogActors notify MyCalendar:(start|end):.*
+    { my $reading= "$EVTPART0";; my $uid= "$EVTPART1";; \<br>
+      my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+     Log3 $NAME, 1, "Actor: $actor, Reading $reading" }
     </code><br><br>
     </ul>
 
 
-  </ul>
+    <i>Inform about garbage collection</i><br><br>
+    <ul>
+    We assume the <code>GarbageCalendar</code> has all the dates of the
+    garbage collection with the type of garbage collected in the summary. The
+    following notify can be used to inform about the garbage collection:
+    <br><br><code>
+    define GarbageCollectionNotifier notify GarbageCalendar:alarm:.* { \<br>
+      my $uid= "$EVTPART1";; \<br>
+      my $summary= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+      # e.g. mail $summary to someone \<br>
+    }</code><br><br>
 
+    If the garbage calendar has no reminders, you can set these to one day
+    before the date of the collection:<br><br><code>
+    attr GarbageCalendar onCreateEvent { $e->{alarm}= $e->{start}-86400 }
+    </code><br><br>
+    The following code realizes a HTML display of the upcoming collection
+    dates (see below):<br><br>
+    <code>{ CalendarEventsAsHtml('GarbageCalendar','format:text filter:mode=~"alarm|start"') }</code>
+    <br>
+    </ul>
+
+
+  </ul>
+  <br>
 
   <b>Embedded HTML</b>
   <ul><br>
-  The module provides an additional function <code>CalendarAsHtml(&lt;name&gt;,&lt;options&gt;)</code>. It
+  The module provides two functions which return HTML code.<br><br>
+  <code>CalendarAsHtml(&lt;name&gt;,&lt;options&gt;)</code>
   returns the HTML code for a list of calendar events. <code>&lt;name&gt;</code> is the name of the
-  Calendar device and <code>&lt;options&gt;</code> is what you would write after <code>get &lt;name&gt; text ...</code>.
+  Calendar device and <code>&lt;options&gt;</code> is what you would write
+  after <code>get &lt;name&gt; text ...</code>. This function is deprecated.
   <br><br>
   Example: <code>define MyCalendarWeblink weblink htmlCode { CalendarAsHtml("MyCalendar","next 3") }</code>
   <br><br>
-  This is a rudimentary function which might be extended in a future version.
+  <code>CalendarEventsAsHtml(&lt;name&gt;,&lt;parameters&gt;)</code>
+  returns the HTML code for a list of calendar events. <code>&lt;name&gt;</code> is the name of the
+  Calendar device and <code>&lt;parameters&gt;</code> is what you would write
+  in <code>get &lt;name&gt; events &lt;parameters&gt;</code>.
+  <br><br>
+  Example: <code>define MyCalendarWeblink weblink htmlCode
+  { CalendarEventsAsHtml('F','format:custom="$T1 $D $S" timeFormat="%d.%m" series:next=3') }</code>
+  <br><br>
+  Tip: use single quotes as outer quotes.
+
   <p>
   </ul>
 
@@ -3183,6 +3659,10 @@ sub CalendarAsHtml($;$) {
 <h3>Calendar</h3>
 <ul>
   <br>
+  <b>Diese deutsche &Uuml;bersetzung ist nicht mehr aktuell
+  (siehe bitte <a href="https://forum.fhem.de/index.php/topic,86148.msg786290.html#msg786290">Forumsbeitrag</a>).
+  Bitte hilf bei FHEM mit und aktualisiere diese &Uuml;bersetzung. Die englischsprachige
+  Dokumentation ist immer aktuell.</b><p>
 
   <a name="Calendardefine"></a>
   <b>Define</b>
@@ -3373,6 +3853,12 @@ sub CalendarAsHtml($;$) {
         SSL_VERIFY_PEER (&Uuml;berpr&uuml;fung des Zertifikats). Die &Uuml;berpr&uuml;fung auszuschalten
         ist n&uuml;tzlich f&uuml;r lokale Kalenderinstallationen(e.g. OwnCloud, NextCloud)
         ohne g&uuml;tiges SSL-Zertifikat.
+    </li><p>
+
+    <li><code>ignoreCancelled</code><br>
+        Wenn dieses Attribut auf 1 gesetzt ist, werden Termine im Status "CANCELLED" ignoriert.
+        Dieses Attribut auf 1 setzen, falls Termine in einer
+        Serie zur&uuml;ckgegeben werden, die gel&ouml;scht sind.
     </li><p>
 
 <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
