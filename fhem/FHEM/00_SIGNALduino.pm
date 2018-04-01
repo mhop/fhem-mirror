@@ -48,6 +48,7 @@ sub SIGNALduino_Read($);
 sub SIGNALduino_Ready($);
 sub SIGNALduino_Write($$$);
 sub SIGNALduino_SimpleWrite(@);
+sub SIGNALduino_Log3($$$);
 
 #my $debug=0;
 
@@ -4111,8 +4112,12 @@ sub SIGNALduino_callsub
 		#Log3 $name, 5, "$name: value bevore $funcname: @args";
 		
 		my ($rcode, @returnvalues) = $method->($name, @args) ;	
-			
-	    Log3 $name, 5, "$name: modified value after $funcname: @returnvalues";
+		
+		if (@returnvalues && defined($returnvalues[0])) {
+	    	SIGNALduino_Log3 $name, 5, "$name: rcode=$rcode, modified value after $funcname: @returnvalues";
+		} else {
+	   		SIGNALduino_Log3 $name, 5, "$name: rcode=$rcode, after calling $funcname";
+	    } 
 	    return ($rcode, @returnvalues);
 	} elsif (defined $method ) {					
 		Log3 $name, 5, "$name: Error: Unknown method $funcname Please check definition";
@@ -4436,7 +4441,7 @@ sub SIGNALduino_postDemo_WS2000($@) {
 		do {
 			$error += !$bit_msg[$index + $datastart];			# jedes 5. Bit muss 1 sein
 			$dataindex = $index + $datastart + 1;				 
-			$data = oct( "0b".(join "", reverse @bit_msg[$dataindex .. $dataindex + 3]));
+			$data = oct( "0b".(join "", reverse @bit_msg[$dataindex .. $dataindex + 3])) if ($dataindex <= $datalength);
 			if ($index == 5) {$adr = ($data & 0x07)}			# Sensoradresse
 			if ($datalength == 45 || $datalength == 46) { 	# Typ 1 ohne Summe
 				if ($index <= $datalength - 5) {
@@ -4459,7 +4464,7 @@ sub SIGNALduino_postDemo_WS2000($@) {
 		return (0, undef);
 	} else {
 		if ($datalength < 45 || $datalength > 46) { 			# Summe prüfen, außer Typ 1 ohne Summe
-			$data = oct( "0b".(join "", reverse @bit_msg[$dataindex .. $dataindex + 3]));
+			$data = oct( "0b".(join "", reverse @bit_msg[$dataindex .. $dataindex + 3])) if ($dataindex <= $datalength);
 			if ($data != ($sum & 0x0F)) {
 				Log3 $name, 4, "$name: WS2000 Sensortyp $typ Adr $adr - ERROR sum";
 				return (0, undef);
@@ -5133,6 +5138,16 @@ sub SIGNALduino_compPattern($$$%)
 
 	#modify msg_parts pattern hash
 	#$patternListRaw = \%buckets;
+}
+
+################################################
+# the new Log with integrated loglevel checking
+sub SIGNALduino_Log3($$$)
+{
+  
+  my ($dev, $loglevel, $text) = @_;
+  
+  return Log3($dev,$loglevel,$text);
 }
 
 #print Dumper (%msg_parts);
