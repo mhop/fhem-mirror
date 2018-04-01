@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   88_xs1Bridge: Documentation added
+  - added:   88_xs1Dev: various sensor types added
   - feature: 57_Calendar: get ... vevents and much more (forum #86148)
   - feature: 73_AMADCommBridge/74_AMADDevice: add new mediaPlayer Support, add
                                               takeScreenshot function
