@@ -40,12 +40,14 @@ sub xs1Dev_Initialize($) {
 }
 
 sub xs1Dev_Define($$) {
+	# $def --> Definition des Module
+	# $hash --> ARRAY des Module
+	
 	my ($hash, $def) = @_;
 	my @arg = split("[ \t][ \t]*", $def);
 
-   			#				0		1	  2		3     4
-	return "Usage: define <NAME> xs1Dev <Typ> <ID> IODev=  |  wrong number of arguments" if( @arg != 5);
-	return "Usage: define <NAME> xs1Dev <Typ> <ID> IODev=  |  wrong IODev argument" if not ( $arg[4] =~ m/IODev=([^\s]*)[a-zA-Z0-9]/);
+							#-----0------1------2----3----4
+	return "Usage: define <NAME> xs1Dev <Typ> <ID>  |  wrong number of arguments" if( @arg != 4);
 	return "Usage: define <NAME> xs1Dev <Typ> <ID>  |  wrong ID, must be 1-64" if ( $arg[3] <1 || $arg[3] >64);
 	return "Usage: define <NAME> xs1Dev <Typ> <ID>  |  wrong Typ, must be A or S" if ( $arg[2] ne "A" && $arg[2] ne "S");
 
@@ -53,6 +55,7 @@ sub xs1Dev_Define($$) {
 	my $iodev;
 	my $i = 0;
 
+	############## !! ################ nicht genutzt derzeit ############# !! #################
 	#### Schleife (Durchlauf der Argumente @arg) wo IODev= gefiltert wird aus define | Dispatch
 	foreach my $param ( @arg ) {
 		if( $param =~ m/IODev=([^\s]*)/ ) {
@@ -96,8 +99,8 @@ sub xs1Dev_Define($$) {
 	
 	$hash->{STATE}			= "Defined";					## Der Status des Modules nach Initialisierung.
 	$hash->{TIME}			= time();						## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION}		= "1.16";						## Version
-	
+	#$hash->{VERSION}		= "1.17";						## Version
+		
 	$hash->{xs1_name}		= "undefined";					## Aktor | Sensor Name welcher def. im xs1
 	$hash->{xs1_typ}		= "undefined";					## xs1_Typ switch | hygrometer | temperature ...
 	
@@ -109,23 +112,25 @@ sub xs1Dev_Define($$) {
 	}
 
 	# Attribut gesetzt
-	$attr{$name}{room}				= "xs1"	if( not defined( $attr{$name}{room} ) );
+	$attr{$name}{room}			= "xs1"	if( not defined( $attr{$name}{room} ) );
 
-	
 	AssignIoPort($hash,$iodev) if( !$hash->{IODev} );		## sucht nach einem passenden IO-Gerät (physikalische Definition)
+
+	# alles mit IODev erst NACH AssignIoPort nutzbar !!!
+	$hash->{VERSION} = $hash->{IODev}->{VERSION};		## Version
 	
 	if(defined($hash->{IODev}->{NAME})) {
-		Log3 $name, 4, "xs1Dev: $name - I/O device is " . $hash->{IODev}->{NAME};
-    } 
-	
-	# GENERELL in FHEM auf LOG1 genommen von Rudi
-	# else {
-		# Log3 $name, 3, "xs1Dev: $name - no I/O device";
-    # }
+		Log3 $name, 4, "xs1Dev: $name - I/O Device is " . $hash->{IODev}->{NAME};
+    } else {
+		Log3 $name, 3, "xs1Dev: $name - no I/O Device, Please delete and restart FHEM.";
+   }
+
+	#$iodev = $hash->{IODev}->{NAME};
 
 	# if(defined($hash->{IODev}->{xs1_ip})) {				## IP von xs1Bridge - Device aus HASH
         # $hash->{xs1_ip} = $hash->{IODev}->{xs1_ip};
 	# }
+	
 	return undef;
 }
 
@@ -153,7 +158,7 @@ sub xs1Dev_Set ($$@)
 	
 	return "no set value specified" if(int(@args) < 1);
 	
-	if ($xs1_typ ne "temperature" && $xs1_typ ne "hygrometer") {
+	if ($xs1_typ ne "temperature" && $xs1_typ ne "hygrometer" && $xs1_typ ne "undefined") {
 		my @xs1_function =();		## Funktionen in ARRAY schreiben
 		push (@xs1_function, $hash->{xs1_function1});
 		push (@xs1_function, $hash->{xs1_function2});
@@ -265,6 +270,8 @@ sub xs1Dev_Set ($$@)
 		if(defined($hash->{IODev}->{NAME})) {
 			if ($xs1_typ eq "switch" || $xs1_typ eq "dimmer" || $xs1_typ eq "shutter" || $xs1_typ eq "timerswitch") {
 				Debug " $name: Set IOWrite | xs1_ID=$xs1_ID xs1_typ=$xs1_typ cmd=$cmd cmd2=$cmd2" if($debug && $xs1_typ ne "temperature" && $xs1_typ ne "hygrometer");
+				Log3 $name, 3, "$name: Set IOWrite | xs1_ID=$xs1_ID xs1_typ=$xs1_typ cmd=$cmd cmd2=$cmd2 IODev=$hash->{IODev}->{NAME}";
+				
 				IOWrite($hash, $xs1_ID, $xs1_typ, $cmd, $cmd2);
 				readingsSingleUpdate($hash, "state", $cmd , 1);			
 			}
@@ -278,7 +285,7 @@ sub xs1Dev_Set ($$@)
 		Debug " $name: Set | xs1_ID=$xs1_ID xs1_typ=$xs1_typ" if($debug);
 		Debug " -------------- ERROR CHECK - END --------------" if($debug);
 	}
-	
+
 	return undef;
 }
 
@@ -302,12 +309,13 @@ sub xs1Dev_Parse($$)				## Input Data from 88_xs1Bridge
 	$typ = "xs1Dev" if (!$def);			## Erstanlegung
 	
 	###### Define and values update ######
-	#Log3 $typ, 3, "$typ: Parse | Data: $xs1Dev | $xs1_readingsname | $xs1_ID | $xs1_typ2 | $xs1_value | $xs1_typ1 | $IODev" if (!$def);
+	#Log3 $typ, 3, "$typ: Parse | Data: $xs1Dev | $xs1_readingsname | $xs1_ID | $xs1_typ2 | $xs1_value | $xs1_typ1" if (!$def);
+	#Log3 $typ, 3, "$typ: Parse | Data: $xs1Dev | $xs1_readingsname | $xs1_ID | $xs1_typ2 | $xs1_value | $xs1_typ1";
 
 	if(!$def) {
 			# "UNDEFINED xs1Dev_Aktor_12 xs1Dev A 12"
-			Log3 $name, 3, "$typ: Unknown device ".$xs1Dev."_".$xs1_readingsname."_"."$xs1_ID $xs1_ID $xs1_typ1 IODev=$IODev, please define it";
-			return "UNDEFINED xs1Dev"."_".$xs1_readingsname."_"."$xs1_ID xs1Dev $xs1_typ1 $xs1_ID IODev=$IODev";
+			Log3 $name, 3, "$typ: Unknown device ".$xs1Dev."_".$xs1_readingsname."_"."$xs1_ID $xs1_ID $xs1_typ1 , please define it";
+			return "UNDEFINED xs1Dev"."_".$xs1_readingsname."_"."$xs1_ID xs1Dev $xs1_typ1 $xs1_ID";
 	} else {
 		#Log3 $name, 3, "$typ: device $xs1_readingsname"."_"."$xs1_ID xs1_value:$xs1_value xs1_typ2:$xs1_typ2";
 		
@@ -382,6 +390,37 @@ sub xs1Dev_Parse($$)				## Input Data from 88_xs1Bridge
 				elsif ($xs1_value == 100) { $xs1_value = "on"; }
 			readingsSingleUpdate($hash, "state", $xs1_value ,1);
 		}
+		#### ### Erweiterung v1.20 ###
+		elsif ($xs1_typ2 eq "barometer") {
+			readingsBeginUpdate($hash);
+			readingsSingleUpdate($hash, "pressure", $xs1_value ,1);
+			readingsSingleUpdate($hash, "state", "P: ".$xs1_value ,1);
+			readingsEndUpdate($hash, 1);
+		}
+		elsif ($xs1_typ2 eq "rain") {
+			readingsBeginUpdate($hash);
+			readingsSingleUpdate($hash, "rain", $xs1_value ,1);
+			readingsSingleUpdate($hash, "state", "R: ".$xs1_value ,1);
+			readingsEndUpdate($hash, 1);
+		}
+		elsif ($xs1_typ2 eq "rain_1h") {
+			readingsBeginUpdate($hash);
+			readingsSingleUpdate($hash, "rain_calc_h", $xs1_value ,1);
+			readingsSingleUpdate($hash, "state", "R: ".$xs1_value ,1);
+			readingsEndUpdate($hash, 1);
+		}
+		elsif ($xs1_typ2 eq "rain_24h") {
+			readingsBeginUpdate($hash);
+			readingsSingleUpdate($hash, "rain_calc_d", $xs1_value ,1);
+			readingsSingleUpdate($hash, "state", "R: ".$xs1_value ,1);
+			readingsEndUpdate($hash, 1);
+		}
+		elsif ($xs1_typ2 eq "counter" || $xs1_typ2 eq "counterdiff" || $xs1_typ2 eq "light" || $xs1_typ2 eq "motion" || 
+			$xs1_typ2 eq "other" || $xs1_typ2 eq "rainintensity" || $xs1_typ2 eq "remotecontrol" || $xs1_typ2 eq "uv_index" || 
+			$xs1_typ2 eq "waterdetector" || $xs1_typ2 eq "winddirection" || $xs1_typ2 eq "windgust" || $xs1_typ2 eq "windspeed" || $xs1_typ2 eq "windvariance") {
+				readingsSingleUpdate($hash, "state", $xs1_value ,1);
+			}
+		#### ### Erweiterung v1.20 ### ENDE ###
 	}
 	
 	return $name;
@@ -415,7 +454,13 @@ sub xs1Dev_Undef($$)
 	This module works with the xs1Bridge module. (The <code>xs1_control</code> attribute in the xs1Bridge module must be set to 1!) <br>
 	It communicates with this and creates all actuators of the xs1 as a device in FHEM. So you can control the actuators of the xs1 from the FHEM. <br><br>
 	The module was developed based on the firmware version v4-Beta of the xs1. There may be errors due to different adjustments within the manufacturer's firmware.
-	<br><br>
+	<br>
+	
+	<br><ul>
+	<u>Currently implemented types of xs1 for processing: </u><br>
+	<li>Aktor: dimmer, switch, shutter, timerswitch</li>
+	<li>Sensor: barometer, counter, counterdiff, light, motion, other, rain, rain_1h, rain_24h, rainintensity, remotecontrol, uv_index, waterdetector, winddirection, windgust, windspeed, windvariance</li>
+	</ul><br><br>
 
 	<a name="xs1Dev_define"></a>
 	<b>Define</b><br>
@@ -470,8 +515,6 @@ sub xs1Dev_Undef($$)
 		xs1_name: defined name in the device<br>
 		xs1_typ: defined type in the device<br>
 		</ul><br>
-	
-	<li>The following xs1 device types are already integrated: dimmer | shutter | switch | timerswitch</li>
 	</ul>
 </ul>
 =end html
@@ -483,8 +526,13 @@ sub xs1Dev_Undef($$)
 	Dieses Modul arbeitet mit dem Modul xs1Bridge zusammen. (Das Attribut <code>xs1_control</code> im Modul xs1Bridge muss auf 1 gestellt sein!) <br>
 	Es kommuniziert mit diesem und legt sämtliche Aktoren des xs1 als Device im FHEM an. So kann man vom FHEM aus, die Aktoren der xs1 steuern.
 	<br><br>
-	Das Modul wurde entwickelt basierend auf dem Firmwarestand v4-Beta des xs1. Es kann aufgrund von unterschiedlichen Anpassungen innerhalb der Firmware des Herstellers zu Fehlern kommen.
-	<br><br>
+	Das Modul wurde entwickelt basierend auf dem Firmwarestand v4-Beta des xs1. Es kann aufgrund von unterschiedlichen Anpassungen innerhalb der Firmware des Herstellers zu Fehlern kommen.<br>
+	
+	<br><ul>
+	<u>Derzeit implementierte Typen des xs1 zur Verarbeitung: </u><br>
+	<li>Aktor: dimmer, switch, shutter, timerswitch</li>
+	<li>Sensor: barometer, counter, counterdiff, light, motion, other, rain, rain_1h, rain_24h, rainintensity, remotecontrol, uv_index, waterdetector, winddirection, windgust, windspeed, windvariance</li>
+	</ul><br><br>
 
 	<a name="xs1Dev_define"></a>
 	<b>Define</b><br>
@@ -539,8 +587,6 @@ sub xs1Dev_Undef($$)
 		xs1_name: definierter Name im Ger&auml;t<br>
 		xs1_typ: definierter Typ im Ger&auml;t<br>
 		</ul><br>
-	
-	<li>Folgende xs1-Ger&aumltetypen sind bereits integriert: dimmer | shutter | switch | timerswitch</li>
 	</ul>
 		
 </ul>

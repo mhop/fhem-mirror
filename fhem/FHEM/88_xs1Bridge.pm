@@ -85,9 +85,9 @@ sub xs1Bridge_Define($$) {
 	my $xs1_ip = $arg[2];				## Zusatzparameter 1 bei Define - ggf. nur in Sub
 	$hash->{xs1_ip} = $xs1_ip;
 	
-	$hash->{STATE} = "Initialized";	## Der Status des Modules nach Initialisierung.
+	$hash->{STATE} = "Initialized";		## Der Status des Modules nach Initialisierung.
 	$hash->{TIME} = time();				## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.19";			## Version
+	$hash->{VERSION} = "1.20";			## Version
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
@@ -102,11 +102,11 @@ sub xs1Bridge_Define($$) {
 	#Log3 $name, 3, "$typ: IODev defined with xs1_ip: $xs1_ip";
 	
 	if(!defined($defs{'FileLog_xs1Bridge'})) {												## Logfile existent check
-		Log3 $name, 3, "$typ: FileLog_xs1Bridge ist NICHT definiert";
+		Log3 $name, 4, "$typ: FileLog_xs1Bridge ist NICHT definiert";
 		fhem("define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log ".$arg[0]);		## Logfile define
 		fhem("attr FileLog_xs1Bridge room xs1");											## Logfile in xs1 room
 	} else {
-		Log3 $name, 3, "$typ: FileLog_xs1Bridge ist definiert";
+		Log3 $name, 4, "$typ: FileLog_xs1Bridge ist definiert";
 	}
 
 	return undef;
@@ -127,7 +127,7 @@ sub xs1Bridge_Attr(@) {
 	if ($cmd eq "set") {
 		RemoveInternalTimer($hash);											## Timer löschen
 		Debug " $typ: Attr | Cmd:$cmd | RemoveInternalTimer" if($debug);
-		if ($attrName eq "xs1_interval" && $attrValue == 0) {			## Handling xs1_interval == 0
+		if ($attrName eq "xs1_interval" && $attrValue == 0) {				## Handling xs1_interval == 0
 			RemoveInternalTimer($hash);
 			readingsSingleUpdate($hash, "state", "deactive", 1);
 		}elsif ($attrName eq "xs1_interval" && $attrValue >= 30) {	## Handling xs1_interval >= 30
@@ -135,34 +135,38 @@ sub xs1Bridge_Attr(@) {
 			my $xs1_interval = $attrValue;
 			InternalTimer(gettimeofday()+$xs1_interval, "xs1Bridge_GetUpDate", $hash);
 			readingsSingleUpdate($hash, "state", "active", 1);
+		### Ansicht xs1_Device_function ###
 		}elsif ($attrName eq "view_Device_function") {
 			if ($attrValue eq "1") {								## Handling view_Device_function 1
-			Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
+				Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
 			}
-			elsif ($attrValue eq "0") {							## Handling view_Device_function 0
-			Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
+			elsif ($attrValue eq "0") {								## Handling view_Device_function 0
+				Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
 			}
+		### Ansicht xs1_Device_name ###
 		}elsif ($attrName eq "view_Device_name") {
-			if ($attrValue eq "1") {								## Handling view_Device_name 1
-			Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
-			}
-			elsif ($attrValue eq "0") {							## Handling view_Device_name 0
-				Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
-				for my $i (0..64) {
-				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
-				delete $hash->{READINGS}{"Sensor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
+				if ($attrValue eq "1") {								## Handling view_Device_name 1
+					Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
 				}
-			}
+				elsif ($attrValue eq "0") {								## Handling view_Device_name 0
+						Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
+						for my $i (0..64) {
+						delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
+						delete $hash->{READINGS}{"Sensor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
+					}
+				}
+		### Wertaenderung nur bei Difference ###
 		}elsif ($attrName eq "update_only_difference") {
 			if ($attrValue eq "1") {								## Handling update_only_difference 1
-			Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
+				Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
 			}
 			elsif ($attrValue eq "0") {								## Handling update_only_difference 0
 				Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
 				for my $i (0..64) {
-				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
+					delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
 				}
 			}
+		### xs1 - steuern ###
 		}elsif ($attrName eq "xs1_control") {
 			if ($attrValue eq "1") {								## Handling xs1_control 1
 				if(! $modules{xs1Dev}) {							## Check Modul vorhanden
@@ -170,20 +174,17 @@ sub xs1Bridge_Attr(@) {
 					return "Module xs1Dev is non-existent or still under development. Please wait"
 				}
 			}
-			################# WUNSCH #################
+		### Blacklist - Aktor / Sensor ###
 		}elsif ($attrName eq "xs1_blackl_aktor") {			## Handling xs1_blackl_aktor
-			#if ($attrValue eq "1") {
-				Log3 $name, 3, "$typ: Attribut xs1_blackl_aktor $attrValue";
-			#}
+				Log3 $name, 4, "$typ: Attribut xs1_blackl_aktor $attrValue";
 		}elsif ($attrName eq "xs1_blackl_sensor") {			## Handling xs1_blackl_sensor
-			Log3 $name, 3, "$typ: Attribut xs1_blackl_sensor $attrValue";
+			Log3 $name, 4, "$typ: Attribut xs1_blackl_sensor $attrValue";
 		}
-			################# WUNSCH ENDE #################
 	}
 	
 	#### Handling bei del ... attribute
 	if ($cmd eq "del") {
-		if ($attrName eq "xs1_interval") {						## Handling deleteattr xs1_interval
+		if ($attrName eq "xs1_interval") {					## Handling deleteattr xs1_interval
 			RemoveInternalTimer($hash);
 			readingsSingleUpdate($hash, "state", "deactive", 1);
 			Debug " $typ: Attr | Cmd:$cmd | $attrName" if($debug);
@@ -196,7 +197,7 @@ sub xs1Bridge_Attr(@) {
 				}
 			}
 		}
-		elsif ($attrName eq "view_Device_name") {				## Handling deleteattr view_Device_name
+		elsif ($attrName eq "view_Device_name") {			## Handling deleteattr view_Device_name
 			Log3 $name, 3, "$typ: Attribut view_Device_name delete";
 			for my $i (0..64) {
 				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
@@ -208,7 +209,7 @@ sub xs1Bridge_Attr(@) {
 		}
 	}
 
-	# #### Handling bei state active
+	#### Handling bei state active
 	if ($hash->{STATE} eq "active") {
 		RemoveInternalTimer($hash);
 		InternalTimer(gettimeofday()+$xs1_interval, "xs1Bridge_GetUpDate", $hash);
@@ -429,6 +430,26 @@ sub xs1Bridge_GetUpDate() {
 							delete $hash->{READINGS}{$readingsname[$i]."_".sprintf("%02d", $i3)} if($hash->{READINGS});
 							delete $hash->{READINGS}{$readingsname[$i]."_".sprintf("%02d", $i3)."_name"} if($hash->{READINGS});
 							
+							### Erweiterung v1.20 ### Device | Logfile | SVG löschen wenn in xs1 disable - TEST
+							my $delDevice = "xs1Dev_".$readingsname[$i]."_".sprintf("%02d", $i3);
+							
+							if (defined($defs{"xs1Dev_".$readingsname[$i]."_".sprintf("%02d", $i3)})) {
+								#Log3 $name, 3, "$typ: GetUpDate | for delete $delDevice";
+								fhem("delete ".$delDevice);				## delete Device
+							}
+							
+							if (defined($defs{"SVG_xs1Dev_".$readingsname[$i]."_".sprintf("%02d", $i3)})) {
+								#Log3 $name, 3, "$typ: GetUpDate | for delete FileLog_$delDevice";
+								fhem("delete SVG_".$delDevice);		## delete FileLog_Device
+							}
+							
+							if (defined($defs{"FileLog_xs1Dev_".$readingsname[$i]."_".sprintf("%02d", $i3)})) {
+								#Log3 $name, 3, "$typ: GetUpDate | for delete FileLog_$delDevice";
+								fhem("delete FileLog_".$delDevice);		## delete FileLog_Device
+							}
+							
+							### Erweiterung v1.20 ### Device | Logfile | SVG löschen wenn in xs1 disable - TEST ### ENDE ###
+							
 							if ($i == 0) {
 								for my $count (1..4) {
 									delete $hash->{READINGS}{$readingsname[$i]."_".sprintf("%02d", $i3)."_function_".$count} if($hash->{READINGS});
@@ -519,23 +540,23 @@ sub xs1Bridge_Write($)			## Zustellen von Daten via IOWrite() vom logischen zum 
 	my $typ = $hash->{TYPE};
 	my $xs1_ip = $hash->{xs1_ip};
    
-   ## Anfrage (Client -> XS1): http://192.168.1.242/control?callback=cname&cmd=set_state_actuator&number=1&value=100
+	## Anfrage (Client -> XS1): http://192.168.1.242/control?callback=cname&cmd=set_state_actuator&number=1&value=100
 	
 	## Aktor Typen aus xs1: (notwendig zur Verarbeitung)
 	## -------------------------------------------------
 	## blind - Jalousie				|	dimmer - Dimmer				|	door - Tür			|	disabled - deaktivert
-	## switch - Schalter				|	shutter - Rolladen			|	sound - Ton			|	sun-blind - Markise
-	## temperature - Temperatur	|	timerswitch - Zeitschalter	|	window - Fenster
+	## switch - Schalter			|	shutter - Rolladen			|	sound - Ton			|	sun-blind - Markise
+	## temperature - Temperatur		|	timerswitch - Zeitschalter	|	window - Fenster
 
 	## Sensor Typen (Auswahl) aus xs1: (nur Info)
 	## ------------------------------------------
-	## alarmmat - Alarmmatte			|	disabled - deaktivert
+	## alarmmat - Alarmmatte		|	disabled - deaktivert
 	## gas_butan - Gasmelder Butan	|	gas_peak - Gas Spitzenwert
-	## mail - Briefmelder				|	motion - Bewegung
-	## other - Andere						|	presence - Anwesenheit
+	## mail - Briefmelder			|	motion - Bewegung
+	## other - Andere				|	presence - Anwesenheit
 	## pwr_consump - Energiezähler	|	pwr_peak - Energie Spitzenwert
 	## soilmoisture - Bodenfeuchte	|	soiltemp -  Bodentemperatur
-	## leafwetness - Blattfeuchte		|	remotecontrol - Fernbedienung
+	## leafwetness - Blattfeuchte	|	remotecontrol - Fernbedienung
 	## windowopen - Fenstermelder	...
 
 	$Aktor_ID = substr($Aktor_ID, 1,2);
@@ -550,9 +571,9 @@ sub xs1Bridge_Write($)			## Zustellen von Daten via IOWrite() vom logischen zum 
 		}
 		$xs1cmd = "http://$xs1_ip/control?callback=cname&cmd=set_state_actuator&number=$Aktor_ID&value=$cmd";
 	} else {
-	#### keine Verarbeitung zum senden ####
-	Log3 $name, 3, "$typ: Write | $xs1_typ not control xs1. Please inform me!";
-	last;
+		#### keine Verarbeitung zum senden ####
+		Log3 $name, 3, "$typ: Write | $xs1_typ not control xs1. Please inform me!";
+		last;
 	}
 
 	### HTTP Requests #### Start ####
@@ -560,10 +581,10 @@ sub xs1Bridge_Write($)			## Zustellen von Daten via IOWrite() vom logischen zum 
 	my $Http_err 	= "";
 	my $Http_data;
 	my $param 	= 	{
-							url        => "$xs1cmd",
-							timeout    => 3,
-							method     => "GET",		# Lesen von Inhalten
-						};
+						url        => "$xs1cmd",
+						timeout    => 3,
+						method     => "GET",		# Lesen von Inhalten
+					};
 
 	HttpUtils_BlockingGet($param);
 	($Http_err, $Http_data) = HttpUtils_BlockingGet($param);
@@ -645,7 +666,13 @@ sub is_in_array($$$)
 	<br><br>
 
 	The module was developed based on the firmware version v4-Beta of the xs1. There may be errors due to different adjustments within the manufacturer's firmware.<br>
-	Testet firmware: v4.0.0.5326 (Beta) @me | v3.0.0.4493 @ForumUser<br><br>
+	Testet firmware: v4.0.0.5326 (Beta) @me | v3.0.0.4493 @ForumUser<br>
+	
+	<br><ul>
+	<u>Currently implemented types of xs1 for processing: </u><br>
+	<li>Aktor: dimmer, switch, shutter, timerswitch</li>
+	<li>Sensor: barometer, counter, counterdiff, light, motion, other, rain, rain_1h, rain_24h, rainintensity, remotecontrol, uv_index, waterdetector, winddirection, windgust, windspeed, windvariance</li>
+	</ul><br><br>
 
 	<a name="xs1Bridge_define"></a>
 	<b>Define</b><br>
@@ -737,8 +764,14 @@ sub is_in_array($$$)
 	<br><br>
 
 	Das Modul wurde entwickelt basierend auf dem Firmwarestand v4-Beta des xs1. Es kann aufgrund von unterschiedlichen Anpassungen innerhalb der Firmware des Herstellers zu Fehlern kommen.<br>
-	Getestete Firmware: v4.0.0.5326 (Beta) @me | v3.0.0.4493 @ForumUser<br><br>
+	Getestete Firmware: v4.0.0.5326 (Beta) @me | v3.0.0.4493 @ForumUser<br>
 
+	<br><ul>
+	<u>Derzeit implementierte Typen des xs1 zur Verarbeitung: </u><br>
+	<li>Aktor: dimmer, switch, shutter, timerswitch</li>
+	<li>Sensor: barometer, counter, counterdiff, light, motion, other, rain, rain_1h, rain_24h, rainintensity, remotecontrol, uv_index, waterdetector, winddirection, windgust, windspeed, windvariance</li>
+	</ul><br><br>
+	
 	<a name="xs1Bridge_define"></a>
 	<b>Define</b><br>
 		<ul>
