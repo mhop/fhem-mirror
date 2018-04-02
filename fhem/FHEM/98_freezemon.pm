@@ -22,6 +22,7 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.19:	unwrap Log3 function when set inactive
 #		0.0.18:	fixed unnecessary call of blocking function
 #		0.0.17:	fixed Warning when fm_logFile is not maintained
 #				Freeze-Handling non-blocking
@@ -85,7 +86,7 @@ use Time::HiRes qw(tv_interval);
 use B qw(svref_2object);
 use Blocking;
 
-my $version  = "0.0.18";
+my $version  = "0.0.19";
 my @logqueue = ();
 
 ###################################
@@ -438,6 +439,9 @@ sub freezemon_Set($@) {
         RemoveInternalTimer($hash);
         readingsSingleUpdate( $hash, "state", "inactive", 1 );
         $hash->{helper}{DISABLED} = 1;
+		my $status = Log3( "", 100, "" );
+        Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
+        *main::Log3 = $hash->{helper}{Log3};
     }
     elsif ( $cmd eq "active" ) {
         if ( IsDisabled($name) ) {
@@ -594,6 +598,9 @@ sub freezemon_Attr($) {
                 RemoveInternalTimer($hash);
                 readingsSingleUpdate( $hash, "state", "inactive", 1 );
                 $hash->{helper}{DISABLED} = 1;
+				my $status = Log3( "", 100, "" );
+				Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
+				*main::Log3 = $hash->{helper}{Log3};
             }
             elsif ( $aVal == 0 ) {
                 freezemon_start($hash);
