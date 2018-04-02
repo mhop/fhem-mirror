@@ -23,6 +23,9 @@
 ##############################################################################
 # 	  Changelog:
 #		0.0.19:	unwrap Log3 function when set inactive
+#				suppress warnings when redefining subs
+#				Monitoring callFn (fm_CatchFnCalls)
+#				Monitoring Commands (fm_CatchCmds)
 #		0.0.18:	fixed unnecessary call of blocking function
 #		0.0.17:	fixed Warning when fm_logFile is not maintained
 #				Freeze-Handling non-blocking
@@ -88,6 +91,7 @@ use Blocking;
 
 my $version  = "0.0.19";
 my @logqueue = ();
+my $fm_fn    = "";
 
 ###################################
 sub freezemon_Initialize($) {
@@ -97,7 +101,7 @@ sub freezemon_Initialize($) {
     # Module specific attributes
     my @freezemon_attr =
       (
-"fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all fm_extDetail:0,1 fm_logExtraSeconds fm_logFile fm_logKeep fm_whitelistSub"
+"fm_forceApptime:0,1 fm_freezeThreshold disable:0,1 fm_log fm_ignoreDev fm_ignoreMode:off,single,all fm_extDetail:0,1 fm_logExtraSeconds fm_logFile fm_logKeep fm_whitelistSub fm_CatchFnCalls:0,1 fm_CatchCmds:0,1"
       );
 
     $hash->{GetFn}             = "freezemon_Get";
@@ -158,6 +162,9 @@ sub freezemon_Undefine($$) {
 
     RemoveInternalTimer($hash);
     BlockingKill( $hash->{helper}{blocking}{pid} ) if ( defined( $hash->{helper}{blocking}{pid} ) );
+    my $status = Log3( "", 100, "" );
+    Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
+    *main::Log3 = $hash->{helper}{Log3};
 
     return undef;
 }
@@ -252,7 +259,7 @@ sub freezemon_ProcessTimer($) {
             }
         }
 
-        $dev = $guys;
+        $dev = $fm_fn . " " . $guys;
         $dev =~ s/^\s+|\s+$//g;
         my $exists = undef;
 
@@ -287,7 +294,7 @@ sub freezemon_ProcessTimer($) {
                 $exists = 1;
                 foreach my $d ( values %devs ) {
                     if ( exists( $id{$d} ) ) {
-                        Log3 $name, 5, "[Freezemon] $name ignoring $dev in $imode mode, because $d is ignored";
+                        Log3 $name, 5, "[Freezemon] $name: ignoring $dev in $imode mode, because $d is ignored";
                         $exists = undef;
                         last;
                     }
@@ -379,6 +386,8 @@ sub freezemon_ProcessTimer($) {
     freezemon_purge_log_before( $hash, $hash->{helper}{TIMER} - AttrVal( $name, "fm_logExtraSeconds", 0 ) )
       if ( AttrVal( $name, "fm_logFile", "" ) ne "" );
 
+    $fm_fn = "";
+
     # ---- Some stuff not required every second
     $hash->{helper}{intCount} //= 0;
     $hash->{helper}{intCount} += 1;
@@ -403,11 +412,16 @@ sub freezemon_ProcessTimer($) {
             readingsEndUpdate( $hash, 1 );
         }
 
+        # check if apptime is active
         if ( AttrVal( $name, "fm_forceApptime", 0 ) == 1
             and !defined( $cmds{"apptime"} ) )
         {
+            no warnings;
             fhem( "apptime", 1 );
         }
+
+        # check apptime overwrote freezemon CallFn
+        freezemon_install_callFn_wrapper( $hash, 1 ) if AttrVal( $name, "fm_CatchFnCalls", 0 ) == 1;
 
         # let's get rid of old logs
         if ( my $keep = AttrVal( $name, "fm_logKeep", undef ) ) {
@@ -439,7 +453,7 @@ sub freezemon_Set($@) {
         RemoveInternalTimer($hash);
         readingsSingleUpdate( $hash, "state", "inactive", 1 );
         $hash->{helper}{DISABLED} = 1;
-		my $status = Log3( "", 100, "" );
+        my $status = Log3( "", 100, "" );
         Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
         *main::Log3 = $hash->{helper}{Log3};
     }
@@ -582,7 +596,7 @@ sub freezemon_Attr($) {
                 my $path = $1;
                 $path =~ s/%L/$attr{global}{logdir}/g if ( $path =~ m/%/ && $attr{global}{logdir} );
                 if ( opendir( DH, $path ) ) {
-                    freezemon_install_log_wrapper($hash) if (!isDisabled($name));
+                    freezemon_install_log_wrapper($hash) if ( !isDisabled($name) );
                     closedir(DH);
                 }
                 else {
@@ -593,14 +607,39 @@ sub freezemon_Attr($) {
                 return "Attribute " . $aName . ": Enter a valid path or delete the attribute to disable.";
             }
         }
+        elsif ( $aName eq "fm_CatchFnCalls" ) {
+            if ( $aVal ne 0 ) {
+                freezemon_install_callFn_wrapper($hash);
+            }
+            else {
+                Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn" );
+                {
+                    no warnings;
+                    *main::CallFn = $hash->{helper}{mycallFn};
+                }
+            }
+        }
+        elsif ( $aName eq "fm_CatchCmds" ) {
+            if ( $aVal ne 0 ) {
+                freezemon_install_analyzeCommand_wrapper($hash);
+            }
+            else {
+                Log3( "", 0, "[Freezemon] $name: Unwrapping analyzeCommand" );
+                {
+                    no warnings;
+                    *main::AnalyzeCommand = $hash->{helper}{analyzeCommand};
+                }
+            }
+        }
+
         elsif ( $aName eq "disable" ) {
             if ( $aVal == 1 ) {
                 RemoveInternalTimer($hash);
                 readingsSingleUpdate( $hash, "state", "inactive", 1 );
                 $hash->{helper}{DISABLED} = 1;
-				my $status = Log3( "", 100, "" );
-				Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
-				*main::Log3 = $hash->{helper}{Log3};
+                my $status = Log3( "", 100, "" );
+                Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
+                *main::Log3 = $hash->{helper}{Log3};
             }
             elsif ( $aVal == 0 ) {
                 freezemon_start($hash);
@@ -616,6 +655,20 @@ sub freezemon_Attr($) {
             my $status = Log3( "", 100, "" );
             Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
             *main::Log3 = $hash->{helper}{Log3};
+        }
+        elsif ( $aName eq "fm_CatchFnCalls" ) {
+            Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn" );
+            {
+                no warnings;
+                *main::CallFn = $hash->{helper}{mycallFn};
+            }
+        }
+        elsif ( $aName eq "fm_CatchCmds" ) {
+            Log3( "", 0, "[Freezemon] $name: Unwrapping AnalyzeCommand" );
+            {
+                no warnings;
+                *main::AnalyzeCommand = $hash->{helper}{analyzeCommand};
+            }
         }
 
     }
@@ -640,11 +693,11 @@ sub freezemon_start($) {
     my $next = int( gettimeofday() ) + 1;
     $hash->{helper}{TIMER} = $next;
 
-    freezemon_install_log_wrapper($hash) if AttrVal( $name, "fm_logFile", "" ) ne "";
+    #freezemon_install_log_wrapper($hash) if AttrVal( $name, "fm_logFile", "" ) ne "";
 
     InternalTimer( $next, 'freezemon_ProcessTimer', $hash, 0 );
     Log3 $name, 2,
-        "[Freezemon] $name ready to watch out for delays greater than "
+        "[Freezemon] $name: ready to watch out for delays greater than "
       . AttrVal( $name, "fm_freezeThreshold", 1 )
       . " second(s)";
 
@@ -677,10 +730,7 @@ sub freezemon_apptime($) {
 
         #$tim = $intAt{$i}{TRIGGERTIME};
         $tim = $intAtA[$i]->{TRIGGERTIME};
-        if ( $tim - gettimeofday() > $minCoverWait ) {
-
-            #next;
-        }
+        last if ( $tim - $now > $minCoverExec );
 
         #if ( $intAt{$i}{FN} eq "freezemon_ProcessTimer" ) {
         if ( $intAtA[$i]->{FN} eq "freezemon_ProcessTimer" ) {
@@ -690,7 +740,10 @@ sub freezemon_apptime($) {
         #$fn = $intAt{$i}{FN};
         $fn = $intAtA[$i]->{FN};
 
-        next if exists( $blacklist{$fn} );
+        if ( exists( $blacklist{$fn} ) ) {
+            Log3 $name, 5, "[Freezemon] $name whitelisted: " . $fn;
+            next;
+        }
 
         if ( ref($fn) ne "" ) {
             $cv     = svref_2object($fn);
@@ -698,6 +751,7 @@ sub freezemon_apptime($) {
 
             #$ret .= $intAt{$i}{TRIGGERTIME} . "-" . $fnname;
             $ret .= $intAtA[$i]->{TRIGGERTIME} . "-" . $fnname;
+
             #Log3 $name, 5, "[Freezemon] $name Reference found: " . ref($fn) . "/$fnname/$fn";
         }
         else {
@@ -713,7 +767,7 @@ sub freezemon_apptime($) {
             if ( !defined( $shortarg->{NAME} ) ) {
                 if ( AttrVal( $name, "fm_extDetail", 0 ) == 1 ) {
                     if ( $fn eq "BlockingKill" or $fn eq "BlockingStart" ) {
-                        $shortarg = $shortarg->{abortArg}{NAME} if defined($shortarg->{abortArg}{NAME});
+                        $shortarg = $shortarg->{abortArg}{NAME} if defined( $shortarg->{abortArg}{NAME} );
                     }
                     elsif ( $fn eq "HttpUtils_Err" ) {
                         if ( defined( $shortarg->{hash}{hash}{NAME} ) ) {
@@ -750,6 +804,7 @@ sub freezemon_apptime($) {
             $shortarg = "N/A";
         }
         if ( !defined($shortarg) ) {
+
             #Log3 $name, 5, "Freezemon: something went wrong $fn " . Dumper($arg);
             $shortarg = "";
         }
@@ -794,6 +849,52 @@ sub freezemon_apptime($) {
     return $ret;
 }
 ###################################
+sub freezemon_callFn($@) {
+    my ( $lfn, @args ) = @_;
+
+    # take current time, then immediately call the original  function
+    my $t0     = [gettimeofday];
+    my $result = $lfn->(@args);
+    my $ms     = tv_interval($t0);
+    my $d      = $args[0];
+    my $n      = $args[1];
+
+    if ( $ms >= 0.5 ) {
+        $fm_fn .= "$n:$d ";
+        Log3 undef, 5, "[Freezemon] Long function call detected $n:$d - $ms seconds";
+    }
+    return $result;
+}
+###################################
+sub freezemon_analyzeCommand($$$;$) {
+    my ( $lfn, $cl, $cmd, $cfc ) = @_;
+
+    # take current time, then immediately call the original  function
+    my $t0     = [gettimeofday];
+    my $result = $lfn->( $cl, $cmd, $cfc );
+    my $ms     = tv_interval($t0);
+    my $d      = "";
+    my $n      = $cmd;
+    if ( exists( $cl->{SNAME} ) ) {
+        $d = $cl->{SNAME};
+    }
+    else {
+        $d = "Command";
+    }
+
+    if ( $ms >= 0.5 ) {
+        $fm_fn .= "$n:$d ";
+        Log3 undef, 5, "[Freezemon] Long running Command detected $n:$d - $ms seconds";
+    }
+    return $result;
+}
+
+###################################
+sub freezemon_checkCallFnWrap() {
+    return "freezemon called";
+}
+
+###################################
 sub freezemon_Log3($$$$) {
     my ( $lfn, $dev, $loglevel, $text ) = @_;
 
@@ -809,6 +910,28 @@ sub freezemon_Log3($$$$) {
     return $result;
 }
 ###################################
+sub freezemon_wrap_callFn($) {
+    my ($fn) = @_;
+    return sub(@) {
+        my @a = @_;
+        return "already wrapped" if $a[1] eq "freezemon_checkCallFnWrap";
+        return freezemon_callFn( $fn, @a );
+      }
+}
+
+###################################
+sub freezemon_wrap_analyzeCommand($) {
+    my ($fn) = @_;
+    return sub($$;$) {
+        my ( $cl, $cmd, $cfc ) = @_;
+        return "already wrapped" if ( defined($cl) && $cl eq "freezemon" );
+
+        #return $fn if ( $b == 100 );
+        return freezemon_analyzeCommand( $fn, $cl, $cmd, $cfc );
+      }
+}
+
+###################################
 sub freezemon_wrap_Log3($) {
     my ($fn) = @_;
     return sub($$$) {
@@ -819,19 +942,60 @@ sub freezemon_wrap_Log3($) {
       }
 }
 ###################################
+#AnalyzeCommand($$;$)
+sub freezemon_install_analyzeCommand_wrapper($;$) {
+    my ( $hash, $nolog ) = @_;
+    my $name = $hash->{NAME};
+    $name = "FreezeMon" unless defined($name);
+    my $status = AnalyzeCommand( "freezemon", "" );
+    if ( !defined($status) || $status ne "already wrapped" ) {
+        $hash->{helper}{mycallFn} = \&AnalyzeCommand;
+        Log3( "", 3, "[Freezemon] $name: Wrapping AnalyzeCommand" );
+        {
+            no warnings;
+            *main::AnalyzeCommand = freezemon_wrap_analyzeCommand( \&AnalyzeCommand );
+        }
+    }
+    elsif ( !defined($nolog) ) {
+        Log3 $name, 5, "[Freezemon] $name: AnalyzeCommand already wrapped";
+    }
+}
+
+###################################
+sub freezemon_install_callFn_wrapper($;$) {
+    my ( $hash, $nolog ) = @_;
+    my $name = $hash->{NAME};
+    $name = "FreezeMon" unless defined($name);
+    my $status = CallFn( $name, "freezemon_checkCallFnWrap" );
+    if ( !defined($status) || $status ne "already wrapped" ) {
+        $hash->{helper}{mycallFn} = \&CallFn;
+        Log3( "", 3, "[Freezemon] $name: Wrapping CallFn" );
+        {
+            no warnings;
+            *main::CallFn = freezemon_wrap_callFn( \&CallFn );
+        }
+    }
+    elsif ( !defined($nolog) ) {
+        Log3 $name, 5, "[Freezemon] $name: CallFn already wrapped";
+    }
+}
+
+###################################
 sub freezemon_install_log_wrapper($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
     $name = "FreezeMon" unless defined($name);
     my $status = Log3( "", 99, "" );
     if ( !defined($status) || $status ne "already wrapped" ) {
-        Log3( "", 0, "[Freezemon] $name: Wrapping Log3" );
+        Log3( "", 3, "[Freezemon] $name: Wrapping Log3" );
         $hash->{helper}{Log3} = \&Log3;
-        *main::Log3 = freezemon_wrap_Log3( \&Log3 );
+        {
+            no warnings;
+            *main::Log3 = freezemon_wrap_Log3( \&Log3 );
+        }
     }
     else {
-        Log3( "", 0, "[Freezemon] $name: Log3 is already wrapped" );
-        Log3( "", 0, "[Freezemon] $name: status=$status" );
+        Log3 $name, 5, "[Freezemon] $name: Log3 is already wrapped";
     }
 }
 ###################################
@@ -1002,6 +1166,8 @@ sub freezemon_getLogPath($) {
   <b>Attributes</b>
 		<ul>
 			<ul>
+				<li>fm_catchCallFn: if enabled FHEM internal function calls are monitored additionally, in some cases this might give additional hints on who's causing the freeze </li>
+				<li>fm_catchCmds: if enabled FHEM commands are monitored additionally, in some cases this might give additional hints on who's causing the freeze </li>
 				<li>fm_extDetail: provides in some cases extended details for recognized freezes. In some cases it was reported that FHEM crashes, so please be careful.</li>
 				<li>fm_freezeThreshold: Value in seconds (Default: 1) - Only freezes longer than fm_freezeThreshold will be considered as a freeze</li>
 				<li>fm_forceApptime: When FREEZEMON is active, apptime will automatically be started (if not yet active)</li>
@@ -1088,6 +1254,8 @@ sub freezemon_getLogPath($) {
   <b>Attribute</b>
   <ul>
 		<ul>
+			<li>fm_catchCallFn: wenn aktiviert, werden zusätzlich FHEM-interne Funktionsaufrufe überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben</li>
+			<li>fm_catchCmds: wenn aktiviert, werden zusätzlich FHEM-Kommandos überwacht, in einigen Fällen kann das zusätzliche Hinweise auf den Freeze-Verursacher geben</li>
 			<li>fm_extDetail: stellt in einigen Fällen zusätzliche Details bei erkannten Freezes zur Verfügung. In wenigen Fällen wurde berichtet, dass FHEM crasht, also vorsichtig verwenden.</li>
 			<li>fm_freezeThreshold: Wert in Sekunden (Default: 1) - Nur Freezes länger als fm_freezeThreshold werden als Freeze betrachtet </li>
 			<li>fm_forceApptime: Wenn FREEZEMON aktiv ist wird automatisch apptime gestartet (falls nicht aktiv)</li>
