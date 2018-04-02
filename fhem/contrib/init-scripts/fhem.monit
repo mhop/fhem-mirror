@@ -1,0 +1,24 @@
+# Example /etc/monitrc for FHEM
+#
+
+# REQUIRED PREPARATION:
+#
+# mkdir -p /var/run/fhem
+# chown fhem:fhem /var/run/fhem
+# echo "attr global pidfilename /var/run/fhem/fhem.pid" >> /opt/fhem/fhem.cfg
+# echo "define cmd_knock cmdalias knock AS { \"hello.\" }" >> /opt/fhem/fhem.cfg
+# echo "attr cmd_knock comment Monit process monitoring" >> /opt/fhem/fhem.cfg
+# /usr/local/bin/perl fhem.pl 7072 shutdown restart
+
+set daemon 60
+set log syslog
+set httpd port 2812 and
+  allow localhost
+  allow admin:monit
+
+check process fhem.pl with pidfile /var/run/fhem/fhem.pid
+  start = "/bin/sh -c 'cd /opt/fhem; /usr/local/bin/perl fhem.pl fhem.cfg'" as uid "fhem" and gid "fhem"
+  stop = "/bin/sh -c 'cd /opt/fhem; /usr/local/bin/perl fhem.pl 7072 shutdown || kill -9 `cat /var/run/fhem/fhem.pid`'" as uid "fhem" and gid "fhem"
+  if failed host 127.0.0.1 port 7072 with send "knock\n" expect "hello." timeout 20 seconds then restart
+  if cpu usage > 90% for 10 cycles then restart
+  if 5 restarts with 5 cycles then timeout
