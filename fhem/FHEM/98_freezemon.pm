@@ -26,6 +26,7 @@
 #				suppress warnings when redefining subs
 #				Monitoring callFn (fm_CatchFnCalls)
 #				Monitoring Commands (fm_CatchCmds)
+#				adjusted log levels
 #		0.0.18:	fixed unnecessary call of blocking function
 #		0.0.17:	fixed Warning when fm_logFile is not maintained
 #				Freeze-Handling non-blocking
@@ -162,10 +163,7 @@ sub freezemon_Undefine($$) {
 
     RemoveInternalTimer($hash);
     BlockingKill( $hash->{helper}{blocking}{pid} ) if ( defined( $hash->{helper}{blocking}{pid} ) );
-    my $status = Log3( "", 100, "" );
-    Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
-    *main::Log3 = $hash->{helper}{Log3};
-
+	freezemon_unwrap_all($hash);
     return undef;
 }
 ###################################
@@ -336,7 +334,7 @@ sub freezemon_ProcessTimer($) {
                 $hash->{helper}{logfile} = $log;
 
                 $hash->{helper}{blocking} =
-                  BlockingCall( "freezemon_processFreeze", $hash, "freezemon_freezeDone", 300, "freezemon_freezeAbort",
+                  BlockingCall( "freezemon_processFreeze", $hash, "freezemon_freezeDone", 120, "freezemon_freezeAbort",
                     $hash );
                 Log3 $name, 5, "[Freezemon] $name: Blocking Call started with PID " . $hash->{helper}{blocking}{pid};
             }
@@ -429,7 +427,7 @@ sub freezemon_ProcessTimer($) {
             my $path = freezemon_getLogPath($name);
             my $max  = scalar(@fl) - $keep;
             for ( my $i = 0 ; $i < $max ; $i++ ) {
-                Log3 $name, 3, "[Freezemon] $name: Deleting $fl[$i]";
+                Log3 $name, 4, "[Freezemon] $name: Deleting $fl[$i]";
                 unlink("$path/$fl[$i]");
             }
         }
@@ -453,9 +451,7 @@ sub freezemon_Set($@) {
         RemoveInternalTimer($hash);
         readingsSingleUpdate( $hash, "state", "inactive", 1 );
         $hash->{helper}{DISABLED} = 1;
-        my $status = Log3( "", 100, "" );
-        Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
-        *main::Log3 = $hash->{helper}{Log3};
+		freezemon_unwrap_all($hash);
     }
     elsif ( $cmd eq "active" ) {
         if ( IsDisabled($name) ) {
@@ -637,9 +633,7 @@ sub freezemon_Attr($) {
                 RemoveInternalTimer($hash);
                 readingsSingleUpdate( $hash, "state", "inactive", 1 );
                 $hash->{helper}{DISABLED} = 1;
-                my $status = Log3( "", 100, "" );
-                Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
-                *main::Log3 = $hash->{helper}{Log3};
+				freezemon_unwrap_all($hash);
             }
             elsif ( $aVal == 0 ) {
                 freezemon_start($hash);
@@ -866,6 +860,28 @@ sub freezemon_callFn($@) {
     return $result;
 }
 ###################################
+sub freezemon_unwrap_all($) {
+    my ($hash) = @_;
+    Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn" );
+    {
+        no warnings;
+        *main::CallFn = $hash->{helper}{mycallFn};
+    }
+    Log3( "", 0, "[Freezemon] $name: Unwrapping analyzeCommand" );
+    {
+        no warnings;
+        *main::AnalyzeCommand = $hash->{helper}{analyzeCommand};
+    }
+    my $status = Log3( "", 100, "" );
+    Log3( "", 0, "[Freezemon] $name: Unwrapping Log3" );
+    {
+        no warnings;
+		*main::Log3 = $hash->{helper}{Log3};
+	}
+}
+
+
+###################################
 sub freezemon_analyzeCommand($$$;$) {
     my ( $lfn, $cl, $cmd, $cfc ) = @_;
 
@@ -1027,7 +1043,7 @@ sub freezemon_dump_log($$$) {
     my $currlogfile = $hash->{helper}{logfile};
 
     return unless defined($currlogfile) && $currlogfile ne "";
-    Log3 $hash, 3, "[Freezemon] $name: dumping " . ( scalar @queue ) . " log entries to $currlogfile";
+    Log3 $hash, 4, "[Freezemon] $name: dumping " . ( scalar @queue ) . " log entries to $currlogfile";
 
     open( fm_LOG, ">>$currlogfile" ) || return ("Can't open $currlogfile: $!");
 
