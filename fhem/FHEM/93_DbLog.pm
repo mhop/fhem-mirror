@@ -16,6 +16,9 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.10.0     02.04.2018       addLog consider DbLogExclude in Devices, keyword "!useExcludes" to switch off considering 
+#                             DbLogExclude in addLog, DbLogExclude & DbLogInclude can handle "/" in Readingname,
+#                             commandref (reduceLog) revised
 # 3.9.0      17.03.2018       DbLog_ConnectPush state-handling changed, attribute excludeDevs enhanced in DbLog_Log
 # 3.8.9      10.03.2018       commandref revised
 # 3.8.8      05.03.2018       fix device doesn't exit if configuration couldn't be read
@@ -191,8 +194,9 @@ use Data::Dumper;
 use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
+no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.9.0";
+my $DbLogVersion = "3.10.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -542,8 +546,10 @@ sub DbLog_Set($@) {
         }
     }	
 	elsif ($a[1] eq 'addLog') {		
-        unless ($a[2]) { return " The argument of $a[1] is not valid. Use a pair of <devicespec>,reading [value] you want to create a log entry from";}
-		DbLog_AddLog($hash,$a[2],$a[3]);
+        unless ($a[2]) { return "The argument of $a[1] is not valid. Please check commandref.";}
+        my $nce = ("\!useExcludes" ~~ @a)?1:0;
+        map(s/\!useExcludes//g, @a);
+		DbLog_AddLog($hash,$a[2],$a[3],$nce);
 	}
     elsif ($a[1] eq 'reopen') {		
 		if ($dbh) {
@@ -1292,9 +1298,9 @@ sub DbLog_Log($$) {
               
 			      for (my $i=0; $i<int(@v1); $i++) {
                       my @v2 = split(/:/, $v1[$i]);
-                      $DoIt = 0 if(!$v2[1] && $reading =~ m/^$v2[0]$/); #Reading matcht auf Regexp, kein MinIntervall angegeben
+                      $DoIt = 0 if(!$v2[1] && $reading =~ m,^$v2[0]$,); #Reading matcht auf Regexp, kein MinIntervall angegeben
                   
-				      if(($v2[1] && $reading =~ m/^$v2[0]$/) && ($v2[1] =~ m/^(\d+)$/)) {
+				      if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {
                           #Regexp matcht und MinIntervall ist angegeben
                           my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
                           my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
@@ -1317,9 +1323,9 @@ sub DbLog_Log($$) {
               
 			          for (my $i=0; $i<int(@v1); $i++) {
                           my @v2 = split(/:/, $v1[$i]);
-                          $DoIt = 1 if($reading =~ m/^$v2[0]$/); #Reading matcht auf Regexp
+                          $DoIt = 1 if($reading =~ m,^$v2[0]$,); #Reading matcht auf Regexp
                   
-				          if(($v2[1] && $reading =~ m/^$v2[0]$/) && ($v2[1] =~ m/^(\d+)$/)) {
+				          if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {
                               #Regexp matcht und MinIntervall ist angegeben
                               my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
                               my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
@@ -3537,8 +3543,8 @@ return @sr;
 # Addlog - einfügen des Readingwertes eines gegebenen Devices
 #
 #########################################################################################
-sub DbLog_AddLog($$$) {
-  my ($hash,$devrdspec,$value)= @_;
+sub DbLog_AddLog($$$$) {
+  my ($hash,$devrdspec,$value,$nce)= @_;
   my $name     = $hash->{NAME};
   my $async    = AttrVal($name, "asyncMode", undef);
   my $value_fn = AttrVal( $name, "valueFn", "" );
@@ -3572,9 +3578,24 @@ sub DbLog_AddLog($$$) {
 	      next;
       }
 	  
-	  my $r = $defs{$dev_name}{READINGS};
+	  my $r            = $defs{$dev_name}{READINGS};
+      my $DbLogExclude = AttrVal($dev_name, "DbLogExclude", undef);
 	  my @exrds;
 	  foreach my $rd (sort keys %{$r}) {
+           # jedes Reading des Devices auswerten
+           my $do = 1;
+		   if($DbLogExclude && !$nce) {
+               my @v1 = split(/,/, $DbLogExclude);
+               for (my $i=0; $i<int(@v1); $i++) {
+                   my @v2 = split(/:/, $v1[$i]);     # MinInterval wegschneiden, Bsp: "(temperature|humidity):600,battery:3600"
+                   if($rd =~ m,^$v2[0]$,) {
+                       # Reading matcht und soll vom addLog ausgeschlossen werden
+                       Log3 $name, 2, "DbLog $name -> Device: \"$dev_name\", reading: \"$v2[0]\" excluded by attribute DbLogExclude from addLog !";
+                       $do = 0;
+                   }
+               }
+           }
+           next if(!$do);
 		   push @exrds,$rd if($rd =~ m/^$rdspec$/);
 	  }
 	  Log3 $name, 4, "DbLog $name -> Readings extracted from Regex: @exrds";
@@ -3588,7 +3609,7 @@ sub DbLog_AddLog($$$) {
 	      $dev_reading = $_;
           $read_val = $value?$value:ReadingsVal($dev_name,$dev_reading,"");
 	      $dev_type = uc($defs{$dev_name}{TYPE});
-  
+          
           # dummy-Event zusammenstellen
 	      $event = $dev_reading.": ".$read_val;
 	  
@@ -5303,12 +5324,14 @@ sub dbReadings($@) {
 	  set &lt;name&gt; addCacheLine 2017-12-05 17:03:59|MaxBathRoom|MAX|valveposition: 95|valveposition|95|% <br>
     </ul><br>
 	
-    <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] </code><br><br>
+    <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [!useExcludes] </code><br><br>
     <ul> Inserts an additional log entry of a device/reading combination into the database.
       Optionally you can enter a "Value" that is used as reading value for the dataset. If the value isn't specified (default),
 	  the current value of the specified reading will be inserted into the database. The field "$EVENT" will be filled automatically
 	  by "addLog". The device can be declared by a <a href="#devspec">device specification (devspec)</a>. 
-	  "Reading" will be evaluated as regular expression.
+	  "Reading" will be evaluated as regular expression. <br>
+      The function considers attribute "DbLogExclude" in source device if it is set. If the optional keyword "!useExcludes" 
+      is set, the attribute "DbLogExclude" isn't considered. <br>
 	  By the addLog-command NO additional events will be created !<br><br>
       
 	  <b>Examples:</b> <br>
@@ -5380,23 +5403,32 @@ sub dbReadings($@) {
       <ul>In asynchronous mode (<a href="#DbLogattr">attribute</a> asyncMode=1), the in memory cached data will be deleted. 
       With this command data won't be written from cache into the database. </ul><br>
 	  
-    <code>set &lt;name&gt; reduceLog &lt;n&gt; [average[=day]] [exclude=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...]</code> <br><br>
-      <ul>Reduces records older than &lt;n&gt; days to one record each hour (the 1st) per device & reading. <br><br>
-          <b>CAUTION:</b> It is strongly recommended to check if the default INDEX 'Search_Idx' exists on the table 'history'! <br>
-		  The execution of this command may take (without INDEX) extremely long. FHEM will be <b>blocked completely</b> after issuing the command to completion ! <br><br>
+    <code>set &lt;name&gt; reduceLog &lt;n&gt; [average[=day]] [exclude=device1:reading1,device2:reading2,...]</code> <br><br>
+      <ul>Reduces records older than &lt;n&gt; days to one record (the 1st) each hour per device & reading. <br>
+          Within the device/reading name <b>SQL-Wildcards "%" and "_"</b> can be used. <br><br>
           
 		  With the optional argument 'average' not only the records will be reduced, but all numerical values of an hour 
 		  will be reduced to a single average. <br>
           With the optional argument 'average=day' not only the records will be reduced, but all numerical values of a 
-		  day will be reduced to a single average. (implies 'average') <br>
-          You can optional set the last argument to "EXCLUDE=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...." 
-		  to exclude device/readings from reduceLog. <br>
-          You can optional set the last argument to "INCLUDE=Database-deviceRegExp:Database-ReadingRegExp" to delimit 
-		  the SELECT statement which is executet on the database. This reduces the system RAM load and increases the 
-		  performance. (Wildcards are % and _) <br>
+		  day will be reduced to a single average. (implies 'average') <br><br>
+         
+          You can optional set the last argument to "exclude=device1:reading1,device2:reading2,..." to exclude 
+          device/readings from reduceLog. <br>          
+          Also you can optional set the last argument to "include=device:reading" to delimit the SELECT statement which 
+          is executed on the database. This may reduce the system RAM load and increases the performance. <br><br>
+          
+          <ul>
+          <b>Example: </b> <br>
+          set &lt;name&gt; reduceLog 270 average include=Luftdaten_remote:% <br>
+          </ul>
+          <br>
+      
+          <b>CAUTION:</b> It is strongly recommended to check if the default INDEX 'Search_Idx' exists on the table 'history'! <br>
+		  The execution of this command may take (without INDEX) extremely long. FHEM will be <b>blocked completely</b> after issuing the command to completion ! <br><br>
+          
       </ul><br>
 	  
-    <code>set &lt;name&gt; reduceLogNbl &lt;n&gt; [average[=day]] [exclude=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...]</code> <br><br>
+    <code>set &lt;name&gt; reduceLogNbl &lt;n&gt; [average[=day]] [exclude=device1:reading1,device2:reading2,...]</code> <br><br>
       <ul>Same function as "set &lt;name&gt; reduceLog" but FHEM won't be blocked due to this function is implemented non-blocking ! <br>
       </ul><br>
 
@@ -5782,7 +5814,9 @@ sub dbReadings($@) {
          <ul>
             <li>Exclude: DbLog behaves just as usual. This means everything specified in the regex in DEF will be logged by default and anything excluded
                          via the DbLogExclude attribute will not be logged</li>
-            <li>Include: Nothing will be logged, except the readings specified via regex in the DbLogInclude attribute </li>
+            <li>Include: Nothing will be logged, except the readings specified via regex in the DbLogInclude attribute 
+                         (in source devices). 
+                         Neither the Regex set in DEF will be considered nor the device name of the source device itself. </li>
             <li>Exclude/Include: Just almost the same as Exclude, but if the reading matches the DbLogExclude attribute, then
                        it will further be checked against the regex in DbLogInclude whicht may possibly re-include the already 
                        excluded reading. </li>
@@ -5797,9 +5831,8 @@ sub dbReadings($@) {
       attr &lt;device&gt; DbLogInclude regex:MinInterval,[regex:MinInterval] ...
       </code><br>
 	  
-      A new Attribute DbLogInclude will be propagated
-      to all Devices if DBLog is used. DbLogInclude works just like DbLogExclude but 
-      to include matching readings.
+      A new Attribute DbLogInclude will be propagated to all Devices if DBLog is used. 
+      DbLogInclude works just like DbLogExclude but to include matching readings.
       See also DbLogSelectionMode-Attribute of DbLog-Device which takes influence on 
       on how DbLogExclude and DbLogInclude are handled. <br>
 	
@@ -6289,18 +6322,20 @@ sub dbReadings($@) {
 	  set &lt;name&gt; addCacheLine 2017-12-05 17:03:59|MaxBathRoom|MAX|valveposition: 95|valveposition|95|% <br>
     </ul><br>
 	
-    <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] </code><br><br>
+    <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [!useExcludes] </code><br><br>
     <ul> Fügt einen zusatzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein.
       Optional kann "Value" für den Readingwert angegeben werden. Ist Value nicht angegeben, wird der aktuelle
       Wert des Readings in die DB eingefügt. Das Feld "$EVENT" wird automatisch mit "addLog" belegt. Das Device kann 
-	  als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. "Reading" wird als regulärer Ausdruck ausgewertet.
+	  als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. "Reading" wird als regulärer Ausdruck ausgewertet. <br>
+      Ein eventuell im Quell-Device gesetztes Attribut "DbLogExclude" wird von der Funktion berücksichtigt. Soll dieses 
+      Attribut nicht berücksichtigt werden, kann das Schüsselwort "!useExcludes" verwendet werden. <br>
 	  Es wird KEIN zusätzlicher Event im System erzeugt !<br><br>
       
 	  <b>Beispiele:</b> <br>
 	  set &lt;name&gt; addLog SMA_Energymeter:Bezug_Wirkleistung <br>
 	  set &lt;name&gt; addLog TYPE=SSCam:state <br>
 	  set &lt;name&gt; addLog MyWetter:(fc10.*|fc8.*) <br>
-	  set &lt;name&gt; addLog MyWetter:(wind|wind_ch.*) 20 <br>
+	  set &lt;name&gt; addLog MyWetter:(wind|wind_ch.*) 20 !useExcludes <br>
 	  set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|):(measured-temp|desired-temp|actuator) <br>
     </ul><br>
 	  
@@ -6367,25 +6402,38 @@ sub dbReadings($@) {
       <ul>Im asynchronen Modus (<a href="#DbLogattr">Attribut</a> asyncMode=1), werden die im Speicher gecachten Daten gelöscht. 
       Es werden keine Daten aus dem Cache in die Datenbank geschrieben. </ul><br>
 	  
-    <code>set &lt;name&gt; reduceLog &lt;n&gt; [average[=day]] [exclude=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...]</code><br><br>
-      <ul>Reduziert historische Datensaetze, die älter sind als &lt;n&gt; Tage auf einen Eintrag pro Stunde (den ersten) je Device & Reading.<br><br>
-          <b>ACHTUNG:</b> Es wird dringend empfohlen zu überprüfen ob der standard INDEX 'Search_Idx' in der Tabelle 'history' existiert! <br>
-		  Die Abarbeitung dieses Befehls dauert unter Umständen (ohne INDEX) extrem lange. FHEM wird durch den Befehl bis 
-		  zur Fertigstellung <b>komplett blockiert !</b> <br><br>
+    <code>set &lt;name&gt; reduceLog &lt;n&gt; [average[=day]] [exclude=device1:reading1,device2:reading2,...] </code><br><br>
+      <ul>Reduziert historische Datensätze, die älter sind als &lt;n&gt; Tage auf einen Eintrag (den ersten) pro Stunde je 
+          Device & Reading.<br>
+          Innerhalb von device/reading können <b>SQL-Wildcards "%" und "_"</b> verwendet werden. <br><br>
 		  
 		  Das Reading "reduceLogState" zeigt den Ausführungsstatus des letzten reduceLog-Befehls. <br><br>
           Durch die optionale Angabe von 'average' wird nicht nur die Datenbank bereinigt, sondern alle numerischen Werte 
 		  einer Stunde werden auf einen einzigen Mittelwert reduziert. <br>
           Durch die optionale Angabe von 'average=day' wird nicht nur die Datenbank bereinigt, sondern alle numerischen 
-		  Werte eines Tages auf einen einzigen Mittelwert reduziert. (impliziert 'average') <br>
-          Optional kann als letzer Parameter "EXCLUDE=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...." 
-		  angegeben werden um device/reading Kombinationen von reduceLog auszuschließen. <br>
-          Optional kann als letzer Parameter "INCLUDE=Database-deviceRegExp:Database-ReadingRegExp" angegeben werden um 
+		  Werte eines Tages auf einen einzigen Mittelwert reduziert. (impliziert 'average') <br><br>
+          
+          Optional kann als letzer Parameter "exclude=device1:reading1,device2:reading2,...." 
+		  angegeben werden um device/reading Kombinationen von reduceLog auszuschließen. <br><br>
+          
+          Optional kann als letzer Parameter "include=device:reading" angegeben werden um 
 		  die auf die Datenbank ausgeführte SELECT-Abfrage einzugrenzen, was die RAM-Belastung verringert und die 
-		  Performance erhöht. (Wildcards sind % und _) <br>
+		  Performance erhöht. <br><br>
+          
+          <ul>
+          <b>Beispiel: </b> <br>
+          set &lt;name&gt; reduceLog 270 average include=Luftdaten_remote:% <br>
+          
+          </ul>
+          <br>
+          
+          <b>ACHTUNG:</b> Es wird dringend empfohlen zu überprüfen ob der standard INDEX 'Search_Idx' in der Tabelle 'history' existiert! <br>
+		  Die Abarbeitung dieses Befehls dauert unter Umständen (ohne INDEX) extrem lange. FHEM wird durch den Befehl bis 
+		  zur Fertigstellung <b>komplett blockiert !</b> <br><br>
+          
           </ul><br>
 		  
-    <code>set &lt;name&gt; reduceLogNbl &lt;n&gt; [average[=day]] [exclude=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...]</code><br><br>
+    <code>set &lt;name&gt; reduceLogNbl &lt;n&gt; [average[=day]] [exclude=device1:reading1,device2:reading2,...]</code><br><br>
 	      <ul>
 	      Führt die gleiche Funktion wie "set &lt;name&gt; reduceLog" aus. Im Gegensatz zu reduceLog wird mit FHEM wird durch den Befehl reduceLogNbl nicht 
 	      mehr blockiert da diese Funktion non-blocking implementiert ist ! <br>
@@ -6797,7 +6845,7 @@ sub dbReadings($@) {
 	                                               Die current-Tabelle wird bei der SVG-Erstellung ausgewertet.</td></tr>
 	   <tr><td> <b>SampleFill/History</b> </td><td>Events werden nur in die history-Tabelle geloggt. Die current-Tabelle wird bei der SVG-Erstellung ausgewertet und 
                                                    kann zur Erzeugung einer DropDown-Liste mittels einem
-												   <a href="http://fhem.de/commandref_DE.html#DbRep">DbRep-Device</a> <br> "set &lt;DbRep-Name&gt; tableCurrentFillup" mit
+												   <a href="#DbRep">DbRep-Device</a> <br> "set &lt;DbRep-Name&gt; tableCurrentFillup" mit
 											       einem einstellbaren Extract der history-Tabelle gefüllt werden (advanced Feature).  </td></tr>
        </table>
 	   </ul>
@@ -6825,8 +6873,9 @@ sub dbReadings($@) {
         <li>Exclude: DbLog verhaelt sich wie bisher auch, alles was ueber die RegExp im DEF angegeben ist, wird geloggt, bis auf das,
                      was ueber die RegExp in DbLogExclude ausgeschlossen wird. <br>
                      Das Attribut DbLogInclude wird in diesem Fall nicht beruecksichtigt</li>
-        <li>Include: Es wird nur das geloggt was ueber die RegExp in DbLogInclude eingeschlossen wird. <br>
-                     Das Attribut DbLogExclude wird in diesem Fall ebenso wenig beruecksichtigt wie die Regex im DEF. </li>
+        <li>Include: Es wird nur das geloggt was ueber die RegExp in DbLogInclude (im Quelldevice) eingeschlossen wird. <br>
+                     Das Attribut DbLogExclude wird in diesem Fall ebenso wenig beruecksichtigt wie die Regex im DEF. Auch
+                     der Devicename (des Quelldevice) geht in die Auswertung nicht mit ein. </li>
         <li>Exclude/Include: Funktioniert im Wesentlichen wie "Exclude", nur das sowohl DbLogExclude als auch DbLogInclude
                              geprueft werden. Readings die durch DbLogExclude zwar ausgeschlossen wurden, mit DbLogInclude aber wiederum eingeschlossen werden,
                              werden somit dennoch geloggt. </li>
