@@ -121,6 +121,7 @@
 #
 #	CHANGELOG
 #	
+#	02.04.2018	support for vair CO2 sensors (forum #67734) -Thanks to vbs
 #	29.03.2018	Summary for Commandref
 #				
 #				
@@ -143,7 +144,7 @@ TRX_WEATHER_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^..(40|4e|50|51|52|54|55|56|57|58|5a|5c|5d).*";
+  $hash->{Match}     = "^..(40|4e|50|51|52|54|55|56|57|58|5a|5c|5d|71).*";
   $hash->{DefFn}     = "TRX_WEATHER_Define";
   $hash->{UndefFn}   = "TRX_WEATHER_Undef";
   $hash->{ParseFn}   = "TRX_WEATHER_Parse";
@@ -172,6 +173,10 @@ TRX_WEATHER_Define($$)
   	$hash->{scale_current} = ((int(@a) == 6) ? $a[3] : 1);
   	$hash->{scale_total} = ((int(@a) == 6) ? $a[4] : 1.0);
   	$hash->{add_total} = ((int(@a) == 6) ? $a[5] : 0.0);
+  } elsif ($code =~ /^RFXMETER/) {
+  	return "wrong syntax: define <name> TRX_WEATHER RFXMETER [scale_current]" if (int(@a) != 3 && int(@a) != 5);
+  	$hash->{scale_current} = ((int(@a) == 5) ? $a[3] : 1);
+  	$hash->{value_label} = $a[4] if (int(@a) == 5);
   } else {
 	return "wrong syntax: define <name> TRX_WEATHER code" if(int(@a) > 3);
   }
@@ -225,6 +230,9 @@ my %types =
 
     # WEIGHT
    0x5D08 => { part => 'WEIGHT', method => \&TRX_WEATHER_common_weight, },
+
+    # RFXMETER
+   0x710a => { part => 'RFXMETER', method => \&TRX_WEATHER_common_rfxmeter, },
   );
 
 # --------------------------------------------
@@ -634,6 +642,121 @@ sub TRX_WEATHER_common_bbq {
   return @res;
 }
 
+#########################################
+# From xpl-perl/lib/xPL/Util.pm:
+sub RFXMETER_hi_nibble {
+  ($_[0]&0xf0)>>4;
+}
+sub RFXMETER_lo_nibble {
+  $_[0]&0xf;
+}
+sub RFXMETER_nibble_sum {
+  my $c = $_[0];
+  my $s = 0;
+  foreach (0..$_[0]-1) {
+    $s += RFXMETER_hi_nibble($_[1]->[$_]);
+    $s += RFXMETER_lo_nibble($_[1]->[$_]);
+  }
+  $s += RFXMETER_hi_nibble($_[1]->[$_[0]]) if (int($_[0]) != $_[0]);
+  return $s;
+}
+#####################################
+
+sub TRX_WEATHER_common_rfxmeter {
+  my $typeDev = shift;
+  my $longids = shift;
+  my $bytes = shift;
+  
+  my $dev_type;
+
+  my %devname =
+    (  # HEXSTRING => "NAME"
+      0x00 => "RFXMETER",
+  );
+
+  if (exists $devname{$bytes->[1]}) {
+    $dev_type = $devname{$bytes->[1]};
+  } else {
+    my $subtype = sprintf "%02x", $bytes->[1];
+    Log3 undef, 3, "TRX_WEATHER: common_rfxmeter error undefined subtype=$subtype";
+    my @res = ();
+    return @res;
+  }
+
+  my $dev_str = $dev_type;
+  $dev_str .= $DOT.sprintf("%d", $bytes->[3]);
+
+  my @res = ();
+
+  # hexline debugging
+  if ($TRX_HEX_debug) {
+    my $hexline = ""; for (my $i=0;$i<@$bytes;$i++) { $hexline .= sprintf("%02x",$bytes->[$i]);} 
+    push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
+  }
+
+  if ( ($bytes->[3] + ($bytes->[4]^0xf)) != 0xff) {
+    Log 4, "RFXMETER: check1 failed";
+    return @res;
+  }
+  
+  my $type = RFXMETER_hi_nibble($bytes->[5]);
+  Log 4, "RFXMETER: type=$type";
+
+  my $check = RFXMETER_lo_nibble($bytes->[5]);
+  Log 4, "RFXMETER: check=$check";
+
+# we would do the parity check here but I wasn't able to find the parity bits in the msg
+# I will just assume the parity check was done inside the RfxTrx already
+#  my $nibble_sum = RFXMETER_nibble_sum(5.5, $bytes);
+#  my $parity = 0xf^($nibble_sum&0xf);
+#  unless ($parity == $check) {
+#    warn "RFXMeter parity error $parity != $check\n";
+#    return @res;
+#  }
+
+  my $type_str =
+      [
+       'normal data packet',
+       'new interval time set',
+       'calibrate value',
+       'new address set',
+       'counter value reset to zero',
+       'set 1st digit of counter value integer part',
+       'set 2nd digit of counter value integer part',
+       'set 3rd digit of counter value integer part',
+       'set 4th digit of counter value integer part',
+       'set 5th digit of counter value integer part',
+       'set 6th digit of counter value integer part',
+       'counter value set',
+       'set interval mode within 5 seconds',
+       'calibration mode within 5 seconds',
+       'set address mode within 5 seconds',
+       'identification packet',
+      ]->[$type];
+      
+  unless ($type == 0) {
+    warn "Unsupported rfxmeter message $type_str\n";
+    return @res;
+  }
+  
+  # the byte order of the actual value is different from the original RfxMeter protocol
+  # again I assume this was done by RfxTrx
+  my $current = ($bytes->[6] << 16)  + ($bytes->[7] << 8)  + ($bytes->[8]);
+  Log 4, "TRX_WEATHER: current=$current";
+
+  # I could not make sense of all bytes of the message. Example message:
+  # 7100 29 8676 00 016cd8 69
+  # adr  ?? ID   ?? data   ??
+  
+  push @res, {
+       device => $dev_str,
+       type => 'rfxmeter',
+       current => $current,
+       units => ''
+  };
+    
+  return @res;
+}
 
 # --------------------------------------------------------------------
 # T R X _ W E A T H E R _ c o m m o n _ t e m p
@@ -1773,6 +1896,15 @@ TRX_WEATHER_Parse($$)
 			$sensor = "demand";
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
+   	elsif ($i->{type} eq "rfxmeter") {
+            my $current = $i->{current};
+            $current = $current * $def->{scale_current} if (defined($def->{scale_current}));
+            Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name co2 ".$i->{current}." ".$i->{units};
+            $val .= (defined($def->{value_label}) ? $def->{value_label} : "V") . ": " .$current . " ";
+            
+            my $label = defined($def->{value_label}) ? lc $def->{value_label} : "meter";
+            readingsBulkUpdate($def, $label, $current);
+    }
 	else { 
 		Log3 $name, 1, "TRX_WEATHER: name=$name device=$device_name UNKNOWN Type: ".$i->{type}." Value: ".$i->{current} 
 	}

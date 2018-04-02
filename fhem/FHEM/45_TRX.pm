@@ -29,6 +29,7 @@
 #
 #	CHANGELOG
 #	
+#	02.04.2018	support for vair CO2 sensors (forum #67734) -Thanks to vbs
 #	29.03.2018	Summary for Commandref
 #
 #
@@ -67,10 +68,10 @@ TRX_Initialize($)
   $hash->{Clients} =
         ":TRX_WEATHER:TRX_SECURITY:TRX_LIGHT:TRX_ELSE:";
   my %mc = (
-    "1:TRX_WEATHER"   	=> "^..(40|4e|50|51|52|54|55|56|57|58|5a|5b|5c|5d).*",
+    "1:TRX_WEATHER"   	=> "^..(40|4e|50|51|52|54|55|56|57|58|5a|5b|5c|5d|71).*",
     "2:TRX_SECURITY" 	=> "^..(20).*", 
     "3:TRX_LIGHT"	=> "^..(10|11|12|13|14|15|16|17|18|19).*", 
-    "4:TRX_ELSE"   	=> "^..(0[0-9a-f]|1[a-f]|2[1-9a-f]|3[0-9a-f]|4[1-9a-d]|4f|53|59|5e|5f|[6-9a-f][0-9a-f]).*",
+    "4:TRX_ELSE"   	=> "^..(0[0-9a-f]|1[a-f]|2[1-9a-f]|3[0-9a-f]|4[1-9a-d]|4f|53|59|5e|5f|6[0-9a-f]|70|7[2-9a-f]|[8-9a-f][0-9a-f]).*",
   );
   $hash->{MatchList} = \%mc;
 

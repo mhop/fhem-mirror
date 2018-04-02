@@ -32,6 +32,7 @@
 #
 #	CHANGELOG
 #	
+#	02.04.2018	support for vair CO2 sensors (forum #67734) -Thanks to vbs
 #	29.03.2018	Summary for Commandref
 #
 #
@@ -49,7 +50,7 @@ TRX_ELSE_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^..(0[0-9a-f]|1[a-f]|2[1-9a-f]|3[0-9a-f]|4[1-9a-d]|4f|53|59|5e|5f|[6-9a-f][0-9a-f]).*";
+  $hash->{Match}     = "^..(0[0-9a-f]|1[a-f]|2[1-9a-f]|3[0-9a-f]|4[1-9a-d]|4f|53|59|5e|5f|6[0-9a-f]|70|7[2-9a-f]|[8-9a-f][0-9a-f]).*";
   $hash->{DefFn}     = "TRX_ELSE_Define";
   $hash->{UndefFn}   = "TRX_ELSE_Undef";
   $hash->{ParseFn}   = "TRX_ELSE_Parse";
