@@ -862,6 +862,7 @@ sub freezemon_callFn($@) {
 ###################################
 sub freezemon_unwrap_all($) {
     my ($hash) = @_;
+	my $name = $hash->{NAME};
     Log3( "", 0, "[Freezemon] $name: Unwrapping CallFn" );
     {
         no warnings;
