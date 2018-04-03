@@ -673,7 +673,7 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     var newDef = typeof cm !== 'undefined' ?
                  cm.getValue() : $(this).closest("form").find("textarea").val();
     var cmd = $(this).attr("name")+"="+$(this).attr("value")+" "+newDef;
-    var isDef = true;
+    var isDef = true, reloadIfOk = false;
 
     if(newDef == undefined || $(this).attr("value").indexOf("modify") != 0) {
       isDef = false;
@@ -685,9 +685,12 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
       var ifid = (devName+"-"+arg).replace(/([^_a-z0-9])/gi,
                                    function(m){ return "\\"+m });
       if($(".dval[informid="+ifid+"]").length == 0) {
-        log("PSC reload");
-        $(this).unbind('click').click();// No element found to replace, reload
-        return;
+        if(cmd == "attr") {
+          reloadIfOk = true;
+        } else {
+          $(this).unbind('click').click();// No element found to replace, reload
+          return;
+        }
       }
       newDef = $(this).closest("form").find("input:text").val();
       if(newDef == undefined)
@@ -696,6 +699,8 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     }
 
     FW_cmd(FW_root+"?"+encodeURIComponent(cmd)+"&XHR=1", function(resp){
+      if(!resp && reloadIfOk)
+        location.reload();
       if(resp) {
         resp = FW_htmlQuote(resp);
         if(resp.indexOf("\n") >= 0)
