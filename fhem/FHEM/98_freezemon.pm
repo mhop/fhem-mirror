@@ -592,7 +592,7 @@ sub freezemon_Attr($) {
                 my $path = $1;
                 $path =~ s/%L/$attr{global}{logdir}/g if ( $path =~ m/%/ && $attr{global}{logdir} );
                 if ( opendir( DH, $path ) ) {
-                    freezemon_install_log_wrapper($hash) if ( !isDisabled($name) );
+                    freezemon_install_log_wrapper($hash) if ( !IsDisabled($name) );
                     closedir(DH);
                 }
                 else {
