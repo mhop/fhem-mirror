@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.4.3";
+my $HOMEMODE_version = "1.4.4";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -3081,7 +3081,8 @@ sub HOMEMODE_EventCommands($$$$)
       my $summary;
       my $description = "";
       my $t = time();
-      foreach (Calendar_GetEvents($defs{$cal},$t,undef,undef))
+      my @filters = ( { ref => \&filter_true, param => undef } );
+      foreach (Calendar_GetEvents($defs{$cal},$t,@filters))
       {
         next unless ($_->{uid} eq $event);
         $summary = $_->{summary};
@@ -3384,7 +3385,8 @@ sub HOMEMODE_CalendarEvents($$)
   else
   {
     my $t = time();
-    foreach (Calendar_GetEvents($defs{$cal},$t,undef,undef))
+    my @filters = ( { ref => \&filter_true, param => undef } );
+    foreach (Calendar_GetEvents($defs{$cal},$t,@filters))
     {
       my $evt = $_->{summary};
       Log3 $name,5,"Calendar_GetEvents event: $evt";
