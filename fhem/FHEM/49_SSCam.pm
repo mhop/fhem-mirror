@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 3.8.0  03.04.2018    new reading PresetHome, setHome command, minor fixes
 # 3.7.0  26.03.2018    minor details of setPreset changed, new command delPreset
 # 3.6.0  25.03.2018    setPreset command, changed SSCam_wdpollcaminfo, SSCam_getcaminfoall
 # 3.5.0  22.03.2018    new get command listPresets
@@ -212,7 +213,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.7.0";
+my $SSCamVersion = "3.8.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -568,9 +569,10 @@ sub SSCam_Set($@) {
 				 "optimizeParams ".
                  "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_open,lastsnap_fw ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setPreset ": "").
+                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
                  "stopView:noArg ".
-                 ((ReadingsVal("$name", "CapPTZObjTracking", 0) != 0) ? "startTracking:noArg " : "").
-                 ((ReadingsVal("$name", "CapPTZObjTracking", 0) != 0) ? "stopTracking:noArg " : "").
+                 ((ReadingsVal("$name", "CapPTZObjTracking", "false") ne "false") ? "startTracking:noArg " : "").
+                 ((ReadingsVal("$name", "CapPTZObjTracking", "false") ne "false") ? "stopTracking:noArg " : "").
                  ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
@@ -860,6 +862,12 @@ sub SSCam_Set($@) {
       $hash->{HELPER}{PNAME}   = $prop1?$prop1:$prop;  # wenn keine Presetname angegeben -> Presetnummer als Name verwenden
       $hash->{HELPER}{PSPEED}  = $prop2 if($prop2);
 	  SSCam_setPreset($hash);
+                
+  } elsif ($opt eq "setHome" && SSCam_IsModelCam($hash)) {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      if (!$prop) {return "Function \"$opt\" needs a \"Presetname\" as argument";}      
+      $hash->{HELPER}{SETHOME} = $prop;
+      SSCam_setHome($hash);
                 
   } elsif ($opt eq "delPreset" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -1771,6 +1779,55 @@ sub SSCam_delPreset($) {
 		
     } else {
         InternalTimer(gettimeofday()+1.4, "SSCam_delPreset", $hash, 0);
+    }    
+}
+
+###############################################################################
+#                       Preset Home setzen
+###############################################################################
+sub SSCam_setHome($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $errorcode;
+    my $error;
+    
+    RemoveInternalTimer($hash, "SSCam_setHome");
+    return if(IsDisabled($name));
+    
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+        }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = SSCam_experror($hash,$errorcode);
+
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        Log3($name, 2, "$name - ERROR - Home preset of Camera $camname can't be set - $error");
+        
+        return;
+    }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {             
+        $hash->{OPMODE} = "setHome";
+        $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+		
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        
+        SSCam_getapisites($hash);
+		
+    } else {
+        InternalTimer(gettimeofday()+1.2, "SSCam_setHome", $hash, 0);
     }    
 }
 
@@ -3279,6 +3336,15 @@ sub SSCam_camop ($) {
       # einen Preset löschen
 	  $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"DelPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{DELPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
    
+   } elsif ($OpMode eq "setHome") {
+      # aktuelle Position als Home setzen
+      if($hash->{HELPER}{SETHOME} eq "---currentPosition---") {
+          $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetHome\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+      } else {
+          my $bindpos = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{SETHOME}};
+	      $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetHome\"&bindPosition=\"$bindpos\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+      }
+      
    } elsif ($OpMode eq "startTrack") {
       # Object Tracking einschalten
 	  $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&cameraId=\"$camid\"&_sid=\"$sid\"";
@@ -3779,6 +3845,16 @@ sub SSCam_camop_parse ($) {
                 
                 my $dp = $hash->{HELPER}{DELPRESETNAME};               
                 Log3($name, 3, "$name - Preset \"$dp\" of camera \"$camname\" was deleted successfully");
+                SSCam_getptzlistpreset($hash);
+            
+			} elsif ($OpMode eq "setHome") {              
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                
+                my $sh = $hash->{HELPER}{SETHOME};               
+                Log3($name, 3, "$name - Preset \"$sh\" of camera \"$camname\" was set as Home position");
                 SSCam_getptzlistpreset($hash);
             
 			} elsif ($OpMode eq "setoptpar") { 
@@ -4475,6 +4551,13 @@ sub SSCam_camop_parse ($) {
                     $ptziris = "support continuous operation";
                     }
                 
+                my $pot;
+                if($data->{'data'}{'ptzHasObjTracking'} == 1 || $data->{'data'}{'ptzHasObjTracking'} eq "true") {
+                    $pot = "true";
+                } else {
+                    $pot = "false";
+                }
+                
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CapPTZAutoFocus",$data->{'data'}{'ptzAutoFocus'});
@@ -4485,7 +4568,7 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"CapPTZDirections",$data->{'data'}{'ptzDirection'});
                 readingsBulkUpdate($hash,"CapPTZFocus",$ptzfocus);
                 readingsBulkUpdate($hash,"CapPTZIris",$ptziris);
-                readingsBulkUpdate($hash,"CapPTZObjTracking",$data->{'data'}{'ptzHasObjTracking'});
+                readingsBulkUpdate($hash,"CapPTZObjTracking",$pot);
                 readingsBulkUpdate($hash,"CapPTZPan",$ptzpan);
                 readingsBulkUpdate($hash,"CapPTZPresetNumber",$data->{'data'}{'ptzPresetNumber'});
                 readingsBulkUpdate($hash,"CapPTZTilt",$ptztilt);
@@ -4505,11 +4588,16 @@ sub SSCam_camop_parse ($) {
                 # alle Presets der Kamera mit Id's in Assoziatives Array einlesen
                 # "my" nicht am Anfang deklarieren, sonst wird Hash %allpresets wieder geleert !
                 my %allpresets;
+                my $home = "not set";
                 while ($cnt < $presetcnt) {
                     # my $presid = $data->{'data'}->{'presets'}->[$cnt]->{'id'};
-                    my $presid = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
+                    my $presid   = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
                     my $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
                     $allpresets{$presname} = "$presid";
+                    my $ptype = $data->{'data'}->{'presets'}->[$cnt]->{'type'};
+                    if ($ptype) {
+                        $home = $presname;
+                    }
                     $cnt += 1;
                 }
                     
@@ -4522,6 +4610,7 @@ sub SSCam_camop_parse ($) {
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Presets",$presetlist);
+                readingsBulkUpdate($hash,"PresetHome",$home);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -5166,7 +5255,8 @@ sub SSCam_experror {
 	   <li>show the stored credentials of a device </li>
 	   <li>fetch the Surveillance Station Logs, exploit the newest entry as reading  </li>
 	   <li>Start/Stop Object Tracking (only supported PTZ-Cams with this capability)  </li>
-       <li>Set/Delete a Preset (at PTZ-cameras)  </li>
+       <li>set/delete a Preset (at PTZ-cameras)  </li>
+       <li>set a Preset or current position as Home Preset (at PTZ-cameras)  </li>
     </ul>
    </ul>
    <br>
@@ -5308,7 +5398,8 @@ sub SSCam_experror {
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... runView            </td><td> session: ServeillanceStation - observer with privilege liveview of camera </li></td></tr>
-	  <tr><td><li>set ... setPreset          </td><td> session: ServeillanceStation - observer    </li></td></tr>
+	  <tr><td><li>set ... setHome            </td><td> session: ServeillanceStation - observer    </li></td></tr>
+      <tr><td><li>set ... setPreset          </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - observer    </li></td></tr>      
       <tr><td><li>set ... snapGallery        </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>set ... stopView           </td><td> -                                          </li></td></tr>
@@ -5696,7 +5787,15 @@ sub SSCam_experror {
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; setPreset &lt;PresetNumber&gt; [&lt;PresetName&gt;] [&lt;Speed&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> set &lt;name&gt; setHome &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
+  
+  Set the Home-preset to a predefined preset name "&lt;PresetName&gt;" or the current position of the camera.
+
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; setPreset &lt;PresetNumber&gt; [&lt;PresetName&gt;] [&lt;Speed&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
   
   Sets a Preset with name "&lt;PresetName&gt;" to the current postion of the camera. The speed can be defined 
   optionally (&lt;Speed&gt;). If no PresetName is specified, the PresetNummer is used as name.
@@ -5751,8 +5850,8 @@ sub SSCam_experror {
   <li><b> set &lt;name&gt; startTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM with tracking capability)</li> <br>
   
   Starts object tracking of camera.
-  The command is only available if surveillance station has recognise the object tracking capability of camera
-  (Reading "CapPTZObjTracking != 0").
+  The command is only available if surveillance station has recognised the object tracking capability of camera
+  (Reading "CapPTZObjTracking").
   </ul>
   <br><br>
   
@@ -5760,8 +5859,8 @@ sub SSCam_experror {
   <li><b> set &lt;name&gt; stopTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM with tracking capability)</li> <br>
   
   Stops object tracking of camera.
-  The command is only available if surveillance station has recognise the object tracking capability of camera
-  (Reading "CapPTZObjTracking != 0").
+  The command is only available if surveillance station has recognised the object tracking capability of camera
+  (Reading "CapPTZObjTracking").
   </ul>
   <br><br>
   
@@ -6170,6 +6269,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>LiveStreamUrl </li>     </td><td>- the livestream URL if stream is started (is shown if <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set) </td></tr> 
     <tr><td><li>Patrols</li>            </td><td>- in Synology Surveillance Station predefined patrols (at PTZ-Cameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- shows the state of automatic polling  </td></tr>    
+    <tr><td><li>PresetHome</li>         </td><td>- Name of Home-position (at PTZ-Cameras)  </td></tr>
     <tr><td><li>Presets</li>            </td><td>- in Synology Surveillance Station predefined Presets (at PTZ-Cameras)  </td></tr>
     <tr><td><li>Record</li>             </td><td>- if recording is running = Start, if no recording is running = Stop  </td></tr> 
     <tr><td><li>StmKey</li>             </td><td>- current streamkey. it can be used to open livestreams without session id    </td></tr> 
@@ -6224,6 +6324,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 	  <li>erzeugen einer Gallerie der letzten 1-10 Schnappschüsse (als Popup oder permanentes Device)  </li>
       <li>Start bzw. Stop Objekt Tracking (nur unterstützte PTZ-Kameras mit dieser Fähigkeit)  </li>
       <li>Setzen/Löschen eines Presets (bei PTZ-Kameras)  </li>
+      <li>Setzen der Home-Position (bei PTZ-Kameras)  </li>
      </ul> 
     </ul>
     <br>
@@ -6366,7 +6467,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
       <tr><td><li>set ... off                </td><td> session: ServeillanceStation - Betrachter mit erweiterten Privileg "manuelle Aufnahme" </li></td></tr>
 	  <tr><td><li>set ... runView            </td><td> session: ServeillanceStation - Betrachter mit Privileg Liveansicht für Kamera        </li></td></tr>
       <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
-	  <tr><td><li>set ... setPreset          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+	  <tr><td><li>set ... setHome            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>set ... setPreset          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
 	  <tr><td><li>set ... snapGallery        </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
 	  <tr><td><li>set ... stopView           </td><td> -                                            </li></td></tr>
@@ -6755,7 +6857,16 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; setPreset &lt;PresetNummer&gt; [&lt;PresetName&gt;] [&lt;Speed&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> set &lt;name&gt; setHome &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
+  
+  Setzt die Home-Position der Kamera auf einen vordefinierten Preset "&lt;PresetName&gt;" oder auf die aktuell angefahrene 
+  Position.
+
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> set &lt;name&gt; setPreset &lt;PresetNummer&gt; [&lt;PresetName&gt;] [&lt;Speed&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
   
   Setzt einen Preset mit dem Namen "&lt;PresetName&gt;" auf die aktuell angefahrene Position der Kamera. Optional kann die
   Geschwindigkeit angegeben werden (&lt;Speed&gt;). Ist kein PresetName angegeben, wird die PresetNummer als Name verwendet.
@@ -6809,7 +6920,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   
   Startet Objekt Tracking der Kamera.
   Der Befehl ist nur vorhanden wenn die Surveillance Station die Fähigkeit der Kamera zum Objekt Tracking erkannt hat
-  (Reading "CapPTZObjTracking != 0").
+  (Reading "CapPTZObjTracking").
   </ul>
   <br><br>
   
@@ -6818,7 +6929,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   
   Stoppt Objekt Tracking der Kamera.
   Der Befehl ist nur vorhanden wenn die Surveillance Station die Fähigkeit der Kamera zum Objekt Tracking erkannt hat
-  (Reading "CapPTZObjTracking != 0").
+  (Reading "CapPTZObjTracking").
   </ul>
   <br><br>
 
@@ -7243,7 +7354,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung durch "caminfoall" </td></tr> 
     <tr><td><li>LiveStreamUrl </li>     </td><td>- die LiveStream-Url wenn der Stream gestartet ist. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein) </td></tr> 
     <tr><td><li>Patrols</li>            </td><td>- in Surveillance Station voreingestellte Überwachungstouren (bei PTZ-Kameras)  </td></tr>
-    <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>    
+    <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>
+    <tr><td><li>PresetHome</li>         </td><td>- Name der Home-Position (bei PTZ-Kameras)  </td></tr>    
     <tr><td><li>Presets</li>            </td><td>- in Surveillance Station voreingestellte Positionen (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>Record</li>             </td><td>- Aufnahme läuft = Start, keine Aufnahme = Stop  </td></tr> 
     <tr><td><li>StmKey</li>             </td><td>- aktueller StreamKey. Kann zum öffnen eines Livestreams ohne Session Id genutzt werden.    </td></tr> 
