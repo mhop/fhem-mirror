@@ -530,7 +530,7 @@ sub XiaomiDevice_Set($$@) {
     $list .= " on:noArg off:noArg";
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "VacuumCleaner"){
-    $list  .=  ' start:noArg stop:noArg pause:noArg spot:noArg charge:noArg locate:noArg dnd_enabled:on,off dnd_start dnd_end move remotecontrol:start,stop,forward,left,right reset_consumable:filter,mainbrush,sidebrush,sensors timezone volume:slider,0,1,100 volume_test:noArg';
+    $list  .=  ' start:noArg stop:noArg pause:noArg spot:noArg zone charge:noArg locate:noArg dnd_enabled:on,off dnd_start dnd_end goto move remotecontrol:start,stop,forward,left,right reset_consumable:filter,mainbrush,sidebrush,sensors timezone volume:slider,0,1,100 volume_test:noArg';
     $list  .=  ' carpet_mode:on,off' if($hash->{model} ne "rockrobo.vacuum.v1");
     $list  .=  '  sleep:noArg wakeup:noArg';
 
@@ -701,6 +701,21 @@ sub XiaomiDevice_Set($$@) {
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "app_spot";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_spot","params":[""]}' );
+  }
+  elsif ($cmd eq 'zone')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "app_zoned_clean";
+    my $zone = join("],[", @arg);
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_zoned_clean","params":['.$zone.']}' );
+  }
+  elsif ($cmd eq 'goto')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "app_goto_target";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_goto_target","params":['.$arg[0].']}' );
   }
   elsif ($cmd eq 'pause')
   {
@@ -2771,6 +2786,10 @@ sub XiaomiDevice_DbLog_splitFn($) {
    <br>
    Start spot cleaning
    </li><br>
+  <li><code>zone</code> pointA1,pointA2,pointA3,pointA4 [pointB1,pointB2,pointB3,pointB4]<i>(VacuumCleaner)</i>
+  <br>
+  Start zone cleaning (enter points for one or more valid zones)
+  </li><br>
    <li><code>pause</code> <i>(VacuumCleaner)</i>
    <br>
    Pause cleaning
@@ -2782,6 +2801,10 @@ sub XiaomiDevice_DbLog_splitFn($) {
    <li><code>charge</code> <i>(VacuumCleaner)</i>
    <br>
    Return to dock
+   </li><br>
+   <li><code>goto</code> pointX,pointY <i>(VacuumCleaner)</i>
+   <br>
+   Go to point X/Y (needs to be valid on the map)
    </li><br>
    <li><code>locate</code> <i>(VacuumCleaner)</i>
    <br>
