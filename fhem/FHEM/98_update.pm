@@ -35,7 +35,8 @@ update_Initialize($$)
 {
   my %hash = (
     Fn  => "CommandUpdate",
-    Hlp => "[<fileName>|all|check|force] [http://.../controlfile],update FHEM",
+    Hlp => "[<fileName>|all|check|checktime|force] [http://.../controlfile],".
+                "update FHEM",
   );
   $cmds{update} = \%hash;
 }
@@ -62,9 +63,9 @@ CommandUpdate($$)
   my $src = (defined($args[1]) ? $args[1] : "");
 
   my $ret = eval { "Hello" =~ m/$arg/ };
-  return "first argument must be a valid regexp, all, force or check"
+  return "first argument must be a valid regexp, all, force, check or checktime"
         if($arg =~ m/^[-\?\*]/ || $ret);
-  $arg = lc($arg) if($arg =~ m/^(check|all|force)$/i);
+  $arg = lc($arg) if($arg =~ m/^(check|checktime|all|force)$/i);
 
   $updateInBackground = AttrVal("global","updateInBackground",1);
   $updateInBackground = 0 if($arg ne "all");                                   
@@ -160,7 +161,7 @@ uLog($$)
   if($updateInBackground) {
     Log 1, $arg;
   } else {
-    Log $loglevel, $arg if($updArg ne "check");
+    Log $loglevel, $arg if($updArg ne "check" && $updArg ne "checktime");
     $updRet .= "$arg\n";
   }
 }
@@ -247,9 +248,10 @@ doUpdate($$$$)
   $ctrlFileName = $2;
   $ctrlFileName =~ m/controls_(.*).txt/;
   my $srcName = $1;
+  my $isCheck = ($arg eq "check" || $arg eq "checktime");
 
   if(AttrVal("global", "backup_before_update", 0) &&
-     $arg ne "check" && $curr==1) {
+     !$isCheck && $curr==1) {
     my $cmdret = AnalyzeCommand(undef, "backup startedByUpdate");
     if ($cmdret !~ m/backup done.*/) {
       uLog 1, "Something went wrong during backup: $cmdret";
@@ -271,10 +273,10 @@ doUpdate($$$$)
   ###########################
   # read in & digest the local control file
   my $root = $attr{global}{modpath};
-  my $restoreDir = ($arg eq "check" ? "" : restoreDir_init("update"));
+  my $restoreDir = ($isCheck ? "" : restoreDir_init("update"));
 
   my @locList;
-  if(($arg eq "check" || $arg eq "all") &&
+  if(($isCheck || $arg eq "all") &&
      open(FD, "$root/FHEM/$ctrlFileName")) {
     @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
     close(FD);
@@ -306,7 +308,7 @@ doUpdate($$$$)
   ###########################
   # process the remote controlfile
   my ($nChanged,$nSkipped) = (0,0);
-  my $isSingle = ($arg ne "all" && $arg ne "force"  && $arg ne "check");
+  my $isSingle = ($arg ne "all" && $arg ne "force"  && !$isCheck);
   foreach my $r (@remList) {
     my @r = split(" ", $r, 4);
 
@@ -361,11 +363,13 @@ doUpdate($$$$)
     next if($fName =~ m/commandref.*html/ && $fName !~ m/frame/ && $canJoin);
 
     uLog 1, "List of new / modified files since last update:"
-      if($arg eq "check" && $nChanged == 0);
+      if($isCheck && $nChanged == 0);
 
     $nChanged++;
-    uLog 1, "$r[0] $fName";
-    next if($arg eq "check");
+    my $sfx = ($arg eq "checktime" ? " $r[1]" : "");
+    $sfx =~ s/_.*//;
+    uLog 1, "$r[0] $fName$sfx";
+    next if($isCheck);
 
     my $remFile = upd_getUrl("$basePath/$fName");
     return if(!$remFile); # Error already reported
@@ -398,7 +402,7 @@ doUpdate($$$$)
     uLog 1, "New entries in the CHANGED file:";
     map { uLog 1, $_ } @rl;
   }
-  return if($arg eq "check");
+  return if($isCheck);
 
   if(($arg eq "all" || $arg eq "force") && ($nChanged || $nSkipped)) {
     return if(!upd_writeFile($root, $restoreDir,
@@ -574,7 +578,7 @@ upd_writeFile($$$$)
 <a name="update"></a>
 <h3>update</h3>
 <ul>
-  <code>update [&lt;fileName&gt;|all|check|force]
+  <code>update [&lt;fileName&gt;|all|check|checktime|force]
        [http://.../controlfile]</code>
   <br>or<br>
   <code>update [add source|delete source|list|reset]</code>
@@ -597,6 +601,9 @@ upd_writeFile($$$$)
     <li>The force argument will disregard the local file.</li>
     <li>The check argument will only display the files it would download, and
         the last section of the CHANGED file.</li>
+    <li>checktime is like check, but additionally displays the update 
+        timestamp of the new file, which is usually the version date +1 day.
+        </li>
     <li>Specifying a filename will only download matching files (regexp).</li>
   </ul>
   See also the restore command.<br>
@@ -665,7 +672,7 @@ upd_writeFile($$$$)
 <a name="update"></a>
 <h3>update</h3>
 <ul>
-  <code>update [&lt;fileName&gt;|all|check|force]
+  <code>update [&lt;fileName&gt;|all|check|checktime|force]
         [http://.../controlfile]</code>
   <br>oder<br>
   <code>update [add source|delete source|list|reset]</code>
@@ -692,6 +699,9 @@ upd_writeFile($$$$)
         nicht.</li>
     <li>Das check Argument zeigt die neueren Dateien an, und den letzten
         Abschnitt aus der CHANGED Datei</li>
+    <li>checktime zeigt zus&auml;tzlich zu check den update-Zeitstempel der
+        neuen Datei, &uuml;blicherweise version Zeitstempel +1 Tag.
+        </li>
     <li>Falls man &lt;fileName&gt; spezifiziert, dann werden nur die Dateien
         heruntergeladen, die diesem Regexp entsprechen.</li>
   </ul>
