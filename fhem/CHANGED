@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  49_SSCam: V3.8.2, internal codereview, minor fixes
   - feature: 73_GardenaSmartBridge/74_GardenaSmartDevice: rewrite parts of
              Bridge Modul and add Support for predefined start point
   - feature: 49_SSCam: V3.8.0, new setHome command, minor fixes
