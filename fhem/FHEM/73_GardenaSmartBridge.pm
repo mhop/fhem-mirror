@@ -2,7 +2,7 @@
 # 
 # Developed with Kate
 #
-#  (c) 2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -68,7 +68,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 
 
-my $version = "0.4.2";
+my $version = "1.0.0";
 
 
 
@@ -88,9 +88,10 @@ sub GardenaSmartBridge_WriteReadings($$);
 sub GardenaSmartBridge_ParseJSON($$);
 sub GardenaSmartBridge_getDevices($);
 sub GardenaSmartBridge_getToken($);
-#sub GardenaSmartBridge_InternalTimerGetDeviceData($);
 sub GardenaSmartBridge_createHttpValueStrings($@);
 sub GardenaSmartBridge_Notify($$);
+sub GardenaSmartBridge_StorePassword($$);
+sub GardenaSmartBridge_ReadPassword($);
 
 
 
@@ -117,6 +118,7 @@ sub GardenaSmartBridge_Initialize($) {
                           "disable:1 ".
                           "interval ".
                           "disabledForIntervals ".
+                          "gardenaAccountEmail ".
                           $readingFnAttributes;
     
     foreach my $d(sort keys %{$modules{GardenaSmartBridge}{defptr}}) {
@@ -133,38 +135,26 @@ sub GardenaSmartBridge_Define($$) {
     my @a = split( "[ \t][ \t]*", $def );
 
     
-    return "too few parameters: define <NAME> GardenaSmartBridge <Email> <Passwort>" if( @a != 4 ) ;
+    return "too few parameters: define <NAME> GardenaSmartBridge" if( @a < 2 or @a > 4 );
     return "Cannot define Gardena Bridge device. Perl modul ${missingModul}is missing." if ( $missingModul );
     
     my $name                = $a[0];
-    my $user                = $a[2];
-    my $pass                = $a[3];
     $hash->{BRIDGE}         = 1;
     $hash->{URL}            = 'https://sg-api.dss.husqvarnagroup.net/sg-1';
     $hash->{VERSION}        = $version;
     $hash->{INTERVAL}       = 300;
     $hash->{NOTIFYDEV}      = "global,$name";
-    
-    my $username            = GardenaSmartBridge_encrypt($user);
-    my $password            = GardenaSmartBridge_encrypt($pass);
-    
-    ## Ausgabe geändert wegen Forumempfehlung #85801
-    #Log3 $name, 3, "GardenaSmartBridge ($name) - encrypt $user/$pass to $username/$password" if($user ne $username || $pass ne $password);
-    Log3 $name, 3, "GardenaSmartBridge ($name) - encrypt username and password" if($user ne $username || $pass ne $password);
-    $hash->{DEF} = "$username $password";
-    
-    $hash->{helper}{username} = $username;
-    $hash->{helper}{password} = $password;
-    
 
 
-    $attr{$name}{room} = "GardenaSmart" if( !defined( $attr{$name}{room} ) );
+    CommandAttr(undef,$name.' room GardenaSmart') if( AttrVal($name,'room','none') eq 'none' );
     
-    readingsSingleUpdate($hash,'state','initialized',1);
+    CommandDefMod(undef,$name.' '.$hash->{TYPE}) if(@a > 2);      # fix new define
+
     readingsSingleUpdate($hash,'token','none',1);
-    Log3 $name, 3, "GardenaSmartBridge ($name) - defined GardenaSmartBridge and crypt your credentials";
+    readingsSingleUpdate($hash,'state','initialized',1);
     
-    
+    Log3 $name, 3, "GardenaSmartBridge ($name) - defined GardenaSmartBridge";
+
     $modules{GardenaSmartBridge}{defptr}{BRIDGE} = $hash;
 
     return undef;
@@ -175,7 +165,10 @@ sub GardenaSmartBridge_Undef($$) {
     my ( $hash, $arg ) = @_;
 
 
+    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    
     RemoveInternalTimer($hash);
+    setKeyValue($index,undef);
     delete $modules{GardenaSmartBridge}{defptr}{BRIDGE} if( defined($modules{GardenaSmartBridge}{defptr}{BRIDGE}) );
 
     return undef;
@@ -251,12 +244,14 @@ sub GardenaSmartBridge_Notify($$) {
                                                     and (grep /^INITIALIZED$/,@{$events}
                                                         or grep /^DEFINED.$name$/,@{$events}
                                                         or grep /^MODIFIED.$name$/,@{$events}
+                                                        or grep /^ATTR.$name.gardenaAccountEmail.+/,@{$events}
                                                     )
                                                 )
                                                 
                                             or 
                                                 ($devtype eq 'GardenaSmartBridge'
-                                                    and ReadingsVal('$devname','token','') eq 'none')
+                                                    and (grep /^gardenaAccountPassword.+/,@{$events}
+                                                    or ReadingsVal('$devname','token','') eq 'none') )
                                             );
 
     GardenaSmartBridge_getDevices($hash) if ( $devtype eq 'Global'
@@ -279,48 +274,35 @@ sub GardenaSmartBridge_Notify($$) {
 sub GardenaSmartBridge_Set($@) {
     
     my ($hash, $name, $cmd, @args) = @_;
-    my ($arg, @params) = @args;
+    #my ($arg, @params) = @args;
     
     
     if( lc $cmd eq 'getdevicesstate' ) {
-    
         GardenaSmartBridge_getDevices($hash);
         
     } elsif( lc $cmd eq 'gettoken' ) {
-    
+        return "please set Attribut gardenaAccountEmail first" if(AttrVal($name,'gardenaAccountEmail','none') eq 'none');
+        return "please set gardenaAccountPassword first" if( not defined(GardenaSmartBridge_ReadPassword($hash)) );
         return "token is up to date" if( defined($hash->{helper}{session_id}) );
+        
         GardenaSmartBridge_getToken($hash);
+        
+    } elsif( lc $cmd eq 'gardenaaccountpassword' ) {
+        return "please set Attribut gardenaAccountEmail first" if(AttrVal($name,'gardenaAccountEmail','none') eq 'none');
+        return "usage: $cmd <password>" if( @args != 1 );
+        
+        my $passwd = join(' ',@args);
+        GardenaSmartBridge_StorePassword($hash,$passwd);
     
     } else {
     
-        my $list = "getDevicesState:noArg getToken:noArg";
+        my $list    = "getDevicesState:noArg getToken:noArg" if( defined(GardenaSmartBridge_ReadPassword($hash)) );
+        $list       .= " gardenaAccountPassword" if( not defined(GardenaSmartBridge_ReadPassword($hash)) );
         return "Unknown argument $cmd, choose one of $list";
     }
     
     return undef;
 }
-
-# sub GardenaSmartBridge_InternalTimerGetDeviceData($) {
-# 
-#     my $hash    = shift;
-#     my $name    = $hash->{NAME};
-#     
-#     
-#     #RemoveInternalTimer($hash);
-#     
-#     if( not IsDisabled($name) ) {
-#     
-#         GardenaSmartBridge_getDevices($hash);
-#         Log3 $name, 4, "GardenaSmartBridge ($name) - set internal timer function for recall InternalTimerGetDeviceData sub";
-#         
-#     } else {
-#     
-#         readingsSingleUpdate($hash,'state','disabled',1);
-#         Log3 $name, 3, "GardenaSmartBridge ($name) - device is disabled";
-#     }
-#     
-#     InternalTimer( gettimeofday()+$hash->{INTERVAL},"GardenaSmartBridge_InternalTimerGetDeviceData", $hash);
-# }
 
 sub GardenaSmartBridge_Write($@) {
 
@@ -399,7 +381,7 @@ sub GardenaSmartBridge_ErrorHandling($$$) {
         }
     }
 
-    if( $data eq "" and exists( $param->{code} ) && $param->{code} != 200 ) {
+    if( $data eq "" and exists( $param->{code} ) and $param->{code} != 200 ) {
         
         readingsBeginUpdate( $dhash );
         readingsBulkUpdate( $dhash, "state", $param->{code}, 1 ) if( ReadingsVal( $dname, "state", 1 ) ne "initialized" );
@@ -531,7 +513,7 @@ sub GardenaSmartBridge_ResponseProcessing($$) {
             GardenaSmartBridge_WriteReadings($hash,$location);
         }
         
-        Log3 $name, 3, "GardenaSmartBridge ($name) - processed locations id. ID ist " . $hash->{helper}{locations_id};
+        Log3 $name, 3, "GardenaSmartBridge ($name) - processed locations id. ID is " . $hash->{helper}{locations_id};
         GardenaSmartBridge_Write($hash,undef,undef,undef);
         
         return;
@@ -608,6 +590,8 @@ sub GardenaSmartBridge_getDevices($) {
     my $name    = $hash->{NAME};
     
     
+    RemoveInternalTimer($hash);
+    
     if( not IsDisabled($name) ) {
 
         GardenaSmartBridge_Write($hash,undef,undef,undef);
@@ -623,52 +607,91 @@ sub GardenaSmartBridge_getToken($) {
 
     my $hash    = shift;
     my $name    = $hash->{NAME};
-    
+
+
+    return readingsSingleUpdate($hash,'state','please set Attribut gardenaAccountEmail first',1) if(AttrVal($name,'gardenaAccountEmail','none') eq 'none');
+    return readingsSingleUpdate($hash,'state','please set gardena account password first',1) if( not defined(GardenaSmartBridge_ReadPassword($hash)) );
     readingsSingleUpdate($hash,'state','get token',1);
-    
+
     delete $hash->{helper}{session_id}      if( defined($hash->{helper}{session_id}) and $hash->{helper}{session_id} );
     delete $hash->{helper}{user_id}         if( defined($hash->{helper}{user_id}) and $hash->{helper}{user_id} );
     delete $hash->{helper}{locations_id}    if( defined($hash->{helper}{locations_id}) and $hash->{helper}{locations_id} );
         
-    GardenaSmartBridge_Write($hash,'"sessions": {"email": "'.GardenaSmartBridge_decrypt($hash->{helper}{username}).'","password": "'.GardenaSmartBridge_decrypt($hash->{helper}{password}).'"}',undef,undef);
+    GardenaSmartBridge_Write($hash,'"sessions": {"email": "'.AttrVal($name,'gardenaAccountEmail','none').'","password": "'.GardenaSmartBridge_ReadPassword($hash).'"}',undef,undef);
     
     Log3 $name, 3, "GardenaSmartBridge ($name) - send credentials to fetch Token and locationId";
 }
 
-sub GardenaSmartBridge_encrypt($) {
+sub GardenaSmartBridge_StorePassword($$) {
+    
+    my ($hash, $password) = @_;
+    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    my $key = getUniqueId().$index;
+    my $enc_pwd = "";
 
-    my ($decoded) = @_;
-    my $key = getUniqueId();
-    my $encoded;
-
-    return $decoded if( $decoded =~ /crypt:/ );
-
-    for my $char (split //, $decoded) {
-        my $encode = chop($key);
-        $encoded .= sprintf("%.2x",ord($char)^ord($encode));
-        $key = $encode.$key;
+    
+    if(eval "use Digest::MD5;1") {
+    
+        $key = Digest::MD5::md5_hex(unpack "H*", $key);
+        $key .= Digest::MD5::md5_hex($key);
     }
+    
+    for my $char (split //, $password) {
+    
+        my $encode=chop($key);
+        $enc_pwd.=sprintf("%.2x",ord($char)^ord($encode));
+        $key=$encode.$key;
+    }
+    
+    my $err = setKeyValue($index, $enc_pwd);
+    return "error while saving the password - $err" if(defined($err));
 
-    return 'crypt:'.$encoded;
+    return "password successfully saved";
 }
 
-sub GardenaSmartBridge_decrypt($) {
+sub GardenaSmartBridge_ReadPassword($) {
+    
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    my $key = getUniqueId().$index;
+    my ($password, $err);
 
-    my ($encoded) = @_;
-    my $key = getUniqueId();
-    my $decoded;
+    
+    Log3 $name, 4, "GardenaSmartBridge ($name) - Read password from file";
+    
+    ($err, $password) = getKeyValue($index);
 
-    return $encoded if( $encoded !~ /crypt:/ );
-  
-    $encoded = $1 if( $encoded =~ /crypt:(.*)/ );
-
-    for my $char (map { pack('C', hex($_)) } ($encoded =~ /(..)/g)) {
-        my $decode = chop($key);
-        $decoded .= chr(ord($char)^ord($decode));
-        $key = $decode.$key;
+    if ( defined($err) ) {
+    
+        Log3 $name, 3, "GardenaSmartBridge ($name) - unable to read password from file: $err";
+        return undef;
+        
     }
-
-    return $decoded;
+    
+    if ( defined($password) ) {
+        if ( eval "use Digest::MD5;1" ) {
+        
+            $key = Digest::MD5::md5_hex(unpack "H*", $key);
+            $key .= Digest::MD5::md5_hex($key);
+        }
+        
+        my $dec_pwd = '';
+        
+        for my $char (map { pack('C', hex($_)) } ($password =~ /(..)/g)) {
+        
+            my $decode=chop($key);
+            $dec_pwd.=chr(ord($char)^ord($decode));
+            $key=$decode.$key;
+        }
+        
+        return $dec_pwd;
+        
+    } else {
+    
+        Log3 $name, 3, "GardenaSmartBridge ($name) - No password in file";
+        return undef;
+    }
 }
 
 sub GardenaSmartBridge_ParseJSON($$) {
@@ -684,11 +707,11 @@ sub GardenaSmartBridge_ParseJSON($$) {
     
     if($buffer) {
         foreach my $c (split //, $buffer) {
-            if($open == $close && $open > 0) {
+            if($open == $close and $open > 0) {
                 $tail .= $c;
-                Log3 $name, 5, "GardenaSmartBridge ($name) - $open == $close && $open > 0";
+                Log3 $name, 5, "GardenaSmartBridge ($name) - $open == $close and $open > 0";
                 
-            } elsif(($open == $close) && ($c ne '{')) {
+            } elsif(($open == $close) and ($c ne '{')) {
             
                 Log3 $name, 5, "GardenaSmartBridge ($name) - Garbage character before message: " . $c;
         
@@ -741,7 +764,16 @@ sub GardenaSmartBridge_createHttpValueStrings($@) {
     $uri                            .= '/sessions'                                                          if( not defined($hash->{helper}{session_id}));
     
     if( defined($hash->{helper}{locations_id}) ) {
-        $uri                            .= '/devices/' . $deviceId . '/abilities/' . $abilities . '/command'    if( defined($abilities) and defined($payload) );
+        #$uri                            .= '/devices/' . $deviceId . '/abilities/' . $abilities . '/command'    if( defined($abilities) and defined($payload) );
+        if ( defined($abilities) and $abilities eq 'mower_settings') {
+        
+            $method   = 'PUT';
+            my $dhash = $modules{GardenaSmartDevice}{defptr}{$deviceId};
+            $uri                            .= '/devices/' . $deviceId . '/settings/' . $dhash->{helper}{STARTINGPOINTID}   if( defined($abilities) and defined($payload) and $abilities eq 'mower_settings');      
+        } else {
+            $uri                            .= '/devices/' . $deviceId . '/abilities/' . $abilities . '/command'    if( defined($abilities) and defined($payload) and $abilities ne 'mower_settings');        
+        }
+        
         $uri                            .= '?locationId=' . $hash->{helper}{locations_id};
     }
 

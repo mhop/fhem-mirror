@@ -2,12 +2,13 @@
 # 
 # Developed with Kate
 #
-#  (c) 2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
 #       - Michael (mbrak)       Thanks for Commandref
 #       - Matthias (Kenneth)    Thanks for Wiki entry
+#       - BioS                  Thanks for predefined start points Code
 #
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -65,7 +66,7 @@ use Time::Local;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.4.1";
+my $version = "1.0.0";
 
 
 
@@ -81,6 +82,7 @@ sub GardenaSmartDevice_Parse($$);
 sub GardenaSmartDevice_ReadingLangGerman($$);
 sub GardenaSmartDevice_RigRadingsValue($$);
 sub GardenaSmartDevice_Zulu2LocalString($);
+sub GardenaSmartDevice_SetPredefinedStartPoints($@);
 
 
 
@@ -111,25 +113,26 @@ sub GardenaSmartDevice_Initialize($) {
 
 sub GardenaSmartDevice_Define($$) {
 
-    my ( $hash, $def ) = @_;
-    my @a = split( "[ \t]+", $def );
+    my ( $hash, $def )                  = @_;
+    my @a                               = split( "[ \t]+", $def );
 
     return "too few parameters: define <NAME> GardenaSmartDevice <device_Id> <model>" if( @a < 3 ) ;
     return "Cannot define Gardena Bridge device. Perl modul $missingModul is missing." if ( $missingModul );
 
     
-    my $name            = $a[0];
-    my $deviceId        = $a[2];
-    my $category        = $a[3];
+    my $name                            = $a[0];
+    my $deviceId                        = $a[2];
+    my $category                        = $a[3];
     
-    $hash->{DEVICEID}   = $deviceId;
-    $hash->{VERSION}    = $version;
+    $hash->{DEVICEID}                   = $deviceId;
+    $hash->{VERSION}                    = $version;
+    $hash->{helper}{STARTINGPOINTID}    = '';
 
     
     
     CommandAttr(undef,"$name IODev $modules{GardenaSmartBridge}{defptr}{BRIDGE}->{NAME}") if(AttrVal($name,'IODev','none') eq 'none');
 
-    my $iodev           = AttrVal($name,'IODev','none');
+    my $iodev                           = AttrVal($name,'IODev','none');
     
     AssignIoPort($hash,$iodev) if( !$hash->{IODev} );
     
@@ -144,11 +147,13 @@ sub GardenaSmartDevice_Define($$) {
     my $d = $modules{GardenaSmartDevice}{defptr}{$deviceId};
     
     return "GardenaSmartDevice device $name on GardenaSmartBridge $iodev already defined."
-    if( defined($d) && $d->{IODev} == $hash->{IODev} && $d->{NAME} ne $name );
+    if( defined($d) and $d->{IODev} == $hash->{IODev} and $d->{NAME} ne $name );
     
     
-    $attr{$name}{room}          = "GardenaSmart"    if( not defined( $attr{$name}{room} ) );
-    $attr{$name}{model}         = $category         if( not defined( $attr{$name}{model} ) );
+    #$attr{$name}{room}          = "GardenaSmart"    if( not defined( $attr{$name}{room} ) );
+    CommandAttr(undef,$name.' room GardenaSmart') if( AttrVal($name,'room','none') eq 'none');
+    #$attr{$name}{model}         = $category         if( not defined( $attr{$name}{model} ) );
+    CommandAttr(undef,$name.' model '.$category) if( AttrVal($name,'model','none') eq 'none');
     
     Log3 $name, 3, "GardenaSmartDevice ($name) - defined GardenaSmartDevice with DEVICEID: $deviceId";
     readingsSingleUpdate($hash,'state','initialized',1);
@@ -182,7 +187,7 @@ sub GardenaSmartDevice_Attr(@) {
 sub GardenaSmartDevice_Set($@) {
     
     my ($hash, $name, $cmd, @args) = @_;
-    my ($arg, @params) = @args;
+    #my ($arg, @params) = @args;
     
     my $payload;
     my $abilities;
@@ -205,7 +210,13 @@ sub GardenaSmartDevice_Set($@) {
     
         my $duration     = join( " ", @args );
         $payload    = '"name":"start_override_timer","parameters":{"duration":' . $duration . '}';
-    
+
+    } elsif( lc $cmd eq 'startpoint' ) {
+        my $err;
+        
+        ($err,$payload,$abilities)   = GardenaSmartDevice_SetPredefinedStartPoints($hash,@args);
+        return $err if( defined($err) );
+
     ### watering_computer
     } elsif( lc $cmd eq 'manualoverride' ) {
     
@@ -232,33 +243,18 @@ sub GardenaSmartDevice_Set($@) {
             $payload    = '"name":"measure_humidity"';
             $abilities  = 'humidity';
         }
-    
-    } elsif( lc $cmd eq '' ) {
-    
-    } elsif( lc $cmd eq '' ) {
-    
-    } elsif( lc $cmd eq '' ) {
-    
-    } elsif( lc $cmd eq '' ) {
-    
-    
-    } elsif( lc $cmd eq '' ) {
-    
-    
-    } elsif( lc $cmd eq '' ) {
-    
-    
+
     } else {
     
         my $list    = '';
-        $list       .= 'parkUntilFurtherNotice:noArg parkUntilNextTimer:noArg startResumeSchedule:noArg startOverrideTimer:slider,0,60,1440' if( AttrVal($name,'model','unknown') eq 'mower' );
+        $list       .= 'parkUntilFurtherNotice:noArg parkUntilNextTimer:noArg startResumeSchedule:noArg startOverrideTimer:slider,0,60,1440 startpoint' if( AttrVal($name,'model','unknown') eq 'mower' );
         $list       .= 'manualOverride:slider,0,1,59 cancelOverride:noArg' if( AttrVal($name,'model','unknown') eq 'watering_computer' );
         $list       .= 'refresh:temperature,light' if( AttrVal($name,'model','unknown') eq 'sensor' );
         
         return "Unknown argument $cmd, choose one of $list";
     }
     
-    $abilities  = 'mower' if( AttrVal($name,'model','unknown') eq 'mower' );
+    $abilities  = 'mower' if( AttrVal($name,'model','unknown') eq 'mower' ) and $abilities ne 'mower_settings';
     $abilities  = 'outlet' if( AttrVal($name,'model','unknown') eq 'watering_computer' );
     
     
@@ -310,10 +306,11 @@ sub GardenaSmartDevice_Parse($$) {
 
 sub GardenaSmartDevice_WriteReadings($$) {
 
-    my ($hash,$decode_json)     = @_;
+    my ($hash,$decode_json) = @_;
     
-    my $name                    = $hash->{NAME};
-    my $abilities               = scalar (@{$decode_json->{abilities}});
+    my $name                = $hash->{NAME};
+    my $abilities           = scalar (@{$decode_json->{abilities}});
+    my $settings            = scalar (@{$decode_json->{settings}});
 
     
     readingsBeginUpdate($hash);
@@ -344,6 +341,27 @@ sub GardenaSmartDevice_WriteReadings($$) {
 
         $abilities--;
     } while ($abilities >= 0);
+
+
+    do {
+        
+        if( ref($decode_json->{settings}[$settings]{value}) eq "ARRAY" and $decode_json->{settings}[$settings]{name} eq 'starting_points' ) {;
+            #save the startingpointid needed to update the startingpoints
+            if ($hash->{helper}{STARTINGPOINTID} ne $decode_json->{settings}[$settings]{id}) {
+                $hash->{helper}{STARTINGPOINTID} = $decode_json->{settings}[$settings]{id};
+            }
+            
+            $hash->{helper}{STARTINGPOINTS} = '{ "name": "starting_points", "value": '. encode_json($decode_json->{settings}[$settings]{value}) . '}';
+            my $startpoint_cnt = 0;
+            
+            foreach my $startingpoint (@{$decode_json->{settings}[$settings]{value}}) {
+                $startpoint_cnt++;
+                readingsBulkUpdateIfChanged($hash,'startpoint-'.$startpoint_cnt.'-enabled',$startingpoint->{enabled});
+            }
+        }
+
+        $settings--;
+    } while ($settings >= 0);
     
     
     readingsBulkUpdate($hash,'state',ReadingsVal($name,'mower-status','readingsValError')) if( AttrVal($name,'model','unknown') eq 'mower' );
@@ -509,6 +527,52 @@ sub GardenaSmartDevice_Zulu2LocalString($) {
     }
 }
 
+sub GardenaSmartDevice_SetPredefinedStartPoints($@) {
+
+    my ($hash,$startpoint_state,$startpoint_num,@morestartpoints)   = @_;
+    my $name                                                        = $hash->{NAME};
+    my $payload;
+    my $abilities;
+
+
+    if (defined($startpoint_state) and defined($startpoint_num) ) {
+            if (defined($hash->{helper}{STARTINGPOINTS}) and $hash->{helper}{STARTINGPOINTS} ne '') {
+                # add needed parameters to saved settings config and change the value in request
+                my $decode_json_settings = eval{decode_json($hash->{helper}{STARTINGPOINTS})};
+                if($@){
+                    Log3 $name, 3, "GardenaSmartBridge ($name) - JSON error while setting startpoint: $@";
+                }
+                
+                $decode_json_settings->{device} = $hash->{DEVICEID};
+                my $setval = $startpoint_state eq 'disable' ? \0 : \1;
+                $decode_json_settings->{value}[$startpoint_num-1]{enabled} = $setval;
+              
+                #set more startpoints
+                if (defined scalar(@morestartpoints) and (scalar(@morestartpoints) == 2 or scalar(@morestartpoints) == 4 )) {
+                    if (scalar(@morestartpoints) == 2) {
+                        $setval = $morestartpoints[0] eq 'disable' ? \0 : \1;
+                        $decode_json_settings->{value}[$morestartpoints[1]-1]{enabled} = $setval;
+                  
+                    } elsif (scalar(@morestartpoints) == 4) {
+                        $setval = $morestartpoints[0] eq 'disable' ? \0 : \1;
+                        $decode_json_settings->{value}[$morestartpoints[1]-1]{enabled} = $setval;
+                        $setval = $morestartpoints[2] eq 'disable' ? \0 : \1;
+                        $decode_json_settings->{value}[$morestartpoints[3]-1]{enabled} = $setval;
+                    }
+                }
+              
+                $payload = '"settings": '. encode_json($decode_json_settings);
+                $abilities = 'mower_settings';
+            } else {
+                return "startingpoints not loaded yet, please wait a couple of minutes",undef,undef;
+            }
+        } else {
+            return "startpoint usage: set ".$hash->{NAME}." startpoint disable 1 [enable 2] [disable 3]",undef,undef;
+        }
+
+    return undef,$payload,$abilities;
+}
+
 
 
 
@@ -654,8 +718,13 @@ sub GardenaSmartDevice_Zulu2LocalString($) {
     <ul>
         <li>parkUntilFurtherNotice</li>
         <li>parkUntilNextTimer</li>
-        <li>startOverrideTimer - 0 to 59 Minutes</li>
+        <li>startOverrideTimer - (in minutes, 60 = 1h, 1440 = 24h, 4320 = 72h)</li>
         <li>startResumeSchedule</li>
+        <li>startpoint enable|disable 1|2|3 - enables or disables one or more predefined start points</li>
+        <ul>
+            <li>set NAME startpoint enable 1</li>
+            <li>set NAME startpoint disable 3 enable 1</li>
+        </ul>
     </ul>
 </ul>
 
@@ -793,8 +862,13 @@ sub GardenaSmartDevice_Zulu2LocalString($) {
     <ul>
         <li>parkUntilFurtherNotice - Parken des M&auml;hers unter Umgehung des Zeitplans</li>
         <li>parkUntilNextTimer - Parken bis zum n&auml;chsten Zeitplan</li>
-        <li>startOverrideTimer - Manuelles m&auml;hen (0 bis 59 Minuten)</li>
+        <li>startOverrideTimer - Manuelles m&auml;hen (in Minuten, 60 = 1h, 1440 = 24h, 4320 = 72h)</li>
         <li>startResumeSchedule - Weiterf&uuml;hrung des Zeitplans</li>
+        <li>startpoint enable|disable 1|2|3 - Aktiviert oder deaktiviert einen vordefinierten Startbereich</li>
+        <ul>
+            <li>set NAME startpoint enable 1</li>
+            <li>set NAME startpoint disable 3 enable 1</li>
+        </ul>
     </ul>
 </ul>
 
