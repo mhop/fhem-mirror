@@ -357,7 +357,7 @@ ZWCUL_assignId($$$$)
     $myHash = 1;
   }
   ZWCUL_Write($hash, $hash->{homeIdSet}, 
-          sprintf("0013%s080103%s%s####", $oldNodeId, $newNodeId, $newHomeId));
+          sprintf("0013%s080103%s%s0000", $oldNodeId, $newNodeId, $newHomeId));
   delete $modules{ZWave}{defptr}{$key} if($myHash);
 }
 
@@ -463,7 +463,7 @@ ZWCUL_Parse($$$$$)
 
     if($P =~ m/^0101(......)(..)..(.*)/) {
       my ($nodeInfo, $type6, $classes) = ($1, $2, $3);
-      $rmsg = sprintf("004a0003%s####%s##%s", $S, $2, $3);
+      $rmsg = sprintf("004a0003%s0000%s00%s", $S, $2, $3);
 
     } else {
       $rmsg = sprintf("0004%s%s%02x%s", $S, $S, length($P)/2, $P);
@@ -484,13 +484,13 @@ ZWCUL_Parse($$$$$)
 
       ZWCUL_tmp9600($hash, 0);
       $hash->{homeId} = $hash->{homeIdSet};
-      Dispatch($hash, sprintf("004a0003%s####%s##%s",
+      Dispatch($hash, sprintf("004a0003%s0000%s00%s",
                         $hash->{addNode}, $type6, $classes), \%addvals);
 
       my $node = ZWCUL_getNode($hash, $hash->{addNode});
       if($node) { # autocreated a node
         readingsSingleUpdate($node, "nodeInfo", $nodeInfo, 0);
-        Dispatch($hash, sprintf("004a0005%s##", $hash->{addNode}), \%addvals);
+        Dispatch($hash, sprintf("004a0005%s00", $hash->{addNode}), \%addvals);
       }
 
       delete $hash->{addNode};
