@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 3.8.3  05.04.2018    bugfix V3.8.2, $OpMode "Start" changed
 # 3.8.2  04.04.2018    $attr replaced by AttrVal, SSCam_wdpollcaminfo redesigned
 # 3.8.1  04.04.2018    some codereview like new sub SSCam_jboolmap
 # 3.8.0  03.04.2018    new reading PresetHome, setHome command, minor fixes
@@ -215,7 +216,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.8.2";
+my $SSCamVersion = "3.8.3";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -359,6 +360,7 @@ sub SSCam_Define($@) {
   }
   $hash->{HELPER}{ACTIVE}              = "off";                                  # Funktionstoken "off", Funktionen können sofort starten
   $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";                                    # Loggingfunktion für Polling ist an
+  $hash->{HELPER}{OLDVALPOLL}          = "0";  
   $hash->{HELPER}{RECTIME_DEF}         = "15";                                   # Standard für rectime setzen, überschreibbar durch Attribut "rectime" bzw. beim "set .. on-for-time"
   
   readingsBeginUpdate($hash);
@@ -515,18 +517,26 @@ sub SSCam_Attr($$$$) {
         RemoveInternalTimer($hash, "SSCam_getsvsinfo");
         InternalTimer(gettimeofday()+0.5, "SSCam_getsvsinfo", $hash, 0);
     }
+    
+    if($aName =~ m/pollcaminfoall/ && $init_done == 1) {
+        RemoveInternalTimer($hash, "SSCam_getcaminfoall");
+        InternalTimer(gettimeofday()+1.0, "SSCam_getcaminfoall", $hash, 0);
+        RemoveInternalTimer($hash, "SSCam_wdpollcaminfo");
+        InternalTimer(gettimeofday()+1.5, "SSCam_wdpollcaminfo", $hash, 0);
+    }
+    
+    if($aName =~ m/pollnologging/ && $init_done == 1) {
+        RemoveInternalTimer($hash, "SSCam_wdpollcaminfo");
+        InternalTimer(gettimeofday()+1.0, "SSCam_wdpollcaminfo", $hash, 0);
+    } 
                          
     if ($cmd eq "set") {
         if ($aName =~ m/httptimeout|snapGalleryColumns|rectime|pollcaminfoall/) {
             unless ($aVal =~ /^\d+$/) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
         }
-        if($aName =~ m/pollcaminfoall/ && $aVal <= 10) {
-            return "The value of \"$aName\" has to be greater than 10 seconds."
-        }
-        if($aName =~ m/pollcaminfoall|pollnologging/ && $init_done == 1) {
-            RemoveInternalTimer($hash, "SSCam_wdpollcaminfo");
-            InternalTimer(gettimeofday()+1.0, "SSCam_wdpollcaminfo", $hash, 0);
-        }        
+        if($aName =~ m/pollcaminfoall/) {
+            return "The value of \"$aName\" has to be greater than 10 seconds." if($aVal <= 10);
+        }         
     }
 
     if ($cmd eq "del") {
@@ -534,11 +544,7 @@ sub SSCam_Attr($$$$) {
 		    # Polling nicht ausschalten wenn snapGalleryBoost ein (regelmäßig neu einlesen)
 			return "Please switch off \"snapGalleryBoost\" first if you want to deactivate \"pollcaminfoall\" because the functionality of \"snapGalleryBoost\" depends on retrieving snapshots periodical." 
 		       if(AttrVal($name,"snapGalleryBoost",0));
-        }
-        if($aName =~ m/pollcaminfoall|pollnologging/ && $init_done == 1) {
-            RemoveInternalTimer($hash, "SSCam_wdpollcaminfo");
-            InternalTimer(gettimeofday()+1.0, "SSCam_wdpollcaminfo", $hash, 0);
-        }         
+        }       
     }
 	
 	
@@ -1241,7 +1247,7 @@ sub SSCam_wdpollcaminfo ($) {
     }    
     
     # Polling prüfen
-    if (defined($pcia) && !IsDisabled($name)) {
+    if ($pcia && !IsDisabled($name)) {
         if(ReadingsVal($name, "PollState", "Active") eq "Inactive") {
             readingsSingleUpdate($hash,"PollState","Active",1);                             # Polling ist jetzt aktiv
             readingsSingleUpdate($hash,"state","polling",1) if(!SSCam_IsModelCam($hash));   # Polling-state bei einem SVS-Device setzten
@@ -1261,9 +1267,9 @@ sub SSCam_wdpollcaminfo ($) {
         
     }
     
-    if (defined($hash->{HELPER}{OLDVALPOLL}) && defined($pcia)) {
+    if (defined($hash->{HELPER}{OLDVALPOLL}) && $pcia) {
         if ($hash->{HELPER}{OLDVALPOLL} != $pcia) {
-            Log3($name, 3, "$name - Polling of $camname was changed to new Pollinginterval: $pcia s");
+            Log3($name, 3, "$name - Pollinginterval of $camname has been changed to: $pcia s");
             $hash->{HELPER}{OLDVALPOLL} = $pcia;
         }
     }
@@ -2194,16 +2200,18 @@ sub SSCam_getcaminfoall ($$) {
 	# wenn gesetzt = manuelle Abfrage
     # return if ($mode);                # 24.03.2018 geänd.
     
-    if (defined($attr{$name}{pollcaminfoall})) {        
-        $new = gettimeofday()+$attr{$name}{pollcaminfoall}; 
+    my $pcia = AttrVal($name,"pollcaminfoall",0);
+    my $pnl  = AttrVal($name,"pollnologging",0);
+    if ($pcia) {        
+        $new = gettimeofday()+$pcia; 
         InternalTimer($new, "SSCam_getcaminfoall", $hash, 0);
 		
 		$now = FmtTime(gettimeofday());
-        $new = FmtTime(gettimeofday()+$attr{$name}{pollcaminfoall});
+        $new = FmtTime(gettimeofday()+$pcia);
 		readingsSingleUpdate($hash,"state","polling",1) if(!SSCam_IsModelCam($hash));  # state für SVS-Device setzen
 		readingsSingleUpdate($hash,"PollState","Active - next time: $new",1);  
         
-        if (!$attr{$name}{pollnologging}) {
+        if (!$pnl) {
             Log3($name, 3, "$name - Polling now: $now , next Polling: $new");
         }
     
@@ -3664,6 +3672,7 @@ sub SSCam_camop_parse ($) {
 
         if ($success) {       
             # Kameraoperation entsprechend "OpMode" war erfolgreich                
+            
             if ($OpMode eq "Start") {                             
                 # Die Aufnahmezeit setzen
                 # wird "set <name> on [rectime]" verwendet -> dann [rectime] nutzen, 
@@ -3671,11 +3680,7 @@ sub SSCam_camop_parse ($) {
                 if (defined($hash->{HELPER}{RECTIME_TEMP})) {
                     $rectime = delete $hash->{HELPER}{RECTIME_TEMP};
                 } else {
-                    if (defined($attr{$name}{rectime}) && AttrVal($name,"rectime", undef) == 0) {
-                        $rectime = 0;
-                    } else {
-                        $rectime = AttrVal($name, "rectime", undef) ? AttrVal($name, "rectime", undef) : $hash->{HELPER}{RECTIME_DEF};
-                    }
+                    $rectime = AttrVal($name, "rectime", $hash->{HELPER}{RECTIME_DEF});
                 }
                 
                 if ($rectime == "0") {
@@ -4750,7 +4755,7 @@ sub SSCam_login ($$) {
   # sid in Quotes einschliessen oder nicht -> bei Problemen mit 402 - Permission denied
   my $sid = AttrVal($name, "noQuotesForSID", "0") == 1 ? "sid" : "\"sid\"";
   
-  if (defined($attr{$name}{session}) and $attr{$name}{session} eq "SurveillanceStation") {
+  if (AttrVal($name,"session","DSM") eq "SurveillanceStation") {
       $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
       $urlwopw = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
   } else {
@@ -4878,7 +4883,7 @@ sub SSCam_logout ($) {
    $httptimeout = AttrVal($name,"httptimeout",4);
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
-   if (defined($attr{$name}{session}) and $attr{$name}{session} eq "SurveillanceStation") {
+   if (AttrVal($name,"session","DSM") eq "SurveillanceStation") {
        $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&session=SurveillanceStation&_sid=$sid";
    } else {
        $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&_sid=$sid";
@@ -5109,7 +5114,8 @@ return ($ret);
 }
 
 ###############################################################################
-#   Schnappschußgalerie zusammenstellen
+#                   Schnappschußgalerie zusammenstellen
+###############################################################################
 sub composegallery ($;$$) { 
   my ($name,$wlname) = @_;
   my $hash     = $defs{$name};
