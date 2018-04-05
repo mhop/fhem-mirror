@@ -87,7 +87,7 @@ sub xs1Bridge_Define($$) {
 	
 	$hash->{STATE} = "Initialized";		## Der Status des Modules nach Initialisierung.
 	$hash->{TIME} = time();				## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.20";			## Version
+	$hash->{VERSION} = "1.21";			## Version
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
@@ -176,8 +176,14 @@ sub xs1Bridge_Attr(@) {
 			}
 		### Blacklist - Aktor / Sensor ###
 		}elsif ($attrName eq "xs1_blackl_aktor") {			## Handling xs1_blackl_aktor
-				Log3 $name, 4, "$typ: Attribut xs1_blackl_aktor $attrValue";
+			if ($attrValue < 1 || $attrValue > 64) {		## Value only 1 to 64
+				return "Value must be 1 to 64";
+			}
+			Log3 $name, 4, "$typ: Attribut xs1_blackl_aktor $attrValue";
 		}elsif ($attrName eq "xs1_blackl_sensor") {			## Handling xs1_blackl_sensor
+			if ($attrValue < 1 || $attrValue > 64) {		## Value only 1 to 64
+				return "Value must be 1 to 64";
+			}
 			Log3 $name, 4, "$typ: Attribut xs1_blackl_sensor $attrValue";
 		}
 	}
@@ -333,7 +339,7 @@ sub xs1Bridge_GetUpDate() {
 					
 					foreach my $f ( @array ) {
 						$i3++;
-						$xs1_id = $f->{"id"};
+						$xs1_id = $i3;
 						
 						#### Test ob Aktoren / Sensoren auf xs1_blackl
 						if ($f->{"type"} ne "disabled" && is_in_array($hash,$xs1_id,$i) == 0) {
