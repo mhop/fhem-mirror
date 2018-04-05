@@ -27,7 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
-# 3.8.3  05.04.2018    bugfix V3.8.2, $OpMode "Start" changed
+# 3.8.3  05.04.2018    bugfix V3.8.2, $OpMode "Start" changed, composegallery changed
 # 3.8.2  04.04.2018    $attr replaced by AttrVal, SSCam_wdpollcaminfo redesigned
 # 3.8.1  04.04.2018    some codereview like new sub SSCam_jboolmap
 # 3.8.0  03.04.2018    new reading PresetHome, setHome command, minor fixes
@@ -5132,16 +5132,16 @@ sub composegallery ($;$$) {
 				 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
   $lupt =~ s/ / \/ /;
   
-  my $ha = AttrVal($name, "snapGalleryHtmlAttr", undef)?AttrVal($name, "snapGalleryHtmlAttr", undef):AttrVal($name, "htmlattr", 'width="500" height="325"');
-
+  my $ha = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
+  
   # falls "composegallery" durch ein mit "createSnapGallery" angelegtes Device aufgerufen wird
   my ($devWlink,$wlhash,$wlha,$wlalias);
   if ($wlname) {
-      $wlalias  = $attr{$wlname}{alias}?$attr{$wlname}{alias}:$wlname;   # Linktext als Aliasname oder Devicename setzen
+      $wlalias  = AttrVal($wlname, "alias", $wlname);   # Linktext als Aliasname oder Devicename setzen
       $devWlink = "<a href=\"/fhem?detail=$wlname\">$wlalias</a>"; 
       $wlhash   = $defs{$wlname};
-      $wlha     = $attr{$wlname}{htmlattr}; 
-      $ha       = (defined($wlha))?$wlha:$ha;  # htmlattr vom weblink-Device übernehmen falls von wl-Device aufgerufen und gesetzt   
+      $wlha     = AttrVal($wlname, "htmlattr", undef); 
+      $ha       = (defined($wlha))?$wlha:$ha;           # htmlattr vom weblink-Device übernehmen falls von wl-Device aufgerufen und gesetzt   
   } else {
       $devWlink = " ";
   }
