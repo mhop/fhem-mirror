@@ -744,9 +744,9 @@ Telegram</label>
 	<Project sr="proj0" ve="2">
 		<cdate>1502789371413</cdate>
 		<name>AMAD</name>
-		<pids>1025,1023,1014,1011,971,1030,1016,1071,1019,1010,1021,1020,1024,1026,1035,1008,1029,1022,1006,1028,1015,1017,1007,1013,53,1065,1005</pids>
+		<pids>1014,1028,1008,1013,1020,1015,1019,1022,971,1010,1021,1016,1071,1006,1007,53,1029,1030,1065,1024,1017,1005,1011,1025,1035,1026,1023</pids>
 		<scenes>AMAD_Dialog_Message,AMAD_settings</scenes>
-		<tids>924,948,960,935,950,916,987,995,1004,923,946,985,850,997,992,999,970,994,914,965,979,963,996,967,940,972,918,998,990,955,1036,982,1031,936,974,951,962,939,989,973,977,954,993,945,1002,920,991,937,975,949,1055,1063,927,976,959,956,953,1001,984,941,966,932,947,981,931,944,958,1072,986,969,934,1000,938,968,983,961,980,943,957,1003,978,1066,926,964,922,988,942,925</tids>
+		<tids>924,975,954,945,998,960,999,976,935,937,948,940,1002,946,958,922,1004,956,961,991,995,992,967,957,914,973,997,943,916,979,1063,939,1003,982,950,955,977,1001,987,1036,996,923,974,980,936,926,969,983,959,964,920,918,962,986,949,1066,1072,947,1031,1000,932,990,984,993,981,989,938,978,941,951,934,972,850,927,925,966,963,985,994,970,1055,944,968,965,931,953,988,942</tids>
 		<Kid sr="Kid">
 			<feat0>android.hardware.camera:y</feat0>
 			<feat1>android.hardware.bluetooth:y</feat1>
@@ -1841,7 +1841,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task1004">
 		<cdate>1503693866986</cdate>
-		<edate>1522175968545</edate>
+		<edate>1522954652823</edate>
 		<id>1004</id>
 		<nme>AMAD_SetCommands</nme>
 		<pri>100</pri>
@@ -2311,14 +2311,37 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Int sr="arg1" val="1"/>
 		</Action>
 		<Action sr="act137" ve="7">
-			<code>38</code>
+			<code>43</code>
+			<label>setBrightnessMode</label>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%command</lhs>
+					<op>2</op>
+					<rhs>setBrightnessMode</rhs>
+				</Condition>
+			</ConditionList>
 		</Action>
 		<Action sr="act138" ve="7">
-			<code>38</code>
+			<code>808</code>
+			<Int sr="arg0" val="1"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_brightnessmode</lhs>
+					<op>2</op>
+					<rhs>1</rhs>
+				</Condition>
+			</ConditionList>
 		</Action>
 		<Action sr="act139" ve="7">
-			<code>43</code>
-			<label>wrong ID</label>
+			<code>808</code>
+			<Int sr="arg0" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%tpe_brightnessmode</lhs>
+					<op>2</op>
+					<rhs>0</rhs>
+				</Condition>
+			</ConditionList>
 		</Action>
 		<Action sr="act14" ve="7">
 			<code>39</code>
@@ -2326,11 +2349,21 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<Str sr="arg1" ve="3">%valueall()</Str>
 		</Action>
 		<Action sr="act140" ve="7">
+			<code>38</code>
+		</Action>
+		<Action sr="act141" ve="7">
+			<code>38</code>
+		</Action>
+		<Action sr="act142" ve="7">
+			<code>43</code>
+			<label>wrong ID</label>
+		</Action>
+		<Action sr="act143" ve="7">
 			<code>548</code>
 			<Str sr="arg0" ve="3">AMAD: Befehl mit falscher AMAD_ID empfangen</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
-		<Action sr="act141" ve="7">
+		<Action sr="act144" ve="7">
 			<code>38</code>
 		</Action>
 		<Action sr="act15" ve="7">
@@ -8104,7 +8137,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 	</Task>
 	<Task sr="task960">
 		<cdate>1502789397309</cdate>
-		<edate>1522175922571</edate>
+		<edate>1522954308255</edate>
 		<id>960</id>
 		<nme>AMAD_informations</nme>
 		<pri>100</pri>
@@ -8121,7 +8154,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<code>547</code>
 			<label>flowsetVersionAtDevice</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">"flowsetVersionAtDevice": "Tasker v0.26"</Str>
+			<Str sr="arg1" ve="3">"flowsetVersionAtDevice": "4.2.2 (Tasker)"</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>

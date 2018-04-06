@@ -60,8 +60,8 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 
-my $modulversion = "4.2.3";
-my $flowsetversion = "4.2.1";
+my $modulversion = "4.2.4";
+my $flowsetversion = "4.2.2";
 
 
 
@@ -550,6 +550,13 @@ sub AMADDevice_Set($$@) {
         $method = "POST";
     }
     
+    elsif( lc $cmd eq 'screenbrightnessmode' ) {
+        my $mode = join( " ", @args );
+
+        $path   = "/fhem-amad/setCommands/setBrightnessMode?brightnessmode=".($mode eq 'on' ? 1 : 0);
+        $method = "POST";
+    }
+    
     elsif( lc $cmd eq 'screen' ) {
         my $mod = join( " ", @args );
 
@@ -773,7 +780,7 @@ sub AMADDevice_Set($$@) {
             $list .= $_ . ':' . join(',',@playerList) . ' ';
         }
         
-        $list .= "screenMsg ttsMsg screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState userFlowRun sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg takePicture:noArg takeScreenshot:noArg";
+        $list .= "screenMsg ttsMsg screenBrightnessMode:on,off screenBrightness:slider,0,1,255 screen:on,off,lock,unlock openURL nextAlarmTime:time timer:slider,1,1,60 statusRequest:noArg bluetooth:on,off notifySndFile clearNotificationBar:All,Automagic activateVoiceInput:noArg vibrate:noArg sendIntent openCall closeCall:noArg currentFlowsetUpdate:noArg installFlowSource doNotDisturb:never,always,alarmClockOnly,onlyImportant userFlowState userFlowRun sendSMS startDaydream:noArg volumeUp:noArg volumeDown:noArg mute:on,off showHomeScreen:noArg takePicture:noArg takeScreenshot:noArg";
 
         $list .= " screenOrientation:auto,landscape,portrait"   if( AttrVal( $name, "setScreenOrientation", "0" ) eq "1" );
         $list .= " screenFullscreen:on,off"                     if( AttrVal( $name, "setFullscreen", "0" ) eq "1" );
@@ -1103,6 +1110,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>powerPlugged - 0=no/1,2=yes, power supply connected</li>
     <li>screen - on locked,unlocked/off locked,unlocked, state of display</li>
     <li>screenBrightness - 0-255, level of screen-brightness</li>
+    <li>screenBrightnessMode - Adaptive brightness on,off</li>
     <li>screenFullscreen - on/off, full screen mode (Automagic only)</li>
     <li>screenOrientation - Landscape/Portrait, screen orientation (horizontal,vertical)</li>
     <li>screenOrientationMode - auto/manual, mode for screen orientation</li>
@@ -1135,6 +1143,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>notifySndFile - plays a media-file <b>which by default needs to be stored in the folder "/storage/emulated/0/Notifications/" of the Android device. You may use the attribute setNotifySndFilePath for defining a different folder.</b></li>
     <li>openCall - initial a call and hang up after optional time / set DEVICE openCall 0176354 10 call this number and hang up after 10s</li>
     <li>screenBrightness - 0-255, set screen brighness</li>
+    <li>screenBrightnessMode - turn Adaptive brightness on,off</li>
     <li>screenMsg - display message on screen of Android device</li>
     <li>sendintent - send intent string <u>Example:</u><i> set $AMADDEVICE sendIntent org.smblott.intentradio.PLAY url http://stream.klassikradio.de/live/mp3-192/stream.klassikradio.de/play.m3u name Klassikradio</i>, first parameter contains the action, second parameter contains the extra. At most two extras can be used.</li>
     <li>sendSMS - Sends an SMS to a specific phone number. Bsp.: sendSMS Dies ist ein Test|555487263</li>
@@ -1290,6 +1299,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>powerPlugged - Netzteil angeschlossen? 0=NEIN, 1|2=JA</li>
     <li>screen - on locked/unlocked, off locked/unlocked gibt an ob der Bildschirm an oder aus ist und gleichzeitig gesperrt oder nicht gesperrt</li>
     <li>screenBrightness - Bildschirmhelligkeit von 0-255</li>
+    <li>screenBrightnessMode - Adaptive Helligkeit on,off</li>
     <li>screenFullscreen - on/off, Vollbildmodus (An,Aus) (nur Automagic)</li>
     <li>screenOrientation - Landscape,Portrait, Bildschirmausrichtung (Horizontal,Vertikal)</li>
     <li>screenOrientationMode - auto/manual, Modus f&uuml;r die Ausrichtung (Automatisch, Manuell)</li>
@@ -1321,6 +1331,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>nextAlarmTime - setzt die Alarmzeit. gilt aber nur innerhalb der n&auml;chsten 24Std.</li>
     <li>openCall - ruft eine Nummer an und legt optional nach X Sekunden auf / set DEVICE openCall 01736458 10 / ruft die Nummer an und beendet den Anruf nach 10s</li>
     <li>screenBrightness - setzt die Bildschirmhelligkeit, von 0-255.</li>
+    <li>screenBrightnessMode - schaltet die Adaptive Helligkeit on,off</li>
     <li>screenMsg - versendet eine Bildschirmnachricht</li>
     <li>sendintent - sendet einen Intentstring <u>Bsp:</u><i> set $AMADDeviceDEVICE sendIntent org.smblott.intentradio.PLAY url http://stream.klassikradio.de/live/mp3-192/stream.klassikradio.de/play.m3u name Klassikradio</i>, der erste Befehl ist die Aktion und der zweite das Extra. Es k&ouml;nnen immer zwei Extras mitgegeben werden.</li>
     <li>sendSMS - sendet eine SMS an eine bestimmte Telefonnummer. Bsp.: sendSMS Dies ist ein Test|555487263</li>
