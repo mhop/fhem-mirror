@@ -453,7 +453,7 @@ Way the message was sent (BT, Wifi, GCM)
 	<Profile sr="prof1024" ve="2">
 		<cdate>1516830496890</cdate>
 		<clp>true</clp>
-		<edate>1522170694436</edate>
+		<edate>1523024457613</edate>
 		<id>1024</id>
 		<mid0>972</mid0>
 		<nme>AMAD_InformationFlow</nme>
@@ -744,9 +744,9 @@ Telegram</label>
 	<Project sr="proj0" ve="2">
 		<cdate>1502789371413</cdate>
 		<name>AMAD</name>
-		<pids>1014,1028,1008,1013,1020,1015,1019,1022,971,1010,1021,1016,1071,1006,1007,53,1029,1030,1065,1024,1017,1005,1011,1025,1035,1026,1023</pids>
-		<scenes>AMAD_Dialog_Message,AMAD_settings</scenes>
-		<tids>924,975,954,945,998,960,999,976,935,937,948,940,1002,946,958,922,1004,956,961,991,995,992,967,957,914,973,997,943,916,979,1063,939,1003,982,950,955,977,1001,987,1036,996,923,974,980,936,926,969,983,959,964,920,918,962,986,949,1066,1072,947,1031,1000,932,990,984,993,981,989,938,978,941,951,934,972,850,927,925,966,963,985,994,970,1055,944,968,965,931,953,988,942</tids>
+		<pids>53,1015,1071,971,1023,1010,1021,1016,1035,1030,1007,1025,1013,1005,1026,1022,1008,1017,1020,1006,1011,1024,1014,1065,1029,1019,1028</pids>
+		<scenes>AMAD_settings,AMAD_Dialog_Message</scenes>
+		<tids>948,946,960,935,975,1063,985,936,953,1031,977,937,961,989,1004,967,999,997,988,994,979,976,957,980,990,991,918,959,920,850,981,972,932,970,962,969,1001,925,951,950,924,1000,926,986,987,939,996,995,1003,927,1036,974,954,1002,923,940,934,914,955,941,916,956,964,966,963,1072,949,978,944,943,947,942,973,984,958,993,968,998,1066,965,945,982,922,983,938,1055,992,931</tids>
 		<Kid sr="Kid">
 			<feat0>android.hardware.camera:y</feat0>
 			<feat1>android.hardware.bluetooth:y</feat1>
@@ -1841,7 +1841,7 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 	</Task>
 	<Task sr="task1004">
 		<cdate>1503693866986</cdate>
-		<edate>1522954652823</edate>
+		<edate>1523024585084</edate>
 		<id>1004</id>
 		<nme>AMAD_SetCommands</nme>
 		<pri>100</pri>
@@ -2355,15 +2355,26 @@ Only available if you select &amp;lt;b&amp;gt;Continue Task After Error&amp;lt;/
 			<code>38</code>
 		</Action>
 		<Action sr="act142" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_informations</Str>
+			<Int sr="arg1">
+				<var>%priority+1</var>
+			</Int>
+			<Str sr="arg2" ve="3"/>
+			<Str sr="arg3" ve="3"/>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
+		</Action>
+		<Action sr="act143" ve="7">
 			<code>43</code>
 			<label>wrong ID</label>
 		</Action>
-		<Action sr="act143" ve="7">
+		<Action sr="act144" ve="7">
 			<code>548</code>
 			<Str sr="arg0" ve="3">AMAD: Befehl mit falscher AMAD_ID empfangen</Str>
 			<Int sr="arg1" val="1"/>
 		</Action>
-		<Action sr="act144" ve="7">
+		<Action sr="act145" ve="7">
 			<code>38</code>
 		</Action>
 		<Action sr="act15" ve="7">
@@ -8137,7 +8148,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 	</Task>
 	<Task sr="task960">
 		<cdate>1502789397309</cdate>
-		<edate>1522954308255</edate>
+		<edate>1523024368481</edate>
 		<id>960</id>
 		<nme>AMAD_informations</nme>
 		<pri>100</pri>
@@ -8271,6 +8282,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 		<Action sr="act17" ve="7">
 			<code>664</code>
 			<label>Query locked</label>
+			<se>false</se>
 			<Str sr="arg0" ve="3">kgm</Str>
 			<Str sr="arg1" ve="3">CONTEXT</Str>
 			<Str sr="arg2" ve="3">getSystemService
@@ -8286,6 +8298,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 		<Action sr="act18" ve="7">
 			<code>664</code>
 			<label>Query locked</label>
+			<se>false</se>
 			<Str sr="arg0" ve="3">%locked</Str>
 			<Str sr="arg1" ve="3">kgm</Str>
 			<Str sr="arg2" ve="3">inKeyguardRestrictedInputMode
@@ -8368,12 +8381,74 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			</ConditionList>
 		</Action>
 		<Action sr="act22" ve="7">
+			<code>664</code>
+			<se>false</se>
+			<Str sr="arg0" ve="3">cr</Str>
+			<Str sr="arg1" ve="3">CONTEXT</Str>
+			<Str sr="arg2" ve="3">getContentResolver
+{ContentResolver} ()</Str>
+			<Str sr="arg3" ve="3"/>
+			<Str sr="arg4" ve="3"/>
+			<Str sr="arg5" ve="3"/>
+			<Str sr="arg6" ve="3"/>
+			<Str sr="arg7" ve="3"/>
+			<Str sr="arg8" ve="3"/>
+			<Str sr="arg9" ve="3"/>
+		</Action>
+		<Action sr="act23" ve="7">
+			<code>664</code>
+			<se>false</se>
+			<Str sr="arg0" ve="3">%autobright</Str>
+			<Str sr="arg1" ve="3">android.provider.Settings$System</Str>
+			<Str sr="arg2" ve="3">getInt
+{int} (ContentResolver, String)</Str>
+			<Str sr="arg3" ve="3">cr</Str>
+			<Str sr="arg4" ve="3">screen_brightness_mode</Str>
+			<Str sr="arg5" ve="3"/>
+			<Str sr="arg6" ve="3"/>
+			<Str sr="arg7" ve="3"/>
+			<Str sr="arg8" ve="3"/>
+			<Str sr="arg9" ve="3"/>
+		</Action>
+		<Action sr="act24" ve="7">
+			<code>547</code>
+			<label>screenBrightnessMode</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"screenBrightnessMode": "on"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%autobright</lhs>
+					<op>2</op>
+					<rhs>1</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act25" ve="7">
+			<code>547</code>
+			<label>screenBrightnessMode</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"screenBrightnessMode": "off"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%autobright</lhs>
+					<op>2</op>
+					<rhs>0</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act26" ve="7">
 			<code>348</code>
 			<Int sr="arg0" val="1"/>
 			<Str sr="arg1" ve="3"/>
 			<Str sr="arg2" ve="3">%orientation</Str>
 		</Action>
-		<Action sr="act23" ve="7">
+		<Action sr="act27" ve="7">
 			<code>547</code>
 			<label>screenOrientation</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8389,13 +8464,13 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act24" ve="7">
+		<Action sr="act28" ve="7">
 			<code>348</code>
 			<Int sr="arg0" val="0"/>
 			<Str sr="arg1" ve="3"/>
 			<Str sr="arg2" ve="3">%autorotate</Str>
 		</Action>
-		<Action sr="act25" ve="7">
+		<Action sr="act29" ve="7">
 			<code>547</code>
 			<label>screenOrientationMode</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8411,7 +8486,23 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act26" ve="7">
+		<Action sr="act3" ve="7">
+			<code>547</code>
+			<label>airplanemode</label>
+			<Str sr="arg0" ve="3">%setreading</Str>
+			<Str sr="arg1" ve="3">%setreading,"airplanemode": "%AIR"</Str>
+			<Int sr="arg2" val="0"/>
+			<Int sr="arg3" val="0"/>
+			<Int sr="arg4" val="0"/>
+			<ConditionList sr="if">
+				<Condition sr="c0" ve="3">
+					<lhs>%AIR</lhs>
+					<op>12</op>
+					<rhs>\%AIR</rhs>
+				</Condition>
+			</ConditionList>
+		</Action>
+		<Action sr="act30" ve="7">
 			<code>547</code>
 			<label>screenOrientationMode</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8427,7 +8518,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act27" ve="7">
+		<Action sr="act31" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%setstate</Str>
 			<Str sr="arg1" ve="3">inaktiv</Str>
@@ -8435,7 +8526,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act28" ve="7">
+		<Action sr="act32" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%infostate</Str>
 			<Str sr="arg1" ve="3">inaktiv</Str>
@@ -8443,7 +8534,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act29" ve="7">
+		<Action sr="act33" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%setstate</Str>
 			<Str sr="arg1" ve="3">aktiv</Str>
@@ -8470,23 +8561,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act3" ve="7">
-			<code>547</code>
-			<label>airplanemode</label>
-			<Str sr="arg0" ve="3">%setreading</Str>
-			<Str sr="arg1" ve="3">%setreading,"airplanemode": "%AIR"</Str>
-			<Int sr="arg2" val="0"/>
-			<Int sr="arg3" val="0"/>
-			<Int sr="arg4" val="0"/>
-			<ConditionList sr="if">
-				<Condition sr="c0" ve="3">
-					<lhs>%AIR</lhs>
-					<op>12</op>
-					<rhs>\%AIR</rhs>
-				</Condition>
-			</ConditionList>
-		</Action>
-		<Action sr="act30" ve="7">
+		<Action sr="act34" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%infostate</Str>
 			<Str sr="arg1" ve="3">aktiv</Str>
@@ -8507,7 +8582,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act31" ve="7">
+		<Action sr="act35" ve="7">
 			<code>547</code>
 			<label>flow_SetCommands</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8516,7 +8591,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act32" ve="7">
+		<Action sr="act36" ve="7">
 			<code>547</code>
 			<label>flow_informations</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8525,7 +8600,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act33" ve="7">
+		<Action sr="act37" ve="7">
 			<code>547</code>
 			<label>volume</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8541,7 +8616,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act34" ve="7">
+		<Action sr="act38" ve="7">
 			<code>547</code>
 			<label>volumeNotification</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8557,7 +8632,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act35" ve="7">
+		<Action sr="act39" ve="7">
 			<code>664</code>
 			<label>Query Alarm</label>
 			<se>false</se>
@@ -8573,7 +8648,18 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Str sr="arg8" ve="3"/>
 			<Str sr="arg9" ve="3"/>
 		</Action>
-		<Action sr="act36" ve="7">
+		<Action sr="act4" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SDK2Name</Str>
+			<Int sr="arg1">
+				<var>%priority</var>
+			</Int>
+			<Str sr="arg2" ve="3"/>
+			<Str sr="arg3" ve="3"/>
+			<Str sr="arg4" ve="3">%androidversion</Str>
+			<Int sr="arg5" val="0"/>
+		</Action>
+		<Action sr="act40" ve="7">
 			<code>664</code>
 			<label>Query Alarm</label>
 			<se>false</se>
@@ -8589,7 +8675,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Str sr="arg8" ve="3"/>
 			<Str sr="arg9" ve="3"/>
 		</Action>
-		<Action sr="act37" ve="7">
+		<Action sr="act41" ve="7">
 			<code>37</code>
 			<ConditionList sr="if">
 				<Condition sr="c0" ve="3">
@@ -8599,7 +8685,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act38" ve="7">
+		<Action sr="act42" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%blank</Str>
 			<Str sr="arg1" ve="3"> </Str>
@@ -8607,24 +8693,13 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act39" ve="7">
+		<Action sr="act43" ve="7">
 			<code>590</code>
 			<Str sr="arg0" ve="3">%alarm</Str>
 			<Str sr="arg1" ve="3">.,%blank</Str>
 			<Int sr="arg2" val="0"/>
 		</Action>
-		<Action sr="act4" ve="7">
-			<code>130</code>
-			<Str sr="arg0" ve="3">AMAD_SDK2Name</Str>
-			<Int sr="arg1">
-				<var>%priority</var>
-			</Int>
-			<Str sr="arg2" ve="3"/>
-			<Str sr="arg3" ve="3"/>
-			<Str sr="arg4" ve="3">%androidversion</Str>
-			<Int sr="arg5" val="0"/>
-		</Action>
-		<Action sr="act40" ve="7">
+		<Action sr="act44" ve="7">
 			<code>547</code>
 			<label>nextAlarmDay</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8640,7 +8715,7 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act41" ve="7">
+		<Action sr="act45" ve="7">
 			<code>547</code>
 			<label>nextAlarmTime</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8656,10 +8731,10 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 				</Condition>
 			</ConditionList>
 		</Action>
-		<Action sr="act42" ve="7">
+		<Action sr="act46" ve="7">
 			<code>43</code>
 		</Action>
-		<Action sr="act43" ve="7">
+		<Action sr="act47" ve="7">
 			<code>547</code>
 			<label>nextAlarmDay|Time</label>
 			<Str sr="arg0" ve="3">%setreading</Str>
@@ -8668,27 +8743,16 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
 		</Action>
-		<Action sr="act44" ve="7">
+		<Action sr="act48" ve="7">
 			<code>38</code>
 		</Action>
-		<Action sr="act45" ve="7">
+		<Action sr="act49" ve="7">
 			<code>547</code>
 			<Str sr="arg0" ve="3">%fhemcmd</Str>
 			<Str sr="arg1" ve="3">setreading</Str>
 			<Int sr="arg2" val="0"/>
 			<Int sr="arg3" val="0"/>
 			<Int sr="arg4" val="0"/>
-		</Action>
-		<Action sr="act46" ve="7">
-			<code>130</code>
-			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
-			<Int sr="arg1">
-				<var>%priority</var>
-			</Int>
-			<Str sr="arg2" ve="3">%fhemcmd</Str>
-			<Str sr="arg3" ve="3">%setreading</Str>
-			<Str sr="arg4" ve="3"/>
-			<Int sr="arg5" val="0"/>
 		</Action>
 		<Action sr="act5" ve="7">
 			<code>547</code>
@@ -8705,6 +8769,17 @@ Es können mehrere SSIDs durch slash "/" getrennt angegeben werden.</Str>
 					<rhs>\%androidversion</rhs>
 				</Condition>
 			</ConditionList>
+		</Action>
+		<Action sr="act50" ve="7">
+			<code>130</code>
+			<Str sr="arg0" ve="3">AMAD_SendData2CommBridge</Str>
+			<Int sr="arg1">
+				<var>%priority</var>
+			</Int>
+			<Str sr="arg2" ve="3">%fhemcmd</Str>
+			<Str sr="arg3" ve="3">%setreading</Str>
+			<Str sr="arg4" ve="3"/>
+			<Int sr="arg5" val="0"/>
 		</Action>
 		<Action sr="act6" ve="7">
 			<code>547</code>
@@ -9976,7 +10051,7 @@ Hierüber wird festgelegt, über welchen Dienst die setCommands empfangen werden
 	</Task>
 	<Task sr="task972">
 		<cdate>1502904145564</cdate>
-		<edate>1522170694436</edate>
+		<edate>1523024457613</edate>
 		<id>972</id>
 		<pri>100</pri>
 		<Action sr="act0" ve="7">
