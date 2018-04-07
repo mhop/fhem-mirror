@@ -787,7 +787,6 @@ sub HMinfo_tempList(@) { ######################################################
 }
 sub HMinfo_tempListTmpl(@) { ##################################################
   my ($hiN,$filter,$tmpl,$action,$fName)=@_;
-  Log 1,"General ----- $action:$fName";
   $filter = "." if (!$filter);
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
   my $ret = "";
@@ -888,7 +887,7 @@ sub HMinfo_tempListTmplView() { ###############################################
   $ret .= "\ndevices not using tempList templates:\n      =>  "   .join("\n      =>  ",@dWoTmpl) if (@dWoTmpl);
   return $ret;
 }
-sub HMinfo_tempListDefFns(@) { #################################################
+sub HMinfo_tempListDefFns(@) { ################################################
   my ($fn) = shift;
   $fn = "" if (!defined $fn);
   
@@ -906,6 +905,7 @@ sub HMinfo_listOfTempTemplates() { ############################################
   my ($n) =devspec2array("TYPE=HMinfo");
   my $dir = AttrVal($n,"configDir","$attr{global}{modpath}/")."/"; #no dir?  add defDir
   $dir = "./".$dir if ($dir !~ m/^(\.|\/)/);
+  $dir =~ s/\/\//\//g;
   my @tFiles = split('[;,]',AttrVal($n,"configTempFile","tempList.cfg"));
   my $tDefault = $dir.$tFiles[0].":";
   my @tmpl;
@@ -2119,6 +2119,7 @@ sub HMinfo_getConfigFile($$$) {################################################
     $fnt = AttrVal("global","modpath",".")."\/".$fnt  if ($fnt !~ m/^\//);
     push @fns,$fnt;
   }
+  $_ =~ s/\.\/\.\//\.\// foreach(@fns);
   return join(";",@fns);
 }
 
