@@ -108,7 +108,7 @@ sub XiaomiDevice_Initialize($) {
   $hash->{WriteFn}      = "XiaomiDevice_Write";
   $hash->{DbLog_splitFn}= "XiaomiDevice_DbLog_splitFn";
   $hash->{AttrFn}       = "XiaomiDevice_Attr";
-  $hash->{AttrList}     = "subType:AirPurifier,Humidifier,VacuumCleaner,SmartFan,SmartLamp,EyeCare,WaterPurifier,Camera intervalData intervalSettings preset disable:0,1 ".
+  $hash->{AttrList}     = "subType:AirPurifier,Humidifier,VacuumCleaner,SmartFan,SmartLamp,EyeCare,WaterPurifier,Camera intervalData intervalSettings preset disable:0,1 zone_names point_names ".
                           $readingFnAttributes;
                           
 }
@@ -273,6 +273,8 @@ sub XiaomiDevice_Define($$$) {
   $attr{$name}{stateFormat} = "power" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "WaterPurifier" && !defined($attr{$name}{stateFormat}));
   $attr{$name}{stateFormat} = "power" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "Camera" && !defined($attr{$name}{stateFormat}));
 
+  XiaomiDevice_ReadZones($hash) if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "VacuumCleaner");
+
   InternalTimer( gettimeofday() + 10, "XiaomiDevice_Init", $hash, 0);
 
   return undef;
@@ -418,6 +420,7 @@ sub XiaomiDevice_Get($@) {
 
 
   return undef;
+}
 
 #Methods={
 # GetProp:"get_prop",
@@ -463,24 +466,25 @@ sub XiaomiDevice_Get($@) {
 # GetMapUrl:"/home/getmapfileurl",
 # CheckVersion:"/home/checkversion",
 # DeviceStatus:"/home/device_list"},
-
-
+#
 # start_clean // "enable_push", "0";"enable_timer", "1";"enable_timer_off", "0");"enable_timer_on", "1";"identify", ID;"off_method", BuildConfig.FLAVOR);
 # "off_param", "off";"off_time", ?,?;"on_method", "start_clean";"on_param", "on";"on_time", ?,?;
 # upd_timer ID // on/off
 # del_timer ID
-
+#
 #{"method":"get_prop","params":["power","fw_ver","bright","ct","pdo_status","pdo_wt","pdo_bt","kid_mode","lan_ctrl","skey_act","skey_scene_id"]}
 #{"method":"cron_get","params":[0]}
-
+#
 #S=n.STORAGE_KEY="@RockroboVacuum_Clean_v2"+d.deviceId+":key"
-
+#
 #Methods={GetProp:"get_prop",GetStatus:"get_status",GetMap:"get_map",GetMapAndroid:"get_map_v1",GetMapV2:"get_map_v2",GetCustomMode:"get_custom_mode",SetCustomMode:"set_custom_mode",GetCleanSummary:"get_clean_summary",GetCleanRecord:"get_clean_record",GetCleanRecordMap:"get_clean_record_map",GetCleanRecordMapV2:"get_clean_record_map_v2",GetSupplies:"get_consumable",
 #GetTimer:"get_timer",SetTimer:"set_timer",DelTimer:"del_timer",UpdTimer:"upd_timer",GetDndTimer:"get_dnd_timer",SetDndTimer:"set_dnd_timer",CloseDndTimer:"close_dnd_timer",AppStart:"app_start",AppPause:"app_pause",AppSpot:"app_spot",AppCharge:"app_charge",AppRemoteControlMove:"app_rc_move",AppRemoteControlStart:"app_rc_start",AppRemoteControlEnd:"app_rc_end",
 #ResetSupplies:"reset_consumable",TimerStart:"start_clean",GetSerialNumber:"get_serial_number",FindMe:"find_me",EnableLogUpload:"enable_log_upload",GetLogUploadStatus:"get_log_upload_status",SetSoundPackage:"dnld_install_sound",GetSoundPackageProgress:"get_sound_progress",GetCurrentSoundPackage:"get_current_sound",GetTimezone:"get_timezone",SetTimezone:"set_timezone"},
 #_.LogLevel={None:0,BlackBox:1,Pickup:2,Full:4},_.GetMapRetry="retry",_.SmartHomeApi={GetMapUrl:"/home/getmapfileurl",CheckVersion:"/home/checkversion",DeviceStatus:"/home/device_list"},_.CleanMode={38:a.localization_strings_Common_Protocol_0,60:a.localization_strings_Common_Protocol_1,77:a.localization_strings_Common_Protocol_2,90:a.localization_strings_Common_Protocol_3}});
+#
+#zone {"from":"4","id":1164,"method":"app_zoned_clean","params":[[19500,22700,21750,24250,3],[23150,26050,25150,27500,3],[23650,22950,25150,26250,3],[21700,23000,23750,24150,3],[23700,23050,25200,24200,3]]}
+#goto {"from":"4","id":1293,"method":"app_goto_target","params":[21500,25250]}
 
-}
 
 #####################################
 sub XiaomiDevice_Set($$@) {
@@ -530,13 +534,23 @@ sub XiaomiDevice_Set($$@) {
     $list .= " on:noArg off:noArg";
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "VacuumCleaner"){
-    $list  .=  ' start:noArg stop:noArg pause:noArg spot:noArg zone charge:noArg locate:noArg dnd_enabled:on,off dnd_start dnd_end goto move remotecontrol:start,stop,forward,left,right reset_consumable:filter,mainbrush,sidebrush,sensors timezone volume:slider,0,1,100 volume_test:noArg';
-    $list  .=  ' carpet_mode:on,off' if($hash->{model} ne "rockrobo.vacuum.v1");
+    $list  .=  ' start:noArg stop:noArg pause:noArg spot:noArg charge:noArg locate:noArg dnd_enabled:on,off dnd_start dnd_end move remotecontrol:start,stop,forward,left,right reset_consumable:filter,mainbrush,sidebrush,sensors timezone volume:slider,0,1,100 volume_test:noArg';
+    $list  .=  ' carpet_mode:on,off' if(!defined($hash->{model}) || $hash->{model} ne "rockrobo.vacuum.v1");
     $list  .=  '  sleep:noArg wakeup:noArg';
 
     $list  .=  ' fan_power:slider,1,1,100' if(defined($hash->{model}) && $hash->{model} eq "rockrobo.vacuum.v1");
     $list  .=  ' cleaning_mode:quiet,balanced,turbo,max,mop';
     
+    if(defined($hash->{helper}{zone_names})) {
+      $list  .=  ' zone:'.$hash->{helper}{zone_names};
+    } else {
+      $list  .=  ' zone';
+    }
+    if(defined($hash->{helper}{point_names})) {
+      $list  .=  ' goto:'.$hash->{helper}{point_names};
+    } else {
+      $list  .=  ' goto';
+    }
 
     if (defined($hash->{helper}{timers})&&($hash->{helper}{timers}>0))
     {
@@ -707,11 +721,15 @@ sub XiaomiDevice_Set($$@) {
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "app_zoned_clean";
-    my $zone = join("],[", @arg);
+    my $zone = "[".join("],[", @arg)."]";
+    $zone = $hash->{helper}{zones}{$arg[0]} if(defined($hash->{helper}{zones}) && defined($hash->{helper}{zones}{$arg[0]}));
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_zoned_clean","params":['.$zone.']}' );
   }
   elsif ($cmd eq 'goto')
   {
+    $arg[0] = $hash->{helper}{points}{$arg[0]} if(defined($hash->{helper}{points}) && defined($hash->{helper}{points}{$arg[0]}));
+    $arg[0] =~ s/\[//g;
+    $arg[0] =~ s/\]//g;
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "app_goto_target";
@@ -1385,6 +1403,49 @@ sub XiaomiDevice_Init($) {
   return undef;
 }
 
+
+sub XiaomiDevice_ReadZones($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  if(!defined($attr{$name}) || !defined($attr{$name}{subType}) || $attr{$name}{subType} ne "VacuumCleaner") {
+    delete $hash->{helper}{zones};
+    delete $hash->{helper}{zone_names};
+    delete $hash->{helper}{points};
+    delete $hash->{helper}{point_names};
+    return undef;
+  }
+
+  if(defined($attr{$name}) && defined($attr{$name}{zone_names})) {
+    my @definitionnames;
+    my @definitions = split(" ",$attr{$name}{zone_names});
+    foreach my $singledefinition (@definitions) {
+      my @definitionparts = split(":",$singledefinition);
+      push(@definitionnames,$definitionparts[0]);
+      $hash->{helper}{zones}{$definitionparts[0]} = $definitionparts[1];
+    }
+    $hash->{helper}{zone_names} = join(',',@definitionnames);
+  } else {
+    delete $hash->{helper}{zones};
+    delete $hash->{helper}{zone_names};
+  }
+
+  if(defined($attr{$name}) && defined($attr{$name}{point_names})) {
+    my @definitionnames;
+    my @definitions = split(" ",$attr{$name}{point_names});
+    foreach my $singledefinition (@definitions) {
+      my @definitionparts = split(":",$singledefinition);
+      push(@definitionnames,$definitionparts[0]);
+      $hash->{helper}{points}{$definitionparts[0]} = $definitionparts[1];
+    }
+    $hash->{helper}{point_names} = join(',',@definitionnames);
+  } else {
+    delete $hash->{helper}{points};
+    delete $hash->{helper}{point_names};
+  }
+
+  return undef;
+}
 
 
 
@@ -2348,8 +2409,8 @@ sub XiaomiDevice_ParseJSON($$)
   InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "power_on" || $msgtype eq "power_off");
   return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "set_poweroff_time");
   
-  return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "app_start" || $msgtype eq "app_spot");
-  return InternalTimer( gettimeofday() + 10, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "app_stop" || $msgtype eq "app_pause");
+  return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "app_start" || $msgtype eq "app_spot"  || $msgtype eq "app_zoned_clean");
+  return InternalTimer( gettimeofday() + 10, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "app_stop" || $msgtype eq "app_pause" || $msgtype eq "app_goto_target");
   return InternalTimer( gettimeofday() + 60, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "app_charge");
 
   return InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "app_rc_start");
@@ -2681,6 +2742,12 @@ sub XiaomiDevice_Attr($$$) {
       $attr{$name}{$attrName} = 0;
       XiaomiDevice_Init($hash);
     }
+    return undef;
+  }
+
+  if($attrName eq "zone_names" || $attrName eq "point_names") {
+    my $hash = $defs{$name};
+    InternalTimer( gettimeofday() + 2, "XiaomiDevice_ReadZones", $hash, 0);
   }
 
   if( $cmd eq "set" ) {
@@ -2786,7 +2853,7 @@ sub XiaomiDevice_DbLog_splitFn($) {
    <br>
    Start spot cleaning
    </li><br>
-  <li><code>zone</code> pointA1,pointA2,pointA3,pointA4 [pointB1,pointB2,pointB3,pointB4]<i>(VacuumCleaner)</i>
+  <li><code>zone</code> pointA1,pointA2,pointA3,pointA4,count [pointB1,pointB2,pointB3,pointB4,count]<i>(VacuumCleaner)</i>
   <br>
   Start zone cleaning (enter points for one or more valid zones)
   </li><br>
