@@ -65,6 +65,7 @@ my @filelist2 = (
   "www/images/openautomation/.*.txt",
   "www/images/default/.*",
   "www/images/default/remotecontrol/.*",
+  "www/images/sscam/.*.png",
   "docs/commandref.*.html",
   "docs/faq(_..)?.html",
   "docs/HOWTO(_..)?.html",
