@@ -60,8 +60,9 @@ SetExtensions($$@)
 
   my $hasOn  = ($list =~ m/(^| )on\b/);
   my $hasOff = ($list =~ m/(^| )off\b/);
+  my $eventMap = AttrVal($name, "eventMap", undef);
 
-  if((!$hasOn || !$hasOff) && AttrVal($name, "eventMap", undef)) {
+  if((!$hasOn || !$hasOff) && $eventMap) {
     if(!$hasOn) {
       my (undef,$value) = ReplaceEventMap($name, [$name, "on"], 0);
       $hasOn = ($value ne "on");
@@ -169,6 +170,8 @@ SetExtensions($$@)
     
   } elsif($cmd eq "toggle") {
     my $value = Value($name);
+    (undef,$value) = ReplaceEventMap($name, [$name, $value], 0) if($eventMap);
+
     $value = ($1==0 ? "off" : "on") if($value =~ m/dim (\d+)/); # Forum #49391
     SE_DoSet($name, $value =~ m/^on/ ? "off" : "on");
 
