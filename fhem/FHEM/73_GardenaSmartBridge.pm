@@ -811,15 +811,13 @@ sub GardenaSmartBridge_createHttpValueStrings($@) {
 <a name="GardenaSmartBridgedefine"></a>
 <b>Define</b>
 <ul><br>
-  <code>define &lt;name&gt; GardenaSmartBridge &lt;Account-EMail&gt; &lt;Account-Passwort&gt;</code>
+  <code>define &lt;name&gt; GardenaSmartBridge</code>
   <br><br>
   Beispiel:
   <ul><br>
-    <code>define Gardena_Bridge GardenaSmartBridge me@email.me secret</code><br>
+    <code>define Gardena_Bridge GardenaSmartBridge</code><br>
   </ul>
   <br>
-  &lt;Account-EMail&gt; Email Adresse which was used in the GardenaAPP<br>
-  &lt;Account-Passwort&gt; Passwort which was used in the GardenaAPP<br>
   The GardenaSmartBridge device is created in the room GardenaSmart, then the devices of Your system are recognized automatically and created in FHEM. From now on the devices can be controlled and changes in the GardenaAPP are synchronized with the state and readings of the devices.
   <br><br>
   <a name="GardenaSmartBridgereadings"></a>
@@ -844,6 +842,7 @@ sub GardenaSmartBridge_createHttpValueStrings($@) {
   <ul>
     <li>getDeviceState - Starts a Datarequest</li>
     <li>getToken - Gets a new Session-ID</li>
+    <li>gardenaAccountPassword - Passwort which was used in the GardenaAPP</li>
   </ul>
   <br><br>
   <a name="GardenaSmartBridgeattributes"></a>
@@ -852,6 +851,7 @@ sub GardenaSmartBridge_createHttpValueStrings($@) {
     <li>debugJSON - </li>
     <li>disable - Disables the Bridge</li>
     <li>interval - Interval in seconds (Default=300)</li>
+    <li>gardenaAccountEmail - Email Adresse which was used in the GardenaAPP</li>
   </ul>
 </ul>
 
@@ -872,15 +872,13 @@ sub GardenaSmartBridge_createHttpValueStrings($@) {
 <a name="GardenaSmartBridgedefine"></a>
 <b>Define</b>
 <ul><br>
-  <code>define &lt;name&gt; GardenaSmartBridge &lt;Account-EMail&gt; &lt;Account-Passwort&gt;</code>
+  <code>define &lt;name&gt; GardenaSmartBridge</code>
   <br><br>
   Beispiel:
   <ul><br>
-    <code>define Gardena_Bridge GardenaSmartBridge me@email.me secret</code><br>
+    <code>define Gardena_Bridge GardenaSmartBridge</code><br>
   </ul>
   <br>
-  &lt;Account-EMail&gt; Email Adresse, die auch in der GardenaApp verwendet wurde<br>
-  &lt;Account-Passwort&gt; Passwort, welches in der GardenaApp verwendet wurde<br>
   Das Bridge Device wird im Raum GardenaSmart angelegt und danach erfolgt das Einlesen und automatische Anlegen der Ger&auml;te. Von nun an k&ouml;nnen die eingebundenen Ger&auml;te gesteuert werden. &Auml;nderungen in der APP werden mit den Readings und dem Status syncronisiert.
   <br><br>
   <a name="GardenaSmartBridgereadings"></a>
@@ -905,6 +903,7 @@ sub GardenaSmartBridge_createHttpValueStrings($@) {
   <ul>
     <li>getDeviceState - Startet eine Abfrage der Daten.</li>
     <li>getToken - Holt eine neue Session-ID</li>
+    <li>gardenaAccountPassword - Passwort, welches in der GardenaApp verwendet wurde</li>
   </ul>
   <br><br>
   <a name="GardenaSmartBridgeattributes"></a>
@@ -913,6 +912,7 @@ sub GardenaSmartBridge_createHttpValueStrings($@) {
     <li>debugJSON - JSON Fehlermeldungen</li>
     <li>disable - Schaltet die Daten&uuml;bertragung der Bridge ab</li>
     <li>interval - Abfrageinterval in Sekunden (default: 300)</li>
+    <li>gardenaAccountEmail - Email Adresse, die auch in der GardenaApp verwendet wurde</li>
   </ul>
 </ul>
 

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_GardenaSmartBridge: add commandref parts
   - change:  93_DbLog: V3.10.2, event parsing of Weather changed, add option
                        CN=<caller name> to addlog-function
   - change:  49_SSCam: V3.8.4, usage of Internal MODEL changed
