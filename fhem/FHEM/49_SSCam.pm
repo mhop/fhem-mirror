@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 3.8.4  06.04.2018    Internal MODEL changed to SVS or "CamVendor - CamModel" for Cams
 # 3.8.3  05.04.2018    bugfix V3.8.2, $OpMode "Start" changed, composegallery changed
 # 3.8.2  04.04.2018    $attr replaced by AttrVal, SSCam_wdpollcaminfo redesigned
 # 3.8.1  04.04.2018    some codereview like new sub SSCam_jboolmap
@@ -216,7 +217,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.8.3";
+my $SSCamVersion = "3.8.4";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -332,7 +333,7 @@ sub SSCam_Define($@) {
   $hash->{SERVERPORT} = $serverport;
   $hash->{CAMNAME}    = $camname;
   $hash->{VERSION}    = $SSCamVersion;
-  $hash->{MODEL}      = ($camname =~ m/^SVS$/i)?"SVS":"CAM";
+  $hash->{MODEL}      = ($camname =~ m/^SVS$/i)?"SVS":"CAM";                     # initial, CAM wird später ersetzt durch CamModel
  
   # benötigte API's in $hash einfügen
   $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
@@ -4402,8 +4403,8 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
-                            
-                # Logausgabe
+                   
+                $hash->{MODEL} = ReadingsVal($name,"CamVendor","")." - ".ReadingsVal($name,"CamModel","CAM") if(SSCam_IsModelCam($hash));                   
                 Log3($name, $verbose, "$name - Informations of camera $camname retrieved");
             
 			} elsif ($OpMode eq "geteventlist") {              
@@ -4994,7 +4995,7 @@ return($hash,$success);
 ###############################################################################
 sub SSCam_IsModelCam($){ 
   my ($hash)= @_;
-  my $m = ($hash->{MODEL} eq "CAM")?1:0;
+  my $m = ($hash->{MODEL} ne "SVS")?1:0;
 return($m);
 }
 
