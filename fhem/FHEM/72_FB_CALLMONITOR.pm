@@ -186,28 +186,67 @@ FB_CALLMONITOR_Get($@)
         
         return $head."\n".("-" x $width)."\n".$table;
     }
-    elsif($arguments[1] eq "showPhonebookEntries" and exists($hash->{helper}{PHONEBOOK}))
+    elsif($arguments[1] eq "showPhonebookEntries" and (exists($hash->{helper}{PHONEBOOK}) or exists($hash->{helper}{PHONEBOOKS})) and int(@arguments) <= 3)
     {
-        my $table = "";
+        return "given argument is not a valid phonebook id: ".$arguments[2] if(int(@arguments) == 3 and ($arguments[2] !~ /^\d+$/ or !exists($hash->{helper}{PHONEBOOKS}{$arguments[2]}) ) );
+        
+        my $return = ""; 
+             
+        if(exists($hash->{helper}{PHONEBOOKS}))
+        {
+            foreach my $pb_id (sort keys %{$hash->{helper}{PHONEBOOKS}})
+            {
+                next if(int(@arguments) == 3 and int($arguments[2]) != $pb_id);
+                 
+                my $number_width = 0;
+                my $name_width = 0;
+                my $table = "";
+                
+                if(defined($hash->{helper}{PHONEBOOKS}{$pb_id}) and scalar(keys(%{$hash->{helper}{PHONEBOOKS}{$pb_id}})) > 0)
+                {
+                    foreach my $number (keys %{$hash->{helper}{PHONEBOOKS}{$pb_id}})
+                    {
+                        $number_width = length($number) if($number_width < length($number));
+                        $name_width = length($hash->{helper}{PHONEBOOKS}{$pb_id}{$number}) if($name_width < length($hash->{helper}{PHONEBOOKS}{$pb_id}{$number}));
+                    }
+                    
+                    my $head = "Phonebook: ".$hash->{helper}{PHONEBOOK_NAMES}{$pb_id}." / Id: $pb_id\n\n   ".sprintf("%-".$number_width."s   %s" ,"Number", "Name"); 
+                    
+                    foreach my $number (sort { lc($hash->{helper}{PHONEBOOKS}{$pb_id}{$a}) cmp lc($hash->{helper}{PHONEBOOKS}{$pb_id}{$b}) } keys %{$hash->{helper}{PHONEBOOKS}{$pb_id}})
+                    {
+                        my $string = sprintf("   %-".$number_width."s - %s" , $number,$hash->{helper}{PHONEBOOKS}{$pb_id}{$number}); 
+                        $table .= $string."\n";
+                    }
+                    
+                    $return .= $head."\n   ".("-" x ($number_width + $name_width + 3))."\n".$table."\n";
+                }
+            }
+       }
        
-        my $number_width = 0;
-        my $name_width = 0;
-        
-        foreach my $number (keys %{$hash->{helper}{PHONEBOOK}})
-        {
-            $number_width = length($number) if($number_width < length($number));
-            $name_width = length($hash->{helper}{PHONEBOOK}{$number}) if($name_width < length($hash->{helper}{PHONEBOOK}{$number}));
+       if(exists($hash->{helper}{PHONEBOOK}) and int(@arguments) == 2)
+       {
+            my $number_width = 0;
+            my $name_width = 0;
+            my $table = "";
+            
+            foreach my $number (keys %{$hash->{helper}{PHONEBOOK}})
+            {
+                $number_width = length($number) if($number_width < length($number));
+                $name_width = length($hash->{helper}{PHONEBOOK}{$number}) if($name_width < length($hash->{helper}{PHONEBOOK}{$number}));
+            }
+            
+            my $head = sprintf("Phonebook file\n\n   %-".$number_width."s   %s" ,"Number", "Name"); 
+            
+            foreach my $number (sort { lc($hash->{helper}{PHONEBOOK}{$a}) cmp lc($hash->{helper}{PHONEBOOK}{$b}) } keys %{$hash->{helper}{PHONEBOOK}})
+            {
+                my $string = sprintf("   %-".$number_width."s - %s" , $number,$hash->{helper}{PHONEBOOK}{$number}); 
+                $table .= $string."\n";
+            }
+            
+            $return .= $head."\n   ".("-" x ($number_width + $name_width + 3))."\n".$table
         }
         
-        my $head = sprintf("%-".$number_width."s   %s" ,"Number", "Name"); 
-        
-        foreach my $number (sort { lc($hash->{helper}{PHONEBOOK}{$a}) cmp lc($hash->{helper}{PHONEBOOK}{$b}) } keys %{$hash->{helper}{PHONEBOOK}})
-        {
-            my $string = sprintf("%-".$number_width."s - %s" , $number,$hash->{helper}{PHONEBOOK}{$number}); 
-            $table .= $string."\n";
-        }
-        
-        return $head."\n".("-" x ($number_width + $name_width + 3))."\n".$table;
+        return $return;
     }
     elsif($arguments[1] eq "showCacheEntries" and exists($hash->{helper}{CACHE}))
     {
@@ -257,7 +296,10 @@ FB_CALLMONITOR_Get($@)
     }
     else
     {
-        return "unknown argument ".$arguments[1].", choose one of search".(exists($hash->{helper}{PHONEBOOK_NAMES}) ? " showPhonebookIds" : "").(exists($hash->{helper}{PHONEBOOK}) ? " showPhonebookEntries" : "").(exists($hash->{helper}{CACHE}) ? " showCacheEntries" : "").(exists($hash->{helper}{TEXTFILE}) ? " showTextfileEntries" : ""); 
+        return "unknown argument ".$arguments[1].", choose one of search".(exists($hash->{helper}{PHONEBOOK_NAMES}) ? " showPhonebookIds" : "").
+                                                                          ((exists($hash->{helper}{PHONEBOOK}) or exists($hash->{helper}{PHONEBOOKS})) ? " showPhonebookEntries" : "").
+                                                                          (exists($hash->{helper}{CACHE}) ? " showCacheEntries" : "").
+                                                                          (exists($hash->{helper}{TEXTFILE}) ? " showTextfileEntries" : ""); 
     }
 }
 
@@ -2094,7 +2136,7 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
   <ul>
   <li><b>search &lt;phone-number&gt;</b> - returns the name of the given number via reverse-search (internal phonebook, cache or internet lookup)</li>
   <li><b>showPhonebookIds</b> - returns a list of all available phonebooks on the FritzBox (not available when using telnet to retrieve remote phonebook)</li>
-  <li><b>showPhonebookEntries</b> - returns a list of all currently known phonebook entries (only available when using phonebook funktionality)</li>
+  <li><b>showPhonebookEntries [phonebook-id]</b> - returns a list of all currently known phonebook entries, or just for a spefific phonebook id (only available when using phonebook funktionality)</li>
   <li><b>showCacheEntries</b> - returns a list of all currently known cache entries (only available when using reverse search caching funktionality)</li>
   <li><b>showTextfileEntries</b> - returns a list of all known entries from user given textfile (only available when using reverse search caching funktionality)</li>
   </ul>
@@ -2249,7 +2291,7 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
   <ul>
   <li><b>search &lt;Rufnummer&gt;</b> - gibt den Namen der Telefonnummer zur&uuml;ck (aus Cache, Telefonbuch oder R&uuml;ckw&auml;rtssuche)</li>
   <li><b>showPhonebookIds</b> - gibt eine Liste aller verf&uuml;gbaren Telefonb&uuml;cher auf der FritzBox zur&uuml;ck (nicht verf&uuml;gbar wenn das Telefonbuch via Telnet-Verbindung eingelesen wird)</li>
-  <li><b>showPhonebookEntries</b> - gibt eine Liste aller bekannten Telefonbucheintr&auml;ge zur&uuml;ck (nur verf&uuml;gbar, wenn eine R&uuml;ckw&auml;rtssuche via Telefonbuch aktiviert ist)</li>
+  <li><b>showPhonebookEntries [Phonebook-ID]</b> - gibt eine Liste aller bekannten Telefonbucheintr&auml;ge, oder nur eines bestimmten Telefonbuchs, zur&uuml;ck (nur verf&uuml;gbar, wenn eine R&uuml;ckw&auml;rtssuche via Telefonbuch aktiviert ist)</li>
   <li><b>showCacheEntries</b> - gibt eine Liste aller bekannten Cacheeintr&auml;ge zur&uuml;ck (nur verf&uuml;gbar, wenn die Cache-Funktionalit&auml;t der R&uuml;ckw&auml;rtssuche aktiviert ist))</li>
   <li><b>showTextEntries</b> - gibt eine Liste aller Eintr&auml;ge aus der nutzereigenen Textdatei zur&uuml;ck (nur verf&uuml;gbar, wenn eine Textdatei als Attribut definiert ist))</li>
   </ul>
