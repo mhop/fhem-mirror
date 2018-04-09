@@ -16,6 +16,8 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.10.2     09.04.2018       add qualifier CN=<caller name> to addlog
+# 3.10.1     04.04.2018       changed event parsing of Weather
 # 3.10.0     02.04.2018       addLog consider DbLogExclude in Devices, keyword "!useExcludes" to switch off considering 
 #                             DbLogExclude in addLog, DbLogExclude & DbLogInclude can handle "/" in Readingname,
 #                             commandref (reduceLog) revised
@@ -196,7 +198,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.10.0";
+my $DbLogVersion = "3.10.2";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -383,6 +385,7 @@ sub DbLog_Attr(@) {
              "%VALUE" => $name,
              "%UNIT" => $name,
 			 "%IGNORE" => $name,
+             "%CN" => $name,
           );
           my $err = perlSyntaxCheck($aVal, %specials);
           return $err if($err);
@@ -549,7 +552,13 @@ sub DbLog_Set($@) {
         unless ($a[2]) { return "The argument of $a[1] is not valid. Please check commandref.";}
         my $nce = ("\!useExcludes" ~~ @a)?1:0;
         map(s/\!useExcludes//g, @a);
-		DbLog_AddLog($hash,$a[2],$a[3],$nce);
+        my $cn;
+        if(/CN=/ ~~ @a) {
+            my $t = join(" ",@a);
+            ($cn) = ($t =~ /^.*CN=(\w+).*$/);
+            map(s/CN=$cn//g, @a);
+        }
+		DbLog_AddLog($hash,$a[2],$a[3],$nce,$cn);
 	}
     elsif ($a[1] eq 'reopen') {		
 		if ($dbh) {
@@ -1122,10 +1131,11 @@ sub DbLog_ParseEvent($$$)
     if($event =~ m(^wind_condition)) {
       @parts= split(/ /,$event); # extract wind direction from event
       if(defined $parts[0]) {
-        $reading = "wind_direction";
-        $value= $parts[2];
+        $reading = "wind_condition";
+        $value= "$parts[1] $parts[2] $parts[3]";
       }
     }
+    if($reading eq "wind_condition") { $unit= "km/h"; }
     elsif($reading eq "wind_chill") { $unit= "°C"; }
     elsif($reading eq "wind_direction") { $unit= ""; }
     elsif($reading =~ m(^wind)) { $unit= "km/h"; } # wind, wind_speed
@@ -1356,6 +1366,7 @@ sub DbLog_Log($$) {
  		  	          my $VALUE 	 = $value;
  				      my $UNIT   	 = $unit;
 					  my $IGNORE     = 0;
+                      my $CN         = " ";
 
  				      eval $value_fn;
 					  Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
@@ -3543,8 +3554,8 @@ return @sr;
 # Addlog - einfügen des Readingwertes eines gegebenen Devices
 #
 #########################################################################################
-sub DbLog_AddLog($$$$) {
-  my ($hash,$devrdspec,$value,$nce)= @_;
+sub DbLog_AddLog($$$$$) {
+  my ($hash,$devrdspec,$value,$nce,$cn)= @_;
   my $name     = $hash->{NAME};
   my $async    = AttrVal($name, "asyncMode", undef);
   my $value_fn = AttrVal( $name, "valueFn", "" );
@@ -3636,6 +3647,7 @@ sub DbLog_AddLog($$$$) {
  	          my $VALUE 	 = $read_val;
  	          my $UNIT   	 = $ut;
 	          my $IGNORE     = 0;
+              my $CN         = $cn if($cn);
 
  	          eval $value_fn;
 	          Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
@@ -5323,23 +5335,39 @@ sub dbReadings($@) {
 	  <b>Example:</b> <br>
 	  set &lt;name&gt; addCacheLine 2017-12-05 17:03:59|MaxBathRoom|MAX|valveposition: 95|valveposition|95|% <br>
     </ul><br>
-	
-    <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [!useExcludes] </code><br><br>
-    <ul> Inserts an additional log entry of a device/reading combination into the database.
-      Optionally you can enter a "Value" that is used as reading value for the dataset. If the value isn't specified (default),
-	  the current value of the specified reading will be inserted into the database. The field "$EVENT" will be filled automatically
-	  by "addLog". The device can be declared by a <a href="#devspec">device specification (devspec)</a>. 
-	  "Reading" will be evaluated as regular expression. <br>
-      The function considers attribute "DbLogExclude" in source device if it is set. If the optional keyword "!useExcludes" 
-      is set, the attribute "DbLogExclude" isn't considered. <br>
-	  By the addLog-command NO additional events will be created !<br><br>
+    
+    <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [CN=&lt;caller name&gt;] [!useExcludes] </code><br><br>
+    <ul> Inserts an additional log entry of a device/reading combination into the database. <br><br>
+      
+      <ul>
+      <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - The device can be declared by a <a href="#devspec">device specification 
+                                                    (devspec)</a>. "Reading" will be evaluated as regular expression. </li>
+      <li> <b>Value</b> - Optionally you can enter a "Value" that is used as reading value in the dataset. If the value isn't 
+                          specified (default), the current value of the specified reading will be inserted into the database. </li>  
+      <li> <b>CN=&lt;caller name&gt;</b> - By the key "CN=" (<b>C</b>aller <b>N</b>ame) you can specify an additional string, 
+                                           e.g. the name of a calling device (for example an at- or notify-device).
+                                           Via the function defined in <a href="#DbLogattr">attribute</a> "valueFn" this key can be analyzed
+                                           by the variable $CN. Thereby it is possible to control the behavior of the addLog dependend from
+                                           the calling source. </li> 
+      <li> <b>!useExcludes</b> - The function considers attribute "DbLogExclude" in the source device if it is set. If the optional 
+                                 keyword "!useExcludes" is set, the attribute "DbLogExclude" isn't considered. </li>
+      </ul>
+      <br>
+      
+      The database field "EVENT" will be filled with the string "addLog" automatically. <br>
+	  The addLog-command dosn't create an additional event in your system !<br><br>
       
 	  <b>Examples:</b> <br>
 	  set &lt;name&gt; addLog SMA_Energymeter:Bezug_Wirkleistung <br>
 	  set &lt;name&gt; addLog TYPE=SSCam:state <br>
 	  set &lt;name&gt; addLog MyWetter:(fc10.*|fc8.*) <br>
-	  set &lt;name&gt; addLog MyWetter:(wind|wind_ch.*) 20 <br>
-	  set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|):(measured-temp|desired-temp|actuator) <br>
+	  set &lt;name&gt; addLog MyWetter:(wind|wind_ch.*) 20 !useExcludes <br>
+	  set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|):(measured-temp|desired-temp|actuator) <br><br>
+      
+      set &lt;name&gt; addLog USV:state CN=di.cronjob <br>
+      In the valueFn-function the caller "di.cronjob" is evaluated via the variable $CN and the timestamp is corrected: <br><br>
+      valueFn = if($CN eq "di.cronjob" and $TIMESTAMP =~ m/\s00:00:[\d:]+/) { $TIMESTAMP =~ s/([^\s]+)\s/\1 00:00:00/ }      
+      
     </ul><br>
 	
     <code>set &lt;name&gt; clearReadings </code><br><br>
@@ -6322,13 +6350,26 @@ sub dbReadings($@) {
 	  set &lt;name&gt; addCacheLine 2017-12-05 17:03:59|MaxBathRoom|MAX|valveposition: 95|valveposition|95|% <br>
     </ul><br>
 	
-    <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [!useExcludes] </code><br><br>
-    <ul> Fügt einen zusatzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein.
-      Optional kann "Value" für den Readingwert angegeben werden. Ist Value nicht angegeben, wird der aktuelle
-      Wert des Readings in die DB eingefügt. Das Feld "$EVENT" wird automatisch mit "addLog" belegt. Das Device kann 
-	  als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. "Reading" wird als regulärer Ausdruck ausgewertet. <br>
-      Ein eventuell im Quell-Device gesetztes Attribut "DbLogExclude" wird von der Funktion berücksichtigt. Soll dieses 
-      Attribut nicht berücksichtigt werden, kann das Schüsselwort "!useExcludes" verwendet werden. <br>
+    <code>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [CN=&lt;caller name&gt;] [!useExcludes] </code><br><br>
+    <ul> Fügt einen zusatzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein. <br><br>
+      
+      <ul>
+      <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - Das Device kann als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. <br>
+                                                    Die Angabe von "Reading" wird als regulärer Ausdruck ausgewertet. </li>
+      <li> <b>Value</b> - Optional kann "Value" für den Readingwert angegeben werden. Ist Value nicht angegeben, wird der aktuelle
+                          Wert des Readings in die DB eingefügt. </li>  
+      <li> <b>CN=&lt;caller name&gt;</b> - Mit dem Schlüssel "CN=" (<b>C</b>aller <b>N</b>ame) kann dem addLog-Aufruf ein String, 
+                                           z.B. der Name des aufrufenden Devices (z.B. eines at- oder notify-Devices), mitgegeben 
+                                           werden. Mit Hilfe der im <a href="#DbLogattr">Attribut</a> "valueFn" hinterlegten 
+                                           Funktion kann dieser Schlüssel über die Variable $CN ausgewertet werden. Dadurch ist es 
+                                           möglich, das Verhalten des addLogs abhängig von der aufrufenden Quelle zu beeinflussen. 
+                                           </li> 
+      <li> <b>!useExcludes</b> - Ein eventuell im Quell-Device gesetztes Attribut "DbLogExclude" wird von der Funktion berücksichtigt. Soll dieses 
+                                 Attribut nicht berücksichtigt werden, kann das Schüsselwort "!useExcludes" verwendet werden. </li>
+      </ul>
+      <br>
+      
+      Das Datenbankfeld "EVENT" wird automatisch mit "addLog" belegt. <br>
 	  Es wird KEIN zusätzlicher Event im System erzeugt !<br><br>
       
 	  <b>Beispiele:</b> <br>
@@ -6336,7 +6377,13 @@ sub dbReadings($@) {
 	  set &lt;name&gt; addLog TYPE=SSCam:state <br>
 	  set &lt;name&gt; addLog MyWetter:(fc10.*|fc8.*) <br>
 	  set &lt;name&gt; addLog MyWetter:(wind|wind_ch.*) 20 !useExcludes <br>
-	  set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|):(measured-temp|desired-temp|actuator) <br>
+	  set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|):(measured-temp|desired-temp|actuator) <br><br>
+      
+      set &lt;name&gt; addLog USV:state CN=di.cronjob <br>
+      In der valueFn-Funktion wird der Aufrufer "di.cronjob" über die Variable $CN ausgewertet und davon abhängig der 
+      Timestamp dieses addLog korrigiert: <br><br>
+      valueFn = if($CN eq "di.cronjob" and $TIMESTAMP =~ m/\s00:00:[\d:]+/) { $TIMESTAMP =~ s/([^\s]+)\s/\1 00:00:00/ }      
+      
     </ul><br>
 	  
     <code>set &lt;name&gt; clearReadings </code><br><br>
