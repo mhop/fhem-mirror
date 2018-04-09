@@ -1,4 +1,4 @@
-REV 16564
+REV 16574
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,11 +21,11 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-04-07_07:45:02 243868 ./CHANGED
+UPD 2018-04-09_07:45:03 243990 ./CHANGED
 UPD 2018-03-30_07:45:03 36835 ./MAINTAINER.txt
 UPD 2018-03-26_07:45:02 41123 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
-UPD 2018-03-21_07:45:08 145782 ./fhem.pl
+UPD 2018-04-09_07:45:08 145850 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2017-09-09_07:45:02 56979 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -44,7 +44,7 @@ UPD 2017-09-07_07:45:02 25519 FHEM/00_NetzerI2C.pm
 UPD 2018-03-19_07:45:04 59968 FHEM/00_OWX.pm
 UPD 2015-07-28_14:05:31 48674 FHEM/00_OWX_ASYNC.pm
 UPD 2017-09-07_07:45:02 38258 FHEM/00_RPII2C.pm
-UPD 2018-04-02_07:45:03 186393 FHEM/00_SIGNALduino.pm
+UPD 2018-04-09_07:45:03 186335 FHEM/00_SIGNALduino.pm
 UPD 2018-03-25_07:45:03 488536 FHEM/00_SONOS.pm
 UPD 2017-06-30_07:45:02 20215 FHEM/00_SmartMeterP1.pm
 UPD 2017-08-12_07:45:02 56324 FHEM/00_TCM.pm
@@ -337,7 +337,7 @@ UPD 2018-01-29_07:45:02 123938 FHEM/71_YAMAHA_NP.pm
 UPD 2018-03-19_07:45:04 80986 FHEM/72_FB_CALLLIST.pm
 UPD 2018-03-29_07:45:02 106718 FHEM/72_FB_CALLMONITOR.pm
 UPD 2018-03-22_07:45:04 220673 FHEM/72_FRITZBOX.pm
-UPD 2018-04-04_07:45:05 133214 FHEM/72_XiaomiDevice.pm
+UPD 2018-04-09_07:45:03 135875 FHEM/72_XiaomiDevice.pm
 UPD 2018-04-07_07:45:02 47236 FHEM/73_AMADCommBridge.pm
 UPD 2018-02-26_07:45:03 89287 FHEM/73_ElectricityCalculator.pm
 UPD 2018-04-05_07:45:03 33979 FHEM/73_GardenaSmartBridge.pm
@@ -482,7 +482,7 @@ UPD 2016-12-03_07:45:16 5092 FHEM/98_dummy.pm
 UPD 2018-02-09_07:45:02 10560 FHEM/98_expandJSON.pm
 UPD 2018-02-01_07:45:02 5918 FHEM/98_fhemdebug.pm
 UPD 2018-03-31_07:45:03 11180 FHEM/98_fheminfo.pm
-UPD 2018-04-04_07:45:05 49783 FHEM/98_freezemon.pm
+UPD 2018-04-09_07:45:03 53633 FHEM/98_freezemon.pm
 UPD 2017-10-11_07:45:02 9129 FHEM/98_help.pm
 UPD 2018-03-02_07:47:09 44070 FHEM/98_logProxy.pm
 UPD 2017-12-10_07:45:03 52575 FHEM/98_monitoring.pm
@@ -525,7 +525,7 @@ UPD 2017-05-02_07:45:02 138443 FHEM/RESIDENTStk.pm
 UPD 2016-01-13_07:45:13 1191 FHEM/RTypes.pm
 UPD 2015-07-28_14:05:31 7121 FHEM/SHC_datafields.pm
 UPD 2015-07-28_14:05:31 11758 FHEM/SHC_parser.pm
-UPD 2018-02-19_07:45:04 5239 FHEM/SetExtensions.pm
+UPD 2018-04-09_07:45:03 5347 FHEM/SetExtensions.pm
 UPD 2017-05-21_07:45:02 7416 FHEM/SubProcess.pm
 UPD 2017-11-16_07:45:02 3372 FHEM/TR064Utils.pm
 UPD 2017-12-28_07:45:02 7652 FHEM/TcpServerUtils.pm
@@ -663,8 +663,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-04-08_07:45:06 3401684 docs/commandref.html
-UPD 2018-04-08_07:45:07 2102770 docs/commandref_DE.html
+UPD 2018-04-09_07:45:06 3401679 docs/commandref.html
+UPD 2018-04-09_07:45:08 2102755 docs/commandref_DE.html
 UPD 2018-03-18_07:45:02 75650 docs/commandref_frame.html
 UPD 2018-03-18_07:45:02 85157 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
@@ -1953,6 +1953,24 @@ UPD 2015-07-28_14:05:33 1824 www/images/openautomation/weather_wind_directions_s
 UPD 2015-07-28_14:05:33 1728 www/images/openautomation/weather_wind_directions_w.svg
 UPD 2015-07-28_14:05:33 2221 www/images/openautomation/weather_wind_speed.svg
 UPD 2015-07-28_14:05:33 3958 www/images/openautomation/weather_winter.svg
+UPD 2018-04-09_07:45:03 191 www/images/sscam/black_btn_CAMBLANK.png
+UPD 2018-04-09_07:45:03 972 www/images/sscam/black_btn_CAMDOWN.png
+UPD 2018-04-09_07:45:03 1193 www/images/sscam/black_btn_CAMDOWNFAST.png
+UPD 2018-04-09_07:45:03 854 www/images/sscam/black_btn_CAMDOWNLEFT.png
+UPD 2018-04-09_07:45:03 907 www/images/sscam/black_btn_CAMDOWNLEFTFAST.png
+UPD 2018-04-09_07:45:03 852 www/images/sscam/black_btn_CAMDOWNRIGHT.png
+UPD 2018-04-09_07:45:03 906 www/images/sscam/black_btn_CAMDOWNRIGHTFAST.png
+UPD 2018-04-09_07:45:03 707 www/images/sscam/black_btn_CAMHOME.png
+UPD 2018-04-09_07:45:03 973 www/images/sscam/black_btn_CAMLEFT.png
+UPD 2018-04-09_07:45:03 1138 www/images/sscam/black_btn_CAMLEFTFAST.png
+UPD 2018-04-09_07:45:03 975 www/images/sscam/black_btn_CAMRIGHT.png
+UPD 2018-04-09_07:45:03 1142 www/images/sscam/black_btn_CAMRIGHTFAST.png
+UPD 2018-04-09_07:45:03 1021 www/images/sscam/black_btn_CAMUP.png
+UPD 2018-04-09_07:45:03 1148 www/images/sscam/black_btn_CAMUPFAST.png
+UPD 2018-04-09_07:45:03 870 www/images/sscam/black_btn_CAMUPLEFT.png
+UPD 2018-04-09_07:45:03 909 www/images/sscam/black_btn_CAMUPLEFTFAST.png
+UPD 2018-04-09_07:45:03 869 www/images/sscam/black_btn_CAMUPRIGHT.png
+UPD 2018-04-09_07:45:03 927 www/images/sscam/black_btn_CAMUPRIGHTFAST.png
 UPD 2015-07-28_14:05:34 66 www/jscolor/arrow.gif
 UPD 2015-07-28_14:05:34 83 www/jscolor/cross.gif
 UPD 2015-07-28_14:05:34 373 www/jscolor/ct_background.svg
