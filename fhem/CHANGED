@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     00_Neuron.pm, 10_NeuronPin.pm: support for Neuron Devices
   - feature: 59_WUup: add attribute round
   - bugfix:  72_FB_CALLMONITOR: fix not working get command 
                                 showPhonebookEntries for remote phonebooks
