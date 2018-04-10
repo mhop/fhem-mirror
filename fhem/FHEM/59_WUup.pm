@@ -32,7 +32,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-my $version = "0.9.6";
+my $version = "0.9.7";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -62,6 +62,7 @@ sub WUup_Initialize($) {
       . "disabledForIntervals "
       . "interval "
       . "unit_windspeed:km/h,m/s "
+      . "round "
       . "wubaromin wudailyrainin wudewptf wuhumidity wurainin wusoilmoisture "
       . "wusoiltempf wusolarradiation wutempf wuUV wuwinddir wuwinddir_avg2m "
       . "wuwindgustdir wuwindgustdir_10m wuwindgustmph wuwindgustmph_10m "
@@ -95,6 +96,7 @@ sub WUup_Define($$$) {
     $attr{$name}{room} = "Weather" if ( !defined( $attr{$name}{room} ) );
     $attr{$name}{unit_windspeed} = "km/h"
       if ( !defined( $attr{$name}{unit_windspeed} ) );
+    $attr{$name}{round} = 4 if ( !defined( $attr{$name}{round} ) );
 
     RemoveInternalTimer($hash);
 
@@ -228,8 +230,11 @@ sub WUup_send($) {
     $attr{$name}{unit_windspeed} = "km/h"
       if ( !defined( $attr{$name}{unit_windspeed} ) );
 
+    $attr{$name}{round} = 4 if ( !defined( $attr{$name}{round} ) );
+
     my ( $data, $d, $r, $o );
-    my $a = $attr{$name};
+    my $a   = $attr{$name};
+    my $rnd = $attr{$name}{round};
     while ( my ( $key, $value ) = each(%$a) ) {
         next if substr( $key, 0, 2 ) ne 'wu';
         $key = substr( $key, 2, length($key) - 2 );
@@ -239,24 +244,25 @@ sub WUup_send($) {
             $value = ReadingsVal( $d, $r, 0 ) + $o;
         }
         if ( $key =~ /\w+f$/ ) {
-            $value = UConv::c2f( $value, 4 );
+            $value = UConv::c2f( $value, $rnd );
         }
         elsif ( $key =~ /\w+mph.*/ ) {
 
             if ( $attr{$name}{unit_windspeed} eq "m/s" ) {
                 Log3 $name, 5, "WUup ($name) - windspeed unit is m/s";
-                $value = UConv::kph2mph( ( UConv::mps2kph( $value, 4 ) ), 4 );
+                $value =
+                  UConv::kph2mph( ( UConv::mps2kph( $value, $rnd ) ), $rnd );
             }
             else {
                 Log3 $name, 5, "WUup ($name) - windspeed unit is km/h";
-                $value = UConv::kph2mph( $value, 4 );
+                $value = UConv::kph2mph( $value, $rnd );
             }
         }
         elsif ( $key eq "baromin" ) {
-            $value = UConv::hpa2inhg( $value, 4 );
+            $value = UConv::hpa2inhg( $value, $rnd );
         }
         elsif ( $key =~ /.*rainin$/ ) {
-            $value = UConv::mm2in( $value, 4 );
+            $value = UConv::mm2in( $value, $rnd );
         }
         elsif ( $key eq "solarradiation" ) {
             $value = ( $value / 126.7 );
@@ -347,6 +353,7 @@ sub WUup_receive($) {
 # 2017-10-16 fixed attributes
 # 2017-10-19 added set-command "update"
 # 2018-03-19 solarradiation calculated from lux to W/m² (thanks to dieter114)
+# 2018-04-10 added attribute round
 #
 ################################################################################
 
@@ -400,6 +407,7 @@ sub WUup_receive($) {
         <li><b>disable</b> - disables the module</li>
         <li><b><a href="#disabledForIntervals">disabledForIntervals</a></b></li>
         <li><b>unit_windspeed</b> - change the units of your windspeed readings (m/s or km/h)</li>
+        <li><b>round</b> - round values to this number of decimals for calculation (default 4)</li>
         <li><b>wu....</b> - Attribute name corresponding to 
 <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">parameter name from api.</a> 
             Each of these attributes contains information about weather data to be sent 
@@ -500,6 +508,7 @@ sub WUup_receive($) {
         <li><b><a href="#disabledForIntervals">disabledForIntervals</a></b></li>
         <li><b>unit_windspeed</b> - gibt die Einheit der Readings für die
         Windgeschwindigkeiten an (m/s oder km/h)</li>
+        <li><b>round</b> - Anzahl der Nachkommastellen zur Berechnung (Standard 4)</li>
         <li><b>wu....</b> - Attributname entsprechend dem 
 <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">Parameternamen aus der API.</a><br />
         Jedes dieser Attribute enth&auml;lt Informationen &uuml;ber zu sendende Wetterdaten
