@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.10.3     10.04.2018       minor fixes in addLog
 # 3.10.2     09.04.2018       add qualifier CN=<caller name> to addlog
 # 3.10.1     04.04.2018       changed event parsing of Weather
 # 3.10.0     02.04.2018       addLog consider DbLogExclude in Devices, keyword "!useExcludes" to switch off considering 
@@ -198,7 +199,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.10.2";
+my $DbLogVersion = "3.10.3";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -3562,6 +3563,7 @@ sub DbLog_AddLog($$$$$) {
   my $ce       = AttrVal($name, "cacheEvents", 0);
   my ($dev_type,$dev_name,$dev_reading,$read_val,$event,$ut);  
   my @row_array;  
+  my $ts;
   
   return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
   
@@ -3572,7 +3574,6 @@ sub DbLog_AddLog($$$$$) {
       $value_fn = '';
   }
   
-  my $ts   = TimeNow();
   my $now  = gettimeofday(); 
   
   my $rdspec = (split ":",$devrdspec)[-1];
@@ -3601,7 +3602,7 @@ sub DbLog_AddLog($$$$$) {
                    my @v2 = split(/:/, $v1[$i]);     # MinInterval wegschneiden, Bsp: "(temperature|humidity):600,battery:3600"
                    if($rd =~ m,^$v2[0]$,) {
                        # Reading matcht und soll vom addLog ausgeschlossen werden
-                       Log3 $name, 2, "DbLog $name -> Device: \"$dev_name\", reading: \"$v2[0]\" excluded by attribute DbLogExclude from addLog !";
+                       Log3 $name, 2, "DbLog $name -> Device: \"$dev_name\", reading: \"$v2[0]\" excluded by attribute DbLogExclude from addLog !" if($rd =~ m/^$rdspec$/);
                        $do = 0;
                    }
                }
@@ -3618,7 +3619,7 @@ sub DbLog_AddLog($$$$$) {
 	  
 	  foreach (@exrds) {
 	      $dev_reading = $_;
-          $read_val = $value?$value:ReadingsVal($dev_name,$dev_reading,"");
+          $read_val = defined($value)?$value:ReadingsVal($dev_name,$dev_reading,"");
 	      $dev_type = uc($defs{$dev_name}{TYPE});
           
           # dummy-Event zusammenstellen
@@ -3639,6 +3640,7 @@ sub DbLog_AddLog($$$$$) {
 	  
 	      # Anwender spezifische Funktion anwenden 
           if($value_fn ne '') {
+              $ts            = TimeNow();
               my $TIMESTAMP  = $ts;
  	          my $DEVICE     = $dev_name;
  	          my $DEVICETYPE = $dev_type;
@@ -3647,7 +3649,7 @@ sub DbLog_AddLog($$$$$) {
  	          my $VALUE 	 = $read_val;
  	          my $UNIT   	 = $ut;
 	          my $IGNORE     = 0;
-              my $CN         = $cn if($cn);
+              my $CN         = $cn?$cn:"";
 
  	          eval $value_fn;
 	          Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
@@ -5366,7 +5368,7 @@ sub dbReadings($@) {
       
       set &lt;name&gt; addLog USV:state CN=di.cronjob <br>
       In the valueFn-function the caller "di.cronjob" is evaluated via the variable $CN and the timestamp is corrected: <br><br>
-      valueFn = if($CN eq "di.cronjob" and $TIMESTAMP =~ m/\s00:00:[\d:]+/) { $TIMESTAMP =~ s/([^\s]+)\s/\1 00:00:00/ }      
+      valueFn = if($CN eq "di.cronjob" and $TIMESTAMP =~ m/\s00:00:[\d:]+/) { $TIMESTAMP =~ s/\s([^\s]+)/ 23:59:59/ }      
       
     </ul><br>
 	
@@ -6382,7 +6384,7 @@ sub dbReadings($@) {
       set &lt;name&gt; addLog USV:state CN=di.cronjob <br>
       In der valueFn-Funktion wird der Aufrufer "di.cronjob" über die Variable $CN ausgewertet und davon abhängig der 
       Timestamp dieses addLog korrigiert: <br><br>
-      valueFn = if($CN eq "di.cronjob" and $TIMESTAMP =~ m/\s00:00:[\d:]+/) { $TIMESTAMP =~ s/([^\s]+)\s/\1 00:00:00/ }      
+      valueFn = if($CN eq "di.cronjob" and $TIMESTAMP =~ m/\s00:00:[\d:]+/) { $TIMESTAMP =~ s/\s([^\s]+)/ 23:59:59/ }      
       
     </ul><br>
 	  
