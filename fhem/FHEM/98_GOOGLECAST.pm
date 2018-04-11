@@ -170,8 +170,10 @@ sub GOOGLECAST_Define($$) {
     } elsif(int(@a) == 3) {
         Log3 $hash, 3, "GOOGLECAST: $a[2] initializing...";
         $hash->{CCNAME} = $a[2];
+        Log3 $hash, 5, "GOOGLECAST: $a[2] set readings offline";
         GOOGLECAST_updateReading($hash, "presence", "offline");
         GOOGLECAST_updateReading($hash, "state", "offline");
+        Log3 $hash, 5, "GOOGLECAST: $a[2] start initDevice";
         GOOGLECAST_initDevice($hash);
     }
 
@@ -197,7 +199,9 @@ sub GOOGLECAST_initDevice {
     my ($hash) = @_;
     my $devName = $hash->{CCNAME};
 
+    Log3 $hash, 5, "GOOGLECAST($hash->{NAME}): start findChromecasts BlockingCall";
     BlockingCall("GOOGLECAST_findChromecasts", $hash->{NAME}, "GOOGLECAST_findChromecastsResult");
+    Log3 $hash, 5, "GOOGLECAST($hash->{NAME}): finished findChromecasts BlockingCall";
 
     return undef;
 }
@@ -567,10 +571,15 @@ sub GOOGLECAST_addSocketToMainloop {
 
     eval {
         $sock = $hash->{helper}{ccdevice}->{socket_client}->get_socket();
-        $hash->{helper}{currentsock} = $sock;
+        if ($sock->fileno() > 0) {
+            $hash->{helper}{currentsock} = $sock;
+        }
     };
 
-    my $chash = GOOGLECAST_newChash($hash, $sock, {NAME => "GOOGLECAST-".$hash->{NAME}});
+    if ($sock->fileno() > 0) {
+        my $chash = GOOGLECAST_newChash($hash, $sock, {NAME => "GOOGLECAST-".$hash->{NAME}});
+    }
+
     return undef;
 }
 
@@ -610,6 +619,8 @@ sub GOOGLECAST_Read {
     my ($hash) = @_;
     my $name = $hash->{NAME};
     $hash = $hash->{phash};
+
+    return undef if (!defined($hash));
 
     eval {
         Log3 $hash, 5, "GOOGLECAST ($hash->{NAME}): run_once";
