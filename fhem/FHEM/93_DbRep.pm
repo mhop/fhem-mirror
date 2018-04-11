@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 # 
+# 7.15.1       11.04.2018       sqlCmd accept widget textField-long, Internal MODEL is set
 # 7.15.0       24.03.2018       new command sqlSpecial
 # 7.14.8       21.03.2018       fix no save into database if value=0 (DbRep_OutputWriteToDB) 
 # 7.14.7       21.03.2018       exportToFile,importFromFile can use file as an argument and executeBeforeDump, 
@@ -332,7 +333,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.15.0";
+my $DbRepVersion = "7.15.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -782,9 +783,10 @@ sub DbRep_Set($@) {
           $sqlcmd = $prop;
       }
       if($opt eq "sqlCmd") {
-          shift @a;
-          shift @a;
-          $sqlcmd = join(" ", @a);
+          my @cmd = @a;
+          shift @cmd; shift @cmd;
+          $sqlcmd = join(" ", @cmd);
+          $sqlcmd =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
       }
       if($opt eq "sqlCmdHistory") {
           $prop =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
@@ -1036,14 +1038,14 @@ sub DbRep_Attr($$$$) {
                 foreach (@agentnoattr) {
                     delete($attr{$name}{$_});
                 }
-                
                 $attr{$name}{icon} = "security";
             }
             $do = $aVal;
         } else {
             $do = "Client";
         }
-        $hash->{ROLE} = $do;
+        $hash->{ROLE}  = $do;
+        $hash->{MODEL} = $hash->{ROLE};
         delete($attr{$name}{icon}) if($do eq "Client");
     }
                          

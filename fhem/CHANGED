@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbRep: 7.15.1, sqlCmd accept widget textField-long,
+                               Internal MODEL is set
   - feature: 72_FB_CALLMONITOR: new attribute "sendKeepAlive" to send cyclic
                                 keep-alives when connected FritzBox for example
                                 is located behind another NAT router
