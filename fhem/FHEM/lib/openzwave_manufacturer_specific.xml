@@ -1097,7 +1097,7 @@
 	<Manufacturer id="0271" name="Steinel">
 		<Product type="0002" id="1a72" name="IS 140-2" config="steinel/is140-2.xml"/>
 		<Product type="0001" id="1a73" name="XLED Home 2" config="steinel/is140-2.xml"/>
-		<Product type="0001" id="1a74" name="RS LED D2" forumNr="no-statistics"/>
+		<Product type="0001" id="1a74" name="RS LED D2" config="steinel/rs-led-d2.xml"/>
 		<Product type="0001" id="1a75" name="L 810 LED iHF" forumNr="no-statistics"/>
 	</Manufacturer>
 	<Manufacturer id="0166" name="Swiid">
