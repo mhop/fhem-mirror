@@ -669,7 +669,7 @@ FB_CALLMONITOR_reverseSearch($$)
     my $status;
     my $invert_match = undef;
     my $country_code = AttrVal($name, "country-code", "0049");
-    my @attr_list = split("(,|\\|)", AttrVal($name, "reverse-search", ""));
+    my @attr_list = split(/,|\|/, AttrVal($name, "reverse-search", ""));
     
     foreach my $method (@attr_list)
     {     
