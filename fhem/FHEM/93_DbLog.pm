@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.10.4     11.04.2018       fix addLog if no valueFn is used
 # 3.10.3     10.04.2018       minor fixes in addLog
 # 3.10.2     09.04.2018       add qualifier CN=<caller name> to addlog
 # 3.10.1     04.04.2018       changed event parsing of Weather
@@ -199,7 +200,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.10.3";
+my $DbLogVersion = "3.10.4";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -3564,7 +3565,7 @@ sub DbLog_AddLog($$$$$) {
   my ($dev_type,$dev_name,$dev_reading,$read_val,$event,$ut);  
   my @row_array;  
   my $ts;
-  
+
   return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
   
   # Funktion aus Attr valueFn validieren
@@ -3580,7 +3581,7 @@ sub DbLog_AddLog($$$$$) {
   my @dc = split(":",$devrdspec);
   pop @dc;
   my $devspec = join(':',@dc);
-  
+
   my @exdvs = devspec2array($devspec);
   Log3 $name, 4, "DbLog $name -> Addlog known devices by devspec: @exdvs";
   foreach (@exdvs) {
@@ -3611,7 +3612,7 @@ sub DbLog_AddLog($$$$$) {
 		   push @exrds,$rd if($rd =~ m/^$rdspec$/);
 	  }
 	  Log3 $name, 4, "DbLog $name -> Readings extracted from Regex: @exrds";
-	  
+
 	  if(!@exrds) {
           Log3 $name, 4, "DbLog $name -> no Reading of device '$dev_name' selected from '$rdspec' used by addLog !";
 	      next;
@@ -3619,12 +3620,12 @@ sub DbLog_AddLog($$$$$) {
 	  
 	  foreach (@exrds) {
 	      $dev_reading = $_;
-          $read_val = defined($value)?$value:ReadingsVal($dev_name,$dev_reading,"");
+          $read_val = $value ne ""?$value:ReadingsVal($dev_name,$dev_reading,"");
 	      $dev_type = uc($defs{$dev_name}{TYPE});
           
           # dummy-Event zusammenstellen
-	      $event = $dev_reading.": ".$read_val;
-	  
+	      $event = $dev_reading.": ".$read_val; 
+
 	      # den zusammengestellten Event parsen lassen (evtl. Unit zuweisen)
           my @r = DbLog_ParseEvent($dev_name, $dev_type, $event);
           $dev_reading = $r[0];
@@ -3637,10 +3638,9 @@ sub DbLog_AddLog($$$$$) {
 		  
 		  $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{TIME}  = $now;
           $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{VALUE} = $read_val;
-	  
+          $ts = TimeNow();
 	      # Anwender spezifische Funktion anwenden 
           if($value_fn ne '') {
-              $ts            = TimeNow();
               my $TIMESTAMP  = $ts;
  	          my $DEVICE     = $dev_name;
  	          my $DEVICETYPE = $dev_type;
@@ -7212,4 +7212,7 @@ sub dbReadings($@) {
 </ul>
 
 =end html_DE
+
 =cut
+
+
