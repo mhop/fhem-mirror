@@ -2007,7 +2007,7 @@ sub CUL_HM_Parse($$) {#########################################################
         $mh{shash}->{helper}{lastRain} = $mh{tmStr};
       }
       elsif ($val eq "dry" && $mh{shash}->{helper}{lastRain}){
-        push @evtEt,[$mh{shash},0,"lastRain:$mh{shash}->{helper}{lastRain}"];
+        push @evtEt,[$mh{shash},1,"lastRain:$mh{shash}->{helper}{lastRain}"];
         delete $mh{shash}->{helper}{lastRain};
       }
 
