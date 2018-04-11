@@ -75,6 +75,7 @@ FB_CALLMONITOR_Initialize($)
                          "fritzbox-remote-timeout ".
                          "fritzbox-user ".
                          "apiKeySearchCh ".
+                         "sendKeepAlives:none,5m,10m,15m,30m,1h ".
                          $readingFnAttributes;
 }
 
@@ -113,7 +114,8 @@ sub
 FB_CALLMONITOR_Undef($$)
 {
     my ($hash, $arg) = @_;
-
+  
+    RemoveInternalTimer($hash, "FB_CALLMONITOR_sendKeepAlive");
     DevIo_CloseDev($hash); 
     
     return undef;
@@ -606,22 +608,27 @@ FB_CALLMONITOR_Attr($@)
         {
             DevIo_OpenDev($hash, 0, undef, \&FB_CALLMONITOR_DevIoCallback);
         }
+        
+        if($attrib eq "sendKeepAlives" and $value !~ /^none|(?:5|10|15|30)m|1h$/)
+        {
+            return "invalid value $value for $attrib. Allowed values are: none,5m,10m,15m,30m,1h";
+        }
     }
     elsif($cmd eq "del")
     {
         if($attrib eq "reverse-search" or $attrib eq "reverse-search-phonebook-file")
         {
-            delete($hash->{helper}{PHONEBOOK}) if(defined($hash->{helper}{PHONEBOOK}));
+            delete($hash->{helper}{PHONEBOOK});
         } 
         
         if($attrib eq "reverse-search-cache")
         {
-            delete($hash->{helper}{CACHE}) if(defined($hash->{helper}{CACHE}));
+            delete($hash->{helper}{CACHE});
         } 
         
         if($attrib eq "reverse-search-text-file")
         {
-            delete($hash->{helper}{TEXTFILE}) if(defined($hash->{helper}{TEXTFILE}));
+            delete($hash->{helper}{TEXTFILE});
         }
         
         if($attrib eq "disable")
@@ -639,15 +646,19 @@ FB_CALLMONITOR_Attr($@)
 sub
 FB_CALLMONITOR_Notify($$)
 {
-    my ($hash,$device) = @_;
-
+    my ($hash, $device) = @_;
+    my $name = $hash->{NAME};
+    
     my $events = deviceEvents($device, undef);
     
     return if($device->{NAME} ne "global");
+    
+    FB_CALLMONITOR_sendKeepAlive($hash)  if(grep(m/(?:DELETE)?ATTR $name sendKeepAlives/, @{$events}));
+    
     return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$events}));
     
     FB_CALLMONITOR_readPhonebook($hash);
-    
+  
     return undef;
 }
 
@@ -2082,6 +2093,43 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
     Log3 $name, 4, "FB_CALLMONITOR ($name) - found matching deflection. call will be ignored" if($ret);
     return $ret;
 }
+
+sub FB_CALLMONITOR_sendKeepAlive($)
+{
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my $sendKeepAlives = AttrVal($name, "sendKeepAlives", "none");
+    my $values = {
+                    "5m" => 300,
+                    "10m" => 600,
+                    "15m" => 900,
+                    "30m" => 1800,
+                    "1h" => 3600
+                 };
+                 
+    if($sendKeepAlives ne "none" and DevIo_IsOpen($hash))
+    {
+        Log3 $name, 5, "FB_CALLMONITOR ($name) - sending keep-alive";
+        DevIo_SimpleWrite($hash, "\n", 2);
+        
+        if($values->{$sendKeepAlives})
+        {
+            InternalTimer(gettimeofday()+$values->{$sendKeepAlives}, "FB_CALLMONITOR_sendKeepAlive", $hash);
+        }
+        else
+        {
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - unsupported value for attribute sendKeepAlives: $sendKeepAlives. discard sending keep-alive";
+        }
+    }
+    else
+    {
+        RemoveInternalTimer($hash, "FB_CALLMONITOR_sendKeepAlive");
+    }
+    
+    return undef;
+}
+
+
 1;
 
 =pod
@@ -2223,7 +2271,11 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
     Use the given user for remote connect to obtain the phonebook (see <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>). This attribute is only needed, if you use multiple users on your FritzBox.<br><br>
     <li><a name="FB_CALLMONITOR_apiKeySearchCh">apiKeySearchCh</a> &lt;API-Key&gt;</li>
     A private API key from <a href="https://tel.search.ch/api/getkey" target="_new">tel.search.ch</a> to perform a reverse search via search.ch (see attribute <a href=#FB_CALLMONITOR_reverse-search">reverse-search</a>). Without an API key, no reverse search via search.ch is not possible<br><br>
-  </ul>
+    <li><a name="FB_CALLMONITOR_sendKeepAlives">sendKeepAlives</a> (none,5m,10m,15m,30m,1h)</li>
+    If activated, FB_CALLMONITOR sends a keep-alive on a regularly basis depending on the configured value. This ensures a working connection when the connected FritzBox is operating behind another NAT-based router (e.g. another FritzBox) so the connection will not be detected as "dead" and therefore blocked.<br><br>
+    Possible values: none,5m,10m,15m,30m,1h<br>
+    Default value: none (no keep-alives will be sent)<br>
+ </ul>
   <br>
  
   <a name="FB_CALLMONITOR_events"></a>
@@ -2387,6 +2439,10 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
     Der Username f&uuml;r das Telnet-Interface, sofern das Telefonbuch direkt von der FritzBox geladen werden soll (siehe Attribut: <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>). Dieses Attribut ist nur notwendig, wenn mehrere Benutzer auf der FritzBox konfiguriert sind.<br><br>
     <li><a name="FB_CALLMONITOR_apiKeySearchCh">apiKeySearchCh</a> &lt;API-Key&gt;</li>
     Der private API-Key von <a href="https://tel.search.ch/api/getkey" target="_new">tel.search.ch</a> um eine R&uuml;ckw&auml;rtssuche via search.ch durchzuf&uuml;hren (siehe Attribut <a href=#FB_CALLMONITOR_reverse-search">reverse-search</a>). Ohne einen solchen API-Key ist eine R&uuml;ckw&auml;rtssuche via search.ch nicht m&ouml;glich<br><br>
+    <li><a name="FB_CALLMONITOR_sendKeepAlives">sendKeepAlives</a> (none,5m,10m,15m,30m,1h)</li>
+    Wenn dieses Attribut gesetzt ist, wird ein zyklisches Keep-Alive im konfigurierten Zeitabstand an die FritzBox gesendet um die Verbindung aktiv zu halten. Dadurch bleibt die Verbindung bestehen, insbesondere wenn die verbundene FritzBox sich hinter einem weiteren NAT-Router befindet (z.B. einer weiteren FritzBox). Dadurch wird die Verbindung in so einem Fall nicht f&auml;lschlicherweise als "tot" erkannt und geblockt.<br><br>
+    M&ouml;gliche Werte: none,5m,10m,15m,30m,1h<br>
+    Standardwert ist "none" (es werden keine Keep-Alives gesendet)<br>
     </ul>
   <br>
  

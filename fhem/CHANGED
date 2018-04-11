@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 72_FB_CALLMONITOR: new attribute "sendKeepAlive" to send cyclic
+                                keep-alives when connected FritzBox for example
+                                is located behind another NAT router
   - bugfix:  72_FB_CALLMONITOR: fix log message on every reverse search:
                                 "unknown reverse search method ,"
   - bugfix:  93_DbLog: V3.10.4, fix addLog if no valueFn is used
