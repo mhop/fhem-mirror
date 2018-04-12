@@ -36,7 +36,8 @@
 #
 ###########################################################################################################################
 #  Versions History:
-# 
+#
+# 7.15.2       12.04.2018       fix in setting MODEL, prevent fhem from crash if wrong timestamp "0000-00-00" found in db 
 # 7.15.1       11.04.2018       sqlCmd accept widget textField-long, Internal MODEL is set
 # 7.15.0       24.03.2018       new command sqlSpecial
 # 7.14.8       21.03.2018       fix no save into database if value=0 (DbRep_OutputWriteToDB) 
@@ -333,7 +334,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.15.1";
+my $DbRepVersion = "7.15.2";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -433,6 +434,7 @@ sub DbRep_Define($@) {
   
   $hash->{LASTCMD}             = " ";
   $hash->{ROLE}                = AttrVal($name, "role", "Client");
+  $hash->{MODEL}               = $hash->{ROLE};
   $hash->{HELPER}{DBLOGDEVICE} = $a[2];
   $hash->{VERSION}             = $DbRepVersion;
   $hash->{NOTIFYDEV}           = "global,".$name;                     # nur Events dieser Devices an DbRep_Notify weiterleiten 
@@ -1601,6 +1603,11 @@ sub DbRep_createTimeArray($$$) {
  ######################################################################################
  #  absolute Auswertungszeiträume statische und dynamische (Beginn / Ende) berechnen 
  ######################################################################################
+ 
+ if($hash->{HELPER}{MINTS} && $hash->{HELPER}{MINTS} =~ m/0000-00-00/) {
+     Log3 ($name, 1, "DbRep $name - ERROR - wrong timestamp \"$hash->{HELPER}{MINTS}\" found in database. Please delete it !");
+     delete $hash->{HELPER}{MINTS};
+ }
  
  my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";  # Timestamp des 1. Datensatzes verwenden falls ermittelt
  $tsbegin = AttrVal($name, "timestamp_begin", $mints);
