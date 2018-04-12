@@ -1393,6 +1393,7 @@ sub LUXTRONIK2_SetParameter ($$$)
   my $result;
   my $buffer;
   my $host = $hash->{HOST};
+  my $port = $hash->{PORT};
   my $name = $hash->{NAME};
   
    my %opMode = ( "Auto" => 0,
@@ -1512,7 +1513,7 @@ sub LUXTRONIK2_SetParameter ($$$)
   if ($setParameter != 0) {
      LUXTRONIK2_Log $name, 5, "Opening connection to host ".$host;
      my $socket = new IO::Socket::INET (  PeerAddr => $host, 
-                     PeerPort => 8888,
+                     PeerPort => $port,
                      Proto => 'tcp'
        );
       # Socket error
