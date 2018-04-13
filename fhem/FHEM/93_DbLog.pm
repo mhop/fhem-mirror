@@ -16,6 +16,8 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.10.6     13.04.2018       verbose level in addlog changed if reading not found
+# 3.10.5     12.04.2018       fix warnings
 # 3.10.4     11.04.2018       fix addLog if no valueFn is used
 # 3.10.3     10.04.2018       minor fixes in addLog
 # 3.10.2     09.04.2018       add qualifier CN=<caller name> to addlog
@@ -200,7 +202,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.10.4";
+my $DbLogVersion = "3.10.6";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -3614,10 +3616,11 @@ sub DbLog_AddLog($$$$$) {
 	  Log3 $name, 4, "DbLog $name -> Readings extracted from Regex: @exrds";
 
 	  if(!@exrds) {
-          Log3 $name, 4, "DbLog $name -> no Reading of device '$dev_name' selected from '$rdspec' used by addLog !";
+          Log3 $name, 2, "DbLog $name -> no Reading '$rdspec' of device '$dev_name' found by addLog !";
 	      next;
       }
 	  
+      no warnings 'uninitialized'; 
 	  foreach (@exrds) {
 	      $dev_reading = $_;
           $read_val = $value ne ""?$value:ReadingsVal($dev_name,$dev_reading,"");
@@ -3663,7 +3666,6 @@ sub DbLog_AddLog($$$$$) {
  			  $ut           = $UNIT       if(defined $UNIT);
           }
 	   
-	      no warnings 'uninitialized'; 
           # Daten auf maximale Länge beschneiden
           ($dev_name,$dev_type,$event,$dev_reading,$read_val,$ut) = DbLog_cutCol($hash,$dev_name,$dev_type,$event,$dev_reading,$read_val,$ut);
           
@@ -3675,7 +3677,6 @@ sub DbLog_AddLog($$$$$) {
           my $row = ($ts."|".$dev_name."|".$dev_type."|".$event."|".$dev_reading."|".$read_val."|".$ut);
           Log3 $hash->{NAME}, 3, "DbLog $name -> addLog created - TS: $ts, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $dev_reading, Value: $read_val, Unit: $ut"
 		      if(!AttrVal($name, "suppressAddLogV3",0));
-		  use warnings;
   
           if($async) {
               # asynchoner non-blocking Mode
@@ -3694,6 +3695,7 @@ sub DbLog_AddLog($$$$$) {
 	          push(@row_array, $row);
           }
 	  }
+      use warnings;
   }
   if(!$async) {    
       if(@row_array) {
@@ -3701,7 +3703,7 @@ sub DbLog_AddLog($$$$$) {
 		  # return wenn "reopen" mit Ablaufzeit gestartet ist
           return if($hash->{HELPER}{REOPEN_RUNS});	  
           my $error = DbLog_Push($hash, 1, @row_array);
-		  
+
           my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
           my $evt    = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
           readingsSingleUpdate($hash, "state", $state, $evt);
