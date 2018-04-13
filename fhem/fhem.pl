@@ -4422,11 +4422,11 @@ readingsEndUpdate($$)
 
       my $trigger = $userReading->{trigger};
       my $reading= $userReading->{reading};
+      my ($event, $ownRead);
       if(defined($trigger)) {
-        my ($trRead, $ownRead);
-        map { $trRead  = 1 if($_ && $_ =~ m/^$trigger$/);
+        map { $event  = $_ if($_ && $_ =~ m/^$trigger$/);
               $ownRead = 1 if($_ && $_ =~ m/^$reading:/); } @{$hash->{CHANGED}};
-        next if(!$trRead || $ownRead);
+        next if(!$event || $ownRead);
       }
 
       my $modifier= $userReading->{modifier};
