@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_ElectricityCalculator: missing notifydev implemented
+  - bugfix:  73_GasCalculator: missing notifydev implemented
+  - bugfix:  73_WaterCalculator: missing notifydev implemented
   - change:  88_xs1Dev: xs1-function to set from FHEM
   - change:  88_xs1Bridge: fix PEARL WARNING
   - change: 10_MYSENSORS_DEVICE: implemented alive check thanks to Beta-User
