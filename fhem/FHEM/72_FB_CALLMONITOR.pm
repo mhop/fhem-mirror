@@ -2268,7 +2268,7 @@ sub FB_CALLMONITOR_sendKeepAlive($)
     A comma separated list of phonebook id's or names which should be excluded when retrieving all possible phonebooks via web or tr064 method (see attribute <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a>). All list possible values is provided by <a href="#FB_CALLMONITOR_get">get command</a> <i>showPhonebookIds</i>. This attribute is not applicable when using telnet method to obtain remote phonebook.<br><br>
     Default Value: <i>empty</i> (all phonebooks should be used, no exclusions)<br><br>
     <li><a name="FB_CALLMONITOR_fritzbox-user">fritzbox-user</a> &lt;username&gt;</li>
-    Use the given user for remote connect to obtain the phonebook (see <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>). This attribute is only needed, if you use multiple users on your FritzBox.<br><br>
+    Use the given username to obtain the phonebook via network connection (see <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>). This attribute is only needed, if you use multiple users on your FritzBox.<br><br>
     <li><a name="FB_CALLMONITOR_apiKeySearchCh">apiKeySearchCh</a> &lt;API-Key&gt;</li>
     A private API key from <a href="https://tel.search.ch/api/getkey" target="_new">tel.search.ch</a> to perform a reverse search via search.ch (see attribute <a href=#FB_CALLMONITOR_reverse-search">reverse-search</a>). Without an API key, no reverse search via search.ch is not possible<br><br>
     <li><a name="FB_CALLMONITOR_sendKeepAlives">sendKeepAlives</a> (none,5m,10m,15m,30m,1h)</li>
@@ -2436,7 +2436,7 @@ sub FB_CALLMONITOR_sendKeepAlive($)
     Eine komma-separierte Liste von Telefonbuch-ID's oder Namen welche beim einlesen &uuml;bersprungen werden sollen. Dieses Attribut greift nur beim einlesen der Telefonb&uuml;cher via "web"- oder "tr064"-Methode (siehe Attribut <i>fritzbox-remote-phonebook-via</i>). Eine Liste aller m&ouml;glichen Werte kann &uuml;ber das <a href="#FB_CALLMONITOR_get">Get-Kommando</a> <i>showPhonebookIds</i> angezeigt werden.<br><br>
     Standardm&auml;&szlig;ig ist diese Funktion deaktiviert (alle Telefonb&uuml;cher werden eingelesen)<br><br>
     <li><a name="FB_CALLMONITOR_fritzbox-user">fritzbox-user</a> &lt;Username&gt;</li>
-    Der Username f&uuml;r das Telnet-Interface, sofern das Telefonbuch direkt von der FritzBox geladen werden soll (siehe Attribut: <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>). Dieses Attribut ist nur notwendig, wenn mehrere Benutzer auf der FritzBox konfiguriert sind.<br><br>
+    Der Username, sofern das Telefonbuch direkt von der FritzBox via Netzwerk geladen werden soll (siehe Attribut: <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>). Dieses Attribut ist nur notwendig, wenn verschiedene Benutzernamen auf der FritzBox konfiguriert sind.<br><br>
     <li><a name="FB_CALLMONITOR_apiKeySearchCh">apiKeySearchCh</a> &lt;API-Key&gt;</li>
     Der private API-Key von <a href="https://tel.search.ch/api/getkey" target="_new">tel.search.ch</a> um eine R&uuml;ckw&auml;rtssuche via search.ch durchzuf&uuml;hren (siehe Attribut <a href=#FB_CALLMONITOR_reverse-search">reverse-search</a>). Ohne einen solchen API-Key ist eine R&uuml;ckw&auml;rtssuche via search.ch nicht m&ouml;glich<br><br>
     <li><a name="FB_CALLMONITOR_sendKeepAlives">sendKeepAlives</a> (none,5m,10m,15m,30m,1h)</li>
