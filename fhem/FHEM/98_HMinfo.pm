@@ -2415,14 +2415,9 @@ sub HMinfo_register ($){ ######################################################
 sub HMinfo_bpPost($) {#bp finished ############################################
   my ($rep) = @_;
   my ($name,$id,$cl,$ret) = split(";",$rep,4);
-  if ($rep =~ m/Can't open/){
+  if ($ret && defined $defs{$cl}){
+    $ret =~s/-ret-/\n/g; # re-insert new-line
     asyncOutput($defs{$cl},$ret);
-  }
-  else{
-    if ($ret && defined $defs{$cl}){
-      $ret =~s/-ret-/\n/g; # re-insert new-line
-      asyncOutput($defs{$cl},$ret);
-    }
   }
   delete $defs{$name}{nb}{$id};
   $defs{$name}{helper}{cfgChkResult} = $ret;
