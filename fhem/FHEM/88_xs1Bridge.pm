@@ -5,9 +5,9 @@
 #
 # note / ToDo´s / Bugs:
 # - Port Check ???
-# 
-# 
-# 
+# - Sendeausgabe im LOG anpassen
+#
+#
 #################################################################
 
 package main;
@@ -87,13 +87,13 @@ sub xs1Bridge_Define($$) {
 	
 	$hash->{STATE} = "Initialized";		## Der Status des Modules nach Initialisierung.
 	$hash->{TIME} = time();				## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.22";			## Version
+	$hash->{VERSION} = "1.24";			## Version
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
 	$attr{$name}{xs1_interval}	= "60"	if( not defined( $attr{$name}{xs1_interval} ) );
 	$attr{$name}{room}			= "xs1"	if( not defined( $attr{$name}{room} ) );
-	$attr{$name}{xs1_control}	= "0"		if( not defined( $attr{$name}{xs1_control} ) );
+	$attr{$name}{xs1_control}	= "0"	if( not defined( $attr{$name}{xs1_control} ) );
 	
 	$modules{xs1Bridge}{defptr}{BRIDGE} = $hash;
 	
@@ -101,10 +101,10 @@ sub xs1Bridge_Define($$) {
 
 	#Log3 $name, 3, "$typ: IODev defined with xs1_ip: $xs1_ip";
 	
-	if(!defined($defs{'FileLog_xs1Bridge'})) {												## Logfile existent check
+	if(!defined($defs{'FileLog_xs1Bridge'})) {													## Logfile existent check
 		Log3 $name, 4, "$typ: FileLog_xs1Bridge ist NICHT definiert";
-		fhem("define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log ".$arg[0]);		## Logfile define
-		fhem("attr FileLog_xs1Bridge room xs1");											## Logfile in xs1 room
+		fhem("define FileLog_xs1Bridge FileLog ./log/xs1Bridge-%Y-%m.log ".$arg[0]);			## Logfile define
+		fhem("attr FileLog_xs1Bridge room xs1");												## Logfile in xs1 room
 	} else {
 		Log3 $name, 4, "$typ: FileLog_xs1Bridge ist definiert";
 	}
@@ -119,8 +119,8 @@ sub xs1Bridge_Attr(@) {
 	my $debug = AttrVal($hash->{NAME},"debug",0);
 	my $xs1_interval = 0;
 	
-	my @string_attrValue = split(",",$attrValue);	## for Check Blacklist
-	my $length = scalar @string_attrValue;			## for Check Blacklist
+	my @string_attrValue = split(",",$attrValue) if (defined $attrValue);	## for Check Blacklist
+	my $length = scalar @string_attrValue;									## for Check Blacklist
 	
 	# $cmd  - Vorgangsart - kann die Werte "del" (löschen) oder "set" (setzen) annehmen
 	# $name - Gerätename
@@ -128,22 +128,22 @@ sub xs1Bridge_Attr(@) {
    
 	#### Handling bei set .. attribute
 	if ($cmd eq "set") {
-		RemoveInternalTimer($hash);											## Timer löschen
+		RemoveInternalTimer($hash);												## Timer löschen
 		Debug " $typ: Attr | Cmd:$cmd | RemoveInternalTimer" if($debug == 2);
-		if ($attrName eq "xs1_interval" && $attrValue == 0) {				## Handling xs1_interval == 0
+		if ($attrName eq "xs1_interval" && $attrValue == 0) {					## Handling xs1_interval == 0
 			RemoveInternalTimer($hash);
 			readingsSingleUpdate($hash, "state", "deactive", 1);
-		}elsif ($attrName eq "xs1_interval" && $attrValue >= 30) {	## Handling xs1_interval >= 30
+		}elsif ($attrName eq "xs1_interval" && $attrValue >= 30) {		## Handling xs1_interval >= 30
 			$xs1_ConnectionTry = 1;
 			my $xs1_interval = $attrValue;
 			InternalTimer(gettimeofday()+$xs1_interval, "xs1Bridge_GetUpDate", $hash);
 			readingsSingleUpdate($hash, "state", "active", 1);
 		### Ansicht xs1_Device_function ###
 		}elsif ($attrName eq "view_Device_function") {
-			if ($attrValue eq "1") {								## Handling view_Device_function 1
+			if ($attrValue eq "1") {									## Handling view_Device_function 1
 				Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
 			}
-			elsif ($attrValue eq "0") {								## Handling view_Device_function 0
+			elsif ($attrValue eq "0") {									## Handling view_Device_function 0
 				Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
 			}
 		### Ansicht xs1_Device_name ###
@@ -178,7 +178,7 @@ sub xs1Bridge_Attr(@) {
 				}
 			}
 		### Blacklist - Aktor / Sensor ###
-		}elsif ($attrName eq "xs1_blackl_aktor") {			## Handling xs1_blackl_aktor
+		}elsif ($attrName eq "xs1_blackl_aktor") {					## Handling xs1_blackl_aktor
 			for (my $x = 0; $x < $length ; $x++) {
 				if ($string_attrValue[$x]  =~ /^[1-9]{1}\d*/ && $string_attrValue[$x] <65) {
 					## RICHTIG ##
@@ -188,7 +188,7 @@ sub xs1Bridge_Attr(@) {
 			}
 			Log3 $name, 4, "$typ: Attribut xs1_blackl_aktor $attrValue";
 		
-		}elsif ($attrName eq "xs1_blackl_sensor") {			## Handling xs1_blackl_sensor
+		}elsif ($attrName eq "xs1_blackl_sensor") {					## Handling xs1_blackl_sensor
 			for (my $x = 0; $x < $length ; $x++) {
 				if ($string_attrValue[$x]  =~ /^[1-9]{1}\d*/ && $string_attrValue[$x] <65) {
 					## RICHTIG ##
@@ -202,12 +202,12 @@ sub xs1Bridge_Attr(@) {
 	
 	#### Handling bei del ... attribute
 	if ($cmd eq "del") {
-		if ($attrName eq "xs1_interval") {					## Handling deleteattr xs1_interval
+		if ($attrName eq "xs1_interval") {							## Handling deleteattr xs1_interval
 			RemoveInternalTimer($hash);
 			readingsSingleUpdate($hash, "state", "deactive", 1);
 			Debug " $typ: Attr | Cmd:$cmd | $attrName" if($debug == 2);
 		}
-		elsif ($attrName eq "view_Device_function") {		## Handling deleteattr view_Device_function
+		elsif ($attrName eq "view_Device_function") {				## Handling deleteattr view_Device_function
 			Log3 $name, 3, "$typ: Attribut view_Device_function delete";
 			for my $i (0..64) {
 				for my $i2 (1..4) {
@@ -215,7 +215,7 @@ sub xs1Bridge_Attr(@) {
 				}
 			}
 		}
-		elsif ($attrName eq "view_Device_name") {			## Handling deleteattr view_Device_name
+		elsif ($attrName eq "view_Device_name") {					## Handling deleteattr view_Device_name
 			Log3 $name, 3, "$typ: Attribut view_Device_name delete";
 			for my $i (0..64) {
 				delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
@@ -588,7 +588,10 @@ sub xs1Bridge_Write($)			## Zustellen von Daten via IOWrite() vom logischen zum 
 		if ($cmd eq "off") {
 			$cmd = 0;
 		}
-		$xs1cmd = "http://$xs1_ip/control?callback=cname&cmd=set_state_actuator&number=$Aktor_ID&value=$cmd";
+		$xs1cmd = "http://$xs1_ip/control?callback=cname&cmd=set_state_actuator&number=$Aktor_ID&$cmd2" if ($cmd2 =~ /[f][u][n][c][t][i][o][n][=]./);
+		my $valuenew = substr($cmd2,3,length($cmd2)-3) if ($cmd2 !~ /[f][u][n][c][t][i][o][n][=]./);
+		#Log3 $name, 3, "$typ: Write | Check cmd=$cmd cmd2=$cmd2 valuenew=$valuenew";
+		$xs1cmd = "http://$xs1_ip/control?callback=cname&cmd=set_state_actuator&number=$Aktor_ID&value=$valuenew" if ($cmd2 !~ /[f][u][n][c][t][i][o][n][=]./);
 	} else {
 		#### keine Verarbeitung zum senden ####
 		Log3 $name, 3, "$typ: Write | $xs1_typ not control xs1. Please inform me!";
@@ -714,7 +717,7 @@ sub is_in_array($$$)
 	<a name="xs1_attr"></a>
 	<b>Attributes</b>
 	<ul>
-		<li>debug (0,1)<br>
+		<li>debug (0,1,2)<br>
 		This brings the module into a very detailed debug output in the logfile. Program parts can be checked and errors checked.<br>
 		(Default, debug 0)
 		</li><br>
@@ -812,7 +815,7 @@ sub is_in_array($$$)
 	<a name="xs1_attr"></a>
 	<b>Attribute</b>
 	<ul>
-		<li>debug (0,1)<br>
+		<li>debug (0,1,2)<br>
 		Dies bringt das Modul in eine sehr ausf&uuml;hrliche Debug-Ausgabe im Logfile. Somit lassen sich Programmteile kontrollieren und Fehler &uuml;berpr&uuml;fen.<br>
 		(Default, debug 0)
 		</li><br>
