@@ -95,6 +95,7 @@ sub WaterCalculator_Define($$$)
 	$hash->{REGEXP} = $RegEx;	
 
 	### Writing values to global hash
+	notifyRegexpChanged($hash, $RegEx);
 	$hash->{NAME}							= $name;
 	$hash->{STATE}              			= "active";
 	$hash->{REGEXP}             			= $RegEx;
