@@ -32,7 +32,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-my $version = "0.9.7";
+my $version = "0.9.8";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -66,7 +66,7 @@ sub WUup_Initialize($) {
       . "wubaromin wudailyrainin wudewptf wuhumidity wurainin wusoilmoisture "
       . "wusoiltempf wusolarradiation wutempf wuUV wuwinddir wuwinddir_avg2m "
       . "wuwindgustdir wuwindgustdir_10m wuwindgustmph wuwindgustmph_10m "
-      . "wuwindspdmph_avg2m wuwindspeedmph "
+      . "wuwindspdmph_avg2m wuwindspeedmph wuAqPM2.5 wuAqPM10 "
       . $readingFnAttributes;
     $hash->{VERSION} = $version;
 }
@@ -354,6 +354,7 @@ sub WUup_receive($) {
 # 2017-10-19 added set-command "update"
 # 2018-03-19 solarradiation calculated from lux to W/m² (thanks to dieter114)
 # 2018-04-10 added attribute round
+# 2018-04-13 added AqPM2.5 and AqPM10
 #
 ################################################################################
 
@@ -422,24 +423,26 @@ sub WUup_receive($) {
             Solarradiation takes readings in lux and converts them to W/m&sup2;<br/><br/>
         <u>The following information is supported:</u>
         <ul>
-            <li>winddir - [0-360 instantaneous wind direction]</li>
-            <li>windspeedmph - [mph instantaneous wind speed]</li>
-            <li>windgustmph - [mph current wind gust, using software specific time period]</li>
-            <li>windgustdir - [0-360 using software specific time period]</li>
-            <li>windspdmph_avg2m  - [mph 2 minute average wind speed mph]</li>
-            <li>winddir_avg2m - [0-360 2 minute average wind direction]</li>
-            <li>windgustmph_10m - [mph past 10 minutes wind gust mph]</li>
-            <li>windgustdir_10m - [0-360 past 10 minutes wind gust direction]</li>
-            <li>humidity - [&#37; outdoor humidity 0-100&#37;]</li>
-            <li>dewptf- [F outdoor dewpoint F]</li>
-            <li>tempf - [F outdoor temperature]</li>
-            <li>rainin - [rain inches over the past hour)] -- the accumulated rainfall in the past 60 min</li>
-            <li>dailyrainin - [rain inches so far today in local time]</li>
-            <li>baromin - [barometric pressure inches]</li>
-            <li>soiltempf - [F soil temperature]</li>
-            <li>soilmoisture - [&#37;]</li>
-            <li>solarradiation - [W/m&sup2;]</li>
+            <li>winddir - instantaneous wind direction (0-360) [&deg;]</li>
+            <li>windspeedmph - instantaneous wind speed ·[mph]</li>
+            <li>windgustmph - current wind gust, using software specific time period [mph]</li>
+            <li>windgustdir - current wind direction, using software specific time period [&deg;]</li>
+            <li>windspdmph_avg2m  - 2 minute average wind speed [mph]</li>
+            <li>winddir_avg2m - 2 minute average wind direction [&deg;]</li>
+            <li>windgustmph_10m - past 10 minutes wind gust [mph]</li>
+            <li>windgustdir_10m - past 10 minutes wind gust direction [&deg;]</li>
+            <li>humidity - outdoor humidity (0-100) [&#37;]</li>
+            <li>dewptf- outdoor dewpoint [F]</li>
+            <li>tempf - outdoor temperature [F]</li>
+            <li>rainin - rain over the past hour -- the accumulated rainfall in the past 60 min [in]</li>
+            <li>dailyrainin - rain so far today in local time [in]</li>
+            <li>baromin - barometric pressure [inHg]</li>
+            <li>soiltempf - soil temperature [F]</li>
+            <li>soilmoisture - soil moisture [&#37;]</li>
+            <li>solarradiation - solar radiation[W/m&sup2;]</li>
             <li>UV - [index]</li>
+            <li>AqPM2.5 - PM2.5 mass [&micro;g/m&sup3;]</li>
+            <li>AqPM10 - PM10 mass [&micro;g/m&sup3;]</li>
         </ul>
         </li>
     </ul>
@@ -522,24 +525,26 @@ sub WUup_receive($) {
         Solarradiation nimmt Readings in lux an und rechnet diese in W/m&sup2; um.<br/><br/>
         <u>Unterst&uuml;tzte Angaben</u>
         <ul>
-            <li>Winddir - [0-360 momentane Windrichtung]</li>
-            <li>Windspeedmph - [mph momentane Windgeschwindigkeit]</li>
-            <li>Windgustmph - [mph aktuellen B&ouml;e, mit Software-spezifischem Zeitraum]</li>
-            <li>Windgustdir - [0-360 mit Software-spezifischer Zeit]</li>
-            <li>Windspdmph_avg2m - [mph durchschnittliche Windgeschwindigkeit innerhalb 2 Minuten]</li>
-            <li>Winddir_avg2m - [0-360 durchschnittliche Windrichtung innerhalb 2 Minuten]</li>
-            <li>Windgustmph_10m - [mph B&ouml;en der vergangenen 10 Minuten]</li>
-            <li>Windgustdir_10m - [0-360 Richtung der B&ouml;en der letzten 10 Minuten]</li>
-            <li>Feuchtigkeit - [&#37; Au&szlig;enfeuchtigkeit 0-100&#37;]</li>
-            <li>Dewptf- [F Taupunkt im Freien]</li>
-            <li>Tempf - [F Au&szlig;entemperatur]</li>
-            <li>Rainin - [in Regen in der vergangenen Stunde]</li>
-            <li>Dailyrainin - [in Regenmenge bisher heute]</li>
-            <li>Baromin - [inHg barometrischer Druck]</li>
-            <li>Soiltempf - [F Bodentemperatur]</li>
-            <li>Bodenfeuchtigkeit - [&#37;]</li>
-            <li>Solarradiation - [W/m&sup2;]</li>
+            <li>winddir - momentane Windrichtung (0-360) [&deg;]</li>
+            <li>windspeedmph - momentane Windgeschwindigkeit [mph]</li>
+            <li>windgustmph - aktuelle B&ouml;e, mit Software-spezifischem Zeitraum [mph]</li>
+            <li>windgustdir - aktuelle B&ouml;enrichtung, mit Software-spezifischer Zeitraum [&deg;]</li>
+            <li>windspdmph_avg2m - durchschnittliche Windgeschwindigkeit innerhalb 2 Minuten [mph]</li>
+            <li>winddir_avg2m - durchschnittliche Windrichtung innerhalb 2 Minuten [&deg;]</li>
+            <li>windgustmph_10m - B&ouml;en der vergangenen 10 Minuten [mph]</li>
+            <li>windgustdir_10m - Richtung der B&ouml;en der letzten 10 Minuten [&deg;]</li>
+            <li>humidity - Luftfeuchtigkeit im Freien (0-100) [&#37;]</li>
+            <li>dewptf- Taupunkt im Freien [F]</li>
+            <li>tempf - Au&szlig;entemperatur [F]</li>
+            <li>rainin - Regen in der vergangenen Stunde [in]</li>
+            <li>dailyrainin - Regenmenge bisher heute [in]</li>
+            <li>baromin - barometrischer Druck [inHg]</li>
+            <li>soiltempf - Bodentemperatur [F]</li>
+            <li>soilmoisture - Bodenfeuchtigkeit [&#37;]</li>
+            <li>solarradiation - Sonneneinstrahlung [W/m&sup2;]</li>
             <li>UV - [Index]</li>
+            <li>AqPM2.5 - Feinstaub PM2,5 [&micro;g/m&sup3;]</li>
+            <li>AqPM10 - Feinstaub PM10 [&micro;g/m&sup3;]</li>
         </ul>
         </li>
     </ul>
