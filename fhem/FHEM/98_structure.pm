@@ -41,10 +41,18 @@ structure_Initialize($)
   $hash->{NotifyFn}  = "structure_Notify";
   $hash->{SetFn}     = "structure_Set";
   $hash->{AttrFn}    = "structure_Attr";
-  $hash->{AttrList}  = "async_delay clientstate_priority ".
-                 "clientstate_behavior:relative,relativeKnown,absolute,last ".
-                 "disable disabledForIntervals evaluateSetResult:1,0 ".
-                 $readingFnAttributes;
+  no warnings 'qw';
+  my @attrList = qw(
+    async_delay
+    clientstate_behavior:relative,relativeKnown,absolute,last 
+    clientstate_priority
+    disable
+    disabledForIntervals
+    evaluateSetResult:1,0
+    setStructType:0,1
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList)." $readingFnAttributes";
 
   my %ahash = ( Fn=>"CommandAddStruct",
                 Hlp=>"<structure> <devspec>,add <devspec> to <structure>" );
@@ -97,7 +105,8 @@ structure_Define($$)
   structure_setDevs($hash, $def); # needed by set while init is running
   InternalTimer(1, sub {          # repeat it for devices defined later
     structure_setDevs($hash, $def);
-    structure_Attr("set", $devname, $stype, $devname);
+    structure_Attr("set", $devname, $stype, $devname)
+        if(AttrVal($devname, "setStructType", $featurelevel <= 5.8));
   }, undef, 0);
 
   return undef;
@@ -722,9 +731,17 @@ structure_Attr($@)
       compute the new status.
       </li>
 
+    <li>setStructType<br>
+      If true (1), then the &lt;struct-type&gt; will be set as an attribute for
+      each member device to the name of the structure.  True is the default for
+      featurelevel <= 5.8.
+      </li>
+
     <a name="structexclude"></a>
     <li>structexclude<br>
-        exclude the device from set/notify or attribute operations. For the set
+        Note: this is an attribute for the member device, not for the struct
+        itself.<br>
+        Exclude the device from set/notify or attribute operations. For the set
         and notify the value of structexclude must match the structure name,
         for the attr/deleteattr commands ist must match the combination of
         structure_name:attribute_name. Examples:<br>
@@ -930,6 +947,12 @@ structure_Attr($@)
       neuen Status auswerten soll.
       </li>
 
+
+    <li>setStructType<br>
+      Falls wahr (1), &lt;struct-type&gt; wird als Attribute f&uuml;r jedes
+      Mitglied-Ger&auml;t auf dem Namen der Struktur gesetzt.
+      Wahr ist die Voreinstellung f&uuml;r featurelevel <= 5.8.
+      </li>
 
     <li>structexclude<br>
       Bei gesetztem Attribut wird set, attr/deleteattr ignoriert.  Dies

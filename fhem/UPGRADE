@@ -23,3 +23,6 @@ enable the old feature.
     rewrite the above call to:
       wget 'http://fhemhost:8083/fhem?cmd=set%20device%20on&fwcsrf=mySecret'
     There are other solutions in the FHEM wiki.
+
+- 20XX-XX-XX (5.9)
+  - the default for the setStructType structure attribute changed from 1 to 0
