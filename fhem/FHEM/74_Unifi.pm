@@ -18,6 +18,8 @@
 #  - feature: 74_Unifi: added voucher-functions
 # V 2.2
 #  - feature: 74_Unifi: added set updateClien, encrypt user and password
+# V 2.2.1
+#  - feature: 74_Unifi: update VC-readings immediately when getting voucher
 
 
 package main;
@@ -606,14 +608,15 @@ sub Unifi_Get($@) {
     elsif ($getName eq 'voucher' && defined $hash->{hotspot}->{vouchers}[0]) {
         my $returnedVoucher = Unifi_getNextVoucherForNote($hash,$getVal);
         if ($returnedVoucher eq ""){
-            return "VoucherCache for $getVal is not defined!";
+            return "No voucher with note: $getVal!";
         }
         my $returnedVoucherCode = "";
         if(defined $returnedVoucher->{_id}){
             $returnedVoucherCode = $returnedVoucher->{code};
-            #if (defined $hash->{hotspot}->{voucherCache}->{$getVal}->{setCmd}){ 
-                $hash->{hotspot}->{voucherCache}->{$getVal}->{$returnedVoucher->{_id}}->{delivered_at} = time();
-            #}
+            if (defined $hash->{hotspot}->{voucherCache}->{$getVal}->{setCmd}){
+              $hash->{hotspot}->{voucherCache}->{$getVal}->{$returnedVoucher->{_id}}->{delivered_at} = time();
+              readingsSingleUpdate($hash,"-VC_".$getVal,Unifi_getNextVoucherForNote($hash,$getVal)->{code},1);
+            }
         }
         return $returnedVoucherCode;
     }
