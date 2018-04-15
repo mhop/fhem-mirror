@@ -51,11 +51,14 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 15.04.2018
+#	Streams über Alexa (z.B. Sonos One) werden nun korrekt als Radiostreams dargestellt
+#	Es werden nun auch Updateinformationen und die interne Softwareversionsnummer gesucht und als Reading gesetzt: "softwareRevisionAvailable", "softwareRevisionInternal" und "softwareRevisionInternalAvailable"
 # 24.03.2018
 #	Einige Log-Ausgaben haben bei undefinierten Default-Übergaben Fehlermeldungen verursacht.
 #	Bei einigen Positionsabfragen an die Player wurden Sonderfälle (wie NOT_IMPLEMENTED) nicht berücksichtigt.
 #	Slider-Wertebereich für Bass und Treble auf den Bereich -10..10 korrigiert.
-#	Es gibt jetzt ein Reading "IsZoneGroup", das 0 oder 1 sein kann. Danach wird jetzt auch entschieden, ob eine Playersteuerung dargestellt wird, oder nicht.
+#	Es gibt jetzt ein Reading "IsZoneBridge", das 0 oder 1 sein kann. Danach wird jetzt auch entschieden, ob eine Playersteuerung dargestellt wird, oder nicht.
 # 10.03.2018
 #	Die PlayBase kann nun auch den SPDIF-Eingang aktivieren (wie die PlayBar)
 #	Wenn man über Alexa Musik hört, wird das aktuelle Cover nun auch angezeigt.
@@ -71,10 +74,6 @@
 #	Warnung mit "unescaped left brace" in Tag.pm wurde korrigiert.
 #	ExportSonosBibliothek wird nun in einem eigenen Thread (LongJobs-Thread) ausgeführt. Dadurch bleibt das System steuerbar, auch wenn gerade ein langwieriger Export läuft.
 #	Prüfmethode eingebaut, um verlorengegangene Fhem-Prozessverbindungen (aus Sicht des SubProzesses) zu erkennen, und entsprechende Thread-Bereinigungmaßnahmen durchführen zu können.
-# 07.01.2018
-#	Der Initialwert von LastProcessAnswer (wird beim Start auf 0 gesetzt) wird nun korrekt berücksichtigt
-#	Bei ignoredIPs und bei usedOnlyIPs kann jetzt für jedes Komma-Getrennte Element auch ein regulärer Ausdruck stehen. Wird mit // umschlossen, und darf keine Doppelpunkte enthalten.
-#	Logausgabe im UPnP-Modul, welche Devices mit welchen Header-Angaben nun akzeptiert wurden (Ausgabe auf Level 5)
 #
 ########################################################################################
 #
@@ -5775,6 +5774,7 @@ sub SONOS_Discover_Callback($$$) {
 		my $saveRoomName = '';
 		my $modelNumber = '';
 		my $displayVersion = '';
+		my $internalVersion = '';
 		my $serialNum = '';
 		my $iconURI = '';
 	
@@ -5796,7 +5796,10 @@ sub SONOS_Discover_Callback($$$) {
 		
 		# DisplayVersion ermitteln
 		$displayVersion = decode_entities($1) if ($descriptionDocument =~ m/<displayVersion>(.*?)<\/displayVersion>/im);
-	
+		
+		# Interne Version ermitteln
+		$internalVersion = decode_entities($1) if ($descriptionDocument =~ m/<softwareVersion>(.*?)<\/softwareVersion>/im);
+		
 		# SerialNum ermitteln
 		$serialNum = decode_entities($1) if ($descriptionDocument =~ m/<serialNum>(.*?)<\/serialNum>/im);
 	
@@ -5991,6 +5994,15 @@ sub SONOS_Discover_Callback($$$) {
 		# Wenn der Player noch nicht auf der "Aktiv"-Liste steht, dann draufpacken...
 		push @{$SONOS_Client_Data{PlayerAlive}}, $udn if (!SONOS_isInList($udn, @{$SONOS_Client_Data{PlayerAlive}}));
 		
+		# Verfügbare Software herausfinden...
+		my $internalVersionAvailable = '';
+		my $softwareVersionAvailable = '';
+		my $updateItem = $SONOS_ZoneGroupTopologyProxy{$udn}->CheckForUpdate('Software', 'false', '')->getValue('UpdateItem');
+		if ($updateItem =~ m/<UpdateItem xmlns=".*?" Type="Software" Version="(.+?)" UpdateURL=".+?v(.+?)-.+?" DownloadSize=".+?" ManifestURL=".+?"\/>/i) {
+			$internalVersionAvailable = $1;
+			$softwareVersionAvailable = $2;
+		}
+		
 		# Readings aktualisieren
 		SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'presence', 'appeared');
@@ -6003,6 +6015,9 @@ sub SONOS_Discover_Callback($$$) {
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'Volume', $currentVolume);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'location', $device->location);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'softwareRevision', $displayVersion);
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'softwareRevisionAvailable', $softwareVersionAvailable);
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'softwareRevisionInternal', $internalVersion);
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'softwareRevisionInternalAvailable', $internalVersionAvailable);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'serialNum', $serialNum);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'fieldType', $fieldType);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'IsBonded', (($fieldType eq '') || ($fieldType eq 'LF') || ($fieldType eq 'LF_RF')) ? '0' : '1');
@@ -6881,7 +6896,7 @@ sub SONOS_TransportCallback($$) {
 		SONOS_Client_Notifier('ProcessCover:'.$udn.':0:'.SONOS_URI_Escape($tempURI).':'.SONOS_URI_Escape($groundURL));
 		
 		# Auch hier den XML-Parser verhindern, und alles per regulärem Ausdruck ermitteln...
-		if ($currentTrackMetaData =~ m/<dc:title>x-(sonosapi|rincon)-(stream|mp3radio):.*?<\/dc:title>/) {
+		if ($currentTrackMetaData =~ m/(<dc:title>x-(sonosapi|rincon)-(stream|mp3radio):.*?<\/dc:title>|<res protocolInfo="x-(sonosapi|rincon)-(stream|mp3radio):.*?">)/) {
 			# Wenn es ein Stream ist, dann muss da was anderes erkannt werden
 			SONOS_Log $udn, 4, "Transport-Event: Stream erkannt!";
 			SONOS_Client_Notifier('SetCurrent:StreamAudio:1');
