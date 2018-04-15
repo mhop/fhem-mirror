@@ -68,7 +68,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 
 
-my $version = "1.0.0";
+my $version = "1.0.1";
 
 
 
@@ -262,7 +262,8 @@ sub GardenaSmartBridge_Notify($$) {
                                                     )
                                                 and $init_done );
 
-    if( $devtype eq 'GardenaSmartBridge' and grep /^state:.connected.to.cloud$/,@{$events} ) {
+    if( $devtype eq 'GardenaSmartBridge' and (grep /^state:.connected.to.cloud$/,@{$events}
+                                            or grep /^lastRequestState:.request_error$/,@{$events}) ) {
     
         InternalTimer( gettimeofday()+$hash->{INTERVAL},"GardenaSmartBridge_getDevices", $hash);
         Log3 $name, 4, "GardenaSmartBridge ($name) - set internal timer function for recall GardenaSmartBridge_getDevices sub";
@@ -330,7 +331,8 @@ sub GardenaSmartBridge_Write($@) {
         }
     );
 
-    Log3 $name, 4, "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method";
+    #Log3 $name, 4, "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method";
+    Log3 $name, 4, "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: secret!, DATA: secret!, METHOD: $method";
 }
 
 sub GardenaSmartBridge_ErrorHandling($$$) {

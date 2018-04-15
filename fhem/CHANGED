@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_GardenaSmartBridge: add error trigger for notify sub
   - feature: 98_SVG.pm: horizontalLine* added (Forum #86800)
   - change:  93_DbLog: verbose level in addlog changed if reading not found
   - feature: 59_WUup: added AqPM2.5, AqPM10; fixed documentation
