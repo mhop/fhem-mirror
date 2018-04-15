@@ -992,7 +992,7 @@ SVG_calcOffsets($$)
 
   } elsif($zoom eq "qday") {
     if($endPlotNow) {
-      my $t = int($now/300)*300 + ($off-1)*21600;
+      my $t = int($now/300)*300+300 + ($off-1)*21600;
       my @l = localtime($t);
       $SVG_devs{$d}{from} = SVG_tspec( 0,$l[1],$l[2],$l[3],$l[4],$l[5]);
       @l = localtime($t+21600-1);
@@ -1009,7 +1009,7 @@ SVG_calcOffsets($$)
   } elsif($zoom =~ m/^(\d+)?day/) {
     my $nDays = $1 ? ($1-1) : 0;
     if($endPlotNow) {
-      my $t = int($now/300)*300 + ($off-$nDays-1)*86400;
+      my $t = int($now/300)*300+300 + ($off-$nDays-1)*86400;
       my @l = localtime($t);
       $SVG_devs{$d}{from} = SVG_tspec(0,$l[1],$l[2],$l[3],$l[4],$l[5]);
       @l = localtime($t+(1+$nDays)*86400-1);
