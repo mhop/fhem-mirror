@@ -23,6 +23,8 @@
 #
 ########################################################################################
 # Changelog
+# 15.04.2018
+#	Beim Stoppen der Wiedergabe werden nun noch einige Readings geleert, damit diese sauber neu belegt werden können.
 # 26.02.2018
 #	Es gab einen Fehler bei der prozentualen Positionsberechnung. Nun wird ein Dezimalbruch zwischen 0.0 und 100.0 ausgegeben, den man mit dem Attribut "PositionPercentFormat" z.B. auch auf mehrere Nachkommastellen formatieren kann.
 #	Heartbeat und 3facher Verbindungsversuch wurden wieder abgeschafft, da es keinen Vorteil gebracht hat.
@@ -460,7 +462,7 @@ sub MEDIAPORTAL_Read($) {
 	
 	my $buf = DevIo_SimpleRead($hash);
 	if(!defined($buf)) {
-		MEDIAPORTAL_Log $hash->{NAME}, 3, 'DevIo_SimpleRead hat keine Daten geliefert, obwohl Read aufgerufen wurde! Setze Buffer zurück. Aktueller Buffer: '.$hash->{helper}{buffer};
+		MEDIAPORTAL_Log $hash->{NAME}, 3, 'DevIo_SimpleRead hat keine Daten geliefert, obwohl Read aufgerufen wurde! Setze Buffer und einige Readings zurück. Aktueller Buffer: '.$hash->{helper}{buffer};
 		$hash->{helper}{buffer} = '';
 		return undef;
 	}
@@ -547,6 +549,32 @@ sub MEDIAPORTAL_ProcessMessage($$) {
 			readingsBulkUpdate($hash, 'playStatus', $playStatus);
 			readingsBulkUpdate($hash, 'CurrentModule', $json->{CurrentModule});
 			readingsBulkUpdate($hash, 'Title', $title);
+			
+			# Wenn der Abspielstatus auf Stopped gewechselt hat, dann einige Readings löschen...
+			if ($json->{IsPlaying} eq 'false' && $json->{IsPaused} eq 'false') {
+				readingsBulkUpdate($hash, 'Title', '');
+				readingsBulkUpdate($hash, 'Description', '');
+				readingsBulkUpdate($hash, 'nextTitle', '');
+				readingsBulkUpdate($hash, 'nextDescription', '');
+				
+				readingsBulkUpdate($hash, 'mediaType', '');
+				readingsBulkUpdate($hash, 'tvChannel', '');
+				readingsBulkUpdate($hash, 'tvCurrentProgramName', '');
+				readingsBulkUpdate($hash, 'tvNextProgramName', '');
+				readingsBulkUpdate($hash, 'movieTitle', '');
+				readingsBulkUpdate($hash, 'seriesName', '');
+				readingsBulkUpdate($hash, 'seriesSeason', '');
+				readingsBulkUpdate($hash, 'seriesEpisode', '');
+				readingsBulkUpdate($hash, 'seriesTitle', '');
+				readingsBulkUpdate($hash, 'recordingChannel', '');
+				readingsBulkUpdate($hash, 'recordingProgramName', '');
+				
+				readingsBulkUpdate($hash, 'Position', '0:00:00');
+				readingsBulkUpdate($hash, 'PositionPercent', 0);
+				readingsBulkUpdate($hash, 'File', '');
+				readingsBulkUpdate($hash, 'Duration', '0:00:00');
+			}
+			
 			readingsEndUpdate($hash, 1);
 			
 			$hash->{helper}{LastStatusTitle} = $title;
