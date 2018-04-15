@@ -84,6 +84,12 @@ sv_menu(evt, embed)
   var lid = $(label).attr("line_id");
   var sel = $(svg).find("#"+lid);
   var selNode = $(sel).get(0);
+
+  // horizintalLine* consists of a list of lines, too much work do handle
+  // it.
+  if(!selNode)
+    return;
+
   var tl = $(svg).find("#svg_title");
   var par = svgNode.par;
 
