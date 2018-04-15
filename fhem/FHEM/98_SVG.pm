@@ -1050,7 +1050,7 @@ SVG_calcOffsets($$)
       $sm = $l[4]-1; $em = $l[4];
       $sm += 12, $sy-- if($sm < 0);
       $sd = $l[3]+1; $ed = $l[3];
-      $sd = $me[$sm] if($sd > $me[$sm]);
+      $sd=1, $sm=$em, $sy=$ey if($sd > $me[$sm]);
 
     } else {
       $sy = $ey = $l[5];
