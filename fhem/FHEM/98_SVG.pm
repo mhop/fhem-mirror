@@ -380,12 +380,13 @@ SVG_PEdit($$$$)
                "s.display = s.display=='none' ? 'block' : 'none';".
                "s=document.getElementById('pdisp').style;".
                "s.display = s.display=='none' ? 'block' : 'none';";
-    $ret .= "<a id=\"pdisp\" style=\"cursor:pointer\" onClick=\"$pgm\">Show Plot Editor</a>";
+    $ret .= "<a id=\"pdisp\" style=\"cursor:pointer\" onClick=\"$pgm\">".
+                "Show Plot Editor</a>";
     $pestyle = 'style="display:none"';
   }
 
-  $ret .= "<form $pestyle id=\"pedit\" method=\"$FW_formmethod\" autocomplete=\"off\" ".
-                "action=\"$FW_ME/SVG_WriteGplot\">";
+  $ret.="<form $pestyle id='pedit' method='$FW_formmethod' autocomplete='off' ".
+              "action='$FW_ME/SVG_WriteGplot'>";
   $ret .= FW_hidden("detail", $d); # go to detail after save
   if(defined($FW_pos{zoom}) && defined($FW_pos{off})) { # for showData
     $ret .= FW_hidden("pos", "zoom=$FW_pos{zoom};off=$FW_pos{off}");
@@ -501,7 +502,8 @@ SVG_PEdit($$$$)
     $o .= SVG_sel("axes_${idx}", "left,right,left log,right log", $sel );
     $o .= SVG_sel("type_${idx}",
                 "lines,points,steps,fsteps,histeps,bars,ibars,".
-                        "cubic,quadratic,quadraticSmooth",
+                "horizontalLineFrom,horizontalLineTo,".
+                "cubic,quadratic,quadraticSmooth",
                 $conf{lType}[$idx]);
     my $ls = $conf{lStyle}[$idx]; 
     if($ls) {
@@ -514,7 +516,7 @@ SVG_PEdit($$$$)
       $lw =~ s/.*stroke-width://g;
       $lw =~ s/"//g; 
     }
-    $o .= SVG_sel("width_$idx", "0.2,0.5,1,1.5,2,3,4", ($lw ? $lw : 1));
+    $o .= SVG_sel("width_$idx", "0.2,0.5,1,1.5,2,3,4,8,12,16,24",($lw ? $lw:1));
     $o .= "</td></tr>";
     $output[$idx] = $o;
   }
@@ -2013,6 +2015,7 @@ SVG_render($$$$$$$$$$)
         SVG_pO "<rect $attributes $lStyle x=\"$x1\" y=\"$y1\" ".
                     "width=\"$x2\" height=\"$y2\"/>";
       }
+
     } elsif( $lType eq "ibars" ) { # Forum #35268
       if(@{$dxp} == 1) {
         my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
@@ -2034,6 +2037,18 @@ SVG_render($$$$$$$$$$)
                         "width=\"$bw\" height=\"$height\"/>";
         }
       }
+
+    } elsif($lType =~ m/^horizontalLine(From|To)$/) {
+      $attributes =~ s/id=\"line_[^\"]+\"//;    # no id for each line
+      foreach my $i (0..int(@{$dxp})-2) {
+        my ($x1, $y1) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
+        my ($x2, $y2) = ($x+$dxp->[$i+1], $y+$h-($dyp->[$i+1]-$min)*$hmul);
+        next if(int($x2) == $lx);
+        my $Y = ($lType eq "horizontalLineFrom" ? $y1 : $y2);
+        SVG_pO "<line $attributes $lStyle x1='$x1' y1='$Y' x2='$x2' y2='$Y'/>";
+        $lx = int($x2);
+      }
+
     } else {                            # lines and everything else
       my ($ymin, $ymax) = (99999999, -99999999);
       my %lt =(cubic=>"C",quadratic=>"Q",quadraticSmooth=>"T");
@@ -2278,14 +2293,17 @@ SVG_calcControlPoints($$$$$$)
       $iloc++;
     }
 
-    # Calulcation of first control Point using first 3 Points around actual Point
+    # Calulcation of first control Point using first 3 Points around actual
+    # Point
     my $m1x = ($lxp[0]+$lxp[1])/2.0;
     my $m1y = ($lyp[0]+$lyp[1])/2.0;
     my $m2x = ($lxp[1]+$lxp[2])/2.0;
     my $m2y = ($lyp[1]+$lyp[2])/2.0;
     
-    my $l1 = sqrt(($lxp[0]-$lxp[1])*($lxp[0]-$lxp[1])+($lyp[0]-$lyp[1])*($lyp[0]-$lyp[1]));
-    my $l2 = sqrt(($lxp[1]-$lxp[2])*($lxp[1]-$lxp[2])+($lyp[1]-$lyp[2])*($lyp[1]-$lyp[2]));
+    my $l1 = sqrt(($lxp[0]-$lxp[1])*($lxp[0]-$lxp[1]) +
+                  ($lyp[0]-$lyp[1])*($lyp[0]-$lyp[1]));
+    my $l2 = sqrt(($lxp[1]-$lxp[2])*($lxp[1]-$lxp[2]) +
+                  ($lyp[1]-$lyp[2])*($lyp[1]-$lyp[2]));
     
     my $dxm = ($m1x - $m2x);
     my $dym = ($m1y - $m2y);
@@ -2299,14 +2317,17 @@ SVG_calcControlPoints($$$$$$)
     $px1->[$i] = $m2x + $tx;
     $py1->[$i] = $m2y + $ty;
 
-    # Calulcation of second control Point using last 3 Points around actual Point
+    # Calulcation of second control Point using last 3 Points around actual
+    # Point
     $m1x = ($lxp[1]+$lxp[2])/2.0;
     $m1y = ($lyp[1]+$lyp[2])/2.0;
     $m2x = ($lxp[2]+$lxp[3])/2.0;
     $m2y = ($lyp[2]+$lyp[3])/2.0;
     
-    $l1 = sqrt(($lxp[1]-$lxp[2])*($lxp[1]-$lxp[2])+($lyp[1]-$lyp[2])*($lyp[1]-$lyp[2]));
-    $l2 = sqrt(($lxp[2]-$lxp[3])*($lxp[2]-$lxp[3])+($lyp[2]-$lyp[3])*($lyp[2]-$lyp[3]));
+    $l1 = sqrt(($lxp[1]-$lxp[2])*($lxp[1]-$lxp[2])+
+               ($lyp[1]-$lyp[2])*($lyp[1]-$lyp[2]));
+    $l2 = sqrt(($lxp[2]-$lxp[3])*($lxp[2]-$lxp[3])+
+               ($lyp[2]-$lyp[3])*($lyp[2]-$lyp[3]));
     
     $dxm = ($m1x - $m2x);
     $dym = ($m1y - $m2y);
