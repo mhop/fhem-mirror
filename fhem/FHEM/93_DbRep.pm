@@ -37,6 +37,8 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.17.0       17.04.2018       new function DbReadingsVal
+# 7.16.0       13.04.2018       new function dbValue (blocking)
 # 7.15.2       12.04.2018       fix in setting MODEL, prevent fhem from crash if wrong timestamp "0000-00-00" found in db 
 # 7.15.1       11.04.2018       sqlCmd accept widget textField-long, Internal MODEL is set
 # 7.15.0       24.03.2018       new command sqlSpecial
@@ -334,7 +336,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.15.2";
+my $DbRepVersion = "7.17.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -802,7 +804,7 @@ sub DbRep_Set($@) {
       }
       $hash->{LASTCMD} = $sqlcmd?"$opt $sqlcmd":"$opt";
 	  if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
-          return " Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
+          return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }  
       DbRep_Main($hash,$opt,$sqlcmd);
 	 
@@ -870,6 +872,7 @@ sub DbRep_Get($@) {
                 "svrinfo:noArg ".
 				"blockinginfo:noArg ".
                 "minTimestamp:noArg ".
+                "dbValue ".
                 (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
                 (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
 				(($dbmodel eq "MYSQL")?"procinfo:noArg ":"").
@@ -913,6 +916,20 @@ sub DbRep_Get($@) {
       DbRep_delread($hash); 
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);   
 	  DbRep_firstconnect($hash);	  
+  
+  } elsif ($opt =~ /dbValue/) {
+      return "get \"$opt\" needs at least an argument" if ( @a < 3 );
+      # remove arg 0, 1 to get SQL command
+      my @cmd = @a;
+      shift @cmd; shift @cmd;
+      my $sqlcmd = join(" ",@cmd);
+      $sqlcmd =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+      $hash->{LASTCMD} = $sqlcmd?"$opt $sqlcmd":"$opt";
+	  if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
+          return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
+      }  
+      my ($err,$ret) = DbRep_dbValue($name,$sqlcmd);
+      return $err?$err:$ret;
   
   } else {
       return "$getlist";
@@ -8713,6 +8730,165 @@ return $val;
 }
 
 ####################################################################################################
+#     blockierende DB-Abfrage 
+#     liefert Ergebnis sofort zurück, setzt keine Readings
+####################################################################################################
+sub DbRep_dbValue($$) {
+  my ($name,$cmd) = @_;
+  my $hash       = $defs{$name};
+  my $dbloghash  = $hash->{dbloghash};
+  my $dbconn     = $dbloghash->{dbconn};
+  my $dbuser     = $dbloghash->{dbuser};
+  my $dblogname  = $dbloghash->{NAME};
+  my $dbpassword = $attr{"sec$dblogname"}{secret};
+  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
+  my ($err,$ret,$dbh);
+  
+  readingsDelete($hash, "errortext");
+  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
+  
+  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
+ 
+  if ($@) {
+     $err = $@;
+     Log3 ($name, 2, "DbRep $name - $err");
+     ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+     ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+     return ($err);  
+  } 
+
+  my $sql = ($cmd =~ m/\;$/)?$cmd:$cmd.";";
+  
+  # Ausgaben
+  Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
+  Log3 ($name, 4, "DbRep $name - Command: dbValue");  
+  Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
+
+  # SQL-Startzeit
+  my $st = [gettimeofday];  
+  
+  my ($sth,$r);
+  eval {$sth = $dbh->prepare($sql);
+        $r = $sth->execute();
+       }; 
+  
+  if ($@) {
+     $err = $@;
+     Log3 ($name, 2, "DbRep $name - $err");
+     $dbh->disconnect;
+     ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+     ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+     return ($err);     
+  }
+  
+  my $nrows = 0;
+  if($sql =~ m/^\s*(select|pragma|show)/is) {
+    while (my @line = $sth->fetchrow_array()) {
+      Log3 ($name, 4, "DbRep $name - SQL result: @line");
+      $ret .= join("$srs", @line);
+      $ret .= "\n";
+      # Anzahl der Datensätze
+      $nrows++;
+    }
+    
+  } else {
+     $nrows = $sth->rows;
+     eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+     if ($@) {
+         $err = $@;
+         Log3 ($name, 2, "DbRep $name - $err");
+         $dbh->disconnect;
+         ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
+         ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+         return ($err);    
+     }
+	 $ret = $nrows; 
+  }
+  
+  $sth->finish;
+  $dbh->disconnect;
+  
+  # SQL-Laufzeit ermitteln
+  my $rt = tv_interval($st);
+  
+  my $com = (split(" ",$sql, 2))[0];
+  Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");
+  
+  # Readingaufbereitung
+  readingsBeginUpdate($hash);
+  ReadingsBulkUpdateTimeState($hash,undef,$rt,"done");
+  readingsEndUpdate($hash, 1);
+  
+return ($ret); 
+}
+
+####################################################################################################
+#     blockierende DB-Abfrage 
+#     liefert den Wert eines Device:Readings des nächsmöglichen Logeintrags zum 
+#     angegebenen Zeitpunkt
+#
+#     Aufruf: DbReadingsVal("<dbrep-device>","<device:reading>","<timestamp>,"<default>")
+####################################################################################################
+sub DbReadingsVal($$$$) {
+  my ($name, $devread, $ts, $default) = @_;
+  my $hash = $defs{$name};
+  my $dbmodel = $defs{$hash->{HELPER}{DBLOGDEVICE}}{MODEL};
+  my ($err,$ret,$sql);
+  
+  unless(defined($defs{$name})) {
+      return ("DbRep-device \"$name\" doesn't exist.");
+  }
+  unless($ts =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
+      return ("timestamp has not a valid format. Use \"YYYY-MM-DD hh:mm:ss\" as timestamp.");
+  }
+  my ($dev,$reading) = split(":",$devread);
+  unless($dev && $reading) {
+      return ("device:reading must be specified !");
+  }
+  
+  if($dbmodel eq "MYSQL") {
+      $sql = "select value from ( 
+                ( select *, TIMESTAMPDIFF(SECOND, '$ts', timestamp) as diff from history 
+                  where device='$dev' and reading='$reading' and timestamp >= '$ts' order by timestamp asc limit 1 
+                ) 
+                union 
+                ( select *, TIMESTAMPDIFF(SECOND, timestamp, '$ts') as diff from history 
+                  where device='$dev' and reading='$reading' and timestamp < '$ts' order by timestamp desc limit 1 
+                ) 
+              ) x order by diff limit 1;";
+  
+  } elsif ($dbmodel eq "SQLITE") {
+      $sql = "select value from (
+                select value, (julianday(timestamp) - julianday('$ts')) * 86400.0 as diff from history 
+                where device='MyWetter' and reading='temperature' and timestamp >= '$ts' 
+                union
+                select value, (julianday('$ts') - julianday(timestamp)) * 86400.0 as diff from history 
+                where device='MyWetter' and reading='temperature' and timestamp < '$ts'
+              )
+              x order by diff limit 1;";    
+  
+  } elsif ($dbmodel eq "POSTGRESQL") {
+      $sql = "select value from (
+                select value, EXTRACT(EPOCH FROM (timestamp - '$ts')) as diff from history 
+                where device='MyWetter' and reading='temperature' and timestamp >= '$ts' 
+                union
+                select value, EXTRACT(EPOCH FROM ('$ts' - timestamp)) as diff from history 
+                where device='MyWetter' and reading='temperature' and timestamp < '$ts'
+              )
+              x order by diff limit 1;";     
+  } else {
+      return ("DbReadingsVal is not implemented for $dbmodel");
+  }
+  
+  $hash->{LASTCMD} = "dbValue $sql";
+  $ret = DbRep_dbValue($name,$sql);
+  $ret = $ret?$ret:$default;
+
+return $ret;
+}
+
+####################################################################################################
 # Browser Refresh nach DB-Abfrage
 ####################################################################################################
 sub browser_refresh($) { 
@@ -8782,7 +8958,8 @@ return;
   The purpose of this module is browsing and managing the content of DbLog-databases. The searchresults can be evaluated concerning to various aggregations and the appropriate 
   Readings will be filled. The data selection will been done by declaration of device, reading and the time settings of selection-begin and selection-end.  <br><br>
   
-  All database operations are implemented nonblocking. Optional the execution time of SQL-statements in background can also be determined and provided as reading.
+  Almost all database operations are implemented nonblocking. If there are exceptions it will be suggested to.
+  Optional the execution time of SQL-statements in background can also be determined and provided as reading.
   (refer to <a href="#DbRepattr">attributes</a>). <br>
   All existing readings will be deleted when a new operation starts. By attribute "readingPreventFromDel" a comma separated list of readings which are should prevent
   from deletion can be provided. <br><br>
@@ -8801,9 +8978,10 @@ return;
      <li> export of datasets to file (CSV-format). </li>
      <li> import of datasets from file (CSV-Format). </li>
      <li> rename of device/readings in datasets </li>
-     <li> change of reading values in the database </li>
+     <li> change of reading values in the database (changeValue) </li>
      <li> automatic rename of device names in datasets and other DbRep-definitions after FHEM "rename" command (see <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
-	 <li> Execution of arbitrary user specific SQL-commands </li>
+	 <li> Execution of arbitrary user specific SQL-commands (non-blocking) </li>
+     <li> Execution of arbitrary user specific SQL-commands (blocking) for usage in user own code (dbValue) </li>
 	 <li> creation of backups of the database in running state non-blocking (MySQL, SQLite) </li>
 	 <li> transfer dumpfiles to a FTP server after backup incl. version control</li>
 	 <li> restore of SQLite-dumps and MySQL serverSide-backups non-blocking </li>
@@ -8817,21 +8995,50 @@ return;
      </ul></ul>
      <br>
      
-  To activate the function "Autorename" the attribute "role" has to be assigned to a defined DbRep-device. The standard role after DbRep definition is "Client.
-  Please read more in section <a href="#DbRepAutoRename">DbRep-Agent</a> . <br><br>
+  To activate the function <b>Autorename</b> the attribute "role" has to be assigned to a defined DbRep-device. The standard role after DbRep definition is "Client".
+  Please read more in section <a href="#DbRepAutoRename">DbRep-Agent</a> about autorename function. <br><br>
   
-  DbRep provides a UserExit function. By that interface the user can execute own program code dependent from free 
+  DbRep provides a <b>UserExit</b> function. With this interface the user can execute own program code dependent from free 
   definable Reading/Value-combinations (Regex). The interface works without respectively independent from event 
   generation.
-  Further informations you can find as described at <a href="#DbRepattr">attribute</a> "userExitFn". <br><br>
+  Further informations you can find as described at <a href="#DbRepattr">attribute</a> "userExitFn". 
+  <br><br>
+  
+  Once a DbRep-Device is defined, the function <b>DbReadingsVal</b> is provided.
+  With this function you can, similar to the well known ReadingsVal, get a reading value from database. 
+  The function execution is carried out blocking.
+  The command syntax is: <br><br>
+    
+  <ul>
+  <code>DbReadingsVal("&lt;name&gt;","&lt;device:reading&gt;","&lt;timestamp&gt;","&lt;default&gt;") </code>   <br><br>
+  
+  <b>Examples: </b><br>
+  $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13 08:00:00",""); <br>
+  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13 08:00:00","")}
+  <br><br>
+  
+  <table>  
+     <colgroup> <col width=5%> <col width=95%> </colgroup>
+     <tr><td> <b>&lt;name&gt;</b>           </td><td>: name of the DbRep-Device to request  </td></tr>
+     <tr><td> <b>&lt;device:reading&gt;</b> </td><td>: device:reading whose value is to deliver </td></tr>
+     <tr><td> <b>&lt;timestamp&gt;</b>      </td><td>: timestamp of reading whose value is to deliver (*) in the form "YYYY-MM-DD hh:mm:ss" </td></tr>
+     <tr><td> <b>&lt;default&gt;</b>        </td><td>: default value if no reading value can be retrieved </td></tr>
+  </table>
+  </ul>
+  <br>
+  (*) If no value can be retrieved at the &lt;timestamp&gt; exactly requested, the chronological most convenient reading 
+      value is delivered back. 
+  <br><br>
   
   FHEM-Forum: <br>
   <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">Modul 93_DbRep - Reporting and Management of database content (DbLog)</a>.<br><br>
  
   <br>
-   
-  <b>Preparations </b> <br><br>
+
   
+</ul>
+  <b>Preparations </b> <br><br>
+<ul>
   The module requires the usage of a DbLog instance and the credentials of the database definition will be used. <br>
   Only the content of table "history" will be included if isn't other is explained. <br><br>
   
@@ -9810,7 +10017,46 @@ return;
                                  # Only readings containing "uptime" and "qcache" in name will be created
                                  </li> 
                                  <br><br>
-                                 </ul>                               
+                                 </ul> 
+
+    <li><b> dbValue &lt;SQL-statement&gt;</b> - 
+                            Executes the specified SQL-statement in <b>blocking</b> manner. Because of its mode of operation
+                            this function is particular convenient for user own perl scripts.  <br>
+                            The input accepts multi line commands and delivers multi line results as well. 
+                            If several fields are selected and passed back, the fieds are separated by the separator defined  
+                            by <a href="#DbRepattr">attribute</a> "sqlResultFieldSep" (default "|"). Several result lines 
+                            are separated by newline ("\n"). <br>
+                            This function only set/update status readings, the userExitFn function isn't called.                            
+                            <br>
+                           
+                                 <br><ul>
+                                 <b>Examples for use in FHEMWEB</b>  <br>
+                                 {fhem("get &lt;name&gt; dbValue select device,count(*) from history where timestamp > '2018-04-01' group by device")} <br>
+                                 get &lt;name&gt; dbValue select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
+                                 {CommandGet(undef,"Rep.LogDB1 dbValue select device,count(*) from history where timestamp > '2018-04-01' group by device")} <br>
+                                 </ul>
+                            
+                            <br><br>
+                            If you create a little routine in 99_myUtils, for example: 
+                            <br>                            
+                            <pre>
+sub dbval($$) {
+  my ($name,$cmd) = @_;
+  my $ret = CommandGet(undef,"$name dbValue $cmd"); 
+return $ret;
+}                            
+                            </pre> 
+                            it can be accessed with e.g. those calls: 
+                            <br><br>                  
+                                 
+                                 <ul>
+                                 <b>Examples:</b>  <br>
+                                 {dbval("&lt;name&gt;","select count(*) from history")} <br>
+                                 $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
+                                 </ul>                            
+                            
+                                 </li> 
+                                 <br><br>                                 
                                  
     <li><b> dbvars </b> -  lists global informations about MySQL system variables. Included are e.g. readings related to InnoDB-Home, datafile path, 
                            memory- or cache-parameter and so on. The Output reports initially all available informations. Using the 
@@ -10475,7 +10721,8 @@ sub bdump {
   Aggregationen auszuwerten und als Readings darzustellen. Die Abgrenzung der zu berücksichtigenden Datenbankinhalte erfolgt durch die Angabe von Device, Reading und
   die Zeitgrenzen für Auswertungsbeginn bzw. Auswertungsende.  <br><br>
   
-  Alle Datenbankoperationen werden nichtblockierend ausgeführt. Die Ausführungszeit der (SQL)-Hintergrundoperationen kann optional ebenfalls als Reading bereitgestellt
+  Fast alle Datenbankoperationen werden nichtblockierend ausgeführt. Auf Ausnahmen wird hingewiesen.
+  Die Ausführungszeit der (SQL)-Hintergrundoperationen kann optional ebenfalls als Reading bereitgestellt
   werden (siehe <a href="#DbRepattr">Attribute</a>). <br>
   Alle vorhandenen Readings werden vor einer neuen Operation gelöscht. Durch das Attribut "readingPreventFromDel" kann eine Komma separierte Liste von Readings 
   angegeben werden die nicht gelöscht werden sollen. <br><br>
@@ -10497,10 +10744,11 @@ sub bdump {
      <li> Export von Datensätzen in ein File im CSV-Format </li>
      <li> Import von Datensätzen aus File im CSV-Format </li>
      <li> Umbenennen von Device/Readings in Datenbanksätzen </li>
-     <li> Ändern von Reading-Werten (VALUES) in der Datenbank </li>
+     <li> Ändern von Reading-Werten (VALUES) in der Datenbank (changeValue) </li>
      <li> automatisches Umbenennen von Device-Namen in Datenbanksätzen und DbRep-Definitionen nach FHEM "rename" 
 	      Befehl (siehe <a href="#DbRepAutoRename">DbRep-Agent</a>) </li>
-	 <li> Ausführen von beliebigen Benutzer spezifischen SQL-Kommandos </li>
+	 <li> Ausführen von beliebigen Benutzer spezifischen SQL-Kommandos (non-blocking) </li>
+     <li> Ausführen von beliebigen Benutzer spezifischen SQL-Kommandos (blocking) zur Verwendung in eigenem Code (dbValue) </li>
 	 <li> Backups der FHEM-Datenbank im laufenden Betrieb erstellen (MySQL, SQLite) </li>
 	 <li> senden des Dumpfiles zu einem FTP-Server nach dem Backup incl. Versionsverwaltung </li>
 	 <li> Restore von SQLite-Dumps und MySQL serverSide-Backups </li>
@@ -10514,22 +10762,50 @@ sub bdump {
      </ul></ul>
      <br>
      
-  Zur Aktivierung der Funktion "Autorename" wird dem definierten DbRep-Device mit dem Attribut "role" die Rolle "Agent" zugewiesen. Die Standardrolle nach Definition
+  Zur Aktivierung der Funktion <b>Autorename</b> wird dem definierten DbRep-Device mit dem Attribut "role" die Rolle "Agent" zugewiesen. Die Standardrolle nach Definition
   ist "Client". Mehr ist dazu im Abschnitt <a href="#DbRepAutoRename">DbRep-Agent</a> beschrieben. <br><br>
   
-  DbRep stellt dem Nutzer einen UserExit zur Verfügung. Über diese Schnittstelle kann der Nutzer in Abhängigkeit von 
+  DbRep stellt dem Nutzer einen <b>UserExit</b> zur Verfügung. Über diese Schnittstelle kann der Nutzer in Abhängigkeit von 
   frei definierbaren Reading/Value-Kombinationen (Regex) eigenen Code zur Ausführung bringen. Diese Schnittstelle arbeitet
   unabhängig von einer Eventgenerierung. Weitere Informationen dazu ist unter <a href="#DbRepattr">Attribut</a> 
   "userExitFn" beschrieben. <br><br>
   
+  Sobald ein DbRep-Device definiert ist, wird die Funktion <b>DbReadingsVal</b> zur Verfügung gestellt.
+  Mit dieser Funktion läßt sich, ähnlich dem allgemeinen ReadingsVal, der Wert eines Readings aus der Datenbank abrufen. 
+  Die Funktionsausführung erfolgt blockierend.
+  Die Befehlssyntax ist: <br><br>
+    
+  <ul>
+  <code>DbReadingsVal("&lt;name&gt;","&lt;device:reading&gt;","&lt;timestamp&gt;","&lt;default&gt;") </code>   <br><br>
+  
+  <b>Beispiele: </b><br>
+  $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13 08:00:00",""); <br>
+  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13 08:00:00","")}
+  <br><br>
+  
+  <table>  
+     <colgroup> <col width=5%> <col width=95%> </colgroup>
+     <tr><td> <b>&lt;name&gt;</b>           </td><td>: Name des abzufragenden DbRep-Device   </td></tr>
+     <tr><td> <b>&lt;device:reading&gt;</b> </td><td>: Device:Reading dessen Wert geliefert werden soll </td></tr>
+     <tr><td> <b>&lt;timestamp&gt;</b>      </td><td>: Zeitpunkt des zu liefernden Readingwertes (*) in der Form "YYYY-MM-DD hh:mm:ss" </td></tr>
+     <tr><td> <b>&lt;default&gt;</b>        </td><td>: Defaultwert falls kein Readingwert ermittelt werden konnte </td></tr>
+  </table>
+  </ul>
+  <br>
+  (*) Es wird der zeitlich zu &lt;timestamp&gt; passendste Readingwert zurück geliefert, falls kein Wert exakt zu dem 
+        angegebenen Zeitpunkt geloggt wurde. 
+  <br><br>
+    
   FHEM-Forum: <br>
   <a href="https://forum.fhem.de/index.php/topic,53584.msg452567.html#msg452567">Modul 93_DbRep - Reporting und Management von Datenbankinhalten (DbLog)</a>. <br><br>
   
   FHEM-Wiki: <br>
   <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten">DbRep - Reporting und Management von DbLog-Datenbankinhalten</a>. <br><br>
- 
-  <b>Voraussetzungen </b> <br><br>
+  <br>
+  </ul>
   
+<b>Voraussetzungen </b> <br><br>
+<ul>  
   Das Modul setzt den Einsatz einer oder mehrerer DbLog-Instanzen voraus. Es werden die Zugangsdaten dieser 
   Datenbankdefinition genutzt. <br>
   Es werden nur Inhalte der Tabelle "history" berücksichtigt wenn nichts anderes beschrieben ist. <br><br>
@@ -11533,6 +11809,48 @@ sub bdump {
                                  <br><br>
                                  </ul>                               
                                  
+    <li><b> dbValue &lt;SQL-Statement&gt;</b> - 
+                            Führt das angegebene SQL-Statement <b>blockierend</b> aus. Diese Funktion ist durch ihre Arbeitsweise 
+                            speziell für den Einsatz in usereigenen Scripten geeignet. <br>
+                            Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück. 
+                            Werden mehrere Felder selektiert und zurückgegeben, erfolgt die Feldtrennung mit dem Trenner 
+                            des <a href="#DbRepattr">Attributes</a> "sqlResultFieldSep" (default "|"). Mehrere Ergebniszeilen 
+                            werden mit Newline ("\n") separiert. <br>
+                            Diese Funktion setzt/aktualisiert nur Statusreadings, die Funktion im Attribut  "userExitFn" 
+                            wird nicht aufgerufen.                            
+                            <br>
+                           
+                                 <br><ul>
+                                 <b>Bespiele zur Nutzung im FHEMWEB</b>  <br>
+                                 {fhem("get &lt;name&gt; dbValue select device,count(*) from history where timestamp > '2018-04-01' group by device")} <br>
+                                 get &lt;name&gt; dbValue select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
+                                 {CommandGet(undef,"Rep.LogDB1 dbValue select device,count(*) from history where timestamp > '2018-04-01' group by device")} <br>
+                                 </ul>
+                            
+                            <br><br>
+                            Erstellt man eine kleine Routine in 99_myUtils, wie z.B.: 
+                            <br>                            
+                            <pre>
+sub dbval($$) {
+  my ($name,$cmd) = @_;
+  my $ret = CommandGet(undef,"$name dbValue $cmd"); 
+return $ret;
+}                            
+                            </pre> 
+                            kann dbValue vereinfacht verwendet werden mit Aufrufen wie: 
+                            <br><br>                  
+                                 
+                                 <ul>
+                                 <b>Bespiele</b>  <br>
+                                 {dbval("&lt;name&gt;","select count(*) from history")} <br>
+                                 oder <br>
+                                 $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
+                                 </ul>                            
+                            
+                                 </li> 
+                                 <br><br>
+                                 
+
     <li><b> dbvars </b> -  Zeigt die globalen Werte der MySQL Systemvariablen. Enthalten sind zum Beispiel Angaben zum InnoDB-Home, dem Datafile-Pfad, 
                            Memory- und Cache-Parameter, usw. Die Ausgabe listet zunächst alle verfügbaren Informationen auf. Mit dem 
                            <a href="#DbRepattr">Attribut</a> "showVariables" kann die Ergebnismenge eingeschränkt werden um nur gewünschte Ergebnisse 
