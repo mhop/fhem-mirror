@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.10.7     16.04.2018       fix generate addLog-event if device or reading was not found by addLog
 # 3.10.6     13.04.2018       verbose level in addlog changed if reading not found
 # 3.10.5     12.04.2018       fix warnings
 # 3.10.4     11.04.2018       fix addLog if no valueFn is used
@@ -202,7 +203,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.10.6";
+my $DbLogVersion = "3.10.7";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -503,7 +504,7 @@ sub DbLog_Set($@) {
 	
 	return $usage if(int(@a) < 2);
 	my $dbh  = $hash->{DBHP};
-	my $db   = (split(/;|=/, $hash->{dbconn}))[1];
+	my $db   = (split(/;|=/, $hash->{dbconn}))[1]; 
 	my $ret;
 
     if ($a[1] eq 'reduceLog') {
@@ -563,6 +564,8 @@ sub DbLog_Set($@) {
             map(s/CN=$cn//g, @a);
         }
 		DbLog_AddLog($hash,$a[2],$a[3],$nce,$cn);
+        my $skip_trigger = 1;   # kein Event erzeugen falls addLog device/reading not found aber Abarbeitung erfolgreich
+        return undef,$skip_trigger;
 	}
     elsif ($a[1] eq 'reopen') {		
 		if ($dbh) {
@@ -859,7 +862,6 @@ sub DbLog_Set($@) {
     else { $ret = $usage; }
 
 return $ret;
-
 }
 
 ###############################################################################################
