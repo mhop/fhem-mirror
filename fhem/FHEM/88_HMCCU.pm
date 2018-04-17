@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.004
+#  Version 4.2.005
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -105,7 +105,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.2.004';
+my $HMCCU_VERSION = '4.2.005';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -267,7 +267,6 @@ sub HMCCU_GetAddress ($$$$);
 sub HMCCU_IsDevAddr ($$);
 sub HMCCU_IsChnAddr ($$);
 sub HMCCU_SplitChnAddr ($);
-sub HMCCU_GetCCUObjectAttribute ($$$);
 sub HMCCU_FindClientDevices ($$$$);
 sub HMCCU_GetRPCDevice ($$$);
 sub HMCCU_FindIODevice ($);
@@ -424,6 +423,7 @@ sub HMCCU_Define ($$)
 	$hash->{version} = $HMCCU_VERSION;
 	$hash->{ccutype} = 'CCU2';
 	$hash->{RPCState} = "inactive";
+	$hash->{NOTIFYDEV} = "global,TYPE=(HMCCU|HMCCUDEV|HMCCUCHN)";
 
 	Log3 $name, 1, "HMCCU: Device $name. Initialized version $HMCCU_VERSION";
 	my ($devcnt, $chncnt, $ifcount) = HMCCU_GetDeviceList ($hash);
@@ -496,6 +496,9 @@ sub HMCCU_Attr ($@)
 					return "Stop RPC server before switching RPC server"
 						if (HMCCU_IsRPCServerRunning ($hash, undef, undef));
 				}
+			}
+			if ($attrval =~ /(extrpc|intrpc)/) {
+				HMCCU_Log ($hash, 1, "RPC server mode $1 is deprecated. Please use procrpc instead", 0);
 			}
 		}
 		elsif ($attrname eq 'rpcdevice') {
@@ -1211,12 +1214,10 @@ sub HMCCU_Set ($@)
 
 		return HMCCU_SetError ($hash, $usage) if (!defined ($program));
 
-		my $url = qq(http://$host:8181/do.exe?r1=dom.GetObject("$program").ProgramExecute());
-		$response = GetFileFromURL ($url, $ccureqtimeout);
-		$response =~ m/<r1>(.*)<\/r1>/;
-		my $value = $1;
+		my $cmd = qq(dom.GetObject("$program").ProgramExecute());
+		my $value = HMCCU_HMCommand ($hash, $cmd, 0);
 		
-		return HMCCU_SetState ($hash, "OK") if (defined ($value) && $value ne '' && $value ne 'null');
+		return HMCCU_SetState ($hash, "OK") if (defined ($value));
 		return HMCCU_SetError ($hash, "Program execution error");
 	}
 	elsif ($opt eq 'hmscript') {
@@ -1674,7 +1675,7 @@ sub HMCCU_Get ($@)
 				my $ch = $defs{$dev};
 				my $ct = uc($ch->{ccutype});
 				my $fw = defined ($ch->{firmware}) ? $ch->{firmware} : 'N/A';
-				next if (!exists ($hash->{hmccu}{type}{$ct}));
+				next if (!exists ($hash->{hmccu}{type}{$ct}) || $ct !~ /$dtexp/);
 				$result .= sprintf "%-25s %-20s %-7s <a href=\"http://www.eq-3.de/%s\">%-9s</a> %-10s\n",
 					$ch->{NAME}, $ct, $fw, $hash->{hmccu}{type}{$ct}{download},
 					$hash->{hmccu}{type}{$ct}{firmware}, $hash->{hmccu}{type}{$ct}{date};
@@ -4430,28 +4431,6 @@ sub HMCCU_SplitChnAddr ($)
 }
 
 ######################################################################
-# Query object attribute from CCU. Attribute must be a valid method
-# for specified object, i.e. Address()
-######################################################################
-
-sub HMCCU_GetCCUObjectAttribute ($$$)
-{
-	my ($hash, $object, $attr) = @_;
-	my $name = $hash->{NAME};
-	my $ccureqtimeout = AttrVal ($name, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
-
-	my $url = 'http://'.$hash->{host}.':8181/do.exe?r1=dom.GetObject("'.$object.'").'.$attr;
-	my $response = GetFileFromURL ($url, $ccureqtimeout);
-	if (defined ($response) && $response !~ /<r1>null</) {
-		if ($response =~ /<r1>(.+)<\/r1>/) {
-			return $1;
-		}
-	}
-
-	return undef;
-}
-
-######################################################################
 # Get list of client devices matching the specified criteria.
 # If no criteria is specified all device names will be returned.
 # Parameters modexp and namexp are regular expressions for module
@@ -5234,6 +5213,11 @@ sub HMCCU_HMScriptExt ($$$)
 	my $host = $hash->{host};
 	my $code = $hmscript;
 	my $scrname = '';
+	
+	if (!exists ($hash->{host})) {
+		Log3 $name, 2, "HMCCU: CCU host name not defined. Name=$name Type=".$hash->{TYPE};
+		return "ERROR: CCU host name not defined";
+	}
 
 	# Check for internal script
 	if ($hmscript =~ /^!(.*)$/) {
@@ -5317,14 +5301,13 @@ sub HMCCU_GetDatapoint ($@)
 {
 	my ($hash, $param) = @_;
 	my $name = $hash->{NAME};
-	my $type = $hash->{TYPE};
 	my $fnc = "GetDatapoint";
 	my $hmccu_hash;
 	my $value = '';
 
 	$hmccu_hash = HMCCU_GetHash ($hash);
 	return (-3, $value) if (!defined ($hmccu_hash));
-	return (-4, $value) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'deleted');
+	return (-4, $value) if ($hash->{TYPE} ne 'HMCCU' && $hash->{ccudevstate} eq 'deleted');
 
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hmccu_hash);
 	my ($statechn, $statedpt, $controlchn, $controldpt) = HMCCU_GetSpecialDatapoints (
@@ -5332,28 +5315,22 @@ sub HMCCU_GetDatapoint ($@)
 	my $ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value');
 	my $ccureqtimeout = AttrVal ($hmccu_hash->{NAME}, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
 
-	my $url = 'http://'.$hmccu_hash->{host}.':8181/do.exe?r1=dom.GetObject("';
+	my $cmd = '';
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $param,
 		$HMCCU_FLAG_INTERFACE);
+	return (-1, $value) if ($flags != $HMCCU_FLAGS_IACD && $flags != $HMCCU_FLAGS_NCD);
+
 	if ($flags == $HMCCU_FLAGS_IACD) {
-		$url .= $int.'.'.$add.':'.$chn.'.'.$dpt.'").'.$ccuget.'()';
+		$cmd = '(datapoints.Get("'.$int.'.'.$add.':'.$chn.'.'.$dpt.'")).'.$ccuget.'()';
 	}
 	elsif ($flags == $HMCCU_FLAGS_NCD) {
-		$url .= $nam.'").DPByHssDP("'.$dpt.'").'.$ccuget.'()';
+		$cmd = '(dom.GetObject(ID_CHANNELS)).Get("'.$nam.'").DPByHssDP("'.$dpt.'").'.$ccuget.'()';
 		($add, $chn) = HMCCU_GetAddress ($hmccu_hash, $nam, '', '');
 	}
-	else {
-		return (-1, $value);
-	}
 
-	HMCCU_Trace ($hash, 2, $fnc, "URL=$url, param=$param, ccuget=$ccuget");
+	HMCCU_Trace ($hash, 2, $fnc, "CMD=$cmd, param=$param, ccuget=$ccuget");
 
-	my $rawresponse = GetFileFromURL ($url, $ccureqtimeout);
-	my $response = $rawresponse;
-	$response =~ m/<r1>(.*)<\/r1>/;
-	$value = $1;
-
-	HMCCU_Trace ($hash, 2, $fnc, "Response = ".$rawresponse);
+	$value = HMCCU_HMCommand ($hmccu_hash, $cmd, 1);
 
 	if (defined ($value) && $value ne '' && $value ne 'null') {
 		$value = HMCCU_UpdateSingleDatapoint ($hash, $chn, $dpt, $value);
@@ -5361,7 +5338,7 @@ sub HMCCU_GetDatapoint ($@)
 		return (1, $value);
 	}
 	else {
-		Log3 $name, 1, "$type: Error URL = ".$url;
+		HMCCU_Log ($hash, 1, "Error CMD = $cmd", 0);
 		return (-2, '');
 	}
 }
@@ -5407,7 +5384,7 @@ sub HMCCU_SetDatapoint ($$$)
 		$param = $1;
 	}
 
-	my $cmd = 'dom.GetObject("';
+	my $cmd = '';
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hmccu_hash, $param,
 		$HMCCU_FLAG_INTERFACE);
 	return -1 if ($flags != $HMCCU_FLAGS_IACD && $flags != $HMCCU_FLAGS_NCD);
@@ -5425,11 +5402,11 @@ sub HMCCU_SetDatapoint ($$$)
 	}
 	
 	if ($flags == $HMCCU_FLAGS_IACD) {
-		$cmd .= $int.'.'.$add.':'.$chn.'.'.$dpt.'").State('.$value.')';
+		$cmd = '(datapoints.Get("'.$int.'.'.$add.':'.$chn.'.'.$dpt.'")).State('.$value.')';
 		$nam = HMCCU_GetChannelName ($hmccu_hash, $add.":".$chn, '');
 	}
 	elsif ($flags == $HMCCU_FLAGS_NCD) {
-		$cmd .= $nam.'").DPByHssDP("'.$dpt.'").State('.$value.')';
+		$cmd = '(dom.GetObject(ID_CHANNELS)).Get("'.$nam.'").DPByHssDP("'.$dpt.'").State('.$value.')';
 		($add, $chn) = HMCCU_GetAddress ($hmccu_hash, $nam, '', '');
 	}
 
@@ -5581,12 +5558,9 @@ sub HMCCU_SetVariable ($$$$$)
 	);
 
 	if (!defined ($vartype)) {
-		my $url = 'http://'.$hash->{host}.':8181/do.exe?r1=dom.GetObject("'.$varname.
-			'").State("'.$value.'")';
-
-		my $response = GetFileFromURL ($url, $ccureqtimeout);
-		return HMCCU_Log ($hash, 1, "URL=$url", -2)
-			if (!defined ($response) || $response =~ /<r1>null</);
+		my $cmd = qq(dom.GetObject("$varname").State("$value"));
+		my $response = HMCCU_HMCommand ($hash, $cmd, 1);
+		return HMCCU_Log ($hash, 1, "CMD=$cmd", -2) if (!defined ($response));
 	}
 	else {
 		return -18 if (!exists ($varfnc{$vartype}));
