@@ -426,15 +426,15 @@ isday</pre>
   found on different websites.  See perldoc "DateTime::Event::Sunrise" for
   alternatives.  <br><br>
 
-  sunrise()/sunset() returns the absolute time of the next sunrise/sunset,
+  sunrise() and sunset() return the absolute time of the next sunrise/sunset,
   adding 24 hours if the next event is tomorrow, to use it in the timespec of
   an at device or for the on-till command for FS20 devices.<br>
 
-  sunrise_rel()/sunset_rel() returns the relative time to the next
+  sunrise_rel() and sunset_rel() return the relative time to the next
   sunrise/sunset. <br>
-  sunrise_abs()/sunset_abs() return the absolute time of the corresponding
+  sunrise_abs() and sunset_abs() return the absolute time of the corresponding
   event today (no 24 hours added).<br>
-  sunrise_abs_dat()/sunset_abs_dat() return the absolute time of the
+  sunrise_abs_dat() and sunset_abs_dat() return the absolute time of the
   corresponding event to a given date(no 24 hours added).<br>
 
   All functions take up to three arguments:<br>
@@ -537,14 +537,30 @@ isday</pre>
     </p>
 
     <ul>
-        <li><code>sunrise()</code> - absolute Zeit des n&auml;chsten Sonnenaufgangs (+ 24 h, wenn am n&auml;chsten Tag)</li>
-        <li><code>sunset()</code> - absolute Zeit des n&auml;chsten Sonnenuntergangs (+ 24 h, wenn am n&auml;chsten Tag)</li>
-        <li><code>sunrise_rel()</code> - relative Zeit des n&auml;chsten Sonnenaufgangs</li>
-        <li><code>sunset_rel()</code> - relative Zeit des n&auml;chsten Sonnenuntergangs</li>
-        <li><code>sunrise_abs()</code> - absolute Zeit des n&auml;chsten Sonnenaufgangs (ohne Stundenzuschlag)</li>
-        <li><code>sunset_abs()</code> - relative Zeit des n&auml;chsten Sonnenuntergangs (ohne Stundenzuschlag)</li>
-        <li><code>sunrise_abs_dat()</code> - absolute Zeit des n&auml;chsten Sonnenaufgangs an einem bestimmten Tag</li>
-        <li><code>sunset_abs_dat()</code> - relative Zeit des n&auml;chsten Sonnenuntergangs an einem bestimmten Tag</li>
+        <li><code>sunrise()</code> - absolute Zeit des n&auml;chsten
+        Sonnenaufgangs (+ 24 h, wenn am n&auml;chsten Tag)</li>
+
+        <li><code>sunset()</code> - absolute Zeit des n&auml;chsten
+        Sonnenuntergangs (+ 24 h, wenn am n&auml;chsten Tag)</li>
+
+        <li><code>sunrise_rel()</code> - relative Zeit des n&auml;chsten
+        Sonnenaufgangs</li>
+
+        <li><code>sunset_rel()</code> - relative Zeit des n&auml;chsten
+        Sonnenuntergangs</li>
+
+        <li><code>sunrise_abs()</code> - absolute Zeit des n&auml;chsten
+        Sonnenaufgangs (ohne Stundenzuschlag)</li>
+
+        <li><code>sunset_abs()</code> - absolute Zeit des n&auml;chsten
+        Sonnenuntergangs (ohne Stundenzuschlag)</li>
+
+        <li><code>sunrise_abs_dat()</code> - absolute Zeit des n&auml;chsten
+        Sonnenaufgangs an einem bestimmten Tag</li>
+
+        <li><code>sunset_abs_dat()</code> - absolute Zeit des n&auml;chsten
+        Sonnenuntergangs an einem bestimmten Tag</li>
+
         <li><code>isday()</code> - Tag oder Nacht</li>
     </ul>
 
