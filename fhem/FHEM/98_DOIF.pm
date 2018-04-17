@@ -2472,11 +2472,11 @@ DOIF_TimerTrigger ($)
       if (!AttrVal($hash->{NAME},"disable","")) {
         if (defined ($hash->{interval}{$j})) {
           if ($hash->{interval}{$j} != -1) {
-            DOIF_SetTimer($hash,"DOIF_TimerTrigger",$hash->{interval}{$j}) ;
-            DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j) ;
+            DOIF_SetTimer($hash,"DOIF_TimerTrigger",$hash->{interval}{$j},1);
+            DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j,1);
           }
         } else {
-          DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j) ;
+          DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j,1);
         }
       }
     }
@@ -2548,7 +2548,7 @@ DOIF_DetTime($$)
   if ($second == 0 and $rel) {
     $err = "null is not allowed on a relative time";
   }
-  return ($err, ($rel and !defined ($align)), $second);
+  return ($err, ($rel and !defined ($align)), $second,defined ($align));
 }
 
 sub
@@ -2566,9 +2566,10 @@ DOIF_CalcTime($$)
   my $device;
   my $pos;
   my $ret;
+  my $align;
   if ($block=~ m/^\+\[([0-9]+)\]:([0-5][0-9])$/) {
-    ($err,$rel,$block)=DOIF_DetTime($hash,$block);
-    return ($block,$err,$rel);
+    ($err,$rel,$block,$align)=DOIF_DetTime($hash,$block);
+    return ($block,$err,$rel,$align);
   } elsif ($block =~ /^\+\(/ or $block =~ /^\+\[/) {
     $relGlobal=1;
     #$pos=pos($block);
@@ -2584,9 +2585,9 @@ DOIF_CalcTime($$)
       ($block,$err,$device,$reading,$internal)=ReplaceReadingEvalDoIf($hash,$block,1);
       return ($block,$err) if ($err);
     }
-    ($err,$rel,$block)=DOIF_DetTime($hash, $block);
+    ($err,$rel,$block,$align)=DOIF_DetTime($hash, $block);
     $rel=1 if ($relGlobal);
-    return ($block,$err,$rel);
+    return ($block,$err,$rel,$align);
   }
   $tailBlock=$block;
   while ($tailBlock ne "") {
@@ -2619,13 +2620,13 @@ DOIF_CalcTime($$)
   $ret = eval $cmd;
   return($cmd." ",$@) if ($@);
   return ($ret,"null is not allowed on a relative time",$relGlobal) if ($ret == 0 and $relGlobal);
-  return ($ret,"",$relGlobal);
+  return ($ret,"",$relGlobal,$align);
 }
 
 sub
-DOIF_SetTimer($$$)
+DOIF_SetTimer
 {
-  my ($hash, $func, $nr) = @_;
+  my ($hash, $func, $nr,$next_day) = @_;
   my $timeStr=$hash->{time}{$nr};
   my $cond=$hash->{timeCond}{$nr};
   my $next_time;
@@ -2645,7 +2646,7 @@ DOIF_SetTimer($$$)
       delete ($hash->{triggertime}{$old_lt});
     }
   }
-  my ($second,$err, $rel)=DOIF_CalcTime($hash,$timeStr);
+  my ($second,$err, $rel,$align)=DOIF_CalcTime($hash,$timeStr);
   my $timernr=sprintf("timer_%02d_c%02d",($nr+1),($cond+1));
   if ($err)
   {
@@ -2678,7 +2679,7 @@ DOIF_SetTimer($$$)
     $next_time = $midnight+$second;
   }
 
-  if ($second <= $sec_today and !$rel) {
+  if ($second <= $sec_today and !$rel or defined ($next_day) and !$rel and $second < 86400 and !$align) {
     $next_time+=86400;
     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($next_time);
     if ($isdst_now != $isdst) {
@@ -3033,6 +3034,7 @@ DOIF_Define($$$)
   
   if (!$cmd) {
     $cmd="";
+    $defs{$hash->{NAME}}{DEF}="##";
   } else {
     $cmd =~ s/(##.*\n)|(##.*$)/ /g;
     $cmd =~ s/\$SELF/$hash->{NAME}/g;
@@ -3827,7 +3829,7 @@ DOELSEIF ([#"^Window:closed":state:"open"] == 0)<br>
 (push "alle Fenster geschlossen")<br>
 <br>
 attr di_Fenster do always<br>
-attr di_Fenster cmdState $DEVICE zuletzt geöffnet|alle geschlossen</code><br>
+attr di_Fenster cmdState [$SELF:Device] zuletzt geöffnet|alle geschlossen</code><br>
 <br>
 Raumtemperatur-Überwachung:<br>
 <br>
@@ -5083,7 +5085,8 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 </dl>
 </br>
 </ul>
-<u>Operanden in der Bedingung und den Befehlen</u>
+<a name="DOIF_Operanden"></a>
+<u>Operanden in der Bedingung und den Befehlen und im Perl-Modus</u>
 <ul>
 <dl>
         <dt><a href="#DOIF_Ereignissteuerung">Status</a> <code><b>[</b>&lt;Device&gt;&lang;<b>,</b>&lt;Default&gt;&rang;<b>]</b></code></dt>
@@ -5119,7 +5122,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 </br>
 </ul>
 
-<u>Operanden in der Bedingung</u>
+<u>Operanden in der Bedingung und im Perl-Modus</u>
 <ul>
 <dl>
         <dt><a href="#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events">Events</a> <code><b>[</b>&lt;Device&gt;<b>:"</b>&lt;Regex-Events&gt;"<b>]</b></code> oder <code><b>["</b>&lt;Regex-Devices&gt;<b>:</b>&lt;Regex-Events&gt;<b>"]</b></code> oder <code><b>["</b>&lt;Regex-Devices&gt;<b>"</b>&lang;<b>:"</b>&lt;Regex-Filter&gt;<b>"</b>&rang;&lang;<b>:</b>&lt;Output&gt;&rang;<b>,</b>&lt;Default&gt;<b>]</b></code></dt>
@@ -5344,19 +5347,25 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 <b>Perl Modus</b><br>
 <br>
 Im Perl-Modus lassen sich insb. komplexere Abläufe innerhalb eines DOIF-Devices in Perl programmieren.
-Der Anwender hat mehr Einfluss auf den Ablauf der Steuerung als im FHEM-Modus. Einfache Perlkenntnise werden in diesem Modus vorausgesetzt.
-Im Unterschied zum FHEM-Modus, werden für die Steuerung unmittelbar keine Attribute benötigt. DOIF-spezifische Angaben in eckigen Klammern entsprechen vollständig den Angaben im DOIF FHEM-Modus. Deren Syntax kann in der obigen Beschreibung des FHEM-Modus nachgelesen werden.<br>
+Der Anwender hat mehr Einfluss auf den Ablauf der Steuerung als im FHEM-Modus. Einfache Perlkenntnise werden in diesem Modus vorausgesetzt.<br>
+<br>
+Die Steuerungsabläufe werden im Gegensatz zum FHEM-Modus nicht durch Attibute beinflusst, daher werden im Perl-Modus selten Attribute benötigt. 
+Die Auswahl der <a href="#DOIF_Attribute_Perl_Modus">DOIF-spezifischen Attribute im Perl-Modus</a> ist auf einige sinnvolle beschränkt.<br>
+<br>
+Der Status des Moduls wird nicht vom Modul gesetzt, er kann vom Anwender mit Hilfe der Funktion <code>set_Reading</code> verändert werden, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">spezifische Perl-Funktionen im Perl-Modus</a>.
+DOIF-spezifische <a href="#DOIF_Operanden">Operanden-Angaben in eckigen Klammern</a> entsprechen vollständig den Angaben im FHEM-Modus des Moduls. Sie können an beliebiger Stelle im Perlcode angegeben werden, wo auch Perl-Funktionen angegeben werden können.<br>
 <br>
 Syntax Perl-Modus:<br>
 <br>
 <ol><code>define &lt;name&gt; DOIF &lt;Blockname&gt; {&lt;Perl mit DOIF-Syntax in eckigen Klammern&gt;} &lt;Blockname&gt; {&lt;Perl mit DOIF-Syntax in eckigen Klammern&gt;} ...</code></ol><br>
 <br>
 Ein Perlblock wird ausgeführt, wenn dieser, bedingt durch DOIF-spezifischen Angaben in eckigen Klammern innerhalb des Blocks, getriggert wird.
-Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Perlblöcke definiert werden. Wird ein Perlblock mit dem Namen "init" benannt, so wird er bereits zum Definitionszeitpunkt ausgeführt. Der Name eines Blocks ist optional.<br>
+Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Perlblöcke definiert werden. Der Name eines Blocks ist optional. Wird ein Perlblock mit dem Namen "init" benannt, so wird er bereits zum Definitionszeitpunkt ausgeführt.<br>
 <br>
 FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem"..."</code> ausgeführt. Im Gegensatz zum FHEM-Modus können im Perl-Modus mehrere Blöcke unabhängig voneinander, ausgelöst durch einen Ereignis- oder Zeit-Trigger, ausgeführt werden. So kann die Funktionalität mehrer DOIF-Module im FHEM-Modus innerhalb eines DOIF-Moduls im Perl-Moduls realisiert werden.<br>
 <br>
-Die Anzahl der eigenen Timer ist im Gegensatz zu einem wait-Timer unbegrenzt.
+Im Perl-Modus gibt es keinen wait-Timer, stattdessen kann der Benutzer mit der Funktion <code>set_Timer</code> beliebig viele eigene Timer definieren, die unabhängig voneinander gesetzt und ausgewertet werden können, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">Spezifische Perl-Funktionen im Perl-Modus</a>.<br>
+<br>
 Zum Zeitpunkt der Definition werden alle DOIF-spezifischen Angaben in Perl übersetzt, zum Zeitpunkt der Ausführung wird nur noch Perl ausgeführt, damit wird maximale Performance gewährleistet.<br>
 <br>
 <a name="DOIF_Einfache_Anwendungsbeispiele_Perl"></a>
@@ -5369,8 +5378,9 @@ Zum Zeitpunkt der Definition werden alle DOIF-spezifischen Angaben in Perl über
 <code>define di_lamp DOIF {if ([06:00-09:00] and [sensor:brightness] < 40) {fhem"set lamp:FILTER=STATE!=on on"} else {fhem"set lamp:FILTER=STATE!=off off"}}</code><br>
 <br>
 </ol>
-Bemerkung: Im Gegensatz zum FHEM-Modus arbeitet der Perl-Modus ohne Zustandsauswertung, daher muss der Anwender selbst darauf achten, wiederholdene Ausführungen zu vermeiden (im oberen Beispiel z.B. mit FILTER-Option)<br>
+Bemerkung: Im Gegensatz zum FHEM-Modus arbeitet der Perl-Modus ohne Zustandsauswertung, daher muss der Anwender selbst darauf achten, wiederholende Ausführungen zu vermeiden (im oberen Beispiel z.B. mit FILTER-Option)<br>
 <br>
+<a name="DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus"></a>
 <b>Spezifische Perl-Funktionen im Perl-Modus</b><br>
 <br>
 Timer setzen: <code><b>set_Timer(&lt;TimerEvent&gt;, &lt;seconds&gt;)</code></b>, mit &lt;TimerEvent&gt;: beliebige Angabe, sie spezifiziert eindeutig einen Timer und ist gleichzeitig ein Ereignis,
@@ -5403,8 +5413,7 @@ $_betrag{$i}=100;</code><br>
 Ebenso funktionieren hash-Variablen z. B.: <br>
 <code>$_betrag{heute}=100;</code><br>
 <br>
-Um den aktuellen Status des DOIF-Devices muss sich der Anwender selbst kümmern. Diesen kann er z.B. mit Hilfe der Funktion set_Reading setzen.<br>
-<br>
+<a name="DOIF_Attribute_Perl_Modus"></a>
 <u>Nutzbare Attribute im Perl-Modus</u><br>
 <br>
   <ul>
