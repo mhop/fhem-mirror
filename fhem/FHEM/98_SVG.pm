@@ -2043,10 +2043,9 @@ SVG_render($$$$$$$$$$)
       foreach my $i (0..int(@{$dxp})-2) {
         my ($x1, $y1) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
         my ($x2, $y2) = ($x+$dxp->[$i+1], $y+$h-($dyp->[$i+1]-$min)*$hmul);
-        next if(int($x2) == $lx);
+        $x2 += 0.2 if($x1 == $x2);
         my $Y = ($lType eq "horizontalLineFrom" ? $y1 : $y2);
         SVG_pO "<line $attributes $lStyle x1='$x1' y1='$Y' x2='$x2' y2='$Y'/>";
-        $lx = int($x2);
       }
 
     } else {                            # lines and everything else
