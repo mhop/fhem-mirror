@@ -68,7 +68,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 
 
-my $version = "1.0.1";
+my $version = "1.0.2";
 
 
 
@@ -92,6 +92,7 @@ sub GardenaSmartBridge_createHttpValueStrings($@);
 sub GardenaSmartBridge_Notify($$);
 sub GardenaSmartBridge_StorePassword($$);
 sub GardenaSmartBridge_ReadPassword($);
+sub GardenaSmartBridge_DeletePassword($);
 
 
 
@@ -294,11 +295,17 @@ sub GardenaSmartBridge_Set($@) {
         
         my $passwd = join(' ',@args);
         GardenaSmartBridge_StorePassword($hash,$passwd);
+        
+    } elsif( lc $cmd eq 'deleteaccountpassword' ) {
+        return "usage: $cmd <password>" if( @args != 0 );
+
+        GardenaSmartBridge_DeletePassword($hash);
     
     } else {
     
         my $list    = "getDevicesState:noArg getToken:noArg" if( defined(GardenaSmartBridge_ReadPassword($hash)) );
         $list       .= " gardenaAccountPassword" if( not defined(GardenaSmartBridge_ReadPassword($hash)) );
+        $list       .= " deleteAccountPassword:noArg" if( defined(GardenaSmartBridge_ReadPassword($hash)) );
         return "Unknown argument $cmd, choose one of $list";
     }
     
@@ -782,6 +789,17 @@ sub GardenaSmartBridge_createHttpValueStrings($@) {
     return ($payload,$session_id,$header,$uri,$method,$deviceId,$abilities);
 }
 
+sub GardenaSmartBridge_DeletePassword($) {
+
+    my $hash    = shift;
+
+
+    #my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    setKeyValue($hash->{TYPE}."_".$hash->{NAME}."_passwd",undef);
+
+    return undef;
+}
+
 
 
 
@@ -845,6 +863,7 @@ sub GardenaSmartBridge_createHttpValueStrings($@) {
     <li>getDeviceState - Starts a Datarequest</li>
     <li>getToken - Gets a new Session-ID</li>
     <li>gardenaAccountPassword - Passwort which was used in the GardenaAPP</li>
+    <li>deleteAccountPassword - delete the password from store</li>
   </ul>
   <br><br>
   <a name="GardenaSmartBridgeattributes"></a>
@@ -906,6 +925,7 @@ sub GardenaSmartBridge_createHttpValueStrings($@) {
     <li>getDeviceState - Startet eine Abfrage der Daten.</li>
     <li>getToken - Holt eine neue Session-ID</li>
     <li>gardenaAccountPassword - Passwort, welches in der GardenaApp verwendet wurde</li>
+    <li>deleteAccountPassword - l&oml;scht das Passwort aus dem Passwortstore</li>
   </ul>
   <br><br>
   <a name="GardenaSmartBridgeattributes"></a>
