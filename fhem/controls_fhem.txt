@@ -1,4 +1,4 @@
-REV 16632
+REV 16634
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-04-18_07:45:03 246000 ./CHANGED
+UPD 2018-04-19_07:45:03 246074 ./CHANGED
 UPD 2018-04-11_07:45:02 36969 ./MAINTAINER.txt
 UPD 2018-03-26_07:45:02 41123 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
@@ -342,7 +342,7 @@ UPD 2018-03-22_07:45:04 220673 FHEM/72_FRITZBOX.pm
 UPD 2018-04-09_07:45:03 135875 FHEM/72_XiaomiDevice.pm
 UPD 2018-04-07_07:45:02 47236 FHEM/73_AMADCommBridge.pm
 UPD 2018-04-14_07:45:02 89324 FHEM/73_ElectricityCalculator.pm
-UPD 2018-04-16_07:45:03 34109 FHEM/73_GardenaSmartBridge.pm
+UPD 2018-04-19_07:45:03 34800 FHEM/73_GardenaSmartBridge.pm
 UPD 2018-04-14_07:45:02 81612 FHEM/73_GasCalculator.pm
 UPD 2018-01-09_07:45:03 87372 FHEM/73_MPD.pm
 UPD 2018-02-28_07:45:03 30809 FHEM/73_NUKIBridge.pm
@@ -665,8 +665,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-04-18_07:45:06 3413163 docs/commandref.html
-UPD 2018-04-18_07:45:08 2115371 docs/commandref_DE.html
+UPD 2018-04-19_07:45:06 3413231 docs/commandref.html
+UPD 2018-04-19_07:45:08 2115454 docs/commandref_DE.html
 UPD 2018-03-18_07:45:02 75650 docs/commandref_frame.html
 UPD 2018-03-18_07:45:02 85157 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
