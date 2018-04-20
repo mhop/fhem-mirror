@@ -365,6 +365,7 @@ sub SSCam_Define($@) {
   $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";                                    # Loggingfunktion für Polling ist an
   $hash->{HELPER}{OLDVALPOLL}          = "0";  
   $hash->{HELPER}{RECTIME_DEF}         = "15";                                   # Standard für rectime setzen, überschreibbar durch Attribut "rectime" bzw. beim "set .. on-for-time"
+  $hash->{HELPER}{OLDPTZHOME}          = "";
   $hash->{".ptzhtml"}                  = "";
   
   readingsBeginUpdate($hash);
