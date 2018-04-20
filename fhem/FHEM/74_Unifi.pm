@@ -20,6 +20,8 @@
 #  - feature: 74_Unifi: added set updateClien, encrypt user and password
 # V 2.2.1
 #  - feature: 74_Unifi: update VC-readings immediately when getting voucher
+# V 2.2.2
+#  - fixed:   74_Unifi: restart-typo in poe
 
 
 package main;
@@ -364,7 +366,7 @@ sub Unifi_Set($@) {
                   $port_overrides->[$idx]{poe_mode} = "passthrough";
                   Unifi_RestJson_Send($hash, $apRef->{device_id}, {port_overrides => $port_overrides });
 
-                } elsif( $setVal3 eq 'restsart' ) {
+                } elsif( $setVal3 eq 'restart' ) {
                   Unifi_ApJson_Send($hash,{cmd => 'power-cycle', mac => $apRef->{mac}, port_idx => $setVal2+0});
 
                 } else {
