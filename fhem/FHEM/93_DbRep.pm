@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.17.1       20.04.2017       fix "§" is deleted by carfilter
 # 7.17.0       17.04.2018       new function DbReadingsVal
 # 7.16.0       13.04.2018       new function dbValue (blocking)
 # 7.15.2       12.04.2018       fix in setting MODEL, prevent fhem from crash if wrong timestamp "0000-00-00" found in db 
@@ -336,7 +337,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.17.0";
+my $DbRepVersion = "7.17.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -790,10 +791,10 @@ sub DbRep_Set($@) {
           my @cmd = @a;
           shift @cmd; shift @cmd;
           $sqlcmd = join(" ", @cmd);
-          $sqlcmd =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+          $sqlcmd =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
       }
       if($opt eq "sqlCmdHistory") {
-          $prop =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+          $prop =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
           $prop =~ s/<c>/,/g;          
           $sqlcmd = $prop;
           if($sqlcmd eq "___purge_historylist___") {
@@ -923,7 +924,7 @@ sub DbRep_Get($@) {
       my @cmd = @a;
       shift @cmd; shift @cmd;
       my $sqlcmd = join(" ",@cmd);
-      $sqlcmd =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+      $sqlcmd =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
       $hash->{LASTCMD} = $sqlcmd?"$opt $sqlcmd":"$opt";
 	  if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
@@ -5566,7 +5567,7 @@ sub dbmeta_DoParse($) {
 			       while (my @line = $sth->fetchrow_array()) {
                        Log3 ($name, 4, "DbRep $name - SQL result: @line");
 					   my $row = join("|", @line);
-					   $row =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd; 
+					   $row =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd; 
 		               $row =~ s/\|/<\/td><td style='padding-right:5px;padding-left:5px'>/g;
                        $res .= "<tr><td style='padding-right:5px;padding-left:5px'>".$row."</td></tr>";
                    }
@@ -7702,7 +7703,7 @@ sub DbRep_charfilter ($) {
   my ($txt) = @_;
   
   # nur erwünschte Zeichen, Filtern von Steuerzeichen
-  $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€//cd;      
+  $txt =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€//cd;      
   
 return($txt);
 }
