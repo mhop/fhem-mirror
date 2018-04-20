@@ -27,6 +27,8 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 3.9.1  20.04.2018    Attribute ptzPanel_use, initial webcommands in DeviceOverview changed, minor fixes ptzPanel
+# 3.9.0  17.04.2018    control panel & PTZcontrol weblink device for PTZ cams
 # 3.8.4  06.04.2018    Internal MODEL changed to SVS or "CamVendor - CamModel" for Cams
 # 3.8.3  05.04.2018    bugfix V3.8.2, $OpMode "Start" changed, composegallery changed
 # 3.8.2  04.04.2018    $attr replaced by AttrVal, SSCam_wdpollcaminfo redesigned
@@ -217,7 +219,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.8.4";
+my $SSCamVersion = "3.9.1";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -276,8 +278,8 @@ sub SSCam_Initialize($) {
  $hash->{GetFn}        = "SSCam_Get";
  $hash->{AttrFn}       = "SSCam_Attr";
  # Aufrufe aus FHEMWEB
- $hash->{FW_summaryFn} = "SSCam_FWview";
- # $hash->{FW_detailFn}  = "SSCam_FWview";
+ $hash->{FW_summaryFn} = "SSCam_FWsummaryFn";
+ $hash->{FW_detailFn}  = "SSCam_FWdetailFn";
  $hash->{FW_deviceOverview} = 1;
  
  $hash->{AttrList} =
@@ -354,7 +356,7 @@ sub SSCam_Define($@) {
   
   # Startwerte setzen
   if(SSCam_IsModelCam($hash)) {
-      $attr{$name}{webCmd}             = "on:off:snap:enable:disable";           # initiale Webkommandos setzen
+      $attr{$name}{webCmd}             = "on:off:snap:enable:disable:runView:stopView";  # initiale Webkommandos setzen
   } else {
       $attr{$name}{webCmd}             = "homeMode";
 	  $attr{$name}{webCmdLabel}        = "HomeMode";
@@ -363,6 +365,7 @@ sub SSCam_Define($@) {
   $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";                                    # Loggingfunktion für Polling ist an
   $hash->{HELPER}{OLDVALPOLL}          = "0";  
   $hash->{HELPER}{RECTIME_DEF}         = "15";                                   # Standard für rectime setzen, überschreibbar durch Attribut "rectime" bzw. beim "set .. on-for-time"
+  $hash->{".ptzhtml"}                  = "";
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"PollState","Inactive");                              # es ist keine Gerätepolling aktiv
@@ -415,6 +418,20 @@ sub SSCam_Attr($$$$) {
     # $cmd can be "del" or "set"
     # $name is device name
     # aName and aVal are Attribute name and value
+    
+    # dynamisch PTZ-Attribute setzen (wichtig beim Start wenn Reading "DeviceType" nicht gesetzt ist)
+    if ($cmd eq "set" && ($aName =~ m/ptzPanel_.*/)) {
+        foreach my $n (0..9) { 
+            $n = sprintf("%2.2d",$n);
+            addToDevAttrList($name, "ptzPanel_row$n");
+        }
+        addToDevAttrList($name, "ptzPanel_iconPrefix");
+        addToDevAttrList($name, "ptzPanel_iconPath");
+    }
+    
+    if($aName =~ m/ptzPanel_row.*|ptzPanel_Home|ptzPanel_use/) {
+        InternalTimer(gettimeofday()+0.7, "SSCam_addptzattr", "$name", 0);
+    } 
     
     if ($aName eq "disable") {
         if($cmd eq "set") {
@@ -547,8 +564,7 @@ sub SSCam_Attr($$$$) {
 		       if(AttrVal($name,"snapGalleryBoost",0));
         }       
     }
-	
-	
+
 return undef;
 }
 
@@ -581,6 +597,7 @@ sub SSCam_Set($@) {
                  "snap:noArg ".
 	     		 (AttrVal($name, "snapGalleryBoost",0)?(AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ":" ").
 	     		 "createSnapGallery:noArg ".
+                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "createPTZcontrol:noArg ": "").
                  "enable:noArg ".
                  "disable:noArg ".
 				 "optimizeParams ".
@@ -672,8 +689,18 @@ sub SSCam_Set($@) {
 	  my $wlname = "SSCam.$name.snapgallery";
 	  my $room   = "SnapGallery";
 	  CommandAttr($hash->{CL},$wlname." room ".$room);
-	  return "<html>Snapgallery device \"$sgdev\" was created successfully. Please have a look to room <a href=\"/fhem?room=$room\">$room</a>.<br> You can now assign it to another room if you want. Don't rename this new device ! </html>";
+	  return "<html>Snapgallery device \"$sgdev\" was created successfully. Please have a look to room <a href=\"/fhem?room=$room\">$room</a>.<br> You can now assign it to another room if you want. Don't rename this new device !</html>";
       
+  } elsif ($opt eq "createPTZcontrol" && SSCam_IsModelCam($hash)) {
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  my $ptzcdev = "SSCam.$name.PTZcontrol";
+      my $ret     = CommandDefine($hash->{CL},"$ptzcdev weblink htmlCode {SSCam_ptzpanel('$name')}");
+	  return $ret if($ret);
+	  my $room    = AttrVal($name,"room","PTZcontrol");
+      $attr{$ptzcdev}{room}  = $room;
+      $attr{$ptzcdev}{group} = $name."_PTZcontrol";
+	  return "PTZ control device \"$ptzcdev\" was created successfully. Please have a look to room \"$room\".\nYou can assign \"$ptzcdev\" to another room if you want.";  
+  
   } elsif ($opt eq "enable" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       SSCam_camenable($hash);
@@ -714,6 +741,10 @@ sub SSCam_Set($@) {
 	  
 	  if($success) {
 	      SSCam_getcaminfoall($hash,0);
+          RemoveInternalTimer($hash, "SSCam_getptzlistpreset");
+          InternalTimer(gettimeofday()+11, "SSCam_getptzlistpreset", $hash, 0);
+          RemoveInternalTimer($hash, "SSCam_getptzlistpatrol");
+          InternalTimer(gettimeofday()+12, "SSCam_getptzlistpatrol", $hash, 0);
 		  return "Username and Password saved successfully";
 	  } else {
 		   return "Error while saving Username / Password - see logfile for details";
@@ -1043,19 +1074,19 @@ return $ret;  # not generate trigger out of command
 ######################################################################################
 # wird von FW aufgerufen. $FW_wname = aufrufende Webinstanz, $d = aufrufendes 
 # Device (z.B. CamCP1)
-sub SSCam_FWview ($$$$) {
+sub SSCam_FWsummaryFn ($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_;   # pageHash is set for summaryFn in FHEMWEB
-  my $hash          = $defs{$d};
-  my $name          = $hash->{NAME};
-  my $link          = $hash->{HELPER}{LINK};
-  my $wltype        = $hash->{HELPER}{WLTYPE};
+  my $hash   = $defs{$d};
+  my $name   = $hash->{NAME};
+  my $link   = $hash->{HELPER}{LINK};
+  my $wltype = $hash->{HELPER}{WLTYPE};
   my $ret;
   my $alias;
     
   return if(!$hash->{HELPER}{LINK} || ReadingsVal("$name", "state", "") =~ /^dis.*/ || IsDisabled($name));
   
   my $attr = AttrVal($d, "htmlattr", " ");
-  Log3($name, 4, "$name - SSCam_FWview called - FW_wname: $FW_wname, device: $d, room: $room, attributes: $attr");
+  Log3($name, 4, "$name - SSCam_FWsummaryFn called - FW_wname: $FW_wname, device: $d, room: $room, attributes: $attr");
   
   if($wltype eq "image") {
     $ret = "<img src=$link $attr><br>".weblink_FwDetail($d);
@@ -1074,6 +1105,24 @@ sub SSCam_FWview ($$$$) {
 
   # FW_directNotify("FILTER=room=$room", "#FHEMWEB:$FW_wname", "location.reload('true')", "") if($d eq $name);
 return $ret;
+}
+
+######################################################################################
+#                 PTZ-Steuerpanel in Detailanzeige darstellen 
+######################################################################################
+sub SSCam_FWdetailFn ($$$$) {
+  my ($FW_wname, $d, $room, $pageHash) = @_;           # pageHash is set for summaryFn.
+  my $hash = $defs{$d};
+  
+  return undef if(!AttrVal($d,"ptzPanel_use",1));
+  $hash->{".ptzhtml"} = SSCam_ptzpanel($d) if($hash->{".ptzhtml"} eq "");
+
+  if($hash->{".ptzhtml"} ne "") {
+      return $hash->{".ptzhtml"};
+  } else {
+      return undef;
+  }
+
 }
 
 ######################################################################################
@@ -3552,7 +3601,7 @@ sub SSCam_camop ($) {
           $url = "http://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid";   
       }
        
-      # Liveview-Link in Hash speichern -> Anzeige über SSCam_FWview, in Reading setzen für Linkversand
+      # Liveview-Link in Hash speichern -> Anzeige über SSCam_FWsummaryFn, in Reading setzen für Linkversand
       $hash->{HELPER}{LINK} = $url;
          
       Log3($name, 4, "$name - Set Streaming-URL: $url");
@@ -4622,8 +4671,10 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
-                  
-                            
+                
+                # spezifische Attribute für PTZ-Cams verfügbar machen
+                SSCam_addptzattr($name);
+                             
                 # Logausgabe
                 Log3($name, $verbose, "$name - PTZ Presets of camera $camname retrieved");
             
@@ -4991,7 +5042,7 @@ return($hash,$success);
 }
 
 ###############################################################################
-#                    Test ob MODEL=CAM (sonst ist es SVS)
+#               Test ob MODEL=SVS (sonst ist es eine Cam)
 ###############################################################################
 sub SSCam_IsModelCam($){ 
   my ($hash)= @_;
@@ -5112,6 +5163,142 @@ sub SSCam_getclhash ($;$$) {
   }
   
 return ($ret);
+}
+
+###############################################################################
+#     konvertiere alle ptzPanel_rowXX-attribute zu html-Code für 
+#     das generierte Widget und das weblink-Device ptzpanel_$name
+###############################################################################
+sub SSCam_ptzpanel($) {
+  my ($name)     = @_;
+  my $hash       = $defs{$name};
+  my $iconpath   = AttrVal("$name","ptzPanel_iconPath","www/images/sscam");
+  my $iconprefix = AttrVal("$name","ptzPanel_iconPrefix","black_btn_");
+  my $rowisset   = 0;
+  my $ptz_ret;
+  my $row;
+  
+  my @vl = split (/\.|-/,ReadingsVal($name, "SVSversion", ""));
+  if(@vl) {
+      my $actvs = $vl[0];
+      $actvs   .= $vl[1];
+      return "" if($actvs <= 71);
+  }
+  
+  $ptz_ret = "<div class=\"ptzpanel\">";
+  $ptz_ret.= '<table class="rc_body">';
+  
+  foreach my $rownr (0..9) {
+      $rownr = sprintf("%2.2d",$rownr);
+      $row   = AttrVal("$name","ptzPanel_row$rownr",undef);
+      next if (!$row);
+      $rowisset = 1;
+      $ptz_ret .= "<tr>\n";
+      my @btn = split (",",$row);                    # die Anzahl Buttons in einer Reihe
+      
+      foreach my $btnnr (0..$#btn) {                 
+          $ptz_ret .= '<td class="rc_button">';
+          if ($btn[$btnnr] ne "") {
+              my $cmd;
+              my $img;
+              if ($btn[$btnnr] =~ /(.*?):(.*)/) {    # enthält Komando -> <command>:<image>
+                  $cmd = $1;
+                  $img = $2;
+              } else {                               # button has format <command> or is empty
+                  $cmd = $btn[$btnnr];
+                  $img = $btn[$btnnr];
+              }
+		      if ($img =~ m/\.svg/) {                # Verwendung für SVG's
+		          $img = FW_makeImage($img, $cmd, "rc-button");
+		      } else {
+                  $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\">";                      # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
+		      }
+              if ($cmd || $cmd eq "0") {
+                  # $cmd = "cmd.$name=set $name $cmd";
+                  $cmd = "cmd=set $name $cmd";
+                  $ptz_ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmd')\">$img</a>";  # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
+              } else {
+                  $ptz_ret .= $img;
+              }
+          }
+          $ptz_ret .= "</td>";
+          $ptz_ret .= "\n";    
+      }
+      $ptz_ret .= "</tr>\n";
+  }
+  
+  $ptz_ret .= "</table>";
+  $ptz_ret .= "</div>";
+  
+  if ($rowisset) {
+      return $ptz_ret;
+  } else {
+      return "";
+  }
+}
+
+###############################################################################
+#     spezielle Attribute für PTZ-ControlPanel verfügbar machen
+###############################################################################
+sub SSCam_addptzattr($) {
+  my ($name) = @_;
+  my $hash   = $defs{$name};
+  my $actvs;
+  
+  my @vl = split (/\.|-/,ReadingsVal($name, "SVSversion", ""));
+  if(@vl) {
+      $actvs = $vl[0];
+      $actvs.= $vl[1];
+  }
+  return if(ReadingsVal($name,"DeviceType","Camera") ne "PTZ" || $actvs <= 71);
+  
+  foreach my $n (0..9) { 
+      $n = sprintf("%2.2d",$n);
+      addToDevAttrList($name, "ptzPanel_row$n");
+  }
+  if(ReadingsVal("$name","Presets","") ne "") {
+      $attr{$name}{userattr} =~ s/ptzPanel_Home:$hash->{HELPER}{OLDPRESETS}//g if($hash->{HELPER}{OLDPRESETS} && ReadingsVal("$name","Presets","") ne $hash->{HELPER}{OLDPRESETS});
+      $hash->{HELPER}{OLDPRESETS} = ReadingsVal("$name","Presets","");
+      addToDevAttrList($name, "ptzPanel_Home:".ReadingsVal("$name","Presets",""));
+  }
+  addToDevAttrList($name, "ptzPanel_iconPrefix");
+  addToDevAttrList($name, "ptzPanel_iconPath");
+  addToDevAttrList($name, "ptzPanel_use:0,1");
+  
+  # PTZ Panel Widget initial generieren
+  my $upleftfast    = "move upleft";
+  my $upfast        = "move up";
+  my $uprightfast   = "move upright";
+  my $upleft        = "move upleft 0.5";
+  my $up            = "move up 0.5";
+  my $upright       = "move upright 0.5";
+  my $leftfast      = "move left";
+  my $left          = "move left 0.5";
+  my $home          = "goPreset ".AttrVal($name,"ptzPanel_Home",ReadingsVal($name,"PresetHome",""));  
+  my $right         = "move right 0.5";
+  my $rightfast     = "move right";
+  my $downleft      = "move downleft 0.5";                       
+  my $down          = "move down 0.5";
+  my $downright     = "move downright 0.5";
+  my $downleftfast  = "move downleft";
+  my $downfast      = "move down";
+  my $downrightfast = "move downright";
+  
+  $attr{$name}{ptzPanel_row00} = "$upleftfast:CAMUPLEFTFAST.png,:CAMBLANK.png,$upfast:CAMUPFAST.png,:CAMBLANK.png,$uprightfast:CAMUPRIGHTFAST.png" 
+      if(!AttrVal($name,"ptzPanel_row00",undef));
+  $attr{$name}{ptzPanel_row01} = ":CAMBLANK.png,$upleft:CAMUPLEFT.png,$up:CAMUP.png,$upright:CAMUPRIGHT.png"
+      if(!AttrVal($name,"ptzPanel_row01",undef));  
+  $attr{$name}{ptzPanel_row02} = "$leftfast:CAMLEFTFAST.png,$left:CAMLEFT.png,$home:CAMHOME.png,$right:CAMRIGHT.png,$rightfast:CAMRIGHTFAST.png"
+      if(!AttrVal($name,"ptzPanel_row02",undef) || $home ne $hash->{HELPER}{OLDPTZHOME});  
+  $attr{$name}{ptzPanel_row03} = ":CAMBLANK.png,$downleft:CAMDOWNLEFT.png,$down:CAMDOWN.png,$downright:CAMDOWNRIGHT.png"
+      if(!AttrVal($name,"ptzPanel_row03",undef));  
+  $attr{$name}{ptzPanel_row04} = "$downleftfast:CAMDOWNLEFTFAST.png,:CAMBLANK.png,$downfast:CAMDOWNFAST.png,:CAMBLANK.png,$downrightfast:CAMDOWNRIGHTFAST.png"
+      if(!AttrVal($name,"ptzPanel_row04",undef));
+      
+  $hash->{HELPER}{OLDPTZHOME} = $home;
+  $hash->{".ptzhtml"} = "";     # SSCam_ptzpanel wird neu durchlaufen
+  
+return;
 }
 
 ###############################################################################
@@ -5279,6 +5466,7 @@ sub SSCam_experror {
 	   <li>Start/Stop Object Tracking (only supported PTZ-Cams with this capability)  </li>
        <li>set/delete a Preset (at PTZ-cameras)  </li>
        <li>set a Preset or current position as Home Preset (at PTZ-cameras)  </li>
+       <li>provides a panel for camera control (at PTZ-cameras)  </li>
     </ul>
    </ul>
    <br>
@@ -5312,8 +5500,8 @@ sub SSCam_experror {
   <ul>
   <br>
     There is a distinction between the definition of a camera-device and the definition of a Surveillance Station (SVS) 
-	device. Dependend on the kind of the defined device the internal MODEL will be set to CAM or SVS and a proper 
-    subset of the described set/get-commands are assigned to the device. <br>
+	device. Dependend on the kind of defined device the internal MODEL will be set to "vendor - camera type" or "SVS" and 
+    a proper subset of the described set/get-commands are assigned to the device. <br>
 	The scope of application of set/get-commands is denoted to every particular command (valid for CAM, SVS, CAM/SVS).
 	<br><br>
 	
@@ -5368,12 +5556,19 @@ sub SSCam_experror {
 
     In that case the command <b>"set &lt;name&gt; on 0"</b> leads also to an endless recording as well.<br><br>
     
-    If you have specified a pre-recording time in SVS it will be considered too. <br><br><br>
+    If you have specified a pre-recording time in SVS it will be considered too. <br><br>
     
+    If the module recognizes the defined camera as a PTZ-device (Reading "DeviceType = PTZ"), then a control panel is  
+    created automatically in the detal view. This panel requires SVS >= 7.1. The properties and the behave of the  
+    panel can be affected by <a href="#SSCamattr">attributes</a> "ptzPanel_.*". <br>
+    Please see also <a href="#SSCamset">command</a> <b>"set &lt;name&gt; createPTZcontrol"</b> in this context.
+    <br><br><br>
+    </ul>
     
     <a name="SSCam_Credentials"></a>
     <b>Credentials </b><br><br>
     
+    <ul>
     After a camera-device is defined, firstly it is needed to save the credentials. This will be done with command:
    
     <pre> 
@@ -5457,11 +5652,12 @@ sub SSCam_experror {
   They can be selected in the drop-down-menu of the particular device. <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  <li><b> set &lt;name&gt; createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
   
-  set username / password combination for access the Synology Surveillance Station. 
-  See <a href="#SSCam_Credentials">Credentials</a><br> for further informations.
-  
+  A separate PTZ-control panel will be created (weblink-device). The current room of the parent camera device is assigned if
+  it is set there.  
+  With the "ptzPanel_.*"-<a href="#SSCamattr">attributes</a> or respectively the specific attributes of a weblink-device 
+  the properties of the control panel can be affected. <br> 
   <br><br>
   </ul>
   
@@ -5471,6 +5667,15 @@ sub SSCam_experror {
   A snapshot gallery will be created as a permanent (weblink)Device. The device will be provided in room "SnapGallery".
   With the "snapGallery..."-<a href="#SSCamattr">attributes</a> respectively the weblink-device specific attributes (which was created)
   you are able to manipulate the properties of the new snapshot gallery device. <br> 
+  <br><br>
+  </ul>
+  
+  <ul>
+  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  
+  set username / password combination for access the Synology Surveillance Station. 
+  See <a href="#SSCam_Credentials">Credentials</a><br> for further informations.
+  
   <br><br>
   </ul>
   
@@ -6157,6 +6362,52 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 
   <li><b>pollnologging</b><br>
     "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive</li><br>
+    
+  <li><b>ptzPanel_Home</b><br>
+    In the PTZ-control panel the Home-Icon (in attribute "ptzPanel_row02") is automatically assigned to the value of 
+    Reading "PresetHome".
+    With "ptzPanel_Home" you can change the assignment to another preset from the available Preset list. </li><br> 
+    
+  <li><b>ptzPanel_iconPath</b><br>
+    Path for icons used in PTZ-control panel, default is "www/images/sscam". 
+    The attribute value will be used for all icon-files except *.svg. </li><br> 
+
+  <li><b>ptzPanel_iconPrefix</b><br>
+    Prefix for icons used in PTZ-control panel, default is "black_btn_". 
+    The attribute value will be used for all icon-files except *.svg. <br>
+    If the used icon-files begin with e.g. "black_btn_" ("black_btn_CAMDOWN.png"), the icon needs to be defined in
+    attributes "ptzPanel_row[00-09]" just with the subsequent part of name, e.g. "CAMDOWN.png".
+    </li><br>   
+
+  <li><b>ptzPanel_row[00-09] &lt;command&gt;:&lt;icon&gt;,&lt;command&gt;:&lt;icon&gt;,... </b><br>
+    For PTZ-cameras the attributes "ptzPanel_row00" to "ptzPanel_row04" are created automatically for usage by 
+    the PTZ-control panel. <br>
+    The attributes contain a comma spareated list of command:icon-combinations (buttons) each panel line. 
+    One panel line can contain a random number of buttons. The attributes "ptzPanel_row00" to "ptzPanel_row04" can't be 
+    deleted because of they are created automatically again in that case.
+    The user can change or complement the attribute values. These changes are conserved. <br>
+    If needed the assignment for Home-button in "ptzPanel_row02" can be changed by attribute "ptzPanel_Home". <br>
+    The icons are searched in path "ptzPanel_iconPath". The value of "ptzPanel_iconPrefix" is prepend to the icon filename.
+    Own extensions of the PTZ-control panel can be done using the attributes "ptzPanel_row05" to "ptzPanel_row09". 
+    For creation of own icons a template is provided in the SVN: 
+    <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/sscam">contrib/sscam/black_btn_CAM_Template.pdn</a>. This
+    template can be edited by e.g. Paint.Net.  <br><br>
+    
+    <b>Note:</b> <br>
+    For an empty field please use ":CAMBLANK.png" respectively ":CAMBLANK.png,:CAMBLANK.png,:CAMBLANK.png,..." for an empty 
+    line.
+    <br><br>
+    
+        <ul>
+		<b>Example:</b><br>
+        attr &lt;name&gt; ptzPanel_row00 move upleft:CAMUPLEFTFAST.png,:CAMBLANK.png,move up:CAMUPFAST.png,:CAMBLANK.png,move upright:CAMUPRIGHTFAST.png <br>
+        # The command "move upleft" is transmitted to the camera by pressing the button(icon) "CAMUPLEFTFAST.png".  <br>
+        </ul>
+		<br>
+    </li><br>      
+
+  <li><b>ptzPanel_use</b><br>
+    Switch the use of PTZ-control panel in detail view off or on (default: on). </li><br> 
   
   <li><b>rectime</b><br>
    determines the recordtime when a recording starts. If rectime = 0 an endless recording will be started. If 
@@ -6347,6 +6598,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
       <li>Start bzw. Stop Objekt Tracking (nur unterstützte PTZ-Kameras mit dieser Fähigkeit)  </li>
       <li>Setzen/Löschen eines Presets (bei PTZ-Kameras)  </li>
       <li>Setzen der Home-Position (bei PTZ-Kameras)  </li>
+      <li>stellt ein Paneel zur Kamera-Steuerung zur Verfügung (bei PTZ-Kameras)  </li>
      </ul> 
     </ul>
     <br>
@@ -6362,6 +6614,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     
     
     <b>Vorbereitung </b> <br><br>
+    
+    <ul>
     Dieses Modul nutzt das Perl-Modul JSON. <br>
 	Auf Debian-Linux basierenden Systemen kann es installiert werden mit: <br><br>
     
@@ -6378,14 +6632,15 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     MIME::Base64    <br>
     Time::HiRes     <br>
     HttpUtils       (FHEM-Modul) <br><br>
+    </ul>
 
 <a name="SSCamdefine"></a>
 <b>Definition</b>
   <ul>
   <br>
     Bei der Definition wird zwischen einer Kamera-Definition und der Definition einer Surveillance Station (SVS) 
-	unterschieden. Abhängig von der Art des definierten Devices wird das Internal MODEL auf CAM oder SVS gesetzt und eine 
-	passende Teilmenge der beschriebenen set/get-Befehle dem Device zugewiesen. <br>
+	unterschieden. Abhängig von der Art des definierten Devices wird das Internal MODEL auf "Hersteller - Kameramodell" oder 
+    SVS gesetzt und eine passende Teilmenge der beschriebenen set/get-Befehle dem Device zugewiesen. <br>
 	Der Gültigkeitsbereich von set/get-Befehlen ist nach dem jeweiligen Befehl angegeben (gilt für CAM, SVS, CAM/SVS).
 	<br><br>
 	
@@ -6437,12 +6692,20 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     Mit dem <a href="#SSCamset">Befehl</a> <b>"set &lt;name&gt; on [rectime]"</b> wird die Aufnahmedauer temporär festgelegt und überschreibt einmalig sowohl den Defaultwert als auch den Wert des gesetzten Attributs "rectime". <br>
     Auch in diesem Fall führt <b>"set &lt;name&gt; on 0"</b> zu einer Daueraufnahme. <br><br>
 
-    Eine eventuell in der SVS eingestellte Dauer der Voraufzeichnung wird weiterhin berücksichtigt. <br><br><br>
+    Eine eventuell in der SVS eingestellte Dauer der Voraufzeichnung wird weiterhin berücksichtigt. <br><br>
     
+    Erkennt das Modul die definierte Kamera als PTZ-Device (Reading "DeviceType = PTZ"), wird automatisch ein 
+    Steuerungspaneel in der Detailansicht erstellt. Dieses Paneel setzt SVS >= 7.1 voraus. Die Eigenschaften und das 
+    Verhalten des Paneels können mit den <a href="#SSCamattr">Attributen</a> "ptzPanel_.*" beeinflusst werden. <br>
+    Siehe dazu auch den <a href="#SSCamset">Befehl</a> <b>"set &lt;name&gt; createPTZcontrol"</b>.
+    
+    <br><br><br>
+    </ul>
     
     <a name="SSCam_Credentials"></a>
     <b>Credentials </b><br><br>
     
+    <ul>
     Nach dem Definieren des Gerätes müssen zuerst die Zugangsparameter gespeichert werden. Das geschieht mit dem Befehl:
    
     <pre> 
@@ -6527,20 +6790,30 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   Drop-Down-Menü des jeweiligen Devices zur Auswahl zur Verfügung. <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  <li><b> set &lt;name&gt; createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
   
-  Setzt Username / Passwort für den Zugriff auf die Synology Surveillance Station. 
-  Siehe <a href="#SSCam_Credentials">Credentials</a><br>
-  
+  Es wird ein separates PTZ-Steuerungspaneel (weblink) erstellt. Es wird der aktuelle Raum des Kameradevice zugewiesen sofern
+  dort gesetzt.  
+  Mit den "ptzPanel_.*"-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des entstandenen Weblink-Devices 
+  können die Eigenschaften des PTZ-Paneels beeinflusst werden. <br> 
   <br><br>
   </ul>
-  
+    
   <ul>
   <li><b> set &lt;name&gt; createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Es wird eine Schnappschußgallerie als permanentes (weblink)Device erzeugt. Das Device wird im Raum "SnapGallery" erstellt.
   Mit den "snapGallery..."-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des entstandenen Weblink-Devices 
   können die Eigenschaften der Schnappschußgallerie beeinflusst werden. <br> 
+  <br><br>
+  </ul>
+  
+  <ul>
+  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  
+  Setzt Username / Passwort für den Zugriff auf die Synology Surveillance Station. 
+  Siehe <a href="#SSCam_Credentials">Credentials</a><br>
+  
   <br><br>
   </ul>
   
@@ -7185,7 +7458,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <li><b>CAMID</b> - die ID der Kamera in der SVS, der Wert wird automatisch anhand des SVS-Kameranamens ermittelt. </li>
   <li><b>CAMNAME</b> - der Name der Kamera in der SVS </li>
   <li><b>CREDENTIALS</b> - der Wert ist "Set" wenn die Credentials gesetzt wurden </li>
-  <li><b>MODEL</b> - Unterscheidung von Kamera-Device (CAM) und Surveillance Station Device (SVS) </li>
+  <li><b>MODEL</b> - Unterscheidung von Kamera-Device (Hersteller - Kameratyp) und Surveillance Station Device (SVS) </li>
   <li><b>NAME</b> - der Kameraname in FHEM </li>
   <li><b>OPMODE</b> - die zuletzt ausgeführte Operation des Moduls </li> 
   <li><b>SERVERADDR</b> - IP-Adresse des SVS Hostes </li>
@@ -7242,7 +7515,53 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <li><b>pollnologging</b><br>
     "0" bzw. nicht gesetzt = Logging Gerätepolling aktiv (default), "1" = Logging 
     Gerätepolling inaktiv </li><br>
-  
+    
+  <li><b>ptzPanel_Home</b><br>
+    Im PTZ-Steuerungspaneel wird dem Home-Icon (im Attribut "ptzPanel_row02") automatisch der Wert des Readings 
+    "PresetHome" zugewiesen.
+    Mit "ptzPanel_Home" kann diese Zuweisung mit einem Preset aus der verfügbaren Preset-Liste geändert werden. </li><br> 
+    
+  <li><b>ptzPanel_iconPath</b><br>
+    Pfad für Icons im PTZ-Steuerungspaneel, default ist "www/images/sscam". 
+    Der Attribut-Wert wird für alle Icon-Dateien außer *.svg verwendet. </li><br> 
+
+  <li><b>ptzPanel_iconPrefix</b><br>
+    Prefix für Icon-Dateien im PTZ-Steuerungspaneel, default ist "black_btn_". 
+    Der Attribut-Wert wird für alle Icon-Dateien außer *.svg verwendet. <br>
+    Beginnen die verwendeten Icon-Dateien z.B. mit "black_btn_" ("black_btn_CAMDOWN.png"), braucht das Icon in den
+    Attributen "ptzPanel_row[00-09]" nur noch mit dem darauf folgenden Teilstring, z.B. "CAMDOWN.png" benannt zu werden.
+    </li><br>    
+
+  <li><b>ptzPanel_row[00-09] &lt;command&gt;:&lt;icon&gt;,&lt;command&gt;:&lt;icon&gt;,... </b><br>
+    Für PTZ-Kameras werden automatisch die Attribute "ptzPanel_row00" bis "ptzPanel_row04" zur Verwendung im
+    PTZ-Steuerungspaneel angelegt. <br>
+    Die Attribute enthalten eine Komma-separarierte Liste von Befehl:Icon-Kombinationen (Tasten) je Paneelzeile. 
+    Eine Paneelzeile kann beliebig viele Tasten enthalten. Die Attribute "ptzPanel_row00" bis "ptzPanel_row04" können nicht
+    gelöscht werden da sie in diesem Fall automatisch wieder angelegt werden. Der User kann die Attribute ändern und ergänzen.
+    Diese Änderungen bleiben erhalten. <br>
+    Bei Bedarf kann die Belegung der Home-Taste in "ptzPanel_row02" geändert werden mit dem Attribut "ptzPanel_Home". <br>
+    Die Icons werden im Pfad "ptzPanel_iconPath" gesucht. Dem Icon-Namen wird "ptzPanel_iconPrefix" vorangestellt.
+    Eigene Erweiterungen des PTZ-Steuerungspaneels können über die Attribute "ptzPanel_row05" bis "ptzPanel_row09" 
+    vorgenommen werden. Zur Erstellung eigener Icons gibt es eine Vorlage im SVN: 
+    <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/sscam">contrib/sscam/black_btn_CAM_Template.pdn</a>. Diese
+    Vorlage kann zum Beispiel mit Paint.Net bearbeitet werden.    <br><br>
+    
+    <b>Hinweis</b> <br>
+    Für eine Leerfeld verwenden sie bitte ":CAMBLANK.png" bzw. ":CAMBLANK.png,:CAMBLANK.png,:CAMBLANK.png,..." für eine 
+    Leerzeile.
+    <br><br>
+    
+        <ul>
+		<b>Beispiel:</b><br>
+        attr &lt;name&gt; ptzPanel_row00 move upleft:CAMUPLEFTFAST.png,:CAMBLANK.png,move up:CAMUPFAST.png,:CAMBLANK.png,move upright:CAMUPRIGHTFAST.png <br>
+        # Der Befehl "move upleft" wird der Kamera beim Druck auf Tastenicon "CAMUPLEFTFAST.png" übermittelt.  <br>
+        </ul>
+		<br>
+    </li><br>  
+
+  <li><b>ptzPanel_use</b><br>
+    Die Anzeige des PTZ-Steuerungspaneels in der Detailanzeige wird ein(1)- bzw. ausgeschaltet(0) (default ein). </li><br>    
+    
   <li><b>rectime</b><br>
     festgelegte Aufnahmezeit wenn eine Aufnahme gestartet wird. Mit rectime = 0 wird eine 
     Endlosaufnahme gestartet. Ist "rectime" nicht gesetzt, wird der Defaultwert von 15s 

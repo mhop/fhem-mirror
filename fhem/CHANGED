@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCam: V3.9.1, PTZ control panel added, please consider
+                       attributes "ptzPanel_.*" and command "createPTZcontrol"
   - bugfix:  93_DbRep: V7.17.1, sqlCmd can't use §timestamp_begin§
   - feature: 73_GardenaSmartBridge: add set command deleteAccountPassword
   - change:  88_HMCCU: minor changes
