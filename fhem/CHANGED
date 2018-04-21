@@ -1,11 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 59_Weather: italian translations and other (forum #87080)
   - feature: 49_SSCam: V3.9.1, PTZ control panel added, please consider
                        attributes "ptzPanel_.*" and command "createPTZcontrol"
   - bugfix:  93_DbRep: V7.17.1, sqlCmd can't use §timestamp_begin§
   - feature: 73_GardenaSmartBridge: add set command deleteAccountPassword
   - change:  88_HMCCU: minor changes
-  - feature: 93_DbRep: new function dbValue, DbReadingsVal (blocking) 
+  - feature: 93_DbRep: new function dbValue, DbReadingsVal (blocking)
   - bugfix:  93_DbLog: 3.10.7, create addLog-event if reading was not found
   - bugfix:  73_GardenaSmartBridge: add error trigger for notify sub
   - feature: 98_SVG.pm: horizontalLine* added (Forum #86800)
@@ -26,10 +27,10 @@
   - bugfix:  72_FB_CALLMONITOR: fix log message on every reverse search:
                                 "unknown reverse search method ,"
   - bugfix:  93_DbLog: V3.10.4, fix addLog if no valueFn is used
-  - bugfix:  93_DbLog: V3.10.3, minor fixes in addLog function 
+  - bugfix:  93_DbLog: V3.10.3, minor fixes in addLog function
   - new:     00_Neuron.pm, 10_NeuronPin.pm: support for Neuron Devices
   - feature: 59_WUup: add attribute round
-  - bugfix:  72_FB_CALLMONITOR: fix not working get command 
+  - bugfix:  72_FB_CALLMONITOR: fix not working get command
                                 showPhonebookEntries for remote phonebooks
   - bugfix:  73_GardenaSmartBridge: add commandref parts
   - change:  93_DbLog: V3.10.2, event parsing of Weather changed, add option
@@ -40,7 +41,7 @@
   - bugfix:  88_xs1Bridge: blacklist PEARL Warning + Code mod
   - feature: 74_AMADDevice: add support to set and read Adaptive brightness
   - bugfix:  88_xs1Bridge: blacklist option (forum #790923)
-  - bugfix:  49_SSCam: V3.8.3, fix of version 3.8.2 
+  - bugfix:  49_SSCam: V3.8.3, fix of version 3.8.2
   - change:  49_SSCam: V3.8.2, internal codereview, minor fixes
   - feature: 73_GardenaSmartBridge/74_GardenaSmartDevice: rewrite parts of
              Bridge Modul and add Support for predefined start point

@@ -131,6 +131,25 @@ my @YahooCodes_pl = (
        'gorąco', 'gdzieniegdzie burze', 'burze', 'burze', 'przelotne opady śniegu', 'duże opady śniegu',
        'ciężkie opady śniegu', 'dużo śniegu', 'częściowe zachmurzenie', 'burze z deszczem', 'opady śniegu', 'przejściowo burze');
 
+my @YahooCodes_it = (
+       'tromba d\'aria', 'tempesta tropicale', 'uragano', 'temporali di grande intensità', 'temporali', 'pioggia mista e neve',
+       'pioggia mista e nevischio', 'neve mista e nevischio', 'pioggia gelata', 'pioggia leggera', 'grandine' ,'rovesci',
+       'piogge', 'raffiche di neve', 'deboli nevicate', 'bufera di neve', 'neve', 'grandine',
+       'nevischio', 'pulviscolo', 'nebbia', 'foschia', 'smog', 'ventoso',
+       'ventoso', 'freddo', 'nuvoloso',
+       'parzialmente nuvoloso', # night
+       'parzialmente nuvoloso', # day
+       'parzialmente nuvoloso', # night
+       'parzialmente nuvoloso', # day
+       'sereno',
+       'soleggiato',
+       'bel tempo', #night
+       'bel tempo', #day
+       'pioggia mista a grandine',
+       'caldo', 'temporali isolati', 'temporali sparsi', 'temporali sparsi', 'piogge sparse', 'forti nevicate',
+       'nevicate sparse', 'forti nevicate', 'parzialmente nuvoloso', 'rovesci temporaleschi', 'rovesci di neve', 'temporali isolati');
+
+
 ###################################
 
 # Cache
@@ -343,6 +362,8 @@ sub YahooWeatherAPI_getYahooCodes($) {
         return @YahooCodes_fr;
     } elsif($lang eq "pl") {
         return @YahooCodes_pl;
+    } elsif($lang eq "it") {
+        return @YahooCodes_it;
     } else {
         return @YahooCodes_en;
     }
