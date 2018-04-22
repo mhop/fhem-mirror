@@ -1,4 +1,4 @@
-# ############################################################################
+ï»¿# ############################################################################
 # $Id$
 #
 #  FHEM Module for Squeezebox Servers
@@ -47,7 +47,7 @@ use IO::Socket;
 use URI::Escape;
 # include for using the perl ping command
 use Net::Ping;
-use Encode qw(decode encode);           # CD 0009 hinzugefügt
+use Encode qw(decode encode);           # CD 0009 hinzugefÃ¼gt
 #use Text::Unidecode;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
@@ -69,7 +69,7 @@ use Time::HiRes qw(gettimeofday time);
 
 use constant { true => 1, false => 0 };
 use constant { TRUE => 1, FALSE => 0 };
-use constant SB_SERVER_VERSION => '0041';
+use constant SB_SERVER_VERSION => '0049';
 
 my $SB_SERVER_hasDataDumper = 1;        # CD 0024
 
@@ -106,8 +106,9 @@ sub SB_SERVER_Initialize( $ ) {
     $hash->{AttrList} .= "doalivecheck:true,false ";
     $hash->{AttrList} .= "maxcmdstack ";
     $hash->{AttrList} .= "httpport ";
+    $hash->{AttrList} .= "disable:0,1 ";    # CD 0046
     $hash->{AttrList} .= "enablePlugins ";
-    $hash->{AttrList} .= "ignoredIPs ignoredMACs internalPingProtocol:icmp,tcp,udp,syn,stream,none ";   # CD 0021 none hinzugefügt
+    $hash->{AttrList} .= "ignoredIPs ignoredMACs internalPingProtocol:icmp,tcp,udp,syn,stream,none ";   # CD 0021 none hinzugefÃ¼gt
     $hash->{AttrList} .= $readingFnAttributes;
 
     # CD 0024
@@ -124,7 +125,8 @@ sub SB_SERVER_SetAttrList( $ ) {
     $attrList .= "doalivecheck:true,false ";
     $attrList .= "maxcmdstack ";
     $attrList .= "httpport ";
-    $attrList .= "ignoredIPs ignoredMACs internalPingProtocol:icmp,tcp,udp,syn,stream,none ";   # CD 0021 none hinzugefügt
+    $attrList .= "disable:0,1 ";    # CD 0046
+    $attrList .= "ignoredIPs ignoredMACs internalPingProtocol:icmp,tcp,udp,syn,stream,none ";   # CD 0021 none hinzugefÃ¼gt
     my $applist="enablePlugins";
     if (defined($hash->{helper}{apps})) {
         $applist.=":multiple-strict";
@@ -140,6 +142,38 @@ sub SB_SERVER_SetAttrList( $ ) {
 }
 # CD 0032 end
 
+# CD 0046 start
+# ----------------------------------------------------------------------------
+# connect to server
+# ----------------------------------------------------------------------------
+sub SB_SERVER_TryConnect( $$ ) {
+    my ($hash,$reopen) = @_;    # CD 0047 reopen hinzugefÃ¼gt
+
+    return if ($hash->{CLICONNECTION} eq 'on');
+    return if (IsDisabled($hash->{NAME}));
+    
+    delete $hash->{helper}{disableReconnect} if (defined($hash->{helper}{disableReconnect}));
+
+    if(SB_SERVER_IsValidIPV4($hash->{IP})) {
+        return DevIo_OpenDev($hash, $reopen, "SB_SERVER_DoInit");
+    } else {
+        return DevIo_OpenDev($hash, $reopen, "SB_SERVER_DoInit", \&SB_SERVER_DevIoCallback)
+    }
+}
+
+sub SB_SERVER_DevIoCallback($$)
+{
+    my ($hash, $err) = @_;
+    my $name = $hash->{NAME};
+    
+    if($err)
+    {
+        Log3 $name, 2, "SB_SERVER_DevIoCallback ($name) - unable to connect: $err";
+        SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
+        DevIo_Disconnected( $hash );    # CD 0048 wird nicht von DevIo gemacht ?
+        SB_SERVER_setStates($hash, "disconnected"); # CD 0048 wird nicht von DevIo gemacht ?
+    }
+}
 # ----------------------------------------------------------------------------
 #  called when defining a module
 # ----------------------------------------------------------------------------
@@ -171,14 +205,33 @@ sub SB_SERVER_Define( $$ ) {
     $hash->{IP} = "127.0.0.1";
     $hash->{CLIPORT}  = 9090;
     $hash->{WOLNAME} = "none";
+    $hash->{helper}{wolSetCmd}=' ';         # CD 0047
+    $hash->{helper}{wolSetValue}='on';      # CD 0047
     $hash->{PRESENCENAME} = "none";         # CD 0007
+    $hash->{helper}{presenceReading}='state';           # CD 0047
+    $hash->{helper}{presenceValuePresent}='present';    # CD 0047
+    $hash->{helper}{presenceValueAbsent}='absent';      # CD 0047
     $hash->{RCCNAME} = "none";
     $hash->{USERNAME} = "?";
     $hash->{PASSWORD} = "?";
 
+    # CD 0048 versuchen Namen/Adresse zu sÃ¤ubern
+    $a[0] =~ s/^https:\/\///;
+    $a[0] =~ s/^http:\/\///;
+    $a[0] =~ s/\/$//;
+
+    # CD 0046 Hostnamen statt IP-Adresse zulassen
+    $hash->{DeviceName} = $a[0];
+    if($a[0] =~ m/^(.+):([0-9]+)$/) {
+        $hash->{IP} = $1;
+        $hash->{CLIPORT}  = $2;
+    } else {
+        $hash->{IP} = $a[0];
+    }
+
     my ($user,$password);
     my @newDef;
-
+    
     # CD 0041 start
     my @notifyregexp;
     push @notifyregexp,"global";
@@ -193,13 +246,20 @@ sub SB_SERVER_Define( $$ ) {
         push @notifyregexp,$2;              # CD 0041
 	    next;
 	} elsif( $_ =~ /^(WOL:)(.*)/ ) {
-	    $hash->{WOLNAME} = $2;
         push @newDef,$_;
+        my @pp=split ':',$2;                # CD 0047
+        $hash->{WOLNAME} = $pp[0];
+        $hash->{helper}{wolSetCmd}=$pp[1] if defined($pp[1]);        # CD 0047
+        $hash->{helper}{wolSetValue}=$pp[2] if defined($pp[2]);      # CD 0047
 	    next;
 	} elsif( $_ =~ /^(PRESENCE:)(.*)/ ) {   # CD 0007
-	    $hash->{PRESENCENAME} = $2;         # CD 0007
         push @newDef,$_;
-        push @notifyregexp,$2;              # CD 0041
+        my @pp=split ':',$2;                # CD 0047
+        $hash->{PRESENCENAME} = $pp[0];     # CD 0007 CD 0047
+        $hash->{helper}{presenceReading}=$pp[1] if defined($pp[1]);      # CD 0047
+        $hash->{helper}{presenceValuePresent}=$pp[2] if defined($pp[2]); # CD 0047
+        $hash->{helper}{presenceValueAbsent}=$pp[3] if defined($pp[3]);  # CD 0047
+        push @notifyregexp,$pp[0];              # CD 0041
 	    next;                               # CD 0007
 	} elsif( $_ =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{3,5})/ ) {
 	    $hash->{IP} = $1;
@@ -213,11 +273,11 @@ sub SB_SERVER_Define( $$ ) {
 	    next;
 	} elsif( $_ =~ /^(USER:)(.*)/ ) {
         $user=$2 if($2 ne 'yes');
-	    $hash->{USERNAME} = 'yes';
+        $hash->{USERNAME} = 'yes';
         push @newDef,'USER:yes';
 	} elsif( $_ =~ /^(PASSWORD:)(.*)/ ) {
         $password=$2 if($2 ne 'yes');
-	    $hash->{PASSWORD} = 'yes';
+        $hash->{PASSWORD} = 'yes';
         push @newDef,'PASSWORD:yes';
 	} else {
         push @newDef,$_;
@@ -257,8 +317,11 @@ sub SB_SERVER_Define( $$ ) {
     }
 
     # the port of the HTTP interface as needed for the coverart url
+    # CD 0049 auf $hash->{helper}{httpport} umgestellt
     if( !defined( $attr{$name}{httpport} ) ) {
-	$attr{$name}{httpport} = "9000";
+        $hash->{helper}{httpport}='9000';
+    } else {
+        $hash->{helper}{httpport}=$attr{$name}{httpport};
     }
 
     # Preset our readings if undefined
@@ -353,7 +416,7 @@ sub SB_SERVER_Define( $$ ) {
                0 );
             $ret=undef;
         } else {
-            $ret= DevIo_OpenDev($hash, 0, "SB_SERVER_DoInit" );
+            $ret= SB_SERVER_TryConnect($hash,0);
         }
     }
 
@@ -432,6 +495,8 @@ sub SB_SERVER_Ready( $ ) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
+    return if (IsDisabled($name));  # CD 0046
+
     #Log3( $hash, 4, "SB_SERVER_Ready: called" );
 
     # check for bad/missing password
@@ -483,11 +548,11 @@ sub SB_SERVER_Ready( $ ) {
                     delete($hash->{helper}{WOLFastReconnectNext});
                 }
             }
-            if( ReadingsVal( $hash->{PRESENCENAME}, "state", "present" ) eq "present" ) {
+            if( ReadingsVal( $hash->{PRESENCENAME}, $hash->{helper}{presenceReading}, $hash->{helper}{presenceValuePresent} ) eq $hash->{helper}{presenceValuePresent} ) {  # CD 0047 erweitert
                 $reconnect=1;
             }
             if (($reconnect==1)&&(!defined($hash->{helper}{disableReconnect}))) {
-                return( DevIo_OpenDev( $hash, 1, "SB_SERVER_DoInit") );
+                return( SB_SERVER_TryConnect( $hash , 1 ));
             } else {
                 return undef;
             }
@@ -536,14 +601,18 @@ sub SB_SERVER_Attr( @ ) {
             # CD 0021 end
         }
     } elsif( $args[ 0 ] eq "httpport" ) {
-        # CD 0015 bei Änderung des Ports diesen an Clients schicken
+        # CD 0015 bei Ã„nderung des Ports diesen an Clients schicken
         if( $cmd eq "set" ) {
+            $hash->{helper}{httpport}=$args[ 1 ];
             SB_SERVER_Broadcast( $hash, "SERVER",
                      "IP " . $hash->{IP} . ":" .
                      $args[ 1 ] );
+        } elsif( $cmd eq 'del' ) {
+            DevIo_SimpleWrite( $hash, "pref httpport ?\n", 0 );               # CD 0049
         }
     } elsif( $args[ 0 ] eq "enablePlugins" ) {
-        # CD 0070 bei Änderung Status abfragen
+        return "$name: device is disabled, modifying enablePlugins is not possible" if(IsDisabled($name));   # CD 0046
+        # CD 0070 bei Ã„nderung Status abfragen
         if( $cmd eq "set" ) {
             if($init_done>0) {
                 if(defined($hash->{helper}{apps})) {
@@ -570,6 +639,43 @@ sub SB_SERVER_Attr( @ ) {
             delete($hash->{helper}{appcmd}) if(defined($hash->{helper}{appcmd}));
             DevIo_SimpleWrite( $hash, "apps 0 200\n", 0 );
         }
+    # CD 0046 start
+    } elsif( $args[ 0 ] eq 'disable' ) {
+        if( $cmd eq 'set' ) {
+            if($args[ 1 ] eq '1') {
+                DevIo_SimpleWrite( $hash, 'listen 0\n', 0 );
+                SB_SERVER_RemoveInternalTimers( $hash );
+                DevIo_Disconnected( $hash );
+                delete($hash->{NEXT_OPEN}) if($hash->{NEXT_OPEN});
+                $hash->{CLICONNECTION} = 'off';
+                SB_SERVER_setStates($hash, 'disabled');
+            } else {
+                if ($hash->{CLICONNECTION} ne 'on') {
+                    SB_SERVER_setStates($hash, 'disconnected');
+                    if(!defined($hash->{helper}{disableReconnect})) {
+                        readingsSingleUpdate( $hash, 'power', 'off', 0 );
+                        delete($hash->{NEXT_OPEN}) if($hash->{NEXT_OPEN});
+                        InternalTimer( gettimeofday() + 0.1,
+                           "SB_SERVER_tcb_Alive",
+                           "SB_SERVER_Alive:$name",
+                           0 );
+                    }
+                }
+            }
+        } elsif( $cmd eq 'del' ) {
+            if ($hash->{CLICONNECTION} ne 'on') {
+                SB_SERVER_setStates($hash, 'disconnected');
+                if(!defined($hash->{helper}{disableReconnect})) {
+                    readingsSingleUpdate( $hash, 'power', 'off', 0 );
+                    delete($hash->{NEXT_OPEN}) if($hash->{NEXT_OPEN});
+                    InternalTimer( gettimeofday() + 0.1,
+                       "SB_SERVER_tcb_Alive",
+                       "SB_SERVER_Alive:$name",
+                       0 );
+                }
+            }
+        }
+    # CD 0046 end
     }
     return; # 0033 betateilchen/mahowi
 }
@@ -603,18 +709,20 @@ sub SB_SERVER_Set( $@ ) {
         my $out="";
         if (defined($hash->{helper}{savedServerStates})) {
             foreach my $pl ( keys %{$hash->{helper}{savedServerStates}} ) {
-                $out.=$pl."," unless ($pl=~/xxxSgTalkxxx/);  # CD 0027 xxxSgTalkxxx hinzugefügt
+                $out.=$pl."," unless ($pl=~/xxxSgTalkxxx/);  # CD 0027 xxxSgTalkxxx hinzugefÃ¼gt
             }
             $out=~s/,$//;
         }
         $res .= "recall:$out ";
 
         return( $res );
+    } elsif( IsDisabled($name) ) {  # CD 0046
+        return;
     } elsif( $cmd eq "on" ) {
 	if( ReadingsVal( $name, "power", "off" ) eq "off" ) {
         # the server is off, try to reactivate it
         if( $hash->{WOLNAME} ne "none" ) {
-            fhem( "set $hash->{WOLNAME} on" );
+            fhem( "set $hash->{WOLNAME} $hash->{helper}{wolSetCmd} $hash->{helper}{wolSetValue}" ); # CD 0047 Befehl und Wert konfigurierbar
             $hash->{helper}{WOLFastReconnectUntil}=time()+120;   # CD 0007
             $hash->{helper}{WOLFastReconnectNext}=time()+30;    # CD 0007
         }
@@ -636,6 +744,7 @@ sub SB_SERVER_Set( $@ ) {
                 readingsSingleUpdate( $hash, "power", "off", 1 );
                 SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
                 DevIo_Disconnected( $hash );
+                $hash->{CLICONNECTION} = 'off'; # CD 0046
                 InternalTimer( gettimeofday() + 5,
                            "SB_SERVER_tcb_Alive",
                            "SB_SERVER_Alive:$name",
@@ -656,6 +765,7 @@ sub SB_SERVER_Set( $@ ) {
             readingsSingleUpdate( $hash, "power", "off", 1 );
             SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
             SB_SERVER_RemoveInternalTimers( $hash );
+            $hash->{CLICONNECTION} = 'off'; # CD 0046
         }
     } elsif( $cmd eq "statusRequest" ) {
         Log3( $hash, 5, "SB_SERVER_Set: statusRequest" );
@@ -666,6 +776,7 @@ sub SB_SERVER_Set( $@ ) {
                    0 );
         DevIo_SimpleWrite( $hash, "playlists 0 200\n", 0 );
         DevIo_SimpleWrite( $hash, "alarm playlists 0 300\n", 0 );               # CD 0011
+        DevIo_SimpleWrite( $hash, "pref httpport ?\n", 0 );               # CD 0049
         # CD 0032 start
         DevIo_SimpleWrite( $hash, "apps 0 200\n", 0 );
         if(defined($hash->{helper}{apps})) {
@@ -682,9 +793,9 @@ sub SB_SERVER_Set( $@ ) {
         my $v = join( " ", @a );
         $v .= "\n";
         Log3( $hash, 5, "SB_SERVER_Set: cliraw: $v " );
-        DevIo_SimpleWrite( $hash, $v, 0 ); # CD 0016 IOWrite in DevIo_SimpleWrite geändert
+        DevIo_SimpleWrite( $hash, $v, 0 ); # CD 0016 IOWrite in DevIo_SimpleWrite geÃ¤ndert
     } elsif( $cmd eq "rescan" ) {
-        DevIo_SimpleWrite( $hash, $cmd . " " . $a[ 0 ] . "\n", 0 );     # CD 0016 IOWrite in DevIo_SimpleWrite geändert
+        DevIo_SimpleWrite( $hash, $cmd . " " . $a[ 0 ] . "\n", 0 );     # CD 0016 IOWrite in DevIo_SimpleWrite geÃ¤ndert
     # CD 0018 start
     } elsif( $cmd eq "addToFHEMUpdate" ) {
         fhem("update add https://raw.githubusercontent.com/ChrisD70/FHEM-Modules/master/autoupdate/sb/controls_squeezebox.txt");
@@ -871,7 +982,7 @@ sub SB_SERVER_Set( $@ ) {
                 return( "sync group $statename not found" );
             }
 
-            # Zustand speichern, Gruppe laden, talk verzögert an Player absetzen
+            # Zustand speichern, Gruppe laden, talk verzÃ¶gert an Player absetzen
             SB_SERVER_Save($hash, 'xxxSgTalkxxx');
             SB_SERVER_LoadSyncGroup($hash, $statename, $poweron);
             $hash->{helper}{sgTalkPlayers}=ReadingsVal($name,"sg$statename","-");
@@ -971,6 +1082,7 @@ sub SB_SERVER_tcb_StartTalk($) {
     my(undef,$name) = split(':',$in);
     my $hash = $defs{$name};
 
+    return if (IsDisabled($name));  # CD 0046
     return unless defined($hash->{helper}{sgTalkActivePlayer});
 
     # alle gesynced ?
@@ -1133,6 +1245,8 @@ sub SB_SERVER_Read( $ ) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
+    return if (IsDisabled($name));  # CD 0046
+
     #my $start = time;   # CD 0019
 
     Log3( $hash, 4, "SB_SERVER_Read($name): called" );
@@ -1202,14 +1316,14 @@ sub SB_SERVER_Read( $ ) {
 
     # and dispatch the rest
     foreach( @cmds ) {
-        #my $t31=time;   # CD 0020
+        my $t31=time;   # CD 0020
         # double check complete line
         my $lastchar = substr( $_, -1);
         SB_SERVER_DispatchCommandLine( $hash, $_  );
         # CD 0020 start
-        #if((time-$t31)>0.2) {
-        #    Log3($hash,0,"SB_SERVER_Read($name), time:".int((time-$t31)*1000)." cmd: ".$_);
-        #}
+        if((time-$t31)>0.5) {
+            Log3($hash,3,"SB_SERVER_Read($name), time:".int((time-$t31)*1000)."ms cmd: ".$_);
+        }
         # CD 0020 end
     }
 
@@ -1226,6 +1340,7 @@ sub SB_SERVER_Read( $ ) {
         DevIo_SimpleWrite( $hash, "favorites items 0 " .
                    AttrVal( $name, "maxfavorites", 100 ) . " want_url:1\n",        # CD 0009 url mit abfragen
                    0 );
+        DevIo_SimpleWrite( $hash, "pref httpport ?\n", 0 );     # CD 0049
         DevIo_SimpleWrite( $hash, "playlists 0 200\n", 0 );
     }
     # CD 0009 end
@@ -1267,6 +1382,8 @@ sub SB_SERVER_Write( $$$ ) {
 
     Log3( $hash, 4, "SB_SERVER_Write($name): called with FN:$fn" ); # unless($fn=~m/\?/);  # CD TEST 4
 
+    return if (IsDisabled($name));  # CD 0046
+
     if( !defined( $fn ) ) {
 	return( undef );
     }
@@ -1275,7 +1392,7 @@ sub SB_SERVER_Write( $$$ ) {
 	Log3( $hash, 4, "SB_SERVER_Write: MSG:$msg" );
     }
 
-    # CD 0012 fhemrelay Meldungen nicht an den LMS schicken sondern direkt an Dispatch übergeben
+    # CD 0012 fhemrelay Meldungen nicht an den LMS schicken sondern direkt an Dispatch Ã¼bergeben
     if($fn =~ m/fhemrelay/) {
         # CD 0027 start
         if ($fn =~ m/ttsdone/) {
@@ -1284,7 +1401,7 @@ sub SB_SERVER_Write( $$$ ) {
             # sg talk auf Player aktiv ?
             if(defined($hash->{helper}{sgTalkActivePlayer})) {
                 if($a[0] eq $hash->{helper}{sgTalkActivePlayer}) {
-                    # recall auslösen
+                    # recall auslÃ¶sen
                     RemoveInternalTimer( "RecallAfterTalk:$name");
                     InternalTimer( gettimeofday() + 0.01,
                        "SB_SERVER_tcb_RecallAfterTalk",
@@ -1330,6 +1447,8 @@ sub SB_SERVER_DoInit( $ ) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
+    return if (IsDisabled($name));  # CD 0046
+
     Log3( $hash, 4, "SB_SERVER_DoInit($name): called" );
 
     if( !$hash->{TCPDev} ) {
@@ -1355,7 +1474,7 @@ sub SB_SERVER_DoInit( $ ) {
             SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
             SB_SERVER_Broadcast( $hash, "SERVER",
                      "IP " . $hash->{IP} . ":" .
-                     AttrVal( $name, "httpport", "9000" ) );
+                     $hash->{helper}{httpport} );
         }
         return( 1 );
     } elsif( $state eq "opened" ) { # CD 0038 state statt STATE verwenden
@@ -1377,7 +1496,7 @@ sub SB_SERVER_DoInit( $ ) {
 
             SB_SERVER_Broadcast( $hash, "SERVER",
                      "IP " . $hash->{IP} . ":" .
-                     AttrVal( $name, "httpport", "9000" ) );
+                     $hash->{helper}{httpport} );
             $hash->{helper}{doBroadcast}=1;                                 # CD 0007
 
             SB_SERVER_LMS_Status( $hash );
@@ -1411,8 +1530,8 @@ sub SB_SERVER_DoInit( $ ) {
 	return( 1 );
     }
 
-	#Log3( $hash, 3, "SB_SERVER_DoInit: something went wrong!" );        # CD 0008 nur für Testzwecke 0009 deaktiviert
-    #return(0);                                                          # CD 0008 nur für Testzwecke 0009 deaktiviert
+	#Log3( $hash, 3, "SB_SERVER_DoInit: something went wrong!" );        # CD 0008 nur fÃ¼r Testzwecke 0009 deaktiviert
+    #return(0);                                                          # CD 0008 nur fÃ¼r Testzwecke 0009 deaktiviert
     return( 1 );
 }
 
@@ -1633,6 +1752,31 @@ sub SB_SERVER_ParseAppResponse( $$ ) {
 }
 # CD 0032 end
 
+# CD 0044 start
+# ----------------------------------------------------------------------------
+#  used for checking, if the string contains a valid IP v4 (decimal) address
+# ----------------------------------------------------------------------------
+sub SB_SERVER_IsValidIPV4( $ ) {
+    my $instr = shift( @_ );
+
+    if( $instr =~ m/^(\d\d?\d?)\.(\d\d?\d?)\.(\d\d?\d?)\.(\d\d?\d?)$/ )
+    {
+        if($1 <= 255 && $2 <= 255 && $3 <= 255 && $4 <= 255)
+        {
+            return( 1 );
+        }
+        else
+        {
+            return( 0 );
+        }
+    }
+    else
+    {
+        return( 0 );
+    }
+}
+# CD 0044 end
+
 # CD 0041 start
 # ----------------------------------------------------------------------------
 #  used for checking if the string contains a valid MAC adress
@@ -1664,6 +1808,8 @@ sub SB_SERVER_DispatchCommandLine( $$ ) {
 
     Log3( $hash, 4, "SB_SERVER_DispatchCommandLine($name): Line:$buf..." );
 
+    return if (IsDisabled($name));  # CD 0046
+
     # try to extract the first answer to the SPACE
     my $indx = index( $buf, " " );
     my $id1  = substr( $buf, 0, $indx );
@@ -1672,7 +1818,7 @@ sub SB_SERVER_DispatchCommandLine( $$ ) {
     # Player ID is MAC adress, hence : included
     my @id = split( ":", $id1 );
     
-    if( SB_SERVER_IsValidMAC($id1) == 1 ) { # CD 0041 SB_SERVER_IsValidMAC verwenden
+    if(( SB_SERVER_IsValidMAC($id1) == 1 ) || ( SB_SERVER_IsValidIPV4($id1) == 1)) { # CD 0041 SB_SERVER_IsValidMAC verwenden # CD 0044 auf IP-Adresse prÃ¼fen
         # CD 0032 start
         # check for app response
         if(SB_SERVER_ParseAppResponse($hash,$buf)==0) {
@@ -1716,7 +1862,7 @@ sub SB_SERVER_ParseCmds( $$ ) {
 	    SB_SERVER_Broadcast( $hash, "SERVER", "ON" );
 	    SB_SERVER_Broadcast( $hash, "SERVER",
 				 "IP " . $hash->{IP} . ":" .
-				 AttrVal( $name, "httpport", "9000" ) );
+                 $hash->{helper}{httpport} );
         delete ($hash->{helper}{doBroadcast});
     }
     # CD 0007 end
@@ -1731,7 +1877,7 @@ sub SB_SERVER_ParseCmds( $$ ) {
 	    SB_SERVER_Broadcast( $hash, "SERVER", "ON" );
 	    SB_SERVER_Broadcast( $hash, "SERVER",
 				 "IP " . $hash->{IP} . ":" .
-				 AttrVal( $name, "httpport", "9000" ) );
+                 $hash->{helper}{httpport} );
 	}
 
     } elsif( $cmd eq "pref" ) {
@@ -1739,7 +1885,7 @@ sub SB_SERVER_ParseCmds( $$ ) {
 	    readingsSingleUpdate( $hash, "serversecure", $args[ 1 ], 0 );
 	    if( $args[ 1 ] eq "1" ) {
 		# username and password is required
-        # CD 0007 zu spät, login muss als erstes gesendet werden, andernfalls bricht der Server die Verbindung sofort ab
+        # CD 0007 zu spÃ¤t, login muss als erstes gesendet werden, andernfalls bricht der Server die Verbindung sofort ab
 		if( ( $hash->{USERNAME} ne "?" ) &&
 		    ( $hash->{PASSWORD} ne "?" ) ) {
             my ($user,$password)=SB_SERVER_readPassword($hash); # CD 0031
@@ -1765,7 +1911,17 @@ sub SB_SERVER_ParseCmds( $$ ) {
 		      "result for authorize received. Should be 0 or 1" );
 	    }
 	}
-
+    # CD 0049
+        if( $args[ 0 ] eq "httpport" ) {
+            if (defined($args[1]) && ($args[1] =~ /^([0-9])*/ )) {
+                if(!defined(AttrVal( $name, "httpport", undef ))) {
+                    $hash->{helper}{httpport}=$args[1]; 
+                    SB_SERVER_Broadcast( $hash, "SERVER",
+                         "IP " . $hash->{IP} . ":" .
+                         $hash->{helper}{httpport} );
+                }
+            }
+        }    
     } elsif( $cmd eq "login" ) {
 	if( ( $args[ 1 ] eq $hash->{USERNAME} ) &&
 	    ( $args[ 2 ] eq "******" ) ) {
@@ -1799,7 +1955,7 @@ sub SB_SERVER_ParseCmds( $$ ) {
 
     } elsif( $cmd eq "playlists" ) {
         Log3( $hash, 4, "SB_SERVER_ParseCmds($name): playlists" );
-        # CD 0004 Playlisten neu anfragen bei Änderung
+        # CD 0004 Playlisten neu anfragen bei Ã„nderung
         if(($args[0] eq "rename")||($args[0] eq "delete")) {
             DevIo_SimpleWrite( $hash, "playlists 0 200\n", 0 );
             DevIo_SimpleWrite( $hash, "alarm playlists 0 300\n", 0 );   # CD 0011
@@ -1995,6 +2151,8 @@ sub SB_SERVER_Alive( $ ) {
     my $name = $hash->{NAME};
     my $state=ReadingsVal($name, "state", "unknown");   # CD 0038
 
+    return if (IsDisabled($name));  # CD 0046
+
     # CD 0004 set default to off
     #my $rccstatus = "on";
     #my $pingstatus = "on";
@@ -2019,10 +2177,10 @@ sub SB_SERVER_Alive( $ ) {
         # CD 0007 start
         if (($hash->{PRESENCENAME} ne "none")
             && defined($defs{$hash->{PRESENCENAME}})
-            && defined($defs{$hash->{PRESENCENAME}}->{TIMEOUT_NORMAL})
-            && (($defs{$hash->{PRESENCENAME}}->{TIMEOUT_NORMAL}) < AttrVal( $name, "alivetimer", 30 ))) {
+            && ((defined($defs{$hash->{PRESENCENAME}}->{TIMEOUT_NORMAL})
+            && (($defs{$hash->{PRESENCENAME}}->{TIMEOUT_NORMAL}) < AttrVal( $name, "alivetimer", 30 ))) || (GetType($hash->{PRESENCENAME},'x') ne 'PRESENCE'))) {
             Log3( $hash, 4,"SB_SERVER_Alive($name): using $hash->{PRESENCENAME}");                      # CD 0009 level 2->4
-            if( ReadingsVal( $hash->{PRESENCENAME}, "state", "absent" ) eq "present" ) {
+            if( ReadingsVal( $hash->{PRESENCENAME}, $hash->{helper}{presenceReading}, "xxxxxxx" ) eq $hash->{helper}{presenceValuePresent} ) {  # CD 0047 erweitert
                 $pingstatus = "on";
                 $hash->{helper}{pingCounter}=0;
             } else {
@@ -2047,7 +2205,7 @@ sub SB_SERVER_Alive( $ ) {
                 Log3( $hash, 4,"SB_SERVER_Alive($name): using internal ping");                              # CD 0007 # CD 0009 level 2->4
                 # check via ping
                 my $p;
-                # CD 0017 eval hinzugefügt, Absturz auf FritzBox, bei Fehler annehmen dass Host verfügbar ist, internalPingProtocol hinzugefügt
+                # CD 0017 eval hinzugefÃ¼gt, Absturz auf FritzBox, bei Fehler annehmen dass Host verfÃ¼gbar ist, internalPingProtocol hinzugefÃ¼gt
 
                 eval { $p = Net::Ping->new( $ipp ); };
                 if($@) {
@@ -2055,12 +2213,19 @@ sub SB_SERVER_Alive( $ ) {
                     $pingstatus = "on";
                     $hash->{helper}{pingCounter}=0;
                 } else {
-                    if( $p->ping( $hash->{IP}, 2 ) ) {
+                    eval {  # CD 0048 ungÃ¼ltige Adressen bringen FHEM zum Absturz
+                        if( $p->ping( $hash->{IP}, 2 ) ) {
+                            $pingstatus = "on";
+                            $hash->{helper}{pingCounter}=0;                                 # CD 0004
+                        } else {
+                            $pingstatus = "off";
+                            $hash->{helper}{pingCounter}=$hash->{helper}{pingCounter}+1;    # CD 0004
+                        }
+                    };
+                    if($@) {
+                        Log3( $hash,1,"SB_SERVER_Alive($name): internal ping failed with $@");
                         $pingstatus = "on";
-                        $hash->{helper}{pingCounter}=0;                                 # CD 0004
-                    } else {
-                        $pingstatus = "off";
-                        $hash->{helper}{pingCounter}=$hash->{helper}{pingCounter}+1;    # CD 0004
+                        $hash->{helper}{pingCounter}=0;
                     }
                     # close our ping mechanism again
                     $p->close( );
@@ -2084,7 +2249,7 @@ sub SB_SERVER_Alive( $ ) {
             # first time we realized server is away
             if( $state eq "disconnected" ) {        # CD 0038 state statt STATE verwenden
                 delete($hash->{NEXT_OPEN}) if($hash->{NEXT_OPEN});                  # CD 0007 remove delay for reconnect
-                DevIo_OpenDev( $hash, 1, "SB_SERVER_DoInit" );
+                SB_SERVER_TryConnect( $hash , 1);
             }
 
             readingsSingleUpdate( $hash, "power", "on", 1 );
@@ -2201,6 +2366,8 @@ sub SB_SERVER_Broadcast( $$@ ) {
     my $iodevhash;
 
     Log3( $hash, 4, "SB_SERVER_Broadcast($name): called with $cmd - $msg" );
+
+    return if (IsDisabled($name));  # CD 0046
 
     if( !defined( $bin ) ) {
 	$bin = 0;
@@ -2357,6 +2524,19 @@ sub SB_SERVER_ParseServerStatus( $$ ) {
 	    }
         $nameactive=0;  # CD 0030
 	    next;
+    # CD 0044 auf IP-Adresse prÃ¼fen
+	} elsif( $_ =~ /^(playerid:)(.*)/ ) {
+        if (SB_PLAYER_IsValidIPV4( $2 ) == 1) {
+            if( $addplayers == true ) {
+                $players{$2}{ID} = $2;
+                $players{$2}{MAC} = $2;
+                $players{$2}{isplayer} = "1";   # fÃ¼r virtuellen Player der angelegt wird wenn stream.mp3 abgerufen wird
+                $currentplayerid = $2;
+            }
+        }
+        $nameactive=0;
+	    next;
+    # CD 0044 end
 	} elsif( $_ =~ /^(name:)(.*)/ ) {
 	    if( $currentplayerid ne "none" ) {
 		$players{$currentplayerid}{name} = $2;
@@ -2395,7 +2575,7 @@ sub SB_SERVER_ParseServerStatus( $$ ) {
 	    next;
 	} elsif( $_ =~ /^(isplayer:)([0|1])/ ) {
 	    if( $currentplayerid ne "none" ) {
-		$players{$currentplayerid}{isplayer} = $2;
+            $players{$currentplayerid}{isplayer} = $2 unless defined($players{$currentplayerid}{isplayer});     # CD 0044 Hack fÃ¼r Zugriff Ã¼ber stream.mp3
 	    }
         $nameactive=0;  # CD 0030
 	    next;
@@ -2564,6 +2744,7 @@ sub SB_SERVER_ParseServerStatus( $$ ) {
         push @SB_SERVER_SM, "ADD $players{$player}{name} " .
                       "$players{$player}{MAC} $uniqueid" # CD 0029 aufteilen wenn Hardware zu schwach
     }
+    push @SB_SERVER_SM,'DONE';  # CD 0045
     # CD 0029 start
     if(scalar(@SB_SERVER_SM)>0) {
         RemoveInternalTimer( "SB_SERVER_tcb_SendSyncMasters:$name");
@@ -2580,7 +2761,7 @@ sub SB_SERVER_ParseServerStatus( $$ ) {
 }
 
 # CD 0029 start
-# für schwache Hardware Übertragung aufteilen
+# fÃ¼r schwache Hardware Ãœbertragung aufteilen
 sub SB_SERVER_tcb_SendSyncMasters( $ ) {
     my($in ) = shift;
     my(undef,$name) = split(':',$in);
@@ -2592,14 +2773,14 @@ sub SB_SERVER_tcb_SendSyncMasters( $ ) {
     my $t=time();
 
     do {
-        $a=pop @SB_SERVER_SM;
+        $a=shift @SB_SERVER_SM; # CD 0045 Reihenfolge beibehalten
         if (defined($a)) {
             SB_SERVER_Broadcast( $hash, "SYNCMASTER", $a, undef );
         }
     } while ((time()<$t+0.05) && defined($a));
 
     if(scalar(@SB_SERVER_SM)>0) {
-    Log 0,"SB_SERVER_tcb_SendSyncMasters: ".scalar(@SB_SERVER_SM)." entries remaining";
+    #Log 0,"SB_SERVER_tcb_SendSyncMasters: ".scalar(@SB_SERVER_SM)." entries remaining";
         InternalTimer( gettimeofday() + 0.05,
                    "SB_SERVER_tcb_SendSyncMasters",
                    "SB_SERVER_tcb_SendSyncMasters:$name",
@@ -2694,7 +2875,7 @@ sub SB_SERVER_FavoritesParse( $$ ) {
     my $hasitemsbuf = false;
     my $isaudiobuf = "";
     my $isplaylist = false;
-    my $url = "?";           # CD 0009 hinzugefügt
+    my $url = "?";           # CD 0009 hinzugefÃ¼gt
 
     my $cnt=0;
 
@@ -2707,14 +2888,14 @@ sub SB_SERVER_FavoritesParse( $$ ) {
             if(( $hasitemsbuf == false )||($isplaylist == true)) {
                 # derive our hash entry
                 $namebuf="noname_".$cnt++ if($namebuf=~/^\s*$/);            # CD 0037
-                my $entryuid = SB_SERVER_FavoritesName2UID( $namebuf );     # CD 0009 decode hinzugefügt # CD 0010 decode wieder entfernt
+                my $entryuid = SB_SERVER_FavoritesName2UID( $namebuf );     # CD 0009 decode hinzugefÃ¼gt # CD 0010 decode wieder entfernt
                 $favorites{$name}{$entryuid} = {
                 ID => $idbuf,
                 Name => $namebuf,
-                URL => $url, };         # CD 0009 hinzugefügt
+                URL => $url, };         # CD 0009 hinzugefÃ¼gt
                 $namebuf = "";
                 $isaudiobuf = "";
-                $url = "?";              # CD 0009 hinzugefügt
+                $url = "?";              # CD 0009 hinzugefÃ¼gt
                 $hasitemsbuf = false;
                 $isplaylist = false;
             } else {
@@ -2754,7 +2935,7 @@ sub SB_SERVER_FavoritesParse( $$ ) {
 	    }
     # CD 0018 end
 	#} elsif( $_ =~ /^(name:)([0-9a-zA-Z]*)/ ) {     # CD 0007   # CD 0009 deaktiviert
-	} elsif( $_ =~ /^(name:)(.*)/ ) {     # CD 0009 hinzugefügt
+	} elsif( $_ =~ /^(name:)(.*)/ ) {     # CD 0009 hinzugefÃ¼gt
 	    $namebuf = $2;
 	    $namestarted = true;
 
@@ -2776,11 +2957,11 @@ sub SB_SERVER_FavoritesParse( $$ ) {
     if(( $hasitemsbuf == false )||($isplaylist == true)) {
 	    # CD 0003 replaced ** my $entryuid = join( "", split( " ", $namebuf ) ); ** with:
         $namebuf="noname_".$cnt++ if($namebuf=~/^\s*$/);            # CD 0037
-        my $entryuid = SB_SERVER_FavoritesName2UID( $namebuf );             # CD 0009 decode hinzugefügt # CD 0010 decode wieder entfernt
+        my $entryuid = SB_SERVER_FavoritesName2UID( $namebuf );             # CD 0009 decode hinzugefÃ¼gt # CD 0010 decode wieder entfernt
 	    $favorites{$name}{$entryuid} = {
 		ID => $idbuf,
 		Name => $namebuf,
-        URL => $url, };         # CD 0009 hinzugefügt
+        URL => $url, };         # CD 0009 hinzugefÃ¼gt
 	} else {
 	    # that is a folder we found, but we don't handle that
 	}
@@ -2815,7 +2996,7 @@ sub SB_SERVER_FavoritesParse( $$ ) {
 }
 
 # CD 0029 start
-# für schwache Hardware Übertragung aufteilen
+# fÃ¼r schwache Hardware Ãœbertragung aufteilen
 sub SB_SERVER_tcb_SendFavorites( $ ) {
     my($in ) = shift;
     my(undef,$name) = split(':',$in);
@@ -2827,7 +3008,7 @@ sub SB_SERVER_tcb_SendFavorites( $ ) {
     my $t=time();
 
     do {
-        $a=pop @SB_SERVER_FAVS;
+        $a=shift @SB_SERVER_FAVS;   # CD 0045 Reihenfolge beibehalten
         if (defined($a)) {
             SB_SERVER_Broadcast( $hash, "FAVORITES", $a, undef );     # CD 0009 URL an Player schicken
         }
@@ -2850,11 +3031,11 @@ sub SB_SERVER_FavoritesName2UID( $ ) {
     my $namestr = shift( @_ );
 
     # eliminate spaces
-    $namestr = join( "_", split( " ", $namestr ) );     # CD 0009 Leerzeichen durch _ ersetzen statt löschen
+    $namestr = join( "_", split( " ", $namestr ) );     # CD 0009 Leerzeichen durch _ ersetzen statt lÃ¶schen
 
-    # CD 0009 verschiedene Sonderzeichen ersetzen und nicht mehr löschen
-    my %Sonderzeichen = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss",
-                        "é" => "e", "è" => "e", "ë" => "e", "à" => "a", "ç" => "c" );
+    # CD 0009 verschiedene Sonderzeichen ersetzen und nicht mehr lÃ¶schen
+    my %Sonderzeichen = ("Ã¤" => "ae", "Ã„" => "Ae", "Ã¼" => "ue", "Ãœ" => "Ue", "Ã¶" => "oe", "Ã–" => "Oe", "ÃŸ" => "ss",
+                        "Ã©" => "e", "Ã¨" => "e", "Ã«" => "e", "Ã " => "a", "Ã§" => "c" );
     my $Sonderzeichenkeys = join ("|", keys(%Sonderzeichen));
     $namestr =~ s/($Sonderzeichenkeys)/$Sonderzeichen{$1}/g;
 #    $namestr =~ s/($Sonderzeichenkeys)/$Sonderzeichen{$1}||''/g;
@@ -2869,9 +3050,9 @@ sub SB_SERVER_FavoritesName2UID( $ ) {
     # CD 0034 end
 
     # this defines the regexp. Please add new stuff with the seperator |
-    # CD 0003 changed öÜ to ö|Ü
-    my $tobereplaced = '[Ä|ä|Ö|ö|Ü|ü|\[|\]|\{|\}|\(|\)|\\\\|,|:|\?|;|' .       # CD 0011 ,:? hinzugefügt # CD 0035 ; hinzugefügt
-	'\/|\'|\.|\"|\^|°|\$|\||%|@|*|#|&|\+]';     # CD 0009 + hinzugefügt # CD 0070 * und # hinzugefügt
+    # CD 0003 changed Ã¶Ãœ to Ã¶|Ãœ
+    my $tobereplaced = '[Ã„|Ã¤|Ã–|Ã¶|Ãœ|Ã¼|\[|\]|\{|\}|\(|\)|\\\\|,|:|\?|;|' .       # CD 0011 ,:? hinzugefÃ¼gt # CD 0035 ; hinzugefÃ¼gt
+	'\/|\'|\.|\"|\^|Â°|\$|\||%|@|*|#|&|\+]';     # CD 0009 + hinzugefÃ¼gt # CD 0070 * und # hinzugefÃ¼gt
 
     $namestr =~ s/$tobereplaced//g;
 
@@ -2885,6 +3066,8 @@ sub SB_SERVER_CMDStackPush( $$ ) {
     my ( $hash, $cmd ) = @_;
 
     my $name = $hash->{NAME};
+
+    return if (IsDisabled($name));  # CD 0046
 
     my $n = $SB_SERVER_CmdStack{$name}{last_n};
 
@@ -2970,7 +3153,7 @@ sub SB_SERVER_ParseServerAlarmPlaylists( $$ ) {
 			 "FLUSH all", undef );
 
     @SB_SERVER_AL_PLS=split("category:",join(" ",@{$dataptr}));
-    # CD 0029 Übertragung an Player aufteilen
+    # CD 0029 Ãœbertragung an Player aufteilen
     if(scalar(@SB_SERVER_AL_PLS)>0) {
         RemoveInternalTimer( "SB_SERVER_tcb_SendAlarmPlaylists:$name");
         InternalTimer( gettimeofday() + 0.01,
@@ -2982,7 +3165,7 @@ sub SB_SERVER_ParseServerAlarmPlaylists( $$ ) {
 # CD 0011 end
 
 # CD 0029 start
-# für schwache Hardware Übertragung aufteilen
+# fÃ¼r schwache Hardware Ãœbertragung aufteilen
 sub SB_SERVER_tcb_SendAlarmPlaylists( $ ) {
     my($in ) = shift;
     my(undef,$name) = split(':',$in);
@@ -2994,7 +3177,7 @@ sub SB_SERVER_tcb_SendAlarmPlaylists( $ ) {
     my $t=time();
 
     do {
-        $a=pop @SB_SERVER_AL_PLS;
+        $a=shift @SB_SERVER_AL_PLS; # CD 0045 Reihenfolge beibehalten
         if (defined($a)) {
             my $i1=index($a," title:");
             my $i2=index($a," url:");
@@ -3076,7 +3259,7 @@ sub SB_SERVER_ParseServerPlaylists( $$ ) {
               "id:$idbuf name:$namebuf " );
             if( $idbuf != -1 ) {
                 $namebuf="noname_".$cnt++ if($namebuf=~/^\s*$/);                # CD 0037
-                $uniquename = SB_SERVER_FavoritesName2UID( $namebuf );          # CD 0009 decode hinzugefügt # CD 0010 decode wieder entfernt
+                $uniquename = SB_SERVER_FavoritesName2UID( $namebuf );          # CD 0009 decode hinzugefÃ¼gt # CD 0010 decode wieder entfernt
                 push @SB_SERVER_PLS, "ADD $namebuf $idbuf $uniquename LMS";         # CD 0029
             }
             $idbuf = $2;
@@ -3092,7 +3275,7 @@ sub SB_SERVER_ParseServerPlaylists( $$ ) {
               "id:$idbuf name:$namebuf " );
             if( $idbuf != -1 ) {
                 $namebuf="noname_".$cnt++ if($namebuf=~/^\s*$/);                # CD 0037
-                $uniquename = SB_SERVER_FavoritesName2UID( $namebuf );          # CD 0009 decode hinzugefügt # CD 0010 decode wieder entfernt
+                $uniquename = SB_SERVER_FavoritesName2UID( $namebuf );          # CD 0009 decode hinzugefÃ¼gt # CD 0010 decode wieder entfernt
                 push @SB_SERVER_PLS, "ADD $namebuf $idbuf $uniquename LMS";         # CD 0029
             }
 
@@ -3113,7 +3296,7 @@ sub SB_SERVER_ParseServerPlaylists( $$ ) {
 }
 
 # CD 0029 start
-# für schwache Hardware Übertragung aufteilen
+# fÃ¼r schwache Hardware Ãœbertragung aufteilen
 sub SB_SERVER_tcb_SendPlaylists( $ ) {
     my($in ) = shift;
     my(undef,$name) = split(':',$in);
@@ -3125,7 +3308,7 @@ sub SB_SERVER_tcb_SendPlaylists( $ ) {
     my $t=time();
 
     do {
-        $a=pop @SB_SERVER_PLS;
+        $a=shift @SB_SERVER_PLS;    # CD 0045 Reihenfolge beibehalten
         if (defined($a)) {
             SB_SERVER_Broadcast( $hash, "PLAYLISTS", $a, undef );
         }
@@ -3147,6 +3330,8 @@ sub SB_SERVER_CheckConnection($) {
     my(undef,$name) = split(':',$in);
     my $hash = $defs{$name};
 
+    return if (IsDisabled($name));  # CD 0046
+
     Log3( $hash, 3, "SB_SERVER_CheckConnection($name): STATE: " . ReadingsVal($name, "state", "unknown") . " power: ". ReadingsVal( $name, "power", "X" )); # CD 0009 level 2->3 # CD 0038 state statt STATE verwenden
     if(ReadingsVal( $name, "power", "X" ) ne "on") {
         Log3( $hash, 3, "SB_SERVER_CheckConnection($name): forcing power on");      # CD 0009 level 2->3
@@ -3155,7 +3340,7 @@ sub SB_SERVER_CheckConnection($) {
 
         SB_SERVER_Broadcast( $hash, "SERVER",
                  "IP " . $hash->{IP} . ":" .
-                 AttrVal( $name, "httpport", "9000" ) );
+                 $hash->{helper}{httpport} );
         $hash->{helper}{doBroadcast}=1;
 
         SB_SERVER_LMS_Status( $hash );
@@ -3184,9 +3369,11 @@ sub SB_SERVER_Notify( $$ ) {
     my $name = $hash->{NAME}; # own name / hash
     my $devName = $dev_hash->{NAME}; # Device that created the events
 
+    return if (IsDisabled($name));  # CD 0046
+
     # CD start
     if ($dev_hash->{NAME} eq "global" && grep (m/^INITIALIZED$|^REREADCFG$/,@{$dev_hash->{CHANGED}})){
-        DevIo_OpenDev($hash, 0, "SB_SERVER_DoInit" ) unless defined($hash->{helper}{disableReconnect}); # CD 0038
+        SB_SERVER_TryConnect( $hash , 0) unless defined($hash->{helper}{disableReconnect}); # CD 0038
     }
     # CD end
     #Log3( $hash, 3, "SB_SERVER_Notify($name): called" .
@@ -3246,16 +3433,29 @@ sub SB_SERVER_Notify( $$ ) {
         return( "" );
     # CD 0007 start
     } elsif( $devName eq $hash->{PRESENCENAME} ) {
-        if(grep (m/^present$|^absent$/,@{$dev_hash->{CHANGED}})) {
-            Log3( $hash, 3, "SB_SERVER_Notify($name): $devName changed to ". join(" ",@{$dev_hash->{CHANGED}}));    # CD 0023 loglevel 2->3
-            # CD 0023 start
-            if (defined($hash->{helper}{lastPRESENCEstate})) {
-                if($hash->{helper}{lastPRESENCEstate} eq $dev_hash->{CHANGED}[0]) {
-                    # nichts geändert
-                    return( undef );
-                }
+        my $pp=0;
+        my $pa=0;
+        my $ps;
+        
+        foreach my $line (@{$dev_hash->{CHANGED}}) {
+            my @args=split(':',$line);
+            my $ps;
+            # Spezialfall 'state'
+            $ps=trim($args[0]) if ((@args==1) && ($hash->{helper}{presenceReading} eq 'state'));
+            
+            # Reading: Value
+            $ps=trim($args[1]) if ((@args==2) && ($hash->{helper}{presenceReading} eq trim($args[0])));
+
+            if (defined($ps)) {
+                Log3( $hash, 3, "SB_SERVER_Notify($name): $devName changed to ". $ps);    # CD 0023 loglevel 2->3
+                $pp=$ps eq $hash->{helper}{presenceValuePresent};
+                $pa=$ps eq $hash->{helper}{presenceValueAbsent};
             }
-            $hash->{helper}{lastPRESENCEstate}=$dev_hash->{CHANGED}[0];
+        }
+        
+        # Serverstatus geÃ¤ndert ?
+        if (($pa)||($pp)) {
+            $hash->{helper}{lastPRESENCEstate}=$ps;
             # CD 0023 end
             SB_SERVER_RemoveInternalTimers( $hash );
             # do an update of the status, but SB CLI must come up
@@ -3265,9 +3465,8 @@ sub SB_SERVER_Notify( $$ ) {
                        "SB_SERVER_Alive:$name",
                        0 );
             return( "" );
-        } else {
-            return( undef );
         }
+        return( undef );
     # CD 0007 end
     } else {
         return( undef );
@@ -3280,6 +3479,8 @@ sub SB_SERVER_Notify( $$ ) {
 sub SB_SERVER_LMS_Status( $ ) {
     my ( $hash ) = @_;
     my $name = $hash->{NAME}; # own name / hash
+
+    return if (IsDisabled($name));  # CD 0046
 
     # CD 0007 login muss als erstes gesendet werden
     $hash->{helper}{SB_SERVER_LMS_Status}=time();
@@ -3309,6 +3510,7 @@ sub SB_SERVER_LMS_Status( $ ) {
     DevIo_SimpleWrite( $hash, "playlists 0 200\n", 0 );
     DevIo_SimpleWrite( $hash, "alarm playlists 0 300\n", 0 );       # CD 0011
     DevIo_SimpleWrite( $hash, "apps 0 200\n", 0 );  # CD 0029
+    DevIo_SimpleWrite( $hash, "pref httpport ?\n", 0 );     # CD 0049
     # CD 0032 start
     if(defined($hash->{helper}{apps})) {
         my @enabledApps=split(',',AttrVal($name,'enablePlugins',''));
@@ -3754,7 +3956,7 @@ sub SB_SERVER_readPassword($)
   <a name="SBserverdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; SB_SERVER &lt;ip[:cliserverport]&gt; [RCC:&lt;RCC&gt;] [WOL:&lt;WOL&gt;] [PRESENCE:&lt;PRESENCE&gt;] [USER:&lt;username&gt;] [PASSWORD:&lt;password&gt;]</code>
+    <code>define &lt;name&gt; SB_SERVER &lt;ip|hostname[:cliserverport]&gt; [RCC:&lt;RCC&gt;] [WOL:&lt;WOL&gt;[:&lt;command&gt;[:&lt;value&gt;]]] [PRESENCE:&lt;PRESENCE&gt;[:&lt;reading&gt;[:&lt;value for present&gt;[:&lt;value for absent&gt;]]]] [USER:&lt;username&gt;] [PASSWORD:&lt;password&gt;]</code>
     <br><br>
 
     This module allows you in combination with the module SB_PLAYER to control a
@@ -3766,8 +3968,11 @@ sub SB_SERVER_readPassword($)
     <b>Optional</b>
     <ul>
       <li><code>&lt;[RCC]&gt;</code>: You can define a FHEM RCC Device, if you want to wake it up when you set the SB_SERVER on.  </li>
-      <li><code>&lt;[WOL]&gt;</code>: You can define a FHEM WOL Device, if you want to wake it up when you set the SB_SERVER on.  </li>
-      <li><code>&lt;[PRESENCE]&gt;</code>: You can define a FHEM PRESENCE Device that is used to check if the server is reachable.  </li>
+      <li><code>&lt;[WOL]&gt;</code>: You can define a FHEM WOL Device, if you want to wake it up when you set the SB_SERVER on.
+      Command and value can be optionally configured, by default command is empty and 'on' is used as value.</li>
+      <li><code>&lt;[PRESENCE]&gt;</code>: You can define a FHEM PRESENCE Device that is used to check if the server is reachable.
+      Optionally a reading and values for present and absent can be added,
+      by default the reading 'state' and the values 'present' and 'absent' are used.</li>
       <li><code>&lt;username&gt;</code> and <code>&lt;password&gt;</code>: If your LMS is password protected you can define the credentials here.  </li>
     </ul><br>
   </ul>
@@ -3821,15 +4026,15 @@ sub SB_SERVER_readPassword($)
   <ul>
     <li><code>alivetimer &lt;sec&gt;</code><br>
     Default: 120. Every &lt;sec&gt; seconds it is checked, whether the computer with its LMS is still reachable
-    – either via an internal ping (that leads regulary to problems) or via PRESENCE (preferred, no problems)
+    â€“ either via an internal ping (that leads regulary to problems) or via PRESENCE (preferred, no problems)
     - and running.</li>
     <li><code>doalivecheck &lt;true|false&gt;</code><br>
     Switches the LMS-monitoring on or off.</li>
     <li><code>enablePlugins &lt;plugin1[,pluginX]&gt;</code><br>
     Adds the playlists and favorites (if available) of the specified LMS-plugins.</li>
     <li><code>httpport &lt;port&gt;</code><br>
-    Normally the http-port is set to 9000. If this ist NOT the case, you have to enter here the new
-    port-number. You can check the port-number of the LMS within its setup under Setup – Network – Web Server Port Number.</li>
+    Normally the http-port is automatically detected. This attribute can be used to override the detected value.
+    You can check the port-number of the LMS within its setup under Setup â€“ Network â€“ Web Server Port Number.</li>
     <li><a name="SBserver_attribut_ignoredIPs"><code>ignoredIPs &lt;IP-Address[,IP-Address]&gt;</code>
     </a><br />With this attribute you can define IP-addresses of players which will to be ignored by the server, e.g. "192.168.0.11,192.168.0.37"</li>
     <li><a name="SBserver_attribut_ignoredMACs"><code>ignoredMACs &lt;MAC-Address[,MAC-Address]&gt;</code>
@@ -3854,7 +4059,7 @@ sub SB_SERVER_readPassword($)
   <a name="SBserverdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; SB_SERVER &lt;ip[:cliserverport]&gt; [RCC:&lt;RCC&gt;] [WOL:&lt;WOL&gt;] [PRESENCE:&lt;PRESENCE&gt;] [USER:&lt;username&gt;] [PASSWORD:&lt;password&gt;]</code>
+    <code>define &lt;name&gt; SB_SERVER &lt;ip|hostname[:cliserverport]&gt; [RCC:&lt;RCC&gt;] [WOL:&lt;WOL&gt;[:&lt;Befehl&gt;[:&lt;Wert&gt;]]] [PRESENCE:&lt;PRESENCE&gt;[:&lt;Reading&gt;[:&lt;Wert fÃ¼r anwesend&gt;[:&lt;Wert fÃ¼r abwesend&gt;]]]] [USER:&lt;Benutzername&gt;] [PASSWORD:&lt;Passwort&gt;]</code>
     <br><br>
 
     Diese Modul erm&ouml;glicht es - zusammen mit dem Modul SB_PLAYER - einen
@@ -3868,9 +4073,13 @@ sub SB_SERVER_readPassword($)
     <b>Optionen</b>
     <ul>
       <li><code>&lt;[RCC]&gt;</code>: Hier kann ein FHEM RCC Device angegeben werden mit dem der Server aufgeweckt und eingeschaltet werden kann.</li>
-      <li><code>&lt;[WOL]&gt;</code>: Hier kann ein FHEM WOL Device angegeben werden mit dem der Server aufgeweckt und eingeschaltet werden kann.</li>
-      <li><code>&lt;[PRESENCE]&gt;</code>: Hier kann ein FHEM PRESENCE Device angegeben werden mit dem die Erreichbarkeit des Servers &uuml;berpr&uuml;ft werden kann.</li>
-      <li><code>&lt;username&gt;</code> and <code>&lt;password&gt;</code>: Falls der Server durch ein Passwort gesichert wurde, k&ouml;nnen hier die notwendigen Angaben für den Serverzugang angegeben werden.</li>
+      <li><code>&lt;[WOL]&gt;</code>: Hier kann ein FHEM WOL Device angegeben werden mit dem der Server aufgeweckt und eingeschaltet werden kann.
+      Optional k&ouml;nnen Befehl und Wert mit angegeben werden, voreingestellt ist kein Befehl und der Wert 'on'.</li>
+      <li><code>&lt;[PRESENCE]&gt;</code>: Hier kann ein FHEM PRESENCE Device angegeben
+      werden mit dem die Erreichbarkeit des Servers &uuml;berpr&uuml;ft werden kann.
+      Optional k&ouml;nnen Reading und Werte f&uuml;r an/abwesend mit angegeben werden,
+      voreingestellt ist das Reading 'state' und die Werte 'present' und 'absent'.</li>
+      <li><code>&lt;Benutzername&gt;</code> und <code>&lt;Passwort&gt;</code>: Falls der Server durch ein Passwort gesichert wurde, k&ouml;nnen hier die notwendigen Angaben fÃ¼r den Serverzugang angegeben werden.</li>
     </ul><br>
   </ul>
   <a name="SBserverset"></a>
@@ -3896,7 +4105,7 @@ sub SB_SERVER_readPassword($)
         </ul>
     </ul>
     <br><br>
-    Der Befehl <code>syncGroup</code> dient zur Verwaltung von Gruppenvorlagen für die Synchronisierung der Player.
+    Der Befehl <code>syncGroup</code> dient zur Verwaltung von Gruppenvorlagen fÃ¼r die Synchronisierung der Player.
     Dar&uuml;ber k&ouml;nnen Gruppen von Playern angelegt werden die sich bei Bedarf aktivieren lassen. Die Vorlagen
     werden bei SAVE und SHUTDOWN von FHEM abgespeichert und beim Start von FHEM geladen.
     Folgende Unterbefehle sind definiert:<br><br>
@@ -3916,9 +4125,9 @@ sub SB_SERVER_readPassword($)
       hergestellt. Wenn zus&auml;tzlich <code>poweron</code> angegeben wird, wird versucht die Player einzuschalten.</li>
       <li><b>resetTTS</b> -  TTS zur&uuml;cksetzen, kann n&ouml;tig sein wenn die Ausgabe h&auml;ngt.</li>
       <li><b>volume &lt;Vorlage&gt; &lt;n&gt;</b> -  Stellt die Lautst&auml;rke auf einen Wert &lt;n&gt; ein. Dabei muss &lt;n&gt;
-      eine Zahl zwischen 0 und 100 sein. Der Befehl wird nur ausgeführt wenn die Vorlage aktiv ist.</li>
+      eine Zahl zwischen 0 und 100 sein. Der Befehl wird nur ausgefÃ¼hrt wenn die Vorlage aktiv ist.</li>
       <li><b>volume &lt;Vorlage&gt; +|-&lt;n&gt;</b> - Erh&ouml;ht oder vermindert die Lautst&auml;rke um den Wert, der durch +|-&lt;n&gt;
-      vorgegeben wird. Dabei muss &lt;n&gt; eine Zahl zwischen 0 und 100 sein. Der Befehl wird nur ausgeführt wenn die Vorlage aktiv ist.</li>
+      vorgegeben wird. Dabei muss &lt;n&gt; eine Zahl zwischen 0 und 100 sein. Der Befehl wird nur ausgefÃ¼hrt wenn die Vorlage aktiv ist.</li>
     </ul>
     <br>
   </ul>
@@ -3927,22 +4136,22 @@ sub SB_SERVER_readPassword($)
   <ul>
     <li><code>alivetimer &lt;sec&gt;</code><br>
     Default 120. Alle &lt;sec&gt; Sekunden wird &uuml;berpr&uuml;ft, ob der Rechner mit dem LMS noch erreichbar ist
-    - entweder über internen Ping (f&uuml;hrt zu regelm&auml;&szlig;igen H&auml;ngern von FHEM) oder PRESENCE (bevorzugt,
+    - entweder Ã¼ber internen Ping (f&uuml;hrt zu regelm&auml;&szlig;igen H&auml;ngern von FHEM) oder PRESENCE (bevorzugt,
     keine H&auml;nger) - und ob der LMS noch l&auml;uft.</li>
     <li><code>doalivecheck &lt;true|false&gt;</code><br>
     &Uuml;berwachung des LMS ein- oder auschalten.</li>
     <li><code>enablePlugins &lt;plugin1[,pluginX]&gt;</code><br>
     Bindet die Wiedergabelisten und Favoriten (soweit vorhanden) von LMS-Plugins (z.B. Spotify) ein.</li>
     <li><code>httpport &lt;port&gt;</code><br>
-    Im Normalfall ist der http-Port auf 9000 eingestellt. Sollte dies NICHT der Fall sein muss hier die ge&auml;nderte
-    Portnummer eingetragen werden. Zur &Uuml;berpr&uuml;fung kann im Server unter Einstellungen – Erweitert –Netzwerk
+    Im Normalfall wird der http-Port automatisch ermittelt. Sollte dies NICHT funktionieren kann er Ã¼ber das Attribut fest vorgegeben werden.
+    Zur &Uuml;berpr&uuml;fung kann im Server unter Einstellungen â€“ Erweitert â€“Netzwerk
     - Anschlussnummer des Webservers nachgeschlagen werden.</li>
     <li><a name="SBserver_attribut_ignoredIPs"><b><code>ignoredIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
-    </a><br />Mit diesem Attribut kann die automatische Erkennung dedizierter Ger&auml;te durch die Angabe derer IP-Adressen unterdrückt werden, z.B. "192.168.0.11,192.168.0.37"</li>
+    </a><br />Mit diesem Attribut kann die automatische Erkennung dedizierter Ger&auml;te durch die Angabe derer IP-Adressen unterdrÃ¼ckt werden, z.B. "192.168.0.11,192.168.0.37"</li>
     <li><a name="SBserver_attribut_ignoredMACs"><b><code>ignoredMACs &lt;MAC-Adresse&gt;[,MAC-Adresse]</code></b>
-    </a><br />Mit diesem Attribut kann die automatische Erkennung dedizierter Ger&auml;te durch die Angabe derer MAC-Adressen unterdrückt werden, z.B. "00:11:22:33:44:55,ff:ee:dd:cc:bb:aa"</li>
+    </a><br />Mit diesem Attribut kann die automatische Erkennung dedizierter Ger&auml;te durch die Angabe derer MAC-Adressen unterdrÃ¼ckt werden, z.B. "00:11:22:33:44:55,ff:ee:dd:cc:bb:aa"</li>
     <li><code>internalPingProtocol icmp|tcp|udp|syn|stream|none</code><br>
-    Legt fest welches Protokoll für den internen Ping verwendet wird. Wenn das Attribut nicht definiert ist, wird tcp verwendet.</li>
+    Legt fest welches Protokoll fÃ¼r den internen Ping verwendet wird. Wenn das Attribut nicht definiert ist, wird tcp verwendet.</li>
     <li><code>maxcmdstack &lt;Anzahl&gt;</code><br>
     Default ist der Stack auf eine Gr&ouml;&szlig;e von 200 eingestellt. Wenn die Verbindung zum LMS unterbrochen ist,
     werden bis zu &lt;Anzahl&gt; Befehle zwischengespeichert. Nach dem Verbindungsaufbau werden die Befehle,
