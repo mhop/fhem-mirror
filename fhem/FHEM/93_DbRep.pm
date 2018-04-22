@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.17.2       22.04.2017       fix don't writeToDB if device name contain "." only, minor fix in DbReadingsVal
 # 7.17.1       20.04.2017       fix "§" is deleted by carfilter
 # 7.17.0       17.04.2018       new function DbReadingsVal
 # 7.16.0       13.04.2018       new function dbValue (blocking)
@@ -337,7 +338,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.17.1";
+my $DbRepVersion = "7.17.2";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -676,7 +677,7 @@ sub DbRep_Set($@) {
           return " The attribute reading to analyze is not set !";
       }
       if ($prop && $prop =~ /writeToDB/) {
-          if (!AttrVal($hash->{NAME}, "device", "") || AttrVal($hash->{NAME}, "device", "") =~ /[%.*:=,]/ || AttrVal($hash->{NAME}, "reading", "") =~ /[,\s]/) {
+          if (!AttrVal($hash->{NAME}, "device", "") || AttrVal($hash->{NAME}, "device", "") =~ /[%*:=,]/ || AttrVal($hash->{NAME}, "reading", "") =~ /[,\s]/) {
               return "<html>If you want write results back to database, attributes \"device\" and \"reading\" must be set.<br>
                       In that case \"device\" mustn't be a <a href='https://fhem.de/commandref.html#devspec\'>devspec</a> and mustn't contain SQL-Wildcard (%).<br>
                       The \"reading\" to evaluate has to be a single reading and no list.</html>";
@@ -8548,7 +8549,7 @@ return ($wrt,$irowdone,$err);
 ####################################################################################################
 #                              Werte eines Array in DB schreiben
 # Übergabe-Array: $date_ESC_$time_ESC_$device_ESC_$type_ESC_$event_ESC_$reading_ESC_$value_ESC_$unit
-# $histupd = 1 wenn history update, $histupd = 0 nur gistory insert
+# $histupd = 1 wenn history update, $histupd = 0 nur history insert
 #
 ####################################################################################################
 sub DbRep_WriteToDB($$$@) {
@@ -8840,6 +8841,9 @@ sub DbReadingsVal($$$$) {
   unless(defined($defs{$name})) {
       return ("DbRep-device \"$name\" doesn't exist.");
   }
+  unless($defs{$name}{TYPE} eq "DbRep") {
+      return ("\"$name\" is not a DbRep-device but of type \"".$defs{$name}{TYPE}."\"");
+  }  
   unless($ts =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
       return ("timestamp has not a valid format. Use \"YYYY-MM-DD hh:mm:ss\" as timestamp.");
   }

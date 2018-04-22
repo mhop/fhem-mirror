@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbRep: 7.17.2, doesn't writeToDB if device name contain "." 
   - feature: 93_DbLog: addLog - not available reading can be added as new one
                        (forum:#86966)
   - feature: 02_RSS: label and goto in layout definition (forum #86844)
