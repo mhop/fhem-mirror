@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  59_Weather: reverted changes in HTML routine (forum #87187)
   - feature: 59_Weather: italian translations and other (forum #87080)
   - feature: 49_SSCam: V3.9.1, PTZ control panel added, please consider
                        attributes "ptzPanel_.*" and command "createPTZcontrol"

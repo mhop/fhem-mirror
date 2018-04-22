@@ -521,45 +521,30 @@ WeatherIconIMGTag($) {
 
 }
 
-# number of items for forecast
-# 6 => 5 days, 11 => 10 days
-# day 0 is 'now', 1 to 10 are forecast
-#
-use constant FORECASTSIZE => 11;
-use constant MAXFORECASTS => 11;
-
 #####################################
+
 sub
-WeatherAsHtmlV($;$;$)
+WeatherAsHtmlV($;$)
 {
 
-  my ($d,$items,$pt) = @_;
+  my ($d,$items) = @_;
   $d = "<none>" if(!$d);
-  $items = int(FORECASTSIZE) if( !$items );
-  # check number of items
-  $items = int(FORECASTSIZE) if( $items > int(MAXFORECASTS));
-  return "$d is not a Weather instance<br/>"
+  $items = 10 if( !$items );
+  return "$d is not a Weather instance<br>"
         if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
-  $pt = 0 if( !$pt );
 
   my $width= int(ICONSCALE*ICONWIDTH);
 
-  my $ret = '<table class="block">'; #class="weather"   style="table-layout:fixed"
-
-  $ret .= sprintf('<tr><td style="text-align:left" colspan=2>%s%s</td></tr>', "$status_items_txt_i18n{4}", ReadingsVal($d, "city", ""))
-    if ($pt ne 0);
-
-  $ret .= sprintf('<tr><td class="weatherIcon" style="width:%dpx;text-align:center">%s</td><td class="weatherValue">%s: %s<br>%s°C  %s%%<br>%s</td></tr>',
+  my $ret = '<table class="weather">';
+  $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue">%s<br>%s°C  %s%%<br>%s</td></tr>',
         $width,
         WeatherIconIMGTag(ReadingsVal($d, "icon", "")),
-		    "$status_items_txt_i18n{3}",
         ReadingsVal($d, "condition", ""),
-        "$status_items_txt_i18n{2}: " . ReadingsVal($d, "temp_c", ""),
-        "$status_items_txt_i18n{1}: " . ReadingsVal($d, "humidity", ""),
+        ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""),
         ReadingsVal($d, "wind_condition", ""));
 
   for(my $i=1; $i<$items; $i++) {
-    $ret .= sprintf('<tr><td class="weatherIcon" style="width:%dpx;text-align:left">%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr>',
+    $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr>',
         $width,
         WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")),
         ReadingsVal($d, "fc${i}_day_of_week", ""),
@@ -567,46 +552,44 @@ WeatherAsHtmlV($;$;$)
         ReadingsVal($d, "fc${i}_low_c", ""), ReadingsVal($d, "fc${i}_high_c", ""));
   }
 
-  $ret .= "</table><br/>";
-
+  $ret .= "</table>";
   return $ret;
 }
 
 sub
-WeatherAsHtml($;$;$)
+WeatherAsHtml($;$)
 {
-  my ($d,$i,$p) = @_;
-  WeatherAsHtmlV($d,$i,$p);
+  my ($d,$i) = @_;
+  WeatherAsHtmlV($d,$i);
 }
 
 sub
-WeatherAsHtmlH($;$;$)
+WeatherAsHtmlH($;$)
 {
 
-  my ($d,$items,$pt) = @_;
+  my ($d,$items) = @_;
   $d = "<none>" if(!$d);
-  $items = int(FORECASTSIZE) if( !$items );
-  #chek number of items
-  $items = int(FORECASTSIZE) if( $items > int(MAXFORECASTS));
+  $items = 10 if( !$items );
   return "$d is not a Weather instance<br>"
         if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
-  $pt = 0 if( !$pt );
+
   my $width= int(ICONSCALE*ICONWIDTH);
 
-  my $ret = '<table class="block wide" style="table-layout:fixed">'; #class="weather"
 
-  $ret .= sprintf('<tr><td style="text-align:left" colspan=%d>%s%s</td></tr>', $items, "$status_items_txt_i18n{4}", ReadingsVal($d, "city", ""))
-    if ($pt ne 0);
+
+  my $format= '<td><table border=1><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue">%s</td></tr><tr><td class="weatherValue">%s°C %s%%</td></tr><tr><td class="weatherValue">%s</td></tr></table></td>';
+
+  my $ret = '<table class="weather">';
 
   # icons
-  $ret .= sprintf('<tr><td class="weatherIcon" style="width:%dpx;text-align:center">%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "icon", "")));
+  $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "icon", "")));
   for(my $i=1; $i<$items; $i++) {
-    $ret .= sprintf('<td class="weatherIcon" style="width:%dpx;text-align:center">%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")));
+    $ret .= sprintf('<td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")));
   }
   $ret .= '</tr>';
 
   # condition
-  $ret .= sprintf('<tr><td class="weatherDay">%s: %s</td>', "$status_items_txt_i18n{3}", ReadingsVal($d, "condition", ""));
+  $ret .= sprintf('<tr><td class="weatherDay">%s</td>', ReadingsVal($d, "condition", ""));
   for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<td class="weatherDay">%s: %s</td>', ReadingsVal($d, "fc${i}_day_of_week", ""),
         ReadingsVal($d, "fc${i}_condition", ""));
@@ -614,34 +597,32 @@ WeatherAsHtmlH($;$;$)
   $ret .= '</tr>';
 
   # temp/hum | min
-  $ret .= sprintf('<tr><td class="weatherMin">%s°C %s%%</td>', "$status_items_txt_i18n{2}: " . ReadingsVal($d, "temp_c", ""), "$status_items_txt_i18n{1}: " . ReadingsVal($d, "humidity", ""));
+  $ret .= sprintf('<tr><td class="weatherMin">%s°C %s%%</td>', ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""));
   for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<td class="weatherMin">min %s°C</td>', ReadingsVal($d, "fc${i}_low_c", ""));
   }
   $ret .= '</tr>';
 
   # wind | max
-  $ret .= sprintf('<tr><td class="weatherMax">%s</td>',  ReadingsVal($d, "wind_condition", ""));
+  $ret .= sprintf('<tr><td class="weatherMax">%s</td>', ReadingsVal($d, "wind_condition", ""));
   for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<td class="weatherMax">max %s°C</td>', ReadingsVal($d, "fc${i}_high_c", ""));
   }
   $ret .= "</tr></table>";
-  $ret .= "</table><br/>";
 
   return $ret;
 }
 
 sub
-WeatherAsHtmlD($;$;$)
+WeatherAsHtmlD($;$)
 {
-  my ($d,$i,$p) = @_;
+  my ($d,$i) = @_;
   if($FW_ss) {
-    WeatherAsHtmlV($d,$i,$p);
+    WeatherAsHtmlV($d,$i);
   } else {
-    WeatherAsHtmlH($d,$i,$p);
+    WeatherAsHtmlH($d,$i);
   }
 }
-
 
 #####################################
 
