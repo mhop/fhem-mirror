@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.10.8     21.04.2018       addLog - not available reading can be added as new one (forum:#86966)
 # 3.10.7     16.04.2018       fix generate addLog-event if device or reading was not found by addLog
 # 3.10.6     13.04.2018       verbose level in addlog changed if reading not found
 # 3.10.5     12.04.2018       fix warnings
@@ -203,7 +204,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.10.7";
+my $DbLogVersion = "3.10.8";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -3598,9 +3599,11 @@ sub DbLog_AddLog($$$$$) {
 	  my $r            = $defs{$dev_name}{READINGS};
       my $DbLogExclude = AttrVal($dev_name, "DbLogExclude", undef);
 	  my @exrds;
+      my $found = 0;
 	  foreach my $rd (sort keys %{$r}) {
            # jedes Reading des Devices auswerten
            my $do = 1;
+           $found = 1 if($rd =~ m/^$rdspec$/);       # Reading gefunden
 		   if($DbLogExclude && !$nce) {
                my @v1 = split(/,/, $DbLogExclude);
                for (my $i=0; $i<int(@v1); $i++) {
@@ -3613,15 +3616,21 @@ sub DbLog_AddLog($$$$$) {
                }
            }
            next if(!$do);
-		   push @exrds,$rd if($rd =~ m/^$rdspec$/);
+		   push @exrds,$rd if($rd =~ m/^$rdspec$/);    
 	  }
 	  Log3 $name, 4, "DbLog $name -> Readings extracted from Regex: @exrds";
 
-	  if(!@exrds) {
-          Log3 $name, 2, "DbLog $name -> no Reading '$rdspec' of device '$dev_name' found by addLog !";
-	      next;
+	  if(!$found) {
+          if(goodReadingName($rdspec) && defined($value)) {
+              Log3 $name, 3, "DbLog $name -> Reading '$rdspec' of device '$dev_name' not found - add it as new reading.";
+              push @exrds,$rdspec;
+          } elsif (goodReadingName($rdspec) && !defined($value)) {
+              Log3 $name, 2, "DbLog $name -> WARNING - new Reading '$rdspec' has no value - can't add it !";
+          } else {
+              Log3 $name, 2, "DbLog $name -> WARNING - Readingname '$rdspec' is no valid or regexp - can't add regexp as new reading !";
+          }
       }
-	  
+      
       no warnings 'uninitialized'; 
 	  foreach (@exrds) {
 	      $dev_reading = $_;
@@ -5347,7 +5356,10 @@ sub dbReadings($@) {
       
       <ul>
       <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - The device can be declared by a <a href="#devspec">device specification 
-                                                    (devspec)</a>. "Reading" will be evaluated as regular expression. </li>
+                                                    (devspec)</a>. "Reading" will be evaluated as regular expression. If
+                                                    The reading isn't available and the value "Value" is specified, the
+                                                    reading will be added to database as new one if it isn't a regular 
+                                                    expression and the readingname is valid.  </li>
       <li> <b>Value</b> - Optionally you can enter a "Value" that is used as reading value in the dataset. If the value isn't 
                           specified (default), the current value of the specified reading will be inserted into the database. </li>  
       <li> <b>CN=&lt;caller name&gt;</b> - By the key "CN=" (<b>C</b>aller <b>N</b>ame) you can specify an additional string, 
@@ -6361,7 +6373,10 @@ sub dbReadings($@) {
       
       <ul>
       <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - Das Device kann als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. <br>
-                                                    Die Angabe von "Reading" wird als regulärer Ausdruck ausgewertet. </li>
+                                                    Die Angabe von "Reading" wird als regulärer Ausdruck ausgewertet. Ist
+                                                    das Reading nicht vorhanden und der Wert "Value" angegeben, wird das Reading
+                                                    in die DB eingefügt wenn es kein regulärer Ausdruck und ein valider 
+                                                    Readingname ist. </li>
       <li> <b>Value</b> - Optional kann "Value" für den Readingwert angegeben werden. Ist Value nicht angegeben, wird der aktuelle
                           Wert des Readings in die DB eingefügt. </li>  
       <li> <b>CN=&lt;caller name&gt;</b> - Mit dem Schlüssel "CN=" (<b>C</b>aller <b>N</b>ame) kann dem addLog-Aufruf ein String, 

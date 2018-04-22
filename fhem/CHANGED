@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_DbLog: addLog - not available reading can be added as new one
+                       (forum:#86966)
   - feature: 02_RSS: label and goto in layout definition (forum #86844)
   - change:  59_Weather: reverted changes in HTML routine (forum #87187)
   - feature: 59_Weather: italian translations and other (forum #87080)
