@@ -2472,7 +2472,7 @@ DOIF_TimerTrigger ($)
       if (!AttrVal($hash->{NAME},"disable","")) {
         if (defined ($hash->{interval}{$j})) {
           if ($hash->{interval}{$j} != -1) {
-            DOIF_SetTimer($hash,"DOIF_TimerTrigger",$hash->{interval}{$j},1);
+            DOIF_SetTimer($hash,"DOIF_TimerTrigger",$hash->{interval}{$j});
             DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j,1);
           }
         } else {
