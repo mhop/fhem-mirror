@@ -156,6 +156,7 @@ my $curReadingType = 0;
      ,"leicht" => 1
      ,"ja" => 1
      ,"mäßig" => 2
+     ,"m&auml;&szlig;ig" => 2
      ,"stark" => 3
   );
 
@@ -545,6 +546,8 @@ sub PROPLANTA_HtmlAcquire($$)
    return unless (defined($hash->{NAME}));
  
    PROPLANTA_Log $hash, 4, "Start capturing of $URL";
+   
+   #$ENV{PERL_LWP_SSL_VERIFY_HOSTNAME}=0;
 
    my $err_log  = "";
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http', 'https'], timeout => 10
@@ -1021,7 +1024,7 @@ PROPLANTA_Html(@)
       <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - Niederschlagsmenge <i>heute</i> um <i>15</i>:00 Uhr in mm</li>
       <li><b>fc</b><i>0</i><b>_sun</b> - relative Sonnenscheindauer <i>heute</i> in % (zwischen Sonnenauf- und -untergang)</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>Minimal|Maximal</i>temperatur <i>heute</i> in °C</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i> - Temperatur <i>heute</i> um <i>15</i>:00 Uhr in °C</li>
+      <li><b>fc</b><i>1</i><b>_temp</b><i>15</i> - Temperatur <i>morgen</i> um <i>15</i>:00 Uhr in °C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - Wetterzustand <i>heute morgen|tagsüber|abends|nachts</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>heute tagsüber</i></li>
