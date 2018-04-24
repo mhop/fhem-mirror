@@ -70,7 +70,7 @@ SVG_Initialize($)
     nrAxis
     plotWeekStartDay:0,1,2,3,4,5,6
     plotfunction
-    plotmode
+    plotmode:gnuplot-scroll,gnuplot-scroll-svg,SVG
     plotsize
     plotReplace:textField-long
     startDate
@@ -1163,22 +1163,24 @@ SVG_doShowLog($$$$;$)
     my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
     $gplot_script =~ s/<TMPFILE>/$tmpfile/g;
 
-    $plot =~ s/ls \w+//g;
-    open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
-    print FH $gplot_script;
-    close(FH);
-    unlink($tmpfile);
-
     my $ext;
     if($pm eq "gnuplot-scroll") {
       $FW_RETTYPE = "image/png";
       $ext = "png";
     }
     else {
+      $gplot_script =~ s/set terminal png transparent/set terminal svg/;
+      $gplot_script =~ s/set terminal (.*) crop/set terminal $1/;
+      $gplot_script =~ s/set output (.*).png'/set output $1.svg'/;
       $FW_RETTYPE = "image/svg+xml";
       $ext = "svg";
     }
-    
+    $gplot_script =~ s/ls \w+//g;
+    open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
+    print FH $gplot_script;
+    close(FH);
+    unlink($tmpfile);
+
     open(FH, "$tmpfile.$ext");         # read in the result and send it
     binmode (FH); # necessary for Windows
     FW_pO join("", <FH>);
