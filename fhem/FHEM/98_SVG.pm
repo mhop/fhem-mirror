@@ -1964,15 +1964,24 @@ SVG_render($$$$$$$$$$)
           $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
                 $x,$y+$h, $x,$y1, $x+$w,$y1, $x+$w,$y+$h);
       } else {
-        foreach my $i (1..int(@{$dxp})-1) {
+        my $nEl = int(@{$dxp})-1;
+        foreach my $i (1..$nEl) {
           my ($x1, $y1) = ($x+$dxp->[$i-1], $y+$h-($dyp->[$i-1]-$min)*$hmul);
           my ($x2, $y2) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
           next if(int($x2) == $lx && int($y1) == $ly);
           $lx = int($x2); $ly = int($y2);
-          if($lType eq "steps") {
-            $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x2,$y1, $x2,$y2);
+          if($i == $nEl) {
+            if($lType eq "steps") {
+              $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x2,$y1, $x2,$y2);
+            } else {
+              $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x1,$y2, $x2,$y2);
+            }
           } else {
-            $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x1,$y2, $x2,$y2);
+            if($lType eq "steps") {
+              $ret .=  sprintf(" %d,%d %d,%d", $x1,$y1, $x2,$y1);
+            } else {
+              $ret .=  sprintf(" %d,%d %d,%d", $x1,$y1, $x1,$y2);
+            }
           }
         }
       }
