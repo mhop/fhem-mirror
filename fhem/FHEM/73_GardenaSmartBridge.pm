@@ -68,7 +68,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 
 
-my $version = "1.0.2";
+my $version = "1.0.3";
 
 
 
@@ -80,6 +80,7 @@ sub GardenaSmartBridge_Initialize($);
 sub GardenaSmartBridge_Set($@);
 sub GardenaSmartBridge_Write($@);
 sub GardenaSmartBridge_Undef($$);
+sub GardenaSmartBridge_Delete($$);
 sub GardenaSmartBridge_ResponseProcessing($$);
 sub GardenaSmartBridge_ErrorHandling($$$);
 sub GardenaSmartBridge_encrypt($);
@@ -112,6 +113,7 @@ sub GardenaSmartBridge_Initialize($) {
     $hash->{SetFn}      = "GardenaSmartBridge_Set";
     $hash->{DefFn}      = "GardenaSmartBridge_Define";
     $hash->{UndefFn}    = "GardenaSmartBridge_Undef";
+    $hash->{DeleteFn}   = "GardenaSmartBridge_Delete";
     $hash->{NotifyFn}   = "GardenaSmartBridge_Notify";
     
     $hash->{AttrFn}     = "GardenaSmartBridge_Attr";
@@ -163,15 +165,21 @@ sub GardenaSmartBridge_Define($$) {
 
 sub GardenaSmartBridge_Undef($$) {
 
-    my ( $hash, $arg ) = @_;
-
-
-    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    my ( $hash, $name ) = @_;
+    
     
     RemoveInternalTimer($hash);
-    setKeyValue($index,undef);
     delete $modules{GardenaSmartBridge}{defptr}{BRIDGE} if( defined($modules{GardenaSmartBridge}{defptr}{BRIDGE}) );
 
+    return undef;
+}
+
+sub GardenaSmartBridge_Delete($$) {
+
+    my ( $hash, $name ) = @_;
+
+    
+    setKeyValue($hash->{TYPE}."_".$name."_passwd",undef);
     return undef;
 }
 
