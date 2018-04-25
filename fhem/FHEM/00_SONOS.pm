@@ -51,6 +51,10 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 25.04.2018
+#	"Deep Recursion"-Warnung beim loggen wird nun verhindert
+#	Beim Erzeugen der Gruppen-ReadingsGroup ist bei der Verwendung eines Boosts ab und zu ein Fehler aufgetreten
+#	Beim Erzeugen eines ControlPoint-Objekts kann man nun das Envelope-Prefix angeben (nicht für das Sonos-Modul relevant)
 # 15.04.2018
 #	Streams über Alexa (z.B. Sonos One) werden nun korrekt als Radiostreams dargestellt
 #	Es werden nun auch Updateinformationen und die interne Softwareversionsnummer gesucht und als Reading gesetzt: "softwareRevisionAvailable", "softwareRevisionInternal" und "softwareRevisionInternalAvailable"
@@ -66,14 +70,6 @@
 #	Wenn ein Player disabled oder disappeared ist, wird ein Proxy-Cover-Zugriffsversuch auf diesen Player unterbunden.
 #	Ein Modify-Befehlsaufruf wird nun am Vorhandensein von $hash->{OLDDEF} erkannt.
 #	Bei einigen PERL-Installationen stand im Reading 'currentTrackPositionSimulatedSec' eine Kommazahl (da sie von time() aus berechnet wird). Diese Zahl wird nun gerundet.
-# 26.02.2018
-#	ComObjectTransportQueue in Client_ReceiveQueue umbenannt.
-#	If-Abfrage um die can_read-Schleife im SubProzess eingebaut, Um Signalunterbrechungen zu berücksichtigen.
-#	Neuer Getter "WifiPortStatus". Liefert Active, wenn das WLAN aktiviert ist, sonst Inactive.
-#	Drei neue (automatisch ermittelte) Readings "Orientation", "WifiEnabled" und "WirelessMode".
-#	Warnung mit "unescaped left brace" in Tag.pm wurde korrigiert.
-#	ExportSonosBibliothek wird nun in einem eigenen Thread (LongJobs-Thread) ausgeführt. Dadurch bleibt das System steuerbar, auch wenn gerade ein langwieriger Export läuft.
-#	Prüfmethode eingebaut, um verlorengegangene Fhem-Prozessverbindungen (aus Sicht des SubProzesses) zu erkennen, und entsprechende Thread-Bereinigungmaßnahmen durchführen zu können.
 #
 ########################################################################################
 #
@@ -2105,9 +2101,7 @@ sub SONOS_ConvertZoneGroupState($) {
 			
 			# Etwaig von vorher enthaltene Bridges wieder entfernen (wenn sie bereits als Koordinator eingesetzt wurde)
 			if ($string =~ m/IsZoneBridge="."/) {
-				for(my $i = 0; $i <= $#group; $i++) {
-					delete $group[$i] if ($group[$i] eq $udn.'_MR');
-				}
+				@group = grep { $_ ne $udn.'_MR' } @group;
 			}
 		}
 		
@@ -9563,7 +9557,7 @@ sub SONOS_getSonosPlayerByUDN(;$) {
 		return SONOS_getSonosPlayerByName();
 	}
 	
-	SONOS_Log $udn, 0, "The Method 'SONOS_getSonosPlayerByUDN' cannot find the FHEM-Device according to '".(defined($udn) ? $udn : 'undef')."'. This should not happen!";
+	SONOS_Log undef, 0, "The Method 'SONOS_getSonosPlayerByUDN' cannot find the FHEM-Device according to '".(defined($udn) ? $udn : 'undef')."'. This should not happen!";
 	
 	return undef;
 }

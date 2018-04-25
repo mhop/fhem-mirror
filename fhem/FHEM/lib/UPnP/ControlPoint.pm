@@ -51,6 +51,7 @@ use constant DEFAULT_SUBSCRIPTION_URL => '/eventSub';
 our @IGNOREIP;
 our @USEDONLYIP;
 our $LogLevel;
+our $EnvPrefix;
 
 sub isIgnoreIP($) {
 	my($ip) = @_;
@@ -102,6 +103,7 @@ sub new {
 	@IGNOREIP = @{$args{IgnoreIP}};
 	@USEDONLYIP = @{$args{UsedOnlyIP}};
 	$LogLevel = $args{LogLevel} || 0;
+	$EnvPrefix = $args{EnvPrefix} || $SOAP::Constants::PREFIX_ENV;
 	
 	my $reuseport = $args{ReusePort};
 	$reuseport = 0 if (!defined($reuseport));
@@ -709,6 +711,7 @@ sub queryStateVariable {
         my $result;
         if ($SOAP::Lite::VERSION >= 0.67) {
             $result = SOAP::Lite
+                    ->envprefix($EnvPrefix)
                     ->ns("u")
                     ->uri('urn:schemas-upnp-org:control-1-0')
                     ->proxy($self->controlURL)
@@ -718,6 +721,7 @@ sub queryStateVariable {
                                                ->value($name));
         } else {
             $result = SOAP::Lite
+                    ->envprefix($EnvPrefix)
                     ->uri('urn:schemas-upnp-org:control-1-0')
                     ->proxy($self->controlURL)
                     ->call('QueryStateVariable' => 
@@ -880,12 +884,12 @@ sub new {
         if ($SOAP::Lite::VERSION >= 0.67) {
             return bless {
                     _service => $service,
-                    _proxy => SOAP::Lite->ns("u")->uri($service->serviceType)->proxy($service->controlURL),
+                    _proxy => SOAP::Lite->envprefix($EnvPrefix)->ns("u")->uri($service->serviceType)->proxy($service->controlURL),
             }, $class;
         } else {
             return bless {
                     _service => $service,
-                    _proxy => SOAP::Lite->uri($service->serviceType)->proxy($service->controlURL),
+                    _proxy => SOAP::Lite->envprefix($EnvPrefix)->uri($service->serviceType)->proxy($service->controlURL),
             }, $class;
         }
 }
