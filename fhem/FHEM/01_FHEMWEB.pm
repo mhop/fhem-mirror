@@ -1177,8 +1177,7 @@ FW_digestCgi($)
 
   }
   $cmd.=" $dev{$c}" if(defined($dev{$c}));
-  $cmd.=" $arg{$c}" if(defined($arg{$c}) &&
-                       ($arg{$c} ne "state" || $cmd !~ m/^set/));
+  $cmd.=" $arg{$c}" if(defined($arg{$c}));
   $cmd.=" $val{$c}" if(defined($val{$c}));
 
   #replace unicode newline symbol \u2424 with real newline
@@ -1271,13 +1270,15 @@ FW_makeTable($$$@)
           $v = FW_htmlEscape($v);
         }
 
+        my $ifid = "class='dval' informId='$name-$prefix$n'";
+        my $ifidts = "informId='$name-$prefix$n-ts'";
         if($FW_ss) {
-          $t = ($t ? "<br><div class=\"tiny\">$t</div>" : "");
-          FW_pO "<td><div class=\"dval\">$v$t</div></td>";
+          $t = ($t ? "<br><div class='tiny' $ifidts>$t</div>" : "");
+          FW_pO "<td><span $ifid>$v</span>$t</td>";
         } else {
           $t = "" if(!$t);
-          FW_pO "<td><div class=\"dval\" informId=\"$name-$prefix$n\">$v</div></td>";
-          FW_pO "<td><div informId=\"$name-$prefix$n-ts\">$t</div></td>";
+          FW_pO "<td><div class='dval' $ifid>$v</div></td>";
+          FW_pO "<td><div $ifidts>$t</div></td>";
         }
       } else {
         $val = FW_htmlEscape($val);
