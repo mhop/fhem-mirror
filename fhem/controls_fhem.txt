@@ -1,4 +1,4 @@
-REV 16656
+REV 16659
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-04-23_07:45:04 246699 ./CHANGED
+UPD 2018-04-26_07:45:02 246770 ./CHANGED
 UPD 2018-04-11_07:45:02 36969 ./MAINTAINER.txt
 UPD 2018-03-26_07:45:02 41123 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
@@ -46,7 +46,7 @@ UPD 2018-03-19_07:45:04 59968 FHEM/00_OWX.pm
 UPD 2015-07-28_14:05:31 48674 FHEM/00_OWX_ASYNC.pm
 UPD 2017-09-07_07:45:02 38258 FHEM/00_RPII2C.pm
 UPD 2018-04-16_07:45:03 186342 FHEM/00_SIGNALduino.pm
-UPD 2018-04-16_07:45:03 489502 FHEM/00_SONOS.pm
+UPD 2018-04-26_07:45:02 488957 FHEM/00_SONOS.pm
 UPD 2017-06-30_07:45:02 20215 FHEM/00_SmartMeterP1.pm
 UPD 2017-08-12_07:45:02 56324 FHEM/00_TCM.pm
 UPD 2018-02-19_07:45:04 141607 FHEM/00_THZ.pm
@@ -342,7 +342,7 @@ UPD 2018-03-22_07:45:04 220673 FHEM/72_FRITZBOX.pm
 UPD 2018-04-09_07:45:03 135875 FHEM/72_XiaomiDevice.pm
 UPD 2018-04-07_07:45:02 47236 FHEM/73_AMADCommBridge.pm
 UPD 2018-04-14_07:45:02 89324 FHEM/73_ElectricityCalculator.pm
-UPD 2018-04-19_07:45:03 34800 FHEM/73_GardenaSmartBridge.pm
+UPD 2018-04-26_07:45:02 34956 FHEM/73_GardenaSmartBridge.pm
 UPD 2018-04-14_07:45:02 81612 FHEM/73_GasCalculator.pm
 UPD 2018-01-09_07:45:03 87372 FHEM/73_MPD.pm
 UPD 2018-02-28_07:45:03 30809 FHEM/73_NUKIBridge.pm
@@ -623,7 +623,7 @@ UPD 2015-07-28_14:05:30 1015 FHEM/lib/SWAP/panStamp/temphum.xml
 UPD 2015-07-28_14:05:30 1137 FHEM/lib/SWAP/panStamp/temppress.xml
 UPD 2015-07-28_14:05:30 1987 FHEM/lib/SWAP/template.xml
 UPD 2016-02-08_07:45:13 19048 FHEM/lib/UPnP/Common.pm
-UPD 2018-01-08_07:45:02 45272 FHEM/lib/UPnP/ControlPoint.pm
+UPD 2018-04-26_07:45:02 45490 FHEM/lib/UPnP/ControlPoint.pm
 UPD 2017-05-15_07:45:02 2808 FHEM/lib/UPnP/sonos_bibliothek_quadratic.jpg
 UPD 2017-05-15_07:45:02 2817 FHEM/lib/UPnP/sonos_bibliothek_round.png
 UPD 2017-05-15_07:45:02 5416 FHEM/lib/UPnP/sonos_dock_quadratic.jpg
