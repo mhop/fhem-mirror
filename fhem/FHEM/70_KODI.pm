@@ -1611,53 +1611,53 @@ sub KODI_HTTP_Request($$@)
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; KODI &lt;ip[:port]&gt; &lt;http|tcp&gt; [&lt;username&gt;] [&lt;password&gt;]</code>
-    <br><br>
+    <br/><br/>
 
-    This module allows you to control Kodi and receive events from Kodi. It can also be used to control Plex (see attribute <i>compatibilityMode</i>).<br><br>
+    This module allows you to control Kodi and receive events from Kodi. It can also be used to control Plex (see attribute <i>compatibilityMode</i>).<br/><br/>
   
   <b>Prerequisites</b>
   <ul>
     <li>Requires XBMC "Frodo" 12.0.</li>
-    <li>To use this module you will have to enable JSON-RPC. See <a href="http://wiki.xbmc.org/index.php?title=JSON-RPC_API#Enabling_JSON-RPC">here</a>.</li>
-    <li>The Perl module JSON is required. <br>
-        On Debian/Raspbian: <code>apt-get install libjson-perl </code><br>
+    <li>To use this module you will have to enable JSON-RPC. See <a href="https://kodi.wiki/view/JSON-RPC_API#Enabling_JSON-RPC">here</a>.</li>
+    <li>The Perl module JSON is required. <br/>
+        On Debian/Raspbian: <code>apt-get install libjson-perl </code><br/>
       Via CPAN: <code>cpan install JSON</code>
       To get it working on a Fritzbox the JSON module has to be installed manually.</li>
   </ul>
 
     To receive events it is necessary to use TCP. The default TCP port is 9090. Username and password are optional for TCP. Be sure to enable JSON-RPC 
-  for TCP. See <a href="http://wiki.xbmc.org/index.php?title=JSON-RPC_API#Enabling_JSON-RPC>here</a>.<br><br>
+  for TCP. See <a href="https://kodi.wiki/view/JSON-RPC_API#Enabling_JSON-RPC">here</a>.<br/><br/>
   
   If you just want to control Kodi you can use the HTTP instead of tcp. The username and password are required for HTTP. Be sure to enable JSON-RPC for HTTP.
-    See <a href="http://wiki.xbmc.org/index.php?title=JSON-RPC_API#Enabling_JSON-RPC">here</a>.<br><br>
+    See <a href="https://kodi.wiki/view/JSON-RPC_API#Enabling_JSON-RPC">here</a>.<br/><br/>
 
-    Example:<br><br>
+    Example:<br/><br/>
     <ul>
     <code>
         define htpc KODI 192.168.0.10 tcp
-        <br><br>
+        <br/><br/>
         define htpc KODI 192.168.0.10:9000 tcp # With custom port
-        <br><br>
+        <br/><br/>
         define htpc KODI 192.168.0.10 http # Use HTTP instead of TCP - Note: to receive events use TCP!
-        <br><br>
+        <br/><br/>
         define htpc KODI 192.168.0.10 http kodi passwd # Use HTTP with credentials - Note: to receive events use TCP!
       </code>
-  </ul><br><br>
+  </ul><br/><br/>
   
-  Remote control:<br>
+  Remote control:<br/>
   There is an simple remote control layout for Kodi which contains the most basic buttons. To add the remote control to the webinterface execute the 
-  following commands:<br><br>
+  following commands:<br/><br/>
   <ul>
     <code>
         define &lt;rc_name&gt; remotecontrol #adds the remote control
-        <br><br>
+        <br/><br/>
         set &lt;rc_name&gt; layout KODI_RClayout #sets the layout for the remote control
-        <br><br>
+        <br/><br/>
         set &lt;rc_name&gt; makenotify &lt;KODI_device&gt; #links the buttons to the actions
     </code>
-  </ul><br><br>
+  </ul><br/><br/>
   
-  Known issues:<br>
+  Known issues:<br/>
     Kodi sometimes creates events twices. For example the Player.OnPlay event is created twice if play a song. Unfortunately this
     is a issue of Kodi. The fix of this bug is included in future version of Kodi (> 12.2).
    
@@ -1667,10 +1667,10 @@ sub KODI_HTTP_Request($$@)
   <b>Set</b>
   <ul>
     <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
-    <br><br>
-    This module supports the following commands:<br>
+    <br/><br/>
+    This module supports the following commands:<br/>
     
-  Player related commands:<br>
+  Player related commands:<br/>
   <ul> 
     <li><b>play [&lt;all|audio|video|picture&gt;]</b> -  starts the playback (might only work if previously paused). The second argument defines which player should be started. By default the active players will be started</li>
     <li><b>pause [&lt;all|audio|video|picture&gt;]</b> -  pauses the playback</li>
@@ -1678,7 +1678,7 @@ sub KODI_HTTP_Request($$@)
     <li><b>stop [&lt;all|audio|video|picture&gt;]</b> -  stop the playback</li>
     <li><b>next [&lt;all|audio|video|picture&gt;]</b> -  jump to the next track</li>
     <li><b>prev [&lt;all|audio|video|picture&gt;]</b> -  jump to the previous track or the beginning of the current track.</li>
-    <li><b>goto &lt;position&gt; [&lt;audio|video|picture&gt;]</b> -  Goes to the <position> in the playlist. <position> has to be a number.</li>
+    <li><b>goto &lt;position&gt; [&lt;audio|video|picture&gt;]</b> -  Goes to the in the playlist. has to be a number.</li>
     <li><b>shuffle [&lt;toggle|on|off&gt;] [&lt;audio|video|picture&gt;]</b> -  Enables/Disables shuffle mode. Without furhter parameters the shuffle mode is toggled.</li>
     <li><b>repeat &lt;one|all|off&gt; [&lt;audio|video|picture&gt;]</b> -  Sets the repeat mode.</li>
     <li><b>open &lt;URI&gt;</b> -  Plays the resource located at the URI (can be a url or a file)</li>
@@ -1689,7 +1689,7 @@ sub KODI_HTTP_Request($$@)
     <li><b>addon &lt;addonid&gt; &lt;parametername&gt; &lt;parametervalue&gt;</b> -  Executes addon with one Parameter, for example set kodi addon script.json-cec command activate</li>
     <li><b>seek &lt;hh:mm:ss&gt;</b> - seek to the specified time</li>
   </ul>
-  <br>Input related commands:<br>
+  <br/>Input related commands:<br/>
   <ul> 
     <li><b>back</b> -  Back-button</li>
     <li><b>down</b> -  Down-button</li>
@@ -1705,14 +1705,14 @@ sub KODI_HTTP_Request($$@)
     <li><b>send &lt;text&gt;</b> -  Sends &lt;text&gt; as input to Kodi</li>
     <li><b>jsonraw</b> -  Sends raw JSON data to Kodi</li>
   </ul>
-  <br>Libary related commands:<br>
+  <br/>Libary related commands:<br/>
   <ul>
     <li><b>videolibrary clean</b> -  Removes non-existing files from the video libary</li>
     <li><b>videolibrary scan</b> -  Scan for new video files</li>
     <li><b>audiolibrary clean</b> -  Removes non-existing files from the audio libary</li>
     <li><b>audiolibrary scan</b> -  Scan for new audio files</li>
   </ul>
-  <br>Application related commands:<br>
+  <br/>Application related commands:<br/>
   <ul>
     <li><b>activatewindow &lt;name&gt;</b> - activates the window "name" of the following list:
         <ul><li>AddonSearch</li><li>Addons</li><li>Albums</li><li>AndroidApps</li><li>Artists</li><li>Compilations</li><li>EventLog</li><li>FileManager</li><li>Genres</li><li>InProgressTvShows</li><li>MovieActors</li><li>MovieCountries</li><li>MovieDirectors</li><li>MovieGenres</li><li>MovieInformation</li><li>MovieSets</li><li>MovieStudios</li><li>MovieTags</li><li>MovieTitles</li><li>MovieYears</li><li>Movies</li><li>MusicAddons</li><li>MusicFiles</li><li>MusicPlaylists</li><li>MusicRoot</li><li>MusicVideoAlbums</li><li>MusicVideoArtists</li><li>MusicVideoDirectors</li><li>MusicVideoGenres</li><li>MusicVideoStudios</li><li>MusicVideoTitles</li><li>MusicVideoYears</li><li>MusicVideos</li><li>ProgramAddons</li><li>RecentlyAddedAlbums</li><li>RecentlyAddedEpisodes</li><li>RecentlyAddedMovies</li><li>RecentlyAddedMusicVideos</li><li>RecentlyPlayedAlbums</li><li>Settings</li><li>Singles</li><li>Song</li><li>SubTitles</li><li>Top100</li><li>Top100Albums</li><li>Top100Songs</li><li>TvShowActors</li><li>TvShowGenres</li><li>TvShowStudios</li><li>TvShowTitles</li><li>TvShowYears</li><li>TvShows</li><li>VideoAddons</li><li>VideoFiles</li><li>VideoPlaylists</li><li>VideoRoot</li><li>Years</li></ul>
@@ -1724,7 +1724,7 @@ sub KODI_HTTP_Request($$@)
     <li><b>quit</b> -  closes Kodi</li>
     <li><b>off</b> -  depending on the value of the attribute &quot;offMode&quot; Kodi will be closed (see quit) or the system will be shut down, put into hibernation or stand by. Default is quit.</li>
   </ul>
-  <br>System related commands:<br>
+  <br/>System related commands:<br/>
   <ul>
     <li><b>eject</b> -  will eject the optical drive</li>
     <li><b>shutdown</b> -  the Kodi host will be shut down</li>
@@ -1734,19 +1734,19 @@ sub KODI_HTTP_Request($$@)
     <li><b>connect</b> -  try to connect to the Kodi host immediately</li>
   </ul>
   </ul>
-  <br><br>
+  <br/><br/>
 
   <u>Messaging</u>
   <ul>
-    To show messages on Kodi (little message PopUp at the bottom right egde of the screen) you can use the following commands:<br>
-    <code>set &lt;KODI_device&gt; msg &lt;title&gt; &lt;msg&gt; [&lt;duration&gt;] [&lt;icon&gt;]</code><br>
+    To show messages on Kodi (little message PopUp at the bottom right egde of the screen) you can use the following commands:<br/>
+    <code>set &lt;KODI_device&gt; msg &lt;title&gt; &lt;msg&gt; [&lt;duration&gt;] [&lt;icon&gt;]</code><br/>
     The default duration of a message is 5000 (5 seconds). The minimum duration is 1500 (1.5 seconds). By default no icon is shown. Kodi provides three 
     different icon: error, info and warning. You can also use an uri to define an icon. Please enclose title and/or message into quotes (" or ') if it consists
     of multiple words.
   </ul>
 
-  <br>
-  <b>Generated Readings/Events:</b><br>
+  <br/>
+  <b>Generated Readings/Events:</b><br/>
   <ul>
   <li><b>audiolibrary</b> - Possible values: cleanfinished, cleanstarted, remove, scanfinished, scanstarted, update</li>
   <li><b>currentAlbum</b> - album of the current song/musicvideo</li>
@@ -1781,10 +1781,10 @@ sub KODI_HTTP_Request($$@)
   <li><b>volume</b> - value between 0 and 100 stating the current volume setting</li>
   <li><b>year</b> - year of the movie being played</li>
   <li><b>3dfile</b> - is a 3D movie according to filename</li>
-  <li><b>sd_<type><n>_<reading></b> - stream details of the current medium. type can be video, audio or subtitle, n is the stream index (a stream can have multiple audio/video streams)</li>
+  <li><b>sd_&#x3C;type&#x3E;&#x3C;n&#x3E;_&#x3C;reading&#x3E;</b> - stream details of the current medium. type can be video, audio or subtitle, n is the stream index (a stream can have multiple audio/video streams)</li>
   </ul>
-  <br><br>
-  <u>Remarks on the events</u><br><br>
+  <br/><br/>
+  <u>Remarks on the events</u><br/><br/>
   <ul>
     The event <b>playStatus = playing</b> indicates a playback of a media item. Depending on the event <b>type</b> different events are generated:
   <ul>
@@ -1796,25 +1796,25 @@ sub KODI_HTTP_Request($$@)
     <li><b>type = unknown</b> generated events are: <b>file</b></li>  
   </ul> 
   </ul>
-  <br><br>
+  <br/><br/>
   <a name="KODIattr"></a>
   <b>Attributes</b>
   <ul>
-    <li>compatibilityMode<br>
+    <li>compatibilityMode<br/>
       This module can also be used to control Plex, since the JSON Api is mostly the same, but there are some differences. 
     If you want to control Plex set the attribute <i>compatibilityMode</i> to <i>plex</i>.</li>
-    <li>offMode<br>
+    <li>offMode<br/>
       Declares what should be down if the off command is executed. Possible values are <i>quit</i> (closes Kodi), <i>hibernate</i> (puts system into hibernation), 
     <i>suspend</i> (puts system into stand by), and <i>shutdown</i> (shuts down the system). Default value is <i>quit</i></li>
-  <li>fork<br>
+  <li>fork<br/>
       If Kodi does not run all the time it used to be the case that FHEM blocks because it cannot reach Kodi (only happened 
     if TCP was used). If you encounter problems like FHEM not responding for a few seconds then you should set <code>attr &lt;KODI_device&gt; fork enable</code>
     which will move the search for Kodi into a separate process.</li>
-  <li>updateInterval<br>
+  <li>updateInterval<br/>
       The interval which is used to check if Kodi is still alive (by sending a JSON ping) and also it is used to update current player item.</li>
-  <li>disable<br>
+  <li>disable<br/>
       Disables the device. All connections will be closed immediately.</li>
-  <li>jsonResponseReading<br>
+  <li>jsonResponseReading<br/>
       When enabled then every received JSON message from Kodi will be saved into the reading <i>jsonResponse</i> so the last received message is always available.
       Also an event is triggered upon each update.</li>
   </ul>
