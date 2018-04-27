@@ -282,8 +282,9 @@ sub TRX_DoInit($) {
                 my $msg3   = ord( pack( 'H*', $5 ) );
                 my $msg4   = ord( pack( 'H*', $6 ) );
                 my $msg5   = ord( pack( 'H*', $7 ) );
-                my $msg6   = ord( pack( 'H*', $8 ) ) if $fw == 2;
-                my $freq   = {
+                my $msg6   = "";
+                $msg6 = ord( pack( 'H*', $8 ) ) if $fw == 2;
+                my $freq = {
                     '50' => '310MHz',
                     '51' => '315MHz',
                     '52' => '433.92MHz receiver only',
@@ -298,14 +299,15 @@ sub TRX_DoInit($) {
                 }->{$msg1}
                   || 'unknown Mhz';
                 $status .= $freq;
-				my $firmware = "";
-				if ($fw==2) {
-					$firmware  = $msg2 + 1000;
-				}
-				else {
-					$firmware  = $msg2;
-				}
-				
+                my $firmware = "";
+
+                if ( $fw == 2 ) {
+                    $firmware = $msg2 + 1000;
+                }
+                else {
+                    $firmware = $msg2;
+                }
+
                 $status .= ", " . sprintf "firmware=%d", $firmware;
                 my $protocols = "";
                 $status    .= ", protocols enabled: ";
