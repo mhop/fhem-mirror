@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.005
+#  Version 4.2.006
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -105,7 +105,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.2.005';
+my $HMCCU_VERSION = '4.2.006';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -326,6 +326,7 @@ sub HMCCU_ExprNotMatch ($$$);
 sub HMCCU_GetDutyCycle ($);
 sub HMCCU_TCPPing ($$$);
 sub HMCCU_TCPConnect ($$);
+sub HMCCU_ResolveName ($$);
 sub HMCCU_CorrectName ($);
 
 # Subprocess functions
@@ -397,12 +398,7 @@ sub HMCCU_Define ($$)
 	}
 	
 	# Get CCU IP address
-	$hash->{ccuip} = 'N/A';
-	my $ccuname = inet_aton ($hash->{host});
-	if (defined ($ccuname)) {
-      my $ccuip = inet_ntoa ($ccuname);
-      $hash->{ccuip} = $ccuip if (defined ($ccuip));
-	}
+	$hash->{ccuip} = HMCCU_ResolveName ($hash->{host}, 'N/A');
 
 	# Get CCU number (if more than one)
 	if (scalar (@$a) >= 4) {
@@ -4483,6 +4479,7 @@ sub HMCCU_GetRPCDevice ($$$)
 	my $name = $hash->{NAME};
 	my $rpcdevname;
 	my $rpcdevtype = 'HMCCURPC';
+	my $rpchost = $hash->{host};
 	
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 
@@ -4490,7 +4487,8 @@ sub HMCCU_GetRPCDevice ($$$)
 		return (HMCCU_Log ($hash, 1, "Interface not defined for RPC server of type HMCCURPCPROC", ''), 0)
 			if (!defined ($ifname));
 		$rpcdevname = HMCCU_GetRPCServerInfo ($hash, $ifname, 'device');
-		return ($rpcdevname, 0) if (defined ($rpcdevname));
+		$rpchost = HMCCU_GetRPCServerInfo ($hash, $ifname, 'host');
+		return ($rpcdevname, 0) if (defined ($rpcdevname) || !defined ($rpchost));
 		$rpcdevtype = 'HMCCURPCPROC';
 	}
 	elsif ($ccuflags =~ /extrpc/) {
@@ -4514,7 +4512,11 @@ sub HMCCU_GetRPCDevice ($$$)
 	my @devlist;
 	foreach my $dev (keys %defs) {
 		my $devhash = $defs{$dev};
-		next if ($devhash->{TYPE} ne $rpcdevtype || $devhash->{host} ne $hash->{host});
+		next if ($devhash->{TYPE} ne $rpcdevtype);
+		my $ip = 'null';
+		my $addrnum = inet_aton ($devhash->{host});
+		$ip = inet_ntoa ($addrnum) if (defined ($addrnum)); 
+		next if ($devhash->{host} ne $rpchost && $ip ne $rpchost);
 		next if ($rpcdevtype eq 'HMCCURPCPROC' && $devhash->{rpcinterface} ne $ifname);
 		push @devlist, $devhash->{NAME};
 	}
@@ -4542,13 +4544,13 @@ sub HMCCU_GetRPCDevice ($$$)
 		if (defined ($ifname)) {
 			$rpcdevname = makeDeviceName ("d_rpc".$ifname);
 			$alias .= " $ifname";
-			$rpccreate = "$rpcdevname $rpcdevtype ".$hash->{host}. " $ifname";
+			$rpccreate = "$rpcdevname $rpcdevtype $rpchost $ifname";
 		}
 
 		HMCCU_Log ($hash, 1, "Creating new RPC device $rpcdevname", undef);
 		my $ret = CommandDefine (undef, $rpccreate);
 		if (!defined ($ret)) {
-			# HMCCURPC device created. Set/copy some attributes from HMCCU device
+			# RPC device created. Set/copy some attributes from HMCCU device
 			my %rpcdevattr = ('room' => 'copy', 'group' => 'copy', 'icon' => 'copy',
 				'stateFormat' => 'rpcstate/state', 'eventMap' => '/rpcserver on:on/rpcserver off:off/',
 				'verbose' => 2, 'alias' => $alias );
@@ -6504,6 +6506,22 @@ sub HMCCU_TCPConnect ($$)
 	}
 
 	return 0;
+}
+
+######################################################################
+# Resolve hostname.
+# Return value defip if hostname can't be resolved.
+######################################################################
+
+sub HMCCU_ResolveName ($$)
+{
+	my ($hname, $defip) = @_;
+	
+	my $ip = $defip;
+	my $addrnum = inet_aton ($hname);
+	$ip = inet_ntoa ($addrnum) if (defined ($addrnum));
+	
+	return $ip;
 }
 
 ######################################################################
