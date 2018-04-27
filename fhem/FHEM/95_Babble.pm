@@ -36,6 +36,8 @@ use vars qw(%intAt);		    # FHEM at definitions
 use vars qw($FW_ME);
 
 use JSON;      # imports encode_json, decode_json, to_json and from_json.
+use Encode;
+
 my $rive = 0;
 my $riveinterpreter;
 #-- RiveScript missing in System 
@@ -53,7 +55,8 @@ if  (eval {require RiveScript;1;} ne 1) {
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.33";
+my $babbleversion    = "1.35";
+my @babblerows;
 
 my %babble_transtable_EN = ( 
     "ok"                =>  "OK",
@@ -444,10 +447,9 @@ sub Babble_save($) {
   $hash->{DATA}{"savedate"} = $date;
   readingsSingleUpdate( $hash, "savedate", $date, 1 ); 
   my $jhash0 = toJSON($hash->{DATA});
+  #$jhash0    = decode_utf8( $jhash0 );
   if( ReadingsVal($name,"lockstate","locked") ne "locked" ){
     my $error  = FileWrite("babbleFILE",$jhash0);
-    #Log3 $name, 1, "         ".Dumper($jhash0);
-    
     Log3 $name,1,"[Babble_save]";
   }else{
     Log3 $name, 1, "[Babble] attempt to save data failed due to lockstate";
@@ -479,7 +481,9 @@ sub Babble_restore($$) {
     return undef;
   }
   my $json   = JSON->new->utf8;
-  my $jhash1 = eval{ $json->decode( join('',@lines) ) };
+  my $jhash0 = join('',@lines);
+  $jhash0    = encode_utf8( $jhash0 );
+  my $jhash1 = eval{ $json->decode( $jhash0 ) };
   my $date   = $jhash1->{"savedate"};
   #-- just for the first time, reading an old savefile
   $date = localtime(time)
@@ -837,7 +841,7 @@ sub Babble_Normalize($$){
   #   status
   }else{
     $cat = 3;
-    my $rex = $hash->{DATA}{"re_verbparts"}." ?".$hash->{DATA}{"re_verbsi"};
+    my $rex = $hash->{DATA}{"re_verbparts"}." ?".$hash->{DATA}{"re_verbsi"};    
     #-- guten morgen / gute nacht
     if( $word[0] =~ /^gut.*/){
       $subcat = 1;
@@ -1143,9 +1147,10 @@ sub Babble_DoIt{
       if(index($stardev,'*')!=-1){
         my $starrexp = $stardev;
         $starrexp    =~ s/\*/\(\.\*\)/;
-        if( $realdev =~ /$starrexp/ ){
+        if( $realdev =~ m/$starrexp/ ){
           $star = $1;
           $cmd = $hash->{DATA}{"command"}{$stardev}{$place}{$verb}{$reading};
+          $cmd =~ s/\$STAR/$star/g;
           if( defined($cmd) && $cmd ne "" ){
             $device = $stardev;
             last;
@@ -1446,9 +1451,9 @@ sub Babble_ModCmd($$$$$$){
 #
 #########################################################################################
 
-sub Babble_RemCmd($$$$$){
+sub Babble_RemCmd($$$$$$){
 
-   my ($name,$bdev,$place,$verb,$target) = @_;
+   my ($name,$bdev,$place,$verb,$target,$fallback) = @_;
    my $hash   = $defs{$name};
    
    #-- lower case characters
@@ -1463,9 +1468,19 @@ sub Babble_RemCmd($$$$$){
      if( $verb eq "");
    $target="none"
      if( $target eq "");
-     
-   Log3 $name, 1,"[Babble_RemCmd] Deleting from hash: $bdev.$place.$verb.$target => ".$hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target};
-   delete($hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target});
+   #-- trying to delete from data obtained via web
+   if( defined($hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target}) ){
+     Log3 $name, 1,"[Babble_RemCmd] Deleting from hash: $bdev.$place.$verb.$target => ".$hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target};
+     delete($hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target});
+     return
+   #-- try to figure out data from index (fallback strategy)
+   }else{
+     my $cmdstr = $babblerows[$fallback-1];
+     ($bdev,$place,$verb,$target)=split('\+\|\+',$cmdstr);
+     Log3 $name, 1,"[Babble_RemCmd] Deleting in fallback strategy from hash: $bdev.$place.$verb.$target => ".$hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target};
+     delete($hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target});
+     return
+   }
 }
 
 #########################################################################################
@@ -1710,10 +1725,16 @@ sub Babble_getplaces($$$) {
     if( !defined($sel) ){
       return "<option></option><option>".join("</option><option>",@places)."</option>";
     }else{
+      $sel = lc($sel);
+      #-- todo: geht das einfacher ?
+      $sel =~ s/\xe3\xbc/ü/g;
+      $sel =~ s/\xe3\xb6/ö/g;
+      $sel =~ s/\xe3\xa4/ä/g;
+      $sel =~ s/\xe3\x9f/ß/g;
       my $ret = ($sel eq "none") ? '<option selected="selected">' : '<option>';
       $ret .= '</option>';
       for( my $i=0;$i<int(@places);$i++){
-        $ret .= (lc($sel) eq lc($places[$i]) ) ? '<option selected="selected">' : '<option>';
+        $ret .= ( $sel eq lc($places[$i]) ) ? '<option selected="selected">' : '<option>';
         $ret .= $places[$i].'</option>';
       }
       return $ret;
@@ -1760,7 +1781,13 @@ sub Babble_getverbs($$$) {
       } 
     }
     $hash->{DATA}{"re_verbsi"} = "(?P<verbsi>(".lc( join(")|(",@{$hash->{DATA}{"verbsi"}}))."))"; 
-    $hash->{DATA}{"re_verbsc"} = lc("((".join(")|(",(keys %{$hash->{DATA}{"verbs"}}))."))");
+    #$hash->{DATA}{"re_verbsc"} = lc("((".join(")|(",(keys %{$hash->{DATA}{"verbs"}}))."))");
+    my $verbsc="((";
+    while (my ($key, $value) = each %{$hash->{DATA}{"verbs"}}){
+      $verbsc.=lc($key).")|(";
+    }
+    $verbsc =~ s/\)\|\($/))/;
+    $hash->{DATA}{"re_verbsc"}=$verbsc;
     return;
   #-- just do something with the current list
   }elsif( $type eq "html" ){
@@ -1770,10 +1797,18 @@ sub Babble_getverbs($$$) {
     if( !defined($sel) ){
       return "<option></option><option>".join("</option><option>",@verbsi)."</option>";
     }else{
+      $sel = lc($sel);
+      #-- todo: geht das einfacher ?
+      $sel =~ s/\xe3\xbc/ü/g;
+      $sel =~ s/\xe3\xb6/ö/g;
+      $sel =~ s/\xe3\xa4/ä/g;
+      $sel =~ s/\xe3\x9f/ß/g;
+      #my $sel1 = encode_utf8($sel);
+      #my $sel2 = decode_utf8($sel);
       my $ret = ($sel eq "none") ? '<option selected="selected">' : '<option>';
       $ret .= '</option>';
       for( my $i=0;$i<int(@verbsi);$i++){
-        if( lc($sel) eq lc($verbsi[$i]) ) {
+        if( $sel eq  lc($verbsi[$i]) ) {
           $ret .=  '<option selected="selected">';
           $fnd = 1;
         }else{
@@ -1856,6 +1891,12 @@ sub Babble_getwords($$$$) {
     if( !defined($sel) ){
       return "<option></option><option>".join("</option><option>",@targets)."</option>";
     }else{
+      $sel = lc($sel);
+      #-- todo: geht das einfacher ?
+      $sel =~ s/\xe3\xbc/ü/g;
+      $sel =~ s/\xe3\xb6/ö/g;
+      $sel =~ s/\xe3\xa4/ä/g;
+      $sel =~ s/\xe3\x9f/ß/g;
       my $ret = ($sel eq "none") ? '<option selected="selected">' : '<option>';
       $ret .= '</option>';
       for( my $i=0;$i<int(@targets);$i++){
@@ -1985,6 +2026,8 @@ sub Babble_Html($)
     my $ig       = 0;
     my $devcount = 0;
     my @devrows  = ();
+    my $indrow   = 0;
+    @babblerows     = ();
    
     my($devrow,$ip,$ipp);
     $rot .= "<tr><td colspan=\"3\"><div class=\"devType\">".$babble_tt->{"babbledev"}."</div></td></tr>";
@@ -1993,6 +2036,7 @@ sub Babble_Html($)
             "<td class=\"col3\">".$babble_tt->{"place"}."</td><td class=\"col3\">".$babble_tt->{"verb"}."</td><td class=\"col3\">".$babble_tt->{"target"}."</td>\n".
             "<td class=\"col3\">".$babble_tt->{"action"}."</td><td class=\"col3\">".$babble_tt->{"confirm"}."</td><td class=\"col3\"><input type=\"button\" id=\"d_save\" onclick=\"babble_savedevs('".$name."')\" value=\"".$babble_tt->{"save"}.
                         "\" style=\"width:100px;\"/></td></tr>\n";
+   
     #-- loop over all unique devices to get some sorting
     if( defined($hash->{DATA}{"devsalias"}) ){
       for my $alidev (sort keys %{$hash->{DATA}{"devsalias"}}) {
@@ -2062,6 +2106,8 @@ sub Babble_Html($)
                 }else{
                   $checked="";
                 }
+                push(@babblerows,$lbdev."+|+".$place."+|+".$verb."+|+".$target);
+                $indrow++;
                 $tblrow++;
                 $devrow++;
               
@@ -2076,7 +2122,7 @@ sub Babble_Html($)
                         "<td class=\"col3\"><select name=\"d_verbpart\">".$vpmlist."</select></td>\n";  
                 $rot .= "<td class=\"col3\"  style=\"text-align:left;padding:2px\"><input type=\"text\" name=\"d_command\" size=\"30\" maxlength=\"512\" value=\"".$cmd."\"/></td>";
                 $rot .= "<td class=\"col3\"><input type=\"checkbox\" name=\"d_confirm\"$checked</td>";
-                $rot .= "<td><input type=\"button\" id=\"d_remrow\" onclick=\"babble_remrow('".$name."',$devcount,$tblrow)\" value=\"".$babble_tt->{"remove"}."\" style=\"width:100px;\"/></td></tr>\n";#$tblrow-$devcount.$devrow
+                $rot .= "<td><input type=\"button\" id=\"d_remrow\" onclick=\"babble_remrow('".$name."',$devcount,$tblrow,$indrow)\" value=\"".$babble_tt->{"remove"}."\" style=\"width:100px;\"/></td></tr>\n";#$tblrow-$devcount.$devrow
               }
            }
         }
@@ -2243,7 +2289,6 @@ sub Babble_Html($)
                     locked|unlocked</code></a>
                 <br /><i>locked</i> means that babble setups may not be changed, <i>unlocked</i>
                 means that babble setups may be changed></li>
-        </ul>
         </ul>
 =end html
 =begin html_DE
