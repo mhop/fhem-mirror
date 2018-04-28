@@ -29,6 +29,42 @@ use HTTP::Request;
 
 use utf8;
 
+
+my %pollen_types = (  0 => "Unknown",
+                      1 => "Ahorn",
+                      2 => "Ambrosia",
+                      3 => "Beifuss",
+                      4 => "Birke",
+                      5 => "Brennnessel",
+                      6 => "Buche",
+                      7 => "Eiche",
+                      8 => "Erle",
+                      9 => "Esche",
+                      10 => "Fichte",
+                      11 => "Flieder",
+                      12 => "Gaensefuss",
+                      13 => "Gerste",
+                      14 => "Graeser",
+                      15 => "Hafer",
+                      16 => "Hasel",
+                      17 => "Holunder",
+                      18 => "Hopfen",
+                      19 => "Kiefer",
+                      20 => "Linde",
+                      21 => "Loewenzahn",
+                      22 => "Mais",
+                      23 => "Nessel",
+                      24 => "Pappel",
+                      25 => "Platane",
+                      26 => "Raps",
+                      27 => "Roggen",
+                      28 => "Rotbuche",
+                      29 => "Spitzwegerich",
+                      30 => "Tanne",
+                      31 => "Ulme",
+                      32 => "Weide",
+                      33 => "Weizen", );
+
 ##############################################################################
 
 
@@ -39,12 +75,14 @@ sub allergy_Initialize($) {
   $hash->{DefFn}        = "allergy_Define";
   $hash->{UndefFn}      = "allergy_Undefine";
   $hash->{GetFn}        = "allergy_Get";
+  $hash->{AttrFn}       = "allergy_Attr";
   $hash->{AttrList}     = "disable:0,1 ".
                           "ignoreList ".
-                          "updateIgnored:1 ".
-                          "updateEmpty:1 ".
+                          "updateIgnored:1,0 ".
+                          "updateEmpty:1,0 ".
                           "levelsFormat ".
                           "weekdaysFormat ".
+                          "extended5Day:1,0 ".
                           $readingFnAttributes;
 }
 
@@ -64,6 +102,8 @@ sub allergy_Define($$$) {
   {
     require XML::Simple;
     XML::Simple->import();
+    require JSON;
+    JSON->import();
     1;
   };
 
@@ -77,7 +117,7 @@ sub allergy_Define($$$) {
   }
   else
   {
-    $hash->{STATE} = "XML::Simple is required!";
+    $hash->{STATE} = "XML::Simple and JSON is required!";
     $attr{$name}{disable} = "1";
     return undef;
   }
@@ -91,7 +131,7 @@ sub allergy_Undefine($$) {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
   RemoveInternalTimer($hash);
-  fhem("deletereading $name fc.*", 1);
+  #fhem("deletereading $name fc.*", 1);
   return undef;
 }
 
@@ -134,8 +174,21 @@ sub allergy_GetUpdate($) {
 
 
   my $url="http://www.allergie.hexal.de/pollenflug/xml-interface-neu/pollen_de_7tage.php?plz=".$hash->{helper}{ZIPCODE};
-  Log3 ($name, 4, "Getting URL $url");
 
+  if(AttrVal($name, "extended5Day", 0) eq 1) {
+    $url="https://pollenwarner-live.herokuapp.com/pollen/".$hash->{helper}{ZIPCODE};
+  Log3 ($name, 4, "Getting URL $url");
+    HttpUtils_NonblockingGet({
+      url => $url,
+      noshutdown => 1,
+      hash => $hash,
+      type => 'allergydata',
+      callback => \&allergy_ParseExtended,
+    });
+    return undef;
+  }
+
+  Log3 ($name, 4, "Getting URL $url");
 
   HttpUtils_NonblockingGet({
     url => $url,
@@ -161,7 +214,7 @@ sub allergy_Parse($$$)
 
   if( $err )
   {
-    Log3 $name, 1, "$name: URL error: ".$err;
+    Log3 $name, 1, "$name: URL error (".($hash->{ERROR}+1)."): ".$err;
     my $nextupdate = gettimeofday()+( (900*$hash->{ERROR}) + 90 );
     InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
     $hash->{STATE} = "error" if($hash->{ERROR} > 1);
@@ -173,7 +226,15 @@ sub allergy_Parse($$$)
   Log3 $name, 5, "Received XML data ".$data;
 
   my $xml = new XML::Simple();
-  my $xmldata = $xml->XMLin($data,forcearray => [qw( pollenbelastungen pollen )],keyattr => {pollen => 'name'});
+  #my $xmldata = $xml->XMLin($data,forcearray => [qw( pollenbelastungen pollen )],keyattr => {pollen => 'name'});
+  my $xmldata = eval { $xml->XMLin($data,forcearray => [qw( pollenbelastungen pollen )],keyattr => {pollen => 'name'}) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: XML error ".$@;
+    my $nextupdate = gettimeofday()+$hash->{helper}{INTERVAL};
+    InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
+    return undef;
+  }
 
   my @wdays = split(',',AttrVal($hash->{NAME}, "weekdaysFormat", "Sun,Mon,Tue,Wed,Thu,Fri,Sat" ));
   my @levels = split(',',AttrVal($hash->{NAME}, "levelsFormat", "-,low,moderate,high,extreme" ));
@@ -235,6 +296,144 @@ sub allergy_Parse($$$)
 
   return undef;
 }
+
+sub allergy_ParseExtended($$$)
+{
+  my ($param, $err, $data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+
+  if( $err )
+  {
+    Log3 $name, 1, "$name: URL error (".($hash->{ERROR}+1)."): ".$err;
+    my $nextupdate = gettimeofday()+( (900*$hash->{ERROR}) + 90 );
+    InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
+    $hash->{STATE} = "error" if($hash->{ERROR} > 1);
+    $hash->{ERROR} = $hash->{ERROR}+1;
+    return undef;
+  }
+
+  $hash->{ERROR} = 0;
+  Log3 $name, 5, "Received data ".$data;
+
+  my $json = eval { JSON::decode_json($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: JSON error ".$@;
+    my $nextupdate = gettimeofday()+$hash->{helper}{INTERVAL};
+    InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
+    return undef;
+  }
+
+  Log3 $name, 5, "$name: parse json\n".Dumper($json);
+
+
+  my @wdays = split(',',AttrVal($hash->{NAME}, "weekdaysFormat", "Sun,Mon,Tue,Wed,Thu,Fri,Sat" ));
+  my @levels = split(',',AttrVal($hash->{NAME}, "levelsFormat", "-,low,moderate,high,extreme" ));
+
+  readingsBeginUpdate($hash); # Start update readings
+
+  my $city = $json->{region};
+  readingsBulkUpdate($hash, "city", allergy_utf8clean($city)) if($json->{region});
+  my $day = $json->{date};
+  readingsBulkUpdate($hash, "date", $day) if($json->{date});
+  Log3 $name, 4, "Received data for postcode ".$json->{region};
+
+  my @daymax;
+
+  return undef if(!defined($json->{polls}));
+  #Log3 $name, 1, "found polls ".ref($json->{polls});
+
+  foreach my $pollenid ( keys %{$json->{polls}}) {
+    my $pollenid = $json->{polls}->{$pollenid}->{id};
+    #Log3 $name, 1, "polls step ".$pollenid;
+    my $pollenkey = 'Unknown';
+    $pollenkey = $pollen_types{$pollenid} if( defined($pollen_types{$pollenid}) );
+
+    return undef if(!defined($json->{polls}->{$pollenid}->{forecast}));
+    #Log3 $name, 1, "forecast ";
+    return undef if(ref($json->{polls}->{$pollenid}->{forecast}) ne "ARRAY");
+
+    #my @forecast = $json->{polls}->{$pollenid}->{forecast};
+
+    my $daycode = 0;
+    while(defined($json->{polls}->{$pollenid}->{forecast}[$daycode])) {
+
+      my $pollendata = int($json->{polls}->{$pollenid}->{forecast}[$daycode]);
+      #Log3 $name, 1, "forecast array".ref($pollendata);
+
+      if (( AttrVal($hash->{NAME}, "updateEmpty", 0 ) gt 0 or $pollendata gt 0) and ( AttrVal($hash->{NAME}, "updateIgnored", 0 ) gt 0 or ( index(AttrVal($hash->{NAME}, "ignoreList", ""), $pollenkey ) == -1 )))
+      {
+        readingsBulkUpdate($hash, "fc".($daycode+1)."_".$pollenkey, $levels[$pollendata]);
+        $daymax[$daycode] = $pollendata if(!defined($daymax[$daycode]) || $pollendata gt $daymax[$daycode]);
+        Log3 $name, 4, "Received pollen level for ".$pollenkey.": day".($daycode+1)." level ".$pollendata;
+      }
+      else
+      {
+        fhem( "deletereading $name fc".($daycode+1)."_".$pollenkey, 1 );
+        Log3 $name, 5, "Received pollen level for ".$pollenkey.": day".($daycode+1)." level ".$pollendata." (ignored)";
+      }
+      $daymax[$daycode] = 0 if(!defined($daymax[$daycode]));
+      $daycode++;
+    }
+  }
+
+  my $daycode = 0;
+  while(defined($daymax[$daycode])) {
+
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time+($daycode*86400));
+    readingsBulkUpdate($hash, "fc".($daycode+1)."_day_of_week", $wdays[$wday]);
+    readingsBulkUpdate($hash, "fc".($daycode+1)."_maximum", $levels[$daymax[$daycode]]);
+    $daycode++;
+  }
+
+
+  readingsEndUpdate($hash, 1);
+
+
+  $hash->{UPDATED} = FmtDateTime(time());
+
+  my $nextupdate = gettimeofday()+$hash->{helper}{INTERVAL};
+  InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
+
+  return undef;
+}
+
+
+sub allergy_Attr($$$)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  my $orig = $attrVal;
+
+  if( $attrName eq "disable" ) {
+    my $hash = $defs{$name};
+    RemoveInternalTimer($hash);
+    if( $cmd eq "set" && $attrVal ne "0" ) {
+      $attrVal = 1;
+    } else {
+      $attr{$name}{$attrName} = 0;
+      allergy_GetUpdate($hash);
+    }
+  }
+  elsif ($attrName eq "extended5Day") {
+    fhem("deletereading $name fc.*", 1);
+    fhem("deletereading $name date", 1);
+    my $hash = $defs{$name};
+    allergy_GetUpdate($hash);
+  }
+
+  if( $cmd eq "set" ) {
+    if( !defined($orig) || $orig ne $attrVal ) {
+      $attr{$name}{$attrName} = $attrVal;
+      return $attrName ." set to ". $attrVal;
+    }
+  }
+
+  return;
+}
+
+
 
 
 sub allergy_utf8clean($) {
@@ -432,6 +631,10 @@ sub allergy_utf8clean($) {
       <li><code>updateIgnored (1)</code>
          <br>
          Aktualisierung von Allergenen, die sonst durch die ignoreList entfernt werden.
+      </li><br>
+      <li><code>extended5Days (1)</code>
+         <br>
+         Alternative Datenquelle mit 5 Tagen Vorhersage für mehr Allergene
       </li><br>
       <li><code>levelsFormat (Standard: -,low,moderate,high,extreme)</code>
          <br>
