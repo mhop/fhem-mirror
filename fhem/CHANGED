@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     74_HusqvarnaAutomower.pm: New module to control your
+             Husqvarna Automower with original Connect Module (SIM)
   - bugfix:  73_GardenaSmartBridge: fix delete password then rereadcfg
   - bugfix:  93_DbRep: 7.17.2, doesn't writeToDB if device name contain "." 
   - feature: 93_DbLog: addLog - not available reading can be added as new one

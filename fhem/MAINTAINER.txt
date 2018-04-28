@@ -338,6 +338,7 @@ FHEM/74_NUKIBridge.pm        CoolTux              Sonstige Systeme
 FHEM/74_AMADDevice.pm        CoolTux              Sonstige Systeme
 FHEM/74_GardenaSmartDevice.pm CoolTux             Sonstige Systeme
 FHEM/74_HOMBOT.pm            CoolTux              sonstige Systeme
+FHEM/74_HusqvarnaAutomower.pm krannich            Sonstige Systeme
 FHEM/74_NUKIDevice.pm        CoolTux              Sonstige Systeme
 FHEM/74_Nmap.pm              igami                Unterstuetzende Dienste
 FHEM/74_XiaomiFlowerSens     CoolTux              Sonstige Systeme
