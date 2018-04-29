@@ -998,7 +998,7 @@ FW_doUpdate(evt)
           this.setValueFn(d[1].replace(/\n/g, '\u2424'));
 
         } else {
-          if(d[2].match(/\n/))
+          if(d[2].match(/\n/) && !d[2].match(/<.*>/)) // format multiline
             d[2] = '<html><pre>'+d[2]+'</pre></html>';
 
           var ma = /^<html>([\s\S]*)<\/html>$/.exec(d[2]);
