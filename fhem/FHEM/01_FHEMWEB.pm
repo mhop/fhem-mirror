@@ -3086,7 +3086,9 @@ FW_devState($$@)
   }
 
   my $style = AttrVal($d, "devStateStyle", "");
+
   $state =~ s/"//g;
+  $state =~ s/<.*?>/ /g; # remove HTML tags for the title
   $txt = "<div id=\"$d\" $style title=\"$state\" class=\"col2\">$txt</div>";
 
   my $type = $defs{$d}{TYPE};
