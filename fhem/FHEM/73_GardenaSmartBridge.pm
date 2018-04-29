@@ -68,7 +68,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 
 
-my $version = "1.0.3";
+my $version = "1.0.4";
 
 
 
@@ -251,6 +251,7 @@ sub GardenaSmartBridge_Notify($$) {
     GardenaSmartBridge_getToken($hash) if ( 
                                                 ($devtype eq 'Global'
                                                     and (grep /^INITIALIZED$/,@{$events}
+                                                        or grep /^REREADCFG$/,@{$events}
                                                         or grep /^DEFINED.$name$/,@{$events}
                                                         or grep /^MODIFIED.$name$/,@{$events}
                                                         or grep /^ATTR.$name.gardenaAccountEmail.+/,@{$events}
