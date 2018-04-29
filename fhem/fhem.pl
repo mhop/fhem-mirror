@@ -2022,6 +2022,10 @@ CommandDefMod($$)
   my @a = split("[ \t]+", $def, 3);
   return "Usage: defmod <name> <type> <type dependent arguments>"
                 if(int(@a) < 2);
+  if($a[0] eq "-temporary" && $defs{$a[1]}) {
+    @a = split("[ \t]+", $def, 4);
+    shift @a;
+  }
   if($defs{$a[0]}) {
     $def = $a[2] ? "$a[0] $a[2]" : $a[0];
     return "defmod $a[0]: Cannot change the TYPE of an existing definition"
