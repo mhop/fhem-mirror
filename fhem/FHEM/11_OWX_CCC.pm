@@ -31,7 +31,7 @@
 ########################################################################################
 #
 # $hash->{DeviceName}   =  
-# $hash->{INTERFACE}    = "COC/CUNO"; 
+# $hash->{INTERFACE}    = "COC/CUNO/CUBE"; 
 # $hash->{HWDEVICE}     =     
 # $hash->{TYPE}         = "OWX";   
 #  
@@ -54,7 +54,7 @@ sub new($) {
 	return bless {
 		hash => $hash,
 	    #-- module version
-		version => "7.10"
+		version => "7.11"
 	}, $class;
 }
 
@@ -76,7 +76,7 @@ sub Define($) {
 
 	#-- check syntax
 	if(int(@a) < 3){
-		return "OWX_CCC::Define Syntax error - must be define <name> OWX <cuno/coc-device>"
+		return "OWX_CCC::Define Syntax error - must be define <name> OWX <cuno/coc/cube-device>"
 	}
 	
     my $name = $a[0];
@@ -85,7 +85,7 @@ sub Define($) {
     $hash->{DeviceName} = $dev;
     
     #-- Second step in case of CUNO: See if we can open it
-    my $msg = "OWX_CCC::Define COC/CUNO device $dev";
+    my $msg = "OWX_CCC::Define COC/CUNO/CUBE device $dev";
     #-- hash des COC/CUNO
     my $hwdevice = $main::defs{$dev};
     if(!$hwdevice){
@@ -98,7 +98,7 @@ sub Define($) {
     #-- store with OWX device
     $hash->{DeviceName}   = $dev;
     $hash->{ASYNCHRONOUS} = 0; 
-    $hash->{INTERFACE}    = "COC/CUNO";
+    $hash->{INTERFACE}    = "COC/CUNO/CUBE";
     $hash->{HWDEVICE}     = $hwdevice;
     
     #-- loop for some time until the state is "Initialized"
@@ -108,7 +108,7 @@ sub Define($) {
       select(undef,undef,undef,3); 
     }
     main::Log(1, "OWX_CCC::Define Can't open ".$dev) if( $hwdevice->{STATE} ne "Initialized");
-    #-- reset the 1-Wire system in COC/CUNO
+    #-- reset the 1-Wire system in COC/CUNO/CUBE
     main::CUL_SimpleWrite($hwdevice, "Oi");
       
     main::Log3 $name,1,"OWX_CCC::Define warning: version ".$self->{version}." not identical to OWX version ".$main::owx_version
@@ -159,6 +159,11 @@ sub Detect () {
   }elsif( $ob =~ m/.*CUNO.*/){
     $interface="CUNO";
      $ress .= "DS2482 / CUNO detected in $hwdevice->{NAME}";
+    $ret=1;
+  #-- CUBE
+  }elsif( $ob =~ m/.*CUBE.*/){
+    $interface="CUBE";
+     $ress .= "DS2482 / CUBE detected in $hwdevice->{NAME}";
     $ret=1;
   #-- something else
   } else {
@@ -423,7 +428,7 @@ sub Read(@) {
     } 
   }
   if( $numget >= $numexp){
-    main::OWX_WDBGL($name,1,"OWX_CCC::Read from CUNO with error=$err: ",$buffer);
+    main::OWX_WDBGL($name,4,"OWX_CCC::Read from CUNO with error=$err: ",$buffer);
     return $buffer    
   #-- ultimate failure
   }else{
@@ -642,3 +647,4 @@ See <a href="/fhem/docs/commandref.html#OWX">OWX</a>
 <a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#OWX">OWX</a> 
 </ul>
 =end html_DE
+=cut

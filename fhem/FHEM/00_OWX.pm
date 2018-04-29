@@ -74,6 +74,7 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
   "3B"  => ["DS1825","OWID 3B"],
   "7E"  => ["OW-ENV","OWID 7E"], #Environmental sensor
   "81"  => ["DS1420","OWID 81"],
+  "A6"  => ["DS2438","OWMULTI DS2438a"],
   "FF"  => ["LCD","OWLCD"]
 );
 
@@ -98,7 +99,7 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version="7.10";
+$owx_version="7.11";
 
 #-- debugging now verbosity, this is just for backward compatibility
 $owx_debug=0;

@@ -59,7 +59,7 @@ sub new($) {
 		#-- OWX device
 		hash => $hash,
 		#-- module version
-	    version => "7.08",
+	    version => "7.11",
 		#-- baud rate serial interface
 		baud => 9600,
 		#-- 16 byte search string
@@ -97,7 +97,7 @@ sub Define ($) {
     $hash->{ASYNCHRONOUS} = 0;  
   
     main::Log3 $hash->{NAME},1,"OWX_SER::Define warning: version ".$self->{version}." not identical to OWX version ".$main::owx_version
-      if( $hash->{version} ne $main::owx_version);
+      if( $self->{version} ne $main::owx_version);
       
     #-- call low level init function for the device
     $self->Init();
@@ -927,3 +927,4 @@ See <a href="/fhem/docs/commandref.html#OWX">OWX</a>
 <a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#OWX">OWX</a> 
 </ul>
 =end html_DE
+=cut

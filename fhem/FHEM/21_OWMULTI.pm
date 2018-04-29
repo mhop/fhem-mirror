@@ -46,7 +46,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="7.01";
+my $owx_version="7.02";
 #-- flexible channel name
 my ($owg_channel,$owg_schannel);
 
@@ -200,6 +200,9 @@ sub OWMULTI_Define ($$) {
     if( $fam eq "26" ){
       $model = "DS2438";
       CommandAttr (undef,"$name model DS2438"); 
+    }elsif( $fam eq "A6" ){
+      $model = "DS2438a";
+      CommandAttr (undef,"$name model DS2438a"); 
     }else{
       return "OWMULTI: Wrong 1-Wire device family $fam";
     }
@@ -211,6 +214,9 @@ sub OWMULTI_Define ($$) {
     if( $model eq "DS2438" ){
       $fam = "26";
       CommandAttr (undef,"$name model DS2438"); 
+    }elsif( $model eq "DS2438a" ){
+      $fam = "A6";
+      CommandAttr (undef,"$name model DS2438a"); 
     }else{
       return "OWMULTI: Wrong 1-Wire device model $model";
     }
@@ -842,6 +848,7 @@ sub OWXMULTI_BinValues($$$$$$$) {
 
   #-- this must be different for the different device types
   #   family = 26 => DS2438
+  #   family = A6 => DS2438a
   #-- transform binary rep of VDD
   if( $context eq "ds2438.getvdd") { 
     #-- possible addtional check: $data[0] must be 08
@@ -1349,6 +1356,7 @@ sub OWXMULTI_PT_SetValues($@) {
 
  <a name="OWMULTI"></a>
         <h3>OWMULTI</h3>
+        <ul>
         <p>FHEM module to commmunicate with 1-Wire multi-sensors, currently the DS2438 smart battery
             monitor<br /> <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
                 (prerequisite: Add this module's name to the list of clients in OWServer).
@@ -1374,6 +1382,9 @@ sub OWXMULTI_PT_SetValues($@) {
                 <code>[&lt;model&gt;]</code><br /> Defines the sensor model (and thus 1-Wire family
                 id), currently the following values are permitted: <ul>
                     <li>model DS2438 with family id 26 (default if the model parameter is omitted).
+                        Measured is a temperature value, an external voltage and the current supply
+                        voltage</li>
+                    <li>model DS2438a with family id A6.
                         Measured is a temperature value, an external voltage and the current supply
                         voltage</li>
                 </ul>
@@ -1452,6 +1463,6 @@ sub OWXMULTI_PT_SetValues($@) {
                 <br />unit of measurement (temperature scale), default is Celsius = &deg;C </li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
-        
+        </ul>
 =end html
 =cut

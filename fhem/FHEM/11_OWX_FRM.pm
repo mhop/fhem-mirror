@@ -58,7 +58,7 @@ sub new($) {
 	return bless {
 		hash => $hash,
 	    #-- module version
-        version => "7.10"
+        version => "7.11"
 	}, $class;
 }
 
@@ -714,3 +714,4 @@ See <a href="/fhem/docs/commandref.html#OWX">OWX</a>
 <a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#OWX">OWX</a> 
 </ul>
 =end html_DE
+=cut
