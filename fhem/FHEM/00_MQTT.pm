@@ -242,11 +242,12 @@ sub Set($@) {
   };
 }
 
-sub parseParams($;$$) {
+sub parseParams($;$$$$) {
 
-    my ( $cmd, $separator, $joiner ) = @_;
+    my ( $cmd, $separator, $joiner, $keyvalueseparator, $acceptedkeys ) = @_;
     $separator = ' '        if ( !$separator );
     $joiner    = $separator if ( !$joiner );   # needed if separator is a regexp
+    $keyvalueseparator = ':' if(!$keyvalueseparator);
     my ( @a, %h );
 
     my @params;
@@ -260,7 +261,7 @@ sub parseParams($;$$) {
     while (@params) {
         my $param = shift(@params);
         next if ( $param eq "" );
-        my ( $key, $value ) = split( ':', $param, 2 );
+        my ( $key, $value ) = split( $keyvalueseparator, $param, 2 );
 
         if ( !defined($value) ) {
             $value = $key;
@@ -269,6 +270,16 @@ sub parseParams($;$$) {
         # the key can not start with a { -> it must be a perl expression # vim:}
         }
         elsif ( $key =~ m/^\s*{/ ) {    # for vim: }
+            $value = $param;
+            $key   = undef;
+        }
+        # the key can not start with a ' or "
+        elsif ( $key =~ m/^\s*('|")/ ) {
+            $value = $param;
+            $key   = undef;
+        } 
+        # accept known keys only (if defined $acceptedkeys)
+        elsif (defined($acceptedkeys) and !defined($acceptedkeys->{$key})) {
             $value = $param;
             $key   = undef;
         }
@@ -321,22 +332,16 @@ sub parseParams($;$$) {
 sub parsePublishCmdStr($) {
   my ($str) = @_;
 
-  if(defined($str) && $str=~m/\s*(?:({.*})\s+)?(.*)/) {
-    my $exp = $1;
-    my $rest = $2;
-    if ($rest){
-      my @lwa = split("[ \t]+",$rest);
-      unshift (@lwa,$exp) if($exp);
-      return parsePublishCmd(@lwa);
-    }    
-  }
-  return undef;
+  return undef unless defined($str);
+  
+  my @lwa = split("[ \t]+",$str);
+  return parsePublishCmd(@lwa);
 }
 
 sub parsePublishCmd(@) { 
     my @a = @_;
-    my ( $aa, $bb ) = parseParams(\@a);
-
+    my ( $aa, $bb ) = parseParams(\@a,undef,undef,undef,{qos=>1,retain=>1});
+    
     my $qos        = 0;
     my $retain     = 0;
     my $topic      = undef;
@@ -356,7 +361,7 @@ sub parsePublishCmd(@) {
 
     while ( scalar(@xaa) > 0 ) {
         my $av = shift @xaa;
-        if ( $av =~ /\{.*\}/ ) {
+        if (!defined($expression) and $av =~ /^\{.*\}$/ and scalar(@xaa)>0) {
             $expression = $av;
             next;
         }
@@ -695,6 +700,7 @@ sub send_message($$$@) {
 sub topic_to_regexp($) {
   my $t = shift;
   $t =~ s|#$|.\*|;
+  $t =~ s|\$|\\\$|g;
   $t =~ s|\/\.\*$|.\*|;
   $t =~ s|\/|\\\/|g;
   $t =~ s|(\+)([^+]*$)|(+)$2|;
@@ -705,6 +711,7 @@ sub topic_to_regexp($) {
 sub client_subscribe_topic($$;$$) {
   my ($client,$topic,$qos,$retain) = @_;
   push @{$client->{subscribe}},$topic unless grep {$_ eq $topic} @{$client->{subscribe}};
+  $client->{subscribeQos}->{$topic}=$qos;
   my $expr = topic_to_regexp($topic);
   push @{$client->{subscribeExpr}},$expr unless grep {$_ eq $expr} @{$client->{subscribeExpr}};
   if ($main::init_done) {
@@ -723,6 +730,7 @@ sub client_subscribe_topic($$;$$) {
 sub client_unsubscribe_topic($$) {
   my ($client,$topic) = @_;
   $client->{subscribe} = [grep { $_ ne $topic } @{$client->{subscribe}}];
+  delete $client->{subscribeQos}->{$topic};
   my $expr = topic_to_regexp($topic);
   $client->{subscribeExpr} = [grep { $_ ne $expr} @{$client->{subscribeExpr}}];
   if ($main::init_done) {
@@ -744,6 +752,7 @@ sub Client_Define($$) {
   $client->{".qos"}->{'*'} = 0; 
   $client->{".retain"}->{'*'} = "0";
   $client->{subscribe} = [];
+  $client->{subscribeQos} = {};
   $client->{subscribeExpr} = [];
   AssignIoPort($client);
 
@@ -875,13 +884,15 @@ sub client_attr($$$$$) {
 
 sub client_start($) {
   my $client = shift;
-  my $name = $client->{NAME};
-  if (! (defined AttrVal($name,"stateFormat",undef))) {
-    $main::attr{$name}{stateFormat} = "transmission-state";
-  }
+  CallFn($client->{NAME},"OnClientStartFn",($client));
+  
+  #my $name = $client->{NAME};
+  #if (! (defined AttrVal($name,"stateFormat",undef))) {
+  #  $main::attr{$name}{stateFormat} = "transmission-state";
+  #}
   if (@{$client->{subscribe}}) {
     my $msgid = send_subscribe($client->{IODev},
-      topics => [map { [$_ => $client->{".qos"}->{$_} || MQTT_QOS_AT_MOST_ONCE] } @{$client->{subscribe}}],
+      topics => [map { [$_ => $client->{subscribeQos}->{$_} || MQTT_QOS_AT_MOST_ONCE] } @{$client->{subscribe}}],
     );
     $client->{message_ids}->{$msgid}++;
     readingsSingleUpdate($client,"transmission-state","subscribe sent",1);
@@ -892,6 +903,7 @@ sub client_start($) {
 
 sub client_stop($) {
   my $client = shift;
+  
   if (@{$client->{subscribe}}) {
     my $msgid = send_unsubscribe($client->{IODev},
       topics => [@{$client->{subscribe}}],
@@ -899,6 +911,8 @@ sub client_stop($) {
     $client->{message_ids}->{$msgid}++;
     readingsSingleUpdate($client,"transmission-state","unsubscribe sent",1);
   }
+  
+  CallFn($client->{NAME},"OnClientStopFn",($client));
 };
 
 1;

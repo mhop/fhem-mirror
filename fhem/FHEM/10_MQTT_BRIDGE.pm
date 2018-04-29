@@ -39,6 +39,8 @@ sub MQTT_BRIDGE_Initialize($) {
 
   my $hash = shift @_;
 
+  require "$main::attr{global}{modpath}/FHEM/00_MQTT.pm";
+
   # Consumer
   $hash->{DefFn}    = "MQTT::Client_Define";
   $hash->{UndefFn}  = "MQTT::Client_Undefine";

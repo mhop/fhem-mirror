@@ -35,6 +35,8 @@ sub MQTT_DEVICE_Initialize($) {
 
   my $hash = shift @_;
 
+  require "$main::attr{global}{modpath}/FHEM/00_MQTT.pm";
+
   # Consumer
   $hash->{DefFn}    = "MQTT::DEVICE::Define";
   $hash->{UndefFn}  = "MQTT::Client_Undefine";
@@ -188,7 +190,7 @@ sub Attr($$$$) {
     };
     $attribute =~ /^publishSet(_?)(.*)/ and do {
       if ($command eq "set") {
-        my ( $aa, $bb ) = parseParams($value);
+        my ( $aa, $bb ) = parseParams($value,undef,undef,undef,{});
         my @values = @{$aa};
         my $topic = pop @values;
         $hash->{publishSets}->{$2} = {
@@ -306,7 +308,8 @@ sub onmessage($$$) {
     <li>
       <p><code>attr &lt;name&gt; autoSubscribeReadings &lt;topic&gt;</code><br/>
          specify a mqtt-topic pattern with wildcard (e.c. 'myhouse/kitchen/+') and MQTT_DEVICE automagically creates readings based on the wildcard-match<br/>
-         e.g a message received with topic 'myhouse/kitchen/temperature' would create and update a reading 'temperature'</p>
+         e.g a message received with topic 'myhouse/kitchen/temperature' would create and update a reading 'temperature'.<br/>
+         Please note that topics with spaces will not work here!</p>
     </li>
     <li>
       <p><code>attr &lt;name&gt; subscribeReading_&lt;reading&gt; [{Perl-expression}] [qos:?] [retain:?] &lt;topic&gt;</code><br/>

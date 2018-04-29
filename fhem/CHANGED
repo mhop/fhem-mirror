@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  00_MQTT: topics and payload patch
   - bugfix:  73_GardenaSmartBridge: fix fetch token after rereadcfg
   - feature: 60_allergy: alternative data source for extended 5 day forecast
   - new:     74_HusqvarnaAutomower.pm: New module to control your
