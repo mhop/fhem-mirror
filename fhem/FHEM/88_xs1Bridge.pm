@@ -87,7 +87,7 @@ sub xs1Bridge_Define($$) {
 	
 	$hash->{STATE} = "Initialized";		## Der Status des Modules nach Initialisierung.
 	$hash->{TIME} = time();				## Zeitstempel, derzeit vom anlegen des Moduls
-	$hash->{VERSION} = "1.24";			## Version
+	$hash->{VERSION} = "1.26";			## Version
 	$hash->{BRIDGE}	= 1;
 	
 	# Attribut gesetzt
@@ -141,18 +141,18 @@ sub xs1Bridge_Attr(@) {
 		### Ansicht xs1_Device_function ###
 		}elsif ($attrName eq "view_Device_function") {
 			if ($attrValue eq "1") {									## Handling view_Device_function 1
-				Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
+				#Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
 			}
 			elsif ($attrValue eq "0") {									## Handling view_Device_function 0
-				Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
+				#Log3 $name, 3, "$typ: Attribut view_Device_function $cmd to $attrValue";
 			}
 		### Ansicht xs1_Device_name ###
 		}elsif ($attrName eq "view_Device_name") {
 				if ($attrValue eq "1") {								## Handling view_Device_name 1
-					Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
+					#Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
 				}
 				elsif ($attrValue eq "0") {								## Handling view_Device_name 0
-						Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
+						#Log3 $name, 3, "$typ: Attribut view_Device_name $cmd to $attrValue";
 						for my $i (0..64) {
 						delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
 						delete $hash->{READINGS}{"Sensor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
@@ -161,10 +161,10 @@ sub xs1Bridge_Attr(@) {
 		### Wertaenderung nur bei Difference ###
 		}elsif ($attrName eq "update_only_difference") {
 			if ($attrValue eq "1") {								## Handling update_only_difference 1
-				Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
+				#Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
 			}
 			elsif ($attrValue eq "0") {								## Handling update_only_difference 0
-				Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
+				#Log3 $name, 3, "$typ: Attribut update_only_difference $cmd to $attrValue";
 				for my $i (0..64) {
 					delete $hash->{READINGS}{"Aktor_".sprintf("%02d", $i)."_name"} if($hash->{READINGS});
 				}
@@ -698,16 +698,20 @@ sub is_in_array($$$)
 	<a name="xs1Bridge_define"></a>
 	<b>Define</b><br>
 		<ul>
-		<code>define &lt;NAME&gt; xs1Bridge &lt;IP&gt;</code>
+		xs1 without password:&nbsp;&nbsp;<code>define &lt;NAME&gt; xs1Bridge &lt;IP&gt;</code><br>
+		xs1 with password:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>define &lt;NAME&gt; xs1Bridge &lt;User&gt;:&lt;Passwort&gt;@&lt;IP&gt;</code>
 		<br><br>
 
 		The module can not create without the IP of the xs1. If the IP can not be reached during module definition, the Define process is aborted.
 			<ul>
-			<li><code>&lt;IP&gt;</code> is IP address in the local network.</li>
+			<li><code>&lt;IP&gt;</code> is IP address in the local network</li>
+			<li><code>&lt;User&gt;</code> is the administrator user admin (default)</li>
+			<li><code>&lt;Password&gt;</code> is the assigned administrator password in xs1</li>
 			</ul><br>
-		example:
+		examples:
 		<ul>
-		define EZcontrol_xs1 xs1Bridge 192.168.1.45
+		define EZcontrol_xs1 xs1Bridge 192.168.1.45<br>
+		define EZcontrol_xs1 xs1Bridge admin:secret@192.168.1.45<br>
 		</ul>	
 		</ul><br>
 	<b>Set</b>
@@ -796,16 +800,20 @@ sub is_in_array($$$)
 	<a name="xs1Bridge_define"></a>
 	<b>Define</b><br>
 		<ul>
-		<code>define &lt;NAME&gt; xs1Bridge &lt;IP&gt;</code>
+		xs1 ohne Passwortabfrage:&nbsp;&nbsp;<code>define &lt;NAME&gt; xs1Bridge &lt;IP&gt;</code><br>
+		xs1 mit Passwortabfrage:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>define &lt;NAME&gt; xs1Bridge &lt;User&gt;:&lt;Passwort&gt;@&lt;IP&gt;</code>
 		<br><br>
 
 		Ein anlegen des Modules ohne Angabe der IP vom xs1 ist nicht m&ouml;glich. Sollte die IP bei der Moduldefinierung nicht erreichbar sein, so bricht der Define Vorgang ab.
 			<ul>
-			<li><code>&lt;IP&gt;</code> ist IP-Adresse im lokalen Netzwerk.</li>
+			<li><code>&lt;IP&gt;</code> ist IP-Adresse im lokalen Netzwerk</li>
+			<li><code>&lt;User&gt;</code> ist der Administrator Benutzer admin (standard)</li>
+			<li><code>&lt;Passwort&gt;</code> ist das vergebene Administrator Passwort im xs1.</li>
 			</ul><br>
-		Beispiel:
+		Beispiele:
 		<ul>
-		define EZcontrol_xs1 xs1Bridge 192.168.1.45
+		define EZcontrol_xs1 xs1Bridge 192.168.1.45<br>
+		define EZcontrol_xs1 xs1Bridge admin:geheim@192.168.1.45<br>
 		</ul>	
 		</ul><br>
 	<b>Set</b>
