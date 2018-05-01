@@ -1,4 +1,4 @@
-REV 16678
+REV 16681
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-04-30_07:45:05 247096 ./CHANGED
+UPD 2018-05-01_07:45:03 247268 ./CHANGED
 UPD 2018-04-29_07:45:04 37036 ./MAINTAINER.txt
 UPD 2018-03-26_07:45:02 41123 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
@@ -204,7 +204,7 @@ UPD 2017-12-01_07:45:02 32680 FHEM/36_LaCrosseGateway.pm
 UPD 2017-06-16_07:45:03 6518 FHEM/36_Level.pm
 UPD 2016-08-23_07:45:12 9997 FHEM/36_PCA301.pm
 UPD 2017-11-03_07:45:02 17579 FHEM/36_PrecipitationSensor.pm
-UPD 2017-06-29_07:45:02 52978 FHEM/36_Vallox.pm
+UPD 2018-05-01_07:45:03 67004 FHEM/36_Vallox.pm
 UPD 2018-03-04_07:45:03 22669 FHEM/36_WMBUS.pm
 UPD 2018-02-10_07:45:02 10932 FHEM/37_NotifyAndroidTV.pm
 UPD 2015-07-28_14:05:31 10162 FHEM/37_SHC.pm
@@ -391,7 +391,7 @@ UPD 2015-07-28_14:05:31 3937 FHEM/88_Itach_Relay.pm
 UPD 2015-07-28_14:05:31 3507 FHEM/88_LINDY_HDMI_SWITCH.pm
 UPD 2015-07-28_14:05:31 12845 FHEM/88_VantagePro2.pm
 UPD 2015-07-28_14:05:31 4198 FHEM/88_WEBCOUNT.pm
-UPD 2018-04-14_07:45:02 38707 FHEM/88_xs1Bridge.pm
+UPD 2018-05-01_07:45:03 39556 FHEM/88_xs1Bridge.pm
 UPD 2018-04-14_07:45:02 22528 FHEM/88_xs1Dev.pm
 UPD 2018-01-24_07:45:02 18146 FHEM/89_FULLY.pm
 UPD 2016-01-05_07:45:12 44169 FHEM/89_HEATRONIC.pm
@@ -666,8 +666,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-04-30_07:45:08 3421069 docs/commandref.html
-UPD 2018-04-30_07:45:09 2122363 docs/commandref_DE.html
+UPD 2018-05-01_07:45:06 3421487 docs/commandref.html
+UPD 2018-05-01_07:45:08 2122788 docs/commandref_DE.html
 UPD 2018-04-30_07:45:05 75663 docs/commandref_frame.html
 UPD 2018-04-30_07:45:05 85170 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
