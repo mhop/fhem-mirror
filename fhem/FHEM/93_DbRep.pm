@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.17.3       30.04.2017       writeToDB - readingname can be replaced by the value of attribute "readingNameMap"
 # 7.17.2       22.04.2017       fix don't writeToDB if device name contain "." only, minor fix in DbReadingsVal
 # 7.17.1       20.04.2017       fix "§" is deleted by carfilter
 # 7.17.0       17.04.2018       new function DbReadingsVal
@@ -338,7 +339,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.17.2";
+my $DbRepVersion = "7.17.3";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -8346,7 +8347,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
   
   no warnings 'uninitialized';
   (undef,undef,$aggr) = DbRep_checktimeaggr($hash);
-  $reading = $optxt."_".$aggr."_".$reading;
+  $reading = $optxt."_".$aggr."_".AttrVal($name, "readingNameMap", $reading);
   
   $type = $defs{$device}{TYPE} if($defs{$device});                # $type vom Device ableiten
   
@@ -8482,7 +8483,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
           Log3($name, 2, "DbRep $name -> Error start transaction for history - $@");
       }
       
-      Log3 $hash->{NAME}, 5, "DbRep $name - data prepared to db write:"; 
+      Log3 $hash->{NAME}, 4, "DbRep $name - data prepared to db write:"; 
       
       # SQL-Startzeit
       my $wst = [gettimeofday]; 
@@ -8498,7 +8499,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
           $reading   = $a[4];
           $value     = $a[5];
           $unit      = $a[6];
-          Log3 $hash->{NAME}, 5, "DbRep $name - $row";
+          Log3 $hash->{NAME}, 4, "DbRep $name - $row";
           
           eval {
               # update oder insert history
@@ -9115,7 +9116,8 @@ return;
                                  Is no or the option "display" specified, the results are only displayed. Using 
                                  option "writeToDB" the calculated results are stored in the database with a new reading
                                  name. <br>
-                                 The new readingname is built of a prefix and the original reading name. 
+                                 The new readingname is built of a prefix and the original reading name,
+                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".								 
                                  The prefix is made up of the creation function and the aggregation. <br>
                                  The timestamp of the new stored readings is deviated from aggregation period, 
                                  unless no unique point of time of the result can be determined. 
@@ -9325,7 +9327,8 @@ return;
                                  Is no or the option "display" specified, the results are only displayed. Using 
                                  option "writeToDB" the calculation results are stored in the database with a new reading
                                  name. <br>
-                                 The new readingname is built of a prefix and the original reading name. 
+                                 The new readingname is built of a prefix and the original reading name,
+                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".	
                                  The prefix is made up of the creation function and the aggregation. <br>
                                  The timestamp of the new stored readings is deviated from aggregation period, 
                                  unless no unique point of time of the result can be determined. 
@@ -9697,7 +9700,8 @@ return;
                                  Is no or the option "display" specified, the results are only displayed. Using 
                                  option "writeToDB" the calculated results are stored in the database with a new reading
                                  name. <br>
-                                 The new readingname is built of a prefix and the original reading name. 
+                                 The new readingname is built of a prefix and the original reading name,
+                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".	 
                                  The prefix is made up of the creation function and the aggregation. <br>
                                  The timestamp of the new stored readings is deviated from aggregation period, 
                                  unless no unique point of time of the result can be determined. 
@@ -9720,7 +9724,8 @@ return;
                                  Is no or the option "display" specified, the results are only displayed. Using 
                                  option "writeToDB" the calculated results are stored in the database with a new reading
                                  name. <br>
-                                 The new readingname is built of a prefix and the original reading name. 
+                                 The new readingname is built of a prefix and the original reading name,
+                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".	
                                  The prefix is made up of the creation function and the aggregation. <br>
                                  The timestamp of the new stored readings is deviated from aggregation period, 
                                  unless no unique point of time of the result can be determined. 
@@ -9908,7 +9913,8 @@ return;
                                  Is no or the option "display" specified, the results are only displayed. Using 
                                  option "writeToDB" the calculation results are stored in the database with a new reading
                                  name. <br>
-                                 The new readingname is built of a prefix and the original reading name. 
+                                 The new readingname is built of a prefix and the original reading name,
+                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".	 
                                  The prefix is made up of the creation function and the aggregation. <br>
                                  The timestamp of the new stored readings is deviated from aggregation period, 
                                  unless no unique point of time of the result can be determined. 
@@ -10885,7 +10891,8 @@ sub bdump {
                                  Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
                                  der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
                                  in der Datenbank gespeichert. <br>
-                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
+                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
+								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann.
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
                                  Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
                                  abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
@@ -11097,7 +11104,8 @@ sub bdump {
                                  Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
                                  der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
                                  in der Datenbank gespeichert. <br>
-                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
+                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
+								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
                                  Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
                                  abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
@@ -11474,7 +11482,8 @@ sub bdump {
                                  Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
                                  der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
                                  in der Datenbank gespeichert. <br>
-                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
+                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
+								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
                                  Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
                                  abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
@@ -11500,7 +11509,8 @@ sub bdump {
                                  Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
                                  der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
                                  in der Datenbank gespeichert. <br>
-                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
+                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
+								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
                                  Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
                                  abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
@@ -11696,7 +11706,8 @@ sub bdump {
                                    Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
                                    der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
                                    in der Datenbank gespeichert. <br>
-                                   Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet. 
+                                   Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
+								   wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
                                    Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
                                    Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
                                    abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
