@@ -39,7 +39,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 my $version = "0.1";
 
 use constant AUTHURL => "https://iam-api.dss.husqvarnagroup.net/api/v3/";
-use constant APIURL => "https://amc-api.dss.husqvarnagroup.net/v1/";
+use constant APIURL => "https://amc-api.dss.husqvarnagroup.net/app/v1/";
 
 ##############################################################
 #
@@ -73,6 +73,7 @@ sub HusqvarnaAutomower_Initialize($) {
     $hash->{AttrList}   = "username " .
                           "password " .
                           "mower " .
+                          "language " .
                           "interval " .
                           $readingFnAttributes;
 
@@ -94,27 +95,30 @@ sub HusqvarnaAutomower_Define($$){
 
     %$hash = (%$hash,
         NOTIFYDEV => "global,$name",
-        HusqvarnaAutomower     => { 
-            CONNECTED   			=> 0,
-            version     			=> $version,
-            token					=> '',
-            provider				=> '',
-            user_id					=> '',
-            mower_id				=> '',
-            mower_name				=> '',
-            mower_model 			=> '',
-            mower_battery 			=> 0,
-            mower_status 		 	=> '',
-            mower_lastLatitude 		=> 0,
-            mower_lastLongitude 	=> 0,
-            mower_status 		 	=> '',
-            device_operatingMode 	=> '',
-            mower_nextStart 		=> 0,
-            mower 					=> 0,
-            username 				=> '',
-            password 				=> '',
-            interval    			=> 300,
-            expires 				=> time(),
+        HusqvarnaAutomower => { 
+            CONNECTED   				=> 0,
+            version     				=> $version,
+            token						=> '',
+            provider					=> '',
+            user_id						=> '',
+            mower_id					=> '',
+            mower_name					=> '',
+            mower_model 				=> '',
+            mower_battery 				=> 0,
+            mower_status 		 		=> '',
+            mower_mode					=> '',
+            mower_cuttingMode			=> '',
+            mower_lastLatitude 			=> 0,
+            mower_lastLongitude 		=> 0,
+            mower_nextStart 			=> 0,
+            mower_nextStartSource 		=> '',
+            mower_restrictedReason		=> '',
+            mower 						=> 0,
+            username 					=> '',
+            language 					=> 'DE',
+            password 					=> '',
+            interval    				=> 300,
+            expires 					=> time(),
         },
     );
 	
@@ -204,6 +208,13 @@ sub HusqvarnaAutomower_Attr(@) {
 		if( $cmd eq "set" ) {
 			$hash->{HusqvarnaAutomower}->{password} = $attrVal;
 		    Log3 $name, 5, "$name - password set to " . $hash->{HusqvarnaAutomower}->{password};	
+		}
+	}
+
+	elsif( $attrName eq "language" ) {
+		if( $cmd eq "set" ) {
+			$hash->{HusqvarnaAutomower}->{language} = $attrVal;
+		    Log3 $name, 5, "$name - language set to " . $hash->{HusqvarnaAutomower}->{language};	
 		}
 	}
 	
@@ -393,7 +404,6 @@ sub HusqvarnaAutomower_CONNECTED($@) {
 	}
 }
 
-
 ##############################################################
 #
 # UPDATE FUNCTIONS
@@ -490,11 +500,11 @@ sub HusqvarnaAutomower_getMowerResponse($) {
 			# MOWER STATUS
 		    my $mymowerStatus = $mymower->{'status'};
 			$hash->{HusqvarnaAutomower}->{mower_battery} = $mymowerStatus->{'batteryPercent'};
-			$hash->{HusqvarnaAutomower}->{mower_status} = $mymowerStatus->{'mowerStatus'};
+			$hash->{HusqvarnaAutomower}->{mower_status} = $mymowerStatus->{'mowerStatus'}->{'activity'};
 			$hash->{HusqvarnaAutomower}->{mower_mode} = $mymowerStatus->{'operatingMode'};
 		
 			$hash->{HusqvarnaAutomower}->{mower_nextStart} = HusqvarnaAutomower_Correct_Localtime( $mymowerStatus->{'nextStartTimestamp'} );
-			
+						
 			HusqvarnaAutomower_CONNECTED($hash,'connected');
 
 		}
@@ -505,7 +515,7 @@ sub HusqvarnaAutomower_getMowerResponse($) {
 		readingsBulkUpdate($hash, "mower_name", $hash->{HusqvarnaAutomower}->{mower_name} );    
 		readingsBulkUpdate($hash, "mower_battery", $hash->{HusqvarnaAutomower}->{mower_battery} );    
 		readingsBulkUpdate($hash, "mower_status", $hash->{HusqvarnaAutomower}->{mower_status} );    
-		readingsBulkUpdate($hash, "mower_mode", $hash->{HusqvarnaAutomower}->{mower_mode} );    
+		readingsBulkUpdate($hash, "mower_mode", HusqvarnaAutomower_ToGerman($hash, $hash->{HusqvarnaAutomower}->{mower_mode} ));    
 
 		my $nextStartTimestamp = strftime("%Y-%m-%d %H:%M:%S", localtime($hash->{HusqvarnaAutomower}->{mower_nextStart}) );
 		readingsBulkUpdate($hash, "mower_nextStart", $nextStartTimestamp );  
@@ -556,24 +566,39 @@ sub HusqvarnaAutomower_getMowerStatusResponse($) {
 		my $result = decode_json($data);
 		
 		$hash->{HusqvarnaAutomower}->{mower_battery} = $result->{'batteryPercent'};
-		$hash->{HusqvarnaAutomower}->{mower_status} = $result->{'mowerStatus'};
-		$hash->{HusqvarnaAutomower}->{mower_mode} = $result->{'operatingMode'};
-		
+		$hash->{HusqvarnaAutomower}->{mower_status} = HusqvarnaAutomower_ToGerman($hash, $result->{'mowerStatus'}->{'activity'});
+		$hash->{HusqvarnaAutomower}->{mower_mode} = HusqvarnaAutomower_ToGerman($hash, $result->{'operatingMode'});
+
 		$hash->{HusqvarnaAutomower}->{mower_nextStart} = HusqvarnaAutomower_Correct_Localtime( $result->{'nextStartTimestamp'} );
+		
+		$hash->{HusqvarnaAutomower}->{mower_nextStartSource} = HusqvarnaAutomower_ToGerman($hash, $result->{'nextStartSource'});
+		$hash->{HusqvarnaAutomower}->{mower_restrictedReason} = HusqvarnaAutomower_ToGerman($hash, $result->{'mowerStatus'}->{'restrictedReason'});
+		
+		$hash->{HusqvarnaAutomower}->{mower_cuttingMode} = HusqvarnaAutomower_ToGerman($hash, $result->{'mowerStatus'}->{'mode'});
 		
 		$hash->{HusqvarnaAutomower}->{mower_lastLatitude} = $result->{'lastLocations'}->[0]->{'latitude'};
 		$hash->{HusqvarnaAutomower}->{mower_lastLongitude} = $result->{'lastLocations'}->[0]->{'longitude'};
 
 		readingsBeginUpdate($hash);
-		#readingsBulkUpdate($hash,$reading,$value);
-		readingsBulkUpdate($hash, "mower_battery", $hash->{HusqvarnaAutomower}->{mower_battery} );    
+		readingsBulkUpdate($hash, "mower_battery", $hash->{HusqvarnaAutomower}->{mower_battery}."%" );    
 		readingsBulkUpdate($hash, "mower_status", $hash->{HusqvarnaAutomower}->{mower_status} );    
 		readingsBulkUpdate($hash, "mower_mode", $hash->{HusqvarnaAutomower}->{mower_mode} );  
 
 		my $nextStartTimestamp = strftime("%Y-%m-%d %H:%M:%S", localtime($hash->{HusqvarnaAutomower}->{mower_nextStart}));
-				
-		readingsBulkUpdate($hash, "mower_nextStart", $nextStartTimestamp );  
-  
+		if ($nextStartTimestamp eq "1969-12-31 23:00:00") {	$nextStartTimestamp = "-"; }
+
+		if (HusqvarnaAutomower_isSetGerman($hash) and $nextStartTimestamp ne "-") {
+			my @c_time = split(" ", $nextStartTimestamp);
+			my $c_date = join("." => reverse split('-', (split(' ',$nextStartTimestamp))[0]));
+			readingsBulkUpdate($hash, "mower_nextStart", $c_date . " um " . $c_time[1] . " Uhr" );  
+		} else {
+			readingsBulkUpdate($hash, "mower_nextStart", $nextStartTimestamp );  
+		}		
+		
+  		readingsBulkUpdate($hash, "mower_nextStartSource", $hash->{HusqvarnaAutomower}->{mower_nextStartSource} );    
+  		readingsBulkUpdate($hash, "mower_restrictedReason", $hash->{HusqvarnaAutomower}->{mower_restrictedReason} );    
+  		readingsBulkUpdate($hash, "mower_cuttingMode", $hash->{HusqvarnaAutomower}->{mower_cuttingMode} );    
+
 		readingsBulkUpdate($hash, "mower_lastLatitude", $hash->{HusqvarnaAutomower}->{mower_lastLatitude} );    
 		readingsBulkUpdate($hash, "mower_lastLongitude", $hash->{HusqvarnaAutomower}->{mower_lastLongitude} );    
 		readingsEndUpdate($hash, 1);
@@ -592,7 +617,6 @@ sub HusqvarnaAutomower_getMowerStatusResponse($) {
 ##############################################################
 
 sub HusqvarnaAutomower_CMD($$) {
-    #my ($hash, $def) = @_;
     my ($hash,$cmd) = @_;
     my $name = $hash->{NAME};
     
@@ -662,6 +686,118 @@ sub HusqvarnaAutomower_Correct_Localtime($) {
 }
 
 
+sub HusqvarnaAutomower_ToGerman($$) {
+	my ($hash,$readingValue) = @_;
+	my $name = $hash->{NAME};
+	
+	my %langGermanMapping = (
+		#'initialized'											=> 'initialisiert',
+		#'authenticated'										=> 'authentifiziert',
+		#'disabled'												=> 'deaktiviert',
+		#'connected'											=> 'verbunden',
+
+		'SENSOR'                        						=>  'Sensor',
+		'COMPLETED_CUTTING_TODAY_AUTO'                        	=>  'Fertig für heute',
+		
+		'MAIN_AREA'                        						=>  'Hauptbereich',
+		'AUTO'                        							=>  'Automatisch',
+
+		'OK_CUTTING'                   							=>  'mäht',
+        'OK_CUTTING_TIMER_OVERRIDDEN'       					=>  'manuelles Mähen',
+
+		'PAUSED' 					                           	=>  'pausiert',
+
+		'OK_SEARCHING'                      					=>  'sucht Ladestation',
+		'OK_LEAVING'                        					=>  'verlässt Ladestation',
+
+		'OK_CHARGING'                       					=>  'lädt',
+		'PARKED_IN_CS'                        					=>  'In der Ladestation geparkt',
+
+        'PARKED_TIMER'                      					=>  'geparkt nach Zeitplan',
+        'PARKED_PARK_SELECTED'              					=>  'geparkt',
+
+        'OFF_DISABLED'                      					=>  'ausgeschaltet',
+        'OFF_HATCH_OPEN'                    					=>  'Abdeckung ist offen',
+        'OFF_HATCH_CLOSED'                  					=>  'Ausgeschaltet, manueller Start erforderlich',
+
+        'UNKNOWN'                           =>  'unbekannter Status',
+        'ERROR'                             =>  'Fehler',
+        
+        'parked_autotimer'                  =>  'geparkt durch SensorControl',
+        'parked_daily_limit_reached'        =>  'abgeschlossen',
+        
+        'mower_charging'                    =>  'Mäher wurde geladen',
+        'completed_cutting_autotimer'       =>  'Sensor Control erreicht',
+        'week_timer'                        =>  'Wochentimer erreicht',
+        'countdown_timer'                   =>  'Stoppuhr Timer',
+
+        'outside_working_area'              =>  'außerhalb des Arbeitsbereichs',
+        'no_loop_signal'                    =>  'kein Schleifensignal',
+        'wrong_loop_signal'                 =>  'falsches Schleifensignal',
+        'loop_sensor_problem_front'         =>  'Problem Schleifensensor, vorne',
+        'loop_sensor_problem_rear'          =>  'Problem Schleifensensor, hinten',
+        'trapped'                           =>  'eingeschlossen',
+        'upside_down'                       =>  'steht auf dem Kopf',
+        'low_battery'                       =>  'niedriger Batteriestand',
+        'empty_battery'                     =>  'Batterie leer',
+        'no_drive'                          =>  'fährt nicht',
+        'lifted'                            =>  'angehoben',
+        'stuck_in_charging_station'         =>  'eingeklemmt in Ladestation',
+        'charging_station_blocked'          =>  'Ladestation blockiert',
+        'collision_sensor_problem_rear'     =>  'Problem Stoßsensor hinten',
+        'collision_sensor_problem_front'    =>  'Problem Stoßsensor vorne',
+        'wheel_motor_blocked_right'         =>  'Radmotor rechts blockiert',
+        'wheel_motor_blocked_left'          =>  'Radmotor links blockiert',
+        'wheel_drive_problem_right'         =>  'Problem Antrieb, rechts',
+        'wheel_drive_problem_left'          =>  'Problem Antrieb, links',
+        'cutting_system_blocked'            =>  'Schneidsystem blockiert',
+        'invalid_sub_device_combination'    =>  'fehlerhafte Verbindung',
+        'settings_restored'                 =>  'Standardeinstellungen',
+        'electronic_problem'                =>  'elektronisches Problem',
+        'charging_system_problem'           =>  'Problem Ladesystem',
+        'tilt_sensor_problem'               =>  'Kippsensor Problem',
+        'wheel_motor_overloaded_right'      =>  'rechter Radmotor überlastet',
+        'wheel_motor_overloaded_left'       =>  'linker Radmotor überlastet',
+        'charging_current_too_high'         =>  'Ladestrom zu hoch',
+        'temporary_problem'                 =>  'vorübergehendes Problem',
+        'guide_1_not_found'                 =>  'SK 1 nicht gefunden',
+        'guide_2_not_found'                 =>  'SK 2 nicht gefunden',
+        'guide_3_not_found'                 =>  'SK 3 nicht gefunden',
+        'difficult_finding_home'            =>  'Problem die Ladestation zu finden',
+        'guide_calibration_accomplished'    =>  'Kalibrierung des Suchkabels beendet',
+        'guide_calibration_failed'          =>  'Kalibrierung des Suchkabels fehlgeschlagen',
+        'temporary_battery_problem'         =>  'kurzzeitiges Batterieproblem',
+        'battery_problem'                   =>  'Batterieproblem',
+        'alarm_mower_switched_off'          =>  'Alarm! Mäher ausgeschalten',
+        'alarm_mower_stopped'               =>  'Alarm! Mäher gestoppt',
+        'alarm_mower_lifted'                =>  'Alarm! Mäher angehoben',
+        'alarm_mower_tilted'                =>  'Alarm! Mäher gekippt',
+        'connection_changed'                =>  'Verbindung geändert',
+        'connection_not_changed'            =>  'Verbindung nicht geändert',
+        'com_board_not_available'           =>  'COM Board nicht verfügbar',
+        'slipped'                           =>  'rutscht',
+        'out_of_operation'                  =>  'ausser Betrieb',
+
+		'OK'                        							=>  'OK'
+	);
+    
+    if( defined($langGermanMapping{$readingValue}) and  HusqvarnaAutomower_isSetGerman($hash) ) {
+        return $langGermanMapping{$readingValue};
+    } else {
+        return $readingValue;
+    }
+}
+
+sub HusqvarnaAutomower_isSetGerman($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	if ( AttrVal('global','language','EN') eq 'DE' or $hash->{HusqvarnaAutomower}->{language} eq 'DE') {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 sub HusqvarnaAutomower_Whoami()  { return (split('::',(caller(1))[3]))[1] || ''; }
 sub HusqvarnaAutomower_Whowasi() { return (split('::',(caller(2))[3]))[1] || ''; }
 
@@ -718,6 +854,7 @@ sub HusqvarnaAutomower_Whowasi() { return (split('::',(caller(2))[3]))[1] || '';
 	<ul>
 		<li>mower - ID of Automower, if more that one is registered. Default: 0</li>
 		<li>interval - Time in seconds that is used to get new data from Husqvarna Cloud. Default: 300</li>
+		<li>language - language setting, EN = original messages, DE = german translation. Default: DE</li>
 	</ul>
 	<br>
 	
@@ -731,7 +868,10 @@ sub HusqvarnaAutomower_Whowasi() { return (split('::',(caller(2))[3]))[1] || '';
 		<li>mower_mode - current working mode (e. g. AUTO)</li>
 		<li>mower_name - name of the mower</li>
 		<li>mower_nextStart - next start time</li>
-		<li>mower_status - current status (e. g. OFF_HATCH_CLOSED_DISABLED)</li>
+		<li>mower_status - current status (e. g. OFF_HATCH_CLOSED_DISABLED, PARKED_IN_CS)</li>
+		<li>mower_cuttingMode - mode of cutting area (e. g. MAIN_AREA)</li>
+        <li>mower_nextStartSource - detailed status (e. g. COMPLETED_CUTTING_TODAY_AUTO)</li>
+        <li>mower_restrictedReason - reason for parking (e. g. SENSOR)</li>
 		<li>provider - should be Husqvarna</li>
 		<li>state - status of connection to Husqvarna Cloud (e. g. connected)</li>
 		<li>token - current session token of Husqvarna Cloud</li>
@@ -788,6 +928,7 @@ sub HusqvarnaAutomower_Whowasi() { return (split('::',(caller(2))[3]))[1] || '';
 	<ul>
 		<li>mower - ID des Automowers, sofern mehrere registriert sind. Standard: 0</li>
 		<li>interval - Zeit in Sekunden nach denen neue Daten aus der Husqvarna Cloud abgerufen werden. Standard: 300</li>
+		<li>language - Spracheinstellungen, EN = original Meldungen, DE = deutsche Übersetzung. Standard: DE</li>
 	</ul>
 	<br>
 	
@@ -801,7 +942,10 @@ sub HusqvarnaAutomower_Whowasi() { return (split('::',(caller(2))[3]))[1] || '';
 		<li>mower_mode - aktueller Arbeitsmodus (e. g. AUTO)</li>
 		<li>mower_name - Name des Automowers</li>
 		<li>mower_nextStart - nächste Startzeit</li>
-		<li>mower_status - aktueller Status (e. g. OFF_HATCH_CLOSED_DISABLED)</li>
+		<li>mower_status - aktueller Status (e. g. OFF_HATCH_CLOSED_DISABLED, PARKED_IN_CS)</li>
+		<li>mower_cuttingMode - Angabe welcher Bereich gemäht wird (e. g. MAIN_AREA)</li>
+        <li>mower_nextStartSource - detaillierter Status (e. g. COMPLETED_CUTTING_TODAY_AUTO)</li>
+        <li>mower_restrictedReason - Grund für Parken (e. g. SENSOR)</li>
 		<li>provider - Sollte immer Husqvarna sein</li>
 		<li>state - Status der Verbindung zur Husqvarna Cloud (e. g. connected)</li>
 		<li>token - aktueller Sitzungstoken für die Husqvarna Cloud</li>
