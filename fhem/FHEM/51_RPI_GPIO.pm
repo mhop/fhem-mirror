@@ -682,7 +682,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 		}
 	} else {
 		delete $selectlist{$hash->{NAME}};
-		close($hash->{filehandle});
+		close($hash->{filehandle}) if defined $hash->{filehandle};
 	}
 }
 
