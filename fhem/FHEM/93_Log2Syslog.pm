@@ -30,6 +30,8 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 3.2.1      04.05.2018       fix compatibility with newer IO::Socket::SSL on debian 9, attr ssldebug for
+#                             debugging SSL messages
 # 3.2.0      22.11.2017       add NOTIFYDEV if possible
 # 3.1.0      28.08.2017       get-function added, commandref revised, $readingFnAttributes deleted
 # 3.0.0      27.08.2017       change attr type to protocol, ready to check in
@@ -64,7 +66,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "3.2.0";
+my $Log2SyslogVn = "3.2.1";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -106,6 +108,7 @@ sub Log2Syslog_Initialize($) {
                       "disable:1,0 ".
                       "addTimestamp:0,1 ".
 					  "logFormat:BSD,IETF ".
+                      "ssldebug:0,1,2,3 ".
 					  "TLS:1,0 ".
 					  "timeout ".
 	                  "protocol:UDP,TCP ".
@@ -213,7 +216,7 @@ return undef;
 }
 
 ###############################################################################
-sub Log2Syslog_Attr {
+sub Log2Syslog_Attr ($$$$) {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
     my $do;
@@ -243,6 +246,11 @@ sub Log2Syslog_Attr {
 			readingsSingleUpdate($hash, "SSL_Version", "n.a.", 1);
             readingsSingleUpdate($hash, "SSL_Algorithm", "n.a.", 1);
 		}
+    }
+    
+    if ($aName eq "rateCalcRerun") {
+        RemoveInternalTimer($hash, "Log2Syslog_trate");
+        InternalTimer(gettimeofday()+5, "Log2Syslog_trate", $hash, 0);
     }
 	
 	if ($cmd eq "set" && $aName =~ /port|timeout|rateCalcRerun/) {
@@ -395,6 +403,7 @@ sub Log2Syslog_setsock ($) {
   my $protocol = lc(AttrVal($name, "protocol", "udp"));
   my $st       = "active";
   my $timeout  = AttrVal($name, "timeout", 0.5);
+  my $ssldbg   = AttrVal($name, "ssldebug", 0);
   my ($sock,$lo,$sslver,$sslalgo);
   
   return undef if($init_done != 1);
@@ -414,22 +423,28 @@ sub Log2Syslog_setsock ($) {
 		      $st = "unable open socket for $host, $protocol, $port";
 		  } else {
 		      $sock->blocking(1);
+              $IO::Socket::SSL::DEBUG = $ssldbg;
 		      eval { IO::Socket::SSL->start_SSL($sock, 
-						    			        SSL_verify_mode => "SSL_VERIFY_PEER",
-		                                        SSL_version => "TLSv12",
+						    			        SSL_verify_mode => 0,
+		                                        SSL_version => "TLSv1_2:!TLSv1_1:!SSLv3:!SSLv23:!SSLv2",
 								    	        SSL_hostname => $host,
 									            SSL_veriycn_scheme => "rfc5425",
 									            SSL_veriycn_publicsuffix => '',
 												Timeout => $timeout
 									            ) || undef $sock; };
-		      if (!$sock) {
-			      undef $sock;
+              $IO::Socket::SSL::DEBUG = 0;
+		      if($@) {
+                  $st = "SSL error: $@";
+                  undef $sock;
+              } elsif (!$sock) {
 		          $st = "SSL error: ".IO::Socket::SSL::errstr();
+                  undef $sock;
 		      } else  {
 			      $sslver  = $sock->get_sslversion();
 			      $sslalgo = $sock->get_fingerprint();
 			      $sslalgo = (split("\\\$",$sslalgo))[0];
 			      $lo      = "Socket opened for Host: $host, Protocol: $protocol, Port: $port, TLS: 0";
+                  $st      = "active";
 		      }
 		  }
 	  }     
@@ -455,6 +470,7 @@ sub Log2Syslog_setsock ($) {
       readingsSingleUpdate($hash, "SSL_Version", $sslver, 1);
 	  $hash->{HELPER}{SSLVER} = $sslver;
   }
+  
   if($sslalgo ne $hash->{HELPER}{SSLALGO}) {
       readingsSingleUpdate($hash, "SSL_Algorithm", $sslalgo, 1);
 	  $hash->{HELPER}{SSLALGO} = $sslalgo;
@@ -823,7 +839,23 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
         Rerun cycle for calculation of log transfer rate (Reading "Transfered_logs_per_minute") in seconds. 
 		Default is 60 seconds.
     </li><br>
+    
+    <li><code>ssldebug</code><br>
+        <br>
+        Debugging level of SSL messages. <br><br>
+        <ul>
+        <li> 0 - No debugging (default).  </li>
+        <li> 1 - Print out errors from <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> and ciphers from <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
+        <li> 2 - Print also information about call flow from <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> and progress information from <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
+        <li> 3 - Print also some data dumps from <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> and from <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
+        </ul>
+    </li><br>
 	
+    <li><code>TLS</code><br>
+        <br>
+        A secured connection to Syslog-server is used. The protocol will be switched to TCP automatically.
+    </li><br>
+    
     <li><code>timeout</code><br>
         <br>
         Timeout for connection to the syslog server (TCP).
@@ -1031,7 +1063,24 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
         Wiederholungszyklus für die Bestimmung der Log-Transferrate (Reading "Transfered_logs_per_minute") in Sekunden. 
 		Default sind 60 Sekunden.
     </li><br>
+    
+    <li><code>ssldebug</code><br>
+        <br>
+        Debugging Level von SSL Messages. <br><br>
+        <ul>
+        <li> 0 - Kein Debugging (default).  </li>
+        <li> 1 - Ausgabe Errors von from <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> und ciphers von <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
+        <li> 2 - zusätzliche Ausgabe von Informationen über den Protokollfluss von <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> und Fortschritinformationen von <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
+        <li> 3 - zusätzliche Ausgabe einiger Dumps von <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> und <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
+        </ul>
+    </li><br>
 	
+    <li><code>TLS</code><br>
+        <br>
+        Es wird eine gesicherte Verbindung zum Syslog-Server aufgebaut. Das Protokoll schaltet automatisch
+        auf TCP um.
+    </li><br>
+    
     <li><code>timeout</code><br>
         <br>
         Timeout für die Verbindung zum Syslog-Server (TCP).

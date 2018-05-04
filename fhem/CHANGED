@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_Log2Syslog: ssldebug for debugging SSL messages, minor fixes
   - feature: 49_SSCam: V3.10.0, CreateStreamDev added, new lastrec_fw_MJPEG, 
                        lastrec_fw_MPEG4/H.264 playback MPEG4/H.264 recordings
   - feature: 93_DbRep: V7.17.3, writeToDB - readingname can be replaced by the
