@@ -27,6 +27,9 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 4.1.0  05.05.2018    use SYNO.SurveillanceStation.VideoStream instead of SYNO.SurveillanceStation.VideoStreaming
+#                      preparation for hls
+# 4.0.0  01.05.2018    AudioStream possibility added
 # 3.10.0 24.04.2018    CreateStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to 
 #                      playback MPEG4/H.264 videos
 # 3.9.2  21.04.2018    minor fixes
@@ -222,7 +225,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "3.10.0";
+my $SSCamVersion = "4.1.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -352,10 +355,12 @@ sub SSCam_Define($@) {
   $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
   $hash->{HELPER}{APIPRESET}      = "SYNO.SurveillanceStation.PTZ.Preset";
   $hash->{HELPER}{APICAMEVENT}    = "SYNO.SurveillanceStation.Camera.Event";
-  $hash->{HELPER}{APIVIDEOSTM}    = "SYNO.SurveillanceStation.VideoStreaming";   # wird verwendet in Response von "SYNO.SurveillanceStation.Camera: GetLiveViewPath" 
+  $hash->{HELPER}{APIVIDEOSTM}    = "SYNO.SurveillanceStation.VideoStreaming";   # wird verwendet in Response von "SYNO.SurveillanceStation.Camera: GetLiveViewPath" -> StreamKey-Methode
   $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Streaming";        # This API provides methods to get Live View or Event video stream
   $hash->{HELPER}{APIHM}          = "SYNO.SurveillanceStation.HomeMode";
   $hash->{HELPER}{APILOG}         = "SYNO.SurveillanceStation.Log";
+  $hash->{HELPER}{APIAUDIOSTM}    = "SYNO.SurveillanceStation.AudioStream";      # Audiostream mit SID
+  $hash->{HELPER}{APIVIDEOSTMS}   = "SYNO.SurveillanceStation.VideoStream";      # Videostream mit SID
   
   # Startwerte setzen
   if(SSCam_IsModelCam($hash)) {
@@ -910,6 +915,11 @@ sub SSCam_Set($@) {
           $hash->{HELPER}{WLTYPE}     = "image"; 
 		  $hash->{HELPER}{ALIAS}      = " ";
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw";
+      } elsif ($prop eq "live_fw_hls") {
+          $hash->{HELPER}{OPENWINDOW} = 0;
+          $hash->{HELPER}{WLTYPE}     = "video"; 
+		  $hash->{HELPER}{ALIAS}      = " ";
+		  $hash->{HELPER}{RUNVIEW}    = "live_fw_hls";
       } elsif ($prop eq "lastsnap_fw") {
           $hash->{HELPER}{OPENWINDOW}  = 0;
           $hash->{HELPER}{WLTYPE}      = "base64img"; 
@@ -1117,19 +1127,34 @@ sub SSCam_FWsummaryFn ($$$$) {
   my $ret;
   my $alias;
     
-  return if(!$hash->{HELPER}{LINK} || ReadingsVal("$name", "state", "") =~ /^dis.*/ || IsDisabled($name));
+  return if(!$hash->{HELPER}{LINK} || ReadingsVal($d, "state", "") =~ /^dis.*/ || IsDisabled($name));
   
   my $attr = AttrVal($d, "htmlattr", " ");
-  Log3($name, 4, "$name - SSCam_FWsummaryFn called - FW_wname: $FW_wname, device: $d, room: $room, attributes: $attr");
+  Log3($name, 4, "$name - SSCam_FWsummaryFn called - FW_wname: $FW_wname, device: $d, room: $room, attributes: $attr, FwDetail: ".weblink_FwDetail($d));
   
   if($wltype eq "image") {
     $ret = "<img src=$link $attr><br>".weblink_FwDetail($d);
+    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
+        $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
+                 Your browser does not support the audio element.      
+                 </audio>".weblink_FwDetail($d);
+    }
     
   } elsif($wltype eq "iframe") {
     $ret = "<iframe src=$link $attr controls>Iframes disabled</iframe>".weblink_FwDetail($d);
+    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
+        $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
+                 Your browser does not support the audio element.      
+                 </audio>".weblink_FwDetail($d);
+    }
            
   } elsif($wltype eq "embed") {
     $ret = "<embed src=$link $attr>".weblink_FwDetail($d);
+    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
+        $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
+                 Your browser does not support the audio element.      
+                 </audio>".weblink_FwDetail($d);
+    }
            
   } elsif($wltype eq "link") {
     $alias = $hash->{HELPER}{ALIAS};
@@ -1145,7 +1170,12 @@ sub SSCam_FWsummaryFn ($$$$) {
              <source src=$link type=\"video/ogg\">
              <source src=$link type=\"video/webm\">
              Your browser does not support the video tag.
-             </video>".weblink_FwDetail($d);        
+             </video>".weblink_FwDetail($d); 
+    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
+        $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
+                 Your browser does not support the audio element.      
+                 </audio>".weblink_FwDetail($d);
+    }             
   } 
 #FW_directNotify("FILTER=room=$room", "#FHEMWEB:$FW_wname", "location.reload('true')", "") if($d eq $name);
 return $ret;
@@ -2005,6 +2035,7 @@ sub SSCam_stopliveview ($) {
         
         # Link aus Helper-hash löschen
         delete $hash->{HELPER}{LINK};
+        delete $hash->{HELPER}{AUDIOLINK};
         
         # Reading LiveStreamUrl löschen
         delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});
@@ -2750,6 +2781,8 @@ sub SSCam_getapisites($) {
    my $apicamevent = $hash->{HELPER}{APICAMEVENT};
    my $apievent    = $hash->{HELPER}{APIEVENT};
    my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
+   my $apiaudiostm = $hash->{HELPER}{APIAUDIOSTM};
+   my $apivideostms = $hash->{HELPER}{APIVIDEOSTMS};
    my $apistm      = $hash->{HELPER}{APISTM};
    my $apihm       = $hash->{HELPER}{APIHM};
    my $apilog      = $hash->{HELPER}{APILOG};     
@@ -2772,7 +2805,7 @@ sub SSCam_getapisites($) {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apipreset,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm,$apilog";
+   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apipreset,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm,$apilog,$apiaudiostm,$apivideostms";
 
    Log3($name, 4, "$name - Call-Out now: $url");
    
@@ -2807,6 +2840,8 @@ sub SSCam_getapisites_parse ($) {
    my $apicamevent = $hash->{HELPER}{APICAMEVENT};
    my $apievent    = $hash->{HELPER}{APIEVENT};
    my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
+   my $apiaudiostm = $hash->{HELPER}{APIAUDIOSTM};
+   my $apivideostms = $hash->{HELPER}{APIVIDEOSTMS};
    my $apistm      = $hash->{HELPER}{APISTM};
    my $apihm       = $hash->{HELPER}{APIHM};
    my $apilog      = $hash->{HELPER}{APILOG};
@@ -2990,6 +3025,25 @@ sub SSCam_getapisites_parse ($) {
             $logstr = defined($apilogmaxver) ? "MaxVersion of $apilog selected: $apilogmaxver" : "MaxVersion of $apilog undefined - Surveillance Station may be stopped";
             Log3($name, 4, "$name - $logstr");
 			
+          # Pfad und Maxversion von "SYNO.SurveillanceStation.AudioStream" ermitteln
+            my $apiaudiostmpath = $data->{'data'}->{$apiaudiostm}->{'path'};
+            $apiaudiostmpath =~ tr/_//d if (defined($apiaudiostmpath));
+            my $apiaudiostmmaxver = $data->{'data'}->{$apiaudiostm}->{'maxVersion'}; 
+       
+            $logstr = defined($apiaudiostmpath) ? "Path of $apiaudiostm selected: $apiaudiostmpath" : "Path of $apiaudiostm undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");
+            $logstr = defined($apiaudiostmmaxver) ? "MaxVersion of $apiaudiostm selected: $apiaudiostmmaxver" : "MaxVersion of $apiaudiostm undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");
+            
+          # Pfad und Maxversion von "SYNO.SurveillanceStation.VideoStream" ermitteln
+            my $apivideostmspath = $data->{'data'}->{$apivideostms}->{'path'};
+            $apivideostmspath =~ tr/_//d if (defined($apivideostmspath));
+            my $apivideostmsmaxver = $data->{'data'}->{$apivideostms}->{'maxVersion'}; 
+       
+            $logstr = defined($apivideostmspath) ? "Path of $apivideostms selected: $apivideostmspath" : "Path of $apivideostms undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");
+            $logstr = defined($apivideostmsmaxver) ? "MaxVersion of $apivideostms selected: $apivideostmsmaxver" : "MaxVersion of $apivideostms undefined - Surveillance Station may be stopped";
+            Log3($name, 4, "$name - $logstr");
 		
             # aktuelle oder simulierte SVS-Version für Fallentscheidung setzen
             no warnings 'uninitialized'; 
@@ -3063,34 +3117,39 @@ sub SSCam_getapisites_parse ($) {
             Log3($name, 4, "$name - ------- End of simulation section -------");  
 			       
             # ermittelte Werte in $hash einfügen
-            $hash->{HELPER}{APIAUTHPATH}       = $apiauthpath;
-            $hash->{HELPER}{APIAUTHMAXVER}     = $apiauthmaxver;
-            $hash->{HELPER}{APIEXTRECPATH}     = $apiextrecpath;
-            $hash->{HELPER}{APIEXTRECMAXVER}   = $apiextrecmaxver;
-            $hash->{HELPER}{APICAMPATH}        = $apicampath;
-            $hash->{HELPER}{APICAMMAXVER}      = $apicammaxver;
-            $hash->{HELPER}{APITAKESNAPPATH}   = $apitakesnappath;
-            $hash->{HELPER}{APITAKESNAPMAXVER} = $apitakesnapmaxver;
-            $hash->{HELPER}{APIPTZPATH}        = $apiptzpath;
-            $hash->{HELPER}{APIPTZMAXVER}      = $apiptzmaxver;
-            $hash->{HELPER}{APIPRESETPATH}     = $apipresetpath;
-            $hash->{HELPER}{APIPRESETMAXVER}   = $apipresetmaxver;
-            $hash->{HELPER}{APISVSINFOPATH}    = $apisvsinfopath;
-            $hash->{HELPER}{APISVSINFOMAXVER}  = $apisvsinfomaxver;
-            $hash->{HELPER}{APICAMEVENTPATH}   = $apicameventpath;
-            $hash->{HELPER}{APICAMEVENTMAXVER} = $apicameventmaxver;
-            $hash->{HELPER}{APIEVENTPATH}      = $apieventpath;
-            $hash->{HELPER}{APIEVENTMAXVER}    = $apieventmaxver;
-            $hash->{HELPER}{APIVIDEOSTMPATH}   = $apivideostmpath;
-            $hash->{HELPER}{APIVIDEOSTMMAXVER} = $apivideostmmaxver;
-            $hash->{HELPER}{APIEXTEVTPATH}     = $apiextevtpath;
-            $hash->{HELPER}{APIEXTEVTMAXVER}   = $apiextevtmaxver;
-            $hash->{HELPER}{APISTMPATH}        = $apistmpath;
-            $hash->{HELPER}{APISTMMAXVER}      = $apistmmaxver;
-            $hash->{HELPER}{APIHMPATH}         = $apihmpath;
-            $hash->{HELPER}{APIHMMAXVER}       = $apihmmaxver;
-            $hash->{HELPER}{APILOGPATH}        = $apilogpath;
-            $hash->{HELPER}{APILOGMAXVER}      = $apilogmaxver;
+            $hash->{HELPER}{APIAUTHPATH}        = $apiauthpath;
+            $hash->{HELPER}{APIAUTHMAXVER}      = $apiauthmaxver;
+            $hash->{HELPER}{APIEXTRECPATH}      = $apiextrecpath;
+            $hash->{HELPER}{APIEXTRECMAXVER}    = $apiextrecmaxver;
+            $hash->{HELPER}{APICAMPATH}         = $apicampath;
+            $hash->{HELPER}{APICAMMAXVER}       = $apicammaxver;
+            $hash->{HELPER}{APITAKESNAPPATH}    = $apitakesnappath;
+            $hash->{HELPER}{APITAKESNAPMAXVER}  = $apitakesnapmaxver;
+            $hash->{HELPER}{APIPTZPATH}         = $apiptzpath;
+            $hash->{HELPER}{APIPTZMAXVER}       = $apiptzmaxver;
+            $hash->{HELPER}{APIPRESETPATH}      = $apipresetpath;
+            $hash->{HELPER}{APIPRESETMAXVER}    = $apipresetmaxver;
+            $hash->{HELPER}{APISVSINFOPATH}     = $apisvsinfopath;
+            $hash->{HELPER}{APISVSINFOMAXVER}   = $apisvsinfomaxver;
+            $hash->{HELPER}{APICAMEVENTPATH}    = $apicameventpath;
+            $hash->{HELPER}{APICAMEVENTMAXVER}  = $apicameventmaxver;
+            $hash->{HELPER}{APIEVENTPATH}       = $apieventpath;
+            $hash->{HELPER}{APIEVENTMAXVER}     = $apieventmaxver;
+            $hash->{HELPER}{APIVIDEOSTMPATH}    = $apivideostmpath;
+            $hash->{HELPER}{APIVIDEOSTMMAXVER}  = $apivideostmmaxver;      
+            $hash->{HELPER}{APIAUDIOSTMPATH}    = $apiaudiostmpath;
+            $hash->{HELPER}{APIAUDIOSTMMAXVER}  = $apiaudiostmmaxver;   
+            $hash->{HELPER}{APIEXTEVTPATH}      = $apiextevtpath;
+            $hash->{HELPER}{APIEXTEVTMAXVER}    = $apiextevtmaxver;
+            $hash->{HELPER}{APISTMPATH}         = $apistmpath;
+            $hash->{HELPER}{APISTMMAXVER}       = $apistmmaxver;
+            $hash->{HELPER}{APIHMPATH}          = $apihmpath;
+            $hash->{HELPER}{APIHMMAXVER}        = $apihmmaxver;
+            $hash->{HELPER}{APILOGPATH}         = $apilogpath;
+            $hash->{HELPER}{APILOGMAXVER}       = $apilogmaxver;
+            $hash->{HELPER}{APIVIDEOSTMSPATH}   = $apivideostmspath;
+            $hash->{HELPER}{APIVIDEOSTMSMAXVER} = $apivideostmsmaxver;
+            
        
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash,"Errorcode","none");
@@ -3324,51 +3383,57 @@ return SSCam_camop($hash);
 #############################################################################################
 sub SSCam_camop ($) {  
    my ($hash) = @_;
-   my $name              = $hash->{NAME};
-   my $serveraddr        = $hash->{SERVERADDR};
-   my $serverport        = $hash->{SERVERPORT};
-   my $apicam            = $hash->{HELPER}{APICAM};
-   my $apicampath        = $hash->{HELPER}{APICAMPATH};
-   my $apicammaxver      = $hash->{HELPER}{APICAMMAXVER};  
-   my $apiextrec         = $hash->{HELPER}{APIEXTREC};
-   my $apiextrecpath     = $hash->{HELPER}{APIEXTRECPATH};
-   my $apiextrecmaxver   = $hash->{HELPER}{APIEXTRECMAXVER};
-   my $apiextevt         = $hash->{HELPER}{APIEXTEVT};
-   my $apiextevtpath     = $hash->{HELPER}{APIEXTEVTPATH};
-   my $apiextevtmaxver   = $hash->{HELPER}{APIEXTEVTMAXVER};
-   my $apitakesnap       = $hash->{HELPER}{APISNAPSHOT};
-   my $apitakesnappath   = $hash->{HELPER}{APITAKESNAPPATH};
-   my $apitakesnapmaxver = $hash->{HELPER}{APITAKESNAPMAXVER};
-   my $apiptz            = $hash->{HELPER}{APIPTZ};
-   my $apiptzpath        = $hash->{HELPER}{APIPTZPATH};
-   my $apiptzmaxver      = $hash->{HELPER}{APIPTZMAXVER};
-   my $apipreset         = $hash->{HELPER}{APIPRESET};
-   my $apipresetpath     = $hash->{HELPER}{APIPRESETPATH};
-   my $apipresetmaxver   = $hash->{HELPER}{APIPRESETMAXVER};
-   my $apisvsinfo        = $hash->{HELPER}{APISVSINFO};
-   my $apisvsinfopath    = $hash->{HELPER}{APISVSINFOPATH};
-   my $apisvsinfomaxver  = $hash->{HELPER}{APISVSINFOMAXVER};
-   my $apicamevent       = $hash->{HELPER}{APICAMEVENT};
-   my $apicameventpath   = $hash->{HELPER}{APICAMEVENTPATH};
-   my $apicameventmaxver = $hash->{HELPER}{APICAMEVENTMAXVER};
-   my $apievent          = $hash->{HELPER}{APIEVENT};
-   my $apieventpath      = $hash->{HELPER}{APIEVENTPATH};
-   my $apieventmaxver    = $hash->{HELPER}{APIEVENTMAXVER};
-   my $apivideostm       = $hash->{HELPER}{APIVIDEOSTM};
-   my $apivideostmpath   = $hash->{HELPER}{APIVIDEOSTMPATH};
-   my $apivideostmmaxver = $hash->{HELPER}{APIVIDEOSTMMAXVER};
-   my $apistm            = $hash->{HELPER}{APISTM};
-   my $apistmpath        = $hash->{HELPER}{APISTMPATH};
-   my $apistmmaxver      = $hash->{HELPER}{APISTMMAXVER};
-   my $apihm             = $hash->{HELPER}{APIHM};
-   my $apihmpath         = $hash->{HELPER}{APIHMPATH};
-   my $apihmmaxver       = $hash->{HELPER}{APIHMMAXVER};
-   my $apilog            = $hash->{HELPER}{APILOG};
-   my $apilogpath        = $hash->{HELPER}{APILOGPATH};
-   my $apilogmaxver      = $hash->{HELPER}{APILOGMAXVER};
-   my $sid               = $hash->{HELPER}{SID};
-   my $OpMode            = $hash->{OPMODE};
-   my $camid             = $hash->{CAMID};
+   my $name               = $hash->{NAME};
+   my $serveraddr         = $hash->{SERVERADDR};
+   my $serverport         = $hash->{SERVERPORT};
+   my $apicam             = $hash->{HELPER}{APICAM};
+   my $apicampath         = $hash->{HELPER}{APICAMPATH};
+   my $apicammaxver       = $hash->{HELPER}{APICAMMAXVER};  
+   my $apiextrec          = $hash->{HELPER}{APIEXTREC};
+   my $apiextrecpath      = $hash->{HELPER}{APIEXTRECPATH};
+   my $apiextrecmaxver    = $hash->{HELPER}{APIEXTRECMAXVER};
+   my $apiextevt          = $hash->{HELPER}{APIEXTEVT};
+   my $apiextevtpath      = $hash->{HELPER}{APIEXTEVTPATH};
+   my $apiextevtmaxver    = $hash->{HELPER}{APIEXTEVTMAXVER};
+   my $apitakesnap        = $hash->{HELPER}{APISNAPSHOT};
+   my $apitakesnappath    = $hash->{HELPER}{APITAKESNAPPATH};
+   my $apitakesnapmaxver  = $hash->{HELPER}{APITAKESNAPMAXVER};
+   my $apiptz             = $hash->{HELPER}{APIPTZ};
+   my $apiptzpath         = $hash->{HELPER}{APIPTZPATH};
+   my $apiptzmaxver       = $hash->{HELPER}{APIPTZMAXVER};
+   my $apipreset          = $hash->{HELPER}{APIPRESET};
+   my $apipresetpath      = $hash->{HELPER}{APIPRESETPATH};
+   my $apipresetmaxver    = $hash->{HELPER}{APIPRESETMAXVER};
+   my $apisvsinfo         = $hash->{HELPER}{APISVSINFO};
+   my $apisvsinfopath     = $hash->{HELPER}{APISVSINFOPATH};
+   my $apisvsinfomaxver   = $hash->{HELPER}{APISVSINFOMAXVER};
+   my $apicamevent        = $hash->{HELPER}{APICAMEVENT};
+   my $apicameventpath    = $hash->{HELPER}{APICAMEVENTPATH};
+   my $apicameventmaxver  = $hash->{HELPER}{APICAMEVENTMAXVER};
+   my $apievent           = $hash->{HELPER}{APIEVENT};
+   my $apieventpath       = $hash->{HELPER}{APIEVENTPATH};
+   my $apieventmaxver     = $hash->{HELPER}{APIEVENTMAXVER};
+   my $apivideostm        = $hash->{HELPER}{APIVIDEOSTM};
+   my $apivideostmpath    = $hash->{HELPER}{APIVIDEOSTMPATH};
+   my $apivideostmmaxver  = $hash->{HELPER}{APIVIDEOSTMMAXVER};  
+   my $apiaudiostm        = $hash->{HELPER}{APIAUDIOSTM};
+   my $apiaudiostmpath    = $hash->{HELPER}{APIAUDIOSTMPATH};
+   my $apiaudiostmmaxver  = $hash->{HELPER}{APIAUDIOSTMMAXVER};   
+   my $apistm             = $hash->{HELPER}{APISTM};
+   my $apistmpath         = $hash->{HELPER}{APISTMPATH};
+   my $apistmmaxver       = $hash->{HELPER}{APISTMMAXVER};
+   my $apihm              = $hash->{HELPER}{APIHM};
+   my $apihmpath          = $hash->{HELPER}{APIHMPATH};
+   my $apihmmaxver        = $hash->{HELPER}{APIHMMAXVER};
+   my $apilog             = $hash->{HELPER}{APILOG};
+   my $apilogpath         = $hash->{HELPER}{APILOGPATH};
+   my $apilogmaxver       = $hash->{HELPER}{APILOGMAXVER};
+   my $apivideostms       = $hash->{HELPER}{APIVIDEOSTMS};
+   my $apivideostmspath   = $hash->{HELPER}{APIVIDEOSTMSPATH};
+   my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
+   my $sid                = $hash->{HELPER}{SID};
+   my $OpMode             = $hash->{OPMODE};
+   my $camid              = $hash->{CAMID};
    my ($livestream,$winname,$attr,$room,$param);
    my ($url,$snapid,$httptimeout,$expmode,$motdetsc);
        
@@ -3628,19 +3693,22 @@ sub SSCam_camop ($) {
       $url = "http://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtmaxver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ /snap/) {    
-      if ($hash->{HELPER}{RUNVIEW} =~ m/live/) {
+      if ($hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) {
+          $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
+      } elsif ($hash->{HELPER}{RUNVIEW} =~ m/live/) {
+          $hash->{HELPER}{AUDIOLINK} = "http://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
           # externe URL
           $livestream = AttrVal($name, "livestreamprefix", "http://$serveraddr:$serverport");
-          $livestream .= "/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\"";
+          $livestream .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
           readingsSingleUpdate($hash,"LiveStreamUrl", $livestream, 1) if(AttrVal($name, "showStmInfoFull", undef));
           # interne URL
-          $url = "http://$serveraddr:$serverport/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\""; 
+          $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
       } else {
           # Abspielen der letzten Aufnahme (EventId) 
           $url = "http://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid";   
       }
        
-      # Liveview-Link in Hash speichern -> Anzeige über SSCam_FWsummaryFn, in Reading setzen für Linkversand
+      # Liveview-Link in Hash speichern
       $hash->{HELPER}{LINK} = $url;
          
       Log3($name, 4, "$name - Set Streaming-URL: $url");
@@ -4449,12 +4517,28 @@ sub SSCam_camop_parse ($) {
                 } elsif ($exposurecontrol == 6) {
                     $exposurecontrol = "Unknown";
                 }
+                
+                my $camaudiotype = SSCam_jboolmap($data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camAudioType'});
+                if ($camaudiotype == 0) {
+                    $camaudiotype = "Unknown";
+                } elsif ($camaudiotype == 1) {
+                    $camaudiotype = "PCM";
+                } elsif ($camaudiotype == 2) {
+                    $camaudiotype = "G711";
+                } elsif ($camaudiotype == 3) {
+                    $camaudiotype = "G726";
+                } elsif ($camaudiotype == 4) {
+                    $camaudiotype = "AAC";
+                } elsif ($camaudiotype == 5) {
+                    $camaudiotype = "AMR";
+                }           
                     
                 $data->{'data'}->{'cameras'}->[0]->{'video_flip'}    = SSCam_jboolmap($data->{'data'}->{'cameras'}->[0]->{'video_flip'});
                 $data->{'data'}->{'cameras'}->[0]->{'video_mirror'}  = SSCam_jboolmap($data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
                 $data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'} = SSCam_jboolmap($data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
                 
                 readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"CamAudioType",$camaudiotype);
                 readingsBulkUpdate($hash,"CamLiveMode",$camLiveMode);
                 readingsBulkUpdate($hash,"CamExposureMode",$exposuremode);
                 readingsBulkUpdate($hash,"CamExposureControl",$exposurecontrol);
@@ -4464,6 +4548,7 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"CamIP",$data->{'data'}->{'cameras'}->[0]->{'host'});
 				readingsBulkUpdate($hash,"CamNTPServer",$data->{'data'}->{'cameras'}->[0]->{'time_server'}) if($data->{'data'}->{'cameras'}->[0]->{'time_server'}); 
                 readingsBulkUpdate($hash,"CamVendor",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camVendor'});
+                readingsBulkUpdate($hash,"CamVideoType",$data->{'data'}->{'cameras'}->[0]->{'camVideoType'});
                 readingsBulkUpdate($hash,"CamPreRecTime",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camPreRecTime'});
                 readingsBulkUpdate($hash,"CamPort",$data->{'data'}->{'cameras'}->[0]->{'port'});
                 readingsBulkUpdate($hash,"CamPtSpeed",$data->{'data'}->{'cameras'}->[0]->{'ptSpeed'});
@@ -5336,15 +5421,22 @@ return;
 ######################################################################################
 sub SSCam_StreamDev($$$) {
   my ($camname,$livdev,$fmt) = @_; 
-  my $hash              = $defs{$camname};
-  my $wltype            = $hash->{HELPER}{WLTYPE}; 
-  my $serveraddr        = $hash->{SERVERADDR};
-  my $serverport        = $hash->{SERVERPORT};
-  my $apivideostm       = $hash->{HELPER}{APIVIDEOSTM};
-  my $apivideostmpath   = $hash->{HELPER}{APIVIDEOSTMPATH};
-  my $apivideostmmaxver = $hash->{HELPER}{APIVIDEOSTMMAXVER};  
-  my $camid             = $hash->{CAMID};
-  my ($cause,$ret,$link,$devWlink,$wlhash,$alias,$wlalias);
+  my $hash               = $defs{$camname};
+  my $wltype             = $hash->{HELPER}{WLTYPE}; 
+  my $serveraddr         = $hash->{SERVERADDR};
+  my $serverport         = $hash->{SERVERPORT};
+  my $apivideostm        = $hash->{HELPER}{APIVIDEOSTM};
+  my $apivideostmpath    = $hash->{HELPER}{APIVIDEOSTMPATH};
+  my $apivideostmmaxver  = $hash->{HELPER}{APIVIDEOSTMMAXVER}; 
+  my $apiaudiostm        = $hash->{HELPER}{APIAUDIOSTM};
+  my $apiaudiostmpath    = $hash->{HELPER}{APIAUDIOSTMPATH};
+  my $apiaudiostmmaxver  = $hash->{HELPER}{APIAUDIOSTMMAXVER};
+  my $apivideostms       = $hash->{HELPER}{APIVIDEOSTMS};  
+  my $apivideostmspath   = $hash->{HELPER}{APIVIDEOSTMSPATH};
+  my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
+  my $camid              = $hash->{CAMID};
+  my $sid                = $hash->{HELPER}{SID};
+  my ($cause,$ret,$link,$audiolink,$devWlink,$wlhash,$alias,$wlalias);
   
   my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
@@ -5373,16 +5465,40 @@ sub SSCam_StreamDev($$$) {
   }
   
   if($fmt =~ /mjpeg/) {  
-      $link = "http://$serveraddr:$serverport/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&format=mjpeg&cameraId=$camid&StmKey=\"$StmKey\"";
-      $ret .= "<td><img src=$link $ha> </td>";  
+      # $link      = "http://$serveraddr:$serverport/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&format=mjpeg&cameraId=$camid&StmKey=\"$StmKey\"";
+      $link      = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+      $audiolink = "http://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
+      $ret .= "<td><img src=$link $ha> </td>"; 
+      $ret .= '</tr>';
+      if($audiolink && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+          $ret .= '<tr class="odd">';
+          $ret .= "<td><audio src=$audiolink preload='none' volume='0.5' controls>
+                       Your browser does not support the audio element.      
+                       </audio></td>";
+          $ret .= '</tr>'; 
+      }      
   } elsif($fmt =~ /switched/) {
       my $wltype = $hash->{HELPER}{WLTYPE};
       $link = $hash->{HELPER}{LINK};
       if($link && $wltype =~ /image|iframe|video|base64img|embed/) {
           if($wltype =~ /image/) {
               $ret .= "<td><img src=$link $ha> </td>";
+              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+                  $ret .= '<tr class="odd">';
+                  $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
+                               Your browser does not support the audio element.      
+                               </audio></td>";
+                  $ret .= '</tr>';
+              }
           } elsif ($wltype =~ /iframe/) {
               $ret .= "<td><iframe src=$link $ha controls>Iframes disabled</iframe></td>";
+              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+                  $ret .= '<tr class="odd">';
+                  $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
+                               Your browser does not support the audio element.      
+                               </audio></td>";
+                  $ret .= '</tr>';
+              }
           } elsif ($wltype =~ /video/) {
               $ret .= "<td><video $ha controls> 
                        <source src=$link type=\"video/mp4\"> 
@@ -5390,6 +5506,13 @@ sub SSCam_StreamDev($$$) {
                        <source src=$link type=\"video/webm\">
                        Your browser does not support the video tag.
                        </video></td>";
+              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+                  $ret .= '<tr class="odd">';
+                  $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
+                               Your browser does not support the audio element.      
+                               </audio></td>";
+                  $ret .= '</tr>';
+              }
           } elsif($wltype =~ /base64img/) {
               $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha></td>";
 		  } elsif($wltype =~ /embed/) {
@@ -6641,6 +6764,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <ul>
   <table>  
   <colgroup> <col width=5%> <col width=95%> </colgroup>
+    <tr><td><li>CamAudioType</li>       </td><td>- Indicating audio type  </td></tr>
     <tr><td><li>Availability</li>       </td><td>- Availability of Camera (disabled, enabled, disconnected, other)  </td></tr>
     <tr><td><li>CamEventNum</li>        </td><td>- delivers the total number of in SVS registered events of the camera  </td></tr>
     <tr><td><li>CamExposureControl</li> </td><td>- indicating type of exposure control  </td></tr>
@@ -6657,6 +6781,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>CamPreRecTime</li>      </td><td>- Duration of Pre-Recording (in seconds) adjusted in SVS  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- shared folder on disk station for recordings </td></tr>
     <tr><td><li>CamRecVolume</li>       </td><td>- Volume on disk station for recordings  </td></tr>
+    <tr><td><li>CamVideoType</li>       </td><td>- Indicating video type  </td></tr>
     <tr><td><li>CamVendor</li>          </td><td>- Identifier of camera producer  </td></tr>
     <tr><td><li>CamVideoFlip</li>       </td><td>- Is the video flip  </td></tr>
     <tr><td><li>CamVideoMirror</li>     </td><td>- Is the video mirror  </td></tr>
@@ -7826,6 +7951,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <ul>
   <table>  
   <colgroup> <col width=5%> <col width=95%> </colgroup>
+    <tr><td><li>CamAudioType</li>       </td><td>- listet den eingestellten Audiocodec auf wenn verwendet  </td></tr>
     <tr><td><li>Availability</li>       </td><td>- Verfügbarkeit der Kamera (disabled, enabled, disconnected, other)  </td></tr>
     <tr><td><li>CamEventNum</li>        </td><td>- liefert die Gesamtanzahl der in SVS registrierten Events der Kamera  </td></tr>
     <tr><td><li>CamExposureControl</li> </td><td>- zeigt den aktuell eingestellten Typ der Belichtungssteuerung  </td></tr>
@@ -7842,6 +7968,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>CamPreRecTime</li>      </td><td>- Dauer der der Voraufzeichnung in Sekunden (Einstellung in SVS)  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- gemeinsamer Ordner auf der DS für Aufnahmen  </td></tr>
     <tr><td><li>CamRecVolume</li>       </td><td>- Volume auf der DS für Aufnahmen  </td></tr>
+    <tr><td><li>CamVideoType</li>       </td><td>- listet den eingestellten Videocodec auf </td></tr>
     <tr><td><li>CamVendor</li>          </td><td>- Kamerahersteller Bezeichnung  </td></tr>
     <tr><td><li>CamVideoFlip</li>       </td><td>- Ist das Video gedreht  </td></tr>
     <tr><td><li>CamVideoMirror</li>     </td><td>- Ist das Video gespiegelt  </td></tr>
