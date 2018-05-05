@@ -34,11 +34,12 @@ FB_doCheckPW($$$)
 
   if($data =~ m/iswriteaccess/) {      # Old version
     my @d = ( "login:command/response=$chlAnsw",
-              "getpage=../html/de/internet/connect_status.txt" );
+              "getpage=../html/login_sid.xml" );
     $data = join("&", map {join("=", map {urlEncode($_)} split("=",$_,2))} @d);
     $data = GetFileFromURL(FB_host2URL($host)."cgi-bin/webcm", undef, $data, 1);
-    my $isOk = ($data =~ m/checkStatus/);
-    return $isOk;
+    my $sid = $1 if($data =~ /<SID>(\w+)<\/SID>/i);
+    $sid = undef if($sid =~ m/^0*$/);
+    return $sid;
 
   } else {                            # FritzOS >= 5.50
     my @d = ( "response=$chlAnsw", "page=/login_sid.lua" );
