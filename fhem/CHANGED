@@ -1,15 +1,16 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  57_Calendar: fix count for series with exceptions
   - bugfix:  72_FB_CALLMONITOR: fix control code entries in phonebook and
                                 reverse search text file
   - feature: 49_SSCam: V4.1.0, support Audiostream cams, minor internal changes
   - change:  93_Log2Syslog: ssldebug for debugging SSL messages, minor fixes
-  - feature: 49_SSCam: V3.10.0, CreateStreamDev added, new lastrec_fw_MJPEG, 
+  - feature: 49_SSCam: V3.10.0, CreateStreamDev added, new lastrec_fw_MJPEG,
                        lastrec_fw_MPEG4/H.264 playback MPEG4/H.264 recordings
   - feature: 93_DbRep: V7.17.3, writeToDB - readingname can be replaced by the
                        value of attribute "readingNameMap"
   - change:  88_xs1Bridge: documentation | xs1 with password
-  - bugfix:  36_Vallox: Fixed Multireadings. Added Legacy Mapping. 
+  - bugfix:  36_Vallox: Fixed Multireadings. Added Legacy Mapping.
                         added set commands
   - bugfix:  00_MQTT: topics and payload patch
   - bugfix:  73_GardenaSmartBridge: fix fetch token after rereadcfg
@@ -17,7 +18,7 @@
   - new:     74_HusqvarnaAutomower.pm: New module to control your
              Husqvarna Automower with original Connect Module (SIM)
   - bugfix:  73_GardenaSmartBridge: fix delete password then rereadcfg
-  - bugfix:  93_DbRep: 7.17.2, doesn't writeToDB if device name contain "." 
+  - bugfix:  93_DbRep: 7.17.2, doesn't writeToDB if device name contain "."
   - feature: 93_DbLog: addLog - not available reading can be added as new one
                        (forum:#86966)
   - feature: 02_RSS: label and goto in layout definition (forum #86844)

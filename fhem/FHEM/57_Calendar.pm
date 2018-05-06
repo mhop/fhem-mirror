@@ -1460,7 +1460,7 @@ sub addOrSkipSeriesEvent($$$$$$) {
       #return 0 if($self->addEventLimited($t0, $event) > 0);
   }
 
-  my $occurances= scalar(@{$self->{events}});
+  my $occurances= scalar(@{$self->{events}})+scalar(@{$self->{skippedEvents}});
   #main::Debug("$occurances occurances so far");
   return($occurances< $count);
 
