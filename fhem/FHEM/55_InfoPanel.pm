@@ -60,6 +60,8 @@
 #                              with \n in text
 # 2016-09-04 - 12114 - added:   movecalculated
 #
+# 2018-05-06 - $Rev$ - changed: check plotName exists
+#
 ##############################################
 =cut
 
@@ -543,6 +545,7 @@ sub btIP_itemLongpoll {
 sub btIP_itemPlot {
   my ($id,$x,$y,$scale,$inline,$arg) = @_;
   my (@plotName) = split(";",$arg);
+  return ("<!-- undefined plotDevice -->\n",undef,undef) unless defined($defs{$plotName[0]});
   $id = ($id eq '-') ? createUniqueId() : $id;
   my (@webs,$width,$height,$newWidth,$newHeight,$output,$mimetype,$svgdata);
   
