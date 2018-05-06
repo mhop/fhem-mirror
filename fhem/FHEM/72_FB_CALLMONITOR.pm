@@ -1362,7 +1362,7 @@ sub FB_CALLMONITOR_loadTextFile($;$)
         {      
             foreach my $line (@file)
             {
-                $line =~ s/#.*$//g;
+                $line =~ s/(,.*?)#.*$/$1/g;
                 $line =~ s,//.*$,,g;
                 
                 if((not $line =~ /^\s*$/) and $line =~ /,/)
@@ -1993,10 +1993,10 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     $number =~ s/\s//g;                         # Remove spaces
     $number =~ s/^(\#[0-9]{1,10}\#)//g;         # Remove phone control codes
     $number =~ s/^\+/00/g;                      # Convert leading + to 00 country extension
-    $number =~ s/\D//g if(not $number =~ /@/);  # Remove anything else isn't a number if it is no VoIP number
+    $number =~ s/[^\d\*#]//g if(not $number =~ /@/);  # Remove anything else isn't a number if it is no VoIP number
     $number =~ s/^$country_code/0/g;            # Replace own country code with leading 0
 
-    if($number !~ /^0/ and $number !~ /^11/ and $number !~ /@/ and $area_code =~ /^0[1-9]\d+$/) 
+    if($number =~ /^\d/ and $number !~ /^0/ and $number !~ /^11/ and $number !~ /@/ and $area_code =~ /^0[1-9]\d+$/) 
     {
        $number = $area_code.$number;
     }

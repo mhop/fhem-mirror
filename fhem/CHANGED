@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  72_FB_CALLMONITOR: fix control code entries in phonebook and
+                                reverse search text file
   - feature: 49_SSCam: V4.1.0, support Audiostream cams, minor internal changes
   - change:  93_Log2Syslog: ssldebug for debugging SSL messages, minor fixes
   - feature: 49_SSCam: V3.10.0, CreateStreamDev added, new lastrec_fw_MJPEG, 
