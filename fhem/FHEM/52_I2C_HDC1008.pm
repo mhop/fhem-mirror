@@ -192,6 +192,10 @@ sub I2C_HDC1008_GetTemp ($$)
 	
 	my @raw = split(" ",$rawdata);
 	my $tempWord  = ($raw[0] << 8 | $raw[1]);
+	if ( ($tempWord & 0x3) != 0 ) {
+		Log3 $hash, 4, "[$name] I2C_HDC1008_I2CRec  invalid temperature raw value: $tempWord";
+		return undef;
+	}
 	
 	my $temperature = (($tempWord /65536.0)*165.0)-40.0;
 
@@ -210,7 +214,11 @@ sub I2C_HDC1008_GetHum ($$)
 	
 	my @raw = split(" ",$rawdata);
 	my $humWord  = ($raw[2] << 8 | $raw[3]);	
-	
+	if ( ($humWord & 0x3) != 0) {
+		Log3 $hash, 4, "[$name] I2C_HDC1008_I2CRec  invalid humidity raw value: $humWord";
+		return undef;
+	}
+
 	my $humidity  = ($humWord /65536.0)*100.0;
 
 	Log3 $hash, 5, "[$name] I2C_HDC1008_I2CRec  calced humidity: $humidity";
