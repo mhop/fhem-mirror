@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  52_I2C_HDC1008: improve and restructure I2C error handling
   - bugfix:  57_Calendar: fix count for series with exceptions
   - bugfix:  72_FB_CALLMONITOR: fix control code entries in phonebook and
                                 reverse search text file

@@ -163,12 +163,24 @@ sub I2C_HDC1008_I2CRec ($$) {
 		my $upper_k = uc $k;
 		$hash->{$upper_k} = $v if $k =~ /^$pname/ ;
 	}
-	if ($clientmsg->{direction} && $clientmsg->{type} && $clientmsg->{$pname . "_SENDSTAT"} && $clientmsg->{$pname . "_SENDSTAT"} eq "Ok") {
-		if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) 
-		{
-			Log3 $hash, 5, "[$name] I2C_HDC1008_I2CRec  received: $clientmsg->{type} $clientmsg->{received}";
-			I2C_HDC1008_GetTemp  ($hash, $clientmsg->{received}) if $clientmsg->{type} eq "temp" && $clientmsg->{nbyte} == 2;
-			I2C_HDC1008_GetHum ($hash, $clientmsg->{received}) if $clientmsg->{type} eq "hum" && $clientmsg->{nbyte} == 2;
+	if ($clientmsg->{direction} && $clientmsg->{$pname . "_SENDSTAT"}) {
+		my $sendstat = $clientmsg->{$pname . "_SENDSTAT"};
+		Log3 $hash, 5, "[$name] I2C_HDC1008_I2CRec  $clientmsg->{direction} $sendstat ";
+		if ( $clientmsg->{$pname . "_SENDSTAT"} eq "Ok") {
+			if ( $clientmsg->{direction} eq "i2cwrite" ) {
+				if ($hash->{DEVICE_STATE} eq 'READY') {
+					$hash->{DEVICE_STATE} = 'CONFIGURING';
+				} elsif($hash->{DEVICE_STATE} eq 'CONFIGURING') {
+					$hash->{DEVICE_STATE} = 'MEASURING';
+				}
+			}
+			
+			if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) 
+			{
+				Log3 $hash, 5, "[$name] I2C_HDC1008_I2CRec  received: $clientmsg->{type} $clientmsg->{received}";
+				I2C_HDC1008_GetTemp  ($hash, $clientmsg->{received}) if $clientmsg->{nbyte} == 4;
+				I2C_HDC1008_GetHum ($hash, $clientmsg->{received}) if $clientmsg->{nbyte} == 4;
+			}
 		}
 	}
 }
@@ -315,7 +327,6 @@ sub I2C_HDC1008_UpdateValues($)
 					reg => 2,
 					data => $high_byte. " ".$low_byte	# Leider fehlt es hier an Doku. Laut Quellcode (00_RPII2C.pm, ab Zeile 369),  werden die  dezimale Zahlen durch Leerzeichen getrennt, binär gewandelt und zum I2C-Bus geschickt
 					});
-		$hash->{DEVICE_STATE} = 'CONFIGURING';
 		return 15.0/1000; # Sensor braucht bis 15 ms bis er bereit ist
 	}
 	elsif($hash->{DEVICE_STATE} eq 'CONFIGURING')
@@ -329,8 +340,6 @@ sub I2C_HDC1008_UpdateValues($)
 					data => (0)
 					});				
 					
-		$hash->{DEVICE_STATE} = 'MEASURING';
-		
 		my $tempWait = $I2C_HDC1008_tempParams{$resTempIndex}{delay} + 
 		               $I2C_HDC1008_humParams{$resTempIndex}{delay};  # in ns
 		return $tempWait/1000000.0; 
