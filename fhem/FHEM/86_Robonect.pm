@@ -38,6 +38,7 @@
 # ABU 20171006 added "umlautfilter" for test
 # ABU 20171006 added "health" for test
 # ABU 20171010 finished health for test, added chck for undef at each reading
+# ABU 20180507 replaced "umwelt" with "climate" in readings-section (roughly line 740)
 
 package main;
 
@@ -735,10 +736,10 @@ sub Robonect_callback ($)
 				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "voltages", "batt");
 				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 
-				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "umwelt", "temperature");
+				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "climate", "temperature");
 				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 
-				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "umwelt", "humidity");
+				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "climate", "humidity");
 				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 			}
 			
