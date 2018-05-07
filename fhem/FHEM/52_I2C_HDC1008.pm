@@ -209,7 +209,7 @@ sub I2C_HDC1008_GetHum ($$)
 	my $name = $hash->{NAME};
 	
 	my @raw = split(" ",$rawdata);
-	my $humWord  = ($raw[0] << 8 | $raw[1]);	
+	my $humWord  = ($raw[2] << 8 | $raw[3]);	
 	
 	my $humidity  = ($humWord /65536.0)*100.0;
 
