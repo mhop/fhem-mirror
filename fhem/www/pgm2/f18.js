@@ -19,6 +19,7 @@ $(document).ready(function(){
 
   } else {
     f18_sd = {};
+    f18_attr = {};
 
   }
 
