@@ -1,5 +1,5 @@
 # Modul für  I2C Temperatur- und Feuchtigkeitssensor HDC1008
-# Autor : Karsten Grüttner
+# Autor : Karsten Grüttner (schlawiano) bis 2016, Änderungen ab 2018: Gernot Hillier (yoda_gh)
 # $Id$
 # Technische Dokumention für den Sensor befindet sich  http://www.ti.com/lit/ds/symlink/hdc1008.pdf
 
@@ -586,6 +586,9 @@ sub I2C_HDC1008_Attr(@)
 1;
 
 =pod
+=item device
+=item summary read Texas Instruments HDC1008/1080 temp/humidity sensor via I2C bus
+=item summary_DE Texas Instruments HDC1008/1080 Temp./Feuchte-Sensor über I2C auslesen
 =begin html
 
 <a name="I2C_HDC1008"></a>
