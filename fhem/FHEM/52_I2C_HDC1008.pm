@@ -320,7 +320,7 @@ sub I2C_HDC1008_UpdateValues($)
 	}
 	elsif($hash->{DEVICE_STATE} eq 'CONFIGURING')
 	{
-		# HDC1008-Sensor soll Temperatur messen
+		# HDC1008-Sensor soll messen
 		# --------------------------------------------------------
 		
 		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
@@ -329,54 +329,25 @@ sub I2C_HDC1008_UpdateValues($)
 					data => (0)
 					});				
 					
-		$hash->{DEVICE_STATE} = 'MEASURING_TEMPERATURE';
+		$hash->{DEVICE_STATE} = 'MEASURING';
 		
-		my $tempWait = $I2C_HDC1008_tempParams{$resTempIndex}{delay};  # in ns
+		my $tempWait = $I2C_HDC1008_tempParams{$resTempIndex}{delay} + 
+		               $I2C_HDC1008_humParams{$resTempIndex}{delay};  # in ns
 		return $tempWait/1000000.0; 
 		
 	}
-	elsif($hash->{DEVICE_STATE} eq 'MEASURING_TEMPERATURE')
+	elsif($hash->{DEVICE_STATE} eq 'MEASURING')
 	{
 	
-		# Temperatur vom HDC1008-Sensor lesen
+		# Werte vom HDC1008-Sensor lesen
 		# --------------------------------------------------------	
 		
 		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {	# Leider fehlt es hier an Doku. daher hier der Hinweis bei erfolgreichem Lesen wird die Funktion in $hash->{I2CRecFn} aufgerufen	
 				direction  => 	"i2cread",
 				i2caddress => 	$i2caddress,
-				type => 		"temp",
-				nbyte => 		2
+				nbyte => 		4
 				});	
 	
-
-
-		# HDC1008-Sensor soll Feuchtigkeit messen
-		# --------------------------------------------------------
-		
-		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
-					direction  => 	"i2cwrite",
-					i2caddress => 	$i2caddress,
-					data => 		1
-					});			
-		
-		$hash->{DEVICE_STATE} = 'MEASURING_HUMIDITY';
-		
-		my $humWait = $I2C_HDC1008_humParams{$resTempIndex}{delay}; 	
-	
-		return $humWait/1000000.0; 
-	}
-	elsif($hash->{DEVICE_STATE} eq 'MEASURING_HUMIDITY')
-	{	
-		# lese Feuchtigkeit vom HDC1008-Sensor
-		# --------------------------------------------------------	
-		
-		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
-				direction  => "i2cread",
-				i2caddress => $i2caddress,
-				type => 			 "hum",
-				nbyte => 2
-				});	
-				
 		# fertig	
 		
 		$hash->{DEVICE_STATE} = 'READY';
