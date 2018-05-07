@@ -989,10 +989,9 @@ FW_doUpdate(evt)
     if(d.length != 3)
       continue;
 
-    if( d[0].match(/^#FHEMWEB:/) ) {
-      eval(d[1]);
-
-    } else {
+    function
+    setValue(d) // is Callable from eval below
+    {
       $("[informId='"+d[0]+"']").each(function(){
         if(this.setValueFn) {     // change the select/etc value
           this.setValueFn(d[1].replace(/\n/g, '\u2424'));
@@ -1014,6 +1013,13 @@ FW_doUpdate(evt)
           $(this).find("a").each(function() { FW_replaceLink(this) });
         }
       });
+    }
+
+    if( d[0].match(/^#FHEMWEB:/) ) {
+      eval(d[1]);
+
+    } else {
+      setValue(d);
     }
 
     // updateLine is deprecated, use setValueFn
