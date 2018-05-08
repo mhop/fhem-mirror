@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     98_feels_like.pm: New module to compute a "feels like" temperature
+                               and the cloud coverage from a WH2600 like
+                               sensor array
   - change:  52_I2C_HDC1008: improve and restructure I2C error handling
   - bugfix:  57_Calendar: fix count for series with exceptions
   - bugfix:  72_FB_CALLMONITOR: fix control code entries in phonebook and

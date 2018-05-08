@@ -458,6 +458,7 @@ FHEM/98_dewpoint.pm          hotbso               Automatisierung
 FHEM/98_Dooya.pm             Jarnsen/ralf9/darkmission        Sonstige Systeme
 FHEM/98_dummy.pm             rudolfkoenig         Automatisierung
 FHEM/98_expandJSON.pm        dev0                 Unterstuetzende Dienste
+FHEM/98_feels_like.pm        hotbso               Wettermodule
 FHEM/98_fheminfo.pm          betateilchen         Sonstiges
 FHEM/98_fhemdebug.pm         rudolfkoenig         Sonstiges
 FHEM/98_freezemon            KernSani             Unterstuetzende Dienste 	
