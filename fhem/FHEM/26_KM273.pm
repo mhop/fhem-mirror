@@ -83,6 +83,9 @@
 #       0016    27.08.2017  mike3436            KM273_Set                       add RAW command to send CAN messages
 #       0016    27.08.2017  mike3436            KM273_ReadElementList           on error read element list again after short delay
 #       0016    08.01.2018  mike3436            attr ListenOnly                 like DoNotPoll=1 but also table won't be read from heatpump
+#       0017    21.01.2018  mike3436            KM273_StoreElementList          function stores element list in json format
+#       0017    21.01.2018  mike3436            KM273_LoadElementList           function read external element list from json format, executed on Attribut ListenOnly=1
+#       0017    08.05.2018  mike3436            KM273_LoadElementList           JSON library load by 'require' instead 'use' for more compatibility
 
 package main;
 use strict;
@@ -2255,6 +2258,94 @@ sub KM273_CreateElementList($)
     $KM273_ReadElementListStatus{done} = 1;
 }
 
+sub KM273_StoreElementList($)
+{
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    Log3 $name, 3, "$name: KM273_StoreElementList";
+    
+    return "No statefile specified" if(!$attr{global}{statefile});
+    my $elementListFile=$attr{global}{statefile}; 
+    $elementListFile=~ s/fhem.save/KM273ElementList.json/g;  #saving to statefile path
+    
+    eval {
+    require utf8;
+    require Encode;
+    require JSON;
+    };
+    if ($@) {
+      Log3 $name, 1, "$name: KM273_StoreElementList: json/utf8 library missing: $@";
+      return undef;
+    }
+    
+    my $fh;
+    if (!open($fh, '>', $elementListFile)) {
+      Log3 $name, 3, "$name: KM273_StoreElementList: Cannot open $elementListFile: $!";
+      return "Cannot open $elementListFile: $!";
+    }
+
+    print $fh "{\n";
+    my $first = 1;
+    foreach (sort keys(%KM273_elements))
+    {
+      print $fh ",\n" if (!$first);
+      print $fh '"' . $_ .'":' . JSON->new->utf8->encode($KM273_elements{$_});
+      $first = 0;
+    }
+    print $fh "\n}";
+    
+    close $fh;
+    
+    Log3 $name, 3, "$name: KM273_StoreElementList: json file $elementListFile has been stored";
+  
+    return "json file $elementListFile has been stored";
+}
+
+sub KM273_LoadElementList($)
+{
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    Log3 $name, 3, "$name: KM273_LoadElementList";
+
+    return "No statefile specified" if(!$attr{global}{statefile});
+    my $elementListFile=$attr{global}{statefile}; 
+    $elementListFile=~ s/fhem.save/KM273ElementList.json/g;  #saving to statefile path
+
+    eval {
+    require utf8;
+    require Encode;
+    require JSON;
+    };
+    if ($@) {
+      Log3 $name, 1, "$name: KM273_LoadElementList: json/utf8 library missing: $@";
+      return undef;
+    }
+
+    my $fh;
+    if(!open($fh, '<', $elementListFile)) {
+      Log3 $name, 3, "$name: KM273_LoadElementList: Cannot open $elementListFile: $!";
+      return "Cannot open $elementListFile: $!";
+    }
+
+    my $content = '';
+    {
+        local $/;
+        $content = <$fh>;
+    }
+    close $fh;
+
+    eval { %KM273_elements = %{ JSON->new->utf8->decode($content) }; };
+    if ($@) {
+      Log3 $name, 1, "$name: KM273_LoadElementList: json file $elementListFile is faulty: $@!";
+      return undef;
+    }
+
+    Log3 $name, 3, "$name: KM273_LoadElementList: json file $elementListFile has been loaded";
+
+    $KM273_ReadElementListStatus{done} = 1;
+    return undef;
+}
+
 sub KM273_CreatePollingList($)
 {
     my ($hash) = @_;
@@ -2263,11 +2354,14 @@ sub KM273_CreatePollingList($)
 
     @KM273_readingsRTR = ();
     @KM273_readingsRTRAll = ();
-    foreach my $element (keys %KM273_elements)
+    foreach my $element (sort keys %KM273_elements)
     {
-        push @KM273_readingsRTR, $KM273_elements{$element}{rtr} if $KM273_elements{$element}{read} == 1;
-        push @KM273_readingsRTR, $KM273_elements{$element}{rtr} if ($KM273_elements{$element}{read} == 2) && defined($attr{$name}{HeatCircuit2Active}) && ($attr{$name}{HeatCircuit2Active} == 1);
-        push @KM273_readingsRTRAll, $KM273_elements{$element}{rtr};
+        push @KM273_readingsRTRAll, $KM273_elements{$element}{rtr} if defined $KM273_elements{$element}{rtr};
+        if (defined $KM273_elements{$element}{read})
+        {
+          push @KM273_readingsRTR, $KM273_elements{$element}{rtr} if $KM273_elements{$element}{read} == 1;
+          push @KM273_readingsRTR, $KM273_elements{$element}{rtr} if ($KM273_elements{$element}{read} == 2) && defined($attr{$name}{HeatCircuit2Active}) && ($attr{$name}{HeatCircuit2Active} == 1);
+        }
     }
     foreach my $val (@KM273_readingsRTR)
     {
@@ -2284,6 +2378,10 @@ sub KM273_CreatePollingList($)
     foreach my $element (keys %KM273_elements)
     {
         $KM273_writingsTXD{$KM273_elements{$element}{text}} = $KM273_elements{$element} if (defined($KM273_gets{$KM273_elements{$element}{text}}));
+    }
+    foreach my $element (keys %KM273_gets)
+    {
+        delete $KM273_gets{$element} if !defined $KM273_writingsTXD{$element};
     }
     foreach my $val (keys %KM273_writingsTXD)
     {
@@ -2316,6 +2414,7 @@ sub KM273_Initialize($)
                           "ConsoleMessage " .
                           "DoNotPoll " .
                           "ListenOnly " .
+                          "LoadElementList " .
                           "ReadBackDelay " .
                           "HeatCircuit2Active " .
                           "AddToGetSet " .
@@ -2327,9 +2426,9 @@ sub KM273_Define($$)
 {
     my ($hash, $def) = @_;
     my $name = $hash->{NAME};
-    Log3 $name, 5, "$name: KM273_Define";
+    Log3 $name, 3, "$name: KM273_Define";
 
-    $hash->{VERSION} = "0016";
+    $hash->{VERSION} = "0017";
     
     my @param = split('[ \t]+', $def);
 
@@ -2361,6 +2460,8 @@ sub KM273_InitInterface($)
     my ($hash) = @_;
     my $name = $hash->{NAME};
     Log3 $name, 3, "$name: KM273_InitInterface";
+    
+    return undef if (!defined($hash->{DeviceName})) || ($hash->{DeviceName} eq 'none');
 
     RemoveInternalTimer($hash);
     
@@ -2383,7 +2484,20 @@ sub KM273_Notify($$)
   Log3 $ownName, 3, "$ownName: KM273_Notify ".join(',',@{$events});
 	if($devName eq "global" && grep(m/^INITIALIZED|REREADCFG$|AddToGetSet|AddToReadings|HeatCircuit2Active/, @{$events}))
 	{
-    return undef if defined($attr{$ownName}{ListenOnly}) && ($attr{$ownName}{ListenOnly} == 1);
+    if (defined($attr{$ownName}{LoadElementList}) && ($attr{$ownName}{LoadElementList} == 1))
+    {
+        RemoveInternalTimer($own_hash);
+        KM273_LoadElementList($own_hash);
+        KM273_CreatePollingList($own_hash);
+        KM273_InitInterface($own_hash);
+        InternalTimer(gettimeofday()+10, "KM273_GetReadings", $own_hash, 0);
+        return undef;
+    }
+    if (defined($attr{$ownName}{ListenOnly}) && ($attr{$ownName}{ListenOnly} == 1))
+    {
+      KM273_LoadElementList($own_hash);
+      return undef;
+    }
     if ($KM273_ReadElementListStatus{done})
     {
       RemoveInternalTimer($own_hash);
@@ -2461,6 +2575,11 @@ sub KM273_Set($@)
     {
       $hash->{readAllIndex} = 0;
       return undef;
+    }
+
+    if ($opt eq 'StoreElementList')
+    {
+      return KM273_StoreElementList($hash);
     }
 
     if ($opt eq 'RAW')
@@ -3127,7 +3246,11 @@ sub CAN_DoInit($)
                   on second read, only the changed values are logged
               </li>    
               <li><i>RAW</i><br>
-                  Send CAN RAW message in USBTin/SLCAN format: read Riiiiiiii0, write TiiiiiiiiLvv...</li>
+                  Send CAN RAW message in USBTin/SLCAN format: read Riiiiiiii0, write TiiiiiiiiLvv...
+              </li>
+              <li><i>StoreElementList</i><br>
+                  The parameter table read from heatpump is stored to file ./log/KM237ElementList.json
+              </li>
         </ul>
     </ul>
     <br>
@@ -3159,6 +3282,9 @@ sub CAN_DoInit($)
             </li>
             <li><i>ListenOnly</i> 0|1<br>
                 When you set ListenOnly to "1", the module is only listening to the telegrams on CAN bus. Also the Parameter table isn't read from heatpump. Default is "0".<br>
+            </li>
+            <li><i>LoadElementList</i> 0|1<br>
+                When you set LoadElementList to "1", the module load the Parameter table from file ./log/KM237ElementList.json. The Parameter table isn't read from heatpump, then. Default is "0".<br>
             </li>
             <li><i>HeatCircuit2Active</i> 0|1<br>
                 When you set HeatCircuit2Active to "1", the module read and set also the values for the second heating circuit E12. Default is "0".<br>
