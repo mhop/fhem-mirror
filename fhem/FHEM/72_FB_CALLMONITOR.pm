@@ -687,10 +687,18 @@ FB_CALLMONITOR_reverseSearch($$)
         # Using internal phonebook if available and enabled
         if($method eq "phonebook")
         {
-            if(exists($hash->{helper}{PHONEBOOK}) and defined($hash->{helper}{PHONEBOOK}{$number}))
+            if(exists($hash->{helper}{PHONEBOOK}))
             {
-                Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
-                return $hash->{helper}{PHONEBOOK}{$number};
+                if(defined($hash->{helper}{PHONEBOOK}{$number}))
+                {
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
+                    return $hash->{helper}{PHONEBOOK}{$number};
+                }
+                elsif(my $result = FB_CALLMONITOR_searchPhonebookWildcards($hash->{helper}{PHONEBOOK}, $number))
+                {
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
+                    return $result;
+                }
             }
             
             if(exists($hash->{helper}{PHONEBOOKS}))
@@ -701,6 +709,11 @@ FB_CALLMONITOR_reverseSearch($$)
                     {                    
                         Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
                         return $hash->{helper}{PHONEBOOKS}{$pb_id}{$number};
+                    }
+                    elsif(my $result = FB_CALLMONITOR_searchPhonebookWildcards($hash->{helper}{PHONEBOOKS}{$pb_id}, $number))
+                    {
+                        Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
+                        return $result;
                     }
                 }
             }
@@ -1029,6 +1042,31 @@ FB_CALLMONITOR_reverseSearch($$)
 
     return undef;
 } 
+
+#####################################
+# check a number against wildcard entries in a given phonebook list
+sub FB_CALLMONITOR_searchPhonebookWildcards($$)
+{
+    my ($list, $number) = @_;
+    
+    foreach my $key (keys %{$list})
+    {
+        next if($key !~ /^\+?\d+\*$/);
+        
+        if(defined($list->{$key}))
+        {
+            my $test = $key;
+            $test =~ s/\*$//;
+             
+            if(index($number,$test) == 0)
+            {
+                return $list->{$key}.substr($number,length($test));
+            }
+        }
+    }
+    
+    return undef;
+}
 
 #####################################
 # replaces all HTML entities to their utf-8 counter parts.
