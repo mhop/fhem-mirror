@@ -50,7 +50,7 @@ eval "use Blocking;1" or $missingModul .= "Blocking ";
 #use Data::Dumper;          only for Debugging
 
 
-my $version = "2.0.12";
+my $version = "2.0.13";
 
 
 
@@ -167,7 +167,6 @@ sub XiaomiBTLESens_Define($$) {
         
     
     readingsSingleUpdate($hash,"state","initialized", 0);
-    #$attr{$name}{room}                      = "XiaomiBTLESens" if( AttrVal($name,'room','none') eq 'none' );
     CommandAttr(undef,$name . ' room XiaomiBTLESens') if( AttrVal($name,'room','none') eq 'none' );
     
     Log3 $name, 3, "XiaomiBTLESens ($name) - defined with BTMAC $hash->{BTMAC}";
@@ -272,8 +271,6 @@ sub XiaomiBTLESens_Notify($$) {
 
 
     XiaomiBTLESens_stateRequestTimer($hash) if( (((grep /^DEFINED.$name$/,@{$events}
-                                                    or grep /^INITIALIZED$/,@{$events}
-                                                    or grep /^MODIFIED.$name$/,@{$events}
                                                     or grep /^DELETEATTR.$name.disable$/,@{$events}
                                                     or grep /^ATTR.$name.disable.0$/,@{$events}
                                                     or grep /^DELETEATTR.$name.interval$/,@{$events}
@@ -281,7 +278,10 @@ sub XiaomiBTLESens_Notify($$) {
                                                     or grep /^ATTR.$name.model.+/,@{$events}
                                                     or grep /resetBatteryTimestamp$/,@{$events}
                                                     or grep /^ATTR.$name.interval.[0-9]+/,@{$events}) and $devname eq 'global')
-                                                    or grep /^resetBatteryTimestamp$/,@{$events}) and $init_done  );
+                                                    or grep /^resetBatteryTimestamp$/,@{$events}) and $init_done
+                                                    or ((grep /^INITIALIZED$/,@{$events}
+                                                    or grep /^REREADCFG$/,@{$events}
+                                                    or grep /^MODIFIED.$name$/,@{$events}) and $devname eq 'global') );
 
     XiaomiBTLESens_CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{devicename}) if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' 
                                                                                                                 and $devname eq $name
@@ -334,7 +334,8 @@ sub XiaomiBTLESens_stateRequestTimer($) {
     my $name        = $hash->{NAME};
 
 
-    XiaomiBTLESens_stateRequest($hash) if( $init_done );
+    RemoveInternalTimer($hash);
+    XiaomiBTLESens_stateRequest($hash);
 
     InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(90)), "XiaomiBTLESens_stateRequestTimer", $hash );
     
