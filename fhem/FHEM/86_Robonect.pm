@@ -39,6 +39,7 @@
 # ABU 20171006 added "health" for test
 # ABU 20171010 finished health for test, added chck for undef at each reading
 # ABU 20180507 replaced "umwelt" with "climate" in readings-section (roughly line 740)
+# ABU 20180509 reading winterschlaf was not decoded correctly - fixed
 
 package main;
 
@@ -583,7 +584,9 @@ sub Robonect_GetUpdate($)
 	Log3 ($name, 5, "enter update $name: $name");
 
 	#evaluate reading hybernate
-	my $hybernate = $hash->{READINGS}{$HYBERNATE}{VAL};
+	#my $hybernate = $hash->{READINGS}{$HYBERNATE}{VAL};
+	my $hybernate =  ReadingsVal($name, $HYBERNATE, undef);
+	
 	#supress sending, if hybernate is set
 	if (!defined ($hybernate) or ($hybernate =~ m/[off]|[0]/))
 	{
