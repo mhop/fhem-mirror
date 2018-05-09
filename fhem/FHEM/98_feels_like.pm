@@ -1192,7 +1192,7 @@ sub T_apparent_temperature($$$$)
 
 =pod
 =item helper
-=item compute a 'feels like' temperature according to UTCI or AT as well as the cloud coverage
+=item summary compute a 'feels like' temperature according to UTCI or AT and cloud coverage
 =begin html
 
 <a name="feels_like"></a>
