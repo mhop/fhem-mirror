@@ -66,7 +66,7 @@ use Time::Local;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "1.0.0";
+my $version = "1.0.2";
 
 
 
@@ -100,7 +100,7 @@ sub GardenaSmartDevice_Initialize($) {
     
     $hash->{AttrFn}     = "GardenaSmartDevice_Attr";
     $hash->{AttrList}   = "readingValueLanguage:de,en ".
-                            "model ".
+                            "model:watering_computer,sensor,mower ".
                             "IODev ".
                             $readingFnAttributes;
     
@@ -190,7 +190,7 @@ sub GardenaSmartDevice_Set($@) {
     #my ($arg, @params) = @args;
     
     my $payload;
-    my $abilities;
+    my $abilities   = '';
     
     
     ### mower
@@ -317,7 +317,7 @@ sub GardenaSmartDevice_WriteReadings($$) {
     
     do {
         
-        if( ref($decode_json->{abilities}[$abilities]{properties}) eq "ARRAY" and scalar(@{$decode_json->{abilities}[$abilities]{properties}}) > 0 ) {;
+        if( ref($decode_json->{abilities}[$abilities]{properties}) eq "ARRAY" and scalar(@{$decode_json->{abilities}[$abilities]{properties}}) > 0 ) {
             foreach my $propertie (@{$decode_json->{abilities}[$abilities]{properties}}) {
                 readingsBulkUpdateIfChanged($hash,$decode_json->{abilities}[$abilities]{name}.'-'.$propertie->{name},GardenaSmartDevice_RigRadingsValue($hash,$propertie->{value})) if( defined($propertie->{value})
                                                             and $decode_json->{abilities}[$abilities]{name}.'-'.$propertie->{name} ne 'radio-quality'
@@ -345,7 +345,7 @@ sub GardenaSmartDevice_WriteReadings($$) {
 
     do {
         
-        if( ref($decode_json->{settings}[$settings]{value}) eq "ARRAY" and $decode_json->{settings}[$settings]{name} eq 'starting_points' ) {;
+        if( ref($decode_json->{settings}[$settings]{value}) eq "ARRAY" and $decode_json->{settings}[$settings]{name} eq 'starting_points' ) {
             #save the startingpointid needed to update the startingpoints
             if ($hash->{helper}{STARTINGPOINTID} ne $decode_json->{settings}[$settings]{id}) {
                 $hash->{helper}{STARTINGPOINTID} = $decode_json->{settings}[$settings]{id};
