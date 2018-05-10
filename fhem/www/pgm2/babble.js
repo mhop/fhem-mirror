@@ -1,7 +1,7 @@
 //########################################################################################
 // babble.js
-// Version 1.25
-// See 95_Babble for licensing
+// Version 1.4
+// See 95_Babble.pm for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
 
@@ -190,7 +190,7 @@ function babble_addrow(name, devx, rowx) {
     cell6.innerHTML = newcheck;
 }
 
-function babble_remrow(name, devx, rowx) {
+function babble_remrow(name, devx, rowx, rowy) {
     var table = document.getElementById("devstable");
     var url = document.location.protocol + "//" + document.location.host + "/fhem";
     var rown = rowx;
@@ -231,7 +231,7 @@ function babble_remrow(name, devx, rowx) {
       target = "none";
     }
     //
-    cmd = '{Babble_RemCmd("' + name + '","' + bdev + '","' + place + '","' + verb + '","' + target + '")}';
+    cmd = '{Babble_RemCmd("' + name + '","' + bdev + '","' + place + '","' + verb + '","' + target + '","' + rowy + '")}';
     FW_cmd(url + '?XHR=1&fwcsrf=' + csrfToken + '&cmd.' + name + '=' + cmd);
     table.deleteRow(rown);
 }
