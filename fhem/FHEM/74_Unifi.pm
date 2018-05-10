@@ -22,6 +22,8 @@
 #  - feature: 74_Unifi: update VC-readings immediately when getting voucher
 # V 2.2.2
 #  - fixed:   74_Unifi: restart-typo in poe
+# V 2.2.3
+#  - fixed:   74_Unifi: Cookies for UnifiController 5.9.4
 
 
 package main;
@@ -794,7 +796,7 @@ sub Unifi_Login_Receive($) {
                 for (split("\r\n",$param->{httpheader})) {
                     if(/^Set-Cookie/) {
                         s/Set-Cookie:\s(.*?);.*/Cookie: $1/;
-                        $hash->{httpParams}->{header} .= $_.'\r\n';
+                        $hash->{httpParams}->{header} .= 'Cookie: '.$1.';\r\n';
                     }
                 }
                 if($hash->{httpParams}->{header} ne '') {

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_Unifi: Cookies for UnifiController 5.9.4
   - bugfix:  74_GardenaSmartDevice: fix uninitialized value $abilities
   - feature: 72_FB_CALLMONITOR: support for wildcard phonebook entries (numbers
                                 with trailing star sign)
