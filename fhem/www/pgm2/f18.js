@@ -2,7 +2,7 @@
 FW_version["f18.js"] = "$Id$";
 
 // TODO: absPos,hierMenu+Pin,menuBorder,f18style.css,SVGcolors,floorplan
-var f18_attr, f18_aCol, f18_sd, f18_isMobile, f18_icon={}, f18_hasPos, f18_room;
+var f18_attr={}, f18_sd, f18_icon={}, f18_hasPos, f18_room;
 var f18_small = (screen.width < 480 || screen.height < 480);
 
 $(window).resize(f18_resize);
@@ -15,15 +15,15 @@ $(document).ready(function(){
     if(!f18_sd)
       f18_sd = {};
     f18_attr = f18_sd.f18;
-    delete(f18_attr.cols); // fix the past
+    if(f18_attr)
+      delete(f18_attr.cols); // fix the past
 
   } else {
     f18_sd = {};
-    f18_attr = {};
 
   }
 
-  if(!f18_attr) {
+  if(!f18_sd.f18) {
     f18_attr = { "Pinned.menu":"true" };
     f18_resetCol();
     f18_sd.f18 = f18_attr;
@@ -47,7 +47,7 @@ $(document).ready(function(){
   if(f18_attr.rightMenu)
     $("body").addClass("rightMenu");
 
-  f18_aCol = getComputedStyle($("a").get(0),null).getPropertyValue('color'); 
+  var f18_aCol = getComputedStyle($("a").get(0),null).getPropertyValue('color');
   for(var i in f18_icon)
     f18_icon[i] = f18_icon[i].replace('gray', f18_aCol);
   f18_icon.pinOut = f18_icon.pinIn
