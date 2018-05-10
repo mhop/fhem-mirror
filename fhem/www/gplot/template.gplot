@@ -1,7 +1,5 @@
 ############################
-# Display the power reported by the EM1010
-# Corresponding FileLog definition:
-# define ememlog FileLog /var/log/fhem/emem-%Y.log emem:power.*
+# Template .gplot file for creating a new SVG instance
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'

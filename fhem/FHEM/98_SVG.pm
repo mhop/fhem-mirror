@@ -764,17 +764,19 @@ SVG_readgplotfile($$$)
   # Read in the template gnuplot file.  Digest the #FileLog lines.  Replace
   # the plot directive with our own, as we offer a file for each line
   my (%srcDesc, @data, $plot);
+  my ($err1, $err2, @svgplotfile);
 
+  return ("Nonexisting device $wl specified", @svgplotfile)
+        if(!$defs{$wl});
   my $ld = $defs{$wl}{LOGDEVICE}
-     if($defs{$wl} && $defs{$wl}{LOGDEVICE});
+     if($defs{$wl}{LOGDEVICE});
   my $ldType = $defs{$defs{$wl}{LOGDEVICE}}{TYPE}
      if($ld && $defs{$ld});
-  if(!$ldType && $defs{$wl}) {
+  if(!$ldType) {
     $ldType = $defs{$wl}{TYPE};
     $ld = $wl;
   }
 
-  my ($err1, $err2, @svgplotfile);
   ($err1, @svgplotfile) = FileRead($gplot_pgm);
   ($err2, @svgplotfile) = FileRead("$FW_gplotdir/template.gplot") if($err1);
   return ($err1, undef) if($err2);
@@ -819,7 +821,7 @@ SVG_readgplotfile($$$)
     }
 
     if($plotfn) {
-      Log 3, "$wl: space is not allowed in $ldType definition: $plotfn"
+      Log 3, "$wl: space is not allowed in >$ldType< definition: $plotfn"
         if($plotfn =~ m/\s/);
       if ($specval) {
         my @spec = split(" ",$specval);
@@ -1113,10 +1115,10 @@ SVG_doShowLog($$$$;$)
 
   my ($err, $cfg, $plot, $srcDesc) = SVG_readgplotfile($wl, $gplot_pgm, $pm);
   if($err || !$defs{$d}) {
-    my $msg = ($defs{$d} ? "Cannot read $gplot_pgm" : "No Logdevice $d");
+    my $msg = ($err ? $err : "No Logdevice >$d<");
     Log3 $FW_wname, 1, $msg;
 
-    if($pm =~ m/SVG/) { # FW_fatal for SVG:
+    if($pm && $pm =~ m/SVG/) { # FW_fatal for SVG:
       $FW_RETTYPE = "image/svg+xml";
       FW_pO '<svg xmlns="http://www.w3.org/2000/svg">';
       FW_pO '<text x="20" y="20">'.$msg.'</text>';
