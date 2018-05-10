@@ -1318,8 +1318,7 @@ SVG_digestConf($$)
     $lAxis[$i] = "x1y2" if(!$lAxis[$i]);
     $lStyle[$i] = "class=\"SVGplot ".
                         (defined($lStyle[$i]) ? $lStyle[$i] : "l$i")."\"";
-    $lWidth[$i] = (defined($lWidth[$i]) ?
-                        "style=\"stroke-width:$lWidth[$i]\"" :"");
+    $lWidth[$i] = (defined($lWidth[$i]) ? "stroke-width:$lWidth[$i]" :"");
   }
 
   $conf{lAxis}  = \@lAxis;
@@ -1458,16 +1457,26 @@ SVG_render($$$$$$$$$$)
   }
 
   ######################
+  # Mask:
+  SVG_pO "<defs>".
+           "<mask id='mask_$name' x='0' y='0' width ='$ow' height ='$oh'>".
+             sprintf("<rect x='%d' y='%d' width='%d' height='%d' ",
+                     $x-2, $y-1, $w+2, $h+1).
+                "style='stroke:none; fill:#ffffff'/>".
+           "</mask>".
+         "</defs>";
+
+  ######################
   # Rectangle
-  SVG_pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" rx=\"8\" ry=\"8\" ".
-        "fill=\"none\" class=\"border\"/>";
+  SVG_pO "<rect x='$x' y='$y' width ='$w' height ='$h' rx='8' ry='8' ".
+        "fill='red' class='border'/>";
 
   my ($off1,$off2) = ($x+$w/2, 3*$y/4);
   my $title = ($conf{title} ? $conf{title} : " ");
   $title =~ s/</&lt;/g;
   $title =~ s/>/&gt;/g;
-  SVG_pO "<text id=\"svg_title\" x=\"$off1\" y=\"$off2\" " .
-        "class=\"title\" text-anchor=\"middle\">$title</text>";
+  SVG_pO "<text id='svg_title' x='$off1' y='$off2' " .
+        "class='title' text-anchor='middle'>$title</text>";
 
   ######################
   # Left label = ylabel and right label = y2label
@@ -1936,12 +1945,13 @@ SVG_render($$$$$$$$$$)
     my $dec = length(sprintf("%d",$hmul*3))-1;
     $dec = 0 if($dec < 0);
     my $attributes = "id=\"line_$idx\" decimals=\"$dec\" ".
+          "style='mask:url(#mask_$name); $conf{lWidth}[$idx]' ".
           "x_min=\"$x\" ".
           ($conf{xrange}?"x_off=\"$xmin\" ":"x_off=\"$fromsec\" ").
           ($conf{xrange}?"x_mul=\"$xmul\" ":"t_mul=\"$tmul\" ").
           "y_h=\"$yh\" y_min=\"$min\" y_mul=\"$hmul\" title=\"$tl\" ".
           ($log eq 'log'?"log_scale=\"$f_log\" ":"").
-          "onclick=\"parent.svg_click(evt)\" $conf{lWidth}[$idx]";
+          "onclick=\"parent.svg_click(evt)\"";
     my $lStyle = $conf{lStyle}[$idx];
     my $isFill = ($conf{lStyle}[$idx] =~ m/fill/);
     my $doClose = $isFill;
