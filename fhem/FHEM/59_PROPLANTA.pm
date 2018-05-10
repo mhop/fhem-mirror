@@ -55,10 +55,11 @@ my $curReadingType = 0;
   #   5 = Time Col 2-5
   #   6 = Time Col 3
   #   7 = alternative text of image Col 2-5 (weather state)
-  #   8 = MinMaxNummer Col 3
+  #   8 = MinMaxNummer Col 3 (cloud base)
   #   9 = Date Col 2-5 / bold
-  #   10 = alternative text of Col 3 (Wind direction)
+  #   10 = alternative text of Col 3 (wind direction)
   #   11 = alternative text of image Col 3 (current weather state)
+  #   12 = Text Col 3
   my @knownNoneIDs = ( ["Temperatur", "temperature", 1] 
       ,["relative Feuchte", "humidity", 1]
       ,["Sichtweite", "visibility", 1]
@@ -69,6 +70,7 @@ my $curReadingType = 0;
       ,["Taupunkt", "dewPoint", 1]
       ,["Uhrzeit", "obsTime", 6]
       ,["Höhe der", "cloudBase", 8]
+      ,["H&ouml;he der", "cloudBase", 8]
   );
 
   # 1 = Tag-ID, 2 = readingName, 3 = Tag-Type (see above)
@@ -166,12 +168,19 @@ my $curReadingType = 0;
      ,"Ost-Nordost" => 68
      ,"Ost" => 90
      ,"Ost-Südost" => 113
+     ,"Ost-S&uuml;dost" => 113
      ,"Südost" => 135
+     ,"S&uuml;dost" => 135
      ,"Süd-Südost" => 158
+     ,"S&uuml;d-S&uuml;dost" => 158
      ,"Süd" => 180
+     ,"S&uuml;d" => 180
      ,"Süd-Südwest" => 203
+     ,"S&uuml;d-S&uuml;dwest" => 203
      ,"Südwest" => 225
+     ,"S&uuml;dwest" => 225
      ,"West-Südwest" => 248
+     ,"West-S&uuml;dwest" => 248
      ,"West" => 270
      ,"West-Nordwest" => 203
      ,"Nordwest" => 225
@@ -326,6 +335,15 @@ sub text
             push( @texte, $readingName."|".$text ); 
          }
       }
+   # Tag-Type 12 = Text Col 3
+      elsif ($curReadingType == 12) {
+         if ( $curCol == 3 )
+         {
+            $readingName = $curReadingName;
+            push( @texte, $readingName."|".$text ); 
+            $curReadingType = 0;
+         }
+      }
    }
 }
 
@@ -361,10 +379,10 @@ sub start
       $readingName = "fc" . ($startDay+$curCol-2) . "_" . $readingName     if $curReadingType == 7;
       $text = $attr->{alt};
       $text =~ s/Wetterzustand: //;
-      $text =~ s/�/oe/;
-      $text =~ s/�/ae/;
-      $text =~ s/�/ue/;
-      $text =~ s/�/ss/;
+#      $text =~ s/ö/oe/;
+#      $text =~ s/ä/ae/;
+#      $text =~ s/ü/ue/;
+#      $text =~ s/ß/ss/;
       push( @texte, $readingName . "|" . $text ); 
     # Image URL
       push( @texte, $readingName."Icon" . "|" . $attr->{src} ); 
@@ -402,6 +420,7 @@ sub end
 package main;
 use strict;
 use feature qw/say switch/;
+use Encode qw/from_to/;
 use warnings;
 
 my $missingModul;
@@ -565,7 +584,11 @@ sub PROPLANTA_HtmlAcquire($$)
    }
 
    PROPLANTA_Log $hash, 4, length($response->content)." characters captured";
-   return $response->content;
+   
+   my $returnString = $response->content;
+   from_to($returnString,"iso-8859-1","utf8", Encode::FB_QUIET);
+   
+   return $returnString;
 }
 
 
