@@ -15,7 +15,16 @@ sequence_Initialize($)
   $hash->{DefFn} = "sequence_Define";
   $hash->{UndefFn} = "sequence_Undef";
   $hash->{NotifyFn} = "sequence_Notify";
-  $hash->{AttrList} = "disable:0,1 triggerPartial:1,0 showtime:1,0 reportEvents:1,0";
+  no warnings 'qw';
+  my @attrList = qw(
+    disable:0,1
+    disabledForIntervals
+    reportEvents:1,0
+    triggerPartial:1,0 
+    showtime:1,0
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
 }
 
 
@@ -59,7 +68,7 @@ sequence_Notify($$)
   my ($hash, $dev) = @_;
 
   my $ln = $hash->{NAME};
-  return "" if($attr{$ln} && $attr{$ln}{disable});
+  return "" if(IsDisabled($ln));
 
   my $n = $dev->{NAME};
   my $re = $hash->{RE};
@@ -204,6 +213,7 @@ sequence_Undef($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#triggerPartial">triggerPartial</a><br>
       if set (to 1), and not all the events of a sequence are received, then a
@@ -293,25 +303,7 @@ sequence_Undef($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
-    <li><a href="#triggerPartial">triggerPartial</a><br>
-      Falls gesetzt (auf 1), und nicht alle erwarteten Events eingetroffen
-      sind, dann wird ein partial_X Event generiert, wobei X durch Anzahl der
-      eingetroffenen Events ersetzt wird. Beispiel:<br><code><ul>
-      fhem> define seq sequence d1:on 1 d1:on 1 d1:on<br>
-      fhem> attr seq triggerPartial<br>
-      fhem> set d1 on;; sleep 0.5;; set d1 on<br>
-      </ul></code>
-      erzeugt das Event "seq partial_2". Dies kann verwendet werden, um z.Bsp.
-      einer Taste unterschiedliche Aufgaben zuzuweisen, jenachdem wie oft sie
-      gedr&uuml;ckt wurde.
-      </li>
-  </ul>
-  <br>
-
-  <a name="sequenceattr"></a>
-  <b>Attributes</b>
-  <ul>
-    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#triggerPartial">triggerPartial</a><br>
       Falls gesetzt (auf 1), und nicht alle erwarteten Events eingetroffen
