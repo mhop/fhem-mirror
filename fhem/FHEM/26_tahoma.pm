@@ -49,6 +49,7 @@
 # 2017-07-08 V 0215 login delay increased automatically up to 160s if login failed
 # 2017-07-08 V 0215 default set commands on devices without commands deleted
 # 2017-10-08 V 0216 group definition added
+# 2018-05-10 V 0217 disable activated on devices
 
 package main;
 
@@ -121,7 +122,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0216";
+  my $ModuleVersion = "0217";
   
   my $subtype;
   my $name = $a[0];
@@ -561,11 +562,13 @@ sub tahoma_updateDevices($)
         $def->{inOID} = $device->{oid};
         $def->{inClass} = 'RollerShutter';
         $def->{inClass} = $attr{$def->{NAME}}{placeClasses} if (defined $attr{$def->{NAME}}{placeClasses});
+        $device->{NAME} = $def->{NAME};
       }
       elsif( defined($device) && ($subtype eq 'SCENE') ) {
         Log3 $name, 4, "$name: I/O device is label=".$device->{label};
         $def->{inLabel} = $device->{label};
         $def->{inOID} = $device->{oid};
+        $device->{NAME} = $def->{NAME};
       }
     }
     elsif (defined($def->{device}) && !defined($def->{inType}))
@@ -580,6 +583,7 @@ sub tahoma_updateDevices($)
         $def->{inPlaceOID} = $device->{placeOID};
         $def->{inClass} = $device->{uiClass};
         $device->{levelInvert} = $attr{$def->{NAME}}{levelInvert} if (defined $attr{$def->{NAME}}{levelInvert});
+        $device->{NAME} = $def->{NAME};
       }
     }
   }
@@ -671,7 +675,7 @@ sub tahoma_getDeviceList($$$$)
   foreach my $device (@{$devices}) {
     if ( defined($device->{deviceURL}) && defined($device->{placeOID}) && defined($device->{uiClass}) ) {
       if (( grep { $_ eq $device->{uiClass}} @classes ) && ($device->{placeOID} eq $oid)) {
-        push ( @{$deviceList}, { device => $device->{deviceURL}, class => $device->{uiClass}, levelInvert => $device->{levelInvert} } ) ;
+        push ( @{$deviceList}, { device => $device->{deviceURL}, class => $device->{uiClass}, levelInvert => $device->{levelInvert} } ) if !($attr{$device->{NAME}}{disable});
         #print "tahoma_getDeviceList url=$device->{deviceURL} devices=".scalar @{$deviceList}."\n";
       }
     } elsif ( defined($device->{oid}) && defined($device->{subPlaces}) ) {
@@ -693,7 +697,7 @@ sub tahoma_getGroupList($$$)
   my @groupDevices = split(',',$oid);
   foreach my $module (@groupDevices) {
     if (defined($defs{$module}) && defined($defs{$module}{device}) && defined($defs{$module}{inClass})) {
-      push ( @{$deviceList}, { device => $defs{$module}{device}, class => $defs{$module}{inClass}, levelInvert => $attr{$module}{levelInvert} } ) ;
+      push ( @{$deviceList}, { device => $defs{$module}{device}, class => $defs{$module}{inClass}, levelInvert => $attr{$module}{levelInvert} } ) if !($attr{$module}{disable});
     }
   }
 }
@@ -1386,7 +1390,7 @@ sub tahoma_Set($$@)
     {
       if( $cmd eq (split(":",$command))[0])
       {
-        tahoma_applyRequest($hash,$cmd,$val);
+        tahoma_applyRequest($hash,$cmd,$val) if !($attr{$hash->{NAME}}{disable});
         return undef;
       }
     }
@@ -1396,12 +1400,12 @@ sub tahoma_Set($$@)
     $list = "start:noArg startAt cancel:noArg";
 
     if( $cmd eq "start" ) {
-      tahoma_launchActionGroup($hash);
+      tahoma_launchActionGroup($hash) if !($attr{$hash->{NAME}}{disable});
       return undef;
     }
     
     if( $cmd eq "startAt" ) {
-      tahoma_scheduleActionGroup($hash,$val);
+      tahoma_scheduleActionGroup($hash,$val) if !($attr{$hash->{NAME}}{disable});
       return undef;
     }
     
