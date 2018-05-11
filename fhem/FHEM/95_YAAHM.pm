@@ -47,7 +47,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "1.53";
+my $yaahmversion    = "1.54";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -1184,7 +1184,15 @@ sub YAAHM_time {
   readingsBulkUpdate($hash,"tr_housetime",$yaahm_tt->{$targettime});
   readingsBulkUpdate($hash,"housephase",$targetphase);
   readingsBulkUpdate($hash,"tr_housephase",$yaahm_tt->{$targetphase});
+  if( $targettime eq "wakeup" ){
+    $hash->{DATA}{"WT"}[0]{"next"} = "";
+    readingsBulkUpdate($hash,"next_0","");
+  }elsif( $targettime eq "sleep" ){ 
+    $hash->{DATA}{"WT"}[1]{"next"} = "";
+    readingsBulkUpdate($hash,"next_1","");
+  }
   readingsEndUpdate($hash,1); 
+  YAAHM_setWeeklyTime($hash);
   
   #-- helper function not executed, e.g. by call from external timer
   return
