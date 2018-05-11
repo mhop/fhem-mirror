@@ -691,27 +691,34 @@ sub HusqvarnaAutomower_ToGerman($$) {
 	my $name = $hash->{NAME};
 	
 	my %langGermanMapping = (
-		#'initialized'											=> 'initialisiert',
+		#'initialized'										=> 'initialisiert',
 		#'authenticated'										=> 'authentifiziert',
-		#'disabled'												=> 'deaktiviert',
+		#'disabled'											=> 'deaktiviert',
 		#'connected'											=> 'verbunden',
 
 		'SENSOR'                        						=>  'Sensor',
-		'COMPLETED_CUTTING_TODAY_AUTO'                        	=>  'Fertig für heute',
+		'COMPLETED_CUTTING_TODAY_AUTO'                      	=>  'Fertig für heute',
 		
-		'MAIN_AREA'                        						=>  'Hauptbereich',
-		'AUTO'                        							=>  'Automatisch',
-
-		'OK_CUTTING'                   							=>  'mäht',
+		'MAIN_AREA'                        					=>  'Hauptbereich',
+		'AUTO'                        						=>  'Automatisch',
+		
+		'MOWING'												=>	'mäht',
+		'NO_SOURCE'											=>	'keine Quelle',
+		'NOT_APPLICABLE'										=>	'nicht zutreffend',
+		
+		'CHARGING'											=>	'lädt',
+		'MOWER_CHARGING'										=>	'Automower lädt',
+		
+		'OK_CUTTING'                   						=>  'mäht',
         'OK_CUTTING_TIMER_OVERRIDDEN'       					=>  'manuelles Mähen',
 
-		'PAUSED' 					                           	=>  'pausiert',
+		'PAUSED'												=>  'pausiert',
 
 		'OK_SEARCHING'                      					=>  'sucht Ladestation',
 		'OK_LEAVING'                        					=>  'verlässt Ladestation',
 
 		'OK_CHARGING'                       					=>  'lädt',
-		'PARKED_IN_CS'                        					=>  'In der Ladestation geparkt',
+		'PARKED_IN_CS'                        				=>  'In der Ladestation geparkt',
 
         'PARKED_TIMER'                      					=>  'geparkt nach Zeitplan',
         'PARKED_PARK_SELECTED'              					=>  'geparkt',
