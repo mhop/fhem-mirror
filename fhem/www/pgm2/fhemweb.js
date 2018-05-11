@@ -928,6 +928,32 @@ FW_doUpdate(evt)
   var retryTime = 5000;
   var now = new Date()/1000;
 
+  function
+  setValue(d) // is Callable from eval below
+  {
+    $("[informId='"+d[0]+"']").each(function(){
+      if(this.setValueFn) {     // change the select/etc value
+        this.setValueFn(d[1].replace(/\n/g, '\u2424'));
+
+      } else {
+        if(d[2].match(/\n/) && !d[2].match(/<.*>/)) // format multiline
+          d[2] = '<html><pre>'+d[2]+'</pre></html>';
+
+        var ma = /^<html>([\s\S]*)<\/html>$/.exec(d[2]);
+        if(!d[0].match("-")) // not a reading
+          $(this).html(d[2]);
+        else if(ma)
+          $(this).html(ma[1]);
+        else
+          $(this).text(d[2]);
+
+        if(d[0].match(/-ts$/))  // timestamps
+          $(this).addClass('changed');
+        $(this).find("a").each(function() { FW_replaceLink(this) });
+      }
+    });
+  }
+
   // iOS closes HTTP after 60s idle, websocket after 240s idle
   if(now-FW_lastDataTime > 59) {
     errstr="";
@@ -988,32 +1014,6 @@ FW_doUpdate(evt)
     var d = JSON.parse(l);
     if(d.length != 3)
       continue;
-
-    function
-    setValue(d) // is Callable from eval below
-    {
-      $("[informId='"+d[0]+"']").each(function(){
-        if(this.setValueFn) {     // change the select/etc value
-          this.setValueFn(d[1].replace(/\n/g, '\u2424'));
-
-        } else {
-          if(d[2].match(/\n/) && !d[2].match(/<.*>/)) // format multiline
-            d[2] = '<html><pre>'+d[2]+'</pre></html>';
-
-          var ma = /^<html>([\s\S]*)<\/html>$/.exec(d[2]);
-          if(!d[0].match("-")) // not a reading
-            $(this).html(d[2]);
-          else if(ma)
-            $(this).html(ma[1]);
-          else
-            $(this).text(d[2]);
-
-          if(d[0].match(/-ts$/))  // timestamps
-            $(this).addClass('changed');
-          $(this).find("a").each(function() { FW_replaceLink(this) });
-        }
-      });
-    }
 
     if( d[0].match(/^#FHEMWEB:/) ) {
       eval(d[1]);
