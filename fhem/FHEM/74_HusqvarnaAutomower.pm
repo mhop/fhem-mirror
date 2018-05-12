@@ -691,41 +691,45 @@ sub HusqvarnaAutomower_ToGerman($$) {
 	my $name = $hash->{NAME};
 	
 	my %langGermanMapping = (
-		#'initialized'										=> 'initialisiert',
+		#'initialized'											=> 'initialisiert',
 		#'authenticated'										=> 'authentifiziert',
-		#'disabled'											=> 'deaktiviert',
+		#'disabled'												=> 'deaktiviert',
 		#'connected'											=> 'verbunden',
 
-		'SENSOR'                        						=>  'Sensor',
-		'COMPLETED_CUTTING_TODAY_AUTO'                      	=>  'Fertig für heute',
-		
-		'MAIN_AREA'                        					=>  'Hauptbereich',
-		'AUTO'                        						=>  'Automatisch',
-		
-		'MOWING'												=>	'mäht',
-		'NO_SOURCE'											=>	'keine Quelle',
+		'NO_SOURCE'												=>	'keine Quelle',
 		'NOT_APPLICABLE'										=>	'nicht zutreffend',
 		
-		'CHARGING'											=>	'lädt',
-		'MOWER_CHARGING'										=>	'Automower lädt',
+		'AUTO'                        							=>  'Automatisch',
+		'MAIN_AREA'                        						=>  'Hauptbereich',
 		
-		'OK_CUTTING'                   						=>  'mäht',
-        'OK_CUTTING_TIMER_OVERRIDDEN'       					=>  'manuelles Mähen',
+		'MOWING'												=>	'mäht',
+		'CHARGING'												=>	'lädt',
+		
+		'LEAVING'												=>  'verlässt Ladestation',
+		'GOING_HOME'											=> 	'auf dem Weg zur Ladestation',
+		'WEEK_TIMER'											=> 	'Wochen-Zeitplan',
 
+		'PARKED_IN_CS'                        					=>  'In der Ladestation geparkt',
+		'COMPLETED_CUTTING_TODAY_AUTO'                      	=>  'Fertig für heute',
 		'PAUSED'												=>  'pausiert',
 
-		'OK_SEARCHING'                      					=>  'sucht Ladestation',
-		'OK_LEAVING'                        					=>  'verlässt Ladestation',
-
-		'OK_CHARGING'                       					=>  'lädt',
-		'PARKED_IN_CS'                        				=>  'In der Ladestation geparkt',
-
-        'PARKED_TIMER'                      					=>  'geparkt nach Zeitplan',
-        'PARKED_PARK_SELECTED'              					=>  'geparkt',
+		'SENSOR'                        						=>  'Sensor',
 
         'OFF_DISABLED'                      					=>  'ausgeschaltet',
         'OFF_HATCH_OPEN'                    					=>  'Abdeckung ist offen',
         'OFF_HATCH_CLOSED'                  					=>  'Ausgeschaltet, manueller Start erforderlich',
+		
+
+        'PARKED_TIMER'                      					=>  'geparkt nach Zeitplan',
+        'PARKED_PARK_SELECTED'              					=>  'geparkt',
+
+		'MOWER_CHARGING'										=>	'Automower lädt',
+
+		'OK_SEARCHING'                      					=>  'sucht Ladestation',
+		'OK_LEAVING'                        					=>  'verlässt Ladestation',
+		'OK_CHARGING'                       					=>  'lädt',
+		'OK_CUTTING'                   							=>  'mäht',
+        'OK_CUTTING_TIMER_OVERRIDDEN'       					=>  'manuelles Mähen',
 
         'UNKNOWN'                           =>  'unbekannter Status',
         'ERROR'                             =>  'Fehler',
