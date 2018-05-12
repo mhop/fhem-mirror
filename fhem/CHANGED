@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  98_dewpoint: Don't manipulate STATE of target device if has
+                          stateFormat defined.
   - new:     55_DWD_OpenData: weather and alerts from DWD
   - bugfix:  74_Unifi: Cookies for UnifiController 5.9.4
   - bugfix:  74_GardenaSmartDevice: fix uninitialized value $abilities

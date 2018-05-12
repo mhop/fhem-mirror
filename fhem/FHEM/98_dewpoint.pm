@@ -311,7 +311,9 @@ dewpoint_Notify($$)
         }	
 
         $sensor = $new_name;
-        if ($temp_name ne "T") {
+
+        my $has_state_format = defined(AttrVal($dev->{NAME}, "stateFormat", undef));
+        if ($temp_name ne "T" || $has_state_format) {
             $current = $dewpoint;
             readingsBulkUpdate($dev, $sensor, $current);
             readingsEndUpdate($dev, 1);
@@ -547,9 +549,11 @@ dewpoint_absFeuchte ($$)
 	If optional &lt;temp_name&gt;, &lt;hum_name&gt; and &lt;new_name&gt; is specified
 	then read temperature from reading &lt;temp_name&gt;, humidity from reading &lt;hum_name&gt;
 	and write the calculated dewpoint to reading &lt;new_name&gt;.<br>
-	If &lt;temp_name&gt; is T then use temperature from state T: H:, add &lt;new_name&gt; to the state.
+        <b>Obsolete, avoid for new definitions</b><br>
+	&nbsp;&nbsp;If &lt;temp_name&gt; is T then use temperature from state T: H:, add &lt;new_name&gt; to the STATE.
+        The addition to STATE only occurs if the target device does not define attribute "stateFormat".
     </ul>
-    <br>
+    <br><br>
 
     Example:<PRE>
     # Compute the dewpoint for the temperature/humidity
@@ -565,12 +569,13 @@ dewpoint_absFeuchte ($$)
 
     # Compute the dewpoint for the temperature/humidity
     # events of the device Aussen_1 offering temperature and humidity
-    # and insert is into STATE.
+    # and insert is into STATE unless Aussen_1 has attribute "stateFormat" defined.
+    # If "stateFormat" is defined then a reading D will be generated.
     define dew_state dewpoint dewpoint Aussen_1 T H D
 
     # Compute the dewpoint for the temperature/humidity
     # events of all devices offering temperature and humidity
-    # and insert the result into the STATE.
+    # and insert the result into the STATE. (See example above).
     # Example STATE: "T: 10 H: 62.5" will change to
     # "T: 10 H: 62.5 D: 3.2"
     define dew_state dewpoint dewpoint .* T H D
@@ -699,9 +704,11 @@ dewpoint_absFeuchte ($$)
     und Luftfeuchte und erzeugt daraus ein neues Reading namens dewpoint.<br/>
     Wenn &lt;temp_name&gt;, &lt;hum_name&gt; und &lt;new_name&gt; angegeben sind, 
     werden die Temperatur aus dem Reading &lt;temp_name&gt;, die Luftfeuchte aus dem 
-    Reading &lt;hum_name&gt; gelesen und als berechneter Taupunkt ins Reading &lt;new_name&gt; geschrieben.<br>
-    Wenn &lt;temp_name&gt; T lautet, wird die Temperatur aus state T: H: benutzt 
-    und &lt;new_name&gt; zu state hinzugef&uuml;gt.
+    Reading &lt;hum_name&gt; gelesen und als berechneter Taupunkt ins Reading &lt;new_name&gt; geschrieben.<br><br>
+    <b>Veraltet, f&uuml;r neue Definitionen nicht mehr benutzen</b><br>
+    &nbsp;&nbsp;Wenn &lt;temp_name&gt; T lautet, wird die Temperatur aus state T: H: benutzt 
+    und &lt;new_name&gt; zu STATE hinzugef&uuml;gt. Das hinzuf&uuml;gen zu STATE erfolgt nur, falls im Zielger&auml;t
+    das Attribut "stateFormat" nicht definiert ist.<br>
     <br/>
     Beispiele:
     <pre>
@@ -718,12 +725,13 @@ dewpoint_absFeuchte ($$)
 
     # Berechnet den Taupunkt aufgrund von Temperatur und Luftfeuchte
     # in Ereignissen, die vom Ger&auml;t Aussen_1 erzeugt wurden und erg&auml;nzt 
-    # mit diesem Wert den Status STATE.
+    # mit diesem Wert den Status STATE, falls in Aussen_1 das Attribut "stateFormat" nicht definiert ist.
+    # Falls "stateFormat" definiert ist, wird das reading "D" angelegt.
     define dew_state dewpoint dewpoint Aussen_1 T H D
 
     # Berechnet den Taupunkt aufgrund von Temperatur und Luftfeuchte
     # in Ereignissen, die von allen Ger&auml;ten erzeugt wurden die diese Werte ausgeben
-    # und erg&auml;nzt mit diesem Wert den Status STATE.
+    # und erg&auml;nzt mit diesem Wert den Status STATE. (Siehe Beispiel oben).
     # Beispiel STATE: "T: 10 H: 62.5" wird ver&auml;ndert nach
     # "T: 10 H: 62.5 D: 3.2"
     define dew_state dewpoint dewpoint .* T H D
