@@ -1,4 +1,4 @@
-REV 16731
+REV 16734
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-05-12_07:45:03 248541 ./CHANGED
+UPD 2018-05-13_07:45:03 248661 ./CHANGED
 UPD 2018-05-12_07:45:03 37253 ./MAINTAINER.txt
 UPD 2018-03-26_07:45:02 41123 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
@@ -354,7 +354,7 @@ UPD 2017-05-09_07:45:02 118318 FHEM/73_km200.pm
 UPD 2018-04-07_07:45:02 67361 FHEM/74_AMADDevice.pm
 UPD 2018-05-10_07:45:03 39817 FHEM/74_GardenaSmartDevice.pm
 UPD 2018-03-22_07:45:04 41340 FHEM/74_HOMBOT.pm
-UPD 2018-05-12_07:45:03 33308 FHEM/74_HusqvarnaAutomower.pm
+UPD 2018-05-13_07:45:03 33477 FHEM/74_HusqvarnaAutomower.pm
 UPD 2018-02-28_07:45:03 22902 FHEM/74_NUKIDevice.pm
 UPD 2017-04-26_07:45:02 35753 FHEM/74_Nmap.pm
 UPD 2017-05-03_07:45:02 64129 FHEM/74_THINKINGCLEANER.pm
@@ -480,7 +480,7 @@ UPD 2018-03-02_07:47:09 3985 FHEM/98_cmdalias.pm
 UPD 2018-03-25_07:45:03 20196 FHEM/98_configdb.pm
 UPD 2018-03-10_07:45:02 1997 FHEM/98_copy.pm
 UPD 2016-08-20_07:45:12 1200 FHEM/98_count.pm
-UPD 2018-01-20_07:45:02 34352 FHEM/98_dewpoint.pm
+UPD 2018-05-13_07:45:03 35148 FHEM/98_dewpoint.pm
 UPD 2016-12-03_07:45:16 5092 FHEM/98_dummy.pm
 UPD 2018-02-09_07:45:02 10560 FHEM/98_expandJSON.pm
 UPD 2018-05-10_07:45:03 47985 FHEM/98_feels_like.pm
@@ -667,8 +667,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-05-12_07:45:06 3446815 docs/commandref.html
-UPD 2018-05-11_07:45:07 2123486 docs/commandref_DE.html
+UPD 2018-05-13_07:45:06 3447133 docs/commandref.html
+UPD 2018-05-13_07:45:08 2123857 docs/commandref_DE.html
 UPD 2018-04-30_07:45:05 75663 docs/commandref_frame.html
 UPD 2018-04-30_07:45:05 85170 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
