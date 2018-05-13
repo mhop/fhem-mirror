@@ -1459,7 +1459,8 @@ SVG_render($$$$$$$$$$)
   ######################
   # Mask:
   SVG_pO "<defs>".
-           "<mask id='mask_$name' x='0' y='0' width ='$ow' height ='$oh'>".
+           "<mask id='mask_$name' maskUnits='userSpaceOnUse' ".
+                  "x='0' y='0' width ='$ow' height ='$oh'>".
              sprintf("<rect x='%d' y='%d' width='%d' height='%d' ",
                      $x-2, $y-1, $w+2, $h+1).
                 "style='stroke:none; fill:#ffffff'/>".
