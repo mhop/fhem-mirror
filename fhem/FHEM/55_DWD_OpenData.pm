@@ -1024,7 +1024,7 @@ sub DWD_OpenData_GetAlertsBlockingFn($)
   # get communion (5, 8) or district (1, 9) alerts for Germany from DWD server
   my $communeUnion = DWD_OpenData_IsCommuneUnionWarncellId($warncellId);
   my $alertLanguage = AttrVal($name, 'alertLanguage', 'DE');
-  my $url = 'https://opendata.dwd.de/weather/alerts/cap/'.($communeUnion? 'COMMUNEUNION' : 'DISTRICT').'_CELLS_STAT/Z_CAP_C_EDZW_LATEST_PVW_STATUS_PREMIUMCELLS_'.($communeUnion? 'COMMUNEUNION' : 'DISTRICT').'_'.$alertLanguage.'.zip';  
+  my $url = 'https://opendata.dwd.de/weather/alerts/cap/'.($communeUnion? 'COMMUNEUNION' : 'DISTRICT').'_CELLS_STAT/Z_CAP_C_EDZW_LATEST_PVW_STATUS_PREMIUMCELLS_'.($communeUnion? 'COMMUNEUNION' : 'DISTRICT').'_'.$alertLanguage.'.zip';
   my $param = {
                 url        => $url,
                 method     => "GET",
@@ -1216,10 +1216,10 @@ sub DWD_OpenData_ProcessAlerts($$$)
       Log3 $name, 3, "$name: DWD_OpenData_ProcessAlerts error: temp file name not defined";
     }
   }
-  
+
   # get rid of newlines and commas because of Blocking InformFn parameter restrictions
-  $errorMessage =~ s/\n/; /g; 
-  $errorMessage =~ s/,/;/g; 
+  $errorMessage =~ s/\n/; /g;
+  $errorMessage =~ s/,/;/g;
 
   Log3 $name, 5, "$name: DWD_OpenData_ProcessAlerts END";
 
@@ -1304,8 +1304,8 @@ sub DWD_OpenData_GetAlertsFinishFn(;$$$$)
       readingsSingleUpdate($hash, 'state', "alerts error: result file name not defined", 1);
       Log3 $name, 3, "$name: DWD_OpenData_GetAlertsFinishFn error: temp file name not defined";
     }
-    
-    $hash->{ALERTS_IN_CACHE} = scalar(keys(%{$dwd_alerts[0]})) + scalar(keys(%{$dwd_alerts[1]}));
+
+    $hash->{ALERTS_IN_CACHE} = (ref($dwd_alerts[0]) eq 'HASH'? scalar(keys(%{$dwd_alerts[0]})) : 0) + (ref($dwd_alerts[1]) eq 'HASH'? scalar(keys(%{$dwd_alerts[1]})) : 0);
 
     Log3 $name, 5, "$name: DWD_OpenData_GetAlertsFinishFn END";
   } else {
@@ -1460,6 +1460,9 @@ sub DWD_OpenData_Timer($)
 
  CHANGES
 
+ 13.05.2018 jensb
+ bugfix: total alerts in cache
+
  06.05.2018 jensb
  feature: detect empty alerts zip file
  bugfix:  preprocess exception messages from ProcessAlerts because Blocking FinishFn parameter content may not contain commas or newlines
@@ -1536,6 +1539,8 @@ sub DWD_OpenData_Timer($)
 
       <li>The weekday of the forecast will be in the language of your FHEM system. Enter <code>{$ENV{LANG}}</code> into the FHEM command line to verify.
       If nothing is displayed or you see an unexpected language setting, add <code>export LANG=de_DE.UTF-8</code> or something similar to your FHEM start script, restart FHEM and check again. If you get a locale warning when starting FHEM the required language pack might be missing. It can be installed depending on your OS and your preferences (e.g. <code>dpkg-reconfigure locales</code>, <code>apt-get install language-pack-de</code> or something similar). </li><br>
+
+      <li>The digits in a warncell id of a communeunion or a district are mostly identical to an <i>Amtliche Gemeindekennziffer</i> if you strip of the 1st digit from the warncell id. You can lookup an Amtliche Gemeindekennziffer using the name of a communeunion or district e.g. at <a href="https://www.statistik-bw.de/Statistik-Portal/gemeindeverz.asp">Statistische &Auml;mter des Bundes und der L&auml;nder</a>. Then add 8 for a communeunion or 1 or 9 for a district at the beginning and try to find an exact or near match in the <a href="https://www.dwd.de/DE/leistungen/opendata/help/warnungen/cap_warncellids_csv.csv">Warncell-IDs for CAP alerts catalogue</a>. This approach is an alternative to <i>guessing</i> the right warncell id by the name of a communeunion or district. </li><br>
 
       <li>Like some other Perl modules this module temporarily modifies the TZ environment variable for timezone conversions. This may cause unexpected results in multi threaded environments. </li><br>
 
@@ -1741,4 +1746,3 @@ sub DWD_OpenData_Timer($)
 =end html_DE
 
 =cut
-
