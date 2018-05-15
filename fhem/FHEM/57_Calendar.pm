@@ -3297,14 +3297,14 @@ sub CalendarEventsAsHtml($;$) {
     used instead.<br><br>
 
     Examples:<br>
-    <code>get MyCalendar filter:uid=="432dsafweq64yehdbwqhkd"</code><br>
-    <code>get MyCalendar filter:uid=~"^7"</code><br>
-    <code>get MyCalendar filter:mode=="alarm"</code><br>
-    <code>get MyCalendar filter:mode=~"alarm|upcoming"</code><br>
-    <code>get MyCalendar filter:field(summary)=~"Mama"</code><br>
-    <code>get MyCalendar filter:field(classification)=="PUBLIC"</code><br>
-    <code>get MyCalendar filter:field(summary)=~"Gelber Sack",mode=~"upcoming|start"</code><br>
-    <code>get MyCalendar filter:field(summary)=~"Gelber Sack" filter:mode=~"upcoming|start"</code>
+    <code>get MyCalendar events filter:uid=="432dsafweq64yehdbwqhkd"</code><br>
+    <code>get MyCalendar events filter:uid=~"^7"</code><br>
+    <code>get MyCalendar events filter:mode=="alarm"</code><br>
+    <code>get MyCalendar events filter:mode=~"alarm|upcoming"</code><br>
+    <code>get MyCalendar events filter:field(summary)=~"Mama"</code><br>
+    <code>get MyCalendar events filter:field(classification)=="PUBLIC"</code><br>
+    <code>get MyCalendar events filter:field(summary)=~"Gelber Sack",mode=~"upcoming|start"</code><br>
+    <code>get MyCalendar events filter:field(summary)=~"Gelber Sack" filter:mode=~"upcoming|start"</code>
     <br><br>
 
     The <u><code>series</code></u> parameter determines the display of
@@ -3331,9 +3331,9 @@ sub CalendarEventsAsHtml($;$) {
     </table><br>
 
     Examples:<br>
-    <code>get MyCalendar limit:count=10</code><br>
-    <code>get MyCalendar limit:from=-2d</code><br>
-    <code>get MyCalendar limit:count=10,from=0,to=+10d</code><br>
+    <code>get MyCalendar events limit:count=10</code><br>
+    <code>get MyCalendar events limit:from=-2d</code><br>
+    <code>get MyCalendar events limit:count=10,from=0,to=+10d</code><br>
     <br><br>
 
     </li>
