@@ -1921,6 +1921,7 @@ sub Calendar_Get($@) {
     my $timeFormat= AttrVal($name, "defaultTimeFormat",'%d.%m.%Y %H:%M');
     my @filters= ();
     my $next= undef;
+    my $count= undef;
 
     my ($paramerror, $arrayref)= Calendar_simpleParseWords(join(" ", @a));
     return "$name: Parameter parse error: $paramerror" if(defined($paramerror));
@@ -1986,6 +1987,29 @@ sub Calendar_Get($@) {
             return "$name: Illegal series specification: $seriesspec";
           }
         }
+      ### limit
+    } elsif($p =~ /^limit:(.+)$/) {
+        my ($limiterror, $limitarrayref)= Calendar_simpleParseWords($1, ",");
+        return "$name: Limit parse error: $limiterror" if(defined($limiterror));
+        my @limits= @{$limitarrayref};
+        for my $limit (@limits) {
+          if($limit =~ /count=([1-9]+\d*)/) {
+            $count= $1;
+          } elsif($limit =~ /from=([+-]?)(.+)/ ) {
+            my $sign= $1 eq "-" ? -1 : 1;
+            my ($error, $from)= Calendar_GetSecondsFromTimeSpec($2);
+            return "$name: $error" if($error);
+            push @filters, { ref => \&filter_endafter, param => $t+$sign*$from };
+          } elsif($limit =~ /to=([+-]?)(.+)/ ) {
+            my $sign= $1 eq "-" ? -1 : 1;
+            my ($error, $to)= Calendar_GetSecondsFromTimeSpec($2);
+            return "$name: $error" if($error);
+            push @filters, { ref => \&filter_startbefore, param => $t+$sign*$to };
+          } else {
+            return "$name: Illegal limit specification: $limit";
+          }
+
+      }
       } else {
         return "$name: Illegal parameter: $p";
       }
@@ -2006,9 +2030,10 @@ sub Calendar_Get($@) {
         } @events;
     }
 
+    my $n= 0;
     foreach my $event (@events) {
         push @texts, $event->formatted($format, $timeFormat);
-
+        last if(defined($count) && (++$n>= $count));
     }
     return "" if($#texts<0);
     return join("\n", @texts);
@@ -2020,6 +2045,7 @@ sub Calendar_Get($@) {
   if($cmd ~~ @cmds2) {
 
     return "argument is missing" if($#a < 2);
+    Log3 $hash, 2, "get $name $cmd is deprecated and will be removed soon. Use get $name events instead.";
     my $filter= $a[2];
 
 
@@ -2297,9 +2323,19 @@ sub filter_start($) {
     return $event->getMode() eq "start" ? 1 : 0;
 }
 
+sub filter_startbefore($$) {
+    my ($event, $param)= @_;
+    return $event->start() < $param ? 1 : 0;
+}
+
 sub filter_end($) {
     my ($event)= @_;
     return $event->getMode() eq "end" ? 1 : 0;
+}
+
+sub filter_endafter($$) {
+    my ($event, $param)= @_;
+    return $event->end() > $param ? 1 : 0;
 }
 
 sub filter_notend($) {
@@ -3153,12 +3189,12 @@ sub CalendarEventsAsHtml($;$) {
     Same as  <code>set &lt;name&gt; update</code><br><br></li>
 
 
-    <li><code>get &lt;name&gt; events [format:&lt;formatSpec&gt;] [timeFormat:&lt;timeFormatSpec&gt;] [filter:&lt;filterSpecs&gt;] [series:next[=&lt;max&gt;]]</code><br><br>
+    <li><code>get &lt;name&gt; events [format:&lt;formatSpec&gt;] [timeFormat:&lt;timeFormatSpec&gt;] [filter:&lt;filterSpecs&gt;] [series:next[=&lt;max&gt;]] [limit:&lt;limitSpecs&gt;]</code><br><br>
     The swiss army knife for displaying calendar events.
     Returns, line by line, information on the calendar events in the calendar &lt;name&gt;
     according to formatting and filtering rules.
     You can give none, one or several of the <code>format</code>,
-    <code>timeFormat</code>, <code>filter</code> and <code>series</code>
+    <code>timeFormat</code>, <code>filter</code>, <code>series</code> and <code>limit</code>
     parameters and it makes even sense to give the <code>filter</code>
     parameter several times.
     <br><br>
@@ -3275,9 +3311,35 @@ sub CalendarEventsAsHtml($;$) {
     recurring events. <code>series:next</code> limits the display to the
     next calendar event out of all calendar events in the series that have
     not yet ended. <code>series:next=&lt;max&gt;</code> shows at most the
-    <code>&lt;max&gt;</code> next calendar events in the series.<br><br>
+    <code>&lt;max&gt;</code> next calendar events in the series. This applies
+    per series. To limit the total amount of events displayed see the <code>limit</code>
+    parameter below.<br><br>
+
+    The <u><code>limit</code></u> parameter limits the number of events displayed.
+    <code>&lt;limitSpecs&gt;</code> is a comma-separated list of <code>&lt;limitSpec&gt;</code>
+    specifications.<br><br>
+
+    <table>
+    <tr><th align="left"><code>&lt;limitSpec&gt;</code></th><th align="left">description</th></tr>
+    <tr><td><code>count=&lt;n&gt;</code></td><td>shows at most <code>&lt;n&gt;</code> events, <code>&lt;n&gt;</code> is a positive integer</td></tr>
+    <tr><td><code>from=[+|-]&lt;timespec&gt;</code></td><td>shows only events that end after
+      a timespan &lt;timespec&gt; from now; use a minus sign for events in the
+      past; &lt;timespec&gt; is described below in the Attributes section</td></tr>
+    <tr><td><code>to=[+|-]&lt;timespec&gt;</code></td><td>shows only events that start before
+      a timespan &lt;timespec&gt; from now; use a minus sign for events in the
+      past; &lt;timespec&gt; is described below in the Attributes section</td></tr>
+    </table><br>
+
+    Examples:<br>
+    <code>get MyCalendar limit:count=10</code><br>
+    <code>get MyCalendar limit:from=-2d</code><br>
+    <code>get MyCalendar limit:count=10,from=0,to=+10d</code><br>
+    <br><br>
 
     </li>
+
+
+    <!-- DEPRECATED
 
     <li><code>get &lt;name&gt; &lt;format&gt; &lt;filter&gt; [&lt;max&gt;]</code><br>
     This command is deprecated. Use <code>get &lt;name&gt;  events ...</code>
@@ -3336,6 +3398,7 @@ sub CalendarEventsAsHtml($;$) {
     <br>
     </li>
 
+    -->
 
     <li><code>get &lt;name&gt; find &lt;regexp&gt;</code><br>
     Returns, line by line, the UIDs of all calendar events whose summary matches the regular expression
