@@ -1494,6 +1494,14 @@ The following local attributes are used by a wider range of devices:
         compression by default. Set httpcompress to 0 to disable this feature.
     </li><br>
 
+    <a name="keyFileName"></a>
+    <li>keyFileName<br>
+        FHEM modules store passwords and unique IDs in the file
+        FHEM/FhemUtils/uniqueID. In order to start multiple FHEM instances from
+        the same directory, you may set this attribute, whose value will
+        appended to FHEM/FhemUtils/
+    </li><br>
+
     <a name="logdir"></a>
     <li>logdir<br>
         If set, the %L attribute in the logfile attribute (or in the FileLog
@@ -1594,8 +1602,6 @@ The following local attributes are used by a wider range of devices:
     </li><br>
 
     <li><a href="#title">title</a><br>
-
-    <li><a href="#fheminfo">uniqueID</a><br>
 
     <a name="useInet6"></a>
     <li>useInet6<br>

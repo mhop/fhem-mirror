@@ -316,6 +316,7 @@ my @globalAttrList = qw(
   genericDisplayType:switch,outlet,light,blind,speaker,thermostat
   holiday2we
   httpcompress:0,1
+  keyFileName
   language:EN,DE
   lastinclude
   latitude
@@ -340,7 +341,6 @@ my @globalAttrList = qw(
   stacktrace:1,0
   statefile
   title
-  uniqueID
   updateInBackground:1,0
   updateNoFileCheck:1,0
   useInet6:1,0
@@ -5044,7 +5044,9 @@ sub
 getKeyValue($)
 {
   my ($key) = @_;
-  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/uniqueID";
+  my $fName = AttrVal("global", "keyFileName", "uniqueID");
+  $fName =~ s/\.\.//g;
+  $fName = $attr{global}{modpath}."/FHEM/FhemUtils/$fName";
   my ($err, @l) = FileRead($fName);
   return ($err, undef) if($err);
   for my $l (@l) {
@@ -5058,7 +5060,9 @@ sub
 setKeyValue($$)
 {
   my ($key,$value) = @_;
-  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/uniqueID";
+  my $fName = AttrVal("global", "keyFileName", "uniqueID");
+  $fName =~ s/\.\.//g;
+  $fName = $attr{global}{modpath}."/FHEM/FhemUtils/$fName";
   my ($err, @old) = FileRead($fName);
   my @new;
   if($err) {

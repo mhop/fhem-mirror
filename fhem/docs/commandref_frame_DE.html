@@ -1596,6 +1596,14 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         httpcompress auf 0 setzt, wird die Komprimierung deaktiviert.
     </li><br>
 
+    <a name="keyFileName"></a>
+    <li>keyFileName<br>
+        FHEM Module speichern Passw&ouml;rter und IDs in der Datei 
+        FHEM/FhemUtils/uniqueID. Um mehrere FHEM-Instanzen im gleichen
+        Verzeichnis starten zu k&ouml;nnen, kann man dieses Attribut setzen,
+        dessen Wert an FHEM/FhemUtils/ angeh&auml;ngt wird.
+    </li><br>
+
     <a name="logdir"></a>
     <li>logdir<br>
         Falls gesetzt, wird %L in dem logfile Attribut (oder in der Dateinamen 
@@ -1709,8 +1717,6 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     </li><br>
 
     <li><a href="#title">title</a><br>
-
-    <li><a href="#fheminfo">uniqueID</a>
 
     <a name="useInet6"></a>
     <li>useInet6<br>
