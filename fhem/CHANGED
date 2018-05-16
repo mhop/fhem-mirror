@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_dewpoint: Use NOTIFYDEV with framework functions
   - feature: 57_Calendar: new parameter "limit" (forum #87566)
   - bugfix:  55_DWD_OpenData: updateAlertsCache causing "not a HASH reference"
                               error on some platforms (forum #83097)
