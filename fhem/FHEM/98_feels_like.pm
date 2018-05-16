@@ -19,7 +19,7 @@ use strict;
 use warnings;
 
 # so "perl -w 98_feels_like.pm" should produce no syntax errors
-use vars qw($readingFnAttributes $defs);
+use vars qw($readingFnAttributes %defs);
 
 sub feels_like_Initialize($$)
 {
@@ -83,13 +83,27 @@ sub
 feels_like_Attr(@)
 {
     my ($cmd, $name, $a_name, $a_val) = @_;
+    my $hash = $defs{$name};
 
     if ($cmd eq "set" && $a_name eq "sunVisibility") {
         my @x = split(/, */, $a_val);
         if ((@x & 1) == 0 || $x[0] != 0 || $x[$#x] != 360) {
-            return "Value of sunVisibility must must be a list odd # of elemnts starting with 0 and ending with 360";
+            return "Value of sunVisibility must must be a list odd # of elements "
+                   . "starting with 0 and ending with 360";
         }
     }
+
+    if ($a_name eq 'disable') {
+        if ($cmd eq 'set') {
+            $hash->{DISABLED} = $a_val;
+            $hash->{STATE} = $a_val == 1 ? 'disabled' : 'active';
+        }
+        elsif ($cmd eq 'del') {
+            $hash->{DISABLED} = 0;
+            $hash->{STATE} = 'active';
+        }
+    }
+
     return undef;
 }
 
@@ -102,7 +116,7 @@ feels_like_Notify($$)
     my $hash_name = $hash->{NAME};
     my $dev_name = $dev->{NAME};
 
-    return undef if (AttrVal($hash_name, "disable", undef));
+    return undef if ($hash->{DISABLED});
 
     Log3($hash_name, 4, "feels_like_Notify: $hash_name for $dev_name");
 
