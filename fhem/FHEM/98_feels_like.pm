@@ -1333,15 +1333,4 @@ Elsevier, Kidlington, UK, 2013
 </ul>
 
 =end html
-
-=begin html_DE
-
-<a name="feels_like"></a>
-<h3>feels_like</h3>
-<ul>
-  Leider keine deutsche Dokumentation vorhanden. Die englische Version gibt es
-  hier: <a href='commandref.html#feels_like'>feels_like</a><br/>
-</ul>
-=end html_DE
-
 =cut
