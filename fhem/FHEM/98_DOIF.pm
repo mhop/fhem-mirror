@@ -1975,9 +1975,9 @@ sub CheckiTimerDoIf($$$) {
 
 
 
-sub CheckReadingDoIf($$)
+sub CheckReadingDoIf($$$)
 {
-  my ($readings,$eventa)=@_;
+  my ($mydevice,$readings,$eventa)=@_;
   my $max = int(@{$eventa});
   my $s;
   my $found=0;
@@ -1987,9 +1987,13 @@ sub CheckReadingDoIf($$)
   if (!defined $readings) {
     return 1;
   }
+  if ($readings !~ / $mydevice:.+ /) {
+    return 1;
+  }
+  
   foreach my $item (split(/ /,$readings)) {
     ($device,$reading)=(split(":",$item));
-    if (defined $reading) {
+    if (defined $reading and $mydevice eq $device) {
       for (my $j = 0; $j < $max; $j++) {
         $s = $eventa->[$j];
         $s = "" if(!defined($s));
@@ -2106,7 +2110,7 @@ sub DOIF_Perl_Trigger
       if (!defined CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEvents},1)) {
         next if (!defined ($hash->{devices}{$i}));
         next if ($hash->{devices}{$i} !~ / $device /);
-        next if (AttrVal($pn, "checkReadingEvent", 1) and !CheckReadingDoIf ($hash->{readings}{$i},$hash->{helper}{triggerEventsState}) and (defined $hash->{internals}{$i} ? $hash->{internals}{$i} !~ / $device:.+ /:1))
+        next if (AttrVal($pn, "checkReadingEvent", 1) and !CheckReadingDoIf ($device,$hash->{readings}{$i},$hash->{helper}{triggerEventsState}) and (defined $hash->{internals}{$i} ? $hash->{internals}{$i} !~ / $device:.+ /:1));
       }
       $event="$device";
     }
@@ -2174,7 +2178,7 @@ sub DOIF_Trigger
         if (AttrVal($pn, "checkall", 0) !~ "1|all|event" and !defined $checkall) {
           next if (!defined ($hash->{devices}{$i}));
           next if ($hash->{devices}{$i} !~ / $device /);
-          next if (AttrVal($pn, "checkReadingEvent", 1) and !CheckReadingDoIf ($hash->{readings}{$i},$hash->{helper}{triggerEventsState}) and (defined $hash->{internals}{$i} ? $hash->{internals}{$i} !~ / $device:.+ /:1))
+          next if (AttrVal($pn, "checkReadingEvent", 1) and !CheckReadingDoIf ($device,$hash->{readings}{$i},$hash->{helper}{triggerEventsState}) and (defined $hash->{internals}{$i} ? $hash->{internals}{$i} !~ / $device:.+ /:1))
         }
       }
       $event="$device";
@@ -2318,7 +2322,7 @@ DOIF_Notify($$)
       foreach my $item (split(/ /,$hash->{readings}{all})) {
         ($device,$reading)=(split(":",$item));
         if ($item and $device eq $dev->{NAME} and defined ($defs{$device}{READINGS}{$reading})) {
-          if (!AttrVal($pn, "checkReadingEvent", 1) or CheckReadingDoIf ("$item",$eventas)) {
+          if (!AttrVal($pn, "checkReadingEvent", 1) or CheckReadingDoIf ($device,"$item",$eventas)) {
             readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_".$reading,$defs{$device}{READINGS}{$reading}{VAL},0);
           }
         }
