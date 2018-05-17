@@ -38,6 +38,7 @@ use IO::Socket::Timeout;
 use JSON;
 use SetExtensions;
 
+
 #####################################
 sub TPLinkHS110_Initialize($)
 {
@@ -113,15 +114,28 @@ sub TPLinkHS110_Get($$)
 		$json = decode_json($data);
 	} or do {
 		Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
-                Log3 $hash, 5, "TPLinkHS110: $name json-raw: $data";
+        Log3 $hash, 5, "TPLinkHS110: $name json-raw: $data";
 		return;
 	};
 
 	Log3 $hash, 3, "TPLinkHS110: $name Get called. Relay state: $json->{'system'}->{'get_sysinfo'}->{'relay_state'}, RSSI: $json->{'system'}->{'get_sysinfo'}->{'rssi'}";
 	readingsBeginUpdate($hash);	
+	
+	my $hw_ver = $json->{'system'}->{'get_sysinfo'}->{'hw_ver'};
+	my %hwMap = hwMapping();
+	
 	foreach my $key (sort keys %{$json->{'system'}->{'get_sysinfo'}}) {
-		readingsBulkUpdate($hash, $key, $json->{'system'}->{'get_sysinfo'}->{$key});
-        }
+		my $sysinfoValue = $json->{'system'}->{'get_sysinfo'}->{$key};
+		
+		#adjust different hw_ver readings 
+		if (exists($hwMap{$hw_ver}{'system'}{'get_sysinfo'}{$key})) {
+			if (exists($hwMap{$hw_ver}{'system'}{'get_sysinfo'}{$key}{'factor'})) {
+				$sysinfoValue = $sysinfoValue * $hwMap{$hw_ver}{'system'}{'get_sysinfo'}{$key}{'factor'};
+			}
+			$key = $hwMap{$hw_ver}{'system'}{'get_sysinfo'}{$key}{'name'}
+		}			
+		readingsBulkUpdate($hash, $key, $sysinfoValue);		
+    }
 	if ($json->{'system'}->{'get_sysinfo'}->{'relay_state'} == 0) {
 		readingsBulkUpdate($hash, "state", "off");
 	}
@@ -153,14 +167,33 @@ sub TPLinkHS110_Get($$)
 			$realtimejson = decode_json($rdata);
 		} or do {
 			Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting realtime data";
-                        Log3 $hash, 5, "TPLinkHS110: $name json-raw: $rdata";
-                        readingsEndUpdate($hash, 1);
+            	Log3 $hash, 5, "TPLinkHS110: $name json-raw: $rdata";
+            	readingsEndUpdate($hash, 1);
 			return;
 		};
+		
+		my %emeterReadings = ();
+
 		foreach my $key2 (sort keys %{$realtimejson->{'emeter'}->{'get_realtime'}}) {
-			readingsBulkUpdate($hash, $key2, $realtimejson->{'emeter'}->{'get_realtime'}->{$key2});
+			
+			my $emeterValue = $realtimejson->{'emeter'}->{'get_realtime'}->{$key2};
+			
+			#adjust different hw_ver readings, be sure to list all emeter readings in hwMapping
+			if (exists($hwMap{$hw_ver}{'emeter'}{'get_realtime'}{$key2})) {
+				if (exists($hwMap{$hw_ver}{'emeter'}{'get_realtime'}{$key2}{'factor'})) {
+					$emeterValue = $emeterValue * $hwMap{$hw_ver}{'emeter'}{'get_realtime'}{$key2}{'factor'};
+				}
+				$key2 = $hwMap{$hw_ver}{'emeter'}{'get_realtime'}{$key2}{'name'};
+				readingsBulkUpdate($hash, $key2, $emeterValue);
+				$emeterReadings{$key2} = $emeterValue;
+			} else {
+				return "Check supported hw_ver of device: $hw_ver\n";
+			}
 		}
-		Log3 $hash, 3, "TPLinkHS110: $name Device is an HS110. Got extra realtime data: $realtimejson->{'emeter'}->{'get_realtime'}->{'power'} Watt, $realtimejson->{'emeter'}->{'get_realtime'}->{'voltage'} Volt, $realtimejson->{'emeter'}->{'get_realtime'}->{'current'} Ampere";
+
+		Log3 $hash, 3, "TPLinkHS110: $name Device is an HS110. Got extra realtime data: $emeterReadings{'power'} Watt, $emeterReadings{'voltage'} Volt, $emeterReadings{'current'} Ampere";
+
+		
 		# Get Daily Stats
 		my $command = '{"emeter":{"get_daystat":{"month":'.$mon.',"year":'.$year.'}}}';
 		my $c = encrypt($command);
@@ -181,10 +214,18 @@ sub TPLinkHS110_Get($$)
 			my $total=0;
 			foreach my $key (sort keys @{$json->{'emeter'}->{'get_daystat'}->{'day_list'}}) {
 				foreach my $key2 ($json->{'emeter'}->{'get_daystat'}->{'day_list'}[$key]) {
-					$total = $total+ $key2->{'energy'};
-					if ($key2->{'day'} == $mday) {
+					if ($hw_ver eq "1.0") {
+						$total = $total+ $key2->{'energy'};
+						if ($key2->{'day'} == $mday) {
 						readingsBulkUpdate($hash, "daily_total", sprintf("%.3f", $key2->{'energy'}));
+						}
+					} else {
+						$total = $total+ $key2->{'energy_wh'};
+						if ($key2->{'day'} == $mday) {
+						readingsBulkUpdate($hash, "daily_total", sprintf("%.3f", $key2->{'energy_wh'}));
+						}
 					}
+					
 				}
 			}
 			my $count=1;
@@ -346,8 +387,8 @@ sub TPLinkHS110_Attr {
 # Based on https://www.softscheck.com/en/reverse-engineering-tp-link-hs110/
 sub encrypt {
         my $key = 171;
-        my $result = "\0\0\0\0";
-        my @string=split(//, $_[0]);
+		my @string=split(//, $_[0]);
+        my $result = "\0\0\0".chr(@string);
         foreach (@string) {
                 my $a = $key ^ ord($_);
                 $key = $a;
@@ -365,6 +406,43 @@ sub decrypt {
                 $result .= chr($a);
         }
         return $result;
+}
+
+# mapping for different hardware versions
+sub hwMapping {
+	my %hwMap = ();
+	$hwMap{'1.0'}{'system'}{'get_sysinfo'}{'longitude'}{'name'}		= 'longitude';
+	$hwMap{'1.0'}{'system'}{'get_sysinfo'}{'longitude'}{'factor'}		= 1;
+	$hwMap{'1.0'}{'system'}{'get_sysinfo'}{'latitude'}{'name'}		= 'latitude';
+	$hwMap{'1.0'}{'system'}{'get_sysinfo'}{'latitude'}{'factor'}		= 1;
+	$hwMap{'2.0'}{'system'}{'get_sysinfo'}{'longitude_i'}{'name'}		= 'longitude';
+	$hwMap{'2.0'}{'system'}{'get_sysinfo'}{'longitude_i'}{'factor'}		= 0.0001;
+	$hwMap{'2.0'}{'system'}{'get_sysinfo'}{'latitude_i'}{'name'}		= 'latitude';
+	$hwMap{'2.0'}{'system'}{'get_sysinfo'}{'latitude_i'}{'factor'}		= 0.0001;	
+	
+	$hwMap{'1.0'}{'emeter'}{'get_realtime'}{'power'}{'name'}		= 'power';
+	$hwMap{'1.0'}{'emeter'}{'get_realtime'}{'power'}{'factor'}		= 1;
+	$hwMap{'1.0'}{'emeter'}{'get_realtime'}{'voltage'}{'name'}		= 'voltage';
+	$hwMap{'1.0'}{'emeter'}{'get_realtime'}{'voltage'}{'factor'}		= 1;
+	$hwMap{'1.0'}{'emeter'}{'get_realtime'}{'current'}{'name'}		= 'current';
+	$hwMap{'1.0'}{'emeter'}{'get_realtime'}{'current'}{'factor'}		= 1;
+	$hwMap{'1.0'}{'emeter'}{'get_realtime'}{'total'}{'name'}		= 'total';
+	$hwMap{'1.0'}{'emeter'}{'get_realtime'}{'total'}{'factor'}		= 1;
+	$hwMap{'1.0'}{'emeter'}{'get_realtime'}{'err_code'}{'name'}		= 'err_code';
+	$hwMap{'1.0'}{'emeter'}{'get_realtime'}{'err_code'}{'factor'}		= 1;
+
+	$hwMap{'2.0'}{'emeter'}{'get_realtime'}{'power_mw'}{'name'}		= 'power';
+	$hwMap{'2.0'}{'emeter'}{'get_realtime'}{'power_mw'}{'factor'}		= 0.001;
+	$hwMap{'2.0'}{'emeter'}{'get_realtime'}{'voltage_mv'}{'name'}		= 'voltage';
+	$hwMap{'2.0'}{'emeter'}{'get_realtime'}{'voltage_mv'}{'factor'}		= 0.001;
+	$hwMap{'2.0'}{'emeter'}{'get_realtime'}{'current_ma'}{'name'}		= 'current';
+	$hwMap{'2.0'}{'emeter'}{'get_realtime'}{'current_ma'}{'factor'}		= 0.001;
+	$hwMap{'2.0'}{'emeter'}{'get_realtime'}{'total_wh'}{'name'}		= 'total';
+	$hwMap{'2.0'}{'emeter'}{'get_realtime'}{'total_wh'}{'factor'}		= 0.001;
+	$hwMap{'2.0'}{'emeter'}{'get_realtime'}{'err_code'}{'name'}		= 'err_code';
+	$hwMap{'2.0'}{'emeter'}{'get_realtime'}{'err_code'}{'factor'}		= 1;
+	
+	return %hwMap;
 }
 
 ######################################################################################
