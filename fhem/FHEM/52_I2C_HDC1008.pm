@@ -465,7 +465,7 @@ sub I2C_HDC1008_Poll
 	 
 	
 	my $delay = I2C_HDC1008_UpdateValues($hash);
-	
+	# TODO Catch ohne eval?! Das bringt wohl nix, fraglich ist, ob wir hier ein Catch brauchen?
 	my $ret = I2C_HDC1008_Catch($@) if $@;
 	
 
