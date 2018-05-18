@@ -2322,7 +2322,7 @@ DOIF_Notify($$)
       foreach my $item (split(/ /,$hash->{readings}{all})) {
         ($device,$reading)=(split(":",$item));
         if ($item and $device eq $dev->{NAME} and defined ($defs{$device}{READINGS}{$reading})) {
-          if (!AttrVal($pn, "checkReadingEvent", 1) or CheckReadingDoIf ($device,"$item",$eventas)) {
+          if (!AttrVal($pn, "checkReadingEvent", 1) or CheckReadingDoIf ($dev->{NAME}," $item ",$eventas)) {
             readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_".$reading,$defs{$device}{READINGS}{$reading}{VAL},0);
           }
         }
