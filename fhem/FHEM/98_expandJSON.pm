@@ -22,7 +22,7 @@
 #
 ################################################################################
 
-my $module_version = "1.12";
+my $module_version = "1.13";
 
 package main;
 
@@ -132,7 +132,7 @@ sub expandJSON_Notify($$) {
   return "" if(IsDisabled($name));
 
   my $events = deviceEvents($dhash, AttrVal($name, "addStateEvent", 0));
-  return if( !grep { m/{.*}\s*$/s } @{ $events } ); #there is no JSON content
+  return if( !grep { m/\{.*}\s*$/s } @{ $events } ); #there is no JSON content
 
   for (my $i = 0; $i < int(@{$events}); $i++) {
     my $event = $events->[$i];
@@ -145,13 +145,13 @@ sub expandJSON_Notify($$) {
       my $type = $hash->{TYPE};
       Log3 $name, 5, "$type $name: Found $devName:$event";
 
-      my ($reading,$value) = $event =~ m/^\s*{.*}\s*$/s 
+      my ($reading,$value) = $event =~ m/^\s*\{.*}\s*$/s 
         ? ("state", $event)
         : split(": ", $event, 2);
 
       $hash->{STATE} = $dhash->{NTFY_TRIGGERTIME};
 
-      if ($value !~ m/^\s*{.*}\s*$/s) { # eg. state with an invalid json
+      if ($value !~ m/^\s*\{.*}\s*$/s) { # eg. state with an invalid json
         Log3 $name, 5, "$type $name: Invalid JSON: $value";
         return;
       }
@@ -182,9 +182,9 @@ sub expandJSON_decode($$$$) {
     Log3 $name, 2, "$type $name: $@";
     return undef;
   }
-
   my $sPrefix = $hash->{helper}{addReadingsPrefix} ? $dreading."_" : "";
   readingsBeginUpdate($dhash);
+#  readingsBulkUpdate($dhash, "expandJSON_".$dreading, $h);
   expandJSON_expand($hash,$dhash,$sPrefix,$h);
   readingsEndUpdate($dhash, AttrVal($name,"do_not_notify",0) ? 0 : 1);
 
@@ -200,12 +200,25 @@ sub expandJSON_expand($$$$;$$) {
   $suffix = "" if( !$suffix );
   $suffix = "_$suffix" if( $suffix );
 
+#  if( ref( $ref ) eq "ARRAY" ) {
+#    while( my ($key,$value) = each @{ $ref } ) {
+#      expandJSON_expand($hash,$dhash,$sPrefix,$value,
+#                        $prefix.sprintf("%02i",$key+1)."_");
+#    }
+#  }
   if( ref( $ref ) eq "ARRAY" ) {
     while( my ($key,$value) = each @{ $ref } ) {
-      expandJSON_expand($hash,$dhash,$sPrefix,$value,
-                        $prefix.sprintf("%02i",$key+1)."_");
+      if( ref( $value ) ) {
+        expandJSON_expand($hash,$dhash,$sPrefix,$value,$prefix.sprintf("%02i",$key+1)."_");
+      }
+      else {
+        (my $reading = $sPrefix.$prefix.sprintf("%02i",$key+1)) =~ s/[^A-Za-z\d_\.\-\/]/_/g;
+        readingsBulkUpdate($dhash, $reading, $value) 
+          if $reading =~ m/^$hash->{t_regexp}$/;
+      }
     }
   }
+
   elsif( ref( $ref ) eq "HASH" ) {
     while( my ($key,$value) = each %{ $ref } ) {
       if( ref( $value ) ) {
@@ -256,13 +269,17 @@ sub expandJSON_isPmInstalled($$)
 <h3>expandJSON</h3>
 
 <ul>
-  <p>Expand a JSON string from a reading into individual readings</p>
+  <p>Expand a JSON object from a reading into individual readings</p>
 
   <ul>
     <li>Requirement: perl module JSON<br>
       Use "cpan install JSON" or operating system's package manager to install
       Perl JSON Modul. Depending on your os the required package is named: 
       libjson-perl or perl-JSON.
+    </li>
+    <li>
+      Decoding of JSON objects is fully implemented. JSON arrays are supported
+      but may change in future a little bit...
     </li>
   </ul><br>
   
@@ -297,13 +314,9 @@ sub expandJSON_isPmInstalled($$)
       <br>
       <u>Source reading:</u><br>
       <code>
-        device:{.*} #state without attribute addStateEvent<br>
-        device:state:.{.*} #state with attribute addStateEvent<br>
-        device:reading:.{.*}<br>
-        Sonoff.*:ENERGY.*:.{.*}<br>
-        .*wifiIOT.*:.*sensor.*:.{.*}<br>
-        (?i)dev.*:(sensor1|sensor2|teleme.*):.{.*}<br>
-        (devX:{.*}|devY.*:jsonY:.{.*Wifi.*{.*SSID.*}.*})
+        device:\{.*} #state without attribute addStateEvent<br>
+        device:state:.\{.*} #state with attribute addStateEvent<br>
+        device:reading:.\{.*} #regular reading (typical application)<br>
       </code><br>
       <br>
 
@@ -312,12 +325,10 @@ sub expandJSON_isPmInstalled($$)
       <code>(Power|Current|Voltage|.*day)</code><br><br>
 
       <u>Complete definitions:</u><br>
-      <code>define ej1 expandJSON device:sourceReading:.{.*} targetReading
+      <code>define ej expandJSON device:reading:.\{.*} targetReading
       </code><br>
-      <code>define ej2 expandJSON Sonoff.*:ENERGY.*:.{.*} (Power|.*day)
+      <code>define ej expandJSON Sonoff.*:ENERGY.*:.\{.*} (Power|.*day)
       </code><br>
-      <code>define ej3 expandJSON (?i).*_sensordev_.*:.*:.{.*}
-      </code><br><br>
    
     </li><br>
   </ul>
