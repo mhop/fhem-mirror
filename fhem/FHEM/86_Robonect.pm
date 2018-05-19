@@ -40,6 +40,7 @@
 # ABU 20171010 finished health for test, added chck for undef at each reading
 # ABU 20180507 replaced "umwelt" with "climate" in readings-section (roughly line 740)
 # ABU 20180509 reading winterschlaf was not decoded correctly - fixed
+# ABU 20180509 always try to decode health details - even without Attribute being set. Line 726-748.
 
 package main;
 
@@ -585,10 +586,12 @@ sub Robonect_GetUpdate($)
 
 	#evaluate reading hybernate
 	#my $hybernate = $hash->{READINGS}{$HYBERNATE}{VAL};
-	my $hybernate =  ReadingsVal($name, $HYBERNATE, undef);
+	my $hybernate = ReadingsVal($name, $HYBERNATE, undef);
+	
+	Log3 ($name, 5, "XXX: $hybernate");	
 	
 	#supress sending, if hybernate is set
-	if (!defined ($hybernate) or ($hybernate =~ m/[off]|[0]/))
+	if (!defined ($hybernate) or ($hybernate =~ m/(off)|[0]/i))
 	{
 		#get status	
 		my @callAttr;
@@ -718,9 +721,9 @@ sub Robonect_callback ($)
 			}
 			
 			#try to decode health, if desired
-			my $useHealth = AttrVal($name,"useHealth",undef);		
-			if (defined ($useHealth) and ($useHealth =~ m/[1]|([oO][nN])/))
-			{
+			#my $useHealth = AttrVal($name,"useHealth",undef);		
+			#if (defined ($useHealth) and ($useHealth =~ m/[1]|([oO][nN])/))
+			#{
 				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "alarm", "voltagebattmin");
 				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
 				
@@ -744,7 +747,7 @@ sub Robonect_callback ($)
 
 				($key, $value) = Robonect_decodeContent ($hash, $answer, "health", "climate", "humidity");
 				readingsBulkUpdate($hash, $key, $value) if (defined ($value) and !($value =~ m/undef/));
-			}
+			#}
 			
 			readingsEndUpdate($hash, 1);
 		}
