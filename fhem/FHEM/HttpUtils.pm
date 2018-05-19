@@ -136,30 +136,38 @@ ip2str($)
   return "[$h]";
 }
 
-# http://www.ccs.neu.edu/home/amislove/teaching/cs4700/fall09/handouts/project1-primer.pdf
+# https://mislove.org/teaching/cs4700/spring11/handouts/project1-primer.pdf
 my %HU_dnsCache;
 sub
 HttpUtils_dnsParse($$$)
 {
-  my ($a, $ql,$try6) = @_;    # $ql: avoid hardcoding query length
+  my ($a,$ql,$try6) = @_;    # $ql: query length
+  my $ml = length($a);
+  return "short DNS answer" if(length($a) <= $ql);
   return "wrong message ID" if(unpack("H*",substr($a,0,2)) ne "7072");
 
-  while(length($a) >= $ql+16) {
+  return "Cant find host" if(unpack("n",substr($a,6,2)) == 0);
+
+  while($ml >= $ql+16) {        # there is a header
     my $l = unpack("C",substr($a,$ql, 1));
     if(($l & 0xC0) == 0xC0) { # DNS packed compression
       $ql += 2;
     } else {
-      while($l != 0) {
+      while($l != 0 && ($ql+$l+1)<$ml) {        # skip a name
         $ql += $l+1;
         $l = unpack("C",substr($a,$ql,2));
+        if(($l & 0xC0) == 0xC0) { # DNS packed compression
+          $ql++;
+          last;
+        }
       }
       $ql++;
     }
     return (undef, substr($a,$ql+10,16),unpack("N",substr($a,$ql+4,4)))
-        if(unpack("N",substr($a,$ql,4)) == 0x1c0001 && $try6);
+        if($ql+4<= $ml && unpack("N",substr($a,$ql,4)) == 0x1c0001 && $try6);
     return (undef, substr($a,$ql+10,4), unpack("N",substr($a,$ql+4,4)))
-        if(unpack("N",substr($a,$ql,4)) == 0x10001 && !$try6);
-    $ql += 10+unpack("n",substr($a,$ql+8)) if(length($a) >= $ql+10);
+        if($ql+4 <= $ml && unpack("N",substr($a,$ql,4)) == 0x10001 && !$try6);
+    $ql += 10+unpack("n",substr($a,$ql+8)) if($ql+10 <= $ml);
   }
   return "No A record found";
 }
