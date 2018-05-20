@@ -96,13 +96,13 @@ sub HusqvarnaAutomower_Define($$){
     %$hash = (%$hash,
         NOTIFYDEV => "global,$name",
         HusqvarnaAutomower => { 
-            CONNECTED   				=> 0,
+            CONNECTED				=> 0,
             version     				=> $version,
-            token						=> '',
+            token					=> '',
             provider					=> '',
-            user_id						=> '',
+            user_id					=> '',
             mower_id					=> '',
-            mower_name					=> '',
+            mower_name				=> '',
             mower_model 				=> '',
             mower_battery 				=> 0,
             mower_status 		 		=> '',
@@ -151,8 +151,8 @@ sub HusqvarnaAutomower_Notify($$) {
     
     if ( $devtype eq 'Global') {
 	    if (
-	    	grep /^INITIALIZED$/,@{$events}
-	    	or grep /^REREADCFG$/,@{$events}
+		    grep /^INITIALIZED$/,@{$events}
+		    or grep /^REREADCFG$/,@{$events}
 	        or grep /^DEFINED.$name$/,@{$events}
 	        or grep /^MODIFIED.$name$/,@{$events}
 	    ) {
@@ -162,7 +162,7 @@ sub HusqvarnaAutomower_Notify($$) {
 	
 	if ( $devtype eq 'HusqvarnaAutomower') {
 		if ( grep(/^state:.authenticated$/, @{$events}) ) {
-        	HusqvarnaAutomower_getMower($hash);
+     	   	HusqvarnaAutomower_getMower($hash);
 		}
 		
 		if ( grep(/^state:.connected$/, @{$events}) ) {
@@ -227,21 +227,22 @@ sub HusqvarnaAutomower_Attr(@) {
             $hash->{HusqvarnaAutomower}->{mower} = 0;
             Log3 $name, 5, "$name - deleted mower and set to default: 0";
         }
-
 	}
 
 	elsif( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
-            RemoveInternalTimer($hash);
             return "Interval must be greater than 0"
             unless($attrVal > 0);
             $hash->{HusqvarnaAutomower}->{interval} = $attrVal;
+            RemoveInternalTimer($hash);
+            InternalTimer( time() + $hash->{HusqvarnaAutomower}->{interval}, "HusqvarnaAutomower_DoUpdate", $hash, 0 );
             Log3 $name, 5, "$name - set interval: $attrVal";
         }
 
         elsif( $cmd eq "del" ) {
+            $hash->{HusqvarnaAutomower}->{interval} = 300;
             RemoveInternalTimer($hash);
-            $hash->{HusqvarnaAutomower}->{interval}   = 300;
+            InternalTimer( time() + $hash->{HusqvarnaAutomower}->{interval}, "HusqvarnaAutomower_DoUpdate", $hash, 0 );
             Log3 $name, 5, "$name - deleted interval and set to default: 300";
         }
     }
@@ -580,20 +581,35 @@ sub HusqvarnaAutomower_getMowerStatusResponse($) {
 		$hash->{HusqvarnaAutomower}->{mower_lastLongitude} = $result->{'lastLocations'}->[0]->{'longitude'};
 
 		readingsBeginUpdate($hash);
+		
 		readingsBulkUpdate($hash, "mower_battery", $hash->{HusqvarnaAutomower}->{mower_battery}."%" );    
 		readingsBulkUpdate($hash, "mower_status", $hash->{HusqvarnaAutomower}->{mower_status} );    
 		readingsBulkUpdate($hash, "mower_mode", $hash->{HusqvarnaAutomower}->{mower_mode} );  
 
-		my $nextStartTimestamp = strftime("%Y-%m-%d %H:%M:%S", localtime($hash->{HusqvarnaAutomower}->{mower_nextStart}));
-		if ($nextStartTimestamp eq "1969-12-31 23:00:00") {	$nextStartTimestamp = "-"; }
+		my $nextStartTimestamp = strftime("%Y-%m-%d %H:%M", localtime($hash->{HusqvarnaAutomower}->{mower_nextStart}));
+		if ($nextStartTimestamp eq "1969-12-31 23:00") { $nextStartTimestamp = "-"; }
+		
+		if (
+			strftime("%Y-%m-%d", localtime($hash->{HusqvarnaAutomower}->{mower_nextStart}) )
+			eq
+			strftime("%Y-%m-%d", localtime() )
+		) {
+			$nextStartTimestamp = HusqvarnaAutomower_ToGerman($hash, "Today at") . " " . strftime("%H:%M", localtime($hash->{HusqvarnaAutomower}->{mower_nextStart}));
 
-		if (HusqvarnaAutomower_isSetGerman($hash) and $nextStartTimestamp ne "-") {
+		} elsif (
+			strftime("%Y-%m-%d", localtime($hash->{HusqvarnaAutomower}->{mower_nextStart}) )
+			eq
+			strftime("%Y-%m-%d", localtime(time + 86400) )
+		) {
+			$nextStartTimestamp = HusqvarnaAutomower_ToGerman($hash, "Tomorrow at") . " " . strftime("%H:%M", localtime($hash->{HusqvarnaAutomower}->{mower_nextStart}));
+
+		} elsif ($nextStartTimestamp ne "-") {
 			my @c_time = split(" ", $nextStartTimestamp);
 			my $c_date = join("." => reverse split('-', (split(' ',$nextStartTimestamp))[0]));
-			readingsBulkUpdate($hash, "mower_nextStart", $c_date . " um " . $c_time[1] . " Uhr" );  
-		} else {
-			readingsBulkUpdate($hash, "mower_nextStart", $nextStartTimestamp );  
-		}		
+			$nextStartTimestamp = $c_date . " " . HusqvarnaAutomower_ToGerman($hash, "at") . " " . $c_time[1];
+			
+		}
+		readingsBulkUpdate($hash, "mower_nextStart", $nextStartTimestamp );  
 		
   		readingsBulkUpdate($hash, "mower_nextStartSource", $hash->{HusqvarnaAutomower}->{mower_nextStartSource} );    
   		readingsBulkUpdate($hash, "mower_restrictedReason", $hash->{HusqvarnaAutomower}->{mower_restrictedReason} );    
@@ -601,6 +617,7 @@ sub HusqvarnaAutomower_getMowerStatusResponse($) {
 
 		readingsBulkUpdate($hash, "mower_lastLatitude", $hash->{HusqvarnaAutomower}->{mower_lastLatitude} );    
 		readingsBulkUpdate($hash, "mower_lastLongitude", $hash->{HusqvarnaAutomower}->{mower_lastLongitude} );    
+		
 		readingsEndUpdate($hash, 1);
 	    
 	}	
@@ -661,7 +678,6 @@ sub HusqvarnaAutomower_CMDResponse($) {
 		    
 	    } else {
 	        Log3 $name, 5, $data; 
-
 			
 	    }
         
@@ -696,6 +712,10 @@ sub HusqvarnaAutomower_ToGerman($$) {
 		#'disabled'												=> 'deaktiviert',
 		#'connected'											=> 'verbunden',
 
+		'Today at'												=>	'Heute um',
+		'Tomorrow at'											=>	'Morgen um',
+		'at'													=>	'um',
+
 		'NO_SOURCE'												=>	'keine Quelle',
 		'NOT_APPLICABLE'										=>	'nicht zutreffend',
 		
@@ -708,7 +728,8 @@ sub HusqvarnaAutomower_ToGerman($$) {
 		'LEAVING'												=>  'verlässt Ladestation',
 		'GOING_HOME'											=> 	'auf dem Weg zur Ladestation',
 		'WEEK_TIMER'											=> 	'Wochen-Zeitplan',
-
+		'WEEK_SCHEDULE'											=> 	'Wochen-Zeitplan',
+		
 		'PARKED_IN_CS'                        					=>  'In der Ladestation geparkt',
 		'COMPLETED_CUTTING_TODAY_AUTO'                      	=>  'Fertig für heute',
 		'PAUSED'												=>  'pausiert',
@@ -731,63 +752,7 @@ sub HusqvarnaAutomower_ToGerman($$) {
 		'OK_CUTTING'                   							=>  'mäht',
         'OK_CUTTING_TIMER_OVERRIDDEN'       					=>  'manuelles Mähen',
 
-        'UNKNOWN'                           =>  'unbekannter Status',
-        'ERROR'                             =>  'Fehler',
-        
-        'parked_autotimer'                  =>  'geparkt durch SensorControl',
-        'parked_daily_limit_reached'        =>  'abgeschlossen',
-        
-        'mower_charging'                    =>  'Mäher wurde geladen',
-        'completed_cutting_autotimer'       =>  'Sensor Control erreicht',
-        'week_timer'                        =>  'Wochentimer erreicht',
-        'countdown_timer'                   =>  'Stoppuhr Timer',
 
-        'outside_working_area'              =>  'außerhalb des Arbeitsbereichs',
-        'no_loop_signal'                    =>  'kein Schleifensignal',
-        'wrong_loop_signal'                 =>  'falsches Schleifensignal',
-        'loop_sensor_problem_front'         =>  'Problem Schleifensensor, vorne',
-        'loop_sensor_problem_rear'          =>  'Problem Schleifensensor, hinten',
-        'trapped'                           =>  'eingeschlossen',
-        'upside_down'                       =>  'steht auf dem Kopf',
-        'low_battery'                       =>  'niedriger Batteriestand',
-        'empty_battery'                     =>  'Batterie leer',
-        'no_drive'                          =>  'fährt nicht',
-        'lifted'                            =>  'angehoben',
-        'stuck_in_charging_station'         =>  'eingeklemmt in Ladestation',
-        'charging_station_blocked'          =>  'Ladestation blockiert',
-        'collision_sensor_problem_rear'     =>  'Problem Stoßsensor hinten',
-        'collision_sensor_problem_front'    =>  'Problem Stoßsensor vorne',
-        'wheel_motor_blocked_right'         =>  'Radmotor rechts blockiert',
-        'wheel_motor_blocked_left'          =>  'Radmotor links blockiert',
-        'wheel_drive_problem_right'         =>  'Problem Antrieb, rechts',
-        'wheel_drive_problem_left'          =>  'Problem Antrieb, links',
-        'cutting_system_blocked'            =>  'Schneidsystem blockiert',
-        'invalid_sub_device_combination'    =>  'fehlerhafte Verbindung',
-        'settings_restored'                 =>  'Standardeinstellungen',
-        'electronic_problem'                =>  'elektronisches Problem',
-        'charging_system_problem'           =>  'Problem Ladesystem',
-        'tilt_sensor_problem'               =>  'Kippsensor Problem',
-        'wheel_motor_overloaded_right'      =>  'rechter Radmotor überlastet',
-        'wheel_motor_overloaded_left'       =>  'linker Radmotor überlastet',
-        'charging_current_too_high'         =>  'Ladestrom zu hoch',
-        'temporary_problem'                 =>  'vorübergehendes Problem',
-        'guide_1_not_found'                 =>  'SK 1 nicht gefunden',
-        'guide_2_not_found'                 =>  'SK 2 nicht gefunden',
-        'guide_3_not_found'                 =>  'SK 3 nicht gefunden',
-        'difficult_finding_home'            =>  'Problem die Ladestation zu finden',
-        'guide_calibration_accomplished'    =>  'Kalibrierung des Suchkabels beendet',
-        'guide_calibration_failed'          =>  'Kalibrierung des Suchkabels fehlgeschlagen',
-        'temporary_battery_problem'         =>  'kurzzeitiges Batterieproblem',
-        'battery_problem'                   =>  'Batterieproblem',
-        'alarm_mower_switched_off'          =>  'Alarm! Mäher ausgeschalten',
-        'alarm_mower_stopped'               =>  'Alarm! Mäher gestoppt',
-        'alarm_mower_lifted'                =>  'Alarm! Mäher angehoben',
-        'alarm_mower_tilted'                =>  'Alarm! Mäher gekippt',
-        'connection_changed'                =>  'Verbindung geändert',
-        'connection_not_changed'            =>  'Verbindung nicht geändert',
-        'com_board_not_available'           =>  'COM Board nicht verfügbar',
-        'slipped'                           =>  'rutscht',
-        'out_of_operation'                  =>  'ausser Betrieb',
 
 		'OK'                        							=>  'OK'
 	);
