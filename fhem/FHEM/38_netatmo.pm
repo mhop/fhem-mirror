@@ -440,6 +440,12 @@ netatmo_Define($$)
 
   $hash->{NOTIFYDEV} = "global";
 
+  if(IsDisabled($name) || !defined($name)) {
+    RemoveInternalTimer($hash);
+    $hash->{STATE} = "Disabled";
+    return undef;
+  }
+
   if( $init_done ) {
     netatmo_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
     netatmo_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
@@ -506,6 +512,12 @@ netatmo_Notify($$)
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
   RemoveInternalTimer($hash);
+
+  if(IsDisabled($name) || !defined($name)) {
+    RemoveInternalTimer($hash);
+    $hash->{STATE} = "Disabled";
+    return undef;
+  }
 
   netatmo_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
   netatmo_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
@@ -704,7 +716,7 @@ netatmo_getToken($)
     url => "https://".$hash->{helper}{apiserver}."/oauth2/token",
     timeout => 5,
     noshutdown => 1,
-    data => {grant_type => 'password', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, username => netatmo_decrypt($hash->{helper}{username}), password => netatmo_decrypt($hash->{helper}{password}), scope => 'read_station read_thermostat write_thermostat write_camera read_camera access_camera read_presence write_presence access_presence read_homecoach'},
+    data => {grant_type => 'password', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, username => netatmo_decrypt($hash->{helper}{username}), password => netatmo_decrypt($hash->{helper}{password}), scope => 'read_station read_thermostat write_thermostat read_camera write_camera access_camera read_presence write_presence access_presence read_homecoach'},
   });
 
   netatmo_dispatch( {hash=>$hash,type=>'token'},$err,$data );
@@ -1075,6 +1087,12 @@ netatmo_initDevice($)
     Log3 $name, 1, "$name: no I/O device";
   }
 
+  if(IsDisabled($name) || !defined($name)) {
+    RemoveInternalTimer($hash);
+    $hash->{STATE} = "Disabled";
+    return undef;
+  }
+
   my $device;
   if( $hash->{Module} ) {
     $device = netatmo_getDeviceDetail( $hash, $hash->{Module} );
@@ -1098,8 +1116,8 @@ netatmo_initDevice($)
   $hash->{last_seen} = FmtDateTime($device->{last_seen}) if(defined($device->{last_seen}));
   $hash->{wifi_status} = $device->{wifi_status} if(defined($device->{wifi_status}));
   $hash->{rf_status} = $device->{rf_status} if(defined($device->{rf_status}));
-  $hash->{battery_percent} = $device->{battery_percent} if(defined($device->{battery_percent}));
-  $hash->{battery_vp} = $device->{battery_vp} if(defined($device->{battery_vp}));
+  #$hash->{battery_percent} = $device->{battery_percent} if(defined($device->{battery_percent}));
+  #$hash->{battery_vp} = $device->{battery_vp} if(defined($device->{battery_vp}));
 
   if( $device->{place} ) {
     $hash->{country} = $device->{place}{country};
@@ -1110,8 +1128,9 @@ netatmo_initDevice($)
     $hash->{location} = $device->{place}{location}[1] .",". $device->{place}{location}[0];
   }
 
-  readingsSingleUpdate($hash, "battery", ($device->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($device->{battery_percent}));
-  readingsSingleUpdate($hash, "battery_percent", $device->{battery_percent}, 1) if(defined($device->{battery_percent}));
+  readingsSingleUpdate($hash, "batteryState", ($device->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($device->{battery_percent}));
+  readingsSingleUpdate($hash, "batteryPercent", $device->{battery_percent}, 1) if(defined($device->{battery_percent}));
+  readingsSingleUpdate($hash, "batteryVoltage", $device->{battery_vp}/1000, 1) if(defined($device->{battery_vp}));
 
   my $state_format;
   if( $device->{data_type} ) {
@@ -1145,7 +1164,11 @@ netatmo_initDevice($)
 
   $attr{$name}{stateFormat} = $state_format if( !defined($attr{$name}{stateFormat}) && defined($state_format) && defined($name) );
 
-  return undef if(IsDisabled($name) || !defined($name));
+  if(IsDisabled($name) || !defined($name)) {
+    RemoveInternalTimer($hash);
+    $hash->{STATE} = "Disabled";
+    return undef;
+  }
 
   InternalTimer(gettimeofday()+90, "netatmo_poll", $hash);
 
@@ -2497,7 +2520,11 @@ netatmo_poll($)
   my $name = $hash->{NAME};
 
 
-  return undef if(IsDisabled($name) || !defined($name));
+  if(IsDisabled($name) || !defined($name)) {
+    RemoveInternalTimer($hash);
+    $hash->{STATE} = "Disabled";
+    return undef;
+  }
 
   # my $resolve = inet_aton($hash->{helper}{apiserver});
   # if(!defined($resolve))
@@ -3383,7 +3410,7 @@ netatmo_parseReadings($$;$)
               my $rain_sum = ReadingsVal($name,"rain_sum",0);
               $rain_sum += $reading;
               readingsSingleUpdate($hash,"rain_sum",$rain_sum,1);
-              Log3 $name, 1, $name.": summed rain ".$reading." (to ".$rain_sum.")";
+              Log3 $name, 2, $name.": summed rain ".$reading." (to ".$rain_sum.")";
             }
 
 
@@ -3618,10 +3645,11 @@ netatmo_parseGlobal($$)
         $device->{wifi_status} = $devicedata->{wifi_status} if(defined($devicedata->{wifi_status}));
         $device->{rf_status} = $devicedata->{rf_status} if(defined($devicedata->{rf_status}));
         #$device->{battery_percent} = $devicedata->{battery_percent} if(defined($devicedata->{battery_percent}));
-        $device->{battery_vp} = $devicedata->{battery_vp} if(defined($devicedata->{battery_vp}));
+        #$device->{battery_vp} = $devicedata->{battery_vp} if(defined($devicedata->{battery_vp}));
 
-        readingsSingleUpdate($device, "battery", ($devicedata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($devicedata->{battery_percent}));
-        readingsSingleUpdate($device, "battery_percent", $devicedata->{battery_percent}, 1) if(defined($devicedata->{battery_percent}));
+        readingsSingleUpdate($device, "batteryState", ($devicedata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($devicedata->{battery_percent}));
+        readingsSingleUpdate($device, "batteryPercent", $devicedata->{battery_percent}, 1) if(defined($devicedata->{battery_percent}));
+        readingsSingleUpdate($device, "batteryVoltage", $devicedata->{battery_vp}/1000, 1) if(defined($devicedata->{battery_vp}));
 
         if(defined($devicedata->{modules}))
         {
@@ -3723,10 +3751,11 @@ netatmo_parseGlobal($$)
             $module->{wifi_status} = $moduledata->{wifi_status} if(defined($moduledata->{wifi_status}));
             $module->{rf_status} = $moduledata->{rf_status} if(defined($moduledata->{rf_status}));
             #$module->{battery_percent} = $moduledata->{battery_percent} if(defined($moduledata->{battery_percent}));
-            $module->{battery_vp} = $moduledata->{battery_vp} if(defined($moduledata->{battery_vp}));
+            #$module->{battery_vp} = $moduledata->{battery_vp} if(defined($moduledata->{battery_vp}));
 
-            readingsSingleUpdate($module, "battery", ($moduledata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($moduledata->{battery_percent}));
-            readingsSingleUpdate($module, "battery_percent", $moduledata->{battery_percent}, 1) if(defined($moduledata->{battery_percent}));
+            readingsSingleUpdate($module, "batteryState", ($moduledata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($moduledata->{battery_percent}));
+            readingsSingleUpdate($module, "batteryPercent", $moduledata->{battery_percent}, 1) if(defined($moduledata->{battery_percent}));
+            readingsSingleUpdate($module, "batteryVoltage", $moduledata->{battery_vp}/1000, 1) if(defined($moduledata->{battery_vp}));
 
 
           }#foreach module
@@ -4092,8 +4121,9 @@ netatmo_parseHomeReadings($$;$)
               $tag->{notify_rule} = $tagdata->{notify_rule};
               $tag->{notify_rule} = $tagdata->{notify_rule};
 
-              readingsSingleUpdate($tag, "battery", ($tagdata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($tagdata->{battery_percent}));
-              readingsSingleUpdate($tag, "battery_percent", $tagdata->{battery_percent}, 1) if(defined($tagdata->{battery_percent}));
+              readingsSingleUpdate($tag, "batteryState", ($tagdata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($tagdata->{battery_percent}));
+              readingsSingleUpdate($tag, "batteryPercent", $tagdata->{battery_percent}, 1) if(defined($tagdata->{battery_percent}));
+              readingsSingleUpdate($tag, "batteryVoltage", $tagdata->{battery_vp}/1000, 1) if(defined($tagdata->{battery_vp}));
 
             }            
             
@@ -4837,7 +4867,7 @@ netatmo_parseThermostatReadings($$;$)
         $hash->{wifi_status} = $devicedata->{wifi_status} if(defined($devicedata->{wifi_status}));
         $hash->{rf_status} = $devicedata->{rf_status} if(defined($devicedata->{rf_status}));
         #$hash->{battery_percent} = $devicedata->{battery_percent} if(defined($devicedata->{battery_percent}));
-        $hash->{battery_vp} = $devicedata->{battery_vp} if(defined($devicedata->{battery_vp}));
+        #$hash->{battery_vp} = $devicedata->{battery_vp} if(defined($devicedata->{battery_vp}));
         $hash->{therm_orientation} = $devicedata->{therm_orientation} if(defined($devicedata->{therm_orientation}));
         $hash->{therm_relay_cmd} = $devicedata->{therm_relay_cmd} if(defined($devicedata->{therm_relay_cmd}));
         $hash->{udp_conn} = $devicedata->{udp_conn} if(defined($devicedata->{udp_conn}));
@@ -4856,8 +4886,9 @@ netatmo_parseThermostatReadings($$;$)
           $hash->{timezone} = encode_utf8($devicedata->{place}{timezone});
         }
 
-        readingsSingleUpdate($hash, "battery", ($devicedata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($devicedata->{battery_percent}));
-        readingsSingleUpdate($hash, "battery_percent", $devicedata->{battery_percent}, 1) if(defined($devicedata->{battery_percent}));
+        readingsSingleUpdate($hash, "batteryState", ($devicedata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($devicedata->{battery_percent}));
+        readingsSingleUpdate($hash, "batteryPercent", $devicedata->{battery_percent}, 1) if(defined($devicedata->{battery_percent}));
+        readingsSingleUpdate($hash, "batteryVoltage", $devicedata->{battery_vp}/1000, 1) if(defined($devicedata->{battery_vp}));
 
 
         if(defined($devicedata->{modules}))
@@ -4885,7 +4916,7 @@ netatmo_parseThermostatReadings($$;$)
             $module->{wifi_status} = $moduledata->{wifi_status} if(defined($moduledata->{wifi_status}));
             $module->{rf_status} = $moduledata->{rf_status} if(defined($moduledata->{rf_status}));
             #$module->{battery_percent} = $moduledata->{battery_percent} if(defined($moduledata->{battery_percent}));
-            $module->{battery_vp} = $moduledata->{battery_vp} if(defined($moduledata->{battery_vp}));
+            #$module->{battery_vp} = $moduledata->{battery_vp} if(defined($moduledata->{battery_vp}));
             $module->{therm_orientation} = $moduledata->{therm_orientation} if(defined($moduledata->{therm_orientation}));
             #$module->{therm_relay_cmd} = $moduledata->{therm_relay_cmd} if(defined($moduledata->{therm_relay_cmd}));
             $module->{udp_conn} = $moduledata->{udp_conn} if(defined($moduledata->{udp_conn}));
@@ -4904,8 +4935,9 @@ netatmo_parseThermostatReadings($$;$)
               $module->{timezone} = encode_utf8($moduledata->{place}{timezone});
             }
 
-            readingsSingleUpdate($module, "battery", ($moduledata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($moduledata->{battery_percent}));
-            readingsSingleUpdate($module, "battery_percent", $moduledata->{battery_percent}, 1) if(defined($moduledata->{battery_percent}));
+            readingsSingleUpdate($module, "batteryState", ($moduledata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($moduledata->{battery_percent}));
+            readingsSingleUpdate($module, "batteryPercent", $moduledata->{battery_percent}, 1) if(defined($moduledata->{battery_percent}));
+            readingsSingleUpdate($module, "batteryVoltage", $moduledata->{battery_vp}/1000, 1) if(defined($moduledata->{battery_vp}));
             #readingsSingleUpdate($module, "name", encode_utf8($moduledata->{module_name}), 1) if(defined($moduledata->{module_name}));
 
             my $setmode = "manual";
@@ -6292,6 +6324,14 @@ sub netatmo_DbLog_splitFn($)
   elsif($event =~ m/air_/)
   {
     $unit = "ug/m3";
+  }
+  elsif($event =~ m/batteryPercent/)
+  {
+    $unit = "%";
+  }
+  elsif($event =~ m/batteryVoltage/)
+  {
+    $unit = "V";
   }
   else
   {

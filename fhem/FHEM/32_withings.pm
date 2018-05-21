@@ -47,11 +47,11 @@ my %device_types = (  0 => "User related",
                      64 => "Thermometer", );
 
 my %device_models = (  1 => { 1 => "Smart Scale", 2 => "Wireless Scale", 3 => "Smart Kid Scale", 4 => "Smart Body Analyzer", 5 => "WiFi Body Scale", 6 => "Cardio Scale", 7 => "Body Scale", },
-                       2 => { 21 => "Smart Baby Monitor", 22 => "Withings Home", },
-                       4 => { 41 => "iOS Blood Pressure Monitor", 42 => "Wireless Blood Pressure Monitor", },
-                      16 => { 51 => "Pulse Ox", 52 => "Activite", 53 => "Activite v2", 54 => "Withings Go", 55 => "Withings Steel HR", },
-                      32 => { 60 => "Withings Aura", 61 => "Aura Sleep Sensor", },
-                      64 => { 70 => "Withings Thermo", }, );
+                       2 => { 21 => "Smart Baby Monitor", 22 => "Home", 22 => "Home v2", },
+                       4 => { 41 => "iOS Blood Pressure Monitor", 42 => "Wireless Blood Pressure Monitor", 43 => "BPM", 44 => "BPM+", },
+                      16 => { 51 => "Pulse Ox", 52 => "Activite", 53 => "Activite v2", 54 => "Go", 55 => "Steel HR", },
+                      32 => { 60 => "Aura", 61 => "Sleep Sensor", 61 => "Aura v2", 62 => "Sleep Mat", },
+                      64 => { 70 => "Thermo", }, );
 
                       #Firmware files: cdnfw_withings_net
                       #Smart Body Analyzer: /wbs02/wbs02_1521.bin
@@ -128,6 +128,7 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       93 => { name => "Muscle Mass (%)", reading => "muscleRatio", }, # cardio scale
                       94 => { name => "Bone Mass (%)", reading => "boneRatio", }, # cardio scale
                       95 => { name => "Hydration (%)", reading => "hydration", }, # body water
+                     122 => { name => "Pulse Transit Time (ms)", reading => "pulseTransitTime", },
                       #-10 => { name => "Speed", reading => "speed", },
                       #-11 => { name => "Pace", reading => "pace", },
                       #-12 => { name => "Altitude", reading => "altitude", },
@@ -884,7 +885,7 @@ sub withings_initDevice($) {
 
 
   if( !defined( $attr{$name}{stateFormat} ) ) {
-    $attr{$name}{stateFormat} = "batteryLevel %";
+    $attr{$name}{stateFormat} = "batteryPercent %";
 
     $attr{$name}{stateFormat} = "co2 ppm" if( $device->{model} == 4 );
     $attr{$name}{stateFormat} = "voc ppm" if( $device->{model} == 22 );
@@ -916,9 +917,10 @@ sub withings_initUser($) {
   my $user = withings_getUserDetail( $hash );
 
   $hash->{shortName} = $user->{shortname};
-  $hash->{gender} = ($user->{gender}==0)?"male":"female" if( defined($hash->{gender}) );
+  $hash->{gender} = ($user->{gender}==0)?"male":"female" if( defined($user->{gender}) );
   $hash->{userName} = ($user->{firstname}?$user->{firstname}:"") ." ". ($user->{lastname}?$user->{lastname}:"");
   $hash->{birthdate} = strftime("%Y-%m-%d", localtime($user->{birthdate})) if( defined($user->{birthdate}) );
+  $hash->{age} = sprintf("%.1f",((int(time()) - int($user->{birthdate}))/(60*60*24*365.24225))) if( defined($user->{birthdate}) );
   $hash->{created} = $user->{created};
   $hash->{modified} = $user->{modified};
 
@@ -1767,8 +1769,8 @@ sub withings_parseProperties($$) {
   readingsBeginUpdate($hash);
 
   if( defined($detail->{batterylvl}) and $detail->{batterylvl} > 0 and $detail->{type} ne '32' and $detail->{model} ne '22') {
-    readingsBulkUpdate( $hash, "batteryLevel", $detail->{batterylvl}, 1 );
-    readingsBulkUpdate( $hash, "battery", ($detail->{batterylvl}>20?"ok":"low"), 1 );
+    readingsBulkUpdate( $hash, "batteryPercent", $detail->{batterylvl}, 1 );
+    readingsBulkUpdate( $hash, "batteryState", ($detail->{batterylvl}>20?"ok":"low"), 1 );
   }
   readingsBulkUpdate( $hash, "lastWeighinDate", FmtDateTime($detail->{lastweighindate}), 1 ) if( defined($detail->{lastweighindate}) and $detail->{lastweighindate} > 0  and $detail->{model} ne '60' );
   readingsBulkUpdate( $hash, "lastSessionDate", FmtDateTime($detail->{lastsessiondate}), 1 ) if( defined($detail->{lastsessiondate}) );
@@ -3374,9 +3376,9 @@ sub withings_DbLog_splitFn($) {
     $reading = 'light';
     $unit = 'lux';
   }
-  elsif($event =~ m/batteryLevel/)
+  elsif($event =~ m/batteryPercent/)
   {
-    $reading = 'batteryLevel';
+    $reading = 'batteryPercent';
     $unit = '%';
   }
   else
@@ -3592,8 +3594,8 @@ sub withings_weekdays2Int( $ ) {
     <li>light</li>
     <li>noise</li>
     <li>voc</li>
-    <li>battery</li>
-    <li>batteryLevel</li>
+    <li>batteryState</li>
+    <li>batteryPercent</li>
   </ul><br>
 
   <a name="withings_Get"></a>
