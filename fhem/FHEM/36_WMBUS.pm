@@ -340,7 +340,7 @@ sub WMBUS_SetReadings($$$)
 				readingsBulkUpdate($hash, "$dataBlock->{number}_errormsg", $dataBlock->{errormsg});
 			}
 		}
-    readingsBulkUpdate($hash, "battery", $mb->{status} & 4 ? "low" : "ok");
+    readingsBulkUpdate($hash, "batteryState", $mb->{status} & 4 ? "low" : "ok");
 
     WMBUS_SetDeviceSpecificReadings($hash, $name, $mb);
   }
@@ -542,7 +542,7 @@ WMBUS_Attr(@)
   <li><code>is_encrypted</code> is 1 if the received message is encrypted.</li>
   <li><code>decryption_ok</code> is 1 if a message has either been successfully decrypted or if it is unencrypted.</li>
   <li><code>state</code> contains the state of the meter and may contain error message like battery low. Normally it contains 'no error'.</li>
-  <li><code>battery</code> contains ok or low.</li>
+  <li><code>batteryState</code> contains ok or low.</li>
   </ul>
   For some well known devices specific readings like the energy consumption in kWh created.
   </ul>
@@ -653,7 +653,7 @@ WMBUS_Attr(@)
   <li><code>is_encrypted</code> ist 1 wenn die empfangene Nachricht verschl&uuml;sselt ist.</li>
   <li><code>decryption_ok</code> ist 1 wenn die Nachricht entweder erfolgreich entschl&uuml;sselt wurde oder gar nicht verschl&uuml;sselt war.</li>
   <li><code>state</code> enth&auml;lt den Status des Z&auml;hlers und kann Fehlermeldungen wie 'battery low' enthalten. Normalerweise ist der Wert 'no error'.</li>
-  <li><code>battery</code> enth&auml;lt ok oder low.</li>
+  <li><code>batteryState</code> enth&auml;lt ok oder low.</li>
   </ul>
   Für einige bekannte Gerätetypen werden zusätzliche Readings wie der Energieverbrauch in kWh erzeugt. 
   </ul>

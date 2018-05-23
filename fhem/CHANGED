@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  36_WMBUS: standard battery readings
   - change:  32_withings/38_netatmo/72_XiaomiDevice: standard battery readings
   - bugfix:  98_dewpoint: Use NOTIFYDEV with framework functions
   - feature: 57_Calendar: new parameter "limit" (forum #87566)
