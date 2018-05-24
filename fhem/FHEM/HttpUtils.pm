@@ -189,15 +189,15 @@ HttpUtils_gethostbyname($$$$)
 
   if(!$dnsServer) { # use the blocking libc to get the IP
     if($haveInet6) {
-      $host = $1 if($host =~ m/^\[([a-f0-9:]+)\]+$/);
-      my $iaddr = Socket6::inet_pton(AF_INET6, $host);
+      $host = $1 if($host =~ m/^\[([a-f0-9:]+)\]+$/); # remove [] from IPV6
+      my $iaddr = Socket6::inet_pton(AF_INET6, $host);  # Try it as IPV6
       return $fn->($hash, undef, $iaddr) if($iaddr);
 
-      $iaddr = Socket6::inet_pton(AF_INET , $host);
+      $iaddr = Socket6::inet_pton(AF_INET , $host);     # Try it as IPV4
       return $fn->($hash, undef, $iaddr) if($iaddr);
 
       my ($s4, $s6);
-      my @res = Socket6::getaddrinfo($host, 80);
+      my @res = Socket6::getaddrinfo($host, 80);        # gethostbyname, blocks
       for(my $i=0; $i+5<=@res; $i+=5) {
         $s4 = $res[$i+3] if($res[$i] == AF_INET  && !$s4);
         $s6 = $res[$i+3] if($res[$i] == AF_INET6 && !$s6);
@@ -389,11 +389,12 @@ HttpUtils_Connect($)
                         Socket6::pack_sockaddr_in6($port, $iaddr);
       my $ret = connect($hash->{conn}, $sa);
       if(!$ret) {
-        if($!{EINPROGRESS} || int($!)==10035 ||
+        if($!{EINPROGRESS} ||
+            int($!)==10035 ||   # WSAEWOULDBLOCK
            (int($!)==140 && $^O eq "MSWin32")) { # Nonblocking connect
 
           $hash->{FD} = $hash->{conn}->fileno();
-          my %timerHash=(hash=>$hash,sts=>$selectTimestamp,msg=>"connect to");
+          my %timerHash = (hash=>$hash,sts=>$selectTimestamp,msg=>"connect to");
           $hash->{directWriteFn} = sub() {
             delete($hash->{FD});
             delete($hash->{directWriteFn});
