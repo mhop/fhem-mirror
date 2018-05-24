@@ -259,6 +259,7 @@ use vars qw(@structChangeHist); # Contains the last 10 structural changes
 use vars qw($haveInet6);        # Using INET6
 use vars qw(%prioQueues);       #
 use vars qw($fhemForked);       # 1 in a fhemFork()'ed process, else undef
+use vars qw($addTimerStacktrace);# set to 1 by fhemdebug
 
 $selectTimestamp = gettimeofday();
 $cvsid = '$Id$';
@@ -351,10 +352,18 @@ $modules{Global}{AttrList} = join(" ", @globalAttrList);
 $modules{Global}{AttrFn} = "GlobalAttr";
 
 use vars qw($readingFnAttributes);
-$readingFnAttributes = "event-on-change-reading event-on-update-reading ".
-                       "event-aggregator event-min-interval ".
-                       "stateFormat:textField-long timestamp-on-change-reading ".
-                       "oldreadings";
+no warnings 'qw';
+my @attrList = qw(
+  event-aggregator
+  event-min-interval
+  event-on-change-reading
+  event-on-update-reading
+  oldreadings
+  stateFormat:textField-long
+  timestamp-on-change-reading
+);
+$readingFnAttributes = join(" ", @attrList);
+
 my %ra = (
   "suppressReading"            => { s=>"\n" },
   "event-aggregator"           => { s=>",", c=>".attraggr" },
@@ -3151,6 +3160,7 @@ InternalTimer($$$;$)
 
   $nextat = $tim if(!$nextat || $nextat > $tim);
   my %h = (TRIGGERTIME=>$tim, FN=>$fn, ARG=>$arg, atNr=>++$intAtCnt);
+  $h{STACKTRACE} = stacktraceAsString(1) if($addTimerStacktrace);
   $intAt{$h{atNr}} = \%h;
 
   if(!@intAtA) {
@@ -3204,6 +3214,20 @@ stacktrace()
     Log 1, sprintf ("    %-35s called by %s (%s)",
                $call_details[3], $call_details[1], $call_details[2]);
   }
+}
+
+sub
+stacktraceAsString($)
+{
+  my ($offset) = @_;
+  $offset = 1 if (!$offset);
+  my ($max_depth,$ret) = (50,"");
+
+  while( (my @call_details = (caller($offset++))) && ($offset<$max_depth) ) {
+    $call_details[3] =~ s/main:://;
+    $ret .= sprintf(" %s:%s", $call_details[3], $call_details[2]);
+  }
+  return $ret;
 }
 
 my $inWarnSub;

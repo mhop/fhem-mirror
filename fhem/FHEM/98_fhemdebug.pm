@@ -40,8 +40,17 @@ fhemdebug_Fn($$)
   } elsif($param =~ m/^memusage/) {
     return fhemdebug_memusage($param);
 
+  } elsif($param =~ m/^timerList/) {
+    return fhemdebug_timerList($param);
+
+  } elsif($param =~ m/^addTimerStacktrace/) {
+    $param =~ s/addTimerStacktrace\s*//;
+    $addTimerStacktrace = $param;
+    return;
+
   } else {
-    return "Usage: fhemdebug {enable|disable|status|memusage}";
+    return "Usage: fhemdebug {enable | disable | status | memusage | ".
+                        "timerList | addTimerStacktrace {0|1} }";
   }
 }
 
@@ -162,6 +171,21 @@ fhemdebug_memusage($)
   return join("\n", @ret);
 }
 
+sub
+fhemdebug_timerList($)
+{
+  my ($param) = @_;
+  my @res;
+
+  for my $h (@intAtA) {
+    my $tt = $h->{TRIGGERTIME};
+    push(@res, sprintf("%s.%05d %s%s",
+      FmtDateTime($tt), int(($tt-int($tt))*100000), $h->{FN},
+      $h->{STACKTRACE} ? $h->{STACKTRACE} : ""));
+  }
+  return join("\n", @res);
+}
+
 1;
 
 =pod
@@ -173,8 +197,9 @@ fhemdebug_memusage($)
 <a name="fhemdebug"></a>
 <h3>fhemdebug</h3>
 <ul>
-  <code>fhemdebug {enable|disable|status|}</code><br>
+  <code>fhemdebug &lt;command&gt;</code><br>
   <br>
+  where &lt;command&gt; is one of
   <ul>
     <li>enable/disable/status<br>
       fhemdebug produces debug information in the FHEM Log to help localize
@@ -186,23 +211,34 @@ fhemdebug_memusage($)
       it is not recommended to enable it all the time. A FHEM restart after
       disabling it is not necessary.<br>
       </li>
+
     <li>memusage [regexp] [nr]<br>
       Dump the name of the first nr datastructures with the largest memory
       footprint. Filter the names by regexp, if specified.<br>
       <b>Notes</b>:
       <ul>
-      <li>this function depends on the Devel::Size module, so this must be
-        installed first.</li>
-      <li>The used function Devel::Size::size may crash perl (and FHEM) for
-        functions and some other data structures. memusage tries to avoid to
-        call it for such data structures, but as the problem is not identified,
-        it may crash your currently running instance. It works for me, but make
-        sure you saved your fhem.cfg before calling it.</li>
-      <li>To avoid the crash, the size of same data is not computed, so the
-        size reported is probably inaccurate, it should only be used as a hint.
-        </li>
+        <li>this function depends on the Devel::Size module, so this must be
+          installed first.</li>
+        <li>The used function Devel::Size::size may crash perl (and FHEM) for
+          functions and some other data structures. memusage tries to avoid to
+          call it for such data structures, but as the problem is not
+          identified, it may crash your currently running instance. It works
+          for me, but make sure you saved your fhem.cfg before calling it.</li>
+        <li>To avoid the crash, the size of same data is not computed, so the
+          size reported is probably inaccurate, it should only be used as a
+          hint.  </li>
       </ul>
-    </li>
+      </li>
+
+    <li>timerList<br>
+      show the list of InternalTimer calls.
+      </li>
+
+    <li>addTimerStacktrace {1|0}<br>
+      enable or disable the registering the stacktrace of each InternalTimer
+      call. This stacktrace will be shown in the timerList command.
+      </li>
+
   </ul>
 </ul>
 
