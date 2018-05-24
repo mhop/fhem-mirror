@@ -862,6 +862,11 @@ RESCAN:
       my $end = $hash->{pos}{"$inf:$from"};
       my $start = $end - 1024;
       $start = 0 if($start < 0);
+
+      $ifh->seek($end, 0);
+      my $l = <$ifh>;
+      $end = $ifh->tell if($l && $l lt $from);
+
       $ifh->seek($start, 0);
       sysread($ifh, $buf, $end-$start);
       @rescanArr = split("\n", $buf);
