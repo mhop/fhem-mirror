@@ -5,61 +5,9 @@
 use strict;
 use warnings;
 
-sub _cref_search {
-   my ($mod,$lang) = @_;
-   my $output = "";
-   my $skip = 1;
-   my ($err,@text) = _cref_read($mod);
-   return $err if $err;
-   foreach my $l (@text) {
-     if($l =~ m/^=begin html$lang$/) {
-        $skip = 0;
-     } elsif($l =~ m/^=end html$lang$/) {
-        $skip = 1;
-     } elsif(!$skip) {
-        $output .= "$l\n";
-        if($l =~ m,INSERT_DOC_FROM: ([^ ]+)/([^ /]+) ,) {
-          my ($dir, $re) = ($1, $2);
-          if(opendir(DH, $dir)) {
-            foreach my $file (grep { m/^$2$/ } readdir(DH)) {
-              $output .= cref_search("$dir/$file", $lang);
-            }
-            closedir(DH);
-          }
-        }
-     }
-   }
-   return $output;
-}
-
-sub _cref_read {
-   my ($fileName) = @_;
-   my ($err, @ret);
-   if(open(FH, $fileName)) {
-      @ret = <FH>;
-      close(FH);
-      chomp(@ret);
-   } else {
-      $err = "Can't open $fileName: $!";
-   }
-   return ($err, @ret);
-}
-
-sub _cref_write {
-   my ($fileName,$content) = @_;
-
-   if(open(FH, ">$fileName")) {
-      binmode (FH);
-#      foreach my $l (@rows) {
-#        print FH $l,$nl;
-#      }
-      print FH, $content;
-      close(FH);
-      return undef;
-   } else {
-      return "Can't open $fileName: $!";
-   }
-}
+sub _cref_search;
+sub _cref_read;
+sub _cref_write;
 
 my $protVersion=1;
 my @lang = ("EN", "DE");
@@ -196,4 +144,62 @@ EOF
   }
   close(OUT);
   close(IN);
+}
+
+
+sub _cref_search {
+   my ($mod,$lang) = @_;
+   print "_cref_search $mod $lang";
+   my $output = "";
+   my $skip = 1;
+   my ($err,@text) = _cref_read($mod);
+   return $err if $err;
+   foreach my $l (@text) {
+     if($l =~ m/^=begin html$lang$/) {
+        $skip = 0;
+     } elsif($l =~ m/^=end html$lang$/) {
+        $skip = 1;
+     } elsif(!$skip) {
+        $output .= "$l\n";
+        if($l =~ m,INSERT_DOC_FROM: ([^ ]+)/([^ /]+) ,) {
+          my ($dir, $re) = ($1, $2);
+          if(opendir(DH, $dir)) {
+            foreach my $file (grep { m/^$2$/ } readdir(DH)) {
+              $output .= cref_search("$dir/$file", $lang);
+            }
+            closedir(DH);
+          }
+        }
+     }
+   }
+   return $output;
+}
+
+sub _cref_read {
+   my ($fileName) = @_;
+   my ($err, @ret);
+   if(open(FH, $fileName)) {
+      @ret = <FH>;
+      close(FH);
+      chomp(@ret);
+   } else {
+      $err = "Can't open $fileName: $!";
+   }
+   return ($err, @ret);
+}
+
+sub _cref_write {
+   my ($fileName,$content) = @_;
+
+   if(open(FH, ">$fileName")) {
+      binmode (FH);
+#      foreach my $l (@rows) {
+#        print FH $l,$nl;
+#      }
+      print FH $content;
+      close(FH);
+      return undef;
+   } else {
+      return "Can't open $fileName: $!";
+   }
 }
