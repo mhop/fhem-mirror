@@ -18,6 +18,9 @@ for my $lang (@lang) {
   my $sfx = ($lang eq "EN" ? "" : "_$lang");
   my %modData;
   my $cmdref = "docs/commandref_frame$sfx.html";
+  
+  my $outpath = "docs/cref$sfx";
+  mkdir $outpath unless (-e $outpath);
 
   open(FH, $cmdref) || die("Cant open $cmdref: $!\n");
   my $type = "";
@@ -69,8 +72,8 @@ for my $lang (@lang) {
     next if($fName !~ m/^\d\d_(.*)\.pm$/);
     my $mName = $1;
     my $ts = (stat("$modDir/$fName"))[9];
-    if($protVersion != $fileVersion ||
-       !$modData{$mName} || !$modData{$mName}{ts} || $modData{$mName}{ts}<$ts) {
+#    if($protVersion != $fileVersion ||
+#       !$modData{$mName} || !$modData{$mName}{ts} || $modData{$mName}{ts}<$ts) {
       #print "Checking $fName for $lang short description\n";
 
       $modData{$mName}{type}="device" if(!$modData{$mName}{type});
@@ -83,8 +86,8 @@ for my $lang (@lang) {
                  if($l =~ m/<a\s+name=['"]([^ '"]+)['"]>/);
       }
       close(FH);
-      print (_cref_search("$modDir/$fName",$lang));
-    }
+      my $output = _cref_search("$modDir/$fName",$mName,$sfx);
+#    }
   }
   closedir(DH);
 
@@ -147,40 +150,43 @@ EOF
 }
 
 
-sub _cref_search {
-   my ($mod,$lang) = @_;
-   print "_cref_search $mod $lang";
+sub _cref_search($$$) {
+   my ($mod,$modShort,$sfx) = @_;
    my $output = "";
    my $skip = 1;
    my ($err,@text) = _cref_read($mod);
    return $err if $err;
    foreach my $l (@text) {
-     if($l =~ m/^=begin html$lang$/) {
+     if($l =~ m/^=begin html$sfx$/) {
         $skip = 0;
-     } elsif($l =~ m/^=end html$lang$/) {
+     } elsif($l =~ m/^=end html$sfx$/) {
         $skip = 1;
      } elsif(!$skip) {
         $output .= "$l\n";
         if($l =~ m,INSERT_DOC_FROM: ([^ ]+)/([^ /]+) ,) {
           my ($dir, $re) = ($1, $2);
-          if(opendir(DH, $dir)) {
-            foreach my $file (grep { m/^$2$/ } readdir(DH)) {
-              $output .= cref_search("$dir/$file", $lang);
+          if(opendir(DD, $dir)) {
+            foreach my $file (grep { m/^$2$/ } readdir(DD)) {
+              my $o2 = _cref_search("$dir/$file", "", $sfx);
+              $output .= $o2 if $o2;
             }
-            closedir(DH);
+            closedir(DD);
           }
         }
      }
    }
-   return $output;
+   my $fileName = "docs/cref$sfx/$modShort.cref";
+#   print "$fileName\n";
+   _cref_write($fileName,$output) if $output;
+   return;
 }
 
 sub _cref_read {
    my ($fileName) = @_;
    my ($err, @ret);
-   if(open(FH, $fileName)) {
-      @ret = <FH>;
-      close(FH);
+   if(open(FF, $fileName)) {
+      @ret = <FF>;
+      close(FF);
       chomp(@ret);
    } else {
       $err = "Can't open $fileName: $!";
@@ -193,9 +199,6 @@ sub _cref_write {
 
    if(open(FH, ">$fileName")) {
       binmode (FH);
-#      foreach my $l (@rows) {
-#        print FH $l,$nl;
-#      }
       print FH $content;
       close(FH);
       return undef;
