@@ -1,4 +1,4 @@
-REV 16763
+REV 16766
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-05-22_07:45:03 249016 ./CHANGED
+UPD 2018-05-24_07:45:02 249065 ./CHANGED
 UPD 2018-05-16_07:45:03 37253 ./MAINTAINER.txt
 UPD 2018-03-26_07:45:02 41123 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
@@ -205,7 +205,7 @@ UPD 2017-06-16_07:45:03 6518 FHEM/36_Level.pm
 UPD 2016-08-23_07:45:12 9997 FHEM/36_PCA301.pm
 UPD 2017-11-03_07:45:02 17579 FHEM/36_PrecipitationSensor.pm
 UPD 2018-05-01_07:45:03 67004 FHEM/36_Vallox.pm
-UPD 2018-03-04_07:45:03 22669 FHEM/36_WMBUS.pm
+UPD 2018-05-24_07:45:02 22684 FHEM/36_WMBUS.pm
 UPD 2018-02-10_07:45:02 10932 FHEM/37_NotifyAndroidTV.pm
 UPD 2015-07-28_14:05:31 10162 FHEM/37_SHC.pm
 UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
@@ -642,9 +642,9 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2018-04-12_07:45:02 11059 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2018-05-24_07:45:02 11476 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2018-03-12_07:45:04 233915 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2018-04-12_07:45:02 97411 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2018-05-24_07:45:02 97504 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2018-02-12_07:45:03 24025 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2018-03-10_07:45:02 16040 FHEM/msgSchema.pm
@@ -667,8 +667,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-05-22_07:45:06 3449619 docs/commandref.html
-UPD 2018-05-17_07:45:08 2125375 docs/commandref_DE.html
+UPD 2018-05-24_07:45:05 3449624 docs/commandref.html
+UPD 2018-05-24_07:45:07 2125380 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-05-16_07:45:03 85474 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
