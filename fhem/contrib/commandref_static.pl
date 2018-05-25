@@ -86,7 +86,10 @@ for my $lang (@lang) {
                  if($l =~ m/<a\s+name=['"]([^ '"]+)['"]>/);
       }
       close(FH);
-      my $output = _cref_search("$modDir/$fName",$mName,$sfx);
+      my $output = _cref_search("$modDir/$fName",$sfx);
+      my $outFile = "docs/cref$sfx/$mName.cref";
+      _cref_write($outFile,$output) if $output;
+
 #    }
   }
   closedir(DH);
@@ -150,11 +153,11 @@ EOF
 }
 
 
-sub _cref_search($$$) {
-   my ($mod,$modShort,$sfx) = @_;
+sub _cref_search {
+   my ($fileName,$sfx) = @_;
    my $output = "";
    my $skip = 1;
-   my ($err,@text) = _cref_read($mod);
+   my ($err,@text) = _cref_read($fileName);
    return $err if $err;
    foreach my $l (@text) {
      if($l =~ m/^=begin html$sfx$/) {
@@ -167,7 +170,7 @@ sub _cref_search($$$) {
           my ($dir, $re) = ($1, $2);
           if(opendir(DD, $dir)) {
             foreach my $file (grep { m/^$2$/ } readdir(DD)) {
-              my $o2 = _cref_search("$dir/$file", "", $sfx);
+              my $o2 = _cref_search("$dir/$file", $sfx);
               $output .= $o2 if $o2;
             }
             closedir(DD);
@@ -175,10 +178,7 @@ sub _cref_search($$$) {
         }
      }
    }
-   my $fileName = "docs/cref$sfx/$modShort.cref";
-#   print "$fileName\n";
-   _cref_write($fileName,$output) if $output;
-   return;
+   return $output;
 }
 
 sub _cref_read {
