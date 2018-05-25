@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  10_KNX: new major release. See commandref for details. The 
+                     following attributes are deprecated now: readonly, 
+                     listenonly, slider and useSetExtensions.
   - change:  36_WMBUS: standard battery readings
   - change:  32_withings/38_netatmo/72_XiaomiDevice: standard battery readings
   - bugfix:  98_dewpoint: Use NOTIFYDEV with framework functions
