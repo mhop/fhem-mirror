@@ -9,6 +9,8 @@ sub _cref_search;
 sub _cref_read;
 sub _cref_write;
 
+my $rebuild = (defined($ARGV[0]) && lc($ARGV[0]) eq "rebuild") ? 1 : 0;
+
 my $protVersion=1;
 my @lang = ("EN", "DE");
 my $modDir = "FHEM";
@@ -20,6 +22,7 @@ for my $lang (@lang) {
   my $cmdref = "docs/commandref_frame$sfx.html";
   
   my $outpath = "docs/cref$sfx";
+  unlink glob "$outpath/*" if $rebuild;
   mkdir $outpath unless (-e $outpath);
 
   open(FH, $cmdref) || die("Cant open $cmdref: $!\n");
@@ -72,7 +75,7 @@ for my $lang (@lang) {
     next if($fName !~ m/^\d\d_(.*)\.pm$/);
     my $mName = $1;
     my $ts = (stat("$modDir/$fName"))[9];
-    if($protVersion != $fileVersion ||
+    if($protVersion != $fileVersion || $rebuild ||
        !$modData{$mName} || !$modData{$mName}{ts} || $modData{$mName}{ts}<$ts) {
       #print "Checking $fName for $lang short description\n";
 
