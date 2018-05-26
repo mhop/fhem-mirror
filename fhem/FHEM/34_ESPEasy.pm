@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.38";     # Version of this module
+my $module_version    = "1.39";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -670,17 +670,14 @@ sub ESPEasy_Read($) {
 
   # Read 1024 byte of data
   my $buf;
-  my $ret = sysread($hash->{CD}, $buf, 1024);
+  my $ret = sysread($hash->{CD}, $buf, 9000); # accept jumbo frames
 
-  # If there is an error in connection return
+  # Delete temporary device
   if( !defined($ret ) || $ret <= 0 ) {
     CommandDelete( undef, $hash->{NAME} );
     return;
   }
 
-  #$bhash->{SESSIONS} = scalar devspec2array("TYPE=$btype:FILTER=TEMPORARY=1")-1;
-
-  # Check attr disabled
   return if (IsDisabled $bname);
 
   # Check allowed IPs
@@ -689,17 +686,44 @@ sub ESPEasy_Read($) {
     Log3 $bname, 2, "$btype $name: Peer address rejected";
     return;
   }
-  Log3 $bname, 4, "$btype $name: Peer address accepted";
+  Log3 $bname, 4, "$btype $name: Peer address $peer accepted";
 
-  my @data = split( '\R\R', $buf );
-  my $header = ESPEasy_header2Hash($data[0]);
+  # check content-length header
+  $hash->{PARTIAL} .= $buf;
+	my @data = split( '\R\R', $hash->{PARTIAL} );
+  (my $ldata = $hash->{PARTIAL}) =~ s/Authorization: Basic [\w=]+/Authorization: Basic *****/;
+  if(scalar @data < 2) { #header not complete
+    Log3 $bname, 5, "$btype $name: Incomplete or no header, awaiting more data: \n$ldata";
+    #start timer
+    return;
+  }
+	my $header = ESPEasy_header2Hash($data[0]);
+	if(!defined $header->{"Content-Length"}) {
+    Log3 $bname, 2, "$btype $name: Missing content-length header: \n$ldata";
+    ESPEasy_sendHttpClose($hash,"400 Bad Request","");
+    #delete temp bridge device
+    return;
+	}
+  my $len = length($data[1]);
+  if($header->{"Content-Length"} > $len) {
+    Log3 $bname, 5, "$btype $name: Received content too small, awaiting more content: $header->{'Content-Length'}:$len \n$ldata";
+    #start timer
+    return;
+  }
+  elsif($header->{"Content-Length"} < $len) {
+    Log3 $bname, 2, "$btype $name: Received content too large, skip processing data: $header->{'Content-Length'}:$len \n$ldata";
+    ESPEasy_sendHttpClose($hash,"400 Bad Request","");
+    #delete temp bridge device
+    return;
+  }
+  Log3 $name, 4, "$btype $name: Received content length ok";
 
   # mask password in authorization header with ****
   my $logHeader = { %$header };
 
   # public IPs
   if (!defined $logHeader->{Authorization} && $peer !~ m/$d_localIPs/) {
-    Log3 $bname, 2, "$btype $name: No basic auth set while using public IP "
+    Log3 $bname, 2, "$btype $name: No basic auth set while using a public IP "
                   . "address. $peer rejected.";
     return;
   }
@@ -710,17 +734,6 @@ sub ESPEasy_Read($) {
     if (defined $logHeader);
   # Dump content
   Log3 $bname, 5, "$btype $name: Received content: $data[1]" if defined $data[1];
-
-  # Check content length if defined
-  if (defined $header->{'Content-Length'}
-  && $header->{'Content-Length'} != length($data[1])) {
-    Log3 $bname, 2, "$btype $name: Invalid content length ".
-                    "($header->{'Content-Length'} != ".length($data[1]).")";
-    Log3 $bname, 2, "$btype $name: Received content: $data[1]"
-      if defined $data[1];
-    ESPEasy_sendHttpClose($hash,"400 Bad Request","");
-    return;
-  }
 
   # check authorization
   if (!defined ESPEasy_isAuthenticated($hash,$header->{Authorization})) {
