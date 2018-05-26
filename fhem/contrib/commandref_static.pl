@@ -72,8 +72,8 @@ for my $lang (@lang) {
     next if($fName !~ m/^\d\d_(.*)\.pm$/);
     my $mName = $1;
     my $ts = (stat("$modDir/$fName"))[9];
-#    if($protVersion != $fileVersion ||
-#       !$modData{$mName} || !$modData{$mName}{ts} || $modData{$mName}{ts}<$ts) {
+    if($protVersion != $fileVersion ||
+       !$modData{$mName} || !$modData{$mName}{ts} || $modData{$mName}{ts}<$ts) {
       #print "Checking $fName for $lang short description\n";
 
       $modData{$mName}{type}="device" if(!$modData{$mName}{type});
@@ -90,7 +90,7 @@ for my $lang (@lang) {
       my $outFile = "docs/cref$sfx/$mName.cref";
       _cref_write($outFile,$output) if $output;
 
-#    }
+    }
   }
   closedir(DH);
 
