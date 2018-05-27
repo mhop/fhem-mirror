@@ -1,4 +1,4 @@
-REV 16777
+REV 16781
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -186,7 +186,7 @@ UPD 2017-12-15_07:45:02 4576 FHEM/33_readingsChange.pm
 UPD 2018-03-02_07:47:09 89206 FHEM/33_readingsGroup.pm
 UPD 2018-03-02_07:47:09 23233 FHEM/33_readingsHistory.pm
 UPD 2018-03-02_07:47:09 12101 FHEM/33_readingsProxy.pm
-UPD 2018-03-02_07:47:09 134797 FHEM/34_ESPEasy.pm
+UPD 2018-05-27_07:45:07 135399 FHEM/34_ESPEasy.pm
 UPD 2015-08-06_07:45:08 13198 FHEM/34_NUT.pm
 UPD 2016-08-23_07:45:12 47048 FHEM/34_SWAP.pm
 UPD 2016-08-23_07:45:12 16074 FHEM/34_panStamp.pm
@@ -667,8 +667,8 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-05-26_07:45:06 3453318 docs/commandref.html
-UPD 2018-05-26_07:45:08 2112914 docs/commandref_DE.html
+UPD 2018-05-27_07:45:10 3453318 docs/commandref.html
+UPD 2018-05-27_07:45:12 2112914 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-05-16_07:45:03 85474 docs/commandref_frame_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
