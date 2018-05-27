@@ -24,6 +24,8 @@
 #  - fixed:   74_Unifi: restart-typo in poe
 # V 2.2.3
 #  - fixed:   74_Unifi: Cookies for UnifiController 5.9.4
+# V 2.2.4
+#  - fixed:   74_Unifi: import encode_json for newest libs 
 
 
 package main;
@@ -32,6 +34,7 @@ use warnings;
 use HttpUtils;
 use POSIX;
 use JSON qw(decode_json);
+use JSON qw(encode_json);
 ##############################################################################}
 
 ###  Forward declarations ####################################################{
