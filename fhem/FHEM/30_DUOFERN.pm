@@ -16,6 +16,7 @@ my %devices = (
     "47"    => {"name" => "Rohrmotor Steuerung",              "format" => "23a"},
     "48"    => {"name" => "Dimmaktor"                         },
     "49"    => {"name" => "Rohrmotor"                         },
+    "4A"    => {"name" => "Dimmer(9476-1)"                    },
     "4B"    => {"name" => "Connect-Aktor"                     },
     "4C"    => {"name" => "Troll Basis"                       },
     "4E"    => {"name" => "SX5",                              "format" => "24a"},
@@ -37,8 +38,10 @@ my %devices = (
     "A8"    => {"name" => "HomeTimer"                         },
     "AA"    => {"name" => "Markisenwaechter"                  },
     "AB"    => {"name" => "Rauchmelder"                       },
+    "AC"    => {"name" => "Fenster-Tuer-Kontakt"              },
     "AD"    => {"name" => "Wandtaster 6fach Bat"              },
     "E0"    => {"name" => "Handzentrale"                      },
+    "E1"    => {"name" => "Heizkoerperantrieb"                },
 );
 
 my %sensorMsg = (
@@ -62,8 +65,8 @@ my %sensorMsg = (
     "071F"    => {"name" => "endSmoke",    "chan" => 5, "state" => "off"},      
     "0720"    => {"name" => "startMotion", "chan" => 5, "state" => "on"},
     "0721"    => {"name" => "endMotion",   "chan" => 5, "state" => "off"},
-    "0723"    => {"name" => "closeEnd",    "chan" => 5, "state" => "off"},
-    "0724"    => {"name" => "closeStart",  "chan" => 5, "state" => "on"},
+    "0723"    => {"name" => "closeStart",  "chan" => 5, "state" => "on"},
+    "0724"    => {"name" => "closeEnd",    "chan" => 5, "state" => "off"},
     "0E01"    => {"name" => "off",         "chan" => 6, "state" => "Btn01"},
     "0E02"    => {"name" => "off",         "chan" => 6, "state" => "Btn02"},
     "0E03"    => {"name" => "on",          "chan" => 6, "state" => "Btn03"},        
@@ -80,6 +83,8 @@ my %statusGroups = (
   "25"  => [300,301,302,303,304,305,306,307,308,309,310,311,312,313],
   "26"  => [],
   "27"  => [160,161,162,163,164,165,166,167,168,169,170,171],
+  "29"  => [180,181,182,183,184,185,186,187,998],
+  "2B"  => [300,301,302,303,304,305,306,307,308,309,310,311,312,313],
 );
 
 
@@ -93,6 +98,8 @@ my %statusMapping = (
   "scale10"   => [10,0],
   "scaleF1"   => [2,80],
   "scaleF2"   => [10,400],
+  "scaleF3"   => [2,-8],
+  "hex"       => [1,0],
 );
 
      
@@ -167,6 +174,14 @@ my %statusIds = (
   169 => {"name" => "timeAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 2, "from" => 3, "to" => 3}}},
   170 => {"name" => "manualMode",           "map" => "onOff",                   "chan" => { "01" => {"position" => 2, "from" => 4, "to" => 4}}},
   171 => {"name" => "measured-temp2",       "map" => "scaleF2",                 "chan" => { "01" => {"position" => 3, "from" => 0, "to" => 10}}},
+  180 => {"name" => "desired-temp",         "map" => "scaleF3",                 "chan" => { "01" => {"position" => 0, "from" => 0, "to" => 5}}},
+  181 => {"name" => "measured-temp",        "map" => "scaleF2",                 "chan" => { "01" => {"position" => 2, "from" => 0, "to" => 15}}}, 
+  182 => {"name" => "manualMode",           "map" => "onOff",                   "chan" => { "01" => {"position" => 4, "from" => 0, "to" => 0}}},
+  183 => {"name" => "timeAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 4, "from" => 1, "to" => 1}}},
+  184 => {"name" => "sendingInterval",                                          "chan" => { "01" => {"position" => 4, "from" => 6, "to" => 11}}},
+  185 => {"name" => "batteryPercent",                                           "chan" => { "01" => {"position" => 7, "from" => 0, "to" => 6}}},
+  186 => {"name" => "valvePosition",                                            "chan" => { "01" => {"position" => 6, "from" => 0, "to" => 6}}},
+  187 => {"name" => "forceResponse",                                            "chan" => { "01" => {"position" => 8, "from" => 7, "to" => 7}}}, 
   300 => {"name" => "level",                                                    "chan" => { "01" => {"position" => 7, "from" => 0, "to" => 6}}},
   301 => {"name" => "manualMode",           "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 5, "to" => 5}}},
   302 => {"name" => "timeAutomatic",        "map" => "onOff",                   "chan" => { "01" => {"position" => 3, "from" => 0, "to" => 0}}},
@@ -193,7 +208,8 @@ my %statusIds = (
   409 => {"name" => "backJump",             "map" => "onOff",                   "chan" => { "01" => {"position" => 9, "from" => 0, "to" => 0}}},
   410 => {"name" => "10minuteAlarm",        "map" => "onOff",                   "chan" => { "01" => {"position" => 9, "from" => 1, "to" => 1}}},
   411 => {"name" => "light",                "map" => "onOff",                   "chan" => { "01" => {"position" => 9, "from" => 2, "to" => 2}}},
-  999 => {"name" => "version",                                                  "chan" => { "01" => {"position" => 8, "from" => 0, "to" => 7},
+  998 => {"name" => "version",              "map" => "hex",                     "chan" => { "01" => {"position" => 9, "from" => 0, "to" => 6}}},
+  999 => {"name" => "version",              "map" => "hex",                     "chan" => { "01" => {"position" => 8, "from" => 0, "to" => 7},
                                                                                             "02" => {"position" => 8, "from" => 0, "to" => 7}}},        
 );
 
@@ -347,6 +363,21 @@ my %commandsStatus = (
   "getTime"         => "10",
 );
 
+my %commandsHSA = (                             
+  "manualMode"              => {"bitFrom" => 8,   "changeFlag" => 10},
+  "timeAutomatic"           => {"bitFrom" => 9,   "changeFlag" => 11},
+  "sendingInterval"         => {"bitFrom" => 0,   "changeFlag" => 7,    "min" => 0, "max" => 60,  "step" => 1},
+  "desired-temp"            => {"bitFrom" => 17,  "changeFlag" => 23,   "min" => 4, "max" => 28,  "step" => 0.5},
+);
+
+my @readingsBlindMode = ( "tiltInSunPos",
+                          "tiltInVentPos",
+                          "tiltAfterMoveLevel",
+                          "tiltAfterStopDown",
+                          "defaultSlatPos",
+                          "slatRunTime",
+                          "slatPosition");
+         
 my %setsBasic = (
   "reset:settings,full"                 => "",
   "remotePair:noArg"                    => "",
@@ -523,13 +554,21 @@ my %setsThermostat = (
   "actTempLimit:1,2,3,4"                => "",
   "desired-temp:$tempSetList"           => "",
 );
-                        
+
+my %setsHSA = (
+  "manualMode:on,off"                   => "",
+  "timeAutomatic:on,off"                => "",
+  "sendingInterval:slider,1,1,60"       => "",
+  "desired-temp:$tempSetList"           => "",
+);
+                          
 my $duoStatusRequest      = "0DFFnn400000000000000000000000000000yyyyyy01";
 my $duoCommand            = "0Dccnnnnnnnnnnnnnnnnnnnn000000zzzzzzyyyyyy00";
 my $duoCommand2           = "0Dccnnnnnnnnnnnnnnnnnnnn000000000000yyyyyy01";
 my $duoWeatherConfig      = "0D001B400000000000000000000000000000yyyyyy00";
 my $duoWeatherWriteConfig = "0DFF1Brrnnnnnnnnnnnnnnnnnnnn00000000yyyyyy00";
 my $duoSetTime            = "0D0110800001mmmmmmmmnnnnnn0000000000yyyyyy00";
+my $duoSetHSA             = "0D011D80nnnnnn0000000000000000000000yyyyyy00";
 
 #####################################
 sub
@@ -578,10 +617,11 @@ DUOFERN_Set($@)
   %sets = (%setsReset, "getStatus:noArg"=> "")                                if ($hash->{CODE} =~ /^(43|65|74)....$/);
   %sets = (%setsBasic, %setsSwitchActor)                                      if ($hash->{CODE} =~ /^(46|71)..../);
   %sets = (%setsBasic, %setsSX5)                                              if ($hash->{CODE} =~ /^4E..../);
-  %sets = (%setsBasic, %setsDimmer)                                           if ($hash->{CODE} =~ /^48..../);
+  %sets = (%setsBasic, %setsDimmer)                                           if ($hash->{CODE} =~ /^(48|4A)..../);
   %sets = (%setsBasic, %setsThermostat)                                       if ($hash->{CODE} =~ /^73..../);
   %sets = (%setsSwitchActor, %setsPair)                                       if ($hash->{CODE} =~ /^(65|74)....01/);
-
+  %sets = (%setsHSA)                                                          if ($hash->{CODE} =~ /^E1..../);
+  
   my $blindsMode=ReadingsVal($name, "blindsMode", "off");
   %sets = (%sets, %setsBlinds)    if ($blindsMode eq "on");
   
@@ -640,7 +680,32 @@ DUOFERN_Set($@)
     
     IOWrite( $hash, $buf );
     return undef;   
+  
+  #Heizkörperantrieb
+  } elsif (($code =~ m/^E1..../) && (exists $commandsHSA{$cmd})) {
+    return "Missing argument" if (!defined($arg));
+    if(exists $commandsHSA{$cmd}{max}) {
+      return "Wrong argument $arg" if ($arg !~ m/^\d+(\.\d+|)$/ || $arg < $commandsHSA{$cmd}{min} || $arg > $commandsHSA{$cmd}{max});
+      $arg = int($arg / $commandsHSA{$cmd}{step}) * $commandsHSA{$cmd}{step};
+    } else {
+      return "Wrong argument $arg" if($arg ne "off" && $arg ne "on");
+    }
     
+    if(!exists $hash->{helper}{HSAold}{$cmd}) {
+      $hash->{helper}{HSAold}{$cmd} = ReadingsVal($name, $cmd, 0);
+    }
+    
+    if($cmd eq "desired-temp") {
+      if($arg2 && ($arg2 eq "timer")) {
+        $hash->{helper}{HSAtimer} = 1;
+      } else {
+        $hash->{helper}{HSAtimer} = 0;
+      }
+    }
+    
+    readingsSingleUpdate($hash, $cmd, $arg, 1);
+    return undef;
+        
   } elsif (exists $wCmds{$cmd}) { 
     return "This command is not allowed for this device." if ($hash->{CODE} !~ /^69....00/);  
 
@@ -922,7 +987,7 @@ DUOFERN_Define($$)
   
  return undef if (AttrVal($name,"ignore",0) != 0);
   
-  if ($hash->{CODE} =~ m/^(40|41|42|43|46|47|48|49|4B|4C|4E|61|62|65|69|70|71|73|74)....$/) {
+  if ($hash->{CODE} =~ m/^(40|41|42|43|46|47|48|49|4A|4B|4C|4E|61|62|65|69|70|71|73|74)....$/) {
     $hash->{helper}{timeout}{t} = 30;
     InternalTimer(gettimeofday()+$hash->{helper}{timeout}{t}, "DUOFERN_StatusTimeout", $hash, 0);
     $hash->{helper}{timeout}{count} = 2;
@@ -1063,21 +1128,16 @@ DUOFERN_Parse($$)
         my %statusValue;
         my $positionInverse = AttrVal($name,"positionInverse",0);
         
-        readingsBeginUpdate($hashA);
-        
         foreach my $statusId (@{$statusGroups{$format}}) {
-     
           if(exists $statusIds{$statusId}) {
-            
             my $chan= (exists $hashA->{chanNo} ? $hashA->{chanNo} : "01");
-            
             my $stName  = $statusIds{$statusId}{name};
             my $stPos   = $statusIds{$statusId}{chan}{$chan}{position};    
             my $stFrom  = $statusIds{$statusId}{chan}{$chan}{from};
             my $stTo    = $statusIds{$statusId}{chan}{$chan}{to};
             my $stLen   = $stTo - $stFrom + 1;
+            my $value = hex(substr($msg,  6 + $stPos*2,  4));
             
-            my $value = hex(substr($msg, ($stLen > 8 ? 6 : 8) + $stPos*2, ($stLen > 8 ? 4 : 2)));
             $value = ($value >> $stFrom) & ((1<<$stLen) - 1);
             
             if((exists $statusIds{$statusId}{invert}) && ($positionInverse eq "1")) {
@@ -1085,29 +1145,73 @@ DUOFERN_Parse($$)
             }
             
             if((exists $statusIds{$statusId}{map}) && (exists $statusMapping{$statusIds{$statusId}{map}})) {
-              
               if ($statusIds{$statusId}{map} =~ m/scaleF.*/) {
                 $value = sprintf("%0.1f",($value - $statusMapping{$statusIds{$statusId}{map}}[1]) / $statusMapping{$statusIds{$statusId}{map}}[0]);
               } elsif ($statusIds{$statusId}{map} =~ m/scale.*/) {
                 $value = ($value - $statusMapping{$statusIds{$statusId}{map}}[1]) / $statusMapping{$statusIds{$statusId}{map}}[0];
+              } elsif ($statusIds{$statusId}{map} =~ m/hex/) {
+                $value = sprintf("%02x",$value);
+                $value = substr($value, 0, 1).".".substr($value, 1, 1);
               } else {
                 $value = $statusMapping{$statusIds{$statusId}{map}}[$value];
               }    
             }
             
             $statusValue{$stName} = $value;
-            readingsBulkUpdate($hashA, $stName,  $value,     1);
+          }
+        }
+                
+        if (defined($statusValue{blindsMode}) && ($statusValue{blindsMode} eq "off")) {
+          foreach my $reading (@readingsBlindMode){
+            delete($hash->{READINGS}{$reading});
+            delete($statusValue{$reading});
+            Log3 $hash, 1, "DUOFERN blinds mode ".$reading;
           }
         }
         
-        if (defined($statusValue{blindsMode}) && ($statusValue{blindsMode} eq "off")) {
-          delete($hash->{READINGS}{tiltInSunPos});
-          delete($hash->{READINGS}{tiltInVentPos});
-          delete($hash->{READINGS}{tiltAfterMoveLevel});
-          delete($hash->{READINGS}{tiltAfterStopDown});
-          delete($hash->{READINGS}{defaultSlatPos});
-          delete($hash->{READINGS}{slatRunTime});
-          delete($hash->{READINGS}{slatPosition});
+        #Heizkörperantrieb
+        if ($code =~ m/^E1..../) {
+          my $setValue = 0;
+          
+          foreach my $key (keys %commandsHSA) {
+            if(defined($hash->{helper}{HSAold}{$key})) {
+              my $oldValue = $hash->{helper}{HSAold}{$key};
+              my $isValue = $statusValue{$key};
+              my $newValue = ReadingsVal($name, $key, 0);
+              my $rawValue = 0;
+              my $changeFlag = 0;
+              
+              delete($hash->{helper}{HSAold}{$key});
+              
+              if($oldValue eq $isValue) {
+                $statusValue{$key} = $newValue;
+                $changeFlag = 1;
+              }
+              
+              if(exists $commandsHSA{$key}{min}) {
+                $rawValue = int(($newValue - $commandsHSA{$key}{min}) / $commandsHSA{$key}{step});
+              } else {
+                $rawValue = 1 if($newValue eq "on");
+              }
+              
+              $setValue |= ($rawValue << $commandsHSA{$key}{bitFrom}) | ($changeFlag << $commandsHSA{$key}{changeFlag});
+            }  
+          }
+          
+          if(defined($hash->{helper}{HSAtimer})) {
+            $setValue |= ($hash->{helper}{HSAtimer} << 16);
+          }
+          delete($hash->{helper}{HSAtimer});
+          
+          if(($setValue + $statusValue{forceResponse}) > 0) {
+            $setValue = sprintf "%06x", $setValue;
+          
+            my $buf = $duoSetHSA;
+            $buf =~ s/yyyyyy/$code/;
+            $buf =~ s/nnnnnn/$setValue/;
+            IOWrite( $hash, $buf );
+          }
+          delete($statusValue{forceResponse});
         }
         
         $state = "x";
@@ -1121,12 +1225,12 @@ DUOFERN_Parse($$)
             $state = "closed"   if ($state eq "100");
           }      
         
-        } elsif ($format =~ m/^(22|25)/) {  
+        } elsif ($format =~ m/^(22|25|2B)/) {  
           $state = $statusValue{level} if defined($statusValue{level});
           $state = "off"   if ($state eq "0");
           $state = "on"    if ($state eq "100");
                      
-        } elsif ($format =~ m/^(27)/) {  
+        } elsif ($format =~ m/^(27|29)/) {  
           my $temperature1 = "x";
           my $desiredTemp  = "x";
           $temperature1 = $statusValue{"measured-temp"} if defined($statusValue{"measured-temp"});
@@ -1138,9 +1242,14 @@ DUOFERN_Parse($$)
         $state = "light curtain"  if (defined($statusValue{"lightCurtain"}) && $statusValue{"lightCurtain"} eq "1");
         $state = "obstacle"       if (defined($statusValue{"obstacle"}) && $statusValue{"obstacle"} eq "1");
         $state = "block"          if (defined($statusValue{"block"}) && $statusValue{"block"} eq "1");
+        
+        readingsBeginUpdate($hashA);        
         readingsBulkUpdate($hashA, "state",  $state,     1) if ($state ne "x");
-          
-        readingsEndUpdate($hashA, 1); # Notify is done by Dispatch 
+        foreach my $key (keys %statusValue) {
+          readingsBulkUpdate($hashA, $key,  $statusValue{$key},     1);  
+        }
+        readingsEndUpdate($hashA, 1); # Notify is done by Dispatch
+         
         DoTrigger($hashA->{NAME}, undef);
       }
 
@@ -1194,7 +1303,7 @@ DUOFERN_Parse($$)
         if(($code !~ m/^(69|73).*/) || ($id =~ m/..(11|12)/)) {
           $chan="";
         }
-        if($code =~ m/^(65|A5|AA|AB)..../) {
+        if($code =~ m/^(65|A5|AA|AB|AC)..../) {
           readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
         }
         
@@ -1277,21 +1386,23 @@ DUOFERN_Parse($$)
     DUOFERN_DecodeWeatherSensorConfig($hash);
     
   
-  #Rauchmelder Batterie
+  #Sensoren Batterie
   } elsif ($msg =~ m/0FFF1323.{36}/) {
     my $battery      = (hex(substr($msg,  8, 2)) <= 10 ? "low" : "ok");
     my $batteryLevel =  hex(substr($msg,  8, 2));
     
     readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, "battery",          $battery,       1);
-    readingsBulkUpdate($hash, "batteryLevel",     $batteryLevel,  1);
+    readingsBulkUpdate($hash, "batteryState",     $battery,       1);
+    readingsBulkUpdate($hash, "batteryPercent",   $batteryLevel,  1);
     readingsEndUpdate($hash, 1); # Notify is done by Dispatch
   
   #ACK, Befehl vom Aktor empfangen
   } elsif ($msg =~ m/810003CC.{36}/) {
-    $hash->{helper}{timeout}{t} = AttrVal($hash->{NAME}, "timeout", "60");    
-    InternalTimer(gettimeofday()+$hash->{helper}{timeout}{t}, "DUOFERN_StatusTimeout", $hash, 0);
-    $hash->{helper}{timeout}{count} = 4;
+    if (!($code =~ m/^E1..../)) {
+      $hash->{helper}{timeout}{t} = AttrVal($hash->{NAME}, "timeout", "60");    
+      InternalTimer(gettimeofday()+$hash->{helper}{timeout}{t}, "DUOFERN_StatusTimeout", $hash, 0);
+      $hash->{helper}{timeout}{count} = 4;
+    }
   
   #NACK, Befehl nicht vom Aktor empfangen
   } elsif ($msg =~ m/810108AA.{36}/) {
@@ -1670,6 +1781,18 @@ DUOFERN_StatusTimeout($)
         Set desired temperature to the selected temperatureThreshold. If parameter 
         <b>timer</b> is used the command will only be executed if timeAutomatic is
         activated.
+        </li><br>
+        
+    </ul>    
+    <b>Radiator Actuator commands:</b><br><br>
+    <ul>  
+    <li><b>desired-temp &lt;temp&gt; [timer]</b><br>
+        Set desired temperature. &lt;temp&gt; must be between 4 and 35.5
+        Celsius, and precision is half a degree. If parameter <b>timer</b> 
+        is used the command will only be executed if timeAutomatic is activated.
+        </li><br>
+    <li><b>sendingInterval &lt;minutes&gt;</b><br>
+        Sets the transmission interval of the status responds.
         </li><br>
         
     </ul>    
