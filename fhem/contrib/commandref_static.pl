@@ -100,7 +100,7 @@ for my $lang (@lang) {
   $cmdref = "docs/commandref_frame${sfx}.html";
   open(IN, $cmdref) || die("Cant open $cmdref: $!\n");
 
-  $cmdref = ">docs/commandref${sfx}.html";
+  $cmdref = ">docs/commandref_modular${sfx}.html";
   open(OUT, $cmdref) || die("Cant open $cmdref: $!\n");
   
   my $linkDumped = 0;
@@ -110,7 +110,7 @@ for my $lang (@lang) {
     if($l =~ m,\s*<title>,) {
       print OUT << 'EOF'
   <script type="text/javascript" src="../pgm2/jquery.min.js"></script>
-  <script type="text/javascript" src="../pgm2/fhemdoc_static.js"></script>
+  <script type="text/javascript" src="../pgm2/fhemdoc_modular.js"></script>
 EOF
     }
 

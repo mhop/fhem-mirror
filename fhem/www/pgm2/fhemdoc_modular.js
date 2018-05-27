@@ -2,7 +2,9 @@
 // $Id$
 
 var fd_loadedHash={}, fd_loadedList=[], fd_all={}, fd_allCnt, fd_progress=0, 
-    fd_lang, fd_offsets=[], fd_scrolled=0, fd_modLinks={}, csrfToken="X";
+    fd_lang, fd_offsets=[], fd_scrolled=0, fd_modLinks={}, csrfToken="X",
+    fd_mode = "FHEM";
+var fd_otherSrc = { "usb":"autocreate", "createlog":"autocreate" };
 
 
 function
@@ -10,7 +12,8 @@ fd_status(txt)
 {
   var errmsg = $("#errmsg");
   if(!$(errmsg).length) {
-    $('#menuScrollArea').append('<div id="errmsg">');
+    $('#menu').append('<a style="display:block; padding-top:2em" '+
+                         'id="errmsg" href="#"></a>');
     errmsg = $("#errmsg");
   }
   if(txt == "")
@@ -23,25 +26,46 @@ function
 fd_fC(fn, callback)
 {
   console.log("fd_fC:"+fn);
-  var p = location.pathname;
-  var cmd = p.substr(0,p.indexOf('/doc'))+'?cmd='+fn+csrfToken+'&XHR=1';
-  $.ajax({
-    url:cmd, method:'POST', cache:false, success:callback,
-    error:function(xhr, status, err) {
-      if(xhr.status == 400 && csrfToken) {
-        csrfToken = "";
-        fd_csrfRefresh(function(){fd_fC(fn, callback)});
-      } else {
-        console.log("FAIL ERR:"+xhr.status+" STAT:"+status);
+
+  if(fd_mode == "FHEM") {
+    var p = location.pathname;
+    var cmd = p.substr(0,p.indexOf('/doc'))+'?cmd='+fn+csrfToken+'&XHR=1';
+    $.ajax({
+      url:cmd, method:'POST', cache:false, success:callback,
+      error:function(xhr, status, err) {
+        if(xhr.status == 400 && csrfToken) {
+          csrfToken = "";
+          fd_csrfRefresh(function(){fd_fC(fn, callback)});
+        } else {
+          console.log("FAIL ERR:"+xhr.status+" STAT:"+status);
+        }
       }
-    }
-  });
+    });
+
+  } else { // static
+    $.ajax({
+      url:fn, method:'GET',
+      success:function(ret) {
+        callback('<html>'+ret+'</html>');
+      },
+      error:function(xhr, status, err) {
+        callback("");
+        console.log("FAIL ERR:"+xhr.status+" STAT:"+status);
+        fd_status("Cannot load "+fn);
+        setTimeout(function(){ fd_status("") }, 5000);
+      }
+    });
+  }
 }
 
+// Dynamically load the codumentation of one module.
+var inLoadOneDoc = false;
 function
 loadOneDoc(mname, lang)
 {
   var origLink = mname;
+  if(inLoadOneDoc)
+    return;
 
   function
   done(err, calc)
@@ -56,8 +80,12 @@ loadOneDoc(mname, lang)
     } else {
       if(calc)
         setTimeout(calcOffsets,100);
-      if(!err)
-        setTimeout(function(){location.href = "#"+origLink;}, 100);
+
+      inLoadOneDoc = true; // avoid the hashchange callback
+      setTimeout(function(){ location.href = "#"+origLink; }, 100);
+
+      // takes long if the complete doc is loaded
+      setTimeout(function(){ inLoadOneDoc = false; }, 2000);
     }
   }
 
@@ -66,8 +94,9 @@ loadOneDoc(mname, lang)
   if(fd_loadedHash[mname] && fd_loadedHash[mname] == lang)
     return done(false, false);
 
-  fd_fC("help "+mname+" "+lang, function(ret){
-    //console.log(mname+" "+lang+" => "+ret.length);
+  fd_fC(fd_mode=="FHEM" ? "help "+mname+" "+langC : 
+                          "/cref"+(lang=="EN" ? "":"_"+lang)+"/"+mname+".cref",
+  function(ret){
     if(ret.indexOf("<html>") != 0 || ret.indexOf("<html>No help found") == 0)
       return done(true, false);
     ret = ret.replace(/<\/?html>/g,'');
@@ -96,6 +125,7 @@ loadOneDoc(mname, lang)
   });
 }
 
+// Add a hook for each <a> tag to load & scroll to the corresponding item
 function
 addAHooks(el)
 {
@@ -113,6 +143,8 @@ addAHooks(el)
   });
 }
 
+// remember the offset of all loaded elements, to be able to dynamically show
+// the correct "load <XXX> in other language" link
 function
 calcOffsets()
 {
@@ -124,6 +156,7 @@ calcOffsets()
   checkScroll();
 }
 
+// Show the correct otherLang, see calcOffsets
 function
 checkScroll()
 {
@@ -153,6 +186,7 @@ checkScroll()
   }
 }
 
+// Load the current entry in the other langueage
 function
 loadOtherLang()
 {
@@ -160,9 +194,12 @@ loadOtherLang()
   loadOneDoc(mname, fd_loadedHash[mname]=="EN" ? "DE" : "EN");
 }
 
+// get the current csrf from FHEMWEB
 function
 fd_csrfRefresh(callback)
 {
+  if(fd_mode != "FHEM")
+    return;
   console.log("fd_csrfRefresh");
   $.ajax({
     url:location.pathname.replace(/docs.*/,'')+"?XHR=1",
@@ -175,11 +212,16 @@ fd_csrfRefresh(callback)
   });
 }
 
+
 $(document).ready(function(){
-  var p = location.pathname;
-  fd_lang = p.substring(p.indexOf("commandref")+11,p.indexOf(".html"));
-  if(!fd_lang || fd_lang == '.')
+  var p = location.pathname.split(/[_.]/);
+  fd_lang = (p[1] == "modular" ? p[2] : p[1]);
+  if(fd_lang == "html")
     fd_lang = "EN";
+
+  if(location.host == "fhem.de" || location.host == "commandref.fhem.de")
+    fd_mode = "static";
+
 
   $("div#modLinks").each(function(){
     var a1 = $(this).html().split(" ");
@@ -205,11 +247,15 @@ $(document).ready(function(){
       loadOneDoc($(this).html(), fd_lang);
     });
 
-  if(location.hash)
+  for(var i1 in fd_otherSrc)
+    fd_modLinks[i1] = fd_otherSrc[i1];
+
+  if(location.hash && location.hash.length > 1)
     loadOneDoc(location.hash.substr(1), fd_lang);
 
   $(window).bind('hashchange', function() {
-    loadOneDoc(location.hash.substr(1), fd_lang);
+    if(location.hash.length > 1)
+      loadOneDoc(location.hash.substr(1), fd_lang);
   });
 
   $("a[name=loadAll]").show().click(function(e){
