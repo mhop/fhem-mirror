@@ -1,4 +1,4 @@
-REV 16786
+REV 16787
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -671,8 +671,8 @@ UPD 2018-05-27_13:13:28 3453832 docs/commandref.html
 UPD 2018-05-27_12:53:54 2112914 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-05-16_07:45:03 85474 docs/commandref_frame_DE.html
-UPD 2018-05-27_13:13:30 192425 docs/commandref_modular.html
-UPD 2018-05-27_13:13:31 203111 docs/commandref_modular_DE.html
+UPD 2018-05-27_13:14:49 192425 docs/commandref_modular.html
+UPD 2018-05-27_13:14:50 203111 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2007,7 +2007,6 @@ UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2018-05-11_07:45:02 23710 www/pgm2/f18.js
 UPD 2018-02-12_07:45:03 2369 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
-UPD 2018-05-27_12:57:15 7487 www/pgm2/fhemdoc_modular.js.orig
 UPD 2018-05-12_07:45:03 56285 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
 UPD 2018-02-01_07:45:02 4063 www/pgm2/fhemweb_fbcalllist.js
