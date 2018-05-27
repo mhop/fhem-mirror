@@ -10,10 +10,10 @@ var fd_otherSrc = { "usb":"autocreate", "createlog":"autocreate" };
 function
 fd_status(txt)
 {
+
   var errmsg = $("#errmsg");
   if(!$(errmsg).length) {
-    $('#menu').append('<a style="display:block; padding-top:2em" '+
-                         'id="errmsg" href="#"></a>');
+    $('#menu').append('<a style="background-color:black; color:white; position:fixed; top:0px; left:40px; z-index: 10;" id="errmsg" href="#"></a>');
     errmsg = $("#errmsg");
   }
   if(txt == "")
@@ -94,7 +94,7 @@ loadOneDoc(mname, lang)
   if(fd_loadedHash[mname] && fd_loadedHash[mname] == lang)
     return done(false, false);
 
-  fd_fC(fd_mode=="FHEM" ? "help "+mname+" "+langC : 
+  fd_fC(fd_mode=="FHEM" ? "help "+mname+" "+lang : 
                           "/cref"+(lang=="EN" ? "":"_"+lang)+"/"+mname+".cref",
   function(ret){
     if(ret.indexOf("<html>") != 0 || ret.indexOf("<html>No help found") == 0)
