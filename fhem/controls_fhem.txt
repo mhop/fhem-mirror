@@ -1,4 +1,4 @@
-REV 16781
+REV 16786
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-05-26_07:45:03 249273 ./CHANGED
+UPD 2018-05-27_13:13:25 249332 ./CHANGED
 UPD 2018-05-16_07:45:03 37253 ./MAINTAINER.txt
 UPD 2018-03-26_07:45:02 41123 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
@@ -156,7 +156,7 @@ UPD 2015-07-28_14:05:31 10651 FHEM/24_NetIO230B.pm
 UPD 2018-05-18_07:47:02 19582 FHEM/24_TPLinkHS110.pm
 UPD 2018-05-09_07:45:02 355062 FHEM/26_KM273.pm
 UPD 2018-05-11_07:45:02 54419 FHEM/26_tahoma.pm
-UPD 2018-03-03_07:47:08 85669 FHEM/30_DUOFERN.pm
+UPD 2018-05-27_13:13:25 91572 FHEM/30_DUOFERN.pm
 UPD 2015-07-28_14:05:31 4923 FHEM/30_ENECSYSGW.pm
 UPD 2018-03-03_07:47:08 61628 FHEM/30_HUEBridge.pm
 UPD 2017-03-12_07:45:02 32401 FHEM/30_LIGHTIFY.pm
@@ -358,7 +358,7 @@ UPD 2018-05-21_07:45:03 30457 FHEM/74_HusqvarnaAutomower.pm
 UPD 2018-02-28_07:45:03 22902 FHEM/74_NUKIDevice.pm
 UPD 2017-04-26_07:45:02 35753 FHEM/74_Nmap.pm
 UPD 2017-05-03_07:45:02 64129 FHEM/74_THINKINGCLEANER.pm
-UPD 2018-05-11_07:45:02 103181 FHEM/74_Unifi.pm
+UPD 2018-05-27_13:13:25 103277 FHEM/74_Unifi.pm
 UPD 2018-02-13_07:45:02 15941 FHEM/74_UnifiVideo.pm
 UPD 2018-05-09_07:45:02 40421 FHEM/74_XiaomiBTLESens.pm
 UPD 2017-10-11_07:45:02 112592 FHEM/75_MSG.pm
@@ -667,10 +667,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-05-27_07:45:10 3453318 docs/commandref.html
-UPD 2018-05-27_07:45:12 2112914 docs/commandref_DE.html
+UPD 2018-05-27_13:13:28 3453832 docs/commandref.html
+UPD 2018-05-27_12:53:54 2112914 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-05-16_07:45:03 85474 docs/commandref_frame_DE.html
+UPD 2018-05-27_13:13:30 192425 docs/commandref_modular.html
+UPD 2018-05-27_13:13:31 203111 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2004,8 +2006,8 @@ UPD 2018-03-26_07:45:02 5908 www/pgm2/defaultCommon.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2018-05-11_07:45:02 23710 www/pgm2/f18.js
 UPD 2018-02-12_07:45:03 2369 www/pgm2/f18style.css
-UPD 2018-01-28_07:45:02 5993 www/pgm2/fhemdoc_modular.js
-UPD 2018-05-25_07:45:02 5992 www/pgm2/fhemdoc_static.js
+UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
+UPD 2018-05-27_12:57:15 7487 www/pgm2/fhemdoc_modular.js.orig
 UPD 2018-05-12_07:45:03 56285 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
 UPD 2018-02-01_07:45:02 4063 www/pgm2/fhemweb_fbcalllist.js
