@@ -50,6 +50,7 @@
 # 2017-07-08 V 0215 default set commands on devices without commands deleted
 # 2017-10-08 V 0216 group definition added
 # 2018-05-10 V 0217 disable activated on devices
+# 2018-05-25 V 0218 keepalive of http connection corrected
 
 package main;
 
@@ -122,7 +123,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0217";
+  my $ModuleVersion = "0218";
   
   my $subtype;
   my $name = $a[0];
@@ -398,6 +399,7 @@ sub tahoma_getEvents($)
     noshutdown => 1,
     hash => $hash,
     page => 'getEvents',
+    method => 'PUSH',
     callback => \&tahoma_dispatch,
     nonblocking => 1,
   });
@@ -1473,6 +1475,28 @@ sub tahoma_UserAgent_NonblockingGet($)
 	my ($param) = @_;
   my ($hash) = $param->{hash};
   $hash = $hash->{IODev} if (defined ($hash->{IODev}));
+  
+  # restore parameter from last HttpUtils call
+  if (defined $hash->{paramHash} && $hash->{paramHash}{keepalive})
+  {
+    my $paramHash = $hash->{paramHash};
+    if (defined $paramHash)
+    {
+        delete $paramHash->{timeout};
+        delete $paramHash->{noshutdown};
+        delete $paramHash->{hash};
+        delete $paramHash->{page};
+        delete $paramHash->{subpage};
+        delete $paramHash->{data};
+        delete $paramHash->{method};
+        delete $paramHash->{callback};
+        delete $paramHash->{nonblocking};
+    }
+    $paramHash = {} if !(defined $paramHash);
+    $paramHash->{$_} = $param->{$_} for (keys %$param);
+    $param = $paramHash;
+  }
+  $hash->{paramHash} = $param;
 
   my $name = $hash->{NAME};
   Log3 $name, 5, "$name: tahoma_UserAgent_NonblockingGet page=$param->{page}";
