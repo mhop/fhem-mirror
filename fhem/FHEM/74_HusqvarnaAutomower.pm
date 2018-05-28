@@ -514,7 +514,7 @@ sub HusqvarnaAutomower_getMowerResponse($) {
 		#readingsBulkUpdate($hash,$reading,$value);
 		readingsBulkUpdate($hash, "mower_id", $hash->{HusqvarnaAutomower}->{mower_id} );    
 		readingsBulkUpdate($hash, "mower_name", $hash->{HusqvarnaAutomower}->{mower_name} );    
-		readingsBulkUpdate($hash, "mower_battery", $hash->{HusqvarnaAutomower}->{mower_battery} );    
+		readingsBulkUpdate($hash, "mower_battery", chop($hash->{HusqvarnaAutomower}->{mower_battery}) );    
 		readingsBulkUpdate($hash, "mower_status", $hash->{HusqvarnaAutomower}->{mower_status} );    
 		readingsBulkUpdate($hash, "mower_mode", HusqvarnaAutomower_ToGerman($hash, $hash->{HusqvarnaAutomower}->{mower_mode} ));    
 
@@ -582,7 +582,7 @@ sub HusqvarnaAutomower_getMowerStatusResponse($) {
 
 		readingsBeginUpdate($hash);
 		
-		readingsBulkUpdate($hash, "mower_battery", $hash->{HusqvarnaAutomower}->{mower_battery}."%" );    
+		readingsBulkUpdate($hash, "mower_battery", $hash->{HusqvarnaAutomower}->{mower_battery} );    
 		readingsBulkUpdate($hash, "mower_status", $hash->{HusqvarnaAutomower}->{mower_status} );    
 		readingsBulkUpdate($hash, "mower_mode", $hash->{HusqvarnaAutomower}->{mower_mode} );  
 
