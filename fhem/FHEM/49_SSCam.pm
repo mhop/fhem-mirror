@@ -613,7 +613,7 @@ sub SSCam_Set($@) {
                  "enable:noArg ".
                  "disable:noArg ".
 				 "optimizeParams ".
-                 "runView:live_fw,live_fw_hls,live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
+                 "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setPreset ": "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
                  "stopView:noArg ".
@@ -2873,7 +2873,7 @@ sub SSCam_getapisites_parse ($) {
 		
     } elsif ($myjson ne "") {          
         # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, my $success) = &SSCam_evaljson($hash,$myjson,$param->{url});
+        ($hash, my $success) = SSCam_evaljson($hash,$myjson);
         
         unless ($success) {
             Log3($name, 4, "$name - Data returned: $myjson");
@@ -3294,7 +3294,7 @@ sub SSCam_getcamid_parse ($) {
    } elsif ($myjson ne "") {
        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
        # evaluiere ob Daten im JSON-Format empfangen wurden, Achtung: sehr viele Daten mit verbose=5
-       ($hash, $success) = SSCam_evaljson($hash,$myjson,$param->{url});
+       ($hash, $success) = SSCam_evaljson($hash,$myjson);
         
        unless ($success) {
            Log3($name, 4, "$name - Data returned: ".$myjson);
@@ -3827,7 +3827,7 @@ sub SSCam_camop_parse ($) {
    } elsif ($myjson ne "") {    
         # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
         # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, $success) = &SSCam_evaljson($hash,$myjson,$param->{url});
+        ($hash, $success) = SSCam_evaljson($hash,$myjson);
         
         unless ($success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
@@ -4998,7 +4998,7 @@ sub SSCam_login_return ($) {
         # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
         
 		# Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, $success) = SSCam_evaljson($hash,$myjson,$param->{url});
+        ($hash, $success) = SSCam_evaljson($hash,$myjson);
         unless ($success) {
             Log3($name, 4, "$name - no JSON-Data returned: ".$myjson);
             $hash->{HELPER}{ACTIVE} = "off";
@@ -5119,7 +5119,7 @@ sub SSCam_logout_return ($) {
        Log3($name, 4, "$name - URL-Call: ".$param->{url});
         
        # Evaluiere ob Daten im JSON-Format empfangen wurden
-       ($hash, $success) = &SSCam_evaljson($hash,$myjson,$param->{url});
+       ($hash, $success) = SSCam_evaljson($hash,$myjson);
         
        unless ($success) {
            Log3($name, 4, "$name - Data returned: ".$myjson);
@@ -5167,15 +5167,13 @@ return;
 
 ###############################################################################
 #   Test ob JSON-String empfangen wurde
-sub SSCam_evaljson { 
-  my ($hash,$myjson,$url)= @_;
+sub SSCam_evaljson($$) { 
+  my ($hash,$myjson)= @_;
   my $success = 1;
-  my $e;
   
   eval {decode_json($myjson)} or do 
   {
       $success = 0;
-      $e = $@;
   
       # Setreading 
       readingsBeginUpdate($hash);
