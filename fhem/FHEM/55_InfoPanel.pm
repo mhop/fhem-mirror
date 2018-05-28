@@ -60,7 +60,8 @@
 #                              with \n in text
 # 2016-09-04 - 12114 - added:   movecalculated
 #
-# 2018-05-06 - $Rev$ - changed: check plotName exists
+# 2018-05-06 - 16695 - changed: check plotName exists
+# 2018-05-28 - $Rev$ - changed: remove misleading link in commandref
 #
 ##############################################
 =cut
@@ -1920,13 +1921,5 @@ sub btIP_getURL {
 </ul>
 
 =end html
-=begin html_DE
 
-<a name="InfoPanel"></a>
-<h3>InfoPanel</h3>
-<ul>
-Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
-Die englische Doku gibt es hier: <a href='commandref.html#InfoPanel'>InfoPanel</a><br/>
-</ul>
-=end html_DE
 =cut
