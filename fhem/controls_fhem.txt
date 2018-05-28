@@ -1,4 +1,4 @@
-REV 16787
+REV 16789
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -155,7 +155,7 @@ UPD 2015-07-28_14:05:31 5626 FHEM/23_WEBIO_12DIGITAL.pm
 UPD 2015-07-28_14:05:31 10651 FHEM/24_NetIO230B.pm
 UPD 2018-05-18_07:47:02 19582 FHEM/24_TPLinkHS110.pm
 UPD 2018-05-09_07:45:02 355062 FHEM/26_KM273.pm
-UPD 2018-05-11_07:45:02 54419 FHEM/26_tahoma.pm
+UPD 2018-05-28_07:45:03 55203 FHEM/26_tahoma.pm
 UPD 2018-05-27_13:13:25 91572 FHEM/30_DUOFERN.pm
 UPD 2015-07-28_14:05:31 4923 FHEM/30_ENECSYSGW.pm
 UPD 2018-03-03_07:47:08 61628 FHEM/30_HUEBridge.pm
@@ -671,8 +671,8 @@ UPD 2018-05-27_13:13:28 3453832 docs/commandref.html
 UPD 2018-05-27_12:53:54 2112914 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-05-16_07:45:03 85474 docs/commandref_frame_DE.html
-UPD 2018-05-27_13:14:49 192425 docs/commandref_modular.html
-UPD 2018-05-27_13:14:50 203111 docs/commandref_modular_DE.html
+UPD 2018-05-28_07:45:09 192425 docs/commandref_modular.html
+UPD 2018-05-28_07:45:10 203111 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
