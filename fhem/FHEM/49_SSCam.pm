@@ -27,7 +27,9 @@
 #########################################################################################################################
 #  Versions History:
 # 
-# 4.1.0  05.05.2018    use SYNO.SurveillanceStation.VideoStream instead of SYNO.SurveillanceStation.VideoStreaming
+# 4.3.0  27.05.2018    HLS preparation changed
+# 4.2.0  22.05.2018    PTZ-Panel integrated to created StreamDevice
+# 4.1.0  05.05.2018    use SYNO.SurveillanceStation.VideoStream instead of SYNO.SurveillanceStation.VideoStreaming,
 #                      preparation for hls
 # 4.0.0  01.05.2018    AudioStream possibility added
 # 3.10.0 24.04.2018    CreateStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to 
@@ -225,7 +227,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "4.1.0";
+my $SSCamVersion = "4.3.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -611,7 +613,7 @@ sub SSCam_Set($@) {
                  "enable:noArg ".
                  "disable:noArg ".
 				 "optimizeParams ".
-                 "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
+                 "runView:live_fw,live_fw_hls,live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setPreset ": "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
                  "stopView:noArg ".
@@ -917,8 +919,8 @@ sub SSCam_Set($@) {
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw";
       } elsif ($prop eq "live_fw_hls") {
           $hash->{HELPER}{OPENWINDOW} = 0;
-          $hash->{HELPER}{WLTYPE}     = "video"; 
-		  $hash->{HELPER}{ALIAS}      = " ";
+          $hash->{HELPER}{WLTYPE}     = "hls"; 
+		  $hash->{HELPER}{ALIAS}      = "View on Safari";
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw_hls";
       } elsif ($prop eq "lastsnap_fw") {
           $hash->{HELPER}{OPENWINDOW}  = 0;
@@ -1164,11 +1166,19 @@ sub SSCam_FWsummaryFn ($$$$) {
     $alias = $hash->{HELPER}{ALIAS};
     $ret = "<img $attr alt='$alias' src='data:image/jpeg;base64,$link'><br>";
   
+  } elsif($wltype eq "hls") {
+    $alias = $hash->{HELPER}{ALIAS};
+    $ret = "<video $attr controls>
+            <source src=\"$link\" type=\"application/x-mpegURL\">
+            </video>";
+  
   } elsif($wltype eq "video") {
     $ret = "<video $attr controls> 
              <source src=$link type=\"video/mp4\"> 
              <source src=$link type=\"video/ogg\">
              <source src=$link type=\"video/webm\">
+             <source src=$link type=\"application/x-mpegURL\">
+             <source src=$link type=\"video/MP2T\">
              Your browser does not support the video tag.
              </video>".weblink_FwDetail($d); 
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
@@ -3692,10 +3702,8 @@ sub SSCam_camop ($) {
       Log3($name, 4, "$name - trigger external event \"$hash->{HELPER}{EVENTID}\"");
       $url = "http://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtmaxver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
    
-   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ /snap/) {    
-      if ($hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) {
-          $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
-      } elsif ($hash->{HELPER}{RUNVIEW} =~ m/live/) {
+   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/) {    
+      if ($hash->{HELPER}{RUNVIEW} =~ m/live/) {
           $hash->{HELPER}{AUDIOLINK} = "http://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
           # externe URL
           $livestream = AttrVal($name, "livestreamprefix", "http://$serveraddr:$serverport");
@@ -3744,6 +3752,11 @@ sub SSCam_camop ($) {
 	  my $imgsize = 2;                # full size image, für lastsnap_fw 
 	  my $keyword = $hash->{CAMNAME}; # nur Snaps von $camname selektieren, für lastsnap_fw   
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
+   
+   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) {
+      # HLS Livestreaming aktivieren
+      $httptimeout = $httptimeout+90; # aktivieren HLS dauert lange !
+      $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Open&cameraId=$camid&format=hls&_sid=$sid"; 
    }
    
    Log3($name, 4, "$name - Call-Out now: $url");
@@ -3765,11 +3778,18 @@ sub SSCam_camop ($) {
 ###################################################################################
 sub SSCam_camop_parse ($) {  
    my ($param, $err, $myjson) = @_;
-   my $hash             = $param->{hash};
-   my $name             = $hash->{NAME};
-   my $camname          = $hash->{CAMNAME};
-   my $OpMode           = $hash->{OPMODE};
-   my $apicammaxver      = $hash->{HELPER}{APICAMMAXVER}; 
+   my $hash               = $param->{hash};
+   my $name               = $hash->{NAME};
+   my $camname            = $hash->{CAMNAME};
+   my $OpMode             = $hash->{OPMODE};
+   my $serveraddr         = $hash->{SERVERADDR};
+   my $serverport         = $hash->{SERVERPORT};
+   my $camid              = $hash->{CAMID};
+   my $apivideostms       = $hash->{HELPER}{APIVIDEOSTMS};
+   my $apivideostmspath   = $hash->{HELPER}{APIVIDEOSTMSPATH};
+   my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
+   my $apicammaxver       = $hash->{HELPER}{APICAMMAXVER}; 
+   my $sid                = $hash->{HELPER}{SID};
    my ($rectime,$data,$success);
    my ($error,$errorcode);
    my ($snapid,$camLiveMode,$update_time);
@@ -4091,7 +4111,7 @@ sub SSCam_camop_parse ($) {
                 RemoveInternalTimer("SSCam_getsnapinfo"); 
                 InternalTimer(gettimeofday()+0.6, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
             
-			} elsif ($OpMode eq "getsnapinfo" || $OpMode eq "getsnapgallery" || $OpMode eq "runliveview") {
+			} elsif ($OpMode eq "getsnapinfo" || $OpMode eq "getsnapgallery" || ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/)) {
                 # Informationen zu einem oder mehreren Schnapschüssen wurde abgerufen bzw. Lifeanzeige Schappschuß              			
 				my $lsid   = exists($data->{data}{data}[0]{id})?$data->{data}{data}[0]{id}:"n.a.";
 				my $lfname = exists($data->{data}{data}[0]{fileName})?$data->{data}{data}[0]{fileName}:"n.a.";
@@ -4180,7 +4200,19 @@ sub SSCam_camop_parse ($) {
 				}		
                 Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
             
-			} elsif ($OpMode eq "getsnapfilename") {
+			} elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) {
+                # HLS Streaming 
+                my $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
+                # Liveview-Link in Hash speichern
+                $hash->{HELPER}{LINK} = $url;
+                Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated, Streaming-URL: $url");
+                      
+                # Aufnahmestatus in state abbilden mit Longpoll refresh
+	            my $st;
+	            (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
+	            readingsSingleUpdate($hash,"state", $st, 1);
+                
+            } elsif ($OpMode eq "getsnapfilename") {
                 # den Filenamen eines Schnapschusses ermitteln
                 $snapid = ReadingsVal("$name", "LastSnapId", " ");
                            
@@ -5469,6 +5501,12 @@ sub SSCam_StreamDev($$$) {
       $link      = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
       $audiolink = "http://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
       $ret .= "<td><img src=$link $ha> </td>"; 
+      if(AttrVal($camname,"ptzPanel_use",1)) {
+          my $ptz_ret = SSCam_ptzpanel($camname);
+          if($ptz_ret) { 
+              $ret .= "<td>$ptz_ret</td>";
+          }
+      }
       $ret .= '</tr>';
       if($audiolink && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
           $ret .= '<tr class="odd">';
@@ -5483,6 +5521,12 @@ sub SSCam_StreamDev($$$) {
       if($link && $wltype =~ /image|iframe|video|base64img|embed/) {
           if($wltype =~ /image/) {
               $ret .= "<td><img src=$link $ha> </td>";
+              if(AttrVal($camname,"ptzPanel_use",1)) {
+                  my $ptz_ret = SSCam_ptzpanel($camname);
+                  if($ptz_ret) { 
+                      $ret .= "<td>$ptz_ret</td>";
+                  }
+              }
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -5492,6 +5536,12 @@ sub SSCam_StreamDev($$$) {
               }
           } elsif ($wltype =~ /iframe/) {
               $ret .= "<td><iframe src=$link $ha controls>Iframes disabled</iframe></td>";
+              if(AttrVal($camname,"ptzPanel_use",1)) {
+                  my $ptz_ret = SSCam_ptzpanel($camname);
+                  if($ptz_ret) { 
+                      $ret .= "<td>$ptz_ret</td>";
+                  }
+              }
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -5504,6 +5554,8 @@ sub SSCam_StreamDev($$$) {
                        <source src=$link type=\"video/mp4\"> 
                        <source src=$link type=\"video/ogg\">
                        <source src=$link type=\"video/webm\">
+                       <source src=$link type=\"application/x-mpegURL\">
+                       <source src=$link type=\"video/MP2T\">
                        Your browser does not support the video tag.
                        </video></td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
@@ -6674,7 +6726,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     </li><br>      
 
   <li><b>ptzPanel_use</b><br>
-    Switch the use of PTZ-control panel in detail view off or on (default: on). </li><br> 
+    Switch the usage of a PTZ-control panel in detail view respectively a created StreamDevice off or on 
+    (default: on). </li><br> 
   
   <li><b>rectime</b><br>
    determines the recordtime when a recording starts. If rectime = 0 an endless recording will be started. If 
@@ -7860,7 +7913,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     </li><br>  
 
   <li><b>ptzPanel_use</b><br>
-    Die Anzeige des PTZ-Steuerungspaneels in der Detailanzeige wird ein(1)- bzw. ausgeschaltet(0) (default ein). </li><br>    
+    Die Anzeige des PTZ-Steuerungspaneels in der Detailanzeige bzw. innerhalb eines generierten Streamdevice wird 
+    ein- bzw. ausgeschaltet (default ein). </li><br>    
     
   <li><b>rectime</b><br>
     festgelegte Aufnahmezeit wenn eine Aufnahme gestartet wird. Mit rectime = 0 wird eine 
