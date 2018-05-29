@@ -5,30 +5,22 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday usleep);
-#use Device::SMBus;
-
-#my $clientsI2C = ":I2C_PC.*:I2C_SHT21:I2C_MCP23017:I2C_BMP180:";
 
 my @clients = qw(
 I2C_LCD
 I2C_DS1307
 I2C_PC.*
 I2C_MCP.*
-I2C_BME280
-I2C_BMP180
-I2C_SHT21
-I2C_TSL2561
+I2C_BM.*
+I2C_SH.*
+I2C_TSL.*
 I2C_SUSV
 I2C_LM.*
 );
 
 my $gpioprg = "/usr/local/bin/gpio";		#WiringPi GPIO utility
-my $I2C_SLAVE = 0x0703;									#Variable for IOCTL (set I2C slave address)
+my $I2C_SLAVE = 0x0703;						#Variable for IOCTL (set I2C slave address)
 
-#my %matchListI2C = (			#kann noch weg?
-#    "1:I2C_PCF8574"=> ".*",
-#    "2:FHT"       => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
-#);
 my $libcheck_SMBus = 1;
 my $check_ioctl_ph = 1;
 
@@ -41,8 +33,7 @@ sub RPII2C_Initialize($) {
 	
 # Provider
 	$hash->{Clients} = join (':',@clients);
-	#$hash->{WriteFn}  = "RPII2C_Write";    #wird vom client per IOWrite($@) aufgerufen
-	$hash->{I2CWrtFn} = "RPII2C_Write";    #zum testen als alternative fuer IOWrite
+	$hash->{I2CWrtFn} = "RPII2C_Write";    #alternative fuer IOWrite
 
 # Normal devices
 	$hash->{DefFn}   = "RPII2C_Define";
@@ -65,7 +56,6 @@ sub RPII2C_Define($$) {							#
 		Log3 undef, 2, $msg;
 		return $msg;
 	}
-	
 	$hash->{SMBus_exists}    = $libcheck_SMBus if($libcheck_SMBus);
 	$hash->{ioctl_ph_exists} = $check_ioctl_ph if($check_ioctl_ph);
 
@@ -90,9 +80,6 @@ sub RPII2C_Define($$) {							#
 		}
 	}
 	$hash->{NOTIFYDEV} = "global";
-	
-	#$hash->{Clients} = $clientsI2C;
-	#$hash->{MatchList} = \%matchListI2C;
 
 	if($dev eq "none") {
 		Log3 $name, 1, "$name device is none, commands will be echoed only";
@@ -171,7 +158,7 @@ sub RPII2C_Attr(@){
 	return undef;
 }
 #####################################
-sub RPII2C_Set($@) {								#writeBlock noch nicht fertig
+sub RPII2C_Set($@) {								#
 	my ($hash, @a) = @_;
 	my $name = shift @a;
 	my $type = shift @a;
@@ -214,7 +201,7 @@ sub RPII2C_Set($@) {								#writeBlock noch nicht fertig
 	undef $i2chash;																																	#Hash loeschen
 	return undef;
 }
-##################################### nicht fertig!
+#####################################
 sub RPII2C_Get($@) {								#
 	my ($hash, @a) = @_;
 	my $nargs = int(@a);
@@ -231,10 +218,7 @@ sub RPII2C_Get($@) {								#
 		my $i2chash = { i2caddress => hex($a[2]), direction => "i2cbyteread" };
 		$i2chash->{reg}   = hex($a[3]) if defined($a[3]);																			#startadresse zum lesen
 		$i2chash->{nbyte} = $a[4] if defined($a[4]);
-		#Log3 $hash, 1, "Reg: ". $i2chash->{reg};
-		#my $status = RPII2C_HWACCESS_ioctl($hash, $i2chash);
-		my $status  = &{$hash->{hwfn}}($hash, $i2chash);
-		#my $received = join(" ", @{$i2chash->{received}});															#als Array
+		my $status  = &{$hash->{hwfn}}($hash, $i2chash);														#als Array
 		my $received = $i2chash->{received};																						#als Scalar
 		undef $i2chash;																																	#Hash loeschen
 		return (defined($received) ? "received : " . $received ." | " : "" ) . " transmission: $status";	
@@ -290,20 +274,6 @@ sub RPII2C_Write($$) { 							#wird vom Client aufgerufen
 	}
 	return undef;
 }
-#####################################
-#FRM_forall_clients($$$)
-#{
-#  my ($hash,$fn,$args) = @_;
-#  foreach my $d ( sort keys %main::defs ) {
-#    if ( defined( $main::defs{$d} )
-#      && defined( $main::defs{$d}{IODev} )
-#      && $main::defs{$d}{IODev} == $hash ) {
-#       &$fn($main::defs{$d},$args);					#funktion mit Varianblennamen von $fn ausfuehren
-#    }
-#  }
-#  return undef;
-#}
-#####################################
 
 sub RPII2C_CHECK_I2C_DEVICE {	
 	my ($dev) = @_;
@@ -368,15 +338,13 @@ sub RPII2C_HWACCESS($$) {
 			I2CBusDevicePath => $hash->{DeviceName},
 			I2CDeviceAddress => hex( sprintf("%.2X", $clientmsg->{i2caddress}) ),
 		);
-#		if (defined($clientmsg->{nbyte}) && defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cblockwrite") {	#blockweise beschreiben (Register)
-		if (                                defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {				#blockweise beschreiben (Register)
+		if ( defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {				#blockweise beschreiben (Register)
 		my @data = split(" ", $clientmsg->{data});
 			my $dataref = \@data;
 			$inh = $dev->writeBlockData( $clientmsg->{reg} , $dataref );
 			my $wr = join(" ", @{$dataref});
 			Log3 $hash, 5, "$hash->{NAME}: Block schreiben Register: " . sprintf("0x%.2X", $clientmsg->{reg}) . " Inhalt: " . $wr . " N: ". int(@data) ." Returnvar.: $inh";
 			$status = "Ok" if $inh == 0;
-#		} elsif (defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {																	#byteweise beschreiben (Register)
 		} elsif (defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cbytewrite") {															#byteweise beschreiben (Register)
 			my @data = split(" ", $clientmsg->{data});
 			foreach (@data) {
@@ -435,17 +403,15 @@ sub RPII2C_HWACCESS_ioctl($$) {
 	my ($fh, $msg) = undef;
 	
 	my $ankommen = "$hash->{NAME}: vom client empfangen";
-		foreach my $av (keys %{$clientmsg}) { $ankommen .= "|" . $av . ": " . $clientmsg->{$av}; }
+	foreach my $av (keys %{$clientmsg}) { $ankommen .= "|" . $av . ": " . $clientmsg->{$av}; }
 	Log3 $hash, 5, $ankommen;
-	#Log3 $hash, 1, $ankommen if $clientmsg->{test} eq "local";
 	
 	my $i2caddr = hex(sprintf "%x", $clientmsg->{i2caddress});
 	if ( sysopen(my $fh, $hash->{DeviceName}, O_RDWR) != 1) {																																														#Datei oeffnen
 		Log3 $hash, 3, "$hash->{NAME}: HWaccess sysopen failure: $!"
 	} elsif( not defined( ioctl($fh,$I2C_SLAVE,$i2caddr) ) ) {																																													#I2C Adresse per ioctl setzen
 		Log3 $hash, 3, "$hash->{NAME}: HWaccess (0x".unpack( "H2",pack "C", $clientmsg->{i2caddress}).") ioctl failure: $!"
-#	} elsif (defined($clientmsg->{nbyte}) && defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cblockwrite") {	#blockweise schreiben
-	} elsif (                                                              defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {			#blockweise schreiben
+	} elsif ( defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {			#blockweise schreiben
 		my $data = defined($clientmsg->{reg}) ? chr($clientmsg->{reg}) : undef;
 		foreach (split(" ", $clientmsg->{data})) {
 			$data .= chr($_);
@@ -458,8 +424,7 @@ sub RPII2C_HWACCESS_ioctl($$) {
 			Log3 $hash, 5, "$hash->{NAME}: HWaccess block schreiben, " . (defined($clientmsg->{reg}) ? "Reg: 0x". unpack( "H2",pack "C", $clientmsg->{reg}) : "") . " Inh(dec):|$clientmsg->{data}|, laenge: |".length($data)."|";
 		}
 
-#	} elsif (defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {																																		#byteweise schreiben
-	} elsif (defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cbytewrite") {																																#byteweise schreiben
+	} elsif (defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cbytewrite") {		#byteweise schreiben
 		my $reg = undef;
 		$reg = $clientmsg->{reg} if (defined($clientmsg->{reg}));
 		$status = "Ok";
@@ -475,8 +440,7 @@ sub RPII2C_HWACCESS_ioctl($$) {
 		Log3 $hash, 5,   "$hash->{NAME}: HWaccess byteweise schreiben, ". (defined($reg) ?  "Reg: 0x". unpack( "H2",pack "C", ($reg - 1)) . " " : "")."Inh: 0x" .  unpack( "H2",pack "C", $_) .", laenge: ".length($data);
 		#Log3 $hash, 1, "$hash->{NAME}: HWaccess byteweise zu 0x".unpack( "H2",pack "C", $clientmsg->{i2caddress})."  schreiben, ". (defined($reg) ?  "Reg: 0x". unpack( "H2",pack "C", ($reg - 1)) . " " : "")."Inh: 0x" .  unpack( "H2",pack "C", $_) .", laenge: ".length($data) if $clientmsg->{test} eq "local";	
 		}
-#	} elsif ($clientmsg->{direction} eq "i2cread") {																																																		#byteweise lesen
-	} elsif ($clientmsg->{direction} eq "i2cbyteread") {																																																#byteweise lesen
+	} elsif ($clientmsg->{direction} eq "i2cbyteread") {										#byteweise lesen
 		my $nbyte = defined($clientmsg->{nbyte}) ? $clientmsg->{nbyte} : 1;
 		my $rmsg = "";
 		foreach (my $n = 0; $n < $nbyte; $n++) {
@@ -501,37 +465,32 @@ sub RPII2C_HWACCESS_ioctl($$) {
 			$rmsg .= " " if $n <= $nbyte;
 			$status = "Ok" if ($n + 1) == $nbyte;
 		}
-		$clientmsg->{received} = $rmsg if($rmsg);											  #Daten als Scalar uebertragen
-#	} elsif ($clientmsg->{direction} eq "i2cblockread") {																																																#blockweise lesen
-	} elsif ($clientmsg->{direction} eq "i2cread") {																																																		#blockweise lesen
+		$clientmsg->{received} = $rmsg if($rmsg);			#Daten als Scalar uebertragen
+	} elsif ($clientmsg->{direction} eq "i2cread") {											#blockweise lesen
 		my $nbyte = defined($clientmsg->{nbyte}) ? $clientmsg->{nbyte} : 1;
-		#Log3 $hash, 1, "test Blockweise lese menge: |$nbyte|, reg: |". $clientmsg->{reg} ."|";
 		my $rmsg = "";
 		if ( defined($clientmsg->{reg}) ) {
 			Log3 $hash, 4, "$hash->{NAME}: HWaccess blockweise lesen setze Registerpointer auf " . ($clientmsg->{reg});
 			my $retval = syswrite($fh, chr($clientmsg->{reg}), 1);
 			unless (defined($retval) && $retval == 1) {
 				Log3 $hash, 3, "$hash->{NAME}: HWaccess blockweise von 0x".unpack( "H2",pack "C", $clientmsg->{i2caddress})." lesen,". (defined($clientmsg->{reg}) ? " Reg: 0x". unpack( "H2",pack "C", ($clientmsg->{reg})) : "") . " -> syswrite failure: $!" if $!;
-				last;
+				$status = "regerror";
 			}
 		}
-        if (defined($clientmsg->{usleep})) {
-            usleep($clientmsg->{usleep});
-        }
-		my $buf = undef;
-		my $retval = sysread($fh, $buf, $nbyte);
-		#Log3 $hash, 1, "test Blockweise lesen menge: |$nbyte|, return: |$retval|, inh: |$buf|";
-		unless (defined($retval) && $retval == $nbyte) {
-			Log3 $hash, 3, "$hash->{NAME}: HWaccess blockweise von 0x".unpack( "H2",pack "C", $clientmsg->{i2caddress})." lesen,". (defined($clientmsg->{reg}) ? " Reg: 0x". unpack( "H2",pack "C", ($clientmsg->{reg})) : "") . " -> sysread failure: $!" if $!;
-			last;
-		} else {
-			$status = "Ok"
+		unless ($status eq "regerror") {
+			usleep($clientmsg->{usleep}) if defined $clientmsg->{usleep};       
+			my $buf = undef;
+			my $retval = sysread($fh, $buf, $nbyte);
+			unless (defined($retval) && $retval == $nbyte) {
+				Log3 $hash, 3, "$hash->{NAME}: HWaccess blockweise von 0x".unpack( "H2",pack "C", $clientmsg->{i2caddress})." lesen,". (defined($clientmsg->{reg}) ? " Reg: 0x". unpack( "H2",pack "C", ($clientmsg->{reg})) : "") . " -> sysread failure: $!" if $!;
+			} else {
+				$rmsg = $buf;
+				$rmsg =~ s/(.|\n)/sprintf("%u ",ord($1))/eg;
+				#Log3 $hash, 1, "test Blockweise lesen menge: |$nbyte|, inh: |$buf|, ergebnis: |$rmsg|";
+				$clientmsg->{received} = $rmsg if($rmsg);												#Daten als Scalar uebertragen
+				$status = "Ok"
+			}
 		}
-		#Log3 $hash, 1, "test Blockweise lesen menge: |$nbyte|, inh: $buf";
-		$rmsg = $buf;
-		$rmsg =~ s/(.|\n)/sprintf("%u ",ord($1))/eg;
-		#Log3 $hash, 1, "test Blockweise lesen ergebnis: |$rmsg|";
-		$clientmsg->{received} = $rmsg if($rmsg);												#Daten als Scalar uebertragen
 	}
 	$hash->{STATE} = $status;
 	$hash->{ERRORCNT} = defined($hash->{ERRORCNT}) ? $hash->{ERRORCNT} += 1 : 1 if $status ne "Ok";
