@@ -228,6 +228,8 @@ HMS_Parse($$)
   my $max = int(@txt);
   for( my $i = 0; $i < $max; $i++) {
     readingsBulkUpdate($def, $txt[$i], $v[$i]);
+    readingsBulkUpdate($def, "batteryState", $v[$i] eq "empty" ? "low" : "ok")
+      if($txt[$i] eq "battery");
   }
   readingsBulkUpdate($def, "type", $type);
   readingsBulkUpdate($def, "state", $val);
