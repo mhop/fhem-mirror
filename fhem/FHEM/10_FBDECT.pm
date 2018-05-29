@@ -297,6 +297,8 @@ FBDECT_ParseHttp($$$)
     my ($ptyp,$pyld) = split(":", eval $fbhttp_readings{$n}, 2);
     readingsBulkUpdate($hash, "state", "$ptyp: $pyld") if($n eq "tsoll");
     readingsBulkUpdate($hash, $ptyp, $pyld);
+    readingsBulkUpdate($hash, "batteryState", $pyld ? "low" : "ok")
+        if($ptyp eq "batterylow");
   }
   readingsEndUpdate($hash, 1);
 
