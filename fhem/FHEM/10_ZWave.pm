@@ -467,7 +467,7 @@ my %zwave_class = (
   REMOTE_ASSOCIATION       => { id => '7d' },
   BATTERY                  => { id => '80',
     get   => { battery     => "02" },
-    parse => { "0.8003(..)"=> '"battery:".($1 eq "ff" ? "low":hex($1)." %")'} },
+    parse => { "0.8003(..)"=> 'ZWave_battery($1)'} } ,
   CLOCK                    => { id => '81',
     get   => { clock           => "05" },
     set   => { clock           => 'ZWave_clockSet()' },
@@ -3173,6 +3173,18 @@ ZWave_protectionParse($$)
 }
 
 sub
+ZWave_battery($) # Forum #87575
+{
+  my ($val) = @_;
+  my @ret;
+
+  push @ret, "battery:".($val eq "ff" ? "low":hex($val)." %");
+  push @ret, "batteryState:".($val eq "ff" ? "low":"ok");
+  push @ret, "batteryPercent:".hex($val) if($val ne "ff");
+  return @ret;
+}
+
+sub
 ZWave_configParse($$$$)
 {
   my ($hash, $cmdId, $size, $val) = @_;
@@ -5841,7 +5853,7 @@ s2Hex($)
 
   <br><br><b>Class BATTERY</b>
   <li>battery<br>
-    return the charge of the battery in %, as battery:value % or battery:low
+    return the state and charge of the battery, see below the events
     </li>
 
   <br><br><b>CLASS DOOR_LOCK_LOGGING, V1 (deprecated)</b>
@@ -6371,7 +6383,9 @@ s2Hex($)
   <li>covering:[open|close|stop]</li>
 
   <br><br><b>Class BATTERY</b>
-  <li>battery:chargelevel %</li>
+  <li>battery:{low|chargelevel %}</li>
+  <li>batteryState:{ok|low}</li>
+  <li>batteryPercent:&lt;value&gt;</li>
 
   <br><br><b>Class CENTRAL_SCENE</b>
   <li>cSceneSet:X</li>
