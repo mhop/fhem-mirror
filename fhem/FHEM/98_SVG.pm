@@ -1983,7 +1983,7 @@ SVG_render($$$$$$$$$$)
         foreach my $i (1..$nEl) {
           my ($x1, $y1) = ($x+$dxp->[$i-1], $y+$h-($dyp->[$i-1]-$min)*$hmul);
           my ($x2, $y2) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
-          next if(int($x2) == $lx && int($y1) == $ly);
+          next if(int($x2) == $lx && int($y2) == $ly);
           $lx = int($x2); $ly = int($y2);
           if($i == $nEl) {
             if($lType eq "steps") {
