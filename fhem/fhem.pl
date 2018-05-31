@@ -641,6 +641,7 @@ my $errcount= 0;
 $gotSig = undef if($gotSig && $gotSig eq "HUP");
 while (1) {
   my ($rout,$rin, $wout,$win, $eout,$ein) = ('','', '','', '','');
+  my $nfound = 0;
 
   my $timeout = HandleTimeout();
 
@@ -656,11 +657,15 @@ while (1) {
     }
     vec($ein, $hash->{EXCEPT_FD}, 1) = 1
         if(defined($hash->{"EXCEPT_FD"}));
+    if($hash->{SSL} && $hash->{CD} && $hash->{CD}->pending()) {
+      vec($rout, $hash->{FD}, 1) = 1;
+      $nfound++;
+    }
   }
   $timeout = $readytimeout if(keys(%readyfnlist) &&
                               (!defined($timeout) || $timeout > $readytimeout));
   $timeout = 5 if $winService->{AsAService} && $timeout > 5;
-  my $nfound = select($rout=$rin, $wout=$win, $eout=$ein, $timeout);
+  $nfound = select($rout=$rin, $wout=$win, $eout=$ein, $timeout) if(!$nfound);
 
   $winService->{serviceCheck}->() if($winService->{serviceCheck});
   if($gotSig) {
