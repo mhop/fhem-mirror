@@ -1,4 +1,4 @@
-REV 16800
+REV 16802
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -25,7 +25,7 @@ UPD 2018-05-29_07:45:03 249402 ./CHANGED
 UPD 2018-05-16_07:45:03 37253 ./MAINTAINER.txt
 UPD 2018-03-26_07:45:02 41123 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
-UPD 2018-05-25_07:45:07 146640 ./fhem.pl
+UPD 2018-06-01_07:45:10 146793 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2017-09-09_07:45:02 56979 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -671,8 +671,8 @@ UPD 2018-05-30_07:45:06 3453948 docs/commandref.html
 UPD 2018-05-29_07:45:08 2112876 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-05-16_07:45:03 85474 docs/commandref_frame_DE.html
-UPD 2018-05-31_07:45:09 192425 docs/commandref_modular.html
-UPD 2018-05-31_07:45:10 203111 docs/commandref_modular_DE.html
+UPD 2018-06-01_07:45:09 192425 docs/commandref_modular.html
+UPD 2018-06-01_07:45:10 203111 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
