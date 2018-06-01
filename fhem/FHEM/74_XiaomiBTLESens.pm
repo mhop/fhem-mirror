@@ -170,6 +170,7 @@ sub XiaomiBTLESens_Define($$) {
     CommandAttr(undef,$name . ' room XiaomiBTLESens') if( AttrVal($name,'room','none') eq 'none' );
     
     Log3 $name, 3, "XiaomiBTLESens ($name) - defined with BTMAC $hash->{BTMAC}";
+    Log3 $name, 1, "XiaomiBTLESens ($name) - readings battery and batteryLevel a deprecated and will be remove in future";
     
     $modules{XiaomiBTLESens}{defptr}{$hash->{BTMAC}} = $hash;
     return undef;
@@ -657,6 +658,10 @@ sub XiaomiBTLESens_FlowerSensHandle0x38($$) {
 
     $readings{'batteryLevel'}   = hex("0x".$dataBatFw[0]);
     $readings{'battery'}        = (hex("0x".$dataBatFw[0]) > 15 ? "ok" : "low");
+    ### neue Vereinheitlichung für Batteriereadings Forum #800017
+    $readings{'batteryPercent'}   = hex("0x".$dataBatFw[0]);
+    $readings{'batteryState'}        = (hex("0x".$dataBatFw[0]) > 15 ? "ok" : "low");
+    
     $readings{'firmware'}       = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
         
     $hash->{helper}{CallBattery} = 1;
@@ -954,8 +959,8 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
   <b>Readings</b>
   <ul>
     <li>state - Status of the flower sensor or error message if any errors.</li>
-    <li>battery - current battery state dependent on batteryLevel.</li>
-    <li>batteryLevel - current battery level in percent.</li>
+    <li>batteryState - current battery state dependent on batteryLevel.</li>
+    <li>batteryPercent - current battery level in percent.</li>
     <li>fertility - Values for the fertilizer content</li>
     <li>firmware - current device firmware</li>
     <li>lux - current light intensity</li>
@@ -1035,8 +1040,8 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
   <b>Readings</b>
   <ul>
     <li>state - Status des BTLE Sensor oder eine Fehlermeldung falls Fehler beim letzten Kontakt auftraten.</li>
-    <li>battery - aktueller Batterie-Status in Abhängigkeit vom Wert batteryLevel.</li>
-    <li>batteryLevel - aktueller Ladestand der Batterie in Prozent.</li>
+    <li>batteryState - aktueller Batterie-Status in Abhängigkeit vom Wert batteryLevel.</li>
+    <li>batteryPercent - aktueller Ladestand der Batterie in Prozent.</li>
     <li>fertility - Wert des Fruchtbarkeitssensors (Bodenleitf&auml;higkeit)</li>
     <li>firmware - aktuelle Firmware-Version des BTLE Sensor</li>
     <li>lastGattError - Fehlermeldungen vom gatttool</li>
