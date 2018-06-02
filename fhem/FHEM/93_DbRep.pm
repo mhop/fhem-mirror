@@ -37,6 +37,8 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.18.0       02.06.2018       possible use of y:(\d) for timeDiffToNow, timeOlderThan , minor fixes of timeOlderThan
+#                               delEntries considers executeBeforeDump,executeAfterDump
 # 7.17.3       30.04.2017       writeToDB - readingname can be replaced by the value of attribute "readingNameMap"
 # 7.17.2       22.04.2017       fix don't writeToDB if device name contain "." only, minor fix in DbReadingsVal
 # 7.17.1       20.04.2017       fix "§" is deleted by carfilter
@@ -339,7 +341,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.17.3";
+my $DbRepVersion = "7.18.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -690,7 +692,8 @@ sub DbRep_Set($@) {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       if (!AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
-      }        
+      }      
+      DbRep_beforeproc($hash, "delEntries");      
       DbRep_Main($hash,$opt);
       
   } elsif ($opt =~ m/tableCurrentFillup/ && $hash->{ROLE} ne "Agent") {   
@@ -796,7 +799,7 @@ sub DbRep_Set($@) {
           $sqlcmd =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
       }
       if($opt eq "sqlCmdHistory") {
-          $prop =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+          $prop =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
           $prop =~ s/<c>/,/g;          
           $sqlcmd = $prop;
           if($sqlcmd eq "___purge_historylist___") {
@@ -1132,16 +1135,16 @@ sub DbRep_Attr($$$$) {
             unless ($aVal =~ m/^[A-Za-z\d_\.-]+$/) { return " Unsupported character in $aName found. Use only A-Z a-z _ . -";}
         }
 		if ($aName eq "timeDiffToNow") {
-            unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[dhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ )
-			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"d:10 h:6 m:12 s:20\". Refer to commandref !";}
+            unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ )
+			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";}
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
             delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
             delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
         } 
 		if ($aName eq "timeOlderThan") {
-            unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[dhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ )
-			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"d:10 h:6 m:12 s:20\". Refer to commandref !";}
+            unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ )
+			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";}
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
             delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
@@ -1620,10 +1623,8 @@ sub DbRep_createTimeArray($$$) {
  my ($tsbegin,$tsend,$dim,$tsub,$tadd);
  my ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear);
  
- ######################################################################################
+
  #  absolute Auswertungszeiträume statische und dynamische (Beginn / Ende) berechnen 
- ######################################################################################
- 
  if($hash->{HELPER}{MINTS} && $hash->{HELPER}{MINTS} =~ m/0000-00-00/) {
      Log3 ($name, 1, "DbRep $name - ERROR - wrong timestamp \"$hash->{HELPER}{MINTS}\" found in database. Please delete it !");
      delete $hash->{HELPER}{MINTS};
@@ -1873,10 +1874,8 @@ sub DbRep_createTimeArray($$$) {
  # extrahieren der Einzelwerte von Datum/Zeit Ende 
  my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($tsend =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
         	 
- ######################################################################################
- #  relative Auswertungszeit Beginn berücksichtigen  
- ######################################################################################
- # Umwandeln in Epochesekunden Beginn
+
+ #  relative Auswertungszeit Beginn berücksichtigen  # Umwandeln in Epochesekunden Beginn
  my $epoch_seconds_begin = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
  my ($timeolderthan,$timedifftonow) = DbRep_normRelTime($hash);
  
@@ -1884,17 +1883,17 @@ sub DbRep_createTimeArray($$$) {
      $epoch_seconds_begin = time() - $timedifftonow;
      Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp begin: $timedifftonow sec"); 
  } elsif ($timeolderthan) {
-     $epoch_seconds_begin = timelocal(00, 00, 01, 01, 01-1, 1970-1900);
+     my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";  # Timestamp des 1. Datensatzes verwenden falls ermittelt
+     $mints =~ /^(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)$/;
+     $epoch_seconds_begin = timelocal($6, $5, $4, $3, $2-1, $1-1900);
  }
  
  my $tsbegin_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin);
  Log3 ($name, 5, "DbRep $name - Timestamp begin epocheseconds: $epoch_seconds_begin") if($opt !~ /tableCurrentPurge/);   
  Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: $tsbegin_string") if($opt !~ /tableCurrentPurge/);  
  
- ######################################################################################
- #  relative Auswertungszeit Ende berücksichtigen  
- ######################################################################################
- # Umwandeln in Epochesekunden Endezeit
+
+ #  relative Auswertungszeit Ende berücksichtigen  # Umwandeln in Epochesekunden Endezeit
  my $epoch_seconds_end = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900); 
  
  $epoch_seconds_end = $timeolderthan ? (time() - $timeolderthan) : $epoch_seconds_end;
@@ -1908,9 +1907,8 @@ sub DbRep_createTimeArray($$$) {
  Log3 ($name, 5, "DbRep $name - Timestamp end epocheseconds: $epoch_seconds_end") if($opt !~ /tableCurrentPurge/); 
  Log3 ($name, 4, "DbRep $name - Timestamp end human readable: $tsend_string") if($opt !~ /tableCurrentPurge/); 
 
- ######################################################################################
+
  #  Erstellung Wertehash für Aggregationen
- ######################################################################################
  my $runtime = $epoch_seconds_begin;                                    # Schleifenlaufzeit auf Beginn der Zeitselektion setzen
  my $runtime_string;                                                    # Datum/Zeit im SQL-Format für Readingname Teilstring
  my $runtime_string_first;                                              # Datum/Zeit Auswertungsbeginn im SQL-Format für SQL-Statement
@@ -3728,8 +3726,12 @@ sub del_ParseDone($) {
      $device     =~ s/[^A-Za-z\/\d_\.-]/\//g; 
   my $reading    = $a[6];
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g; 
+  my $erread;
   
-   if ($err) {
+  # Befehl nach Procedure ausführen
+  $erread = DbRep_afterproc($hash, "delEntries");
+  
+  if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       delete($hash->{HELPER}{RUNNING_PID});
@@ -3755,7 +3757,8 @@ sub del_ParseDone($) {
   $rows = ($table eq "current")?$rows:$ds.$rds.$rows;
   Log3 ($name, 3, "DbRep $name - Entries of $hash->{DATABASE}.$table deleted: $rows");  
   
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
+  my $state = $erread?$erread:"done";
+  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   
   readingsEndUpdate($hash, 1);
 
@@ -7630,14 +7633,18 @@ return;
 #
 # liefert die Attribute timeOlderThan, timeDiffToNow als Sekunden normiert zurück
 ####################################################################################################
-sub DbRep_normRelTime ($) {
+sub DbRep_normRelTime($) {
  my ($hash) = @_;
  my $name = $hash->{NAME};
  my $tdtn = AttrVal($name, "timeDiffToNow", undef);
  my $toth = AttrVal($name, "timeOlderThan", undef);
- 
- if($tdtn && $tdtn =~ /^\s*[dhms]:(([\d]+.[\d]+)|[\d]+)\s*/) {
-     my ($d,$h,$m,$s);
+  
+ if($tdtn && $tdtn =~ /^\s*[ydhms]:(([\d]+.[\d]+)|[\d]+)\s*/) {
+     my ($y,$d,$h,$m,$s);
+	 if($tdtn =~ /.*y:(([\d]+.[\d]+)|[\d]+).*/) {
+	     $y =  $tdtn;
+	     $y =~ s/.*y:(([\d]+.[\d]+)|[\d]+).*/$1/e; 
+	 }
 	 if($tdtn =~ /.*d:(([\d]+.[\d]+)|[\d]+).*/) {
 	     $d =  $tdtn;
 	     $d =~ s/.*d:(([\d]+.[\d]+)|[\d]+).*/$1/e; 
@@ -7656,18 +7663,24 @@ sub DbRep_normRelTime ($) {
 	 }
      
 	 no warnings 'uninitialized'; 
-	 Log3($name, 4, "DbRep $name - timeDiffToNow - day: $d, hour: $h, min: $m, sec: $s ");
+	 Log3($name, 4, "DbRep $name - timeDiffToNow - year: $y, day: $d, hour: $h, min: $m, sec: $s ");
 	 use warnings;
-     $d = $d?($d*86400)+1:0;      # one security second for correct create TimeArray
-     $h = $h?($h*3600)+1:0;
-     $m = $m?($m*60)+1:0;
+     $y = $y?($y*365*86400):0;
+     $d = $d?($d*86400):0;      
+     $h = $h?($h*3600):0;
+     $m = $m?($m*60):0;
      $s = $s?$s:0;
 
-     $tdtn = $d + $h + $m +$s;
+     $tdtn = $y + $d + $h + $m + $s + 1;  # one security second for correct create TimeArray
+     $tdtn = DbRep_corrRelTime($name,$tdtn,1);
  }
  
- if($toth && $toth =~ /^\s*[dhms]:(([\d]+.[\d]+)|[\d]+)\s*/) {
-     my ($d,$h,$m,$s);
+ if($toth && $toth =~ /^\s*[ydhms]:(([\d]+.[\d]+)|[\d]+)\s*/) {
+     my ($y,$d,$h,$m,$s);
+	 if($toth =~ /.*y:(([\d]+.[\d]+)|[\d]+).*/) {
+	     $y =  $toth;
+	     $y =~ s/.*y:(([\d]+.[\d]+)|[\d]+).*/$1/e; 
+	 }
 	 if($toth =~ /.*d:(([\d]+.[\d]+)|[\d]+).*/) {
 	     $d =  $toth;
 	     $d =~ s/.*d:(([\d]+.[\d]+)|[\d]+).*/$1/e; 
@@ -7686,22 +7699,95 @@ sub DbRep_normRelTime ($) {
 	 }
 
 	 no warnings 'uninitialized'; 
-	 Log3($name, 4, "DbRep $name - timeDiffToNow - day: $d, hour: $h, min: $m, sec: $s ");
+	 Log3($name, 4, "DbRep $name - timeOlderThan - year: $y, day: $d, hour: $h, min: $m, sec: $s ");
 	 use warnings;
-     $d = $d?($d*86400)+1:0;            # one security second for correct create TimeArray
-     $h = $h?($h*3600)+1:0;
-     $m = $m?($m*60)+1:0;
+     $y = $y?($y*365*86400):0;
+     $d = $d?($d*86400):0;            
+     $h = $h?($h*3600):0;
+     $m = $m?($m*60):0;
      $s = $s?$s:0;
 
-     $toth = $d + $h + $m +$s;
+     $toth = $y + $d + $h + $m + $s + 1;  # one security second for correct create TimeArray
+     $toth = DbRep_corrRelTime($name,$toth,0);
  }
 return ($toth,$tdtn);
 }
 
+####################################################################################################
+#   Korrektur Schaltjahr und Sommer/Winterzeit bei relativen Zeitangaben
+####################################################################################################
+sub DbRep_corrRelTime($$$) {
+ my ($name,$tim,$tdtn) = @_;
+ my $hash = $defs{$name};
+ 
+ # year   als Jahre seit 1900 
+ # $mon   als 0..11  
+ my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst);
+ my ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,$disdst);
+ if($tdtn) {
+     # timeDiffToNow
+     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)          = localtime(time);       # Startzeit Ableitung
+     ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,$disdst) = localtime(time-$tim);  # Analyse Zieltimestamp timeDiffToNow
+ } else {
+     # timeOlderThan
+     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)          = localtime(time-$tim);  # Startzeit Ableitung
+     my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";        # Timestamp des 1. Datensatzes verwenden falls ermittelt
+     my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($mints =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
+     my $tsend = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
+     ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,$disdst) = localtime($tsend);     # Analyse Zieltimestamp timeOlderThan
+ }
+ $year += 1900;
+ $dyear += 1900;
+ my $k   = $year - $dyear;
+ my $mg  = ((int($mon)+1)+(($year-$dyear-1)*12)+(11-int($dmon)+1));  # Gesamtzahl der Monate des Bewertungszeitraumes
+ my $cly = 0;                                                        # Anzahl Schaltjahre innerhalb Beginn und Ende Auswertungszeitraum
+ my $fly = 0;                                                        # erstes Schaltjahr nach Start
+ my $lly = 0;                                                        # letzes Schaltjahr nach Start	 
+ while ($dyear+$k >= $dyear) {
+     my $ily = DbRep_IsLeapYear($name,$dyear+$k);
+     $cly++ if($ily);
+     $fly = $dyear+$k if($ily && !$fly);
+     $lly = $dyear+$k if($ily);
+     $k--;
+ }
+ # Log3($name, 4, "DbRep $name - countleapyear: $cly firstleapyear: $fly lastleapyear: $lly totalmonth: $mg isdaylight:$isdst destdaylight:$disdst");
+ if( ($fly <= $year && $mon > 1) && ($lly > $dyear || ($lly = $dyear && $dmon < 1)) ) {
+     $tim += $cly*86400;
+     # Log3($name, 4, "DbRep $name - leap year correction 1");
+ } else {
+     $tim += ($cly-1)*86400 if($cly);
+     # Log3($name, 4, "DbRep $name - leap year correction 2");
+ }
+	 
+ # Sommer/Winterzeitkorrektur
+ $tim += ($disdst-$isdst)*3600 if($disdst != $isdst);
+
+return $tim;
+}
+
+####################################################################################################
+#  liefert zurück ob übergebenes Jahr ein Schaltjahr ist ($ily = 1)
+#
+#  Es gilt:
+#  - Wenn ein Jahr durch 4 teilbar ist, ist es ein Schaltjahr, aber
+#  - wenn es durch 100 teilbar ist, ist es kein schaltjahr, außer
+#  - es ist durch 400 teilbar, dann ist es ein schaltjahr
+#
+####################################################################################################
+sub DbRep_IsLeapYear($$) {
+ my ($name,$year) = @_;
+ my $ily = 0;
+ if ($year % 4 == 0 && $year % 100 != 0 || $year % 400 == 0) {    # $year modulo 4 -> muß 0 sein
+     $ily = 1;
+ }
+ Log3($name, 4, "DbRep $name - Year $year is leap year") if($ily);
+return $ily;
+}
+ 
 ###############################################################################
 #              Zeichencodierung für Fileexport filtern 
 ###############################################################################
-sub DbRep_charfilter ($) { 
+sub DbRep_charfilter($) { 
   my ($txt) = @_;
   
   # nur erwünschte Zeichen, Filtern von Steuerzeichen
@@ -9205,10 +9291,28 @@ return;
                                  <ul>
                                  "timestamp_begin" is set:  deletes db entries <b>from</b> this timestamp until current date/time <br>
                                  "timestamp_end" is set  :  deletes db entries <b>until</b> this timestamp <br>
-                                 both Timestamps are set :  deletes db entries <b>between</b> these timestamps <br><br>
+                                 both Timestamps are set :  deletes db entries <b>between</b> these timestamps <br>
+                                 Same is valid if one of attributes "timeOlderThan, timeDiffToNow" is used. <br><br>
                                  
                                  Due to security reasons the attribute <a href="#DbRepattr">attribute</a> "allowDeletion" needs to be set to unlock the 
 								 delete-function. <br>
+                                 
+                                 The relevant attributes to control function changeValue delEntries are: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>allowDeletion</b>     </td><td>: unlock the delete function </td></tr>
+                                      <tr><td> <b>device</b>            </td><td>: selection only of datasets which contain &lt;device&gt; </td></tr>
+                                      <tr><td> <b>reading</b>           </td><td>: selection only of datasets which contain &lt;reading&gt; </td></tr>
+                                      <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
+ 	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: execute a FHEM command (or perl-routine) before start of delEntries </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>  </td><td>: execute a FHEM command (or perl-routine) after delEntries is finished </td></tr>
+                                      </table>
+	                               </ul>
+	                               <br>
+	                               <br>
+                                 
                                  </li>
 								 <br>
                                  </ul>
@@ -10571,6 +10675,10 @@ sub bdump {
                                 # the start time is set to "current time - 600 minutes" gesetzt <br>
 								<code>attr &lt;name&gt; timeDiffToNow h:2.5</code> <br>
                                 # the start time is set to "current time - 2,5 hours" <br>
+								<code>attr &lt;name&gt; timeDiffToNow y:1 h:2.5</code> <br>
+                                # the start time is set to "current time - 1 year and 2,5 hours" <br>
+								<code>attr &lt;name&gt; timeDiffToNow y:1.5</code> <br>
+                                # the start time is set to "current time - 1.5 years" <br>
 								</ul>
 								<br><br>								
 
@@ -10982,10 +11090,28 @@ sub bdump {
                                  "timestamp_begin" gesetzt:  gelöscht werden DB-Einträge <b>ab</b> diesem Zeitpunkt bis zum aktuellen Datum/Zeit <br>
                                  "timestamp_end" gesetzt  :  gelöscht werden DB-Einträge <b>bis</b> bis zu diesem Zeitpunkt <br>
                                  beide Timestamps gesetzt :  gelöscht werden DB-Einträge <b>zwischen</b> diesen Zeitpunkten <br>
+                                 Entsprechendes gilt bei Verwendung der Attribute "timeOlderThan, timeDiffToNow". <br>
                                  
                                  <br>
                                  Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" 
-								 gesetzt sein um die Löschfunktion freizuschalten. <br>
+								 gesetzt sein um die Löschfunktion freizuschalten. <br><br>
+                                 
+                                 Die zur Steuerung von delEntries relevanten Attribute: <br><br>
+
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>allowDeletion</b>     </td><td>: Freischaltung der Löschfunktion </td></tr>
+                                      <tr><td> <b>device</b>            </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>reading</b>           </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+                                      <tr><td> <b>time.*</b>            </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+	                                  <tr><td> <b>executeBeforeProc</b> </td><td>: ausführen FHEM Kommando (oder perl-Routine) vor Start delEntries </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>  </td><td>: ausführen FHEM Kommando (oder perl-Routine) nach Ende delEntries </td></tr>
+                                      </table>
+	                               </ul>
+	                               <br>
+	                               <br>
+                                 
                                  </li>
 								 <br>
                                  </ul>
@@ -12362,6 +12488,10 @@ sub bdump {
                                 # die Startzeit wird auf "aktuelle Zeit - 600 Minuten" gesetzt <br>
 								<code>attr &lt;name&gt; timeDiffToNow h:2.5</code> <br>
                                 # die Startzeit wird auf "aktuelle Zeit - 2,5 Stunden" gesetzt <br>
+								<code>attr &lt;name&gt; timeDiffToNow y:1 h:2.5</code> <br>
+                                # die Startzeit wird auf "aktuelle Zeit - 1 Jahr und 2,5 Stunden" gesetzt <br>
+								<code>attr &lt;name&gt; timeDiffToNow y:1.5</code> <br>
+                                # die Startzeit wird auf "aktuelle Zeit - 1,5 Jahre gesetzt <br>
 								</ul>
 								<br><br>
 								
