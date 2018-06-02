@@ -60,8 +60,8 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 
-my $modulversion = "4.2.4";
-my $flowsetversion = "4.2.2";
+my $modulversion = "4.2.5";
+my $flowsetversion = "4.2.3";
 
 
 
@@ -1053,7 +1053,6 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <a name="AMADDevicedefine"></a>
   <b>Define</b>
   <ul><br>
-  10.6.9.10 1496497380000 IODev=AMADBridge
     <code>define &lt;name&gt; AMADDevice &lt;IP-ADRESSE&gt; &lt;AMAD_ID&gt; &lt;REMOTESERVER&gt;</code>
     <br><br>
     Example:
@@ -1242,7 +1241,6 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
   <a name="AMADDevicedefine"></a>
   <b>Define</b>
   <ul><br>
-  10.6.9.10 1496497380000 IODev=AMADBridge
     <code>define &lt;name&gt; AMADDevice &lt;IP-ADRESSE&gt; &lt;AMAD_ID&gt; &lt;REMOTESERVER&gt;</code>
     <br><br>
     Beispiel:
