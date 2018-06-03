@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.18.1       03.06.2018       commandref revised
 # 7.18.0       02.06.2018       possible use of y:(\d) for timeDiffToNow, timeOlderThan , minor fixes of timeOlderThan
 #                               delEntries considers executeBeforeDump,executeAfterDump
 # 7.17.3       30.04.2017       writeToDB - readingname can be replaced by the value of attribute "readingNameMap"
@@ -341,7 +342,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.18.0";
+my $DbRepVersion = "7.18.1";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -9289,11 +9290,13 @@ return;
 	                             Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow/timeOlderThan". <br><br>
                                  
                                  <ul>
-                                 "timestamp_begin" is set:  deletes db entries <b>from</b> this timestamp until current date/time <br>
-                                 "timestamp_end" is set  :  deletes db entries <b>until</b> this timestamp <br>
-                                 both Timestamps are set :  deletes db entries <b>between</b> these timestamps <br>
-                                 Same is valid if one of attributes "timeOlderThan, timeDiffToNow" is used. <br><br>
+                                 "timestamp_begin" is set <b>-&gt;</b> deletes db entries <b>from</b> this timestamp until current date/time <br>
+                                 "timestamp_end" is set  <b>-&gt;</b>  deletes db entries <b>until</b> this timestamp <br>
+                                 both Timestamps are set <b>-&gt;</b>  deletes db entries <b>between</b> these timestamps <br>
+                                 "timeOlderThan" is set  <b>-&gt;</b>  delete entries <b>older</b> than current time minus "timeOlderThan" <br>
+                                 "timeDiffToNow" is set  <b>-&gt;</b>  delete db entries <b>from</b> current time minus "timeDiffToNow" until now <br>
                                  
+                                 <br>
                                  Due to security reasons the attribute <a href="#DbRepattr">attribute</a> "allowDeletion" needs to be set to unlock the 
 								 delete-function. <br>
                                  
@@ -11087,10 +11090,11 @@ sub bdump {
 								 folgendermaßen: <br><br>
                                  
                                  <ul>
-                                 "timestamp_begin" gesetzt:  gelöscht werden DB-Einträge <b>ab</b> diesem Zeitpunkt bis zum aktuellen Datum/Zeit <br>
-                                 "timestamp_end" gesetzt  :  gelöscht werden DB-Einträge <b>bis</b> bis zu diesem Zeitpunkt <br>
-                                 beide Timestamps gesetzt :  gelöscht werden DB-Einträge <b>zwischen</b> diesen Zeitpunkten <br>
-                                 Entsprechendes gilt bei Verwendung der Attribute "timeOlderThan, timeDiffToNow". <br>
+                                 "timestamp_begin" gesetzt <b>-&gt;</b> gelöscht werden DB-Einträge <b>ab</b> diesem Zeitpunkt bis zum aktuellen Datum/Zeit <br>
+                                 "timestamp_end" gesetzt <b>-&gt;</b>   gelöscht werden DB-Einträge <b>bis</b> bis zu diesem Zeitpunkt <br>
+                                 beide Timestamps gesetzt <b>-&gt;</b>  gelöscht werden DB-Einträge <b>zwischen</b> diesen Zeitpunkten <br>
+                                 "timeOlderThan" gesetzt  <b>-&gt;</b>  gelöscht werden DB-Einträge <b>älter</b> als aktuelle Zeit minus "timeOlderThan" <br>
+                                 "timeDiffToNow" gesetzt  <b>-&gt;</b>  gelöscht werden DB-Einträge <b>ab</b> aktueller Zeit minus "timeDiffToNow" bis jetzt <br>
                                  
                                  <br>
                                  Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" 
