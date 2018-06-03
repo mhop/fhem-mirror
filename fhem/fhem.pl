@@ -657,7 +657,8 @@ while (1) {
     }
     vec($ein, $hash->{EXCEPT_FD}, 1) = 1
         if(defined($hash->{"EXCEPT_FD"}));
-    if($hash->{SSL} && $hash->{CD} && $hash->{CD}->pending()) {
+    if($hash->{SSL} && $hash->{CD} &&
+       $hash->{CD}->can('pending') && $hash->{CD}->pending()) {
       vec($rout, $hash->{FD}, 1) = 1;
       $nfound++;
     }
