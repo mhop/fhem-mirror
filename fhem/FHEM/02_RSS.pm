@@ -584,7 +584,7 @@ sub RSS_cleanLayout($) {
 
 sub RSS_analyzePerl($) {
     my ($expr) = @_;
-    return AnalyzePerlCommand( undef, $expr, 1 );
+    return AnalyzePerlCommand( "", $expr, 1 ); # specials have been previously stored
 }
 
 sub RSS_evalLayout($$@) {
@@ -610,7 +610,7 @@ sub RSS_evalLayout($$@) {
             }
         }
     }
-    EvalSpecials( undef, %count );
+    EvalSpecials( "", %count );
 
     # second pass
     # create actual layout
@@ -844,7 +844,7 @@ sub RSS_evalLayout($$@) {
                     last;
                 }
                 #Debug "label $def hit count " . $count{ '$' . $def };
-                EvalSpecials(undef, %count);
+                EvalSpecials("", %count);
             }
             elsif ( $cmd eq "goto" ) {
                 my ( $label, $if, $condition ) = split( "[ \t]+", $def, 3 );
