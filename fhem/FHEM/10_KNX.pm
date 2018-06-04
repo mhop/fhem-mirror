@@ -16,6 +16,8 @@
 # ABU 20180509 Added dpt14.033
 # ABU 20180519 Added dpt17.001, adjustet $PAT_GAD_OPTIONS with boundaries and whitespace 
 # ABU 20180523 Added dpt7.007
+# ABU 20180528 Patched dpt1 in dpt-list and encodyByDpt for being backward-compatible
+# ABU 20180604 Set dpt17-offset to "0", added examples
 
 #TODO Prio 1:
 #
@@ -96,30 +98,30 @@ my %dpttypes = (
 	"dpt1" 			=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"off", MAX=>"on"},  
 	"dpt1.000" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"0", MAX=>"1"},
 	"dpt1.001" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"off", MAX=>"on"},
-	"dpt1.002" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(true)|(false)|(0?1)|(0?0)/i, MIN=>"false", MAX=>"true"},
-	"dpt1.003" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(enable)|(disable)|(0?1)|(0?0)/i, MIN=>"disable", MAX=>"enable"},
-	"dpt1.004"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"no ramp", MAX=>"ramp"},
-	"dpt1.005"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"no alarm", MAX=>"alarm"},
-	"dpt1.006"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"low", MAX=>"high"},
-	"dpt1.007"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"decrease", MAX=>"increase"},
-	"dpt1.008" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(up)|(down)|(0?1)|(0?0)/i, MIN=>"up", MAX=>"down"},
-	"dpt1.009" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(closed)|(open)|(0?1)|(0?0)/i, MIN=>"open", MAX=>"closed"},
-	"dpt1.010" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(start)|(stop)|(0?1)|(0?0)/i, MIN=>"stop", MAX=>"start"},
-	"dpt1.011"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"inactive", MAX=>"active"},
-	"dpt1.012"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"not inverted", MAX=>"inverted"},
-	"dpt1.013"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"start/stop", MAX=>"cyclically"},
-	"dpt1.014"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"fixed", MAX=>"calculated"},
-	"dpt1.015"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"no action", MAX=>"reset"},
-	"dpt1.016"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"no action", MAX=>"acknowledge"},
-	"dpt1.017"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"trigger", MAX=>"trigger"},
-	"dpt1.018"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"not occupied", MAX=>"occupied"},
-	"dpt1.019" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(closed)|(open)|(0?1)|(0?0)/i, MIN=>"closed", MAX=>"open"},	
-	"dpt1.021"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"logical or", MAX=>"logical and"},
-	"dpt1.022"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"scene A", MAX=>"scene B"},
-	"dpt1.023"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(0?1)|(0?0)/i, MIN=>"move up/down", MAX=>"move and step mode"},
+	"dpt1.002" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(true)|(false)|(0?1)|(0?0))$/i, MIN=>"false", MAX=>"true"},
+	"dpt1.003" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(enable)|(disable)|(0?1)|(0?0))$/i, MIN=>"disable", MAX=>"enable"},
+	"dpt1.004"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"no ramp", MAX=>"ramp"},
+	"dpt1.005"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"no alarm", MAX=>"alarm"},
+	"dpt1.006"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"low", MAX=>"high"},
+	"dpt1.007"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"decrease", MAX=>"increase"},
+	"dpt1.008" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(up)|(down)|(0?1)|(0?0))$/i, MIN=>"up", MAX=>"down"},
+	"dpt1.009" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(closed)|(open)|(0?1)|(0?0))$/i, MIN=>"open", MAX=>"closed"},
+	"dpt1.010" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(start)|(stop)|(0?1)|(0?0))$/i, MIN=>"stop", MAX=>"start"},
+	"dpt1.011"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"inactive", MAX=>"active"},
+	"dpt1.012"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"not inverted", MAX=>"inverted"},
+	"dpt1.013"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"start/stop", MAX=>"cyclically"},
+	"dpt1.014"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"fixed", MAX=>"calculated"},
+	"dpt1.015"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"no action", MAX=>"reset"},
+	"dpt1.016"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"no action", MAX=>"acknowledge"},
+	"dpt1.017"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"trigger", MAX=>"trigger"},
+	"dpt1.018"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"not occupied", MAX=>"occupied"},
+	"dpt1.019" 		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(closed)|(open)|(0?1)|(0?0))$/i, MIN=>"closed", MAX=>"open"},	
+	"dpt1.021"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"logical or", MAX=>"logical and"},
+	"dpt1.022"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"scene A", MAX=>"scene B"},
+	"dpt1.023"		=> {CODE=>"dpt1", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(0?1)|(0?0))$/i, MIN=>"move up/down", MAX=>"move and step mode"},
 
 	#Step value (two-bit)
-	"dpt2" 			=> {CODE=>"dpt2", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(on)|(off)|(forceon)|(forceoff)/i, MIN=>undef, MAX=>undef, SETLIST=>"on,off,forceon,forceoff"},
+	"dpt2" 			=> {CODE=>"dpt2", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/((on)|(off)|(forceon)|(forceoff))$/i, MIN=>undef, MAX=>undef, SETLIST=>"on,off,forceon,forceoff"},
 	  
 	#Step value (four-bit)
 	"dpt3" 			=> {CODE=>"dpt3", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/i, MIN=>-100, MAX=>100},
@@ -195,7 +197,7 @@ my %dpttypes = (
 	"dpt16.001"     => {CODE=>"dpt16", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/i, MIN=>undef, MAX=>undef},
 
 	# 1-Octet unsigned value
-	"dpt17.001" 	=> {CODE=>"dpt5", UNIT=>"", FACTOR=>1, OFFSET=>1, PATTERN=>qr/[+-]?\d{1,3}/i, MIN=>0, MAX=>63},
+	"dpt17.001" 	=> {CODE=>"dpt5", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/i, MIN=>0, MAX=>63},
 	
 	#date and time
 	"dpt19"			=> {CODE=>"dpt19", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(((3[01]|[0-2]?[0-9]).(1[0-2]|0?[0-9]).(19[0-9][0-9]|2[01][0-9][0-9]))_((2[0-4]|[0?1][0-9]):(60|[0?1-5]?[0-9]):(60|[0?1-5]?[0-9])))|(now)/i, MIN=>undef, MAX=>undef},
@@ -1453,6 +1455,8 @@ KNX_encodeByDpt ($$$) {
 	{
 		$numval = "00" if ($value eq 0);
 		$numval = "01" if ($value eq 1);
+		$numval = "00" if ($value =~ m/off$/i);
+		$numval = "01" if ($value =~ m/on$/i);
 		$numval = "00" if ($value eq $dpttypes{$model}{MIN});
 		$numval = "01" if ($value eq $dpttypes{$model}{MAX});
 		
@@ -2260,7 +2264,37 @@ The answer from the bus-device is not shown in the toolbox, but is treated like 
 <pre>}</pre>
 <pre>attr newTest webCmd An:Aus::Label1:getG1::Label2:getG2</pre>
 <pre>attr newTest widgetOverride getG1:slider,0,5,100 getG2:slider,0,5,100</pre>
-
+<p>&nbsp;</p>
+<p><em>Has a synchronized slider for send and reveive-values, on/off-buttons and a state-icon:</em></p>
+<pre>define testDev11 KNX 15/1/19:dpt1:steuern 15/1/20:dpt1:status 15/1/21:dpt5.001:dimmwert:nosuffix\</pre>
+  <pre>  attr testDev11 IODev knxd\</pre>
+  <pre>  attr testDev11 devStateIcon (on)|([Aa]n):general_an:Aus (off)|([Aa]us):general_aus:An\</pre>
+  <pre>  attr testDev11 eventMap {\\</pre>
+  <pre>  #Von Device nach Frontend sollte eigentlich bei einem Dezimalwert\\</pre>
+  <pre>  #das Reading status-get angezeigt werden. Geht aber nicht. Deshalb: stateCmd...\\</pre>
+	<pre>    dev=>{\\</pre>
+    <pre>    #		'^(\d+)?.%$'=>ReadingsVal($dev,'status-get',"Zefix..."),\\</pre>
+	<pre>    },\\</pre>
+    <pre>    #Frontend nach Device: Ersetze "An"/"Aus" durch "Steuern on/off".\\</pre>
+    <pre>    #Alle numerischen Werte vom Slider landen in "dimmwert"\\</pre>
+	<pre>    usr=>{\\</pre>
+		<pre>      '^An'=>'steuern on',\\</pre>
+		<pre>      '^Aus'=>'steuern off',\\</pre>
+	<pre>    },\\</pre>
+    <pre>    #Tuning für die Detailseite...Zeige An/Aus richtig an\\</pre>
+	<pre>    fw=>{\\</pre>
+		<pre>      '^An'=>'An',\\</pre>
+		<pre>      '^Aus'=>'Aus',\\</pre>
+	<pre>    }\\</pre>
+  <pre>  }\</pre>
+  <pre>  attr testDev11 stateCmd {ReadingsVal($name,"status-get","")}\</pre>
+  <pre>  attr testDev11 webCmd An:Aus:dimmwert\</pre>
+  <pre>  attr testDev11 widgetOverride dimmwert:slider,0,5,100\</pre>
+  <pre>  #Dimmwert muss ein reales reading sein. Kann auch ...-get sein, wenn\</pre>
+  <pre>  #nosuffix nicht angegeben ist.\</pre>
+  <pre>  #Achtung: bei einem Userreading sind die Werte nicht persistent, also\</pre>
+  <pre>  #nicht machen!!!\</pre>
+  
 =end html
 =device
 =item summary Communicates to KNX via module TUL
