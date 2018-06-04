@@ -496,7 +496,7 @@ sub msgDialog_update_msgCommand($) {
       Can be optionally set to true or false. In both cases, the TRIGGER will
       not be returned at "get &lt;name&gt; trigger".<br>
       If setOnly is set to true, the dialog at this point cannot be triggered
-      by incoming messages, but only by using "get &lt;name&gt; say
+      by incoming messages, but only by using "set &lt;name&gt; say
       TRIGGER".<br>
       This can be used to initiate a dialog from FHEM.
     </li>
@@ -921,7 +921,7 @@ plot=Waschkeller_washer_SVG
       zur&uuml;ck gegeben.<br>
       Wenn setOnly auf true gestellt wird kann der Dialog an dieser Stelle
       nicht durch eingehnde Nachrichten ausgel&ouml;st werden, sondern nur
-      &uuml;ber "get &lt;name&gt; say TRIGGER".<br>
+      &uuml;ber "set &lt;name&gt; say TRIGGER".<br>
       Dies kann dazu genutzt werden um einen Dialog von FHEM zu aus zu
       initieren.
     </li>
