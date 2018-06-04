@@ -942,8 +942,9 @@ SVG_calcOffsets($$)
     $fr = AttrVal($wl, "fixedrange", undef);
     if($fr) {
       if($fr =~ "^(hour|qday|day|week|month|year)" ||
-         $fr =~ m/^\d+days$/  || #fixedrange with offset
-         $fr =~ m/^\d+years$/ ) { #fixedrange with offset
+         $fr =~ m/^\d+hour/  || #fixedrange with offset
+         $fr =~ m/^\d+day/   ||
+         $fr =~ m/^\d+year/ ) {
         $frx=$fr; #fixedrange with offset
 
       } else {
@@ -979,18 +980,19 @@ SVG_calcOffsets($$)
   if(defined($zrange[1])) { $off += $zrange[1]; $zoom=$zrange[0]; }  #fixedrange with offset
 
   my $endPlotNow = (SVG_Attr($FW_wname, $wl, "endPlotNow", undef) && !$st);
-  if($zoom eq "hour") {
+  if($zoom =~ m/^(\d+)?hour/) {
+    my $nHours = $1 ? ($1-1) : 0;
     if($endPlotNow) {
-      my $t = int(($now + $off*3600 - 3600)/300.0)*300 + 300;
+      my $t = int(($now + ($off-$nHours-1)*3600)/300.0)*300 + 300;
       my @l = localtime($t);
       $SVG_devs{$d}{from} = SVG_tspec(@l);
-      @l = localtime($t+3599);
+      @l = localtime($t+$nHours*3600+3599);
       $SVG_devs{$d}{to}   = SVG_tspec(@l);
     } else { 
-      my $t = int($now/3600)*3600 + $off*3600;
+      my $t = int($now/3600)*3600 + ($off-$nHours)*3600;
       my @l = localtime($t);
       $SVG_devs{$d}{from} = SVG_tspec(@l);
-      @l = localtime($t+3600-1);
+      @l = localtime($t+($nHours+1)*3600-1);
       $SVG_devs{$d}{to}   = SVG_tspec(@l);
     }
 
@@ -1627,8 +1629,11 @@ SVG_render($$$$$$$$$$)
   my $ddur = ($tosec-$fromsec)/86400;
   my ($first_tag, $tag, $step, $tstep, $aligntext,  $aligntics);
 
-  if($ddur <= 0.1) {
+  if($ddur <= 0.05) {
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 300; $tstep = 60;
+
+  } elsif($ddur <= 0.2) {
+    $first_tag=". 2 1"; $tag=": 3 4"; $step = 1200; $tstep = 300;
 
   } elsif($ddur <= 0.5) {
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 3600; $tstep = 900;
@@ -2566,11 +2571,12 @@ plotAsPng(@)
         In plotmode gnuplot-scroll(-svg) or SVG the given time-range will be
         used, and no scrolling for this SVG will be possible. Needed e.g. for
         looking at last-years data without scrolling.<br><br> If the value is
-        one of hour, day, &lt;N&gt;days, week, month, year, &lt;N&gt;years then 
-        set the zoom level for this SVG independently of the user specified
-        zoom-level. This is useful for pages with multiple plots: one of the
-        plots is best viewed in with the default (day) zoom, the other one with
-        a week zoom.<br>
+        one of hour, &lt;N&gt;hours, day, &lt;N&gt;days, week, month, year,
+        &lt;N&gt;years then set the zoom level for this SVG independently of
+        the user specified zoom-level. This is useful for pages with multiple
+        plots: one of the plots is best viewed in with the default (day) zoom,
+        the other one with a week zoom.
+        <br>
 
         If given, the optional integer parameter offset refers to a different
         period (e.g. last year: fixedrange year -1, 2 days ago: fixedrange day
@@ -2797,15 +2803,16 @@ plotAsPng(@)
       Jahre auf eine Seite anzusehen.<br><br>
 
       Zweite Alternative:<br>
-      Wenn der Wert entweder hour, day, &lt;N&gt;days, week, month, year oder
-      &lt;N&gt;years lautet, kann der Zoom-Level f&uuml;r dieses SVG 
-      unabh&auml;ngig vom User-spezifischen Zoom eingestellt werden. Diese 
-      Einstellung ist n&uuml;tzlich f&uuml;r mehrere Plots auf einer Seite: 
-      Eine Grafik ist mit dem Standard-Zoom am aussagekr&auml;ftigsten, die 
-      anderen mit einem Zoom &uuml;ber eine Woche. Der optionale ganzzahlige 
-      Parameter [offset] setzt ein anderes Zeitintervall (z.B. letztes Jahr: 
-      <code>fixedrange year -1</code>, vorgestern:
-      <code> fixedrange day -2</code>).
+      Wenn der Wert entweder hour, &lt;N&gt;hours, day, &lt;N&gt;days, week,
+      month, year oder &lt;N&gt;years lautet, kann der Zoom-Level f&uuml;r
+      dieses SVG unabh&auml;ngig vom User-spezifischen Zoom eingestellt werden.
+      Diese Einstellung ist n&uuml;tzlich f&uuml;r mehrere Plots auf einer
+      Seite: Eine Grafik ist mit dem Standard-Zoom am aussagekr&auml;ftigsten,
+      die anderen mit einem Zoom &uuml;ber eine Woche. Der optionale
+      ganzzahlige Parameter [offset] setzt ein anderes Zeitintervall (z.B.
+      letztes Jahr: <code>fixedrange year -1</code>, vorgestern: <code>
+      fixedrange day -2</code>).
+
       </li><br>
 
     <a name="label"></a>
