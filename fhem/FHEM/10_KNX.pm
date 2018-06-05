@@ -19,6 +19,7 @@
 # ABU 20180528 Patched dpt1 in dpt-list and encodyByDpt for being backward-compatible
 # ABU 20180604 Set dpt17-offset to "0", added examples
 # ABU 20180605 Added dpt18, tuned doku
+# ABU 20180605 Corrected dpt18
 
 #TODO Prio 1:
 #
@@ -201,7 +202,7 @@ my %dpttypes = (
 	"dpt17.001" 	=> {CODE=>"dpt5", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/i, MIN=>0, MAX=>63},
 
 	# Scene, 1-64
-	"dpt18.001" 	=> {CODE=>"dpt5", UNIT=>"", FACTOR=>1, OFFSET=>1, PATTERN=>qr/[+-]?\d{1,3}/i, MIN=>0, MAX=>63},
+	"dpt18.001" 	=> {CODE=>"dpt5", UNIT=>"", FACTOR=>1, OFFSET=>-1, PATTERN=>qr/[+-]?\d{1,3}/i, MIN=>1, MAX=>64},
 	
 	#date and time
 	"dpt19"			=> {CODE=>"dpt19", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(((3[01]|[0-2]?[0-9]).(1[0-2]|0?[0-9]).(19[0-9][0-9]|2[01][0-9][0-9]))_((2[0-4]|[0?1][0-9]):(60|[0?1-5]?[0-9]):(60|[0?1-5]?[0-9])))|(now)/i, MIN=>undef, MAX=>undef},
@@ -1778,17 +1779,17 @@ KNX_decodeByDpt ($$$) {
 	my $state = undef;
 	
 	Log3 ($name, 5, "decode model: $model, code: $code, value: $value");
-		
+	
+	my $min = $dpttypes{"$model"}{MIN};
+	my $max = $dpttypes{"$model"}{MAX};
+	
 	#get correction details
 	my $factor = $dpttypes{$model}{FACTOR};
 	my $offset = $dpttypes{$model}{OFFSET};
 	
 	#Binary value
 	if ($code eq "dpt1")
-	{
-		my $min = $dpttypes{"$model"}{MIN};
-		my $max = $dpttypes{"$model"}{MAX};
-		
+	{		
 		$numval = $min if ($value =~ m/00/i);
 		$numval = $max if ($value =~ m/01/i);
 		$state = $numval;
@@ -2006,6 +2007,12 @@ KNX_decodeByDpt ($$$) {
 		Log3 ($name, 2, "decode model: $model, no valid model defined");
 		return undef;	
 	}
+
+	#optionally limit
+	my $orgVal = $state;
+	$state = $min if (defined ($min) and ($state < $min));
+	$state = $max if (defined ($max) and ($state > $max));
+	Log3 ($name, 5, "decode: limited. OrgVal: $orgVal, state: $state") if ($orgVal != $state);
 	
 	#append unit, if supplied
 	my $unit = $dpttypes{$model}{UNIT};	
@@ -2202,7 +2209,7 @@ The answer from the bus-device is not shown in the toolbox, but is treated like 
 <ul>dpt16.000 ASCII-String</ul>
 <ul>dpt16.001 ISO-8859-1-String (Latin1)</ul>
 <ul>dpt17.001 Scene number: 0..63</ul>
-<ul>dpt17.001 Scene number: 1..64</ul>
+<ul>dpt18.001 Scene number: 1..64. Watch out - only "activation" works. "Learning" will be limited to 64...</ul>
 <ul>dpt19 01.12.2010_01:00:00</ul>
 <ul>dpt232 RGB-Value RRGGBB</ul>
 
