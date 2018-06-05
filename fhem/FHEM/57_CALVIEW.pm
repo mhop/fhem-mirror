@@ -334,34 +334,20 @@ sub getsummery($)
 	my $modi = $attr{$name}{modes};
 	my @modes = split(/,/,$modi);
 	foreach my $calendername (@calendernamen){
-			my $all = CallFn($calendername, "GetFn", $defs{$calendername},(" ","uid", "next"));
+			my $all = CallFn($calendername, "GetFn", $defs{$calendername},("-","events","format:custom='\$U|\$T1|\$T2|\$S|\$L|\$DS|\$CA'"));
+			Log3 $name , 5,  "CALVIEW $name - All data: \n$all ...";
 			my @termine=split(/\n/,$all);
-			
-			foreach my $uid (@termine){
-				#für jedes event die einzelnen infos holen
-				my $tmpstarts = CallFn($calendername, "GetFn", $defs{$calendername},(" ","start", $uid));
-				my @starts  = split(/\n/,$tmpstarts);
-				my $tmpends = CallFn($calendername, "GetFn", $defs{$calendername},(" ","end", $uid));
-				my @ends  = split(/\n/,$tmpends);
-				my $tmpsummarys = CallFn($calendername, "GetFn", $defs{$calendername},(" ","summary", $uid));
-				my @summarys  = split(/\n/,$tmpsummarys);
-				my $tmplocations = CallFn($calendername, "GetFn", $defs{$calendername},(" ","location", $uid));
-				my @locations = split(/\n/,$tmplocations);				
-				my $tmpdescriptions = CallFn($calendername, "GetFn", $defs{$calendername},(" ","description", $uid));
-				my @description = split(/\n/,$tmpdescriptions);
-				my $tmpcategories = CallFn($calendername, "GetFn", $defs{$calendername},(" ","categories", $uid));
-				my @categories = split(/\n/,$tmpcategories);
-				
-				for(my $i = 1; $i <= (scalar(@starts)); $i++) {
-					my $internali = $i-1;
-					my $terminstart = $starts[$internali];
-					my $termintext = $summarys[$internali];
-					my $terminend = $ends[$internali];
-					my $terminort = $locations[$internali];
-					my $termindescription = $description[$internali];
-					 my $termincategories = $categories[$internali];
-					push(@terminliste, [$terminstart, $termintext, $terminend, $calendername, $terminort, $termindescription, $termincategories, "next"]);
-				}
+			foreach my $line (@termine){
+				Log3 $name , 5,  "CALVIEW $name - Termin: $line";
+				my @lineparts  = split(/\|/,$line);
+				#my $terminstart = $lineparts[1];
+				#my $terminend = $lineparts[2];
+				#my $termintext = $lineparts[3];
+				#my $terminort = $lineparts[4];
+				#my $termindescription = $lineparts[5];
+				#my $termincategories = $lineparts[6];
+				#Log3 $name , 5,  "CALVIEW $name - Termin splitted : $terminstart, $termintext, $terminend, $calendername, $terminort, $termindescription, $termincategories";
+				push(@terminliste, [$lineparts[1], $lineparts[3], $lineparts[2], $calendername, $lineparts[4], $lineparts[5], $lineparts[6], "next"]);
 			};
 	};
 	return @terminliste;
@@ -379,8 +365,9 @@ sub CALVIEW_Notify($$)
 		if ($extDevName eq $calendar) {
 			foreach $event (@{$extDevHash->{CHANGED}}) {
 				if ($event eq "triggered") { 
-					Log3 $name , 3,  "CALVIEW $name - CALENDAR:$extDevName triggered, updating CALVIEW $name ...";
+					Log3 $name , 5,  "CALVIEW $name - CALENDAR:$extDevName triggered, updating CALVIEW $name (CALVIEW_Notify) ...";
 					CALVIEW_GetUpdate($hash); 
+					Log3 $name , 5,  "CALVIEW $name - CALENDAR:$extDevName successfully got all updates for CALVIEW $name (CALVIEW_Notify). Now process updates...";
 				}
 			}
 		}
