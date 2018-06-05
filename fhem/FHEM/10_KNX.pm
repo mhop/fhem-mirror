@@ -18,6 +18,7 @@
 # ABU 20180523 Added dpt7.007
 # ABU 20180528 Patched dpt1 in dpt-list and encodyByDpt for being backward-compatible
 # ABU 20180604 Set dpt17-offset to "0", added examples
+# ABU 20180605 Added dpt18, tuned doku
 
 #TODO Prio 1:
 #
@@ -196,8 +197,11 @@ my %dpttypes = (
 	"dpt16.000"     => {CODE=>"dpt16", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/i, MIN=>undef, MAX=>undef},
 	"dpt16.001"     => {CODE=>"dpt16", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/i, MIN=>undef, MAX=>undef},
 
-	# 1-Octet unsigned value
+	# Scene, 0-63
 	"dpt17.001" 	=> {CODE=>"dpt5", UNIT=>"", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/i, MIN=>0, MAX=>63},
+
+	# Scene, 1-64
+	"dpt18.001" 	=> {CODE=>"dpt5", UNIT=>"", FACTOR=>1, OFFSET=>1, PATTERN=>qr/[+-]?\d{1,3}/i, MIN=>0, MAX=>63},
 	
 	#date and time
 	"dpt19"			=> {CODE=>"dpt19", UNIT=>"", FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/(((3[01]|[0-2]?[0-9]).(1[0-2]|0?[0-9]).(19[0-9][0-9]|2[01][0-9][0-9]))_((2[0-4]|[0?1][0-9]):(60|[0?1-5]?[0-9]):(60|[0?1-5]?[0-9])))|(now)/i, MIN=>undef, MAX=>undef},
@@ -2040,7 +2044,7 @@ The reading &lt;state&gt; will be updated with the last sent or received value.&
 <p>The &lt;group&gt; parameters are either a group name notation (0-15/0-15/0-255) or the hex representation of the value (0-f0-f0-ff). All of the defined groups can be used for bus-communication. It is not allowed to have the same group more then once in one device. You can have several devices containing the same adresses.<br /> 
 As described above the parameter &lt;DPT&gt; must contain the corresponding DPT.<br /> 
 The optional parameteter [gadName] may contain an alias for the GAD.&nbsp;The name must not cotain one of the following strings: on, off, on-for-timer, on-until, off-for-timer, off-until, toggle, raw, rgb, string, value, set, get, readonly.<br />
-If you want to restrict the GAD, you can raise the flags "get", "set", or "readonly". The usage should be self-explainable. It is not possible to combine the flags.<br /> 
+Especially if answerReading is set to 1, it might be useful to modifiy the behaviour of single GADs. If you want to restrict the GAD, you can raise the flags "get", "set", or "readonly". The usage should be self-explainable. It is not possible to combine the flags.<br /> 
 Furthermore you can supply a IO-Device directly at startup. This can be done later on via attribute as well.</p>
 <p>The GAD's are per default named with "g&lt;number&gt;". The correspunding readings are calles getG&lt;number&gt;, setG&lt;number&gt; and putG&lt;number&gt;.<br /> 
 If you supply &lt;gadName&gt; this name is used instead. The readings are &lt;gadName&gt;-get, &lt;gadName&gt;-set and &lt;gadName&gt;-put. We will use the synonyms &lt;getName&gt;, &lt;setName&gt; and &lt;putName&gt; in this documentation.
@@ -2056,7 +2060,7 @@ If you add the option "nosuffix", &lt;getName&gt;, &lt;setName&gt; and &lt;putNa
 &lt;timespec&gt;<br />
   set &lt;deviceName&gt; [gadName] &lt;value&gt;<br /></code></p>
 <p>Set sends the given value to the bus.<br /> If &lt;gadName&gt; is omitted, the first listed GAD of the device is used. If the GAD is restricted in the definition with "get" or "readonly", the set-command will be refused.<br /> 
-<strong>For dpt1 and dpt1.001 valid values are on, off and toggle. Also the timer-functions can be used. For all other binary DPT (dpt1.xxx) the min- and max-values are used for en- and decoding instead of on/off. This is different to older versions.</strong><br /> 
+<strong>For dpt1 and dpt1.001 valid values are on, off and toggle. Also the timer-functions can be used. For all other binary DPT (dpt1.xxx) the min- and max-values can be used for en- and decoding alternatively to on/off. This is different to older versions.</strong><br /> 
 After successful sending the value, it is stored in the readings &lt;setName&gt;.</p>
 <p>Example:</p>
 <p><code></code></p>
@@ -2198,6 +2202,7 @@ The answer from the bus-device is not shown in the toolbox, but is treated like 
 <ul>dpt16.000 ASCII-String</ul>
 <ul>dpt16.001 ISO-8859-1-String (Latin1)</ul>
 <ul>dpt17.001 Scene number: 0..63</ul>
+<ul>dpt17.001 Scene number: 1..64</ul>
 <ul>dpt19 01.12.2010_01:00:00</ul>
 <ul>dpt232 RGB-Value RRGGBB</ul>
 
@@ -2266,34 +2271,38 @@ The answer from the bus-device is not shown in the toolbox, but is treated like 
 <pre>attr newTest widgetOverride getG1:slider,0,5,100 getG2:slider,0,5,100</pre>
 <p>&nbsp;</p>
 <p><em>Has a synchronized slider for send and reveive-values, on/off-buttons and a state-icon:</em></p>
-<pre>define testDev11 KNX 15/1/19:dpt1:steuern 15/1/20:dpt1:status 15/1/21:dpt5.001:dimmwert:nosuffix\</pre>
-  <pre>  attr testDev11 IODev knxd\</pre>
-  <pre>  attr testDev11 devStateIcon (on)|([Aa]n):general_an:Aus (off)|([Aa]us):general_aus:An\</pre>
-  <pre>  attr testDev11 eventMap {\\</pre>
-  <pre>  #Von Device nach Frontend sollte eigentlich bei einem Dezimalwert\\</pre>
-  <pre>  #das Reading status-get angezeigt werden. Geht aber nicht. Deshalb: stateCmd...\\</pre>
-	<pre>    dev=>{\\</pre>
-    <pre>    #		'^(\d+)?.%$'=>ReadingsVal($dev,'status-get',"Zefix..."),\\</pre>
-	<pre>    },\\</pre>
-    <pre>    #Frontend nach Device: Ersetze "An"/"Aus" durch "Steuern on/off".\\</pre>
-    <pre>    #Alle numerischen Werte vom Slider landen in "dimmwert"\\</pre>
-	<pre>    usr=>{\\</pre>
-		<pre>      '^An'=>'steuern on',\\</pre>
-		<pre>      '^Aus'=>'steuern off',\\</pre>
-	<pre>    },\\</pre>
-    <pre>    #Tuning für die Detailseite...Zeige An/Aus richtig an\\</pre>
-	<pre>    fw=>{\\</pre>
-		<pre>      '^An'=>'An',\\</pre>
-		<pre>      '^Aus'=>'Aus',\\</pre>
-	<pre>    }\\</pre>
-  <pre>  }\</pre>
-  <pre>  attr testDev11 stateCmd {ReadingsVal($name,"status-get","")}\</pre>
-  <pre>  attr testDev11 webCmd An:Aus:dimmwert\</pre>
-  <pre>  attr testDev11 widgetOverride dimmwert:slider,0,5,100\</pre>
-  <pre>  #Dimmwert muss ein reales reading sein. Kann auch ...-get sein, wenn\</pre>
-  <pre>  #nosuffix nicht angegeben ist.\</pre>
-  <pre>  #Achtung: bei einem Userreading sind die Werte nicht persistent, also\</pre>
-  <pre>  #nicht machen!!!\</pre>
+  <pre>define testDev11 KNX 15/1/19:dpt1:steuern 15/1/20:dpt1:status 15/1/21:dpt5.001:dimmwert:nosuffix\</pre>
+  <pre>attr testDev11 IODev knxd\</pre>
+  <pre>attr testDev11 eventMap {\</pre>
+  <pre>#Von Device nach Frontend sollte eigentlich bei einem Dezimalwert\\</pre>
+  <pre>#das Reading status-get angezeigt werden. Geht aber nicht. Deshalb: stateCmd...\\</pre>
+	<pre>  dev=>{\\</pre>
+    <pre>  #		'^(\d+)?.%$'=>ReadingsVal($dev,'status-get',"Zefix..."),\\</pre>
+	<pre>  },\\</pre>
+    <pre>  #Frontend nach Device: Ersetze "An"/"Aus" durch "Steuern on/off".\\</pre>
+    <pre>  #Alle numerischen Werte vom Slider landen in "dimmwert"\\</pre>
+	<pre>  usr=>{\\</pre>
+		<pre>    '^An'=>'steuern on',\\</pre>
+		<pre>    '^Aus'=>'steuern off',\\</pre>
+	<pre>  },\\</pre>
+    <pre>  #Tuning für die Detailseite...Zeige An/Aus richtig an\\</pre>
+	<pre>  fw=>{\\</pre>
+		<pre>    '^An'=>'An',\\</pre>
+		<pre>    '^Aus'=>'Aus',\\</pre>
+	<pre>  }\\</pre>
+  <pre>}\</pre>
+  <pre>attr testDev11 stateRegex /steuern-[sg]et:/steuern-/ /status-get:/status-/</pre>
+  <pre>attr testDev11 stateCmd {\</pre>
+    <pre>    if ($state =~ m/dimmwert:/i) {'status-' . ReadingsVal($name,"status-get","")}\</pre>
+    <pre>    else {return $state}\</pre>
+  <pre>}</pre>
+  <pre>attr testDev11 devStateIcon status-on:general_an:Aus status-off:general_aus:Ein steuern.*:hourglass:Aus</pre>
+  <pre>#Dimmwert muss ein reales reading sein. Kann auch ...-get sein, wenn\</pre>
+  <pre>#nosuffix nicht angegeben ist.\</pre>
+  <pre>#Achtung: bei einem Userreading sind die Werte nicht persistent, also\</pre>
+  <pre>#nicht machen!!!\</pre>
+  <pre>attr testDev11 webCmd An:Aus:dimmwert\</pre>
+  <pre>attr testDev11 widgetOverride dimmwert:slider,0,5,100\</pre>
   
 =end html
 =device
