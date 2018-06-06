@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  98_dewpoint: new attribute legacyStateHandling
   - feature: 93_DbRep: V7.18.0, possible use of y:(\d) in timeDiffToNow, 
                        timeOlderThan, delEntries considers executeBeforeDump,
                        executeAfterDump, minor fixes

@@ -40,7 +40,7 @@ dewpoint_Initialize($)
   $hash->{DefFn}   = "dewpoint_Define";
   $hash->{NotifyFn} = "dewpoint_Notify";
   $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
-  $hash->{AttrList} = "disable:0,1 verbose max_timediff absFeuchte";
+  $hash->{AttrList} = "disable:0,1 legacyStateHandling:0,1 verbose max_timediff absFeuchte";
 }
 
 
@@ -287,7 +287,8 @@ dewpoint_Notify($$)
         $sensor = $new_name;
 
         my $has_state_format = defined(AttrVal($dev->{NAME}, "stateFormat", undef));
-        if ($temp_name ne "T" || $has_state_format) {
+        my $legacy_sh = AttrVal($hash->{NAME}, "legacyStateHandling", 0);
+        if ($temp_name ne "T" || ($has_state_format && ! $legacy_sh)) {
             $current = $dewpoint;
             readingsBulkUpdate($dev, $sensor, $current);
             readingsEndUpdate($dev, 1);
@@ -525,7 +526,9 @@ dewpoint_absFeuchte ($$)
 	and write the calculated dewpoint to reading &lt;new_name&gt;.<br>
         <b>Obsolete, avoid for new definitions</b><br>
 	&nbsp;&nbsp;If &lt;temp_name&gt; is T then use temperature from state T: H:, add &lt;new_name&gt; to the STATE.
-        The addition to STATE only occurs if the target device does not define attribute "stateFormat".
+        The addition to STATE only occurs if the target device does not define attribute "stateFormat".<br>
+        If the obsolete behaviour of STATE is mandatory set attribute <code>legacyStateHandling</code>
+        should be set.
     </ul>
     <br><br>
 
@@ -683,6 +686,8 @@ dewpoint_absFeuchte ($$)
     &nbsp;&nbsp;Wenn &lt;temp_name&gt; T lautet, wird die Temperatur aus state T: H: benutzt 
     und &lt;new_name&gt; zu STATE hinzugef&uuml;gt. Das hinzuf&uuml;gen zu STATE erfolgt nur, falls im Zielger&auml;t
     das Attribut "stateFormat" nicht definiert ist.<br>
+    Falls das veraltete Verhalten zum Update unbedingt gew&uuml;scht ist,
+    kann das Attribut <code>legacyStateHandling</code> gesetzt werden.
     <br/>
     Beispiele:
     <pre>
@@ -783,7 +788,7 @@ dewpoint_absFeuchte ($$)
       <ul>
         Durch setzen des Attributes absFeuchte wird in den Readings auch die absolute Feuchte mit ausgerechnet.
 		Durch <a href="#stateFormat">stateFormat</a> kann man diese Info auch im Status anzeigen.
-		 Beispiel: (<Adapter> = Der FHEM Name des Adapters der geändert werden muss)
+		 Beispiel: (<Adapter> = Der FHEM Name des Adapters der ge&auml;ndert werden muss)
         <pre>
 		 stateFormat:	
 		{sprintf("T: %.1f H: %.1f D: %.1f A: %.1f", ReadingsVal("<Adapter>","temperature",0), ReadingsVal("<Adapter>","H",0), ReadingsVal("<Adapter>","dewpoint",0), ReadingsVal("<Adapter>","absFeuchte",0))}
