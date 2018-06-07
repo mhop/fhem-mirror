@@ -1408,14 +1408,16 @@ KNX_checkAndClean ($$$)
 	return undef if ($found == 0);
 
 	#get min
-	my $min = $dpttypes{"$model"}{MIN};
+	#my $min = $dpttypes{"$model"}{MIN};
 	#if min is numeric, cast to min
-	$value = $min if (defined ($min) and ($min =~ /^[+-]?\d*[.,]?\d+/) and ($value < $min));
+	#$value = $min if (defined ($min) and ($min =~ /^[+-]?\d*[.,]?\d+/) and ($value < $min));
 
 	#get max
-	my $max = $dpttypes{"$model"}{MAX};
+	#my $max = $dpttypes{"$model"}{MAX};
 	#if max is numeric, cast to max
-	$value = $max if (defined ($max) and ($max =~ /^[+-]?\d*[.,]?\d+/) and ($value > $max));
+	#$value = $max if (defined ($max) and ($max =~ /^[+-]?\d*[.,]?\d+/) and ($value > $max));
+	
+	$value = KNX_limit ($hash, $value, $gadName);	
 
 	Log3 ($name, 3, "check value: input-value $orgValue was casted to $value") if (not($orgValue eq $value));		
 	Log3 ($name, 5, "check value: $value, gadName: $gadName, model: $model, pattern: $pattern");
@@ -1423,6 +1425,107 @@ KNX_checkAndClean ($$$)
 	return $value;
 }
 
+
+#Private function to replace state-values
+#############################
+sub
+KNX_replaceByRegex ($$$) {
+	my ($regAttr, $prefix, $input) = @_;
+	my $retVal = $input;
+
+	#execute regex, if defined
+	if (defined($regAttr))
+	{
+		#get array of given attributes
+		my @reg = split(" /", $regAttr);
+		
+		my $tempVal = $prefix . $input;
+		
+		#loop over all regex
+		foreach my $regex (@reg)
+		{
+			#trim leading and trailing slashes
+			$regex =~ s/^\/|\/$//gi;
+			#get pairs
+			my @regPair = split("\/", $regex);
+						
+			#skip if not at least 2 values supplied
+			#next if (int(@regPair < 2));
+			next if (not defined($regPair[0]));
+			
+			if (not defined ($regPair[1]))
+			{
+				#cut value
+				$tempVal =~ s/$regPair[0]//gi;
+			}
+			else
+			{
+				#replace value
+				$tempVal =~ s/$regPair[0]/$regPair[1]/gi;
+			}
+			
+			#restore value
+			$retVal = $tempVal;
+		}
+	}
+	
+	return $retVal;
+}
+
+#Private function to limit numeric values. Valid directions: encode, decode
+#############################
+sub
+KNX_limit ($$$$) {
+	my ($hash, $value, $gadName, $direction) = @_;
+	my $name = $hash->{NAME};	
+	my $model = $hash->{GADDETAILS}{$gadName}{MODEL};	
+	my $retVal = $value;
+	
+	#get correction details
+	my $factor = $dpttypes{$model}{FACTOR};
+	my $offset = $dpttypes{$model}{OFFSET};		
+	#get limits
+	my $min = $dpttypes{"$model"}{MIN};
+	my $max = $dpttypes{"$model"}{MAX};
+	
+	#only execute, if nummeric value
+	if (looks_like_number ($value))
+	{
+		#determine direction of scaling, do only if defined
+		if (defined ($direction))
+		{
+			if ($direction =~ m/^encode/i)
+			{
+				$retVal = $value / $factor if (defined ($factor));
+				$retVal = $value - $offset if (defined ($offset));			
+			}
+			elsif ($direction =~ m/^decode/i)
+			{
+				#correct value
+				$retVal = $value + $offset if (defined ($offset));
+				$retVal = $value * $factor if (defined ($factor));			
+			}			
+			
+			Log3 ($name, 5, "limit: FACTOR: $min" ) if (defined ($factor));
+			Log3 ($name, 5, "limit: OFFSET: $min" ) if (defined ($offset));
+			Log3 ($name, 5, "limit: scaled... Output: $retVal, Input: $value") if ($retVal != $value);
+		}
+		
+		#limitValue
+		$retVal = $min if (defined ($min) and ($value < $min));
+		$retVal = $max if (defined ($max) and ($value > $max));
+		
+		Log3 ($name, 5, "limit: MIN: $min" ) if (defined ($min));
+		Log3 ($name, 5, "limit: MAX: $min" ) if (defined ($max));
+		Log3 ($name, 5, "limit: casted... Output: $retVal, Input: $value" ) if ($retVal != $value);
+	}
+	else
+	{
+		#Log3 ($name, 2, "limit: did not execute any action. Value should be numeric, but wasn't...");
+	}
+	
+	return $retVal;
+}
 
 #Private function to encode KNX-Message according DPT
 #############################
@@ -1447,15 +1550,7 @@ KNX_encodeByDpt ($$$) {
 	
 	Log3 ($name, 5, "encode model: $model, code: $code, value: $value");
 		
-	#get correction details
-	my $factor = $dpttypes{$model}{FACTOR};
-	my $offset = $dpttypes{$model}{OFFSET};
-	
-	#correct value
-	$value /= $factor if (defined ($factor));
-	$value -= $offset if (defined ($offset));
-	
-	Log3 ($name, 5, "encode normalized value: $value");
+	$value = KNX_limit ($hash, $value, $gadName, "ENCODE");
 	
 	#Binary value
 	if ($code eq "dpt1")
@@ -1713,52 +1808,6 @@ KNX_encodeByDpt ($$$) {
 	return $hexval;
 }
 
-#Private function to replace state-values
-#############################
-sub
-KNX_replaceByRegex ($$$) {
-	my ($regAttr, $prefix, $input) = @_;
-	my $retVal = $input;
-
-	#execute regex, if defined
-	if (defined($regAttr))
-	{
-		#get array of given attributes
-		my @reg = split(" /", $regAttr);
-		
-		my $tempVal = $prefix . $input;
-		
-		#loop over all regex
-		foreach my $regex (@reg)
-		{
-			#trim leading and trailing slashes
-			$regex =~ s/^\/|\/$//gi;
-			#get pairs
-			my @regPair = split("\/", $regex);
-						
-			#skip if not at least 2 values supplied
-			#next if (int(@regPair < 2));
-			next if (not defined($regPair[0]));
-			
-			if (not defined ($regPair[1]))
-			{
-				#cut value
-				$tempVal =~ s/$regPair[0]//gi;
-			}
-			else
-			{
-				#replace value
-				$tempVal =~ s/$regPair[0]/$regPair[1]/gi;
-			}
-			
-			#restore value
-			$retVal = $tempVal;
-		}
-	}
-	
-	return $retVal;
-}
-
 #Private function to decode KNX-Message according DPT
 #############################
 sub
@@ -1784,10 +1833,6 @@ KNX_decodeByDpt ($$$) {
 	
 	my $min = $dpttypes{"$model"}{MIN};
 	my $max = $dpttypes{"$model"}{MAX};
-	
-	#get correction details
-	my $factor = $dpttypes{$model}{FACTOR};
-	my $offset = $dpttypes{$model}{OFFSET};
 	
 	#Binary value
 	if ($code eq "dpt1")
@@ -1824,22 +1869,14 @@ KNX_decodeByDpt ($$$) {
 		#get dim-direction
 		$state = 0 - $state if (not ($numval & 8));
 		
-		#correct value
-		$state += $offset if (defined ($offset));
-		$state *= $factor if (defined ($factor));
-
 		$state = sprintf ("%.0f", $state);
 	}
 	#1-Octet unsigned value
 	elsif ($code eq "dpt5")
 	{
 		$numval = hex ($value);
-		$state = $numval;
+		$state = KNX_limit ($hash, $numval, $gadName, "DECODE");
 		
-		#correct value
-		$state += $offset if (defined ($offset));
-		$state *= $factor if (defined ($factor));
-
 		$state = sprintf ("%.0f", $state);
 	}
 	#1-Octet signed value
@@ -1847,24 +1884,16 @@ KNX_decodeByDpt ($$$) {
 	{
 		$numval = hex ($value);
 		$numval -= 0x100 if ($numval >= 0x80);
-		$state = $numval;
+		$state = KNX_limit ($hash, $numval, $gadName, "DECODE");		
 		
-		#correct value
-		$state += $offset if (defined ($offset));
-		$state *= $factor if (defined ($factor));
-
 		$state = sprintf ("%.0f", $state);		
 	}
 	#2-Octet unsigned Value
 	elsif ($code eq "dpt7")
 	{
 		$numval = hex ($value);
-		$state = $numval;
+		$state = KNX_limit ($hash, $numval, $gadName, "DECODE");
 		
-		#correct value
-		$state += $offset if (defined ($offset));
-		$state *= $factor if (defined ($factor));
-
 		$state = sprintf ("%.0f", $state);		
 	}
 	#2-Octet signed Value 
@@ -1872,11 +1901,7 @@ KNX_decodeByDpt ($$$) {
 	{
 		$numval = hex ($value);
 		$numval -= 0x10000 if ($numval >= 0x8000);
-		$state = $numval;
-		
-		#correct value
-		$state += $offset if (defined ($offset));
-		$state *= $factor if (defined ($factor));
+		$state = KNX_limit ($hash, $numval, $gadName, "DECODE");
 		
 		$state = sprintf ("%.0f", $state);		
 	}
@@ -1891,9 +1916,7 @@ KNX_decodeByDpt ($$$) {
 		$mant = -(~($mant-1) & 0x07FF) if($sign == -1);
 		$numval = (1 << $exp) * 0.01 * $mant;
 
-		#correct value
-		$state += $offset if (defined ($offset));
-		$state *= $factor if (defined ($factor));
+		$numval = KNX_limit ($hash, $numval, $gadName, "DECODE");
 		
 		$state = sprintf ("%.2f","$numval");
 	}
@@ -1924,12 +1947,8 @@ KNX_decodeByDpt ($$$) {
 	elsif ($code eq "dpt12")
 	{
 		$numval = hex ($value);
-		$state = $numval;	
+		$state = KNX_limit ($hash, $numval, $gadName, "DECODE");
 		
-		#correct value
-		$state += $offset if (defined ($offset));
-		$state *= $factor if (defined ($factor));
-
 		$state = sprintf ("%.0f", $state);		
 	}	
 	#4-Octet Signed Value
@@ -1937,22 +1956,15 @@ KNX_decodeByDpt ($$$) {
 	{
 		$numval = hex ($value);
 		$numval -= 4294967296 if ($numval >= 0x80000000);
-		$state = $numval;
+		$state = KNX_limit ($hash, $numval, $gadName, "DECODE");
 		
-		#correct value
-		$state += $offset if (defined ($offset));
-		$state *= $factor if (defined ($factor));
-
 		$state = sprintf ("%.0f", $state);		
 	}  
 	#4-Octet single precision float
 	elsif ($code eq "dpt14")
 	{
 		$numval = unpack "f", pack "L", hex ($value);
-		
-		#correct value
-		$state += $offset if (defined ($offset));
-		$state *= $factor if (defined ($factor));
+		$numval = KNX_limit ($hash, $numval, $gadName, "DECODE");		
 		
 		$state = sprintf ("%.3f","$numval");
 	}	
@@ -2009,12 +2021,6 @@ KNX_decodeByDpt ($$$) {
 		Log3 ($name, 2, "decode model: $model, no valid model defined");
 		return undef;	
 	}
-
-	#optionally limit
-	my $orgVal = $state;
-	$state = $min if (defined ($min) and ($state < $min));
-	$state = $max if (defined ($max) and ($state > $max));
-	Log3 ($name, 5, "decode: limited. OrgVal: $orgVal, state: $state") if ($orgVal != $state);
 	
 	#append unit, if supplied
 	my $unit = $dpttypes{$model}{UNIT};	
