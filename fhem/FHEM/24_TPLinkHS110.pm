@@ -37,6 +37,7 @@ use IO::Socket::INET;
 use IO::Socket::Timeout;
 use JSON;
 use SetExtensions;
+use Data::Dumper; 
 
 
 #####################################
@@ -84,6 +85,7 @@ sub TPLinkHS110_Get($$)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
+    my($success,$json,$realtimejson);
 	return "Device disabled in config" if ($attr{$name}{"disable"} eq "1");
   	RemoveInternalTimer($hash);    
 	InternalTimer(gettimeofday()+$hash->{INTERVAL}, "TPLinkHS110_Get", $hash, 1);
@@ -108,18 +110,17 @@ sub TPLinkHS110_Get($$)
 	my $retval = $socket->recv($data,8192);
 	$socket->close();
 	unless( defined $retval) { return undef; }
-	$data = decrypt(substr($data,4));
-	my $json;
-	eval {
-		$json = decode_json($data);
-	} or do {
-		Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
-        Log3 $hash, 5, "TPLinkHS110: $name json-raw: $data";
-		return;
-	};
+	
+    readingsBeginUpdate($hash);
+    $data = decrypt(substr($data,4));
+	
+    ($success,$json) = TPLinkHS110__evaljson($name,$data);
+    if(!$success) {
+        readingsEndUpdate($hash, 1);
+        return;
+	}
 
 	Log3 $hash, 3, "TPLinkHS110: $name Get called. Relay state: $json->{'system'}->{'get_sysinfo'}->{'relay_state'}, RSSI: $json->{'system'}->{'get_sysinfo'}->{'rssi'}";
-	readingsBeginUpdate($hash);	
 	
 	my $hw_ver = $json->{'system'}->{'get_sysinfo'}->{'hw_ver'};
 	my %hwMap = hwMapping();
@@ -158,19 +159,17 @@ sub TPLinkHS110_Get($$)
 		$socket->close();
 		unless( defined $retval) { return undef; }
 		$rdata = decrypt(substr($rdata,4));
-		my $realtimejson;
+
 		if (length($rdata)==0) {
 			Log3 $hash, 1, "TPLinkHS110: $name: Received zero bytes of realtime data. Cannot process realtime data";
 			return;
 		}
-		eval {
-			$realtimejson = decode_json($rdata);
-		} or do {
-			Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting realtime data";
-            	Log3 $hash, 5, "TPLinkHS110: $name json-raw: $rdata";
-            	readingsEndUpdate($hash, 1);
-			return;
-		};
+        
+        ($success,$realtimejson) = TPLinkHS110__evaljson($name,$rdata);
+        if(!$success) {
+            readingsEndUpdate($hash, 1);
+			return; 
+		}
 		
 		my %emeterReadings = ();
 
@@ -209,8 +208,9 @@ sub TPLinkHS110_Get($$)
 		$socket->close();
 		unless( defined $retval) { return undef; }
 		$data = decrypt(substr($data,4));
-		eval {
-			my $json = decode_json($data);
+        
+        ($success,$json) = TPLinkHS110__evaljson($name,$data);
+        if($success && $json) {
 			my $total=0;
 			foreach my $key (sort keys @{$json->{'emeter'}->{'get_daystat'}->{'day_list'}}) {
 				foreach my $key2 ($json->{'emeter'}->{'get_daystat'}->{'day_list'}[$key]) {
@@ -232,12 +232,10 @@ sub TPLinkHS110_Get($$)
 			$count = @{$json->{'emeter'}->{'get_daystat'}->{'day_list'}};
 			readingsBulkUpdate($hash, "monthly_total", $total);
 			if ($count) { readingsBulkUpdate($hash, "daily_average", $total/$count)};
-			1;
-		} or do {
-			Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting daily stat data";
-                        readingsEndUpdate($hash, 1);
-			return;
-		};
+        } else {
+            readingsEndUpdate($hash, 1);
+			return;       
+        }
 	}
 	readingsEndUpdate($hash, 1);
 	Log3 $hash, 3, "TPLinkHS110: $name Get end";
@@ -249,9 +247,10 @@ sub TPLinkHS110_Set($$)
 {
 	my ( $hash, $name, $cmd, @args ) = @_;
 	my $cmdList = "on off";
+    my($success,$json,$realtimejson);
 	return "\"set $name\" needs at least one argument" unless(defined($cmd));
 	return "Device disabled in config" if ($attr{$name}{"disable"} eq "1");
-   	Log3 $hash, 3, "TPLinkHS110: $name Set <". $cmd ."> called";
+   	Log3 $hash, 3, "TPLinkHS110: $name Set <". $cmd ."> called" if ($cmd !~ /\?/);
 		
 	my $command="";
 	if($cmd eq "on")
@@ -281,14 +280,15 @@ sub TPLinkHS110_Set($$)
 	my $retval = $socket->recv($data,8192);
 	$socket->close();
 	unless( defined $retval) { return undef; }
+    
+    readingsBeginUpdate($hash);
 	$data = decrypt(substr($data,4));
-	my $json;
-	eval {
-		$json = decode_json($data);
-	} or do {
-		Log3 $hash, 2, "TPLinkHS110: $name json-decoding failed. Problem decoding getting statistical data";
-		return;
-	};
+    
+	($success,$json) = TPLinkHS110__evaljson($name,$data);
+    if(!$success) {
+        readingsEndUpdate($hash, 1);
+        return;
+	}
 
 	if ($json->{'system'}->{'set_relay_state'}->{'err_code'} eq "0") {
 		TPLinkHS110_Get($hash,"");
@@ -443,6 +443,34 @@ sub hwMapping {
 	$hwMap{'2.0'}{'emeter'}{'get_realtime'}{'err_code'}{'factor'}		= 1;
 	
 	return %hwMap;
+}
+
+###############################################################################
+#   Test ob JSON-String empfangen wurde
+sub TPLinkHS110__evaljson($$) { 
+  my ($name,$data)= @_;
+  my $hash = $defs{$name};
+  my $json;
+  my $success = 1;
+  my $jerr = "ok";
+  
+  Log3 $name, 5, "$name - Data returned: ". Dumper $data;
+  eval {$json = decode_json($data);} or do 
+  {
+      $success = 0; 
+  };
+        
+  if($@) {
+      $jerr = $@;
+  };
+  
+  readingsBulkUpdate($hash, "decode_json", $jerr);
+  
+  if($success) {
+      return($success,$json);
+  } else {
+      return($success,undef); 
+  }
 }
 
 ######################################################################################
