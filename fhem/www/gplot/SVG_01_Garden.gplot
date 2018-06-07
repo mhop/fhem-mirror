@@ -10,6 +10,7 @@ set y2tics
 set grid
 set ylabel "Rain (mm)"
 set y2label "Temperature"
+set ysprintf %.2f
 
 #Log.Garden 4:Garden.T\x3a:15:
 #Log.Garden 10:Garden.T\x3a:0:delta-h

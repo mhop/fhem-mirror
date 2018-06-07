@@ -1904,7 +1904,8 @@ SVG_render($$$$$$$$$$)
         }
         $off2 += $th/4;
         #--  text   
-        my $txt = sprintf("%g", $i);
+        my $name = ($axis==1 ? "y":"y$axis")."sprintf"; # Forum #88460
+        my $txt = sprintf($conf{$name} ? $conf{$name} : "%g", $i);
         SVG_pO
           "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$txt</text>";
       }

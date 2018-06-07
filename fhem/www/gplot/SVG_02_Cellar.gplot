@@ -10,6 +10,7 @@ set y2tics
 set grid
 set ylabel "Humidity"
 set y2label "Temperature"
+set ysprintf %.1f
 
 #Log.Cellar 4:Cellar.T\x3a:10:
 #Log.Cellar 6:Cellar.T\x3a:10:
