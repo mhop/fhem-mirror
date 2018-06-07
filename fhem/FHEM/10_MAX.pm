@@ -685,6 +685,7 @@ MAX_Parse($$)
 
     readingsBulkUpdate($shash, "mode", $ctrl_modes[$mode] );
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
+    readingsBulkUpdate($shash, "batteryState", $batterylow ? "low" : "ok"); # Forum #87575
     #The formatting of desiredTemperature must match with in MAX_Set:$templist
     #Sometime we get an MAX_Parse MAX,1,ThermostatState,01090d,180000000000, where desiredTemperature is 0 - ignore it
     readingsBulkUpdate($shash, "desiredTemperature", MAX_SerializeTemperature($desiredTemperature)) if($desiredTemperature != 0);
