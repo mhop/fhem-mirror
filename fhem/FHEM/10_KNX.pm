@@ -32,7 +32,7 @@ use Encode;
 use SetExtensions;
 
 #set to 1 for debug
-my $debug = 1;
+my $debug = 0;
 
 #string constant for autocreate
 my $modelErr = "MODEL_NOT_DEFINED";
