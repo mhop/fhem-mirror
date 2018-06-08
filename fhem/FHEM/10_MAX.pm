@@ -732,6 +732,7 @@ MAX_Parse($$)
       $shash->{rferror} = $rferror;
       readingsBulkUpdate($shash, "mode", $ctrl_modes[$mode] );
       readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
+      readingsBulkUpdate($shash, "batteryState", $batterylow ? "low" : "ok"); # Forum #87575
       readingsBulkUpdate($shash, "displayActualTemperature", ($displayActualTemperature) ? 1 : 0);
     } else {
       Log3 $hash, 2, "Invalid $msgtype packet"
@@ -760,6 +761,7 @@ MAX_Parse($$)
     $shash->{rferror} = $rferror;
 
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
+    readingsBulkUpdate($shash, "batteryState", $batterylow ? "low" : "ok"); # Forum #87575
     readingsBulkUpdate($shash,"onoff",$isopen);
 
   }elsif($msgtype eq "PushButtonState") {
@@ -770,6 +772,7 @@ MAX_Parse($$)
     my $batterylow = vec($bits2, 7, 1); #1 if battery is low
 
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
+    readingsBulkUpdate($shash, "batteryState", $batterylow ? "low" : "ok"); # Forum #87575
     readingsBulkUpdate($shash, "onoff", $onoff);
     readingsBulkUpdate($shash, "connection", $gateway);
 
