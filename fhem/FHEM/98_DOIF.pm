@@ -1868,16 +1868,22 @@ sub DOIF_cmd ($$$$) {
   my $err="";
   my $repeatnr;
   my $last_cmd=ReadingsVal($pn,"cmd_nr",0)-1;
-
-  my @cmdpause=SplitDoIf(':',AttrVal($pn,"cmdpause",""));
-  my @sleeptimer=SplitDoIf(':',AttrVal($pn,"repeatcmd",""));
+  
   my ($seconds, $microseconds) = gettimeofday();
-  my $cmdpauseValue=EvalValueDoIf($hash,"cmdpause",$cmdpause[$nr]);
-  if ($cmdpauseValue and $subnr==0) {
-    return undef if ($seconds - time_str2num(ReadingsTimestamp($pn, "state", "1970-01-01 01:00:00")) < $cmdpauseValue);
+  
+  if (defined $hash->{attrtimer}{cmdpause}) {
+    my @cmdpause=@{$hash->{attrtimer}{cmdpause}};
+    my $cmdpauseValue=EvalValueDoIf($hash,"cmdpause",$cmdpause[$nr]);
+    if ($cmdpauseValue and $subnr==0) {
+      return undef if ($seconds - time_str2num(ReadingsTimestamp($pn, "state", "1970-01-01 01:00:00")) < $cmdpauseValue);
+    }
   }
-  if (AttrVal($pn,"repeatsame","")) {
-   my @repeatsame=SplitDoIf(':',AttrVal($pn,"repeatsame",""));
+  my @sleeptimer;
+  if (defined $hash->{attrtimer}{repeatcmd}) {
+    @sleeptimer=@{$hash->{attrtimer}{repeatcmd}};
+  }
+  if (defined $hash->{attrtimer}{repeatsame}) {
+   my @repeatsame=@{$hash->{attrtimer}{repeatsame}};
    my $repeatsameValue=EvalValueDoIf($hash,"repeatsame",$repeatsame[$nr]);
     if ($subnr == 0) {
       if ($repeatsameValue) {
@@ -1899,8 +1905,8 @@ sub DOIF_cmd ($$$$) {
       }
     }
   }
-  if (AttrVal($pn,"waitsame","")) {
-    my @waitsame=SplitDoIf(':',AttrVal($pn,"waitsame",""));
+  if (defined $hash->{attrtimer}{waitsame}) {
+    my @waitsame=@{$hash->{attrtimer}{waitsame}};
     my $waitsameValue=EvalValueDoIf($hash,"waitsame",$waitsame[$nr]);
     if ($subnr == 0) {
       if ($waitsameValue) {
@@ -2408,7 +2414,7 @@ sub DOIF_TimerTrigger ($) {
   my $pn = $hash->{NAME};
   my $localtime=${$timer}->{localtime};
   delete $hash->{triggertime}{$localtime};
-
+  $hash->{helper}{DOIF_Readings_events}= ();
   my $ret;
   my ($now, $microseconds) = gettimeofday();
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
@@ -2705,17 +2711,18 @@ DOIF_SetSleepTimer($$$$$$$)
   my ($hash,$last_cond,$nr,$subnr,$device,$timerNr,$repeatcmd)=@_;
   my $pn = $hash->{NAME};
   my $sleeptimer=$hash->{helper}{sleeptimer};
-  my @waitdel=SplitDoIf(':',AttrVal($pn,"waitdel",""));
-  my @waitdelsubnr=SplitDoIf(',',defined $waitdel[$sleeptimer] ? $waitdel[$sleeptimer] : "");
+  
+  my @waitdel;
+  @waitdel=@{$hash->{attrtimer}{waitdel}{$nr}} if (defined $hash->{attrtimer}{waitdel}{$nr});
   my $err;
 
-  if ($sleeptimer != -1 and (($sleeptimer != $nr or AttrVal($pn,"do","") eq "resetwait") or ($sleeptimer == $nr and $waitdelsubnr[$subnr]))) {
+  if ($sleeptimer != -1 and (($sleeptimer != $nr or AttrVal($pn,"do","") eq "resetwait") or ($sleeptimer == $nr and $waitdel[$subnr]))) {
     RemoveInternalTimer($hash);
     #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
     readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
     $hash->{helper}{sleeptimer}=-1;
     $subnr=$hash->{helper}{sleepsubtimer} if ($hash->{helper}{sleepsubtimer}!=-1 and $sleeptimer == $nr);
-    return 0 if ($sleeptimer == $nr and $waitdelsubnr[$subnr]);
+    return 0 if ($sleeptimer == $nr and $waitdel[$subnr]);
   }
 
   if ($timerNr >= 0 and !AttrVal($pn,"timerWithWait","")) {#Timer
@@ -2734,13 +2741,13 @@ DOIF_SetSleepTimer($$$$$$$)
     if ($repeatcmd) {
       $sleeptime=$repeatcmd;
     } else {
-      my @sleeptimer=SplitDoIf(':',AttrVal($pn,"wait",""));
-      if ($waitdelsubnr[$subnr]) {
-        $sleeptime = $waitdelsubnr[$subnr];
+      my @sleeptimer;
+      @sleeptimer=@{$hash->{attrtimer}{wait}{$nr}} if (defined $hash->{attrtimer}{wait}{$nr});
+      if ($waitdel[$subnr]) {
+        $sleeptime = $waitdel[$subnr];
       } else {
-        my @sleepsubtimer=SplitDoIf(',',defined $sleeptimer[$nr]? $sleeptimer[$nr]: "");
-        if ($sleepsubtimer[$subnr]) {
-          $sleeptime=$sleepsubtimer[$subnr];
+        if ($sleeptimer[$subnr]) {
+          $sleeptime=$sleeptimer[$subnr];
         }
       }
     }
@@ -2778,6 +2785,8 @@ DOIF_SleepTrigger ($)
   my $sleeptimer=$hash->{helper}{sleeptimer};
   my $sleepsubtimer=$hash->{helper}{sleepsubtimer};
   my $pn = $hash->{NAME};
+  $hash->{helper}{DOIF_eventas} = ();
+  
   $hash->{helper}{cur_cmd_nr}="wait_timer" if (!AttrVal($hash->{NAME},"selftrigger",""));
   $hash->{helper}{triggerEvents}=$hash->{helper}{timerevents};
   $hash->{helper}{triggerEventsState}=$hash->{helper}{timereventsState};
@@ -3062,6 +3071,7 @@ DOIF_Attr(@)
 {
   my @a = @_;
   my $hash = $defs{$a[1]};
+  my $pn=$hash->{NAME};
   my $ret="";
   if (($a[0] eq "set" and $a[2] eq "disable" and ($a[3] eq "0")) or (($a[0] eq "del" and $a[2] eq "disable")))
   {
@@ -3101,14 +3111,38 @@ DOIF_Attr(@)
       return $err if ($err);
   } elsif($a[0] eq "del" && $a[2] eq "state") {
       delete $hash->{Regex}{"STATE"};
-  } elsif($a[0] eq "set" && $a[2] eq "wait") {
-      RemoveInternalTimer($hash);
-      readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
-      $hash->{helper}{sleeptimer}=-1;
-  } elsif($a[0] eq "del" && $a[2] eq "repeatsame") {
+  } elsif($a[0] =~ "set|del"  && $a[2] eq "wait") {
+      if ($a[0] eq "del") {
+        RemoveInternalTimer($hash);
+        readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
+        $hash->{helper}{sleeptimer}=-1;
+      }
+      delete $hash->{attrtimer}{wait};
+      my @wait=SplitDoIf(':',$a[3]);
+      for (my $i=0;$i<@wait;$i++){
+        @{$hash->{attrtimer}{wait}{$i}}=SplitDoIf(',',$wait[$i]);
+      }
+  } elsif($a[0] =~ "set|del"  && $a[2] eq "waitdel") {
+      if ($a[0] eq "del") {
+        RemoveInternalTimer($hash);
+        readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
+        $hash->{helper}{sleeptimer}=-1;
+      }
+      delete $hash->{attrtimer}{waitdel};
+      my @waitdel=SplitDoIf(':',$a[3]);
+      for (my $i=0;$i<@waitdel;$i++){
+        @{$hash->{attrtimer}{waitdel}{$i}}=SplitDoIf(',',$waitdel[$i]);
+      }
+  } elsif($a[0] =~ "set|del" && $a[2] eq "repeatsame") {
     delete ($defs{$hash->{NAME}}{READINGS}{cmd_count});
-  } elsif($a[0] eq "del" && $a[2] eq "waitsame") {
+    @{$hash->{attrtimer}{repeatsame}}=SplitDoIf(':',$a[3]);
+  } elsif($a[0] =~ "set|del" && $a[2] eq "repeatcmd") {
+    @{$hash->{attrtimer}{repeatcmd}}=SplitDoIf(':',$a[3]);
+  } elsif($a[0] =~ "set|del" && $a[2] eq "cmdpause") {
+    @{$hash->{attrtimer}{cmdpause}}=SplitDoIf(':',$a[3]);
+  } elsif($a[0] =~ "set|del" && $a[2] eq "waitsame") {
     delete ($defs{$hash->{NAME}}{READINGS}{waitsame});
+    @{$hash->{attrtimer}{waitsame}}=SplitDoIf(':',$a[3]);
   } elsif($a[0] eq "set" && $a[2] eq "DOIF_Readings") {
     my ($def,$err)=addDOIF_Readings($hash,$a[3]);
     if ($err) {
