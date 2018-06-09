@@ -5945,7 +5945,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my (undef,undef,$cond) = @a;
     my $cndNo;
     if ($cond =~ m/[+-]?\d+/){
-      return "condition value:$cond above 200 illegal" if ($cond > 200);
+      return "condition value:$cond above 255 illegal" if ($cond > 255);
       $cndNo = $cond;
     }
     else{
@@ -5969,7 +5969,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           }
         }
       }
-      return "cond:$cond not allowed. choose one of:[0..200],"
+      return "cond:$cond not allowed. choose one of:[0..255],"
             .join(",",sort @keys)
         if (!defined $cndNo);
     }
