@@ -82,6 +82,7 @@ sub monitoring_Define($$) {
   return("Usage: define <name> $TYPE <add-event> [<remove-event>]")
     if(int(@re) < 1 || int(@re) > 2);
 
+  monitoring_NOTIFYDEV($hash);
   monitoring_setActive($hash) if($init_done);
 
   return;
@@ -230,15 +231,19 @@ sub monitoring_Attr(@) {
       monitoring_modify("$SELF|error|remove|$name");
     }
   }
-  elsif($attribute eq "whitelist" && $value){
-    my @whitelist;
+  elsif($attribute eq "whitelist"){
+    monitoring_NOTIFYDEV($hash);
 
-    push(@whitelist, devspec2array($_)) foreach (split(/[\s]+/, $value));
+    if($value){
+      my @whitelist;
 
-    foreach my $list ("warning", "error"){
-      foreach my $name (split(",", ReadingsVal($SELF, $list, ""))){
-        monitoring_modify("$SELF|$list|remove|$name")
-          unless(grep(/$name/, @whitelist));
+      push(@whitelist, devspec2array($_)) foreach (split(/[\s]+/, $value));
+
+      foreach my $list ("warning", "error"){
+        foreach my $name (split(",", ReadingsVal($SELF, $list, ""))){
+          monitoring_modify("$SELF|$list|remove|$name")
+            unless(grep(/$name/, @whitelist));
+        }
       }
     }
   }
@@ -457,6 +462,18 @@ sub monitoring_modify($) {
   readingsEndUpdate($hash, 1);
 
   return;
+}
+
+sub monitoring_NOTIFYDEV($) {
+  my ($hash) = @_;
+  my $SELF = $hash->{NAME};
+  my $NOTIFYDEV =
+    AttrVal($SELF, "whitelist", undef) ||
+    join(",", (InternalVal($SELF, "DEF", undef) =~ m/(?:^|\s)([^:\s]+):/g))
+  ;
+  $NOTIFYDEV =~ s/\s/,/g;
+
+  $hash->{NOTIFYDEV} = $NOTIFYDEV;
 }
 
 sub monitoring_RemoveInternalTimer($) {
