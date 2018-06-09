@@ -136,6 +136,7 @@ sub monitoring_Set($@) {
 
     if($value =~ m/^(warning|all)$/){
       readingsBulkUpdate($hash, "warning", "", 0);
+      readingsBulkUpdate($hash, "warningCount", 0, 0);
 
       foreach my $r (keys %{$hash->{READINGS}}){
         if($r =~ m/(warning)Add_(.+)/){
@@ -147,6 +148,7 @@ sub monitoring_Set($@) {
     }
     if($value =~ m/^(error|all)$/){
       readingsBulkUpdate($hash, "error", "", 0);
+      readingsBulkUpdate($hash, "errorCount", 0, 0);
 
       foreach my $r (keys %{$hash->{READINGS}}){
         if($r =~ m/(error)Add_(.+)/){
@@ -398,7 +400,6 @@ sub monitoring_Notify($$) {
 }
 
 # module Fn ###################################################################
-# stateFormat #################################################################
 sub monitoring_modify($) {
   my ($SELF, $list, $operation, $value, $wait) = split("\\|", shift);
   my ($hash) = $defs{$SELF};
@@ -452,6 +453,7 @@ sub monitoring_modify($) {
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "state", "$list $operation: $value");
   readingsBulkUpdate($hash, $list, join(",", sort(keys %readings)));
+  readingsBulkUpdate($hash, $list."Count", int(keys %readings));
   readingsEndUpdate($hash, 1);
 
   return;
@@ -656,6 +658,10 @@ sub monitoring_setActive($) {
         Displays the time when the device will be set to the error list.
       </li>
       <li>
+        <code>errorCount</code><br>
+        Displays the amount of devices on the error List.
+      </li>
+      <li>
         <code>state</code><br>
         Displays the status (active, inactive, or disabled). In "active" it
         displays which device added to which list or was removed from which
@@ -668,6 +674,10 @@ sub monitoring_setActive($) {
       <li>
         <code>warningAdd_&lt;name&gt;</code><br>
         Displays the time when the device will be set to the warning list.
+      </li>
+      <li>
+        <code>warningCount</code><br>
+        Displays the amount of devices on the warning List.
       </li>
     </ul>
     <br>
@@ -886,7 +896,9 @@ attr Activity_monitoring warningWait 60*60*12</pre>
         If the device does not trigger another event in 12 hours, it will be
         set to the warning list. If the device does not trigger another event
         within 24 hours, it will be moved from the warning list to the error
-        list.
+        list.<br>
+        <br>
+        Note: It is recommended to use the whitelist attribute.
       </li>
       <br>
       <li>
@@ -955,6 +967,7 @@ attr BeamerFilter_monitoring errorFuncAdd {return 1\
  return;;\
 }
 attr BeamerFilter_monitoring errorFuncRemove {return unless($removeMatch);;\
+ $name = "Beamer_HourCounter";;\
  fhem(\
     "setreading $name pulseTimeService "\
    .ReadingsVal($name, "pulseTimeOverall", 0)\
@@ -1367,7 +1380,9 @@ attr Activity_monitoring warningWait 60*60*12</pre>
         ausgel&ouml;st haben. Sollte das Ger&auml;t in 12 Stunden kein weiterer
         Event ausl&ouml;sen, wird es auf die warning-Liste gesetzt. Sollte das
         Ger&auml;t in 24 Stunden kein weiteres Event ausl&ouml;sen, wird es von
-        der warning- auf die error-Liste verschoben.
+        der warning- auf die error-Liste verschoben.<br>
+        <br>
+        Hinweis: Es ist empfehlenswert das whitelist Attribut zu verwenden.
       </li>
       <br>
       <li>
@@ -1443,6 +1458,7 @@ attr BeamerFilter_monitoring errorFuncAdd {return 1\
  return;;\
 }
 attr BeamerFilter_monitoring errorFuncRemove {return unless($removeMatch);;\
+ $name = "Beamer_HourCounter";;\
  fhem(\
     "setreading $name pulseTimeService "\
    .ReadingsVal($name, "pulseTimeOverall", 0)\
