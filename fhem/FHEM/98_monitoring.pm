@@ -315,7 +315,7 @@ sub monitoring_Notify($$) {
 
     Log3($SELF, 4 , "$TYPE ($SELF) triggered by \"$name $event\"");
 
-    foreach my $list ("warning", "error"){
+    foreach my $list ("error", "warning"){
       my $listFuncAdd = AttrVal($SELF, $list."FuncAdd", "preset");
       my $listFuncRemove = AttrVal($SELF, $list."FuncRemove", "preset");
       my $listWait = eval(AttrVal($SELF, $list."Wait", 0));
@@ -429,7 +429,11 @@ sub monitoring_modify($) {
   );
 
   if($operation eq "add"){
-    return if($readings{$value});
+    return if(
+      $readings{$value} ||
+      ReadingsVal($SELF, "error", "") =~ m/(?:^|,)$value(?:,|$)/
+    );
+
     if($at){
       return if($hash->{READINGS}{$reading});
 
@@ -455,10 +459,16 @@ sub monitoring_modify($) {
 
   return unless(@change || $operation eq "add");
 
+  my $allCount =
+    int(keys %readings) +
+    ReadingsNum($SELF, ($list eq "warning" ? "error" : "warning")."Count", 0)
+  ;
+
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "state", "$list $operation: $value");
   readingsBulkUpdate($hash, $list, join(",", sort(keys %readings)));
   readingsBulkUpdate($hash, $list."Count", int(keys %readings));
+  readingsBulkUpdate($hash, "allCount", $allCount);
   readingsEndUpdate($hash, 1);
 
   return;
@@ -509,7 +519,7 @@ sub monitoring_setActive($) {
   readingsSingleUpdate($hash, "state", "active", 0);
   Log3($SELF, 3, "$TYPE ($SELF) set $SELF active");
 
-  foreach my $reading (sort(keys %{$hash->{READINGS}})){
+  foreach my $reading (reverse sort(keys %{$hash->{READINGS}})){
     if($reading =~ m/(error|warning)Add_(.+)/){
       my $wait = time_str2num(ReadingsVal($SELF, $reading, ""));
 
@@ -667,6 +677,10 @@ sub monitoring_setActive($) {
     <b>Readings</b><br>
     <ul>
       <li>
+        <code>allCount</code><br>
+        Displays the amount of devices on the warning and error list..
+      </li>
+      <li>
         <code>error</code><br>
         Comma-separated list of devices.
       </li>
@@ -676,7 +690,7 @@ sub monitoring_setActive($) {
       </li>
       <li>
         <code>errorCount</code><br>
-        Displays the amount of devices on the error List.
+        Displays the amount of devices on the error list.
       </li>
       <li>
         <code>state</code><br>
@@ -694,7 +708,7 @@ sub monitoring_setActive($) {
       </li>
       <li>
         <code>warningCount</code><br>
-        Displays the amount of devices on the warning List.
+        Displays the amount of devices on the warning list.
       </li>
     </ul>
     <br>
@@ -1147,6 +1161,10 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
     <b>Readings</b><br>
     <ul>
       <li>
+        <code>allCount</code><br>
+        Zeigt die Anzahl der Geräte in der warning- und error-Liste an.
+      </li>
+      <li>
         <code>error</code><br>
         Durch Komma getrennte Liste von Ger&auml;ten.
       </li>
@@ -1154,6 +1172,10 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         <code>errorAdd_&lt;name&gt;</code><br>
         Zeigt den Zeitpunkt an wann das Ger&auml;t auf die error-Liste gesetzt
         wird.
+      </li>
+      <li>
+        <code>errorCount</code><br>
+        Zeigt die Anzahl der Geräte in der error-Liste an.
       </li>
       <li>
         <code>state</code><br>
@@ -1169,6 +1191,10 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         <code>warningAdd_&lt;name&gt;</code><br>
         Zeigt den Zeitpunkt an wann das Ger&auml;t auf die warning-Liste
         gesetzt wird.
+      </li>
+      <li>
+        <code>warningCount</code><br>
+        Zeigt die Anzahl der Geräte in der warning-Liste an.
       </li>
     </ul>
     <br>
