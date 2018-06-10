@@ -347,6 +347,7 @@ FHEM/74_Nmap.pm              igami                Unterstuetzende Dienste
 FHEM/74_XiaomiBTLESens       CoolTux              Sonstige Systeme
 FHEM/74_THINKINGCLEANER.pm   loredo               Unterstuetzende Dienste
 FHEM/74_Unifi.pm             rapster/Wuehler      Automatisierung
+FHEM/74_UnifiSwitch.pm       Wuehler              Automatisierung
 FHEM/74_UnifiVideo.pm        justme1968           Sonstiges
 FHEM/75_MSG.pm               loredo               Automatisierung
 FHEM/75_msgConfig.pm         loredo               Automatisierung
