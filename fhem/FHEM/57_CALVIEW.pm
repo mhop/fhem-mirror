@@ -169,7 +169,8 @@ sub CALVIEW_GetUpdate($){
 			btimestamp => $bts[0],
 			mode => $item->[7],
 			weekday => $weekday,
-			weekdayname => $weekdayname};
+			weekdayname => $weekdayname,
+			duration => $item->[8]};
 	}
 	my $todaycounter = 1;
 	my $tomorrowcounter = 1;
@@ -221,7 +222,8 @@ sub CALVIEW_GetUpdate($){
 					my $nextday = $startday + 1;
 					$nextday = sprintf ('%02d', $nextday);
 					Log3 $name , 5,  "CALVIEW $name - nextday = $nextday , endday = $endday , startday = $startday , btime ".$termin->{btime}." , etime ".$termin->{etime}."";
-					if( $endday eq $nextday && $termin->{btime} eq $termin->{etime} ){ $timeshort = AttrVal($name,"fulldaytext","ganztägig"); }
+					#if( $endday eq $nextday && $termin->{btime} eq $termin->{etime} ){ $timeshort = AttrVal($name,"fulldaytext","ganztägig"); }
+					if( $termin->{duration} == 86400 ){ $timeshort = AttrVal($name,"fulldaytext","ganztägig"); }
 					else { 
 						if(AttrVal($name,"timeshort","0") eq 0) {$timeshort = $termin->{btime}." - ".$termin->{etime}; }
 						elsif(AttrVal($name,"timeshort","0") eq 1) {
@@ -250,6 +252,7 @@ sub CALVIEW_GetUpdate($){
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_timeshort", $timeshort );
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_weekday", $termin->{weekday} );
 					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_weekdayname", $termin->{weekdayname} );
+					readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_duration", $termin->{duration});
 					#wenn termin heute today readings anlegen
 					if ($date eq $termin->{bdate} ){
 						if($isbday == 1 ){ readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_age", $age);}
@@ -268,6 +271,7 @@ sub CALVIEW_GetUpdate($){
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_etime", $termin->{etime}); 
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_mode", $termin->{mode});
 						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_timeshort", $timeshort );
+						readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_duration", $termin->{duration});
 						$todaycounter ++;
 					}
 					#wenn termin morgen tomorrow readings anlegen
@@ -288,6 +292,7 @@ sub CALVIEW_GetUpdate($){
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_etime", $termin->{etime});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_mode", $termin->{mode});
 						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_timeshort", $timeshort );
+						readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_duration", $termin->{duration});
 						$tomorrowcounter++;
 					}
 					$endday = '';
@@ -334,7 +339,7 @@ sub getsummery($)
 	my $modi = $attr{$name}{modes};
 	my @modes = split(/,/,$modi);
 	foreach my $calendername (@calendernamen){
-			my $all = CallFn($calendername, "GetFn", $defs{$calendername},("-","events","format:custom='\$U|\$T1|\$T2|\$S|\$L|\$DS|\$CA'"));
+			my $all = CallFn($calendername, "GetFn", $defs{$calendername},("-","events","format:custom='\$U|\$T1|\$T2|\$S|\$L|\$DS|\$CA|\$d'"));
 			Log3 $name , 5,  "CALVIEW $name - All data: \n$all ...";
 			my @termine=split(/\n/,$all);
 			foreach my $line (@termine){
@@ -347,7 +352,7 @@ sub getsummery($)
 				#my $termindescription = $lineparts[5];
 				#my $termincategories = $lineparts[6];
 				#Log3 $name , 5,  "CALVIEW $name - Termin splitted : $terminstart, $termintext, $terminend, $calendername, $terminort, $termindescription, $termincategories";
-				push(@terminliste, [$lineparts[1], $lineparts[3], $lineparts[2], $calendername, $lineparts[4], $lineparts[5], $lineparts[6], "next"]);
+				push(@terminliste, [$lineparts[1], $lineparts[3], $lineparts[2], $calendername, $lineparts[4], $lineparts[5], $lineparts[6], "next", $lineparts[7]]);
 			};
 	};
 	return @terminliste;
