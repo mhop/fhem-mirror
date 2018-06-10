@@ -240,6 +240,7 @@ FHEM/46_Aqicn.pm             CoolTux              Sonstige Systeme
 FHEM/47_OBIS.pm              icinger              Sonstige Systeme
 FHEM/49_IPCAM.pm             mfr69bs              Sonstiges
 FHEM/49_SSCAM.pm             DS_Starter           Sonstiges
+FHEM/49_SSCamSTRM.pm         DS_Starter           Sonstiges
 FHEM/49_TBot_List.pm         viegener             Unterstuetzende Dienste
 FHEM/50_HP1000.pm            loredo               Heizungssteuerung/Raumklima
 FHEM/50_MOBILEALERTSGW.pm    MarkusF              Sonstige Systeme
