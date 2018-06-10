@@ -1042,6 +1042,7 @@ MAX_DbLog_splitFn($)
     <li>desiredTemperature<br>Only for HeatingThermostat and WallMountedThermostat</li>
     <li>valveposition<br>Only for HeatingThermostat</li>
     <li>battery</li>
+    <li>batteryState</li>
     <li>temperature<br>The measured temperature (= measured temperature at sensor + measurementOffset), only for HeatingThermostat and WallMountedThermostat</li>
   </ul>
 </ul>
@@ -1218,6 +1219,7 @@ MAX_DbLog_splitFn($)
     <li>desiredTemperature<br>Nur f&uuml;r Heizk&ouml;rperthermostate und Wandthermostate</li>
     <li>valveposition<br>Nur f&uuml;r Heizk&ouml;rperthermostate</li>
     <li>battery</li>
+    <li>batteryState</li>
     <li>temperature<br>Die gemessene Temperatur (= gemessene Temperatur + <code>measurementOffset</code>),
        nur f&uuml;r Heizk&ouml;rperthermostate und Wandthermostate</li>
   </ul>
