@@ -52,6 +52,7 @@
 # 2018-05-10 V 0217 disable activated on devices
 # 2018-05-25 V 0218 keepalive of http connection corrected
 # 2018-06-01 V 0219 new Attributes for time interval of getEvents, getStates and refreshAllStates
+# 2018-06-11 V 0220 HttpUtils_Close before login, some newer Debug outputs deleted, Apply command separated, command responds verified
 
 package main;
 
@@ -75,8 +76,6 @@ my $hash_;
 sub tahoma_Initialize($)
 {
   my ($hash) = @_;
-  my $name = $hash->{NAME};
-  Log3 $name, 3, "$name: tahoma_Initialize";
 
   $hash->{DefFn}    = "tahoma_Define";
   $hash->{NOTIFYDEV} = "global";
@@ -126,12 +125,10 @@ my $groupId = 123001;
 sub tahoma_Define($$)
 {
   my ($hash, $def) = @_;
-  my $name = $hash->{NAME};
-  Log3 $name, 3, "$name: tahoma_Define: def=$def";
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0219";
+  my $ModuleVersion = "0220";
   
   my $subtype;
   my $name = $a[0];
@@ -290,6 +287,7 @@ sub tahoma_login($)
   my $name = $hash->{NAME};
   Log3 $name, 3, "$name: tahoma_login";
 
+  HttpUtils_Close($hash);
   $hash->{logged_in} = undef;
   $hash->{startup_run} = undef;
   $hash->{startup_done} = undef;
@@ -448,6 +446,8 @@ sub tahoma_readStatusTimer($)
     if ( $hash->{startup_done} ) {
       tahoma_getStates($hash) ;
       $hash->{refreshStatesTimer} = $seconds + $hash->{refreshStatesInterval};
+      $hash->{getStatesTimer} = $seconds + $hash->{getStatesInterval};
+      $hash->{getEventsTimer} = $seconds + $hash->{getEventsInterval};
       $timeinfo = "tahoma_getStates";
     }
   }
@@ -923,21 +923,21 @@ sub tahoma_dispatch($$$)
     # perl exception while parsing json string captured
     my $json = {};
     eval { $json = JSON->new->utf8(0)->decode($data); };
-    if ($@) {
-      Log3 $name, 3, "$name: tahoma_dispatch json string is faulty";
-      $hash->{lastError} = 'json string is faulty';
+    if ($@ || ((ref $json ne 'HASH') && (ref $json ne 'ARRAY')) ) {
+      Log3 $name, 3, "$name: tahoma_dispatch json string is faulty" . substr($data,0,40) . ' ...';
+      $hash->{lastError} = 'json string is faulty: ' . substr($data,0,40) . ' ...';
       $hash->{logged_in} = 0;
       return;
     }
     
-    if( (ref $json ne 'ARRAY') && ($json->{errorResponse}) ) {
+    if( (ref $json eq 'HASH') && ($json->{errorResponse}) ) {
       $hash->{lastError} = $json->{errorResponse}{message};
       $hash->{logged_in} = 0;
       Log3 $name, 3, "$name: tahoma_dispatch error: $hash->{lastError}";
       return;
     }
 
-    if( (ref $json ne 'ARRAY') && ($json->{error}) ) {
+    if( (ref $json eq 'HASH') && ($json->{error}) ) {
       $hash->{lastError} = $json->{error};
       $hash->{logged_in} = 0;
       Log3 $name, 3, "$name: tahoma_dispatch error: $hash->{lastError}";
@@ -1070,13 +1070,18 @@ sub tahoma_parseLogin($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseLogin";
+  if (ref($json) ne 'HASH')
+  {
+    Log3 $name, 3, "$name: tahoma_parseLogin response is not a valid hash";
+    return;
+  }
   if (defined $json->{errorResponse}) {
     $hash->{logged_in} = 0;
     $hash->{STATE} = $json->{errorResponse}{message};
   } else {
     $hash->{inVersion} = $json->{version};
     $hash->{logged_in} = 1;
-    $hash->{loginRetryTimer} = 5,
+    $hash->{loginRetryTimer} = 5;
   }
   Log3 $name, 2, "$name: login end, logged_in=".$hash->{logged_in};
 }
@@ -1157,6 +1162,10 @@ sub tahoma_parseApplyRequest($$)
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseApplyRequest";
   $hash->{inExecState} = 0;
+  if (ref($json) ne 'HASH') {
+    Log3 $name, 3, "$name: tahoma_parseApplyRequest response is not a valid hash";
+    return;
+  }
   if (defined($json->{execId})) {
     $hash->{inExecId} = $json->{execId};
   } else {
@@ -1172,7 +1181,11 @@ sub tahoma_parseGetSetup($$)
 {
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
-  
+  if (ref($json) ne 'HASH') {
+    Log3 $name, 3, "$name: tahoma_parseGetSetup response is not a valid hash";
+    return;
+  }
+
   $hash->{gatewayId} = $json->{setup}{gateways}[0]{gatewayId};
 
   my @devices = ();
@@ -1224,6 +1237,10 @@ sub tahoma_parseGetActionGroups($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseGetActionGroups";
+  if (ref($json) ne 'HASH') {
+    Log3 $name, 3, "$name: tahoma_parseGetActionGroups response is not a valid hash";
+    return;
+  }
   
   my $devices = $hash->{helper}{devices};
   foreach my $action (@{$json->{actionGroups}}) {
@@ -1246,6 +1263,10 @@ sub tahoma_parseGetStates($$)
   my($hash, $states) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseGetStates";
+  if (ref($states) ne 'HASH') {
+    Log3 $name, 3, "$name: tahoma_parseGetStates response is not a valid hash";
+    return;
+  }
 
   if( defined($states->{devices}) ) {
     foreach my $devices ( @{$states->{devices}} ) {
@@ -1281,6 +1302,10 @@ sub tahoma_parseEnduserAPISetupGateways($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseEnduserAPISetupGateways";
+  if (ref($json) ne 'HASH') {
+    Log3 $name, 3, "$name: tahoma_parseEnduserAPISetupGateways response is not a valid hash";
+    return;
+  }
   
   eval { $hash->{inGateway} = $json->{result}; };
   eval { $hash->{inGateway} = $json->[0]{gatewayId}; };
@@ -1291,6 +1316,10 @@ sub tahoma_parseGetCurrentExecutions($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseGetCurrentExecutions";
+  if (ref($json) ne 'HASH') {
+    Log3 $name, 3, "$name: tahoma_parseGetCurrentExecutions response is not a valid hash";
+    return;
+  }
 }
 
 sub tahoma_parseScheduleActionGroup($$)
@@ -1298,6 +1327,10 @@ sub tahoma_parseScheduleActionGroup($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseScheduleActionGroup";
+  if (ref($json) ne 'HASH') {
+    Log3 $name, 3, "$name: tahoma_parseScheduleActionGroup response is not a valid hash";
+    return;
+  }
   if (defined $json->{actionGroup})
   {
     $hash->{inTriggerState} = 0;
@@ -1318,6 +1351,10 @@ sub tahoma_parseLaunchActionGroup($$)
   my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseLaunchActionGroup";
+  if (ref($json) ne 'HASH') {
+    Log3 $name, 3, "$name: tahoma_parseLaunchActionGroup response is not a valid hash";
+    return;
+  }
   if (defined $json->{actionGroup})
   {
     $hash->{inExecState} = 0;
@@ -1540,7 +1577,7 @@ sub tahoma_UserAgent_NonblockingGet($)
   $hash = $hash->{IODev} if (defined ($hash->{IODev}));
   
   # restore parameter from last HttpUtils call
-  if (defined $hash->{paramHash} && $hash->{paramHash}{keepalive})
+  if (defined $hash->{paramHash} && $hash->{paramHash}{keepalive} && !$hash->{request_active})
   {
     my $paramHash = $hash->{paramHash};
     if (defined $paramHash)
