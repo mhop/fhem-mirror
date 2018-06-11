@@ -2,6 +2,7 @@
 # $Id$
 # todo:
 # holen von status nach sets nicht wenn ws verbindung
+# ao funktioniert nicht
 
 package main;
 
@@ -25,13 +26,15 @@ sub NeuronPin_Initialize($) {
 	$hash->{SetFn}    		= 'NeuronPin_Set';
 	$hash->{GetFn}    		= 'NeuronPin_Get';
 	$hash->{UndefFn}  		= 'NeuronPin_Undef';
-	$hash->{AttrList} 		= 'IODev do_not_notify:0,1 showtime:0,1 ' .
-							  'poll_interval:1,2,5,10,20,30 restoreOnStartup:on,off,last aomax ' .
+	$hash->{AttrList} 		= 'IODev do_not_notify:0,1 showtime:0,1 '.
+							  'disable:0,1 disabledForIntervals'.
+							  'poll_interval:1,2,5,10,20,30 restoreOnStartup:on,off,last '.
+							  'aomax skipreadings ownsets autoalias '.
 								$readingFnAttributes;
 	$hash->{Match} 			= ".*";
 	$hash->{ParseFn}   		= "NeuronPin_Parse";
 #	$hash->{DbLog_splitFn} 	= "NeuronPin_DbLog_splitFn";
-	$hash->{AutoCreate} 	= {"NeuronPin_.*"  => { ATTR   => "room:Neuron", } };
+	$hash->{AutoCreate} 	= {"NeuronPin_.*"  => { ATTR   => "room:Neuron" } };
 	$hash->{noAutocreatedFilelog} = 1;
 }
 
@@ -40,7 +43,7 @@ sub NeuronPin_Define($$) {
 	my @a = split('[ \t][ \t]*', $def);
 # hier fehlt noch Überprüfung der Attribute
 	$modules{NeuronPin}{defptr}{$a[2]." ".$a[3]} = $hash;
-	return "$hash->{NAME} Pintype not valid" unless ($a[2] =~ /^(input|relay|ai|ao|led)$/ );
+	return "$hash->{NAME} Pintype not valid" unless ($a[2] =~ /^(input|relay|ai|ao|led|temp|wd)$/ );
 	$hash->{DEV} = $a[2];
 	#return "$hash->{NAME} Circuit Name not valid" unless ($a[3] =~ /^[1-9]_((0[1-9])|[1-9][0-9])$/ );
 	$hash->{CIRCUIT} = $a[3];
@@ -69,6 +72,7 @@ sub NeuronPin_Init($$) {
 			NeuronPin_Set($hash,$hash->{NAME}, (looks_like_number($val) ? dim $val : $val));
 		}
 	} else {
+		return if(IsDisabled($hash->{NAME}));
 		IOWrite($hash, split " ", $hash->{DEF});
 	}
 	$hash->{STATE} = ReadingsVal($hash->{NAME},'state','') if ReadingsVal($hash->{NAME},'state','');
@@ -109,22 +113,43 @@ sub NeuronPin_Parse ($$) {
 	Log3 (undef, 4, "NeuronPin_Parse von $io_hash->{NAME} empfangen:\n" . encode_json $message);
 	if (my $hash = $modules{NeuronPin}{defptr}{$port}) {
 		my $value = $message->{value};
-		$hash->{RELAY_TYPE} = $message->{relay_type} if $message->{relay_type};
+		# zusätzliche Daten als Internal
+		$hash->{RELAY_TYPE} = 	$message->{relay_type} 	if $message->{relay_type};
+		$hash->{TYP} = 			$message->{typ} 		if defined $message->{typ};
+		$hash->{GLOB_DEV_ID} = 	$message->{glob_dev_id} if defined $message->{glob_dev_id};
 		$value = $rsets{$value} if ($message->{dev} eq 'input' || $message->{dev} eq 'relay' || $message->{dev} eq 'led');
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash,"state",$value);
-		my @readings = ("mode","unit","range","debounce","counter","counter_mode","alias","pwm_freq","pwm_duty");
-		foreach (@readings){
-			
-			#Log3 (undef, 1, "NeuronPin_Parse1 $_ exists") if exists($message->{$_});
-			#Log3 (undef, 1, "NeuronPin_Parse2 $_ defined") if defined($message->{$_});
-			#Log3 (undef, 1, "NeuronPin_Parse3 $_ ist $message->{$_}");
-			
-			
-			if (exists($message->{$_})) {
-				readingsBulkUpdate($hash,$_,$message->{$_});
-			} else {
-				readingsDelete($hash, $_);
+		readingsBulkUpdate($hash,"dim",$value) if $message->{dev} eq 'ao';
+		
+	#	my @readings = ("mode","unit","range","debounce","counter","counter_mode","alias","pwm_freq","pwm_duty","temp","humidity","vdd","vad");
+	#	foreach (@readings){
+	#		if (exists($message->{$_})) {
+	#			readingsBulkUpdate($hash,"Z_".$_,$message->{$_});
+	#		} else {
+	#			readingsDelete($hash, "Z_".$_);
+	#		}
+	#	}
+
+		my @skipreadings = split(',', AttrVal($hash->{NAME}, 'skipreadings', "relay_type,typ,dev,circuit,glob_dev_id,value,pending") );
+		foreach (keys %{$hash->{READINGS}}) {
+			#next if substr($_,0,2) eq "Z_";
+			readingsDelete($hash, $_) unless exists($message->{$_}) || $_ eq "state" || $_ eq ".conf" || $_ eq "dim";
+		}
+		foreach my $key (keys %$message){
+			if (ref $message->{$key} eq 'ARRAY') {		# alle Arrays überspringen
+			} elsif (grep( /^$key/, @skipreadings )) {	# Wer soll nicht als reading angelegt werden
+				readingsDelete($hash, $key);
+			} elsif ($key eq 'alias') {					# al_ am Anfang von alias weg
+				my $alias = (split '_', $message->{$key})[1];
+				readingsBulkUpdate($hash,$key,$alias);
+				# autocreate alias attribute
+				if (AttrVal($hash->{NAME}, 'alias', '?') ne $alias && defined AttrVal($hash->{NAME}, 'autoalias', '')) {
+				   my $msg = CommandAttr(undef, $hash->{NAME} . " alias $alias");
+				   Log3 ($hash, 2, "$hash->{TYPE} ($hash->{NAME}): Error creating alias $msg") if ($msg);
+				}
+			 }else {
+				readingsBulkUpdate($hash,$key,$message->{$key});
 			}
 		}
 		delete $message->{value};
@@ -149,6 +174,7 @@ sub NeuronPin_Parse ($$) {
 
 sub NeuronPin_RereadPin($) {
 	my ($hash) =  @_;
+	return if(IsDisabled($hash->{NAME}));
 	IOWrite( $hash, split(" ", $hash->{DEF}) );
 }
 
@@ -199,23 +225,45 @@ sub NeuronPin_CreateSets($) {
 	} else {
 		eval {
 			delete $hash->{HELPER}{SETS};
-			my @stypes = ("modes","range_modes","counter_modes");
-			my @stype = ("mode","range_mode","counter_mode");
-			foreach my $i (0 .. $#stypes) {
-				#if ($result->{$stypes[$i]} && keys %{$result->{$stypes[$i]}} && scalar keys %{$result->{$stypes[$i]}} > 1) {
-				if ($result->{$stypes[$i]} && scalar keys @{$result->{$stypes[$i]}} > 1) {
-					foreach (@{$result->{$stypes[$i]}}){
-						$hash->{HELPER}{SETS}{$stype[$i]}{$_} = 1;
+			foreach my $key (keys %$result){
+				if (ref $result->{$key} eq 'ARRAY') {									# wenn Array dann zur set->Dropdonwmenüerzeugung verwenden
+					if ( exists($result->{substr($key,0,-1)}) ) {						# z.B. zu "modes":["Simple","PWM"] passt "mode":"Simple"
+						if ($result->{$key} && scalar keys @{$result->{$key}} > 1) {	# und mehr als eine Option verfügbar
+							foreach (@{$result->{$key}}){
+								$hash->{HELPER}{SETS}{substr($key,0,-1)}{$_} = 1;
+							}
+						}
+					} elsif (exists($result->{(split "_", $key)[0]})) {					# z.B. "range_modes":["10.0","1.0"]
+						if ($result->{$key} && scalar keys @{$result->{$key}} > 1) {	# und mehr als eine Option verfügbar
+							foreach (@{$result->{$key}}){
+								$hash->{HELPER}{SETS}{(split "_", $key)[0]}{$_} = 1;
+							}
+						}						
+					} else {
+						Log3 ($hash, 5, "NeuronPin_CreateSets unbekanntes Array: $key");
 					}
 				}
 			}
-			#foreach ("debounce","counter")
-			$hash->{HELPER}{SETS}{debounce} = "free" if $result->{debounce};
-			$hash->{HELPER}{SETS}{counter}	= "free" if exists($result->{counter});
-			$hash->{HELPER}{SETS}{pwm_duty} = "slider,0,0.1,100" if exists($result->{pwm_duty});
-			$hash->{HELPER}{SETS}{pwm_freq} = "free" if exists($result->{pwm_freq});
+		#	my @stypes = ("modes","range_modes","counter_modes");
+		#	my @stype = ("mode","range_mode","counter_mode");
+		#	foreach my $i (0 .. $#stypes) {
+		#		if ($result->{$stypes[$i]} && scalar keys @{$result->{$stypes[$i]}} > 1) {
+		#			foreach (@{$result->{$stypes[$i]}}){
+		#				$hash->{HELPER}{SETS}{$stype[$i]}{$_} = 1;
+		#			}
+		#		}
+		#	}
+			
+			my @freesets = split(';', AttrVal($hash->{NAME}, 'ownsets', "debounce;counter;interval;pwm_freq;pwm_duty:slider,0,0.1,100") );
+			foreach (@freesets) {
+				my $args = (defined((split ':', $_)[1]) ? (split ':', $_)[1] : "free");
+				my $setname = (split ':', $_)[0];
+				$hash->{HELPER}{SETS}{$setname} = $args if exists($result->{$setname});
+				#$hash->{HELPER}{SETS}{$_} = "free" if exists($result->{$_});
+			}
+			#$hash->{HELPER}{SETS}{pwm_duty} = "slider,0,0.1,100" if exists($result->{pwm_duty});
 			$hash->{HELPER}{SETS}{alias} 	= "free";
-
+			
 			if ($hash->{DEV} eq 'led' || $hash->{DEV} eq 'relay') {
 				$hash->{HELPER}{SETS}{on} = "noArg";
 				$hash->{HELPER}{SETS}{off} = "noArg";
@@ -224,12 +272,7 @@ sub NeuronPin_CreateSets($) {
 				$hash->{HELPER}{SETS}{off} = "noArg";
 				$hash->{HELPER}{SETS}{dim} = "slider,0,0.1," . AttrVal($hash->{NAME},"aomax",'10');
 			}
-			#my $str = join(" ", map { "$_:$hash->{HELPER}{SETS}{$_}" } keys %$hash->{HELPER}{SETS});
-#			my $str = join(" ", map { "$_:".( 	ref($hash->{HELPER}{SETS}{$_}) eq 'HASH' ? 
-#												join (",", sort keys %{$hash->{HELPER}{SETS}{$_}} ) : 
-#												"$hash->{HELPER}{SETS}{$_}") 
-#									} keys %{$hash->{HELPER}{SETS}}
-#						  );
+
 			my $str = join(" ", map { "$_".( 	ref($hash->{HELPER}{SETS}{$_}) eq 'HASH' ? 
 												':' . join (",", sort keys %{$hash->{HELPER}{SETS}{$_}} ) : 
 												($hash->{HELPER}{SETS}{$_} eq "free" ? '' : ':'.$hash->{HELPER}{SETS}{$_})) 
@@ -261,6 +304,7 @@ sub NeuronPin_Set($@) {
 		return undef
 	} elsif ($cmd eq "dim") {
 		$arguments[2] = $arg;
+		$hash->{HELPER}{SETREQ} = 1;
 	} elsif ( $hash->{HELPER}{SETS}{$cmd} eq "noArg") {
 		$arguments[2] = $sets{$cmd};
 		if ($hash->{DEV} eq 'ao') {
@@ -271,27 +315,29 @@ sub NeuronPin_Set($@) {
 			}
 		}
 		$hash->{HELPER}{SETREQ} = 1;
-#	} elsif (defined($hash->{HELPER}{SETS}{$cmd}{$arg})) {
-#		$arguments[2] = $cmd;
-#		$arguments[3] = $arg;
+	} elsif ($cmd eq "alias") {
+		$arguments[2] = $cmd;
+		$arguments[3] = "al_".$arg;
 	} else {
 		$arguments[2] = $cmd;
 		$arguments[3] = $arg;
 	}
 	#$hash->{HELPER}{SETREQ} = 1;
 	#my @arguments = (split(" ",$hash->{DEF}),$sets{$cmd});
+	return if(IsDisabled($hash->{NAME}));
 	IOWrite($hash, @arguments);
-
 }
 
 sub NeuronPin_Get($@) {
 	my ($hash, $name, $cmd, @args) = @_;
 	if ($cmd && $cmd eq "refresh") {
 		my @arguments = (split " ", $hash->{DEF});
+		return if(IsDisabled($hash->{NAME}));
 		IOWrite($hash, @arguments);
 	} elsif ($cmd && $cmd eq "config") {
 		my @arguments = (split " ", $hash->{DEF});
 		$hash->{HELPER}{CL} = $hash->{CL};
+		return if(IsDisabled($hash->{NAME}));
 		IOWrite($hash, @arguments);
 	} else {
 		return 'Unknown argument ' . $cmd . ', choose one of refresh:noArg config:noArg'
@@ -378,7 +424,7 @@ sub NeuronPin_Undef($$) {
 	</ul>
   </ul><br>
 
-  <a name="RPI_GPIOAttr"></a>
+  <a name="NeuronPinAttr"></a>
   <b>Attributes</b>
   <ul>
     <li>poll_interval<br>
@@ -389,7 +435,28 @@ sub NeuronPin_Undef($$) {
       Restore Readings and sets after reboot<br>
       Default: last, valid values: last, on, off, no<br><br>
     </li>
+    <li>aomax<br>
+      Maximum value for the slider from the analog output ports<br>
+      Default: 10, valid values: decimal number<br><br>
+    </li>
+	<li>skipreadings<br>
+      Values which will be sent from the Device and which shall not be listed as readings<br>
+      Default: relay_type,typ,dev,circuit,glob_dev_id,value,pending; valid values: comma separated list<br><br>
+    </li>
+	<li>ownsets<br>
+      Values which will be sent from the Device which can be changed via set. For Values for where the device sends fixed choices, the sets will created automatically<br>
+      Default: debounce;counter;interval;pwm_freq;pwm_duty:slider,0,0.1,100 valid values: semicolon separated list<br><br>
+    </li>
+	<li>autoalias<br>
+      If set to 1, reading alias will automatically change the attribute "alias"<br>
+      Default: 0, valid values: 0,1<br><br>
+    </li>
+	<li><a href="#IODev">IODev</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
   </ul>
   <br>
 </ul>
@@ -449,7 +516,7 @@ sub NeuronPin_Undef($$) {
 	</ul>
   </ul><br>
 
-  <a name="RPI_GPIOAttr"></a>
+  <a name="NeuronPinAttr"></a>
   <b>Attribute</b>
   <ul>
     <li>poll_interval<br>
@@ -460,7 +527,28 @@ sub NeuronPin_Undef($$) {
       Readings nach Neustart wiederherstellen<br>
       Standard: last, g&uuml;ltige Werte: last, on, off<br><br>
     </li>
+    <li>aomax<br>
+      Maxwert f&uuml;r den Schieberegler beim Analogen Ausgang<br>
+      Standard: 10, g&uuml;ltige Werte: Dezimalzahl<br><br>
+    </li>
+	<li>skipreadings<br>
+      Werte, die vom Ger&auml;t gesendet, aber nicht als Reading dargestellt werden sollen.<br>
+      Standard: relay_type,typ,dev,circuit,glob_dev_id,value,pending; g&uuml;ltige Werte: kommaseparierte Liste<br><br>
+    </li>
+	<li>ownsets<br>
+      Werte, die vom Ger&auml;t gesendet, und &uuml;ber set ver&auml;ndert werden k&ouml;nnen. Schickt das Ger&auml;t feste Auswahllisten f&uuml;r einen Wert dann werden die sets automatisch angelegt.<br>
+      Standard: debounce;counter;interval;pwm_freq;pwm_duty:slider,0,0.1,100; g&uuml;ltige Werte: semikolonseparierte Liste<br><br>
+    </li>
+	<li>autoalias<br>
+      Wenn auf 1 wird das reading alias automatisch als Attribut alias gesetzt.<br>
+      Standard: 0, g&uuml;ltige Werte: 0,1<br><br>
+    </li>
+	<li><a href="#IODev">IODev</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
   </ul>
   <br>
 </ul>

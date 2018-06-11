@@ -27,7 +27,7 @@
 #{"glob_dev_id": 1, "dev": "wd", 	"circuit": "1_01", "value": 0, "timeout": 5000, "was_wd_reset": 0, "nv_save": 0}, 
 #{"glob_dev_id": 1, "dev": "neuron","circuit": "1",    "ver2": "1.0", "sn": 31, "model": "M503", "board_count": 2}, 
 #{"glob_dev_id": 1, "dev": "uart", 	"circuit": "1_01", "conf_value": 14, "stopb_modes": ["One", "Two"], "stopb_mode": "One", "speed_modes": ["2400bps", "4800bps", "9600bps", "19200bps", "38400bps", "57600bps", "115200bps"], "parity_modes": ["None", "Odd", "Even"], "parity_mode": "None", "speed_mode": "19200bps"}]#
-#
+#{"vis": "0",       "dev": "temp",  "circuit": "2620531402000075", "typ": "DS2438", "lost": false, "temp": "24.25", "interval": 15, "vad": "2.52", "humidity": 50.196646084329984, "vdd": "5.34", "time": 1527144341.185264}
 #
 package main;
  
@@ -57,14 +57,14 @@ my %setsP = (
 
 sub Neuron_Initialize(@) {
     my ($hash) = @_;
-	eval "use JSON::XS;";
+	eval "use JSON;";
 	return "please install JSON::XS" if($@);
 	eval "use Digest::SHA qw(sha1_hex);";
 	return "please install Digest::SHA" if($@);
 
     # Provider
 	$hash->{Clients} 		= join (':',@clients);
-	$hash->{MatchList} 		= { "NeuronPin" => ".*" };
+	$hash->{MatchList} 		= { "1:NeuronPin" => ".*" };
     $hash->{ReadFn}     	= "Neuron_Read";
     $hash->{ReadyFn}     	= "Neuron_Ready";
 	$hash->{WriteFn}    	= "Neuron_Test";
@@ -78,7 +78,7 @@ sub Neuron_Initialize(@) {
     $hash->{NotifyFn}       = 'Neuron_Notify';
     $hash->{AttrList}       = "connection:websockets,polling poll_interval "
 							 ."wsFilter:multiple-strict,ai,ao,input,led,relay,wd "
-							 ."logicalDev:multiple-strict,ai,ao,input,led,relay,wd "
+							 ."logicalDev:multiple-strict,ai,ao,input,led,relay,wd,temp "
 							 ."$readingFnAttributes";
     return undef;
 }
@@ -108,21 +108,14 @@ sub Neuron_Set(@) {
 	my ($hash, $name, $cmd, @args) = @_;
 	my $sets = $hash->{HELPER}{SETS};
 	if (index($hash->{HELPER}{SETS}, $cmd) != -1) {			# dynamisch erzeugte outputs
-		my $circuit = substr($cmd,length($cmd)-4,4);
-		my $dev = (split '_', $cmd)[0];
+		my ($dev, $circuit) = (split '_', $cmd, 2);
 		my $value = (looks_like_number($args[0]) ? $args[0] : $setsP{$args[0]});
-#		if ($hash->{HELPER}{WESOCKETS}) {
 		if ($hash->{HELPER}{wsKey} && DevIo_IsOpen($hash)) {
 			my $string = Neuron_wsEncode('{"cmd":"set", "dev":"'.$dev.'", "circuit":"'.$circuit.'", "value":"'.$value.'"}');
 			Neuron_Write($hash,$string);
 		} else {
 			Neuron_HTTP($hash,$dev,$circuit,$value);
 		}
-	} elsif ($cmd eq "atest") {
-		Log3 $hash, 1, "Testcmd abgesetzt";
-		my $testcmd = '{"cmd":"set", "dev":"relay", "circuit":"2_01", "value":"'.$args[0].'"}';
-		my $string = Neuron_wsEncode($testcmd);
-		Neuron_Write($hash,$string);
 	} elsif ($cmd eq "postjson") {
 		my ($dev, $circuit , $value, $state) = @args;
 		$value = '{"'.$value.'":"'.$state.'"}' if (defined($state));
@@ -136,9 +129,10 @@ sub Neuron_Set(@) {
 		}
 	} elsif ($cmd eq "clearreadings") {
 		fhem("deletereading $hash->{NAME} .*", 1);
-		#readingsDelete($hash, ".*");
+	} elsif ($cmd eq "testdispatch") {
+		Neuron_ParseWsResponse($hash, '{"dev":"temp","time":1527316294.23915,"temp":"23.4375","vis":"0.0002441","circuit":"2620531402000075","vad":"2.58","interval":15,"typ":"DS2438","humidity":51.9139754019274,"lost":false,"vdd":"5.34"}');
 	} else {
-		return "Unknown argument $cmd, choose one of clearreadings:noArg websocket:open,close atest postjson " . ($hash->{HELPER}{SETS} ? $hash->{HELPER}{SETS} : '');
+		return "Unknown argument $cmd, choose one of testdispatch clearreadings:noArg websocket:open,close " . ($hash->{HELPER}{SETS} ? $hash->{HELPER}{SETS} : '');
 	}
     return undef;
 }
@@ -151,17 +145,17 @@ sub Neuron_Get(@) {
 		Neuron_ReadingstoSets($hash);
 	} elsif ($cmd eq "value") {
 		if (index($hash->{HELPER}{GETS}, $args[0]) != -1) {
-			my @line = (split("_", $args[0],2));
+			my ($dev, $circuit) = (split '_', $args[0], 2);
 			$hash->{HELPER}{CLVAL} = $hash->{CL};
-			Neuron_HTTP($hash,$line[0],$line[1]);
+			Neuron_HTTP($hash, $dev, $circuit);
 		} else {
 			return "Unknown Port $args[0], choose one of ".$hash->{HELPER}{GETS};
 		}
 	} elsif ($cmd eq "conf") {
 		if (index($hash->{HELPER}{GETS}, $args[0]) != -1) {
-			my @line = (split("_", $args[0],2));
+			my ($dev, $circuit) = (split '_', $args[0], 2);
 			$hash->{HELPER}{CLCONF} = $hash->{CL};
-			Neuron_HTTP($hash,$line[0],$line[1]);
+			Neuron_HTTP($hash, $dev, $circuit);
 		} else {
 			return "Unknown Port $args[0], choose one of ".$hash->{HELPER}{GETS};
 		}
@@ -223,8 +217,6 @@ sub Neuron_Poll($) {
 		InternalTimer(gettimeofday() + ($pollInterval * 60), 'Neuron_Poll', $hash, 0) if ($pollInterval > 0);
 	}
 }
-
-
 
 sub Neuron_Notify(@) {
 	my ($hash, $nhash) = @_;
@@ -303,7 +295,11 @@ sub Neuron_HTTP(@){
 	#my $url="http://$hash->{HOST}:$hash->{PORT}/json/$dev/$circuit";
 	my $url="http://$hash->{HOST}:$hash->{PORT}/".(defined($data) ? "json" : "rest")."/$dev/$circuit";
 	if (defined($data) && index($data, ':') == -1) {
-    	$data = '{"value":"'.$data.'"}';
+    	unless ($dev eq 'ao') {
+			$data = '{"value":"'.$data.'"}';
+		} else {
+			$data = '{"value":'.$data.'}';		# Sonderlösung, da der Analoge Ausgang den Wert nur ohne Hochkommas akzeptiert
+		}
 	}
 	Log3($hash, 3,"$hash->{TYPE} ($hash->{NAME}): sending ".($data ? "POST ($data)" : "GET")." request to url $url");
     my $param= {
@@ -363,7 +359,7 @@ sub Neuron_callback(@) {
 sub Neuron_ParseSingle(@){
     my ($hash, $data)=@_;
     my $result;
-	Log3($hash, 4, "$hash->{TYPE} ($hash->{NAME}) parse data:\n$data");
+	Log3($hash, 4, "$hash->{TYPE} ($hash->{NAME}) parse data:\n".$data);
 	eval {
 		$result = JSON->new->utf8(1)->decode($data);
 		#Log3 ($hash, 1, "$hash->{TYPE} ($hash->{NAME}) single result->status=".ref($result));
@@ -390,10 +386,16 @@ sub Neuron_ParseSingle(@){
 		} else {
 			$result = $result;
 		}
-		readingsSingleUpdate($hash,$result->{dev}."_".$result->{circuit},$result->{value},1);
-		asyncOutput($hash->{HELPER}{CLVAL}, $result->{value}) if $hash->{HELPER}{CLVAL};
-		delete $hash->{HELPER}{CLVAL};
-		Dispatch($hash, $result, (%addvals ? \%addvals : undef)) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao') , $result->{dev}) != -1; 
+
+		if (ref $result eq 'HASH') {
+			readingsSingleUpdate($hash,$result->{dev}."_".$result->{circuit},$result->{value},1);
+			asyncOutput($hash->{HELPER}{CLVAL}, $result->{value}) if $hash->{HELPER}{CLVAL};
+			delete $hash->{HELPER}{CLVAL};
+			Dispatch($hash, $result, (%addvals ? \%addvals : undef)) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao,temp') , $result->{dev}) != -1;
+		} else {
+			Log3 ($hash, 3, "$hash->{TYPE} ($hash->{NAME}) http response not JSON: ".$result);
+		}
+
 	}
 	delete $hash->{HELPER}{CLSET};
 	return $result;
@@ -432,7 +434,8 @@ sub Neuron_ParseAll(@){
 					}
 					$i++;
 				}  else {
-					my $value = $subdev->{value};
+					my $value = $subdev->{temp};		# Temperaturwert nehmen (!wire Geräte haben kein value?)
+					$value = $subdev->{value};
 					#$value = $rsetsP{$value} if ($subdev->{dev} eq 'input' || $subdev->{dev} eq 'relay' || $subdev->{dev} eq 'led');	# on,off anstelle von 1,0
 					readingsBulkUpdateIfChanged($hash,$subdev->{dev}."_".$subdev->{circuit},$value) if defined($value);
 					Dispatch($hash, $subdev, (%addvals ? \%addvals : undef)) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao'), $subdev->{dev}) != -1;
@@ -466,18 +469,30 @@ sub Neuron_ParseWsResponse($$){
     } else {
         #my ($subdevs) = $result->{data};
         readingsBeginUpdate($hash);
-        foreach (@{$result}){
-            (my $subdev)=$_;
-			my $value = $subdev->{value};
-			#$value = $rsetsP{$value} if ($subdev->{dev} eq 'input' || $subdev->{dev} eq 'relay' || $subdev->{dev} eq 'led');	# on,off anstelle von 1,0
-			readingsBulkUpdate($hash,$subdev->{dev}."_".$subdev->{circuit},$value);
-			Dispatch($hash, $subdev, undef) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao') , $subdev->{dev}) != -1; 
-################################
+		if (ref $result eq 'ARRAY') {				#[{"circuit": "1_01", "value": 0, ...}]
+			foreach (@{$result}){
+				Neuron_DecodeWsJSON($hash,$_);
+			}										
+		} elsif (ref $result eq 'HASH') {			#{"circuit": "1_01", "value": 0, ...}
+			Neuron_DecodeWsJSON($hash,$result);
 		}
         readingsEndUpdate($hash,1);
     }         
     return undef
 }
+
+sub Neuron_DecodeWsJSON($$){
+	my ($hash, $dev)=@_;
+	eval {
+		readingsBulkUpdate($hash,$dev->{dev}."_".$dev->{circuit},$dev->{value});
+		Dispatch($hash, $dev, undef) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao') , $dev->{dev}) != -1; 
+	};
+    if ($@) {
+        Log3 ($hash, 3, "$hash->{TYPE} ($hash->{NAME}): error decoding JSON $@\nData:\n$dev");
+    }
+	return undef
+}
+
 sub Neuron_ReadingstoSets($){
 	my ($hash)=@_;
 	my $sets;
@@ -577,7 +592,7 @@ sub Neuron_Read($) {
 
 	Log3 $name, 5, "$hash->{TYPE} ($name) - ReadFn started";
 ########### 1
-	my $buf = DevIo_SimpleRead($hash);
+	$buf = DevIo_SimpleRead($hash);
 ########### 2
 #	my $len = sysread($hash->{CD},$buf,10240);
 #	if( !defined($len) or !$len ) {
@@ -633,9 +648,6 @@ sub Neuron_wsHandshake($) {
 
 #	Log3 $name, 4, "$hash->{TYPE} Websocket ($name) - start WS hearbeat timer";
 #	Neuron_HbTimer($hash);
-
-#	Log3 $name, 4, "$hash->{TYPE} Websocket ($name) - start WS initialisation routine";
-#	Neuron_WsInit($hash);
 	return undef;
 }
 
@@ -674,13 +686,10 @@ sub Neuron_wsCheckHandshake($$) {
 
 sub Neuron_wsSetFilter($;$) {
 	my ($hash,$val) = @_;
-#	if ($hash->{HELPER}{WESOCKETS}) {
 	if ($hash->{HELPER}{wsKey} && DevIo_IsOpen($hash)) {
 		my $wsFilter = $val || AttrVal($hash->{NAME}, 'wsFilter', 'all');
 		my $filter = '{"cmd":"filter","devices":["'. join( '","', split(',', $wsFilter ) ) .'"]}';
-		#Log3 $hash, 1, "Filter: $filter";
 		my $string = Neuron_wsEncode($filter);
-		#Log3 $hash, 1, "Filter encoded: $string\nMAY NOT WORK";
 		Neuron_Write($hash,$string);
 	}
 }
