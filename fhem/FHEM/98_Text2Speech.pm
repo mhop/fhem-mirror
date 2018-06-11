@@ -84,7 +84,8 @@ my %language        = ("Google"     =>  {"Deutsch"        => "de",
                                          "France"         => "fr",
                                          "Spain"          => "es",
                                          "Italian"        => "it",
-                                         "Chinese"        => "cn"
+                                         "Chinese"        => "cn",
+                                         "Dutch"          => "nl"
                                          },
                        "VoiceRSS"   =>  {"Deutsch"        => "de-de",
                                          "English-US"     => "en-us",

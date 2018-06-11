@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_Text2Speech: added Duch language for Google TTS
   - feature: 74_UnifiSwitch: initial version
   - feature: 74_Unifi: new child-Module UnifiSwitch
                        new reading UC_newClients for new clients 
