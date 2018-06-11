@@ -4,11 +4,11 @@
 #       49_SSCamSTRM.pm
 #
 #       (c) 2018 by Heiko Maaz
+#       forked from 98_weblink.pm by Rudolf König
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module is used by module 49_SSCam to create Streaming devices.
-#       It can't be used to create standalone devices wihout any SSCam-Device
-#       The module is based on 98_weblink.pm of Rudolf König.
+#       It can't be used without any SSCam-Device.
 # 
 #       This script is part of fhem.
 #
@@ -28,6 +28,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 0.2    11.06.2018    check in with SSCam 5.0.0
 # 0.1    10.06.2018    initial Version
 
 
@@ -37,9 +38,9 @@ use strict;
 use warnings;
 use vars qw($FW_subdir);  # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
 
-my $SSCamSTRMVersion = "0.1";
+my $SSCamSTRMVersion = "0.2";
 
-#####################################
+################################################################
 sub SSCamSTRM_Initialize($) {
   my ($hash) = @_;
 
@@ -51,7 +52,7 @@ sub SSCamSTRM_Initialize($) {
 }
 
 
-#####################################
+################################################################
 sub SSCamSTRM_Define($$) {
   my ($hash, $def) = @_;
   my ($name, $type, $link) = split("[ \t]+", $def, 3);
@@ -74,21 +75,7 @@ sub SSCamSTRM_Define($$) {
 return undef;
 }
 
-#####################################
-# FLOORPLAN compat
-sub FW_showSSCamSTRM($$$$) {
-  my ($d,undef,undef,$buttons) = @_;
-
-  if($buttons !~ m/HASH/) {
-    my %h = (); $buttons = \%h;
-  }
-  FW_pO(SSCamSTRM_FwFn(undef, $d, "", $buttons));
-  
-return $buttons;
-}
-
-
-##################
+################################################################
 sub SSCamSTRM_FwDetail($@) {
   my ($d, $text, $nobr)= @_;
   return "" if(AttrVal($d, "group", ""));
@@ -102,6 +89,7 @@ sub SSCamSTRM_FwDetail($@) {
 return $ret;
 }
 
+################################################################
 sub SSCamSTRM_FwFn($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash   = $defs{$d};
@@ -122,7 +110,7 @@ return $ret;
 
 =pod
 =item summary    define a Streaming device by SSCam module
-=item summary_DE Erstellung eines Streaming-Device durch SSCam-Modul
+=item summary_DE Erstellung eines Streaming-Device durch das SSCam-Modul
 =begin html
 
 <a name="SSCamSTRM"></a>

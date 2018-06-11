@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCam: V5.0.0, HLS Streaming implemented, new Streamingdevice
+                       based on module 49_SSCamSTRM, some improvements & fixes
   - feature: 98_Text2Speech: added Duch language for Google TTS
   - feature: 74_UnifiSwitch: initial version
   - feature: 74_Unifi: new child-Module UnifiSwitch

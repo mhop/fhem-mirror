@@ -1,4 +1,4 @@
-#########################################################################################################################
+########################################################################################################################
 # $Id$
 #########################################################################################################################
 #       49_SSCam.pm
@@ -27,6 +27,8 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 5.0.0  11.06.2018    HLS Streaming, Buttons for Streaming-Devices, use of module SSCamSTRM for Streaming-Devices, 
+#                      deletion of Streaming-devices if SSCam-device is deleted, some more improvements, minor bugfixes
 # 4.3.0  27.05.2018    HLS preparation changed
 # 4.2.0  22.05.2018    PTZ-Panel integrated to created StreamDevice
 # 4.1.0  05.05.2018    use SYNO.SurveillanceStation.VideoStream instead of SYNO.SurveillanceStation.VideoStreaming,
@@ -227,7 +229,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "4.3.0";
+my $SSCamVersion = "5.0.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -318,6 +320,7 @@ sub SSCam_Initialize($) {
 return undef;   
 }
 
+################################################################
 sub SSCam_Define($@) {
   # Die Define-Funktion eines Moduls wird von Fhem aufgerufen wenn der Define-Befehl für ein Gerät ausgeführt wird 
   # Welche und wie viele Parameter akzeptiert werden ist Sache dieser Funktion. Die Werte werden nach dem übergebenen Hash in ein Array aufgeteilt
@@ -377,6 +380,7 @@ sub SSCam_Define($@) {
   $hash->{HELPER}{RECTIME_DEF}         = "15";                                   # Standard für rectime setzen, überschreibbar durch Attribut "rectime" bzw. beim "set .. on-for-time"
   $hash->{HELPER}{OLDPTZHOME}          = "";
   $hash->{".ptzhtml"}                  = "";
+  $hash->{HELPER}{HLSSTREAM}           = "inactive";                             # Aktivitätsstatus HLS-Streaming
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"PollState","Inactive");                              # es ist keine Gerätepolling aktiv
@@ -409,6 +413,7 @@ return undef;
 sub SSCam_Delete($$) {
     my ($hash, $arg) = @_;
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
+    my $name  = $hash->{NAME};
     
     # gespeicherte Credentials löschen
     setKeyValue($index, undef);
@@ -416,6 +421,9 @@ sub SSCam_Delete($$) {
 	# löschen snapGallerie-Device falls vorhanden
 	my $sgdev = "SSCam.$hash->{NAME}.snapgallery";
     CommandDelete($hash->{CL},"$sgdev");
+    
+	# alle Streaming-Devices löschen falls vorhanden
+    CommandDelete($hash->{CL},"TYPE=SSCamSTRM:FILTER=PARENT=$name");
     
 return undef;
 }
@@ -595,9 +603,10 @@ sub SSCam_Set($@) {
   my @prop;
         
   return "module is deactivated" if(IsDisabled($name));
-  
+ 
   if(SSCam_IsModelCam($hash)) {
       # selist für Cams
+      my $hlslfw = (ReadingsVal($name,"CamStreamFormat","MJPEG") eq "HLS")?",live_fw_hls,":",";
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
@@ -613,7 +622,7 @@ sub SSCam_Set($@) {
                  "enable:noArg ".
                  "disable:noArg ".
 				 "optimizeParams ".
-                 "runView:live_fw,live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
+                 "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setPreset ": "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
                  "stopView:noArg ".
@@ -693,44 +702,43 @@ sub SSCam_Set($@) {
   } elsif ($opt eq "createSnapGallery" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       my ($ret,$sgdev);
-      return "When you want use \"$opt\", you have to set the attribute \"snapGalleryBoost\" first because the functionality depends on retrieving snapshots automatically." 
+      return "Before use \"$opt\" you have to set the attribute \"snapGalleryBoost\" first due to the technology of retrieving snapshots automatically is needed." 
 		       if(!AttrVal($name,"snapGalleryBoost",0));
-	  $sgdev = "SSCam.$name.snapgallery";
-      $ret = CommandDefine($hash->{CL},"$sgdev weblink htmlCode {composegallery('$name','$sgdev')}");
+	  $sgdev = "SSCamSTRM.$name.snapgallery";
+      $ret = CommandDefine($hash->{CL},"$sgdev SSCamSTRM {composegallery('$name','$sgdev','snapgallery')}");
 	  return $ret if($ret);
-	  my $wlname = "SSCam.$name.snapgallery";
-	  my $room   = "SnapGallery";
-	  CommandAttr($hash->{CL},$wlname." room ".$room);
-	  return "<html>Snapgallery device \"$sgdev\" was created successfully. Please have a look to room <a href=\"/fhem?room=$room\">$room</a>.<br> You can now assign it to another room if you want. Don't rename this device !</html>";
+	  my $room = "SnapGallery";
+      $attr{$sgdev}{room}  = $room;
+	  return "Snapgallery device \"$sgdev\" created and assigned to room \"$room\".";
       
   } elsif ($opt eq "createPTZcontrol" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-	  my $ptzcdev = "SSCam.$name.PTZcontrol";
-      my $ret     = CommandDefine($hash->{CL},"$ptzcdev weblink htmlCode {SSCam_ptzpanel('$name')}");
+	  my $ptzcdev = "SSCamSTRM.$name.PTZcontrol";
+      my $ret     = CommandDefine($hash->{CL},"$ptzcdev SSCamSTRM {SSCam_ptzpanel('$name','$ptzcdev','ptzcontrol')}");
 	  return $ret if($ret);
 	  my $room    = AttrVal($name,"room","PTZcontrol");
       $attr{$ptzcdev}{room}  = $room;
       $attr{$ptzcdev}{group} = $name."_PTZcontrol";
-	  return "PTZ control device \"$ptzcdev\" was created successfully. Please have a look to room \"$room\".\nYou can assign \"$ptzcdev\" to another room if you want.";  
+	  return "PTZ control device \"$ptzcdev\" created and assigned to room \"$room\".";
   
   } elsif ($opt eq "createStreamDev" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 	  my ($livedev,$ret);
       
       if($prop =~ /mjpeg/) {
-          $livedev = "SSCam.$name.mjpeg";
-          $ret = CommandDefine($hash->{CL},"$livedev weblink htmlCode {SSCam_StreamDev('$name','$livedev','mjpeg')}");
+          $livedev = "SSCamSTRM.$name.mjpeg";
+          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {SSCam_StreamDev('$name','$livedev','mjpeg')}");
 	      return $ret if($ret);
       }
       if($prop =~ /switched/) {
-          $livedev = "SSCam.$name.switched";
-          $ret = CommandDefine($hash->{CL},"$livedev weblink htmlCode {SSCam_StreamDev('$name','$livedev','switched')}");
+          $livedev = "SSCamSTRM.$name.switched";
+          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {SSCam_StreamDev('$name','$livedev','switched')}");
 	      return $ret if($ret);
       }
       
-	  my $room = AttrVal($name,"room","PTZcontrol");
+	  my $room = AttrVal($name,"room","Livestream");
       $attr{$livedev}{room}  = $room;
-	  return "Livestream device \"$livedev\" was created successfully. Please have a look to room \"$room\".\nYou can assign \"$livedev\" to another room if you want but please don't rename the device.";  
+	  return "Livestream device \"$livedev\" created and assigned to room \"$room\".";
   
   } elsif ($opt eq "enable" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -920,7 +928,7 @@ sub SSCam_Set($@) {
       } elsif ($prop eq "live_fw_hls") {
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "hls"; 
-		  $hash->{HELPER}{ALIAS}      = "View on Safari";
+		  $hash->{HELPER}{ALIAS}      = "View only on compatible browsers";
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw_hls";
       } elsif ($prop eq "lastsnap_fw") {
           $hash->{HELPER}{OPENWINDOW}  = 0;
@@ -932,6 +940,16 @@ sub SSCam_Set($@) {
       }
       SSCam_runliveview($hash); 
             
+  } elsif ($opt eq "hlsreactivate" && SSCam_IsModelCam($hash)) {
+      # ohne SET-Menüeintrag
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      SSCam_hlsreactivate($hash);
+        
+  } elsif ($opt eq "hlsactivate" && SSCam_IsModelCam($hash)) {
+      # ohne SET-Menüeintrag
+      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      SSCam_hlsactivate($hash);
+        
   } elsif ($opt eq "extevent" && !SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
                                    
@@ -1132,30 +1150,30 @@ sub SSCam_FWsummaryFn ($$$$) {
   return if(!$hash->{HELPER}{LINK} || ReadingsVal($d, "state", "") =~ /^dis.*/ || IsDisabled($name));
   
   my $attr = AttrVal($d, "htmlattr", " ");
-  Log3($name, 4, "$name - SSCam_FWsummaryFn called - FW_wname: $FW_wname, device: $d, room: $room, attributes: $attr, FwDetail: ".weblink_FwDetail($d));
+  Log3($name, 4, "$name - SSCam_FWsummaryFn called - FW_wname: $FW_wname, device: $d, room: $room, attributes: $attr");
   
   if($wltype eq "image") {
-    $ret = "<img src=$link $attr><br>".weblink_FwDetail($d);
+    $ret = "<img src=$link $attr><br>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                  Your browser does not support the audio element.      
-                 </audio>".weblink_FwDetail($d);
+                 </audio>";
     }
     
   } elsif($wltype eq "iframe") {
-    $ret = "<iframe src=$link $attr controls>Iframes disabled</iframe>".weblink_FwDetail($d);
+    $ret = "<iframe src=$link $attr controls>Iframes disabled</iframe>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                  Your browser does not support the audio element.      
-                 </audio>".weblink_FwDetail($d);
+                 </audio>";
     }
            
   } elsif($wltype eq "embed") {
-    $ret = "<embed src=$link $attr>".weblink_FwDetail($d);
+    $ret = "<embed src=$link $attr>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                  Your browser does not support the audio element.      
-                 </audio>".weblink_FwDetail($d);
+                 </audio>";
     }
            
   } elsif($wltype eq "link") {
@@ -1168,8 +1186,9 @@ sub SSCam_FWsummaryFn ($$$$) {
   
   } elsif($wltype eq "hls") {
     $alias = $hash->{HELPER}{ALIAS};
-    $ret = "<video $attr controls>
+    $ret = "<video $attr controls autoplay>
             <source src=\"$link\" type=\"application/x-mpegURL\">
+            <source src=$link type=\"video/MP2T\">
             </video>";
   
   } elsif($wltype eq "video") {
@@ -1177,17 +1196,15 @@ sub SSCam_FWsummaryFn ($$$$) {
              <source src=$link type=\"video/mp4\"> 
              <source src=$link type=\"video/ogg\">
              <source src=$link type=\"video/webm\">
-             <source src=$link type=\"application/x-mpegURL\">
-             <source src=$link type=\"video/MP2T\">
              Your browser does not support the video tag.
-             </video>".weblink_FwDetail($d); 
+             </video>"; 
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                  Your browser does not support the audio element.      
-                 </audio>".weblink_FwDetail($d);
+                 </audio>";
     }             
   } 
-#FW_directNotify("FILTER=room=$room", "#FHEMWEB:$FW_wname", "location.reload('true')", "") if($d eq $name);
+
 return $ret;
 }
 
@@ -1206,7 +1223,6 @@ sub SSCam_FWdetailFn ($$$$) {
   } else {
       return undef;
   }
-
 }
 
 ######################################################################################
@@ -2020,6 +2036,102 @@ sub SSCam_runliveview($) {
 }
 
 ###############################################################################
+#                         Kamera HLS-Stream aktivieren
+###############################################################################
+sub SSCam_hlsactivate($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $errorcode;
+    my $error;
+    
+    RemoveInternalTimer($hash, "SSCam_hlsactivate");
+    return if(IsDisabled($name));
+ 
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+        }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = &SSCam_experror($hash,$errorcode);
+
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        Log3($name, 2, "$name - ERROR - HLS-Stream of Camera $camname can't be activated - $error");
+        return;
+    }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        # Aktivierung starten             
+        $hash->{OPMODE} = "activate_hls";
+        $hash->{HELPER}{ACTIVE} = "on";
+		$hash->{HELPER}{LOGINRETRIES} = 0;   
+        
+        if (AttrVal($name,"debugactivetoken",0)) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        SSCam_getapisites($hash);
+    
+	} else {
+        InternalTimer(gettimeofday()+0.3, "SSCam_hlsactivate", $hash, 0);
+    }    
+}
+
+###############################################################################
+#               HLS-Stream reaktivieren (stoppen & starten)
+###############################################################################
+sub SSCam_hlsreactivate($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $errorcode;
+    my $error;
+    
+    RemoveInternalTimer($hash, "SSCam_hlsreactivate");
+    return if(IsDisabled($name));
+ 
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+        }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = &SSCam_experror($hash,$errorcode);
+
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        Log3($name, 2, "$name - ERROR - HLS-Stream of Camera $camname can't be activated - $error");
+        return;
+    }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        # Aktivierung starten             
+        $hash->{OPMODE} = "reactivate_hls";
+        $hash->{HELPER}{ACTIVE} = "on";
+		$hash->{HELPER}{LOGINRETRIES} = 0;   
+        
+        if (AttrVal($name,"debugactivetoken",0)) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }
+        SSCam_getapisites($hash);
+    
+	} else {
+        InternalTimer(gettimeofday()+0.4, "SSCam_hlsreactivate", $hash, 0);
+    }    
+}
+
+###############################################################################
 #                         Kamera Liveview stoppen
 ###############################################################################
 sub SSCam_stopliveview ($) {
@@ -2049,16 +2161,20 @@ sub SSCam_stopliveview ($) {
         
         # Reading LiveStreamUrl löschen
         delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});
-		# Longpoll refresh
-        readingsSingleUpdate($hash,"state","stopview",1); 
-		
-        # Aufnahmestatus im state abbilden
-        my $st = (ReadingsVal("$name", "Record", "Stop") eq "Start")?"on":"off";    
-        readingsSingleUpdate($hash,"state", $st, 1);          
         
-		$hash->{HELPER}{ACTIVE} = "off";  
-		if (AttrVal($name,"debugactivetoken",0)) {
-            Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
+        readingsSingleUpdate($hash,"state","stopview",1);           
+        
+        if($hash->{HELPER}{WLTYPE} eq "hls") {
+            # HLS Stream war aktiv, Streaming beenden
+            $hash->{OPMODE} = "stopliveview_hls";
+            SSCam_getapisites($hash);
+        } else {
+            # kein HLS Stream
+			SSCam_refresh($hash,1,1);    # Room-Refresh, Longpoll
+		    $hash->{HELPER}{ACTIVE} = "off";  
+		    if (AttrVal($name,"debugactivetoken",0)) {
+                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
+            }
         }
 	
 	} else {
@@ -2305,24 +2421,27 @@ sub SSCam_getcaminfoall ($$) {
 	    # Model ist CAM
         RemoveInternalTimer($hash, "SSCam_geteventlist");
         InternalTimer(gettimeofday()+0.5, "SSCam_geteventlist", $hash, 0);
+	    RemoveInternalTimer($hash, "SSCam_getmotionenum");
+        InternalTimer(gettimeofday()+0.6, "SSCam_getmotionenum", $hash, 0);
         RemoveInternalTimer($hash, "SSCam_getcaminfo");
         InternalTimer(gettimeofday()+0.9, "SSCam_getcaminfo", $hash, 0);
-    
+        RemoveInternalTimer($hash, "SSCam_getcapabilities");
+        InternalTimer(gettimeofday()+1.3, "SSCam_getcapabilities", $hash, 0);
+        RemoveInternalTimer($hash, "SSCam_getstreamformat");
+        InternalTimer(gettimeofday()+1.4, "SSCam_getstreamformat", $hash, 0);
+        
         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
         my ($slim,$ssize) = SSCam_snaplimsize($hash);
         RemoveInternalTimer("SSCam_getsnapinfo"); 
         InternalTimer(gettimeofday()+1.5, "SSCam_getsnapinfo", "$name:$slim:$ssize", 0);
 	
-	    RemoveInternalTimer($hash, "SSCam_getmotionenum");
-        InternalTimer(gettimeofday()+0.6, "SSCam_getmotionenum", $hash, 0);
-        RemoveInternalTimer($hash, "SSCam_getcapabilities");
-        InternalTimer(gettimeofday()+1.3, "SSCam_getcapabilities", $hash, 0);
         RemoveInternalTimer($hash, "SSCam_getptzlistpreset");
         InternalTimer(gettimeofday()+1.6, "SSCam_getptzlistpreset", $hash, 0);
         RemoveInternalTimer($hash, "SSCam_getptzlistpatrol");
         InternalTimer(gettimeofday()+1.9, "SSCam_getptzlistpatrol", $hash, 0);
         RemoveInternalTimer($hash, "SSCam_getStmUrlPath");
         InternalTimer(gettimeofday()+2.1, "SSCam_getStmUrlPath", $hash, 0);
+
 	} else {
 	    # Model ist SVS
         RemoveInternalTimer($hash, "SSCam_gethomemodestate");
@@ -2592,6 +2711,32 @@ sub SSCam_getcaminfo ($) {
 		
     } else {
         InternalTimer(gettimeofday()+2, "SSCam_getcaminfo", $hash, 0);
+    } 
+}
+
+###########################################################################
+#   SYNO.SurveillanceStation.VideoStream query aktuelles Streamformat 
+###########################################################################
+sub SSCam_getstreamformat ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    
+    RemoveInternalTimer($hash, "SSCam_getstreamformat");
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE} = "getstreamformat";
+        $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+		
+        if (AttrVal($name,"debugactivetoken",0)) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        } 
+        SSCam_getapisites($hash);
+		
+    } else {
+        InternalTimer(gettimeofday()+1.4, "SSCam_getstreamformat", $hash, 0);
     } 
 }
 
@@ -3444,7 +3589,7 @@ sub SSCam_camop ($) {
    my $sid                = $hash->{HELPER}{SID};
    my $OpMode             = $hash->{OPMODE};
    my $camid              = $hash->{CAMID};
-   my ($livestream,$winname,$attr,$room,$param);
+   my ($exturl,$winname,$attr,$room,$param);
    my ($url,$snapid,$httptimeout,$expmode,$motdetsc);
        
    Log3($name, 4, "$name - --- Begin Function $OpMode nonblocking ---");
@@ -3705,20 +3850,25 @@ sub SSCam_camop ($) {
    } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/) {    
       if ($hash->{HELPER}{RUNVIEW} =~ m/live/) {
           $hash->{HELPER}{AUDIOLINK} = "http://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
-          # externe URL
-          $livestream = AttrVal($name, "livestreamprefix", "http://$serveraddr:$serverport");
-          $livestream .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
-          readingsSingleUpdate($hash,"LiveStreamUrl", $livestream, 1) if(AttrVal($name, "showStmInfoFull", undef));
+          # externe URL in Reading setzen
+          $exturl = AttrVal($name, "livestreamprefix", "http://$serveraddr:$serverport");
+          $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+          readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
           # interne URL
           $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
       } else {
-          # Abspielen der letzten Aufnahme (EventId) 
+          # Abspielen der letzten Aufnahme (EventId)
+          # externe URL in Reading setzen
+          $exturl = AttrVal($name, "livestreamprefix", "http://$serveraddr:$serverport");
+          $exturl .= "/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid"; 
+          readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
+          # interne URL          
           $url = "http://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid";   
       }
        
       # Liveview-Link in Hash speichern
       $hash->{HELPER}{LINK} = $url;
-         
+ 
       Log3($name, 4, "$name - Set Streaming-URL: $url");
       
       # livestream sofort in neuem Browsertab öffnen
@@ -3734,13 +3884,10 @@ sub SSCam_camop ($) {
               map {FW_directNotify("#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("WEB.*");
           }
       }
+           
+	  SSCam_refresh($hash,1,1);    # Room-Refresh, Longpoll
       
-      # Aufnahmestatus in state abbilden mit Longpoll refresh
-	  my $st;
-	  (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
-	  readingsSingleUpdate($hash,"state", $st, 1); 
-      
-      $hash->{HELPER}{ACTIVE} = "off";
+	  $hash->{HELPER}{ACTIVE} = "off";
       if (AttrVal($name,"debugactivetoken",0)) {
           Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
       }
@@ -3753,10 +3900,18 @@ sub SSCam_camop ($) {
 	  my $keyword = $hash->{CAMNAME}; # nur Snaps von $camname selektieren, für lastsnap_fw   
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
    
-   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) {
+   } elsif (($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) || $OpMode eq "activate_hls") {
       # HLS Livestreaming aktivieren
       $httptimeout = $httptimeout+90; # aktivieren HLS dauert lange !
       $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Open&cameraId=$camid&format=hls&_sid=$sid"; 
+   
+   } elsif ($OpMode eq "stopliveview_hls" || $OpMode eq "reactivate_hls") {
+      # HLS Livestreaming deaktivieren
+      $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Close&cameraId=$camid&format=hls&_sid=$sid"; 
+   
+   } elsif ($OpMode eq "getstreamformat") {
+      # aktuelles Streamformat abfragen
+      $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Query&cameraId=$camid&_sid=$sid"; 
    }
    
    Log3($name, 4, "$name - Call-Out now: $url");
@@ -3827,7 +3982,7 @@ sub SSCam_camop_parse ($) {
    } elsif ($myjson ne "") {    
         # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
         # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, $success) = SSCam_evaljson($hash,$myjson);
+        ($hash,$success,$myjson) = SSCam_evaljson($hash,$myjson);
         
         unless ($success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
@@ -4142,14 +4297,13 @@ sub SSCam_camop_parse ($) {
 			    
 				if (exists($hash->{HELPER}{RUNVIEW}) && $hash->{HELPER}{RUNVIEW} =~ /snap/ && exists($data->{'data'}{'data'}[0]{imageData})) {
 				    delete $hash->{HELPER}{RUNVIEW};
-					# Aufnahmestatus in state abbilden 
+                    # Aufnahmestatus in state abbilden
 	                my $st;
 	                (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
-	                readingsSingleUpdate($hash,"state", $st, 1); 
+	                readingsSingleUpdate($hash,"state", $st, 0); 
 					
 					$hash->{HELPER}{LINK} = $data->{data}{data}[0]{imageData};
-					# Longpoll refresh 
-                    DoTrigger($name,"startview");					
+                    SSCam_refresh($hash,1,1);     # Page Refresh, Longpoll					
 				}
 
                 if($OpMode eq "getsnapgallery") {
@@ -4201,17 +4355,44 @@ sub SSCam_camop_parse ($) {
                 Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
             
 			} elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) {
-                # HLS Streaming 
-                my $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
-                # Liveview-Link in Hash speichern
-                $hash->{HELPER}{LINK} = $url;
-                Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated, Streaming-URL: $url");
-                      
-                # Aufnahmestatus in state abbilden mit Longpoll refresh
-	            my $st;
-	            (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
-	            readingsSingleUpdate($hash,"state", $st, 1);
+                # HLS Streaming wurde aktiviert
+                $hash->{HELPER}{HLSSTREAM} = "active";
+                # externe LivestreamURL setzen
+                my $exturl = AttrVal($name, "livestreamprefix", "http://$serveraddr:$serverport");
+                $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
+                readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
                 
+                my $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
+                # Liveview-Link in Hash speichern und Aktivitätsstatus speichern
+                $hash->{HELPER}{LINK}      = $url;
+                Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated, Streaming-URL: $url") if(AttrVal($name,"verbose",3) == 4);
+                Log3($name, 3, "$name - HLS Streaming of camera \"$name\" activated") if(AttrVal($name,"verbose",3) == 3);
+                
+                SSCam_refresh($hash,1,1);   # Page Refresh, Longpoll
+                
+            } elsif ($OpMode eq "stopliveview_hls") {
+                # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
+                $hash->{HELPER}{HLSSTREAM} = "inactive";
+                Log3($name, 3, "$name - HLS Streaming of camera \"$name\" deactivated");
+                               
+                SSCam_refresh($hash,1,1);   # Page Refresh, Longpoll
+                
+            } elsif ($OpMode eq "reactivate_hls") {
+                # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
+                $hash->{HELPER}{HLSSTREAM} = "inactive";
+                Log3($name, 4, "$name - HLS Streaming of camera \"$name\" deactivated for streaming device");
+
+				# Token freigeben vor hlsactivate
+                $hash->{HELPER}{ACTIVE} = "off";
+                SSCam_hlsactivate($hash);
+                
+                SSCam_refresh($hash,1,1);   # Page Refresh, Longpoll
+                
+            } elsif ($OpMode eq "activate_hls") {
+                # HLS Streaming wurde aktiviert, Aktivitätsstatus speichern
+                $hash->{HELPER}{HLSSTREAM} = "active"; 
+                Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated for streaming device");
+                                
             } elsif ($OpMode eq "getsnapfilename") {
                 # den Filenamen eines Schnapschusses ermitteln
                 $snapid = ReadingsVal("$name", "LastSnapId", " ");
@@ -4224,6 +4405,16 @@ sub SSCam_camop_parse ($) {
                                 
                 # Logausgabe
                 Log3($name, 4, "$name - Filename of Snap-ID $snapid is \"$data->{'data'}{'data'}[0]{'fileName'}\"") if($data->{'data'}{'data'}[0]{'fileName'});
+            
+			} elsif ($OpMode eq "getstreamformat") {
+                # aktuelles Streamformat abgefragt
+                my $sformat = SSCam_jboolmap($data->{'data'}->{'format'});
+                
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsBulkUpdate($hash,"CamStreamFormat", uc($sformat));
+                readingsEndUpdate($hash, 1);                
             
 			} elsif ($OpMode eq "gopreset") {
                 # eine Presetposition wurde angefahren
@@ -5167,21 +5358,67 @@ return;
 
 ###############################################################################
 #   Test ob JSON-String empfangen wurde
+###############################################################################
 sub SSCam_evaljson($$) { 
-  my ($hash,$myjson)= @_;
+  my ($hash,$myjson) = @_;
+  my $OpMode  = $hash->{OPMODE};
+  my $name    = $hash->{NAME};
   my $success = 1;
   
   eval {decode_json($myjson)} or do 
   {
-      $success = 0;
-  
-      # Setreading 
-      readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash,"Errorcode","none");
-      readingsBulkUpdate($hash,"Error","malformed JSON string received");
-      readingsEndUpdate($hash, 1);  
+      if($hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/ || $OpMode =~ m/^.*_hls$/) {
+          # HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
+          Log3($name, 5, "$name - HLS-activation data return: $myjson");
+          if ($myjson =~ m/{"success":true}/) {
+              $success = 1;
+              $myjson  = '{"success":true}';    
+          } 
+      } else {
+          $success = 0;
+          # Setreading 
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,"Errorcode","none");
+          readingsBulkUpdate($hash,"Error","malformed JSON string received");
+          readingsEndUpdate($hash, 1);  
+      }
   };
-return($hash,$success);
+  
+return($hash,$success,$myjson);
+}
+
+###############################################################################
+#      Refresh eines Raumes aus $hash->{HELPER}{STRMROOM}
+#      bzw. Longpoll
+#      $hash, $pload (1=page reload), $longpoll (1=Event)
+###############################################################################
+sub SSCam_refresh($$$) { 
+  my ($hash,$pload,$longpoll) = @_;
+  my $name   = $hash->{NAME};
+  
+  my $r = $hash->{HELPER}{STRMROOM}?$hash->{HELPER}{STRMROOM}:"";
+  Log3($name, 5, "$name - room for refresh: $r");
+  
+  if($pload) {
+      if($hash->{HELPER}{STRMROOM} && $hash->{HELPER}{STRMROOM} !~ /^detail=.*$/) {
+          # Raumrefresh
+	      my @rooms = split(",",$hash->{HELPER}{STRMROOM});
+	      foreach (@rooms) {
+	          my $room = $_;
+              { map { FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("WEB.*") } 
+	      }
+      } 
+  }
+  
+  # Aufnahmestatus in state abbilden & Longpoll
+  my $st = (ReadingsVal($name, "Record", "") eq "Start")?"on":"off";  
+  if($longpoll) {
+      readingsSingleUpdate($hash,"state", $st, 1);
+  } else {
+      readingsSingleUpdate($hash,"state", $st, 0);  
+  }
+  
+return;
 }
 
 ###############################################################################
@@ -5312,8 +5549,8 @@ return ($ret);
 #     konvertiere alle ptzPanel_rowXX-attribute zu html-Code für 
 #     das generierte Widget und das weblink-Device ptzpanel_$name
 ###############################################################################
-sub SSCam_ptzpanel($) {
-  my ($name)     = @_;
+sub SSCam_ptzpanel($;$$) {
+  my ($name,$ptzcdev,$ptzcontrol)     = @_; 
   my $hash       = $defs{$name};
   my $iconpath   = AttrVal("$name","ptzPanel_iconPath","www/images/sscam");
   my $iconprefix = AttrVal("$name","ptzPanel_iconPrefix","black_btn_");
@@ -5468,13 +5705,17 @@ sub SSCam_StreamDev($$$) {
   my $sid                = $hash->{HELPER}{SID};
   my ($cause,$ret,$link,$audiolink,$devWlink,$wlhash,$alias,$wlalias);
   
-  my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');
+  # den Raum/Räume des Streamingdevice speichern für Refresh  
+  $hash->{HELPER}{STRMROOM} = AttrVal($livdev,"room",undef)?AttrVal($livdev,"room",undef):$FW_webArgs{room};                                              
+     
+  my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');  # HTML Attribute der Cam
+  $ha        = AttrVal($livdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
+  my $hlslfw = (ReadingsVal($camname,"CamStreamFormat","MJPEG") eq "HLS")?"live_fw_hls,":undef;
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
   $wlalias  = AttrVal($livdev, "alias", $livdev);   # Linktext als Aliasname oder Devicename setzen
   $devWlink = "<a href=\"/fhem?detail=$livdev\">$wlalias</a>"; 
   $wlhash   = $defs{$livdev};
-  $ha       = AttrVal($livdev, "htmlattr", $ha);    # htmlattr vom weblink-Device übernehmen oder von Cam 
 
   # Document Division
   $ret  = sprintf("<div class=\"makeTable wide\"> $devWlink");
@@ -5485,7 +5726,8 @@ sub SSCam_StreamDev($$$) {
   if(!$StmKey || ReadingsVal($camname, "Availability", "") ne "enabled" || IsDisabled($camname)) {
       # Ausgabe bei Fehler
       my $cam = AttrVal($camname, "alias", $camname);
-      $cause = !$StmKey?"Camera $cam has no Reading \"StmKey\" set !":"Camera $cam is disabled !";
+      $cause = !$StmKey?"Camera $cam has no Reading \"StmKey\" set !":"Camera \"$cam\" is disabled";
+      $cause = "Camera \"$cam\" is disabled" if(IsDisabled($camname));
       $ret .= "<td> <br> <b> $cause </b> <br><br></td>";
       $ret .= '</tr>';
       $ret .= '</tbody>';
@@ -5513,12 +5755,32 @@ sub SSCam_StreamDev($$$) {
                        </audio></td>";
           $ret .= '</tr>'; 
       }      
+  
   } elsif($fmt =~ /switched/) {
       my $wltype = $hash->{HELPER}{WLTYPE};
       $link = $hash->{HELPER}{LINK};
-      if($link && $wltype =~ /image|iframe|video|base64img|embed/) {
+      my $cmdstop     = "cmd=set $camname stopView";                                                      # Stream deaktivieren
+      my $imgstop     = "<img src=\"$FW_ME/www/images/default/remotecontrol/black_btn_POWEROFF3.png\">";
+      my $cmdhlsreact = "cmd=set $camname hlsreactivate";                                                 # HLS Stream reaktivieren
+      my $imghlsreact = "<img src=\"$FW_ME/www/images/default/remotecontrol/black_btn_BACKDroid.png\">";
+      my $cmdmjpegrun = "cmd=set $camname runView live_fw";                                               # MJPEG Stream aktivieren  
+      my $imgmjpegrun = "<img src=\"$FW_ME/www/images/sscam/black_btn_MJPEG.png\">";
+      my $cmdhlsrun   = "cmd=set $camname runView live_fw_hls";                                           # HLS Stream aktivieren  
+      my $imghlsrun   = "<img src=\"$FW_ME/www/images/sscam/black_btn_HLS.png\">";
+      my $cmdlrirun   = "cmd=set $camname runView lastrec_fw";                                            # Last Record IFrame  
+      my $imglrirun   = "<img src=\"$FW_ME/www/images/sscam/black_btn_LASTRECIFRAME.png\">";
+      my $cmdlh264run = "cmd=set $camname runView lastrec_fw_MPEG4/H.264";                                # Last Record H.264  
+      my $imglh264run = "<img src=\"$FW_ME/www/images/sscam/black_btn_LRECH264.png\">";
+      my $cmdlmjpegrun = "cmd=set $camname runView lastrec_fw_MJPEG";                                     # Last Record MJPEG  
+      my $imglmjpegrun = "<img src=\"$FW_ME/www/images/sscam/black_btn_LRECMJPEG.png\">";
+      my $cmdlsnaprun = "cmd=set $camname runView lastsnap_fw";                                          # Last SNAP  
+      my $imglsnaprun = "<img src=\"$FW_ME/www/images/sscam/black_btn_LSNAP.png\">";
+      
+      if($link && $wltype =~ /image|iframe|video|base64img|embed|hls/) {
           if($wltype =~ /image/) {
-              $ret .= "<td><img src=$link $ha> </td>";
+              $ret .= "<td><img src=$link $ha><br>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";               
+              $ret .= "</td>";
               if(AttrVal($camname,"ptzPanel_use",1)) {
                   my $ptz_ret = SSCam_ptzpanel($camname);
                   if($ptz_ret) { 
@@ -5529,33 +5791,32 @@ sub SSCam_StreamDev($$$) {
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                                Your browser does not support the audio element.      
-                               </audio></td>";
-                  $ret .= '</tr>';
-              }
+                               </audio>";
+              }         
+          
           } elsif ($wltype =~ /iframe/) {
-              $ret .= "<td><iframe src=$link $ha controls>Iframes disabled</iframe></td>";
-              if(AttrVal($camname,"ptzPanel_use",1)) {
-                  my $ptz_ret = SSCam_ptzpanel($camname);
-                  if($ptz_ret) { 
-                      $ret .= "<td>$ptz_ret</td>";
-                  }
-              }
+              $ret .= "<td><iframe src=$link $ha controls autoplay>
+                       Iframes disabled
+                       </iframe><br>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";               
+              $ret .= "</td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+                  $ret .= '</tr>';
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                                Your browser does not support the audio element.      
                                </audio></td>";
-                  $ret .= '</tr>';
               }
+          
           } elsif ($wltype =~ /video/) {
-              $ret .= "<td><video $ha controls> 
+              $ret .= "<td><video $ha controls autoplay> 
                        <source src=$link type=\"video/mp4\"> 
                        <source src=$link type=\"video/ogg\">
                        <source src=$link type=\"video/webm\">
-                       <source src=$link type=\"application/x-mpegURL\">
-                       <source src=$link type=\"video/MP2T\">
-                       Your browser does not support the video tag.
-                       </video></td>";
+                       Your browser does not support the video tag
+                       </video><br>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>"; 
+              $ret .= "</td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -5564,16 +5825,42 @@ sub SSCam_StreamDev($$$) {
                   $ret .= '</tr>';
               }
           } elsif($wltype =~ /base64img/) {
-              $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha></td>";
-		  } elsif($wltype =~ /embed/) {
+              $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha><br>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
+              $ret .= "</td>";
+		  
+          } elsif($wltype =~ /embed/) {
               $ret .= "<td><embed src=$link $ha></td>";
-          }
+          
+          } elsif($wltype =~ /hls/) {
+              $ret .= "<td><video $ha controls autoplay>
+                       <source src=$link type=\"application/x-mpegURL\">
+                       <source src=$link type=\"video/MP2T\">
+                       Your browser does not support the video tag
+                       </video><br>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\">$imghlsreact </a>";			  
+              $ret .= "</td>";
+              if(AttrVal($camname,"ptzPanel_use",1)) {
+                  my $ptz_ret = SSCam_ptzpanel($camname);
+                  if($ptz_ret) { 
+                      $ret .= "<td>$ptz_ret</td>";
+                  }
+              }
+          } 
       } else {
           my $cam = AttrVal($camname, "alias", $camname);
-          $cause = "Camera $cam is switched off";
-          $ret .= "<td> <br> <b> $cause </b> <br><br></td>";    
+          $cause = "Videostream of camera \"$cam\" is switched off";
+          $ret .= "<td> <br> <b> $cause </b> <br><br>";
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdmjpegrun')\">$imgmjpegrun </a>";
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsrun')\">$imghlsrun </a>" if($hlslfw);  
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlrirun')\">$imglrirun </a>"; 
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlh264run')\">$imglh264run </a>";
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlmjpegrun')\">$imglmjpegrun </a>";
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlsnaprun')\">$imglsnaprun </a>";            
+          $ret .= "</td>";    
       }
-  }else {
+  } else {
       $cause = "Videoformat not supported";
       $ret .= "<td> <br> <b> $cause </b> <br><br></td>";  
   }
@@ -5590,7 +5877,7 @@ return $ret;
 #                   Schnappschußgalerie zusammenstellen
 ###############################################################################
 sub composegallery ($;$$) { 
-  my ($name,$wlname) = @_;
+  my ($name,$wlname,$model) = @_;
   my $hash     = $defs{$name};
   my $camname  = $hash->{CAMNAME};
   my $allsnaps = $hash->{HELPER}{".SNAPHASH"}; # = \%allsnaps
@@ -5716,8 +6003,8 @@ sub SSCam_experror {
 1;
 
 =pod
-=item summary    operates surveillance cameras defined in Synology Surveillance Station
-=item summary_DE steuert Kameras welche der Synology Surveillance Station
+=item summary    Camera module to control the Synology Surveillance Station
+=item summary_DE Kamera-Modul für die Steuerung der Synology Surveillance Station
 =begin html
 
 <a name="SSCam"></a>
@@ -5743,7 +6030,7 @@ sub SSCam_experror {
        <li>Positioning of PTZ-cameras to absolute X/Y-coordinates  </li>
        <li>continuous moving of PTZ-camera lense   </li>
        <li>trigger of external events 1-10 (action rules in SVS)   </li>
-       <li>start and stop of camera livestreams, show the last recording and snapshot embedded </li>
+       <li>start and stop of camera livestreams incl. audio replay, show the last recording and snapshot </li>
        <li>fetch of livestream-Url's with key (login not needed in that case)   </li>
        <li>playback of last recording and playback the last snapshot  </li>
 	   <li>switch the Surveillance Station HomeMode on/off and retrieve the HomeModeState </li>
@@ -5788,20 +6075,23 @@ sub SSCam_experror {
   <ul>
   <br>
     There is a distinction between the definition of a camera-device and the definition of a Surveillance Station (SVS) 
-	device. Dependend on the kind of defined device the internal MODEL will be set to "vendor - camera type" or "SVS" and 
-    a proper subset of the described set/get-commands are assigned to the device. <br>
+    device, that means the application on the discstation itself. 
+    Dependend on the type of defined device the internal MODEL will be set to "&lt;vendor&gt; - &lt;camera type&gt;" 
+    or "SVS" and a proper subset of the described set/get-commands are assigned to the device. <br>
 	The scope of application of set/get-commands is denoted to every particular command (valid for CAM, SVS, CAM/SVS).
 	<br><br>
 	
-    A camera-device will be defined by: <br><br>
-	
-    <code>define &lt;name&gt; SSCAM &lt;camera name in SVS&gt; &lt;ServerAddr&gt; [Port] </code> <br><br>
+    A camera-device is defined by: <br><br>
+	<ul>
+      <b><code>define &lt;name&gt; SSCAM &lt;camera name in SVS&gt; &lt;ServerAddr&gt; [Port] </code></b> <br><br>
+    </ul>
     
     At first the devices have to be set up and has to be operable in Synology Surveillance Station 7.0 and above. <br><br>
 	
-	A SVS-device to control functions of the Surveillance Station (SVS) will be defined by: <br><br>
-	
-	<code>define &lt;name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] </code> <br><br>
+	A SVS-device to control functions of the Surveillance Station (SVS) is defined by: <br><br>
+	<ul>
+	  <b><code>define &lt;name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] </code></b> <br><br>
+    </ul>
 	
     In that case the term &lt;camera name in SVS&gt; become replaced by <b>SVS</b> only. <br><br>
     
@@ -5940,30 +6230,37 @@ sub SSCam_experror {
   They can be selected in the drop-down-menu of the particular device. <br><br>
   
   <ul>
+  <a name="SSCamcreateStreamDev"></a>
   <li><b> set &lt;name&gt; createStreamDev [mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
-  A separate device of type weblink will be created. This device can be used as a discrete device in a dashboard for example.
-  The current room of the parent camera device is assigned to the weblink-device if it is set there. 
-  You can control the design with HTML tags in <a href="#SSCamattr">attribute</a> "htmlattr" of the camera device or by the specific attributes
-  in the weblink-device itself.
+  A separate streaming device (type SSCamSTRM) will be created. This device can be used as a discrete device in a dashboard for example.
+  The current room of the parent camera device is assigned to the new device if it is set there. 
+  You can control the design with HTML tags in <a href="#SSCamattr">attribute</a> "htmlattr" of the camera device or by the 
+  specific attributes of the SSCamSTRM-device itself. <br>
+  In "switched"-Devices are buttons provided for mode control. <br>
+  If HLS (HTTP Live Streaming) is used in Streaming-Device of type "switched", then the camera has to be set to video format
+  H.264 in the Synology Surveillance Station. Therefore the selection button for "HLS" is only provided in Streaming-Device 
+  if the Reading "CamStreamFormat" contains HLS". <br>
+  HTTP Live Streaming is currently onla available on Mac Safari or modern mobile iOS/Android devices.
   <br><br>
   
     <ul>
     <table>
     <colgroup> <col width=10%> <col width=90%> </colgroup>
-      <tr><td>mjpeg     </td><td>- the weblink-device playback a permanent MJPEG camera stream (Streamkey method) </td></tr>
-      <tr><td>switched  </td><td>- Content and playback state of the weblink-device is controlled by the command "set &lt;name&gt; runView ...". </td></tr>
+      <tr><td>mjpeg     </td><td>- the streaming device permanent playback a MJPEG video stream (Streamkey method) </td></tr>
+      <tr><td>switched  </td><td>- playback of different streaming types. Buttons for mode control are provided. </td></tr>
     </table>
     </ul>
     <br><br>
   </ul>
   
+  
   <ul>
   <li><b> set &lt;name&gt; createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
   
-  A separate PTZ-control panel will be created (weblink-device). The current room of the parent camera device is assigned if
-  it is set there.  
-  With the "ptzPanel_.*"-<a href="#SSCamattr">attributes</a> or respectively the specific attributes of a weblink-device 
+  A separate PTZ-control panel will be created (type SSCamSTRM). The current room of the parent camera device is 
+  assigned if it is set there.  
+  With the "ptzPanel_.*"-<a href="#SSCamattr">attributes</a> or respectively the specific attributes of the SSCamSTRM-device
   the properties of the control panel can be affected. <br> 
   <br><br>
   </ul>
@@ -5971,8 +6268,9 @@ sub SSCam_experror {
   <ul>
   <li><b> set &lt;name&gt; createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
-  A snapshot gallery will be created as a permanent (weblink)Device. The device will be provided in room "SnapGallery".
-  With the "snapGallery..."-<a href="#SSCamattr">attributes</a> respectively the weblink-device specific attributes (which was created)
+  A snapshot gallery will be created as a separate device (type SSCamSTRM). The device will be provided in 
+  room "SnapGallery".
+  With the "snapGallery..."-<a href="#SSCamattr">attributes</a> respectively the specific attributes of the SSCamSTRM-device
   you are able to manipulate the properties of the new snapshot gallery device. <br> 
   <br><br>
   </ul>
@@ -6280,28 +6578,36 @@ sub SSCam_experror {
   <ul>
   <li><b> set &lt;name&gt; runView [live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_fw_MJPEG | lastrec_fw_MPEG4/H.264 | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
-  With "live_fw, live_link, live_open" a livestream (mjpeg-stream) of a camera will be started, either as embedded image 
-  or as a generated link. <br>
-  The option "live_open" starts a new browser window. If the optional &lt;room&gt; was set, the window will only be
-  started if the specified room is currently opend in a browser session. <br><br> 
-  
-  The command <b>"set &lt;name&gt; runView lastsnap_fw"</b> shows the last snapshot of the camera embedded in room- or detailview. <br><br>
-  
-  Access to the last recording of a camera can be done using "lastrec_fw..." respectively "lastrec_open".
-  The recording will be opened in iFrame. So there are some control elements available, e.g. to increase/descrease 
-  reproduce speed. <br><br>
-  
   <ul>
   <table>
   <colgroup> <col width=25%> <col width=75%> </colgroup>
-      <tr><td>lastrec_fw             </td><td>- playback last recording as iFrame object </td></tr>
-      <tr><td>lastrec_fw_MJPEG       </td><td>- usable if last recording has format MJPEG </td></tr>
-      <tr><td>lastrec_fw_MPEG4/H.264 </td><td>- usable if last recording has format MPEG4/H.264 </td></tr>
+      <tr><td>live_fw                     </td><td>- MJPEG-Livestream. Audio playback is provided if possible. </td></tr>
+      <tr><td>live_fw_hls                 </td><td>- HLS-Livestream (currently only Mac Safari Browser and mobile iOS/Android-Devices) </td></tr>
+      <tr><td>live_link                   </td><td>- Link of a MJPEG-Livestream </td></tr>
+      <tr><td>live_open [&lt;room&gt;]    </td><td>- opens MJPEG-Livestream in separate Browser window </td></tr>
+      <tr><td>lastrec_fw                  </td><td>- playback last recording as iFrame object </td></tr>
+      <tr><td>lastrec_fw_MJPEG            </td><td>- usable if last recording has format MJPEG </td></tr>
+      <tr><td>lastrec_fw_MPEG4/H.264      </td><td>- usable if last recording has format MPEG4/H.264 </td></tr>
+      <tr><td>lastrec_open [&lt;room&gt;] </td><td>- playback last recording in a separate Browser window </td></tr>
+      <tr><td>lastsnap_fw                 </td><td>- playback last snapshot </td></tr>
   </table>
   </ul>
   <br><br>
   
-  The kind of windows in FHEMWEB can be affected by HTML-tags in <a href="#SSCamattr">attribute</a> "htmlattr". 
+  With <b>"live_fw, live_link"</b> a MJPEG-Livestream will be started, either as an embedded image 
+  or as a generated link. <br>
+  The option <b>"live_open"</b> starts a new browser window with a MJPEG-Livestream. If the optional "&lt;room&gt;" is set, the 
+  window will only be started if the specified room is currently opened in a FHEMWEB-session. <br>
+  If a HLS-Stream by <b>"live_fw_hls"</b> is requested, the camera has to be setup to video format H.264 (not MJPEG) in the 
+  Synology Surveillance Station. Therefore this possibility is only present if the Reading "CamStreamFormat" is set to "HLS".
+  <br><br> 
+  
+  Access to the last recording of a camera can be done using <b>"lastrec_fw.*"</b> respectively <b>"lastrec_open"</b>.
+  By <b>"lastrec_fw"</b> the recording will be opened in an iFrame. There are some control elements provided if available. <br>
+  The <b>"lastrec_open"</b> command can be extended optionally by a room. In this case the new window opens only, if the 
+  room is the same as a FHEMWEB-session has currently opened. <br>  
+  The command <b>"set &lt;name&gt; runView lastsnap_fw"</b> shows the last snapshot of the camera embedded. <br>
+  The Streaming-Device properties can be affected by HTML-tags in <a href="#SSCamattr">attribute</a> "htmlattr". 
   <br><br>
   
   <b>Examples:</b><br>
@@ -6310,16 +6616,14 @@ sub SSCam_experror {
     attr &lt;name&gt; htmlattr width="700",height="525",top="200",left="300"
   </pre>
   
-  The command <b>"set &lt;name&gt; runView live_open"</b> starts the stream immediately in a new browser window (longpoll=1 
-  must be set for WEB). 
-  A browser window will be initiated to open for every FHEM session which is active. If you want to change this behavior, 
-  you can use command <b>"set &lt;name&gt; runView live_open &lt;room&gt;"</b>. It initiates open a browser window in that 
-  FHEM session which has just opend the room &lt;room&gt;.
-  
-  The settings of <a href="#SSCamattr">attribute</a> "livestreamprefix" overwrites the data for protocol, servername and 
+  The command <b>"set &lt;name&gt; runView live_open"</b> starts the stream immediately in a new browser window. 
+  A browser window will be initiated to open for every FHEMWEB-session which is active. If you want to change this behavior, 
+  you can use command <b>"set &lt;name&gt; runView live_open &lt;room&gt;"</b>. In this case the new window opens only, if the 
+  room is the same as a FHEMWEB-session has currently opened. <br>  
+  The settings of <a href="#SSCamattr">attribute</a> "livestreamprefix" overwrite the data for protocol, servername and 
   port in <a href="#SSCamreadings">reading</a> "LiveStreamUrl".
   By "livestreamprefix" the LivestreamURL (is shown if <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set) can 
-  be modified and used for distribution and external access to SVS livestream. <br><br>
+  be modified and used for distribution and external access to the Livestream. <br><br>
   
   <b>Example:</b><br>
   <pre>
@@ -6327,6 +6631,15 @@ sub SSCam_experror {
   </pre>
   
   The livestream can be stopped again by command <b>"set &lt;name&gt; stopView"</b>.
+  The "runView" function also switches Streaming-Devices of type "switched" into the appropriate mode. <br><br>
+  
+  <b>Note for HLS (HTTP Live Streaming):</b> <br>
+  The video starts with a technology caused delay. Every stream will be segemented into some little video files 
+  (with a lenth of approximately 10 seconds) and is than delivered to the client. 
+  The video format of the camera has to be set to H.264 in the Synology Surveillance Station and not every camera type is
+  a proper device for HLS-Streaming.
+  At the time only the Mac Safari Browser and modern mobile iOS/Android-Devices are able to playback HLS-Streams. 
+  
   </ul>
   <br><br>
   
@@ -6648,7 +6961,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     if set the state of active token will be logged - only for debugging, don't use it in normal operation ! </li><br>
   
   <li><b>disable</b><br>
-    deactivates the module (device definition) </li><br>
+    deactivates the device definition </li><br>
   
   <li><b>httptimeout</b><br>
     Timeout-Value of HTTP-Calls to Synology Surveillance Station, Default: 4 seconds (if httptimeout = "0" 
@@ -6832,6 +7145,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>CamPreRecTime</li>      </td><td>- Duration of Pre-Recording (in seconds) adjusted in SVS  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- shared folder on disk station for recordings </td></tr>
     <tr><td><li>CamRecVolume</li>       </td><td>- Volume on disk station for recordings  </td></tr>
+    <tr><td><li>CamStreamFormat</li>    </td><td>- the current format of video streaming  </td></tr>
     <tr><td><li>CamVideoType</li>       </td><td>- Indicating video type  </td></tr>
     <tr><td><li>CamVendor</li>          </td><td>- Identifier of camera producer  </td></tr>
     <tr><td><li>CamVideoFlip</li>       </td><td>- Is the video flip  </td></tr>
@@ -6908,7 +7222,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
       <li>Positionieren von PTZ-Kameras zu absoluten X/Y-Koordinaten  </li>
       <li>kontinuierliche Bewegung von PTZ-Kameras   </li>
       <li>auslösen externer Ereignisse 1-10 (Aktionsregel SVS)   </li>
-      <li>starten und beenden von Kamera-Livestreams, anzeigen der letzten Aufnahme oder des letzten Schnappschusses  </li>
+      <li>starten und beenden von Kamera-Livestreams incl. Audiowiedergabe, anzeigen der letzten Aufnahme oder des letzten Schnappschusses  </li>
       <li>Abruf und Ausgabe der Kamera Streamkeys sowie Stream-Urls (Nutzung von Kamera-Livestreams ohne Session Id)  </li>
       <li>abspielen der letzten Aufnahme bzw. Anzeige des letzten Schnappschusses  </li>
 	  <li>anzeigen der gespeicherten Anmeldeinformationen (Credentials)  </li>
@@ -6918,8 +7232,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
       <li>Start bzw. Stop Objekt Tracking (nur unterstützte PTZ-Kameras mit dieser Fähigkeit)  </li>
       <li>Setzen/Löschen eines Presets (bei PTZ-Kameras)  </li>
       <li>Setzen der Home-Position (bei PTZ-Kameras)  </li>
-      <li>stellt ein Paneel zur Kamera-Steuerung zur Verfügung (bei PTZ-Kameras)  </li>
-	  <li>erzeugen eines separaten Streamin-Devices (createStreamDev)  </li>
+      <li>erstellen eines Paneels zur Kamera-Steuerung. (bei PTZ-Kameras)  </li>
+	  <li>erzeugen eines separaten Streaming-Devices (createStreamDev)  </li>
      </ul> 
     </ul>
     <br>
@@ -6959,23 +7273,26 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 <b>Definition</b>
   <ul>
   <br>
-    Bei der Definition wird zwischen einer Kamera-Definition und der Definition einer Surveillance Station (SVS) 
-	unterschieden. Abhängig von der Art des definierten Devices wird das Internal MODEL auf "Hersteller - Kameramodell" oder 
+    Bei der Definition wird zwischen einer Kamera-Definition und der Definition einer Surveillance Station (SVS), d.h.
+    der Applikation selbst auf der Diskstation, unterschieden. 
+    Abhängig von der Art des definierten Devices wird das Internal MODEL auf "&lt;Hersteller&gt; - &lt;Kameramodell&gt;" oder 
     SVS gesetzt und eine passende Teilmenge der beschriebenen set/get-Befehle dem Device zugewiesen. <br>
-	Der Gültigkeitsbereich von set/get-Befehlen ist nach dem jeweiligen Befehl angegeben (gilt für CAM, SVS, CAM/SVS).
+	Der Gültigkeitsbereich von set/get-Befehlen ist nach dem jeweiligen Befehl angegeben "gilt für CAM, SVS, CAM/SVS".
 	<br><br>
 	
     Eine Kamera wird definiert durch: <br><br>
-	
-    <code>define &lt;name&gt; SSCAM &lt;Kameraname in SVS&gt; &lt;ServerAddr&gt; [Port] </code> <br><br>
+	<ul>
+      <b><code>define &lt;name&gt; SSCAM &lt;Kameraname in SVS&gt; &lt;ServerAddr&gt; [Port] </code></b> <br><br>
+    </ul>
     
     Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend 
 	funktionieren. <br><br>
 	
 	Ein SVS-Device zur Steuerung von Funktionen der Surveillance Station wird definiert mit: <br><br>
-	
-	<code>define &lt;name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] </code> <br><br>
-	
+	<ul>
+	  <b><code>define &lt;name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] </code></b> <br><br>
+	</ul>
+    
     In diesem Fall wird statt &lt;Kameraname in SVS&gt; nur <b>SVS</b> angegeben. <br><br>
 	
 	Das Modul SSCam basiert auf Funktionen der Synology Surveillance Station API. <br>
@@ -7111,19 +7428,26 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   Drop-Down-Menü des jeweiligen Devices zur Auswahl zur Verfügung. <br><br>
   
   <ul>
+  <a name="SSCamcreateStreamDev"></a>
   <li><b> set &lt;name&gt; createStreamDev [mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
-  Es wird ein separates Streamingpaneel (weblink) erstellt. Dieses Device kann z.B. als separates Device in einem Dashboard genutzt werden.
-  Dem Weblink-Device wird der aktuelle Raum des Kameradevice zugewiesen sofern dort gesetzt. 
-  Die Gestaltung kann durch HTML-Tags im <a href="#SSCamattr">Attribut</a> "htmlattr" im Kameradevice oder mit den spezifischen Attributen
-  im Weblink-Device beeinflusst werden.
+  Es wird ein separates Streaming-Device (Type SSCamSTRM) erstellt. Dieses Device kann z.B. als separates Device 
+  in einem Dashboard genutzt werden.
+  Dem Streaming-Device wird der aktuelle Raum des Kameradevice zugewiesen sofern dort gesetzt. 
+  Die Gestaltung kann durch HTML-Tags im <a href="#SSCamattr">Attribut</a> "htmlattr" im Kameradevice oder mit den 
+  spezifischen Attributen im Streaming-Device beeinflusst werden. <br>
+  Soll ein HLS-Stream im Streaming-Device vom Typ "switched" gestartet werden, muss die Kamera in der Synology Surveillance Station 
+  auf das Videoformat H.264 eingestellt sein. Diese Auswahltaste wird deshalb im nur im Streaming-Device angeboten wenn das 
+  Reading "CamStreamFormat = HLS" beinhaltet. <br>
+  HLS (HTTP Live Streaming) kann momentan nur auf Mac Safari oder mobilen iOS/Android-Geräten wiedergegeben werden. <br>
+  Im "switched"-Device werden Drucktasten zur Steuerung angeboten.
   <br><br>
   
     <ul>
     <table>
     <colgroup> <col width=10%> <col width=90%> </colgroup>
-      <tr><td>mjpeg     </td><td>- das Weblink-Device gibt einen permanenten MJPEG Kamerastream wieder (Streamkey Methode) </td></tr>
-      <tr><td>switched  </td><td>- Inhalte und Wiedergabestatus des Weblink-Devices werden durch den Befehl "set &lt;name&gt; runView ..." gesteuert. </td></tr>
+      <tr><td>mjpeg     </td><td>- das Streaming-Device gibt einen permanenten MJPEG Kamerastream wieder (Streamkey Methode) </td></tr>
+      <tr><td>switched  </td><td>- Wiedergabe unterschiedlicher Streamtypen. Drucktasten zur Steuerung werden angeboten. </td></tr>
     </table>
     </ul>
     <br><br>
@@ -7132,18 +7456,19 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <ul>
   <li><b> set &lt;name&gt; createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
   
-  Es wird ein separates PTZ-Steuerungspaneel (weblink) erstellt. Es wird der aktuelle Raum des Kameradevice zugewiesen sofern
-  dort gesetzt.  
-  Mit den "ptzPanel_.*"-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des entstandenen Weblink-Devices 
-  können die Eigenschaften des PTZ-Paneels beeinflusst werden. <br> 
+  Es wird ein separates PTZ-Steuerungspaneel (Type SSCamSTRM) erstellt. Es wird der aktuelle Raum des Kameradevice 
+  zugewiesen sofern dort gesetzt.  
+  Mit den "ptzPanel_.*"-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des erzeugten 
+  SSCamSTRM-Devices können die Eigenschaften des PTZ-Paneels beeinflusst werden. <br> 
   <br><br>
   </ul>
     
   <ul>
   <li><b> set &lt;name&gt; createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
-  Es wird eine Schnappschußgallerie als permanentes (weblink)Device erzeugt. Das Device wird im Raum "SnapGallery" erstellt.
-  Mit den "snapGallery..."-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des entstandenen Weblink-Devices 
+  Es wird eine Schnappschußgallerie als separates Device (Type SSCamSTRM) erzeugt. Das Device wird im Raum 
+  "SnapGallery" erstellt.
+  Mit den "snapGallery..."-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des erzeugten SSCamSTRM-Devices 
   können die Eigenschaften der Schnappschußgallerie beeinflusst werden. <br> 
   <br><br>
   </ul>
@@ -7451,31 +7776,41 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; runView [live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_fw_MJPEG | lastrec_fw_MPEG4/H.264 | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
-  
-  Mit "live_fw, live_link, live_open" wird ein Livestream (mjpeg-Stream) der Kamera, entweder als eingebettetes Image 
-  oder als generierter Link, gestartet. <br>
-  Die Option "live_open" startet ein separates Browserfenster mit dem Lifestream. Wird dabei optional der Raum mit
-  angegeben, wird das Browserfenster nur gestartet wenn dieser Raum aktuell im Browser geöffnet ist. <br><br> 
-    
-  Der Zugriff auf die letzte Aufnahme einer Kamera kann über die Optionen "lastrec_fw..." bzw. "lastrec_open" erfolgen.
-  Bei Verwendung von "lastrec_fw" wird die letzte Aufnahme als eingebettetes iFrame-Objekt abgespielt. Es stehen entsprechende
-  Steuerungselemente zur Wiedergabegeschwindigkeit usw. zur Verfügung. <br><br>
+  <li><b> set &lt;name&gt; runView [live_fw | live_fw_hls | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_fw_MJPEG | lastrec_fw_MPEG4/H.264 | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   <ul>
   <table>
   <colgroup> <col width=25%> <col width=75%> </colgroup>
-      <tr><td>lastrec_fw             </td><td>- letzte Aufnahme als iFrame Objekt </td></tr>
-      <tr><td>lastrec_fw_MJPEG       </td><td>- nutzbar wenn Aufnahme im Format MJPEG vorliegt </td></tr>
-      <tr><td>lastrec_fw_MPEG4/H.264 </td><td>- nutzbar wenn Aufnahme im Format MPEG4/H.264 vorliegt </td></tr>
+      <tr><td>live_fw                     </td><td>- MJPEG-LiveStream. Audiowiedergabe wird mit angeboten wenn verfügbar. </td></tr>
+      <tr><td>live_fw_hls                 </td><td>- HLS-LiveStream (aktuell nur Mac Safari und mobile iOS/Android-Geräte) </td></tr>
+      <tr><td>live_link                   </td><td>- Link zu einem MJPEG-Livestream </td></tr>
+      <tr><td>live_open [&lt;room&gt;]    </td><td>- öffnet MJPEG-Stream in separatem Browser-Fenster </td></tr>
+      <tr><td>lastrec_fw                  </td><td>- letzte Aufnahme als iFrame Objekt </td></tr>
+      <tr><td>lastrec_fw_MJPEG            </td><td>- nutzbar wenn Aufnahme im Format MJPEG vorliegt </td></tr>
+      <tr><td>lastrec_fw_MPEG4/H.264      </td><td>- nutzbar wenn Aufnahme im Format MPEG4/H.264 vorliegt </td></tr>
+      <tr><td>lastrec_open [&lt;room&gt;] </td><td>- letzte Aufnahme wird in separatem Browser-Fenster geöffnet </td></tr>
+      <tr><td>lastsnap_fw                 </td><td>- letzter Schnappschuss wird dargestellt </td></tr>
   </table>
   </ul>
   <br><br>
   
-  Der Befehl <b>"set &lt;name&gt; runView lastsnap_fw"</b> zeigt den letzten Schnappschuss der Kamera eingebettet an. <br><br>
-  Durch Angabe des optionalen Raumes bei "lastrec_open" erfolgt die gleiche Einschränkung wie bei "live_open". <br><br>
+  Mit <b>"live_fw, live_link, live_open"</b> wird ein MJPEG-Livestream, entweder als eingebettetes Image 
+  oder als generierter Link, gestartet. <br>
+  Der Befehl <b>"live_open"</b> öffnet ein separates Browserfenster mit dem MJPEG-Livestream. Wird dabei optional der Raum mit
+  angegeben, wird das Browserfenster nur dann gestartet, wenn dieser Raum aktuell im Browser geöffnet ist. <br>
+  Soll mit <b>"live_fw_hls"</b> ein HLS-Stream verwendet werden, muss die Kamera in der Synology Surveillance Station auf
+  das Videoformat H.264 (nicht MJPEG) eingestellt sein. Diese Möglichkeit wird deshalb nur dann angeboten wenn das Reading 
+  "CamStreamFormat" den Wert "HLS" hat.
+  <br><br> 
+    
+  Der Zugriff auf die letzte Aufnahme einer Kamera kann über die Optionen <b>"lastrec_fw.*"</b> bzw. <b>"lastrec_open"</b> erfolgen.
+  Bei Verwendung von <b>"lastrec_fw.*"</b> wird die letzte Aufnahme als eingebettetes iFrame-Objekt abgespielt. Es werden entsprechende
+  Steuerungselemente zur Wiedergabegeschwindigkeit usw. angeboten wenn verfügbar. <br><br>
   
-  Die Gestaltung der Fenster im FHEMWEB kann durch HTML-Tags im <a href="#SSCamattr">Attribut</a> "htmlattr" beeinflusst werden. <br><br>
+  Der Befehl <b>"set &lt;name&gt; runView lastsnap_fw"</b> zeigt den letzten Schnappschuss der Kamera eingebettet an. <br>
+  Durch Angabe des optionalen Raumes bei <b>"lastrec_open"</b> erfolgt die gleiche Einschränkung wie bei "live_open". <br>
+  Die Gestaltung der Fenster im FHEMWEB kann durch HTML-Tags im <a href="#SSCamattr">Attribut</a> "htmlattr" beeinflusst werden. 
+  <br><br>
   
   <b>Beispiel:</b><br>
   <pre>
@@ -7485,10 +7820,10 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     
   Wird der Stream als live_fw gestartet, ändert sich die Größe entsprechend der Angaben von Width und Hight. <br>
   Das Kommando <b>"set &lt;name&gt; runView live_open"</b> startet den Livestreamlink sofort in einem neuen 
-  Browserfenster (longpoll=1 muß für WEB gesetzt sein). 
-  Dabei wird für jede aktive FHEM-Session eine Fensteröffnung initiiert. Soll dieses Verhalten geändert werden, kann 
-  <b>"set &lt;name&gt; runView live_open &lt;room&gt;"</b> verwendet werden um das Öffnen des Browserwindows in einem 
-  beliebigen, in einer FHEM-Session angezeigten Raum &lt;room&gt;, zu initiieren.<br>
+  Browserfenster. 
+  Dabei wird für jede aktive FHEMWEB-Session eine Fensteröffnung initiiert. Soll dieses Verhalten geändert werden, kann 
+  <b>"set &lt;name&gt; runView live_open &lt;room&gt;"</b> verwendet werden um das Öffnen des Browserfensters in einem 
+  beliebigen, in einer FHEMWEB-Session aktiven Raum "&lt;room&gt;", zu initiieren.<br>
   Das gesetzte <a href="#SSCamattr">Attribut</a> "livestreamprefix" überschreibt im <a href="#SSCamreadings">Reading</a> "LiveStreamUrl" 
   die Angaben für Protokoll, Servername und Port. Damit kann z.B. die LiveStreamUrl für den Versand und externen Zugriff 
   auf die SVS modifiziert werden. <br><br>
@@ -7498,9 +7833,19 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     attr &lt;name&gt; livestreamprefix https://&lt;Servername&gt;:&lt;Port&gt;
   </pre>
   
-  Der Livestream wird über das Kommando <b>"set &lt;name&gt; stopView"</b> wieder beendet.
+  Der Livestream wird über das Kommando <b>"set &lt;name&gt; stopView"</b> wieder beendet. <br>
+  Die "runView" Funktion schaltet ebenfalls Streaming-Devices vom Typ "switched" in den entsprechenden Modus. <br><br>
+  
+  <b>Hinweis zu HLS (HTTP Live Streaming):</b> <br>
+  Das Video startet mit einer technologisch bedingten Verzögerung. Jeder Stream wird in eine Reihe sehr kleiner Videodateien 
+  (mit etwa 10 Sekunden Länge) segmentiert und an den Client ausgeliefert. 
+  Die Kamera muss in der SVS auf das Videoformat H.264 eingestellt sein und nicht jeder Kameratyp ist gleichermassen für 
+  HLS-Streaming geeignet.
+  Momentan kann HLS nur durch den Mac Safari Browser sowie auf mobilen iOS/Android-Geräten wiedergegeben werden.
+    
   </ul>
   <br><br>
+  
   
   <ul>
   <li><b> set &lt;name&gt; setHome &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
@@ -8020,6 +8365,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <tr><td><li>CamPreRecTime</li>      </td><td>- Dauer der der Voraufzeichnung in Sekunden (Einstellung in SVS)  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- gemeinsamer Ordner auf der DS für Aufnahmen  </td></tr>
     <tr><td><li>CamRecVolume</li>       </td><td>- Volume auf der DS für Aufnahmen  </td></tr>
+    <tr><td><li>CamStreamFormat</li>    </td><td>- aktuelles Format des Videostream  </td></tr>
     <tr><td><li>CamVideoType</li>       </td><td>- listet den eingestellten Videocodec auf </td></tr>
     <tr><td><li>CamVendor</li>          </td><td>- Kamerahersteller Bezeichnung  </td></tr>
     <tr><td><li>CamVideoFlip</li>       </td><td>- Ist das Video gedreht  </td></tr>
