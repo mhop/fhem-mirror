@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 0.6
+#  89_FULLY.pm 0.7
 #
 #  $Id$
 #
@@ -34,7 +34,7 @@ sub FULLY_Abort ($);
 sub FULLY_UpdateReadings ($$);
 sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "0.6";
+my $FULLY_VERSION = "0.7";
 my $FULLY_TIMEOUT = 4;
 my $FULLY_POLL_INTERVAL = 3600;
 
@@ -179,7 +179,8 @@ sub FULLY_Set ($@)
 	my $name = shift @$a;
 	my $opt = shift @$a;
 	my $options = "brightness clearCache:noArg exit:noArg lock:noArg motionDetection:on,off ".
-		"off:noArg on:noArg on-for-timer restart:noArg unlock:noArg speak url";
+		"off:noArg on:noArg on-for-timer restart:noArg screenOffTimer screenSaver:start,stop ".
+		"screenSaverTimer screenSaverURL speak unlock:noArg url";
 	my $response;
 	
 	# Fully commands without argument
@@ -225,6 +226,37 @@ sub FULLY_Set ($@)
 		
 		RemoveInternalTimer ($hash, "FULLY_ScreenOff") if ($par eq 'off' || $par eq 'forever');
 		$hash->{onForTimer} = $par if (defined ($response) && $response ne '');
+	}
+	elsif ($opt eq 'screenOffTimer') {
+		my $value = shift @$a;
+		return "Usage: set $name $opt {seconds}" if (!defined ($value));
+		$response = FULLY_Execute ($hash, "setStringSetting",
+			{ "key" => "timeToScreenOffV2", "value" => "$value" }, 1);		
+	}
+	elsif ($opt eq 'screenSaver') {
+		my $state = shift @$a;
+		return "Usage: set $name $opt { start | stop }" if (!defined ($state));
+		if ($state eq 'start') {
+			$response = FULLY_Execute ($hash, "startScreensaver", undef, 1);
+		}
+		elsif ($state eq 'stop') {
+			$response = FULLY_Execute ($hash, "stopScreensaver", undef, 1);
+		}
+		else {
+			return "Usage: set $name $opt { start | stop }";
+		}
+	}
+	elsif ($opt eq 'screenSaverTimer') {
+		my $value = shift @$a;
+		return "Usage: set $name $opt {seconds}" if (!defined ($value));
+		$response = FULLY_Execute ($hash, "setStringSetting",
+			{ "key" => "timeToScreensaverV2", "value" => "$value" }, 1);		
+	}
+	elsif ($opt eq 'screenSaverURL') {
+		my $value = shift @$a;
+		return "Usage: set $name $opt {URL}" if (!defined ($value));
+		$response = FULLY_Execute ($hash, "setStringSetting",
+			{ "key" => "screensaverURL", "value" => "$value" }, 1);		
 	}
 	elsif ($opt eq 'brightness') {
 		my $value = shift @$a;
@@ -619,6 +651,18 @@ sub FULLY_Ping ($$)
 		</li><br/>
 		<li><b>set &lt;name&gt; restart</b><br/>
 			Restart Fully.
+		</li><br/>
+		<li><b>set &lt;name&gt; screenOffTimer &lt;seconds&gt;</b><br/>
+			Turn screen off after some idle seconds, set to 0 to disable timer.
+		</li><br/>
+		<li><b>set &lt;name&gt; screenSaver { start | stop }</b><br/>
+		   Start or stop screen saver. Screen saver URL can be set with command <b>set screenSaverURL</b>.
+		</li><br/>
+		<li><b>set &lt;name&gt; screenSaverTimer &lt;seconds&gt;</b><br/>
+			Show screen saver URL after some idle seconds, set to 0 to disable timer.
+		</li><br/>
+		<li><b>set &lt;name&gt; screenSaverURL &lt;URL&gt;</b><br/>
+			Show this URL when screensaver starts, set daydream: for Android daydream or dim: for black.<br/>
 		</li><br/>
 		<li><b>set &lt;name&gt; speak &lt;text&gt;</b><br/>
 			Audio output of <i>text</i>. If <i>text</i> contains blanks it must be enclosed
