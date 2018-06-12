@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 5.0.1  12.06.2018    control of page refresh improved (for e.g. Floorplan,Dashboard)
 # 5.0.0  11.06.2018    HLS Streaming, Buttons for Streaming-Devices, use of module SSCamSTRM for Streaming-Devices, 
 #                      deletion of Streaming-devices if SSCam-device is deleted, some more improvements, minor bugfixes
 # 4.3.0  27.05.2018    HLS preparation changed
@@ -229,7 +230,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "5.0.0";
+my $SSCamVersion = "5.0.1";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -887,7 +888,7 @@ sub SSCam_Set($@) {
         
   } elsif ($opt eq "runView" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            
+
       if ($prop eq "live_open") {
           if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
           $hash->{HELPER}{OPENWINDOW} = 1;
@@ -2027,7 +2028,7 @@ sub SSCam_runliveview($) {
         if (AttrVal($name,"debugactivetoken",0)) {
             Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
-        readingsSingleUpdate($hash,"state","startview",1); 
+        readingsSingleUpdate($hash,"state","runView ".$hash->{HELPER}{RUNVIEW},1); 
         SSCam_getapisites($hash);
     
 	} else {
@@ -5390,23 +5391,33 @@ return($hash,$success,$myjson);
 ###############################################################################
 #      Refresh eines Raumes aus $hash->{HELPER}{STRMROOM}
 #      bzw. Longpoll
-#      $hash, $pload (1=page reload), $longpoll (1=Event)
+#      $hash, $pload (1=Page reload), $longpoll (1=Event)
 ###############################################################################
 sub SSCam_refresh($$$) { 
   my ($hash,$pload,$longpoll) = @_;
-  my $name   = $hash->{NAME};
+  my $name = $hash->{NAME};
+  my $fpr  = 0;
   
-  my $r = $hash->{HELPER}{STRMROOM}?$hash->{HELPER}{STRMROOM}:"";
-  Log3($name, 5, "$name - room for refresh: $r");
+  # my $r = $hash->{HELPER}{STRMROOM}?$hash->{HELPER}{STRMROOM}:"";
+  # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
+  my $sd  = defined($hash->{HELPER}{STRMDEV})?$hash->{HELPER}{STRMDEV}:"\"not defined\"";       # Name des aufrufenden SSCamSTRM-Devices
+  my $sr  = defined($hash->{HELPER}{STRMROOM})?$hash->{HELPER}{STRMROOM}:"\"not defined\"";     # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
+  my $sl  = defined($hash->{HELPER}{STRMDETAIL})?$hash->{HELPER}{STRMDETAIL}:"\"not defined\""; # Name des SSCamSTRM-Devices (wenn Detailansicht)
+  $fpr    = AttrVal($hash->{HELPER}{STRMDEV},"forcePageRefresh",0) if(defined $hash->{HELPER}{STRMDEV});
+  Log3($name, 4, "$name - SSCam_refresh - caller: $sd, callerroom: $sr, detail: $sl, forcePageRefresh: $fpr");
   
-  if($pload) {
-      if($hash->{HELPER}{STRMROOM} && $hash->{HELPER}{STRMROOM} !~ /^detail=.*$/) {
-          # Raumrefresh
+  if($pload && defined($hash->{HELPER}{STRMROOM}) && defined($hash->{HELPER}{STRMDETAIL})) {
+      if($hash->{HELPER}{STRMROOM} && !$hash->{HELPER}{STRMDETAIL} && !$fpr) {
+          # trifft zu wenn in einer Raumansicht
 	      my @rooms = split(",",$hash->{HELPER}{STRMROOM});
 	      foreach (@rooms) {
 	          my $room = $_;
-              { map { FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("WEB.*") } 
+              { map { FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") } 
 	      }
+      } elsif ( !$hash->{HELPER}{STRMROOM} || $hash->{HELPER}{STRMDETAIL} || $fpr ) {
+          # trifft zu bei Detailansicht oder im FLOORPLAN bzw. Dashboard oder wenn Seitenrefresh mit dem 
+          # SSCamSTRM-Attribut "forcePageRefresh" erzwungen wird
+          { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
       } 
   }
   
@@ -5687,7 +5698,7 @@ return;
 #              Methode: GetLiveViewPath
 ######################################################################################
 sub SSCam_StreamDev($$$) {
-  my ($camname,$livdev,$fmt) = @_; 
+  my ($camname,$strmdev,$fmt) = @_; 
   my $hash               = $defs{$camname};
   my $wltype             = $hash->{HELPER}{WLTYPE}; 
   my $serveraddr         = $hash->{SERVERADDR};
@@ -5705,17 +5716,19 @@ sub SSCam_StreamDev($$$) {
   my $sid                = $hash->{HELPER}{SID};
   my ($cause,$ret,$link,$audiolink,$devWlink,$wlhash,$alias,$wlalias);
   
-  # den Raum/Räume des Streamingdevice speichern für Refresh  
-  $hash->{HELPER}{STRMROOM} = AttrVal($livdev,"room",undef)?AttrVal($livdev,"room",undef):$FW_webArgs{room};                                              
+  # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
+  $hash->{HELPER}{STRMDEV}    = $strmdev;                   # Name des aufrufenden SSCamSTRM-Devices
+  $hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";       # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
+  $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";   # Name des SSCamSTRM-Devices (wenn Detailansicht)
      
   my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');  # HTML Attribute der Cam
-  $ha        = AttrVal($livdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
+  $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
   my $hlslfw = (ReadingsVal($camname,"CamStreamFormat","MJPEG") eq "HLS")?"live_fw_hls,":undef;
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
-  $wlalias  = AttrVal($livdev, "alias", $livdev);   # Linktext als Aliasname oder Devicename setzen
-  $devWlink = "<a href=\"/fhem?detail=$livdev\">$wlalias</a>"; 
-  $wlhash   = $defs{$livdev};
+  $wlalias  = AttrVal($strmdev, "alias", $strmdev);   # Linktext als Aliasname oder Devicename setzen
+  $devWlink = "<a href=\"/fhem?detail=$strmdev\">$wlalias</a>"; 
+  $wlhash   = $defs{$strmdev};
 
   # Document Division
   $ret  = sprintf("<div class=\"makeTable wide\"> $devWlink");

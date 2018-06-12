@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  49_SSCamSTRM: new attribute "forcePageRefresh" for better control
+                           of page refresh (for e.g. Floorplan,Dashboard)
   - feature: 89_FULLY: Added screen saver commands.
   - feature: 49_SSCam: V5.0.0, HLS Streaming implemented, new Streamingdevice
                        based on module 49_SSCamSTRM, some improvements & fixes

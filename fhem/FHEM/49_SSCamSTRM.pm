@@ -28,6 +28,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 0.3    12.06.2018    new attribute "forcePageRefresh"
 # 0.2    11.06.2018    check in with SSCam 5.0.0
 # 0.1    10.06.2018    initial Version
 
@@ -38,14 +39,14 @@ use strict;
 use warnings;
 use vars qw($FW_subdir);  # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
 
-my $SSCamSTRMVersion = "0.2";
+my $SSCamSTRMVersion = "0.3";
 
 ################################################################
 sub SSCamSTRM_Initialize($) {
   my ($hash) = @_;
 
   $hash->{DefFn}        = "SSCamSTRM_Define";
-  $hash->{AttrList}     = "disable:0,1 htmlattr ";
+  $hash->{AttrList}     = "disable:1,0 forcePageRefresh:1,0 htmlattr ";
   $hash->{FW_summaryFn} = "SSCamSTRM_FwFn";
   $hash->{FW_detailFn}  = "SSCamSTRM_FwFn";
   $hash->{FW_atPageEnd} = 1;
@@ -131,22 +132,40 @@ return $ret;
 
   <a name="SSCamSTRMget"></a>
   <b>Get</b> <ul>N/A</ul><br>
-
+  
   <a name="SSCamSTRMattr"></a>
   <b>Attributes</b>
+  <br><br>
   
   <ul>
+  <ul>
+
+    <li><b>disable</b><br>
+      deactivates the device definition
+    </li>
+    <br>
+    
+    <li><b>forcePageRefresh</b><br>
+      The attribute is evaluated by SSCam. <br>
+      If set, a reload of all browser pages with active FHEMWEB-connections will be enforced. 
+      The restriction of a page reload of only one room or more rooms is canceled by this attribute, if the SSCamSTRM-Device 
+      is e.g. added to a FLOORPLAN or Dashboard and it is additionally located in one or more rooms.       
+    </li>
+    <br>
+    
     <a name="htmlattr"></a>
-    <li>htmlattr - HTML attributes to be used for Streaming device e.g.:<br>
+    <li><b>htmlattr</b><br>
+      HTML attributes to be used for Streaming device e.g.: <br><br>
       <ul>
         <code>
-        attr &lt;name&gt; htmlattr width="480" height="560"<br>
+        attr &lt;name&gt; htmlattr width="480" height="560"
         </code>
-      </ul></li>
-
-    <li>disable - deactivates the device definition</li>
+        <br><br>
+      </ul>
+    </li>
+  
   </ul>
-  <br>
+  </ul>
   
 </ul>
 
@@ -174,19 +193,38 @@ return $ret;
 
   <a name="SSCamSTRMattr"></a>
   <b>Attributes</b>
+  <br><br>
   
   <ul>
+  <ul>
+  
+    <li><b>disable</b><br>
+      aktiviert/deaktiviert das Device
+    </li>
+    <br>
+    
+    <li><b>forcePageRefresh</b><br>
+      Das Attribut wird durch SSCam ausgewertet. <br>
+      Wenn gesetzt, wird ein Reload aller Browserseiten mit aktiven FHEMWEB-Verbindungen bei bestimmten Aktionen erzwungen. 
+      Die Beschränkung des Seitenreloads auf nur einen oder mehrere Räume wird mit diesem Attribut aufgehoben, falls das 
+      SSCamSTRM-Device sich z.B. in einem FLOORPLAN oder Dashboard befindet und zusätzlich in einen oder mehrere Räume 
+      eingefügt ist.       
+    </li>
+    <br>
+    
     <a name="htmlattr"></a>
-    <li>htmlattr - HTML-Attribute zur Darstellungänderung des SSCam Streaming Device z.B.:<br>
+    <li><b>htmlattr</b><br>
+      HTML-Attribute zur Darstellungsänderung des SSCam Streaming Device z.B.: <br><br>
       <ul>
         <code>
-        attr &lt;name&gt; htmlattr width="480" height="560"<br>
+        attr &lt;name&gt; htmlattr width="480" height="560"
         </code>
-      </ul></li>
+        <br><br>
+      </ul>
+    </li>
 
-    <li>disable - aktiviert/deaktiviert das Device</li>
   </ul>
-  <br>
+  </ul>
   
 </ul>
 
