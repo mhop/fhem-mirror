@@ -1417,7 +1417,7 @@ KNX_checkAndClean ($$$)
 	#if max is numeric, cast to max
 	#$value = $max if (defined ($max) and ($max =~ /^[+-]?\d*[.,]?\d+/) and ($value > $max));
 	
-	$value = KNX_limit ($hash, $value, $gadName);	
+	$value = KNX_limit ($hash, $value, $gadName, undef);	
 
 	Log3 ($name, 3, "check value: input-value $orgValue was casted to $value") if (not($orgValue eq $value));		
 	Log3 ($name, 5, "check value: $value, gadName: $gadName, model: $model, pattern: $pattern");
