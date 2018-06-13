@@ -50,7 +50,7 @@ eval "use Blocking;1" or $missingModul .= "Blocking ";
 #use Data::Dumper;          only for Debugging
 
 
-my $version = "2.0.13";
+my $version = "2.0.14";
 
 
 
@@ -656,8 +656,8 @@ sub XiaomiBTLESens_FlowerSensHandle0x38($$) {
 
     my @dataBatFw   = split(" ",$notification);
 
-    $readings{'batteryLevel'}   = hex("0x".$dataBatFw[0]);
-    $readings{'battery'}        = (hex("0x".$dataBatFw[0]) > 15 ? "ok" : "low");
+    #$readings{'batteryLevel'}   = hex("0x".$dataBatFw[0]);
+    #$readings{'battery'}        = (hex("0x".$dataBatFw[0]) > 15 ? "ok" : "low");
     ### neue Vereinheitlichung für Batteriereadings Forum #800017
     $readings{'batteryPercent'}   = hex("0x".$dataBatFw[0]);
     $readings{'batteryState'}        = (hex("0x".$dataBatFw[0]) > 15 ? "ok" : "low");
@@ -711,8 +711,11 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x18($$) {
     
     chomp($notification);
         
-    $readings{'batteryLevel'}   = hex("0x".$notification);
-    $readings{'battery'}        = (hex("0x".$notification) > 15 ? "ok" : "low");
+    #$readings{'batteryLevel'}   = hex("0x".$notification);
+    #$readings{'battery'}        = (hex("0x".$notification) > 15 ? "ok" : "low");
+    ### neue Vereinheitlichung für Batteriereadings Forum #800017
+    $readings{'batteryPercent'}   = hex("0x".$notification);
+    $readings{'batteryState'}        = (hex("0x".$notification) > 15 ? "ok" : "low");
         
     $hash->{helper}{CallBattery} = 1;
     XiaomiBTLESens_CallBattery_Timestamp($hash);
@@ -797,7 +800,9 @@ sub XiaomiBTLESens_WriteReadings($$) {
         readingsBulkUpdate($hash,$r,$v);
     }
 
-    readingsBulkUpdateIfChanged($hash, "state", ($readings->{'lastGattError'}?'error':'active'));
+    readingsBulkUpdateIfChanged($hash, "state", ($readings->{'lastGattError'}?'error':'active')) if( AttrVal($name,'model','none') eq 'flowerSens' );
+    readingsBulkUpdateIfChanged($hash, "state", ($readings->{'lastGattError'}?'error':'T: '.ReadingsVal($name,'temperature',0).' H: '.ReadingsVal($name,'humidity',0)) ) if( AttrVal($name,'model','none') eq 'thermoHygroSens' );
+    
     readingsEndUpdate($hash,1);
 
 
