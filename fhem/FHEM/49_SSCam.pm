@@ -27,6 +27,9 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 5.2.0  14.06.2018    support longpoll refresh of SSCamSTRM-Devices
+# 5.1.0  13.06.2018    more control elements (Start/Stop Recording, Take Snapshot) in func SSCam_StreamDev
+#                      control of detaillink is moved to SSCamSTRM-device
 # 5.0.1  12.06.2018    control of page refresh improved (for e.g. Floorplan,Dashboard)
 # 5.0.0  11.06.2018    HLS Streaming, Buttons for Streaming-Devices, use of module SSCamSTRM for Streaming-Devices, 
 #                      deletion of Streaming-devices if SSCam-device is deleted, some more improvements, minor bugfixes
@@ -230,7 +233,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "5.0.1";
+my $SSCamVersion = "5.2.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -2171,7 +2174,7 @@ sub SSCam_stopliveview ($) {
             SSCam_getapisites($hash);
         } else {
             # kein HLS Stream
-			SSCam_refresh($hash,1,1);    # Room-Refresh, Longpoll
+			SSCam_refresh($hash,0,1,1);    # kein Room-Refresh, Longpoll SSCam, Longpoll SSCamSTRM
 		    $hash->{HELPER}{ACTIVE} = "off";  
 		    if (AttrVal($name,"debugactivetoken",0)) {
                 Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
@@ -3886,7 +3889,7 @@ sub SSCam_camop ($) {
           }
       }
            
-	  SSCam_refresh($hash,1,1);    # Room-Refresh, Longpoll
+	  SSCam_refresh($hash,0,1,1);    # kein Room-Refresh, Longpoll SSCam, Longpoll SSCamSTRM
       
 	  $hash->{HELPER}{ACTIVE} = "off";
       if (AttrVal($name,"debugactivetoken",0)) {
@@ -4039,6 +4042,8 @@ sub SSCam_camop_parse ($) {
                     RemoveInternalTimer($hash, "SSCam_camstoprec");
                     InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", $hash);
                 }      
+                
+                SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein Longpoll SSCam, Longpoll SSCamSTRM
             
 			} elsif ($OpMode eq "Stop") {                
 			
@@ -4051,6 +4056,8 @@ sub SSCam_camop_parse ($) {
        
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname Recording stopped");
+                
+                SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein Longpoll SSCam, Longpoll SSCamSTRM
                 
                 # Aktualisierung Eventlist der letzten Aufnahme
                 SSCam_geteventlist($hash);
@@ -4245,9 +4252,10 @@ sub SSCam_camop_parse ($) {
 			} elsif ($OpMode eq "Snap") {
                 # ein Schnapschuß wurde aufgenommen
                 # falls Aufnahme noch läuft -> state = on setzen
-	            my $st;
-	            (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
-	            readingsSingleUpdate($hash,"state", $st, 0);
+	            # my $st;
+	            # (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
+	            # readingsSingleUpdate($hash,"state", $st, 0);
+                SSCam_refresh($hash,0,0,0);     # kein Room-Refresh, kein Longpoll SSCam, kein Longpoll SSCamSTRM	
                 
                 $snapid = $data->{data}{'id'};
                 
@@ -4300,11 +4308,11 @@ sub SSCam_camop_parse ($) {
 				    delete $hash->{HELPER}{RUNVIEW};
                     # Aufnahmestatus in state abbilden
 	                my $st;
-	                (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
-	                readingsSingleUpdate($hash,"state", $st, 0); 
+	                # (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
+	                # readingsSingleUpdate($hash,"state", $st, 0); 
 					
 					$hash->{HELPER}{LINK} = $data->{data}{data}[0]{imageData};
-                    SSCam_refresh($hash,1,1);     # Page Refresh, Longpoll					
+                    SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein Longpoll SSCam, Longpoll SSCamSTRM					
 				}
 
                 if($OpMode eq "getsnapgallery") {
@@ -4369,14 +4377,14 @@ sub SSCam_camop_parse ($) {
                 Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated, Streaming-URL: $url") if(AttrVal($name,"verbose",3) == 4);
                 Log3($name, 3, "$name - HLS Streaming of camera \"$name\" activated") if(AttrVal($name,"verbose",3) == 3);
                 
-                SSCam_refresh($hash,1,1);   # Page Refresh, Longpoll
+                SSCam_refresh($hash,0,1,1);   # kein Room-Refresh, Longpoll SSCam, Longpoll SSCamSTRM
                 
             } elsif ($OpMode eq "stopliveview_hls") {
                 # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
                 $hash->{HELPER}{HLSSTREAM} = "inactive";
                 Log3($name, 3, "$name - HLS Streaming of camera \"$name\" deactivated");
                                
-                SSCam_refresh($hash,1,1);   # Page Refresh, Longpoll
+                SSCam_refresh($hash,0,1,1);   # kein Room-Refresh, Longpoll SSCam, Longpoll SSCamSTRM
                 
             } elsif ($OpMode eq "reactivate_hls") {
                 # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
@@ -4387,12 +4395,12 @@ sub SSCam_camop_parse ($) {
                 $hash->{HELPER}{ACTIVE} = "off";
                 SSCam_hlsactivate($hash);
                 
-                SSCam_refresh($hash,1,1);   # Page Refresh, Longpoll
-                
             } elsif ($OpMode eq "activate_hls") {
                 # HLS Streaming wurde aktiviert, Aktivitätsstatus speichern
                 $hash->{HELPER}{HLSSTREAM} = "active"; 
                 Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated for streaming device");
+                
+                SSCam_refresh($hash,0,1,1);   # kein Room-Refresh, Longpoll SSCam, Longpoll SSCamSTRM
                                 
             } elsif ($OpMode eq "getsnapfilename") {
                 # den Filenamen eines Schnapschusses ermitteln
@@ -4414,7 +4422,7 @@ sub SSCam_camop_parse ($) {
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
-                readingsBulkUpdate($hash,"CamStreamFormat", uc($sformat));
+                readingsBulkUpdate($hash,"CamStreamFormat", uc($sformat)) if($sformat);
                 readingsEndUpdate($hash, 1);                
             
 			} elsif ($OpMode eq "gopreset") {
@@ -5388,17 +5396,17 @@ sub SSCam_evaljson($$) {
 return($hash,$success,$myjson);
 }
 
-###############################################################################
+######################################################################################################
 #      Refresh eines Raumes aus $hash->{HELPER}{STRMROOM}
-#      bzw. Longpoll
-#      $hash, $pload (1=Page reload), $longpoll (1=Event)
-###############################################################################
-sub SSCam_refresh($$$) { 
-  my ($hash,$pload,$longpoll) = @_;
+#      bzw. Longpoll von SSCam bzw. eines SSCamSTRM Devices wenn
+#      $hash->{HELPER}{STRMDEV} gefüllt 
+#      $hash, $pload (1=Page reload), $longpoll SSCam(1=Event), $longpoll SSCamSTRM (1=Event)
+######################################################################################################
+sub SSCam_refresh($$$$) { 
+  my ($hash,$pload,$lpoll_scm,$lpoll_strm) = @_;
   my $name = $hash->{NAME};
   my $fpr  = 0;
   
-  # my $r = $hash->{HELPER}{STRMROOM}?$hash->{HELPER}{STRMROOM}:"";
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
   my $sd  = defined($hash->{HELPER}{STRMDEV})?$hash->{HELPER}{STRMDEV}:"\"not defined\"";       # Name des aufrufenden SSCamSTRM-Devices
   my $sr  = defined($hash->{HELPER}{STRMROOM})?$hash->{HELPER}{STRMROOM}:"\"not defined\"";     # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
@@ -5421,12 +5429,22 @@ sub SSCam_refresh($$$) {
       } 
   }
   
-  # Aufnahmestatus in state abbilden & Longpoll
+  # Aufnahmestatus in state abbilden & Longpoll SSCam-Device wenn Event 1
   my $st = (ReadingsVal($name, "Record", "") eq "Start")?"on":"off";  
-  if($longpoll) {
+  if($lpoll_scm) {
       readingsSingleUpdate($hash,"state", $st, 1);
   } else {
       readingsSingleUpdate($hash,"state", $st, 0);  
+  }
+  
+  # Longpoll des SSCamSTRM-Device
+  if($hash->{HELPER}{STRMDEV}) {
+      my $strmhash = $defs{$hash->{HELPER}{STRMDEV}};  
+      if($lpoll_strm) {
+          readingsSingleUpdate($strmhash,"state", $st, 1);
+      } else {
+          readingsSingleUpdate($strmhash,"state", $st, 0);  
+      } 
   }
   
 return;
@@ -5578,13 +5596,13 @@ sub SSCam_ptzpanel($;$$) {
   
   $ptz_ret = "<div class=\"ptzpanel\">";
   $ptz_ret.= '<table class="rc_body">';
-  
+
   foreach my $rownr (0..9) {
       $rownr = sprintf("%2.2d",$rownr);
       $row   = AttrVal("$name","ptzPanel_row$rownr",undef);
       next if (!$row);
       $rowisset = 1;
-      $ptz_ret .= "<tr>\n";
+      $ptz_ret .= "<tr>";
       my @btn = split (",",$row);                    # die Anzahl Buttons in einer Reihe
       
       foreach my $btnnr (0..$#btn) {                 
@@ -5720,18 +5738,37 @@ sub SSCam_StreamDev($$$) {
   $hash->{HELPER}{STRMDEV}    = $strmdev;                   # Name des aufrufenden SSCamSTRM-Devices
   $hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";       # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
   $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";   # Name des SSCamSTRM-Devices (wenn Detailansicht)
-     
-  my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');  # HTML Attribute der Cam
+  
+  # Definition Tasten
+  my $cmdstop       = "cmd=set $camname stopView";                                                      # Stream deaktivieren
+  my $imgstop       = "<img src=\"$FW_ME/www/images/default/remotecontrol/black_btn_POWEROFF3.png\">";
+  my $cmdhlsreact   = "cmd=set $camname hlsreactivate";                                                 # HLS Stream reaktivieren
+  my $imghlsreact   = "<img src=\"$FW_ME/www/images/default/remotecontrol/black_btn_BACKDroid.png\">";
+  my $cmdmjpegrun   = "cmd=set $camname runView live_fw";                                               # MJPEG Stream aktivieren  
+  my $imgmjpegrun   = "<img src=\"$FW_ME/www/images/sscam/black_btn_MJPEG.png\">";
+  my $cmdhlsrun     = "cmd=set $camname runView live_fw_hls";                                           # HLS Stream aktivieren  
+  my $imghlsrun     = "<img src=\"$FW_ME/www/images/sscam/black_btn_HLS.png\">";
+  my $cmdlrirun     = "cmd=set $camname runView lastrec_fw";                                            # Last Record IFrame  
+  my $imglrirun     = "<img src=\"$FW_ME/www/images/sscam/black_btn_LASTRECIFRAME.png\">";
+  my $cmdlh264run   = "cmd=set $camname runView lastrec_fw_MPEG4/H.264";                                # Last Record H.264  
+  my $imglh264run   = "<img src=\"$FW_ME/www/images/sscam/black_btn_LRECH264.png\">";
+  my $cmdlmjpegrun  = "cmd=set $camname runView lastrec_fw_MJPEG";                                      # Last Record MJPEG  
+  my $imglmjpegrun  = "<img src=\"$FW_ME/www/images/sscam/black_btn_LRECMJPEG.png\">";
+  my $cmdlsnaprun   = "cmd=set $camname runView lastsnap_fw";                                           # Last SNAP  
+  my $imglsnaprun   = "<img src=\"$FW_ME/www/images/sscam/black_btn_LSNAP.png\">";
+  my $cmdrecendless = "cmd=set $camname on 0";                                                          # Endlosaufnahme Start  
+  my $imgrecendless = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTART.png\">";
+  my $cmdrecstop    = "cmd=set $camname off";                                                           # Aufnahme Stop  
+  my $imgrecstop    = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTOP.png\">";
+  my $cmddosnap     = "cmd=set $camname snap";                                                          # Snapshot auslösen 
+  my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
+  
+  my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
   $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
   my $hlslfw = (ReadingsVal($camname,"CamStreamFormat","MJPEG") eq "HLS")?"live_fw_hls,":undef;
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
-  $wlalias  = AttrVal($strmdev, "alias", $strmdev);   # Linktext als Aliasname oder Devicename setzen
-  $devWlink = "<a href=\"/fhem?detail=$strmdev\">$wlalias</a>"; 
-  $wlhash   = $defs{$strmdev};
-
-  # Document Division
-  $ret  = sprintf("<div class=\"makeTable wide\"> $devWlink");
+  $ret  = "<div class=\"makeTable wide\">";
   $ret .= '<table class="block wide internals">';
   $ret .= '<tbody>';
   $ret .= '<tr class="odd">';  
@@ -5739,8 +5776,8 @@ sub SSCam_StreamDev($$$) {
   if(!$StmKey || ReadingsVal($camname, "Availability", "") ne "enabled" || IsDisabled($camname)) {
       # Ausgabe bei Fehler
       my $cam = AttrVal($camname, "alias", $camname);
-      $cause = !$StmKey?"Camera $cam has no Reading \"StmKey\" set !":"Camera \"$cam\" is disabled";
-      $cause = "Camera \"$cam\" is disabled" if(IsDisabled($camname));
+      $cause = !$StmKey?"Cam $cam has no Reading \"StmKey\" set !":"Cam \"$cam\" is disabled";
+      $cause = "Cam \"$cam\" is disabled" if(IsDisabled($camname));
       $ret .= "<td> <br> <b> $cause </b> <br><br></td>";
       $ret .= '</tr>';
       $ret .= '</tbody>';
@@ -5750,7 +5787,6 @@ sub SSCam_StreamDev($$$) {
   }
   
   if($fmt =~ /mjpeg/) {  
-      # $link      = "http://$serveraddr:$serverport/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&format=mjpeg&cameraId=$camid&StmKey=\"$StmKey\"";
       $link      = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
       $audiolink = "http://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
       $ret .= "<td><img src=$link $ha> </td>"; 
@@ -5760,39 +5796,30 @@ sub SSCam_StreamDev($$$) {
               $ret .= "<td>$ptz_ret</td>";
           }
       }
-      $ret .= '</tr>';
       if($audiolink && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+          $ret .= '</tr>';
           $ret .= '<tr class="odd">';
           $ret .= "<td><audio src=$audiolink preload='none' volume='0.5' controls>
                        Your browser does not support the audio element.      
                        </audio></td>";
-          $ret .= '</tr>'; 
       }      
   
   } elsif($fmt =~ /switched/) {
       my $wltype = $hash->{HELPER}{WLTYPE};
       $link = $hash->{HELPER}{LINK};
-      my $cmdstop     = "cmd=set $camname stopView";                                                      # Stream deaktivieren
-      my $imgstop     = "<img src=\"$FW_ME/www/images/default/remotecontrol/black_btn_POWEROFF3.png\">";
-      my $cmdhlsreact = "cmd=set $camname hlsreactivate";                                                 # HLS Stream reaktivieren
-      my $imghlsreact = "<img src=\"$FW_ME/www/images/default/remotecontrol/black_btn_BACKDroid.png\">";
-      my $cmdmjpegrun = "cmd=set $camname runView live_fw";                                               # MJPEG Stream aktivieren  
-      my $imgmjpegrun = "<img src=\"$FW_ME/www/images/sscam/black_btn_MJPEG.png\">";
-      my $cmdhlsrun   = "cmd=set $camname runView live_fw_hls";                                           # HLS Stream aktivieren  
-      my $imghlsrun   = "<img src=\"$FW_ME/www/images/sscam/black_btn_HLS.png\">";
-      my $cmdlrirun   = "cmd=set $camname runView lastrec_fw";                                            # Last Record IFrame  
-      my $imglrirun   = "<img src=\"$FW_ME/www/images/sscam/black_btn_LASTRECIFRAME.png\">";
-      my $cmdlh264run = "cmd=set $camname runView lastrec_fw_MPEG4/H.264";                                # Last Record H.264  
-      my $imglh264run = "<img src=\"$FW_ME/www/images/sscam/black_btn_LRECH264.png\">";
-      my $cmdlmjpegrun = "cmd=set $camname runView lastrec_fw_MJPEG";                                     # Last Record MJPEG  
-      my $imglmjpegrun = "<img src=\"$FW_ME/www/images/sscam/black_btn_LRECMJPEG.png\">";
-      my $cmdlsnaprun = "cmd=set $camname runView lastsnap_fw";                                          # Last SNAP  
-      my $imglsnaprun = "<img src=\"$FW_ME/www/images/sscam/black_btn_LSNAP.png\">";
       
       if($link && $wltype =~ /image|iframe|video|base64img|embed|hls/) {
           if($wltype =~ /image/) {
               $ret .= "<td><img src=$link $ha><br>";
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";               
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>"; 
+              if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
+                  # Aufnahmebutton endlos Start
+                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
+              }	else {
+                  # Aufnahmebutton Stop
+                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\">$imgrecstop </a>";
+              }	      
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\">$imgdosnap </a>";               
               $ret .= "</td>";
               if(AttrVal($camname,"ptzPanel_use",1)) {
                   my $ptz_ret = SSCam_ptzpanel($camname);
@@ -5852,7 +5879,15 @@ sub SSCam_StreamDev($$$) {
                        Your browser does not support the video tag
                        </video><br>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\">$imghlsreact </a>";			  
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\">$imghlsreact </a>";
+              if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
+                  # Aufnahmebutton endlos Start
+                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
+              }	else {
+                  # Aufnahmebutton Stop
+                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\">$imgrecstop </a>";
+              }		
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\">$imgdosnap </a>";                   
               $ret .= "</td>";
               if(AttrVal($camname,"ptzPanel_use",1)) {
                   my $ptz_ret = SSCam_ptzpanel($camname);
@@ -5863,7 +5898,7 @@ sub SSCam_StreamDev($$$) {
           } 
       } else {
           my $cam = AttrVal($camname, "alias", $camname);
-          $cause = "Videostream of camera \"$cam\" is switched off";
+          $cause = "Playback cam \"$cam\" switched off";
           $ret .= "<td> <br> <b> $cause </b> <br><br>";
           $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdmjpegrun')\">$imgmjpegrun </a>";
           $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsrun')\">$imghlsrun </a>" if($hlslfw);  
@@ -5890,7 +5925,7 @@ return $ret;
 #                   Schnappschußgalerie zusammenstellen
 ###############################################################################
 sub composegallery ($;$$) { 
-  my ($name,$wlname,$model) = @_;
+  my ($name,$strmdev,$model) = @_;
   my $hash     = $defs{$name};
   my $camname  = $hash->{CAMNAME};
   my $allsnaps = $hash->{HELPER}{".SNAPHASH"}; # = \%allsnaps
@@ -5908,20 +5943,22 @@ sub composegallery ($;$$) {
   my $ha = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
   
   # falls "composegallery" durch ein mit "createSnapGallery" angelegtes Device aufgerufen wird
-  my ($devWlink,$wlhash,$wlha,$wlalias);
-  if ($wlname) {
-      $wlalias  = AttrVal($wlname, "alias", $wlname);   # Linktext als Aliasname oder Devicename setzen
-      $devWlink = "<a href=\"/fhem?detail=$wlname\">$wlalias</a>"; 
-      $wlhash   = $defs{$wlname};
-      $wlha     = AttrVal($wlname, "htmlattr", undef); 
-      $ha       = (defined($wlha))?$wlha:$ha;           # htmlattr vom weblink-Device übernehmen falls von wl-Device aufgerufen und gesetzt   
+  my ($devWlink);
+  if ($strmdev) {
+      if($defs{$strmdev}{TYPE} ne "SSCamSTRM") {
+          # Abfrage wegen Kompatibilität zu "alten" compose mit weblink-Modul
+          my $sdalias = AttrVal($strmdev, "alias", $strmdev);   # Linktext als Aliasname oder Devicename setzen
+          $devWlink   = "<a href=\"/fhem?detail=$strmdev\">$sdalias</a><br>"; 
+      }   
+      my $wlha = AttrVal($strmdev, "htmlattr", undef); 
+      $ha      = (defined($wlha))?$wlha:$ha;             # htmlattr vom weblink-Device übernehmen falls von wl-Device aufgerufen und gesetzt   
   } else {
       $devWlink = " ";
   }
   
   # wenn Weblink genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
   my $sgbnote = " ";
-  if($wlname && !AttrVal($name,"snapGalleryBoost",0)) {
+  if($strmdev && !AttrVal($name,"snapGalleryBoost",0)) {
       $sgbnote = "<b>CAUTION</b> - No snapshots can be retrieved. Please set the attribute \"snapGalleryBoost=1\" in device <a href=\"/fhem?detail=$name\">$name</a>" if ($lang eq "EN");
 	  $sgbnote = "<b>ACHTUNG</b> - Es können keine Schnappschüsse abgerufen werden. Bitte setzen sie das Attribut \"snapGalleryBoost=1\" im Device <a href=\"/fhem?detail=$name\">$name</a>" if ($lang eq "DE");
   }
@@ -5943,7 +5980,7 @@ sub composegallery ($;$$) {
   # Ausgabetabelle erstellen
   my ($htmlCode,$ct);
   $htmlCode  = "<html>";
-  $htmlCode .= sprintf("$devWlink<br> <div class=\"makeTable wide\"; style=\"text-align:center\"> $header <br>");
+  $htmlCode .= sprintf("$devWlink <div class=\"makeTable wide\"; style=\"text-align:center\"> $header <br>");
   $htmlCode .= "<table class=\"block wide internals\">";
   $htmlCode .= "<tbody>";
   $htmlCode .= "<tr class=\"odd\">";
@@ -6512,14 +6549,16 @@ sub SSCam_experror {
   <br><br>
   
   <ul>
-  <li><b>set &lt;name&gt; [on|off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b>set &lt;name&gt; [on [&lt;rectime&gt;] | off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
    
-  The command "set &lt;name&gt; on" starts a recording. The default recording time takes 15 seconds. It can be changed by the <a href="#SSCamattr">attribute</a> "rectime" individualy. 
-  With the <a href="#SSCamattr">attribute</a> (respectively the default value) provided recording time can be overwritten once by "set &lt;name&gt; on [rectime]".
+  The command "set &lt;name&gt; on" starts a recording. The default recording time takes 15 seconds. It can be changed by 
+  the <a href="#SSCamattr">attribute</a> "rectime" individualy. 
+  With the <a href="#SSCamattr">attribute</a> (respectively the default value) provided recording time can be overwritten 
+  once by "set &lt;name&gt; on &lt;rectime&gt;".
   The recording will be stopped after processing time "rectime"automatically.<br>
 
-  A special case is the start using "set &lt;name&gt; on 0" respectively the attribute value "rectime = 0". In that case a endless-recording will be started. One have to stop this recording
-  by command "set &lt;name&gt; off" explicitely.<br>
+  A special case is start recording by "set &lt;name&gt; on 0" respectively the attribute value "rectime = 0". In that case 
+  a endless-recording will be started. One have to stop this recording by command "set &lt;name&gt; off" explicitely.<br>
 
   The recording behavior can be impacted with <a href="#SSCamattr">attribute</a> "recextend" furthermore as explained as follows.<br><br>
 
@@ -7711,16 +7750,19 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; [on|off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
+  <li><b> set &lt;name&gt; [on [&lt;rectime&gt;] | off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
 
-  Der Befehl "set &lt;name&gt; on" startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem Attribut "rectime" individuell festgelegt werden. 
-  Die im Attribut (bzw. im Standard) hinterlegte Aufnahmedauer kann einmalig mit "set &lt;name&gt; on [rectime]" überschrieben werden.
+  Der Befehl "set &lt;name&gt; on" startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem 
+  Attribut "rectime" individuell festgelegt werden. 
+  Die im Attribut (bzw. im Standard) hinterlegte Aufnahmedauer kann einmalig mit "set &lt;name&gt; on &lt;rectime&gt;" 
+  überschrieben werden.
   Die Aufnahme stoppt automatisch nach Ablauf der Zeit "rectime".<br>
 
-  Ein Sonderfall ist der Start einer Daueraufnahme mit "set &lt;name&gt; on 0" bzw. dem Attributwert "rectime = 0". In diesem Fall wird eine Daueraufnahme gestartet die 
-  explizit wieder mit dem Befehl "set &lt;name&gt; off" gestoppt werden muß.<br>
+  Ein Sonderfall ist der Start einer Daueraufnahme mit "set &lt;name&gt; on 0" bzw. dem Attributwert "rectime = 0". 
+  In diesem Fall wird eine Daueraufnahme gestartet, die explizit wieder mit dem Befehl "set &lt;name&gt; off" gestoppt 
+  werden muß.<br>
 
-  Das Aufnahmeverhalten kann weiterhin mit dem Attribut "recextend" wie folgt beeinflusst werden.<br><br>
+  Das Aufnahmeverhalten kann weiterhin mit dem Attribut "recextend" beeinflusst werden.<br><br>
 
   <b>Attribut "recextend = 0" bzw. nicht gesetzt (Standard):</b><br><br>
   <ul>
@@ -8055,7 +8097,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   
         <ul>
 		<b>Hinweis:</b><br>
-        Abhängig von der Anzahl und Auflösung (Qualität) der Schnappschuß-Images werden entsprechende ausreichende CPU und/oder
+        Abhängig von der Anzahl und Auflösung (Qualität) der Schnappschuß-Images werden entsprechend ausreichende CPU und/oder
 		RAM-Ressourcen benötigt.
         </ul>
 		<br><br>

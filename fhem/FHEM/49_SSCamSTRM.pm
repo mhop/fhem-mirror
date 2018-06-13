@@ -28,6 +28,8 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 1.0.0  14.06.2018    switch to longpoll refresh
+# 0.4    13.06.2018    new attribute "noDetaillink" (deleted in V1.0.0)
 # 0.3    12.06.2018    new attribute "forcePageRefresh"
 # 0.2    11.06.2018    check in with SSCam 5.0.0
 # 0.1    10.06.2018    initial Version
@@ -37,9 +39,8 @@ package main;
 
 use strict;
 use warnings;
-use vars qw($FW_subdir);  # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
 
-my $SSCamSTRMVersion = "0.3";
+my $SSCamSTRMVersion = "1.0.0";
 
 ################################################################
 sub SSCamSTRM_Initialize($) {
@@ -49,7 +50,8 @@ sub SSCamSTRM_Initialize($) {
   $hash->{AttrList}     = "disable:1,0 forcePageRefresh:1,0 htmlattr ";
   $hash->{FW_summaryFn} = "SSCamSTRM_FwFn";
   $hash->{FW_detailFn}  = "SSCamSTRM_FwFn";
-  $hash->{FW_atPageEnd} = 1;
+  $hash->{AttrFn}       = "SSCamSTRM_Attr";
+  # $hash->{FW_atPageEnd} = 1;
 }
 
 
@@ -68,26 +70,34 @@ sub SSCamSTRM_Define($$) {
   
   $hash->{VERSION} = $SSCamSTRMVersion;
   $hash->{LINK}    = $link;
+  $attr{$name}{alias} = ".";
   
-  readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"state", "initialized");           # Init für "state" 
-  readingsEndUpdate($hash,1);
+  readingsSingleUpdate($hash,"state", "initialized", 1);      # Init für "state" 
   
 return undef;
 }
 
 ################################################################
-sub SSCamSTRM_FwDetail($@) {
-  my ($d, $text, $nobr)= @_;
-  return "" if(AttrVal($d, "group", ""));
-  my $alias = AttrVal($d, "alias", $d);
+sub SSCamSTRM_Attr($$$$) {
+    my ($cmd,$name,$aName,$aVal) = @_;
+    my $hash = $defs{$name};
+    my ($do,$val);
+      
+    # $cmd can be "del" or "set"
+    # $name is device name
+    # aName and aVal are Attribute name and value
+    
+    if ($aName eq "disable") {
+        if($cmd eq "set") {
+            $do = ($aVal) ? 1 : 0;
+        }
+        $do = 0 if($cmd eq "del");
+		$val = ($do == 1 ? "Stream-device of \"$hash->{PARENT}\" disabled" : "initialized");
+    
+        readingsSingleUpdate($hash, "state", $val, 1);
+    }
 
-  my $ret = ($nobr ? "" : "<br>");
-  $ret   .= "$text " if($text);
-  $ret   .= FW_pHPlain("detail=$d", $alias) if(!$FW_subdir);
-  $ret   .= "<br>";
-  
-return $ret;
+return undef;
 }
 
 ################################################################
@@ -95,14 +105,13 @@ sub SSCamSTRM_FwFn($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash   = $defs{$d};
   my $link   = $hash->{LINK};
-  my $ret    = "";
-
-  return "" if(IsDisabled($d));
   
-  my $attr = AttrVal($d, "htmlattr", "");
+  return undef if(IsDisabled($d));
 
-    $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
-    $ret = $link;
+  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
+  
+  my $ret = "";
+  $ret   .= $link;
 
 return $ret;
 }
@@ -116,6 +125,26 @@ return $ret;
 
 <a name="SSCamSTRM"></a>
 <h3>SSCamSTRM</h3>
+<br>
+The module SSCamSTRM is a special device module synchronized to the SSCam module. It is used for definition of
+Streaming-Devices. <br>
+Dependend of the Streaming-Device state, different buttons are provided to start actions:
+  <ul>   
+    <table>  
+    <colgroup> <col width=25%> <col width=75%> </colgroup>
+      <tr><td> MJPEG           </td><td>- starts a MJPEG Livestream </td></tr>
+      <tr><td> HLS             </td><td>- starts HLS (HTTP Live Stream) </td></tr>
+      <tr><td> Last Record     </td><td>- playback the last recording as iFrame </td></tr>
+      <tr><td> Last Rec H.264  </td><td>- playback the last recording if available as H.264 </td></tr>
+      <tr><td> Last Rec MJPEG  </td><td>- playback the last recording if available as MJPEG </td></tr>
+      <tr><td> Last SNAP       </td><td>- show the last snapshot </td></tr>
+      <tr><td> Start Recording </td><td>- starts an endless recording </td></tr>
+      <tr><td> Stop Recording  </td><td>- stopps the recording </td></tr>
+      <tr><td> Take Snapshot   </td><td>- take a snapshot </td></tr>
+      <tr><td> Switch off      </td><td>- stops a running playback </td></tr>
+    </table>
+   </ul>     
+   <br>
 
 <ul>
   <a name="SSCamSTRMdefine"></a>
@@ -158,9 +187,8 @@ return $ret;
       HTML attributes to be used for Streaming device e.g.: <br><br>
       <ul>
         <code>
-        attr &lt;name&gt; htmlattr width="480" height="560"
+        attr &lt;name&gt; htmlattr width="480" height="560" <br>
         </code>
-        <br><br>
       </ul>
     </li>
   
@@ -174,6 +202,26 @@ return $ret;
 
 <a name="SSCamSTRM"></a>
 <h3>SSCamSTRM</h3>
+
+<br>
+Das Modul SSCamSTRM ist ein mit SSCam abgestimmtes Gerätemodul zur Definition von Streaming-Devices. <br>
+Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unterschiedliche Drucktasten angeboten:
+  <ul>   
+    <table>  
+    <colgroup> <col width=25%> <col width=75%> </colgroup>
+      <tr><td> MJPEG           </td><td>- Startet MJPEG Livestream </td></tr>
+      <tr><td> HLS             </td><td>- Startet HLS (HTTP Live Stream) </td></tr>
+      <tr><td> Last Record     </td><td>- spielt die letzte Aufnahme als iFrame </td></tr>
+      <tr><td> Last Rec H.264  </td><td>- spielt die letzte Aufnahme wenn als H.264 vorliegend </td></tr>
+      <tr><td> Last Rec MJPEG  </td><td>- spielt die letzte Aufnahme wenn als MJPEG vorliegend </td></tr>
+      <tr><td> Last SNAP       </td><td>- zeigt den letzten Snapshot </td></tr>
+      <tr><td> Start Recording </td><td>- startet eine Endlosaufnahme </td></tr>
+      <tr><td> Stop Recording  </td><td>- stoppt eine Aufnahme </td></tr>
+      <tr><td> Take Snapshot   </td><td>- löst einen Schnappschuß aus </td></tr>
+      <tr><td> Switch off      </td><td>- stoppt eine laufende Wiedergabe </td></tr>
+    </table>
+   </ul>     
+   <br>
 
 <ul>
   <a name="SSCamSTRMdefine"></a>
@@ -217,9 +265,8 @@ return $ret;
       HTML-Attribute zur Darstellungsänderung des SSCam Streaming Device z.B.: <br><br>
       <ul>
         <code>
-        attr &lt;name&gt; htmlattr width="480" height="560"
+        attr &lt;name&gt; htmlattr width="480" height="560" <br>
         </code>
-        <br><br>
       </ul>
     </li>
 
