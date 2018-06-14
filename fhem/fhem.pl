@@ -4969,13 +4969,13 @@ FileRead($)
   my ($param) = @_;
   my ($err, @ret, $fileName, $forceType);
 
+  $forceType = "" if(!defined($forceType));
   if(ref($param) eq "HASH") {
     $fileName = $param->{FileName};
-    $forceType = $param->{ForceType};
+    $forceType = lc($param->{ForceType});
   } else {
     $fileName = $param;
   }
-  $forceType = "" if(!defined($forceType));
 
   if(configDBUsed() && $forceType ne "file") {
     ($err, @ret) = cfgDB_FileRead($fileName);
