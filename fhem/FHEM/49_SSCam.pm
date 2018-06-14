@@ -5408,14 +5408,15 @@ sub SSCam_refresh($$$$) {
   my $fpr  = 0;
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
-  my $sd  = defined($hash->{HELPER}{STRMDEV})?$hash->{HELPER}{STRMDEV}:"\"not defined\"";       # Name des aufrufenden SSCamSTRM-Devices
-  my $sr  = defined($hash->{HELPER}{STRMROOM})?$hash->{HELPER}{STRMROOM}:"\"not defined\"";     # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
-  my $sl  = defined($hash->{HELPER}{STRMDETAIL})?$hash->{HELPER}{STRMDETAIL}:"\"not defined\""; # Name des SSCamSTRM-Devices (wenn Detailansicht)
-  $fpr    = AttrVal($hash->{HELPER}{STRMDEV},"forcePageRefresh",0) if(defined $hash->{HELPER}{STRMDEV});
-  Log3($name, 4, "$name - SSCam_refresh - caller: $sd, callerroom: $sr, detail: $sl, forcePageRefresh: $fpr");
+  my $sd  = $hash->{HELPER}{STRMDEV}?$hash->{HELPER}{STRMDEV}:"\"n.a.\"";       # Name des aufrufenden SSCamSTRM-Devices
+  my $sr  = $hash->{HELPER}{STRMROOM}?$hash->{HELPER}{STRMROOM}:"\"n.a.\"";     # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
+  my $sl  = $hash->{HELPER}{STRMDETAIL}?$hash->{HELPER}{STRMDETAIL}:"\"n.a.\""; # Name des SSCamSTRM-Devices (wenn Detailansicht)
+  $fpr    = AttrVal($hash->{HELPER}{STRMDEV},"forcePageRefresh",0) if($hash->{HELPER}{STRMDEV});
+  Log3($name, 4, "$name - SSCam_refresh - caller: $sd, callerroom: $sr, detail: $sl, pload: $pload, forcePageRefresh: $fpr");
   
-  if($pload && defined($hash->{HELPER}{STRMROOM}) && defined($hash->{HELPER}{STRMDETAIL})) {
+  if($pload && $hash->{HELPER}{STRMROOM} && $hash->{HELPER}{STRMDETAIL}) {
       if($hash->{HELPER}{STRMROOM} && !$hash->{HELPER}{STRMDETAIL} && !$fpr) {
+      Log3($name, 4, "$name - SSCam_refresh jetzt");
           # trifft zu wenn in einer Raumansicht
 	      my @rooms = split(",",$hash->{HELPER}{STRMROOM});
 	      foreach (@rooms) {
@@ -5427,6 +5428,9 @@ sub SSCam_refresh($$$$) {
           # SSCamSTRM-Attribut "forcePageRefresh" erzwungen wird
           { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
       } 
+  } elsif ($fpr) {
+      # Seitenrefresh durch SSCamSTRM-Attribut "forcePageRefresh" erzwungen
+      { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
   }
   
   # Aufnahmestatus in state abbilden & Longpoll SSCam-Device wenn Event 1
