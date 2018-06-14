@@ -27,7 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
-# 5.2.1  14.06.2018    design change of SSCam_StreamDev
+# 5.2.1  14.06.2018    design change of SSCam_StreamDev, change in event generation for SSCam_StreamDev, fix global vars
 # 5.2.0  14.06.2018    support longpoll refresh of SSCamSTRM-Devices
 # 5.1.0  13.06.2018    more control elements (Start/Stop Recording, Take Snapshot) in func SSCam_StreamDev
 #                      control of detaillink is moved to SSCamSTRM-device
@@ -2180,7 +2180,7 @@ sub SSCam_stopliveview ($) {
             SSCam_getapisites($hash);
         } else {
             # kein HLS Stream
-			SSCam_refresh($hash,0,1,1);    # kein Room-Refresh, Longpoll SSCam, Longpoll SSCamSTRM
+			SSCam_refresh($hash,0,1,1);    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
 		    $hash->{HELPER}{ACTIVE} = "off";  
 		    if (AttrVal($name,"debugactivetoken",0)) {
                 Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
@@ -3895,7 +3895,7 @@ sub SSCam_camop ($) {
           }
       }
            
-	  SSCam_refresh($hash,0,1,1);    # kein Room-Refresh, Longpoll SSCam, Longpoll SSCamSTRM
+	  SSCam_refresh($hash,0,1,1);    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
       
 	  $hash->{HELPER}{ACTIVE} = "off";
       if (AttrVal($name,"debugactivetoken",0)) {
@@ -4049,7 +4049,7 @@ sub SSCam_camop_parse ($) {
                     InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", $hash);
                 }      
                 
-                SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein Longpoll SSCam, Longpoll SSCamSTRM
+                SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
             
 			} elsif ($OpMode eq "Stop") {                
 			
@@ -4063,7 +4063,7 @@ sub SSCam_camop_parse ($) {
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname Recording stopped");
                 
-                SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein Longpoll SSCam, Longpoll SSCamSTRM
+                SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
                 
                 # Aktualisierung Eventlist der letzten Aufnahme
                 SSCam_geteventlist($hash);
@@ -4258,10 +4258,7 @@ sub SSCam_camop_parse ($) {
 			} elsif ($OpMode eq "Snap") {
                 # ein Schnapschuß wurde aufgenommen
                 # falls Aufnahme noch läuft -> state = on setzen
-	            # my $st;
-	            # (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
-	            # readingsSingleUpdate($hash,"state", $st, 0);
-                SSCam_refresh($hash,0,0,0);     # kein Room-Refresh, kein Longpoll SSCam, kein Longpoll SSCamSTRM	
+                SSCam_refresh($hash,0,0,0);     # kein Room-Refresh, kein SSCam-state-Event, kein SSCamSTRM-Event
                 
                 $snapid = $data->{data}{'id'};
                 
@@ -4312,14 +4309,12 @@ sub SSCam_camop_parse ($) {
 			    
 				if (exists($hash->{HELPER}{RUNVIEW}) && $hash->{HELPER}{RUNVIEW} =~ /snap/ && exists($data->{'data'}{'data'}[0]{imageData})) {
 				    delete $hash->{HELPER}{RUNVIEW};
-                    # Aufnahmestatus in state abbilden
-	                my $st;
-	                # (ReadingsVal("$name", "Record", "") eq "Start")?$st="on":$st="off";
-	                # readingsSingleUpdate($hash,"state", $st, 0); 
-					
+                    # Aufnahmestatus in state abbilden					
 					$hash->{HELPER}{LINK} = $data->{data}{data}[0]{imageData};
-                    SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein Longpoll SSCam, Longpoll SSCamSTRM					
-				}
+                    SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event					
+				} else {
+                    SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event                
+                }              
 
                 if($OpMode eq "getsnapgallery") {
 				    # es soll eine Schnappschußgallerie bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt werden (Attr snapGalleryBoost=0)
@@ -4383,14 +4378,14 @@ sub SSCam_camop_parse ($) {
                 Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated, Streaming-URL: $url") if(AttrVal($name,"verbose",3) == 4);
                 Log3($name, 3, "$name - HLS Streaming of camera \"$name\" activated") if(AttrVal($name,"verbose",3) == 3);
                 
-                SSCam_refresh($hash,0,1,1);   # kein Room-Refresh, Longpoll SSCam, Longpoll SSCamSTRM
+                SSCam_refresh($hash,0,1,1);   # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
                 
             } elsif ($OpMode eq "stopliveview_hls") {
                 # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
                 $hash->{HELPER}{HLSSTREAM} = "inactive";
                 Log3($name, 3, "$name - HLS Streaming of camera \"$name\" deactivated");
                                
-                SSCam_refresh($hash,0,1,1);   # kein Room-Refresh, Longpoll SSCam, Longpoll SSCamSTRM
+                SSCam_refresh($hash,0,1,1);   # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
                 
             } elsif ($OpMode eq "reactivate_hls") {
                 # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
@@ -4406,7 +4401,7 @@ sub SSCam_camop_parse ($) {
                 $hash->{HELPER}{HLSSTREAM} = "active"; 
                 Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated for streaming device");
                 
-                SSCam_refresh($hash,0,1,1);   # kein Room-Refresh, Longpoll SSCam, Longpoll SSCamSTRM
+                SSCam_refresh($hash,0,1,1);   # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
                                 
             } elsif ($OpMode eq "getsnapfilename") {
                 # den Filenamen eines Schnapschusses ermitteln
@@ -5406,20 +5401,21 @@ return($hash,$success,$myjson);
 #      Refresh eines Raumes aus $hash->{HELPER}{STRMROOM}
 #      bzw. Longpoll von SSCam bzw. eines SSCamSTRM Devices wenn
 #      $hash->{HELPER}{STRMDEV} gefüllt 
-#      $hash, $pload (1=Page reload), $longpoll SSCam(1=Event), $longpoll SSCamSTRM (1=Event)
+#      $hash, $pload (1=Page reload), SSCam-state-Event(1=Event), SSCamSTRM-Event (1=Event)
 ######################################################################################################
 sub SSCam_refresh($$$$) { 
   my ($hash,$pload,$lpoll_scm,$lpoll_strm) = @_;
   my $name = $hash->{NAME};
   my $fpr  = 0;
   
-  # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
+  # Kontext des SSCamSTRM-Devices speichern für Refresh
   my $sd  = $hash->{HELPER}{STRMDEV}?$hash->{HELPER}{STRMDEV}:"\"n.a.\"";       # Name des aufrufenden SSCamSTRM-Devices
   my $sr  = $hash->{HELPER}{STRMROOM}?$hash->{HELPER}{STRMROOM}:"\"n.a.\"";     # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
   my $sl  = $hash->{HELPER}{STRMDETAIL}?$hash->{HELPER}{STRMDETAIL}:"\"n.a.\""; # Name des SSCamSTRM-Devices (wenn Detailansicht)
   $fpr    = AttrVal($hash->{HELPER}{STRMDEV},"forcePageRefresh",0) if($hash->{HELPER}{STRMDEV});
   Log3($name, 4, "$name - SSCam_refresh - caller: $sd, callerroom: $sr, detail: $sl, pload: $pload, forcePageRefresh: $fpr");
   
+  # Page-Reload
   if($pload && $hash->{HELPER}{STRMROOM} && $hash->{HELPER}{STRMDETAIL}) {
       if($hash->{HELPER}{STRMROOM} && !$hash->{HELPER}{STRMDETAIL} && !$fpr) {
       Log3($name, 4, "$name - SSCam_refresh jetzt");
@@ -5439,7 +5435,7 @@ sub SSCam_refresh($$$$) {
       { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
   }
   
-  # Aufnahmestatus in state abbilden & Longpoll SSCam-Device wenn Event 1
+  # Aufnahmestatus in state abbilden & SSCam-Device state setzen (mit/ohne Event)
   my $st = (ReadingsVal($name, "Record", "") eq "Start")?"on":"off";  
   if($lpoll_scm) {
       readingsSingleUpdate($hash,"state", $st, 1);
@@ -5447,13 +5443,13 @@ sub SSCam_refresh($$$$) {
       readingsSingleUpdate($hash,"state", $st, 0);  
   }
   
-  # Longpoll des SSCamSTRM-Device
+  # state des SSCamSTRM-Device mit Opmode updaten (mit/ohne Event)
   if($hash->{HELPER}{STRMDEV}) {
       my $strmhash = $defs{$hash->{HELPER}{STRMDEV}};  
       if($lpoll_strm) {
-          readingsSingleUpdate($strmhash,"state", $st, 1);
+          readingsSingleUpdate($strmhash,"state", $hash->{OPMODE}, 1);
       } else {
-          readingsSingleUpdate($strmhash,"state", $st, 0);  
+          readingsSingleUpdate($strmhash,"state", $hash->{OPMODE}, 0);  
       } 
   }
   
@@ -5799,7 +5795,16 @@ sub SSCam_StreamDev($$$) {
   if($fmt =~ /mjpeg/) {  
       $link      = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
       $audiolink = "http://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
-      $ret .= "<td><img src=$link $ha> </td>"; 
+      $ret .= "<td><img src=$link $ha><br>";
+      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
+             # Aufnahmebutton endlos Start
+             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
+          }	else {
+             # Aufnahmebutton Stop
+             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\">$imgrecstop </a>";
+          }	      
+      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\">$imgdosnap </a>";               
+      $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
           my $ptz_ret = SSCam_ptzpanel($camname);
           if($ptz_ret) { 
@@ -5811,7 +5816,8 @@ sub SSCam_StreamDev($$$) {
           $ret .= '<tr class="odd">';
           $ret .= "<td><audio src=$audiolink preload='none' volume='0.5' controls>
                        Your browser does not support the audio element.      
-                       </audio></td>";
+                       </audio>";
+          $ret .= "</td>";
       }      
   
   } elsif($fmt =~ /switched/) {
@@ -5821,7 +5827,8 @@ sub SSCam_StreamDev($$$) {
       if($link && $wltype =~ /image|iframe|video|base64img|embed|hls/) {
           if($wltype =~ /image/) {
               $ret .= "<td><img src=$link $ha><br>";
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>"; 
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
+              $ret .= $imgblank;              
               if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
                   # Aufnahmebutton endlos Start
                   $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
@@ -5838,6 +5845,7 @@ sub SSCam_StreamDev($$$) {
                   }
               }
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+                  $ret .= "</tr>";
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                                Your browser does not support the audio element.      
@@ -5855,7 +5863,8 @@ sub SSCam_StreamDev($$$) {
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                                Your browser does not support the audio element.      
-                               </audio></td>";
+                               </audio>";
+                  $ret .= "</td>";
               }
           
           } elsif ($wltype =~ /video/) {
@@ -5868,11 +5877,12 @@ sub SSCam_StreamDev($$$) {
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>"; 
               $ret .= "</td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+                  $ret .= '</tr>';
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                                Your browser does not support the audio element.      
-                               </audio></td>";
-                  $ret .= '</tr>';
+                               </audio>";
+                  $ret .= "</td>";
               }
           } elsif($wltype =~ /base64img/) {
               $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha><br>";
@@ -5954,7 +5964,7 @@ sub composegallery ($;$$) {
   my $ha = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
   
   # falls "composegallery" durch ein mit "createSnapGallery" angelegtes Device aufgerufen wird
-  my ($devWlink);
+  my $devWlink = " ";
   if ($strmdev) {
       if($defs{$strmdev}{TYPE} ne "SSCamSTRM") {
           # Abfrage wegen Kompatibilität zu "alten" compose mit weblink-Modul
@@ -5963,8 +5973,6 @@ sub composegallery ($;$$) {
       }   
       my $wlha = AttrVal($strmdev, "htmlattr", undef); 
       $ha      = (defined($wlha))?$wlha:$ha;             # htmlattr vom weblink-Device übernehmen falls von wl-Device aufgerufen und gesetzt   
-  } else {
-      $devWlink = " ";
   }
   
   # wenn Weblink genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben

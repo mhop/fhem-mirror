@@ -28,6 +28,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 1.0.1  14.06.2018    commandref revised
 # 1.0.0  14.06.2018    switch to longpoll refresh
 # 0.4    13.06.2018    new attribute "noDetaillink" (deleted in V1.0.0)
 # 0.3    12.06.2018    new attribute "forcePageRefresh"
@@ -40,7 +41,7 @@ package main;
 use strict;
 use warnings;
 
-my $SSCamSTRMVersion = "1.0.0";
+my $SSCamSTRMVersion = "1.0.1";
 
 ################################################################
 sub SSCamSTRM_Initialize($) {
@@ -51,7 +52,8 @@ sub SSCamSTRM_Initialize($) {
   $hash->{FW_summaryFn} = "SSCamSTRM_FwFn";
   $hash->{FW_detailFn}  = "SSCamSTRM_FwFn";
   $hash->{AttrFn}       = "SSCamSTRM_Attr";
-  # $hash->{FW_atPageEnd} = 1;
+  #$hash->{FW_addDetailToSummary} = 1;
+  # $hash->{FW_atPageEnd} = 1;            # Achtung, kein Longpoll
 }
 
 
@@ -70,7 +72,11 @@ sub SSCamSTRM_Define($$) {
   
   $hash->{VERSION} = $SSCamSTRMVersion;
   $hash->{LINK}    = $link;
-  $attr{$name}{alias} = ".";
+  if($hash->{MODEL} =~ /switched|mjpeg/) {
+      $attr{$name}{alias} = "<span></span>";
+  } else {
+      $attr{$name}{alias} = ".";
+  }
   
   readingsSingleUpdate($hash,"state", "initialized", 1);      # Init für "state" 
   
@@ -177,8 +183,7 @@ Dependend of the Streaming-Device state, different buttons are provided to start
     <li><b>forcePageRefresh</b><br>
       The attribute is evaluated by SSCam. <br>
       If set, a reload of all browser pages with active FHEMWEB-connections will be enforced. 
-      The restriction of a page reload of only one room or more rooms is canceled by this attribute, if the SSCamSTRM-Device 
-      is e.g. added to a FLOORPLAN or Dashboard and it is additionally located in one or more rooms.       
+      This may be helpful if problems with longpoll are appear.       
     </li>
     <br>
     
@@ -254,8 +259,7 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
     <li><b>forcePageRefresh</b><br>
       Das Attribut wird durch SSCam ausgewertet. <br>
       Wenn gesetzt, wird ein Reload aller Browserseiten mit aktiven FHEMWEB-Verbindungen bei bestimmten Aktionen erzwungen. 
-      Die Beschränkung des Seitenreloads auf nur einen oder mehrere Räume wird mit diesem Attribut aufgehoben, falls das 
-      SSCamSTRM-Device sich z.B. in einem FLOORPLAN oder Dashboard befindet und zusätzlich in einen oder mehrere Räume 
+      Das kann hilfreich sein, falls es mit Longpoll Probleme geben sollte.
       eingefügt ist.       
     </li>
     <br>
