@@ -49,6 +49,7 @@ structure_Initialize($)
     disable
     disabledForIntervals
     evaluateSetResult:1,0
+    setStateIndirectly:1,0
     setStructType:0,1
   );
   use warnings 'qw';
@@ -420,10 +421,11 @@ structure_Set($@)
   my $filter;
   if($list[1] ne "?") {
     my $state = join(" ", @list[1..@list-1]);
-    readingsSingleUpdate($hash, "state", $state, 1);
+    readingsSingleUpdate($hash, "state", $state, 1)
+        if(!AttrVal($me, "setStateIndirectly", undef));
 
     if($state =~ /^\[(FILTER=.*)]/) {
-      delete($hash->{INSET}); # Experimental, Forum #35382
+      delete($hash->{INSET}); # Forum #35382
       $filter = $1;
       @list = split(" ", $list[0] ." ". substr($state, length($filter)+2));
     }
@@ -523,6 +525,7 @@ structure_Attr($@)
     group=>1,
     icon=>1,
     room=>1,
+    setStateIndirectly=>1,
     stateFormat=>1,
     webCmd=>1,
     userattr=>1
@@ -729,6 +732,12 @@ structure_Attr($@)
       different from the set command (like set statusRequest), then you have to
       set this attribute to 1 in order to enable the structure instance to
       compute the new status.
+      </li>
+
+    <li>setStateIndirectly<br>
+      If true (1), set the state only when member devices report a state
+      change, else the state is first set to the set command argument. Default
+      is 0.
       </li>
 
     <li>setStructType<br>
@@ -947,6 +956,11 @@ structure_Attr($@)
       neuen Status auswerten soll.
       </li>
 
+    <li>setStateIndirectly<br>
+      Falls wahr (1), dann wird der Status der Struktur nur aus dem
+      Statusmeldungen der Mitglied-Ger&auml;te bestimmt, sonst wird zuerst der
+      Status auf dem set Argument gesetzt. Die Voreinstellung ist 0.
+      </li>
 
     <li>setStructType<br>
       Falls wahr (1), &lt;struct-type&gt; wird als Attribute f&uuml;r jedes
