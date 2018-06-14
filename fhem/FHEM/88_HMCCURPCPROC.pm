@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.0.004
+#  Version 1.0.005
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.0.004';
+my $HMCCURPCPROC_VERSION = '1.0.005';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -277,11 +277,13 @@ sub HMCCURPCPROC_Define ($$)
 	return (0, "Can't connect to CCU ".$hash->{host}." port $ifport") if (!$socket);
 	$hash->{hmccu}{localaddr} = $socket->sockhost ();
 	close ($socket);
+	return "Can't detect local IP address" if (!defined ($hash->{hmccu}{localaddr}));
+	$hash->{hmccu}{defaultaddr} = $hash->{hmccu}{localaddr};
 
 	# Get unique ID for RPC server: last 2 segments of local IP address
 	# Do not append random digits because of https://forum.fhem.de/index.php/topic,83544.msg797146.html#msg797146
 	my @ipseg = split (/\./, $hash->{hmccu}{localaddr});
-	return (0, "Invalid local IP address ".$hash->{hmccu}{localaddr}) if (scalar (@ipseg) != 4);
+	return "Invalid local IP address ".$hash->{hmccu}{localaddr} if (scalar (@ipseg) != 4);
 #	my $base = (time() % 10)+1;
 	$hash->{rpcid} = sprintf ("%03d%03d", $ipseg[2], $ipseg[3]); # . join '', map int rand ($base), 1..2;
 
@@ -361,6 +363,14 @@ sub HMCCURPCPROC_Attr ($@)
 	if ($cmd eq 'set') {
 		if (($attrname eq 'rpcAcceptTimeout' || $attrname eq 'rpcMaxEvents') && $attrval == 0) {
 			return "HMCCURPCPROC: [$name] Value for attribute $attrname must be greater than 0";
+		}
+		elsif ($attrname eq 'rpcServerAddr') {
+			$hash->{hmccu}{localaddr} = $attrval;
+		}
+	}
+	elsif ($cmd eq 'del') {
+		if ($attrname eq 'rpcServerAddr') {
+			$hash->{hmccu}{localaddr} = $hash->{hmccu}{defaultaddr};
 		}
 	}
 	
@@ -885,12 +895,17 @@ sub HMCCURPCPROC_GetAttribute ($$$$)
 	my ($hash, $attr, $ioattr, $default) = @_;
 	my $name = $hash->{NAME};
 	my $hmccu_hash = $hash->{IODev};
+	my $value = 'null';
 	
-	my $value = AttrVal ($name, $attr, 'null');
-	return $value if ($value ne 'null');
+	if (defined ($attr)) {
+		$value = AttrVal ($name, $attr, 'null');
+		return $value if ($value ne 'null');
+	}
 	
-	$value = AttrVal ($hmccu_hash->{NAME}, $ioattr, 'null');
-	return $value if ($value ne 'null');
+	if (defined ($ioattr)) {
+		$value = AttrVal ($hmccu_hash->{NAME}, $ioattr, 'null');
+		return $value if ($value ne 'null');
+	}
 	
 	return $default;
 }
@@ -1103,9 +1118,7 @@ sub HMCCURPCPROC_InitRPCServer ($$$$)
 }
 
 ######################################################################
-# Start RPC server processes
-# 1 process for processing event data in event queue
-# 1 process per CCU RPC interface for receiving data
+# Start RPC server process
 # Return (State, Msg)
 ######################################################################
 
@@ -1124,7 +1137,7 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	
 	# Get parameters and attributes
 	my %procpar;
-	my $localaddr     = HMCCURPCPROC_GetAttribute ($hash, 'rpcServerAddr', 'rpcserveraddr', $hash->{hmccu}{localaddr});
+	my $localaddr     = HMCCURPCPROC_GetAttribute ($hash, undef, 'rpcserveraddr', $hash->{hmccu}{localaddr});
 	my $rpcserverport = HMCCURPCPROC_GetAttribute ($hash, 'rpcServerPort', 'rpcserverport', $HMCCURPCPROC_SERVER_PORT);
 	my $evttimeout    = HMCCURPCPROC_GetAttribute ($hash, 'rpcEventTimeout', 'rpcevtimeout', $HMCCURPCPROC_TIMEOUT_EVENT);
 	my $ccunum        = $hash->{CCUNum};
@@ -1132,6 +1145,7 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	my $serveraddr    = HMCCU_GetRPCServerInfo ($hmccu_hash, $rpcport, 'host');
 	my $interface     = HMCCU_GetRPCServerInfo ($hmccu_hash, $rpcport, 'name');
 	my $clkey         = 'CB'.$rpcport.$hash->{rpcid};
+	$hash->{hmccu}{localaddr} = $localaddr;
 
 	# Store parameters for child process
 	$procpar{socktimeout} = AttrVal ($name, 'rpcWriteTimeout',  $HMCCURPCPROC_TIMEOUT_WRITE);

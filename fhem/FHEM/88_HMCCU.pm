@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.006
+#  Version 4.2.007
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
@@ -105,7 +105,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.2.006';
+my $HMCCU_VERSION = '4.2.007';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -4534,7 +4534,7 @@ sub HMCCU_GetRPCDevice ($$$)
 		return (HMCCU_Log ($hash, 2, "Found more than one RPC device", ''), 0);
 	}
 	
-	HMCCU_Log ($hash, 1, "No RPC device defined", undef);
+	HMCCU_Log ($hash, 1, "No RPC device defined for interface $ifname", undef);
 	
 	# Create RPC device
 	if ($create) {
@@ -5654,7 +5654,13 @@ sub HMCCU_GetUpdate ($$$)
 		next if (!defined ($value));
 		my ($iface, $chnadd, $dpt) = split /\./, $dpspec;
 		next if (!defined ($dpt));
-		my ($add, $chn) = HMCCU_SplitChnAddr ($chnadd);
+		my ($add, $chn) = ('', '');
+		if ($iface eq 'sysvar' && $chnadd eq 'link') {
+			($add, $chn) = HMCCU_GetAddress ($hmccu_hash, $chnname, '', '');
+		}
+		else {
+			($add, $chn) = HMCCU_SplitChnAddr ($chnadd);
+		}
 		next if ($chn eq '');
 		$events{$add}{$chn}{$dpt} = $value;
 	}

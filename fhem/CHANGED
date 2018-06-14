@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  88_HMCCU: fixed rpcServerAddr attribute and update of sysvar dpt
   - change:  49_SSCam: V5.2.0, support longpoll refresh of SSCamSTRM-Devices
                        Design change of SSCamSTRM-Devs due to longpoll support
   - change:  82_LGTV_WebOS: change launchApp Vvalue for AmatonVideo and add

@@ -4,11 +4,11 @@
 #
 #  $Id$
 #
-#  Version 4.2.002
+#  Version 4.2.003
 #
 #  Configuration parameters for HomeMatic devices.
 #
-#  (c) 2017 by zap (zap01 <at> t-online <dot> de)
+#  (c) 2018 by zap (zap01 <at> t-online <dot> de)
 #
 #  Datapoints LOWBAT, LOW_BAT, UNREACH, ERROR.*, SABOTAGE and FAULT.*
 #  must not be specified in attribute ccureadingfilter. They are always
@@ -99,7 +99,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	webCmd           => "devstate",
 	widgetOverride   => "devstate:uzsuToggle,off,on"
 	},
-"HM-LC-Dim1L-Pl|HM-LC-Dim1L-Pl-2|HM-LC-Dim1L-CV|HM-LC-Dim2L-CV|HM-LC-Dim2L-SM|HM-LC-Dim1L-Pl-3|HM-LC-Dim1L-CV-2" => {
+	"HM-LC-Dim1L-Pl|HM-LC-Dim1L-Pl-2|HM-LC-Dim1L-CV|HM-LC-Dim2L-CV|HM-LC-Dim2L-SM|HM-LC-Dim1L-Pl-3|HM-LC-Dim1L-CV-2" => {
 	_description     => "Funk-Anschnitt-Dimmaktor",
 	_channels        => "1",
 	ccureadingfilter => "(^LEVEL\$|DIRECTION)",
@@ -290,6 +290,13 @@ use vars qw(%HMCCU_SCRIPTS);
 	statedatapoint   => "TEMPERATURE",
 	stripnumber      => 1,
 	substitute       => "RAINING!(1|true):yes,(0|false):no"
+	},
+	"HmIP-SWO-PR|HmIP-SWO-B|HmIP-SWO-PL" => {
+	_description     => "Funk-Wettersensor",
+	_channels        => "1",
+	ccureadingfilter => "1!.*",
+	stripnumber      => 1,
+	substitute       => "RAINING,RAIN_COUNTER_OVERFLOW,SUNSHINEDURATION_OVERFLOW,SUNSHINE_THRESHOLD_OVERRUN,WIND_THRESHOLD_OVERRUN!(0|false):no,(1|true):yes"
 	},
 	"HM-Sec-MD|HM-Sec-MDIR|HM-Sec-MDIR-2|HM-Sec-MDIR-3" => {
 	_description     => "Bewegungsmelder",
@@ -704,6 +711,12 @@ use vars qw(%HMCCU_SCRIPTS);
 	stripnumber      => 1,
 	substitute       => "RAINING!(1|true):yes,(0|false):no"
 	},
+	"HmIP-SWO-PR|HmIP-SWO-B|HmIP-SWO-PL" => {
+	_description     => "Funk-Wettersensor",
+	ccureadingfilter => "1!.*",
+	stripnumber      => 1,
+	substitute       => "RAINING,RAIN_COUNTER_OVERFLOW,SUNSHINEDURATION_OVERFLOW,SUNSHINE_THRESHOLD_OVERRUN,WIND_THRESHOLD_OVERRUN!(0|false):no,(1|true):yes"
+	},
 	"HM-ES-TX-WM" => {
 	_description     => "Energiezaehler Sensor",
 	ccureadingfilter => "(ENERGY_COUNTER|POWER)"
@@ -1103,7 +1116,12 @@ foreach (sChnName, sChnList.Split(",")) {
       object oDP = dom.GetObject(sDPId);
       if (oDP) {
         if (OPERATION_READ & oDP.Operations()) {
-          WriteLine (sChnName # "=" # oDP.Name() # "=" # oDP.\$ccuget());
+          if (oDP.TypeName() == "HSSDP") {
+            WriteLine (sChnName # "=" # oDP.Name() # "=" # oDP.\$ccuget());
+          }
+          else {
+            WriteLine (sChnName # "=sysvar.link." # oDP.Name() # "=" # oDP.\$ccuget());
+          }
           c = c+1;
         }
       }
@@ -1133,7 +1151,12 @@ foreach (sDevName, sDevList.Split(",")) {
 		    object oDP = dom.GetObject(sDPId);
           if (oDP) {
             if (OPERATION_READ & oDP.Operations()) {
-              WriteLine (ochn.Name() # "=" # oDP.Name() # "=" # oDP.\$ccuget());
+              if (oDP.TypeName() == "HSSDP") {
+                WriteLine (ochn.Name() # "=" # oDP.Name() # "=" # oDP.\$ccuget());
+              }
+              else {
+                WriteLine (ochn.Name() # "=sysvar.link." # oDP.Name() # "=" # oDP.\$ccuget());
+              }
               c = c+1;
             }
           }
@@ -1168,7 +1191,10 @@ foreach (sDevice, sDevList.Split(",")) {
         foreach(sDPId, ochn.DPs()) {
           object oDP = dom.GetObject(sDPId);
           if (oDP) {
-            string sDPName = oDP.Name().StrValueByIndex(".",2);
+            string sDPName = oDP.Name();
+            if (sDPName.Find(".") >= 0) {
+              sDPName = sDPName.StrValueByIndex(".",2);
+            }
             WriteLine (intna # ";" # sAddr # ";" # sType # ";" # sChnNo # ";" # sDPName # ";" # oDP.ValueType() # ";" # oDP.Operations());
           }
         }
