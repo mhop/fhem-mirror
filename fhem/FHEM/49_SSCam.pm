@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 5.2.1  14.06.2018    design change of SSCam_StreamDev
 # 5.2.0  14.06.2018    support longpoll refresh of SSCamSTRM-Devices
 # 5.1.0  13.06.2018    more control elements (Start/Stop Recording, Take Snapshot) in func SSCam_StreamDev
 #                      control of detaillink is moved to SSCamSTRM-device
@@ -233,7 +234,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "5.2.0";
+my $SSCamVersion = "5.2.1";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -282,6 +283,11 @@ my %SSCam_errlist = (
 # Standardvariablen
 my $SSCam_slim = 3;                          # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $SSCAM_snum = "1,2,3,4,5,6,7,8,9,10";     # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
+
+use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
+use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
+use vars qw($FW_room);    # currently selected room
+use vars qw($FW_detail);  # currently selected device for detail view
 
 sub SSCam_Initialize($) {
  my ($hash) = @_;
@@ -5627,7 +5633,6 @@ sub SSCam_ptzpanel($;$$) {
                   $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\">";                      # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
 		      }
               if ($cmd || $cmd eq "0") {
-                  # $cmd = "cmd.$name=set $name $cmd";
                   $cmd = "cmd=set $name $cmd";
                   $ptz_ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmd')\">$img</a>";  # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
               } else {
@@ -5744,6 +5749,7 @@ sub SSCam_StreamDev($$$) {
   $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";   # Name des SSCamSTRM-Devices (wenn Detailansicht)
   
   # Definition Tasten
+  my $imgblank      = "<img src=\"$FW_ME/www/images/sscam/black_btn_CAMBLANK.png\">";                   # nicht sichtbare Leertaste
   my $cmdstop       = "cmd=set $camname stopView";                                                      # Stream deaktivieren
   my $imgstop       = "<img src=\"$FW_ME/www/images/default/remotecontrol/black_btn_POWEROFF3.png\">";
   my $cmdhlsreact   = "cmd=set $camname hlsreactivate";                                                 # HLS Stream reaktivieren
@@ -5884,6 +5890,7 @@ sub SSCam_StreamDev($$$) {
                        </video><br>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\">$imghlsreact </a>";
+              $ret .= $imgblank;
               if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
                   # Aufnahmebutton endlos Start
                   $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
