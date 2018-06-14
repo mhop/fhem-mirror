@@ -25,6 +25,7 @@
 # ABU 20180606 Fixed dpt18, fixed offset-addition in decode (was "-" instead of "+"), fixed issue with slider
 # ABU 20180607 seperated limit and scale from encode/decode in order to avoid warnings and clean up
 # ABU 20180613 fixed scaling algo
+# ABU 20180613 fixed scaling algo part 2
 
 package main;
 
@@ -1496,6 +1497,10 @@ KNX_limit ($$$$) {
 		{
 			if ($direction =~ m/^encode/i)
 			{
+				#limitValue
+				$retVal = $min if (defined ($min) and ($retVal < $min));
+				$retVal = $max if (defined ($max) and ($retVal > $max));
+							
 				#correct value
 				$retVal /= $factor if (defined ($factor));
 				$retVal -= $offset if (defined ($offset));		
@@ -1505,22 +1510,21 @@ KNX_limit ($$$$) {
 				#correct value
 				$retVal += $offset if (defined ($offset));
 				$retVal *= $factor if (defined ($factor));			
+				
+				#limitValue
+				$retVal = $min if (defined ($min) and ($retVal < $min));
+				$retVal = $max if (defined ($max) and ($retVal > $max));						
 			}			
 			
-			Log3 ($name, 5, "limit: FACTOR: $factor" ) if (defined ($factor));
-			Log3 ($name, 5, "limit: OFFSET: $offset" ) if (defined ($offset));
-			Log3 ($name, 5, "limit: scaled... Output: $retVal, Input: $value, Model: $model") if ($retVal != $value);
+			my $logString = "limit:";
+			$logString .= " DIR: $direction" if (defined ($direction));
+			$logString .= " FACTOR: $factor" if (defined ($factor));
+			$logString .= " OFFSET: $factor" if (defined ($offset));
+			$logString .= " MIN: $factor" if (defined ($min));
+			$logString .= " MAX: $factor" if (defined ($max));
+			Log3 ($name, 5, $logString);
+			Log3 ($name, 5, "limit: modified... Output: $retVal, Input: $value, Model: $model") if ($retVal != $value);
 		}
-		
-		#backup for later check
-		my $checkVal = $retVal;
-		#limitValue
-		$retVal = $min if (defined ($min) and ($retVal < $min));
-		$retVal = $max if (defined ($max) and ($retVal > $max));
-		
-		Log3 ($name, 5, "limit: MIN: $min" ) if (defined ($min));
-		Log3 ($name, 5, "limit: MAX: $max" ) if (defined ($max));
-		Log3 ($name, 5, "limit: casted... Output: $retVal, Input: $value, Model: $model" ) if ($checkVal != $value);
 	}
 	else
 	{
