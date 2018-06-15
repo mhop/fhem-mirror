@@ -1704,11 +1704,13 @@ FW_makeDeviceLine($$$$$)
   my $icon = AttrVal($d, "icon", "");
   $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
 
-  if($FW_hiddenroom{detail}) {
-    FW_pO "<td><div class=\"col1\">$icon$devName</div></td>"
-          if(!$usuallyAtEnd->{$d});
-  } else {
-    FW_pH "detail=$d", "$icon$devName", 1, "col1" if(!$usuallyAtEnd->{$d});
+  $devName="" if($modules{$defs{$d}{TYPE}}{FW_hideDisplayName}); # Forum 88667
+  if(!$usuallyAtEnd->{$d}) {
+    if($FW_hiddenroom{detail}) {
+      FW_pO "<td><div class=\"col1\">$icon$devName</div></td>";
+    } else {
+      FW_pH "detail=$d", "$icon$devName", 1, "col1";
+    }
   }
 
   my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, $extPage);
