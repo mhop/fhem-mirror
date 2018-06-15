@@ -37,7 +37,7 @@ HTTPSRV_addExtension($$$$) {
     $data{FWEXT}{$url}{NAME} = $friendlyname;
 }
 
-sub 
+sub
 HTTPSRV_removeExtension($) {
     my ($link)= @_;
 
@@ -65,7 +65,7 @@ HTTPSRV_Initialize($) {
     #$hash->{AttrFn}    = "HTTPSRV_Attr";
     $hash->{AttrList}  = "directoryindex " .
                         "readings";
-    $hash->{AttrFn}    = "HTTPSRV_Attr";                    
+    $hash->{AttrFn}    = "HTTPSRV_Attr";
     #$hash->{SetFn}     = "HTTPSRV_Set";
 
     return undef;
@@ -92,7 +92,7 @@ HTTPSRV_Define($$) {
   Log3 $name, 3, "$name: new ext defined infix:$infix: dir:$directory:";
 
   HTTPSRV_addExtension($name, "HTTPSRV_CGI", $infix, $friendlyname);
-  
+
   $hash->{STATE} = $name;
   return undef;
 }
@@ -113,7 +113,7 @@ sub
 HTTPSRV_Attr(@)
 {
     my ($cmd,$name,$aName,$aVal) = @_;
-    if ($cmd eq "set") {        
+    if ($cmd eq "set") {
         if ($aName =~ "readings") {
             if ($aVal !~ /^[A-Z_a-z0-9\,]+$/) {
                 Log3 $name, 3, "$name: Invalid reading list in attr $name $aName $aVal (only A-Z, a-z, 0-9, _ and , allowed)";
@@ -136,8 +136,8 @@ sub HTTPSRV_CGI() {
   my ($request) = @_;   # /$infix/filename
 
 #  Debug "request= $request";
-  
-  # Match request first without trailing / in the link part 
+
+  # Match request first without trailing / in the link part
   if($request =~ m,^(/[^/]+)(/(.*)?)?$,) {
     my $link= $1;
     my $filename= $3;
@@ -148,9 +148,9 @@ sub HTTPSRV_CGI() {
       $link = $link."/";
       return("text/plain; charset=utf-8", "Illegal request: $request") if(! $data{FWEXT}{$link});
     }
-    
+
     # get device name
-    $name= $data{FWEXT}{$link}{deviceName}; 
+    $name= $data{FWEXT}{$link}{deviceName};
 
 #    Debug "link= $link";
 #    Debug "filename= $filename";
@@ -169,7 +169,7 @@ sub HTTPSRV_CGI() {
             readingsSingleUpdate($defs{$name}, $reading, $value, 1);
         }
     };
-    
+
     # set directory index
     $filename= AttrVal($name,"directoryindex","index.html") unless($filename);
     $filename =~ s/\?.*//;
@@ -191,10 +191,10 @@ sub HTTPSRV_CGI() {
     return("text/plain; charset=utf-8", "Illegal request: $request");
   }
 
-    
-}   
-    
-   
+
+}
+
+
 
 
 ####
@@ -213,7 +213,7 @@ sub HTTPSRV_CGI() {
 <a name="HTTPSRV"></a>
 <h3>HTTPSRV</h3>
 <ul>
-  Provides a mini HTTP server plugin for FHEMWEB. It serves files from a given directory. 
+  Provides a mini HTTP server plugin for FHEMWEB. It serves files from a given directory.
   It optionally accepts a query string to set readings of this device if an attribute allows the given reading<p>
 
   HTTPSRV is an extension to <a href="HTTPSRV">FHEMWEB</a>. You must install FHEMWEB to use HTTPSRV.</p>
@@ -221,7 +221,7 @@ sub HTTPSRV_CGI() {
   <a name="HTTPSRVdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; &lt;infix&gt; &lt;directory&gt; &lt;friendlyname&gt;</code><br><br>
+    <code>define &lt;name&gt; HTTPSRV &lt;infix&gt; &lt;directory&gt; &lt;friendlyname&gt;</code><br><br>
 
     Defines the HTTP server. <code>&lt;infix&gt;</code> is the portion behind the FHEMWEB base URL (usually
     <code>http://hostname:8083/fhem</code>), <code>&lt;directory&gt;</code> is the absolute path the
