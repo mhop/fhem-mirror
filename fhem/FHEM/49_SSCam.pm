@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 5.2.3  16.06.2018    no SSCamSTRM refresh when snapgetinfo was running without taken a snap by SSCamSTRM-Device
 # 5.2.2  16.06.2018    compatibility to SSCamSTRM V 1.1.0
 # 5.2.1  14.06.2018    design change of SSCam_StreamDev, change in event generation for SSCam_StreamDev, fix global vars
 # 5.2.0  14.06.2018    support longpoll refresh of SSCamSTRM-Devices
@@ -235,7 +236,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "5.2.2";
+my $SSCamVersion = "5.2.3";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -667,6 +668,7 @@ sub SSCam_Set($@) {
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+      $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if($prop);     # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
       SSCam_camsnap($hash);
         
   } elsif ($opt eq "startTracking" && SSCam_IsModelCam($hash)) {
@@ -4311,11 +4313,16 @@ sub SSCam_camop_parse ($) {
 				if (exists($hash->{HELPER}{RUNVIEW}) && $hash->{HELPER}{RUNVIEW} =~ /snap/ && exists($data->{'data'}{'data'}[0]{imageData})) {
 				    delete $hash->{HELPER}{RUNVIEW};
                     # Aufnahmestatus in state abbilden					
-					$hash->{HELPER}{LINK} = $data->{data}{data}[0]{imageData};
-                    SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event					
-				} else {
-                    SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event                
-                }              
+					$hash->{HELPER}{LINK} = $data->{data}{data}[0]{imageData};					
+				}           
+
+                if (defined($hash->{HELPER}{SNAPBYSTRMDEV})) {
+                    # Snap durch SSCamSTRM-Device ausgelöst
+                    SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
+                    delete $hash->{HELPER}{SNAPBYSTRMDEV};
+                } else {
+                    SSCam_refresh($hash,0,0,0);     # kein Room-Refresh, kein SSCam-state-Event, kein SSCamSTRM-Event
+                }           
 
                 if($OpMode eq "getsnapgallery") {
 				    # es soll eine Schnappschußgallerie bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt werden (Attr snapGalleryBoost=0)
@@ -5767,7 +5774,7 @@ sub SSCam_StreamDev($$$) {
   my $imgrecendless = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTART.png\">";
   my $cmdrecstop    = "cmd=set $camname off";                                                           # Aufnahme Stop  
   my $imgrecstop    = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTOP.png\">";
-  my $cmddosnap     = "cmd=set $camname snap";                                                          # Snapshot auslösen 
+  my $cmddosnap     = "cmd=set $camname snap STRM";                                                     # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
   
   my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
