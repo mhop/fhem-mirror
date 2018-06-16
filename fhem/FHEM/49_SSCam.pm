@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 5.2.2  16.06.2018    compatibility to SSCamSTRM V 1.1.0
 # 5.2.1  14.06.2018    design change of SSCam_StreamDev, change in event generation for SSCam_StreamDev, fix global vars
 # 5.2.0  14.06.2018    support longpoll refresh of SSCamSTRM-Devices
 # 5.1.0  13.06.2018    more control elements (Start/Stop Recording, Take Snapshot) in func SSCam_StreamDev
@@ -234,7 +235,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "5.2.1";
+my $SSCamVersion = "5.2.2";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -5774,7 +5775,8 @@ sub SSCam_StreamDev($$$) {
   my $hlslfw = (ReadingsVal($camname,"CamStreamFormat","MJPEG") eq "HLS")?"live_fw_hls,":undef;
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
-  $ret  = "<div class=\"makeTable wide\">";
+  $ret  = "";
+  #$ret .= "<div class=\"makeTable wide\">";
   $ret .= '<table class="block wide internals">';
   $ret .= '<tbody>';
   $ret .= '<tr class="odd">';  
@@ -5937,7 +5939,7 @@ sub SSCam_StreamDev($$$) {
   $ret .= '</tr>';
   $ret .= '</tbody>';
   $ret .= '</table>';
-  $ret .= '</div>';
+  #$ret .= '</div>';
 
 return $ret;
 }
@@ -5963,19 +5965,14 @@ sub composegallery ($;$$) {
   
   my $ha = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
   
-  # falls "composegallery" durch ein mit "createSnapGallery" angelegtes Device aufgerufen wird
-  my $devWlink = " ";
+  # falls "composegallery" durch ein SSCamSTRM-Device aufgerufen wird
+  my $devWlink = "";
   if ($strmdev) {
-      if($defs{$strmdev}{TYPE} ne "SSCamSTRM") {
-          # Abfrage wegen Kompatibilität zu "alten" compose mit weblink-Modul
-          my $sdalias = AttrVal($strmdev, "alias", $strmdev);   # Linktext als Aliasname oder Devicename setzen
-          $devWlink   = "<a href=\"/fhem?detail=$strmdev\">$sdalias</a><br>"; 
-      }   
       my $wlha = AttrVal($strmdev, "htmlattr", undef); 
-      $ha      = (defined($wlha))?$wlha:$ha;             # htmlattr vom weblink-Device übernehmen falls von wl-Device aufgerufen und gesetzt   
+      $ha      = (defined($wlha))?$wlha:$ha;                # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt   
   }
   
-  # wenn Weblink genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
+  # wenn SSCamSTRM-device genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
   my $sgbnote = " ";
   if($strmdev && !AttrVal($name,"snapGalleryBoost",0)) {
       $sgbnote = "<b>CAUTION</b> - No snapshots can be retrieved. Please set the attribute \"snapGalleryBoost=1\" in device <a href=\"/fhem?detail=$name\">$name</a>" if ($lang eq "EN");

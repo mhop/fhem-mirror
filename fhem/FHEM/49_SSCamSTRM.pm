@@ -28,6 +28,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 1.1.0  16.06.2018    attr hideDisplayName regarding to Forum #88667
 # 1.0.1  14.06.2018    commandref revised
 # 1.0.0  14.06.2018    switch to longpoll refresh
 # 0.4    13.06.2018    new attribute "noDetaillink" (deleted in V1.0.0)
@@ -41,19 +42,20 @@ package main;
 use strict;
 use warnings;
 
-my $SSCamSTRMVersion = "1.0.1";
+my $SSCamSTRMVersion = "1.1.0";
 
 ################################################################
 sub SSCamSTRM_Initialize($) {
   my ($hash) = @_;
 
-  $hash->{DefFn}        = "SSCamSTRM_Define";
-  $hash->{AttrList}     = "disable:1,0 forcePageRefresh:1,0 htmlattr ";
-  $hash->{FW_summaryFn} = "SSCamSTRM_FwFn";
-  $hash->{FW_detailFn}  = "SSCamSTRM_FwFn";
-  $hash->{AttrFn}       = "SSCamSTRM_Attr";
-  #$hash->{FW_addDetailToSummary} = 1;
-  # $hash->{FW_atPageEnd} = 1;            # Achtung, kein Longpoll
+  $hash->{DefFn}              = "SSCamSTRM_Define";
+  $hash->{AttrList}           = "disable:1,0 forcePageRefresh:1,0 htmlattr hideDisplayName:1,0 ";
+  $hash->{FW_summaryFn}       = "SSCamSTRM_FwFn";
+  $hash->{FW_detailFn}        = "SSCamSTRM_FwFn";
+  $hash->{AttrFn}             = "SSCamSTRM_Attr";
+  $hash->{FW_hideDisplayName} = 1;        # Forum 88667
+  # $hash->{FW_addDetailToSummary} = 1;
+  # $hash->{FW_atPageEnd} = 1;            # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 }
 
 
@@ -72,11 +74,8 @@ sub SSCamSTRM_Define($$) {
   
   $hash->{VERSION} = $SSCamSTRMVersion;
   $hash->{LINK}    = $link;
-  if($hash->{MODEL} =~ /switched|mjpeg/) {
-      $attr{$name}{alias} = "<span></span>";
-  } else {
-      $attr{$name}{alias} = ".";
-  }
+  
+  $attr{$name}{comment} = "when using the device in a Dashboard, set \"attr $name alias <span></span>\" ";
   
   readingsSingleUpdate($hash,"state", "initialized", 1);      # Init für "state" 
   
@@ -115,8 +114,12 @@ sub SSCamSTRM_FwFn($$$$) {
   return undef if(IsDisabled($d));
 
   $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
+
+  my $alias = AttrVal($d, "alias", $d);                            # Linktext als Aliasname oder Devicename setzen
+  my $dlink = "<a href=\"/fhem?detail=$d\">$alias</a><br>"; 
   
   my $ret = "";
+  $ret   .= "<span>$dlink </span>"  if(!AttrVal($d,"hideDisplayName",0));
   $ret   .= $link;
 
 return $ret;
@@ -184,6 +187,11 @@ Dependend of the Streaming-Device state, different buttons are provided to start
       The attribute is evaluated by SSCam. <br>
       If set, a reload of all browser pages with active FHEMWEB-connections will be enforced. 
       This may be helpful if problems with longpoll are appear.       
+    </li>
+    <br>
+    
+    <li><b>hideDisplayName</b><br>
+      hide the device/alias name (link to detail view)     
     </li>
     <br>
     
@@ -261,6 +269,11 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
       Wenn gesetzt, wird ein Reload aller Browserseiten mit aktiven FHEMWEB-Verbindungen bei bestimmten Aktionen erzwungen. 
       Das kann hilfreich sein, falls es mit Longpoll Probleme geben sollte.
       eingefügt ist.       
+    </li>
+    <br>
+    
+    <li><b>hideDisplayName</b><br>
+      verbirgt den Device/Alias-Namen (Link zur Detailansicht)     
     </li>
     <br>
     
