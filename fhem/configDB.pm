@@ -132,6 +132,10 @@
 # 2018-03-24 - changed   set privacy as default for username and password
 # 2018-03-25 - changed   move rescue modes from ENV to config file
 #
+# 2018-06-17 - changed   remove migration on FHEM start by default
+#                        check migration only if parameter migrate => 1 
+#                        is set in configDB.conf
+#
 ##############################################################################
 =cut
 
@@ -230,19 +234,21 @@ if ($count > 1) {
 my $cfgDB_dbconn	= $dbconfig{connection};
 my $cfgDB_dbuser	= $dbconfig{user};
 my $cfgDB_dbpass	= $dbconfig{password};
+my $cfgDB_migrate   = 0;
+   $cfgDB_migrate   = $dbconfig{migrate} if (defined($dbconfig{migrate}) && $dbconfig{migrate} == 1);
 my $cfgDB_dbtype;
 my $cfgDB_filename;
 
 
 if($cfgDB_dbconn =~ m/pg:/i) {
-	$cfgDB_dbtype ="POSTGRESQL";
-	} elsif ($cfgDB_dbconn =~ m/mysql:/i) {
-	$cfgDB_dbtype = "MYSQL";
-	} elsif ($cfgDB_dbconn =~ m/sqlite:/i) {
-	$cfgDB_dbtype = "SQLITE";
-    (undef,$cfgDB_filename) = split(/=/,$cfgDB_dbconn);
-	} else {
-	$cfgDB_dbtype = "unknown";
+      $cfgDB_dbtype ="POSTGRESQL";
+   } elsif ($cfgDB_dbconn =~ m/mysql:/i) {
+      $cfgDB_dbtype = "MYSQL";
+   } elsif ($cfgDB_dbconn =~ m/sqlite:/i) {
+      $cfgDB_dbtype = "SQLITE";
+      (undef,$cfgDB_filename) = split(/=/,$cfgDB_dbconn);
+   } else {
+      $cfgDB_dbtype = "unknown";
 }
 
 $configDB{attr}{nostate}     = defined($dbconfig{nostate})     ? $dbconfig{nostate}     : 0;
@@ -308,12 +314,13 @@ sub cfgDB_Init() {
 		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemb64filesave(filename TEXT, content BLOB)");
 	}
 
+if ($cfgDB_migrate) {
 ### migrate fhembinfilesave to fhemb64filesave
 #    # check: fhembinfilesave exists?
     if (_cfgDB_table_exists($fhem_dbh,'fhembinfilesave')) {
        # check: any files for migratione?
-   	   $count = undef;
-	   $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhembinfilesave');
+       $count = undef;
+       $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhembinfilesave');
        if ($count > 0) {
           printf "need to migrate $count files to base64\n";
           my @toMigrate;
@@ -328,9 +335,9 @@ sub cfgDB_Init() {
              $sth2->finish();
              # 2. encode and write to fhemb64filesave
              $fhem_dbh->do("delete from fhemb64filesave where filename = '$file'");
-	         $sth2 = $fhem_dbh->prepare('INSERT INTO fhemb64filesave values (?, ?)');
+             $sth2 = $fhem_dbh->prepare('INSERT INTO fhemb64filesave values (?, ?)');
              $sth2->execute($file,encode_base64($content));
-	         $sth2->finish();
+             $sth2->finish();
              # 3. delete from fhembinfilesave
              $fhem_dbh->do("delete from fhembinfilesave where filename = '$file'");
              printf "done.\n";
@@ -340,6 +347,7 @@ sub cfgDB_Init() {
        $fhem_dbh->do("drop table fhembinfilesave");
     }
 ### end migration base64
+}
 
 # close database connection
 	$fhem_dbh->commit();
