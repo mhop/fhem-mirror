@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 5.2.4  17.06.2018    SSCam_composegallery added and write warning if old composegallery-weblink device is used 
 # 5.2.3  16.06.2018    no SSCamSTRM refresh when snapgetinfo was running without taken a snap by SSCamSTRM-Device
 # 5.2.2  16.06.2018    compatibility to SSCamSTRM V 1.1.0
 # 5.2.1  14.06.2018    design change of SSCam_StreamDev, change in event generation for SSCam_StreamDev, fix global vars
@@ -236,7 +237,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "5.2.3";
+my $SSCamVersion = "5.2.4";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -699,7 +700,7 @@ sub SSCam_Set($@) {
 		
       } else {
 		  # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet (Polling ist aktiv)
-		  my $htmlCode = composegallery($name);
+		  my $htmlCode = SSCam_composegallery($name);
 		  for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
 		      if ($hash->{HELPER}{CL}{$k}->{COMP}) {
 		          # CL zusammengestellt (Auslösung durch Notify)
@@ -718,7 +719,7 @@ sub SSCam_Set($@) {
       return "Before use \"$opt\" you have to set the attribute \"snapGalleryBoost\" first due to the technology of retrieving snapshots automatically is needed." 
 		       if(!AttrVal($name,"snapGalleryBoost",0));
 	  $sgdev = "SSCamSTRM.$name.snapgallery";
-      $ret = CommandDefine($hash->{CL},"$sgdev SSCamSTRM {composegallery('$name','$sgdev','snapgallery')}");
+      $ret = CommandDefine($hash->{CL},"$sgdev SSCamSTRM {SSCam_composegallery('$name','$sgdev','snapgallery')}");
 	  return $ret if($ret);
 	  my $room = "SnapGallery";
       $attr{$sgdev}{room}  = $room;
@@ -1100,7 +1101,7 @@ sub SSCam_Get($@) {
 		
 		} else {
 		    # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet
-			my $htmlCode = composegallery($name);
+			my $htmlCode = SSCam_composegallery($name);
 		    for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
 		        if ($hash->{HELPER}{CL}{$k}->{COMP}) {
 		            # CL zusammengestellt (Auslösung durch Notify)
@@ -4359,7 +4360,7 @@ sub SSCam_camop_parse ($) {
                     
 					# Direktausgabe Snaphash wenn nicht gepollt wird
 					if(!AttrVal($name, "snapGalleryBoost",0)) {		    
-						my $htmlCode = composegallery($name);
+						my $htmlCode = SSCam_composegallery($name);
                         
 					    for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
                             asyncOutput($hash->{HELPER}{CL}{$k},"$htmlCode");						
@@ -5956,6 +5957,18 @@ return $ret;
 ###############################################################################
 sub composegallery ($;$$) { 
   my ($name,$strmdev,$model) = @_;
+  
+  Log3($name, 1, "$name - SSCam will change the internal Code soon. Please delete your old Snapgallery-Device and create a new one by \"set $name createSnapGallery\" ");
+  my $htmlCode = SSCam_composegallery($name,$strmdev,$model);
+  				
+return $htmlCode;
+}
+
+###############################################################################
+#                   Schnappschußgalerie zusammenstellen
+###############################################################################
+sub SSCam_composegallery ($;$$) { 
+  my ($name,$strmdev,$model) = @_;
   my $hash     = $defs{$name};
   my $camname  = $hash->{CAMNAME};
   my $allsnaps = $hash->{HELPER}{".SNAPHASH"}; # = \%allsnaps
@@ -5972,7 +5985,7 @@ sub composegallery ($;$$) {
   
   my $ha = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
   
-  # falls "composegallery" durch ein SSCamSTRM-Device aufgerufen wird
+  # falls "SSCam_composegallery" durch ein SSCamSTRM-Device aufgerufen wird
   my $devWlink = "";
   if ($strmdev) {
       my $wlha = AttrVal($strmdev, "htmlattr", undef); 
