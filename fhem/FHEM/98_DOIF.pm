@@ -1549,7 +1549,7 @@ ParseCommandsDoIf($$$)
 sub DOIF_weekdays($$)
 {
   my ($hash,$weekdays)=@_;
-  my @days=SplitDoIf(',',AttrVal($hash->{NAME},"weekdays","So,Mo,Di,Mi,Do,Fr,Sa,WE,AT"));
+  my @days=split(',',AttrVal($hash->{NAME},"weekdays","So,Mo,Di,Mi,Do,Fr,Sa,WE,AT"));
   for (my $i=0;$i<@days;$i++)
   {
     $weekdays =~ s/$days[$i]/$i/;
@@ -1701,22 +1701,21 @@ sub DOIF_SetState($$$$$) {
   my $cmdNr="";
   my $cmd="";
   my $err="";
-  my $attr=AttrVal($hash->{NAME},"cmdState","");
   my $state=AttrVal($hash->{NAME},"state","");
   $state =~ s/\$SELF/$pn/g;
-  my @cmdState=SplitDoIf('|',$attr);
   $nr=ReadingsVal($pn,"cmd_nr",0)-1 if (!$event);
   if ($nr!=-1) {
     $cmdNr=$nr+1;
-    my @cmdSubState=SplitDoIf(',',$cmdState[$nr]);
-    if (defined $cmdSubState[$subnr]) {
-      $cmd=EvalCmdStateDoIf($hash,$cmdSubState[$subnr]);
+    my @cmdState;
+    @cmdState=@{$hash->{attr}{cmdState}{$nr}} if (defined $hash->{attr}{cmdState}{$nr});
+    if (defined $cmdState[$subnr]) {
+      $cmd=EvalCmdStateDoIf($hash,$cmdState[$subnr]);
     } else {
       if (defined $hash->{do}{$nr}{$subnr+1}) {
         $cmd="cmd_".$cmdNr."_".($subnr+1);
       } else {
-        if (defined ($cmdState[$nr]) and defined $cmdSubState[$subnr]) {
-          $cmd=EvalCmdStateDoIf($hash,$cmdState[$nr]);
+        if (defined ($cmdState[0])) {
+          $cmd=EvalCmdStateDoIf($hash,$cmdState[0]);
         } else {
           $cmd="cmd_$cmdNr";
         }
@@ -1726,6 +1725,7 @@ sub DOIF_SetState($$$$$) {
   if ($cmd =~ /^"(.*)"$/) {
     $cmd=$1;
   }
+  $hash->{helper}{DOIF_eventas} = ();
   readingsBeginUpdate($hash);
   if ($event) {
     push (@{$hash->{helper}{DOIF_eventas}},"cmd_nr: $cmdNr");
@@ -1871,19 +1871,19 @@ sub DOIF_cmd ($$$$) {
   
   my ($seconds, $microseconds) = gettimeofday();
   
-  if (defined $hash->{attrtimer}{cmdpause}) {
-    my @cmdpause=@{$hash->{attrtimer}{cmdpause}};
+  if (defined $hash->{attr}{cmdpause}) {
+    my @cmdpause=@{$hash->{attr}{cmdpause}};
     my $cmdpauseValue=EvalValueDoIf($hash,"cmdpause",$cmdpause[$nr]);
     if ($cmdpauseValue and $subnr==0) {
       return undef if ($seconds - time_str2num(ReadingsTimestamp($pn, "state", "1970-01-01 01:00:00")) < $cmdpauseValue);
     }
   }
   my @sleeptimer;
-  if (defined $hash->{attrtimer}{repeatcmd}) {
-    @sleeptimer=@{$hash->{attrtimer}{repeatcmd}};
+  if (defined $hash->{attr}{repeatcmd}) {
+    @sleeptimer=@{$hash->{attr}{repeatcmd}};
   }
-  if (defined $hash->{attrtimer}{repeatsame}) {
-   my @repeatsame=@{$hash->{attrtimer}{repeatsame}};
+  if (defined $hash->{attr}{repeatsame}) {
+   my @repeatsame=@{$hash->{attr}{repeatsame}};
    my $repeatsameValue=EvalValueDoIf($hash,"repeatsame",$repeatsame[$nr]);
     if ($subnr == 0) {
       if ($repeatsameValue) {
@@ -1905,8 +1905,8 @@ sub DOIF_cmd ($$$$) {
       }
     }
   }
-  if (defined $hash->{attrtimer}{waitsame}) {
-    my @waitsame=@{$hash->{attrtimer}{waitsame}};
+  if (defined $hash->{attr}{waitsame}) {
+    my @waitsame=@{$hash->{attr}{waitsame}};
     my $waitsameValue=EvalValueDoIf($hash,"waitsame",$waitsame[$nr]);
     if ($subnr == 0) {
       if ($waitsameValue) {
@@ -2315,7 +2315,6 @@ DOIF_Notify($$)
   return "" if (ReadingsVal($pn,"mode","") eq "disabled");
   
   $ret=0;
-  $hash->{helper}{DOIF_eventas} = ();
   
   if ((($hash->{devices}{all}) and $hash->{devices}{all} =~ / $dev->{NAME} /) or defined CheckRegexpDoIf($hash,"cond",$dev->{NAME},"",$eventa,0)){
     $hash->{helper}{cur_cmd_nr}="Trigger  $dev->{NAME}" if (AttrVal($hash->{NAME},"selftrigger","") ne "all");
@@ -2359,7 +2358,6 @@ DOIF_Notify($$)
   
   delete $hash->{helper}{cur_cmd_nr};
   
-  $hash->{helper}{DOIF_Readings_events}= ();
   if (defined $hash->{Regex}{"DOIF_Readings"}) {
     foreach $device ("$dev->{NAME}","") {
       if (defined $hash->{Regex}{"DOIF_Readings"}{$device}) {
@@ -2402,6 +2400,7 @@ DOIF_Notify($$)
     if ($dev->{NAME} ne $hash->{NAME}) {
       @{$hash->{CHANGED}}=@{$hash->{helper}{DOIF_Readings_events}};
       @{$hash->{CHANGEDWITHSTATE}}=@{$hash->{helper}{DOIF_Readings_events}};
+      $hash->{helper}{DOIF_Readings_events}=();
       DOIF_Notify($hash,$hash);
     }
   }
@@ -2414,7 +2413,6 @@ sub DOIF_TimerTrigger ($) {
   my $pn = $hash->{NAME};
   my $localtime=${$timer}->{localtime};
   delete $hash->{triggertime}{$localtime};
-  $hash->{helper}{DOIF_Readings_events}= ();
   my $ret;
   my ($now, $microseconds) = gettimeofday();
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
@@ -2713,7 +2711,7 @@ DOIF_SetSleepTimer($$$$$$$)
   my $sleeptimer=$hash->{helper}{sleeptimer};
   
   my @waitdel;
-  @waitdel=@{$hash->{attrtimer}{waitdel}{$nr}} if (defined $hash->{attrtimer}{waitdel}{$nr});
+  @waitdel=@{$hash->{attr}{waitdel}{$nr}} if (defined $hash->{attr}{waitdel}{$nr});
   my $err;
 
   if ($sleeptimer != -1 and (($sleeptimer != $nr or AttrVal($pn,"do","") eq "resetwait") or ($sleeptimer == $nr and $waitdel[$subnr]))) {
@@ -2742,7 +2740,7 @@ DOIF_SetSleepTimer($$$$$$$)
       $sleeptime=$repeatcmd;
     } else {
       my @sleeptimer;
-      @sleeptimer=@{$hash->{attrtimer}{wait}{$nr}} if (defined $hash->{attrtimer}{wait}{$nr});
+      @sleeptimer=@{$hash->{attr}{wait}{$nr}} if (defined $hash->{attr}{wait}{$nr});
       if ($waitdel[$subnr]) {
         $sleeptime = $waitdel[$subnr];
       } else {
@@ -2785,7 +2783,6 @@ DOIF_SleepTrigger ($)
   my $sleeptimer=$hash->{helper}{sleeptimer};
   my $sleepsubtimer=$hash->{helper}{sleepsubtimer};
   my $pn = $hash->{NAME};
-  $hash->{helper}{DOIF_eventas} = ();
   
   $hash->{helper}{cur_cmd_nr}="wait_timer" if (!AttrVal($hash->{NAME},"selftrigger",""));
   $hash->{helper}{triggerEvents}=$hash->{helper}{timerevents};
@@ -3117,10 +3114,10 @@ DOIF_Attr(@)
         readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
         $hash->{helper}{sleeptimer}=-1;
       }
-      delete $hash->{attrtimer}{wait};
+      delete $hash->{attr}{wait};
       my @wait=SplitDoIf(':',$a[3]);
       for (my $i=0;$i<@wait;$i++){
-        @{$hash->{attrtimer}{wait}{$i}}=SplitDoIf(',',$wait[$i]);
+        @{$hash->{attr}{wait}{$i}}=SplitDoIf(',',$wait[$i]);
       }
   } elsif($a[0] =~ "set|del"  && $a[2] eq "waitdel") {
       if ($a[0] eq "del") {
@@ -3128,21 +3125,27 @@ DOIF_Attr(@)
         readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
         $hash->{helper}{sleeptimer}=-1;
       }
-      delete $hash->{attrtimer}{waitdel};
+      delete $hash->{attr}{waitdel};
       my @waitdel=SplitDoIf(':',$a[3]);
       for (my $i=0;$i<@waitdel;$i++){
-        @{$hash->{attrtimer}{waitdel}{$i}}=SplitDoIf(',',$waitdel[$i]);
+        @{$hash->{attr}{waitdel}{$i}}=SplitDoIf(',',$waitdel[$i]);
       }
   } elsif($a[0] =~ "set|del" && $a[2] eq "repeatsame") {
     delete ($defs{$hash->{NAME}}{READINGS}{cmd_count});
-    @{$hash->{attrtimer}{repeatsame}}=SplitDoIf(':',$a[3]);
+    @{$hash->{attr}{repeatsame}}=SplitDoIf(':',$a[3]);
   } elsif($a[0] =~ "set|del" && $a[2] eq "repeatcmd") {
-    @{$hash->{attrtimer}{repeatcmd}}=SplitDoIf(':',$a[3]);
+    @{$hash->{attr}{repeatcmd}}=SplitDoIf(':',$a[3]);
   } elsif($a[0] =~ "set|del" && $a[2] eq "cmdpause") {
-    @{$hash->{attrtimer}{cmdpause}}=SplitDoIf(':',$a[3]);
+    @{$hash->{attr}{cmdpause}}=SplitDoIf(':',$a[3]);
+  } elsif($a[0] =~ "set|del" && $a[2] eq "cmdState") {
+      delete $hash->{attr}{cmdState};
+      my @cmdState=SplitDoIf('|',$a[3]);
+      for (my $i=0;$i<@cmdState;$i++){
+        @{$hash->{attr}{cmdState}{$i}}=SplitDoIf(',',$cmdState[$i]);
+      }
   } elsif($a[0] =~ "set|del" && $a[2] eq "waitsame") {
     delete ($defs{$hash->{NAME}}{READINGS}{waitsame});
-    @{$hash->{attrtimer}{waitsame}}=SplitDoIf(':',$a[3]);
+    @{$hash->{attr}{waitsame}}=SplitDoIf(':',$a[3]);
   } elsif($a[0] eq "set" && $a[2] eq "DOIF_Readings") {
     my ($def,$err)=addDOIF_Readings($hash,$a[3]);
     if ($err) {
@@ -3249,19 +3252,16 @@ DOIF_Set($@)
       };
       return if($doRet);
 	  if (ReadingsVal($pn,"mode","") ne "disabled") {
-		  my @cmdState=SplitDoIf('|',AttrVal($hash->{NAME},"cmdState",""));
-		  my @cmdSubState;
-		  for (my $i=0; $i < @cmdState;$i++) {
-		    @cmdSubState=SplitDoIf(',',$cmdState[$i]);
-		    if ($arg eq EvalCmdStateDoIf($hash,$cmdSubState[0])) {
-			  if ($hash->{helper}{sleeptimer} != -1) {
-				RemoveInternalTimer($hash);
-				readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
-				$hash->{helper}{sleeptimer}=-1;
-			  }
-			  DOIF_cmd ($hash,$i,0,"set_".$arg."_cmd_".($i+1));
-			  last;
-			}
+      foreach my $i (keys %{$hash->{attr}{cmdState}}) {
+		    if ($arg eq EvalCmdStateDoIf($hash,$hash->{attr}{cmdState}{$i}[0])) {
+          if ($hash->{helper}{sleeptimer} != -1) {
+          RemoveInternalTimer($hash);
+          readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
+          $hash->{helper}{sleeptimer}=-1;
+          }
+          DOIF_cmd ($hash,$i,0,"set_".$arg."_cmd_".($i+1));
+          last;
+        }
 		  }
 		}
       #return "unknown argument $arg for $pn, choose one of disable:noArg initialize:noArg enable:noArg cmd $setList";
