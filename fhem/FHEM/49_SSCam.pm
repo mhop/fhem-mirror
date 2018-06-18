@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 5.2.5  18.06.2018    trigger lastsnap_fw to SSCamSTRM-Device only if snap was done by it.
 # 5.2.4  17.06.2018    SSCam_composegallery added and write warning if old composegallery-weblink device is used 
 # 5.2.3  16.06.2018    no SSCamSTRM refresh when snapgetinfo was running without taken a snap by SSCamSTRM-Device
 # 5.2.2  16.06.2018    compatibility to SSCamSTRM V 1.1.0
@@ -237,7 +238,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "5.2.4";
+my $SSCamVersion = "5.2.5";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -669,7 +670,7 @@ sub SSCam_Set($@) {
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if($prop);     # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
+      $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop);          # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
       SSCam_camsnap($hash);
         
   } elsif ($opt eq "startTracking" && SSCam_IsModelCam($hash)) {
@@ -945,6 +946,7 @@ sub SSCam_Set($@) {
 		  $hash->{HELPER}{ALIAS}      = "View only on compatible browsers";
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw_hls";
       } elsif ($prop eq "lastsnap_fw") {
+          $hash->{HELPER}{LSNAPBYSTRMDEV} = 1 if ($prop1);      # $prop1 wird mitgegeben durch lastsnap_fw by SSCamSTRM-Device
           $hash->{HELPER}{OPENWINDOW}  = 0;
           $hash->{HELPER}{WLTYPE}      = "base64img"; 
 		  $hash->{HELPER}{ALIAS}       = " ";
@@ -4317,10 +4319,11 @@ sub SSCam_camop_parse ($) {
 					$hash->{HELPER}{LINK} = $data->{data}{data}[0]{imageData};					
 				}           
 
-                if (defined($hash->{HELPER}{SNAPBYSTRMDEV})) {
+                if ($hash->{HELPER}{SNAPBYSTRMDEV} || $hash->{HELPER}{LSNAPBYSTRMDEV}) {
                     # Snap durch SSCamSTRM-Device ausgelöst
                     SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
                     delete $hash->{HELPER}{SNAPBYSTRMDEV};
+                    delete $hash->{HELPER}{LSNAPBYSTRMDEV};
                 } else {
                     SSCam_refresh($hash,0,0,0);     # kein Room-Refresh, kein SSCam-state-Event, kein SSCamSTRM-Event
                 }           
@@ -5769,7 +5772,7 @@ sub SSCam_StreamDev($$$) {
   my $imglh264run   = "<img src=\"$FW_ME/www/images/sscam/black_btn_LRECH264.png\">";
   my $cmdlmjpegrun  = "cmd=set $camname runView lastrec_fw_MJPEG";                                      # Last Record MJPEG  
   my $imglmjpegrun  = "<img src=\"$FW_ME/www/images/sscam/black_btn_LRECMJPEG.png\">";
-  my $cmdlsnaprun   = "cmd=set $camname runView lastsnap_fw";                                           # Last SNAP  
+  my $cmdlsnaprun   = "cmd=set $camname runView lastsnap_fw STRM";                                      # Last SNAP  
   my $imglsnaprun   = "<img src=\"$FW_ME/www/images/sscam/black_btn_LSNAP.png\">";
   my $cmdrecendless = "cmd=set $camname on 0";                                                          # Endlosaufnahme Start  
   my $imgrecendless = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTART.png\">";
