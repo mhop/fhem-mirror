@@ -944,7 +944,8 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
  ,sensRain            =>{ transmDevTryMax =>1,localResDis     =>1}
  ,tipTronic           =>{ cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1}
  ,senBright           =>{ cyclicInfoMsgDis=>1,localResDis     =>1,transmDevTryMax =>1}
- ,powerMeter          =>{ intKeyVisib     =>1,localResDis     =>1
+ ,powerMeter          =>{ intKeyVisib     =>1
+                         ,confBtnTime     =>1,localResDis     =>1
                          ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1}
  ,outputUnit          =>{ intKeyVisib     =>1}
  ,powerSensor         =>{ transmitTryMax  =>1,transmDevTryMax =>1
@@ -1890,7 +1891,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                      ,"HM-CC-RT-DN00"        =>{ sysTime        =>"" }
                      ,"HM-CC-RT-DN04"        =>{ controlMode    =>"[auto|manual|boost|day|night]"
                                                 ,controlManu    =>"[on|off|5.0..30.0]"
-                                                ,controlParty   =>"-temp- -startDate- -startTime- -enddate- -endTime-"
+                                                ,controlParty   =>"-temp- -startDate- -startTime- -endDate- -endTime-"
                                                 ,tempListSat    =>"[prep|exec] HH:MM temp ..."
                                                 ,tempListSun    =>"[prep|exec] HH:MM temp ..."
                                                 ,tempListMon    =>"[prep|exec] HH:MM temp ..."
@@ -1909,7 +1910,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                      ,"HM-TC-IT-WM-W-EU01"   =>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
                      ,"HM-TC-IT-WM-W-EU02"   =>{ controlMode    =>"[auto|manual|boost|day|night]"
                                                 ,controlManu    =>"[on|off|5.0..30.0]"
-                                                ,controlParty   =>"-temp- -startDate- -startTime- -enddate- -endTime-"
+                                                ,controlParty   =>"-temp- -startDate- -startTime- -endDate- -endTime-"
                                                 ,tempListSat    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
                                                 ,tempListSun    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
                                                 ,tempListMon    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
