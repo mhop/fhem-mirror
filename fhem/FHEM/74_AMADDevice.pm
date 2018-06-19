@@ -1070,6 +1070,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>androidVersion - currently installed version of Android</li>
     <li>automagicState - state of the Automagic or Tasker App <b>(prerequisite Android >4.3). In case you have Android >4.3 and the reading says "not supported", you need to enable Automagic/Tasker inside Android / Settings / Sound & notification / Notification access</b></li>
     <li>batteryHealth - the health of the battery (1=unknown, 2=good, 3=overheat, 4=dead, 5=over voltage, 6=unspecified failure, 7=cold) (Automagic only)</li>
+    <li>powerPercent - state of battery in %</li>
     <li>batterytemperature - the temperature of the battery (Automagic only)</li>
     <li>bluetooth - on/off, bluetooth state</li>
     <li>checkActiveTask - state of an app (needs to be defined beforehand). 0=not active or not active in foreground, 1=active in foreground, <b>see note below</b> (Automagic only)</li>
@@ -1105,7 +1106,6 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>nextAlarmTime - currently set time of alarm</li>
     <li>nfc - state of nfc service on/off</li>
     <li>nfcLastTagID - nfc_id of last scan nfc Tag / In order for the ID to be recognized correctly, the trigger NFC TagIDs must be processed in Flow NFC Tag Support and the TagId's Commase-separated must be entered. (Automagic only)</li>
-    <li>powerLevel - state of battery in %</li>
     <li>powerPlugged - 0=no/1,2=yes, power supply connected</li>
     <li>screen - on locked,unlocked/off locked,unlocked, state of display</li>
     <li>screenBrightness - 0-255, level of screen-brightness</li>
@@ -1258,6 +1258,7 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>androidVersion - aktuell installierte Androidversion</li>
     <li>automagicState - Statusmeldungen von der Automagic oder Tasker App <b>(Voraussetzung Android >4.3). Ist Android gr&ouml;&szlig;er 4.3 vorhanden und im Reading steht "wird nicht unterst&uuml;tzt", mu&szlig; in den Androideinstellungen unter Ton und Benachrichtigungen -> Benachrichtigungszugriff ein Haken f&uuml;r Automagic/Tasker gesetzt werden</b></li>
     <li>batteryHealth - Zustand der Battery (1=unbekannt, 2=gut, 3=&Uuml;berhitzt, 4=tot, 5=&Uuml;berspannung, 6=unbekannter Fehler, 7=kalt) (nur Automagic)</li>
+    <li>powerPercent - Status der Batterie in %</li>
     <li>batterytemperature - Temperatur der Batterie (nur Automagic)</li>
     <li>bluetooth - on/off, Bluetooth Status an oder aus</li>
     <li>checkActiveTask - Zustand einer zuvor definierten APP. 0=nicht aktiv oder nicht aktiv im Vordergrund, 1=aktiv im Vordergrund, <b>siehe Hinweis unten</b> (nur Automagic)</li>
@@ -1293,7 +1294,6 @@ sub AMADDevice_CreateChangeBtDeviceValue($$) {
     <li>nextAlarmTime - aktive Alarmzeit</li>
     <li>nfc - Status des NFC on/off</li>
     <li>nfcLastTagID - nfc_id des zu letzt gescannten Tag's / Damit die ID korrekt erkannt wird muss im Flow NFC Tag Support der Trigger NFC TagIDs bearbeitet werden und die TagId's Kommasepariert eingetragen werden. (nur Automagic)</li>
-    <li>powerLevel - Status der Batterie in %</li>
     <li>powerPlugged - Netzteil angeschlossen? 0=NEIN, 1|2=JA</li>
     <li>screen - on locked/unlocked, off locked/unlocked gibt an ob der Bildschirm an oder aus ist und gleichzeitig gesperrt oder nicht gesperrt</li>
     <li>screenBrightness - Bildschirmhelligkeit von 0-255</li>
