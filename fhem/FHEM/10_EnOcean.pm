@@ -425,11 +425,13 @@ my %EnO_models = (
   "Eltako_FSB14" => {attr => {manufID => "00D"}},
   "Eltako_FSB61" => {attr => {manufID => "00D"}},
   "Eltako_FSB70" => {attr => {manufID => "00D"}},
+  "Eltako_FSB_ACK" => {attr => {manufID => "00D"}},
   "Eltako_FSM12" => {attr => {manufID => "00D"}},
   "Eltako_FSM61" => {attr => {manufID => "00D"}},
   "Eltako_FT55" => {attr => {manufID => "00D"}},
   "Eltako_FTS12" => {attr => {manufID => "00D"}},
   "Eltako_TF"=> {attr => {manufID => "00D"}},
+  "Eltako_TF_RWB"=> {attr => {manufID => "00D"}},
   "Holter_OEM" => {attr => {pidCtrl => "off"}},
   "Micropelt_MVA004" => {attr => {remoteCode => "FFFFFFFE", remoteEEP => "A5-20-01", remoteID => "getNextID", remoteManagement => "manager"}, xml => {productID => "0x004900000000", xmlDescrLocation => "/FHEM/lib/EnO_ReCom_Device_Descr.xml"}},
   other => {},
@@ -7149,6 +7151,10 @@ sub EnOcean_Parse($$)
       # Eltako shutter
       if ($db[0] == 0x70) {
         # open
+        if ($model eq 'Eltako_FSB_ACK') {
+          push @event, "3:position:0";
+          push @event, "3:anglePos:" . AttrVal($name, "angleMin", -90);
+        }
         push @event, "3:endPosition:open_ack";
         $msg = "open_ack";
       } elsif ($db[0] == 0x50) {
@@ -7236,7 +7242,7 @@ sub EnOcean_Parse($$)
       # the state should remain released.
       if ($msg =~ m/released$/ &&
           AttrVal($name, "sensorMode", "switch") ne "pushbutton" &&
-          $model !~ m/(FT55|FSB14|FSB61|FSB70|FSM12|FSM61|FTS12)$/) {
+          $model !~ m/(FT55|FSB.*|FSM12|FSM61|FTS12)$/) {
         $event = "buttons";
         $msg = "released";
       } else {
@@ -9622,19 +9628,32 @@ sub EnOcean_Parse($$)
 
     } elsif ($st eq "digitalInput.03") {
       # 4 digital inputs, wake, temperature (EEP A5-30-03)
-      my $in0 = $db[1] & 1;
-      my $in1 = ($db[1] & 2) > 1;
-      my $in2 = ($db[1] & 4) > 2;
-      my $in3 = ($db[1] & 8) > 3;
-      my $wake = $db[1] & 16 ? 'high' : 'low';
       my $temperature = sprintf "%0.1f", 40 - $db[2] * 40 / 255;
-      push @event, "3:in0:$in0";
-      push @event, "3:in1:$in1";
-      push @event, "3:in2:$in2";
-      push @event, "3:in3:$in3";
-      push @event, "3:wake:$wake";
       push @event, "3:temperature:$temperature";
-      push @event, "3:state:T: $temperature I: " . $in0 . $in1 . $in2 . $in3 . " W: " . $wake;
+      if ($model eq 'Eltako_TF_RWB') {
+        # Eltako TF-RWB smoke detector
+        my $alarm = $db[1] & 16 ? 'off' : 'smoke-alarm';
+        if (!exists($hash->{helper}{lastEvent}) || $hash->{helper}{lastEvent} ne $alarm || ReadingsVal($name, 'alarm', '') eq 'dead_sensor') {
+          push @event, "3:alarm:$alarm";
+          $hash->{helper}{lastEvent} = $alarm;
+        }
+        push @event, "3:state:$alarm";
+        @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        RemoveInternalTimer($hash->{helper}{alarmTimer});
+        InternalTimer(gettimeofday() + 1980, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
+      } else {
+        my $in0 = $db[1] & 1;
+        my $in1 = ($db[1] & 2) > 1;
+        my $in2 = ($db[1] & 4) > 2;
+        my $in3 = ($db[1] & 8) > 3;
+        my $wake = $db[1] & 16 ? 'high' : 'low';
+        push @event, "3:in0:$in0";
+        push @event, "3:in1:$in1";
+        push @event, "3:in2:$in2";
+        push @event, "3:in3:$in3";
+        push @event, "3:wake:$wake";
+        push @event, "3:state:T: $temperature I: " . $in0 . $in1 . $in2 . $in3 . " W: " . $wake;
+      }
 
     } elsif ($st eq "digitalInput.04") {
       # 3 digital inputs, 1 digital input 8 bit (EEP A5-30-04)
@@ -17498,7 +17517,8 @@ EnOcean_Delete($$)
       <a href="#shutTime">shutTime</a> and <a href="#shutTimeCloses">shutTimeCloses</a>,
       are set correctly.
       If <a href="#EnOcean_settingAccuracy">settingAccuracy</a> is set to high, the run-time is sent in 1/10 increments.<br>
-      Set attr subType to manufProfile, manufID to 00D and attr model to Eltako_FSB14|FSB61|FSB70|TF manually.<br>
+      Set attr subType to manufProfile, manufID to 00D and attr model to Eltako_FSB14|FSB61|FSB70|FSB_ACK manually.
+      If the attribute model is set to Eltako_FSB_ACK, with the status "open_ack" the readings position and anglePos are also updated.<br>
       Use the sensor type "Szenentaster/PC" for Eltako devices.
     </li>
     <br><br>
@@ -19905,6 +19925,21 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
+     <li>Smoke Detector (EEP A5-30-03)<br>
+       [Eltako TF-RWB]<br>
+     <ul>
+       <li>smoke-alarm</li>
+       <li>off</li>
+       <li>alarm: dead_sensor|smoke-alarm|off</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
+       <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
+       <li>state: smoke-alarm|off</li>
+     </ul><br>
+        The attr subType must be digitalInput.03. This is done if the device was
+        created by autocreate. Set attr model to Eltako_TF_RWB manually.
+     </li>
+     <br><br>
+
      <li>Digital Input (EEP A5-30-04)<br>
          3 digital Inputs, 1 digital Input 8 bits [untested]<br>
      <ul>
@@ -20135,8 +20170,10 @@ EnOcean_Delete($$)
         The values of the reading position and anglePos are updated automatically,
         if the command position is sent or the reading state was changed
         manually to open or closed.<br>
-        Set attr subType file, attr manufID to 00D and attr model to
-        Eltako_FSB14|FSB61|FSB70 manually.
+        Set attr subType manufProfile, attr manufID to 00D and attr model to
+        Eltako_FSB14|FSB61|FSB70|FSB_ACK manually.
+        If the attribute model is set to Eltako_FSB_ACK, with the status "open_ack" the readings position and anglePos are also updated.<br>
+
      </li>
      <br><br>
 
