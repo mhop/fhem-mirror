@@ -25,7 +25,7 @@ set grid
 #FileLog 4:wake:0:$fld[3]=~"high"?1:0.85
 #FileLog 4:in0:0:$fld[3]=~"high"?0.75:0.6
 #FileLog 4:in1:0:$fld[3]=~"high"?0.55:0.4
-#FileLog 4:in2:0:$fld[3]=~"high"?0.55:0.2
+#FileLog 4:in2:0:$fld[3]=~"high"?0.35:0.2
 #FileLog 4:in3:0:$fld[3]=~"high"?0.15:0
 
 plot "<IN>" using 1:2 axes x1y1 title "Wake" ls l0 lw 1 with steps,\
