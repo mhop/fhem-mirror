@@ -1,4 +1,4 @@
-REV 16884
+REV 16888
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-06-17_07:45:02 250930 ./CHANGED
+UPD 2018-06-20_07:45:04 251006 ./CHANGED
 UPD 2018-06-11_07:45:06 37379 ./MAINTAINER.txt
 UPD 2018-06-18_07:45:05 41502 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
@@ -352,10 +352,10 @@ UPD 2018-02-15_07:45:02 88225 FHEM/73_PRESENCE.pm
 UPD 2017-11-06_07:45:02 81399 FHEM/73_UpsPico.pm
 UPD 2018-04-14_07:45:02 84632 FHEM/73_WaterCalculator.pm
 UPD 2017-05-09_07:45:02 118318 FHEM/73_km200.pm
-UPD 2018-06-03_07:45:03 67275 FHEM/74_AMADDevice.pm
+UPD 2018-06-20_07:45:04 67279 FHEM/74_AMADDevice.pm
 UPD 2018-05-10_07:45:03 39817 FHEM/74_GardenaSmartDevice.pm
 UPD 2018-03-22_07:45:04 41340 FHEM/74_HOMBOT.pm
-UPD 2018-05-21_07:45:03 30457 FHEM/74_HusqvarnaAutomower.pm
+UPD 2018-06-20_07:45:04 30459 FHEM/74_HusqvarnaAutomower.pm
 UPD 2018-06-02_07:45:03 23022 FHEM/74_NUKIDevice.pm
 UPD 2017-04-26_07:45:02 35753 FHEM/74_Nmap.pm
 UPD 2017-05-03_07:45:02 64129 FHEM/74_THINKINGCLEANER.pm
@@ -518,7 +518,7 @@ UPD 2015-07-28_14:05:29 5739 FHEM/FhemUtils/update-20130127-001
 UPD 2018-05-06_07:45:03 3548 FHEM/FritzBoxUtils.pm
 UPD 2015-07-28_14:05:31 1582 FHEM/GPUtils.pm
 UPD 2018-06-15_07:45:04 49909 FHEM/HMCCUConf.pm
-UPD 2018-02-26_07:45:03 196659 FHEM/HMConfig.pm
+UPD 2018-06-20_07:45:04 196705 FHEM/HMConfig.pm
 UPD 2017-05-22_07:45:02 42698 FHEM/HOMESTATEtk.pm
 UPD 2018-05-25_07:45:02 29085 FHEM/HttpUtils.pm
 UPD 2015-07-28_14:05:31 2324 FHEM/MaxCommon.pm
@@ -575,7 +575,7 @@ UPD 2017-09-10_16:01:38 422 FHEM/holiday/sn.holiday
 UPD 2017-09-10_16:01:38 405 FHEM/holiday/st.holiday
 UPD 2017-09-10_16:01:38 392 FHEM/holiday/th.holiday
 UPD 2018-06-02_07:45:03 330219 FHEM/lib/74_AMADautomagicFlowset_4.2.3.xml
-UPD 2018-06-02_07:45:03 411256 FHEM/lib/74_AMADtaskerset_4.2.3.prj.xml
+UPD 2018-06-20_07:45:04 410988 FHEM/lib/74_AMADtaskerset_4.2.3.prj.xml
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -669,12 +669,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-06-17_07:45:06 3469418 docs/commandref.html
-UPD 2018-06-17_07:45:07 2122554 docs/commandref_DE.html
+UPD 2018-06-20_07:45:07 3469420 docs/commandref.html
+UPD 2018-06-20_07:45:08 2122556 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-06-15_07:45:04 85474 docs/commandref_frame_DE.html
-UPD 2018-06-19_07:45:10 192754 docs/commandref_modular.html
-UPD 2018-06-19_07:45:10 203463 docs/commandref_modular_DE.html
+UPD 2018-06-20_07:45:09 192754 docs/commandref_modular.html
+UPD 2018-06-20_07:45:10 203463 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
