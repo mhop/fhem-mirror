@@ -148,6 +148,9 @@
 #   2018-01-18  added preProcessRegex e.g. to fix broken JSON data in a response
 #   2018-02-10  modify handling of attribute removeBuf since httpUtils doesn't expose its buffer anymore, 
 #               Instead new attribute showBody to explicitely show a formatted version of the http response body (header is already shown)
+#   2018-05-01  new attribute enforceGoodReadingNames
+#   2018-05-05  experimental support for named groups in regexes (won't support individual MaxAge / deleteIf attributes)
+#               see ExtractReading function
 #
 
 #
@@ -159,6 +162,7 @@
 #                   you can refer to them by absolute number (using "$1" instead of "\g1" , etc)
 #                   or by name via the %+ hash, using "$+{name}".
 #                   -> if named groups exist - 
+#
 #               reading mit Status je get (error, no match, ...) oder reading zum nachverfolgen der schritte, fehler, auth etc.
 #
 #               In _Attr bei Prüfungen auf get auch set berücksichtigen wo nötig, ebenso in der Attr Liste (oft fehlt set)
@@ -171,6 +175,10 @@
 #               multi page log extraction?
 #               Profiling von Modbus übernehmen?
 #               extend httpmod to support simple tcp connections over devio instead of HttpUtils?
+#
+#
+# Merkliste fürs nächste Fhem Release
+#   - enforceGoodReadingNames 1 als Default
 #
 #
 #
@@ -213,7 +221,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.4.2 - 10.2.2018';
+my $HTTPMOD_Version = '3.4.4 - 5.5.2018';
 
 #
 # FHEM module intitialisation
@@ -258,9 +266,9 @@ sub HTTPMOD_Initialize($)
       "(reading|get|set)[0-9]*DeleteOnError " .
       "extractAllJSON " .
       
-      "readingsName.* " .           # old 
-      "readingsRegex.* " .          # old 
-      "readingsExpr.* " .           # old 
+      "readingsName.* " .               # old 
+      "readingsRegex.* " .              # old 
+      "readingsExpr.* " .               # old 
      
       "requestHeader.* " .  
       "requestData.* " .
@@ -285,14 +293,14 @@ sub HTTPMOD_Initialize($)
 
       "[gs]et[0-9]*URL " .
       "[gs]et[0-9]*Data.* " .
-      "[gs]et[0-9]*NoData.* " .     # make sure it is an HTTP GET without data - even if a more generic data is defined
+      "[gs]et[0-9]*NoData.* " .         # make sure it is an HTTP GET without data - even if a more generic data is defined
       "[gs]et[0-9]*Header.* " .
       "[gs]et[0-9]*CheckAllReadings:0,1 " .
       "[gs]et[0-9]*ExtractAllJSON:0,1 " .
       
-      "[gs]et[0-9]*URLExpr " .         # old
-      "[gs]et[0-9]*DatExpr " .         # old
-      "[gs]et[0-9]*HdrExpr " .         # old
+      "[gs]et[0-9]*URLExpr " .          # old
+      "[gs]et[0-9]*DatExpr " .          # old
+      "[gs]et[0-9]*HdrExpr " .          # old
 
       "get[0-9]*Poll:0,1 " . 
       "get[0-9]*PollDelay " .
@@ -346,6 +354,7 @@ sub HTTPMOD_Initialize($)
       "enableCookies:0,1 " .
       "enableXPath:0,1 " .                      # old 
       "enableXPath-Strict:0,1 " .               # old
+      "enforceGoodReadingNames " .
       $readingFnAttributes;  
 }
 
@@ -511,7 +520,7 @@ sub HTTPMOD_Attr(@)
             }
         } elsif ($aName =~ /Expr/) { # validate all Expressions
             my $val = 0; my $old = 0;
-            my $timeDiff = 0;
+            my $timeDiff = 0;               # to be available in Exprs
             my @matchlist = ();
             no warnings qw(uninitialized);
             my $oldSig = ($SIG{__WARN__} ? $SIG{__WARN__} : 'DEFAULT');
@@ -632,6 +641,7 @@ sub HTTPMOD_Attr(@)
             HTTPMOD_SetTimer($hash, 2);     # change timer for alignment but at least 2 secs from now 
 
         } elsif ($aName =~ /^(reading|get)([0-9]+)(-[0-9]+)?Name$/) {
+            # todo: validate good reading name if enforceGoodReadingNames is set to 1 / by default in next fhem version
             $hash->{".updateRequestHash"} = 1;
         }
         
@@ -1702,10 +1712,10 @@ sub HTTPMOD_FormatReading($$$$$)
     if ($expr) {
         my $old = $val;     # save for later logging
         my $now = ($hash->{".updateTime"} ? $hash->{".updateTime"} : gettimeofday());
-        my $timeDiff = 0;
+        my $timeDiff = 0;       # to be available in Exprs
 
         my $timeStr = ReadingsTimestamp($name, $reading, 0);
-        $timeDiff = ($now - time_str2num($timeStr)) if ($timeStr);
+        $timeDiff = ($now - time_str2num($timeStr)) if ($timeStr);  
 
         my $oldSig = ($SIG{__WARN__} ? $SIG{__WARN__} : 'DEFAULT');        
         $SIG{__WARN__} = sub { Log3 $name, 3, "$name: FormatReadig OExpr $expr created warning: @_"; };
@@ -1746,7 +1756,7 @@ sub HTTPMOD_ExtractReading($$$$$)
     my ($hash, $buffer, $context, $num, $reqType) = @_;
     # for get / set which use reading.* definitions for parsing reqType might be "get01" and context might be "reading"
     my $name = $hash->{NAME};
-    my ($val, $reading, $regex) = ("", "", "");
+    my ($reading, $regex) = ("", "", "");
     my ($json, $xpath, $xpathst, $recomb, $regopt, $sublen, $alwaysn);
     my @subrlist  = ();
     my @matchlist = ();
@@ -1762,13 +1772,14 @@ sub HTTPMOD_ExtractReading($$$$$)
     
     # support for old syntax
     if ($context eq "reading") {        
-        $reading = AttrVal($name, 'readingsName'.$num, ($json ? $json : "unnamed-$num"));
+        $reading = AttrVal($name, 'readingsName'.$num, ($json ? $json : "reading$num"));
         $regex   = AttrVal($name, 'readingsRegex'.$num, "");
     }
     # new syntax overrides reading and regex
     $reading = HTTPMOD_GetFAttr($name, $context, $num, "Name", $reading);
     $regex   = HTTPMOD_GetFAttr($name, $context, $num, "Regex", $regex);
 
+    my %namedRegexGroups;
 
     if ($regex) {
         # old syntax for xpath and xpath-strict as prefix in regex - one result joined 
@@ -1797,11 +1808,15 @@ sub HTTPMOD_ExtractReading($$$$$)
                 Log3 $name, 5, "$name: ExtractReading $reading with regex /$regex/$regopt ...";
                 eval '@matchlist = ($buffer =~ /' . "$regex/$regopt" . ')';
                 Log3 $name, 3, "$name: error in regex matching with regex option: $@" if ($@);
+                %namedRegexGroups = %+ if (%+);
             } else {
                 Log3 $name, 5, "$name: ExtractReading $reading with regex /$regex/...";
                 @matchlist = ($buffer =~ /$regex/);
+                %namedRegexGroups = %+ if (%+);
             }
-            Log3 $name, 5, "$name: " . @matchlist . " capture group(s), matchlist = " . join ",", @matchlist if (@matchlist);
+            Log3 $name, 5, "$name: " . @matchlist . " capture group(s), " .
+                (%namedRegexGroups ? "named capture groups, " : "") .
+                "matchlist = " . join ",", @matchlist if (@matchlist);
         }
     } elsif ($json) {
         Log3 $name, 5, "$name: ExtractReading $reading with json $json ...";
@@ -1847,10 +1862,6 @@ sub HTTPMOD_ExtractReading($$$$$)
 
     my $match = @matchlist;
     if ($match) {
-        my ($eNum, $subReading);
-        my $group  = 1;
-        my $subNum = "";
-        
         if ($recomb) {
             Log3 $name, 5, "$name: ExtractReading is recombining $match matches with expression $recomb";
             my $oldSig = ($SIG{__WARN__} ? $SIG{__WARN__} : 'DEFAULT');
@@ -1864,40 +1875,70 @@ sub HTTPMOD_ExtractReading($$$$$)
             @matchlist = ($val);
             $match = 1;
         }
-        foreach $val (@matchlist) {
-            if ($match == 1) {
-                # only one match
-                $eNum       = $num;
-                $subReading = ($alwaysn ? "${reading}-" . ($sublen ? sprintf ("%0${sublen}d", 1) : "1") : $reading);
-            } else {
-                # multiple matches -> check for special name of readings
-                $eNum     = $num ."-".$group;
-                # don't use GetFAttr here because we don't want to get the value of the generic attribute "Name"
-                # but this name with -group number added as default
-                if (defined ($attr{$name}{$context . $eNum . "Name"})) {
-                    $subReading = $attr{$name}{$context . $eNum . "Name"};
-                } else {
-                    if ($sublen) {
-                        $subReading = "${reading}-" . sprintf ("%0${sublen}d", $group);
-                    } else {
-                        $subReading = "${reading}-$group";
+        if (%namedRegexGroups) {
+            Log3 $name, 5, "$name: experimental named regex group handling";
+            foreach my $subReading (keys %namedRegexGroups) {
+                my $val = $namedRegexGroups{$subReading};
+                push @subrlist, $subReading;
+                # search for group in -Name attrs (-group is sub number) ...
+                my $group = 0;
+                foreach my $aName (sort keys %{$attr{$name}}) {
+                    if ($aName =~ /^$context$num-([\d]+)Name$/) {
+                        if ($attr{$name}{$context.$num."-".$1."Name"} eq $subReading) {
+                            $group = $1;
+                            Log3 $name, 5, "$name: ExtractReading uses $context$num-$group attrs for named capture group $subReading";
+                        }
                     }
-                    $subNum     = "-$group";
                 }
+                my $eNum = $num . ($group ? "-".$group : "");
+                $val  = HTTPMOD_FormatReading($hash, $context, $eNum, $val, $subReading);
+                            
+                Log3 $name, 4, "$name: ExtractReading for $context$num sets reading for named capture group $subReading to $val";
+                readingsBulkUpdate( $hash, $subReading, $val );
+                # point from reading name back to the parsing definition as reading01 or get02 ...
+                $hash->{defptr}{readingBase}{$subReading} = $context;                   # used to find maxAge attr
+                $hash->{defptr}{readingNum}{$subReading}  = $num;                       # used to find maxAge attr
+                $hash->{defptr}{requestReadings}{$reqType}{$subReading} = "$context $eNum"; # used by deleteOnError / deleteIfUnmatched
+                delete $hash->{defptr}{readingOutdated}{$subReading};                   # used by MaxAge as well
             }
-            push @subrlist, $subReading;
-            $val = HTTPMOD_FormatReading($hash, $context, $eNum, $val, $subReading);
-                        
-            Log3 $name, 4, "$name: ExtractReading for $context$num-$group sets $subReading to $val";
-            readingsBulkUpdate( $hash, $subReading, $val );
-            # point from reading name back to the parsing definition as reading01 or get02 ...
-            $hash->{defptr}{readingBase}{$subReading}   = $context;
-            $hash->{defptr}{readingNum}{$subReading}    = $num;
-            $hash->{defptr}{readingSubNum}{$subReading} = $subNum if ($subNum);
-            $hash->{defptr}{requestReadings}{$reqType}{$subReading} = "$context $eNum";
-            # might be                       get01      Temp-02         reading  5 (where its parsing / naming was defined)
-            delete $hash->{defptr}{readingOutdated}{$subReading};
-            $group++;
+        } else {
+            my $group = 1;
+            foreach my $val (@matchlist) {
+                my ($subNum, $eNum, $subReading);
+                if ($match == 1) {
+                    # only one match
+                    $eNum = $num;
+                    $subReading = ($alwaysn ? "${reading}-" . ($sublen ? sprintf ("%0${sublen}d", 1) : "1") : $reading);
+                } else {
+                    # multiple matches -> check for special name of readings
+                    $eNum = $num ."-".$group;
+                    # don't use GetFAttr here because we don't want to get the value of the generic attribute "Name"
+                    # but this name with -group number added as default
+                    if (defined ($attr{$name}{$context . $eNum . "Name"})) {
+                        $subReading = $attr{$name}{$context . $eNum . "Name"};
+                    } else {
+                        if ($sublen) {
+                            $subReading = "${reading}-" . sprintf ("%0${sublen}d", $group);
+                        } else {
+                            $subReading = "${reading}-$group";
+                        }
+                        $subNum = "-$group";
+                    }
+                }
+                push @subrlist, $subReading;
+                $val = HTTPMOD_FormatReading($hash, $context, $eNum, $val, $subReading);
+                            
+                Log3 $name, 4, "$name: ExtractReading for $context$num-$group sets $subReading to $val";
+                readingsBulkUpdate( $hash, $subReading, $val );
+                # point from reading name back to the parsing definition as reading01 or get02 ...
+                $hash->{defptr}{readingBase}{$subReading}   = $context;                 # used to find maxAge attr
+                $hash->{defptr}{readingNum}{$subReading}    = $num;                     # used to find maxAge attr
+                $hash->{defptr}{readingSubNum}{$subReading} = $subNum if ($subNum);     # used to find maxAge attr
+                $hash->{defptr}{requestReadings}{$reqType}{$subReading} = "$context $eNum";     # used by deleteOnError / deleteIfUnmathced
+                # might be                       get01      Temp-02         reading  5 (where its parsing / naming was defined)
+                delete $hash->{defptr}{readingOutdated}{$subReading};                   # used by MaxAge as well
+                $group++;
+            }
         }
     } else {
         Log3 $name, 5, "$name: ExtractReading $reading did not match" if ($try);
@@ -2497,16 +2538,19 @@ sub HTTPMOD_Read($$$)
         # create a reading for each JSON object and use formatting options if a correspondig reading name / formatting is defined 
         if (ref $hash->{ParserData}{JSON} eq "HASH") {
             foreach my $object (keys %{$hash->{ParserData}{JSON}}) {
+                # todo: create good reading name with makeReadingName instead of using the potentially illegal object name
+                my $rName = $object;                
+                $rName = makeReadingName($object) if (AttrVal($name, "enforceGoodReadingNames", 0));    # todo: should become default with next fhem version
                 my $value = $hash->{ParserData}{JSON}{$object};
-                Log3 $name, 5, "$name: Read set JSON $object as reading $object to value " . $value;
-                $value = HTTPMOD_FormatReading($hash, $context, $num, $value, $object);
-                readingsBulkUpdate($hash, $object, $value);
-                push @matched, $object;     # unmatched is not filled for "ExtractAllJSON"
-                delete $hash->{defptr}{readingOutdated}{$object};
+                Log3 $name, 5, "$name: Read set JSON $object as reading $rName to value " . $value;
+                $value = HTTPMOD_FormatReading($hash, $context, $num, $value, $rName);
+                readingsBulkUpdate($hash, $rName, $value);
+                push @matched, $rName;     # unmatched is not filled for "ExtractAllJSON"
+                delete $hash->{defptr}{readingOutdated}{$rName};
                 
-                $hash->{defptr}{readingBase}{$object}   = $context;
-                $hash->{defptr}{readingNum}{$object}    = $num;
-                $hash->{defptr}{requestReadings}{$type}{$object} = "$context $num";
+                $hash->{defptr}{readingBase}{$rName} = $context;
+                $hash->{defptr}{readingNum}{$rName}  = $num;
+                $hash->{defptr}{requestReadings}{$type}{$rName} = "$context $num";
             }
         } else {
             Log3 $name, 3, "$name: no parsed JSON structure available";
@@ -3573,6 +3617,10 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
             This attribute should no longer be used. Please specify an HTTP XPath in the dedicated attributes shown above.
         <li><b>enableXPath-Strict</b></li>
             This attribute should no longer be used. Please specify an XML XPath in the dedicated attributes shown above.
+            
+        <li><b>enforceGoodReadingNames</b></li>
+            makes sure that reading names are valid and especially that extractAllJSON creates valid reading names.         
+            
         <li><b>parseFunction1</b> and <b>parseFunction2</b></li>
             These functions allow an experienced Perl / Fhem developer to plug in his own parsing functions.<br>
             Please look into the module source to see how it works and don't use them if you are not sure what you are doing.
