@@ -4,17 +4,17 @@ use List::Util qw(first);
  
 #-- Message types
 use constant {
-  C_PRESENTATION => 0,
-  C_SET          => 1,
-  C_REQ          => 2,
-  C_INTERNAL     => 3,
-  C_STREAM       => 4,
+	C_PRESENTATION => 0,
+	C_SET          => 1,
+	C_REQ          => 2,
+	C_INTERNAL     => 3,
+	C_STREAM       => 4,
 };
 
 use constant commands => qw( C_PRESENTATION C_SET C_REQ C_INTERNAL C_STREAM );
 
 sub commandToStr($) {
-  (commands)[shift];
+	(commands)[shift];
 }
 
 #-- Variable types
@@ -84,46 +84,64 @@ use constant variableTypes => qw{ V_TEMP V_HUM V_STATUS V_PERCENTAGE V_PRESSURE 
         V_HVAC_FLOW_STATE V_HVAC_SPEED V_LIGHT_LEVEL V_VAR1 V_VAR2 V_VAR3 V_VAR4 V_VAR5
         V_UP V_DOWN V_STOP V_IR_SEND V_IR_RECEIVE V_FLOW V_VOLUME V_LOCK_STATUS 
         V_LEVEL V_VOLTAGE V_CURRENT V_RGB V_RGBW V_ID V_UNIT_PREFIX V_HVAC_SETPOINT_COOL V_HVAC_SETPOINT_HEAT V_HVAC_FLOW_MODE
-		V_TEXT V_CUSTOM V_POSITION V_IR_RECORD V_PH V_ORP V_EC V_VAR V_VA V_POWER_FACTOR };
+        V_TEXT V_CUSTOM V_POSITION V_IR_RECORD V_PH V_ORP V_EC V_VAR V_VA V_POWER_FACTOR };
 
 sub variableTypeToStr($) {
   (variableTypes)[shift];
 }
 
 sub variableTypeToIdx($) {
-  my $var = shift;
-  return first { (variableTypes)[$_] eq $var } 0 .. scalar(variableTypes);
+	my $var = shift;
+	return first { (variableTypes)[$_] eq $var } 0 .. scalar(variableTypes);
 }
 
 #-- Internal messages
 use constant {
-  I_BATTERY_LEVEL        => 0,
-  I_TIME                 => 1,
-  I_VERSION              => 2,
-  I_ID_REQUEST           => 3,
-  I_ID_RESPONSE          => 4,
-  I_INCLUSION_MODE       => 5,
-  I_CONFIG               => 6,
-  I_FIND_PARENT          => 7,
-  I_FIND_PARENT_RESPONSE => 8,
-  I_LOG_MESSAGE          => 9,
-  I_CHILDREN             => 10,
-  I_SKETCH_NAME          => 11,
-  I_SKETCH_VERSION       => 12,
-  I_REBOOT               => 13,
-  I_GATEWAY_READY        => 14,
-  I_REQUEST_SIGNING      => 15,
-  I_GET_NONCE            => 16,
-  I_GET_NONCE_RESPONSE   => 17,
+  I_BATTERY_LEVEL           => 0,
+  I_TIME                    => 1,
+  I_VERSION                 => 2,
+  I_ID_REQUEST              => 3,
+  I_ID_RESPONSE             => 4,
+  I_INCLUSION_MODE          => 5,
+  I_CONFIG                  => 6,
+  I_FIND_PARENT             => 7,
+  I_FIND_PARENT_RESPONSE    => 8,
+  I_LOG_MESSAGE             => 9,
+  I_CHILDREN                => 10,
+  I_SKETCH_NAME             => 11,
+  I_SKETCH_VERSION          => 12,
+  I_REBOOT                  => 13,
+  I_GATEWAY_READY           => 14,
+  I_REQUEST_SIGNING         => 15,
+  I_GET_NONCE               => 16,
+  I_GET_NONCE_RESPONSE      => 17,
+  I_HEARTBEAT_REQUEST       => 18,
+  I_PRESENTATION            => 19,
+  I_DISCOVER_REQUEST        => 20,
+  I_DISCOVER_RESPONSE       => 21,
+  I_HEARTBEAT_RESPONSE      => 22,
+  I_LOCKED                  => 23, # 	Node is locked (reason in string-payload)
+  I_PING                    => 24, # 	Ping sent to node, payload incremental hop counter
+  I_PONG                    => 25, # 	In return to ping, sent back to sender, payload incremental hop counter
+  I_REGISTRATION_REQUEST    => 26, # 	Register request to GW
+  I_REGISTRATION_RESPONSE   => 27, # 	Register response from GW
+  I_DEBUG                   => 28, 
+  I_SIGNAL_REPORT_REQUEST   => 29,
+  I_SIGNAL_REPORT_REVERSE   => 30,
+  I_SIGNAL_REPORT_RESPONSE  => 31,
+  I_PRE_SLEEP_NOTIFICATION  => 32,
+  I_POST_SLEEP_NOTIFICATION => 33,
 };
 
-use constant internalMessageTypes => qw{ I_BATTERY_LEVEL I_TIME I_VERSION I_ID_REQUEST I_ID_RESPONSE
-        I_INCLUSION_MODE I_CONFIG I_FIND_PARENT I_FIND_PARENT_RESPONSE
-        I_LOG_MESSAGE I_CHILDREN I_SKETCH_NAME I_SKETCH_VERSION
-        I_REBOOT I_GATEWAY_READY I_REQUEST_SIGNING I_GET_NONCE I_GET_NONCE_RESPONSE };
+use constant internalMessageTypes => qw{ I_BATTERY_LEVEL I_TIME I_VERSION I_ID_REQUEST I_ID_RESPONSE 
+        I_INCLUSION_MODE I_CONFIG I_FIND_PARENT I_FIND_PARENT_RESPONSE 
+        I_LOG_MESSAGE I_CHILDREN I_SKETCH_NAME I_SKETCH_VERSION 
+        I_REBOOT I_GATEWAY_READY I_REQUEST_SIGNING I_GET_NONCE I_GET_NONCE_RESPONSE I_HEARTBEAT_REQUEST I_PRESENTATION I_DISCOVER_REQUEST 
+        I_DISCOVER_RESPONSE I_HEARTBEAT_RESPONSE I_LOCKED I_PING I_PONG I_REGISTRATION_REQUEST I_REGISTRATION_RESPONSE I_DEBUG 
+        I_SIGNAL_REPORT_REQUEST I_SIGNAL_REPORT_REVERSE I_SIGNAL_REPORT_RESPONSE I_PRE_SLEEP_NOTIFICATION I_POST_SLEEP_NOTIFICATION };
 
 sub internalMessageTypeToStr($) {
-  (internalMessageTypes)[shift];
+	(internalMessageTypes)[shift];
 }
 
 #-- Sensor types
@@ -131,7 +149,7 @@ use constant {
   S_DOOR                  => 0,
   S_MOTION                => 1,
   S_SMOKE                 => 2,
-  S_BINARY                 => 3,
+  S_BINARY                => 3,
   S_DIMMER                => 4,
   S_COVER                 => 5,
   S_TEMP                  => 6,
@@ -174,7 +192,7 @@ use constant sensorTypes => qw{ S_DOOR S_MOTION S_SMOKE S_BINARY S_DIMMER S_COVE
         S_RAIN S_UV S_WEIGHT S_POWER S_HEATER S_DISTANCE S_LIGHT_LEVEL S_ARDUINO_NODE
         S_ARDUINO_REPEATER_NODE S_LOCK S_IR S_WATER S_AIR_QUALITY S_CUSTOM S_DUST S_SCENE_CONTROLLER
         S_RGB_LIGHT S_RGBW_LIGHT S_COLOR_SENSOR S_HVAC S_MULTIMETER S_SPRINKLER S_WATER_LEAK S_SOUND S_VIBRATION
-        S_MOISTURE S_INFO S_GAS S_GPS S_WATER_QUALITY};
+        S_MOISTURE S_INFO S_GAS S_GPS S_WATER_QUALITY };
 
 sub sensorTypeToStr($) {
   (sensorTypes)[shift];
@@ -204,20 +222,20 @@ sub datastreamTypeToStr($) {
 
 #-- Payload types
 use constant {
-  P_STRING  => 0,
-  P_BYTE    => 1,
-  P_INT16   => 2,
-  P_UINT16  => 3,
-  P_LONG32  => 4,
-  P_ULONG32 => 5,
-  P_CUSTOM  => 6,
-  P_FLOAT32 => 7,
+	P_STRING  => 0,
+	P_BYTE    => 1,
+	P_INT16   => 2,
+	P_UINT16  => 3,
+	P_LONG32  => 4,
+	P_ULONG32 => 5,
+	P_CUSTOM  => 6,
+	P_FLOAT32 => 7,
 };
 
 use constant payloadTypes => qw{ P_STRING P_BYTE P_INT16 P_UINT16 P_LONG32 P_ULONG32 P_CUSTOM P_FLOAT32 };
 
 sub payloadTypeToStr($) {
-  (payloadTypes)[shift];
+	(payloadTypes)[shift];
 }
 
 sub subTypeToStr($$) {

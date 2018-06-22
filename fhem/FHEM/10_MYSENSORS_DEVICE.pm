@@ -28,7 +28,10 @@ use strict;
 use warnings;
 
 my %gets = (
-  "version"   => "",
+	# "version" => 1,
+	"heartbeat" => 1, #request node to send hearbeat, MySensorsCore.cpp L 429
+	# "presentation" => 1, #request node to redo presentation, MySensorsCore.cpp L 426
+	"RSSI" => 1, #request RSSI values (available only for recent versions, not for all transceiver types
 );
 
 sub MYSENSORS_DEVICE_Initialize($) {
@@ -39,6 +42,7 @@ sub MYSENSORS_DEVICE_Initialize($) {
   $hash->{DefFn}    = "MYSENSORS::DEVICE::Define";
   $hash->{UndefFn}  = "MYSENSORS::DEVICE::UnDefine";
   $hash->{SetFn}    = "MYSENSORS::DEVICE::Set";
+  $hash->{GetFn}    = "MYSENSORS::DEVICE::Get";
   $hash->{AttrFn}   = "MYSENSORS::DEVICE::Attr";
   
   $hash->{AttrList} =
@@ -114,8 +118,8 @@ my %static_types = (
   S_CUSTOM                => { receives => [V_VAR1,V_VAR2,V_VAR3,V_VAR4,V_VAR5], sends => [V_VAR1,V_VAR2,V_VAR3,V_VAR4,V_VAR5] }, # Use this for custom sensors where no other fits.
   S_DUST                  => { receives => [], sends => [V_LEVEL,V_UNIT_PREFIX] }, # Dust level sensor
   S_SCENE_CONTROLLER      => { receives => [], sends => [V_SCENE_ON,V_SCENE_OFF] }, # Scene controller device
-  S_RGB_LIGHT             => { receives => [V_RGB,V_WATT], sends => [V_RGB,V_WATT] }, # RGB light
-  S_RGBW_LIGHT            => { receives => [V_RGBW,V_WATT], sends => [V_RGBW,V_WATT] }, # RGBW light (with separate white component)
+  S_RGB_LIGHT             => { receives => [V_RGB,V_WATT,V_PERCENTAGE], sends => [V_RGB,V_WATT,V_PERCENTAGE] }, # RGB light
+  S_RGBW_LIGHT            => { receives => [V_RGBW,V_WATT,V_PERCENTAGE], sends => [V_RGBW,V_WATT,V_PERCENTAGE] }, # RGBW light (with separate white component)
   S_COLOR_SENSOR          => { receives => [V_RGB], sends => [V_RGB] }, # Color sensor
   S_HVAC                  => { receives => [], sends => [V_STATUS,V_TEMP,V_HVAC_SETPOINT_HEAT,V_HVAC_SETPOINT_COOL,V_HVAC_FLOW_STATE,V_HVAC_FLOW_MODE,V_HVAC_SPEED] }, # Thermostat/HVAC device
   S_MULTIMETER            => { receives => [], sends => [V_VOLTAGE,V_CURRENT,V_IMPEDANCE] }, # Multimeter device
@@ -268,6 +272,35 @@ sub Set($@) {
     };
     return "$command not defined: ".GP_Catch($@) if $@;
   }
+}
+
+sub Get($@) {
+	my ($hash, @a) = @_;
+	my $type = $hash->{TYPE};
+	return "\"get $type\" needs at least one parameter" if(@a < 2);
+	if(!defined($gets{$a[1]})) {
+		my @cList = map { $_ =~ m/^(file|raw)$/ ? $_ : "$_:noArg" } sort keys %gets;
+		return "Unknown argument $a[1], choose one of " . join(" ", @cList);
+	}
+	my $command = $a[1];
+	COMMAND_HANDLER: {
+		$command eq "version" and do {
+		sendMessage($hash->{IODev}, radioId => $hash->{radioId}, cmd => C_INTERNAL, ack => 0, subType => I_VERSION);
+		last;
+		};
+		$command eq "heartbeat" and do {
+			sendMessage($hash->{IODev}, radioId => $hash->{radioId}, cmd => C_INTERNAL, ack => 0, subType => I_HEARTBEAT_REQUEST);
+			last;
+		};
+		$command eq "presentation" and do {
+			sendMessage($hash->{IODev}, radioId => $hash->{radioId}, cmd => C_INTERNAL, ack => 0, subType => I_PRESENTATION);
+			last;
+		};
+		$command eq "RSSI" and do {
+			sendMessage($hash->{IODev}, radioId => $hash->{radioId}, cmd => C_INTERNAL, ack => 0, subType => I_SIGNAL_REPORT_REQUEST);
+			last;
+		};
+	}
 }
 
 sub Attr($$$$) {
@@ -480,7 +513,7 @@ sub onSetMessage($$) {
 			readingsSingleUpdate($hash, $reading, $value, 1);
 		};
 		Log3 ($hash->{NAME}, 4, "MYSENSORS_DEVICE $hash->{NAME}: ignoring C_SET-message ".GP_Catch($@)) if $@;
-		refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
+		refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive}; #deactivate in case of wanted reduction of alive to internal (heartbeat/battery/smartsleep) messages
 	} else {
 		Log3 ($hash->{NAME}, 5, "MYSENSORS_DEVICE $hash->{NAME}: ignoring C_SET-message without payload");
 	};
@@ -502,107 +535,199 @@ sub onRequestMessage($$) {
 }
 
 sub onInternalMessage($$) {
-  my ($hash,$msg) = @_;
-  my $name = $hash->{NAME};
-  my $type = $msg->{subType};
-  my $typeStr = internalMessageTypeToStr($type);
-  INTERNALMESSAGE: {
-    $type == I_BATTERY_LEVEL and do {
-      readingsSingleUpdate($hash, "batterylevel", $msg->{payload}, 1);
-      Log3 ($name, 4, "MYSENSORS_DEVICE $name: batterylevel $msg->{payload}");
-      last;
-    };
-    $type == I_TIME and do {
-      if ($msg->{ack}) {
-        Log3 ($name, 4, "MYSENSORS_DEVICE $name: response to time-request acknowledged");
-      } else {
-        sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_TIME, payload => time);
-        Log3 ($name, 4, "MYSENSORS_DEVICE $name: update of time requested");
-      }
-      last;
-    };
-    $type == I_VERSION and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-    $type == I_ID_REQUEST and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-    $type == I_ID_RESPONSE and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-    $type == I_INCLUSION_MODE and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-    $type == I_CONFIG and do {
-      if ($msg->{ack}) {
-        Log3 ($name, 4, "MYSENSORS_DEVICE $name: response to config-request acknowledged");
-      } else {
-        readingsSingleUpdate($hash, "parentId", $msg->{payload}, 1);
-        sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_CONFIG, payload => AttrVal($name,"config","M"));
-        Log3 ($name, 4, "MYSENSORS_DEVICE $name: respond to config-request, node parentId = " . $msg->{payload});
-      }
-      last;
-    };
-    $type == I_FIND_PARENT and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-    $type == I_FIND_PARENT_RESPONSE and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-    $type == I_LOG_MESSAGE and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-    $type == I_CHILDREN and do {
-      readingsSingleUpdate($hash, "state", "routingtable cleared", 1);
-      Log3 ($name, 3, "MYSENSORS_DEVICE $name: routingtable cleared");
-      last;
-    };
-    $type == I_SKETCH_NAME and do {
-      $hash->{$typeStr} = $msg->{payload};
-      readingsSingleUpdate($hash, "SKETCH_NAME", $msg->{payload}, 1);
-      last;
-    };
-    $type == I_SKETCH_VERSION and do {
-      $hash->{$typeStr} = $msg->{payload};
-      readingsSingleUpdate($hash, "SKETCH_VERSION", $msg->{payload}, 1);
-      last;
-    };
-    $type == I_REBOOT and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-    $type == I_GATEWAY_READY and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-    $type == I_REQUEST_SIGNING and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-    $type == I_GET_NONCE and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-    $type == I_GET_NONCE_RESPONSE and do {
-      $hash->{$typeStr} = $msg->{payload};
-      last;
-    };
-  }
+	my ($hash,$msg) = @_;
+	my $name = $hash->{NAME};
+	my $type = $msg->{subType};
+	my $typeStr = internalMessageTypeToStr($type);
+	INTERNALMESSAGE: {
+		$type == I_BATTERY_LEVEL and do {
+			# readingsSingleUpdate($hash, "batterylevel", $msg->{payload}, 1);
+			# Log3 ($name, 3, "MYSENSORS_DEVICE $name: batterylevel is deprecated and will be removed soon, use batteryPercent instead (Forum #87575)");
+			readingsSingleUpdate($hash, "batteryPercent", $msg->{payload}, 1);
+			refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
+			Log3 ($name, 4, "MYSENSORS_DEVICE $name: batteryPercent $msg->{payload}");
+			last;
+		};
+		$type == I_TIME and do {
+			if ($msg->{ack}) {
+				Log3 ($name, 4, "MYSENSORS_DEVICE $name: response to time-request acknowledged");
+			} else {
+				sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_TIME, payload => time);
+				Log3 ($name, 4, "MYSENSORS_DEVICE $name: update of time requested");
+			}
+			last;
+		};
+		$type == I_VERSION and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_ID_REQUEST and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_ID_RESPONSE and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_INCLUSION_MODE and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_CONFIG and do {
+			if ($msg->{ack}) {
+				Log3 ($name, 4, "MYSENSORS_DEVICE $name: response to config-request acknowledged");
+			} else {
+				readingsSingleUpdate($hash, "parentId", $msg->{payload}, 1);
+				sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_CONFIG, payload => AttrVal($name,"config","M"));
+				Log3 ($name, 4, "MYSENSORS_DEVICE $name: respond to config-request, node parentId = " . $msg->{payload});
+			}
+			last;
+		};
+		$type == I_FIND_PARENT and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_FIND_PARENT_RESPONSE and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_LOG_MESSAGE and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_CHILDREN and do {
+			readingsSingleUpdate($hash, "state", "routingtable cleared", 1);
+			Log3 ($name, 3, "MYSENSORS_DEVICE $name: routingtable cleared");
+			last;
+		};
+		$type == I_SKETCH_NAME and do {
+			#$hash->{$typeStr} = $msg->{payload};
+			readingsSingleUpdate($hash, "SKETCH_NAME", $msg->{payload}, 1);
+			last;
+		};
+		$type == I_SKETCH_VERSION and do {
+			#$hash->{$typeStr} = $msg->{payload};
+			readingsSingleUpdate($hash, "SKETCH_VERSION", $msg->{payload}, 1);
+			last;
+		};
+		$type == I_REBOOT and do {
+			#$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_GATEWAY_READY and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_REQUEST_SIGNING and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_GET_NONCE and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_GET_NONCE_RESPONSE and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_HEARTBEAT_REQUEST and do {
+			#$hash->{$typeStr} = $msg->{payload};
+			eval {
+				sendMessage($hash->{IODev},radioId => 0, childId => 0, cmd => C_INTERNAL, ack => 0, subType => I_HEARTBEAT_RESPONSE);
+			};
+			refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
+			last;
+		};
+		$type == I_PRESENTATION and do {
+			#$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_DISCOVER_REQUEST and do {
+			#$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_DISCOVER_RESPONSE and do {
+			#$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_HEARTBEAT_RESPONSE and do {
+			readingsSingleUpdate($hash, "heartbeat", "last", 0);
+			refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_LOCKED and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_REGISTRATION_REQUEST and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_REGISTRATION_RESPONSE and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		};
+		$type == I_DEBUG and do {
+			$hash->{$typeStr} = $msg->{payload};
+			last;
+		}; 
+		$type == I_SIGNAL_REPORT_REVERSE and do {
+			#$hash->{$typeStr} = $msg->{payload};
+			readingsSingleUpdate($hash, "rssi_DEVICE", $msg->{payload}, 1) if ($msg->{payload} > -256 );
+			last;
+		}; 
+		$type == I_SIGNAL_REPORT_RESPONSE and do {
+			#$hash->{$typeStr} = $msg->{payload};
+			readingsSingleUpdate($hash, "rssi_at_IODev", $msg->{payload}, 1) if ($msg->{payload} > -256 );
+			last;
+		}; 
+		$type == I_PRE_SLEEP_NOTIFICATION and do {
+			#$hash->{$typeStr} = $msg->{payload};
+			readingsSingleUpdate($hash, "nowSleeping", "1", 0);
+			refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
+			last;
+		}; 
+		$type == I_POST_SLEEP_NOTIFICATION and do {
+			#$hash->{$typeStr} = $msg->{payload};
+			readingsSingleUpdate($hash, "nowSleeping", "0", 0);
+			refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
+			#here we can send out retained and outstanding messages
+			$hash->{nexttry} = -1;
+			MYSENSORS::Timer($hash);
+			my $retainedMsg;
+			while (defined($retainedMsg = shift @{$hash->{retainedMessagesForRadioId}})) {
+				sendClientMessage($hash,$retainedMsg);
+			};
+			last;
+		};
+	}
 }
 
 sub sendClientMessage($%) {
 	my ($hash,%msg) = @_;
 	$msg{radioId} = $hash->{radioId};
 	$msg{ack} = $hash->{ack} unless defined $msg{ack};
-	sendMessage($hash->{IODev},%msg);
-	refreshInternalMySTimer($hash,"Ack") if (($hash->{ack} or $hash->{IODev}->{ack}) and $hash->{timeoutAck}) ; 
+    unless ($hash->{nowSleeping}) {
+      sendMessage($hash->{IODev},%msg);
+      refreshInternalMySTimer($hash,"Ack") if (($hash->{ack} or $hash->{IODev}->{ack}) and $hash->{timeoutAck}); 
+    } else {
+      #write to queue if node is asleep
+      my $retainedMessagesForRadioId = $hash->{retainedMessagesForRadioId}->{$msg{radioId}};
+      unless (defined $retainedMessagesForRadioId) {
+          $retainedMessagesForRadioId = {
+            messages => [],
+          };
+          $hash->{retainedMessagesForRadioId}->{$msg{radioId}} = $retainedMessagesForRadioId;
+      }
+      my $messages = $retainedMessagesForRadioId->{messages};
+      @$messages = grep {
+          $_->{childId} != $msg{childId}
+      or $_->{cmd}     != $msg{cmd}
+          or $_->{subType} != $msg{subType}
+      } @$messages;
+      push @$messages,\%msg;
+    }
 }
 
 sub rawToMappedReading($$$$) {
