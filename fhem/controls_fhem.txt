@@ -1,4 +1,4 @@
-REV 16893
+REV 16896
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-06-20_07:45:04 251006 ./CHANGED
+UPD 2018-06-23_07:45:04 251006 ./CHANGED
 UPD 2018-06-11_07:45:06 37379 ./MAINTAINER.txt
 UPD 2018-06-18_07:45:05 41502 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
@@ -78,7 +78,7 @@ UPD 2016-12-22_07:45:02 36655 FHEM/10_KOPP_FC.pm
 UPD 2018-06-11_07:45:06 61938 FHEM/10_MAX.pm
 UPD 2018-04-30_07:45:05 10978 FHEM/10_MQTT_BRIDGE.pm
 UPD 2018-04-30_07:45:05 13504 FHEM/10_MQTT_DEVICE.pm
-UPD 2018-04-14_07:45:02 30379 FHEM/10_MYSENSORS_DEVICE.pm
+UPD 2018-06-23_07:45:04 30428 FHEM/10_MYSENSORS_DEVICE.pm
 UPD 2018-06-12_07:45:06 19100 FHEM/10_NeuronPin.pm
 UPD 2018-03-28_07:45:02 33933 FHEM/10_OWServer.pm
 UPD 2017-04-30_07:45:02 71321 FHEM/10_RESIDENTS.pm
@@ -583,7 +583,7 @@ UPD 2015-07-28_14:05:30 2254 FHEM/lib/Device/Firmata/Error.pm
 UPD 2015-07-28_14:05:30 2210 FHEM/lib/Device/Firmata/Language.pm
 UPD 2018-01-13_07:45:02 32223 FHEM/lib/Device/Firmata/Platform.pm
 UPD 2018-01-13_07:45:02 37009 FHEM/lib/Device/Firmata/Protocol.pm
-UPD 2017-09-26_07:45:02 7923 FHEM/lib/Device/MySensors/Constants.pm
+UPD 2018-06-23_07:45:04 9072 FHEM/lib/Device/MySensors/Constants.pm
 UPD 2018-04-14_07:45:02 1576 FHEM/lib/Device/MySensors/Message.pm
 UPD 2018-01-23_07:45:02 9355 FHEM/lib/EnO_ReCom_Device_Descr.xml
 UPD 2015-07-28_14:05:30 11604 FHEM/lib/LiquidCrystal.pm
@@ -673,8 +673,8 @@ UPD 2018-06-22_07:45:07 3470468 docs/commandref.html
 UPD 2018-06-20_07:45:08 2122556 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-06-15_07:45:04 85474 docs/commandref_frame_DE.html
-UPD 2018-06-22_07:45:10 192754 docs/commandref_modular.html
-UPD 2018-06-22_07:45:11 203463 docs/commandref_modular_DE.html
+UPD 2018-06-23_07:45:10 192754 docs/commandref_modular.html
+UPD 2018-06-23_07:45:11 203463 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
