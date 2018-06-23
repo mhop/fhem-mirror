@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: commandref hint for special character usage in passwords
   - change:  74_AMADtasker: AMAD Taskerproject change to new battery states
   - feature: 49_SSCamSTRM: new attr hideDisplayName regarding to Forum #88667
   - bugfix:  49_SSCam: global vars

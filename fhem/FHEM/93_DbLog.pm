@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.10.9     23.06.2018       commandref added hint about special characters in passwords
 # 3.10.8     21.04.2018       addLog - not available reading can be added as new one (forum:#86966)
 # 3.10.7     16.04.2018       fix generate addLog-event if device or reading was not found by addLog
 # 3.10.6     13.04.2018       verbose level in addlog changed if reading not found
@@ -204,7 +205,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.10.8";
+my $DbLogVersion = "3.10.9";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -5258,8 +5259,15 @@ sub dbReadings($@) {
     #);                                                              
     ####################################################################################
 	</pre>
-	If configDB is used, the configuration file has to be uploaded into the configDB ! <br><br><br>
+	If configDB is used, the configuration file has to be uploaded into the configDB ! <br><br>
 	
+    <b>Note about special characters:</b><br>
+    If special characters, e.g. @,$ or % which have a meaning in the perl programming 
+    language are used in a password, these special characters have to be escaped.
+    That means in this example you have to use: \@,\$ respectively \%.  
+	<br>
+    <br>
+    <br>
 
   <a name="DbLogdefine"></a>
   <b>Define</b>  
@@ -6274,7 +6282,15 @@ sub dbReadings($@) {
     #);                                                              
     ####################################################################################
 	</pre>
-	Wird configDB genutzt, ist das Konfigurationsfile in die configDB hochzuladen ! <br><br><br>
+	Wird configDB genutzt, ist das Konfigurationsfile in die configDB hochzuladen ! <br><br>
+    
+    <b>Hinweis zu Sonderzeichen:</b><br>
+    Werden Sonderzeichen, wie z.B. @, $ oder %, welche eine programmtechnische Bedeutung in Perl haben im Passwort verwendet, 
+    sind diese Zeichen zu escapen.
+    Das heißt in diesem Beispiel wäre zu verwenden: \@,\$ bzw. \%.  
+	<br>
+    <br>
+    <br>
 
   <a name="DbLogdefine"></a>
   <b>Define</b>
