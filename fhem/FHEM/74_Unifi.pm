@@ -31,6 +31,8 @@
 # V 3.0.1
 #  - feature: 74_Unifi: new reading UC_newClients for new clients 
 #  - feature: 74_Unifi: block clients by mac-address 
+# V 3.0.2
+#  - fixed:   74_Unifi: Minor bugfix in notify-function
 
 
 package main;
@@ -190,9 +192,10 @@ sub Unifi_Undef($$) {
 sub Unifi_Notify($$) {
     my ($hash,$dev) = @_;
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed.";
 
     return if($dev->{NAME} ne "global");
-    return if(!grep(m/^DEFINED|MODIFIED|INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
+    return if(!grep(m/^DEFINED $name|MODIFIED $name|INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
     if(AttrVal($name, "disable", 0)) {
         Log3 $name, 5, "$name ($self) - executed. - Device '$name' is disabled, do nothing...";
@@ -1315,7 +1318,7 @@ sub Unifi_SetWlanReadings($) {
     for my $wlanID (keys %{$hash->{wlans}}) {
         $wlanRef = $hash->{wlans}->{$wlanID};
         $wlanName = makeReadingName($wlanRef->{name});        
-        readingsBulkUpdate($hash,'-WLAN_'.$wlanName.'_state',($wlanRef->{enabled} == JSON::true) ? 'enabled' : 'disabled');
+        readingsBulkUpdate($hash,'-WLAN_'.$wlanName.'_state',($wlanRef->{enabled} eq JSON::true) ? 'enabled' : 'disabled');
     }
     
     return undef;

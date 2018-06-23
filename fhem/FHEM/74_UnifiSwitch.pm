@@ -14,6 +14,8 @@
 # V 0.90
 # - feature: 74_UnififSwitch: setter for poe-Mode
 #                             added commandref
+# V 0.91
+# - fixed:   74_UnififSwitch: fixed wording in commandref
 # 
 # TODOs:
 # - state des USW korrekt setzen (aktuell nur connected und provisioning)
@@ -36,7 +38,7 @@ sub UnifiSwitch_Parse($$);
 sub UnifiSwitch_Whoami();
 sub UnifiSwitch_Whowasi();
 
-my $version="0.90";
+my $version="0.91";
 
 sub UnifiSwitch_Initialize($$) {
   my ($hash) = @_; 
@@ -201,7 +203,9 @@ sub UnifiSwitch_Parse($$) {
         if( $apRef->{type} eq 'usw' ){
           if ($apRef->{state} eq "1"){
             $hash->{STATE} = "connected";
-          }elsif($apRef->{state} eq "5"){
+          }elsif($apRef->{state} eq "4"){
+            $hash->{STATE} = "upgrading";
+          elsif($apRef->{state} eq "5"){
             $hash->{STATE} = "provisioning";
           }else{
             $hash->{STATE} = "unknown: ".$apRef->{state}; # TODO: Weitere states setzen wenn state-id bekannt
@@ -297,7 +301,7 @@ You can use the readings or set features to control your unifi-switch.
     <li><code>set &lt;name&gt; clear &lt;readings|all&gt;</code><br>
     Clears the readings or all. </li>
     <br>
-    <li><code>set &lt;name&gt; poeMode &lt;name|mac|id&gt; &lt;port&gt; &lt;off|auto|passive|passthrough|restart&gt;</code><br>
+    <li><code>set &lt;name&gt; poeMode &lt;port&gt; &lt;off|auto|passive|passthrough|restart&gt;</code><br>
     Set PoE mode for &lt;port&gt;. </li>
 </ul>
 
@@ -312,7 +316,7 @@ You can use the readings or set features to control your unifi-switch.
         <ul>The connection state of the port. Can be disconnected or in Mbps/Gbps.</ul>
     </li>
     <li>poe_current
-        <ul>The current power-usage.</ul>
+        <ul>The current of the port.</ul>
     </li>
     <li>poe_mode
         <ul>The poe-mode of the port.</ul>
