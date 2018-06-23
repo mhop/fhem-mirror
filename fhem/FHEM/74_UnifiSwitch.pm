@@ -16,6 +16,7 @@
 #                             added commandref
 # V 0.91
 # - fixed:   74_UnififSwitch: fixed wording in commandref
+#                             added new state-mappings
 # 
 # TODOs:
 # - state des USW korrekt setzen (aktuell nur connected und provisioning)
@@ -203,9 +204,11 @@ sub UnifiSwitch_Parse($$) {
         if( $apRef->{type} eq 'usw' ){
           if ($apRef->{state} eq "1"){
             $hash->{STATE} = "connected";
+          }elsif($apRef->{state} eq "2"){
+            $hash->{STATE} = "managed by other";
           }elsif($apRef->{state} eq "4"){
             $hash->{STATE} = "upgrading";
-          elsif($apRef->{state} eq "5"){
+          }elsif($apRef->{state} eq "5"){
             $hash->{STATE} = "provisioning";
           }else{
             $hash->{STATE} = "unknown: ".$apRef->{state}; # TODO: Weitere states setzen wenn state-id bekannt
