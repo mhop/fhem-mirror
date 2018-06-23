@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 5.2.6  20.06.2018    running stream as human readable entry for SSCamSTRM-Device 
 # 5.2.5  18.06.2018    trigger lastsnap_fw to SSCamSTRM-Device only if snap was done by it.
 # 5.2.4  17.06.2018    SSCam_composegallery added and write warning if old composegallery-weblink device is used 
 # 5.2.3  16.06.2018    no SSCamSTRM refresh when snapgetinfo was running without taken a snap by SSCamSTRM-Device
@@ -238,7 +239,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "5.2.5";
+my $SSCamVersion = "5.2.6";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -908,49 +909,58 @@ sub SSCam_Set($@) {
           $hash->{HELPER}{OPENWINDOW} = 1;
           $hash->{HELPER}{WLTYPE}     = "link";    
 		  $hash->{HELPER}{ALIAS}      = "LiveView";
-		  $hash->{HELPER}{RUNVIEW}    = "live_open";				
+		  $hash->{HELPER}{RUNVIEW}    = "live_open";
+          $hash->{HELPER}{ACTSTRM}    = "";		             # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "live_link") {
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "link"; 
 		  $hash->{HELPER}{ALIAS}      = "LiveView";
 		  $hash->{HELPER}{RUNVIEW}    = "live_link";
+		  $hash->{HELPER}{ACTSTRM}    = "";		             # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "lastrec_open") {
           if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
           $hash->{HELPER}{OPENWINDOW} = 1;
           $hash->{HELPER}{WLTYPE}     = "link"; 
 	      $hash->{HELPER}{ALIAS}      = "LastRecording";
 		  $hash->{HELPER}{RUNVIEW}    = "lastrec_open";
+		  $hash->{HELPER}{ACTSTRM}    = "";		             # sprechender Name des laufenden Streamtyps für SSCamSTRM
       }  elsif ($prop eq "lastrec_fw") {                     # Video in iFrame eingebettet
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "iframe"; 
 	      $hash->{HELPER}{ALIAS}      = " ";
 		  $hash->{HELPER}{RUNVIEW}    = "lastrec";
+		  $hash->{HELPER}{ACTSTRM}    = "last Recording";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "lastrec_fw_MJPEG") {                # “video/avi” – MJPEG format event
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "image"; 
 	      $hash->{HELPER}{ALIAS}      = " ";
 		  $hash->{HELPER}{RUNVIEW}    = "lastrec";
+		  $hash->{HELPER}{ACTSTRM}    = "last Recording";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "lastrec_fw_MPEG4/H.264") {          # “video/mp4” – MPEG4/H.264 format event
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "video"; 
 	      $hash->{HELPER}{ALIAS}      = " ";
 		  $hash->{HELPER}{RUNVIEW}    = "lastrec";
+		  $hash->{HELPER}{ACTSTRM}    = "last Recording";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "live_fw") {
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "image"; 
 		  $hash->{HELPER}{ALIAS}      = " ";
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw";
+		  $hash->{HELPER}{ACTSTRM}    = "MJPEG Livestream";   # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "live_fw_hls") {
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "hls"; 
 		  $hash->{HELPER}{ALIAS}      = "View only on compatible browsers";
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw_hls";
+		  $hash->{HELPER}{ACTSTRM}    = "HLS Livestream";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "lastsnap_fw") {
-          $hash->{HELPER}{LSNAPBYSTRMDEV} = 1 if ($prop1);      # $prop1 wird mitgegeben durch lastsnap_fw by SSCamSTRM-Device
+          $hash->{HELPER}{LSNAPBYSTRMDEV} = 1 if ($prop1);   # $prop1 wird mitgegeben durch lastsnap_fw by SSCamSTRM-Device
           $hash->{HELPER}{OPENWINDOW}  = 0;
           $hash->{HELPER}{WLTYPE}      = "base64img"; 
 		  $hash->{HELPER}{ALIAS}       = " ";
 		  $hash->{HELPER}{RUNVIEW}     = "lastsnap_fw";
+		  $hash->{HELPER}{ACTSTRM}     = "last Snapshot";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } else {
           return "$prop isn't a valid option of runview, use one of live_fw, live_link, live_open, lastrec_fw, lastrec_open, lastsnap_fw";
       }
@@ -2174,6 +2184,7 @@ sub SSCam_stopliveview ($) {
         # Link aus Helper-hash löschen
         delete $hash->{HELPER}{LINK};
         delete $hash->{HELPER}{AUDIOLINK};
+		delete $hash->{HELPER}{ACTSTRM};    # sprechender Name des laufenden Streamtyps für SSCamSTRM
         
         # Reading LiveStreamUrl löschen
         delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});
