@@ -27,7 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
-# 5.2.6  20.06.2018    running stream as human readable entry for SSCamSTRM-Device 
+# 5.2.6  20.06.2018    running stream as human readable entry for SSCamSTRM-Device, goAbsPTZ fix set-entry für non-PTZ
 # 5.2.5  18.06.2018    trigger lastsnap_fw to SSCamSTRM-Device only if snap was done by it.
 # 5.2.4  17.06.2018    SSCam_composegallery added and write warning if old composegallery-weblink device is used 
 # 5.2.3  16.06.2018    no SSCamSTRM refresh when snapgetinfo was running without taken a snap by SSCamSTRM-Device
@@ -646,7 +646,7 @@ sub SSCam_Set($@) {
                  ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-                 (ReadingsVal("$name", "CapPTZAbs", 0) ? "goAbsPTZ"." " : ""). 
+                 ((ReadingsVal("$name", "CapPTZAbs", "false") ne "false") ? "goAbsPTZ"." " : ""). 
                  ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "");
   } else {
       # setlist für SVS Devices
