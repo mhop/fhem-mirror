@@ -5,12 +5,11 @@ package WMBus;
 use strict;
 use warnings;
 use feature qw(say);
-use Crypt::CBC;  # libcrypt-cbc-perl
 use Digest::CRC; # libdigest-crc-perl
-
-# there seems to be no debian package for Crypt::OpenSSL::AES, so use
-# sudo apt-get install libssl-dev
-# sudo cpan -i Crypt::OpenSSL::AES
+eval "use Crypt::Mode::CBC"; # cpan -i Crypt::Mode::CBC
+my $hasCBC = ($@)?0:1;
+eval "use Crypt::Mode::CTR"; # cpan -i Crypt::Mode::CTR
+my $hasCTR = ($@)?0:1;
 
 require Exporter;
 my @ISA = qw(Exporter);
@@ -44,6 +43,11 @@ use constant {
   CI_ERROR => 0x70,   # Error from device, only specified for wired M-Bus but used by Easymeter WMBUS module
   CI_TL_4 => 0x8a,    # Transport layer from device, 4 Bytes
   CI_TL_12 => 0x8b,   # Transport layer from device, 12 Bytes
+  CI_ELL_2 => 0x8c,   # Extended Link Layer, 2 Bytes
+  CI_ELL_6 => 0x8e,   # Extended Link Layer, 6 Bytes
+  CI_ELL_8 => 0x8d,   # Extended Link Layer, 8 Bytes (see https://www.telit.com/wp-content/uploads/2017/09/Telit_Wireless_M-bus_2013_Part4_User_Guide_r14.pdf, 2.3.4)
+  CI_ELL_16 => 0x8f,  # Extended Link Layer, 16 Bytes (see https://www.telit.com/wp-content/uploads/2017/09/Telit_Wireless_M-bus_2013_Part4_User_Guide_r14.pdf, 2.3.4)
+  CI_AFL => 0x90,     # Authentification and Fragmentation Layer, variable size
   CI_RESP_SML_4 => 0x7e, # Response from device, 4 Bytes, application layer SML encoded
   CI_RESP_SML_12 => 0x7f, # Response from device, 12 Bytes, application layer SML encoded  
   
@@ -88,8 +92,14 @@ use constant {
   ERR_TOO_MANY_VIFE => 11,
   ERR_MSG_TOO_SHORT => 12,
   ERR_SML_PAYLOAD => 13,
+  ERR_FRAGMENT_UNSUPPORTED => 14,
+  ERR_UNKNOWN_COMPACT_FORMAT => 15,
+  ERR_CIPHER_NOT_INSTALLED => 16,
   
-  
+  # TYPE C transmission uses two different frame types
+  # see http://www.st.com/content/ccc/resource/technical/document/application_note/3f/fb/35/5a/25/4e/41/ba/DM00233038.pdf/files/DM00233038.pdf/jcr:content/translations/en.DM00233038.pdf
+  FRAME_TYPE_A => 'A',
+  FRAME_TYPE_B => 'B',
 };
 
 sub valueCalcNumeric($$) {
@@ -796,6 +806,18 @@ my %VIFInfo_ESY = (
   },
 );
 
+# For Kamstrup (manufacturer specific)
+my %VIFInfo_KAM = (       
+  VIF_KAMSTRUP_INFO => {
+    typeMask     => 0b00000000,
+    expMask      => 0b00000000,
+    type         => 0b00000000,
+    bias         => 0,
+    unit         => '',
+  },
+);
+
+
 # see 4.2.3, page 24
 my %validDeviceTypes = (
  0x00 => 'Other',
@@ -917,6 +939,7 @@ sub checkCRC($$) {
   return $ctx->digest;  
 }
 
+
 sub removeCRC($$)
 {
   my $self = shift;
@@ -995,6 +1018,7 @@ sub _initialize {
   my $self = shift;
   
   $self->{crc_size} = CRC_SIZE;
+  $self->{frame_type} = FRAME_TYPE_A; # default
 }
 
 sub setCRCsize {
@@ -1144,6 +1168,9 @@ sub decodeValueInformationBlock($$$) {
         # Easymeter
         $vif = unpack('C', substr($vib,$offset++,1));
         $vifInfoRef = \%VIFInfo_ESY;
+      } elsif ($self->{manufacturer} eq 'KAM') {
+        $vif = unpack('C', substr($vib,$offset++,1));
+        $vifInfoRef = \%VIFInfo_KAM;       
       } else {
         # manufacturer specific data, can't be interpreted
         
@@ -1421,21 +1448,183 @@ sub decrypt($) {
   for (1..8) {
     $initVector .= pack('C',$self->{access_no});
   }
-  my $cipher = Crypt::CBC->new(
-                -key         => $self->{aeskey},
-                -cipher      => "Crypt::OpenSSL::AES",
-                -header      => "none",
-                -iv          => $initVector,
-                -literal_key => "true",
-                -keysize     => 16,
-        );             
+  my $cipher = Crypt::Mode::CBC->new('AES', 1);
+  return $cipher->decrypt($encrypted, $self->{aeskey}, $initVector);
+}
 
-  return $cipher->decrypt($encrypted);  
+sub decrypt_mode7($) {
+  my $self = shift;
+  my $encrypted = shift;
+  
+  # see 9.2.4, page 59      
+  my $initVector = '';
+  for (1..16) {
+    $initVector .= pack('C',0x00);
+  }
+  my $cipher = Crypt::Mode::CBC->new('AES', 1);
+  return $cipher->decrypt($encrypted, $self->{aeskey}, $initVector);
+}
+
+# Generate MAC of data
+#
+# Parameter 1: private key as byte string, 16bytes
+# Parameter 2: data fro which mac should be calculated in hexadecimal format, len variable
+# Parameter 3: length of MAC to be generated in bytes
+#
+# Returns: MAC in hexadecimal format
+#
+# This function currently supports data with lentgh of less then 16bytes,
+# MAC for longer data is untested but specified
+#
+# copied from 10_EnOcean.pm
+sub generateMAC($$$$) {
+  my $self = shift;
+	my $private_key = $_[0];
+	my $data = $_[1];
+	my $cmac_len = $_[2];
+
+	#print "Calculating MAC for data $data\n";
+
+	# Pack data to 16byte byte string, padd with 10..0 binary
+	my $data_expanded = pack('H32', $data.'80');
+
+	#print "Exp. data  ".unpack('H32', $data_expanded)."\n";
+
+	# Constants according to specification
+	my $const_zero = pack('H32','00');
+	my $const_rb = pack('H32', '00000000000000000000000000000087');
+
+	# Encrypt zero data with private key to get L
+	my $cipher = Crypt::Rijndael->new($private_key);
+  my $l = $cipher->encrypt($const_zero);
+	#print "L          ".unpack('H32', $l)."\n";
+	#print "L          ".unpack('B128', $l)."\n";
+
+	# Expand L to 128bit string
+	my $l_bit = unpack('B128', $l);
+
+	# K1 and K2 stored as 128bit string
+	my $k1_bit;
+	my $k2_bit;
+
+	# K1 and K2 as binary
+	my $k1;
+	my $k2;
+
+	# Store L << 1 in K1
+	$l_bit =~ /^.(.{127})/;
+	$k1_bit = $1.'0';
+	$k1 = pack('B128', $k1_bit);
+
+	# If MSB of L == 1, K1 = K1 XOR const_Rb
+	if($l_bit =~ m/^1/) {
+		#print "MSB of L is set\n";
+		$k1 = $k1 ^ $const_rb;
+		$k1_bit = unpack('B128', $k1);
+	} else {
+		#print "MSB of L is unset\n";
+	}
+
+	# Store K1 << 1 in K2
+	$k1_bit =~ /^.(.{127})/;
+	$k2_bit = $1.'0';
+	$k2 = pack('B128', $k2_bit);
+
+	# If MSB of K1 == 1, K2 = K2 XOR const_Rb
+	if($k1_bit =~ m/^1/) {
+		#print "MSB of K1 is set\n";
+		$k2 = $k2 ^ $const_rb;
+	} else {
+		#print "MSB of K1 is unset\n";
+	}
+
+	# XOR data with K2
+	$data_expanded ^= $k2;
+
+	# Encrypt data
+	my $cmac = $cipher->encrypt($data_expanded);
+
+	#print "CMAC ".unpack('H32', $cmac)."\n";
+
+	# Extract specified len of MAC
+	my $cmac_pattern = '^(.{'.($cmac_len * 2).'})';
+	unpack('H32', $cmac) =~ /$cmac_pattern/;
+
+	# Return MAC in hexadecimal format
+	return uc($1);
+}
+
+
+sub decodeAFL($$) {
+  my $self = shift;
+  my $afl = shift;
+  my $offset = 0;
+  
+  
+  $self->{afl}{fcl} = unpack('v', $afl);
+  $offset += 2;
+  $self->{afl}{fcl_mf}   = ($self->{afl}{fcl} & 0b0100000000000000) != 0;
+  $self->{afl}{fcl_mclp} = ($self->{afl}{fcl} & 0b0010000000000000) != 0;
+  $self->{afl}{fcl_mlp}  = ($self->{afl}{fcl} & 0b0001000000000000) != 0;
+  $self->{afl}{fcl_mcrp} = ($self->{afl}{fcl} & 0b0000100000000000) != 0;
+  $self->{afl}{fcl_macp} = ($self->{afl}{fcl} & 0b0000010000000000) != 0;
+  $self->{afl}{fcl_kip}  = ($self->{afl}{fcl} & 0b0000001000000000) != 0;
+  $self->{afl}{fcl_fid}  =  $self->{afl}{fcl} & 0b0000000011111111;
+  
+  if ($self->{afl}{fcl_mclp}) {
+    # AFL Message Control Field (AFL.MCL)
+    $self->{afl}{mcl} = unpack('C', substr($afl, $offset, 1));
+    $offset += 1;
+    $self->{afl}{mcl_mlmp} = ($self->{afl}{mcl} & 0b01000000) != 0; 
+    $self->{afl}{mcl_mcmp} = ($self->{afl}{mcl} & 0b00100000) != 0; 
+    $self->{afl}{mcl_kimp} = ($self->{afl}{mcl} & 0b00010000) != 0; 
+    $self->{afl}{mcl_at}   = ($self->{afl}{mcl} & 0b00001111); 
+  }
+  if ($self->{afl}{fcl_mcrp}) {
+    # AFL Message Counter Field (AFL.MCR)
+    $self->{afl}{mcr} = unpack('V', substr($afl, $offset));
+    #printf "AFL MC %08x\n", $self->{afl}{mcr};
+    $offset += 4;
+  }
+  if ($self->{afl}{fcl_mlp}) {
+    # AFL Message Length Field (AFL.ML)
+    $self->{afl}{ml} = unpack('v', substr($afl, $offset));
+    $offset += 2;
+  }
+  if ($self->{afl}{fcl_macp}) {
+    # AFL MAC Field (AFL.MCL)
+    # The length of the MAC field depends on the selected option AFL.MCL.AT indicated by the
+    # AFL.MCL field.
+    my $mac_len = 0;
+    if ($self->{afl}{mcl_at} == 4) {
+      $mac_len = 4;
+      $self->{afl}{mac} = unpack('N', substr($afl, $offset, $mac_len));
+    } elsif ($self->{afl}{mcl_at} == 5) { 
+      $mac_len = 8;
+      $self->{afl}{mac} = (unpack('N', substr($afl, $offset, 4))) << 32 | ((unpack('N', substr($afl, $offset+4, 4))));
+    } elsif ($self->{afl}{mcl_at} == 6) { 
+      $mac_len = 12;
+    } elsif ($self->{afl}{mcl_at} == 7) { 
+      $mac_len = 16;
+    }
+    #printf "AFL MAC %16x\n", $self->{afl}{mac};
+    $offset += $mac_len;
+  }
+  if ($self->{afl}{fcl_kip}) {
+    # AFL Key Information-Field (AFL.KI)
+    $self->{afl}{ki} = unpack('v', $afl);
+    $self->{afl}{ki_key_version}   = ($self->{afl}{ki} & 0b1111111100000000) >> 8;
+    $self->{afl}{ki_kdf_selection} = ($self->{afl}{ki} & 0b0000000001110000) >> 4;
+    $self->{afl}{ki_key_id}        = ($self->{afl}{ki} & 0b0000000000001111);
+    $offset += 2;
+  }
+  return $offset;
 }
 
 sub decodeApplicationLayer($) {
   my $self = shift;
-  my $applicationlayer = $self->removeCRC(substr($self->{msg},TL_BLOCK_SIZE + $self->{crc_size}));
+  my $applicationlayer = $self->{applicationlayer};
+  my $payload;
   
   #print unpack("H*", $applicationlayer) . "\n";
   
@@ -1447,6 +1636,102 @@ sub decodeApplicationLayer($) {
 
   my $offset = 1;
 
+  if ($self->{cifield} == CI_ELL_2) {
+    # Extended Link Layer
+    ($self->{ell}{cc}, $self->{ell}{access_no}) = unpack('CC', substr($applicationlayer,$offset));
+    $offset += 2;
+  } elsif ($self->{cifield} == CI_ELL_6) {
+    # Extended Link Layer
+    ($self->{ell}{cc}, $self->{ell}{access_no}) = unpack('CC', substr($applicationlayer,$offset));
+    $offset += 6;
+  } elsif ($self->{cifield} == CI_ELL_8) {
+    # Extended Link Layer, payload CRC is part of (encrypted) payload
+    ($self->{ell}{cc}, $self->{ell}{access_no}, $self->{ell}{session_number}) = unpack('CCV', substr($applicationlayer, $offset));
+    $offset += 6;
+  } elsif ($self->{cifield} == CI_ELL_16) {
+    # Extended Link Layer
+    ($self->{ell}{cc}, $self->{ell}{access_no}, $self->{ell}{m2}, $self->{ell}{a2}, $self->{ell}{session_number}) = unpack('CCvC6V', substr($applicationlayer,$offset));
+    $offset += 14;
+  }
+  
+  if (exists($self->{ell})) {
+    $self->{ell}{session_number_enc} = $self->{ell}{session_number} >> 29;
+    $self->{ell}{session_number_time} = ($self->{ell}{session_number} & 0b0001111111111111111111111111111) >> 4;
+    $self->{ell}{session_number_session} = $self->{ell}{session_number} & 0b1111;
+    $self->{isEncrypted} = $self->{ell}{session_number_enc} != 0;
+    $self->{decrypted} = 0;
+    
+    if ($self->{isEncrypted}) {
+      if ($self->{aeskey}) {
+        if ($hasCTR) {
+          # AES IV
+          # M-field, A-field, CC, SN, 00, 0000
+          my $initVector = pack("v", $self->{mfield}) . $self->{afield} . pack("CV", $self->{ell}{cc}, $self->{ell}{session_number}) . pack("H*", "000000");
+          my $m = Crypt::Mode::CTR->new('AES', 1);
+          my $ciphertext = substr($applicationlayer,$offset); # payload CRC must also be decrypted
+          #printf("##ciphertext: %s\n", unpack("H*", $ciphertext));
+          $payload = $m->decrypt($ciphertext, $self->{aeskey}, $initVector);
+        
+          #printf("##plaintext   %s\n", unpack("H*", $payload));
+        } else {
+          $self->{errormsg} = 'Crypt::Mode::CTR is not installed, please install it (sudo cpan -i Crypt::Mode::CTR)';
+          $self->{errorcode} = ERR_CIPHER_NOT_INSTALLED;
+          return 0;
+        }
+      } else {
+        $self->{errormsg} = 'encrypted message and no aeskey provided';
+        $self->{errorcode} = ERR_NO_AESKEY;
+        return 0;
+      }
+    }   
+    $self->{ell}{crc} = unpack('v', $payload);
+    $offset += 2;
+    # PayloadCRC is  a  cyclic  redundancy  check  covering  the  remainder  of  the  frame  (excluding the CRC fields)
+    # payload CRC is also encrypted
+    if ($self->{ell}{crc} != $self->checkCRC(substr($payload, 2, $self->{lfield}-20))) {
+      #printf("crc %x, calculated %x\n", $self->{ell}{crc}, $self->checkCRC(substr($payload, 2, $self->{lfield}-20))); 
+      $self->{errormsg} = "Payload CRC check failed on ELL" . ($self->{isEncrypted} ? ", wrong AES key?" : "");
+      $self->{errorcode} = ERR_CRC_FAILED;
+      return 0;
+    } else {
+      $self->{decrypted} = 1;
+    }
+    $applicationlayer = $payload;
+    $offset = 2; # skip PayloadCRC
+  }
+  
+  if ($offset > 1) {
+    $applicationlayer = substr($applicationlayer,$offset);
+    $self->{cifield} = unpack('C', $applicationlayer);
+    $offset = 1;
+    if ($self->{cifield} == CI_AFL) {
+      # Authentification and Fragmentation Layer
+      $self->{afl}{afll} = unpack('C', substr($applicationlayer, $offset));
+      #printf "AFL AFLL %02x\n", $self->{afl}{afll};
+      $offset += 1;
+      $self->decodeAFL(substr($applicationlayer,$offset,$self->{afl}{afll}));
+      $offset += $self->{afl}{afll};
+      if ($self->{afl}{fcl_mf}) {
+        $self->{errormsg} = "fragmented messages are not yet supported";
+        $self->{errorcode} = ERR_FRAGMENT_UNSUPPORTED;
+        return 0;
+      }
+    }
+  }
+  
+  if ($offset > 1) {
+    $applicationlayer = substr($applicationlayer,$offset);
+    $self->{cifield} = unpack('C', $applicationlayer); 
+    $offset = 1;
+  }
+
+  # initialize some fields
+  $self->{cw_1} = 0;
+  $self->{cw_2} = 0;
+  $self->{status} = 0;
+  $self->{statusstring} = "";
+  $self->{access_no} = 0;
+  
   if ($self->{cifield} == CI_RESP_4 || $self->{cifield} == CI_RESP_SML_4) {
     # Short header
     #print "short header\n";
@@ -1463,10 +1748,49 @@ sub decodeApplicationLayer($) {
     $offset += 12;
   } elsif ($self->{cifield} == CI_RESP_0) {
     # no header
-    $self->{cw} = 0;
+    #print "No header\n";
+
+  } elsif ($self->{cifield} == 0x79 && $self->{manufacturer} eq 'KAM') {
+    #print "Kamstrup compact frame header\n";
+    $self->{format_signature} = unpack("v", substr($applicationlayer,$offset, 2));
+    $offset += 2;
+    $self->{full_frame_payload_crc} = unpack("v", substr($applicationlayer, $offset, 2));
+    $offset += 2;
+    if ($self->{format_signature} == $self->checkCRC(pack("H*", "02FF20" . "0413" . "4413"))) {
+      # Info, Volume, Target Volume
+      # convert into full frame
+      $applicationlayer =   pack("H*", "02FF20") . substr($applicationlayer, 5, 2) # Info
+                          . pack("H*", "0413") . substr($applicationlayer,7,4) # volume
+                          . pack("H*", "4413") . substr($applicationlayer,11,4); # target volume 
+      $offset = 0;
+    } elsif ($self->{format_signature} == $self->checkCRC(pack("H*", "02FF20" . "0413" . "523B"))) {
+      # Info, Volume, Max flow
+      # convert into full frame
+      $applicationlayer =   pack("H*", "02FF20") . substr($applicationlayer, 5, 2) # Info
+                          . pack("H*", "0413") . substr($applicationlayer,7,4) # volume
+                          . pack("H*", "523B") . substr($applicationlayer,11,2); # max flow 
+      $offset = 0;
+    } elsif ($self->{format_signature} == $self->checkCRC(pack("H*", "02FF20" . "0413" . "4413" . "615B" . "6167"))) {
+      # Info, Volume, Max flow, flow temp, external temp
+      # convert into full frame
+      $applicationlayer =   pack("H*", "02FF20") . substr($applicationlayer, 5, 2) # Info
+                          . pack("H*", "0413") . substr($applicationlayer,7,4) # volume
+                          . pack("H*", "4413") . substr($applicationlayer,11,4) # target volume 
+                          . pack("H*", "615B") . substr($applicationlayer,15,1) # flow temp 
+                          . pack("H*", "6167") . substr($applicationlayer,16,1); # external temp
+      $offset = 0;
+    } else {
+      $self->{errormsg} = 'Unknown Kamstrup compact frame format';
+      $self->{errorcode} = ERR_UNKNOWN_COMPACT_FORMAT;
+      return 0;
+    }
+    if ($self->{full_frame_payload_crc} != $self->checkCRC($applicationlayer)) {
+      $self->{errormsg} = 'Kamstrup compact frame format payload CRC error';
+      $self->{errorcode} = ERR_CRC_FAILED;
+      return 0;
+    }
   } else {
     # unsupported
-    $self->{cw} = 0;
     $self->decodeConfigword();
     $self->{errormsg} = 'Unsupported CI Field ' . sprintf("%x", $self->{cifield}) . ", remaining payload is " . unpack("H*", substr($applicationlayer,$offset));
     $self->{errorcode} = ERR_UNKNOWN_CIFIELD;
@@ -1476,12 +1800,13 @@ sub decodeApplicationLayer($) {
 
   $self->decodeConfigword();
   
-  my $payload;
   $self->{encryptionMode} = $encryptionModes{$self->{cw_parts}{mode}};
   if ($self->{cw_parts}{mode} == 0) {
     # no encryption
-    $self->{isEncrypted} = 0;
-    $self->{decrypted} = 1;
+    if (!defined $self->{isEncrypted}) {
+      $self->{isEncrypted} = 0;
+      $self->{decrypted} = 1;
+    }
     $payload = substr($applicationlayer, $offset);
   } elsif ($self->{cw_parts}{mode} == 5) {
     # data is encrypted with AES 128, dynamic init vector
@@ -1490,15 +1815,21 @@ sub decodeApplicationLayer($) {
     $self->{decrypted} = 0;
 
     if ($self->{aeskey}) { 
-      $payload = $self->decrypt(substr($applicationlayer,$offset));
-      if (unpack('n', $payload) == 0x2f2f) {
-        $self->{decrypted} = 1;
-        #printf("decrypted payload %s\n", unpack("H*", $payload));
+      if ($hasCBC) {
+        $payload = $self->decrypt(substr($applicationlayer,$offset));
+        if (unpack('n', $payload) == 0x2f2f) {
+          $self->{decrypted} = 1;
+          #printf("decrypted payload %s\n", unpack("H*", $payload));
+        } else {
+          # Decryption verification failed
+          $self->{errormsg} = 'Decryption failed, wrong key?';
+          $self->{errorcode} = ERR_DECRYPTION_FAILED;
+          #printf("%x\n", unpack('n', $payload));
+          return 0;
+        }
       } else {
-        # Decryption verification failed
-        $self->{errormsg} = 'Decryption failed, wrong key?';
-        $self->{errorcode} = ERR_DECRYPTION_FAILED;
-        #printf("%x\n", unpack('n', $payload));
+        $self->{errormsg} = 'Crypt::Mode::CBC is not installed, please install it (sudo cpan -i Crypt::Mode::CBC)';
+        $self->{errorcode} = ERR_CIPHER_NOT_INSTALLED;
         return 0;
       }
     } else {
@@ -1533,33 +1864,73 @@ sub decodeLinkLayer($$)
   my $linklayer = shift;
 
 
-  
   ($self->{lfield}, $self->{cfield}, $self->{mfield}) = unpack('CCv', $linklayer);
+  $self->{afield} = substr($linklayer,4,6);
   $self->{afield_id} = sprintf("%08d", $self->decodeBCD(8,substr($linklayer,4,4)));
   ($self->{afield_ver}, $self->{afield_type}) = unpack('CC', substr($linklayer,8,2));
   
   #printf("lfield %d\n", $self->{lfield});
 
-  if ($self->{crc_size} > 0) {
-    $self->{crc0} = unpack('n', substr($linklayer,TL_BLOCK_SIZE, $self->{crc_size}));
+  if ($self->{frame_type} eq FRAME_TYPE_A) {
+    if ($self->{crc_size} > 0) {
+      $self->{crc0} = unpack('n', substr($linklayer,TL_BLOCK_SIZE, $self->{crc_size}));
+    
+      #printf("crc0 %x calc %x\n", $self->{crc0}, $self->checkCRC(substr($linklayer,0,10)));
+    
+      if ($self->{crc0} != $self->checkCRC(substr($linklayer,0,TL_BLOCK_SIZE))) {
+        $self->{errormsg} = "CRC check failed on link layer";
+        $self->{errorcode} = ERR_CRC_FAILED;
+        #print "CRC check failed on link layer\n";
+        return 0;
+      }
+    }
+
+    # header block is 10 bytes + 2 bytes CRC, each following block is 16 bytes + 2 bytes CRC, the last block may be smaller
+    $self->{datalen} = $self->{lfield} - (TL_BLOCK_SIZE - 1); # this is without CRCs and the lfield itself
+    $self->{datablocks} = int($self->{datalen} / LL_BLOCK_SIZE);
+    $self->{datablocks}++ if $self->{datalen} % LL_BLOCK_SIZE != 0;
+    $self->{msglen} = TL_BLOCK_SIZE + $self->{crc_size} + $self->{datalen} + $self->{datablocks} * $self->{crc_size};
+      
+    #printf("calc len %d, actual %d\n", $self->{msglen}, length($self->{msg}));
+    $self->{applicationlayer} = $self->removeCRC(substr($self->{msg},TL_BLOCK_SIZE + $self->{crc_size}));
   
-    #printf("crc0 %x calc %x\n", $self->{crc0}, $self->checkCRC(substr($linklayer,0,10)));
-  
-    if ($self->{crc0} != $self->checkCRC(substr($linklayer,0,TL_BLOCK_SIZE))) {
-      $self->{errormsg} = "CRC check failed on link layer";
-      $self->{errorcode} = ERR_CRC_FAILED;
-      #print "CRC check failed on link layer\n";
-      return 0;
+  } else {
+    # FRAME TYPE B
+    # each block is at most 129 bytes long.
+    # first contains the header (TL_BLOCK), L field and trailing crc
+    # L field is included in crc calculation
+    # each following block contains only data and trailing crc
+    my $length = 129;
+    if ($self->{lfield} < $length) {
+      $length = $self->{lfield};
+    }
+    if ($self->{crc_size} > 0) {
+      $length -= $self->{crc_size};
+      $length++; # for L field
+      #print "length: $length\n";
+      $self->{crc0} = unpack('n', substr($self->{msg}, $length, $self->{crc_size}));
+      
+      #printf "crc in msg %x crc calculated %x\n", $self->{crc0}, $self->checkCRC(substr($self->{msg}, 0, $length));
+      if ($self->{crc0} != $self->checkCRC(substr($self->{msg}, 0, $length))) {
+        $self->{errormsg} = "CRC check failed on block 1";
+        $self->{errorcode} = ERR_CRC_FAILED;
+        return 0;
+      }
+    }
+    
+    $self->{datablocks} = int($self->{lfield} / 129);
+    $self->{datablocks}++ if $self->{lfield} % 129 != 0;
+    # header block is 10 bytes, following block 
+    $self->{datalen} = $self->{lfield} - (TL_BLOCK_SIZE - 1) - ($self->{datablocks} * $self->{crc_size}) ; # this is with CRCs but without the lfield itself
+    $self->{msglen} = $self->{lfield};
+
+    if ($self->{datablocks} == 2) {
+      # TODO
+    } else {
+      $self->{applicationlayer} = substr($self->{msg}, TL_BLOCK_SIZE, $length - TL_BLOCK_SIZE); # - $self->{crc_size});
     }
   }
 
-  # header block is 10 bytes + 2 bytes CRC, each following block is 16 bytes + 2 bytes CRC, the last block may be smaller
-  $self->{datalen} = $self->{lfield} - (TL_BLOCK_SIZE - 1); # this is without CRCs and the lfield itself
-  $self->{datablocks} = int($self->{datalen} / LL_BLOCK_SIZE);
-  $self->{datablocks}++ if $self->{datalen} % LL_BLOCK_SIZE != 0;
-  $self->{msglen} = TL_BLOCK_SIZE + $self->{crc_size} + $self->{datalen} + $self->{datablocks} * $self->{crc_size};
-    
-  #printf("calc len %d, actual %d\n", $self->{msglen}, length($self->{msg}));
   if (length($self->{msg}) > $self->{msglen}) {
     $self->{remainingData} = substr($self->{msg},$self->{msglen});
   } elsif (length($self->{msg}) < $self->{msglen}) {
@@ -1567,6 +1938,8 @@ sub decodeLinkLayer($$)
     $self->{errorcode} = ERR_MSG_TOO_SHORT;
     return 0;
   }
+  
+  
   # according to the MBus spec only upper case letters are allowed.
   # some devices send lower case letters none the less
   # convert to upper case to make them spec conformant
@@ -1575,6 +1948,11 @@ sub decodeLinkLayer($$)
   return 1;
 }
 
+sub setFrameType($)
+{
+  my $self = shift;
+  $self->{frame_type} = shift;
+}
 
 sub parse($$)
 {
@@ -1583,6 +1961,10 @@ sub parse($$)
   
   $self->{errormsg} = '';
   $self->{errorcode} = ERR_NO_ERROR;
+  if (substr($self->{msg}, 0, 4) == pack("H*", "543D543D")) {
+    $self->setFrameType(FRAME_TYPE_B);
+    $self->{msg} = substr($self->{msg},4);
+  }
   if ($self->decodeLinkLayer(substr($self->{msg},0,12)) != 0)  {
     $self->{linkLayerOk} = 1;
     return $self->decodeApplicationLayer();

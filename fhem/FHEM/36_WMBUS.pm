@@ -54,6 +54,10 @@ WMBUS_HandleEncoding($$)
     my $msglen = sprintf("%1x", hex(substr($msg,4,1)) - 1);
     $msg = "b" . $msglen . substr($msg,5);
   } else {
+    if (substr($msg,1,1) eq "Y") {
+      $mb->setFrameType(WMBus::FRAME_TYPE_B);
+      $msg = "b" . substr($msg,2);
+    }
     $msg .= WMBUS_RSSIAsRaw($rssi);
   }
   return ($msg, $rssi, $encoding);
@@ -456,8 +460,8 @@ WMBUS_Attr(@)
   It uses the 868 MHz band for radio transmissions.
   Therefore you need a device which can receive Wireless M-Bus messages, e.g. a <a href="#CUL">CUL</a> with culfw >= 1.59 or an AMBER Wireless AMB8465M.
   <br>
-  WMBus uses two different radio protocols, T-Mode and S-Mode. The receiver must be configured to use the same protocol as the sender.
-  In case of a CUL this can be done by setting <a href="#rfmode">rfmode</a> to WMBus_T or WMBus_S respectively.
+  WMBus uses three different radio protocols, T-Mode, S-Mode and C-Mode. The receiver must be configured to use the same protocol as the sender.
+  In case of a CUL this can be done by setting <a href="#rfmode">rfmode</a> to WMBus_T, WMBus_S or WMBus_C respectively.
   <br>
   WMBus devices send data periodically depending on their configuration. It can take days between individual messages or they might be sent
   every minute.
@@ -466,11 +470,11 @@ WMBUS_Attr(@)
   will fail and no relevant data will be available.
   <br><br>
   <b>Prerequisites</b><br>
-  This module requires the perl modules Crypt::CBC, Digest::CRC and Crypt::OpenSSL::AES (AES only if encrypted messages should be processed).<br>
+  This module requires the perl modules Digest::CRC, Crypt::Mode::CBC and Crypt::Mode::CTR (Crypt modules only if encrypted messages should be processed).<br>
   On a debian based system these can be installed with<br>
   <code>
-  sudo apt-get install libcrypt-cbc-perl libdigest-crc-perl libssl-dev<br>
-  sudo cpan -i Crypt::OpenSSL::AES
+  sudo apt-get install libdigest-crc-perl<br>
+  sudo cpan -i Crypt::Mode::CBC Crypt::Mode:CTR
   </code>
   <br><br>
   <a name="WMBUSdefine"></a>
@@ -563,8 +567,8 @@ WMBUS_Attr(@)
 	Es verwendet das 868 MHz Band f&uuml;r Radio&uuml;bertragungen.
 	Daher wird ein Ger&auml;t ben&ouml;tigt das die Wireless M-Bus Nachrichten empfangen kann, z. B. ein <a href="#CUL">CUL</a> mit culfw >= 1.59 oder ein AMBER Wireless AMB8465-M.
   <br>
-  WMBus verwendet zwei unterschiedliche Radioprotokolle, T-Mode und S-Mode. Der Empf&auml;nger muss daher so konfiguriert werden, dass er das selbe Protokoll
-  verwendet wie der Sender. Im Falle eines CUL kann das erreicht werden, in dem das Attribut <a href="#rfmode">rfmode</a> auf WMBus_T bzw. WMBus_S gesetzt wird.
+  WMBus verwendet drei unterschiedliche Radioprotokolle, T-Mode, S-Mode und C-Mode. Der Empf&auml;nger muss daher so konfiguriert werden, dass er das selbe Protokoll
+  verwendet wie der Sender. Im Falle eines CUL kann das erreicht werden, in dem das Attribut <a href="#rfmode">rfmode</a> auf WMBus_T, WMBus_S bzw. WMBus_C gesetzt wird.
   <br>
   WMBus Ger&auml;te senden Daten periodisch abh&auml;ngig von ihrer Konfiguration. Es k&ouml;nnen u. U. Tage zwischen einzelnen Nachrichten vergehen oder sie k&ouml;nnen im 
   Minutentakt gesendet werden.
@@ -573,11 +577,11 @@ WMBUS_Attr(@)
   Andernfalls wird die Entschl&uuml;sselung fehlschlagen und es k&ouml;nnen keine relevanten Daten ausgelesen werden.
   <br><br>
   <b>Voraussetzungen</b><br>
-  Dieses Modul ben&ouml;tigt die perl Module Crypt::CBC, Digest::CRC and Crypt::OpenSSL::AES (AES wird nur ben&ouml;tigt wenn verschl&uuml;sselte Nachrichten verarbeitet werden sollen).<br>
+  Dieses Modul ben&ouml;tigt die perl Module Digest::CRC, Crypt::Mode::CBC und Crypt::ModeL::CTR (die Crypt Module werden nur ben&ouml;tigt wenn verschl&uuml;sselte Nachrichten verarbeitet werden sollen).<br>
   Bei einem Debian basierten System k&ouml;nnen diese so installiert werden<br>
   <code>
-  sudo apt-get install libcrypt-cbc-perl libdigest-crc-perl libssl-dev<br>
-  sudo cpan -i Crypt::OpenSSL::AES
+  sudo apt-get install libdigest-crc-perl<br>
+  sudo cpan -i Crypt::Mode::CBC Crypt::Mode::CTR
   </code>
   <br><br>
   <a name="WMBUSdefine"></a>
