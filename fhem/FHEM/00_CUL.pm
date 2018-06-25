@@ -148,7 +148,7 @@ CUL_Initialize($)
     hmId longids 
     hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger 
     model:CUL,CUN,CUNO,SCC,nanoCUL
-    rfmode:SlowRF,HomeMatic,MAX,WMBus_T,WMBus_S,KOPP_FC 
+    rfmode:SlowRF,HomeMatic,MAX,WMBus_T,WMBus_S,WMBus_C,KOPP_FC 
     sendpool
     showtime:1,0
   );
@@ -1000,6 +1000,7 @@ CUL_Attr(@)
                           && $aVal ne "MAX" 
                           && $aVal ne "WMBus_T" 
                           && $aVal ne "WMBus_S" 
+                          && $aVal ne "WMBus_C" 
                           && $aVal ne "KOPP_FC"));
     my $msg = $hash->{NAME} . ": Mode $aVal not supported";
 
@@ -1055,6 +1056,18 @@ CUL_Attr(@)
         Log3 $name, 2, $msg;
         return $msg;
       }
+    } elsif($aVal eq "WMBus_C") {
+      return if($hash->{initString} =~ m/brt/);
+      if($hash->{CMDS} =~ m/b/ || IsDummy($hash->{NAME}) || !$hash->{FD}) {
+        $hash->{Clients} = $clientsWMBus;
+        $hash->{MatchList} = \%matchListWMBus;
+        $hash->{initString} = "X21\nbrc"; # Use C-Mode
+        CUL_WriteInit($hash);
+   
+      } else {
+        Log3 $name, 2, $msg;
+        return $msg;
+      }      
     } elsif($aVal eq "KOPP_FC") {
       if($hash->{CMDS} =~ m/k/ || IsDummy($hash->{NAME}) || !$hash->{FD}) {
         $hash->{Clients} = $clientsKOPP_FC;
@@ -1378,10 +1391,11 @@ CUL_prefix($$$)
             To communicate with MAX! type of devices @10 kHz datarate.</li>
 
         <li>WMBus_S</li>
-        <li>WMBus_T<br>
+        <li>WMBus_T</li>
+        <li>WMBus_C<br>
             To communicate with Wireless M-Bus devices like water, gas or
-            electrical meters.  Wireless M-Bus uses two different communication
-            modes, S-Mode and T-Mode. While in this mode, no reception of other
+            electrical meters.  Wireless M-Bus uses three different communication
+            modes, S-Mode, T-Mode and C-Mode. While in this mode, no reception of other
             protocols like SlowRF or HomeMatic is possible. See also the WMBUS
             FHEM Module.
             </li>
@@ -1683,10 +1697,11 @@ CUL_prefix($$$)
             F&uuml;r die Kommunikation mit MAX! Ger&auml;ten @10 kHz
             Datenrate.</li>
         <li>WMBus_S</li>
-        <li>WMBus_T<br>
+        <li>WMBus_T</li>
+        <li>WMBus_C<br>
             F&uuml;r die Kommunikation mit Wireless M-Bus Ger&auml;ten wie
             Wasser-, Gas- oder Elektroz&auml;hlern.  Wireless M-Bus verwendet
-            zwei unterschiedliche Kommunikationsarten, S-Mode und T-Mode.  In
+            drei unterschiedliche Kommunikationsarten, S-Mode, T-Mode und C-Mode.  In
             diesem Modus ist der Empfang von anderen Protokollen wie SlowRF
             oder HomeMatic nicht m&ouml;glich.</li>
         </ul>
