@@ -47,7 +47,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.44;
+my $astroversion = 1.47;
 
 #-- These we may get on request
 my %gets = (
@@ -374,7 +374,7 @@ sub Astro_tzoffset($) {
   
 sub Astro_HHMM($){
   my ($hh) = @_;
-  return("")
+  return("---")
     if (!defined($hh) || $hh !~ /\d*\.\d*/) ;
   
   my $h = floor($hh);
@@ -776,7 +776,12 @@ sub Astro_GMSTRiseSet($$$$$){
   #Log 1,"-------------------> Called Astro_GMSTRiseSet with $ra $dec $lon $lat $h";
 
   # my $tagbogen = acos(-tan(lat)*tan(coor.dec)); // simple formula if twilight is not required
-  my $tagbogen = acos((sin($h) - sin($lat)*sin($dec)) / (cos($lat)*cos($dec)));
+  my $tagbarg  = (sin($h) - sin($lat)*sin($dec)) / (cos($lat)*cos($dec));
+  if( ($tagbarg > 1.000000) || ($tagbarg < -1.000000) ){
+    Log 5,"[Astro_GMSTRiseSet] Parameters $ra $dec $lon $lat $h give complex angle";
+    return( ("---","---","---") );
+  };
+  my $tagbogen = acos($tagbarg);
 
   my $transit =     $RAD/15*(          +$ra-$lon);
   my $rise    = 24.+$RAD/15*(-$tagbogen+$ra-$lon); # calculate GMST of rise of object
@@ -819,6 +824,11 @@ sub Astro_RiseSet($$$$$$$$$$$){
 
   my ($transit1, $rise1, $set1) = Astro_GMSTRiseSet($ra1, $dec1, $lon, $lat, $altitude);
   my ($transit2, $rise2, $set2) = Astro_GMSTRiseSet($ra2, $dec2, $lon, $lat, $altitude);
+  
+  #-- complex angle
+  if( ($transit1 eq "---") || ($transit2 eq "---") ){
+    return( ("---","---","---") );
+  }
   
   #-- unwrap GMST in case we move across 24h -> 0h
   $transit2 += 24
@@ -885,6 +895,10 @@ sub Astro_SunRise($$$$$$){
   #-- rise/set time in UTC
   my ($transit,$rise,$set) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
     $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1,undef); 
+  if( $transit eq "---" ){
+    Log 1,"[Astro_SunRise] no solution possible - maybe the sun never sets ?";
+   return( ($transit,$rise,$set) ); 
+  }
   
   my ($transittemp,$risetemp,$settemp);
   #-- check and adjust to have rise/set time on local calendar day
@@ -919,28 +933,60 @@ sub Astro_SunRise($$$$$$){
 
 	#-- Twilight calculation
 	#-- civil twilight time in UTC. 
+	my $CivilTwilightMorning;
+	my $CivilTwilightEvening;
 	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
 	   $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -6.*$DEG);
-	my $CivilTwilightMorning = Astro_mod($risetemp +$zone, 24.);
-	my $CivilTwilightEvening = Astro_mod($settemp  +$zone, 24.);
-
-	#-- nautical twilight time in UTC. 
+	if( $transittemp eq "---" ){
+      Log 3,"[Astro_SunRise] no solution possible for civil twilight - maybe the sun never sets below -6 degrees?";
+      $CivilTwilightMorning = "---";
+      $CivilTwilightEvening = "---";
+    }else{
+	  $CivilTwilightMorning = Astro_mod($risetemp +$zone, 24.);
+	  $CivilTwilightEvening = Astro_mod($settemp  +$zone, 24.);
+    }
+    
+	#-- nautical twilight time in UTC.
+	my $NauticTwilightMorning;
+	my $NauticTwilightEvening; 
 	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
 	  $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -12.*$DEG);
-	my $NauticTwilightMorning = Astro_mod($risetemp +$zone, 24.);
-	my $NauticTwilightEvening = Astro_mod($settemp  +$zone, 24.);
+	if( $transittemp eq "---" ){
+      Log 3,"[Astro_SunRise] no solution possible for nautical twilight - maybe the sun never sets below -12 degrees?";
+      $NauticTwilightMorning = "---";
+      $NauticTwilightEvening = "---";
+    }else{
+      $NauticTwilightMorning = Astro_mod($risetemp +$zone, 24.);
+	  $NauticTwilightEvening = Astro_mod($settemp  +$zone, 24.);
+	}
 
 	#-- astronomical twilight time in UTC. 
+	my $AstroTwilightMorning;
+	my $AstroTwilightEvening;
 	($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
 	  $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, -18.*$DEG);
-	my $AstroTwilightMorning = Astro_mod($risetemp +$zone, 24.);
-	my $AstroTwilightEvening = Astro_mod($settemp  +$zone, 24.);
+	if( $transittemp eq "---" ){
+      Log 3,"[Astro_SunRise] no solution possible for astronomical twilight - maybe the sun never sets below -18 degrees?";
+      $AstroTwilightMorning = "---";
+      $AstroTwilightEvening = "---";
+    }else{
+	  $AstroTwilightMorning = Astro_mod($risetemp +$zone, 24.);
+	  $AstroTwilightEvening = Astro_mod($settemp  +$zone, 24.);
+	}
 	
 	#-- custom twilight time in UTC
+	my $CustomTwilightMorning;
+	my $CustomTwilightEvening;
     ($transittemp,$risetemp,$settemp) = Astro_RiseSet($jd0UT, $sunCoor1->{diameter}, $sunCoor1->{parallax}, 
 	  $sunCoor1->{ra}, $sunCoor1->{dec}, $sunCoor2->{ra}, $sunCoor2->{dec}, $lon, $lat, 1, $Astro{ObsHor}*$DEG);
-	my $CustomTwilightMorning = Astro_mod($risetemp +$zone, 24.);
-	my $CustomTwilightEvening = Astro_mod($settemp  +$zone, 24.);
+	  if( $transittemp eq "---" ){
+      Log 3,"[Astro_SunRise] no solution possible for custom twilight - maybe the sun never sets below ".$Astro{ObsHor}." degrees?";
+      $CustomTwilightMorning = "---";
+      $CustomTwilightEvening = "---";
+    }else{
+	  $CustomTwilightMorning = Astro_mod($risetemp +$zone, 24.);
+	  $CustomTwilightEvening = Astro_mod($settemp  +$zone, 24.);
+	}
 	
 	return( ($transit,$rise,$set,$CivilTwilightMorning,$CivilTwilightEvening,
 	  $NauticTwilightMorning,$NauticTwilightEvening,$AstroTwilightMorning,$AstroTwilightEvening,$CustomTwilightMorning,$CustomTwilightEvening) );  
@@ -1224,18 +1270,13 @@ sub Astro_moonwidget($){
   
   my $mooncolor = 'rgb(255,220,100)';
   my $moonshadow = 'rgb(70,70,100)';
-;
-  my $colorscheme = ($FW_webArgs{color}  ? $FW_webArgs{color}  : 'none');
-  if( $colorscheme eq 'light' ){
-    $mooncolor = 'rgb(255,220,180)';
-    $moonshadow = 'rgb(210,210,210)';
-  }
+
   $mooncolor = $FW_webArgs{mooncolor} 
     if ($FW_webArgs{mooncolor} );
   $moonshadow = $FW_webArgs{moonshadow}
     if ($FW_webArgs{moonshadow} );
     
-  my @size       = split('x', ($FW_webArgs{size} ? $FW_webArgs{size}  : '400x400'));
+  my @size = split('x', ($FW_webArgs{size} ? $FW_webArgs{size}  : '400x400'));
   
   $FW_RETTYPE = "image/svg+xml";
   $FW_RET="";
@@ -1465,11 +1506,12 @@ sub Astro_Get($@) {
         <li><i>Season,SeasonN</i> = String and numerical (0..3) value of season</li>
         <li><i>Time,Timezone</i> obvious meaning</li>
         <li><i>IsDST</i> = 1 if running on daylight savings time, 0 otherwise</li>
-        <li><i>GMST,ÖMST</i> = Greenwich and Local Mean Sidereal Time (in HH:MM)</li>
+        <li><i>GMST,LMST</i> = Greenwich and Local Mean Sidereal Time (in HH:MM)</li>
 	    </ul>
 	    <p>
 	    An SVG image of the current moon phase may be obtained under the link 
-	    <code>&lt;ip address of fhem&gt;/fhem/Astro_moonwidget?name='&lt;device name&gt;'&amp;size='&lt;width&gt;x&lt;height&gt;'</code>
+	    <code>&lt;ip address of fhem&gt;/fhem/Astro_moonwidget?name='&lt;device name&gt;'</code>
+	    Optional web parameters are <code>[&amp;size='&lt;width&gt;x&lt;height&gt;'][&amp;mooncolor=&lt;color&gt;][&amp;moonshadow=&lt;color&gt;]</code>
 	    <p>
         Notes: <ul>
         <li>Calculations are only valid between the years 1900 and 2100</li>
