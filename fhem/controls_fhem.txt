@@ -1,4 +1,4 @@
-REV 16903
+REV 16905
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-06-24_07:45:02 251086 ./CHANGED
+UPD 2018-06-25_07:45:04 251474 ./CHANGED
 UPD 2018-06-11_07:45:06 37379 ./MAINTAINER.txt
 UPD 2018-06-18_07:45:05 41502 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
@@ -205,7 +205,7 @@ UPD 2017-06-16_07:45:03 6518 FHEM/36_Level.pm
 UPD 2016-08-23_07:45:12 9997 FHEM/36_PCA301.pm
 UPD 2017-11-03_07:45:02 17579 FHEM/36_PrecipitationSensor.pm
 UPD 2018-05-01_07:45:03 67004 FHEM/36_Vallox.pm
-UPD 2018-05-24_07:45:02 22684 FHEM/36_WMBUS.pm
+UPD 2018-06-25_07:45:04 22843 FHEM/36_WMBUS.pm
 UPD 2018-02-10_07:45:02 10932 FHEM/37_NotifyAndroidTV.pm
 UPD 2015-07-28_14:05:31 10162 FHEM/37_SHC.pm
 UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
@@ -538,7 +538,7 @@ UPD 2017-12-28_07:45:02 7652 FHEM/TcpServerUtils.pm
 UPD 2016-02-22_07:45:12 27613 FHEM/TimeSeries.pm
 UPD 2017-05-29_07:45:02 49037 FHEM/UConv.pm
 UPD 2017-04-30_07:45:02 137531 FHEM/Unit.pm
-UPD 2017-11-02_07:45:02 48879 FHEM/WMBus.pm
+UPD 2018-06-25_07:45:04 63576 FHEM/WMBus.pm
 UPD 2015-07-28_14:05:31 8525 FHEM/WinService.pm
 UPD 2018-04-22_07:45:04 13981 FHEM/YahooWeatherAPI.pm
 UPD 2017-11-21_07:45:02 8463 FHEM/ZWLib.pm
@@ -669,12 +669,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-06-24_07:45:06 3470756 docs/commandref.html
-UPD 2018-06-24_07:45:07 2122855 docs/commandref_DE.html
+UPD 2018-06-25_07:45:07 3470772 docs/commandref.html
+UPD 2018-06-25_07:45:09 2122876 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-06-15_07:45:04 85474 docs/commandref_frame_DE.html
-UPD 2018-06-24_07:45:08 192754 docs/commandref_modular.html
-UPD 2018-06-24_07:45:09 203463 docs/commandref_modular_DE.html
+UPD 2018-06-25_07:45:09 192754 docs/commandref_modular.html
+UPD 2018-06-25_07:45:10 203463 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
