@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 17 / 2018-03-03
+# Release 18 / 2018-06-25
 
 package main;
 
@@ -436,7 +436,7 @@ netatmo_Define($$)
   $hash->{NAME} = $name;
   $hash->{SUBTYPE} = $subtype;
 
-  $hash->{STATE} = "Initialized";
+  $hash->{STATE} = "Initialized" if( $hash->{SUBTYPE} eq "ACCOUNT" );
 
   $hash->{NOTIFYDEV} = "global";
 
@@ -568,7 +568,7 @@ netatmo_Set($$@)
   $list = "autocreate:noArg autocreate_homes:noArg autocreate_thermostats:noArg autocreate_homecoachs:noArg" if( $hash->{SUBTYPE} eq "ACCOUNT" );
   #$list .= " unban:noArg" if( $hash->{SUBTYPE} eq "ACCOUNT" );
   $list = "home:noArg away:noArg" if ($hash->{SUBTYPE} eq "PERSON");
-  $list = "empty:noArg notify_movements:never,empty,always notify_unknowns:empty,always record_movements:never,empty,always record_alarms:never,empty,always presence_record_humans:ignore,record,record_and_notify presence_record_vehicles:ignore,record,record_and_notify presence_record_animals:ignore,record,record_and_notify presence_record_movements:ignore,record,record_and_notify presence_record_alarms:ignore,record,record_and_notify gone_after presence_enable_notify_from_to:empty,always presence_notify_from presence_notify_to smart_notifs:on,off" if ($hash->{SUBTYPE} eq "HOME");
+  $list = "empty:noArg notify_movements:never,empty,always notify_unknowns:empty,always notify_animals:true,false record_animals:true,false record_movements:never,empty,always record_alarms:never,empty,always presence_record_humans:ignore,record,record_and_notify presence_record_vehicles:ignore,record,record_and_notify presence_record_animals:ignore,record,record_and_notify presence_record_movements:ignore,record,record_and_notify presence_record_alarms:ignore,record,record_and_notify gone_after presence_enable_notify_from_to:empty,always presence_notify_from presence_notify_to smart_notifs:on,off" if ($hash->{SUBTYPE} eq "HOME");
   $list = "enable disable irmode:auto,always,never led_on_live:on,off mirror:off,on audio:on,off" if ($hash->{SUBTYPE} eq "CAMERA");
   $list = "enable disable light_mode:auto,on,off floodlight intensity:slider,0,1,100 night_always:true,false night_person:true,false night_vehicle:true,false night_animal:true,false night_movement:true,false" if ($hash->{SUBTYPE} eq "CAMERA" && defined($hash->{model}) && $hash->{model} eq "NOC");
   $list = "calibrate:noArg" if ($hash->{SUBTYPE} eq "TAG");
@@ -2184,7 +2184,7 @@ netatmo_setNotifications($$$)
 
 
   HttpUtils_NonblockingGet({
-    url => "https://my.netatmo.com/api/updatehome",
+    url => "https://app.netatmo.net/api/updatehome",
     timeout => 20,
     noshutdown => 1,
     method => "POST",
@@ -4045,6 +4045,8 @@ netatmo_parseHomeReadings($$;$)
 
         readingsSingleUpdate($hash, "notify_unknowns", $homedata->{notify_unknowns}, 1) if(defined($homedata->{notify_unknowns}));
         readingsSingleUpdate($hash, "notify_movements", $homedata->{notify_movements}, 1) if(defined($homedata->{notify_movements}));
+        readingsSingleUpdate($hash, "notify_animals", ($homedata->{notify_animals} eq "1")?"true":"false", 1) if(defined($homedata->{notify_animals}));
+        readingsSingleUpdate($hash, "record_animals", ($homedata->{record_animals} eq "1")?"true":"false", 1) if(defined($homedata->{record_animals}));
         readingsSingleUpdate($hash, "record_alarms", $homedata->{record_alarms}, 1) if(defined($homedata->{record_alarms}));
         readingsSingleUpdate($hash, "record_movements", $homedata->{record_movements}, 1) if(defined($homedata->{record_movements}));
 
