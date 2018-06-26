@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 5.2.7  26.06.2018    fix state turns to "off" even though cam is disabled
 # 5.2.6  20.06.2018    running stream as human readable entry for SSCamSTRM-Device, goAbsPTZ fix set-entry für non-PTZ
 # 5.2.5  18.06.2018    trigger lastsnap_fw to SSCamSTRM-Device only if snap was done by it.
 # 5.2.4  17.06.2018    SSCam_composegallery added and write warning if old composegallery-weblink device is used 
@@ -239,7 +240,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "5.2.6";
+my $SSCamVersion = "5.2.7";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -5458,8 +5459,8 @@ sub SSCam_refresh($$$$) {
       { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
   }
   
-  # Aufnahmestatus in state abbilden & SSCam-Device state setzen (mit/ohne Event)
-  my $st = (ReadingsVal($name, "Record", "") eq "Start")?"on":"off";  
+  # Aufnahmestatus/Disabledstatus in state abbilden & SSCam-Device state setzen (mit/ohne Event)
+  my $st = (ReadingsVal($name, "Availability", "enabled") eq "disabled")?"disabled":(ReadingsVal($name, "Record", "") eq "Start")?"on":"off";  
   if($lpoll_scm) {
       readingsSingleUpdate($hash,"state", $st, 1);
   } else {

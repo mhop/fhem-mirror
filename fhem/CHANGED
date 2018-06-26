@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCam: fix state turns to "off" even though cam is disabled
   - bugfix:  38_netatmo: fixed camera recording and notification settings
   - feature: 36_WMBUS: support for WMBUS type C and Kamstrup Multical 21 
                        encoding.
