@@ -26,6 +26,8 @@
 # ABU 20180607 seperated limit and scale from encode/decode in order to avoid warnings and clean up
 # ABU 20180613 fixed scaling algo
 # ABU 20180613 fixed scaling algo part 2
+# ABU 20180624 no set-option for listenoly- or get-devices, warning for illegal EVAL
+# ABU 20180626 fixed last changes
 
 package main;
 
@@ -558,8 +560,17 @@ KNX_Define($$) {
 		my $setString = "";	
 		foreach my $key (keys %{$hash->{GADDETAILS}})
 		{
-			$setString .= " " if (length ($setString) > 1);
-			$setString = $setString . $key . $hash->{GADDETAILS}{$key}{SETLIST}; 
+			#no set-command for listenonly or get
+			my $option = $hash->{GADDETAILS}{$key}{OPTION};
+			if  (defined ($option) and ($option =~  m/(get)|(listenonly)/i)) 
+			{
+				#readonly, do nothing
+			}
+			else
+			{
+				$setString .= " " if (length ($setString) > 1);
+				$setString = $setString . $key . $hash->{GADDETAILS}{$key}{SETLIST};			
+			}
 		}
 		$hash->{SETSTRING} = $setString;
 		
@@ -979,6 +990,7 @@ KNX_Set($@) {
 		if (defined ($cmdAttr) and !($cmdAttr eq ""))
 		{
 			$state = eval $cmdAttr;
+			Log3 ($name, 2, "set name: Eval error - $@") if $@;
 			Log3 ($name, 5, "set name: $name - state replaced via command, result: state:$state");					
 		}
 		
@@ -1222,6 +1234,7 @@ KNX_Parse($$) {
 				if (defined ($cmdAttr) and !($cmdAttr eq ""))
 				{
 					$state = eval $cmdAttr;
+					Log3 ($deviceName, 2, "parse device hash (wpi): Eval error - $@") if $@;
 					Log3 ($deviceName, 5, "parse device hash (wpi): $deviceHash name: $deviceName - state replaced via command $cmdAttr - state: $state");
 				}
 				#reassign original name...
@@ -1274,6 +1287,8 @@ KNX_Parse($$) {
 				$hash = $deviceHash;
 				
 				eval $cmdAttr;
+				Log3 ($deviceName, 2, "parse device hash (r): Eval error - $@") if $@;
+				
 				if ($orgValue ne $value)
 				{
 					Log3 ($deviceName, 5, "parse device hash (r): $deviceHash name: $deviceName - put replaced via command $cmdAttr - value: $value");
