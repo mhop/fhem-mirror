@@ -69,7 +69,7 @@ eval "use Blocking;1" or $missingModul .= "Blocking ";
 
 
 
-my $version = "2.0.4";
+my $version = "2.0.5";
 
 
 
@@ -366,15 +366,15 @@ sub LGTV_WebOS_TimerStatusRequest($) {
         
         LGTV_WebOS_Presence($hash) if( AttrVal($name,'pingPresence', 0) == 1 );
         
-        readingsBulkUpdate($hash,'channel','-');
-        readingsBulkUpdate($hash,'channelName','-');
-        readingsBulkUpdate($hash,'channelMedia','-');
-        readingsBulkUpdate($hash,'channelCurrentTitle','-');
-        readingsBulkUpdate($hash,'channelCurrentStartTime','-');
-        readingsBulkUpdate($hash,'channelCurrentEndTime','-');
-        readingsBulkUpdate($hash,'channelNextTitle','-');
-        readingsBulkUpdate($hash,'channelNextStartTime','-');
-        readingsBulkUpdate($hash,'channelNextEndTime','-');
+        readingsBulkUpdateIfChanged($hash,'channel','-');
+        readingsBulkUpdateIfChanged($hash,'channelName','-');
+        readingsBulkUpdateIfChanged($hash,'channelMedia','-');
+        readingsBulkUpdateIfChanged($hash,'channelCurrentTitle','-');
+        readingsBulkUpdateIfChanged($hash,'channelCurrentStartTime','-');
+        readingsBulkUpdateIfChanged($hash,'channelCurrentEndTime','-');
+        readingsBulkUpdateIfChanged($hash,'channelNextTitle','-');
+        readingsBulkUpdateIfChanged($hash,'channelNextStartTime','-');
+        readingsBulkUpdateIfChanged($hash,'channelNextEndTime','-');
         
         $hash->{helper}{device}{runsetcmd}              = 0;
     }
