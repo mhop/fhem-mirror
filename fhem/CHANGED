@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  98_feels_like.pm: Improved algorithms
+                               New attribute "sensorType"
+                               minor bugfixes
   - change:  82_LGTV_WebOS: change part of code
   - bugfix:  49_SSCam: fix state turns to "off" even though cam is disabled
   - bugfix:  38_netatmo: fixed camera recording and notification settings

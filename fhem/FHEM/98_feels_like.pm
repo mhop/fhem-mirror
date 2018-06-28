@@ -30,7 +30,7 @@ sub feels_like_Initialize($$)
     $hash->{NotifyOrderPrefix} = "48-";   # Want to be called earlier than default
     $hash->{AttrList} = "disable:0,1 maxTimediff sensorSkyViewFactor skyViewFactor " .
                         "bowenRatio linkeTurbity directRadiationRatio coverageCallback utciWindCutoff " .
-                        "sunVisibility alphaMin alphaMax $readingFnAttributes";
+                        "sunVisibility alphaMin alphaMax sensorType:wh2601,generic $readingFnAttributes";
 }
 
 ##########################
@@ -141,10 +141,10 @@ feels_like_Notify($$)
         foreach my $k ('T', 'H', 'W', 'S', 'P') {
             $i++;
             my $dk = $k . '_DEV';
-            next if $hash->{$dk} ne $dev_name;
+            next if (!exists($hash->{$dk}) || ($hash->{$dk} ne $dev_name));
 
             my $rk = $k . '_READING';
-            next if $hash->{$rk} ne $ev_name;
+            next if (!exists($hash->{$rk}) || ($hash->{$rk} ne $ev_name));
             $R[$i-1] = $val;
             $have_one = 1;
         }
@@ -203,7 +203,9 @@ feels_like_Notify($$)
         my $x = $hash->{helper}{alpha}; 
         readingsBulkUpdate($hash, "alpha", defined($x) ? round($x, 2) : '');
         $x = $hash->{helper}{nr_stddev}; 
-        readingsBulkUpdate($hash, "nr_stddev", defined($x) ? round($x, 2) : '');
+        readingsBulkUpdate($hash, "nr_stddev", defined($x) ? round($x, 3) : '');
+        $x = $hash->{helper}{nr_current}; 
+        readingsBulkUpdate($hash, "nr_current", defined($x) ? round($x, 3) : '');
 
         my ($oktas, $clouds);
         my $coverage = $hash->{helper}{nr_coverage};
@@ -636,36 +638,36 @@ my $alpha_min = 0.28;
 my $alpha_max = 3.20;
 my $nx = 7;
 my $ny = 10;
-my @poly = (-80.23280867846618,6.145065782244877,-0.7313678902154087,
-         0.03250849135687465,-0.0008978201231421577,1.2347982929985227e-05,
-         -6.695047898526558e-08,-6.925834867866924e-13,1.118146677702321e-12,
-         -3.761823314379515e-15,8.31708341485985e-18,2.889991801034238,
-         -0.021047044910027124,0.0036703670873613507,3.1069176573053456e-07,
-         2.6470054821477945e-06,-5.508774210575208e-08,-1.2439092637735542e-11,
-         3.7634863724249864e-12,-1.3255609900004629e-14,4.339293538942833e-20,
-         -4.68151013627075e-20,-0.04712919605086813,6.893886246929368e-06,
-         -2.4691399433555226e-05,-2.7337830810319805e-06,3.726252525682523e-08,
-         -1.0515675063167236e-13,1.591454248835739e-13,3.053932162293519e-18,
-         -9.360829215949115e-17,4.002296426843836e-19,-1.4894216811964654e-26,
-         0.0004197684396043355,-1.8732722222493324e-06,6.033160136276518e-07,
-         1.2176711956423159e-08,-2.062820321383044e-10,-1.1291543376052022e-13,
-         -2.439658121332727e-16,1.7915626144639213e-19,-8.842129866028896e-20,
-         1.6742219332109106e-21,4.263995859323078e-27,-2.138344965559571e-06,
-         3.214635151772535e-10,-4.334635876244454e-09,-2.5406627767533693e-13,
-         -4.663374881131278e-16,5.985383017939705e-15,5.032395312757073e-18,
-         2.8018146883583936e-22,-1.6611650939055894e-22,5.358372694525906e-24,
-         -8.462210368880217e-26,6.152870110997017e-09,1.347360353950362e-10,
-         9.431561152562534e-12,2.0079746039341004e-14,1.5719724367552726e-16,
-         -5.2446655819462686e-18,-2.0705070511073696e-19,-2.480922327826887e-22,
-         1.6382316916191638e-23,-1.4051484459006766e-25,6.577693048301765e-28,
-         -9.252604312148363e-12,-6.014074995390795e-13,6.689614000017945e-17,
-         -2.602920051152143e-16,-9.332333141173395e-22,1.4543725660072884e-20,
-         4.2294696816900514e-22,-7.190623685255967e-25,-1.8751070930782814e-26,
-         2.3268376697378167e-28,-1.330640955851776e-30,5.664842198596399e-15,
-         7.143889573805286e-16,-9.369499427606346e-18,8.11159678374021e-20,
-         9.545333699396679e-21,-1.717759863496281e-22,5.874702834998392e-25,
-         6.326001764152421e-27,-1.009832457124965e-28,4.329510333618922e-31,
-         -3.330400033066543e-35);
+my @poly = (-90.66442587970859,-0.12653967513953918,-0.05429196782572522,
+         -0.003947505982161431,0.0002942560101669465,-9.23777160083294e-06,
+         1.2564390326055938e-07,-7.837444757016697e-10,2.976503890716177e-12,
+         -9.029301310686075e-15,1.297737110059297e-17,3.811119753792056,
+         0.025141696145316254,0.0023982784945238145,-2.5486216904746934e-05,
+         4.018143816156442e-08,4.961244712996584e-08,-6.93209410072197e-10,
+         6.038700298155277e-13,7.445309001840248e-15,-1.9899681263361284e-19,
+         6.966461804177705e-22,-0.06612735443754429,-0.0007213163346721225,
+         -1.859170016835626e-05,9.228080919592265e-08,-2.5512896337894643e-08,
+         1.456811407705844e-10,-1.833908748420345e-14,2.2290556279960535e-14,
+         -2.6098516954286017e-19,-1.8043262610342805e-19,-1.246673705681534e-22,
+         0.0006231749950812171,8.038470749835932e-06,1.6299836636140978e-08,
+         6.7526397449547776e-09,1.013751152232904e-10,-8.865941766791051e-13,
+         -2.2679945112156536e-15,2.992765354989327e-19,-1.2796172696085801e-18,
+         5.692130944971647e-22,6.121907579877861e-25,-3.4503019397362654e-06,
+         -4.290149971856156e-08,2.900577518957586e-11,-5.395084246995899e-11,
+         -4.110949698556136e-14,9.961729200251771e-16,-6.781846849607143e-19,
+         2.8473447321672775e-19,9.03281869038426e-22,3.779074156761943e-23,
+         -6.41561370484806e-31,1.1233524858094804e-08,1.1218419288910449e-10,
+         1.705139816573712e-12,1.392728520516869e-13,3.3833213964714306e-17,
+         -1.915293420933926e-20,3.7494431936474405e-20,-1.73536092192404e-21,
+         1.098128449551401e-23,-1.656504982988262e-25,-3.2050256268063015e-28,
+         -1.994061567326138e-11,-1.1693850699135202e-13,-9.669322076648309e-15,
+         -2.359211807676409e-17,-3.3118811681151757e-18,2.3240018538390688e-20,
+         -2.1966930654068847e-23,-4.486890059210402e-25,1.5217375241812627e-26,
+         8.715547477814691e-30,2.0002771306203812e-30,1.4911298152625538e-14,
+         5.870928780450363e-21,1.5237962637002946e-17,-3.203113238718731e-19,
+         1.0006959961601528e-20,-1.2002161320425675e-22,7.845657723758814e-25,
+         -2.756151543721822e-28,-4.9606444725220614e-29,3.9282483015414235e-31,
+         -3.124485189918848e-33);
 
 # azimuth, sday
 sub sensor_factor($$) {
@@ -950,6 +952,7 @@ sub compute_coverage($$$$$$)
 
     my $sr_invalid = 0;
     my $sun_visible = 0;
+    $hash->{helper}{nr_current} = undef;
 
     # check whether sun is visible
     my @sv = split(/, */, main::AttrVal($name, "sunVisibility", "0,5,360"));
@@ -986,20 +989,30 @@ sub compute_coverage($$$$$$)
 
         $sday = -$sday if ($sday < 0);
 
-        $alpha = sensor_factor($az, $sday);
-        Log(4, sprintf("sday: $sday, alpha: %3.2f", $alpha));
+        my $sensor_type = main::AttrVal($name, "sensorType", "wh2601");
 
-        # likely to be 100% wrong if out of range
-        my $amin = main::AttrVal($name, "alphaMin", $alpha_min);
-        my $amax = main::AttrVal($name, "alphaMax", $alpha_max);
-        $amin = $amin > $alpha_min ? $amin : $alpha_min;
-        $amax = $amax < $alpha_max ? $amax : $alpha_max;
+        if ($sensor_type eq "wh2601") {
+            # apply sensor specific corrections
+            $alpha = sensor_factor($az, $sday);
+            Log(4, sprintf("sday: $sday, alpha: %3.2f", $alpha));
 
-        if ($alpha > $amax || $alpha < $amin
-            || $az < $azimuth_min || $az > $azimuth_max) {
-            $sr_invalid = 1;
-            Log(4, "Alpha or sun's position is out of range");
+            # likely to be 100% wrong if out of range
+            my $amin = main::AttrVal($name, "alphaMin", $alpha_min);
+            my $amax = main::AttrVal($name, "alphaMax", $alpha_max);
+            $amin = $amin > $alpha_min ? $amin : $alpha_min;
+            $amax = $amax < $alpha_max ? $amax : $alpha_max;
+
+            if ($alpha > $amax || $alpha < $amin
+                || $az < $azimuth_min || $az > $azimuth_max) {
+                $sr_invalid = 1;
+                Log(4, "Alpha or sun's position is out of range");
+            }
         } else {
+            $alpha = 1.0;
+            $sr_invalid = 0;
+        }
+
+        if (! $sr_invalid) {
             # use last coverage computed as estimation
             my $last_coverage = $hash->{helper}{coverage};
             $last_coverage = defined($last_coverage) ? $last_coverage : 0.5;
@@ -1007,6 +1020,7 @@ sub compute_coverage($$$$$$)
             my $I_h_m = $alpha * ($Isensor - $D);
             my $x = $G_0 - $D;
             my $nr = $I_h_m / $x;
+            $hash->{helper}{nr_current} = $nr;
             Log(4, sprintf("I_h_m: %3.1f, Limit: %3.1f, nr: %3.2f", $I_h_m, $x, $nr));
 
             my $n_nr_history = push(@$nr_history, $nr);
@@ -1043,9 +1057,11 @@ sub compute_coverage($$$$$$)
                     # meaning:
                     # for alternate high and med it's statistical
                     # for 100% low it will be rounded up to OVC
-                    $nr_coverage = $nr_band_0 * 0.5/8 + $nr_band_1 * 2.5/8
+                    $nr_coverage = $nr_band_0 * 0.5/8 + $nr_band_1 * 3.5/8
                                     + $nr_band_2 * 6.5/8 + $nr_band_3 * 7.5/8;
                 }
+
+                $hash->{helper}{nr_coverage_raw} = $nr_coverage;
 
                 # experimental stuff for low coverage
                 # around 30 minutes
@@ -1064,8 +1080,12 @@ sub compute_coverage($$$$$$)
 
                     $nr_stddev = sqrt($sum2 - $sum * $sum);
 
-                    if (0 && $nr_coverage < 1/8) {
-                        if ($nr_stddev > 0.005) {
+                    if ($nr_coverage <= 4/8 && $nr_stddev > 0.2) {
+                        $nr_coverage = 4/8;
+                    } elsif ($nr_coverage < 1/8) {
+                        if ($nr_stddev >= 0.1) {
+                            $nr_coverage = 2/8;
+                        } elsif ($nr_stddev > 0.015) {
                             $nr_coverage = 1/8;
                         }
                     }
@@ -1259,7 +1279,7 @@ An older standard developed by R. B. Steadman in the 1970s to 1990s and still in
   <a name="feels_likedefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; feels_like &lt;out-device&gt; &lt;temperature&gt; &lt;humidity&gt; [&lt;wind_speed&gt; [&lt;solar_radiation&gt; [&lt;pressure&gt;]]]</code><br>
+    <code>define &lt;name&gt; feels_like &lt;out-device&gt; &lt;temperature&gt; &lt;humidity&gt; [&lt;wind_speed&gt; [&lt;solarradiation&gt; [&lt;pressure&gt;]]]</code><br>
     <br>
     <ul>
         Calculates a 'feels like' temperatures for specified readings and writes them into new readings for device &lt;out-device&gt;.<br>
@@ -1270,7 +1290,7 @@ An older standard developed by R. B. Steadman in the 1970s to 1990s and still in
 <tr><td>temperature</td> <td>ambient temperature [&deg;C]</td></tr>
 <tr><td>humidity</td> <td>ambient relative humidity [%]</td></tr>
 <tr><td>wind_speed</td> <td>speed of wind 10 m above ground (so be sure to calibrate accordingly) [m/s]</td></tr>
-<tr><td>solar_radiation&nbsp;</td> <td>solar radiation [W/m^2]</td></tr>
+<tr><td>solarradiation&nbsp;</td> <td>solar radiation [W/m^2]</td></tr>
 <tr><td>pressure</td> <td>pressure [hPa]</td></tr>
 </table><br><br>
 
@@ -1282,21 +1302,21 @@ An older standard developed by R. B. Steadman in the 1970s to 1990s and still in
 <tr><td>extra_radiation</td> <td>extra radiation on human body [W/m^2]</td></tr>
 </table><br><br>
 
-If &lt;solar_radiation&gt; is specified as input parameter these readings are generated in addition:<br><br>
+If &lt;solarradiation&gt; is specified as input parameter these readings are generated in addition:<br><br>
 <table>
 <tr><td>coverage</td> <td>cloud cover as value 0.0 -> 1.0</td></tr>
 <tr><td>oktas</td> <td>cloud cover in oktas 1 -> 8</td></tr>
 <tr><td>clouds</td> <td>letter code for coverage SKC -> OVC</td></tr>
 </table><br>
 The value for <i>clouds</i> is compatible with Wunderground and can be uploaded with field code "clouds".<br><br>
-<b>Note:</b>For cloud detection it is essential that an event for &lt;solar_radiation&gt; is generated for each transmission
+<b>Note:</b>For cloud detection it is essential that an event for &lt;solarradiation&gt; is generated for each transmission
 of the weather station, i.e. each 16 seconds.
 </ul>
 <br>
 
 Example:<PRE>
 # Use full functionality for a wh2601 weather station
-define wh2601_fl feels_like wh2601 temperature humidity wind_speed solar_radiation pressure
+define wh2601_fl feels_like wh2601 temperature humidity wind_speed solarradiation pressure
 
 # Use different sensors
 define Thermo_1_fl feels_like Thermo_1 temperature Thermo_2:humidity WS_Sensor:wind_speed
@@ -1318,6 +1338,7 @@ You can find values for other locations <a href="http://www.soda-pro.com/web-ser
 <tr><td>sunVisibility</td> <td>optional, should match installation</td> <td>Comma separated list of azimuth/altitude values to describe whether the sun is visible (e.g. due to buildings, trees, ...).<br>Must start with 0 and end with 360.<br>
 E.g. 0,5,75,20.5,130,10,360 -> sun must be > 5° between 0 and 75° azimuth, then > 20.5° between 75° and 130° etc.</td></tr>
 <tr><td>coverageCallback</td> <td>optional, technical</td> <td>Callback function for use with an additional infrared thermometer</td></tr>
+<tr><td>sensorType</td> <td>optional, technical</td> <td>Type of sensor for applying specific corrections, values:wh2601,generic, default wh2601</td></tr>
 </table>
 
 <br><br>
