@@ -1,4 +1,4 @@
-REV 16913
+REV 16915
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-06-27_07:45:02 251624 ./CHANGED
+UPD 2018-06-28_07:45:04 251672 ./CHANGED
 UPD 2018-06-11_07:45:06 37379 ./MAINTAINER.txt
 UPD 2018-06-18_07:45:05 41502 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
@@ -376,7 +376,7 @@ UPD 2016-12-14_11:01:16 51480 FHEM/79_BDKM.pm
 UPD 2018-03-11_07:45:03 9772 FHEM/80_M232.pm
 UPD 2018-03-11_07:45:03 8527 FHEM/81_M232Counter.pm
 UPD 2017-09-27_07:45:02 34699 FHEM/82_LGTV_IP12.pm
-UPD 2018-06-14_07:45:03 66055 FHEM/82_LGTV_WebOS.pm
+UPD 2018-06-28_07:45:04 66136 FHEM/82_LGTV_WebOS.pm
 UPD 2018-03-11_07:45:03 3753 FHEM/82_M232Voltage.pm
 UPD 2017-09-18_07:45:03 11901 FHEM/83_IOhomecontrol.pm
 UPD 2018-05-20_07:45:03 42145 FHEM/86_Robonect.pm
@@ -673,8 +673,8 @@ UPD 2018-06-26_07:45:06 3470916 docs/commandref.html
 UPD 2018-06-26_07:45:08 2122909 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-06-15_07:45:04 85474 docs/commandref_frame_DE.html
-UPD 2018-06-27_07:45:08 192754 docs/commandref_modular.html
-UPD 2018-06-27_07:45:09 203463 docs/commandref_modular_DE.html
+UPD 2018-06-28_07:45:09 192754 docs/commandref_modular.html
+UPD 2018-06-28_07:45:10 203463 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
