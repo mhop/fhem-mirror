@@ -656,6 +656,7 @@ sub HMinfo_paramCheck(@) { ####################################################
       my $ehash = $defs{$eName};
       my $pairId =  ReadingsVal($eName,"R-pairCentral", ReadingsVal($eName,".R-pairCentral","undefined"));
       my $IoDev =  $ehash->{IODev} if ($ehash->{IODev});
+      if (!$IoDev->{NAME}){push @noIoDev,$eName;next;}
       my $ioHmId = AttrVal($IoDev->{NAME},"hmId","-");
       my ($ioCCU,$prefIO) = split":",AttrVal($eName,"IOgrp","");
       if ($ioCCU){
