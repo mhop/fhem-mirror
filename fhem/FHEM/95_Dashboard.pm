@@ -62,6 +62,10 @@
 #	Minor improvements in javascript and css.
 # 3.10: added attribute dashboard_tabXdevices, which can contain devspec definitions and thus allow to also shown not grouped devices
 #
+# ---- Changes by DS_Starter ----
+# 3.10.1   29.06.2018   added FW_hideDisplayName, Forum #88727
+#
+#
 # Known Bugs/Todos:
 # BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden? -> widgets aus js über XHR nachladen und dann anzeigen (jquery xml nachladen...)
 # BUG: Variabler abstand wird nicht gesichert
@@ -97,13 +101,13 @@ package main;
 use strict;
 use warnings;
 use vars qw(%FW_icons); 	# List of icons
-use vars qw($FW_dir);       	# base directory for web server
-use vars qw($FW_icondir);   	# icon base directory
+use vars qw($FW_dir);      	# base directory for web server
+use vars qw($FW_icondir);   # icon base directory
 use vars qw($FW_room);      # currently selected room
 use vars qw(%defs);		    # FHEM device/button definitions
 #use vars qw(%FW_groups);	# List of Groups
-use vars qw($FW_wname);   # Web instance
-use vars qw(%FW_types);    # device types
+use vars qw($FW_wname);     # Web instance
+use vars qw(%FW_types);     # device types
 use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 #########################
@@ -116,7 +120,7 @@ my %group;
 my $dashboard_groupListfhem;
 my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
-my $dashboardversion = "3.10";
+my $dashboardversion = "3.10.1";
 
 #############################################################################################
 sub Dashboard_Initialize ($) {
@@ -289,9 +293,10 @@ sub Dashboard_define ($$) {
 
  my @args = split (" ", $def);
 
- my $now = time();
- my $name = $hash->{NAME}; 
+ my $now          = time();
+ my $name         = $hash->{NAME}; 
  $hash->{VERSION} = $dashboardversion;
+ 
  readingsSingleUpdate( $hash, "state", "Initialized", 0 ); 
   
  RemoveInternalTimer($hash);
@@ -803,8 +808,8 @@ sub BuildGroup
 	} @devices;
 
 	foreach my $d (@devices) {	
-                next if (!defined($defs{$d}));
-                $foundDevices++;
+        next if (!defined($defs{$d}));
+        $foundDevices++;
 
 		$ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
 		
@@ -814,6 +819,7 @@ sub BuildGroup
 
 		$icon = FW_makeImage($icon,$icon,"icon dashboard_groupicon") . "&nbsp;" if($icon);
 	
+        $devName="" if($modules{$defs{$d}{TYPE}}{FW_hideDisplayName}); # Forum 88667
 		if (!$modules{$defs{$d}{TYPE}}{FW_atPageEnd}) { # Don't show Link for "atEnd"-devices
 			$ret .= FW_pH "detail=$d", "$icon$devName", 1, "col1", 1; 
 		}			

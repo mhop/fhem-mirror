@@ -402,7 +402,7 @@ FHEM/95_Astro.pm             pahenning            Unterstützende Dienste
 FHEM/95_Babble.pm             pahenning            Unterstützende Dienste
 FHEM/95_PostMe.pm            pahenning            Unterstützende Dienste
 FHEM/95_YAAHM.pm             pahenning            Unterstützende Dienste
-FHEM/95_Dashboard.pm         svenson08            Frontends
+FHEM/95_Dashboard.pm         DS_Starter/orphan    Frontends
 FHEM/95_PachLog.pm           rudolfkoenig/orphan  Sonstiges
 FHEM/95_holiday.pm           rudolfkoenig         Sonstiges
 FHEM/95_remotecontrol.pm     ulimaass             Frontends

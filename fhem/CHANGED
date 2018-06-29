@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  95_Dashboard: V3.10.1, added FW_hideDisplayName, Forum #88727
   - change:  98_feels_like.pm: Improved algorithms
                                New attribute "sensorType"
                                minor bugfixes
