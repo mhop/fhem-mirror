@@ -213,12 +213,17 @@
       don't be afraid to ask something in english.</div>
         <div class="dist"></div>
 
-      <div class="dist"><a href="Heimautomatisierung-mit-fhem.pdf">
-      Heimautomatisierung-mit-FHEM.pdf</a> (pdf, german)</div>
+      <div class="dist">short course in FHEM (no hardware needed): <a 
+      href="https://wiki.fhem.de/wiki/First_steps_in_FHEM">
+      First steps in FHEM</a></div>
         <div class="dist"></div>
 
-      <div class="dist"><a href="HOWTO.html">HOWTO.html</a> for a short
-      installation/configuration.</div> 
+      <div class="dist"><a href="https://wiki.fhem.de/wiki/Quick-Start/en">
+      Quick-Start</a> for a short installation/configuration.</div> 
+        <div class="dist"></div>
+
+      <div class="dist"><a href="Heimautomatisierung-mit-fhem.pdf">
+      Heimautomatisierung-mit-FHEM.pdf</a> (pdf, german)</div>
         <div class="dist"></div>
 
     </ul>
@@ -227,10 +232,10 @@
     <a name="Download"></a>
     <h3>Download</h3>
     <ul>
-      Last released version: (as of =DATE=): 
-      <a href="http://fhem.de/fhem-=VERS=.tar.gz">fhem-=VERS=.tar.gz</a>,
-      <a href="http://fhem.de/fhem-=VERS=.zip">fhem-=VERS=.zip</a>,
-      <a href="http://fhem.de/fhem-=VERS=.deb">fhem-=VERS=.deb</a>,
+      Last released version: (as of 2017-02-19): 
+      <a href="http://fhem.de/fhem-5.8.tar.gz">fhem-5.8.tar.gz</a>,
+      <a href="http://fhem.de/fhem-5.8.zip">fhem-5.8.zip</a>,
+      <a href="http://fhem.de/fhem-5.8.deb">fhem-5.8.deb</a>,
       <br>
       See the <a href="CHANGED">CHANGED</a> file for the change history or the 
       <a href="SVNLOG">svn log</a> for a more detailed log.<br><br>
@@ -242,8 +247,7 @@
       forum.<br>
 
       Nightly versions:
-      <a href="http://www.dhs-computertechnik.de/downloads/fhem-cvs.tgz">
-      fhem-cvs.tgz</a>, <a href="http://debian.fhem.de/">debian.fhem.de</a>
+      <a href="http://debian.fhem.de/">debian.fhem.de</a>
       <br><br>
 
       Please use <a href="commandref.html#fheminfo">fheminfo</a> command to
@@ -258,7 +262,7 @@
     <ul>
     <h4>Debian/Ubuntu/Raspbian</h4>
     <ul>
-      <li>Install <a href="http://fhem.de/fhem-=VERS=.deb">this</a> package.
+      <li>Install <a href="http://fhem.de/fhem-5.8.deb">this</a> package.
       For a better integration check out <a
       href="http://debian.fhem.de/">debian.fhem.de</a>
     </ul>
@@ -269,15 +273,15 @@
           Device::SerialPort perl module, install it with "sudo cpan
           Device::SerialPort" or "apt-get install libdevice-serialport-perl".
           </li>
-      <li>Download the <a href="http://fhem.de/fhem-=VERS=.tar.gz">
+      <li>Download the <a href="http://fhem.de/fhem-5.8.tar.gz">
           .tar.gz</a> package, unpack it, and change to the unpacked directory.
       <li>start FHEM directly from this directory (perl fhem.pl fhem.cfg).
     </ul>
 
     <h4>Windows</h4>
     <ul>
-      <li>See the <a href="HOWTO_Windows.html">HOWTO_Windows.html</a> for a
-      detailed description.</li>
+      <li>See the <a href="https://wiki.fhem.de/wiki/FHEM_Installation_Windows/en">
+      FHEM Installation Windows</a> for a detailed description.</li>
       <li>If you are using cygwin for your perl installation you can
       follow the guidelines for Unix.</li>
     </ul>
@@ -300,8 +304,9 @@
 
     <br><br>
 
-    After the installation follow the <a href="HOWTO.html">HOWTO</a> for adding
-    devices or try out the demo configuration by starting fhem with:<br>
+    After the installation follow the 
+    <a href="https://wiki.fhem.de/wiki/Quick-Start/en">Quick-Start</a> for 
+    adding devices or try out the demo configuration by starting fhem with:<br>
       <ul><code>
       perl fhem.pl fhem.cfg.demo
       </code></ul>
@@ -342,6 +347,7 @@
     </ul>  
 
   <footer><center><a href="Impressum.html">Impressum / Datenschutz</a></center></footer>
+  <br>
 
   </body>
 
