@@ -139,6 +139,7 @@ sub CUL_HM_getAttrInt($@);
 sub CUL_HM_appFromQ($$);
 sub CUL_HM_autoReadReady($);
 sub CUL_HM_calcDisWm($$$);
+sub CUL_HM_statCnt($$;$);
 
 # ----------------modul globals-----------------------
 my $respRemoved; # used to control trigger of stack processing
@@ -1134,7 +1135,7 @@ sub CUL_HM_Parse($$) {#########################################################
   $mh{id}     = CUL_HM_h2IoId($iohash);
   $mh{ioName} = $iohash->{NAME};
   $evtDly     = 1;# switch delay trigger on
-  CUL_HM_statCnt($mh{ioName},"r");
+  CUL_HM_statCnt($mh{ioName},"r",$mh{mFlgH});
   $mh{dstN}   = ($mh{dst} eq "000000") ? "broadcast" :
                          ($mh{dstH} ? $mh{dstH}->{NAME} :
                     ($mh{dst} eq $mh{id} ? $mh{ioName} :
@@ -1423,6 +1424,7 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   CUL_HM_eventP($mh{devH},"Evt_$mh{msgStat}")if ($mh{msgStat});#log io-events
   CUL_HM_eventP($mh{devH},"Rcv");
+  CUL_HM_eventP($mh{devH},"RcvB") if($mh{mFlgH} & 1);#burst msg received
   my $target = " (to $mh{dstN})";
   $mh{st} = AttrVal($mh{devN}, "subType", "");
   $mh{md} = AttrVal($mh{devN}, "model"  , "");
@@ -3034,7 +3036,7 @@ sub CUL_HM_parseCommon(@){#####################################################
                   foreach (keys%{$devHlpr->{prt}{rspWaitSec}});   #back to original message
           delete $devHlpr->{prt}{rspWaitSec};
           IOWrite($mhp->{devH}, "", $devHlpr->{prt}{rspWait}{cmd});     # and send
-          CUL_HM_statCnt($mhp->{devH}{IODev}{NAME},"s");
+          CUL_HM_statCnt($mhp->{devH}{IODev}{NAME},"s",hex(substr($devHlpr->{prt}{rspWait}{cmd},6,2)));
           return "done";
         }
         $mhp->{devH}{protCondBurst} = "on" if (   $mhp->{devH}{protCondBurst}
@@ -7007,20 +7009,25 @@ sub CUL_HM_SndCmd($$) {
   }
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
-  CUL_HM_statCnt($ioName,"s");
+  CUL_HM_statCnt($ioName,"s",hex(substr($cmd2,0,2)));
   CUL_HM_eventP($hash,"Snd");
+  CUL_HM_eventP($hash,"SndB") if (hex(substr($cmd2,0,2)) & 1);
   CUL_HM_responseSetup($hash,$cmd);
   $cmd =~ m/^As(..)(..)(..)(..)(......)(......)(.*)/;
   CUL_HM_DumpProtocol("SND", $io, ($1,$2,$3,$4,$5,$6,$7));
 }
-sub CUL_HM_statCnt($$) {# set msg statistics for (r)ecive (s)end or (u)pdate
-  my ($ioName,$dir) = @_;
+sub CUL_HM_statCnt(@) {# set msg statistics for (r)ecive (s)end or (u)pdate
+  my ($ioName,$dir,$typ) = @_;
   my $stat = $modules{CUL_HM}{stat};
   if (!$stat->{$ioName}){
-    $stat->{r}{$ioName}{h}{$_} = 0 foreach(0..23);
-    $stat->{r}{$ioName}{d}{$_} = 0 foreach(0..6);
-    $stat->{s}{$ioName}{h}{$_} = 0 foreach(0..23);
-    $stat->{s}{$ioName}{d}{$_} = 0 foreach(0..6);
+    $stat->{r}{$ioName}{h}{$_}  = 0 foreach(0..23);
+    $stat->{r}{$ioName}{d}{$_}  = 0 foreach(0..6);
+    $stat->{s}{$ioName}{h}{$_}  = 0 foreach(0..23);
+    $stat->{s}{$ioName}{d}{$_}  = 0 foreach(0..6);
+    $stat->{rb}{$ioName}{h}{$_} = 0 foreach(0..23);
+    $stat->{rb}{$ioName}{d}{$_} = 0 foreach(0..6);
+    $stat->{sb}{$ioName}{h}{$_} = 0 foreach(0..23);
+    $stat->{sb}{$ioName}{d}{$_} = 0 foreach(0..6);
     $stat->{$ioName}{last} = 0;
   }
   my @l = localtime(gettimeofday());
@@ -7028,17 +7035,21 @@ sub CUL_HM_statCnt($$) {# set msg statistics for (r)ecive (s)end or (u)pdate
   if ($l[2] != $stat->{$ioName}{last}){#next field
     if ($l[2] < $stat->{$ioName}{last}){#next day
       my $recentD = ($l[6]+5)%7;
-      foreach my $ud ("r","s"){
+      foreach my $ud ("r","s","rb","sb"){
         $stat->{$ud}{$ioName}{d}{$recentD} = 0;
-        $stat->{$ud}{$ioName}{d}{$recentD} += $stat->{$ud}{$ioName}{h}{$_}
-                    foreach (0..23);
+        $stat->{$ud}{$ioName}{d}{$recentD} += $stat->{$ud}{$ioName}{h}{$_}    foreach (0..23);
       }
     }
     $stat->{r}{$ioName}{h}{$l[2]} = 0;
     $stat->{s}{$ioName}{h}{$l[2]} = 0;
     $stat->{$ioName}{last}        = $l[2];
   }
-  $stat->{$dir}{$ioName}{h}{$l[2]}++ if ($dir ne "u");
+  if ($dir ne "u"){
+    $stat->{$dir}{$ioName}{h}{$l[2]}++;
+    if (defined($typ) && ($typ & 1)){
+      $stat->{$dir."b"}{$ioName}{h}{$l[2]}++;
+    }
+  }
 }
 sub CUL_HM_statCntRfresh($) {# update statistic once a day
   my ($ioName,$dir) = @_;
@@ -7047,6 +7058,8 @@ sub CUL_HM_statCntRfresh($) {# update statistic once a day
       delete $modules{CUL_HM}{stat}{$ioName};
       delete $modules{CUL_HM}{stat}{r}{$ioName};
       delete $modules{CUL_HM}{stat}{s}{$ioName};
+      delete $modules{CUL_HM}{stat}{rb}{$ioName};
+      delete $modules{CUL_HM}{stat}{sb}{$ioName};
       next;
     }
     CUL_HM_statCnt($_,"u") if ($_ ne "dummy");
@@ -7158,7 +7171,8 @@ sub CUL_HM_respPendTout($) {
           $pHash->{rspWait}{cmd} = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
         }
         IOWrite($hash, "", $pHash->{rspWait}{cmd});
-        CUL_HM_statCnt($hash->{IODev}{NAME},"s");
+        CUL_HM_eventP($hash,"SndB")          if(hex(substr($pHash->{rspWait}{cmd},6,2)) & 1);
+        CUL_HM_statCnt($hash->{IODev}{NAME},"s",hex(substr($pHash->{rspWait}{cmd},6,2)));
         InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
       }
     }
@@ -7306,8 +7320,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
     CUL_HM_UpdtReadSingle($hash,".protLastRcv",$hash->{"protLastRcv"},0);
     return;
   }
-
-  my $evnt = $hash->{"prot".$evntType}?$hash->{"prot".$evntType}:"0";
+  my $evnt = $hash->{"prot".$evntType} ? $hash->{"prot".$evntType} : "0";
   my ($evntCnt,undef) = split(' last_at:',$evnt);
   $hash->{"prot".$evntType} = ++$evntCnt." last_at:".TimeNow();
 
