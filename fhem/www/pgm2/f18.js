@@ -1,7 +1,7 @@
 "use strict";
 FW_version["f18.js"] = "$Id$";
 
-// TODO: absPos,hierMenu+Pin,menuBorder,f18style.css,SVGcolors,floorplan
+// TODO: absPos,hierMenu+Pin,menuBorder,SVGcolors,floorplan
 var f18_attr={}, f18_sd, f18_icon={}, f18_hasPos, f18_room;
 var f18_small = (screen.width < 480 || screen.height < 480);
 
@@ -53,6 +53,7 @@ $(document).ready(function(){
   f18_icon.pinOut = f18_icon.pinIn
                         .replace('/>',' transform="rotate(90,896,896)"/>');
 
+  f18_setFixedInput();
   f18_menu();
   f18_tables();
   f18_svgSetCols();
@@ -267,7 +268,7 @@ f18_special()
     $("tr#f18rr").append("<table id='f18tr' class='block wide'></table>");
     appendTo = "table#f18tr";
 
-    addRow("room", "Target", '<select><option>all</option></select>');
+    addRow("room", "Target <select><option>all</option></select>");
     FW_cmd(FW_root+"?cmd=jsonlist2 .* room&XHR=1", function(data) {
       var d;
       try { d=JSON.parse(data); } catch(e){ log(data); return FW_okDialog(e); }
@@ -321,7 +322,7 @@ f18_special()
     $("table.f18colors input").attr("size", 8);
 
     var bgImg = attr("bgImg", true);
-    addRow("bgImg", "<a href='#'>Background image: <span>"+
+    addRow("bgImg", "<a href='#'>Background: <span>"+
                     (bgImg ? bgImg : "none")+"</span></a>");
     $(appendTo+" tr.ar_bgImg a").click(function(){
       FW_cmd(FW_root+'?cmd='+
@@ -350,11 +351,21 @@ f18_special()
       else
         $("div.pinHeader div.pin").css("display", c ? "none":"block");
     });
+    addHider("fixedInput", true, "Fixed input", f18_setFixedInput);
 
     $("div.f18colors").css("margin-top", "20px");
     $("tr.f18 div.fileList").each(function(e){f18_addPinToStyleDiv(this)});
   };
   loadScript("pgm2/fhemweb_colorpicker.js", f18_drawSpecial);
+}
+
+function
+f18_setFixedInput()
+{
+  $("#menu,#menuBtn,#content,#hdr")
+    .css(f18_getAttr("fixedInput") ?
+      { position:"fixed", overflow:"auto" } :
+      { position:"absolute", overflow:"visible" });
 }
 
 function
@@ -535,7 +546,7 @@ f18_setCss(why)
   function bg(c) { return "{ background:#"+c+"; fill:#"+c+"; }\n" }
   function fg(c) { return "{ color:#"+c+"; }\n" }
   style += ".col_fg, body, input, textarea "+fg(col("fg"));
-  style += ".col_bg, #menu, textarea, input, option "+bg(col("bg"));
+  style += ".col_bg, textarea, input, option "+bg(col("bg"));
   style += ".col_link,a:not(.changed),.handle,.fhemlog,input[type=submit],"+
            "select,div.ui-widget-content a "+
            "{color:#"+col("link")+"!important; stroke:#"+col("link")+";}\n";
