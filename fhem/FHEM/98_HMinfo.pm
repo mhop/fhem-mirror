@@ -1087,41 +1087,60 @@ sub HMinfo_getEntities(@) { ###################################################
   return sort(@names);
 }
 sub HMinfo_getMsgStat() { #####################################################
-  my ($hr,$dr,$hs,$ds);
-  $hr  =  sprintf("\n  %-14s:","receive hour");
-  $hs  =  sprintf("\n  %-14s:","send    hour");
-  $dr  =  sprintf("\n  %-14s:","receive day");
-  $ds  =  sprintf("\n  %-14s:","send    day");
-  $hr .=  sprintf("| %02d",$_) foreach (0..23);
-  $hs .=  sprintf("| %02d",$_) foreach (0..23);
-  $dr .=  sprintf("|%4s",$_) foreach ("Mon","Tue","Wed","Thu","Fri","Sat","Sun","# 24h");
-  $ds .=  sprintf("|%4s",$_) foreach ("Mon","Tue","Wed","Thu","Fri","Sat","Sun","# 24h");
+  my ($hr,$dr,$hs,$ds,$hrb,$drb,$hsb,$dsb);
+  my ($hstr,$dstr) = (" "," ");
+  $hstr .= sprintf("| %02d",$_) foreach (0..23);
+  $dstr .= sprintf("|%4s",$_)   foreach ("Mon","Tue","Wed","Thu","Fri","Sat","Sun","# 24h");
+
+  $hr      = "\nreceive       " .$hstr;
+  $hs      = "\nsend          ";
+  $hrb     = "\nreceive burst ";
+  $hsb     = "\nsend    burst ";
+  $dr      = "\nreceive       " .$dstr;
+  $ds      = "\nsend          ";
+  $drb     = "\nreceive burst ";
+  $dsb     = "\nsend    burst ";
+  my $tsts = "\n               |";
   foreach my $ioD(keys %{$modules{CUL_HM}{stat}{r}}){
     next if ($ioD eq "dummy");
-    $hr .=  sprintf("\n      %-10s:",$ioD);
-    $hs .=  sprintf("\n      %-10s:",$ioD);
-    $dr .=  sprintf("\n      %-10s:",$ioD);
-    $ds .=  sprintf("\n      %-10s:",$ioD);
-    $hr .=  sprintf("|%3d",$modules{CUL_HM}{stat}{r}{$ioD}{h}{$_}) foreach (0..23);
-    $hs .=  sprintf("|%3d",$modules{CUL_HM}{stat}{s}{$ioD}{h}{$_}) foreach (0..23);
-    $dr .=  sprintf("|%4d",$modules{CUL_HM}{stat}{r}{$ioD}{d}{$_}) foreach (0..6);
-    $ds .=  sprintf("|%4d",$modules{CUL_HM}{stat}{s}{$ioD}{d}{$_}) foreach (0..6);
+    my $ioDs = sprintf("\n    %-10s:",$ioD);
+    $hr .=  $ioDs;
+    $hs .=  $ioDs;
+    $hrb.=  $ioDs;
+    $hsb.=  $ioDs;
+    $dr .=  $ioDs;
+    $ds .=  $ioDs;
+    $drb.=  $ioDs;
+    $dsb.=  $ioDs;
+    $hr .=  sprintf("|%3d",$modules{CUL_HM}{stat}{r}{$ioD}{h}{$_})  foreach (0..23);
+    $hs .=  sprintf("|%3d",$modules{CUL_HM}{stat}{s}{$ioD}{h}{$_})  foreach (0..23);
+    $hrb.=  sprintf("|%3d",$modules{CUL_HM}{stat}{rb}{$ioD}{h}{$_}) foreach (0..23);
+    $hsb.=  sprintf("|%3d",$modules{CUL_HM}{stat}{sb}{$ioD}{h}{$_}) foreach (0..23);
+    $dr .=  sprintf("|%4d",$modules{CUL_HM}{stat}{r}{$ioD}{d}{$_})  foreach (0..6);
+    $ds .=  sprintf("|%4d",$modules{CUL_HM}{stat}{s}{$ioD}{d}{$_})  foreach (0..6);
+    $drb.=  sprintf("|%4d",$modules{CUL_HM}{stat}{rb}{$ioD}{d}{$_}) foreach (0..6);
+    $dsb.=  sprintf("|%4d",$modules{CUL_HM}{stat}{sb}{$ioD}{d}{$_}) foreach (0..6);
   
-    my ($tdr,$tds);
-    $tdr += $modules{CUL_HM}{stat}{r}{$ioD}{h}{$_} foreach (0..23);
-    $tds += $modules{CUL_HM}{stat}{s}{$ioD}{h}{$_} foreach (0..23);
+    my ($tdr,$tds,$tdrb,$tdsb);
+    $tdr  += $modules{CUL_HM}{stat}{r}{$ioD}{h}{$_}  foreach (0..23);
+    $tds  += $modules{CUL_HM}{stat}{s}{$ioD}{h}{$_}  foreach (0..23);
+    $tdrb += $modules{CUL_HM}{stat}{rb}{$ioD}{h}{$_} foreach (0..23);
+    $tdsb += $modules{CUL_HM}{stat}{sb}{$ioD}{h}{$_} foreach (0..23);
     $dr .=  sprintf("|#%4d",$tdr);
     $ds .=  sprintf("|#%4d",$tds);
+    $drb.=  sprintf("|#%4d",$tdrb);
+    $dsb.=  sprintf("|#%4d",$tdsb);
   }
   my @l = localtime(gettimeofday());
-  my $tsts = "\n                 |";
   $tsts .=  "----" foreach (1..$l[2]);
   $tsts .=  ">*" ;
   return  "msg statistics\n"
            .$tsts
-           .$hr.$hs
+           .$hr.$hs.$hrb.$hsb
+           ."\n              ".$hstr
            .$tsts
-           .$dr.$ds
+           .$dr.$ds.$drb.$dsb
+           ."\n              ".$dstr
            ;
 }
 
@@ -1155,15 +1174,15 @@ sub HMinfo_GetFn($@) {#########################################################
       my $nl = length($dName); 
       $maxNlen = $nl if($nl > $maxNlen);
       my ($found,$para) = HMinfo_getParam($id,
-                             ,"protState","protCmdPend"
-                             ,"protSnd","protLastRcv","protResnd"
-                             ,"protCmdDel","protResndFail","protNack","protIOerr");
+                             ,"protState","protCmdPend","protSnd"
+                             ,"protSndB","protLastRcv"
+                             ,"protResnd","protCmdDel","protResndFail","protNack","protIOerr");
       $para =~ s/( last_at|20..-|\|)//g;
       my @pl = split "\t",$para;
       foreach (@pl){
         $_ =~ s/\s+$|//g ;
         $_ =~ s/CMDs_//;
-        $_ =~ s/..-.. ..:..:..//g if ($type eq "short");
+        $_ =~ s/:*..-.. ..:..:..//g if ($type eq "short");
         $_ =~ s/CMDs // if ($type eq "short");
       }
 
@@ -1179,26 +1198,27 @@ sub HMinfo_GetFn($@) {#########################################################
     my @paramList;
     if ($type eq "short"){
       push @paramList, sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
-                    @{$_}[0..3],@{$_}[5..9]) foreach(@paramList2);
+                    @{$_}[0..3],@{$_}[6..10]) foreach(@paramList2);
       $hdr = sprintf("%-${maxNlen}s:%-16s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
-                               ,"name"
-                               ,"State","CmdPend"
-                               ,"Snd","Resnd"
+                               ,"name","State","CmdPend"
+                               ,"Snd"
+                               ,"Resnd"
                                ,"CmdDel","ResndFail","Nack","IOerr");
       $ftr = sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s","sum",@plSum[1..3],@plSum[5..9]);
     }
     else{
-      push @paramList, sprintf("%-${maxNlen}s%-17s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s",
-                    @{$_}[0..9]) foreach(@paramList2);
-      $hdr = sprintf("%-${maxNlen}s:%-16s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s",
-                               ,"name"
-                               ,"State","CmdPend"
-                               ,"Snd","LastRcv","Resnd"
+      push @paramList, sprintf("%-${maxNlen}s%-17s|%-18s|%-19s|%-18s|%-15s|%-18s#%-18s|%-18s|%-18s|%-18s",
+                    @{$_}[0..10]) foreach(@paramList2);
+      $hdr = sprintf("%-${maxNlen}s:%-16s|%-18s|%-19s|%-18s|%-15s|%-18s#%-18s|%-18s|%-18s|%-18s",
+                               ,"name","State","CmdPend"
+                               ,"Snd"
+                               ,"SndB","LastRcv"
+                               ,"Resnd"
                                ,"CmdDel","ResndFail","Nack","IOerr");
-      $ftr = sprintf("%-${maxNlen}20s%-17s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s","sum",@plSum[1..9]);
+      $ftr = sprintf("%-${maxNlen}s%-17s|%-18s|%-19s|%-18s|%-15s|%-18s#%-18s|%-18s|%-18s|%-18s","sum",@plSum[1..9]);
    }
     
-    $ret = $cmd." done:" 
+    $ret = $cmd." send to devices done:" 
            ."\n    ".$hdr  
            ."\n    ".(join "\n    ",sort @paramList)
            ."\n================================================================================================================"
