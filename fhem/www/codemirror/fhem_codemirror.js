@@ -162,16 +162,21 @@ function cm_wait(cm_editor, callback, recursions) {
         return;
     }
 
-    var cm = CodeMirror.fromTextArea(cm_editor, cm_attr);
+    // setTimeout needed for FireFox 58+, Forum #87740
+    setTimeout(function(){
+        var cm = CodeMirror.fromTextArea(cm_editor, cm_attr);
 
-    if (cm_attr.autocomplete && cm_attr.autocompleteAlways) {
-        cm.on("keyup", function (cm, event) {
-            if ( !cm.state.completionActive && String.fromCharCode(event.keyCode).match(/\w/) ) {
-                CodeMirror.commands.autocomplete(cm, null, {completeSingle: false});
-            }
-        });
-    }
+        if (cm_attr.autocomplete && cm_attr.autocompleteAlways) {
+            cm.on("keyup", function (cm, event) {
+                if ( !cm.state.completionActive &&
+                     String.fromCharCode(event.keyCode).match(/\w/) ) {
+                    CodeMirror.commands.autocomplete(cm, null, 
+                        {completeSingle: false});
+                }
+            });
+        }
 
-    if(callback)
-        callback(cm);
+        if(callback)
+            callback(cm);
+      }, 10);
 }
