@@ -1369,7 +1369,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
   }
 
- if ($mh{msgStat}){
+  if ($mh{msgStat}){
     if   ($mh{msgStat} =~ m/^AESKey/){
       push @evtEt,[$mh{devH},1,"aesKeyNbr:".substr($mh{msgStat},7)];
       $mh{msgStat} = ""; # already processed
@@ -1423,8 +1423,6 @@ sub CUL_HM_Parse($$) {#########################################################
     }
   }
   CUL_HM_eventP($mh{devH},"Evt_$mh{msgStat}")if ($mh{msgStat});#log io-events
-  CUL_HM_eventP($mh{devH},"Rcv");
-  CUL_HM_eventP($mh{devH},"RcvB") if($mh{mFlgH} & 1);#burst msg received
   my $target = " (to $mh{dstN})";
   $mh{st} = AttrVal($mh{devN}, "subType", "");
   $mh{md} = AttrVal($mh{devN}, "model"  , "");
@@ -1461,6 +1459,8 @@ sub CUL_HM_Parse($$) {#########################################################
   delete $mh{devH}->{helper}{rpt};# new message, rm recent ack
   my @ack; # ack and responses, might be repeated
   
+  CUL_HM_eventP($mh{devH},"Rcv");
+  CUL_HM_eventP($mh{devH},"RcvB") if($mh{mFlgH} & 0x10);#burst msg received
   CUL_HM_DumpProtocol("RCV",$iohash,$mh{len},$mh{mNo},$mh{mFlg},$mh{mTp},$mh{src},$mh{dst},$mh{p});
 
   #----------start valid messages parsing ---------
@@ -7011,7 +7011,7 @@ sub CUL_HM_SndCmd($$) {
   IOWrite($hash, "", $cmd);
   CUL_HM_statCnt($ioName,"s",hex(substr($cmd2,0,2)));
   CUL_HM_eventP($hash,"Snd");
-  CUL_HM_eventP($hash,"SndB") if (hex(substr($cmd2,0,2)) & 1);
+  CUL_HM_eventP($hash,"SndB") if (hex(substr($cmd2,0,2)) & 0x10);
   CUL_HM_responseSetup($hash,$cmd);
   $cmd =~ m/^As(..)(..)(..)(..)(......)(......)(.*)/;
   CUL_HM_DumpProtocol("SND", $io, ($1,$2,$3,$4,$5,$6,$7));
@@ -7046,7 +7046,7 @@ sub CUL_HM_statCnt(@) {# set msg statistics for (r)ecive (s)end or (u)pdate
   }
   if ($dir ne "u"){
     $stat->{$dir}{$ioName}{h}{$l[2]}++;
-    if (defined($typ) && ($typ & 1)){
+    if (defined($typ) && ($typ & 0x10)){
       $stat->{$dir."b"}{$ioName}{h}{$l[2]}++;
     }
   }
@@ -7171,7 +7171,7 @@ sub CUL_HM_respPendTout($) {
           $pHash->{rspWait}{cmd} = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
         }
         IOWrite($hash, "", $pHash->{rspWait}{cmd});
-        CUL_HM_eventP($hash,"SndB")          if(hex(substr($pHash->{rspWait}{cmd},6,2)) & 1);
+        CUL_HM_eventP($hash,"SndB")          if(hex(substr($pHash->{rspWait}{cmd},6,2)) & 0x10);
         CUL_HM_statCnt($hash->{IODev}{NAME},"s",hex(substr($pHash->{rspWait}{cmd},6,2)));
         InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
       }
@@ -7318,7 +7318,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
   if ($evntType eq "Rcv"){
     $hash->{"protLastRcv"} = TimeNow();
     CUL_HM_UpdtReadSingle($hash,".protLastRcv",$hash->{"protLastRcv"},0);
-    return;
+#    return;
   }
   my $evnt = $hash->{"prot".$evntType} ? $hash->{"prot".$evntType} : "0";
   my ($evntCnt,undef) = split(' last_at:',$evnt);
