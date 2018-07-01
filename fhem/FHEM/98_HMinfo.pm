@@ -1175,18 +1175,25 @@ sub HMinfo_GetFn($@) {#########################################################
       $maxNlen = $nl if($nl > $maxNlen);
       my ($found,$para) = HMinfo_getParam($id,
                              ,"protState","protCmdPend","protSnd"
-                             ,"protSndB","protLastRcv"
+                             ,"protSndB","protRcv","protRcvB"
                              ,"protResnd","protCmdDel","protResndFail","protNack","protIOerr");
       $para =~ s/( last_at|20..-|\|)//g;
       my @pl = split "\t",$para;
       foreach (@pl){
         $_ =~ s/\s+$|//g ;
         $_ =~ s/CMDs_//;
-        $_ =~ s/:*..-.. ..:..:..//g if ($type eq "short");
+        
+        if ($type eq "short"){
+          $_ =~ s/:*..-.. ..:..:..//g;# if ($type eq "short");
+        }
+        elsif($_ =~m /^[ ,0-9]{1,5}:/)
+          {my ($cnt,$date) = split(":",$_,2);
+           $_ = sprintf("%-5s%s",$cnt,$date);
+        }
         $_ =~ s/CMDs // if ($type eq "short");
       }
 
-      for (1..9){
+      for (1..11){
         my ($x) =  $pl[$_] =~ /(\d+)/;
         $plSum[$_] += $x if ($x);
       }
@@ -1198,7 +1205,7 @@ sub HMinfo_GetFn($@) {#########################################################
     my @paramList;
     if ($type eq "short"){
       push @paramList, sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
-                    @{$_}[0..3],@{$_}[6..10]) foreach(@paramList2);
+                    @{$_}[0..3],@{$_}[7..11]) foreach(@paramList2);
       $hdr = sprintf("%-${maxNlen}s:%-16s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
                                ,"name","State","CmdPend"
                                ,"Snd"
@@ -1207,15 +1214,15 @@ sub HMinfo_GetFn($@) {#########################################################
       $ftr = sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s","sum",@plSum[1..3],@plSum[5..9]);
     }
     else{
-      push @paramList, sprintf("%-${maxNlen}s%-17s|%-18s|%-19s|%-18s|%-15s|%-18s#%-18s|%-18s|%-18s|%-18s",
+      push @paramList, sprintf("%-${maxNlen}s%-17s|%-18s|%-19s|%-19s|%-19s|%-19s|%-19s#%-18s|%-19s|%-19s|%-19s",
                     @{$_}[0..10]) foreach(@paramList2);
-      $hdr = sprintf("%-${maxNlen}s:%-16s|%-18s|%-19s|%-18s|%-15s|%-18s#%-18s|%-18s|%-18s|%-18s",
+      $hdr = sprintf("%-${maxNlen}s:%-16s|%-18s|%-19s|%-19s|%-19s|%-19s|%-19s#%-18s|%-19s|%-19s|%-19s",
                                ,"name","State","CmdPend"
                                ,"Snd"
-                               ,"SndB","LastRcv"
+                               ,"SndB","Rcv","RcvB"
                                ,"Resnd"
                                ,"CmdDel","ResndFail","Nack","IOerr");
-      $ftr = sprintf("%-${maxNlen}s%-17s|%-18s|%-19s|%-18s|%-15s|%-18s#%-18s|%-18s|%-18s|%-18s","sum",@plSum[1..9]);
+      $ftr = sprintf("%-${maxNlen}s%-17s|%-18s|%-19s|%-19s|%-19s|%-19s|%-19s#%-18s|%-19s|%-19s|%-19s","sum",@plSum[1..9]);
    }
     
     $ret = $cmd." send to devices done:" 
