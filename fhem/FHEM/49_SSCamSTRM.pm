@@ -28,6 +28,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 1.2.2  26.06.2018    make changes for generic stream dev
 # 1.2.1  23.06.2018    no name add-on if MODEL is snapgallery
 # 1.2.0  20.06.2018    running stream as human readable entry for SSCamSTRM-Device
 # 1.1.0  16.06.2018    attr hideDisplayName regarding to Forum #88667
@@ -44,7 +45,7 @@ package main;
 use strict;
 use warnings;
 
-my $SSCamSTRMVersion = "1.2.1";
+my $SSCamSTRMVersion = "1.2.2";
 
 ################################################################
 sub SSCamSTRM_Initialize($) {
@@ -116,7 +117,7 @@ sub SSCamSTRM_FwFn($$$$) {
   return undef if(IsDisabled($d));
 
   $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
-  my $show = $defs{$hash->{PARENT}}->{HELPER}{ACTSTRM} if($hash->{MODEL} !~ /snapgallery/);
+  my $show = $defs{$hash->{PARENT}}->{HELPER}{ACTSTRM} if($hash->{MODEL} =~ /switched/);
   $show = $show?"($show)":"";
 
   my $alias = AttrVal($d, "alias", $d);                            # Linktext als Aliasname oder Devicename setzen
