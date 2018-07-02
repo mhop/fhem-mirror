@@ -26,8 +26,9 @@
 #
 #
 #################################################################################################################
-# Versions History done by DS_Starter
+# Versions History by DS_Starter
 #
+# 2.10.0   29.06.2018      Internal MODEL added
 # 2.9.2    08.10.2017      adapted to use extended abortArg (Forum:77472)
 # 2.9.1    24.04.2017      fix for issue #24 (Wrong INV_TYPE for STP10000TL-20) and fix for issue #25 (unpack out of range for SB1.5-1VL-40)
 # 2.9.0    23.04.2017      fixed issue #22: wrong logon command for SunnyBoy systems
@@ -81,7 +82,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Blocking;
 use Time::Local;
 
-my $SMAInverterVersion = "2.9.2";
+my $SMAInverterVersion = "2.10.0";
 
 # Inverter Data fields and supported commands flags.
 # $inv_SPOT_ETODAY                # Today yield
@@ -949,6 +950,7 @@ sub getstatus_ParseDone ($) {
  foreach my $row (@row_array) {
      chomp $row;
 	 my @a = split(" ", $row, 2);
+     $hash->{MODEL} = $a[1] if($a[0] eq "device_type");
      readingsBulkUpdate($hash, $a[0], $a[1]);
  }
  readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));  
