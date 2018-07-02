@@ -249,7 +249,7 @@ sub TPLinkHS110_Set($$)
 	my $cmdList = "on off";
     my($success,$json,$realtimejson);
 	return "\"set $name\" needs at least one argument" unless(defined($cmd));
-	return "Device disabled in config" if ($attr{$name}{"disable"} eq "1");
+	return if ($attr{$name}{"disable"} eq "1");
    	Log3 $hash, 3, "TPLinkHS110: $name Set <". $cmd ."> called" if ($cmd !~ /\?/);
 		
 	my $command="";
