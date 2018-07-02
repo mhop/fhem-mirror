@@ -210,6 +210,8 @@ SD_WS07_Parse($$)
         #my $battery = ReadingsVal($name, "battery", "unknown");
         #if ($bat ne $battery) {
            readingsBulkUpdate($hash, "battery", $bat);
+           readingsBulkUpdate($hash, "batteryState", $bat);
+           
         #}
     }
     readingsBulkUpdate($hash, "channel", $channel) if ($channel ne "");

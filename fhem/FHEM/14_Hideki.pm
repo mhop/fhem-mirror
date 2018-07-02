@@ -216,6 +216,7 @@ Hideki_Parse($$)
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "state", $val);
 	readingsBulkUpdate($hash, "battery", $bat)   if ($bat ne "");
+	readingsBulkUpdate($hash, "batteryState", $bat)   if ($bat ne "");
 	readingsBulkUpdate($hash, "channel", $channel) if ($channel ne "");
 	readingsBulkUpdate($hash, "temperature", $temp) if ($temp ne "");
 	readingsBulkUpdate($hash, "package_number", $count) if ($count ne "");

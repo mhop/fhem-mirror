@@ -412,6 +412,8 @@
           readingsBulkUpdate($hash, "temperature", $temp)  if ($temp ne"");
           readingsBulkUpdate($hash, "humidity", $hum)  if ($hum ne "" && $hum != 0 );
           readingsBulkUpdate($hash, "battery", $bat)   if ($bat ne "");
+		  readingsBulkUpdate($hash, "batteryState", $bat)   if ($bat ne "");
+          
           #zusätzlich Daten für Wetterstation
           readingsBulkUpdate($hash, "rain", $rain );
           readingsBulkUpdate($hash, ".rainOffset", $rain_offset );	# Zwischenspeicher für den offset
