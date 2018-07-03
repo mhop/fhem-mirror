@@ -1167,7 +1167,7 @@ sub HMinfo_GetFn($@) {#########################################################
     $type = "short" if(!$type);
     my @paramList2;
     my @IOlist;
-    my @plSum; push @plSum,0 for (0..9);#prefill
+    my @plSum; push @plSum,0 for (0..11);#prefill
     my $maxNlen = 3;
     foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
       my $id = $defs{$dName}{DEF};
@@ -1211,18 +1211,18 @@ sub HMinfo_GetFn($@) {#########################################################
                                ,"Snd"
                                ,"Resnd"
                                ,"CmdDel","ResndFail","Nack","IOerr");
-      $ftr = sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s","sum",@plSum[1..3],@plSum[5..9]);
+      $ftr = sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s","sum",@plSum[1..3],@plSum[5..11]);
     }
     else{
       push @paramList, sprintf("%-${maxNlen}s%-17s|%-18s|%-19s|%-19s|%-19s|%-19s|%-19s#%-18s|%-19s|%-19s|%-19s",
-                    @{$_}[0..10]) foreach(@paramList2);
+                    @{$_}[0..11]) foreach(@paramList2);
       $hdr = sprintf("%-${maxNlen}s:%-16s|%-18s|%-19s|%-19s|%-19s|%-19s|%-19s#%-18s|%-19s|%-19s|%-19s",
                                ,"name","State","CmdPend"
                                ,"Snd"
                                ,"SndB","Rcv","RcvB"
                                ,"Resnd"
                                ,"CmdDel","ResndFail","Nack","IOerr");
-      $ftr = sprintf("%-${maxNlen}s%-17s|%-18s|%-19s|%-19s|%-19s|%-19s|%-19s#%-18s|%-19s|%-19s|%-19s","sum",@plSum[1..9]);
+      $ftr = sprintf("%-${maxNlen}s%-17s|%-18s|%-19s|%-19s|%-19s|%-19s|%-19s#%-18s|%-19s|%-19s|%-19s","sum",@plSum[1..11]);
    }
     
     $ret = $cmd." send to devices done:" 
