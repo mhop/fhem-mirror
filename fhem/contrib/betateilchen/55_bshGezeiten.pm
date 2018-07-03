@@ -150,11 +150,12 @@ sub _bsh_decode($) {
   $ort = latin1ToUtf8($ort);
   my @values = $tree->findvalues(q{//table//tr});
   my $counter = 0;
-  my $year = (split(/ /,localtime(time)))[4];
+  my $year = (localtime(time))[5] + 1900;
   readingsBeginUpdate($hash);
   foreach my $v (@values){
     next if(length($v) < 2);
     #Sa16.12.HW03:09 4.0�m
+    #Di03.07.NW11:30 0.6�m
     my $d = substr($v,2,6);
     my $w = substr($v,8,2);
        $w =~ s/NW/LW/ if (lc(AttrVal($name,'bsh_language',"en")) eq 'en');
