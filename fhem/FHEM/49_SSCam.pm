@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 6.0.0  03.07.2018    HTTPS Support, buttons for refresh SSCamSTRM-devices
 # 5.3.0  29.06.2018    changes regarding to "createStreamDev ... generic", refresh reading parentState of all 
 #                      SSCamSTRM devices with PARENT=SSCam-device, control elements for runView within fhemweb, 
 #                      new CamLive.*-Readings, minor fixes
@@ -243,7 +244,7 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "5.3.0";
+my $SSCamVersion = "6.0.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -361,13 +362,15 @@ sub SSCam_Define($@) {
   my $camname    = $a[2];
   my $serveraddr = $a[3];
   my $serverport = $a[4] ? $a[4] : 5000;
+  my $proto      = $a[5] ? $a[5] : "http";
   
   $hash->{SERVERADDR} = $serveraddr;
   $hash->{SERVERPORT} = $serverport;
   $hash->{CAMNAME}    = $camname;
   $hash->{VERSION}    = $SSCamVersion;
   $hash->{MODEL}      = ($camname =~ m/^SVS$/i)?"SVS":"CAM";                     # initial, CAM wird später ersetzt durch CamModel
- 
+  $hash->{PROTOCOL}   = $proto;
+  
   # benötigte API's in $hash einfügen
   $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
   $hash->{HELPER}{APIAUTH}        = "SYNO.API.Auth";                             # API used to perform session login and logout
@@ -966,7 +969,8 @@ sub SSCam_Set($@) {
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw_hls";
 		  $hash->{HELPER}{ACTSTRM}    = "HLS Livestream";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "lastsnap_fw") {
-          $hash->{HELPER}{LSNAPBYSTRMDEV} = 1 if ($prop1);   # $prop1 wird mitgegeben durch lastsnap_fw by SSCamSTRM-Device
+          $hash->{HELPER}{LSNAPBYSTRMDEV}  = 1 if($prop1);   # Anzeige durch SSCamSTRM-Device ausgelöst
+          $hash->{HELPER}{LSNAPBYDEV}  = 1 if(!$prop1);      # Anzeige durch SSCam ausgelöst
           $hash->{HELPER}{OPENWINDOW}  = 0;
           $hash->{HELPER}{WLTYPE}      = "base64img"; 
 		  $hash->{HELPER}{ALIAS}       = " ";
@@ -987,6 +991,13 @@ sub SSCam_Set($@) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       SSCam_hlsactivate($hash);
         
+  } elsif ($opt eq "refresh" && SSCam_IsModelCam($hash)) {
+      # ohne SET-Menüeintrag
+      if($prop =~ /STRM/) {
+          # Event in allen SSCamSTRM-Devices erzeugen um Contentwiedergabe aufzufrischen
+          SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
+      }
+      
   } elsif ($opt eq "extevent" && !SSCam_IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
                                    
@@ -1036,7 +1047,7 @@ sub SSCam_Get($@) {
 	my $getlist;
 
 	if(SSCam_IsModelCam($hash)) {
-	    # selist für Cams
+	    # getlist für Cams
 	    $getlist = "Unknown argument $opt, choose one of ".
                    "caminfoall:noArg ".
 				   "caminfo:noArg ".
@@ -1052,7 +1063,7 @@ sub SSCam_Get($@) {
 				   "scanVirgin:noArg "
                    ;
 	} else {
-        # setlist für SVS Devices
+        # getlist für SVS Devices
 	    $getlist = "Unknown argument $opt, choose one of ".
 		           "caminfoall:noArg ".
 				   ($hash->{HELPER}{APIHMMAXVER}?"homeModeState:noArg ": "").
@@ -3038,7 +3049,8 @@ sub SSCam_getapisites($) {
    my $apivideostms = $hash->{HELPER}{APIVIDEOSTMS};
    my $apistm      = $hash->{HELPER}{APISTM};
    my $apihm       = $hash->{HELPER}{APIHM};
-   my $apilog      = $hash->{HELPER}{APILOG};     
+   my $apilog      = $hash->{HELPER}{APILOG};
+   my $proto       = $hash->{PROTOCOL};   
    my $url;
    my $param;
   
@@ -3058,7 +3070,7 @@ sub SSCam_getapisites($) {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apipreset,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm,$apilog,$apiaudiostm,$apivideostms";
+   $url = "$proto://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apipreset,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm,$apilog,$apiaudiostm,$apivideostms";
 
    Log3($name, 4, "$name - Call-Out now: $url");
    
@@ -3480,6 +3492,7 @@ sub SSCam_getcamid ($) {
    my $apicampath   = $hash->{HELPER}{APICAMPATH};
    my $apicammaxver = $hash->{HELPER}{APICAMMAXVER};
    my $sid          = $hash->{HELPER}{SID};
+   my $proto        = $hash->{PROTOCOL};
    
    my $url;
     
@@ -3495,9 +3508,9 @@ sub SSCam_getcamid ($) {
    my $httptimeout = AttrVal($name,"httptimeout", 4);
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
-   $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
+   $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
    if ($apicammaxver >= 9) {
-       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=\"List\"&basic=true&streamInfo=true&camStm=0&_sid=\"$sid\"";
+       $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=\"List\"&basic=true&streamInfo=true&camStm=0&_sid=\"$sid\"";
    }
  
    Log3($name, 4, "$name - Call-Out now: $url");
@@ -3687,6 +3700,7 @@ sub SSCam_camop ($) {
    my $sid                = $hash->{HELPER}{SID};
    my $OpMode             = $hash->{OPMODE};
    my $camid              = $hash->{CAMID};
+   my $proto              = $hash->{PROTOCOL};
    my ($exturl,$winname,$attr,$room,$param);
    my ($url,$snapid,$httptimeout,$expmode,$motdetsc);
        
@@ -3698,19 +3712,19 @@ sub SSCam_camop ($) {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
    
    if ($OpMode eq "Start") {
-      $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&_sid=\"$sid\"";
       if($apiextrecmaxver >= 3) {
-          $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraIds=$camid&action=start&_sid=\"$sid\"";
+          $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraIds=$camid&action=start&_sid=\"$sid\"";
       }
    } elsif ($OpMode eq "Stop") {
-      $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&_sid=\"$sid\"";
       if($apiextrecmaxver >= 3) {
-          $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraIds=$camid&action=stop&_sid=\"$sid\"";
+          $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraIds=$camid&action=stop&_sid=\"$sid\"";
       }   
    
    } elsif ($OpMode eq "Snap") {
       # ein Schnappschuß wird ausgelöst
-      $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "snap", 1); 
       readingsSingleUpdate($hash, "LastSnapId", "", 0);
    
@@ -3720,22 +3734,22 @@ sub SSCam_camop ($) {
 	  my $imgsize = $hash->{HELPER}{SNAPIMGSIZE};
 	  my $keyword = $hash->{HELPER}{KEYWORD};
 	  Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
-      $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "getsnapfilename") {
       # der Filename der aktuellen Schnappschuß-ID wird ermittelt
       $snapid = ReadingsVal("$name", "LastSnapId", " ");
       Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
-      $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&imgSize=\"0\"&idList=\"$snapid\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&imgSize=\"0\"&idList=\"$snapid\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "gopreset") {
       # Preset wird angefahren
       $apiptzmaxver = ($apiptzmaxver >= 5)?4:$apiptzmaxver;
-	  $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+	  $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "getPresets") {
       # Liste der Presets abrufen
-	  $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"Enum\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+	  $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"Enum\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
    
    } elsif ($OpMode eq "setPreset") {
       # einen Preset setzen
@@ -3743,65 +3757,65 @@ sub SSCam_camop ($) {
       my $pname   = $hash->{HELPER}{PNAME};
       my $pspeed  = $hash->{HELPER}{PSPEED};
       if ($pspeed) {
-	      $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&speed=\"$pspeed\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+	      $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&speed=\"$pspeed\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
       } else {
-	      $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&cameraId=\"$camid\"&_sid=\"$sid\"";       
+	      $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&cameraId=\"$camid\"&_sid=\"$sid\"";       
       }
       
    } elsif ($OpMode eq "delPreset") {
       # einen Preset löschen
-	  $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"DelPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{DELPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+	  $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"DelPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{DELPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
    
    } elsif ($OpMode eq "setHome") {
       # aktuelle Position als Home setzen
       if($hash->{HELPER}{SETHOME} eq "---currentPosition---") {
-          $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetHome\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetHome\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
       } else {
           my $bindpos = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{SETHOME}};
-	      $url = "http://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetHome\"&bindPosition=\"$bindpos\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+	      $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetHome\"&bindPosition=\"$bindpos\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
       }
       
    } elsif ($OpMode eq "startTrack") {
       # Object Tracking einschalten
-	  $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+	  $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&cameraId=\"$camid\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "stopTrack") {
       # Object Tracking stoppen
-	  $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&moveType=\"Stop\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+	  $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&moveType=\"Stop\"&cameraId=\"$camid\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "runpatrol") {
       # eine Überwachungstour starten
-      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"RunPatrol\"&patrolId=\"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"RunPatrol\"&patrolId=\"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "goabsptz") {
-      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"AbsPtz\"&cameraId=\"$camid\"&posX=\"$hash->{HELPER}{GOPTZPOSX}\"&posY=\"$hash->{HELPER}{GOPTZPOSY}\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"AbsPtz\"&cameraId=\"$camid\"&posX=\"$hash->{HELPER}{GOPTZPOSX}\"&posY=\"$hash->{HELPER}{GOPTZPOSY}\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "movestart") {
-      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&speed=\"3\"&moveType=\"Start\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&speed=\"3\"&moveType=\"Start\"&_sid=\"$sid\"";
       
    } elsif ($OpMode eq "movestop") {
       Log3($name, 4, "$name - Stop Camera $hash->{CAMNAME} moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
-      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&moveType=\"Stop\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&moveType=\"Stop\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "Enable") {
-      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Enable&cameraIds=$camid&_sid=\"$sid\"";     
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Enable&cameraIds=$camid&_sid=\"$sid\"";     
       if($apicammaxver >= 9) {
-	      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicammaxver&method=\"Enable\"&idList=\"$camid\"&_sid=\"$sid\"";     
+	      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicammaxver&method=\"Enable\"&idList=\"$camid\"&_sid=\"$sid\"";     
 	  }
    
    } elsif ($OpMode eq "Disable") {
-      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
       if($apicammaxver >= 9) {
-	      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicammaxver&method=\"Disable\"&idList=\"$camid\"&_sid=\"$sid\"";     
+	      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicammaxver&method=\"Disable\"&idList=\"$camid\"&_sid=\"$sid\"";     
 	  }
 	  
    } elsif ($OpMode eq "sethomemode") {
       my $sw = $hash->{HELPER}{HOMEMODE};     # HomeMode on,off
 	  $sw  = ($sw eq "on")?"true":"false";
-      $url = "http://$serveraddr:$serverport/webapi/$apihmpath?on=$sw&api=$apihm&method=Switch&version=$apihmmaxver&_sid=\"$sid\"";     
+      $url = "$proto://$serveraddr:$serverport/webapi/$apihmpath?on=$sw&api=$apihm&method=Switch&version=$apihmmaxver&_sid=\"$sid\"";     
    
    } elsif ($OpMode eq "gethomemodestate") {
-      $url = "http://$serveraddr:$serverport/webapi/$apihmpath?api=$apihm&method=GetInfo&version=$apihmmaxver&_sid=\"$sid\"";     
+      $url = "$proto://$serveraddr:$serverport/webapi/$apihmpath?api=$apihm&method=GetInfo&version=$apihmmaxver&_sid=\"$sid\"";     
    
    } elsif ($OpMode eq "getsvslog") {
       my $sev = $hash->{HELPER}{LISTLOGSEVERITY}?$hash->{HELPER}{LISTLOGSEVERITY}:"";
@@ -3815,14 +3829,14 @@ sub SSCam_camop ($) {
       Log3($name,4, "$name - get logList with params: severity => $hash->{HELPER}{LISTLOGSEVERITY}, limit => $lim, matchcode => $hash->{HELPER}{LISTLOGMATCH}");
       use warnings;
 	  
-	  $url = "http://$serveraddr:$serverport/webapi/$apilogpath?api=$apilog&version=\"2\"&method=\"List\"&time2String=\"no\"&level=\"$sev\"&limit=\"$lim\"&keyword=\"$mco\"&_sid=\"$sid\"";     
+	  $url = "$proto://$serveraddr:$serverport/webapi/$apilogpath?api=$apilog&version=\"2\"&method=\"List\"&time2String=\"no\"&level=\"$sev\"&limit=\"$lim\"&keyword=\"$mco\"&_sid=\"$sid\"";     
 
 	  delete($hash->{HELPER}{LISTLOGSEVERITY});
 	  delete($hash->{HELPER}{LISTLOGLIMIT});
 	  delete($hash->{HELPER}{LISTLOGMATCH});
 	  
    } elsif ($OpMode eq "getsvsinfo") {
-      $url = "http://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfomaxver\"&method=\"GetInfo\"&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfomaxver\"&method=\"GetInfo\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "setoptpar") {
       my $mirr = $hash->{HELPER}{MIRROR}?$hash->{HELPER}{MIRROR}:ReadingsVal("$name","CamVideoMirror","");
@@ -3831,33 +3845,33 @@ sub SSCam_camop ($) {
 	  my $ntp  = $hash->{HELPER}{NTPSERV}?$hash->{HELPER}{NTPSERV}:ReadingsVal("$name","CamNTPServer","");
 	  my $clst = $hash->{HELPER}{CHKLIST}?$hash->{HELPER}{CHKLIST}:"";
 	  $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&vdoMirror=$mirr&vdoRotation=$rot&vdoFlip=$flip&timeServer=\"$ntp\"&camParamChkList=$clst&cameraIds=\"$camid\"&_sid=\"$sid\"";  
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&vdoMirror=$mirr&vdoRotation=$rot&vdoFlip=$flip&timeServer=\"$ntp\"&camParamChkList=$clst&cameraIds=\"$camid\"&_sid=\"$sid\"";  
              
    } elsif ($OpMode eq "Getcaminfo") {
       $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=\"true\"&streamInfo=\"true\"&ptz=\"true\"&basic=\"true\"&camAppInfo=\"true\"&optimize=\"true\"&fisheye=\"true\"&eventDetection=\"true\"&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=\"true\"&streamInfo=\"true\"&ptz=\"true\"&basic=\"true\"&camAppInfo=\"true\"&optimize=\"true\"&fisheye=\"true\"&eventDetection=\"true\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "getStmUrlPath") {
-      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetStmUrlPath\"&cameraIds=\"$camid\"&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetStmUrlPath\"&cameraIds=\"$camid\"&_sid=\"$sid\"";   
       if($apicammaxver >= 9) {
-	      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&method=\"GetLiveViewPath\"&version=$apicammaxver&idList=\"$camid\"&_sid=\"$sid\"";   
+	      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&method=\"GetLiveViewPath\"&version=$apicammaxver&idList=\"$camid\"&_sid=\"$sid\"";   
 	  }
    
    } elsif ($OpMode eq "geteventlist") {
       # Abruf der Events einer Kamera
-      $url = "http://$serveraddr:$serverport/webapi/$apieventpath?api=\"$apievent\"&version=\"$apieventmaxver\"&method=\"List\"&cameraIds=\"$camid\"&locked=\"0\"&blIncludeSnapshot=\"false\"&reason=\"\"&limit=\"2\"&includeAllCam=\"false\"&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apieventpath?api=\"$apievent\"&version=\"$apieventmaxver\"&method=\"List\"&cameraIds=\"$camid\"&locked=\"0\"&blIncludeSnapshot=\"false\"&reason=\"\"&limit=\"2\"&includeAllCam=\"false\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "Getptzlistpreset") {
-      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPreset&cameraId=$camid&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPreset&cameraId=$camid&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "Getcapabilities") {
       # Capabilities einer Cam werden abgerufen
 	  $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=\"GetCapabilityByCamId\"&cameraId=$camid&_sid=\"$sid\"";    
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=\"GetCapabilityByCamId\"&cameraId=$camid&_sid=\"$sid\"";    
    
    } elsif ($OpMode eq "Getptzlistpatrol") {
       # PTZ-ListPatrol werden abgerufen
-      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPatrol&cameraId=$camid&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPatrol&cameraId=$camid&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "ExpMode") {
       if ($hash->{HELPER}{EXPMODE} eq "auto") {
@@ -3870,7 +3884,7 @@ sub SSCam_camop ($) {
           $expmode = "2";
       }
 	  $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=\"$expmode\"&camParamChkList=32&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=\"$expmode\"&camParamChkList=32&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "MotDetSc") {
       # Hash für Optionswerte sichern für Logausgabe in Befehlsauswertung
@@ -3878,7 +3892,7 @@ sub SSCam_camop ($) {
         
       if ($hash->{HELPER}{MOTDETSC} eq "disable") {
           $motdetsc = "-1";
-          $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
+          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
       } elsif ($hash->{HELPER}{MOTDETSC} eq "camera") {
           $motdetsc = "0";
           
@@ -3886,7 +3900,7 @@ sub SSCam_camop ($) {
           $motdetoptions{OBJECTSIZE}  = $hash->{'HELPER'}{'MOTDETSC_PROP2'} if ($hash->{'HELPER'}{'MOTDETSC_PROP2'});
           $motdetoptions{PERCENTAGE}  = $hash->{'HELPER'}{'MOTDETSC_PROP3'} if ($hash->{'HELPER'}{'MOTDETSC_PROP3'});
           
-          $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&_sid=\"$sid\"";
+          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&_sid=\"$sid\"";
           
           if ($hash->{HELPER}{MOTDETSC_PROP1} || $hash->{HELPER}{MOTDETSC_PROP2} || $hash->{HELPER}{MOTDETSC_PROP13}) {
               # umschalten und neue Werte setzen
@@ -3921,7 +3935,7 @@ sub SSCam_camop ($) {
           $motdetoptions{THRESHOLD}   = $hash->{'HELPER'}{'MOTDETSC_PROP2'} if ($hash->{'HELPER'}{'MOTDETSC_PROP2'});
       
           # nur Umschaltung, alte Werte beibehalten
-          $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
+          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
 
           if ($hash->{HELPER}{MOTDETSC_PROP1}) {
               # der Wert für Bewegungserkennung SVS -> Empfindlichkeit ist gesetzt
@@ -3939,29 +3953,29 @@ sub SSCam_camop ($) {
       $hash->{HELPER}{MOTDETOPTIONS} = \%motdetoptions;
    
    } elsif ($OpMode eq "getmotionenum") {
-      $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MotionEnum\"&camId=\"$camid\"&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MotionEnum\"&camId=\"$camid\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "extevent") {
       Log3($name, 4, "$name - trigger external event \"$hash->{HELPER}{EVENTID}\"");
-      $url = "http://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtmaxver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtmaxver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/) {    
       if ($hash->{HELPER}{RUNVIEW} =~ m/live/) {
-          $hash->{HELPER}{AUDIOLINK} = "http://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
+          $hash->{HELPER}{AUDIOLINK} = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
           # externe URL in Reading setzen
-          $exturl = AttrVal($name, "livestreamprefix", "http://$serveraddr:$serverport");
+          $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
           $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
           readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
           # interne URL
-          $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+          $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
       } else {
           # Abspielen der letzten Aufnahme (EventId)
           # externe URL in Reading setzen
-          $exturl = AttrVal($name, "livestreamprefix", "http://$serveraddr:$serverport");
+          $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
           $exturl .= "/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid"; 
           readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
           # interne URL          
-          $url = "http://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid";   
+          $url = "$proto://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid";   
       }
        
       # Liveview-Link in Hash speichern
@@ -3996,20 +4010,20 @@ sub SSCam_camop ($) {
 	  my $limit   = 1;                # nur 1 Snap laden, für lastsnap_fw 
 	  my $imgsize = 2;                # full size image, für lastsnap_fw 
 	  my $keyword = $hash->{CAMNAME}; # nur Snaps von $camname selektieren, für lastsnap_fw   
-      $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
    
    } elsif (($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) || $OpMode eq "activate_hls") {
       # HLS Livestreaming aktivieren
       $httptimeout = $httptimeout+90; # aktivieren HLS dauert lange !
-      $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Open&cameraId=$camid&format=hls&_sid=$sid"; 
+      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Open&cameraId=$camid&format=hls&_sid=$sid"; 
    
    } elsif ($OpMode eq "stopliveview_hls" || $OpMode eq "reactivate_hls") {
       # HLS Livestreaming deaktivieren
-      $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Close&cameraId=$camid&format=hls&_sid=$sid"; 
+      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Close&cameraId=$camid&format=hls&_sid=$sid"; 
    
    } elsif ($OpMode eq "getstreamformat") {
       # aktuelles Streamformat abfragen
-      $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Query&cameraId=$camid&_sid=$sid"; 
+      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Query&cameraId=$camid&_sid=$sid"; 
    }
    
    Log3($name, 4, "$name - Call-Out now: $url");
@@ -4043,6 +4057,7 @@ sub SSCam_camop_parse ($) {
    my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
    my $apicammaxver       = $hash->{HELPER}{APICAMMAXVER}; 
    my $sid                = $hash->{HELPER}{SID};
+   my $proto              = $hash->{PROTOCOL};
    my ($rectime,$data,$success);
    my ($error,$errorcode);
    my ($snapid,$camLiveMode,$update_time);
@@ -4452,8 +4467,11 @@ sub SSCam_camop_parse ($) {
                     SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
                     delete $hash->{HELPER}{SNAPBYSTRMDEV};
                     delete $hash->{HELPER}{LSNAPBYSTRMDEV};
+                } elsif ($hash->{HELPER}{LSNAPBYDEV}) {
+                    SSCam_refresh($hash,0,1,0);     # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
+                    delete $hash->{HELPER}{LSNAPBYDEV};
                 } else {
-                    SSCam_refresh($hash,0,1,1);     # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
+                    SSCam_refresh($hash,0,0,0);     # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
                 } 
                 
                 Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
@@ -4462,11 +4480,11 @@ sub SSCam_camop_parse ($) {
                 # HLS Streaming wurde aktiviert
                 $hash->{HELPER}{HLSSTREAM} = "active";
                 # externe LivestreamURL setzen
-                my $exturl = AttrVal($name, "livestreamprefix", "http://$serveraddr:$serverport");
+                my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
                 $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
                 readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
                 
-                my $url = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
+                my $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
                 # Liveview-Link in Hash speichern und Aktivitätsstatus speichern
                 $hash->{HELPER}{LINK}      = $url;
                 Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated, Streaming-URL: $url") if(AttrVal($name,"verbose",3) == 4);
@@ -5214,6 +5232,7 @@ sub SSCam_login ($$) {
   my $apiauth       = $hash->{HELPER}{APIAUTH};
   my $apiauthpath   = $hash->{HELPER}{APIAUTHPATH};
   my $apiauthmaxver = $hash->{HELPER}{APIAUTHMAXVER};
+  my $proto         = $hash->{PROTOCOL};
   my $lrt = AttrVal($name,"loginRetries",3);
   my ($url,$param);
   
@@ -5254,11 +5273,11 @@ sub SSCam_login ($$) {
   my $sid = AttrVal($name, "noQuotesForSID", "0") == 1 ? "sid" : "\"sid\"";
   
   if (AttrVal($name,"session","DSM") eq "SurveillanceStation") {
-      $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
-      $urlwopw = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
+      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
   } else {
-      $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=$sid"; 
-      $urlwopw = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&format=$sid";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=$sid"; 
+      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&format=$sid";
   }
   
   AttrVal($name, "showPassInLog", "0") == 1 ? Log3($name, 4, "$name - Call-Out now: $url") : Log3($name, 4, "$name - Call-Out now: $urlwopw");
@@ -5369,6 +5388,7 @@ sub SSCam_logout ($) {
    my $apiauthpath      = $hash->{HELPER}{APIAUTHPATH};
    my $apiauthmaxver    = $hash->{HELPER}{APIAUTHMAXVER};
    my $sid              = $hash->{HELPER}{SID};
+   my $proto            = $hash->{PROTOCOL};
    my $url;
    my $param;
    my $httptimeout;
@@ -5382,9 +5402,9 @@ sub SSCam_logout ($) {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
    if (AttrVal($name,"session","DSM") eq "SurveillanceStation") {
-       $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&session=SurveillanceStation&_sid=$sid";
+       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&session=SurveillanceStation&_sid=$sid";
    } else {
-       $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&_sid=$sid";
+       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&_sid=$sid";
    }
 
    $param = {
@@ -5505,7 +5525,14 @@ return($hash,$success,$myjson);
 ######################################################################################################
 sub SSCam_refresh($$$$) { 
   my ($hash,$pload,$lpoll_scm,$lpoll_strm) = @_;
-  my $name = $hash->{NAME};
+  my $name;
+  if (ref $hash ne "HASH")
+  {
+    ($name,$pload,$lpoll_scm,$lpoll_strm) = split ",",$hash;
+    $hash = $defs{$name};
+  } else {
+    $name = $hash->{NAME};
+  }
   my $fpr  = 0;
   
   # Kontext des SSCamSTRM-Devices speichern für Refresh
@@ -5840,6 +5867,7 @@ sub SSCam_StreamDev($$$) {
   my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
   my $camid              = $hash->{CAMID};
   my $sid                = $hash->{HELPER}{SID};
+  my $proto              = $hash->{PROTOCOL};
   my ($cause,$ret,$link,$audiolink,$devWlink,$wlhash,$alias,$wlalias);
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
@@ -5871,6 +5899,8 @@ sub SSCam_StreamDev($$$) {
   my $imgrecstop    = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTOP.png\">";
   my $cmddosnap     = "cmd=set $camname snap STRM";                                                     # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
+  my $cmdrefresh    = "cmd=set $camname refresh STRM";                                                  # Refresh in SSCamSTRM-Devices
+  my $imgrefresh    = "<img src=\"$FW_ME/www/images/default/Restart.png\">";
   
   my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
   $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
@@ -5896,8 +5926,8 @@ sub SSCam_StreamDev($$$) {
   }
   
   if($fmt =~ /mjpeg/) {  
-      $link      = "http://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
-      $audiolink = "http://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
+      $link      = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+      $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
       $ret .= "<td><img src=$link $ha><br>";
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
@@ -5944,7 +5974,8 @@ sub SSCam_StreamDev($$$) {
       $ret .= "$htag";
       $ret .= "<br>";
       Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
-      
+      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";
+      $ret .= $imgblank;
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
@@ -5999,7 +6030,8 @@ sub SSCam_StreamDev($$$) {
               $ret .= "<td><iframe src=$link $ha controls autoplay>
                        Iframes disabled
                        </iframe><br>";
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";               
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";              
               $ret .= "</td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
                   $ret .= '</tr>';
@@ -6042,6 +6074,7 @@ sub SSCam_StreamDev($$$) {
                        Your browser does not support the video tag
                        </video><br>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\">$imgstop </a>";
+              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\">$imgrefresh </a>";
               $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\">$imghlsreact </a>";
               $ret .= $imgblank;
               if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
@@ -6303,23 +6336,21 @@ sub SSCam_experror {
 	The scope of application of set/get-commands is denoted to every particular command (valid for CAM, SVS, CAM/SVS).
 	<br><br>
 	
-    A camera-device is defined by: <br><br>
+    A <b>camera</b> is defined by: <br><br>
 	<ul>
-      <b><code>define &lt;name&gt; SSCAM &lt;camera name in SVS&gt; &lt;ServerAddr&gt; [Port] </code></b> <br><br>
+      <b><code>define &lt;Name&gt; SSCAM &lt;camera name in SVS&gt; &lt;ServerAddr&gt; [Port] [Protocol]</code></b> <br><br>
     </ul>
     
     At first the devices have to be set up and has to be operable in Synology Surveillance Station 7.0 and above. <br><br>
 	
-	A SVS-device to control functions of the Surveillance Station (SVS) is defined by: <br><br>
+	A <b>SVS-device</b> to control functions of the Surveillance Station (SVS) is defined by: <br><br>
 	<ul>
-	  <b><code>define &lt;name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] </code></b> <br><br>
+	  <b><code>define &lt;Name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] [Protocol] </code></b> <br><br>
     </ul>
 	
     In that case the term &lt;camera name in SVS&gt; become replaced by <b>SVS</b> only. <br><br>
     
-    The Modul SSCam ist based on functions of Synology Surveillance Station API. <br>
-    
-    Currently the HTTP-protocol is supported to call Synology Disk Station. <br><br>  
+    The Modul SSCam ist based on functions of Synology Surveillance Station API. <br><br>
 
     The parameters are in detail:
    <br>
@@ -6327,21 +6358,24 @@ sub SSCam_experror {
      
    <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
-    <tr><td>name:         </td><td>the name of the new device to use in FHEM</td></tr>
-    <tr><td>Cameraname:   </td><td>camera name as defined in Synology Surveillance Station if camera-device, "SVS" if SVS-Device. Spaces are not allowed in camera name. </td></tr>
-    <tr><td>ServerAddr:   </td><td>IP-address of Synology Surveillance Station Host. <b>Note:</b> avoid using hostnames because of DNS-Calls are not unblocking in FHEM </td></tr>
-    <tr><td>Port:         </td><td>optional - the port of synology surveillance station, if not set the default of 5000 (HTTP only) is used</td></tr>
+    <tr><td><b>Name</b>         </td><td>the name of the new device to use in FHEM</td></tr>
+    <tr><td><b>Cameraname</b>   </td><td>camera name as defined in Synology Surveillance Station if camera-device, "SVS" if SVS-Device. Spaces are not allowed in camera name. </td></tr>
+    <tr><td><b>ServerAddr</b>   </td><td>IP-address of Synology Surveillance Station Host. <b>Note:</b> avoid using hostnames because of DNS-Calls are not unblocking in FHEM </td></tr>
+    <tr><td><b>Port</b>         </td><td>optional - the port of synology disc station. If not set, the default "5000" is used</td></tr>
+    <tr><td><b>Protocol</b>     </td><td>optional - the protocol (http or https) to access the synology disc station. If not set, the default "http" is used</td></tr>   
    </table>
 
     <br><br>
 
-    <b>Example:</b>
+    <b>Examples:</b>
      <pre>
-      <code>define CamCP SSCAM Carport 192.168.2.20 [5000]</code>
-      creates a new camera device CamCP
+      <code>define CamCP SSCAM Carport 192.168.2.20 [5000] [http]</code>
+      <code>define CamCP SSCAM Carport 192.168.2.20 [5001] [https]</code>
+      # creates a new camera device CamCP
 
-      <code>define DS1 SSCAM SVS 192.168.2.20 [5000]</code>
-      creares a new SVS device DS1	  
+      <code>define DS1 SSCAM SVS 192.168.2.20 [5000] [http]</code>
+      <code>define DS1 SSCAM SVS 192.168.2.20 [5001] [https]</code>
+      # creares a new SVS device DS1	  
     </pre>
     
     When a new Camera is defined, as a start the recordingtime of 15 seconds will be assigned to the device.<br>
@@ -7551,23 +7585,22 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
 	Der Gültigkeitsbereich von set/get-Befehlen ist nach dem jeweiligen Befehl angegeben "gilt für CAM, SVS, CAM/SVS".
 	<br><br>
 	
-    Eine Kamera wird definiert durch: <br><br>
+    Eine <b>Kamera</b> wird definiert mit: <br><br>
 	<ul>
-      <b><code>define &lt;name&gt; SSCAM &lt;Kameraname in SVS&gt; &lt;ServerAddr&gt; [Port] </code></b> <br><br>
+      <b><code>define &lt;Name&gt; SSCAM &lt;Kameraname in SVS&gt; &lt;ServerAddr&gt; [Port] [Protocol]</code></b> <br><br>
     </ul>
     
     Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend 
 	funktionieren. <br><br>
 	
-	Ein SVS-Device zur Steuerung von Funktionen der Surveillance Station wird definiert mit: <br><br>
+	Ein <b>SVS-Device</b> zur Steuerung von Funktionen der Surveillance Station wird definiert mit: <br><br>
 	<ul>
-	  <b><code>define &lt;name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] </code></b> <br><br>
+	  <b><code>define &lt;Name&gt; SSCAM SVS &lt;ServerAddr&gt; [Port] [Protocol]</code></b> <br><br>
 	</ul>
     
     In diesem Fall wird statt &lt;Kameraname in SVS&gt; nur <b>SVS</b> angegeben. <br><br>
 	
-	Das Modul SSCam basiert auf Funktionen der Synology Surveillance Station API. <br>
-    Momentan wird nur das HTTP-Protokoll unterstützt um die Web-Services der Synology DS aufzurufen. <br><br>  
+	Das Modul SSCam basiert auf Funktionen der Synology Surveillance Station API. <br><br> 
     
     Die Parameter beschreiben im Einzelnen:
     <br>
@@ -7575,21 +7608,24 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     
     <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
-    <tr><td>name:           </td><td>der Name des neuen Gerätes in FHEM</td></tr>
-    <tr><td>Kameraname:     </td><td>Kameraname wie er in der Synology Surveillance Station angegeben ist für Kamera-Device, "SVS" für SVS-Device. Leerzeichen im Namen sind nicht erlaubt. </td></tr>
-    <tr><td>ServerAddr:     </td><td>die IP-Addresse des Synology Surveillance Station Host. Hinweis: Es sollte kein Servername verwendet werden weil DNS-Aufrufe in FHEM blockierend sind.</td></tr>
-    <tr><td>Port:           </td><td>optional - der Port der Synology Surveillance Station. Wenn nicht angegeben wird der Default-Port 5000 (nur HTTP) gesetzt </td></tr>
+    <tr><td><b>Name</b>           </td><td>der Name des neuen Gerätes in FHEM</td></tr>
+    <tr><td><b>Kameraname</b>     </td><td>Kameraname wie er in der Synology Surveillance Station angegeben ist für Kamera-Device, "SVS" für SVS-Device. Leerzeichen im Namen sind nicht erlaubt. </td></tr>
+    <tr><td><b>ServerAddr</b>     </td><td>die IP-Addresse des Synology Surveillance Station Host. Hinweis: Es sollte kein Servername verwendet werden weil DNS-Aufrufe in FHEM blockierend sind.</td></tr>
+    <tr><td><b>Port</b>           </td><td>optional - der Port der Synology Disc Station. Wenn nicht angegeben, wird der Default-Port "5000" genutzt </td></tr>
+    <tr><td><b>Protocol</b>       </td><td>optional - das Protokoll (http oder https) zum Funktionsaufruf. Wenn nicht angegeben, wird der Default "http" genutzt </td></tr>
     </table>
 
     <br><br>
 
     <b>Beispiel:</b>
      <pre>
-      <code>define CamCP SSCAM Carport 192.168.2.20 [5000] </code>
-      erstellt ein neues Kamera-Device CamCP
+      <code>define CamCP SSCAM Carport 192.168.2.20 [5000] [http] </code>
+      <code>define CamCP SSCAM Carport 192.168.2.20 [5001] [https]</code>
+      # erstellt ein neues Kamera-Device CamCP
 
-      <code>define DS1 SSCAM SVS 192.168.2.20 [5000] </code>
-      erstellt ein neues SVS-Device DS1
+      <code>define DS1 SSCAM SVS 192.168.2.20 [5000] [http] </code>
+      <code>define DS1 SSCAM SVS 192.168.2.20 [5001] [https] </code>
+      # erstellt ein neues SVS-Device DS1
      </pre>
      
     Wird eine neue Kamera definiert, wird diesem Device zunächst eine Standardaufnahmedauer von 15 zugewiesen. <br>

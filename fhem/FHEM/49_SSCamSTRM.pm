@@ -28,6 +28,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 1.2.3  03.07.2018    behavior changed if device is disabled
 # 1.2.2  26.06.2018    make changes for generic stream dev
 # 1.2.1  23.06.2018    no name add-on if MODEL is snapgallery
 # 1.2.0  20.06.2018    running stream as human readable entry for SSCamSTRM-Device
@@ -45,7 +46,7 @@ package main;
 use strict;
 use warnings;
 
-my $SSCamSTRMVersion = "1.2.2";
+my $SSCamSTRMVersion = "1.2.3";
 
 ################################################################
 sub SSCamSTRM_Initialize($) {
@@ -78,8 +79,6 @@ sub SSCamSTRM_Define($$) {
   $hash->{VERSION} = $SSCamSTRMVersion;
   $hash->{LINK}    = $link;
   
-  $attr{$name}{comment} = "when using the device in a Dashboard, set \"attr $name alias <span></span>\" ";
-  
   readingsSingleUpdate($hash,"state", "initialized", 1);      # Init für "state" 
   
 return undef;
@@ -100,7 +99,7 @@ sub SSCamSTRM_Attr($$$$) {
             $do = ($aVal) ? 1 : 0;
         }
         $do = 0 if($cmd eq "del");
-		$val = ($do == 1 ? "Stream-device of \"$hash->{PARENT}\" disabled" : "initialized");
+		$val = ($do == 1 ? "disabled" : "initialized");
     
         readingsSingleUpdate($hash, "state", $val, 1);
     }
@@ -114,7 +113,7 @@ sub SSCamSTRM_FwFn($$$$) {
   my $hash   = $defs{$d};
   my $link   = $hash->{LINK};
   
-  return undef if(IsDisabled($d));
+  # return undef if(IsDisabled($d));
 
   $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
   my $show = $defs{$hash->{PARENT}}->{HELPER}{ACTSTRM} if($hash->{MODEL} =~ /switched/);
@@ -124,8 +123,16 @@ sub SSCamSTRM_FwFn($$$$) {
   my $dlink = "<a href=\"/fhem?detail=$d\">$alias</a>"; 
   
   my $ret = "";
-  $ret   .= "<span>$dlink $show</span><br>"  if(!AttrVal($d,"hideDisplayName",0));
-  $ret   .= $link;
+  $ret .= "<span>$dlink $show</span><br>"  if(!AttrVal($d,"hideDisplayName",0));
+  if(IsDisabled($d)) {
+      if(AttrVal($d,"hideDisplayName",0)) {
+          $ret .= "Stream-device <a href=\"/fhem?detail=$d\">$d</a> is disabled";
+      } else {
+          $ret .= "<html>Stream-device is disabled</html>";
+      }  
+  } else {
+      $ret .= $link;  
+  }
 
 return $ret;
 }
@@ -146,6 +153,9 @@ Dependend of the Streaming-Device state, different buttons are provided to start
   <ul>   
     <table>  
     <colgroup> <col width=25%> <col width=75%> </colgroup>
+      <tr><td> Switch off      </td><td>- stops a running playback </td></tr>
+      <tr><td> Refresh         </td><td>- refresh a view (no page reload) </td></tr>
+      <tr><td> Restart         </td><td>- restart a running content (e.g. a HLS-Stream) </td></tr>
       <tr><td> MJPEG           </td><td>- starts a MJPEG Livestream </td></tr>
       <tr><td> HLS             </td><td>- starts HLS (HTTP Live Stream) </td></tr>
       <tr><td> Last Record     </td><td>- playback the last recording as iFrame </td></tr>
@@ -155,7 +165,6 @@ Dependend of the Streaming-Device state, different buttons are provided to start
       <tr><td> Start Recording </td><td>- starts an endless recording </td></tr>
       <tr><td> Stop Recording  </td><td>- stopps the recording </td></tr>
       <tr><td> Take Snapshot   </td><td>- take a snapshot </td></tr>
-      <tr><td> Switch off      </td><td>- stops a running playback </td></tr>
     </table>
    </ul>     
    <br>
@@ -227,6 +236,9 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
   <ul>   
     <table>  
     <colgroup> <col width=25%> <col width=75%> </colgroup>
+      <tr><td> Switch off      </td><td>- stoppt eine laufende Wiedergabe </td></tr>
+      <tr><td> Refresh         </td><td>- auffrischen einer Ansicht (kein Browser Seiten-Reload) </td></tr>
+      <tr><td> Restart         </td><td>- neu starten eines laufenden Contents (z.B. eines HLS-Streams) </td></tr>
       <tr><td> MJPEG           </td><td>- Startet MJPEG Livestream </td></tr>
       <tr><td> HLS             </td><td>- Startet HLS (HTTP Live Stream) </td></tr>
       <tr><td> Last Record     </td><td>- spielt die letzte Aufnahme als iFrame </td></tr>
@@ -236,7 +248,6 @@ Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unters
       <tr><td> Start Recording </td><td>- startet eine Endlosaufnahme </td></tr>
       <tr><td> Stop Recording  </td><td>- stoppt eine Aufnahme </td></tr>
       <tr><td> Take Snapshot   </td><td>- löst einen Schnappschuß aus </td></tr>
-      <tr><td> Switch off      </td><td>- stoppt eine laufende Wiedergabe </td></tr>
     </table>
    </ul>     
    <br>
