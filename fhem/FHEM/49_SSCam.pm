@@ -229,8 +229,8 @@
 #
 # Definition: define <name> SSCam <camname> <ServerAddr> [ServerPort] 
 # 
-# Example of defining a Cam-device: define CamCP1 SSCAM Carport 192.168.2.20 [5000]
-# Example of defining a SVS-device: define SDS1 SSCAM SVS 192.168.2.20 [5000]
+# Example of defining a Cam-device: define CamCP1 SSCAM Carport 192.168.2.20 [5000] [HTTP(S)]
+# Example of defining a SVS-device: define SDS1 SSCAM SVS 192.168.2.20 [5000] [HTTP(S)]
 #
 
 package main;
