@@ -7020,14 +7020,10 @@ sub CUL_HM_statCnt(@) {# set msg statistics for (r)ecive (s)end or (u)pdate
   my ($ioName,$dir,$typ) = @_;
   my $stat = $modules{CUL_HM}{stat};
   if (!$stat->{$ioName}){
-    $stat->{r}{$ioName}{h}{$_}  = 0 foreach(0..23);
-    $stat->{r}{$ioName}{d}{$_}  = 0 foreach(0..6);
-    $stat->{s}{$ioName}{h}{$_}  = 0 foreach(0..23);
-    $stat->{s}{$ioName}{d}{$_}  = 0 foreach(0..6);
-    $stat->{rb}{$ioName}{h}{$_} = 0 foreach(0..23);
-    $stat->{rb}{$ioName}{d}{$_} = 0 foreach(0..6);
-    $stat->{sb}{$ioName}{h}{$_} = 0 foreach(0..23);
-    $stat->{sb}{$ioName}{d}{$_} = 0 foreach(0..6);
+    foreach my $ud ("r","s","rb","sb"){
+      $stat->{$ud}{$ioName}{h}{$_}  = 0 foreach(0..23);
+      $stat->{$ud}{$ioName}{d}{$_}  = 0 foreach(0..6);
+    }
     $stat->{$ioName}{last} = 0;
   }
   my @l = localtime(gettimeofday());
@@ -7040,9 +7036,10 @@ sub CUL_HM_statCnt(@) {# set msg statistics for (r)ecive (s)end or (u)pdate
         $stat->{$ud}{$ioName}{d}{$recentD} += $stat->{$ud}{$ioName}{h}{$_}    foreach (0..23);
       }
     }
-    $stat->{r}{$ioName}{h}{$l[2]} = 0;
-    $stat->{s}{$ioName}{h}{$l[2]} = 0;
-    $stat->{$ioName}{last}        = $l[2];
+    foreach my $ud ("r","s","rb","sb"){
+      $stat->{$ud}{$ioName}{h}{$l[2]}  = 0;
+    }
+    $stat->{$ioName}{last} = $l[2];
   }
   if ($dir ne "u"){
     $stat->{$dir}{$ioName}{h}{$l[2]}++;
