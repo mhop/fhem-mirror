@@ -362,7 +362,7 @@ sub SSCam_Define($@) {
   my $camname    = $a[2];
   my $serveraddr = $a[3];
   my $serverport = $a[4] ? $a[4] : 5000;
-  my $proto      = $a[5] ? $a[5] : "http";
+  my $proto      = $a[5] ? lc($a[5]) : "http";
   
   $hash->{SERVERADDR} = $serveraddr;
   $hash->{SERVERPORT} = $serverport;
