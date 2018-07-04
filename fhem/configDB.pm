@@ -231,9 +231,9 @@ if ($count > 1) {
    eval $configs[0];
 }
 
-my $cfgDB_dbconn	= $dbconfig{connection};
-my $cfgDB_dbuser	= $dbconfig{user};
-my $cfgDB_dbpass	= $dbconfig{password};
+my $cfgDB_dbconn    = $dbconfig{connection};
+my $cfgDB_dbuser    = $dbconfig{user};
+my $cfgDB_dbpass    = $dbconfig{password};
 my $cfgDB_migrate   = 0;
    $cfgDB_migrate   = $dbconfig{migrate} if (defined($dbconfig{migrate}) && $dbconfig{migrate} == 1);
 my $cfgDB_dbtype;
@@ -268,8 +268,8 @@ $count    = undef;
 # initialize database, create tables if necessary
 sub cfgDB_Init() {
 ##################################################
-#	Create non-existing database tables 
-#	Create default config entries if necessary
+# Create non-existing database tables 
+# Create default config entries if necessary
 #
 	my $fhem_dbh = _cfgDB_Connect;
 
@@ -484,7 +484,8 @@ sub cfgDB_SaveCfg(;$) {
 
 	my ($internal) = shift;
 	$internal = defined($internal) ? $internal : 0;
-
+	my @dontSave = qw(configdb:rescue configdb:nostate configdb:loadversion 
+	                  global:configfile global:version);
 	my (%devByNr, @rowList, %comments, $t, $out);
 
 	map { $devByNr{$defs{$_}{NR}} = $_ } keys %defs;
@@ -519,12 +520,11 @@ sub cfgDB_SaveCfg(;$) {
 		}
 
 		foreach my $a (sort {
-										return -1 if($a eq "userattr"); # userattr must be first
-										return  1 if($b eq "userattr");
-										return $a cmp $b;
-										} keys %{$attr{$d}}) {
-			next if($d eq "global" &&
-				($a eq "configfile" || $a eq "version"));
+			return -1 if($a eq "userattr"); # userattr must be first
+			return  1 if($b eq "userattr");
+			return $a cmp $b;
+			} keys %{$attr{$d}}) {
+			next if (grep { $_ eq "$d:$a" } @dontSave);
 			my $val = $attr{$d}{$a};
 			$val =~ s/;/;;/g;
 			push @rowList, "attr $d $a $val";
