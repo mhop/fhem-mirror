@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  41_Oregon: batterypercent typo, Forum #89120
   - feature: 49_SSCam: HTTPS Support, buttons for refresh SSCamSTRM-devices
   - changed: 14_Hideki: standard battery readings
   - changed: 14_SD_WS: standard battery readings

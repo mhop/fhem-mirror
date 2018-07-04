@@ -1034,7 +1034,7 @@ OREGON_Parse($$)
 			##$def->{READINGS}{$sensor}{TIME} = $tm;
 			##$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			##$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
-	}	elsif ($i->{type} eq "batterPercent" || $i->{type} eq "batteryState") { 
+	}	elsif ($i->{type} eq "batteryPercent" || $i->{type} eq "batteryState") { 
 			readingsBulkUpdate($def,$i->{type},$i->{current});
 	}
 	elsif ($i->{type} eq "pressure") { 
