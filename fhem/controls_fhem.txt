@@ -1,4 +1,4 @@
-REV 16942
+REV 16945
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,9 +21,9 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-07-04_07:45:03 252479 ./CHANGED
+UPD 2018-07-05_07:45:04 252537 ./CHANGED
 UPD 2018-06-30_07:45:03 37379 ./MAINTAINER.txt
-UPD 2018-06-18_07:45:05 41502 ./configDB.pm
+UPD 2018-07-05_07:45:04 41582 ./configDB.pm
 UPD 2018-01-23_07:45:02 15848 ./fhem.cfg.demo
 UPD 2018-06-15_07:45:11 146835 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
@@ -222,7 +222,7 @@ UPD 2018-03-18_07:45:02 80208 FHEM/39_Talk2Fhem.pm
 UPD 2018-03-02_07:47:09 24286 FHEM/39_alexa.pm
 UPD 2017-04-21_07:45:02 2759 FHEM/39_siri.pm
 UPD 2016-04-26_07:45:11 13443 FHEM/40_RFXCOM.pm
-UPD 2018-07-03_07:45:02 35493 FHEM/41_OREGON.pm
+UPD 2018-07-05_07:45:04 35494 FHEM/41_OREGON.pm
 UPD 2017-05-26_07:45:02 29928 FHEM/42_Nextion.pm
 UPD 2015-07-28_14:05:31 8038 FHEM/42_RFXMETER.pm
 UPD 2017-06-01_07:45:02 21914 FHEM/42_SMARTMON.pm
@@ -673,8 +673,8 @@ UPD 2018-07-04_07:45:06 3473992 docs/commandref.html
 UPD 2018-07-04_07:45:08 2125875 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-06-15_07:45:04 85474 docs/commandref_frame_DE.html
-UPD 2018-07-04_07:45:09 192754 docs/commandref_modular.html
-UPD 2018-07-04_07:45:10 203463 docs/commandref_modular_DE.html
+UPD 2018-07-05_07:45:10 192754 docs/commandref_modular.html
+UPD 2018-07-05_07:45:10 203463 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
