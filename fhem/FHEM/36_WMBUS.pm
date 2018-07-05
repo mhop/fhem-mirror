@@ -251,6 +251,7 @@ WMBUS_Parse($$)
       my $rname = $rhash->{NAME};
       return "" if(IsIgnored($rname));
 			
+      $rhash->{model} =join("_", $mb->{manufacturer}, $mb->{afield_type}, $mb->{afield_ver});
 			WMBUS_SetRSSI($rhash, $mb, $rssi);
 
 			my $aeskey;
