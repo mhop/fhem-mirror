@@ -27,6 +27,8 @@ package main;
 use strict;
 use warnings;
 
+use vars qw(%defs);
+
 sub Log3($$$);
 
 # default maximum time_diff for dewpoint
@@ -39,8 +41,10 @@ dewpoint_Initialize($)
   my ($hash) = @_;
   $hash->{DefFn}   = "dewpoint_Define";
   $hash->{NotifyFn} = "dewpoint_Notify";
+  $hash->{AttrFn} = "dewpoint_Attr";
   $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
-  $hash->{AttrList} = "disable:0,1 legacyStateHandling:0,1 verbose max_timediff absFeuchte";
+  $hash->{AttrList} = "disable:0,1 legacyStateHandling:0,1 verbose max_timediff absFeuchte"
+                      . " absoluteHumidity vapourPressure";
 }
 
 
@@ -106,6 +110,27 @@ dewpoint_Define($$)
     # set NOTIFYDEV
     notifyRegexpChanged($hash, $devname);
     $hash->{STATE} = "active";
+    return undef;
+}
+
+##########################
+sub
+dewpoint_Attr(@)
+{
+    my ($cmd, $name, $a_name, $a_val) = @_;
+    my $hash = $defs{$name};
+
+    if ($cmd eq "set" && $a_name eq "absFeuchte") {
+        Log(1, "dewpoint $name: attribute 'absFeuchte' is deprecated, please use 'absoluteHumidity'");
+        return undef;
+    }
+
+    if ($cmd eq "set" && ($a_name eq "absoluteHumidity" || $a_name eq "vapourPressure")) {
+	if (! goodReadingName($a_val)) {
+            return "Value of $a_name is not a valid reading name";
+        }
+    }
+
     return undef;
 }
 
@@ -273,24 +298,38 @@ dewpoint_Notify($$)
         # define dewtest2 dewpoint dewpoint .* T H D
 
         readingsBeginUpdate($dev);
-        my $current;
-        my $sensor;
-        my $aFeuchte = AttrVal($hash->{NAME},"absFeuchte", undef);
+        my $rval;
+        my $rname;
+        my $abs_hunidity = dewpoint_absFeuchte($temperature, $humidity);
+        my $aFeuchte = AttrVal($hashName, "absFeuchte", undef);
         if (defined($aFeuchte)) {
-            $sensor = "absFeuchte";
-            $current = dewpoint_absFeuchte($temperature, $humidity);
-            readingsBulkUpdate($dev, $sensor, $current);
-            Log3($hashName, 5, "dewpoint absFeuchte= $current");
-            $aFeuchte = "A: " . $current;
+            $rname = "absFeuchte";
+            readingsBulkUpdate($dev, $rname, $abs_hunidity);
+            Log3($hashName, 5, "dewpoint absFeuchte= $abs_hunidity");
+            $aFeuchte = "A: " . $abs_hunidity;
+    	}
+
+        my $ah_rname = AttrVal($hashName, "absoluteHumidity", undef);
+        if (defined($ah_rname)) {
+            readingsBulkUpdate($dev, $ah_rname, $abs_hunidity);
+            Log3($hashName, 5, "dewpoint $ah_rname= $abs_hunidity");
+            $aFeuchte = "A: " . $abs_hunidity if !defined($aFeuchte);
         }	
 
-        $sensor = $new_name;
+        my $vp_rname = AttrVal($hashName, "vapourPressure", undef);
+        if (defined($vp_rname)) {
+            my $vp = round(10 * dewpoint_vp($temperature, $humidity), 1);
+            readingsBulkUpdate($dev, $vp_rname, $vp);
+            Log3($hashName, 5, "dewpoint $vp_rname= $vp");
+        }	
+
+        $rname = $new_name;
 
         my $has_state_format = defined(AttrVal($dev->{NAME}, "stateFormat", undef));
         my $legacy_sh = AttrVal($hash->{NAME}, "legacyStateHandling", 0);
         if ($temp_name ne "T" || ($has_state_format && ! $legacy_sh)) {
-            $current = $dewpoint;
-            readingsBulkUpdate($dev, $sensor, $current);
+            $rval = $dewpoint;
+            readingsBulkUpdate($dev, $rname, $rval);
             readingsEndUpdate($dev, 1);
         } else {
             # explicit manipulation of STATE here
@@ -302,26 +341,26 @@ dewpoint_Notify($$)
             # STATE begins with "T:". append dewpoint or insert before BAT
             my $lastval = $dev->{CHANGED}[$i_state_ev];
             if ($lastval =~ /BAT:/) {	
-                $current = $lastval;
-                $current =~ s/BAT:/$sensor: $dewpoint BAT:/g;
+                $rval = $lastval;
+                $rval =~ s/BAT:/$rname: $dewpoint BAT:/g;
             } elsif ($lastval =~ /<</) {	
-                $current = $lastval;
-                $current =~ s/<</$sensor:$dewpoint   <</g;
+                $rval = $lastval;
+                $rval =~ s/<</$rname:$dewpoint   <</g;
             } else {
-                $current = $lastval." ".$sensor.": ".$dewpoint;
+                $rval = $lastval." ".$rname.": ".$dewpoint;
                 if (defined($aFeuchte)) {
-                    $current = $current." ".$aFeuchte;
+                    $rval = $rval." ".$aFeuchte;
                 }
             }
 
-            $dev->{STATE} = $current;
+            $dev->{STATE} = $rval;
             # the state event must be REPLACED
-            $dev->{CHANGED}[$i_state_ev] = $current;		
+            $dev->{CHANGED}[$i_state_ev] = $rval;		
         }
 
         # remove cached "state:..." events if any
         $dev->{CHANGEDWITHSTATE} = [];
-        Log3($hashName, 5, "dewpoint_notify: current=$current");
+        Log3($hashName, 5, "dewpoint_notify: rval=$rval");
 
     } elsif ($cmd_type eq "fan") {
         # >define <name> dewpoint fan devicename devicename-outside min-temp [diff-temp]
@@ -334,26 +373,26 @@ dewpoint_Notify($$)
         #   and reading "fan" was not already "on".
         # - Generate reading/event "fan: off": else and if reading "fan" was not already "off".
         Log3($hashName, 5, "dewpoint_notify: fan devname_out=$devname_out, min_temp=$min_temp, diff_temp=$diff_temp");
-        my $sensor;
-        my $current;
+        my $rname;
+        my $rval;
         if (exists $defs{$devname_out}{READINGS}{temperature}{VAL} && exists $defs{$devname_out}{READINGS}{humidity}{VAL}) {
             my $temperature_out = $defs{$devname_out}{READINGS}{temperature}{VAL};
             my $humidity_out = $defs{$devname_out}{READINGS}{humidity}{VAL};
             my $dewpoint_out = dewpoint_dewpoint($temperature_out, $humidity_out);
             Log3($hashName, 5, "dewpoint_notify: fan dewpoint_out=$dewpoint_out");
             if (($dewpoint_out + $diff_temp) < $dewpoint && $temperature_out >= $min_temp) {
-                $current = "on";
+                $rval = "on";
                 Log3($hashName, 3, "dewpoint_notify: fan ON");
             } else {
-                $current = "off";
+                $rval = "off";
                 Log3($hashName, 3, "dewpoint_notify: fan OFF");
             }
-            $sensor = "fan";
-            if (!exists $defs{$devName}{READINGS}{$sensor}{VAL} || $defs{$devName}{READINGS}{$sensor}{VAL} ne $current) {
-                Log3($hashName, 3, "dewpoint_notify: CHANGE fan $current");
-                $dev->{READINGS}{$sensor}{TIME} = $tn;
-                $dev->{READINGS}{$sensor}{VAL} = $current;
-                $dev->{CHANGED}[$nev++] = $sensor . ": " . $current;
+            $rname = "fan";
+            if (!exists $defs{$devName}{READINGS}{$rname}{VAL} || $defs{$devName}{READINGS}{$rname}{VAL} ne $rval) {
+                Log3($hashName, 3, "dewpoint_notify: CHANGE fan $rval");
+                $dev->{READINGS}{$rname}{TIME} = $tn;
+                $dev->{READINGS}{$rname}{VAL} = $rval;
+                $dev->{CHANGED}[$nev++] = $rname . ": " . $rval;
             }
 
         } else {
@@ -379,24 +418,24 @@ dewpoint_Notify($$)
         #    than the inside temperature, set diff to 5. 
         # 	Example: define alarmtest dewpoint alarm roomsensor roomsensor 5
         Log3($hashName, 5, "dewpoint_notify: alarm devname_ref=$devname_ref, diff_temp=$diff_temp");
-        my $sensor;
-        my $current;
+        my $rname;
+        my $rval;
         if (exists $defs{$devname_ref}{READINGS}{temperature}{VAL}) {
             my $temperature_ref = $defs{$devname_ref}{READINGS}{temperature}{VAL};
             Log3($hashName, 5, "dewpoint_notify: alarm temperature_ref=$temperature_ref");
             if ($temperature_ref - $diff_temp < $dewpoint) {
-                $current = "on";
+                $rval = "on";
                 Log3($hashName, 3, "dewpoint_notify: alarm ON");
             } else {
-                $current = "off";
+                $rval = "off";
                 Log3($hashName, 3, "dewpoint_notify: alarm OFF");
             }
-            $sensor = "alarm";
-            if (!exists $defs{$devName}{READINGS}{$sensor}{VAL} || $defs{$devName}{READINGS}{$sensor}{VAL} ne $current) {
-                Log3($hashName, 5, "dewpoint_notify: CHANGE alarm $current");
-                $dev->{READINGS}{$sensor}{TIME} = $tn;
-                $dev->{READINGS}{$sensor}{VAL} = $current;
-                $dev->{CHANGED}[$nev++] = $sensor . ": " . $current;
+            $rname = "alarm";
+            if (!exists $defs{$devName}{READINGS}{$rname}{VAL} || $defs{$devName}{READINGS}{$rname}{VAL} ne $rval) {
+                Log3($hashName, 5, "dewpoint_notify: CHANGE alarm $rval");
+                $dev->{READINGS}{$rname}{TIME} = $tn;
+                $dev->{READINGS}{$rname}{VAL} = $rval;
+                $dev->{CHANGED}[$nev++] = $rname . ": " . $rval;
             }
         } else {
             Log3($hashName, 1, "dewpoint_notify: alarm devname_out=$devname_out no temperature or humidity available"
@@ -630,17 +669,16 @@ dewpoint_absFeuchte ($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
-    <li>absFeuchte</li><br>
+    <li>absoluteHumidity &lt;reading_name&gt;</li>
       <ul>
-        AbsFeuchte also becomes by the absolute humidity set the attribute into the Readings of all things.
-		One can by these show information also in the status.
-		Example: (<Adapter> = the FHEM name of the adapter this one you must change) 
-        <PRE>
-		 stateFormat:	
-		{sprintf("T: %.1f H: %.1f D: %.1f A: %.1f", ReadingsVal("<Adapter>","temperature",0), ReadingsVal("<Adapter>","H",0), ReadingsVal("<Adapter>","dewpoint",0), ReadingsVal("<Adapter>","absFeuchte",0))}
-		</PRE>
-      </ul>
-    <li>max_timediff<br>
+        In addition the absolute humidity in g/m&sup3; will be computed as reading &lt;reading_name&gt;.
+      </ul><br>
+    <li>vapourPressure &lt;reading_name&gt;</li>
+      <ul>
+        In addition the vapour pressure in hPa will be computed as reading &lt;reading_name&gt;.
+      </ul><br>
+    <li>max_timediff</li>
+      <ul>
         Maximum time difference in seconds allowed between the temperature and humidity values for a device. dewpoint uses the Readings for temperature or humidity if they are not delivered in the event. This is necessary for using dewpoint with event-on-change-reading. Also needed for sensors that do deliver temperature and humidity in different events like for example technoline sensors TX3TH.<br>
 		If not set default is 1 second.
       <br><br>
@@ -648,7 +686,7 @@ dewpoint_absFeuchte ($$)
 		# allow maximum time difference of 60 seconds
 		define dew_all dewpoint dewpoint .*
 		attr dew_all max_timediff 60
-    </li><br>
+    </ul>
   </ul>
 </ul>
 
@@ -784,23 +822,21 @@ dewpoint_absFeuchte ($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
-    <li>absFeuchte</li><br>
+    <li>absoluteHumidity &lt;reading_name&gt;</li>
       <ul>
-        Durch setzen des Attributes absFeuchte wird in den Readings auch die absolute Feuchte mit ausgerechnet.
-		Durch <a href="#stateFormat">stateFormat</a> kann man diese Info auch im Status anzeigen.
-		 Beispiel: (<Adapter> = Der FHEM Name des Adapters der ge&auml;ndert werden muss)
-        <pre>
-		 stateFormat:	
-		{sprintf("T: %.1f H: %.1f D: %.1f A: %.1f", ReadingsVal("<Adapter>","temperature",0), ReadingsVal("<Adapter>","H",0), ReadingsVal("<Adapter>","dewpoint",0), ReadingsVal("<Adapter>","absFeuchte",0))}
-		</pre>
-      </ul>
-    <li>max_timediff</li><br>
+        Zus&auml;tzlich wird die absolute Feuchte in g/m&sup3; als Reading &lt;reading_name&gt; berechnet.
+      </ul><br>
+    <li>vapourPressure &lt;reading_name&gt;</li>
+      <ul>
+        Zus&auml;tzlich wird der Dampfdruck in hPa als Reading &lt;reading_name&gt; berechnet.
+      </ul><br>
+    <li>max_timediff</li>
       <ul>
         Maximale erlaubter Zeitunterschied in Sekunden zwischen den Temperatur- und Luftfeuchtewerten eines 
         Ger&auml;ts. dewpoint verwendet Readings von Temperatur oder Luftfeuchte wenn sie nicht im Ereignis 
         mitgeliefert werden. Das ist sowohl f&uuml;r den Betrieb mit event-on-change-reading n&ouml;tig 
         als auch bei Sensoren die Temperatur und Luftfeuchte in getrennten Ereignissen kommunizieren 
-        (z.B. Technoline Sensoren TX3TH).<br/>
+        (z.B. Technoline Sensoren TX3TH).<br>
         Der Standardwert ist 1 Sekunde.
         <br><br>
         Beispiel:
