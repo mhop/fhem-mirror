@@ -1,4 +1,4 @@
-REV 16945
+REV 16947
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -205,7 +205,7 @@ UPD 2017-06-16_07:45:03 6518 FHEM/36_Level.pm
 UPD 2016-08-23_07:45:12 9997 FHEM/36_PCA301.pm
 UPD 2017-11-03_07:45:02 17579 FHEM/36_PrecipitationSensor.pm
 UPD 2018-05-01_07:45:03 67004 FHEM/36_Vallox.pm
-UPD 2018-06-25_07:45:04 22843 FHEM/36_WMBUS.pm
+UPD 2018-07-06_07:45:03 22937 FHEM/36_WMBUS.pm
 UPD 2018-02-10_07:45:02 10932 FHEM/37_NotifyAndroidTV.pm
 UPD 2015-07-28_14:05:31 10162 FHEM/37_SHC.pm
 UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
@@ -673,8 +673,8 @@ UPD 2018-07-04_07:45:06 3473992 docs/commandref.html
 UPD 2018-07-04_07:45:08 2125875 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-06-15_07:45:04 85474 docs/commandref_frame_DE.html
-UPD 2018-07-05_07:45:10 192754 docs/commandref_modular.html
-UPD 2018-07-05_07:45:10 203463 docs/commandref_modular_DE.html
+UPD 2018-07-06_07:45:09 192754 docs/commandref_modular.html
+UPD 2018-07-06_07:45:10 203463 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
