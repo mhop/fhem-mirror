@@ -29,6 +29,7 @@
 # ABU 20180624 no set-option for listenoly- or get-devices, warning for illegal EVAL
 # ABU 20180626 fixed last changes
 # ABU 20180706 changed eval, removed stateCopy
+# ABU 20180706 fixed doku: changed readonly in listenonly
 
 package main;
 
@@ -2081,12 +2082,12 @@ The reading &lt;state&gt; will be updated with the last sent or received value.&
 
 <p>&nbsp;</p>
 <p><strong>Define</strong></p>
-<p><code>d</code><code>efine &lt;name&gt; KNX &lt;group&gt;:&lt;DPT&gt;:[gadName]:[set|get|readonly]:[nosuffix] [&lt;group&gt;:&lt;DPT&gt; ..] [IODev]</code></p>
+<p><code>d</code><code>efine &lt;name&gt; KNX &lt;group&gt;:&lt;DPT&gt;:[gadName]:[set|get|listenonly]:[nosuffix] [&lt;group&gt;:&lt;DPT&gt; ..] [IODev]</code></p>
 <p><strong>Important:&nbsp;a KNX device needs at least one&nbsp;concrete DPT. Please refer to <a href="#KNXdpt">available DPT</a>. Otherwise the system cannot en- or decode the messages.</strong><br />
 <strong>Devices defined by autocreate have to be reworked with the suitable dpt. Otherwise they won't be able to work productively.</strong></p>
 <strong>Unless older versions the on-off command and the clickable bulb are not shown in the webfrontend out-of-the box. You have to add webCmd and devStateIcon. See examples...</strong></p>
 <p>Examples:</p>
-<pre style="padding-left: 30px;">define lamp1 KNX 0/10/11:dpt1:readonly</pre>
+<pre style="padding-left: 30px;">define lamp1 KNX 0/10/11:dpt1:listenonly</pre>
 <pre style="padding-left: 30px;">arr lamp1 webCmd on:off</pre>
 <pre style="padding-left: 30px;">attr lamp1 devStateIcon on::off off::on</pre>
 <br>
@@ -2094,8 +2095,8 @@ The reading &lt;state&gt; will be updated with the last sent or received value.&
 <pre style="padding-left: 30px;">define lamp3 KNX 0A0D:dpt1.003 myTul</pre>
 <p>The &lt;group&gt; parameters are either a group name notation (0-15/0-15/0-255) or the hex representation of the value (0-f0-f0-ff). All of the defined groups can be used for bus-communication. It is not allowed to have the same group more then once in one device. You can have several devices containing the same adresses.<br /> 
 As described above the parameter &lt;DPT&gt; must contain the corresponding DPT.<br /> 
-The optional parameteter [gadName] may contain an alias for the GAD.&nbsp;The name must not cotain one of the following strings: on, off, on-for-timer, on-until, off-for-timer, off-until, toggle, raw, rgb, string, value, set, get, readonly.<br />
-Especially if answerReading is set to 1, it might be useful to modifiy the behaviour of single GADs. If you want to restrict the GAD, you can raise the flags "get", "set", or "readonly". The usage should be self-explainable. It is not possible to combine the flags.<br /> 
+The optional parameteter [gadName] may contain an alias for the GAD.&nbsp;The name must not cotain one of the following strings: on, off, on-for-timer, on-until, off-for-timer, off-until, toggle, raw, rgb, string, value, set, get, listenonly.<br />
+Especially if answerReading is set to 1, it might be useful to modifiy the behaviour of single GADs. If you want to restrict the GAD, you can raise the flags "get", "set", or "listenonly". The usage should be self-explainable. It is not possible to combine the flags.<br /> 
 Furthermore you can supply a IO-Device directly at startup. This can be done later on via attribute as well.</p>
 <p>The GAD's are per default named with "g&lt;number&gt;". The correspunding readings are calles getG&lt;number&gt;, setG&lt;number&gt; and putG&lt;number&gt;.<br /> 
 If you supply &lt;gadName&gt; this name is used instead. The readings are &lt;gadName&gt;-get, &lt;gadName&gt;-set and &lt;gadName&gt;-put. We will use the synonyms &lt;getName&gt;, &lt;setName&gt; and &lt;putName&gt; in this documentation.
@@ -2110,7 +2111,7 @@ If you add the option "nosuffix", &lt;getName&gt;, &lt;setName&gt; and &lt;putNa
   set &lt;deviceName&gt; [gadName] &lt;on-for-timer|on-until|off-for-timer|off-until&gt;
 &lt;timespec&gt;<br />
   set &lt;deviceName&gt; [gadName] &lt;value&gt;<br /></code></p>
-<p>Set sends the given value to the bus.<br /> If &lt;gadName&gt; is omitted, the first listed GAD of the device is used. If the GAD is restricted in the definition with "get" or "readonly", the set-command will be refused.<br /> 
+<p>Set sends the given value to the bus.<br /> If &lt;gadName&gt; is omitted, the first listed GAD of the device is used. If the GAD is restricted in the definition with "get" or "listenonly", the set-command will be refused.<br /> 
 <strong>For dpt1 and dpt1.001 valid values are on, off and toggle. Also the timer-functions can be used. For all other binary DPT (dpt1.xxx) the min- and max-values can be used for en- and decoding alternatively to on/off. This is different to older versions.</strong><br /> 
 After successful sending the value, it is stored in the readings &lt;setName&gt;.</p>
 <p>Example:</p>
@@ -2126,7 +2127,7 @@ After successful sending the value, it is stored in the readings &lt;setName&gt;
 <p>&nbsp;</p>
 <p><strong>Get</strong></p>
 <p>If you execute "get" for a KNX-Element the status will be requested a state from the device. The device has to be able to respond to a read - this is not given for all devices.<br /> 
-If the GAD is restricted in the definition with "readonly", the execution will be refused.<br /> 
+If the GAD is restricted in the definition with "listenonly", the execution will be refused.<br /> 
 The answer from the bus-device is not shown in the toolbox, but is treated like a regular telegram.</p>
 
 <p>&nbsp;</p>
@@ -2276,7 +2277,7 @@ The answer from the bus-device is not shown in the toolbox, but is treated like 
 <pre>attr sps webCmd Ein:Aus</pre>
 <p>&nbsp;</p>
 <p><em>Object with feedback, state is always showing status:</em></p>
-<pre>define wasser_status KNX 11/3/0:dpt1.001:status:readonly 11/3/1:dpt1.001:steuern-auf 11/3/2:dpt1.001:steuern-zu</pre>
+<pre>define wasser_status KNX 11/3/0:dpt1.001:status:listenonly 11/3/1:dpt1.001:steuern-auf 11/3/2:dpt1.001:steuern-zu</pre>
 <pre>attr wasser_status devStateIcon on:general_an off:general_aus</pre>
 <pre>attr wasser_status stateCmd {sprintf("%s", ReadingsVal($name,"status-get",""))}</pre>
 <pre>attr wasser_status webCmd :</pre>
