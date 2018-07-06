@@ -1,8 +1,9 @@
 "use strict";
 FW_version["f18.js"] = "$Id$";
 
-// TODO: absPos,hierMenu+Pin,menuBorder,SVGcolors,floorplan
-var f18_attr={}, f18_sd, f18_icon={}, f18_hasPos, f18_room;
+// TODO: hierMenu+Pin,SVGcolors,floorplan
+// Known bugs: AbsSize is wrong for ColorSlider
+var f18_attr={}, f18_sd, f18_icon={}, f18_room, f18_grid=20;
 var f18_small = (screen.width < 480 || screen.height < 480);
 
 $(window).resize(f18_resize);
@@ -31,15 +32,16 @@ $(document).ready(function(){
   if(typeof f18_attr.savePinChanges == "undefined")
     f18_attr.savePinChanges = true;
 
- f18_setCss('init');
+  f18_setCss('init');
 
- var icon = FW_root+"/images/default/fhemicon_ios.png";
+  var icon = FW_root+"/images/default/fhemicon_ios.png";
   $('head').append(
     '<meta name="viewport" content="initial-scale=1.0,user-scalable=1">'+
     '<meta name=      "mobile-web-app-capable" content="yes">'+
     '<meta name="apple-mobile-web-app-capable" content="yes">'+
     '<link rel="apple-touch-icon" href="'+icon+'">');
-  if('ontouchstart' in window)                  $("body").addClass('touch');
+  if('ontouchstart' in window)
+    $("body").addClass('touch');
   if(f18_small) {
     $("body").addClass('small');
     f18_attr["Pinned.menu"] = false;
@@ -53,12 +55,18 @@ $(document).ready(function(){
   f18_icon.pinOut = f18_icon.pinIn
                         .replace('/>',' transform="rotate(90,896,896)"/>');
 
+  // Needed for moving this label
+  var szc = $("[data-name=svgZoomControl]");
+  if($(szc).length)
+    $(szc).before("<div class='SVGplot'></div>");
+
   f18_setFixedInput();
   f18_menu();
   f18_tables();
   f18_svgSetCols();
   if(typeof svgCallback != "undefined")
     svgCallback.f18 = f18_svgSetCols;
+  $("[data-name]").each(function(){ f18_setPos(this) });
 });
 
 function
@@ -108,17 +116,7 @@ f18_tables()
       var ntr = $(el).closest("tr").next("tr");
       isFixed ? $(ntr).show() : $(ntr).hide();
     });
-    f18_setPos(el);
-    if(f18_getAttr("showDragger"))
-      f18_addDragger(el);
   });
-
-  $("div.SVGlabel").each(function(){
-    f18_setPos(this);
-    if(f18_getAttr("showDragger"))
-      f18_addDragger(this);
-  });
-
 
   if(FW_urlParams.detail) {
     $("div.makeTable > span").each(function(){
@@ -133,15 +131,15 @@ f18_tables()
     });
   }
 
-  if(FW_urlParams.cmd == "style%20select") 
-    f18_special();
 
   if(FW_urlParams.cmd == "style%20list" ||
-     FW_urlParams.cmd == "style%20select") 
+     FW_urlParams.cmd == "style%20select")
     $("div.fileList").each(function(){ f18_addPinToStyleDiv(this) });
 
-  if(f18_hasPos || f18_getAttr("showDragger"))
-    $("div.pinHeader:not(.menu) div.pin").hide();
+  if(FW_urlParams.cmd == "style%20select") 
+    f18_special();
+  else if(f18_getAttr("showDragger"))
+    $("[data-name]").each(function(){ f18_addDragger(this) });
 }
 
 function
@@ -184,7 +182,8 @@ f18_special()
       .click(function(){
         var c = $(this).is(":checked");
         setAttr(name, c, inRoom);
-        fn(c);
+        if(fn)
+          fn(c);
       });
   };
 
@@ -199,7 +198,7 @@ f18_special()
       });
   };
 
-// call drawspecial after got the roomlist...
+  // call drawspecial after got the roomlist...
   var f18_drawSpecial = function()
   {
     var roomHash={};
@@ -223,14 +222,23 @@ f18_special()
     addHider("rightMenu", false, "MenuBtn right<br>on SmallScreen", function(c){
       $("body").toggleClass("rightMenu");
     });
-    addHider("savePinChanges", false, "Save pin changes", function(){});
+    addHider("savePinChanges", false, "Save pin changes");
     addHider("showDragger", false, "Dragging active", function(c){
       if(c) {
-        $("div.fileList").each(function(){ f18_addDragger(this) });
-        $("div.pinHeader:not(.menu) div.pin").hide();
+        if($(".ui-draggable").length) {
+          $(".ui-draggable").draggable("enable");
+          $(".dragMove,.dragSize,.dragReset").show();
+        } else {
+          $("div.fileList").each(function(){ f18_addDragger(this) });
+        }
       } else {
-        $("div.pinHeader div.dragger").remove();
+        $(".dragMove,.dragSize,.dragReset").hide();
+        $(".ui-draggable").draggable("disable");
       }
+    });
+    addHider("snapToGrid", false, "Snap to grid", function(c){
+      $(".ui-draggable").draggable("option", "grid",
+        c ? [f18_grid,f18_grid] : [1,1]);
     });
 
     addRow("editStyle", "<a href='#'>Additional CSS</a>");
@@ -346,15 +354,15 @@ f18_special()
     addHider("hideLogo", true, "Hide logo", f18_menu);
     addHider("hideInput", true, "Hide input", f18_menu);
     addHider("hidePin", true, "Hide pin", function(c){
-      if(f18_hasPos || f18_getAttr("showDragger"))
-        $("div.pinHeader.menu div.pin").css("display", c ? "none":"block");
-      else
-        $("div.pinHeader div.pin").css("display", c ? "none":"block");
+      $("div.pinHeader div.pin").css("display", c ? "none":"block");
     });
     addHider("fixedInput", true, "Fixed input", f18_setFixedInput);
 
     $("div.f18colors").css("margin-top", "20px");
-    $("tr.f18 div.fileList").each(function(e){f18_addPinToStyleDiv(this)});
+    $("tr.f18 div.fileList").each(function(e){ f18_addPinToStyleDiv(this) });
+    if(f18_getAttr("showDragger"))
+      $("div.fileList").each(function(){ f18_addDragger(this) });
+    $("[data-name]").each(function(){ f18_setPos(this) });
   };
   loadScript("pgm2/fhemweb_colorpicker.js", f18_drawSpecial);
 }
@@ -377,11 +385,6 @@ f18_addPinToStyleDiv(el)
     var ntr = $(el).next("table");
     isFixed ? $(ntr).show() : $(ntr).hide();
   });
-  if(f18_getAttr("showDragger"))
-    f18_addDragger(el);
-  f18_setPos(el);
-  if(f18_hasPos || f18_getAttr("showDragger"))
-    $("div.pinHeader:not(.menu) div.pin").hide();
 }
 
 
@@ -433,42 +436,162 @@ f18_addPin(el, name, defVal, fn, hidePin)
   fn(init);
 }
 
+// el is the drag-handle, return the corresponding SVG/table etc
+function
+f18_compEl(el)
+{
+  return $(el).hasClass("fileList") ?  $(el).next("table") : 
+         $(el).hasClass("SVGlabel") ?  $(el).prev(".SVGplot") :
+         $(el).closest("tr").next().find(">td>table").first();
+}
+
 function
 f18_addDragger(el)
 {
   if(f18_small)
     return;
-  var comp = $(el).hasClass("fileList") ?  $(el).next("table") : 
-             $(el).hasClass("SVGlabel") ?  $(el).prev(".SVGplot") :
-             $(el).closest("tr").next().find(">td>table").first();
+  if($(el).find(".dragger").length)
+    return;
+    
+  var comp = f18_compEl(el);
+  if($(comp).length == 0)
+    return;
 
+  f18_convertToAbs();
+  var ep = $(el).position();
+  var cp = $(comp).position();
+  var padding = $(el).css("padding").replace("px","")*2; // kind of a hack
+
+  var grid = [1,1];
+  if(f18_getAttr("snapToGrid"))
+    grid = [f18_grid, f18_grid];
+
+  function
+  save()
+  {
+    var nep = $(el).position();
+    f18_setAttr("Pos."+$(el).attr("data-name"), {
+      left:nep.left, top:nep.top,
+      width:$(comp).width(), height:$(comp).height(), 
+      oTop:cp.top-ep.top, oLeft:cp.left-ep.left
+    });
+  }
+
+  /////////////////////////////////////
+  // Position
   $("<div class='dragger dragMove'></div>")
     .appendTo(el)
     .css({"cursor":"pointer",
          "background-image":"url('"+f18_icon.arrows+"')"})
   $(el).draggable({
     drag:function(evt,ui){
-      $(comp).css({ left:ui.position.left, top:ui.position.top});
+      $(comp).css({ left:ui.position.left+cp.left-ep.left, 
+                    top: ui.position.top +cp.top -ep.top });
     },
-    start:function(evt,ui){
-      $(comp).css({ position:"relative",
-                    left:0, top:0, right:"auto", bottom:"auto" });
-    },
-    stop:function(evt,ui){
-      f18_setAttr("Pos."+$(el).attr("data-name"), ui.position);
-    },
+    stop:save, grid:grid
   });
 
+  /////////////////////////////////////
+  // Size
+  var off = 20;
+  if(!$(el).hasClass("SVGlabel")) {
+    $("<div class='dragSize'></div>")
+      .appendTo(el)
+      .css({ cursor:"pointer", "background-image":"url('"+f18_icon.arrows+"')",
+             position:"absolute", width:"16px", height:"16px",
+             top:$(comp).height()+2, left:$(comp).width()-off, "z-index":1 })
+      .draggable({
+        drag:function(evt,ui){
+          $(el).css(  { width:ui.position.left+off-padding });
+          $(comp).css({ width:ui.position.left+off,
+                        height:ui.position.top });
+        },
+        stop:save, grid:grid
+      });
+  }
+
+
+  /////////////////////////////////////
+  // Reset _all_ elements on this page
   $("<div class='dragger dragReset'></div>")
     .appendTo(el)
     .css({"cursor":"pointer",
          "background-image":"url('"+f18_icon.ban+"')"})
+
     .click(function(){
-      $(el)  .css({ left:0, top:0 });
-      $(comp).css({ left:0, top:0 });
-      delete(f18_attr["Pos."+$(el).attr("data-name")]);
+      function
+      delStyle(e)
+      {
+        var style = $(e).attr("style");
+        $(e).attr("style", style.replace(/position:.*;/,"")); // hack
+      }
+
+      $("[data-name]").each(function(){
+        var el = this;
+        var name = $(el).attr("data-name");
+        if(!f18_getAttr("Pos."+name))
+          return;
+        delete(f18_attr["Pos."+$(el).attr("data-name")]);
+        delStyle(el);
+        delStyle(f18_compEl(el));
+        $(el).draggable('disable');
+        $(el).find(".dragMove,.dragSize,.dragReset").hide();
+      });
       f18_setAttr();
     });
+}
+
+function
+f18_applyGrid(pos)
+{
+  if(!f18_getAttr("snapToGrid"))
+    return;
+  pos.left   = Math.floor((pos.left  + f18_grid-1)/f18_grid)*f18_grid;
+  pos.top    = Math.floor((pos.top   + f18_grid-1)/f18_grid)*f18_grid;
+  pos.width  = Math.floor((pos.width + f18_grid-1)/f18_grid)*f18_grid;
+  pos.height = Math.floor((pos.height+ f18_grid-1)/f18_grid)*f18_grid;
+}
+
+//////////////////////////
+// We use absolute positioning for all elements, if a user positioned 
+// an item, relative (the default one) else.
+function
+f18_convertToAbs()
+{
+  // Need two loops, else the sizes/positions are wrong
+  var sz = {};
+  $("[data-name]").each(function(){
+    var el = this;
+    var name = $(el).attr("data-name");
+    if(f18_getAttr("Pos."+name))
+      return;
+    var comp = f18_compEl(el);
+    if($(comp).length == 0)
+      return;
+    sz[name] = { ep:$(el).position(), cp:$(comp).position(), 
+                 w:$(comp).width(), h:$(comp).height() };
+  });
+
+  var needSave=false;
+  $("[data-name]").each(function(){
+    var el = this;
+    var name = $(el).attr("data-name");
+    if(!name || !sz[name])
+      return;
+    needSave = true;
+
+    var comp = f18_compEl(el);
+    var ep=sz[name].ep, cp=sz[name].cp, w=sz[name].w, h=sz[name].h;
+    var pos = {
+      left:ep.left, top:ep.top, width:w, height:h, 
+      oTop:cp.top-ep.top, oLeft:cp.left-ep.left
+    };
+    f18_doSetPos(el, comp, pos);
+    f18_setAttr("Pos."+name, pos, true);
+  });
+
+  if(needSave)
+    f18_setAttr();
 }
 
 function
@@ -476,20 +599,38 @@ f18_setPos(el)
 {
   if(f18_small)
     return;
-  var name = $(el).attr("data-name");
-  var pos = f18_attr["Pos."+name];
-  if(!pos)
+  var comp = f18_compEl(el);
+  if($(comp).length == 0)
     return;
 
-  f18_hasPos = true;
-  var comp = $(el).hasClass("fileList") ?  $(el).next("table") : 
-             $(el).hasClass("SVGlabel") ?  $(el).prev(".SVGplot") :
-             $(el).closest("tr").next().find(">td>table").first();
-  $(el).css({ position:"relative",
-              left:pos.left, top:pos.top, right:"auto", bottom:"auto" });
-  $(comp).css({ position:"relative",
-              left:pos.left, top:pos.top, right:"auto", bottom:"auto" });
+  var name = $(el).attr("data-name");
+  var pos = f18_getAttr("Pos."+name);
+  if(!pos || !pos.width)
+    return;
+
+  f18_doSetPos(el, comp, pos);
+
+  // correct position
+  var ds = $(el).find(".dragSize");
+  if($(ds).length)
+    $(ds).css({ top:pos.height+2, left:pos.width-20 });
 }
+
+function
+f18_doSetPos(el, comp, pos)
+{
+  f18_applyGrid(pos);
+  $(el).css({ position:"absolute", left:pos.left, top:pos.top });
+  if(!$(el).hasClass("SVGlabel")) {
+    var padding = $(el).css("padding").replace("px","")*2; // kind of a hack
+    $(el).css({ width:pos.width-padding });
+  }
+  $(comp).css({ position:"absolute", 
+              left:pos.left+pos.oLeft, top:pos.top+pos.oTop,
+              width:pos.width, height:pos.height });
+
+}
+
 
 function
 f18_getAttr(attrName)
@@ -503,13 +644,15 @@ f18_getAttr(attrName)
 }
 
 function
-f18_setAttr(name, value)
+f18_setAttr(name, value, dontSave)
 {
   if(name)
     f18_attr[name]=value;
   if(name && value == undefined)
     delete f18_attr[name];
   if(name && name.indexOf("Pinned.") == 0 && !f18_attr.savePinChanges)
+    return;
+  if(dontSave)
     return;
 
   var wn = $("body").attr("data-webName");
