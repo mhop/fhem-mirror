@@ -28,6 +28,7 @@
 # ABU 20180613 fixed scaling algo part 2
 # ABU 20180624 no set-option for listenoly- or get-devices, warning for illegal EVAL
 # ABU 20180626 fixed last changes
+# ABU 20180706 changed eval, removed stateCopy
 
 package main;
 
@@ -235,10 +236,9 @@ KNX_Initialize($) {
 								"do_not_notify:1,0 " . 		#supress any notification (including log)
 								"showtime:1,0 " . 			#shows time instead of received value in state
 								"answerReading:1,0 " .		#allows FHEM to answer a read telegram								
-								"stateRegex " .				#modifies state value
-								"stateCmd " .				#modify state value
-								"putCmd " . 				#called when the KNX bus asks for a -put reading
-								"stateCopy " .				#backup content of state in this reading (only for received telegrams)
+								"stateRegex:textField-long " .#modifies state value
+								"stateCmd:textField-long " .	#modify state value
+								"putCmd:textField-long " .	#called when the KNX bus asks for a -put reading
 								"format " .					#supplies post-string
 								"listenonly:1,0 " . 		#DEPRECATED
 								"readonly:1,0 " .			#DEPRECATED
@@ -989,8 +989,7 @@ KNX_Set($@) {
 		my $cmdAttr = AttrVal($name, "stateCmd", undef);
 		if (defined ($cmdAttr) and !($cmdAttr eq ""))
 		{
-			$state = eval $cmdAttr;
-			Log3 ($name, 2, "set name: Eval error - $@") if $@;
+			$state = KNX_eval ($hash, $targetGadName, $state, $cmdAttr);
 			Log3 ($name, 5, "set name: $name - state replaced via command, result: state:$state");					
 		}
 		
@@ -1233,8 +1232,8 @@ KNX_Parse($$) {
 				my $cmdAttr = AttrVal($deviceName, "stateCmd", undef);
 				if (defined ($cmdAttr) and !($cmdAttr eq ""))
 				{
-					$state = eval $cmdAttr;
-					Log3 ($deviceName, 2, "parse device hash (wpi): Eval error - $@") if $@;
+
+					$state = KNX_eval ($deviceHash, $gadName, $state, $cmdAttr);								
 					Log3 ($deviceName, 5, "parse device hash (wpi): $deviceHash name: $deviceName - state replaced via command $cmdAttr - state: $state");
 				}
 				#reassign original name...
@@ -1280,23 +1279,14 @@ KNX_Parse($$) {
 			if (defined ($cmdAttr) and !($cmdAttr eq ""))
 			{			
 				my $orgValue = $value;
-				my $gad = $gadName;	
-					
-				#backup kontext
-				my $orgHash = $hash;
-				$hash = $deviceHash;
-				
-				eval $cmdAttr;
-				Log3 ($deviceName, 2, "parse device hash (r): Eval error - $@") if $@;
+
+				$value = KNX_eval ($hash, $gadName, $value, $cmdAttr);
 				
 				if ($orgValue ne $value)
 				{
 					Log3 ($deviceName, 5, "parse device hash (r): $deviceHash name: $deviceName - put replaced via command $cmdAttr - value: $value");
 					readingsSingleUpdate($deviceHash, $putString, $value,1);								
 				}
-				
-				#restore kontext
-				$hash = $orgHash;
 			}
 			###/
 
@@ -1545,6 +1535,26 @@ KNX_limit ($$$$) {
 	{
 		#Log3 ($name, 2, "limit: did not execute any action. Value should be numeric, but wasn't...");
 	}
+	
+	return $retVal;
+}
+
+#Private function to encode KNX-Message according DPT
+#############################
+sub
+KNX_eval ($$$$) {
+	my ($hash, $gadName, $state, $evalString) = @_;
+	my $name = $hash->{NAME};
+	my $retVal = undef;
+	
+	Log3 ($name, 5, "Enter eval...name: $name, gadName: $gadName, evalString: \n$evalString\n");
+	
+	$retVal = eval $evalString;
+							
+	Log3 ($name, 2, "set name: Eval error - $@") if $@;
+	Log3 ($name, 5, "Exit eval...result: $retVal");
+
+	$retVal = "ERROR" if (not defined ($retVal));
 	
 	return $retVal;
 }
@@ -2137,7 +2147,6 @@ The answer from the bus-device is not shown in the toolbox, but is treated like 
 <a href="#room">room</a><br /> 
 <a href="#showtime">showtime</a><br /> 
 <a href="#sortby">sortby</a><br /> 
-<a href="#stateCopy">stateCopy</a><br />
 <a href="#stateFormat">stateFormat</a><br />
 <a href="#supressReading">supressReading</a><br /> 
 <a href="#timestamp-on-change-reading">timestamp-on-change-reading</a><br /> 
@@ -2156,12 +2165,12 @@ The answer from the bus-device is not shown in the toolbox, but is treated like 
 <ul>This function has only an impact on the content of state - no other functions are disturbed. It is executed directly after replacing the reading-names and setting the formats, but before stateCmd.</ul>
 <p><a name="KNXstateCmd"></a> <strong>stateCmd</strong></p>
 <ul>You can supply a perl-command for modifying state. This command is executed directly before updating the reading - so after renaming, format and regex. Please supply a valid perl command like using the attribute stateFormat.</ul>
-<ul>Unlike stateFormat the stateCmd modifies also the content of the reading, not only the hash-conten for visualization.</ul>
-<ul>You can access the device-hash directly in the perl string.</ul>
+<ul>Unlike stateFormat the stateCmd modifies also the content of the reading, not only the hash-content for visualization.</ul>
+<ul>You can access the device-hash directly in the perl string. You can access "$hash", "$name" and "$state". The return-value overrides "state".</ul>
 <p><a name="KNXputCmd"></a> <strong>putCmd</strong></p>
 <ul>Every time a KNX-value is requested from the bus to FHEM, the content of putCmd is evaluated before the answer is send. You can supply a perl-command for modifying content. This command is executed directly before sending the data. A copy is stored in the reading &lt;putName&gt;.</ul>
 <ul>Each device only knows one putCmd, so you have to take care about the different GAD's in the perl string.</ul>
-<ul>Unlike in stateCmd you can not access the device hash in this perl string.</ul>
+<ul>Like in stateCmd you can access the device hash in this perl string. You can access "$hash", "$name" and "$state". "$state" contains the prefilled return-value. The return-value overrides "state".</ul>
 <p><a name="KNXformat"></a> <strong>format</strong></p>
 <ul>The content of this attribute is added to every received value, before this is copied to state.</ul>
 
