@@ -95,7 +95,7 @@
 #   2016-03-28  during extractAllJSON reading definitions will not be used to format readings. 
 #               Instead after the ExtractAllJSION loop 
 #               individual readings will be extracted (checkAll) and recombined if necessary
-#               Fixed cookie handling to add cookies in HandleSendQueue inmstead of PrepareRequest
+#               Fixed cookie handling to add cookies in HandleSendQueue instead of PrepareRequest
 #   2016-04-08  fixed usage of "keys" on reference in 1555 and 1557
 #   2016-04-10  added readings UNMATCHED_READINGS and LAST_REQUEST if showMatched is set.
 #               added AlwaysNum to force names anding with a number even if just one value is found
@@ -151,6 +151,9 @@
 #   2018-05-01  new attribute enforceGoodReadingNames
 #   2018-05-05  experimental support for named groups in regexes (won't support individual MaxAge / deleteIf attributes)
 #               see ExtractReading function
+#   2018-07-01  own redirect handling, support for cookies with different paths / options
+#               new attributes dontRequeueAfterAuth, handleRedirects
+#
 #
 
 #
@@ -158,11 +161,8 @@
 #               get after set um readings zu aktualisieren
 #               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
 #
-#               named groups im regexes [?<name>.  )
-#                   you can refer to them by absolute number (using "$1" instead of "\g1" , etc)
-#                   or by name via the %+ hash, using "$+{name}".
-#                   -> if named groups exist - 
-#
+#				set clearCookies
+#				
 #               reading mit Status je get (error, no match, ...) oder reading zum nachverfolgen der schritte, fehler, auth etc.
 #
 #               In _Attr bei Prüfungen auf get auch set berücksichtigen wo nötig, ebenso in der Attr Liste (oft fehlt set)
@@ -221,7 +221,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.4.4 - 5.5.2018';
+my $HTTPMOD_Version = '3.5.1 - 5.7.2018';
 
 #
 # FHEM module intitialisation
@@ -352,9 +352,11 @@ sub HTTPMOD_Initialize($)
       "disable:0,1 " .
       "enableControlSet:0,1 " .
       "enableCookies:0,1 " .
+      "handleRedirects:0,1 " .                  # own redirect handling outside HttpUtils
       "enableXPath:0,1 " .                      # old 
       "enableXPath-Strict:0,1 " .               # old
       "enforceGoodReadingNames " .
+      "dontRequeueAfterAuth " .
       $readingFnAttributes;  
 }
 
@@ -582,7 +584,6 @@ sub HTTPMOD_Attr(@)
         } elsif ($aName eq "enableCookies") {
             if ($aVal eq "0") {
                 delete $hash->{HTTPCookieHash};
-                delete $hash->{HTTPCookies};
             }
         } elsif ($aName eq "enableXPath" 
                 || $aName =~ /(get|reading)[0-9]+XPath$/
@@ -710,7 +711,6 @@ sub HTTPMOD_Attr(@)
             }
         } elsif ($aName eq "enableCookies") {
             delete $hash->{HTTPCookieHash};
-            delete $hash->{HTTPCookies};
 
         } elsif ($aName =~ /(reading|get)[0-9]*(-[0-9]+)?MaxAge$/) {
             if (!(grep !/$aName/, grep (/(reading|get)[0-9]*(-[0-9]+)?MaxAge$/, keys %{$attr{$name}}))) {
@@ -1149,8 +1149,9 @@ sub HTTPMOD_Auth($@)
     foreach my $step (sort {$b cmp $a} keys %steps) {   # reverse sort
         ($url, $header, $data) = HTTPMOD_PrepareRequest($hash, "sid", $step);
         if ($url) {
+            my $ignRedir = AttrVal($name, "sid${step}IgnoreRedirects", 0);
             # add to front of queue (prio)
-            HTTPMOD_AddToQueue($hash, $url, $header, $data, "auth$step", undef, 0, AttrVal($name, "sid${step}IgnoreRedirects", 0), 1);
+            HTTPMOD_AddToQueue($hash, $url, $header, $data, "auth$step", undef, 0, $ignRedir, 1);
         } else {
             Log3 $name, 3, "$name: no URL for Auth $step";
         }
@@ -2192,8 +2193,6 @@ sub HTTPMOD_DoDeleteIfUnmatched($$@)
 }
 
 
-
-
 #
 # extract cookies from HTTP Response Header
 # called from _Read
@@ -2202,17 +2201,25 @@ sub HTTPMOD_GetCookies($$)
 {
     my ($hash, $header) = @_;
     my $name = $hash->{NAME};
-    Log3 $name, 5, "$name: looking for Cookies in $header";
+    #Log3 $name, 5, "$name: looking for Cookies in $header";
+    Log3 $name, 5, "$name: GetCookies is looking for Cookies";
     foreach my $cookie ($header =~ m/set-cookie: ?(.*)/gi) {
-        Log3 $name, 5, "$name: Set-Cookie: $cookie";
-        $cookie =~ /([^,; ]+)=([^,; ]+)[;, ]*(.*)/;
-        Log3 $name, 4, "$name: Cookie: $1 Wert $2 Rest $3";
-        $hash->{HTTPCookieHash}{$1}{Value} = $2;
-        $hash->{HTTPCookieHash}{$1}{Options} = ($3 ? $3 : "");
-    }
-    $hash->{HTTPCookies} = join ("; ", map ($_ . "=".$hash->{HTTPCookieHash}{$_}{Value}, 
-                                        sort keys %{$hash->{HTTPCookieHash}}));
-    
+        #Log3 $name, 5, "$name: GetCookies found Set-Cookie: $cookie";
+        $cookie =~ /([^,; ]+)=([^,; ]+)[;, ]*([^\v]*)/;
+        Log3 $name, 4, "$name: GetCookies parsed Cookie: $1 Wert $2 Rest $3";
+        my $name  = $1;
+        my $value = $2;
+        my $rest  = ($3 ? $3 : "");
+        my $path  = "";
+        if ($rest =~ /path=([^;,]+)/) {
+            $path = $1; 
+        }
+        my $key = $name . ';' . $path;
+        $hash->{HTTPCookieHash}{$key}{Name}    = $name;
+        $hash->{HTTPCookieHash}{$key}{Value}   = $value;
+        $hash->{HTTPCookieHash}{$key}{Options} = $rest;
+        $hash->{HTTPCookieHash}{$key}{Path}    = $path;     
+    }    
 }
 
 
@@ -2395,9 +2402,11 @@ sub HTTPMOD_CheckAuth($$$$$)
         Log3 $name, 4, "$name: CheckAuth decided new authentication required";
         if ($request->{retryCount} < AttrVal($name, "authRetries", 1)) {
             HTTPMOD_Auth $hash;
-            HTTPMOD_AddToQueue ($hash, $request->{url}, $request->{header}, 
-                $request->{data}, $request->{type}, $request->{value}, $request->{retryCount}+1); 
-            Log3 $name, 4, "$name: CheckAuth requeued request $request->{type} after auth, retryCount $request->{retryCount} ...";
+            if (!AttrVal($name, "dontRequeueAfterAuth", 0)) {
+                HTTPMOD_AddToQueue ($hash, $request->{url}, $request->{header}, 
+                    $request->{data}, $request->{type}, $request->{value}, $request->{retryCount}+1); 
+                Log3 $name, 4, "$name: CheckAuth requeued request $request->{type} after auth, retryCount $request->{retryCount} ...";
+            }
             return 1;
         } else {
             Log3 $name, 4, "$name: Authentication still required but no retries left - did last authentication fail?";
@@ -2432,6 +2441,43 @@ sub HTTPMOD_UpdateReadingList($)
 }
 
 
+sub HTTPMOD_CheckRedirects($$)
+{
+    my ($hash, $header) = @_;
+    my $name    = $hash->{NAME};
+    my $request = $hash->{REQUEST};
+    my $type    = $request->{type};
+    my $url     = $request->{url};
+    
+    my @header= split("\r\n", $hash->{httpheader});
+    my @header0= split(" ", shift @header);
+    my $code= $header0[1];
+    Log3 $name, 4, "$name: checking for redirects, code=$code, ignore=$request->{ignoreredirects}";
+    if ($code==301 || $code==302 || $code==303) {       # redirect ?
+        $hash->{HTTPMOD_Redirects} = 0 if (!$hash->{HTTPMOD_Redirects});
+        if(++$hash->{HTTPMOD_Redirects} > 5) {
+            Log3 $name, 3, "$name: Too many redirects processing response to $url";
+            return;
+        } else {
+            my $ra;
+            map { $ra=$1 if($_ =~ m/Location:\s*(\S+)$/) } @header;
+            $ra = "/$ra" if($ra !~ m/^http/ && $ra !~ m/^\//);
+            my $rurl = ($ra =~ m/^http/) ? $ra: $hash->{addr}.$ra;
+            if ($request->{ignoreredirects}) {
+                Log3 $name, 4, "$name: ignoring redirect to $rurl";
+                return;
+            }
+            Log3 $name, 4, "$name: $url: Redirect ($hash->{HTTPMOD_Redirects}) to $rurl";
+            # add new url with prio to queue, old header, no data todo: redirect with post possible / supported??
+            HTTPMOD_AddToQueue($hash, $rurl, $request->{header}, "", $type, undef, $request->{retryCount}, 0, 1);   
+            HTTPMOD_HandleSendQueue("direct:".$name);   # AddToQueue with prio did not call this.
+            return 1;
+        }
+    } else {
+        Log3 $name, 4, "$name: no redirects to handle";
+    }
+}
+
 #
 # read / parse new data from device
 # - callback for non blocking HTTP 
@@ -2465,7 +2511,7 @@ sub HTTPMOD_Read($$$)
     Log3 $name, 3, "$name: Read callback: Error: $err" if ($err);
     Log3 $name, 4, "$name: Read callback: request type was $type" . 
         " retry $request->{retryCount}" .
-         ($header ? ",\r\nHeader: $header" : ", no headers") . 
+         #($header ? ",\r\nHeader: $header" : ", no headers") . 
          ($body ? ",\r\nBody: $body" : ", body empty");
     
     $body = "" if (!$body);
@@ -2493,6 +2539,9 @@ sub HTTPMOD_Read($$$)
     HTTPMOD_InitParsers($hash, $body);   
     HTTPMOD_GetCookies($hash, $header) if (AttrVal($name, "enableCookies", 0));   
     HTTPMOD_ExtractSid($hash, $buffer, $context, $num); 
+    
+    return if (AttrVal($name, "handleRedirects", 0) && HTTPMOD_CheckRedirects($hash, $header));
+    delete $hash->{HTTPMOD_Redirects};
     
     readingsBeginUpdate($hash);
     readingsBulkUpdate ($hash, "LAST_ERROR", $err)      if ($err && AttrVal($name, "showError", 0));
@@ -2653,17 +2702,21 @@ HTTPMOD_HandleSendQueue($)
         }   
         
         # set parameters for HttpUtils from request into hash
-        $hash->{BUSY}            = 1;         # HTTPMOD queue is busy until response is received
-        $hash->{LASTSEND}        = $now;      # remember when last sent
-        $hash->{redirects}       = 0;
+        $hash->{BUSY}            = 1;           # HTTPMOD queue is busy until response is received
+        $hash->{LASTSEND}        = $now;        # remember when last sent
+        $hash->{redirects}       = 0;           # for HttpUtils
         $hash->{callback}        = \&HTTPMOD_Read;
         $hash->{url}             = $hash->{REQUEST}{url};
         $hash->{header}          = $hash->{REQUEST}{header};
         $hash->{data}            = $hash->{REQUEST}{data}; 
         $hash->{value}           = $hash->{REQUEST}{value}; 
         $hash->{timeout}         = AttrVal($name, "timeout", 2);
-        $hash->{ignoreredirects} = $hash->{REQUEST}{ignoreredirects};
         $hash->{httpversion}     = AttrVal($name, "httpVersion", "1.0");
+        if (AttrVal($name, "handleRedirects", 0)) {
+            $hash->{ignoreredirects} = 1;           # HttpUtils should not follow redirects if we do it in HTTPMOD
+        } else {
+            $hash->{ignoreredirects} = $hash->{REQUEST}{ignoreredirects};   # as defined in queue / set when adding to queue
+        }
         
         my $sslArgList = AttrVal($name, "sslArgs", undef);
         if ($sslArgList) {
@@ -2699,16 +2752,54 @@ HTTPMOD_HandleSendQueue($)
             $hash->{url}    =~ s/\$sid/$hash->{sid}/g;
         }
         
-        if (AttrVal($name, "enableCookies", 0) && $hash->{HTTPCookies}) {
-            Log3 $name, 5, "$name: HandleSendQueue is adding Cookies: " . $hash->{HTTPCookies};
-            $hash->{header} .= "\r\n" if ($hash->{header});
-            $hash->{header} .= "Cookie: " . $hash->{HTTPCookies};
-        }        
+                
+        if (AttrVal($name, "enableCookies", 0)) {       
+            my $uriPath = "";
+            if($hash->{url} =~ /
+                ^(http|https):\/\/                # $1: proto
+                (([^:\/]+):([^:\/]+)@)?          # $2: auth, $3:user, $4:password
+                ([^:\/]+|\[[0-9a-f:]+\])         # $5: host or IPv6 address
+                (:\d+)?                          # $6: port
+                (\/.*)$                          # $7: path
+                /xi) {
+                $uriPath = $7;
+            }
+            my $cookies = "";
+            if ($hash->{HTTPCookieHash}) {
+                foreach my $cookie (sort keys %{$hash->{HTTPCookieHash}}) {
+                    my $cPath = $hash->{HTTPCookieHash}{$cookie}{Path};
+                    my $idx = index ($uriPath, $cPath);
+                    #Log3 $name, 5, "$name: HandleSendQueue checking cookie $hash->{HTTPCookieHash}{$cookie}{Name} path $cPath";
+                    #Log3 $name, 5, "$name: HandleSendQueue cookie path $cPath";
+                    #Log3 $name, 5, "$name: HandleSendQueue URL path $uriPath";
+                    #Log3 $name, 5, "$name: HandleSendQueue no cookie path" if (!$cPath);
+                    #Log3 $name, 5, "$name: HandleSendQueue URL path" if (!$uriPath);
+                    #Log3 $name, 5, "$name: HandleSendQueue cookie path match idx = $idx";
+                    if (!$uriPath || !$cPath || $idx == 0) {
+                        Log3 $name, 5, "$name: HandleSendQueue is using Cookie $hash->{HTTPCookieHash}{$cookie}{Name} " .
+                            "with path $hash->{HTTPCookieHash}{$cookie}{Path} and Value " .
+                            "$hash->{HTTPCookieHash}{$cookie}{Value} (key $cookie, destination path is $uriPath)";
+                        $cookies .= "; " if ($cookies); 
+                        $cookies .= $hash->{HTTPCookieHash}{$cookie}{Name} . "=" . $hash->{HTTPCookieHash}{$cookie}{Value};
+                    } else {
+                        #Log3 $name, 5, "$name: HandleSendQueue no cookie path match";
+                        Log3 $name, 5, "$name: HandleSendQueue is ignoring Cookie $hash->{HTTPCookieHash}{$cookie}{Name} ";
+                        Log3 $name, 5, "$name: " . unpack ('H*', $cPath);
+                        Log3 $name, 5, "$name: " . unpack ('H*', $uriPath);
+                    }
+                }
+            }
+            if ($cookies) {
+                Log3 $name, 5, "$name: HandleSendQueue is adding Cookie header: $cookies";
+                $hash->{header} .= "\r\n" if ($hash->{header});
+                $hash->{header} .= "Cookie: " . $cookies;
+            }
+        }
                 
         Log3 $name, 4, "$name: HandleSendQueue sends request type $hash->{REQUEST}{type} to " .
                         "URL $hash->{url}, " . 
                         ($hash->{data} ? "\r\ndata: $hash->{data}, " : "No Data, ") .
-                        ($hash->{header} ? "\r\nheader: $hash->{header}, " : "No Header, ") .
+                        ($hash->{header} ? "\r\nheader: $hash->{header}" : "No Header") .
                         "\r\ntimeout $hash->{timeout}";
                         
         shift(@{$queue});       # remove first element from queue
@@ -2733,7 +2824,7 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
 
     $value           = 0 if (!$value);
     $count           = 0 if (!$count);
-    $ignoreredirects = 0 if (!$ignoreredirects);
+    $ignoreredirects = 0 if (! defined($ignoreredirects));
     
     my %request;
     $request{url}             = $url;
@@ -2751,6 +2842,7 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
             "URL $request{url}, " .
             ($request{data} ? "data $request{data}, " : "no data, ") .
             ($request{header} ? "header $request{header}, " : "no headers, ") .
+            ($request{ignoreredirects} ? "ignore redirects, " : "") .
             "retry $count";
     if(!$qlen) {
         $hash->{QUEUE} = [ \%request ];
@@ -2830,6 +2922,12 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         Example for a PoolManager 5:<br><br>
         <ul><code>
             define PM HTTPMOD http://MyPoolManager/cgi-bin/webgui.fcgi 60<br>
+			<br>
+			attr PM enableControlSet 1<br>
+			attr PM enableCookies 1<br>
+			attr PM enforceGoodReadingNames 1<br>
+			attr PM handleRedirects 1<br>
+			<br>
             attr PM reading01Name PH<br>
             attr PM reading01Regex 34.4001.value":[ \t]+"([\d\.]+)"<br>
             <br>
@@ -3092,8 +3190,8 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         In the next step this session id is sent in a post request to the same URL where tha post data contains a username and password.
         The a third and a fourth request follow that set a value and a code. The result will be a valid and authorized session id that can be used in other requests where $sid is part of a URL, header or post data and will be replaced with the session id extracted above.<br>
         <br>
-        In the special case where a session id is set as a HTTP-Cookie (with the header Set-cookie: in the HTTP response) HTTPMOD offers an even simpler way. With the attribute enableCookies a very basic cookie handling mechanism is activated that stores all cookies that the server sends to the HTTPMOD device and puts them back as cookie headers in the following requests. <br>
-        For such cases no sidIdRegex and no $sid in a user defined header is necessary.
+        In the special case where a session id is set as a HTTP-Cookie (with the header Set-cookie: in the HTTP response) HTTPMOD offers an even simpler way. With the attribute enableCookies a basic cookie handling mechanism is activated that stores all cookies that the server sends to the HTTPMOD device and puts them back as cookie headers in the following requests. <br>
+        For such cases no sidIdRegex and no $sid in a user defined header is necessary.<br>
         
     </ul>
     <br>
@@ -3106,6 +3204,12 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
 
         <ul><code>
         define test2 HTTPMOD none 0<br>
+		<br>
+		attr PM enableControlSet 1<br>
+		attr PM enableCookies 1<br>
+		attr PM enforceGoodReadingNames 1<br>
+		attr PM handleRedirects 1<br>
+		<br>
         attr test2 get01Name Chlor<br>
         attr test2 getURL http://192.168.70.90/cgi-bin/webgui.fcgi<br>
         attr test2 getHeader1 Content-Type: application/json<br>
@@ -3225,6 +3329,14 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
     </ul>
     <br>
 
+    <a name="HTTPMODnamedGroupsconfiguration"></a>
+    <b>Parsing with named regex groups</b><br><br>
+    <ul>
+		If you are an expert with regular expressions you can also use named capture groups in regexes for parsing and HTTPMOD will use the group names as reading names. This feature is only meant for experts who know exactly what they are doing and it is not necessary for normal users.
+		For formatting such readings the name of a capture group can be matched with a readingXYName attribute and then the correspondug formatting attributes will be used here.
+    </ul>
+    <br>
+	
     <a name="HTTPMODreplacements"></a>
     <b>Further replacements of URL, header or post data</b><br><br>
     <ul>
@@ -3620,6 +3732,12 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
             
         <li><b>enforceGoodReadingNames</b></li>
             makes sure that reading names are valid and especially that extractAllJSON creates valid reading names.         
+            
+        <li><b>handleRedirects</b></li>
+            enables redirect handling inside HTTPMOD. This makes complex session establishment where the HTTP responses contain a series of redirects much easier. If enableCookies is set as well, cookies will be tracked during the redirects.
+            
+        <li><b>dontRequeueAfterAuth</b></li>
+            prevents the original HTTP request to be added to the send queue again after the authentication steps. This might be necessary if the authentication steps will automatically get redirects to the URL originally requested. This option will likely need to be combined with sidXXParseResponse.
             
         <li><b>parseFunction1</b> and <b>parseFunction2</b></li>
             These functions allow an experienced Perl / Fhem developer to plug in his own parsing functions.<br>
