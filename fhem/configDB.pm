@@ -136,6 +136,10 @@
 #                        check migration only if parameter migrate => 1 
 #                        is set in configDB.conf
 #
+# 2018-07-04 - bugfix    change rescue mode persistence
+#
+# 2018-07-07 - change    lastReorg added to info output
+#
 ##############################################################################
 =cut
 
@@ -801,8 +805,7 @@ sub _cfgDB_ReadCfg(@) {
        my $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemversions');
        $count--;
        $version = $version > $count ? $count : $version;
-       Log 0, "configDB loading version $version on user request. ".
-              "Don't forget to unset variable cfgDB_version in environment!";
+       Log 0, "configDB loading version $version on user request.";
     }    
 
 # maybe this will be done with join later
@@ -939,9 +942,10 @@ sub _cfgDB_Info($) {
 	my $maxVersions = $configDB{attr}{maxversions};
 	$maxVersions = ($maxVersions) ? $maxVersions : 0;
 	push @r, " max Versions: $maxVersions" if($maxVersions);
+	push @r, " lastReorg:    ".$configDB{attr}{'lastReorg'};
 	my $count;
 	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
-	push @r, " config: $count entries";
+	push @r, " config:       $count entries";
 	push @r, "";
 
 # read versions creation time
@@ -1034,10 +1038,14 @@ sub _cfgDB_Reorg(;$$) {
 	$lastversion = (defined($lastversion)) ? $lastversion : 3;
 	Log3('configDB', 4, "DB Reorg started, keeping last $lastversion versions.");
 	my $fhem_dbh = _cfgDB_Connect;
+	my $uuid = $fhem_dbh->selectrow_array("select versionuuid from fhemversions where version = 0");
 	$fhem_dbh->do("delete FROM fhemconfig   where versionuuid in (select versionuuid from fhemversions where version > $lastversion)");
 	$fhem_dbh->do("delete from fhemversions where version > $lastversion");
 	$fhem_dbh->do("delete FROM fhemconfig   where versionuuid in (select versionuuid from fhemversions where version = -1)");
 	$fhem_dbh->do("delete from fhemversions where version = -1");
+	my $ts = localtime(time);
+	$configDB{attr}{'lastReorg'} = $ts;
+	_cfgDB_InsertLine($fhem_dbh,$uuid,"attr configdb lastReorg $ts",-1); 
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
 	eval qx(sqlite3 $cfgDB_filename vacuum) if($cfgDB_dbtype eq "SQLITE");
