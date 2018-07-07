@@ -1164,71 +1164,67 @@ sub HMinfo_GetFn($@) {#########################################################
   #------------ statistics ---------------
   if   ($cmd eq "protoEvents"){##print protocol-events-------------------------
     my ($type) = @a;
-    $type = "short" if(!$type);
+    $type = "all" if(!$type);
     my @paramList2;
     my @IOlist;
     my @plSum; push @plSum,0 for (0..11);#prefill
     my $maxNlen = 3;
+    my @hdrA = ("name","protState","protCmdPend","protSnd","protSndB","protRcv","protRcvB"
+               ,"protResnd","protCmdDel","protResndFail","protNack","protIOerr");
     foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
       my $id = $defs{$dName}{DEF};
       my $nl = length($dName); 
       $maxNlen = $nl if($nl > $maxNlen);
-      my ($found,$para) = HMinfo_getParam($id,
-                             ,"protState","protCmdPend","protSnd"
-                             ,"protSndB","protRcv","protRcvB"
-                             ,"protResnd","protCmdDel","protResndFail","protNack","protIOerr");
+      my ($found,$para) = HMinfo_getParam($id,@hdrA[1..11]);
       $para =~ s/( last_at|20..-|\|)//g;
       my @pl = split "\t",$para;
+      my $c = 0;
       foreach (@pl){
         $_ =~ s/\s+$|//g ;
         $_ =~ s/CMDs_//;
         
-        if ($type eq "short"){
+        if ($type ne "long"){
           $_ =~ s/:*..-.. ..:..:..//g;# if ($type eq "short");
+          $plSum[$c] +=$_;
         }
-        elsif($_ =~m /^[ ,0-9]{1,5}:/)
-          {my ($cnt,$date) = split(":",$_,2);
-           $_ = sprintf("%-5s%s",$cnt,$date);
+        elsif($_ =~m /^[ ,0-9]{1,5}:/){
+           my ($cnt,$date) = split(":",$_,2);
+           $_ = sprintf("%-5s-%s",$cnt,$date);
+           $plSum[$c] +=$cnt;
         }
-        $_ =~ s/CMDs // if ($type eq "short");
+        $_ =~ s/CMDs // if ($type ne "long");
+        $c++;
       }
 
-      for (1..11){
-        my ($x) =  $pl[$_] =~ /(\d+)/;
-        $plSum[$_] += $x if ($x);
-      }
       push @paramList2,[@pl];
       push @IOlist,$defs{$pl[0]}{IODev}->{NAME};
     }
     $maxNlen ++;
     my ($hdr,$ftr);
     my @paramList;
+    $_ =~ s/prot// foreach(@hdrA);
     if ($type eq "short"){
       push @paramList, sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
                     @{$_}[0..3],@{$_}[7..11]) foreach(@paramList2);
-      $hdr = sprintf("%-${maxNlen}s:%-16s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
-                               ,"name","State","CmdPend"
-                               ,"Snd"
-                               ,"Resnd"
-                               ,"CmdDel","ResndFail","Nack","IOerr");
-      $ftr = sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s","sum",@plSum[1..3],@plSum[5..11]);
+      $hdr = sprintf("%-${maxNlen}s:%-16s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",@hdrA[0..3],@hdrA[7..11]);
+      $ftr = sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s","sum",@plSum[1..3],@plSum[7..11]);
+    }
+    elsif ($type eq "all"){
+      push @paramList, sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
+                    @{$_}[0..11]) foreach(@paramList2);
+      $hdr = sprintf("%-${maxNlen}s:%-16s|%-10s|%-10s|%-10s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",@hdrA[0..11]);
+      $ftr = sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s","sum",@plSum[1..11]);
     }
     else{
-      push @paramList, sprintf("%-${maxNlen}s%-17s|%-18s|%-19s|%-19s|%-19s|%-19s|%-19s#%-18s|%-19s|%-19s|%-19s",
+      push @paramList, sprintf("%-${maxNlen}s%-17s|%-18s|%-20s|%-20s|%-20s|%-20s|%-20s#%-18s|%-20s|%-20s|%-20s",
                     @{$_}[0..11]) foreach(@paramList2);
-      $hdr = sprintf("%-${maxNlen}s:%-16s|%-18s|%-19s|%-19s|%-19s|%-19s|%-19s#%-18s|%-19s|%-19s|%-19s",
-                               ,"name","State","CmdPend"
-                               ,"Snd"
-                               ,"SndB","Rcv","RcvB"
-                               ,"Resnd"
-                               ,"CmdDel","ResndFail","Nack","IOerr");
-      $ftr = sprintf("%-${maxNlen}s%-17s|%-18s|%-19s|%-19s|%-19s|%-19s|%-19s#%-18s|%-19s|%-19s|%-19s","sum",@plSum[1..11]);
-   }
-    
+      $hdr = sprintf("%-${maxNlen}s:%-16s|%-18s|%-20s|%-20s|%-20s|%-20s|%-20s#%-18s|%-20s|%-20s|%-20s",@hdrA[0..11]);
+      $ftr = sprintf("%-${maxNlen}s%-17s|%-18s|%-20s|%-20s|%-20s|%-20s|%-20s#%-18s|%-20s|%-20s|%-20s","sum",@plSum[1..11]);
+    }
     $ret = $cmd." send to devices done:" 
            ."\n    ".$hdr  
            ."\n    ".(join "\n    ",sort @paramList)
-           ."\n================================================================================================================"
+           ."\n"."=" x (length($hdr)+($type eq "long"? 10 : 0))
            ."\n    ".$ftr 
            ."\n"
            ."\n    CUL_HM queue length:$modules{CUL_HM}{prot}{rspPend}"
@@ -1499,7 +1495,7 @@ sub HMinfo_GetFn($@) {#########################################################
             ,"param"
             ,"peerCheck"
             ,"peerXref"
-            ,"protoEvents"
+            ,"protoEvents:all,short,long"
             ,"msgStat"
             ,"rssi rssiG:full,reduced"
             ,"models"
@@ -1706,7 +1702,7 @@ sub HMInfo_help(){ ############################################################
            ."\n get register [-typeFilter-]                        # devicefilter parse devicename. Partial strings supported"
            ."\n get peerXref [-typeFilter-]                        # peer cross-reference"
            ."\n get models [-typeFilter-]                          # list of models incl native parameter"
-           ."\n get protoEvents [-typeFilter-] [short|long]        # protocol status - names can be filtered"
+           ."\n get protoEvents [-typeFilter-] [short|all|long]    # protocol status - names can be filtered"
            ."\n get msgStat                                        # view message statistic"
            ."\n get param [-typeFilter-] [-param1-] [-param2-] ... # displays params for all entities as table"
            ."\n get rssi [-typeFilter-]                            # displays receive level of the HM devices"
