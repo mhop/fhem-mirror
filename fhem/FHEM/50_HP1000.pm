@@ -140,6 +140,9 @@ sub HP1000_Initialize($) {
         Log3 undef, 1, $ret if ($ret);
     }
 
+    my $webhookFWinstance =
+      join( ",", devspec2array('TYPE=FHEMWEB:FILTER=TEMPORARY!=1') );
+
     $hash->{GetFn}         = "HP1000_Get";
     $hash->{DefFn}         = "HP1000_Define";
     $hash->{UndefFn}       = "HP1000_Undefine";
@@ -147,7 +150,7 @@ sub HP1000_Initialize($) {
     $hash->{parseParams}   = 1;
 
     $hash->{AttrList} =
-"disable:1,0 disabledForIntervals do_not_notify:1,0 wu_push:1,0 wu_indoorValues:1,0 wu_id wu_password wu_realtime:1,0 wu_dataValues extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl stateReadings stateReadingsFormat:0,1 "
+"disable:1,0 disabledForIntervals do_not_notify:1,0 wu_push:1,0 wu_indoorValues:1,0 wu_id wu_password wu_realtime:1,0 wu_dataValues extSrvPush_Url stateReadingsLang:en,de,at,ch,nl,fr,pl webhookFWinstances:sortable-strict,$webhookFWinstance stateReadings stateReadingsFormat:0,1 "
       . $readingFnAttributes;
 
     my @wu;
@@ -412,14 +415,8 @@ sub HP1000_CGI() {
     return ( "text/plain; charset=utf-8", "Booting up" )
       unless ($init_done);
 
-    # incorrect FHEMWEB instance used
-    if ( AttrVal( $FW_wname, "webname", "fhem" ) ne "weatherstation" ) {
-        return ( "text/plain; charset=utf-8",
-            "incorrect FHEMWEB instance to receive data" );
-    }
-
     # data received
-    elsif ( $request =~ /^\/updateweatherstation\.(\w{3})\?(.+=.+)/ ) {
+    if ( $request =~ /^\/updateweatherstation\.(\w{3})\?(.+=.+)/ ) {
         $servertype = lc($1);
         $URI        = $2;
 
@@ -431,6 +428,14 @@ sub HP1000_CGI() {
         return ( "text/plain; charset=utf-8",
             "No HP1000 device for webhook /updateweatherstation" )
           unless ( IsDevice( $name, 'HP1000' ) );
+
+        # incorrect FHEMWEB instance used
+        my @webhookFWinstances = split( ",",
+            AttrVal( $name, "webhookFWinstances", "weatherstation" ) );
+
+        return ( "text/plain; charset=utf-8",
+            "incorrect FHEMWEB instance to receive data" )
+          unless ( $FW_wname ~~ @webhookFWinstances );
 
         # extract values from URI
         foreach my $pv ( split( "&", $URI ) ) {
@@ -1599,6 +1604,9 @@ sub HP1000_HistoryDb($$;$$$) {
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
       <br>
 
+      <a name="webhookFWinstances"></a><li><b>webhookFWinstances</b></li>
+        Explicitly specify allowed FHEMWEB instaces for data input (defaults to weatherstation)
+
       <a name="wu_id"></a><li><b>wu_id</b></li>
         Weather Underground (Wunderground) station ID
 
@@ -1670,6 +1678,9 @@ sub HP1000_HistoryDb($$;$$$) {
     <ul>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
       <br>
+
+      <a name="webhookFWinstances"></a><li><b>webhookFWinstances</b></li>
+        Explizite Angabe der FHEMWEB Instanzen, &auml;ber die Dateneingaben erlaubt sind (Standard ist weatherstation)
 
       <a name="wu_id"></a><li><b>wu_id</b></li>
         Weather Underground (Wunderground) Stations ID
