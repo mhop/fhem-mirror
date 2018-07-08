@@ -3,6 +3,7 @@
 package main;
 use strict;
 use warnings;
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 use Data::Dumper;
 use Time::Local;
 use Encode qw(encode_utf8 decode_utf8);
@@ -10,6 +11,7 @@ use List::Util qw(sum);
 
 use HttpUtils;
 use Unit;
+
 
 # module hashes ###############################################################
 my %HP1000_pwsMapping = (
