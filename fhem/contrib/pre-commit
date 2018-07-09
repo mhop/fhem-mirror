@@ -126,7 +126,7 @@ foreach my $row (split("\n", $fList)) {
           $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
           $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
           if($tagcount{$tag} < 0) {
-            print "*** $lang $fName: negative tagcount for $tag, line $line\n";
+            err $fName, "$lang: negative tagcount for $tag, line $line";
             $tagcount{$tag} = 0;
           }
           $llwct{$tag} = $line if(!$llwct{$tag} || ($ot && !$tagcount{$tag}));
