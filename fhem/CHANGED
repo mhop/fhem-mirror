@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  98_DOIFtools: more precise hint related to DOELSE (Forum #89260)
   - change:  98_feels_like.pm: Improved algorithms
   - change:  98_dewpoint: new attributes absoluteHumidity, vapourPressure
                           attribute absFeuchte is now deprecated,

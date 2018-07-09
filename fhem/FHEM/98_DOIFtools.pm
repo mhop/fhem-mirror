@@ -896,7 +896,7 @@ sub DOIFtoolsCheckDOIF {
       $ret .= "<li><b>sleep</b> im DOIF zu nutzen, wird nicht empfohlen, nutze das Attribut <b>wait</b> für (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_wait\">Verzögerungen</a>)</li>\n" if ($tail =~ m/(sleep\s\d+\.?\d+\s*[;|,]?)/);
       $ret .= "<li>ersetze <b>[</b>name<b>:?</b>regex<b>]</b> durch <b>[</b>name<b>:\"</b>regex<b>\"]</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events\">Vermeidung veralteter Syntax</a>)</li>\n" if ($tail =~ m/(\[.*?[^"]?:[^"]?\?.*?\])/);
 
-      $ret .= "<li>der erste <b>Befehl</b> nach <b>DOELSE</b> scheint eine  <b>Bedingung</b> zu sein, weil <b>$2</b> enthalten ist, bitte prüfen.</li>\n" if ($tail =~ m/(DOELSE .*?\]\s*?(\!\S|\=\~|\!\~|and|or|xor|not|\|\||\&\&|\=\=|\!\=|ne|eq|lt|gt|le|ge)\s*?).*?\)/);
+      $ret .= "<li>nach <b>DOELSE</b> ist möglicherweise eine <b>Bedingung</b> angegeben, weil <b>$2</b> gefunden wurde, bitte prüfen (ignorieren, wenn der Operator zu einem Befehl gehört).</li>\n" if ($tail =~ m/(DOELSE .*?\]\s*?(\!\S|\=\~|\!\~|and|or|xor|not|\|\||\&\&|\=\=|\!\=|ne|eq|lt|gt|le|ge)\s*?).*?\)/);
       my @wait = SplitDoIf(":",AttrVal($tn,"wait",""));
       my @sub0 = ();
       my @tmp = ();
@@ -966,7 +966,7 @@ sub DOIFtoolsCheckDOIF {
       $ret .= "<li><b>sleep</b> is not recommended in DOIF, use attribute <b>wait</b> for (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_wait\">delay</a>)</li>\n" if ($tail =~ m/(sleep\s\d+\.?\d+\s*[;|,]?)/);
       $ret .= "<li>replace <b>[</b>name<b>:?</b>regex<b>]</b> by <b>[</b>name<b>:\"</b>regex<b>\"]</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events\">avoid old syntax</a>)</li>\n" if ($tail =~ m/(\[.*?[^"]?:[^"]?\?.*?\])/);
 
-      $ret .= "<li>the first <b>command</b> after <b>DOELSE</b> seems to be a <b>condition</b> indicated by <b>$2</b>, check it.</li>\n" if ($tail =~ m/(DOELSE .*?\]\s*?(\!\S|\=\~|\!\~|and|or|xor|not|\|\||\&\&|\=\=|\!\=|ne|eq|lt|gt|le|ge)\s*?).*?\)/);
+      $ret .= "<li><b>$2</b> found after <b>DOELSE</b>, it seems to be a <b>condition</b>, check it (ignore if it's part of a command).</li>\n" if ($tail =~ m/(DOELSE .*?\]\s*?(\!\S|\=\~|\!\~|and|or|xor|not|\|\||\&\&|\=\=|\!\=|ne|eq|lt|gt|le|ge)\s*?).*?\)/);
       my @wait = SplitDoIf(":",AttrVal($tn,"wait",""));
       my @sub0 = ();
       my @tmp = ();
