@@ -39,7 +39,9 @@ watchdog_Initialize($)
       my $wh = $defs{$wd};
       my $aTime = ReadingsTimestamp($wd, "Activated", undef);
       my $tTime = ReadingsTimestamp($wd, "Triggered", undef);
+      my $rTime = ReadingsTimestamp($wd, "Reset",     undef);
       next if(!$aTime ||
+              ($rTime && $rTime gt $aTime) ||
               ($tTime && $tTime gt $aTime) ||
               time_str2num($aTime)+$wh->{TO} <= $now);
       my $remaining = time_str2num($aTime)+$wh->{TO};
@@ -48,6 +50,13 @@ watchdog_Initialize($)
   }, 1) if(!$init_done);
 }
 
+sub
+watchdog_reset($)
+{
+  my ($watchdog) = @_;
+  $watchdog->{STATE} = "defined";
+  setReadingsVal($watchdog, "Reset", "reset", TimeNow());
+}
 
 #####################################
 # defined watchme watchdog reg1 timeout reg2 command
@@ -91,7 +100,7 @@ watchdog_Define($$)
     watchdog_Activate($watchdog)
 
   } else {
-    $watchdog->{STATE} = "defined";
+    $watchdog->{STATE} = "defined"; # do not set the reading
 
   }
 
@@ -131,7 +140,7 @@ watchdog_Notify($$)
 
       if($dotTrigger) {
         RemoveInternalTimer($watchdog);
-        $watchdog->{STATE} = "defined";
+        watchdog_reset($watchdog);
         return;
       }
 
@@ -146,7 +155,7 @@ watchdog_Notify($$)
           return "";
 
         } else {
-          $watchdog->{STATE} = "defined";
+          watchdog_reset($watchdog);
 
         }
 
@@ -161,7 +170,7 @@ watchdog_Notify($$)
       }
 
     } elsif($dotTrigger) {
-      $watchdog->{STATE} = "defined";       # trigger w . 
+      watchdog_reset($watchdog);       # trigger w . 
 
     }
 
@@ -176,7 +185,7 @@ watchdog_Trigger($)
   my $name = $watchdog->{NAME};
 
   if(IsDisabled($name) || $watchdog->{STATE} eq "inactive") {
-    $watchdog->{STATE} = "defined";
+    watchdog_reset($watchdog);
     return "";
   }
 
@@ -190,7 +199,7 @@ watchdog_Trigger($)
   Log3 $name, 3, $ret if($ret);
 
   if(AttrVal($name, "autoRestart", 0)) {
-      $watchdog->{STATE} = "defined";       # auto trigger w . 
+    watchdog_reset($watchdog);       # auto trigger w . 
   }
 }
 
