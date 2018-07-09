@@ -198,7 +198,7 @@ dummy_Define($$)
       diesem Fall werden nur die Befehle aus setList und die set exensions
       akzeptiert.</li>
 
-    </li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 
