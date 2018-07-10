@@ -1181,18 +1181,16 @@ sub HMinfo_GetFn($@) {#########################################################
       my $c = 0;
       foreach (@pl){
         $_ =~ s/\s+$|//g ;
-        $_ =~ s/CMDs_//;
-        
+        $_ =~ s/CMDs[_ ]//;
         if ($type ne "long"){
           $_ =~ s/:*..-.. ..:..:..//g;# if ($type eq "short");
-          $plSum[$c] +=$_;
+          $plSum[$c] += $1 if ($_ =~ m/^\s*(\d+)/);
         }
         elsif($_ =~m /^[ ,0-9]{1,5}:/){
            my ($cnt,$date) = split(":",$_,2);
            $_ = sprintf("%-5s-%s",$cnt,$date);
            $plSum[$c] +=$cnt;
         }
-        $_ =~ s/CMDs // if ($type ne "long");
         $c++;
       }
 
