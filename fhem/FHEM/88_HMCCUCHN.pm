@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.002
+#  Version 4.2.003
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -116,7 +116,7 @@ sub HMCCUCHN_Define ($@)
 	return "Cannot detect IO device" if (!defined ($hmccu_hash));
 
 	return "Invalid or unknown CCU channel name or address"
-		if (! HMCCU_IsValidChannel ($hmccu_hash, $devspec));
+		if (! HMCCU_IsValidChannel ($hmccu_hash, $devspec, 7));
 
 	my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
 	return "Invalid or unknown CCU device name or address" if (!defined ($da));
@@ -820,8 +820,8 @@ sub HMCCUCHN_Get ($@)
          attr mydev ccureadingname [1-4].PRESSED_SHORT:+pressed
          </code>
       </li><br/>
-      <li><b>ccuscaleval &lt;datapoint&gt;:&lt;factor&gt;[,...]</b><br/>
-      <b>ccuscaleval &lt;[!]datapoint&gt;:&lt;min&gt;:&lt;max&gt;:&lt;minn&gt;:&lt;maxn&gt;[,...]
+      <li><b>ccuscaleval &lt;[channelno.]datapoint&gt;:&lt;factor&gt;[,...]</b><br/>
+      <b>ccuscaleval &lt;[!][channelno.]datapoint&gt;:&lt;min&gt;:&lt;max&gt;:&lt;minn&gt;:&lt;maxn&gt;[,...]
       </b><br/>
          Scale, spread, shift and optionally reverse values before executing set datapoint commands
          or after executing get datapoint commands / before storing values in readings.<br/>

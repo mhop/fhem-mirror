@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.0.005
+#  Version 1.0.006
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.0.005';
+my $HMCCURPCPROC_VERSION = '1.0.006';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -76,7 +76,7 @@ my $HMCCURPCPROC_SERVER_PORT = 5400;
 # Delay for RPC server start after FHEM is initialized
 my $HMCCURPCPROC_INIT_INTERVAL0 = 12;
 
-# Delay for RPC server cleanup after top
+# Delay for RPC server cleanup after stop
 my $HMCCURPCPROC_INIT_INTERVAL2 = 30;
 
 # Delay for RPC server functionality check after start
@@ -273,19 +273,16 @@ sub HMCCURPCPROC_Define ($$)
 	}
 	
 	# Detect local IP address and check if CCU is reachable
-	my $socket = IO::Socket::INET->new (PeerAddr => $hash->{host}, PeerPort => $ifport);
-	return (0, "Can't connect to CCU ".$hash->{host}." port $ifport") if (!$socket);
-	$hash->{hmccu}{localaddr} = $socket->sockhost ();
-	close ($socket);
-	return "Can't detect local IP address" if (!defined ($hash->{hmccu}{localaddr}));
+	my $localaddr = HMCCU_TCPConnect ($hash->{host}, $ifport);
+	return "Can't connect to CCU ".$hash->{host}." port $ifport" if ($localaddr eq '');
+	$hash->{hmccu}{localaddr} = $localaddr;
 	$hash->{hmccu}{defaultaddr} = $hash->{hmccu}{localaddr};
 
 	# Get unique ID for RPC server: last 2 segments of local IP address
 	# Do not append random digits because of https://forum.fhem.de/index.php/topic,83544.msg797146.html#msg797146
 	my @ipseg = split (/\./, $hash->{hmccu}{localaddr});
 	return "Invalid local IP address ".$hash->{hmccu}{localaddr} if (scalar (@ipseg) != 4);
-#	my $base = (time() % 10)+1;
-	$hash->{rpcid} = sprintf ("%03d%03d", $ipseg[2], $ipseg[3]); # . join '', map int rand ($base), 1..2;
+	$hash->{rpcid} = sprintf ("%03d%03d", $ipseg[2], $ipseg[3]);
 
 	# Set I/O device and store reference for RPC device in I/O device
 	AssignIoPort ($hash, $hmccu_hash->{NAME});

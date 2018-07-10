@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.2.001
+#  Version 4.2.003
 #
 #  (c) 2018 zap (zap01 <at> t-online <dot> de)
 #
@@ -142,7 +142,7 @@ sub HMCCUDEV_Define ($@)
 		return "Cannot detect IO device" if (!defined ($hmccu_hash));
 		
 		return "Invalid or unknown CCU device name or address: $devspec"
-			if (! HMCCU_IsValidDevice ($hmccu_hash, $devspec));
+			if (! HMCCU_IsValidDevice ($hmccu_hash, $devspec, 7));
 
 		my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
 		return "Invalid or unknown CCU device name or address: $devspec" if (!defined ($da));
@@ -177,7 +177,7 @@ sub HMCCUDEV_Define ($@)
 			foreach my $gd (@gdevlist) {
 				my ($gda, $gdc, $gdo) = ('', '', '', '');
 
-				return "Invalid device or channel $gd" if (!HMCCU_IsValidDevice ($hmccu_hash, $gd));
+				return "Invalid device or channel $gd" if (!HMCCU_IsValidDevice ($hmccu_hash, $gd, 7));
 
 				($gda, $gdc) = HMCCU_GetAddress ($hmccu_hash, $gd, '', '');
 				$gdo = $gda;

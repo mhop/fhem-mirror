@@ -4,12 +4,13 @@
 #
 #  $Id$
 #
-#  Version 4.2.007
+#  Version 4.2.008
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #
 #  Supports BidCos-RF, BidCos-Wired, HmIP-RF, virtual CCU channels,
 #  CCU group devices, HomeGear, CUxD, Osram Lightify, Homematic Virtual Layer
+#  and Philips Hue (not tested)
 #
 #  (c) 2018 by zap (zap01 <at> t-online <dot> de)
 #
@@ -105,7 +106,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.2.007';
+my $HMCCU_VERSION = '4.2.008';
 
 # Default RPC port (BidCos-RF)
 my $HMCCU_RPC_PORT_DEFAULT = 2001;
@@ -194,6 +195,13 @@ my $HMCCU_FLAGS_ND = $HMCCU_FLAG_NAME | $HMCCU_FLAG_DATAPOINT;
 my $HMCCU_FLAGS_NC = $HMCCU_FLAG_NAME | $HMCCU_FLAG_CHANNEL;
 my $HMCCU_FLAGS_NCD = $HMCCU_FLAG_NAME | $HMCCU_FLAG_CHANNEL | $HMCCU_FLAG_DATAPOINT;
 
+# Flags for address/name checks
+my $HMCCU_FL_STADDRESS = 1;
+my $HMCCU_FL_NAME      = 2;
+my $HMCCU_FL_EXADDRESS = 4;
+my $HMCCU_FL_ADDRESS   = 5;
+my $HMCCU_FL_ALL       = 7;
+
 # Default values
 my $HMCCU_DEF_HMSTATE = '^0\.UNREACH!(1|true):unreachable;^[0-9]\.LOW_?BAT!(1|true):warn_battery';
 
@@ -276,9 +284,9 @@ sub HMCCU_GetDatapointCount ($$$);
 sub HMCCU_GetSpecialDatapoints ($$$$$);
 sub HMCCU_GetAttrReadingFormat ($$);
 sub HMCCU_GetAttrSubstitute ($$);
-sub HMCCU_IsValidDeviceOrChannel ($$);
-sub HMCCU_IsValidDevice ($$);
-sub HMCCU_IsValidChannel ($$);
+sub HMCCU_IsValidDeviceOrChannel ($$$);
+sub HMCCU_IsValidDevice ($$$);
+sub HMCCU_IsValidChannel ($$$);
 sub HMCCU_GetCCUDeviceParam ($$);
 sub HMCCU_GetDatapointAttr ($$$$$);
 sub HMCCU_GetValidDatapoints ($$$$$);
@@ -300,7 +308,7 @@ sub HMCCU_HMScriptExt ($$$);
 sub HMCCU_BulkUpdate ($$$$);
 sub HMCCU_GetDatapoint ($@);
 sub HMCCU_SetDatapoint ($$$);
-sub HMCCU_ScaleValue ($$$$);
+sub HMCCU_ScaleValue ($$$$$);
 sub HMCCU_GetVariables ($$);
 sub HMCCU_SetVariable ($$$$$);
 sub HMCCU_GetUpdate ($$$);
@@ -1476,7 +1484,7 @@ sub HMCCU_Get ($@)
 		$ccuget = 'Attr' if (!defined ($ccuget));
 		return HMCCU_SetError ($hash, $usage) if ($ccuget !~ /^(Attr|State|Value)$/);
 
-		return HMCCU_SetError ($hash, -1) if (!HMCCU_IsValidDeviceOrChannel ($hash, $device));
+		return HMCCU_SetError ($hash, -1) if (!HMCCU_IsValidDeviceOrChannel ($hash, $device, $HMCCU_FL_ALL));
 		$result = HMCCU_GetDeviceInfo ($hash, $device, $ccuget);
 		return HMCCU_SetError ($hash, -2) if ($result eq '' || $result =~ /^ERROR:.*/);
 		HMCCU_SetState ($hash, "OK");
@@ -1905,7 +1913,7 @@ sub HMCCU_FilterReading ($$$)
 	my $devadd = '';
 
 	# Get channel name and channel number
-	if (HMCCU_IsValidChannel ($hmccu_hash, $chn)) {
+	if (HMCCU_IsValidChannel ($hmccu_hash, $chn, $HMCCU_FL_ADDRESS)) {
 		$chnnam = HMCCU_GetChannelName ($hmccu_hash, $chn, '');
 		($devadd, $chnnum) = HMCCU_SplitChnAddr ($chn);
 	}
@@ -2786,7 +2794,7 @@ sub HMCCU_UpdateSingleDevice ($$$)
 
 					if (HMCCU_FilterReading ($ch, $chnadd, $dpt)) {
 						my @readings = HMCCU_GetReadingName ($ch, '', $da, $chnnum, $dpt, '', $crf);
-						my $svalue = HMCCU_ScaleValue ($ch, $dpt, $value, 0);	
+						my $svalue = HMCCU_ScaleValue ($ch, $chnnum, $dpt, $value, 0);	
 						my $fvalue = HMCCU_FormatReadingValue ($ch, $svalue, $dpt);
 						my $cvalue = HMCCU_Substitute ($fvalue, $substitute, 0, $chnnum, $dpt);
 						my %calcs = HMCCU_CalculateReading ($ch, $chnnum, $dpt);
@@ -3276,12 +3284,10 @@ sub HMCCU_StartIntRPCServer ($)
 
 	# Detect local IP address
 	if ($localaddr eq '') {
-		my $socket = IO::Socket::INET->new (PeerAddr => $serveraddr, PeerPort => $rpcportlist[0]);
-		return HMCCU_Log ($hash, 1, "Can't connect to RPC host $serveraddr port".$rpcportlist[0], 0) if (!$socket);
-		$localaddr = $socket->sockhost ();
-		close ($socket);
+		$localaddr = HMCCU_TCPConnect ($serveraddr, $rpcportlist[0]);
+		return HMCCU_Log ($hash, 1, "Can't connect to RPC host $serveraddr port".$rpcportlist[0], 0)
+			if ($localaddr eq '');
 	}
-
 	$hash->{hmccu}{localaddr} = $localaddr;
 
 	my $ccunum = $hash->{CCUNum};
@@ -3883,97 +3889,92 @@ sub HMCCU_GetDatapointList ($$$)
 ######################################################################
 # Check if device/channel name or address is valid and refers to an
 # existing device or channel.
+# mode: Bit combination: 1=Address 2=Name 4=Special address
 ######################################################################
 
-sub HMCCU_IsValidDeviceOrChannel ($$)
+sub HMCCU_IsValidDeviceOrChannel ($$$)
 {
-	my ($hash, $param) = @_;
+	my ($hash, $param, $mode) = @_;
 
-	if (HMCCU_IsDevAddr ($param, 1) || HMCCU_IsChnAddr ($param, 1)) {
-		my ($i, $a) = split (/\./, $param);
-		return 0 if (! exists ($hash->{hmccu}{dev}{$a}));
-		return $hash->{hmccu}{dev}{$a}{valid};		
-	}
-	
-	if (HMCCU_IsDevAddr ($param, 0) || HMCCU_IsChnAddr ($param, 0)) {
-		return 0 if (! exists ($hash->{hmccu}{dev}{$param}));
-		return $hash->{hmccu}{dev}{$param}{valid};
-	}
-	else {
-		if (exists ($hash->{hmccu}{adr}{$param})) {
-			return $hash->{hmccu}{adr}{$param}{valid};
-		}
-		elsif (exists ($hash->{hmccu}{dev}{$param})) {
-			return $hash->{hmccu}{dev}{$param}{valid};
-		}
-		else {
-			return 0;
-		}
-	}
+	return HMCCU_IsValidDevice ($hash, $param, $mode) || HMCCU_IsValidChannel ($hash, $param, $mode) ? 1 : 0;
 }
 
 ######################################################################
 # Check if device name or address is valid and refers to an existing
 # device.
+# mode: Bit combination: 1=Address 2=Name 4=Special address
 ######################################################################
 
-sub HMCCU_IsValidDevice ($$)
+sub HMCCU_IsValidDevice ($$$)
 {
-	my ($hash, $param) = @_;
+	my ($hash, $param, $mode) = @_;
 
-	if (HMCCU_IsDevAddr ($param, 1)) {
-		my ($i, $a) = split (/\./, $param);
-		return 0 if (! exists ($hash->{hmccu}{dev}{$a}));
-		return $hash->{hmccu}{dev}{$a}{valid};		
-	}
-	
-	if (HMCCU_IsDevAddr ($param, 0)) {
-		return 0 if (! exists ($hash->{hmccu}{dev}{$param}));
-		return $hash->{hmccu}{dev}{$param}{valid};
-	}
-	else {
-		if (exists ($hash->{hmccu}{adr}{$param})) {
-			return $hash->{hmccu}{adr}{$param}{valid} && $hash->{hmccu}{adr}{$param}{addtype} eq 'dev' ? 1 : 0;
+	# Address
+	if ($mode & $HMCCU_FL_STADDRESS) {
+		# Address with interface
+		if (HMCCU_IsDevAddr ($param, 1)) {
+			my ($i, $a) = split (/\./, $param);
+			return 0 if (! exists ($hash->{hmccu}{dev}{$a}));
+			return $hash->{hmccu}{dev}{$a}{valid};		
 		}
-		elsif (exists ($hash->{hmccu}{dev}{$param})) {
+
+		# Address without interface
+		if (HMCCU_IsDevAddr ($param, 0)) {
+			return 0 if (! exists ($hash->{hmccu}{dev}{$param}));
+			return $hash->{hmccu}{dev}{$param}{valid};
+		}
+		
+		# Special address for Non-Homematic devices
+		if (($mode & $HMCCU_FL_EXADDRESS) && exists ($hash->{hmccu}{dev}{$param})) {
 			return $hash->{hmccu}{dev}{$param}{valid} && $hash->{hmccu}{dev}{$param}{addtype} eq 'dev' ? 1 : 0;
 		}
-		else {
-			return 0;
-		}
 	}
+	
+	# Name
+	if (($mode & 2) && exists ($hash->{hmccu}{adr}{$param})) {
+		return $hash->{hmccu}{adr}{$param}{valid} && $hash->{hmccu}{adr}{$param}{addtype} eq 'dev' ? 1 : 0;
+	}
+
+	return 0;
 }
 
 ######################################################################
 # Check if channel name or address is valid and refers to an existing
 # channel.
+# mode: Bit combination: 1=Address 2=Name 4=Special address
 ######################################################################
 
-sub HMCCU_IsValidChannel ($$)
+sub HMCCU_IsValidChannel ($$$)
 {
-	my ($hash, $param) = @_;
+	my ($hash, $param, $mode) = @_;
 
-	if (HMCCU_IsChnAddr ($param, 1)) {
-		my ($i, $a) = split (/\./, $param);
-		return 0 if (! exists ($hash->{hmccu}{dev}{$a}));
-		return $hash->{hmccu}{dev}{$a}{valid};		
-	}
+	# Standard address for Homematic devices
+	if ($mode & $HMCCU_FL_STADDRESS) {
+		# Address with interface
+		if (($mode & $HMCCU_FL_STADDRESS) && HMCCU_IsChnAddr ($param, 1)) {
+			my ($i, $a) = split (/\./, $param);
+			return 0 if (! exists ($hash->{hmccu}{dev}{$a}));
+			return $hash->{hmccu}{dev}{$a}{valid};		
+		}
 	
-	if (HMCCU_IsChnAddr ($param, 0)) {
-		return 0 if (! exists ($hash->{hmccu}{dev}{$param}));
-		return $hash->{hmccu}{dev}{$param}{valid};
-	}
-	else {
-		if (exists ($hash->{hmccu}{adr}{$param})) {
-			return $hash->{hmccu}{adr}{$param}{valid} && $hash->{hmccu}{adr}{$param}{addtype} eq 'chn' ? 1 : 0;
-		}
-		elsif (exists ($hash->{hmccu}{dev}{$param})) {
-			return $hash->{hmccu}{dev}{$param}{valid} && $hash->{hmccu}{dev}{$param}{addtype} eq 'chn' ? 1 : 0;
-		}
-		else {
-			return 0;
+		# Address without interface
+		if (HMCCU_IsChnAddr ($param, 0)) {
+			return 0 if (! exists ($hash->{hmccu}{dev}{$param}));
+			return $hash->{hmccu}{dev}{$param}{valid};
 		}
 	}
+
+	# Special address for Non-Homematic devices
+	if (($mode & $HMCCU_FL_EXADDRESS) && exists ($hash->{hmccu}{dev}{$param})) {
+		return $hash->{hmccu}{dev}{$param}{valid} && $hash->{hmccu}{dev}{$param}{addtype} eq 'chn' ? 1 : 0;
+	}
+
+	# Name
+	if (($mode & 2) && exists ($hash->{hmccu}{adr}{$param})) {
+		return $hash->{hmccu}{adr}{$param}{valid} && $hash->{hmccu}{adr}{$param}{addtype} eq 'chn' ? 1 : 0;
+	}
+
+	return 0;
 }
 
 ######################################################################
@@ -4167,7 +4168,7 @@ sub HMCCU_IsValidDatapoint ($$$$$)
 			HMCCU_Trace ($hash, 2, $fnc, "$chn is a channel number");
 			$chnno = $chn;
 		}
-		elsif (HMCCU_IsValidChannel ($hmccu_hash, $chn)) {
+		elsif (HMCCU_IsValidChannel ($hmccu_hash, $chn, $HMCCU_FL_ADDRESS)) {
 			HMCCU_Trace ($hash, 2, $fnc, "$chn is a valid channel address");
 			my ($a, $c) = split(":",$chn);
 			$chnno = $c;
@@ -4224,7 +4225,7 @@ sub HMCCU_GetDeviceName ($$$)
 {
 	my ($hash, $addr, $default) = @_;
 
-	if (HMCCU_IsValidDeviceOrChannel ($hash, $addr)) {
+	if (HMCCU_IsValidDeviceOrChannel ($hash, $addr, $HMCCU_FL_ADDRESS)) {
 		$addr =~ s/:[0-9]+$//;
 		return $hash->{hmccu}{dev}{$addr}{name};
 	}
@@ -4240,7 +4241,7 @@ sub HMCCU_GetChannelName ($$$)
 {
 	my ($hash, $addr, $default) = @_;
 
-	if (HMCCU_IsValidChannel ($hash, $addr)) {
+	if (HMCCU_IsValidChannel ($hash, $addr, $HMCCU_FL_ADDRESS)) {
 		return $hash->{hmccu}{dev}{$addr}{name};
 	}
 
@@ -4256,7 +4257,7 @@ sub HMCCU_GetDeviceType ($$$)
 {
 	my ($hash, $addr, $default) = @_;
 
-	if (HMCCU_IsValidDeviceOrChannel ($hash, $addr)) {
+	if (HMCCU_IsValidDeviceOrChannel ($hash, $addr, $HMCCU_FL_ADDRESS)) {
 		$addr =~ s/:[0-9]+$//;
 		return $hash->{hmccu}{dev}{$addr}{type};
 	}
@@ -4274,7 +4275,7 @@ sub HMCCU_GetDeviceChannels ($$$)
 {
 	my ($hash, $addr, $default) = @_;
 
-	if (HMCCU_IsValidDeviceOrChannel ($hash, $addr)) {
+	if (HMCCU_IsValidDeviceOrChannel ($hash, $addr, $HMCCU_FL_ADDRESS)) {
 		$addr =~ s/:[0-9]+$//;
 		return $hash->{hmccu}{dev}{$addr}{channels};
 	}
@@ -4291,7 +4292,7 @@ sub HMCCU_GetDeviceInterface ($$$)
 {
 	my ($hash, $addr, $default) = @_;
 
-	if (HMCCU_IsValidDeviceOrChannel ($hash, $addr)) {
+	if (HMCCU_IsValidDeviceOrChannel ($hash, $addr, $HMCCU_FL_ADDRESS)) {
 		$addr =~ s/:[0-9]+$//;
 		return $hash->{hmccu}{dev}{$addr}{interface};
 	}
@@ -4305,7 +4306,7 @@ sub HMCCU_GetDeviceInterface ($$$)
 # preceded by "hmccu:". CCU names can be preceded by "ccu:".
 # Return array with device address and channel no. If name is not
 # found or refers to a device the specified default values will be
-# returned.
+# returned. 
 ######################################################################
 
 sub HMCCU_GetAddress ($$$$)
@@ -4318,6 +4319,7 @@ sub HMCCU_GetAddress ($$$$)
 	my $type = '';
 
 	if ($name =~ /^hmccu:.+$/) {
+		# Name is a FHEM device name
 		$name =~ s/^hmccu://;
 		if ($name =~ /^([^:]+):([0-9]{1,2})$/) {
 			$name = $1;
@@ -4331,6 +4333,7 @@ sub HMCCU_GetAddress ($$$$)
 		return ($add, $chn);
 	}
 	elsif ($name =~ /^ccu:.+$/) {
+		# Name is a CCU device or channel name
 		$name =~ s/^ccu://;
 	}
 
@@ -4584,7 +4587,7 @@ sub HMCCU_FindIODevice ($)
 		next if (!exists ($ch->{TYPE}));
 		next if ($ch->{TYPE} ne 'HMCCU');
 		
-		return $ch if (HMCCU_IsValidDeviceOrChannel ($ch, $param));
+		return $ch if (HMCCU_IsValidDeviceOrChannel ($ch, $param, $HMCCU_FL_ALL));
 	}
 	
 	return undef;
@@ -4830,7 +4833,7 @@ sub HMCCU_ProcessEvent ($$)
 		# Output: EV, DevAdd, ChnNo, Reading='', Value
 		#
 		return HMCCU_Log ($hash, 2, "Invalid channel ".$t[1], undef)
-			if (!HMCCU_IsValidChannel ($hash, $t[1]));
+			if (!HMCCU_IsValidChannel ($hash, $t[1], $HMCCU_FL_ADDRESS));
 		my ($add, $chn) = split (/:/, $t[1]);
 		return ($t[0], $add, $chn, $t[2], $t[3]);
 	}
@@ -5062,7 +5065,7 @@ sub HMCCU_ReadRPCQueue ($)
 	if ($hash->{hmccu}{evtime} > 0 && time()-$hash->{hmccu}{evtime} > $rpcevtimeout &&
 	   $hash->{hmccu}{evtimeout} == 0) {
 	   $hash->{hmccu}{evtimeout} = 1;
-		$hash->{ccustate} = HMCCU_TCPConnect ($hash->{host}, 8181) ? 'timeout' : 'unreachable';
+		$hash->{ccustate} = HMCCU_TCPConnect ($hash->{host}, 8181) ne '' ? 'timeout' : 'unreachable';
 		Log3 $name, 2, "HMCCU: Received no events from CCU since $rpcevtimeout seconds";
 		DoTrigger ($name, "No events from CCU since $rpcevtimeout seconds");
 	}
@@ -5395,7 +5398,7 @@ sub HMCCU_SetDatapoint ($$$)
 		$value = HMCCU_EncodeEPDisplay ($value);
 	}
 	else {
-		$value = HMCCU_ScaleValue ($hash, $dpt, $value, 1);
+		$value = HMCCU_ScaleValue ($hash, $chn, $dpt, $value, 1);
 	}
 	
 	my $dpttype = HMCCU_GetDatapointAttr ($hmccu_hash, $hash->{ccutype}, $chn, $dpt, 'type');
@@ -5446,15 +5449,15 @@ sub HMCCU_SetDatapoint ($$$)
 # Mode: 0 = Get/Divide, 1 = Set/Multiply
 # Supports reversing of value if value range is specified. Syntax for
 # Rule is:
-#   Datapoint:Factor
-#   [!]Datapoint:Min:Max:Range1:Range2
+#   [ChannelNo.]Datapoint:Factor
+#   [!][ChannelNo.]Datapoint:Min:Max:Range1:Range2
 # If Datapoint name starts with a ! the value is reversed. In case of
 # an error original value is returned.
 ######################################################################
 
-sub HMCCU_ScaleValue ($$$$)
+sub HMCCU_ScaleValue ($$$$$)
 {
-	my ($hash, $dpt, $value, $mode) = @_;
+	my ($hash, $chnno, $dpt, $value, $mode) = @_;
 	my $name = $hash->{NAME};
 	
 	my $ccuscaleval = AttrVal ($name, 'ccuscaleval', '');	
@@ -5469,11 +5472,18 @@ sub HMCCU_ScaleValue ($$$$)
 
 		my $rev = 0;
 		my $dn = $a[0];
+		my $cn = $chnno;
 		if ($dn =~ /^\!(.+)$/) {
+			# Invert
 			$dn = $1;
 			$rev = 1;
-		}		
-		next if ($dpt ne $dn);
+		}
+		if ($dn =~ /^([0-9]{1,2})\.(.+)$/) {
+			# Compare channel number
+			$cn = $1;
+			$dn = $2;
+		}
+		next if ($dpt ne $dn || ($chnno ne '' && $cn ne $chnno));
 			
 		if ($n == 2) {
 			$f = ($a[1] == 0.0) ? 1.0 : $a[1];
@@ -5611,7 +5621,7 @@ sub HMCCU_GetUpdate ($$$)
 
 	$ccuget = HMCCU_GetAttribute ($hmccu_hash, $cl_hash, 'ccuget', 'Value') if ($ccuget eq 'Attr');
 
-	if (HMCCU_IsValidChannel ($hmccu_hash, $addr)) {
+	if (HMCCU_IsValidChannel ($hmccu_hash, $addr, $HMCCU_FL_ADDRESS)) {
 		$nam = HMCCU_GetChannelName ($hmccu_hash, $addr, '');
 		return -1 if ($nam eq '');
 		my ($stadd, $stchn) = split (':', $addr);
@@ -5619,7 +5629,7 @@ sub HMCCU_GetUpdate ($$$)
 		$list = $stnam eq '' ? $nam : $stnam . "," . $nam;
 		$script = "!GetDatapointsByChannel";
 	}
-	elsif (HMCCU_IsValidDevice ($hmccu_hash, $addr)) {
+	elsif (HMCCU_IsValidDevice ($hmccu_hash, $addr, $HMCCU_FL_ADDRESS)) {
 		$nam = HMCCU_GetDeviceName ($hmccu_hash, $addr, '');
 		return -1 if ($nam eq '');
 		$list = $nam;
@@ -6486,19 +6496,20 @@ sub HMCCU_TCPPing ($$$)
 		my $t = time ();
 	
 		while (time () < $t+$timeout) {
-			return 1 if (HMCCU_TCPConnect ($addr, $port));
+			return 1 if (HMCCU_TCPConnect ($addr, $port) ne '');
 			sleep (20);
 		}
 		
 		return 0;
 	}
 	else {
-		return HMCCU_TCPConnect ($addr, $port);
+		return HMCCU_TCPConnect ($addr, $port) eq '' ? 0 : 1;
 	}
 }
 
 ######################################################################
 # Check if TCP connection to specified host and port is possible.
+# Return empty string on error or local IP address on success.
 ######################################################################
 
 sub HMCCU_TCPConnect ($$)
@@ -6507,11 +6518,12 @@ sub HMCCU_TCPConnect ($$)
 	
 	my $socket = IO::Socket::INET->new (PeerAddr => $addr, PeerPort => $port);
 	if ($socket) {
+		my $ipaddr = $socket->sockhost ();
 		close ($socket);
-		return 1;
+		return $ipaddr if (defined ($ipaddr));
 	}
 
-	return 0;
+	return '';
 }
 
 ######################################################################
