@@ -33,7 +33,7 @@ use warnings;
 use JSON;
 
 
-my $version = "0.6.2";
+my $version = "0.6.3";
 
 
 
@@ -212,8 +212,6 @@ sub NUKIDevice_Attr(@) {
     #### webhook #########
     
     return "Invalid value for attribute $attrName: can only by FQDN or IPv4 or IPv6 address" if ( $attrVal && $attrName eq "webhookHttpHostname" && $attrVal !~ /^([A-Za-z_.0-9]+\.[A-Za-z_.0-9]+)|[0-9:]+$/ );
-
-    return "Invalid value for attribute $attrName: needs to be different from the defined name/address of your Smartlock, we need to know how Smartlock can connect back to FHEM here!" if ( $attrVal && $attrName eq "webhookHttpHostname" && $attrVal eq $hash->{DeviceName} );
 
     return "Invalid value for attribute $attrName: FHEMWEB instance $attrVal not existing" if ( $attrVal && $attrName eq "webhookFWinstance" && ( !defined( $defs{$attrVal} ) || $defs{$attrVal}{TYPE} ne "FHEMWEB" ) );
 

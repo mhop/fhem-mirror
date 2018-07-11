@@ -46,8 +46,8 @@ use JSON;
 
 use HttpUtils;
 
-my $version     = "0.6.2";
-my $bridgeapi   = "1.5";
+my $version     = "0.6.3";
+my $bridgeapi   = "1.6";
 
 
 
@@ -477,7 +477,7 @@ sub NUKIBridge_ResponseProcessing($$$) {
         return "NUKIBridge ($name) - invalid json detected: $json";
     }
 
-    my $decode_json = eval{decode_json($json)};
+    $decode_json = eval{decode_json($json)};
     if($@){
         Log3 $name, 3, "NUKIBridge ($name) - JSON error while request: $@";
         return;
