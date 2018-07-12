@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  98_feels_like.pm: Improved algorithms, fix reDEFINE
   - new:     42_AptToDate: Modul to retrieves apt information about Debian
                            update state
   - bugfix:  74_NUKIDevice: fix Perl Warnings
