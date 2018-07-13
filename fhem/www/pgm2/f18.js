@@ -460,7 +460,7 @@ f18_addDragger(el)
   f18_convertToAbs();
   var ep = $(el).position();
   var cp = $(comp).position();
-  var padding = $(el).css("padding").replace("px","")*2; // kind of a hack
+  var pl = parseInt($(el).css("padding-left").replace("px",""));
 
   var grid = [1,1];
   if(f18_getAttr("snapToGrid"))
@@ -485,7 +485,7 @@ f18_addDragger(el)
          "background-image":"url('"+f18_icon.arrows+"')"})
   $(el).draggable({
     drag:function(evt,ui){
-      $(comp).css({ left:ui.position.left+cp.left-ep.left, 
+      $(comp).css({ left:ui.position.left+cp.left-ep.left,
                     top: ui.position.top +cp.top -ep.top });
     },
     stop:save, grid:grid
@@ -502,7 +502,7 @@ f18_addDragger(el)
              top:$(comp).height()+2, left:$(comp).width()-off, "z-index":1 })
       .draggable({
         drag:function(evt,ui){
-          $(el).css(  { width:ui.position.left+off-padding });
+          $(el).css(  { width:ui.position.left+off });
           $(comp).css({ width:ui.position.left+off,
                         height:ui.position.top });
         },
@@ -622,12 +622,12 @@ f18_doSetPos(el, comp, pos)
   f18_applyGrid(pos);
   $(el).css({ position:"absolute", left:pos.left, top:pos.top });
   if(!$(el).hasClass("SVGlabel")) {
-    var padding = $(el).css("padding").replace("px","")*2; // kind of a hack
+    var padding = parseInt($(el).css("padding-left").replace("px",""));
     $(el).css({ width:pos.width-padding });
   }
   $(comp).css({ position:"absolute", 
-              left:pos.left+pos.oLeft, top:pos.top+pos.oTop,
-              width:pos.width, height:pos.height });
+                left:pos.left+pos.oLeft, top:pos.top+pos.oTop,
+                width:pos.width, height:pos.height });
 
 }
 
