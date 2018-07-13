@@ -1,4 +1,4 @@
-REV 16976
+REV 16978
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -674,8 +674,8 @@ UPD 2018-07-12_07:45:05 3478238 docs/commandref.html
 UPD 2018-07-12_07:45:07 2128496 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-06-15_07:45:04 85474 docs/commandref_frame_DE.html
-UPD 2018-07-13_07:45:08 193049 docs/commandref_modular.html
-UPD 2018-07-13_07:45:09 203759 docs/commandref_modular_DE.html
+UPD 2018-07-13_19:10:45 193049 docs/commandref_modular.html
+UPD 2018-07-13_19:10:46 203759 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2016,7 +2016,7 @@ UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2018-03-26_07:45:02 5908 www/pgm2/defaultCommon.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
-UPD 2018-07-07_07:45:03 27686 www/pgm2/f18.js
+UPD 2018-07-13_19:10:39 27666 www/pgm2/f18.js
 UPD 2018-07-02_07:45:03 7902 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
 UPD 2018-05-12_07:45:03 56285 www/pgm2/fhemweb.js
