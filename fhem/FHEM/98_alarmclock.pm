@@ -350,7 +350,7 @@ sub alarmclock_Set($$)
 
     if ($opt eq "stop")
     {
-        if (($value eq "Alarm") && ((ReadingsVal($hash->{NAME},"state",0)) =~ /^(Alarm is running|Snooze for.*)/))
+        if (($value eq "Alarm") && ((ReadingsVal($hash->{NAME},"state",0)) =~ /^(Alarm is running|PreAlarm is running|Snooze for.*)/))
         {
             alarmclock_alarmroutine_stop($hash);
         }
@@ -744,9 +744,8 @@ sub alarmclock_alarmroutine_stop($)
     fhem("".AttrVal($hash->{NAME},"AlarmRoutineOff",""));
     readingsSingleUpdate( $hash,"state", "Alarm stopped", 1 );
     Log3 $hash->{NAME}, 3, "alarmclock: $hash->{NAME} - alarmroutine stopped.";
-    RemoveInternalTimer($hash, "alarmclock_hardalarmroutine_start");
-    RemoveInternalTimer($hash, "alarmclock_alarmroutine_stop");
-    alarmclock_createtimer($hash);
+    RemoveInternalTimer($hash);
+    alarmclock_midnight_timer($hash);
 
 }
 
@@ -1335,7 +1334,7 @@ sub alarmclock_Notify($$)
 
 ### Notify Alarm off ###
 
-    if((ReadingsVal($hash->{NAME},"state",0)) =~ /^(Alarm is running|Snooze for.*)/)
+    if((ReadingsVal($hash->{NAME},"state",0)) =~ /^(Alarm is running|PreAlarm is running|Snooze for.*)/)
     {
         if(my @AlarmOffDevice = split(/\|/, AttrVal($hash->{NAME},"EventForAlarmOff","")))
         {
