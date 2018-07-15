@@ -961,14 +961,25 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <ul>
   <code>inform {on|off|timer|raw} [regexp]</code> <br>
   <br>
-  Wenn auf &quot;on&quot; gesetzt und der Status eines Ger&auml;tes &auml;ndert
-  sich, dann wird eine Nachricht an den Client gesendet. Dieser Befehl kann von
-  anderen Programmen/Modulen dazu benutzt werden, eine Hinweisnachricht zu
-  erhalten. <br> Die Option &quot;timer&quot; f&uuml;gt&nbsp; der Nachricht
-  einen Zeitstempel hinzu. Hinweis: Dieser Befehl erleichtert Ihnen die bessere
-  Kontrolle in <a href="#notify">notify</a> oder <a href="#FileLog">FileLog</a>
-  , wann welche Ereignisse erzeugt wurden.
-
+  Erm&ouml;glicht Event-Verfolgung &uuml;ber das telnet Interface. Es ist das
+  telnet Equivalent des FHEMWEB Event-Monitors, es kann aber auch von weiteren
+  Programmen zur Benachrichtigung verwendet werden. Optionen:<br>
+  <ul>
+    <li>on<br>
+      aktiviert die Benachrichtigung.</li>
+    <li>onWithState<br>
+      zeigt auch das zus&auml;tzliche state Event</li>
+    <li>off<br>
+      deaktiviert die Benachrichtigung (sowohl Events wie auch Logs, s.u.)</li>
+    <li>raw<br>
+      zeigt (nur) die raw Events der physikalischen Module</li>
+    <li>timer<br>
+      stellt der Daten ein Zeitstempel vor</li>
+    <li>log<br>
+      zeigt die vom FHEM Log Interface protokollierten Daten</li>
+    <li>status<br>
+      zeigt den aktuellen Status</li>
+  </ul>
   <br>
 </ul>
 <!-- inform -->

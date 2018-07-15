@@ -904,15 +904,27 @@ The following local attributes are used by a wider range of devices:
 <a name="inform"></a>
 <h3>inform</h3>
 <ul>
-  <code>inform {on|off|timer|raw} [regexp]</code> <br>
+  <code>inform {on|onWithState|off|raw|timer|log|status} [regexp]</code> <br>
   <br>
-  If set to on, and a device state changes, send a notification to the current
-  client. This command can be used by other programs/modules to receive a
-  notification.<br>
-  The option timer prepends a timerstamp to the line. Note: this command is
-  a nice way to check which events are generated, to help you when creating
-  <a href="#notify">notify</a> or <a href="#FileLog">FileLog</a> entries.
-
+  Monitor events via a telnet client.  This command is the telnet equivalent of
+  the FHEMWEB Event monitor, but can also be used by other programs/modules to
+  receive a notification. Options:<br>
+  <ul>
+    <li>on<br>
+      switch the inform mechanism on</li>
+    <li>onWithState<br>
+      show the additional state event too</li>
+    <li>off<br>
+      switch the inform mechanism off (both events and logs, see below)</li>
+    <li>raw<br>
+      show only raw events from physical devices</li>
+    <li>timer<br>
+      prepend a timestamp to each event</li>
+    <li>log<br>
+      show messages written by the FHEM Log interface</li>
+    <li>status<br>
+      show the current status</li>
+  </ul>
   <br>
 </ul>
 <!-- inform end -->
