@@ -1,4 +1,4 @@
-REV 16979
+REV 16981
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -472,7 +472,7 @@ UPD 2017-01-17_07:45:03 30007 FHEM/98_Verkehrsinfo.pm
 UPD 2016-01-23_07:45:13 15736 FHEM/98_WOL.pm
 UPD 2018-01-27_07:45:02 49645 FHEM/98_WeekdayTimer.pm
 UPD 2017-01-18_07:45:02 3906 FHEM/98_XmlList.pm
-UPD 2018-06-04_07:45:02 56451 FHEM/98_alarmclock.pm
+UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2018-03-22_07:45:04 13667 FHEM/98_apptime.pm
 UPD 2017-12-10_07:45:03 43981 FHEM/98_archetype.pm
 UPD 2017-12-17_07:45:02 32673 FHEM/98_autocreate.pm
@@ -674,8 +674,8 @@ UPD 2018-07-12_07:45:05 3478238 docs/commandref.html
 UPD 2018-07-12_07:45:07 2128496 docs/commandref_DE.html
 UPD 2018-05-16_07:45:03 75940 docs/commandref_frame.html
 UPD 2018-06-15_07:45:04 85474 docs/commandref_frame_DE.html
-UPD 2018-07-14_07:45:08 193049 docs/commandref_modular.html
-UPD 2018-07-14_07:45:09 203759 docs/commandref_modular_DE.html
+UPD 2018-07-15_07:45:09 193049 docs/commandref_modular.html
+UPD 2018-07-15_07:45:10 203759 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
