@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  98_DOIFtools: added shortcut remove_DOIFtoolsLog to commandref
   - change:  01_FHEMWEB.pm: default plotEmbed to 0 (Forum #82351)
   - feature: 73_GardenaSmartBridge: 74_GeardenaSmartDevice: add support for
                                                             Irrigation Control

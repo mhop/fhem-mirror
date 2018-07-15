@@ -1810,7 +1810,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         attr DOIFtools DOIFtoolsExecuteDefinition 1<br>
         attr DOIFtools DOIFtoolsExecuteSave 1<br>
         attr DOIFtools DOIFtoolsMenuEntry 1<br>
-        attr DOIFtools DOIFtoolsMyShortcuts ##My Shortcuts:,,list DOIFtools,fhem?cmd=list DOIFtools<br>
+        attr DOIFtools DOIFtoolsMyShortcuts ##My Shortcuts:,,list DOIFtools,fhem?cmd=list DOIFtools,remove_DOIFtoolsLog,fhem?cmd=delete DOIFtoolsLog;%22rm ./log/DOIFtoolsLog*.log%22<br>
         </code>
     </ul>
 <br>
