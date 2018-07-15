@@ -397,12 +397,12 @@ f18_resize()
       hi = f18_getAttr("hideInput"),
       pm = f18_getAttr("Pinned.menu");
 
-  var diff = 0;
-  diff += hl ? 0 : 40;
-  diff += pm ? 0 : 44;
-  $("input.maininput")
-    .css("width", (w-(FW_isiOS ? 40 : 30)-diff)+'px')
-    .css("display", hi ? "none":"block");
+  var left = 0;
+  left += hl ? 0 : 40;
+  left += pm ? 0 : 44;
+  $("input.maininput").css({ width:(w-left-(FW_isiOS ? 30 : 20))+'px', 
+                             display: hi ? "none":"block"});
+  $("#hdr").css({ left:left+'px' });
   $("#menu,#content").css("top", (hi && pm && hl) ? "10px" : "50px");
 }
 

@@ -5,13 +5,14 @@ textarea, .ui-dialog.ui-widget textarea { font-family:Courier; }
 input,textarea { border-style:ridge; }
 
 #logo {
-  position:fixed; top:10px; left:52px; width:32px; height:32px; z-index:10;
+  position:absolute; top:10px; left:52px; width:32px; height:32px; z-index:10;
   background-image:url(../images/default/fhemicon.png);
   background-size: contain; background-repeat: no-repeat;
 }
 #menuBtn { top:10px; left:10px; width:32px; height:32px; }
-#hdr     { top:10px; right:10px; }
-#content { top:50px; left:10px; bottom:10px; right:10px; }
+#hdr     { position:absolute; top:10px; left:48px; }
+#content { position:absolute; top:50px; left:10px; bottom:10px; right:10px; }
+body.small #content { left:10px; }
 #menu {
   top:50px; bottom:10px; left:-120%;
   z-index:20;

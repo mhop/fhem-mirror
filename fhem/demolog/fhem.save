@@ -1,4 +1,4 @@
-#Sun Jan  4 16:24:11 2015
+#Sun Jul 15 15:31:10 2018
 setstate Alarm on
 setstate Alarm 2015-01-04 16:22:21 state on
 setstate AllLights on
@@ -6,10 +6,11 @@ setstate AllLights 2015-01-04 16:22:04 LastDevice Alarm
 setstate AllLights 2015-01-04 16:22:04 LastDevice_Abs Alarm
 setstate AllLights 2015-01-04 16:22:04 state undefined
 setstate AllResidentsAway active
+setstate AllResidentsAway 2018-07-15 15:27:23 state active
 setstate CT off
 setstate CT 2015-01-03 01:10:50 ct 3703
 setstate CT 2015-01-04 13:30:52 lastCmd off
-setstate CT 2015-01-04 16:22:04 state off
+setstate CT 2018-07-15 15:27:23 state off
 setstate CeilingLight dim0%
 setstate CeilingLight 2015-01-04 16:22:40 state off
 setstate Cellar T: 21.1  H: 54.6
@@ -30,7 +31,7 @@ setstate Garden 2013-08-13 15:03:17 israining no
 setstate Garden 2013-08-13 15:03:17 rain 81.9
 setstate Garden 2013-08-13 15:03:17 rain_raw 321
 setstate Garden 2013-08-13 15:03:17 rain_raw_adj 321
-setstate Garden 2015-01-04 16:19:04 state defined
+setstate Garden 2018-07-15 15:27:23 state defined
 setstate Garden 2013-08-13 15:03:17 temperature 18.3
 setstate Garden 2013-08-13 15:03:17 tsecs 1376805797
 setstate Garden 2013-08-13 15:03:17 unknown1 a
@@ -42,6 +43,7 @@ setstate Livingroom 2015-01-04 16:22:21 state on
 setstate Log.Cellar active
 setstate Log.Dewpoint active
 setstate Log.Garden active
+setstate Log.Predicted active
 setstate Logfile active
 setstate Office on
 setstate Office 2015-01-04 16:22:21 state on
@@ -53,32 +55,33 @@ setstate RGB off
 setstate RGB 2015-01-04 12:55:47 hue 220
 setstate RGB 2015-01-04 13:30:54 lastCmd off
 setstate RGB 2015-01-04 12:55:47 rgb 0054FF
-setstate RGB 2015-01-04 16:22:04 state off
+setstate RGB 2018-07-15 15:27:23 state off
 setstate ReadingLight dim0%
 setstate ReadingLight 2015-01-04 16:22:40 state off
 setstate ResidentsComeHome active
+setstate ResidentsComeHome 2018-07-15 15:27:23 state active
 setstate SVG_01_Garden initialized
 setstate SVG_02_Cellar initialized
 setstate SVG_03_Dewpoint initialized
+setstate SVG_04_Sun initialized
+setstate SVG_05_Polar initialized
 setstate Screen up
 setstate Screen 2015-01-04 16:22:40 state up
 setstate TV off
 setstate TV 2015-01-04 16:22:40 state off
-setstate anyViews 2015-01-04 16:24:11 lockstate 0
-setstate anyViews 2015-01-04 16:19:04 state Initialized
-setstate anyViews_weblink initialized
+setstate Weather.weblink initialized
 setstate autocreate active
-setstate colorInit 2015-01-04 16:19:04
+setstate colorInit 2018-07-15 15:27:23
+setstate colorInit 2018-07-15 15:27:23 state active
 setstate dew_all active
 setstate eventTypes active
-setstate global <no definition>
-
-setstate lcCinema AllOff
+setstate global no definition
 setstate lcCinema 2015-01-04 16:22:40 state AllOff
-setstate outdoorNotifier 2015-01-04 16:22:21
+setstate outdoorNotifier active
+setstate outdoorNotifier 2018-07-15 15:27:23 state active
 setstate rg_Guest1 none
-setstate rg_Guest1 2015-01-04 16:19:19 durTimerAbsence 00:00:00
-setstate rg_Guest1 2015-01-04 16:19:19 durTimerAbsence_cr 0
+setstate rg_Guest1 2018-07-15 15:30:38 durTimerAbsence 38640:21:18
+setstate rg_Guest1 2018-07-15 15:30:38 durTimerAbsence_cr 2318421
 setstate rg_Guest1 2015-01-04 16:19:19 durTimerPresence 00:00:00
 setstate rg_Guest1 2015-01-04 16:19:19 durTimerPresence_cr 0
 setstate rg_Guest1 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -99,8 +102,8 @@ setstate rg_Guest1 2014-02-16 14:09:20 presence absent
 setstate rg_Guest1 2014-02-16 14:09:20 state none
 setstate rg_Guest1 2014-02-15 16:16:27 wayhome 0
 setstate rg_Guest2 none
-setstate rg_Guest2 2015-01-04 16:19:19 durTimerAbsence 00:00:00
-setstate rg_Guest2 2015-01-04 16:19:19 durTimerAbsence_cr 0
+setstate rg_Guest2 2018-07-15 15:30:38 durTimerAbsence 38640:29:53
+setstate rg_Guest2 2018-07-15 15:30:38 durTimerAbsence_cr 2318430
 setstate rg_Guest2 2015-01-04 16:19:19 durTimerPresence 00:00:00
 setstate rg_Guest2 2015-01-04 16:19:19 durTimerPresence_cr 0
 setstate rg_Guest2 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -121,6 +124,12 @@ setstate rg_Guest2 2014-02-16 14:00:46 presence absent
 setstate rg_Guest2 2014-02-16 14:01:22 state none
 setstate rg_Guest2 2014-02-15 16:16:29 wayhome 0
 setstate rgr_Children home
+setstate rgr_Children 2018-07-15 15:19:54 durTimerAbsence 00:00:00
+setstate rgr_Children 2018-07-15 15:19:54 durTimerAbsence_cr 0
+setstate rgr_Children 2018-07-15 15:30:38 durTimerPresence 38639:59:33
+setstate rgr_Children 2018-07-15 15:30:38 durTimerPresence_cr 2318400
+setstate rgr_Children 2018-07-15 15:19:54 durTimerSleep 00:00:00
+setstate rgr_Children 2018-07-15 15:19:54 durTimerSleep_cr 0
 setstate rgr_Children 2015-01-04 16:19:19 lastActivity gone
 setstate rgr_Children 2015-01-04 16:19:19 lastActivityBy Son
 setstate rgr_Children 2014-02-16 14:31:05 lastArrival 2014-02-16 14:31:05
@@ -145,6 +154,12 @@ setstate rgr_Children 2014-02-16 14:58:01 residentsTotalPresent 1
 setstate rgr_Children 2014-02-15 16:16:25 residentsTotalWayhome 0
 setstate rgr_Children 2014-02-17 20:45:12 state home
 setstate rgr_Guests none
+setstate rgr_Guests 2018-07-15 15:30:38 durTimerAbsence 38640:21:18
+setstate rgr_Guests 2018-07-15 15:30:38 durTimerAbsence_cr 2318421
+setstate rgr_Guests 2018-07-15 15:19:54 durTimerPresence 00:00:00
+setstate rgr_Guests 2018-07-15 15:19:54 durTimerPresence_cr 0
+setstate rgr_Guests 2018-07-15 15:19:54 durTimerSleep 00:00:00
+setstate rgr_Guests 2018-07-15 15:19:54 durTimerSleep_cr 0
 setstate rgr_Guests 2014-02-16 14:09:20 lastActivity none
 setstate rgr_Guests 2014-02-16 14:09:20 lastActivityBy Guests
 setstate rgr_Guests 2014-02-16 14:09:17 lastArrival 2014-02-16 14:09:17
@@ -166,6 +181,12 @@ setstate rgr_Guests 2014-02-16 14:09:20 residentsTotalPresent 0
 setstate rgr_Guests 2014-02-15 16:16:27 residentsTotalWayhome 0
 setstate rgr_Guests 2014-02-16 14:09:20 state none
 setstate rgr_Parents home
+setstate rgr_Parents 2018-07-15 15:19:54 durTimerAbsence 00:00:00
+setstate rgr_Parents 2018-07-15 15:19:54 durTimerAbsence_cr 0
+setstate rgr_Parents 2018-07-15 15:30:38 durTimerPresence 38640:14:21
+setstate rgr_Parents 2018-07-15 15:30:38 durTimerPresence_cr 2318414
+setstate rgr_Parents 2018-07-15 15:19:54 durTimerSleep 00:00:00
+setstate rgr_Parents 2018-07-15 15:19:54 durTimerSleep_cr 0
 setstate rgr_Parents 2015-01-04 16:19:19 lastActivity gone
 setstate rgr_Parents 2015-01-04 16:19:19 lastActivityBy Father
 setstate rgr_Parents 2014-02-16 14:16:17 lastArrival 2014-02-16 14:16:17
@@ -190,6 +211,12 @@ setstate rgr_Parents 2014-02-16 14:26:52 residentsTotalPresent 1
 setstate rgr_Parents 2014-02-15 16:13:39 residentsTotalWayhome 0
 setstate rgr_Parents 2014-02-16 14:16:17 state home
 setstate rgr_Residents home
+setstate rgr_Residents 2018-07-15 15:19:54 durTimerAbsence 00:00:00
+setstate rgr_Residents 2018-07-15 15:19:54 durTimerAbsence_cr 0
+setstate rgr_Residents 2018-07-15 15:30:38 durTimerPresence 38640:14:21
+setstate rgr_Residents 2018-07-15 15:30:38 durTimerPresence_cr 2318414
+setstate rgr_Residents 2018-07-15 15:19:54 durTimerSleep 00:00:00
+setstate rgr_Residents 2018-07-15 15:19:54 durTimerSleep_cr 0
 setstate rgr_Residents 2015-01-04 16:19:19 lastActivity gone
 setstate rgr_Residents 2015-01-04 16:19:19 lastActivityBy Son
 setstate rgr_Residents 2014-02-16 14:16:17 lastArrival 2014-02-16 14:16:17
@@ -216,8 +243,8 @@ setstate rgr_Residents 2014-02-16 14:16:17 state home
 setstate rr_Baby home
 setstate rr_Baby 2015-01-04 16:19:19 durTimerAbsence 00:00:00
 setstate rr_Baby 2015-01-04 16:19:19 durTimerAbsence_cr 0
-setstate rr_Baby 2015-01-04 16:23:19 durTimerPresence 7729:52:58
-setstate rr_Baby 2015-01-04 16:23:19 durTimerPresence_cr 463793
+setstate rr_Baby 2018-07-15 15:30:38 durTimerPresence 38640:00:17
+setstate rr_Baby 2018-07-15 15:30:38 durTimerPresence_cr 2318400
 setstate rr_Baby 2015-01-04 16:19:19 durTimerSleep 00:00:00
 setstate rr_Baby 2015-01-04 16:19:19 durTimerSleep_cr 0
 setstate rr_Baby 2014-02-16 14:30:21 lastArrival 2014-02-16 14:30:21
@@ -234,8 +261,8 @@ setstate rr_Baby 2014-02-16 14:30:21 presence present
 setstate rr_Baby 2014-02-17 20:45:12 state home
 setstate rr_Baby 2014-02-16 14:30:21 wayhome 0
 setstate rr_Daughter gone
-setstate rr_Daughter 2015-01-04 16:23:19 durTimerAbsence 7729:25:20
-setstate rr_Daughter 2015-01-04 16:23:19 durTimerAbsence_cr 463765
+setstate rr_Daughter 2018-07-15 15:30:38 durTimerAbsence 38639:32:39
+setstate rr_Daughter 2018-07-15 15:30:38 durTimerAbsence_cr 2318373
 setstate rr_Daughter 2015-01-04 16:19:19 durTimerPresence 00:00:00
 setstate rr_Daughter 2015-01-04 16:19:19 durTimerPresence_cr 0
 setstate rr_Daughter 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -256,8 +283,8 @@ setstate rr_Daughter 2014-02-16 14:57:59 presence absent
 setstate rr_Daughter 2015-01-04 16:19:19 state gone
 setstate rr_Daughter 2014-02-16 13:46:26 wayhome 0
 setstate rr_Father gone
-setstate rr_Father 2015-01-04 16:23:19 durTimerAbsence 7729:56:27
-setstate rr_Father 2015-01-04 16:23:19 durTimerAbsence_cr 463796
+setstate rr_Father 2018-07-15 15:30:38 durTimerAbsence 38640:03:46
+setstate rr_Father 2018-07-15 15:30:38 durTimerAbsence_cr 2318404
 setstate rr_Father 2015-01-04 16:19:19 durTimerPresence 00:00:00
 setstate rr_Father 2015-01-04 16:19:19 durTimerPresence_cr 0
 setstate rr_Father 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -277,8 +304,8 @@ setstate rr_Father 2014-02-16 13:46:02 wayhome 0
 setstate rr_Mother home
 setstate rr_Mother 2015-01-04 16:19:19 durTimerAbsence 00:00:00
 setstate rr_Mother 2015-01-04 16:19:19 durTimerAbsence_cr 0
-setstate rr_Mother 2015-01-04 16:23:19 durTimerPresence 7730:07:02
-setstate rr_Mother 2015-01-04 16:23:19 durTimerPresence_cr 463807
+setstate rr_Mother 2018-07-15 15:30:38 durTimerPresence 38640:14:21
+setstate rr_Mother 2018-07-15 15:30:38 durTimerPresence_cr 2318414
 setstate rr_Mother 2015-01-04 16:19:19 durTimerSleep 00:00:00
 setstate rr_Mother 2015-01-04 16:19:19 durTimerSleep_cr 0
 setstate rr_Mother 2014-02-16 14:16:17 lastArrival 2014-02-16 14:16:17
@@ -294,8 +321,8 @@ setstate rr_Mother 2014-02-16 14:16:17 presence present
 setstate rr_Mother 2014-02-16 14:16:17 state home
 setstate rr_Mother 2014-02-16 13:46:09 wayhome 0
 setstate rr_Son gone
-setstate rr_Son 2015-01-04 16:23:19 durTimerAbsence 7729:25:18
-setstate rr_Son 2015-01-04 16:23:19 durTimerAbsence_cr 463765
+setstate rr_Son 2018-07-15 15:30:38 durTimerAbsence 38639:32:37
+setstate rr_Son 2018-07-15 15:30:38 durTimerAbsence_cr 2318373
 setstate rr_Son 2015-01-04 16:19:19 durTimerPresence 00:00:00
 setstate rr_Son 2015-01-04 16:19:19 durTimerPresence_cr 0
 setstate rr_Son 2015-01-04 16:19:19 durTimerSleep 00:00:00
@@ -315,6 +342,8 @@ setstate rr_Son 2014-02-16 14:58:01 mood -
 setstate rr_Son 2014-02-16 14:58:01 presence absent
 setstate rr_Son 2015-01-04 16:19:19 state gone
 setstate rr_Son 2014-02-16 13:46:38 wayhome 0
-setstate sunRise Next: 07:45:49
-setstate sunSet Next: 17:14:06
+setstate sunRise Next: 04:50:28
+setstate sunRise 2018-07-15 15:27:23 state Next: 04:50:28
+setstate sunSet Next: 22:12:30
+setstate sunSet 2018-07-15 15:27:23 state Next: 22:12:30
 setstate wlCinema initialized

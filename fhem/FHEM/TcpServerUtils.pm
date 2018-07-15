@@ -30,7 +30,7 @@ TcpServer_Open($$$)
     Domain    => ($hash->{IPV6} ? AF_INET6() : AF_UNSPEC), # Linux bug
     LocalHost => $lh,
     LocalPort => $port,
-    Listen    => 10,
+    Listen    => 32,    # For Windows
     Blocking  => ($^O =~ /Win/ ? 1 : 0), # Needed for .WRITEBUFFER@darwin
     ReuseAddr => 1
   );

@@ -1,30 +1,30 @@
-#Sun Jan  4 16:24:11 2015
+#Sun Jul 15 15:31:10 2018
 {
   'lcCinema' => {
+                  'AllOff' => {
+                                'Screen' => 'up',
+                                'ReadingLight' => 'off',
+                                'Projector' => 'off',
+                                'CeilingLight' => 'off',
+                                'TV' => 'off'
+                              },
                   'Break' => {
-                               'CeilingLight' => 'dim37%',
-                               'ReadingLight' => 'dim37%'
+                               'ReadingLight' => 'dim37%',
+                               'CeilingLight' => 'dim37%'
                              },
                   'Cinema' => {
                                 'CeilingLight' => 'off',
-                                'Projector' => 'on',
+                                'TV' => 'off',
                                 'Screen' => 'down',
                                 'ReadingLight' => 'off',
-                                'TV' => 'off'
+                                'Projector' => 'on'
                               },
                   'WatchTV' => {
-                                 'CeilingLight' => 'off',
-                                 'Projector' => 'off',
                                  'Screen' => 'up',
                                  'ReadingLight' => 'dim12%',
+                                 'Projector' => 'off',
+                                 'CeilingLight' => 'off',
                                  'TV' => 'on'
-                               },
-                  'AllOff' => {
-                                'CeilingLight' => 'off',
-                                'Projector' => 'off',
-                                'Screen' => 'up',
-                                'ReadingLight' => 'off',
-                                'TV' => 'off'
-                              }
+                               }
                 }
 }

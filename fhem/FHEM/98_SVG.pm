@@ -199,8 +199,7 @@ SVG_getplotsize($)
 sub
 SVG_isEmbed($)
 {
-  return (AttrVal($FW_wname, "plotEmbed", 1));
-                        # $FW_userAgent !~ m/(iPhone|iPad|iPod).*OS (8|9)/));
+  return AttrVal($FW_wname, "plotEmbed", 0);
 }
 
 sub
@@ -222,16 +221,13 @@ SVG_FwFn($$$$)
   my $hash = $defs{$d};
   my $ret = "";
 
-  if(!$pageHash || !$pageHash->{jsLoaded}) {
-    $ret .= "<script type='text/javascript' src='$FW_ME/pgm2/svg.js'></script>";
-    $pageHash->{jsLoaded} = 1 if($pageHash);
-  }
+  my $isFirst = (!$pageHash || !$pageHash->{index} || $pageHash->{index} == 1);
+  $ret .= "<script type='text/javascript' src='$FW_ME/pgm2/svg.js'></script>"
+    if($isFirst);
 
   # plots navigation buttons
   my $pm = AttrVal($d,"plotmode",$FW_plotmode);
-  if((!$pageHash || !$pageHash->{buttons}) &&
-     AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
-
+  if($isFirst) {
     $ret .= '<div class="SVGlabel" data-name="svgZoomControl">';
     $ret .= SVG_zoomLink("zoom=-1", "Zoom-in", "zoom in");
     $ret .= SVG_zoomLink("zoom=1",  "Zoom-out","zoom out");
@@ -242,34 +238,6 @@ SVG_FwFn($$$$)
     $ret .= "<br>";
   }
 
-
-  if($pm eq "jsSVG") {
-    my @d=split(":",$defs{$d}{DEF});
-    my ($err, @svgplotfile) = FileRead("$FW_gplotdir/$d[1].gplot");
-       ($err, @svgplotfile) = FileRead("$FW_gplotdir/template.gplot") if($err);
-    my $gplot = join("&#01;", @svgplotfile);
-    $gplot =~ s/'/&#39;/g;
-    my %webattrflt = ( endPlotNow=>1, endPlotToday=>1, plotmode=>1,
-                       plotsize=>1,   nrAxis=>1,       stylesheetPrefix=>1 );
-    if(!$pageHash || !$pageHash->{jssvgLoaded}) {
-      $ret .=
-          "<script type='text/javascript' src='$FW_ME/pgm2/jsSVG.js'></script>";
-      $pageHash->{jssvgLoaded} = 1 if($pageHash);
-    }
-
-    SVG_calcOffsets($d[0], $d);
-    $ret .= "<div id='jsSVG_$d' class='jsSVG' ".
-                "data-webAttr='".jsSVG_getAttrs($FW_wname, \%webattrflt)."' ".
-                "data-svgAttr='".jsSVG_getAttrs($d)."' ".
-                "data-svgName='".$d."' ".
-                "data-from='".$SVG_devs{$d[0]}{from}."' ".
-                "data-to='"  .$SVG_devs{$d[0]}{to}  ."' ".
-                "data-gplotFile='$gplot' source='$d[0]'>".
-            "</div>";
-    $ret .= (SVG_PEdit($FW_wname,$d,$room,$pageHash) . "<br>")
-      if(!$pageHash);
-    return $ret;
-  }
 
   my $arg="$FW_ME/SVG_showLog?dev=$d".
                 "&logdev=$hash->{LOGDEVICE}".

@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use TcpServerUtils;
 use HttpUtils;
+use Blocking;
 use Time::HiRes qw(gettimeofday);
 
 #########################
@@ -89,9 +90,7 @@ use vars qw($FW_userAgent); # user agent string
 
 $FW_formmethod = "post";
 
-my $FW_zlib_checked;
-my $FW_use_zlib = 1;
-my $FW_use_sha = 0;
+my %FW_use;
 my $FW_activateInform = 0;
 my $FW_lastWebName = "";  # Name of last FHEMWEB instance, for caching
 my $FW_lastHashUpdate = 0;
@@ -119,6 +118,7 @@ my $FW_headerlines; #
 my $FW_chash;      # client fhem hash
 my $FW_encoding="UTF-8";
 my $FW_styleStamp=time();
+my %FW_svgData;
 
 
 #####################################
@@ -228,13 +228,21 @@ FHEMWEB_Initialize($)
     }
   }
 
-  eval { require Digest::SHA; };
-  if($@) {
-    Log 4, $@;
-    Log 3, "FHEMWEB: Can't load Digest::SHA, ".
-           "longpoll via websocket is not available";
+  my %optMod = (
+    zlib   => { mod=>"Compress::Zlib", txt=>"compressed HTTP transfer" },
+    sha    => { mod=>"Digest::SHA",    txt=>"longpoll via websocket" },
+    base64 => { mod=>"MIME::Base64",   txt=>"parallel SVG computing" }
+  );
+  foreach my $mod (keys %optMod) {
+    eval "require $optMod{$mod}{mod}";
+    if($@) {
+      Log 4, $@;
+      Log 3, "FHEMWEB: Can't load $optMod{$mod}{mod}, ".
+             "$optMod{$mod}{txt} is not available";
+    } else {
+      $FW_use{$mod} = 1;
+    }
   }
-  $FW_use_sha = 1;
 }
 
 #####################################
@@ -310,20 +318,6 @@ FW_Read($$)
   $FW_subdir = "";
 
   my $c = $hash->{CD};
-  if(!$FW_zlib_checked) {
-    $FW_zlib_checked = 1;
-    $FW_use_zlib = AttrVal($FW_wname, "fwcompress", 1);
-    if($FW_use_zlib) {
-      eval { require Compress::Zlib; };
-      if($@) {
-        $FW_use_zlib = 0;
-        Log3 $FW_wname, 1, $@;
-        Log3 $FW_wname, 1,
-               "$FW_wname: Can't load Compress::Zlib, deactivating compression";
-        $attr{$FW_wname}{fwcompress} = 0;
-      }
-    }
-  }
 
   if(!$reread) {
     # Data from HTTP Client
@@ -478,7 +472,7 @@ FW_Read($$)
   $FW_CSRF = (defined($defs{$FW_wname}{CSRFTOKEN}) ?
                 "&fwcsrf=".$defs{$FW_wname}{CSRFTOKEN} : "");
      
-  if($FW_use_sha && $method eq 'GET' &&
+  if($FW_use{sha} && $method eq 'GET' &&
      $FW_httpheader{Connection} && $FW_httpheader{Connection} =~ /Upgrade/i) {
 
     my $shastr = Digest::SHA::sha1_base64($FW_httpheader{'Sec-WebSocket-Key'}.
@@ -504,7 +498,7 @@ FW_Read($$)
 
   $arg = "" if(!defined($arg));
   Log3 $FW_wname, 4, "$name $method $arg; BUFLEN:".length($hash->{BUF});
-  my $pf = AttrVal($FW_wname, "plotfork", undef);
+  my $pf = AttrVal($FW_wname, "plotfork", 0);
   if($pf) {   # 0 disables
     # Process SVG rendering as a parallel process
     my $p = $data{FWEXT};
@@ -540,12 +534,22 @@ FW_Read($$)
     FW_closeConn($hash);
     return;
   }
+  return if($cacheable == -2); # async op, well be answered later
+  FW_finishRead($hash, $cacheable, $arg);
+
+}
+
+sub
+FW_finishRead($$$)
+{
+  my ($hash, $cacheable, $arg) = @_;
+  my $name = $hash->{NAME};
 
   my $compressed = "";
   if($FW_RETTYPE =~ m/(text|xml|json|svg|script)/i &&
      ($FW_httpheader{"Accept-Encoding"} &&
       $FW_httpheader{"Accept-Encoding"} =~ m/gzip/) &&
-     $FW_use_zlib) {
+     $FW_use{zlib}) {
     utf8::encode($FW_RET)
         if(utf8::is_utf8($FW_RET) && $FW_RET =~ m/[^\x00-\xFF]/ );
     eval { $FW_RET = Compress::Zlib::memGzip($FW_RET); };
@@ -558,7 +562,7 @@ FW_Read($$)
 
   my $length = length($FW_RET);
   my $expires = ($cacheable?
-                ("Expires: ".FmtDateTimeRFC1123($now+900)."\r\n") : "");
+        ("Expires: ".FmtDateTimeRFC1123($hash->{LASTACCESS}+900)."\r\n") : "");
   Log3 $FW_wname, 4,
         "$FW_wname: $arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
   if( ! FW_addToWritebuffer($hash,
@@ -1025,7 +1029,7 @@ FW_answerCall($)
   my $csrf= ($FW_CSRF ? "fwcsrf='$defs{$FW_wname}{CSRFTOKEN}'" : "");
   my $gen = 'generated="'.(time()-1).'"';
   my $lp = 'longpoll="'.AttrVal($FW_wname,"longpoll",
-                 $FW_use_sha && $FW_userAgent=~m/Chrome/ ? "websocket": 1).'"';
+                 $FW_use{sha} && $FW_userAgent=~m/Chrome/ ? "websocket": 1).'"';
   $FW_id = $FW_chash->{NR} if( !$FW_id );
 
   my $dataAttr = FW_dataAttr();
@@ -1069,15 +1073,16 @@ FW_answerCall($)
     return $ret if($ret);
   }
 
+  my $srVal = 0;
      if($cmd =~ m/^style /)    { FW_style($cmd,undef);    }
   elsif($FW_detail)            { FW_doDetail($FW_detail); }
-  elsif($FW_room)              { FW_showRoom();           }
+  elsif($FW_room)              { $srVal = FW_showRoom();  }
   elsif(!defined($FW_cmdret) &&
         !$FW_contentFunc) {
 
     $FW_room = AttrVal($FW_wname, "defaultRoom", '');
     if($FW_room ne '') {
-      FW_showRoom(); 
+      $srVal = FW_showRoom(); 
 
     } else {
       my $motd = AttrVal("global","motd","none");
@@ -1086,6 +1091,7 @@ FW_answerCall($)
       }
     }
   }
+  return $srVal if($srVal);
   FW_pO "</body></html>";
   return 0;
 }
@@ -1810,7 +1816,7 @@ FW_sortIndex($)
 sub
 FW_showRoom()
 {
-  return if(!$FW_room);
+  return 0 if(!$FW_room);
   
   %FW_hiddengroup = ();
   foreach my $r (split(",",AttrVal($FW_wname, "hiddengroup", ""))) {
@@ -1898,15 +1904,60 @@ FW_showRoom()
   FW_pO "</table><br>";
 
   # Now the "atEnds"
-  foreach my $d (sort { $sortIndex{$a} cmp $sortIndex{$b} } @atEnds) {
+  my $doBC = (AttrVal($FW_wname, "plotfork", 0) &&
+              AttrVal($FW_wname, "plotEmbed", 0) == 0);
+  my %res;
+  my $idx = 1;
+  @atEnds =  sort { $sortIndex{$a} cmp $sortIndex{$b} } @atEnds;
+  foreach my $d (@atEnds) {
     no strict "refs";
+    my $fn = $modules{$defs{$d}{TYPE}}{FW_summaryFn};
     $extPage{group} = "atEnd";
-    FW_pO &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_wname, $d, 
-                                                        $FW_room, \%extPage);
+    $extPage{index} = $idx++;
+    if($doBC && $defs{$d}{TYPE} eq "SVG" && $FW_use{base64}) {
+      BlockingCall(sub {
+        return "$FW_cname,$d,".
+               encode_base64(&{$fn}($FW_wname,$d,$FW_room,\%extPage),'');
+      }, undef, "FW_svgCollect");
+    } else {
+      $res{$d} = &{$fn}($FW_wname,$d,$FW_room,\%extPage);
+    }
     use strict "refs";
+  }
+  return FW_svgDone(\%res, \@atEnds, undef);
+}
+
+sub
+FW_svgDone($$$)
+{
+  my ($res, $atEnds, $delayedReturn) = @_;
+
+  if(int(keys %{$res}) != int(@{$atEnds})) {
+    $FW_svgData{$FW_cname} = { FW_RET=>$FW_RET, RES=>$res, ATENDS=>$atEnds };
+    return -2 ;
+  }
+
+  foreach my $d (@{$atEnds}) {
+    FW_pO $res->{$d};
   }
   FW_pO "</div>";
   FW_pO "</form>";
+  FW_pO "</body></html>" if($delayedReturn);
+  return 0;
+}
+
+sub
+FW_svgCollect($)
+{
+  my ($cname,$d,$enc) = split(",",$_[0],3);
+  my $h = $FW_svgData{$cname};
+  my ($res, $atEnds) = ($h->{RES}, $h->{ATENDS});
+  $res->{$d} = decode_base64($enc);
+  return if(int(keys %{$res}) != int(@{$atEnds}));
+  $FW_RET = $h->{FW_RET};
+  delete($FW_svgData{$cname});
+  FW_svgDone($res, $atEnds, 1);
+  FW_finishRead($defs{$cname}, 0, "");
 }
 
 # Room1:col1group1,col1group2|col2group1,col2group2 Room2:...
@@ -2021,7 +2072,7 @@ FW_returnFileAsStream($$$$$)
   $etag = defined($etag) ? "ETag: \"$etag\"\r\n" : "";
   my $expires = $cacheable ? ("Expires: ".gmtime(time()+900)." GMT\r\n"): "";
   my $compr = ($FW_httpheader{"Accept-Encoding"} &&
-               $FW_httpheader{"Accept-Encoding"} =~ m/gzip/ && $FW_use_zlib) ?
+               $FW_httpheader{"Accept-Encoding"} =~ m/gzip/ && $FW_use{zlib}) ?
                 "Content-Encoding: gzip\r\n" : "";
   TcpServer_WriteBlocking($FW_chash, "HTTP/1.1 200 OK\r\n".
                   $compr . $expires . $FW_headerlines . $etag .
@@ -2608,7 +2659,7 @@ FW_Attr(@)
 
   if($attrName eq "longpoll" && $type eq "set" && $param[0] eq "websocket") {
     return "$devName: Could not load Digest::SHA on startup, no websocket"
-        if(!$FW_use_sha);
+        if(!$FW_use{sha});
   }
 
   return $retMsg;
@@ -3732,25 +3783,18 @@ FW_widgetOverride($$)
         </li><br>
 
     <a name="plotEmbed"></a>
-    <li>plotEmbed 0<br>
-        SVG plots are rendered as part of &lt;embed&gt; tags, as in the past
-        this was the only way to display SVG, and it allows to render them in
-        parallel, see plotfork.
-        Setting plotEmbed to 0 will render SVG in-place, but as a side-effect
-        makes the plotfork attribute meaningless.<br>
+    <li>plotEmbed<br>
+        If set (to 1), SVG plots will be rendered as part of &lt;embed&gt;
+        tags, as in the past this was the only way to display SVG.  Setting
+        plotEmbed to 0 (the default) will render SVG in-place.<br>
     </li><br>
 
     <a name="plotfork"></a>
-    <li>plotfork [&lt;&Delta;p&gt;]<br>
+    <li>plotfork<br>
         If set to a nonzero value, run part of the processing (e.g. <a
         href="#SVG">SVG</a> plot generation or <a href="#RSS">RSS</a> feeds) in
-        parallel processes.  Actually, child processes are forked whose
-        priorities are the FHEM process' priority plus &Delta;p. 
-        Higher values mean lower priority. e.g. use &Delta;p= 10 to renice the
-        child processes and provide more CPU power to the main FHEM process.
-        &Delta;p is optional and defaults to 0.<br>
-        Note: do not use it
-        on Windows and on systems with small memory footprint.
+        parallel processes, default is 0.  Note: do not use it on systems with
+        small memory footprint.
     </li><br>
 
     <a name="plotmode"></a>
@@ -4439,24 +4483,17 @@ FW_widgetOverride($$)
 
     <a name="plotEmbed"></a>
     <li>plotEmbed 0<br>
-        SVG Grafiken werden als Teil der &lt;embed&gt; Tags dargestellt, da
-        fr&uuml;her das der einzige Weg war SVG darzustellen, weiterhin
-        erlaubt es das parallele Berechnen via plotfork (s.o.)
-        Falls plotEmbed auf 0 gesetzt wird, dann werden die SVG Grafiken als
-        Teil der HTML-Seite generiert, was leider das plotfork Attribut
-        wirkungslos macht.
+        Falls gesetzt (auf 1), dann werden SVG Grafiken mit &lt;embed&gt; Tags
+        gerendert, da auf &auml;lteren Browsern das die einzige
+        M&ouml;glichkeit war, SVG dastellen zu k&ouml;nnen. Falls 0 (die
+        Voreinstellung), dann werden die SVG Grafiken "in-place" gezeichnet.
     </li><br>
 
     <a name="plotfork"></a>
     <li>plotfork<br>
-        Normalerweise wird die Ploterstellung im Hauptprozess ausgef&uuml;hrt,
-        FHEM wird w&auml;rend dieser Zeit nicht auf andere Ereignisse
-        reagieren.
-        Falls dieses Attribut auf einen nicht 0 Wert gesetzt ist, dann wird die
-        Berechnung in weitere Prozesse ausgelagert. Das kann die Berechnung auf
-        Rechnern mit mehreren Prozessoren beschleunigen, allerdings kann es auf
-        Rechnern mit wenig Speicher (z.Bsp. FRITZ!Box 7390) zum automatischen
-        Abschuss des FHEM Prozesses durch das OS f&uuml;hren.
+        Falls gesetzt, dann werden bestimmte Berechnungen (z.Bsp. SVG und RSS)
+        auf nebenl&auml;ufige Prozesse verteilt. Voreinstellung ist 0. Achtung:
+        nicht auf Systemen mit wenig Hauptspeicher verwenden.
         </li><br>
 
     <a name="plotmode"></a>
