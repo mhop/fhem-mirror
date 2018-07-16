@@ -214,6 +214,7 @@ FHEM/42_RFXMETER.pm          wherzig              RFXTRX
 FHEM/42_SMARTMON.pm          hexenmeister         Unterstuetzende Dienste
 FHEM/42_SYSMON.pm            hexenmeister         Unterstuetzende Dienste
 FHEM/42_Nextion.pm           viegener             Bastelecke
+FHEM/42_AptToDate.pm         CoolTux              Sonstige Systeme
 FHEM/43_RFXX10REC.pm         wherzig              RFXTRX
 FHEM/44_S7.pm                charlie71            Sonstige Systeme
 FHEM/44_S7_ARead.pm          charlie71            Sonstige Systeme
