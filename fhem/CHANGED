@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  83_IOhomecontrol, 84_IOhomecontrolDevice: complete rewrite and
+             extended features
   - feature: 42_AptToDate: add Attribut upgradeListReading for Reading in JSON
   - change:  98_DOIFtools: added shortcut remove_DOIFtoolsLog to commandref
   - change:  01_FHEMWEB.pm: default plotEmbed to 0 (Forum #82351)
@@ -23,7 +25,7 @@
   - changed: 14_SD_WS09: standard battery readings
   - changed: 41_Oregon: standard battery readings
   - change:  76_SMAInverter: Internal MODEL added
-  - feature: 49_SSCam: V5.3.0, new createStreamDev generic, control elements 
+  - feature: 49_SSCam: V5.3.0, new createStreamDev generic, control elements
                        for runView content within fhemweb, some new CamLive-
                        Readings, minor fixes
   - change:  95_Dashboard: V3.10.1, added FW_hideDisplayName, Forum #88727
@@ -33,10 +35,10 @@
   - change:  82_LGTV_WebOS: change part of code
   - bugfix:  49_SSCam: fix state turns to "off" even though cam is disabled
   - bugfix:  38_netatmo: fixed camera recording and notification settings
-  - feature: 36_WMBUS: support for WMBUS type C and Kamstrup Multical 21 
+  - feature: 36_WMBUS: support for WMBUS type C and Kamstrup Multical 21
                        encoding.
-                       ATTENTION: decryption has changed, please install 
-                       the perl modules Crypt::Mode::CBC and 
+                       ATTENTION: decryption has changed, please install
+                       the perl modules Crypt::Mode::CBC and
                        Crypt::Mode::CTR if you want to decrypt messages.
                        (sudo cpan -i Crypt::Mode::CBC Crypt::Mode::CTR)
   - change:  93_DbLog: commandref hint for special character usage in passwords
@@ -58,16 +60,16 @@
   - feature: 98_Text2Speech: added Duch language for Google TTS
   - feature: 74_UnifiSwitch: initial version
   - feature: 74_Unifi: new child-Module UnifiSwitch
-                       new reading UC_newClients for new clients 
-                       block clients by mac-address 
+                       new reading UC_newClients for new clients
+                       block clients by mac-address
   - change:  98_dewpoint: new attribute legacyStateHandling
-  - feature: 93_DbRep: V7.18.0, possible use of y:(\d) in timeDiffToNow, 
+  - feature: 93_DbRep: V7.18.0, possible use of y:(\d) in timeDiffToNow,
                        timeOlderThan, delEntries considers executeBeforeDump,
                        executeAfterDump, minor fixes
   - feature: 49_SSCam: PTZ-Panel integrated into created StreamDevice
-  - fixed:   74_Unifi: import encode_json for newest libs 
-  - change:  10_KNX: new major release. See commandref for details. The 
-                     following attributes are deprecated now: readonly, 
+  - fixed:   74_Unifi: import encode_json for newest libs
+  - change:  10_KNX: new major release. See commandref for details. The
+                     following attributes are deprecated now: readonly,
                      listenonly, slider and useSetExtensions.
   - change:  36_WMBUS: standard battery readings
   - change:  32_withings/38_netatmo/72_XiaomiDevice: standard battery readings
