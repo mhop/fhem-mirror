@@ -1334,10 +1334,11 @@ define Thermo_1_fl feels_like Thermo_1 temperature Thermo_2:humidity WS_Sensor:w
 <b>Attributes</b><br>
 <table>
 <tr><td>latitude, longitude, altitude &nbsp;</td> <td>required</td> <td>must be defined in <code>global</code></td></tr>
+<tr><td>maxTimediff</td> <td>optional, should match installation &nbsp;</td> <td>Maximum allowed time difference in seconds for readings of different sensors to be considered coherent (default: 600)</td></tr>
 <tr><td>sensorSkyViewFactor</td> <td>optional, should match installation &nbsp;</td> <td>Fraction of sky that is visible to the sensor (default: 0.6)</td></tr>
 <tr><td>skyViewFactor</td> <td>optional, your personal choice</td> <td>Fraction of visible sky to be used for computation of T_mrt (default: 0.7)</td></tr>
 <tr><td>directRadiationRatio</td> <td>optional, your personal choice</td> <td>Fraction of direct insolation to be  used for computation of T_mrt (default 0.4)</td></tr>
-<tr><td>utciWindCutoff</td> <td>optional, your personal choice</td> <td>Max wind speed for UTCI computation, default 3 m/s</td></tr>
+<tr><td>utciWindCutoff</td> <td>optional, your personal choice</td> <td>Max wind speed for UTCI computation (default: 3 m/s)</td></tr>
 <tr><td>bowenRatio</td> <td>optional, technical</td> <td><a href="https://en.wikipedia.org/wiki/Bowen_ratio">Bowen ratio</a> of environment (default 0.6 = grassland)</td></tr>
 <tr><td>linkeTurbity</td> <td>optional, technical</td> <td><a href="http://www.soda-pro.com/help/general-knowledge/linke-turbidity-factor">Linke Turbity</a> of atmosphere.<br>
 Value should be an array of 12 values ( = one value / month) (default: values for Frankfurt)<br>
@@ -1345,7 +1346,7 @@ You can find values for other locations <a href="http://www.soda-pro.com/web-ser
 <tr><td>sunVisibility</td> <td>optional, should match installation</td> <td>Comma separated list of azimuth/altitude values to describe whether the sun is visible (e.g. due to buildings, trees, ...).<br>Must start with 0 and end with 360.<br>
 E.g. 0,5,75,20.5,130,10,360 -> sun must be > 5° between 0 and 75° azimuth, then > 20.5° between 75° and 130° etc.</td></tr>
 <tr><td>coverageCallback</td> <td>optional, technical</td> <td>Callback function for use with an additional infrared thermometer</td></tr>
-<tr><td>sensorType</td> <td>optional, technical</td> <td>Type of sensor for applying specific corrections, values:wh2601,generic, default wh2601</td></tr>
+<tr><td>sensorType</td> <td>optional, technical</td> <td>Type of sensor for applying specific corrections, values:wh2601,generic (default: wh2601)</td></tr>
 </table>
 
 <br><br>
