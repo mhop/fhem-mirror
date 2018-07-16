@@ -49,7 +49,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 
-my $version = "0.2.2";
+my $version = "0.2.4";
 
 
 
@@ -102,6 +102,7 @@ sub AptToDate_Initialize($) {
     $hash->{AttrFn}     = "AptToDate_Attr";
     $hash->{AttrList}   = "disable:1 ".
                             "disabledForIntervals ".
+                            "upgradeListReading:1 ".
                             $readingFnAttributes;
 
 
@@ -690,6 +691,7 @@ sub AptToDate_WriteReadings($$) {
     }
     
     readingsBulkUpdateIfChanged($hash,'updatesAvailable',scalar keys %{$decode_json->{packages}}) if( $hash->{".fhem"}{aptget}{cmd} eq 'getUpdateList' );
+    readingsBulkUpdateIfChanged($hash,'upgradeListAsJSON',eval{encode_json($hash->{".fhem"}{aptget}{packages})}) if( AttrVal($name,'upgradeListReading','none') ne 'none');
     readingsBulkUpdate($hash,'toUpgrade','successful') if( $hash->{".fhem"}{aptget}{cmd} eq 'toUpgrade' and not defined($hash->{".fhem"}{aptget}{'errors'}) and not defined($hash->{".fhem"}{aptget}{'warnings'}) );
     
     if( $hash->{".fhem"}{aptget}{cmd} eq 'getDistribution' ) {
@@ -920,6 +922,7 @@ sub AptToDate_ToDay() {
   <b>Attributes</b>
   <ul>
     <li>disable - disables the device</li>
+    <li>upgradeListReading - add Upgrade List Reading as JSON</li>
     <li>disabledForIntervals - disable device for interval time (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
   </ul>
 </ul>
@@ -983,6 +986,7 @@ sub AptToDate_ToDay() {
   <b>Attributes</b>
   <ul>
     <li>disable - Deaktiviert das Device</li>
+    <li>upgradeListReading - f&uuml;gt die Upgrade Liste als ein zus&auml;iches Reading im JSON Format ein.</li>
     <li>disabledForIntervals - Deaktiviert das Device f&uuml;r eine bestimmte Zeit (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
   </ul>
 </ul>
