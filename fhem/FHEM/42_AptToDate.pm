@@ -49,7 +49,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 
 
 
-my $version = "0.2.4";
+my $version = "1.0.0";
 
 
 
@@ -103,6 +103,7 @@ sub AptToDate_Initialize($) {
     $hash->{AttrList}   = "disable:1 ".
                             "disabledForIntervals ".
                             "upgradeListReading:1 ".
+                            "distupgrade:1 ".
                             $readingFnAttributes;
 
 
@@ -358,16 +359,17 @@ use constant POLLINTERVAL => 1;
 sub AptToDate_AsynchronousExecuteAptGetCommand($) {
 
     require "SubProcess.pm";
-    my ($hash)                      = shift;
+    my ($hash)                          = shift;
     
     
-    my $name                        = $hash->{NAME};
-    $hash->{".fhem"}{aptget}{lang}  = ReadingsVal($name,'os-release_language','none');
+    my $name                            = $hash->{NAME};
+    $hash->{".fhem"}{aptget}{lang}      = ReadingsVal($name,'os-release_language','none');
 
-    my $subprocess                  = SubProcess->new({ onRun => \&AptToDate_OnRun });
-    $subprocess->{aptget}           = $hash->{".fhem"}{aptget};
-    $subprocess->{aptget}{host}     = $hash->{HOST};
-    $subprocess->{aptget}{debug}    = ( AttrVal($name,'verbose',0) > 3 ? 1 : 0 );
+    my $subprocess                      = SubProcess->new({ onRun => \&AptToDate_OnRun });
+    $subprocess->{aptget}               = $hash->{".fhem"}{aptget};
+    $subprocess->{aptget}{host}         = $hash->{HOST};
+    $subprocess->{aptget}{debug}        = ( AttrVal($name,'verbose',0) > 3 ? 1 : 0 );
+    $subprocess->{aptget}{distupgrade}  = ( AttrVal($name,'distupgrade',0) == 1 ? 1 : 0 );
     my $pid                         = $subprocess->run();
 
     readingsSingleUpdate($hash,'state',$hash->{".fhem"}{aptget}{cmd}.' in progress', 1);
@@ -447,7 +449,8 @@ sub AptToDate_ExecuteAptGetCommand($) {
         $apt->{distri}          = 'ssh '.$aptget->{host}.' cat /etc/os-release |';
         $apt->{'locale'}        = 'ssh '.$aptget->{host}.' locale';
         $apt->{aptgetupgrade}   = 'ssh '.$aptget->{host}.' \'echo n | sudo apt-get -s -q -V upgrade\'';
-        $apt->{aptgettoupgrade} = 'ssh '.$aptget->{host}.' \'echo n | sudo apt-get -y -q -V upgrade\'';
+        $apt->{aptgettoupgrade} = 'ssh '.$aptget->{host}.' \'echo n | sudo apt-get -y -q -V upgrade\'' if($aptget->{distupgrade} == 0);
+        $apt->{aptgettoupgrade} = 'ssh '.$aptget->{host}.' \'echo n | sudo apt-get -y -q -V dist-upgrade\'' if($aptget->{distupgrade} == 1);
 
     } else {
     
@@ -455,7 +458,8 @@ sub AptToDate_ExecuteAptGetCommand($) {
         $apt->{distri}          = '</etc/os-release';
         $apt->{'locale'}        = 'locale';
         $apt->{aptgetupgrade}   = 'echo n | sudo apt-get -s -q -V upgrade';
-        $apt->{aptgettoupgrade} = 'echo n | sudo apt-get -y -q -V upgrade';
+        $apt->{aptgettoupgrade} = 'echo n | sudo apt-get -y -q -V upgrade' if($aptget->{distupgrade} == 0);
+        $apt->{aptgettoupgrade} = 'echo n | sudo apt-get -y -q -V dist-upgrade' if($aptget->{distupgrade} == 1);
     }
     
     my $response;
