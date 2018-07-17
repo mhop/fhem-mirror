@@ -50,7 +50,7 @@ eval "use Blocking;1" or $missingModul .= "Blocking ";
 #use Data::Dumper;          only for Debugging
 
 
-my $version = "2.0.14";
+my $version = "2.2.0";
 
 
 
@@ -656,8 +656,6 @@ sub XiaomiBTLESens_FlowerSensHandle0x38($$) {
 
     my @dataBatFw   = split(" ",$notification);
 
-    #$readings{'batteryLevel'}   = hex("0x".$dataBatFw[0]);
-    #$readings{'battery'}        = (hex("0x".$dataBatFw[0]) > 15 ? "ok" : "low");
     ### neue Vereinheitlichung für Batteriereadings Forum #800017
     $readings{'batteryPercent'}   = hex("0x".$dataBatFw[0]);
     $readings{'batteryState'}        = (hex("0x".$dataBatFw[0]) > 15 ? "ok" : "low");
@@ -694,6 +692,8 @@ sub XiaomiBTLESens_FlowerSensHandle0x35($$) {
     $readings{'lux'}                = hex("0x".$dataSensor[4].$dataSensor[3]);
     $readings{'moisture'}           = hex("0x".$dataSensor[7]);
     $readings{'fertility'}          = hex("0x".$dataSensor[9].$dataSensor[8]);
+    
+    Log3 $name, 4, "XiaomiBTLESens ($name) - FlowerSens Handle0x35 - lux: " . $readings{lux} . ", moisture: " . $readings{moisture} . ", fertility: " . $readings{fertility} ;
         
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
@@ -710,9 +710,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x18($$) {
     Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x18";
     
     chomp($notification);
-        
-    #$readings{'batteryLevel'}   = hex("0x".$notification);
-    #$readings{'battery'}        = (hex("0x".$notification) > 15 ? "ok" : "low");
+
     ### neue Vereinheitlichung für Batteriereadings Forum #800017
     $readings{'batteryPercent'}   = hex("0x".$notification);
     $readings{'batteryState'}        = (hex("0x".$notification) > 15 ? "ok" : "low");
