@@ -2081,7 +2081,7 @@ FW_returnFileAsStream($$$$$)
 
   my $d = Compress::Zlib::deflateInit(-WindowBits=>31) if($compr);
   FW_outputChunk($FW_chash, $FW_RET, $d);
-  FW_outputChunk($FW_chash,
+  FW_outputChunk($FW_chash, "<a name='top'></a>".
         "<a href='#end_of_file'>jump to the end</a><br><br>", $d)
     if($doEsc && $sz > 2048);
   my $buf;
