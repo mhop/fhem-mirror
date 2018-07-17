@@ -674,7 +674,7 @@ sub KODI_ProcessNotification($$)
   elsif($obj->{method} eq "Player.OnPropertyChanged") {
     KODI_PlayerUpdate($hash,$obj->{params}->{data}->{player}->{playerid});
   }
-  elsif($obj->{method} =~ /(Player\.OnSeek|Player\.OnSpeedChanged|Player\.OnPropertyChanged)/) {
+  elsif($obj->{method} =~ /Player\.(OnSeek|OnSpeedChanged|OnPropertyChanged)/) {
     my $base = $obj->{params}->{data}->{player};
     readingsBeginUpdate($hash);
     foreach my $key (keys %$base) {
@@ -698,6 +698,9 @@ sub KODI_ProcessNotification($$)
     KODI_ResetMediaReadings($hash);
     KODI_PlayerOnPlay($hash, $obj);
 	KODI_Update($hash);
+  }
+  elsif($obj->{method} eq "Player.OnResume") {
+    readingsSingleUpdate($hash,"playStatus",'playing',1);
   }
   elsif($obj->{method} =~ /(Playlist|AudioLibrary|VideoLibrary|System).On(.*)/) {
     readingsSingleUpdate($hash,lc($1),lc($2),1);
