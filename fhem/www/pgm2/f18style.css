@@ -210,9 +210,6 @@ body.touch div.col1, body.touch #menu table.room div { padding:0.25em 0; }
 body.pinnedMenu #menuBtn { display:none; }
 body.pinnedMenu #menu { left:10px; }
 body.pinnedMenu #logo { left:10px; }
-body.small.rightMenu #menuBtn { right:10px; left:auto; }
-body.small.rightMenu #logo    { right:52px; left:auto; }
-body.small.rightMenu #hdr     { left:10px; right:auto; }
 body { background-repeat: no-repeat; background-size:cover; }
 
 div.SVGlabel { display:inline-block; }

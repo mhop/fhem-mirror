@@ -46,8 +46,6 @@ $(document).ready(function(){
     $("body").addClass('small');
     f18_attr["Pinned.menu"] = false;
   }
-  if(f18_attr.rightMenu)
-    $("body").addClass("rightMenu");
 
   var f18_aCol = getComputedStyle($("a").get(0),null).getPropertyValue('color');
   for(var i in f18_icon)
@@ -60,7 +58,6 @@ $(document).ready(function(){
   if($(szc).length)
     $(szc).before("<div class='SVGplot'></div>");
 
-  f18_setFixedInput();
   f18_menu();
   f18_tables();
   f18_svgSetCols();
@@ -219,9 +216,7 @@ f18_special()
     $("tr#f18rs").append("<table id='f18ts' class='block wide'></table>");
     appendTo = "table#f18ts";
 
-    addHider("rightMenu", false, "MenuBtn right<br>on SmallScreen", function(c){
-      $("body").toggleClass("rightMenu");
-    });
+    addHider("rightMenu", false, "MenuBtn right<br>on SmallScreen", f18_resize);
     addHider("savePinChanges", false, "Save pin changes");
     addHider("showDragger", false, "Dragging active", function(c){
       if(c) {
@@ -395,15 +390,20 @@ f18_resize()
   log("f18.js W:"+w+" S:"+screen.width);
   var hl = f18_getAttr("hideLogo"),
       hi = f18_getAttr("hideInput"),
-      pm = f18_getAttr("Pinned.menu");
+      pm = f18_getAttr("Pinned.menu"),
+      rm = (f18_getAttr("rightMenu") && f18_small);
 
   var left = 0;
   left += hl ? 0 : 40;
   left += pm ? 0 : 44;
+  var lleft = (pm ? 10 : 52);
   $("input.maininput").css({ width:(w-left-(FW_isiOS ? 30 : 20))+'px', 
                              display: hi ? "none":"block"});
-  $("#hdr").css({ left:left+'px' });
   $("#menu,#content").css("top", (hi && pm && hl) ? "10px" : "50px");
+  $("#hdr").css({ left:(rm ? 10 : left)+'px' });
+  $("#menuBtn").css({ left:(rm ? "auto":"10px"), right:(rm ? "10px":"auto") });
+  $("#logo")   .css({ left:(rm ? "auto":lleft ), right:(rm ? "52px":"auto") });
+  f18_setFixedInput(); // Wonder, why its needed
 }
 
 function
