@@ -927,6 +927,7 @@ sub AptToDate_ToDay() {
   <ul>
     <li>disable - disables the device</li>
     <li>upgradeListReading - add Upgrade List Reading as JSON</li>
+    <li>distupgrade - change upgrade prozess to dist-upgrade</li>
     <li>disabledForIntervals - disable device for interval time (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
   </ul>
 </ul>
@@ -991,6 +992,7 @@ sub AptToDate_ToDay() {
   <ul>
     <li>disable - Deaktiviert das Device</li>
     <li>upgradeListReading - f&uuml;gt die Upgrade Liste als ein zus&auml;iches Reading im JSON Format ein.</li>
+    <li>distupgrade - wechselt den upgrade Prozess nach dist-upgrade</li>
     <li>disabledForIntervals - Deaktiviert das Device f&uuml;r eine bestimmte Zeit (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
   </ul>
 </ul>
