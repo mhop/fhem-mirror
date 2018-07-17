@@ -1448,7 +1448,7 @@ sub decrypt($) {
   for (1..8) {
     $initVector .= pack('C',$self->{access_no});
   }
-  my $cipher = Crypt::Mode::CBC->new('AES', 1);
+  my $cipher = Crypt::Mode::CBC->new('AES', 2);
   return $cipher->decrypt($encrypted, $self->{aeskey}, $initVector);
 }
 
@@ -1461,7 +1461,7 @@ sub decrypt_mode7($) {
   for (1..16) {
     $initVector .= pack('C',0x00);
   }
-  my $cipher = Crypt::Mode::CBC->new('AES', 1);
+  my $cipher = Crypt::Mode::CBC->new('AES', 2);
   return $cipher->decrypt($encrypted, $self->{aeskey}, $initVector);
 }
 
@@ -1817,9 +1817,9 @@ sub decodeApplicationLayer($) {
     if ($self->{aeskey}) { 
       if ($hasCBC) {
         $payload = $self->decrypt(substr($applicationlayer,$offset));
+        #printf("decrypted payload %s\n", unpack("H*", $payload));
         if (unpack('n', $payload) == 0x2f2f) {
           $self->{decrypted} = 1;
-          #printf("decrypted payload %s\n", unpack("H*", $payload));
         } else {
           # Decryption verification failed
           $self->{errormsg} = 'Decryption failed, wrong key?';
@@ -1961,7 +1961,13 @@ sub parse($$)
   
   $self->{errormsg} = '';
   $self->{errorcode} = ERR_NO_ERROR;
-  if (substr($self->{msg}, 0, 4) == pack("H*", "543D543D")) {
+  
+  if (length($self->{msg}) < 12) {
+    $self->{errormsg} = "Message too short";
+    $self->{errorcode} = ERR_MSG_TOO_SHORT;
+    return 1;
+  }
+  if (substr($self->{msg}, 0, 4) eq pack("H*", "543D543D")) {
     $self->setFrameType(FRAME_TYPE_B);
     $self->{msg} = substr($self->{msg},4);
   }
