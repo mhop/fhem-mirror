@@ -33,9 +33,12 @@
 #  - feature: 74_Unifi: block clients by mac-address 
 # V 3.0.2
 #  - fixed:   74_Unifi: Minor bugfix in notify-function
+# V 3.0.3
+#  - fixed:   74_Unifi: Minor loglevel-bugfix
 
 
 package main;
+my $version="3.0.3";
 use strict;
 use warnings;
 use HttpUtils;
@@ -166,6 +169,7 @@ sub Unifi_Define($$) {
         sslargs         => { SSL_verify_mode => 0 },
     };
     
+    $hash->{VERSION}=$version;
     my $username = Unifi_encrypt($a[4]);
     my $password = Unifi_encrypt($a[5]);    
     $hash->{helper}{username} = $username;
@@ -728,7 +732,7 @@ sub Unifi_Write($$){
 	my ( $hash, $type, $ap_id, $port_overrides) = @_; #TODO: ap_id und port_overrides in @a, damit es für andere $type auch geht.
 	
   my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
-  Log3 $name, 1, "$name ($self) - executed with ".$type;
+  Log3 $name, 5, "$name ($self) - executed with ".$type;
   if($type eq "Unifi_RestJson_Send"){
     Unifi_RestJson_Send($hash, $ap_id, {port_overrides => $port_overrides });
   }

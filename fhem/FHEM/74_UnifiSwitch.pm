@@ -22,6 +22,7 @@
 # - state des USW korrekt setzen (aktuell nur connected und provisioning)
 
 package main;
+my $version="0.92";
 # Laden evtl. abhängiger Perl- bzw. FHEM-Module
 use strict;
 use warnings;
@@ -39,7 +40,6 @@ sub UnifiSwitch_Parse($$);
 sub UnifiSwitch_Whoami();
 sub UnifiSwitch_Whowasi();
 
-my $version="0.91";
 
 sub UnifiSwitch_Initialize($$) {
   my ($hash) = @_; 
