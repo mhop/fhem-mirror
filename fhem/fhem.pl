@@ -2066,7 +2066,7 @@ AssignIoPort($;$)
   $proposed = $attr{$hn}{IODev}
         if(!$proposed && $attr{$hn} && $attr{$hn}{IODev});
   
-  if($proposed && $defs{$proposed} && !IsDisabled($proposed)) {
+  if($proposed && $defs{$proposed} && IsDisabled($proposed) != 1) {
     $hash->{IODev} = $defs{$proposed};
     $attr{$hn}{IODev} = $proposed if($hasIODevAttr);
     delete($defs{$proposed}{".clientArray"});
@@ -2075,7 +2075,7 @@ AssignIoPort($;$)
   # Set the I/O device, search for the last compatible one.
   for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
 
-    next if(IsDisabled($p));
+    next if(IsDisabled($p) != 1);
     my $cl = $defs{$p}{Clients};
     $cl = $modules{$defs{$p}{TYPE}}{Clients} if(!$cl);
 
