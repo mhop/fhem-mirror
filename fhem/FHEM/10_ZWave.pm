@@ -48,7 +48,7 @@ my %zwave_class = (
     parse => { "..2001(.*)"=> '"basicSet:".hex($1)', # Forum #36980
                "..2002"    => "basicGet:request", # sent by the remote
                "032003(..)"=> '"basicReport:".hex($1)', # V1
-               "052003(..)(..)(..)" => 'ZWave_BASIC_03_report($1,$2,$3)',
+               "052003(..)(..)(..)" => 'ZWave_basicReport($1,$2,$3)',
                }},
   CONTROLLER_REPLICATION   => { id => '21' },
   APPLICATION_STATUS       => { id => '22', # V1
@@ -60,30 +60,43 @@ my %zwave_class = (
   ZIP_SERVER               => { id => '24' },
   SWITCH_BINARY            => { id => '25',
     set   => { off         => "0100",
-               on          => "01FF" },
+               on          => "01FF",
+               "off-for-timer" => 'ZWave_switchBinary_timer($hash,"00","%s")',
+               "on-for-timer"  => 'ZWave_switchBinary_timer($hash,"FF","%s")' },
     get   => { swbStatus   => "02",       },
     parse => { "..250300"  => "state:off",
                "..2503ff"  => "state:on",
                "052503(..)(..)(..)" => 'sprintf("swbStatus:%s target %s '.
-                          'duration %s", hex($1), hex($2), ZWave_duration($3))',
+                          'duration %s", hex($1), hex($2),ZWave_byte2time($3))',
                "03250100"  => "state:setOff",
                "032501ff"  => "state:setOn"  } } ,
   SWITCH_MULTILEVEL        => { id => '26',
     set   => { off         => "0100",
                on          => "01FF",
                dim         => "01%02x",
-               dimWithDuration => "01%02x%02x",
+               dimWithDuration => 'ZWave_switchMultilevel_Set($hash, 0, "%s")',
+               dimUpDown       => 'ZWave_switchMultilevel_Set($hash, 1, "%s")',
+               dimUpDownWithDuration =>
+                                  'ZWave_switchMultilevel_Set($hash, 2, "%s")',
+               dimUpDownIncDecWithDuration =>
+                                  'ZWave_switchMultilevel_Set($hash, 3, "%s")',
                stop        => "05" },
-    get   => { swmStatus   => "02",     },
-    parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" :
+    get   => { swmStatus   => "02",
+               swmSupported=> "06" },
+    parse => { "..2603(.*)"=> '($1 eq "00" ? "state:off" :
                                ($1 eq "ff" ? "state:on" :
                                              "state:dim ".hex($1)))',
+               "052603(..)(..)(..)" => 'sprintf("swmStatus:%s target %s '.
+                    'duration %s", hex($1), hex($2), ZWave_duration($3))', # V4
                "..260100.."=> "state:setOff",
                "..2601ff.."=> "state:setOn",
                "..260420"  => "state:swmBeginUp",
                "..260460"  => "state:swmBeginDown",
                "..2604(..)(..)(..)(..)"  => 'ZWave_swmParse($1,$2,$3,$4)',
-               "..2605"    => "state:swmEnd" } },
+               "..2605"    => "state:swmEnd",
+               "..2607(..)(..)" =>
+                      'sprintf("swmSwitchType:primary %s secondary %s",
+                          Zwave_switchType($1), Zwave_switchType($2))', }}, #V3
   SWITCH_ALL               => { id => '27',
     set   => { swaIncludeNone  => "0100",
                swaIncludeOff   => "0101",
@@ -581,18 +594,24 @@ my %zwave_class = (
 );
 
 my %zwave_classVersion = (
-  dimWithDuration             => { min => 2 },
-  meterReset                  => { min => 2 },
-  meterSupported              => { min => 2 },
-  wakeupIntervalCapabilities  => { min => 2 },
+  alarmEventSupported         => { min => 3 },
   alarmTypeSupported          => { min => 2 },
-  alarmnotification           => { min => 2 },
   alarmWithType               => { min => 2 },
   alarmWithTypeEvent          => { min => 3 },
-  alarmEventSupported         => { min => 3 },
+  alarmnotification           => { min => 2 },
+  dimWithDuration             => { min => 2 },
+  dimUpDownWithDuration       => { min => 2 },
+  dimUpDownIncDecWithDuration => { min => 3 },
+  meterReset                  => { min => 2 },
+  meterSupported              => { min => 2 },
+  "on-for-timer"              => { min => 2 },
+  "off-for-timer"             => { min => 2 },
+  swmSupported                => { min => 3 },
   tmEnergySaveHeating         => { min => 2 },
   tmFullPower                 => { min => 3 },
   tmManual                    => { min => 3 },
+  wakeupIntervalCapabilities  => { min => 2 },
+
 );
 
 my %zwave_cmdArgs = (
@@ -2773,11 +2792,9 @@ ZWave_configCheckParam($$$$@)
   return ("", sprintf("04%02x%02x%0*x", $h->{index}, $len/2, $len, $arg[0]));
 }
 
-##############################################
-### START: 0x20 BASIC
 sub
-ZWave_BASIC_03_report ($$$)
-{ # 0x2003 BASIC_REPORT V2
+ZWave_basicReport ($$$)
+{
   my ($value, $target, $duration) = @_;;
   my $time = hex($duration);
 
@@ -2795,8 +2812,6 @@ ZWave_BASIC_03_report ($$$)
   return $rt;
 }
 
-##############################################
-### START: 0x21 APPLICATION_STATUS
 sub
 ZWave_APPLICATION_STATUS_01_Report($$$)
 { # 0x2101 ApplicationStatus ApplicationBusyReport >= V1
@@ -2810,6 +2825,7 @@ ZWave_APPLICATION_STATUS_01_Report($$$)
   $rt .= sprintf("waitTime: %d", hex($wTime));
   return ("applicationBusy:$rt");
 }
+
 
 ##############################################
 ### START: 0x71 ALARM (NOTIFICATION)
@@ -5087,12 +5103,99 @@ ZWave_Attr(@)
 }
 
 sub
-ZWave_duration($)
+ZWave_switchBinary_timer($$$)
+{
+  my ($hash, $on, $time) = @_;
+  return (undef, "01$on".ZWave_time2byte($hash, $time));
+}
+
+sub
+ZWave_switchMultilevel_Set($$$)
+{
+  my ($hash, $cmdType, $arg) = @_;
+  my $n = $hash->{NAME};
+  $arg = uc($arg);
+  my ($regexp, $duration);
+  
+  if($cmdType == 0) {                           # dimWithDuration
+    return "$n dimWithDuration: wrong format for $arg"
+        if($arg !~ m/$p1_b (\d+)/);
+    return ("", sprintf("01%02x%02x", $1, ZWave_time2byte($hash,$2)));
+
+  } elsif ($cmdType == 1) {                     # dimUpDown
+    $regexp = "(UP|DOWN) (IGNORE|USE) $p1_b";
+
+  } elsif ($cmdType == 2) {                     # dimUpDownWithDuration
+    $regexp = "(UP|DOWN) (IGNORE|USE) $p1_b $p1_b";
+
+  } elsif ($cmdType == 3) {                     # dimUpDownIncDecWithDuration
+    $regexp = "(UP|DOWN|NOMOTION) (IGNORE|USE) $p1_b "
+             ."$p1_b (INC|DEC|NOINCDEC) $p1_b";
+  }
+  
+  return "$n: wrong format, see commandref" if($arg !~ m/$regexp/);
+  
+  my $bitfield = 0;
+  $bitfield |= ($2 eq "IGNORE")   ? 0x01<<5 : 0x00;
+  $bitfield |= ($1 eq "DOWN")     ? 0x01<<6 : 
+               ($1 eq "NOMOTION") ? 0x03<<6 : 0x00;
+  if ($cmdType == 3) {
+    $bitfield |= ($5 eq "DEC")      ? 0x01<<3 : 
+                 ($5 eq "NOINCDEC") ? 0x03<<3 : 0x00;
+  }
+  
+  $duration = ZWave_time2byte($hash,$4) if ($cmdType >=2);
+  
+  my $rt = sprintf("04%02x%02x", $bitfield, $3);
+  $rt .= sprintf("%02x",      $duration) if ($cmdType == 2);
+  $rt .= sprintf("%02x%02x",  $duration, $6) if ($cmdType == 3);
+      
+  return ("", $rt);
+
+}
+
+my %zwave_switchType = (
+  "00"=>"Undefined",
+  "01"=>"On/Off",
+  "02"=>"Up/Down",
+  "03"=>"Open/Close",
+  "04"=>"Clockwise/Counter-Clockwise",
+  "05"=>"Right/Left",
+  "06"=>"Forward/Reverse",
+  "07"=>"Push/Pull",
+);
+
+sub
+Zwave_switchType($)
+{
+  my ($t) = @_;
+  $t = sprintf("%02x", hex($t)&0x1f); # clear reserved bits
+  return (($zwave_switchType{$t}) ? $zwave_switchType{$t} : "Unknown");
+}
+
+sub
+ZWave_time2byte($$)
+{
+  my ($hash, $txt) = @_;
+  if($txt !~ m/^[0-9]+$/) {
+    Log 1, "ZWave_time2byte: wrong duration $txt, replacing it with 0";
+    return "00";
+  }
+  my $b = ($txt <= 0x7f ? $txt : int($txt/60)+0x7f);
+  $b = 0xfe if($b > 0xfe);
+  my $b2 = $b > 0x7f ? ($b - 0x7f) * 60 : $b;
+  my $n = ($hash ? $hash->{NAME} : "unknown");
+  Log3 $n, 2, "$n: changing *for-timeout to $b2 from $txt" if($b2 != $txt);
+  return sprintf("%02x", $b);
+}
+
+sub
+ZWave_byte2time($)
 {
   my ($duration) = @_;
   my $time = hex($duration);
-  $time = ($time - 0x7f) * 60 if($time>0x7f && $time<=0xfd);
-  return (lc($duration) eq "fe" ? "unknown" : "$time seconds");
+  $time = ($time - 0x7f) * 60 if($time>0x7f && $time<0xff);
+  return (lc($duration) eq "ff" ? "factoryDefault" : "$time seconds");
 }
 
 #####################################
@@ -5648,18 +5751,76 @@ s2Hex($)
     switch the device on</li>
   <li>off<br>
     switch the device off</li>
+  <li>on-for-timer seconds<br>
+      off-for-timer seconds<br>
+    For version 2 of this class the ZWave implementation of this command is
+    used, else the SetExtensions emulation with a delayed on/off. The native
+    implementation has a second resolution for up to 127 seconds, and a minute
+    resolution up to 7620 seconds (i.e. 127 minutes). The specified value will
+    be rounded to the required resolution and/or limited to the maximum allowed
+    value. If the value has to be changed, then this will be logged in the
+    logfile.<br>
+    If the SetExtensions emulation without such limitations is preferred, then
+    the vclasses attribute should be modified.
+    </li>
 
   <br><br><b>Class SWITCH_MULTILEVEL</b>
   <li>on, off<br>
     the same as for SWITCH_BINARY.</li>
-  <li>dim value<br>
-    dim/jump to the requested value (0..100)</li>
-  <li>dimWithDuration value duration<br>
-    dim to the requested value (0..100) in duration time.  If duration is
-    less than 128, then it is interpreted as seconds, if it is between 128 and
-    254, then as duration-128 minutes. Note: this command works only with
-    devices supporting version 2 of the SWITCH_MULTILEVEL class, which you can
-    verify with get versionClassAll</li>
+
+  <li>dim &lt;value&gt;<br>
+    dim/jump to the requested &lt;value&gt; (0..99)<br>
+    Note: ZWave defines the range for &lt;value&gt; to 0..99, with 99
+    representing "on".</li>
+
+  <li>dimUpDown (UP|DOWN) (IGNORE|USE) &lt;startlevel&gt;<br>
+    starts dimming up or down, starting at a &lt;startlevel&gt; if USE
+    is specified. If IGNORE is specified, the startlevel will be
+    ignored.<br>
+    Note: All keywords must be specified, even in the case of IGNORE.
+    The device SHOULD respect the &lt;startlevel&gt;, however,
+    most devices will ignore the specified startlevel.</li>
+
+  <li>dimUpDownIncDecWithDuration (UP|DOWN|NOMOTION) (IGNORE|USE)
+    &lt;startlevel&gt; &lt;duration&gt; (INC|DEC|NOINCDEC) &lt;stepsize&gt;<br>  
+    similar to dimUpDownWithDuration, adding support for secondary switch types
+    (e.g. shutter and blind control) (class version V3).<br>
+    The dimming/movement of the primary switch type can be inhibited by
+    specifying NOMOTION, so that only the secondary switch type is used. The
+    secondary switch type is controlled by the keywords INC, DEC and NOINCDEC,
+    where NOINCDEC will inhibit the dimming/movement of the secondary switch.
+    If NOINCDEC is used, the &lt;stepsize&gt; must be specified as 0.<br>
+    &lt;stepsize&gt; can be 0..99 or 255.<br>
+    Note: &lt;stepsize&gt; will be interpreted by the device, most likely to
+    represent a time or position, e.g. to turn blinds.<br>
+    &lt;duration&gt; can be 0..7620 seconds (127 minutes). Up to a duration of 
+    127 seconds, the (internal) resolution is 1 second, for longer durations
+    the resolution is 60 seconds.<br>
+    Note: A device SHOULD respect the given duration, however, most devices
+    will use their internal default duration and ignore the specified duration.
+    </li>
+
+  <li>dimUpDownWithDuration (up|down) (ignore|use) &lt;startlevel&gt;
+    &lt;duration&gt;<br>  
+    similar to dimUpDown, adding a &lt;duration&gt; time for the
+    transition (V2)<br>
+    &lt;duration&gt; can be 0..7620 seconds (127 minutes). Up to a duration of 
+    127 seconds, the (internal) resolution is 1 second, for longer durations
+    the resolution is 60 seconds.<br>
+    Note: A device SHOULD respect the given duration, however, most devices
+    will use their internal default duration and ignore the specified duration.
+    </li>
+
+  <li>dimWithDuration &lt;value&gt; &lt;duration&gt;<br>
+    dim to the requested &lt;value&gt; (0..99) in &lt;duration&gt; seconds.
+    (V2) <br>
+    &lt;duration&gt; can be 0..7620 seconds (127 minutes). Up to a duration of 
+    127 seconds, the (internal) resolution is 1 second, for longer durations
+    the resolution is 60 seconds.<br>
+    Note: A device SHOULD respect the given duration, however, most devices
+    will use their internal default duration and ignore the specified duration.
+    </li>
+
   <li>stop<br>
     stop dimming/operation</li>
 
@@ -6113,6 +6274,9 @@ s2Hex($)
   <li>swmStatus<br>
     return the status of the node, as state:on, state:off or state:dim value.
     </li>
+  <li>swmSupported<br>
+    return the supported switch types (class version 3)
+    </li>
 
   <br><br><b>Class THERMOSTAT_FAN_MODE</b>
   <li>fanMode<br>
@@ -6374,8 +6538,8 @@ s2Hex($)
   <li>barrierState:[ closed | [%] | closing | stopped | opening | open ]</li>
 
   <br><br><b>Class BASIC</b>
-  <li>basicReport:X (for version 1), basicReport:X target y duration z 
-    (for version 2 or greater)</li>
+  <li>basicReport:X (for class version 1)<br>
+      basicReport:X target y duration z (for class version 2 or greater)</li>
   <li>basicGet:request</li>
   <li>basicSet:X</li>
 
@@ -6616,6 +6780,7 @@ s2Hex($)
   <li>state:off</li>
   <li>state:setOn</li>
   <li>state:setOff</li>
+  <li>swbState:$current target $target duration [$time seconds|unknown]</li>
 
   <br><br><b>Class SWITCH_MULTILEVEL</b>
   <li>state:on</li>
@@ -6628,6 +6793,7 @@ s2Hex($)
   <li>state:swm [ Decrement | Increment ] [ Up | Down ]
                 Start: $sl Duration: $dur Step: $step</li>
   <li>state:swmEnd</li>
+  <li>swmStatus:$value target &target duration $duration</li>
 
   <br><br><b>Class THERMOSTAT_FAN_MODE</b>
   <li>fanMode:[ fanAutoLow | fanLow | fanAutoHigh | fanHigh | fanAutoMedium |
