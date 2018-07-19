@@ -1,4 +1,4 @@
-REV 16999
+REV 17001
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -360,8 +360,8 @@ UPD 2018-06-20_07:45:04 30459 FHEM/74_HusqvarnaAutomower.pm
 UPD 2018-07-12_07:45:02 22747 FHEM/74_NUKIDevice.pm
 UPD 2017-04-26_07:45:02 35753 FHEM/74_Nmap.pm
 UPD 2017-05-03_07:45:02 64129 FHEM/74_THINKINGCLEANER.pm
-UPD 2018-06-24_07:45:02 104707 FHEM/74_Unifi.pm
-UPD 2018-06-24_07:45:02 12159 FHEM/74_UnifiSwitch.pm
+UPD 2018-07-19_07:45:03 104815 FHEM/74_Unifi.pm
+UPD 2018-07-19_07:45:03 12159 FHEM/74_UnifiSwitch.pm
 UPD 2018-02-13_07:45:02 15941 FHEM/74_UnifiVideo.pm
 UPD 2018-07-18_07:45:03 41166 FHEM/74_XiaomiBTLESens.pm
 UPD 2017-10-11_07:45:02 112592 FHEM/75_MSG.pm
@@ -675,8 +675,8 @@ UPD 2018-07-18_07:45:06 3481975 docs/commandref.html
 UPD 2018-07-18_07:45:08 2128890 docs/commandref_DE.html
 UPD 2018-07-16_07:45:03 76259 docs/commandref_frame.html
 UPD 2018-07-16_07:45:03 85715 docs/commandref_frame_DE.html
-UPD 2018-07-18_07:45:08 193632 docs/commandref_modular.html
-UPD 2018-07-18_07:45:09 204272 docs/commandref_modular_DE.html
+UPD 2018-07-19_07:45:09 193632 docs/commandref_modular.html
+UPD 2018-07-19_07:45:10 204272 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
