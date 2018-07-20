@@ -448,7 +448,7 @@ f18_compEl(el)
 function
 f18_addDragger(el)
 {
-  if(f18_small)
+  if(f18_small || FW_urlParams.detail)
     return;
   if($(el).find(".dragger").length)
     return;
@@ -597,7 +597,7 @@ f18_convertToAbs()
 function
 f18_setPos(el)
 {
-  if(f18_small)
+  if(f18_small || FW_urlParams.detail)
     return;
   var comp = f18_compEl(el);
   if($(comp).length == 0)

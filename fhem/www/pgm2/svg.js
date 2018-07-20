@@ -65,14 +65,13 @@ svg_click(evt)
   var t = evt.target;
   var o = svg_prepareHash(t);
 
-  var y_org = (((o.y_h-evt.clientY)/o.y_mul)+o.y_min).toFixed(o.decimals);
+  var y_org = (((o.y_h-evt.offsetY)/o.y_mul)+o.y_min).toFixed(o.decimals);
   var d = new Date((((evt.clientX-o.x_min)/o.t_mul)+o.x_off) * 1000);
   var ts = (d.getHours() < 10 ? '0' : '') + d.getHours() + ":"+
            (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
 
-  
-  var tl = t.ownerDocument.getElementById('svg_title');
-  tl.firstChild.nodeValue = t.getAttribute("title")+": "+y_org+" ("+ts+")";
+  var tl = $(t).closest("svg").find("#svg_title");
+  $(tl).html($(t).attr("title")+": "+y_org+" ("+ts+")");
 }
 
 function
