@@ -1,4 +1,4 @@
-REV 17004
+REV 17007
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -25,7 +25,7 @@ UPD 2018-07-18_07:45:03 253830 ./CHANGED
 UPD 2018-07-17_07:45:04 37446 ./MAINTAINER.txt
 UPD 2018-07-08_07:45:03 41916 ./configDB.pm
 UPD 2018-07-16_07:45:03 17421 ./fhem.cfg.demo
-UPD 2018-07-20_07:45:10 146844 ./fhem.pl
+UPD 2018-07-20_21:03:39 146844 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2018-06-26_07:45:03 57519 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -675,8 +675,8 @@ UPD 2018-07-20_07:45:07 3485306 docs/commandref.html
 UPD 2018-07-18_07:45:08 2128890 docs/commandref_DE.html
 UPD 2018-07-16_07:45:03 76259 docs/commandref_frame.html
 UPD 2018-07-16_07:45:03 85715 docs/commandref_frame_DE.html
-UPD 2018-07-20_07:45:09 193632 docs/commandref_modular.html
-UPD 2018-07-20_07:45:10 204272 docs/commandref_modular_DE.html
+UPD 2018-07-20_21:03:38 193632 docs/commandref_modular.html
+UPD 2018-07-20_21:03:39 204272 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2017,7 +2017,7 @@ UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2018-03-26_07:45:02 5908 www/pgm2/defaultCommon.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
-UPD 2018-07-18_07:45:03 27885 www/pgm2/f18.js
+UPD 2018-07-20_21:03:32 27931 www/pgm2/f18.js
 UPD 2018-07-18_07:45:03 7806 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
 UPD 2018-05-12_07:45:03 56285 www/pgm2/fhemweb.js
@@ -2081,7 +2081,7 @@ UPD 2017-03-08_07:45:03 4545 www/pgm2/jquery.vticker.min.js
 UPD 2017-02-24_07:45:02 2525 www/pgm2/smallscreenstyle.css
 UPD 2017-01-17_07:45:03 18745 www/pgm2/sorttable.js
 UPD 2015-07-28_14:05:34 649 www/pgm2/style.css
-UPD 2018-04-16_07:45:03 12351 www/pgm2/svg.js
+UPD 2018-07-20_21:03:32 12324 www/pgm2/svg.js
 UPD 2015-07-28_14:05:34 2502 www/pgm2/svg_defs.svg
 UPD 2015-07-28_14:05:34 2578 www/pgm2/svg_style.css
 UPD 2015-07-28_14:05:34 639 www/pgm2/touchpadstyle.css
