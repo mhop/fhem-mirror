@@ -139,7 +139,7 @@ sub CUL_HM_getAttrInt($@);
 sub CUL_HM_appFromQ($$);
 sub CUL_HM_autoReadReady($);
 sub CUL_HM_calcDisWm($$$);
-sub CUL_HM_statCnt($$;$);
+sub CUL_HM_statCnt(@);
 
 # ----------------modul globals-----------------------
 my $respRemoved; # used to control trigger of stack processing
