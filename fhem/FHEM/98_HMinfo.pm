@@ -1186,10 +1186,13 @@ sub HMinfo_GetFn($@) {#########################################################
           $_ =~ s/:*..-.. ..:..:..//g;# if ($type eq "short");
           $plSum[$c] += $1 if ($_ =~ m/^\s*(\d+)/);
         }
-        elsif($_ =~m /^[ ,0-9]{1,5}:/){
+        elsif($_ =~m /^[ ,0-9]{1,5}/){
            my ($cnt,$date) = split(":",$_,2);
-           $_ = sprintf("%-5s-%s",$cnt,$date);
+           $_ = sprintf("%-5s>%s",$cnt,$date);
            $plSum[$c] +=$cnt;
+        }
+        else{
+          Log 1,"General $dName: $c : $_" if($_ !~ m/-/);#if ($c == 8);
         }
         $c++;
       }
