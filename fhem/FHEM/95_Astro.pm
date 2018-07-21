@@ -47,7 +47,7 @@ my $deltaT   = 65;  # Correction time in s
 my %Astro;
 my %Date;
 
-my $astroversion = 1.47;
+my $astroversion = 1.48;
 
 #-- These we may get on request
 my %gets = (
@@ -1353,7 +1353,8 @@ sub Astro_Update($@) {
   foreach my $key (keys %Astro){   
     readingsBulkUpdate($hash,$key,$Astro{$key});
   }
-  readingsEndUpdate($hash,1); 
+  readingsEndUpdate($hash,0); 
+  readingsSingleUpdate($hash,"state","Updated",1);
 }
 
 ########################################################################################
