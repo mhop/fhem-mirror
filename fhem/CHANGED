@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  82_LGTV_WebOS: fix current program list readings
   - change:  74_Unifi: changed readings -UC_newClients and -AP_utilization
   - bugfix:  36_WMBUS: fix decryption for AES CBC mode
   - feature: 42_AptToDate: add dist-upgrade available with Attribut

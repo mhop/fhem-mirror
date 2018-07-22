@@ -69,7 +69,7 @@ eval "use Blocking;1" or $missingModul .= "Blocking ";
 
 
 
-my $version = "2.0.5";
+my $version = "2.0.6";
 
 
 
@@ -246,6 +246,7 @@ sub LGTV_WebOS_Define($$) {
 
     $hash->{HOST}                                   = $host;
     $hash->{VERSION}                                = $version;
+    $hash->{PARTIAL}                                = '';
     $hash->{helper}{device}{channelguide}{counter}  = 0;
     $hash->{helper}{device}{registered}             = 0;
     $hash->{helper}{device}{runsetcmd}              = 0;
@@ -360,7 +361,7 @@ sub LGTV_WebOS_TimerStatusRequest($) {
         LGTV_WebOS_Close($hash);
         LGTV_WebOS_Presence($hash) if( AttrVal($name,'pingPresence', 0) == 1 );
         $hash->{helper}{device}{runsetcmd}              = 0;
-        readingsBulkUpdate($hash, 'state', 'disabled');
+        readingsBulkUpdateIfChanged($hash, 'state', 'disabled');
     
     } else {
         
@@ -856,7 +857,7 @@ sub LGTV_WebOS_WriteReadings($$) {
     if( ref($decode_json->{payload}{services}) eq "ARRAY" and scalar(@{$decode_json->{payload}{services}}) > 0 ) {
         foreach my $services (@{$decode_json->{payload}{services}}) {
         
-            readingsBulkUpdate($hash,'service_'.$services->{name},'v.'.$services->{version});
+            readingsBulkUpdateIfChanged($hash,'service_'.$services->{name},'v.'.$services->{version});
         }
     }
     
@@ -870,30 +871,32 @@ sub LGTV_WebOS_WriteReadings($$) {
                 $hash->{helper}{device}{inputapps}{$devices->{appId}}   = $devices->{label};
             }
             
-            readingsBulkUpdate($hash,'extInput_'.$devices->{label},'connect_'.$devices->{connected});
+            readingsBulkUpdateIfChanged($hash,'extInput_'.$devices->{label},'connect_'.$devices->{connected});
         }
     }
     
     elsif( ref($decode_json->{payload}{programList}) eq "ARRAY" and scalar(@{$decode_json->{payload}{programList}}) > 0 ) {
-        
+        use Date::Parse;
         my $count = 0;
         foreach my $programList ( @{$decode_json->{payload}{programList}} ) {
+        
+            if( str2time(LGTV_WebOS_FormartStartEndTime($programList->{localEndTime})) > time() ) {
+                if($count < 1) {
+                
+                    readingsBulkUpdateIfChanged($hash,'channelCurrentTitle',$programList->{programName});
+                    readingsBulkUpdateIfChanged($hash,'channelCurrentStartTime',LGTV_WebOS_FormartStartEndTime($programList->{localStartTime}));
+                    readingsBulkUpdateIfChanged($hash,'channelCurrentEndTime',LGTV_WebOS_FormartStartEndTime($programList->{localEndTime}));
+                
+                } elsif($count < 2) {
+                
+                    readingsBulkUpdateIfChanged($hash,'channelNextTitle',$programList->{programName});
+                    readingsBulkUpdateIfChanged($hash,'channelNextStartTime',LGTV_WebOS_FormartStartEndTime($programList->{localStartTime}));
+                    readingsBulkUpdateIfChanged($hash,'channelNextEndTime',LGTV_WebOS_FormartStartEndTime($programList->{localEndTime}));
+                }
             
-            if($count < 1) {
-            
-                readingsBulkUpdate($hash,'channelCurrentTitle',$programList->{programName});
-                readingsBulkUpdate($hash,'channelCurrentStartTime',LGTV_WebOS_FormartStartEndTime($programList->{localStartTime}));
-                readingsBulkUpdate($hash,'channelCurrentEndTime',LGTV_WebOS_FormartStartEndTime($programList->{localEndTime}));
-            
-            } elsif($count < 2) {
-            
-                readingsBulkUpdate($hash,'channelNextTitle',$programList->{programName});
-                readingsBulkUpdate($hash,'channelNextStartTime',LGTV_WebOS_FormartStartEndTime($programList->{localStartTime}));
-                readingsBulkUpdate($hash,'channelNextEndTime',LGTV_WebOS_FormartStartEndTime($programList->{localEndTime}));
+                $count++;
+                return if($count > 1);
             }
-            
-            $count++;
-            return if($count > 1);
         }
     }
     
@@ -901,49 +904,49 @@ sub LGTV_WebOS_WriteReadings($$) {
     
         if( defined($decode_json->{payload}{'mute'}) and ($decode_json->{payload}{'mute'} eq 'true' or $decode_json->{payload}{'mute'} == 1 ) ) {
     
-            readingsBulkUpdate($hash,'mute','on');
+            readingsBulkUpdateIfChanged($hash,'mute','on');
             
         } elsif( defined($decode_json->{payload}{'mute'}) ) {
             if( $decode_json->{payload}{'mute'} eq 'false' or $decode_json->{payload}{'mute'} == 0 ) {
         
-                readingsBulkUpdate($hash,'mute','off');
+                readingsBulkUpdateIfChanged($hash,'mute','off');
             }
         }
         
         if( defined($decode_json->{payload}{'muted'}) and ($decode_json->{payload}{'muted'} eq 'true' or $decode_json->{payload}{'muted'} == 1) ) {
         
-                readingsBulkUpdate($hash,'mute','on');
+                readingsBulkUpdateIfChanged($hash,'mute','on');
             
         } elsif( defined($decode_json->{payload}{'muted'}) and ($decode_json->{payload}{'muted'} eq 'false' or $decode_json->{payload}{'muted'} == 0) ) {
         
-            readingsBulkUpdate($hash,'mute','off');
+            readingsBulkUpdateIfChanged($hash,'mute','off');
         }
     }
     
     elsif( defined($decode_json->{payload}{status3D}{status}) ) {
         if( $decode_json->{payload}{status3D}{status} eq 'false' or $decode_json->{payload}{status3D}{status} == 0 ) {
         
-            readingsBulkUpdate($hash,'3D','off');
+            readingsBulkUpdateIfChanged($hash,'3D','off');
         
         } elsif( $decode_json->{payload}{status3D}{status} eq 'true' or $decode_json->{payload}{status3D}{status} == 1 ) {
         
-            readingsBulkUpdate($hash,'3D','on');
+            readingsBulkUpdateIfChanged($hash,'3D','on');
         }
         
-        readingsBulkUpdate($hash,'3DMode',$decode_json->{payload}{status3D}{pattern});
+        readingsBulkUpdateIfChanged($hash,'3DMode',$decode_json->{payload}{status3D}{pattern});
     }
 
     elsif( defined($decode_json->{payload}{appId}) ) {
         
         if( $decode_json->{payload}{appId} =~ /com.webos.app.externalinput/ or $decode_json->{payload}{appId} =~ /com.webos.app.hdmi/ ) {
 
-            readingsBulkUpdate($hash,'input',$hash->{helper}{device}{inputapps}{$decode_json->{payload}{appId}});
-            readingsBulkUpdate($hash,'launchApp','-');
+            readingsBulkUpdateIfChanged($hash,'input',$hash->{helper}{device}{inputapps}{$decode_json->{payload}{appId}});
+            readingsBulkUpdateIfChanged($hash,'launchApp','-');
         
         } else {
 
-            readingsBulkUpdate($hash,'launchApp',$openAppsPackageName{$decode_json->{payload}{appId}});
-            readingsBulkUpdate($hash,'input','-');
+            readingsBulkUpdateIfChanged($hash,'launchApp',$openAppsPackageName{$decode_json->{payload}{appId}});
+            readingsBulkUpdateIfChanged($hash,'input','-');
         }
     }
     
@@ -956,7 +959,7 @@ sub LGTV_WebOS_WriteReadings($$) {
         } elsif( ($decode_json->{type} eq 'response' and ($decode_json->{payload}{returnValue} eq 'true' or $decode_json->{payload}{returnValue} == 1 )) or ($decode_json->{type} eq 'registered') and defined($decode_json->{payload}{'client-key'}) ) {
         
             $response = 'ok';
-            readingsBulkUpdate($hash,'pairing','paired');
+            readingsBulkUpdateIfChanged($hash,'pairing','paired');
             $hash->{helper}{device}{runsetcmd}  = $hash->{helper}{device}{runsetcmd} - 1 if($hash->{helper}{device}{runsetcmd} > 0);
             
         } elsif( $decode_json->{type} eq 'error' ) {
@@ -965,7 +968,7 @@ sub LGTV_WebOS_WriteReadings($$) {
             
             if($decode_json->{error} eq '401 insufficient permissions' or $decode_json->{error} eq '401 insufficient permissions (not registered)') {
             
-                readingsBulkUpdate($hash,'pairing','unpaired');
+                readingsBulkUpdateIfChanged($hash,'pairing','unpaired');
             }
             
             $hash->{helper}{device}{runsetcmd}  = $hash->{helper}{device}{runsetcmd} - 1 if($hash->{helper}{device}{runsetcmd} > 0);
@@ -973,27 +976,27 @@ sub LGTV_WebOS_WriteReadings($$) {
     }
     
     
-    readingsBulkUpdate($hash,'lgKey',$decode_json->{payload}{'client-key'});
-    readingsBulkUpdate($hash,'volume',$decode_json->{payload}{'volume'});
-    readingsBulkUpdate($hash,'lastResponse',$response);
+    readingsBulkUpdateIfChanged($hash,'lgKey',$decode_json->{payload}{'client-key'});
+    readingsBulkUpdateIfChanged($hash,'volume',$decode_json->{payload}{'volume'});
+    readingsBulkUpdateIfChanged($hash,'lastResponse',$response);
     
     if( ReadingsVal($name,'launchApp','none') eq 'TV') {
     
-        readingsBulkUpdate($hash,'channel',$decode_json->{payload}{'channelNumber'});
-        readingsBulkUpdate($hash,'channelName',$decode_json->{payload}{'channelName'});
-        readingsBulkUpdate($hash,'channelMedia',$decode_json->{payload}{'channelTypeName'});
+        readingsBulkUpdateIfChanged($hash,'channel',$decode_json->{payload}{'channelNumber'});
+        readingsBulkUpdateIfChanged($hash,'channelName',$decode_json->{payload}{'channelName'});
+        readingsBulkUpdateIfChanged($hash,'channelMedia',$decode_json->{payload}{'channelTypeName'});
     
     } else {
     
-        readingsBulkUpdate($hash,'channelName','-');
-        readingsBulkUpdate($hash,'channel','-');
-        readingsBulkUpdate($hash,'channelMedia','-');
-        readingsBulkUpdate($hash,'channelCurrentTitle','-');
-        readingsBulkUpdate($hash,'channelCurrentStartTime','-');
-        readingsBulkUpdate($hash,'channelCurrentEndTime','-');
-        readingsBulkUpdate($hash,'channelNextTitle','-');
-        readingsBulkUpdate($hash,'channelNextStartTime','-');
-        readingsBulkUpdate($hash,'channelNextEndTime','-');
+        readingsBulkUpdateIfChanged($hash,'channelName','-');
+        readingsBulkUpdateIfChanged($hash,'channel','-');
+        readingsBulkUpdateIfChanged($hash,'channelMedia','-');
+        readingsBulkUpdateIfChanged($hash,'channelCurrentTitle','-');
+        readingsBulkUpdateIfChanged($hash,'channelCurrentStartTime','-');
+        readingsBulkUpdateIfChanged($hash,'channelCurrentEndTime','-');
+        readingsBulkUpdateIfChanged($hash,'channelNextTitle','-');
+        readingsBulkUpdateIfChanged($hash,'channelNextStartTime','-');
+        readingsBulkUpdateIfChanged($hash,'channelNextEndTime','-');
     }
     
     readingsBulkUpdateIfChanged($hash,'state','on');
