@@ -38,6 +38,14 @@ sub Wunderground_Initialize($) {
         'UV'         => { rtype => 'uvi' },
         'dewpoint'   => { rtype => 'c', formula_symbol => 'Td', },
         'dewpoint_f' => { rtype => 'f', formula_symbol => 'Td', },
+        'fc0_heat_index_c' => {
+            formula_symbol => 'HI',
+            scope          => { empty_replace => '--.-' }
+        },
+        'fc0_heatindex_f' => {
+            formula_symbol => 'HI',
+            scope          => { empty_replace => '--.-' }
+        },
         'fc0_high_c' =>
           { rtype => 'c', format => '%i', formula_symbol => 'Th', },
         'fc0_high_f' =>
@@ -51,22 +59,44 @@ sub Wunderground_Initialize($) {
           { rtype => 'c', format => '%i', formula_symbol => 'Tl', },
         'fc0_low_f' =>
           { rtype => 'f', format => '%i', formula_symbol => 'Tl', },
-        'fc0_rain_day'           => { rtype => 'mm' },
-        'fc0_rain_day_in'        => { rtype => 'in' },
-        'fc0_rain_night'         => { rtype => 'mm' },
-        'fc0_rain_night_in'      => { rtype => 'in' },
-        'fc0_snow_day'           => { rtype => 'cm' },
-        'fc0_snow_day_in'        => { rtype => 'in' },
-        'fc0_snow_night'         => { rtype => 'cm' },
-        'fc0_snow_night_in'      => { rtype => 'in' },
-        'fc0_title'              => { rtype => 'weekday', showLong => 1 },
-        'fc0_title_night'        => { rtype => 'weekday_night', showLong => 1 },
+        'fc0_rain_day'        => { rtype => 'mm' },
+        'fc0_rain_day_in'     => { rtype => 'in' },
+        'fc0_rain_daytime'    => { rtype => 'mm' },
+        'fc0_rain_daytime_in' => { rtype => 'in' },
+        'fc0_rain_night'      => { rtype => 'mm' },
+        'fc0_rain_night_in'   => { rtype => 'in' },
+        'fc0_snow_day'        => { rtype => 'cm' },
+        'fc0_snow_day_in'     => { rtype => 'in' },
+        'fc0_snow_daytime'    => { rtype => 'cm' },
+        'fc0_snow_daytime_in' => { rtype => 'in' },
+        'fc0_snow_night'      => { rtype => 'cm' },
+        'fc0_snow_night_in'   => { rtype => 'in' },
+        'fc0_title'           => { rtype => 'weekday', showLong => 1 },
+        'fc0_title_night'     => { rtype => 'weekday_night', showLong => 1 },
+        'fc0_wind_chill' => {
+            rtype          => 'c',
+            formula_symbol => 'Wc',
+            scope          => { empty_replace => '--.-' },
+        },
+        'fc0_wind_chill_f' => {
+            rtype          => 'f',
+            formula_symbol => 'Wc',
+            scope          => { empty_replace => '--.-' }
+        },
         'fc0_wind_direction'     => { rtype => 'compasspoint' },
         'fc0_wind_direction_max' => { rtype => 'compasspoint' },
         'fc0_wind_speed'         => { rtype => 'kmph', formula_symbol => 'Ws' },
         'fc0_wind_speed_max'     => { rtype => 'kmph', formula_symbol => 'Ws' },
         'fc0_wind_speed_max_mph' => { rtype => 'mph', formula_symbol => 'Ws' },
         'fc0_wind_speed_mph'     => { rtype => 'mph', formula_symbol => 'Ws' },
+        'fc1_heat_index_c' => {
+            formula_symbol => 'HI',
+            scope          => { empty_replace => '--.-' }
+        },
+        'fc1_heat_index_f' => {
+            formula_symbol => 'HI',
+            scope          => { empty_replace => '--.-' }
+        },
         'fc1_high_c' =>
           { rtype => 'c', format => '%i', formula_symbol => 'Th', },
         'fc1_high_f' =>
@@ -80,22 +110,42 @@ sub Wunderground_Initialize($) {
           { rtype => 'c', format => '%i', formula_symbol => 'Tl', },
         'fc1_low_f' =>
           { rtype => 'f', format => '%i', formula_symbol => 'Tl', },
-        'fc1_rain_day'           => { rtype => 'mm' },
-        'fc1_rain_day_in'        => { rtype => 'in' },
-        'fc1_rain_night'         => { rtype => 'mm' },
-        'fc1_rain_night_in'      => { rtype => 'in' },
-        'fc1_snow_day'           => { rtype => 'cm' },
-        'fc1_snow_day_in'        => { rtype => 'in' },
-        'fc1_snow_night'         => { rtype => 'cm' },
-        'fc1_snow_night_in'      => { rtype => 'in' },
-        'fc1_title'              => { rtype => 'weekday', showLong => 1 },
-        'fc1_title_night'        => { rtype => 'weekday_night', showLong => 1 },
+        'fc1_rain_day'        => { rtype => 'mm' },
+        'fc1_rain_day_in'     => { rtype => 'in' },
+        'fc1_rain_daytime'    => { rtype => 'mm' },
+        'fc1_rain_daytime_in' => { rtype => 'in' },
+        'fc1_rain_night'      => { rtype => 'mm' },
+        'fc1_rain_night_in'   => { rtype => 'in' },
+        'fc1_snow_day'        => { rtype => 'cm' },
+        'fc1_snow_day_in'     => { rtype => 'in' },
+        'fc1_snow_night'      => { rtype => 'cm' },
+        'fc1_snow_night_in'   => { rtype => 'in' },
+        'fc1_title'           => { rtype => 'weekday', showLong => 1 },
+        'fc1_title_night'     => { rtype => 'weekday_night', showLong => 1 },
+        'fc1_wind_chill' => {
+            rtype          => 'c',
+            formula_symbol => 'Wc',
+            scope          => { empty_replace => '--.-' },
+        },
+        'fc1_wind_chill_f' => {
+            rtype          => 'f',
+            formula_symbol => 'Wc',
+            scope          => { empty_replace => '--.-' }
+        },
         'fc1_wind_direction'     => { rtype => 'compasspoint' },
         'fc1_wind_direction_max' => { rtype => 'compasspoint' },
         'fc1_wind_speed'         => { rtype => 'kmph', formula_symbol => 'Ws' },
         'fc1_wind_speed_max'     => { rtype => 'kmph', formula_symbol => 'Ws' },
         'fc1_wind_speed_max_mph' => { rtype => 'mph', formula_symbol => 'Ws' },
         'fc1_wind_speed_mph'     => { rtype => 'mph', formula_symbol => 'Ws' },
+        'fc2_heat_index_c' => {
+            formula_symbol => 'HI',
+            scope          => { empty_replace => '--.-' }
+        },
+        'fc2_heat_index_f' => {
+            formula_symbol => 'HI',
+            scope          => { empty_replace => '--.-' }
+        },
         'fc2_high_c' =>
           { rtype => 'c', format => '%i', formula_symbol => 'Th', },
         'fc2_high_f' =>
@@ -109,22 +159,42 @@ sub Wunderground_Initialize($) {
           { rtype => 'c', format => '%i', formula_symbol => 'Tl', },
         'fc2_low_f' =>
           { rtype => 'f', format => '%i', formula_symbol => 'Tl', },
-        'fc2_rain_day'       => { rtype => 'mm' },
-        'fc2_rain_day_in'    => { rtype => 'in' },
-        'fc2_rain_night'     => { rtype => 'mm' },
-        'fc2_rain_night_in'  => { rtype => 'in' },
-        'fc2_snow_day'       => { rtype => 'cm' },
-        'fc2_snow_day_in'    => { rtype => 'in' },
-        'fc2_snow_night'     => { rtype => 'cm' },
-        'fc2_snow_night_in'  => { rtype => 'in' },
-        'fc2_title'          => { rtype => 'weekday', showLong => 1 },
-        'fc2_title_night'    => { rtype => 'weekday_night', showLong => 1, },
-        'fc2_wind_direction' => { rtype => 'compasspoint' },
+        'fc2_rain_day'        => { rtype => 'mm' },
+        'fc2_rain_day_in'     => { rtype => 'in' },
+        'fc2_rain_daytime'    => { rtype => 'mm' },
+        'fc2_rain_daytime_in' => { rtype => 'in' },
+        'fc2_rain_night'      => { rtype => 'mm' },
+        'fc2_rain_night_in'   => { rtype => 'in' },
+        'fc2_snow_day'        => { rtype => 'cm' },
+        'fc2_snow_day_in'     => { rtype => 'in' },
+        'fc2_snow_night'      => { rtype => 'cm' },
+        'fc2_snow_night_in'   => { rtype => 'in' },
+        'fc2_title'           => { rtype => 'weekday', showLong => 1 },
+        'fc2_title_night'     => { rtype => 'weekday_night', showLong => 1, },
+        'fc2_wind_chill' => {
+            rtype          => 'c',
+            formula_symbol => 'Wc',
+            scope          => { empty_replace => '--.-' },
+        },
+        'fc2_wind_chill_f' => {
+            rtype          => 'f',
+            formula_symbol => 'Wc',
+            scope          => { empty_replace => '--.-' }
+        },
+        'fc2_wind_direction'     => { rtype => 'compasspoint' },
         'fc2_wind_direction_max' => { rtype => 'compasspoint' },
         'fc2_wind_speed'         => { rtype => 'kmph', formula_symbol => 'Ws' },
         'fc2_wind_speed_max'     => { rtype => 'kmph', formula_symbol => 'Ws' },
         'fc2_wind_speed_max_mph' => { rtype => 'mph', formula_symbol => 'Ws' },
         'fc2_wind_speed_mph'     => { rtype => 'mph', formula_symbol => 'Ws' },
+        'fc3_heat_index_c' => {
+            formula_symbol => 'HI',
+            scope          => { empty_replace => '--.-' }
+        },
+        'fc3_heat_index_f' => {
+            formula_symbol => 'HI',
+            scope          => { empty_replace => '--.-' }
+        },
         'fc3_high_c' =>
           { rtype => 'c', format => '%i', formula_symbol => 'Th', },
         'fc3_high_f' =>
@@ -138,16 +208,28 @@ sub Wunderground_Initialize($) {
           { rtype => 'c', format => '%i', formula_symbol => 'Tl', },
         'fc3_low_f' =>
           { rtype => 'f', format => '%i', formula_symbol => 'Tl', },
-        'fc3_rain_day'           => { rtype => 'mm' },
-        'fc3_rain_day_in'        => { rtype => 'in' },
-        'fc3_rain_night'         => { rtype => 'mm' },
-        'fc3_rain_night_in'      => { rtype => 'in' },
-        'fc3_snow_day'           => { rtype => 'cm' },
-        'fc3_snow_day_in'        => { rtype => 'in' },
-        'fc3_snow_night'         => { rtype => 'cm' },
-        'fc3_snow_night_in'      => { rtype => 'in' },
-        'fc3_title'              => { rtype => 'weekday', showLong => 1 },
-        'fc3_title_night'        => { rtype => 'weekday_night', showLong => 1 },
+        'fc3_rain_day'        => { rtype => 'mm' },
+        'fc3_rain_day_in'     => { rtype => 'in' },
+        'fc3_rain_daytime'    => { rtype => 'mm' },
+        'fc3_rain_daytime_in' => { rtype => 'in' },
+        'fc3_rain_night'      => { rtype => 'mm' },
+        'fc3_rain_night_in'   => { rtype => 'in' },
+        'fc3_snow_day'        => { rtype => 'cm' },
+        'fc3_snow_day_in'     => { rtype => 'in' },
+        'fc3_snow_night'      => { rtype => 'cm' },
+        'fc3_snow_night_in'   => { rtype => 'in' },
+        'fc3_title'           => { rtype => 'weekday', showLong => 1 },
+        'fc3_title_night'     => { rtype => 'weekday_night', showLong => 1 },
+        'fc3_wind_chill' => {
+            rtype          => 'c',
+            formula_symbol => 'Wc',
+            scope          => { empty_replace => '--.-' },
+        },
+        'fc3_wind_chill_f' => {
+            rtype          => 'f',
+            formula_symbol => 'Wc',
+            scope          => { empty_replace => '--.-' }
+        },
         'fc3_wind_direction'     => { rtype => 'compasspoint' },
         'fc3_wind_direction_max' => { rtype => 'compasspoint' },
         'fc3_wind_speed'         => { rtype => 'kmph', formula_symbol => 'Ws' },
@@ -157,28 +239,36 @@ sub Wunderground_Initialize($) {
         'feelslike_c'            => { rtype => 'c', formula_symbol => 'Tf', },
         'feelslike_f'            => { rtype => 'f', formula_symbol => 'Tf', },
         'forecast_url'           => { rtype => 'url_http' },
-        'history_url'            => { rtype => 'url_http' },
-        'humidity'               => { rtype => 'pct', formula_symbol => 'H' },
-        'icon_url'               => { rtype => 'url_http' },
-        'israining'              => { rtype => 'bool', },
-        'lastQueryResult'        => { rtype => 'oknok' },
-        'moon_age'               => { rtype => 'd' },
-        'moon_pct'               => { rtype => 'pct' },
-        'moon_rise'              => { rtype => 'time' },
-        'moon_set'               => { rtype => 'time' },
-        'ob_url'                 => { rtype => 'url_http' },
-        'pressure'               => { rtype => 'hpamb' },
-        'pressure_in'            => { rtype => 'inhg' },
-        'pressure_trend'         => { rtype => 'trend' },
-        'rain'                   => { rtype => 'mm' },
-        'rain_day'               => { rtype => 'mm' },
-        'rain_day_in'            => { rtype => 'in' },
-        'rain_in'                => { rtype => 'in' },
-        'solarradiation'         => { rtype => 'wpsm' },
-        'sunrise'                => { rtype => 'time' },
-        'sunset'                 => { rtype => 'time' },
-        'temp_c'                 => { rtype => 'c' },
-        'temp_f'                 => { rtype => 'f' },
+        'heat_index_c' => {
+            formula_symbol => 'HI',
+            scope          => { empty_replace => '--.-' }
+        },
+        'heat_index_f' => {
+            formula_symbol => 'HI',
+            scope          => { empty_replace => '--.-' }
+        },
+        'history_url'     => { rtype => 'url_http' },
+        'humidity'        => { rtype => 'pct', formula_symbol => 'H' },
+        'icon_url'        => { rtype => 'url_http' },
+        'israining'       => { rtype => 'bool', },
+        'lastQueryResult' => { rtype => 'oknok' },
+        'moon_age'        => { rtype => 'd' },
+        'moon_pct'        => { rtype => 'pct' },
+        'moon_rise'       => { rtype => 'time' },
+        'moon_set'        => { rtype => 'time' },
+        'ob_url'          => { rtype => 'url_http' },
+        'pressure'        => { rtype => 'hpamb' },
+        'pressure_in'     => { rtype => 'inhg' },
+        'pressure_trend'  => { rtype => 'trend' },
+        'rain'            => { rtype => 'mm' },
+        'rain_day'        => { rtype => 'mm' },
+        'rain_day_in'     => { rtype => 'in' },
+        'rain_in'         => { rtype => 'in' },
+        'solarradiation'  => { rtype => 'wpsm' },
+        'sunrise'         => { rtype => 'time' },
+        'sunset'          => { rtype => 'time' },
+        'temp_c'          => { rtype => 'c' },
+        'temp_f'          => { rtype => 'f' },
         'visibility' => {
             rtype => 'km',
             scope => { empty_replace => '--.-' }
@@ -612,19 +702,19 @@ sub Wunderground_Hash2Readings($$;$) {
                 );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "heatindex_c",
+                    $reading . "heat_index_c",
                     $h->{heatindex}{metric}
                 ) if ( $h->{heatindex}{metric} ne "-9999" );
-                readingsBulkUpdateIfChanged( $hash, $reading . "heatindex_c",
-                    "-" )
+                readingsBulkUpdateIfChanged( $hash, $reading . "heat_index_c",
+                    " " )
                   if ( $h->{heatindex}{metric} eq "-9999" );
                 readingsBulkUpdate(
                     $hash,
-                    $reading . "heatindex_f",
+                    $reading . "heat_index_f",
                     $h->{heatindex}{english}
                 ) if ( $h->{heatindex}{english} ne "-9999" );
-                readingsBulkUpdateIfChanged( $hash, $reading . "heatindex_f",
-                    "-" )
+                readingsBulkUpdateIfChanged( $hash, $reading . "heat_index_f",
+                    " " )
                   if ( $h->{heatindex}{english} eq "-9999" );
                 readingsBulkUpdate( $hash, $reading . "humidity",
                     $h->{humidity} );
@@ -683,7 +773,7 @@ sub Wunderground_Hash2Readings($$;$) {
                     $h->{windchill}{metric}
                 ) if ( $h->{windchill}{metric} ne "-9999" );
                 readingsBulkUpdateIfChanged( $hash, $reading . "wind_chill",
-                    "-" )
+                    " " )
                   if ( $h->{windchill}{metric} eq "-9999" );
                 readingsBulkUpdate(
                     $hash,
@@ -691,7 +781,7 @@ sub Wunderground_Hash2Readings($$;$) {
                     $h->{windchill}{english}
                 ) if ( $h->{windchill}{english} ne "-9999" );
                 readingsBulkUpdateIfChanged( $hash, $reading . "wind_chill_f",
-                    "-" )
+                    " " )
                   if ( $h->{windchill}{english} eq "-9999" );
                 readingsBulkUpdate(
                     $hash,
