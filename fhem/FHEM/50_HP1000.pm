@@ -3,7 +3,6 @@
 package main;
 use strict;
 use warnings;
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 use Data::Dumper;
 use Time::Local;
 use Encode qw(encode_utf8 decode_utf8);
@@ -11,7 +10,6 @@ use List::Util qw(sum);
 
 use HttpUtils;
 use Unit;
-
 
 # module hashes ###############################################################
 my %HP1000_pwsMapping = (
@@ -437,7 +435,7 @@ sub HP1000_CGI() {
 
         return ( "text/plain; charset=utf-8",
             "incorrect FHEMWEB instance to receive data" )
-          unless ( $FW_wname ~~ @webhookFWinstances );
+          unless ( grep ( /^$FW_wname$/, @webhookFWinstances ) );
 
         # extract values from URI
         foreach my $pv ( split( "&", $URI ) ) {
