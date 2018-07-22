@@ -17,9 +17,11 @@
 # V 0.91
 # - fixed:   74_UnififSwitch: fixed wording in commandref
 #                             added new state-mappings
+# V 0.92
+# - fixed:   74_UnififSwitch: fixed possible log-error in eq in line 135
 # 
 # TODOs:
-# - state des USW korrekt setzen (aktuell nur connected und provisioning)
+# - state des USW für weiter state-Numbers korrekt in Worte übersetzen 
 
 package main;
 my $version="0.92";
@@ -132,7 +134,7 @@ sub UnifiSwitch_Set($@){
       my $idx;
       my $i = 0;
       for my $entry (@{$port_overrides}) {
-        if( $entry->{port_idx} eq $setVal ) {
+        if( defined $entry->{port_idx} && ($entry->{port_idx} eq $setVal) ) {
           $idx = $i;
           last;
         }

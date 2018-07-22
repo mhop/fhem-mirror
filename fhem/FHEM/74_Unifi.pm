@@ -35,10 +35,13 @@
 #  - fixed:   74_Unifi: Minor bugfix in notify-function
 # V 3.0.3
 #  - fixed:   74_Unifi: Minor loglevel-bugfix
+# V 3.0.4
+#  - fixed:   74_Unifi: Readingname -UC_newClients with leading -
+#  - changed: 74_Unifi: Reading(name) for Utilization of APs with UC V 5.7/8.x
 
 
 package main;
-my $version="3.0.3";
+my $version="3.0.4";
 use strict;
 use warnings;
 use HttpUtils;
@@ -1249,7 +1252,7 @@ sub Unifi_SetClientReadings($) {
             readingsBulkUpdate($hash,$clientName,'disconnected');
         }
     }
-    readingsBulkUpdate($hash,"UC_newClients",$newClients);
+    readingsBulkUpdate($hash,"-UC_newClients",$newClients);
     
     return undef;
 }
@@ -1273,13 +1276,15 @@ sub Unifi_SetAccesspointReadings($) {
     my ($hash) = @_;
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
     Log3 $name, 5, "$name ($self) - executed.";
-    
+
     my ($apName,$apRef,$essid);
+    my $utiliz;
     for my $apID (keys %{$hash->{accespoints}}) {
         $essid = '';
+        $utiliz = '';
         $apRef = $hash->{accespoints}->{$apID};
         $apName = ($apRef->{name}) ? $apRef->{name} : $apRef->{ip};
-        
+
         if (defined $apRef->{vap_table} && scalar @{$apRef->{vap_table}}) {
             for my $vap (@{$apRef->{vap_table}}) {
                 $essid .= makeReadingName($vap->{essid}).',';
@@ -1288,11 +1293,22 @@ sub Unifi_SetAccesspointReadings($) {
         } else {
             my $essid = 'none';
         }
-        
+
+        #nochmal genauer ins json schauen, ob hier wirklich eine Schleife notwendig ist. (cu_total mehrfach vorhanden?
+        if (defined $apRef->{'radio_table_stats'} ) {
+            for my $rts (@{$apRef->{'radio_table_stats'}}) {
+                $utiliz .= makeReadingName($rts->{'cu_total'}).','; # TODO: hier nicht unbedingt notwendig, aufgrund des funktionierenden schnellen fixes wegen neuer controller-Version bleibt es aber erstmal so drin.
+            }
+            $utiliz =~ s/.$//;
+        } else {
+            my $utiliz = 'none';
+        }
+
         readingsBulkUpdate($hash,'-AP_'.$apName.'_state',($apRef->{state} == 1) ? 'ok' : 'error');
         readingsBulkUpdate($hash,'-AP_'.$apName.'_clients',$apRef->{'num_sta'});
         if( $apRef->{type} eq 'uap' ) {
           readingsBulkUpdate($hash,'-AP_'.$apName.'_essid',$essid);
+          readingsBulkUpdate($hash,'-AP_'.$apName.'_utilization',$utiliz) if ($utiliz ne '');
           readingsBulkUpdate($hash,'-AP_'.$apName.'_utilizationNA',$apRef->{'na_cu_total'}) if( defined($apRef->{'na_cu_total'}) );
           readingsBulkUpdate($hash,'-AP_'.$apName.'_utilizationNG',$apRef->{'ng_cu_total'}) if( defined($apRef->{'ng_cu_total'}) );
         }
@@ -1308,7 +1324,7 @@ sub Unifi_SetAccesspointReadings($) {
         # readingsBulkUpdate($hash,'-AP_'.$apName.'_users',$apRef->{'user-num_sta'});
         # readingsBulkUpdate($hash,'-AP_'.$apName.'_last_seen',$apRef->{'last_seen'});
     }
-    
+
     return undef;
 }
 
@@ -2370,8 +2386,8 @@ Or you can use the other readings or set and get features to control your unifi-
 <ul>
     Note: All readings generate events. You can control this with <a href="#readingFnAttributes">these global attributes</a>.
     <li>Each client has 7 readings for connection-state, SNR, uptime, last_seen-time, connected-AP, essid and hostname.</li>
-    <li><code>UC_newClients</code>&nbsp;shows nameof a new client, could be a comma-separated list. Will be set to empty at next interval.</li>
-    <li>Each AP has 3 readings for state (can be 'ok' or 'error'), essid's and count of connected-clients.</li>
+    <li><code>-UC_newClients</code>&nbsp;shows nameof a new client, could be a comma-separated list. Will be set to empty at next interval.</li>
+    <li>Each AP has 5 readings for state (can be 'ok' or 'error'), essid's, utilization, locate and count of connected-clients.</li>
     <li>The unifi-controller has 6 readings for event-count in configured 'timePeriod', unarchived-alert count, accesspoint count, overall wlan-state (can be 'ok', 'warning', or other?), connected user count and connected guest count. </li>
     <li>The Unifi-device reading 'state' represents the connection-state to the unifi-controller (can be 'connected', 'disconnected', 'initialized' and 'disabled').</li>
     <li>Each voucher-cache has a reading with the next free voucher code.</li>
