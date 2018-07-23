@@ -62,6 +62,7 @@ FBAHAHTTP_Delete($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my ($err, $fb_pw) = setKeyValue("FBAHAHTTP_PASSWORD_$name", undef);
+  return $err;
 }
 
 sub
