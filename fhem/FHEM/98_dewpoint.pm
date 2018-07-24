@@ -382,14 +382,14 @@ dewpoint_Notify($$)
             Log3($hashName, 5, "dewpoint_notify: fan dewpoint_out=$dewpoint_out");
             if (($dewpoint_out + $diff_temp) < $dewpoint && $temperature_out >= $min_temp) {
                 $rval = "on";
-                Log3($hashName, 3, "dewpoint_notify: fan ON");
+                Log3($hashName, 4, "dewpoint_notify: fan ON");
             } else {
                 $rval = "off";
-                Log3($hashName, 3, "dewpoint_notify: fan OFF");
+                Log3($hashName, 4, "dewpoint_notify: fan OFF");
             }
             $rname = "fan";
             if (!exists $defs{$devName}{READINGS}{$rname}{VAL} || $defs{$devName}{READINGS}{$rname}{VAL} ne $rval) {
-                Log3($hashName, 3, "dewpoint_notify: CHANGE fan $rval");
+                Log3($hashName, 4, "dewpoint_notify: CHANGE fan $rval");
                 $dev->{READINGS}{$rname}{TIME} = $tn;
                 $dev->{READINGS}{$rname}{VAL} = $rval;
                 $dev->{CHANGED}[$nev++] = $rname . ": " . $rval;
@@ -425,10 +425,10 @@ dewpoint_Notify($$)
             Log3($hashName, 5, "dewpoint_notify: alarm temperature_ref=$temperature_ref");
             if ($temperature_ref - $diff_temp < $dewpoint) {
                 $rval = "on";
-                Log3($hashName, 3, "dewpoint_notify: alarm ON");
+                Log3($hashName, 4, "dewpoint_notify: alarm ON");
             } else {
                 $rval = "off";
-                Log3($hashName, 3, "dewpoint_notify: alarm OFF");
+                Log3($hashName, 4, "dewpoint_notify: alarm OFF");
             }
             $rname = "alarm";
             if (!exists $defs{$devName}{READINGS}{$rname}{VAL} || $defs{$devName}{READINGS}{$rname}{VAL} ne $rval) {
