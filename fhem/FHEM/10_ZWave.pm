@@ -4255,21 +4255,19 @@ ZWave_getHash($$$)
     map { $ptr->{$_} = $add->{$_} } keys %{$add} if($add);
   }
 
-  my $version = $hash->{".vclasses"}{$cl};
-  if(defined($version) && ($type eq "get" || $type eq "set")) {
+  if($type eq "get" || $type eq "set") {
     my %h;
-    if($version > 0) {
-      map {
-        my $zv = $zwave_classVersion{$_};
-        if(!$zv || ((!$zv->{min} || $zv->{min} <= $version) &&
-                    (!$zv->{max} || $zv->{max} >= $version))) {
-          $h{$_} = $ptr->{$_};
-        }
-      } keys %{$ptr};
-    }
+    my $version = $hash->{".vclasses"}{$cl};
+    $version = 0 if(!defined($version));
+    map {
+      my $zv = $zwave_classVersion{$_};
+      if(!$zv || ((!$zv->{min} || $zv->{min} <= $version) &&
+                  (!$zv->{max} || $zv->{max} >= $version))) {
+        $h{$_} = $ptr->{$_};
+      }
+    } keys %{$ptr};
     $ptr = \%h;
   }
-
   return $ptr;
 }
 
