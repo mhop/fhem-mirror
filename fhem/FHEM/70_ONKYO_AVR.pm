@@ -1637,7 +1637,7 @@ sub ONKYO_AVR_Read($) {
 
     elsif ( $cmd eq "video-information" ) {
         my @video_split = split( /,/, $value );
-        if ( scalar(@video_split) >= 9 ) {
+        if ( scalar(@video_split) >= 8 ) {
 
             # Video-in resolution
             my @vidin_res_string = split( / +/, $video_split[1] );
@@ -1713,8 +1713,9 @@ sub ONKYO_AVR_Read($) {
                 ReadingsVal( $name, "vidout_cdepth", "-" ) ne $vidout_cdepth );
 
             readingsBulkUpdate( $hash, "vidout_mode", $video_split[8] )
-              if (
-                ReadingsVal( $name, "vidout_mode", "-" ) ne $video_split[8] );
+              if ( defined( $video_split[8] )
+                && ReadingsVal( $name, "vidout_mode", "-" ) ne $video_split[8]
+              );
 
         }
         else {
