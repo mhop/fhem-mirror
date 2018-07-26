@@ -128,13 +128,13 @@ CUL_FHTTK_Initialize($)
   $hash->{SetFn}     = "CUL_FHTTK_Set";
   $hash->{DefFn}     = "CUL_FHTTK_Define";
   $hash->{UndefFn}   = "CUL_FHTTK_Undef";
+  $hash->{AttrFn}    = "CUL_FHTTK_Attr";  
   $hash->{ParseFn}   = "CUL_FHTTK_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:0,1 " .
-                        "model:FHT80TF,FHT80TF-2,dummy ".
+                        "model:FHT80TF,FHT80TF-2,virtual ".
                         $readingFnAttributes;
   $hash->{AutoCreate}=
      { "CUL_FHTTK.*" => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" } };
-
 }
 
 #############################
@@ -152,7 +152,11 @@ CUL_FHTTK_Set($@)
   
   # suppress SET option
   if(defined($attr{$name}) && defined($attr{$name}{"model"})) {
-    if($attr{$name}{"model"} ne "dummy") {
+    if($attr{$name}{"model"} eq "dummy") {
+      Log3 $name, 5, "CUL_FHTTK ($name) Attribute was renamed from dummy to virtual! No functional lack.";
+      $attr{$name}{"model"} = "virtual";
+    }
+    if($attr{$name}{"model"} ne "virtual") {
       return $ret;
     }
   }
@@ -188,10 +192,11 @@ CUL_FHTTK_Set($@)
   } elsif($opt eq "ReSync" ) {
     Log3 $name, 3, "CUL_FHTTK ($name) resyncing with FHT80b.";
 
-    IOWrite($hash, "", sprintf("T%s%s", $hash->{CODE}, $fhttfk_c2b{$opt})); # 0xff - ReSync
-    # window state switch to closed through cul FW implementation
-    $opt = "Closed";
+    CUL_FHTTK_ReSync($hash);
     
+    # return, because readingsupdate is perfomred by sub function
+    return $ret;
+
   } else {
     return "Unknown argument $a[1], choose one of Pair ReSync Open Closed"
   }
@@ -213,7 +218,7 @@ CUL_FHTTK_Define($$)
   my $u= "wrong syntax: define <name> CUL_FHTTK <sensor>";
   return $u if((int(@a)< 3) || (int(@a)>3));
 
-  my $name     = $a[0];
+  my $name     = $hash->{NAME};
   my $sensor   = lc($a[2]);
   if($sensor !~ /^[0-9a-f]{6}$/) {
     return "wrong sensor specification $sensor, need a 6 digit hex number!";
@@ -221,7 +226,7 @@ CUL_FHTTK_Define($$)
   
   $hash->{CODE} = $sensor;
   $modules{CUL_FHTTK}{defptr}{$sensor} = $hash;
-
+  
   AssignIoPort($hash);
   return undef;
 }
@@ -232,10 +237,24 @@ sub
 CUL_FHTTK_Undef($$)
 {
   my ($hash, $name) = @_;
+
+  RemoveInternalTimer($hash);
+ 
   delete($modules{CUL_FHTTK}{defptr}{$hash->{CODE}}) if($hash && $hash->{CODE});
+
   return undef;
 }
 
+#############################
+sub CUL_FHTTK_Attr($$$) {
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  if( $attrName eq "model" && $attrVal eq "dummy") {
+    $attr{$name}{$attrName} = "virtual";
+    return "$name - Renamed attrubte model from dummy to virtual! No functional lack!";
+  }
+  return undef;
+}
 
 #############################
 sub
@@ -253,6 +272,8 @@ CUL_FHTTK_Parse($$)
   my $name  = $def->{NAME};
   my $state = lc(substr($msg, 7, 2));
 
+  Log3 $hash, 4, "CUL_FHTTK $sensor RAW message: $msg";
+  
   return "" if(IsIgnored($name));
 
   if(!defined($fhttfk_translatedcodes{$state})) {
@@ -270,7 +291,7 @@ CUL_FHTTK_Parse($$)
       if($defs{$name}{PREV}{TIMESTAMP} > time()-5) {
          if(defined($defs{$name}{PREV}{STATE})) {
              if($defs{$name}{PREV}{STATE} eq $state) {
-                 Log3 $name, 4, sprintf("FHTTK skipping state $state as last similar telegram was received less than 5 (%s) secs ago", time()-$defs{$name}{PREV}{TIMESTAMP});
+                 Log3 $name, 4, sprintf("FHTTK skipping state $state as last similar telegram was received less than 5 (%s) secs ago", $defs{$name}{PREV}{STATE}, time()-$defs{$name}{PREV}{TIMESTAMP});
                  return "";
              }
          }
@@ -316,12 +337,26 @@ CUL_FHTTK_Parse($$)
   } else {
       readingsBulkUpdate($def, "Reliability", "ok");
   }
-  # Flag the battery warning separately
+  
+  # set battery state - Forum #87575
+  my $batteryReading = "batteryState";
+  my $batteryState = "ok";
+  
   if($state eq "11" || $state eq "12") {
-    readingsBulkUpdate($def, "Battery", "Low");
-  } else {
-    readingsBulkUpdate($def, "Battery", "ok");
+    $batteryState = "low";
   }
+  
+  if(exists($defs{$name}{READINGS}{"Battery"})) {
+    if(defined($featurelevel) && $featurelevel <= 5.8) {
+        readingsBulkUpdate($def, "Battery", $batteryState);
+    } else {
+        # delete reading
+        readingsDelete($def, "Battery");
+    }
+  }
+  
+  readingsBulkUpdate($def, $batteryReading, $batteryState);
+  
   #CHANGED
   readingsBulkUpdate($def, "state", $val);
 
@@ -334,6 +369,66 @@ CUL_FHTTK_Parse($$)
   readingsEndUpdate($def, 1);
   
   return $def->{NAME};
+}
+
+#############################
+sub
+CUL_FHTTK_ReSync($)
+{
+  my ($hash) = @_;
+  
+  RemoveInternalTimer($hash);
+  
+  Log3 undef, 3, "CUL_FHTTK_ReSync() - ReSync for $hash->{NAME} started!";
+  
+  # set resync
+  IOWrite($hash, "", sprintf("T%sff", $hash->{CODE})); # 0xff - ReSync
+  
+  # update new state 
+  readingsSingleUpdate($hash, "state", "ReSync", 1);
+  readingsSingleUpdate($hash, "Window", "ReSync", 1);
+  
+  # finish timer
+  InternalTimer( gettimeofday() + 64, "CUL_FHTTK_ReSyncDone", $hash, 0 );
+}
+
+#############################
+sub
+CUL_FHTTK_ReSyncDone($)
+{
+  my ($hash) = @_;
+  
+  RemoveInternalTimer($hash);
+  
+  # update new state 
+  readingsSingleUpdate($hash, "state", "Closed", 1);
+  readingsSingleUpdate($hash, "Window", "Closed", 1);
+  
+  Log3 undef, 3, "CUL_FHTTK_ReSyncDone() - ReSync for $hash->{NAME} done!";
+}
+
+#############################
+sub
+CUL_FHTTK_ReSyncAll()
+{
+  my $timeOffset = 0;
+  
+  foreach my $culFhtTk ( sort keys %{$modules{CUL_FHTTK}{defptr}} ) {
+    my $hash = $modules{CUL_FHTTK}{defptr}{$culFhtTk};
+    my $name = $hash->{NAME};
+
+    Log3 undef, 4, "CUL_FHTTK_ReSyncAll - Possible device ($hash->{NAME}) found.";
+    
+    # check for model virtual
+    if(AttrVal($name, "model", "") eq "virtual") {
+      my $timerRaised = gettimeofday() + $timeOffset;
+      InternalTimer( $timerRaised, "CUL_FHTTK_ReSync", $hash, 0 );
+      Log3 undef, 3, "CUL_FHTTK_ReSyncAll() - ReSync for $hash->{NAME} starts at ".localtime($timerRaised)."!";
+
+      $timeOffset += 3600; # one hour later, the next one, because of LOVF
+    }
+  }
+  Log3 undef,  3, "CUL_FHTTK_ReSyncAll done! Devices will be synchronized in steps!";
 }
 
 #############################
@@ -362,7 +457,7 @@ CUL_FHTTK_Parse($$)
   or next official version 1.62 or higher, it is possible to send out FHT80 TF data with a CUL or simular 
   devices. So it can be simulate up to four window sensor with one device 
   (see <a href="http://www.fhemwiki.de/wiki/CUL_FHTTK">FHEM Wiki</a>). To setup a window sensor, you have to
-  add and/or change the attribute "model" to dummy. The 6 digit hex number must not equal to FHTID.<br><br>
+  add and/or change the attribute "model" to virtual. The 6 digit hex number must not equal to FHTID.<br><br>
 
   <a name="CUL_FHTTKdefine"></a>
   <b>Define</b>
@@ -383,21 +478,27 @@ CUL_FHTTK_Parse($$)
 
   <a name="CUL_FHTTKset"></a>
   <b>Set</b>
-    <ul> Only available, if model is set to dummy.<br><br>
+    <ul> Only available, if model is set to virtual.<br><br>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is one of:<br>
-    <ul><code>
-      Pair     # start pairing with FHT80B (activate FHT80B sync mode before) - state after pairing is Closed<br>
-      Closed   # set window state to Closed<br>
-      Open     # set window state to Open<br>
-      ReSync   # resync virtual sensor with FHT80b after a reset of CUL device. In other words, perform a virtual
+    <ul>
+      <li><code>Closed</code><br>set window state to Closed</li><br>
+      <li><code>Open</code><br>set window state to Open</li><br>
+      <li><code>Pair</code><br>start pairing with FHT80B (activate FHT80B sync mode before) - state after pairing is Closed</li><br>
+      <li><code>ReSync</code><br>resync virtual sensor with FHT80b after a reset of CUL device. In other words, perform a virtual
                  battery exchange to synchronize the sensor with FHT80b device again. (at the moment, only 
-                 available with prototype cul_fw - see forum 55774)<br>
-    </code></ul>
+                 available with prototype cul fw - see forum 55774)</li><br>
+    </ul>
     </ul>
     <br>
 
+    <u>Special to the "ReSync" of existing FHT80TFs after a CUL firmware reset:</u><br>
+    After a reset or restart of a CUL device, the connection between the FHT80B and the virtual FHT80TFs is interrupted. This is equivalent to a battery change. 
+    The contacts are still registered at the FHT80B. No new pairing is required. If multiple virtual contacts are used, it is recommended to synchronize them at large intervals!<br>
+    Calling the <b>CUL_FHTTK_ReSyncAll()</b> function synchronizes all virtual window contacts successively with the FHT80B. 
+    The time interval between the individual sensors is <u>1 hour</u>. This is determined by the 1% rule, since per contact 480 credits are consumed within 64 seconds!<br><br>
+    
   <b>Get</b>
    <ul> No get implemented yet ...
    </ul><br>
@@ -407,7 +508,7 @@ CUL_FHTTK_Parse($$)
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#verbose">verbose</a></li><br>
-    <li><a href="#model">model</a><br>Possible values are: FHT80TF, FHT80TF-2, dummy (value, which allow to simulate a window sensor)</li><br>
+    <li><a href="#model">model</a><br>Possible values are: FHT80TF, FHT80TF-2, virtual (value, which allow to simulate a window sensor)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#ignore">ignore</a></li><br>
@@ -438,7 +539,7 @@ CUL_FHTTK_Parse($$)
   oder mit der n&auml;chsten offiziellen Version 1.62 oder h&ouml;her, ist es m&ouml;glich, FHT80 TF Daten zu senden. 
   M&ouml;glich mit einem CUL oder &auml;hnlichen Ger&auml;ten. So k&ouml;nnen bis zu vier Fenstersensoren mit einem Ger&auml;t
   simuliert werden (siehe <a href="http://www.fhemwiki.de/wiki/CUL_FHTTK">FHEM Wiki</a>). Es muss lediglich das Attribut model mit dem 
-  Wert "dummy" hinzugef&uuml;gt oder ge&auml;ndert werden. Wichtig: Der Devicecode sollte nicht der FHTID entsprechen.<br><br>
+  Wert "virtual" hinzugef&uuml;gt oder ge&auml;ndert werden. Wichtig: Der Devicecode sollte nicht der FHTID entsprechen.<br><br>
 
   <a name="CUL_FHTTKdefine"></a>
   <b>D</b>
@@ -459,20 +560,27 @@ CUL_FHTTK_Parse($$)
 
   <a name="CUL_FHTTKset"></a>
   <b>Set</b>
-    <ul> Nur vorhanden, wenn das Attribut model mit dummy definiert wurde.<br><br>
+    <ul> Nur vorhanden, wenn das Attribut model mit virtual definiert wurde.<br><br>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     wobei <code>value</code> folgendes sein kann:<br>
-    <ul><code>
-      Pair     # startet das Anlernen an das FHT80B (FHT80B muss sich im Sync mode befinden) - danach wird der state auf "Closed" gesetzt<br>
-      Closed   # setzt den Fensterstatus zu Closed<br>
-      Open     # setzt den Fensterstatus zu Open<br>
-      ReSync   # neu synchronisieren des virtuellen Sensor mit dem FHT80b Module. Damit wird ein virtueller Batteriewechsel symuliert und der angelernte
-                 Sensor wieder aufsynchronisiert. (aktuell nur mit Prototyp CUL FW verfügbar Forum 55774)<br>
-    </code></ul>
+    <ul>
+      <li><code>Closed</code><br>setzt den Fensterstatus zu Closed</li><br>
+      <li><code>Open</code><br>setzt den Fensterstatus zu Open</li><br>
+      <li><code>Pair</code><br>startet das Anlernen an das FHT80B (FHT80B muss sich im Sync mode befinden) - danach wird der state auf "Closed" gesetzt</li><br>
+      <li><code>ReSync</code><br>neu synchronisieren des virtuellen Sensor mit dem FHT80b Module. Damit wird ein virtueller Batteriewechsel simuliert und der angelernte
+                 Sensor wieder aufsynchronisiert. (aktuell nur mit Prototyp CUL FW verf&uuml;gbar Forum 55774)</li><br>
+    </ul>
     </ul>
     <br>
-
+    
+    <u>Spezielles zum "ReSync" von vorhanden FHT80TFs nach einem CUL Firmware Reset:</u><br>
+    Nach einem Reset bzw. Neustart eines CUL Devices ist die Verbindung zwischen dem FHT80B und den virtuellen FHT80TFs unterbrochen. Dies kommt einem Batteriewechsel gleich. 
+    Die Kontakte sind weiterhin am FHT80B angelernt. Ein neues Pairen entf&auml;llt. Wenn mehrere vitruelle Kontakte verwendet werden, empfiehlt es sich diese in großen Abst&auml;nden 
+    wieder zu synchronisieren!<br>
+    Mithilfe des Aufrufes der Funktion <b>CUL_FHTTK_ReSyncAll()</b> werden alle virtuellen Fensterkontakte <u>nacheinander</u> mit den FHT80B wieder synchronisiert. 
+    Der Abstand betr&auml;gt zwischen den einzelnen Sensoren <u>1 Stunde</u>. Dies wird durch die 1% Regeln bestimmt, da pro Kontakt 480 credits innerhalb von 64 Sekunden verbraucht werden!<br><br>
+    
   <b>Get</b>
   <ul> N/A </ul>
   <br>
@@ -482,7 +590,7 @@ CUL_FHTTK_Parse($$)
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#verbose">verbose</a></li><br>
-    <li><a href="#model">model</a><br>M&ouml;gliche Werte sind: FHT80TF, FHT80TF-2, dummy (zum simulieren eines Fensterkontaktes)</li><br>
+    <li><a href="#model">model</a><br>M&ouml;gliche Werte sind: FHT80TF, FHT80TF-2, virtual (zum simulieren eines Fensterkontaktes)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#ignore">ignore</a></li><br>

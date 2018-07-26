@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 09_CUL_FHTTK: adapted battery reading to new common reading 
+                Forum #87575
   - change:  98_dewpoint: adjust log level for FAN/ALARM on/off to 4
   - bugfix:  82_LGTV_WebOS: fix current program list readings
   - change:  74_Unifi: changed readings -UC_newClients and -AP_utilization
