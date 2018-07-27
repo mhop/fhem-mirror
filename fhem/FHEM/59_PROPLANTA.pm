@@ -182,9 +182,9 @@ my $curReadingType = 0;
      ,"West-Südwest" => 248
      ,"West-S&uuml;dwest" => 248
      ,"West" => 270
-     ,"West-Nordwest" => 203
-     ,"Nordwest" => 225
-     ,"Nord-Nordwest" => 248
+     ,"West-Nordwest" => 303
+     ,"Nordwest" => 325
+     ,"Nord-Nordwest" => 348
   );
   
 ##############################################
