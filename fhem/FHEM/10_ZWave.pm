@@ -1731,20 +1731,15 @@ ZWave_meterParse($$)
   my $meter_type_text = ($meter_type > $#meter_type_text ?
                         "undef" : $meter_type_text[$meter_type]);
 
-  my $precision = ($v2 >>5) & 0x7;
-  # no definition for text or numbers, used as -> (10 ** hex($precision))
+  my $precision = ($v2>>5) & 0x7; # 3 bits
+  my $scale     = ($v2>>3) & 0x3; # 2 bits, meaning unit
+  my $size      =  $v2     & 0x7; # 3 bits
 
-  # V3 use 3 bit, in V2 there are only 2 bit available
-  # V3 use bit 7 of first byte as bit 3 of scale
-  my $scale = ($v2 >> 3) & 0x3;
   $scale |= (($v1 & 0x80) >> 5);
 
   my $unit_text = ($meter_type_text eq "undef" ?
                         "undef" : $zwm_unit{$meter_type_text}[$scale]);
-
-  my $size = $v2 & 0x7;
-
-  $meter_type_text = "power" if ($unit_text eq "W");
+  $meter_type_text = "power"   if ($unit_text eq "W");
   $meter_type_text = "voltage" if ($unit_text eq "V");
   $meter_type_text = "current" if ($unit_text eq "A");
 
