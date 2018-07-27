@@ -54,8 +54,11 @@ svg_prepareHash(el)
 {
   var obj = { y_mul:0,y_h:0,y_min:0, decimals:0,
               t_mul:0,x_off:0,x_min:0, x_mul:0, log_scale:undefined };
-  for(var name in obj)
-    obj[name] = parseFloat($(el).attr(name));
+  for(var name in obj) {
+    var n = $(el).attr(name);
+    if(n)
+      obj[name] = parseFloat(n);
+  }
   return obj;
 }
 
@@ -65,8 +68,15 @@ svg_click(evt)
   var t = evt.target;
   var o = svg_prepareHash(t);
 
-  var y_org = (((o.y_h-evt.offsetY)/o.y_mul)+o.y_min).toFixed(o.decimals);
-  var d = new Date((((evt.clientX-o.x_min)/o.t_mul)+o.x_off) * 1000);
+  var svg=$(t).closest("svg"), x=evt.clientX, y=evt.clientY;
+  if($(svg).parent().length) { // isEmbed=0
+    var off = $(svg).offset();
+    x -= off.left;
+    y -= off.top;
+  }
+
+  var y_org = (((o.y_h-y)/o.y_mul)+o.y_min).toFixed(o.decimals);
+  var d = new Date((((x-o.x_min)/o.t_mul)+o.x_off) * 1000);
   var ts = (d.getHours() < 10 ? '0' : '') + d.getHours() + ":"+
            (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
 
@@ -224,7 +234,8 @@ sv_menu(evt, embed)
 
           par.div = $('<div id="svgmarker">');
           par.divoffY = $(embed ? embed : svg).offset().top -
-                       $("#content").offset().top-50;
+                       $("#content").offset().top-50 +
+                       $("#content").scrollTop();
           $("#content").append(par.div);
 
           var pl = selNode[arrName];
