@@ -561,8 +561,8 @@ SVG_zoomLink($$$)
   my ($d,$off) = split("=", $cmd, 2);
 
   my $val = $FW_pos{$d};
-  $cmd = ($FW_detail ? "detail=$FW_detail":
-                        ($prf ? $prf : "room=$FW_room")) . "&pos=";
+  $cmd = ($FW_detail ? "detail=".urlEncode($FW_detail):
+                        ($prf ? $prf : "room=".urlEncode($FW_room))) . "&pos=";
   if($d eq "zoom") {
 
     my $n = 0;
