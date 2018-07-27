@@ -315,7 +315,7 @@ Aurora_dispatch($$$;$)
 sub
 Aurora_SetParam($$@)
 {
-  my ($name, $obj, $cmd, $value, $value2) = @_;
+  my ($name, $obj, $cmd, $value, $value2, @a) = @_;
 
   if( $cmd eq "color" ) {
     $value = int(1000000/$value);
@@ -435,6 +435,7 @@ Aurora_SetParam($$@)
   } elsif( $cmd eq "effect" ) {
     $obj->{'select'} = "$value";
     $obj->{'select'} .= " $value2" if( $value2 );
+    $obj->{'select'} .= " ". join(" ", @a) if( @a );
   } elsif( $cmd eq "transitiontime" ) {
     $obj->{'transitiontime'} = 0+$value;
   } elsif( $name &&  $cmd eq "delayedUpdate" ) {
@@ -473,7 +474,7 @@ Aurora_Set($@)
       return undef;
     }
 
-    Aurora_SetParam($name, \%obj, $cmd, $value, $value2);
+    Aurora_SetParam($name, \%obj, $cmd, $value, $value2, @a);
   }
 #Log 1, Dumper \%obj;
 
