@@ -1792,11 +1792,15 @@ ZWave_meterGet($)
 
 }
 
+#V2: 1b7:reset 1b65:resrvd, 1b4-0:type, 2b7-4:resrvd, 2b3-0:scale
+#V3: 1b7:reset 1b65:resrvd, 1b4-0:type, 2b:scale
+#V4: 1b7:reset 1b65:rate, 1b4-0:type, 2b7:mst, 2b6-0:scale1, 3b:#scaleBytes,...
+# No V4 support...
 sub
 ZWave_meterSupportedParse($$)
 {
   my ($hash,$val) = @_;
-  return if($val !~ m/^(..)(..)$/);
+  return if($val !~ m/^(..)(..)/);
   my ($v1, $v2) = (hex($1), hex($2));
 
   my $name = $hash->{NAME};
