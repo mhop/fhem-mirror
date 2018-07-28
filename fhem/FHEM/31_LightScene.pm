@@ -332,6 +332,8 @@ sub
 myStatefileName()
 {
   my $statefile = $attr{global}{statefile};
+  my @t = localtime(gettimeofday());
+  $statefile = ResolveDateWildcards($statefile, @t);
   $statefile = substr $statefile,0,rindex($statefile,'/')+1;
   return $statefile ."LightScenes.save" if( $LightScene_hasJSON );
   return $statefile ."LightScenes.dd.save" if( $LightScene_hasDataDumper );
