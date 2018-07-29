@@ -2219,6 +2219,8 @@ FW_fileNameToPath($)
     return "$FW_icondir/$d/$name";
   } elsif($name =~ m/.*gplot$/) {
     return "$FW_gplotdir/$name";
+  } elsif($name =~ m/.*log$/) {
+    return AttrVal("global", "logdir", "log")."/$name";
   } else {
     return "$MW_dir/$name";
   }
@@ -3590,7 +3592,8 @@ FW_widgetOverride($$)
     <li>editFileList<br>
         Specify the list of Files shown in "Edit Files" section. It is a
         newline separated list of triples, the first is the Title, the next is
-        the directory to search for, the third the regular expression. Default
+        the directory to search for as a perl expression(!), the third the
+        regular expression. Default
         is:
         <ul>
         <code>
@@ -4288,9 +4291,10 @@ FW_widgetOverride($$)
 
     <a name="editFileList"></a>
     <li>editFileList<br>
-        Definiert die Liste der angezeigten Dateien in der "Edit Files" Abschnitt.
-        Es ist eine Newline getrennte Liste von Tripeln bestehend aus Titel,
-        Verzeichnis f&uuml;r die Suche, und Regexp. Die Voreinstellung ist:
+        Definiert die Liste der angezeigten Dateien in der "Edit Files"
+        Abschnitt.  Es ist eine Newline getrennte Liste von Tripeln bestehend
+        aus Titel, Verzeichnis f&uuml;r die Suche als perl Ausdruck(!), und
+        Regexp. Die Voreinstellung ist:
         <ul>
         <code>
           Own modules and helper files:$MW_dir:^(.*sh|[0-9][0-9].*Util.*pm|.*cfg|.*holiday|myUtilsTemplate.pm|.*layout)$<br>
