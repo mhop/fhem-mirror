@@ -2001,11 +2001,11 @@ sub
 FW_fileList($;$)
 {
   my ($fname,$mtime) = @_;
+  $fname =~ s/%L/$attr{global}{logdir}/g #Forum #89744
+        if($fname =~ m/%/ && $attr{global}{logdir});
   $fname =~ m,^(.*)/([^/]*)$,; # Split into dir and file
   my ($dir,$re) = ($1, $2);
   return $fname if(!$re);
-  $dir =~ s/%L/$attr{global}{logdir}/g # %L present and log directory defined
-        if($dir =~ m/%/ && $attr{global}{logdir});
   $re =~ s/%./[A-Za-z0-9]*/g;    # logfile magic (%Y, etc)
   my @ret;
   return @ret if(!opendir(DH, $dir));
