@@ -51,8 +51,8 @@ div.block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
 .langLinks { font-size: 0.6em; }
 
 /* Widgets */
-.makeTable  { display:inline; float:left; clear:left; /*detail-selector,slider*/
-              margin-top:10px; margin-bottom:20px;}
+.makeTable  { display:inline; float:left; clear:left; margin-bottom:20px; }
+.makeTable:not(:first-child)  { margin-top:10px; }
 .makeSelect { display:inline; float:left; clear:left; }
 select      { margin-left:5px; margin-right:5px; }
 .slider     { float:left; width:250px; height:26px; }

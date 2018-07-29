@@ -166,24 +166,29 @@ FW_jqueryReadyFn()
       });
     });
 
-  $("form").each(function(){                             // shutdown handling
+  $("form").each(function(){   // main input special cases
     var input = $(this).find("input.maininput");
     if(!input.length)
       return;
     $(this).on("submit", function(e) {
       var val = $(input).val();
-
-      if(val.match(/^\s*ver.*/)) {
+      if(val.match(/^\s*ver.*/)) {              // version
         e.preventDefault();
         $(input).val("");
         return FW_showVersion(val);
         
-      } else if(val.match(/^\s*shutdown/)) {
+      } else if(val.match(/^\s*shutdown/)) {    // shutdown
         FW_cmd(FW_root+"?XHR=1&cmd="+val);
         $(input).val("");
         return false;
 
-      } else if(val.match(/^\s*get\s+/)) {
+      } else if(val.match(/^\s*l\s/)) {        // l dev
+        var m = val.match(/^\s*l\s+(.*)/);
+        location.href = FW_root+"?detail="+m[1];
+        e.preventDefault();
+        return false;
+
+      } else if(val.match(/^\s*get\s+/)) {      // get
         // make get use xhr instead of reload
         //return true;
         FW_cmd(FW_root+"?cmd="+encodeURIComponent(val)+"&XHR=1", function(data){
