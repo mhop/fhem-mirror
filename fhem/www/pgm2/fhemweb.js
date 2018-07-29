@@ -223,9 +223,7 @@ FW_jqueryReadyFn()
         return;
       }
       $("#content").append('<div id="devSpecHelp"></div>');
-      FW_cmd(FW_root+"?cmd=help "+dev+"&XHR=1", function(data) {
-        if(!$("#devSpecHelp").length) // FHEM slow, user clicked again, #68166
-          return;
+      FW_getHelp(dev, function(data){
         $("#devSpecHelp").html(data);
         var off = $("#devSpecHelp").position().top-20;
         $('body, html').animate({scrollTop:off}, 500);
@@ -280,10 +278,45 @@ FW_jqueryReadyFn()
     FW_urlParams[kv[0]] = kv[1];
   }
 
+  $("select[id^=sel_attr],select[id^=sel_set],select[id^=sel_get]")
+  .change(function(){ // online help
+    var val = $(this).val();
+    var m = $(this).attr("id").match(/sel_(set|get|attr)(.*)/);
+    if(!m)
+      return;
+    if($("#devSpecHelp").length == 0)
+      $("#content").append('<div id="devSpecHelp"></div>');
+    FW_getHelp(m[2], function(data) {
+      var str = '<a name="'+val+'"></a>'; // my regexp crashes Chrome :(
+      var o1 = data.indexOf(str);
+      if(o1 < 0)
+        return;
+      data = data.substr(o1+str.length);
+      o1 = data.indexOf('<a name="');
+      if(o1 > 0)
+        data = data.substr(0,o1);
+      $("#devSpecHelp").html(data);
+    });
+  });
+
   FW_smallScreenCommands();
   FW_inlineModify();
   FW_rawDef();
   FW_treeMenu();
+}
+
+var FW_helpData;
+function
+FW_getHelp(dev, fn)
+{
+  if(FW_helpData)
+    return fn(FW_helpData);
+  FW_cmd(FW_root+"?cmd=help "+dev+"&XHR=1", function(data) {
+    FW_helpData = data;
+    if(!$("#devSpecHelp").length) // FHEM slow, user clicked again, #68166
+      return;
+    return fn(FW_helpData);
+  });
 }
 
 function

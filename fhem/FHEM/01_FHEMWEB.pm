@@ -3423,6 +3423,7 @@ FW_widgetOverride($$)
         instance from now on.
     </li><br>
 
+    <a name="allowedHttpMethods"></a>
     <li>allowedHttpMethods<br>
       FHEMWEB implements the GET, POST and OPTIONS HTTP methods. Some external
       devices require the HEAD method, which is not implemented correctly in
@@ -4116,6 +4117,7 @@ FW_widgetOverride($$)
         f&uuml;r eine FHEMWEB Instanz unerw&uuml;nscht.
     </li><br>
 
+    <a name="allowedHttpMethods"></a>
     <li>allowedHttpMethods</br>
       FHEMWEB implementiert die HTTP Methoden GET, POST und OPTIONS. Manche
       externe Ger&auml;te ben&ouml;tigen HEAD, das ist aber in FHEMWEB nicht
