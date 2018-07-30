@@ -52,6 +52,9 @@ CommandBackup($$)
   my $modpath    = AttrVal("global", "modpath","");
   my $configfile = AttrVal("global", "configfile", "");
   my $statefile  = AttrVal("global", "statefile", "");
+  my $now = gettimeofday();
+  my @t = localtime($now);
+  $statefile = ResolveDateWildcards($statefile, @t);
 
   # prevent duplicate entries in backup list for default config, forum #54826
   $configfile = '' if ($configfile eq 'fhem.cfg' || configDBUsed());
