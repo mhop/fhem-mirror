@@ -18,7 +18,7 @@ at_Initialize($)
   $hash->{SetFn}    = "at_Set";
   $hash->{AttrFn}   = "at_Attr";
   $hash->{StateFn}  = "at_State";
-  $hash->{AttrList} = "disable:0,1 disabledForIntervals ".
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals $readingFnAttributes ".
                         "skip_next:0,1 alignTime computeAfterInit";
   $hash->{FW_detailFn} = "at_fhemwebFn";
 }
@@ -292,6 +292,12 @@ at_Attr(@)
     return "alignTime needs a list of timespec parameters" if(!$attrVal);
     my $ret = at_adjustAlign($hash, $attrVal);
     return $ret if($ret);
+  }
+
+  if($cmd eq "set" && $attrName eq "stateFormat" && !$init_done) {
+    $attr{$name}{stateFormat} = $attrVal;
+    evalStateFormat($hash);
+    return undef;
   }
 
   if($cmd eq "set" && $attrName eq "disable") {
@@ -761,6 +767,7 @@ EOF
         &uuml;berspringen</li><br>
 
     <li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 
   </ul>
   <br>

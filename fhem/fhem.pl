@@ -3987,8 +3987,8 @@ attrSplit($)
 }
 
 #######################
-# $dir: 0: User to Device (i.e. set) 1: Device to Usr (i.e trigger)
-# $dir: 0: $str is an array pointer  1: $str is a a string
+# $dir: 0: User to Device (i.e. set), $str is an array pointer 
+# $dir: 1: Device to Usr (i.e trigger), $str is a a string
 sub
 ReplaceEventMap($$$)
 {
