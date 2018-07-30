@@ -204,7 +204,8 @@ body.touch div.col1, body.touch #menu table.room div { padding:0.25em 0; }
 
 @media screen and (orientation: portrait) {
   body.small table.block tr td:nth-child(n+3) { width: 0px; display: none; }
-  body.small #content > table { width: 100%; }
+  body.small #content > table { width: 100%; table-layout: fixed; }
+  .SVGplot { width: 100%; overflow-x: scroll }
 }
 
 body.pinnedMenu #menuBtn { display:none; }
