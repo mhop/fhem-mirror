@@ -829,7 +829,7 @@ sub FRITZBOX_API_Check_Run($)
       my $globalModPath = AttrVal( "global", "modpath", "." );
       my $m3uFileLocal = AttrVal( $name, "m3uFileLocal", $globalModPath."/www/images/".$name.".m3u" );
       if (open my $fh, '>', $m3uFileLocal) {
-         my $ttsText = uri_escape("Lirumlaruml�ffelstielwerdasnichtkannderkannnichtviel");
+         my $ttsText = uri_escape("Lirumlarumlöffelstielwerdasnichtkannderkannnichtviel");
          my $ttsLink = $ttsLinkTemplate;
          $ttsLink =~ s/\[TEXT\]/$ttsText/;
          $ttsLink =~ s/\[SPRACHE\]/fr/;
@@ -1302,6 +1302,7 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Log $hash, 4, "Prepare query string for luaQuery.";
    my $queryStr = "&radio=configd:settings/WEBRADIO/list(Name)"; # Webradio
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
+   $queryStr .= "&handsetCount=dect:settings/Handset/count"; # Anzahl Handsets
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
    $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx,rssi)"; # WLAN devices
    $queryStr .= "&wlanListNew=wlan:settings/wlanlist/list(mac,speed,rssi)"; # WLAN devices fw>=6.69
@@ -1464,46 +1465,48 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
    
 # Dect-Geräteliste erstellen
-   $runNo = 0;
-   foreach ( @{ $result->{dectUser} } ) {
-      my $intern = $_->{Intern};
-      my $id = $_->{Id};
-      if ($intern) 
-      {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo,                     $_->{Name} ;
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_intern",           $intern ;
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_alarmRingTone",    $_->{AlarmRingTone0}, "ringtone" ;
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_intRingTone",      $_->{IntRingTone}, "ringtone" ;
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_radio",            $_->{RadioRingID}, "radio" ;
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_custRingTone",     $_->{G722RingTone} ;
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_custRingToneName", $_->{G722RingToneName} ;
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_imagePath",        $_->{ImagePath} ;
+   if ( $result->{handsetCount} > 0 ) {
+     $runNo = 0;
+     foreach ( @{ $result->{dectUser} } ) {
+        my $intern = $_->{Intern};
+        my $id = $_->{Id};
+        if ($intern) 
+        {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo,                     $_->{Name} ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_intern",           $intern ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_alarmRingTone",    $_->{AlarmRingTone0}, "ringtone" ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_intRingTone",      $_->{IntRingTone}, "ringtone" ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_radio",            $_->{RadioRingID}, "radio" ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_custRingTone",     $_->{G722RingTone} ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_custRingToneName", $_->{G722RingToneName} ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_imagePath",        $_->{ImagePath} ;
 
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->id",   $id ;
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->userId", $runNo;
-         
-         $dectFonID{$id}{Intern} = $intern;
-         $dectFonID{$id}{User} = $runNo;
-      }
-      $runNo++;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->id",   $id ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->userId", $runNo;
+           
+           $dectFonID{$id}{Intern} = $intern;
+           $dectFonID{$id}{User} = $runNo;
+        }
+        $runNo++;
+     }
+     
+  # Handset der internen Nummer zuordnen
+     foreach ( @{ $result->{handset} } ) {
+        my $dectUserID = $_->{User};
+        next if defined $dectUserID eq "";
+        my $dectUser = $dectFonID{$dectUserID}{User};
+        my $intern = $dectFonID{$dectUserID}{Intern};
+        
+        if ($dectUser) {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$dectUser."_manufacturer", $_->{Manufacturer};
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$dectUser."_model",        $_->{Model},         "model";
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$dectUser."_fwVersion",    $_->{FWVersion};
+
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->brand", $_->{Manufacturer};
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->model", $_->{Model},       "model";
+        }
+     }
    }
-   
-# Handset der internen Nummer zuordnen
-   foreach ( @{ $result->{handset} } ) {
-      my $dectUserID = $_->{User};
-      my $dectUser = $dectFonID{$dectUserID}{User};
-      my $intern = $dectFonID{$dectUserID}{Intern};
-      
-      if ($dectUser) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$dectUser."_manufacturer", $_->{Manufacturer};
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$dectUser."_model",        $_->{Model},         "model";
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$dectUser."_fwVersion",    $_->{FWVersion};
-
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->brand", $_->{Manufacturer};
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->model", $_->{Model},       "model";
-      }
-   }
-
 # Analog Fons Name
    $runNo=1;
    foreach ( @{ $result->{fonPort} } ) {
@@ -5420,7 +5423,7 @@ sub FRITZBOX_fritztris($)
       
       <li><code>allowTR064Command &lt;0 | 1&gt;</code>
          <br>
-         Freischalten des get-Befehls "tr064Command"
+         Freischalten des get-Befehls "tr064Command" und "luaQuery"
       </li><br>
       
       <li><code>boxUser &lt;user name&gt;</code>
