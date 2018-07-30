@@ -1,4 +1,4 @@
-REV 17044
+REV 17049
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -53,7 +53,7 @@ UPD 2018-02-19_07:45:04 141607 FHEM/00_THZ.pm
 UPD 2017-12-16_07:45:02 35823 FHEM/00_TUL.pm
 UPD 2018-04-05_07:45:03 21475 FHEM/00_ZWCUL.pm
 UPD 2018-03-01_07:45:03 44383 FHEM/00_ZWDongle.pm
-UPD 2018-07-18_07:45:03 152803 FHEM/01_FHEMWEB.pm
+UPD 2018-07-30_07:45:03 153008 FHEM/01_FHEMWEB.pm
 UPD 2016-09-07_07:45:12 15690 FHEM/02_FRAMEBUFFER.pm
 UPD 2017-04-23_07:45:02 42910 FHEM/02_FTUISRV.pm
 UPD 2018-06-16_07:45:03 7921 FHEM/02_HTTPSRV.pm
@@ -671,12 +671,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-07-29_07:45:06 3486137 docs/commandref.html
-UPD 2018-07-29_07:45:08 2130003 docs/commandref_DE.html
+UPD 2018-07-30_07:45:06 3486207 docs/commandref.html
+UPD 2018-07-30_07:45:08 2130071 docs/commandref_DE.html
 UPD 2018-07-16_07:45:03 76259 docs/commandref_frame.html
 UPD 2018-07-16_07:45:03 85715 docs/commandref_frame_DE.html
-UPD 2018-07-29_07:45:09 193486 docs/commandref_modular.html
-UPD 2018-07-29_07:45:09 204126 docs/commandref_modular_DE.html
+UPD 2018-07-30_07:45:09 193505 docs/commandref_modular.html
+UPD 2018-07-30_07:45:10 204145 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2018,9 +2018,9 @@ UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2018-03-26_07:45:02 5908 www/pgm2/defaultCommon.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2018-07-20_21:03:32 27931 www/pgm2/f18.js
-UPD 2018-07-18_07:45:03 7806 www/pgm2/f18style.css
+UPD 2018-07-30_07:45:03 7800 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
-UPD 2018-05-12_07:45:03 56285 www/pgm2/fhemweb.js
+UPD 2018-07-30_07:45:03 57376 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
 UPD 2018-02-01_07:45:02 4063 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
