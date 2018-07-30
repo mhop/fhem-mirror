@@ -69,7 +69,7 @@ eval "use Blocking;1" or $missingModul .= "Blocking ";
 
 
 
-my $version = "2.0.7";
+my $version = "2.0.8";
 
 
 
@@ -564,10 +564,10 @@ sub LGTV_WebOS_Set($@) {
 
     } else {
         my  $list = ""; 
-        $list .= "connect:noArg pairing:noArg screenMsg mute:on,off volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg channelDown:noArg channelUp:noArg getServiceList:noArg on:noArg off:noArg launchApp:Maxdome,AmazonVideo,AmazonVid,YouTube,Netflix,TV,GooglePlay,Browser,Chilieu,TVCast,Smartshare,Scheduler,Miracast,TVGuide,Timemachine,ARDMediathek,Arte,WetterMeteo,Notificationcenter,Plex 3D:on,off stop:noArg play:noArg pause:noArg rewind:noArg fastForward:noArg clearInputList:noArg input:$inputs channel";
+        $list .= "connect:noArg pairing:noArg screenMsg mute:on,off volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg channelDown:noArg channelUp:noArg getServiceList:noArg on:noArg off:noArg launchApp:Maxdome,AmazonLovefilm,AmazonVideo,YouTube,Netflix,TV,GooglePlay,Browser,Chilieu,TVCast,Smartshare,Scheduler,Miracast,TVGuide,Timemachine,ARDMediathek,Arte,WetterMeteo,Notificationcenter,Plex 3D:on,off stop:noArg play:noArg pause:noArg rewind:noArg fastForward:noArg clearInputList:noArg input:$inputs channel";
         return "Unknown argument $cmd, choose one of $list";
     }
-    
+
     $hash->{helper}{device}{runsetcmd}  = $hash->{helper}{device}{runsetcmd} + 1;
     LGTV_WebOS_CreateSendCommand($hash,$uri,\%payload);
 }

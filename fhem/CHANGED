@@ -1,8 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  82_LGTV_WebOS: fix set cmd for AmazonLovefilm
   - feature: 51_MOBILEALERTS: added feature to adjust values in define
   - changed: 09_CUL_FHTTK: adapted battery reading to new common reading 
                 Forum #87575
+  - bugfix:  82_LGTV_WebOS: fix uninitialized value
   - change:  98_dewpoint: adjust log level for FAN/ALARM on/off to 4
   - bugfix:  82_LGTV_WebOS: fix current program list readings
   - change:  74_Unifi: changed readings -UC_newClients and -AP_utilization
