@@ -1429,7 +1429,7 @@ sub SIP_ListenStart($)
 	     filter => \&$sub_filter, 
 	   recv_bye => \&$sub_bye,
          init_media => $ua->rtp('send_recv',($msg3) ? $msg3 : $send_something),
-        cb_rtp_done => sub {Log3 $name, 5,  "$logname, wfp cb_rtp_done";},
+        #cb_rtp_done => sub {Log3 $name, 5,  "$logname, wfp cb_rtp_done";}, legt nicht mehr auf wenn aktiv !
           rtp_param => [8, 160, 160/8000, 'PCMA/8000']
 	); # options are invite and hangup
   }
