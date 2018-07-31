@@ -2196,7 +2196,7 @@ sub HMinfo_deviceReplace($$$){
   }
   # each old channel has a pendant in new channel
   # lets begin
-  #1  --- foreach entity  => rename old>"old-".<name> and new><name>
+  #1  --- foreach entity  => rename old>"old_".<name> and new><name>
   #2  --- foreach channel => copy peers (peerBulk)
   #3  --- foreach channel => copy registerlist (regBulk)
   #4  --- foreach channel => copy templates 
@@ -2208,26 +2208,26 @@ sub HMinfo_deviceReplace($$$){
   
   
   my @rename = ();# logging only
-  {#1  --- foreach entity  => rename old=>"old-".<name> and new=><name>
+  {#1  --- foreach entity  => rename old=>"old_".<name> and new=><name>
     push @rename,"1) rename";
     foreach my $i(sort keys %{$rnHash{old}}){
       my $old = $rnHash{old}{$i};
       if ($execMode){
-        AnalyzeCommand("","rename $old old-$old");
+        AnalyzeCommand("","rename $old old_$old");
         AnalyzeCommand("","rename $rnHash{new}{$i} $old");
       }
-      push @rename,"1)- $oldDev - $i: rename $old old-$old";
+      push @rename,"1)- $oldDev - $i: rename $old old_$old";
       push @rename,"1)- $newDev - $i: $rnHash{new}{$i} $old";
     }
     if ($execMode){
       foreach my $name(keys %{$rnHash{old}}){# correct hash internal for further processing
         $rnHash{new}{$name} = $rnHash{old}{$name};
-        $rnHash{old}{$name} = "old-".$rnHash{old}{$name};
+        $rnHash{old}{$name} = "old_".$rnHash{old}{$name};
       }
     }
   }
   {#2  --- foreach channel => copy peers (peerBulk) from old to new
-    push @rename,"2) copy peers from old to new";
+    push @rename,"2) copy peers from old to new ";
     foreach my $ch(sort keys %{$rnHash{old}}){
       my ($nameO,$nameN) = ($rnHash{old}{$ch},$rnHash{new}{$ch});
       next if(!defined $attr{$nameO}{peerIDs});
