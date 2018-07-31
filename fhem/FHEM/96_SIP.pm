@@ -55,7 +55,7 @@ use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
 
-my $sip_version ="V1.9 / 27.07.18";
+my $sip_version ="V1.91 / 31.07.18";
 my $ua;  # SIP user agent
 my @fifo;
 
@@ -112,7 +112,7 @@ sub SIP_Initialize($$)
                           "audio_converter:sox,ffmpeg ".  #
 			  "history_file ".
 			  "history_size ".
-                          "phonebook ",
+                          "phonebook ".
                           "disabled:0,1 ".$readingFnAttributes;
 }
 
