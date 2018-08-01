@@ -431,7 +431,7 @@ sub HP1000_CGI() {
 
         # incorrect FHEMWEB instance used
         my @webhookFWinstances = split( ",",
-            AttrVal( $name, "webhookFWinstances", "weatherstation" ) );
+            AttrVal( $name, "webhookFWinstances", "WEBweatherstation" ) );
 
         return ( "text/plain; charset=utf-8",
             "incorrect FHEMWEB instance to receive data" )
