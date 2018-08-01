@@ -173,7 +173,8 @@ sub Log2Syslog_Initialize($) {
 					  "timeout ".
 	                  "protocol:UDP,TCP ".
 	                  "port ".
-					  "rateCalcRerun "
+					  "rateCalcRerun ".
+                      $readingFnAttributes
                       ;
 return undef;   
 }
