@@ -1465,7 +1465,7 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
    
 # Dect-Geräteliste erstellen
-   if ( $result->{handsetCount} > 0 ) {
+   if ( $result->{handsetCount} =~ /[1-9]/ ) {
      $runNo = 0;
      foreach ( @{ $result->{dectUser} } ) {
         my $intern = $_->{Intern};
