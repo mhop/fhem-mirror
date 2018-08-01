@@ -392,7 +392,7 @@ sub Log2Syslog_parsePayload($$) {
               $severity = $Log2Syslog_Severity{$sev};
      
               Log2Syslog_Log3slog($name, 4, "$name - FACILITY: $fac/$facility, SEVERITY: $sev/$severity, DATE: $date, HOST: $host, ID: $ident, CONT: $content");
-              $pl = "HOST: $host || FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";
+              $pl = "$host: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
           }
       } elsif ($pp =~ /raw/) {
           Log2Syslog_Log3slog($name, 4, "$name - $data");
@@ -426,7 +426,7 @@ sub Log2Syslog_parsePayload($$) {
               $host   = substr($host,0, ($RFC5425len{HST}-1));
       
               Log2Syslog_Log3slog($name, 4, "$name - FACILITY: $fac/$facility, SEVERITY: $sev/$severity, VERSION: $version, DATE: $date, HOST: $host, ID: $ident, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $content");
-              $pl = "HOST: $host || FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";
+              $pl = "$host: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
           }
       } elsif ($pp =~ /raw/) {
           Log2Syslog_Log3slog($name, 4, "$name - $data");
