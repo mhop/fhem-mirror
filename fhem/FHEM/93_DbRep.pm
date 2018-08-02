@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.18.2       02.08.2018       fix in fetchrow function (forum:#89886), fix highlighting
 # 7.18.1       03.06.2018       commandref revised
 # 7.18.0       02.06.2018       possible use of y:(\d) for timeDiffToNow, timeOlderThan , minor fixes of timeOlderThan
 #                               delEntries considers executeBeforeDump,executeAfterDump
@@ -342,7 +343,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.18.1";
+my $DbRepVersion = "7.18.2";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -4548,9 +4549,9 @@ sub fetchrows_ParseDone($) {
   my $name       = $hash->{NAME};
   my $reading    = AttrVal($name, "reading", undef);
   my $limit      = AttrVal($name, "limit", 1000);
-  my $color      = "<html><span style='color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";'>";  # Highlighting doppelter DB-Einträge
+  my $color      = "<html><span style=\"color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";\">";  # Highlighting doppelter DB-Einträge
   $color =~ s/#// if($color =~ /red|blue|brown|green|orange/);
-  my $ecolor     = "</span></html>";   # Ende Highlighting
+  my $ecolor     = "</span></html>";                                                                       # Ende Highlighting
   my @i;
   my @row;
   my $reading_runtime_string;
@@ -4569,22 +4570,11 @@ sub fetchrows_ParseDone($) {
   
   # Readingaufbereitung
   readingsBeginUpdate($hash);
-  my $orow;
+  my ($orow,$nrow,$oval,$nval);
   my $dz = 1;                      # Index des Vorkommens im Selektionsarray
+  my $zs = "";                     # Zusatz wenn device + Reading + Timestamp von folgenden DS gleich ist UND Value unterschiedlich
+  my $zsz = 1;                     # Zusatzzähler
   foreach my $row (@row_array) {
-      if($orow) {
-          if($orow eq $row) {
-              $dz++;
-              
-          } else {
-              $dz = 1;
-          }
-      }
-      $orow = $row;
-      if($dz > 1) {
-          # Hervorhebung von multiplen Datensätzen
-          # $dz = "<html><span style='color: ".$color.";'>".$dz."</span></html>";
-      }
       my @a = split("_ESC_", $row, 6);     
       my $dev = $a[0];
       my $rea = $a[1];
@@ -4593,18 +4583,41 @@ sub fetchrows_ParseDone($) {
       my $val = $a[4];
 	  my $unt = $a[5];
       $val = $unt?$val." ".$unt:$val;
+ 
+      $nrow = $ts.$dev.$rea;
+      $nval = $val;
+      if($orow) {
+          if($orow.$oval eq $nrow.$val) {
+              $dz++;
+              $zs = "";
+              $zsz = 1;              
+          } else {
+              # wenn device + Reading + Timestamp gleich ist UND Value unterschiedlich -> dann Zusatz an Reading hängen 
+              if(($orow eq $nrow) && ($oval ne $val)) {
+                  $zs = "_".$zsz;
+                  $zsz++;
+              } else {
+                  $zs = "";
+                  $zsz = 1;
+              }
+              $dz = 1;
+              
+          }
+      }
+      $orow = $nrow; 
+      $oval = $val;
       
       if ($reading && AttrVal($hash->{NAME}, "readingNameMap", "")) {
           if($dz > 1 && AttrVal($name, "fetchMarkDuplicates", undef)) {
-              $reading_runtime_string = $ts."__".$color.$dz."__".AttrVal($hash->{NAME}, "readingNameMap", "").$ecolor;
+              $reading_runtime_string = $ts."__".$color.$dz."__".AttrVal($hash->{NAME}, "readingNameMap", "").$zs.$ecolor;
           } else {
-              $reading_runtime_string = $ts."__".$dz."__".AttrVal($hash->{NAME}, "readingNameMap", "");
+              $reading_runtime_string = $ts."__".$dz."__".AttrVal($hash->{NAME}, "readingNameMap", "").$zs;
           }
       } else {
           if($dz > 1 && AttrVal($name, "fetchMarkDuplicates", undef)) {
-              $reading_runtime_string = $ts."__".$color.$dz."__".$dev."__".$rea.$ecolor;
+              $reading_runtime_string = $ts."__".$color.$dz."__".$dev."__".$rea.$zs.$ecolor;
           } else {
-              $reading_runtime_string = $ts."__".$dz."__".$dev."__".$rea;
+              $reading_runtime_string = $ts."__".$dz."__".$dev."__".$rea.$zs;
           }
       }
      

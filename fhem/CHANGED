@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbRep: fix in fetchrow function (forum:#89886),fix highlighting
   - bugfix:  82_LGTV_WebOS: fix set cmd for AmazonLovefilm
   - feature: 51_MOBILEALERTS: added feature to adjust values in define
   - changed: 09_CUL_FHTTK: adapted battery reading to new common reading 
