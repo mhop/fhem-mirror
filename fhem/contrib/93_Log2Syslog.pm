@@ -169,7 +169,7 @@ sub Log2Syslog_Initialize($) {
                       "disable:1,0 ".
                       "addTimestamp:0,1 ".
 					  "logFormat:BSD,IETF ".
-                      "parseProfile:default,raw ".
+                      "parseProfile:BSD,IETF,raw ".
                       "ssldebug:0,1,2,3 ".
 					  "TLS:1,0 ".
 					  "timeout ".
@@ -311,7 +311,7 @@ sub Log2Syslog_Read($) {
   my $socket = $hash->{SERVERSOCKET};
   my $st     = "active";
   my $lf     = AttrVal($name, "logFormat", "IETF");
-  my ($err,$data,$facility,$severity,$date,$host,$ident,$content,$pl,$version,$pid,$mid,$sdfield);
+  my ($err,$data,$facility,$severity,$ts,$host,$ident,$content,$pl,$version,$pid,$mid,$sdfield);
   
   return if(IsDisabled($name) || $hash->{MODEL} !~ /Collector/);
 
@@ -325,12 +325,12 @@ sub Log2Syslog_Read($) {
           $st = "receive error - see logfile";          
       } else {
           # parse Payload  
-          ($err,$pl) = Log2Syslog_parsePayload($hash,$data);      
+          ($err,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
           $hash->{SEQNO}++;
           if($err) {
               $st = "parse error - see logfile";
           } else {
-              Log2Syslog_Trigger($hash,$date,$pl);
+              Log2Syslog_Trigger($hash,$ts,$pl);
           }
       }
   
@@ -344,12 +344,12 @@ sub Log2Syslog_Read($) {
           $st = "receive error - see logfile";            
       } else {
           # parse Payload  
-          ($err,$pl) = Log2Syslog_parsePayload($hash,$data);      
+          ($err,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
           $hash->{SEQNO}++;
           if($err) {
               $st = "parse error - see logfile";
           } else {
-              Log2Syslog_Trigger($hash,$date,$pl);
+              Log2Syslog_Trigger($hash,$ts,$pl);
           }
       }  
   }
@@ -368,9 +368,8 @@ return;
 sub Log2Syslog_parsePayload($$) { 
   my ($hash,$data) = @_;
   my $name         = $hash->{NAME};
-  my $lf           = AttrVal($name, "logFormat", "IETF");
-  my $pp           = AttrVal($name, "parseProfile", "default"); 
-  my ($prival,$Mmm,$dd,$time,$host,$ident,$delimiter,$content,$day,$date);
+  my $pp           = AttrVal($name, "parseProfile", "IETF"); 
+  my ($prival,$Mmm,$dd,$time,$host,$ident,$delimiter,$content,$day,$date,$ts);
   my ($severity,$sev,$facility,$fac,$version,$pid,$mid,$sdfield,$err,$pl);
     
   Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - ###  new Syslog message Parsing ### ");
@@ -384,72 +383,63 @@ sub Log2Syslog_parsePayload($$) {
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);       # Istzeit Ableitung
   $year = $year+1900;
   
-  if ($lf eq "BSD") {
-      # BSD Protokollformat https://tools.ietf.org/html/rfc3164
-      # Beispiel data "<$prival>$month $day $time $myhost $ident: : $otp"
-      if($pp =~ /default/) {
-          ($prival,$Mmm,$dd,$time,$host,$ident,$delimiter,$content) = ($data =~ /^<(?<prival>\d{1,3})>(?<month>\w{3})\s{1,2}(?<day>\d{1,2})\s(?<time>\d{2}:\d{2}:\d{2})\s(?<host>\S+)\s(?<ident>[a-zA-Z_0-9.]+)(?<delimiter>\W+)(?<content>.*)$/);
-          if(!$prival && !$host && !$ident && !$content) {
-              $err = 1;
-              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");  
-          } else {
-              $mon = $Log2Syslog_BSDMonth{$Mmm};
-              $day = (length($dd) == 1)?("0".$dd):$dd;
-              $date = "$year-$mon-$day $time";
-      
-              $fac = int($prival/8);
-              $sev = $prival-($fac*8);
-      
-              $facility = $Log2Syslog_Facility{$fac};
-              $severity = $Log2Syslog_Severity{$sev};
-     
-              Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FACILITY: $fac/$facility, SEVERITY: $sev/$severity, DATE: $date, HOST: $host, ID: $ident, CONT: $content");
-              $host = "" if($host eq "-");
-			  $phost = $host?$host:$phost;
-			  $pl = "$phost: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
-          }
-      } elsif ($pp =~ /raw/) {
-          Log2Syslog_Log3slog($name, 4, "$name - $data");
-          $pl = "$phost: $data";
-      }
-      return ($err,$pl);
-  }
+  if ($pp =~ /raw/) {
+      Log2Syslog_Log3slog($name, 4, "$name - $data");
+      $pl = "$phost: $data";
+	  $ts = TimeNow();
   
-  if ($lf eq "IETF") {
-      # IETF Protokollformat https://tools.ietf.org/html/rfc5424 
-      # Beispiel data "<$prival>1 $tim $host $ident $pid $mid - : $otp";
-      if($pp =~ /default/) {
-          # ($prival,$version,$date,$time,$host,$ident,$pid,$mid,$sdfield,$content) = ($data =~ /^<(\d{1,3})>(\d+)\s(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})\S*\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\[.*\]|-)\s(.*)$/);
-          ($prival,$version,$date,$time,$host,$ident,$pid,$mid,$sdfield,$content) = ($data =~ /^<(?<prival>\d{1,3})>(?<version>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S+)\s(?<ident>\S+)\s(?<pid>\S+)\s(?<mid>\S+)\s(?<sdfield>\[.*\]|-)\s(?<content>.*)$/);
-          if(!$prival && !$version && !$host && !$ident && !$content) {
-              $err = 1;
-              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");           
-          } else {
-              $date    = "$date $time";
-              $content =~ s/^:?(.*)$/$1/ if(lc($mid) eq "fhem");      # Modul Sender setzt vor $content ein ":" (wegen Synology Compatibilität)
+  } elsif($pp eq "BSD") { 
+      # BSD Protokollformat https://tools.ietf.org/html/rfc3164
+      # Beispiel data "<$prival>$month $day $time $myhost $ident: : $otp"	  
+      ($prival,$Mmm,$dd,$time,$host,$ident,$delimiter,$content) = ($data =~ /^<(?<prival>\d{1,3})>(?<month>\w{3})\s{1,2}(?<day>\d{1,2})\s(?<time>\d{2}:\d{2}:\d{2})\s(?<host>\S+)\s(?<ident>[a-zA-Z_0-9.]+)(?<delimiter>\W+)(?<content>.*)$/);
+      if(!$prival && !$host && !$ident && !$content) {
+          $err = 1;
+          Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");  
+      } else {
+          my $month = $Log2Syslog_BSDMonth{$Mmm};
+          $day      = (length($dd) == 1)?("0".$dd):$dd;
+          $ts       = "$year-$month-$day $time";
+     
+          $fac = int($prival/8);
+          $sev = $prival-($fac*8);
       
-              $fac = int($prival/8);
-              $sev = $prival-($fac*8);
-      
-              $facility = $Log2Syslog_Facility{$fac};
-              $severity = $Log2Syslog_Severity{$sev};
-      
-              # Längenbegrenzung nach RFC5424
-              $ident  = substr($ident,0, ($RFC5425len{ID}-1));
-              $pid    = substr($pid,0, ($RFC5425len{PID}-1));
-              $mid    = substr($mid,0, ($RFC5425len{MID}-1));
-              $host   = substr($host,0, ($RFC5425len{HST}-1));
-      
-              Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FACILITY: $fac/$facility, SEVERITY: $sev/$severity, VERSION: $version, DATE: $date, HOST: $host, ID: $ident, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $content");
-              $host = "" if($host eq "-");
-			  $phost = $host?$host:$phost;
-			  $pl = "$phost: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
-          }
-      } elsif ($pp =~ /raw/) {
-          Log2Syslog_Log3slog($name, 4, "$name - $data");
-          $pl = "$phost: $data";
+          $facility = $Log2Syslog_Facility{$fac};
+          $severity = $Log2Syslog_Severity{$sev};
+     
+          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FACILITY: $fac/$facility, SEVERITY: $sev/$severity, TS: $ts, HOST: $host, ID: $ident, CONT: $content");
+          $host = "" if($host eq "-");
+		  $phost = $host?$host:$phost;
+		  $pl = "$phost: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
       }
-      return ($err,$pl);
+      
+  } elsif($pp eq "IETF") {
+	  # IETF Protokollformat https://tools.ietf.org/html/rfc5424 
+      # Beispiel data "<$prival>1 $tim $host $ident $pid $mid - : $otp";
+      ($prival,$version,$date,$time,$host,$ident,$pid,$mid,$sdfield,$content) = ($data =~ /^<(?<prival>\d{1,3})>(?<version>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S+)\s(?<ident>\S+)\s(?<pid>\S+)\s(?<mid>\S+)\s(?<sdfield>\[.*\]|-)\s(?<content>.*)$/);
+      if(!$prival && !$version && !$host && !$ident && !$content) {
+          $err = 1;
+          Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");           
+      } else {
+          $ts      = "$date $time";
+          $content =~ s/^:?(.*)$/$1/ if(lc($mid) eq "fhem");      # Modul Sender setzt vor $content ein ":" (wegen Synology Compatibilität)
+      
+          $fac = int($prival/8);
+          $sev = $prival-($fac*8);
+      
+     	  $facility = $Log2Syslog_Facility{$fac};
+          $severity = $Log2Syslog_Severity{$sev};
+      
+          # Längenbegrenzung nach RFC5424
+          $ident  = substr($ident,0, ($RFC5425len{ID}-1));
+          $pid    = substr($pid,0, ($RFC5425len{PID}-1));
+          $mid    = substr($mid,0, ($RFC5425len{MID}-1));
+          $host   = substr($host,0, ($RFC5425len{HST}-1));
+      
+          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FACILITY: $fac/$facility, SEVERITY: $sev/$severity, VERSION: $version, TS: $ts, HOST: $host, ID: $ident, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $content");
+          $host = "" if($host eq "-");
+	      $phost = $host?$host:$phost;
+		  $pl = "$phost: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
+      }
   }
   
   if(AttrVal($name, "TLS", 0)) {
@@ -457,6 +447,7 @@ sub Log2Syslog_parsePayload($$) {
 	  
   } 	
 
+return ($err,$ts,$pl);
 }
 
 #################################################################################################
@@ -464,7 +455,7 @@ sub Log2Syslog_parsePayload($$) {
 #                       (im Collector Model)
 #################################################################################################
 sub Log2Syslog_Trigger($$$) {
-  my ($hash,$date,$pl) = @_;
+  my ($hash,$ts,$pl) = @_;
   my $name       = $hash->{NAME};
   my $no_replace = 1;                     # Ersetzung von Events durch das Attribut eventMap verhindern
   
@@ -475,9 +466,9 @@ sub Log2Syslog_Trigger($$$) {
   }
   
   if($hash->{CHANGETIME}) {
-      push @{$hash->{CHANGETIME}}, $date;
+      push @{$hash->{CHANGETIME}}, $ts;
   } else {
-      $hash->{CHANGETIME}[0] = $date;
+      $hash->{CHANGETIME}[0] = $ts;
   }
 
   my $ret = DoTrigger($name, undef, $no_replace);
@@ -616,13 +607,11 @@ sub Log2Syslog_Attr ($$$$) {
         }
 	}
     
-	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /logFormat/ && $init_done == 1) {
-        Log2Syslog_downServer($hash);
-        RemoveInternalTimer($hash, "Log2Syslog_initServer");
-        InternalTimer(gettimeofday()+1.5, "Log2Syslog_initServer", "$name,global", 0);
+	if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/ && $aName =~ /parseProfile/) {
+         return "\"$aName\" is only valid for model \"Collector\"";
 	}
     
-	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|addStateEvent|protocol/) {
+	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|addStateEvent|protocol|logFormat/) {
         return "\"$aName\" is only valid for model \"Sender\"";
 	}
     
@@ -1339,13 +1328,13 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     </ul>
     
-    Die Definition ist sehr einfach und benötigt keine weiteren Parameter.
+    Die Definition benötigt keine weiteren Parameter.
     In der Grundeinstellung wird der Syslog-Server mit dem Port=1514/UDP Format=IETF initialisiert.
-    Mit dem <a href="#Log2Syslogattr">Attribut</a> "logFomat" kann alternativ das BSD-Format ausgewählt werden.
-    Der Syslog-Server ist sofort betriebsbereit und generiert aus den eingehenden Syslog-Meldungen FHEM-Events mit 
-    entsprechender Adaption der RFC-Richtlinien (siehe dazu auch das <a href="#Log2Syslogattr">Attribut</a> "parseProfile"). <br><br>
+    Mit dem <a href="#Log2Syslogattr">Attribut</a> "parseProfile" können alternativ andere Formate (z.B. BSD)ausgewählt werden.
+    Der Syslog-Server ist sofort betriebsbereit, parst die Syslog-Daten entsprechend der Richlinien nach RFC5424 und generiert aus den 
+	eingehenden Syslog-Meldungen FHEM-Events. <br><br>
+	
     <br>
-
     <b>Beispiel für einen Collector: </b><br>
     
     <ul>
@@ -1354,7 +1343,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     </ul>
     
-    Im Eventmonitor können die generierten Events kontrolliert werden (Beispiel mit Attribut parseProfile=default): <br>
+    Im Eventmonitor können die generierten Events kontrolliert werden (Beispiel mit Attribut parseProfile=IETF): <br>
     <pre>
 2018-07-31 17:07:24.382 Log2Syslog SyslogServer HOST: fhem.myds.me || FAC: syslog || SEV: Notice || ID: Prod_event || CONT: USV state: OL
 2018-07-31 17:07:24.858 Log2Syslog SyslogServer HOST: fhem.myds.me || FAC: syslog || SEV: Notice || ID: Prod_event || CONT: HMLAN2 loadLvl: low
@@ -1373,9 +1362,21 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
       <tr><td> <b>ID</b>    </td><td> Ident-Tag </td></tr>
       <tr><td> <b>CONT</b>  </td><td> die übertragene Nachricht </td></tr>
     </table>
-    </ul>     
-    <br>
-    <br>
+    </ul>
+	<br>
+	
+	Der Timestamp der generierten Events wird aus den Syslogmeldungen geparst. Sollte diese Information nicht mitgeliefert werden, wird der
+	aktuelle Timestamp des Systems verwendet. <br>
+	Der Name des Readings im generierten Event entspricht dem aus der Syslogmeldung geparsten Hostnamen.
+	Ist der Hostname in der Meldung nicht enthalten, wird die IP-Adresse des Senders aus dem Netzwerk Interface abgerufen und der Hostname 
+	ermittelt sofern möglich. In diesem Fall wird der ermittelte Hostname bzw. die IP-Adresse werden als Reading im Event genutzt.
+	<br>
+	Nach der Definition des Collectors werden die Syslog-Meldungen im IETF-Format erwartet. Werden die Daten nicht in diesem Format 
+	geliefert erscheint im Readings "state" die Meldung "parse error - see logfile" und die empfangenen Syslog-Daten werden im Logfile ausgegeben. <br>
+	In diesem Fall kann mit dem	<a href="#Log2Syslogattr">Attribut</a> "parseProfile" ein vordefiniertes Parsing-Profil eingestellt werden bzw.
+	ein eigenes Profil vrwendet werden (siehe auch Attribut "paseFn").
+	<br>
+	<br>
     
     <br>
     <b> Definition eines Senders </b>
@@ -1434,11 +1435,11 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     
     Es werden alle Events weitergeleitet wie deses Beispiel der raw-Ausgabe eines Splunk Syslog Servers zeigt:<br/>
     <pre>
-Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM - : LogDB sql_processing_time: 0.2306
-Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM - : LogDB background_processing_time: 0.2397
-Aug 18 21:06:45 fhemtest.myds.me 1 2017-08-18T21:06:45 fhemtest.myds.me Test_event 13339 FHEM - : LogDB CacheUsage: 21
-Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.760 fhemtest.myds.me Test_fhem 13339 FHEM - : 4: CamTER - Informations of camera Terrasse retrieved
-Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test_fhem 13339 FHEM - : 4: CamTER - CAMID already set - ignore get camid
+Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM [version@Log2Syslog version="4.2.0"] : LogDB sql_processing_time: 0.2306
+Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM [version@Log2Syslog version="4.2.0"] : LogDB background_processing_time: 0.2397
+Aug 18 21:06:45 fhemtest.myds.me 1 2017-08-18T21:06:45 fhemtest.myds.me Test_event 13339 FHEM [version@Log2Syslog version="4.2.0"] : LogDB CacheUsage: 21
+Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.760 fhemtest.myds.me Test_fhem 13339 FHEM [version@Log2Syslog version="4.2.0"] : 4: CamTER - Informations of camera Terrasse retrieved
+Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test_fhem 13339 FHEM [version@Log2Syslog version="4.2.0"] : 4: CamTER - CAMID already set - ignore get camid
     </pre>
 
 	Der Aufbau der Payload unterscheidet sich je nach verwendeten logFormat. <br><br>
@@ -1449,13 +1450,14 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <ul>  
     <table>  
     <colgroup> <col width=10%> <col width=90%> </colgroup>
-	  <tr><td> PRIVAL   </td><td> Priority Wert (kodiert aus "facility" und "severity") </td></tr>
-      <tr><td> TIME     </td><td> Timestamp nach RFC5424 </td></tr>
-      <tr><td> MYHOST   </td><td> Internal MYHOST </td></tr>
-      <tr><td> IDENT    </td><td> Ident-Tag aus DEF wenn angegeben, sonst der eigene Devicename. Die Angabe wird mit "_fhem" (FHEM-Log) bzw. "_event" (Event-Log) ergänzt. </td></tr>
-      <tr><td> PID      </td><td> fortlaufende Payload-ID </td></tr>
-      <tr><td> MID      </td><td> fester Wert "FHEM" </td></tr>
-      <tr><td> MESSAGE  </td><td> der zu übertragende Datensatz </td></tr>
+	  <tr><td> PRIVAL     </td><td> Priority Wert (kodiert aus "facility" und "severity") </td></tr>
+      <tr><td> TIME       </td><td> Timestamp nach RFC5424 </td></tr>
+      <tr><td> MYHOST     </td><td> Internal MYHOST </td></tr>
+      <tr><td> IDENT      </td><td> Ident-Tag aus DEF wenn angegeben, sonst der eigene Devicename. Die Angabe wird mit "_fhem" (FHEM-Log) bzw. "_event" (Event-Log) ergänzt. </td></tr>
+      <tr><td> PID        </td><td> fortlaufende Payload-ID </td></tr>
+      <tr><td> MID        </td><td> fester Wert "FHEM" </td></tr>
+	  <tr><td> [SD-FIELD] </td><td> Structured Data Feld. Enthält Informationen zur verwendeten Modulversion (die Klammern "[]" sind Bestandteil des Feldes)</td></tr>
+      <tr><td> MESSAGE    </td><td> der zu übertragende Datensatz </td></tr>
     </table>
     </ul>     
     <br>	
@@ -1526,15 +1528,14 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
 	
     <li><code>logFormat [BSD|IETF]</code><br>
         <br>
-        Stellt das Protokollformat ein. <br>
-		Der Standardwert ist "IETF". <br>
+        Das Attribut ist nur für "Sender" verwendbar.  Es stellt das Protokollformat ein. (default: "IETF") <br>
     </li><br>
     
     <li><code>parseProfile [default|raw]</code><br>
         <br>
         Auswahl eines Parsing-Profiles. Wird "raw" gewählt, erfolgt kein Parsing und die empfangenen Daten werden 
         unverändert in ein Event umgesetzt.  <br>
-		Das "default"-Profil wendet ein Parsing entsprechend der RFC-Richtlinien an (Voreinstellung).
+		
     </li><br>
 	
     <li><code>protocol [TCP|UDP]</code><br>
