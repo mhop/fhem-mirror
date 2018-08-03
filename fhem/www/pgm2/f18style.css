@@ -1,23 +1,28 @@
 @import url("dashboard_style.css");
 
 body,input,select,textarea { font-family:Arial, sans-serif; font-size:16px;}
+td {padding: 0;}
 textarea, .ui-dialog.ui-widget textarea { font-family:Courier; }
 input,textarea { border-style:ridge; }
-
+input.maininput { margin-left:10px; }
 #logo {
-  position:absolute; top:10px; left:52px; width:32px; height:32px; z-index:10;
+  position:absolute; top:6.5px; left:50px; width:32px; height:32px; z-index:10;
   background-image:url(../images/default/fhemicon.png);
   background-size: contain; background-repeat: no-repeat;
 }
-#menuBtn { top:10px; left:10px; width:32px; height:32px; }
-#hdr     { position:absolute; top:10px; left:48px; }
-#content { position:absolute; top:50px; left:10px; bottom:10px; right:10px; }
-body.small #content { left:10px; }
+#menuBtn { position: absolute; top:6.5px; left:10px; width:32px; height:32px; }
+#hdr     { position: absolute; top:10px; left:48px; }
+#content { 
+  position: absolute; top:50px; left:10px; bottom:0; right: 0; 
+  padding-right: 10px; 
+  padding-bottom: 10px;
+}
 #menu {
   top:50px; bottom:10px; left:-120%;
   z-index:20;
   display:inline-block;
   padding:0 0.5em 0.5em 0;
+  position: absolute;
 }
 #menu.visible  { left:10px!important; }
 #console { width:100%; top:2em; bottom:0px; position:absolute; overflow-y:auto;}
@@ -26,14 +31,15 @@ body.small #content { left:10px; }
 
 .devType { padding-top:20px; }
 a        { color:#278727; }
-img      { border-style:none; }
+img      { border-style:none; vertical-align: top;}
 .wide    { width:100%; }
 table.readings td:nth-child(2) { word-break: break-all; }
 
 table.block { border:1px solid gray; }
-table { border-radius:8px; }
+table { border-collapse: collapse; }
 table.room { border:1px solid gray; width: 100%;  }
-tr.column > td { padding:0; vertical-align:top;}
+tr.column > td { vertical-align:top;}
+
 .changed a, .changed { color:red; }
 .fhemlog { color:#278727; }
 .col2 { text-align:center; }
@@ -174,7 +180,7 @@ table.room,table.block.wide,table.fileList {
   border-top:1px solid gray;
   border-bottom:1px solid gray;
 }
-table.block.wide td > div { padding:0 4px; }
+table.block.wide td > div, #menu td td { padding:2px 4px; }
 
 #menuScrollArea { display:none; } /* commandref */
 body[fw_id] #menuScrollArea { display:block; } /* not commandref */
@@ -202,10 +208,46 @@ body.touch a { font-size: 20px; }
 body.touch #menu { font-size: 20px; } /* for the menuTree icon */
 body.touch div.col1, body.touch #menu table.room div { padding:0.25em 0; }
 
-@media screen and (orientation: portrait) {
-  body.small table.block tr td:nth-child(n+3) { width: 0px; display: none; }
-  body.small #content > table { width: 100%; table-layout: fixed; }
-  .SVGplot { width: 100%; overflow-x: scroll }
+
+
+body.fixedInput #menu,
+body.fixedInput #menuBtn,
+body.fixedInput #content,
+body.fixedInput #hdr {
+	position: fixed;
+	overflow: auto;
+}
+
+@media screen and (max-width: 480px) and (orientation: portrait) {
+  #content > table { width: 100%; table-layout: fixed; }
+  #content > table, table.block.wide { width: 100%; }
+  table.block tr td:nth-child(2) { width: 0; }
+  table.block tr td:nth-child(n+3) { width: 0px; display: none; }
+ 
+  .SVGplot { width: 100%; overflow-x: auto;} 
+  
+  /* flex-collapsing table */
+  .wrapcolumns, 
+  .wrapcolumns thead, 
+  .wrapcolumns tbody, 
+  .wrapcolumns th, 
+  .wrapcolumns td {
+    display: block;
+  }
+
+  .wrapcolumns tr { 
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .wrapcolumns td { 
+    word-wrap: break-word; 
+    align-self: center;
+    max-width: 100%;
+  }
+
+  .wrapcolumns tr td:nth-child(1) { flex-grow: 1; }
+  .wrapcolumns tr td:nth-child(2) { width: auto!important; }
 }
 
 body.pinnedMenu #menuBtn { display:none; }

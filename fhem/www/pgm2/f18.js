@@ -64,6 +64,9 @@ $(document).ready(function(){
   if(typeof svgCallback != "undefined")
     svgCallback.f18 = f18_svgSetCols;
   $("[data-name]").each(function(){ f18_setPos(this) });
+  
+  f18_setWrapColumns();
+  f18_setFixedInput();
 });
 
 function
@@ -216,7 +219,7 @@ f18_special()
     $("tr#f18rs").append("<table id='f18ts' class='block wide'></table>");
     appendTo = "table#f18ts";
 
-    addHider("rightMenu", false, "MenuBtn right<br>on SmallScreen", f18_resize);
+    addHider("rightMenu", false, "MenuBtn right<br>on small screen",f18_resize);
     addHider("savePinChanges", false, "Save pin changes");
     addHider("showDragger", false, "Dragging active", function(c){
       if(c) {
@@ -351,13 +354,16 @@ f18_special()
     addHider("hidePin", true, "Hide pin", function(c){
       $("div.pinHeader div.pin").css("display", c ? "none":"block");
     });
-    addHider("fixedInput", true, "Fixed input", f18_setFixedInput);
+    addHider("fixedInput", true, "Fixed input and menu", f18_setFixedInput);
+    addHider("wrapcolumns",false,"Wrap columns<br>on small screen",
+                        f18_setWrapColumns);
 
     $("div.f18colors").css("margin-top", "20px");
     $("tr.f18 div.fileList").each(function(e){ f18_addPinToStyleDiv(this) });
     if(f18_getAttr("showDragger"))
       $("div.fileList").each(function(){ f18_addDragger(this) });
     $("[data-name]").each(function(){ f18_setPos(this) });
+    f18_setWrapColumns();
   };
   loadScript("pgm2/fhemweb_colorpicker.js", f18_drawSpecial);
 }
@@ -369,6 +375,19 @@ f18_setFixedInput()
     .css(f18_getAttr("fixedInput") ?
       { position:"fixed", overflow:"auto" } :
       { position:"absolute", overflow:"visible" });
+}
+
+function
+f18_setFixedInput()
+{
+  $("body").toggleClass("fixedInput", f18_getAttr("fixedInput"));
+  f18_resize();
+}
+
+function
+f18_setWrapColumns()
+{
+  $("table.block").toggleClass("wrapcolumns", f18_getAttr("wrapcolumns"));
 }
 
 function
@@ -397,13 +416,13 @@ f18_resize()
   left += hl ? 0 : 40;
   left += pm ? 0 : 44;
   var lleft = (pm ? 10 : 52);
-  $("input.maininput").css({ width:(w-left-(FW_isiOS ? 30 : 20))+'px', 
+  $("input.maininput").css({ width:(w-left-(FW_isiOS ? 26 : 24))+'px', 
+                             "margin-left":(rm ? "0px" : "10px"),
                              display: hi ? "none":"block"});
   $("#menu,#content").css("top", (hi && pm && hl) ? "10px" : "50px");
   $("#hdr").css({ left:(rm ? 10 : left)+'px' });
   $("#menuBtn").css({ left:(rm ? "auto":"10px"), right:(rm ? "10px":"auto") });
-  $("#logo")   .css({ left:(rm ? "auto":lleft ), right:(rm ? "52px":"auto") });
-  f18_setFixedInput(); // Wonder, why its needed
+  $("#logo")   .css({ left:(rm ? "auto":lleft ), right:(rm ? "48px":"auto") });
 }
 
 function
