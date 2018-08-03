@@ -30,7 +30,9 @@
 ######################################################################################################################
 #  Versions History:
 #
-# 4.0.0      30.07.2018       server mode
+# 4.2.0      03.08.2018       evaluate sender peer ip-address/hostname, use it as reading in event generation
+# 4.1.0      02.08.2018       state event generation changed
+# 4.0.0      30.07.2018       server mode (Collector)
 # 3.2.1      04.05.2018       fix compatibility with newer IO::Socket::SSL on debian 9, attr ssldebug for
 #                             debugging SSL messages
 # 3.2.0      22.11.2017       add NOTIFYDEV if possible
@@ -68,7 +70,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.0.0";
+my $Log2SyslogVn = "4.2.0";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -230,6 +232,7 @@ sub Log2Syslog_Define($@) {
   $hash->{HELPER}{SSLALGO}  = "n.a.";                       # Initialisierung
   $hash->{HELPER}{LTIME}    = time();                       # Init Timestmp f. Ratenbestimmung
   $hash->{HELPER}{OLDSEQNO} = $hash->{SEQNO};               # Init Sequenznummer f. Ratenbestimmung
+  $hash->{HELPER}{OLDSTATE} = "initialized";
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "SSL_Version", "n.a.");
@@ -310,8 +313,8 @@ sub Log2Syslog_Read($) {
   my $lf     = AttrVal($name, "logFormat", "IETF");
   my ($err,$data,$facility,$severity,$date,$host,$ident,$content,$pl,$version,$pid,$mid,$sdfield);
   
-  return if(IsDisabled($name));
-  
+  return if(IsDisabled($name) || $hash->{MODEL} !~ /Collector/);
+
   if($lf =~ /BSD/) {
       # BSD-Format  
       unless($socket->recv($data, $RFC3164len{DL})) {
@@ -350,7 +353,10 @@ sub Log2Syslog_Read($) {
           }
       }  
   }
-  readingsSingleUpdate($hash, "state", $st, 1) if($st ne OldValue($name));     
+  # readingsSingleUpdate($hash, "state", $st, 1) if($st ne OldValue($name));  
+  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+  readingsSingleUpdate($hash, "state", $st, $evt);
+  $hash->{HELPER}{OLDSTATE} = $st;  
   
 return;
 }
@@ -366,8 +372,14 @@ sub Log2Syslog_parsePayload($$) {
   my $pp           = AttrVal($name, "parseProfile", "default"); 
   my ($prival,$Mmm,$dd,$time,$host,$ident,$delimiter,$content,$day,$date);
   my ($severity,$sev,$facility,$fac,$version,$pid,$mid,$sdfield,$err,$pl);
+    
+  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - ###  new Syslog message Parsing ### ");
   
-  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - raw message: ".$data);
+  # Sender Host / IP-Adresse ermitteln, $phost wird Reading im Event
+  my ($phost,$paddr) = Log2Syslog_evalPeer($hash);
+  $phost = $phost?$phost:$paddr;
+  
+  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - raw message -> $data");
   
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);       # Istzeit Ableitung
   $year = $year+1900;
@@ -379,7 +391,7 @@ sub Log2Syslog_parsePayload($$) {
           ($prival,$Mmm,$dd,$time,$host,$ident,$delimiter,$content) = ($data =~ /^<(\d{1,3})>(\w{3})\s{1,2}(\d{1,2})\s(\d{2}:\d{2}:\d{2})\s(\S+)\s([a-zA-Z_0-9.]+)(\W+)(.*)$/);
           if(!$prival && !$host && !$ident && !$content) {
               $err = 1;
-              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg: $data");  
+              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");  
           } else {
               $mon = $Log2Syslog_BSDMonth{$Mmm};
               $day = (length($dd) == 1)?("0".$dd):$dd;
@@ -391,12 +403,12 @@ sub Log2Syslog_parsePayload($$) {
               $facility = $Log2Syslog_Facility{$fac};
               $severity = $Log2Syslog_Severity{$sev};
      
-              Log2Syslog_Log3slog($name, 4, "$name - FACILITY: $fac/$facility, SEVERITY: $sev/$severity, DATE: $date, HOST: $host, ID: $ident, CONT: $content");
-              $pl = "$host: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
+              Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FACILITY: $fac/$facility, SEVERITY: $sev/$severity, DATE: $date, HOST: $host, ID: $ident, CONT: $content");
+              $pl = "$phost: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
           }
       } elsif ($pp =~ /raw/) {
           Log2Syslog_Log3slog($name, 4, "$name - $data");
-          $pl = $data;
+          $pl = "$phost: $data";
       }
       return ($err,$pl);
   }
@@ -405,10 +417,11 @@ sub Log2Syslog_parsePayload($$) {
       # IETF Protokollformat https://tools.ietf.org/html/rfc5424 
       # Beispiel data "<$prival>1 $tim $host $ident $pid $mid - : $otp";
       if($pp =~ /default/) {
-          ($prival,$version,$date,$time,$host,$ident,$pid,$mid,$sdfield,$content) = ($data =~ /^<(\d{1,3})>(\d+)\s(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})\S*\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\[.*\]|-)\s(.*)$/);
+          # ($prival,$version,$date,$time,$host,$ident,$pid,$mid,$sdfield,$content) = ($data =~ /^<(\d{1,3})>(\d+)\s(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})\S*\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\[.*\]|-)\s(.*)$/);
+          ($prival,$version,$date,$time,$host,$ident,$pid,$mid,$sdfield,$content) = ($data =~ /^<(?<prival>\d{1,3})>(?<version>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S+)\s(?<ident>\S+)\s(?<pid>\S+)\s(?<mid>\S+)\s(?<sdfield>\[.*\]|-)\s(?<content>.*)$/);
           if(!$prival && !$version && !$host && !$ident && !$content) {
               $err = 1;
-              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg: $data");           
+              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");           
           } else {
               $date    = "$date $time";
               $content =~ s/^:?(.*)$/$1/ if(lc($mid) eq "fhem");      # Modul Sender setzt vor $content ein ":" (wegen Synology Compatibilität)
@@ -425,12 +438,12 @@ sub Log2Syslog_parsePayload($$) {
               $mid    = substr($mid,0, ($RFC5425len{MID}-1));
               $host   = substr($host,0, ($RFC5425len{HST}-1));
       
-              Log2Syslog_Log3slog($name, 4, "$name - FACILITY: $fac/$facility, SEVERITY: $sev/$severity, VERSION: $version, DATE: $date, HOST: $host, ID: $ident, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $content");
-              $pl = "$host: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
+              Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FACILITY: $fac/$facility, SEVERITY: $sev/$severity, VERSION: $version, DATE: $date, HOST: $host, ID: $ident, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $content");
+              $pl = "$phost: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
           }
       } elsif ($pp =~ /raw/) {
           Log2Syslog_Log3slog($name, 4, "$name - $data");
-          $pl = $data;
+          $pl = "$phost: $data";
       }
       return ($err,$pl);
   }
@@ -656,13 +669,16 @@ sub Log2Syslog_eventlog($$) {
               } else {
                   my $err = $!;
 				  Log2Syslog_Log3slog($name, 4, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
-		          readingsSingleUpdate($hash, "state", "write error: $err", 1) if($err ne OldValue($name));			      		  
+
+                  my $st = "write error: $err";
+                  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+                  readingsSingleUpdate($hash, "state", $st, $evt);
+                  $hash->{HELPER}{OLDSTATE} = $st;                  
 			  }
           }
-      }
-      
+      } 
       Log2Syslog_closesock($hash,$sock);
-   }
+  }
   
 return "";
 }
@@ -700,9 +716,12 @@ sub Log2Syslog_fhemlog($$) {
           } else {
               my $err = $!;
 			  Log2Syslog_Log3slog($name, 4, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
-		      readingsSingleUpdate($hash, "state", "write error: $err", 1) if($err ne OldValue($name));			      		  
-	      }
-		  
+
+              my $st = "write error: $err";
+              my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+              readingsSingleUpdate($hash, "state", $st, $evt);
+              $hash->{HELPER}{OLDSTATE} = $st;              
+	      }  
           Log2Syslog_closesock($hash,$sock);
 	  }
   }
@@ -816,7 +835,9 @@ sub Log2Syslog_setsock ($) {
       }
   }
 
-  readingsSingleUpdate($hash, "state", $st, 1) if($st ne OldValue($name));
+  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+  readingsSingleUpdate($hash, "state", $st, $evt);
+  $hash->{HELPER}{OLDSTATE} = $st;
   
   if($sslver ne $hash->{HELPER}{SSLVER}) {
       readingsSingleUpdate($hash, "SSL_Version", $sslver, 1);
@@ -1024,6 +1045,23 @@ InternalTimer(gettimeofday()+$rerun, "Log2Syslog_trate", $hash, 0);
 
 return; 
 }
+
+###############################################################################
+#                  Peer IP-Adresse und Host ermitteln (Sender der Message)
+###############################################################################
+sub Log2Syslog_evalPeer($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $socket = $hash->{SERVERSOCKET};
+  
+  my($pport, $pipaddr) = sockaddr_in($socket->peername);
+  my $phost = gethostbyaddr($pipaddr, AF_INET);
+  my $paddr = inet_ntoa($pipaddr);
+  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - message peerhost: $phost, $paddr");
+
+return ($phost,$paddr); 
+}
+
 
 1;
 
