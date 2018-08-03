@@ -210,6 +210,7 @@ body.touch div.col1, body.touch #menu table.room div { padding:0.25em 0; }
 
 
 
+body.fixedInput #logo,
 body.fixedInput #menu,
 body.fixedInput #menuBtn,
 body.fixedInput #content,
