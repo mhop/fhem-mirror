@@ -388,7 +388,7 @@ sub Log2Syslog_parsePayload($$) {
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
       # Beispiel data "<$prival>$month $day $time $myhost $ident: : $otp"
       if($pp =~ /default/) {
-          ($prival,$Mmm,$dd,$time,$host,$ident,$delimiter,$content) = ($data =~ /^<(\d{1,3})>(\w{3})\s{1,2}(\d{1,2})\s(\d{2}:\d{2}:\d{2})\s(\S+)\s([a-zA-Z_0-9.]+)(\W+)(.*)$/);
+          ($prival,$Mmm,$dd,$time,$host,$ident,$delimiter,$content) = ($data =~ /^<(?<prival>\d{1,3})>(?<month>\w{3})\s{1,2}(?<day>\d{1,2})\s(?<time>\d{2}:\d{2}:\d{2})\s(?<host>\S+)\s(?<ident>[a-zA-Z_0-9.]+)(?<delimiter>\W+)(?<content>.*)$/);
           if(!$prival && !$host && !$ident && !$content) {
               $err = 1;
               Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");  
@@ -404,7 +404,9 @@ sub Log2Syslog_parsePayload($$) {
               $severity = $Log2Syslog_Severity{$sev};
      
               Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FACILITY: $fac/$facility, SEVERITY: $sev/$severity, DATE: $date, HOST: $host, ID: $ident, CONT: $content");
-              $pl = "$phost: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
+              $host = "" if($host eq "-");
+			  $phost = $host?$host:$phost;
+			  $pl = "$phost: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
           }
       } elsif ($pp =~ /raw/) {
           Log2Syslog_Log3slog($name, 4, "$name - $data");
@@ -439,7 +441,9 @@ sub Log2Syslog_parsePayload($$) {
               $host   = substr($host,0, ($RFC5425len{HST}-1));
       
               Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FACILITY: $fac/$facility, SEVERITY: $sev/$severity, VERSION: $version, DATE: $date, HOST: $host, ID: $ident, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $content");
-              $pl = "$phost: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
+              $host = "" if($host eq "-");
+			  $phost = $host?$host:$phost;
+			  $pl = "$phost: FAC: $facility || SEV: $severity || ID: $ident || CONT: $content";   # $host wird zum Reading im Event -> positiv für Logging
           }
       } elsif ($pp =~ /raw/) {
           Log2Syslog_Log3slog($name, 4, "$name - $data");
