@@ -1110,8 +1110,10 @@ AnalyzePerlCommand($$;$)
 
   $cmdFromAnalyze = $cmd;
   my $ret = eval $cmd;
-  Log 1, "ERROR evaluating $cmd: $@" if($@);
-  $ret = $@ if($@);
+  if($@) {
+    $ret = $@;
+    Log 1, "ERROR evaluating $cmd: $ret";
+  }
   $cmdFromAnalyze = undef;
   return $ret;
 }
