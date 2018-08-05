@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.10.10    05.08.2018       commandref revised reducelogNbl
 # 3.10.9     23.06.2018       commandref added hint about special characters in passwords
 # 3.10.8     21.04.2018       addLog - not available reading can be added as new one (forum:#86966)
 # 3.10.7     16.04.2018       fix generate addLog-event if device or reading was not found by addLog
@@ -205,7 +206,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.10.9";
+my $DbLogVersion = "3.10.10";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -5416,10 +5417,21 @@ sub dbReadings($@) {
       <ul>The non-blocking execution of "set &lt;name&gt; count".</ul><br/>
 	    
     <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br/>
-      <ul>Delete records from history older than &lt;n&gt; days. Number of deleted records will be written into reading lastRowsDeleted.</ul><br/>
+      <ul>Delete records from history older than &lt;n&gt; days. Number of deleted records will be written into reading 
+      lastRowsDeleted.
+      </ul><br>
 	  
     <code>set &lt;name&gt; deleteOldDaysNbl &lt;n&gt;</code><br/><br/>
-      <ul>Is identical to function "deleteOldDays" 	whereupon deleteOldDaysNbl will be executed non-blocking. </ul><br/>	
+      <ul>
+      Is identical to function "deleteOldDays" 	whereupon deleteOldDaysNbl will be executed non-blocking. 
+      <br><br>
+      
+      <b>Note:</b> <br>
+      Even though the function itself is non-blocking, you have to set DbLog into the asynchronous mode (attr asyncMode = 1) to
+      avoid a blocking situation of FHEM !
+      
+      </ul>
+      <br>	
 
     <code>set &lt;name&gt; eraseReadings </code><br><br>
       <ul> This function deletes all readings except reading "state". </ul><br>
@@ -5483,7 +5495,13 @@ sub dbReadings($@) {
       </ul><br>
 	  
     <code>set &lt;name&gt; reduceLogNbl &lt;n&gt; [average[=day]] [exclude=device1:reading1,device2:reading2,...]</code> <br><br>
-      <ul>Same function as "set &lt;name&gt; reduceLog" but FHEM won't be blocked due to this function is implemented non-blocking ! <br>
+      <ul>Same function as "set &lt;name&gt; reduceLog" but FHEM won't be blocked due to this function is implemented 
+      non-blocking ! <br><br>
+      
+      <b>Note:</b> <br>
+      Even though the function itself is non-blocking, you have to set DbLog into the asynchronous mode (attr asyncMode = 1) to
+      avoid a blocking situation of FHEM !
+      
       </ul><br>
 
     <code>set &lt;name&gt; reopen [n] </code><br/><br/>
@@ -6444,15 +6462,29 @@ sub dbReadings($@) {
       <ul>Zählt die Datensätze in den Tabellen current und history und schreibt die Ergebnisse in die Readings 
 	  countCurrent und countHistory.</ul><br>
 	  
-    <code>set &lt;name&gt; countNbl </code><br/><br>
-      <ul>Die non-blocking Ausführung von "set &lt;name&gt; count".</ul><br>
+    <code>set &lt;name&gt; countNbl </code><br><br>
+      <ul>
+      Die non-blocking Ausführung von "set &lt;name&gt; count".
+      <br><br>
+
+      <b>Hinweis:</b> <br>
+      Obwohl die Funktion selbst non-blocking ist, muß das DbLog-Device im asynchronen Modus betrieben werden (asyncMode = 1)
+      um FHEM nicht zu blockieren ! 
+      </ul><br>
 
     <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br>
       <ul>Löscht Datensätze in Tabelle history, die älter sind als &lt;n&gt; Tage sind. 
 	  Die Anzahl der gelöschten Datens&auml;tze wird in das Reading lastRowsDeleted geschrieben.</ul><br>
 
     <code>set &lt;name&gt; deleteOldDaysNbl &lt;n&gt;</code><br><br>
-      <ul>Identisch zu Funktion "deleteOldDays" wobei deleteOldDaysNbl nicht blockierend ausgeführt wird. </ul><br>	  
+      <ul>
+      Identisch zu Funktion "deleteOldDays" wobei deleteOldDaysNbl nicht blockierend ausgeführt wird.
+      <br><br>
+
+      <b>Hinweis:</b> <br>
+      Obwohl die Funktion selbst non-blocking ist, muß das DbLog-Device im asynchronen Modus betrieben werden (asyncMode = 1)
+      um FHEM nicht zu blockieren !     
+      </ul><br>	  
 
 	<a name="DbLogsetexportCache"></a>
     <code>set &lt;name&gt; exportCache [nopurge | purgecache] </code><br><br>
@@ -6520,7 +6552,12 @@ sub dbReadings($@) {
     <code>set &lt;name&gt; reduceLogNbl &lt;n&gt; [average[=day]] [exclude=device1:reading1,device2:reading2,...]</code><br><br>
 	      <ul>
 	      Führt die gleiche Funktion wie "set &lt;name&gt; reduceLog" aus. Im Gegensatz zu reduceLog wird mit FHEM wird durch den Befehl reduceLogNbl nicht 
-	      mehr blockiert da diese Funktion non-blocking implementiert ist ! <br>
+	      mehr blockiert da diese Funktion non-blocking implementiert ist ! 
+          <br><br>
+
+          <b>Hinweis:</b> <br>
+          Obwohl die Funktion selbst non-blocking ist, muß das DbLog-Device im asynchronen Modus betrieben werden (asyncMode = 1)
+          um FHEM nicht zu blockieren ! 
           </ul><br>
 		  
     <code>set &lt;name&gt; reopen [n]</code><br/><br/>
