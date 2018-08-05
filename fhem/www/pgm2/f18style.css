@@ -24,6 +24,8 @@ input.maininput { margin-left:10px; }
   padding:0 0.5em 0.5em 0;
   position: absolute;
 }
+#menu > table td { padding-top: 2px; }
+
 #menu.visible  { left:10px!important; }
 #console { width:100%; top:2em; bottom:0px; position:absolute; overflow-y:auto;}
 #errmsg  { background-color: #000000; color: #FFFFFF;
