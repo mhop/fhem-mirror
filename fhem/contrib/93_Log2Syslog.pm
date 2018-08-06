@@ -2038,6 +2038,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
   <br> 
     <table>  
     <colgroup> <col width=35%> <col width=65%> </colgroup>
+      <tr><td><b>MSG_&lt;Host&gt;</b>               </td><td> die letzte erfolgreich geparste Syslog-Message von &lt;Host&gt; </td></tr>
 	  <tr><td><b>SSL_Algorithm</b>                  </td><td> der verwendete SSL Algorithmus wenn SSL eingeschaltet und aktiv ist </td></tr>
       <tr><td><b>SSL_Version</b>                    </td><td> die verwendete TLS-Version wenn die Verschlüsselung aktiv ist</td></tr>
 	  <tr><td><b>Transfered_logs_per_minute</b>     </td><td> die durchschnittliche Anzahl der übertragenen/empfangenen Logs/Events pro Minute </td></tr>
