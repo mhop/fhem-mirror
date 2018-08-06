@@ -30,6 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 4.5.0      06.08.2018       Regex capture groups used in parsePayload to set variables, parsing of BSD changed
 # 4.4.0      04.08.2018       Attribute "outputFields" added
 # 4.3.0      03.08.2018       Attribute "parseFn" added
 # 4.2.0      03.08.2018       evaluate sender peer ip-address/hostname, use it as reading in event generation
@@ -63,6 +64,7 @@ package main;
 
 use strict;
 use warnings;
+use Scalar::Util qw(looks_like_number);
 use Encode qw(encode_utf8);
 eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
 eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom = "Net::Domain";
@@ -72,7 +74,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.4.0";
+my $Log2SyslogVn = "4.5.0";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -99,7 +101,7 @@ my %Log2Syslog_BSDMonth = (
   "Sep" => "09",
   "Oct" => "10",
   "Nov" => "11",
-  "Dec" => "12",
+  "Dec" => "12"
 );
 
 # Mappinghash Severity
@@ -112,6 +114,14 @@ my %Log2Syslog_Severity = (
   "5" => "Notice",
   "6" => "Informational",
   "7" => "Debug",
+  "Emergency"     => "0",
+  "Alert"         => "1",
+  "Critical"      => "2",
+  "Error"         => "3",
+  "Warning"       => "4",
+  "Notice"        => "5",
+  "Informational" => "6",
+  "Debug"         => "7"
 );
 
 # Mappinghash Facility
@@ -139,7 +149,7 @@ my %Log2Syslog_Facility = (
   "20" => "local4",
   "21" => "local5",
   "22" => "local6",
-  "23" => "local7",
+  "23" => "local7"
   );
 
 # Längenvorgaben nach RFC3164
@@ -269,7 +279,6 @@ sub Log2Syslog_initServer($) {
   # Inititialisierung FHEM ist fertig -> Attribute geladen
   my $port     = AttrVal($name, "TLS", 0)?AttrVal($name, "port", 6514):AttrVal($name, "port", 1514);
   my $protocol = lc(AttrVal($name, "protocol", "udp"));
-  my $lf       = AttrVal($name, "logFormat", "IETF");
   my $lh = $global ? ($global eq "global"? undef : $global) : ($hash->{IPV6} ? "::1" : "127.0.0.1");
   
   Log3 $hash, 3, "Log2Syslog $name - Opening socket ...";
@@ -291,12 +300,11 @@ sub Log2Syslog_initServer($) {
   $hash->{FD}               = $hash->{SERVERSOCKET}->fileno();
   $hash->{PORT}             = $hash->{SERVERSOCKET}->sockport();
   $hash->{PROTOCOL}         = $protocol;
-  $hash->{LOGFORMAT}        = $lf;
   $hash->{SEQNO}            = 1;                            # PROCID wird kontinuierlich pro empfangenen Datensatz hochgezählt
   $hash->{HELPER}{OLDSEQNO} = $hash->{SEQNO};               # Init Sequenznummer f. Ratenbestimmung
   $hash->{INTERFACE}        = $lh?$lh:"global";
   
-  Log3 ($hash, 3, "Log2Syslog $name - port $hash->{PORT}/$protocol opened for Syslog Collector ($lf) on interface \"$hash->{INTERFACE}\"");
+  Log3 ($hash, 3, "Log2Syslog $name - port $hash->{PORT}/$protocol opened for Syslog Collector on interface \"$hash->{INTERFACE}\"");
   ReadingsSingleUpdateValue ($hash, "state", "initialized", 1);
   delete($readyfnlist{"$name.$port"});
   $selectlist{"$name.$port"} = $hash;
@@ -315,7 +323,7 @@ sub Log2Syslog_Read($) {
   my $socket = $hash->{SERVERSOCKET};
   my $st     = ReadingsVal($name,"state","active");
   my $pp     = AttrVal($name, "parseProfile", "IETF");
-  my ($err,$data,$facility,$severity,$ts,$host,$ident,$pl,$version,$pid,$mid,$sdfield);
+  my ($err,$data,$ts,$phost,$pl);
   
   return if(IsDisabled($name) || $hash->{MODEL} !~ /Collector/);
 
@@ -329,12 +337,13 @@ sub Log2Syslog_Read($) {
           $st = "receive error - see logfile";          
       } else {
           # parse Payload  
-          ($err,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
+          ($err,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
           $hash->{SEQNO}++;
           if($err) {
               $st = "parse error - see logfile";
           } else {
               $st = "active";
+              $pl = "$phost: $pl";
               Log2Syslog_Trigger($hash,$ts,$pl);
           }
       }
@@ -349,24 +358,26 @@ sub Log2Syslog_Read($) {
           $st = "receive error - see logfile";            
       } else {
           # parse Payload  
-          ($err,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
+          ($err,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
           $hash->{SEQNO}++;
           if($err) {
               $st = "parse error - see logfile";
           } else {
               $st = "active";
+              $pl = "$phost: $pl";
               Log2Syslog_Trigger($hash,$ts,$pl);
           }
       }  
   } else {
       # raw oder User eigenes Format
       $socket->recv($data, 8192);
-      ($err,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
+      ($err,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
       $hash->{SEQNO}++;
       if($err) {
           $st = "parse error - see logfile";
       } else {
           $st = "active";
+          $pl = "$phost: $pl";
           Log2Syslog_Trigger($hash,$ts,$pl);
       }      
   
@@ -425,32 +436,47 @@ sub Log2Syslog_parsePayload($$) {
   if ($pp =~ /raw/) {
       Log2Syslog_Log3slog($name, 4, "$name - $data");
       $ts = TimeNow();
-      $pl = "$phost: $data";
+      $pl = $data;
   
   } elsif($pp eq "BSD") { 
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
       # Beispiel data "<$prival>$month $day $time $myhost $id: : $otp"	  
-      ($prival,$Mmm,$dd,$time,$host,$id,$delimiter,$cont) = ($data =~ /^<(?<prival>\d{1,3})>(?<month>\w{3})\s{1,2}(?<day>\d{1,2})\s(?<time>\d{2}:\d{2}:\d{2})\s(?<host>\S+)\s(?<id>[a-zA-Z_0-9.]+)(?<delimiter>\W+)(?<cont>.*)$/);
-      if(!$prival && !$host && !$id && !$cont) {
+      $data =~ /^<(?<prival>\d{1,3})>(((((\s*(?<month>\w{3})\s*)?(?<day>\d{1,2})\s*)?(?<time>\d{2}:\d{2}:\d{2})\s*)?(?<host>\S+)\s*)?(?<id>[a-zA-Z_0-9.]*))?(?<delimiter>\W*)(?<cont>.*)$/;
+      $prival    = $+{prival};        # must
+      $Mmm       = $+{month};         # should
+      $dd        = $+{day};           # should
+      $time      = $+{time};          # should
+      $host      = $+{host};          # should 
+      $id        = $+{id};            # should
+      $delimiter = $+{delimiter};     # should
+      $cont      = $+{cont};          # should
+        
+      if(!$prival) {
           $err = 1;
           Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");  
       } else {
-          my $month = $Log2Syslog_BSDMonth{$Mmm};
-          $day      = (length($dd) == 1)?("0".$dd):$dd;
-          $ts       = "$year-$month-$day $time";
-     
-          $facility = int($prival/8);
-          $severity = $prival-($facility*8);
-      
-     	  $fac = $Log2Syslog_Facility{$facility};
-          $sev = $Log2Syslog_Severity{$severity};
+          if( $Mmm && $dd && $time =~ /(d{2}:\d{2}:\d{2})/ ) {
+              my $month = $Log2Syslog_BSDMonth{$Mmm};
+              $day      = (length($dd) == 1)?("0".$dd):$dd;
+              $ts       = "$year-$month-$day $time";
+          }
+          
+          if(looks_like_number($prival)) {
+              $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
+              $severity = $prival-($facility*8);
+     	      $fac = $Log2Syslog_Facility{$facility};
+              $sev = $Log2Syslog_Severity{$severity};
+          } else {
+              $err = 1;
+              Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
+          }
      
           Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, CONT: $cont");
           $host = "" if($host eq "-");
 		  $phost = $host?$host:$phost;
           
           # Payload zusammenstellen für Event/Reading
-          $pl = "$phost: ";
+          $pl = "";
           my $i = 0;
           foreach my $f (@evf) {
               if(${$fh{$f}}) { 
@@ -464,19 +490,34 @@ sub Log2Syslog_parsePayload($$) {
   } elsif($pp eq "IETF") {
 	  # IETF Protokollformat https://tools.ietf.org/html/rfc5424 
       # Beispiel data "<$prival>1 $tim $host $id $pid $mid - : $otp";
-      ($prival,$ietf,$date,$time,$host,$id,$pid,$mid,$sdfield,$cont) = ($data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S+)\s(?<id>\S+)\s(?<pid>\S+)\s(?<mid>\S+)\s(?<sdfield>\[.*\]|-)\s(?<cont>.*)$/);
-      if(!$prival && !$ietf && !$host && !$id && !$cont) {
+      $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s(?<pid>\S*)\s(?<mid>\S*)\s(?<sdfield>\[.*\]|-)\s(?<cont>.*)$/;
+      $prival  = $+{prival};      # must
+      $ietf    = $+{ietf};        # must 
+      $date    = $+{date};        # must
+      $time    = $+{time};        # must
+      $host    = $+{host};        # should 
+      $id      = $+{id};          # should
+      $pid     = $+{pid};         # should
+      $mid     = $+{mid};         # should 
+      $sdfield = $+{sdfield};     # must
+      $cont    = $+{cont};        # should
+      
+      if(!$prival || !$ietf || !$date || !$time) {
           $err = 1;
           Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");           
       } else {
           $ts      = "$date $time";
           $cont =~ s/^:?(.*)$/$1/ if(lc($mid) eq "fhem");      # Modul Sender setzt vor $cont ein ":" (wegen Synology Compatibilität)
       
-          $facility = int($prival/8);
-          $severity = $prival-($facility*8);
-      
-     	  $fac = $Log2Syslog_Facility{$facility};
-          $sev = $Log2Syslog_Severity{$severity};
+          if(looks_like_number($prival)) {
+              $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
+              $severity = $prival-($facility*8);
+     	      $fac = $Log2Syslog_Facility{$facility};
+              $sev = $Log2Syslog_Severity{$severity};
+          } else {
+              $err = 1;
+              Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
+          }
       
           # Längenbegrenzung nach RFC5424
           $id     = substr($id,0, ($RFC5425len{ID}-1));
@@ -489,7 +530,7 @@ sub Log2Syslog_parsePayload($$) {
 	      $phost = $host?$host:$phost;
           
           # Payload zusammenstellen für Event/Reading
-          $pl = "$phost: ";
+          $pl = "";
           my $i = 0;
           foreach my $f (@evf) {
               if(${$fh{$f}}) { 
@@ -535,7 +576,7 @@ sub Log2Syslog_parsePayload($$) {
           $date    = $DATE if($DATE =~ /^(\d{4})-(\d{2})-(\d{2})$/);
           $time    = $TIME if($TIME =~ /^(\d{2}):(\d{2}):(\d{2})$/);          
           $ts      = ($TS =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/)?$TS:($date && $time)?"$date $time":$ts;
- 	      $host    = $HOST if($HOST);
+ 	      $host    = $HOST if(defined $HOST);
 	      $id      = $ID if(defined $ID);
           $pid     = $PID if(defined $PID);
           $mid     = $MID if(defined $MID);
@@ -544,11 +585,14 @@ sub Log2Syslog_parsePayload($$) {
           $sev     = $SEV if(defined $SEV);
           $sdfield = $SDFIELD if(defined $SDFIELD);
           
-          if($prival) {
-              $facility = int($prival/8);
+          if($prival && looks_like_number($prival)) {
+              $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
               $severity = $prival-($facility*8);
      	      $fac = $Log2Syslog_Facility{$facility};
-              $sev = $Log2Syslog_Severity{$severity};            
+              $sev = $Log2Syslog_Severity{$severity};
+          } else {
+              $err = 1;
+              Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
           }
 
           Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, PID: $pid, MID: $mid, CONT: $cont");
@@ -559,7 +603,7 @@ sub Log2Syslog_parsePayload($$) {
           @evf = split(",",AttrVal($name, "outputFields", $ef));    
           
           # Payload zusammenstellen für Event/Reading
-          $pl = "$phost: ";
+          $pl = "";
           my $i = 0;
           foreach my $f (@evf) {
               if(${$fh{$f}}) { 
@@ -580,7 +624,7 @@ sub Log2Syslog_parsePayload($$) {
 	  
   } 	
 
-return ($err,$ts,$pl);
+return ($err,$phost,$ts,$pl);
 }
 
 #################################################################################################
@@ -1213,7 +1257,6 @@ sub Log2Syslog_evalPeer($) {
   
   my($pport, $pipaddr) = sockaddr_in($socket->peername);
   my $phost = gethostbyaddr($pipaddr, AF_INET);
-  $phost = $phost?$phost:"n.a.";
   my $paddr = inet_ntoa($pipaddr);
   Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - message peerhost: $phost, $paddr");
 
@@ -1761,9 +1804,9 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
         <ul>  
         <table>  
         <colgroup> <col width=20%> <col width=80%> </colgroup>
-	    <tr><td> $PRIVAL  </td><td> "" (3 Digit 0 ... 191) </td></tr>
-        <tr><td> $FAC     </td><td> "" </td></tr>
-        <tr><td> $SEV     </td><td> "" </td></tr>
+	    <tr><td> $PRIVAL  </td><td> "" (0 ... 191) </td></tr>
+        <tr><td> $FAC     </td><td> "" (0 ... 23) </td></tr>
+        <tr><td> $SEV     </td><td> "" (0 ... 7) </td></tr>
         <tr><td> $TS      </td><td> Zeitstempel (YYYY-MM-DD hh:mm:ss) </td></tr>
         <tr><td> $HOST    </td><td> "" </td></tr>
         <tr><td> $DATE    </td><td> "" (YYYY-MM-DD) </td></tr>
