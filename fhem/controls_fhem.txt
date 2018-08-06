@@ -1,4 +1,4 @@
-REV 17089
+REV 17093
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -408,7 +408,7 @@ UPD 2018-05-11_07:45:02 9863 FHEM/91_sequence.pm
 UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2018-05-25_07:45:02 56079 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
-UPD 2018-06-24_07:45:02 342023 FHEM/93_DbLog.pm
+UPD 2018-08-06_07:45:02 343226 FHEM/93_DbLog.pm
 UPD 2018-08-03_07:45:03 640691 FHEM/93_DbRep.pm
 UPD 2017-09-06_07:45:02 17463 FHEM/93_FHEM2FHEM.pm
 UPD 2018-05-05_07:45:03 44452 FHEM/93_Log2Syslog.pm
@@ -671,12 +671,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-07-30_07:45:06 3486207 docs/commandref.html
-UPD 2018-07-31_07:45:10 2130154 docs/commandref_DE.html
+UPD 2018-08-06_07:45:05 3486684 docs/commandref.html
+UPD 2018-08-06_07:45:07 2130817 docs/commandref_DE.html
 UPD 2018-07-16_07:45:03 76259 docs/commandref_frame.html
 UPD 2018-07-16_07:45:03 85715 docs/commandref_frame_DE.html
-UPD 2018-08-05_07:45:09 193505 docs/commandref_modular.html
-UPD 2018-08-05_07:45:10 204145 docs/commandref_modular_DE.html
+UPD 2018-08-06_07:45:08 193505 docs/commandref_modular.html
+UPD 2018-08-06_07:45:09 204145 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2018,7 +2018,7 @@ UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2018-03-26_07:45:02 5908 www/pgm2/defaultCommon.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2018-08-04_07:45:03 28372 www/pgm2/f18.js
-UPD 2018-08-04_07:45:03 8716 www/pgm2/f18style.css
+UPD 2018-08-06_07:45:02 8756 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
 UPD 2018-07-30_07:45:03 57376 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
