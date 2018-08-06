@@ -30,7 +30,8 @@
 ######################################################################################################################
 #  Versions History:
 #
-# 4.5.0      06.08.2018       Regex capture groups used in parsePayload to set variables, parsing of BSD changed
+# 4.5.0      06.08.2018       Regex capture groups used in parsePayload to set variables, parsing of BSD changed,
+#                             Attribute "makeMsgEvent" added
 # 4.4.0      04.08.2018       Attribute "outputFields" added
 # 4.3.0      03.08.2018       Attribute "parseFn" added
 # 4.2.0      03.08.2018       evaluate sender peer ip-address/hostname, use it as reading in event generation
@@ -182,6 +183,7 @@ sub Log2Syslog_Initialize($) {
                       "addTimestamp:0,1 ".
                       "outputFields:sortable,PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT ".
 					  "logFormat:BSD,IETF ".
+                      "makeMsgEvent:no,intern,reading ".
                       "parseProfile:BSD,IETF,raw,ParseFn ".
                       "parseFn:textField-long ".
                       "ssldebug:0,1,2,3 ".
@@ -323,6 +325,7 @@ sub Log2Syslog_Read($) {
   my $socket = $hash->{SERVERSOCKET};
   my $st     = ReadingsVal($name,"state","active");
   my $pp     = AttrVal($name, "parseProfile", "IETF");
+  my $mevt   = AttrVal($name, "makeMsgEvent", "intern");          # wie soll Reading/Eventerstellt werden
   my ($err,$data,$ts,$phost,$pl);
   
   return if(IsDisabled($name) || $hash->{MODEL} !~ /Collector/);
@@ -343,8 +346,17 @@ sub Log2Syslog_Read($) {
               $st = "parse error - see logfile";
           } else {
               $st = "active";
-              $pl = "$phost: $pl";
-              Log2Syslog_Trigger($hash,$ts,$pl);
+              if($mevt =~ /intern/) {
+                  # kein Reading, nur Event
+                  $pl = "$phost: $pl";
+                  Log2Syslog_Trigger($hash,$ts,$pl);
+              } elsif ($mevt =~ /reading/) {
+                  # Reading, Event abhängig von event-on-.*
+                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
+              } else {
+                  # Reading ohne Event
+                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
+              }
           }
       }
   
@@ -364,8 +376,17 @@ sub Log2Syslog_Read($) {
               $st = "parse error - see logfile";
           } else {
               $st = "active";
-              $pl = "$phost: $pl";
-              Log2Syslog_Trigger($hash,$ts,$pl);
+              if($mevt =~ /intern/) {
+                  # kein Reading, nur Event
+                  $pl = "$phost: $pl";
+                  Log2Syslog_Trigger($hash,$ts,$pl);
+              } elsif ($mevt =~ /reading/) {
+                  # Reading, Event abhängig von event-on-.*
+                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
+              } else {
+                  # Reading ohne Event
+                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
+              }
           }
       }  
   } else {
@@ -377,8 +398,17 @@ sub Log2Syslog_Read($) {
           $st = "parse error - see logfile";
       } else {
           $st = "active";
-          $pl = "$phost: $pl";
-          Log2Syslog_Trigger($hash,$ts,$pl);
+              if($mevt =~ /intern/) {
+                  # kein Reading, nur Event
+                  $pl = "$phost: $pl";
+                  Log2Syslog_Trigger($hash,$ts,$pl);
+              } elsif ($mevt =~ /reading/) {
+                  # Reading, Event abhängig von event-on-.*
+                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
+              } else {
+                  # Reading ohne Event
+                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
+              }
       }      
   
   }
@@ -744,7 +774,7 @@ sub Log2Syslog_Attr ($$$$) {
     # $name is device name
     # aName and aVal are Attribute name and value
 
-	if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/ && $aName =~ /parseProfile|parseFn|outputFields/) {
+	if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/ && $aName =~ /parseProfile|parseFn|outputFields|makeMsgEvent/) {
          return "\"$aName\" is only valid for model \"Collector\"";
 	}
     
@@ -821,6 +851,12 @@ sub Log2Syslog_Attr ($$$$) {
     if ($cmd eq "del" && $aName =~ /parseFn/ && AttrVal($name,"parseProfile","") eq "ParseFn" ) {
           return "You use a parse-function via attribute \"parseProfile\". Please change/delete attribute \"parseProfile\" first !";
     }
+    
+    if ($aName =~ /makeMsgEvent/) {
+        foreach my $reading (grep { /MSG_/ } keys %{$defs{$name}{READINGS}}) {
+            readingsDelete($defs{$name}, $reading);
+        }
+    }    
     
 return;
 }
@@ -1522,7 +1558,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     Je nach Verwendungszweck kann ein Syslog-Server (MODEL Collector) oder ein Syslog-Client (MODEL Sender) definiert 
     werden. <br>
-    Der Collector empfängt Meldungen im Syslog-Format anderer Geräte und generiert daraus Events zur Weiterverarbeitung in 
+    Der Collector empfängt Meldungen im Syslog-Format anderer Geräte und generiert daraus Events/Readings zur Weiterverarbeitung in 
     FHEM. Das Sender-Device leitet FHEM Systemlog Einträge und/oder Events an einen externen Syslog-Server weiter. <br>
   </ul>
     
@@ -1599,7 +1635,9 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     Parsingfunktion hinterlegt. <br>
     Die im Event verwendeten Felder und deren Reihenfolge können aus einem Wertevorrat mit dem 
     <a href="#Log2Syslogattr">Attribut</a> "outputFields" bestimmt werden. Je nach verwendeten Parsingprofil können alle oder
-    nur eine Untermenge der verfügbaren Felder verwendet werden. Näheres dazu in der Beschreibung des Attributes "parseProfile".
+    nur eine Untermenge der verfügbaren Felder verwendet werden. Näheres dazu in der Beschreibung des Attributes "parseProfile". <br>
+    <br>
+    Das Verhalten der Eventgenerierung kann mit dem <a href="#Log2Syslogattr">Attribut</a> "makeMsgEvent" angepasst werden. <br>
   </ul>
     
   <br>
@@ -1774,6 +1812,27 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <li><b>logFormat [ BSD | IETF ]</b><br>
         <br>
         Das Attribut ist nur für "Sender" verwendbar.  Es stellt das Protokollformat ein. (default: "IETF") <br>
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+    <li><b>makeMsgEvent [ intern | no | reading ]</b><br>
+        <br>
+        Das Attribut ist nur für "Collector" verwendbar.  Mit dem Attribut wird das Verhalten der Event- bzw.
+        Readinggenerierung festgelegt. 
+        <br><br>
+        
+        <ul>  
+        <table>  
+        <colgroup> <col width=10%> <col width=90%> </colgroup>
+	    <tr><td> <b>intern</b>   </td><td> es werden Events über die modulinterne Eventfunktion generiert </td></tr>
+        <tr><td> <b>no</b>       </td><td> es werden nur Readings der Form "MSG_&lt;Hostname&gt;" ohne Eventfunktion erstellt </td></tr>
+        <tr><td> <b>reading</b>  </td><td> es werden Readings der Form "MSG_&lt;Hostname&gt;" erstellt. Events werden in Abhängigkeit der "event-on-.*"-Attribute generiert </td></tr>
+        </table>
+        </ul> 
+        
     </li>
     </ul>
     <br>
