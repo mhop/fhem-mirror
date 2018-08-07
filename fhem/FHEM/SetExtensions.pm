@@ -115,7 +115,11 @@ SetExtensions($$@)
       my $hms_now  = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
       if($hms_now ge $hms_till) {
         Log3 $hash, 4,
-          "$cmd: won't switch as now ($hms_now) is later than $hms_till";
+          "$name $cmd: won't switch as now ($hms_now) is later than $hms_till";
+        return "";
+      }
+      if($hms_till ge "24") { # sunrise, #89985
+        Log3 $hash, 4, "$name $cmd: won't switch as $hms_till is tomorrow";
         return "";
       }
     }
