@@ -30,6 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 4.5.1      07.08.2018       BSD Regex changed, setpayload of BSD changed 
 # 4.5.0      06.08.2018       Regex capture groups used in parsePayload to set variables, parsing of BSD changed,
 #                             Attribute "makeMsgEvent" added
 # 4.4.0      04.08.2018       Attribute "outputFields" added
@@ -75,7 +76,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.5.0";
+my $Log2SyslogVn = "4.5.1";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -431,7 +432,7 @@ sub Log2Syslog_parsePayload($$) {
   my $severity     = "";
   my $facility     = "";  
   my @evf          = split(",",AttrVal($name, "outputFields", "FAC,SEV,ID,CONT"));   # auszugebene Felder im Event/Reading
-  my ($Mmm,$dd,$delimiter,$day,$ietf,$err,$pl);
+  my ($Mmm,$dd,$delimiter,$day,$ietf,$err,$pl,$tail);
   
   # Hash zur Umwandlung Felder in deren Variablen
   my ($prival,$ts,$host,$date,$time,$id,$pid,$mid,$sdfield,$cont);
@@ -468,28 +469,39 @@ sub Log2Syslog_parsePayload($$) {
       $ts = TimeNow();
       $pl = $data;
   
-  } elsif($pp eq "BSD") { 
+  } elsif ($pp eq "BSD") { 
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
-      # Beispiel data "<$prival>$month $day $time $myhost $id: : $otp"	  
-      $data =~ /^<(?<prival>\d{1,3})>(((((\s*(?<month>\w{3})\s*)?(?<day>\d{1,2})\s*)?(?<time>\d{2}:\d{2}:\d{2})\s*)?(?<host>\S+)\s*)?(?<id>[a-zA-Z_0-9.]*))?(?<delimiter>\W*)(?<cont>.*)$/;
+      # Beispiel data "<$prival>$month $day $time $myhost $id: : $otp"
+      $data =~ /^<(?<prival>\d{1,3})>(?<tail>.*)$/;
       $prival    = $+{prival};        # must
+      $tail      = $+{tail};        
+      $tail =~ /^((?<month>\w{3})\s+(?<day>\d{1,2})\s+(?<time>\d{2}:\d{2}:\d{2}))?\s+(?<tail>.*)$/;
       $Mmm       = $+{month};         # should
       $dd        = $+{day};           # should
       $time      = $+{time};          # should
-      $host      = $+{host};          # should 
-      $id        = $+{id};            # should
-      $delimiter = $+{delimiter};     # should
-      $cont      = $+{cont};          # should
-        
+      $tail      = $+{tail};  
+      if( $Mmm && $dd && $time ) {
+          my $month = $Log2Syslog_BSDMonth{$Mmm};
+          $day      = (length($dd) == 1)?("0".$dd):$dd;
+          $ts       = "$year-$month-$day $time";
+      }      
+      if($ts) {
+          # Annahme: wenn Timestamp gesetzt, wird der Rest der Message ebenfalls dem Standard entsprechen
+          $tail =~ /^(?<host>[^\s]*)?\s(?<tail>.*)$/;
+          $host = $+{host};          # should 
+          $tail = $+{tail};
+          $tail =~ /^(?<id>\w{1,32}\W:?)?(?<cont>.*)$/;      
+          $id   = $+{id};            # should
+          $cont = $+{cont};          # should
+      } else {
+          # andernfalls eher kein Standardaufbau
+          $cont = $tail;
+      }
+
       if(!$prival) {
           $err = 1;
           Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");  
       } else {
-          if( $Mmm && $dd && $time =~ /(d{2}:\d{2}:\d{2})/ ) {
-              my $month = $Log2Syslog_BSDMonth{$Mmm};
-              $day      = (length($dd) == 1)?("0".$dd):$dd;
-              $ts       = "$year-$month-$day $time";
-          }
           
           if(looks_like_number($prival)) {
               $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
@@ -501,7 +513,7 @@ sub Log2Syslog_parsePayload($$) {
               Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
           }
      
-          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, CONT: $cont");
+          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, MM: $Mmm, Day: $dd, TIME: $time, TS: $ts, HOST: $host, ID: $id, CONT: $cont");
           $host = "" if($host eq "-");
 		  $phost = $host?$host:$phost;
           
@@ -517,7 +529,7 @@ sub Log2Syslog_parsePayload($$) {
           }  	  
       }
       
-  } elsif($pp eq "IETF") {
+  } elsif ($pp eq "IETF") {
 	  # IETF Protokollformat https://tools.ietf.org/html/rfc5424 
       # Beispiel data "<$prival>1 $tim $host $id $pid $mid - : $otp";
       $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s(?<pid>\S*)\s(?<mid>\S*)\s(?<sdfield>\[.*\]|-)\s(?<cont>.*)$/;
@@ -1173,7 +1185,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
 	  $day   =~ s/0/ / if($day =~ m/^0.*$/);                # in Tagen < 10 muss 0 durch Space ersetzt werden
 	  $ident = substr($ident,0, $RFC3164len{TAG});          # Länge TAG Feld begrenzen
 	  no warnings 'uninitialized'; 
-      $data  = "<$prival>$month $day $time $myhost $ident: : $otp";
+      $data  = "<$prival>$month $day $time $myhost $ident :$otp";
 	  use warnings;
 	  $data = substr($data,0, ($RFC3164len{DL}-1));         # Länge Total begrenzen
   }
