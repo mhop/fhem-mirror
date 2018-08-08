@@ -38,8 +38,10 @@ CUL_TX_Define($$)
   my $dp = $modules{CUL_TX}{defptr};
   my $old = ($dp && $dp->{$a[2]} ? $dp->{$a[2]}{NAME} : "");
   my $op = ($hash->{OLDDEF} ? "modify":"define");
+  my $oc = ($hash->{OLDDEF} ? $hash->{CODE} : "");
   return "Cannot $op $hash->{NAME} as the code $a[2] is already used by $old"
-        if($old);
+        if($old && $oc ne $a[2]);
+  delete($modules{CUL_TX}{defptr}{$oc}) if($oc);
 
   $hash->{CODE} = $a[2];
   $hash->{corr} = ((int(@a) > 3) ? $a[3] : 0);
