@@ -56,7 +56,7 @@
 # 2.3.0      18.08.2017       new parameter "ident" in DEF, sub setidex, Log2Syslog_charfilter
 # 2.2.0      17.08.2017       set BSD data length, set only acceptable characters (USASCII) in payload
 #                             commandref revised
-# 2.1.0      17.08.2017       sub Log2Syslog_setsock created
+# 2.1.0      17.08.2017       sub Log2Syslog_opensock created
 # 2.0.0      16.08.2017       create syslog without SYS::SYSLOG
 # 1.1.1      13.08.2017       registrate Log2Syslog_fhemlog to %loginform in case of sending fhem-log
 #                             attribute timeout, commandref revised
@@ -802,7 +802,7 @@ sub Log2Syslog_Get($@) {
   my($sock,$cert,@certs);
   if ($opt =~ /certinfo/) {
       if(ReadingsVal($name,"SSL_Version","n.a.") ne "n.a.") {
-	      $sock = Log2Syslog_setsock($hash);
+	      $sock = Log2Syslog_opensock($hash);
 		  if(defined($sock)) {
 		      $cert = $sock->dump_peer_certificate();
 		      Log2Syslog_closesock($hash,$sock);
@@ -939,7 +939,7 @@ sub Log2Syslog_eventlog($$) {
   my $tn  = $dev->{NTFY_TRIGGERTIME};
   my $ct  = $dev->{CHANGETIME};
   
-  $sock = Log2Syslog_setsock($hash);
+  $sock = Log2Syslog_opensock($hash);
   
   if(defined($sock)) { 
       for (my $i = 0; $i < $max; $i++) {
@@ -1014,7 +1014,7 @@ sub Log2Syslog_fhemlog($$) {
       ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"fhem");	
 	  return if(!$data);
 	  
-      $sock = Log2Syslog_setsock($hash);
+      $sock = Log2Syslog_opensock($hash);
 	  
       if (defined($sock)) {
 	      $ret = syswrite $sock, $data."\n" if($data);
@@ -1063,7 +1063,7 @@ sub Log2Syslog_sendTestMsg($$) {
 	  return if(!$data);
   }  
       
-  $sock = Log2Syslog_setsock($hash);
+  $sock = Log2Syslog_opensock($hash);
 	  
   if (defined($sock)) {
 	  $ret = syswrite $sock, $data."\n" if($data);
@@ -1121,7 +1121,7 @@ return($txt);
 ###############################################################################
 #                        erstelle Socket 
 ###############################################################################
-sub Log2Syslog_setsock ($) { 
+sub Log2Syslog_opensock ($) { 
   my ($hash)   = @_;
   my $name     = $hash->{NAME};
   my $host     = $hash->{PEERHOST};
