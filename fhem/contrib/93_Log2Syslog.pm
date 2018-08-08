@@ -30,6 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 4.6.0      08.08.2018       set sendTestMessage added
 # 4.5.1      07.08.2018       BSD Regex changed, setpayload of BSD changed 
 # 4.5.0      06.08.2018       Regex capture groups used in parsePayload to set variables, parsing of BSD changed,
 #                             Attribute "makeMsgEvent" added
@@ -76,7 +77,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.5.1";
+my $Log2SyslogVn = "4.6.0";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -174,13 +175,14 @@ sub Log2Syslog_Initialize($) {
   $hash->{DefFn}    = "Log2Syslog_Define";
   $hash->{UndefFn}  = "Log2Syslog_Undef";
   $hash->{DeleteFn} = "Log2Syslog_Delete";
+  $hash->{SetFn}    = "Log2Syslog_Set";
   $hash->{GetFn}    = "Log2Syslog_Get";
   $hash->{AttrFn}   = "Log2Syslog_Attr";
   $hash->{NotifyFn} = "Log2Syslog_eventlog";
   $hash->{ReadFn}   = "Log2Syslog_Read";
 
   $hash->{AttrList} = "addStateEvent:1,0 ".
-                      "disable:1,0 ".
+                      "disable:1,0,maintenance ".
                       "addTimestamp:0,1 ".
                       "outputFields:sortable,PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT ".
 					  "logFormat:BSD,IETF ".
@@ -432,7 +434,7 @@ sub Log2Syslog_parsePayload($$) {
   my $severity     = "";
   my $facility     = "";  
   my @evf          = split(",",AttrVal($name, "outputFields", "FAC,SEV,ID,CONT"));   # auszugebene Felder im Event/Reading
-  my ($Mmm,$dd,$delimiter,$day,$ietf,$err,$pl,$tail);
+  my ($Mmm,$dd,$delimiter,$day,$ietf,$err,$pl,$tail,$tail2);
   
   # Hash zur Umwandlung Felder in deren Variablen
   my ($prival,$ts,$host,$date,$time,$id,$pid,$mid,$sdfield,$cont);
@@ -473,8 +475,8 @@ sub Log2Syslog_parsePayload($$) {
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
       # Beispiel data "<$prival>$month $day $time $myhost $id: : $otp"
       $data =~ /^<(?<prival>\d{1,3})>(?<tail>.*)$/;
-      $prival    = $+{prival};        # must
-      $tail      = $+{tail};        
+      $prival = $+{prival};        # must
+      $tail   = $+{tail}; 
       $tail =~ /^((?<month>\w{3})\s+(?<day>\d{1,2})\s+(?<time>\d{2}:\d{2}:\d{2}))?\s+(?<tail>.*)$/;
       $Mmm       = $+{month};         # should
       $dd        = $+{day};           # should
@@ -490,7 +492,7 @@ sub Log2Syslog_parsePayload($$) {
           $tail =~ /^(?<host>[^\s]*)?\s(?<tail>.*)$/;
           $host = $+{host};          # should 
           $tail = $+{tail};
-          $tail =~ /^(?<id>\w{1,32}\W:?)?(?<cont>.*)$/;      
+          $tail =~ /^(?<id>\w{1,32}\W?)?:?(?<cont>.*)$/;      
           $id   = $+{id};            # should
           $cont = $+{cont};          # should
       } else {
@@ -742,6 +744,38 @@ return undef;
 }
 
 ###############################################################################
+#              Set
+###############################################################################
+sub Log2Syslog_Set($@) {
+  my ($hash, @a) = @_;
+  return "\"set X\" needs at least an argument" if ( @a < 2 );
+  my $name    = $a[0];
+  my $opt     = $a[1];
+  my $prop    = $a[2];
+  
+  my $setlist = "Unknown argument $opt, choose one of ".
+                "sendTestMessage " 
+                ;
+  
+  return if(AttrVal($name, "disable", "") eq "1" || $hash->{MODEL} !~ /Sender/);
+  
+  if($opt =~ /sendTestMessage/) {
+      my $own;
+      if ($prop) {
+          shift @a;
+          shift @a;
+          $own = join(" ",@a);     
+      }
+	  Log2Syslog_sendTestMsg($hash,$own);
+  
+  } else {
+      return "$setlist";
+  }  
+  
+return undef;
+}
+
+###############################################################################
 #              Get
 ###############################################################################
 sub Log2Syslog_Get($@) {
@@ -796,10 +830,11 @@ sub Log2Syslog_Attr ($$$$) {
     
     if ($aName eq "disable") {
         if($cmd eq "set") {
+            return "Mode \"$aVal\" is only valid for model \"Sender\"" if($aVal eq "maintenance" && $hash->{MODEL} !~ /Sender/);
             $do = $aVal?1:0;
         }
         $do = 0 if($cmd eq "del");
-        my $val = $do?"disabled":"active";
+        my $val = ($do&&$aVal==2)?"maintenance":($do&&$aVal==1)?"disabled":"active";
 		
         readingsSingleUpdate($hash, "state", $val, 1);
     }
@@ -972,6 +1007,53 @@ sub Log2Syslog_fhemlog($$) {
 	      }  
           Log2Syslog_closesock($hash,$sock);
 	  }
+  }
+
+return;
+}
+
+#################################################################################
+#                               Test Message senden
+#################################################################################
+sub Log2Syslog_sendTestMsg($$) {
+  my ($hash,$own) = @_;                              
+  my $name        = $hash->{NAME};
+  my ($prival,$ts,$tim,$date,$time,$sock,$err,$ret,$data,$pid,$otp);
+  
+  if($own) {
+      # eigene Testmessage ohne Formatanpassung raw senden
+      $data = $own;
+  
+  } else {   
+      $ts = TimeNow();
+      ($date,$time) = split(" ",$ts);
+      $date =~ s/\./-/g;
+      $tim = $date." ".$time;
+   	
+      $otp    = "Test message from FHEM Syslog Client from ($hash->{MYHOST})";
+      $otp    = "$tim $otp" if AttrVal($name,'addTimestamp',0);
+	  $prival = "14";
+	  
+      ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"fhem");	
+	  return if(!$data);
+  }  
+      
+  $sock = Log2Syslog_setsock($hash);
+	  
+  if (defined($sock)) {
+	  $ret = syswrite $sock, $data."\n" if($data);
+	  if($ret && $ret > 0) {  
+	      Log2Syslog_Log3slog($name, 4, "$name - Payload sequence $pid sent\n");	
+      } else {
+          my $err = $!;
+	      Log2Syslog_Log3slog($name, 4, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
+
+          my $st = "write error: $err";
+          my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+          readingsSingleUpdate($hash, "state", $st, $evt);
+          $hash->{HELPER}{OLDSTATE} = $st;              
+	  }  
+      Log2Syslog_closesock($hash,$sock);
   }
 
 return;
@@ -1759,6 +1841,25 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
   </ul>
   <br><br>
   
+  <a name="Log2SyslogSet"></a>
+  <b>Set</b>
+  <ul>
+    <br> 
+    
+    <ul>
+    <li><b>sendTestMessage [&lt;Message&gt;] </b><br>
+        <br>
+        Mit einem Devicetyp "Sender" kann abhängig vom Attribut "logFormat" eine Testnachricht im BSD- bzw. IETF-Format 
+        gesendet werden. Wird eine optionale eigene &lt;Message&gt; angegeben, wird diese Nachricht im raw-Format ohne 
+        Formatanpassung (BSD/IETF) gesendet. Das Attribut "disable = maintenance" legt fest, dass keine Daten ausser eine 
+        Testnachricht an den Empfänger gesendet wird.
+    </li>
+    </ul>
+    <br>
+
+  </ul>
+  <br>
+  
   <a name="Log2SyslogGet"></a>
   <b>Get</b>
   <ul>
@@ -1774,7 +1875,7 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
 
   </ul>
   <br>
-  
+
   
   <a name="Log2Syslogattr"></a>
   <b>Attribute</b>
@@ -1812,9 +1913,10 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
 	
     <ul>
-    <li><b>disable </b><br>
+    <li><b>disable [1 | 0 | maintenance] </b><br>
         <br>
-        Das Device wird aktiviert | aktiviert.
+        Das Device wird aktiviert, deaktiviert bzw. in den Maintenance-Mode geschaltet. Im Maintenance-Mode kann mit dem "Sender" 
+        eine Testnachricht gesendet werden (siehe "set &lt;name&gt; sendTestMessage").
     </li>
     </ul>
     <br>
