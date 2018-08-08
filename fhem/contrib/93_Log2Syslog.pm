@@ -30,7 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
-# 4.6.0      08.08.2018       set sendTestMessage added
+# 4.6.0      08.08.2018       set sendTestMessage added, Attribute "contDelimiter", "sendSeverity"
 # 4.5.1      07.08.2018       BSD Regex changed, setpayload of BSD changed 
 # 4.5.0      06.08.2018       Regex capture groups used in parsePayload to set variables, parsing of BSD changed,
 #                             Attribute "makeMsgEvent" added
@@ -184,11 +184,13 @@ sub Log2Syslog_Initialize($) {
   $hash->{AttrList} = "addStateEvent:1,0 ".
                       "disable:1,0,maintenance ".
                       "addTimestamp:0,1 ".
-                      "outputFields:sortable,PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT ".
+                      "contDelimiter ".
 					  "logFormat:BSD,IETF ".
                       "makeMsgEvent:no,intern,reading ".
+                      "outputFields:sortable-strict,PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT ".
                       "parseProfile:BSD,IETF,raw,ParseFn ".
                       "parseFn:textField-long ".
+                      "sendSeverity:multiple-strict,Emergency,Alert,Critical,Error,Warning,Notice,Informational,Debug ".
                       "ssldebug:0,1,2,3 ".
 					  "TLS:1,0 ".
 					  "timeout ".
@@ -434,12 +436,18 @@ sub Log2Syslog_parsePayload($$) {
   my $severity     = "";
   my $facility     = "";  
   my @evf          = split(",",AttrVal($name, "outputFields", "FAC,SEV,ID,CONT"));   # auszugebene Felder im Event/Reading
-  my ($Mmm,$dd,$delimiter,$day,$ietf,$err,$pl,$tail,$tail2);
+  my ($delimiter,$day,$ietf,$err,$pl,$tail,$tail2);
+  my $Mmm = "";
+  my $dd  = "";
   
   # Hash zur Umwandlung Felder in deren Variablen
-  my ($prival,$ts,$host,$date,$time,$id,$pid,$mid,$sdfield,$cont);
-  my $fac = "";
-  my $sev = "";
+  my ($prival,$date,$pid,$mid,$sdfield,$cont);
+  my $fac  = "";
+  my $sev  = "";
+  my $host = "";
+  my $ts   = "";
+  my $id   = "";
+  my $time = "";
   my %fh = (PRIVAL  => \$prival,
             FAC     => \$fac,
             SEV     => \$sev,
@@ -515,7 +523,7 @@ sub Log2Syslog_parsePayload($$) {
               Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
           }
      
-          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, MM: $Mmm, Day: $dd, TIME: $time, TS: $ts, HOST: $host, ID: $id, CONT: $cont");
+          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, MM: ".$Mmm?$Mmm:"".", Day: ".$dd?$dd:"".", TIME: ".$time?$time:"".", TS: $ts, HOST: $host, ID: $id, CONT: $cont");
           $host = "" if($host eq "-");
 		  $phost = $host?$host:$phost;
           
@@ -551,7 +559,7 @@ sub Log2Syslog_parsePayload($$) {
           Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");           
       } else {
           $ts      = "$date $time";
-          $cont =~ s/^:?(.*)$/$1/ if(lc($mid) eq "fhem");      # Modul Sender setzt vor $cont ein ":" (wegen Synology Compatibilität)
+          # $cont =~ s/^:?(.*)$/$1/ if(lc($mid) eq "fhem");      # Modul Sender setzt vor $cont ein ":" (wegen Synology Compatibilität)
       
           if(looks_like_number($prival)) {
               $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
@@ -789,7 +797,7 @@ sub Log2Syslog_Get($@) {
                 "certinfo:noArg " 
                 ;
   
-  return if(IsDisabled($name));
+  return if(AttrVal($name, "disable", "") eq "1");
   
   my($sock,$cert,@certs);
   if ($opt =~ /certinfo/) {
@@ -824,7 +832,7 @@ sub Log2Syslog_Attr ($$$$) {
          return "\"$aName\" is only valid for model \"Collector\"";
 	}
     
-	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|addStateEvent|protocol|logFormat|timeout|TLS/) {
+	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|contDelimiter|addStateEvent|protocol|logFormat|sendSeverity|timeout|TLS/) {
         return "\"$aName\" is only valid for model \"Sender\"";
 	}
     
@@ -834,7 +842,7 @@ sub Log2Syslog_Attr ($$$$) {
             $do = $aVal?1:0;
         }
         $do = 0 if($cmd eq "del");
-        my $val = ($do&&$aVal==2)?"maintenance":($do&&$aVal==1)?"disabled":"active";
+        my $val = ($do&&$aVal=~/maintenance/)?"maintenance":($do&&$aVal==1)?"disabled":"active";
 		
         readingsSingleUpdate($hash, "state", $val, 1);
     }
@@ -900,8 +908,10 @@ sub Log2Syslog_Attr ($$$$) {
     }
     
     if ($aName =~ /makeMsgEvent/) {
-        foreach my $reading (grep { /MSG_/ } keys %{$defs{$name}{READINGS}}) {
-            readingsDelete($defs{$name}, $reading);
+        if($aVal =~ /intern/ || $cmd eq "del") {
+            foreach my $reading (grep { /MSG_/ } keys %{$defs{$name}{READINGS}}) {
+                readingsDelete($defs{$name}, $reading);
+            }
         }
     }    
     
@@ -914,9 +924,11 @@ return;
 sub Log2Syslog_eventlog($$) {
   # $hash is my entry, $dev is the entry of the changed device
   my ($hash,$dev) = @_;
-  my $name = $hash->{NAME};
-  my $rex  = $hash->{HELPER}{EVNTLOG};
-  my ($prival,$sock,$data,$pid);
+  my $name    = $hash->{NAME};
+  my $rex     = $hash->{HELPER}{EVNTLOG};
+  my $st      = ReadingsVal($name,"state","active");
+  my $sendsev = AttrVal($name, "sendSeverity", "");              # Nachrichten welcher Schweregrade sollen gesendet werden
+  my ($prival,$sock,$data,$pid,$sevAstxt);
   
   return if(IsDisabled($name) || !$rex || $hash->{MODEL} !~ /Sender/);
   my $events = deviceEvents($dev, AttrVal($name, "addStateEvent", 0));
@@ -939,9 +951,14 @@ sub Log2Syslog_eventlog($$) {
           my ($date,$time) = split(" ",$tim);
 	  
 	      if($n =~ m/^$rex$/ || "$n:$txt" =~ m/^$rex$/ || "$tim:$n:$txt" =~ m/^$rex$/) {				  
-              my $otp  = "$n $txt";
-              $otp     = "$tim $otp" if AttrVal($name,'addTimestamp',0);
-	          $prival  = Log2Syslog_setprival($txt);
+              my $otp             = "$n $txt";
+              $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
+	          ($prival,$sevAstxt) = Log2Syslog_setprival($txt);
+              if($sendsev && $sendsev !~ m/$sevAstxt/) {
+                  # nicht senden wenn Severity nicht in "sendSeverity" enthalten
+                  Log2Syslog_Log3slog($name, 5, "$name - Warning - Payload NOT sent due to Message Severity not in attribute \"sendSeverity\"\n");
+                  next;        
+              }
 
 	          ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"event");	
               next if(!$data);			  
@@ -952,17 +969,17 @@ sub Log2Syslog_eventlog($$) {
               } else {
                   my $err = $!;
 				  Log2Syslog_Log3slog($name, 4, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
-
-                  my $st = "write error: $err";
-                  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
-                  readingsSingleUpdate($hash, "state", $st, $evt);
-                  $hash->{HELPER}{OLDSTATE} = $st;                  
+                  $st = "write error: $err";                 
 			  }
           }
       } 
       Log2Syslog_closesock($hash,$sock);
   }
-  
+
+  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+  readingsSingleUpdate($hash, "state", $st, $evt);
+  $hash->{HELPER}{OLDSTATE} = $st; 
+                  
 return "";
 }
 
@@ -971,9 +988,11 @@ return "";
 #################################################################################
 sub Log2Syslog_fhemlog($$) {
   my ($name,$raw) = @_;                              
-  my $hash = $defs{$name};
-  my $rex  = $hash->{HELPER}{FHEMLOG};
-  my ($prival,$sock,$err,$ret,$data,$pid);
+  my $hash    = $defs{$name};
+  my $rex     = $hash->{HELPER}{FHEMLOG};
+  my $st      = ReadingsVal($name,"state","active");
+  my $sendsev = AttrVal($name, "sendSeverity", "");              # Nachrichten welcher Schweregrade sollen gesendet werden
+  my ($prival,$sock,$err,$ret,$data,$pid,$sevAstxt);
   
   return if(IsDisabled($name) || !$rex || $hash->{MODEL} !~ /Sender/);
 	
@@ -983,9 +1002,14 @@ sub Log2Syslog_fhemlog($$) {
   my $tim = $date." ".$time;
   
   if($txt =~ m/^$rex$/ || "$vbose: $txt" =~ m/^$rex$/) {  	
-      my $otp  = "$vbose: $txt";
-      $otp     = "$tim $otp" if AttrVal($name,'addTimestamp',0);
-	  $prival  = Log2Syslog_setprival($txt,$vbose);
+      my $otp             = "$vbose: $txt";
+      $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
+	  ($prival,$sevAstxt) = Log2Syslog_setprival($txt,$vbose);
+      if($sendsev && $sendsev !~ m/$sevAstxt/) {
+          # nicht senden wenn Severity nicht in "sendSeverity" enthalten
+          Log2Syslog_Log3slog($name, 5, "$name - Warning - Payload NOT sent due to Message Severity not in attribute \"sendSeverity\"\n");
+          return;        
+      }
 	  
       ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"fhem");	
 	  return if(!$data);
@@ -999,15 +1023,15 @@ sub Log2Syslog_fhemlog($$) {
           } else {
               my $err = $!;
 			  Log2Syslog_Log3slog($name, 4, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
-
-              my $st = "write error: $err";
-              my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
-              readingsSingleUpdate($hash, "state", $st, $evt);
-              $hash->{HELPER}{OLDSTATE} = $st;              
+              $st = "write error: $err";             
 	      }  
           Log2Syslog_closesock($hash,$sock);
 	  }
   }
+  
+  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+  readingsSingleUpdate($hash, "state", $st, $evt);
+  $hash->{HELPER}{OLDSTATE} = $st; 
 
 return;
 }
@@ -1018,6 +1042,7 @@ return;
 sub Log2Syslog_sendTestMsg($$) {
   my ($hash,$own) = @_;                              
   my $name        = $hash->{NAME};
+  my $st          = ReadingsVal($name,"state","active");
   my ($prival,$ts,$tim,$date,$time,$sock,$err,$ret,$data,$pid,$otp);
   
   if($own) {
@@ -1047,14 +1072,14 @@ sub Log2Syslog_sendTestMsg($$) {
       } else {
           my $err = $!;
 	      Log2Syslog_Log3slog($name, 4, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
-
-          my $st = "write error: $err";
-          my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
-          readingsSingleUpdate($hash, "state", $st, $evt);
-          $hash->{HELPER}{OLDSTATE} = $st;              
+          $st = "write error: $err";              
 	  }  
       Log2Syslog_closesock($hash,$sock);
   }
+  
+  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
+  readingsSingleUpdate($hash, "state", $st, $evt);
+  $hash->{HELPER}{OLDSTATE} = $st; 
 
 return;
 }
@@ -1206,7 +1231,7 @@ return;
 ###############################################################################
 sub Log2Syslog_setprival ($;$$) { 
   my ($txt,$vbose) = @_;
-  my $prival;
+  my ($prival,$sevAstxt);
   
   # Priority = (facility * 8) + severity 
   # https://tools.ietf.org/pdf/rfc5424.pdf
@@ -1238,9 +1263,10 @@ sub Log2Syslog_setprival ($;$$) {
   $sv = 3 if (lc($txt) =~ m/error/);              # error condition
   $sv = 4 if (lc($txt) =~ m/warning/);            # warning conditions
   
-  $prival = ($fac*8)+$sv;
+  $prival   = ($fac*8)+$sv;
+  $sevAstxt = $Log2Syslog_Severity{$sv};
    
-return($prival);
+return($prival,$sevAstxt);
 }
 
 ###############################################################################
@@ -1252,6 +1278,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
   my $ident  = ($hash->{HELPER}{IDENT}?$hash->{HELPER}{IDENT}:$name)."_".$lt;
   my $myhost = $hash->{MYHOST}?$hash->{MYHOST}:"0.0.0.0";
   my $lf     = AttrVal($name, "logFormat", "IETF");
+  my $tag    = AttrVal($name, "contDelimiter", "");         # Trennzeichen vor Content (z.B. für Synology nötig)
   my $data;
   
   return undef,undef if(!$otp);
@@ -1267,7 +1294,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
 	  $day   =~ s/0/ / if($day =~ m/^0.*$/);                # in Tagen < 10 muss 0 durch Space ersetzt werden
 	  $ident = substr($ident,0, $RFC3164len{TAG});          # Länge TAG Feld begrenzen
 	  no warnings 'uninitialized'; 
-      $data  = "<$prival>$month $day $time $myhost $ident :$otp";
+      $data  = "<$prival>$month $day $time $myhost $ident $tag$otp";
 	  use warnings;
 	  $data = substr($data,0, ($RFC3164len{DL}-1));         # Länge Total begrenzen
   }
@@ -1289,7 +1316,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
       
       no warnings 'uninitialized';
       if ($IETFver == 1) {
-          $data = "<$prival>$IETFver $tim $myhost $ident $pid $mid $sdfield :$otp";
+          $data = "<$prival>$IETFver $tim $myhost $ident $pid $mid $sdfield $tag$otp";
       }
 	  use warnings;
   }
@@ -1384,11 +1411,13 @@ sub Log2Syslog_evalPeer($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   my $socket = $hash->{SERVERSOCKET};
+  my $phost  = "";
+  my $paddr  = "";
   
   my($pport, $pipaddr) = sockaddr_in($socket->peername);
-  my $phost = gethostbyaddr($pipaddr, AF_INET);
-  my $paddr = inet_ntoa($pipaddr);
-  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - message peerhost: $phost, $paddr");
+  $phost = gethostbyaddr($pipaddr, AF_INET);
+  $paddr = inet_ntoa($pipaddr);
+  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - message peerhost: ".$phost?$phost:"".", ".$paddr);
 
 return ($phost,$paddr); 
 }
@@ -1911,12 +1940,24 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     </ul>
     <br>
     <br>
+    
+    <ul>
+    <li><b>contDelimiter </b><br>
+        <br>
+        Das Attribut ist nur für "Sender" verwendbar. Es enthält ein zusätzliches Zeichen welches unmittelber vor das 
+        Content-Feld eingefügt wird. <br>
+        Diese Möglichkeit ist in manchen speziellen Fällen hilfreich (z.B. kann das Zeichen ':' eingefügt werden um eine 
+        ordnungsgemäße Anzeige im Synology-Protokollcenter zu erhalten).
+    </li>
+    </ul>
+    <br>
+    <br>
 	
     <ul>
     <li><b>disable [1 | 0 | maintenance] </b><br>
         <br>
-        Das Device wird aktiviert, deaktiviert bzw. in den Maintenance-Mode geschaltet. Im Maintenance-Mode kann mit dem "Sender" 
-        eine Testnachricht gesendet werden (siehe "set &lt;name&gt; sendTestMessage").
+        Das Device wird aktiviert, deaktiviert bzw. in den Maintenance-Mode geschaltet. Im Maintenance-Mode kann mit dem 
+        "Sender"-Device eine Testnachricht gesendet werden (siehe "set &lt;name&gt; sendTestMessage").
     </li>
     </ul>
     <br>
@@ -1955,7 +1996,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <ul>
     <li><b>outputFields </b><br>
         <br>
-        Über eine sortierbare Liste können die gewünschten Felder zur Eventgenerierung ausgewählt werden.
+        Über eine sortierbare Liste können die gewünschten Felder des generierten Events ausgewählt werden.
         Die abhängig vom Attribut <b>"parseProfil"</b> sinnvoll verwendbaren Felder und deren Bedeutung ist der Beschreibung 
         des Attributs "parseProfil" zu entnehmen.
         Ist "outputFields" nicht gesetzt, wird ein vordefinierter Satz Felder zur Eventgenerierung verwendet.
@@ -1995,7 +2036,19 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
 	    <br>  
 
         Die Variablennamen korrespondieren mit den Feldnamen und deren ursprünglicher Bedeutung angegeben im Attribut 
-        <b>"parseProfile" (Erläuterung der Felddaten)</b>.       
+        <b>"parseProfile"</b> (Erläuterung der Felddaten). <br><br>
+
+        <ul>
+        <b>Beispiel: </b> <br>
+        # Quelltext: '<4> <;4>LAN IP and mask changed to 192.168.2.3 255.255.255.0' <br>
+        # Die Zeichen '<;4>' sollen aus dem CONT-Feld entfernt werden
+<pre>
+{
+($PRIVAL,$CONT) = ($DATA =~ /^<(\d{1,3})>\s(.*)$/);
+$CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
+} 
+</pre>        
+        </ul>         
               
     </li>
     </ul>
@@ -2031,11 +2084,11 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
         <br>
         <ul>  
         <table>  
-        <colgroup> <col width=20%> <col width=80%> </colgroup>
-	    <tr><td> BSD     </td><td> PRIVAL,FAC,SEV,TS,HOST,ID,CONT  </td></tr>
-        <tr><td> IETF    </td><td> PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT  </td></tr>
-        <tr><td> ParseFn </td><td> PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT </td></tr>
-        <tr><td> raw     </td><td> keine Auswahl sinnvoll, es wird immer die Originalmeldung in einen Event umgesetzt </td></tr>
+        <colgroup> <col width=10%> <col width=90%> </colgroup>
+	    <tr><td> BSD     </td><td>-> PRIVAL,FAC,SEV,TS,HOST,ID,CONT  </td></tr>
+        <tr><td> IETF    </td><td>-> PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT  </td></tr>
+        <tr><td> ParseFn </td><td>-> PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT </td></tr>
+        <tr><td> raw     </td><td>-> keine Auswahl sinnvoll, es wird immer die Originalmeldung in einen Event umgesetzt </td></tr>
         </table>
         </ul>
 	    <br>   
@@ -2092,6 +2145,16 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
         Wiederholungszyklus für die Bestimmung der Log-Transferrate (Reading "Transfered_logs_per_minute") in Sekunden (>=60).
         Eingegebene Werte <60 Sekunden werden automatisch auf 60 Sekunden korrigiert.        
 		Default sind 60 Sekunden.
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+    <li><b>sendSeverity </b><br>
+        <br>
+        Es werden nur Nachrichten übermittelt, deren Schweregrad im Attribut enthalten ist.
+        Ist "sendSeverity" nicht gesetzt, werden Nachrichten aller Schwierigkeitsgrade gesendet.
     </li>
     </ul>
     <br>
