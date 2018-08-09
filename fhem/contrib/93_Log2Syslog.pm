@@ -536,7 +536,7 @@ sub Log2Syslog_parsePayload($$) {
   } elsif ($pp eq "IETF") {
 	  # IETF Protokollformat https://tools.ietf.org/html/rfc5424 
       # Beispiel data "<$prival>1 $tim $host $id $pid $mid - : $otp";
-      $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s(?<pid>\S*)\s(?<mid>\S*)\s(?<sdfield>\[.*\]|-)\s(?<cont>.*)$/;
+      $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s(?<pid>\S*)\s(?<mid>\S*)\s(?<sdfield>(\[.*?\]|-))\s(?<cont>.*)$/;
       $prival  = $+{prival};      # must
       $ietf    = $+{ietf};        # must 
       $date    = $+{date};        # must
