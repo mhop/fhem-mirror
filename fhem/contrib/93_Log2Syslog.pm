@@ -436,18 +436,12 @@ sub Log2Syslog_parsePayload($$) {
   my $severity     = "";
   my $facility     = "";  
   my @evf          = split(",",AttrVal($name, "outputFields", "FAC,SEV,ID,CONT"));   # auszugebene Felder im Event/Reading
-  my ($delimiter,$day,$ietf,$err,$pl,$tail,$tail2);
-  my $Mmm = "";
-  my $dd  = "";
+  my ($Mmm,$dd,$delimiter,$day,$ietf,$err,$pl,$tail);
   
   # Hash zur Umwandlung Felder in deren Variablen
-  my ($prival,$date,$pid,$mid,$sdfield,$cont);
-  my $fac  = "";
-  my $sev  = "";
-  my $host = "";
-  my $ts   = "";
-  my $id   = "";
-  my $time = "";
+  my ($prival,$ts,$host,$date,$time,$id,$pid,$mid,$sdfield,$cont);
+  my $fac = "";
+  my $sev = "";
   my %fh = (PRIVAL  => \$prival,
             FAC     => \$fac,
             SEV     => \$sev,
@@ -523,7 +517,7 @@ sub Log2Syslog_parsePayload($$) {
               Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
           }
      
-          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, MM: ".$Mmm?$Mmm:"".", Day: ".$dd?$dd:"".", TIME: ".$time?$time:"".", TS: $ts, HOST: $host, ID: $id, CONT: $cont");
+          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, MM: $Mmm, Day: $dd, TIME: $time, TS: $ts, HOST: $host, ID: $id, CONT: $cont");
           $host = "" if($host eq "-");
 		  $phost = $host?$host:$phost;
           
@@ -1411,13 +1405,12 @@ sub Log2Syslog_evalPeer($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   my $socket = $hash->{SERVERSOCKET};
-  my $phost  = "";
-  my $paddr  = "";
+  my ($phost,$paddr);
   
   my($pport, $pipaddr) = sockaddr_in($socket->peername);
   $phost = gethostbyaddr($pipaddr, AF_INET);
   $paddr = inet_ntoa($pipaddr);
-  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - message peerhost: ".$phost?$phost:"".", ".$paddr);
+  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - message peerhost: $phost,$paddr");
 
 return ($phost,$paddr); 
 }
