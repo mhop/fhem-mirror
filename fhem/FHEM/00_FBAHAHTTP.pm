@@ -39,13 +39,14 @@ FBAHAHTTP_Define($$)
   my %matchList = ( "1:FBDECT" => ".*" );
   $hash->{MatchList} = \%matchList;
 
+  # Moving definition from FBAHA to FBAHAHTTP
   for my $d (devspec2array("TYPE=FBDECT")) {
     if($defs{$d}{IODev} && $defs{$d}{IODev}{TYPE} eq "FBAHA") {
       my $n = $defs{$d}{IODev}{NAME};
       CommandAttr(undef, "$d IODev $hash->{NAME}");
       CommandDelete(undef, $n) if($defs{$n});
+      $defs{$d}{IODev} = $hash;
     }
-    $defs{$d}{IODev} = $hash
   }
   $hash->{CmdStack} = ();
 
