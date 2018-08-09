@@ -54,6 +54,7 @@ sub MQTT_Initialize($) {
   $hash->{DefFn}      = "MQTT::Define";
   $hash->{UndefFn}    = "MQTT::Undef";
   $hash->{DeleteFn}   = "MQTT::Delete";
+  $hash->{RenameFn}   = "MQTT::Rename";
   $hash->{ShutdownFn} = "MQTT::Shutdown";
   $hash->{SetFn}      = "MQTT::Set";
   $hash->{NotifyFn}   = "MQTT::Notify";
