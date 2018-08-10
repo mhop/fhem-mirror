@@ -24,6 +24,7 @@ telnet_Initialize($)
                         "allowfrom SSL connectTimeout connectInterval ".
                         "encoding:utf8,latin1 sslVersion";
   $hash->{ActivateInformFn} = "telnet_ActivateInform";
+  $hash->{CanAuthenticate} = 2;
 
   $cmds{encoding} = { Fn=>"CommandTelnetEncoding",
             ClientFilter => "telnet",

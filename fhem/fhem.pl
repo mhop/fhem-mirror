@@ -56,7 +56,7 @@ sub CallInstanceFn(@);
 sub CheckDuplicate($$@);
 sub Debug($);
 sub DoSet(@);
-sub Dispatch($$$);
+sub Dispatch($$;$$);
 sub DoTrigger($$@);
 sub EvalSpecials($%);
 sub Each($$;$);
@@ -2078,6 +2078,7 @@ AssignIoPort($;$)
   for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
 
     next if(IsDisabled($p) == 1);
+    next if($defs{$p}{TEMPORARY}); # e.g. server clients
     my $cl = $defs{$p}{Clients};
     $cl = $modules{$defs{$p}{TYPE}}{Clients} if(!$cl);
 
@@ -3751,9 +3752,9 @@ HandleArchiving($;$)
 # Call a logical device (FS20) ParseMessage with data from a physical device
 # (FHZ). Note: $hash may be dummy, used by FHEM2FHEM
 sub
-Dispatch($$$)
+Dispatch($$;$$)
 {
-  my ($hash, $dmsg, $addvals) = @_;
+  my ($hash, $dmsg, $addvals, $nounknown) = @_;
   my $module = $modules{$hash->{TYPE}};
   my $name = $hash->{NAME};
 
@@ -3785,7 +3786,7 @@ Dispatch($$$)
     last if(int(@found));
   }
 
-  if(!int(@found) || !defined($found[0])) {
+  if((!int(@found) || !defined($found[0])) && !$nounknown) {
     my $h = $hash->{MatchList};
     $h = $module->{MatchList} if(!$h);
     if(defined($h)) {
@@ -3815,7 +3816,7 @@ Dispatch($$$)
         }
       }
     }
-    if(!int(@found) || !defined($found[0])) {
+    if((!int(@found) || !defined($found[0])) && !$nounknown) {
       DoTrigger($name, "UNKNOWNCODE $dmsg");
       Log3 $name, 3, "$name: Unknown code $dmsg, help me!";
       return undef;
@@ -5519,9 +5520,11 @@ SecurityCheck()
 {
   return if(AttrVal("global", "motd", "") eq "none");
   my @fnd;
-  foreach my $sdev (devspec2array("TYPE=(telnet|FHEMWEB)")) {
-    next if(!$defs{$sdev} || $defs{$sdev}{TEMPORARY});
-    my $hash = { SNAME=>$sdev, TYPE=>$defs{$sdev}{TYPE}, NAME=>"SecurityCheck"};
+  foreach my $sdev (keys %defs) {
+    next if($defs{$sdev}{TEMPORARY});
+    my $type = $defs{$sdev}{TYPE};
+    next if(!$modules{$type}{CanAuthenticate});
+    my $hash = { SNAME=>$sdev, TYPE=>$type, NAME=>"SecurityCheck"};
     push(@fnd, "  $sdev is not password protected")
         if(!Authenticate($hash, undef));
   }

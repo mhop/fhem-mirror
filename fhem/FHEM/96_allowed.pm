@@ -5,7 +5,10 @@ package main;
 use strict;
 use warnings;
 use vars qw(@FW_httpheader); # HTTP header, line by line
+use MIME::Base64;
 my $allowed_haveSha;
+
+sub allowed_CheckBasicAuth($$$$@);
 
 #####################################
 sub
@@ -91,8 +94,6 @@ allowed_Authorize($$$$)
     stacktrace() if(AttrVal($me, "verbose", 5));
     return 2;
   }
-
-
   return 0;
 }
 
@@ -127,34 +128,13 @@ allowed_Authenticate($$$$)
       }
     }
 
-    my $pwok = ($secret && $secret eq $basicAuth);      # Base64
-    my ($user, $password) = split(":", decode_base64($secret)) if($secret);
-    ($user,$password) = ("","") if(!defined($user) || !defined($password));
-    if($secret && $basicAuth =~ m/^{.*}$/) {
-      eval "use MIME::Base64";
-      if($@) {
-        Log3 $aName, 1, $@;
-
-      } else {
-        $pwok = eval $basicAuth;
-        Log3 $aName, 1, "basicAuth expression: $@" if($@);
-      }
-
-    } elsif($basicAuth =~ m/^SHA256:(.{8}):(.*)$/) {
-      if($allowed_haveSha) {
-        $pwok = Digest::SHA::sha256_base64("$1:$user:$password") eq $2;
-      } else {
-        Log3 $me, 3, "Cant load Digest::SHA to decode $me->{NAME} beiscAuth";
-      }
-
-    }
-    Log3 $me, 3, "Login denied by $aName for $user via $cl->{NAME}"
-        if(!$pwok && $user);
+    my $pwok = (allowed_CheckBasicAuth($me, $cl, $secret, $basicAuth, 0) == 1);
 
     # Add Cookie header ONLY if authentication with basicAuth was succesful
     if($pwok && (!defined($authcookie) || $secret ne $authcookie)) {
       my $time = AttrVal($aName, "basicAuthExpiry", 0);
       if ( $time ) {
+        my ($user, $password) = split(":", decode_base64($secret)) if($secret);
         $time = int($time*86400+time());
         # generate timestamp according to RFC-1130 in Expires
         my $expires = FmtDateTimeRFC1123($time);
@@ -177,9 +157,8 @@ allowed_Authenticate($$$$)
     $cl->{".httpAuthHeader"} = "HTTP/1.1 401 Authorization Required\r\n".
                                "WWW-Authenticate: Basic realm=\"$msg\"\r\n";
     return 2;
-  }
 
-  if($cl->{TYPE} eq "telnet") {
+  } elsif($cl->{TYPE} eq "telnet") {
     my $pw = AttrVal($aName, "password", undef);
     if(!$pw) {
       $pw = AttrVal($aName, "globalpassword", undef);
@@ -203,9 +182,51 @@ allowed_Authenticate($$$$)
     }
 
     return ($pw eq $param) ? 1 : 2;
+
+  } elsif(!$param || ($param && $param =~ m/^basicAuth:(.*)/)) {
+    return allowed_CheckBasicAuth($me, $cl, $1,
+                                AttrVal($aName,"basicAuth",undef), $param);
+
   }
 
   return 0;
+}
+
+sub
+allowed_CheckBasicAuth($$$$@)
+{
+  my ($me, $cl, $secret, $basicAuth, $verbose) = @_;
+
+  return 0 if(!$basicAuth);
+
+  my $aName = $me->{NAME};
+
+  my $pwok = ($secret && $secret eq $basicAuth) ? 1 : 2;      # Base64
+  my ($user, $password) = split(":", decode_base64($secret)) if($secret);
+  ($user,$password) = ("","") if(!defined($user) || !defined($password));
+
+  if($secret && $basicAuth =~ m/^{.*}$/) {
+    $pwok = eval $basicAuth;
+    if($@) {
+      Log3 $aName, 1, "basicAuth expression: $@";
+      $pwok = 2;
+    } else {
+      $pwok = ($pwok ? 1 : 2);
+    }
+
+  } elsif($basicAuth =~ m/^SHA256:(.{8}):(.*)$/) {
+    if($allowed_haveSha) {
+      $pwok = (Digest::SHA::sha256_base64("$1:$user:$password") eq $2 ? 1 : 2);
+    } else {
+      Log3 $me, 3, "Cannot load Digest::SHA to decode $aName basicAuth";
+      $pwok = 2;
+    }
+
+  }
+  Log3 $me, 3, "Login denied by $aName for $user via $cl->{NAME}"
+      if($pwok != 1 && ($verbose || $user));
+
+  return $pwok;
 }
 
 
@@ -281,13 +302,15 @@ allowed_fhemwebFn($$$$)
   my $vf = $defs{$d}{validFor} ? $defs{$d}{validFor} : "";
   my (@F_arr, @t_arr);
   my @arr = map {
-              push(@F_arr, $_) if($defs{$_}{TYPE} eq "FHEMWEB");
-              push(@t_arr, $_) if($defs{$_}{TYPE} eq "telnet");
+              my $ca = $modules{$defs{$_}{TYPE}}{CanAuthenticate};
+              push(@F_arr, $_) if($ca == 1);
+              push(@t_arr, $_) if($ca == 2);
               "<input type='checkbox' ".($vf =~ m/\b$_\b/ ? "checked ":"").
                    "name='$_' class='vfAttr'><label>$_</label>"
             }
-            grep { !$defs{$_}{SNAME} }
-            devspec2array("TYPE=(FHEMWEB|telnet)");
+            grep { !$defs{$_}{SNAME} && 
+                   $modules{$defs{$_}{TYPE}}{CanAuthenticate} } 
+            sort keys %defs;
   my $r = "<input id='vfAttr' type='button' value='attr'> $d validFor <ul>".
           join("<br>",@arr)."</ul><script>var dev='$d';".<<'EOF';
 $("#vfAttr").click(function(){

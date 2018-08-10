@@ -136,6 +136,7 @@ FHEMWEB_Initialize($)
   $hash->{NotifyFn}= "FW_Notify";
   $hash->{AsyncOutputFn} = "FW_AsyncOutput";
   $hash->{ActivateInformFn} = "FW_ActivateInform";
+  $hash->{CanAuthenticate} = 1;
   no warnings 'qw';
   my @attrList = qw(
     CORS:0,1
