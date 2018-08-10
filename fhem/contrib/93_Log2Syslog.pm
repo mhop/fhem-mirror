@@ -30,6 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 4.7.0      10.08.2018       Parser for TPLink
 # 4.6.1      10.08.2018       some perl warnings, changed IETF Parser
 # 4.6.0      08.08.2018       set sendTestMessage added, Attribute "contDelimiter", "sendSeverity"
 # 4.5.1      07.08.2018       BSD Regex changed, setpayload of BSD changed 
@@ -78,7 +79,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.6.1";
+my $Log2SyslogVn = "4.7.0";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -189,7 +190,7 @@ sub Log2Syslog_Initialize($) {
 					  "logFormat:BSD,IETF ".
                       "makeMsgEvent:no,intern,reading ".
                       "outputFields:sortable-strict,PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT ".
-                      "parseProfile:BSD,IETF,raw,ParseFn ".
+                      "parseProfile:BSD,IETF,TPLink-SG2424,raw,ParseFn ".
                       "parseFn:textField-long ".
                       "sendSeverity:multiple-strict,Emergency,Alert,Critical,Error,Warning,Notice,Informational,Debug ".
                       "ssldebug:0,1,2,3 ".
@@ -557,7 +558,6 @@ sub Log2Syslog_parsePayload($$) {
           Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");           
       } else {
           $ts      = "$date $time";
-          # $cont =~ s/^:?(.*)$/$1/ if(lc($mid) eq "fhem");      # Modul Sender setzt vor $cont ein ":" (wegen Synology Compatibilität)
       
           if(looks_like_number($prival)) {
               $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
@@ -575,8 +575,10 @@ sub Log2Syslog_parsePayload($$) {
           $mid    = substr($mid,0, ($RFC5425len{MID}-1));
           $host   = substr($host,0, ($RFC5425len{HST}-1));
       
+	      no warnings 'uninitialized'; 
           Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $cont");
           $host = "" if($host eq "-");
+		  use warnings;
 	      $phost = $host?$host:$phost;
           
           # Payload zusammenstellen für Event/Reading
@@ -590,6 +592,52 @@ sub Log2Syslog_parsePayload($$) {
               }
           }          
       }
+  
+  } elsif ($pp eq "TPLink-SG2424") {
+	  # Parser für TPLink Router
+      # Beispiel data "<131>2018-08-10 09:03:58 10.0.x.y 31890 Login the web by admin on web (10.0.x.y).";
+      $data =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})\s(?<time>\d{2}:\d{2}:\d{2})\s(?<host>\S*)\s(?<id>\S*)\s(?<cont>.*)$/;
+      $prival  = $+{prival};      # must
+      $date    = $+{date};        # must
+      $time    = $+{time};        # must
+      $host    = $+{host};        # should 
+      $id      = $+{id};          # should
+      $cont    = $+{cont};        # should
+      
+      if(!$prival || !$date || !$time) {
+          $err = 1;
+          Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");           
+      } else {
+          $ts      = "$date $time";
+      
+          if(looks_like_number($prival)) {
+              $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
+              $severity = $prival-($facility*8);
+     	      $fac = $Log2Syslog_Facility{$facility};
+              $sev = $Log2Syslog_Severity{$severity};
+          } else {
+              $err = 1;
+              Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
+          }
+            
+		  no warnings 'uninitialized'; 
+          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, CONT: $cont");
+          $host = "" if($host eq "-");
+		  use warnings;
+	      $phost = $host?$host:$phost;
+          
+          # Payload zusammenstellen für Event/Reading
+          $pl = "";
+          my $i = 0;
+          foreach my $f (@evf) {
+              if(${$fh{$f}}) { 
+		          $pl .= " || " if($i);
+                  $pl .= "$f: ".${$fh{$f}};
+                  $i++;
+              }
+          }          
+      }
+  
   } elsif($pp eq "ParseFn") {
 	  # user spezifisches Parsing
       my $parseFn = AttrVal( $name, "parseFn", "" );
@@ -1745,8 +1793,9 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     In diesem Fall wird der ermittelte Hostname bzw. die IP-Adresse als Reading im Event genutzt.
 	<br>
 	Nach der Definition des Collectors werden die Syslog-Meldungen im IETF-Format gemäß RFC5424 erwartet. Werden die Daten 
-    nicht in diesem Format geliefert, erscheint im Reading "state" die Meldung <b>"parse error - see logfile"</b> und die 
-    empfangenen Syslog-Daten werden im Logfile im raw-Format ausgegeben. <br>
+    nicht in diesem Format geliefert bzw. können nicht geparst werden, erscheint im Reading "state" die Meldung 
+	<b>"parse error - see logfile"</b> und die empfangenen Syslog-Daten werden im Logfile im raw-Format ausgegeben. <br>
+	
 	In diesem Fall kann mit dem	<a href="#Log2Syslogattr">Attribut</a> "parseProfile" ein anderes vordefiniertes Parsing-Profil 
     eingestellt bzw. ein eigenes Profil definiert werden. <br><br>
     
