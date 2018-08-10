@@ -300,7 +300,7 @@ sub Log2Syslog_initServer($) {
   if(!$hash->{SERVERSOCKET}) {
       my $err = "Can't open Syslog Collector at $port: $!";
       Log3 ($hash, 1, "Log2Syslog $name - $err");
-      ReadingsSingleUpdateValue ($hash, 'state', $err, 1);
+      readingsSingleUpdate ($hash, 'state', $err, 1);
       return;      
   }
   
@@ -312,7 +312,7 @@ sub Log2Syslog_initServer($) {
   $hash->{INTERFACE}        = $lh?$lh:"global";
   
   Log3 ($hash, 3, "Log2Syslog $name - port $hash->{PORT}/$protocol opened for Syslog Collector on interface \"$hash->{INTERFACE}\"");
-  ReadingsSingleUpdateValue ($hash, "state", "initialized", 1);
+  readingsSingleUpdate ($hash, "state", "initialized", 1);
   delete($readyfnlist{"$name.$port"});
   $selectlist{"$name.$port"} = $hash;
 
