@@ -30,6 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 4.6.1      10.08.2018       some perl warnings, changed IETF Parser
 # 4.6.0      08.08.2018       set sendTestMessage added, Attribute "contDelimiter", "sendSeverity"
 # 4.5.1      07.08.2018       BSD Regex changed, setpayload of BSD changed 
 # 4.5.0      06.08.2018       Regex capture groups used in parsePayload to set variables, parsing of BSD changed,
@@ -77,7 +78,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.6.0";
+my $Log2SyslogVn = "4.6.1";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -516,9 +517,11 @@ sub Log2Syslog_parsePayload($$) {
               $err = 1;
               Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
           }
-     
+          
+		  no warnings 'uninitialized'; 
           Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, MM: $Mmm, Day: $dd, TIME: $time, TS: $ts, HOST: $host, ID: $id, CONT: $cont");
           $host = "" if($host eq "-");
+		  use warnings;
 		  $phost = $host?$host:$phost;
           
           # Payload zusammenstellen für Event/Reading
@@ -536,7 +539,8 @@ sub Log2Syslog_parsePayload($$) {
   } elsif ($pp eq "IETF") {
 	  # IETF Protokollformat https://tools.ietf.org/html/rfc5424 
       # Beispiel data "<$prival>1 $tim $host $id $pid $mid - : $otp";
-      $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s(?<pid>\S*)\s(?<mid>\S*)\s(?<sdfield>(\[.*?\]|-))\s(?<cont>.*)$/;
+#      $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s(?<pid>\S*)\s(?<mid>\S*)\s(?<sdfield>(\[.*?\]|-))\s(?<cont>.*)$/;
+      $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s(?<pid>\S*)\s(?<mid>\S*)\s(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;
       $prival  = $+{prival};      # must
       $ietf    = $+{ietf};        # must 
       $date    = $+{date};        # must
