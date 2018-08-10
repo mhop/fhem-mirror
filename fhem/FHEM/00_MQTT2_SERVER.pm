@@ -72,7 +72,7 @@ MQTT2_SERVER_keepaliveChecker($)
 {
   my ($hash) = @_;
   my $now = gettimeofday();
-  foreach my $clName (keys $hash->{clients}) {
+  foreach my $clName (keys %{$hash->{clients}}) {
     my $cHash = $defs{$clName};
     next if(!$cHash || !$cHash->{keepalive} ||
              $now < $cHash->{lastMsgTime}+$cHash->{keepalive}*1.5 );
@@ -335,7 +335,7 @@ MQTT2_SERVER_doPublish($$$;$$)
     $hash->{retain}{$tp} = \%h;
   }
 
-  foreach my $clName (keys $hash->{clients}) {
+  foreach my $clName (keys %{$hash->{clients}}) {
     MQTT2_SERVER_sendto($defs{$clName}, $tp, $val) if(!$src || $src ne $clName);
   }
 
@@ -353,7 +353,7 @@ MQTT2_SERVER_sendto($$$)
   my ($hash, $topic, $val) = @_;
   return if(IsDisabled($hash->{NAME}));
   $val = "" if(!defined($val));
-  foreach my $s (keys $hash->{subscriptions}) {
+  foreach my $s (keys %{$hash->{subscriptions}}) {
     my $re = $s;
     $re =~ s,/?#,\\b.*,g;
     $re =~ s,\+,\\b[^/]+\\b,g;
