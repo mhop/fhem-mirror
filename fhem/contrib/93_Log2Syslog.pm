@@ -190,7 +190,7 @@ sub Log2Syslog_Initialize($) {
 					  "logFormat:BSD,IETF ".
                       "makeMsgEvent:no,intern,reading ".
                       "outputFields:sortable-strict,PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT ".
-                      "parseProfile:BSD,IETF,TPLink-SG2424,raw,ParseFn ".
+                      "parseProfile:BSD,IETF,TPLink-Switch,raw,ParseFn ".
                       "parseFn:textField-long ".
                       "sendSeverity:multiple-strict,Emergency,Alert,Critical,Error,Warning,Notice,Informational,Debug ".
                       "ssldebug:0,1,2,3 ".
@@ -593,8 +593,8 @@ sub Log2Syslog_parsePayload($$) {
           }          
       }
   
-  } elsif ($pp eq "TPLink-SG2424") {
-	  # Parser für TPLink Router
+  } elsif ($pp eq "TPLink-Switch") {
+	  # Parser für TPLink Switch
       # Beispiel data "<131>2018-08-10 09:03:58 10.0.x.y 31890 Login the web by admin on web (10.0.x.y).";
       $data =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})\s(?<time>\d{2}:\d{2}:\d{2})\s(?<host>\S*)\s(?<id>\S*)\s(?<cont>.*)$/;
       $prival  = $+{prival};      # must
