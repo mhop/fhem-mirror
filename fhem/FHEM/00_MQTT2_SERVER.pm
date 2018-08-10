@@ -442,7 +442,8 @@ MQTT2_SERVER_getStr($$)
     <br><br>
     Enable the server on port &lt;tcp-portnr&gt;. If global is specified,
     then requests from all interfaces (not only localhost / 127.0.0.1) are
-    serviced. If IP is specified, then FHEMWEB will only listen on this IP.<br>
+    serviced. If IP is specified, then MQTT2_SERVER will only listen on this
+    IP.<br>
     To enable listening on IPV6 see the comments <a href="#telnet">here</a>.
     <br>
     Notes:<br>

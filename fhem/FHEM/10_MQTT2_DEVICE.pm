@@ -2,6 +2,8 @@
 # $Id$
 package main;
 
+# TODO: autocreate
+
 use strict;
 use warnings;
 use SetExtensions;
@@ -390,8 +392,9 @@ MQTT2_DEVICE_Undef($$)
         <a href="#disabledForIntervals">disabledForIntervals</a></li><br>
 
     <a name="readingList"></a>
-    <li>readingList &lt;topic-regexp&gt; [readingName|perl-Expression] ...<br>
-      On receiving a topic matching the topic-regexp either set readingName to
+    <li>readingList &lt;regexp&gt; [readingName|perl-Expression] ...
+      <br>
+      If the regexp matches topic:message either set readingName to
       the published message, or evaluate the perl expression, which has to
       return a hash consisting of readingName=>readingValue entries.
       You can define multiple such tuples, separated by newline, the newline
@@ -399,8 +402,8 @@ MQTT2_DEVICE_Undef($$)
       Example:<br>
       <code>
         &nbsp;&nbsp;attr dev readingList\<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;myDev/temp temperature\<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;myDev/hum { { humidity=>$EVTPART0 } }<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;myDev/temp:.* temperature\<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;myDev/hum:.* { { humidity=>$EVTPART0 } }<br>
       </code><br>
       Notes:
       <ul>
