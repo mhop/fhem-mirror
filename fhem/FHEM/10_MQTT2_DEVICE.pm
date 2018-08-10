@@ -305,7 +305,7 @@ MQTT2_DEVICE_Attr($$)
 sub
 MQTT2_DEVICE_delReading($)
 {
-  my ($name) = $_;
+  my ($name) = @_;
   my $dp = $modules{MQTT2_DEVICE}{defptr};
   foreach my $re (keys %{$dp}) {
     if($dp->{$re}{$name}) {
@@ -332,7 +332,7 @@ MQTT2_DEVICE_Rename($$)
 {
   my ($new, $old) = @_;
   MQTT2_DEVICE_delReading($old);
-  MQTT2_DEVICE_addReading($new, AttrVal($old, "readingList", ""));
+  MQTT2_DEVICE_addReading($new, AttrVal($new, "readingList", ""));
   return undef;
 }
 
