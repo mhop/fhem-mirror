@@ -60,7 +60,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "1.2.0";
+my $version = "1.4.0";
 
 
 
@@ -175,7 +175,6 @@ sub SmartPi_Attr(@) {
             return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
             unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
             Log3 $name, 3, "SmartPi ($name) - disabledForIntervals";
-            readingsSingleUpdate ( $hash, "state", "disabled", 1 );
         }
 
         elsif( $cmd eq "del" ) {
@@ -186,9 +185,11 @@ sub SmartPi_Attr(@) {
     } elsif( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
             $hash->{INTERVAL} = $attrVal;
+            Log3 $name, 3, "SmartPi ($name) - set interval: $attrVal";
             
         } else {
             $hash->{INTERVAL} = 300;
+            Log3 $name, 3, "SmartPi ($name) - delete User interval and set default: 300";
         }
     }
 
@@ -487,6 +488,17 @@ sub SmartPi_WriteReadings($$) {
 
 <a name="SmartPi"></a>
 <h3>SmartPi</h3>
+<a name="GardenaSmartBridgedefine"></a>
+<b>Define</b>
+<ul><br>
+  <code>define &lt;name&gt; SmartPi &lt;HOST&gt;</code>
+  <br><br>
+  Beispiel:
+  <ul><br>
+    <code>define Gardena_Bridge SmartPi 192.168.1.34</code><br>
+  </ul>
+  <br><br>
+</ul>
 <ul>
     <a name="SmartPireadings"></a>
     <b>Readings</b>
@@ -503,12 +515,12 @@ sub SmartPi_WriteReadings($$) {
         <li>phaseX Y             - get new Y (Voltage or Current or so)data about phaseX</li>
     </ul>
     <a name="SmartPiattribut"></a>
-    <b>get</b>
+    <b>Attribute</b>
     <ul>
         <li>disable - disables the device</li>
         <li>disabledForIntervals - disable device for interval time (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
         <li>interval - interval in seconds for statusRequest</li>
-        <li></li>
+        <li>decimalPlace - set decimal Place</li>
     </ul>
 </ul>
 
