@@ -1386,6 +1386,7 @@ OpenLogfile($)
   }
   LOG->autoflush(1);
   $logopened = 1;
+  $defs{global}{FD} = LOG->fileno();
   return undef;
 }
 

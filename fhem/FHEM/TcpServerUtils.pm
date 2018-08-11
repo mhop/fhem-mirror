@@ -34,7 +34,7 @@ TcpServer_Open($$$)
     Blocking  => ($^O =~ /Win/ ? 1 : 0), # Needed for .WRITEBUFFER@darwin
     ReuseAddr => 1
   );
-  $hash->{STATE} = "Initialized";
+  readingsSingleUpdate($hash, "state", "Initialized", 0);
   $hash->{SERVERSOCKET} = $hash->{IPV6} ?
         IO::Socket::INET6->new(@opts) : 
         IO::Socket::INET->new(@opts);
@@ -145,7 +145,7 @@ TcpServer_Accept($$)
   $nhash{CD}    = $clientinfo[0];     # sysread / close won't work on fileno
   $nhash{TYPE}  = $type;
   $nhash{SSL}   = $hash->{SSL};
-  $nhash{STATE} = "Connected";
+  readingsSingleUpdate(\%nhash, "state", "Connected", 0);
   $nhash{SNAME} = $name;
   $nhash{TEMPORARY} = 1;              # Don't want to save it
   $nhash{BUF}   = "";

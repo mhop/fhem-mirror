@@ -61,6 +61,7 @@ MQTT2_SERVER_Define($$)
     Log3 $hash, 1, "$ret. Exiting.";
     exit(1);
   }
+  $hash->{NRCLIENTS} = 0;
   $hash->{clients} = {};
   $hash->{retain} = {};
   InternalTimer(1, "MQTT2_SERVER_keepaliveChecker", $hash, 0);
@@ -89,12 +90,14 @@ MQTT2_SERVER_Undef($@)
   my $ret = TcpServer_Close($hash);
   my $sname = $hash->{SNAME};
   return undef if(!$sname);
-  delete($defs{$sname}{clients}{$hash->{NAME}});
+
+  my $shash = $defs{$sname};
+  delete($shash->{clients}{$hash->{NAME}});
+  $shash->{NRCLIENTS}--;
 
   if($hash->{lwt}) {    # Last will
     my ($tp, $val) = split(':', $hash->{lwt}, 2);
-    MQTT2_SERVER_doPublish($defs{$sname}, $tp, $val, undef,
-                        $hash->{cflags} & 0x20);
+    MQTT2_SERVER_doPublish($shash, $tp, $val, undef, $hash->{cflags} & 0x20);
   }
   return $ret;
 }
@@ -164,6 +167,7 @@ MQTT2_SERVER_Read($@)
     my $nhash = TcpServer_Accept($hash, "MQTT2_SERVER");
     return if(!$nhash);
     $nhash->{CD}->blocking(0);
+    $hash->{NRCLIENTS}++;
     return;
   }
 

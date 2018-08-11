@@ -112,6 +112,7 @@ FileLog_Define($@)
   }
 
   $hash->{FH} = $fh;
+  $hash->{FD} = $fh->fileno() if($fh);
   $hash->{REGEXP} = $a[3];
   $hash->{logfile} = $a[2];
   $hash->{currentlogfile} = $f;
@@ -161,6 +162,7 @@ FileLog_Switch($)
       return 0;
     }
     $log->{FH} = $fh;
+    $log->{FD} = $fh->fileno();
     setReadingsVal($log, "linesInTheFile", 0, TimeNow());
     return 1;
   }
@@ -294,6 +296,7 @@ FileLog_Set($@)
       }
       return "Can't open $cn" if(!defined($fh));
       $hash->{FH} = $fh;
+      $hash->{FD} = $fh->fileno();
     }
 
   } elsif($cmd eq "addRegexpPart") {
@@ -355,6 +358,7 @@ FileLog_Set($@)
     rename("$mylogfile.new", $mylogfile);
     $fh = new IO::File(">>$mylogfile");
     $hash->{FH} = $fh;
+    $hash->{FD} = $fh->fileno();
 
     $hash->{REGEXP} .= "|".$vh->{REGEXP};
     $hash->{DEF} = $hash->{logfile} . " ". $hash->{REGEXP};
