@@ -3826,16 +3826,18 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       foreach my $readEntry (keys %{$hash->{READINGS}}){
         if ($readEntry =~ m/^[\.]?RegL_(.*)/){ #reg Reading "RegL_<list>:peerN
           my $peer = substr($1,3);
-          next if (!$peer);
+          next if (!$peer); 
           push(@peers,$peer);
           push(@listWp,substr($1,1,1));
         }
       }
+      @listWp = CUL_HM_noDup(@listWp);
       my @regValList; #storage of results
       my $regHeader = "list:peer\tregister         :value\n";
       foreach my $regName (@regArr){
         my $regL  = $culHmRegDefine->{$regName}->{l};
         my @peerExe = (grep (/$regL/,@listWp)) ? @peers : ("00000000");
+        @peerExe = CUL_HM_noDup(@peerExe);
         foreach my $peer(@peerExe){
           next if($peer eq "");
           my $regVal= CUL_HM_getRegFromStore($name,$regName,0,$peer);#determine
@@ -3869,9 +3871,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     return HMinfo_GetFn($hash,$name,"register","-f","\^".$name."\$");
   }       
   elsif($cmd eq "regList") {  #################################################
-    my @regArr = CUL_HM_getRegN($st,$md,$chn);
     return CUL_HM_getRegInfo($name) ;
-#    return CUL_HM_getRegInfo(\@regArr,$roleD,$roleC) ;
   }
   elsif($cmd eq "cmdList") {  #################################################
     my   @arr;
@@ -4583,7 +4583,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                               :""
                                               )
             )
-           .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
+           .(($reg->{p} eq 'y')?" peer required":"")." : ".$reg->{t}."\n"
             if ($data eq "?");
     if (   $conv ne 'lit' 
         && $reg->{lit} 
@@ -4627,7 +4627,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                            8-int($reg->{s}+0.99)*2,);
 
     my ($lChn,$peerId,$peerChn) = ($chn,"000000","00");
-    if (($list == 3) ||($list == 4)   # peer is necessary for list 3/4
+#    if (($list == 3) ||($list == 4)   # peer is necessary for list 3/4
+    if ($reg->{p} eq 'y'              # peer is necessary 
         ||($peerChnIn))              {# and if requested by user
       return "Peer not specified" if ($peerChnIn eq "");
       $peerId  = CUL_HM_peerChId($peerChnIn,$dst);
@@ -7871,6 +7872,9 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
     return "invalid:regname or address"
             if($addr<1 ||$addr>255);
   }
+
+  return "invalid:no peer for this register" if(($reg->{p} eq "n" && $peerId ne "00000000")
+                                              ||($reg->{p} eq "y" && $peerId eq "00000000"));
   my $dst = substr(CUL_HM_name2Id($name),0,6);
   if(!$regLN){
     $regLN = ($hash->{helper}{expert}{raw}?"":".")
@@ -8276,7 +8280,7 @@ sub CUL_HM_getRegInfo($) { #
                       $reg->{l},$regName
                      ,$min
                      ,$max.$reg->{u}
-                     ,($hash->{helper}{regLst} =~ m/$cp/ ? "required" : "")
+                     ,($reg->{p} eq 'y' ? "required" : "")
                      ,$help)
           if (($roleD && $reg->{l} == 0)||
               ($roleC && $reg->{l} != 0));
