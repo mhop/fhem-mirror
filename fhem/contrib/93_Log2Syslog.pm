@@ -30,6 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 4.8.0      12.08.2018       enhanced IETF Parser to match logs without version 
 # 4.7.0      10.08.2018       Parser for TPLink
 # 4.6.1      10.08.2018       some perl warnings, changed IETF Parser
 # 4.6.0      08.08.2018       set sendTestMessage added, Attribute "contDelimiter", "sendSeverity"
@@ -79,7 +80,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.7.0";
+my $Log2SyslogVn = "4.8.0";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -539,25 +540,52 @@ sub Log2Syslog_parsePayload($$) {
       
   } elsif ($pp eq "IETF") {
 	  # IETF Protokollformat https://tools.ietf.org/html/rfc5424 
-      # Beispiel data "<$prival>1 $tim $host $id $pid $mid - : $otp";
-#      $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s(?<pid>\S*)\s(?<mid>\S*)\s(?<sdfield>(\[.*?\]|-))\s(?<cont>.*)$/;
-      $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s(?<pid>\S*)\s(?<mid>\S*)\s(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;
+      # Beispiel data "<14>1 2018-08-09T21:45:08+02:00 SDS1 Connection - - [synolog@6574 synotype="Connection" luser="apiuser" event="User [apiuser\] logged in from [192.168.2.45\] via [DSM\]."][meta sequenceId="1"] ﻿apiuser: User [apiuser] logged in from [192.168.2.45] via [DSM].";
+      # $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s(?<pid>\S*)\s(?<mid>\S*)\s(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;
+      $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s(?<cont>.*)$/;
       $prival  = $+{prival};      # must
-      $ietf    = $+{ietf};        # must 
-      $date    = $+{date};        # must
-      $time    = $+{time};        # must
-      $host    = $+{host};        # should 
-      $id      = $+{id};          # should
-      $pid     = $+{pid};         # should
-      $mid     = $+{mid};         # should 
-      $sdfield = $+{sdfield};     # must
-      $cont    = $+{cont};        # should
+      $ietf    = $+{ietf};        # should      
       
-      if(!$prival || !$ietf || !$date || !$time) {
-          $err = 1;
-          Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");           
+      if($prival && $ietf) {
+          # Standard IETF-Syslog incl. VERSION
+          if($ietf == 1) {
+              $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s?(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;      
+              $prival  = $+{prival};      # must
+              $ietf    = $+{ietf};        # should
+              $date    = $+{date};        # must
+              $time    = $+{time};        # must
+              $host    = $+{host};        # should 
+              $id      = $+{id};          # should
+              $pid     = $+{pid};         # should
+              $mid     = $+{mid};         # should 
+              $sdfield = $+{sdfield};     # must
+              $cont    = $+{cont};        # should
+          } else {
+              $err = 1;
+              Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - new IETF version detected, inform Log2Syslog Maintainer");          
+          }
       } else {
-          $ts      = "$date $time";
+          # IETF-Syslog ohne VERSION
+          $data =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;
+          $prival  = $+{prival};      # must
+          $date    = $+{date};        # must
+          $time    = $+{time};        # must
+          $host    = $+{host};        # should 
+          $id      = $+{id};          # should
+          $pid     = $+{pid};         # should
+          $mid     = $+{mid};         # should 
+          $sdfield = $+{sdfield};     # must
+          $cont    = $+{cont};        # should                        
+      }      
+      
+      if(!$prival || !$date || !$time) {
+          $err = 1;
+          Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");  
+	      no warnings 'uninitialized'; 
+          Log2Syslog_Log3slog($name, 5, "$name - parsed fields -> PRI: $prival, IETF: $ietf, DATE: $date, TIME: $time, HOST: $host, ID: $id, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $cont");
+		  use warnings;          
+      } else {
+          $ts = "$date $time";
       
           if(looks_like_number($prival)) {
               $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
@@ -2102,7 +2130,7 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
     
     <ul>
-    <li><b>parseProfile [ BSD | IETF | ParseFn | raw ] </b><br>
+    <li><b>parseProfile [ BSD | IETF | ... | ParseFn | raw ] </b><br>
         <br>
         Auswahl eines Parsing-Profiles. Das Attribut ist nur für Device-MODEL "Collector" verwendbar.
         <br><br>
@@ -2112,6 +2140,7 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
         <colgroup> <col width=20%> <col width=80%> </colgroup>
 	    <tr><td> <b>BSD</b>     </td><td> Parsing der Meldungen im BSD-Format nach RFC3164 </td></tr>
         <tr><td> <b>IETF</b>    </td><td> Parsing der Meldungen im IETF-Format nach RFC5424 (default) </td></tr>
+		<tr><td> <b>...</b>     </td><td> Es werden weitere angepasste Parsingprofile für ausgewählte Geräte angeboten </td></tr>
         <tr><td> <b>ParseFn</b> </td><td> Verwendung einer eigenen spezifischen Parsingfunktion im Attribut "parseFn". </td></tr>
         <tr><td> <b>raw</b>     </td><td> kein Parsing, die Meldungen werden wie empfangen in ein Event umgesetzt </td></tr>
         </table>
