@@ -30,6 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 4.8.1      12.08.2018       IETF-Syslog without VERSION changed, Log verbose 1 to 2 changed in parsePayload
 # 4.8.0      12.08.2018       enhanced IETF Parser to match logs without version 
 # 4.7.0      10.08.2018       Parser for TPLink
 # 4.6.1      10.08.2018       some perl warnings, changed IETF Parser
@@ -80,7 +81,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.8.0";
+my $Log2SyslogVn = "4.8.1";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -507,7 +508,7 @@ sub Log2Syslog_parsePayload($$) {
 
       if(!$prival) {
           $err = 1;
-          Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");  
+          Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");  
       } else {
           
           if(looks_like_number($prival)) {
@@ -566,7 +567,7 @@ sub Log2Syslog_parsePayload($$) {
           }
       } else {
           # IETF-Syslog ohne VERSION
-          $data =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;
+          $data =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))?\s(?<cont>.*)$/;
           $prival  = $+{prival};      # must
           $date    = $+{date};        # must
           $time    = $+{time};        # must
@@ -574,13 +575,13 @@ sub Log2Syslog_parsePayload($$) {
           $id      = $+{id};          # should
           $pid     = $+{pid};         # should
           $mid     = $+{mid};         # should 
-          $sdfield = $+{sdfield};     # must
+          $sdfield = $+{sdfield};     # should
           $cont    = $+{cont};        # should                        
       }      
       
       if(!$prival || !$date || !$time) {
           $err = 1;
-          Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");  
+          Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");  
 	      no warnings 'uninitialized'; 
           Log2Syslog_Log3slog($name, 5, "$name - parsed fields -> PRI: $prival, IETF: $ietf, DATE: $date, TIME: $time, HOST: $host, ID: $id, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $cont");
 		  use warnings;          
@@ -594,7 +595,7 @@ sub Log2Syslog_parsePayload($$) {
               $sev = $Log2Syslog_Severity{$severity};
           } else {
               $err = 1;
-              Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
+              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");          
           }
       
           # Längenbegrenzung nach RFC5424
@@ -634,7 +635,7 @@ sub Log2Syslog_parsePayload($$) {
       
       if(!$prival || !$date || !$time) {
           $err = 1;
-          Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");           
+          Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");           
       } else {
           $ts      = "$date $time";
       
@@ -645,7 +646,7 @@ sub Log2Syslog_parsePayload($$) {
               $sev = $Log2Syslog_Severity{$severity};
           } else {
               $err = 1;
-              Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
+              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");          
           }
             
 		  no warnings 'uninitialized'; 
@@ -694,7 +695,7 @@ sub Log2Syslog_parsePayload($$) {
 
  	      eval $parseFn;
           if($@) {
-	          Log3 $name, 1, "DbLog $name -> error parseFn: $@";
+	          Log3 $name, 2, "DbLog $name -> error parseFn: $@";
               $err = 1;
           }
 		 
@@ -718,7 +719,7 @@ sub Log2Syslog_parsePayload($$) {
               $sev = $Log2Syslog_Severity{$severity};
           } else {
               $err = 1;
-              Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
+              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");          
           }
 
           Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, PID: $pid, MID: $mid, CONT: $cont");
