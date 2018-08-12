@@ -2,8 +2,6 @@
 # $Id$
 package main;
 
-# TODO: autocreate
-
 use strict;
 use warnings;
 use SetExtensions;
@@ -46,6 +44,7 @@ MQTT2_DEVICE_Define($$)
   my @a = split("[ \t][ \t]*", $def);
   my $name = shift @a;
   my $type = shift @a; # always MQTT2_DEVICE
+  shift(@a) if(@a && $a[0] eq "autocreated");
 
   return "wrong syntax for $name: define <name> MQTT2_DEVICE" if(int(@a));
 
@@ -72,10 +71,11 @@ MQTT2_DEVICE_Parse($$)
     }
   }
 
-  my ($topic, $value) = split(":", $msg, 2);
+  my ($cid, $topic, $value) = split(":", $msg, 3);
   my $dp = $modules{MQTT2_DEVICE}{defptr};
   foreach my $re (keys %{$dp}) {
-    next if($msg !~ m/^$re$/s);
+    next if(!("$topic:$value" =~ m/^$re$/s ||
+              "$cid:$topic:$value" =~ m/^$re$/s));
     foreach my $dev (keys %{$dp->{$re}}) {
       next if(IsDisabled($dev));
       my @retData;
@@ -86,13 +86,15 @@ MQTT2_DEVICE_Parse($$)
       if($code =~ m/^{.*}$/s) {
         $code = EvalSpecials($code, ("%TOPIC"=>$topic, "%EVENT"=>$value));
         my $ret = AnalyzePerlCommand(undef, $code);
-        readingsBeginUpdate($hash);
-        foreach my $k (keys %{$ret}) {
-          readingsBulkUpdate($hash, $k, $ret->{$k});
-          push(@retData, "$k $ret->{$k}");
-          checkForGet($hash, $k, $ret->{$k});
+        if($ret && ref $ret eq "HASH") {
+          readingsBeginUpdate($hash);
+          foreach my $k (keys %{$ret}) {
+            readingsBulkUpdate($hash, $k, $ret->{$k});
+            push(@retData, "$k $ret->{$k}");
+            checkForGet($hash, $k, $ret->{$k});
+          }
+          readingsEndUpdate($hash, 1);
         }
-        readingsEndUpdate($hash, 1);
 
       } else {
         readingsSingleUpdate($hash, $code, $value, 1);
@@ -103,6 +105,27 @@ MQTT2_DEVICE_Parse($$)
       push @ret, $dev;
     }
   }
+
+  # autocreate, init readingList if message is a json string
+  # deactivated, as there are a lot of messages to be catched
+# if(!@ret) {
+#   my $nn = "MQTT2_$cid";
+#   if(!$defs{$nn} && $cid !~ m/mosqpub.*/) {
+#     PrioQueue_add(sub{
+#       return if(!$defs{$nn});
+#       if($value =~ m/^{.*}$/) {
+#         my %ret = MQTT2_JSON($msg);
+#         if(keys %ret) {
+#           CommandAttr(undef,
+#                     "$nn readingList $cid:$topic:.* { MQTT2_JSON(\$EVENT) }");
+#         }
+#       }
+#       $defs{$nn}{autocreated_on} = $msg;
+#     }, undef);
+#     return "UNDEFINED $nn MQTT2_DEVICE autocreated"
+#   }
+#   return "";
+# }
 
   return @ret;
 }
@@ -274,6 +297,7 @@ MQTT2_DEVICE_Attr($$)
       return undef;
     }
 
+    return "$dev attr $attrName: more parameters needed" if(!$param); #90145
     foreach my $el (split("\n", $param)) {
       my ($par1, $par2) = split(" ", $el, 2);
       next if(!$par1);
@@ -394,11 +418,13 @@ MQTT2_DEVICE_Undef($$)
     <a name="readingList"></a>
     <li>readingList &lt;regexp&gt; [readingName|perl-Expression] ...
       <br>
-      If the regexp matches topic:message either set readingName to
-      the published message, or evaluate the perl expression, which has to
-      return a hash consisting of readingName=>readingValue entries.
+      If the regexp matches topic:message or cid:topic:message either set
+      readingName to the published message, or evaluate the perl expression,
+      which has to return a hash consisting of readingName=>readingValue
+      entries.
       You can define multiple such tuples, separated by newline, the newline
-      does not have to be entered in the FHEMWEB frontend.<br>
+      does not have to be entered in the FHEMWEB frontend. cid is the client-id
+      of the sending device.<br>
       Example:<br>
       <code>
         &nbsp;&nbsp;attr dev readingList\<br>

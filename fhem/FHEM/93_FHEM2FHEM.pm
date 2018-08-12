@@ -59,9 +59,10 @@ FHEM2FHEM_Define($$)
     my $iodev = $defs{$rdev};
     return "Undefined local device $rdev" if(!$iodev);
     $hash->{rawDevice} = $rdev;
-    $hash->{Clients} = $iodev->{Clients};
-    $hash->{Clients} = $modules{$iodev->{TYPE}}{Clients}
-        if(!$hash->{Clients});
+
+    my $iomod = $modules{$iodev->{TYPE}};
+    $hash->{Clients} = $iodev->{Clients} ? $iodev->{Clients} :$iomod->{Clients};
+    $hash->{MatchList} = $iomod->{MatchList} if($iomod->{MatchList});
 
   }
 
