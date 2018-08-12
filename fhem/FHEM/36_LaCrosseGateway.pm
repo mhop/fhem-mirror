@@ -7,7 +7,7 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use Time::Local;
 
-my $clients = ":PCA301:EC3000:LaCrosse:Level:EMT7110:KeyValueProtocol";
+my $clients = ":PCA301:EC3000:LaCrosse:Level:EMT7110:KeyValueProtocol:CapacitiveLevel";
 
 my %matchList = (
   "1:PCA301"           => "^\\S+\\s+24",
@@ -16,6 +16,7 @@ my %matchList = (
   "4:EMT7110"          => "^OK\\sEMT7110\\s",
   "5:Level"            => "^OK\\sLS\\s",
   "6:KeyValueProtocol" => "^OK\\sVALUES\\s",
+  "7:CapacitiveLevel"  => "^OK\\sCL\\s",
 );
 
 sub LaCrosseGateway_Initialize($) {
