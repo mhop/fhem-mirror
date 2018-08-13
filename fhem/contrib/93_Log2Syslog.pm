@@ -30,11 +30,12 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 4.8.2      13.08.2018       rename makeMsgEvent to makeEvent, use hostname instead of fqdn
 # 4.8.1      12.08.2018       IETF-Syslog without VERSION changed, Log verbose 1 to 2 changed in parsePayload
 # 4.8.0      12.08.2018       enhanced IETF Parser to match logs without version 
 # 4.7.0      10.08.2018       Parser for TPLink
 # 4.6.1      10.08.2018       some perl warnings, changed IETF Parser
-# 4.6.0      08.08.2018       set sendTestMessage added, Attribute "contDelimiter", "sendSeverity"
+# 4.6.0      08.08.2018       set sendTestMessage added, Attribute "contDelimiter", "respectSeverity"
 # 4.5.1      07.08.2018       BSD Regex changed, setpayload of BSD changed 
 # 4.5.0      06.08.2018       Regex capture groups used in parsePayload to set variables, parsing of BSD changed,
 #                             Attribute "makeMsgEvent" added
@@ -73,6 +74,7 @@ use strict;
 use warnings;
 use Scalar::Util qw(looks_like_number);
 use Encode qw(encode_utf8);
+use Net::Domain qw(hostname hostfqdn hostdomain);
 eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
 eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom = "Net::Domain";
 
@@ -81,7 +83,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.8.1";
+my $Log2SyslogVn = "4.8.2";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -190,11 +192,11 @@ sub Log2Syslog_Initialize($) {
                       "addTimestamp:0,1 ".
                       "contDelimiter ".
 					  "logFormat:BSD,IETF ".
-                      "makeMsgEvent:no,intern,reading ".
+                      "makeEvent:no,intern,reading ".
                       "outputFields:sortable-strict,PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT ".
                       "parseProfile:BSD,IETF,TPLink-Switch,raw,ParseFn ".
                       "parseFn:textField-long ".
-                      "sendSeverity:multiple-strict,Emergency,Alert,Critical,Error,Warning,Notice,Informational,Debug ".
+                      "respectSeverity:multiple-strict,Emergency,Alert,Critical,Error,Warning,Notice,Informational,Debug ".
                       "ssldebug:0,1,2,3 ".
 					  "TLS:1,0 ".
 					  "timeout ".
@@ -222,7 +224,8 @@ sub Log2Syslog_Define($@) {
   delete($hash->{HELPER}{FHEMLOG});
   delete($hash->{HELPER}{IDENT});
   
-  $hash->{MYHOST} = hostfqdn();                            # FQDN eigener Host
+  # $hash->{MYHOST} = hostfqdn();                            # FQDN eigener Host
+  $hash->{MYHOST} = hostname();                            # eigener Host (lt. RFC nur Hostname nicht FQDN)
   
   if(int(@a)-3 < 0){
       # Einrichtung Servermode (Collector)
@@ -334,8 +337,9 @@ sub Log2Syslog_Read($) {
   my $socket = $hash->{SERVERSOCKET};
   my $st     = ReadingsVal($name,"state","active");
   my $pp     = AttrVal($name, "parseProfile", "IETF");
-  my $mevt   = AttrVal($name, "makeMsgEvent", "intern");          # wie soll Reading/Eventerstellt werden
-  my ($err,$data,$ts,$phost,$pl);
+  my $mevt   = AttrVal($name, "makeEvent", "intern");          # wie soll Reading/Eventerstellt werden
+  my $sevevt = AttrVal($name, "respectSeverity", "");             # welcher Schweregrad soll berücksichtigt werden (default: alle)
+  my ($err,$sev,$data,$ts,$phost,$pl);
   
   return if(IsDisabled($name) || $hash->{MODEL} !~ /Collector/);
 
@@ -349,11 +353,12 @@ sub Log2Syslog_Read($) {
           $st = "receive error - see logfile";          
       } else {
           # parse Payload  
-          ($err,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
+          ($err,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
           $hash->{SEQNO}++;
           if($err) {
               $st = "parse error - see logfile";
           } else {
+              return if($sevevt && $sevevt !~ m/$sev/);            # Message nicht berücksichtigen
               $st = "active";
               if($mevt =~ /intern/) {
                   # kein Reading, nur Event
@@ -379,11 +384,12 @@ sub Log2Syslog_Read($) {
           $st = "receive error - see logfile";            
       } else {
           # parse Payload  
-          ($err,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
+          ($err,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
           $hash->{SEQNO}++;
           if($err) {
               $st = "parse error - see logfile";
           } else {
+              return if($sevevt && $sevevt !~ m/$sev/);            # Message nicht berücksichtigen
               $st = "active";
               if($mevt =~ /intern/) {
                   # kein Reading, nur Event
@@ -401,23 +407,24 @@ sub Log2Syslog_Read($) {
   } else {
       # raw oder User eigenes Format
       $socket->recv($data, 8192);
-      ($err,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
+      ($err,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
       $hash->{SEQNO}++;
       if($err) {
           $st = "parse error - see logfile";
       } else {
+          return if($sevevt && $sevevt !~ m/$sev/);            # Message nicht berücksichtigen
           $st = "active";
-              if($mevt =~ /intern/) {
-                  # kein Reading, nur Event
-                  $pl = "$phost: $pl";
-                  Log2Syslog_Trigger($hash,$ts,$pl);
-              } elsif ($mevt =~ /reading/) {
-                  # Reading, Event abhängig von event-on-.*
-                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
-              } else {
-                  # Reading ohne Event
-                  readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
-              }
+          if($mevt =~ /intern/) {
+              # kein Reading, nur Event
+              $pl = "$phost: $pl";
+              Log2Syslog_Trigger($hash,$ts,$pl);
+          } elsif ($mevt =~ /reading/) {
+              # Reading, Event abhängig von event-on-.*
+              readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
+          } else {
+              # Reading ohne Event
+              readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
+          }
       }      
   
   }
@@ -751,7 +758,7 @@ sub Log2Syslog_parsePayload($$) {
 	  
   } 	
 
-return ($err,$phost,$ts,$pl);
+return ($err,$sev,$phost,$ts,$pl);
 }
 
 #################################################################################################
@@ -903,11 +910,11 @@ sub Log2Syslog_Attr ($$$$) {
     # $name is device name
     # aName and aVal are Attribute name and value
 
-	if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/ && $aName =~ /parseProfile|parseFn|outputFields|makeMsgEvent/) {
+	if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/ && $aName =~ /parseProfile|parseFn|outputFields|makeEvent/) {
          return "\"$aName\" is only valid for model \"Collector\"";
 	}
     
-	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|contDelimiter|addStateEvent|protocol|logFormat|sendSeverity|timeout|TLS/) {
+	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|contDelimiter|addStateEvent|protocol|logFormat|timeout|TLS/) {
         return "\"$aName\" is only valid for model \"Sender\"";
 	}
     
@@ -982,7 +989,7 @@ sub Log2Syslog_Attr ($$$$) {
           return "You use a parse-function via attribute \"parseProfile\". Please change/delete attribute \"parseProfile\" first !";
     }
     
-    if ($aName =~ /makeMsgEvent/) {
+    if ($aName =~ /makeEvent/) {
         if($aVal =~ /intern/ || $cmd eq "del") {
             foreach my $reading (grep { /MSG_/ } keys %{$defs{$name}{READINGS}}) {
                 readingsDelete($defs{$name}, $reading);
@@ -1002,7 +1009,7 @@ sub Log2Syslog_eventlog($$) {
   my $name    = $hash->{NAME};
   my $rex     = $hash->{HELPER}{EVNTLOG};
   my $st      = ReadingsVal($name,"state","active");
-  my $sendsev = AttrVal($name, "sendSeverity", "");              # Nachrichten welcher Schweregrade sollen gesendet werden
+  my $sendsev = AttrVal($name, "respectSeverity", "");              # Nachrichten welcher Schweregrade sollen gesendet werden
   my ($prival,$sock,$data,$pid,$sevAstxt);
   
   return if(IsDisabled($name) || !$rex || $hash->{MODEL} !~ /Sender/);
@@ -1030,8 +1037,8 @@ sub Log2Syslog_eventlog($$) {
               $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
 	          ($prival,$sevAstxt) = Log2Syslog_setprival($txt);
               if($sendsev && $sendsev !~ m/$sevAstxt/) {
-                  # nicht senden wenn Severity nicht in "sendSeverity" enthalten
-                  Log2Syslog_Log3slog($name, 5, "$name - Warning - Payload NOT sent due to Message Severity not in attribute \"sendSeverity\"\n");
+                  # nicht senden wenn Severity nicht in "respectSeverity" enthalten
+                  Log2Syslog_Log3slog($name, 5, "$name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
                   next;        
               }
 
@@ -1066,7 +1073,7 @@ sub Log2Syslog_fhemlog($$) {
   my $hash    = $defs{$name};
   my $rex     = $hash->{HELPER}{FHEMLOG};
   my $st      = ReadingsVal($name,"state","active");
-  my $sendsev = AttrVal($name, "sendSeverity", "");              # Nachrichten welcher Schweregrade sollen gesendet werden
+  my $sendsev = AttrVal($name, "respectSeverity", "");              # Nachrichten welcher Schweregrade sollen gesendet werden
   my ($prival,$sock,$err,$ret,$data,$pid,$sevAstxt);
   
   return if(IsDisabled($name) || !$rex || $hash->{MODEL} !~ /Sender/);
@@ -1081,8 +1088,8 @@ sub Log2Syslog_fhemlog($$) {
       $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
 	  ($prival,$sevAstxt) = Log2Syslog_setprival($txt,$vbose);
       if($sendsev && $sendsev !~ m/$sevAstxt/) {
-          # nicht senden wenn Severity nicht in "sendSeverity" enthalten
-          Log2Syslog_Log3slog($name, 5, "$name - Warning - Payload NOT sent due to Message Severity not in attribute \"sendSeverity\"\n");
+          # nicht senden wenn Severity nicht in "respectSeverity" enthalten
+          Log2Syslog_Log3slog($name, 5, "$name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
           return;        
       }
 	  
@@ -1491,7 +1498,9 @@ sub Log2Syslog_evalPeer($) {
   my($pport, $pipaddr) = sockaddr_in($socket->peername);
   $phost = gethostbyaddr($pipaddr, AF_INET);
   $paddr = inet_ntoa($pipaddr);
+  no warnings 'uninitialized'; 
   Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - message peerhost: $phost,$paddr");
+  use warnings;
 
 return ($phost,$paddr); 
 }
@@ -1835,7 +1844,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <a href="#Log2Syslogattr">Attribut</a> "outputFields" bestimmt werden. Je nach verwendeten Parsingprofil können alle oder
     nur eine Untermenge der verfügbaren Felder verwendet werden. Näheres dazu in der Beschreibung des Attributes "parseProfile". <br>
     <br>
-    Das Verhalten der Eventgenerierung kann mit dem <a href="#Log2Syslogattr">Attribut</a> "makeMsgEvent" angepasst werden. <br>
+    Das Verhalten der Eventgenerierung kann mit dem <a href="#Log2Syslogattr">Attribut</a> "makeEvent" angepasst werden. <br>
   </ul>
     
   <br>
@@ -2048,7 +2057,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <br>
     
     <ul>
-    <li><b>makeMsgEvent [ intern | no | reading ]</b><br>
+    <li><b>makeEvent [ intern | no | reading ]</b><br>
         <br>
         Das Attribut ist nur für "Collector" verwendbar.  Mit dem Attribut wird das Verhalten der Event- bzw.
         Readinggenerierung festgelegt. 
@@ -2227,10 +2236,11 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
     
     <ul>
-    <li><b>sendSeverity </b><br>
+    <li><b>respectSeverity </b><br>
         <br>
-        Es werden nur Nachrichten übermittelt, deren Schweregrad im Attribut enthalten ist.
-        Ist "sendSeverity" nicht gesetzt, werden Nachrichten aller Schwierigkeitsgrade gesendet.
+        Es werden nur Nachrichten übermittelt (Sender) bzw. beim Empfang berücksichtigt (Collector), deren Schweregrad im 
+        Attribut enthalten ist.
+        Ist "respectSeverity" nicht gesetzt, werden Nachrichten aller Schweregrade verarbeitet.
     </li>
     </ul>
     <br>
