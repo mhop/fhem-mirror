@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 18 / 2018-06-25
+# Release 19 / 2018-08-14
 
 package main;
 
@@ -3025,11 +3025,13 @@ netatmo_autocreatethermostat($;$)
     $devname =~ s/:/_/g;
     my $define= "$devname netatmo RELAY $id";
     if( $device->{type} eq "Home" ) {
+      next;
       $devname = "netatmo_E". $id;
       $devname =~ s/:/_/g;
       $define= "$devname netatmo HEATINGHOME $id";
     }
     elsif( $device->{type} eq "Room" ) {
+      next;
       $devname = "netatmo_O". $id;
       $devname =~ s/:/_/g;
       $define= "$devname netatmo HEATINGROOM $device->{Home} $id";
