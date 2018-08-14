@@ -3816,7 +3816,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     return "undefined";
   }
   elsif($cmd =~ m/^(reg|regVal)$/) {  #########################################
-    my (undef,undef,$regReq,$list,$peerId) = @a;
+    my (undef,undef,$regReq,$list,$peerId) = (@a,0,0);
     return if(!defined $regReq);
     if ($regReq eq 'all'){
       my @regArr = CUL_HM_getRegN($st,$md,($roleD?"00":""),($roleC?$chn:""));
@@ -3862,7 +3862,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     }
     else{
       my $regVal = CUL_HM_getRegFromStore($name,$regReq,$list,$peerId);
-	$regVal =~ s/ .*// if ($cmd eq "regVal");
+	  $regVal =~ s/ .*// if ($cmd eq "regVal");
       return ($regVal =~ m/^invalid/)? "Value not captured:$name - $regReq"
                                      : $regVal;
     }
@@ -7873,8 +7873,8 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
             if($addr<1 ||$addr>255);
   }
 
-  return "invalid:no peer for this register" if(($reg->{p} eq "n" && $peerId ne "00000000")
-                                              ||($reg->{p} eq "y" && $peerId eq "00000000"));
+  return "invalid:no peer for this register" if(($reg->{p} eq "n" && $peerId ne 0)
+                                              ||($reg->{p} eq "y" && $peerId eq 0));
   my $dst = substr(CUL_HM_name2Id($name),0,6);
   if(!$regLN){
     $regLN = ($hash->{helper}{expert}{raw}?"":".")
