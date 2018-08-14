@@ -1067,7 +1067,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  
  ,"HM-WDS100-C6-O"    =>{ burstRx         =>1,sunThresh       =>1,stormUpThresh   =>1,stormLowThresh  =>1}
  ,"HM-WDS100-C6-O-2"  =>{ burstRx         =>1,sunThresh       =>1,stormUpThresh   =>1,stormLowThresh  =>1
-                         ,windSpeedRsltSrc=>1,peerNeedsBurst  =>1,localResDis     =>1}
+                         ,windSpeedRsltSrc=>1,peerNeedsBurst  =>1,localResDis     =>1,cyclicInfoMsgDis=>1}
  ,"HM-OU-LED16"       =>{ brightness      =>1,energyOpt       =>1,localResDis     =>1}
  ,"HM-OU-CFM-PL"      =>{ localResetDis   =>1
                          ,OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
