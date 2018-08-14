@@ -6,8 +6,6 @@ use strict;
 use warnings;
 use SetExtensions;
 
-sub MQTT2_JSON($;$);
-
 sub
 MQTT2_DEVICE_Initialize($)
 {
@@ -84,7 +82,8 @@ MQTT2_DEVICE_Parse($$)
       my $hash = $defs{$dev};
 
       if($code =~ m/^{.*}$/s) {
-        $code = EvalSpecials($code, ("%TOPIC"=>$topic, "%EVENT"=>$value));
+        $code = EvalSpecials($code,
+                  ("%TOPIC"=>$topic, "%EVENT"=>$value, "%NAME"=>$hash->{NAME}));
         my $ret = AnalyzePerlCommand(undef, $code);
         if($ret && ref $ret eq "HASH") {
           readingsBeginUpdate($hash);
@@ -114,10 +113,10 @@ MQTT2_DEVICE_Parse($$)
 #     PrioQueue_add(sub{
 #       return if(!$defs{$nn});
 #       if($value =~ m/^{.*}$/) {
-#         my %ret = MQTT2_JSON($msg);
+#         my %ret = json2nameValue($msg);
 #         if(keys %ret) {
 #           CommandAttr(undef,
-#                     "$nn readingList $cid:$topic:.* { MQTT2_JSON(\$EVENT) }");
+#                 "$nn readingList $cid:$topic:.* { json2nameValue(\$EVENT) }");
 #         }
 #       }
 #       $defs{$nn}{autocreated_on} = $msg;
@@ -130,91 +129,10 @@ MQTT2_DEVICE_Parse($$)
   return @ret;
 }
 
-#############################
-# simple json reading parser
 sub
 MQTT2_JSON($;$)
 {
-  my ($in,$prefix) = @_;
-  $prefix = "" if(!defined($prefix));
-  my %ret;
-
-  sub
-  lquote($)
-  {
-    my ($t) = @_;
-    my $esc;
-    for(my $off = 1; $off < length($t); $off++){
-      my $s = substr($t,$off,1);
-      if($s eq '\\') { 
-        $esc = !$esc;
-      } elsif($s eq '"' && !$esc) {
-        return (substr($t,1,$off-1), substr($t,$off+1));
-      } else {
-        $esc = 0;
-      }
-    }
-    return ($t, "");    # error
-  }
-
-  sub
-  lhash($)
-  {
-    my ($t) = @_;
-    my $depth=1;
-    my ($esc, $inquote);
-
-    for(my $off = 1; $off < length($t); $off++){
-      my $s = substr($t,$off,1);
-      if($s eq '}') {
-        $depth--;
-        return (substr($t,1,$off-1), substr($t,$off+1)) if(!$depth);
-
-      } elsif($s eq '{' && !$inquote) {
-        $depth++;
-
-      } elsif($s eq '"' && !$esc) {
-        $inquote = !$inquote;
-
-      } elsif($s eq '\\') {
-        $esc = !$esc;
-
-      } else {
-        $esc = 0;
-      }
-    }
-    return ($t, "");    # error
-  }
-
-  $in = $1 if($in =~ m/^{(.*)}$/s);
-
-  while($in =~ m/^"([^"]+)"\s*:\s*(.*)$/s) {
-    my ($name,$val) = ($1,$2);
-    $name =~ s/[^a-z0-9._\-\/]/_/gsi;
-
-    if($val =~ m/^"/) {
-      ($val, $in) = lquote($val);
-      $ret{"$prefix$name"} = $val;
-
-    } elsif($val =~ m/^{/) { # }
-      ($val, $in) = lhash($val);
-      my $r2 = MQTT2_JSON($val);
-      foreach my $k (keys %{$r2}) {
-        $ret{"$prefix${name}_$k"} = $r2->{$k};
-      }
-
-    } elsif($val =~ m/^([0-9.-]+)(.*)$/s) {
-      $ret{"$prefix$name"} = $1;
-      $in = $2;
-
-    } else {
-      Log 1, "Error parsing $val";
-      $in = "";
-    }
-
-    $in =~ s/^\s*,\s*//;
-  }
-  return \%ret;
+  return json2nameValue(@_);
 }
 
 
@@ -244,7 +162,7 @@ MQTT2_DEVICE_Get($@)
 
   shift @a;
   if($cmd =~ m/^{.*}$/) {
-    $cmd = EvalSpecials($cmd, ("%EVENT"=>join(" ",@a)));
+    $cmd = EvalSpecials($cmd, ("%EVENT"=>join(" ",@a), "%NAME"=>$hash->{NAME}));
     $cmd = AnalyzeCommandChain($hash->{CL}, $cmd);
     return if(!$cmd);
   } else {
@@ -272,7 +190,8 @@ MQTT2_DEVICE_Set($@)
 
   shift @a;
   if($cmd =~ m/^{.*}$/) {
-    $cmd = EvalSpecials($cmd, ("%EVENT"=>join(" ",@a)));
+    my $NAME = $hash->{NAME};
+    $cmd = EvalSpecials($cmd, ("%EVENT"=>join(" ",@a), "%NAME"=>$hash->{NAME}));
     $cmd = AnalyzeCommandChain($hash->{CL}, $cmd);
     return if(!$cmd);
   } else {
@@ -290,10 +209,10 @@ MQTT2_DEVICE_Attr($$)
   my ($type, $dev, $attrName, $param) = @_;
 
   if($attrName =~ m/(.*)List/) {
-    my $type = $1;
+    my $atype = $1;
 
     if($type eq "del") {
-      MQTT2_DEVICE_delReading($dev) if($type eq "reading");
+      MQTT2_DEVICE_delReading($dev) if($atype eq "reading");
       return undef;
     }
 
@@ -305,10 +224,10 @@ MQTT2_DEVICE_Attr($$)
       (undef, $par2) = split(" ", $par2, 2) if($type eq "get");
       return "$dev attr $attrName: more parameters needed" if(!$par2);
 
-      if($type eq "reading") {
+      if($atype eq "reading") {
         if($par2 =~ m/^{.*}$/) {
           my $ret = perlSyntaxCheck($par2,
-                                ("%TOPIC"=>1, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9"));
+                ("%TOPIC"=>1, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9", "%NAME"=>$dev));
           return $ret if($ret);
         } else {
           return "unsupported character in readingname $par2"
@@ -321,7 +240,7 @@ MQTT2_DEVICE_Attr($$)
 
       }
     }
-    MQTT2_DEVICE_addReading($dev, $param) if($type eq "reading");
+    MQTT2_DEVICE_addReading($dev, $param) if($atype eq "reading");
   }
   return undef;
 }
@@ -437,11 +356,12 @@ MQTT2_DEVICE_Undef($$)
           available (the letter containing the whole message), as well as
           $EVTPART0, $EVTPART1, ... each containing a single word of the
           message.</li>
-        <li>the helper function MQTT2_JSON($EVENT) can be used to parse a json
-          encoded value. Importing all values from a Sonoff device with a
+        <li>the helper function json2nameValue($EVENT) can be used to parse a
+          json encoded value. Importing all values from a Sonoff device with a
           Tasmota firmware can be done with:
           <ul><code>
-            attr sonoff_th10 readingList tele/sonoff/S.* { MQTT2_JSON($EVENT) }
+            attr sonoff_th10 readingList tele/sonoff/S.* {
+                json2nameValue($EVENT) }
           </code></ul></li>
       </ul>
       </li><br>

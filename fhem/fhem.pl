@@ -130,6 +130,7 @@ sub getAllGets($;$);
 sub getAllSets($;$);
 sub getPawList($);
 sub getUniqueId();
+sub json2nameValue($;$);
 sub latin1ToUtf8($);
 sub myrename($$$);
 sub notifyRegexpChanged($$);
@@ -4872,6 +4873,116 @@ toJSON($)
 
   }
 }
+
+#############################
+# will return a hash of name:value pairs.
+# Note: doesnt know arrays, just objects and simple types
+sub
+json2nameValue($;$)
+{
+  my ($in,$prefix) = @_;
+  $prefix = "" if(!defined($prefix));
+  my %ret;
+
+  sub
+  lquote($)
+  {
+    my ($t) = @_;
+    my $esc;
+    for(my $off = 1; $off < length($t); $off++){
+      my $s = substr($t,$off,1);
+      if($s eq '\\') { 
+        $esc = !$esc;
+      } elsif($s eq '"' && !$esc) {
+        return (substr($t,1,$off-1), substr($t,$off+1));
+      } else {
+        $esc = 0;
+      }
+    }
+    return ($t, "");    # error
+  }
+
+  sub
+  lhash($)
+  {
+    my ($t) = @_;
+    my $depth=1;
+    my ($esc, $inquote);
+
+    for(my $off = 1; $off < length($t); $off++){
+      my $s = substr($t,$off,1);
+      if($s eq '}') {
+        $depth--;
+        return (substr($t,1,$off-1), substr($t,$off+1)) if(!$depth);
+
+      } elsif($s eq '{' && !$inquote) {
+        $depth++;
+
+      } elsif($s eq '"' && !$esc) {
+        $inquote = !$inquote;
+
+      } elsif($s eq '\\') {
+        $esc = !$esc;
+
+      } else {
+        $esc = 0;
+      }
+    }
+    return ($t, "");    # error
+  }
+
+  $in = $1 if($in =~ m/^{(.*)}$/s);
+
+  while($in =~ m/^"([^"]+)"\s*:\s*(.*)$/s) {
+    my ($name,$val) = ($1,$2);
+    $name =~ s/[^a-z0-9._\-\/]/_/gsi;
+
+    if($val =~ m/^"/) {
+      ($val, $in) = lquote($val);
+      $ret{"$prefix$name"} = $val;
+
+    } elsif($val =~ m/^{/) { # }
+      ($val, $in) = lhash($val);
+      my $r2 = json2nameValue($val);
+      foreach my $k (keys %{$r2}) {
+        $ret{"$prefix${name}_$k"} = $r2->{$k};
+      }
+
+    } elsif($val =~ m/^([0-9.-]+)(.*)$/s) {
+      $ret{"$prefix$name"} = $1;
+      $in = $2;
+
+    } else {
+      Log 1, "Error parsing $val";
+      $in = "";
+    }
+
+    $in =~ s/^\s*,\s*//;
+  }
+  return \%ret;
+}
+
+# generate readings from the json string (parsed by json2reading) for $hash
+sub
+json2reading($$)
+{
+  my ($hash, $json) = @_;
+
+  $hash = $defs{$hash} if(ref($hash) ne "HASH");
+  return "json2reading: first arg is not a FHEM device"
+        if(!$hash || ref $hash ne "HASH" || !$hash->{TYPE});
+
+  my $ret = json2nameValue($json);
+  if($ret && ref $ret eq "HASH") {
+    readingsBeginUpdate($hash);
+    foreach my $k (keys %{$ret}) {
+      readingsBulkUpdate($hash, $k, $ret->{$k});
+    }
+    readingsEndUpdate($hash, 1);
+  }
+  return undef;
+}
+
 
 
 sub

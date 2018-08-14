@@ -2,7 +2,7 @@
 # $Id$
 package main;
 
-# TODO: save retain, Test SSL
+# TODO: autocreate, save retain, test SSL
 
 use strict;
 use warnings;
@@ -313,6 +313,18 @@ MQTT2_SERVER_Read($@)
       }, undef, 0);
     }
 
+  ####################################
+  } elsif($cpt eq "UNSUBSCRIBE") {
+    Log3 $sname, 4, "$cname $hash->{cid} $cpt";
+    my $pid = unpack('n', substr($pl, 0, 2));
+    my ($subscr, @ret);
+    $off = 2;
+    while($off < $tlen) {
+      ($subscr, $off) = MQTT2_SERVER_getStr($pl, $off);
+      delete $hash->{subscriptions}{$subscr};
+      Log3 $sname, 4, "  topic:$subscr";
+    }
+    addToWritebuffer($hash, pack("CCn", 0xb0, 2, $pid)); # UNSUBACK
 
   } elsif($cpt eq "PINGREQ") {
     Log3 $sname, 4, "$cname $hash->{cid} $cpt";
