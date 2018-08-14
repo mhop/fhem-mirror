@@ -559,8 +559,8 @@ sub HMinfo_peerCheck(@) { #####################################################
             elsif($chn eq "04"){
               # compare templist template are identical and boost is same
               my $rtCn = CUL_HM_id2Name(substr($pId,0,6)."04");
-              my $ob = CUL_HM_Get($defs{$eName},$eName,"regVal","boostPeriod");
-              my $pb = CUL_HM_Get($defs{$rtCn} ,$rtCn ,"regVal","boostPeriod");
+              my $ob = CUL_HM_Get($defs{$eName},$eName,"regVal","boostPeriod",0,0);
+              my $pb = CUL_HM_Get($defs{$rtCn} ,$rtCn ,"regVal","boostPeriod",0,0);
               my $ot = AttrVal($eName,"tempListTmpl","--");
               my $pt = AttrVal($rtCn ,"tempListTmpl","--");
               push @peerIDsTeamRT,$eName." team:$rtCn  boost differ  $ob / $pb"        if ($ob ne $pb);
@@ -581,8 +581,8 @@ sub HMinfo_peerCheck(@) { #####################################################
             else{
               # compare templist template are identical and boost is same
               my $rtCn = CUL_HM_id2Name(substr($pId,0,6)."04");
-              my $ob = CUL_HM_Get($defs{$eName},$eName,"regVal","boostPeriod");
-              my $pb = CUL_HM_Get($defs{$rtCn} ,$rtCn ,"regVal","boostPeriod");
+              my $ob = CUL_HM_Get($defs{$eName},$eName,"regVal","boostPeriod",0,0);
+              my $pb = CUL_HM_Get($defs{$rtCn} ,$rtCn ,"regVal","boostPeriod",0,0);
               my $ot = AttrVal($eName,"tempListTmpl","--");
               my $pt = AttrVal($rtCn ,"tempListTmpl","--");
               push @peerIDsTeamRT,$eName." team:$rtCn  boost differ $ob / $pb" if ($ob ne $pb);
@@ -1192,7 +1192,6 @@ sub HMinfo_GetFn($@) {#########################################################
            $plSum[$c] +=$cnt;
         }
         else{
-          Log 1,"General $dName: $c : $_" if($_ !~ m/-/);#if ($c == 8);
         }
         $c++;
       }
