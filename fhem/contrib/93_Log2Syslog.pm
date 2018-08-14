@@ -30,7 +30,8 @@
 ######################################################################################################################
 #  Versions History:
 #
-# 4.8.2      13.08.2018       rename makeMsgEvent to makeEvent, use hostname instead of fqdn
+# 4.8.3      14.08.2018       BSD setpayload changed, BSD parsing changed, Internal MYFQDN 
+# 4.8.2      13.08.2018       rename makeMsgEvent to makeEvent
 # 4.8.1      12.08.2018       IETF-Syslog without VERSION changed, Log verbose 1 to 2 changed in parsePayload
 # 4.8.0      12.08.2018       enhanced IETF Parser to match logs without version 
 # 4.7.0      10.08.2018       Parser for TPLink
@@ -83,7 +84,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.8.2";
+my $Log2SyslogVn = "4.8.3";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -224,8 +225,8 @@ sub Log2Syslog_Define($@) {
   delete($hash->{HELPER}{FHEMLOG});
   delete($hash->{HELPER}{IDENT});
   
-  # $hash->{MYHOST} = hostfqdn();                            # FQDN eigener Host
-  $hash->{MYHOST} = hostname();                            # eigener Host (lt. RFC nur Hostname nicht FQDN)
+  $hash->{MYFQDN} = hostfqdn();                            # MYFQDN eigener Host (f. IETF)
+  $hash->{MYHOST} = hostname();                            # eigener Host (lt. RFC nur Hostname f. BSD)
   
   if(int(@a)-3 < 0){
       # Einrichtung Servermode (Collector)
@@ -502,10 +503,8 @@ sub Log2Syslog_parsePayload($$) {
       }      
       if($ts) {
           # Annahme: wenn Timestamp gesetzt, wird der Rest der Message ebenfalls dem Standard entsprechen
-          $tail =~ /^(?<host>[^\s]*)?\s(?<tail>.*)$/;
-          $host = $+{host};          # should 
-          $tail = $+{tail};
-          $tail =~ /^(?<id>\w{1,32}\W?)?:?(?<cont>.*)$/;      
+          $tail =~ /(?<host>[^\s]*)?\s((?<id>\w*(\[?.*(?!\\\]).\])?\s?)\W?\s)?(?<cont>.*)$/;
+          $host = $+{host};          # should       
           $id   = $+{id};            # should
           $cont = $+{cont};          # should
       } else {
@@ -1359,6 +1358,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
   my $name   = $hash->{NAME};
   my $ident  = ($hash->{HELPER}{IDENT}?$hash->{HELPER}{IDENT}:$name)."_".$lt;
   my $myhost = $hash->{MYHOST}?$hash->{MYHOST}:"0.0.0.0";
+  my $myfqdn = $hash->{MYFQDN}?$hash->{MYFQDN}:"0.0.0.0";
   my $lf     = AttrVal($name, "logFormat", "IETF");
   my $tag    = AttrVal($name, "contDelimiter", "");         # Trennzeichen vor Content (z.B. für Synology nötig)
   my $data;
@@ -1376,6 +1376,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
 	  $day   =~ s/0/ / if($day =~ m/^0.*$/);                # in Tagen < 10 muss 0 durch Space ersetzt werden
 	  $ident = substr($ident,0, $RFC3164len{TAG});          # Länge TAG Feld begrenzen
 	  no warnings 'uninitialized'; 
+      $ident = $ident."[$hash->{SEQNO}]:";
       $data  = "<$prival>$month $day $time $myhost $ident $tag$otp";
 	  use warnings;
 	  $data = substr($data,0, ($RFC3164len{DL}-1));         # Länge Total begrenzen
@@ -1394,11 +1395,11 @@ sub Log2Syslog_setpayload ($$$$$$) {
       $ident  = substr($ident,0, ($RFC5425len{ID}-1));
       $pid    = substr($pid,0, ($RFC5425len{PID}-1));
       $mid    = substr($mid,0, ($RFC5425len{MID}-1));
-      $myhost = substr($myhost,0, ($RFC5425len{HST}-1));
+      $myfqdn = substr($myfqdn,0, ($RFC5425len{HST}-1));
       
       no warnings 'uninitialized';
       if ($IETFver == 1) {
-          $data = "<$prival>$IETFver $tim $myhost $ident $pid $mid $sdfield $tag$otp";
+          $data = "<$prival>$IETFver $tim $myfqdn $ident $pid $mid $sdfield $tag$otp";
       }
 	  use warnings;
   }
