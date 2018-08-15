@@ -140,6 +140,7 @@ sub CUL_HM_appFromQ($$);
 sub CUL_HM_autoReadReady($);
 sub CUL_HM_calcDisWm($$$);
 sub CUL_HM_statCnt(@);
+sub CUL_HM_trigLastEvent($$$$$);
 
 # ----------------modul globals-----------------------
 my $respRemoved; # used to control trigger of stack processing
@@ -7066,6 +7067,13 @@ sub CUL_HM_statCntRfresh($) {# update statistic once a day
   InternalTimer(gettimeofday()+3600*20,"CUL_HM_statCntRfresh","StatCntRfresh",0);
 }
 
+sub CUL_HM_trigLastEvent($$$$$){#set trigLast for central setting commands
+  my ($dst,$mTp,$p01,$p02,$chn) = @_;
+  my $name = CUL_HM_id2Name($dst.$chn);
+  return if (!defined $defs{$name});
+  CUL_HM_UpdtReadSingle($defs{$name},"trigLast","fhem:".$p01,1);
+}
+
 sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
   my ($hash) =  @_;
 
@@ -7810,14 +7818,15 @@ sub CUL_HM_DumpProtocol($$@) {
   my $hmProtocolEvents = int (AttrVal(CUL_HM_id2Name($src), "hmProtocolEvents",
                               AttrVal(InternalVal($iname,"owner_CCU",$iname), "hmProtocolEvents", 0)));
   use warnings;
-  return if(!$hmProtocolEvents);
 
   my $p01 = substr($p,0,2);
   my $p02 = substr($p,0,4);
   my $p11 = (length($p) > 2 ? substr($p,2,2) : "");
+  CUL_HM_trigLastEvent($dst,$mTp,$p01,$p02,$p11) if ($mTp eq "11" && $p01 =~ m/(02|03|80|81)/ && $p11);
+  return if(!$hmProtocolEvents);
 
   # decode message flags for printing
-  my $msgFlLong="";
+  my $msgFlLong   = "";
   my $msgFlagsHex = hex($msgFlags);
   for(my $i = 0; $i < @{$culHmCmdFlags}; $i++) {
     $msgFlLong .= ",".${$culHmCmdFlags}[$i] if($msgFlagsHex & (1<<$i));
