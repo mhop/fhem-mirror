@@ -7882,8 +7882,8 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
             if($addr<1 ||$addr>255);
   }
 
-  return "invalid:no peer for this register" if(($reg->{p} eq "n" && $peerId ne 0)
-                                              ||($reg->{p} eq "y" && $peerId eq 0));
+  return "invalid:no peer for this register" if(($reg->{p} eq "n" && hex($peerId) != 0)
+                                              ||($reg->{p} eq "y" && hex($peerId) == 0));
   my $dst = substr(CUL_HM_name2Id($name),0,6);
   if(!$regLN){
     $regLN = ($hash->{helper}{expert}{raw}?"":".")
