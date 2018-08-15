@@ -507,9 +507,10 @@ sub Log2Syslog_parsePayload($$) {
           $tail =~ /^(?<host>[^\s]*)?\s(?<tail>.*)$/;
           $host = $+{host};          # should 
           $tail = $+{tail};
-          $tail =~ /^((?<id>\w*(\[?.*(?!\\\]).\])?\s?)?:)\s(?<cont>.*)$/; 
+          $tail =~ /^(?<id>[\w\s]*)?(?<cont>\W.*)$/; 
           $id   = $+{id};            # should
-          if($id) {         
+          if($id) {
+              $id   = substr($id,0, ($RFC3164len{TAG}-1));           # Länge TAG-Feld nach RFC begrenzen
               $cont = $+{cont};      # should
           } else {
               $cont = $tail;
@@ -523,7 +524,7 @@ sub Log2Syslog_parsePayload($$) {
           $err = 1;
           Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");  
       } else {
-          
+          $cont =~ s/^(:\s*)(.*)$/$2/;
           if(looks_like_number($prival)) {
               $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
               $severity = $prival-($facility*8);
