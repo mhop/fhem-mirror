@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 59_WUup: added attribute unit_solarradiation
   - bugfix:  38_netatmo: removed heating home/room autocreate
   - feature: 46_SmartPi: exchange commandref, add NotifyFn
   - new:     00_MQTT2_SERVER / 10_MQTT2_DEVICE

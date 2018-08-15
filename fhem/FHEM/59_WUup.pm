@@ -32,7 +32,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-my $version = "0.9.8";
+my $version = "0.9.9";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -62,6 +62,7 @@ sub WUup_Initialize($) {
       . "disabledForIntervals "
       . "interval "
       . "unit_windspeed:km/h,m/s "
+      . "unit_solarradiation:W/m²,lux "
       . "round "
       . "wubaromin wudailyrainin wudewptf wuhumidity wurainin wusoilmoisture "
       . "wusoiltempf wusolarradiation wutempf wuUV wuwinddir wuwinddir_avg2m "
@@ -96,6 +97,8 @@ sub WUup_Define($$$) {
     $attr{$name}{room} = "Weather" if ( !defined( $attr{$name}{room} ) );
     $attr{$name}{unit_windspeed} = "km/h"
       if ( !defined( $attr{$name}{unit_windspeed} ) );
+    $attr{$name}{unit_solarradiation} = "lux"
+      if ( !defined( $attr{$name}{unit_solarradiation} ) );
     $attr{$name}{round} = 4 if ( !defined( $attr{$name}{round} ) );
 
     RemoveInternalTimer($hash);
@@ -230,6 +233,9 @@ sub WUup_send($) {
     $attr{$name}{unit_windspeed} = "km/h"
       if ( !defined( $attr{$name}{unit_windspeed} ) );
 
+    $attr{$name}{unit_solarradiation} = "lux"
+      if ( !defined( $attr{$name}{unit_solarradiation} ) );
+
     $attr{$name}{round} = 4 if ( !defined( $attr{$name}{round} ) );
 
     my ( $data, $d, $r, $o );
@@ -265,7 +271,14 @@ sub WUup_send($) {
             $value = UConv::mm2in( $value, $rnd );
         }
         elsif ( $key eq "solarradiation" ) {
-            $value = ( $value / 126.7 );
+
+            if ( $attr{$name}{unit_solarradiation} eq "lux" ) {
+                Log3 $name, 5, "WUup ($name) - solarradiation unit is lux";
+                $value = ( $value / 126.7 );
+            }
+            else {
+                Log3 $name, 5, "WUup ($name) - solarradiation unit is W/m²";
+            }
         }
         $data .= "&$key=$value";
     }
@@ -355,6 +368,7 @@ sub WUup_receive($) {
 # 2018-03-19 solarradiation calculated from lux to W/m² (thanks to dieter114)
 # 2018-04-10 added attribute round
 # 2018-04-13 added AqPM2.5 and AqPM10
+# 2018-08-15 added attribute unit_solarradiation
 #
 ################################################################################
 
@@ -408,6 +422,7 @@ sub WUup_receive($) {
         <li><b>disable</b> - disables the module</li>
         <li><b><a href="#disabledForIntervals">disabledForIntervals</a></b></li>
         <li><b>unit_windspeed</b> - change the units of your windspeed readings (m/s or km/h)</li>
+        <li><b>unit_solarradiation</b> - change the units of your solarradiation readings (lux or W/m&sup2;)</li>
         <li><b>round</b> - round values to this number of decimals for calculation (default 4)</li>
         <li><b>wu....</b> - Attribute name corresponding to 
 <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">parameter name from api.</a> 
@@ -419,8 +434,7 @@ sub WUup_receive($) {
             network as parameter "tempf" (which indicates current temperature)
             <br/>
             Units get converted to angloamerican system automatically 
-            (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/>
-            Solarradiation takes readings in lux and converts them to W/m&sup2;<br/><br/>
+            (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
         <u>The following information is supported:</u>
         <ul>
             <li>winddir - instantaneous wind direction (0-360) [&deg;]</li>
@@ -511,6 +525,8 @@ sub WUup_receive($) {
         <li><b><a href="#disabledForIntervals">disabledForIntervals</a></b></li>
         <li><b>unit_windspeed</b> - gibt die Einheit der Readings für die
         Windgeschwindigkeiten an (m/s oder km/h)</li>
+        <li><b>unit_solarradiation</b> - gibt die Einheit der Readings für die
+        Sonneneinstrahlung an (lux oder W/m&sup2;)</li>
         <li><b>round</b> - Anzahl der Nachkommastellen zur Berechnung (Standard 4)</li>
         <li><b>wu....</b> - Attributname entsprechend dem 
 <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">Parameternamen aus der API.</a><br />
@@ -521,8 +537,7 @@ sub WUup_receive($) {
         (welches die aktuelle Temperatur angibt).
         <br />
         Einheiten werden automatisch ins anglo-amerikanische System umgerechnet. 
-        (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/>
-        Solarradiation nimmt Readings in lux an und rechnet diese in W/m&sup2; um.<br/><br/>
+        (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
         <u>Unterst&uuml;tzte Angaben</u>
         <ul>
             <li>winddir - momentane Windrichtung (0-360) [&deg;]</li>
