@@ -30,6 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 4.8.4      15.08.2018       BSD parsing changed
 # 4.8.3      14.08.2018       BSD setpayload changed, BSD parsing changed, Internal MYFQDN 
 # 4.8.2      13.08.2018       rename makeMsgEvent to makeEvent
 # 4.8.1      12.08.2018       IETF-Syslog without VERSION changed, Log verbose 1 to 2 changed in parsePayload
@@ -84,7 +85,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.8.3";
+my $Log2SyslogVn = "4.8.4";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -487,7 +488,7 @@ sub Log2Syslog_parsePayload($$) {
   
   } elsif ($pp eq "BSD") { 
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
-      # Beispiel data "<$prival>$month $day $time $myhost $id: : $otp"
+      # Beispiel data "<$prival>$month $day $time $myhost $id: $otp"
       $data =~ /^<(?<prival>\d{1,3})>(?<tail>.*)$/;
       $prival = $+{prival};        # must
       $tail   = $+{tail}; 
@@ -503,10 +504,16 @@ sub Log2Syslog_parsePayload($$) {
       }      
       if($ts) {
           # Annahme: wenn Timestamp gesetzt, wird der Rest der Message ebenfalls dem Standard entsprechen
-          $tail =~ /(?<host>[^\s]*)?\s((?<id>\w*(\[?.*(?!\\\]).\])?\s?)\W?\s)?(?<cont>.*)$/;
-          $host = $+{host};          # should       
+          $tail =~ /^(?<host>[^\s]*)?\s(?<tail>.*)$/;
+          $host = $+{host};          # should 
+          $tail = $+{tail};
+          $tail =~ /^((?<id>\w*(\[?.*(?!\\\]).\])?\s?)?:)\s(?<cont>.*)$/; 
           $id   = $+{id};            # should
-          $cont = $+{cont};          # should
+          if($id) {         
+              $cont = $+{cont};      # should
+          } else {
+              $cont = $tail;
+          }
       } else {
           # andernfalls eher kein Standardaufbau
           $cont = $tail;
