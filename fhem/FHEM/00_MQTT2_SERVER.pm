@@ -37,6 +37,7 @@ MQTT2_SERVER_Initialize($)
   my @attrList = qw(
     disable:0,1
     disabledForIntervals
+    autocreate
     rawEvents:0,1
     SSL:0,1
   );
@@ -364,7 +365,8 @@ MQTT2_SERVER_doPublish($$$$;$)
   if($src->{cid}) { # "real" MQTT client
     my $cid = $src->{cid};
     $cid =~ s,[^a-z0-9._],_,gi;
-    Dispatch($tgt, "$cid:$tp:$val", undef, 1);
+    my $ac = AttrVal($tgt->{NAME}, "autocreate", undef) ? "autocreate:":"";
+    Dispatch($tgt, "$ac$cid:$tp:$val", undef, !$ac);
     my $re = AttrVal($tgt->{NAME}, "rawEvents", undef);
     DoTrigger($tgt->{NAME}, "$tp:$val") if($re && $tp =~ m/$re/);
   }
@@ -412,8 +414,10 @@ MQTT2_SERVER_calcRemainingLength($)
   my ($l) = @_;
   my @r;
   while($l > 0) {
-    unshift(@r, $l % 128);
+    my $eb = $l % 128;
     $l = int($l/128);
+    $eb += 128 if($l);
+    push(@r, $eb);
   }
   return pack("C*", @r);
 }
@@ -527,6 +531,13 @@ MQTT2_SERVER_getStr($$)
     <li>SSL<br>
       Enable SSL (i.e. TLS)
       </li><br>
+
+    <a name="autocreate"></a>
+    <li>autocreate<br>
+      If set, MQTT2_DEVICES will be automatically created upon receiving an
+      unknown message.
+      </li><br>
+
   </ul>
 </ul>
 =end html

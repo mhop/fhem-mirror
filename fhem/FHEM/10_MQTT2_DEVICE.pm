@@ -22,6 +22,7 @@ MQTT2_DEVICE_Initialize($)
   no warnings 'qw';
   my @attrList = qw(
     IODev
+    devicetopic
     disable:0,1
     disabledForIntervals
     readingList:textField-long
@@ -30,7 +31,8 @@ MQTT2_DEVICE_Initialize($)
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
-  $modules{MQTT2_DEVICE}{defptr} = ();
+  my %h = ( re=>{}, cid=>{});
+  $modules{MQTT2_DEVICE}{defptr} = \%h;
 }
 
 
@@ -42,9 +44,12 @@ MQTT2_DEVICE_Define($$)
   my @a = split("[ \t][ \t]*", $def);
   my $name = shift @a;
   my $type = shift @a; # always MQTT2_DEVICE
-  shift(@a) if(@a && $a[0] eq "autocreated");
+  $hash->{CID} = shift(@a) if(@a);
 
-  return "wrong syntax for $name: define <name> MQTT2_DEVICE" if(int(@a));
+  return "wrong syntax for $name: define <name> MQTT2_DEVICE [clientid]"
+        if(int(@a));
+  $hash->{DEVICETOPIC} = $name;
+  $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}} = $hash if($hash->{CID});
 
   AssignIoPort($hash);
   return undef;
@@ -56,7 +61,7 @@ MQTT2_DEVICE_Parse($$)
 {
   my ($iodev, $msg) = @_;
   my $ioname = $iodev->{NAME};
-  my @ret;
+  my %fnd;
 
   sub
   checkForGet($$$)
@@ -69,21 +74,35 @@ MQTT2_DEVICE_Parse($$)
     }
   }
 
+  my $autocreate;
+  if($msg =~ m/^autocreate:(.*)/) {
+    $msg = $1;
+    $autocreate = 1;
+  }
+
   my ($cid, $topic, $value) = split(":", $msg, 3);
-  my $dp = $modules{MQTT2_DEVICE}{defptr};
+  my $dp = $modules{MQTT2_DEVICE}{defptr}{re};
   foreach my $re (keys %{$dp}) {
-    next if(!("$topic:$value" =~ m/^$re$/s ||
-              "$cid:$topic:$value" =~ m/^$re$/s));
+    my $reAll = $re;
+    $reAll =~ s/\$DEVICETOPIC/\.\*/g;
+
+    next if(!("$topic:$value" =~ m/^$reAll$/s ||
+              "$cid:$topic:$value" =~ m/^$reAll$/s));
     foreach my $dev (keys %{$dp->{$re}}) {
       next if(IsDisabled($dev));
+      my $hash = $defs{$dev};
+      my $reRepl = $re;
+      $reRepl =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
+      next if(!("$topic:$value" =~ m/^$reRepl$/s ||
+                "$cid:$topic:$value" =~ m/^$reRepl$/s));
+
       my @retData;
       my $code = $dp->{$re}{$dev};
       Log3 $dev, 4, "MQTT2_DEVICE_Parse: $dev $topic => $code";
-      my $hash = $defs{$dev};
 
       if($code =~ m/^{.*}$/s) {
-        $code = EvalSpecials($code,
-                  ("%TOPIC"=>$topic, "%EVENT"=>$value, "%NAME"=>$hash->{NAME}));
+        $code = EvalSpecials($code, ("%TOPIC"=>$topic, "%EVENT"=>$value,
+                 "%DEVICETOPIC"=>$hash->{DEVICETOPIC}, "%NAME"=>$hash->{NAME}));
         my $ret = AnalyzePerlCommand(undef, $code);
         if($ret && ref $ret eq "HASH") {
           readingsBeginUpdate($hash);
@@ -101,32 +120,35 @@ MQTT2_DEVICE_Parse($$)
         checkForGet($hash, $code, $value);
       }
 
-      push @ret, $dev;
+      $fnd{$dev} = 1;
     }
   }
 
-  # autocreate, init readingList if message is a json string
-  # deactivated, as there are a lot of messages to be catched
-# if(!@ret) {
-#   my $nn = "MQTT2_$cid";
-#   if(!$defs{$nn} && $cid !~ m/mosqpub.*/) {
-#     PrioQueue_add(sub{
-#       return if(!$defs{$nn});
-#       if($value =~ m/^{.*}$/) {
-#         my %ret = json2nameValue($msg);
-#         if(keys %ret) {
-#           CommandAttr(undef,
-#                 "$nn readingList $cid:$topic:.* { json2nameValue(\$EVENT) }");
-#         }
-#       }
-#       $defs{$nn}{autocreated_on} = $msg;
-#     }, undef);
-#     return "UNDEFINED $nn MQTT2_DEVICE autocreated"
-#   }
-#   return "";
-# }
+  # autocreate and expand readingList
+  if($autocreate && !%fnd) {
+    return "" if($cid =~ m/mosqpub.*/);
+    my $cidHash = $modules{MQTT2_DEVICE}{defptr}{cid}{$cid};
+    my $nn = $cidHash ? $cidHash->{NAME} : "MQTT2_$cid";
+    PrioQueue_add(sub{
+      return if(!$defs{$nn});
+      my $add;
+      if($value =~ m/^{.*}$/) {
+        my $ret = json2nameValue($value);
+        $add = "{ json2nameValue(\$EVENT) }" if(keys %{$ret});
+      }
+      if(!$add) {
+        $topic =~ m,[^/]*/(.*),;
+        $add = ($1 ? $1 : $topic);
+      }
+      my $rl = AttrVal($nn, "readingList", "");
+      $rl .= "\n" if($rl);
+      CommandAttr(undef, "$nn readingList $rl$cid:$topic:.* $add");
+    }, undef);
+    return "UNDEFINED $nn MQTT2_DEVICE $cid" if(!$cidHash);
+    return "";
+  }
 
-  return @ret;
+  return keys %fnd;
 }
 
 sub
@@ -170,6 +192,7 @@ MQTT2_DEVICE_Get($@)
     $cmd .= " ".join(" ",@a) if(@a);
   }
 
+  $cmd =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
   IOWrite($hash, split(" ",$cmd,2));
   return undef;
 }
@@ -198,6 +221,8 @@ MQTT2_DEVICE_Set($@)
     shift @a;
     $cmd .= " ".join(" ",@a) if(@a);
   }
+
+  $cmd =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
   IOWrite($hash, split(" ",$cmd,2));
   return undef;
 }
@@ -207,6 +232,12 @@ sub
 MQTT2_DEVICE_Attr($$)
 {
   my ($type, $dev, $attrName, $param) = @_;
+  my $hash = $defs{$dev};
+
+  if($attrName eq "devicetopic") {
+    $hash->{DEVICETOPIC} = ($type eq "del" ? $hash->{NAME} : $param);
+    return undef;
+  }
 
   if($attrName =~ m/(.*)List/) {
     my $atype = $1;
@@ -217,6 +248,7 @@ MQTT2_DEVICE_Attr($$)
     }
 
     return "$dev attr $attrName: more parameters needed" if(!$param); #90145
+
     foreach my $el (split("\n", $param)) {
       my ($par1, $par2) = split(" ", $el, 2);
       next if(!$par1);
@@ -226,8 +258,9 @@ MQTT2_DEVICE_Attr($$)
 
       if($atype eq "reading") {
         if($par2 =~ m/^{.*}$/) {
-          my $ret = perlSyntaxCheck($par2,
-                ("%TOPIC"=>1, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9", "%NAME"=>$dev));
+          my $ret = perlSyntaxCheck($par2, 
+                ("%TOPIC"=>1, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9",
+                 "%NAME"=>$dev, "%DEVICETOPIC"=>$hash->{DEVICETOPIC}));
           return $ret if($ret);
         } else {
           return "unsupported character in readingname $par2"
@@ -249,7 +282,7 @@ sub
 MQTT2_DEVICE_delReading($)
 {
   my ($name) = @_;
-  my $dp = $modules{MQTT2_DEVICE}{defptr};
+  my $dp = $modules{MQTT2_DEVICE}{defptr}{re};
   foreach my $re (keys %{$dp}) {
     if($dp->{$re}{$name}) {
       delete($dp->{$re}{$name});
@@ -264,7 +297,7 @@ MQTT2_DEVICE_addReading($$)
   my ($name, $param) = @_;
   foreach my $line (split("\n", $param)) {
     my ($re,$code) = split(" ", $line,2);
-    $modules{MQTT2_DEVICE}{defptr}{$re}{$name} = $code;
+    $modules{MQTT2_DEVICE}{defptr}{re}{$re}{$name} = $code;
   }
 }
 
@@ -285,6 +318,7 @@ MQTT2_DEVICE_Undef($$)
 {
   my ($hash, $arg) = @_;
   MQTT2_DEVICE_delReading($arg);
+  delete $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}} if($hash->{CID});
   return undef;
 }
 
@@ -331,6 +365,13 @@ MQTT2_DEVICE_Undef($$)
   <b>Attributes</b>
   <ul>
 
+    <a name="devicetopic"></a>
+    <li>devicetopic value<br>
+      replace $DEVICETOPIC in the topic part of readingList, setList and
+      getList with value. if not set, $DEVICETOPIC will be replaced with the
+      name of the device.
+      </li><br>
+
     <li><a href="#disable">disable</a><br>
         <a href="#disabledForIntervals">disabledForIntervals</a></li><br>
 
@@ -352,10 +393,10 @@ MQTT2_DEVICE_Undef($$)
       </code><br>
       Notes:
       <ul>
-        <li>in the perl expression the variables $TOPIC and $EVENT are
-          available (the letter containing the whole message), as well as
-          $EVTPART0, $EVTPART1, ... each containing a single word of the
-          message.</li>
+        <li>in the perl expression the variables $TOPIC, $NAME, $DEVICETOPIC 
+          and $EVENT are available (the letter containing the whole message),
+          as well as $EVTPART0, $EVTPART1, ... each containing a single word of
+          the message.</li>
         <li>the helper function json2nameValue($EVENT) can be used to parse a
           json encoded value. Importing all values from a Sonoff device with a
           Tasmota firmware can be done with:
