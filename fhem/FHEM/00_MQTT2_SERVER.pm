@@ -2,7 +2,7 @@
 # $Id$
 package main;
 
-# TODO: autocreate, save retain, test SSL
+# TODO: save retain, test SSL
 
 use strict;
 use warnings;
