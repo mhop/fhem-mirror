@@ -853,8 +853,7 @@ sub Vallox_InterpretAndUpdate(@) {
             || $rawReadingType eq "AB"
             || $rawReadingType eq "B0"
             || $rawReadingType eq "B1"
-            || $rawReadingType eq "B3"
-            || $rawReadingType eq "B4" )
+            )
         {
             $fineReadingValue = sprintf( "%d", hex "0x" . $rawReadingValue );
             Log3( $name, 4,
@@ -1213,8 +1212,13 @@ sub Vallox_InterpretAndUpdate(@) {
         else {
             $fineReadingValue = $rawReadingValue;
             $singlereading    = 1;
-
-            Log3( $name, 2, "Vallox: Incoming unhandled datagram: $datagram" );
+            if ( $rawReadingType eq "B3" ) {
+                Log3( $name, 4, "Vallox: Incoming CO2SetPoint-Part (Upper): $datagram");
+            } elsif ( $rawReadingType eq "B4" ) {
+                Log3( $name, 4, "Vallox: Incoming CO2SetPoint-Part (Lower): $datagram");
+            } else {
+                Log3( $name, 2, "Vallox: Incoming unhandled datagram: $datagram" );
+            }
         }
 
         if ( $Vallox_datatypes{$rawReadingType} ) {
@@ -1223,6 +1227,13 @@ sub Vallox_InterpretAndUpdate(@) {
 
                 readingsSingleUpdate( $hash, $Vallox_datatypes{$rawReadingType},
                     $fineReadingValue, 1 );
+
+		# If this is a CO2SetPointLower && CO2SetPointUpper has been set, write CO2SetPoint
+		if ($rawReadingType eq "B4" && ReadingsVal( $name, "CO2SetPointUpper", "unknown" ) ne "unknown" ) {
+		    my $CO2SetPoint =  ReadingsVal( $name, "CO2SetPointUpper", "unknown" ) . $fineReadingValue;
+                    
+                    readingsSingleUpdate( $hash, "CO2SetPoint", hex $CO2SetPoint  , 1 );
+		}
 
                 # Efficiency Calculation
                 # Is this Reading a Temp?
@@ -1396,6 +1407,107 @@ sub Vallox_InterpretAndUpdate(@) {
 
 }
 
+
+##############################################
+# Create Datagram and send it (Set)
+##############################################
+sub Vallox_CreateAndSend(@) {
+
+    my ( $hash, $domain, $sender, $receiver, $datatype, $datavalue, $broadcast ) = @_;
+
+    my $name = $hash->{NAME};
+    my $checksum;
+    my $msg;
+    
+    if ($broadcast == 1) {
+        
+        ## Send to all Remotes
+        $checksum = ( $domain + $sender + 0x20 + $datatype + $datavalue ) % 0x100;
+        $msg =
+          lc(
+                sprintf( "%02x", $domain )
+              . sprintf( "%02x", $sender )
+              . sprintf( "%02x", 0x20 )
+              . sprintf( "%02x", $datatype )
+              . sprintf( "%02x", $datavalue )
+              . sprintf( "%02x", $checksum ) );
+
+        DevIo_SimpleWrite( $hash, $msg, 1 );
+        Log3( $name, 3, "Vallox: Command " . $msg . " has been sent." );
+        
+        
+        ## Send to all ventilation units
+        $checksum = ( $domain + $sender + 0x10 + $datatype + $datavalue ) % 0x100;
+        $msg =
+          lc(
+                sprintf( "%02x", $domain )
+              . sprintf( "%02x", $sender )
+              . sprintf( "%02x", 0x10 )
+              . sprintf( "%02x", $datatype )
+              . sprintf( "%02x", $datavalue )
+              . sprintf( "%02x", $checksum ) );
+
+        DevIo_SimpleWrite( $hash, $msg, 1 );
+        Log3( $name, 3, "Vallox: Command " . $msg . " has been sent." );
+        
+    }
+    
+    $checksum = ( $domain + $sender + $receiver + $datatype + $datavalue ) % 0x100;
+    $msg =
+      lc(
+            sprintf( "%02x", $domain )
+          . sprintf( "%02x", $sender )
+          . sprintf( "%02x", $receiver )
+          . sprintf( "%02x", $datatype )
+          . sprintf( "%02x", $datavalue )
+          . sprintf( "%02x", $checksum ) );
+
+    DevIo_SimpleWrite( $hash, $msg, 1 );
+
+    Log3( $name, 3, "Vallox: Command " . $msg . " has been sent." );
+
+    if ( AttrVal( $hash->{NAME}, "ValloxProcessOwnCommands", "0" ) == 1
+        || $hash->{BusVersion} eq "1" )
+    {
+
+        Vallox_InterpretAndUpdate( $hash, $msg );
+        Log3( $name, 3,
+            "Vallox: Command " . $msg . " has been internal processed." );
+
+    }
+    if ( AttrVal( $hash->{NAME}, "ValloxForceBroadcast", "0" ) == 1
+        || $hash->{BusVersion} eq "1" )
+    {
+        $checksum =
+          ( $domain + $sender + 0x10 + $datatype + $datavalue ) % 0x100;
+        $msg =
+          lc(
+                sprintf( "%02x", $domain )
+              . sprintf( "%02x", $sender )
+              . 10
+              . sprintf( "%02x", $datatype )
+              . sprintf( "%02x", $datavalue )
+              . sprintf( "%02x", $checksum ) );
+        DevIo_SimpleWrite( $hash, $msg, 1 );
+        Log3( $name, 3,
+            "Vallox: Broadcast-Command " . $msg . " has been sent." );
+
+        $checksum =
+          ( $domain + $sender + 0x20 + $datatype + $datavalue ) % 0x100;
+        $msg =
+          lc(
+                sprintf( "%02x", $domain )
+              . sprintf( "%02x", $sender )
+              . 20
+              . sprintf( "%02x", $datatype )
+              . sprintf( "%02x", $datavalue )
+              . sprintf( "%02x", $checksum ) );
+        DevIo_SimpleWrite( $hash, $msg, 1 );
+        Log3( $name, 3,
+            "Vallox: Broadcast-Command " . $msg . " has been sent." );
+    }
+}
+
 ##############################################
 # Default Functions
 ##############################################
@@ -1490,13 +1602,25 @@ sub Vallox_Get($@) {
 
     # "reading" is a predefined list of readings from the bus
     if ( $cmd eq "reading" ) {
+        
+        if ($arg eq "CO2SetPoint") {
+            
+            my $msg = Vallox_CreateMsg( $hash, "b3" );
+            DevIo_SimpleWrite( $hash, $msg, 1 );
+            Log3( $name, 3, "Vallox: Request " . $msg . " has been sent." );
+            
+            my $msg = Vallox_CreateMsg( $hash, "b4" );
+            DevIo_SimpleWrite( $hash, $msg, 1 );
+            Log3( $name, 3, "Vallox: Request " . $msg . " has been sent." );
+            
+        } else {
+            my $argKey = $Vallox_datatypesReverse{$arg};
+            my $msg = Vallox_CreateMsg( $hash, $argKey );
 
-        my $argKey = $Vallox_datatypesReverse{$arg};
-        my $msg = Vallox_CreateMsg( $hash, $argKey );
+            DevIo_SimpleWrite( $hash, $msg, 1 );
 
-        DevIo_SimpleWrite( $hash, $msg, 1 );
-
-        Log3( $name, 3, "Vallox: Request " . $msg . " has been sent." );
+            Log3( $name, 3, "Vallox: Request " . $msg . " has been sent." );
+        }
         return undef;
 
         # "update" shall be ask for all possible data.
@@ -1532,14 +1656,18 @@ sub Vallox_Get($@) {
         my $readingCount = keys %Vallox_datatypesReverse;
 
         $retmsg .= join( " ", @commandList ) if ( $commandCount > 0 );
-        $retmsg .= " reading:" . join( ",", sort @readingList )
-          if ( $readingCount > 0 );
+        if ( $readingCount > 0 ) {
+            $retmsg .= " reading:" . join( ",", sort @readingList );
+            
+            $retmsg .= ",CO2SetPoint";
+            $readingCount = $readingCount + 1;
+        }
 
         ## Ich kann nicht alle befehle bulken. ... :(
         # $retmsg .= " update:noArg";
 
         Log3( $name, 2, "Vallox: Unknown argument $cmd." )
-          if ( $cmd ne '?' && $cmd ne '' );
+          if ( $cmd ne '?' && length $cmd );
         return "Unknown argument $cmd, choose one of " . $retmsg;
     }
 }
@@ -1547,8 +1675,10 @@ sub Vallox_Get($@) {
 ##################################
 sub Vallox_Set($@) {
     my ( $hash, @a ) = @_;
-    return "\"set Vallox\" needs at least an argument" if ( @a < 2 );
-
+    if ( @a < 2 ) {
+        return "\"set Vallox\" needs at least an argument";
+    }
+    
     my $domain = hex "0x"
       . AttrVal( $hash->{NAME}, "ValloxIDDomain", "01" )
       ;    # Domain (1 by default)
@@ -1556,6 +1686,8 @@ sub Vallox_Set($@) {
       . AttrVal( $hash->{NAME}, "ValloxIDFHEM", "2F" );    # ID of this FHEM
     my $receiver = hex "0x"
       . AttrVal( $hash->{NAME}, "ValloxIDCentral", "11" );   # ID of the central
+
+    my $broadcast = 0;
 
     my $name = shift @a;
     my $cmd  = shift @a;
@@ -1575,6 +1707,12 @@ sub Vallox_Set($@) {
     $setCommands .= " BasicHumidityLevel:slider,0,1,100";
     $setCommands .= " HeatRecoveryCellBypassSetpointTemperature:slider,0,1,20";
     $setCommands .= " ServiceReminderMonths:slider,1,1,15";
+    $setCommands .= " DCFanInputAdjustment:slider,0,1,100";
+    $setCommands .= " DCFanOutputAdjustment:slider,0,1,100";
+    $setCommands .= " CellDefrostingSetpointTemperature:slider,0,1,10";
+    $setCommands .= " HeatingSetPoint:slider,10,1,30";
+    $setCommands .= " CO2SetPoint:slider,500,100,2000";
+
 
     foreach my $MR_key ( keys %Vallox_multiReadingTable_realcmd ) {
         $setCommands .= " " . $MR_key . ":0,1";
@@ -1587,16 +1725,16 @@ sub Vallox_Set($@) {
     {
 
         # TODO: Integrate get before set;
-        return
-            "Vallox: Internal "
-          . $Vallox_multiReadingTable_realcmd{$cmd}
-          . " empty ("
-          . $hash->{ "MR_" . $cmd }
-          . "). Read "
-          . $Vallox_multiReadingTable_realcmd{$cmd}
-          . " first!"
-          if (
-            $hash->{ "MR_" . $Vallox_multiReadingTable_realcmd{$cmd} } eq "" );
+        if ($hash->{ "MR_" . $Vallox_multiReadingTable_realcmd{$cmd} } ) {
+            return
+                "Vallox: Internal "
+              . $Vallox_multiReadingTable_realcmd{$cmd}
+              . " empty ("
+              . $hash->{ "MR_" . $cmd }
+              . "). Read "
+              . $Vallox_multiReadingTable_realcmd{$cmd}
+              . " first!";
+        }
 
         $arg = Vallox_ReplaceBit(
             $hash,
@@ -1611,86 +1749,61 @@ sub Vallox_Set($@) {
 
         $datatype = hex "0x" . $Vallox_datatypesReverse{$cmd};
 
+	# Method: FSM
         if ( $datatype == 0x29 || $datatype == 0xA5 || $datatype == 0xA9 ) {
             $datavalue = hex "0x" . $Vallox_levelTableReverse{$arg};
         }
-        elsif ( $datatype == 0xae ) {
+	# Method: PCTM
+        elsif ( $datatype == 0xAE ) {
             $datavalue = hex "0x" . $Vallox_percentageTableReverse{$arg};
         }
-        elsif ( $datatype == 0xaf ) {
+	# Method: TM
+        elsif ( $datatype == 0xA4  || $datatype == 0xAF ) {
             $datavalue = hex "0x" . $Vallox_temperatureTableReverse{$arg};
         }
+	# Method: DF
+        elsif ( $datatype == 0xA6 || $datatype == 0xB0 || $datatype == 0xB1 ) {
+            $datavalue = hex "0x" . sprintf("%x", $arg);
+        }
+        # Method: CDSTF
+        elsif ( $datatype == 0xB2 ) {
+            $datavalue = hex "0x" . sprintf("%x", $arg * 3);
+        }
+	# All other is Hex Input
         else {
             $datavalue = hex "0x" . $arg;
         }
 
+        Vallox_CreateAndSend($hash, $domain, $sender, $receiver, $datatype, $datavalue, $broadcast);
+    }
+    elsif ( $cmd eq "CO2SetPoint" ) {
+        $broadcast = 1;
+        
+        my $datatype_high  = hex "0xb3";
+        my $datavalue_high = hex "0x" . substr( sprintf("%04x", $arg), 0, 2 );
+        Vallox_CreateAndSend($hash, $domain, $sender, $receiver, $datatype_high, $datavalue_high, $broadcast);
+        
+        ## Sleep is needed due to broadcast. Message cache on bus devices seems very limited.
+        sleep(1);
+        
+        my $datatype_low  = hex "0xb4";
+        my $datavalue_low = hex "0x" . substr( sprintf("%04x", $arg), 2, 2 );
+        Vallox_CreateAndSend($hash, $domain, $sender, $receiver, $datatype_low, $datavalue_low, $broadcast);
+        
     }
     elsif ( $cmd eq "raw" ) {
 
         $datatype  = hex "0x" . substr( $arg, 0, 2 );
         $datavalue = hex "0x" . substr( $arg, 2, 2 );
 
+        Vallox_CreateAndSend($hash, $domain, $sender, $receiver, $datatype, $datavalue, $broadcast);
     }
     else {
         Log3( $name, 2, "Vallox: Unknown argument $cmd." )
-          if ( $cmd ne '?' && $cmd ne '' );
+          if ( $cmd ne '?' && length $cmd );
         return "Unknown argument $cmd, choose one of " . $setCommands;
     }
-
-    my $checksum =
-      ( $domain + $sender + $receiver + $datatype + $datavalue ) % 0x100;
-    my $msg =
-      lc(
-            sprintf( "%02x", $domain )
-          . sprintf( "%02x", $sender )
-          . sprintf( "%02x", $receiver )
-          . sprintf( "%02x", $datatype )
-          . sprintf( "%02x", $datavalue )
-          . sprintf( "%02x", $checksum ) );
-
-    DevIo_SimpleWrite( $hash, $msg, 1 );
-    Log3( $name, 3, "Vallox: Command " . $msg . " has been sent." );
-
-    if ( AttrVal( $hash->{NAME}, "ValloxProcessOwnCommands", "0" ) == 1
-        || $hash->{BusVersion} eq "1" )
-    {
-
-        Vallox_InterpretAndUpdate( $hash, $msg );
-        Log3( $name, 3,
-            "Vallox: Command " . $msg . " has been internal processed." );
-
-    }
-    if ( AttrVal( $hash->{NAME}, "ValloxForceBroadcast", "0" ) == 1
-        || $hash->{BusVersion} eq "1" )
-    {
-        $checksum =
-          ( $domain + $sender + 0x10 + $datatype + $datavalue ) % 0x100;
-        $msg =
-          lc(
-                sprintf( "%02x", $domain )
-              . sprintf( "%02x", $sender )
-              . 10
-              . sprintf( "%02x", $datatype )
-              . sprintf( "%02x", $datavalue )
-              . sprintf( "%02x", $checksum ) );
-        DevIo_SimpleWrite( $hash, $msg, 1 );
-        Log3( $name, 3,
-            "Vallox: Broadcast-Command " . $msg . " has been sent." );
-
-        $checksum =
-          ( $domain + $sender + 0x20 + $datatype + $datavalue ) % 0x100;
-        $msg =
-          lc(
-                sprintf( "%02x", $domain )
-              . sprintf( "%02x", $sender )
-              . 20
-              . sprintf( "%02x", $datatype )
-              . sprintf( "%02x", $datavalue )
-              . sprintf( "%02x", $checksum ) );
-        DevIo_SimpleWrite( $hash, $msg, 1 );
-        Log3( $name, 3,
-            "Vallox: Broadcast-Command " . $msg . " has been sent." );
-    }
+    
 
     return undef;
 
