@@ -4205,7 +4205,7 @@ SYSMON_Exec_Ssh($$)
      $p_tmp = ' -p '.$port.' ';
    }
    
-   my $call = "ssh ".$p_tmp.$user."\@".$host." ".$cmd;
+   my $call = "ssh ".$p_tmp.$user."\@".$host." ".'"'.$cmd.'"';
    SYSMON_Log ($hash, 5, "Call: '".$call."'");
    $call = $t_sshpass.$call;
    
