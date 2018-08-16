@@ -10,11 +10,11 @@
 #
 # This file is part of the PiXtend(R) Project.
 #
-# For more information about PiXtendV2(R) and this program,
+# For more information about PiXtend(R) and this program,
 # see <http://www.PiXtend.de> or <http://www.PiXtend.com>
 #
-# Copyright (C) 2014-2017 Tobias Sperling
-# Qube Solutions UG (haftungsbeschränkt), Arbachtalstr. 6
+# Copyright (C) 2014-2018 Tobias Sperling
+# Qube Solutions GmbH, Arbachtalstr. 6
 # 72800 Eningen, Germany
 #
 # This program is free software: you can redistribute it and/or modify
@@ -37,8 +37,12 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday usleep);
 
-my $modul_ver = "1.00";
+my $modul_ver = "1.02";
 
+
+#####################################
+# Configuration for Model -S-
+#####################################
 my @PiXtendV2S_Set = (
 	"_JumperSettingAI0:10V,5V",
 	"_JumperSettingAI1:10V,5V",
@@ -49,6 +53,7 @@ my @PiXtendV2S_Set = (
 	"_GPIOPullupsEnable:no,yes",
 	"_WatchdogEnable:disabled,125ms,1s,8s",
 	"_StateLEDDisable:no,yes",
+	
 	"Reset:noArg",
 	"SafeState:noArg",
 	"RetainCopy:off,on",
@@ -156,21 +161,25 @@ sub BufferRead_S($$) {
 	readingsBulkUpdateIfChanged($hash, "UCState", $buffer->[3], 1);
 	readingsBulkUpdateIfChanged($hash, "UCWarnings", $buffer->[4], 1);
 	
+	#DigitalIn
 	for(my $i=0; $i < 8; $i++){
 		if($buffer->[9] & (1<<$i)) { readingsBulkUpdateIfChanged($hash, "DigitalIn$i", "on", 1);}
 		else { readingsBulkUpdateIfChanged($hash, "DigitalIn$i", "off", 1);}
 	}
 	
+	#AnalogIn
 	$str = sprintf("%.2f", (($buffer->[10] | ($buffer->[11] << 8))*($hash->{DataOut}{JumperAI0})/1024));
 	readingsBulkUpdateIfChanged($hash, "AnalogIn0", $str, 1);
 	$str = sprintf("%.2f", (($buffer->[12] | ($buffer->[13] << 8))*($hash->{DataOut}{JumperAI1})/1024));
 	readingsBulkUpdateIfChanged($hash, "AnalogIn1", $str, 1);
 	
+	#GPIOIn
 	for(my $i=0; $i < 4; $i++){
 		if($buffer->[14] & (1<<$i)) { readingsBulkUpdateIfChanged($hash, "GPIOIn$i", "on", 1);}
 		else { readingsBulkUpdateIfChanged($hash, "GPIOIn$i", "off", 1);}
 	}
 	
+	#DHTs
 	for(my $i=0; $i < 4; $i++){
 		my $temp = ($buffer->[15+(4*$i)] | ($buffer->[16+(4*$i)] << 8));
 		my $humi = ($buffer->[17+(4*$i)] | ($buffer->[18+(4*$i)] << 8));
@@ -224,6 +233,262 @@ sub BufferRead_S($$) {
 }
 
 #####################################
+# Configuration for Model -L-
+#####################################
+
+my @PiXtendV2L_Set = (
+	"_JumperSettingAI0:10V,5V",
+	"_JumperSettingAI1:10V,5V",
+	"_JumperSettingAI2:10V,5V",
+	"_JumperSettingAI3:10V,5V",
+	"_GPIO0Ctrl:input,output,DHT11,DHT22",
+	"_GPIO1Ctrl:input,output,DHT11,DHT22",
+	"_GPIO2Ctrl:input,output,DHT11,DHT22",
+	"_GPIO3Ctrl:input,output,DHT11,DHT22",
+	"_GPIOPullupsEnable:no,yes",
+	"_WatchdogEnable:disabled,125ms,1s,8s",
+	"_StateLEDDisable:no,yes",
+	
+	"Reset:noArg",
+	"SafeState:noArg",
+	"RetainCopy:off,on",
+	"RetainEnable:off,on",
+	"DigitalDebounce01:textField",
+	"DigitalDebounce23:textField",
+	"DigitalDebounce45:textField",
+	"DigitalDebounce67:textField",
+	"DigitalDebounce89:textField",
+	"DigitalDebounce1011:textField",
+	"DigitalDebounce1213:textField",
+	"DigitalDebounce1415:textField",
+	"DigitalOut0:on,off,toggle",
+	"DigitalOut1:on,off,toggle",
+	"DigitalOut2:on,off,toggle",
+	"DigitalOut3:on,off,toggle",
+	"DigitalOut4:on,off,toggle",
+	"DigitalOut5:on,off,toggle",
+	"DigitalOut6:on,off,toggle",
+	"DigitalOut7:on,off,toggle",
+	"DigitalOut8:on,off,toggle",
+	"DigitalOut9:on,off,toggle",
+	"DigitalOut10:on,off,toggle",
+	"DigitalOut11:on,off,toggle",
+	"RelayOut0:on,off,toggle",
+	"RelayOut1:on,off,toggle",
+	"RelayOut2:on,off,toggle",
+	"RelayOut3:on,off,toggle",
+	"GPIOOut0:on,off,toggle",
+	"GPIOOut1:on,off,toggle",
+	"GPIOOut2:on,off,toggle",
+	"GPIOOut3:on,off,toggle",
+	"GPIODebounce01:textField",
+	"GPIODebounce23:textField",
+	"PWM0Ctrl0:textField",
+	"PWM0Ctrl1:slider,0,1,65535",
+	"PWM0A:slider,0,1,65535",
+	"PWM0B:slider,0,1,65535",
+	"PWM1Ctrl0:textField",
+	"PWM1Ctrl1:slider,0,1,65535",
+	"PWM1A:slider,0,1,65535",
+	"PWM1B:slider,0,1,65535",
+	"PWM2Ctrl0:textField",
+	"PWM2Ctrl1:slider,0,1,65535",
+	"PWM2A:slider,0,1,65535",
+	"PWM2B:slider,0,1,65535",
+	"AnalogOut0:slider,0.00,0.01,10.00,1",
+	"AnalogOut1:slider,0.00,0.01,10.00,1",
+	"RetainDataOut:textField"
+);
+	
+my @PiXtendV2L_Get = (
+	"Version:noArg",
+	"SysState:noArg",
+	"UCState:noArg",
+	"UCWarnings:noArg",
+	"DigitalIn0:noArg",
+	"DigitalIn1:noArg",
+	"DigitalIn2:noArg",
+	"DigitalIn3:noArg",
+	"DigitalIn4:noArg",
+	"DigitalIn5:noArg",
+	"DigitalIn6:noArg",
+	"DigitalIn7:noArg",
+	"DigitalIn8:noArg",
+	"DigitalIn9:noArg",
+	"DigitalIn10:noArg",
+	"DigitalIn11:noArg",
+	"DigitalIn12:noArg",
+	"DigitalIn13:noArg",
+	"DigitalIn14:noArg",
+	"DigitalIn15:noArg",
+	"AnalogIn0:noArg",
+	"AnalogIn1:noArg",
+	"AnalogIn2:noArg",
+	"AnalogIn3:noArg",
+	"AnalogIn4:noArg",
+	"AnalogIn5:noArg",
+	"GPIOIn0:noArg",
+	"GPIOIn1:noArg",
+	"GPIOIn2:noArg",
+	"GPIOIn3:noArg",
+	"Sensor0:temperature,humidity",
+	"Sensor1:temperature,humidity",
+	"Sensor2:temperature,humidity",
+	"Sensor3:temperature,humidity",
+	"RetainDataIn:textField"
+);
+
+sub BufferWrite_L($$) {
+	my ($buffer, $hash) = @_;
+	
+	if($hash->{DataOut}{DigitalDebounce01})		{$buffer->[9] = ($hash->{DataOut}{DigitalDebounce01});}
+	if($hash->{DataOut}{DigitalDebounce23})		{$buffer->[10] = ($hash->{DataOut}{DigitalDebounce23});}
+	if($hash->{DataOut}{DigitalDebounce45})		{$buffer->[11] = ($hash->{DataOut}{DigitalDebounce45});}
+	if($hash->{DataOut}{DigitalDebounce67})		{$buffer->[12] = ($hash->{DataOut}{DigitalDebounce67});}
+	if($hash->{DataOut}{DigitalDebounce89})		{$buffer->[13] = ($hash->{DataOut}{DigitalDebounce89});}
+	if($hash->{DataOut}{DigitalDebounce1011})	{$buffer->[14] = ($hash->{DataOut}{DigitalDebounce1011});}
+	if($hash->{DataOut}{DigitalDebounce1213})	{$buffer->[15] = ($hash->{DataOut}{DigitalDebounce1213});}
+	if($hash->{DataOut}{DigitalDebounce1415})	{$buffer->[16] = ($hash->{DataOut}{DigitalDebounce1415});}
+	if($hash->{DataOut}{DigitalOut})			{$buffer->[17] = (($hash->{DataOut}{DigitalOut}) & 0xFF);
+												 $buffer->[18] = (($hash->{DataOut}{DigitalOut}) >> 8);}
+	if($hash->{DataOut}{RelayOut})				{$buffer->[19] = ($hash->{DataOut}{RelayOut});}
+	if($hash->{DataOut}{GPIOCtrl0})				{$buffer->[20] = ($hash->{DataOut}{GPIOCtrl0});}
+	if($hash->{DataOut}{GPIOOut})				{$buffer->[21] = ($hash->{DataOut}{GPIOOut});}
+	if($hash->{DataOut}{GPIODebounce01})		{$buffer->[22] = ($hash->{DataOut}{GPIODebounce01});}
+	if($hash->{DataOut}{GPIODebounce23})		{$buffer->[23] = ($hash->{DataOut}{GPIODebounce23});}
+	
+	if($hash->{DataOut}{PWMCtrl00})				{$buffer->[24] = ($hash->{DataOut}{PWMCtrl00});}
+	if($hash->{DataOut}{PWMCtrl01})				{$buffer->[25] = (($hash->{DataOut}{PWMCtrl01}) & 0xFF);
+												 $buffer->[26] = (($hash->{DataOut}{PWMCtrl01}) >> 8);}
+	if($hash->{DataOut}{PWM0a})					{$buffer->[27] = (($hash->{DataOut}{PWM0a}) & 0xFF);
+												 $buffer->[28] = (($hash->{DataOut}{PWM0a}) >> 8);}
+	if($hash->{DataOut}{PWM0b})					{$buffer->[29] = (($hash->{DataOut}{PWM0b}) & 0xFF);
+												 $buffer->[30] = (($hash->{DataOut}{PWM0b}) >> 8);}
+	
+	if($hash->{DataOut}{PWMCtrl10})				{$buffer->[31] = ($hash->{DataOut}{PWMCtrl10});}
+	if($hash->{DataOut}{PWMCtrl11})				{$buffer->[32] = (($hash->{DataOut}{PWMCtrl11}) & 0xFF);
+												 $buffer->[33] = (($hash->{DataOut}{PWMCtrl11}) >> 8);}
+	if($hash->{DataOut}{PWM1a})					{$buffer->[34] = (($hash->{DataOut}{PWM1a}) & 0xFF);
+												 $buffer->[35] = (($hash->{DataOut}{PWM1a}) >> 8);}
+	if($hash->{DataOut}{PWM1b})					{$buffer->[36] = (($hash->{DataOut}{PWM1b}) & 0xFF);
+												 $buffer->[37] = (($hash->{DataOut}{PWM1b}) >> 8);}
+
+	if($hash->{DataOut}{PWMCtrl20})				{$buffer->[38] = ($hash->{DataOut}{PWMCtrl20});}
+	if($hash->{DataOut}{PWMCtrl21})				{$buffer->[39] = (($hash->{DataOut}{PWMCtrl21}) & 0xFF);
+												 $buffer->[40] = (($hash->{DataOut}{PWMCtrl21}) >> 8);}
+	if($hash->{DataOut}{PWM2a})					{$buffer->[41] = (($hash->{DataOut}{PWM2a}) & 0xFF);
+												 $buffer->[42] = (($hash->{DataOut}{PWM2a}) >> 8);}
+	if($hash->{DataOut}{PWM2b})					{$buffer->[43] = (($hash->{DataOut}{PWM2b}) & 0xFF);
+												 $buffer->[44] = (($hash->{DataOut}{PWM2b}) >> 8);}
+	for(my $i=0; $i < ($hash->{RetainSize}); $i++){
+		if($hash->{DataOut}{"RetainDataOut".$i})		{$buffer->[45+$i] = ($hash->{DataOut}{"RetainDataOut".$i});}
+	}
+}
+
+sub BufferRead_L($$) {
+	my ($buffer, $hash) = @_;
+	my $str;
+	
+	readingsBeginUpdate($hash);
+	
+	readingsBulkUpdateIfChanged($hash, "Firmware", $buffer->[0], 0);
+	readingsBulkUpdateIfChanged($hash, "Hardware", $buffer->[1], 0);
+	readingsBulkUpdateIfChanged($hash, "Model", pack("C",$buffer->[2]), 0);
+	readingsBulkUpdateIfChanged($hash, "UCState", $buffer->[3], 1);
+	readingsBulkUpdateIfChanged($hash, "UCWarnings", $buffer->[4], 1);
+	
+	#DigitalIn
+	for(my $i=0; $i < 8; $i++){
+		if($buffer->[9] & (1<<$i)) { readingsBulkUpdateIfChanged($hash, "DigitalIn$i", "on", 1);}
+		else { readingsBulkUpdateIfChanged($hash, "DigitalIn$i", "off", 1);}
+	}
+	for(my $i=8; $i < 16; $i++){
+		if($buffer->[10] & (1<<($i-8))) { readingsBulkUpdateIfChanged($hash, "DigitalIn$i", "on", 1);}
+		else { readingsBulkUpdateIfChanged($hash, "DigitalIn$i", "off", 1);}
+	}
+	
+	#AnalogIn
+	$str = sprintf("%.2f", (($buffer->[11] | ($buffer->[12] << 8))*($hash->{DataOut}{JumperAI0})/1024));
+	readingsBulkUpdateIfChanged($hash, "AnalogIn0", $str, 1);
+	$str = sprintf("%.2f", (($buffer->[13] | ($buffer->[14] << 8))*($hash->{DataOut}{JumperAI1})/1024));
+	readingsBulkUpdateIfChanged($hash, "AnalogIn1", $str, 1);
+	
+	$str = sprintf("%.2f", (($buffer->[15] | ($buffer->[16] << 8))*($hash->{DataOut}{JumperAI0})/1024));
+	readingsBulkUpdateIfChanged($hash, "AnalogIn2", $str, 1);
+	$str = sprintf("%.2f", (($buffer->[17] | ($buffer->[18] << 8))*($hash->{DataOut}{JumperAI1})/1024));
+	readingsBulkUpdateIfChanged($hash, "AnalogIn3", $str, 1);
+	
+	$str = sprintf("%.2f", (($buffer->[19] | ($buffer->[20] << 8))*0.02015840023));
+	readingsBulkUpdateIfChanged($hash, "AnalogIn4", $str, 1);
+	$str = sprintf("%.2f", (($buffer->[21] | ($buffer->[22] << 8))*0.02015840023));
+	readingsBulkUpdateIfChanged($hash, "AnalogIn5", $str, 1);
+	
+	#GPIOIn
+	for(my $i=0; $i < 4; $i++){
+		if($buffer->[23] & (1<<$i)) { readingsBulkUpdateIfChanged($hash, "GPIOIn$i", "on", 1);}
+		else { readingsBulkUpdateIfChanged($hash, "GPIOIn$i", "off", 1);}
+	}
+	
+	#DHTs
+	for(my $i=0; $i < 4; $i++){
+		my $temp = ($buffer->[24+(4*$i)] | ($buffer->[25+(4*$i)] << 8));
+		my $humi = ($buffer->[26+(4*$i)] | ($buffer->[27+(4*$i)] << 8));
+		if($temp == 65535 && $humi == 65535)
+		{
+			$temp = "Sensor not connected";
+			$humi = $temp;
+		}
+		else
+		{
+			if($hash->{DataOut}{"GPIO".$i."DHT"})
+			{
+				if(($hash->{DataOut}{"GPIO".$i."DHT"}) eq "dht11")
+				{
+					$temp = sprintf("%.1f", ($temp/256));
+					$humi = sprintf("%.1f", ($humi/256));
+					
+				}
+				elsif(($hash->{DataOut}{"GPIO".$i."DHT"}) eq "dht22")
+				{
+					if($temp & (1<<15))
+					{
+						$temp &= ~(1<<15);
+						$temp /= (-10);
+					}
+					else
+					{
+						$temp /= 10;
+					}
+					$temp = sprintf("%.1f", $temp);
+					$humi = sprintf("%.1f", ($humi/10));
+				}
+			}
+			else
+			{
+				$temp = "Function not enabled";
+				$humi = $temp;
+			}
+		}
+		readingsBulkUpdateIfChanged($hash, "Sensor".$i."T", $temp, 1);
+		readingsBulkUpdateIfChanged($hash, "Sensor".$i."H", $humi, 1);
+	}
+	
+	$str = "";
+	for(my $i=0; $i < ($hash->{RetainSize}); $i++){
+		$str .= $buffer->[45+$i]." ";
+	}
+	readingsBulkUpdateIfChanged($hash, "RetainDataIn", $str, 1);
+
+	readingsEndUpdate($hash, 1);
+}
+
+
+
+#####################################
+# General Functions
+#####################################
+
+#####################################
 sub PiXtendV2_Initialize($) {
     my ($hash) = @_;
  
@@ -265,7 +530,28 @@ sub PiXtendV2_Define($$) {
 		
 		$hash->{DataOut}{JumperAI0} = 10;
 		$hash->{DataOut}{JumperAI1} = 10;
-			
+	}
+	elsif($param[2] eq "L")
+	{
+		$hash->{Set} = \@PiXtendV2L_Set;
+		$hash->{Get} = \@PiXtendV2L_Get;
+		$hash->{SPI}{Write} = \&BufferWrite_L;
+		$hash->{SPI}{Read} = \&BufferRead_L;
+		$hash->{SPI}{Length} = 111;
+		$hash->{SPI}{Speed} = 1100000;
+		$hash->{SPI}{Dev0} = "/dev/spidev0.0";
+		$hash->{SPI}{Dev1} = "/dev/spidev0.1";
+		$hash->{SPI}{Enable} = "/sys/class/gpio/";
+		$hash->{SPI}{Model} = 76;
+		$hash->{RetainSize} = 64;
+		
+		$hash->{DataOut}{JumperAI0} = 10;
+		$hash->{DataOut}{JumperAI1} = 10;
+		$hash->{DataOut}{JumperAI2} = 10;
+		$hash->{DataOut}{JumperAI3} = 10;
+		
+		$hash->{DataIn}{UnitAI4} = "mA";
+		$hash->{DataIn}{UnitAI5} = "mA";
 	}
 	else
 	{
@@ -306,6 +592,7 @@ sub PiXtendV2_Attr ($$$$)
 	
 	if($cmd eq "set")
 	{
+		#GetFormat
 		if($attrName eq "PiXtend_GetFormat")
 		{
 			if($attrValue eq "text" or $attrValue eq "value")
@@ -317,6 +604,7 @@ sub PiXtendV2_Attr ($$$$)
 			}
 		}
 		
+		#Parameter
 		if($attrName eq "PiXtend_Parameter")
 		{
 			my @coms = split(/ /, $attrValue);
@@ -406,7 +694,15 @@ sub PiXtendV2_Get($$@) {
 			$val = ReadingsVal($name, "AnalogIn$cmd", undef);
 			if(defined($val))
 			{
-				$str = "AnalogIn$cmd is [$val] V";
+				if($hash->{DataIn}{"UnitAI$cmd"})
+				{
+					my $unit = $hash->{DataIn}{"UnitAI$cmd"};
+					$str = "AnalogIn$cmd is [$val] $unit";
+				}
+				else
+				{
+					$str = "AnalogIn$cmd is [$val] V";
+				}
 			}
 		}
 		
@@ -519,6 +815,8 @@ sub PiXtendV2_Set($$@){
 			UC_Reset($hash);
 		}
 		
+		#Parameter
+		###############
 		elsif(index($cmd, "_jumpersettingai") != -1)
 		{
 			$cmd =~ s/_jumpersettingai//;
@@ -1005,13 +1303,10 @@ sub UC_Reset()
 	my ($handler) = undef;
 	my $ret = sysopen($handler, $hash->{SPI}{Enable}."export", O_WRONLY);
 	syswrite($handler, 23);
-	#close($handler);
 	$ret = sysopen($handler, $hash->{SPI}{Enable}."gpio23/direction", O_WRONLY);
 	syswrite($handler, "out", 3);
-	#close($handler);
 	$ret = sysopen($handler, $hash->{SPI}{Enable}."gpio23/value", O_WRONLY);
 	syswrite($handler, "1", 1);
-	#close($handler);
 	usleep(1000);
 	$ret = sysopen($handler, $hash->{SPI}{Enable}."gpio23/value", O_WRONLY);
 	syswrite($handler, "0", 1);
@@ -1047,11 +1342,15 @@ sub UC_Reset()
   <a name="PiXtendV2Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PiXtendV2</code>
+    <code>define &lt;name&gt; PiXtendV2 &lt;optional&gt;</code>
     <br><br>
+	The parameter "optional" is used to determine the hardware model, e.g. S or L. If the parameter is not used a FHEM device for model S is created automatically.
+	<br><br>
     Example:
     <ul>
-      <code>define pix PiXtendV2</code><br>
+      <code>define pix PiXtendV2</code>		&emsp;&emsp;&emsp;=> creates a FHEM device for model S<br>
+	  <code>define pix PiXtendV2 S</code>	&emsp;&emsp;=> creates a FHEM device for model S<br>
+	  <code>define pix PiXtendV2 L</code>	&emsp;&emsp;=> creates a FHEM device for model L<br>
     </ul>
   </ul>
   <br>
@@ -1114,7 +1413,7 @@ sub UC_Reset()
 	<li>DigitalDebounce# [0-255]<br>
 		Allows to debounce the digital inputs. A setting always affects two channels. So DigitalDebounce01 affects DigitalIn0 and DigitalIn1.
 		The resulting delay is calculated by (selected value)*(100 ms). The selected value can be any number between 0 and 255.
-		Debouncing can be usefull if a switch or button is connected to this input.
+		Debouncing can be useful if a switch or button is connected to this input.
 		<br><br>
 		Example:
 		<ul>
@@ -1129,7 +1428,7 @@ sub UC_Reset()
 	<li>GPIODebounce# [0-255]<br>
 		Allows to debounce the GPIO inputs. A setting always affects two channels. So GPIODebounce01 affects GPIOIn0 and GPIOIn1.
 		The resulting delay is calculated by (selected value)*(100 ms). The selected value can be any number between 0 and 255.
-		Debouncing can be usefull if a switch or button is connected to this input.
+		Debouncing can be useful if a switch or button is connected to this input.
 		<br><br>
 		Example:
 		<ul>
@@ -1151,8 +1450,8 @@ sub UC_Reset()
 		of our homepage.
 		<br><br>
 		PWM#Ctrl0 needs a value between 0 and 255<br>
-		PWM#Ctrl1 needs a value between 0 and 65535 (or a value between 0 and 255)<br>
-		PWM#A/B needs a value between 0 and 65535 (or a value between 0 and 255)
+		PWM#Ctrl1 needs a value between 0 and 65535 (or a value between 0 and 255, see exception for model -S-)<br>
+		PWM#A/B needs a value between 0 and 65535 (or a value between 0 and 255, see exception for model -S-)
 	<br><br></li>
 
 	<li>RelayOut# [on,off,toggle]<br>
@@ -1165,7 +1464,7 @@ sub UC_Reset()
 	
 	<li>RetainCopy [on,off]<br>
 		If RetainCopy is enabled [on] the RetainDataOut that is written to the PiXtend will be received in RetainDataIn again.
-		This can be usefull in some situations to see which data was send to the PiXtend.
+		This can be useful in some situations to see which data was send to the PiXtend.
 		If it is disabled [off] the last stored data will be received.
 	<br><br></li>
 	
@@ -1189,7 +1488,7 @@ sub UC_Reset()
 	<br><br></li>
 	
 	<li>SafeState<br>
-		This setting allows to force the PiXtend to enter the safe state . If retain storage is enabled the data will be stored. In safe state the PiXtend won't communicate with FHEM and can't be configured.
+		This setting allows to force the PiXtend to enter the safe state . If retain storage is enabled the data will be stored. In safe state the PiXtend won't communicate with FHEM and can't be configured anymore.
 		To restart the PiXtend a reset has to be done.
 	<br><br></li>
 
@@ -1206,20 +1505,21 @@ sub UC_Reset()
 	<a href="http://www.PiXtend.de/PiXtend/downloads/" target="_blank">download section</a>
 	of our homepage.
 	The values can be returned as a string where the actual value is inside squared brackets or as raw values.
-	To change the returned value an attribute has to be set.
+	To change the returned value the attribute "PiXtend_GetFormat" has to be set.
 	<br><br>
 	
 	<li>AnalogIn#<br>
 		Returns the Value of the selected analog input.
-		The result depends on the selected _JumperSettingAI# and the actual physical jumper position on the board.
+		The result depends on the selected _JumperSettingAI# and the actual physical jumper position on the board, as well as the kind of measurement.
+		For example AnalogIn4 and AnalogIn5 on model -L- are used to measure a current instead of a voltage.
 	<br><br></li>
 
 	<li>DigitalIn#<br>
-		Returns the state 1 (HIGH) or 0 (LOW) of the digital input.
+		Returns the state on (HIGH) or off (LOW) of the digital input.
 	<br><br></li>
 
 	<li>GPIOIn#<br>
-		Returns the state 1 (HIGH) or 0 (LOW) of the GPIO, independant of its configuration (input, output, ..).
+		Returns the state on (HIGH) or off (LOW) of the GPIO, independant of its configuration (input, output, ..).
 	<br><br></li>
 	
 	<li>RetainDataIn [0-(RetainSize-1)]<br>
@@ -1271,11 +1571,11 @@ sub UC_Reset()
 	<br><br>
 
     <li>AnalogIn#<br>
-		Shows the result of the measurment on the analog inputs in V.
+		Shows the result of the measurment on the analog inputs in V or mA.
 	<br><br></li>
 
 	<li>DigitalIn#<br>
-		Shows the state 1 (HIGH) or 0 (LOW) of the digital inputs.
+		Shows the state on (HIGH) or off (LOW) of the digital inputs.
 	<br><br></li>
 	
 	<li>Firmware<br>
@@ -1283,7 +1583,7 @@ sub UC_Reset()
 	<br><br></li>
 	
 	<li>GPIOIn#<br>
-		Shows the state 1 (HIGH) or 0 (LOW) of the GPIOs, independant of their configuration (input, output, ..).
+		Shows the state on (HIGH) or off (LOW) of the GPIOs, independant of their configuration (input, output, ..).
 	<br><br></li>
 	
 	<li>Hardware<br>
@@ -1378,11 +1678,16 @@ sub UC_Reset()
   <a name="PiXtendV2Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PiXtendV2</code>
+    <code>define &lt;name&gt; PiXtendV2 &lt;optional&gt;</code>
     <br><br>
+	Der Parameter "optional" bestimmt f&uuml;r welches Hardware-Modell ein FHEM-Ger&auml;t angelegt werden soll, z.B. S oder L.
+	Wird der Parameter weggelassen, wird automatisch ein FHEM-Ger&auml;t f&uuml;r Model -S- angelegt.
+	<br><br>
     Beispiel:
     <ul>
-      <code>define pix PiXtendV2</code><br>
+      <code>define pix PiXtendV2</code>		&emsp;&emsp;&emsp;=> erzeugt ein FHEM-Ger&auml;t f&uuml;r Model S<br>
+	  <code>define pix PiXtendV2 S</code>	&emsp;&emsp;=> erzeugt ein FHEM-Ger&auml;t f&uuml;r Model S<br>
+	  <code>define pix PiXtendV2 L</code>	&emsp;&emsp;=> erzeugt ein FHEM-Ger&auml;t f&uuml;r Model L<br>
     </ul>
   </ul>
   <br>
@@ -1487,8 +1792,8 @@ sub UC_Reset()
 		unserer Hompage nach.
 		<br><br>
 		PWM#Ctrl0 ben&ouml;tigt einen Wert zwischen 0 und 255<br>
-		PWM#Ctrl1 ben&ouml;tigt einen Wert zwischen 0 und 65535 (oder einen Wert zwischen 0 und 255)<br>
-		PWM#A/B ben&ouml;tigt einen Wert zwischen 0 und 65535 (oder einen Wert zwischen 0 und 255)
+		PWM#Ctrl1 ben&ouml;tigt einen Wert zwischen 0 und 65535 (oder einen Wert zwischen 0 und 255, siehe Ausnahme Model -S-)<br>
+		PWM#A/B ben&ouml;tigt einen Wert zwischen 0 und 65535 (oder einen Wert zwischen 0 und 255, siehe Ausnahme Model -S-)
 	<br><br></li>
 
 	<li>RelayOut# [on,off,toggle]<br>
@@ -1544,20 +1849,21 @@ sub UC_Reset()
 	<a href="http://www.PiXtend.de/PiXtend/downloads/" target="_blank">Downloadbereich</a>
 	unserer Hompage nach.<br>
 	Die Werte k&ouml;nnen als Text, wobei die Werte in eckigen Klammern stehen oder als rohe Werte zur&uuml;ckgegeben werden.
-	Die Einstellung f&uuml;r das Format ist in den Attributen zu finden.
+	Die Einstellung f&uuml;r das Format ist in den Attributen ("PiXtend_GetFormat") zu finden.
 	<br><br>
 	
 	<li>AnalogIn#<br>
 		Gibt den Wert des ausgew&auml;hlten analogen Eingangs zur&uuml;ck.
-		Der Wert h&auml;ngt dabei von der Einstellung _JumperSettingAI# und der tats&auml;chlichen Jumper-Position auf dem Board ab.
+		Der Wert h&auml;ngt dabei von der Einstellung _JumperSettingAI# und der tats&auml;chlichen Jumper-Position auf dem Board ab, sowie der Messmethode des Kanals ab.
+		AnalogIn4 und AnalogIn5 bei Modell -L- sind z.B. Stromeing&auml;nge.
 	<br><br></li>
 
 	<li>DigitalIn#<br>
-		Gibt den Status 1 (HIGH) oder 0 (LOW) des digitalen Eingangs zur&uuml;ck.
+		Gibt den Status on (HIGH) oder off (LOW) des digitalen Eingangs zur&uuml;ck.
 	<br><br></li>
 
 	<li>GPIOIn#<br>
-		Gibt den Status 1 (HIGH) oder 0 (LOW) des GPIOs zur&uuml;ck, unabh&auml;ngig von der Konfiguration (input, output, ..).
+		Gibt den Status on (HIGH) oder off (LOW) des GPIOs zur&uuml;ck, unabh&auml;ngig von der Konfiguration (input, output, ..).
 	<br><br></li>
 	
 	<li>RetainDataIn [0-(RetainSize-1)]<br>
@@ -1610,11 +1916,11 @@ sub UC_Reset()
 	<br><br>
 
     <li>AnalogIn#<br>
-		Zeigt das Ergebnis der Messungen der analogen Eing&auml;nge in Volt an.
+		Zeigt das Ergebnis der Messungen der analogen Eing&auml;nge in V beziehungsweise in mA an.
 	<br><br></li>
 
 	<li>DigitalIn#<br>
-		Zeigt den Status 1 (HIGH) oder 0 (LOW) der digitalen Eing&auml;nge an.
+		Zeigt den Status on (HIGH) oder off (LOW) der digitalen Eing&auml;nge an.
 	<br><br></li>
 	
 	<li>Firmware<br>
@@ -1622,7 +1928,7 @@ sub UC_Reset()
 	<br><br></li>
 	
 	<li>GPIOIn#<br>
-		Zeigt den Status 1 (HIGH) oder 0 (LOW) der GPIOs, unabh&auml;ngig von deren Konfiguration (input, output, ..).
+		Zeigt den Status on (HIGH) oder off (LOW) der GPIOs, unabh&auml;ngig von deren Konfiguration (input, output, ..).
 	<br><br></li>
 	
 	<li>Hardware<br>
