@@ -143,6 +143,7 @@ MQTT2_DEVICE_Parse($$)
       my $rl = AttrVal($nn, "readingList", "");
       $rl .= "\n" if($rl);
       CommandAttr(undef, "$nn readingList $rl$cid:$topic:.* $add");
+      MQTT2_DEVICE_Parse($iodev, $msg);
     }, undef);
     return "UNDEFINED $nn MQTT2_DEVICE $cid" if(!$cidHash);
     return "";
