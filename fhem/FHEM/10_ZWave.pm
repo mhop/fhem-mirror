@@ -4257,6 +4257,8 @@ ZWave_getHash($$$)
   if($type eq "get" || $type eq "set") {
     my %h;
     my $version = $hash->{".vclasses"}{$cl};
+    $version = $defs{$hash->{endpointParent}}{".vclasses"}{$cl}
+        if($hash->{endpointParent} && $defs{$hash->{endpointParent}});
     $version = 0 if(!defined($version));
     map {
       my $zv = $zwave_classVersion{$_};
@@ -5117,7 +5119,7 @@ ZWave_switchMultilevel_Set($$$)
   if($cmdType == 0) {                           # dimWithDuration
     return "$n dimWithDuration: wrong format for $arg"
         if($arg !~ m/$p1_b (\d+)/);
-    return ("", sprintf("01%02x%02x", $1, ZWave_time2byte($hash,$2)));
+    return ("", sprintf("01%02x%s", $1, ZWave_time2byte($hash,$2)));
 
   } elsif ($cmdType == 1) {                     # dimUpDown
     $regexp = "(UP|DOWN) (IGNORE|USE) $p1_b";
@@ -5144,8 +5146,8 @@ ZWave_switchMultilevel_Set($$$)
   $duration = ZWave_time2byte($hash,$4) if ($cmdType >=2);
   
   my $rt = sprintf("04%02x%02x", $bitfield, $3);
-  $rt .= sprintf("%02x",      $duration) if ($cmdType == 2);
-  $rt .= sprintf("%02x%02x",  $duration, $6) if ($cmdType == 3);
+  $rt .= sprintf("%s",      $duration) if ($cmdType == 2);
+  $rt .= sprintf("%s%02x",  $duration, $6) if ($cmdType == 3);
       
   return ("", $rt);
 
