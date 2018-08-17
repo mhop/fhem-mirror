@@ -137,7 +137,7 @@ MQTT2_DEVICE_Parse($$)
         $add = "{ json2nameValue(\$EVENT) }" if(keys %{$ret});
       }
       if(!$add) {
-        $topic =~ m,[^/]*/(.*),;
+        $topic =~ m,.*/([^/]+),;
         $add = ($1 ? $1 : $topic);
       }
       my $rl = AttrVal($nn, "readingList", "");
