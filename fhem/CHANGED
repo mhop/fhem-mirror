@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   00_MQTT: ability for client notifications: on connect, 
+                      on disconnect, on timeout
+  - fixed:   00_MQTT: failure on handling with mqtt-devices without 
+                      or with wrong devio attributes
+  - change:  maintainer change for 00_MQTT, 10_MQTT_DEVICE, 10_MQTT_BRIDGE 
+             (eisler => hexenmeister)
   - feature: 36_Vallox: Added DF Method, Added CO2SetPoint Handling, Optimized
   - feature: 59_WUup: added attribute unit_solarradiation
   - bugfix:  38_netatmo: removed heating home/room autocreate
