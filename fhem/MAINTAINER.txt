@@ -27,7 +27,7 @@ FHEM/00_HXB.pm               neubert              Sonstige Systeme
 FHEM/00_KM271.pm             physikus             Sonstiges
 FHEM/00_LIRC.pm              rudolfkoenig         Sonstiges
 FHEM/00_MAXLAN.pm            rudolfkoenig/orphan  MAX
-FHEM/00_MQTT.pm              eisler               MQTT
+FHEM/00_MQTT.pm              hexenmeister         MQTT
 FHEM/00_MQTT2_SERVER.pm      rudolfkoenig         MQTT
 FHEM/00_MYSENSORS.pm         Hauswart             Sonstige Systeme
 FHEM/00_NetzerI2C.pm         klausw               Sonstige Systeme
@@ -65,8 +65,8 @@ FHEM/10_IT.pm                dancer0705/bjoernh   InterTechno
 FHEM/10_Itach_IR             ulimaass             Sonstige Systeme
 FHEM/10_KOPP_FC.pm           raspii               Sonstige Systeme
 FHEM/10_MAX.pm               rudolfkoenig/orphan  MAX
-FHEM/10_MQTT_BRIDGE          eisler               MQTT
-FHEM/10_MQTT_DEVICE          eisler               MQTT
+FHEM/10_MQTT_BRIDGE          hexenmeister         MQTT
+FHEM/10_MQTT_DEVICE          hexenmeister         MQTT
 FHEM/10_MQTT2_DEVICE.pm      rudolfkoenig         MQTT
 FHEM/10_MYSENSORS_DEVICE     Hauswart             Sonstige Systeme
 FHEM/10_NeuronPin.pm         klausw               Sonstige Systeme
@@ -525,8 +525,8 @@ FHEM/YahooWeatherAPI.pm      neubert              Unterstuetzende Dienste/Wetter
 FHEM/lib/Device/Firmata/*    jensb                Sonstige Systeme
 FHEM/lib/Device/MySensors/*  Hauswart             Sonstige Systeme
 FHEM/lib/MP3/*               Reinerlein           Multimedia
-FHEM/lib/Net/MQTT.pod        eisler               MQTT
-FHEM/lib/Net/MQTT/*          eisler               MQTT
+FHEM/lib/Net/MQTT.pod        hexenmeister         MQTT
+FHEM/lib/Net/MQTT/*          hexenmeister         MQTT
 FHEM/lib/ProtoThreads.pm     ntruchsess           FHEM Development
 FHEM/lib/SHC_packet_layout.xml  rr2000            Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           Sonstige Systeme
