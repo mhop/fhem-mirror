@@ -463,9 +463,11 @@ HCS_getValues($$) {
     next if($t eq "MAX" && !$defs{$d}{type});
     next if($t eq "MAX" && $defs{$d}{type} !~ m/HeatingThermostat/);
 
-    next if($t eq "CUL_HM" &&(   !$attr{$d}{model}
-	                          ||!(  ($attr{$d}{model} eq "HM-CC-TC"    && !$defs{$d}{device})
-	                              ||($attr{$d}{model} eq "HM-CC-RT-DN" && !$defs{$d}{device}))));
+    next if($t eq "CUL_HM" && ( !$attr{$d}{model}
+                || !( ($attr{$d}{model} eq "HM-CC-TC" && !$defs{$d}{device})
+                    || ($attr{$d}{model} eq "HM-TC-IT-WM-W-EU" && !$defs{$d}{device})
+                    || ($attr{$d}{model} eq "HmIP-WTH-2" && !$defs{$d}{device})
+                    || ($attr{$d}{model} eq "HM-CC-RT-DN" && !$defs{$d}{device}) )) );
     
     next if($t eq "ZWave" && $attr{$d}{classes} !~ m/THERMOSTAT_SETPOINT/);
 
