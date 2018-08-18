@@ -155,7 +155,7 @@ MQTT2_DEVICE_Parse($$)
 sub
 MQTT2_JSON($;$)
 {
-  return json2nameValue(@_);
+  return json2nameValue($_[0], $_[1]);
 }
 
 
