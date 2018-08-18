@@ -4258,7 +4258,8 @@ ZWave_getHash($$$)
     my %h;
     my $version = $hash->{".vclasses"}{$cl};
     $version = $defs{$hash->{endpointParent}}{".vclasses"}{$cl}
-        if($hash->{endpointParent} && $defs{$hash->{endpointParent}});
+        if(!$version &&
+            $hash->{endpointParent} && $defs{$hash->{endpointParent}});
     $version = 0 if(!defined($version));
     map {
       my $zv = $zwave_classVersion{$_};
