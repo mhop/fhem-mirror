@@ -175,6 +175,13 @@ sub onTimeout($) {
   }
 }
 
+sub isConnected($) {
+  my $hash = shift;
+  my $cstate=ReadingsVal($hash->{NAME}, "connection", "");
+  return 1 if($cstate eq "connected" || $cstate eq "active");
+  return undef;
+}
+
 sub process_event($$) {
   my $hash = shift;
   my $str = shift;
@@ -483,6 +490,7 @@ sub Timer($) {
   unless ($hash->{ping_received}) {
     onTimeout($hash);
     readingsSingleUpdate($hash,"connection","timed-out",1) ;#unless $hash->{ping_received};
+    GP_ForallClients($hash,\&notify_client_connection_timeout);
   }
   $hash->{ping_received} = 0;
   InternalTimer(gettimeofday()+$hash->{timeout}, "MQTT::Timer", $hash, 0);
@@ -506,6 +514,7 @@ sub Read {
         readingsSingleUpdate($hash,"connection","connected",1);
         onConnect($hash);
         GP_ForallClients($hash,\&client_start);
+        GP_ForallClients($hash,\&notify_client_connected);
         foreach my $message_id (keys %{$hash->{messages}}) {
           my $msg = $hash->{messages}->{$message_id}->{message};
           $msg->{dup} = 1;
@@ -680,6 +689,7 @@ sub send_ping($) {
 sub send_disconnect($) {
   my $hash = shift;
   onDisconnect($hash);
+  GP_ForallClients($hash,\&notify_client_disconnected);
   return send_message($hash, message_type => MQTT_DISCONNECT);
 };
 
@@ -873,7 +883,7 @@ sub client_attr($$$$$) {
         if ($command eq "set") {
           client_stop($client);
           $main::attr{$name}{IODev} = $value;
-          client_start($client);
+          return client_start($client);
         } else {
           client_stop($client);
         }
@@ -883,14 +893,42 @@ sub client_attr($$$$$) {
   }
 };
 
+sub notify_client_connected($) {
+  my $client = shift;
+  CallFn($client->{NAME},"OnClientConnectFn",($client));
+}
+
+sub notify_client_disconnected($) {
+  my $client = shift;
+  CallFn($client->{NAME},"OnClientDisconnectFn",($client));
+}
+
+sub notify_client_connection_timeout($) {
+  my $client = shift;
+  CallFn($client->{NAME},"OnClientConnectionTimeoutFn",($client));
+}
+
 sub client_start($) {
   my $client = shift;
+  # probably internal failure
+  unless (defined $client) {
+    Log3("MQTT IODev",1,"no client device hash provided");
+    return "no client device hash provided";
+  }
+
+  # client device without IODev. probably internal failure
+  unless (defined $client->{IODev}) {
+    Log3("MQTT IODev",1,"client device hash no IODev provided");
+    return "client device hash no IODev provided"; 
+  }
+  
   CallFn($client->{NAME},"OnClientStartFn",($client));
   
-  #my $name = $client->{NAME};
-  #if (! (defined AttrVal($name,"stateFormat",undef))) {
-  #  $main::attr{$name}{stateFormat} = "transmission-state";
-  #}
+  unless (ref($client->{subscribe}) eq "ARRAY") {
+    Log3($client->{NAME},1,"unknown client or client initialization error");
+    return "unknown client or client initialization error";
+  }
+
   if (@{$client->{subscribe}}) {
     my $msgid = send_subscribe($client->{IODev},
       topics => [map { [$_ => $client->{subscribeQos}->{$_} || MQTT_QOS_AT_MOST_ONCE] } @{$client->{subscribe}}],
