@@ -221,11 +221,12 @@ MQTT2_SERVER_Read($@)
   my $cpt = $cptype{$cp};
   $hash->{lastMsgTime} = gettimeofday();
 
-  #my $pltxt = $pl;
-  #$pltxt =~ s/[^ -~]/./g;
-  #Log3 $sname, 5, "$pltxt";
+  # Lowlevel debugging
+  # my $pltxt = $pl;
+  # $pltxt =~ s/([^ -~])/"(".ord($1).")"/ge;
+  # Log3 $sname, 5, "$pltxt";
 
-  if(!$hash->{cid} && $cpt ne "CONNECT") {
+  if(!defined($hash->{cid}) && $cpt ne "CONNECT") {
     Log3 $sname, 2, "$cname $cpt before CONNECT, disconnecting";
     CommandDelete(undef, $cname);
     return MQTT2_SERVER_Read($hash, 1);
@@ -234,8 +235,8 @@ MQTT2_SERVER_Read($@)
   ####################################
   if($cpt eq "CONNECT") {
     ($hash->{protoTxt}, $off) = MQTT2_SERVER_getStr($pl, 0); # V3:MQIsdb V4:MQTT
-    $hash->{protoNum}  = unpack('C*', substr($pl, $off++, 1));
-    $hash->{cflags}    = unpack('C*', substr($pl, $off++, 1));
+    $hash->{protoNum}  = unpack('C*', substr($pl,$off++,1)); # 3 or 4
+    $hash->{cflags}    = unpack('C*', substr($pl,$off++,1));
     $hash->{keepalive} = unpack('n', substr($pl, $off, 2)); $off += 2;
     ($hash->{cid}, $off) = MQTT2_SERVER_getStr($pl, $off);
 

@@ -126,7 +126,7 @@ MQTT2_DEVICE_Parse($$)
 
   # autocreate and expand readingList
   if($autocreate && !%fnd) {
-    return "" if($cid =~ m/mosqpub.*/);
+    return "" if($cid && $cid =~ m/mosqpub.*/);
     my $cidHash = $modules{MQTT2_DEVICE}{defptr}{cid}{$cid};
     my $nn = $cidHash ? $cidHash->{NAME} : "MQTT2_$cid";
     PrioQueue_add(sub{
