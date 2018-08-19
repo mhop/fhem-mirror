@@ -1330,41 +1330,11 @@ FileLog_regexpFn($$)
 
     <a name="logtype"></a>
     <li>logtype<br>
-        Used by the pgm2 webfrontend to offer gnuplot/SVG images made from the
+        Used by FHEMWEB to offer gnuplot/SVG images made from the
         logs.  The string is made up of tokens separated by comma (,), each
-        token specifies a different gnuplot program. The token may contain a
+        token specifies a different configuration. The token may contain a
         colon (:), the part before the colon defines the name of the program,
-        the part after is the string displayed in the web frontend. Currently
-        following types of gnuplot programs are implemented:<br>
-        <ul>
-           <li>fs20<br>
-               Plots on as 1 and off as 0. The corresponding filelog definition
-               for the device fs20dev is:<br>
-               define fslog FileLog log/fs20dev-%Y-%U.log fs20dev
-          </li>
-           <li>fht<br>
-               Plots the measured-temp/desired-temp/actuator lines. The
-               corresponding filelog definitions (for the FHT device named
-               fht1) looks like:<br>
-               <code>define fhtlog1 FileLog log/fht1-%Y-%U.log fht1:.*(temp|actuator).*</code>
-
-          </li>
-           <li>temp4rain10<br>
-               Plots the temperature and rain (per hour and per day) of a
-               ks300. The corresponding filelog definitions (for the KS300
-               device named ks300) looks like:<br>
-               define ks300log FileLog log/fht1-%Y-%U.log ks300:.*H:.*
-          </li>
-           <li>hum6wind8<br>
-               Plots the humidity and wind values of a
-               ks300. The corresponding filelog definition is the same as
-               above, both programs evaluate the same log.
-          </li>
-           <li>text<br>
-               Shows the logfile as it is (plain text). Not gnuplot definition
-               is needed.
-          </li>
-        </ul>
+        the part after is the string displayed in the web frontend.<br>
         Example:<br>
            attr ks300log1 logtype
                 temp4rain10:Temp/Rain,hum6wind8:Hum/Wind,text:Raw-data
