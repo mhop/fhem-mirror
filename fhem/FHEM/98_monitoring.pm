@@ -9,18 +9,17 @@
 #
 # This file is part of FHEM.
 #
-# FHEM is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 2 of the License, or
-# (at your option) any later version.
+# FHEM is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 2 of the License, or (at your option) any later
+# version.
 #
-# FHEM is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# FHEM is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with FHEM.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License along with
+# FHEM.  If not, see <http://www.gnu.org/licenses/>.
 
 # packages ####################################################################
 package main;
@@ -54,23 +53,23 @@ sub monitoring_Initialize($) {
   $hash->{AttrFn}   = $TYPE."_Attr";
   $hash->{NotifyFn} = $TYPE."_Notify";
 
-  $hash->{AttrList} = ""
-    . "addStateEvent:1,0 "
-    . "blacklist:textField-long "
-    . "disable:1,0 "
-    . "disabledForIntervals "
-    . "errorFuncAdd:textField-long "
-    . "errorFuncRemove:textField-long "
-    . "errorWait "
-    . "errorReturn:textField-long "
-    . "getDefault:all,error,warning "
-    . "setActiveFunc:textField-long "
-    . "warningFuncAdd:textField-long "
-    . "warningFuncRemove:textField-long "
-    . "warningWait "
-    . "warningReturn:textField-long "
-    . "whitelist:textField-long "
-    . $readingFnAttributes
+  $hash->{AttrList} =
+    "addStateEvent:1,0 ".
+    "blacklist:textField-long ".
+    "disable:1,0 ".
+    "disabledForIntervals ".
+    "errorFuncAdd:textField-long ".
+    "errorFuncRemove:textField-long ".
+    "errorWait ".
+    "errorReturn:textField-long ".
+    "getDefault:all,error,warning ".
+    "setActiveFunc:textField-long ".
+    "warningFuncAdd:textField-long ".
+    "warningFuncRemove:textField-long ".
+    "warningWait ".
+    "warningReturn:textField-long ".
+    "whitelist:textField-long ".
+    $readingFnAttributes
   ;
 }
 
@@ -106,20 +105,20 @@ sub monitoring_Set($@) {
   my $argument = shift @a;
   my $value    = join(" ", @a) if (@a);
   my %monitoring_sets = (
-      "active"        => "active:noArg"
-    , "clear"         => "clear:all,error,warning"
-    , "errorAdd"      => "errorAdd:textField"
-    , "errorRemove"   => "errorRemove:"
-                         . join(",", ReadingsVal($SELF, "error", ""))
-    , "inactive"      => "inactive:noArg"
-    , "warningAdd"    => "warningAdd:textField"
-    , "warningRemove" => "warningRemove:"
-                         . join(",", ReadingsVal($SELF, "warning", ""))
+    "active"        => "active:noArg",
+    "clear"         => "clear:all,error,warning",
+    "errorAdd"      => "errorAdd:textField",
+    "errorRemove"   => "errorRemove:".
+                       join(",", ReadingsVal($SELF, "error", "")),
+    "inactive"      => "inactive:noArg",
+    "warningAdd"    => "warningAdd:textField",
+    "warningRemove" => "warningRemove:".
+                       join(",", ReadingsVal($SELF, "warning", ""))
   );
 
   return(
-    "Unknown argument $argument, choose one of "
-    . join(" ", sort(values %monitoring_sets))
+    "Unknown argument $argument, choose one of ".
+    join(" ", sort(values %monitoring_sets))
   ) unless(exists($monitoring_sets{$argument}));
 
   if($argument eq "active"){
@@ -185,16 +184,16 @@ sub monitoring_Get($@) {
   my $value = join(" ", @a) if (@a);
   my $default = AttrVal($SELF, "getDefault", "all");
   my %monitoring_gets = (
-      "all"     => "all:noArg"
-    , "default" => "default:noArg"
-    , "error"   => "error:noArg"
-    , "warning" => "warning:noArg"
+    "all"     => "all:noArg",
+    "default" => "default:noArg",
+    "error"   => "error:noArg",
+    "warning" => "warning:noArg"
   );
   my @ret;
 
   return(
-    "Unknown argument $argument, choose one of "
-    . join(" ", sort(values %monitoring_gets))
+    "Unknown argument $argument, choose one of ".
+    join(" ", sort(values %monitoring_gets))
   ) unless(exists($monitoring_gets{$argument}));
 
   if($argument eq "all" || ($argument eq "default" && $default eq "all")){
@@ -267,10 +266,10 @@ sub monitoring_Notify($$) {
   my $TYPE = $hash->{TYPE};
 
   return if(
-       !$init_done
-    || IsDisabled($SELF)
-    || IsDisabled($name)
-    || $SELF eq $name # do not process own events
+    !$init_done ||
+    IsDisabled($SELF) ||
+    IsDisabled($name) ||
+    $SELF eq $name # do not process own events
   );
 
   my $events = deviceEvents($dev_hash, AttrVal($SELF, "addStateEvent", 0));
@@ -286,9 +285,9 @@ sub monitoring_Notify($$) {
   my ($addRegex, $removeRegex) = split(/[\s]+/, InternalVal($SELF, "DEF", ""));
 
   return unless(
-       $addRegex =~ m/^$name:/
-    || $removeRegex && $removeRegex =~ m/^$name:/
-    || $events
+    $addRegex =~ m/^$name:/ ||
+    $removeRegex && $removeRegex =~ m/^$name:/ ||
+    $events
   );
 
   my @blacklist;
@@ -322,16 +321,16 @@ sub monitoring_Notify($$) {
       $listWait = 0 unless(looks_like_number($listWait));
 
       if($listFuncAdd eq "preset" && $listFuncRemove eq "preset"){
-        Log3($SELF, 5
-          , "$TYPE ($SELF) "
-          . $list."FuncAdd and "
-          . $list."FuncRemove are preset"
+        Log3(
+          $SELF, 5  "$TYPE ($SELF) ".
+          $list."FuncAdd and $list"."FuncRemove are preset"
         );
         if(!$removeRegex){
           if($listWait == 0){
-            Log3($SELF, 2
-              , "$TYPE ($SELF) set \"$list"."Wait\" while \"$list"
-              . "FuncAdd\" and \"$list"."FuncRemove\" are same"
+            Log3(
+              $SELF, 2, "$TYPE ($SELF) ".
+              "set \"$list"."Wait\" while \"$list".
+              "FuncAdd\" and \"$list"."FuncRemove\" are same"
             ) if($list eq "error");
 
             next;
@@ -340,18 +339,16 @@ sub monitoring_Notify($$) {
           Log3($SELF, 5, "$TYPE ($SELF) only addRegex is defined");
 
           monitoring_modify("$SELF|$list|remove|$name");
-          monitoring_modify(
-            "$SELF|$list|add|$name|$listWait"
-          );
+          monitoring_modify("$SELF|$list|add|$name|$listWait");
 
           next;
         }
         else{
           next unless($list eq "error" || AttrVal($SELF, "errorWait", undef));
 
-          Log3($SELF, 5
-            , "$TYPE ($SELF) addRegex ($addRegex) "
-            . "and removeRegex ($removeRegex) are defined"
+          Log3(
+            $SELF, 5, "$TYPE ($SELF) ".
+            "addRegex ($addRegex) and removeRegex ($removeRegex) are defined"
           );
 
           monitoring_modify("$SELF|$list|remove|$name") if($removeMatch);
@@ -368,9 +365,10 @@ sub monitoring_Notify($$) {
 
         if($listFuncRemove eq "preset"){
           if($listWait == 0){
-            Log3($SELF, 2
-              , "$TYPE ($SELF) set \"$list"."Wait\" while \"$list"
-              . "FuncAdd\" and \"$list"."FuncRemove\" are same"
+            Log3(
+              $SELF, 2, "$TYPE ($SELF) ".
+              "set \"$list"."Wait\" while \"$list".
+              "FuncAdd\" and \"$list"."FuncRemove\" are same"
             ) if($list eq "error");
 
             next;
@@ -380,9 +378,9 @@ sub monitoring_Notify($$) {
         }
       }
       else{
-        Log3($SELF, 5
-          , "$TYPE ($SELF) addRegex ($addRegex) "
-          . "and removeRegex ($removeRegex) are defined"
+        Log3(
+          $SELF, 5, "$TYPE ($SELF) ".
+          "addRegex ($addRegex) and removeRegex ($removeRegex) are defined"
         );
 
         $listFuncRemove = 1 if($listFuncRemove eq "preset" && $removeMatch);
@@ -420,12 +418,12 @@ sub monitoring_modify($) {
   my $reading = $list."Add_".$value;
 
   Log3(
-    $SELF, 5 , "$TYPE ($SELF)"
-    . "\n    entering monitoring_modify"
-    . "\n        reading:   $list"
-    . "\n        operation: $operation"
-    . "\n        value:     $value"
-    . "\n        at:        ".($at ? FmtDateTime($at) : "now")
+    $SELF, 5 , "$TYPE ($SELF)".
+    "\n    entering monitoring_modify".
+    "\n        reading:   $list".
+    "\n        operation: $operation".
+    "\n        value:     $value".
+    "\n        at:        ".($at ? FmtDateTime($at) : "now")
   );
 
   if($operation eq "add"){
@@ -437,9 +435,7 @@ sub monitoring_modify($) {
     if($at){
       return if($hash->{READINGS}{$reading});
 
-      readingsSingleUpdate(
-        $hash, $reading, FmtDateTime($at), 0
-      );
+      readingsSingleUpdate($hash, $reading, FmtDateTime($at), 0);
       InternalTimer($at, "monitoring_modify", $arg);
 
       return;
@@ -483,7 +479,7 @@ sub monitoring_NOTIFYDEV($) {
   ;
   $NOTIFYDEV =~ s/\s/,/g;
 
-  $hash->{NOTIFYDEV} = $NOTIFYDEV;
+  notifyRegexpChanged($hash, $NOTIFYDEV);
 }
 
 sub monitoring_RemoveInternalTimer($) {
