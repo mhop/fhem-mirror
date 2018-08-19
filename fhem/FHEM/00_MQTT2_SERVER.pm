@@ -102,7 +102,7 @@ MQTT2_SERVER_Undef($@)
 
   if($hash->{lwt}) {    # Last will
     my ($tp, $val) = split(':', $hash->{lwt}, 2);
-    MQTT2_SERVER_doPublish($shash, $shash, $tp, $val, $hash->{cflags} & 0x20);
+    MQTT2_SERVER_doPublish($hash, $shash, $tp, $val, $hash->{cflags} & 0x20);
   }
   return $ret;
 }
@@ -346,6 +346,7 @@ MQTT2_SERVER_Read($@)
 
 ######################################
 # Call sendto for all clients + Dispatch + dotrigger if rawEvents is set
+# tgt is the "accept" server, src is the connection generating the data
 sub
 MQTT2_SERVER_doPublish($$$$;$)
 {
@@ -363,7 +364,7 @@ MQTT2_SERVER_doPublish($$$$;$)
     MQTT2_SERVER_sendto($defs{$clName}, $tp, $val) if($src->{NAME} ne $clName);
   }
 
-  if($src->{cid}) { # "real" MQTT client
+  if(defined($src->{cid})) { # "real" MQTT client
     my $cid = $src->{cid};
     $cid =~ s,[^a-z0-9._],_,gi;
     my $ac = AttrVal($tgt->{NAME}, "autocreate", undef) ? "autocreate:":"";
