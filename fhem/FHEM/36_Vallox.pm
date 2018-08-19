@@ -5,7 +5,7 @@
 #
 # @Author Skjall
 # @Created 21.07.2016 10:18:23
-# @Version 1.5.0
+# @Version 1.6.1
 #
 #  The modul reads and writes parameters via RS485 from and to a Vallox
 #  ventilation bus.
@@ -1603,19 +1603,21 @@ sub Vallox_Get($@) {
     # "reading" is a predefined list of readings from the bus
     if ( $cmd eq "reading" ) {
         
+        my $msg;
+        
         if ($arg eq "CO2SetPoint") {
             
-            my $msg = Vallox_CreateMsg( $hash, "b3" );
+            $msg = Vallox_CreateMsg( $hash, "b3" );
             DevIo_SimpleWrite( $hash, $msg, 1 );
             Log3( $name, 3, "Vallox: Request " . $msg . " has been sent." );
             
-            my $msg = Vallox_CreateMsg( $hash, "b4" );
+            $msg = Vallox_CreateMsg( $hash, "b4" );
             DevIo_SimpleWrite( $hash, $msg, 1 );
             Log3( $name, 3, "Vallox: Request " . $msg . " has been sent." );
             
         } else {
             my $argKey = $Vallox_datatypesReverse{$arg};
-            my $msg = Vallox_CreateMsg( $hash, $argKey );
+            $msg = Vallox_CreateMsg( $hash, $argKey );
 
             DevIo_SimpleWrite( $hash, $msg, 1 );
 
