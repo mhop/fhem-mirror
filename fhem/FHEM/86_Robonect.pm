@@ -41,6 +41,7 @@
 # ABU 20180507 replaced "umwelt" with "climate" in readings-section (roughly line 740)
 # ABU 20180509 reading winterschlaf was not decoded correctly - fixed
 # ABU 20180509 always try to decode health details - even without Attribute being set. Line 726-748.
+# ABU 20180819 Added userdefined status. Line 102.
 
 package main;
 
@@ -99,7 +100,7 @@ my %elements = (
 		"status" =>
 		{
 			ALIAS		=> "allgemein",
-			"status" 	=> {ALIAS=>"status", 0=>"schlafen", 1=>"parken", 2=>"maehen", 3=>"suche-base", 4=>"laden", 5=>"suche", 7=>"fehler", 8=>"schleife-fehlt", 16=>"abgeschaltet", 17=>"schlafen"}, 
+			"status" 	=> {ALIAS=>"status", 0=>"schlafen", 1=>"parken", 2=>"maehen", 3=>"suche-base", 4=>"laden", 5=>"suche", 7=>"fehler", 8=>"schleife-fehlt", 16=>"abgeschaltet", 17=>"schlafen", 18=>"user-defined-18"}, 
 			"mode"	 	=> {ALIAS=>"modus", 0=>"automatik", 1=>"manuell", 2=>"home", 3=>"demo"}, 
 			"battery" 	=> {ALIAS=>"batteriezustand"},
 			"duration" 	=> {ALIAS=>"dauer"},
