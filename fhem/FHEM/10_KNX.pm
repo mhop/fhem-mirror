@@ -30,6 +30,7 @@
 # ABU 20180626 fixed last changes
 # ABU 20180706 changed eval, removed stateCopy
 # ABU 20180706 fixed doku: changed readonly in listenonly
+# ABU 20180815 updated link in doku, changed (dpt16$) to dpt16 in set, tried to fix öast-sender (replaced bulk by single in decoding loop)
 
 package main;
 
@@ -807,7 +808,7 @@ KNX_Set($@) {
 		elsif ($cmd =~ m/$STRING/i)
 		{
 			my $code = $hash->{GADDETAILS}{$targetGadName}{MODEL};
-			return "\"string\" only allowed for dpt16" if (not($code =~ m/(dpt16$)/i));
+			return "\"string\" only allowed for dpt16" if (not($code =~ m/dpt16/i));
 			return "no data for cmd $cmd" if ($lastArg < 2);
 			
 			$cmd = $a[2];
@@ -1203,7 +1204,7 @@ KNX_Parse($$) {
 			#message invalid
 			if (not defined($transval) or ($transval eq ""))
 			{
-				readingsBulkUpdate($deviceHash, "last-sender", KNX_hexToName($src));
+				readingsSingleUpdate($deviceHash, "last-sender", KNX_hexToName($src), 1);
 				Log3 ($deviceName, 2, "parse device hash (wpi): $deviceHash name: $deviceName, message could not be decoded - see log for details");
 				next;
 			}
@@ -2071,7 +2072,7 @@ KNX_decodeByDpt ($$$) {
 <p><a name="KNX"></a></p>
 <h3>KNX</h3>
 <p>KNX is a standard for building automation / home automation. It is mainly based on a twisted pair wiring, but also other mediums (ip, wireless) are specified.</p>
-<p>For getting started, please refer to this document: <a href="http://www.knx.org/media/docs/Flyers/KNX-Basics/KNX-Basics_de.pdf">KNX-Basics</a></p>
+<p>For getting started, please refer to this document: <a href="https://www2.knx.org/media/docs/downloads/Marketing/Flyers/KNX-Basics/KNX-Basics_en.pdf">KNX-Basics</a></p>
 <p>While the module <a href="#TUL">TUL</a> represents the connection to the KNX network, the KNX modules represent individual KNX devices. <br /> 
 This module provides a basic set of operations (on, off, toggle, on-until, on-for-timer) to switch on/off KNX devices and to send values to the bus.&nbsp;</p>
 <p>Sophisticated setups can be achieved by combining a number of KNX module instances. Therefore you can define a number of different GAD/DPT combinations per each device.</p>
