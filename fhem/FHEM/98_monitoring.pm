@@ -322,7 +322,7 @@ sub monitoring_Notify($$) {
 
       if($listFuncAdd eq "preset" && $listFuncRemove eq "preset"){
         Log3(
-          $SELF, 5  "$TYPE ($SELF) ".
+          $SELF, 5, "$TYPE ($SELF) ".
           $list."FuncAdd and $list"."FuncRemove are preset"
         );
         if(!$removeRegex){
