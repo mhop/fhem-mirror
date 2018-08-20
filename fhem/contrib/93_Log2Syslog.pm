@@ -30,7 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
-# 4.8.5      20.08.2018       BSD parsing changed, BSD setpayload changed
+# 4.8.5      20.08.2018       BSD/parseFn parsing changed, BSD setpayload changed, new variable $IGNORE in parseFn
 # 4.8.4      15.08.2018       BSD parsing changed
 # 4.8.3      14.08.2018       BSD setpayload changed, BSD parsing changed, Internal MYFQDN 
 # 4.8.2      13.08.2018       rename makeMsgEvent to makeEvent
@@ -89,7 +89,7 @@ sub Log2Syslog_Log3slog($$$);
 my $Log2SyslogVn = "4.8.5";
 
 # Mappinghash BSD-Formatierung Monat
-my %Log2Syslog_BSDMonth = (
+our %Log2Syslog_BSDMonth = (
   "01" => "Jan",
   "02" => "Feb",
   "03" => "Mar",
@@ -342,7 +342,7 @@ sub Log2Syslog_Read($) {
   my $pp     = AttrVal($name, "parseProfile", "IETF");
   my $mevt   = AttrVal($name, "makeEvent", "intern");          # wie soll Reading/Eventerstellt werden
   my $sevevt = AttrVal($name, "respectSeverity", "");             # welcher Schweregrad soll berücksichtigt werden (default: alle)
-  my ($err,$sev,$data,$ts,$phost,$pl);
+  my ($err,$sev,$data,$ts,$phost,$pl,$ignore);
   
   return if(IsDisabled($name) || $hash->{MODEL} !~ /Collector/);
 
@@ -356,10 +356,12 @@ sub Log2Syslog_Read($) {
           $st = "receive error - see logfile";          
       } else {
           # parse Payload  
-          ($err,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
+          ($err,$ignore,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
           $hash->{SEQNO}++;
           if($err) {
               $st = "parse error - see logfile";
+          } elsif ($ignore) {
+              Log3 $name, 5, "Log2Syslog $name -> dataset was ignored by parseFn";
           } else {
               return if($sevevt && $sevevt !~ m/$sev/);            # Message nicht berücksichtigen
               $st = "active";
@@ -387,10 +389,12 @@ sub Log2Syslog_Read($) {
           $st = "receive error - see logfile";            
       } else {
           # parse Payload  
-          ($err,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
+          ($err,$ignore,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
           $hash->{SEQNO}++;
           if($err) {
               $st = "parse error - see logfile";
+          } elsif ($ignore) {
+              Log3 $name, 5, "Log2Syslog $name -> dataset was ignored by parseFn";
           } else {
               return if($sevevt && $sevevt !~ m/$sev/);            # Message nicht berücksichtigen
               $st = "active";
@@ -410,10 +414,12 @@ sub Log2Syslog_Read($) {
   } else {
       # raw oder User eigenes Format
       $socket->recv($data, 8192);
-      ($err,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
+      ($err,$ignore,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$data);      
       $hash->{SEQNO}++;
       if($err) {
           $st = "parse error - see logfile";
+      } elsif ($ignore) {
+          Log3 $name, 5, "Log2Syslog $name -> dataset was ignored by parseFn";
       } else {
           return if($sevevt && $sevevt !~ m/$sev/);            # Message nicht berücksichtigen
           $st = "active";
@@ -450,6 +456,7 @@ sub Log2Syslog_parsePayload($$) {
   my $severity     = "";
   my $facility     = "";  
   my @evf          = split(",",AttrVal($name, "outputFields", "FAC,SEV,ID,CONT"));   # auszugebene Felder im Event/Reading
+  my $ignore       = 0;
   my ($Mmm,$dd,$delimiter,$day,$ietf,$err,$pl,$tail);
   
   # Hash zur Umwandlung Felder in deren Variablen
@@ -682,7 +689,7 @@ sub Log2Syslog_parsePayload($$) {
           }          
       }
   
-  } elsif($pp eq "ParseFn") {
+  } elsif ($pp eq "ParseFn") {
 	  # user spezifisches Parsing
       my $parseFn = AttrVal( $name, "parseFn", "" );
       $ts = TimeNow();
@@ -707,13 +714,14 @@ sub Log2Syslog_parsePayload($$) {
 	      my $SEV          = "";
           my $DATA         = $data;
           my $SDFIELD      = "";
+          my $IGNORE       = 0;
 
  	      eval $parseFn;
           if($@) {
-	          Log3 $name, 2, "DbLog $name -> error parseFn: $@";
+	          Log3 $name, 2, "Log2Syslog $name -> error parseFn: $@";
               $err = 1;
           }
-		 
+         		 
           $prival  = $PRIVAL if($PRIVAL =~ /\d{1,3}/);
           $date    = $DATE if($DATE =~ /^(\d{4})-(\d{2})-(\d{2})$/);
           $time    = $TIME if($TIME =~ /^(\d{2}):(\d{2}):(\d{2})$/);          
@@ -726,6 +734,7 @@ sub Log2Syslog_parsePayload($$) {
           $fac     = $FAC if(defined $FAC);
           $sev     = $SEV if(defined $SEV);
           $sdfield = $SDFIELD if(defined $SDFIELD);
+          $ignore  = $IGNORE if($IGNORE =~ /\d/);
           
           if($prival && looks_like_number($prival)) {
               $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
@@ -766,7 +775,7 @@ sub Log2Syslog_parsePayload($$) {
 	  
   } 	
 
-return ($err,$sev,$phost,$ts,$pl);
+return ($err,$ignore,$sev,$phost,$ts,$pl);
 }
 
 #################################################################################################
@@ -971,6 +980,7 @@ sub Log2Syslog_Attr ($$$$) {
          $_[3] = "{$aVal}" if($aVal !~ m/^\{.*\}$/s);
          $aVal = $_[3];
 	      my %specials = (
+             "%IGNORE"  => "0",
              "%DATA"    => "1",
              "%PRIVAL"  => "1",
              "%TS"      => "1",
@@ -2125,6 +2135,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
         <tr><td> $SDFIELD </td><td> "" </td></tr>
         <tr><td> $CONT    </td><td> "" </td></tr>
         <tr><td> $DATA    </td><td> übergebene Rohdaten der Syslog-Mitteilung (keine Rückgabeauswertung!) </td></tr>
+        <tr><td> $IGNORE  </td><td> 0 (0|1), wenn $IGNORE==1 wird der Syslog-Datensatz ignoriert </td></tr>
         </table>
         </ul>
 	    <br>  
