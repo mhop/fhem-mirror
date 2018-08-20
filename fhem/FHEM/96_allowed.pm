@@ -21,9 +21,22 @@ allowed_Initialize($)
   $hash->{AuthenticateFn} = "allowed_Authenticate";
   $hash->{SetFn}    = "allowed_Set";
   $hash->{AttrFn}   = "allowed_Attr";
-  $hash->{AttrList} = "disable:0,1 validFor allowedCommands allowedDevices ".
-                        "basicAuth basicAuthMsg password globalpassword ".
-                        "basicAuthExpiry";
+  no warnings 'qw';
+  my @attrList = qw(
+    allowedCommands
+    allowedDevices
+    allowedDevicesRegexp
+    basicAuth
+    basicAuthExpiry
+    basicAuthMsg
+    disable:0,1
+    globalpassword
+    password
+    validFor
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
+
   $hash->{UndefFn} = "allowed_Undef";
   $hash->{FW_detailFn} = "allowed_fhemwebFn";
 
@@ -88,8 +101,12 @@ allowed_Authorize($$$$)
   }
 
   if($type eq "devicename") {
-    return 0 if(!$me->{allowedDevices});
-    return 1 if($me->{allowedDevices} =~ m/\b\Q$arg\E\b/);
+    return 0 if(!$me->{allowedDevices} &&
+                !$me->{allowedDevicesRegexp});
+    return 1 if($me->{allowedDevices} &&
+                $me->{allowedDevices} =~ m/\b\Q$arg\E\b/);
+    return 1 if($me->{allowedDevicesRegexp} &&
+                $arg =~ m/^$me->{allowedDevicesRegexp}$/);
     Log3 $me, 3, "Forbidden device $arg for $cl->{NAME}";
     stacktrace() if(AttrVal($me, "verbose", 5));
     return 2;
@@ -269,6 +286,7 @@ allowed_Attr(@)
 
   } elsif($attrName eq "allowedCommands" ||     # hoping for some speedup
           $attrName eq "allowedDevices"  ||
+          $attrName eq "allowedDevicesRegexp"  ||
           $attrName eq "validFor") {
     if($set) {
       $hash->{$attrName} = join(" ", @param);
@@ -405,8 +423,23 @@ EOF
 
     <a name="allowedDevices"></a>
     <li>allowedDevices<br>
-        A comma separated list of device names which can be manipulated via the
-        matching frontend (see validFor).
+        A comma or space separated list of device names which can be
+        manipulated via the matching frontend (see validFor).
+        </li><br>
+
+    <a name="allowedDevicesRegexp"></a>
+    <li>allowedDevices<br>
+        Comma separated list of device names which can be manipulated via the
+        frontends specified by validFor. The regexp is prepended with ^ and
+        suffixed with $, as usual.  Only devices listed in allowedDevices or
+        matching allowedDevicesRegexp may manipulated.
+        </li><br>
+
+    <a name="allowedDevicesRegexp"></a>
+    <li>allowedDevicesRegexp<br>
+        A regexp to match device names which can be manipulated via the
+        frontends specified by validFor. Only devices listed in allowedDevices
+        or matching allowedDevicesRegexp may manipulated.
         </li><br>
 
     <a name="basicAuth"></a>
