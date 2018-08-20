@@ -219,6 +219,7 @@ sub watchdog_client_NotifySystemD($$) {
 1;
 
 =pod
+=item summary_DE Sendet periodisch eine keep-alive Nachricht an das Systemd.
 =begin html_DE
 
 <a name="systemd_watchdog"></a>
@@ -280,6 +281,7 @@ sub watchdog_client_NotifySystemD($$) {
 
 =end html_DE
 
+=item summary Sends periodically keep-alive message to the systemd.
 =begin html
 
 <a name="systemd_watchdog"></a>

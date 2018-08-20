@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   98_systemd_watchdog: tested and moved from contrib
   - bugfix:  36_Vallox: Initialization bug fixed
   - added:   00_MQTT: ability for client notifications: on connect, 
                       on disconnect, on timeout

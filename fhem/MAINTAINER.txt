@@ -446,6 +446,7 @@ FHEM/98_TRAFFIC.pm           jmike                Unterstuetzende Dienste
 FHEM/98_UbiquitiPM.pm        Wzut                 Sonstige Systeme
 FHEM/98_UbiquitiOut.pm       Wzut                 Sonstige Systeme
 FHEM/98_Verkehrsinfo.pm      martins              Unterstuetzende Dienste
+FHEM/98_systemd_watchdog.pm  hexenmeister         Unterstuetzende Dienste
 FHEM/98_WeekdayTimer.pm      igami                Unterstuetzende Dienste
 FHEM/98_WOL.pm               dietmar63            Unterstuetzende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         Automatisierung
