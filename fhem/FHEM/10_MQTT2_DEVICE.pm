@@ -423,12 +423,13 @@ MQTT2_DEVICE_Undef($$)
       the same topic, but with different messages (arguments).<br>
       Notes:
       <ul>
-        <li>Arguments to the set command will be appended to the message
+        <li>arguments to the set command will be appended to the message
           published (not for the perl expression)</li>
-        <li>If using a perl expressions, the command arguments are available as
+        <li>if using a perl expressions, the command arguments are available as
           $EVENT, $EVTPART0, etc. The perl expression must return a string
           containing the topic and the message separated by a space.</li>
         <li>SetExtensions is activated</li>
+        <li>if the topic name ends with :r, then the retain flag is set</li>
       </ul>
       </li><br>
 

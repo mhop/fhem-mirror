@@ -4939,6 +4939,7 @@ json2nameValue($;$)
 
     if($val =~ m/^"/) {
       ($val, $in) = lquote($val);
+      $val =~ s/\\u([0-9A-F]{4})/chr(hex($1))/gsie; # toJSON reverse
       $ret{"$prefix$name"} = $val;
 
     } elsif($val =~ m/^{/) { # }

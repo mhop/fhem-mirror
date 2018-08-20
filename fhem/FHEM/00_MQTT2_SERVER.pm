@@ -2,7 +2,7 @@
 # $Id$
 package main;
 
-# TODO: save retain, test SSL
+# TODO: test SSL
 
 use strict;
 use warnings;
@@ -31,6 +31,7 @@ MQTT2_SERVER_Initialize($)
   $hash->{SetFn}   = "MQTT2_SERVER_Set";
   $hash->{UndefFn} = "MQTT2_SERVER_Undef";
   $hash->{WriteFn} = "MQTT2_SERVER_Write";
+  $hash->{StateFn} = "MQTT2_SERVER_State";
   $hash->{CanAuthenticate} = 1;
 
   no warnings 'qw';
@@ -142,6 +143,21 @@ MQTT2_SERVER_Set($@)
   }
 }
 
+sub
+MQTT2_SERVER_State()
+{
+  my ($hash, $ts, $name, $val) = @_;
+
+  if($name eq "RETAIN") {
+    my $now = gettimeofday;
+    my $ret = json2nameValue($val);
+    for my $k (keys %{$ret}) {
+      my %h = ( ts=>$now, val=>$ret->{$k} );
+      $hash->{retain}{$k} = \%h;
+    }
+  }
+  return undef;
+}
 
 my %cptype = (
   0 => "RESERVED_0",
@@ -358,6 +374,10 @@ MQTT2_SERVER_doPublish($$$$;$)
     my $now = gettimeofday();
     my %h = ( ts=>$now, val=>$val );
     $tgt->{retain}{$tp} = \%h;
+
+    # Save it
+    my %nots = map { $_ => $tgt->{retain}{$_}{val} } keys %{$tgt->{retain}};
+    setReadingsVal($tgt, "RETAIN", toJSON(\%nots), FmtDateTime(gettimeofday()));
   }
 
   foreach my $clName (keys %{$tgt->{clients}}) {
@@ -407,7 +427,12 @@ sub
 MQTT2_SERVER_Write($$$)
 {
   my ($hash,$topic,$msg) = @_;
-  MQTT2_SERVER_doPublish($hash, $hash, $topic, $msg);
+  my $retain;
+  if($topic =~ m/^(.*):r$/) {
+    $topic = $1;
+    $retain = 1;
+  }
+  MQTT2_SERVER_doPublish($hash, $hash, $topic, $msg, $retain);
 }
 
 sub
