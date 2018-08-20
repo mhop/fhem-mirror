@@ -50,6 +50,7 @@ FileLog_Initialize($)
     disabledForIntervals
     eventOnThreshold
     ignoreRegexp
+    label
     logtype
     mseclog:1,0
     nrarchive
@@ -1328,6 +1329,8 @@ FileLog_regexpFn($$)
 
     <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
 
+    <li><a href="#label">label</a><br></li>
+      
     <a name="logtype"></a>
     <li>logtype<br>
         Used by FHEMWEB to offer gnuplot/SVG images made from the
