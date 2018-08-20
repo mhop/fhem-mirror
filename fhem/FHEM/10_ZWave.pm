@@ -4592,6 +4592,15 @@ ZWave_Parse($$@)
       return "";
     }
 
+    if($cmd eq "CLEAR_NETWORK_STATS") {
+      my $retval;
+           if($arg eq "01") { $retval = 'ok';
+      } else                { $retval = 'unknown_'.$arg; # should never happen
+      }
+      DoTrigger($ioName, "$cmd $retval");
+      return "";
+    }
+
     if($cmd eq "ZW_SET_PRIORITY_ROUTE" && $arg =~ m/(..)(..)/) {
       DoTrigger($ioName, "$cmd node $1 result $2");
       return "";

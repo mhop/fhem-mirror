@@ -28,6 +28,7 @@ my %sets = (
                                      onNwSec=>0xc1, onSec=>0x81 } },
   "backupCreate"     => { cmd => "" },
   "backupRestore"    => { cmd => "" },
+  "clearStatistics"  => { cmd => "39" },       # CLEAR_NETWORK_STATS
   "controllerChange" => { cmd => "4d%02x@",    # ZW_CONTROLLER_CHANGE
                           param => { on     =>0x02, stop =>0x05,
                                      stopFailed =>0x06 } },
@@ -69,6 +70,7 @@ my %gets = (
   "random"          => "1c%02x",  # ZW_GET_RANDOM
   "raw"             => "%s",      # hex
   "routeFor"        => "92%02x",  # hex
+  "statistics"      => "3a",      # GET_NETWORK_STATS
   "sucNodeId"       => "56",      # ZW_GET_SUC_NODE_ID
 #  "timeouts"        => "06",     # Forum #71333
   "version"         => "15",      # ZW_GET_VERSION
@@ -583,7 +585,14 @@ ZWDongle_Get($@)
         $i++
     }
     $msg = join(" ", @list);
-  }
+
+  } elsif($cmd eq "statistics") {              ############################
+    $msg = sprintf("Transmitted:%s BackOffs:%s ReceivedNoErrors:%s
+                    ChecksumErrors:%s CRC16Errors:%s ForeignHomeId:%s",
+                hex(substr($ret,4,4)), hex(substr($ret,8,4)), 
+                hex(substr($ret,12,4)), hex(substr($ret,16,4)),
+                hex(substr($ret,20,4)), hex(substr($ret,24,4)));
+    }
 
   $cmd .= "_".join("_", @a) if(@a);
   readingsSingleUpdate($hash, $cmd, $msg, 0);
@@ -1099,6 +1108,10 @@ ZWDongle_Ready($)
     the MEMORY functions.
     </li>
 
+  <li>clearStatistics<br>
+    clear network statistics.
+    </li>
+
   <li>controllerChange on|stop|stopFailed<br>
     Add a controller to the current network and transfer role as primary to it.
     Invoking controller is converted to secondary.<br>
@@ -1247,6 +1260,10 @@ ZWDongle_Ready($)
     request priority routing for &lt;device&gt;. &lt;device&gt; is either 
     device name or decimal nodeId.</li>
 
+  <li>statistics<br>
+    return the current network statistics.
+    </li>
+
   <li>sucNodeId<br>
     return the currently registered decimal SUC nodeId.
     </li>
@@ -1314,6 +1331,9 @@ ZWDongle_Ready($)
   <br><b>addNode</b>
   <li>ZW_ADD_NODE_TO_NETWORK [learnReady|nodeFound|slave|controller|
                               done|failed]</li>
+
+  <br><b>clearStatistics</b>
+  <li>CLEAR_NETWORK_STATS ok</li>
 
   <br><b>controllerChange</b>
   <li>ZW_CONTROLLER_CHANGE [learnReady|nodeFound|controller|done|failed]</li>
