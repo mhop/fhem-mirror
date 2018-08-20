@@ -30,6 +30,7 @@
 ######################################################################################################################
 #  Versions History:
 #
+# 4.8.5      20.08.2018       BSD parsing changed, BSD setpayload changed
 # 4.8.4      15.08.2018       BSD parsing changed
 # 4.8.3      14.08.2018       BSD setpayload changed, BSD parsing changed, Internal MYFQDN 
 # 4.8.2      13.08.2018       rename makeMsgEvent to makeEvent
@@ -85,7 +86,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $Mis
 #
 sub Log2Syslog_Log3slog($$$);
 
-my $Log2SyslogVn = "4.8.4";
+my $Log2SyslogVn = "4.8.5";
 
 # Mappinghash BSD-Formatierung Monat
 my %Log2Syslog_BSDMonth = (
@@ -507,7 +508,7 @@ sub Log2Syslog_parsePayload($$) {
           $tail =~ /^(?<host>[^\s]*)?\s(?<tail>.*)$/;
           $host = $+{host};          # should 
           $tail = $+{tail};
-          $tail =~ /^(?<id>[\w\s]*)?(?<cont>\W.*)$/; 
+          $tail =~ /^(?<id>(\w*))?(?<cont>(\[\w*\]:|:\s).*)$/; 
           $id   = $+{id};            # should
           if($id) {
               $id   = substr($id,0, ($RFC3164len{TAG}-1));           # Länge TAG-Feld nach RFC begrenzen
@@ -1384,8 +1385,8 @@ sub Log2Syslog_setpayload ($$$$$$) {
 	  $day   =~ s/0/ / if($day =~ m/^0.*$/);                # in Tagen < 10 muss 0 durch Space ersetzt werden
 	  $ident = substr($ident,0, $RFC3164len{TAG});          # Länge TAG Feld begrenzen
 	  no warnings 'uninitialized'; 
-      $ident = $ident."[$hash->{SEQNO}]:";
-      $data  = "<$prival>$month $day $time $myhost $ident $tag$otp";
+      $ident = $ident.$tag."[$pid]:";
+      $data  = "<$prival>$month $day $time $myhost $ident$otp";
 	  use warnings;
 	  $data = substr($data,0, ($RFC3164len{DL}-1));         # Länge Total begrenzen
   }
