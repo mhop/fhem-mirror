@@ -818,11 +818,39 @@ YAMAHA_AVR_Set($@)
         }
         elsif($a[2] eq "tunerPresetUp")
         {
-            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Up</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+            if($hash->{helper}{SUPPORT_DAB})
+            {
+                if(ReadingsVal($name, "tunerFrequencyBand", "FM") eq "DAB")
+                {
+                    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><DAB><Play_Control><DAB><Preset><Preset_Sel>Up</Preset_Sel></Preset></DAB></Play_Control></DAB></YAMAHA_AV>", $what, $a[2]);
+                }
+                else
+                {
+                    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><DAB><Play_Control><FM><Preset><Preset_Sel>Up</Preset_Sel></Preset></FM></Play_Control></DAB></YAMAHA_AV>", $what, $a[2]);
+                }
+            }
+            else
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Up</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+            }
         }
         elsif($a[2] eq "tunerPresetDown")
         {
-            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Down</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+            if($hash->{helper}{SUPPORT_DAB})
+            {
+                if(ReadingsVal($name, "tunerFrequencyBand", "FM") eq "DAB")
+                {
+                    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><DAB><Play_Control><DAB><Preset><Preset_Sel>Down</Preset_Sel></Preset></DAB></Play_Control></DAB></YAMAHA_AV>", $what, $a[2]);
+                }
+                else
+                {
+                    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><DAB><Play_Control><FM><Preset><Preset_Sel>Down</Preset_Sel></Preset></FM></Play_Control></DAB></YAMAHA_AV>", $what, $a[2]);
+                }
+            }
+            else
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Down</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+            }
         }
         else
         {
@@ -940,13 +968,28 @@ YAMAHA_AVR_Set($@)
         if($a[2] =~ /^\d+(?:(?:\.|,)\d{1,2})?$/)
         {
             $a[2] =~ s/,/./;
+            
             if((defined($a[3]) and $a[3] eq "AM" )) # AM Band 
             {
-                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Tuning><Band>AM</Band><Freq><AM><Val>".$a[2]."</Val><Exp>0</Exp><Unit>kHz</Unit></AM></Freq></Tuning></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], {options => {can_fail => 1}});
+                if($hash->{helper}{SUPPORT_DAB}) 
+                {
+                    return "no AM band supported by DAB based models";
+                }
+                else
+                {
+                    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Tuning><Band>AM</Band><Freq><AM><Val>".$a[2]."</Val><Exp>0</Exp><Unit>kHz</Unit></AM></Freq></Tuning></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], {options => {can_fail => 1}});
+                }
             }
             else # FM Band
             {
-                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Tuning><Band>FM</Band><Freq><FM><Val>".($a[2] * 100)."</Val><Exp>2</Exp><Unit>MHz</Unit></FM></Freq></Tuning></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], {options => {can_fail => 1}});
+                if($hash->{helper}{SUPPORT_DAB}) 
+                {
+                    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><DAB><Play_Control><FM><Tuning><Freq><Val>".($a[2] * 100)."</Val><Exp>2</Exp><Unit>MHz</Unit></Freq></Tuning></FM></Play_Control></DAB></YAMAHA_AV>", $what, $a[2], {options => {can_fail => 1}});
+                }
+                else
+                {
+                    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Tuning><Band>FM</Band><Freq><FM><Val>".($a[2] * 100)."</Val><Exp>2</Exp><Unit>MHz</Unit></FM></Freq></Tuning></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], {options => {can_fail => 1}});
+                }
             }
         }
         else
@@ -2341,6 +2384,9 @@ YAMAHA_AVR_ParseXML($$$)
 
     # check for hdmi output command
     $hash->{helper}{SUPPORT_HDMI_OUT} = ($data =~ /<Menu Func_Ex="HDMI_Out" Title_1="HDMI OUT">/ ? 1 : 0);
+    
+    # check for DAB support
+    $hash->{helper}{SUPPORT_DAB} = ($data =~ /<Menu Func="Source_Device" Func_Ex="[^"]+" YNC_Tag="DAB">/ ? 1 : 0);
     
     # uncomment line for zone detection testing
     #
