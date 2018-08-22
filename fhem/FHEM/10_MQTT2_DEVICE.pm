@@ -168,6 +168,7 @@ MQTT2_DEVICE_Get($@)
 
   my %gets;
   map {  my ($k,$v) = split(" ",$_,2); $gets{$k} = $v; }
+        grep /./,
         split("\n", AttrVal($hash->{NAME}, "getList", ""));
   return "Unknown argument $a[1], choose one of ".join(" ",sort keys %gets)
         if(!$gets{$a[1]});
@@ -207,6 +208,7 @@ MQTT2_DEVICE_Set($@)
 
   my %sets;
   map {  my ($k,$v) = split(" ",$_,2); $sets{$k} = $v; }
+        grep /./,
         split("\n", AttrVal($hash->{NAME}, "setList", ""));
   my $cmd = $sets{$a[1]};
   return SetExtensions($hash, join(" ", sort keys %sets), @a) if(!$cmd);
@@ -298,7 +300,7 @@ MQTT2_DEVICE_addReading($$)
   my ($name, $param) = @_;
   foreach my $line (split("\n", $param)) {
     my ($re,$code) = split(" ", $line,2);
-    $modules{MQTT2_DEVICE}{defptr}{re}{$re}{$name} = $code;
+    $modules{MQTT2_DEVICE}{defptr}{re}{$re}{$name} = $code if($re && $code);
   }
 }
 
