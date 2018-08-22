@@ -2086,7 +2086,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
         <ul>  
         <table>  
         <colgroup> <col width=10%> <col width=90%> </colgroup>
-	    <tr><td> <b>intern</b>   </td><td> es werden Events über die modulinterne Eventfunktion generiert </td></tr>
+	    <tr><td> <b>intern</b>   </td><td> Events werden modulintern generiert und sind nur im Eventmonitor sichtbar. Readings werden nicht erstellt. </td></tr>
         <tr><td> <b>no</b>       </td><td> es werden nur Readings der Form "MSG_&lt;Hostname&gt;" ohne Eventfunktion erstellt </td></tr>
         <tr><td> <b>reading</b>  </td><td> es werden Readings der Form "MSG_&lt;Hostname&gt;" erstellt. Events werden in Abhängigkeit der "event-on-.*"-Attribute generiert </td></tr>
         </table>
