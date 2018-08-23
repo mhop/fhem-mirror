@@ -1,5 +1,14 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  71_YAMAHA_AVR: renamed attributes:
+                "request-timeout" => "requestTimeout"
+                "volume-smooth-change" => "volumeSmoothChange"
+                "volume-smooth-steps" => "volumeSmoothSteps"
+             already configured values will be converted by FHEM automatically
+  - feature: 71_YAMAHA_AVR: add new set command tunerFrequencyBand to change
+             between FM and DAB band on DAB-based models
+  - bugfix:  71_YAMAHA_AVR: fix set commands preset/presetUp/presetDown for 
+             input tuner on DAB based models
   - bugfix:  71_YAMAHA_AVR: fix set commands remoteControl tunerPresetUp,
              tunerPresetDown and tunerFrequency for DAB based models 
   - added:   98_systemd_watchdog: tested and moved from contrib
