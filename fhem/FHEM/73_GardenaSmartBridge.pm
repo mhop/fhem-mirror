@@ -70,7 +70,7 @@ eval "use JSON;1" or $missingModul .= "JSON ";
 eval "use IO::Socket::SSL;1" or $missingModul .= "IO::Socket::SSL ";
 
 
-my $version = "1.2.0";
+my $version = "1.2.2";
 
 
 
@@ -85,8 +85,6 @@ sub GardenaSmartBridge_Undef($$);
 sub GardenaSmartBridge_Delete($$);
 sub GardenaSmartBridge_ResponseProcessing($$);
 sub GardenaSmartBridge_ErrorHandling($$$);
-#sub GardenaSmartBridge_encrypt($);
-#sub GardenaSmartBridge_decrypt($);
 sub GardenaSmartBridge_WriteReadings($$);
 sub GardenaSmartBridge_ParseJSON($$);
 sub GardenaSmartBridge_getDevices($);
@@ -96,6 +94,7 @@ sub GardenaSmartBridge_Notify($$);
 sub GardenaSmartBridge_StorePassword($$);
 sub GardenaSmartBridge_ReadPassword($);
 sub GardenaSmartBridge_DeletePassword($);
+sub GardenaSmartBridge_Rename(@);
 
 
 
@@ -116,6 +115,7 @@ sub GardenaSmartBridge_Initialize($) {
     $hash->{DefFn}      = "GardenaSmartBridge_Define";
     $hash->{UndefFn}    = "GardenaSmartBridge_Undef";
     $hash->{DeleteFn}   = "GardenaSmartBridge_Delete";
+    $hash->{RenameFn}   = "GardenaSmartBridge_Rename";
     $hash->{NotifyFn}   = "GardenaSmartBridge_Notify";
     
     $hash->{AttrFn}     = "GardenaSmartBridge_Attr";
@@ -420,7 +420,7 @@ sub GardenaSmartBridge_ErrorHandling($$$) {
         } elsif( $param->{code} == 204 and $dhash ne $hash and defined($dhash->{helper}{deviceAction}) ) {
             
             readingsBulkUpdate( $dhash, "state", "the command is processed", 1);
-            InternalTimer( gettimeofday()+3,"GardenaSmartBridge_getDevices", $hash, 1 );
+            InternalTimer( gettimeofday()+5,"GardenaSmartBridge_getDevices", $hash, 1 );
         
         } elsif( $param->{code} != 200 ) {
 
@@ -712,6 +712,18 @@ sub GardenaSmartBridge_ReadPassword($) {
         Log3 $name, 3, "GardenaSmartBridge ($name) - No password in file";
         return undef;
     }
+}
+
+sub GardenaSmartBridge_Rename(@) {
+
+    my ($new,$old)  = @_;
+    my $hash        = $defs{$new};
+    
+
+    GardenaSmartBridge_StorePassword($hash,GardenaSmartBridge_ReadPassword($hash));
+    setKeyValue($hash->{TYPE}."_".$old."_passwd",undef);
+
+    return undef;
 }
 
 sub GardenaSmartBridge_ParseJSON($$) {

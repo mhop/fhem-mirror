@@ -67,7 +67,7 @@ use Time::Local;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "1.2.0";
+my $version = "1.2.2";
 
 
 
@@ -253,7 +253,7 @@ sub GardenaSmartDevice_Set($@) {
             $abilities  = 'light';
             
         } elsif( lc $sensname eq 'humidity' ) {
-            $payload    = '"name":"measure_humidity"';
+            $payload    = '"name":"measure_soil_humidity"';
             $abilities  = 'humidity';
         }
 
