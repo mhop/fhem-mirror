@@ -27,6 +27,8 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 7.0.0  27.07.2018    compatibility to API v2.8
+# 6.0.1  04.07.2018    Reading CamFirmware
 # 6.0.0  03.07.2018    HTTPS Support, buttons for refresh SSCamSTRM-devices
 # 5.3.0  29.06.2018    changes regarding to "createStreamDev ... generic", refresh reading parentState of all 
 #                      SSCamSTRM devices with PARENT=SSCam-device, control elements for runView within fhemweb, 
@@ -244,7 +246,9 @@ use Time::HiRes;
 use HttpUtils;
 # no if $] >= 5.017011, warnings => 'experimental';  
 
-my $SSCamVersion = "6.0.0";
+# Version und getestete SVS-Version
+my $SSCamVersion = "7.0.0";
+my $compstat     = "8.2.0";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -334,7 +338,7 @@ sub SSCam_Initialize($) {
          "session:SurveillanceStation,DSM ".
          "showPassInLog:1,0 ".
          "showStmInfoFull:1,0 ".
-         "simu_SVSversion:7.2-xxxx,7.1-xxxx,8.0.0-xxxx ".
+         "simu_SVSversion:7.2-xxxx,7.1-xxxx,8.0.0-xxxx,8.1.5-xxxx,8.2.0-xxxx ".
          "webCmd ".
          $readingFnAttributes;   
          
@@ -364,12 +368,13 @@ sub SSCam_Define($@) {
   my $serverport = $a[4] ? $a[4] : 5000;
   my $proto      = $a[5] ? lc($a[5]) : "http";
   
-  $hash->{SERVERADDR} = $serveraddr;
-  $hash->{SERVERPORT} = $serverport;
-  $hash->{CAMNAME}    = $camname;
-  $hash->{VERSION}    = $SSCamVersion;
-  $hash->{MODEL}      = ($camname =~ m/^SVS$/i)?"SVS":"CAM";                     # initial, CAM wird später ersetzt durch CamModel
-  $hash->{PROTOCOL}   = $proto;
+  $hash->{SERVERADDR}    = $serveraddr;
+  $hash->{SERVERPORT}    = $serverport;
+  $hash->{CAMNAME}       = $camname;
+  $hash->{VERSION}       = $SSCamVersion;
+  $hash->{MODEL}         = ($camname =~ m/^SVS$/i)?"SVS":"CAM";                  # initial, CAM wird später ersetzt durch CamModel
+  $hash->{PROTOCOL}      = $proto;
+  $hash->{COMPATIBILITY} = $compstat;                                            # getestete SVS-version Kompatibilität 
   
   # benötigte API's in $hash einfügen
   $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
@@ -378,17 +383,18 @@ sub SSCam_Define($@) {
   $hash->{HELPER}{APIEVENT}       = "SYNO.SurveillanceStation.Event"; 
   $hash->{HELPER}{APIEXTREC}      = "SYNO.SurveillanceStation.ExternalRecording"; 
   $hash->{HELPER}{APIEXTEVT}      = "SYNO.SurveillanceStation.ExternalEvent";
-  $hash->{HELPER}{APICAM}         = "SYNO.SurveillanceStation.Camera";           # This API provides a set of methods to acquire camera-related information and to enable/disable cameras
+  $hash->{HELPER}{APICAM}         = "SYNO.SurveillanceStation.Camera";           # stark geändert ab API v2.8
   $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";
   $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
   $hash->{HELPER}{APIPRESET}      = "SYNO.SurveillanceStation.PTZ.Preset";
   $hash->{HELPER}{APICAMEVENT}    = "SYNO.SurveillanceStation.Camera.Event";
-  $hash->{HELPER}{APIVIDEOSTM}    = "SYNO.SurveillanceStation.VideoStreaming";   # wird verwendet in Response von "SYNO.SurveillanceStation.Camera: GetLiveViewPath" -> StreamKey-Methode
-  $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Streaming";        # This API provides methods to get Live View or Event video stream
+  $hash->{HELPER}{APIVIDEOSTM}    = "SYNO.SurveillanceStation.VideoStreaming";   # verwendet in Response von "SYNO.SurveillanceStation.Camera: GetLiveViewPath" -> StreamKey-Methode
+  # $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Streaming";        # provides methods to get Live View or Event video stream, removed in API v2.8
+  $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Stream";           # Beschreibung ist falsch und entspricht "SYNO.SurveillanceStation.Streaming" auch noch ab v2.8
   $hash->{HELPER}{APIHM}          = "SYNO.SurveillanceStation.HomeMode";
   $hash->{HELPER}{APILOG}         = "SYNO.SurveillanceStation.Log";
-  $hash->{HELPER}{APIAUDIOSTM}    = "SYNO.SurveillanceStation.AudioStream";      # Audiostream mit SID
-  $hash->{HELPER}{APIVIDEOSTMS}   = "SYNO.SurveillanceStation.VideoStream";      # Videostream mit SID
+  $hash->{HELPER}{APIAUDIOSTM}    = "SYNO.SurveillanceStation.AudioStream";      # Audiostream mit SID, removed in API v2.8
+  $hash->{HELPER}{APIVIDEOSTMS}   = "SYNO.SurveillanceStation.VideoStream";      # Videostream mit SID, removed in API v2.8
   
   # Startwerte setzen
   if(SSCam_IsModelCam($hash)) {
@@ -404,6 +410,8 @@ sub SSCam_Define($@) {
   $hash->{HELPER}{OLDPTZHOME}          = "";
   $hash->{".ptzhtml"}                  = "";
   $hash->{HELPER}{HLSSTREAM}           = "inactive";                             # Aktivitätsstatus HLS-Streaming
+  $hash->{HELPER}{SNAPLIMIT}           = 0;                                      # abgerufene Anzahl Snaps
+  $hash->{HELPER}{TOTALCNT}            = 0;                                      # totale Anzahl Snaps
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"PollState","Inactive");                              # es ist keine Gerätepolling aktiv
@@ -499,7 +507,8 @@ sub SSCam_Attr($$$$) {
 
         if ($do == 0) {
             delete($defs{$name}{READINGS}{StmKeymjpegHttp});
-            delete($defs{$name}{READINGS}{LiveStreamUrl}); 	
+            delete($defs{$name}{READINGS}{LiveStreamUrl}); 
+            delete($defs{$name}{READINGS}{StmKeyUnicst});            
 			delete($defs{$name}{READINGS}{StmKeyUnicstOverHttp});
             delete($defs{$name}{READINGS}{StmKeymxpegHttp});			
         }
@@ -574,8 +583,8 @@ sub SSCam_Attr($$$$) {
 	    delete $hash->{HELPER}{APIPARSET};
 	    delete $hash->{HELPER}{SID};
 		delete $hash->{CAMID};
-        RemoveInternalTimer($hash, "SSCam_getsvsinfo");
-        InternalTimer(gettimeofday()+0.5, "SSCam_getsvsinfo", $hash, 0);
+        RemoveInternalTimer($hash, "SSCam_getcaminfoall");
+        InternalTimer(gettimeofday()+0.5, "SSCam_getcaminfoall", $hash, 0);
     }
     
     if($aName =~ m/pollcaminfoall/ && $init_done == 1) {
@@ -630,7 +639,7 @@ sub SSCam_Set($@) {
  
   if(SSCam_IsModelCam($hash)) {
       # selist für Cams
-      my $hlslfw = (ReadingsVal($name,"CamStreamFormat","MJPEG") eq "HLS")?",live_fw_hls,":",";
+      my $hlslfw = SSCam_IsHLSCap($hash)?",live_fw_hls,":",";
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
@@ -963,6 +972,7 @@ sub SSCam_Set($@) {
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw";
 		  $hash->{HELPER}{ACTSTRM}    = "MJPEG Livestream";   # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "live_fw_hls") {
+          return "API \"SYNO.SurveillanceStation.VideoStream\" is not available or Reading \"CamStreamFormat\" is not \"HLS\". May be your API version is 2.8 or higher." if(!SSCam_IsHLSCap($hash));
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "hls"; 
 		  $hash->{HELPER}{ALIAS}      = "View only on compatible browsers";
@@ -1172,6 +1182,12 @@ sub SSCam_Get($@) {
 		SSCam_sessionoff($hash);
 		delete $hash->{HELPER}{APIPARSET};
 		delete $hash->{CAMID};
+        # alte Readings außer state löschen
+        my @allrds = keys%{$defs{$name}{READINGS}};
+        foreach my $key(@allrds) {
+            # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
+            delete($defs{$name}{READINGS}{$key}) if($key ne "state");
+        }
 		# "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
         SSCam_getcaminfoall($hash,1);
     
@@ -2800,7 +2816,7 @@ sub SSCam_sessionoff ($) {
 ###########################################################################
 #               Kamera allgemeine Informationen abrufen (Get) 
 ###########################################################################
-sub SSCam_getcaminfo ($) {
+sub SSCam_getcaminfo($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
@@ -2832,7 +2848,14 @@ sub SSCam_getstreamformat ($) {
     my $name     = $hash->{NAME};
     
     RemoveInternalTimer($hash, "SSCam_getstreamformat");
-    return if(IsDisabled($name));
+    my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
+    return if(IsDisabled($name));  
+    
+    if(!$apivideostmsmaxver) {
+        # keine API "SYNO.SurveillanceStation.VideoStream" mehr ab API v2.8
+        readingsSingleUpdate($hash,"CamStreamFormat", "no API", 1);
+        return;
+    }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "getstreamformat";
@@ -3317,6 +3340,7 @@ sub SSCam_getapisites_parse ($) {
 			my $small = $hash->{HELPER}{SVSVERSION}{SMALL};
             my $build = $hash->{HELPER}{SVSVERSION}{BUILD}; 
             my $actvs = $major.$minor.$small.$build;
+            my $avsc  = $major.$minor.$small;                                # Variable zum Version Kompatibilitätscheck
             Log3($name, 4, "$name - installed SVS version is: $actvs");
             use warnings; 
                         
@@ -3374,6 +3398,22 @@ sub SSCam_getapisites_parse ($) {
                     Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
                     $apiptzmaxver    = 5;
                     Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");                               
+                } elsif ($actvs =~ /^815/) {
+                    $apicammaxver = 9;
+                    Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
+                    $apiauthmaxver = 6;
+                    Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
+                    $apiextrecmaxver = 3;
+                    Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
+                    $apiptzmaxver    = 5;
+                    Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");                               
+                } elsif ($actvs =~ /^820/) {
+                    # ab API v2.8 kein "SYNO.SurveillanceStation.VideoStream", "SYNO.SurveillanceStation.AudioStream",
+                    # "SYNO.SurveillanceStation.Streaming" mehr enthalten
+                    $apivideostmsmaxver = 0;
+                    Log3($name, 4, "$name - MaxVersion of $apivideostms adapted to: $apivideostmsmaxver");
+                    $apiaudiostmmaxver = 0;
+                    Log3($name, 4, "$name - MaxVersion of $apiaudiostm adapted to: $apiaudiostmmaxver");                              
                 }
             
 			} else {
@@ -3401,9 +3441,9 @@ sub SSCam_getapisites_parse ($) {
             $hash->{HELPER}{APIEVENTPATH}       = $apieventpath;
             $hash->{HELPER}{APIEVENTMAXVER}     = $apieventmaxver;
             $hash->{HELPER}{APIVIDEOSTMPATH}    = $apivideostmpath;
-            $hash->{HELPER}{APIVIDEOSTMMAXVER}  = $apivideostmmaxver;      
-            $hash->{HELPER}{APIAUDIOSTMPATH}    = $apiaudiostmpath;
-            $hash->{HELPER}{APIAUDIOSTMMAXVER}  = $apiaudiostmmaxver;   
+            $hash->{HELPER}{APIVIDEOSTMMAXVER}  = $apivideostmmaxver;
+            $hash->{HELPER}{APIAUDIOSTMPATH}    = $apiaudiostmpath?$apiaudiostmpath:"undefinded";
+            $hash->{HELPER}{APIAUDIOSTMMAXVER}  = $apiaudiostmmaxver?$apiaudiostmmaxver:0;
             $hash->{HELPER}{APIEXTEVTPATH}      = $apiextevtpath;
             $hash->{HELPER}{APIEXTEVTMAXVER}    = $apiextevtmaxver;
             $hash->{HELPER}{APISTMPATH}         = $apistmpath;
@@ -3412,8 +3452,8 @@ sub SSCam_getapisites_parse ($) {
             $hash->{HELPER}{APIHMMAXVER}        = $apihmmaxver;
             $hash->{HELPER}{APILOGPATH}         = $apilogpath;
             $hash->{HELPER}{APILOGMAXVER}       = $apilogmaxver;
-            $hash->{HELPER}{APIVIDEOSTMSPATH}   = $apivideostmspath;
-            $hash->{HELPER}{APIVIDEOSTMSMAXVER} = $apivideostmsmaxver;
+            $hash->{HELPER}{APIVIDEOSTMSPATH}   = $apivideostmspath?$apivideostmspath:"undefinded";
+            $hash->{HELPER}{APIVIDEOSTMSMAXVER} = $apivideostmsmaxver?$apivideostmsmaxver:0;
             
        
             readingsBeginUpdate($hash);
@@ -3961,21 +4001,34 @@ sub SSCam_camop ($) {
    
    } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/) {    
       if ($hash->{HELPER}{RUNVIEW} =~ m/live/) {
-          $hash->{HELPER}{AUDIOLINK} = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
-          # externe URL in Reading setzen
+	      if($apiaudiostmmaxver) {   # API "SYNO.SurveillanceStation.AudioStream" vorhanden ? (removed ab API v2.8)
+              $hash->{HELPER}{AUDIOLINK} = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
+          } else {
+              delete $hash->{HELPER}{AUDIOLINK} if($hash->{HELPER}{AUDIOLINK});
+          }
+		  
           $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
-          $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+          if($apivideostmsmaxver) {  # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
+              # externe URL in Reading setzen
+              $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+              
+              # interne URL
+              $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+          } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
+              $url = $hash->{HELPER}{STMKEYMJPEGHTTP};
+          }
           readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
-          # interne URL
-          $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+      
       } else {
           # Abspielen der letzten Aufnahme (EventId)
-          # externe URL in Reading setzen
           $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
+          # externe URL in Reading setzen
           $exturl .= "/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid"; 
-          readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
+              
           # interne URL          
           $url = "$proto://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&timestamp=1&_sid=$sid";   
+
+          readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
       }
        
       # Liveview-Link in Hash speichern
@@ -4645,6 +4698,11 @@ sub SSCam_camop_parse ($) {
                    
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been enabled successfully");
+				
+				# Token freigeben vor nächstem Kommando
+                $hash->{HELPER}{ACTIVE} = "off";
+                # neuen Status abrufen	
+                SSCam_getcaminfo($hash);
             
 			} elsif ($OpMode eq "Disable") {
                 # Kamera wurde deaktiviert
@@ -4658,6 +4716,11 @@ sub SSCam_camop_parse ($) {
                    
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been disabled successfully");
+				
+				# Token freigeben vor nächstem Kommando
+                $hash->{HELPER}{ACTIVE} = "off";
+                # neuen Status abrufen	
+                SSCam_getcaminfo($hash);
             
 			} elsif ($OpMode eq "getsvsinfo") {
                 # Parse SVS-Infos
@@ -4696,6 +4759,17 @@ sub SSCam_camop_parse ($) {
                     $minor = $vl[1];
 					$small = ($vl[2] =~ /\d/)?$vl[2]:undef;
                     $build = "xxxx-simu";
+                }
+                
+                my $avsc   = $major.$minor.(($small=~/\d/)?$small:0); 
+                my $avcomp = $hash->{COMPATIBILITY};
+                $avcomp    =~ s/\.//g;
+
+                if($avsc <= $avcomp) {
+                    ReadingsSingleUpdateValue ($hash, "compstate", "true", 1);
+                } else {
+                    ReadingsSingleUpdateValue ($hash, "compstate", "false", 1);
+                    Log3($name, 1, "$name - WARNING - your current/simulated SVS-version may be incompatible to the SSCam version $hash->{VERSION}");
                 }
                 
                 if (!exists($data->{'data'}{'customizedPortHttp'})) {
@@ -4762,10 +4836,16 @@ sub SSCam_camop_parse ($) {
 				$mjpegHttp =~ tr/"//d if(AttrVal($name, "noQuotesForSID",0));
                 
                 # Readings löschen falls sie nicht angezeigt werden sollen (showStmInfoFull)
-                if (!AttrVal($name,"showStmInfoFull",0)) {
-                    delete($defs{$name}{READINGS}{StmKeymjpegHttp});
-					delete($defs{$name}{READINGS}{StmKeyUnicstOverHttp});
-                }
+                #if (!AttrVal($name,"showStmInfoFull",0)) {
+                #    delete($defs{$name}{READINGS}{StmKeymjpegHttp});
+					#delete($defs{$name}{READINGS}{StmKeyUnicstOverHttp});
+                #}
+                
+                # Streaminginfos in Helper speichern
+                $hash->{HELPER}{STMKEYMJPEGHTTP}      = $mjpegHttp if($mjpegHttp);
+                $hash->{HELPER}{STMKEYMXPEGHTTP}      = $mxpegHttp if($mxpegHttp);
+                $hash->{HELPER}{STMKEYUNICSTOVERHTTP} = $unicastOverHttp if($unicastOverHttp);
+                $hash->{HELPER}{STMKEYUNICST}         = $unicastPath if($unicastPath);
                 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamForceEnableMulticast",$camforcemcast) if($camforcemcast);
@@ -4773,7 +4853,7 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"StmKeymjpegHttp",$mjpegHttp) if(AttrVal($name,"showStmInfoFull",0));
                 readingsBulkUpdate($hash,"StmKeymxpegHttp",$mxpegHttp) if(AttrVal($name,"showStmInfoFull",0));
 				readingsBulkUpdate($hash,"StmKeyUnicstOverHttp",$unicastOverHttp) if(AttrVal($name,"showStmInfoFull",0) && $unicastOverHttp);
-                readingsBulkUpdate($hash,"StmKeyUnicst",$unicastPath) if($unicastPath);
+                readingsBulkUpdate($hash,"StmKeyUnicst",$unicastPath) if(AttrVal($name,"showStmInfoFull",0) && $unicastPath);
 				readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -4884,8 +4964,11 @@ sub SSCam_camop_parse ($) {
                 my $clstrmno = $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveStreamNo'};
                 $clstrmno++ if($clstrmno == 0);
                 
+                my $fw = $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camFirmware'};
+                
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamAudioType",$camaudiotype);
+                readingsBulkUpdate($hash,"CamFirmware",$fw) if($fw);
                 readingsBulkUpdate($hash,"CamLiveMode",$camLiveMode);
                 readingsBulkUpdate($hash,"CamLiveFps",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveFps'});
                 readingsBulkUpdate($hash,"CamLiveResolution",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveResolution'});
@@ -4902,7 +4985,7 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"CamVideoType",$data->{'data'}->{'cameras'}->[0]->{'camVideoType'});
                 readingsBulkUpdate($hash,"CamPreRecTime",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camPreRecTime'});
                 readingsBulkUpdate($hash,"CamPort",$data->{'data'}->{'cameras'}->[0]->{'port'});
-                readingsBulkUpdate($hash,"CamPtSpeed",$data->{'data'}->{'cameras'}->[0]->{'ptSpeed'});
+                readingsBulkUpdate($hash,"CamPtSpeed",$data->{'data'}->{'cameras'}->[0]->{'ptSpeed'}) if($deviceType =~ /PTZ/);
                 readingsBulkUpdate($hash,"CamblPresetSpeed",$data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
                 readingsBulkUpdate($hash,"CamVideoMirror",$data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
                 readingsBulkUpdate($hash,"CamVideoFlip",$data->{'data'}->{'cameras'}->[0]->{'video_flip'});
@@ -5644,7 +5727,7 @@ return;
 ###############################################################################
 #              Helper für optimizeParams-Argumente extrahieren 
 ###############################################################################
-sub SSCam_extoptpar ($$$) { 
+sub SSCam_extoptpar($$$) { 
   my ($hash,$a,$cpcl) = @_;
 
   $hash->{HELPER}{MIRROR}   = (split("mirror:",$a))[1] if(lc($a) =~ m/^mirror:.*/);
@@ -5661,9 +5744,26 @@ return;
 }
 
 ###############################################################################
+#  Helper für HLS Lieferfähigkeit
+#  HLS kann geliefert werden wenn "SYNO.SurveillanceStation.VideoStream" 
+#  existiert und Reading CamStreamFormat "HLS" ist   
+###############################################################################
+sub SSCam_IsHLSCap($) { 
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $ret    = 0;
+  my $api    = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
+  my $csf    = (ReadingsVal($name,"CamStreamFormat","MJPEG") eq "HLS")?1:0;
+  
+  $ret = 1 if($api && $csf);
+  
+return $ret;
+}
+
+###############################################################################
 # Clienthash übernehmen oder zusammenstellen
 # Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
-sub SSCam_getclhash ($;$$) {      
+sub SSCam_getclhash($;$$) {      
   my ($hash,$nobgd)= @_;
   my $name  = $hash->{NAME};
   my $ret;
@@ -5904,7 +6004,6 @@ sub SSCam_StreamDev($$$) {
   
   my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
   $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
-  my $hlslfw = (ReadingsVal($camname,"CamStreamFormat","MJPEG") eq "HLS")?"live_fw_hls,":undef;
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
   $ret  = "";
@@ -5925,10 +6024,16 @@ sub SSCam_StreamDev($$$) {
       return $ret; 
   }
   
-  if($fmt =~ /mjpeg/) {  
-      $link      = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
-      $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
-      $ret .= "<td><img src=$link $ha><br>";
+  if($fmt =~ /mjpeg/) { 
+      if($apivideostmsmaxver) {     # keine API "SYNO.SurveillanceStation.VideoStream" mehr ab API v2.8
+          $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+      } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
+          $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
+      }
+      if($apiaudiostmmaxver) {      # keine API "SYNO.SurveillanceStation.AudioStream" mehr ab API v2.8 
+	      $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
+      }
+	  $ret .= "<td><img src=$link $ha><br>";
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\">$imgrecendless </a>";
@@ -5955,11 +6060,11 @@ sub SSCam_StreamDev($$$) {
   
   } elsif($fmt =~ /generic/) {  
       my $htag  = AttrVal($camname,"genericStrmHtmlTag","");
-  if( $htag =~ m/^\s*(.*)\s*$/s ) {
-      $htag = $1;
-      $htag =~ s/\$NAME/$camname/g;
-      $htag =~ s/\$HTMLATTR/$ha/g;
-  }
+      if( $htag =~ m/^\s*(.*)\s*$/s ) {
+          $htag = $1;
+          $htag =~ s/\$NAME/$camname/g;
+          $htag =~ s/\$HTMLATTR/$ha/g;
+      }
 
       if(!$htag) {
           $ret .= "<td> <br> <b> Set attribute \"genericStrmHtmlTag\" in device <a href=\"/fhem?detail=$camname\">$camname</a></b> <br><br></td>";
@@ -6098,7 +6203,7 @@ sub SSCam_StreamDev($$$) {
           $cause = "Playback cam \"$cam\" switched off";
           $ret .= "<td> <br> <b> $cause </b> <br><br>";
           $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdmjpegrun')\">$imgmjpegrun </a>";
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsrun')\">$imghlsrun </a>" if($hlslfw);  
+          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsrun')\">$imghlsrun </a>" if(SSCam_IsHLSCap($hash));  
           $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlrirun')\">$imglrirun </a>"; 
           $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlh264run')\">$imglh264run </a>";
           $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlmjpegrun')\">$imglmjpegrun </a>";
@@ -6507,8 +6612,9 @@ sub SSCam_experror {
   specific attributes of the SSCamSTRM-device itself. <br>
   In "switched"-Devices are buttons provided for mode control. <br>
   If HLS (HTTP Live Streaming) is used in Streaming-Device of type "switched", then the camera has to be set to video format
-  H.264 in the Synology Surveillance Station. Therefore the selection button for "HLS" is only provided in Streaming-Device 
-  if the Reading "CamStreamFormat" contains HLS". <br>
+  H.264 in the Synology Surveillance Station and the SVS-Version has to support the HLS format. 
+  Therefore the selection button of HLS is only provided by the Streaming-Device if the Reading "CamStreamFormat" contains 
+  "HLS". <br>
   HTTP Live Streaming is currently only available on Mac Safari or modern mobile iOS/Android devices. <br>
   In devices of type "switched" buttons for controlling the media type to start are provided. <br>
   A Streaming-Device of type "generic" needs the complete definition of HTML-Tags by the attribute "genericStrmHtmlTag". 
@@ -6872,7 +6978,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   The option <b>"live_open"</b> starts a new browser window with a MJPEG-Livestream. If the optional "&lt;room&gt;" is set, the 
   window will only be started if the specified room is currently opened in a FHEMWEB-session. <br>
   If a HLS-Stream by <b>"live_fw_hls"</b> is requested, the camera has to be setup to video format H.264 (not MJPEG) in the 
-  Synology Surveillance Station. Therefore this possibility is only present if the Reading "CamStreamFormat" is set to "HLS".
+  Synology Surveillance Station and the SVS-Version has to support the HLS format.
+  Therefore this possibility is only present if the Reading "CamStreamFormat" is set to "HLS".
   <br><br> 
   
   Access to the last recording of a camera can be done using <b>"lastrec_fw.*"</b> respectively <b>"lastrec_open"</b>.
@@ -7226,6 +7333,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <ul>
   <li><b>CAMID</b> - the ID of camera defined in SVS, the value will be retrieved automatically on the basis of SVS-cameraname </li>
   <li><b>CAMNAME</b> - the name of the camera in SVS </li>
+  <li><b>COMPATIBILITY</b> - information up to which SVS-version the module version is currently released/tested (see also Reading "compstate") </li>
   <li><b>CREDENTIALS</b> - the value is "Set" if Credentials are set </li> 
   <li><b>NAME</b> - the cameraname in FHEM </li>
   <li><b>MODEL</b> - distinction between camera device (CAM) and Surveillance Station device (SVS) </li>
@@ -7448,6 +7556,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <tr><td><li>CamNTPServer</li>       </td><td>- set time server  </td></tr>
     <tr><td><li>CamPort</li>            </td><td>- IP-Port of Camera  </td></tr>
     <tr><td><li>CamPreRecTime</li>      </td><td>- Duration of Pre-Recording (in seconds) adjusted in SVS  </td></tr>
+    <tr><td><li>CamPtSpeed</li>         </td><td>- adjusted value of Pan/Tilt-activities (setup in SVS)  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- shared folder on disk station for recordings </td></tr>
     <tr><td><li>CamRecVolume</li>       </td><td>- Volume on disk station for recordings  </td></tr>
     <tr><td><li>CamStreamFormat</li>    </td><td>- the current format of video streaming  </td></tr>
@@ -7494,6 +7603,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <tr><td><li>SVSversion</li>         </td><td>- package version of the installed Surveillance Station (to get with "svsinfo")  </td></tr>
     <tr><td><li>UsedSpaceMB</li>        </td><td>- used disk space of recordings by Camera  </td></tr>
     <tr><td><li>VideoFolder</li>        </td><td>- Path to the recorded video  </td></tr>
+    <tr><td><li>compstate</li>          </td><td>- state of compatibility (compares current/simulated SVS-version with Internal COMPATIBILITY)  </td></tr>
   </table>
   </ul>
   <br><br>    
@@ -7756,8 +7866,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Die Gestaltung kann durch HTML-Tags im <a href="#SSCamattr">Attribut</a> "htmlattr" im Kameradevice oder mit den 
   spezifischen Attributen im Streaming-Device beeinflusst werden. <br>
   Soll ein HLS-Stream im Streaming-Device vom Typ "switched" gestartet werden, muss die Kamera in der Synology Surveillance Station 
-  auf das Videoformat H.264 eingestellt sein. Diese Auswahltaste wird deshalb im nur im Streaming-Device angeboten wenn das 
-  Reading "CamStreamFormat = HLS" beinhaltet. <br>
+  auf das Videoformat H.264 eingestellt und HLS von der eingesetzten SVS-Version unterstützt sein. 
+  Diese Auswahltaste wird deshalb im nur im Streaming-Device angeboten wenn das Reading "CamStreamFormat = HLS" beinhaltet. <br>
   HLS (HTTP Live Streaming) kann momentan nur auf Mac Safari oder mobilen iOS/Android-Geräten wiedergegeben werden. <br>
   Im "switched"-Device werden Drucktasten zur Steuerung des zu startenden Medientyps angeboten. <br>
   Ein Streaming-Device vom Typ "generic" benötigt die Angabe von HTML-Tags im Attribut "genericStrmHtmlTag". Diese Tags
@@ -8124,8 +8234,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
   Der Befehl <b>"live_open"</b> öffnet ein separates Browserfenster mit dem MJPEG-Livestream. Wird dabei optional der Raum mit
   angegeben, wird das Browserfenster nur dann gestartet, wenn dieser Raum aktuell im Browser geöffnet ist. <br>
   Soll mit <b>"live_fw_hls"</b> ein HLS-Stream verwendet werden, muss die Kamera in der Synology Surveillance Station auf
-  das Videoformat H.264 (nicht MJPEG) eingestellt sein. Diese Möglichkeit wird deshalb nur dann angeboten wenn das Reading 
-  "CamStreamFormat" den Wert "HLS" hat.
+  das Videoformat H.264 (nicht MJPEG) eingestellt und HLS durch die eingesetzte SVS-Version unterstützt sein. 
+  Diese Möglichkeit wird deshalb nur dann angeboten wenn das Reading "CamStreamFormat" den Wert "HLS" hat.
   <br><br> 
     
   Der Zugriff auf die letzte Aufnahme einer Kamera kann über die Optionen <b>"lastrec_fw.*"</b> bzw. <b>"lastrec_open"</b> erfolgen.
@@ -8490,6 +8600,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <ul>
   <li><b>CAMID</b> - die ID der Kamera in der SVS, der Wert wird automatisch anhand des SVS-Kameranamens ermittelt. </li>
   <li><b>CAMNAME</b> - der Name der Kamera in der SVS </li>
+  <li><b>COMPATIBILITY</b> - Information bis zu welcher SVS-Version das Modul kompatibel bzw. zur Zeit getestet ist (siehe Reading "compstate")</li>
   <li><b>CREDENTIALS</b> - der Wert ist "Set" wenn die Credentials gesetzt wurden </li>
   <li><b>MODEL</b> - Unterscheidung von Kamera-Device (Hersteller - Kameratyp) und Surveillance Station Device (SVS) </li>
   <li><b>NAME</b> - der Kameraname in FHEM </li>
@@ -8720,6 +8831,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <tr><td><li>CamNTPServer</li>       </td><td>- eingestellter Zeitserver  </td></tr>
     <tr><td><li>CamPort</li>            </td><td>- IP-Port der Kamera  </td></tr>
     <tr><td><li>CamPreRecTime</li>      </td><td>- Dauer der der Voraufzeichnung in Sekunden (Einstellung in SVS)  </td></tr>
+    <tr><td><li>CamPtSpeed</li>         </td><td>- eingestellter Wert für Schwenken/Neige-Aktionen (Einstellung in SVS)  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- gemeinsamer Ordner auf der DS für Aufnahmen  </td></tr>
     <tr><td><li>CamRecVolume</li>       </td><td>- Volume auf der DS für Aufnahmen  </td></tr>
     <tr><td><li>CamStreamFormat</li>    </td><td>- aktuelles Format des Videostream  </td></tr>
@@ -8766,6 +8878,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
     <tr><td><li>SVSversion</li>         </td><td>- die Paketversion der installierten Surveillance Station (get mit "svsinfo") </td></tr>
     <tr><td><li>UsedSpaceMB</li>        </td><td>- durch Aufnahmen der Kamera belegter Plattenplatz auf dem Volume  </td></tr>
     <tr><td><li>VideoFolder</li>        </td><td>- Pfad zu den aufgenommenen Videos  </td></tr>
+    <tr><td><li>compstate</li>          </td><td>- Kompatibilitätsstatus (Vergleich von eingesetzter/simulierter SVS-Version zum Internal COMPATIBILITY)  </td></tr>
   </table>
   </ul>
   <br><br>    
