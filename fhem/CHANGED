@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 93_Log2Syslog: V4.8.5, new Syslog-Server Mode and some other 
+                            improvements, version is moved from contrib
   - bugfix:  73_GardenaSmartBridge fix get humidity bug, add rename Fn
   - change:  71_YAMAHA_AVR: renamed attributes:
                 "request-timeout" => "requestTimeout"
