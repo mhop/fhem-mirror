@@ -1538,7 +1538,8 @@ return ($phost,$paddr);
 <a name="Log2Syslog"></a>
 <h3>Log2Syslog</h3>
 <ul>
-  Send FHEM system log entries and/or FHEM events to an external syslog server. <br>
+  The module sends FHEM systemlog entries and/or FHEM events to an external syslog server or act itself as an Syslog-Server 
+  to receive Syslog-messages of other Devices which are able to send Syslog. <br>
   The syslog protocol has been implemented according the specifications of <a href="https://tools.ietf.org/html/rfc5424"> RFC5424 (IETF)</a>,
   <a href="https://tools.ietf.org/html/rfc3164"> RFC3164 (BSD)</a> and the TLS transport protocol according to 
   <a href="https://tools.ietf.org/pdf/rfc5425.pdf"> RFC5425</a>. <br>	
@@ -1555,30 +1556,133 @@ return ($phost,$paddr);
   <br>
   
   <a name="Log2Syslogdefine"></a>
-  <b>Define</b>
+  <b>Definition and usage</b>
   <ul>
     <br>
-    <code>define &lt;name&gt; Log2Syslog &lt;destination host&gt; [ident:&lt;ident&gt;] [event:&lt;regexp&gt;] [fhem:&lt;regexp&gt;]</code><br>
+    Depending of the intended purpose a Syslog-Server (MODEL Collector) or a Syslog-Client (MODEL Sender) can be  
+    defined. <br>
+    The Collector receives messages in Syslog-format of other Devices and hence generates Events/Readings for further 
+    processing. The Sender-Device forwards FHEM Systemlog entries and/or Events to an external Syslog-Server. <br>
+  </ul>
+    
+  <br>
+  <b><h4> The Collector (Syslog-Server) </h4></b>
+
+  <ul>    
+    <b> Definition of a Collector </b>
     <br>
+    
+    <ul>
+    <br>
+        <code>define &lt;name&gt; Log2Syslog </code><br>
+    <br>
+    </ul>
+    
+    The Definition don't need any further parameter.
+    In basic setup the Syslog-Server is initialized with Port=1514/UDP and the Parsingprofil "IETF".
+    By the <a href="#Log2Syslogattr">attribute</a> "parseProfile" another formats (e.g. BSD) can be selected.
+    The Syslog-Server is immediately ready for use, is parsing the Syslog-data accordingly the rules of RFC5424 and 
+    generates FHEM-Events from received Syslog-messages (pls. see Eventmonitor for parsed data). <br><br>
 	
-	&lt;destination host&gt; = host where the syslog server is running <br>
-	[ident:&lt;ident&gt;] = optional program identifier. If not set the device name will be used as default <br>
-	[event:&lt;regexp&gt;] = optional regex to filter events for logging  <br>
-	[fhem:&lt;regexp&gt;] = optional regex to filter fhem system log for logging <br><br>
+    <br>
+    <b>Example of a Collector: </b><br>
+    
+    <ul>
+    <br>
+        <code>define SyslogServer Log2Syslog </code><br>
+    <br>
+    </ul>
+    
+    The generated events are visible in the FHEM-Eventmonitor. <br>
+    <br>
+
+    Example of generated Events with attribute parseProfile=IETF: <br>
+    <br>
+    <code>
+2018-07-31 17:07:24.382 Log2Syslog SyslogServer HOST: fhem.myds.me || FAC: syslog || SEV: Notice || ID: Prod_event || CONT: USV state: OL <br>
+2018-07-31 17:07:24.858 Log2Syslog SyslogServer HOST: fhem.myds.me || FAC: syslog || SEV: Notice || ID: Prod_event || CONT: HMLAN2 loadLvl: low <br>
+    </code> 
+    <br>
+
+    To separate fields the string "||" is used. 
+    The meaning of the fields in the example is:   
+    <br><br>
+    
+    <ul>  
+    <table>  
+    <colgroup> <col width=20%> <col width=80%> </colgroup>
+	  <tr><td> <b>HOST</b>  </td><td> the Sender of the dataset </td></tr>
+      <tr><td> <b>FAC</b>   </td><td> Facility corresponding to RFC5424 </td></tr>
+      <tr><td> <b>SEV</b>   </td><td> Severity corresponding to RFC5424 </td></tr>
+      <tr><td> <b>ID</b>    </td><td> Ident-Tag </td></tr>
+      <tr><td> <b>CONT</b>  </td><td> the message part of the received message </td></tr>
+    </table>
+    </ul>
+	<br>
 	
+	The timestamp of generated events is parsed from the Syslog-message. If this information isn't delivered, the current
+    timestamp of the operating system is used. <br>
+	The reading name in the generated event match the parsed hostname from Syslog-message.
+	If the message don't contain a hostname, the IP-address of the sender is retrieved from the network interface and 
+    the hostname is determined if possible. 
+    In this case the determined hostname respectively the IP-address is used as Reading in the generated event.
+	<br>
+	After definition of a Collectors Syslog-messages in IETF-format according to RFC5424 are expected. If the data are not
+    delivered in this record format and can't be parsed, the Reading "state" will contain the message 
+	<b>"parse error - see logfile"</b> and the received Syslog-data are printed into the FHEM Logfile in raw-format. <br>
+	
+	By the <a href="#Log2Syslogattr">attribute</a> "parseProfile" you can try to use another predefined parse-profile  
+    or you can create an own parse-profile as well. <br><br>
+    
+    To define an <b>own parse function</b> the 
+    "parseProfile = ParseFn" has to be set and with <a href="#Log2Syslogattr">attribute</a> "parseFn" a specific 
+    parse function has to be provided. <br>
+    The fields used by the event and their sequential arrangement can be selected from a range with 
+    <a href="#Log2Syslogattr">attribute</a> "outputFields". Depending from the used parse-profil all or a subset of 
+    the available fields can be selected. Further information about it you can find in description of attribute 
+    "parseProfile". <br>
+    <br>
+    The behavior of the event generation can be adapted by <a href="#Log2Syslogattr">attribute</a> "makeEvent". <br>
+  </ul>
+    
+  <br>
+  <b><h4> The Sender (Syslog-Client) </h4></b>
+
+  <ul>    
+    <b> Definition of a Sender </b>
+    <br>
+    
+    <ul>
+    <br>
+        <code>define &lt;name&gt; Log2Syslog &lt;destination host&gt; [ident:&lt;ident&gt;] [event:&lt;regexp&gt;] [fhem:&lt;regexp&gt;]</code><br>
+    <br>
+    </ul>
+    
+    <ul>  
+    <table>  
+    <colgroup> <col width=25%> <col width=75%> </colgroup>
+	  <tr><td> <b>&lt;destination host&gt;</b> </td><td> host (name or IP-address) where the syslog server is running </td></tr>
+      <tr><td> <b>[ident:&lt;ident&gt;]</b>    </td><td> optional program identifier. If not set the device name will be used as default. </td></tr>
+      <tr><td> <b>[event:&lt;regexp&gt;]</b>   </td><td> optional regex to filter events for logging </td></tr>
+      <tr><td> <b>[fhem:&lt;regexp&gt;]</b>    </td><td> optional regex to filter fhem system log for logging </td></tr>
+    </table>
+    </ul> 
+    
+    <br><br>
+	    
 	After definition the new device sends all new appearing fhem systemlog entries and events to the destination host, 
-	port=514/UDP format:IETF, immediately without further settings if the regex for fhem or event were set. <br>
-	Without setting regex no fhem system log or event log will be forwarded. <br><br>
-	
-	The verbose level of FHEM system logs will convert into equivalent syslog severity level. <br>
+	port=514/UDP format:IETF, immediately without further settings if the regex for fhem or event is set. <br>
+	Without setting a regex, no fhem system log or event log will be forwarded. <br><br>
+
+	The verbose level of FHEM system logs are converted into equivalent syslog severity level. <br>
 	Thurthermore the message text will be scanned for signal terms "warning" and "error" (with case insensitivity). 
-	Dependent off the severity will be set equivalent as well. If a severity is already set by verbose level, it wil be overwritten
-    by the level according to the signal term found in the message text. <br><br>
+	Dependent of it the severity will be set equivalent as well. If a severity is already set by verbose level, it will be 
+    overwritten by the level according to the signal term found in the message text. <br><br>
 	
 	<b>Lookup table Verbose-Level to Syslog severity level: </b><br><br>
     <ul>  
     <table>  
-    <colgroup> <col width=40%> <col width=60%> </colgroup>
+    <colgroup> <col width=50%> <col width=50%> </colgroup>
 	  <tr><td> <b>verbose-Level</b> </td><td> <b>Severity in Syslog</b> </td></tr>
       <tr><td> 0    </td><td> Critical </td></tr>
       <tr><td> 1    </td><td> Error </td></tr>
@@ -1587,53 +1691,61 @@ return ($phost,$paddr);
       <tr><td> 4    </td><td> Informational </td></tr>
       <tr><td> 5    </td><td> Debug </td></tr>
     </table>
-    </ul>     
-    <br>
-    
+    </ul>    
+    <br>	
 	<br>
-    Example to log anything: <br>
-    <br/>
-    <code>define splunklog Log2Syslog fhemtest 192.168.2.49 ident:Test event:.* fhem:.* </code><br>
-    <br/>
-    will produce output like this raw example of a splunk syslog server:<br/>
-    <pre>Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM - : LogDB sql_processing_time: 0.2306
-Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM - : LogDB background_processing_time: 0.2397
-Aug 18 21:06:45 fhemtest.myds.me 1 2017-08-18T21:06:45 fhemtest.myds.me Test_event 13339 FHEM - : LogDB CacheUsage: 21
-Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.760 fhemtest.myds.me Test_fhem 13339 FHEM - : 4: CamTER - Informations of camera Terrasse retrieved
-Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test_fhem 13339 FHEM - : 4: CamTER - CAMID already set - ignore get camid
+   
+    <b>Example of a Sender: </b><br>
+    
+    <ul>
+    <br>
+    <code>define splunklog Log2Syslog fhemtest 192.168.2.49 ident:Test event:.* fhem:.* </code><br/>
+    <br>
+    </ul>
+    
+    All events are forwarded like this exmple of a raw-print of a Splunk Syslog Servers shows:<br/>
+    <pre>
+Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM [version@Log2Syslog version="4.2.0"] : LogDB sql_processing_time: 0.2306
+Aug 18 21:06:46 fhemtest.myds.me 1 2017-08-18T21:06:46 fhemtest.myds.me Test_event 13339 FHEM [version@Log2Syslog version="4.2.0"] : LogDB background_processing_time: 0.2397
+Aug 18 21:06:45 fhemtest.myds.me 1 2017-08-18T21:06:45 fhemtest.myds.me Test_event 13339 FHEM [version@Log2Syslog version="4.2.0"] : LogDB CacheUsage: 21
+Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.760 fhemtest.myds.me Test_fhem 13339 FHEM [version@Log2Syslog version="4.2.0"] : 4: CamTER - Informations of camera Terrasse retrieved
+Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test_fhem 13339 FHEM [version@Log2Syslog version="4.2.0"] : 4: CamTER - CAMID already set - ignore get camid
     </pre>
-	
+    
 	The structure of the payload differs dependent of the used logFormat. <br><br>
 	
 	<b>logFormat IETF:</b> <br><br>
-	"&lt;PRIVAL&gt;VERSION TIME MYHOST IDENT PID MID [SD-FIELD] :MESSAGE" <br><br> 
+	"&lt;PRIVAL&gt;IETFVERS TIME MYHOST IDENT PID MID [SD-FIELD] :MESSAGE" <br><br> 
 		
     <ul>  
     <table>  
     <colgroup> <col width=10%> <col width=90%> </colgroup>
 	  <tr><td> PRIVAL   </td><td> priority value (coded from "facility" and "severity") </td></tr>
+      <tr><td> IETFVERS </td><td> used version of RFC5424 specification </td></tr>
       <tr><td> TIME     </td><td> timestamp according to RFC5424 </td></tr>
       <tr><td> MYHOST   </td><td> Internal MYHOST </td></tr>
       <tr><td> IDENT    </td><td> ident-Tag from DEF if set, or else the own device name. The statement will be completed by "_fhem" (FHEM-Log) respectively "_event" (Event-Log). </td></tr>
       <tr><td> PID      </td><td> sequential Payload-ID </td></tr>
       <tr><td> MID      </td><td> fix value "FHEM" </td></tr>
+      <tr><td> SD-FIELD </td><td> contains additional iformation about used module version </td></tr>
       <tr><td> MESSAGE  </td><td> the dataset to transfer </td></tr>
     </table>
     </ul>     
     <br>	
 	
 	<b>logFormat BSD:</b> <br><br>
-	"&lt;PRIVAL&gt;MONAT TAG TIME MYHOST IDENT: : MESSAGE" <br><br>
-		
+	"&lt;PRIVAL&gt;MONTH DAY TIME MYHOST IDENT[PID]:MESSAGE" <br><br>
+    
     <ul>  
     <table>  
     <colgroup> <col width=10%> <col width=90%> </colgroup>
 	  <tr><td> PRIVAL   </td><td> priority value (coded from "facility" and "severity") </td></tr>
-      <tr><td> MONAT    </td><td> month according to RFC3164 </td></tr>
-	  <tr><td> TAG      </td><td> day of month according to RFC3164 </td></tr>
+      <tr><td> MONTH    </td><td> month according to RFC3164 </td></tr>
+	  <tr><td> DAY      </td><td> day of month according to RFC3164 </td></tr>
 	  <tr><td> TIME     </td><td> timestamp according to RFC3164 </td></tr>
       <tr><td> MYHOST   </td><td> Internal MYHOST </td></tr>
       <tr><td> IDENT    </td><td> ident-Tag from DEF if set, or else the own device name. The statement will be completed by "_fhem" (FHEM-Log) respectively "_event" (Event-Log). </td></tr>
+      <tr><td> PID      </td><td> the message-id (sequence number) </td></tr>
       <tr><td> MESSAGE  </td><td> the dataset to transfer </td></tr>
     </table>
     </ul>     
@@ -1642,73 +1754,308 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
   </ul>
   <br>
 
+  <a name="Log2SyslogSet"></a>
+  <b>Set</b>
+  <ul>
+    <br> 
+    
+    <ul>
+    <li><b>sendTestMessage [&lt;Message&gt;] </b><br>
+        <br>
+        With device type "Sender" a testmessage can be transfered. The format of the message depends on attribute "logFormat" 
+        and contains data in BSD- or IETF-format. 
+        Alternatively an own &lt;Message&gt; can be set. This message will be sent in im raw-format without  
+        any conversion. The attribute "disable = maintenance" determines, that no data except test messages are sent 
+        to the receiver.
+    </li>
+    </ul>
+    <br>
+
+  </ul>
+  <br>
+  
   <a name="Log2SyslogGet"></a>
   <b>Get</b>
   <ul>
     <br> 
     
-    <li><code>certinfo</code><br>
+    <ul>
+    <li><b>certinfo </b><br>
         <br>
         Show informations about the server certificate if a TLS-session was created (Reading "SSL_Version" isn't "n.a.").
-    </li><br>
+    </li>
+    </ul>
+    <br>
+
   </ul>
-  <br>
-  
+  <br>  
   
   <a name="Log2Syslogattr"></a>
   <b>Attributes</b>
   <ul>
-    <br/>
+    <br>
+	
+    <ul>
     <a name="addTimestamp"></a>
-    <li><code>addTimestamp [0|1]</code><br>
+    <li><b>addTimestamp </b><br>
         <br/>
-        If set to 1, fhem timestamps will be logged too.<br/>
-        Default behavior is to not log these timestamps, because syslog uses own timestamps.<br/>
-        Maybe useful if mseclog is activated in fhem.<br/>
-        <br/>
+        The attribute is only usable for device type "Sender".         
+        If set, FHEM timestamps will be logged too.<br>
+        Default behavior is not log these timestamps, because syslog uses own timestamps.<br>
+        Maybe useful if mseclog is activated in FHEM.<br>
+        <br>
+		
         Example output (raw) of a Splunk syslog server: <br>
         <pre>Aug 18 21:26:55 fhemtest.myds.me 1 2017-08-18T21:26:55 fhemtest.myds.me Test_event 13339 FHEM - : 2017-08-18 21:26:55 USV state: OL
 Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_event 13339 FHEM - : 2017-08-18 21:26:54 Bezug state: done
 Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_event 13339 FHEM - : 2017-08-18 21:26:54 recalc_Bezug state: Next: 21:31:59
         </pre>
-    </li><br>
+    </li>
+    </ul>
+    <br>
 
-    <li><code>addStateEvent [0|1]</code><br>
+    <ul>
+    <li><b>addStateEvent </b><br>
         <br>
-        If set to 1, events will be completed with "state" if a state-event appears.<br/>
+        The attribute is only usable for device type "Sender".         
+        If set, events will be completed with "state" if a state-event appears. <br>
 		Default behavior is without getting "state".
-    </li><br>
-	
-    <li><code>disable [0|1]</code><br>
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+    <li><b>contDelimiter </b><br>
         <br>
-        disables the device.
-    </li><br>
+        The attribute is only usable for device type "Sender". 
+        You can set an additional character which is straight inserted before the content-field. <br>
+        This possibility is useful in some special cases if the receiver need it (e.g. the Synology-Protokollcenter needs the 
+        character ":" for proper function).
+    </li>
+    </ul>
+    <br>
+    <br>
 	
-    <li><code>logFormat [BSD|IETF]</code><br>
+    <ul>
+    <li><b>disable [1 | 0 | maintenance] </b><br>
         <br>
+        This device will be activated, deactivated respectSeverity set into the maintenance-mode. 
+        In maintenance-mode a test message can be sent by the "Sender"-device (pls. see also command "set &lt;name&gt; 
+        sendTestMessage").
+    </li>
+    </ul>
+    <br>
+    <br>
+	
+    <ul>
+    <li><b>logFormat [ BSD | IETF ]</b><br>
+        <br>
+        This attribute is only usable for device type "Sender".  
         Set the syslog protocol format. <br>
 		Default value is "IETF" if not specified. 
-		</li><br>
-	
-    <li><code>protocol [TCP|UDP]</code><br>
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+    <li><b>makeEvent [ intern | no | reading ]</b><br>
         <br>
-        Sets the socket protocol which should be used. You can choose UDP or TCP. <br>
-		Default value is "UDP" if not specified.
-    </li><br>
+        The attribute is only usable for device type "Collector". 
+        With this attribute the behavior of the event- and reading generation is  defined. 
+        <br><br>
+        
+        <ul>  
+        <table>  
+        <colgroup> <col width=10%> <col width=90%> </colgroup>
+	    <tr><td> <b>intern</b>   </td><td> events are generated by module intern mechanism and only visible in FHEM eventmonitor. Readings are not created. </td></tr>
+        <tr><td> <b>no</b>       </td><td> only readings like "MSG_&lt;hostname&gt;" without event generation are created </td></tr>
+        <tr><td> <b>reading</b>  </td><td> readings like "MSG_&lt;hostname&gt;" are created. Events are created dependent of the "event-on-.*"-attributes </td></tr>
+        </table>
+        </ul> 
+        
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+    <li><b>outputFields </b><br>
+        <br>
+        The attribute is only usable for device type "Collector".
+        By a sortable list the desired fields of generated events can be selected.
+        The meaningful usable fields are depending on the attribute <b>"parseProfil"</b>. Their meaning can be found in 
+        the description of attribute "parseProfil".
+        Is "outputFields" not defined, a predefined set of fields for event generation is used.
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+    <li><b>parseFn {&lt;Parsefunktion&gt;} </b><br>
+        <br>
+        The attribute is only usable for device type "Collector".
+        The provided perl function (has to be set into "{}") will be applied to the received Syslog-message. 
+        The following variables are commited to the function. They can be used for programming, processing and for 
+        value return. Variables which are provided as blank, are marked as "". <br>
+        In case of restrictions the expected format of variables return is specified in "()".
+        Otherwise the variable is usable for free.        
+        <br><br>
+        
+        <ul>  
+        <table>  
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+	    <tr><td> $PRIVAL  </td><td> "" (0 ... 191) </td></tr>
+        <tr><td> $FAC     </td><td> "" (0 ... 23) </td></tr>
+        <tr><td> $SEV     </td><td> "" (0 ... 7) </td></tr>
+        <tr><td> $TS      </td><td> Timestamp (YYYY-MM-DD hh:mm:ss) </td></tr>
+        <tr><td> $HOST    </td><td> "" </td></tr>
+        <tr><td> $DATE    </td><td> "" (YYYY-MM-DD) </td></tr>
+        <tr><td> $TIME    </td><td> "" (hh:mm:ss) </td></tr>
+        <tr><td> $ID      </td><td> "" </td></tr>
+        <tr><td> $PID     </td><td> "" </td></tr>
+        <tr><td> $MID     </td><td> "" </td></tr>
+        <tr><td> $SDFIELD </td><td> "" </td></tr>
+        <tr><td> $CONT    </td><td> "" </td></tr>
+        <tr><td> $DATA    </td><td> provided raw-data of received Syslog-message (no evaluation of value return!) </td></tr>
+        <tr><td> $IGNORE  </td><td> 0 (0|1), if $IGNORE==1 the Syslog-dataset is ignored </td></tr>
+        </table>
+        </ul>
+	    <br>  
+
+        The names of the variables corresponding to the field names and their primary meaning  denoted in attribute 
+        <b>"parseProfile"</b> (explanation of the field data). <br><br>
+
+        <ul>
+        <b>Example: </b> <br>
+        # Source text: '<4> <;4>LAN IP and mask changed to 192.168.2.3 255.255.255.0' <br>
+        # Task: The characters '<;4>' are to removed from the CONT-field
+<pre>
+{
+($PRIVAL,$CONT) = ($DATA =~ /^<(\d{1,3})>\s(.*)$/);
+$CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
+} 
+</pre>        
+        </ul>         
+              
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+    <li><b>parseProfile [ BSD | IETF | ... | ParseFn | raw ] </b><br>
+        <br>
+        Selection of a parse profile. The attribute is only usable for device type "Collector".
+        <br><br>
+    
+        <ul>  
+        <table>  
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+	    <tr><td> <b>BSD</b>     </td><td> Parsing of messages in BSD-format according to RFC3164 </td></tr>
+        <tr><td> <b>IETF</b>    </td><td> Parsing of messages in IETF-format according to RFC5424 (default) </td></tr>
+		<tr><td> <b>...</b>     </td><td> further specific parse profiles for selective device are provided </td></tr>
+        <tr><td> <b>ParseFn</b> </td><td> Usage of an own specific parse function provided by attribute "parseFn" </td></tr>
+        <tr><td> <b>raw</b>     </td><td> no parsing, events are created from the messages as received without conversion </td></tr>
+        </table>
+        </ul>
+	    <br>
+
+        The parsed data are provided in fields. The fields to use for events and their sequence can be defined by  
+        attribute <b>"outputFields"</b>. <br>
+        Dependent from used "parseProfile" the following fields are filled with values and therefor it is meaningful 
+        to use only the namend fields by attribute "outputFields". By the "raw"-profil the received data are not converted 
+        and the event is created directly.
+        <br><br>
+        
+        The meaningful usable fields in attribute "outputFields" depending of the particular profil: 
+        <br>
+        <br>
+        <ul>  
+        <table>  
+        <colgroup> <col width=10%> <col width=90%> </colgroup>
+	    <tr><td> BSD     </td><td>-> PRIVAL,FAC,SEV,TS,HOST,ID,CONT  </td></tr>
+        <tr><td> IETF    </td><td>-> PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT  </td></tr>
+        <tr><td> ParseFn </td><td>-> PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT </td></tr>
+        <tr><td> raw     </td><td>-> no selection is meaningful, the original message is used for event creation </td></tr>
+        </table>
+        </ul>
+	    <br>   
+        
+        Explanation of field data: 
+        <br>
+        <br>
+        <ul>  
+        <table>  
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+	    <tr><td> PRIVAL  </td><td> coded Priority value (coded from "facility" and "severity")  </td></tr>
+        <tr><td> FAC     </td><td> decoded Facility  </td></tr>
+        <tr><td> SEV     </td><td> decoded Severity of message </td></tr>
+        <tr><td> TS      </td><td> Timestamp containing date and time (YYYY-MM-DD hh:mm:ss) </td></tr>
+        <tr><td> HOST    </td><td> Hostname / Ip-address of the Sender </td></tr>
+        <tr><td> DATE    </td><td> Date (YYYY-MM-DD) </td></tr>
+        <tr><td> TIME    </td><td> Time (hh:mm:ss) </td></tr>
+        <tr><td> ID      </td><td> Device or application what was sending the Syslog-message  </td></tr>
+        <tr><td> PID     </td><td> Programm-ID, offen reserved by process name or prozess-ID </td></tr>
+        <tr><td> MID     </td><td> Type of message (arbitrary string) </td></tr>
+        <tr><td> SDFIELD </td><td> Metadaten about the received Syslog-message </td></tr>
+        <tr><td> CONT    </td><td> Content of the message </td></tr>
+        <tr><td> DATA    </td><td> received raw-data </td></tr>
+        </table>
+        </ul>
+	    <br>   
+              
+    </li>
+    </ul>
+    <br>
 	
-    <li><code>port</code><br>
+    <ul>
+    <li><b>protocol [ TCP | UDP ]</b><br>
+        <br>
+        Sets the socket protocol which should be used. You can choose UDP or TCP (MODEL Sender). <br>
+		Default value is "UDP" if not specified.
+        A Syslog-Server (MODEL Collector) uses UDP.
+    </li>
+    </ul>
+    <br>
+    <br>
+	
+    <ul>
+    <li><b>port &lt;Port&gt;</b><br>
         <br>
         The used port. For a Sender the default-port is 514.
         A Collector (Syslog-Server) uses the port 1514 per default.
-    </li><br>
+    </li>
+    </ul>
+    <br>
+    <br>
 	
-    <li><code>rateCalcRerun</code><br>
+    <ul>
+    <li><b>rateCalcRerun &lt;Zeit in Sekunden&gt; </b><br>
         <br>
-        Rerun cycle for calculation of log transfer rate (Reading "Transfered_logs_per_minute") in seconds. 
+        Rerun cycle for calculation of log transfer rate (Reading "Transfered_logs_per_minute") in seconds (>=60).  
+        Values less than 60 seconds are corrected to 60 seconds automatically.        
 		Default is 60 seconds.
-    </li><br>
+    </li>
+    </ul>
+    <br>
+    <br>
     
-    <li><code>ssldebug</code><br>
+    <ul>
+    <li><b>respectSeverity </b><br>
+        <br>
+        Messages are only forwarded (Sender) respectively the receipt considered (Collector), whose severity is included 
+        by this attribute.
+        If "respectSeverity" isn't set, messages of all severity is processed.
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+    <li><b>ssldebug</b><br>
         <br>
         Debugging level of SSL messages. <br><br>
         <ul>
@@ -1717,33 +2064,52 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
         <li> 2 - Print also information about call flow from <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> and progress information from <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
         <li> 3 - Print also some data dumps from <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.056/lib/IO/Socket/SSL.pod">IO::Socket::SSL</a> and from <a href="http://search.cpan.org/~mikem/Net-SSLeay-1.85/lib/Net/SSLeay.pod">Net::SSLeay</a>. </li>
         </ul>
-    </li><br>
-	
-    <li><code>TLS</code><br>
-        <br>
-        A secured connection to Syslog-server is used. The protocol will be switched to TCP automatically.
-    </li><br>
-    
-    <li><code>timeout</code><br>
-        <br>
-        Timeout for connection to the destination syslog server (TCP). Only valid in Sender-mode. Default: 0.5 seconds.
-    </li><br>
-	
-    <li><code>verbose</code><br>
-        <br>
-        To avoid loops, the output of verbose level of the Log2Syslog-Devices will only be reported into the local FHEM Logfile and
-		no forwarded.
-    </li><br>
-	
-	</ul>
+    </li>
+    </ul>
     <br>
+    <br>
+	
+    <ul>
+    <li><b>TLS</b><br>
+        <br>
+        This attribute is only usable for device type "Sender".  
+        A secured connection to a Syslog-Server is used. The protocol will be switched to TCP automatically.
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+    <li><b>timeout</b><br>
+        <br>
+        This attribute is only usable for device type "Sender".  
+        Timeout für die Verbindung zum Syslog-Server (TCP). Default: 0.5s.
+    </li>
+    </ul>
+    <br>
+    <br>
+	
+    <ul>
+    <li><b>verbose</b><br>
+        <br>
+        Please see global <a href="#attributes">attribute</a> "verbose".
+        To avoid loops, the output of verbose level of the Log2Syslog-Devices will only be reported into the local FHEM 
+        Logfile and not forwarded.
+    </li>
+    </ul>
+    <br>
+    <br>
+	
+  </ul>
+  <br>  
 	
   <a name="Log2Syslogreadings"></a>
   <b>Readings</b>
   <ul>
   <br> 
     <table>  
-    <colgroup> <col width=40%> <col width=60%> </colgroup>
+    <colgroup> <col width=35%> <col width=65%> </colgroup>
+      <tr><td><b>MSG_&lt;Host&gt;</b>               </td><td> the last successful parsed Syslog-message from &lt;Host&gt; </td></tr>
 	  <tr><td><b>SSL_Algorithm</b>                  </td><td> used SSL algorithm if SSL is enabled and active </td></tr>
       <tr><td><b>SSL_Version</b>                    </td><td> the used TLS-version if encryption is enabled and is active</td></tr>
 	  <tr><td><b>Transfered_logs_per_minute</b>     </td><td> the average number of forwarded logs/events per minute </td></tr>
@@ -1753,13 +2119,15 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
   
 </ul>
 
+
+
 =end html
 =begin html_DE
 
 <a name="Log2Syslog"></a>
 <h3>Log2Syslog</h3>
 <ul>
-  Sendet das Modul FHEM Systemlog Einträge und/oder Events an einen externen Syslog-Server weiter oder agiert als 
+  Das Modul sendet FHEM Systemlog-Einträge und/oder Events an einen externen Syslog-Server weiter oder agiert als 
   Syslog-Server um Syslog-Meldungen anderer Geräte zu empfangen. <br>
   Die Implementierung des Syslog-Protokolls erfolgte entsprechend den Vorgaben von <a href="https://tools.ietf.org/html/rfc5424"> RFC5424 (IETF)</a>,
   <a href="https://tools.ietf.org/html/rfc3164"> RFC3164 (BSD)</a> sowie dem TLS Transport Protokoll nach 
@@ -1804,8 +2172,8 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     Die Definition benötigt keine weiteren Parameter.
     In der Grundeinstellung wird der Syslog-Server mit dem Port=1514/UDP und dem Parsingprofil "IETF" initialisiert.
     Mit dem <a href="#Log2Syslogattr">Attribut</a> "parseProfile" können alternativ andere Formate (z.B. BSD) ausgewählt werden.
-    Der Syslog-Server ist sofort betriebsbereit, parst die Syslog-Daten entsprechend der Richlinien nach RFC5424 und generiert aus den 
-	eingehenden Syslog-Meldungen FHEM-Events. <br><br>
+    Der Syslog-Server ist sofort betriebsbereit, parst die Syslog-Daten entsprechend der Richtlinien nach RFC5424 und generiert 
+    aus den eingehenden Syslog-Meldungen FHEM-Events (Daten sind im Eventmonitor sichtbar). <br><br>
 	
     <br>
     <b>Beispiel für einen Collector: </b><br>
@@ -1854,14 +2222,14 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     nicht in diesem Format geliefert bzw. können nicht geparst werden, erscheint im Reading "state" die Meldung 
 	<b>"parse error - see logfile"</b> und die empfangenen Syslog-Daten werden im Logfile im raw-Format ausgegeben. <br>
 	
-	In diesem Fall kann mit dem	<a href="#Log2Syslogattr">Attribut</a> "parseProfile" ein anderes vordefiniertes Parsing-Profil 
+	In diesem Fall kann mit dem	<a href="#Log2Syslogattr">Attribut</a> "parseProfile" ein anderes vordefiniertes Parse-Profil 
     eingestellt bzw. ein eigenes Profil definiert werden. <br><br>
     
-    Zur Definition einer <b>eigenen Parsingfunktion</b> wird 
+    Zur Definition einer <b>eigenen Parse-Funktion</b> wird 
     "parseProfile = ParseFn" eingestellt und im <a href="#Log2Syslogattr">Attribut</a> "parseFn" eine spezifische 
-    Parsingfunktion hinterlegt. <br>
+    Parse-Funktion hinterlegt. <br>
     Die im Event verwendeten Felder und deren Reihenfolge können aus einem Wertevorrat mit dem 
-    <a href="#Log2Syslogattr">Attribut</a> "outputFields" bestimmt werden. Je nach verwendeten Parsingprofil können alle oder
+    <a href="#Log2Syslogattr">Attribut</a> "outputFields" bestimmt werden. Je nach verwendeten Parse-Funktion können alle oder
     nur eine Untermenge der verfügbaren Felder verwendet werden. Näheres dazu in der Beschreibung des Attributes "parseProfile". <br>
     <br>
     Das Verhalten der Eventgenerierung kann mit dem <a href="#Log2Syslogattr">Attribut</a> "makeEvent" angepasst werden. <br>
@@ -1937,12 +2305,13 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
 	Der Aufbau der Payload unterscheidet sich je nach verwendeten logFormat. <br><br>
 	
 	<b>logFormat IETF:</b> <br><br>
-	"&lt;PRIVAL&gt;VERSION TIME MYHOST IDENT PID MID [SD-FIELD] :MESSAGE" <br><br>
+	"&lt;PRIVAL&gt;IETFVERS TIME MYHOST IDENT PID MID [SD-FIELD] :MESSAGE" <br><br>
 		
     <ul>  
     <table>  
     <colgroup> <col width=10%> <col width=90%> </colgroup>
 	  <tr><td> PRIVAL     </td><td> Priority Wert (kodiert aus "facility" und "severity") </td></tr>
+      <tr><td> IETFVERS   </td><td> Version der benutzten RFC5424 Spezifikation </td></tr>
       <tr><td> TIME       </td><td> Timestamp nach RFC5424 </td></tr>
       <tr><td> MYHOST     </td><td> Internal MYHOST </td></tr>
       <tr><td> IDENT      </td><td> Ident-Tag aus DEF wenn angegeben, sonst der eigene Devicename. Die Angabe wird mit "_fhem" (FHEM-Log) bzw. "_event" (Event-Log) ergänzt. </td></tr>
@@ -1955,17 +2324,18 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <br>	
 	
 	<b>logFormat BSD:</b> <br><br>
-	"&lt;PRIVAL&gt;MONAT TAG TIME MYHOST IDENT: : MESSAGE" <br><br>
+	"&lt;PRIVAL&gt;MONTH DAY TIME MYHOST IDENT[PID]:MESSAGE" <br><br>
 		
     <ul>  
     <table>  
     <colgroup> <col width=10%> <col width=90%> </colgroup>
 	  <tr><td> PRIVAL   </td><td> Priority Wert (kodiert aus "facility" und "severity") </td></tr>
-      <tr><td> MONAT    </td><td> Monatsangabe nach RFC3164 </td></tr>
-	  <tr><td> TAG      </td><td> Tag des Monats nach RFC3164 </td></tr>
+      <tr><td> MONTH    </td><td> Monatsangabe nach RFC3164 </td></tr>
+	  <tr><td> DAY      </td><td> Tag des Monats nach RFC3164 </td></tr>
 	  <tr><td> TIME     </td><td> Zeitangabe nach RFC3164 </td></tr>
       <tr><td> MYHOST   </td><td> Internal MYHOST </td></tr>
       <tr><td> IDENT    </td><td> Ident-Tag aus DEF wenn angegeben, sonst der eigene Devicename. Die Angabe wird mit "_fhem" (FHEM-Log) bzw. "_event" (Event-Log) ergänzt. </td></tr>
+      <tr><td> PID      </td><td> Die ID der Mitteilung (= Sequenznummer) </td></tr>
       <tr><td> MESSAGE  </td><td> der zu übertragende Datensatz </td></tr>
     </table>
     </ul>     
@@ -2020,10 +2390,10 @@ Aug 18 21:08:27 fhemtest.myds.me 1 2017-08-18T21:08:27.095 fhemtest.myds.me Test
     <li><b>addTimestamp </b><br>
         <br/>
         Das Attribut ist nur für "Sender" verwendbar. Wenn gesetzt, werden FHEM Timestamps im Content-Feld der Syslog-Meldung
-        mit übertragen.<br/>
+        mit übertragen.<br>
         Per default werden die Timestamps nicht im Content-Feld hinzugefügt, da innerhalb der Syslog-Meldungen im IETF- bzw.
-        BSD-Format bereits Zeitstempel gemäß RFC-Vorgabe erstellt werden.<br/>
-        Die Einstellung kann hilfeich sein wenn mseclog in FHEM aktiviert ist.<br/>
+        BSD-Format bereits Zeitstempel gemäß RFC-Vorgabe erstellt werden.<br>
+        Die Einstellung kann hilfeich sein wenn mseclog in FHEM aktiviert ist.<br>
         <br/>
 		
         Beispielausgabe (raw) eines Splunk Syslog Servers:<br/>
@@ -2038,7 +2408,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <ul>
     <li><b>addStateEvent </b><br>
         <br>
-        Das Attribut ist nur für "Sender" verwendbar. Wenn gesetzt, werden state-events mit dem Reading "state" ergänzt.<br/>
+        Das Attribut ist nur für "Sender" verwendbar. Wenn gesetzt, werden state-events mit dem Reading "state" ergänzt.<br>
 		Die Standardeinstellung ist ohne state-Ergänzung.
     </li>
     </ul>
@@ -2100,6 +2470,7 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
     <ul>
     <li><b>outputFields </b><br>
         <br>
+        Das Attribut ist nur für "Collector" verwendbar.
         Über eine sortierbare Liste können die gewünschten Felder des generierten Events ausgewählt werden.
         Die abhängig vom Attribut <b>"parseProfil"</b> sinnvoll verwendbaren Felder und deren Bedeutung ist der Beschreibung 
         des Attributs "parseProfil" zu entnehmen.
@@ -2306,6 +2677,7 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <ul>
     <li><b>verbose</b><br>
         <br>
+        Verbose-Level entsprechend dem globalen <a href="#attributes">Attribut</a> "verbose".
         Die Ausgaben der Verbose-Level von Log2Syslog-Devices werden ausschließlich im lokalen FHEM Logfile ausgegeben und
 		nicht weitergeleitet um Schleifen zu vermeiden.
     </li>
