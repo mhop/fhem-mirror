@@ -210,7 +210,8 @@ MQTT2_DEVICE_Set($@)
   map {  my ($k,$v) = split(" ",$_,2); $sets{$k} = $v; }
         grep /./,
         split("\n", AttrVal($hash->{NAME}, "setList", ""));
-  my $cmd = $sets{$a[1]};
+  my $cmdName = $a[1];
+  my $cmd = $sets{$cmdName};
   return SetExtensions($hash, join(" ", sort keys %sets), @a) if(!$cmd);
   return undef if(IsDisabled($hash->{NAME}));
 
@@ -227,6 +228,7 @@ MQTT2_DEVICE_Set($@)
 
   $cmd =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
   IOWrite($hash, split(" ",$cmd,2));
+  readingsSingleUpdate($hash, "state", $cmdName, 1);
   return undef;
 }
 
