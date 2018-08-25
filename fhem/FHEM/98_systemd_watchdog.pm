@@ -248,7 +248,7 @@ sub watchdog_client_NotifySystemD($$) {
      Group=dialout<br/>
      # Run ExecStartPre with root-permissions<br/>
 	 PermissionsStartOnly=true<br/>
-	 ExecStartPre=-/bin/mkdir /var/run/fhem<br/>
+	 ExecStartPre=-/bin/mkdir -p /var/run/fhem<br/>
 	 ExecStartPre=/bin/chown -R fhem:dialout /var/run/fhem<br/>
 	 # Run ExecStart with defined user and group<br/>
      WorkingDirectory=/opt/fhem<br/>
@@ -316,7 +316,7 @@ sub watchdog_client_NotifySystemD($$) {
      Group=dialout<br/>
      # Run ExecStartPre with root-permissions<br/>
 	 PermissionsStartOnly=true<br/>
-	 ExecStartPre=-/bin/mkdir /var/run/fhem<br/>
+	 ExecStartPre=-/bin/mkdir -p /var/run/fhem<br/>
 	 ExecStartPre=/bin/chown -R fhem:dialout /var/run/fhem<br/>
 	 # Run ExecStart with defined user and group<br/>
      WorkingDirectory=/opt/fhem<br/>
