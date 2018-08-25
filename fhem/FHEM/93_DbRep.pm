@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.19.0       25.08.2018       attribute "valueFilter" to filter datasets in fetchrows
 # 7.18.2       02.08.2018       fix in fetchrow function (forum:#89886), fix highlighting
 # 7.18.1       03.06.2018       commandref revised
 # 7.18.0       02.06.2018       possible use of y:(\d) for timeDiffToNow, timeOlderThan , minor fixes of timeOlderThan
@@ -343,7 +344,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.18.2";
+my $DbRepVersion = "7.19.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -418,7 +419,13 @@ sub DbRep_Initialize($) {
                        "timeOlderThan ".
                        "timeout ".
 					   "userExitFn ".
+                       "valueFilter ".
                        $readingFnAttributes;
+ 
+ # Umbenennen von existierenden Attrbuten  
+ # $hash->{AttrRenameMap} = { "reading" => "readingFilter",
+ #                            "device" => "deviceFilter",
+ #                          }; 
   
 return undef;   
 }
@@ -1077,9 +1084,15 @@ sub DbRep_Attr($$$$) {
     }
                          
     if ($cmd eq "set") {
+		if ($aName =~ /valueFilter/) {
+            eval { "Hallo" =~ m/$aVal/ };
+            return "Bad regexp: $@" if($@);
+        }
+        
 		if ($aName =~ /seqDoubletsVariance/) {
             unless (looks_like_number($aVal)) { return " The Value of $aName is not valid. Only figures are allowed !";}
         }
+        
 		if ($aName eq "timeYearPeriod") {
 		    # 06-01 02-28
             unless ($aVal =~ /^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/ )
@@ -4464,6 +4477,7 @@ sub fetchrows_DoParse($) {
  my $limit      = AttrVal($name, "limit", 1000);
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my $fetchroute = AttrVal($name, "fetchRoute", "descent");
+ my $valfilter  = AttrVal($name, "valueFilter", undef);         # nur Anzeige von Datensätzen die "valueFilter" enthalten
  $fetchroute    = ($fetchroute eq "descent")?"DESC":"ASC";
  my ($err,$dbh,$sth,$sql,$rowlist,$nrows);
  
@@ -4506,6 +4520,16 @@ sub fetchrows_DoParse($) {
  no warnings 'uninitialized'; 
  my @row_array = map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."_ESC_".$_->[4]."\n" } @{$sth->fetchall_arrayref()}; 
 
+ # eventuell gesetzten Datensatz-Filter anwenden
+ if($valfilter) {
+ my @fiarr;
+     foreach my $row (@row_array) {
+         next if($row !~ /$valfilter/);
+         push @fiarr,$row;
+     }
+ @row_array = @fiarr;   
+ }
+ 
  use warnings;
  $nrows = $#row_array+1;                # Anzahl der Ergebniselemente  
  pop @row_array if($nrows>$limit);      # das zuviel selektierte Element wegpoppen wenn Limit überschritten
@@ -4552,7 +4576,6 @@ sub fetchrows_ParseDone($) {
   my $color      = "<html><span style=\"color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";\">";  # Highlighting doppelter DB-Einträge
   $color =~ s/#// if($color =~ /red|blue|brown|green|orange/);
   my $ecolor     = "</span></html>";                                                                       # Ende Highlighting
-  my @i;
   my @row;
   my $reading_runtime_string;
   
@@ -4583,7 +4606,7 @@ sub fetchrows_ParseDone($) {
       my $val = $a[4];
 	  my $unt = $a[5];
       $val = $unt?$val." ".$unt:$val;
- 
+      
       $nrow = $ts.$dev.$rea;
       $nval = $val;
       if($orow) {
@@ -9746,6 +9769,7 @@ return;
                                       <tr><td> <b>device</b>                </td><td>: select only datasets which are contain &lt;device&gt; </td></tr>
                                       <tr><td> <b>reading</b>               </td><td>: select only datasets which are contain &lt;reading&gt; </td></tr>
                                       <tr><td> <b>time.*</b>                </td><td>: A number of attributes to limit selection by time </td></tr>
+                                      <tr><td> <b>valueFilter</b>           </td><td>: filter datasets of database field "VALUE" by a regular expression </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -10747,8 +10771,13 @@ sub bdump {
 							   </ul>
 							   </li>
 							   <br><br> 
+                               
+  <li><b>valueFilter </b>     - Regular expression to filter datasets within particular functions. The regex is  
+                                applied to the whole selected dataset (inclusive Device, Reading and so on). 
+                                Please compare to explanations of relevant set-commands. </li> <br> 
 							   
-</ul></ul></ul>
+</ul>
+</ul></ul>
 
 <a name="DbRepReadings"></a>
 <b>Readings</b>
@@ -11545,6 +11574,7 @@ sub bdump {
                                       <tr><td> <b>device</b>                </td><td>: Selektion nur von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                       <tr><td> <b>reading</b>               </td><td>: Selektion nur von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                       <tr><td> <b>time.*</b>                </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                      <tr><td> <b>valueFilter</b>           </td><td>: filtert Datensätze des Datenbankfeldes "VALUE" mit einem regulären Ausdruck </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -12562,7 +12592,13 @@ sub bdump {
 							   
 							   </ul>
 							   </li>
-							   <br><br> 
+							   <br>
+                               <br>
+                               
+  <li><b>valueFilter </b>     - Regulärer Ausdruck zur Filterung von Datensätzen innerhalb bestimmter Funktionen. Der 
+                                Regex auf den gesamten selektierten Datensatz (inkl. Device, Reading usw.) angewendet. 
+                                Bitte vergleichen sie die Erläuterungen zu den entsprechenden Set-Kommandos. </li> <br> 
+                                
 
 </ul></ul>
 </ul>
