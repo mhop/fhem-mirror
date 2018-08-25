@@ -58,6 +58,9 @@ $(document).ready(function(){
   if($(szc).length)
     $(szc).before("<div class='SVGplot'></div>");
 
+  $(".SVGlabel[data-name]").each(function(){ 
+    $(this).attr("data-name", "Room_"+f18_room+"_"+$(this).attr("data-name"));
+  });
   f18_menu();
   f18_tables();
   f18_svgSetCols();
