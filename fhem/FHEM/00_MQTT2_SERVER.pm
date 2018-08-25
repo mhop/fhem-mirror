@@ -102,6 +102,19 @@ MQTT2_SERVER_Undef($@)
                        ReadingsVal($sname, "nrclients", 1)-1, 1);
 
   if($hash->{lwt}) {    # Last will
+
+    # skip lwt if there is another connection with the same ip+cid (tasmota??)
+    for my $dev (keys %defs) {
+      my $h = $defs{$dev};
+      next if($h->{TYPE} ne $hash->{TYPE} ||
+              $h->{NR} == $hash->{NR} ||
+              !$h->{cid}  || $h->{cid}  ne $hash->{cid} ||
+              !$h->{PEER} || $h->{PEER} ne $hash->{PEER});
+      Log3 $shash, 4,
+        "Closing second connection for $h->{cid}/$h->{PEER} without lwt";
+      return $ret;
+    }
+
     my ($tp, $val) = split(':', $hash->{lwt}, 2);
     MQTT2_SERVER_doPublish($hash, $shash, $tp, $val, $hash->{cflags} & 0x20);
   }
