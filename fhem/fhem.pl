@@ -4885,7 +4885,7 @@ json2nameValue($;$)
   my %ret;
 
   sub
-  lquote($)
+  lStr($) # extract a string
   {
     my ($t) = @_;
     my $esc;
@@ -4899,23 +4899,23 @@ json2nameValue($;$)
         $esc = 0;
       }
     }
-    return ($t, "");    # error
+    return ($t, "");
   }
 
   sub
-  lhash($)
+  lObj($$$) # extract one object: {} or []
   {
-    my ($t) = @_;
+    my ($t, $oc, $cc) = @_;
     my $depth=1;
     my ($esc, $inquote);
 
     for(my $off = 1; $off < length($t); $off++){
       my $s = substr($t,$off,1);
-      if($s eq '}') {
+      if($s eq $cc && !$inquote) { # close character
         $depth--;
         return (substr($t,1,$off-1), substr($t,$off+1)) if(!$depth);
 
-      } elsif($s eq '{' && !$inquote) {
+      } elsif($s eq $oc && !$inquote) { # open character
         $depth++;
 
       } elsif($s eq '"' && !$esc) {
@@ -4931,33 +4931,50 @@ json2nameValue($;$)
     return ($t, "");    # error
   }
 
-  $in = $1 if($in =~ m/^{(.*)}$/s);
-
-  while($in =~ m/^"([^"]+)"\s*:\s*(.*)$/s) {
-    my ($name,$val) = ($1,$2);
-    $name =~ s/[^a-z0-9._\-\/]/_/gsi;
+  sub eObj($$$$$);
+  sub
+  eObj($$$$$)
+  {
+    my ($ret,$name,$val,$in,$prefix) = @_;
 
     if($val =~ m/^"/) {
-      ($val, $in) = lquote($val);
+      ($val, $in) = lStr($val);
       $val =~ s/\\u([0-9A-F]{4})/chr(hex($1))/gsie; # toJSON reverse
-      $ret{"$prefix$name"} = $val;
+      $ret->{"$prefix$name"} = $val;
 
     } elsif($val =~ m/^{/) { # }
-      ($val, $in) = lhash($val);
+      ($val, $in) = lObj($val, '{', '}');
       my $r2 = json2nameValue($val);
       foreach my $k (keys %{$r2}) {
-        $ret{"$prefix${name}_$k"} = $r2->{$k};
+        $ret->{"$prefix${name}_$k"} = $r2->{$k};
       }
 
+    } elsif($val =~ m/^\[/) { 
+      ($val, $in) = lObj($val, '[', ']');
+      my $idx = 1;
+      $val =~ s/^\s*//;
+      while($val) {
+        $val = eObj($ret, $name."_$idx", $val, $val, $prefix);
+        $val =~ s/^\s*,\s*//;
+        $idx++
+      }
     } elsif($val =~ m/^([0-9.-]+)(.*)$/s) {
-      $ret{"$prefix$name"} = $1;
+      $ret->{"$prefix$name"} = $1;
       $in = $2;
 
     } else {
       Log 1, "Error parsing $val";
       $in = "";
     }
+    return $in;
+  }
 
+  $in = $1 if($in =~ m/^{(.*)}$/s);
+
+  while($in =~ m/^\s*"([^"]+)"\s*:\s*(.*)$/s) {
+    my ($name,$val) = ($1,$2);
+    $name =~ s/[^a-z0-9._\-\/]/_/gsi;
+    $in = eObj(\%ret, $name, $val, $in, $prefix);
     $in =~ s/^\s*,\s*//;
   }
   return \%ret;
