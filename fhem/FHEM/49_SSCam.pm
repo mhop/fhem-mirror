@@ -4766,9 +4766,9 @@ sub SSCam_camop_parse ($) {
                 $avcomp    =~ s/\.//g;
 
                 if($avsc <= $avcomp) {
-                    ReadingsSingleUpdateValue ($hash, "compstate", "true", 1);
+                    readingsSingleUpdate($hash, "compstate", "true", 1);
                 } else {
-                    ReadingsSingleUpdateValue ($hash, "compstate", "false", 1);
+                    readingsSingleUpdate($hash, "compstate", "false", 1);
                     Log3($name, 2, "$name - WARNING - your current/simulated SVS-version may be incompatible to the SSCam version $hash->{VERSION}");
                 }
                 
