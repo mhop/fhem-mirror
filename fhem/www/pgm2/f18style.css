@@ -227,7 +227,7 @@ body.fixedInput #hdr {
   table.block tr td:nth-child(2) { width: 0; }
   table.block tr td:nth-child(n+3) { width: 0px; display: none; }
  
-  .SVGplot { width: 100%; overflow-x: auto;} 
+  .SVGplot { overflow-x: auto;} 
   
   /* flex-collapsing table */
   .wrapcolumns, 

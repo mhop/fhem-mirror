@@ -409,7 +409,7 @@ function
 f18_resize()
 {
   var w=$(window).width();
-  log("f18.js W:"+w+" S:"+screen.width);
+  log("f18.js resize W:"+w+" S:"+screen.width);
   var hl = f18_getAttr("hideLogo"),
       hi = f18_getAttr("hideInput"),
       pm = f18_getAttr("Pinned.menu"),

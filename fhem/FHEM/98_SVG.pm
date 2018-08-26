@@ -221,7 +221,8 @@ SVG_FwFn($$$$)
   my $hash = $defs{$d};
   my $ret = "";
 
-  my $isFirst = (!$pageHash || !$pageHash->{index} || $pageHash->{index} == 1);
+  my $isFirst = (!$pageHash || !$pageHash->{svgLoaded});
+  $pageHash->{svgLoaded} = 1 if($pageHash);
   $ret .= "<script type='text/javascript' src='$FW_ME/pgm2/svg.js'></script>"
     if($isFirst);
 

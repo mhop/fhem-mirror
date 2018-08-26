@@ -260,7 +260,7 @@ FW_jqueryReadyFn()
     $(this).html(txt);
     $(this).find("a").click(function(){
       var txt = $(this).text();
-      var ma = txt.match(/configuring.*device (.*)/);
+      var ma = txt.match(/configuring.*device (.*)/);   // ??
       if(ma)
         location.href = FW_root+"?detail="+ma[1];
       FW_cmd(FW_root+"?cmd="+encodeURIComponent(txt)+"&XHR=1",
@@ -303,6 +303,19 @@ FW_jqueryReadyFn()
   FW_inlineModify();
   FW_rawDef();
   FW_treeMenu();
+
+  // automatic reload for style change
+  if(location.search.indexOf("cmd=style%20select") > 0) {
+    $('a[href*="style set"],a[onclick*="style set"]').each(function(){
+      var href = $(this).attr("href");
+      if(!href && (href = $(this).attr("onclick")))
+        href = href.substr(15,href.length-16);
+      $(this).click(function(e){
+        e.preventDefault();
+        FW_cmd(href+"&XHR=1", function(data) { location.reload(true); });
+      });
+    });
+  }
 }
 
 var FW_helpData;

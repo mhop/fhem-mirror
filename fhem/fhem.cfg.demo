@@ -4,7 +4,12 @@ attr global autosave 0
 attr global backup_before_update 0
 attr global logfile -
 attr global modpath .
-attr global motd 
+attr global motd SecurityCheck:\
+  WEB is not password protected\
+  telnetPort is not password protected\
+\
+Protect this FHEM installation by defining an allowed device with define allowed allowed\
+You can disable this message with attr global motd none
 attr global mseclog 1
 attr global room System
 attr global sendStatistics never
@@ -37,17 +42,113 @@ attr WEB styleData {\
   "fixedInput": true,\
   "hidePin": true,\
   "showDragger": false,\
+  "Pos.Room_Bla_svgZoomControl": {\
+   "left": 412,\
+   "top": 308,\
+   "width": 1566,\
+   "height": 0,\
+   "oTop": 0,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Bla_SVG_01_Garden": {\
+   "left": 0,\
+   "top": 218,\
+   "width": 1566,\
+   "height": 164,\
+   "oTop": -164,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Bla_SVG_05_Polar": {\
+   "left": 0,\
+   "top": 540,\
+   "width": 1566,\
+   "height": 304,\
+   "oTop": -304,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Sensors_grp_FileLog": {\
+   "left": 600,\
+   "top": 0,\
+   "width": 260,\
+   "height": 138,\
+   "oTop": 20,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Sensors_grp_Helper": {\
+   "left": 40,\
+   "top": -20,\
+   "width": 260,\
+   "height": 40,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Sensors_grp_Sensors": {\
+   "left": 40,\
+   "top": 60,\
+   "width": 260,\
+   "height": 60,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Sensors_svgZoomControl": {\
+   "left": 100,\
+   "top": 220,\
+   "width": 1580,\
+   "height": 0,\
+   "oTop": 0,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Sensors_SVG_01_Garden": {\
+   "left": 0,\
+   "top": 660,\
+   "width": 1580,\
+   "height": 180,\
+   "oTop": -164,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Sensors_SVG_02_Cellar": {\
+   "left": 0,\
+   "top": 840,\
+   "width": 1580,\
+   "height": 180,\
+   "oTop": -164,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Sensors_SVG_03_Dewpoint": {\
+   "left": 0,\
+   "top": 480,\
+   "width": 1580,\
+   "height": 180,\
+   "oTop": -164,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Sensors_SVG_04_Sun": {\
+   "left": 0,\
+   "top": 1020,\
+   "width": 1580,\
+   "height": 180,\
+   "oTop": -164,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Sensors_SVG_05_Polar": {\
+   "left": 280,\
+   "top": 300,\
+   "width": 340,\
+   "height": 320,\
+   "oTop": -304,\
+   "oLeft": 0\
+  },\
   "Pos.style_list_Styles": {\
    "left": 20,\
    "top": 0,\
    "width": 240,\
-   "height": 260,\
+   "height": 300,\
    "oTop": 20,\
    "oLeft": 0\
   },\
   "Pos.style_list_f18_special": {\
    "left": 20,\
-   "top": 280,\
+   "top": 320,\
    "width": 240,\
    "height": 140,\
    "oTop": 40,\
@@ -57,49 +158,9 @@ attr WEB styleData {\
    "left": 280,\
    "top": -20,\
    "width": 240,\
-   "height": 400,\
+   "height": 480,\
    "oTop": 40,\
    "oLeft": 0\
-  },\
-  "Pos.Room_Light_grp_Color_Lights": {\
-   "left": 0,\
-   "top": 0,\
-   "width": 860,\
-   "height": 80,\
-   "oTop": 21,\
-   "oLeft": 1\
-  },\
-  "Pos.Room_Light_grp_Notify": {\
-   "left": 420,\
-   "top": 300,\
-   "width": 440,\
-   "height": 38,\
-   "oTop": 41,\
-   "oLeft": 1\
-  },\
-  "Pos.Room_Light_grp_Single_Lights": {\
-   "left": 0,\
-   "top": 100,\
-   "width": 400,\
-   "height": 240,\
-   "oTop": 41,\
-   "oLeft": 1\
-  },\
-  "Pos.Room_Light_grp_Structure": {\
-   "left": 420,\
-   "top": 220,\
-   "width": 440,\
-   "height": 38,\
-   "oTop": 41,\
-   "oLeft": 1\
-  },\
-  "Pos.Room_Light_grp_Timer": {\
-   "left": 420,\
-   "top": 100,\
-   "width": 440,\
-   "height": 78,\
-   "oTop": 41,\
-   "oLeft": 1\
   },\
   "snapToGrid": true,\
   "Pos.Room_Cinema_grp_AV": {\
@@ -107,103 +168,199 @@ attr WEB styleData {\
    "top": 0,\
    "width": 560,\
    "height": 120,\
-   "oTop": 21,\
-   "oLeft": 1\
+   "oTop": 20,\
+   "oLeft": 0\
   },\
   "Pos.Room_Cinema_grp_Control": {\
    "left": 0,\
    "top": 140,\
    "width": 560,\
    "height": 40,\
-   "oTop": 41,\
-   "oLeft": 1\
+   "oTop": 40,\
+   "oLeft": 0\
   },\
   "Pos.Room_Cinema_grp_Light": {\
    "left": 0,\
    "top": 220,\
    "width": 560,\
-   "height": 78,\
-   "oTop": 41,\
-   "oLeft": 1\
+   "height": 80,\
+   "oTop": 40,\
+   "oLeft": 0\
   },\
   "Pos.Room_Cinema_grp_Scenes": {\
    "left": 0,\
    "top": 360,\
    "width": 560,\
-   "height": 180,\
-   "oTop": 24,\
+   "height": 198,\
+   "oTop": 20,\
    "oLeft": 0\
   },\
-  "Pos.Room_Sensors_grp_FileLog": {\
+  "Pos.Room_Residents_grp_Baby": {\
    "left": 0,\
    "top": 0,\
-   "width": 260,\
-   "height": 120,\
-   "oTop": 21,\
-   "oLeft": 1\
+   "width": 280,\
+   "height": 40,\
+   "oTop": 20,\
+   "oLeft": 0\
   },\
-  "Pos.Room_Sensors_grp_Helper": {\
+  "Pos.Room_Residents_grp_Daughter": {\
+   "left": 0,\
+   "top": 60,\
+   "width": 280,\
+   "height": 40,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Residents_grp_Father": {\
+   "left": 0,\
+   "top": 300,\
+   "width": 280,\
+   "height": 60,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Residents_grp_Guests": {\
+   "left": 300,\
+   "top": 180,\
+   "width": 280,\
+   "height": 80,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Residents_grp_Home_State": {\
+   "left": 300,\
+   "top": -20,\
+   "width": 280,\
+   "height": 160,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Residents_grp_Mother": {\
+   "left": 0,\
+   "top": 220,\
+   "width": 280,\
+   "height": 40,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_Residents_grp_Son": {\
    "left": 0,\
    "top": 140,\
-   "width": 260,\
-   "height": 20,\
-   "oTop": 41,\
-   "oLeft": 1\
+   "width": 280,\
+   "height": 40,\
+   "oTop": 40,\
+   "oLeft": 0\
   },\
-  "Pos.Room_Sensors_grp_Sensors": {\
+  "Pos.Room_Residents_grp_notify": {\
+   "left": 300,\
+   "top": 300,\
+   "width": 280,\
+   "height": 58,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_undefined_grp_Color_Lights": {\
+   "left": 0,\
+   "top": 0,\
+   "width": 640,\
+   "height": 100,\
+   "oTop": 20,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_undefined_grp_Notify": {\
+   "left": 0,\
+   "top": 120,\
+   "width": 440,\
+   "height": 40,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_undefined_grp_Single_Lights": {\
    "left": 0,\
    "top": 200,\
-   "width": 260,\
+   "width": 440,\
+   "height": 160,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_undefined_grp_Structure": {\
+   "left": 0,\
+   "top": 400,\
+   "width": 440,\
    "height": 40,\
-   "oTop": 41,\
-   "oLeft": 1\
+   "oTop": 40,\
+   "oLeft": 0\
   },\
-  "Pos.svgZoomControl": {\
+  "Pos.Room_undefined_grp_Timer": {\
+   "left": 0,\
+   "top": 480,\
+   "width": 440,\
+   "height": 80,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_System_grp_CUL": {\
+   "left": 0,\
+   "top": 0,\
+   "width": 240,\
+   "height": 40,\
+   "oTop": 20,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_System_grp_FHEMWEB": {\
+   "left": 0,\
+   "top": 60,\
+   "width": 240,\
+   "height": 40,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_System_grp_FileLog": {\
+   "left": 0,\
+   "top": 120,\
+   "width": 240,\
+   "height": 40,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_System_grp_Global": {\
+   "left": 0,\
+   "top": 180,\
+   "width": 240,\
+   "height": 40,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_System_grp_autocreate": {\
+   "left": 0,\
+   "top": 240,\
+   "width": 240,\
+   "height": 40,\
+   "oTop": 40,\
+   "oLeft": 0\
+  },\
+  "Pos.Room_System_grp_eventTypes": {\
    "left": 0,\
    "top": 300,\
-   "width": 1040,\
-   "height": 0,\
-   "oTop": 0,\
+   "width": 240,\
+   "height": 40,\
+   "oTop": 40,\
    "oLeft": 0\
   },\
-  "Pos.SVG_01_Garden": {\
+  "Pos.Room_System_grp_logProxy": {\
    "left": 0,\
-   "top": 500,\
-   "width": 1040,\
-   "height": 180,\
-   "oTop": -164,\
+   "top": 380,\
+   "width": 240,\
+   "height": 40,\
+   "oTop": 40,\
    "oLeft": 0\
   },\
-  "Pos.SVG_02_Cellar": {\
+  "Pos.Room_System_grp_telnet": {\
    "left": 0,\
-   "top": 680,\
-   "width": 1040,\
-   "height": 180,\
-   "oTop": -164,\
-   "oLeft": 0\
-  },\
-  "Pos.SVG_03_Dewpoint": {\
-   "left": 0,\
-   "top": 860,\
-   "width": 1040,\
-   "height": 180,\
-   "oTop": -164,\
-   "oLeft": 0\
-  },\
-  "Pos.SVG_04_Sun": {\
-   "left": 0,\
-   "top": 1040,\
-   "width": 1040,\
-   "height": 180,\
-   "oTop": -164,\
-   "oLeft": 0\
-  },\
-  "Pos.SVG_05_Polar": {\
-   "left": 280,\
-   "top": 300,\
-   "width": 1040,\
-   "height": 320,\
-   "oTop": -304,\
+   "top": 440,\
+   "width": 240,\
+   "height": 40,\
+   "oTop": 40,\
    "oLeft": 0\
   }\
  }\
