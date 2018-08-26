@@ -488,6 +488,7 @@ FHEM/98_rssFeed.pm           Benni                Unterstuetzende Dienste
 FHEM/98_statistics.pm        tupol                Unterstuetzende Dienste (Link als PM an tupol)
 FHEM/98_structure.pm         rudolfkoenig         Automatisierung
 FHEM/98_Siro.pm              Byte09 / Dr. Smag    Sonstige Systeme
+FHEM/98_MSwitch.pm           Byte09	              Automatisierung
 FHEM/98_telnet.pm            rudolfkoenig         Automatisierung
 FHEM/98_update.pm            rudolfkoenig         Sonstiges
 FHEM/98_version.pm           markusbloch          Sonstiges
