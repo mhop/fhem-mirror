@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     98_MSwitch.pm: Multi Switch Modul
   - feature: 93_DbRep: V7.19.0, attribute "valueFilter" to filter datasets in 
                                 fetchrows
   - feature: 49_SSCam: V7.0.0, compatibility to SVS 8.2.0
