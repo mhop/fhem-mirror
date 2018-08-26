@@ -1078,12 +1078,11 @@ sub DOIFtools_Define($$$)
   my @Liste = devspec2array("TYPE=DOIFtools");
   if (@Liste > 1) {
     CommandDelete(undef,$pn);
-    # CommandSave(undef,undef);
     return "Only one instance of DOIFtools is allowed per FHEM installation. Delete the old one first.";
   }
-  $hash->{STATE} = "initialized";
   $hash->{logfile} = AttrVal($pn,"DOIFtoolsLogDir",AttrVal("global","logdir","./log/"))."$hash->{TYPE}Log-%Y-%j.log";
   DOIFtoolsCounterReset($pn);
+  readingsSingleUpdate($hash,"state","initialized",0);
   return undef;
 }
 
@@ -1294,6 +1293,8 @@ sub DOIFtools_Get($@)
   my $ret="";
   my @ret=();
   my @doifList = devspec2array("TYPE=DOIF");
+  my @doifListFHEM = devspec2array("TYPE=DOIF" and "MODEL=FHEM");
+  my @doifListPerl = devspec2array("TYPE=DOIF" and "MODEL=Perl");
   my @ntL =();
   my $dL = join(",",sort @doifList);
   my $DE = AttrVal("global", "language", "") eq "DE" ? 1 : 0;
@@ -1454,6 +1455,15 @@ sub DOIFtools_Get($@)
           $ret .= sprintf("%".($typlen+$evtlen-7)."s","Rate: ").sprintf("%-10s","&gt;= $compRate\n\n");
       }
       $ret .= "<div style=\"color:#d9d9d9\" >".sprintf("-"x($typlen+$evtlen+33))."</div>";
+      # model statistics
+      if ($DE) {
+        $ret .= "<b>".sprintf("%-30s","DOIF-Modelle").sprintf("%-12s","Anzahl")."</b>\n";
+      } else {
+        $ret .= "<b>".sprintf("%-30s","Models of DOIF").sprintf("%-12s","Number")."</b>\n";
+      }
+      $ret .= sprintf("-"x42)."\n";
+      $ret .= sprintf("%-30s","FHEM").sprintf("%-12s","".@doifListFHEM)."\n"; 
+      $ret .= sprintf("%-30s","Perl").sprintf("%-12s","".@doifListPerl)."\n\n"; 
       # attibute statistics
       if ($DE) {
         $ret .= "<b>".sprintf("%-30s","genutzte Attribute in DOIF").sprintf("%-12s","Anzahl")."</b>\n";
@@ -1483,7 +1493,7 @@ sub DOIFtools_Get($@)
   } elsif ($arg eq "checkDOIF") {
       my @coll = ();
       my $coll = "";
-      foreach my $di (@doifList) {
+      foreach my $di (@doifListFHEM) {
         $coll = DOIFtoolsCheckDOIFcoll($hash,$di);
         push @coll, $coll if($coll);
       }
@@ -1493,11 +1503,11 @@ sub DOIFtools_Get($@)
       } else {
         $ret .= "\n<ul><li><b>DOELSEIF</b> without <b>DOELSE</b> is o.k., if state changes between, the same condition becomes true again,<br>otherwise use attribute <b>do always</b> (<a target=\"_blank\" href=\"https://fhem.de/commandref_DE.html#DOIF_do_always\">controlling by events</a>, <a target=\"_blank\" href=\"https://wiki.fhem.de/wiki/DOIF/Einsteigerleitfaden,_Grundfunktionen_und_Erl%C3%A4uterungen#Verhaltensweise_ohne_steuernde_Attribute\">behaviour without attributes</a>)</li></ul> \n" if (@coll);
       }
-      foreach my $di (@doifList) {
+      foreach my $di (@doifListFHEM) {
         $ret .= DOIFtoolsCheckDOIF($hash,$di);
       }
       
-      $ret = $DE ? ($ret ? "Empfehlung gefunden für:\n\n$ret" : "Keine Empfehlung gefunden.") : ($ret ? "Found recommendation for:\n\n$ret" : "No recommendation found.");
+      $ret = $DE ? ($ret ? "Empfehlung gefunden für MODEL FHEM:\n\n$ret" : "Keine Empfehlung gefunden.") : ($ret ? "Found recommendation for MODEL FHEM:\n\n$ret" : "No recommendation found.");
       return $ret;
       
   } elsif ($arg eq "runningTimerInDOIF") {
@@ -1731,7 +1741,7 @@ DOIFtools contains tools to support DOIF.<br>
     <li>access from DOIFtools to existing DOIFtoolsLog logfiles</li>
     <li>show event monitor in device detail view and optionally in DOIFs detail view</li>
     <li>convert events to DOIF operands, a selected operand is copied to clipboard and the DEF editor will open</li>
-    <li>check definitions and offer recommendations</li>
+    <li>check definitions and offer recommendations for DOIF MODEL FHEM</li>
     <li>create shortcuts</li>
     <li>optionally create a menu entry</li>
     <li>show a list of running wait timer</li>
@@ -1770,7 +1780,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
       <li>Ist der <b>Event-Monitor in DOIF</b> geöffnet, dann kann die Definition des <b>DOIF geändert</b> werden.</li>
       <li>Ist der <b>Event-Monitor in DOIFtools</b> geöffnet, dann kann die Definition eines <b>DOIF erzeugt</b> werden.</li>
     </ul>
-    <li>prüfen der DOIF Definitionen mit Empfehlungen.</li>
+    <li>prüfen der Definitionen mit Empfehlungen für DOIF-Modus FHEM.</li>
     <li>erstellen von Shortcuts</li>
     <li>optionalen Menüeintrag erstellen</li>
     <li>Liste der laufenden Wait-Timer anzeigen</li>
@@ -1819,39 +1829,50 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
 <b>Set</b>
 <br>
     <ul>
+<a name="deleteReadingInTargetDOIF"></a>
         <code>set &lt;name&gt; deleteReadingInTargetDOIF &lt;readings to delete name&gt;</code><br>
         <b>deleteReadingInTargetDOIF</b> löscht die benutzerdefinierten Readings im Ziel-DOIF<br>
         <br>
+<a name="targetDOIF"></a>
         <code>set &lt;name&gt; targetDOIF &lt;target name&gt;</code><br>
         <b>targetDOIF</b> vor dem Löschen der Readings muss das Ziel-DOIF gesetzt werden.<br>
         <br>
+<a name="deleteReadingInTargetDevice"></a>
         <code>set &lt;name&gt; deleteReadingInTargetDevice &lt;readings to delete name&gt;</code><br>
         <b>deleteReadingInTargetDevice</b> löscht sichtbare Readings, ausser <i>state</i> im Ziel-Gerät. Bitte den Gefahrenhinweis zum Befehl <a href="https://fhem.de/commandref_DE.html#deletereading">deletereading</a> beachten!<br>
         <br>
+<a name="targetDevice"></a>
         <code>set &lt;name&gt; targetDevice &lt;target name&gt;</code><br>
         <b>targetDevice</b> vor dem Löschen der Readings muss das Ziel-Gerät gesetzt werden.<br>
         <br>
+<a name="sourceAttribute"></a>
         <code>set &lt;name&gt; sourceAttribute &lt;readingList&gt; </code><br>
         <b>sourceAttribute</b> vor dem Erstellen einer ReadingsGroup muss das Attribut gesetzt werden aus dem die Readings gelesen werden, um die ReadingsGroup zu erstellen und zu beschriften. <b>Default, readingsList</b><br>
         <br>
+<a name="statisticsDeviceFilterRegex"></a>
         <code>set &lt;name&gt; statisticsDeviceFilterRegex &lt;regular expression as device filter&gt;</code><br>
         <b>statisticsDeviceFilterRegex</b> setzt einen Filter auf Gerätenamen, nur die gefilterten Geräte werden im Bericht ausgewertet. <b>Default, ".*"</b>.<br>
         <br>
+<a name="statisticsTYPEs"></a>
         <code>set &lt;name&gt; statisticsTYPEs &lt;List of TYPE used for statistics generation&gt;</code><br>
         <b>statisticsTYPEs</b> setzt eine Liste von TYPE für die Statistikdaten erfasst werden, bestehende Statistikdaten werden gelöscht. <b>Default, ""</b>.<br>
         <br>
+<a name="statisticsShowRate_ge"></a>
         <code>set &lt;name&gt; statisticsShowRate_ge &lt;integer value for event rate&gt;</code><br>
         <b>statisticsShowRate_ge</b> setzt eine Event-Rate, ab der ein Gerät in die Auswertung einbezogen wird. <b>Default, 0</b>.<br>
         <br>
+<a name="specialLog"></a>
         <code>set &lt;name&gt; specialLog &lt;0|1&gt;</code><br>
         <b>specialLog</b> <b>1</b> DOIF-Listing bei Status und Wait-Timer Aktualisierung im Debug-Logfile. <b>Default, 0</b>.<br>
         <br>
+<a name="doStatistics"></a>
         <code>set &lt;name&gt; doStatistics &lt;enabled|disabled|deleted&gt;</code><br>
         <b>doStatistics</b><br>
             &emsp;<b>deleted</b> setzt die Statistik zurück und löscht alle <i>stat_</i> Readings.<br>
             &emsp;<b>disabled</b> pausiert die Statistikdatenerfassung.<br>
             &emsp;<b>enabled</b> startet die Statistikdatenerfassung.<br>
         <br>
+<a name="recording_target_duration"></a>
         <code>set &lt;name&gt; recording_target_duration &lt;hours&gt;</code><br>
         <b>recording_target_duration</b> gibt an wie lange Daten erfasst werden sollen. <b>Default, 0</b> die Dauer ist nicht begrenzt.<br>
         <br>
@@ -1861,27 +1882,35 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
 <b>Get</b>
 <br>
     <ul>
+<a name="DOIF_to_Log"></a>
         <code>get &lt;name&gt; DOIF_to_Log &lt;DOIF names for logging&gt;</code><br>
         <b>DOIF_to_Log</b> erstellt eine FileLog-Definition, die für alle angegebenen DOIF-Definitionen loggt. Der <i>Reguläre Ausdruck</i> wird aus den, direkt in den DOIF-Greräte angegebenen und den wahrscheinlich verbundenen Geräten, ermittelt.<br>
         <br>
+<a name="checkDOIF"></a>
         <code>get &lt;name&gt; checkDOIF</code><br>
-        <b>checkDOIF</b> führt eine einfache Syntaxprüfung durch und empfiehlt Änderungen.<br>
+        <b>checkDOIF</b> führt eine einfache Syntaxprüfung durch und empfiehlt Änderungen für DOIF-Modus FHEM.<br>
         <br>
+<a name="readingsGroup_for"></a>
         <code>get &lt;name&gt; readingsGroup_for &lt;DOIF names to create readings groups&gt;</code><br>
         <b>readingsGroup_for</b> erstellt readingsGroup-Definitionen für die angegebenen DOIF-namen. <b>sourceAttribute</b> verweist auf das Attribut, dessen Readingsliste als Basis verwendet wird. Die Eingabeelemente im Frontend werden mit den Readingsnamen beschriftet.<br>
         <br>
+<a name="userReading_nextTimer_for"></a>
         <code>get &lt;name&gt; userReading_nextTimer_for &lt;DOIF names where to create real date timer readings&gt;</code><br>
         <b>userReading_nextTimer_for</b> erstellt userReadings-Attribute für Timer-Readings mit realem Datum für Timer, die mit Wochentagangaben angegeben sind, davon ausgenommen sind indirekte Wochentagsangaben.<br>
         <br>
+<a name="statisticsReport"></a>
         <code>get &lt;name&gt; statisticsReport </code><br>
         <b>statisticsReport</b> erstellt einen Bericht aus der laufenden Datenerfassung.<br><br>Die Statistik kann genutzt werden, um Geräte mit hohen Ereignisaufkommen zu erkennen. Bei einer hohen Rate, sollte im Interesse der Systemperformance geprüft werden, ob die <a href="https://wiki.fhem.de/wiki/Event">Events</a> eingeschränkt werden können. Werden keine Events eines Gerätes weiterverarbeitet, kann das Attribut <i>event-on-change-reading</i> auf <i>none</i> oder eine andere Zeichenfolge, die im Gerät nicht als Readingname vorkommt, gesetzt werden.<br>
         <br>
+<a name="runningTimerInDOIF"></a>
         <code>get &lt;name&gt; runningTimerInDOIF</code><br>
         <b>runningTimerInDOIF</b> zeigt eine Liste der laufenden Timer. Damit kann entschieden werden, ob bei einem Neustart wichtige Timer gelöscht werden und der Neustart ggf. verschoben werden sollte. Zeigt nachrichtlich das Ergebnis von blockinginfo an.<br>
         <br>
+<a name="SetAttrIconForDOIF"></a>
         <code>get &lt;name&gt; SetAttrIconForDOIF &lt;DOIF names for setting the attribute icon to helper_doif&gt;</code><br>
         <b>SetAttrIconForDOIF</b> setzt für die ausgewählten DOIF das Attribut <i>icon</i> auf <i>helper_doif</i>.<br>
         <br>
+<a name="linearColorGradient"></a>
         <code>get &lt;name&gt; linearColorGradient &lt;start color number&gt;,&lt;end color number&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;</code><br>
         <b>linearColorGradient</b> erzeugt eine Tabelle mit linear abgestuften Farbnummern und RGB-Werten.<br>
         &lt;start color number&gt;, ist eine HTML-Farbnummer, Beispiel: #0000FF für Blau.<br>
@@ -1892,6 +1921,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <br>
         Beispiel: <code>get DOIFtools linearColorGradient #0000FF,#FF0000,7,30,0.5</code><br>
         <br>
+<a name="modelColorGradient"></a>
         <code>get &lt;name&gt; modelColorGradient &lt;minimal value&gt;,&lt;middle value&gt;,&lt;maximal value&gt;,&lt;step width&gt;,&lt;color model&gt;</code><br>
         <b>modelColorGradient</b> erzeugt eine Tabelle mit modellbedingt abgestuften Farbnummern und RGB-Werten, siehe FHEM-Wiki<a href="https://wiki.fhem.de/wiki/Color#Farbskala_mit_Color::pahColor"> Farbskala mit Color::pahColor </a><br>
         &lt;minimal value&gt;, der Minimalwert auf den die Startfarbnummer skaliert wird, Beispiel: 7.<br>
@@ -1904,6 +1934,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <code>get DOIFtools modelColorGradient 7,20,30,1,0</code><br>
         <code>get DOIFtools modelColorGradient 0,50,100,5,[255,255,0,127,255,0,0,255,0,0,255,255,0,127,255]</code><br>
         <br>
+<a name="hsvColorGradient"></a>
         <code>get &lt;name&gt; hsvColorGradient &lt;HUE start value&gt;,&lt;HUE end value&gt;,&lt;minimal value&gt;,&lt;maximal value&gt;,&lt;step width&gt;,&lt;saturation&gt;,&lt;lightness&gt;</code><br>
         <b>hsvColorGradient</b> erzeugt eine Tabelle über HUE-Werte abgestufte Farbnummern und RGB-Werten.<br>
         &lt;Hue start value&gt;, der HUE-Startwert, Beispiel: 240 für Blau.<br>
@@ -1923,45 +1954,59 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
 <a name="DOIFtoolsAttribute"></a>
 <b>Attribute</b><br>
     <ul>
+<a name="DOIFtoolsExecuteDefinition"></a>
         <code>attr &lt;name&gt; DOIFtoolsExecuteDefinition &lt;0|1&gt;</code><br>
         <b>DOIFtoolsExecuteDefinition</b> <b>1</b> führt die erzeugten Definitionen aus. <b>Default 0</b>, zeigt die erzeugten Definitionen an, sie können mit <i>Raw definition</i> importiert werden.<br>
         <br>
+<a name="DOIFtoolsExecuteSave"></a>
         <code>attr &lt;name&gt; DOIFtoolsExecuteSave &lt;0|1&gt;</code><br>
         <b>DOIFtoolsExecuteSave</b> <b>1</b>, die Definitionen werden automatisch gespeichert. <b>Default 0</b>, der Benutzer kann die Definitionen speichern.<br>
         <br>
+<a name="DOIFtoolsTargetGroup"></a>
         <code>attr &lt;name&gt; DOIFtoolsTargetGroup &lt;group names for target&gt;</code><br>
         <b>DOIFtoolsTargetGroup</b> gibt die Gruppen für die zu erstellenden Definitionen an. <b>Default</b>, die Gruppe der Ursprungs Definition.<br>
         <br>
+<a name="DOIFtoolsTargetRoom"></a>
         <code>attr &lt;name&gt; DOIFtoolsTargetRoom &lt;room names for target&gt;</code><br>
         <b>DOIFtoolsTargetRoom</b> gibt die Räume für die zu erstellenden Definitionen an. <b>Default</b>, der Raum der Ursprungs Definition.<br>
         <br>
+<a name="DOIFtoolsReadingsPrefix"></a>
         <code>attr &lt;name&gt; DOIFtoolsReadingsPrefix &lt;user defined prefix&gt;</code><br>
         <b>DOIFtoolsReadingsPrefix</b> legt den Präfix der benutzerdefinierten Readingsnamen für die Zieldefinition fest. <b>Default</b>, DOIFtools bestimmt den Präfix.<br>
         <br>
+<a name="DOIFtoolsEventMonitorInDOIF"></a>
         <code>attr &lt;name&gt; DOIFtoolsEventMonitorInDOIF &lt;1|0&gt;</code><br>
         <b>DOIFtoolsEventMonitorInDOIF</b> <b>1</b>, die Anzeige des Event-Monitors wird in DOIF ermöglicht. <b>Default 0</b>, kein Zugriff auf den Event-Monitor im DOIF.<br>
         <br>
+<a name="DOIFtoolsEMbeforeReading"></a>
         <code>attr &lt;name&gt; DOIFtoolsEMbeforeReadings &lt;1|0&gt;</code><br>
         <b>DOIFtoolsEMbeforeReading</b> <b>1</b>, die Anzeige des Event-Monitors wird in DOIF direkt über den Readings angezeigt. <b>Default 0</b>, anzeige des Event-Monitors über den Internals.<br>
         <br>
+<a name="DOIFtoolsHideModulGetSet"></a>
         <code>attr &lt;name&gt; DOIFtoolsHideGetSet &lt;0|1&gt;</code><br>
         <b>DOIFtoolsHideModulGetSet</b> <b>1</b>, verstecken der Set- und Get-Shortcuts. <b>Default 0</b>.<br>
         <br>
+<a name="DOIFtoolsNoLookUp"></a>
         <code>attr &lt;name&gt; DOIFtoolsNoLookUp &lt;0|1&gt;</code><br>
         <b>DOIFtoolsNoLookUp</b> <b>1</b>, es werden keine Lookup-Fenster in DOIFtools geöffnet. <b>Default 0</b>.<br>
         <br>
+<a name="DOIFtoolsNoLookUpInDOIF"></a>
         <code>attr &lt;name&gt; DOIFtoolsNoLookUpInDOIF &lt;0|1&gt;</code><br>
         <b>DOIFtoolsNoLookUpInDOIF</b> <b>1</b>, es werden keine Lookup-Fenster in DOIF geöffnet. <b>Default 0</b>.<br>
         <br>
+<a name="DOIFtoolsHideModulShortcuts"></a>
         <code>attr &lt;name&gt; DOIFtoolsHideModulShortcuts &lt;0|1&gt;</code><br>
         <b>DOIFtoolsHideModulShortcuts</b> <b>1</b>, verstecken der DOIFtools Shortcuts. <b>Default 0</b>.<br>
         <br>
+<a name="DOIFtoolsHideStatReadings"></a>
         <code>attr &lt;name&gt; DOIFtoolsHideStatReadings &lt;0|1&gt;</code><br>
         <b>DOIFtoolsHideStatReadings</b> <b>1</b>, verstecken der <i>stat_</i> Readings. Das Ändern des Attributs löscht eine bestehende Event-Aufzeichnung. <b>Default 0</b>.<br>
         <br>
+<a name="DOIFtoolsEventOnDeleted"></a>
         <code>attr &lt;name&gt; DOIFtoolsEventOnDeleted &lt;0|1&gt;</code><br>
         <b>DOIFtoolsEventOnDeleted</b> <b>1</b>, es werden Events für alle <i>stat_</i> erzeugt, bevor sie gelöscht werden. Damit könnten die erfassten Daten geloggt werden. <b>Default 0</b>.<br>
         <br>
+<a name="DOIFtoolsMyShortcuts"></a>
         <code>attr &lt;name&gt; DOIFtoolsMyShortcuts &lt;shortcut name&gt,&lt;command&gt;, ...</code><br>
         <b>DOIFtoolsMyShortcuts</b> &lt;Bezeichnung&gt;<b>,</b>&lt;Befehl&gt;<b>,...</b> anzeigen eigener Shortcuts, siehe globales Attribut <a href="#menuEntries">menuEntries</a>.<br>
         Zusätzlich gilt, wenn ein Eintrag mit ## beginnt und mit ,, endet, wird er als HTML interpretiert.<br>
@@ -1969,9 +2014,11 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <code>attr DOIFtools DOIFtoolsMyShortcuts ##&lt;br&gt;My Shortcuts:,,list DOIFtools,fhem?cmd=list DOIFtools</code><br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsMenuEntry &lt;0|1&gt;</code><br>
+<a name="DOIFtoolsMenuEntry"></a>
         <b>DOIFtoolsMenuEntry</b> <b>1</b>, erzeugt einen Menüeintrag im FHEM-Menü. <b>Default 0</b>.<br>
         <br>
         <code>attr &lt;name&gt; DOIFtoolsLogDir &lt;path to DOIFtools logfile&gt;</code><br>
+<a name="DOIFtoolsLogDir"></a>
         <b>DOIFtoolsLogDir</b> <b>&lt;path&gt;</b>, gibt den Pfad zum Logfile an <b>Default <i>./log</i> oder der Pfad aus dem Attribut <i>global logdir</i></b>.<br>
         <br>
         <a href="#disabledForIntervals"><b>disabledForIntervals</b></a> pausiert die Statistikdatenerfassung.<br>
