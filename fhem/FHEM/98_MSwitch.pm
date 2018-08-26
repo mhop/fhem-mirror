@@ -5772,7 +5772,7 @@ sub MSwitch_VUpdate($) {
 	# my $newtriggercond = join( '|', @devs );
 	# readingsSingleUpdate( $hash, ".Device_Affected_Details", $newtriggercond, 0 );
 	
-	Log3( $Name, 0,"vupdate - $Name". __LINE__ );
+	Log3( $Name, 5,"vupdate - $Name". __LINE__ );
 	#$attr{$Name}{disable}                = '0';
 	
 	readingsSingleUpdate( $hash, ".V_Check", $vupdate, 0 );
