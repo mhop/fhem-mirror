@@ -1588,7 +1588,6 @@ sub MSwitch_Attr(@) {
     {
 		delete( $hash->{helper}{savemodeblock} );
 		delete( $hash->{READINGS}{Safemode} );
-		MSwitch_LoadHelper($hash);
 		MSwitch_Createtimer($hash);
 	}
 	
@@ -1597,18 +1596,12 @@ sub MSwitch_Attr(@) {
     {
         $hash->{NOTIFYDEV} =
         ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
-		
-		MSwitch_Delete_Delay($hash,'all');
-		MSwitch_Clear_timer($hash);
     }
 	
     if ($cmd eq 'del'&& $aName eq 'disable'&& ReadingsVal($name, 'Trigger_device', 'no_trigger') ne 'no_trigger' )
     {
         $hash->{NOTIFYDEV} =
         ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
-		
-		MSwitch_Delete_Delay($hash,'all');
-		MSwitch_Clear_timer($hash);
     }
 
     if ($aName eq 'MSwitch_Activate_MSwitchcmds' && $aVal == 1 ) 
@@ -5772,7 +5765,7 @@ sub MSwitch_VUpdate($) {
 	# my $newtriggercond = join( '|', @devs );
 	# readingsSingleUpdate( $hash, ".Device_Affected_Details", $newtriggercond, 0 );
 	
-	Log3( $Name, 5,"vupdate - $Name". __LINE__ );
+	Log3( $Name, 0,"vupdate - $Name". __LINE__ );
 	#$attr{$Name}{disable}                = '0';
 	
 	readingsSingleUpdate( $hash, ".V_Check", $vupdate, 0 );
@@ -6340,7 +6333,9 @@ $todec =~ s/#\[wa\]/|/g;
 return $todec;				
 }
 			
+		
 1;
+
 
 =pod
 =item helper
@@ -6501,5 +6496,4 @@ MSwitch is an auxiliary module that works both event- and time-controlled. <br /
 =end html_DE
 
 =cut
-
 
