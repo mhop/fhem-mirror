@@ -1,4 +1,4 @@
-REV 17207
+REV 17214
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,10 +21,10 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-08-26_07:45:02 256274 ./CHANGED
-UPD 2018-08-21_07:45:03 37630 ./MAINTAINER.txt
+UPD 2018-08-27_07:45:04 256478 ./CHANGED
+UPD 2018-08-27_07:45:04 37696 ./MAINTAINER.txt
 UPD 2018-07-08_07:45:03 41916 ./configDB.pm
-UPD 2018-07-16_07:45:03 17421 ./fhem.cfg.demo
+UPD 2018-08-27_07:45:04 20439 ./fhem.cfg.demo
 UPD 2018-08-26_07:45:09 149950 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2018-06-26_07:45:03 57519 FHEM/00_CUL.pm
@@ -438,7 +438,7 @@ UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
 UPD 2018-08-18_07:45:03 252646 FHEM/98_DOIF.pm
-UPD 2018-07-16_07:45:03 109874 FHEM/98_DOIFtools.pm
+UPD 2018-08-27_07:45:04 111834 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2016-10-29_07:45:14 28678 FHEM/98_EDIPLUG.pm
 UPD 2017-04-03_07:45:02 25462 FHEM/98_FReplacer.pm
@@ -454,6 +454,7 @@ UPD 2016-04-26_07:45:11 33223 FHEM/98_HourCounter.pm
 UPD 2017-12-02_07:45:02 66644 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2018-03-01_07:45:03 4837 FHEM/98_JsonList2.pm
+UPD 2018-08-27_07:45:04 222650 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2017-09-05_07:45:02 34104 FHEM/98_MediaList.pm
 UPD 2018-01-14_07:45:02 121875 FHEM/98_Modbus.pm
@@ -464,7 +465,7 @@ UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
 UPD 2018-06-07_07:45:10 22527 FHEM/98_RandomTimer.pm
 UPD 2016-10-05_07:45:11 20567 FHEM/98_STOCKQUOTES.pm
-UPD 2018-07-28_07:45:02 95720 FHEM/98_SVG.pm
+UPD 2018-08-27_07:45:04 95741 FHEM/98_SVG.pm
 UPD 2018-03-24_07:45:03 97508 FHEM/98_Siro.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
@@ -660,11 +661,11 @@ UPD 2015-07-28_14:05:31 162 FHEM/template.layout
 UPD 2018-03-18_07:45:07 6218 contrib/commandref_join.pl
 UPD 2018-01-26_07:45:05 4302 contrib/commandref_modular.pl
 UPD 2018-07-16_07:45:03 1242 demolog/LightScenes.dd.save
-UPD 2015-07-28_14:05:35 390 demolog/LightScenes.save
+UPD 2018-08-27_07:45:04 390 demolog/LightScenes.save
 UPD 2015-07-28_14:05:35 28600 demolog/cellar.log
 UPD 2015-07-28_14:05:35 71762 demolog/dewpoint.log
 UPD 2015-07-28_14:05:35 2944 demolog/eventTypes.txt
-UPD 2018-07-16_07:45:03 19187 demolog/fhem.save
+UPD 2018-08-27_07:45:04 19305 demolog/fhem.save
 UPD 2015-07-28_14:05:35 71800 demolog/garden.log
 UPD 2015-07-28_14:05:35 2225 demolog/layout
 UPD 2015-07-28_14:05:35 219 demolog/pictures-copyright.txt
@@ -674,12 +675,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-08-26_07:45:05 3514560 docs/commandref.html
-UPD 2018-08-26_07:45:07 2158073 docs/commandref_DE.html
+UPD 2018-08-27_07:45:07 3518462 docs/commandref.html
+UPD 2018-08-27_07:45:09 2163478 docs/commandref_DE.html
 UPD 2018-07-16_07:45:03 76259 docs/commandref_frame.html
 UPD 2018-07-16_07:45:03 85715 docs/commandref_frame_DE.html
-UPD 2018-08-26_07:45:08 194230 docs/commandref_modular.html
-UPD 2018-08-26_07:45:09 204865 docs/commandref_modular_DE.html
+UPD 2018-08-27_07:45:10 195114 docs/commandref_modular.html
+UPD 2018-08-27_07:45:11 205791 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2020,10 +2021,10 @@ UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2018-03-26_07:45:02 5908 www/pgm2/defaultCommon.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
-UPD 2018-08-26_07:45:02 28503 www/pgm2/f18.js
-UPD 2018-08-06_07:45:02 8756 www/pgm2/f18style.css
+UPD 2018-08-27_07:45:04 28510 www/pgm2/f18.js
+UPD 2018-08-27_07:45:04 8743 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
-UPD 2018-07-30_07:45:03 57376 www/pgm2/fhemweb.js
+UPD 2018-08-27_07:45:04 57848 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
 UPD 2018-02-01_07:45:02 4063 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
