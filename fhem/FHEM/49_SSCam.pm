@@ -2477,8 +2477,6 @@ sub SSCam_camenable ($) {
     RemoveInternalTimer($hash, "SSCam_camenable");
     return if(IsDisabled($name));
     
-    # if (ReadingsVal("$name", "Availability", "disabled") eq "enabled") {return;}       # Kamera ist bereits enabled
-    
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # eine Kamera aktivieren
         Log3($name, 4, "$name - Enable Camera $camname");
@@ -2507,8 +2505,6 @@ sub SSCam_camdisable ($) {
     
     RemoveInternalTimer($hash, "SSCam_camdisable");
     return if(IsDisabled($name));
-    
-    # if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {return;}       # Kamera ist bereits disabled
     
     if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Start") ne "Start") {
         # eine Kamera deaktivieren
