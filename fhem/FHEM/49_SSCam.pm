@@ -27,6 +27,7 @@
 #########################################################################################################################
 #  Versions History:
 # 
+# 7.0.1  27.08.2018    enable/disable issue (https://forum.fhem.de/index.php/topic,45671.msg830869.html#msg830869)
 # 7.0.0  27.07.2018    compatibility to API v2.8
 # 6.0.1  04.07.2018    Reading CamFirmware
 # 6.0.0  03.07.2018    HTTPS Support, buttons for refresh SSCamSTRM-devices
@@ -3747,7 +3748,7 @@ sub SSCam_camop ($) {
    Log3($name, 4, "$name - --- Begin Function $OpMode nonblocking ---");
 
    $httptimeout = AttrVal($name, "httptimeout", 4);
-   $httptimeout = $httptimeout+90 if($OpMode eq "setoptpar");   # setzen der Optimierungsparameter dauert lange !
+   $httptimeout = $httptimeout+90 if($OpMode =~ /setoptpar|Disable/);   # setzen der Optimierungsparameter/Disable dauert lange !
    
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
    
@@ -4698,11 +4699,6 @@ sub SSCam_camop_parse ($) {
                    
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been enabled successfully");
-				
-				# Token freigeben vor nächstem Kommando
-                $hash->{HELPER}{ACTIVE} = "off";
-                # neuen Status abrufen	
-                SSCam_getcaminfo($hash);
             
 			} elsif ($OpMode eq "Disable") {
                 # Kamera wurde deaktiviert
@@ -4716,11 +4712,6 @@ sub SSCam_camop_parse ($) {
                    
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been disabled successfully");
-				
-				# Token freigeben vor nächstem Kommando
-                $hash->{HELPER}{ACTIVE} = "off";
-                # neuen Status abrufen	
-                SSCam_getcaminfo($hash);
             
 			} elsif ($OpMode eq "getsvsinfo") {
                 # Parse SVS-Infos
@@ -4881,7 +4872,7 @@ sub SSCam_camop_parse ($) {
                     $deviceType = "Fisheye"; 
                 }
                 
-                $camStatus = $data->{'data'}->{'cameras'}->[0]->{'camStatus'};
+                $camStatus = SSCam_jboolmap($data->{'data'}->{'cameras'}->[0]->{'camStatus'});
                 if ($camStatus eq "1") {
                     $camStatus = "enabled";
                     
