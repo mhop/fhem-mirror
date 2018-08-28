@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 0.7
+#  89_FULLY.pm 0.8
 #
 #  $Id$
 #
@@ -24,6 +24,7 @@ sub FULLY_Shutdown ($);
 sub FULLY_Set ($@);
 sub FULLY_Get ($@);
 sub FULLY_Attr ($@);
+sub FULLY_Detail ($@);
 sub FULLY_UpdateDeviceInfo ($);
 sub FULLY_Execute ($$$$);
 sub FULLY_ScreenOff ($);
@@ -34,9 +35,23 @@ sub FULLY_Abort ($);
 sub FULLY_UpdateReadings ($$);
 sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "0.7";
+my $FULLY_VERSION = "0.8";
 my $FULLY_TIMEOUT = 4;
 my $FULLY_POLL_INTERVAL = 3600;
+
+my $FULLY_FHEM_COMMAND = qq(
+function SendRequest(FHEM_Address, Devicename, Command) {
+	var Port = "8085"
+
+	var url =  "http://" + FHEM_Address + ":" + Port + "/fhem?XHR=1&cmd." + Devicename + "=" + Command;
+	
+	var req = new XMLHttpRequest();
+	req.open("GET", url);
+	req.send(null);	
+	
+	req = null;
+}
+);
 
 ##################################################
 # Initialize module
@@ -52,6 +67,7 @@ sub FULLY_Initialize ($)
 	$hash->{GetFn} = "FULLY_Get";
 	$hash->{AttrFn} = "FULLY_Attr";
 	$hash->{ShutdownFn} = "FULLY_Shutdown";
+	$hash->{FW_detailFn} = "FULLY_Detail";
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = "pingBeforeCmd:0,1,2 pollInterval requestTimeout repeatCommand:0,1,2 " .
@@ -77,10 +93,11 @@ sub FULLY_Define ($$)
 	$hash->{host} = $$a[2];
 	$hash->{version} = $FULLY_VERSION;
 	$hash->{onForTimer} = 'off';
+#	$hash->{remoteAdmin} = '<html><a href="http://'.$hash->{host}.':2323">Remote Admin</a></html>';
 	$hash->{fully}{password} = $$a[3];
 	$hash->{fully}{schedule} = 0;
 
-	Log3 $name, 1, "FULLY: Opening device ".$hash->{host};
+	Log3 $name, 1, "FULLY: Version $FULLY_VERSION Opening device ".$hash->{host};
 	
 	my $result = FULLY_GetDeviceInfo ($name);
 	if (!FULLY_UpdateReadings ($hash, $result)) {
@@ -168,6 +185,29 @@ sub FULLY_Shutdown ($)
 
 	return undef;
 }
+
+#####################################
+# Enhance device detail view
+#####################################
+
+sub FULLY_Detail ($@)
+{
+	my ($FW_wname, $name, $room, $pageHash) = @_;
+	my $hash = $defs{$name};
+	
+	my $html = qq(
+	<span class='mkTitle'>Device Administration</span>
+	<table class="block wide">
+	<tr class="odd">
+	<td><div class="col1">
+	<a target="_blank" href="http://$hash->{host}:2323">Remote Admin</a>
+	</div></td>
+	</tr>
+	</table>
+	);
+	
+	return $html;
+}
 	
 #####################################
 # Set commands
@@ -180,7 +220,7 @@ sub FULLY_Set ($@)
 	my $opt = shift @$a;
 	my $options = "brightness clearCache:noArg exit:noArg lock:noArg motionDetection:on,off ".
 		"off:noArg on:noArg on-for-timer restart:noArg screenOffTimer screenSaver:start,stop ".
-		"screenSaverTimer screenSaverURL speak unlock:noArg url";
+		"screenSaverTimer screenSaverURL speak startURL unlock:noArg url";
 	my $response;
 	
 	# Fully commands without argument
@@ -257,6 +297,12 @@ sub FULLY_Set ($@)
 		return "Usage: set $name $opt {URL}" if (!defined ($value));
 		$response = FULLY_Execute ($hash, "setStringSetting",
 			{ "key" => "screensaverURL", "value" => "$value" }, 1);		
+	}
+	elsif ($opt eq 'startURL') {
+		my $value = shift @$a;
+		return "Usage: set $name $opt {URL}" if (!defined ($value));
+		$response = FULLY_Execute ($hash, "setStringSetting",
+			{ "key" => "startURL", "value" => "$value" }, 1);		
 	}
 	elsif ($opt eq 'brightness') {
 		my $value = shift @$a;
@@ -449,6 +495,7 @@ sub FULLY_ProcessDeviceInfo ($$)
 	while ($result =~ /table-cell\">([^<]+)<\/td><td class="table-cell">([^<]+)</g) {
 		my $rn = lc($1);
 		my $rv = $2;
+		$rv =~ s/\s+$//;
 		$rn =~ s/\:/\./g;
 		$rn =~ s/[^A-Za-z\d_\.-]+/_/g;
 		$rn =~ s/[_]+$//;
@@ -667,6 +714,9 @@ sub FULLY_Ping ($$)
 		<li><b>set &lt;name&gt; speak &lt;text&gt;</b><br/>
 			Audio output of <i>text</i>. If <i>text</i> contains blanks it must be enclosed
 			in double quotes. The text can contain device readings in format [device:reading].
+		</li><br/>
+		<li><b>set &lt;name&gt; startURL &lt;URL&gt;</b><br/>
+			Show this URL when FULLY starts.<br/>
 		</li><br/>
 		<li><b>set &lt;name&gt; url [&lt;URL&gt;]</b><br/>
 			Navigate to <i>URL</i>. If no URL is specified navigate to start URL.

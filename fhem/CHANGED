@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  89_FULLY: Set start URL and bug fixes
   - bugfix:  49_SSCam: V7.0.1, enable/disable issue 
              (forum.fhem.de/index.php/topic,45671.msg830869.html#msg830869)
   - change:  98_DOIFtools: add help labels in commandref for attr, set and get
