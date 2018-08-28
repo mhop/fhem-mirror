@@ -410,7 +410,7 @@ sub monitoring_modify($) {
   return unless(defined($hash));
   return if(IsDisabled($SELF));
 
-  my $at = eval($wait + gettimeofday()) if($wait);
+  my $at = eval($wait + gettimeofday()) if($wait && $wait ne "quiet");
   my $TYPE = $hash->{TYPE};
   my (@change, %readings);
   %readings = map{$_, 1} split(",", ReadingsVal($SELF, $list, ""));
@@ -441,7 +441,8 @@ sub monitoring_modify($) {
       return;
     }
     else{
-      monitoring_modify("$SELF|warning|remove|$value") if($list eq "error");
+      monitoring_modify("$SELF|warning|remove|$value|quiet")
+        if($list eq "error");
       $readings{$value} = 1;
       delete $hash->{READINGS}{$reading};
     }
@@ -464,7 +465,8 @@ sub monitoring_modify($) {
   readingsBulkUpdate($hash, "state", "$list $operation: $value");
   readingsBulkUpdate($hash, $list, join(",", sort(keys %readings)));
   readingsBulkUpdate($hash, $list."Count", int(keys %readings));
-  readingsBulkUpdate($hash, "allCount", $allCount);
+  readingsBulkUpdate($hash, "allCount", $allCount)
+    unless($wait &&$wait eq "quiet");
   readingsEndUpdate($hash, 1);
 
   return;
