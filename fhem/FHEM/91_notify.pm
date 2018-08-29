@@ -15,8 +15,20 @@ notify_Initialize($)
   $hash->{DefFn} = "notify_Define";
   $hash->{NotifyFn} = "notify_Exec";
   $hash->{AttrFn}   = "notify_Attr";
-  $hash->{AttrList} ="disable:1,0 disabledForIntervals forwardReturnValue:1,0 ".
-                     "readLog:1,0 showtime:1,0 addStateEvent:1,0 ignoreRegexp";
+  no warnings 'qw';
+  my @attrList = qw(
+    addStateEvent:1,0
+    disable:1,0
+    disabledForIntervals
+    disabledAfterTrigger
+    forwardReturnValue:1,0
+    ignoreRegexp
+    readLog:1,0
+    showtime:1,0
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
+
   $hash->{SetFn}    = "notify_Set";
   $hash->{StateFn}  = "notify_State";
   $hash->{FW_detailFn} = "notify_fhemwebFn";
@@ -70,6 +82,10 @@ notify_Exec($$)
   my $ln = $ntfy->{NAME};
   return "" if(IsDisabled($ln));
 
+  my $now = gettimeofday();
+  my $dat = AttrVal($ln, "disabledAfterTrigger", 0);
+  return "" if($ntfy->{TRIGGERTIME} && $now < $ntfy->{TRIGGERTIME}+$dat);
+
   my $n = $dev->{NAME};
   my $re = $ntfy->{REGEXP};
   my $iRe = AttrVal($ln, "ignoreRegexp", undef);
@@ -104,6 +120,7 @@ notify_Exec($$)
       my $r = AnalyzeCommandChain(undef, $exec);
       Log3 $ln, 3, "$ln return value: $r" if($r);
       $ret .= " $r" if($r);
+      $ntfy->{TRIGGERTIME} = $now;
       $ntfy->{STATE} =
         AttrVal($ln,'showtime',1) ? $dev->{NTFY_TRIGGERTIME} : 'active';
     }
@@ -503,6 +520,11 @@ END
   <ul>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+
+    <a name="disabledAfterTrigger"></a>
+    <li>disabledAfterTrigger someSeconds<br>
+      disable the execution for someSeconds after it triggered.
+    </li>
 
     <a name="addStateEvent"></a>
     <li>addStateEvent<br>
