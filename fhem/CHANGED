@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - feature: 51_MOBILEALERTSGW: Added TFA30.3060.01.IT
+  - feature: 51_MOBILEALERTS: Added MA10120PRO
+  - feature: 51_MOBILEALERTS: Added TFA30.3060.01.IT
   - change:  89_FULLY: Set start URL and bug fixes
   - bugfix:  49_SSCam: V7.0.1, enable/disable issue 
              (forum.fhem.de/index.php/topic,45671.msg830869.html#msg830869)

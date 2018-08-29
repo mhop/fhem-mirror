@@ -823,6 +823,43 @@ sub MOBILEALERTS_Parse_d6 ($$) {
           . $temperatureOut );
 }
 
+sub MOBILEALERTS_Parse_01_d2 ($$) {
+    my ( $hash, $message ) = @_;
+    my ( $txCounter, $temperatureIn, $temperatureOut, $prevTemperatureIn,
+        $prevTemperatureOut )
+      = unpack( "nnnnn", $message );
+    MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
+        "MA10120PRO" );
+
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "txCounter",
+        MOBILEALERTS_decodeTxCounter($txCounter) );
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "triggered",
+        MOBILEALERTS_triggeredTxCounter($txCounter) );
+    $temperatureIn =
+      MOBILEALERTS_decodeTemperature($temperatureIn) +
+      $hash->{".corrTemperature"};
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "temperatureIn",
+        $temperatureIn );
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "temperatureStringIn",
+        MOBILEALERTS_temperatureToString($temperatureIn) );
+    $temperatureOut = MOBILEALERTS_decodeTemperature($temperatureOut) +
+      $hash->{".corrTemperatureOut"};
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "temperatureOut",
+        $temperatureOut );
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "temperatureStringOut",
+        MOBILEALERTS_temperatureToString($temperatureOut) );
+    $prevTemperatureIn = MOBILEALERTS_decodeTemperature($prevTemperatureIn) +
+      $hash->{".corrTemperature"};
+    MOBILEALERTS_readingsBulkUpdate( $hash, 1, "prevTemperatureIn",
+        $prevTemperatureIn );
+    $prevTemperatureOut = MOBILEALERTS_decodeTemperature($prevTemperatureOut) +
+      $hash->{".corrTemperatureOut"};
+    MOBILEALERTS_readingsBulkUpdate( $hash, 1, "prevTemperatureOut",
+        $prevTemperatureOut );
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "state",
+        "In T: " . $temperatureIn . " Out T: " . $temperatureOut );
+}
+
 sub MOBILEALERTS_Parse_11_ea ($$) {
     my ( $hash, $message ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
@@ -1276,7 +1313,7 @@ sub MOBILEALERTS_ActionDetector($) {
   The MOBILEALERTS is a fhem module for the german MobileAlerts devices and TFA WEATHERHUB devices.
   <br><br>
   The fhem module represents a MobileAlerts device. The connection is provided by the <a href="#MOBILEALERTSGW">MOBILELAERTSGW</a> module.
-  Currently supported: MA10100, MA10101, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT<br>
+  Currently supported: MA10100, MA10101, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT, MA10120PRO<br>
   Supported but untested: ./.<br>
   <br>
 
@@ -1295,13 +1332,13 @@ sub MOBILEALERTS_ActionDetector($) {
     <br>
     corrHumOut optional: correction humidity out / sensor 1
     <br>
-    corrTemp3 optional: correction temperature sensor 2
+    corrTemp2 optional: correction temperature sensor 2
     <br>
-    corrHum3 optional: correction humidity sensor 2
+    corrHum2 optional: correction humidity sensor 2
    <br>
-    corrTemp4 optional: correction temperature sensor 3
+    corrTemp3 optional: correction temperature sensor 3
     <br>
-    corrHum4 optional: correction humidity sensor 3
+    corrHum3 optional: correction humidity sensor 3
   </ul>
   <br>
 
@@ -1371,7 +1408,7 @@ sub MOBILEALERTS_ActionDetector($) {
   <br><br>
   Dieses FHEM Modul stellt jeweils ein MobileAlerts Ger&auml;t dar. Die Verbindung wird durch das 
   <a href="#MOBILEALERTSGW">MOBILELAERTSGW</a> Modul bereitgestellt.<br>
-  Aktuell werden unterst&uuml;zt: MA10100, MA10101, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT<br>
+  Aktuell werden unterst&uuml;zt: MA10100, MA10101, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT, MA10120PRO<br>
   Unterst&uuml;zt aber ungetestet: ./.<br>
   <br>
 
