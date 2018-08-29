@@ -42,7 +42,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.3.3";
+my $VERSION = "2.3.4";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -4201,7 +4201,7 @@ SYSMON_Exec_Ssh($$)
    
    SYSMON_Log($hash, 5, "Execute '".$cmd."' by SSH");
    my $p_tmp = '';
-   if(!defined($port)) {
+   if(defined($port)) {
      $p_tmp = ' -p '.$port.' ';
    }
    
