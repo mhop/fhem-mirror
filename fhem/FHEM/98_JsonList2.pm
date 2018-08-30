@@ -25,7 +25,9 @@ JsonList2_Escape($)
 {
   my $a = shift;
   return "null" if(!defined($a));
-  $a=~ s/([\x00-\x19\x22\x5c])/sprintf '\u%04x', ord($1)/ge; # Forum 57377
+  $a =~ s/([\x00-\x09\x0b-\x19\x5c])/sprintf '\u%04x', ord($1)/ge; # Forum 57377
+  $a =~ s/"/\\\\"/g; 
+  $a =~ s/\n/\\\\n/g; 
   my $b = "x$a";
   $a = "<BINARY>" if(!utf8::decode($b)); # Forum #55318
   return $a;
