@@ -3958,6 +3958,24 @@ addToDevAttrList($$)
   $attr{$dev}{userattr} = join(" ", sort keys %hash);
 }
 
+# The counterpart: delete it.
+sub
+delFromDevAttrList($$)
+{
+  my ($dev,$arg) = @_;
+
+  my $ua = $attr{$dev}{userattr};
+  $ua = "" if(!$ua);
+  my %hash = map { ($_ => 1) }
+             grep { " $arg " !~ m/ $_ / }
+             split(" ", "$ua $arg");
+  $attr{$dev}{userattr} = join(" ", sort keys %hash);
+  delete $attr{$dev}{userattr}
+        if(!keys %hash && defined($attr{$dev}{userattr}));
+  map { delete $attr{$dev}{$_} } split(" ", $arg);
+}
+
+
 sub
 addToAttrList($)
 {
