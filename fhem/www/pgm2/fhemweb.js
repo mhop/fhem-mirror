@@ -222,8 +222,8 @@ FW_jqueryReadyFn()
         $("#devSpecHelp").remove();
         return;
       }
-      $("#content").append('<div id="devSpecHelp"></div>');
       FW_getHelp(dev, function(data){
+        $("#content").append('<div id="devSpecHelp"></div>');
         $("#devSpecHelp").html(data);
         var off = $("#devSpecHelp").position().top-20;
         $('body, html').animate({scrollTop:off}, 500);
@@ -284,18 +284,23 @@ FW_jqueryReadyFn()
     var m = $(this).attr("id").match(/sel_(set|get|attr)(.*)/);
     if(!m)
       return;
-    if($("#devSpecHelp").length == 0)
-      $("#content").append('<div id="devSpecHelp"></div>');
+    $("#devSpecHelp").remove();
+    var sel = this;
     FW_getHelp(m[2], function(data) {
-      var str = '<a name="'+val+'"></a>'; // my regexp crashes Chrome :(
-      var o1 = data.indexOf(str);
-      if(o1 < 0)
-        return;
-      data = data.substr(o1+str.length);
-      o1 = data.indexOf('<a name="');
-      if(o1 > 0)
-        data = data.substr(0,o1);
-      $("#devSpecHelp").html(data);
+      var mm = data.match(new RegExp('<li>(.*")?'+val+'[^A-Za-z_0-9]'));
+      if(mm == null) {
+        data = "";
+      } else {
+        data = data.substr(mm.index);
+        var o1 = data.indexOf('</li>');
+        if(o1 > 0)
+          data = data.substr(0,o1+5);
+      }
+      if(data) {
+        $(sel).closest("div[cmd='"+m[1]+"']")
+           .after('<div class="makeTable" id="devSpecHelp"></div>')
+        $("#devSpecHelp").html(data);
+      }
     });
   });
 
@@ -326,8 +331,6 @@ FW_getHelp(dev, fn)
     return fn(FW_helpData);
   FW_cmd(FW_root+"?cmd=help "+dev+"&XHR=1", function(data) {
     FW_helpData = data;
-    if(!$("#devSpecHelp").length) // FHEM slow, user clicked again, #68166
-      return;
     return fn(FW_helpData);
   });
 }
