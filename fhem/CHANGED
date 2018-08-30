@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 72_XiaomiDevice: resume zoned cleanup
   - feature: 51_MOBILEALERTS: Added MA10120PRO
   - feature: 51_MOBILEALERTS: Added TFA30.3060.01.IT
   - change:  89_FULLY: Set start URL and bug fixes

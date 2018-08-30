@@ -579,9 +579,9 @@ sub XiaomiDevice_Set($$@) {
 
     if(!defined($hash->{model}) || $hash->{model} ne "roborock.vacuum.c1") {
     if(defined($hash->{helper}{zone_names})) {
-      $list  .=  ' zone:'.$hash->{helper}{zone_names};
+        $list  .=  ' zone:'.$hash->{helper}{zone_names}.' resume:noArg';
     } else {
-      $list  .=  ' zone';
+        $list  .=  ' zone resume:noArg';
     }
     if(defined($hash->{helper}{point_names})) {
       $list  .=  ' goto:'.$hash->{helper}{point_names};
@@ -766,6 +766,13 @@ sub XiaomiDevice_Set($$@) {
     my $zone = "[".join("],[", @arg)."]";
     $zone = $hash->{helper}{zones}{$arg[0]} if(defined($hash->{helper}{zones}) && defined($hash->{helper}{zones}{$arg[0]}));
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_zoned_clean","params":['.$zone.']}' );
+  }
+  elsif ($cmd eq 'resume')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "app_zoned_clean";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"resume_zoned_clean","params":[""]}' );
   }
   elsif ($cmd eq 'goto')
   {
@@ -1553,7 +1560,7 @@ sub XiaomiDevice_GetUpdate($)
   if(defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "VacuumCleaner")
   {
     my $currentstate = ReadingsVal($name,"state","-");
-    if($currentstate eq "Cleaning" || $currentstate eq "Spot cleaning")
+    if($currentstate eq "Cleaning" || $currentstate eq "Spot cleaning" || $currentstate eq "Zoned Clean" || $currentstate eq "Goto")
     {
       $timerinterval = 90 if($timerinterval > 90);
     }
@@ -2902,8 +2909,8 @@ sub XiaomiDevice_Attr($$$) {
   return undef if(!defined($defs{$name}));
   my $orig = $attrVal;
   $attrVal = int($attrVal) if($attrName eq "intervalData" || $attrName eq "intervalSettings");
-  $attrVal = 60 if($attrName eq "intervalData" && $attrVal < 60 );
-  $attrVal = 300 if($attrName eq "intervalSettings" && $attrVal < 300 );
+  $attrVal = 10 if($attrName eq "intervalData" && $attrVal < 10 );
+  $attrVal = 60 if($attrName eq "intervalSettings" && $attrVal < 60 );
 
   if( $attrName eq "disable" ) {
     my $hash = $defs{$name};
@@ -3031,6 +3038,10 @@ sub XiaomiDevice_DbLog_splitFn($) {
    <li><code>pause</code> <i>(VacuumCleaner)</i>
    <br>
    Pause cleaning
+   </li><br>
+   <li><code>resume</code> <i>(VacuumCleaner)</i>
+   <br>
+   Resume zoned cleaning when paused
    </li><br>
    <li><code>stop</code> <i>(VacuumCleaner)</i>
    <br>
@@ -3221,11 +3232,11 @@ sub XiaomiDevice_DbLog_splitFn($) {
    </li><br>
    <li><code>intervalData</code>
       <br>
-      Interval for data update (min 60 sec)
+      Interval for data update (min 10 sec)
    </li><br>
    <li><code>intervalSettings</code>
       <br>
-      Interval for settings update (min 300 sec)
+      Interval for settings update (min 60 sec)
    </li><br>
    <li><code>preset</code>  <i>(AirPurifier)</i>
       <br>
