@@ -601,6 +601,8 @@ sub MSwitch_Get($$@) {
 #################################################
     if ( $opt eq 'active_timer' && $args[0] eq 'show' ) 
 	{
+	
+	    $ret .= "<div nowrap>Systemzeit: ".localtime()."</div><hr>";
         $ret .= "<div nowrap>Schaltzeiten (at - kommandos).</div><hr>";
         #timer
         my $timehash = $hash->{helper}{timer};
@@ -1183,8 +1185,18 @@ sub MSwitch_Set($@) {
                     $cs = "$devicedetails{$device.'_onarg'}";
 						
 				# setmagic
-				$cs =~ s/\n//g;
+				
+				#Log3( $name, 0,"$name MSwitch_Set: ".$cs." L:". __LINE__ );
+				
 				$cs =~ s/#\[ti\]/~/g;	
+				
+				# entferne kommntarzeilen
+				$cs =~ s/#.*\n//g;
+				
+				
+				$cs =~ s/\n//g;
+				
+				
 				my $x =0;
 				while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
 					{
@@ -1341,8 +1353,14 @@ sub MSwitch_Set($@) {
 				{
                     $cs = "$devicedetails{$device.'_offarg'}";
 					# setmagic	
-					$cs =~ s/\n//g;
-					$cs =~ s/#\[ti\]/~/g;
+					$cs =~ s/#\[ti\]/~/g;	
+				
+				# entferne kommntarzeilen
+				$cs =~ s/#.*\n//g;
+				
+				
+				$cs =~ s/\n//g;
+				
 					my $x =0;
 					while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
 						{
@@ -1494,6 +1512,15 @@ sub MSwitch_Cmd(@) {
         ############################
         if ( $cmds =~ m/{.*}/ ) 
 		{
+		
+		#Log3( $Name, 0,"$Name MSwitch_Cmd: ".$cmds." " . __LINE__ );
+		
+		
+		
+		
+		
+		
+		
             eval($cmds);
             if ($@) 
 			{
@@ -4360,8 +4387,15 @@ sub MSwitch_Exec_Notif($$$$) {
 				
 				
 				# setmagic	
-				$cs =~ s/\n//g;
+				
 				$cs =~ s/#\[ti\]/~/g;
+				# entferne kommentarte
+				
+				$cs =~ s/#.*\n//g;
+				
+				$cs =~ s/\n//g;
+				
+				
 				my $x =0;
 				while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
 					{
@@ -6336,7 +6370,6 @@ return $todec;
 		
 1;
 
-
 =pod
 =item helper
 =item summary       MultiswitchModul
@@ -6496,4 +6529,5 @@ MSwitch is an auxiliary module that works both event- and time-controlled. <br /
 =end html_DE
 
 =cut
+
 
