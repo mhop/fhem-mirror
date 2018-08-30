@@ -1582,7 +1582,7 @@ sub XiaomiDevice_GetUpdate($)
   if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "VacuumCleaner")
   {
     $hash->{helper}{packet}{$packetid} = "get_status";
-    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_status","params":[""]}' );
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["get_status"]}' );
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "AirPurifier")
   {
@@ -2246,6 +2246,10 @@ sub XiaomiDevice_ParseJSON($$)
     return undef if(!defined($json->{result}));
     return undef if(ref($json->{result}) ne "ARRAY");
     return undef if(ref($json->{result}[0]) ne "HASH");
+
+    if (defined($json->{result}[0]{events})) {
+      readingsSingleUpdate( $hash, "event", $json->{result}[0]{events}[0], 1 ) if(defined($json->{result}[0]{events}[0]));
+    }
 
     my $laststate = ReadingsVal($name, "state","-");
     if(($laststate ne "Docked" && $laststate ne "Charging") && defined($json->{result}[0]{state}) && $json->{result}[0]{state} eq "8")
@@ -3157,6 +3161,10 @@ sub XiaomiDevice_DbLog_splitFn($) {
     <li><code>error_code</code> <i>(VacuumCleaner)</i>
     <br>
     Error code<br/>
+    </li><br>
+    <li><code>event</code> <i>(VacuumCleaner)</i>
+    <br>
+    Last event (e.g., bin_full)<br/>
     </li><br>
     <li><code>consumables_X</code> <i>(VacuumCleaner)</i>
     <br>
