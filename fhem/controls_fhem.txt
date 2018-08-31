@@ -1,4 +1,4 @@
-REV 17227
+REV 17238
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,11 +21,11 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-08-30_07:45:03 256758 ./CHANGED
+UPD 2018-08-31_07:45:03 256824 ./CHANGED
 UPD 2018-08-27_07:45:04 37696 ./MAINTAINER.txt
 UPD 2018-07-08_07:45:03 41916 ./configDB.pm
 UPD 2018-08-27_07:45:04 20439 ./fhem.cfg.demo
-UPD 2018-08-26_07:45:09 149950 ./fhem.pl
+UPD 2018-08-31_07:45:09 150442 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2018-06-26_07:45:03 57519 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -344,7 +344,7 @@ UPD 2018-01-29_07:45:02 123938 FHEM/71_YAMAHA_NP.pm
 UPD 2018-03-19_07:45:04 80986 FHEM/72_FB_CALLLIST.pm
 UPD 2018-05-09_07:45:02 113204 FHEM/72_FB_CALLMONITOR.pm
 UPD 2018-08-02_07:45:03 220936 FHEM/72_FRITZBOX.pm
-UPD 2018-05-22_07:45:03 145893 FHEM/72_XiaomiDevice.pm
+UPD 2018-08-31_07:45:03 146677 FHEM/72_XiaomiDevice.pm
 UPD 2018-06-03_07:45:03 47236 FHEM/73_AMADCommBridge.pm
 UPD 2018-04-14_07:45:02 89324 FHEM/73_ElectricityCalculator.pm
 UPD 2018-08-24_07:45:02 35702 FHEM/73_GardenaSmartBridge.pm
@@ -453,8 +453,8 @@ UPD 2018-01-27_07:45:02 26432 FHEM/98_Heating_Control.pm
 UPD 2016-04-26_07:45:11 33223 FHEM/98_HourCounter.pm
 UPD 2017-12-02_07:45:02 66644 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
-UPD 2018-03-01_07:45:03 4837 FHEM/98_JsonList2.pm
-UPD 2018-08-28_07:45:03 222484 FHEM/98_MSwitch.pm
+UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
+UPD 2018-08-31_07:45:03 222941 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2017-09-05_07:45:02 34104 FHEM/98_MediaList.pm
 UPD 2018-01-14_07:45:02 121875 FHEM/98_Modbus.pm
@@ -675,12 +675,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-08-30_07:45:06 3519105 docs/commandref.html
+UPD 2018-08-31_07:45:06 3519322 docs/commandref.html
 UPD 2018-08-30_07:45:08 2163912 docs/commandref_DE.html
 UPD 2018-07-16_07:45:03 76259 docs/commandref_frame.html
 UPD 2018-07-16_07:45:03 85715 docs/commandref_frame_DE.html
-UPD 2018-08-30_07:45:09 195135 docs/commandref_modular.html
-UPD 2018-08-30_07:45:09 205812 docs/commandref_modular_DE.html
+UPD 2018-08-31_07:45:08 195135 docs/commandref_modular.html
+UPD 2018-08-31_07:45:09 205812 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2024,7 +2024,7 @@ UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2018-08-27_07:45:04 28510 www/pgm2/f18.js
 UPD 2018-08-27_07:45:04 8743 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
-UPD 2018-08-27_07:45:04 57848 www/pgm2/fhemweb.js
+UPD 2018-08-31_07:45:03 57855 www/pgm2/fhemweb.js
 UPD 2017-10-04_07:45:02 13775 www/pgm2/fhemweb_colorpicker.js
 UPD 2018-02-01_07:45:02 4063 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
