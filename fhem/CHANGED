@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     10_MQTT_GENERIC_BRIDGE an MQTT bridge, which simultaneously 
+             collects data from several FHEM devices and passes 
+             their readings via MQTT or set readings from 
+             the incoming MQTT messages or executes them 
+             as a 'set' command on the configured FHEM device.
   - feature: 72_XiaomiDevice: vacuum events, resume zoned cleanup
   - feature: 51_MOBILEALERTS: Added MA10120PRO
   - feature: 51_MOBILEALERTS: Added TFA30.3060.01.IT

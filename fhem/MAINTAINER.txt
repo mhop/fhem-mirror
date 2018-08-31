@@ -67,6 +67,7 @@ FHEM/10_KOPP_FC.pm           raspii               Sonstige Systeme
 FHEM/10_MAX.pm               rudolfkoenig/orphan  MAX
 FHEM/10_MQTT_BRIDGE          hexenmeister         MQTT
 FHEM/10_MQTT_DEVICE          hexenmeister         MQTT
+FHEM/10_MQTT_GENERIC_BRIDGE  hexenmeister         MQTT
 FHEM/10_MQTT2_DEVICE.pm      rudolfkoenig         MQTT
 FHEM/10_MYSENSORS_DEVICE     Hauswart             Sonstige Systeme
 FHEM/10_NeuronPin.pm         klausw               Sonstige Systeme
