@@ -109,6 +109,7 @@ sub WriteStatefile();
 sub XmlEscape($);
 sub addEvent($$);
 sub addToDevAttrList($$);
+sub delFromDevAttrList($$);
 sub addToAttrList($);
 sub addToWritebuffer($$@);
 sub attrSplit($);
