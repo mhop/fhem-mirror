@@ -3973,7 +3973,7 @@ delFromDevAttrList($$)
   $attr{$dev}{userattr} = join(" ", sort keys %hash);
   delete $attr{$dev}{userattr}
         if(!keys %hash && defined($attr{$dev}{userattr}));
-  map { delete $attr{$dev}{$_} } split(" ", $arg);
+  map { delete $attr{$dev}{$_} } split(" ", (split(":", $arg))[0]);
 }
 
 
