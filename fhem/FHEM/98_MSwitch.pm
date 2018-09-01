@@ -5419,7 +5419,7 @@ sub MSwitch_Execute_Timer($) {
         if ( $triggercondition ne '' ) 
 		{
 		
-		Log3( $Name, 0,"aufruf triggerconditionr". __LINE__ );
+		#Log3( $Name, 0,"aufruf triggerconditionr". __LINE__ );
 		
 		
             my $ret = MSwitch_checkcondition( $triggercondition, $Name, '' );
