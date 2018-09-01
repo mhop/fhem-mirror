@@ -36,7 +36,7 @@ use warnings;
 use POSIX;
 
 # Version #######################################################
-my $version = 'V1.73';
+my $version = 'V1.74';
 my $vupdate = 'V 1.2';
 my $savecount = 30;
 my $standartstartdelay =60;
@@ -79,6 +79,7 @@ sub MSwitch_set_dev($);
 sub MSwitch_EventBulk($$$);
 sub MSwitch_priority ;
 sub MSwitch_dec($$);
+sub MSwitch_makefreecmd($$);
 
 
 my %sets = (
@@ -512,6 +513,11 @@ sub MSwitch_Get($$@) {
     if ( $opt eq 'checkcondition' ) {
         my ( $condstring, $eventstring ) = split( /\|/, $args[0] );
 
+		 Log3( $name, 0,"cond: $condstring " . __LINE__ );
+		 Log3( $name, 0,"event: $eventstring " . __LINE__ );
+		 
+		 
+		 
 		$condstring =~ s/#\[dp\]/:/g;
 		$condstring =~ s/#\[pt\]/./g;
 		$condstring =~ s/#\[ti\]/~/g;
@@ -1183,28 +1189,43 @@ sub MSwitch_Set($@) {
                 if ( $devicenamet eq 'FreeCmd' )
 				{
                     $cs = "$devicedetails{$device.'_onarg'}";
-						
-				# setmagic
+					$cs = MSwitch_makefreecmd($hash,$cs);	
+				# # setmagic
+				# my $ersetzung ="";
+				# #Log3( $name, 0,"$name MSwitch_Set: ".$cs." L:". __LINE__ );
 				
-				#Log3( $name, 0,"$name MSwitch_Set: ".$cs." L:". __LINE__ );
+				# $cs =~ s/#\[ti\]/~/g;	
 				
-				$cs =~ s/#\[ti\]/~/g;	
-				
-				# entferne kommntarzeilen
-				$cs =~ s/#.*\n//g;
-				
-				
-				$cs =~ s/\n//g;
+				# # entferne kommntarzeilen
+				# $cs =~ s/#.*\n//g;
 				
 				
-				my $x =0;
-				while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
-					{
-					$x++;                        # notausstieg notausstieg
-					last if $x > 20;             # notausstieg notausstieg
-					my $setmagic = ReadingsVal( $2, $3, 0 );
-					$cs = $1.$setmagic.$4;
-					}
+				# $cs =~ s/\n//g;
+				
+				# $ersetzung = ReadingsVal( $name, "EVTPART3", "" );
+				# $cs =~ s/\$EVTPART3/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVTPART2", "" );
+				# $cs =~ s/\$EVTPART2/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVTPART1", "" );
+				# $cs =~ s/\$EVTPART1/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVENT", "" );
+				# $cs =~ s/\$EVENT/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVENTFULL", "" );
+				# $cs =~ s/\$EVENTFULL/$ersetzung/g;
+				
+				
+				
+				
+				
+				
+				# my $x =0;
+				# while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
+					# {
+					# $x++;                        # notausstieg notausstieg
+					# last if $x > 20;             # notausstieg notausstieg
+					# my $setmagic = ReadingsVal( $2, $3, 0 );
+					# $cs = $1.$setmagic.$4;
+					# }
                 }
 
                 if ($devicedetails{$timerkey} eq "0"|| $devicedetails{$timerkey} eq "")
@@ -1352,23 +1373,39 @@ sub MSwitch_Set($@) {
                 if ( $devicenamet eq 'FreeCmd' ) 
 				{
                     $cs = "$devicedetails{$device.'_offarg'}";
-					# setmagic	
-					$cs =~ s/#\[ti\]/~/g;	
+					$cs = MSwitch_makefreecmd($hash,$cs);
+					# # setmagic	
+					# my $ersetzung ="";
+					# $cs =~ s/#\[ti\]/~/g;	
 				
-				# entferne kommntarzeilen
-				$cs =~ s/#.*\n//g;
+				# # entferne kommntarzeilen
+				# $cs =~ s/#.*\n//g;
 				
 				
-				$cs =~ s/\n//g;
+				# $cs =~ s/\n//g;
 				
-					my $x =0;
-					while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
-						{
-						$x++;                        # exit
-						last if $x > 20;             # exit
-						my $setmagic = ReadingsVal( $2, $3, 0 );
-						$cs = $1.$setmagic.$4;
-						}
+				# $ersetzung = ReadingsVal( $name, "EVTPART3", "" );
+				# $cs =~ s/\$EVTPART3/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVTPART2", "" );
+				# $cs =~ s/\$EVTPART2/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVTPART1", "" );
+				# $cs =~ s/\$EVTPART1/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVENT", "" );
+				# $cs =~ s/\$EVENT/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVENTFULL", "" );
+				# $cs =~ s/\$EVENTFULL/$ersetzung/g;
+				
+				
+				
+				
+					# my $x =0;
+					# while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
+						# {
+						# $x++;                        # exit
+						# last if $x > 20;             # exit
+						# my $setmagic = ReadingsVal( $2, $3, 0 );
+						# $cs = $1.$setmagic.$4;
+						# }
                 }
 
                 #my $conditionkey;
@@ -3492,7 +3529,11 @@ sub MSwitch_fhemwebFn($$$$) {
 	
     if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' ) 
 	{
-        $ret = $ret. " <input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('triggercondition',document.querySelector('#triggercondition').value)\">";
+       # $ret = $ret. " <input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('triggercondition',document.querySelector('#triggercondition').value)\">";
+		
+		$ret = $ret. " <input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('triggercondition','$Name:trigger:conditiontest')\">";
+		
+
     }
 
     $ret = $ret . "</td></tr>";
@@ -3750,24 +3791,32 @@ sub MSwitch_fhemwebFn($$$$) {
 	}
 
 	
-	function checkcondition(condition,event){		
+	function checkcondition(condition,event){	
+
+    //alert(condition,event);
 	var selected =document.getElementById(condition).value;
+	// event = \"test:test:test\";
 	if (selected == '')
 	{
 	var textfinal = \"<div style ='font-size: medium;'>Es ist keine Bedingung definiert, das Kommando wird immer ausgeführt.</div>\";
 	FW_okDialog(textfinal);
 	return;
 	}
-	//selected = selected.replace(/ /g,'~');
-	selected = selected.replace(/\\|/g,'(DAYS)');
 	
+	
+	//var textfinal = \"<div style ='font-size: medium;'>\"+event+\"</div>\";
+	//FW_okDialog(textfinal);
+	//return;
+	
+	
+	
+	selected = selected.replace(/\\|/g,'(DAYS)');
 	selected = selected.replace(/\\./g,'#[pt]');
 	selected = selected.replace(/:/g,'#[dp]');
 	selected= selected.replace(/~/g,'#[ti]');
 	selected = selected.replace(/ /g,'#[sp]');
-	
+
 	event = event.replace(/~/g,'#[ti]');
-	//event = event.replace(/ /g,'~');
 	event = event.replace(/ /g,'#[sp]');
 
 	cmd ='get " . $Name . " checkcondition '+selected+'|'+event;
@@ -4385,25 +4434,32 @@ sub MSwitch_Exec_Notif($$$$) {
 			{
                 $cs = "  $devicedetails{$device.'_'.$comand.'arg'}";
 				
+				$cs = MSwitch_makefreecmd($hash,$cs);
 				
-				# setmagic	
-				
-				$cs =~ s/#\[ti\]/~/g;
-				# entferne kommentarte
-				
-				$cs =~ s/#.*\n//g;
-				
-				$cs =~ s/\n//g;
-				
-				
-				my $x =0;
-				while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
-					{
-					$x++;                        # notausstieg notausstieg
-					last if $x > 20;             # notausstieg notausstieg
-					my $setmagic = ReadingsVal( $2, $3, 0 );
-					$cs = $1.$setmagic.$4;
-					}
+				# my $ersetzung ="";
+				# # setmagic	
+				# $cs =~ s/#\[ti\]/~/g;
+				# # entferne kommentarte
+				# $cs =~ s/#.*\n//g;
+				# $cs =~ s/\n//g;
+				# $ersetzung = ReadingsVal( $name, "EVTPART3", "" );
+				# $cs =~ s/\$EVTPART3/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVTPART2", "" );
+				# $cs =~ s/\$EVTPART2/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVTPART1", "" );
+				# $cs =~ s/\$EVTPART1/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVENT", "" );
+				# $cs =~ s/\$EVENT/$ersetzung/g;
+				# $ersetzung = ReadingsVal( $name, "EVENTFULL", "" );
+				# $cs =~ s/\$EVENTFULL/$ersetzung/g;
+				# my $x =0;
+				# while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
+					# {
+					# $x++;                        # notausstieg notausstieg
+					# last if $x > 20;             # notausstieg notausstieg
+					# my $setmagic = ReadingsVal( $2, $3, 0 );
+					# $cs = $1.$setmagic.$4;
+					# }
 				
             }
             else 
@@ -5357,10 +5413,15 @@ sub MSwitch_Execute_Timer($) {
 		$triggercondition =~ s/#\[ti\]/~/g;
 		$triggercondition =~ s/#\[sp\]/ /g;
 		
+		
+		
+		
+		
+		
         if ( $triggercondition ne '' ) 
 		{
 		
-		#Log3( $Name, 5,"aufruf triggerconditionr". __LINE__ );
+		Log3( $Name, 0,"aufruf triggerconditionr". __LINE__ );
 		
 		
             my $ret = MSwitch_checkcondition( $triggercondition, $Name, '' );
@@ -5370,19 +5431,24 @@ sub MSwitch_Execute_Timer($) {
             }
         }
     }
-
-	readingsBeginUpdate($hash);
-    readingsBulkUpdate( $hash, "EVENT", $Name.":execute_timer:P".$param );
-	readingsBulkUpdate( $hash, "EVTFULL", $Name.":execute_timer:P".$param );
-	readingsBulkUpdate( $hash, "EVTPART1", $Name );
-	readingsBulkUpdate( $hash, "EVTPART2","execute_timer" );
-	readingsBulkUpdate( $hash, "EVTPART3","P".$param );
-    readingsEndUpdate( $hash, 1 );
+	
+	
+ my $extime = POSIX::strftime("%H:%M",localtime);
+ 
+ 
+	 readingsBeginUpdate($hash);
+     readingsBulkUpdate( $hash, "EVENT", $Name.":execute_timer_P".$param.":".$extime );
+	 readingsBulkUpdate( $hash, "EVTFULL",  $Name.":execute_timer_P".$param.":".$extime );
+	 readingsBulkUpdate( $hash, "EVTPART1", $Name );
+	 readingsBulkUpdate( $hash, "EVTPART2","execute_timer_P".$param );
+	 readingsBulkUpdate( $hash, "EVTPART3",$extime );
+     readingsEndUpdate( $hash, 1 );
 
     if ( $param eq '1' )
 	{
         my $cs = "set $Name on";
         Log3( $Name, 3, "$Name MSwitch_Execute_Timer: Befehlsausfuehrung -> $cs" . __LINE__ );
+		#Log3( $Name, 3, "$Name MSwitch_Execute_Timer: Befehlsausfuehrung -> $cs" . __LINE__ );
         my $errors = AnalyzeCommandChain( undef, $cs );
         if ( defined($errors) ) 
 		{
@@ -6366,7 +6432,48 @@ $todec =~ s/\n//g;
 $todec =~ s/#\[wa\]/|/g; 
 return $todec;				
 }
-			
+	
+################################################################
+sub MSwitch_makefreecmd($$) {
+	my ( $hash, $cs) = @_;
+    my $name = $hash->{NAME};
+
+				my $ersetzung ="";
+
+
+				$cs =~ s/#\[ti\]/~/g;	
+				
+				# entferne kommntarzeilen
+				$cs =~ s/#.*\n//g;
+				
+				# entferne zeilenumbruch
+				$cs =~ s/\n//g;
+				
+				# ersetze Eventvariablen
+				$ersetzung = ReadingsVal( $name, "EVTPART3", "" );
+				$cs =~ s/\$EVTPART3/$ersetzung/g;
+				$ersetzung = ReadingsVal( $name, "EVTPART2", "" );
+				$cs =~ s/\$EVTPART2/$ersetzung/g;
+				$ersetzung = ReadingsVal( $name, "EVTPART1", "" );
+				$cs =~ s/\$EVTPART1/$ersetzung/g;
+				$ersetzung = ReadingsVal( $name, "EVENT", "" );
+				$cs =~ s/\$EVENT/$ersetzung/g;
+				$ersetzung = ReadingsVal( $name, "EVENTFULL", "" );
+				$cs =~ s/\$EVENTFULL/$ersetzung/g;
+				
+                # setmagic ersetzun
+				my $x =0;
+				while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
+					{
+					$x++;                        # notausstieg notausstieg
+					last if $x > 20;             # notausstieg notausstieg
+					my $setmagic = ReadingsVal( $2, $3, 0 );
+					$cs = $1.$setmagic.$4;
+					}
+	return $cs;
+}
+
+#################################					
 		
 1;
 
