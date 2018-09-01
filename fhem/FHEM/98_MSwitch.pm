@@ -513,11 +513,9 @@ sub MSwitch_Get($$@) {
     if ( $opt eq 'checkcondition' ) {
         my ( $condstring, $eventstring ) = split( /\|/, $args[0] );
 
-		 Log3( $name, 0,"cond: $condstring " . __LINE__ );
-		 Log3( $name, 0,"event: $eventstring " . __LINE__ );
-		 
-		 
-		 
+		 #Log3( $name, 0,"cond: $condstring " . __LINE__ );
+		 #Log3( $name, 0,"event: $eventstring " . __LINE__ );
+
 		$condstring =~ s/#\[dp\]/:/g;
 		$condstring =~ s/#\[pt\]/./g;
 		$condstring =~ s/#\[ti\]/~/g;
@@ -6439,8 +6437,6 @@ sub MSwitch_makefreecmd($$) {
     my $name = $hash->{NAME};
 
 				my $ersetzung ="";
-
-
 				$cs =~ s/#\[ti\]/~/g;	
 				
 				# entferne kommntarzeilen
