@@ -920,9 +920,13 @@ sub EnOcean_Define($$) {
             $attr{$name}{remoteManagement} = 'client';
             # unlock device to send acknowledgment telegram
             $hash->{RemoteClientUnlock} = 1;
-            my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
-            RemoveInternalTimer(\%functionHash);
-            InternalTimer(gettimeofday() + 1, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
+            #####
+            #my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
+            #RemoveInternalTimer(\%functionHash);
+            #InternalTimer(gettimeofday() + 1, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
+            RemoveInternalTimer($hash->{helper}{timer}{RemoteClientUnlock}) if(exists $hash->{helper}{timer}{RemoteClientUnlock});
+            $hash->{helper}{timer}{RemoteClientUnlock} = {hash => $hash, param => 'RemoteClientUnlock'};
+            InternalTimer(gettimeofday() + 1, 'EnOcean_cdmClearHashVal', $hash->{helper}{timer}{RemoteClientUnlock}, 0);
           } else {
             $attr{$name}{remoteManagement} = 'manager';
           }
@@ -1728,9 +1732,13 @@ sub EnOcean_Set($@)
           }
         }
         $hash->{RemoteClientUnlock} = 1;
-        my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
-        RemoveInternalTimer(\%functionHash);
-        InternalTimer(gettimeofday() + $remoteUnlockPeriod, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
+        #####
+        #my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
+        #RemoveInternalTimer(\%functionHash);
+        #InternalTimer(gettimeofday() + $remoteUnlockPeriod, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
+        RemoveInternalTimer($hash->{helper}{timer}{RemoteClientUnlock}) if(exists $hash->{helper}{timer}{RemoteClientUnlock});
+        $hash->{helper}{timer}{RemoteClientUnlock} = {hash => $hash, param => 'RemoteClientUnlock'};
+        InternalTimer(gettimeofday() + $remoteUnlockPeriod, 'EnOcean_cdmClearHashVal', $hash->{helper}{timer}{RemoteClientUnlock}, 0);
         $updateState = 3;
       }
       Log3 $name, 3, "EnOcean set $name $cmd";
@@ -1754,8 +1762,10 @@ sub EnOcean_Set($@)
       } else {
         # client
         delete $hash->{RemoteClientUnlock};
-        my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
-        RemoveInternalTimer(\%functionHash);
+        #####
+        #my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
+        #RemoveInternalTimer(\%functionHash);
+        RemoveInternalTimer($hash->{helper}{timer}{RemoteClientUnlock}) if(exists $hash->{helper}{timer}{RemoteClientUnlock});
         $updateState = 3;
       }
       Log3 $name, 3, "EnOcean set $name $cmd";
@@ -7083,8 +7093,8 @@ sub EnOcean_Parse($$)
         push @event, "3:$event:$msg";
         $hash->{helper}{lastEvent} = $db[0];
       }
+      RemoveInternalTimer($hash->{helper}{alarmTimer}) if(exists $hash->{helper}{timer}{alarm});
       @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-      RemoveInternalTimer($hash->{helper}{alarmTimer});
       InternalTimer(gettimeofday() + 1440, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
 
     } elsif ($st eq "windSpeed.00") {
@@ -7106,9 +7116,9 @@ sub EnOcean_Parse($$)
         push @event, "3:$event:$msg";
         $hash->{helper}{lastEvent} = $db[0];
       }
-      @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-      RemoveInternalTimer($hash->{helper}{alarmTimer});
-      InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
+      RemoveInternalTimer($hash->{helper}{alarmTimer}) if(exists $hash->{helper}{timer}{alarm});
+      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+      InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
 
     } elsif ($model =~ m/FAE14|FHK14|FHK61$/) {
       # heating/cooling relay FAE14, FHK14, untested
@@ -7537,9 +7547,9 @@ sub EnOcean_Parse($$)
       readingsSingleUpdate($hash, 'wakeUpCycle', $wakeUpCycle, 1);
       # set alarm timer
       CommandDeleteReading(undef, "$name alarm");
-      @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'no_response_from_actuator', 1, 3);
-      RemoveInternalTimer($hash->{helper}{alarmTimer});
-      InternalTimer(gettimeofday() + $wakeUpCycle * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{alarmTimer}, 0);
+      RemoveInternalTimer($hash->{helper}{alarmTimer}) if(exists $hash->{helper}{timer}{alarm});
+      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'no_response_from_actuator', 1, 3);
+      InternalTimer(gettimeofday() + $wakeUpCycle * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
 
       my $actionCmd = AttrVal($name, "rcvRespAction", undef);
       if (defined $actionCmd) {
@@ -9015,12 +9025,12 @@ sub EnOcean_Parse($$)
         }
       }
       if ($model eq "tracker") {
-        @{$hash->{helper}{motionTimer}} = ($hash, 'motion', 'off', 1, 5);
-        @{$hash->{helper}{stateTimer}} = ($hash, 'state', 'off', 1, 5);
-        RemoveInternalTimer($hash->{helper}{motionTimer});
-        RemoveInternalTimer($hash->{helper}{stateTimer});
-        InternalTimer(gettimeofday() + AttrVal($name, 'trackerWakeUpCycle', 30) * 1.1, 'EnOcean_readingsSingleUpdate', $hash->{helper}{motionTimer}, 0);
-        InternalTimer(gettimeofday() + AttrVal($name, 'trackerWakeUpCycle', 30) * 1.1, 'EnOcean_readingsSingleUpdate', $hash->{helper}{stateTimer}, 0);
+        RemoveInternalTimer($hash->{helper}{timer}{motion}) if(exists $hash->{helper}{timer}{motion});
+        RemoveInternalTimer($hash->{helper}{timer}{state}) if(exists $hash->{helper}{timer}{state});
+        @{$hash->{helper}{timer}{motion}} = ($hash, 'motion', 'off', 1, 5);
+        @{$hash->{helper}{timer}{state}} = ($hash, 'state', 'off', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, 'trackerWakeUpCycle', 30) * 1.1, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{motion}, 0);
+        InternalTimer(gettimeofday() + AttrVal($name, 'trackerWakeUpCycle', 30) * 1.1, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{state}, 0);
       }
       if (!exists($hash->{helper}{lastVoltage}) || $hash->{helper}{lastVoltage} != $db[3]) {
         push @event, "3:battery:" . ($db[3] * 0.02 > 2.8 ? "ok" : "low");
@@ -9585,9 +9595,9 @@ sub EnOcean_Parse($$)
         $hash->{helper}{lastEvent} = $data;
       }
       CommandDeleteReading(undef, "$name alarm");
-      @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-      RemoveInternalTimer($hash->{helper}{alarmTimer});
-      InternalTimer(gettimeofday() + 66, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+      InternalTimer(gettimeofday() + 66, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
 
     } elsif ($st eq "windowContact") {
       # window contact (EEP A5-14-09, A5-14-0A)
@@ -9603,9 +9613,9 @@ sub EnOcean_Parse($$)
         $hash->{helper}{lastEvent} = $data;
       }
       CommandDeleteReading(undef, "$name alarm");
-      @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-      RemoveInternalTimer($hash->{helper}{alarmTimer});
-      InternalTimer(gettimeofday() + 66, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
+      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+      InternalTimer(gettimeofday() + 66, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
 
     } elsif ($st =~ m/^digitalInput\.0[12]$/) {
       # Digital Input (EEP A5-30-01, A5-30-02)
@@ -9638,9 +9648,9 @@ sub EnOcean_Parse($$)
           $hash->{helper}{lastEvent} = $alarm;
         }
         push @event, "3:state:$alarm";
-        @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-        RemoveInternalTimer($hash->{helper}{alarmTimer});
-        InternalTimer(gettimeofday() + 1980, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
+        InternalTimer(gettimeofday() + 1980, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
       } else {
         my $in0 = $db[1] & 1;
         my $in1 = ($db[1] & 2) > 1;
@@ -11666,16 +11676,22 @@ sub EnOcean_Parse($$)
       # unlock
       if ($data eq uc($remoteCode) && !exists($hash->{RemoteClientUnlockFailed})) {
         $hash->{RemoteClientUnlock} = 1;
-        my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
-        RemoveInternalTimer(\%functionHash);
-        InternalTimer(gettimeofday() + 1800, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
+        #my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
+        #RemoveInternalTimer(\%functionHash);
+        #InternalTimer(gettimeofday() + 1800, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
+        RemoveInternalTimer($hash->{helper}{timer}{RemoteClientUnlock}) if(exists $hash->{helper}{timer}{RemoteClientUnlock});
+        $hash->{helper}{timer}{RemoteClientUnlock} = {hash => $hash, param => 'RemoteClientUnlock'};
+        InternalTimer(gettimeofday() + 1800, 'EnOcean_cdmClearHashVal', $hash->{helper}{timer}{RemoteClientUnlock}, 0);
         Log3 $name, 2, "EnOcean $name RMCC unlock request executed.";
       } else {
         $remoteLastStatusReturnCode = '02';
         $hash->{RemoteClientUnlockFailed} = 1;
-        my %functionHash = (hash => $hash, param => 'RemoteClientUnlockFailed');
-        RemoveInternalTimer(\%functionHash);
-        InternalTimer(gettimeofday() + 30, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
+        #my %functionHash = (hash => $hash, param => 'RemoteClientUnlockFailed');
+        #RemoveInternalTimer(\%functionHash);
+        #InternalTimer(gettimeofday() + 30, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
+        RemoveInternalTimer($hash->{helper}{timer}{RemoteClientUnlockFailed}) if(exists $hash->{helper}{timer}{RemoteClientUnlockFailed});
+        $hash->{helper}{timer}{RemoteClientUnlockFailed} = {hash => $hash, param => 'RemoteClientUnlockFailed'};
+        InternalTimer(gettimeofday() + 30, 'EnOcean_cdmClearHashVal', $hash->{helper}{timer}{RemoteClientUnlockFailed}, 0);
         Log3 $name, 2, "EnOcean $name RMCC unlock request not executed, remote Code $data wrong.";
       }
       push @event, "3:remoteLastStatusReturnCode:$remoteLastStatusReturnCode";
@@ -11684,8 +11700,10 @@ sub EnOcean_Parse($$)
       # lock
       if ($hash->{RemoteClientUnlock} && $data eq uc($remoteCode)) {
         delete $hash->{RemoteClientUnlock};
-        my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
-        RemoveInternalTimer(\%functionHash);
+        #####
+        #my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
+        #RemoveInternalTimer(\%functionHash);
+        RemoveInternalTimer($hash->{helper}{timer}{RemoteClientUnlock}) if(exists $hash->{helper}{timer}{RemoteClientUnlock});
         Log3 $name, 2, "EnOcean $name RMCC lock request executed.";
       } else {
         $remoteLastStatusReturnCode = '02';
@@ -14637,12 +14655,12 @@ sub EnOcean_InternalTimer($$$$$)
   if ($modifier eq "") {
     $mHash = $hash;
   } else {
-    if (exists ($hash->{helper}{TIMER}{$timerName})) {
-      $mHash = $hash->{helper}{TIMER}{$timerName};
+    if (exists ($hash->{helper}{timer}{$timerName})) {
+      $mHash = $hash->{helper}{timer}{$timerName};
       Log3 $hash->{NAME}, 5, "EnOcean_InternalTimer setting mHash with stored $timerName";
    } else {
       $mHash = {HASH => $hash, NAME => $timerName, MODIFIER => $modifier};
-      $hash->{helper}{TIMER}{$timerName} = $mHash;
+      $hash->{helper}{timer}{$timerName} = $mHash;
       Log3 $hash->{NAME}, 5, "EnOcean_InternalTimer setting mHash with $timerName";
     }
   }
@@ -14660,9 +14678,9 @@ sub EnOcean_RemoveInternalTimer($$)
   if ($modifier eq "") {
     RemoveInternalTimer($hash);
   } else {
-    $mHash = $hash->{helper}{TIMER}{$timerName};
+    $mHash = $hash->{helper}{timer}{$timerName};
     if (defined($mHash)) {
-      delete $hash->{helper}{TIMER}{$timerName};
+      delete $hash->{helper}{timer}{$timerName};
       RemoveInternalTimer($mHash);
     }
   }
@@ -16150,8 +16168,10 @@ EnOcean_Undef($$)
   delete $modules{EnOcean}{defptr}{uc($attr{$name}{remoteID})} if (exists $attr{$name}{remoteID});
   if (AttrVal($name, "remoteManagement", "off") eq "client") {
     delete $hash->{RemoteClientUnlock};
-    my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
-    RemoveInternalTimer(\%functionHash);
+    #####
+    #my %functionHash = (hash => $hash, param => 'RemoteClientUnlock');
+    #RemoveInternalTimer(\%functionHash);
+    RemoveInternalTimer($hash->{helper}{timer}{RemoteClientUnlock}) if(exists $hash->{helper}{timer}{RemoteClientUnlock});
   }
   return undef;
 }
