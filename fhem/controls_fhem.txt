@@ -1,4 +1,4 @@
-REV 17239
+REV 17246
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,8 +21,8 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2018-08-31_07:45:03 256824 ./CHANGED
-UPD 2018-08-27_07:45:04 37696 ./MAINTAINER.txt
+UPD 2018-09-01_07:45:03 257143 ./CHANGED
+UPD 2018-09-01_07:45:03 37751 ./MAINTAINER.txt
 UPD 2018-07-08_07:45:03 41916 ./configDB.pm
 UPD 2018-08-27_07:45:04 20439 ./fhem.cfg.demo
 UPD 2018-08-31_07:45:09 150442 ./fhem.pl
@@ -80,6 +80,7 @@ UPD 2018-06-11_07:45:06 61938 FHEM/10_MAX.pm
 UPD 2018-08-25_07:45:03 14084 FHEM/10_MQTT2_DEVICE.pm
 UPD 2018-04-30_07:45:05 10978 FHEM/10_MQTT_BRIDGE.pm
 UPD 2018-04-30_07:45:05 13504 FHEM/10_MQTT_DEVICE.pm
+UPD 2018-09-01_07:45:03 95482 FHEM/10_MQTT_GENERIC_BRIDGE.pm
 UPD 2018-06-23_07:45:04 30428 FHEM/10_MYSENSORS_DEVICE.pm
 UPD 2018-06-12_07:45:06 19100 FHEM/10_NeuronPin.pm
 UPD 2018-03-28_07:45:02 33933 FHEM/10_OWServer.pm
@@ -454,7 +455,7 @@ UPD 2016-04-26_07:45:11 33223 FHEM/98_HourCounter.pm
 UPD 2017-12-02_07:45:02 66644 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
-UPD 2018-08-31_07:45:03 222941 FHEM/98_MSwitch.pm
+UPD 2018-09-01_07:45:03 226466 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2017-09-05_07:45:02 34104 FHEM/98_MediaList.pm
 UPD 2018-01-14_07:45:02 121875 FHEM/98_Modbus.pm
@@ -675,12 +676,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2018-08-31_07:45:06 3519322 docs/commandref.html
-UPD 2018-08-30_07:45:08 2163912 docs/commandref_DE.html
+UPD 2018-09-01_07:45:06 3536273 docs/commandref.html
+UPD 2018-09-01_07:45:08 2182193 docs/commandref_DE.html
 UPD 2018-07-16_07:45:03 76259 docs/commandref_frame.html
 UPD 2018-07-16_07:45:03 85715 docs/commandref_frame_DE.html
-UPD 2018-08-31_07:52:49 195135 docs/commandref_modular.html
-UPD 2018-08-31_07:52:50 205812 docs/commandref_modular_DE.html
+UPD 2018-09-01_07:45:09 195596 docs/commandref_modular.html
+UPD 2018-09-01_07:45:10 206273 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
