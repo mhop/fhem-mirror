@@ -7085,7 +7085,7 @@ sub EnOcean_Parse($$)
       }
       @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
       RemoveInternalTimer($hash->{helper}{alarmTimer});
-      InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
+      InternalTimer(gettimeofday() + 1440, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
 
     } elsif ($st eq "windSpeed.00") {
       # wind speed threshold detector
@@ -9493,13 +9493,13 @@ sub EnOcean_Parse($$)
       } elsif ($identifier == 4) {
         # Time und Day exchange (EEP A5-13-04)
         my @day = ('', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
-        my $day = ($db[3] & 0xF0) >> 4;
+        my $day = $db[3] >> 5;
         push @event, "3:weekday:" . $day[$day];
         if ($db[0] & 4) {
           # 12 h time format
-          push @event, "3:time:" . ($db[3] & 0x0F) . ':' . $db[2] . ':' . $db[1] . ' ' . ($db[1] & 2 ? 'PM' : 'AM');
+          push @event, "3:time:" . ($db[3] & 0x1F) . ':' . $db[2] . ':' . $db[1] . ' ' . ($db[1] & 2 ? 'PM' : 'AM');
         } else {
-          push @event, "3:time:" . ($db[3] & 0x0F) . ':' . $db[2] . ':' . $db[1];
+          push @event, "3:time:" . ($db[3] & 0x1F) . ':' . $db[2] . ':' . $db[1];
         }
         push @event, "3:timeSource:" . ($db[0] & 1 ? 'GPS' : 'RTC');
 
