@@ -1908,7 +1908,7 @@ FW_showRoom()
   my $doBC = (AttrVal($FW_wname, "plotfork", 0) &&
               AttrVal($FW_wname, "plotEmbed", 0) == 0);
   my %res;
-  my $idx = 1;
+  my ($idx,$svgIdx) = (1,1);
   @atEnds =  sort { $sortIndex{$a} cmp $sortIndex{$b} } @atEnds;
   foreach my $d (@atEnds) {
     no strict "refs";
@@ -1916,6 +1916,7 @@ FW_showRoom()
     $extPage{group} = "atEnd";
     $extPage{index} = $idx++;
     if($doBC && $defs{$d}{TYPE} eq "SVG" && $FW_use{base64}) {
+      $extPage{svgIdx} = $svgIdx++;
       BlockingCall(sub {
         return "$FW_cname,$d,".
                encode_base64(&{$fn}($FW_wname,$d,$FW_room,\%extPage),'');
