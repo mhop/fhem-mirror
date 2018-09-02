@@ -120,9 +120,11 @@ at_Define($$)
     return undef if($cnt eq "0");
     $cnt = 0 if(!$cnt);
     $cnt--;
+    delete($hash->{VOLATILE});  # Modify
     $hash->{REP} = $cnt; 
   } else {
     $hash->{VOLATILE} = 1;      # Write these entries to the statefile
+    delete($hash->{REP});       # Modify
   }
 
   my $alTime = AttrVal($name, "alignTime", undef);
