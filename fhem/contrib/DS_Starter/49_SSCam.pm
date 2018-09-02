@@ -657,7 +657,7 @@ sub SSCam_Set($@) {
                  "enable:noArg ".
                  "disable:noArg ".
 				 "optimizeParams ".
-                 "pirSensor:enable,disable ".
+                 "pirSensor:activate,deactivate ".
                  "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setPreset ": "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
@@ -850,7 +850,8 @@ sub SSCam_Set($@) {
                 
   } elsif ($opt eq "pirSensor" && SSCam_IsModelCam($hash)) {
       if (!$prop) {return "Function \"$opt\" needs an argument";}
-      $hash->{HELPER}{PIRACT} = ($prop eq "enable")?0:-1;
+      $hash->{HELPER}{PIRACT} = ($prop eq "activate")?0:($prop eq "deactivate")?-1:5;
+      if($hash->{HELPER}{PIRACT} == 5) {return " Illegal argument for \"$opt\" detected, use \"activate\" or \"activate\" !";}
       SSCam_piract($hash);
         
   } elsif ($opt eq "runPatrol" && SSCam_IsModelCam($hash)) {
@@ -3819,7 +3820,7 @@ sub SSCam_camop ($) {
    } elsif ($OpMode eq "piract") {
       # PIR Sensor aktivieren/deaktivieren
       my $piract = $hash->{HELPER}{PIRACT};
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"PDParamSave\"&keep=true&source=$piract&cameraId=\"$camid\"&_sid=\"$sid\""; 
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"PDParamSave\"&keep=true&source=$piract&camId=\"$camid\"&_sid=\"$sid\""; 
    
    } elsif ($OpMode eq "setPreset") {
       # einen Preset setzen
@@ -4391,7 +4392,7 @@ sub SSCam_camop_parse ($) {
        
                 # Logausgabe
                 my $piract = ($hash->{HELPER}{PIRACT} == 0)?"activated":"deactivated";
-                Log3($name, 3, "$name - The PIR sensor was $piract");
+                Log3($name, 3, "$name - PIR sensor $piract");
             
 			} elsif ($OpMode eq "setHome") {              
                 readingsBeginUpdate($hash);
