@@ -16,6 +16,7 @@
 ############################################################################################################################################
 #  Versions History done by DS_Starter & DeeSPe:
 #
+# 3.12.0     03.09.2018       corrected SVG-select (https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640)
 # 3.11.0     02.09.2018       reduceLog, reduceLogNbl - optional "days newer than" part added
 # 3.10.10    05.08.2018       commandref revised reducelogNbl
 # 3.10.9     23.06.2018       commandref added hint about special characters in passwords
@@ -207,7 +208,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Encode qw(encode_utf8);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
-my $DbLogVersion = "3.11.0";
+my $DbLogVersion = "3.12.0";
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -2545,7 +2546,7 @@ sub DbLog_Get($@) {
   %to_datetime   = DbLog_explode_datetime($to, DbLog_explode_datetime("2099-01-01 00:00:00", ()));
   $from = $from_datetime{datetime};
   $to = $to_datetime{datetime};
-
+  # Log 1, Dumper(%to_datetime);
 
   my ($retval,$retvaldummy,$hour,$sql_timestamp, $sql_device, $sql_reading, $sql_value, $type, $event, $unit) = "";
   my @ReturnArray;
@@ -2692,12 +2693,12 @@ sub DbLog_Get($@) {
     $stm2 .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
 
     $stm2 .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-    $stm2 .= "AND TIMESTAMP < $sqlspec{to_timestamp} ";
+    $stm2 .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";             # 03.09.2018 -> https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640
     $stm2 .= "ORDER BY TIMESTAMP";
 
     if($deltacalc) {
       $stmdelta .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-      $stmdelta .= "AND TIMESTAMP < $sqlspec{to_timestamp} ";
+      $stmdelta .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";       # 03.09.2018 -> https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640
 
       $stmdelta .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
       $stmdelta .= "ORDER BY TIMESTAMP";
@@ -2707,7 +2708,7 @@ sub DbLog_Get($@) {
     }
 
 
-    Log3 $hash->{NAME}, 4, "Processing Statement: $stm";
+    Log3 $hash->{NAME}, 1, "Processing Statement: $stm";
 
     my $sth= $dbh->prepare($stm) ||
       return "Cannot prepare statement $stm: $DBI::errstr";
