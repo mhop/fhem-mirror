@@ -1120,9 +1120,13 @@ sub EnOcean_Get($@)
       $destinationID = "FFFFFFFF";
       $status = '0F';
       $hash->{IODev}{helper}{remoteAnswerWait}{0x604}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x604);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      #####
+      #my %functionHash = (hash => $hash, param => 0x604);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{0x604}) if(exists $hash->{helper}{timer}{0x604});
+      $hash->{helper}{timer}{0x604} = {hash => $hash, param => 0x604};
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x604}, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($cmd eq "remotePing") {
@@ -1136,9 +1140,13 @@ sub EnOcean_Get($@)
       $destinationID = $remoteID;
       $status = '0F';
       $hash->{IODev}{helper}{remoteAnswerWait}{0x606}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x606);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      #####
+      #my %functionHash = (hash => $hash, param => 0x606);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{0x606}) if(exists $hash->{helper}{timer}{0x606});
+      $hash->{helper}{timer}{0x606} = {hash => $hash, param => 0x606};
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x606}, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($cmd eq "remoteFunctions") {
@@ -1152,9 +1160,13 @@ sub EnOcean_Get($@)
       $destinationID = $remoteID;
       $status = '0F';
       $hash->{IODev}{helper}{remoteAnswerWait}{0x607}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x607);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      #####
+      #my %functionHash = (hash => $hash, param => 0x607);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{0x607}) if(exists $hash->{helper}{timer}{0x607});
+      $hash->{helper}{timer}{0x607} = {hash => $hash, param => 0x607};
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x607}, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($cmd eq "remoteStatus") {
@@ -1171,9 +1183,13 @@ sub EnOcean_Get($@)
       }
       $status = '0F';
       $hash->{IODev}{helper}{remoteAnswerWait}{0x608}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x608);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      #####
+      #my %functionHash = (hash => $hash, param => 0x608);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{0x608}) if(exists $hash->{helper}{timer}{0x608});
+      $hash->{helper}{timer}{0x608} = {hash => $hash, param => 0x608};
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x608}, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($cmd eq "remoteLinkTableInfo") {
@@ -1187,10 +1203,14 @@ sub EnOcean_Get($@)
       $destinationID = $remoteID;
       $status = '0F';
       $hash->{IODev}{helper}{remoteAnswerWait}{0x810}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x810);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
-      Log3 $name, 3, "EnOcean get $name $cmd";
+      #####
+      #my %functionHash = (hash => $hash, param => 0x810);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{0x810}) if(exists $hash->{helper}{timer}{0x810});
+      $hash->{helper}{timer}{0x810} = {hash => $hash, param => 0x810};
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x810}, 0);
+     Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($cmd eq "remoteLinkTable") {
       return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
@@ -1215,9 +1235,13 @@ sub EnOcean_Get($@)
       $destinationID = $remoteID;
       $status = '0F';
       $hash->{IODev}{helper}{remoteAnswerWait}{0x811}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x811);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      #####
+      #my %functionHash = (hash => $hash, param => 0x811);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{0x811}) if(exists $hash->{helper}{timer}{0x811});
+      $hash->{helper}{timer}{0x811} = {hash => $hash, param => 0x811};
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x811}, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($cmd eq "remoteLinkTableGP") {
@@ -1240,9 +1264,13 @@ sub EnOcean_Get($@)
       $destinationID = $remoteID;
       $status = '0F';
       $hash->{IODev}{helper}{remoteAnswerWait}{0x813}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x813);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      #####
+      #my %functionHash = (hash => $hash, param => 0x813);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{0x813}) if(exists $hash->{helper}{timer}{0x813});
+      $hash->{helper}{timer}{0x813} = {hash => $hash, param => 0x813};
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x813}, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($cmd eq "remoteProductID") {
@@ -1256,9 +1284,13 @@ sub EnOcean_Get($@)
       $destinationID = $remoteID;
       $status = '0F';
       $hash->{IODev}{helper}{remoteAnswerWait}{0x827}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x827);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 5.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      #####
+      #my %functionHash = (hash => $hash, param => 0x827);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{0x827}) if(exists $hash->{helper}{timer}{0x827});
+      $hash->{helper}{timer}{0x827} = {hash => $hash, param => 0x827};
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x827}, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($cmd eq "remoteDevCfg") {
@@ -1285,9 +1317,13 @@ sub EnOcean_Get($@)
       $destinationID = $remoteID;
       $status = '0F';
       $hash->{IODev}{helper}{remoteAnswerWait}{0x830}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x830);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      #####
+      #my %functionHash = (hash => $hash, param => 0x830);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{0x830}) if(exists $hash->{helper}{timer}{0x830});
+      $hash->{helper}{timer}{0x830} = {hash => $hash, param => 0x830};
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x830}, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($cmd eq "remoteLinkCfg") {
@@ -1320,9 +1356,13 @@ sub EnOcean_Get($@)
       $destinationID = $remoteID;
       $status = '0F';
       $hash->{IODev}{helper}{remoteAnswerWait}{0x832}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x832);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      #####
+      #my %functionHash = (hash => $hash, param => 0x832);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{0x832}) if(exists $hash->{helper}{timer}{0x832});
+      $hash->{helper}{timer}{0x832} = {hash => $hash, param => 0x832};
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x832}, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($cmd eq "remoteRepeater") {
@@ -1336,9 +1376,13 @@ sub EnOcean_Get($@)
       $destinationID = $remoteID;
       $status = '0F';
       $hash->{IODev}{helper}{remoteAnswerWait}{0x850}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x850);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 5.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      #####
+      #my %functionHash = (hash => $hash, param => 0x850);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{0x850}) if(exists $hash->{helper}{timer}{0x850});
+      $hash->{helper}{timer}{0x850} = {hash => $hash, param => 0x850};
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', $hash->{helper}{timer}{0x850}, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($st eq "switch.05") {
@@ -1909,9 +1953,13 @@ sub EnOcean_Set($@)
         if (!exists($hash->{IODev}{Teach})) {
           # enable teach-in receiving for 3 sec
           $hash->{IODev}{Teach} = 1;
-          my %functionHash = (hash => $IOHash, param => 'Teach');
-          RemoveInternalTimer(\%functionHash);
-          InternalTimer(gettimeofday() + 3, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
+          #####
+          #my %functionHash = (hash => $IOHash, param => 'Teach');
+          #RemoveInternalTimer(\%functionHash);
+          #InternalTimer(gettimeofday() + 3, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
+          RemoveInternalTimer($hash->{helper}{timer}{Teach}) if(exists $hash->{helper}{timer}{Teach});
+          $hash->{helper}{timer}{Teach} = {hash => $IOHash, param => 'Teach'};
+          InternalTimer(gettimeofday() + 3, 'EnOcean_cdmClearHashVal', $hash->{helper}{timer}{Teach}, 0);
         }
       } else {
         return "Usage: $cmd argument needed or wrong.";
@@ -6212,9 +6260,13 @@ sub EnOcean_Set($@)
           if (!exists($hash->{IODev}{Teach})) {
             # enable teach-in receiving for 3 sec
             $hash->{IODev}{Teach} = 1;
-            my %timeoutHash = (hash => $IOHash, function => "gpRespTimeout", helper => "gpRespWait");
-            RemoveInternalTimer(\%timeoutHash);
-            InternalTimer(gettimeofday() + 3, "EnOcean_RespTimeout", \%timeoutHash, 0);
+            #####
+            #my %timeoutHash = (hash => $IOHash, function => "gpRespTimeout", helper => "gpRespWait");
+            #RemoveInternalTimer(\%timeoutHash);
+            #InternalTimer(gettimeofday() + 3, "EnOcean_RespTimeout", \%timeoutHash, 0);
+            RemoveInternalTimer($hash->{helper}{timer}{gpRespTimeout}) if(exists $hash->{helper}{timer}{gpRespTimeout});
+            $hash->{helper}{timer}{gpRespTimeout} = {hash => $IOHash, function => "gpRespTimeout", helper => "gpRespWait"};
+            InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{gpRespTimeout}, 0);
           }
         }
         $header = (0x7FF << 1 | $comMode) << 4;
@@ -6252,10 +6304,14 @@ sub EnOcean_Set($@)
           if (!exists($hash->{IODev}{Teach})) {
             # enable teach-in receiving for 3 sec
             $hash->{IODev}{Teach} = 1;
-            my %timeoutHash = (hash => $IOHash, function => "gpRespTimeout", helper => "gpRespWait");
-            RemoveInternalTimer(\%timeoutHash);
-            InternalTimer(gettimeofday() + 3, "EnOcean_RespTimeout", \%timeoutHash, 0);
-          }
+            #####
+            #my %timeoutHash = (hash => $IOHash, function => "gpRespTimeout", helper => "gpRespWait");
+            #RemoveInternalTimer(\%timeoutHash);
+            #InternalTimer(gettimeofday() + 3, "EnOcean_RespTimeout", \%timeoutHash, 0);
+            RemoveInternalTimer($hash->{helper}{timer}{gpRespTimeout}) if(exists $hash->{helper}{timer}{gpRespTimeout});
+            $hash->{helper}{timer}{gpRespTimeout} = {hash => $IOHash, function => "gpRespTimeout", helper => "gpRespWait"};
+            InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{gpRespTimeout}, 0);
+         }
         }
         $data = sprintf '%04X', (0x7FF << 1 | $comMode) << 4 | 4;
         my $teachInState = $comMode == 1 ? "teach-in deletion sent, response requested" : "teach-in deletion sent";
@@ -6619,9 +6675,13 @@ sub EnOcean_Parse($$)
         $iohash->{helper}{cdm}{rorg} = $2;
         $iohash->{helper}{cdm}{data}{$idx} = $3;
         $iohash->{helper}{cdm}{lenCounter} = length($3) / 2;
-        my %functionHash = (hash => $iohash, function => "cdm");
-        RemoveInternalTimer(\%functionHash);
-        InternalTimer(gettimeofday() + 1, "EnOcean_helperClear", \%functionHash, 0);
+        #####
+        #my %functionHash = (hash => $iohash, function => "cdm");
+        #RemoveInternalTimer(\%functionHash);
+        #InternalTimer(gettimeofday() + 1, "EnOcean_helperClear", \%functionHash, 0);
+        RemoveInternalTimer($hash->{helper}{timer}{helperClear}) if(exists $hash->{helper}{timer}{helperClear});
+        $hash->{helper}{timer}{helperClear} = {hash => $iohash, function => "cdm"};
+        InternalTimer(gettimeofday() + 1, 'EnOcean_helperClear', $hash->{helper}{timer}{helperClear}, 0);
         #Log3 $IODev, 3, "EnOcean $IODev CDM timer started";
       } else {
         $iohash->{helper}{cdm}{data}{$idx} = $data;
@@ -6645,8 +6705,11 @@ sub EnOcean_Parse($$)
           return "";
         }
         delete $iohash->{helper}{cdm};
-        my %functionHash = (hash => $iohash, function => "cdm");
-        RemoveInternalTimer(\%functionHash);
+        #####
+        #my %functionHash = (hash => $iohash, function => "cdm");
+        #RemoveInternalTimer(\%functionHash);
+        RemoveInternalTimer($hash->{helper}{timer}{helperClear}) if(exists $hash->{helper}{timer}{helperClear});
+        delete $hash->{helper}{timer}{helperClear} if (exists $hash->{helper}{timer}{helperClear});
         #Log3 $IODev, 3, "EnOcean $IODev CDM concatenated DATA $data";
       } else {
         # wait for next data message part
@@ -7093,9 +7156,9 @@ sub EnOcean_Parse($$)
         push @event, "3:$event:$msg";
         $hash->{helper}{lastEvent} = $db[0];
       }
-      RemoveInternalTimer($hash->{helper}{alarmTimer}) if(exists $hash->{helper}{timer}{alarm});
-      @{$hash->{helper}{alarmTimer}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-      InternalTimer(gettimeofday() + 1440, 'EnOcean_readingsSingleUpdate', $hash->{helper}{alarmTimer}, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+      InternalTimer(gettimeofday() + 1440, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
 
     } elsif ($st eq "windSpeed.00") {
       # wind speed threshold detector
@@ -7116,7 +7179,7 @@ sub EnOcean_Parse($$)
         push @event, "3:$event:$msg";
         $hash->{helper}{lastEvent} = $db[0];
       }
-      RemoveInternalTimer($hash->{helper}{alarmTimer}) if(exists $hash->{helper}{timer}{alarm});
+      RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
       @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
       InternalTimer(gettimeofday() + 1320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
 
@@ -7547,7 +7610,7 @@ sub EnOcean_Parse($$)
       readingsSingleUpdate($hash, 'wakeUpCycle', $wakeUpCycle, 1);
       # set alarm timer
       CommandDeleteReading(undef, "$name alarm");
-      RemoveInternalTimer($hash->{helper}{alarmTimer}) if(exists $hash->{helper}{timer}{alarm});
+      RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
       @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'no_response_from_actuator', 1, 3);
       InternalTimer(gettimeofday() + $wakeUpCycle * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
 
@@ -9648,8 +9711,8 @@ sub EnOcean_Parse($$)
           $hash->{helper}{lastEvent} = $alarm;
         }
         push @event, "3:state:$alarm";
-        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
         RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
         InternalTimer(gettimeofday() + 1980, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
       } else {
         my $in0 = $db[1] & 1;
@@ -14319,9 +14382,13 @@ sub EnOcean_4BSRespWait($$$) {
   if (!exists($hash->{IODev}{Teach})) {
     # enable teach-in receiving for 3 sec
     $hash->{IODev}{Teach} = 1;
-    my %timeoutHash = (hash => $IOHash, function => "4BSRespTimeout", helper => "4BSRespWait");
-    RemoveInternalTimer(\%timeoutHash);
-    InternalTimer(gettimeofday() + 3, "EnOcean_RespTimeout", \%timeoutHash, 0);
+    #####
+    #my %timeoutHash = (hash => $IOHash, function => "4BSRespTimeout", helper => "4BSRespWait");
+    #RemoveInternalTimer(\%timeoutHash);
+    #InternalTimer(gettimeofday() + 3, "EnOcean_RespTimeout", \%timeoutHash, 0);
+    RemoveInternalTimer($hash->{helper}{timer}{"4BSRespTimeout"}) if(exists $hash->{helper}{timer}{"4BSRespTimeout"});
+    $hash->{helper}{timer}{"4BSRespTimeout"} = {hash => $IOHash, function => "4BSRespTimeout", helper => "4BSRespWait"};
+    InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{"4BSRespTimeout"}, 0);
   }
   return;
 }
@@ -14720,9 +14787,13 @@ sub EnOcean_observeInit($$@)
   $hash->{helper}{observeCntr} = 1;
   #CommandDeleteReading(undef, "$name observeFailedDev");
   readingsSingleUpdate($hash, "observeFailedDev", "", 0);
-  my %functionHash = (hash => $hash, function => "observe");
-  RemoveInternalTimer(\%functionHash);
-  InternalTimer(gettimeofday() + AttrVal($name, "observeInterval", 1), "EnOcean_observeRepeat", \%functionHash, 0);
+  #####
+  #my %functionHash = (hash => $hash, function => "observe");
+  #RemoveInternalTimer(\%functionHash);
+  #InternalTimer(gettimeofday() + AttrVal($name, "observeInterval", 1), "EnOcean_observeRepeat", \%functionHash, 0);
+  RemoveInternalTimer($hash->{helper}{timer}{observe}) if(exists $hash->{helper}{timer}{observe});
+  $hash->{helper}{timer}{observe} = {hash => $hash, function => "observe"};
+  InternalTimer(gettimeofday() + AttrVal($name, "observeInterval", 1), "EnOcean_observeRepeat", $hash->{helper}{timer}{observe}, 0);
   Log3 $name, 4, "EnOcean set " . join(" ", @cmdValue) . " observing started";
   return ($err, $ctrl);
 }
@@ -14752,8 +14823,10 @@ sub EnOcean_observeParse($$@)
     delete $hash->{helper}{observeRefDev};
     delete $hash->{helper}{lastCmdFunction};
     delete $hash->{helper}{lastCmdValue};
-    my %functionHash = (hash => $hash, function => "observe");
-    RemoveInternalTimer(\%functionHash);
+    #####
+    #my %functionHash = (hash => $hash, function => "observe");
+    #RemoveInternalTimer(\%functionHash);
+    RemoveInternalTimer($hash->{helper}{timer}{observe}) if(exists $hash->{helper}{timer}{observe});
     Log3 $name, 4, "EnOcean $name < $devName $cmd " . join(" ", @cmdValue) . " observing stopped";
   } else {
     # remove the device that has sent a telegram
@@ -14772,8 +14845,10 @@ sub EnOcean_observeParse($$@)
       delete $hash->{helper}{observeRefDev};
       delete $hash->{helper}{lastCmdFunction};
       delete $hash->{helper}{lastCmdValue};
-      my %functionHash = (hash => $hash, function => "observe");
-      RemoveInternalTimer(\%functionHash);
+      #####
+      #my %functionHash = (hash => $hash, function => "observe");
+      #RemoveInternalTimer(\%functionHash);
+      RemoveInternalTimer($hash->{helper}{timer}{observe}) if(exists $hash->{helper}{timer}{observe});
       Log3 $name, 4, "EnOcean $name < $devName $cmd " . join(" ", @cmdValue) . " observing stopped";
     }
   }
@@ -15035,20 +15110,29 @@ sub EnOcean_energyManagement_01Parse($@)
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "randomEnd", $randomEnd);
   readingsBulkUpdate($hash, "randomStart", $randomStart);
-  my %timeoutHash = (hash => $hash, function => "demandResponseTimeout");
-  my %functionHash = (hash            => $hash,
-                      function        => "demandResponseExec",
-                      drLevel         => $drLevel,
-                      powerUsage      => $powerUsage,
-                      powerUsageLevel => $powerUsageLevel,
-                      powerUsageScale => $powerUsageScale,
-                      setpoint        => $setpoint
-                     );
-  RemoveInternalTimer(\%timeoutHash);
-  RemoveInternalTimer(\%functionHash);
+  #my %timeoutHash = (hash => $hash, function => "demandResponseTimeout");
+  #my %functionHash = (hash            => $hash,
+  #                    function        => "demandResponseExec",
+  #                    drLevel         => $drLevel,
+  #                    powerUsage      => $powerUsage,
+  #                    powerUsageLevel => $powerUsageLevel,
+  #                    powerUsageScale => $powerUsageScale,
+  #                    setpoint        => $setpoint
+  #                   );
+  $hash->{helper}{timer}{demandResponseTimeout} = {hash => $hash, function => "demandResponseTimeout"};
+  $hash->{helper}{demandResponseExec} = {hash            => $hash,
+                                         function        => "demandResponseExec",
+                                         drLevel         => $drLevel,
+                                         powerUsage      => $powerUsage,
+                                         powerUsageLevel => $powerUsageLevel,
+                                         powerUsageScale => $powerUsageScale,
+                                         setpoint        => $setpoint
+                                        };
+  RemoveInternalTimer($hash->{helper}{timer}{demandResponseTimeout}) if (exists $hash->{helper}{timer}{demandResponseTimeout});
+  RemoveInternalTimer($hash->{helper}{demandResponseExec}) if (exists $hash->{helper}{demandResponseExec});
   if ($timeout > 0 && $drLevel < 15) {
     # timeout timer
-    InternalTimer(gettimeofday() + $timeout, "EnOcean_demandResponseTimeout", \%timeoutHash, 0);
+    InternalTimer(gettimeofday() + $timeout, "EnOcean_demandResponseTimeout", $hash->{helper}{timer}{demandResponseTimeout}, 0);
     my ($sec, $min, $hour, $day, $month, $year) = localtime(time + $timeout);
     $month += 1;
     $year += 1900;
@@ -15063,13 +15147,13 @@ sub EnOcean_energyManagement_01Parse($@)
   if ($randomStart eq "yes" && ReadingsVal($name, "level", 15) == 15) {
     readingsBulkUpdate($hash, "state", "waiting_for_start");
     Log3 $name, 3, "EnOcean set $name demand response waiting for start";
-    InternalTimer(gettimeofday() + $randomTime, "EnOcean_demandResponseExec", \%functionHash, 0);
+    InternalTimer(gettimeofday() + $randomTime, "EnOcean_demandResponseExec", $hash->{helper}{demandResponseExec}, 0);
   } elsif ($randomEnd eq "yes" && ReadingsVal($name, "level", 15) < 15) {
     readingsBulkUpdate($hash, "state", "waiting_for_stop");
     Log3 $name, 3, "EnOcean set $name demand response waiting for stop";
-    InternalTimer(gettimeofday() + $randomTime, "EnOcean_demandResponseExec", \%functionHash, 0);
+    InternalTimer(gettimeofday() + $randomTime, "EnOcean_demandResponseExec", $hash->{helper}{demandResponseExec}, 0);
   } else {
-    EnOcean_demandResponseExec(\%functionHash);
+    EnOcean_demandResponseExec($hash->{helper}{demandResponseExec});
   }
   readingsEndUpdate($hash, 1);
   return;
@@ -15234,9 +15318,13 @@ sub EnOcean_sndUTE($$$$$$$) {
     if (!exists($hash->{IODev}{Teach})) {
       # enable teach-in receiving for 3 sec
       $hash->{IODev}{Teach} = 1;
-      my %timeoutHash = (hash => $IOHash, function => "UTERespTimeout", helper => "UTERespWait");
-      RemoveInternalTimer(\%timeoutHash);
-      InternalTimer(gettimeofday() + 3, "EnOcean_RespTimeout", \%timeoutHash, 0);
+      #####
+      #my %timeoutHash = (hash => $IOHash, function => "UTERespTimeout", helper => "UTERespWait");
+      #RemoveInternalTimer(\%timeoutHash);
+      #InternalTimer(gettimeofday() + 3, "EnOcean_RespTimeout", \%timeoutHash, 0);
+      RemoveInternalTimer($hash->{helper}{timer}{UTERespTimeout}) if(exists $hash->{helper}{timer}{UTERespTimeout});
+      $hash->{helper}{timer}{UTERespTimeout} = {hash => $IOHash, function => "UTERespTimeout", helper => "UTERespWait"};
+      InternalTimer(gettimeofday() + 3, 'EnOcean_RespTimeout', $hash->{helper}{timer}{UTERespTimeout}, 0);
     }
   }
   $attr{$name}{devChannel} = $devChannel;
@@ -15263,9 +15351,13 @@ sub EnOcean_setTeachConfirmWaitHash($) {
   my ($ctrl, $hash) = @_;
   if (AttrVal($hash->{NAME}, "teachMethod", "") eq 'confirm') {
     $hash->{IODev}{helper}{teachConfirmWaitHash} = $hash;
-    my %functionHash = (hash => $hash->{IODev}, function => "teachConfirmWaitHash");
-    RemoveInternalTimer(\%functionHash);
-    InternalTimer(gettimeofday() + 5, "EnOcean_helperClear", \%functionHash, 0);
+    #####
+    #my %functionHash = (hash => $hash->{IODev}, function => "teachConfirmWaitHash");
+    #RemoveInternalTimer(\%functionHash);
+    #InternalTimer(gettimeofday() + 5, "EnOcean_helperClear", \%functionHash, 0);
+    RemoveInternalTimer($hash->{helper}{timer}{teachConfirmWaitHash}) if(exists $hash->{helper}{timer}{teachConfirmWaitHash});
+    $hash->{helper}{timer}{teachConfirmWaitHash} = {hash => $hash->{IODev}, function => "teachConfirmWaitHash"};
+    InternalTimer(gettimeofday() + 5, 'EnOcean_helperClear', $hash->{helper}{timer}{teachConfirmWaitHash}, 0);
   }
   return;
 }
