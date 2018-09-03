@@ -1597,7 +1597,7 @@ sub XiaomiDevice_GetUpdate($)
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan")
   {
     $hash->{helper}{packet}{$packetid} = "fan_data";
-    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["angle","angle_enable","power","bat_charge","battery","speed_level","natural_level","buzzer","led_b","poweroff_time","ac_power","child_lock","temp_dec","humidity","speed"]}' );
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["angle","angle_enable","power","bat_charge","battery","speed_level","natural_level","buzzer","led_b","poweroff_time","ac_power","child_lock","temp_dec","humidity","speed","button_pressed"]}' );
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartLamp")
   {
@@ -1664,7 +1664,7 @@ sub XiaomiDevice_GetSettings($)
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "fan_data";
-    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["angle","angle_enable","power","bat_charge","battery","speed_level","natural_level","buzzer","led_b","poweroff_time","ac_power","child_lock","temp_dec","humidity","speed"]}' );
+    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["angle","angle_enable","power","bat_charge","battery","speed_level","natural_level","buzzer","led_b","poweroff_time","ac_power","child_lock","temp_dec","humidity","speed","button_pressed"]}' );
   }
 
   if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartLamp")
@@ -2122,9 +2122,9 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "angle", (int($json->{result}[0])==118)?"120":$json->{result}[0], 1 ) if(defined($json->{result}[0]));
     readingsBulkUpdate( $hash, "angle_enable", $json->{result}[1], 1 ) if(defined($json->{result}[1]));
     readingsBulkUpdate( $hash, "power", $json->{result}[2], 1 ) if(defined($json->{result}[2]));
-    readingsBulkUpdate( $hash, "charging", $json->{result}[3], 1 ) if(defined($json->{result}[3]));
-    readingsBulkUpdate( $hash, "batteryPercent", $json->{result}[4], 1 ) if(defined($json->{result}[4]));
-    readingsBulkUpdate( $hash, "batteryState", int($json->{result}[4])<20 ? "low" : "ok", 1 ) if(defined($json->{result}[4]));
+    readingsBulkUpdate( $hash, "charging", $json->{result}[3], 1 ) if(defined($json->{result}[3]) && $json->{result}[3] ne "null");
+    readingsBulkUpdate( $hash, "batteryPercent", $json->{result}[4], 1 ) if(defined($json->{result}[4]) && $json->{result}[4] ne "null");
+    readingsBulkUpdate( $hash, "batteryState", int($json->{result}[4])<20 ? "low" : "ok", 1 ) if(defined($json->{result}[4]) && $json->{result}[4] ne "null");
     my $fanspeed = 0;
     $fanspeed = $json->{result}[5] if(defined($json->{result}[5]));
     $fanspeed = $json->{result}[6] if(defined($json->{result}[6]) && int($json->{result}[6])>0);
@@ -2137,9 +2137,10 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "poweroff_time", $json->{result}[9], 1 ) if(defined($json->{result}[9]));
     readingsBulkUpdate( $hash, "ac_power", $json->{result}[10], 1 ) if(defined($json->{result}[10]));
     readingsBulkUpdate( $hash, "child_lock", $json->{result}[11], 1 ) if(defined($json->{result}[11]));
-    readingsBulkUpdate( $hash, "temperature", $json->{result}[12]/10, 1 ) if(defined($json->{result}[12]));
-    readingsBulkUpdate( $hash, "humidity", $json->{result}[13], 1 ) if(defined($json->{result}[13]));
+    readingsBulkUpdate( $hash, "temperature", $json->{result}[12]/10, 1 ) if(defined($json->{result}[12]) && $json->{result}[12] ne "null");
+    readingsBulkUpdate( $hash, "humidity", $json->{result}[13], 1 ) if(defined($json->{result}[13]) && $json->{result}[13] ne "null");
     readingsBulkUpdate( $hash, "speed", $json->{result}[14], 1 ) if(defined($json->{result}[14]));
+    readingsBulkUpdate( $hash, "button_pressed", $json->{result}[15], 1 ) if(defined($json->{result}[15]) && $json->{result}[15] ne "null");
     readingsEndUpdate($hash,1);
     return undef;
   }
@@ -2578,7 +2579,6 @@ sub XiaomiDevice_ParseJSON($$)
     return undef;
   }
 
-
   Log3 $name, 5, "$name: parse result for ".$json->{id}." is ".$json->{result} if($json->{result});
 
   return InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetSpeed", $hash) if($msgtype eq "set_level");
@@ -2587,7 +2587,7 @@ sub XiaomiDevice_ParseJSON($$)
   InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "power_on" || $msgtype eq "power_off");
   return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "set_poweroff_time");
 
-  return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "app_start" || $msgtype eq "app_spot"  || $msgtype eq "app_zoned_clean");
+  return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "app_start" || $msgtype eq "app_spot"  || $msgtype eq "app_zoned_clean" || $msgtype eq "resume_zoned_clean");
   return InternalTimer( gettimeofday() + 10, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "app_stop" || $msgtype eq "app_pause" || $msgtype eq "app_goto_target");
   return InternalTimer( gettimeofday() + 60, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "app_charge");
 
