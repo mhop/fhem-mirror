@@ -1,8 +1,8 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 1/2018
-my $thzversion = "0.178"; 
+# by immi 9/2018
+my $thzversion = "0.180";  #   
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -278,8 +278,13 @@ my %parsinghash = (
 	      [" dewPoint: ",		    82, 4, "hex2int", 10],
 	      [" P_Nd: ",		        86, 4, "hex2int", 100],	[" P_Hd: ",			        90, 4, "hex2int", 100],
 	      [" actualPower_Qc: ",	    94, 8, "esp_mant", 1],	[" actualPower_Pel: ",		102, 8, "esp_mant", 1],
-	      [" collectorTemp: ",	    4,  4, "hex2int", 10],	[" insideTemp: ",		    32, 4, "hex2int", 10] 
-	      ],
+	      [" collectorTemp: ",	    4,  4, "hex2int", 10],	[" insideTemp: ",		    32, 4, "hex2int", 10], 
+	      [" windowOpen: ",	        47, 1, "bit2", 1], # board X18-1 clamp X4-FA (FensterAuf): window open - signal out 230V
+		  [" quickAirVent: ",	    48, 1, "bit3", 1], # board X15-8 clamp X4-SL (SchnellLüftung): quickAirVent - signal in 230V
+		  [" flowRate: ",	        110, 4, "hex", 10], # board X51 sensor P5 (on newer models B1 flow temp as well)
+		  [" p_HCw: ",		        114, 4, "hex", 100],# board X4-1..3 sensor P4 HC water pressure
+		  [" humidityAirOut: ",	    154, 4, "hex", 100] # board X4-4..6 sensor B15
+          ],
   "FBglob214" => [["outsideTemp: ", 8, 4, "hex2int", 10],	[" flowTemp: ",		        12, 4, "hex2int", 10],
 	      [" returnTemp: ",		    16, 4, "hex2int", 10],  [" hotGasTemp: ", 	        20, 4, "hex2int", 10],
 	      [" dhwTemp: ",	 	    24, 4, "hex2int", 10],  [" flowTempHC2: ",	        28, 4, "hex2int", 10],
@@ -584,11 +589,16 @@ my %sets439539common = (
   "programFan_Sa-So_2"			=> {cmd2=>"0A1D92", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programFan_Mo-So_0"			=> {cmd2=>"0A1DA0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programFan_Mo-So_1"			=> {cmd2=>"0A1DA1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programFan_Mo-So_2"			=> {cmd2=>"0A1DA2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""}
+  "programFan_Mo-So_2"			=> {cmd2=>"0A1DA2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "pOvenFireplace"			    => {cmd2=>"0A057C", argMin =>  "0",     argMax =>  "4",     type =>"1clean",  unit =>""}, #Ofen / Kamin (0=Aus … 4= oeffner - ueberwachung)
+    #OFF/    N-O_CONTACT_OFF/       N-C_CONTACT_OFF/     N-O_MONITORING/    N-C_MONITORING
+    #LLWT = LuftLuftWärmeTauscher - AirAirHeatExchanger
+  "p85MaxDefrostDur"	        => {cmd2=>"0A057D", argMin =>  "60", argMax =>   "250",	type =>"1clean",  unit =>" min"},
+  "p85DefrStartThreshold"       => {cmd2=>"0A057E", argMin =>  "0",  argMax =>   "50",	type =>"1clean",  unit =>" %"},  #LLWT_Abtaubeginnschwelle (%) -
+  "p85FilterSpeed"              => {cmd2=>"0A057F", argMin =>  "0",  argMax =>   "100",	type =>"1clean",  unit =>" %"}   #LLWT_DrehzahlFilter (%) - increase in VentSpeed to indicate dirt / replacement needed 
   );
 
-  
-  
+
   
 my %sets439only =(
   "p75passiveCooling"			=> {cmd2=>"0A0575", argMin =>   "0", argMax =>    "2",	type =>"1clean",  unit =>""}   
@@ -936,8 +946,9 @@ sub THZ_Refresh_all_gets($) {
   my ($hash) = @_;
   RemoveInternalTimer(0, "THZ_GetRefresh");
   #THZ_RemoveInternalTimer("THZ_GetRefresh"); not needed since https://svn.fhem.de/trac/changeset/15667/ because now there is a second parameter for the function
+  #Log3 $hash->{NAME}, 3, "THZ_GetRefresh_all ";
   Log3 $hash->{NAME}, 5, "thzversion = $thzversion ";
-  my $timedelay= 15; 						#5 seconds were ok but considering winter 2017/2018 I prefer to increase
+  my $timedelay= 65; 						#5 seconds were ok but considering winter 2017/2018 I prefer to increase
   foreach  my $cmdhash  (keys %gets) {
     my %par = (  hash => $hash, command => $cmdhash );
     #RemoveInternalTimer(\%par); #commented out in  v.0161 because appearently redundant; THZ_RemoveInternalTimer is more efficient and both are not needed
@@ -983,7 +994,7 @@ sub THZ_GetRefresh($) {
       THZ_Get($hash, $hash->{NAME}, $command) if ($hash->{STATE} ne "disconnected");
     }
     
-    if ($interval) {
+    if (($interval) and ($hash->{STATE} ne "disconnected")) {
 			  $interval = 60 if ($interval < 60); #do not allow intervall <60 sec 
 			  InternalTimer(gettimeofday()+ $interval, "THZ_GetRefresh", $par, 1) ;
 	}
@@ -1089,8 +1100,8 @@ sub THZ_testtimer($) {
  }
  Log3 $hash->{NAME}, 5, $stringa;
 }
-  
 
+     
 #####################################
 #
 # THZ_Ready($) - Cchecks the status
@@ -1101,10 +1112,10 @@ sub THZ_testtimer($) {
 sub THZ_Ready($) {
   my ($hash) = @_;
   if($hash->{STATE} eq "disconnected")
-  { RemoveInternalTimer(0, "THZ_GetRefresh");
+  { #RemoveInternalTimer(0, "THZ_GetRefresh"); #non necessario in THZ_getrefresh non vengono piu' rinnoovati
    #THZ_testtimer($hash);
-    #THZ_RemoveInternalTimer("THZ_GetRefresh");
-  select(undef, undef, undef, 0.25); #equivalent to sleep 250ms
+  select(undef, undef, undef, 0.010); #equivalent to sleep 10ms
+  #Log3 $hash->{NAME}, 3, "THZ_Ready: readyevent";
   return DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets")
   }	
     # This is relevant for windows/USB only
@@ -1845,42 +1856,45 @@ sub THZ_Parse1($$) {
       my $divisor = $parsingelement->[4];
       #check if parsing out of message, and fill with zeros; the other possibility is to skip the step.
       if (length($message) < ($positionInMsg + $lengthInMsg))    {
-      	Log3 $hash->{NAME}, 3, "THZ_Parsing: offset($positionInMsg) + length($lengthInMsg) is longer then message : '$message'"; 
-      	$message.= '0' x ($positionInMsg + $lengthInMsg - length($message)); # fill up with 0s to the end if needed
-      	#Log3 $hash->{NAME},3, "after: '$message'"; 
+      	Log3 $hash->{NAME}, 5, "THZ_Parsing: offset($positionInMsg) + length($lengthInMsg) is longer then message : '$message'"; 
+      	#$message.= '0' x ($positionInMsg + $lengthInMsg - length($message)); # fill up with 0s to the end if needed
+      	#line above redundant because of  else below added 9.2018; 
+        #Log3 $hash->{NAME},3, "after: '$message'"; 
       }
-      my $value = substr($message, $positionInMsg, $lengthInMsg);
-      if    ($Type eq "hex")		{$value= hex($value);}
-      elsif ($Type eq "year")		{$value= hex($value)+2000;}
-      elsif ($Type eq "hex2int")	{$value= hex2int($value);}
-      elsif ($Type eq "turnhexdate")	{$value= substr($value, 2,2) . substr($value, 0,2); $value= sprintf("%02u.%02u", hex($value)/100, hex($value)%100); }
-      elsif ($Type eq "hexdate")	{$value= sprintf("%02u.%02u", hex($value)/100, hex($value)%100) ;}
-      #elsif ($Type eq "turnhex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 2,2) . substr($value, 0,2))/100))) ;}
-      #elsif ($Type eq "hex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 0,2) . substr($value, 2,2))/100))) ;}
-      elsif ($Type eq "turnhex2time")	{$value= substr($value, 2,2) . substr($value, 0,2); $value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100); }
-      elsif ($Type eq "hex2time")	{$value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100) ;}
-      elsif ($Type eq "swver")		{$value= sprintf("%01u.%02u", hex(substr($value, 0,2)), hex(substr($value, 2,2)));}
-      elsif ($Type eq "hex2ascii")	{$value= uc(pack('H*', $value));}
-      elsif ($Type eq "opmode")		{$value= $OpMode{hex($value)};}
-      elsif ($Type eq "opmode2")	{$value= $opMode2{hex($value)};}
-      elsif ($Type eq "opmodehc")	{$value= $OpModeHC{hex($value)};}
-      elsif ($Type eq "esp_mant") 	{$value= sprintf("%.3f", unpack('f', pack( 'L',  reverse(hex($value)))));}
-      elsif ($Type eq "somwinmode")	{$value= $SomWinMode{($value)};}
-      #elsif ($Type eq "hex2wday")	{$value= bitmap2string(unpack('b7', pack('H*',$value)), \%weekdaymap);}
-      elsif ($Type eq "hex2error")	{$value= bitmap2string(unpack('b32', pack('H*',$value)), \%faultmap);}
-      elsif ($Type eq "weekday")	{$value= $weekday{($value)};}
-      elsif ($Type eq "faultmap")	{$value= $faultmap{(hex($value))};}
-      elsif ($Type eq "quater")		{$value= quaters2time($value);}
-      elsif ($Type eq "bit0")		{$value= (hex($value) &  0b0001) / 0b0001;}
-      elsif ($Type eq "bit1")		{$value= (hex($value) &  0b0010) / 0b0010;}
-      elsif ($Type eq "bit2")		{$value= (hex($value) &  0b0100) / 0b0100;}
-      elsif ($Type eq "bit3")		{$value= (hex($value) &  0b1000) / 0b1000;}
-      elsif ($Type eq "nbit0")		{$value= 1-((hex($value) &  0b0001) / 0b0001);}
-      elsif ($Type eq "nbit1")		{$value= 1-((hex($value) &  0b0010) / 0b0010);}
-      elsif ($Type eq "raw")		{;}
-      elsif ($Type eq "n.a.")		{$value= "n.a.";}
-      $value = $value/$divisor if ($divisor != 1); 
-      $ParsedMsg .= $parsingtitle . $value; 
+      else {
+          my $value = substr($message, $positionInMsg, $lengthInMsg);
+          if    ($Type eq "hex")		{$value= hex($value);}
+          elsif ($Type eq "year")		{$value= hex($value)+2000;}
+          elsif ($Type eq "hex2int")	{$value= hex2int($value);}
+          elsif ($Type eq "turnhexdate")	{$value= substr($value, 2,2) . substr($value, 0,2); $value= sprintf("%02u.%02u", hex($value)/100, hex($value)%100); }
+          elsif ($Type eq "hexdate")	{$value= sprintf("%02u.%02u", hex($value)/100, hex($value)%100) ;}
+          #elsif ($Type eq "turnhex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 2,2) . substr($value, 0,2))/100))) ;}
+          #elsif ($Type eq "hex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 0,2) . substr($value, 2,2))/100))) ;}
+          elsif ($Type eq "turnhex2time")	{$value= substr($value, 2,2) . substr($value, 0,2); $value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100); }
+          elsif ($Type eq "hex2time")	{$value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100) ;}
+          elsif ($Type eq "swver")		{$value= sprintf("%01u.%02u", hex(substr($value, 0,2)), hex(substr($value, 2,2)));}
+          elsif ($Type eq "hex2ascii")	{$value= uc(pack('H*', $value));}
+          elsif ($Type eq "opmode")		{$value= $OpMode{hex($value)};}
+          elsif ($Type eq "opmode2")	{$value= $opMode2{hex($value)};}
+          elsif ($Type eq "opmodehc")	{$value= $OpModeHC{hex($value)};}
+          elsif ($Type eq "esp_mant") 	{$value= sprintf("%.3f", unpack('f', pack( 'L',  reverse(hex($value)))));}
+          elsif ($Type eq "somwinmode")	{$value= $SomWinMode{($value)};}
+          #elsif ($Type eq "hex2wday")	{$value= bitmap2string(unpack('b7', pack('H*',$value)), \%weekdaymap);}
+          elsif ($Type eq "hex2error")	{$value= bitmap2string(unpack('b32', pack('H*',$value)), \%faultmap);}
+          elsif ($Type eq "weekday")	{$value= $weekday{($value)};}
+          elsif ($Type eq "faultmap")	{$value= $faultmap{(hex($value))};}
+          elsif ($Type eq "quater")		{$value= quaters2time($value);}
+          elsif ($Type eq "bit0")		{$value= (hex($value) &  0b0001) / 0b0001;}
+          elsif ($Type eq "bit1")		{$value= (hex($value) &  0b0010) / 0b0010;}
+          elsif ($Type eq "bit2")		{$value= (hex($value) &  0b0100) / 0b0100;}
+          elsif ($Type eq "bit3")		{$value= (hex($value) &  0b1000) / 0b1000;}
+          elsif ($Type eq "nbit0")		{$value= 1-((hex($value) &  0b0001) / 0b0001);}
+          elsif ($Type eq "nbit1")		{$value= 1-((hex($value) &  0b0010) / 0b0010);}
+          elsif ($Type eq "raw")		{;}
+          elsif ($Type eq "n.a.")		{$value= "n.a.";}
+          $value = $value/$divisor if ($divisor != 1); 
+          $ParsedMsg .= $parsingtitle . $value; 
+        }
     }
   }
   return (undef, $ParsedMsg);
@@ -1898,7 +1912,7 @@ sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
   my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'F8', 'FB', 'FC', 'FD', 'FE', 'FF');
-  #my @numbers=('FB', 'FB', 'FB', 'FB', 'FB', 'FB', 'FB', '0A05B3', '0A05B4', '0B0264', '0B0287', '0B0582', '0B0583', '0B0584', '0A0126','0A0265', '0A0597', '0A0598', '0A0599', '0A059C','0A05AD', '0A05B0', '0A05DD', '0A05DE', '0A0BA3');
+  #my @numbers=('FB',  '0A0BA3', '0A057C', '0A057D', '0A057E', '0A057F' );
   #my @numbers=(1, 3, 4, 5, 8, 12, 13, 14, 15, 17, 18, 19, 20, 22, 26, 39, 40, 82, 83, 86, 87, 96, 117, 128, 239, 265, 268, 269, 270, 271, 274, 275, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 297, 299, 317, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 603, 607, 612, 613, 634, 647, 650, 961, 1385, 1386, 1387, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 830, 1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 1555, 272, 1489, 1490, 1491, 1492, 1631, 933, 934, 1634, 928, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, 2029, 2030, 2031, 2032, 2033);
   #my @numbers=(1, 3, 12, 13, 14, 15, 19, 20, 22, 26, 39,  82, 83, 86, 87, 96, 239, 265, 268, 274, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 613, 634, 961, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409,  1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 2970, 2971, 2975, 2976, 2977, 2978, 2979, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 272, 1489, 1491, 1492, 1631, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, );
  # my @numbers=(239, 410, 603, 607, 634, 830, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1467, 1468, 1469, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1501, 1502, 374, 1631, 718, 2372, 328);
@@ -2290,7 +2304,8 @@ sub THZ_backup_readings($){
 
 =pod
 =item device
-=item summary   Monitors and controls Tecalor/StiebelEltron heatpumps via serial interface 
+=item summary Monitors and controls Tecalor/StiebelEltron heatpumps via RS232 or ser2net
+=item summary_DE Kommuniziert mittels RS232 oder ser2net mit einer Tecalor/SE W&auml;rmepumpe
 =begin html
 
 <a name="THZ"></a>
