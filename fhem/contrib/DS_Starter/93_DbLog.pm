@@ -2708,7 +2708,7 @@ sub DbLog_Get($@) {
     }
 
 
-    Log3 $hash->{NAME}, 1, "Processing Statement: $stm";
+    Log3 $hash->{NAME}, 4, "Processing Statement: $stm";
 
     my $sth= $dbh->prepare($stm) ||
       return "Cannot prepare statement $stm: $DBI::errstr";
