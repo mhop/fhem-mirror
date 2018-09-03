@@ -111,6 +111,7 @@ sub addEvent($$);
 sub addToDevAttrList($$);
 sub delFromDevAttrList($$);
 sub addToAttrList($);
+sub delFromAttrList($);
 sub addToWritebuffer($$@);
 sub attrSplit($);
 sub computeClientArray($$);
@@ -3981,6 +3982,12 @@ sub
 addToAttrList($)
 {
   addToDevAttrList("global", shift);
+}
+
+sub 
+delFromAttrList($)
+{
+  delFromDevAttrList("global", shift);
 }
 
 # device specific attrList, overwrites module AttrList, user undef for $argList
