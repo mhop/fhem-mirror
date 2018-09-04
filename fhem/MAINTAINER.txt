@@ -86,6 +86,8 @@ FHEM/11_OWX_FRM.pm           pahenning            1Wire
 FHEM/11_OWX_CCC.pm           pahenning            1Wire
 FHEM/14_Hideki.pm            Sidey/Ralf9          Sonstige Systeme
 FHEM/12_HMS.pm               rudolfkoenig         SlowRF
+FHEM/12_HProtocolGateway.pm  eisler               Sonstige Systeme
+FHEM/12_HProtocolTank.pm     eisler               Sonstige Systeme
 FHEM/13_KS300.pm             rudolfkoenig         SlowRF
 FHEM/14_CUL_MAX.pm           rudolfkoenig/orphan  MAX
 FHEM/14_CUL_REDIRECT.pm      dancer0705/bjoernh   Sonstiges

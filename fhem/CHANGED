@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - new:     12_HProtocolGateway / 12_HProtocolTank 
   - bugfix:  72_XiaomiDevice: remove unused battery readings for new fans
   - feature: 49_SSCam: activate/deactivate cam internal PIR-sensor 
   - new:     10_MQTT_GENERIC_BRIDGE an MQTT bridge, which simultaneously 
