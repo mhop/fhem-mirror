@@ -442,6 +442,7 @@ FHEM/98_ModbusAttr.pm        stefanstrobel        Sonstiges
 FHEM/98_ModbusSET.pm         stefanstrobel        Sonstiges
 FHEM/98_ModbusTrovis5576.pm  Reinerlein           Heizungssteuerung/Raumklima
 FHEM/98_PID20.pm             John                 Automatisierung
+FHEM/98_PHC.pm               stefanstrobel        Sonstiges
 FHEM/98_RandomTimer.pm       igami                Unterstuetzende Dienste/Kalendermodule
 FHEM/98_SVG.pm               rudolfkoenig         Frontends/SVG/Plots/logProxy
 FHEM/98_THRESHOLD.pm         damian-s             Automatisierung
