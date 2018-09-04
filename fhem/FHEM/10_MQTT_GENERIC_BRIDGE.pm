@@ -29,7 +29,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 0.9.3 by hexenmeister\n$cvsid";
+my $VERSION = "version 0.9.4 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -394,6 +394,12 @@ sub removeOldUserAttr($;$$) {
   # kann spaeter auch delFromDevAttrList Methode genutzt werden
   my @devices = devspec2array($devspec);
   foreach my $dev (@devices) {
+    # TODO: eingekommentieren, alte entfernen, testen
+    #delFromDevAttrList($dev,$prefix.CTRL_ATTR_NAME_DEFAULTS);
+    #delFromDevAttrList($dev,$prefix.CTRL_ATTR_NAME_ALIAS);
+    #delFromDevAttrList($dev,$prefix.CTRL_ATTR_NAME_PUBLISH);
+    #delFromDevAttrList($dev,$prefix.CTRL_ATTR_NAME_SUBSCRIBE);
+    #delFromDevAttrList($dev,$prefix.CTRL_ATTR_NAME_IGNORE);
     my $ua = $main::attr{$dev}{userattr};
     if (defined $ua) {
       my %h = map { ($_ => 1) } split(" ", "$ua");
@@ -1531,16 +1537,20 @@ sub Attr($$$$) {
     #
     $attribute eq "IODev" and do {
       my $ioDevType = undef;
-      $ioDevType = $defs{$value}{TYPE} if defined $defs{$value};
+      $ioDevType = $defs{$value}{TYPE} if defined ($value) and defined ($defs{$value});
       $hash->{+HELPER}->{+IO_DEV_TYPE} = $ioDevType;
 
       if ($main::init_done) {
         if ($command eq "set") {
-          MQTT::client_stop($hash) if $ioDevType eq 'MQTT';
-          $main::attr{$name}{IODev} = $value;
-          MQTT::client_start($hash) if $ioDevType eq 'MQTT';
+          unless (defined ($hash->{IODev}) and ($hash->{IODev} eq $value) ) {
+            MQTT::client_stop($hash) if defined($main::attr{$name}{IODev}) and ($main::attr{$name}{IODev} eq 'MQTT');
+            $main::attr{$name}{IODev} = $value;
+            $hash->{IODev} = $value;
+            RemoveAllSubscripton($hash);
+            MQTT::client_start($hash) if defined ($ioDevType) and ($ioDevType eq 'MQTT');
+          }
         } else {
-          MQTT::client_stop($hash) if $ioDevType eq 'MQTT';
+          MQTT::client_stop($hash) if defined ($ioDevType) and ($ioDevType eq 'MQTT');
         }
       }
       last;
