@@ -1543,7 +1543,9 @@ sub MSwitch_Cmd(@) {
                 InternalTimer( $timecond, "MSwitch_repeat", $msg );
             }
         }
-		$cmds =~ s/\n//g;
+		#$cmds =~ s/\n//g;
+		my $todec = $cmds;
+		$cmds = MSwitch_dec($hash,$todec);
         ############################
         if ( $cmds =~ m/{.*}/ ) 
 		{
