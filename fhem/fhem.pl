@@ -4988,6 +4988,10 @@ json2nameValue($;$)
       $ret->{"$prefix$name"} = $1;
       $in = $2;
 
+    } elsif($val =~ m/^(true|false)(.*)$/s) {
+      $ret->{"$prefix$name"} = $1;
+      $in = $2;
+
     } else {
       Log 1, "Error parsing $val";
       $in = "";
