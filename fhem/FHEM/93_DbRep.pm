@@ -9436,7 +9436,7 @@ return;
                                  
                                  <ul>
                                  <b>Example: </b> <br> 
-                                 set &lt;name&gt; deviceRename &lt;old device name&gt;,&lt;new device name&gt;  <br>               
+                                 set &lt;name&gt; deviceRename ST_5000,ST5100  <br>               
                                  # The amount of renamed device names (datasets) will be displayed in reading "device_renamed". <br>
                                  # If the device name to be renamed was not found in the database, a WARNUNG will appear in reading "device_not_renamed". <br>
                                  # Appropriate entries will be written to Logfile if verbose >= 3 is set.
@@ -11245,7 +11245,7 @@ sub bdump {
                                  
                                  <ul>
                                  <b>Beispiel: </b><br>  
-                                 set &lt;name&gt; deviceRename &lt;alter Devicename&gt;,&lt;neuer Devicename&gt;  <br>               
+                                 set &lt;name&gt; deviceRename ST_5000,ST5100  <br>               
                                  # Die Anzahl der umbenannten Device-Datensätze wird im Reading "device_renamed" ausgegeben. <br>
                                  # Wird der umzubenennende Gerätename in der Datenbank nicht gefunden, wird eine WARNUNG im Reading "device_not_renamed" ausgegeben. <br>
                                  # Entsprechende Einträge erfolgen auch im Logfile mit verbose=3
