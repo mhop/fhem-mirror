@@ -1983,10 +1983,15 @@ FW_parseColumns($)
       foreach my $group (split(",",$groups)) {
         $group =~ s/%20/ /g; # Forum #33612
         $group = "^$group\$"; #71381
-        foreach my $g (grep /$group/ ,@grouplist) {
-          next if($handled{$g});
-          $handled{$g} = 1;
-          $columns{$g} = [$lineNo++, $colNo]; #23212
+        eval { "Hallo" =~ m/^$group$/ };
+        if($@) {
+          Log3 $FW_wname, 1, "Bad regexp in column spec: $@";
+        } else {
+          foreach my $g (grep /$group/ ,@grouplist) {
+            next if($handled{$g});
+            $handled{$g} = 1;
+            $columns{$g} = [$lineNo++, $colNo]; #23212
+          }
         }
       }
       $colNo++;
