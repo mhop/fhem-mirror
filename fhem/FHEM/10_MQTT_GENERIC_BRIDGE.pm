@@ -29,7 +29,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 0.9.4 by hexenmeister\n$cvsid";
+my $VERSION = "version 0.9.5 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -136,8 +136,12 @@ BEGIN {
     defs
     AttrVal
     ReadingsVal
+    ReadingsTimestamp
+    ReadingsAge
+    deviceEvents
     AssignIoPort
     addToDevAttrList
+    delFromDevAttrList
     devspec2array
     gettimeofday
     InternalTimer
@@ -1242,28 +1246,43 @@ sub Notify() {
     return "" unless ($size>0);
   }
 
-  foreach my $event (@{$dev->{CHANGED}}) {
-    #Log3($hash->{NAME},5,"Notify for $dev->{NAME} event: $event STATE: $dev->{STATE}");
+#Log3($hash->{NAME},1,"Notify for $dev->{NAME}>>>>>>>>  ".Dumper($dev)) if $dev->{NAME} eq 'sonoff_8';
+#Log3($hash->{NAME},1,"Notify for $dev->{NAME}>>>>>>>>  ".Dumper(deviceEvents($dev,1))) if $dev->{NAME} eq 'sonoff_8';
+
+  #foreach my $event (@{$dev->{CHANGED}}) {
+  foreach my $event (@{deviceEvents($dev,1)}) {
+    #Log3($hash->{NAME},1,"Notify for $dev->{NAME} event: $event STATE: $dev->{STATE}");
     $event =~ /^([^:]+)(: )?(.*)$/;
     #Log3($hash->{NAME},1,"MQTT-GB:DEBUG:> event: $event, '".((defined $1) ? $1 : "-undef-")."', '".((defined $3) ? $3 : "-undef-")."'");
     my $devreading = undef;
     my $devval = undef;
     # pruefen, ob der neue Wert dem 'state' des Devices entspricht
     #   {$defs{$dev}{STATE}}
-    if ($dev->{STATE} ne $event) {
+    #Log3($hash->{NAME},1,"Notify for $dev->{NAME} : state: ".ReadingsVal($dev->{NAME},'state','nö'));
+    # Wenn Readings 'state' existiert. Nicht STATE! Wenn der Wert dem neuen 'change' gleich ist. Wenn der ReadingsTimestamp frisch ist => dann state annehmen.
+    #my $vState = ReadingsVal($dev->{NAME},'state',undef);
+    #my $tState = ReadingsTimestamp($dev->{NAME},'state',undef);
+    #my $aState = ReadingsAge($dev->{NAME},'state',-1);
+    #Log3($hash->{NAME},1,"Notify for $dev->{NAME}>>>>>>>> vState: $vState, tState: $tState, age: $aState ");# if $hash->{NAME} eq 'sonoff_8';
+    #unless (defined ($vState) and ($vState eq $event) and ($aState <= 1)) {
+    #if (!defined ($vState) or ($vState ne $event)) {
+    #if ($dev->{STATE} ne $event) {
     #if (defined $3 and $3 ne "") {
+      # $vState = 'undef' unless defined $vState;
+      #Log3($hash->{NAME},1,"Notify recognise state change = no : event: $event, old_state: $vState, state age: $aState");
       #send reading=$1 value=$3
       #publishDeviceUpdate($hash, $dev, $1, $3);
       $devreading = $1;
       $devval = $3;
-    } else {
-      #send reading=state value=$1
-      #publishDeviceUpdate($hash, $dev, 'state', $1);
-      $devreading = 'state';
-      #$devval = $1;
-      $devval = $event;
-    }
-    #Log3($hash->{NAME},5,"Notify for $dev->{NAME} reading: $devreading, val: $devval");
+    # } else {
+    #   #Log3($hash->{NAME},1,"Notify recognise state change = yes : event: $event, old_state: $vState, state age: $aState");
+    #   #send reading=state value=$1
+    #   #publishDeviceUpdate($hash, $dev, 'state', $1);
+    #   $devreading = 'state';
+    #   #$devval = $1;
+    #   $devval = $event;
+    # }
+    #Log3($hash->{NAME},1,"Notify for $dev->{NAME} reading: $devreading, val: $devval");
     if(defined $devreading and defined $devval) {
       # wenn ueberwachtes device and reading
       publishDeviceUpdate($hash, $dev, $devreading, $devval);
