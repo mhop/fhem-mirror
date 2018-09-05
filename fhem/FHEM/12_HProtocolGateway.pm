@@ -119,7 +119,7 @@ sub HProtocolGateway_GetUpdate($) {
       $command = "\$C";
     }
 
-    my $msg = $command . $tankHash->{READINGS}{hID}{VAL}  . "\r\n";
+    my $msg = $command . $tankHash->{READINGS}{hID}{VAL} . "\r\n";
     DevIo_SimpleWrite($hash, $msg , 2);
     my ($err, $data) = HProtocolGateway_ReadAnswer($hash,$tankHash);
     Log3 $name, 5, "err:". $err;
@@ -188,7 +188,7 @@ sub HProtocolGateway_ParseMessage($$) {
     $data =~ s/^.//; # remove # 
     
     my ($tankdata,$water,$temperature,$probe_offset,$version,$error,$checksum)=split(/@/,$data);
-    my $test = "#".$data.$water.$temperature.$probe_offset.$version.$error; 
+    my $test = "#".$tankdata.$water.$temperature.$probe_offset.$version.$error; 
 
     # calculate XOR CRC
     my $check = 0;
@@ -198,7 +198,7 @@ sub HProtocolGateway_ParseMessage($$) {
     
     return if($check ne $checksum);
 
-   my ($filllevel,$volume,$ullage) = 0; 
+    my ($filllevel,$volume,$ullage) = (0,0,0); 
 
     if ($attr{$name}{mode} eq "Filllevel") {
       $filllevel = $tankdata;
@@ -365,12 +365,12 @@ sub HProtocolGateway_Tank($$$) {
   my $volume = 0;
 
   foreach my $level (sort keys %TankChartHash) {
-    if ($messwert <= $level && $level ne "level") {
+    if ($level ne "level" && $messwert <= $level) {
 	    $volume = $TankChartHash{$level};
       last;
     }
   }
-  retun $volume;
+  return $volume;
 }
 
 1;
