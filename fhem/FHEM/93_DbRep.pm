@@ -37,6 +37,7 @@
 ###########################################################################################################################
 #  Versions History:
 #
+# 7.20.0       04.09.2018       deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name
 # 7.19.0       25.08.2018       attribute "valueFilter" to filter datasets in fetchrows
 # 7.18.2       02.08.2018       fix in fetchrow function (forum:#89886), fix highlighting
 # 7.18.1       03.06.2018       commandref revised
@@ -344,7 +345,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
-my $DbRepVersion = "7.19.0";
+my $DbRepVersion = "7.20.0";
 
 my %dbrep_col = ("DEVICE"  => 64,
                  "TYPE"    => 64,
@@ -710,8 +711,12 @@ sub DbRep_Set($@) {
       DbRep_Main($hash,$opt);
       
   } elsif ($opt eq "deviceRename") {
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+      shift @a;
+      shift @a;
+      $prop = join(" ",@a);      # Device Name kann Leerzeichen enthalten
+      Log3 ($name, 1, "DbRep $name - a: @a");
       my ($olddev, $newdev) = split(",",$prop);
+      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";    
       if (!$olddev || !$newdev) {return "Both entries \"old device name\", \"new device name\" are needed. Use \"set $name deviceRename olddevname,newdevname\" ";}
       $hash->{HELPER}{OLDDEV}  = $olddev;
       $hash->{HELPER}{NEWDEV}  = $newdev;
