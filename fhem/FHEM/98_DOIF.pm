@@ -21,6 +21,7 @@
 package main;
 use strict;
 use warnings;
+use Blocking;
 use Color;
 use vars qw($FW_CSRF);
 
@@ -38,10 +39,18 @@ sub DOIF_delTimer($)
     RemoveInternalTimer (\$hash->{ptimer}{$key});
   }
 }
+sub DOIF_killBlocking($)
+{
+  my ($hash) = @_;
+  foreach my $key (keys %{$hash->{var}{blockingcalls}}) {
+    BlockingKill($hash->{var}{blockingcalls}{$key}) if(defined($hash->{var}{blockingcalls}{$key}));
+  }
+}
 
 sub DOIF_delAll($)
 {
   my ($hash) = @_;
+  DOIF_killBlocking($hash);
   delete ($hash->{helper});
   delete ($hash->{condition});
   delete ($hash->{do});
@@ -80,6 +89,7 @@ sub DOIF_Initialize($)
   $hash->{SetFn}   = "DOIF_Set";
   $hash->{GetFn}   = "DOIF_Get";
   $hash->{UndefFn}  = "DOIF_Undef";
+  $hash->{ShutdownFn}  = "DOIF_Shutdown";
   $hash->{AttrFn}   = "DOIF_Attr";
   $hash->{NotifyFn} = "DOIF_Notify";
   $hash->{FW_deviceOverview} = 1;
@@ -3262,6 +3272,14 @@ DOIF_Undef
   my ($hash, $name) = @_;
   $hash->{DELETED} = 1;
   DOIF_delTimer($hash);
+  DOIF_killBlocking($hash);
+  return undef;
+}
+sub
+DOIF_Shutdown
+{
+  my ($hash) = @_;
+  DOIF_killBlocking($hash);
   return undef;
 }
 
@@ -5527,9 +5545,10 @@ Timer setzen: <code><b>set_Exec(&lt;timerName&gt;, &lt;seconds&gt;, &lt;function
 welcher nach Ablauf die angegebene Perl-Funktion &lt;function&gt; mit optionalen Parameter &lt;parameter&gt; aufruft. Die Perlfunkion muss eindeutig sein und in FHEM zuvor deklariert worden sein.
 Wird set_Exec mit dem gleichen &lt;timerName&gt; vor seinem Ablauf erneut aufgerufen, so wird der laufender Timer gelöscht und neugesetzt.<br>
 <br>
-Timer holen: <code><b>get_Exec(&lt;timerNamet&gt;)</code></b>, Returnwert: 0, wenn Timer abgelaufen oder nicht gesetzt ist, sonst Anzahl der Sekunden bis zum Ablauf des Timers<br>
+Timer holen: <code><b>get_Exec(&lt;timerName&gt;)</code></b>, Returnwert: 0, wenn Timer abgelaufen oder nicht gesetzt ist, sonst Anzahl der Sekunden bis zum Ablauf des Timers<br>
 <br>
 Laufenden Timer löschen: <code><b>del_Exec(&lt;timerName&gt;)</code></b><br>
+<br>
 <br>
 Ein beliebiges FHEM-Event absetzen: <code><b>set_Event(&lt;Event&gt;)</code></b><br>
 <br>
@@ -5552,6 +5571,18 @@ $_betrag{$i}=100;</code><br>
 <br>
 Ebenso funktionieren hash-Variablen z. B.: <br>
 <code>$_betrag{heute}=100;</code><br>
+<br>
+<u>Blokierende Funktionsaufrufe (blocking calls)</u><br>
+<br>
+DOIF verwaltet blockierende Funktionsaufrufe, d.h. die in diesem Zusammenhang gestarteten FHEM-Instanzen werden gelöscht, beim Herunterfahren (shutdown), Wiedereinlesen der Konfiguration (rereadcfg) Änderung der Konfiguration (modify) und Deaktivieren des Gerätes (disabled).<br>
+Die Handhabung von blockierenden Funktionsaufrufen ist im FHEMwiki erklärt, s. <a href="https://wiki.fhem.de/wiki/Blocking_Call">Blocking Call</a>.<br>
+Der von der Funktion BlockingCall zurückgegebene Datensatz ist unterhalb von $_blockingcalls abzulegen, z.B.<br>
+<br>
+<code>$_blockingcalls{&lt;blocking call name&gt;} = BlockingCall(&lt;blocking function&gt;, &lt;argument&gt;, &lt;finish function&gt;, &lt;timeout&gt;, &lt;abort function&gt;, &lt;abort argument&gt;) unless(defined($_blockingcalls{&lt;blocking call name&gt;}));</code><br>
+<br>
+Für unterschiedliche blockierende Funktionen ist jeweils ein eigener Name (&lt;blocking call name&gt;) unterhalb von $_blockingcalls anzulegen.<br>
+<br>
+<b>$_blockingcalls</b> ist eine für DOIF reservierte Variable und darf nur in der beschriebenen Weise verwendet werden.<br>
 <br>
 <a name="DOIF_Attribute_Perl_Modus"></a>
 <u>Nutzbare Attribute im Perl-Modus</u><br>
