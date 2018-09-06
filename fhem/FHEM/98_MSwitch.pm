@@ -36,7 +36,7 @@ use warnings;
 use POSIX;
 
 # Version #######################################################
-my $version = 'V1.74';
+my $version = 'V1.75';
 my $vupdate = 'V 1.2';
 my $savecount = 30;
 my $standartstartdelay =60;
@@ -576,8 +576,39 @@ sub MSwitch_Get($$@) {
         $ret =
 "eingehender String:<br>$condstring<br><br>If Anweisung Perl:<br>$condstring1<br><br>";
         $ret .= "If Anweisung Perl Klarzeiten:<br>$condmarker<br><br>"
-          if $x > 0;
+		
+		
+		if $x > 0;
         $ret .= $ret1;
+		my $condsplit = $condmarker;
+		
+		my $reads ='<br><br>States der geprüften Readings:<br>';
+		
+		
+		#Log3( $name, 0,"condsplit - $condsplit". __LINE__ );
+		
+		
+		 $x          = 0;              # exit 
+        while ( $condsplit =~ m/(.*')(.*)',\s'(.*)',\s(.*)/ ) 
+		{
+		
+		#Log3( $name, 0,"condsplit s1,s2,s3,s4 - $1 - $2 - $3 - $4". __LINE__ );
+		
+		 $x++;                        # exit 
+         last if $x > 20;             # exit 
+		$reads .="Reading: [$2:$3]      -      Inhalt: ".ReadingsVal( $2, $3, 'undef' );
+		
+		$reads .="<div style=\"color: #FF0000\">Reading nicht vorhanden !</div>" if (ReadingsVal( $2, $3, 'undef' )) eq "undef";
+		$reads .="<br>";
+		
+		$condsplit = $1.$4;
+		}
+		
+		#Log3( $name, 0,"reads - $reads". __LINE__ );
+		
+		$ret .= $reads if $x > 0;
+		
+       
         my $err1;
         my $err2;
 	
@@ -676,7 +707,51 @@ sub MSwitch_AsyncOutput ($) {
 
 sub MSwitch_Set($@) {
     my ( $hash, $name, $cmd, @args ) = @_;
+	
     return "" if ( IsDisabled($name) );# Return without any further action if the module is disabled
+	Log3( $name, 4,"$name Set: eingehend cmd - $cmd ");
+	Log3( $name, 4,"$name Set: eingehend argumente - @args ");
+	
+	
+	# verry special commands readingactivated
+	my $special='';
+	if (ReadingsVal( $name, 'AcceptPCT', '')  eq 'on')
+	{
+		$special='pct:slider,0,1,100';
+		my $arg = $args[0];
+		if ($cmd eq "pct" && $arg eq '0')
+			{
+			$cmd ='off';
+			}
+			
+		if ($cmd eq "pct" && $arg ne '0')
+			{
+			$cmd ='on';
+			}	
+		if ( $cmd eq 'on' && $arg eq ''	)
+		{
+		$args[0] = ReadingsVal( $name, 'pct', 100);
+		}
+		if ( $cmd eq 'off' && $arg eq ''	)
+		{
+		$args[0] = 0;
+		}	
+			
+		readingsSingleUpdate( $hash, "pct", $args[0], 1 );	
+	}
+	#######################################
+	
+	if (!defined $args[0]) { $args[0]='';}
+	
+	#######################################
+	if ((($cmd eq 'on') || ($cmd eq 'off')) && ($args[0] ne ''))
+	{
+	readingsSingleUpdate( $hash, "Parameter", $args[0], 1 );
+	if ($cmd eq 'on'){$args[0] = "$name:on_with_Parameter:$args[0]";}
+	if ($cmd eq 'off'){$args[0] = "$name:off_with_Parameter:$args[0]";}
+	}
+	
+	#######################################
     if ( AttrVal( $name, 'MSwitch_Debug', "0" ) eq '2' ) 
 	#AUFRUF DEBUGFUNKTIONEN
 	{
@@ -710,14 +785,17 @@ sub MSwitch_Set($@) {
 		}
         elsif ( AttrVal( $name, 'MSwitch_Mode', 'Full' ) eq "Toggle" )
 		{
-			return "Unknown argument $cmd, choose one of on:noArg off:noArg del_delays:noArg backup_MSwitch:all_devices fakeevent wait";
+			return "Unknown argument $cmd, choose one of on offdel_delays:noArg backup_MSwitch:all_devices fakeevent wait";
 		}
         else 
 		{
-			return "Unknown argument $cmd, choose one of on:noArg off:noArg del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd1:noArg exec_cmd2:noArg wait";
+		
+		
+			return "Unknown argument $cmd, choose one of on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd1:noArg exec_cmd2:noArg wait $special";
+				
         }
     }
-	
+	#"position" => "slider,0,1,100"
 	if ( AttrVal( $name, 'MSwitch_RandomNumber', '' ) ne '' )
 	{
 		# randomnunner erzeugen wenn attr an
@@ -1188,42 +1266,7 @@ sub MSwitch_Set($@) {
 				{
                     $cs = "$devicedetails{$device.'_onarg'}";
 					$cs = MSwitch_makefreecmd($hash,$cs);	
-				# # setmagic
-				# my $ersetzung ="";
-				# #Log3( $name, 0,"$name MSwitch_Set: ".$cs." L:". __LINE__ );
-				
-				# $cs =~ s/#\[ti\]/~/g;	
-				
-				# # entferne kommntarzeilen
-				# $cs =~ s/#.*\n//g;
-				
-				
-				# $cs =~ s/\n//g;
-				
-				# $ersetzung = ReadingsVal( $name, "EVTPART3", "" );
-				# $cs =~ s/\$EVTPART3/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVTPART2", "" );
-				# $cs =~ s/\$EVTPART2/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVTPART1", "" );
-				# $cs =~ s/\$EVTPART1/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVENT", "" );
-				# $cs =~ s/\$EVENT/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVENTFULL", "" );
-				# $cs =~ s/\$EVENTFULL/$ersetzung/g;
-				
-				
-				
-				
-				
-				
-				# my $x =0;
-				# while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
-					# {
-					# $x++;                        # notausstieg notausstieg
-					# last if $x > 20;             # notausstieg notausstieg
-					# my $setmagic = ReadingsVal( $2, $3, 0 );
-					# $cs = $1.$setmagic.$4;
-					# }
+	
                 }
 
                 if ($devicedetails{$timerkey} eq "0"|| $devicedetails{$timerkey} eq "")
@@ -1235,7 +1278,7 @@ sub MSwitch_Set($@) {
                     if ( $execute eq 'true' ) 
 					{
 					# variabelersetzung
-                        Log3( $name, 3,"$name MSwitch_Set: Befehlsausfuehrung -> $cs L:". __LINE__ );
+                        Log3( $name, 3,"$name Set - Befehlsausfuehrung: $cs ");
                         $cs =~ s/\$NAME/$hash->{helper}{eventfrom}/;
 						#Log3( $name, 5,"eintrag cmdpool $cs . '|' . $device L:". __LINE__ );
                         push @cmdpool, $cs . '|' . $device;
@@ -1372,38 +1415,7 @@ sub MSwitch_Set($@) {
 				{
                     $cs = "$devicedetails{$device.'_offarg'}";
 					$cs = MSwitch_makefreecmd($hash,$cs);
-					# # setmagic	
-					# my $ersetzung ="";
-					# $cs =~ s/#\[ti\]/~/g;	
-				
-				# # entferne kommntarzeilen
-				# $cs =~ s/#.*\n//g;
-				
-				
-				# $cs =~ s/\n//g;
-				
-				# $ersetzung = ReadingsVal( $name, "EVTPART3", "" );
-				# $cs =~ s/\$EVTPART3/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVTPART2", "" );
-				# $cs =~ s/\$EVTPART2/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVTPART1", "" );
-				# $cs =~ s/\$EVTPART1/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVENT", "" );
-				# $cs =~ s/\$EVENT/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVENTFULL", "" );
-				# $cs =~ s/\$EVENTFULL/$ersetzung/g;
-				
-				
-				
-				
-					# my $x =0;
-					# while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
-						# {
-						# $x++;                        # exit
-						# last if $x > 20;             # exit
-						# my $setmagic = ReadingsVal( $2, $3, 0 );
-						# $cs = $1.$setmagic.$4;
-						# }
+					
                 }
 
                 #my $conditionkey;
@@ -1543,21 +1555,18 @@ sub MSwitch_Cmd(@) {
                 InternalTimer( $timecond, "MSwitch_repeat", $msg );
             }
         }
-		#$cmds =~ s/\n//g;
+
 		my $todec = $cmds;
 		$cmds = MSwitch_dec($hash,$todec);
+					
+					
+					
         ############################
         if ( $cmds =~ m/{.*}/ ) 
 		{
 		
 		#Log3( $Name, 0,"$Name MSwitch_Cmd: ".$cmds." " . __LINE__ );
-		
-		
-		
-		
-		
-		
-		
+
             eval($cmds);
             if ($@) 
 			{
@@ -2803,7 +2812,7 @@ sub MSwitch_fhemwebFn($$$$) {
             }
 				
 				$detailhtml = $detailhtml. "MSwitch 'cmd1': 
-				Set <select id='"
+				Set <select class=\"devdetails2\" id='"
                 . $_
                 . "_on' name='cmdon"
                 . $_
@@ -2857,7 +2866,7 @@ sub MSwitch_fhemwebFn($$$$) {
             }
 				
 				$detailhtml = $detailhtml. "MSwitch 'cmd1':</td>
-			<td><textarea cols='50' rows='3' id='cmdonopt". $_. "1' name='cmdonopt".$_. "'
+			<td><textarea class=\"devdetails\" cols='50' rows='3' id='cmdonopt". $_. "1' name='cmdonopt".$_. "'
 			>".$savedetails{ $aktdevice . '_onarg' }."</textarea>
 			</td>
 			</tr></table>
@@ -2891,7 +2900,7 @@ sub MSwitch_fhemwebFn($$$$) {
             }
 				
 				$detailhtml = $detailhtml. "MSwitch 'cmd2':
-				Set <select id='"
+				Set <select class=\"devdetails2\" id='"
                 . $_
                 . "_off' name='cmdoff"
                 . $_
@@ -2947,7 +2956,7 @@ sub MSwitch_fhemwebFn($$$$) {
 				$detailhtml = $detailhtml. "MSwitch 'cmd2':</td>
 				
 				<td>
-				<textarea cols='50' rows='3' id='cmdoffopt"
+				<textarea class=\"devdetails\" cols='50' rows='3' id='cmdoffopt"
                 . $_
                 . "1' name='cmdoffopt".$_
                 . "'
@@ -2979,7 +2988,7 @@ sub MSwitch_fhemwebFn($$$$) {
                 $detailhtml = $detailhtml. "<input name='info' type='button' value='?' onclick=\"javascript: info('condition')\">&nbsp;";
             }
 			
-			$detailhtml = $detailhtml. "'cmd1' condition: <input type='text' id='conditionon"
+			$detailhtml = $detailhtml. "'cmd1' condition: <input class=\"devdetails\" type='text' id='conditionon"
             . $_
             . "' name='conditionon"
             . $_
@@ -3013,7 +3022,7 @@ sub MSwitch_fhemwebFn($$$$) {
                 $detailhtml = $detailhtml. "<input name='info' type='button' value='?' onclick=\"javascript: info('condition')\">&nbsp;";
             }
 			
-			$detailhtml = $detailhtml. "'cmd2' condition: <input type='text' id='conditionoff"
+			$detailhtml = $detailhtml. "'cmd2' condition: <input class=\"devdetails\" type='text' id='conditionoff"
             . $_
             . "' name='conditionoff"
             . $_
@@ -3134,7 +3143,7 @@ sub MSwitch_fhemwebFn($$$$) {
             $detailhtml = $detailhtml . "<option $sel3 value='at1'>at with Cond-check immediately only:</option>";
 			$detailhtml = $detailhtml . "<option $sel6 value='at0'>at with Cond-check delayed only:</option>";
 			
-            $detailhtml = $detailhtml . "</select><input type='text' id='timeseton"
+            $detailhtml = $detailhtml . "</select><input type='text' class=\"devdetails\" id='timeseton"
             . $_
             . "' name='timeseton"
             . $_
@@ -3179,7 +3188,7 @@ sub MSwitch_fhemwebFn($$$$) {
             $detailhtml = $detailhtml . "<option $sel3 value='at1'>at with Cond-check immediately only:</option>";
 			$detailhtml = $detailhtml . "<option $sel6 value='at0'>at with Cond-check delayed only:</option>";
 			
-            $detailhtml = $detailhtml . "</select><input type='text' id='timesetoff"
+            $detailhtml = $detailhtml . "</select><input type='text' class=\"devdetails\" id='timesetoff"
             . $_
             . "' name='timesetoff"
             . $_
@@ -3216,9 +3225,9 @@ sub MSwitch_fhemwebFn($$$$) {
 			<td  class='col2' colspan='5' style='text-align: left;'>";
             if ( $devicenumber == 1 ) 
 			{
-                $detailhtml = $detailhtml . "<input name='info' type='button' value='add action for $devicenamet' onclick=\"javascript: addevice('$devicenamet')\">";
+                $detailhtml = $detailhtml . "<input name='info' class=\"randomidclass\" id=\"add_action1_".rand(1000000)."\" type='button' value='add action for $devicenamet' onclick=\"javascript: addevice('$devicenamet')\">";
             }
-            $detailhtml = $detailhtml . "<input name='info' type='button' value='delete this action for $devicenamet' onclick=\"javascript: deletedevice('$_')\">";
+            $detailhtml = $detailhtml . "<input name='info' id=\"del_action1_".rand(1000000)."\" class=\"randomidclass\" type='button' value='delete this action for $devicenamet' onclick=\"javascript: deletedevice('$_')\">";
             $detailhtml = $detailhtml . "<br>&nbsp;</td></tr>";
 
             #middle
@@ -3752,8 +3761,65 @@ sub MSwitch_fhemwebFn($$$$) {
 		activate(document.getElementById(sel).value,sel1,aktset,sel2); 
 		};"
     }
-
+ # java wird bei seitenaufruf ausgeführt
     $j1 .= "
+	var globallock='';
+	var randomdev=[];
+	var x = document.getElementsByClassName('randomidclass');
+    for (var i = 0; i < x.length; i++) 
+	{
+    var t  = x[i].id;
+	randomdev.push(t);
+	}";
+	
+	$j1 .= "
+	var globaldetails2='undefined';
+	var x = document.getElementsByClassName('devdetails2');
+    for (var i = 0; i < x.length; i++) 
+	{
+    var t  = x[i].id;
+	
+	
+	globaldetails2 +=document.getElementById(t).value;
+	
+	}
+	//alert(globaldetails2 );
+	
+	
+	var globaldetails='undefined';
+	var x = document.getElementsByClassName('devdetails');
+    for (var i = 0; i < x.length; i++) 
+	{
+    var t  = x[i].id;
+	globaldetails +=document.getElementById(t).value;
+	
+	document.getElementById(t).onchange = function() 
+	{
+	//alert('changed');
+	var changedetails;
+	var y = document.getElementsByClassName('devdetails');
+    for (var i = 0; i < y.length; i++) 
+	{
+    var t  = y[i].id;
+	changedetails +=document.getElementById(t).value;
+	}
+	if( changedetails != globaldetails)
+		{
+		globallock =' unsaved device actions';
+		[ \"aw_trig\",\"aw_md1\",\"aw_md2\",\"aw_addevent\",\"aw_dev\"].forEach (lock,);
+		randomdev.forEach (lock);
+		}
+	if( changedetails == globaldetails)
+		{
+		[ \"aw_trig\",\"aw_md1\",\"aw_md2\",\"aw_addevent\",\"aw_dev\"].forEach (unlock,);
+			randomdev.forEach (unlock);
+		}
+	}
+	}
+	";
+	
+	# triggerlock
+	$j1 .= "
 	var triggerdetails = document.getElementById('MSwitchWebTRDT').innerHTML;
 	var saveddevice = '" . $triggerdevicehtml . "';
 	var sel = document.getElementById('trigdev');
@@ -3763,25 +3829,181 @@ sub MSwitch_fhemwebFn($$$$) {
 	if (trigdev != '";
 		$j1 .= $triggerdevicehtml;
 		$j1 .= "')
-	{
-	document.getElementById('savetrigger').innerHTML = '<font color=#FF0000>trigger device : unsaved!</font> ';	 
-	document.getElementById('MSwitchWebTRDT').innerHTML = '';
-	}
+		{
+		//document.getElementById('savetrigger').innerHTML = '<font color=#FF0000>trigger device : unsaved!</font> ';	 
+		//document.getElementById('MSwitchWebTRDT').innerHTML = '';
+		
+		globallock =' unsaved trigger';
+		[\"aw_dev\", \"aw_det\"].forEach (lock);
+		randomdev.forEach (lock,);
+		}
 	else
-	{	
-	document.getElementById('savetrigger').innerHTML = 'trigger device :';
-	document.getElementById('MSwitchWebTRDT').innerHTML = triggerdetails;	
-	}
+		{	
+		//alert (randomdev);
+		[\"aw_dev\", \"aw_det\"].forEach (unlock);
+		randomdev.forEach (unlock);
+		document.getElementById('savetrigger').innerHTML = 'trigger device :';
+		document.getElementById('MSwitchWebTRDT').innerHTML = triggerdetails;	
+		}
+	
 	if (trigdev == 'all_events')
-	{
-	document.getElementById(\"triggerwhitelist\").style.visibility = \"visible\"; 
-	}
+		{
+		document.getElementById(\"triggerwhitelist\").style.visibility = \"visible\"; 
+		}
 	else
-	{
-	document.getElementById(\"triggerwhitelist\").style.visibility = \"collapse\"; 
-	}
+		{
+		document.getElementById(\"triggerwhitelist\").style.visibility = \"collapse\"; 
+		}
 	}
 	";
+
+	#####################
+	$j1 .= "
+	
+	
+		if (document.getElementById('trigon')){
+	var trigonfirst = document.getElementById('trigon').value;
+	var sel2 = document.getElementById('trigon');
+	sel2.onchange = function() 
+	{
+	if (trigonfirst != document.getElementById('trigon').value)
+		{
+		closetrigger();
+		}
+		else{
+		opentrigger();
+		}
+	}
+	}
+	
+	if (document.getElementById('trigoff')){
+	var trigofffirst = document.getElementById('trigoff').value;
+	var sel3 = document.getElementById('trigoff');
+	sel3.onchange = function() 
+	{
+	if (trigofffirst != document.getElementById('trigoff').value)
+		{
+		closetrigger();
+		}
+		else{
+		opentrigger();
+		}
+	}
+	}
+	
+	if (document.getElementById('trigcmdoff')){
+	var trigcmdofffirst = document.getElementById('trigcmdoff').value;
+	var sel4 = document.getElementById('trigcmdoff');
+	sel4.onchange = function() 
+	{
+	if (trigcmdofffirst != document.getElementById('trigcmdoff').value)
+		{
+		closetrigger();
+		}
+		else{
+		opentrigger();
+		}
+	}
+	}
+	
+	if (document.getElementById('trigcmdon')){
+	var trigcmdonfirst = document.getElementById('trigcmdon').value;
+	var sel5 = document.getElementById('trigcmdon');
+	sel5.onchange = function() 
+	{
+	if (trigcmdonfirst != document.getElementById('trigcmdon').value)
+		{
+		closetrigger();
+		}
+		else{
+		opentrigger();
+		}
+	}
+	}
+	
+	function closetrigger(){
+			globallock =' unsaved trigger details';
+			[\"aw_dev\", \"aw_det\",\"aw_trig\",\"aw_md1\",\"aw_md2\",\"aw_addevent\"].forEach (lock,);
+			randomdev.forEach (lock);
+	}
+	
+	function opentrigger(){
+			//alert('call unlock');
+			[ \"aw_dev\",\"aw_det\",\"aw_trig\",\"aw_md1\",\"aw_md2\",\"aw_addevent\"].forEach (unlock,);
+			randomdev.forEach (unlock);
+	}
+	
+	";
+	
+	#####################
+	#affected lock
+	$j1 .= "
+	var globalaffected;
+	var auswfirst=document.getElementById('devices');
+	for (i=0; i<auswfirst.options.length; i++)
+	{
+	var pos=auswfirst.options[i];
+	if(pos.selected)
+	{
+	//alert (pos.value);
+	globalaffected +=pos.value;
+	}
+	}
+	///alert (globalaffected);
+	var sel1 = document.getElementById('devices');
+	sel1.onchange = function() 
+	{
+		var actaffected;
+		var auswfirst=document.getElementById('devices');
+		for (i=0; i<auswfirst.options.length; i++)
+			{
+			var pos=auswfirst.options[i];
+			if(pos.selected)
+				{
+				//alert (pos.value);
+				actaffected +=pos.value;
+				}
+			}
+		//alert (actaffected);
+		
+		//return;
+		if (actaffected != globalaffected)
+			{
+			globallock =' unsaved affected device';
+			[ \"aw_det\",\"aw_trig\",\"aw_md\",\"aw_md1\",\"aw_md2\",\"aw_addevent\"].forEach (lock,);
+			randomdev.forEach (lock);
+			}
+		else
+			{
+			[ \"aw_det\",\"aw_trig\",\"aw_md\",\"aw_md1\",\"aw_md2\",\"aw_addevent\"].forEach (unlock,);
+			randomdev.forEach (unlock);
+			}
+	
+	}
+	";
+	#function lock unlock
+	$j1 .= "function lock (elem, text){
+	
+	if (document.getElementById(elem)){
+	document.getElementById(elem).style.backgroundColor = \"#ADADAD\"
+	document.getElementById(elem).disabled = true;
+	document.getElementById(elem).model=document.getElementById(elem).value;
+	document.getElementById(elem).value = 'N/A'+globallock;
+	}
+	
+	
+	}";
+	
+	$j1 .= "function unlock (elem, index){
+	
+	if (document.getElementById(elem)){
+	document.getElementById(elem).style.backgroundColor = \"\"
+	document.getElementById(elem).disabled = false;
+	document.getElementById(elem).value=document.getElementById(elem).model;
+	}
+	}";
+	#####################
+	
     $j1 .= "function saveconfig(conf){
 	conf = conf.replace(/ /g,'[s]');
 	conf = conf.replace(/\\n/g,'[nl]');
@@ -3954,8 +4176,52 @@ sub MSwitch_fhemwebFn($$$$) {
 	return;
 	}
 
+
 	function activate(state,target,options,copytofield) ////aufruf durch selctfield
 	{
+	//alert('activate aufgerufen');
+	
+
+	var globaldetails3='undefined';
+	var x = document.getElementsByClassName('devdetails2');
+    for (var i = 0; i < x.length; i++) 
+	{
+    var t  = x[i].id;
+	
+	
+	globaldetails3 +=document.getElementById(t).value;
+	
+	}
+	
+	//alert(globaldetails3 );
+	
+	
+	//alert(globaldetails3 );
+	
+	if ( globaldetails2 )
+	{
+	if (globaldetails3 != globaldetails2)
+	{
+	
+	//alert ('changed: '+globaldetails2);
+	
+	globallock =' unsaved device actions';
+		[ \"aw_trig\",\"aw_md1\",\"aw_md2\",\"aw_addevent\",\"aw_dev\"].forEach (lock,);
+		randomdev.forEach (lock);
+	
+	
+	}
+	else
+	{
+	
+	//alert ('not changed: '+globaldetails2);
+	
+	[ \"aw_trig\",\"aw_md1\",\"aw_md2\",\"aw_addevent\",\"aw_dev\"].forEach (unlock,);
+			randomdev.forEach (unlock);
+	}
+	}
+	
+
 	var ausgabe = target + '<br>' + state + '<br>' + options;
 	if (state == 'no_action'){noaction(target,copytofield);return}
 	var optionarray = options.split(\" \");
@@ -3978,9 +4244,12 @@ sub MSwitch_fhemwebFn($$$$) {
 	else if (devicecmd[0] == 'RGB'){textfield(copytofield,target);return;}
 	else if (devicecmd[0] == 'no_Action'){noaction();return;}
 	else {selectfield(werte[state],target,copytofield);return;}
+	
 	return;
 	}
 
+
+	
 	function addevice(device){
 	var nm = \$(t).attr(\"nm\");
 	var  def = nm+\" add_device \"+device;
@@ -4137,6 +4406,8 @@ sub MSwitch_fhemwebFn($$$$) {
 	sel = sel+'</div>';
 	FW_okDialog(sel,''); 
 	}	
+	
+
 
 	function removeFn() {
     var targ = document.getElementById('devices');
@@ -4273,8 +4544,7 @@ sub MSwitch_makeCmdHash($) {
 		{
             $savedetails{$key} = 1;
         }
-		
-		
+
 
         $key = $detailarray[0] . "_conditionon";
 
@@ -4436,30 +4706,6 @@ sub MSwitch_Exec_Notif($$$$) {
 				
 				$cs = MSwitch_makefreecmd($hash,$cs);
 				
-				# my $ersetzung ="";
-				# # setmagic	
-				# $cs =~ s/#\[ti\]/~/g;
-				# # entferne kommentarte
-				# $cs =~ s/#.*\n//g;
-				# $cs =~ s/\n//g;
-				# $ersetzung = ReadingsVal( $name, "EVTPART3", "" );
-				# $cs =~ s/\$EVTPART3/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVTPART2", "" );
-				# $cs =~ s/\$EVTPART2/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVTPART1", "" );
-				# $cs =~ s/\$EVTPART1/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVENT", "" );
-				# $cs =~ s/\$EVENT/$ersetzung/g;
-				# $ersetzung = ReadingsVal( $name, "EVENTFULL", "" );
-				# $cs =~ s/\$EVENTFULL/$ersetzung/g;
-				# my $x =0;
-				# while ( $cs =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
-					# {
-					# $x++;                        # notausstieg notausstieg
-					# last if $x > 20;             # notausstieg notausstieg
-					# my $setmagic = ReadingsVal( $2, $3, 0 );
-					# $cs = $1.$setmagic.$4;
-					# }
 				
             }
             else 
@@ -4798,8 +5044,12 @@ sub MSwitch_checkcondition($$$) {
 	
 	my $hash     = $modules{MSwitch}{defptr}{$name};
 
-	#Log3( $name, 5,"Aufruf Checkcondition - Parameter condition, name, event: $condition, $name, $event ");
-
+	#$event ="test:test:test" if $event eq "";
+	
+	Log3( $name, 3,"$name Checkcondition - Parameter condition: $condition ") ;
+	Log3( $name, 3,"$name Checkcondition - Parameter event: $event ") ;
+	
+	
 	MSwitch_EventBulk($hash,$event ,'0');
 	
     if ( !defined($condition) ) { return 'true'; }
@@ -4836,7 +5086,7 @@ sub MSwitch_checkcondition($$$) {
     $event =~ s/ //ig;
     $event =~ s/~/ /g;
 
-	MSwitch_EventBulk($hash , $event , '0');
+	MSwitch_EventBulk($hash , $event , '0')  if $event eq "";;
 	
 	
     my $arraycount = '0';
@@ -5006,7 +5256,11 @@ sub MSwitch_checkcondition($$$) {
     }
 
     $finalstring ="if (" . $condition . "){\$answer = 'true';} else {\$answer = 'false';} ";
+	
+	Log3( $name, 3,"$name Checkcondition - finalstring $finalstring ") ;
+	
     my $ret = eval $finalstring;
+	Log3( $name, 3,"$name Checkcondition - return $ret ") ;
     if ($@)
 	{
         Log3( $name, 1, "ERROR: $@ " . __LINE__ );
@@ -5016,6 +5270,9 @@ sub MSwitch_checkcondition($$$) {
     }
     my $test = ReadingsVal( $name, 'last_event', 'undef' );
     $hash->{helper}{conditioncheck} = $finalstring;
+	
+	
+	
     return $ret;
 }
 ####################
@@ -5905,11 +6162,7 @@ sub MSwitch_backup($) {
 		$tmp =~ s/\\/[bs]/g;
 		$tmp =~ s/(.*?)\t/$1~~~~/g;
 		}
-	
-		#$newstring =~ s/\[se\]/;/g;
-		#$newstring =~ s/\[cnl\]/\n/g;
-		#$newstring =~ s/\[bs\]/\\/g;
-			
+
             print BACKUPDATEI "#S $key -> $tmp\n";
         }
         my %keys;
@@ -6055,12 +6308,6 @@ sub MSwitch_backup_all($) {
     {
         my $devhash = $defs{$testdevice};
         $Zeilen =~ s/\n/[nl]/g;
-		
-		#$Zeilen =~ s/\n/[cnl]/g;
-		#$Zeilen =~ s/;/[se]/g;
-		#$Zeilen =~ s/\\/[bs]/g;
-		#$Zeilen =~ s/(.*?)\t/$1~~~~/g;
-		
 		$Zeilen =~ s/\[se\]/;/g;
 		$Zeilen =~ s/\[cnl\]/\n/g;
 		$Zeilen =~ s/\[bs\]/\\/g;	
@@ -6126,24 +6373,6 @@ sub MSwitch_saveconf($$) {
 				if ($1 eq ".Device_Affected_Details")
 					{
 					
-					#Log3( $name, 0, "event -> $newstring" );
-					## ggf. wiedr anschalten
-					#	my $x          = 0;              # notausstieg
-					#	while ( $newstring =~ m/(.*?)(\[.*)(\.)(.*\])(.*)?/ ) 
-					#	{
-					#		$x++;                        # notausstieg notausstieg
-					#		last if $x > 20;             # notausstieg notausstieg
-					#		$newstring = $1.$2.':'.$4.$5;
-					#	}
-						
-						
-						#$x          = 0;              # notausstieg
-						#while ( $newstring =~ m/(.*?)(\[S\])(.*)?/ ) 
-						#{
-						#	$x++;                        # notausstieg notausstieg
-						#	last if $x > 20;             # notausstieg notausstieg
-						#	$newstring = $1.';'.$3;
-						#}
 					$newstring =~ s/\[se\]/;/g;
 					$newstring =~ s/\[cnl\]/\n/g;
 					$newstring =~ s/\[bs\]/\\/g;					
@@ -6425,16 +6654,29 @@ sub MSwitch_set_dev($) {
 ##############################################################
 
 sub MSwitch_dec($$) {
-#my $todec = $_;
+# ersetzungen direkt vor befehlsausführung
 my ( $hash, $todec) = @_;
 my $name = $hash->{NAME};
 $todec =~ s/\n//g;
 $todec =~ s/#\[wa\]/|/g; 
+
+ # setmagic ersetzun
+				my $x =0;
+				while ( $todec =~ m/(.*)\[(.*)\:(.*)\](.*)/ ) 
+					{
+					$x++;                        # notausstieg notausstieg
+					last if $x > 20;             # notausstieg notausstieg
+					my $setmagic = ReadingsVal( $2, $3, 0 );
+					$todec = $1.$setmagic.$4;
+					}
+					
+					
 return $todec;				
 }
 	
 ################################################################
 sub MSwitch_makefreecmd($$) {
+#ersetzungen und variablen für freecmd
 	my ( $hash, $cs) = @_;
     my $name = $hash->{NAME};
 
