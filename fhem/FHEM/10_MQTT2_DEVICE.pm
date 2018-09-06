@@ -25,6 +25,7 @@ MQTT2_DEVICE_Initialize($)
     devicetopic
     disable:0,1
     disabledForIntervals
+    model
     readingList:textField-long
     setList:textField-long
     getList:textField-long
