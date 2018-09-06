@@ -618,7 +618,6 @@ sub matchClient($$) {
          configures the lowest node-id assigned to a mysensor-node on request (defaults to 20)</p>
     </li>
     <li>
-      <a href="MYSENSORSattrOTA_firmwareConfig"></a>
       <p><code>attr &lt;name&gt; OTA_firmwareConfig &lt;filename&gt;</code><br/>
          specifies a configuration file for the <a href="https://www.mysensors.org/about/fota">FOTA</a>
          (firmware over the air - wireless programming of the nodes) configuration. It must be stored 
