@@ -39,7 +39,7 @@ MQTT2_SERVER_Initialize($)
     disable:0,1
     disabledForIntervals
     autocreate
-    rawEvents:0,1
+    rawEvents
     SSL:0,1
   );
   use warnings 'qw';
