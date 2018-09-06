@@ -603,23 +603,23 @@ sub matchClient($$) {
   <p><b>Attributes</b></p>
   <ul>
     <li>
-      <p><code>att &lt;name&gt; autocreate</code><br/>
+      <p><code>attr &lt;name&gt; autocreate</code><br/>
          enables auto-creation of MYSENSOR_DEVICE-devices on receival of presentation-messages</p>
     </li>
     <li>
-      <p><code>att &lt;name&gt; requestAck</code><br/>
+      <p><code>attr &lt;name&gt; requestAck</code><br/>
          request acknowledge from nodes.<br/>
          if set the Readings of nodes are updated not before requested acknowledge is received<br/>
          if not set the Readings of nodes are updated immediatly (not awaiting the acknowledge).
          May also be configured for individual nodes if not set for gateway.</p>
     </li>
     <li>
-      <p><code>att &lt;name&gt; first-sensorid <&lt;number &lth; 255&gt;></code><br/>
+      <p><code>attr &lt;name&gt; first-sensorid <&lt;number &lth; 255&gt;></code><br/>
          configures the lowest node-id assigned to a mysensor-node on request (defaults to 20)</p>
     </li>
     <li>
       <a href="MYSENSORSattrOTA_firmwareConfig"></a>
-      <p><code>att &lt;name&gt; OTA_firmwareConfig &lt;filename&gt;</code><br/>
+      <p><code>attr &lt;name&gt; OTA_firmwareConfig &lt;filename&gt;</code><br/>
          specifies a configuration file for the <a href="https://www.mysensors.org/about/fota">FOTA</a>
          (firmware over the air - wireless programming of the nodes) configuration. It must be stored 
          in the folder FHEM/firmware. The format of the configuration file is the following (csv):</p>
