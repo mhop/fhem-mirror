@@ -3987,7 +3987,15 @@ sub MSwitch_fhemwebFn($$$$) {
 	if (document.getElementById(elem)){
 	document.getElementById(elem).style.backgroundColor = \"#ADADAD\"
 	document.getElementById(elem).disabled = true;
+	
+	if (!document.getElementById(elem).model)
+	{
+	
 	document.getElementById(elem).model=document.getElementById(elem).value;
+	}
+	
+	
+	
 	document.getElementById(elem).value = 'N/A'+globallock;
 	}
 	
