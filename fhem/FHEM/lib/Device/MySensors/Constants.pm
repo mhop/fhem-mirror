@@ -259,6 +259,10 @@ sub subTypeToStr($$) {
       $subType = (internalMessageTypes)[$subType];
       last;
     };
+    $cmd == C_STREAM and do {
+      $subType = (datastreamTypes)[$subType];
+      last;
+    };
     $subType = "<UNKNOWN_$subType>";
   }  
   return $subType;

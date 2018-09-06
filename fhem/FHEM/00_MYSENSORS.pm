@@ -60,14 +60,19 @@ sub MYSENSORS_Initialize($) {
     "requestAck:1 ".
     "first-sensorid ".
     "last-sensorid ".
-    "stateFormat";
+    "stateFormat ".
+    "OTA_firmwareConfig";
 }
 
 package MYSENSORS;
 
 use Exporter ('import');
 @EXPORT = ();
-@EXPORT_OK = qw(sendMessage);
+@EXPORT_OK = qw(
+                sendMessage
+                getFirmwareTypes
+                getLatestFirmware
+            );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 use strict;
@@ -92,6 +97,7 @@ BEGIN {GP_Import(qw(
   InternalTimer
   AttrVal
   Log3
+  FileRead
   ))};
 
 my %sensorAttr = (
@@ -165,6 +171,9 @@ sub Attr($$$$) {
       }
       last;
     };
+    $attribute eq "OTA_firmwareConfig" and do {
+      last;
+    };  
   }
 }
 
@@ -195,11 +204,11 @@ sub Stop($) {
 sub Ready($) {
   my $hash = shift;
   return DevIo_OpenDev($hash, 1, "MYSENSORS::Init") if($hash->{STATE} eq "disconnected");
-	if(defined($hash->{USBDev})) {
-		my $po = $hash->{USBDev};
-		my ( $BlockingFlags, $InBytes, $OutBytes, $ErrorFlags ) = $po->status;
-		return ( $InBytes > 0 );
-	}
+    if(defined($hash->{USBDev})) {
+    my $po = $hash->{USBDev};
+    my ( $BlockingFlags, $InBytes, $OutBytes, $ErrorFlags ) = $po->status;
+    return ( $InBytes > 0 );
+    }
 }
 
 sub Init($) {
@@ -222,6 +231,22 @@ sub Init($) {
   readingsSingleUpdate($hash,"connection","connected",1);
   sendMessage($hash, radioId => 0, childId => 0, cmd => C_INTERNAL, ack => 0, subType => I_VERSION, payload => '');
   return undef;
+}
+
+
+# GetConnectStatus
+sub GetConnectStatus($){
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	Log3 $name, 4, "MySensors: GetConnectStatus called ...";
+    
+	#query heartbeat from gateway 
+    sendMessage($hash, radioId => 0, childId => 0, cmd => C_INTERNAL, ack => 0, subType => I_HEARTBEAT_REQUEST, payload => '');
+ 
+	# neuen Timer starten in einem konfigurierten Interval.
+	InternalTimer(gettimeofday()+300, "MYSENSORS::GetConnectStatus", $hash);# Restart check in 5 mins again
+	InternalTimer(gettimeofday()+5, "MYSENSORS::Start", $hash);  #Start timer for reset if after 5 seconds RESPONSE is not received
+	
 }
 
 sub Timer($) {
@@ -250,7 +275,7 @@ sub Read {
   return "" if(!defined($buf));
 
   my $data = $hash->{PARTIAL};
-  Log3 ($name, 5, "MYSENSORS/RAW: $data/$buf");
+  Log3 ($name, 4, "MYSENSORS/RAW: $data/$buf");
   $data .= $buf;
 
   while ($data =~ m/\n/) {
@@ -258,12 +283,13 @@ sub Read {
     ($txt,$data) = split("\n", $data, 2);
     $txt =~ s/\r//;
     if (my $msg = parseMsg($txt)) {
-      Log3 ($name,5,"MYSENSORS Read: ".dumpMsg($msg));
-
+      Log3 ($name,4,"MYSENSORS Read: ".dumpMsg($msg));
       if ($msg->{ack}) {
         onAcknowledge($hash,$msg);
       }
-
+      RemoveInternalTimer($hash,"MYSENSORS::GetConnectStatus");
+	  InternalTimer(gettimeofday()+300, "MYSENSORS::GetConnectStatus", $hash);# Restart check in 5 mins again
+	  
       my $type = $msg->{cmd};
       MESSAGE_TYPE: {
         $type == C_PRESENTATION and do {
@@ -354,7 +380,12 @@ sub onInternalMsg($$) {
           my $client = shift;
           MYSENSORS::DEVICE::onGatewayStarted($client);
         });
+        InternalTimer(gettimeofday()+300, "MYSENSORS::GetConnectStatus", $hash);
         last;
+      };
+      $type == I_HEARTBEAT_RESPONSE and do {
+    		RemoveInternalTimer($hash,"MYSENSORS::Start"); ## Reset reconnect because timeout was not reached
+      		readingsSingleUpdate($hash, "heartbeat", "last", 0);
       };
       $type == I_VERSION and do {
         $hash->{version} = $msg->{payload};
@@ -393,6 +424,11 @@ sub onInternalMsg($$) {
 
 sub onStreamMsg($$) {
   my ($hash,$msg) = @_;
+  if (my $client = matchClient($hash, $msg)) {
+    MYSENSORS::DEVICE::onStreamMessage($client, $msg);
+  } else {
+    Log3($hash->{NAME},3,"MYSENSORS: ignoring stream-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".datastreamTypeToStr($msg->{subType}));
+  }
 };
 
 sub onAcknowledge($$) {
@@ -413,6 +449,62 @@ sub onAcknowledge($$) {
   }
   Log3 ($hash->{NAME},4,"MYSENSORS Read: unexpected ack ".dumpMsg($msg)) unless $ack;
 }
+
+sub getFirmwareTypes($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my @fwTypes = ();
+  my $filename = AttrVal($name, "OTA_firmwareConfig", undef);
+  if (defined($filename)) {  
+    my ($err, @lines) = FileRead({FileName => "./FHEM/firmware/" . $filename, 
+                                  ForceType => "file"}); 
+    if (defined($err) && $err) {
+      Log3($name, 2, "$name: could not read MySensor firmware configuration file - $err");
+    } else {
+      for (my $i = 0; $i < @lines ; $i++) {
+        chomp(my $row = $lines[$i]);
+        if (index($row, "#") != 0) {
+          my @tokens = split(",", $row);
+          push(@fwTypes, $tokens[0]);
+        }
+      }
+    }
+  }
+  Log3($name, 5, "$name: getFirmwareTypes - list contains: @fwTypes");
+  return @fwTypes;
+}
+
+sub getLatestFirmware($$) {
+  my ($hash, $type) = @_;
+  my $name = $hash->{NAME};
+  my $cfgfilename = AttrVal($name, "OTA_firmwareConfig", undef);
+  my $version = undef;
+  $name = undef;
+  my $filename = undef;
+  if (defined($cfgfilename)) {  
+    my ($err, @lines) = FileRead({FileName => "./FHEM/firmware/" . $cfgfilename, 
+                                  ForceType => "file"}); 
+    if (defined($err) && $err) {
+      Log3($name, 2, "$name: could not read MySensor firmware configuration file - $err");
+    } else {
+      for (my $i = 0; $i < @lines ; $i++) {
+        chomp(my $row = $lines[$i]);
+        if (index($row, "#") != 0) {
+          my @tokens = split(",", $row);
+          if ($tokens[0] eq $type) {
+            if ((not defined $version) || ($tokens[2] > $version)) {
+              $name = $tokens[1];
+              $version = $tokens[2];
+              $filename = $tokens[3];
+            }
+          }
+        }
+      }
+    }
+  }
+  return ($version, $filename, $name);
+}
+
 
 sub sendMessage($%) {
   my ($hash,%msg) = @_;
@@ -524,6 +616,29 @@ sub matchClient($$) {
     <li>
       <p><code>att &lt;name&gt; first-sensorid <&lt;number &lth; 255&gt;></code><br/>
          configures the lowest node-id assigned to a mysensor-node on request (defaults to 20)</p>
+    </li>
+    <li>
+      <a href="MYSENSORSattrOTA_firmwareConfig"></a>
+      <p><code>att &lt;name&gt; OTA_firmwareConfig &lt;filename&gt;</code><br/>
+         specifies a configuration file for the <a href="https://www.mysensors.org/about/fota">FOTA</a>
+         (firmware over the air - wireless programming of the nodes) configuration. It must be stored 
+         in the folder FHEM/firmware. The format of the configuration file is the following (csv):</p>
+      <p><code>#Type,Name,Version,File,Comments</code><br/>
+         <code>10,Blink,1,Blink.hex,blinking example</code><br/></p>
+      <p>The meaning of the columns is the following:</br>
+         <dl>
+           <dt><code>Type</code></dt>
+           <dd>a numeric value (range 0 .. 65536) - each node will be assigned a firmware type</dd>
+           <dt><code>Name</code></dt>
+           <dd>a short name for this type</dd>
+           <dt><code>Version</code></dt> 
+           <dd>a numeric value (range 0 .. 65536) - the version of the firmware (may be different 
+               to the value that is send during the node presentation)</dd>
+           <dt><code>File</code></dt>
+           <dd>the filename containing the firmware - must also be stored in the folder FHEM/firmware</dd>
+           <dt><code>Comments</code></dt>
+           <dd>a description / comment for the firmware</dd>
+         </dl></p>
     </li>
   </ul>
 </ul>
