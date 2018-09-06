@@ -3535,7 +3535,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_uiTable">uiTable, das User Interface</a><br>
   <a href="#DOIF_Reine_Statusanzeige_ohne_Ausfuehrung_von_Befehlen">Reine Statusanzeige ohne Ausführung von Befehlen</a><br>
   <a href="#DOIF_state">Anpassung des Status mit Hilfe des Attributes <code>state</code></a><br>
-  <a href="#DOIF_Readings">Erzeugen berechneter Readings<br>
+  <a href="#DOIF_DOIF_Readings">Erzeugen berechneter Readings<br>
   <a href="#DOIF_initialize">Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut <code>initialize</code></a><br>
   <a href="#DOIF_disable">Deaktivieren des Moduls</a><br>
   <a href="#DOIF_setcmd">Bedingungslose Ausführen von Befehlszweigen</a><br>
@@ -3562,7 +3562,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_checkReadingEvent">checkReadingEvent</a> &nbsp;
   <a href="#DOIF_cmdpause">cmdpause</a> &nbsp;
   <a href="#DOIF_cmdState">cmdState</a> &nbsp;
-  <a href="#DOIF_Readings">DOIF_Readings</a> &nbsp;
+  <a href="#DOIF_DOIF_Readings">DOIF_Readings</a> &nbsp;
   <a href="#DOIF_disable">disable</a> &nbsp;
   <a href="#DOIF_do_always">do always</a> &nbsp;
   <a href="#DOIF_do_resetwait">do resetwait</a> &nbsp;
@@ -4076,6 +4076,7 @@ alternativ mit Buchstaben-Kürzeln:<br>
 <code>[&lt;time&gt;|So Mo Di Mi Do Fr Sa WE AT]</code> WE entspricht der Ziffer 7 und AT der Ziffer 8<br>
 <br>
 <a name="DOIF_weekdays"></a>
+<a name="weekdays"></a>
 Mit Hilfe des Attributes <code>weekdays</code> können beliebige Wochentagbezeichnungen definiert werden. Die Syntax lautet:<br>
 <br>
 <code>weekdays &lt;Bezeichnung für Sonntag&gt;,&lt;Bezeichnung für Montag&gt;,...,&lt;Bezeichnung für Wochenende&gt;,&lt;Bezeichnung für Arbeitstage&gt;</code><br>
@@ -4313,6 +4314,7 @@ attr di_average do always</code><br>
 <a name="DOIF_notexist"></a>
 <b>Ersatzwert für nicht existierende Readings oder Status</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="notexist"></a>
 Es kommt immer wieder vor, dass in der Definition des DOIF-Moduls angegebene Readings oder Status zur Laufzeit nicht existieren. Der Wert ist dann leer.
 Bei der Definition von Status oder Readings kann für diesen Fall ein Vorgabewert oder sogar eine Perlberechnung am Ende des Ausdrucks kommagetrennt angegeben werden.<br>
 <br>
@@ -4339,6 +4341,7 @@ Syntax: <code>attr &lt;DOIF-module&gt; notexist "&lt;default value&gt;"</code> <
 <a name="DOIF_wait"></a>
 <b>Verzögerungen</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="wait"></a>
 Verzögerungen für die Ausführung von Kommandos werden pro Befehlsfolge über das Attribut "wait" definiert. Syntax:<br>
 <br>
 <code>attr &lt;DOIF-module&gt; wait &lt;Sekunden für Befehlsfolge des ersten DO-Falls&gt;:&lt;Sekunden für Befehlsfolge des zweiten DO-Falls&gt;:...<br></code>
@@ -4378,6 +4381,7 @@ Beispiel:<br>
 <br>
 <b>Verzögerungen von Timern</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="timerWithWait"></a>
 Verzögerungen können mit Hilfe des Attributs <code>timerWithWait</code> auf Timer ausgeweitet werden.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Lampe soll zufällig nach Sonnenuntergang verzögert werden.<br>
@@ -4436,6 +4440,7 @@ attr di_push do resetwait</code><br>
 <a name="DOIF_repeatcmd"></a>
 <b>Wiederholung von Befehlsausführung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="repeatcmd"></a>
 Wiederholungen der Ausführung von Kommandos werden pro Befehlsfolge über das Attribut "repeatcmd" definiert. Syntax:<br>
 <br>
 <code>attr &lt;DOIF-modul&gt; repeatcmd &lt;Sekunden für Befehlsfolge des ersten DO-Falls&gt;:&lt;Sekunden für Befehlsfolge des zweiten DO-Falls&gt;:...<br></code>
@@ -4480,6 +4485,7 @@ attr di_presence_simulation repeatcmd rand(3600)+2200</code><br>
 <a name="DOIF_cmdpause"></a>
 <b>Zwangspause für das Ausführen eines Kommandos seit der letzten Zustandsänderung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="cmdpause"></a>
 Mit dem Attribut <code>cmdpause &lt;Sekunden für cmd_1&gt;:&lt;Sekunden für cmd_2&gt;:...</code> wird die Zeitspanne in Sekunden angegeben für eine Zwangspause seit der letzten Zustandsänderung.
 In der angegebenen Zeitspanne wird ein Kommando nicht ausgeführt, auch wenn die dazugehörige Bedingung wahr wird.<br>
 <br>
@@ -4492,6 +4498,7 @@ attr di_frost do always</code><br>
 <a name="DOIF_repeatsame"></a>
 <b>Begrenzung von Wiederholungen eines Kommandos</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="repeatsame"></a>
 Mit dem Attribut <code>repeatsame &lt;maximale Anzahl von cmd_1&gt;:&lt;maximale Anzahl von cmd_2&gt;:...</code> wird die maximale Anzahl hintereinander folgenden Ausführungen festgelegt.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Die Meldung soll maximal dreimal erfolgen mit einer Pause von mindestens 10 Minuten <br>
@@ -4512,6 +4519,7 @@ attr di_repeat do always</code><br>
 <a name="DOIF_waitsame"></a>
 <b>Ausführung eines Kommandos nach einer Wiederholung einer Bedingung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="waitsame"></a>
 Mit dem Attribut <code>waitsame &lt;Zeitspanne in Sekunden für cmd_1&gt;:&lt;Zeitspanne in Sekunden für das cmd_2&gt;:...</code> wird ein Kommando erst dann ausgeführt, wenn innerhalb einer definierten Zeitspanne die entsprechende Bedingung zweimal hintereinander wahr wird.<br>
 Für Kommandos, für die <code>waitsame</code> nicht gelten soll, werden die entsprechenden Sekundenangaben ausgelassen oder auf Null gesetzt.<br>
 <br>
@@ -4524,6 +4532,7 @@ attr di_shuttersup do always</code><br>
 <a name="DOIF_waitdel"></a>
 <b>Löschen des Waittimers nach einer Wiederholung einer Bedingung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="waitdel"></a>
 Das Gegenstück zum <code>repeatsame</code>-Attribut ist das Attribut <code>waitdel</code>. Die Syntax mit Sekundenangaben pro Kommando entspricht der, des wait-Attributs. Im Gegensatz zum wait-Attribut, wird ein laufender Timer gelöscht, falls eine Bedingung wiederholt wahr wird.
 Sekundenangaben können pro Kommando ausgelassen oder auf Null gesetzt werden.<br>
 <br>
@@ -4546,6 +4555,7 @@ attr di_cmd waitdel 0:2</code><br>
 <br>
 <b>Readingauswertung bei jedem Event des Devices</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="checkReadingEvent"></a>
 Bei Angaben der Art <code>[&lt;Device&gt;:&lt;Reading&gt;]</code> wird das Modul getriggert, wenn ein Ereignis zum angegebenen Device und Reading kommt. Soll das Modul, wie bei Statusangaben der Art <code>[&lt;Device&gt;]</code>, auf alle Ereignisse des Devices reagieren, so muss das Attribut auf Null gesetzt werden.<br>
 <br>
 Bemerkung: In früheren Versionen des Moduls war <code>checkReadingEvent 0</code> die Voreinstellung des Moduls. Da die aktuelle Voreinstellung des Moduls <code>checkReadingEvent 1</code> ist, hat das Setzen von 
@@ -4554,6 +4564,7 @@ Bemerkung: In früheren Versionen des Moduls war <code>checkReadingEvent 0</code
 <a name="DOIF_addStateEvent"></a>
 <b>Eindeutige Statuserkennung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="addStateEvent"></a>
 Bei Änderungen des Readings state wird in FHEM standardmäßig, im Gegensatz zu allen anderen Readings, der Readingname hier: "state: " im Event nicht vorangestellt.
 Möchte man eindeutig eine Statusänderung eines Moduls erkennen, so lässt sich das mit dem Attribut <code>addStateEvent</code> bewerksteligen.
 Bei Statusänderungen eines Devices wird bei der Angabe des Attributes <code>addStateEvent</code> im Event "state: " vorangestellt, darauf kann man dann gezielt im DOIF-Modul triggern.<br>
@@ -4567,6 +4578,7 @@ attr di_lamp addStateEvent</code><br>
 <a name="DOIF_selftrigger"></a>
 <b>Triggerung durch selbst ausgelöste Events</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="selftrigger"></a>
 Standardmäßig unterbindet das DOIF-Modul Selbsttriggerung. D. h. das Modul reagiert nicht auf Events, die es selbst direkt oder indirekt auslöst. Dadurch werden Endlosschleifen verhindert.
 Wenn das Attribut <code>selftrigger wait</code> gesetzt ist, kann das DOIF-Modul auf selbst ausgelöste Events reagieren. Dazu müssen die entsprchenden Kommandos mit wait verzögert werden.
 Bei der Angabe  <code>selftrigger all</code> reagiert das Modul grundsätzlich alle selbst ausgelösten Trigger.<br>
@@ -4579,6 +4591,7 @@ Bei der Verwendung des Attributes <code>selftrigger all</code> sollte beachtet w
 <a name="DOIF_timerevent"></a>
 <b>Setzen der Timer mit Event</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="timerevent"></a>
 Wenn das Attribut <code>timerevent</code> ungleich Null gesetzt ist, wird beim Setzen der Timer im DOIF-Modul ein Event erzeugt. Das kann z. B. bei FHEM2FHEM nützlich sein, um die Timer-Readings zeitnah zu aktualisieren.<br>
 <br>
 <a name="DOIF_Zeitspanne_eines_Readings_seit_der_letzten_Aenderung"></a>
@@ -4597,6 +4610,7 @@ Der Status bleibt dabei auf "motion". Mit der obigen Abfrage lässt sich festste
 <a name="DOIF_checkall"></a>
 <b>Alle Bedingungen prüfen</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="checkall"></a>
 Bei der Abarbeitung der Bedingungen, werden nur die Bedingungen überprüft,
 die zum ausgelösten Event das dazughörige Device bzw. die dazugehörige Triggerzeit beinhalten. Mit dem Attribut <b>checkall</b> lässt sich das Verhalten so verändern,
 dass bei einem Event-Trigger auch Bedingungen geprüft werden, die das triggernde Device nicht beinhalten.
@@ -4612,7 +4626,8 @@ Zu beachten ist, dass bei einer wahren Bedingung die dazugehörigen Befehle ausg
 <a name="DOIF_setList__readingList"></a>
 <b>Darstellungselement mit Eingabemöglichkeit im Frontend und Schaltfunktion</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Die unter <a href="#dummy">Dummy</a> beschriebenen Attribute <a href="#readingList">readingList</a> und <a href="#setList">setList</a> stehen auch im DOIF zur Verf&uuml;gung. Damit wird erreicht, dass DOIF im WEB-Frontend als Eingabeelement mit Schaltfunktion dienen kann. Zus&auml;tzliche Dummys sind nicht mehr erforderlich. Es k&ouml;nnen im Attribut <a href="#setList">setList</a>, die in <a href="#FHEMWEB">FHEMWEB</a> angegebenen Modifier des Attributs <a href="#widgetOverride">widgetOverride</a> verwendet werden. Siehe auch das <a href="http://www.fhemwiki.de/wiki/DOIF/Ein-_und_Ausgabe_in_FHEMWEB_und_Tablet-UI_am_Beispiel_einer_Schaltuhr">weiterf&uuml;hrende Beispiel für Tablet-UI</a>. Für die Verwendung moduleigener Readings ist die Funktionalität nicht gew&auml;hrleistet, siehe <a href="#DOIF_Benutzerreadings">benutzerdefinierte Readings</a>.<br>
+<a name="setList"></a>
+Die unter <i>Dummy</i> beschriebenen Attribute <i>readingList</i> und <i>setList</i> stehen auch im DOIF zur Verf&uuml;gung. Damit wird erreicht, dass DOIF im WEB-Frontend als Eingabeelement mit Schaltfunktion dienen kann. Zus&auml;tzliche Dummys sind nicht mehr erforderlich. Es k&ouml;nnen im Attribut <i>setList</i>, die in <i>FHEMWEB</i> angegebenen Modifier des Attributs <i>widgetOverride</i> verwendet werden.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Eine Schaltuhr mit time-Widget f&uuml;r die Ein- u. Ausschaltzeiten und der M&ouml;glichkeit &uuml;ber eine Auswahlliste manuell ein und aus zu schalten.<br>
 <br>
@@ -4634,9 +4649,20 @@ attr time_switch webCmd mybutton:mybegin:myend
 <br>
 attr di_web setList myInput:first,second</code><br>
 <br>
+<u>Links</u><br>
+<a href="#readingList">readingList</a><br>
+<a href="#setList">setList</a><br>
+<a href="#webCmd">webCmd</a><br>
+<a href="#webCmdLabel">webCmdLabel</a><br>
+<a href="#widgetOverride">widgetOverride</a><br>
+<a href="http://www.fhemwiki.de/wiki/DOIF/Ein-_und_Ausgabe_in_FHEMWEB_und_Tablet-UI_am_Beispiel_einer_Schaltuhr">weiterf&uuml;hrendes Beispiel für Tablet-UI</a><br>
+<a href="#DOIF_Benutzerreadings">benutzerdefinierte Readings</a><br>
+<a href="#DOIF_setcmd">Bedingungsloses Ausf&uuml;hren von Befehlen</a><br>
+<br>
 <a name="DOIF_uiTable"></a>
 <b>uiTable, das User Interface</a></b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="uiTable"></a>
 Mit dem Attribut uiTable kann innerhalb eines DOIF-Moduls ein User Interface in Form einer Tabelle erstellt werden. Die Definition der Tabelle wird mit Hilfe von Perl sowie FHEM-Widgets kombiniert mit DOIF-Syntax vorgenommen.<br> 
 <br>
 Features:<br>
@@ -4751,7 +4777,7 @@ Brennericon<br>
 <br>
 <code>WID([burner:state],"iconLabel,closed,sani_boiler_temp\@DarkOrange,open,sani_boiler_temp")<br></code>
 <br>
-Die Widget-Definition entspricht der FHEM-Widget-Syntax, siehe: <a href="https://wiki.fhem.de/wiki/FHEMWEB/Widgets">FHEMWEB-Widgets</a><br>
+Die Widget-Definition entspricht der Syntax der FHEM-Widgets.<br>
 <br>
 Thermostatdefinition mit Hilfe des knob-Widgets:<br>
 <br>
@@ -4885,10 +4911,13 @@ in mytemplates.tpl<br>
 ## template methode<br>
 DEF TPL_temp(STY($1.$TPL{unit},FUNC_temp($1)))<br></code>
 <br>
+<u>Links</u><br>
+<a href="https://wiki.fhem.de/wiki/FHEMWEB/Widgets">FHEMWEB-Widgets</a><br>
 <br>
 <a name="DOIF_cmdState"></a>
 <b>Status des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="cmdState"></a>
 Der Status des Moduls wird standardmäßig mit cmd_1, cmd_2, usw., bzw. cmd1_1 cmd1_2 usw. für Befehlssequenzen belegt. Dieser lässt sich über das Attribut "cmdState" mit Komma bzw. | getrennt umdefinieren:<br>
 <br>
 attr &lt;DOIF-modul&gt; cmdState  &lt;Status für cmd1_1&gt;,&lt;Status für cmd1_2&gt;,...| &lt;Status für cmd2_1&gt;,&lt;Status für cmd2_2&gt;,...|...<br>
@@ -4917,6 +4946,7 @@ attr di_hum cmdState wet|normal|dry</code><br>
 <a name="DOIF_state"></a>
 <b>Anpassung des Status mit Hilfe des Attributes <code>state</code></b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="state"></a>
 Es können beliebige Reading und Status oder Internals angegeben werden.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Aktuelle Außenfeuchtigkeit inkl. Klimazustand (Status des Moduls wurde mit cmdState definiert s. o.)<br>
@@ -4936,9 +4966,10 @@ Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwer
 <br>
 <code>attr di_average state Average of the two rooms is {(sprintf("%.1f",([room1:temperature]+[room2:temperature])/2))}</code><br>
 <br>
-<a name="DOIF_Readings"></a>
+<a name="DOIF_DOIF_Readings"></a>
 <b>Erzeugen berechneter Readings</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="DOIF_Readings"></a>
 Mit Hilfe des Attributes DOIF_Readings können eigene Readings innerhalb des DOIF definiert werden, auf die man im selben DOIF-Moduls zugreifen kann.
 Die Nutzung ist insbesondere dann sinnvoll, wenn mehrfach die gleichen Berechnungen innerhalb eines DOIF-Modus vorgenommen werden sollen.
 DOIF_Readings-Berechnungen funktionieren ressourcenschonend ohne Erzeugung FHEM-Events nach außen. Änderungen dieser Readings triggern allerdings das eigene DOIF-Modul, wenn sich deren Inhalt ändert.<br>
@@ -4969,7 +5000,10 @@ attr heating DOIF_Readings frost:([outdoor:temperature] < 0 ? "on" : "off")</cod
 Das Attribut do always ist in diesem Beispiel unkritisch, obwohl Temperatur zyklisch gesendet wird, da das Reading "frost" nur dann die Bedingung triggert, wenn sich dessen Inhalt ändert<br>
 <br>
 <a name="DOIF_initialize"></a>
-<b>Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut <code>initialize</code></b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<b>Vorbelegung des Status mit Initialisierung nach dem Neustart</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+<a name="initialize"></a>
+Mit dem Attribut <code>initialize</code> Wird der Status vorbelegt, mit Initialisierung nach dem Neustart.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Nach dem Neustart soll der Zustand von <code>di_lamp</code> mit "initialized" vorbelegt werden. Das Reading <code>cmd_nr</code> wird auf 0 gesetzt, damit wird ein Zustandswechsel provoziert, das Modul wird initialisiert - der nächste Trigger führt zum Ausführen eines Kommandos.<br>
 <br>
@@ -4980,6 +5014,7 @@ Das ist insb. dann sinnvoll, wenn das System ohne Sicherung der Konfiguration (u
 <a name="DOIF_startup"></a>
 <b>Ausführen von Befehlsketten beim Starten von FHEM</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="startup"></a>
 Beim Hochfahren von FHEM lässt sich eine bestimme Aktion ausführen. Es kann dazu genutzt werden, um sofort nach dem Hochfahren des Systems einen definierten Zustand des Moduls zu erreichen.
 Dabei wird sichergestellt, dass die angegebenen Befehle erst dann ausgeführt werden, wenn FHEM komplett hochgefahren ist.<br>
 <br>
@@ -4999,6 +5034,7 @@ Beispiele:<br>
 <a name="DOIF_disable"></a>
 <b>Deaktivieren des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="disable"></a>
 Ein DOIF-Modul kann mit Hilfe des Attributes disable, deaktiviert werden. Dabei werden alle Timer und Readings des Moduls gelöscht.
 Soll das Modul nur vorübergehend deaktiviert werden, so kann das durch <code>set &lt;DOIF-modul&gt; disable</code> geschehen.
 <br>
@@ -5009,7 +5045,8 @@ Soll das Modul nur vorübergehend deaktiviert werden, so kann das durch <code>se
 <a name="DOIF_setcheckall"></a>
 <b>Überprüfung aller DOIF-Bedingungen mit Ausführung eines DOIF-Zweiges</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-mit dem set-Befehl <code>checkall</code> werden wie beim gleichnamigen Attribut alle DOIF-Bedingung überprüft, sobald eine Bedingung als wahr geprüft ist, wird das dazugehörige Kommando ausgeführt.
+<a name="checkall"></a>
+Mit dem set-Befehl <code>checkall</code> werden wie beim gleichnamigen Attribut alle DOIF-Bedingung überprüft, sobald eine Bedingung als wahr geprüft ist, wird das dazugehörige Kommando ausgeführt.
 Zu beachten ist, dass nur der erste wahre DOIF-Zweig ausgeführt wird und dass nur Zustandsabfragen sowie Zeitintervalle sinnvoll überprüft werden können.
 Ereignisabfragen sowie Zeitpunkt-Definitionen, sind zum Zeitpunkt der checkall-Abfrage normalerweise nicht wahr.<br>
 <br>
@@ -5020,14 +5057,16 @@ Beispiel:<br>
 <a name="DOIF_setdisable"></a>
 <b>Inaktivieren des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-mit dem set-Befehl <code>disable</code> wird ein DOIF-Modul inaktiviert. Hierbei bleiben alle Timer aktiv, sie werden aktualisiert - das Modul bleibt im Takt, allerdings werden keine Befehle ausgeführt.
+<a name="disable"></a>
+Mit dem set-Befehl <code>disable</code> wird ein DOIF-Modul inaktiviert. Hierbei bleiben alle Timer aktiv, sie werden aktualisiert - das Modul bleibt im Takt, allerdings werden keine Befehle ausgeführt.
 Das Modul braucht mehr Rechenzeit, als wenn es komplett über das Attribut <code>disable</code> deaktiviert wird. Ein inaktiver Zustand bleibt nach dem Neustart erhalten.
 Ein inaktives Modul kann über set-Befehle <code>enable</code> bzw. <code>initialize</code> wieder aktiviert werden.<br>
 <br>
 <a name="DOIF_setenable"></a>
 <b>Aktivieren des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-mit dem set-Befehl <code>enable</code> wird ein inaktives DOIF-Modul wieder aktiviert. Im Gegensatz zum set-Befehl <code>initialize</code> wird der letzte Zustand vor der Inaktivierung des Moduls wieder hergestellt.<br>
+<a name="enable"></a>
+Mit dem set-Befehl <code>enable</code> wird ein inaktives DOIF-Modul wieder aktiviert. Im Gegensatz zum set-Befehl <code>initialize</code> wird der letzte Zustand vor der Inaktivierung des Moduls wieder hergestellt.<br>
 <br>
 <a name="DOIF_Initialisieren_des_Moduls"></a>
 <b>Initialisieren des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -5039,6 +5078,7 @@ Diese Eigenschaft kann auch dazu genutzt werden, ein bereits aktives Modul zu in
 <a name="DOIF_setcmd"></a>
 <b>Auführen von Befehlszweigen ohne Auswertung der Bedingung</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
+<a name="cmd_1"></a>
 Mit <code>set &lt;DOIF-modul&gt; cmd_&lt;nr&gt</code> lässt sich ein Befehlszweig (cmd_1, cmd_2, usw.) bedingunglos ausführen.<br>
 <br>
 Der Befehl hat folgende Eigenschaften:<br>
@@ -5148,12 +5188,12 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 <br>
 <!-- Beginn der Kurzreferenz -->
 <a name="DOIF_Kurzreferenz"></a>
-<b>Kurzreferenz</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a></br>
+<b>Kurzreferenz</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 
 <ul>
 &lang;&rang; kennzeichnet optionale Angaben
 </ul>
-</br>
+<br>
 <u><a href="#DOIF">Definition</a></u>
 <ul>
 <dl>
@@ -5171,58 +5211,64 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
                 </dd>
 </dl>
 </ul>
-</br>
+<br>
 <u>Readings</u>
 <ul>
 <dl>
         <dt>Device</dt>
                 <dd>Name des ausl&ouml;senden Ger&auml;tes</dd>
-</br>
+<br>
+        <dt>block_&lt;block name&gt;</dt>
+                <dd>Zeigt die Ausführung eines Perl-Blocks an (Perl).</dd>
+<br>
         <dt>cmd</dt>
                 <dd>Nr. des letzten ausgef&uuml;hrten Befehls als Dezimalzahl oder 0 nach Initialisierung des DOIF, in der Form &lt;Nr. des Befehlszweiges&gt;&lang;.&lt;Nr. der Sequenz&gt;&rang;</dd>
-</br>
+<br>
         <dt>cmd_event</dt>
                 <dd>Angabe des ausl&ouml;senden Ereignisses</dd>
-</br>
+<br>
         <dt>cmd_nr</dt>
                 <dd>Nr. des letzten ausgef&uuml;hrten Befehlszweiges</dd>
-</br>
+<br>
         <dt>cmd_seqnr</dt>
                 <dd>Nr. der letzten ausgef&uuml;hrten Befehlssequenz</dd>
-</br>
+<br>
         <dt>e_&lt;Device&gt;_&lt;Reading&gt;|&lt;Internal&gt;|Events</dt>
                 <dd>Bezeichner und Wert der ausl&ouml;senden Ger&auml;te mit Readings, Internals oder Events</dd>
-</br>
+<br>
         <dt>error</dt>
                 <dd>Enthält Fehlermeldungen oder R&uuml;ckgabewerte von Befehlen, siehe <a href="http://www.fhemwiki.de/wiki/DOIF/Tools_und_Fehlersuche#Besonderheit_des_Error-Reading">Besonderheit des Error-Reading</a></dd>
-</br>
+<br>
         <dt>last_cmd</dt>
                 <dd>letzter Status</dd>
-</br>
+<br>
         <dt>matched_event_c&lt;lfd. Nr. der Bedingung&gt;_&lt;lfd. Nr. des Events&gt;</dt>
                 <dd>Wert, der mit dem Regul&auml;ren Ausdruck &uuml;bereinstimmt</dd>
-</br>
+<br>
         <dt>mode</dt>
                 <dd>der Modus, in dem sich DOIF befindet: &lt;enabled|disabled|deactivated&gt;</dd>
-</br>
+<br>
         <dt>state</dt>
                 <dd>Status des DOIF nach Befehlsausf&uuml;hrung, Voreinstellung: cmd_&lt;Nr. des Befehlszweiges&gt;&lang;_&lt;Nr. der Befehlssequenz&gt;&rang;</dd>
-</br>
+<br>
         <dt>timer_&lt;lfd. Nr.&gt;_c&lt;Nr. des Befehlszweiges&gt;</dt>
                 <dd>verwendete Timer mit Angabe des n&auml;chsten Zeitpunktes</dd>
-</br>
+<br>
+        <dt>timer_&lt;timer name&gt;</dt>
+                <dd>verwendete, benannte Timer mit Angabe des n&auml;chsten Zeitpunktes (Perl)</dd>
+<br>
         <dt>wait_timer</dt>
                 <dd>Angabe des aktuellen Wait-Timers</dd>
-</br>
+<br>
         <dt>warning</dt>
                 <dd>Perl-Warnung bei der Auswertung einer Bedingung</dd>
-</br>
+<br>
 
   <a name="DOIF_Benutzerreadings"></a>
         <dt>&lt;A-Z&gt;_&lt;readingname&gt;</dt>
                 <dd>Readings, die mit einem Großbuchstaben und nachfolgendem Unterstrich beginnen, sind für User reserviert und werden auch zuk&uuml;nftig nicht vom Modul selbst benutzt.</dd>
 </dl>
-</br>
+<br>
 </ul>
 <a name="DOIF_Operanden"></a>
 <u>Operanden in der Bedingung und den Befehlen und im Perl-Modus</u>
@@ -5230,35 +5276,35 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 <dl>
         <dt><a href="#DOIF_Ereignissteuerung">Status</a> <code><b>[</b>&lt;Device&gt;&lang;<b>,</b>&lt;Default&gt;&rang;<b>]</b></code></dt>
                 <dd></dd>
-</br>
+<br>
         <dt><a href="#DOIF_Ereignissteuerung">Readings</a> <code><b>[</b>&lt;Device&gt;<b>:</b>&lt;Reading&gt;&lang;<b>,</b>&lt;Default&gt;&rang;<b>]</b></code></dt>
                 <dd></dd>
-</br>
+<br>
         <dt><a href="#DOIF_Ereignissteuerung">Internals</a> <code><b>[</b>&lt;Device&gt;<b>:&amp;</b>&lt;Internal&gt;&lang;<b>,</b>&lt;Default&gt;&rang;<b>]</b></code></dt>
                 <dd></dd>
-</br>
+<br>
         <dt><a href="#DOIF_Filtern_nach_Zahlen">Filtern allgemein</a> nach Ausdr&uuml;cken mit Ausgabeformatierung: <code><b>[</b>&lt;Device&gt;:&lt;Reading&gt;|&lt;Internal&gt;:"&lt;Filter&gt;"&lang;:&lt;Output&gt;&rang;&lang;<b>,</b>&lt;Default&gt;&rang;<b>]</b></code></dt>
-</br>
+<br>
         <dt><a href="#DOIF_Filtern_nach_Zahlen">Filtern einer Zahl</a> <code><b>[</b>&lt;Device&gt;<b>:</b>&lt;Reading&gt;<b>:d</b>&lang;<b>,</b>&lt;Default&gt;&rang;<b>]</b></code></dt>
-</br>
+<br>
         <dt><a href="#DOIF_Zeitspanne_eines_Readings_seit_der_letzten_Aenderung">Zeitspanne eines Readings seit der letzten &Auml;nderung</a> <code><b>[</b>&lt;Device&gt;<b>:</b>&lt;Reading&gt;<b>:sec</b>&lang;<b>,</b>&lt;Default&gt;&rang;<b>]</b></code></dt>
-</br>
+<br>
         <dt>$DEVICE</dt>
                 <dd>f&uuml;r den Ger&auml;tenamen</dd>
-</br>
+<br>
         <dt>$EVENT</dt>
                 <dd>f&uuml;r das zugeh&ouml;rige Ereignis</dd>
-</br>
+<br>
         <dt>$EVENTS</dt>
                 <dd>f&uuml;r alle zugeh&ouml;rigen Ereignisse eines Triggers</dd>
-</br>
+<br>
         <dt>$SELF</dt>
                 <dd>f&uuml;r den Ger&auml;tenamen des DOIF</dd>
-</br>
+<br>
         <dt>&lt;Perl-Funktionen&gt;</dt>
                 <dd>vorhandene und selbsterstellte Perl-Funktionen</dd>
 </dl>
-</br>
+<br>
 </ul>
 
 <u>Operanden in der Bedingung und im Perl-Modus</u>
@@ -5267,70 +5313,70 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt><a href="#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events">Events</a> <code><b>[</b>&lt;Device&gt;<b>:"</b>&lt;Regex-Events&gt;"<b>]</b></code> oder <code><b>["</b>&lt;Regex-Devices&gt;<b>:</b>&lt;Regex-Events&gt;<b>"]</b></code> oder <code><b>["</b>&lt;Regex-Devices&gt;<b>"</b>&lang;<b>:"</b>&lt;Regex-Filter&gt;<b>"</b>&rang;&lang;<b>:</b>&lt;Output&gt;&rang;<b>,</b>&lt;Default&gt;<b>]</b></code></dt>
                 <dd>f&uuml;r <code>&lt;Regex&gt;</code> gilt: <code><b>^</b>&lt;ist eindeutig&gt;<b>$</b></code>, <code><b>^</b>&lt;beginnt mit&gt;</code>, <code>&lt;endet mit&gt;<b>$</b></code>, <code><b>""</b></code> entspricht <code><b>".*"</b></code>, Regex-Filter ist mit <code><b>[^\:]*: (.*)</b></code> vorbelegt siehe auch <a target=blank href="https://wiki.selfhtml.org/wiki/Perl/Regul%C3%A4re_Ausdr%C3%BCcke">Regul&auml;re Ausdr&uuml;cke</a> und Events des Ger&auml;tes <a target=blank href="#global">global</a>
                 </dd>
-</br>
+<br>
         <dt><a href="#DOIF_Zeitsteuerung">Zeitpunkte</a> <code><b>[</b>&lt;time&gt;<b>]</b> </code></dt>
                 <dd>als <code><b>[HH:MM]</b></code>, <code><b>[HH:MM:SS]</b></code> oder <code><b>[Zahl] </b></code> in Sekunden nach Mitternacht</dd>
-</br>
+<br>
         <dt><a href="#DOIF_Zeitsteuerung_mit_Zeitintervallen">Zeitintervalle</a> <code><b>[</b>&lt;begin&gt;<b>-</b>&lt;end&gt;<b>]</b></code></dt>
                 <dd>als <code><b>[HH:MM]</b></code>, <code><b>[HH:MM:SS]</b></code> oder <code><b>[Zahl]</b></code> in Sekunden nach Mitternacht</dd>
-</br>
+<br>
         <dt><a href="#DOIF_Indirekten_Zeitangaben">indirekte Zeitangaben</a> <code><b>[[</b>&lt;indirekte Zeit&gt;<b>]]</b></code></dt>
                 <dd>als <code><b>[HH:MM]</b></code>, <code><b>[HH:MM:SS]</b></code> oder <code><b>[Zahl]</b></code> in Sekunden nach Mitternacht, <code>&lt;indirekte Zeit&gt;</code> ist ein Status, Reading oder Internal</dd>
-</br>
+<br>
         <dt><a href="#DOIF_Relative_Zeitangaben">relative Zeitangaben</a> <code><b>[+</b>&lt;time&gt;<b>]</b></code></dt>
                 <dd>als <code><b>[HH:MM]</b></code>, <code><b>[HH:MM:SS]</b></code> oder <code><b>[Zahl]</b></code> in Sekunden</dd>
-</br>
+<br>
         <dt><a href="#DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet">ausgerichtete Zeitraster</a> <code><b>[:MM]</b></code></dt>
                 <dd>in Minuten zwischen 00 und 59</dd>
-</br>
+<br>
         <dt><a href="#DOIF_Relative_Zeitangaben_nach_Zeitraster_ausgerichtet">rel. Zeitraster ausgerichtet</a> <code><b>[+:MM]</b></code></dt>
                 <dd>in Minuten zwischen 1 und 59</dd>
-</br>
+<br>
         <dt><a href="#DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet_alle_X_Stunden">rel. Zeitraster ausgerichtet alle X Stunden</a> <code><b>[+[h]:MM]</b></code></dt>
                 <dd><b>MM</b> in Minuten zwischen 1 und 59, <b>h</b> in Stunden zwischen 2 und 23</dd>
-</br>
+<br>
         <dt><a href="#DOIF_Wochentagsteuerung">Wochentagsteuerung</a> <code><b>[</b>&lt;time&gt;<b>|012345678]</b></code>, <code><b>[</b>&lt;begin&gt;<b>-</b>&lt;end&gt;<b>]</b><b>|012345678]</b></code></dt>
                 <dd>Pipe, gefolgt von ein o. mehreren Ziffern. Bedeutung: 0 bis 6 f&uuml;r So. bis Sa., 7 f&uuml;r $we, Wochenende oder Feiertag, 8 f&uuml;r !$we, Werktags.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_Zeitsteuerung_mit_Zeitberechnung">berechnete Zeitangaben</a> <code><b>[(</b>&lt;Berechnung, gibt Zeit in Sekunden zur&uuml;ck, im Sinne von <a target=blank href="http://perldoc.perl.org/functions/time.html">time</a>&gt;<b>)]</b></code></dt>
                 <dd>Berechnungen sind mit runden Klammern einzuschliessen. Perlfunktionen, die HH:MM zur&uuml;ckgeben sind mit geschweiften Klammern einzuschliessen.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_Intervall-Timer">Intervall-Timer</a> <code><b>[</b>&lt;begin&gt;<b>-</b>&lt;end&gt;<b>,</b>&lt;relativ timer&gt;<b>]</b></code></dt>
                 <dd>L&ouml;st zu den aus &lt;relativ timer&gt; berechneten Zeitpunkten im angegebenen Zeitintervall &lt;begin&gt;-&lt;end&gt; aus.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_Zeitintervalle_Readings_und_Status_ohne_Trigger">Trigger verhindern</a> <code><b>[?</b>&lt;devicename&gt;<b>]</b></code>, <code><b>[?</b>&lt;devicename&gt;<b>:</b>&lt;readingname&gt;<b>]</b></code>, <code><b>[?</b>&lt;devicename&gt;<b>:&amp;</b>&lt;internalname&gt;<b>]</b></code>, <code><b>[?</b>&lt;time specification&gt;<b>]</b></code></dt>
                 <dd>Werden Status, Readings, Internals und Zeitangaben in der Bedingung mit einem Fragezeichen eingeleitet, triggern sie nicht.</dd>
-</br>
+<br>
         <dt>$device, $event, $events</dt>
                 <dd>Perl-Variablen mit der Bedeutung der Schl&uuml;sselworte $DEVICE, $EVENT, $EVENTS</dd>
-</br>
+<br>
         <dt>$cmd</dt>
                 <dd>Perl-Variablen mit der Bedeutung [$SELF:cmd]</dd>
-</br>
+<br>
         <dt>&lt;Perl-Zeitvariablen&gt;</dt>
                 <dd>Variablen f&uuml;r Zeit- und Datumsangaben, $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst, $week, $hms, $hm, $md, $ymd</dd>
 </dl>
-</br>
+<br>
 </ul>
 <u>set-Befehle</u>
 <ul>
 <dl>
         <dt><a href="#DOIF_setcheckall">disable</a> <code><b> set </b>&lt;name&gt;<b> checkall</b></code></dt>
                 <dd>Überprüfung aller DOIF-Bedingungen mit Ausführung eines wahren DOIF-Zweiges</dd>
-</br>
+<br>
         <dt><a href="#DOIF_setdisable">disable</a> <code><b> set </b>&lt;name&gt;<b> disable</b></code></dt>
                 <dd>blockiert die Befehlsausf&uuml;hrung</dd>
-</br>
+<br>
         <dt><a href="#DOIF_Initialisieren_des_Moduls">initialize</a> <code><b> set </b>&lt;name&gt;<b> initialize</b></code></dt>
                 <dd>initialisiert das DOIF und aktiviert die Befehlsausf&uuml;hrung</dd>
-</br>
+<br>
         <dt><a href="#DOIF_setenable">enable</a> <code><b> set </b>&lt;name&gt;<b> enable</b></code></dt>
                 <dd>aktiviert die Befehlsausf&uuml;hrung, im Gegensatz zur obigen Initialisierung bleibt der letzte Zustand des Moduls erhalten</dd>
-</br>
+<br>
         <dt><a href="#DOIF_setcmd">cmd_&lt;nr&gt</a> <code><b> set </b>&lt;name&gt;<b> cmd_&lt;nr&gt;</b></code></dt>
                 <dd>führt ohne Auswertung der Bedingung den Befehlszweig mit der Nummer &lt;nr&gt; aus</dd>
 </dl>
-</br>
+<br>
 </ul>
 <a name="DOIF_getBefehle"></a>
 <u>get-Befehle</u>
@@ -5339,7 +5385,7 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
         <dt><a name="HTML-Code von uiTable">html</a></dt>
         <dd>liefert HTML-Code einer definierten uiTable zurück.</dd>
 </dl>
-</br>
+<br>
 </ul>
 
 <a name="DOIF_Attribute_kurz"></a>
@@ -5348,76 +5394,78 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 <dl>
         <dt><a href="#DOIF_wait">Verz&ouml;gerungen</a> <code><b>attr</b> &lt;name&gt; <b>wait </b>&lt;timer_1_1&gt;<b>,</b>&lt;timer_1_2&gt;<b>,...:</b>&lt;timer_2_1&gt;<b>,</b>&lt;timer_2_2&gt;<b>,...:...</b></code></dt>
                 <dd>Zeit in Sekunden als direkte Angabe oder Berechnung, ein Doppelpunkt trennt die Timer der Bedingungsweige, ein Komma die Timer der Befehlssequenzen eines Bedingungszweiges.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_timerWithWait">Verz&ouml;gerung von Timern</a> <code><b>attr</b> &lt;name&gt; <b>timerWithWait</b></code></dt>
                 <dd>erweitert <code>wait</code> auf Zeitangaben</dd>
-</br>
-        <dt><a href="#DOIF_do_always">Befehlswiederholung zulassen</a> <code><b>attr</b> &lt;name&gt; <b>do always</b></code></dt>
-                <dd>wiederholt den Ausf&uuml;hrungsteil, wenn die selbe Bedingung wiederholt wahr wird.</dd>
-</br>
-        <dt><a href="#DOIF_do_resetwait">Zur&uuml;cksetzen des Waittimers bei Wiederholung</a> <code><b>attr</b> &lt;name&gt; <b>do resetwait</b></code></dt>
-                <dd>setzt den Waittimer zur&uuml;ck, wenn die selbe Bedingung wiederholt wahr wird.</dd>
-</br>
+<br>
+<a name="do"></a>
+        <dt><code><b>attr</b> &lt;name&gt; <b>do </b>&lt;<b>always</b>|<b>resetwait</b>&gt;</code></dt>
+                <dd><code>always</code> wiederholt den Ausf&uuml;hrungsteil, wenn die selbe Bedingung wiederholt wahr wird.<br>
+                    <code>resetwait</code> setzt den Waittimer zurück, wenn die selbe Bedingung wiederholt wahr wird.<br>
+                </dd>
+<a name="DOIF_EndOfItem"></a>
+<br>
         <dt><a href="#DOIF_repeatcmd">Befehle wiederholen</a> <code><b>attr</b> &lt;name&gt; <b>repeatcmd </b>&lt;timer Bedingungszweig 1&gt;<b>:</b>&lt;timer Bedingungszweig 2&gt;<b>:...</b></code></dt>
                 <dd>Zeit in Sekunden als direkte Angabe oder Berechnung, nach der Befehle wiederholt werden.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_cmdpause">Pause f&uuml;r Wiederholung</a> <code><b>attr</b> &lt;name&gt; <b>cmdpause </b>&lt;Pause cmd_1&gt;<b>:</b>&lt;Pause cmd_2&gt;<b>:...</b></code></dt>
                 <dd>Zeit in Sekunden als direkte Angabe oder Berechnung, blockiert die Befehlsausf&uuml;hrung w&auml;hrend der Pause.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_repeatsame">Begrenzung von Wiederholungen</a> <code><b>attr</b> &lt;name&gt; <b>repeatsame </b>&lt;maximale Anzahl von cmd_1&gt;<b>:</b>&lt;maximale Anzahl von cmd_2&gt;<b>:...</b></code></dt>
                 <dd>Anzahl als direkte Angabe oder Berechnung, begrenzt die maximale Anzahl unmittelbar folgender Befehlsausf&uuml;hrungen.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_waitsame">Warten auf Wiederholung</a> <code><b>attr</b> &lt;name&gt; <b>waitsame </b>&lt;Wartezeit cmd_1&gt;<b>:</b>&lt;Wartezeit cmd_2&gt;<b>:...</b></code></dt>
                 <dd>Wartezeit in Sekunden als direkte Angabe oder Berechnung, f&uuml;r ein unmittelbar wiederholtes Zutreffen einer Bedingung.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_waitdel">L&ouml;schen des Waittimers</a> <code><b>attr</b> &lt;name&gt; <b>waitdel </b>&lt;timer_1_1&gt;<b>,</b>&lt;timer_1_2&gt;<b>,...:</b>&lt;timer_2_1&gt;<b>,</b>&lt;timer_2_2&gt;<b>,...:...</b></code></dt>
                 <dd>Zeit in Sekunden als direkte Angabe oder Berechnung, ein laufender Timer wird gel&ouml;scht und die Befehle nicht ausgef&uuml;hrt, falls eine Bedingung vor Ablauf des Timers wiederholt wahr wird.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_checkReadingEvent">Readingauswertung bei jedem Event des Devices</a> <code><b>attr</b> &lt;name&gt; <b>checkReadingEvent </b>&lt;<b>0</b>|<b>1</b>&gt;</code></dt>
                 <dd>0 deaktiviert, 1 keine Funktion mehr, entspricht internen der Voreinstellung des Moduls.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_selftrigger">Selbsttriggerung</a> <code><b>attr</b> &lt;name&gt; <b>selftrigger </b>&lt;<b>wait</b>|<b>all</b>&gt;</code></dt>
                 <dd>lässt die Triggerung des Gerätes durch sich selbst zu. <code>wait</code> zugelassen für verzögerte Befehle, <code>all</code> zugelassen auch für nicht durch wait verzögerte Befehle; es ist nur eine Rekusion möglich</dd>
-</br>
+<br>
         <dt><a href="#DOIF_timerevent">Event beim Setzen eines Timers</a> <code><b>attr</b> &lt;name&gt; <b>timerevent </b>&lt;<b>0</b>|<b>ungleich Null</b>&gt;</code></dt>
                 <dd>erzeugt beim Setzen eines Timers ein Event. ungleich Null aktiviert, 0 deaktiviert</dd>
-</br>
+<br>
         <dt><a href="#DOIF_cmdState">Ger&auml;testatus ersetzen</a> <code><b>attr</b> &lt;name&gt; <b>cmdState </b>&lt;Ersatz cmd_1_1&gt;<b>,</b>...<b>,</b>&lt;Ersatz cmd_1&gt;<b>|</b>&lt;Ersatz cmd_2_1&gt;<b>,</b>...<b>,</b>&lt;Ersatz cmd_2&gt;<b>|...</b></code></dt>
                 <dd>ersetzt die Standartwerte des Ger&auml;testatus als direkte Angabe oder Berechnung, die Ersatzstatus von Befehlssequenzen werden durch Kommata, die von Befehlszweigen durch Pipe Zeichen getrennt.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_startup">Befehle bei FHEM-Start ausf&uuml;hren </a> <code><b>attr</b> &lt;name&gt; <b>startup </b>&lt;FHEM-Befehle&gt;|<b>{</b>&lt;Perl-Befehle mit DOIF-Syntax&gt;<b>}</b></code></dt>
                 <dd></dd>
-</br>
+<br>
         <dt><a href="#DOIF_state">dynamischer Status </a> <code><b>attr</b> &lt;name&gt; <b>state </b>&lt;content&gt;</code></dt>
                 <dd>&lt;content&gt; ist das Ergebnis eines Perl-Ausdrucks, DOIF-Syntax ([&lt;device&gt;:&lt;reading&gt;], usw.) triggert bei Event die Berechnung.</dd>
-</br>
-        <dt><a href="#DOIF_Readings">Erzeugen berechneter Readings </a> <code><b>attr</b> &lt;name&gt; <b>DOIF_Readings </b>&lt;readingname_1&gt;<b>:</b>&lt;content_1&gt;<b>,</b>&lt;readingname_2&gt;<b>:</b>&lt;content_2&gt; ...</code></dt>
+<br>
+        <dt><a href="#DOIF_DOIF_Readings">Erzeugen berechneter Readings </a> <code><b>attr</b> &lt;name&gt; <b>DOIF_Readings </b>&lt;readingname_1&gt;<b>:</b>&lt;content_1&gt;<b>,</b>&lt;readingname_2&gt;<b>:</b>&lt;content_2&gt; ...</code></dt>
                 <dd>&lt;content_n&gt; ist das Ergebnis von Perl-Ausdrücken, DOIF-Syntax ([&lt;device&gt;:&lt;reading&gt;], usw.) triggert bei Event die Berechnung.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_notexist">Ersatzwert für nicht existierende Readings oder Status</a> <code><b>attr</b> &lt;name&gt; <b>notexist </b>"&lt;Ersatzwert&gt;"</code></dt>
                 <dd></dd>
-</br>
+<br>
         <dt><a href="#DOIF_initialize">Status Initialisierung nach Neustart</a> <code><b>attr</b> &lt;name&gt; <b>intialize </b>&lt;Status nach Neustart&gt;</code></dt>
                 <dd></dd>
-</br>
+<br>
         <dt><a href="#DOIF_disable">Ger&auml;t vollst&auml;ndig deaktivieren</a> <code><b>attr</b> &lt;name&gt; <b>disable </b>&lt;<b>0</b>|<b>1</b>&gt;</code></dt>
                 <dd>1 deaktiviert das Modul vollst&auml;ndig, 0 aktiviert es.</dd>
-</br>
+<br>
         <dt><a href="#DOIF_checkall">Alle Bedingungen pr&uuml;fen</a> <code><b>attr</b> &lt;name&gt; <b>checkall </b>&lt;<b>event</b>|<b>timer</b>|<b>all</b>&gt;</code></dt>
                 <dd><code>event</code> Alle Bedingungen werden geprüft, wenn ein Event-Trigger (Ereignisauslöser) auslöst.<br>
                     <code>timer</code> Alle Bedingungen werden geprüft, wenn ein Timer-Trigger (Zeitauslöser) auslöst.<br>
                     <code>all&nbsp;&nbsp;</code> Alle Bedingungen werden gepr&uuml;ft.<br>
                     Die Befehle nach der ersten wahren Bedingung werden ausgef&uuml;hrt.
                 </dd>
-</br>
+<br>
         <dt><a href="#DOIF_addStateEvent">Eindeutige Statuserkennung</a> <code><b>attr</b> &lt;name&gt; <b>addStateEvent </b>&lt;<b>0</b>|<b>ungleich Null</b>&gt;</code></dt>
                 <dd>fügt einem Ger&auml;testatus-Event "state:" hinzu. ungleich Null aktiviert, 0 deaktiviert, siehe auch <a href="#addStateEvent">addStateEvent</a></dd>
-</br>
-        <dt><a href="#DOIF_setList__readingList">Readings, die mit set gesetzt werden k&ouml;nnen</a> <code><b>attr</b> &lt;name&gt; <b>readingList </b>&lt;Reading1&gt;&nbsp;&lt;Reading2&gt; ...</code></dt>
-                <dd>fügt zum set-Befehl direkt setzbare, durch Leerzeichen getrennte Readings hinzu. siehe auch <a href="#readingList">readingList</a></dd>
-</br>
-        <dt><a href="#DOIF_setList__readingList">Readings mit Werteliste und optionaler Widgetangabe</a> <code><b>attr</b> &lt;name&gt; <b>setList </b>&lt;Reading1&gt;<b>:</b>&lang;&lt;Modifier1&gt;<b>,</b>&rang;&lt;Value1&gt;<b>,</b>&lt;Value2&gt;<b>,</b>&lt;...&gt;<b> </b>&lt;Reading2&gt;<b>:</b>&lang;&lt;Modifier2&gt;<b>,</b>&rang;&lt;Value1&gt;<b>,</b>&lt;Value2&gt;<b>,</b>&lt;...&gt; ...</code></dt>
-                <dd>fügt einem Reading einen optionalen Widgetmodifier und eine Werteliste (, getrennt) hinzu, siehe auch <a href="#setList">setList</a>, <a href="#widgetOverride">widgetOverride</a>, und <a href="#webCmd">webCmd</a></dd>
+<br>
+<a name="readingList"></a>
+        <dt><code><b>attr</b> &lt;name&gt; <b>readingList </b>&lt;Reading1&gt;&nbsp;&lt;Reading2&gt; ...</code></dt>
+                <dd>fügt zum set-Befehl direkt setzbare, durch Leerzeichen getrennte Readings hinzu.</dd>
+<br>
+        <dt><code><b>attr</b> &lt;name&gt; <b>setList </b>&lt;Reading1&gt;<b>:</b>&lang;&lt;Modifier1&gt;<b>,</b>&rang;&lt;Value1&gt;<b>,</b>&lt;Value2&gt;<b>,</b>&lt;...&gt;<b> </b>&lt;Reading2&gt;<b>:</b>&lang;&lt;Modifier2&gt;<b>,</b>&rang;&lt;Value1&gt;<b>,</b>&lt;Value2&gt;<b>,</b>&lt;...&gt; ...</code></dt>
+                <dd>fügt einem Reading einen optionalen Widgetmodifier und eine Werteliste (, getrennt) hinzu. <a href="#setList">setList</a>, <a href="#widgetOverride">widgetOverride</a>, und <a href="#webCmd">webCmd</a></dd>
 <br>
   <dt><a href="#DOIF_uiTable">User Interface f&uuml;r DOIF</a> <code><b>attr</b> &lt;name&gt; <b>uiTable</b> &lang;<b>{</b>&lt;perl code (format specification, template specification, function definition, control variable, ...)&gt;<b>}\n</b>&rang;&lt;template file import, method definition, table definition&gt;</code></dt>
     <dd><u>format specification:</u></dd>
@@ -5590,7 +5638,7 @@ Für unterschiedliche blockierende Funktionen ist jeweils ein eigener Name (&lt;
   <ul>
   <a href="#DOIF_addStateEvent">addStateEvent</a> &nbsp;
   <a href="#DOIF_checkReadingEvent">checkReadingEvent</a> &nbsp;
-  <a href="#DOIF_Readings">DOIF_Readings</a> &nbsp;
+  <a href="#DOIF_DOIF_Readings">DOIF_Readings</a> &nbsp;
   <a href="#DOIF_disable">disable</a> &nbsp;
   <a href="#DOIF_initialize">initialize</a> &nbsp;
   <a href="#DOIF_notexist">notexist</a> &nbsp;
