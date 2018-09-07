@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 19 / 2018-08-14
+# Release 20 / 2018-09-09
 
 package main;
 
@@ -3407,13 +3407,13 @@ netatmo_parseReadings($$;$)
               $reading = sprintf( "%.1f", $reading);
             }
 
-            if($reading ne "undefined" && $rname eq "rain" && $reading > 0)
-            {
-              my $rain_sum = ReadingsVal($name,"rain_sum",0);
-              $rain_sum += $reading;
-              readingsSingleUpdate($hash,"rain_sum",$rain_sum,1);
-              Log3 $name, 2, $name.": summed rain ".$reading." (to ".$rain_sum.")";
-            }
+            # if($reading ne "undefined" && $rname eq "rain" && $reading > 0)
+            # {
+            #   my $rain_sum = ReadingsVal($name,"rain_sum",0);
+            #   $rain_sum += $reading;
+            #   readingsSingleUpdate($hash,"rain_sum",$rain_sum,1);
+            #   Log3 $name, 2, $name.": summed rain ".$reading." (to ".$rain_sum.")";
+            # }
 
 
             push(@{$readings}, [$time, $rname, $reading]) if($reading ne "undefined");
@@ -3600,14 +3600,14 @@ netatmo_parseGlobal($$)
         }
         if(defined($devicedata->{dashboard_data}{sum_rain_24}))
         {
-          my $rain_day = ReadingsVal($device->{NAME},"rain_day",0);
-          if($devicedata->{dashboard_data}{sum_rain_24} < $rain_day)
-          {
-            my $rain_total = ReadingsVal($device->{NAME},"rain_total",0);
-            $rain_total += $rain_day;
-            readingsSingleUpdate($device,"rain_total",$rain_total,1);
-            Log3 $name, 1, $device->{NAME}.": added rain ".$rain_day." (to ".$rain_total.")";
-          }
+          #my $rain_day = ReadingsVal($device->{NAME},"rain_day",0);
+          # if($devicedata->{dashboard_data}{sum_rain_24} < $rain_day)
+          # {
+          #   my $rain_total = ReadingsVal($device->{NAME},"rain_total",0);
+          #   $rain_total += $rain_day;
+          #   readingsSingleUpdate($device,"rain_total",$rain_total,1);
+          #   Log3 $name, 1, $device->{NAME}.": added rain ".$rain_day." (to ".$rain_total.")";
+          # }
           readingsBeginUpdate($device);
           $device->{".updateTimestamp"} = FmtDateTime($devicedata->{dashboard_data}{time_utc});
           readingsBulkUpdate( $device, "rain_day", $devicedata->{dashboard_data}{sum_rain_24}, 1 );
